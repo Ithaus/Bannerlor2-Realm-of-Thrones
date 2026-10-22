@@ -74,9 +74,11 @@ ROTwanderer68	D	Bedir Khan			made up by ROT, stays for hire (Jeff: D - ok)
 #   ev:<ROT event> started (IsActive or done), done:<ROT event> finished (ROT.Events.*: NedEvent, RenlyDeathEvent, BlackwaterSiegeEvent, BlackwaterEvent,
 #   RedWeddingEvent, JoffreyEvent = Purple Wedding, RamsayEvent, JonEvent, WallEvent, HarrenhalSiegeNotificationEvent, RickardKarstarkExecutionEvent,
 #   AegonInvasionEvent, DanyInvasionEvent ...), dead:<hero id>, war:<kingdom>:<kingdom> (at war), own:<settlement>:<kingdom> (held by that realm),
-#   rotday:N (days since the story of ROT began - the execution of Ned Stark), prolday:N (days of the prologue; only in a campaign started with it).
+#   rotday:N (days since the story of ROT began - the execution of Ned Stark), prolday:N (days of the prologue; only in a campaign started with it),
+#   kr:NNN.w (Chronicle window resolved), kr:NNN.w=x (option x chosen), kr:NNN.w~R (m107: resolved by one of the rows R - 0 = main row, a-z = variant);
+#   kr: is false for ever when the Chronicle is off, and a kr: window resolved before the row first appeared in the save does not move it (no side change after the fact).
 # action: clan:<clan> lord of that house (may lead a party) | court:<clan> courtier of that house (no party) | lead (may lead a party from now on) |
-#   prisoner:<clan or settlement> captive of that house (its head's party, else its seat) or in that keep | free:<clan> set free and back to that house |
+#   prisoner:<clan or settlement> captive of that house (held in its seat, else in its head's party) or in that keep | free:<clan> set free and back to that house |
 #   wander:<culture> leaves his house and wanders a town of that culture (for hire) | remove (gone from the world, no message) |
 #   hide[:<end term>] (m105 Chronicle K0: leaves his party and is disabled - alive, back with unhide or when the end term comes true) | unhide[:<settlement>] |
 #   die (dies, no message) | marry:<hero id> | wed:<hero id> (marries and joins the spouse's house).
@@ -86,6 +88,10 @@ ROTwanderer68	D	Bedir Khan			made up by ROT, stays for hire (Jeff: D - ok)
 m01	ROTwanderer1	Jaime Lannister	war:battania:vlandia+5	prisoner:clan_battania_1	classic		Whispering Wood - taken by Robb Stark's host (before Ned's execution in the book; in ROT the war of the North starts with NedEvent); classic start only - in Prologue 298 row p10 holds him at Riverrun
 p10	ROTwanderer1	Jaime Lannister	war:battania:vlandia+5	prisoner:town_V2	prolog		Whispering Wood - taken by Robb Stark's host and held at Riverrun until Catelyn frees him (m02); Jeff 21.10: Riverrun. MCM Prologue Jaime At Riverrun: no escape or ransom until then (m104-e5)
 m02	ROTwanderer1	Jaime Lannister	done:BlackwaterEvent|kr:032.1=b|kr:032.1=c	free:clan_vlandia_1		Jaime Lannister has been set free and rides home to his house.	Catelyn frees him (end of A Clash of Kings)
+m35	ROTwanderer1	Jaime Lannister	kr:037.1	prisoner:ROT_town32		Jaime Lannister has been taken by the Brave Companions.	Chronicle 037.1 (A Storm of Swords): Vargo Hoat takes his sword hand; held at Harrenhal (no prologue guard - only p01/p10 are guarded)
+m36	ROTwanderer1	Jaime Lannister	kr:037.2|kr:037.1+45	free:clan_vlandia_1		Jaime Lannister has left Harrenhal and rides for King's Landing.	Chronicle 037.2: Roose Bolton lets him go and he goes back to his house; 45 days after 037.1 if 037.2 never comes
+m37	ROTwanderer1	Jaime Lannister	kr:107.1	court:clan_battania_1		Jaime Lannister has left his sister and ridden north to fight the dead.	Chronicle 107.1 (show, season 7): after Cersei's lie he rides north; courtier of the house of Winterfell, no party (111.1 knights Brienne there)
+m38	ROTwanderer1	Jaime Lannister	kr:113.1|kr:115.1	court:clan_nord_1		Jaime Lannister has ridden south to his sister.	Chronicle 113.1 (show, season 8), at the latest the fall of King's Landing (115.1, the day before 115.2); review B3: courtier of the crown's house (Kingsguard, seat the Red Keep by King's Landing), no party - 115.2b/c/e need him there (near:ROTwanderer1:town_EW4:60); Casterly Rock is far from her
 p01	ROTwanderer8	Tyrion Lannister	prolday:110	prisoner:town_EN1	prolog		Catelyn seizes him at the crossroads inn and takes him to the Eyrie; MCM Prologue Tyrion Held: no escape or ransom until the trial (p02, m104-e5)
 p02	ROTwanderer8	Tyrion Lannister	prolday:132	free:clan_vlandia_1	prolog		trial by combat at the Eyrie, Bronn is his champion
 m03	ROTwanderer8	Tyrion Lannister	ev:JoffreyEvent+40	clan:clan_khuzait_2		Tyrion Lannister has fled across the narrow sea.	accused of Joffrey's death, kills Tywin and flees; in Essos with the Second Sons (A Dance with Dragons)
@@ -95,6 +101,7 @@ p04	ROTwanderer4	Bronn of the Blackwater	prolday:132	court:clan_vlandia_1	prolog
 m05	ROTwanderer4	Bronn of the Blackwater	done:BlackwaterEvent	lead			knighted after the Blackwater - may lead men
 m06	ROTwanderer4	Bronn of the Blackwater	ev:JoffreyEvent+30	clan:clan_nord_1			will not fight for Tyrion; weds Lollys Stokeworth - no House Stokeworth in ROT, so he stays with the crown
 m07	ROTwanderer6	Podrick Payne	ev:JoffreyEvent+40	wander:river			after Tyrion's flight rides with Brienne in search of Sansa
+m34	ROTwanderer6	Podrick Payne	kr:083.1~0b	court:clan_battania_1			Chronicle 083.1 (show, season 6): with Brienne, sworn to Sansa Stark (main row or b; not 083.1a - Brienne dead or taken by the Grey Lady)
 p05	ROTwanderer19	Shagga son of Dolf	prolday:0	clan:stone_crows	prolog		Stone Crows in the Mountains of the Moon
 p06	ROTwanderer19	Shagga son of Dolf	prolday:132	court:clan_vlandia_1	prolog		follows Tyrion after the trial
 m08	ROTwanderer19	Shagga son of Dolf	ev:JoffreyEvent+40	clan:stone_crows			after Tyrion's fall goes back to the hills (an outlaw in the kingswood in the book)
@@ -106,9 +113,17 @@ m13	ROTwanderer27	Lord Petyr Baelish	ev:JoffreyEvent+5	court:clan_vlandia_3		Pet
 m14	ROTwanderer27	Lord Petyr Baelish	ev:JoffreyEvent+15	marry:lord_4_6			weds Lysa Arryn
 m15	ROTwanderer25	Jacelyn Bywater	done:BlackwaterSiegeEvent|done:BlackwaterEvent	die			killed at the Blackwater
 m16	ROTwanderer9	Brienne of Tarth	dead:lord_1_9	court:clan_battania_1			after Renly's death swears herself to Catelyn Stark
-m17	ROTwanderer9	Brienne of Tarth	done:RedWeddingEvent|dead:lord_5_1	wander:river			after the Red Wedding searches for Sansa
+m31	ROTwanderer9	Brienne of Tarth	kr:037.1	prisoner:ROT_town32		Brienne of Tarth has been taken by the Brave Companions.	Chronicle 037.1 (A Storm of Swords): taken with Jaime by Vargo Hoat, held at Harrenhal
+m39	ROTwanderer9	Brienne of Tarth	ev:JoffreyEvent+5	free:clan_battania_1			m107 (review B2/T2): still held at Harrenhal (m31) 5 days after the Purple Wedding - set free and back to the Starks she swore to (m16), so m17 is never held back by her captivity; not a captive - nothing changes (already free, already of that house); dropped when m32 comes first (037.2 in time)
+m32	ROTwanderer9	Brienne of Tarth	kr:037.2|kr:037.1+45	free:clan_vlandia_1			Chronicle 037.2: Jaime pulls her out of the bear pit and she rides with him to King's Landing (Lannister court until Oathkeeper, 904.1); 45 days after 037.1 if 037.2 never comes (review B2/T2: no ev:JoffreyEvent+5 any more - without 037.1 she no longer lands at the Lannister court; m39 frees a captive Brienne instead)
+m17	ROTwanderer9	Brienne of Tarth	ev:JoffreyEvent+10|rotday:1150	wander:river			m107: Sansa goes missing at the Purple Wedding; Brienne leaves King's Landing with Oathkeeper (904.1) to search for her (was done:RedWeddingEvent|dead:lord_5_1)
+m33	ROTwanderer9	Brienne of Tarth	kr:083.1~0b	court:clan_battania_1		Brienne of Tarth has sworn her sword to Sansa Stark.	Chronicle 083.1 (show, season 6): main row or b (Brienne saves Sansa), not 083.1a (Brienne dead or taken by the Grey Lady, 047.2); house of Winterfell (FORMAT 16.8)
 m18	ROTwanderer20	Theon Greyjoy	war:sturgia:battania|kr:902.1+1	clan:clan_sturgia_1		Theon Greyjoy has gone home to the Iron Islands.	Balon's ironborn fall on the North
 m19	ROTwanderer20	Theon Greyjoy	done:BlackwaterEvent+10	prisoner:clan_empire_south_3			Winterfell falls in the days of the Blackwater; Ramsay takes him to the Dreadfort
+m28	ROTwanderer20	Theon Greyjoy	kr:072.3	free:clan_sturgia_1		Theon Greyjoy has escaped from the Boltons.	Chronicle 072.3 (A Dance with Dragons): leaps from the walls of Winterfell with the grey bride and gets away; free again, still of House Greyjoy
+m40	ROTwanderer20	Theon Greyjoy	kr:072.3~0+2	prisoner:clan_empire_west_3		Theon Greyjoy has been taken by the men of King Stannis.	Chronicle 072.3 main row (A Dance with Dragons, review B1): two days after the leap (m28) the scouts of King Stannis find him in the snow - captive of House Baratheon of Dragonstone (held in its seat, Dragonstone, else in Stannis's party); not in 072.3a (Stannis dead - free and still a Greyjoy, so 087.1a can take him to Yara); out by the game's own escape, ransom or peace - while he is a captive 087.1 sails with Yara alone
+m29	ROTwanderer20	Theon Greyjoy	kr:087.1~a	clan:clan_empire_south_1		Theon Greyjoy has fled the Iron Islands with his sister to serve Daenerys Targaryen.	Chronicle 087.1a (show, season 6): only the variant in which Theon sails with Yara
+m30	ROTwanderer20	Theon Greyjoy	kr:108.1	clan:clan_battania_1		Theon Greyjoy has ridden north to fight for the Starks.	Chronicle 108.1 (show, seasons 7-8): after freeing Yara he goes to Winterfell (112.3 needs him there)
 p07	ROTwanderer18	Osha	prolday:0	court:clan_sturgia_2	prolog		free folk beyond the Wall
 p08	ROTwanderer18	Osha	prolday:62	court:clan_battania_1	prolog		taken in the wolfswood, serves at Winterfell
 m20	ROTwanderer18	Osha	done:BlackwaterEvent+10	hide			flees with Rickon when Winterfell falls

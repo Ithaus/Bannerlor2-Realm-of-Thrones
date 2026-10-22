@@ -153,6 +153,21 @@ namespace Armoury
                 return r != null ? r.Version : "";
             }
 
+            /// <summary>m107-kronika: kontekst z wiersza wersja=smierc (smierc z kanonu w wersji lekkiej) - dopisek "| smierc kanonu" w liniach akcji (progi KW-17).</summary>
+            internal static bool IsDeathRow(Ctx c) { return RowVersion(c) == "smierc"; }
+
+            private const string DeathMark = " | smierc kanonu";
+
+            /// <summary>m107: smierc z wiersza smierc (succeed/die) nie weszla - linia "KANON: smierc z NNN.wX nie weszla" (KW-17 a).</summary>
+            private static void DeathNotIn(Ctx c, string act, string why)
+            {
+                string kind = act;
+                int col = act.IndexOf(':');
+                if (col >= 0) kind = act.Substring(0, col);
+                if (kind != "succeed" && kind != "die") return;
+                Log.Info(Tag + "KANON: smierc z " + c.RowKey + (c.Opt != '\0' ? "=" + c.Opt : "") + " nie weszla - " + act + " (" + (why ?? "?") + ").");
+            }
+
             /// <summary>Skutki (okna albo opcji) po kolei; kazda akcja z linia wyniku. CZEKA - do listy czekajacych (zapis).</summary>
             internal static void Run(Ctx c, string[] effects)
             {
@@ -166,7 +181,7 @@ namespace Armoury
                     {
                         _dWait++;
                         _wait.Add(new Waiting { C = c, Idx = i + 1, Since = day, Act = effects[i], Why = why ?? "" });
-                        Log.Info(Tag + "akcja " + c.Label + " #" + (i + 1) + " " + effects[i] + " -> CZEKA (" + why + ", od dnia " + day + ").");
+                        Log.Info(Tag + "akcja " + c.Label + " #" + (i + 1) + " " + effects[i] + " -> CZEKA (" + why + (IsDeathRow(c) ? DeathMark : "") + ", od dnia " + day + ").");
                     }
                 }
             }
@@ -193,8 +208,18 @@ namespace Armoury
                         if (r != Res.Done) { why = detail; detail = null; }
                     }
                 }
-                if (r == Res.Done) { _dOk++; _sOk++; Log.Info(Tag + "akcja " + c.Label + " #" + idx + " " + act + " -> OK" + (detail != null ? " (" + detail + ")" : "") + "."); }
-                else if (r == Res.Skip) { _dSkip++; _sSkip++; Log.Info(Tag + "akcja " + c.Label + " #" + idx + " " + act + " -> POMINIETA (" + (why ?? "?") + ")."); }
+                bool death = IsDeathRow(c);   // m107: akcja z wiersza smierc - dopisek w linii (KW-17)
+                if (r == Res.Done)
+                {
+                    _dOk++; _sOk++;
+                    Log.Info(Tag + "akcja " + c.Label + " #" + idx + " " + act + " -> OK" + (detail != null ? " (" + detail + (death ? DeathMark : "") + ")" : death ? " (smierc kanonu)" : "") + ".");
+                }
+                else if (r == Res.Skip)
+                {
+                    _dSkip++; _sSkip++;
+                    Log.Info(Tag + "akcja " + c.Label + " #" + idx + " " + act + " -> POMINIETA (" + (why ?? "?") + (death ? DeathMark : "") + ").");
+                    if (death) DeathNotIn(c, act, why);
+                }
                 return r;
             }
 
@@ -208,7 +233,10 @@ namespace Armoury
                     if (day - w.Since > WaitActionDays)
                     {
                         _dSkip++; _sSkip++;
-                        Log.Info(Tag + "akcja " + w.C.Label + " #" + w.Idx + " " + w.Act + " -> POMINIETA (czekala ponad " + WaitActionDays + " dni od dnia " + w.Since + ": " + w.Why + ").");
+                        bool death = IsDeathRow(w.C);
+                        string late = "czekala ponad " + WaitActionDays + " dni od dnia " + w.Since + ": " + w.Why;
+                        Log.Info(Tag + "akcja " + w.C.Label + " #" + w.Idx + " " + w.Act + " -> POMINIETA (" + late + (death ? DeathMark : "") + ").");
+                        if (death) DeathNotIn(w.C, w.Act, late);
                         _wait.RemoveAt(i); i--;
                         continue;
                     }

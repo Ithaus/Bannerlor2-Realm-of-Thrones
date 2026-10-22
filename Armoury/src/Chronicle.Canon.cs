@@ -22,6 +22,10 @@ namespace Armoury
             // succeed:umierajacy:dziedzic - tylko pelna (wiersz pelna i klucz Chronicle Full Versions TAK), wyjatki lekkie: wydarzenia 42, 49, 52, 80. Wzor Prologue.End:
             // dziedzic (zywy, z rodu umierajacego) zostaje glowa rodu PRZED smiercia (ChangeClanLeaderAction.ApplyWithSelectedNewLeader - wladca krolestwa rodu
             // panujacego idzie za glowa rodu, bez losowania dziedzica i glosowania o tron), potem smierc bez komunikatu jak die (KillCharacterAction.ApplyByMurder).
+            // m107-kronika: wiersz wersja=smierc (smierc z kanonu w wersji lekkiej, klucz ChronicleCanonDeaths) - succeed wolno (gdy Canon Deaths albo Full Versions TAK),
+            // die glowy rodu/wladcy - POMINIETA (tylko succeed), own/ruler/leader/alliance/truce - POMINIETE; kazda linia akcji z dopiskiem "| smierc kanonu".
+            // Poprawki m107 po recenzji: succeed:<umierajacy>:@dziedzic - dziedzica wybiera gra (PickHeir, A1); wiersz smierc z celem smierci po stronie gracza albo
+            // bez dziedzica nie bierze udzialu w wyborze wiersza (DeathBlock w Chronicle.PickRow, T3).
             // own/ruler/leader/alliance/truce - tylko pelna. alliance - zawsze POMINIETA z powodem (Kronika nie wola StartAlliance: straznik Prologue.Crown pilnuje
             // sojuszu korona-Reach i paktow Dorne, a sojusz spoza listy CanonAlliances CrashScribe zerwalby sie przy wczytaniu - plan P5, decyzja K9/K10).
             // truce - pokoj (MakePeaceAction), gdy ROT nie wymusza wojny tej pary (Prologue.RotWarForced) i gracz nie rzadzi zadna strona.
@@ -82,10 +86,13 @@ namespace Armoury
                 string guardOk = "";
                 if (act == "die" && h.IsAlive)
                 {
-                    if ((h.IsClanLeader || h.IsKingdomLeader) && RowVersion(c) != "pelna")
+                    string rv = RowVersion(c);
+                    if ((h.IsClanLeader || h.IsKingdomLeader) && rv != "pelna")
                     {
-                        detail = HeroName(h) + " jest teraz " + (h.IsKingdomLeader ? "wladca" : "glowa rodu " + (h.Clan != null ? h.Clan.StringId : "?")) + " - smierc glowy rodu tylko pelna (FORMAT 11; wiersz "
-                                 + (RowVersion(c).Length > 0 ? RowVersion(c) : "bez wiersza") + ")";
+                        // m107: wiersz smierc - glowa rodu/wladca ginie tylko przez succeed z dziedzicem (prog KW-17 d: 0 takich linii)
+                        detail = HeroName(h) + " jest teraz " + (h.IsKingdomLeader ? "wladca" : "glowa rodu " + (h.Clan != null ? h.Clan.StringId : "?"))
+                                 + (rv == "smierc" ? " - wiersz smierc: glowa rodu ginie tylko przez succeed z dziedzicem (FORMAT 11)"
+                                    : " - smierc glowy rodu tylko pelna (FORMAT 11; wiersz " + (rv.Length > 0 ? rv : "bez wiersza") + ")");
                         return Res.Skip;
                     }
                     string need;
@@ -99,12 +106,97 @@ namespace Armoury
                 return r;
             }
 
-            /// <summary>null - akcja tylko-pelna wolna (wiersz pelna i klucz TAK); inaczej powod POMINIETA.</summary>
+            /// <summary>null - akcja tylko-pelna wolna (wiersz pelna i klucz TAK); inaczej powod POMINIETA. m107: wiersz smierc - own/ruler/leader/alliance/truce
+            /// zawsze POMINIETE (smierc kanonu nie zmienia zamkow, wladcow ani sojuszy; succeed ma wlasna droge - DeathWhy).</summary>
             private static string FullOnlyWhy(Ctx c, string act)
             {
                 string ver = RowVersion(c);
+                if (ver == "smierc") return act + " - tylko pelna (FORMAT 11): wiersz smierc (smierc kanonu) - z akcji tylko-pelnych tylko succeed";
                 if (ver != "pelna") return act + " - tylko pelna (FORMAT 11): wiersz " + (ver.Length > 0 ? "wersja " + ver : "bez wiersza okna");
                 if (!KeyFull) return act + " - tylko pelna: klucz Chronicle Full Versions NIE";
+                return null;
+            }
+
+            /// <summary>m107: succeed z wiersza smierc - null = wolno (klucz World Changes juz sprawdzony przy klasie S), inaczej powod (klucze zmienione od wyboru wiersza,
+            /// np. akcja CZEKA z poprzedniej doby).</summary>
+            private static string DeathWhy()
+            {
+                if (!KeyFull && !KeyCanon) return "succeed - smierc kanonu: klucze Chronicle Canon Deaths NIE i Full Versions NIE";
+                return null;
+            }
+
+            /// <summary>m107 (recenzja kanon A1): token dziedzica w succeed:&lt;umierajacy&gt;:@dziedzic - dziedzica wybiera gra (FORMAT 11).</summary>
+            internal const string HeirToken = "@dziedzic";
+
+            /// <summary>m107 (A1): dziedzic rodu umierajacego dla @dziedzic - kandydaci gry (Clan.GetHeirApparents: punkty dziedziczenia, potem wiek; gra pomija
+            /// wylaczonych), bez postaci z wierszami #move (zmiany stron tylko CanonCompanions), po stronie gracza, ukrytych przez Armoury i dzieci. null + why - brak.</summary>
+            internal static Hero PickHeir(Hero d, out string why)
+            {
+                why = null;
+                var clan = d != null ? d.Clan : null;
+                if (clan == null || clan.IsEliminated) { why = "@dziedzic: " + HeroName(d) + " bez rodu"; return null; }
+                Hero best = null;
+                int bp = int.MinValue, seen = 0;
+                float ba = -1f;
+                Dictionary<Hero, int> ap = null;
+                try { ap = clan.GetHeirApparents(); } catch (Exception e) { Stumble("Actions.PickHeir", e); }
+                if (ap != null)
+                    foreach (var kv in ap)
+                    {
+                        var h = kv.Key;
+                        if (h == null || h == d || !h.IsAlive || h.Clan != clan || h.IsChild || h.IsDisabled) continue;
+                        seen++;
+                        if (CanonCompanions.IsHidden(h) || CanonCompanions.HasMoveRows(h) || CanonCompanions.PlayerSideOf(h) != null) continue;
+                        if (best == null || kv.Value > bp || (kv.Value == bp && h.Age > ba)) { best = h; bp = kv.Value; ba = h.Age; }
+                    }
+                if (best == null) why = "@dziedzic: rod " + clan.StringId + " bez dziedzica (kandydatow gry " + seen + "; bez postaci z #move, gracza i ukrytych)";
+                return best;
+            }
+
+            /// <summary>m107 (recenzja technika T3): wiersz smierc nie bierze udzialu (Chronicle.PickRow), gdy jego smierc nie weszlaby przez gracza: cel succeed
+            /// (umierajacy albo dziedzic), die albo hide w skutkach wiersza lub jego opcji po stronie gracza (gracz, jego rod, towarzysz, druzyna, jeniec gracza -
+            /// Succeed i CanonCompanions.ApplyAction to pomijaja) albo succeed z @dziedzic bez dziedzica. null - bierze udzial; inaczej powod do linii "smierc kanonu
+            /// ... nie:" (tekst okna nie twierdzi smierci, ktora by nie weszla; hide Jaimego nie idzie bez smierci Cersei).</summary>
+            internal static string DeathBlock(Data.RowDef r, Terms.Tokens tok)
+            {
+                if (r == null || !r.IsDeath) return null;
+                string why = DeathBlockIn(r.Effects, tok);
+                if (why != null) return why;
+                foreach (var o in r.Options)
+                {
+                    why = DeathBlockIn(o.Effects, tok);
+                    if (why != null) return why;
+                }
+                return null;
+            }
+
+            private static string DeathBlockIn(string[] effects, Terms.Tokens tok)
+            {
+                if (effects == null) return null;
+                foreach (var act in effects)
+                {
+                    int col = act != null ? act.IndexOf(':') : -1;
+                    if (col < 0) continue;
+                    string kind = act.Substring(0, col);
+                    if (kind != "succeed" && kind != "die" && kind != "hide") continue;
+                    var a = Terms.SplitArgs(act.Substring(col + 1));
+                    if (a.Count == 0) continue;
+                    var h = Terms.FindHero(a[0], tok);
+                    if (h == null || h.IsDead) continue;   // brak albo martwy - powod da sama akcja (POMINIETA)
+                    string ps = CanonCompanions.PlayerSideOf(h);
+                    if (ps != null) return act + ": " + HeroName(h) + " - " + ps;
+                    if (kind != "succeed" || a.Count < 2) continue;
+                    if (a[1] == HeirToken)
+                    {
+                        string hw;
+                        if (PickHeir(h, out hw) == null) return act + ": " + hw;
+                        continue;
+                    }
+                    var heir = Terms.FindHero(a[1], tok);
+                    if (heir == null || heir.IsDead) continue;
+                    ps = CanonCompanions.PlayerSideOf(heir);
+                    if (ps != null) return act + ": dziedzic " + HeroName(heir) + " - " + ps;
+                }
                 return null;
             }
 
@@ -120,9 +212,14 @@ namespace Armoury
                 detail = null;
                 if (a.Count != 2 || a[0].Length == 0 || a[1].Length == 0) { detail = "succeed:<umierajacy>:<dziedzic> - zle argumenty"; return Res.Skip; }
                 int ev = EventNo(c.Id);
-                if (!SucceedLightOk.Contains(ev)) { string fw = FullOnlyWhy(c, "succeed"); if (fw != null) { detail = fw + " (wyjatki lekkie: 42, 49, 52, 80)"; return Res.Skip; } }
+                if (!SucceedLightOk.Contains(ev))
+                {
+                    if (IsDeathRow(c)) { string dw = DeathWhy(); if (dw != null) { detail = dw; return Res.Skip; } }   // m107: wiersz smierc (smierc kanonu w wersji lekkiej)
+                    else { string fw = FullOnlyWhy(c, "succeed"); if (fw != null) { detail = fw + " (wyjatki lekkie: 42, 49, 52, 80; wiersze smierc)"; return Res.Skip; } }
+                }
                 var d = LiveHero(a[0], c, out detail); if (d == null) return Res.Skip;
-                var heir = LiveHero(a[1], c, out detail); if (heir == null) return Res.Skip;
+                bool picked = a[1] == HeirToken;   // m107 (A1): dziedzica wybiera gra
+                var heir = picked ? PickHeir(d, out detail) : LiveHero(a[1], c, out detail); if (heir == null) return Res.Skip;
                 if (d == heir) { detail = "umierajacy = dziedzic"; return Res.Skip; }
                 if (CanonCompanions.HasMoveRows(d)) { detail = HeroName(d) + " ma wiersze #move - smierc tylko przez CanonCompanions (FORMAT 8)"; return Res.Skip; }
                 if (CanonCompanions.HasMoveRows(heir)) { detail = HeroName(heir) + " ma wiersze #move - zmiana tylko przez CanonCompanions (FORMAT 8)"; return Res.Skip; }
@@ -152,7 +249,7 @@ namespace Armoury
                 else how = "umierajacy nie jest glowa rodu (glowa " + lead0 + ") - bez zmiany glowy";
                 KillCharacterAction.ApplyByMurder(d, null, false);   // jak die: smierc bez komunikatu (w bitwie - znak smierci)
                 string ruler1 = k != null && k.Leader != null ? HeroName(k.Leader) : "-";
-                detail = how + " | " + HeroName(d) + (d.IsDead ? " nie zyje" : " znak smierci - umrze po bitwie") + (k != null ? " | wladca " + k.StringId + ": " + ruler0 + " -> " + ruler1 : "")
+                detail = how + (picked ? " (" + HeirToken + " - wybor gry)" : "") + " | " + HeroName(d) + (d.IsDead ? " nie zyje" : " znak smierci - umrze po bitwie") + (k != null ? " | wladca " + k.StringId + ": " + ruler0 + " -> " + ruler1 : "")
                          + (SucceedLightOk.Contains(ev) ? " (wyjatek lekki " + ev + ")" : "") + (gs == 1 ? " | lista chronionych: " + need + " spelnione" : "");
                 return Res.Done;
             }

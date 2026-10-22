@@ -57,6 +57,7 @@ namespace Armoury
     {
         private const string Tag = "Postacie kanonu (m101)";
         internal const string FileName = "arm_canon_moves.tsv";
+        internal const string TestFileName = "arm_canon_moves_test.tsv";   // m107-kronika: tylko z flaga testu Kroniki (autotest AT1/AT2)
         internal const string WandererPrefix = "ROTwanderer";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -110,6 +111,10 @@ namespace Armoury
         private static readonly HashSet<string> _gone = new HashSet<string>(StringComparer.Ordinal);       // rody zniszczone w tej kampanii (OnClanDestroyed; ROT wyjmuje
                                                                                                              // rod Renly'ego i Stannisa z Clan.All - kontrola odwolan)
         private static readonly Dictionary<string, string> _lostBy = new Dictionary<string, string>(StringComparer.Ordinal);  // klucz postaci -> kto usunal (Lost)
+        // m107-kronika: wiersz #move -> dzien kampanii, od ktorego jest w tej kampanii (nowa kampania - start; wiersz dopisany do starego zapisu - dzien wczytania).
+        // Term kr: okna rozstrzygnietego PRZED tym dniem nie rusza wiersza wstecz (Fires) - jak "zapis sprzed paczki" okien Kroniki (bez lawiny zmian stron).
+        private static readonly Dictionary<string, int> _seen = new Dictionary<string, int>(StringComparer.Ordinal);
+        private static int _seenNew = -1;   // sesja: wierszy dopisanych do zapisu przy starcie sesji (-1 - jeszcze nie liczone)
 
         /// <summary>m105-kronika A4: wpis rejestru ukrytych (akcja hide z #move albo z Kroniki) - klucz postaci (wzor oryginalu albo id bohatera), zrodlo
         /// ("#m11", "Kronika 008.1"), koniec ukrycia (term Kroniki; pusty = do unhide albo na zawsze), dzien kampanii ukrycia.</summary>
@@ -199,7 +204,9 @@ namespace Armoury
                         string v;
                         if (_done.TryGetValue(l[j].Id, out v) && v.EndsWith("|ok", StringComparison.Ordinal)) last = j;
                     }
-                    if (last < 0 || l[last].Action != "prisoner") continue;
+                    // recenzja m107 T5/C1: tylko wiersze niewoli trybu prolog (p01 Tyrion, p10 Jaime - jedyne ze straza HoldKey); niewola z kampanii (m19 -> m28,
+                    // m31 -> m32, m35 -> m36) nie jest trzymana - inaczej HeldCount > 0 wlaczal co 10 dni linie doby E5 i WorldStep (Prologue.World) bez strazy
+                    if (last < 0 || l[last].Action != "prisoner" || l[last].Mode != "prolog") continue;
                     bool freeLater = false;
                     for (int j = last + 1; j < l.Count; j++) if (l[j].Action == "free" && !_done.ContainsKey(l[j].Id)) { freeLater = true; break; }
                     if (!freeLater) continue;
@@ -223,6 +230,7 @@ namespace Armoury
             _spawnBlocked = _spawnBlockedDay = _removedAfter = 0;
             _spawnSaid.Clear();
             _done.Clear(); _first.Clear(); _pend.Clear(); _gone.Clear(); _lostBy.Clear();
+            _seen.Clear(); _seenNew = -1;     // m107-kronika: wiersze #move w zapisie (bez wstecznych zmian stron)
             _hid.Clear(); _firedBy.Clear();   // m105-kronika A4: ukryci (zapis) i term, ktory zaszedl (linia logu)
             _removingKey = _removingWhy = null;
             _held.Clear(); _heldDay.Clear(); _heldArg.Clear(); _freeing = null;   // m104-e5: jency kanonu trzymani do wiersza "free"
@@ -253,6 +261,19 @@ namespace Armoury
                 if (path == null || !System.IO.File.Exists(path)) { _note = "brak pliku " + FileName; return; }
                 Parse(System.IO.File.ReadAllText(path, Encoding.UTF8));
                 _note = "";
+                // m107-kronika: autotest Kroniki (plik flagi CrashScribe/armoury-kronika-test.flag w trybie 1/2, jak paczka k00) - dodatkowe wiersze #move z pliku
+                // testowego (t01/t02 - term kr:000.8~R); bez flagi plik nie jest czytany
+                if (Chronicle.TestWanted())
+                {
+                    string tp = MapVillageTooltip.ModulePath("ModuleData", TestFileName);
+                    if (tp != null && System.IO.File.Exists(tp))
+                    {
+                        int before = _moves.Count, bad0 = _badRows;
+                        ParseTest(System.IO.File.ReadAllText(tp, Encoding.UTF8));
+                        Log.Info(Tag + ": test Kroniki (flaga armoury-kronika-test.flag) - " + TestFileName + ": wierszy #move +" + (_moves.Count - before)
+                                 + ", zlych " + (_badRows - bad0) + ".");   // _note bez zmian (prog MP-0: 'plik wczytany')
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -320,6 +341,46 @@ namespace Armoury
                     if (q.Clan.Length == 0 || q.To.Length == 0 || q.Clan == q.To || _rescue.ContainsKey(q.Clan)) { _badRows++; continue; }
                     _rescue[q.Clan] = q;
                 }
+            }
+        }
+
+        /// <summary>m107-kronika: plik testowy (tylko z flaga testu Kroniki) - wylacznie sekcja #move, id nie moga powtarzac id z pliku glownego; zle wiersze do licznika.</summary>
+        private static void ParseTest(string text)
+        {
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var r in _moves) ids.Add(r.Id);
+            string section = null;
+            var col = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (string raw in text.Split('\n'))
+            {
+                string line = raw.TrimEnd('\r');
+                if (line.Length == 0 || line.StartsWith("# ", StringComparison.Ordinal) || line == "#") continue;
+                var cells = line.Split('\t');
+                if (cells[0].StartsWith("#", StringComparison.Ordinal))
+                {
+                    section = cells[0].Substring(1);
+                    col.Clear();
+                    for (int i = 1; i < cells.Length; i++) col[cells[i].Trim()] = i - 1;
+                    continue;
+                }
+                if (section != "move") { _badRows++; continue; }
+                var m = new MoveRow
+                {
+                    Id = Cell(cells, col, "id"), Who = Cell(cells, col, "who"), Name = Cell(cells, col, "name"), Trigger = Cell(cells, col, "trigger"),
+                    Mode = Cell(cells, col, "mode"), Message = Cell(cells, col, "message"), Note = Cell(cells, col, "note")
+                };
+                string act = Cell(cells, col, "action");
+                int c = act.IndexOf(':');
+                m.Action = c < 0 ? act : act.Substring(0, c);
+                m.Arg = c < 0 ? "" : act.Substring(c + 1);
+                var terms = new List<string>();
+                foreach (var t in m.Trigger.Split('|')) { var tt = t.Trim(); if (tt.Length > 0) terms.Add(tt); }
+                m.Terms = terms.ToArray();
+                bool ok = m.Id.Length > 0 && ids.Add(m.Id) && m.Who.Length > 0 && KnownActions.Contains(m.Action) && m.Terms.Length > 0
+                          && (!ArgActions.Contains(m.Action) || m.Arg.Length > 0) && (m.Mode.Length == 0 || m.Mode == "prolog" || m.Mode == "classic");
+                if (!ok) { _badRows++; continue; }
+                _moves.Add(m);
+                if (!m.Who.StartsWith(WandererPrefix, StringComparison.Ordinal)) _whoIds.Add(m.Who);
             }
         }
 
@@ -675,11 +736,27 @@ namespace Armoury
             try
             {
                 EnsureLoaded();   // maly plik - linia startu z licznikami takze w starym zapisie
+                NoteSeen();       // m107-kronika: wiersze #move nowe w zapisie (dzien wczytania) - bez wstecznych zmian stron od okien Kroniki
                 if (_on && !_startDone) StartPass("start sesji", false);
                 RebuildHeld();   // m104-e5: po wczytaniu - jency kanonu trzymani (straz niewoli prologu) od pierwszej godziny
                 StartLine();
             }
             catch (Exception e) { Stumble("SessionStart", e); }
+        }
+
+        /// <summary>m107-kronika: kazdy wiersz #move bez wpisu w zapisie dostaje dzien kampanii tej sesji (nowa kampania - start; stary zapis albo wiersz dopisany
+        /// w nowej wersji danych - dzien wczytania). Raz na sesje (_seenNew - licznik do linii startu).</summary>
+        private static void NoteSeen()
+        {
+            if (_seenNew >= 0) return;
+            int day = Day(), n = 0;
+            foreach (var r in _moves)
+            {
+                if (_seen.ContainsKey(r.Id)) continue;
+                _seen[r.Id] = day;
+                n++;
+            }
+            _seenNew = n;
         }
 
         private static void StartLine()
@@ -749,7 +826,9 @@ namespace Armoury
                      + (_nk ? YN(_on) : "stary zapis - nic") + "), zmiany stron CanonCompanionsFollowStory " + YN(s != null && s.CanonCompanionsFollowStory)
                      + " | plik " + (_note.Length == 0 ? "wczytany" : _note) + " | A " + _nA + ", B " + _nB + ", C " + _nC + ", D " + _nD
                      + " | zmian stron w tabeli " + _moves.Count + " (zlych wierszy " + _badRows + "), wykonanych " + CountDone("ok") + ", pominietych " + CountDone("skip")
-                     + ", w toku " + _pend.Count + " | prolog " + YN(IsProlog()) + ", dzien opowiesci " + StoryDay().ToString("0", Inv)
+                     + ", w toku " + _pend.Count
+                     + " | wiersze #move nowe w zapisie w tej sesji " + Math.Max(0, _seenNew) + " (dzien " + Day() + "; okna Kroniki rozstrzygniete wczesniej nie ruszaja ich wstecz)"   // m107
+                     + " | prolog " + YN(IsProlog()) + ", dzien opowiesci " + StoryDay().ToString("0", Inv)
                      + " | mapa rodow znaleziona " + clansFound + "/" + clansWant + ", odwolania zmian (osady, postacie, krolestwa, wydarzenia ROT) " + refsFound + "/" + refsWant
                      + (missing.Count > 0 ? " BRAK: " + string.Join(", ", missing.ToArray()) : "") + " | przeniesieni " + _conv.Count + ", bez rodu/bohatera " + _startFail.Count
                      + ", dworzan " + _court.Count + ", start " + (_startDone ? "zamkniety" : "otwarty") + " | B zablokowane przy tworzeniu " + _spawnBlocked
@@ -1110,7 +1189,9 @@ namespace Armoury
             if (i > 0 && int.TryParse(term.Substring(i + 1), NumberStyles.Integer, Inv, out plus)) bas = term.Substring(0, i);
             else plus = 0;
             bool kr = bas.StartsWith("kr:", StringComparison.Ordinal);
-            if (kr && !Chronicle.KeyOn) { never = true; return false; }   // A4: Kronika wylaczona - kr: falsz "nigdy" takze z pamiecia +N (FORMAT 3.3)
+            // A4: Kronika wylaczona - kr: falsz "nigdy" takze z pamiecia +N (FORMAT 3.3). m107 (recenzja T1): klucz Chronicle World Changes NIE tak samo - zmiana strony
+            // z okna Kroniki jest zmiana swiata (opis klucza: "deaths, side changes ..."); tylko tu, nie w Terms.KrTrue (okna przy World NIE dalej sie rozstrzygaja)
+            if (kr && (!Chronicle.KeyOn || !Chronicle.KeyWorld)) { never = true; return false; }
             int f;
             if (!_first.TryGetValue(bas, out f))
             {
@@ -1122,12 +1203,31 @@ namespace Armoury
             return day - f >= plus;
         }
 
-        private static bool Fires(MoveRow r, int day, out bool never)
+        private static bool Fires(MoveRow r, int day, out bool never, out string stale)
         {
             bool any = false, allNever = true;
+            stale = null;
+            int seen;
+            bool hasSeen = _seen.TryGetValue(r.Id, out seen) && !_pend.ContainsKey(r.Id);   // wiersz w toku - bez ochrony (juz ruszyl)
             foreach (var t in r.Terms)
             {
                 bool nv;
+                // m107-kronika: term kr: okna rozstrzygnietego przed dniem, od ktorego wiersz jest w zapisie (wiersz dopisany do trwajacej kampanii), ktorego
+                // zaden wiersz jeszcze nie widzial prawdziwym (brak pamieci _first - stary wiersz, ktory juz zaszedl i czeka za wczesniejszym, ma pamiec) - dla
+                // tego wiersza "nigdy" (bez wstecznej zmiany strony; inne termy wiersza dzialaja jak dotad). Recenzja T4: bez termow z wyborem (kr:NNN.w=x) -
+                // wybor zapada w dniu wyboru (dzien okna to dzien rozstrzygniecia), a lista mogla czekac przez wczytanie; =x ma tylko stary wiersz m02
+                if (hasSeen && t.StartsWith("kr:", StringComparison.Ordinal) && t.IndexOf('=') < 0)
+                {
+                    string ka = t.Substring(3);
+                    int pi = ka.LastIndexOf('+');
+                    if (pi > 0) ka = ka.Substring(0, pi);
+                    int rd = _first.ContainsKey("kr:" + ka) ? -1 : Chronicle.WindowDay(ka);
+                    if (rd >= 0 && rd < seen)
+                    {
+                        if (stale == null) stale = "okno " + t + " rozstrzygniete w dniu " + rd + ", przed wierszem w zapisie (od dnia " + seen + ") - bez wstecznej zmiany strony";
+                        continue;
+                    }
+                }
                 if (TermTrue(t, day, out nv)) { if (!any) _firedBy[r.Id] = t; any = true; }   // A4: pierwszy prawdziwy term do linii logu (para kr, KW-13)
                 if (!nv) allNever = false;
             }
@@ -1180,9 +1280,14 @@ namespace Armoury
                 {
                     if (r.Mode == "prolog" && !IsProlog()) { Resolve(r, day, Res.Skip, "tylko kampania z prologiem (klasyczny start)", null, null, false); continue; }
                     if (r.Mode == "classic" && IsProlog()) { Resolve(r, day, Res.Skip, "tylko klasyczny start (kampania z prologiem)", null, null, false); continue; }
+                    // m107-kronika: pozniejszy wiersz tej samej postaci juz WYKONANY - ten wiersz dopisano do danych po tamtym (w biegu kampanii wczesniejsze
+                    // sa zawsze rozstrzygniete przed wykonaniem pozniejszego) - bez wstecznej zmiany strony (np. m31/m32 Brienne przed m17 w starym zapisie)
+                    string later = LaterExecuted(r);
+                    if (later != null) { Resolve(r, day, Res.Skip, "wyprzedzona przez #" + later + " wykonana wczesniej (wiersz dopisany do zapisu po niej - bez wstecznej zmiany strony)", null, null, false); continue; }
                     bool never;
-                    bool f = Fires(r, day, out never);
-                    if (never) { Resolve(r, day, Res.Skip, "wyzwalacz nie moze zajsc w tej kampanii", null, null, false); continue; }
+                    string stale;
+                    bool f = Fires(r, day, out never, out stale);
+                    if (never) { Resolve(r, day, Res.Skip, "wyzwalacz nie moze zajsc w tej kampanii" + (stale != null ? " (" + stale + ")" : ""), null, null, false); continue; }
                     fires[r.Id] = f || _pend.ContainsKey(r.Id);
                 }
                 catch (Exception e) { Stumble("Moves.Fires(" + r.Id + ")", e); }
@@ -1218,6 +1323,21 @@ namespace Armoury
                     catch (Exception e) { Stumble("Moves.Execute(" + r.Id + ")", e); break; }
                 }
             }
+        }
+
+        /// <summary>m107-kronika: id pozniejszego (w kolejnosci pliku) wiersza tej samej postaci, ktory zostal WYKONANY (ok); null - brak. Pominiete ("nigdy", tryb
+        /// prolog/classic, wyprzedzone) sie nie licza - tylko wykonanie mowi, ze opowiesc tej postaci juz poszla dalej.</summary>
+        private static string LaterExecuted(MoveRow r)
+        {
+            bool after = false;
+            foreach (var m in _moves)
+            {
+                if (m == r) { after = true; continue; }
+                if (!after || m.Who != r.Who) continue;
+                string v;
+                if (_done.TryGetValue(m.Id, out v) && v.EndsWith("|ok", StringComparison.Ordinal)) return m.Id;
+            }
+            return null;
         }
 
         private static string Side(Hero h)
@@ -1715,6 +1835,7 @@ namespace Armoury
             foreach (var kv in _pend) sb.Append("pend\t").Append(kv.Key).Append('\t').Append(kv.Value.ToString(Inv)).Append('\n');
             foreach (var t in _gone) sb.Append("gone\t").Append(t).Append('\n');
             foreach (var kv in _lostBy) sb.Append("lost\t").Append(kv.Key).Append('\t').Append(Clean(kv.Value)).Append('\n');
+            foreach (var kv in _seen) sb.Append("seen\t").Append(kv.Key).Append('\t').Append(kv.Value.ToString(Inv)).Append('\n');   // m107 (starsza DLL pomija prefiks)
             foreach (var h in _hid.Values)   // A4: "hid klucz dzien zrodlo koniec" (koniec na koncu - moze miec ':')
                 sb.Append("hid\t").Append(h.Key).Append('\t').Append(h.Day.ToString(Inv)).Append('\t').Append(Clean(h.Src)).Append('\t').Append(Clean(h.End)).Append('\n');
             return sb.ToString();
@@ -1741,6 +1862,7 @@ namespace Armoury
                     case "pend": { int d; if (p.Length >= 3 && int.TryParse(p[2], NumberStyles.Integer, Inv, out d)) _pend[p[1]] = d; break; }
                     case "gone": _gone.Add(p[1]); break;
                     case "lost": if (p.Length >= 3) _lostBy[p[1]] = p[2]; break;
+                    case "seen": { int d; if (p.Length >= 3 && int.TryParse(p[2].TrimEnd('\r'), NumberStyles.AllowLeadingSign, Inv, out d)) _seen[p[1]] = d; break; }   // m107
                     case "hid":
                         {
                             int d;

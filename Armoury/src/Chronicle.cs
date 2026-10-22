@@ -214,7 +214,8 @@ namespace Armoury
                 if (next == null || w.Od < next.Od) next = w;
             }
             Log.Info(Tag + "start sesji | klucze: Chronicle Of Westeros " + YN(KeyOn) + ", World Changes " + YN(KeyWorld) + ", Full Versions " + YN(KeyFull)
-                     + ", Player Choices " + YN(KeyChoices) + " | " + Data.Summary()
+                     + ", Player Choices " + YN(KeyChoices) + ", Canon Deaths " + YN(KeyCanon) + " (wierszy smierci " + Data.DeathRows + (CanonOffTest ? ", flaga testu " + CanonOffFlagName : "") + ")"   // m107: prog KW-0b
+                     + " | " + Data.Summary()
                      + " | os x" + Terms.DocK().ToString("0.00", Inv) + ", plan Fabuli " + YN(Terms.PlanAvailable)
                      + " | " + Pictures.StartText()
                      + " | " + VoiceStartText()
@@ -373,11 +374,49 @@ namespace Armoury
 
         // ---------------------------------------------------------------- wybor wiersza i formy (FORMAT 3.1 wersja, 3.2 p. 2-3)
 
-        /// <summary>Filtr wersji: ChronicleFullVersions NIE - lekka i obie; TAK - pelna i obie, lekka tylko w oknie bez wiersza pelna.</summary>
+        /// <summary>Filtr wersji: ChronicleFullVersions NIE - lekka i obie; TAK - pelna i obie, lekka tylko w oknie bez wiersza pelna/smierc.
+        /// m107-kronika (decyzja Jeffa 22.10, smierci z kanonu): smierc - przy ChronicleWorldChanges TAK i (Full Versions TAK albo Canon Deaths TAK); przy World Changes NIE
+        /// wiersz smierc nie bierze udzialu (tekst nie moze twierdzic smierci, ktorej akcja swiata by nie zrobila).</summary>
         private static bool VersionOk(string ver, bool hasFull)
         {
-            if (!KeyFull) return ver == "lekka" || ver == "obie";
-            return ver == "pelna" || ver == "obie" || (ver == "lekka" && !hasFull);
+            switch (ver)
+            {
+                case "obie": return true;
+                case "lekka": return !KeyFull || !hasFull;
+                case "pelna": return KeyFull;
+                case "smierc": return KeyWorld && (KeyFull || KeyCanon);
+            }
+            return false;
+        }
+
+        /// <summary>m107: powod, dla ktorego wiersz smierc nie bierze udzialu wedlug kluczy (null - bierze).</summary>
+        private static string DeathKeyWhy()
+        {
+            if (!KeyWorld) return "klucz Chronicle World Changes NIE";
+            if (!KeyFull && !KeyCanon) return "klucze Chronicle Canon Deaths NIE i Full Versions NIE";
+            return null;
+        }
+
+        /// <summary>m107: linie "smierc kanonu" przy rozstrzygnieciu okna z wierszami smierc (progi KW-17, KW-17b): wiersz smierc, ktory wygral - TAK z kluczami;
+        /// kazdy inny wiersz smierc - "nie" z pierwszym falszywym termem (albo kluczem, albo wczesniejszym wierszem, ktory wygral).</summary>
+        private static void DeathLines(string id, Data.WindowDef w, RowPick p, Terms.Tokens tok)
+        {
+            string keys = "klucze: Canon Deaths " + YN(KeyCanon) + ", Full Versions " + YN(KeyFull) + ", World Changes " + YN(KeyWorld);
+            if (p.Row.IsDeath)
+                Log.Info(Tag + "smierc kanonu " + p.Row.Key + " TAK - okno " + id + " wierszem smierci (" + keys + ").");
+            foreach (var v in w.Variants)
+            {
+                if (!v.IsDeath || v == p.Row) continue;
+                string why = DeathKeyWhy();
+                if (why == null)
+                {
+                    bool nv; string vw;
+                    if (Terms.Eval(v.Cond, tok, v.Key + " warunki", out nv, out vw))
+                        why = Actions.DeathBlock(v, tok) ?? ("warunki prawdziwe, wygral wiersz " + p.Row.Key + " (wczesniejszy w pliku albo zmienne bez wartosci)");   // m107 T3
+                    else why = vw ?? "?";   // pierwszy falszywy skladnik (przy "nigdy" z dopiskiem)
+                }
+                Log.Info(Tag + "smierc kanonu " + v.Key + " nie: " + why + " | okno " + id + " wierszem " + p.Row.Key + (p.Row.IsDeath ? " (smierc)" : "") + " (" + keys + ").");
+            }
         }
 
         /// <summary>Wiersz do rozstrzygniecia: pierwszy wariant (kolejnosc pliku) z wersja i warunkami prawdziwymi i zmiennymi z wartoscia, inaczej glowny (zapas);
@@ -391,6 +430,12 @@ namespace Armoury
                 if (!VersionOk(v.Version, w.HasFull)) continue;
                 bool nv; string vw;
                 if (!Terms.Eval(v.Cond, tok, v.Key + " warunki", out nv, out vw)) continue;
+                if (v.IsDeath)
+                {
+                    // m107 (recenzja T3): smierc, ktora nie weszlaby przez gracza (cel po stronie gracza) albo bez dziedzica (@dziedzic) - wiersz nie bierze udzialu
+                    string db = Actions.DeathBlock(v, tok);
+                    if (db != null) { if (firstWhy == null) firstWhy = v.Key + ": " + db; continue; }
+                }
                 var p = MakePick(v, tok, out vw);
                 if (p != null) return p;
                 if (firstWhy == null) firstWhy = v.Key + ": " + vw;
@@ -495,6 +540,10 @@ namespace Armoury
                     _dNothing++;
                     Log.Info(Tag + "nic " + label + " (" + (why ?? "inni = nic") + ") - nic dla gracza, skutki ida | dzien opowiesci " + F1(Terms.StoryDay()) + ".");
                     break;
+            }
+            if (w != null && w.HasDeath)
+            {
+                try { DeathLines(id, w, p, tok); } catch (Exception e) { Stumble("Resolve.DeathLines(" + id + ")", e); }
             }
             Actions.Run(new Actions.Ctx { Id = id, RowKey = p.Row.Key, Tok = tok, Vars = p.Vars }, p.Row.Effects);
             Choice.AfterResolve(id, p, form, tok);

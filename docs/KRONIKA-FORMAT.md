@@ -9,6 +9,10 @@ ksiazka/serial Brienne rozdzielone warunkami (047.2 `przed` = `kr:083.1`, 070.2a
 Zrodla: `docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md` (repo glowne) sekcja "## PLAN kronika" (B P1-P10, D, E, F, G)
 oraz "## kronika:A" i "## kronika:B"; `docs/KRONIKA-WESTEROS-V2-2026-10-21.md` (117 wydarzen, decyzje Jeffa).
 Silnik K0 (Chronicle*.cs) powstanie pozniej i ma czytac DOKLADNIE ten format. Walidator: `tools/kronika/kronika_check.py`.
+**m107-kronika (22.10, galaz `w-toku/m107-kronika`, decyzje Jeffa):** (A) "gina postacie, jesli historia mowi, ze gina; jesli bedzie inne zakonczenie i nie gina, to nie
+gina" - nowa wersja wiersza `smierc` (3.1, 3.3, 11, 16.4), klucz ChronicleCanonDeaths, termy polozenia bohatera `near:`/`region:` (10); (B) "maja przechodzic do innych
+rodow jak w ksiazce" - wiersze #move m28-m40 (Theon, Brienne, Podrick, Jaime; m39/m40 - poprawki recenzji) z termem `kr:NNN.w~R` (okno rozstrzygniete wierszem R, 10) i ochrona wierszy dopisanych
+do trwajacej kampanii (8). Dziennik galezi: `docs/noc-1920/m107-kronika-CHANGELOG.md`.
 
 Spis: 1 pliki | 2 budowa pliku | 3 #okno | 4 #wybor | 5 #tekst | 6 #banda | 7 #zadanie | 8 #para | 9 #usuniete |
 10 warunki (termy) | 11 skutki (akcje) | 12 uchwyty kod: | 13 okna powracajace | 14 tematy obrazkow | 15 lista chronionych |
@@ -20,10 +24,11 @@ Spis: 1 pliki | 2 budowa pliku | 3 #okno | 4 #wybor | 5 #tekst | 6 #banda | 7 #z
 
 | Plik | Co | Kto czyta |
 |---|---|---|
-| `Armoury/ModuleData/arm_kronika_k00.tsv` | 6 okien testowych silnika (000.1-000.6: okno, wariant miejsca, wybor z opcja wyszarzona, hide/unhide, wiesc z akcjami wiesc/plotka, zmienne i filtr wersji) - wczytywany TYLKO przy pliku `CrashScribe/armoury-kronika-test.flag` (i trybie autotestu CrashScribe 1/2) | K0, autotest K0a/K0b |
+| `Armoury/ModuleData/arm_kronika_k00.tsv` | 9 okien testowych silnika (000.1-000.6: okno, wariant miejsca, wybor z opcja wyszarzona, hide/unhide, wiesc z akcjami wiesc/plotka, zmienne i filtr wersji; m107: 000.7 wiersze smierc z `near:`/`region:` i `succeed`, 000.8 zrodlo `kr:~R`, 000.9 `kr:000.8~a` i `~0`) - wczytywany TYLKO przy pliku `CrashScribe/armoury-kronika-test.flag` (i trybie autotestu CrashScribe 1/2); m107: plik `CrashScribe/armoury-kronika-kanon-nie.flag` (tez tylko z flaga testu) = klucz Canon Deaths NIE bez zmiany MCM (autotest AT2) | K0, autotest K0a/K0b, AT1/AT2 |
 | `Armoury/ModuleData/arm_kronika_k01.tsv` ... `k10.tsv` | paczki K1-K10 (rozdz. 18) - jeden plik na paczke | K0 + paczki |
 | `Armoury/ModuleData/arm_kronika_tematy.tsv` | tematy obrazkow -> sprite'y ROT i obrazki prologu (rozdz. 14) | Chronicle.Pictures |
 | `Armoury/ModuleData/arm_canon_moves.tsv` | zmiany stron postaci kanonu (CanonCompanions) - Kronika dopisuje tu tylko termy `kr:` (rozdz. 8) | CanonCompanions |
+| `Armoury/ModuleData/arm_canon_moves_test.tsv` | (m107) wiersze #move autotestu (t01/t02, term `kr:000.8~R`) - czytane TYLKO z plikiem flagi `armoury-kronika-test.flag` (jak k00), sama sekcja `#move` | CanonCompanions, autotest AT1/AT2 |
 | `Armoury/ModuleData/Lektor/EN/arm_lektor_kronika.tsv` | manifest nagran Kroniki (repo glowne `tools/lektor/nagraj_kronika.py`): klucz `kr_NNN_w[war]`, tytul, plik `.ogg`, md5 tekstu (kolumna 4; tekst jak rozdz. 16.5), md5 pliku (kolumna 5), paczka; md5 tekstu nie-hex (`nieaktualne`) = nagranie ze starym tekstem (cisza). `arm_lektor.tsv` obok to nagrania okien ROT i prologu (bez kluczy `kr_`) | Lektor (zasada md5), walidator |
 
 - Kodowanie UTF-8 bez BOM, separator TAB, konce linii LF albo CRLF (git z autocrlf i tak zamienia). Bajt 0 w pliku = plik wyzerowany
@@ -69,7 +74,7 @@ i zero lub wiecej **wariantow** (`war` = jedna mala litera a-z) zaraz pod nim (m
 | `gracz` | opcjonalne | opcjonalne (puste = jak glowny) | warunki "gracz widzi pelna forme". Gracz spelnia -> `forma`, nie spelnia -> `inni`. Puste w glownym = kazdy gracz dostaje `forma`; puste w wariancie = `gracz` wiersza glownego (poprawka K0 R-3, 22.10: 105.1a, 073.1a/b - tekst pytania zaklada miejsce gracza) | `p:vassal:battania` |
 | `forma` | wymagane | wymagane | `okno` (okno ROT z obrazkiem) \| `wiesc` (linia wiesci, tekst `_W`) \| `log` (tylko linia logu, bez niczego dla gracza) | `okno` |
 | `inni` | wymagane | wymagane | forma dla gracza spoza `gracz`: `okno` \| `wiesc` \| `nic` | `wiesc` |
-| `wersja` | wymagane | wymagane | `lekka` \| `pelna` \| `obie`. Klucz ChronicleFullVersions=NIE (domyslnie): biora udzial `lekka` i `obie`; TAK: `pelna` i `obie`, a `lekka` tylko gdy okno nie ma zadnego wiersza `pelna`. Pelna wersja = wariant z `wersja=pelna` | `lekka` |
+| `wersja` | wymagane | wymagane | `lekka` \| `pelna` \| `obie` \| `smierc` (m107, tylko wariant). Klucz ChronicleFullVersions=NIE (domyslnie): biora udzial `lekka` i `obie`; TAK: `pelna` i `obie`, a `lekka` tylko gdy okno nie ma zadnego wiersza `pelna`/`smierc`. Pelna wersja = wariant z `wersja=pelna`. `smierc` = smierc z kanonu w wersji lekkiej: bierze udzial przy ChronicleWorldChanges=TAK i (ChronicleCanonDeaths=TAK albo Full Versions=TAK); warunki wiersza = "swiat jak w ksiazce" (postac zyje, jest tam, gdzie w ksiazce, w tej roli - rozdz. 16.4); wiersz glowny okna = `obie` (zapas bez smierci) | `lekka` |
 | `temat` | wymagane gdy sie pokazuje | puste = dziedziczy | temat obrazka z `arm_kronika_tematy.tsv` (rozdz. 14) | `dorzecze` |
 | `lektor` | `0`/`1` | `0`/`1` | `1` = okno ma byc nagrane (pozniej). Tylko dla okien bez `{ZMIENNYCH}`, ktore sie pokazuja (`forma` albo `inni` = okno). Klucz nagrania `kr_NNN_w[war]` | `1` |
 | `tytul` | wymagane gdy sie pokazuje | opcjonalne | `{=ARM_KR_NNN_w[war]_T}Tekst` - najwyzej 45 znakow tekstu | `{=ARM_KR_008_1_T}The Wagon North` |
@@ -103,10 +108,21 @@ pola z wlasnymi id (`..._1b_T`, `_1b_U`, `_1b_L`).
 - Skutki okna wykonuja sie RAZ przy rozstrzygnieciu (okno/wiesc/log), przed lista wyboru. Skutki opcji - po wyborze.
 - Klasa akcji: T (tekst), R (relacje/slawa), S (swiat). Klucz **ChronicleWorldChanges=NIE** pomija klase S (z linia logu).
 - Klucz **ChroniclePlayerChoices=NIE** (albo gracz poza `gracz`, albo 0 dostepnych opcji) = wykonuje sie opcja **bierna** bez pytania.
+- (m107) Klucz **ChronicleCanonDeaths** (domyslnie TAK; Jeff 22.10 "gina postacie, jesli historia mowi, ze gina"): wiersze `wersja=smierc` biora udzial (przy World Changes TAK);
+  NIE (i Full Versions NIE) - nie biora, okno idzie wierszem bez smierci. Przy kluczu World Changes NIE wiersz `smierc` nie bierze udzialu nigdy (tekst nie twierdzi
+  smierci, ktorej akcja swiata by nie zrobila). Linia startu: `..., Player Choices X, Canon Deaths X (wierszy smierci N)`; przy rozstrzygnieciu okna z wierszami smierc
+  linie `smierc kanonu NNN.wX TAK - okno ... wierszem smierci (klucze: ...)` / `smierc kanonu NNN.wX nie: <pierwszy falszywy term> | okno ... wierszem ...`; akcje wiersza
+  smierc z dopiskiem `| smierc kanonu`; `succeed`/`die` POMINIETE z wiersza smierc - linia `KANON: smierc z NNN.wX nie weszla - <akcja> (<powod>)`.
+  (Recenzja T3) Wiersz smierc NIE bierze udzialu w wyborze wiersza, gdy cel jego `succeed` (umierajacy albo dziedzic), `die` albo `hide` (skutki wiersza i jego
+  opcji) jest po stronie gracza (gracz, jego rod, towarzysz, druzyna, jeniec gracza - akcja by ja pominela) albo `succeed:<b>:@dziedzic` nie ma dziedzica
+  (Chronicle.Actions.DeathBlock) - okno idzie nastepnym wierszem, a linia `smierc kanonu NNN.wX nie: <akcja>: <postac> - <powod> | okno ...`.
 - Klucz **ChronicleOfWesteros=NIE** = brak okien; termy `kr:` (w oknach i w arm_canon_moves) sa wtedy **FALSZYWE na zawsze** ("nigdy", jak dzis
   nieznany term w `CanonCompanions.BaseTrue`) - wiersz `#move` z wyzwalaczem `stary|kr:NNN.w` rusza wtedy od starego wyzwalacza, bo `|` = lub.
   (Poprawka 21.10: pierwsza wersja mowila "prawdziwe" - przy alternatywie `|` m02, m04, m18 i m22 ruszylyby w dniu startu kampanii;
   zglosili to wszyscy autorzy K1-K10.) Wiersz z samymi termami `kr:` przy wylaczonej Kronice nie rusza wcale (walidator: UWAGA).
+- (m107, recenzja T1) Klucz **ChronicleWorldChanges=NIE** robi z termami `kr:` w wyzwalaczach `#move` to samo co ChronicleOfWesteros=NIE (falsz "nigdy",
+  CanonCompanions.TermTrue) - zmiana strony z okna Kroniki jest zmiana swiata (opis klucza: "deaths, side changes ..."). Okna dalej sie rozstrzygaja
+  (Terms.KrTrue bez zmian), wiec `kr:` w warunkach okien dziala jak dotad. Wiersze ze starym wyzwalaczem (m02, m04, m18, m22) ruszaja wtedy od niego.
 - Ten sam "nigdy" konczy ukrycie z koncem `kr:` (rozdz. 11): przy kluczu NIE ukryci z takim koncem wracaja w najblizszej dobie, a konce `rotday:`,
   `ev:` itd. licza sie jak zawsze (poprawka K0 R-1, 22.10 - wczesniej doba przy kluczu NIE pomijala kazdy koniec ukrycia: Melisandre i Brienne
   zostawaly ukryte na zawsze). Ponowne wlaczenie klucza nie ukrywa ich drugi raz.
@@ -154,6 +170,7 @@ Po zamknieciu okna, nad mapa, silnik pokazuje liste MultiSelection (radio, bez w
 Zasady: **ostatnia opcja jest bierna** = wersja z ksiazki (bez dzialania gracza), zawsze dostepna (pusta `dostepna`). Autotest wybiera
 ostatnia czynna pozycje, wiec bieg testowy idzie wersja kanoniczna. Wybor zapisuje sie jako `kr:NNN.w=x` (do warunkow innych okien).
 Akcje tylko-pelne (rozdz. 11) w opcjach - tylko gdy opcje naleza wylacznie do wierszy `wersja=pelna` (`okno` = `NNN.w<war>` wariantu pelnego).
+(m107) Opcje nalezace tylko do wierszy `pelna`/`smierc` (z co najmniej jednym `smierc`) - jak wiersz smierc: `succeed` wolno, reszta tylko-pelnych nie (086.1a, 095.1a).
 
 ## 5. Sekcja #tekst (wiesci i plotki)
 
@@ -255,6 +272,42 @@ Pary `kr` w arm_canon_moves (stan 21.10): m02 Jaime `done:BlackwaterEvent|kr:032
 m18 Theon `war:sturgia:battania|kr:902.1+1`, m22 Yoren `ev:HarrenhalSiegeNotificationEvent|rotday:120|kr:008.1+1` - wszystkie ze starym wyzwalaczem.
 Zmiana strony postaci z `#move`, ktorej dzis nie ma w tabeli (Theon 072.3/087/108, Brienne i Podrick 083, Jaime 107), = NOWY wiersz `#move`
 (najlepiej `kr:` + zapasowy stary wyzwalacz) w paczce silnika - Kronika sama tego nie robi; dzis te okna maja to tylko w tekscie i flagach.
+**Stan m107-kronika (22.10, Jeff "maja przechodzic do innych rodow jak w ksiazce"): zrobione.** Nowe wiersze `#move` (kolejnosc w pliku = kolejnosc ruchow postaci,
+kazdy blok pod ostatnim wierszem tej postaci), wszystkie z para `kr` w pliku paczki okna:
+
+| Wiersz | Postac | Wyzwalacz | Akcja | Kiedy |
+|---|---|---|---|---|
+| m28 | Theon (po m19) | `kr:072.3` | `free:clan_sturgia_1` | ucieczka z Winterfell (zostaje Greyjoyem) |
+| m40 | Theon (po m28; poprawka B1) | `kr:072.3~0+2` | `prisoner:clan_empire_west_3` | tylko wiersz glowny 072.3 (Stannis zyje): zwiadowcy Stannisa - jeniec rodu Smoczej Skaly (loch siedziby, V2 nr 72); wychodzi ucieczka/okupem/pokojem gry; jako jeniec nie plynie z Yara (087.1 bez Theona) |
+| m29 | Theon | `kr:087.1~a` | `clan:clan_empire_south_1` | tylko wariant 087.1a - ucieka z Yara do Daenerys |
+| m30 | Theon | `kr:108.1` | `clan:clan_battania_1` | po uwolnieniu Yary - pod Winterfell (112.3) |
+| m31 | Brienne (po m16, przed m17) | `kr:037.1` | `prisoner:ROT_town32` | Dzielni Kompanioni, Harrenhal |
+| m39 | Brienne (poprawka B2/T2) | `ev:JoffreyEvent+5` | `free:clan_battania_1` | jeniec z m31 piec dni po Purpurowych Godach - wolna, do Starkow (m16), wiec m17 nie czeka; wolna - bez zmian ("juz wolny; juz w tym rodzie"); pominiety, gdy m32 zajdzie wczesniej |
+| m32 | Brienne | `kr:037.2\|kr:037.1+45` | `free:clan_vlandia_1` | z Jaimem do Przystani (dwor Lannisterow, bez druzyny); poprawka B2/T2: bez `ev:JoffreyEvent+5` (bez 037.1 nie trafia juz na dwor Lannisterow) |
+| m17 (zmiana) | Brienne | `ev:JoffreyEvent+10\|rotday:1150` (bylo `done:RedWeddingEvent\|dead:lord_5_1`) | `wander:river` | po Purpurowych Godach szuka Sansy (904.1) |
+| m33 | Brienne | `kr:083.1~0b` | `court:clan_battania_1` | przysiega Sansie (nie 083.1a - Brienne martwa albo u Szarej Pani) |
+| m34 | Podrick (po m07) | `kr:083.1~0b` | `court:clan_battania_1` | z Brienne |
+| m35 | Jaime (po m02) | `kr:037.1` | `prisoner:ROT_town32` | Vargo Hoat (bez strazy prologu - HoldKey tylko p01/p10) |
+| m36 | Jaime | `kr:037.2\|kr:037.1+45` | `free:clan_vlandia_1` | wraca do rodu |
+| m37 | Jaime | `kr:107.1` | `court:clan_battania_1` | odchodzi od Cersei na Polnoc (111.1) |
+| m38 | Jaime | `kr:113.1\|kr:115.1` | `court:clan_nord_1` | wraca do siostry przed 115.2 - poprawka B3: dworzanin rodu korony (siedziba Czerwona Twierdza ROT_castle61, ok. 5 od town_EW4; Gwardia Krolewska), bez druzyny; 115.2b/c/e sprawdzaja `near:ROTwanderer1:town_EW4:60` (Casterly Rock - ok. 350) |
+
+Wiersze z samymi termami `kr:` (m28-m38 i m40) przy ChronicleOfWesteros=NIE albo ChronicleWorldChanges=NIE (poprawka T1) nie ruszaja (UWAGA walidatora). Bez Kroniki
+(albo bez zmian swiata) zostaje stan sprzed m107 z jednym wyjatkiem: m39 (`ev:`) - Brienne wolna od m16 dostaje "juz wolny; juz w tym rodzie" (bez zmian i teleportu),
+a m17 rusza o Purpurowe Gody + 10 jak w kanonie (do poprawek m32 mialo `ev:JoffreyEvent+5` i przenosilo ja wtedy na 5 dni na dwor Lannisterow - recenzja T2).
+Akcja `prisoner:<rod>`: loch siedziby rodu (HomeSettlement - twierdza bez oblezenia, wlasciciel bez znaczenia poza graczem), dopiero bez niej druzyna glowy rodu
+(CanonCompanions.Captor; naglowek arm_canon_moves poprawiony - mowil odwrotnie). `prisoner` na jencu = POMINIETA "juz jeniec" - dlatego m40 idzie po m28 (`+2`).
+Odstepstwo od V2 (B4): m37 Jaime `court:clan_battania_1` (V2 nr 107: "jako wedrowiec") - dworzanin Starkow lepiej oddaje "jedzie do Winterfell" (111.1);
+`wander` wybiera losowe miasto kultury.
+**Ochrona wierszy dopisanych do trwajacej kampanii (m107):** CanonCompanions zapisuje dla kazdego wiersza dzien, od ktorego jest w kampanii (`seen` w arm_canon_companions;
+nowa kampania - start, stary zapis albo nowy wiersz - dzien wczytania). Term `kr:` okna rozstrzygnietego PRZED tym dniem, ktorego zaden wiersz jeszcze nie widzial
+prawdziwym (brak pamieci pierwszego dnia), jest dla tego wiersza "nigdy" - linia POMINIETA `wyzwalacz nie moze zajsc w tej kampanii (okno kr:... rozstrzygniete w dniu X,
+przed wierszem w zapisie (od dnia Y) - bez wstecznej zmiany strony)`. Wiersz w toku (CZEKA) - bez ochrony. Inne termy wiersza (ev:, rotday: ...) dzialaja jak dotad.
+Druga ochrona (bez zapisu): wiersz, za ktorym w pliku jest WYKONANY (ok) pozniejszy wiersz tej samej postaci, zostal dopisany po tamtym (w biegu kampanii wczesniejsze
+wiersze sa zawsze rozstrzygniete, zanim wykona sie pozniejszy) - POMINIETA `wyprzedzona przez #X wykonana wczesniej (wiersz dopisany do zapisu po niej ...)`. Przyklad:
+m31/m39/m32 Brienne (przed m17) w zapisie, w ktorym m17 juz zaszedl - bez wstecznej niewoli i powrotu do Lannisterow albo Starkow (m39 ma `ev:JoffreyEvent+5`, ktorego
+pierwsza ochrona nie obejmuje). Pominiete wiersze ("nigdy", tryb prolog/classic) sie nie licza. Ochrona "seen" nie dotyczy termow z wyborem `kr:NNN.w=x` (poprawka T4 -
+wybor zapada pozniej niz dzien okna; ma go tylko stary wiersz m02).
 
 ## 9. Sekcja #usuniete (nagrobki)
 
@@ -291,6 +344,9 @@ Przed pierwszym wgraniem paczki id mozna jeszcze zmieniac bez nagrobka.
 | `prolday:N` | dzien | dzien kampanii >= N, tylko kampania z prologiem (inaczej nigdy) | CanonCompanions |
 | `kr:NNN.w` | okno | okno ROZSTRZYGNIETE (okno/wiesc/log/nic - poprawka K0 R-8); okno pominiete = term nigdy. Okno powracajace: rozstrzygnieta jakakolwiek instancja; `max:N` zuzyty i zadna instancja nie czeka w kolejce = nigdy (poprawka K0 R-2) | nowy |
 | `kr:NNN.w=x` | okno, opcja a-d | w oknie wybrano opcje x. NIE dla okna powracajacego - wybor instancji zapisuje sie pod `NNN.w#klucz` (walidator: BLAD, uzyj flagi z opcji; poprawka K0 R-10) | nowy |
+| `kr:NNN.w~R` | okno, R = `0` (wiersz glowny) i/lub litery wariantow a-z | (m107) okno rozstrzygniete JEDNYM z wierszy R (np. `kr:083.1~0b` - glowny albo b, `kr:087.1~a`); inny wiersz = nigdy. `+N` liczy sie od dnia okna tylko przy wierszu z R. Nie razem z `=x`; NIE dla okna powracajacego (walidator: BLAD). Tez w wyzwalaczach #move | m107 |
+| `near:<bohater>:<osada>:<odl>` | odleglosc 1-500 | (m107) bohater w promieniu od osady: osada, w ktorej jest (takze loch), loch/druzyna, ktora go wiezi, albo jego druzyna (Chronicle.Terms.HeroPos); martwy = nigdy; ukryty przez Kronike albo bez pozycji (w drodze opoznionego teleportu, zbieg poza osada) = falsz. Skala mapy: Winterfell - Bialy Port ok. 99, Winterfell - Czarny Zamek ok. 256 | m107 |
+| `region:<bohater>:<krolestwo>` | | (m107) najblizsza osada (miasto, zamek, wies) polozenia bohatera nalezy do krolestwa (jak `p:region` dla gracza); martwy = nigdy, bez pozycji = falsz | m107 |
 | `flag:<nazwa>` | male litery/cyfry/_ | flaga ustawiona akcja `flag:` (zalecana nazwa `kNNN_slowo`) | nowy |
 | `mv:<mNN>` | wiersz #move | wiersz rozstrzygniety (wykonany albo pominiety). Wiersz z kolumna mode `classic`/`prolog` jest w kampanii drugiego trybu pominiety w pierwszej dobie, wiec `mv:m01 \| mv:p10` jest prawdziwe od startu - okno za ruchem w obu trybach: `mv:m01 & mv:p10` (krytyk K0, 016.2; walidator: UWAGA) | CanonCompanions.MoveState |
 | `mv:<mNN>=done` / `=skip` | | wiersz wykonany / pominiety | j.w. |
@@ -347,7 +403,7 @@ Wzorce: "N dni przed wydarzeniem ROT X" = `warunki: plan:X-N` + `przed: ev:X` + 
 | `skill:<bohater>:<umiejetnosc>:<d>` | OneHanded, TwoHanded, Polearm, Bow, Crossbow, Throwing, Riding, Athletics, Crafting, Scouting, Tactics, Roguery, Charm, Leadership, Trade, Steward, Medicine, Engineering (+Mariner/Boatswain/Shipmaster) | S | K4 | zmiana umiejetnosci (Jaime nr 37) |
 | `item:<bohater>:<przedmiot>:<skad>` | skad = bohater/rod/osada | S | K1+ | przedmiot unikatowy ROT (ROTassets.xml) PRZENOSZONY od posiadacza - nigdy z niczego; `dragon_*` zakazane (P4) |
 | `clan:<b>:<rod>` `court:<b>:<rod>` `lead:<b>` `prisoner:<b>:<rod\|osada>` `free:<b>:<rod>` `wander:<b>:<kultura>` `die:<b>` `marry:<b>:<b2>` `wed:<b>:<b2>` | jak arm_canon_moves | S | K0 | akcje CanonCompanions.ApplyAction dla postaci BEZ wierszy #move (rozdz. 8). `die` glowy rodu/wladcy = BLAD (uzyj `succeed`) |
-| `succeed:<umierajacy>:<dziedzic>` | | S | K4 | dziedzic zostaje glowa rodu (i wladca), potem smierc (wzor Prologue.End). **Tylko pelna**, wyjatki lekkie: nr 42, 49, 52, 80 |
+| `succeed:<umierajacy>:<dziedzic>` | `<dziedzic>` = id albo (m107) `@dziedzic` | S | K4 | dziedzic zostaje glowa rodu (i wladca), potem smierc (wzor Prologue.End). **Tylko pelna**, wyjatki lekkie: nr 42, 49, 52, 80; (m107) wolno tez w wierszu `smierc` i w opcjach nalezacych tylko do wierszy pelna/smierc. (m107, recenzja A1) `@dziedzic` - dziedzica wybiera gra: kandydaci Clan.GetHeirApparents rodu umierajacego (punkty dziedziczenia, potem wiek) bez postaci z wierszami #move, po stronie gracza, ukrytych i dzieci (Chronicle.Actions.PickHeir); brak dziedzica - wiersz smierc nie bierze udzialu (3.3); linia akcji z dopiskiem `(@dziedzic - wybor gry)` (115.2e) |
 | `own:<osada>:<rod>` | | S | K9 | zmiana wlasciciela - **tylko pelna** |
 | `ruler:<krolestwo>:<rod>` | | S | K9 | rod rzadzacy - **tylko pelna** |
 | `leader:<rod>:<bohater>` | | S | K9 | glowa rodu - **tylko pelna** |
@@ -411,6 +467,15 @@ zgodnosc danych z silnikiem: `python -I tools/kronika/kronika_silnik.py`):
   `leader` rodu bez glowy - POMINIETA; `kod:zaraza` pomija partie w toczacej sie bitwie.
 - Zapis: powod POMINIETE skrocony (pelny w logu), wybory instancji przycinane z rejestrem, pierwszy dzien instancji okna w "ki"; wyjatek przy zapisie -
   ostatni dobry stan zamiast pustego; lista wyboru znikajaca 5 razy - opcja bierna.
+
+**Stan m107-kronika (22.10): wiersz `wersja=smierc` (smierc z kanonu w wersji lekkiej).**
+- `succeed` w wierszu smierc (i w opcjach tylko wierszy pelna/smierc) - jak w pelnej (dziedzic glowa rodu i wladca, potem smierc), gdy klucz Canon Deaths albo Full
+  Versions TAK (World Changes TAK sprawdza klasa S). Klucze zmienione miedzy wyborem wiersza a akcja (CZEKA) - POMINIETA z powodem.
+- `die` postaci, ktora w chwili akcji jest glowa rodu albo wladca, z wiersza smierc - POMINIETA (`wiersz smierc: glowa rodu ginie tylko przez succeed z dziedzicem`);
+  walidator odrzuca `die` glow rodow z XML jak dotad.
+- `own`, `ruler`, `leader`, `alliance`, `truce` w wierszu smierc - POMINIETE (`tylko pelna ... wiersz smierc`); walidator: BLAD.
+- Warunki wiersza smierc powtarzaja warunki akcji (glowa rodu, wladca, nie jeniec, polozenie `near:`, dziedzic w rodzie), wiec wiersz smierc wygrywa tylko wtedy,
+  gdy smierc naprawde wejdzie - inaczej wariant bez smierci (prog KW-17: succeed z wiersza smierc POMINIETA = 0). Lista chronionych (rozdz. 15) bez zmian.
 
 ## 12. Uchwyty kod:<nazwa>
 
@@ -553,6 +618,12 @@ pisze `| lista chronionych: <term> spelnione` dla wszystkich trzech akcji (prog 
    twierdzic czegos, czego warunki nie sprawdzaja.
 4. **Wersje lekkie domyslnie**. Pelne (zamki, wladcy, sojusze, upadki rodow) tylko jako warianty `wersja=pelna` (klucz ChronicleFullVersions,
    domyslnie NIE). 16 duzych: 23, 26, 56, 59, 63, 81, 86, 94, 95, 100, 103, 107, 108, 115, 116, 117. Pelne 95/97/107 dopiero w K9/K10 (P5).
+   **(m107) Smierci z kanonu** (glowy rodow i wladcy z dziedzicem) w wersji lekkiej - wariant `wersja=smierc` nad wierszem glownym `obie` (zapas bez smierci).
+   Warunki wariantu = "swiat jak w ksiazce": postac zyje, jest glowa rodu/wladca jak w ksiazce, nie jest jencem, jest tam, gdzie ksiazka (`near:`), dziedzic zyje
+   w jej rodzie; tekst wariantu moze twierdzic tylko to, co warunki sprawdzaja (np. 081.2a: Brienne pod Winterfell - `near:ROTwanderer9:town_B2:150`). Stan 22.10:
+   081.2a/b (Stannis; po poprawce A4 tylko po spaleniu Shireen - `dead:lord_1_36`), 086.1a (Doran), 094.1a/094.2a (Walder i Freyowie), 095.1a (Mace, nowy), 104.2a (Randyll),
+   115.2b/c/e (Cersei; e - pelny kanon bez Tommena i Myrcelli, `succeed:lord_4_2:@dziedzic`), 115.3a/b (Euron -> Yara, z Qyburnem albo sam; 115.3c - sam Qyburn, obie),
+   115.4a (Gora -> Lorch po 115.2d, log/nic), 116.2a (Daenerys).
 5. **Lektor pozniej**: `lektor=1` dla okien bez `{ZMIENNYCH}` (w praktyce okno 1 kazdego wydarzenia i stale akapity). Tekst po nagraniu
    jest zamrozony (md5 w arm_lektor_kronika.tsv - walidator BLAD, gra cisza). Tekst nagrania = tytul bez koncowych `.!?` + `.` + pusta linia + gora +
    pusta linia + dol (bez `{=...}`), z zamiana wymowy `R'hllor` -> `the Red God` (nagraj_kronika.py = Chronicle.Voice = kronika_check). Zmiana tekstu
@@ -619,6 +690,14 @@ i gral bez zasady md5); UWAGA - nagranie `nieaktualne`, `lektor=1` bez nagrania 
 nagrywa), nagranie bez wiersza `lektor=1`, `lektor=1` w wariancie bez wlasnego tekstu. Stan danych 22.10: 289 nagran zgodnych, UWAGI 5 (051.1a bez nagrania; 075.3,
 079.1, 090.1, 090.1a nieaktualne - do nagrania po odnowieniu ElevenLabs). Test: scratchpad 7aee5f12/kr-kryt/neg_lk.py (7 regul w obie strony, kod wyjscia 1).
 Do tego UWAGA: `mv:X` wiersza tylko-classic/tylko-prolog w alternatywie ` | ` (rozdz. 10 - skladnik prawdziwy od startu; jedyny przypadek 016.2 poprawiony na `&`).
+Reguly m107-kronika (22.10; test: scratchpad 7aee5f12/m107k/neg4.py - kazda regula w obie strony): `wersja=smierc` - BLAD w wierszu glownym, BLAD gdy wiersz glowny
+okna nie jest `obie`, BLAD przy own/ruler/leader/alliance/truce (wolno tylko succeed - takze w opcjach nalezacych tylko do wierszy pelna/smierc), UWAGA bez die/succeed
+w skutkach i opcjach; lektor: wiersz smierc jak obie (UWAGA bez nagrania - nagraj_kronika.py nagrywa `wersja != pelna`); termy `near:<bohater>:<osada>:<1-500>`,
+`region:<bohater>:<krolestwo>`; `kr:NNN.w~R` - R z `0` i liter, kazda litera to wariant okna (BLAD), nie razem z `=x`, BLAD dla okna powracajacego; wyzwalacze
+`#move`: rodzaj termu znany CanonCompanions.BaseTrue (ev, done, dead, rotday, prolday, war, own, kr), `kr:` z opcja/wariantami, ktore istnieja (BLAD).
+Poprawki po recenzji m107: `succeed:<b>:@dziedzic` dozwolone (drugi argument; gdzie indziej token nieznany - BLAD); UWAGA wierszy #move z samymi `kr:` mowi o obu kluczach
+(ChronicleOfWesteros=NIE albo ChronicleWorldChanges=NIE).
+`tools/kronika/kronika_silnik.py` dodatkowo porownuje rodzaje termow z danych z Terms.Kinds / PlayerKinds silnika.
 
 ## 18. Podzial na paczki K1-K10
 

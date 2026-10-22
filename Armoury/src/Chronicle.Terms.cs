@@ -31,7 +31,8 @@ namespace Armoury
         {
             /// <summary>Rodzaje termow znane silnikowi (porownuje je narzedzie scratchpadu z danymi; kolejnosc jak KRONIKA-FORMAT 10).</summary>
             internal static readonly string[] Kinds = { "ev", "done", "dead", "alive", "clanof", "head", "leads", "prisoner", "war", "peace", "kexists", "own",
-                                                        "rotday", "prolday", "kr", "flag", "mv", "cw", "season", "plan", "p" };
+                                                        "rotday", "prolday", "kr", "flag", "mv", "cw", "season", "plan", "p",
+                                                        "near", "region" };   // m107-kronika: polozenie bohatera (smierci z kanonu - "postac tam, gdzie w ksiazce")
             internal static readonly string[] PlayerKinds = { "region", "in", "near", "vassal", "army", "rel" };
             /// <summary>Wydarzenia ROT (29 klas ROT.Events, KRONIKA-FORMAT 10) - dobowy zapis pierwszego dnia ev:/done: (Daily).</summary>
             internal static readonly string[] RotEvents = { "AegonInvasionEvent", "BastardsEvent", "BastardsSiegeEvent", "BastardsSiegeNotificationEvent", "BlackwaterEvent",
@@ -320,12 +321,20 @@ namespace Armoury
                         return a.Length == 1 && int.TryParse(a[0], NumberStyles.AllowLeadingSign, Inv, out n) ? null : t.Kind + ":N";
                     case "kr":
                         {
-                            if (a.Length != 1) return "kr:NNN.w[=x]";
-                            string id = a[0], opt = null;
+                            if (a.Length != 1) return "kr:NNN.w[=x|~R]";
+                            string id = a[0], opt = null, rows = null;
+                            int tl = id.IndexOf('~');
+                            if (tl >= 0) { rows = id.Substring(tl + 1); id = id.Substring(0, tl); }   // m107: kr:NNN.w~R - okno rozstrzygniete wierszem R
                             int eq = id.IndexOf('=');
                             if (eq >= 0) { opt = id.Substring(eq + 1); id = id.Substring(0, eq); }
-                            if (id.Length != 5 || id[3] != '.') return "kr:NNN.w[=x] - id okna NNN.w";
+                            if (id.Length != 5 || id[3] != '.') return "kr:NNN.w[=x|~R] - id okna NNN.w";
+                            if (opt != null && rows != null) return "kr:NNN.w=x i ~R razem niedozwolone";
                             if (opt != null && (opt.Length != 1 || opt[0] < 'a' || opt[0] > 'd')) return "kr:NNN.w=x - opcja a-d";
+                            if (rows != null)
+                            {
+                                if (rows.Length == 0) return "kr:NNN.w~R - R: 0 (wiersz glowny) i/lub litery wariantow a-z";
+                                foreach (char ch in rows) if (!(ch == '0' || (ch >= 'a' && ch <= 'z'))) return "kr:NNN.w~R - R: 0 (wiersz glowny) i/lub litery wariantow a-z";
+                            }
                             return null;
                         }
                     case "mv":
@@ -340,6 +349,10 @@ namespace Armoury
                         return a.Length == 1 && (a[0] == "reach" || a[0] == "dorne") ? null : "cw:reach albo cw:dorne";
                     case "season":
                         return a.Length == 1 && Array.IndexOf(Seasons, a[0]) >= 0 ? null : "season:winter|spring|summer|autumn";
+                    case "near":   // m107: near:<bohater>:<osada>:<odleglosc 1-500>
+                        return a.Length == 3 && int.TryParse(a[2], NumberStyles.None, Inv, out n) && n >= 1 && n <= 500 ? null : "near:<bohater>:<osada>:<odleglosc 1-500>";
+                    case "region":   // m107: region:<bohater>:<krolestwo>
+                        return a.Length == 2 ? null : "region:<bohater>:<krolestwo>";
                     case "plan":
                         {
                             if (a.Length != 1) return "plan:<WydarzenieROT>-N";
@@ -438,6 +451,9 @@ namespace Armoury
                 {
                     string id = a[0]; int eq = id.IndexOf('=');
                     if (eq >= 0) return NoDay;   // wybor - dzien z pamieci
+                    // m107: kr:NNN.w~R - dzien rozstrzygniecia okna tylko, gdy wygral wiersz z R (inaczej +N bylby prawdziwy przy zlym wierszu)
+                    int tl = id.IndexOf('~');
+                    if (tl >= 0) { bool nv; if (!KrTrue(id, out nv)) return NoDay; id = id.Substring(0, tl); }
                     return KeyOn && State.IsResolved(id) ? State.ResolvedDay(id) : NoDay;
                 }
                 if (kind == "mv")
@@ -532,25 +548,93 @@ namespace Armoury
                             return StoryDay() >= pd - n;
                         }
                     case "p": return PlayerTrue(a);
+                    case "near":
+                        {
+                            // m107: bohater (jego osada, loch albo pozycja jego druzyny) w promieniu od osady; martwy - nigdy; ukryty / bez pozycji - falsz
+                            var h = FindHero(a[0], null);
+                            if (h == null) return false;
+                            if (h.IsDead) { never = true; return false; }
+                            var st = FindSettlement(a[1], null);
+                            Vec2 pos;
+                            if (st == null || !HeroPos(h, out pos)) return false;
+                            return pos.Distance(st.GetPosition2D) <= int.Parse(a[2], NumberStyles.None, Inv);
+                        }
+                    case "region":
+                        {
+                            // m107: bohater na ziemiach krolestwa (najblizsza osada - miasto, zamek, wies - nalezy do krolestwa; jak p:region dla gracza)
+                            var h = FindHero(a[0], null);
+                            if (h == null) return false;
+                            if (h.IsDead) { never = true; return false; }
+                            var s = HeroRegion(h);
+                            return s != null && s.MapFaction != null && s.MapFaction.StringId == a[1];
+                        }
                 }
                 never = true;   // nie powinno sie zdarzyc (Check odrzuca nieznane)
                 return false;
             }
 
+            /// <summary>m107: polozenie bohatera - osada, w ktorej jest (takze loch), loch/druzyna, ktora go wiezi, albo jego druzyna. Ukryty przez Kronike (Disabled)
+            /// i bohater bez pozycji (w drodze opoznionego teleportu, zbieg poza osada) - false.</summary>
+            internal static bool HeroPos(Hero h, out Vec2 pos)
+            {
+                pos = Vec2.Zero;
+                if (h == null || h.IsDead || h.IsDisabled) return false;
+                var s = h.CurrentSettlement;
+                if (s != null) { pos = s.GetPosition2D; return true; }
+                var pb = h.PartyBelongedToAsPrisoner;
+                if (pb != null)
+                {
+                    if (pb.IsSettlement && pb.Settlement != null) { pos = pb.Settlement.GetPosition2D; return true; }
+                    if (pb.MobileParty != null) { pos = pb.MobileParty.GetPosition2D; return true; }
+                }
+                var mp = h.PartyBelongedTo;
+                if (mp != null) { pos = mp.GetPosition2D; return true; }
+                return false;
+            }
+
+            /// <summary>m107: najblizsza osada (miasto, zamek, wies) polozenia bohatera - region:. Bohater w osadzie - ta osada. null - brak pozycji.</summary>
+            private static Settlement HeroRegion(Hero h)
+            {
+                var cur = h.CurrentSettlement;
+                if (cur != null && (cur.IsTown || cur.IsCastle || cur.IsVillage)) return cur;
+                Vec2 pos;
+                if (!HeroPos(h, out pos)) return null;
+                Settlement best = null;
+                float bd = float.MaxValue;
+                foreach (var s in Settlement.All)
+                {
+                    if (s == null || !(s.IsTown || s.IsCastle || s.IsVillage)) continue;
+                    float d = s.GetPosition2D.DistanceSquared(pos);
+                    if (d < bd) { bd = d; best = s; }
+                }
+                return best;
+            }
+
             /// <summary>kr:NNN.w[=x]: okno rozstrzygniete (okno/wiesc/log/nic); pominiete, nagrobek albo klucz ChronicleOfWesteros NIE = nigdy (FORMAT 3.3).
             /// =x: wybrana opcja x; inna opcja = nigdy; rozstrzygniete bez wyboru - nigdy, gdy wiersz, ktory wygral, nie ma listy, inaczej czeka.
-            /// Okno nieznane (paczka jeszcze nie wgrana) - falsz, nie nigdy. A4: internal - ta sama logika dla wyzwalaczy #move (Chronicle.Resolved).</summary>
+            /// Okno nieznane (paczka jeszcze nie wgrana) - falsz, nie nigdy. A4: internal - ta sama logika dla wyzwalaczy #move (Chronicle.Resolved).
+            /// m107: ~R - okno rozstrzygniete wierszem z R (0 = glowny, a-z = wariant; np. kr:083.1~0b), inny wiersz - nigdy.</summary>
             internal static bool KrTrue(string arg, out bool never)
             {
                 never = false;
-                string id = arg, opt = null;
-                int eq = arg.IndexOf('=');
-                if (eq >= 0) { id = arg.Substring(0, eq); opt = arg.Substring(eq + 1); }
+                string id = arg, opt = null, rows = null;
+                int tl = id.IndexOf('~');
+                if (tl >= 0) { rows = id.Substring(tl + 1); id = id.Substring(0, tl); }   // m107: kr:NNN.w~R
+                int eq = id.IndexOf('=');
+                if (eq >= 0) { opt = id.Substring(eq + 1); id = id.Substring(0, eq); }
                 if (!KeyOn || State.IsSkipped(id) || Data.IsTomb(id)) { never = true; return false; }
                 if (!State.IsResolved(id))
                 {
                     if (Recurring.Exhausted(id)) never = true;   // recenzja K0 (R-2): okno powracajace z wyczerpanym max:N i bez instancji w kolejce - juz nie zajdzie
                     return false;
+                }
+                if (rows != null)
+                {
+                    // m107: okno rozstrzygniete wierszem z R (0 = glowny, litera = wariant); inny wiersz - nigdy. Okno powracajace (wiersz instancji nie pod NNN.w)
+                    // albo brak wiersza w stanie - nigdy (walidator: BLAD dla okna powracajacego)
+                    string rk = State.ResolvedRow(id);
+                    if (!string.IsNullOrEmpty(rk) && RowIn(id, rk, rows)) return true;
+                    never = true; return false;
                 }
                 if (opt == null) return true;
                 char c = State.Choice(id);
@@ -561,6 +645,14 @@ namespace Armoury
                 }
                 var row = Data.Row(State.ResolvedRow(id));
                 if (row != null && row.Options.Count == 0) never = true;
+                return false;
+            }
+
+            /// <summary>m107: wiersz rk (NNN.w albo NNN.w + litera) jest w zbiorze R ('0' = wiersz glowny, litery = warianty).</summary>
+            internal static bool RowIn(string id, string rk, string rows)
+            {
+                if (rk == id) return rows.IndexOf('0') >= 0;
+                if (rk.Length == id.Length + 1 && rk.StartsWith(id, StringComparison.Ordinal)) return rows.IndexOf(rk[rk.Length - 1]) >= 0;
                 return false;
             }
 

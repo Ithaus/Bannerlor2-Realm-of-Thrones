@@ -1,4 +1,5 @@
-# Kronika Westeros - paczka k00: OKNA TESTOWE silnika K0 (docs/KRONIKA-FORMAT.md). Wczytywana TYLKO przy pliku CrashScribe/armoury-kronika-test.flag (autotest K0a/K0b).
+# Kronika Westeros - paczka k00: OKNA TESTOWE silnika K0 (docs/KRONIKA-FORMAT.md). Wczytywana TYLKO przy pliku CrashScribe/armoury-kronika-test.flag (autotest K0a/K0b,
+# m107: AT1/AT2 - okna 000.7-000.9).
 # 000.1 - okno bez wyboru: wiersz glowny + wariant a (gracz na ziemiach Polnocy); gracz w armii dostaje wiesc 000.1_W zamiast okna; kod:test.
 # 000.2 - okno z wyborem 3 opcji (b wyszarzona bez relacji 50 z Robbem); termin z planu Fabuli (plan:NedEvent-3), kotwica przed:ev:NedEvent, po: 1 doba po 000.1.
 # 000.3 - (recenzja K0 R-15) hide w dwoch drogach: Dick Crabb (ROTwanderer29, grupa C) do kr:000.4 - powrot przez koniec ukrycia (doba Kroniki),
@@ -7,6 +8,11 @@
 # 000.5 - (krytyk K0, plan I K0a "wiesc") forma wiesc dla kazdego gracza (tekst 000.5_W) + akcje wiesc:000.5_N1 i plotka:000.5_P; 1 doba po 000.4.
 # 000.6 - (krytyk K0, plan I K0a "wariant") zmienne {KING}=@wladca:vlandia i {ME}=@gracz w tekscie okna; wariant a (pelna) NIE moze wygrac przy kluczu
 #         Chronicle Full Versions NIE, wygrywa wariant b (obie, bez wlasnego tekstu - tekst i zmienne glownego, flaga kr_test_6b); 1 doba po 000.5.
+# 000.7 - (m107) wiersze smierc: b z falszywym near (Halys Hornwood pod Meereen) i succeed:lord_7_6:lord_7_5_1, a z region: i succeed:lord_7_6:@dziedzic
+#         (poprawka A1: dziedzica Hornwoodow wybiera gra - Actions.PickHeir; bez dziedzica 000.7a nie bierze udzialu - linia "nie: ... @dziedzic"); forma log,
+#         1 doba po 000.6. Canon Deaths TAK: 000.7a (linia smierc kanonu TAK, 000.7b nie: near...); NIE (flaga armoury-kronika-kanon-nie.flag): wiersz glowny.
+# 000.8 - (m107) zrodlo kr:~R: wariant a smierc (die wedrowca ROTwanderer35) przy Canon TAK, inaczej wiersz glowny; 1 doba po 000.7.
+# 000.9 - (m107) kr:000.8~a (wariant a) i kr:000.8~0 (wiersz glowny) w warunkach okna; 1 doba po 000.8. W arm_canon_moves_test.tsv: t01 kr:000.8~a, t02 kr:000.8~0.
 #okno	id	war	od	do	po	przed	warunki	gracz	forma	inni	wersja	temat	lektor	tytul	gora	dol	zmienne	wybor	skutki	powtorz
 000.1		0				rotday:1	!p:army	okno	wiesc	obie	intryga	0	{=ARM_KR_000_1_T}A Raven at Dusk	{=ARM_KR_000_1_U}A tired raven lands on the sill of the rookery with a strip of parchment tied to its leg. The maester reads it twice by candlelight, then sends a boy to wake whoever keeps the keys tonight. In uncertain times small news travels fast, and every lord wants to hear it first.	{=ARM_KR_000_1_L}This is a test window of the Chronicle of Westeros. It checks that a story window opens on the map, shows a picture from its theme and closes cleanly.			flag:kr_test_1 ; kod:test	
 000.1	a					p:region:battania	!p:army	okno	wiesc	obie	polnoc	0	{=ARM_KR_000_1a_T}A Raven Over the Wolfswood	{=ARM_KR_000_1a_U}Snow clings to the wings of the raven as it drops into the rookery of a northern keep. The message is short and smudged by the cold: the roads south are still open, but the lords of the North are counting their men and their winter stores.	{=ARM_KR_000_1a_L}Test variant: you see this text because your party stands on the lands of the North. Anywhere else the same window shows its base text.			flag:kr_test_1 ; flag:kr_test_1a	
@@ -17,6 +23,14 @@
 000.6		0		kr:000.5+1				okno	okno	obie	dwor	0	{=ARM_KR_000_6_T}Word from {KING}	{=ARM_KR_000_6_U}A royal messenger in a mud-stained cloak rides through the gate with a sealed letter. It bears the seal of {KING}, and the steward reads it aloud in the yard: the crown asks every lord to keep the roads safe and the granaries full before the cold months.	{=ARM_KR_000_6_L}Test window with variables: the title and the first paragraph name the ruler of the Crownlands, and this line names you, {ME}. A hidden full-version variant must not show here.	KING=@wladca:vlandia ; ME=@gracz		flag:kr_test_6	
 000.6	a					flag:kr_test_1		okno	okno	pelna		0						flag:kr_test_6a	
 000.6	b					flag:kr_test_1		okno	okno	obie		0						flag:kr_test_6b	
+000.7		0		kr:000.6+1				log	nic	obie		0						flag:kr_test_7
+000.7	b					near:lord_7_6:town_K1:5 & head:lord_7_6:clan_nord_6 & clanof:lord_7_5_1:clan_nord_6		log	nic	smierc		0						succeed:lord_7_6:lord_7_5_1 ; flag:kr_test_7b
+000.7	a					region:lord_7_6:battania & head:lord_7_6:clan_nord_6 & clanof:lord_7_5_1:clan_nord_6		log	nic	smierc		0						succeed:lord_7_6:@dziedzic ; flag:kr_test_7a
+000.8		0		kr:000.7+1				log	nic	obie		0						flag:kr_test_8
+000.8	a					kr:000.7		log	nic	smierc		0						die:ROTwanderer35 ; flag:kr_test_8a
+000.9		0		kr:000.8+1				log	nic	obie		0						flag:kr_test_9
+000.9	a					kr:000.8~a		log	nic	obie		0						flag:kr_test_9a
+000.9	b					kr:000.8~0		log	nic	obie		0						flag:kr_test_9b
 #wybor	okno	opcja	etykieta	podpowiedz	dostepna	skutki	bierna
 000.2	a	{=ARM_KR_000_2_Ca}Send him a purse of silver for his host	{=ARM_KR_000_2_Ha}You pay 200 denars from your own purse to Robb Stark. His opinion of you rises a little.		gold:@gracz:lord_5_1:200 ; relp:lord_5_1:2 ; flag:kr_test_2a	
 000.2	b	{=ARM_KR_000_2_Cb}Ride north and offer him your sword	{=ARM_KR_000_2_Hb}Needs a good standing with Robb Stark (relation 50 or more). His opinion of you rises.	p:rel:lord_5_1:50	relp:lord_5_1:5 ; flag:kr_test_2b	

@@ -219,7 +219,25 @@ namespace Armoury
         internal static int ResolvedDay(string arg)
         {
             if (string.IsNullOrEmpty(arg) || arg.IndexOf('=') >= 0 || !KeyOn) return -1;
+            int tl = arg.IndexOf('~');
+            if (tl >= 0)
+            {
+                // m107: kr:NNN.w~R - dzien okna tylko przy wierszu z R (inaczej +N liczylby sie od rozstrzygniecia innym wierszem)
+                bool nv;
+                try { if (!Terms.KrTrue(arg, out nv)) return -1; } catch (Exception e) { Stumble("ResolvedDay(" + arg + ")", e); return -1; }
+                arg = arg.Substring(0, tl);
+            }
             return State.IsResolved(arg) ? State.ResolvedDay(arg) : -1;
+        }
+
+        /// <summary>m107: dzien kampanii rozstrzygniecia okna z termu kr: (NNN.w, NNN.w=x albo NNN.w~R - zawsze dzien okna, bez sprawdzania opcji i wiersza);
+        /// -1 - okno nierozstrzygniete albo Kronika wylaczona. Do ochrony wierszy #move dopisanych do zapisu (CanonCompanions.Fires - bez wstecznej zmiany strony).</summary>
+        internal static int WindowDay(string arg)
+        {
+            if (string.IsNullOrEmpty(arg) || !KeyOn) return -1;
+            int cut = arg.IndexOfAny(new[] { '=', '~' });
+            string id = cut >= 0 ? arg.Substring(0, cut) : arg;
+            return State.IsResolved(id) ? State.ResolvedDay(id) : -1;
         }
     }
 }

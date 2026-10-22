@@ -32,6 +32,23 @@ namespace Armoury
         internal static bool KeyWorld { get { var s = Settings.Current; return s == null || s.ChronicleWorldChanges; } }
         internal static bool KeyFull { get { var s = Settings.Current; return s != null && s.ChronicleFullVersions; } }
         internal static bool KeyChoices { get { var s = Settings.Current; return s == null || s.ChroniclePlayerChoices; } }
+        /// <summary>m107-kronika: klucz ChronicleCanonDeaths (domyslnie TAK) - wiersze wersja=smierc (smierci z kanonu w wersji lekkiej, KRONIKA-FORMAT 3.1).
+        /// Autotest AT2: plik CrashScribe/armoury-kronika-kanon-nie.flag (tylko z flaga testu Kroniki, tryb 1/2) = NIE bez zmiany MCM.</summary>
+        internal static bool KeyCanon { get { if (_canonOffTest) return false; var s = Settings.Current; return s == null || s.ChronicleCanonDeaths; } }
+        internal const string CanonOffFlagName = "armoury-kronika-kanon-nie.flag";
+        private static bool _canonOffTest;   // liczone przy Data.EnsureLoaded (start sesji)
+        internal static bool CanonOffTest { get { return _canonOffTest; } }
+
+        /// <summary>m107: plik flagi w katalogu CrashScribe (jak TestWanted).</summary>
+        private static bool CrashScribeFlag(string name)
+        {
+            try
+            {
+                var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                return System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), name));
+            }
+            catch { return false; }
+        }
 
         // --- potkniecia (wspolne dla calej Kroniki): Log.Error tylko przy 1-5, potem licznik w liniach (plan G) ---
         private static int _st;
@@ -123,7 +140,8 @@ namespace Armoury
                 public int Line;
                 public int Od, Do = -1;                 // dni opowiesci w skali dokumentu (przeliczenie: Terms.DocToStory); Do = -1 - bez konca
                 public string Po = "", Przed = "", Cond = "", Player = "";
-                public string Form = "", Others = "", Version = "";   // okno|wiesc|log ; okno|wiesc|nic ; lekka|pelna|obie
+                public string Form = "", Others = "", Version = "";   // okno|wiesc|log ; okno|wiesc|nic ; lekka|pelna|obie|smierc (m107: smierc - tylko wariant)
+                public bool IsDeath { get { return Version == "smierc"; } }
                 public string Topic = "";
                 public bool Narrated;                    // lektor = 1
                 public bool OwnText;                     // wariant z wlasnym tytulem/gora/dolem (glowny - zawsze true)
@@ -151,7 +169,9 @@ namespace Armoury
                 public RowDef Main;
                 public readonly List<RowDef> Variants = new List<RowDef>();
                 public RecurDef Recur;                   // null - okno jednorazowe
-                public bool HasFull;                     // jakis wiersz wersja=pelna (filtr ChronicleFullVersions, rozdz. 3.1)
+                public bool HasFull;                     // jakis wiersz wersja=pelna albo smierc (filtr ChronicleFullVersions, rozdz. 3.1; m107: smierc liczy sie jak pelna -
+                                                         // przy kluczu TAK okno z wierszem smierc nie bierze wierszy lekka, jak dotad okno z wierszem pelna)
+                public bool HasDeath;                    // m107: jakis wariant wersja=smierc (linie "smierc kanonu" przy rozstrzygnieciu)
                 public bool HasChoice;                   // jakis wiersz z lista opcji
                 public int Od { get { return Main.Od; } }
                 public int Do { get { return Main.Do; } }
@@ -206,7 +226,7 @@ namespace Armoury
             private static readonly List<TopicDef> _topics = new List<TopicDef>();
             private static readonly Dictionary<string, TopicDef> _topicBy = new Dictionary<string, TopicDef>(StringComparer.Ordinal);
             private static string _topicsWhy = "";
-            private static int _bad, _badShown, _unknownTerms;
+            private static int _bad, _badShown, _unknownTerms, _deathRows;
             private static string _firstBad = "", _firstUnknown = "";
             private static bool _test;
 
@@ -221,6 +241,8 @@ namespace Armoury
             internal static int BadRows { get { return _bad; } }
             internal static string FirstBad { get { return _firstBad; } }
             internal static int UnknownTerms { get { return _unknownTerms; } }
+            /// <summary>m107: wiersze wersja=smierc w dobrych paczkach (linia startu "Canon Deaths ... (wierszy smierci N)").</summary>
+            internal static int DeathRows { get { return _deathRows; } }
 
             internal static WindowDef Window(string id) { WindowDef w; return id != null && _byId.TryGetValue(id, out w) ? w : null; }
             /// <summary>Wiersz po kluczu NNN.w (glowny) albo NNN.w + litera (wariant).</summary>
@@ -285,6 +307,7 @@ namespace Armoury
                 try
                 {
                     bool test = TestWanted();
+                    _canonOffTest = test && CrashScribeFlag(CanonOffFlagName);   // m107: autotest AT2 (Canon Deaths NIE bez MCM)
                     string dir = Dir();
                     var files = ListFiles(dir, test);
                     string stamp = Stamp(dir, files, test);
@@ -348,7 +371,7 @@ namespace Armoury
             {
                 _packs.Clear(); _windows.Clear(); _byId.Clear(); _byKey.Clear(); _texts.Clear(); _bands.Clear(); _tasks.Clear(); _pairs.Clear(); _tombs.Clear();
                 _topics.Clear(); _topicBy.Clear(); _topicsWhy = "";
-                _bad = _badShown = _unknownTerms = 0; _firstBad = _firstUnknown = "";
+                _bad = _badShown = _unknownTerms = _deathRows = 0; _firstBad = _firstUnknown = "";
                 _test = false;
             }
 
@@ -551,7 +574,12 @@ namespace Armoury
                     w.Pack.Rows += 1 + w.Variants.Count;
                     w.HasFull = w.Main.Version == "pelna";
                     w.HasChoice = w.Main.Options.Count > 0;
-                    foreach (var v in w.Variants) { if (v.Version == "pelna") w.HasFull = true; if (v.Options.Count > 0) w.HasChoice = true; }
+                    foreach (var v in w.Variants)
+                    {
+                        if (v.Version == "pelna" || v.IsDeath) w.HasFull = true;   // m107: smierc liczy sie jak pelna (lekka przy kluczu TAK - jak dotad)
+                        if (v.IsDeath) { w.HasDeath = true; _deathRows++; }
+                        if (v.Options.Count > 0) w.HasChoice = true;
+                    }
                     if (w.HasChoice) w.Pack.Choices++;
                     ScanTerms(w.Main);
                     foreach (var v in w.Variants) ScanTerms(v);
@@ -608,7 +636,9 @@ namespace Armoury
                 r.Cond = c[6]; r.Player = c[7]; r.Form = c[8]; r.Others = c[9]; r.Version = c[10]; r.Topic = c[11];
                 if (r.Form != "okno" && r.Form != "wiesc" && r.Form != "log") { Bad(p, l.No, "#okno " + r.Key + ": forma '" + r.Form + "' (okno|wiesc|log)"); return; }
                 if (r.Others != "okno" && r.Others != "wiesc" && r.Others != "nic") { Bad(p, l.No, "#okno " + r.Key + ": inni '" + r.Others + "' (okno|wiesc|nic)"); return; }
-                if (r.Version != "lekka" && r.Version != "pelna" && r.Version != "obie") { Bad(p, l.No, "#okno " + r.Key + ": wersja '" + r.Version + "' (lekka|pelna|obie)"); return; }
+                if (r.Version != "lekka" && r.Version != "pelna" && r.Version != "obie" && r.Version != "smierc") { Bad(p, l.No, "#okno " + r.Key + ": wersja '" + r.Version + "' (lekka|pelna|obie|smierc)"); return; }
+                // m107: wiersz smierc tylko jako wariant - wiersz glowny jest zapasem bez smierci (swiat inny niz w ksiazce, klucze NIE)
+                if (r.Version == "smierc" && war.Length == 0) { Bad(p, l.No, "#okno " + r.Key + ": wersja smierc tylko w wariancie (wiersz glowny = zapas bez smierci)"); return; }
                 if (c[12] != "" && c[12] != "0" && c[12] != "1") { Bad(p, l.No, "#okno " + r.Key + ": lektor '" + c[12] + "' (0|1)"); return; }
                 r.Narrated = c[12] == "1";
                 for (int i = 13; i <= 15; i++) if (!TextOk(c[i])) { Bad(p, l.No, "#okno " + r.Key + ": tekst bez prefiksu {=ARM_KR_...} w kolumnie " + Cols["#okno"][i]); return; }
