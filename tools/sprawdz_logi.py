@@ -1047,13 +1047,13 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m105kronika : (21.10, w-toku/kronika-00-silnik; Armoury/src/Chronicle*.cs, CanonCompanions.cs hide/unhide i term kr:, dane Armoury/ModuleData/arm_kronika_kNN.tsv;
                     klucze ChronicleOfWesteros, ChronicleWorldChanges, ChronicleFullVersions, ChroniclePlayerChoices; plik testu CrashScribe/armoury-kronika-test.flag
                     - paczka k00, armoury-kronika-wybor.flag - wymuszona opcja) python -I tools/sprawdz_logi.py --grupa m105kronika <Armoury-*.log>
-                    [--crashscribe <session-*.log>]. Log 'Kronika Westeros (KW): '. KW-0 start (klucz TAK, paczki z oknami, zle wiersze 0), KW-1 ERROR Chronicle
-                    i potkniecia 0, KW-2 okna do pokazania pokazane w <= 3 doby, KW-3 zadne okno przed 'od' (KW-3b kotwice 'przed' - straty INFO, > 10% sygnal),
-                    KW-4 <= 2 okna na dobe i odstep >= 6 h, KW-5 akcje z wynikiem i nieznanych 0 (KW-5b niewspierane, KW-5c swiadomie POMINIETE INFO), KW-6 zloto z platnikiem, KW-7 okno
+                    [--crashscribe <session-*.log>]. Log 'Kronika Westeros (KW): '. KW-0 start (klucz TAK, paczki z oknami, zle wiersze 0, nieznane termy 0), KW-1
+                    ERROR Chronicle, potkniecia i NIEZNANY TERM 0, KW-2 okna do pokazania pokazane w <= 3 doby, KW-3 zadne okno przed 'od' (KW-3b kotwice 'przed' - straty INFO, > 10% sygnal),
+                    KW-4 <= 2 okna na dobe i odstep >= 6 h, KW-5 akcje z wynikiem i nieznanych 0 (KW-5b niewspierane, KW-5c swiadomie POMINIETE INFO), KW-6 zloto z platnikiem (0 ', zdjete X - dopisane Y'), KW-7 okno
                     i wybor najwyzej raz w kampanii, KW-8 okna zapas 0, KW-9 wybory po oknie (para z AUTOTEST 'OKNO wybor z listy' przy --crashscribe, lista
-                    zniknieta 0), KW-10 ZWOLNIENIE PRZY OKNIE 0, KW-11 lektor (INFO), KW-12 zapis arm_kronika < 24 KB, KW-13 #mNN najwyzej raz i pary #para
-                    w kolejnosci, KW-14 bandy <= 12 i sufit band fabularnych okregu z linii 'banda' (KW-14b losy band INFO), KW-15 ukrycie postaci chronionej
-                    tylko po jej wydarzeniu ROT (KW-15b ukryci bez powrotu INFO), KW-16 zadania i zbiorki (INFO; B2). Log bez Kroniki: INFO; klucz
+                    zniknieta 0), KW-10 ZWOLNIENIE PRZY OKNIE 0, KW-11 lektor (INFO), KW-12 zapis arm_kronika < 48 KB, KW-13 #mNN najwyzej raz i pary #para
+                    w kolejnosci, KW-14 bandy <= 12 i sufit band fabularnych okregu z linii 'banda' (KW-14b losy band INFO), KW-15 ukrycie, die i succeed postaci
+                    chronionej tylko po jej wydarzeniu ROT (KW-15b ukryci bez powrotu INFO), KW-16 zadania i zbiorki (INFO; B2). Log bez Kroniki: INFO; klucz
                     ChronicleOfWesteros NIE: progi okien INFO.
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
@@ -39033,6 +39033,9 @@ M105KR_PACKS = re.compile(r"\| paczki (\d+):(.*?)\[okien/wyborow/band\]")
 M105KR_PACK = re.compile(r"\bk(\d\d) (\d+)/(\d+)/(\d+)")
 M105KR_BADFILE = re.compile(r"\bk(\d\d) ZLY PLIK \(")
 M105KR_BADROWS = re.compile(r"\| zle wiersze (\d+)")
+M105KR_UNKTERMS = re.compile(r"\| nieznane termy (\d+)")              # recenzja K0 R-12: linia startu (Data.Summary) - nieznane termy w danych
+M105KR_UNKDAY = re.compile(r"\| nieznane termy dzis (\d+)")           # linia doby - nieznane termy przy liczeniu
+M105KR_CC_HEIR = re.compile(r"^KONIEC UKRYCIA \(dziedzic\) (.*?) \((\S+)\) - ")   # CanonCompanions.BeforeHeroKilled - powrot ukrytego dziedzica
 M105KR_DAY = re.compile(r"^dzien (-?\d+) \(opowiesci (-?[0-9.]+)(, prolog)?\) \| nalezne (\d+)(?: \(do pokazania (\d+)\))?")
 M105KR_DAY_OFF = re.compile(r"^dzien (-?\d+) \| klucz Chronicle Of Westeros NIE")
 M105KR_DAY_TODAY = re.compile(r"\| dzis okna (\d+), wiesci (\d+), log (\d+), nic (\d+), pominiete (\d+)")
@@ -39047,13 +39050,13 @@ M105KR_SHOWN_HOUR = re.compile(r"\| godzina kampanii (-?[0-9.]+) \| dzis (\d+)/(
 M105KR_SHOWN_VOICE = re.compile(r"\| lektor (\S+) (TAK|NIE|-)")
 M105KR_RES = re.compile(r"^(wiesc|log|nic) (\S+?)(?: wariant \w+)? \((.*)\) ")
 M105KR_SKIP = re.compile(r"^POMINIETE okno (\S+) - (.*) \(dzien opowiesci (-?[0-9.]+)\)\.$")
-M105KR_ACT = re.compile(r"^akcja (\S+) #(\d+) (\S+) -> (OK|POMINIETA|CZEKA)(?: \((.*)\))?\.$")
+M105KR_ACT = re.compile(r"^akcja (\S+) #(\d+) (.+?) -> (OK|POMINIETA|CZEKA)(?: \((.*)\))?\.$")   # akcja moze miec spacje (koniec ukrycia hide z ' | ')
 M105KR_CHOSEN = re.compile(r"^wybor (\S+) = ([a-d]) '")
 M105KR_CHOICE_WAIT = re.compile(r"^wybor (\S+) czeka na liste")
 M105KR_LIST = re.compile(r"^lista wyboru (\S+) pokazana")
 M105KR_LIST_LOST = re.compile(r"^lista wyboru (\S+) zniknela bez wyboru")
 M105KR_SAVE = re.compile(r"^zapis arm_kronika ([0-9.]+) KB")
-M105KR_HIDE = re.compile(r"^ukryty (.*?) \((\S+)\) \((\S+)\) do (.*?) \| (.*)\.$")
+M105KR_HIDE = re.compile(r"^ukryty (.*?) \((\S+)\) \((\S+)\) do (.*?) \| ((?:ukryty|UKRYCIE).*)\.$")   # koniec ukrycia moze miec ' | ' (092.1)
 M105KR_BACK = re.compile(r"^(powrot|KONIEC UKRYCIA|UKRYCIE przerwane) (.*?) \((\S+)\)[ .]")
 M105KR_GOLD = re.compile(r"^zloto (\S+): (.*?) -> (.*?) (\d+)")
 M105KR_BAND = re.compile(r"^banda (\S+) ")
@@ -39121,15 +39124,17 @@ def m105kr_data():
 
 def m105kronika_main(logp, csp=None):
     """m105kronika (21.10, w-toku/kronika-00-silnik; Jeff 21.10: Kronika na cala fabule - 5 tomow + serial, wersje lekkie, wybory gracza po oknie, decyzje Jeffa
-    w docs/KRONIKA-WESTEROS-V2): KW-0 linia startu, klucz TAK, kazda paczka ma okna, zle wiersze 0 (log bez Kroniki - INFO); KW-1 ERROR Chronicle i potkniecia 0;
+    w docs/KRONIKA-WESTEROS-V2): KW-0 linia startu, klucz TAK, kazda paczka ma okna, zle wiersze 0, nieznane termy w danych 0 (log bez Kroniki - INFO); KW-1 ERROR
+    Chronicle, potkniecia, linie NIEZNANY TERM i nieznane termy z linii doby 0;
     KW-2 nalezne okna do pokazania pokazane najdalej w 3 doby (seria dob z oknami czekajacymi i 0 pokazanych <= 3); KW-3 zadne okno przed 'od', okna z kotwica
     'przed' - stracone (wiesc po kotwicy, POMINIETE 'juz ruszylo') INFO, > 10% sygnal do galezi trzymania; KW-4 <= 2 okna na dobe i odstep >= 6 h; KW-5 kazda akcja
-    z linia wyniku, akcji nieznanych 0 (KW-5b niewspierane w tej wersji - INFO); KW-6 zloto zawsze z platnikiem (0 'z niczego'); KW-7 w kampanii zadne okno ani
+    z linia wyniku, akcji nieznanych 0 (KW-5b niewspierane w tej wersji - INFO); KW-6 zloto zawsze z platnikiem (0 linii 'zloto' z ', zdjete X - dopisane Y' -
+    zeszlo z platnika inaczej, niz doszlo do odbiorcy); KW-7 w kampanii zadne okno ani
     wybor dwa razy (po wczytaniu); KW-8 okna zapas 0 (nieotwarte INFO); KW-9 kazde czekanie na liste ma wybor, lista ma pare z AUTOTEST 'OKNO wybor z listy'
-    (--crashscribe), lista zniknieta / Esc 0; KW-10 'ZWOLNIENIE PRZY OKNIE' 0; KW-11 lektor (INFO); KW-12 zapis arm_kronika < 24 KB; KW-13 wiersz #mNN wykonany
-    najwyzej raz, pary #para w kolejnosci (po: okno po ruchu, kr: ruch z 'zaszlo kr:' po oknie); KW-14 bandy <= 12 (linie band - INFO); KW-15 ukrycie postaci
-    z listy chronionych tylko po jej wydarzeniu ROT (linia 'lista chronionych: ... spelnione'), ukryci bez powrotu - INFO. Klucz ChronicleOfWesteros NIE: progi
-    okien INFO (licza KW-1, KW-10, KW-12)."""
+    (--crashscribe), lista zniknieta / Esc 0; KW-10 'ZWOLNIENIE PRZY OKNIE' 0; KW-11 lektor (INFO); KW-12 zapis arm_kronika < 48 KB (recenzja K0 R-16: SaveText
+    tnie napis po 8000 znakow); KW-13 wiersz #mNN wykonany najwyzej raz, pary #para w kolejnosci (po: okno po ruchu, kr: ruch z 'zaszlo kr:' po oknie); KW-14
+    bandy <= 12 (linie band - INFO); KW-15 ukrycie, die i succeed (umierajacy) postaci z listy chronionych tylko po jej wydarzeniu ROT (linia 'lista chronionych:
+    ... spelnione'), ukryci bez powrotu - INFO. Klucz ChronicleOfWesteros NIE: progi okien INFO (licza KW-1, KW-10, KW-12)."""
     from collections import Counter
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -39142,6 +39147,7 @@ def m105kronika_main(logp, csp=None):
     data_lines, bad_files, bad_rows_lines = [], [], 0
     shown, res_lines, skips, acts, chosen, cwait, lists, lost, saves, hides, backs, golds, bands, cc_moves, cc_skips = ([] for _ in range(15))
     tasks, musters = [], []   # B2: linie zadan i konca zbiorek
+    unk_lines = 0             # recenzja K0 R-12: linie NIEZNANY TERM (dane przy wczytaniu i termy przy liczeniu)
     stumb = 0
     seq = 0
     camp = 0
@@ -39165,11 +39171,19 @@ def m105kronika_main(logp, csp=None):
                 if mm:
                     seq += 1
                     cc_skips.append((seq, camp, mm.group(1)))
+                    continue
+                mm = M105KR_CC_HEIR.match(b.lstrip(": "))
+                if mm:
+                    seq += 1
+                    backs.append((seq, camp, "KONIEC UKRYCIA", mm.group(2)))
                 continue
             if not s.startswith(M105KR_TAG):
                 continue
             b = s[len(M105KR_TAG):]
             seq += 1
+            if b.startswith("NIEZNANY TERM"):
+                unk_lines += 1
+                continue
             if b.startswith("start sesji"):
                 if "(nowa kampania)" in b:
                     camp += 1
@@ -39270,17 +39284,23 @@ def m105kronika_main(logp, csp=None):
     empty = [f"k{p[0]}" for p in packs if int(p[1]) == 0]
     mb = M105KR_BADROWS.search(last)
     n_bad = int(mb.group(1)) if mb else -1
+    mu = M105KR_UNKTERMS.search(last) or (M105KR_UNKTERMS.search(data_lines[-1]) if data_lines else None)
+    n_unk = int(mu.group(1)) if mu else -1
     if not starts:
         rep.add("KW-0: linia startu sesji", "brak (tylko linie doby)", "co najmniej 1 linia 'start sesji'", False)
     elif not key_on:
         rep.add("KW-0: linia startu sesji", f"klucz Chronicle Of Westeros NIE | {last[:140]}", "INFO - klucz NIE (brak okien; progi okien INFO)", None)
     else:
-        rep.add("KW-0: start: klucz TAK, paczki z oknami, zle wiersze 0",
+        rep.add("KW-0: start: klucz TAK, paczki z oknami, zle wiersze 0, nieznane termy 0",
                 f"klucze {mk.groups() if mk else '?'} | paczek {len(packs)}" + (f" (bez okien {', '.join(empty)})" if empty else "")
-                + (f", ZLY PLIK {', '.join('k' + x for x in badp)}" if badp else "") + f" | zle wiersze {n_bad} (linii ZLY WIERSZ {bad_rows_lines}), linii ZLY PLIK {len(bad_files)}",
-                "klucz TAK, >= 1 paczka, kazda paczka ma okna, 0 ZLY PLIK, zle wiersze 0", bool(packs) and not empty and not badp and not bad_files and n_bad == 0)
-    # KW-1
-    rep.add("KW-1: ERROR Chronicle i potkniecia Kroniki", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+                + (f", ZLY PLIK {', '.join('k' + x for x in badp)}" if badp else "") + f" | zle wiersze {n_bad} (linii ZLY WIERSZ {bad_rows_lines}), linii ZLY PLIK {len(bad_files)}"
+                + f" | nieznane termy w danych {n_unk if n_unk >= 0 else '? (brak w linii)'}",
+                "klucz TAK, >= 1 paczka, kazda paczka ma okna, 0 ZLY PLIK, zle wiersze 0, nieznane termy 0 (recenzja K0 R-12)",
+                bool(packs) and not empty and not badp and not bad_files and n_bad == 0 and n_unk <= 0)
+    # KW-1 (+ R-12: linie NIEZNANY TERM i licznik doby 'nieznane termy dzis')
+    unk_day_terms = sum(int(M105KR_UNKDAY.search(d[2]).group(1)) for d in days if M105KR_UNKDAY.search(d[2]))
+    rep.add("KW-1: ERROR Chronicle, potkniecia, nieznane termy", f"ERROR {n_err}, potkniecia {stumb}, linii NIEZNANY TERM {unk_lines}, nieznane termy z linii doby {unk_day_terms}",
+            "0, 0, 0 i 0", n_err == 0 and stumb == 0 and unk_lines == 0 and unk_day_terms == 0)
     win = key_on
     # KW-2 seria dob z oknami do pokazania i 0 pokazanych
     worst, cur, worst_at, prev = 0, 0, None, None
@@ -39383,10 +39403,12 @@ def m105kronika_main(logp, csp=None):
             "INFO (alliance zawsze POMINIETA z powodem - straznik Prologue.Crown / CanonAlliances; own, ruler, leader, truce, succeed tylko w wierszu pelna przy kluczu "
             "Chronicle Full Versions TAK, succeed lekki w 42/49/52/80)", None)
     # KW-6 zloto
-    nothing = sum(1 for g_ in golds if "z niczego" in g_) + sum(1 for a in acts if a[4].startswith("gold:") and a[5] == "OK" and "z niczego" in (a[6] or ""))
+    # recenzja K0 R-13: silnik nie pisze 'z niczego' - przeciek widac jako ', zdjete X - dopisane Y' (Actions.Gold: z platnika zeszlo inaczej, niz doszlo)
+    nothing = sum(1 for g_ in golds if ", zdjete " in g_)
     gold_ok = [a for a in acts if a[4].startswith("gold:") and a[5] == "OK"]
-    rep.add("KW-6: zloto z platnikiem", f"linii zlota {len(golds)}, akcji gold OK {len(gold_ok)}, 'z niczego' {nothing}",
-            "0 'z niczego' (zamknieta ekonomia: platnik -> odbiorca); brak zlota w logu - INFO", (nothing == 0) if (golds or gold_ok) else None)
+    rep.add("KW-6: zloto z platnikiem", f"linii zlota {len(golds)}, akcji gold OK {len(gold_ok)}, linii z ', zdjete X - dopisane Y' {nothing}",
+            "0 linii 'zloto' z ', zdjete ' (zamknieta ekonomia: odbiorca dostaje dokladnie to, co zeszlo z platnika); brak zlota w logu - INFO",
+            (nothing == 0) if (golds or gold_ok) else None)
     # KW-7 powtorki w kampanii
     cnt = Counter()
     for x in shown:
@@ -39439,8 +39461,9 @@ def m105kronika_main(logp, csp=None):
     # KW-12 zapis
     day_kb = [float(M105KR_DAY_SAVE.search(d[2]).group(1)) for d in days if M105KR_DAY_SAVE.search(d[2])]
     mx = max(saves) if saves else None
-    rep.add("KW-12: zapis arm_kronika < 24 KB", (f"zapisow {len(saves)}, najwiekszy {mx:.1f} KB" if saves else "brak linii zapisu") + (f" | szacunek z dob max {max(day_kb):.1f} KB" if day_kb else ""),
-            "< 24 KB (SaveText 32 KB napisu - zapas)", (mx < 24.0) if saves else ((max(day_kb) < 24.0) if day_kb else None))
+    rep.add("KW-12: zapis arm_kronika < 48 KB", (f"zapisow {len(saves)}, najwiekszy {mx:.1f} KB" if saves else "brak linii zapisu") + (f" | szacunek z dob max {max(day_kb):.1f} KB" if day_kb else ""),
+            "< 48 KB (recenzja K0 R-16: dluga kampania 30-40 KB; SaveText tnie napis po 8000 znakow, wiec 32 KB napisu nie peka - prog to zapas)",
+            (mx < 48.0) if saves else ((max(day_kb) < 48.0) if day_kb else None))
     # KW-13 #move raz i pary w kolejnosci
     mc_ = Counter((c[1], c[2]) for c in cc_moves)
     dupm = [k[1] for k, v in mc_.items() if v > 1]
@@ -39499,12 +39522,17 @@ def m105kronika_main(logp, csp=None):
     rep.add("KW-14b: losy band Kroniki", f"rozbite przez gracza {routed}, koniec terminu {ended}, zniknely {gone}", "INFO", None)
     # KW-15 lista chronionych i powrot ukrytych
     viol = [f"{h[3]} ({h[4]})" for h in hides if h[3] in prot and "lista chronionych:" not in h[6]]
+    # recenzja K0 R-14: die i succeed (umierajacy = pierwszy argument) z wynikiem OK tez musza miec 'lista chronionych: ... spelnione' (Chronicle.Canon)
+    kills = [a for a in acts if a[5] == "OK" and a[4].split(":")[0] in ("die", "succeed") and len(a[4].split(":")) > 1]
+    kill_prot = [a for a in kills if a[4].split(":")[1] in prot]
+    viol += [f"{a[4].split(':')[1]} ({a[2]} {a[4].split(':')[0]})" for a in kill_prot if "lista chronionych:" not in (a[6] or "")]
     back_ids = {(b[1], b[3]) for b in backs}
     still = [f"{h[3]} do {h[5]}" for h in hides if (h[1], h[3]) not in back_ids and "UKRYCIE: nowy koniec" not in h[6]]
     cc_hide = sum(1 for c in cc_moves if c[3] == "hide")
-    rep.add("KW-15: lista chronionych - ukrycie tylko po wydarzeniu ROT", f"ukryc Kroniki {len(hides)}, z listy chronionych {sum(1 for h in hides if h[3] in prot)}, bez warunku {len(viol)}"
+    rep.add("KW-15: lista chronionych - ukrycie, die i succeed tylko po wydarzeniu ROT", f"ukryc Kroniki {len(hides)}, z listy chronionych {sum(1 for h in hides if h[3] in prot)}"
+            + f" | die/succeed OK {len(kills)}, z listy chronionych {len(kill_prot)} | bez warunku {len(viol)}"
             + (f" [{', '.join(viol[:4])}]" if viol else "") + f" | ukryc #move {cc_hide} | lista: {prot_src} ({len(prot)})",
-            "0 ukryc postaci chronionej bez 'lista chronionych: <wydarzenie> spelnione'", (not viol) if hides else None)
+            "0 ukryc, smierci (die) i sukcesji (succeed) postaci chronionej bez 'lista chronionych: <wydarzenie> spelnione'", (not viol) if (hides or kills) else None)
     rep.add("KW-15b: ukryci bez powrotu w logu", f"{len(still)}" + (f" [{'; '.join(still[:5])}]" if still else "") + f" | powrotow/koncow {len(backs)}",
             "INFO (koniec ukrycia = term albo unhide; term 'nigdy' konczy ukrycie linia KONIEC UKRYCIA)", None)
     # KW-16 (B2): zadania (przyjete/wykonane/nieudane) i zbiorki (na miejscu z wyslanych) - INFO

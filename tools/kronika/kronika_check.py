@@ -62,6 +62,30 @@ ROT_EVENTS = {
     'WallSiegeEvent', 'WallSiegeNotificationEvent',
 }
 
+# Os planu Fabuli (CrashScribe/src/Fabula.cs, slownik Timeline) - term plan:X-N dziala tylko dla X z osi; X spoza osi = term ZAWSZE prawdziwy
+# (Terms.PlanDay false -> decyduje od). Recenzja K0 R-11: plan:BlackwaterEvent w 032.1. main() czyta os z pliku repo; ta lista to zapas.
+FABULA = {
+    'NedEvent', 'HarrenhalSiegeNotificationEvent', 'RiverlandsDeclareWarEvent', 'HarrenhalSiegeEvent', 'RenlyDeathEvent',
+    'BlackwaterSiegeNotificationEvent', 'BlackwaterSiegeEvent', 'RickardKarstarkExecutionEvent', 'JeorMutinyEvent', 'RedWeddingEvent',
+    'JoffreyEvent', 'WallSiegeNotificationEvent', 'WallSiegeEvent', 'EastwatchEvent', 'RamsayEvent', 'JonEvent', 'RooseDeathEvent',
+    'BastardsSiegeNotificationEvent', 'BastardsSiegeEvent', 'AegonInvasionEvent', 'DanyInvasionEvent',
+}
+
+
+def load_fabula(repo):
+    """Wydarzenia osi Fabuli z CrashScribe/src/Fabula.cs (wpisy { "X", N.f }); brak pliku albo wpisow - FABULA bez zmian."""
+    p = os.path.join(repo, 'CrashScribe', 'src', 'Fabula.cs')
+    try:
+        with open(p, encoding='utf-8', errors='replace') as fh:
+            t = fh.read()
+    except OSError:
+        return
+    m = re.search(r'Dictionary<string, float> Timeline\s*=\s*new Dictionary<string, float>\s*\{(.*?)\};', t, re.S)
+    found = set(re.findall(r'\{\s*"([A-Za-z]+)"\s*,\s*[0-9.]+f\s*\}', m.group(1))) if m else set()
+    if found:
+        FABULA.clear()
+        FABULA.update(found)
+
 # Lista chronionych: postac -> warunek, po ktorym wolno ja zabic/ukryc (alternatywy; kazda = zbior termow wymaganych razem).
 # Plan D + uzupelnienie z dekompilacji ROT.Events (ROTLords.* uzywane przez pozniejsze wydarzenia ROT).
 PROTECTED = {
@@ -711,6 +735,9 @@ def chk_term(t, ctx, rep, world, refs, what):
         elif mm.group(1) not in ROT_EVENTS:
             rep.e(ctx.where, '%s: nieznane wydarzenie ROT %r' % (what, mm.group(1)))
             good = False
+        elif mm.group(1) not in FABULA:
+            rep.w(ctx.where, '%s: %r - %s nie ma na osi Fabuli (CrashScribe Fabula.cs) - term zawsze prawdziwy, decyduje od (wydarzenia osi: %s)'
+                  % (what, raw, mm.group(1), ', '.join(sorted(FABULA))))
     elif kind == 'p':
         if not a:
             rep.e(ctx.where, '%s: %r - p:<region|in|near|vassal|army|rel>...' % (what, raw))
@@ -797,13 +824,16 @@ def chk_act(raw, ctx, rep, world, refs, what):
     else:
         name, rest = raw, ''
     if name == 'hide':
-        # hide:<bohater>[:<term konca>] - term moze zawierac ':'
+        # hide:<bohater>[:<koniec ukrycia>] - koniec = warunek (skladnia rozdz. 10, ' & ' i ' | '; silnik: Terms.Eval), moze zawierac ':'
         p = rest.split(':', 1)
         hero = p[0]
         good = chk_ref(hero, 'hero', world, ctx, rep)
         if len(p) > 1 and p[1]:
-            if chk_term(p[1], ctx, rep, world, refs, what + ' (koniec ukrycia)') is None:
+            cnf = parse_cond(p[1], ctx, rep, world, refs, what + ' (koniec ukrycia)')
+            if cnf is None:
                 good = False
+            else:
+                refs.append(('hideend', cnf, raw, ctx.where, ctx.nr))   # recenzja K0 R-2: kr: okna powracajacego bez zapasu - UWAGA po wczytaniu okien
         return Act(name, [hero] + ([p[1]] if len(p) > 1 else []), raw) if good else None
     a = split_args(rest) if rest else []
 
@@ -1042,6 +1072,7 @@ def main():
         pass
     rep = Report(o.ciche)
     md = os.path.join(o.repo, 'Armoury', 'ModuleData')
+    load_fabula(o.repo)
     world = World(o.gra, o.repo, rep)
     linie = load_linie(rep)
     if len([k for k in KODY if k != 'test']) > KODY_MAX:
@@ -1256,7 +1287,9 @@ def main():
                 rep.e(ctx.where, 'forma %r - okno|wiesc|log' % c['forma'])
             if c['inni'] not in ('okno', 'wiesc', 'nic'):
                 rep.e(ctx.where, 'inni %r - okno|wiesc|nic' % c['inni'])
-            if c['inni'] != c['forma'] and not c['gracz'] and c['inni'] != 'nic':
+            # recenzja K0 R-3: pusty gracz wariantu = gracz wiersza glownego (silnik Data.CheckRows)
+            eff_gracz = c['gracz'] or ('' if is_base else rows[0].c['gracz'])
+            if c['inni'] != c['forma'] and not eff_gracz and c['inni'] != 'nic':
                 rep.w(ctx.where, 'inni=%s bez kolumny gracz nic nie zmienia (wszyscy dostaja forme %s)' % (c['inni'], c['forma']))
             if c['wersja'] not in ('lekka', 'pelna', 'obie'):
                 rep.e(ctx.where, 'wersja %r - lekka|pelna|obie' % c['wersja'])
@@ -1307,7 +1340,7 @@ def main():
             else:
                 eff = (base_texts.get('t'), base_texts.get('u'), base_texts.get('l'))
                 if c['zmienne']:
-                    rep.w(ctx.where, 'zmienne w wariancie bez wlasnego tekstu (tekst wiersza glownego ich nie widzi)')
+                    rep.w(ctx.where, 'zmienne w wariancie bez wlasnego tekstu (wariant dziedziczy tekst i zmienne glownego; ta sama NAZWA z wariantu ma pierwszenstwo, inne nazwy tekst glownego pomija)')
             for v in defined - used_vars:
                 if has_text:
                     rep.w(ctx.where, 'zmienna %s zdefiniowana, ale nieuzyta' % v)
@@ -1558,10 +1591,23 @@ def main():
                     rep.w(where, 'kr:%s - paczka k%02d jeszcze nie napisana (sprawdzi sie po jej dopisaniu)' % (ref, NR_PACZKA[rnr]))
             elif opt is not None:
                 keys = [k for k in choices if k[:5] == ref]
-                if not keys:
+                if win_rows[ref][0].c['powtorz']:
+                    # recenzja K0 R-10: wybor instancji zapisuje sie pod NNN.w#klucz - kr:NNN.w=x nigdy nie bylby prawdziwy ani "nigdy"
+                    rep.e(where, 'kr:%s=%s - okno powracajace: wybor instancji nie trafia do kr:NNN.w=x (term nigdy nie zajdzie) - uzyj flagi z opcji' % (ref, opt))
+                elif not keys:
                     rep.e(where, 'kr:%s=%s - okno nie ma wyboru' % (ref, opt))
                 elif not any(any(r.c['opcja'] == opt for r in choices[k]) for k in keys):
                     rep.e(where, 'kr:%s=%s - brak opcji %s' % (ref, opt, opt))
+        elif kind == 'hideend':
+            # recenzja K0 R-2: koniec ukrycia na kr: okna powracajacego - "nigdy" dopiero po wyczerpaniu max:N; okno, ktore nie ruszy wcale (wyzwalacz
+            # nie przyjdzie), zostawia postac ukryta na zawsze - skladnik potrzebuje zapasu (| ev:X | rotday:N)
+            for conj in ref:
+                krs = [t for t in conj if not t.neg and t.base.startswith('kr:')]
+                if krs and len(krs) == len(conj):
+                    rec = [t.base[3:].split('=')[0] for t in krs if t.base[3:].split('=')[0] in win_rows and win_rows[t.base[3:].split('=')[0]][0].c['powtorz']]
+                    if rec:
+                        rep.w(where, '%s - koniec ukrycia tylko na kr: okna powracajacego %s (bez wyzwalacza postac zostaje ukryta na zawsze) - dopisz zapas: | ev:X | rotday:N'
+                              % (opt, ', '.join(rec)))
         elif kind == 'text':
             if ref not in texts:
                 rep.e(where, '%s:%s - brak tekstu %s w #tekst' % (opt, ref, ref))
