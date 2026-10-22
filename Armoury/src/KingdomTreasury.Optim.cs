@@ -24,7 +24,7 @@ namespace Armoury
         {
             _optWar.Clear();
             _optOn = s != null && s.OptimDailyCache;
-            _optVerify = _optOn && s.OptimVerify;
+            _optVerify = _optOn && Optim105.VerifyOn(s);
             _optWarAsk = _optWarHit = _optWarCmp = _optWarDiff = 0;
         }
 
@@ -76,7 +76,7 @@ namespace Armoury
             if (s == null) return;
             _optWar.Clear(); _optWarDiffSess = 0; _optWarCmpSess = 0;   // recenzja m99: nowa kampania / wczytanie - bez krolestw poprzedniej sesji
             try { KtSkipReset(); Optim105.StartLine(); } catch (Exception e) { Log.Error("Optim105.StartLine", e); }   // m105-optym: liczniki sesji i linia "Optym (m105): start"
-            Log.Info("Optym (m99): start | Optim Daily Cache " + (s.OptimDailyCache ? "TAK" : "NIE") + ", Optim Verify " + (s.OptimDailyCache && s.OptimVerify ? "TAK" : "NIE")
+            Log.Info("Optym (m99): start | Optim Daily Cache " + (s.OptimDailyCache ? "TAK" : "NIE") + ", Optim Verify " + (s.OptimDailyCache && Optim105.VerifyOn(s) ? "TAK" : "NIE")
                      + " | wlaczone: " + (s.OptimDailyCache ? "KingdomTreasury.Daily - wojna krolestwa raz na krolestwo na dobe (zamiast przegladu Kingdom.All na kazdy rod)" : "brak (kod jak dotad)")
                      + " | bez zmian (wynik zalezalby od kolejnosci albo skutkow ubocznych modelu finansow - docs/noc-1920/m99-optym-CHANGELOG.md): ClanIncomeBook.Daily, SupplyDemand.DailyTrade, Sutlers.Daily, model dochodu w KingdomTreasury.Daily.");
         }

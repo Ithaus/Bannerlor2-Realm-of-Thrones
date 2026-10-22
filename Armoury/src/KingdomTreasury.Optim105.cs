@@ -71,7 +71,7 @@ namespace Armoury
             try { _ktGuard = KtGuard(); }
             catch (Exception e) { _ktGuard = "straznik: wyjatek " + e.GetType().Name; KtStumble("straznik", e); }
             _ktSkipOn = _ktGuard == null;
-            _ktSkipVerify = _ktSkipOn && s.OptimVerify;
+            _ktSkipVerify = _ktSkipOn && Optim105.VerifyOn(s);
         }
 
         /// <summary>Czy model dochodu tego rodu mozna pominac (warunki z opisu klasy); preLand - StableLand policzony przed modelem (-1, gdy nie liczony).

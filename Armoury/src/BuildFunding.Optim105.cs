@@ -22,7 +22,7 @@ namespace Armoury
         {
             _bfWar.Clear();
             _bfOn = s != null && s.OptimBuildWar;
-            _bfVerify = _bfOn && s.OptimVerify;
+            _bfVerify = _bfOn && Optim105.VerifyOn(s);
             _bfAsk = _bfHit = _bfCmp = _bfDiff = 0;
         }
 

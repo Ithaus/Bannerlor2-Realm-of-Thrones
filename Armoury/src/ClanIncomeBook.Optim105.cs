@@ -35,7 +35,7 @@ namespace Armoury
             _cdFast = _cdCmp = _cdDiff = 0; _cdDiffNote = null;
             var s = Settings.Current;
             _cdOn = s != null && s.OptimStableDelegates;
-            _cdVerify = _cdOn && s.OptimVerify;
+            _cdVerify = _cdOn && Optim105.VerifyOn(s);
             if (!_cdOn) return;
             try
             {

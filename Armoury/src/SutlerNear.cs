@@ -45,7 +45,7 @@ namespace Armoury
                     Put(ref _vSt, ref _vPos, ref _vFac, _vN++, st);
                 }
                 _on = true;
-                _verify = s.OptimVerify;
+                _verify = Optim105.VerifyOn(s);
             }
             catch (Exception e) { _on = false; _tN = _vN = 0; Stumble("tablice", e); }
         }
