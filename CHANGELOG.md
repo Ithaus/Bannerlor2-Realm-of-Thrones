@@ -1,5 +1,10 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-22 WGRANIE 103.5 (w-toku/m108-dziennik 44c03a05) - kon pod jezdzcem niesie juki, muzyka wydarzen bez pauzy
+**Status:** WGRANE 2026-10-22 ok. 21:41 CEST (Jeff: "wgraj"; test p20 kod 0). W GRZE: Armoury e0008b00, reszta jak 103.4. Kopie *.bak-2026-10-22-wgranie1035-przed i na D:. safely_exited 1.
+- m108-jezdziec: kazdy kon pod jezdzcem (gracz, towarzysze, jazda) niesie 20 kg jukow (RiderHorseCarryKg; gra liczyla tylko luzaki).
+- m108-muzyka: muzyka gry przy oknie wydarzenia tylko sciszana (bez SetPaused psai - podejrzenie urywania muzyki w bitwie po oknie wydarzenia).
+
 ## 2026-10-22 WGRANIE 103.4 (w-toku/m108-dziennik 73075573 = 103.3 + m108-dziennik + m108-muzyka) - mniejszy dziennik, muzyka wydarzen
 **Status:** WGRANE 2026-10-22 ok. 20:55 CEST (po tescie 108b). W GRZE: Armoury b9f5ebb5 (reszta DLL jak 103.3) + 6 utworow Lektor/Muzyka/muz_*.ogg. Kopie *.bak-2026-10-22-wgranie1034-przed i na D: (wgrane/2026-10-22-wgranie1034-przed). safely_exited 1.
 - m108-dziennik (Jeff: dziennik zaslanial dol menu miasta): czcionka linii 16 zamiast 20 (MapChatLogFontSize), pole wiadomosci 75% wysokosci (MapChatLogHeightPct; dol zostaje, przy przegladaniu pelne pole).
