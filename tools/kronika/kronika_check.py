@@ -62,6 +62,30 @@ ROT_EVENTS = {
     'WallSiegeEvent', 'WallSiegeNotificationEvent',
 }
 
+# Os planu Fabuli (CrashScribe/src/Fabula.cs, slownik Timeline) - term plan:X-N dziala tylko dla X z osi; X spoza osi = term ZAWSZE prawdziwy
+# (Terms.PlanDay false -> decyduje od). Recenzja K0 R-11: plan:BlackwaterEvent w 032.1. main() czyta os z pliku repo; ta lista to zapas.
+FABULA = {
+    'NedEvent', 'HarrenhalSiegeNotificationEvent', 'RiverlandsDeclareWarEvent', 'HarrenhalSiegeEvent', 'RenlyDeathEvent',
+    'BlackwaterSiegeNotificationEvent', 'BlackwaterSiegeEvent', 'RickardKarstarkExecutionEvent', 'JeorMutinyEvent', 'RedWeddingEvent',
+    'JoffreyEvent', 'WallSiegeNotificationEvent', 'WallSiegeEvent', 'EastwatchEvent', 'RamsayEvent', 'JonEvent', 'RooseDeathEvent',
+    'BastardsSiegeNotificationEvent', 'BastardsSiegeEvent', 'AegonInvasionEvent', 'DanyInvasionEvent',
+}
+
+
+def load_fabula(repo):
+    """Wydarzenia osi Fabuli z CrashScribe/src/Fabula.cs (wpisy { "X", N.f }); brak pliku albo wpisow - FABULA bez zmian."""
+    p = os.path.join(repo, 'CrashScribe', 'src', 'Fabula.cs')
+    try:
+        with open(p, encoding='utf-8', errors='replace') as fh:
+            t = fh.read()
+    except OSError:
+        return
+    m = re.search(r'Dictionary<string, float> Timeline\s*=\s*new Dictionary<string, float>\s*\{(.*?)\};', t, re.S)
+    found = set(re.findall(r'\{\s*"([A-Za-z]+)"\s*,\s*[0-9.]+f\s*\}', m.group(1))) if m else set()
+    if found:
+        FABULA.clear()
+        FABULA.update(found)
+
 # Lista chronionych: postac -> warunek, po ktorym wolno ja zabic/ukryc (alternatywy; kazda = zbior termow wymaganych razem).
 # Plan D + uzupelnienie z dekompilacji ROT.Events (ROTLords.* uzywane przez pozniejsze wydarzenia ROT).
 PROTECTED = {
@@ -232,6 +256,10 @@ class World:
         self.move_who = set()
         self.lektor = {}      # key -> (title, md5tekstu or '')
         self.lektor_titles = {}
+        # krytyk K0 (22.10): nagrania Kroniki leza w manifescie Lektor/EN/arm_lektor_kronika.tsv (nagraj_kronika.py; klucz, tytul, plik, md5 tekstu,
+        # md5 pliku, paczka) - nie w arm_lektor.tsv (tam okna ROT i prologu bez kluczy kr_), wiec stara kontrola md5 nigdy nie trafiala
+        self.lektor_kr = {}   # key -> (tytul, plik, md5 tekstu, md5 pliku, wiersz)
+        self.lektor_kr_path = None
         try:
             t = read_xml(os.path.join(mods, 'ROT-Content', 'ModuleData', 'ROT_heroes.xml'))
             for m in re.finditer(r'<Hero\b' + TAG + '/?>', t):
@@ -302,6 +330,7 @@ class World:
         p = os.path.join(repo, 'Armoury', 'ModuleData', 'arm_canon_moves.tsv')
         self.moves_path = p
         self.moves_line = {}
+        self.move_mode = {}   # id -> '' | classic | prolog (kolumna mode #move)
         if os.path.isfile(p):
             sec = None
             for i, line in enumerate(read_text(p).splitlines(), 1):
@@ -315,17 +344,36 @@ class World:
                     self.moves[c[0]] = (c[1], c[3])
                     self.moves_line[c[0]] = i
                     self.move_who.add(c[1])
+                    self.move_mode[c[0]] = c[5].strip() if len(c) >= 6 else ''
         else:
             rep.e('arm_canon_moves.tsv', 'brak pliku %s' % p)
         p = os.path.join(repo, 'Armoury', 'ModuleData', 'Lektor', 'EN', 'arm_lektor.tsv')
         if os.path.isfile(p):
-            for line in read_text(p).splitlines():
+            for i, line in enumerate(read_text(p).splitlines(), 1):
                 if line.startswith('#') or not line.strip():
                     continue
                 c = line.split('\t')
                 if len(c) >= 2:
                     self.lektor[c[0]] = (c[1], c[4].strip() if len(c) >= 5 else '')
                     self.lektor_titles[norm_title(c[1])] = c[0]
+                    if c[0].startswith('kr_'):
+                        # Lektor.LoadIndex czyta arm_lektor.tsv PRZED manifestem: klucz kr_ stad zaslania wiersz manifestu i gra bez zasady md5
+                        rep.e('arm_lektor.tsv:%d' % i, 'klucz Kroniki %s w arm_lektor.tsv - nagrania Kroniki tylko w arm_lektor_kronika.tsv (tu zaslania manifest '
+                                                       'i gra bez kontroli md5 tekstu)' % c[0])
+        p = os.path.join(repo, 'Armoury', 'ModuleData', 'Lektor', 'EN', 'arm_lektor_kronika.tsv')
+        if os.path.isfile(p):
+            self.lektor_kr_path = p
+            for i, line in enumerate(read_text(p).splitlines(), 1):
+                if line.startswith('#') or not line.strip():
+                    continue
+                c = [x.strip() for x in line.split('\t')]
+                if len(c) < 5 or not c[0].startswith('kr_'):
+                    rep.e('arm_lektor_kronika.tsv:%d' % i, 'wiersz manifestu: klucz kr_..., tytul, plik, md5 tekstu, md5 pliku[, paczka]')
+                    continue
+                if c[0] in self.lektor_kr:
+                    rep.e('arm_lektor_kronika.tsv:%d' % i, 'klucz %s drugi raz (Lektor bierze pierwszy)' % c[0])
+                    continue
+                self.lektor_kr[c[0]] = (c[1], c[2], c[3], c[4], i)
         # glowy rodow i wladcy na starcie (XML) - do zakazu die/hide bez dziedzica
         self.heads = {}
         for cid, a in self.clans.items():
@@ -344,6 +392,27 @@ class World:
 def norm_title(t):
     t = re.sub(r'^\{=[^}]*\}', '', t).strip().rstrip('.!').lower()
     return re.sub(r'\s+', ' ', t)
+
+
+# Tekst nagrania okna Kroniki DOKLADNIE jak repo glowne tools/lektor/nagraj_kronika.py (windows) i Chronicle.Voice.Text: tytul, gora, dol bez {=...},
+# tytul.rstrip('.!?') + '.' + 2 x LF + gora + 2 x LF + dol, potem zamiany wymowy SAY. md5 = md5 UTF-8 tego tekstu (kolumna 4 manifestu).
+VOICE_SAY = (("R'hllor", 'the Red God'),)
+RE_HEX32 = re.compile(r'^[0-9a-f]{32}$')
+
+
+def voice_text(t, u, l):
+    s = t.rstrip('.!?') + '.\n\n' + u + '\n\n' + l
+    for a, b in VOICE_SAY:
+        s = s.replace(a, b)
+    return s
+
+
+def file_md5(path):
+    h = hashlib.md5()
+    with open(path, 'rb') as f:
+        for blk in iter(lambda: f.read(1 << 20), b''):
+            h.update(blk)
+    return h.hexdigest()
 
 
 # ----------------------------------------------------------------------------------------------- miara linii
@@ -613,6 +682,18 @@ def parse_cond(s, ctx, rep, world, refs, what='warunki'):
                 ok = False
             else:
                 alts.append(term)
+        # krytyk K0 (22.10): mv:X (bez =) wiersza tylko-classic / tylko-prolog jest w kampanii drugiego trybu pominiety w pierwszej dobie
+        # (CanonCompanions: Res.Skip "tylko klasyczny start" / "tylko kampania z prologiem") - rozstrzygniety = prawda od startu, wiec w alternatywie
+        # caly skladnik jest prawdziwy od pierwszej doby (016.2: mv:m01 | mv:p10). "Okno za ruchem w obu trybach" = mv:m01 & mv:p10
+        if len(alts) > 1:
+            moded = []
+            for term in alts:
+                mm = re.match(r'^mv:([mp]\d\d)$', term.base)
+                if mm and not term.neg and world.move_mode.get(mm.group(1)) in ('classic', 'prolog'):
+                    moded.append('mv:%s (tylko %s)' % (mm.group(1), world.move_mode[mm.group(1)]))
+            if moded:
+                rep.w(ctx.where, '%s: %s w alternatywie | - w kampanii drugiego trybu taki wiersz jest pominiety od pierwszej doby (rozstrzygniety = prawda), '
+                                 'wiec skladnik %r jest prawdziwy od startu; okno za ruchem w obu trybach: mv:A & mv:B' % (what, ', '.join(moded), conj))
         out.append(alts)
     return out if ok else None
 
@@ -711,6 +792,9 @@ def chk_term(t, ctx, rep, world, refs, what):
         elif mm.group(1) not in ROT_EVENTS:
             rep.e(ctx.where, '%s: nieznane wydarzenie ROT %r' % (what, mm.group(1)))
             good = False
+        elif mm.group(1) not in FABULA:
+            rep.w(ctx.where, '%s: %r - %s nie ma na osi Fabuli (CrashScribe Fabula.cs) - term zawsze prawdziwy, decyduje od (wydarzenia osi: %s)'
+                  % (what, raw, mm.group(1), ', '.join(sorted(FABULA))))
     elif kind == 'p':
         if not a:
             rep.e(ctx.where, '%s: %r - p:<region|in|near|vassal|army|rel>...' % (what, raw))
@@ -797,13 +881,16 @@ def chk_act(raw, ctx, rep, world, refs, what):
     else:
         name, rest = raw, ''
     if name == 'hide':
-        # hide:<bohater>[:<term konca>] - term moze zawierac ':'
+        # hide:<bohater>[:<koniec ukrycia>] - koniec = warunek (skladnia rozdz. 10, ' & ' i ' | '; silnik: Terms.Eval), moze zawierac ':'
         p = rest.split(':', 1)
         hero = p[0]
         good = chk_ref(hero, 'hero', world, ctx, rep)
         if len(p) > 1 and p[1]:
-            if chk_term(p[1], ctx, rep, world, refs, what + ' (koniec ukrycia)') is None:
+            cnf = parse_cond(p[1], ctx, rep, world, refs, what + ' (koniec ukrycia)')
+            if cnf is None:
                 good = False
+            else:
+                refs.append(('hideend', cnf, raw, ctx.where, ctx.nr))   # recenzja K0 R-2: kr: okna powracajacego bez zapasu - UWAGA po wczytaniu okien
         return Act(name, [hero] + ([p[1]] if len(p) > 1 else []), raw) if good else None
     a = split_args(rest) if rest else []
 
@@ -1042,6 +1129,7 @@ def main():
         pass
     rep = Report(o.ciche)
     md = os.path.join(o.repo, 'Armoury', 'ModuleData')
+    load_fabula(o.repo)
     world = World(o.gra, o.repo, rep)
     linie = load_linie(rep)
     if len([k for k in KODY if k != 'test']) > KODY_MAX:
@@ -1176,6 +1264,7 @@ def main():
     bound_rows = {}   # key -> [Row okna z wyborem]
     titles = {}
     used_texts = set()
+    lektor_keys = set()   # klucze kr_NNN_w[war] wierszy lektor=1 z wlasnym tekstem (do nagran bez okna w manifescie)
     for wid, rows in win_rows.items():
         base = rows[0]
         nr = int(wid[:3])
@@ -1256,7 +1345,9 @@ def main():
                 rep.e(ctx.where, 'forma %r - okno|wiesc|log' % c['forma'])
             if c['inni'] not in ('okno', 'wiesc', 'nic'):
                 rep.e(ctx.where, 'inni %r - okno|wiesc|nic' % c['inni'])
-            if c['inni'] != c['forma'] and not c['gracz'] and c['inni'] != 'nic':
+            # recenzja K0 R-3: pusty gracz wariantu = gracz wiersza glownego (silnik Data.CheckRows)
+            eff_gracz = c['gracz'] or ('' if is_base else rows[0].c['gracz'])
+            if c['inni'] != c['forma'] and not eff_gracz and c['inni'] != 'nic':
                 rep.w(ctx.where, 'inni=%s bez kolumny gracz nic nie zmienia (wszyscy dostaja forme %s)' % (c['inni'], c['forma']))
             if c['wersja'] not in ('lekka', 'pelna', 'obie'):
                 rep.e(ctx.where, 'wersja %r - lekka|pelna|obie' % c['wersja'])
@@ -1307,7 +1398,7 @@ def main():
             else:
                 eff = (base_texts.get('t'), base_texts.get('u'), base_texts.get('l'))
                 if c['zmienne']:
-                    rep.w(ctx.where, 'zmienne w wariancie bez wlasnego tekstu (tekst wiersza glownego ich nie widzi)')
+                    rep.w(ctx.where, 'zmienne w wariancie bez wlasnego tekstu (wariant dziedziczy tekst i zmienne glownego; ta sama NAZWA z wariantu ma pierwszenstwo, inne nazwy tekst glownego pomija)')
             for v in defined - used_vars:
                 if has_text:
                     rep.w(ctx.where, 'zmienna %s zdefiniowana, ale nieuzyta' % v)
@@ -1325,10 +1416,24 @@ def main():
                     st['lwiersze'] += 1
                     st['lokna'].add(wid)
                     lk = 'kr_%s' % key.replace('.', '_')
-                    if lk in world.lektor and world.lektor[lk][1]:
-                        md5 = hashlib.md5(('%s\n%s\n%s' % eff).encode('utf-8')).hexdigest()
-                        if md5 != world.lektor[lk][1]:
-                            rep.e(ctx.where, 'tekst okna zmieniony po nagraniu %s (md5 %s, w arm_lektor.tsv %s) - nagraj ponownie albo przywroc tekst' % (lk, md5, world.lektor[lk][1]))
+                    # krytyk K0 (22.10): zasada md5 (KRONIKA-FORMAT 16.5) wobec manifestu arm_lektor_kronika.tsv - tekst jak nagraj_kronika.py/Chronicle.Voice.
+                    # Wariant bez wlasnego tekstu gra nagranie wiersza glownego (RowDef.NarrationKey) - sprawdzany jest glowny.
+                    if not has_text and not is_base:
+                        rep.w(ctx.where, 'lektor=1 w wariancie bez wlasnego tekstu - gra nagranie wiersza glownego, a nagraj_kronika.py nagralby pusty tekst pod %s (ustaw lektor=0)' % lk)
+                    elif world.lektor_kr_path:
+                        lektor_keys.add(lk)
+                        rec = world.lektor_kr.get(lk)
+                        if rec is None:
+                            if c['wersja'] != 'pelna':   # wiersze pelna nagraj_kronika.py pomija celowo (nagrania okien 1 paczek, plan K)
+                                rep.w(ctx.where, 'lektor=1, a nagrania %s brak w arm_lektor_kronika.tsv - okno bez glosu (nagraj_kronika.py%s)'
+                                      % (lk, '' if c['forma'] == 'okno' else '; skrypt nagrywa tylko forma=okno'))
+                        elif not RE_HEX32.match(rec[2]):
+                            rep.w(ctx.where, 'nagranie %s ze starym tekstem (manifest: %s) - okno bez glosu do ponownego nagrania (nagraj_kronika.py)' % (lk, rec[2]))
+                        else:
+                            md5 = hashlib.md5(voice_text(*eff).encode('utf-8')).hexdigest()
+                            if md5 != rec[2]:
+                                rep.e(ctx.where, 'tekst okna zmieniony po nagraniu %s (md5 %s, w arm_lektor_kronika.tsv %s) - gra da cisze: przywroc tekst albo nagraj '
+                                      'ponownie (nagraj_kronika.py) / oznacz wiersz manifestu "nieaktualne"' % (lk, md5, rec[2]))
             # wybor
             if c['wybor']:
                 chk_text(c['wybor'], key, 'Q', ctx, rep, linie, maxlen=QUESTION_MAX, allow_vars=defined, label='wybor')
@@ -1558,10 +1663,23 @@ def main():
                     rep.w(where, 'kr:%s - paczka k%02d jeszcze nie napisana (sprawdzi sie po jej dopisaniu)' % (ref, NR_PACZKA[rnr]))
             elif opt is not None:
                 keys = [k for k in choices if k[:5] == ref]
-                if not keys:
+                if win_rows[ref][0].c['powtorz']:
+                    # recenzja K0 R-10: wybor instancji zapisuje sie pod NNN.w#klucz - kr:NNN.w=x nigdy nie bylby prawdziwy ani "nigdy"
+                    rep.e(where, 'kr:%s=%s - okno powracajace: wybor instancji nie trafia do kr:NNN.w=x (term nigdy nie zajdzie) - uzyj flagi z opcji' % (ref, opt))
+                elif not keys:
                     rep.e(where, 'kr:%s=%s - okno nie ma wyboru' % (ref, opt))
                 elif not any(any(r.c['opcja'] == opt for r in choices[k]) for k in keys):
                     rep.e(where, 'kr:%s=%s - brak opcji %s' % (ref, opt, opt))
+        elif kind == 'hideend':
+            # recenzja K0 R-2: koniec ukrycia na kr: okna powracajacego - "nigdy" dopiero po wyczerpaniu max:N; okno, ktore nie ruszy wcale (wyzwalacz
+            # nie przyjdzie), zostawia postac ukryta na zawsze - skladnik potrzebuje zapasu (| ev:X | rotday:N)
+            for conj in ref:
+                krs = [t for t in conj if not t.neg and t.base.startswith('kr:')]
+                if krs and len(krs) == len(conj):
+                    rec = [t.base[3:].split('=')[0] for t in krs if t.base[3:].split('=')[0] in win_rows and win_rows[t.base[3:].split('=')[0]][0].c['powtorz']]
+                    if rec:
+                        rep.w(where, '%s - koniec ukrycia tylko na kr: okna powracajacego %s (bez wyzwalacza postac zostaje ukryta na zawsze) - dopisz zapas: | ev:X | rotday:N'
+                              % (opt, ', '.join(rec)))
         elif kind == 'text':
             if ref not in texts:
                 rep.e(where, '%s:%s - brak tekstu %s w #tekst' % (opt, ref, ref))
@@ -1592,6 +1710,21 @@ def main():
     for bid, r in bands.items():
         if bid not in used_bands:
             rep.w(r.where(), 'banda %s nieuzyta (band:%s)' % (bid, bid))
+    # krytyk K0 (22.10): pliki nagran z manifestu (dysk C zeruje pliki - wgraj-v5.ps1 robi STOP, walidator mowi o tym wczesniej) i nagrania bez okna
+    if world.lektor_kr_path:
+        ldir = os.path.dirname(world.lektor_kr_path)
+        for lk, rec in sorted(world.lektor_kr.items()):
+            where = 'arm_lektor_kronika.tsv:%d' % rec[4]
+            fp = os.path.join(ldir, rec[1])
+            if not os.path.isfile(fp):
+                rep.e(where, 'plik nagrania %s nie istnieje (Lektor: odrzucone - okno bez glosu)' % rec[1])
+            elif RE_HEX32.match(rec[3]):
+                fm = file_md5(fp)
+                if fm != rec[3]:
+                    rep.e(where, 'plik nagrania %s inny niz w manifescie (md5 pliku %s, w manifescie %s; rozmiar %d B) - uszkodzony albo wyzerowany'
+                          % (rec[1], fm, rec[3], os.path.getsize(fp)))
+            if not o.pliki and lk not in lektor_keys:
+                rep.w(where, 'nagranie %s bez wiersza lektor=1 z wlasnym tekstem w paczkach (zbedny plik albo zmieniony klucz okna)' % lk)
 
     # --- wynik
     names = set(os.path.basename(p) for p in o.pliki)

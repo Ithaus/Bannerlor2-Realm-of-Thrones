@@ -31,7 +31,10 @@ namespace Armoury
                 public string Id = "", RowKey = "";
                 public int Day;
                 public Terms.Tokens Tok;
+                public int Lost;   // recenzja K0 (R9): ile razy lista zniknela bez wyboru (sesja) - po LostMax opcja bierna
             }
+
+            private const int LostMax = 5;
 
             private static readonly List<Pend> _pend = new List<Pend>();
             private static Pend _listFor;
@@ -163,15 +166,31 @@ namespace Armoury
                 return why == null ? v : null;
             }
 
-            /// <summary>AppTick przy otwartej liscie: lista zniknela bez wyboru (zadnego zapytania przez 1 s) - zostaje w stanie 'a' i pokaze sie znowu.</summary>
+            /// <summary>AppTick przy otwartej liscie: lista zniknela bez wyboru (zadnego zapytania przez 1 s) - zostaje w stanie 'a' i pokaze sie znowu.
+            /// Recenzja K0 (R9): ta sama lista zniknela LostMax razy (cudzy kod chowa zapytania) - opcja bierna bez pytania, inaczej petla co ok. 3 s z 2 liniami logu
+            /// i stoja inne okna Kroniki (Choice.Count > 0).</summary>
             internal static void Watch(long t)
             {
                 if (_listFor == null) return;
                 if (InformationManager.IsAnyInquiryActive()) return;
                 if ((t - _listAt) / (double)Stopwatch.Frequency < 1.0) return;
                 _lost++;
-                Log.Info(Tag + "lista wyboru " + _listFor.Id + " zniknela bez wyboru (proba " + _lost + ") - pokaze sie znowu.");
+                var pd = _listFor;
                 _listFor = null;
+                pd.Lost++;
+                if (pd.Lost < LostMax)
+                {
+                    Log.Info(Tag + "lista wyboru " + pd.Id + " zniknela bez wyboru (proba " + pd.Lost + "/" + LostMax + ", w sesji " + _lost + ") - pokaze sie znowu.");
+                    return;
+                }
+                Log.Info(Tag + "lista wyboru " + pd.Id + " zniknela bez wyboru (proba " + pd.Lost + "/" + LostMax + ", w sesji " + _lost + ") - opcja bierna bez pytania.");
+                _pend.Remove(pd);
+                if (State.Choice(pd.Id) != '\0') return;
+                var row = Data.Row(pd.RowKey);
+                if (row == null || row.Options.Count == 0) return;
+                string avail;
+                Available(row, pd.Tok, pd.Id, out avail);
+                Passive(pd.Id, row, pd.Tok, VarsOrNull(row, pd.Tok), avail, "lista znikala " + LostMax + " razy");
             }
 
             /// <summary>Potwierdzenie listy: wybrana litera (albo wymuszona plikiem flagi, gdy dostepna), stan, linia, skutki opcji.</summary>

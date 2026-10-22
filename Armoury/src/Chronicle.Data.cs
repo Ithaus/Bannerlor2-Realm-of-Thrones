@@ -10,7 +10,7 @@ namespace Armoury
     /// m105-kronika K0 (krok A1) - KRONIKA WESTEROS: warstwa danych. Kontrakt: docs/KRONIKA-FORMAT.md (wygrywa przy sprzecznosci), plan: PLANY-E5-WOJNY-KRONIKA
     /// sekcja "## PLAN kronika" (E: Chronicle.Data.cs).
     /// Pliki Armoury/ModuleData/arm_kronika_kNN.tsv (paczki K1-K10, wzorzec kNN - kolejne paczki wchodza same) oraz arm_kronika_tematy.tsv (tematy obrazkow).
-    /// k00 (2 okna testowe silnika) TYLKO przy autotescie: LogGate.Mode 1/2 i plik Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-kronika-test.flag
+    /// k00 (okna testowe silnika 000.1-000.6) TYLKO przy autotescie: LogGate.Mode 1/2 i plik Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-kronika-test.flag
     /// (wzor SideVillageFief.TestWanted).
     /// Wczytanie: Chronicle.Data.EnsureLoaded() przy OnSessionLaunched (wola ChronicleBehavior, krok A2) - pierwszy raz albo po zmianie pliku (rozmiar, data,
     /// zestaw plikow, flaga testu); w tej samej sesji drugie wolanie nic nie czyta.
@@ -652,8 +652,20 @@ namespace Armoury
                     for (int j = w.Variants.Count - 1; j >= 0; j--)
                     {
                         var v = w.Variants[j];
-                        if (v.Title.Length == 0 && v.Upper.Length == 0 && v.Lower.Length == 0) { v.Title = m.Title; v.Upper = m.Upper; v.Lower = m.Lower; }
+                        if (v.Title.Length == 0 && v.Upper.Length == 0 && v.Lower.Length == 0)
+                        {
+                            v.Title = m.Title; v.Upper = m.Upper; v.Lower = m.Lower;
+                            // recenzja K0 (R-4): tekst glownego z {ZMIENNYMI} potrzebuje zmiennych glownego (045.1a/b/c: "villages around  more than once");
+                            // zmienna o tej samej nazwie we wlasnej kolumnie wariantu ma pierwszenstwo
+                            foreach (var mv in m.Vars)
+                            {
+                                bool own = false;
+                                foreach (var x in v.Vars) if (x.Name == mv.Name) { own = true; break; }
+                                if (!own) v.Vars.Add(mv);
+                            }
+                        }
                         if (v.Topic.Length == 0) v.Topic = m.Topic;
+                        if (v.Player.Length == 0) v.Player = m.Player;   // recenzja K0 (R-3): pusty gracz wariantu = gracz glownego (FORMAT 3.1; 105.1a, 073.1a/b)
                         string why = null;
                         if (v.Shows && (v.Title.Length == 0 || v.Upper.Length == 0 || v.Lower.Length == 0)) why = "forma okno bez tytulu, gory albo dolu (wlasnych albo z wiersza glownego)";
                         else if (v.NeedsNews && NewsRaw(v) == null) why = "forma wiesc bez tekstu " + v.Key + "_W ani " + w.Id + "_W w #tekst";
@@ -839,7 +851,7 @@ namespace Armoury
                 Scan(r.Po, r, "po");
                 Scan(r.Przed, r, "przed");
                 Scan(r.Cond, r, "warunki");
-                Scan(r.Player, r, "gracz");
+                if (r.IsMain || r.Window == null || !ReferenceEquals(r.Player, r.Window.Main.Player)) Scan(r.Player, r, "gracz");   // R-3: gracz dziedziczony - liczony raz
                 foreach (var o in r.Options) Scan(o.Avail, r, "dostepna " + o.Letter);
             }
 

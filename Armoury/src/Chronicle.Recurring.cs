@@ -131,6 +131,20 @@ namespace Armoury
                 return false;
             }
 
+            /// <summary>Recenzja K0 (R-2): okno powracajace z max:N wyczerpane - limit instancji zuzyty (licznik "kl" rosnie przy wydaniu), zadna instancja nie czeka
+            /// w kolejce (wydana albo nie) i zadna nie jest rozstrzygnieta (kr:NNN.w falsz). Silnik nigdy nie pomija samego id okna powracajacego, wiec bez tego
+            /// kr:112.1 po przepadlej instancji (pominieta po MaxLate) nie bylo "nigdy" i koniec ukrycia Melisandre (092.1) nie przychodzil.</summary>
+            internal static bool Exhausted(string win)
+            {
+                if (string.IsNullOrEmpty(win)) return false;
+                var w = Data.Window(win);
+                if (w == null || w.Recur == null || w.Recur.Max <= 0) return false;
+                int[] st;
+                if (!_stat.TryGetValue(win, out st) || st[1] < w.Recur.Max) return false;
+                if (WindowQueued(win) || State.IsResolved(win)) return false;
+                return true;
+            }
+
             private static string CleanKey(string k)
             {
                 var sb = new StringBuilder(k.Length);

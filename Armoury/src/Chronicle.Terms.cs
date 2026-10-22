@@ -386,7 +386,12 @@ namespace Armoury
                             if (x.StartsWith("@", StringComparison.Ordinal))
                             {
                                 x = x == "@gracz" ? (Hero.MainHero != null ? Hero.MainHero.StringId : null) : (tok != null ? tok.Get(x) : null);
-                                if (string.IsNullOrEmpty(x)) { never = true; return false; }   // instancja bez tego tokenu - nie zajdzie
+                                if (string.IsNullOrEmpty(x))
+                                {
+                                    // instancja bez tego tokenu - term nie zajdzie; negacja takiego termu zawsze prawdziwa (recenzja K0 R-7: dawniej "nigdy" i dla !term)
+                                    if (t.Neg) return true;
+                                    never = true; return false;
+                                }
                             }
                             a[i] = x;
                         }
@@ -542,7 +547,11 @@ namespace Armoury
                 int eq = arg.IndexOf('=');
                 if (eq >= 0) { id = arg.Substring(0, eq); opt = arg.Substring(eq + 1); }
                 if (!KeyOn || State.IsSkipped(id) || Data.IsTomb(id)) { never = true; return false; }
-                if (!State.IsResolved(id)) return false;
+                if (!State.IsResolved(id))
+                {
+                    if (Recurring.Exhausted(id)) never = true;   // recenzja K0 (R-2): okno powracajace z wyczerpanym max:N i bez instancji w kolejce - juz nie zajdzie
+                    return false;
+                }
                 if (opt == null) return true;
                 char c = State.Choice(id);
                 if (c != '\0')
@@ -615,7 +624,8 @@ namespace Armoury
                     case "vassal":
                         {
                             var pc = Clan.PlayerClan;
-                            return pc != null && pc.Kingdom != null && pc.Kingdom.StringId == a[1];
+                            // recenzja K0 (R-6): najemnik (StartMercenaryServiceAction ustawia Clan.Kingdom) to nie wasal - FORMAT 10 "wasal albo wladca"
+                            return pc != null && pc.Kingdom != null && !pc.IsUnderMercenaryService && pc.Kingdom.StringId == a[1];
                         }
                     case "army": return mp != null && mp.Army != null;
                     case "rel":

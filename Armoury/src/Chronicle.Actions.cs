@@ -504,9 +504,10 @@ namespace Armoury
             }
 
             /// <summary>Doba Kroniki (przed kluczem ChronicleOfWesteros): rejestr ukrytych - postac zmarla / przywrocona przez gre - wpis usuniety z linia
-            /// "UKRYCIE przerwane"; ukryty zostal glowa rodu albo wladca (gra) - powrot "KONIEC UKRYCIA (glowa rodu)"; termsOn (klucz TAK) - koniec ukrycia: term
-            /// prawdziwy albo "nigdy" (FORMAT 11 - np. kr: okna pominietego) - powrot do siedziby rodu z linia "KONIEC UKRYCIA". Klucz NIE - terminy czekaja (nic nie cofa).</summary>
-            internal static void HiddenDaily(int day, bool termsOn)
+            /// "UKRYCIE przerwane"; ukryty zostal glowa rodu albo wladca (gra) - powrot "KONIEC UKRYCIA (glowa rodu)"; koniec ukrycia: term prawdziwy albo "nigdy"
+            /// (FORMAT 11 - np. kr: okna pominietego) - powrot do siedziby rodu z linia "KONIEC UKRYCIA". Recenzja K0 (R-1): takze przy kluczu ChronicleOfWesteros NIE -
+            /// wtedy kr: liczy sie jako "nigdy" (FORMAT 3.3), wiec ukryci z koncem kr: wracaja (bez tego klucz NIE trzymal ich ukrytych na zawsze, a rotday: nie dzialal).</summary>
+            internal static void HiddenDaily(int day)
             {
                 if (CanonCompanions.HiddenCount == 0) return;
                 foreach (var r in CanonCompanions.HiddenRows())
@@ -524,7 +525,7 @@ namespace Armoury
                         }
                         string reason = null;
                         if (h.IsClanLeader || h.IsKingdomLeader) reason = (h.IsKingdomLeader ? "wladca" : "glowa rodu") + " (gra wybrala ukrytego)";
-                        else if (termsOn && r.End.Length > 0)
+                        else if (r.End.Length > 0)
                         {
                             bool nv; string w;
                             if (Terms.Eval(r.End, null, "koniec ukrycia " + r.Key, out nv, out w)) reason = "term prawdziwy: " + r.End;
