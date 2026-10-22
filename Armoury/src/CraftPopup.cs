@@ -98,6 +98,14 @@ namespace Armoury
         private static object _movie;
         private static RootVM _root;
 
+        /// <summary>m105-dziennik: okno wyniku kucia lezy na tym ekranie (warstwa 4500 bez flagi MapScreen) - dziennik wraca wtedy na miejsce gry, zeby nie
+        /// zaslanial przycisku Done. HasLayer zamiast samego _layer != null: warstwa zdjeta bez Close (np. inny ekran) nie trzyma dziennika.</summary>
+        internal static bool IsOpenOn(ScreenBase screen)
+        {
+            var l = _layer;
+            return l != null && screen != null && screen.HasLayer(l);
+        }
+
         internal static void Show(ItemObject item, ItemModifier mod, int made)
         {
             try

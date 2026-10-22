@@ -1044,6 +1044,13 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
                     python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
                     KO-3 encja kola postawiona, KO-4 potkniecia kola 0.
+--grupa m105dziennik : (21.10, w-toku/m105-dziennik; Armoury/src/MapChatLog.cs; klucze MapChatLogClearOfMenu, MapChatLogFrame, MapHideTradeNotices; plik testu
+                    CrashScribe/armoury-dziennik.flag) python -I tools/sprawdz_logi.py --grupa m105dziennik <Armoury-*.log>. DZ-0 linie start i kampania (widok, pola MPChatVM,
+                    latka tabliczek TAK), DZ-0b widget dziennika znaleziony i ramka dodana (przy kluczu ramki), DZ-1 ERROR MapChatLog 0, DZ-2 filtr handlu (doby z filtrem TAK:
+                    przepuszczone 0, ukryte > 0; doby NIE: ukryte 0, przepuszczone > 0; zero zdarzen i zmiana klucza w dobie - INFO), DZ-3 potkniecia 0, DZ-4 proby testu
+                    w menu (>= 1, kazda: zachodzenie 0, ramka TAK przy kluczu, dol ramki <= granica PAUSED z linii testu (1080 - 195 przy 16:9), wynik TAK; brak prob
+                    przy pliku testu i przesunieciach - NIE), DZ-4b proby na mapie (wynik TAK: lewa krawedz >= 100 przy kluczu przesuniecia, ramka, dol nad paskiem),
+                    DZ-5 przesuniecia >= 1 przy kluczu TAK (w autotescie gracz czeka w menu miasta). Log bez linii m105: INFO.
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
@@ -38277,6 +38284,169 @@ def m105kolko_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m105dziennik (21.10, w-toku/m105-dziennik: dziennik wiadomosci na mapie obok menu osady, ramka w stylu ROT,
+# bez wierszy handlu karawan i wiesniakow nad miastami - Armoury/src/MapChatLog.cs; klucze MapChatLogClearOfMenu, MapChatLogFrame, MapHideTradeNotices;
+# autotest: plik CrashScribe/armoury-dziennik.flag)
+M105D_TAG = "Dziennik (m105): "
+M105D_START = re.compile(r"^start - latka tabliczek \(OnCaravanTransactionCompleted\) (TAK|BRAK) \((.*?)\), widok dziennika \(GauntletChatLogView\) (TAK|BRAK), "
+                         r"pola MPChatVM (TAK|BRAK)\.")
+M105D_CAMP = re.compile(r"^kampania - klucze MapChatLogClearOfMenu=(TAK|NIE), MapChatLogFrame=(TAK|NIE), MapHideTradeNotices=(TAK|NIE) .*widok dziennika (TAK|BRAK), "
+                        r"pola MPChatVM (TAK|BRAK), latka tabliczek (TAK|BRAK), test autotestu (TAK|NIE)\.")
+M105D_WIDGET = re.compile(r"^widget dziennika znaleziony \(.*\), ramka dodana (TAK|NIE)")
+M105D_LATE = re.compile(r"^ramka dodana pozniej .*\) (TAK|NIE)")
+M105D_DAY = re.compile(r"^dzien (\d+) - przesuniecia (\d+), powroty (\d+), ramka (\d+), handel na tabliczkach: filtr (TAK|NIE), ukryte (\d+) \(karawany (\d+), "
+                       r"wiesniacy (\d+)\), przepuszczone (\d+), potkniecia (\d+)\.")
+M105D_TEST = re.compile(r"^test - (menu|mapa): linie testowe (\d+)/3 .*, zachodzenie (\d+) px, ramka (TAK|NIE)\b.*, dol ramki y=(-?\d+) .* - (TAK|NIE)(?: \((.*)\))?\.$")
+M105D_NOPROBE = re.compile(r"^test - bez proby \((.*)\)\.")
+M105D_PROBE = re.compile(r"^test - start proby nr (\d+) \((menu|mapa)\)")
+M105D_LIMIT = re.compile(r"\(granica PAUSED (\d+), pasek (\d+)")   # recenzja R5: granice z linii (wysokosc ekranu w jednostkach UI - 16:10, UIScale)
+M105D_PAUSED = 885   # granica przy 16:9 i UIScale 1 - gdy linia testu jej nie podaje (stary format)
+
+
+def m105dziennik_main(logp):
+    """m105dziennik (21.10; Jeff 21.10 "tak, rob dziennik"): DZ-0 linie start i kampania (widok GauntletChatLogView, pola MPChatVM, latka tabliczek TAK), DZ-0b widget
+    znaleziony i ramka dodana (przy kluczu MapChatLogFrame TAK), DZ-1 ERROR MapChatLog 0, DZ-2 filtr handlu na tabliczkach (latka TAK; doby z filtrem TAK - przepuszczone 0
+    i suma ukrytych > 0; doby NIE - ukryte 0, suma przepuszczonych > 0; doba z obiema liczbami > 0 = zmiana klucza w dobie - INFO; zero zdarzen - INFO: osada nie byla
+    w zasiegu), DZ-3 potkniecia (maksimum z linii doby) 0, DZ-4 proby testu w menu (>= 1; kazda: zachodzenie 0, ramka TAK przy kluczu ramki, dol ramki <= granica
+    PAUSED z linii testu (stary format 885), wynik TAK; brak prob - INFO, ale przy pliku testu i przesunieciach obok menu - NIE: autotest przeszedl bez pomiaru),
+    DZ-4b proby na mapie (wynik TAK - lewa krawedz >= 100 przy kluczu przesuniecia, ramka TAK przy kluczu, dol ramki nad paskiem), DZ-5 przy MapChatLogClearOfMenu
+    TAK suma przesuniec >= 1 (test autotestu NIE i zero przesuniec - INFO). Log bez linii m105: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("DZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    n_err, starts, camps, widgets, lates, days, tests, noprobe, probes, moved_lines = 0, [], [], [], [], [], [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in MapChatLog"):
+                n_err += 1
+                continue
+            if not s.startswith(M105D_TAG):
+                continue
+            body = s[len(M105D_TAG):]
+            for rx, bucket in ((M105D_START, starts), (M105D_CAMP, camps), (M105D_WIDGET, widgets), (M105D_LATE, lates), (M105D_TEST, tests),
+                               (M105D_NOPROBE, noprobe), (M105D_PROBE, probes)):
+                mm = rx.search(body)
+                if mm:
+                    g = mm.groups()
+                    if rx is M105D_TEST:
+                        ml = M105D_LIMIT.search(body)
+                        g = g + ((int(ml.group(1)) if ml else M105D_PAUSED),)   # t[7] = granica PAUSED tej proby
+                    bucket.append(g)
+                    break
+            else:
+                md = M105D_DAY.search(body)
+                if md:
+                    g = md.groups()
+                    days.append(tuple(int(x) for x in g[:4]) + (g[4],) + tuple(int(x) for x in g[5:]))
+                elif body.startswith("przesuniety obok menu"):
+                    moved_lines += 1
+    print(f"plik: {logp} | start {len(starts)}, kampania {len(camps)}, widget {len(widgets)}, doby {len(days)}, proby testu {len(tests)} (bez proby {len(noprobe)}, "
+          f"wyslane {len(probes)}), ERROR {n_err}")
+    if not (starts or camps or widgets or days or tests or noprobe or probes):
+        rep.add("DZ-0: linie 'Dziennik (m105): ...'", "brak w logu", "INFO (log sprzed paczki m105-dziennik)", None)
+        rep.add("DZ-1: ERROR MapChatLog", f"ERROR {n_err}", "0", n_err == 0)
+        rep.show()
+        return 0
+    # DZ-0 linie start i kampania
+    st_ok = bool(starts) and all(x[0] == "TAK" and x[2] == "TAK" and x[3] == "TAK" for x in starts)
+    camp_ok = bool(camps) and all(x[3] == "TAK" and x[4] == "TAK" and x[5] == "TAK" for x in camps)
+    st_txt = (f"start {len(starts)} (latka {starts[-1][0]} - {starts[-1][1]}, widok {starts[-1][2]}, pola {starts[-1][3]})" if starts else "start brak")
+    camp_txt = (f"kampania {len(camps)} (klucze ClearOfMenu {camps[-1][0]}, Frame {camps[-1][1]}, HideTrade {camps[-1][2]}; test {camps[-1][6]})" if camps else "kampania brak")
+    rep.add("DZ-0: linie start i kampania", f"{st_txt}; {camp_txt}", "obie linie, widok / pola MPChatVM / latka tabliczek TAK", st_ok and camp_ok)
+    key_clear = camps[-1][0] == "TAK" if camps else True
+    key_frame = camps[-1][1] == "TAK" if camps else True
+    test_on = camps[-1][6] == "TAK" if camps else False
+    # DZ-0b widget i ramka
+    if camps:
+        fr_ok = any(w[0] == "TAK" for w in widgets) or any(x[0] == "TAK" for x in lates)
+        val = f"znaleziony {len(widgets)} razy, ramka dodana " + (", ".join(w[0] for w in widgets) or "-") + (f", pozniej {', '.join(x[0] for x in lates)}" if lates else "")
+        if key_frame:
+            rep.add("DZ-0b: widget dziennika i ramka", val, ">= 1 widget, ramka dodana TAK (klucz MapChatLogFrame TAK)", bool(widgets) and fr_ok)
+        else:
+            rep.add("DZ-0b: widget dziennika i ramka", val, ">= 1 widget (ramka - klucz NIE)", bool(widgets))
+    # DZ-1
+    rep.add("DZ-1: ERROR MapChatLog", f"ERROR {n_err}", "0", n_err == 0)
+    # DZ-2 filtr handlu
+    patch_ok = bool(starts) and starts[-1][0] == "TAK"
+    tak = [d for d in days if d[4] == "TAK"]
+    nie = [d for d in days if d[4] == "NIE"]
+    mixed = [d for d in days if d[5] > 0 and d[8] > 0]
+    bad_tak = [d for d in tak if d[8] > 0 and d[5] == 0]
+    bad_nie = [d for d in nie if d[5] > 0 and d[8] == 0]
+    sum_hid = sum(d[5] for d in tak)
+    sum_car = sum(d[6] for d in days)
+    sum_vil = sum(d[7] for d in days)
+    sum_pass_nie = sum(d[8] for d in nie)
+    events = sum(d[5] + d[8] for d in days)
+    val = (f"latka {starts[-1][0] if starts else '-'}; dob TAK {len(tak)} (ukryte {sum_hid}: karawany {sum_car}, wiesniacy {sum_vil}), dob NIE {len(nie)} "
+           f"(przepuszczone {sum_pass_nie}); zle doby TAK {len(bad_tak)}, zle doby NIE {len(bad_nie)}, zmiana klucza w dobie {len(mixed)}")
+    if not days:
+        rep.add("DZ-2: filtr handlu na tabliczkach", val + "; brak linii doby", "INFO (bieg krotszy niz doba)", None if patch_ok else False)
+    elif events == 0:
+        rep.add("DZ-2: filtr handlu na tabliczkach", val, "INFO - zero zdarzen handlu przy tabliczkach w zasiegu (latka TAK wymagana)", None if patch_ok else False)
+    else:
+        ok = patch_ok and not bad_tak and not bad_nie
+        if tak:
+            ok = ok and sum_hid > 0
+        elif nie:
+            ok = ok and sum_pass_nie > 0
+        rep.add("DZ-2: filtr handlu na tabliczkach", val, "latka TAK; doby TAK: przepuszczone 0 i ukryte > 0; doby NIE: ukryte 0 i przepuszczone > 0", ok)
+        if mixed:
+            rep.add("DZ-2b: zmiana klucza w trakcie doby", f"doby {', '.join(str(d[0]) for d in mixed)}", "INFO", None)
+    # DZ-3 potkniecia
+    stmax = max((d[9] for d in days), default=0)
+    rep.add("DZ-3: potkniecia (linia doby)", f"{stmax} (linii doby {len(days)})", "0", stmax == 0)
+    # DZ-4 proby testu
+    menu = [t for t in tests if t[0] == "menu"]
+    mapa = [t for t in tests if t[0] == "mapa"]
+    moves = sum(d[1] for d in days)
+    limits = sorted(set(t[7] for t in menu))
+    lim_txt = "/".join(str(x) for x in limits) if limits else str(M105D_PAUSED)
+    if menu:
+        bad = []
+        for t in menu:
+            why = []
+            if int(t[2]) != 0:
+                why.append(f"zachodzenie {t[2]}")
+            if key_frame and t[3] != "TAK":
+                why.append("ramka NIE")
+            if t[3] == "TAK" and int(t[4]) > t[7]:
+                why.append(f"dol ramki {t[4]} > {t[7]}")
+            if t[5] != "TAK":
+                why.append("wynik NIE" + (f" ({t[6]})" if t[6] else ""))
+            if why:
+                bad.append("; ".join(why))
+        val = f"menu {len(menu)} (TAK {len(menu) - len(bad)}), mapa {len(mapa)}, bez proby {len(noprobe)}" + (f" | zle: {' | '.join(bad)}" if bad else "")
+        rep.add("DZ-4: proby testu w menu", val, f">= 1, kazda: zachodzenie 0, ramka TAK (klucz ramki {('TAK' if key_frame else 'NIE')}), dol ramki <= granica PAUSED z linii ({lim_txt}), wynik TAK", not bad)
+    elif not key_clear:
+        rep.add("DZ-4: proby testu w menu", f"brak (klucz MapChatLogClearOfMenu NIE; mapa {len(mapa)})", "INFO - bez przesuniecia nie ma proby w menu", None)
+    elif test_on and (moves >= 1 or moved_lines >= 1):
+        # recenzja R4: plik testu i dziennik byl obok menu, a pomiaru w menu nie ma - autotest nie sprawdzil glownej zmiany
+        rep.add("DZ-4: proby testu w menu", f"brak (przesuniec {moves}, linii 'przesuniety' {moved_lines}, mapa {len(mapa)}, bez proby {len(noprobe)}, test autotestu TAK)",
+                ">= 1 pomiar w menu (plik testu i przesuniecia obok menu - pomiar powinien powstac)", False)
+    else:
+        rep.add("DZ-4: proby testu w menu", f"brak (mapa {len(mapa)}, bez proby {len(noprobe)}, test autotestu {'TAK' if test_on else 'NIE'})",
+                "INFO - bez pliku testu albo bieg bez menu", None)
+    for t in mapa:
+        rep.add("DZ-4b: proba testu na mapie", f"linie {t[1]}/3, ramka {t[3]}, dol ramki y={t[4]}, wynik {t[5]}" + (f" ({t[6]})" if t[6] else ""),
+                "wynik TAK (lewa krawedz >= 100 przy kluczu przesuniecia, ramka TAK przy kluczu, dol ramki nad paskiem, linie 3/3)", t[5] == "TAK")
+    # DZ-5 przesuniecia
+    if not key_clear:
+        rep.add("DZ-5: przesuniecia obok menu", f"{moves} (klucz NIE)", "INFO - klucz MapChatLogClearOfMenu NIE", None)
+    elif moves >= 1 or moved_lines >= 1:
+        rep.add("DZ-5: przesuniecia obok menu", f"{moves} w liniach doby, linii 'przesuniety' {moved_lines}", ">= 1", True)
+    elif test_on:
+        rep.add("DZ-5: przesuniecia obok menu", f"0 (linii 'przesuniety' 0)", ">= 1 (autotest: gracz czeka w menu miasta)", False)
+    else:
+        rep.add("DZ-5: przesuniecia obok menu", f"0 (bez pliku testu)", "INFO - log bez menu albo zwykla gra", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m104wojny (21.10, w-toku/m104-wojny: wojny wedlug ksiazki - (1) wojny fabularne ROT czysto essoskie na
 # kalendarzu w kampanii z prologiem, (2) Reach z korona po smierci Renly'ego (pokoj z Dorne, sojusz, pakt Reach-Dorne) i Dorne z korona po zareczynach Myrcelli (pakt),
 # (3) mlode smoki Daenerys - wierzchowiec wedlug etapu; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
@@ -56814,6 +56984,8 @@ def main(argv):
         return m104e5_main(logp)   # m104e5 (21.10, w-toku/m104-e5): sceny zmieniajace swiat prologu 298 - orszak, Turniej Reki, Tyrion i Jaime jencami, klany gorskie, ludzie Gory, Beric
     if group == "m105kolko" and logp:
         return m105kolko_main(logp)   # m105kolko (21.10, w-toku/m105-kolko): kolko najechania przy zajazdach i wioskach pobocznych (MapHoverRing)
+    if group == "m105dziennik" and logp:
+        return m105dziennik_main(logp)   # m105dziennik (21.10, w-toku/m105-dziennik): dziennik obok menu osady, ramka w stylu ROT, bez wierszy handlu nad miastami (MapChatLog)
     if group == "m104wojny" and logp:
         return m104wojny_main(logp)   # m104wojny (21.10, w-toku/m104-wojny): Essos na kalendarzu w prologu, Reach i Dorne z korona, mlode smoki Daenerys (Prologue.Wars/Crown/Dragons)
     if group == "m100kryjowki" and logp:
