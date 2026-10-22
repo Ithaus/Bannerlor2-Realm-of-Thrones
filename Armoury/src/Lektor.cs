@@ -110,6 +110,11 @@ namespace Armoury
             try { if (_stumbles <= 5 || _stumbles % 50 == 0) Log.Error("Lektor." + where + " (potkniecie " + _stumbles + ")", e); } catch { }
         }
 
+        // m108-muzyka (EventMusic.cs): numer kolejnego nowego okna wydarzenia, katalog modulu, stan okna - odczyt dla muzyki wydarzen
+        internal static int WindowSeq;
+        internal static string ModuleDir() { return ModuleRoot(); }
+        internal static bool MusicWindowActive() { return EventStateActive(); }
+
         private static string ModuleRoot()
         {
             var dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);   // bin/Win64_Shipping_Client
@@ -506,6 +511,14 @@ namespace Armoury
             return Prop(ev, "Title") as string;
         }
 
+        /// <summary>m108-muzyka: tekst okna (Event.Description albo Event.Text) - tylko do nastroju muzyki; brak - null.</summary>
+        private static string TextOf(object screen)
+        {
+            object st = _fState != null ? _fState.GetValue(screen) : null;
+            object ev = Prop(st, "Event");
+            return (Prop(ev, "Description") as string) ?? (Prop(ev, "Text") as string);
+        }
+
         /// <summary>m105-kronika K0 (A3): klucz nagrania i md5 tekstu okna opowiesci Armoury (ArmStoryEvent.Key / VoiceMd5) z _eventPopupState.Event - typ po nazwie
         /// (okna ROT nie maja klucza: key = null, szukanie po tytule jak dotad).</summary>
         private static void KeyOf(object screen, out string key, out string md5)
@@ -537,6 +550,18 @@ namespace Armoury
             try
             {
                 _dWinOpen++;
+                // m108-muzyka: nastroj nowego okna dla muzyki wydarzen - takze przy wylaczonym lektorze okien (muzyka ma wlasny klucz)
+                try
+                {
+                    if (_lastScreen == null || !ReferenceEquals(_lastScreen.Target, __instance))
+                    {
+                        string mk, mm;
+                        KeyOf(__instance, out mk, out mm);
+                        WindowSeq++;
+                        EventMusic.NoteWindow(TitleOf(__instance), mk, TextOf(__instance));
+                    }
+                }
+                catch (Exception e) { Stumble("OnActivatePost.Muzyka", e); }
                 if (!WindowsOn) { _dWinOff++; return; }
                 if (_lastScreen != null && ReferenceEquals(_lastScreen.Target, __instance)) { _dWinRepeat++; Log.Info(P + "okno ROT aktywowane ponownie - bez powtorki."); return; }
                 _lastScreen = new WeakReference(__instance);

@@ -479,6 +479,9 @@ namespace Armoury
 
         static partial void GossipClipStopped(string why, double t) { }
 
+        /// <summary>m108-muzyka: strona plotek czytana (od pierwszego kawalka do konca strony albo przerwania) - muzyka wydarzen gra przez cala strone.</summary>
+        internal static bool MusicGossipActive() { return _pageActive; }
+
         static partial void GossipClipEnded(double t, bool early)
         {
             if (early) _dGossipEarly++;

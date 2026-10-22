@@ -470,6 +470,13 @@ namespace Armoury
                 try { Lektor.AppTick(); }
                 catch (Exception e) { _lektorFails++; Log.Error("Lektor.AppTick: nie laduje sie (proba " + _lektorFails + "/3)", e); }
             }
+            // m108-muzyka: muzyka wydarzen - przez okno wydarzenia i strone plotek muzyka gry cichnie, gra nasz utwor (EventMusic; wlasny try w srodku,
+            // nic nie gra i nic nie czeka - od razu wyjscie); tu tylko blad ladowania typu, liczony
+            if (_musicFails < 3)
+            {
+                try { EventMusicTick(); }
+                catch (Exception e) { _musicFails++; Log.Error("EventMusic: nie laduje sie (proba " + _musicFails + "/3)", e); }
+            }
             // m105-dziennik: dziennik wiadomosci obok menu osady i ramka (4 razy na sekunde; poza taktem tylko licznik czasu; wlasny try w srodku) - tu tylko blad
             // ladowania typu, liczony (po 3 dziennik zostaje jak w grze do konca sesji). PRZED returnem wiosek - klucz Map Villages = off nie wylacza dziennika.
             if (_chatLogFails < 3)
@@ -508,6 +515,14 @@ namespace Armoury
 
         private static int _chatLogFails;   // m105-dziennik: blad ladowania typu dziennika (MapChatLog.AppTick)
 
+        private static int _musicFails;   // m108-muzyka: blad ladowania typu EventMusic
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void EventMusicTick()
+        {
+            EventMusic.AppTick();
+        }
+
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void ChatLogTick(float dt)
         {
@@ -528,7 +543,8 @@ namespace Armoury
             base.OnGameEnd(game);
             try { RotWindowPictures.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (obrazki okien ROT)", e); }
             try { Prologue.ScenesGameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (sceny prologu, obrazki)", e); }
-            try { MapChatLog.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (dziennik m105)", e); }   // m105-dziennik: linia kampanii i test od nowa
+            try { MapChatLog.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (dziennik m105)", e); }
+            try { EventMusic.RestoreNow("wyjscie z kampanii"); } catch (Exception e) { Log.Error("OnGameEnd (muzyka m108)", e); }   // m108-muzyka: muzyka gry z powrotem   // m105-dziennik: linia kampanii i test od nowa
             try { Chronicle.GameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (Kronika Westeros)", e); }   // m105-kronika: stan kampanii Kroniki od zera
         }
         private static int _lektorFails;    // m103-lektor: blad ladowania typu lektora (Lektor.AppTick)

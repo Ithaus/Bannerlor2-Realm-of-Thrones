@@ -9252,6 +9252,10 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public int LektorGossipDailyChars { get; set; } = 1000;
 
+        [SettingPropertyBool("Event Music Enabled", HintText = "Event Music: while a story window is open (Realm of Thrones events, the Chronicle, the prologue scenes) and while the narrator reads the gossip of an inn, the game's music fades away and a quiet piece of the mod's own plays under the narrator - mourning, war, the North, crowns and dragons, intrigue or tavern talk, by what the window tells; the game's music comes back when the window closes", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool EventMusicEnabled { get; set; } = true;
+
         [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public int LektorGossipReserveChars { get; set; } = 3000;
@@ -11588,6 +11592,7 @@ namespace Armoury
             s.LektorEventWindows = LektorEventWindows;
             s.LektorGossipLive = LektorGossipLive;
             s.LektorGossipDailyChars = LektorGossipDailyChars;
+            s.EventMusicEnabled = EventMusicEnabled;
             s.LektorGossipReserveChars = LektorGossipReserveChars;
             s.ChronicleOfWesteros = ChronicleOfWesteros;
             s.ChronicleWorldChanges = ChronicleWorldChanges;

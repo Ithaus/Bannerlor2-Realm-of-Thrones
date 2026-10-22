@@ -1,0 +1,302 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+using Scene = TaleWorlds.Engine.Scene;
+using SoundEvent = TaleWorlds.Engine.SoundEvent;   // bez using TaleWorlds.Engine - jego Path zaslania System.IO.Path
+
+namespace Armoury
+{
+    /// <summary>
+    /// m108-muzyka (Jeff 22.10: "jak uruchamiaja sie wydarzenia, lektor czyta, a w tle leci muzyka i zaglusza - muzyka ma cichnac i mamy nasz utwor, nieco
+    /// ciszej, aby posluchac"; "plotkowanie, cale wydarzenie - muzyka tylko nasza i zeby nie przeszkadzala"). Klucz EventMusicEnabled (TAK).
+    ///  - Kiedy: przez cale okno wydarzenia (stan gry ROT EventPopupState - okna ROT, Kronika, sceny prologu; Lektor.EventStateActive) i przez czytanie strony
+    ///    plotek (Lektor.GossipPageActive). Sprawdzane co klatke z SubModuleMain.OnApplicationTick (bez latek - sam odczyt stanu).
+    ///  - Muzyka gry: psai (TaleWorlds.PSAI, psai.net.PsaiCore - odbicie, bez referencji): GetVolume zapamietane, SetVolume plynnie do 0 w 1,2 s, potem SetPaused(true);
+    ///    po wydarzeniu (0,6 s bez okna i plotek - kolejne okno zaraz po zamknieciu nie przywraca) SetPaused(false) i SetVolume plynnie do zapamietanej w 2 s.
+    ///    Wyjscie z kampanii / blad - przywrocenie od razu. Glosnosci gracza nie zmieniamy w ustawieniach.
+    ///  - Nasz utwor: ModuleData/Lektor/Muzyka/muz_[nastroj].ogg (ElevenLabs Music, instrumentalne, -28 LUFS - ok. 13 dB pod lektorem -14.5 LUFS, pasmo 2.5 kHz -3 dB
+    ///    pod glos; tools/muzyka). Odtwarzanie jak lektor: SoundEvent.CreateEventFromExternalFile("event:/Extra/external", ...) - zdarzenie z instrumentem
+    ///    programisty (MasterBank.strings: Extra/external obok Extra/voiceover; voiceover NIE - jeden glos naraz, uciszylby lektora). Po koncu utworu - od nowa.
+    ///    Nastroj z tytulu, klucza i tekstu okna (slowa: smierc -> zaloba, wojna, Polnoc, korona i smoki, reszta intryga); plotki - plotka.
+    ///  - Linie "Muzyka (m108): ..." (start okna z nastrojem i glosnoscia psai, koniec, bledy pierwsze 3). Potkniecia liczone, bez wylacznika.
+    /// </summary>
+    internal static class EventMusic
+    {
+        internal const string P = "Muzyka (m108): ";
+        private const string MusicEvent = "event:/Extra/external";
+        private const float FadeOutSec = 1.2f, FadeInSec = 2.0f, ReleaseDelay = 0.6f;
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+        // ---- psai (odbicie raz)
+        private static bool _psaiTried, _psaiOk;
+        private static MethodInfo _mInit, _mGetVol, _mSetVol, _mPause;
+        private static PropertyInfo _pInst;
+
+        // ---- stan
+        private static bool _ducked, _paused, _active;
+        private static float _saved = 1f, _cur = 1f, _idle;
+        private static SoundEvent _mus;
+        private static string _musMood, _musFile;
+        private static int _winSeqSeen = -1, _stumbles, _createFails, _starts;
+        private static string _mood = "intryga", _moodTag = "";
+        private static Dictionary<string, string> _tracks;
+        private static double _lastTick;
+        private static bool _volLogged;
+
+        private static double Now { get { return Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency; } }
+
+        private static void Stumble(string where, Exception e)
+        {
+            _stumbles++;
+            if (_stumbles <= 3) Log.Error("EventMusic." + where + " (potkniecie " + _stumbles + ")", e);
+        }
+
+        private static bool KeyOn
+        {
+            get { var s = Settings.Current; return s == null || s.EventMusicEnabled; }
+        }
+
+        // ============================================================ nastroj okna (Lektor.OnActivatePost, przed kluczem lektora)
+        /// <summary>Nowe okno wydarzenia: nastroj z tytulu, klucza i tekstu. Glowny watek. Nie rzuca.</summary>
+        internal static void NoteWindow(string title, string key, string text)
+        {
+            try
+            {
+                string all = ((title ?? "") + " | " + (key ?? "") + " | " + (text ?? "")).ToLowerInvariant();
+                _mood = MoodOf(all);
+                _moodTag = string.IsNullOrEmpty(title) ? (key ?? "?") : title;
+            }
+            catch (Exception e) { Stumble("NoteWindow", e); }
+        }
+
+        private static readonly string[] WZaloba = { "death", "dies", "died", "dead", "killed", "slain", "murder", "execut", "funeral", "beheaded", "poison", "burned at", "burning of", "pyre", "red wedding", "mourn", "grief", "corpse" };
+        private static readonly string[] WWojna = { "war ", "war,", "war.", " war", "battle", "siege", "army", "armies", "host of", "banners", "march", "invasion", "invade", "rebellion", "attack", "raid", "sack of", "storm the", "besieg" };
+        private static readonly string[] WPolnoc = { "the wall", "night's watch", "wildling", "free folk", "white walker", "the others", "winterfell", "the north", "beyond the", "snow", "winter", "castle black", "hardhome", "frost" };
+        private static readonly string[] WKorona = { "dragon", "crown", "coronat", "throne", "targaryen", "daenerys", "khal", "comet", "royal", "the king", "king's", "the queen", "queen's", "wedding" };
+
+        internal static string MoodOf(string all)
+        {
+            if (Any(all, WZaloba)) return "zaloba";
+            if (Any(all, WWojna)) return "wojna";
+            if (Any(all, WPolnoc)) return "polnoc";
+            if (Any(all, WKorona)) return "korona";
+            return "intryga";
+        }
+
+        private static bool Any(string s, string[] words)
+        {
+            foreach (var w in words) if (s.IndexOf(w, StringComparison.Ordinal) >= 0) return true;
+            return false;
+        }
+
+        // ============================================================ takt (SubModuleMain.OnApplicationTick)
+        internal static void AppTick()
+        {
+            double now = Now;
+            float dt = _lastTick > 0 ? (float)Math.Min(0.25, now - _lastTick) : 0f;
+            _lastTick = now;
+            bool win = false, gossip = false;
+            if (KeyOn)
+            {
+                try { win = Lektor.MusicWindowActive(); } catch (Exception e) { Stumble("Window", e); }
+                if (!win) { try { gossip = Lektor.MusicGossipActive(); } catch (Exception e) { Stumble("Gossip", e); } }
+            }
+            bool want = win || gossip;
+            if (!want && !_active && !_ducked && _mus == null) return;   // nic nie gra i nic nie czeka
+            try { Step(want, win, dt); }
+            catch (Exception e) { Stumble("Step", e); RestoreNow("blad"); }
+        }
+
+        private static void Step(bool want, bool win, float dt)
+        {
+            if (want)
+            {
+                _idle = 0f;
+                string mood = win ? _mood : "plotka";
+                if (!_active)
+                {
+                    _active = true;
+                    _starts++;
+                    DuckStart();
+                    Log.Info(P + (win ? "okno \"" + _moodTag + "\"" : "plotki") + " - nastroj " + mood + ", muzyka gry cichnie (psai " + (_psaiOk ? "glosnosc " + _saved.ToString("0.00", Inv) : "BRAK") + ").");
+                }
+                int seq = Lektor.WindowSeq;
+                if (_mus == null || _musMood != mood || (win && seq != _winSeqSeen)) { _winSeqSeen = seq; if (_mus == null || _musMood != mood) StartTrack(mood); }
+                else LoopTrack();
+                FadeDown(dt);
+                return;
+            }
+            // bez okna i plotek: chwila zapasu (kolejne okno zaraz po zamknieciu), potem stop utworu i powrot muzyki gry
+            _idle += dt;
+            if (_active && _idle >= ReleaseDelay)
+            {
+                _active = false;
+                StopTrack("koniec wydarzenia");
+                if (_paused) { PsaiPause(false); _paused = false; }
+                Log.Info(P + "koniec wydarzenia - muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s).");
+            }
+            if (!_active && _ducked) FadeUp(dt);
+        }
+
+        // ------------------------------------------------------------ psai
+        private static void PsaiResolve()
+        {
+            if (_psaiTried) return;
+            _psaiTried = true;
+            try
+            {
+                Type t = Type.GetType("psai.net.PsaiCore, TaleWorlds.PSAI");
+                if (t == null) { Log.Info(P + "psai.net.PsaiCore brak - muzyka gry bez wyciszania."); return; }
+                _mInit = t.GetMethod("IsInstanceInitialized", BindingFlags.Public | BindingFlags.Static);
+                _pInst = t.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static);
+                _mGetVol = t.GetMethod("GetVolume", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+                _mSetVol = t.GetMethod("SetVolume", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(float) }, null);
+                _mPause = t.GetMethod("SetPaused", BindingFlags.Public | BindingFlags.Instance, null, new[] { typeof(bool) }, null);
+                _psaiOk = _mInit != null && _pInst != null && _mGetVol != null && _mSetVol != null && _mPause != null;
+                Log.Info(P + "psai " + (_psaiOk ? "TAK (GetVolume/SetVolume/SetPaused)" : "NIE - brak metod") + ".");
+            }
+            catch (Exception e) { Stumble("PsaiResolve", e); _psaiOk = false; }
+        }
+
+        private static object Psai()
+        {
+            PsaiResolve();
+            if (!_psaiOk) return null;
+            if (!(bool)_mInit.Invoke(null, null)) return null;
+            return _pInst.GetValue(null, null);
+        }
+
+        private static void DuckStart()
+        {
+            object ps = Psai();
+            if (ps == null) return;
+            if (!_ducked)
+            {
+                float v = (float)_mGetVol.Invoke(ps, null);
+                if (v > 0.02f) _saved = v;          // gra po naszym wyciszeniu nie wrocila w pelni - zostaje poprzednia zapamietana
+                _cur = v;
+                _ducked = true;
+                _volLogged = false;
+            }
+        }
+
+        private static void FadeDown(float dt)
+        {
+            if (!_ducked) return;
+            object ps = Psai();
+            if (ps == null) return;
+            if (_cur > 0f)
+            {
+                _cur = Math.Max(0f, _cur - dt * Math.Max(_saved, 0.1f) / FadeOutSec);
+                _mSetVol.Invoke(ps, new object[] { _cur });
+            }
+            else if (!_paused)
+            {
+                PsaiPause(true);
+                _paused = true;
+                float got = (float)_mGetVol.Invoke(ps, null);
+                if (!_volLogged) { _volLogged = true; Log.Info(P + "muzyka gry wyciszona i wstrzymana (psai glosnosc teraz " + got.ToString("0.00", Inv) + ", zapamietana " + _saved.ToString("0.00", Inv) + ")."); }
+            }
+        }
+
+        private static void FadeUp(float dt)
+        {
+            object ps = Psai();
+            if (ps == null) { _ducked = false; return; }
+            _cur = Math.Min(_saved, _cur + dt * Math.Max(_saved, 0.1f) / FadeInSec);
+            _mSetVol.Invoke(ps, new object[] { _cur });
+            if (_cur >= _saved - 0.0001f) _ducked = false;
+        }
+
+        private static void PsaiPause(bool p)
+        {
+            object ps = Psai();
+            if (ps != null) _mPause.Invoke(ps, new object[] { p });
+        }
+
+        /// <summary>Wyjscie z kampanii albo blad: utwor stop, muzyka gry od razu z powrotem.</summary>
+        internal static void RestoreNow(string why)
+        {
+            try { StopTrack(why); } catch (Exception e) { Stumble("RestoreNow.Stop", e); }
+            try
+            {
+                if (_ducked || _paused)
+                {
+                    object ps = Psai();
+                    if (ps != null)
+                    {
+                        if (_paused) _mPause.Invoke(ps, new object[] { false });
+                        _mSetVol.Invoke(ps, new object[] { _saved });
+                    }
+                    Log.Info(P + "muzyka gry przywrocona od razu (" + why + ").");
+                }
+            }
+            catch (Exception e) { Stumble("RestoreNow.Psai", e); }
+            _ducked = false; _paused = false; _active = false; _idle = 0f; _cur = _saved;
+        }
+
+        // ------------------------------------------------------------ nasz utwor
+        private static void LoadTracks()
+        {
+            if (_tracks != null) return;
+            _tracks = new Dictionary<string, string>(StringComparer.Ordinal);
+            try
+            {
+                string dir = Path.Combine(Path.Combine(Path.Combine(Lektor.ModuleDir(), "ModuleData"), "Lektor"), "Muzyka");
+                if (Directory.Exists(dir))
+                    foreach (var f in Directory.GetFiles(dir, "muz_*.ogg"))
+                    {
+                        string n = Path.GetFileNameWithoutExtension(f).Substring(4);
+                        if (new FileInfo(f).Length > 4096) _tracks[n] = f;
+                    }
+                Log.Info(P + "utworow " + _tracks.Count + " (" + string.Join(", ", new List<string>(_tracks.Keys).ToArray()) + ") w " + dir + ".");
+            }
+            catch (Exception e) { Stumble("LoadTracks", e); }
+        }
+
+        private static void StartTrack(string mood)
+        {
+            StopTrack(null);
+            LoadTracks();
+            string path;
+            if (!_tracks.TryGetValue(mood, out path) && !_tracks.TryGetValue("intryga", out path)) return;
+            SoundEvent ev = null;
+            try { ev = SoundEvent.CreateEventFromExternalFile(MusicEvent, path, (Scene)null, false, false); }
+            catch (Exception e) { Stumble("CreateEventFromExternalFile", e); return; }
+            bool ok = false;
+            try { ok = ev != null && ev.IsValid && ev.Play(); } catch (Exception e) { Stumble("Play", e); }
+            if (!ok)
+            {
+                _createFails++;
+                try { if (ev != null && ev.IsValid) ev.Release(); } catch { }
+                if (_createFails <= 3) Log.Info(P + "silnik nie przyjal utworu " + Path.GetFileName(path) + " (zdarzenie " + MusicEvent + ") - bez naszej muzyki, muzyka gry dalej wyciszona.");
+                return;
+            }
+            _mus = ev; _musMood = mood; _musFile = Path.GetFileName(path);
+            Log.Info(P + "gra " + _musFile + " (nastroj " + mood + ").");
+        }
+
+        private static void LoopTrack()
+        {
+            var ev = _mus;
+            if (ev == null) return;
+            bool end = false;
+            try { end = !ev.IsValid || ev.IsStopped(); } catch (Exception e) { Stumble("Loop", e); end = true; }
+            if (end) { string m = _musMood; _mus = null; try { if (ev.IsValid) ev.Release(); } catch { } StartTrack(m); }
+        }
+
+        private static void StopTrack(string why)
+        {
+            var ev = _mus;
+            if (ev == null) return;
+            _mus = null;
+            try { ev.Release(); } catch (Exception e) { Stumble("StopTrack", e); }
+            if (why != null) Log.Info(P + "stop " + _musFile + " (" + why + ").");
+        }
+
+        internal static string DayText() { return "wydarzen z muzyka " + _starts + ", bledy utworu " + _createFails + ", potkniecia " + _stumbles; }
+    }
+}
