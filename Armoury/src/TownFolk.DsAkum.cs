@@ -687,7 +687,7 @@ namespace Armoury
                 else sb.Append(" (wsie DS: brak doby kroku 4)");
                 // m105 gosp4 (M5G-7; klucze Ks Village Chest Refill / Ds Rent After Bread - oba NIE: linia jak w WGRANIU 102): wsie biedne - kiesa ponizej 1000 zl i ponizej skrzyni
                 int akP, akN;
-                if ((StartCalibration.SwChestRefill || s.DsRentAfterBread) && DsVillage.AkPoor(out akP, out akN))
+                if ((StartCalibration.SwChestRefill || s.DsRentAfterBread || s.DsLordReliefBelowChest) && DsVillage.AkPoor(out akP, out akN))   // m105 gosp5: takze przy Ds Lord Relief Below Chest
                     sb.Append(" | m105 wsie biedne (kiesa < min(1000 zl, skrzynia)) ").Append(akP).Append(" z ").Append(akN).Append(" wsi DS");
                 sb.Append(" | czas ").Append(Ms(_daTicks)).Append(" ms | potkniecia ").Append(_daSt).Append(" (sesja ").Append(_daStSess).Append(").");
                 Log.Info(sb.ToString());

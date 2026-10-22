@@ -237,7 +237,8 @@ namespace Armoury
 
         /// <summary>Po latce BK i po cudzych postfiksach (Priority.Last): dopisuje wsi to, co z oddanej gotowki nie trafilo nigdzie (Whole112),
         /// potem - F4b - rachunek za drewno kopalni przed dzialka pana (CoalFirst), potem - DS (F1) - daniny wsi przy wozie (DsDues), a na samym koncu - f5-ruda -
-        /// splata kredytu kupcow na drewno dymarki z reszty przyrostu kiesy (F5WoodCredit).</summary>
+        /// splata kredytu kupcow na drewno dymarki z reszty przyrostu kiesy (F5WoodCredit); m105 gosp5 (klucz Ds Lord Relief Below Chest) - po niej ulga pana dla wsi
+        /// ponizej skrzyni z licznika tego wozu (LordRelief).</summary>
         public static void EnterPostfix(Entry __state)
         {
             if (__state == null) return;
@@ -250,7 +251,45 @@ namespace Armoury
             long side = SideFief(__state);                   // n20-wioska: wozy okregu wioski pobocznej gracza - r4-wioska: tylko licznik (dochod co dobe w SideVillageFief.Pay), zwraca 0
             DsDues(__state, works, side);
             F5WoodCredit(__state);                           // f5-ruda: kredyt kupcow na drewno dymarki - splata z reszty przyrostu kiesy (PO pracach okregu i daninie DS - ich podstawa bez zmian)
+            LordRelief(__state);                             // m105 gosp5 (klucz Ds Lord Relief Below Chest): dzialka pana z tego wozu do kiesy wsi ponizej skrzyni (PO splacie drewna f5 - ulga nie splaca kupcow)
             CartCsv(__state);                                // f14-wsie: utarg wozu wies po wsi do wsie-kiesy.csv (tylko licznik, po wszystkich krokach okna)
+        }
+
+        /// <summary>
+        /// m105 gosp5 (klucz Ds Lord Relief Below Chest; klucz NIE - return na wejsciu, okno jak w fd388555): woz wrocil do wsi MACIERZYSTEJ DS, a kiesa wsi jest ponizej
+        /// skrzyni na czarna godzine (DsVillage.ReliefChest) - pan oddaje wsi swoja dzialke z TEGO wozu: zwrot = min(przyrost licznika podatku wsi w tym oknie - po BK, 112,
+        /// F4b, regale i pracach okregu - , skrzynia - kiesa); licznik podatku wsi -= zwrot, kiesa wsi += zwrot (jak F4b: z licznika schodzi najwyzej tyle, ile kiesa przyjela).
+        /// Platnik - pan z biezacego zysku tego wozu (nie z oszczednosci, nie z wczesniejszych wozow): zloto nie powstaje z niczego. Przelew w otwartym oknie powrotu (kiesa
+        /// rosnie, licznik maleje o to samo) - ksiega pieniadza nie widzi "zniklo". Po daninach DS i splacie drewna f5 (ich podstawa bez zmian), przed CartCsv (csv
+        /// woz_netto_do_kiesy zawiera ulge). Ulga konczy sie sama, gdy skrzynia jest pelna. Woz w obcej wsi albo bez utargu - nic. Wlasny try.
+        /// </summary>
+        private static void LordRelief(Entry st)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.DsLordReliefBelowChest) return;
+                if (st == null || st.Here != null || st.Home == null || st.Party == null) return;
+                var home = st.Home;
+                if (!DsVillage.On(home.Settlement)) return;
+                if (st.Gold - st.Party.PartyTradeGold <= 0) return;
+                long got = (long)home.TradeTaxAccumulated - st.HomeTax;   // dzialka pana z tego wozu (licznik pana w tym oknie, po F4b, regale i pracach okregu)
+                if (got <= 0) return;
+                double chest = DsVillage.ReliefChest(home.Settlement);
+                if (!(chest >= 1)) return;                                // wies nieskalibrowana albo bez skrzyni - bez ulgi
+                double lack = Math.Floor(chest - home.Gold);
+                if (!(lack >= 1)) return;                                 // skrzynia pelna - ulga sie konczy
+                long back = (long)Math.Min((double)got, Math.Min(lack, int.MaxValue));
+                int had = home.Gold;
+                home.ChangeGold((int)back);
+                long put = Math.Max(0L, (long)home.Gold - had);
+                if (put < back) back = put;                               // z licznika schodzi najwyzej tyle, ile kiesa przyjela
+                if (back <= 0) return;
+                home.TradeTaxAccumulated -= (int)back;
+                NoteV(home, 0, back);
+                DsVillage.NoteRelief(home.Settlement, back);
+            }
+            catch (Exception e) { Stumble("VillageTakings.LordRelief", e); }
         }
 
         /// <summary>f14-wsie (wsie-kiesy.csv): koniec okna powrotu wozu - gotowka oddana przez woz i przyrost kiesy netto wsi, ktorej kiesa urosla (macierzysta, a gdy woz

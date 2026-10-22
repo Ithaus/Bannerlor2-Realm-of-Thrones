@@ -8228,6 +8228,10 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
         public bool DsRentAfterBread { get; set; } = true;
 
+        [SettingPropertyBool("Ds Lord Relief Below Chest", HintText = "with Dues Medieval: while a village's purse holds less than its chest for a black day, its lord gives it back his share of what each cart brings home - only from that cart, and only as much as the chest still lacks - and takes the fixed rent only from what the purse holds beyond the chest (the rest of the day's rent is let go, not written as arrears; arrears are paid only from what lies beyond both the day's basket and the chest). The lord pays it from his current takings, never from his savings, and the relief stops by itself once the chest is full. Off = the lord takes his share at the cart and the rent as before", RequireRestart = false)]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public bool DsLordReliefBelowChest { get; set; } = true;
+
         [SettingPropertyBool("Ks Bk Village Needs", HintText = "the Banner Kings village market of a village under the medieval dues or the start calibration buys what villagers really need - salt, tools (or iron for the smith), linen, woollen cloth and pots - and only as much as they use (Village Need Cover Days at most in the house); wine, spices, jewellery, velvet and furs only when the village is rich (Ks Bk Rich Chests); it pays only from what the purse holds beyond its chest for a black day, from a real daily budget that shrinks with every purchase (no longer one piece of everything the town has too much of, at 5 percent of the purse for each piece); a village buying its basket from the calibration plan buys no food and none of its basket goods there (the basket already buys them). Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
         public bool KsBkVillageNeeds { get; set; } = true;
@@ -11252,6 +11256,7 @@ namespace Armoury
             s.DsCommunalWorks = DsCommunalWorks;
             s.DsRentArrearsPayDays = DsRentArrearsPayDays;
             s.DsRentAfterBread = DsRentAfterBread;
+            s.DsLordReliefBelowChest = DsLordReliefBelowChest;
             s.KsBkVillageNeeds = KsBkVillageNeeds;
             s.KsBkRichChests = KsBkRichChests;
             s.VillageNeedCoverDays = VillageNeedCoverDays;
