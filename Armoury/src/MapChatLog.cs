@@ -77,6 +77,11 @@ namespace Armoury
 
         // ---- klucze (z MCM wprost w kampanii, bez MCM z Settings.Current)
         private static bool _kClear = true, _kFrame = true, _kHide = true;
+        private static int _kFont = 16, _kHeight = 75;
+        // Jeff 22.10 (zrzut 20-19-24: dziennik w miejscu gry zaslanial dol menu miasta - "Leave"): "zmniejsz czcionke w dzienniku i wysokosc wiadomosci o 25%"
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Widget, object> _fontDone = new System.Runtime.CompilerServices.ConditionalWeakTable<Widget, object>();
+        private static int _fontGen, _fontApplied = -1, _shrinkLogged;
+        private static float _origTextTop = 5f;
         private static int _mcmFails;
 
         // ---- czas i kampania
@@ -237,6 +242,7 @@ namespace Armoury
             if (want != _pos) Move(want);
             // ramka: mapa i menu osady bez okien, w miejscu, gdzie dziennik stoi (Jeff 22.10: "ramka z wiadomosciami moze byc w tym samym miejscu co wczesniej,
             // tylko w ramce" - domyslnie dziennik zostaje w miejscu gry, MapChatLogClearOfMenu NIE; przesuniecie obok menu tylko z kluczem)
+            Shrink();
             Frame(clean);
             if (onMap && _testOn) TestStep(ms);
         }
@@ -262,21 +268,25 @@ namespace Armoury
         {
             var s = Settings.Current;
             bool c = s == null || s.MapChatLogClearOfMenu, f = s == null || s.MapChatLogFrame, h = s == null || s.MapHideTradeNotices;
+            int fs = s != null ? s.MapChatLogFontSize : 16, hp = s != null ? s.MapChatLogHeightPct : 75;
             if (_mcmFails < 3)
             {
-                try { McmKeys(ref c, ref f, ref h); }
+                try { McmKeys(ref c, ref f, ref h, ref fs, ref hp); }
                 catch (Exception e) { _mcmFails++; Stumble("ReadKeys (MCM, proba " + _mcmFails + "/3)", e); }
             }
             _kClear = c; _kFrame = f; _kHide = h;
+            _kFont = fs < 8 ? 8 : fs > 30 ? 30 : fs;
+            _kHeight = hp < 20 ? 20 : hp > 100 ? 100 : hp;
         }
 
         /// <summary>Osobna metoda bez wstawiania: brak biblioteki MCM = blad ladowania typu przy wywolaniu (lapany w ReadKeys), nie przy JIT taktu.</summary>
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        private static void McmKeys(ref bool c, ref bool f, ref bool h)
+        private static void McmKeys(ref bool c, ref bool f, ref bool h, ref int fs, ref int hp)
         {
             var i = McmSettings.Instance;
             if (i == null) return;
             c = i.MapChatLogClearOfMenu; f = i.MapChatLogFrame; h = i.MapHideTradeNotices;
+            fs = i.MapChatLogFontSize; hp = i.MapChatLogHeightPct;
         }
 
         private static void CampaignLine()
@@ -325,6 +335,8 @@ namespace Armoury
             _inner = w.FindChild("InnerPanel", true);
             _text = w.FindChild("ScrollablePanelContainer", true);
             _origLeft = w.MarginLeft; _origBottom = w.MarginBottom;   // nowy film - wartosci prefabu
+            _origTextTop = _text != null ? _text.MarginTop : 5f;
+            _fontGen++; _shrinkLogged = 0;
             _pos = PosGame;
             _frame = null; _frameTried = false; _frameWasVis = false; _frameH = 0f; _lastK = 0;
             _finds++;
@@ -465,7 +477,7 @@ namespace Armoury
                             float sc = _w.Context.CustomScale;
                             if (sc <= 0f) sc = 1f;
                             h = sum / sc + 2f * FramePad;
-                            float max = _w.SuggestedHeight - TextHeightCut;
+                            float max = _w.SuggestedHeight - TextHeightCut - (_text != null ? Math.Max(0f, _text.MarginTop - _origTextTop) : 0f);
                             if (h > max) h = max;
                             vis = sum > 0.5f;
                         }
@@ -482,6 +494,62 @@ namespace Armoury
 
         /// <summary>Linie widoczne od konca MessageHistory (Alpha > 0.01; starsze gasna wczesniej). busy = gracz przeglada albo pisze (gra pokazuje wtedy
         /// wszystkie linie na wlasnym tle) albo brak VM.</summary>
+        /// <summary>Jeff 22.10: mniejsza czcionka linii (MapChatLogFontSize, gra 20) i nizsze pole wiadomosci (MapChatLogHeightPct procent pola gry; dol zostaje,
+        /// gora schodzi - wiekszy MarginTop ScrollablePanelContainer, tylko gdy gracz nie przeglada i nie pisze - wtedy pelne pole). Czcionka: kazda linia
+        /// InnerPanel raz (ConditionalWeakTable z numerem pokolenia - zmiana klucza albo nowy film przestawia wszystkie), wszystkie napisy linii (jedna linia
+        /// i linie zwiniete). Rozmiaru okna gry (SizeY, zapisywany w ustawieniach gry) nie ruszamy.</summary>
+        private static void Shrink()
+        {
+            if (_w == null || _inner == null) return;
+            if (_kFont != _fontApplied) { _fontApplied = _kFont; _fontGen++; }
+            object gen = _fontGen;
+            int cc = _inner.ChildCount, set = 0;
+            for (int i = 0; i < cc; i++)
+            {
+                Widget item = _inner.GetChild(i);
+                object g;
+                if (_fontDone.TryGetValue(item, out g))
+                {
+                    if ((int)g == _fontGen) continue;
+                    _fontDone.Remove(item);
+                }
+                set += FontTo(item, _kFont);
+                _fontDone.Add(item, gen);
+            }
+            if (_text != null)
+            {
+                bool reading = false;
+                if (_vmOk)
+                {
+                    object view = _pCurrent.GetValue(null, null);
+                    object vm = view != null ? _fData.GetValue(view) : null;
+                    reading = vm != null && ((bool)_pInsp.GetValue(vm, null) || (bool)_pTyp.GetValue(vm, null));
+                }
+                float field = _w.SuggestedHeight - 45f - _origTextTop - 65f;   // pole tekstu gry: pasek 45, MarginTop 5, MarginBottom 65
+                float want = _origTextTop + (reading || _kHeight >= 100 || field <= 0f ? 0f : field * (100 - _kHeight) / 100f);
+                if (Math.Abs(_text.MarginTop - want) > 0.5f)
+                {
+                    _text.MarginTop = want;
+                    if (_shrinkLogged < 2 && !reading)
+                    {
+                        _shrinkLogged++;
+                        Log.Info(P + "pole wiadomosci " + _kHeight + "% wysokosci gry (MarginTop " + F0(_origTextTop) + " -> " + F0(want) + ", pole " + F0(field) + " -> "
+                                 + F0(field - (want - _origTextTop)) + "), czcionka linii " + _kFont + " (gra 20), linii przestawionych " + set + ".");
+                    }
+                }
+            }
+        }
+
+        /// <summary>Rozmiar czcionki wszystkich napisow linii dziennika (RichTextWidget jednej linii i linie zwiniete); zwraca 1, gdy cos zmienil.</summary>
+        private static int FontTo(Widget w, int fs)
+        {
+            int n = 0;
+            var bw = w as BrushWidget;
+            if (bw != null && (w is RichTextWidget || w is TextWidget) && bw.ReadOnlyBrush != null && bw.ReadOnlyBrush.FontSize != fs) { bw.Brush.FontSize = fs; n = 1; }
+            for (int i = 0; i < w.ChildCount; i++) n |= FontTo(w.GetChild(i), fs);
+            return n;
+        }
+
         private static int VisibleLines(out IList hist, out bool busy)
         {
             hist = null;
@@ -686,6 +754,7 @@ namespace Armoury
             _pos = PosGame;
             if (_frame != null) { try { _frame.IsVisible = false; } catch { } }
             if (_hiddenStory && _w != null) { try { _w.IsVisible = true; } catch { } }
+            if (_text != null) { try { _text.MarginTop = _origTextTop; } catch { } }
             _hiddenStory = false; _storyHides = 0;
             _frameWasVis = false;
             _movesLogged = 0; _backsLogged = 0; _mapLogged = 0;

@@ -542,6 +542,8 @@ RANGES = {
     'MapSpeedFast': (2, 16, "0"),
     'MapSpeedVeryFast': (2, 32, "0"),
     # m103-lektor (21.10): limit dzienny i rezerwa znakow ElevenLabs - kod przycina do 0..10000 i 0..30000 (Lektor.DailyMax / ReserveChars)
+    'MapChatLogFontSize': (10, 24, "0"),
+    'MapChatLogHeightPct': (40, 100, "0"),
     'LektorGossipDailyChars': (0, 10000, "0"),
     'LektorGossipReserveChars': (0, 30000, "0"),
 }

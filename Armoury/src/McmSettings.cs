@@ -5796,6 +5796,14 @@ namespace Armoury
         [SettingPropertyGroup("Map news")]
         public bool MapChatLogClearOfMenu { get; set; } = false;
 
+        [SettingPropertyInteger("Map Chat Log Font Size", 10, 24, "0", HintText = "Chat Log Text Size: size of the letters of the message log on the campaign map (the game's own size is 20) - 16 is a fifth smaller, so the log covers less of the town menu; 20 = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Map news")]
+        public int MapChatLogFontSize { get; set; } = 16;
+
+        [SettingPropertyInteger("Map Chat Log Height Pct", 40, 100, "0", HintText = "Chat Log Height Percent: how much of the game's height the lines of the message log take while you are not reading it - 75 is a quarter lower (the bottom stays put, the top comes down, older lines go out of sight sooner); opening the log to read it gives the full height back; 100 = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Map news")]
+        public int MapChatLogHeightPct { get; set; } = 75;
+
         [SettingPropertyBool("Map Chat Log Frame", HintText = "Chat Log Frame On The Map: messages in the log on the campaign map get a dark panel with the thin silver bars of the Realm of Thrones tooltips, sized to the lines on show; it goes away with the last line. Battles, other screens and windows over the map keep the game's look, and so does a settlement menu when the log is not moved clear of it. Off = bare text, as before", RequireRestart = false)]
         [SettingPropertyGroup("Map news")]
         public bool MapChatLogFrame { get; set; } = true;
@@ -10716,6 +10724,8 @@ namespace Armoury
             s.PregnancyDays = PregnancyDays;
             s.FertilityYearScale = FertilityYearScale;
             s.MapChatLogClearOfMenu = MapChatLogClearOfMenu;
+            s.MapChatLogFontSize = MapChatLogFontSize;
+            s.MapChatLogHeightPct = MapChatLogHeightPct;
             s.MapChatLogFrame = MapChatLogFrame;
             s.MapHideTradeNotices = MapHideTradeNotices;
             s.MapVillagesEnabled = MapVillagesEnabled;
