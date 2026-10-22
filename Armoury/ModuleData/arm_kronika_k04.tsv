@@ -1,6 +1,7 @@
 # Kronika Westeros - paczka K4 (wydarzenia 37-48), dni opowiesci ok. 800-1600 (+ okna powracajace 039 oldage i 045 brokenmen). Format: docs/KRONIKA-FORMAT.md.
 # Teksty EN wlasnymi slowami (ksiazki, potem serial), bez cytatow. Wersja lekka. 42: succeed Balona (wyjatek lekki). 38 bez ukrycia Brana (glowa rodu po Krwawych Godach).
-# Pary P1 (#para): 037.1 po m02 (Jaime wolny), 044.1 po m10 (Ogar wedruje), 044.2 po m11 (Ogar znika), 047.2 po m17 (Brienne szuka Sansy).
+# Pary P1 (#para): 037.1 po m02 (Jaime wolny), 044.1 po m10 (Ogar wedruje), 044.2 po m11 (Ogar znika), 047.2 po m17 (Brienne szuka Sansy);
+# m107 (kr): 037.1 -> m31/m35 (Brienne i Jaime jencami w Harrenhal), 037.1/037.2 -> m32/m36 (wolni, do Lannisterow).
 # 039 oldage: @cel = siedziba rodu zmarlego (warunek krainy own:@cel:<krolestwo>) - do zrobienia w silniku K0 (FORMAT rozdz. 13 nie podaje @cel dla oldage).
 # 045 brokenmen: banda z puli wedlug krainy @cel (warianty a/b/c, osada bandy i cel plotki stale dla krainy); poza tymi krainami samo okno.
 # 044.2: Arya ukryta (Braavos) do kr:098.2 (K9 Arya Comes Home); K1 008.x ukrywa ja juz do rotday:2000 - hide na ukrytej postaci ma zastapic koniec ukrycia (do ustalenia w K0).
@@ -83,3 +84,9 @@ t048	defeat	town_B5	b048	1	30	relk:nightswatch:8 ; renown:20 ; garrison:town_B5:
 044.1	m10	po
 044.2	m11	po
 047.2	m17	po
+037.1	m31	kr
+037.1	m32	kr
+037.2	m32	kr
+037.1	m35	kr
+037.1	m36	kr
+037.2	m36	kr

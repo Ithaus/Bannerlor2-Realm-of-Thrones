@@ -1,6 +1,7 @@
 # Kronika Westeros - paczka K6 (docs/KRONIKA-FORMAT.md rozdz. 18): wydarzenia 61-72. Dni opowiesci ok. 1300-1460 (+ 061 powracajace).
 # Wersje lekkie domyslnie; pelna (063) jako wariant wersja=pelna. Bez uchwytow kod:. Nowe klocki K6: powtorz others (061), wizja (066).
-# Pary P1 (okno idzie za ruchem CanonCompanions): 064.1 za m17 (Brienne wedruje) i m07 (Podrick), 064.2 za m11 (Ogar znika), 068.1 za m03 (Tyrion w Essos).
+# Pary P1 (okno idzie za ruchem CanonCompanions): 064.1 za m17 (Brienne wedruje) i m07 (Podrick), 064.2 za m11 (Ogar znika), 068.1 za m03 (Tyrion w Essos);
+# m107 (kr - ruch za oknem): 072.3 -> m28 (Theon uwolniony, dalej Greyjoy).
 # Silnik K6 - wizja:N (066.2): @cel = osada wskazana przez stan mapy (najpierw oblezona twierdza Polnocy albo Muru, inaczej najblizsza osada Innych),
 # @region = krolestwo tej osady. 061: @liczba = liczba osad Innych (wyzwalacz others).
 # Decyzje: Davos (glowa rodu) bez ukrycia (065); Mance bez akcji; Theon zostaje w grze jencem Boltonow po ucieczce (072.3) - zmiana strony
@@ -103,7 +104,7 @@ t069	deliver	town_S7	fish	120	60	relk:nightswatch:10 ; relk:clan_sturgia_7:10 ; 
 071.2_W	{=ARM_KR_071_2_W}At Castle Black, Alys Karstark has been wed to the Magnar of Thenn before the fire of a red priestess.
 # 072 Slub w Winterfell i ucieczka Theona. Winterfell u Boltonow (ROT daje go Roose'owi na Krwawych Godach), Ramsay zyje, Theon ich jencem (m19).
 # Zaloga bez zmian (musi dotrwac do Bitwy Bekartow ROT) - tylko bezpieczenstwo i lojalnosc w dol, relacje Manderlych i Umberow z Boltonami.
-# 072.3: Theon w grze zostaje jencem Boltonow (patrz naglowek); wariant a: Stannis nie zyje - ucieczka w pustke.
+# 072.3: Theon ucieka (m107: wiersz #move m28 - free:clan_sturgia_1, para kr); wariant a: Stannis nie zyje - ucieczka w pustke.
 #okno	id	war	od	do	po	przed	warunki	gracz	forma	inni	wersja	temat	lektor	tytul	gora	dol	zmienne	wybor	skutki	powtorz
 072.1		1320	1420			own:town_B2:clan_empire_south_3 & alive:lord_1_29 & prisoner:ROTwanderer20:clan_empire_south_3		okno	okno	obie	wesele	1	{=ARM_KR_072_1_T}A Grey Bride at Winterfell	{=ARM_KR_072_1_U}Snow falls on the godswood of Winterfell as Ramsay Bolton takes a bride before the heart tree. She is presented to the North as Arya Stark, though she is only a frightened steward's daughter in a grey dress, and the man who gives her away is Reek.	{=ARM_KR_072_1_L}The northern lords gathered for the feast know better than to speak. Ramsay's claim to the North is sealed with a lie, and through the walls the castle hears the bride weeping in the night.			relk:clan_battania_4:clan_empire_south_3:-10 ; relk:clan_battania_5:clan_empire_south_3:-10
 072.2		1330		kr:072.1+7		own:town_B2:clan_empire_south_3		okno	okno	obie	boltonowie	1	{=ARM_KR_072_2_T}Lord Manderly's Pies	{=ARM_KR_072_2_U}Snow buries Winterfell, and in the crowded castle men begin to die: a Frey boy found dead in the snow, a Bolton soldier with his throat opened, horses slaughtered in the night. At the feast fat Lord Wyman Manderly presents three huge pork pies and eats more than anyone.	{=ARM_KR_072_2_L}Three Frey guests who rode north with Lord Wyman never arrived, and nobody asks too loudly where they went. Boltons and Freys eye each other across the hall, and the garrison sleeps with its swords.			security:town_B2:-10 ; loyalty:town_B2:-10 ; relk:clan_empire_north_3:clan_empire_south_3:-10
@@ -114,3 +115,4 @@ t069	deliver	town_S7	fish	120	60	relk:nightswatch:10 ; relk:clan_sturgia_7:10 ; 
 064.1	m07	po
 064.2	m11	po
 068.1	m03	po
+072.3	m28	kr
