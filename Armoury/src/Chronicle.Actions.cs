@@ -26,8 +26,12 @@ namespace Armoury
         /// modele gry licza tylko dryf), ware (towar z rynku do rynku), garrison (z innej zalogi albo z ochotnikow regionu przez ksiege ludzi jak autowerbunek A5),
         /// item (od obecnego posiadacza, nigdy dragon_*), wound (rejestr ran w zapisie "kj" - doba trzyma rane), skill; pop - POMINIETA (ksiega ludzi bez przyczyny kronika).
         /// Wyjatek w akcji - POMINIETA z powodem i potkniecie; reszta skutkow idzie dalej (bez globalnego wylacznika).
+        /// B2 (klasa partial - pliki obok): band (Chronicle.Bands.cs - rejestr band Kroniki, zapis "kb"), task (Chronicle.Tasks.cs - wlasny rejestr bez QuestBase,
+        /// zapis "kz"), tourney i muster (zapis "km") oraz akcje kanonu clan/court/lead/prisoner/free/wander/die/marry/wed przez CanonCompanions.ApplyAction, succeed
+        /// i tylko-pelne own/ruler/leader/alliance/truce (Chronicle.Canon.cs), uchwyty kod: test/zaraza/dzwony/wielka_rada (Chronicle.Codes.cs, RunCode).
+        /// Doba swiata Kroniki (WorldDaily: bandy, zadania, zbiorki) biegnie PRZED kluczem ChronicleOfWesteros - klucz NIE wylacza okna, ale nic nie cofa.
         /// </summary>
-        internal static class Actions
+        internal static partial class Actions
         {
             internal enum Res { Done, Skip, Wait }
 
@@ -57,6 +61,10 @@ namespace Armoury
                 { "hide", Hide }, { "unhide", Unhide },   // A4: przez CanonCompanions.ApplyAction (rejestr ukrytych w zapisie arm_canon_companions)
                 { "gold", Gold }, { "security", Security }, { "loyalty", Loyalty }, { "pop", Pop }, { "ware", Ware }, { "garrison", Garrison },   // B1: swiat i ekonomia
                 { "item", Item }, { "wound", Wound }, { "skill", Skill },
+                { "band", Band }, { "task", Task }, { "tourney", Tourney }, { "muster", Muster },   // B2: Chronicle.Bands.cs, Chronicle.Tasks.cs, Chronicle.Canon.cs
+                { "clan", CanonClan }, { "court", CanonCourt }, { "lead", CanonLead }, { "prisoner", CanonPrisoner }, { "free", CanonFree },
+                { "wander", CanonWander }, { "die", CanonDie }, { "marry", CanonMarry }, { "wed", CanonWed }, { "succeed", Succeed },
+                { "own", Own }, { "ruler", Ruler }, { "leader", Leader }, { "alliance", Alliance }, { "truce", Truce },
             };
 
             /// <summary>Klasa akcji: 'T' tekst, 'R' relacje i slawa, 'S' swiat (FORMAT 11, klucz ChronicleWorldChanges).</summary>
@@ -83,8 +91,8 @@ namespace Armoury
             internal static int WoundCount { get { return _wounds.Count; } }
 
             internal static int WaitCount { get { return _wait.Count; } }
-            /// <summary>Bandy Kroniki na mapie (krok A3 - akcja band). Do linii doby.</summary>
-            internal static int Bands { get { return 0; } }
+            /// <summary>Bandy Kroniki na mapie (B2: rejestr Chronicle.Bands - wpisy z zywa partia przy ostatnim przegladzie). Do linii doby (prog KW-14).</summary>
+            internal static int Bands { get { return BandCount; } }
             /// <summary>Postacie ukryte przez Armoury (A4: rejestr CanonCompanions - akcja hide z Kroniki albo z wiersza #move). Do linii startu i doby.</summary>
             internal static int Hidden { get { try { return CanonCompanions.HiddenCount; } catch { return 0; } } }
 
@@ -101,14 +109,48 @@ namespace Armoury
                 return (kr + mv) + " (Kronika " + kr + ", #move " + mv + ")";
             }
 
-            internal static void Reset() { _wait.Clear(); _wounds.Clear(); DayReset(); _sOk = _sSkip = 0; }
+            internal static void Reset() { _wait.Clear(); _wounds.Clear(); BandsReset(); TasksReset(); MusterReset(); DayReset(); _sOk = _sSkip = 0; }
 
             internal static void DayReset() { _dOk = _dSkip = _dWait = _dUnknown = 0; }
 
             internal static string DayText()
             {
                 return "akcje ok " + _dOk + ", pominiete " + _dSkip + ", czeka " + _wait.Count + " (nowe dzis " + _dWait + ")" + (_dUnknown > 0 ? ", NIEZNANE " + _dUnknown : "")
-                       + (_wounds.Count > 0 ? ", rany " + _wounds.Count : "");
+                       + (_wounds.Count > 0 ? ", rany " + _wounds.Count : "") + ", zadania " + TaskCount + ", zbiorki " + MusterCount;
+            }
+
+            /// <summary>B2: doba swiata Kroniki - bandy (koniec terminu, rozbite, zniknely), zadania (termin, dowiezienie), zbiorki (koniec) - PRZED kluczem
+            /// ChronicleOfWesteros (klucz NIE nic nie cofa: banda zyje swoj termin, zadanie mozna dokonczyc). Kazda czesc we wlasnym try.</summary>
+            internal static void WorldDaily(int day)
+            {
+                try { BandsDaily(day); } catch (Exception e) { Stumble("Actions.BandsDaily", e); }
+                try { TasksDaily(day); } catch (Exception e) { Stumble("Actions.TasksDaily", e); }
+                try { MusterDaily(day); } catch (Exception e) { Stumble("Actions.MusterDaily", e); }
+            }
+
+            /// <summary>B2: do linii startu sesji - bandy, zadania, zbiorki.</summary>
+            internal static string WorldText() { return "bandy " + BandCount + "/" + MaxBands + ", zadania " + TaskCount + ", zbiorki " + MusterCount; }
+
+            /// <summary>Numer wydarzenia NNN z kontekstu (okno NNN.w, instancja NNN.w#klucz, banda bNNN, zadanie tNNN); -1 - brak.</summary>
+            internal static int EventNo(string id)
+            {
+                if (string.IsNullOrEmpty(id)) return -1;
+                for (int i = 0; i + 2 < id.Length; i++)
+                {
+                    if (char.IsDigit(id[i]) && char.IsDigit(id[i + 1]) && char.IsDigit(id[i + 2]))
+                    {
+                        int v;
+                        return int.TryParse(id.Substring(i, 3), NumberStyles.None, Inv, out v) ? v : -1;
+                    }
+                }
+                return -1;
+            }
+
+            /// <summary>Wersja wiersza kontekstu (lekka|pelna|obie); "" - bez wiersza (po_rozbiciu bandy, nagroda zadania).</summary>
+            internal static string RowVersion(Ctx c)
+            {
+                var r = c != null ? Data.Row(c.RowKey) : null;
+                return r != null ? r.Version : "";
             }
 
             /// <summary>Skutki (okna albo opcji) po kolei; kazda akcja z linia wyniku. CZEKA - do listy czekajacych (zapis).</summary>
@@ -186,6 +228,9 @@ namespace Armoury
                       .Append(w.Idx.ToString(Inv)).Append('\t').Append(w.Since.ToString(Inv)).Append('\t').Append(TokText(w.C.Tok)).Append('\t').Append(w.Act.Replace('\t', ' ')).Append('\n');
                 foreach (var r in _wounds)
                     sb.Append("kj\t").Append(r.Hero).Append('\t').Append(r.Until.ToString(Inv)).Append('\t').Append(r.Src.Replace('\t', ' ')).Append('\n');
+                BandsExport(sb);     // B2: "kb" bandy Kroniki
+                TasksExport(sb);     // B2: "kz" zadania
+                MusterExport(sb);    // B2: "km" zbiorki
                 return sb.ToString();
             }
 
@@ -193,7 +238,11 @@ namespace Armoury
             {
                 _wait.Clear();
                 _wounds.Clear();
+                BandsReset(); TasksReset(); MusterReset();
                 if (string.IsNullOrEmpty(s)) return;
+                try { BandsImport(s); } catch (Exception e) { Stumble("Actions.BandsImport", e); }
+                try { TasksImport(s); } catch (Exception e) { Stumble("Actions.TasksImport", e); }
+                try { MusterImport(s); } catch (Exception e) { Stumble("Actions.MusterImport", e); }
                 foreach (var raw in s.Split('\n'))
                 {
                     var p = raw.TrimEnd('\r').Split('\t');
@@ -296,20 +345,12 @@ namespace Armoury
                 return Res.Done;
             }
 
-            /// <summary>kod:&lt;nazwa&gt; - nazwany uchwyt C# (FORMAT 12). K0: tylko test; inne - POMINIETA "brak uchwytu" (okno idzie dalej).</summary>
+            /// <summary>kod:&lt;nazwa&gt; - nazwany uchwyt C# (FORMAT 12): Chronicle.Codes.cs RunCode (test, zaraza, dzwony, wielka_rada); nieznany - POMINIETA "brak uchwytu"
+            /// (okno idzie dalej). Uchwyt sam pisze jedna linie "kod nazwa | okno ... | ... | OK/POMINIETA (powod)".</summary>
             private static Res Code(Ctx c, List<string> a, out string detail)
             {
-                detail = null;
                 string name = a.Count > 0 ? a[0] : "";
-                if (name == "test")
-                {
-                    Log.Info(Tag + "kod test | okno " + c.Label + " | proba silnika, bez zmian w swiecie | OK.");
-                    detail = "uchwyt test";
-                    return Res.Done;
-                }
-                Log.Info(Tag + "kod " + name + " | okno " + c.Label + " | POMINIETA (brak uchwytu w tej wersji silnika).");
-                detail = "brak uchwytu " + name;
-                return Res.Skip;
+                return RunCode(name, c, out detail);
             }
 
             /// <summary>rel:&lt;b1&gt;:&lt;b2&gt;:&lt;d&gt; - relacja dwoch postaci, bez powiadomienia (ChangeRelationAction - mnoznik wzrostu modelu dyplomacji jak w grze).</summary>

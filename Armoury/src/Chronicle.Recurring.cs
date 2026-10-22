@@ -31,13 +31,18 @@ namespace Armoury
         ///  besieged:osada - osada oblezona; klucz osada-dzien startu oblezenia; @cel, @region.
         ///  wizja:N - co N dni (od ostatniej instancji okna): @cel = oblezona twierdza Polnocy (battania) albo Muru (nightswatch), inaczej osada Innych najblizsza
         ///           Winterfell (town_B2), inaczej brak instancji; @region = krolestwo @cel; klucz dzien; najwyzej jedna instancja okna w kolejce.
-        ///  brokenmen - NIEWSPIERANY w K0 (potrzebny udzial ludzi regionu poza domem z PeopleBook - paczka K4): okno czeka, linia startu go wymienia.
+        ///  brokenmen - (B2) okreg OutlawLaw (warownia + wsie) z rabunkiem w ostatnich BrokenRaidDays dniach (PeopleBook.LastStrike - zegar rabunku/zerowania z trafionymi)
+        ///           i ponad BrokenShare ludzi okregu poza domem: (uchodzcy wsi okregu PeopleBook.RegionRefugees + pula wyrzutkow OutlawLaw.PoolIn) wobec (to + ludzie
+        ///           w domu we wsiach okregu PopulationLaw.PeopleOf); klucz okreg-okres 90 dni; @cel = warownia okregu, @region = jej krolestwo. Raz na dobe, tylko gdy
+        ///           jakies okno ma ten wyzwalacz (warunki okna z tokenami odsiewaja kandydatow, np. p:region:@region).
         /// Wyjatek detektora - potkniecie; reszta dziala.
         /// </summary>
         internal static class Recurring
         {
             internal static readonly string[] Triggers = { "season", "siegehunger", "ironraid", "oldage", "brokenmen", "others", "captured", "besieged", "wizja" };
-            private static readonly HashSet<string> Unsupported = new HashSet<string>(StringComparer.Ordinal) { "brokenmen" };
+            private static readonly HashSet<string> Unsupported = new HashSet<string>(StringComparer.Ordinal);   // B2: brokenmen wspierany - pusty zbior zostaje na przyszle wyzwalacze
+            private const int BrokenRaidDays = 30, BrokenPeriod = 90;
+            private const double BrokenShare = 0.30;
             private static readonly string[] SeasonNames = { "spring", "summer", "autumn", "winter" };   // kolejnosc CampaignTime.Seasons / WesterosClimate
             private const string OthersClan = "ROTclan_126";
             private const string IronKingdom = "sturgia";
@@ -170,6 +175,7 @@ namespace Armoury
                 try { Captured(day); } catch (Exception e) { Stumble("Recurring.Captured", e); }
                 try { Sieges(day); } catch (Exception e) { Stumble("Recurring.Sieges", e); }
                 try { Vision(day); } catch (Exception e) { Stumble("Recurring.Vision", e); }
+                try { BrokenMen(day); } catch (Exception e) { Stumble("Recurring.BrokenMen", e); }
                 try { Release(day); } catch (Exception e) { Stumble("Recurring.Release", e); }
                 try { _dPruned += State.PruneInstances(RecurringKeys); } catch (Exception e) { Stumble("Recurring.Prune", e); }
             }
@@ -307,6 +313,34 @@ namespace Armoury
                     if (!looked) { looked = true; target = VisionTarget(); }
                     if (target == null) return;
                     Candidate(w, "d" + day, new Terms.Tokens { Cel = target.StringId, Region = target.MapFaction != null ? target.MapFaction.StringId : "" }, day, "wizja:" + n);
+                }
+            }
+
+            /// <summary>B2 brokenmen (opis klasy): okregi z rabunkiem w BrokenRaidDays dniach i ponad BrokenShare ludzi poza domem - kandydat (klucz okreg-okres).</summary>
+            private static void BrokenMen(int day)
+            {
+                if (!Any("brokenmen")) return;
+                List<Data.WindowDef> wins = null;
+                foreach (var w in With("brokenmen"))
+                {
+                    int[] st;
+                    if (w.Recur.Max > 0 && _stat.TryGetValue(w.Id, out st) && st[1] >= w.Recur.Max) continue;
+                    (wins ?? (wins = new List<Data.WindowDef>())).Add(w);
+                }
+                if (wins == null) return;
+                foreach (var region in OutlawLaw.RegionNodes())
+                {
+                    if (region == null || region.StringId == null || region.BoundVillages == null || region.BoundVillages.Count == 0) continue;
+                    int last;
+                    if (!PeopleBook.LastStrike(region, out last) || day - last > BrokenRaidDays) continue;
+                    double away, dead;
+                    PeopleBook.RegionRefugees(region, out away, out dead);
+                    double outside = Math.Max(0.0, away) + Math.Max(0f, OutlawLaw.PoolIn(region)), home = 0.0;
+                    foreach (var v in region.BoundVillages) if (v != null && v.Settlement != null) home += Math.Max(0f, PopulationLaw.PeopleOf(v.Settlement));
+                    if (!(outside + home > 0.0) || outside / (outside + home) <= BrokenShare) continue;
+                    var tok = new Terms.Tokens { Cel = region.StringId, Region = region.MapFaction != null ? region.MapFaction.StringId : "" };
+                    foreach (var w in wins)
+                        Candidate(w, region.StringId + "-" + (day / BrokenPeriod), tok, day, "brokenmen (" + (100.0 * outside / (outside + home)).ToString("0", Inv) + "% poza domem, rabunek d" + last + ")");
                 }
             }
 

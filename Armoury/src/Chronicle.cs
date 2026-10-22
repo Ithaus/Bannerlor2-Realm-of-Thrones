@@ -214,6 +214,7 @@ namespace Armoury
                      + " | " + VoiceStartText()
                      + " | zapis: pokazane " + okno + ", wiesci " + wiesc + ", log " + log + ", nic " + nic + ", pominiete " + State.Skipped + ", wybory " + State.Choices
                      + ", flagi " + State.Flags + ", czeka na wybor " + Choice.Count + ", akcje czekaja " + Actions.WaitCount + ", ukryci " + Actions.HiddenText()
+                     + ", " + Actions.WorldText()
                      + ", instancje w kolejce " + Recurring.QueueCount + ", paczki znane " + PacksText() + (_newCampaign ? " (nowa kampania)" : "")
                      + " | " + Recurring.StartText()
                      + " | dzien kampanii " + Day() + ", dzien opowiesci " + F1(sd) + (Prologue.BeforeStory() ? " (prolog - okna osi czekaja)" : "")
@@ -247,6 +248,7 @@ namespace Armoury
             int day = Day();
             try { Terms.Daily(); } catch (Exception e) { Stumble("Daily.Terms", e); }
             try { Actions.HiddenDaily(day, KeyOn); } catch (Exception e) { Stumble("Daily.Hidden", e); }   // A4: koniec ukrycia (klucz NIE - tylko porzadek rejestru)
+            try { Actions.WorldDaily(day); } catch (Exception e) { Stumble("Daily.World", e); }           // B2: bandy, zadania, zbiorki (klucz NIE nic nie cofa)
             if (!KeyOn)
             {
                 Log.Info(Tag + "dzien " + day + " | klucz Chronicle Of Westeros NIE - bez okien (stan zostaje) | potkniecia " + StumblesDay + " (razem " + Stumbles + ").");
@@ -795,6 +797,8 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, Chronicle.Daily);
             CampaignEvents.BeforeHeroKilledEvent.AddNonSerializedListener(this, Chronicle.Recurring.OnBeforeHeroKilled);   // oldage
             CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, Chronicle.Recurring.OnRaidCompleted);         // ironraid
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, Chronicle.Actions.OnMapEventEnded);               // B2: banda Kroniki rozbita przez gracza
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, Chronicle.Actions.OnSettlementEntered);       // B2: zadanie deliver/prisoners w osadzie celu
         }
 
         public override void SyncData(IDataStore dataStore)
