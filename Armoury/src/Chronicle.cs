@@ -640,7 +640,7 @@ namespace Armoury
                      + " | obrazek " + (r.Topic.Length > 0 ? r.Topic : "-") + "->" + header + " (" + (file ? "plik" : "ROT") + "; " + how + ")"
                      + " | lektor " + (mode == "ROT" ? Voice.LineText(r, vwhy) : r.NarrationKey + " NIE (okno zapasu - lektor gra tylko w oknie ROT)")
                      + " | okno " + mode + " | gracz: " + Where() + (p.Player ? "" : " (poza kolumna gracz: " + p.PlayerWhy + ")")
-                     + " | dzis " + _tempoCount + "/" + PerDay + " | " + ms.ToString("0", Inv) + " ms.");
+                     + " | godzina kampanii " + F1(_lastWinHour) + " | dzis " + _tempoCount + "/" + PerDay + " | " + ms.ToString("0", Inv) + " ms.");   // A4: godzina - prog KW-4 (odstep 6 h)
             Resolve(d.Id, d.W, p, "okno", d.Tok, null);
         }
 

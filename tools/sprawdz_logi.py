@@ -1044,6 +1044,16 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
                     python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
                     KO-3 encja kola postawiona, KO-4 potkniecia kola 0.
+--grupa m105kronika : (21.10, w-toku/kronika-00-silnik; Armoury/src/Chronicle*.cs, CanonCompanions.cs hide/unhide i term kr:, dane Armoury/ModuleData/arm_kronika_kNN.tsv;
+                    klucze ChronicleOfWesteros, ChronicleWorldChanges, ChronicleFullVersions, ChroniclePlayerChoices; plik testu CrashScribe/armoury-kronika-test.flag
+                    - paczka k00, armoury-kronika-wybor.flag - wymuszona opcja) python -I tools/sprawdz_logi.py --grupa m105kronika <Armoury-*.log>
+                    [--crashscribe <session-*.log>]. Log 'Kronika Westeros (KW): '. KW-0 start (klucz TAK, paczki z oknami, zle wiersze 0), KW-1 ERROR Chronicle
+                    i potkniecia 0, KW-2 okna do pokazania pokazane w <= 3 doby, KW-3 zadne okno przed 'od' (KW-3b kotwice 'przed' - straty INFO, > 10% sygnal),
+                    KW-4 <= 2 okna na dobe i odstep >= 6 h, KW-5 akcje z wynikiem i nieznanych 0 (KW-5b niewspierane INFO), KW-6 zloto z platnikiem, KW-7 okno
+                    i wybor najwyzej raz w kampanii, KW-8 okna zapas 0, KW-9 wybory po oknie (para z AUTOTEST 'OKNO wybor z listy' przy --crashscribe, lista
+                    zniknieta 0), KW-10 ZWOLNIENIE PRZY OKNIE 0, KW-11 lektor (INFO), KW-12 zapis arm_kronika < 24 KB, KW-13 #mNN najwyzej raz i pary #para
+                    w kolejnosci, KW-14 bandy <= 12, KW-15 ukrycie postaci chronionej tylko po jej wydarzeniu ROT (KW-15b ukryci bez powrotu INFO). Log bez
+                    Kroniki: INFO; klucz ChronicleOfWesteros NIE: progi okien INFO.
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
@@ -39011,6 +39021,465 @@ def m103lektor_main(logp, csp=None):
     rep.show()
     return 0
 
+# ------------------------------------------------------------ m105kronika (21.10, w-toku/kronika-00-silnik: Kronika Westeros K0 - 117 wydarzen z ksiazek i serialu w oknach
+# ROT, wiesciach i liniach logu wedlug dnia opowiesci i stanu swiata; Armoury/src/Chronicle*.cs, CanonCompanions.cs (hide/unhide, term kr:); dane
+# Armoury/ModuleData/arm_kronika_kNN.tsv; klucze ChronicleOfWesteros, ChronicleWorldChanges, ChronicleFullVersions, ChroniclePlayerChoices;
+# progi z PLANY-E5-WOJNY-KRONIKA "## PLAN kronika" H, linie logu - plan G)
+M105KR_TAG = "Kronika Westeros (KW): "
+M105KR_CC_TAG = "Postacie kanonu (m101): "
+M105KR_KEYS = re.compile(r"klucze: Chronicle Of Westeros (TAK|NIE), World Changes (TAK|NIE), Full Versions (TAK|NIE), Player Choices (TAK|NIE)")
+M105KR_PACKS = re.compile(r"\| paczki (\d+):(.*?)\[okien/wyborow/band\]")
+M105KR_PACK = re.compile(r"\bk(\d\d) (\d+)/(\d+)/(\d+)")
+M105KR_BADFILE = re.compile(r"\bk(\d\d) ZLY PLIK \(")
+M105KR_BADROWS = re.compile(r"\| zle wiersze (\d+)")
+M105KR_DAY = re.compile(r"^dzien (-?\d+) \(opowiesci (-?[0-9.]+)(, prolog)?\) \| nalezne (\d+)(?: \(do pokazania (\d+)\))?")
+M105KR_DAY_OFF = re.compile(r"^dzien (-?\d+) \| klucz Chronicle Of Westeros NIE")
+M105KR_DAY_TODAY = re.compile(r"\| dzis okna (\d+), wiesci (\d+), log (\d+), nic (\d+), pominiete (\d+)")
+M105KR_DAY_ACT = re.compile(r"\| akcje ok (\d+), pominiete (\d+), czeka (\d+) \(nowe dzis (\d+)\)(?:, NIEZNANE (\d+))?")
+M105KR_DAY_CHOICE = re.compile(r"\| wybory: czeka (\d+)")
+M105KR_BANDS = re.compile(r"\| bandy (\d+)/12")
+M105KR_DAY_SAVE = re.compile(r"\| zapis ([0-9.]+) KB")
+M105KR_STUMB = re.compile(r"\| potkniecia (\d+)(?: \(razem (\d+)\))?\.$")
+M105KR_SHOWN = re.compile(r"^okno (\S+) '(.*)' pokazane \| (wiersz glowny|wariant \w+) \| dzien opowiesci (-?[0-9.]+) \(od (-?\d+) = (-?[0-9.]+)")
+M105KR_SHOWN_MODE = re.compile(r"\| okno (ROT|zapas[^|]*) \| gracz")
+M105KR_SHOWN_HOUR = re.compile(r"\| godzina kampanii (-?[0-9.]+) \| dzis (\d+)/(\d+)")
+M105KR_SHOWN_VOICE = re.compile(r"\| lektor (\S+) (TAK|NIE|-)")
+M105KR_RES = re.compile(r"^(wiesc|log|nic) (\S+?)(?: wariant \w+)? \((.*)\) ")
+M105KR_SKIP = re.compile(r"^POMINIETE okno (\S+) - (.*) \(dzien opowiesci (-?[0-9.]+)\)\.$")
+M105KR_ACT = re.compile(r"^akcja (\S+) #(\d+) (\S+) -> (OK|POMINIETA|CZEKA)(?: \((.*)\))?\.$")
+M105KR_CHOSEN = re.compile(r"^wybor (\S+) = ([a-d]) '")
+M105KR_CHOICE_WAIT = re.compile(r"^wybor (\S+) czeka na liste")
+M105KR_LIST = re.compile(r"^lista wyboru (\S+) pokazana")
+M105KR_LIST_LOST = re.compile(r"^lista wyboru (\S+) zniknela bez wyboru")
+M105KR_SAVE = re.compile(r"^zapis arm_kronika ([0-9.]+) KB")
+M105KR_HIDE = re.compile(r"^ukryty (.*?) \((\S+)\) \((\S+)\) do (.*?) \| (.*)\.$")
+M105KR_BACK = re.compile(r"^(powrot|KONIEC UKRYCIA|UKRYCIE przerwane) (.*?) \((\S+)\)[ .]")
+M105KR_GOLD = re.compile(r"^zloto (\S+): (.*?) -> (.*?) (\d+)")
+M105KR_BAND = re.compile(r"^banda (\S+) ")
+M105KR_CC_MOVE = re.compile(r"^zmiana strony #(\S+) - .*? akcja (\w+).*?\| wyzwalacz (.*?)(?: \(zaszlo (\S+)\))? \(dzien kampanii")
+M105KR_CC_SKIP = re.compile(r"^zmiana strony #(\S+) POMINIETA - ")
+M105KR_CS_LIST = re.compile(r'OKNO wybor z listy "(.*?)" \((.*)\) -> (TAK|NIE)')
+M105KR_PROT_FALLBACK = {   # = tools/kronika/kronika_check.py PROTECTED (KRONIKA-FORMAT 15) - zapas, gdy walidatora nie ma obok
+    "lord_1_29", "lord_2_3", "lord_5_17", "lord_1_14", "lord_1_11", "lord_1_17", "lord_5_1", "lord_5_7", "lord_5_13_1", "lord_7_1", "ROTlord_369", "lord_1_9",
+    "lord_1_25", "lord_WE9_l", "lord_4_14", "lord_4_25", "lord_4_25_1", "lord_1_3", "lord_1_50", "lord_1_5", "ROTlord_513", "lord_5_16", "lord_2_18", "lord_5_3",
+    "lord_4_2", "ROTlord_568", "lord_5_21", "lord_2_19", "lord_2_23", "lord_5_20", "ROTlord_486", "ROTlord_373"}
+
+
+def m105kr_repo():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def m105kr_protected():
+    """Lista chronionych (id bohaterow) z tools/kronika/kronika_check.py (PROTECTED); brak walidatora - lista wbudowana."""
+    p = os.path.join(m105kr_repo(), "tools", "kronika", "kronika_check.py")
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("kronika_check_m105kr", p)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return set(mod.PROTECTED.keys()), "kronika_check.PROTECTED"
+    except Exception:
+        return set(M105KR_PROT_FALLBACK), "lista wbudowana"
+
+
+def m105kr_data():
+    """Dane Kroniki w repo (Armoury/ModuleData/arm_kronika_k*.tsv): pary #para (okno, wiersz, kierunek) i okna z kotwica 'przed' (id -> (od, przed))."""
+    md = os.path.join(m105kr_repo(), "Armoury", "ModuleData")
+    pairs, przed = [], {}
+    try:
+        names = sorted(f for f in os.listdir(md) if re.match(r"arm_kronika_k\d\d\.tsv$", f))
+    except OSError:
+        return pairs, przed
+    for f in names:
+        sec, col = None, {}
+        with open(os.path.join(md, f), encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                ln = ln.rstrip("\r\n")
+                if not ln or ln.startswith("# ") or ln == "#":
+                    continue
+                c = ln.split("\t")
+                if c[0].startswith("#"):
+                    sec = c[0]
+                    col = {n.strip(): i - 1 for i, n in enumerate(c) if i > 0}
+                    continue
+                g = lambda n: c[col[n]].strip() if n in col and col[n] < len(c) else ""
+                if sec == "#para" and g("okno") and g("wiersz"):
+                    pairs.append((g("okno"), g("wiersz"), g("kierunek") or "po"))
+                elif sec == "#okno" and g("id") and not g("war") and g("przed"):
+                    try:
+                        od = int(g("od") or "0")
+                    except ValueError:
+                        od = 0
+                    przed[g("id")] = (od, g("przed"))
+    return pairs, przed
+
+
+def m105kronika_main(logp, csp=None):
+    """m105kronika (21.10, w-toku/kronika-00-silnik; Jeff 21.10: Kronika na cala fabule - 5 tomow + serial, wersje lekkie, wybory gracza po oknie, decyzje Jeffa
+    w docs/KRONIKA-WESTEROS-V2): KW-0 linia startu, klucz TAK, kazda paczka ma okna, zle wiersze 0 (log bez Kroniki - INFO); KW-1 ERROR Chronicle i potkniecia 0;
+    KW-2 nalezne okna do pokazania pokazane najdalej w 3 doby (seria dob z oknami czekajacymi i 0 pokazanych <= 3); KW-3 zadne okno przed 'od', okna z kotwica
+    'przed' - stracone (wiesc po kotwicy, POMINIETE 'juz ruszylo') INFO, > 10% sygnal do galezi trzymania; KW-4 <= 2 okna na dobe i odstep >= 6 h; KW-5 kazda akcja
+    z linia wyniku, akcji nieznanych 0 (KW-5b niewspierane w tej wersji - INFO); KW-6 zloto zawsze z platnikiem (0 'z niczego'); KW-7 w kampanii zadne okno ani
+    wybor dwa razy (po wczytaniu); KW-8 okna zapas 0 (nieotwarte INFO); KW-9 kazde czekanie na liste ma wybor, lista ma pare z AUTOTEST 'OKNO wybor z listy'
+    (--crashscribe), lista zniknieta / Esc 0; KW-10 'ZWOLNIENIE PRZY OKNIE' 0; KW-11 lektor (INFO); KW-12 zapis arm_kronika < 24 KB; KW-13 wiersz #mNN wykonany
+    najwyzej raz, pary #para w kolejnosci (po: okno po ruchu, kr: ruch z 'zaszlo kr:' po oknie); KW-14 bandy <= 12 (linie band - INFO); KW-15 ukrycie postaci
+    z listy chronionych tylko po jej wydarzeniu ROT (linia 'lista chronionych: ... spelnione'), ukryci bez powrotu - INFO. Klucz ChronicleOfWesteros NIE: progi
+    okien INFO (licza KW-1, KW-10, KW-12)."""
+    from collections import Counter
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("KW-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    prot, prot_src = m105kr_protected()
+    pairs, przed_w = m105kr_data()
+    starts, days, n_err, zwol = [], [], 0, 0
+    data_lines, bad_files, bad_rows_lines = [], [], 0
+    shown, res_lines, skips, acts, chosen, cwait, lists, lost, saves, hides, backs, golds, bands, cc_moves, cc_skips = ([] for _ in range(15))
+    stumb = 0
+    seq = 0
+    camp = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in Chronicle."):
+                n_err += 1
+                continue
+            if "ZWOLNIENIE PRZY OKNIE" in s:
+                zwol += 1
+            if s.startswith(M105KR_CC_TAG):
+                b = s[len(M105KR_CC_TAG):]
+                mm = M105KR_CC_MOVE.match(b)
+                if mm:
+                    seq += 1
+                    cc_moves.append((seq, camp) + mm.groups())
+                    continue
+                mm = M105KR_CC_SKIP.match(b)
+                if mm:
+                    seq += 1
+                    cc_skips.append((seq, camp, mm.group(1)))
+                continue
+            if not s.startswith(M105KR_TAG):
+                continue
+            b = s[len(M105KR_TAG):]
+            seq += 1
+            if b.startswith("start sesji"):
+                if "(nowa kampania)" in b:
+                    camp += 1
+                starts.append((seq, camp, b))
+                ms = M105KR_STUMB.search(b)
+                if ms:
+                    stumb = max(stumb, int(ms.group(1)))
+                continue
+            if b.startswith("dane wczytane"):
+                data_lines.append(b)
+                continue
+            if b.startswith("ZLY PLIK"):
+                bad_files.append(b)
+                continue
+            if b.startswith("ZLY WIERSZ"):
+                bad_rows_lines += 1
+                continue
+            md_ = M105KR_DAY.match(b)
+            if md_ or M105KR_DAY_OFF.match(b):
+                days.append((seq, camp, b, md_))
+                ms = M105KR_STUMB.search(b)
+                if ms:
+                    stumb = max(stumb, int(ms.group(1)), int(ms.group(2) or 0))
+                continue
+            mm = M105KR_SHOWN.match(b)
+            if mm:
+                shown.append((seq, camp, mm, b))
+                continue
+            mm = M105KR_RES.match(b)
+            if mm:
+                res_lines.append((seq, camp, mm.group(1), mm.group(2), mm.group(3)))
+                continue
+            mm = M105KR_SKIP.match(b)
+            if mm:
+                skips.append((seq, camp, mm.group(1), mm.group(2)))
+                continue
+            mm = M105KR_ACT.match(b)
+            if mm:
+                acts.append((seq, camp) + mm.groups())
+                continue
+            mm = M105KR_CHOSEN.match(b)
+            if mm:
+                chosen.append((seq, camp, mm.group(1), mm.group(2)))
+                continue
+            mm = M105KR_CHOICE_WAIT.match(b)
+            if mm:
+                cwait.append((seq, camp, mm.group(1)))
+                continue
+            mm = M105KR_LIST.match(b)
+            if mm:
+                lists.append((seq, camp, mm.group(1)))
+                continue
+            mm = M105KR_LIST_LOST.match(b)
+            if mm:
+                lost.append((seq, camp, mm.group(1)))
+                continue
+            mm = M105KR_SAVE.match(b)
+            if mm:
+                saves.append(float(mm.group(1)))
+                continue
+            mm = M105KR_HIDE.match(b)
+            if mm:
+                hides.append((seq, camp) + mm.groups())
+                continue
+            mm = M105KR_BACK.match(b)
+            if mm:
+                backs.append((seq, camp, mm.group(1), mm.group(3)))
+                continue
+            mm = M105KR_GOLD.match(b)
+            if mm:
+                golds.append(b)
+                continue
+            mm = M105KR_BAND.match(b)
+            if mm:
+                bands.append(b)
+                continue
+    print(f"plik: {logp} | startow sesji {len(starts)}, dob {len(days)}, okien pokazanych {len(shown)}, wiesci/log/nic {len(res_lines)}, POMINIETE {len(skips)}, "
+          f"akcji {len(acts)}, wyborow {len(chosen)}, list {len(lists)}, ukryc {len(hides)}, zmian stron #move {len(cc_moves)}, ERROR {n_err}")
+    if not starts and not days:
+        rep.add("KW-0: linie 'Kronika Westeros (KW): ...'", "brak w logu", "INFO (log sprzed paczki K0 Kroniki)", None)
+        rep.show()
+        return 0
+    # KW-0 linia startu
+    last = starts[-1][2] if starts else ""
+    mk = M105KR_KEYS.search(last)
+    key_on = (mk.group(1) == "TAK") if mk else not any(M105KR_DAY_OFF.match(d[2]) for d in days)
+    mp = M105KR_PACKS.search(last) or (M105KR_PACKS.search(data_lines[-1]) if data_lines else None)
+    packs = M105KR_PACK.findall(mp.group(2)) if mp else []
+    badp = M105KR_BADFILE.findall(mp.group(2)) if mp else []
+    empty = [f"k{p[0]}" for p in packs if int(p[1]) == 0]
+    mb = M105KR_BADROWS.search(last)
+    n_bad = int(mb.group(1)) if mb else -1
+    if not starts:
+        rep.add("KW-0: linia startu sesji", "brak (tylko linie doby)", "co najmniej 1 linia 'start sesji'", False)
+    elif not key_on:
+        rep.add("KW-0: linia startu sesji", f"klucz Chronicle Of Westeros NIE | {last[:140]}", "INFO - klucz NIE (brak okien; progi okien INFO)", None)
+    else:
+        rep.add("KW-0: start: klucz TAK, paczki z oknami, zle wiersze 0",
+                f"klucze {mk.groups() if mk else '?'} | paczek {len(packs)}" + (f" (bez okien {', '.join(empty)})" if empty else "")
+                + (f", ZLY PLIK {', '.join('k' + x for x in badp)}" if badp else "") + f" | zle wiersze {n_bad} (linii ZLY WIERSZ {bad_rows_lines}), linii ZLY PLIK {len(bad_files)}",
+                "klucz TAK, >= 1 paczka, kazda paczka ma okna, 0 ZLY PLIK, zle wiersze 0", bool(packs) and not empty and not badp and not bad_files and n_bad == 0)
+    # KW-1
+    rep.add("KW-1: ERROR Chronicle i potkniecia Kroniki", f"ERROR {n_err}, potkniecia {stumb}", "0 i 0", n_err == 0 and stumb == 0)
+    win = key_on
+    # KW-2 seria dob z oknami do pokazania i 0 pokazanych
+    worst, cur, worst_at, prev = 0, 0, None, None
+    start_seqs = [x[0] for x in starts]
+    last_seq = -1
+    for d in days:
+        md_ = d[3]
+        if any(last_seq < q < d[0] for q in start_seqs):   # nowa sesja (wczytanie) - bramki od zera, seria przerwana
+            prev, cur = None, 0
+        last_seq = d[0]
+        if md_ is None:
+            prev = None
+            continue
+        if prev is not None and prev[1] == d[1]:
+            mt = M105KR_DAY_TODAY.search(d[2])
+            shown_today = int(mt.group(1)) if mt else 0
+            if prev[0] > 0 and shown_today == 0:
+                cur += 1
+                if cur > worst:
+                    worst, worst_at = cur, md_.group(1)
+            else:
+                cur = 0
+        prev = (int(md_.group(5) or 0), d[1])
+    rep.add("KW-2: okna nalezne pokazane najdalej w 3 doby", f"najdluzsza seria dob z oknami do pokazania i 0 pokazanych: {worst}" + (f" (do dnia {worst_at})" if worst_at else "")
+            + f" | dob z liniami {sum(1 for d in days if d[3])}",
+            "<= 3 (dluzej tylko z powodem: gracz w niewoli, bitwa, menu - bramki Prologue.SceneGate; okna czekajace na warunki maja powod w linii doby)",
+            worst <= 3 if win and days else None)
+    # KW-3 przed 'od' i kotwice 'przed'
+    early = [x for x in shown if int(x[2].group(5)) > 0 and float(x[2].group(4)) < float(x[2].group(6)) - 0.5]
+    rep.add("KW-3: zadne okno przed 'od'", f"okien pokazanych {len(shown)}, przed od {len(early)}"
+            + (f" [{early[0][2].group(1)}: dzien {early[0][2].group(4)} < od {early[0][2].group(6)}]" if early else ""),
+            "0 (dzien opowiesci okna >= od w skali osi, tolerancja 0,5 dnia)", (not early) if win and shown else None)
+    ok_p, news_p, lost_p = 0, 0, 0
+    shown_ids = {x[2].group(1) for x in shown}
+    for wid in przed_w:
+        if wid in shown_ids:
+            ok_p += 1
+        for r in res_lines:
+            if r[3] == wid:
+                if "kotwica" in r[4]:
+                    news_p += 1
+                else:
+                    ok_p += 1
+        for sk in skips:
+            if sk[2] == wid and "juz ruszylo" in sk[3]:
+                lost_p += 1
+    tot_p = ok_p + news_p + lost_p
+    pct = 100.0 * (news_p + lost_p) / tot_p if tot_p else 0.0
+    rep.add("KW-3b: okna z kotwica 'przed' (plan P2)", f"w danych {len(przed_w)}; rozstrzygniete w logu {tot_p}: przed kotwica {ok_p}, wiesc po kotwicy {news_p}, POMINIETE 'juz ruszylo' {lost_p}"
+            + (f" -> stracone {pct:.0f}%" + (" - SYGNAL do galezi trzymania wydarzen ROT (> 10%)" if pct > 10.0 else "") if tot_p else ""),
+            "INFO (licznik; > 10% strat = sygnal do galezi trzymania)", None)
+    # KW-4 tempo
+    over, gaps, prev_h, min_gap = [], 0, {}, None
+    for x in shown:
+        mh = M105KR_SHOWN_HOUR.search(x[3])
+        if not mh:
+            continue
+        h, n = float(mh.group(1)), int(mh.group(2))
+        if n > 2:
+            over.append(x[2].group(1))
+        ph = prev_h.get(x[1])
+        if ph is not None and h >= ph:
+            g_ = h - ph
+            min_gap = g_ if min_gap is None else min(min_gap, g_)
+            if g_ < 5.99:
+                gaps += 1
+        prev_h[x[1]] = h
+    rep.add("KW-4: <= 2 okna na dobe, odstep >= 6 h", f"ponad 2 na dobe {len(over)}" + (f" [{over[0]}]" if over else "") + f", odstep < 6 h {gaps}"
+            + (f", najmniejszy odstep {min_gap:.1f} h" if min_gap is not None else ""),
+            "0 i 0 (godzina kampanii w linii okna; wczytanie starszego zapisu - odstep ujemny pomijany)", (not over and gaps == 0) if win and shown else None)
+    # KW-5 akcje
+    unknown = sum(1 for a in acts if a[5] == "POMINIETA" and (a[6] or "") == "nieznana akcja")
+    unk_day = sum(int(M105KR_DAY_ACT.search(d[2]).group(5) or 0) for d in days if M105KR_DAY_ACT.search(d[2]))
+    pend = {}
+    for a in acts:
+        k = (a[1], a[2], a[3], a[4])
+        if a[5] == "CZEKA":
+            pend[k] = a[0]
+        else:
+            pend.pop(k, None)
+    last_wait = None
+    for d in days:
+        ma = M105KR_DAY_ACT.search(d[2])
+        if ma:
+            last_wait = int(ma.group(3))
+    unres = len(pend)
+    rep.add("KW-5: akcje z linia wyniku, nieznanych 0", f"akcji {len(acts)} (OK {sum(1 for a in acts if a[5] == 'OK')}, POMINIETA {sum(1 for a in acts if a[5] == 'POMINIETA')}, "
+            f"CZEKA {sum(1 for a in acts if a[5] == 'CZEKA')}), nieznane {unknown} (z linii doby {unk_day}), CZEKA bez wyniku {unres} (czeka w ostatniej dobie {last_wait})",
+            "nieznane 0; kazda CZEKA ma potem OK/POMINIETA albo czeka dalej (CZEKA bez wyniku <= 'czeka' ostatniej doby)",
+            (unknown == 0 and unk_day == 0 and (last_wait is None and unres == 0 or last_wait is not None and unres <= last_wait)) if acts else None)
+    nsup = Counter(a[4].split(":")[0] for a in acts if a[5] == "POMINIETA" and (a[6] or "").startswith("akcja jeszcze niewspierana"))
+    rep.add("KW-5b: akcje niewspierane w tej wersji silnika", ", ".join(f"{k} {v}" for k, v in nsup.most_common()) or "0",
+            "INFO (K0: wiesc, plotka, flag, kod:test, rel, relp, relk, renown, influence, hide, unhide; reszta w paczkach K1+)", None)
+    # KW-6 zloto
+    nothing = sum(1 for g_ in golds if "z niczego" in g_) + sum(1 for a in acts if a[4].startswith("gold:") and a[5] == "OK" and "z niczego" in (a[6] or ""))
+    gold_ok = [a for a in acts if a[4].startswith("gold:") and a[5] == "OK"]
+    rep.add("KW-6: zloto z platnikiem", f"linii zlota {len(golds)}, akcji gold OK {len(gold_ok)}, 'z niczego' {nothing}",
+            "0 'z niczego' (zamknieta ekonomia: platnik -> odbiorca); brak zlota w logu - INFO", (nothing == 0) if (golds or gold_ok) else None)
+    # KW-7 powtorki w kampanii
+    cnt = Counter()
+    for x in shown:
+        cnt[(x[1], x[2].group(1))] += 1
+    for r in res_lines:
+        cnt[(r[1], r[3])] += 1
+    dupw = [k[1] for k, v in cnt.items() if v > 1]
+    cc_ = Counter((c[1], c[2]) for c in chosen)
+    dupc = [k[1] for k, v in cc_.items() if v > 1]
+    rep.add("KW-7: okno i wybor najwyzej raz w kampanii (po wczytaniu)", f"okien rozstrzygnietych {len(cnt)}, powtorzonych {len(dupw)}" + (f" [{', '.join(dupw[:5])}]" if dupw else "")
+            + f" | wyborow {len(cc_)}, powtorzonych {len(dupc)}" + (f" [{', '.join(dupc[:5])}]" if dupc else "") + f" | sesji {len(starts)}",
+            "0 i 0 (nowa kampania w tym samym logu - liczona osobno)", (not dupw and not dupc) if win and (cnt or cc_) else None)
+    # KW-8 zapas
+    zapas = [x[2].group(1) for x in shown for mo in [M105KR_SHOWN_MODE.search(x[3])] if mo and mo.group(1).startswith("zapas")]
+    rep.add("KW-8: okna zapas (ShowInquiry zamiast okna ROT)", f"{len(zapas)} z {len(shown)}" + (f" [{', '.join(zapas[:5])}]" if zapas else ""), "0", (not zapas) if win and shown else None)
+    # KW-9 wybory i listy
+    done_c = {(c[1], c[2]) for c in chosen}
+    open_c = [w[2] for w in cwait if (w[1], w[2]) not in done_c]
+    last_cw = None
+    for d in days:
+        mc = M105KR_DAY_CHOICE.search(d[2])
+        if mc:
+            last_cw = int(mc.group(1))
+    cs_lists, cs_no, cs_note = [], 0, "bez --crashscribe"
+    if csp and os.path.isfile(csp):
+        cs_note = "--crashscribe"
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                mm = M105KR_CS_LIST.search(ln)
+                if mm:
+                    ids = re.findall(r"\((\d{3}\.\d[a-z]?(?:#[^)]*)?)\)", mm.group(2))
+                    if ids:
+                        cs_lists.append((ids[-1], mm.group(3)))
+                        if mm.group(3) == "NIE":
+                            cs_no += 1
+    unpaired = [l_[2] for l_ in lists if cs_note != "bez --crashscribe" and not any(c[0] == l_[2] and c[1] == "TAK" for c in cs_lists)]
+    ok9 = len(lost) == 0 and cs_no == 0 and (len(open_c) == 0 or (last_cw is not None and len(open_c) <= last_cw)) and not unpaired
+    rep.add("KW-9: wybory po oknie (lista, autotest, Esc)",
+            f"czekan na liste {len(cwait)}, bez wyboru {len(open_c)} (czeka w ostatniej dobie {last_cw}) | list pokazanych {len(lists)}, zniknietych bez wyboru {len(lost)}"
+            + f" | {cs_note}: par 'OKNO wybor z listy' {len(cs_lists)}, bez pary {len(unpaired)}" + (f" [{', '.join(unpaired[:5])}]" if unpaired else "") + f", wyjscie (NIE) {cs_no}",
+            "kazde czekanie ma wybor albo czeka dalej; lista zniknieta 0; z --crashscribe kazda lista ma pare z TAK, wyjscie 0 (bez --crashscribe pary nie liczone)",
+            ok9 if win and (cwait or lists or chosen) else None)
+    # KW-10
+    rep.add("KW-10: ZWOLNIENIE PRZY OKNIE", str(zwol), "0 (tekstura obrazka zwalniana przy otwartym oknie)", zwol == 0)
+    # KW-11 lektor
+    mv_ = re.search(r"lektor: wierszy lektor=1 z nagraniem (\d+)/(\d+)", last)
+    v_yes = sum(1 for x in shown for mo in [M105KR_SHOWN_VOICE.search(x[3])] if mo and mo.group(2) == "TAK")
+    rep.add("KW-11: lektor okien Kroniki", (f"wierszy lektor=1 z nagraniem {mv_.group(1)}/{mv_.group(2)}" if mv_ else "brak w linii startu") + f" | okna z lektorem TAK {v_yes}/{len(shown)}",
+            "INFO (nagrania okien 1 paczek; zasada md5 - tekst zmieniony = cisza)", None)
+    # KW-12 zapis
+    day_kb = [float(M105KR_DAY_SAVE.search(d[2]).group(1)) for d in days if M105KR_DAY_SAVE.search(d[2])]
+    mx = max(saves) if saves else None
+    rep.add("KW-12: zapis arm_kronika < 24 KB", (f"zapisow {len(saves)}, najwiekszy {mx:.1f} KB" if saves else "brak linii zapisu") + (f" | szacunek z dob max {max(day_kb):.1f} KB" if day_kb else ""),
+            "< 24 KB (SaveText 32 KB napisu - zapas)", (mx < 24.0) if saves else ((max(day_kb) < 24.0) if day_kb else None))
+    # KW-13 #move raz i pary w kolejnosci
+    mc_ = Counter((c[1], c[2]) for c in cc_moves)
+    dupm = [k[1] for k, v in mc_.items() if v > 1]
+    first_res = {}
+    for x in shown:
+        first_res.setdefault((x[1], x[2].group(1)), x[0])
+    for r in res_lines:
+        k = (r[1], r[3])
+        if k not in first_res or r[0] < first_res[k]:
+            first_res[k] = r[0]
+    move_at = {}
+    for c in cc_moves:
+        move_at.setdefault((c[1], c[2]), (c[0], c[5], c[4]))
+    for c in cc_skips:
+        move_at.setdefault((c[1], c[2]), (c[0], None, None))
+    bad_order, info_order = [], 0
+    for okno, wiersz, kier in pairs:
+        for (cmp_, w_), at in list(first_res.items()):
+            if w_ != okno:
+                continue
+            mvx = move_at.get((cmp_, wiersz))
+            if kier == "po":
+                if mvx is None:
+                    info_order += 1
+                elif mvx[0] > at:
+                    bad_order.append(f"{okno} przed #{wiersz}")
+        if kier == "kr":
+            for (cmp_, w_), mvx in move_at.items():
+                if w_ != wiersz or mvx[2] is None:   # pominiety - bez wyzwalacza
+                    continue
+                fired = mvx[1] or (mvx[2] if "|" not in mvx[2] else "")
+                if not fired.startswith("kr:" + okno):
+                    continue
+                at = first_res.get((cmp_, okno))
+                if at is None:
+                    info_order += 1
+                elif at > mvx[0]:
+                    bad_order.append(f"#{wiersz} ({fired}) przed {okno}")
+    rep.add("KW-13: wiersz #move najwyzej raz, pary #para w kolejnosci", f"zmian stron {len(cc_moves)} (powtorzonych {len(dupm)}" + (f": {', '.join(dupm[:5])}" if dupm else "")
+            + f"), pominietych {len(cc_skips)} | par w danych {len(pairs)}, zla kolejnosc {len(bad_order)}" + (f" [{'; '.join(bad_order[:4])}]" if bad_order else "")
+            + f", para bez drugiej strony w logu {info_order} (INFO - wczesniejsza sesja)",
+            "0 powtorzen; 'po': okno po linii ruchu #mNN; 'kr': ruch z '(zaszlo kr:okno)' po oknie", (not dupm and not bad_order) if (cc_moves or first_res) else None)
+    # KW-14 bandy
+    bl = [int(M105KR_BANDS.search(d[2]).group(1)) for d in days if M105KR_BANDS.search(d[2])]
+    bmax = max(bl or [0])
+    rep.add("KW-14: bandy Kroniki <= 12", f"najwiecej w dobie {bmax} (dob z licznikiem {len(bl)}), linii band {len(bands)}",
+            "<= 12 (ludzie z puli i sufit regionu - z linii band, gdy beda; brak licznika w liniach doby - INFO)", (bmax <= 12) if bl else None)
+    # KW-15 lista chronionych i powrot ukrytych
+    viol = [f"{h[3]} ({h[4]})" for h in hides if h[3] in prot and "lista chronionych:" not in h[6]]
+    back_ids = {(b[1], b[3]) for b in backs}
+    still = [f"{h[3]} do {h[5]}" for h in hides if (h[1], h[3]) not in back_ids and "UKRYCIE: nowy koniec" not in h[6]]
+    cc_hide = sum(1 for c in cc_moves if c[3] == "hide")
+    rep.add("KW-15: lista chronionych - ukrycie tylko po wydarzeniu ROT", f"ukryc Kroniki {len(hides)}, z listy chronionych {sum(1 for h in hides if h[3] in prot)}, bez warunku {len(viol)}"
+            + (f" [{', '.join(viol[:4])}]" if viol else "") + f" | ukryc #move {cc_hide} | lista: {prot_src} ({len(prot)})",
+            "0 ukryc postaci chronionej bez 'lista chronionych: <wydarzenie> spelnione'", (not viol) if hides else None)
+    rep.add("KW-15b: ukryci bez powrotu w logu", f"{len(still)}" + (f" [{'; '.join(still[:5])}]" if still else "") + f" | powrotow/koncow {len(backs)}",
+            "INFO (koniec ukrycia = term albo unhide; term 'nigdy' konczy ukrycie linia KONIEC UKRYCIA)", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m102tablica (21.10, w-toku/m102-tablica: tablica ogloszen w miescie - zadania gry, rozmowa z tablicy,
 # "Your tasks", listy gonczne kapitana strazy z kasy miasta; Armoury/src/NoticeBoard*.cs; klucze NoticeBoard, NoticeBoardVillages, NoticeBoardOpening, WatchBounties ...)
 M102_TB = "Tablica ogloszen (m102): "
@@ -56556,6 +57025,8 @@ def main(argv):
         return m104e5_main(logp)   # m104e5 (21.10, w-toku/m104-e5): sceny zmieniajace swiat prologu 298 - orszak, Turniej Reki, Tyrion i Jaime jencami, klany gorskie, ludzie Gory, Beric
     if group == "m105kolko" and logp:
         return m105kolko_main(logp)   # m105kolko (21.10, w-toku/m105-kolko): kolko najechania przy zajazdach i wioskach pobocznych (MapHoverRing)
+    if group == "m105kronika" and logp:
+        return m105kronika_main(logp, csp)   # m105kronika (21.10, w-toku/kronika-00-silnik): Kronika Westeros K0 - okna, wiesci, wybory, akcje, ukrycia, zapis (Chronicle*.cs)
     if group == "m104wojny" and logp:
         return m104wojny_main(logp)   # m104wojny (21.10, w-toku/m104-wojny): Essos na kalendarzu w prologu, Reach i Dorne z korona, mlode smoki Daenerys (Prologue.Wars/Crown/Dragons)
     if group == "m100kryjowki" and logp:
