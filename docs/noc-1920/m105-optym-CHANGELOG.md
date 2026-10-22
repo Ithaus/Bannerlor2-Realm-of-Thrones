@@ -30,6 +30,8 @@ w 1. dobie po wczytaniu).
 | 3 | BuildFunding.Optim105.cs, BuildFunding.Daily (petla warowni) | OptimBuildWar | ok. 0.3-0.5 | 49f1180c |
 | 4 | ClanIncomeBook.Optim105.cs, ClanIncomeBook.StableBegin | OptimStableDelegates | ok. 1-2 (ok. 2000 MethodInfo.Invoke mniej) | 49f1180c |
 | 5 | tools/sprawdz_logi.py - grupa m105optym (M5-0..M5-5) | - | - | 2780c7d0 |
+| 6 | poprawki recenzji: Verify KT (sonda losowania, kiesy rodu), Verify podatku wsi BK, _ktBk, slownik generyczny, klamry if/try, komentarze latek | - (tylko Verify / porzadek) | 0 (Verify: mniej alokacji w sondzie) | 55f47017 |
+| 7 | tools/sprawdz_logi.py - M5-2 kazda czesc, M5-6 delegaty BK bez "BRAK" | - | - | da0363ac |
 
 Linie logu: start kampanii "Optym (m105): start | Optim Verify TAK/NIE | wlaczone: ... | wylaczone (kod jak dotad): ... | bez zmian ..." (z KingdomTreasury.OptimStartLine);
 co dobe (LogEnabled, klucz TAK) "Optym (m105): dzien N | KingdomTreasury.Daily model dochodu: pominiety u X rodow (z Y ...)" albo "pominiecie WYLACZONE - powod",
@@ -70,10 +72,17 @@ postfiksy, transpilery, finalizery, ILManipulators): `Armoury:MercContract.MercI
 `BKROTPatch:CalculateHeroSuzerainPatch.Postfix`; (c) delegat BK GetActualVillages i typy BK sciezki znalezione. Inaczej pominiecie WYLACZONE na te dobe (model jak dotad),
 powod w linii "Optym (m105)" (np. "niesprawdzone latki na sciezce modelu: X na Y"). Nowa latka z innej galezi na tej sciezce = najpierw sprawdzic, czy przy applyWithdrawals = false
 nic nie pisze, potem dopisac do `KtKnownPatches`.
+Straznik porownuje tylko NAZWY latek (nie tresc) i nie widzi metod wolanych w srodku sciezki spoza listy (np. CouncilData.GetHeroPositions, gettery DueWage / DueTax,
+IsAtWarWith, GetPerkValue - skan wlaczonych modulow 21.10: nikt ich nie latuje). Dlatego: zmiana TRESCI `MercContract.MercIncomePrefix / TierPostfix`, `CouncilWages35.IncomesPostfix`,
+`SideVillageFief.IncomeViewPostfix` albo `SmallGold.CutsTier` (wolane z TierPostfix) = przeglad KtSkip (zapis albo MBRandom przy applyWithdrawals = false) - przy kazdej z tych metod
+komentarz "m105-optym KtKnownPatches". Siatka na regresje: sonda generatora losowego w Optim Verify (nizej).
 
 **Tryb kontrolny (Optim Verify):** model liczony jak dotad (gra = stara droga, z NoteModelIncome), przed nim i po nim sondy: wywolania TownBase (CouncilWages35._baseCalls),
-workshopTaxes BK (liczba i suma), kiesa glowy, KingdomBudgetWallet / TributeWallet / CallToWarWallet / MercenaryWallet krolestwa, StableLand przed vs po. Kazda zmiana = roznica
-(pierwsza z nazwa rodu w linii). Grupa progow: M5-2 roznic 0.
+workshopTaxes BK (liczba i suma; Dictionary<Workshop,int> bez pakowania, inny typ pola - IDictionary), suma kies wszystkich bohaterow rodu, KingdomBudgetWallet / TributeWallet /
+CallToWarWallet / MercenaryWallet krolestwa, StableLand przed vs po i (recenzja) stan generatora losowego gry - `PerfD2.RngNow()` (MBFastRandom `_x _y _z _w`, ten sam odczyt co
+straznik losowania zoldu PerfD2, w logu 102 "losowanie przy liczeniu 0" - bez falszywych alarmow). Wynik modelu tych rodow nadpisuje StableLand, wiec przesuniecia losowan nie
+zobaczy zadne porownanie wartosci - tylko sonda generatora. Kazda zmiana = roznica (pierwsza z nazwa rodu w linii, np. "losowanie (MBFastRandom)"). Grupa progow: M5-2 roznic 0.
+Model BK (`_ktBk`, pole workshopTaxes - graf kampanii) zerowany na poczatku i na koncu petli rodow (regula m99: pamiec bez obiektow kampanii miedzy dobami).
 
 **Skutek tylko w logu:** porownanie 169b ("porownanie z liczba z chwili powinnosci (KingdomTreasury) u N rodow" w linii ksiegi i w linii "Obieg") liczy mniej rodow - o pominiete.
 Zadna grupa sprawdz_logi go nie czyta (grep "chwili powinnosci"/"rozna u"/"oszczedziloby" - 0). Potkniecia modelu pominietego rodu nie licza sie w linii "Korona" (model nie biegnie).
@@ -100,8 +109,12 @@ i na koncu petli. W petli tylko odczyty (kolejka budow, WarFront.CivilAllowed) -
 **Zmiana:** GetActualVillages (static, Delegate.CreateDelegate), IsSettlementPopulated i TitleManager.GetTitle (PerfFast.M1), podatek wsi BK CalculateVillageTaxFromIncome(Village,
 bool, bool) (wyrazenie skompilowane raz) zamiast MethodInfo.Invoke z new object[] i pakowaniem bool. To samo wywolanie (ten sam obiekt i argumenty, wywolanie wirtualne jak Invoke).
 Inny podpis BK - delegat null - odbicie jak dotad. Jedyna roznica poza liczbami: wyjatek wewnatrz BK idzie do Stumble bez otoczki TargetInvocationException (tylko tekst logu).
-**Verify:** odczyty czyste (wsie z tytulu, dane osady, tytul) obiema drogami - gra bierze stara; podatku wsi BK NIE liczymy drugi raz (postfiks TownFolk.VillageTaxPostfix dopisuje
-liczniki okna `_win.VTax*`) - w trybie kontrolnym podatek idzie stara droga.
+**Verify:** wszystkie cztery (wsie z tytulu, dane osady, podatek wsi BK, tytul) obiema drogami - nowa pierwsza, stara druga (ostatni zapis BK jak dotad), gra bierze stara,
+roznice do linii. Podatek wsi dwa razy jest bezpieczny (recenzja, dekompilacja zainstalowanego BannerKings.dll 21.08): TownFolk.VillageTaxPostfix wisi na przeciazeniu
+`CalculateVillageTaxFromIncome(Village, int)`, a (Village, bool, bool) go nie wola (liczniki `_win.VTax*` nietkniete); skutki uboczne BK powtarzalne - GetCouncil tworzy rade raz,
+`DueWage = (int)(wynik x AdministrativeCosts())` (stala pozycji), PolicyManager.GetPolicy co najwyzej raz dodaje deterministyczna polityke domyslna; MBRandom 0 trafien
+(BKTaxModel, BKAdministrativeModel, PolicyManager, InnovationsManager); osada bez danych BK tu nie trafia (IsSettlementPopulated przed podatkiem, przeglad 169c).
+(Wczesniejsza wersja galezi pomijala podatek w Verify z falszywym powodem - poprawione w 55f47017.)
 
 ## Czego nie zrobilem (i dlaczego)
 - **BuildFunding.Daily, model dochodu (ok. 12-18 ms, kategoria B):** wynik nadpisuje ClanBudget.BuildShare, ale rody z budowa maja lenna - model pisze TownBase (DueWage) i
@@ -122,21 +135,28 @@ liczniki okna `_win.VTax*`) - w trybie kontrolnym podatek idzie stara droga.
 
 ## Plan autotestu
 1. **Bieg kontrolny, Optim Verify = TAK** (wszystkie klucze m105 TAK; np. 160 dob z zapisu jak n31 albo nowa kampania z prologiem): `python -I tools/sprawdz_logi.py --grupa m105optym
-   <Armoury-*.log>` - M5-2 roznic 0 w kazdej czesci przy porownan > 0 (model bez lenn, najblizsze osady, BuildFunding.Daily wojna krolestwa, delegaty BK), M5-3 TAK (pominiete > 0
-   w wiekszosci dob, straznik nie wylaczyl), M5-4 TAK, M5-5 potkniecia 0 i ERROR 0; m99optym MO-2 jak dotad.
+   <Armoury-*.log>` - M5-2 roznic 0 i porownan > 0 w kazdej czynnej czesci (model bez lenn - w tym sonda losowania, najblizsze osady, delegaty BK - w tym podatek wsi;
+   BuildFunding.Daily wojna krolestwa - linia jest), M5-3 TAK (pominiete > 0 w wiekszosci dob, straznik nie wylaczyl), M5-4 TAK, M5-5 potkniecia 0 i ERROR 0, M5-6 TAK (zaden
+   delegat BK "BRAK"); m99optym MO-2 jak dotad. Roznica "losowanie (MBFastRandom)" w linii KT = cos na sciezce modelu losuje (nazwany rod) - pominiecie WYLACZYC (klucz
+   Optim Kt Skip Model NIE) i szukac latki; NIEPEWNE do sprawdzenia w tym biegu: czy sonda losowania nie daje falszywych alarmow (inny watek losujacy w trakcie doby -
+   oczekiwane 0, jak straznik PerfD2).
 2. **Bieg zwykly, Optim Verify = NIE** (ten sam start): `python -I tools/sprawdz_logi.py --grupa m105optym <log> --baza-doby Armoury-2026-10-21_13-37-13.log` (n31, 160 z zapisu;
    dla prologu - Armoury-2026-10-21_14-29-20.log) - M5-1: takt doby nizej (oczekiwane mediana ok. 25-40 ms nizej, KingdomTreasury.Daily ok. 20-30 ms nizej, Sutlers kilka ms nizej),
    M5-3/M5-4/M5-5 TAK; pozostale grupy wobec bazy - tylko zmiennosc biegu.
 3. Gdy M5-3 = NIE z powodem "niesprawdzone latki": sprawdzic nazwana latke w dekompilacji (zapisy przy applyWithdrawals = false), dopiero potem dopisac do KtKnownPatches.
 
-Test progow: 8 logow syntetycznych (generator scratchpad .../optym/gen_test.py): dobry bieg kontrolny - 0 NIE; roznica w KT - M5-2 NIE; straznik wylaczyl - M5-3 NIE;
+Test progow: 12 logow syntetycznych (generator scratchpad .../optym/gen_test.py): dobry bieg kontrolny - 0 NIE; roznica w KT - M5-2 NIE; straznik wylaczyl - M5-3 NIE;
 Verify TAK bez porownan - M5-2 NIE; stary log - INFO; potkniecia + ERROR + doba bez tablic - M5-4 i M5-5 NIE; podstawa nie-ziemia - M5-3 INFO; zwykly bieg z baza - M5-1
-z roznicami sekcji. Logi 102 / n31 (sprzed galezi): M5-0 / M5-1 INFO.
+z roznicami sekcji; (da0363ac) delegaty BK "BRAK" z 0 porownan - M5-2 NIE i M5-6 NIE; Verify bez linii BuildFunding - M5-2 NIE; Verify przy podstawie nie-ziemia i BuildFunding
+0 porownan - M5-2 TAK (bez falszywego NIE), M5-3 INFO; KT pominiete > 0 przy 0 porownan KT - M5-2 NIE. Logi 102 / n31 (sprzed galezi): M5-0 / M5-1 INFO, m99optym 0 NIE.
 
 ## Ryzyko / co sprawdzic
 - **Regresje:** zmienione miejsca - KingdomTreasury.Daily (4 wstawki: KtSkipBegin, KtSkip + warunkowe wywolanie modelu, StableLand sprzed modelu, KtSkipEnd), Sutlers.Daily / One
   (Begin/End, 3 wywolania NearTown/NearVillage), BuildFunding.Daily (BfWarBegin, BfWarOf, BfWarEnd), ClanIncomeBook.StableBeginBody (CdBegin, 4 wywolania, CdEnd),
   KingdomTreasury.OptimStartLine (1 linia). Przy kluczu NIE kazde miejsce idzie dawnym kodem 1:1 (BfWarOld, Sutlers.NearestTown/NearestVillage, Invoke, model zawsze).
+- **Scalanie (pulapka, recenzja):** `scal.sh` uzywa `patch --fuzz=3`. W KingdomTreasury.Daily `if (!ktSkip || _ktSkipVerify) { try {...} catch {...} }` ma klamry (55f47017) -
+  wstawka innej galezi nie wejdzie miedzy if a try. Zmiana tresci latek z listy KtKnownPatches (MercContract.cs, CouncilWages35.cs, SideVillageFief.cs, SmallGold.cs) w innej
+  galezi = przeglad KtSkip przed scaleniem (wpis do pamieci scalania - tools/scalanie jest tylko w glownym repo).
 - **Kolizje:** nowe pliki czesciowe (KingdomTreasury.Optim105.cs, BuildFunding.Optim105.cs, ClanIncomeBook.Optim105.cs) i klasy (SutlerNear, Optim105); nazwy z przedrostkiem
   Kt/Bf/Cd - sprawdzone, nie wystepuja w tych klasach. Nikt poza Sutlers.One nie wola SutlerNear.NearTown/NearVillage.
 - **Rownolegle galezie gospodarki (m105-gospodarka4 wsie, m105-miasta miasta):** logika nietknieta (cache/pominiecie bez zmiany wyniku). Gdyby ktoras dodala latke na sciezce modelu
@@ -145,7 +165,20 @@ z roznicami sekcji. Logi 102 / n31 (sprzed galezi): M5-0 / M5-1 INFO.
   OptimVerify), sprawdz_logi.py (pomoc, funkcje, dispatch m105optym przed m99optym).
 - **Watki:** wszystko na watku gry (doba), jak dotad. **Zapis:** bez zmian (pamiec tylko w sesji, czyszczona przy starcie kampanii / wczytaniu).
 - **Klucze MCM:** OptimKtSkipModel, OptimSutlerNearest, OptimBuildWar, OptimStableDelegates (TAK) - nowe, nie ma ich w Armoury.json Jeffa (dzialaja domyslne). gen_mcm: Armoury 2281.
-- **Build:** Release Armoury kod 0 (7 ostrzezen jak przed galezia, 0 bledow). Gra nie uruchamiana (zakaz zadania) - dzialanie potwierdzi dopiero autotest.
+- **Build:** Release Armoury kod 0 (7 ostrzezen jak przed galezia, 0 bledow; takze po poprawkach recenzji). Gra nie uruchamiana (zakaz zadania) - dzialanie potwierdzi dopiero
+  autotest.
+
+## Recenzja (21.10) - uwagi i poprawki
+Dwie weryfikacje (wynik i technika): wszystkie uwagi PRAWDA, wszystkie DROBNE - zadna nie zmieniala liczb gry, dotyczyly siatki kontrolnej (Verify, progi) i porzadku.
+| uwaga | stan | poprawka |
+|---|---|---|
+| Verify KT nie czyta generatora losowego (a wynik modelu nadpisuje StableLand - przesuniecia losowan nie widac w wartosciach) | PRAWDA, DROBNE | sonda PerfD2.RngNow przed / po modelu, "losowanie (MBFastRandom)"; przy okazji suma kies bohaterow rodu (55f47017) |
+| Straznik porownuje tylko nazwy latek; metody w srodku sciezki spoza listy | PRAWDA, DROBNE | komentarze "m105-optym KtKnownPatches" przy 5 metodach, akapit w pkt 1, pulapka scalania; siatka = sonda losowania (55f47017) |
+| Verify nie porownuje podatku wsi BK; powod w komentarzu falszywy | PRAWDA, DROBNE | podatek obiema drogami z porownaniem, opis i linia ("podatek wsi tak") poprawione (55f47017) |
+| M5-2 sprawdza tylko sume porownan; nikt nie czyta "BRAK" | PRAWDA, DROBNE | M5-2 kazda czynna czesc (KT tylko przy pominietych > 0 - podstawa nie-ziemia bez falszywego NIE; BuildFunding - sama linia), M5-6 bez "BRAK" (da0363ac) |
+| _ktBk trzyma model BK do nastepnego OnSessionLaunched | PRAWDA, DROBNE | zerowany w KtSkipBegin i na poczatku KtSkipEnd (55f47017) |
+| Verify przeglada workshopTaxes przez IDictionary (pakowanie) | PRAWDA, DROBNE | Dictionary<Workshop,int>, inny typ - IDictionary jak dotad (55f47017) |
+| `if` bez klamer steruje try/catch (ryzyko scalania z fuzz) | PRAWDA, DROBNE | klamry (55f47017) |
 
 ## Status
 DO SPRAWDZENIA - autotest: bieg kontrolny (M5-2 roznic 0) i bieg zwykly (M5-1 takt doby nizej wobec bazy).
