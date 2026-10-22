@@ -998,15 +998,19 @@ namespace Armoury
         internal static string ExportSave()
         {
             if (!LeanSave) return Export();
+            int st0 = _stumblesDay;   // poprawka recenzji kodu R4: null z wyjatku w Export (potkniecie) to nie "pusty"
             long t0 = Stopwatch.GetTimestamp();
             string s = Export();
             double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
             _secV1Day = -2;   // sklad z chwili zapisu - nb1 z linii doby nie jest juz "w tym samym stanie"
             try
             {
-                if (s == null) Log.Info(P7 + "zapis gry arm_board pusty (0 B; brak flag, listow i szkod band), proba odczytu zgodna -, eksport " + ms.ToString("0.00", Inv) + " ms");
+                // poprawka recenzji kodu R3: doba zapisu na koncu linii (ta sama doba D co w zapisie i w linii wczytania "doba zapisu d0") - M7G-52 paruje wczytanie z zapisem tej doby
+                if (s == null && _stumblesDay != st0) Log.Info(P7 + "zapis gry arm_board BLAD eksportu (0 B; wyjatek w Export - potkniecie, tablica bez zapisu), proba odczytu -, eksport "
+                                                              + ms.ToString("0.00", Inv) + " ms; doba zapisu " + Today);
+                else if (s == null) Log.Info(P7 + "zapis gry arm_board pusty (0 B; brak flag, listow i szkod band), proba odczytu zgodna -, eksport " + ms.ToString("0.00", Inv) + " ms; doba zapisu " + Today);
                 else Log.Info(P7 + "zapis gry arm_board " + _secVer + " " + s.Length + " B (" + SecText() + "), proba odczytu " + (_secVer == Ver3 ? "zgodna TAK" : "nb3 zgodna NIE - zapis nb2")
-                              + ", eksport " + ms.ToString("0.00", Inv) + " ms; proby w sesji: zgodne " + _nb3Ok + ", niezgodne " + _nb3Bad);
+                              + ", eksport " + ms.ToString("0.00", Inv) + " ms; proby w sesji: zgodne " + _nb3Ok + ", niezgodne " + _nb3Bad + "; doba zapisu " + _secDay);
             }
             catch (Exception e) { Stumble("ExportSave(linia)", e); }
             return s;

@@ -76,6 +76,7 @@ namespace Armoury
             public long CLeft, CPer;                               // f7-kasy: reszta gersumy do zaplaty i czesc na dobe (rozlozona na okno przegladu; placi TownDay; sesja)
             public int SLow = -1;                                  // m103 P3 (e, Ks Farm Surplus Cap Net): doba startu cyklu obnizki z dochodu (kasa po naleznosciach do 1.5 x zapas albo zaleglosci; sesja)
             public int FastDay = -1;                               // m105 G1 (Ds Farm Cut Below Reserve): doba ostatniej szybkiej obnizki (najwyzej raz na FastGapDays; sesja)
+            public int NImpN; public double NImpAvg;               // m107 K3 (poprawka R2): pamiec doplywu zamku z zapisu (liczba dob, srednia) - do pierwszej probki sesji (CastleSample)
         }
 
         // ------------------------------------------------------------ stan (zapis arm_daniny_miasta)
@@ -628,7 +629,12 @@ namespace Armoury
                     {
                         double r = Math.Max(0.0, F1 / F0), a0 = f.AL + f.AC;
                         f.AL *= r; f.AC *= r;
-                        double fr = a0 - (f.AL + f.AC);
+                        // poprawka recenzji ekonomii R3: przy czesci ludu FLf ~ 0 samo mnozenie zostawia te sama liczbe rat - flaga zaleglosci (>= raty) trzyma dalej, a zamek
+                        // z zaleglosciami ma tylko ruch w dol (przeglad bez podwyzki, wymuszony -15%, na splate nic nie zostaje - firma = doplyw). Zaleglosci z kas najwyzej
+                        // rata po obnizce - 1 zl (ten sam stosunek pan / korona): flaga gasnie, przeglad moze znow podniesc firme za zyskiem. Roszczenie, nie zloto
+                        double cap = Math.Max(0.0, (f.FL + f.FC + f.FLf) / Weeks - 1.0), a1 = f.AL + f.AC;
+                        if (a1 > cap) { double q = a1 > 0 ? cap / a1 : 0.0; f.AL *= q; f.AC *= q; }
+                        double fr = a0 - (f.AL + f.AC);                                  // licznik linii: zmniejszone z firma (stosunek i przyciecie do raty)
                         if (fr > 0) { _ccArrFree += fr; _ccArrFreeS += fr; }
                     }
                 }
@@ -825,6 +831,9 @@ namespace Armoury
             if (!(F > 0)) return false;
             double net = NetAvg(f, NetDays);                                    // recenzja R1: pelne 28 dob (NaN przy NF < 28 - bez zmiany)
             if (double.IsNaN(net) || double.IsInfinity(net)) return false;
+            // m107 K3 (poprawka recenzji kodu R1): zamek z doplywem <= 0 - bez szybkiej obnizki (do 0 firma zamku juz by nie wrocila: przeglad pomija F <= 0, podwyzka mnozy,
+            // FromZero tylko dla miast); obnizka z dochodu (IncomeCut, podloga (1 - mx) x F) jak dotad
+            if (castle && !(net > 0)) return false;
             double cap = Math.Max(0.0, net) * YearDays;
             if (!(F > cap + 1e-6)) return false;
             double r = cap / F;
@@ -1313,6 +1322,19 @@ namespace Armoury
                 if (!On || st == null || t == null) return;
                 var f = FarmOf(st, true);
                 if (f == null) return;
+                // m107 K3 (poprawka recenzji ekonomii R2): pamiec doplywu zamku z zapisu - przy pierwszej probce sesji (klucz Ds Castle Fast Cut TAK, pamiec pusta) srednia
+                // z zapisu jako NImpN probek; szybka obnizka zamkow (pelne 28 dob) dziala wtedy od pierwszych dob sesji, nie dopiero od 29. (sesje Jeffa 12-24 doby). Klucz NIE - jak dotad
+                if (f.NImpN > 0)
+                {
+                    var s = Settings.Current;
+                    if (s != null && s.DsCastleFastCut && f.NF == 0 && !double.IsNaN(f.NImpAvg) && !double.IsInfinity(f.NImpAvg))
+                    {
+                        int n = Math.Min(NetDays, f.NImpN);
+                        for (int i = 0; i < n; i++) f.Net[i] = f.NImpAvg;
+                        f.NF = n; f.NH = n % NetDays;
+                    }
+                    f.NImpN = 0;
+                }
                 long g = t.Gold;
                 if (f.G0 != long.MinValue) Push(f, g - f.G0 + f.PaidWin);
                 f.G0 = g; f.PaidWin = 0;
@@ -1450,7 +1472,7 @@ namespace Armoury
             {
                 double addLf = iLf;
                 if (noArrLf && iLf > 0) { NoteLfFree(st, iLf, 0); addLf = 0; }   // m107 K2: rata ludu bez pana nie czeka - darowana
-                f.AL += iL; f.AC += iC; f.ALf += addLf; _noLord++; _noLordAmt += iL + iC + iLf;   // bez zywego pana - rata czeka (jak zawor)
+                f.AL += iL; f.AC += iC; f.ALf += addLf; _noLord++; _noLordAmt += iL + iC + addLf;   // bez zywego pana - rata czeka (jak zawor); m107 R5: bez darowanej raty ludu
                 _arrNew += iL + iC + addLf;
                 return;
             }
@@ -1494,14 +1516,21 @@ namespace Armoury
             double wantLf = f.ALf + iLf;
             if (noArrLf)
             {
-                // m107 K2: lud placi z nadwyzki ponad zapas (zaleglosc z zapisu najpierw), reszta darowana - ALf = 0 (jak czynsz wsi ponad skrzynie, m105 gosp5)
+                // m107 K2: lud placi z nadwyzki ponad zapas (zaleglosc z zapisu najpierw), brak >= 1 zl darowany - ALf = 0 (jak czynsz wsi ponad skrzynie, m105 gosp5);
+                // ulamek ponizej 1 zl - do nastepnej raty
                 double oldLf = f.ALf;
                 long gF = wantLf >= 1 ? FolkToLord(st, lord, (long)Math.Floor(wantLf)) : 0;
                 _paidLf += gF;
                 double miss = Math.Max(0, wantLf - gF);
-                forgOld = Math.Min(miss, Math.Max(0, oldLf - gF));
-                f.ALf = 0;
-                if (miss > 0) NoteLfFree(st, miss, forgOld);
+                // poprawka recenzji (ekonomia R5, kod R2): przy pelnej wplacie gF = floor(wantLf) - ulamek ponizej 1 zl to nie brak ludu: przechodzi do nastepnej raty (jak
+                // dotad, pan nie traci ulamka co tydzien), nie liczy sie jako darowany; darowany tylko prawdziwy brak (>= 1 zl) - w calosci, ALf = 0
+                if (miss >= 1)
+                {
+                    forgOld = Math.Min(miss, Math.Max(0, oldLf - gF));
+                    f.ALf = 0;
+                    NoteLfFree(st, miss, forgOld);
+                }
+                else f.ALf = miss;
             }
             else if (wantLf >= 1)
             {
@@ -1826,7 +1855,8 @@ namespace Armoury
                 if (_fixDay >= 0 && (s.DsCastleFolkPartNoArrears || s.DsCastleFastCut))
                 {
                     double zC = 0, zLf = 0;
-                    foreach (var f in _farm.Values) if (f.St != null && f.St.IsCastle) { zC += f.AL + f.AC; zLf += f.ALf; }
+                    // poprawka R5: ulamek raty ludu ponizej 1 zl przechodzi do nastepnej raty (nie zaleglosc) - w sumie tylko ALf >= 1 zl (prawdziwa zaleglosc, np. z zapisu)
+                    foreach (var f in _farm.Values) if (f.St != null && f.St.IsCastle) { zC += f.AL + f.AC; if (f.ALf >= 1) zLf += f.ALf; }
                     sb.Append(" | m107 zamki (Ds Castle Folk Part No Arrears ").Append(s.DsCastleFolkPartNoArrears ? (s.DsFarmFolkFromSavings ? "TAK" : "TAK - bez Ds Farm Folk From Savings") : "NIE")
                       .Append(", Ds Castle Fast Cut ").Append(s.DsCastleFastCut ? (CastleCutOn(s) ? "TAK" : "TAK - bez Ds Castle Income Cut, Ks Farm Surplus Cap Net albo kalibracji startu") : "NIE")
                       .Append("): czesc z oszczednosci podzamcza niezaplacona i darowana dzis ").Append(N0(_lfFree)).Append(" zl (").Append(_lfFreeN).Append(" zamkow), w sesji ").Append(N0(_lfFreeS))
@@ -1922,6 +1952,8 @@ namespace Armoury
             try
             {
                 var sb = new StringBuilder(256 + _farm.Count * 80);
+                var s0 = Settings.Current;
+                bool k3Save = s0 != null && s0.DsCastleFastCut;                   // m107 K3 (poprawka R2): pamiec doplywu zamkow w zapisie
                 sb.Append("1|w~").Append(_dayOn.ToString(Inv)).Append('~').Append(_fixDay.ToString(Inv)).Append('~').Append(_mDays.ToString(Inv)).Append('~')
                   .Append(double.IsNaN(_worldShare) ? "-" : _worldShare.ToString("R", Inv));
                 foreach (var kv in _farm)
@@ -1936,6 +1968,13 @@ namespace Armoury
                       .Append('~').Append(BadId(f.MovK) ? "-" : f.MovK).Append('~').Append(f.MovSerial.ToString(Inv)).Append('~').Append(R(f.ML)).Append('~').Append(R(f.MC))
                       .Append('~').Append(R(f.FLf)).Append('~').Append(R(f.ALf)).Append('~').Append(R(f.MLf)).Append('~').Append(R(f.SW)).Append('~').Append(R(f.LW))
                       .Append('~').Append(R(f.AidCut)).Append('~').Append(R(f.MovCur));   // recenzja 17.10: pola 17-23 (starszy zapis bez nich = 0)
+                    // m107 K3 (poprawka R2): zamek - pola 24-25 pamiec doplywu (liczba dob, srednia); starsza DLL czyta pola do 23 (a.Length >= 24), nadmiar pomija.
+                    // Pamiec z zapisu jeszcze nieuzyta (zapis przed pierwsza probka sesji) - ta z zapisu. Klucz NIE - bez pol (zapis jak w 5da5f304)
+                    if (k3Save)
+                    {
+                        if (f.NF > 0 && f.St != null && f.St.IsCastle) sb.Append('~').Append(f.NF.ToString(Inv)).Append('~').Append(R(NetAvg(f, 1)));
+                        else if (f.NF == 0 && f.NImpN > 0) sb.Append('~').Append(f.NImpN.ToString(Inv)).Append('~').Append(R(f.NImpAvg));
+                    }
                 }
                 DsSeason.Export(sb);
                 return sb.ToString();
@@ -1979,6 +2018,11 @@ namespace Armoury
                                 f.FLf = D0(a[17]); f.ALf = D0(a[18]); f.MLf = D0(a[19]); f.SW = D0(a[20]); f.LW = D0(a[21]); f.AidCut = D0(a[22]); f.MovCur = D0(a[23]);
                             }
                             else f.MovCur = f.MovLeft;   // zapis sprzed recenzji: cala niezebrana dziesiata jak wymiar biezacy
+                            if (a.Length >= 26)          // m107 K3 (poprawka R2): pamiec doplywu zamku - do pierwszej probki sesji (CastleSample, tylko przy kluczu TAK)
+                            {
+                                int n = I(a[24], 0); double avg = D(a[25]);
+                                if (n > 0 && !double.IsNaN(avg)) { f.NImpN = Math.Min(NetDays, n); f.NImpAvg = avg; }
+                            }
                             if (f.AidArr <= 0) f.AidK = null;
                             if (f.MovLeft <= 0) { f.MovLeft = 0; f.MovPer = 0; }
                             _farm[a[1]] = f;

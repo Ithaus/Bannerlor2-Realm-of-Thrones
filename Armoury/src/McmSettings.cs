@@ -8584,7 +8584,7 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsCastleFolkPartNoArrears { get; set; } = true;
 
-        [SettingPropertyBool("Ds Castle Fast Cut", HintText = "with Ds Castle Income Cut: a castle whose purse, after the coin it owes, is below its working coin, or that owes a whole instalment or more, has its farm lowered at once to what it really earns (a year of its net daily inflow over the last four weeks) - the same rule as Ds Farm Cut Below Reserve for towns - instead of a quarter every two weeks; the arrears its purse owes shrink by the same share, since they were reckoned on a farm above its takings. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Ds Castle Fast Cut", HintText = "with Ds Castle Income Cut: a castle whose purse, after the coin it owes, is below its working coin, or that owes a whole instalment or more, has its farm lowered at once to what it really earns (a year of its net daily inflow over the last four weeks, kept in the save) - the same rule as Ds Farm Cut Below Reserve for towns - instead of a quarter every two weeks; a castle that takes in nothing is lowered only the slow way and never to nothing. The arrears its purse owes shrink with the farm, to less than one new instalment, since they were reckoned on a farm above its takings - so the quarterly review may raise the castle again once it earns more. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsCastleFastCut { get; set; } = true;
 
