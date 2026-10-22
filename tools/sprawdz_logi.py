@@ -1039,7 +1039,9 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m104e5 <Armoury-*.log>. E5-0 start i latki, E5-1 ERROR i potkniecia 0, E5-2 orszak (rusza <= d3, Winterfell
                     < d40, KP < d100), E5-3 Tyrion na Mur (INFO), E5-4 Turniej Reki w KP d123-127 (E5-4b kanon w drabince INFO), E5-5 Tyrion jencem town_EN1 d111-131,
                     E5-6 Jaime #p10 do town_V2, E5-7 klany gorskie d118-119 i >= 80% dob 119-186, E5-8 ludzie Gory d155-156 i >= 80% dob 156-186 (E5-8b spalona >= 1 wies),
-                    E5-9 Beric rusza d160-165, E5-10 po prologu partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu: INFO. Recenzja m104: scena wylaczona
+                    E5-8c bandy i szacunki celow (INFO, m105-drobne), E5-9 Beric rusza d160-173 po pierwszej SPALONEJ wsi albo od d168 (m105-drobne; dotad d160-165;
+                    liczba spalonych z linii 'Beric: rusza', gdy jest - wczytanie zapisu po spaleniu),
+                    E5-10 po prologu partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu: INFO. Recenzja m104: scena wylaczona
                     kluczem (ostatnia linia startu E5) albo pominieta przez zapis sprzed E5 - INFO z powodem (E5-2, E5-4, E5-5, E5-7, E5-8, E5-8b, E5-9).
 --grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
                     python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
@@ -1051,6 +1053,11 @@ Uzycie (Python 3, tylko odczyt):
                     w menu (>= 1, kazda: zachodzenie 0, ramka TAK przy kluczu, dol ramki <= granica PAUSED z linii testu (1080 - 195 przy 16:9), wynik TAK; brak prob
                     przy pliku testu i przesunieciach - NIE), DZ-4b proby na mapie (wynik TAK: lewa krawedz >= 100 przy kluczu przesuniecia, ramka, dol nad paskiem),
                     DZ-5 przesuniecia >= 1 przy kluczu TAK (w autotescie gracz czeka w menu miasta). Log bez linii m105: INFO.
+--grupa m105drobne : (21/22.10, w-toku/m105-drobne; Armoury/src/QuestGangAxes.cs, klucz QuestGangAxesFix; CrashScribe/src/Watchdog.cs) python -I tools/sprawdz_logi.py
+                    --grupa m105drobne <Armoury-*.log> [--crashscribe <session-*.log>]. DR-1 ERROR QuestGangAxes / QuestPay8.ShownReward 0 (T-4), DR-2 latka sprawy
+                    broni gangu WPIETA (i prefiksy getterow 2/2) w kazdej sesji z kluczem, DR-3 sprawy broni gangu - srednia po zmianie >= 1, ilosc siekier >= 1 i nagroda
+                    czytelna (brak spraw - INFO 'T-4 niesprawdzone'), DR-4 (z --crashscribe): po 'AUTOTEST: WYJSCIE: QuitGame' linia 'Straznik zawieszen: gra sie zamyka'
+                    i 0 blokow GAME HANG (bez QuitGame: po linii zamykania 0 GAME HANG; bez obu - INFO). Ludzie Gory (m105-drobne pkt 1): grupa m104e5 (E5-8b, E5-8c, E5-9).
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
@@ -37758,7 +37765,9 @@ def m104e5_main(logp):
     rozstrzygniety w KP w d123-127 (E5-4b uczestnicy kanonu w drabince - INFO), E5-5 Tyrion jencem town_EN1 bez ucieczki w dniach 111-131 (linie doby) i bez
     'PRZEPUSZCZONE' poza smiercia, E5-6 Jaime: #p10 do town_V2 (bez linii - INFO, gdy wojna Polnocy nie wybuchla), E5-7 klany gorskie: pierwsza banda d118-119 i w polu
     >= 1 przez >= 80% dob 119-186, E5-8 ludzie Gory: pierwsza banda d155-156 i w polu przez >= 80% dob 156-186 (albo rozbici w bitwie), E5-8b spalona >= 1 wies,
-    E5-9 Beric rusza w d160-165 (POMINIETY - INFO z powodem), E5-10 po prologu (doba >= 189) partie pod scena 0, E5-11 straz niewoli (INFO).
+    E5-8c (m105-drobne, INFO) ludzie band przy narodzinach i szacunki 'szac. N dob na osade' w liniach celu, E5-9 Beric rusza w d160-173 po pierwszej SPALONEJ wsi
+    Ludzi Gory albo od d168 bez spalonej (m105-drobne: wezwanie po skargach ze spalonych wsi, na druzyne czeka 5 dni; dotad d160-165; POMINIETY - INFO z powodem),
+    E5-10 po prologu (doba >= 189) partie pod scena 0, E5-11 straz niewoli (INFO).
     Log bez kampanii z prologiem: INFO (kampania klasyczna - E5 nie dziala)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -37768,7 +37777,7 @@ def m104e5_main(logp):
     starts, days, n_err, err_ex = [], {}, 0, []
     ev = {"rusza": [], "winterfell": [], "kp": [], "pominiety": [], "cb": [], "inn": [], "ty_end": [], "t_done": [], "t_skip": [], "t_proc": [],
           "blocked": [], "passed": [], "kg_new": [], "kg_fail": [], "mm_new": [], "mm_burn": [], "mm_lost": [], "mm_home": [], "b_go": [], "b_skip": [], "b_end": [],
-          "kg_skip": [], "mm_skip": []}
+          "kg_skip": [], "mm_skip": [], "mm_tgt": []}
     canon = []
     last_prol = -1
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -37817,6 +37826,8 @@ def m104e5_main(logp):
                         continue
                     ev[key].append((d, body))
                     break
+            if body.startswith("ludzie Gory: ") and " - nowy cel " in body:
+                ev["mm_tgt"].append((d, body))   # m105-drobne: E5-8c (szacunek celu w linii 'nowy cel')
     print(f"plik: {logp} | linii startu E5 {len(starts)}, dob E5 {len(days)}, ostatnia doba prologu {last_prol}, ERROR {n_err}, zmian kanonu (p01/p02/p10/m01/m02) {len(canon)}")
     if not starts and not days:
         rep.add("E5-0: linie 'Prolog E5 (m104): ...'", "brak w logu", "INFO (kampania klasyczna albo log sprzed paczki m104-e5)", None)
@@ -37955,15 +37966,35 @@ def m104e5_main(logp):
                 "pierwsza d155-156, w polu >= 80% dob okna albo wszystkie rozbite w bitwie", bool(mm0) and mm0[0] is not None and 155 <= mm0[0] < 157 and (seen2 == 0 or ok2 >= 0.8 * seen2 or lost_all))
         rep.add("E5-8b: spalone wsie Dorzecza", f"{len(ev['mm_burn'])}" + (f" (pierwsza: {ev['mm_burn'][0][1][:90]})" if ev["mm_burn"] else "") + f", powrot do domow linii {len(ev['mm_home'])}",
                 ">= 1 do d186 (krotszy log - INFO)", (len(ev["mm_burn"]) >= 1) if last_prol >= 186 or ev["mm_burn"] else None)
+        # m105-drobne: E5-8c - ludzie band przy narodzinach (90-130, min 60) i szacunki celow ("szac. N dob na osade", "NIE ZDAZY do d186", "SILNA MILICJA")
+        men = [int(x.group(1)) for x in (re.search(r"\) - (\d+) ludzi \(z puli", e[1]) for e in ev["mm_new"]) if x]
+        est = [float(x.group(1)) for x in (re.search(r"szac\. ([0-9.]+) dob na osade", e[1]) for e in ev["mm_new"] + ev["mm_tgt"]) if x]
+        late = sum(1 for e in ev["mm_new"] + ev["mm_tgt"] if "NIE ZDAZY" in e[1])
+        strong = sum(1 for e in ev["mm_new"] + ev["mm_tgt"] if "SILNA MILICJA" in e[1])
+        rep.add("E5-8c: bandy Ludzi Gory i szacunki celow (m105-drobne)", f"ludzie band przy narodzinach {men or '-'}, szacunki dob na osade {[round(x, 1) for x in est] or '-'}"
+                f", cele 'NIE ZDAZY' {late}, 'SILNA MILICJA' {strong}, linii 'nowy cel' {len(ev['mm_tgt'])}", "INFO (bandy 90-130 ludzi, krok ok. 4-6 dob)", None)
     bg, bs = first("b_go"), first("b_skip")
     if bg:
-        rep.add("E5-9: oddzial Berica", bg[1][:170], "rusza w d160-165", bg[0] is not None and 160 <= bg[0] < 166)
+        # m105-drobne: wezwanie po pierwszej SPALONEJ wsi Ludzi Gory albo od d168 bez spalonej; na druzyne Beric czeka do 5 dni od wezwania (d160-173)
+        b0 = first("mm_burn")
+        burn_d = b0[0] if b0 else None
+        # recenzja m105 R5: linia 'Beric: rusza' niesie liczbe spalonych wsi (_mmBurned - takze z zapisu, pole 3 'wmm'); wczytanie zapisu z d160-168 po spaleniu nie ma
+        # linii 'SPALONA' w biezacym pliku - liczba z linii rozstrzyga; stary format linii (bez liczby, np. log 102) - jak dotad z linii 'SPALONA'
+        mbn = re.search(r"spalone wsie Ludzi Gory (\d+)\]", bg[1])
+        if mbn:
+            nbn = int(mbn.group(1))
+            okb = bg[0] is not None and 160 <= bg[0] < 174 and (nbn > 0 or bg[0] >= 168)
+        else:
+            okb = bg[0] is not None and 160 <= bg[0] < 174 and ((burn_d is not None and burn_d <= bg[0] + 0.05) or bg[0] >= 168)
+        rep.add("E5-9: oddzial Berica", bg[1][:200] + (f" | pierwsza spalona wies d{burn_d}" if burn_d is not None else " | bez spalonej wsi w tym logu przed ruszeniem")
+                + (f" | spalone wsie w linii Berica {mbn.group(1)}" if mbn else ""),
+                "rusza w d160-173 po pierwszej spalonej wsi albo od d168", okb)
     elif bs:
         rep.add("E5-9: oddzial Berica", bs[1][:170], "INFO (POMINIETY - powod w linii)", None)
     elif off("beric"):
         rep.add("E5-9: oddzial Berica", "klucz PrologueBericHunt NIE (linia startu)", "INFO (scena wylaczona kluczem)", None)
     else:
-        rep.add("E5-9: oddzial Berica", "brak linii", "rusza w d160-165 (log krotszy niz 166 dob - INFO)", None if last_prol < 166 else False)
+        rep.add("E5-9: oddzial Berica", "brak linii", "rusza w d160-173 (log krotszy niz 174 dob - INFO)", None if last_prol < 174 else False)
     after = [d for d in sorted(days) if d >= 189]
     if after:
         mp = re.search(r"partie pod scena (\d+)", days[after[0]])
@@ -38446,6 +38477,128 @@ def m105dziennik_main(logp):
     rep.show()
     return 0
 
+
+# ------------------------------------------------------------ m105drobne (21/22.10, w-toku/m105-drobne: punkt 7 PRZEKAZANIE "Drobne" po tescie 102 -
+# (2) T-4 sprawa broni gangu ze srednia wazona ceny siekier (Armoury/src/QuestGangAxes.cs, klucz QuestGangAxesFix), (8a) straznik zawieszen CrashScribe milknie
+# przy zamykaniu gry (CrashScribe/src/Watchdog.cs - log CrashScribe przez --crashscribe). Ludzie Gory (pkt 1) - grupa m104e5 (E5-8b, E5-8c, E5-9).
+M105D_GA = "Bron gangu (T-4"
+M105D_GA_START = re.compile(r"^Bron gangu \(T-4, klucz Quest Gang Axes Fix (TAK|NIE)\): (.*?) \| sprawy broni gangu z zapisu (\d+), naprawione (\d+)")
+M105D_GA_ONE = re.compile(r"^Bron gangu \(T-4\): (NAPRAWIONA sprawa|nowa sprawa) .*? - srednia ceny siekier gry (-?\d+).*? -> (-?\d+) d \(")
+# recenzja m105 R2: ilosc siekier i nagroda gry bez skali w linii sprawy ('?' - getter rzucil / nagroda nieczytelna); brak pola - linia sprzed recenzji
+M105D_GA_QTY = re.compile(r"\| ilosc siekier (-?\d+|\?[^,|]*), nagroda gry \(bez skali\) (-?\d+|\?)")
+M105D_ERR = ("ERROR in QuestGangAxes.", "ERROR in QuestPay8.ShownReward")
+M105D_CS_CLOSE = "Straznik zawieszen: gra sie zamyka"
+M105D_CS_HANG = "# GAME HANG"
+M105D_CS_QUIT = "AUTOTEST: WYJSCIE: QuitGame"   # recenzja m105 R1: kotwica DR-4 w biegu autotestu (linia CrashScribe-at przed wyjsciem)
+
+
+def m105drobne_main(logp, csp):
+    """m105drobne (21/22.10, w-toku/m105-drobne; PRZEKAZANIE-2026-10-21 pkt 7 "Drobne" po tescie 102): DR-1 ERROR QuestGangAxes i QuestPay8.ShownReward 0 (T-4:
+    DivideByZero w sprawie broni gangu), DR-2 linia startu 'Bron gangu (T-4, ...)' w kazdej sesji z latka WPIETA i prefiksami getterow 2/2 (klucz NIE - INFO), DR-3
+    sprawy broni gangu nowe i naprawione - kazda srednia po zmianie >= 1, ilosc siekier >= 1 i nagroda gry czytelna (recenzja m105 R2; linie bez ilosci - sama
+    srednia; brak spraw - INFO 'T-4 niesprawdzone', recenzja R3), DR-4 (z --crashscribe <session-*.log>, recenzja R1): bieg autotestu (linia 'AUTOTEST: WYJSCIE:
+    QuitGame') - po niej linia 'Straznik zawieszen: gra sie zamyka' (brak - NIE, stara DLL CrashScribe) i zaden blok '# GAME HANG' (po QuitGame ani po linii
+    zamykania); bez QuitGame (gra Jeffa) - po linii zamykania 0 blokow; bez obu linii - INFO. Zawieszenia w trakcie gry - INFO z liczba. Log bez linii m105: INFO.
+    Kotwica NIE na SUMMARY: OnSubModuleUnloaded pisze linie zamykania przed Scribe.Summary(), a sesja bez bledow konczy sie 'Session ended with no errors.'."""
+    rep = Report()
+    if logp and not os.path.isfile(logp):
+        rep.add("DR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    n_err, err_ex, starts, ones = 0, [], [], []
+    if logp:
+        with open(logp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                m = TS.match(ln.rstrip("\n"))
+                s = m.group(2) if m else ln.rstrip("\n")
+                if s.startswith(M105D_ERR):
+                    n_err += 1
+                    if len(err_ex) < 2:
+                        err_ex.append(s[:120])
+                    continue
+                if not s.startswith(M105D_GA):
+                    continue
+                ms = M105D_GA_START.match(s)
+                if ms:
+                    starts.append(ms.groups())
+                    continue
+                mo = M105D_GA_ONE.match(s)
+                if mo:
+                    mq = M105D_GA_QTY.search(s)
+                    qv = rv = None
+                    if mq:
+                        qv = int(mq.group(1)) if re.fullmatch(r"-?\d+", mq.group(1)) else "?"
+                        rv = int(mq.group(2)) if re.fullmatch(r"-?\d+", mq.group(2)) else "?"
+                    ones.append((mo.group(1), int(mo.group(2)), int(mo.group(3)), qv, rv))
+        print(f"plik: {logp} | linii startu T-4 {len(starts)}, spraw broni gangu (nowe/naprawione) {len(ones)}, ERROR {n_err}")
+        rep.add("DR-1: ERROR QuestGangAxes / QuestPay8.ShownReward (T-4)", f"{n_err}" + (f" ({err_ex[0]})" if err_ex else ""), "0", n_err == 0)
+        if not starts:
+            rep.add("DR-2: latka sprawy broni gangu (linia startu)", "brak linii 'Bron gangu (T-4, ...)'", "INFO (log sprzed paczki m105-drobne)", None)
+        else:
+            on = [x for x in starts if x[0] == "TAK"]
+            # recenzja m105 R-1: prefiksy getterow nagrody i ilosci - gdy linia je wymienia, musza byc 2/2 (linia sprzed recenzji - sama latka konstruktora)
+            bad = [x for x in on if "WPIETA" not in x[1] or ("prefiksy getterow" in x[1] and "prefiksy getterow nagrody i ilosci 2/2" not in x[1])]
+            fixed_load = sum(int(x[3]) for x in starts)
+            if not on:
+                rep.add("DR-2: latka sprawy broni gangu (linia startu)", f"sesji {len(starts)}, klucz NIE", "INFO (klucz Quest Gang Axes Fix wylaczony)", None)
+            else:
+                rep.add("DR-2: latka sprawy broni gangu (linia startu)", f"sesji z kluczem TAK {len(on)}, bez WPIETA / getterow 2/2 {len(bad)}" + (f" ({bad[0][1][:160]})" if bad else "")
+                        + f", spraw z zapisu naprawionych {fixed_load}", "kazda sesja z kluczem: WPIETA, prefiksy getterow 2/2", not bad)
+        if not ones:
+            rep.add("DR-3: sprawy broni gangu (nowe i naprawione)", "brak - T-4 niesprawdzone",
+                    "INFO (zadna sprawa 'Gang Leader Needs Weapons' nie powstala ani nie byla naprawiana - w raporcie 'T-4 niesprawdzone')", None)
+        else:
+            nfix = sum(1 for x in ones if x[0].startswith("NAPRAWIONA"))
+            low = [x for x in ones if x[2] < 1]
+            zero_game = sum(1 for x in ones if x[1] <= 0)
+            med_game = sorted(x[1] for x in ones)[len(ones) // 2]
+            med_new = sorted(x[2] for x in ones)[len(ones) // 2]
+            # recenzja m105 R2: ilosc siekier >= 1 (0 - sprawa bez towaru: srednia > 2000 przy trudnosci 0.1) i nagroda gry czytelna (> 0)
+            withq = [x for x in ones if x[3] is not None]
+            qbad = [x for x in withq if not (isinstance(x[3], int) and x[3] >= 1)]
+            rbad = [x for x in withq if not (isinstance(x[4], int) and x[4] > 0)]
+            qs = sorted(x[3] for x in withq if isinstance(x[3], int))
+            qtxt = (f", ilosc siekier mediana {qs[len(qs) // 2]} (min {qs[0]}, max {qs[-1]})" if qs else "") + (f", ilosc ponizej 1 / nieczytelna: {len(qbad)}, nagroda nieczytelna: {len(rbad)}"
+                    if withq else ", linie bez ilosci siekier (log sprzed recenzji m105 - sama srednia)")
+            rep.add("DR-3: sprawy broni gangu (nowe i naprawione)", f"{len(ones)} (naprawione {nfix}, srednia gry 0: {zero_game}), mediana sredniej gry {med_game} d -> nasza {med_new} d,"
+                    f" ponizej 1 d: {len(low)}" + qtxt, "kazda srednia po zmianie >= 1, ilosc siekier >= 1, nagroda gry czytelna", not low and not qbad and not rbad)
+    if csp:
+        if not os.path.isfile(csp):
+            rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"brak pliku {csp}", "podaj <session-*.log>", None)
+        else:
+            # recenzja m105 R1: kotwica na 'AUTOTEST: WYJSCIE: QuitGame' (NIE na SUMMARY - linia zamykania stoi przed Scribe.Summary()); stara DLL CrashScribe-at bez
+            # linii zamykania po QuitGame - NIE (dotad INFO: w tescie 102 kazdy '# GAME HANG' stal po QuitGame i SUMMARY, prog przechodzil bez NIE)
+            quit_seen = closing = close_after_quit = False
+            hang_before = hang_after_close = hang_after_quit = 0
+            with open(csp, encoding="utf-8", errors="replace") as fh:
+                for ln in fh:
+                    if M105D_CS_QUIT in ln:
+                        quit_seen = True
+                    elif M105D_CS_CLOSE in ln:
+                        closing = True
+                        if quit_seen:
+                            close_after_quit = True
+                    elif ln.startswith(M105D_CS_HANG):
+                        if quit_seen:
+                            hang_after_quit += 1
+                        if closing:
+                            hang_after_close += 1
+                        elif not quit_seen:
+                            hang_before += 1
+            if quit_seen:
+                rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"QuitGame TAK, linia zamykania po nim {'TAK' if close_after_quit else 'BRAK (stara DLL CrashScribe?)'}"
+                        f", GAME HANG po QuitGame {hang_after_quit}, po linii zamykania {hang_after_close}, w trakcie gry {hang_before} (INFO)",
+                        "po QuitGame: linia zamykania i 0 GAME HANG", close_after_quit and hang_after_quit == 0 and hang_after_close == 0)
+            elif not closing:
+                rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"brak linii '{M105D_CS_CLOSE}' i brak QuitGame (zawieszenia w grze {hang_before})",
+                        "INFO (log sprzed paczki m105-drobne albo gra nie zamknieta zwyczajnie)", None)
+            else:
+                rep.add("DR-4: zawieszenia po zamknieciu gry (CrashScribe)", f"bez QuitGame (gra zwykla), po linii zamykania {hang_after_close}, w trakcie gry {hang_before} (INFO)",
+                        "po linii zamykania 0", hang_after_close == 0)
+    if not logp and not csp:
+        rep.add("DR-0: logi", "brak", "podaj <Armoury-*.log> i/albo --crashscribe <session-*.log>", None)
+    rep.show()
+    return 0
 
 # ------------------------------------------------------------ m104wojny (21.10, w-toku/m104-wojny: wojny wedlug ksiazki - (1) wojny fabularne ROT czysto essoskie na
 # kalendarzu w kampanii z prologiem, (2) Reach z korona po smierci Renly'ego (pokoj z Dorne, sojusz, pakt Reach-Dorne) i Dorne z korona po zareczynach Myrcelli (pakt),
@@ -56986,6 +57139,8 @@ def main(argv):
         return m105kolko_main(logp)   # m105kolko (21.10, w-toku/m105-kolko): kolko najechania przy zajazdach i wioskach pobocznych (MapHoverRing)
     if group == "m105dziennik" and logp:
         return m105dziennik_main(logp)   # m105dziennik (21.10, w-toku/m105-dziennik): dziennik obok menu osady, ramka w stylu ROT, bez wierszy handlu nad miastami (MapChatLog)
+    if group == "m105drobne" and (logp or csp):
+        return m105drobne_main(logp, csp)   # m105drobne (21/22.10, w-toku/m105-drobne): T-4 sprawa broni gangu (QuestGangAxes), straznik zawieszen CrashScribe przy zamykaniu gry (--crashscribe)
     if group == "m104wojny" and logp:
         return m104wojny_main(logp)   # m104wojny (21.10, w-toku/m104-wojny): Essos na kalendarzu w prologu, Reach i Dorne z korona, mlode smoki Daenerys (Prologue.Wars/Crown/Dragons)
     if group == "m100kryjowki" and logp:

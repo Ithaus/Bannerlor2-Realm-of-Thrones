@@ -5428,6 +5428,10 @@ namespace Armoury
         [SettingPropertyGroup("Quest rewards")]
         public bool QuestGoodsReal { get; set; } = true;
 
+        [SettingPropertyBool("Quest Gang Axes Fix", HintText = "the gang leader who needs weapons asks for one-handed axes at their real average price on the town shelves (each axe weighed by how many lie there; empty shelves - the average worth of trade axes). The game divided the sum of the axes' prices by the number of axes on the shelves, which with cheap axes and full shelves gives 0 or a few denars - the quest then broke (an unreadable reward on the notice board, an error in the conversation) or asked for far too many axes. Quests already in a save are mended only if broken; off = as the game", RequireRestart = false)]
+        [SettingPropertyGroup("Quest rewards")]
+        public bool QuestGangAxesFix { get; set; } = true;
+
         [SettingPropertyBool("Player Tourney Prize From Town", HintText = "the prize you win at a tournament is a real thing: it comes off the shelves of the host town, and when the town has no such piece in its stores it pays you its price from its treasury instead - only from what the treasury can spare, so a poor town pays less and you are told. The prize money and match bonuses of Tournaments XPanded are paid by the host town the same way (off = the prize and the coin appear out of thin air, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Player fees and bets")]
         public bool PlayerTourneyPrizeFromTown { get; set; } = true;
@@ -9104,7 +9108,7 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueMountainRaiders { get; set; } = true;
 
-        [SettingPropertyBool("Prologue Beric Hunt", HintText = "in a Prologue 298 campaign from day 160 Lord Beric Dondarrion (or, without him, the head of House Dondarrion) rides with his men after the Mountain's Men until they are broken or the prologue ends; the lords and bands of the realm leave him alone on the way. Off = no hunt", RequireRestart = false)]
+        [SettingPropertyBool("Prologue Beric Hunt", HintText = "in a Prologue 298 campaign, once the Mountain's Men burn their first village (not before day 160, and on day 168 at the latest even if no village has burned), Lord Beric Dondarrion (or, without him, the head of House Dondarrion) rides with his men after the Mountain's Men until they are broken or the prologue ends; the lords and bands of the realm leave him alone on the way. Off = no hunt", RequireRestart = false)]
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueBericHunt { get; set; } = true;
 
@@ -10504,6 +10508,7 @@ namespace Armoury
             s.QuestRewardInWageDays = QuestRewardInWageDays;
             s.QuestPlayerPaysSomeone = QuestPlayerPaysSomeone;
             s.QuestGoodsReal = QuestGoodsReal;
+            s.QuestGangAxesFix = QuestGangAxesFix;
             s.PlayerTourneyPrizeFromTown = PlayerTourneyPrizeFromTown;
             s.PlayerBetsCounterparty = PlayerBetsCounterparty;
             s.PlayerFeesHistorical = PlayerFeesHistorical;

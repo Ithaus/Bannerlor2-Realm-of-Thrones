@@ -127,6 +127,8 @@ namespace Armoury
         public static int OldAvg(object issue)
         {
             int avg = (int)_fAvg.GetValue(issue);
+            // m105-drobne (T-4): srednia 0 (sprawa zepsuta przez gre - QuestGangAxes) - naprawa przed dzieleniem 20000 / srednia; bez naprawy - wartosc gry jak dotad
+            if (avg <= 0 && QuestGangAxes.RepairLate(issue)) avg = (int)_fAvg.GetValue(issue);
             if (!On || avg <= 0) return avg;
             try
             {

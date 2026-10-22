@@ -25,13 +25,26 @@ namespace Armoury
     /// (DistrictRaid: ludzie, spichlerz, towar; zlota nie ma - SmallGold.PayRaidLoot wymaga wodza-bohatera).
     /// KONIEC (dzien 188): kazda banda w domu jak banda najazdu Wolnych Ludzi (FreeFolkRaids.Home: bohaterowie-jency uciekaja, lup do wsi zrodla - zloto do jej kiesy,
     /// towar do magazynu - ludzie do puli okregu zrodla, banda rozwiazana). Klucz wylaczony w trakcie - bandy zostaja zwyklymi bandami (bez rozwiazania).
+    /// m105-drobne pkt 1 (test 102, prolog 230: "spalone wsie 0" - E5-8b NIE): rabunek wsi prowadzi regula osada po osadzie (DistrictRaid E7/R1): krok = 1 osada
+    /// (ok. DistrictSettlementPeople ludzi) przy bandzie ponizej RaidDetachmentMen, tempo DevastationPerRaiderDay (0.5) czlowieka na rabusia na dobe, a wies jest Looted
+    /// (= SPALONA w RaiderTick) dopiero po calym kroku. Bandy 20-50 ludzi (po bitwie z milicja 28) potrzebowaly ok. 20 dob na osade, lordowie 1.1-4.5 - Beric (d160)
+    /// rozbijal bande przed koncem pierwszego kroku. Teraz: bandy RaidMinMen-RaidMaxMen (90-130, nie mniej niz RaidDrawMin 60 z puli okregu Harrenhal) - krok ok. 4-6 dob;
+    /// cel (PickRaidTarget) - wies, ktora banda spali najszybciej (droga + szacunek kroku DistrictRaid.StepEstimate), z pierwszenstwem wsi, ktore zdazy spalic do dnia
+    /// RaidBurnBy (186) i bez milicji silniejszej niz RaidMilitiaShare zdrowych ludzi bandy; okreg wypalony (krok nic nie spali) - pominiety. Beric rusza po pierwszej
+    /// spalonej wsi (Prologue.World.Beric.cs). Klucz bez zmian (PrologueMountainRaiders).
     /// </summary>
     internal static partial class Prologue
     {
         private const string MScene = "Gora";
         private const string RaiderClanId = "robber_knights", CleganeClanId = "clan_vlandia_5", RiverlandsId = "riverlands", RiverrunId = "town_V2";
         private const string RaiderName = "The Mountain's Men";
-        private const int RaidFrom = 155, RaidBands = 2, RaidMinMen = 20, RaidMaxMen = 50, RaidRecentDays = 20, RaidSpawnLate = 5;
+        private const int RaidFrom = 155, RaidBands = 2, RaidMinMen = 90, RaidMaxMen = 130, RaidDrawMin = 60, RaidRecentDays = 20, RaidSpawnLate = 5;   // m105-drobne: 20-50 -> 90-130 (min 60)
+        // m105-drobne pkt 1: wybor celu - spalona wies do dnia RaidBurnBy (prog E5-8b), milicja nie wieksza niz RaidMilitiaShare zdrowych ludzi bandy; droga: Speed partii to
+        // jednostki mapy na 1.2 h gry (Campaign.TickMapTime: dt 1 = 4320 s), RaidMoveHours marszu na dobe (noc, postoje - Beric w tescie 102: ok. 45 jedn./dobe);
+        // rabunek gry (regula E7/R1 nieczynna albo wies poza spustoszeniem) - ok. RaidGameDays dob (gra konczy rabunek po ok. 2.4 doby)
+        private const int RaidBurnBy = 186;
+        private const float RaidMilitiaShare = 0.6f, RaidMoveHours = 12f;
+        private const double RaidGameDays = 2.5;
 
         private sealed class Raider
         {
@@ -145,11 +158,26 @@ namespace Armoury
             return best;
         }
 
-        private static Settlement PickRaidTarget(MobileParty mp, Raider self, double day)
+        /// <summary>m105-drobne pkt 1: cel bandy - wies Dorzecza w stanie Normal (nie cel drugiej bandy, nie spalona przez nas w ostatnich RaidRecentDays dniach, okreg nie
+        /// wypalony), ktora banda spali najszybciej: droga (odleglosc / jednostki na dobe) + doby kroku (DistrictRaid.StepEstimate dla zdrowych ludzi bandy; rabunek gry -
+        /// RaidGameDays). Kolejnosc: zdazy do RaidBurnBy i milicja nie wieksza niz RaidMilitiaShare ludzi, potem zdazy z silna milicja, potem nie zdazy (najszybsza - banda
+        /// i tak rabuje, czesc kroku idzie do ksiegi). `est` - szacunek do linii logu ("" - brak celu).</summary>
+        private static Settlement PickRaidTarget(MobileParty mp, Raider self, double day, out string est)
         {
-            Settlement best = null; float bd = float.MaxValue;
+            est = "";
+            Settlement best = null; double bScore = double.MaxValue, bStep = 0.0, bMove = 0.0; int bRank = int.MaxValue; float bMil = 0f; bool bR1 = false; int cand = 0;
             var taken = new HashSet<string>(StringComparer.Ordinal);
             foreach (var r in _mm) if (r != self && r.Target != null) taken.Add(r.Target);
+            int men = Math.Max(1, mp.MemberRoster.TotalHealthyCount);
+            float spd = 0f;
+            try { spd = mp.Speed; } catch { spd = 0f; }
+            // predkosc z kara gry za ludzi ponad limit partii (banda bez bohatera: limit 20 - DefaultPartySizeLimitModel; 110 ludzi = ok. x0.2, dno gry 1 - MinimumSpeed);
+            // chwilowe 0 (postoj, sen) - dno gry
+            if (!(spd >= 1f)) spd = 1f;
+            double perDay = spd / 1.2 * RaidMoveHours;
+            double left = RaidBurnBy - day;
+            string fid = null;
+            try { fid = mp.MapFaction != null ? mp.MapFaction.StringId : null; } catch { fid = null; }
             foreach (var st in Settlement.All)
             {
                 if (st == null || !st.IsVillage || st.Village == null || st.Village.VillageState != Village.VillageStates.Normal) continue;
@@ -157,9 +185,20 @@ namespace Armoury
                 if (taken.Contains(st.StringId)) continue;
                 int when;
                 if (_mmRecent.TryGetValue(st.StringId, out when) && day - when < RaidRecentDays) continue;
-                float d = mp.GetPosition2D.Distance(st.GetPosition2D);
-                if (d < bd) { bd = d; best = st; }
+                double share, step;
+                bool r1 = DistrictRaid.StepEstimate(st.Village, men, out share, out step, fid);
+                if (r1 && !(step > 0.0)) continue;                   // okreg wypalony: krok nic nie spali (Looted bez osady) - to nie bylaby spalona wies
+                if (!r1) step = RaidGameDays;
+                double move = mp.GetPosition2D.Distance(st.GetPosition2D) / perDay;
+                float mil = st.Militia;
+                int rank = (move + step > left ? 2 : 0) + (mil > RaidMilitiaShare * men ? 1 : 0);
+                double score = move + step;
+                cand++;
+                if (rank < bRank || (rank == bRank && score < bScore)) { best = st; bRank = rank; bScore = score; bStep = step; bMove = move; bMil = mil; bR1 = r1; }
             }
+            if (best != null)
+                est = "szac. " + bStep.ToString("0.0", Inv) + " dob na osade (" + (bR1 ? "osada po osadzie" : "rabunek gry") + ", " + men + " zdrowych), droga ok. " + bMove.ToString("0.0", Inv)
+                      + " dob, milicja " + bMil.ToString("0", Inv) + (bRank >= 2 ? ", NIE ZDAZY do d" + RaidBurnBy : "") + ((bRank & 1) == 1 ? ", SILNA MILICJA" : "") + ", kandydatow " + cand;
             return best;
         }
 
@@ -216,15 +255,16 @@ namespace Armoury
             for (int i = _mm.Count; i < RaidBands; i++)
             {
                 string note;
-                var mp = SpawnBand("armoury_prl_mountain", clan, src, region, RaidMinMen + MBRandom.RandomInt(RaidMaxMen - RaidMinMen + 1), RaidMinMen, RaiderName, null, out note);
+                var mp = SpawnBand("armoury_prl_mountain", clan, src, region, RaidMinMen + MBRandom.RandomInt(RaidMaxMen - RaidMinMen + 1), RaidDrawMin, RaiderName, null, out note);
                 _mmNote = note;
                 if (mp == null) { Log.Info(WTag + "ludzie Gory: banda przy " + src.StringId + " NIE powstala - " + note + " (dzien prologu " + D(day) + ")."); break; }
                 var r = new Raider { Id = mp.StringId, Src = src.StringId, Region = region.StringId };
                 _mm.Add(r); _mmSpawned++; _mmMen += mp.MemberRoster.TotalRegulars; made++;
-                var tgt = PickRaidTarget(mp, r, day);
+                string est;
+                var tgt = PickRaidTarget(mp, r, day, out est);
                 r.Target = tgt != null ? tgt.StringId : null;
                 Log.Info(WTag + "ludzie Gory: nowa banda '" + RaiderName + "' (" + mp.StringId + ", klan " + RaiderClanId + ", bez sztandaru) przy "
-                         + src.StringId + " (okreg " + region.StringId + ") - " + note + " | pierwszy cel " + (r.Target ?? "brak") + " (dzien prologu " + D(day) + ").");
+                         + src.StringId + " (okreg " + region.StringId + ") - " + note + " | pierwszy cel " + (r.Target ?? "brak") + (est.Length > 0 ? " (" + est + ")" : "") + " (dzien prologu " + D(day) + ").");
             }
             if (_mm.Count >= RaidBands || day >= RaidFrom + RaidSpawnLate) _mmStarted = true;
         }
@@ -253,10 +293,12 @@ namespace Armoury
             if (bad)
             {
                 r.Raiding = false;
-                var nt = PickRaidTarget(mp, r, day);
+                string est;
+                var nt = PickRaidTarget(mp, r, day, out est);
                 string was = r.Target;
                 r.Target = nt != null ? nt.StringId : null;
-                if (r.Target != was) Log.Info(WTag + "ludzie Gory: " + r.Id + " - nowy cel " + (r.Target ?? "BRAK (zadnej wsi Dorzecza w stanie Normal)") + " (" + Pos(mp, nt) + ", dzien prologu " + D(day) + ").");
+                if (r.Target != was) Log.Info(WTag + "ludzie Gory: " + r.Id + " - nowy cel " + (r.Target ?? "BRAK (zadnej wsi Dorzecza w stanie Normal)") + " (" + Pos(mp, nt) + (est.Length > 0 ? ", " + est : "")
+                                              + ", dzien prologu " + D(day) + ").");
                 tv = nt;
             }
             if (tv == null) return;   // bez celu - zwykla banda do czasu, az ktoras wies wroci do stanu Normal (WorldStep puszcza ja z rejestru)
