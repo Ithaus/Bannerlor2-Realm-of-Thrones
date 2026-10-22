@@ -4137,6 +4137,15 @@ namespace Armoury
         public int LektorGossipDailyChars = 1000;          // most letters of new gossip sent to ElevenLabs in one day (by your computer's calendar); past it the narrator reads only gossip already on your disk until the next day, and tells you so once
         public int LektorGossipReserveChars = 3000;        // letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. The plan is checked once per session; if it cannot be checked, no new gossip is recorded
 
+        // --- Chronicle of Westeros ---
+        // m105-kronika K0 (Chronicle*.cs, plan "## PLAN kronika" F): okna Kroniki z danych arm_kronika_kNN.tsv. Czytane na zywo. Nowe klucze (MCM Jeffa ich nie ma).
+        // ChronicleOfWesteros NIE: brak okien; termy kr: w oknach i w arm_canon_moves sa wtedy falszywe na zawsze (KRONIKA-FORMAT 3.3) - nic nie cofamy, zapisy sie wczytuja.
+        // ChronicleWorldChanges NIE: akcje klasy S (swiat) pominiete z linia logu. ChronicleFullVersions TAK: wiersze wersja=pelna. ChroniclePlayerChoices NIE: opcja bierna.
+        public bool ChronicleOfWesteros = true;           // 117 events from the books and the show come in story windows when their day comes and the world allows them. Off = no Chronicle windows; nothing already done is undone and saves still load
+        public bool ChronicleWorldChanges = true;         // Chronicle events may change the world: deaths, side changes, hidden characters, bands, tasks, gold. Off = windows, relations and renown only
+        public bool ChronicleFullVersions = false;        // 16 big Chronicle events come in their full versions: castle owners, rulers and alliances change. Off = the light versions, which leave these to the game
+        public bool ChroniclePlayerChoices = true;        // Chronicle windows may ask you to choose what you do. Off = the book outcome without asking
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

@@ -673,6 +673,7 @@ namespace Armoury
                     {
                         if (mp == null || !mp.IsActive || mp.MapEvent != null || mp.CurrentSettlement != null) continue;
                         if (Undead.Party(mp) || mp.IsCurrentlyAtSea) continue;
+                        if (Chronicle.NoBounty(mp)) continue;   // m105-kronika B2: banda Kroniki z kolumna list = 0 (KRONIKA-FORMAT 6) - bez listu gonczego
                         int men = mp.Party != null ? mp.Party.NumberOfHealthyMembers : 0;
                         if (men < 5) continue;
                         Vec2 p = mp.GetPosition2D;

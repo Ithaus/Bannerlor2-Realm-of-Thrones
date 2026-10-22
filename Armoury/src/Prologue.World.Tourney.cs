@@ -34,8 +34,7 @@ namespace Armoury
         private static string _thWinner = "", _thWhy = "", _thHow = "";
         private static readonly HashSet<string> _thMoved = new HashSet<string>(StringComparer.Ordinal);   // przeniesieni do miasta (bez druzyny) - raz
         private static bool _thHeroesSent;    // sesja: uczestnicy kanonu podani GrandTourney (po wczytaniu - ponownie)
-        private static bool _gtTried;
-        private static MethodInfo _gtProclaim, _gtSetHeroes;
+        private static MethodInfo _gtProclaim, _gtSetHeroes;   // m105-kronika B2: kopia z StoryActions (odbicie GrandTourney przeniesione 1:1, wspolne z akcja tourney Kroniki)
 
         private static void ResetTourney()
         {
@@ -69,21 +68,10 @@ namespace Armoury
 
         private static bool GtReady()
         {
-            if (!_gtTried)
-            {
-                _gtTried = true;
-                try
-                {
-                    var t = AccessTools.TypeByName("GrandTourney.CanonApi");
-                    if (t != null)
-                    {
-                        _gtProclaim = t.GetMethod("ProclaimRoyal", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), typeof(string[]) }, null);
-                        _gtSetHeroes = t.GetMethod("SetHeroes", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), typeof(string[]) }, null);
-                    }
-                }
-                catch (Exception e) { WStumble("GtReady", e); }
-            }
-            return _gtProclaim != null && _gtSetHeroes != null;
+            bool ok = StoryActions.GtReady(WStumble);   // B2: ta sama proba odbicia raz na proces (StoryActions), potkniecie w liczniku scen prologu
+            _gtProclaim = StoryActions.GtProclaim;
+            _gtSetHeroes = StoryActions.GtSetHeroes;
+            return ok;
         }
 
         private static void TourneyStep(double day, bool daily)

@@ -115,6 +115,15 @@ namespace Armoury
             return Math.Max(0.25f, Math.Min(6f, k));
         }
 
+        /// <summary>m105-kronika (K0, term cw:reach / cw:dorne; tylko odczyt, logika straznika bez zmian): straznik trzyma sojusz korona-Reach (reach) albo nasz
+        /// pakt korona-Dorne (dorne). never = juz nie bedzie: straznik zakonczony (najazd Daenerys) albo kampania poza zakresem (stary zapis bez znacznika).</summary>
+        internal static bool CrownGuardHolds(string which, out bool never)
+        {
+            never = _crownEnded || !CanonHere;
+            if (never) return false;
+            return which == "reach" ? _rcHeld : which == "dorne" && _cdOurs;
+        }
+
         /// <summary>Dzien opowiesci najazdu Daenerys na osi Fabuli (450 x skala; przy 4.33 - 1948.5).</summary>
         internal static float DanyInvasionDay() { return DanyInvasionRotDay * StoryScale(); }
 

@@ -9200,6 +9200,22 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public int LektorGossipReserveChars { get; set; } = 3000;
 
+        [SettingPropertyBool("Chronicle Of Westeros", HintText = "117 events from the books and the show come in story windows when their day comes and the world allows them. Off = no Chronicle windows; nothing already done is undone and saves still load", RequireRestart = false)]
+        [SettingPropertyGroup("Chronicle of Westeros")]
+        public bool ChronicleOfWesteros { get; set; } = true;
+
+        [SettingPropertyBool("Chronicle World Changes", HintText = "Chronicle events may change the world: deaths, side changes, hidden characters, bands, tasks, gold. Off = windows, relations and renown only", RequireRestart = false)]
+        [SettingPropertyGroup("Chronicle of Westeros")]
+        public bool ChronicleWorldChanges { get; set; } = true;
+
+        [SettingPropertyBool("Chronicle Full Versions", HintText = "16 big Chronicle events come in their full versions: castle owners, rulers and alliances change. Off = the light versions, which leave these to the game", RequireRestart = false)]
+        [SettingPropertyGroup("Chronicle of Westeros")]
+        public bool ChronicleFullVersions { get; set; } = false;
+
+        [SettingPropertyBool("Chronicle Player Choices", HintText = "Chronicle windows may ask you to choose what you do. Off = the book outcome without asking", RequireRestart = false)]
+        [SettingPropertyGroup("Chronicle of Westeros")]
+        public bool ChroniclePlayerChoices { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -11499,6 +11515,10 @@ namespace Armoury
             s.LektorGossipLive = LektorGossipLive;
             s.LektorGossipDailyChars = LektorGossipDailyChars;
             s.LektorGossipReserveChars = LektorGossipReserveChars;
+            s.ChronicleOfWesteros = ChronicleOfWesteros;
+            s.ChronicleWorldChanges = ChronicleWorldChanges;
+            s.ChronicleFullVersions = ChronicleFullVersions;
+            s.ChroniclePlayerChoices = ChroniclePlayerChoices;
         }
 
         internal static void Apply()

@@ -455,6 +455,14 @@ namespace Armoury
                 try { StoryTick(); }
                 catch (Exception e) { _storyTickFails++; Log.Error("Prologue.Scenes: straznik nie laduje sie (proba " + _storyTickFails + "/3)", e); }
             }
+            // m105-kronika K0: straznik okien i list wyboru Kroniki Westeros (4 razy na sekunde, obok scen prologu; bez kampanii, bez okien w kolejce albo przy kluczu
+            // Chronicle Of Westeros NIE - od razu wyjscie; wlasny try w srodku) - tu tylko blad ladowania typu, liczony; po 3 straznik nie startuje do konca sesji.
+            // PRZED returnem wiosek - inaczej klucz Map Villages = off wylaczylby Kronike.
+            if (_chronicleTickFails < 3)
+            {
+                try { ChronicleTick(); }
+                catch (Exception e) { _chronicleTickFails++; Log.Error("Chronicle.AppTick: straznik nie laduje sie (proba " + _chronicleTickFails + "/3)", e); }
+            }
             // m103-lektor: lektor - koniec klipu, kontrola 0,5 s, straznik okna, wyniki watku nagran plotek (wlasny try w srodku, nic nie gra - od razu wyjscie);
             // tu tylko blad ladowania typu, liczony (po 3 lektor nie startuje do konca sesji, gra bez zmian)
             if (_lektorFails < 3)
@@ -506,6 +514,14 @@ namespace Armoury
             MapChatLog.AppTick(dt);
         }
 
+        private static int _chronicleTickFails;   // m105-kronika: blad ladowania typu straznika Kroniki (Chronicle.AppTick)
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void ChronicleTick()
+        {
+            Chronicle.AppTick();
+        }
+
         /// <summary>m103-sceny: wyjscie z kampanii - okno opowiesci zerowane, obrazki z plikow zwolnione od razu (StoryPictures.ReleaseAll).</summary>
         public override void OnGameEnd(Game game)
         {
@@ -513,6 +529,7 @@ namespace Armoury
             try { RotWindowPictures.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (obrazki okien ROT)", e); }
             try { Prologue.ScenesGameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (sceny prologu, obrazki)", e); }
             try { MapChatLog.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (dziennik m105)", e); }   // m105-dziennik: linia kampanii i test od nowa
+            try { Chronicle.GameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (Kronika Westeros)", e); }   // m105-kronika: stan kampanii Kroniki od zera
         }
         private static int _lektorFails;    // m103-lektor: blad ladowania typu lektora (Lektor.AppTick)
 
@@ -667,6 +684,7 @@ namespace Armoury
                 starter.AddBehavior(new CanonCompanionsBehavior()); // m101-postacie: postacie kanonu do rodow, usuniete, zmiany stron (flaga arm_canon_companions, tylko nowa kampania)
                 starter.AddBehavior(new PrologueBehavior());        // m101-prolog: wybor startu w zapisie (arm_prologue), zdarzenia prologu 298
                 starter.AddBehavior(new CanonWarsBehavior());       // m104-wojny: wojny wedlug ksiazki - Essos na kalendarzu, Reach i Dorne z korona, smoki Daenerys (zapis arm_m104)
+                starter.AddBehavior(new ChronicleBehavior());       // m105-kronika K0: Kronika Westeros - okna z arm_kronika_kNN.tsv (zapis arm_kronika); PO CanonCompanions (doba po dobie postaci kanonu)
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

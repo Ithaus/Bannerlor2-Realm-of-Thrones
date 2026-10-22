@@ -1,0 +1,28 @@
+# Kronika Westeros - tematy obrazkow okien (docs/KRONIKA-FORMAT.md rozdz. 14; plan P8). Czyta Chronicle.Pictures (K0) i tools/kronika/kronika_check.py.
+# Pula tematu = pliki Images/Kronika/kronika_<temat>_<n>.png|jpg (jesli sa) + Images/Prolog/prolog_NN z kolumny prolog (jesli plik istnieje) + sprite'y ROT z kolumny sprite.
+# Wybor obrazka: staly skrot klucza okna mod n; gdy wypada ten sam co w poprzednim oknie sesji - nastepny. Bez promptow i bez pracy Jeffa.
+# Poza rotacja (nie wpisywac): event-bg, BlackwaterWarning, Davos, Stannis, Ship1, Ship2, testevent, jonsnowres (= jon_rez), RobbMarching (= robb), jon_death, ramsay_death.
+# stannis-slain tylko w temacie stannis_upadek (kolumna tylko = 081). Kolumna tylko: numery wydarzen NNN po przecinku; puste = wszystkie okna.
+# Nazwa tematu: male litery i _ (czesc nazwy pliku). sprite: nazwy z ROT-ContentSpriteData.xml (ui_event_category), po przecinku. prolog: numery 01-23.
+#temat	temat	sprite	prolog	tylko	opis
+dwor	kingslanding,StannisIronThrone,joffrey	01,06,11,12,15,17,20,23		Krolewska Przystan, dwor, sala tronowa, mala rada, turnieje
+intryga	messenger-1,messenger-2,messenger-img,joffrey	12,16		listy, kruki, szepty, spiski, wiesci z daleka
+oblezenie	blackwater,harrenhal,wallfall,eastwatch	19		mury i bramy, szturm, obrona twierdzy, glod w oblezeniu
+wojna	RobbMarching2,RobbMarching3,robb,jon_stand	09		armie w marszu, zbiorki, rady wojenne, kampanie
+bitwa	RobbMarching3,blackwater,WildlingsFail,jon_stand	09		starcie w polu, rzez, poscig
+polnoc	robb,RobbMarching2,ned_stark,robb_stark	02,04,05,06,07,08		Winterfell, Starkowie, lordowie Polnocy
+mur	jon,jonsnow,eastwatch,jeor	07,10		Czarny Zamek, Nocna Straz, Mur
+za_murem	freefolk1,freefolk2,fist,WildlingsFail	10		Wolni Ludzie, Piesc Pierwszych Ludzi, zwiad, nawiedzony las
+inni	nightking,freefolk3,wallfall,fist			Inni, umarli, Dluga Noc
+zima	freefolk3,fist,eastwatch,jon_stand			zima, snieg i mroz, glod zimowy, biale kruki z Cytadeli
+zaswiaty	melisandre,jon_rez,nightking			wizje, czary, ogien R'hllora, powrot zza grobu, trojoka wrona
+smocza_skala	melisandre,StannisSetsSail,StannisIronThrone			Stannis, Melisandre, Davos, Smocza Skala
+boltonowie	ramsay,roose_bolton			Boltonowie, Dreadfort, Ramsay
+essos	dany_invasion,traveling_merchant	03,18,21		Daenerys, Zatoka Niewolnicza, Wolne Miasta, Dothrakowie (slabo: 2 sprite'y ROT)
+morze	StannisSetsSail,aegon			floty, Zelazne Wyspy, Braavos, rejsy i desanty, Aegon
+dorne	messenger-1,messenger-2,kingslanding			Dorne, Martellowie, Piaskowe Zmije (w ROT brak sprite'a Dorne - listy i dwor)
+dolina	harrenhal,messenger-img	14,16		Dolina Arryn, Orle Gniazdo, Wysoka Droga (w ROT brak sprite'a Doliny)
+dorzecze	riverlands,harrenhal,messenger-img	13,19,20		Dorzecze, Riverrun, Harrenhal, Bractwo bez Choragwi, karczmy przy traktach
+smierc	renly-slain,rickard,jeor,ramsay	08,22		smierc, egzekucja, zamach, pogrzeb
+wesele	traveling_merchant,robb_stark	04		sluby, uczty, gody, Blizniaki
+stannis_upadek	stannis-slain		081	tylko nr 81 Koniec Stannisa (P8)
