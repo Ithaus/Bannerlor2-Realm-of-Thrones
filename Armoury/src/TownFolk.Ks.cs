@@ -96,6 +96,15 @@ namespace Armoury
             public bool CapOn, NoCap, InF2; public double Cap, CapPcs, CapZl, GsPaid;
             // recenzja W1: przyciete rzeczy (szczebel 2 - przedza, len, filc, skora, narzedzia, garnki, tran, futra; szt.), narzedzia drabiny 1 kupione i przyciete (szt.)
             public double CapPcs2, ToolsGot, ToolsCut;
+            // m105 gosp4 (czesc 4, segment linii ZC4): kcal i zl jedzenia drabiny 1 po ziarnie i soli (G1 - kcal na 1 zl)
+            public double K1Kcal, K1Zl;
+            // m105 gosp4 G2 (Ks Village Grain Spike From Surplus): wies DS ponad skrzynia - skok ceny ziarna i soli ponad cene Planu z nadwyzki (zostalo w tempie kroku 5, zaplacone)
+            public bool Spike; public double SpikeRoom, SpikePaid;
+            // m105 gosp4 G3 (Ks Village Own Grain First): ziarno i sol ponad reszte budzetu najpierw z magazynu wsi - sztuki wedlug pozycji (polowa towaru liczona razem z G3 po
+            // drabinie), kcal, sztuki i wartosc przy cenie polki (linia)
+            public bool OwnGs; public int[] OwnEarly; public double OwnK, OwnPcs, OwnZl;
+            // m105 gosp4 G4 (Ks Village Chest Refill): wies DS ponizej skrzyni - kwota odlozona z budzetu reszty drabiny (zl), naprawde odjeta (-1: wies nie ponizej skrzyni)
+            public double Refill, RefillCut = -1;
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -215,13 +224,77 @@ namespace Armoury
             b.T.ChangeGold(paid);
             b.R.AddToCounts(e, -k);
             b.Spent += paid; b.Pcs += k; b.Got += k; b.Rg[rung] += k;
-            if (b.CapOn) { b.Cap -= paid; if (b.NoCap) b.GsPaid += paid; }   // m103 wsie: ziarno i sol tez z budzetu (ponad budzet - z oszczednosci)
+            if (b.CapOn)
+            {
+                // m103 wsie: ziarno i sol tez z budzetu (ponad budzet - z oszczednosci). m105 gosp4 G2: ziarno i sol obciazaja budzet najwyzej po cenie Planu - roznice placi
+                // nadwyzka ponad skrzynie (SpikeRoom); bez nadwyzki (albo klucz NIE) - jak dotad
+                double fromS = b.NoCap && b.Spike && b.SpikeRoom >= 0.5 ? SpikeFrom(b, z, k, paid) : 0.0;
+                b.Cap -= paid - fromS; if (b.NoCap) b.GsPaid += paid - fromS;
+            }
             if (b.CapOn && z == StartCalibration.ZTools && (count || b.InF2)) b.ToolsGot += k;   // recenzja W1: narzedzia drabiny 1 (segment linii ZC4)
+            if (b.CapOn && b.P1 && !b.NoCap && KsBasket.Kcal[z] > 0) { b.K1Kcal += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.K1Zl += paid; }   // m105 gosp4: jedzenie po ziarnie i soli (G1, linia)
             b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
             b.D.VBuy += paid; b.D.VPieces += k;
             if (b.P1) StartCalibration.Zc4NotePass1Zl(b.Mk, paid);        // recenzja runda 3: wartosc kupiona drabiny 1 (NKS-13)
             NoteVillBought(b.Mk, e.Item.ItemCategory, paid);
             return k;
+        }
+
+        /// <summary>m105 gosp4 G2 (Ks Village Grain Spike From Surplus): z k sztuk ziarna albo soli zaplaconych `paid` - czesc ponad cene Planu (StartCalibration.ZPlanPrice miasta
+        /// zakupu) placi nadwyzka ponad skrzynie, najwyzej to, co z niej zostalo na ten zakup (SpikeRoom). Zwraca zl z nadwyzki (budzet z wplywu obciaza reszta). Nie rzuca.</summary>
+        private static double SpikeFrom(ZcBuy b, int z, int k, int paid)
+        {
+            try
+            {
+                double pp = StartCalibration.ZPlanPrice(b.T, z);
+                if (!(pp > 0) || k <= 0) return 0.0;
+                double over = paid - k * pp;
+                if (!(over > 0)) return 0.0;
+                double t = Math.Min(b.SpikeRoom, over);
+                b.SpikeRoom -= t; b.SpikePaid += t;
+                return t;
+            }
+            catch (Exception e) { Stumble("Zc4BuyVillage(skok ceny z nadwyzki)", e); return 0.0; }
+        }
+
+        /// <summary>m105 gosp4 G2: nadwyzka wsi DS na skok ceny ziarna i soli w tym zakupie - w tempie kroku 5: lam x rampa DS x (kiesa - skrzynia) / DsSurplusSpendDays (lam =
+        /// lambda x doby zakupu, jak budzet W1). Wies nie DS, na skrzyni albo ponizej, rampa 0, DsSurplusSpendDays 0 - bez nadwyzki (placi jak dotad). Nie rzuca.</summary>
+        private static void SpikeRoomOf(ZcBuy b, Village vil, double lam)
+        {
+            b.Spike = false; b.SpikeRoom = 0; b.SpikePaid = 0;
+            try
+            {
+                var st = vil != null ? vil.Settlement : null;
+                if (st == null || !DsVillage.On(st)) return;
+                int sd = DsVillage.SpendDaysNow; double ramp = DsVillage.Ramp;
+                if (sd <= 0 || !(ramp > 0) || !(lam > 0)) return;
+                double over = vil.Gold - DsVillage.Chest(vil);
+                if (!(over >= 1)) return;
+                double r = lam * ramp * over / sd;
+                if (!(r >= 0.5) || double.IsInfinity(r)) return;
+                b.Spike = true; b.SpikeRoom = r;
+            }
+            catch (Exception e) { Stumble("Zc4BuyVillage(nadwyzka na skok ceny)", e); b.Spike = false; b.SpikeRoom = 0; }
+        }
+
+        /// <summary>m105 gosp4 G4 (Ks Village Chest Refill; n32: 73 wsie W i 31 E ponizej skrzyni wydawaly caly budzet z wplywu): wies DS z kiesa ponizej skrzyni odklada
+        /// lam x (skrzynia - kiesa) / DsVillageChestDays z budzetu reszty drabiny (po ziarnie i soli - ZcLadder; najwyzej polowa tej reszty). Wies nie DS, na skrzyni albo ponad,
+        /// DsVillageChestDays 0 - bez odkladania (RefillCut -1). Nie rzuca.</summary>
+        private static void ChestRefillOf(ZcBuy b, Village vil, double lam)
+        {
+            try
+            {
+                var st = vil != null ? vil.Settlement : null;
+                if (st == null || !DsVillage.On(st) || !(lam > 0)) return;
+                int cd = DsVillage.ChestDaysNow;
+                if (cd <= 0) return;
+                double gap = DsVillage.Chest(vil) - vil.Gold;
+                if (!(gap >= 1)) return;
+                double r = lam * gap / cd;
+                if (!(r > 0) || double.IsInfinity(r)) return;
+                b.Refill = r; b.RefillCut = 0;
+            }
+            catch (Exception e) { Stumble("Zc4BuyVillage(skrzynia z budzetu)", e); b.Refill = 0; b.RefillCut = -1; }
         }
 
         /// <summary>m103 wsie (Ks Village Basket At Shelf): c sztuk towaru z przycietych budzetem z biezacego wplywu (cena pw za sztuke) - liczone tylko przy pozycji koszyka
@@ -349,15 +422,24 @@ namespace Armoury
             // m103 wsie (klucz Ks Village Basket At Shelf): budzet drabiny 1 z biezacego wplywu (ShelfBudget) - tylko drabina 1 koszyka zaplaconego z Planu
             double shC = 0, shB = 0, shPlan = 0, shNet = -1;
             if (qp != null && StartCalibration.SwBasketAtShelf && ShelfBudget(b, vil, n, lam, budgetDay, out shC, out shB, out shPlan, out shNet))
-            { b.CapOn = true; b.Cap = shB; b.CapPcs = b.CapZl = b.GsPaid = b.CapPcs2 = b.ToolsGot = b.ToolsCut = 0; }
+            { b.CapOn = true; b.Cap = shB; b.CapPcs = b.CapZl = b.GsPaid = b.CapPcs2 = b.ToolsGot = b.ToolsCut = 0; b.K1Kcal = b.K1Zl = 0; }
+            if (b.CapOn && StartCalibration.SwGrainSpike) SpikeRoomOf(b, vil, lam);     // m105 gosp4 G2: kiesa przed zakupem (jak skrzynia kroku 5)
+            b.OwnGs = b.CapOn && StartCalibration.SwOwnGrainFirst && StartCalibration.SwOwnFirst; b.OwnEarly = null; b.OwnK = b.OwnPcs = b.OwnZl = 0;   // m105 gosp4 G3
+            b.Refill = 0; b.RefillCut = -1;
+            if (b.CapOn && StartCalibration.SwChestRefill) ChestRefillOf(b, vil, lam);   // m105 gosp4 G4: kiesa przed zakupem
             try { ZcLadder(b, vil, mk, n, resGS); }
             finally
             {
                 // recenzja W1: narzedzia drabiny 1 - chciane, kupione (z miastami obok), przyciete, bez towaru po miastach obok (w granicy budzetu)
                 int zt = StartCalibration.ZTools;
-                if (b.CapOn) StartCalibration.Zc4NoteShelf(mk, shC, shB, shPlan, shNet, b.CapZl, b.CapPcs, Math.Max(0.0, b.GsPaid - shB),
-                                                           b.CapPcs2, zt < n.Length ? n[zt] : 0, b.ToolsGot, b.ToolsCut, zt < b.Miss.Length ? b.Miss[zt] : 0);
-                b.CapOn = false; b.NoCap = false; b.InF2 = false;
+                if (b.CapOn)
+                {
+                    StartCalibration.Zc4NoteShelf(mk, shC, shB, shPlan, shNet, b.CapZl, b.CapPcs, Math.Max(0.0, b.GsPaid - shB),
+                                                  b.CapPcs2, zt < n.Length ? n[zt] : 0, b.ToolsGot, b.ToolsCut, zt < b.Miss.Length ? b.Miss[zt] : 0);
+                    StartCalibration.Zc4NoteM105(mk, b.K1Kcal, b.K1Zl, b.SpikePaid, b.OwnPcs, b.OwnZl, b.RefillCut);   // m105 gosp4: segment linii ZC4
+                    if (b.SpikePaid > 0) DsVillage.SpikeNote(vil.Settlement, b.SpikePaid);     // m105 gosp4 G2: krok 5 tej i nastepnych dob mniej o to samo
+                }
+                b.CapOn = false; b.NoCap = false; b.InF2 = false; b.Spike = false; b.SpikeRoom = 0;
             }
             b.P1 = false;
             if (qp != null)
@@ -432,10 +514,12 @@ namespace Armoury
                 {
                     double paidK = 0;
                     for (int z = 0; z < NZq && z < qp.Length; z++) if (qp[z] > 0 && KsBasket.Kcal[z] > 0) paidK += Math.Min(q[z], qp[z]) * lam * StartCalibration.ZKg(z) * KsBasket.Kcal[z];
-                    double shortK = paidK - b.KcalG, kr = 0;
+                    // m105 gosp4 G3: brak kcal juz bez zjedzonego z magazynu przed zakupem ziarna i soli (OwnK; klucz NIE - 0, jak dotad)
+                    double shortK = paidK - b.KcalG - b.OwnK, kr = 0; long krPcs = 0;
                     int[] own = shortK > 0 ? new int[NZq] : null;   // f14-rynek (recenzja): sztuki zjedzone swoje wedlug pozycji koszyka
-                    if (shortK > 0) kr = OwnFirst(vil, shortK, b.KcalW, own);
-                    StartCalibration.KsOwnDay(vil, kr, days);
+                    if (shortK > 0) kr = OwnFirst(vil, shortK, own, b.OwnEarly, out krPcs);
+                    if (kr + b.OwnK > 0) StartCalibration.KsOwnEaten(vil, kr + b.OwnK, krPcs + (long)b.OwnPcs, b.KcalW);   // racje spichlerza i linia "KS: wies je swoje"
+                    StartCalibration.KsOwnDay(vil, kr + b.OwnK, days);
                     // f14-rynek (recenzja, Ks Ctl Own Food): brak drabiny 1 pokryty swoim tym samym towarem - sterowanie rynku nie liczy go drugi raz jako brak
                     StartCalibration.KsOwnCovered(vil, mk, b.Miss, own, days);
                 }
@@ -482,12 +566,15 @@ namespace Armoury
                                                    StartCalibration.ZDate, StartCalibration.ZOlives, StartCalibration.ZGrape, StartCalibration.ZApple, StartCalibration.ZCarrot, StartCalibration.ZOrange, StartCalibration.ZHoney };
 
         /// <summary>G3: wies je z magazynu (towar czekajacy na woz) do braku kcal: ziarno, potem wlasne jedzenie wedlug kcal, najwyzej polowa kazdego towaru.
-        /// own (moze byc null) - sztuki zjedzone wedlug pozycji koszyka (f14-rynek, sterowanie rynku).</summary>
-        private static double OwnFirst(Village vil, double shortK, double basketK, int[] own)
+        /// own (moze byc null) - sztuki zjedzone wedlug pozycji koszyka (f14-rynek, sterowanie rynku). m105 gosp4 G3: early (moze byc null) - sztuki zjedzone juz przed zakupem
+        /// ziarna i soli (ZcOwnGs) - polowa towaru liczona razem z nimi (najwyzej polowa na zakup, jak dotad). pcs - sztuki zjedzone tu. Licznik KsOwnEaten u wolajacego (raz na
+        /// zakup, z zjedzonym przed zakupem).</summary>
+        private static double OwnFirst(Village vil, double shortK, int[] own, int[] early, out long pcs)
         {
+            pcs = 0;
             var st = vil.Settlement; var ro = st != null ? st.ItemRoster : null;
             if (ro == null || !(shortK > 0)) return 0;
-            double kr = 0; long pcs = 0;
+            double kr = 0;
             var gf = GoodsLedger.Begin(GoodsLedger.FKsOwn, vil);
             try
             {
@@ -497,7 +584,8 @@ namespace Armoury
                     var it = StartCalibration.ZItem(z); if (it == null) continue;
                     double kc = StartCalibration.ZKg(z) * KsBasket.Kcal[z]; if (!(kc > 0)) continue;
                     int have = ro.GetItemNumber(it);
-                    int cap = have / 2;
+                    int e0 = early != null && z >= 0 && z < early.Length ? early[z] : 0;
+                    int cap = (have + e0) / 2 - e0;
                     if (cap <= 0) continue;
                     int k = (int)Math.Min(cap, Math.Ceiling(shortK / kc));
                     if (k <= 0) continue;
@@ -509,8 +597,74 @@ namespace Armoury
                 }
             }
             finally { GoodsLedger.End(gf); }
-            if (kr > 0) StartCalibration.KsOwnEaten(vil, kr, pcs, basketK);
             return kr;
+        }
+
+        /// <summary>
+        /// m105 gosp4 G3 (klucz Ks Village Own Grain First, z Ks Own Food First i budzetem W1; n32: ziarno i sol ponad budzet 6.4 tys. zl/d z oszczednosci, a wsie W i E
+        /// produkujace zywnosc maja ziarno czekajace na woz): ziarno albo sol (z), na ktore nie starcza reszty budzetu z wplywu (przy G2 - z nadwyzka na skok ceny), wies bierze
+        /// najpierw z wlasnego magazynu (towar czekajacy na woz; najwyzej polowa towaru na zakup - razem z G3 po drabinie), z oszczednosci kupuje tylko reszte. Zjedzone liczy
+        /// sie w chcianych drabiny 1 (Want, kcal i wartosc chciane - jak kupione) i jako "z magazynu" (KsOwnEaten u wolajacego). Ksiega towarow: ramka FKsOwn (jak G3).
+        /// Zwraca sztuki zjedzone (wolajacy kupuje n - zwrot). Nie rzuca.
+        /// </summary>
+        private static int ZcOwnGs(ZcBuy b, Village vil, int z, int n)
+        {
+            if (n <= 0 || vil == null) return 0;
+            try
+            {
+                EquipmentElement e; int have;
+                int price = ZcPrice(b, z, out e, out have);
+                int pw = price; if (pw <= 0) { var iw = StartCalibration.ZItem(z); pw = iw != null ? Math.Max(1, iw.Value) : 0; }
+                if (pw <= 0) return 0;
+                int excess = n - GsAfford(b, z, pw);
+                if (excess <= 0) return 0;
+                if (b.OwnEarly == null) b.OwnEarly = new int[StartCalibration.ZN];
+                int took = OwnTake(vil, z, excess, b.OwnEarly);
+                if (took <= 0) return 0;
+                double kc = took * StartCalibration.ZKg(z) * KsBasket.Kcal[z];
+                b.Want += took; b.Rw[0] += took; b.KcalW += kc; b.ZlW += (double)took * pw;   // chciane drabiny 1 jak przy zakupie (ZcTake count)
+                b.OwnK += kc; b.OwnPcs += took; b.OwnZl += (double)took * pw;
+                return took;
+            }
+            catch (Exception ex) { Stumble("Zc4BuyVillage(swoje ziarno przed oszczednosciami)", ex); return 0; }
+        }
+
+        /// <summary>m105 gosp4 G3: ile sztuk ziarna albo soli (cena polki pw) pokryje reszta budzetu z wplywu - przy G2 (nadwyzka na skok ceny) budzet obciaza najwyzej cena Planu,
+        /// dopoki starcza nadwyzki (ta sama regula co ZcTake / SpikeFrom).</summary>
+        private static int GsAfford(ZcBuy b, int z, int pw)
+        {
+            double cap = Math.Max(0.0, b.Cap);
+            double k = cap / pw;
+            if (b.Spike && b.SpikeRoom >= 0.5)
+            {
+                double pp = StartCalibration.ZPlanPrice(b.T, z);
+                if (pp > 0 && pp < pw)
+                {
+                    double kA = cap / pp, kB = b.SpikeRoom / (pw - pp);
+                    k = kA <= kB ? kA : (cap + b.SpikeRoom) / pw;
+                }
+            }
+            return k >= int.MaxValue ? int.MaxValue : (int)Math.Floor(Math.Max(0.0, k));
+        }
+
+        /// <summary>m105 gosp4 G3: zdejmuje z magazynu wsi najwyzej `want` sztuk towaru z (najwyzej polowa towaru razem z tym, co juz zjedzone w tym zakupie - early), ramka ksiegi
+        /// towarow FKsOwn (ujscie "wies je wlasny towar (KS)", bez zlota). Zwraca zdjete sztuki (dopisuje do early).</summary>
+        private static int OwnTake(Village vil, int z, int want, int[] early)
+        {
+            var st = vil.Settlement; var ro = st != null ? st.ItemRoster : null;
+            var it = StartCalibration.ZItem(z);
+            if (ro == null || it == null || want <= 0 || early == null || z < 0 || z >= early.Length) return 0;
+            int have = ro.GetItemNumber(it);
+            int cap = (have + early[z]) / 2 - early[z];
+            int k = Math.Min(cap, want);
+            if (k <= 0) return 0;
+            int took;
+            var gf = GoodsLedger.Begin(GoodsLedger.FKsOwn, vil);
+            try { ro.AddToCounts(it, -k); took = have - ro.GetItemNumber(it); }
+            finally { GoodsLedger.End(gf); }
+            if (took <= 0) return 0;
+            early[z] += took;
+            return took;
         }
 
         /// <summary>Drabina zakupow wsi (jedna przejscie): ziarno i sol, napoj (najtanszy za litr; brak wina - piwo, brak piwa - ziarno na piwo domowe), bialko (najtansze
@@ -520,43 +674,35 @@ namespace Armoury
             var done = new bool[StartCalibration.ZN];
             // (1) przetrwanie: ziarno, sol
             b.Lim = 0; b.NoCap = true;                                           // m103 wsie: ziarno i sol poza budzetem z wplywu (glod)
-            ZcTake(b, StartCalibration.ZGrain, n[StartCalibration.ZGrain], 0); done[StartCalibration.ZGrain] = true;
-            ZcTake(b, StartCalibration.ZSalt, n[StartCalibration.ZSalt], 0); done[StartCalibration.ZSalt] = true;
+            // m105 gosp4 G3 (Ks Village Own Grain First): czesc, na ktora nie starcza reszty budzetu, najpierw z wlasnego magazynu (klucz NIE - OwnGs falsz, jak dotad)
+            int ng = n[StartCalibration.ZGrain]; if (b.OwnGs) ng -= ZcOwnGs(b, vil, StartCalibration.ZGrain, ng);
+            ZcTake(b, StartCalibration.ZGrain, ng, 0); done[StartCalibration.ZGrain] = true;
+            int ns = n[StartCalibration.ZSalt]; if (b.OwnGs) ns -= ZcOwnGs(b, vil, StartCalibration.ZSalt, ns);
+            ZcTake(b, StartCalibration.ZSalt, ns, 0); done[StartCalibration.ZSalt] = true;
             b.Lim = lim; b.NoCap = false;
-            // (2) napoj - najtanszy za litr najpierw; brak wina -> piwo, brak piwa -> ziarno na piwo domowe (0.4 kg na litr)
-            var dr = new List<int>(ZcDrinks);
-            var unit = new double[StartCalibration.ZN];
-            foreach (int z in dr) { EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h); unit[z] = p > 0 && h > 0 ? p / StartCalibration.ZKg(z) : double.MaxValue; }
-            dr.Sort((x, y) => unit[x].CompareTo(unit[y]));
-            var un = new int[StartCalibration.ZN];
-            foreach (int z in dr) { un[z] = n[z] - ZcTake(b, z, n[z], 1); done[z] = true; }
-            // recenzja 17.10 (wazne): napoj zastepczy zmniejsza brak do szukania w miastach obok (dotad F2 kupowalo tam jeszcze raz to samo piwo i wino - wies placila
-            // dwa razy za jedna potrzebe napoju)
-            if (un[StartCalibration.ZWine] > 0)
+            // m105 gosp4 G4 (Ks Village Chest Refill): wies ponizej skrzyni - budzet reszty drabiny mniejszy o czesc braku skrzyni (ziarno i sol wyzej nietkniete); pieniadz zostaje w kiesie.
+            // Recenzja ekonomii R1: najwyzej polowa reszty budzetu po ziarnie i soli (dotad przy braku skrzyni ponad ok. polowe G4 zabieral cala reszte - ryby, napoje, owoce,
+            // rzeczy - do zapelnienia skrzyni); powoli, z biezacego zysku - wies dalej je reszte drabiny za druga polowe
+            if (b.CapOn && b.Refill > 0) { double c = Math.Min(b.Refill, 0.5 * Math.Max(0.0, b.Cap)); b.Cap -= c; b.RefillCut = c; }
+            // m105 gosp4 G1 (klucz Ks Village Cheap Kcal First, tylko z budzetem W1): napoje, bialko i reszta jedzenia jedna lista wedlug zl za 1000 kcal przy cenie polki doby
+            // (bez towaru na koncu), zamiana wino -> piwo -> piwo domowe po przejsciu (ten sam budzet); rzeczy jak dotad po calym jedzeniu (4). Plan (KsBasket.Rungs) bez zmian.
+            if (b.CapOn && StartCalibration.SwCheapKcalFirst) ZcCheapKcal(b, n, done);
+            else
             {
-                int bw = ZcTake(b, StartCalibration.ZBeer, un[StartCalibration.ZWine], 1, false);
-                un[StartCalibration.ZBeer] += un[StartCalibration.ZWine] - bw;
-                MissCovered(b, StartCalibration.ZWine, bw);
-                un[StartCalibration.ZWine] = 0;
+                // (2) napoj - najtanszy za litr najpierw; brak wina -> piwo, brak piwa -> ziarno na piwo domowe (0.4 kg na litr)
+                var dr = new List<int>(ZcDrinks);
+                var unit = new double[StartCalibration.ZN];
+                foreach (int z in dr) { EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h); unit[z] = p > 0 && h > 0 ? p / StartCalibration.ZKg(z) : double.MaxValue; }
+                dr.Sort((x, y) => unit[x].CompareTo(unit[y]));
+                var un = new int[StartCalibration.ZN];
+                foreach (int z in dr) { un[z] = n[z] - ZcTake(b, z, n[z], 1); done[z] = true; }
+                ZcDrinkSwap(b, un);
+                // (3) bialko - najtansze za 1000 kcal najpierw
+                var pr = new List<int>(ZcProtein);
+                foreach (int z in pr) { EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h); unit[z] = p > 0 && h > 0 ? p / StartCalibration.ZKg(z) / (ZcKcal[z] / 1000.0) : double.MaxValue; }
+                pr.Sort((x, y) => unit[x].CompareTo(unit[y]));
+                foreach (int z in pr) { ZcTake(b, z, n[z], 1); done[z] = true; }
             }
-            if (un[StartCalibration.ZBeer] > 0)
-            {
-                double gk = StartCalibration.ZKg(StartCalibration.ZGrain), bk = StartCalibration.ZKg(StartCalibration.ZBeer);
-                int g = (int)Math.Floor(un[StartCalibration.ZBeer] * bk * KsTab.BeerGrain / gk);
-                if (g > 0)
-                {
-                    int gb = ZcTake(b, StartCalibration.ZGrain, g, 1, false); _zcBrewV += gb;
-                    // litry piwa domowego z kupionego ziarna - najpierw brak piwa, potem reszta braku wina
-                    int brew = (int)Math.Floor(gb * gk / (KsTab.BeerGrain * bk) + 1e-9);
-                    brew -= MissCovered(b, StartCalibration.ZBeer, brew);
-                    if (brew > 0) MissCovered(b, StartCalibration.ZWine, brew);
-                }
-            }
-            // (3) bialko - najtansze za 1000 kcal najpierw
-            var pr = new List<int>(ZcProtein);
-            foreach (int z in pr) { EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h); unit[z] = p > 0 && h > 0 ? p / StartCalibration.ZKg(z) / (ZcKcal[z] / 1000.0) : double.MaxValue; }
-            pr.Sort((x, y) => unit[x].CompareTo(unit[y]));
-            foreach (int z in pr) { ZcTake(b, z, n[z], 1); done[z] = true; }
             // (4) reszta po kolei drabiny
             foreach (int z in StartCalibration.ZLadder)
             {
@@ -605,6 +751,62 @@ namespace Armoury
                 catch (Exception e) { Stumble("Zc4BuyVillage(inne miasto)", e); }
             }
             b.Lim = 0;
+        }
+
+        /// <summary>Zakup zastepczy napoju (recenzja 17.10 - wydzielone bez zmian z drabiny w m105 gosp4): un - niekupione sztuki napojow; brak wina - piwo, brak piwa - ziarno
+        /// na piwo domowe (KsTab.BeerGrain kg ziarna na litr). Napoj zastepczy zmniejsza brak do szukania w miastach obok.</summary>
+        private static void ZcDrinkSwap(ZcBuy b, int[] un)
+        {
+            // recenzja 17.10 (wazne): napoj zastepczy zmniejsza brak do szukania w miastach obok (dotad F2 kupowalo tam jeszcze raz to samo piwo i wino - wies placila
+            // dwa razy za jedna potrzebe napoju)
+            if (un[StartCalibration.ZWine] > 0)
+            {
+                int bw = ZcTake(b, StartCalibration.ZBeer, un[StartCalibration.ZWine], 1, false);
+                un[StartCalibration.ZBeer] += un[StartCalibration.ZWine] - bw;
+                MissCovered(b, StartCalibration.ZWine, bw);
+                un[StartCalibration.ZWine] = 0;
+            }
+            if (un[StartCalibration.ZBeer] > 0)
+            {
+                double gk = StartCalibration.ZKg(StartCalibration.ZGrain), bk = StartCalibration.ZKg(StartCalibration.ZBeer);
+                int g = (int)Math.Floor(un[StartCalibration.ZBeer] * bk * KsTab.BeerGrain / gk);
+                if (g > 0)
+                {
+                    int gb = ZcTake(b, StartCalibration.ZGrain, g, 1, false); _zcBrewV += gb;
+                    // litry piwa domowego z kupionego ziarna - najpierw brak piwa, potem reszta braku wina
+                    int brew = (int)Math.Floor(gb * gk / (KsTab.BeerGrain * bk) + 1e-9);
+                    brew -= MissCovered(b, StartCalibration.ZBeer, brew);
+                    if (brew > 0) MissCovered(b, StartCalibration.ZWine, brew);
+                }
+            }
+        }
+
+        /// <summary>
+        /// m105 gosp4 G1 (klucz Ks Village Cheap Kcal First; projekt czesci 4, sim_drabina na n31/n32: kcal czesci zaplaconej W +2.7..+3.9 pp przy tym samym pieniadzu): po ziarnie
+        /// i soli JEDZENIE drabiny 1 (napoje, bialko, reszta jedzenia z ZLadder) jedna lista wedlug zl za 1000 kcal przy cenie polki miasta targowego z doby - gdy budzet z wplywu
+        /// (W1) sie konczy, czekaja najdrozsze kalorie, nie zawsze bialko i owoce za napojem. Kolejnosc: towar z cena i kcal (najtanszy za 1000 kcal pierwszy), towar bez kcal
+        /// (przyprawy), towar bez polki (szukany potem w miastach obok, F2) - przy rownej cenie kolejnosc drabiny. Zakup zastepczy napoju (wino -> piwo -> piwo domowe) po
+        /// przejsciu listy, w tym samym budzecie. Rzeczy (przedza, len, skora, narzedzia, garnki) dalej po calym jedzeniu (krok (4) w ZcLadder). Wolac tylko z budzetem W1.
+        /// </summary>
+        private static void ZcCheapKcal(ZcBuy b, int[] n, bool[] done)
+        {
+            int nz = StartCalibration.ZN;
+            var fl = new List<int>(24);
+            foreach (int z in StartCalibration.ZLadder) if (!done[z] && StartCalibration.ZFood(z)) fl.Add(z);
+            var key = new double[nz]; var cls = new int[nz]; var pos = new int[nz];
+            for (int i = 0; i < fl.Count; i++)
+            {
+                int z = fl[i]; pos[z] = i;
+                EquipmentElement e; int h; int p = ZcPrice(b, z, out e, out h);
+                double kc = StartCalibration.ZKg(z) * KsBasket.Kcal[z];
+                if (p <= 0 || h <= 0) cls[z] = 2;                                    // bez towaru na polce - na koncu (miasta obok)
+                else if (!(kc > 0)) cls[z] = 1;                                      // bez kcal (przyprawy) - po jedzeniu z kcal
+                else key[z] = p / (kc / 1000.0);                                     // zl za 1000 kcal przy cenie polki doby
+            }
+            fl.Sort((x, y) => { int c = cls[x].CompareTo(cls[y]); if (c != 0) return c; c = key[x].CompareTo(key[y]); return c != 0 ? c : pos[x].CompareTo(pos[y]); });
+            var un = new int[nz];
+            foreach (int z in fl) { un[z] = n[z] - ZcTake(b, z, n[z], 1); done[z] = true; }
+            ZcDrinkSwap(b, un);
         }
 
         /// <summary>Brak towaru z na polce pokryty zakupem zastepczym (n sztuk): mniej do szukania w miastach obok i mniej "bez towaru" w liczbach. Zwraca pokryte.</summary>

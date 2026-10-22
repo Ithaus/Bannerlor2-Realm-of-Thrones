@@ -32,6 +32,12 @@ namespace Armoury
         internal static bool SwPaidFirst { get { var s = S3; return s == null || s.KsVillagePaidFirst; } }
         // m103 wsie (21.10): drabina 1 wsi przy cenach polki z budzetu z biezacego wplywu (TownFolk.ShelfBudget) - tylko przy SwPaidFirst (drabina 1 istnieje)
         internal static bool SwBasketAtShelf { get { var s = S3; return s == null || s.KsVillageBasketAtShelf; } }
+        // m105 gosp4 (21.10, czesc 4): klucze drabiny 1 wsi przy budzecie z wplywu - dzialaja tylko z budzetem W1 (TownFolk.ZcBuy.CapOn)
+        internal static bool SwCheapKcalFirst { get { var s = S3; return s == null || s.KsVillageCheapKcalFirst; } }
+        internal static bool SwGrainSpike { get { var s = S3; return s == null || s.KsVillageGrainSpikeFromSurplus; } }
+        internal static bool SwOwnGrainFirst { get { var s = S3; return s == null || s.KsVillageOwnGrainFirst; } }
+        internal static bool SwChestRefill { get { var s = S3; return s == null || s.KsVillageChestRefill; } }
+        internal static bool M105AnyOn { get { return SwCheapKcalFirst || SwGrainSpike || SwOwnGrainFirst || SwChestRefill; } }
         internal static bool SwOwnFirst { get { var s = S3; return s == null || s.KsOwnFoodFirst; } }
         internal static bool SwPerishReach { get { var s = S3; return s == null || s.KsPerishReach; } }
         internal static bool SwRealOfftake { get { var s = S3; return s == null || s.KsRealOfftake; } }
@@ -1062,6 +1068,15 @@ namespace Armoury
             int m = TownMarket(t);
             double I = KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, m == 0 ? 0 : 1) * LandGradZ(t.Settlement, z);
             return ShelfDays(P2Res * I) * ZDp(t, z);
+        }
+
+        /// <summary>m105 gosp4 G2 (Ks Village Grain Spike From Surplus): cena Planu sztuki towaru z w miescie t (zl) - wartosc x indeks startu rynku x gradient krainy, ta sama
+        /// cena co budzet koszyka wsi w Planie (Zc4VillagePaid; ZPass2Price bez P2Res). 0 - brak towaru albo miasta. Pamiec doby T4 przy Ks Cost Fast (te same liczby).</summary>
+        internal static double ZPlanPrice(Town t, int z)
+        {
+            var it = z >= 0 && z < ZN ? ZItem(z) : null; if (t == null || it == null) return 0.0;
+            int m = TownMarket(t);
+            return Math.Max(1, it.Value) * T4StartIndex(m == 0 ? 0 : 1, z) * T4LandGrad(t.Settlement, z);
         }
 
         /// <summary>Cena rezerwacji drabiny 2 (zl za sztuke): P2Res x cena startu krainy.</summary>

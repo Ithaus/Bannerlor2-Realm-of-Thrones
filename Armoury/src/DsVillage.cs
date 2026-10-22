@@ -53,6 +53,9 @@ namespace Armoury
         private static readonly Dictionary<string, int> _bk = new Dictionary<string, int>();     // id wsi -> polowa kroku 5 na rynek BK (do najblizszego ticku BK wsi)
         private static readonly Dictionary<string, int> _bkTick = new Dictionary<string, int>(); // id wsi -> doba ostatniego ticku rynku BK wsi (wies bez rynku BK - krok 5 caly na P5)
         private static readonly Dictionary<string, int> _bkLeft = new Dictionary<string, int>(); // id wsi -> nowy budzet BK niewydany w ostatnim ticku (brak towaru z nadwyzka podazy) - jutro P5 / roboty
+        // m105 gosp4 G2 (Ks Village Grain Spike From Surplus): id wsi -> skok ceny ziarna i soli zaplacony z nadwyzki ponad skrzynie (zakup koszyka za 1-2 doby), jeszcze nie
+        // odjety od czesci P5 kroku 5 (SurplusDay odejmuje najwyzej P5 doby, reszta czeka na nastepne doby). Sesja (bez zapisu - najwyzej 2 doby kroku 5 jednej wsi).
+        private static readonly Dictionary<string, double> _spikeOwed = new Dictionary<string, double>();
         private static bool _startLogged;
         private static int _stumbles, _stumblesSess;
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
@@ -71,6 +74,8 @@ namespace Armoury
         private static long _payOut, _payIn, _flushed;
         private static long _k5Treas; private static int _k5N;                                   // K5 przy samym F1: brak zwrotu pokryty ze skarbca ponad zapas wojny (DsSeason.TreasuryForRefund)
         private static double _kKept; private static int _kKeptN;                               // r4-bkwies (recenzja): czesc P5 zostawiona w kiesie (potrzeba pokryta - krok 5 do potrzeby, wies z koszykiem ZC4)
+        private static double _kSpike; private static int _kSpikeN;                             // m105 gosp4 G2: P5 mniej o skok ceny chleba zaplacony z nadwyzki (zl, wsi)
+        private static double _rBread; private static int _rBreadN;                             // m105 gosp4 G5: rata dnia czynszu do ksiegi zaleglosci, bo kiesa nie miala nic ponad koszyk dnia (zl, wsi)
 
         private static void ClearCounters()
         {
@@ -87,6 +92,7 @@ namespace Armoury
             _payOut = _payIn = _flushed = 0;
             _k5Treas = 0; _k5N = 0;
             _kKept = 0; _kKeptN = 0;
+            _kSpike = 0; _kSpikeN = 0; _rBread = 0; _rBreadN = 0;   // m105 gosp4
             _stumbles = 0;
         }
 
@@ -94,6 +100,7 @@ namespace Armoury
         internal static void Reset()
         {
             _dayOn = -1; _arr.Clear(); _pend.Clear(); _bk.Clear(); _bkTick.Clear(); _bkLeft.Clear(); _startLogged = false; _atFlag = -1;
+            _spikeOwed.Clear();                                                  // m105 gosp4 G2
             _stumblesSess = 0; _errOnce.Clear();
             ClearCounters();
         }
@@ -486,12 +493,24 @@ namespace Armoury
                 if (s.DsRentArrears && _arr.TryGetValue(st.StringId, out a)) owed = Math.Max(0, a.Owed);
                 long g = Math.Max(0, (long)gold);
                 long payDay = (long)Math.Max(0, Math.Min(Math.Floor(d), (double)g));          // 1. rata dnia - pierwsza, najwyzej kiesa
+                double basket = -1;
+                // m105 gosp4 G5 (klucz Ds Rent After Bread, z ksiega zaleglosci): rata dnia tylko z kiesy ponad koszyk dnia - ta sama zasada co rata zaleglosci (nizej); czego
+                // kiesa nie ma ponad koszyk, idzie do ksiegi zaleglosci (krok 3: x rampa, darowane po DsRentForgiveDays rat). Klucz NIE - rata dnia z calej kiesy, jak dotad.
+                // Recenzja kodu R9: w dobie zakupu przy Ks Village Buy Every 2 wies kupuje (TownFolk.Villages po czynszu) koszyk za 2 doby - chroniony koszyk x 2
+                // (TownFolk.VillageBuyDays); rata zaleglosci nizej - jak dotad, koszyk jednej doby
+                if (s.DsRentAfterBread && s.DsRentArrears && payDay > 0)
+                {
+                    double nv0, r0;
+                    basket = TownFolk.DsVillageDay(st, out nv0, out r0) ? Math.Max(0, VillNeeds.ChestBasket(st, nv0)) : 0;
+                    long pb = (long)Math.Max(0, Math.Min((double)payDay, Math.Floor(g - basket * TownFolk.VillageBuyDays(st))));
+                    if (pb < payDay) { _rBread += payDay - pb; _rBreadN++; payDay = pb; }
+                }
                 long payArr = 0;
                 if (owed >= 1)
                 {
                     // 2. rata zaleglosci tylko z kiesy ponad koszyk dnia (TownFolk.Villages kupuje go po czynszu)
                     double nv, r1;
-                    double basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, VillNeeds.ChestBasket(st, nv)) : 0;   // r4-bkwies (M9): przy KS koszyk z Planu
+                    if (basket < 0) basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, VillNeeds.ChestBasket(st, nv)) : 0;   // r4-bkwies (M9): przy KS koszyk z Planu
                     int pd = ArrPayDays(s);
                     double inst = pd > 0 ? Math.Max(Math.Max(1.0, d), owed / pd) : owed;
                     double room = g - payDay - basket;
@@ -573,12 +592,45 @@ namespace Armoury
                 double bk = Math.Floor(budget * bkShare), p5 = budget - bk;
                 double cy = Math.Floor(Math.Min(Math.Max(0, carry), Math.Max(0, over - budget)));
                 if (cy >= 1) { p5 += cy; _kBkCarry += (long)cy; _kBkCarryN++; }
+                p5 -= SpikeTake(st.StringId, p5);                                // m105 gosp4 G2: skok ceny chleba z nadwyzki byl pierwszy - P5 mniej o to samo (bez podwojnego wydatku)
                 if (bk >= 1) _bk[st.StringId] = (int)Math.Min(int.MaxValue, bk); else _bk.Remove(st.StringId);
                 _kBudget += budget; _kBkPlan += bk; _kP5Plan += p5;
                 return p5;
             }
             catch (Exception e) { Stumble("SurplusDay", e); return 0; }
         }
+
+        /// <summary>m105 gosp4 G2 (TownFolk.Zc4BuyCore, klucz Ks Village Grain Spike From Surplus): wies DS zaplacila `zl` skoku ceny ziarna i soli (ponad cene Planu) z kiesy
+        /// ponad skrzynie - w tempie kroku 5 (lam x rampa x (kiesa - skrzynia) / DsSurplusSpendDays). Krok 5 tej i nastepnych dob wydaje o tyle mniej (SurplusDay - SpikeTake).
+        /// Nie rzuca.</summary>
+        internal static void SpikeNote(Settlement st, double zl)
+        {
+            try
+            {
+                if (st == null || st.StringId == null || !(zl > 0) || double.IsInfinity(zl)) return;
+                double o; _spikeOwed.TryGetValue(st.StringId, out o);
+                _spikeOwed[st.StringId] = o + zl;
+            }
+            catch (Exception e) { Stumble("SpikeNote", e); }
+        }
+
+        /// <summary>m105 gosp4 G2 (SurplusDay): czesc P5 doby zajeta przez skok ceny chleba juz zaplacony z nadwyzki (najwyzej P5; reszta czeka na nastepne doby). Wolajacy w try.</summary>
+        private static double SpikeTake(string id, double p5)
+        {
+            double o;
+            if (id == null || _spikeOwed.Count == 0 || !_spikeOwed.TryGetValue(id, out o)) return 0;
+            double t = Math.Min(Math.Max(0, p5), Math.Max(0, o));
+            o -= t;
+            if (o < 0.5) _spikeOwed.Remove(id); else _spikeOwed[id] = o;
+            if (t > 0) { _kSpike += t; _kSpikeN++; }
+            return t;
+        }
+
+        /// <summary>m105 gosp4 G2 (TownFolk.Zc4BuyCore): tempo kroku 5 - DsSurplusSpendDays (0 - wies nie wydaje nadwyzki, skoku ceny z nadwyzki nie ma).</summary>
+        internal static int SpendDaysNow { get { return SpendDays(Settings.Current); } }
+
+        /// <summary>m105 gosp4 G4 (TownFolk.Zc4BuyCore): DsVillageChestDays (0 - bez skrzyni).</summary>
+        internal static int ChestDaysNow { get { return ChestDays(Settings.Current); } }
 
         /// <summary>TownFolk.Villages: zaplacone z czesci P5 kroku 5 - towar (lista dostatku i lista wsi, `goods`) i roboty gminy (`works` = place `wage` + material `mat`);
         /// `noWorks` - czesc niewydana (bez towaru i bez robot: klucz wylaczony, miasto targowe bez kiesy ludu).</summary>
@@ -595,18 +647,28 @@ namespace Armoury
         // ============================================================ ds-akumulator (noc 17/18.10): miary kies i skrzyn, roboty gminy po budowach
         private static readonly Dictionary<string, double> _akChest = new Dictionary<string, double>();   // id wsi -> skrzynia tej doby (SurplusDay)
         private static readonly List<double> _akGold = new List<double>(), _akCh = new List<double>(), _akRat = new List<double>();
-        private static int _akDay = -1;
+        private static int _akDay = -1, _akPoor;
+
+        /// <summary>m105 gosp4 (linia "Akumulator kies", M5G-7): wsie DS z dzisiejszego kroku 4 z kiesa ponizej min(1000 zl, skrzynia) i wszystkie wsie kroku 4; false - doby nie bylo.</summary>
+        internal static bool AkPoor(out int poor, out int n)
+        {
+            poor = 0; n = 0;
+            if (_akDay != Today || _akGold.Count == 0) return false;
+            poor = _akPoor; n = _akGold.Count;
+            return true;
+        }
 
         private static void AkNote(Settlement st, int gold, double chest)
         {
             try
             {
                 int today = Today;
-                if (today != _akDay) { _akDay = today; _akChest.Clear(); _akGold.Clear(); _akCh.Clear(); _akRat.Clear(); }
+                if (today != _akDay) { _akDay = today; _akChest.Clear(); _akGold.Clear(); _akCh.Clear(); _akRat.Clear(); _akPoor = 0; }
                 if (st == null || st.StringId == null) return;
                 _akChest[st.StringId] = chest;
                 _akGold.Add(Math.Max(0, gold)); _akCh.Add(Math.Max(0, chest));
                 if (chest >= 1) _akRat.Add(Math.Max(0, gold) / chest);
+                if (gold < Math.Min(1000.0, chest)) _akPoor++;                   // m105 gosp4 (M5G-7): wies biedna - kiesa ponizej 1000 zl i ponizej skrzyni (tylko licznik)
             }
             catch (Exception e) { Stumble("AkNote", e); }
         }
@@ -803,8 +865,17 @@ namespace Armoury
                   .Append(" wsi), W7 ").Append(_oW7).Append(" (").Append(_oW7N).Append(" zrodel), 15%/d nadwyzki na stara liste (chciane) ").Append(N0(_kOldExtra)).Append(", stara drabina P5 (chciane) ").Append(N0(_kOldLadder))
                   .Append(" | W7: potrzeba rodow pomniejszona o czesc wsi DS ").Append(_oW7Cut).Append(" (").Append(_oW7CutN).Append(" rodow)")
                   .Append(" | korona: W4 do wplywu dnia (LeviesToday) ").Append(_flushed).Append(", czeka w skarbcach do nastepnego Levies ").Append(PendSum())
-                  .Append("; brak zwrotu zoldu ze skarbca ponad zapas wojny (K5, bez firm F3) ").Append(_k5Treas).Append(" (").Append(_k5N).Append(" krolestw)")
-                  .Append(" | kontrola: platnicy - odbiorcy = ").Append(ctl);
+                  .Append("; brak zwrotu zoldu ze skarbca ponad zapas wojny (K5, bez firm F3) ").Append(_k5Treas).Append(" (").Append(_k5N).Append(" krolestw)");
+                // m105 gosp4 (G2 krok 5 mniej o skok ceny chleba, G5 czynsz po chlebie) - tylko przy ktoryms kluczu (oba NIE - linia jak w WGRANIU 102)
+                bool g2 = StartCalibration.SwGrainSpike, g5 = s.DsRentAfterBread;
+                if (g2 || g5)
+                {
+                    double spOwed = 0; foreach (var x in _spikeOwed.Values) spOwed += x;
+                    sb.Append(" | m105 gosp4 (Grain Spike From Surplus ").Append(g2 ? "TAK" : "NIE").Append(", Rent After Bread ").Append(g5 && s.DsRentArrears ? "TAK" : "NIE")
+                      .Append("): krok 5 mniej o skok ceny chleba ").Append(N0(_kSpike)).Append(" zl (").Append(_kSpikeN).Append(" wsi), czeka na nastepne doby ").Append(N0(spOwed))
+                      .Append(" zl (").Append(_spikeOwed.Count).Append(" wsi); czynsz po chlebie - rata dnia do zaleglosci ").Append(N0(_rBread)).Append(" zl (").Append(_rBreadN).Append(" wsi)");
+                }
+                sb.Append(" | kontrola: platnicy - odbiorcy = ").Append(ctl);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');
                 Log.Info(sb.ToString());

@@ -8004,6 +8004,22 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsOwnFoodFirst { get; set; } = true;
 
+        [SettingPropertyBool("Ks Village Cheap Kcal First", HintText = "with Ks Village Basket At Shelf: after grain and salt a village buys the food the plan pays for in order of the most calories per coin at today's stall prices, so when money runs short the dearest calories wait; yarn, cloth, leather, tools and pots still come after all food. Off = drink first, then the cheapest meat, fish or cheese, then the rest, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsVillageCheapKcalFirst { get; set; } = true;
+
+        [SettingPropertyBool("Ks Village Grain Spike From Surplus", HintText = "with Ks Village Basket At Shelf and Dues Medieval: when grain or salt costs more at the stall than the price the plan reckoned with, a village whose purse holds more than its rainy-day chest pays the difference from that surplus (at the pace it spends its surplus, before finer goods and communal works), so dear bread no longer eats the money for the rest of its food. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsVillageGrainSpikeFromSurplus { get; set; } = true;
+
+        [SettingPropertyBool("Ks Village Own Grain First", HintText = "with Ks Village Basket At Shelf and Ks Own Food First: the grain and salt a village cannot pay for from the money it earns are first taken from its own store waiting for the cart (at most half of it a day), and only the rest is bought from its savings - a village does not sell its grain to the town to buy it back dearer. Off = the village buys all its grain and salt and eats from its store only after shopping, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsVillageOwnGrainFirst { get; set; } = true;
+
+        [SettingPropertyBool("Ks Village Chest Refill", HintText = "with Ks Village Basket At Shelf and Dues Medieval: a village whose purse is below its rainy-day chest keeps back each day one part in Ds Village Chest Days of what is missing from the money for the food and things after grain and salt - at most half of that money (grain and salt are never cut) - so it slowly refills its chest and still buys the rest of its food with the other half. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsVillageChestRefill { get; set; } = true;
+
         [SettingPropertyBool("Ks Perish Reach", HintText = "with Start Calibration: fish, meat, fruit and the other goods that spoil are not counted on in a town that has none of its own and no town with plenty within 7 days by cart - its people buy other food instead; off = every town counts on every food", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsPerishReach { get; set; } = true;
@@ -8207,6 +8223,10 @@ namespace Armoury
         [SettingPropertyInteger("Ds Rent Arrears Pay Days", 0, 364, "0", HintText = "with Ds Rent Arrears: a village pays off its rent arrears at one part in this many a day (at least one day's rent), and only from what its purse holds beyond the day's needs - the arrears never take its bread (0 = all at once, as far as the purse goes)", RequireRestart = false)]
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
         public int DsRentArrearsPayDays { get; set; } = 28;
+
+        [SettingPropertyBool("Ds Rent After Bread", HintText = "with Ds Rent Arrears: the village pays the day's fixed rent only from what its purse holds beyond the basket it buys that day (two days' basket on its market day with Ks Village Buy Every 2) - the rent never takes its bread, as the arrears already do; what it cannot pay goes into the lord's book of arrears (paid off later, forgiven after Ds Rent Forgive Days). Off = the day's rent is paid first from the whole purse, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public bool DsRentAfterBread { get; set; } = true;
 
         [SettingPropertyBool("Ks Bk Village Needs", HintText = "the Banner Kings village market of a village under the medieval dues or the start calibration buys what villagers really need - salt, tools (or iron for the smith), linen, woollen cloth and pots - and only as much as they use (Village Need Cover Days at most in the house); wine, spices, jewellery, velvet and furs only when the village is rich (Ks Bk Rich Chests); it pays only from what the purse holds beyond its chest for a black day, from a real daily budget that shrinks with every purchase (no longer one piece of everything the town has too much of, at 5 percent of the purse for each piece); a village buying its basket from the calibration plan buys no food and none of its basket goods there (the basket already buys them). Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
@@ -8527,6 +8547,10 @@ namespace Armoury
         [SettingPropertyBool("Ds Farm Fix Share Cap", HintText = "with Ds Towns: when the farms of towns and castles are set after the measuring weeks, all farms paid from the purse together are set no higher than what the merchants took in over those weeks - if the old dues took more, every farm is lowered by the same share (each place keeps its rank, also a place whose merchants took in nothing in those weeks), and a place still above its own takings is brought down later by the farm reviews. Off = the farm is what the old dues took, as before", RequireRestart = false)]
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsFarmFixShareCap { get; set; } = true;
+
+        [SettingPropertyBool("Ds Castle Income Cut", HintText = "with Ks Farm Surplus Cap Net and the calibration applied: a castle whose purse, after the coin it already owes, has fallen to one and a half times its working coin, or that owes part of its farm, has a farm above its real takings lowered every Ks Farm Surplus Review Days (a castle that owes part of its farm the first time after a week) by at most Ks Farm Surplus Review Max (never below those takings) - the same rule as for towns; castle farms are never raised by it, and the quarterly review never aims a castle's farm above its takings either. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsCastleIncomeCut { get; set; } = true;
 
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
@@ -11172,6 +11196,10 @@ namespace Armoury
             s.KsVillagePaidFirst = KsVillagePaidFirst;
             s.KsVillageBasketAtShelf = KsVillageBasketAtShelf;
             s.KsOwnFoodFirst = KsOwnFoodFirst;
+            s.KsVillageCheapKcalFirst = KsVillageCheapKcalFirst;
+            s.KsVillageGrainSpikeFromSurplus = KsVillageGrainSpikeFromSurplus;
+            s.KsVillageOwnGrainFirst = KsVillageOwnGrainFirst;
+            s.KsVillageChestRefill = KsVillageChestRefill;
             s.KsPerishReach = KsPerishReach;
             s.KsRealOfftake = KsRealOfftake;
             s.KsMarketControl = KsMarketControl;
@@ -11223,6 +11251,7 @@ namespace Armoury
             s.DsRampDays = DsRampDays;
             s.DsCommunalWorks = DsCommunalWorks;
             s.DsRentArrearsPayDays = DsRentArrearsPayDays;
+            s.DsRentAfterBread = DsRentAfterBread;
             s.KsBkVillageNeeds = KsBkVillageNeeds;
             s.KsBkRichChests = KsBkRichChests;
             s.VillageNeedCoverDays = VillageNeedCoverDays;
@@ -11303,6 +11332,7 @@ namespace Armoury
             s.KsFarmSurplusCapNet = KsFarmSurplusCapNet;
             s.DsFarmCutBelowReserve = DsFarmCutBelowReserve;
             s.DsFarmFixShareCap = DsFarmFixShareCap;
+            s.DsCastleIncomeCut = DsCastleIncomeCut;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;

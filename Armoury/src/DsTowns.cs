@@ -103,6 +103,8 @@ namespace Armoury
         // przegladu (tylko przy Ds Farm Review Days > kwartal) i najkrotszy odstep miedzy przegladami tej samej osady (kontrola limitu: najwyzej jedna zmiana na kwartal)
         private static int _revArrN, _revHeld, _revSame, _revEarly, _revMinGap = int.MaxValue;
         private static double _revUpAmt, _revDownAmt;
+        // m105 gosp4 G6 (Ds Castle Income Cut): obnizki z dochodu zamkow (liczba, zl/rok) i udzial zamku > 1 liczony jak 1 w przegladzie zwyklym - doba (od linii do linii) i sesja
+        private static int _ccN, _ccShare, _ccNS, _ccShareS; private static double _ccAmt, _ccAmtS;
         // f7-kasy (Ks Farm Catch Up): gersuma z zapasu kas - doba (od linii do linii) i sesja
         private static int _cuRev, _cuDec, _cuNone, _cuNoGrow, _cuNoFarm, _cuPaidN, _cuShortN, _cuHouse, _cuArr, _cuRemit, _cuLow, _cuStum, _cuStumSess, _cuNS;
         private static double _cuDecAmt, _cuBills;
@@ -125,6 +127,7 @@ namespace Armoury
             _paidL = _paidC = _paidLf = _distL = _distC = _drawT = _drawC = _aidPaid = _aidArrPaid = _movPaid = 0;
             _payOut = _payIn = 0;
             _revArrN = _revHeld = _revSame = _revEarly = 0; _revUpAmt = _revDownAmt = 0; _revMinGap = int.MaxValue;
+            _ccN = _ccShare = 0; _ccAmt = 0;                                     // m105 gosp4 G6 (doba)
             _stumbles = 0;
         }
 
@@ -136,6 +139,7 @@ namespace Armoury
             _cuStumSess = 0; _cuNS = 0; _cuPaidLS = _cuPaidCS = 0;   // f7-kasy: sesja
             _gersLord.Clear(); _gersCrown.Clear();                   // f19-e3
             _wlDay = int.MinValue; _wl = 1.0;                        // m103 P3 (f)
+            _ccNS = _ccShareS = 0; _ccAmtS = 0;                      // m105 gosp4 G6 (sesja)
             ClearCounters();
         }
 
@@ -475,7 +479,7 @@ namespace Armoury
                     f.Fixed = today; _renewN++;
                     if (F <= 0) continue;
                     double share = !double.IsNaN(f.Share) ? f.Share : _worldShare;
-                    if (share > 1.0 && CapNetTown(f, s)) share = 1.0;           // m103 P3 (poprawka po recenzji): miasto z KS - cel najwyzej caly doplyw (jak (a) i (e))
+                    if (share > 1.0 && CapNetTown(f, s)) { share = 1.0; NoteCastleShare(f); }   // m103 P3 (poprawka po recenzji): miasto z KS - cel najwyzej caly doplyw (jak (a) i (e)); m105 G6: takze zamek
                     if (double.IsNaN(share) || share <= 0) continue;
                     double target = Math.Max(0, NetAvg(f, NetMinDays)) * share * YearDays;
                     double nf = Math.Max(F * (1 - m), Math.Min(F * (1 + m), target));
@@ -534,7 +538,7 @@ namespace Armoury
                     else
                     {
                         double share = !double.IsNaN(f.Share) ? f.Share : _worldShare;
-                        if (share > 1.0 && CapNetTown(f, s)) share = 1.0;       // m103 P3 (poprawka po recenzji): miasto z KS - cel najwyzej caly doplyw (jak (a) i (e))
+                        if (share > 1.0 && CapNetTown(f, s)) { share = 1.0; NoteCastleShare(f); }   // m103 P3 (poprawka po recenzji): miasto z KS - cel najwyzej caly doplyw (jak (a) i (e)); m105 G6: takze zamek
                         if (double.IsNaN(share) || share <= 0) { _revSame++; continue; }
                         double target = Math.Max(0, NetAvg(f, NetMinDays)) * share * YearDays;
                         double hi = arrears ? F : F * (1 + m);             // przy zaleglosci bez podwyzki
@@ -561,8 +565,51 @@ namespace Armoury
         /// ponad doplyw, a po 14 dobach niskiej kasy (e) zbijala ja z powrotem (pila). Zamki, miasta bez KS, klucze wylaczone - jak dotad. Wolajacy w try.</summary>
         private static bool CapNetTown(Farm f, Settings s)
         {
-            return s != null && s.KsFarmFollowsSurplus && s.KsFarmSurplusCapNet && f != null && f.St != null && f.St.IsTown && f.St.Town != null
-                   && StartCalibration.KsTownApplied(f.St.Town);
+            if (s == null || !s.KsFarmFollowsSurplus || !s.KsFarmSurplusCapNet || f == null || f.St == null) return false;
+            if (f.St.IsTown) return f.St.Town != null && StartCalibration.KsTownApplied(f.St.Town);
+            return CastleCutOn(s) && f.St.IsCastle && f.St.Town != null;     // m105 gosp4 G6 (Ds Castle Income Cut): zamek - ta sama regula co miasto z KS
+        }
+
+        /// <summary>m105 gosp4 G6 (klucz Ds Castle Income Cut, z Ks Farm Follows Surplus i Ks Farm Surplus Cap Net): obnizka z dochodu zamkow i udzial zamku najwyzej 1 w przegladzie
+        /// zwyklym - tylko przy zastosowanej kalibracji startu (jak miasta: KsTownApplied). Klucz wylaczony - zamki jak dotad.</summary>
+        private static bool CastleCutOn(Settings s)
+        {
+            return s != null && s.DsCastleIncomeCut && s.KsFarmFollowsSurplus && s.KsFarmSurplusCapNet && StartCalibration.Applied;
+        }
+
+        /// <summary>m105 gosp4 G6: licznik linii - przeglad zwykly zamku z udzialem firmy ponad 1 liczony jak 1 (CapNetTown).</summary>
+        private static void NoteCastleShare(Farm f) { if (f != null && f.St != null && f.St.IsCastle) { _ccShare++; _ccShareS++; } }
+
+        /// <summary>
+        /// m105 gosp4 G6 (B1; klucz Ds Castle Income Cut; M3P-7: zaleglosci zamkow prolog n32 39.0 tys. +0.8 tys./d, stary zapis 13-37-13 449 tys. +6.8 tys./d - Sweetport
+        /// 144 tys. = 8.6 rat, kasa przy podlodze): zamek nie mial drogi w dol poza przegladem kwartalnym (-15% co 91 dob, cel z udzialu ponad 1 ze starego zapisu). Ta sama
+        /// regula co obnizka z dochodu miast (IncomeCut, Ks Farm Surplus Cap Net (e)): zamek, ktorego kasa po naleznosciach (CofferOwes) stoi najwyzej 1.5 x zapas podzamcza
+        /// (CastlePurse.Reserve) albo ktory zalega (firma >= raty), przez caly cykl Ks Farm Surplus Review Days - firma pana i korony ponad biezacy doplyw netto x 364 schodzi do
+        /// niego, najwyzej o Ks Farm Surplus Review Max na cykl. Oblezenie / zdobycie - cykl od nowa (rata darowana). Kasa ponad progiem - cykl od nowa. Podwyzek zamkow BRAK
+        /// (przeglad wedlug nadwyzki to regula kupcow miast z KS). Zloto sie nie rusza - zmienia sie nalezna rata. Wolajacy w try (SurplusReview).
+        /// </summary>
+        private static void CastleIncomeCut(Farm f, Settlement st, int today, int days, double mx, Settings s)
+        {
+            var t = st.Town;
+            double inst = (f.FL + f.FC + f.FLf) / Weeks;
+            bool arrears = f.AL + f.AC + f.ALf + TownDebt.ArrearsLike(st) >= Math.Max(1.0, inst);
+            double gq = t.Gold - CofferOwes(f, s);
+            int remit = RemitOf(st);
+            if (gq <= OverReserve * CastlePurse.Reserve(t) || remit != 0 || arrears)
+            {
+                // recenzja ekonomii R5: cykl obnizki i pamiec doplywu sa sesyjne (bez zapisu), sesje Jeffa trwaja 12-24 doby - zamek z zaleglosciami zaczyna cykl tak, zeby
+                // pierwsza obnizka wypadla po NetMinDays (7) dobach, nie po pelnym cyklu (dotad najwczesniej 15. doba po wczytaniu); probka doplywu zamku (CastleSample
+                // w CastlePurse.Daily) idzie PO tym przegladzie, a pierwsza po wczytaniu tylko zapamietuje kase - bez 7 probek (NetAvg NaN) IncomeCut zaczalby cykl od nowa,
+                // stad czekanie najmniej NetMinDays + 1 - NF dob; dalsze cykle jak dotad
+                if (arrears && remit == 0 && f.SLow < 0)
+                {
+                    int wait = Math.Min(days, Math.Max(NetMinDays, NetMinDays + 1 - f.NF));
+                    f.SLow = today - (days - wait);
+                }
+                double cut = IncomeCut(f, today, days, mx, remit != 0, true);
+                if (cut > 0) { _ccN++; _ccAmt += cut; _ccNS++; _ccAmtS += cut; }
+            }
+            else f.SLow = -1;                                                    // kasa ponad progiem - cykl obnizki od nowa
         }
 
         // ============================================================ f5-lud: firma miasta z KS wedlug nadwyzki kasy (Ks Farm Follows Surplus)
@@ -639,12 +686,19 @@ namespace Armoury
             // m103 P3 (c): w rampie DS kasa placi tylko rampa x rata, reszta firmy zostaje w kasie i wygladala jak przyrost kupcow (x 364 jako nadwyzka) - bez pomiaru
             // i bez podwyzek do konca rampy; pomiar przyrostu od pierwszej doby po rampie
             bool inRamp = capNet && NewShare < 1.0;
+            bool castles = CastleCutOn(s);                                       // m105 gosp4 G6 (Ds Castle Income Cut); klucz wylaczony - zamki pominiete jak dotad
             foreach (var f in _farm.Values)
             {
                 long cu0 = cu ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
                 try
                 {
                     var st = f.St;
+                    // m105 gosp4 G6: zamek - tylko obnizka z dochodu (ta sama regula co miasto w (e)), bez podwyzek i gersumy; w rampie DS bez obnizki (cykl od nowa, jak miasta)
+                    if (castles && st != null && st.IsCastle && st.Town != null && f.Fixed >= 0)
+                    {
+                        if (inRamp) f.SLow = -1; else CastleIncomeCut(f, st, today, days, mx, s);
+                        continue;
+                    }
                     if (st == null || !st.IsTown || st.Town == null || f.Fixed < 0) continue;
                     var t = st.Town;
                     if (!StartCalibration.KsTownApplied(t)) { f.SG0 = long.MinValue; f.SGDay = -1; f.SLow = -1; continue; }
@@ -795,24 +849,25 @@ namespace Armoury
         /// zdobycie - bez obnizki (rata darowana), cykl od nowa. Bez pomiaru doplywu - bez zmiany. Udzial firmy w doplywie ponad 1 (stary zapis, ustalenie bez sufitu)
         /// schodzi do 1 - przeglad zwykly nie podniesie firmy z powrotem ponad doplyw. Zloto sie nie rusza - zmienia sie nalezna rata. Wolajacy w try (SurplusReview).
         /// </summary>
-        private static void IncomeCut(Farm f, int today, int days, double mx, bool remit)
+        private static double IncomeCut(Farm f, int today, int days, double mx, bool remit, bool castle = false)
         {
-            if (remit) { f.SLow = -1; return; }
-            if (f.SLow < 0 || f.SLow > today) { f.SLow = today; return; }       // start cyklu - pierwsza obnizka po pelnym cyklu (jak pierwsza podwyzka po pelnym pomiarze)
-            if (today - f.SLow < days) return;
+            if (remit) { f.SLow = -1; return 0; }
+            if (f.SLow < 0 || f.SLow > today) { f.SLow = today; return 0; }     // start cyklu - pierwsza obnizka po pelnym cyklu (jak pierwsza podwyzka po pelnym pomiarze)
+            if (today - f.SLow < days) return 0;
             f.SLow = today;                                                      // nastepny cykl od tej doby
             double F = f.FL + f.FC;
-            if (!(F > 0)) return;
+            if (!(F > 0)) return 0;
             double net = NetAvg(f, NetMinDays);
-            if (double.IsNaN(net)) return;
+            if (double.IsNaN(net)) return 0;
             double cap = net * YearDays;
-            if (!(F > cap)) return;
+            if (!(F > cap)) return 0;
             double nf = Math.Max(cap, (1 - mx) * F);
-            if (!(nf >= 0) || !(nf < F - 1e-6)) return;
+            if (!(nf >= 0) || !(nf < F - 1e-6)) return 0;
             double r = nf / F;
             f.FL *= r; f.FC *= r;
-            KsFolkIncome.NoteIncomeCut(F - nf);
+            if (!castle) KsFolkIncome.NoteIncomeCut(F - nf);                     // m105 gosp4 G6: obnizki zamkow licza sie osobno (linia DS) - segment P3 linii f5 jak dotad
             if (!double.IsNaN(f.Share) && f.Share > 1.0) f.Share = 1.0;
+            return F - nf;
         }
 
         /// <summary>
@@ -1712,6 +1767,11 @@ namespace Armoury
                 }
                 if (_fixDay >= 0) { try { ArrearsBySettlement(sb, s); } catch (Exception e) { Stumble("Daily(zaleglosci osad)", e); } }   // f14-miary (NKA-1): kto zalega - tylko pomiar
                 if (_fixDay >= 0 && (s.KsFarmSurplusCapNet || s.DsFarmFixShareCap)) { try { ShareToday(sb); } catch (Exception e) { Stumble("Daily(udzial firm)", e); } }   // m103 P3: tylko pomiar (klucze wylaczone - linia jak w WGRANIU 101)
+                // m105 gosp4 G6: obnizki z dochodu zamkow i udzial zamku > 1 liczony jak 1 (klucz Ds Castle Income Cut wylaczony - linia jak w WGRANIU 102)
+                if (_fixDay >= 0 && s.DsCastleIncomeCut)
+                    sb.Append(" | m105 zamki (Ds Castle Income Cut ").Append(CastleCutOn(s) ? "TAK" : "NIE - bez Ks Farm Surplus Cap Net albo kalibracji startu").Append("): obnizki z dochodu zamkow dzis ")
+                      .Append(_ccN).Append(" (-").Append(N0(_ccAmt)).Append(" zl/rok), w sesji ").Append(_ccNS).Append(" (-").Append(N0(_ccAmtS)).Append(" zl/rok); udzial zamku > 1 liczony jak 1 dzis ")
+                      .Append(_ccShare).Append(", w sesji ").Append(_ccShareS);
                 sb.Append(" | kontrola: platnicy - odbiorcy = ").Append(_payOut - _payIn);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');
