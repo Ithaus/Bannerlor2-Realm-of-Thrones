@@ -104,6 +104,8 @@ namespace Armoury
             FeedSwiatInput(inp);                                      // feed-swiat: jedzenie podstawowe, krok progu, rynek musi sie oczyscic (cieply start z poprzedniego Planu)
             double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va; _alphaDsN = 0;   // KS r4: licznik wsi z alfa z praw DS (VilAlphaFor)
             inp.FachOn = s != null && s.KsVillageTradeKeep;           // m106-wozy P1: fach wsi w rownowadze Planu i w RegaleStep (StartCalibration.Fach.cs)
+            inp.MarketBalance = s != null && s.KsPlanMarketBalance;   // m107 K4: ostatnia rownowaga kroku 8 - zbieznosc NA TARG (StartCalibration.Core.cs Equilibrium)
+            inp.FachMarketRoom = s != null && s.KsFachMarketRoom;     // m107 K5: miejsce fachu na targu bez zjedzonego we wszystkich okregach (StartCalibration.Fach.cs)
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");
             foreach (var id in ids)
@@ -213,6 +215,7 @@ namespace Armoury
                 for (int b = 0; b < _plan.NB; b++) if (_plan.Blocks[b].Uid != null) inp.WarmRent[_plan.Blocks[b].Uid] = _plan.Rent[b];
                 inp.RoundsFirst = _plan.OpenAbsM[0] + _plan.OpenAbsM[1] > 0 ? 6000 : 3000;   // recenzja 16.10 (drobne): poprzedni Plan niezbiezny - wiecej rund rownowagi; n22f-plany: stara miara (bez pasma zapasu polek - jak dotad)
                 if (_plan.DistHome != null && _plan.DistHome.Count > 0) inp.WarmHome = new Dictionary<string, double>(_plan.DistHome, StringComparer.Ordinal);   // krok 8: cieply start pracy domowej
+                if (inp.FachMarketRoom && _plan.Eaten != null) inp.PrevEaten = (double[])_plan.Eaten.Clone();   // m107 K5: zjedzone w okregach poprzedniego Planu (fach przed krokiem 8)
             }
             if (inp.Districts.Count == 0) { note = "zaden okreg z ziemia z pliku (plik ziemi nie pasuje do wsi gry)"; return null; }
             // recenzja 17.10: krok 8 z pomiaru (alfa wsi i budzety miast) - Plan bez pomiaru nie zastepuje pracy domowej i czesci zaplaconej zapisanych w okregach;
@@ -471,6 +474,9 @@ namespace Armoury
               .Append(", pola mieszczan ").Append((r.TownFieldHands / 1e6).ToString("0.00", Inv));
             sb.Append(" | niezbiezne: ").Append(r.Open.Count > 0 ? string.Join(", ", r.Open.ToArray()) : "brak");
             sb.Append(" | na granicy ceny 0.05/5: ").Append(r.Bounds.Count > 0 ? string.Join(", ", r.Bounds.ToArray()) : "brak");
+            if (inp.MarketBalance)   // m107 K4: ostatnia rownowaga kroku 8 z miara targu (klucz wylaczony - linia jak w 5da5f304)
+                sb.Append(" | m107 rownowaga na targ (Ks Plan Market Balance TAK): towarow z miara targu ").Append(r.MktN).Append(", ostatnia rownowaga kroku 8 ")
+                  .Append(r.MktOn ? "zbiezna " + (r.MktConv ? "TAK" : "NIE") + " (rund " + r.MktRounds + ")" : "nie liczona (bez kroku 8)").Append(", najwieksze odchylenie targu ").Append(r.MktWorst ?? "-");
             sb.Append(" | ").Append(_snapNote).Append(" | gra bez zmian (Plan).");
             Log.Info(sb.ToString());
             try { MoneyLines(r); } catch (Exception e) { Stumble("MoneyLines", e); }

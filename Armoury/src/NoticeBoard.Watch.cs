@@ -47,6 +47,9 @@ namespace Armoury
         private const float FallbackRate = 5f;     // zold na glowe bez zalogi
         private const float MaxBandDist = 45f;     // jedn. mapy (ok. 214 km) - dalej banda nie jest "z okolicy" zadnego miasta
         private const int HarmDays = 60;
+        private const int LeanEvery = 10, V1Every = 30;   // m107 K6: pomiar zapisu w linii doby co 10 dob (i w pierwszej dobie sesji), nb1 co 30 dob
+        private static bool _leanMeasured;                // m107 K6: pomiar zapisu w tej sesji juz byl
+        private static int _secV1Day = -2;                // m107 K6: doba eksportu, w ktorej zmierzono nb1 (nb1 w linii tylko przy tej samej dobie co sklad)
         private const float BrokenShare = 0.25f;   // banda z mniej niz 25% ludzi z chwili listu - rozbita
 
         private sealed class Notice
@@ -92,6 +95,7 @@ namespace Armoury
         private static void ResetWatch()
         {
             _notices.Clear(); _harm.Clear(); _vilTown.Clear(); _secV1 = -1;
+            _leanMeasured = false; _secV1Day = -2; _secVer = ""; _secBytes = -1; _secDay = -1; _nb3Bad = _nb3Ok = 0;   // m107 K6: pomiar zapisu w pierwszej dobie sesji
             _captainTalk = false; _captainChar = null; _talkNotice = null;
             ZeroWatchDay();
         }
@@ -120,7 +124,7 @@ namespace Armoury
         /// <summary>Linia "Listy goncze (m102): wpiete" (po rejestracji menu i rozmow).</summary>
         private static void WatchStartLine()
         {
-            Log.Info(PW + "wpiete - zdarzenia " + _wEvents + "/3 (MobilePartyDestroyed, MapEventEnded, RaidCompleted), dialog kapitana " + _wDialog + "/7, dialog soltysa " + _hDialog + "/8, opcja karty 1/1, zapis arm_board " + Ver2 + " (odczyt takze " + Ver + ")"
+            Log.Info(PW + "wpiete - zdarzenia " + _wEvents + "/3 (MobilePartyDestroyed, MapEventEnded, RaidCompleted), dialog kapitana " + _wDialog + "/7, dialog soltysa " + _hDialog + "/8, opcja karty 1/1, zapis arm_board " + (LeanSave ? Ver3 + " (odczyt takze " + Ver2 + ", " + Ver + "; Notice Board Lean Save TAK)" : Ver2 + " (odczyt takze " + Ver + ")")
                      + "; klucz Watch Bounties " + YN(WatchOn) + ", na miasto " + PerTown + ", dni " + DaysUp + ", promien " + MaxBandDist.ToString("0", Inv) + " jedn.");
         }
 
@@ -750,11 +754,31 @@ namespace Armoury
                 var towns = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var n in _notices) { if (n.Kind == 0) towns.Add(n.Town); if (n.Taken) takenAll++; }
                 withNotice = towns.Count;
-                string exp = Export();
-                int bytes = exp != null ? exp.Length : 0;
-                double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
-                // m103-drobne: pomiar - stary format nb1 w tym samym stanie (poza kosztem doby; tylko do linii)
-                try { var v1 = ExportV1(); _secV1 = v1 != null ? v1.Length : 0; } catch { _secV1 = -1; }
+                int bytes; double ms; string mix;
+                if (LeanSave)
+                {
+                    // m107 K6: koszt doby liczony PRZED eksportem; eksport do linii (nb3 z proba) tylko w pierwszej dobie sesji i co LeanEvery dob, nb1 co V1Every dob -
+                    // poza kosztem doby (dotad napis zapisu budowany co dobe tylko do linii: ok. 0.47 ms i 0.5 MB alokacji). Zapis gry eksportuje sam (ExportSave).
+                    ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+                    bool first = !_leanMeasured;
+                    if (first || day % LeanEvery == 0)
+                    {
+                        _leanMeasured = true;
+                        Export();
+                        if (first || day % V1Every == 0) { try { var v1 = ExportV1(); _secV1 = v1 != null ? v1.Length : 0; } catch { _secV1 = -1; } _secV1Day = _secDay; }
+                    }
+                    bytes = Math.Max(0, _secBytes);
+                    mix = SaveMixText3(bytes);
+                }
+                else
+                {
+                    string exp = Export();
+                    bytes = exp != null ? exp.Length : 0;
+                    ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+                    // m103-drobne: pomiar - stary format nb1 w tym samym stanie (poza kosztem doby; tylko do linii)
+                    try { var v1 = ExportV1(); _secV1 = v1 != null ? v1.Length : 0; } catch { _secV1 = -1; }
+                    mix = SaveMixText(bytes);
+                }
                 Log.Info(PW + "dzien " + day + ", klucz " + YN(WatchOn) + ", band poza osadami " + bands + ", miasta z banda " + withBand + "/" + Town.AllTowns.Count + ", z listem " + withNotice
                          + ", bez nowego listu: brak kasy " + noCash + ", limit " + atLimit + ", kazda banda z listem " + allPosted + ", oblezone " + besieged + ", dlug rady " + inDebt + ", bez pana " + noLord
                          + ", klucz " + keyOff + ", inne " + other
@@ -763,7 +787,7 @@ namespace Armoury
                          + ", od panow " + _wFromLordPurse + ", z kies wsi " + _wFromVillage + "), niedoplata " + _wShort + ", z niczego " + _wFromNothing
                          + "; zdjete " + (_wDropGuard + _wDropEnemy + _wDropGone + _wDropDue + _wDropOwner + _wDropKey) + " (straz/karawana " + _wDropGuard + ", wrog miasta " + _wDropEnemy + ", banda znikla " + _wDropGone
                          + ", termin " + _wDropDue + ", zmiana pana " + _wDropOwner + ", klucz " + _wDropKey + "); kasa ponizej Keep po wyplacie " + _wBelowKeep
-                         + HeadmanDayText() + "; zapis arm_board " + bytes + " B; " + SaveMixText(bytes) + "; szkody band " + _harm.Count + "; koszt " + ms.ToString("0.00", Inv) + " ms; potkniecia " + _wStumbles);
+                         + HeadmanDayText() + "; zapis arm_board " + bytes + " B; " + mix + "; szkody band " + _harm.Count + "; koszt " + ms.ToString("0.00", Inv) + " ms; potkniecia " + _wStumbles);
             }
             catch (Exception e) { WStumble("WatchDaily(linia)", e); }
             ZeroWatchDay();
@@ -899,57 +923,7 @@ namespace Armoury
             return cnt;
         }
 
-        /// <summary>m103-drobne: odczyt czesci W= i H= zapisu nb2 (d0 - doba zapisu, pre - tablica przedrostkow).</summary>
-        private static void WatchImport2(string p, int d0, string[] pre)
-        {
-            try
-            {
-                if (p.StartsWith("W=", StringComparison.Ordinal))
-                {
-                    _notices.Clear();
-                    if (p.Length <= 2) return;
-                    foreach (var r in p.Substring(2).Split(';'))
-                    {
-                        var x = r.Split('~');
-                        if (x.Length < 8) continue;
-                        int men, sum, due, kind;
-                        if (!int.TryParse(x[2], NumberStyles.Integer, Inv, out men) || !int.TryParse(x[3], NumberStyles.Integer, Inv, out sum)
-                            || !int.TryParse(x[4], NumberStyles.Integer, Inv, out due) || !int.TryParse(x[6], NumberStyles.Integer, Inv, out kind)) continue;
-                        _notices.Add(new Notice
-                        {
-                            Town = Dec(x[0], pre), Band = Dec(x[1], pre), Name = "", Men = men, Sum = sum, Due = d0 + due, Posted = 0, Days = 0, BonusPct = 0, S = 0f,
-                            Taken = x[5].IndexOf('T') >= 0, Lord = x[5].IndexOf('L') >= 0, Kind = kind, Owner = Dec(x[7], pre),
-                            Giver = x.Length > 8 ? Dec(x[8], pre) : "", Village = x.Length > 9 ? Dec(x[9], pre) : ""
-                        });
-                    }
-                }
-                else if (p.StartsWith("H=", StringComparison.Ordinal))
-                {
-                    _harm.Clear();
-                    if (p.Length <= 2) return;
-                    foreach (var r in p.Substring(2).Split(';'))
-                    {
-                        int k = r.IndexOf('~');
-                        if (k <= 0) continue;
-                        var l = new List<Harm>();
-                        string last = "";
-                        foreach (var e in r.Substring(k + 1).Split('/'))
-                        {
-                            var y = e.Split(',');
-                            int off, kind;
-                            if (y.Length < 2 || !int.TryParse(y[0], NumberStyles.Integer, Inv, out off) || !int.TryParse(y[1], NumberStyles.Integer, Inv, out kind)) continue;
-                            string tw = y.Length > 2 ? Dec(y[2], pre) : "", vil = y.Length > 3 ? Dec(y[3], pre) : "";
-                            string town;
-                            if (vil.Length > 0) town = tw.Length > 0 ? tw : null;   // null - miasto z wsi (HarmTown, leniwie - odczyt nie zalezy od obiektow gry)
-                            else { town = tw.Length > 0 ? tw : last; last = town; }
-                            l.Add(new Harm { Day = d0 - off, Kind = (byte)kind, Town = town, Vil = vil });
-                        }
-                        if (l.Count > 0) _harm[Dec(r.Substring(0, k), pre)] = l;
-                    }
-                }
-            }
-            catch (Exception e) { WStumble("WatchImport2", e); }
-        }
+        // m107: odczyt czesci W= i H= zapisu nb2 (dotad WatchImport2) - wspolny z nb3 w NoticeBoard.Nb3.cs (Parse, te same reguly).
 
         private static void WatchImport(string p)
         {

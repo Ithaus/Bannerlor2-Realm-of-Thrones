@@ -62,6 +62,11 @@ namespace Armoury
         // KS r4 (r4-ceny P8, klucz Ks Cloth Demand): 1:1 plotna, sukna i skory takze z odziezy wojska, warsztatow zbrojnych i napraw kowali (kolumna ksiegi KsCloth)
         public bool ClothDemand;
         public bool CheapBasket;                                      // r4-koszyk (klucz KsCheapBasket): klasy miast - drabina tanszego koszyka (KsCheap.PlanLadder); false - jak dotad
+        // m107-gospodarka K4 (klucz Ks Plan Market Balance): ostatnia rownowaga kroku 8 ocenia towary zjadane glownie w okregach (zjedzone >= 1/4 popytu - ziarno) NA TARG
+        // ((podaz - zjedzone) / (popyt - zjedzone), prog 3%) - zbieznosc, najlepszy stan i wyjscie "stoi"; krok ceny bez zmian. false - jak dotad
+        public bool MarketBalance;
+        // m107-gospodarka K5 (klucz Ks Fach Market Room): zjedzone w okregach [rynek * NG + towar] poprzedniego Planu (KsResult.Eaten) - miejsce fachu na targu przed krokiem 8
+        public double[] PrevEaten;
     }
 
     /// <summary>Towar gry: kg sztuki, wartosc, zuzycie dnia w sztukach (wojsko, zamki, dwory, budowy, warsztaty, razem, mieszczanie).</summary>
@@ -149,6 +154,8 @@ namespace Armoury
         public string CorrLine, CsvPlan, CsvBudgets;                   // C2: tekst linii korytarzy i plikow ks-plan.csv / ks-budzety.csv z watku roboczego
         public int CsvPlanRows, CsvBudgetRows;
         public double[] MarketFactor;                                  // czynnik popytu targu uzyty w kroku 8
+        // m107 K4: ostatnia rownowaga kroku 8 z miara targu - towarow z ta miara, zbiezna, rund, najwieksze odchylenie targu (rynek towar stosunek); MktOn - liczona w tym Planie
+        public bool MktOn, MktConv; public int MktN, MktRounds; public string MktWorst = "-";
     }
 
     /// <summary>KS-R3 krok 5: przewoz Planu na korytarzu krain (szt. gry na dobe).</summary>
@@ -222,6 +229,8 @@ namespace Armoury
             public double[] Dm;                                        // popyt rynku
             public Dictionary<string, double[]> DL;                    // popyt krainy
             public double[] LevT;                                      // n22f-plany: cel kroku 8 rynku (podaz / popyt, wartosciowo) - pasmo testu zbieznosci; null - bez kroku 8
+            public double[] EqEat;                                     // m107 K4/K5: zjedzone w okregach tej rundy kroku 8 [m * NG + g] (null poza krokiem 8)
+            public bool EqMkt;                                         // m107 K4: ta rownowaga to ostatnia rownowaga kroku 8 - zbieznosc NA TARG
         }
         private sealed class RegRow { public int B, C; public double L, Cap; public string Land; }
 
@@ -883,6 +892,38 @@ namespace Armoury
             }
         }
 
+        internal static double MktTol = 0.03;                          // m107 K4: prog zbieznosci NA TARG (harness moze zmienic)
+        internal static double MktShare = 0.25;                        // m107 K4: miara targu dla towaru z zjedzonym >= MktShare x popyt
+
+        /// <summary>m107 K4: odchylenie NA TARG towaru zjadanego glownie w okregach - E = min(zjedzone, 0.9 min(D, S)); E >= MktShare x D: dev = |(S - E) / max(1, D - E) - 1|, prog MktTol.
+        /// Inaczej bez zmian (dev i tol jak dotad; false).</summary>
+        private static bool MktDev(double D, double S, double eat, ref double dev, ref double tol)
+        {
+            double E = Math.Min(Math.Max(0.0, eat), 0.9 * Math.Min(D, S));
+            if (!(E >= MktShare * D) || !(D > 1.0)) return false;
+            dev = Math.Abs((S - E) / Math.Max(1.0, D - E) - 1.0);
+            tol = MktTol;
+            return true;
+        }
+
+        /// <summary>m107 K4: liczby ostatniej rownowagi kroku 8 do linii Planu - towarow z miara targu, zbiezna, rund, najwieksze odchylenie targu (stan oddany).</summary>
+        private static void MktResult(Ctx x, double[] p, double[] S, bool[] act, bool conv, int done)
+        {
+            int n = NM * KsTab.NG, cnt = 0; double worst = -1, wq = 0; int wi = -1;
+            for (int i = 0; i < n; i++)
+            {
+                if (!act[i]) continue;
+                double D = x.Dm[i], dev = 0, tol = Tol;
+                if (!MktDev(D, S[i], x.EqEat[i], ref dev, ref tol)) continue;
+                cnt++;
+                bool atb = p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999;
+                if (atb) continue;
+                if (dev > worst) { worst = dev; wi = i; double E = Math.Min(Math.Max(0.0, x.EqEat[i]), 0.9 * Math.Min(D, S[i])); wq = (S[i] - E) / Math.Max(1.0, D - E); }
+            }
+            x.R.MktOn = true; x.R.MktN = cnt; x.R.MktConv = conv; x.R.MktRounds = done;
+            x.R.MktWorst = wi >= 0 ? x.R.Markets[wi / KsTab.NG] + " " + KsTab.Goods[wi % KsTab.NG] + " " + wq.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-";
+        }
+
         private static double[] Equilibrium(Ctx x, double[] p0, int rounds, out double[] xs, out double[] S, out int done, Func<bool> cancel)
         {
             int n = NM * KsTab.NG;
@@ -901,6 +942,10 @@ namespace Armoury
             double[] eta = null; sbyte[] esg = null;                   // feed-swiat (Ks Plan Markets Clear): krok ceny towaru (maleje, gdy cena skacze w kolko)
             if (x.In.MarketsClear && ClearEta) { eta = new double[n]; esg = new sbyte[n]; for (int i = 0; i < n; i++) eta[i] = Eta; }
             bool conv = false;
+            // m107 K4 (Ks Plan Market Balance): ostatnia rownowaga kroku 8 - towar zjadany glownie w okregach (E >= 1/4 popytu, E = min(zjedzone, 0.9 min(D, S))) oceniany NA TARG:
+            // odchylenie |(S - E) / (D - E) - 1|, prog MktTol; ocena "zbiezna", suma mt (najlepszy stan, "stoi"). Krok ceny (D + 1) / (S + 1) i normalizacja bez zmian - punkt staly
+            // S = D ten sam; zmienia sie tylko, kiedy rownowaga konczy i ktory stan oddaje. Wylaczony - jak dotad (mkt false)
+            bool mkt = x.EqMkt && x.EqEat != null && x.EqEat.Length >= n;
             int it = 0;
             for (it = 0; it < rounds; it++)
             {
@@ -942,9 +987,10 @@ namespace Armoury
                     for (int i = 0; i < n; i++)
                     {
                         if (!act[i]) continue;
-                        double dev = Math.Abs(S[i] / Math.Max(1.0, x.Dm[i]) - 1.0);
+                        double dev = Math.Abs(S[i] / Math.Max(1.0, x.Dm[i]) - 1.0), tol = Tol;
+                        if (mkt) MktDev(x.Dm[i], S[i], x.EqEat[i], ref dev, ref tol);   // m107 K4
                         bool atb = p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999;
-                        if (dev > Tol && !atb) bad = true;
+                        if (dev > tol && !atb) bad = true;
                         if (!atb) mt += dev;
                     }
                     if (!bad) { conv = true; break; }
@@ -978,6 +1024,7 @@ namespace Armoury
                 if (x.FeedOn) FeedRestore(x);                          // r4-polnoc (recenzja): liczby progu z punktu kontrolnego (linia wyzywienia krain, A7)
             }
             x.Rent = rr;
+            if (mkt) MktResult(x, p, S, act, conv, done);              // m107 K4: wynik miary targu (linia Planu)
             // stan zbieznosci do wyniku
             x.R.Open.Clear(); x.R.Bounds.Clear(); Array.Clear(x.R.OpenAbsM, 0, x.R.OpenAbsM.Length);
             // n22f-plany (klucz Ks Plan Converge Shelf Level, po recenzji): towar niezbiezny wobec pasma [1, wspolny poziom S/D rynku] - poziom zmierzony (towary, ktore
@@ -1706,10 +1753,14 @@ namespace Armoury
                 Demand(x);
                 RegaleStep(x);
                 int rounds;
+                // m107 K4/K5: zjedzone tej rundy do rownowagi (fach - miejsce na targu, K5) i ocena NA TARG w ostatniej rownowadze kroku 8 (stan oddany do bilansu, K4)
+                x.EqEat = eat; x.EqMkt = inp.MarketBalance && it == iters - 1;
                 p = Equilibrium(x, p, inp.RoundsR8b, out xs, out S, out rounds, cancel);
+                x.EqMkt = false;
                 R.Rounds += rounds; M.Iter++;
-                if (cancel != null && cancel()) return;
+                if (cancel != null && cancel()) { x.EqEat = null; return; }
             }
+            x.EqEat = null;
             R.Eaten = (double[])eat.Clone();
             MuFinish(x);                                               // feed-swiat: narzut niedoboru do wyniku
             // zbieznosc punktu stalego (recenzja 17.10): sumy rynku stoja (sprzedaz, zaplacone, rece w domu - zmiana < 1% w ostatniej rundzie) i rynek bez nadwyzki

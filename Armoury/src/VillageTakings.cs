@@ -274,7 +274,13 @@ namespace Armoury
                 if (!DsVillage.On(home.Settlement)) return;
                 if (st.Gold - st.Party.PartyTradeGold <= 0) return;
                 long got = (long)home.TradeTaxAccumulated - st.HomeTax;   // dzialka pana z tego wozu (licznik pana w tym oknie, po F4b, regale i pracach okregu)
-                if (got <= 0) return;
+                if (got <= 0)
+                {
+                    // m107 (zad. 1, POMIAR hipotezy "licznik podatku ujemny"): wies ponizej skrzyni, a licznik pana bez przyrostu - ulga nie ma z czego; tylko licznik
+                    double ch0 = DsVillage.ReliefChest(home.Settlement);
+                    if (ch0 >= 1) DsVillage.NoteReliefNoTake(home.Settlement, Math.Floor(ch0 - home.Gold));
+                    return;
+                }
                 double chest = DsVillage.ReliefChest(home.Settlement);
                 if (!(chest >= 1)) return;                                // wies nieskalibrowana albo bez skrzyni - bez ulgi
                 double lack = Math.Floor(chest - home.Gold);

@@ -939,83 +939,34 @@ namespace Armoury
         // nb2 (m103-drobne): "nb2|D=doba|P=przedrostek0,przedrostek1,...|F=k~id~doba-D;...|W=...|H=..." - id (miasto, banda, wies, rod, soltys, flaga) z przedrostkiem
         // z tablicy P: "^<nr base36>_<koncowka>" (np. sea_raiders_246 -> ^0_246); doby jako przesuniecie wzgledem D (zapisanej doby zapisu - odczyt nie zalezy od zegara).
         // nb1 (stary, zapisy Jeffa z 101): "nb1|F=k~id~doba;...|W=...|H=..." - czytany jak dotad (WatchImport).
-        // Bieg 101: nb1 mial 18.5 KB (> 16 KB - SaveText kawalkuje); objetosc: listy (84 x ok. 81 B) i szkody band (159 band, ok. 72 B na bande).
+        // nb3 (m107-gospodarka, klucz Notice Board Lean Save): NoticeBoard.Nb3.cs - tablica miast T, podzial id litera/cyfra, szkody base36; proba odczytu przed zapisem.
+        // Bieg 101: nb1 mial 18.5 KB (SaveText kawalkuje napisy od 8000 znakow - SaveText.Part); objetosc: listy (84 x ok. 81 B) i szkody band (159 band, ok. 72 B na bande).
         private static int _secHead, _secF, _secW, _secH, _secHarmN, _secV1 = -1;   // rozmiary czesci ostatniego zapisu (linia doby listow) i nb1 w tym samym stanie
 
-        /// <summary>m103-drobne: tablica przedrostkow id do zapisu nb2 - przedrostek (do ostatniego '_') raz w P, w tekscie "^nr_koncowka" (tylko gdy krocej);
-        /// koncowka liczbowa od 5 cyfr bez zera na przodzie (bandy ROT: looters_2147131604) - "^nr:liczba w base36" (10 cyfr -> 6 znakow).</summary>
-        private sealed class IdTable
-        {
-            private readonly Dictionary<string, int> _ix = new Dictionary<string, int>(StringComparer.Ordinal);
-            private readonly List<string> _list = new List<string>();
-            internal string Enc(string id)
-            {
-                id = Safe(id);
-                if (id.Length < 6 || id[0] == '^') return id;
-                int p = id.LastIndexOf('_');
-                if (p < 3 || p >= id.Length - 1) return id;
-                string pre = id.Substring(0, p), suf = id.Substring(p + 1);
-                if (pre.IndexOfAny(BadPre) >= 0 || suf.IndexOfAny(BadPre) >= 0) return id;
-                int k;
-                bool known = _ix.TryGetValue(pre, out k);
-                long num;
-                bool digits = suf.Length >= 5 && suf.Length <= 18 && suf[0] != '0' && AllDigits(suf) && long.TryParse(suf, NumberStyles.None, Inv, out num);
-                string code = "^" + B36(known ? k : _list.Count) + (digits ? ":" + B36L(long.Parse(suf, NumberStyles.None, Inv)) : "_" + suf);
-                if (code.Length >= id.Length) return id;
-                if (!known) { _ix[pre] = _list.Count; _list.Add(pre); }
-                return code;
-            }
-            internal string Text() { return string.Join(",", _list.ToArray()); }
-        }
-        private static readonly char[] BadPre = { ',', '^', '/', '.', ':' };
+        // IdTable, B36, B36L, FromB36, Dec, AllDigits, BadPre, DecSep - przeniesione bez zmian do NoticeBoard.Nb3.cs (m107: ten sam kod w tescie poza gra).
 
-        private static bool AllDigits(string s) { foreach (char c in s) if (c < '0' || c > '9') return false; return true; }
-
-        private static string B36(int v) { return B36L(v); }
-
-        private static string B36L(long v)
-        {
-            const string D = "0123456789abcdefghijklmnopqrstuvwxyz";
-            if (v <= 0) return "0";
-            var sb = new StringBuilder(8);
-            while (v > 0) { sb.Insert(0, D[(int)(v % 36)]); v /= 36; }
-            return sb.ToString();
-        }
-
-        private static long FromB36(string s)
-        {
-            if (string.IsNullOrEmpty(s) || s.Length > 12) return -1;
-            long v = 0;
-            foreach (char c in s)
-            {
-                int d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'z' ? c - 'a' + 10 : -1;
-                if (d < 0) return -1;
-                v = v * 36 + d;
-            }
-            return v;
-        }
-
-        /// <summary>m103-drobne: id z zapisu nb2 - "^nr_koncowka" albo "^nr:liczba base36" z tablicy przedrostkow; reszta bez zmian.</summary>
-        private static string Dec(string s, string[] pre)
-        {
-            if (string.IsNullOrEmpty(s) || s[0] != '^' || pre == null) return s ?? "";
-            int u = s.IndexOfAny(DecSep, 1);
-            if (u < 2) return s;
-            long k = FromB36(s.Substring(1, u - 1));
-            if (k < 0 || k >= pre.Length) return s;
-            if (s[u] == '_') return pre[(int)k] + s.Substring(u);
-            long num = FromB36(s.Substring(u + 1));
-            return num > 0 ? pre[(int)k] + "_" + num.ToString(Inv) : s;
-        }
-        private static readonly char[] DecSep = { '_', ':' };
+        /// <summary>m107 K6: zapis w formacie nb3 (Notice Board Lean Save); wylaczony - nb2 jak dotad.</summary>
+        private static bool LeanSave { get { var s = Settings.Current; return s != null && s.NoticeBoardLeanSave; } }
 
         internal static string Export()
         {
             try
             {
                 bool any = _flags.Count > 0 || WatchAny();
-                if (!any) { _secHead = _secF = _secW = _secH = _secHarmN = 0; return null; }
+                if (!any)
+                {
+                    _secHead = _secF = _secW = _secH = _secHarmN = 0;
+                    _secVer = ""; _secBytes = 0; _secDay = Today; _secFlagN = _secNotN = _secBandN = _secTownN = 0;   // m107: sklad dla linii K6 (nb2 bez zmian)
+                    return null;
+                }
                 int d0 = Today;
+                if (LeanSave)   // m107 K6: nb3 z proba odczytu; niezgodnosc albo wyjatek - nb2 ponizej (jak dotad)
+                {
+                    string diff;
+                    string s3 = ExportV3(d0, out diff);
+                    if (s3 != null) return s3;
+                    Log.Info(P7 + "proba odczytu nb3 NIEZGODNA (pierwsza roznica: " + diff + ") - zapis nb2; niezgodnych w sesji " + _nb3Bad + ", zgodnych " + _nb3Ok + ".");
+                }
                 var ids = new IdTable();
                 var f = new StringBuilder();
                 foreach (var fl in _flags)
@@ -1032,9 +983,37 @@ namespace Armoury
                 sb.Append("|F=").Append(f); _secF = f.Length + 3;
                 sb.Append("|W=").Append(w); _secW = w.Length + 3;
                 sb.Append("|H=").Append(h); _secH = h.Length + 3;
-                return sb.ToString();
+                string s2 = sb.ToString();
+                _secVer = Ver2; _secBytes = s2.Length; _secDay = d0; _secNotN = _notices.Count; _secTownN = 0;   // m107: sklad (linie K6; zapis nb2 bez zmian)
+                _secFlagN = f.Length > 0 ? CountSep(f, ';') + 1 : 0; _secBandN = h.Length > 0 ? CountSep(h, ';') + 1 : 0;
+                return s2;
             }
             catch (Exception e) { Stumble("Export", e); return null; }
+        }
+
+        private static int CountSep(StringBuilder sb, char c) { int n = 0; for (int i = 0; i < sb.Length; i++) if (sb[i] == c) n++; return n; }
+
+        /// <summary>m107 K6: ArmouryBehavior.SyncData przy zapisie gry - eksport arm_board z pomiarem czasu i linia "Tablica (m107): zapis gry" (rozmiar, sklad, proba odczytu).
+        /// Klucz wylaczony - sam Export (jak dotad, bez linii).</summary>
+        internal static string ExportSave()
+        {
+            if (!LeanSave) return Export();
+            int st0 = _stumblesDay;   // poprawka recenzji kodu R4: null z wyjatku w Export (potkniecie) to nie "pusty"
+            long t0 = Stopwatch.GetTimestamp();
+            string s = Export();
+            double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+            _secV1Day = -2;   // sklad z chwili zapisu - nb1 z linii doby nie jest juz "w tym samym stanie"
+            try
+            {
+                // poprawka recenzji kodu R3: doba zapisu na koncu linii (ta sama doba D co w zapisie i w linii wczytania "doba zapisu d0") - M7G-52 paruje wczytanie z zapisem tej doby
+                if (s == null && _stumblesDay != st0) Log.Info(P7 + "zapis gry arm_board BLAD eksportu (0 B; wyjatek w Export - potkniecie, tablica bez zapisu), proba odczytu -, eksport "
+                                                              + ms.ToString("0.00", Inv) + " ms; doba zapisu " + Today);
+                else if (s == null) Log.Info(P7 + "zapis gry arm_board pusty (0 B; brak flag, listow i szkod band), proba odczytu zgodna -, eksport " + ms.ToString("0.00", Inv) + " ms; doba zapisu " + Today);
+                else Log.Info(P7 + "zapis gry arm_board " + _secVer + " " + s.Length + " B (" + SecText() + "), proba odczytu " + (_secVer == Ver3 ? "zgodna TAK" : "nb3 zgodna NIE - zapis nb2")
+                              + ", eksport " + ms.ToString("0.00", Inv) + " ms; proby w sesji: zgodne " + _nb3Ok + ", niezgodne " + _nb3Bad + "; doba zapisu " + _secDay);
+            }
+            catch (Exception e) { Stumble("ExportSave(linia)", e); }
+            return s;
         }
 
         /// <summary>m103-drobne: stary format nb1 w tym samym stanie - TYLKO do pomiaru w linii doby (porownanie objetosci), nie do zapisu.</summary>
@@ -1068,6 +1047,14 @@ namespace Armoury
                    + (_secV1 > 0 ? " (" + (100.0 * bytes / _secV1).ToString("0", Inv) + "%)" : "");
         }
 
+        /// <summary>m107 K6: sklad ostatniego eksportu (dowolnego - linia doby albo zapis gry) z doba pomiaru; nb1 tylko, gdy zmierzony w tym samym stanie (ta sama doba eksportu).</summary>
+        private static string SaveMixText3(int bytes)
+        {
+            bool v1 = _secV1 >= 0 && _secV1Day == _secDay;
+            return "sklad zapisu " + (_secVer.Length > 0 ? _secVer : "-") + " (pomiar doby " + _secDay + "): " + SecText() + ", stary format nb1 w tym samym stanie " + (v1 ? _secV1 + " B" : "-")
+                   + (v1 && _secV1 > 0 ? " (" + (100.0 * bytes / _secV1).ToString("0", Inv) + "%)" : "");
+        }
+
         internal static void Import(string s)
         {
             _flags.Clear();
@@ -1075,6 +1062,7 @@ namespace Armoury
             try
             {
                 var parts = s.Split('|');
+                if (parts.Length > 0 && parts[0] == Ver3) { Import3(parts, s.Length); return; }   // m107-gospodarka (niezaleznie od klucza)
                 if (parts.Length > 0 && parts[0] == Ver2) { Import2(parts, s.Length); return; }   // m103-drobne
                 if (parts.Length == 0 || parts[0] != Ver) { Log.Info(P + "zapis arm_board w nieznanej wersji (" + (parts.Length > 0 ? parts[0] : "?") + ") - pominiety."); return; }
                 for (int i = 1; i < parts.Length; i++)
@@ -1099,36 +1087,14 @@ namespace Armoury
         }
 
         /// <summary>m103-drobne: odczyt nb2 - najpierw D (doba zapisu) i P (przedrostki), potem flagi, listy i szkody (doby = D + przesuniecie).</summary>
+        /// m107: odczyt wspolny z nb3 (NoticeBoard.Nb3.cs Parse - te same reguly co dotad Import2 i WatchImport2; wyjatek czesci - licznik potkniec i dalej).
         private static void Import2(string[] parts, int bytes)
         {
-            int d0 = 0; bool hasD = false;
-            string[] pre = new string[0];
-            for (int i = 1; i < parts.Length; i++)
-            {
-                var p = parts[i];
-                if (p.StartsWith("D=", StringComparison.Ordinal)) hasD = int.TryParse(p.Substring(2), NumberStyles.Integer, Inv, out d0);
-                else if (p.StartsWith("P=", StringComparison.Ordinal)) pre = p.Length > 2 ? p.Substring(2).Split(',') : new string[0];
-            }
-            if (!hasD) { Log.Info(P + "zapis arm_board nb2 bez doby D - pominiety."); return; }
-            for (int i = 1; i < parts.Length; i++)
-            {
-                var p = parts[i];
-                if (p.StartsWith("F=", StringComparison.Ordinal))
-                {
-                    if (p.Length <= 2) continue;
-                    foreach (var r in p.Substring(2).Split(';'))
-                    {
-                        var x = r.Split('~');
-                        int off;
-                        if (x.Length < 3 || !int.TryParse(x[2], NumberStyles.Integer, Inv, out off)) continue;
-                        _flags.Add(new Flag { Kind = x[0], Id = Dec(x[1], pre), Until = d0 + off });
-                    }
-                }
-                else if (p.StartsWith("W=", StringComparison.Ordinal) || p.StartsWith("H=", StringComparison.Ordinal)) WatchImport2(p, d0, pre);
-            }
+            int d0, np, nt;
+            if (!Parse(parts, false, _flags, _notices, _harm, false, out d0, out np, out nt)) { Log.Info(P + "zapis arm_board nb2 bez doby D - pominiety."); return; }
             int hn = 0;
             foreach (var kv in _harm) hn += kv.Value.Count;
-            Log.Info(P + "wczytano zapis arm_board nb2 (" + bytes + " B, doba zapisu " + d0 + ", przedrostkow " + pre.Length + ") - flagi " + _flags.Count + ", listy " + _notices.Count
+            Log.Info(P + "wczytano zapis arm_board nb2 (" + bytes + " B, doba zapisu " + d0 + ", przedrostkow " + np + ") - flagi " + _flags.Count + ", listy " + _notices.Count
                      + ", szkody band " + _harm.Count + " (wpisow " + hn + ").");
         }
 

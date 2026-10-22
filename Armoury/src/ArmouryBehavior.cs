@@ -1399,7 +1399,8 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_towndebt", e); }
             // m102-tablica: tablica ogloszen ("nb1|F=flagi|W=listy gonczne|H=szkody band"); pisany tylko z danymi; wlasny try; brak klucza (stary zapis) = bez flag i listow; starsza DLL
             // klucz pomija. Reset przed SyncData (konstruktor -> M102TablicaReset)
-            try { string nb = dataStore.IsSaving ? NoticeBoard.Export() : null; if (!dataStore.IsSaving || nb != null) SaveText.Sync(dataStore, "arm_board", ref nb); if (dataStore.IsLoading) NoticeBoard.Import(nb); }
+            // m107-gospodarka K6 (Notice Board Lean Save): nb3 z proba odczytu (niezgodnosc - nb2) i linia "Tablica (m107): zapis gry"; klucz wylaczony - Export jak dotad
+            try { string nb = dataStore.IsSaving ? NoticeBoard.ExportSave() : null; if (!dataStore.IsSaving || nb != null) SaveText.Sync(dataStore, "arm_board", ref nb); if (dataStore.IsLoading) NoticeBoard.Import(nb); }
             catch (Exception e) { Log.Error("SyncData.arm_board", e); }
             // m106-wozy W2 (Village Cart Route Risk): pamiec tras wozow wsi ("m106r1~doba~swiat~region|miasto:A:N:doba!..."); wlasny try; klucz wylaczony - napis z zapisu
             // oddawany bez zmian (nowa kampania bez napisu - klucz nie pisany); brak klucza (stary zapis) = pamiec pusta; starsza DLL klucz pomija. Reset w konstruktorze
@@ -2200,6 +2201,7 @@ namespace Armoury
             try { VillageBook.PlacePendingAll(); } catch (Exception e) { Log.Error("VillageBook.PlacePendingAll", e); }   // Jeff 16.10 (D5, po recenzji): puste osady z zapisu z innym ukladem wiosek na wioski od razu - PO McmSettings.Apply (pulap DevastationMaxPercent z MCM), przed pierwszym tickiem
             try { VillageHamlets.SessionStart(); } catch (Exception e) { Log.Error("VillageHamlets.SessionStart", e); }   // sw-przysiolki: linia "Przysiolki (sw-przysiolki): start sesji" - uklad v6 wobec v5, najblizsza sasiadka, przysiolki na ladzie (po MCM)
             try { CartGuard.SessionStart(); } catch (Exception e) { Log.Error("CartGuard.SessionStart", e); }   // m106-wozy W2: linia "Wozy (m106): start sesji" (klucze i pamiec tras z zapisu) - po McmSettings.Apply
+            try { M107Start.SessionStart(); } catch (Exception e) { Log.Error("M107Start.SessionStart", e); }   // m107-gospodarka: linia "Gospodarka (m107): start sesji" (klucze K1-K6) - po McmSettings.Apply
             try { CanonHouses.SessionStart(); } catch (Exception e) { Log.Error("CanonHouses.SessionStart", e); }   // po recenzji D2 (16.10): plik rodow kanonu (1.4 MB) przy ladowaniu sesji, nie w pierwszym ticku proporczykow - PO McmSettings.Apply (klucze VillageBannerPerHolder / VillageCanonHouses)
             try { FixedSums38.SessionStart(); } catch (Exception e) { Log.Error("FixedSums38.SessionStart", e); }   // 3.8: TXP (drugi raz) i linia "Stale kwoty (3.8)" - PO HistoricalPrices.Apply
             try { CraftOrders8.SessionStart(); } catch (Exception e) { Log.Error("CraftOrders8.SessionStart", e); }   // E8/K (255): zlecenia kowalskie sprzed sesji (zapis, start nowej kampanii) - projekt i nagroda w nowej monecie; PO HistoricalPrices.Apply

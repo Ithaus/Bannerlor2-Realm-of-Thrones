@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
@@ -32,6 +33,13 @@ namespace Armoury
     /// H1 (tylko log): przyczyny, dla ktorych woz w domu z rozkazem nie wyjezdza (warunek gry MobileParty.CheckExitingSettlementParallel: AI wylaczone, Hold, cel chwilowy =
     /// ta osada; tratwa; predkosc), co 5 dob 5 przykladow.
     /// Klucz wylaczony - nic (bez pamieci i dzialan; linia doby z zerami i dopiskiem WYLACZONY); wszystkie piec kluczy W2 wylaczone - bez linii doby.
+    /// m107-gospodarka K1 (Village Cart Flee Unload, przy Village Cart Stuck Guard; WZ-1b: 1355 z 1355 przypadkow H1 to "cel chwilowy = osada"): woz z jukami i rozkazem jazdy,
+    /// ktorego cel chwilowy gry to wlasna wies (ucieczka: wynik inicjatywy > 1 - MobilePartyAi.GetBehaviors, potem GetFleeBehavior trzyma woz w osadzie; bandy z domem w tej
+    /// wsi kraza wokol niej), po FleeUnloadDays dobach w tym stanie (wies Normal, bez bitwy wozu i wsi): juki do magazynu tej wsi, rozkaz do domu i WSTRZYMANIE wsi - prefiks
+    /// VillagerCampaignBehavior.ThinkAboutSendingItemToTown zwraca false (gra nie laduje i nie wysyla wozu ponownie - dotad cofala rozladunek po 10 dobach). Raz na dobe
+    /// wstrzymana wies sprawdzana tym samym modelem AI gry (MobilePartyAIModel.GetBestInitiativeBehavior: wynik > 1 i zachowanie ucieczki); brak zagrozenia, brak wozu albo
+    /// wyjatek - zdjecie wstrzymania (bez limitu dob: woz rusza najpozniej dobe po odejsciu wroga). Pomiar: wsie bez wozu ponad 14 dob z przyczyna wedlug warunku gry.
+    /// Zamknieta ekonomia: towar tylko miedzy jukami a magazynem tej samej wsi, zloto bez ruchu. Wstrzymanie sesyjne (bez zapisu). Klucz wylaczony - jak w 5da5f304.
     /// </summary>
     internal static class CartGuard
     {
@@ -45,6 +53,7 @@ namespace Armoury
             public int FirstIn = -1;                                       // recenzja Z6: pierwsza doba w tej obcej osadzie (Act jej nie zeruje - licznik "ponad 30 dob")
             public Settlement PendAt, PendGo;                              // recenzja Z6: rozkaz z obcej osady - sukces liczony nastepnej doby, gdy woz z niej wyjechal
             public int HomeSince = -1, Unload = -1; public bool Ordered, HomeDone;
+            public int FleeSince = -1;                                     // m107 K1: pierwsza doba w domu z jukami, rozkazem i celem chwilowym = dom (ucieczka gry)
         }
         private sealed class Note { public Settlement To; public double T; public int Day; }
         private sealed class Exm { public int Key; public MobileParty Cart; public Settlement Home; public string What; public Exm(int k, MobileParty c, Settlement h, string w) { Key = k; Cart = c; Home = h; What = w; } }
@@ -62,9 +71,22 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.VillageCartStuckGuard; } }
 
+        // ------------------------------------------------------------ m107 K1: ucieczka w domu - rozladunek i wstrzymanie zaladunku
+        internal const int FleeUnloadDays = 3, NoCartDays = 14, M107ExMax = 3;
+        private static readonly Dictionary<Village, int> _fleeHold = new Dictionary<Village, int>();     // wies wstrzymana -> doba wstrzymania (sesja)
+        private static readonly Dictionary<Village, int> _noCartSince = new Dictionary<Village, int>();  // wies bez wozu -> pierwsza doba bez wozu (pomiar)
+        private static bool _thinkWired;
+        private static List<string> _ex7;                                                                 // przyklady m107 tej doby (co 5 dob) albo null
+        private static int _fuUnload, _fuUnits, _fuNew, _fuFree, _fuChecks, _fuStill, _fuLong, _fuBlocked;
+        private static int _ncOver, _ncStore, _ncHearth, _ncState, _ncOther;
+
+        /// <summary>K1 dziala przy wlaczonym strazniku (Home wolany z Guard).</summary>
+        internal static bool FleeOn { get { var s = Settings.Current; return s != null && s.VillageCartFleeUnload && s.VillageCartStuckGuard; } }
+
         internal static void Reset()
         {
             _st.Clear(); _notes.Clear(); _onceDone = false; _errSites.Clear();
+            _fleeHold.Clear(); _noCartSince.Clear();
             ClearDay();
         }
 
@@ -74,6 +96,35 @@ namespace Armoury
             _homeOver = _homeOrder = _homeUnload = _homeUnloadUnits = _homeNoExit = _y1 = _y2 = _y3 = 0;
             _w1Alt = _w1None = _once = _stumbles = 0;
             _h1Ai = _h1Hold = _h1Short = _h1Raft = _h1Speed = _h1Other = 0;
+            _fuUnload = _fuUnits = _fuNew = _fuFree = _fuChecks = _fuStill = _fuLong = _fuBlocked = 0;
+            _ncOver = _ncStore = _ncHearth = _ncState = _ncOther = 0;
+        }
+
+        /// <summary>m107 K1: MarketRoad.ApplyAll - prefiks VillagerCampaignBehavior.ThinkAboutSendingItemToTown (wstrzymanie zaladunku wsi pod ucieczka). Brak metody - linia
+        /// "BRAK" (sam rozladunek dalej dziala; gra moze zaladowac ponownie - jak dotad).</summary>
+        internal static void Wire(Harmony h)
+        {
+            try
+            {
+                var m = AccessTools.DeclaredMethod(typeof(VillagerCampaignBehavior), "ThinkAboutSendingItemToTown");
+                if (m == null) { Log.Info("Wozy (m107): BRAK VillagerCampaignBehavior.ThinkAboutSendingItemToTown - wstrzymanie zaladunku wylaczone (rozladunek wozu pod ucieczka dziala)."); return; }
+                h.Patch(m, prefix: new HarmonyMethod(typeof(CartGuard), nameof(ThinkPrefix)));
+                _thinkWired = true;
+                Log.Info("Wozy (m107): latka VillagerCampaignBehavior.ThinkAboutSendingItemToTown wpieta (wstrzymanie zaladunku wsi pod ucieczka, klucz Village Cart Flee Unload).");
+            }
+            catch (Exception e) { Log.Error("CartGuard.Wire", e); }
+        }
+
+        /// <summary>m107 K1: wies wstrzymana (rozladowany woz pod ucieczka) - gra nie laduje, nie dobiera ludzi i nie wystawia wozu (return false). Inaczej - gra jak dotad.</summary>
+        private static bool ThinkPrefix(Village village)
+        {
+            try
+            {
+                if (_fleeHold.Count == 0 || village == null || !_fleeHold.ContainsKey(village) || !FleeOn) return true;
+                _fuBlocked++;
+                return false;
+            }
+            catch { return true; }
         }
 
         private static void Stumble(string where, Exception e)
@@ -281,6 +332,11 @@ namespace Armoury
                 MarketCarts.TakeM106(); CartRisk.SkipDay(); ClearDay();
                 return;
             }
+            var ex7 = new List<string>();
+            bool flee = on && s.VillageCartFleeUnload;   // m107 K1 (przy strazniku)
+            _ex7 = exDay ? ex7 : null;
+            if (flee) { try { HoldCheck(today, _ex7); } catch (Exception e) { Stumble("CartGuard.HoldCheck", e); } }   // przed Guard: wstrzymane wczoraj i wczesniej
+            else { _fleeHold.Clear(); _noCartSince.Clear(); }
             if (on) Guard(s, today, vcb, exDay ? ex : null);
             else { _st.Clear(); _notes.Clear(); }
             CartRisk.Tidy();
@@ -304,6 +360,12 @@ namespace Armoury
               .Append(", przepadla ").Append(m.TuLost)
               .Append(" | H1 w domu: AI wylaczone ").Append(_h1Ai).Append(", Hold ").Append(_h1Hold).Append(", cel chwilowy = osada ").Append(_h1Short).Append(", tratwa ").Append(_h1Raft)
               .Append(", predkosc 0 ").Append(_h1Speed).Append(", inne ").Append(_h1Other);
+            // m107 K1: ucieczka w domu i wsie bez wozu (klucz wylaczony - zera i dopisek WYLACZONE)
+            sb.Append(" | m107 ucieczka w domu (Village Cart Flee Unload ").Append(flee ? "TAK" : "NIE - WYLACZONE").Append(_thinkWired ? "" : ", latka zaladunku BRAK").Append("): rozladowane ").Append(_fuUnload)
+              .Append(" (szt. ").Append(_fuUnits).Append("), wsie wstrzymane ").Append(_fleeHold.Count).Append(" (nowe ").Append(_fuNew).Append(", zwolnione ").Append(_fuFree)
+              .Append(", sprawdzenia ").Append(_fuChecks).Append(", wrog dalej ").Append(_fuStill).Append(", ponad ").Append(LongDays).Append(" dob ").Append(_fuLong).Append("), odmowy zaladunku ").Append(_fuBlocked)
+              .Append(" | bez wozu ponad ").Append(NoCartDays).Append(" dob ").Append(_ncOver).Append(" (magazyn < W ").Append(_ncStore).Append(", ogniska ponizej minimum ").Append(_ncHearth)
+              .Append(", wies nie Normal ").Append(_ncState).Append(", inne ").Append(_ncOther).Append(')');
             double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
             sb.Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms (brama w wyborach ").Append(gateMs.ToString("0.00", Inv)).Append(" ms)")
               .Append(" | potkniecia ").Append(_stumbles + CartRisk.StumblesDay + m.Stumbles).Append('.');
@@ -314,7 +376,76 @@ namespace Armoury
                 int n = Math.Min(5, ex.Count);
                 for (int i = 0; i < n; i++) Log.Info("Wozy (m106) przyklad: dzien " + day + " - " + (i + 1) + "/" + n + " " + Ex(ex[i].Cart, ex[i].Home, ex[i].What) + ".");   // pola i najblizszy wrog tylko dla 5 przykladow
             }
+            foreach (var l in ex7) Log.Info(l);   // m107 K1: przyklady wstrzymanych i bez wozu (co 5 dob, najwyzej 3 i 3)
+            _ex7 = null;
             ClearDay();
+        }
+
+        /// <summary>m107 K1: raz na dobe kazda wstrzymana wies - woz brak / nie w domu / nieczynny - zdjecie; inaczej zagrozenie wedlug modelu AI gry (to samo zapytanie, ktore gra
+        /// zadaje wozowi co godzine: GetBestInitiativeBehavior, wynik &gt; 1 i zachowanie ucieczki - MobilePartyAi.GetBehaviors); brak zagrozenia albo wyjatek - zdjecie.
+        /// Wolane w dobie kampanii (miedzy tickami AI - statyczna lista DangerousPartiesAndTheirVecs gra buduje od nowa przy kazdym wywolaniu). Przyklady co 5 dob.</summary>
+        private static void HoldCheck(int today, List<string> ex7)
+        {
+            if (_fleeHold.Count == 0) return;
+            var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.MobilePartyAIModel : null;
+            var free = new List<Village>();
+            int shown = 0;
+            foreach (var kv in _fleeHold)
+            {
+                var v = kv.Key;
+                try
+                {
+                    var cart = v != null && v.VillagerPartyComponent != null ? v.VillagerPartyComponent.MobileParty : null;
+                    if (cart == null || !cart.IsActive || v.Settlement == null || cart.CurrentSettlement != v.Settlement || model == null) { free.Add(v); continue; }
+                    _fuChecks++;
+                    AiBehavior b; MobileParty foe; float sc; Vec2 av;
+                    bool threat;
+                    try { model.GetBestInitiativeBehavior(cart, out b, out foe, out sc, out av); threat = sc > 1f && MobileParty.IsFleeBehavior(b); }
+                    catch (Exception e) { Stumble("CartGuard.HoldCheck(model)", e); threat = false; b = AiBehavior.None; foe = null; sc = 0f; }
+                    if (!threat) { free.Add(v); continue; }
+                    _fuStill++;
+                    int since = today - kv.Value;
+                    if (since > LongDays) _fuLong++;
+                    if (ex7 != null && shown < M107ExMax)
+                    {
+                        shown++;
+                        string fn; try { fn = foe != null && foe.Name != null ? foe.Name.ToString() + " [" + foe.StringId + "]" : "-"; } catch { fn = "?"; }
+                        ex7.Add("Wozy (m107) wstrzymana: wies " + Name(v.Settlement) + " [" + v.Settlement.StringId + "] od " + since + " dob, wrog " + fn + " (wynik " + sc.ToString("0.00", Inv)
+                                + ", " + b + "), magazyn " + StoreText(v) + ".");
+                    }
+                }
+                catch (Exception e) { Stumble("CartGuard.HoldCheck(wies)", e); free.Add(v); }
+            }
+            foreach (var v in free) { _fleeHold.Remove(v); _fuFree++; }
+        }
+
+        private static string StoreText(Village v)
+        {
+            int store = 0, W = 0;
+            try { var r = v.Settlement.ItemRoster; if (r != null) for (int i = 0; i < r.Count; i++) store += r.GetElementNumber(i); W = v.GetWarehouseCapacity(); } catch { }
+            return store + "/" + W;
+        }
+
+        /// <summary>m107 K1 (pomiar): wies bez wozu (VillagerPartyComponent null albo woz nieczynny) - doba pierwszej obserwacji; ponad NoCartDays dob - przyczyna wedlug warunku gry
+        /// przed wystawieniem wozu (VillagerCampaignBehavior.TickVillageThink / ThinkAboutSendingItemToTown: wies Normal, magazyn &gt;= W, ogniska &gt; minimum gry). Tylko log.</summary>
+        private static void NoCart(Village v, int today, List<string> ex7)
+        {
+            int since;
+            if (!_noCartSince.TryGetValue(v, out since)) { _noCartSince[v] = today; return; }
+            int d = today - since;
+            if (d <= NoCartDays) return;
+            _ncOver++;
+            int store = 0, W = 0, min = 0;
+            try { var r = v.Settlement.ItemRoster; if (r != null) for (int i = 0; i < r.Count; i++) store += r.GetElementNumber(i); W = v.GetWarehouseCapacity(); } catch { }
+            try { min = Campaign.Current.Models.PartySizeLimitModel.MinimumNumberOfVillagersAtVillagerParty; } catch { }
+            string why;
+            if (v.VillageState != Village.VillageStates.Normal) { _ncState++; why = "wies " + v.VillageState; }
+            else if (store < W) { _ncStore++; why = "magazyn < W"; }
+            else if (v.Hearth <= min) { _ncHearth++; why = "ogniska ponizej minimum"; }
+            else { _ncOther++; why = "inne"; }
+            if (ex7 != null && _ncOver <= M107ExMax)
+                ex7.Add("Wozy (m107) bez wozu: wies " + Name(v.Settlement) + " [" + (v.Settlement != null ? v.Settlement.StringId : "?") + "] od " + d + " dob, magazyn " + store + "/" + W
+                        + ", ogniska " + v.Hearth.ToString("0", Inv) + " (min " + min + "), " + why + ".");
         }
 
         /// <summary>Klucz Village Cart Land Road Only, pierwsza doba sesji: woz w polu, ktorego cel nie ma drogi ladowej z miejsca, gdzie stoi (pamiec drog &gt;= prog BK) - nowy cel.</summary>
@@ -344,7 +475,12 @@ namespace Armoury
                 try
                 {
                     var cart = v != null && v.VillagerPartyComponent != null ? v.VillagerPartyComponent.MobileParty : null;
-                    if (cart == null || !cart.IsActive) continue;
+                    if (cart == null || !cart.IsActive)
+                    {
+                        if (v != null && v.Settlement != null && FleeOn) NoCart(v, today, _ex7);   // m107 K1: pomiar wsi bez wozu
+                        continue;
+                    }
+                    if (_noCartSince.Count > 0) _noCartSince.Remove(v);
                     present.Add(cart);
                     _tracked++;
                     St st;
@@ -371,7 +507,7 @@ namespace Armoury
             if (gone != null) foreach (var k in gone) _notes.Remove(k);
         }
 
-        private static void ClearHome(St st) { st.HomeSince = -1; st.Unload = -1; st.Ordered = false; st.HomeDone = false; }
+        private static void ClearHome(St st) { st.HomeSince = -1; st.Unload = -1; st.Ordered = false; st.HomeDone = false; st.FleeSince = -1; }   // m107: FleeSince - poza domem od nowa
 
         private static void Field(MobileParty cart, St st, Settlement home, int today, VillagerCampaignBehavior vcb, List<Exm> ex)
         {
@@ -436,6 +572,26 @@ namespace Armoury
             var tg = cart.TargetSettlement;
             bool order = cart.DefaultBehavior == AiBehavior.GoToSettlement && tg != null && tg != home;
             bool lo = load && order;
+            // m107 K1: ucieczka gry trzyma zaladowany woz w domu (cel chwilowy = dom - warunek z H1) - po FleeUnloadDays dobach rozladunek do magazynu tej wsi, rozkaz do domu
+            // i wstrzymanie zaladunku (ThinkPrefix) do doby bez zagrozenia (HoldCheck); epizod konczy sie bez krokow 5/10/20. Bez ucieczki - logika jak dotad.
+            if (s.VillageCartFleeUnload)
+            {
+                if (lo && cart.ShortTermTargetSettlement == home)
+                {
+                    if (st.FleeSince < 0) st.FleeSince = today;
+                    if (today - st.FleeSince >= FleeUnloadDays && v.VillageState == Village.VillageStates.Normal && cart.MapEvent == null && (home.Party == null || home.Party.MapEvent == null))
+                    {
+                        int n = Unload(cart, home);
+                        _fuUnload++; _fuUnits += n;
+                        MarketCarts.ForgetPending(cart);
+                        MarketRoad.Move(vcb, cart, home);
+                        if (!_fleeHold.ContainsKey(v)) { _fleeHold[v] = today; _fuNew++; }
+                        ClearHome(st); st.FleeSince = -1;
+                        return;
+                    }
+                }
+                else st.FleeSince = -1;
+            }
             if (st.HomeSince < 0)
             {
                 if (!lo) return;

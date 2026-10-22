@@ -36,6 +36,7 @@ namespace Armoury
     internal sealed partial class KsInput
     {
         public bool FachOn;                  // m106 (klucz Ks Village Trade Keep): fach wsi w rownowadze Planu i w RegaleStep
+        public bool FachMarketRoom;          // m107 K5 (klucz Ks Fach Market Room): miejsce fachu na targu = popyt - regale - zjedzone we WSZYSTKICH okregach rynku (nie tylko fachu)
     }
 
     /// <summary>m106: fach okregu w wyniku Planu. T - cel na targ kg/d po k (regale - po skali krainy), P - produkcja towaru w Planie kg/d, Own - chec zjedzenia w okregu kg/d,
@@ -101,6 +102,8 @@ namespace Armoury
             }
         }
 
+        internal static bool FachRoomPrev = true;                       // m107 K5: zjedzone z poprzedniego Planu przed biezacym krokiem 8 (harness: false - runda kroku 8)
+
         /// <summary>m106 - raz na rownowage (po FloorStep): okregi fachu, k rynku i towaru, cele, pary z towarem fachu i kolejnosc blokow (typ daje najwiecej towaru na udzial).</summary>
         private static void FachStep(Ctx x)
         {
@@ -148,7 +151,15 @@ namespace Armoury
                 int m = key / KsTab.NG, g = key % KsTab.NG;
                 int gi = m * KsTab.NG + (Livestock(g) ? KsTab.GMeat : g);
                 double dm = x.Dm != null && gi < x.Dm.Length ? x.Dm[gi] : 0.0, sr = x.Sreg != null && gi < x.Sreg.Length ? x.Sreg[gi] : 0.0;
-                double avail = Math.Max(0.0, dm - sr - sumOwn[key]), tot = sumKg[key];
+                // m107 K5 (Ks Fach Market Room): wolne miejsce na targu bez tego, co zjadaja WSZYSTKIE okregi rynku (w kroku 8 - ta runda, x.EqEat; wczesniej - poprzedni Plan,
+                // KsInput.PrevEaten; pierwszy Plan przed krokiem 8 - jak dotad); dotad tylko zjedzone w okregach z fachem - ziarno W fach k 1.00 przy pelnym targu (NKS-3 1.10)
+                double eatAll = 0.0;
+                if (x.In.FachMarketRoom)
+                {
+                    var ea = FachRoomPrev ? (x.In.PrevEaten ?? x.EqEat) : (x.EqEat ?? x.In.PrevEaten);   // bramka: poprzedni Plan najpierw (stale k w Planie)
+                    if (ea != null && gi < ea.Length && ea[gi] > 0 && !double.IsNaN(ea[gi]) && !double.IsInfinity(ea[gi])) eatAll = ea[gi];
+                }
+                double avail = Math.Max(0.0, dm - sr - Math.Max(sumOwn[key], eatAll)), tot = sumKg[key];
                 double k = tot > 0 ? Math.Min(1.0, avail / tot) : 0.0;
                 if (double.IsNaN(k) || double.IsInfinity(k)) k = 0.0;
                 kOf[key] = k;
@@ -401,6 +412,7 @@ namespace Armoury
               .Append(" | najwiekszy niedobor (cel/w Planie szt./d): ");
             if (worst.Count == 0) sb.Append('-');
             for (int i = 0; i < worst.Count && i < 6; i++) sb.Append(i > 0 ? ", " : "").Append(worst[i].Value);
+            if (x.In.FachMarketRoom) sb.Append(" | miejsce na targu od popytu - zjedzone we wszystkich okregach (Ks Fach Market Room TAK)");   // m107 K5 (przed "czas fach" - regex WZ)
             sb.Append(" | czas fach ").Append(R.FachMs.ToString("0", inv)).Append(" ms.");
             R.FachLine = sb.ToString();
         }
