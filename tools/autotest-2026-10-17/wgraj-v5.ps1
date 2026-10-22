@@ -96,10 +96,11 @@ if (Test-Path -LiteralPath $lekDir -PathType Container) {
     }
 }
 # 21/22.10 galaz czcionek: prefaby tabliczek Armoury\GUI\Prefabs\Nameplate\*.xml - gdy sa w drzewie (bez nich nic nie dochodzi)
-$npDir = Join-Path $Tree 'Armoury\GUI\Prefabs\Nameplate'
+$npDir = Join-Path $Tree 'Armoury\GUI\Prefabs'   # noc 21/22.10: wszystkie prefaby Armoury GUI (Nameplate, dziennik) rekurencyjnie
 if (Test-Path -LiteralPath $npDir -PathType Container) {
-    foreach ($f in @(Get-ChildItem -LiteralPath $npDir -Filter '*.xml' -File -ErrorAction SilentlyContinue)) {
-        $r0 = 'Armoury\GUI\Prefabs\Nameplate\' + $f.Name
+    $npFull = (Get-Item -LiteralPath $npDir).FullName
+    foreach ($f in @(Get-ChildItem -LiteralPath $npDir -Filter '*.xml' -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.bak-*' })) {
+        $r0 = 'Armoury\GUI\Prefabs\' + $f.FullName.Substring($npFull.Length + 1)
         if (@($items | Where-Object { $_.name -eq $r0 }).Count -eq 0) { $items += [pscustomobject]@{ name = $r0; src = $f.FullName; dst = (Join-Path $GameDir ('Modules\' + $r0)); dll = $false } }
     }
 }

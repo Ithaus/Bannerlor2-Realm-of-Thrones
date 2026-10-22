@@ -67,10 +67,11 @@ if (Test-Path -LiteralPath $lekDir -PathType Container) {
         $r0 = 'Armoury\ModuleData\Lektor\' + $f.FullName.Substring($lekFull.Length + 1); if ($rel -notcontains $r0) { $rel += $r0 }
     }
 }
-# 21/22.10 galaz czcionek: prefaby tabliczek Armoury\GUI\Prefabs\Nameplate\*.xml - gdy sa w drzewie
-$npDir = Join-Path $Tree 'Armoury\GUI\Prefabs\Nameplate'
+# 21/22.10 galaz czcionek + dziennik (noc 21/22.10): WSZYSTKIE prefaby Armoury\GUI\Prefabs\**\*.xml z drzewa (podkatalogi: Nameplate, dziennik)
+$npDir = Join-Path $Tree 'Armoury\GUI\Prefabs'
 if (Test-Path -LiteralPath $npDir -PathType Container) {
-    foreach ($f in @(Get-ChildItem -LiteralPath $npDir -Filter '*.xml' -File -ErrorAction SilentlyContinue)) { $r0 = 'Armoury\GUI\Prefabs\Nameplate\' + $f.Name; if ($rel -notcontains $r0) { $rel += $r0 } }
+    $npFull = (Get-Item -LiteralPath $npDir).FullName
+    foreach ($f in @(Get-ChildItem -LiteralPath $npDir -Filter '*.xml' -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '*.bak-*' })) { $r0 = 'Armoury\GUI\Prefabs\' + $f.FullName.Substring($npFull.Length + 1); if ($rel -notcontains $r0) { $rel += $r0 } }
 }
 $ef = @()
 foreach ($r in $rel) {
