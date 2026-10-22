@@ -1049,11 +1049,12 @@ Uzycie (Python 3, tylko odczyt):
                     - paczka k00, armoury-kronika-wybor.flag - wymuszona opcja) python -I tools/sprawdz_logi.py --grupa m105kronika <Armoury-*.log>
                     [--crashscribe <session-*.log>]. Log 'Kronika Westeros (KW): '. KW-0 start (klucz TAK, paczki z oknami, zle wiersze 0), KW-1 ERROR Chronicle
                     i potkniecia 0, KW-2 okna do pokazania pokazane w <= 3 doby, KW-3 zadne okno przed 'od' (KW-3b kotwice 'przed' - straty INFO, > 10% sygnal),
-                    KW-4 <= 2 okna na dobe i odstep >= 6 h, KW-5 akcje z wynikiem i nieznanych 0 (KW-5b niewspierane INFO), KW-6 zloto z platnikiem, KW-7 okno
+                    KW-4 <= 2 okna na dobe i odstep >= 6 h, KW-5 akcje z wynikiem i nieznanych 0 (KW-5b niewspierane, KW-5c swiadomie POMINIETE INFO), KW-6 zloto z platnikiem, KW-7 okno
                     i wybor najwyzej raz w kampanii, KW-8 okna zapas 0, KW-9 wybory po oknie (para z AUTOTEST 'OKNO wybor z listy' przy --crashscribe, lista
                     zniknieta 0), KW-10 ZWOLNIENIE PRZY OKNIE 0, KW-11 lektor (INFO), KW-12 zapis arm_kronika < 24 KB, KW-13 #mNN najwyzej raz i pary #para
-                    w kolejnosci, KW-14 bandy <= 12, KW-15 ukrycie postaci chronionej tylko po jej wydarzeniu ROT (KW-15b ukryci bez powrotu INFO). Log bez
-                    Kroniki: INFO; klucz ChronicleOfWesteros NIE: progi okien INFO.
+                    w kolejnosci, KW-14 bandy <= 12 i sufit band fabularnych okregu z linii 'banda' (KW-14b losy band INFO), KW-15 ukrycie postaci chronionej
+                    tylko po jej wydarzeniu ROT (KW-15b ukryci bez powrotu INFO), KW-16 zadania i zbiorki (INFO; B2). Log bez Kroniki: INFO; klucz
+                    ChronicleOfWesteros NIE: progi okien INFO.
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
@@ -39056,6 +39057,10 @@ M105KR_HIDE = re.compile(r"^ukryty (.*?) \((\S+)\) \((\S+)\) do (.*?) \| (.*)\.$
 M105KR_BACK = re.compile(r"^(powrot|KONIEC UKRYCIA|UKRYCIE przerwane) (.*?) \((\S+)\)[ .]")
 M105KR_GOLD = re.compile(r"^zloto (\S+): (.*?) -> (.*?) (\d+)")
 M105KR_BAND = re.compile(r"^banda (\S+) ")
+M105KR_BAND_REG = re.compile(r"\| region (\S+): band fabularnych (\d+)/(\d+)")   # B2: linia narodzin bandy - sufit okregu
+M105KR_BAND_POOL = re.compile(r"\| ludzi (\d+) ludzi \(z puli ([0-9.]+), zabrani z domow ([0-9.]+)\)")
+M105KR_TASK = re.compile(r"^zadanie (\S+) (?:'.*?' )?(przyjete|WYKONANE|NIEUDANE)")
+M105KR_MUSTER = re.compile(r"^zbiorka (\S+) -> (\S+) .*?koniec: na miejscu (\d+) z (\d+)")
 M105KR_CC_MOVE = re.compile(r"^zmiana strony #(\S+) - .*? akcja (\w+).*?\| wyzwalacz (.*?)(?: \(zaszlo (\S+)\))? \(dzien kampanii")
 M105KR_CC_SKIP = re.compile(r"^zmiana strony #(\S+) POMINIETA - ")
 M105KR_CS_LIST = re.compile(r'OKNO wybor z listy "(.*?)" \((.*)\) -> (TAK|NIE)')
@@ -39136,6 +39141,7 @@ def m105kronika_main(logp, csp=None):
     starts, days, n_err, zwol = [], [], 0, 0
     data_lines, bad_files, bad_rows_lines = [], [], 0
     shown, res_lines, skips, acts, chosen, cwait, lists, lost, saves, hides, backs, golds, bands, cc_moves, cc_skips = ([] for _ in range(15))
+    tasks, musters = [], []   # B2: linie zadan i konca zbiorek
     stumb = 0
     seq = 0
     camp = 0
@@ -39239,6 +39245,14 @@ def m105kronika_main(logp, csp=None):
             mm = M105KR_BAND.match(b)
             if mm:
                 bands.append(b)
+                continue
+            mm = M105KR_TASK.match(b)
+            if mm:
+                tasks.append((mm.group(1), mm.group(2)))
+                continue
+            mm = M105KR_MUSTER.match(b)
+            if mm:
+                musters.append((mm.group(1), mm.group(2), int(mm.group(3)), int(mm.group(4))))
                 continue
     print(f"plik: {logp} | startow sesji {len(starts)}, dob {len(days)}, okien pokazanych {len(shown)}, wiesci/log/nic {len(res_lines)}, POMINIETE {len(skips)}, "
           f"akcji {len(acts)}, wyborow {len(chosen)}, list {len(lists)}, ukryc {len(hides)}, zmian stron #move {len(cc_moves)}, ERROR {n_err}")
@@ -39360,7 +39374,14 @@ def m105kronika_main(logp, csp=None):
     nsup = Counter(a[4].split(":")[0] for a in acts if a[5] == "POMINIETA" and (a[6] or "").startswith("akcja jeszcze niewspierana"))
     rep.add("KW-5b: akcje niewspierane w tej wersji silnika", ", ".join(f"{k} {v}" for k, v in nsup.most_common()) or "0",
             "INFO (K0: wiesc, plotka, flag, kod:test, rel, relp, relk, renown, influence, hide, unhide; B1: gold, security, loyalty, ware, garrison, item, wound, skill; "
-            "pop - niewspierana: ksiega ludzi bez przyczyny kronika; reszta w paczkach K1+)", None)
+            "B2: band, task, tourney, muster, clan, court, lead, prisoner, free, wander, die, marry, wed, succeed, own, ruler, leader, truce, kod:zaraza/dzwony/wielka_rada; "
+            "pop - niewspierana: ksiega ludzi bez przyczyny kronika)", None)
+    # KW-5c (B2): swiadomie POMINIETE - alliance (plan P5) i tylko-pelne poza wersja pelna
+    full_skip = Counter(a[4].split(":")[0] for a in acts if a[5] == "POMINIETA" and " - tylko pelna" in (a[6] or ""))
+    ally = sum(1 for a in acts if a[4].startswith("alliance:") and a[5] == "POMINIETA")
+    rep.add("KW-5c: akcje swiadomie POMINIETE (alliance P5, tylko pelna)", f"alliance {ally}; tylko pelna: " + (", ".join(f"{k} {v}" for k, v in full_skip.most_common()) or "0"),
+            "INFO (alliance zawsze POMINIETA z powodem - straznik Prologue.Crown / CanonAlliances; own, ruler, leader, truce, succeed tylko w wierszu pelna przy kluczu "
+            "Chronicle Full Versions TAK, succeed lekki w 42/49/52/80)", None)
     # KW-6 zloto
     nothing = sum(1 for g_ in golds if "z niczego" in g_) + sum(1 for a in acts if a[4].startswith("gold:") and a[5] == "OK" and "z niczego" in (a[6] or ""))
     gold_ok = [a for a in acts if a[4].startswith("gold:") and a[5] == "OK"]
@@ -39465,8 +39486,17 @@ def m105kronika_main(logp, csp=None):
     # KW-14 bandy
     bl = [int(M105KR_BANDS.search(d[2]).group(1)) for d in days if M105KR_BANDS.search(d[2])]
     bmax = max(bl or [0])
-    rep.add("KW-14: bandy Kroniki <= 12", f"najwiecej w dobie {bmax} (dob z licznikiem {len(bl)}), linii band {len(bands)}",
-            "<= 12 (ludzie z puli i sufit regionu - z linii band, gdy beda; brak licznika w liniach doby - INFO)", (bmax <= 12) if bl else None)
+    born = [b for b in bands if M105KR_BAND_REG.search(b)]
+    over = [b.split(" ")[1] + " " + "/".join(M105KR_BAND_REG.search(b).groups()[1:]) for b in born if int(M105KR_BAND_REG.search(b).group(2)) > int(M105KR_BAND_REG.search(b).group(3))]
+    nopool = [b.split(" ")[1] for b in born if not M105KR_BAND_POOL.search(b)]
+    rep.add("KW-14: bandy Kroniki <= 12, sufit okregu, ludzie z puli", f"najwiecej w dobie {bmax} (dob z licznikiem {len(bl)}), narodzin band {len(born)}, ponad sufit okregu {len(over)}"
+            + (f" [{', '.join(over[:4])}]" if over else "") + f", bez 'z puli' w linii {len(nopool)}",
+            "<= 12 w kazdej dobie; kazda linia narodzin: band fabularnych okregu <= sufit i ludzie z puli/domow (SpawnBand); brak licznika - INFO",
+            (bmax <= 12 and not over and not nopool) if (bl or born) else None)
+    routed = sum(1 for b in bands if " ROZBITA przez gracza" in b)
+    ended = sum(1 for b in bands if " koniec terminu" in b)
+    gone = sum(1 for b in bands if " zniknela z mapy" in b)
+    rep.add("KW-14b: losy band Kroniki", f"rozbite przez gracza {routed}, koniec terminu {ended}, zniknely {gone}", "INFO", None)
     # KW-15 lista chronionych i powrot ukrytych
     viol = [f"{h[3]} ({h[4]})" for h in hides if h[3] in prot and "lista chronionych:" not in h[6]]
     back_ids = {(b[1], b[3]) for b in backs}
@@ -39477,6 +39507,10 @@ def m105kronika_main(logp, csp=None):
             "0 ukryc postaci chronionej bez 'lista chronionych: <wydarzenie> spelnione'", (not viol) if hides else None)
     rep.add("KW-15b: ukryci bez powrotu w logu", f"{len(still)}" + (f" [{'; '.join(still[:5])}]" if still else "") + f" | powrotow/koncow {len(backs)}",
             "INFO (koniec ukrycia = term albo unhide; term 'nigdy' konczy ukrycie linia KONIEC UKRYCIA)", None)
+    # KW-16 (B2): zadania (przyjete/wykonane/nieudane) i zbiorki (na miejscu z wyslanych) - INFO
+    tc = Counter(s_ for _, s_ in tasks)
+    rep.add("KW-16: zadania i zbiorki Kroniki", f"zadan przyjetych {tc.get('przyjete', 0)}, wykonanych {tc.get('WYKONANE', 0)}, nieudanych {tc.get('NIEUDANE', 0)} | zbiorek zakonczonych {len(musters)}"
+            + (f", na miejscu {sum(m_[2] for m_ in musters)} z {sum(m_[3] for m_ in musters)} druzyn" if musters else ""), "INFO (zbiorka to jednorazowy rozkaz - AI moze go zmienic)", None)
     rep.show()
     return 0
 
