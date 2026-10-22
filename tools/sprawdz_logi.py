@@ -1044,6 +1044,15 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
                     python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
                     KO-3 encja kola postawiona, KO-4 potkniecia kola 0.
+--grupa m105miasta: (21/22.10, w-toku/m105-miasta; Armoury/src/DsTowns.cs, KsFolkIncome.cs, KingdomTreasury.CrownSurplus.cs, TownFolk.Bread.cs, KsLordFood.cs,
+                    MapRoads.cs, MapRoadKinds.cs, MarketCarts.cs; klucze DsFarmCutBelowReserve, CrownHoardFeedsHungry, MapRoadBonusAboveFloor, VillageCartGoldAware)
+                    python -I tools/sprawdz_logi.py --grupa m105miasta <Armoury-*.log> [--tabele <katalog z kasy-miast.csv>]. M5M-0 segmenty m105 w liniach
+                    f5-lud, "Chleb biedoty (M3)", "Pan miasta placi za dowoz (KS)", "Drogi Valyrii (VR)", "Dowoz (wozy)" kazdej doby (klucze TAK; log bez
+                    segmentow - INFO), M5M-1 miasta >= 28 dob z rzedu ponizej zapasu kupcow z poborem ponad doplyw (kasy-miast.csv, ostatnie 56 dob) <= 2, M5M-2
+                    pobor ponad doplyw w dobach ponizej zapasu (56 dob) <= 1% poboru, M5M-3 (straznik G1) firmy miast panom i koronom d202-229 >= 0.9 x 102,
+                    M5M-4 rachunki KS-H starsze niz zwloka 0 kazdej doby i starsze niz prog wczesnej splaty na koniec <= 10 tys., M5M-5 chleb "nie stac nikogo"
+                    przy wolnym limicie skarbca 0, M5M-6 skarbiec ponizej zapasu wojny po wyplacie 0 / kontrola zlota 0 / koszt skarbcow <= 40 tys./d, M5M-7 VR-3
+                    ze wszystkimi probkami >= 24.9%, M5M-8 rezerwacje wozow wygasle <= 1%, M5M-9 ERROR nowego kodu 0 (czas - INFO).
 --grupa m104wojny : (21.10, w-toku/m104-wojny; Armoury/src/Prologue.Wars.cs, Prologue.Crown.cs, Prologue.Dragons.cs; klucze PrologueEssosWarsCalendar,
                     CanonReachJoinsCrown, CanonDorneJoinsCrown, DaenerysDragonsGrow) python -I tools/sprawdz_logi.py --grupa m104wojny <Armoury-*.log>. WK-0 start,
                     WK-1 ERROR CanonWars i potkniecia 0, WK-2 latka Enforced TAK i 6 wojen essoskich na kalendarzu (bez Daenerys), WK-3 wypowiedzenia Armoury tylko
@@ -38345,6 +38354,262 @@ def m103sceny_main(logp, csp=None, rglp=None):
     return 0
 
 
+# ------------------------------------------------------------ m105miasta (21/22.10, w-toku/m105-miasta: gospodarka miast - G1 szybka obnizka firmy miasta ponizej
+# zapasu kupcow (DsFarmCutBelowReserve), G2 skarbiec korony ponad zapas wojny karmi glodne miasta (CrownHoardFeedsHungry: chleb M3 i rachunki KS-H), G3 premia
+# drogi od predkosci po podlodze gry (MapRoadBonusAboveFloor), G4 wozy wsi rezerwuja zloto kasy celu (VillageCartGoldAware); Armoury/src/DsTowns.cs,
+# KsFolkIncome.cs, KingdomTreasury.CrownSurplus.cs, TownFolk.Bread.cs, KsLordFood.cs, MapRoads.cs, MapRoadKinds.cs, MarketCarts.cs)
+M5M_HEADS = {"g1": "Dochod ludu wedlug koszyka (f5-lud): dzien ", "g2b": "Chleb biedoty (M3): dzien ", "g2l": "Pan miasta placi za dowoz (KS): dzien ",
+             "g3": "Drogi Valyrii (VR): dzien ", "g4": "Dowoz (wozy): dzien "}
+M5M_NAMES = {"g1": "G1 f5-lud 'm105 szybka obnizka'", "g2b": "G2 'Chleb biedoty (M3)' 'm105 skarbiec korony'", "g2l": "G2 'Pan miasta placi za dowoz (KS)' 'm105 skarbiec korony'",
+             "g3": "G3 'Drogi Valyrii (VR)' 'podloga z premia (m105)'", "g4": "G4 'Dowoz (wozy)' 'm105 zloto zarezerwowane'"}
+M5M_KSH = "Kupcy zywnosci (KS-H) dzien "
+M5M_RX = {
+    "g1": re.compile(r"\| m105 szybka obnizka \(Ds Farm Cut Below Reserve (TAK|NIE)\): dzis (\d+) \(-(\d+) zl/rok\), od startu sesji (\d+) \(-(\d+) zl/rok\), "
+                     r"miast z KS ponizej zapasu (\d+), z firma ponad doplyw (\d+)"),
+    "g2b": re.compile(r"\| m105 skarbiec korony \(Crown Hoard Feeds Hungry (TAK|NIE)\): ze skarbca (\d+) zl \(krolestw (\d+), osad (\d+)\), nie stac nikogo po skarbcu (\d+) zl "
+                      r"\(w tym przy wolnym limicie skarbca (\d+) zl - oczekiwane 0\), kontrola skarbiec -(-?\d+) \+ kiesy ludu (\d+) = (-?\d+), ponizej zapasu wojny po wyplacie (\d+)"),
+    "g2l": re.compile(r"\| m105 skarbiec korony: rachunki splacone ze skarbca (\d+) zl \(miast (\d+), krolestw (\d+), kandydatow po panie bez kasy ponad podloge (\d+)\), "
+                      r"kontrola skarbiec -(-?\d+) \+ wierzyciele (\d+) = (-?\d+), ponizej zapasu wojny po wyplacie (\d+)"),
+    "g3": re.compile(r", podloga z premia \(m105\) (\d+)"),
+    "g3n": re.compile(r"liczenia z premia od podlogi gry \(m105, wszystkie drogi\) ok\. (\d+)"),
+    "g4": re.compile(r"\| m105 zloto zarezerwowane \(Village Cart Gold Aware (TAK|NIE)\): wozow z rezerwa (\d+), zarezerwowane (\d+) zl u (\d+) miast, wybor zmieniony (\d+), "
+                     r"wygasle (\d+)"),
+    "kover": re.compile(r", starsze niz (\d+) dni (-?\d+) zl \((\d+) miast\)"),
+    "kearly": re.compile(r"; najstarszy rachunek (-?\d+) dni, rachunki starsze niz (\d+) dni (-?\d+) zl"),
+    "lms": re.compile(r"\| czas ([\d.]+) ms \| potkniecia (\d+)\.$"),
+    "f5ms": re.compile(r"\| czas ([\d.]+) ms \| potkniecia (\d+)"),
+}
+M5M_ERR = ("ERROR in DsTowns.FastCensus", "ERROR in DsTowns.SurplusReview", "ERROR in KingdomTreasury.CrownSurplus.Hoard", "ERROR in KsLordFood.HoardBills",
+           "ERROR in KsLordFood.Before", "ERROR in KsFolkIncome.DayLine", "ERROR in TownFolk.BreadRest", "ERROR in MarketCarts.Choose", "ERROR in MapRoadKinds.Audit",
+           "ERROR in MapRoadKinds.Daily")
+M5M_FARM_BASE = 315136.0   # M5M-3: log 102 (Armoury-2026-10-21_14-29-20, kasy-miast.csv): srednia d202-229 sumy zawor_do_pana + do_korony miast = firmy miast panom i koronom
+# m105m: linie kontrolne zlozone wedlug kodu C# (KsFolkIncome.DayLine, TownFolk.BreadLine, KsLordFood.Line, MapRoadKinds.Daily, MarketCarts.Daily) - zmiana napisu w kodzie
+# bez zmiany wyrazen wyzej wywraca self-test, a nie po cichu progi
+M5M_TEST = {
+    "g1": " | P3 sufit firm (Ks Farm Surplus Cap Net TAK): przyciete sufitem 0 (-0 zl/rok), obnizki z dochodu 1 (-5000 zl/rok), firmy od zera 0 (+0 zl/rok); od startu sesji: "
+          "przyciete 3 (-100), obnizki 4 (-200), od zera 0 (+0) | m105 szybka obnizka (Ds Farm Cut Below Reserve TAK): dzis 2 (-150000 zl/rok), od startu sesji 9 "
+          "(-900000 zl/rok), miast z KS ponizej zapasu 11, z firma ponad doplyw 3.",
+    "g2b": " | na krolestwo (korona/pan/nie stac nikogo): X 7000/2000/3000 | m105 skarbiec korony (Crown Hoard Feeds Hungry TAK): ze skarbca 5000 zl (krolestw 2, osad 3), "
+           "nie stac nikogo po skarbcu 700 zl (w tym przy wolnym limicie skarbca 0 zl - oczekiwane 0), kontrola skarbiec -5000 + kiesy ludu 5000 = 0, ponizej zapasu wojny "
+           "po wyplacie 0, limit doby 1/30 nadwyzki skarbca (wspolny z rachunkami KS-H).",
+    "g2l": ", zwrot uciety (kasa za mala) 0 (0 zl), zaleglosc nawiasu 0 | m105 skarbiec korony: rachunki splacone ze skarbca 1200 zl (miast 1, krolestw 1, kandydatow po panie "
+           "bez kasy ponad podloge 2), kontrola skarbiec -1200 + wierzyciele 1200 = 0, ponizej zapasu wojny po wyplacie 0 | czas 0.123 ms | potkniecia 0.",
+    "g3": " | audyt Valyria: 6 partii, premia rzeczywista sr. 25.00% (min 25.00, maks 25.00), z wpisem 'Valyrian road' 6, oczekiwane 25.0%, podloga z premia (m105) 1 | audyt "
+          "szlak: 0 partii, oczekiwane 7.5%, podloga z premia (m105) 0, liczenia z premia od podlogi gry (m105, wszystkie drogi) ok. 12 | siec AI drog: mosty Valyrii 7.",
+    "g4": ", niezgodne 0, cena rosla 0 | m105 zloto zarezerwowane (Village Cart Gold Aware TAK): wozow z rezerwa 40, zarezerwowane 250000 zl u 30 miast, wybor zmieniony 5, "
+          "wygasle 0 | woz x2.0 dla wsi wszystkich.",
+}
+
+
+def m105m_selftest():
+    """m105miasta: wyrazenia segmentow wobec linii kontrolnych M5M_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    exp = {"g1": ("TAK", "2", "150000", "9", "900000", "11", "3"), "g2b": ("TAK", "5000", "2", "3", "700", "0", "5000", "5000", "0", "0"),
+           "g2l": ("1200", "1", "1", "2", "1200", "1200", "0", "0"), "g4": ("TAK", "40", "250000", "30", "5", "0")}
+    for k, want in exp.items():
+        m = M5M_RX[k].search(M5M_TEST[k])
+        if not m or m.groups() != want:
+            return f"{k}: {m.groups() if m else 'brak dopasowania'}"
+    if [x for x in M5M_RX["g3"].findall(M5M_TEST["g3"])] != ["1", "0"] or not M5M_RX["g3n"].search(M5M_TEST["g3"]):
+        return "g3: podloga z premia / liczenia od podlogi"
+    m = M96VALYRIA_AUD.search(M5M_TEST["g3"])
+    if not m or m.group("k") != "Valyria" or m.group("avg") != "25.00":
+        return "g3: M96VALYRIA_AUD nie czyta audytu z dopiskiem m105"
+    if not M5M_RX["lms"].search(M5M_TEST["g2l"]):
+        return "g2l: czas / potkniecia na koncu linii"
+    return None
+
+
+def m105miasta_main(logp, tabp=None):
+    """m105miasta (21/22.10; projekt m105-miasta, decyzje Jeffa dla gospodarki: z podazy i popytu, z biezacego zysku, zamknieta ekonomia, 100%): M5M-0..M5M-9 - opis
+    w --help. Strumieniowo; kasy-miast.csv z --tabele <katalog> albo z katalogu sesji logu. Log bez segmentow m105 - wiersze INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("M5M-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    st_ = m105m_selftest()
+    base = {k: set() for k in M5M_HEADS}
+    seg = {k: {} for k in M5M_HEADS}
+    off = {k: 0 for k in M5M_HEADS}
+    g3n, vr, ksh, lms, f5ms = {}, [], {}, [], []
+    n_err, err1 = 0, None
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if any(s.startswith(e) for e in M5M_ERR):
+                    n_err += 1
+                    err1 = err1 or s[:200]
+                continue
+            if s.startswith(M5M_KSH):
+                d = num(r"dzien (-?\d+)", s[:60])
+                if d is not None:
+                    mo = M5M_RX["kover"].search(s); me = M5M_RX["kearly"].search(s)
+                    ksh[d] = (int(mo.group(2)) if mo else None, int(mo.group(1)) if mo else None, int(me.group(3)) if me else None, int(me.group(2)) if me else None,
+                              int(me.group(1)) if me else None)
+                continue
+            for k, h in M5M_HEADS.items():
+                if not s.startswith(h):
+                    continue
+                d = num(r"dzien (-?\d+)", s[:len(h) + 12])
+                if d is None:
+                    break
+                base[k].add(d)
+                if k == "g3":
+                    fl_ = M5M_RX["g3"].findall(s)
+                    if fl_:
+                        seg[k][d] = tuple(int(x) for x in fl_)
+                    mn = M5M_RX["g3n"].search(s)
+                    if mn:
+                        g3n[d] = int(mn.group(1))
+                    for ma in M96VALYRIA_AUD.finditer(s):
+                        if ma.group("k") == "Valyria" and ma.group("avg") is not None and int(ma.group("n")) > 0:
+                            vr.append((d, int(ma.group("n")), float(ma.group("avg"))))
+                else:
+                    mm = M5M_RX[k].search(s)
+                    if mm:
+                        seg[k][d] = mm.groups()
+                        if k in ("g1", "g2b", "g4") and mm.group(1) != "TAK":
+                            off[k] += 1
+                    if k == "g2l":
+                        ml = M5M_RX["lms"].search(s)
+                        if ml:
+                            lms.append(float(ml.group(1)))
+                    if k == "g1":
+                        mf = M5M_RX["f5ms"].search(s)
+                        if mf:
+                            f5ms.append(float(mf.group(1)))
+                break
+    nseg = sum(len(v) for v in seg.values())
+    print(f"plik: {logp} | linie bazowe: " + ", ".join(f"{k} {len(base[k])}" for k in M5M_HEADS) + " | segmenty m105: " + ", ".join(f"{k} {len(seg[k])}" for k in M5M_HEADS)
+          + f" | KS-H {len(ksh)} | ERROR {n_err}" + (f" | SELF-TEST: {st_}" if st_ else ""))
+    rep.add("M5M-S: self-test wyrazen segmentow m105 (linie kontrolne jak w kodzie C#)", st_ or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", st_ is None)
+    if nseg == 0:
+        rep.add("M5M-0: segmenty m105 w liniach doby", "brak linii m105 (" + ", ".join(f"{k} bazowych {len(base[k])}" for k in M5M_HEADS) + ")",
+                "INFO (log sprzed paczki m105-miasta albo klucze wylaczone)", None)
+        rep.add("M5M-9: ERROR nowego kodu", f"ERROR {n_err}" + (f" (pierwszy: {err1})" if err1 else ""), "0", n_err == 0)
+        rep.show()
+        return 0
+    # ---- M5M-0 segmenty w kazdej dobie z linia bazowa
+    miss, parts = 0, []
+    for k in M5M_HEADS:
+        bd = base[k]
+        if not bd:
+            parts.append(f"{M5M_NAMES[k]}: brak linii bazowych")
+            continue
+        ms_ = sorted(d for d in bd if d not in seg[k])
+        miss += len(ms_) + off[k]
+        parts.append(f"{M5M_NAMES[k]}: {len(seg[k])}/{len(bd)}" + (f" (brak np. {ms_[:3]})" if ms_ else "") + (f", klucz NIE {off[k]}" if off[k] else ""))
+    rep.add("M5M-0: segmenty m105 w kazdej dobie z linia bazowa, klucze TAK", "; ".join(parts), "brakow 0 (linia KS 'Pan miasta placi' tylko przy Ks Lord Funds Food)", miss == 0)
+    # ---- M5M-1 / M5M-2 / M5M-3 (kasy-miast.csv)
+    kp = os.path.join(tabp, "kasy-miast.csv") if tabp else session_file_find(logp, "kasy-miast.csv")
+    km = _m105_kasy_rows(kp)
+    if km:
+        kd = sorted(km)
+        streak, hist, per = {}, {}, []
+        for d in kd:
+            n1 = 0
+            for r in km[d]:
+                mid = r.get("miasto_id")
+                below = _m105_f(r.get("kasa")) < _m105_f(r.get("zapas_kupcow"))
+                streak[mid] = streak.get(mid, 0) + 1 if below else 0
+                h = hist.setdefault(mid, [])
+                h.append((_m105_f(r.get("pobrane")), _m105_f(r.get("doplyw_netto"))))
+                if len(h) > 28:
+                    del h[0]
+                if streak[mid] >= 28 and sum(x[0] for x in h) > max(0.0, sum(x[1] for x in h)):
+                    n1 += 1
+            per.append((d, n1))
+        w56 = per[-56:]
+        mx1 = max(w56, key=lambda x: x[1])
+        rep.add("M5M-1: miasta >= 28 dob z rzedu ponizej zapasu kupcow z poborem 28 dob ponad doplyw (kasy-miast.csv, ostatnie 56 dob)",
+                f"najwiecej {mx1[1]} (doba {mx1[0]}), na koniec {per[-1][1]}", "<= 2 (102 bez G1: na koniec 4, n31 7, 160 z zapisu 1)", mx1[1] <= 2)
+        wd = kd[-56:]
+        tot = sum(_m105_f(r.get("pobrane")) for d in wd for r in km[d])
+        acc = {}
+        for d in wd:
+            for r in km[d]:
+                if _m105_f(r.get("kasa")) < _m105_f(r.get("zapas_kupcow")):
+                    a = acc.setdefault(r.get("miasto_id"), [0.0, 0.0])
+                    a[0] += _m105_f(r.get("pobrane")); a[1] += _m105_f(r.get("doplyw_netto"))
+        ex = sum(max(0.0, a[0] - max(0.0, a[1])) for a in acc.values())
+        pc2 = 100.0 * ex / tot if tot > 0 else 0.0
+        rep.add("M5M-2: pobor ponad doplyw w dobach ponizej zapasu kupcow (ostatnie 56 dob, kasy-miast.csv)", f"{ex:.0f} zl wobec poboru {tot:.0f} zl ({pc2:.2f}%; miast ponizej {len(acc)})",
+                "<= 1% poboru (102 bez G1 2.10%, n31 2.38%, 160 z zapisu 1.21%)", pc2 <= 1.0 if tot > 0 else None)
+        d0 = kd[0]
+        w3 = [d for d in kd if 202 <= d - d0 + 1 <= 229]
+        if len(w3) >= 28:
+            v3 = sum(_m105_f(r.get("zawor_do_pana")) + _m105_f(r.get("do_korony")) for d in w3 for r in km[d]) / len(w3)
+            rep.add("M5M-3: (straznik G1) firmy miast panom i koronom - srednia d202-229 pliku (kasy-miast.csv: zawor_do_pana + do_korony)",
+                    f"{v3:.0f} zl/d wobec 102 {M5M_FARM_BASE:.0f} ({100.0 * v3 / M5M_FARM_BASE:.1f}%)", ">= 0.9 x 102 (baza z tej samej miary w logu 102)", v3 >= 0.9 * M5M_FARM_BASE)
+        else:
+            w3 = kd[-28:]
+            v3 = sum(_m105_f(r.get("zawor_do_pana")) + _m105_f(r.get("do_korony")) for d in w3 for r in km[d]) / max(1, len(w3))
+            rep.add("M5M-3: (straznik G1) firmy miast panom i koronom (kasy-miast.csv)", f"ostatnie 28 dob pliku {v3:.0f} zl/d (plik {len(kd)} dob)",
+                    "INFO (bieg krotszy niz 229 dob; prog >= 0.9 x 102 tylko w d202-229)", None)
+    else:
+        rep.add("M5M-1..3: kasy miast (kasy-miast.csv)", f"brak {kp}", "INFO (podaj --tabele <katalog> albo uklad sesji <katalog logu>/<znacznik>/kasy-miast.csv)", None)
+    # ---- M5M-4 rachunki KS-H
+    kdays = sorted(d for d in ksh if ksh[d][0] is not None)
+    if kdays:
+        badk = [d for d in kdays if ksh[d][0] > 0]
+        ed = [d for d in sorted(ksh) if ksh[d][2] is not None]
+        endv = ksh[ed[-1]][2] if ed else None
+        rep.add(f"M5M-4: rachunki zywnosci KS-H starsze niz zwloka ({ksh[kdays[-1]][1]} dni) kazdej doby / starsze niz prog wczesnej splaty na koniec",
+                f"dob ze starszymi niz zwloka {len(badk)}" + (f" (pierwsza {badk[0]}: {ksh[badk[0]][0]} zl)" if badk else "")
+                + (f"; na koniec starsze niz {ksh[ed[-1]][3]} dni {endv} zl, najstarszy {ksh[ed[-1]][4]} dni (doba {ed[-1]})" if ed else "; brak segmentu wczesnej splaty"),
+                "0 dob / <= 10 tys. zl (102 bez G2: 11 dob, 56 tys.)", not badk and (endv is None or endv <= 10000))
+    else:
+        rep.add("M5M-4: rachunki zywnosci KS-H", "brak linii KS-H z rachunkami", "INFO (KS nieczynne albo kredyt kupcow wylaczony)", None)
+    # ---- M5M-5 / M5M-6 skarbiec korony (G2)
+    b2, l2 = seg["g2b"], seg["g2l"]
+    if b2 or l2:
+        left = sum(int(v[5]) for v in b2.values())
+        leftd = [d for d in sorted(b2) if int(b2[d][5]) > 0]
+        nobody = sum(int(v[4]) for v in b2.values())
+        rep.add("M5M-5: chleb 'nie stac nikogo' przy wolnym limicie skarbca korony (krolestwo z nadwyzka skarbca)", f"{left} zl w {len(leftd)} dobach"
+                + (f" (pierwsza {leftd[0]})" if leftd else "") + f"; 'nie stac nikogo po skarbcu' razem {nobody} zl (limit doby 1/Crown Surplus Aid Days - INFO)", "0 zl", left == 0)
+        below = sum(int(v[9]) for v in b2.values()) + sum(int(v[7]) for v in l2.values())
+        ctl = [d for d in sorted(b2) if int(b2[d][8]) != 0] + [d for d in sorted(l2) if int(l2[d][6]) != 0]
+        lastd = max(list(b2) + list(l2))
+        cw = [d for d in set(b2) | set(l2) if d > lastd - 28]
+        cost = sum((int(b2[d][1]) if d in b2 else 0) + (int(l2[d][0]) if d in l2 else 0) for d in cw) / max(1, len(cw))
+        tb = sum(int(v[1]) for v in b2.values()); tl = sum(int(v[0]) for v in l2.values())
+        rep.add("M5M-6: skarbiec ponizej zapasu wojny po wyplacie / kontrola zlota skarbiec - odbiorcy / koszt skarbcow (srednia 28 dob)",
+                f"{below} / dob z kontrola != 0: {len(ctl)}" + (f" (pierwsza {ctl[0]})" if ctl else "") + f" / {cost:.0f} zl/d (od startu: chleb {tb} zl, rachunki {tl} zl)",
+                "0 / 0 / <= 40 tys. zl/d", below == 0 and not ctl and cost <= 40000)
+    else:
+        rep.add("M5M-5/6: skarbiec korony (G2)", "brak segmentow G2", "INFO (klucz Crown Hoard Feeds Hungry wylaczony albo log sprzed paczki)", None)
+    # ---- M5M-7 VR-3 ze wszystkimi probkami (G3)
+    if vr:
+        nn = sum(x[1] for x in vr)
+        avg = sum(x[1] * x[2] for x in vr) / max(1, nn)
+        fl3 = sum(sum(v[:1]) for v in seg["g3"].values())
+        rep.add("M5M-7: premia drog Valyrii ze wszystkimi probkami audytu (VR-3, z probkami z podlogi gry)",
+                f"{avg:.2f}% (probek {nn}, dob {len(vr)}; probek z podlogi z pelna premia {fl3}; liczen z premia od podlogi ok. {sum(g3n.values())})",
+                ">= 24.9% (102 bez G3 24.98%, 160 z zapisu 24.26%)", avg >= 24.9)
+    else:
+        rep.add("M5M-7: premia drog Valyrii (audyt)", "brak probek audytu Valyrii", "INFO", None)
+    # ---- M5M-8 rezerwacje wozow (G4)
+    c4 = seg["g4"]
+    if c4:
+        new = sum(int(v[1]) for v in c4.values()); exp = sum(int(v[5]) for v in c4.values()); chg = sum(int(v[4]) for v in c4.values())
+        lastc = c4[max(c4)]
+        rep.add("M5M-8: rezerwacje zlota wozow wsi wygasle przy porzadkach (woz zniknal, skrecil, 30 dob) wobec zalozonych",
+                f"{exp} z {new} ({100.0 * exp / max(1, new):.2f}%); wybor zmieniony {chg}; na koniec zarezerwowane {lastc[2]} zl u {lastc[3]} miast",
+                "<= 1%", (exp <= 0.01 * new) if new > 0 else None)
+    else:
+        rep.add("M5M-8: rezerwacje wozow (G4)", "brak segmentu G4", "INFO", None)
+    # ---- M5M-9 bledy i czas
+    rep.add("M5M-9: ERROR nowego kodu (DsTowns, skarbiec korony, chleb, KsLordFood, wozy, audyt VR)", f"ERROR {n_err}" + (f" (pierwszy: {err1})" if err1 else ""), "0", n_err == 0)
+    rep.add("M5M-9b: czas linii z nowym kodem (KsLordFood z krokiem skarbca, f5-lud)",
+            (f"KsLordFood sr. {sum(lms) / len(lms):.3f} ms (najwiecej {max(lms):.3f})" if lms else "KsLordFood - brak") + (f"; f5-lud sr. {sum(f5ms) / len(f5ms):.2f} ms" if f5ms else ""),
+            "INFO (nowy kod bez osobnego stopera; cel <= 0.1 ms na dobe)", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m105kolko (21.10, w-toku/m105-kolko: kolko najechania przy zajazdach i wioskach pobocznych -
 # Armoury/src/MapHoverRing.cs, RoadsideInnsView.cs, MapVillagesView.cs; klucz MapHoverRingOurObjects; autotest: plik CrashScribe/armoury-kolko.flag)
 M105K_TAG = "Kolko najechania (m105): "
@@ -56740,6 +57005,8 @@ def main(argv):
         return m103sceny_main(logp, csp, rglp)   # m103sceny (21.10, w-toku/m103-sceny): 23 sceny prologu jako okna ROT, obrazki z plikow, okna ROT z obrazkami Jeffa
     if group == "m104e5" and logp:
         return m104e5_main(logp)   # m104e5 (21.10, w-toku/m104-e5): sceny zmieniajace swiat prologu 298 - orszak, Turniej Reki, Tyrion i Jaime jencami, klany gorskie, ludzie Gory, Beric
+    if group == "m105miasta" and logp:
+        return m105miasta_main(logp, tabp)   # m105-miasta (21/22.10): szybka obnizka firm ponizej zapasu, skarbiec korony na glod, premia drogi po podlodze, rezerwy zlota wozow
     if group == "m105kolko" and logp:
         return m105kolko_main(logp)   # m105kolko (21.10, w-toku/m105-kolko): kolko najechania przy zajazdach i wioskach pobocznych (MapHoverRing)
     if group == "m104wojny" and logp:
