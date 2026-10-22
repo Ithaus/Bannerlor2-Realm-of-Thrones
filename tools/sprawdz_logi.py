@@ -2004,8 +2004,10 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m105optym  : (21.10, galaz w-toku/m105-optym; KingdomTreasury.Optim105.cs, SutlerNear.cs, BuildFunding.Optim105.cs, ClanIncomeBook.Optim105.cs) skroty
                     przelomu doby. python -I tools/sprawdz_logi.py --grupa m105optym <Armoury-*.log> [--baza-doby <Armoury-*.log bazy>] (strumieniowo). M5-0 linia startu
                     "Optym (m105): start", M5-1 takt doby i sekcje (KingdomTreasury, Sutlers, ClanIncomeBook, BuildFunding) ostatnich 60 dob wobec bazy (INFO), M5-2 Optim
-                    Verify: roznice 0 przy porownan > 0 (kazda czesc osobno + razem), M5-3 model KT pominiety (dob z pominietymi > 0; straznik nie wylaczyl), M5-4 Sutlers
-                    z tablic doby, M5-5 potkniecia 0 i ERROR Optim105 / SutlerNear 0. Log sprzed galezi - INFO.
+                    Verify: roznice 0 razem i porownan > 0 w kazdej czynnej czesci (model bez lenn - gdy pominiete > 0; najblizsze osady - gdy z tablic doby; delegaty
+                    BK - gdy linie ClanIncomeBook; BuildFunding - sama linia, 0 porownan = brak budow), M5-3 model KT pominiety (dob z pominietymi > 0; straznik nie
+                    wylaczyl), M5-4 Sutlers z tablic doby, M5-5 potkniecia 0 i ERROR Optim105 / SutlerNear 0, M5-6 linie ClanIncomeBook bez "BRAK" (delegaty BK
+                    zbudowane). Log sprzed galezi - INFO.
 --grupa m98plotki  : (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs) plotki za kufel piwa, plotek na kufel wedlug Uroku,
                     turnieje i swaty, pijanstwo i kac gracza. python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log> (strumieniowo). KP-0 start (klucze, krzywa
                     Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours./SyncData.arm_drink/arm_rumours" 0 (m103-drobne: z zapisem stanu),
@@ -56398,10 +56400,13 @@ def m105optym_stat(rows, n=60):
 def m105optym_main(logp, basep=None):
     """m105optym (21.10, galaz w-toku/m105-optym): skroty przelomu doby - model KT pominiety u rodow bez lenn (OptimKtSkipModel), najblizsze osady markietanow
     z tablic doby (OptimSutlerNearest), wojna krolestwa w BuildFunding raz na krolestwo (OptimBuildWar), BK przez delegaty w ClanIncomeBook.StableBegin
-    (OptimStableDelegates). M5-0 linia startu; M5-1 takt doby i sekcje wobec bazy (INFO); M5-2 tryb kontrolny Optim Verify - roznice 0 przy porownan > 0
-    (linia startu "Optim Verify TAK" bez porownan - NIE); M5-3 KT: doby z pominietymi modelami (klucz TAK) - wiekszosc dob > 0, dzien "WYLACZONE" z powodu
-    innego niz podstawa nie-ziemia - NIE; M5-4 Sutlers: "z tablic doby" w kazdej linii (klucz TAK); M5-5 potkniecia w liniach m105 = 0 i ERROR Optim105 /
-    SutlerNear = 0. Log sprzed galezi: INFO, bez wyjatku."""
+    (OptimStableDelegates). M5-0 linia startu; M5-1 takt doby i sekcje wobec bazy (INFO); M5-2 tryb kontrolny Optim Verify - roznice 0 razem i porownan > 0
+    w kazdej czynnej czesci (recenzja m105: czesc z 0 porownan nie moze przejsc dzieki innym; model bez lenn - gdy w liniach KT pominietych > 0, przy podstawie
+    nie-ziemia linii kontrolnej KT nie ma i to jest poprawne; najblizsze osady - gdy linia Sutlers "z tablic doby"; delegaty BK - gdy sa linie ClanIncomeBook;
+    BuildFunding - wymagana sama linia, 0 porownan = brak budow) (linia startu "Optim Verify TAK" bez porownan - NIE); M5-3 KT: doby z pominietymi modelami
+    (klucz TAK) - wiekszosc dob > 0, dzien "WYLACZONE" z powodu innego niz podstawa nie-ziemia - NIE; M5-4 Sutlers: "z tablic doby" w kazdej linii (klucz TAK);
+    M5-5 potkniecia w liniach m105 = 0 i ERROR Optim105 / SutlerNear = 0; M5-6 linie ClanIncomeBook bez "BRAK" (delegat nie powstal - skrot nie biegnie;
+    klucz TAK). Log sprzed galezi: INFO, bez wyjatku."""
     rep = Report()
     start, kt, sut, cib, chk, stum, errs = [], [], [], [], [], 0, 0
     with open(logp, encoding="utf-8", errors="replace") as f:
@@ -56453,6 +56458,7 @@ def m105optym_main(logp, basep=None):
     else:
         rep.add("M5-1: takt doby i sekcje (ostatnie 60 dob) wobec bazy", "brak linii Profil doby (E8/0)", "INFO", None)
     verify_on = "Optim Verify TAK" in last
+    on_part = last.split("| wylaczone")[0] if start else ""
     if chk:
         parts = {}
         for name, c, d in chk:
@@ -56461,14 +56467,28 @@ def m105optym_main(logp, basep=None):
         tc = sum(v[0] for v in parts.values())
         td = sum(v[1] for v in parts.values())
         val = "; ".join(f"{k}: porownan {v[0]}, roznic {v[1]}" for k, v in sorted(parts.items()))
-        rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi", f"{val} | razem porownan {tc}, roznic {td}", "roznic 0 w kazdej czesci (porownan > 0)",
-                td == 0 and tc > 0)
+        # recenzja m105: kazda czynna czesc z porownaniami > 0 (zero = skrot nie biegl w trybie kontrolnym - brak dowodu); bez linii startu / przy Verify NIE w
+        # ostatnim starcie - tylko suma (logi z kilku sesji)
+        miss = []
+        if start and verify_on:
+            need = []
+            if "Optim Kt Skip Model" in on_part and any(int(mk.group(1)) > 0 for mk in (M105_KT.search(x) for x in kt) if mk):
+                need.append("model bez lenn")
+            if "Optim Sutler Nearest" in on_part and any("z tablic doby" in x for x in sut):
+                need.append("najblizsze osady")
+            if "Optim Stable Delegates" in on_part and cib:
+                need.append("delegaty BK")
+            miss = [k for k in need if parts.get(k, (0, 0))[0] == 0]
+            if "Optim Build War" in on_part and "BuildFunding.Daily wojna krolestwa" not in parts:
+                miss.append("BuildFunding.Daily wojna krolestwa (brak linii)")
+        rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi",
+                f"{val} | razem porownan {tc}, roznic {td}" + (f" | bez porownan: {', '.join(miss)}" if miss else ""),
+                "roznic 0, porownan > 0 w kazdej czynnej czesci", td == 0 and tc > 0 and not miss)
     elif verify_on:
         rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi", "linia startu: Optim Verify TAK, brak porownan",
                 "porownania > 0 (tryb kontrolny wlaczony, nic nie porownal)", False)
     else:
         rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi", "brak linii kontrolnych", "INFO (Optim Verify wylaczony)", None)
-    on_part = last.split("| wylaczone")[0] if start else ""
     kt_on = ("Optim Kt Skip Model" in on_part) if start else bool(kt)
     if kt_on and kt:
         skipped, off, off_land = [], [], 0
@@ -56502,6 +56522,13 @@ def m105optym_main(logp, basep=None):
     else:
         rep.add("M5-4: Sutlers - najblizsze osady z tablic doby", "klucz Optim Sutler Nearest NIE albo brak linii", "INFO", None)
     rep.add("M5-5: potkniecia w liniach m105 i ERROR Optim105 / SutlerNear", f"potkniecia {stum}, ERROR {errs}", "0 i 0", stum == 0 and errs == 0)
+    cd_on = ("Optim Stable Delegates" in on_part) if start else bool(cib)
+    if cd_on and cib:
+        brak = [x for x in cib if "BRAK" in x]
+        rep.add("M5-6: ClanIncomeBook.StableBegin - delegaty BK zbudowane", f"BRAK w {len(brak)} z {len(cib)} dob" + (f" (pierwsza: {brak[0][:160]})" if brak else ""),
+                "zadnego BRAK", not brak)
+    else:
+        rep.add("M5-6: ClanIncomeBook.StableBegin - delegaty BK zbudowane", "klucz Optim Stable Delegates NIE albo brak linii", "INFO", None)
     rep.show()
     return 0
 
