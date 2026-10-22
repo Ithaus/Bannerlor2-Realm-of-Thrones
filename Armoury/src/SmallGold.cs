@@ -244,6 +244,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ 3. "za tier" - wolane z MercContract.TierPostfix (przy rozliczeniu, applyWithdrawals)
         /// <summary>Czy "za tier" tego rodu zdejmuje E5/A7 (warunek gry: rod AI bez lenn poza krolestwem albo najemnik) - ten sam warunek w TierPostfix i CancelsTier.</summary>
+        // m105-optym KtKnownPatches: wolane z MercContract.TierPostfix na sciezce modelu pominietego w KtSkip - tylko odczyt, bez MBRandom; zmiana = przeglad KtSkip
         internal static bool CutsTier(Clan c)
         {
             try

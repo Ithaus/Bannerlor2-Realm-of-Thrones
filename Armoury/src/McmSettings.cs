@@ -7112,6 +7112,30 @@ namespace Armoury
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfSutlerWageOnce { get; set; } = true;
 
+        [SettingPropertyBool("Optim Daily Cache", HintText = "at the turn of the day the crown dues ask once per kingdom whether that kingdom is at war, instead of once for every clan - the same dues, less work; off = asked for every clan, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimDailyCache { get; set; } = true;
+
+        [SettingPropertyBool("Optim Verify", HintText = "check mode for the day speed-ups: both ways are worked out, the game keeps the old one and the log counts any difference (for testing only - slower); off = only the fast way", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimVerify { get; set; } = false;
+
+        [SettingPropertyBool("Optim Kt Skip Model", HintText = "at the turn of the day the crown dues no longer work out the whole income of a vassal clan that holds no town, castle or village and whose head owns no workshop, when its dues are taken from its land anyway - that income was worked out only to be thrown away. The same dues, much less work. It stands aside on its own for the day (and says why in the log) when another mod hooks that income; off = worked out for every clan, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimKtSkipModel { get; set; } = true;
+
+        [SettingPropertyBool("Optim Sutler Nearest", HintText = "the sutlers of the bands in the field find the nearest town and village from a list of the map's settlements made once a day, instead of looking over every town and village again for each of some four hundred bands - the same town, the same village, the same coin; off = every settlement is looked over for each band, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimSutlerNearest { get; set; } = true;
+
+        [SettingPropertyBool("Optim Build War", HintText = "at the turn of the day the paid building works ask once per kingdom whether that kingdom is at war, instead of once for every town and castle with a building in progress - the same works stop and go; off = asked for every town and castle, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimBuildWar { get; set; } = true;
+
+        [SettingPropertyBool("Optim Stable Delegates", HintText = "the daily clan income book asks Banner Kings about village lords, village data, village tax and village titles through direct calls made once, instead of through slow reflection for every clan and village - the same answers, less work; off = through reflection, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool OptimStableDelegates { get; set; } = true;
+
         [SettingPropertyBool("Perf Town Tax Fast Hooks", HintText = "the town tax with rents (the lines somebody really pays, the council wages) asks Banner Kings directly instead of through slow reflection - the same numbers, less work each time a town's tax is counted; off = through reflection, as before", RequireRestart = false)]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfTownTaxFastHooks { get; set; } = true;
@@ -10889,6 +10913,12 @@ namespace Armoury
             s.PerfValyrianCensus = PerfValyrianCensus;
             s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;
+            s.OptimDailyCache = OptimDailyCache;
+            s.OptimVerify = OptimVerify;
+            s.OptimKtSkipModel = OptimKtSkipModel;
+            s.OptimSutlerNearest = OptimSutlerNearest;
+            s.OptimBuildWar = OptimBuildWar;
+            s.OptimStableDelegates = OptimStableDelegates;
             s.PerfTownTaxFastHooks = PerfTownTaxFastHooks;
             s.PerfSutlerWageExact = PerfSutlerWageExact;
             s.PerfProbeEachPlace = PerfProbeEachPlace;

@@ -1998,6 +1998,16 @@ Uzycie (Python 3, tylko odczyt):
                     OB-0 start (klucz, udzial), OB-1 linie "ERROR in SideVillageVisit." 0, OB-2 kazda bitwa z obroncami zamknieta (druzyna nie przezywa bitwy; ostatnia
                     otwarta na koncu logu - INFO), OB-3 straty z ludnosci <= obroncow, OB-4 obroncow <= pulapu ludnosci (1/10 w domu, najwyzej 60), OB-5 druzyny
                     sprzatniete po wczytaniu (INFO), OB-6 starcia doby (INFO).
+--grupa m99optym   : (21.10, galaz w-toku/m99-optym; Armoury/src/KingdomTreasury.Optim.cs) optymalizacja przelomu doby. python -I tools/sprawdz_logi.py --grupa m99optym
+                    <Armoury-*.log> [--baza-doby <Armoury-*.log bazy>]. MO-0 linia startu, MO-1 takt doby i KingdomTreasury.Daily wobec bazy (INFO), MO-2 Optim Verify
+                    roznice 0, MO-3 ERROR 0.
+--grupa m105optym  : (21.10, galaz w-toku/m105-optym; KingdomTreasury.Optim105.cs, SutlerNear.cs, BuildFunding.Optim105.cs, ClanIncomeBook.Optim105.cs) skroty
+                    przelomu doby. python -I tools/sprawdz_logi.py --grupa m105optym <Armoury-*.log> [--baza-doby <Armoury-*.log bazy>] (strumieniowo). M5-0 linia startu
+                    "Optym (m105): start", M5-1 takt doby i sekcje (KingdomTreasury, Sutlers, ClanIncomeBook, BuildFunding) ostatnich 60 dob wobec bazy (INFO), M5-2 Optim
+                    Verify: roznice 0 razem i porownan > 0 w kazdej czynnej czesci (model bez lenn - gdy pominiete > 0; najblizsze osady - gdy z tablic doby; delegaty
+                    BK - gdy linie ClanIncomeBook; BuildFunding - sama linia, 0 porownan = brak budow), M5-3 model KT pominiety (dob z pominietymi > 0; straznik nie
+                    wylaczyl), M5-4 Sutlers z tablic doby, M5-5 potkniecia 0 i ERROR Optim105 / SutlerNear 0, M5-6 linie ClanIncomeBook bez "BRAK" (delegaty BK
+                    zbudowane). Log sprzed galezi - INFO.
 --grupa m98plotki  : (20.10, galaz w-toku/m98-plotki; Armoury/src/InnDrink.cs, Rumours.Drink.cs, TownInns.Drink.cs) plotki za kufel piwa, plotek na kufel wedlug Uroku,
                     turnieje i swaty, pijanstwo i kac gracza. python -I tools/sprawdz_logi.py --grupa m98plotki <Armoury-*.log> (strumieniowo). KP-0 start (klucze, krzywa
                     Uroku 20/80/150/250 = 1/2/3/wszystkie), KP-1 "ERROR in InnDrink./Rumours./SyncData.arm_drink/arm_rumours" 0 (m103-drobne: z zapisem stanu),
@@ -56332,6 +56342,254 @@ def m97obroncy_main(logp):
     return 0
 
 
+M99O_PRE = "Optym (m99): "
+M99O_PROF = re.compile(r"Profil doby \(E8/0\): dzien (\d+) \| takt doby ([\d.]+) ms \(wywolan \d+; top: (.*?)\); inne")
+M99O_CHK = re.compile(r"porownan (\d+), roznic (\d+) \(sesja")
+
+
+def m99optym_prof(logp):
+    """Linie "Profil doby (E8/0)": lista (takt doby, {sekcja: ms}) z calego logu (strumieniowo)."""
+    rows = []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "Profil doby (E8/0)" not in ln:
+                continue
+            m = M99O_PROF.search(ln)
+            if not m:
+                continue
+            secs = {}
+            for p in m.group(3).split(", "):
+                mm = re.match(r"(.+) ([\d.]+)$", p.strip())
+                if mm:
+                    secs[mm.group(1)] = float(mm.group(2))
+            rows.append((float(m.group(2)), secs))
+    return rows
+
+
+def m99optym_stat(rows, n=60):
+    """Mediana / srednia taktu doby i srednia KingdomTreasury.Daily w oknie ostatnich n dob (sekcja spoza "top" = 0)."""
+    w = rows[-n:]
+    if not w:
+        return None
+    tak = sorted(r[0] for r in w)
+    kt = [r[1].get("KingdomTreasury.Daily", 0.0) for r in w]
+    k = len(tak)
+    med = tak[k // 2] if k % 2 else (tak[k // 2 - 1] + tak[k // 2]) / 2.0   # recenzja m99: zwykla mediana (przy parzystym n srednia dwoch srodkowych) - jak w CHANGELOG
+    return {"n": len(w), "med": med, "avg": sum(tak) / len(tak), "kt": sum(kt) / len(kt)}
+
+
+M105_PRE = "Optym (m105): "
+M105_CHK = re.compile(r"kontrola \(Optim Verify\) ([^:]+): (?:zapytan \d+, z pamieci \d+, )?porownan (\d+), roznic (\d+) \(sesja")
+M105_KT = re.compile(r"KingdomTreasury\.Daily model dochodu: pominiety u (\d+) rodow \(z (\d+) ")
+M105_STUM = re.compile(r"\| potkniecia (\d+)")
+M105_SECS = ("KingdomTreasury.Daily", "Sutlers.Daily", "ClanIncomeBook.Daily", "BuildFunding.Daily")
+
+
+def m105optym_stat(rows, n=60):
+    """Mediana / srednia taktu doby i srednie sekcji M105_SECS w oknie ostatnich n dob (sekcja spoza "top" = 0)."""
+    w = rows[-n:]
+    if not w:
+        return None
+    tak = sorted(r[0] for r in w)
+    k = len(tak)
+    med = tak[k // 2] if k % 2 else (tak[k // 2 - 1] + tak[k // 2]) / 2.0
+    secs = {s: sum(r[1].get(s, 0.0) for r in w) / len(w) for s in M105_SECS}
+    return {"n": len(w), "med": med, "avg": sum(tak) / len(tak), "secs": secs}
+
+
+def m105optym_main(logp, basep=None):
+    """m105optym (21.10, galaz w-toku/m105-optym): skroty przelomu doby - model KT pominiety u rodow bez lenn (OptimKtSkipModel), najblizsze osady markietanow
+    z tablic doby (OptimSutlerNearest), wojna krolestwa w BuildFunding raz na krolestwo (OptimBuildWar), BK przez delegaty w ClanIncomeBook.StableBegin
+    (OptimStableDelegates). M5-0 linia startu; M5-1 takt doby i sekcje wobec bazy (INFO); M5-2 tryb kontrolny Optim Verify - roznice 0 razem i porownan > 0
+    w kazdej czynnej czesci (recenzja m105: czesc z 0 porownan nie moze przejsc dzieki innym; model bez lenn - gdy w liniach KT pominietych > 0, przy podstawie
+    nie-ziemia linii kontrolnej KT nie ma i to jest poprawne; najblizsze osady - gdy linia Sutlers "z tablic doby"; delegaty BK - gdy sa linie ClanIncomeBook;
+    BuildFunding - wymagana sama linia, 0 porownan = brak budow) (linia startu "Optim Verify TAK" bez porownan - NIE); M5-3 KT: doby z pominietymi modelami
+    (klucz TAK) - wiekszosc dob > 0, dzien "WYLACZONE" z powodu innego niz podstawa nie-ziemia - NIE; M5-4 Sutlers: "z tablic doby" w kazdej linii (klucz TAK);
+    M5-5 potkniecia w liniach m105 = 0 i ERROR Optim105 / SutlerNear = 0; M5-6 linie ClanIncomeBook bez "BRAK" (delegat nie powstal - skrot nie biegnie;
+    klucz TAK). Log sprzed galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, kt, sut, cib, chk, stum, errs = [], [], [], [], [], 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR" in s and ("Optim105" in s or "SutlerNear" in s):
+                errs += 1
+            if not s.startswith(M105_PRE):
+                continue
+            t = s[len(M105_PRE):]
+            if t.startswith("start"):
+                start.append(t)
+                continue
+            for mm in M105_CHK.finditer(t):
+                chk.append((mm.group(1).strip(), int(mm.group(2)), int(mm.group(3))))
+            ms = M105_STUM.search(t)
+            if ms:
+                stum += int(ms.group(1))
+            if "KingdomTreasury.Daily model dochodu" in t:
+                kt.append(t)
+            elif "Sutlers.Daily najblizsze osady" in t:
+                sut.append(t)
+            elif "ClanIncomeBook.StableBegin" in t:
+                cib.append(t)
+    rows = m99optym_prof(logp)
+    st = m105optym_stat(rows)
+    print(f"plik: {logp} | start {len(start)}, linie KT {len(kt)}, Sutlers {len(sut)}, ClanIncomeBook {len(cib)}, kontrolne {len(chk)}, doby profilu {len(rows)}, ERROR {errs}")
+    if not start and not kt and not sut and not cib:
+        rep.add("M5-0: linia startu Optym (m105)", "brak linii m105", "INFO (log sprzed galezi m105-optym)", None)
+        if st:
+            rep.add("M5-1: takt doby (ostatnie 60 dob)", f"mediana {st['med']:.1f} / srednia {st['avg']:.1f} ms ({st['n']} dob)", "INFO", None)
+        rep.show()
+        return 0
+    last = start[-1] if start else ""
+    rep.add("M5-0: linia startu Optym (m105)", last[:220] if start else "brak linii startu (sa linie doby)", "jest", bool(start))
+    if st:
+        val = (f"takt doby mediana {st['med']:.1f} / srednia {st['avg']:.1f} ms; "
+               + ", ".join(f"{k} {v:.1f}" for k, v in st["secs"].items()) + f" ms ({st['n']} dob)")
+        if basep:
+            bs = m105optym_stat(m99optym_prof(basep))
+            if bs:
+                val += (f" | baza: mediana {bs['med']:.1f} / srednia {bs['avg']:.1f}; "
+                        + ", ".join(f"{k} {v:.1f}" for k, v in bs["secs"].items())
+                        + f" | roznica mediany {st['med'] - bs['med']:+.1f} ms, sekcje "
+                        + ", ".join(f"{k} {st['secs'][k] - bs['secs'][k]:+.1f}" for k in M105_SECS))
+        rep.add("M5-1: takt doby i sekcje (ostatnie 60 dob) wobec bazy", val,
+                "INFO (zmiennosc biegu; oczekiwane KingdomTreasury.Daily nizej o ok. 20-30 ms, Sutlers o kilka ms)", None)
+    else:
+        rep.add("M5-1: takt doby i sekcje (ostatnie 60 dob) wobec bazy", "brak linii Profil doby (E8/0)", "INFO", None)
+    verify_on = "Optim Verify TAK" in last
+    on_part = last.split("| wylaczone")[0] if start else ""
+    if chk:
+        parts = {}
+        for name, c, d in chk:
+            pc, pd = parts.get(name, (0, 0))
+            parts[name] = (pc + c, pd + d)
+        tc = sum(v[0] for v in parts.values())
+        td = sum(v[1] for v in parts.values())
+        val = "; ".join(f"{k}: porownan {v[0]}, roznic {v[1]}" for k, v in sorted(parts.items()))
+        # recenzja m105: kazda czynna czesc z porownaniami > 0 (zero = skrot nie biegl w trybie kontrolnym - brak dowodu); bez linii startu / przy Verify NIE w
+        # ostatnim starcie - tylko suma (logi z kilku sesji)
+        miss = []
+        if start and verify_on:
+            need = []
+            if "Optim Kt Skip Model" in on_part and any(int(mk.group(1)) > 0 for mk in (M105_KT.search(x) for x in kt) if mk):
+                need.append("model bez lenn")
+            if "Optim Sutler Nearest" in on_part and any("z tablic doby" in x for x in sut):
+                need.append("najblizsze osady")
+            if "Optim Stable Delegates" in on_part and cib:
+                need.append("delegaty BK")
+            miss = [k for k in need if parts.get(k, (0, 0))[0] == 0]
+            if "Optim Build War" in on_part and "BuildFunding.Daily wojna krolestwa" not in parts:
+                miss.append("BuildFunding.Daily wojna krolestwa (brak linii)")
+        rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi",
+                f"{val} | razem porownan {tc}, roznic {td}" + (f" | bez porownan: {', '.join(miss)}" if miss else ""),
+                "roznic 0, porownan > 0 w kazdej czynnej czesci", td == 0 and tc > 0 and not miss)
+    elif verify_on:
+        rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi", "linia startu: Optim Verify TAK, brak porownan",
+                "porownania > 0 (tryb kontrolny wlaczony, nic nie porownal)", False)
+    else:
+        rep.add("M5-2: tryb kontrolny - roznice starej i nowej drogi", "brak linii kontrolnych", "INFO (Optim Verify wylaczony)", None)
+    kt_on = ("Optim Kt Skip Model" in on_part) if start else bool(kt)
+    if kt_on and kt:
+        skipped, off, off_land = [], [], 0
+        for t in kt:
+            mk = M105_KT.search(t)
+            if mk:
+                skipped.append(int(mk.group(1)))
+            elif "pominiecie WYLACZONE" in t:
+                if "nie ziemia" in t:
+                    off_land += 1
+                else:
+                    off.append(t.split("pominiecie WYLACZONE - ", 1)[-1][:160])
+        pos = sum(1 for x in skipped if x > 0)
+        srt = sorted(skipped)
+        med = srt[len(srt) // 2] if srt else 0
+        val = (f"dob z linia {len(kt)}: pominiete > 0 w {pos}, mediana pominietych {med}, maks. {max(srt) if srt else 0}; WYLACZONE przez straznika {len(off)}"
+               + (f" (pierwszy powod: {off[0]})" if off else "") + (f"; podstawa nie-ziemia {off_land}" if off_land else ""))
+        name = "M5-3: KingdomTreasury - model pominiety (straznik nie wylaczyl)"
+        if off:
+            rep.add(name, val, "straznik nie wylacza (nieznana latka / model - do sprawdzenia)", False)
+        elif off_land and not skipped:
+            rep.add(name, val, "INFO (podstawa powinnosci nie ziemia - pominiecie nie dotyczy)", None)
+        else:
+            rep.add(name, val, "pominiete > 0 w wiekszosci dob (pierwsza doba po wczytaniu bez pomiaru D stalego - 0)", len(skipped) > 0 and pos * 2 >= len(skipped))
+    else:
+        rep.add("M5-3: KingdomTreasury - model pominiety (straznik nie wylaczyl)", "klucz Optim Kt Skip Model NIE albo brak linii", "INFO", None)
+    sut_on = ("Optim Sutler Nearest" in on_part) if start else bool(sut)
+    if sut_on and sut:
+        tab = sum(1 for t in sut if "z tablic doby" in t)
+        rep.add("M5-4: Sutlers - najblizsze osady z tablic doby", f"{tab} z {len(sut)} dob", "kazda doba z tablic", tab == len(sut))
+    else:
+        rep.add("M5-4: Sutlers - najblizsze osady z tablic doby", "klucz Optim Sutler Nearest NIE albo brak linii", "INFO", None)
+    rep.add("M5-5: potkniecia w liniach m105 i ERROR Optim105 / SutlerNear", f"potkniecia {stum}, ERROR {errs}", "0 i 0", stum == 0 and errs == 0)
+    cd_on = ("Optim Stable Delegates" in on_part) if start else bool(cib)
+    if cd_on and cib:
+        brak = [x for x in cib if "BRAK" in x]
+        rep.add("M5-6: ClanIncomeBook.StableBegin - delegaty BK zbudowane", f"BRAK w {len(brak)} z {len(cib)} dob" + (f" (pierwsza: {brak[0][:160]})" if brak else ""),
+                "zadnego BRAK", not brak)
+    else:
+        rep.add("M5-6: ClanIncomeBook.StableBegin - delegaty BK zbudowane", "klucz Optim Stable Delegates NIE albo brak linii", "INFO", None)
+    rep.show()
+    return 0
+
+def m99optym_main(logp, basep=None):
+    """m99optym (21.10, galaz w-toku/m99-optym): optymalizacja przelomu doby (KingdomTreasury.Optim.cs). MO-0 linia startu "Optym (m99): start" (klucze),
+    MO-1 takt doby i KingdomTreasury.Daily (mediana / srednia ostatnich 60 dob; z --baza-doby <log bazy> - roznica wobec bazy) - INFO z liczba,
+    MO-2 tryb kontrolny (Optim Verify): roznice starej i nowej drogi = 0 przy porownan > 0; linia startu z "Optim Verify TAK" bez linii kontrolnych - NIE
+    (bieg kontrolny bez porownan nic nie dowodzi); bez linii kontrolnych przy "Optim Verify NIE" albo bez linii startu - INFO. MO-3 linie ERROR KingdomTreasury /
+    OptimStartLine = 0.
+    Log bez galezi: INFO, bez wyjatku."""
+    rep = Report()
+    start, chk, errs = [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if "ERROR" in s and ("KingdomTreasury" in s or "OptimStartLine" in s):
+                errs += 1
+            if not s.startswith(M99O_PRE):
+                continue
+            t = s[len(M99O_PRE):]
+            if t.startswith("start"):
+                start.append(t)
+            elif "kontrola (Optim Verify)" in t:
+                chk.append(t)
+    rows = m99optym_prof(logp)
+    st = m99optym_stat(rows)
+    print(f"plik: {logp} | start {len(start)}, linie kontrolne {len(chk)}, doby profilu {len(rows)}, ERROR {errs}")
+    if not start:
+        rep.add("MO-0: linia startu Optym (m99)", "brak linii", "INFO (log sprzed galezi m99-optym)", None)
+    else:
+        rep.add("MO-0: linia startu Optym (m99)", start[-1][:200], "jest", True)
+    if st:
+        val = f"takt doby mediana {st['med']:.1f} / srednia {st['avg']:.1f} ms, KingdomTreasury.Daily srednio {st['kt']:.1f} ms ({st['n']} dob)"
+        if basep:
+            bs = m99optym_stat(m99optym_prof(basep))
+            if bs:
+                val += (f" | baza: mediana {bs['med']:.1f} / srednia {bs['avg']:.1f}, KingdomTreasury.Daily {bs['kt']:.1f} ms ({bs['n']} dob)"
+                        f" | roznica mediany {st['med'] - bs['med']:+.1f} ms, KingdomTreasury.Daily {st['kt'] - bs['kt']:+.1f} ms")
+        rep.add("MO-1: takt doby (ostatnie 60 dob) wobec bazy", val, "INFO (zmiennosc biegu; oczekiwane KingdomTreasury.Daily nizej o ok. 1-3 ms)", None)
+    else:
+        rep.add("MO-1: takt doby (ostatnie 60 dob) wobec bazy", "brak linii Profil doby (E8/0)", "INFO", None)
+    if chk:
+        cmp_sum, diff_sum = 0, 0
+        for t in chk:
+            m = M99O_CHK.search(t)
+            if m:
+                cmp_sum += int(m.group(1)); diff_sum += int(m.group(2))
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", f"porownan {cmp_sum}, roznic {diff_sum} w {len(chk)} dobach", "roznic 0 (porownan > 0)",
+                diff_sum == 0 and cmp_sum > 0)
+    elif any("Optim Verify TAK" in t for t in start):
+        # recenzja m99: bieg kontrolny bez ani jednego porownania (klucz nie wszedl, CrownDuesEnabled / LogEnabled NIE, Daily wyszedl przez blad) - nie dowodzi niczego
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", "linia startu: Optim Verify TAK, brak linii kontrolnych",
+                "linie kontrolne z porownan > 0 (tryb kontrolny wlaczony, brak porownan)", False)
+    else:
+        rep.add("MO-2: tryb kontrolny - roznice starej i nowej drogi", "brak linii kontrolnych", "INFO (Optim Verify wylaczony albo log bez linii startu)", None)
+    rep.add("MO-3: linie ERROR KingdomTreasury / OptimStartLine", f"{errs}", "0", errs == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -56684,6 +56942,10 @@ def main(argv):
         return m97obroncy_main(logp)   # m97obroncy (20.10, m97-wioski krok 2): obroncy wioski pobocznej z jej wlasnych ludzi (SideVillageVisit.Defenders.cs)
     if group == "m97wioski" and logp:
         return m97wioski_main(logp)   # m97wioski (20.10, galaz w-toku/m97-wioski): wjazd do wiosek pobocznych - handel, okup, rabunek, potkniecia (SideVillageVisit)   # m96koszyk (20.10, galaz m96-koszyk - PLAN 5.5): placa zatrzymana w kasie do R i P w biedzie - stac jedzenie i pelny koszyk (TownFolk.M96Koszyk.cs)
+    if group == "m105optym" and logp:
+        return m105optym_main(logp, bdp)   # m105optym (21.10, galaz w-toku/m105-optym): skroty przelomu doby (model KT, markietani, budowy, delegaty BK), Optim Verify
+    if group == "m99optym" and logp:
+        return m99optym_main(logp, bdp)   # m99optym (21.10, galaz w-toku/m99-optym): takt doby wobec bazy, tryb kontrolny Optim Verify (KingdomTreasury.Optim.cs)
     if group == "m98plotki" and logp:
         return m98plotki_main(logp, csp)   # m98plotki (20.10, galaz w-toku/m98-plotki): plotki za kufel, plotek na kufel wedlug Uroku, turnieje i swaty prawdziwe, pijanstwo i kac (InnDrink, Rumours.Drink)
     if group != "etap2" or not logp:

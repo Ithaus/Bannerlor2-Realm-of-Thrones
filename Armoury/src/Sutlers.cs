@@ -247,6 +247,7 @@ namespace Armoury
             }
             else _pRamp = -2;
             float townShare = MBMath.ClampFloat(s.SutlerTownShare, 0f, 1f);
+            if (rate > 0f) SutlerNear.Begin(s);   // m105-optym (OptimSutlerNearest, SutlerNear.cs): najblizsze osady z tablic doby (klucz NIE - stara droga)
             if (rate > 0f)
                 foreach (var mp in parties)
                 {
@@ -259,6 +260,7 @@ namespace Armoury
                 }
             else
                 foreach (var mp in parties) ReadSaved(s, mp);    // F6: stawka 0 (Sutler Daily Share 0 albo wyjatek RateToday) - One nie biegnie, pelna petla odczytu jak dotad
+            if (rate > 0f) SutlerNear.End(s, today);   // m105-optym: tablice puste, linia "Optym (m105)" (kontrola przy Optim Verify)
             _dTownsN = _towns.Count; _dVillsN = _vills.Count;
             LastTown = _dTown; LastVill = _dVill;
             LastVillTribute = TributeOn ? _dVillTax : -1;                 // E3-G2: Pompy F
@@ -325,8 +327,8 @@ namespace Armoury
             var p = mp.GetPosition2D;
             var f = mp.MapFaction;
             bool noTown = false;
-            var town = NearestTown(p, f);
-            if (town == null) { town = NearestTown(p, null); noTown = town != null; }
+            var town = SutlerNear.NearTown(p, f);   // m105-optym: z tablic doby (ta sama osada; poza petla Daily i przy kluczu NIE - NearestTown)
+            if (town == null) { town = SutlerNear.NearTown(p, null); noTown = town != null; }
             if (town == null || town.Town == null) { _dEmpty++; return; }   // swiat bez miast - nic nie schodzi
             // T3-K1 (SutlerClothing): markietani przywoza odziez z miasta, do ktorego wplacaja - PRZED ich czescia (jak w OnLeft: odziez przed "zyciem"),
             // z sakiewki ponad zalegle naprawy; naprawy liczone raz (F6) i podane do CampPlan. Klucz wylaczony - mend -1, CampPlan liczy je jak dotad
@@ -367,7 +369,7 @@ namespace Armoury
             bool sackHold = CitySack.NoSpend(town, mp, (long)(want * (double)townShare), true);
             if (sackHold) { want = (int)(want * (double)(1f - townShare)); townShare = 0f; if (want <= 0) return; }
             bool wantVill = (int)(want * (double)(1f - townShare)) > 0;
-            var vill = wantVill ? NearestVillage(p, f) : null;              // wies szukana tylko, gdy jest co jej dac (koszt: ok. 570 wsi na partie)
+            var vill = wantVill ? SutlerNear.NearVillage(p, f) : null;      // wies szukana tylko, gdy jest co jej dac (koszt: ok. 570 wsi na partie; m105-optym: z tablic doby)
             if (vill != null && vill.SettlementComponent == null) vill = null;
             if (sackHold && vill == null) return;                            // bez wsi cala kwota szlaby do lupionej osady - zostaje w sakiewce
             // ---- od zdjecia do obu wplat tylko arytmetyka i ChangeGold
