@@ -75,6 +75,7 @@ namespace Armoury
                     {
                         if (mp == null || !mp.IsActive || mp.MemberRoster == null || mp.MemberRoster.Count == 0) continue;
                         if (mp.CurrentSettlement != st && mp.GetPosition2D.Distance(pos) > 30f) continue;
+                        if (InBattle(mp)) continue;   // recenzja K0 (styk-api R5): partia w toczacej sie bitwie walczy lista z chwili wejscia - bez rannych w trakcie
                         var ro = mp.MemberRoster;
                         int got = 0;
                         for (int i = 0; i < ro.Count; i++)

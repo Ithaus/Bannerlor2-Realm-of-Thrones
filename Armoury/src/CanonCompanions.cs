@@ -593,6 +593,37 @@ namespace Armoury
                      + " | dzien " + Day() + ".");
         }
 
+        /// <summary>m105-kronika (recenzja K0 styk-api R1): CampaignEvents.BeforeHeroKilledEvent - idzie w KillCharacterAction.ApplyInternal PRZED wyborem dziedzica
+        /// (ChangeClanLeaderAction.ApplyWithoutSelectedNewLeader) i przed DestroyClanAction.ApplyByClanLeaderDeath. Clan.GetHeirApparents pomija IsDisabled, wiec ukryty
+        /// (Armoury) nigdy nie jest dziedzicem: gdy umiera glowa rodu i NIKT inny nie moze dziedziczyc, gra niszczy rod razem z ukrytymi (ApplyByRemove). Wtedy pierwszy
+        /// ukryty dorosly lord tego rodu wraca (Unhide - teleport do siedziby, stan Active), a gra wybiera go dziedzicem. Gdy jest inny dziedzic - nic (o glowie decyduje gra).
+        /// Przy smierci w bitwie zdarzenie przychodzi dopiero z ApplyByDeathMark (po bitwie). Bez zmian przy pustym rejestrze ukrytych.</summary>
+        internal static void BeforeHeroKilled(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool notify)
+        {
+            try
+            {
+                if (_hid.Count == 0 || victim == null || detail == KillCharacterAction.KillCharacterActionDetail.Lost) return;   // Lost = usuniecie (DestroyClanAction, remove) - bez dziedzica
+                var cl = victim.Clan;
+                if (cl == null || cl.Leader != victim || cl == Clan.PlayerClan || cl.IsEliminated || cl.IsBanditFaction) return;
+                if (cl.GetHeirApparents().Count > 0) return;
+                foreach (var r in HiddenRows())
+                {
+                    var h = HiddenHero(r);
+                    if (h == null || h == victim || h.Clan != cl || !h.IsDisabled || h.IsDead || h.IsChild || !h.IsLord) continue;
+                    string why;
+                    var res = Unhide(h, "", "dziedzic - smierc glowy rodu " + Nm(victim), out why);
+                    if (res == Res.Done)
+                    {
+                        Log.Info(Tag + ": KONIEC UKRYCIA (dziedzic) " + Nm(h) + " (" + h.StringId + ") - glowa rodu " + Nm(cl) + " (" + cl.StringId + ") " + Nm(victim)
+                                 + " umiera bez innego dziedzica (rod zniszczony razem z ukrytymi) | " + why + " | dzien " + Day() + ".");
+                        return;
+                    }
+                    Log.Info(Tag + ": KONIEC UKRYCIA (dziedzic) " + Nm(h) + " (" + h.StringId + ") NIEMOZLIWY - " + why + " | rod " + cl.StringId + " | dzien " + Day() + ".");
+                }
+            }
+            catch (Exception e) { Stumble("BeforeHeroKilled", e); }
+        }
+
         /// <summary>CampaignEvents.HeroKilledEvent: usuniecie (Lost) postaci kanonu - zrodlo do zapisu (UC, linia doby); cudze usuniecie ma linie logu.</summary>
         internal static void HeroKilled(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool notify)
         {
@@ -1300,7 +1331,7 @@ namespace Armoury
             return Res.Done;
         }
 
-        private static Settlement PickTown(string culture, Hero h)
+        private static Settlement PickTown(string culture, Hero h, bool noEnemy = false)
         {
             Settlement player = null;
             try { player = Hero.MainHero != null ? Hero.MainHero.CurrentSettlement : null; } catch { }
@@ -1311,11 +1342,19 @@ namespace Armoury
                 var s = t != null ? t.Settlement : null;
                 if (s == null || s == player || s.SiegeEvent != null || t.Culture == null) continue;
                 if (t.Culture.StringId == "whitewalker") continue;
+                if (noEnemy && Hostile(s, h)) continue;   // recenzja K0 (R3): powrot z ukrycia bez miast wroga (wander - bez zmian)
                 any.Add(s);
                 if (t.Culture.StringId == culture) same.Add(s);
             }
             var pool = same.Count > 0 ? same : any;
             return pool.Count > 0 ? pool[MBRandom.RandomInt(pool.Count)] : null;
+        }
+
+        /// <summary>Osada stronnictwa w wojnie ze stronnictwem postaci (recenzja K0 R3: powrot z ukrycia i miasto kultury bez osad wroga). Postac bez stronnictwa - false.</summary>
+        private static bool Hostile(Settlement s, Hero h)
+        {
+            try { return s != null && s.MapFaction != null && h != null && h.MapFaction != null && FactionManager.IsAtWarAgainstFaction(s.MapFaction, h.MapFaction); }
+            catch { return false; }
         }
 
         private static PartyBase Captor(string arg)
@@ -1599,6 +1638,9 @@ namespace Armoury
             if (Captive(h)) { why = "jeniec " + Where(h) + " - czeka na wolnosc (jenca nie ukrywamy)"; return Res.Wait; }
             if (h.GovernorOf != null) { why = "gubernator " + Nm(h.GovernorOf.Settlement) + " - czeka"; return Res.Wait; }
             if (Busy(h)) { why = "w bitwie albo oblezeniu"; return Res.Wait; }
+            // recenzja K0 (R1): postac w drodze (opozniony teleport gry - np. AI wysyla gubernatora, GovernorOf jeszcze null) - wpis teleportu gry zostaje
+            // i po dotarciu przywrocilby ukrytego (ImmediateTeleportToSettlement: ChangeState Active) albo zrobil dowodca druzyny w stanie Disabled
+            if (h.IsTraveling) { why = "w drodze (opozniony teleport gry) - czeka"; return Res.Wait; }
             string from = Where(h);
             LeaveParty(h);                 // plan P3: przed DisableHeroAction zawsze wyjscie z druzyny (armia, zbieg, druzyna lorda - StartDisband, ludzie nie przepadaja)
             DisableHeroAction.Apply(h);    // gra: z osady, stan Disabled (lista martwych i wylaczonych - CampaignObjectManager.HeroStateChanged)
@@ -1630,19 +1672,21 @@ namespace Armoury
             if (arg.Length > 0)
             {
                 var st = Settlement.Find(arg);
-                bool enemy = false;
-                try { enemy = st != null && st.MapFaction != null && h.MapFaction != null && FactionManager.IsAtWarAgainstFaction(st.MapFaction, h.MapFaction); } catch { }
+                bool enemy = Hostile(st, h);
                 if (st != null && st.SiegeEvent == null && !st.IsHideout && !enemy) { to = st; how = "osada z akcji"; }
                 else how = "osada " + arg + (st == null ? " nie istnieje" : st.SiegeEvent != null ? " oblezona" : enemy ? " wroga" : " to kryjowka") + " - ";
             }
             if (to == null && h.Clan != null && !h.Clan.IsEliminated)
             {
+                // recenzja K0 (R3): SeatOf moze dac osade wroga (krok 4 - InitialHomeSettlement krolestwa, HomeSettlement przy krolestwie bez osad,
+                // osada glowy rodu-jenca) - wtedy dalej miasto kultury (PickTown tez bez osad wroga), na koncu CZEKA
                 var seat = SeatOf(h.Clan);
-                if (seat != null && seat.SiegeEvent == null && !seat.IsHideout) { to = seat; how += "siedziba rodu " + Nm(h.Clan); }
+                if (seat != null && seat.SiegeEvent == null && !seat.IsHideout && !Hostile(seat, h)) { to = seat; how += "siedziba rodu " + Nm(h.Clan); }
+                else if (seat != null && Hostile(seat, h)) how += "siedziba " + seat.StringId + " wroga - ";
             }
             if (to == null)
             {
-                to = PickTown(h.Culture != null ? h.Culture.StringId : "", h);
+                to = PickTown(h.Culture != null ? h.Culture.StringId : "", h, true);
                 if (to != null) how += "miasto kultury " + (h.Culture != null ? h.Culture.StringId : "-");
             }
             if (to == null) { why = "brak osady powrotu"; return Res.Wait; }
@@ -1723,6 +1767,7 @@ namespace Armoury
             CampaignEvents.CanHeroLeadPartyEvent.AddNonSerializedListener(this, CanonCompanions.CanLead);
             CampaignEvents.OnClanDestroyedEvent.AddNonSerializedListener(this, CanonCompanions.OnClanDestroyed);   // ratunek postaci kanonu z rodu niszczonego przez ROT
             CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, CanonCompanions.HeroKilled);             // zrodlo usuniecia (Lost) postaci kanonu
+            CampaignEvents.BeforeHeroKilledEvent.AddNonSerializedListener(this, CanonCompanions.BeforeHeroKilled); // m105-kronika: ukryty dziedzic, gdy rod bez innego
         }
 
         public override void SyncData(IDataStore dataStore)

@@ -29,6 +29,7 @@ namespace Armoury
             // POMINIETA; turniej juz jest w miescie - OK bez nowego ("gdy nie ma innego"); oblezenie - CZEKA.
             // muster:krolestwo:osada:dni - jednorazowo, miekko: wolne druzyny lordow krolestwa (bez armii, bitwy, oblezenia, morza, scen prologu, rodu gracza) dostaja
             // raz rozkaz "idz do osady" (AI gry moze go zmienic przy nastepnej mysli); rejestr zbiorki (zapis "km") tylko do linii konca: ile druzyn dotarlo.
+            // Osada wroga krolestwa (recenzja K0 R2) - rozkaz "idz pod brame" (GoToPoint bez wejscia; GoToSettlement wprowadzal druzyne do wrogiego miasta).
 
             private static readonly HashSet<int> SucceedLightOk = new HashSet<int> { 42, 49, 52, 80 };   // FORMAT 11 / kronika_check SUCCEED_LIGHT_OK
             private const float MusterArrive = 8f;   // jednostki mapy od bramy osady zbiorki = na miejscu (linia konca)
@@ -78,6 +79,7 @@ namespace Armoury
                         arg = cl.StringId;
                     }
                 }
+                string guardOk = "";
                 if (act == "die" && h.IsAlive)
                 {
                     if ((h.IsClanLeader || h.IsKingdomLeader) && RowVersion(c) != "pelna")
@@ -87,11 +89,13 @@ namespace Armoury
                         return Res.Skip;
                     }
                     string need;
-                    if (CanonCompanions.GuardState(h, out need) == 2) { detail = HeroName(h) + " - lista chronionych, jeszcze przed " + need + " (FORMAT 15)"; return Res.Skip; }
+                    int gs = CanonCompanions.GuardState(h, out need);
+                    if (gs == 2) { detail = HeroName(h) + " - lista chronionych, jeszcze przed " + need + " (FORMAT 15)"; return Res.Skip; }
+                    if (gs == 1) guardOk = " | lista chronionych: " + need + " spelnione";   // recenzja K0 (R-14): prog KW-15 sprawdza tez die
                 }
                 string why;
                 var r = FromCanon(CanonCompanions.ApplyAction(h, act, arg, "Kronika " + c.Label, out why));
-                detail = HeroName(h) + ": " + why;
+                detail = HeroName(h) + ": " + why + (r == Res.Done ? guardOk : "");
                 return r;
             }
 
@@ -129,11 +133,15 @@ namespace Armoury
                 if (d.IsDisabled || CanonCompanions.IsHidden(d)) { detail = HeroName(d) + " ukryty albo wylaczony - bez sukcesji"; return Res.Skip; }
                 if (heir.IsDisabled || CanonCompanions.IsHidden(heir)) { detail = "dziedzic " + HeroName(heir) + " ukryty albo wylaczony"; return Res.Skip; }
                 string need;
-                if (CanonCompanions.GuardState(d, out need) == 2) { detail = HeroName(d) + " - lista chronionych, jeszcze przed " + need + " (FORMAT 15)"; return Res.Skip; }
+                int gs = CanonCompanions.GuardState(d, out need);
+                if (gs == 2) { detail = HeroName(d) + " - lista chronionych, jeszcze przed " + need + " (FORMAT 15)"; return Res.Skip; }
                 var clan = d.Clan;
                 if (clan == null || clan.IsEliminated) { detail = HeroName(d) + " bez rodu"; return Res.Skip; }
                 if (heir.Clan != clan) { detail = "dziedzic " + HeroName(heir) + " poza rodem " + clan.StringId + " (rod " + (heir.Clan != null ? heir.Clan.StringId : "-") + ")"; return Res.Skip; }
                 if (Busy(d) || Busy(heir)) { detail = "umierajacy albo dziedzic w bitwie albo oblezeniu"; return Res.Wait; }
+                // recenzja K0 (styk-api R3): weto smierci (CampaignEvents.CanHeroDie - ROT, sceny prologu, inne mody) - KillCharacterAction wychodzi bez skutku,
+                // a sukcesja juz by weszla; najpierw pytanie, potem zmiana glowy rodu
+                if (!d.CanDie(KillCharacterAction.KillCharacterActionDetail.Murdered)) { detail = HeroName(d) + " - smierc zablokowana (CanHeroDie) - bez sukcesji"; return Res.Skip; }
                 var k = clan.Kingdom;
                 string ruler0 = k != null && k.Leader != null ? HeroName(k.Leader) : "-", lead0 = clan.Leader != null ? HeroName(clan.Leader) : "-", how;
                 if (clan.Leader == d)
@@ -145,7 +153,7 @@ namespace Armoury
                 KillCharacterAction.ApplyByMurder(d, null, false);   // jak die: smierc bez komunikatu (w bitwie - znak smierci)
                 string ruler1 = k != null && k.Leader != null ? HeroName(k.Leader) : "-";
                 detail = how + " | " + HeroName(d) + (d.IsDead ? " nie zyje" : " znak smierci - umrze po bitwie") + (k != null ? " | wladca " + k.StringId + ": " + ruler0 + " -> " + ruler1 : "")
-                         + (SucceedLightOk.Contains(ev) ? " (wyjatek lekki " + ev + ")" : "");
+                         + (SucceedLightOk.Contains(ev) ? " (wyjatek lekki " + ev + ")" : "") + (gs == 1 ? " | lista chronionych: " + need + " spelnione" : "");
                 return Res.Done;
             }
 
@@ -203,7 +211,9 @@ namespace Armoury
                 if (h.Clan != cl) { detail = HeroName(h) + " poza rodem " + cl.StringId; return Res.Skip; }
                 if (h.IsDisabled || CanonCompanions.IsHidden(h)) { detail = HeroName(h) + " ukryty albo wylaczony"; return Res.Skip; }
                 if (cl.Leader == h) { detail = HeroName(h) + " juz glowa rodu " + cl.StringId + " - bez zmian"; return Res.Done; }
-                string before = cl.Leader != null ? HeroName(cl.Leader) : "-";
+                // recenzja K0 (styk-api R4): ChangeClanLeaderAction zaczyna od GiveGoldAction z kiesy starej glowy - bez glowy byl NullReferenceException
+                if (cl.Leader == null) { detail = "rod " + cl.StringId + " bez glowy"; return Res.Skip; }
+                string before = HeroName(cl.Leader);
                 ChangeClanLeaderAction.ApplyWithSelectedNewLeader(cl, h);
                 detail = "rod " + cl.StringId + ": glowa " + before + " -> " + (cl.Leader != null ? HeroName(cl.Leader) : "-");
                 return cl.Leader == h ? Res.Done : Res.Skip;
@@ -297,6 +307,10 @@ namespace Armoury
                 var st = Terms.FindSettlement(a[1], c.Tok);
                 if (st == null) { detail = "osada " + a[1] + " nie istnieje w grze"; return Res.Skip; }
                 if (st.SiegeEvent != null) { detail = "osada zbiorki " + st.StringId + " oblezona"; return Res.Skip; }
+                // recenzja K0 (R2): osada wroga krolestwa - GoToSettlement nie sprawdza wojny i druzyna AI WCHODZILA do wrogiego miasta (EnterSettlementAction);
+                // wtedy zbiorka POD BRAMA (GoToPoint, bez wejscia): 022.1 Ashemark, 023.1 Deepwood Motte, 085.1 Winterfell Boltonow. Osada neutralna - jak dotad
+                bool hostile = false;
+                try { hostile = st.MapFaction != null && FactionManager.IsAtWarAgainstFaction(st.MapFaction, k); } catch (Exception e) { Stumble("Actions.Muster(wojna)", e); }
                 var row = new MusterRow { K = k.StringId, St = st.StringId, Src = c.Label, Day = Terms.Day() };
                 row.Until = row.Day + days;
                 int lords = 0, busy = 0;
@@ -308,14 +322,20 @@ namespace Armoury
                     if (lh == null || lh.Clan == Clan.PlayerClan || lh.IsPrisoner) continue;
                     lords++;
                     if (mp.Army != null || mp.MapEvent != null || mp.SiegeEvent != null || mp.IsCurrentlyAtSea || mp.IsDisbanding || mp.CurrentSettlement == st || Prologue.Scripted(mp)) { busy++; continue; }
-                    try { mp.SetMoveGoToSettlement(st, MobileParty.NavigationType.Default, false); row.Parties.Add(mp.StringId); }
+                    try
+                    {
+                        if (hostile) mp.SetMoveGoToPoint(st.GatePosition, MobileParty.NavigationType.Default);
+                        else mp.SetMoveGoToSettlement(st, MobileParty.NavigationType.Default, false);
+                        row.Parties.Add(mp.StringId);
+                    }
                     catch (Exception e) { Stumble("Actions.Muster(" + mp.StringId + ")", e); }
                 }
                 if (row.Parties.Count == 0) { detail = "brak wolnych druzyn lordow " + k.StringId + " (druzyn " + lords + ", zajete " + busy + ": armie, bitwy, oblezenia, morze)"; return Res.Skip; }
                 for (int i = _musters.Count - 1; i >= 0; i--)
                     if (_musters[i].K == row.K) { Log.Info(Tag + "zbiorka " + _musters[i].K + " -> " + _musters[i].St + " (" + _musters[i].Src + ") zastapiona nowa (" + c.Label + ")."); _musters.RemoveAt(i); }
                 _musters.Add(row);
-                detail = "krolestwo " + k.StringId + " -> " + st.StringId + ": rozkaz zbiorki dla " + row.Parties.Count + " druzyn (z " + lords + ", zajete " + busy + "), jednorazowo - AI moze zmienic, linia konca dzien " + row.Until;
+                detail = "krolestwo " + k.StringId + " -> " + st.StringId + (hostile ? " (osada wroga " + (st.MapFaction != null ? st.MapFaction.StringId : "?") + " - zbiorka pod brama, bez wejscia)" : "")
+                         + ": rozkaz zbiorki dla " + row.Parties.Count + " druzyn (z " + lords + ", zajete " + busy + "), jednorazowo - AI moze zmienic, linia konca dzien " + row.Until;
                 return Res.Done;
             }
 
