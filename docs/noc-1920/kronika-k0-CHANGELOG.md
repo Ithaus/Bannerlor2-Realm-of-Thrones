@@ -5,6 +5,62 @@ Plan: repo glowne docs/PLANY-E5-WOJNY-KRONIKA-2026-10-21.md "## PLAN kronika" (E
 Silnik powstaje w 4 krokach lancucha: A1 dane i termy, A2 zachowanie/doba/okna/wybory/zapis (+ akcje T/R), A3 lektor i obrazki (polecenie lancucha 21.10;
 wczesniejszy podzial mowil "A3 akcje swiata i obrazki, A4 lektor") - akcje swiata, progi m105kronika i autotest zostaja na kolejne kroki.
 
+## 2026-10-22 - K0 krok B2: bandy, zadania, akcje kanonu, tylko-pelne, turniej, zbiorka, uchwyty kod:, wyzwalacz brokenmen
+
+**Problem:** po B1 w danych K1-K10 dalej "POMINIETA (akcja jeszcze niewspierana)": band 31 wierszy, die 30 (43 uzycia), succeed 17, prisoner 13 (18), task 12 (13),
+muster 11, clan 10, free 6 (8), own 5, truce 5 (7), court 4, tourney 3, alliance 2 (3), wed 1, leader 1; uchwyty kod: wielka_rada 8, zaraza 1, dzwony 1 konczyly
+sie "brak uchwytu"; okno powracajace 045 (wyzwalacz brokenmen) czekalo na zawsze ("wyzwalacz niewspierany w K0").
+**Przyczyna:** nowa funkcja (KRONIKA-FORMAT 6, 7, 11, 12, 13; plan P5, P6, J K1-K10).
+**Zmiana:**
+- `Armoury/src/StoryActions.cs` (nowy, plan P6): pomocniki scen PRZENIESIONE 1:1 z prywatnych metod m104-e5 - BanditClan, BanditsById, SpawnBand
+  (Prologue.World.Clans) i GtReady + GtProclaim/GtSetHeroes (GrandTourney.CanonApi odbiciem, Prologue.World.Tourney); Prologue wola je przez swoje stare nazwy
+  (cienkie opakowania z WStumble - logika scen bez zmian). Nowe: wspolny sufit band fabularnych okregu (StoryBandsIn, RegionCap = 4; przedrostki armoury_ffraid,
+  armoury_prl_mountain, armoury_prl_clan, armoury_kr_; okreg = okreg OutlawLaw osady domowej bandy).
+- `Chronicle.Actions.cs`: klasa `Actions` partial; Impl ma procedury dla wszystkich 39 akcji FORMAT 11; Bands = rejestr band; WorldDaily (bandy, zadania, zbiorki -
+  w dobie PRZED kluczem ChronicleOfWesteros, klucz NIE nic nie cofa); EventNo, RowVersion; zapis "kb", "kz", "km"; linia doby ", zadania n, zbiorki n"; kod: -> RunCode.
+- `Chronicle.Bands.cs` (nowy): band:bNNN - ludzie z puli okregu (SpawnBand: OutlawLaw.RaidDraw, nikt z niczego), sufit 12 band Kroniki (MaxBands) i 4 band
+  fabularnych okregu, klan spoza Clan.BanditFactions -> looters z nazwa herszta, zachowanie rabunek/patrol/oboz, koniec terminu -> FreeFolkRaids.Home (ludzie do puli
+  okregu, zloto/towar do wsi), rozbita przez gracza (MapEventEnded: banda po stronie przegranej, druzyna gracza po stronie wygranej) -> raz po_rozbiciu + zadania
+  defeat; list = 0 -> Chronicle.NoBounty (NoticeBoard.Watch pomija bande - jedna linia w NoticeBoard.Watch.cs). Linia "banda bNNN 'nazwa' (id) | ludzi ... (z puli a,
+  zabrani z domow b) | ... | region r: band fabularnych m/4 | ...".
+- `Chronicle.Tasks.cs` (nowy): task:tNNN - wlasny rejestr bez QuestBase (zapis "kz", najwyzej 8); deliver/prisoners przy wejsciu druzyny gracza do osady celu
+  (SettlementEntered) albo w dobie, gdy w niej stoi - towar na rynek osady, jency do lochu osady (PeopleBook.Transfer); defeat - przez rozbicie bandy; termin ->
+  NIEUDANE; nagroda zwykla droga akcji. Tablica ogloszen: BEZ wpisu (wpisy tablicy to QuestBase i listy goncze - nowy rodzaj wpisu = zmiany karty/warunkow/przyciskow,
+  ryzyko bez potrzeby) - wiadomosc dla gracza + linia.
+- `Chronicle.Canon.cs` (nowy): clan/court/lead/prisoner/free/wander/die/marry/wed przez CanonCompanions.ApplyAction (+ z Kroniki POMINIETA: postac z wierszami #move -
+  CanonCompanions.HasMoveRows, die z listy chronionych przed wydarzeniem ROT, die glowy rodu/wladcy w chwili akcji z wiersza lekka/obie); succeed (tylko pelna, wyjatki
+  42/49/52/80; dziedzic z rodu umierajacego glowa rodu przed smiercia - wzor Prologue.End); own/ruler/leader/truce (tylko pelna; truce bez wojny wymuszonej przez ROT -
+  Prologue.RotWarForced, bez gracza-wladcy); alliance - zawsze POMINIETA z powodem (P5); tourney (GrandTourney CanonApi.ProclaimRoyal odbiciem; bez GrandTourney
+  POMINIETA; turniej juz jest - OK bez nowego; oblezenie - CZEKA); muster (jednorazowy rozkaz SetMoveGoToSettlement wolnym druzynom lordow, zapis "km", linia konca
+  "zbiorka ... koniec: na miejscu a z n").
+- `Chronicle.Codes.cs` (nowy): RunCode - test (jak A2), zaraza (ranni 10-20% w partiach w promieniu 30 od town_K1, security -5; ludzie miasta bez zmian - ksiega
+  ludzi bez przyczyny choroba), dzwony (30% kasy town_EW4 -> glowa rodu-wlasciciela akcja gold; ludzie i Devastation bez zmian - powody w linii), wielka_rada
+  (lekka: relacje glow rodow krolestw z kolumny gracz okna 117.1; pelna: + glosy i flaga k117_wynik_*, korona bez zmian).
+- `Chronicle.Recurring.cs`: wyzwalacz brokenmen (okreg z rabunkiem w 30 dniach - PeopleBook.LastStrike - i > 30% ludzi poza domem: uchodzcy + pula wyrzutkow wobec
+  ludzi w domu we wsiach okregu; klucz okreg-okres 90 dni); Unsupported pusty.
+- `Chronicle.cs`: WorldDaily w dobie, WorldText w linii startu, sluchacze MapEventEnded i SettlementEntered w ChronicleBehavior.
+- `CanonCompanions.cs`: HasMoveRows(Hero), PlayerSideOf(Hero) - tylko odczyt. `Prologue.Wars.cs`: RotWarForced - tylko odczyt WarForced.
+- `tools/sprawdz_logi.py` (m105kronika): KW-5b opis B2, KW-5c INFO (alliance, tylko pelna), KW-14 + sufit okregu i "z puli" z linii narodzin bandy, KW-14b losy band
+  INFO, KW-16 zadania i zbiorki INFO. `tools/kronika/kronika_silnik.py` (nowy): kazda akcja z danych ma procedure albo jest swiadomie POMINIETA (procedura bez Res.Done),
+  kazdy kod: ma galaz RunCode, kazdy wyzwalacz powtorz jest wspierany.
+**Ryzyko / co sprawdzic:**
+- W grze nic nie sprawdzone (zakaz gry). Autotest: 008.1 (band b008 - linia "banda", KW-14), 020.1/020.2 (band b020 + task t020 defeat), 014.1 (task t014 deliver -
+  wejscie do town_B5 z 150 grain), 003.1 (tourney town_EW4 - linia GrandTourney), 014.1/022.1 (muster - linia konca), 042.1 (succeed lekki Balon), 049.2 (succeed Lysa),
+  076.2 (kod zaraza), 115.1 (kod dzwony - linia zloto), 117.1 (kod wielka_rada), 045 (brokenmen - instancja w kolejce przy rabunkach Dorzecza).
+- Banda z klanem pomniejszej frakcji idzie pod looters (CreateLooterParty tylko dla band) - tekst okna mowi o Bractwie/Stone Crows/Synach Harpii, na mapie "Looters" z
+  wlasna nazwa. Klan bandycki z nazwa jest w stalej wojnie z kazdym krolestwem.
+- muster: rozkaz jednorazowy - AI przy nastepnej mysli moze go zmienic (zgodnie z "miekko"); linia konca pokaze skutecznosc.
+- zaraza/dzwony bez czesci ludzi (ksiega ludzi bez przyczyn choroba/pozar) - decyzja o nowych przyczynach PeopleBook jak przy pop.
+- MapEventEnded: rozbicie liczone, gdy banda jest po stronie przegranej i druzyna gracza po stronie wygranej (tez gracz w cudzej armii). Banda scalona przez gre
+  z inna (HideoutPurge) zniknie z rejestru jak rozbita bez gracza (zadania defeat NIEUDANE).
+- Testy: harness B2 (scratchpad 7aee5f12/kr-b2/harness, prawdziwy DLL odbiciem) 126/126 - rejestr 39/39 procedur, klasa S, EventNo, zle argumenty 21 akcji, brak
+  obiektow bez wyjatku, tylko-pelne (wiersz lekka / pelna + klucz NIE / pelna + klucz TAK / succeed 42 vs 43), World Changes NIE dla 19 akcji, zapis kb/kz/km tam
+  i z powrotem + zle linie, doba swiata (zadanie po terminie NIEUDANE, bez definicji - usuniete), brokenmen wspierany, StoryActions/Prologue/CanonCompanions metody.
+  Stare harnessy: A1 42/42, A3 44/44, A4 43/43, B1 67/67, A2 33/35 (oczekiwane: gold wspierane od B1, kod:zaraza ma uchwyt od B2). test_kw.py 35/35, test_kw_b2.py
+  38/38 (+3: dobry log B2, sufit okregu, banda bez "z puli"). kronika_check WYNIK OK; kronika_silnik WYNIK OK (34 akcje: 32 z procedura, pop i alliance swiadomie
+  POMINIETE; 3 uchwyty; 9 wyzwalaczy). Build Armoury: 0 bledow, 7 starych ostrzezen. sprawdz_narzedzie czysto.
+**Status:** DO SPRAWDZENIA (autotest K0 z oknami band/zadan/kanonu przed wgraniem; nic nie wgrane).
+
 ## 2026-10-22 - K0 krok B1: akcje swiata i ekonomii (gold, security, loyalty, ware, garrison, item, wound, skill; pop - POMINIETA)
 
 **Problem:** akcje swiata z danych K1-K10 konczyly sie "POMINIETA (akcja jeszcze niewspierana)": gold 25 wierszy (26 uzyc), security 30, loyalty 30, pop 10 (22),

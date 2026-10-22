@@ -179,6 +179,16 @@ Akcje tylko-pelne (rozdz. 11) w opcjach - tylko gdy opcje naleza wylacznie do wi
 Wywolanie: akcja `band:b008` w skutkach okna albo opcji. Sufit: 12 band Kroniki naraz + wspolny sufit band fabularnych regionu (P6).
 Wydarzenie 17 bierze bande Berica z E5, gdy zyje (P6) - wtedy nie definiowac nowej.
 
+**Stan po K0 krok B2 (Chronicle.Bands.cs, StoryActions.cs):** banda powstaje przez `StoryActions.SpawnBand` (przeniesione 1:1 z m104-e5 Prologue.World.Clans:
+OutlawLaw.RaidDraw z okregu osady - najpierw pula wyrzutkow, potem domy wsi okregu; za malo ludzi = banda nie powstaje, ludzie zostaja w puli; kiesa 0,
+pochodzenie i ksiega ludzi). Klan spoza `Clan.BanditFactions` (w ROT `brave_companions`, `faith_militant`, `sons_of_the_harpy` to pomniejsze frakcje, nie bandy) =
+banda pod klanem `looters` z nazwa z kolumny `herszt` (linia mowi o zamianie). Sufity: 12 band Kroniki naraz i 4 bandy fabularne w okregu OutlawLaw
+(`StoryActions.RegionCap`: najazdy Wolnych Ludzi, sceny E5 prologu i Kronika; sufit sprawdza tylko Kronika). Ta sama `bNNN` dwa razy naraz - nie (OK "juz na mapie").
+`zachowanie`: rabunek = AI band gry wokol osady (napada podroznych), patrol = spokojniejsza (Aggressiveness 0.5) z patrolem wokol osady, oboz = prawie bez zaczepek
+(0.1). Po `dni` dniach banda wraca do domow jak najazd Wolnych Ludzi (FreeFolkRaids.Home: ludzie do puli okregu, zloto i towar do wsi). `po_rozbiciu` = raz, gdy
+banda przegra bitwe, w ktorej druzyna gracza jest po stronie zwyciezcy (kontekst akcji `bNNN`). `list = 0` - NoticeBoard (listy goncze) pomija bande
+(`Chronicle.NoBounty`). Zapis "kb" w arm_kronika. b017 w K2 to tabor Lannisterow (nie Beric) - bez osobnej reguly dla Berica.
+
 ## 7. Sekcja #zadanie (od K2, silnik Chronicle.Tasks.cs)
 
 | Kolumna | Opis | Przyklad |
@@ -193,6 +203,14 @@ Wydarzenie 17 bierze bande Berica z E5, gdy zyje (P6) - wtedy nie definiowac now
 | `tytul`, `opis` | `{=ARM_KR_tNNN_T}` (<= 45 zn.), `{=ARM_KR_tNNN_D}` (<= 250 zn.) | |
 
 Wywolanie: `task:t014`. Wlasny rejestr bez QuestBase, wpis na NoticeBoard (Kind.Task). Format moze dostac kolumne w K2 - wtedy zmiana tu i w walidatorze.
+
+**Stan po K0 krok B2 (Chronicle.Tasks.cs):** wlasny rejestr (zapis "kz"), najwyzej 8 zadan naraz, to samo zadanie w trakcie = OK "juz trwa". **Bez wpisu na tablicy
+ogloszen**: wpisy NoticeBoard to dzis zadania gry (QuestBase, Kind.Task) i listy goncze - nowy rodzaj wpisu wymagalby zmian karty, warunkow i przyciskow tablicy;
+zadanie Kroniki idzie wiadomoscia dla gracza (EN: tytul, opis, osada, termin) i linia logu "zadanie tNNN 'tytul' przyjete". `deliver` - przy wejsciu druzyny gracza do
+osady `cel` (albo w dobie, gdy w niej stoi) z co najmniej `ilosc` sztuk - towar schodzi z ekwipunku druzyny na rynek osady; `prisoners` - `ilosc` jencow (bez
+bohaterow i umarlych) z lochu druzyny do lochu osady (PeopleBook.Transfer); `defeat` - banda `co` musi byc na mapie w chwili `task:` (w danych `band:` stoi
+wczesniej), wykonanie = rozbicie przez gracza; zniknela bez gracza = NIEUDANE. Po terminie `dni` - NIEUDANE (linia i wiadomosc). Nagroda zwykla droga akcji
+(kontekst `tNNN`). Brak przypomnienia o brakach poza jedna wiadomoscia przy wejsciu do osady (raz na sesje).
 
 ## 8. Sekcja #para (zmiany stron postaci kanonu - P1)
 
@@ -362,6 +380,20 @@ Zasady silnika K0 ustalone po paczkach K1-K10 (21.10):
 - `wound:<b>:<dni>` - zycie 1 i rana trzymana co dobe do konca terminu (gracz tez nie walczy w tym czasie).
 - `skill` - poziom 0-330 (z XP), `ware` - najwyzej tyle towaru, ile ma rynek zrodla.
 
+**Stan po K0 krok B2 (galaz w-toku/kronika-00-silnik, 22.10): kazda akcja z tabeli ma procedure** (szczegoly: `docs/noc-1920/kronika-k0-CHANGELOG.md`, B2;
+zgodnosc danych z silnikiem: `python -I tools/kronika/kronika_silnik.py`):
+- `band`, `task` - rozdz. 6 i 7. `tourney:<miasto>` - turniej kanonu GrandTourney (CanonApi.ProclaimRoyal odbiciem, jak Turniej Reki prologu, bez oplat gracza);
+  bez GrandTourney - POMINIETA; turniej juz jest w miescie - OK bez nowego; oblezenie albo bunt - CZEKA.
+- `muster` - jednorazowy rozkaz "idz do osady" dla wolnych druzyn lordow krolestwa (bez armii, bitwy, oblezenia, morza, scen prologu, rodu gracza); AI gry moze go
+  zmienic; po `dni` linia "zbiorka ... koniec: na miejscu a z n" (zapis "km").
+- `clan/court/lead/prisoner/free/wander/die/marry/wed` - CanonCompanions.ApplyAction (ta sama droga co #move). Z Kroniki dodatkowo POMINIETA: postac z wierszami
+  `#move` (tez druga strona marry/wed), `die` postaci z listy chronionych przed jej wydarzeniem ROT, `die` glowy rodu/wladcy w chwili akcji z wiersza lekka/obie.
+- `succeed` - tylko pelna (wiersz pelna i klucz TAK), wyjatki lekkie 42/49/52/80; dziedzic musi byc zywy i w rodzie umierajacego; umierajacy glowa rodu - najpierw
+  dziedzic glowa rodu (ChangeClanLeaderAction - wladca krolestwa rodu panujacego idzie za nim), potem smierc bez komunikatu (jak `die`); w bitwie - CZEKA.
+- `own`, `ruler`, `leader`, `truce` - tylko pelna; osada gracza, rod gracza, gracz-wladca - POMINIETA; `truce` POMINIETA, gdy ROT wymusza wojne tej pary.
+- `alliance` - **zawsze POMINIETA z powodem** (straznik Prologue.Crown pilnuje albo sojusz spoza listy CanonAlliances CrashScribe; plan P5 - decyzja K9/K10).
+- `pop` - dalej POMINIETA (B1).
+
 ## 12. Uchwyty kod:<nazwa>
 
 Najwyzej 10 na cala Kronike (bez `test`). Nowy uchwyt = wpis w `KODY` w `kronika_check.py` (dozwolone wydarzenia, `gdzie`, opis) i tutaj.
@@ -383,6 +415,14 @@ Wspolne zasady dla programisty K0 (Chronicle.Codes.cs - jeden `switch` po nazwie
 | `zaraza` | 076.2 | okno | K7 | **Blada klacz pod Meereen** (town_K1, wlasciciel z warunkow okna = empire_s). (1) Meereen traci 8-12% ludzi przez PeopleBook z przyczyna `choroba` (do puli regionu Zatoki - nie znikaja z ksiegi). (2) Partie stojace w promieniu ok. 30 jednostek od Meereen (oblegajace i obroncy, tez gracza) dostaja rannych: 10-20% zdrowych zolnierzy kazdej partii -> ranni (WoundedNumber), bez smierci. (3) security town_K1 -5. Ten sam rzut dla gracza i AI. Opcje 076.2 (oboz za zloto gracza / zamkniete bramy) sa osobno w `#wybor` - uchwyt ich nie czyta. Log: ludzi miasta przed/po, partii, rannych. Wersja lekka i pelna jednakowo. |
 | `dzwony` | 115.1 (wiersz glowny = wersja ostra, przy gniewie krolowej 113; wariant a lagodny NIE ma uchwytu) | okno | K10 | **Krolewska Przystan plonie** po zdobyciu przez empire_s (wyzwalacz `captured:town_EW4:empire_s`, max 1). (1) town_EW4 traci 25-35% ludzi przez PeopleBook z przyczyna `pozar` (do puli regionu korony). (2) Dobrobyt i zabudowa przez Devastation miasta (jak lupienie, poziom maksymalny) - bez kasowania budynkow. (3) Lup rodu zdobywcy: 30% kasy miasta (`@kasa:town_EW4`) -> glowa rodu-wlasciciela miasta po zdobyciu (platnik kasa miasta - zamknieta ekonomia). Udzial GRACZA nie nalezy do uchwytu: to opcja b (`gold:@kasa:town_EW4:@gracz:5000`) wykonana PO uchwycie, z tego, co zostalo w kasie (niedoplata z linia). Wersja lekka i pelna jednakowo (smierc Cersei/Jaimego to okno 115.2). |
 | `wielka_rada` | 117.1 i 117.1a - w skutkach kazdej opcji a-d | opcja | K10 | **Wielka Rada po smierci Daenerys**. Uchwyt czyta glos gracza `kr:117.1=a..d` (a Bran, b gracz, c Jon, d bez glosu - opcja bierna i autotest). LEKKA (ChronicleFullVersions=NIE): wynik rady = Bran (jak w tekscie okna), bez zmian wladcow, rodow i krolestw; uchwyt robi tylko relacje glow rodow krolestw Westeros (lista z kolumny `gracz` okna) z graczem: glos a +3, b -5, c -2, d 0 - i linie logu. PELNA (TAK): glosy glow rodow tych krolestw = slawa rodu + relacja z kandydatem; kandydaci: Bran (lord_5_7, zawsze, premia kanonu +25%), gracz (tylko przy glosie b), Jon (tylko zywy, przy glosie c); glos gracza liczy sie jak jego rod. Wynik w log i we flagach `k117_wynik_bran/gracz/jon`; zmiana korony (`ruler`/`leader` krolestwa trzymajacego town_EW4) wymaga wylacznika straznika Prologue.Crown (P5) i decyzji przy silniku K10, bo Bran jest glowa rodu Starkow (Polnoc) - korona dla niego oznacza rozdzielenie rodu albo krolestwa. Do tej decyzji pelna = jak lekka + flaga wyniku. Flagi `k117_bran/ja/jon/wstrzymal` ustawiaja same opcje. |
+
+**Stan po K0 krok B2 (Chronicle.Codes.cs, RunCode):** wszystkie 4 uchwyty maja galaz. `zaraza` - ranni w partiach w promieniu 30 od town_K1 (jeden rzut 10-20%
+dla gracza i AI, bez smierci, umarli nie choruja) i security town_K1 -5; **czesc (1) ludzie miasta BEZ ZMIAN** - ksiega ludzi nie ma przyczyny `choroba` ani drogi
+miasto -> pula regionu dla Kroniki (jak akcja `pop`), linia mowi o tym. `dzwony` - lup 30% kasy town_EW4 dla glowy rodu-wlasciciela zwykla akcja `gold` (linia
+"zloto"); **czesci (1) ludzie i (2) Devastation BEZ ZMIAN** - ksiega ludzi bez przyczyny `pozar`, a Devastation Armoury dziala tylko na wsie (lupienie miasta robi
+CitySack przy zdobyciu; Town.Prosperity wprost gryzie sie z DailyLife). `wielka_rada` - lekka: relacje glow rodow krolestw z kolumny `gracz` okna (a +3, b -5,
+c -2, d 0), bez flag; pelna: do tego glosy (slawa rodu dla kandydata z najwyzsza relacja, Bran x1.25, glos gracza = slawa jego rodu) i flaga
+`k117_wynik_bran|gracz|jon`, korona bez zmian. Klucz World Changes NIE: `zaraza`/`dzwony` POMINIETA, `wielka_rada` robi relacje (czesc R).
 
 Luki zgloszone przez autorow K1-K10 - BEZ uchwytu (zapisane tekstem/przyblizeniem; nowy uchwyt dopiero, gdy Jeff zechce, w limicie 10):
 pojedynek gracza z Gora (050.2a - dzis pewna wygrana z rana 30 dni; kandydat `pojedynek`), gorsze warunki kredytu Banku w dlugach m96 (058 - dzis
@@ -408,6 +448,10 @@ ktorych nie ma (oblezenie Winterfell przez Innych 112.1, smierc Nocnego Krola w 
 | `captured:<osada>[:<krolestwo>]` | 109, 110, 112, 115 | osada zmienila wlasciciela (na krolestwo) |
 | `besieged:<osada>` | 110, 112 | oblezenie osady |
 | `wizja:N` | 066 (088 w K8 - okna jednorazowe, bez wizji) | okresowo co N dni, tekst z prawdziwego stanu mapy; `@cel` = najpierw oblezona twierdza Polnocy albo Muru, inaczej najblizsza (do Winterfell) osada Innych (ROTclan_126), inaczej brak instancji; `@region` = krolestwo `@cel` (propozycja K6, przyjeta) |
+
+**Stan po K0 krok B2:** wszystkie 9 wyzwalaczy dziala (Chronicle.Recurring.Unsupported pusty). `brokenmen` (045): okreg OutlawLaw z rabunkiem w ostatnich 30 dniach
+(PeopleBook.LastStrike) i ponad 30% ludzi poza domem = (uchodzcy wsi okregu + pula wyrzutkow) wobec (to + ludzie w domu we wsiach okregu); klucz okreg-okres 90 dni;
+`@cel` = warownia okregu, `@region` = jej krolestwo. Instancja okna z `band:` - ta sama banda `bNNN` najwyzej raz naraz na mapie.
 
 Tokeny w miejscach typu zlozonego (`plotka:<id>:<osada|krolestwo>`, `own:<osada>:<rod|krolestwo>`, `prisoner:...:<rod|krolestwo|osada>`)
 pasuja, gdy pasuja do ktoregokolwiek typu (np. `plotka:045.1_P:@region:60`) - poprawka walidatora 21.10. Kolumna `osada` w `#banda` nie przyjmuje
