@@ -93,6 +93,11 @@ static class Program
         if (Environment.GetEnvironmentVariable("KS_TGRAD") == "1") KsCore.TownGrad = true;
         { var ta = Environment.GetEnvironmentVariable("KS_TALPHA"); double tv; if (!string.IsNullOrEmpty(ta) && double.TryParse(ta, NumberStyles.Float, Inv, out tv)) KsCore.TableAlpha = tv; }
         if (Environment.GetEnvironmentVariable("KS_CONVLEV") == "1") inp.ConvShelfLevel = true;   // n22f-plany: klucz Ks Plan Converge Shelf Level
+        if (Environment.GetEnvironmentVariable("KS_MKTBAL") == "1") inp.MarketBalance = true;     // m107 K4: klucz Ks Plan Market Balance
+        if (Environment.GetEnvironmentVariable("KS_FACHROOM") == "1") inp.FachMarketRoom = true;  // m107 K5: klucz Ks Fach Market Room
+        if (Environment.GetEnvironmentVariable("KS_FACHROOMEQ") == "1") KsCore.FachRoomPrev = false;   // m107 K5: wariant - zjedzone z rundy kroku 8 przed poprzednim Planem
+        { double v; if (double.TryParse(Environment.GetEnvironmentVariable("KS_MKTTOL") ?? "", NumberStyles.Float, Inv, out v)) KsCore.MktTol = v;
+          if (double.TryParse(Environment.GetEnvironmentVariable("KS_MKTSHARE") ?? "", NumberStyles.Float, Inv, out v)) KsCore.MktShare = v; }   // m107 K4: plan awaryjny (prog, udzial zjedzonego)
         { var mg = Environment.GetEnvironmentVariable("KS_MARGIN"); double mv; if (!string.IsNullOrEmpty(mg) && double.TryParse(mg, NumberStyles.Float, Inv, out mv)) inp.MarketMargin = mv; }
         foreach (var kv in root.GetProperty("gd").EnumerateObject())
         {
@@ -334,6 +339,7 @@ static class Program
             if (R.Error != null) { Console.WriteLine("BLAD: " + R.Error); return 1; }
             Console.WriteLine("PLAN " + (pl + 1) + ": " + sw1.Elapsed.TotalSeconds.ToString("0.0", Inv) + " s, rund " + R.Rounds + ", krok 5 rund " + R.CorrRounds + " (" + R.CorrMs.ToString("0", Inv) + " ms), gradient max " + R.GradMax.ToString("0.000", Inv) + ", zmiana " + (100 * R.GradDMax).ToString("0.0", Inv) + "% (komorek > 5%: " + R.GradDBig + ")");
             Console.WriteLine("  NIEZB " + (pl + 1) + ": " + R.Open.Count + " | " + string.Join(", ", R.Open));
+            if (inp.MarketBalance) Console.WriteLine("  MKT " + (pl + 1) + ": towarow z miara targu " + R.MktN + ", ostatnia rownowaga kroku 8 " + (R.MktOn ? "zbiezna " + (R.MktConv ? "TAK" : "NIE") + " (rund " + R.MktRounds + ")" : "nie liczona") + ", najwieksze odchylenie targu " + R.MktWorst);   // m107 K4
             for (int m = 0; m < 2; m++)
             {
                 var ex = new List<KeyValuePair<string, double>>(); double tot = 0, dmv = 0;
@@ -375,6 +381,7 @@ static class Program
                 Console.WriteLine("  KRAINA: " + string.Join(", ", R.Kraina) + " | BEZ ZRODLA: " + R.Unreached.Count);
             }
             inp.GradPrev = R.Grad; inp.WarmPrices = (double[])R.P.Clone();
+            if (inp.FachMarketRoom && R.Eaten != null) inp.PrevEaten = (double[])R.Eaten.Clone();   // m107 K5: jak Plan.cs (zjedzone poprzedniego Planu)
             if (inp.FeedStep > 0 && R.FloorLam != null) inp.WarmFloor = new Dictionary<string, double>(R.FloorLam);
             if (inp.MarketsClear && R.MarketsClear) inp.WarmMu = (double[])R.Mu.Clone();
             inp.WarmRent = new Dictionary<string, double>(); for (int b = 0; b < R.NB; b++) if (R.Blocks[b].Uid != null) inp.WarmRent[R.Blocks[b].Uid] = R.Rent[b];
