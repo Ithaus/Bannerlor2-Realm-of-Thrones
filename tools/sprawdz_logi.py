@@ -1664,12 +1664,15 @@ Uzycie (Python 3, tylko odczyt):
                     DsTowns.cs SurplusReview/CapNetTown, StartCalibration.Zc4.cs; klucze Ks Village Cheap Kcal First (G1), Ks Village Grain Spike From Surplus (G2), Ks Village
                     Own Grain First (G3), Ks Village Chest Refill (G4), Ds Rent After Bread (G5), Ds Castle Income Cut (G6)) segmenty 'm105 gosp4' (linia ZC4 i 'Daniny wsi
                     (DS)'), 'm105 wsie biedne' (Akumulator kies), 'm105 zamki' (Firmy miast i zamkow (DS)), krok 8 i drabina 1 linii ZC4, Towary grain: M5G-0 segment w kazdej
-                    linii ZC4 z budzetem W1, M5G-1 bez pokrycia W <= 11.4% (n31), M5G-1b W <= 10% (niespelniony = DECYZJA, tor K-D), M5G-2 E <= 4.0%, M5G-3 kupione W
-                    >= 30%, M5G-4 skok ceny z nadwyzki W 3-12 tys./d i E <= 1 tys./d (M5G-4a/b/c G1, G3, G4 INFO), M5G-5 krok 5 mniej = skok ceny (+-1%), M5G-6 ziarno
-                    i sol ponad budzet <= 4.8 tys./d, M5G-7 wsie z kiesa < min(1000 zl, skrzynia) <= 7% i nachylenie <= +0.1 wsi/d, M5G-8 panowie bezposrednio / oddane
+                    linii ZC4 z budzetem W1 (zly format segmentu albo G2 TAK w linii DS bez segmentu ZC4 - NIE), M5G-1 bez pokrycia W <= 11.4% po zaokragleniu do 0.1 (n31),
+                    M5G-1b W <= 10% (niespelniony = DECYZJA, tor K-D), M5G-2 E <= 4.0%, M5G-3 kupione W >= 29% (G3 przenosi zjedzone ziarno do 'z magazynu'), M5G-4 skok
+                    ceny z nadwyzki W 3-12 tys./d i E <= 1 tys./d (M5G-4a/b/c G1, G3, G4 INFO), M5G-5 kontrola ksiegowa skoku ceny (+-1%), M5G-5b czeka na nastepne doby
+                    <= 2 x skok ceny doby i bez wzrostu, M5G-6 ziarno i sol z oszczednosci (ponad budzet + skok ceny; INFO), M5G-7 wsie z kiesa < min(1000 zl, skrzynia)
+                    <= 11% i nachylenie <= +0.45 wsi/d (nie gorzej niz n32), M5G-7b <= 7% i <= +0.1 wsi/d (niespelniony = DECYZJA), M5G-8 panowie bezposrednio / oddane
                     >= 0.514, M5G-8b czynsz po chlebie <= 1.5 tys./d, M5G-9 M3W-3 <= 0.90, M5G-11 zboze na wozach / w miastach (INFO K-D), M5G-12 M3W-9 z 84 / 28 linii
-                    >= 77 / 74%, M5G-13 zamki w nowej kampanii <= 20 tys. i MNK 28 dob <= +0.2 tys./d, M5G-14 zamki w biegu z zapisu <= 270 tys. i <= +1 tys./d, M5G-15
-                    obnizki zamkow w biegu z zapisu > 0, M5G-15b potkniecia i ERROR 0. Tryb nowa kampania / zapis - z linii wczytania zapisu w logu.
+                    >= 77 / 74%, M5G-13 zamki w nowej kampanii i w zapisie kampanii z prologiem <= 20 tys. i MNK 28 dob <= +0.2 tys./d, M5G-14 zamki w biegu ze starego
+                    zapisu <= 320 tys. i <= +1 tys./d, M5G-15 obnizki zamkow w biegu ze starego zapisu > 0 (od 28 linii firm DS), M5G-15b potkniecia i ERROR 0. Tryb
+                    nowa kampania / zapis kampanii z prologiem / stary zapis - z linii wczytania zapisu i linii 'Prolog (m101): start sesji' w logu.
                     python -I tools/sprawdz_logi.py --grupa m105gosp4 <Armoury-*.log>
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
@@ -58457,9 +58460,16 @@ def m103wsie_main(logp):
         nd = sum(need) / len(need) if need else None
         # m105 gosp4 (N1, 21.10): miara z ksiegi towarow wobec potrzeby wsi z koszyka ZC4 (stosunek) - dawny prog 30/d byl celem starej listy z pieniedzy (DECYZJA)
         ratio = tv / nd if nd else None
+        # recenzja kodu R7 (m105 gosp4): licznik to zakupy narzedzi wszystkich wsi (drabina 1, drabina 2, lista P5 - kupuja glownie wsie bogate); obok pokrycie drabiny 1
+        # z M3W-10b - wies przy budzecie z wplywu odklada narzedzia na koniec drabiny (bez progu: G4 z zalozenia tnie koniec drabiny)
+        t2a = [z[d]["seg2"] for d in w28 if z[d]["seg2"]]
+        w2a = sum(int(g[2]) + int(g[6]) for g in t2a)
+        cov = (sum(int(g[3]) + int(g[7]) for g in t2a) / w2a) if w2a > 0 else None
         rep.add(f"M3W-10: narzedzia kupione przez wsie (linia Towary, srednio {len(td)} dob) wobec potrzeby wsi z koszyka ZC4",
-                f"{tv:.1f}/d" + (f" przy potrzebie wsi ZC4 {nd:.1f}/d = {ratio:.2f}" if ratio is not None else " (bez koszyka ZC4)") + f"; produkcja {tp:.0f}/d, budowy {tb:.0f}/d",
-                f">= {M3W_TOOLS_RATIO:.1f} x potrzeby wsi z koszyka ZC4 (m105 gosp4 N1: n31 1.02, n32 1.25; narzedzia to potrzeba z tabeli stanow, wsie kupuja PRZED budowami "
+                f"{tv:.1f}/d" + (f" przy potrzebie wsi ZC4 {nd:.1f}/d = {ratio:.2f}" if ratio is not None else " (bez koszyka ZC4)") + f"; produkcja {tp:.0f}/d, budowy {tb:.0f}/d"
+                + (f"; drabina 1 przy budzecie z wplywu: kupione {100.0 * cov:.0f}% chcianych (M3W-10b)" if cov is not None else ""),
+                f">= {M3W_TOOLS_RATIO:.1f} x potrzeby wsi z koszyka ZC4 (m105 gosp4 N1: n31 1.02, n32 1.25; razem - wsie bogate kupuja wiecej, wsie przy budzecie z wplywu "
+                f"odkladaja narzedzia na koniec drabiny, M3W-10b; narzedzia to potrzeba z tabeli stanow, wsie kupuja PRZED budowami "
                 f"- TownFolk.Daily przed BuildFunding.Daily, do pracy pola ich nie potrzebuja); bez koszyka ZC4 - INFO (dawny cel {M3W_TOOLS:.0f}/d starej listy, P0 51.7/d)",
                 (ratio >= M3W_TOOLS_RATIO) if ratio is not None else None)
     # ---- M3W-10b narzedzia drabiny 1 przy budzecie z wplywu (recenzja W1: ZTools 26. z 29 miejsc drabiny - za jedzeniem, przedza, lnem i skora)
@@ -58520,25 +58530,34 @@ M5G_RX = {
     "gkup": re.compile(r"kupcy zywnosci w drodze (\d+)\]"),
     "gcart": re.compile(r"\| przewoz \[wozy do osad (\d+);"),
 }
-M5G_W_BASE = 11.4                 # M5G-1: bez pokrycia kcal koszyka wsi Westeros nie gorzej niz baza n31 (11.4%; n32 12.5%; czesc 4 przewiduje 10.9-11.3%)
+M5G_W_BASE = 11.4                 # M5G-1: bez pokrycia kcal koszyka wsi Westeros nie gorzej niz baza n31 (11.42% - porownanie po zaokragleniu do 0.1 pp, recenzja kodu R2;
+                                  # n32 12.5%; czesc 4 po poprawkach ok. 11.2-11.9% - granicznie)
 M5G_W_GOAL = 10.0                 # M5G-1b: cel M3W-7 W - niespelniony = DECYZJA (reszta: zboze na polkach Westeros i warstwa Planu - tor K-D)
 M5G_E = 4.0                       # M5G-2: bez pokrycia Essos (n32 3.6%; czesc 4 3.0-3.3%)
-M5G_BUYW = 30.0                   # M5G-3: kcal koszyka kupione w Westeros (n32 29.1%)
+M5G_BUYW = 29.0                   # M5G-3: kcal koszyka kupione w Westeros (n32 29.1%; recenzja kodu R6: G3 -1.1 pp - zjedzone swoje ziarno liczy sie w 'z magazynu', nie
+                                  # w kupionych; G4 -0.15..-0.55 pp; czesc 4 ok. 29.4-30.1%)
 M5G_SPIKE_W = (3000.0, 12000.0)   # M5G-4: skok ceny z nadwyzki Westeros zl/d (projekt 7.8-8.0 tys./d; ziarno W 2.24 x startu)
 M5G_SPIKE_E = 1000.0              # M5G-4: Essos najwyzej 1 tys./d (ziarno E 1.01 x startu - ponizej ceny Planu)
-M5G_SPIKE_TOL = 0.01              # M5G-5: krok 5 mniej o skok ceny = skok ceny z nadwyzki (z czekajacym na nastepne doby) +-1% + 100 zl
-M5G_GS = 4800.0                   # M5G-6: ziarno i sol ponad budzet (zl/d, segment 'm103 wsie'; n32 6.4 tys./d)
-M5G_POOR = 0.07                   # M5G-7: wsi z kiesa < min(1000 zl, skrzynia) (n32 10.7%, P0 1.1%)
-M5G_POOR_SLOPE = 0.1              # M5G-7: nachylenie liczby tych wsi MNK 28 dob (wsi/d; n32 ok. +0.5/d przy < 1000 zl)
+M5G_SPIKE_TOL = 0.01              # M5G-5 (kontrola ksiegowa): krok 5 mniej o skok ceny = skok ceny z nadwyzki (z czekajacym na nastepne doby) +-1% + 100 zl
+M5G_OWED = (2.0, 0.05)            # M5G-5b (recenzja kodu R1 - tempo, nie tozsamosc): 'czeka na nastepne doby' na koniec <= 2 x sredni skok ceny doby (28 linii ZC4) i nachylenie
+                                  # MNK 28 dob <= +0.05 x sredni skok ceny doby na dobe (szum zakupow co 2. doba)
+M5G_GS_N32 = 6401.0               # M5G-6 INFO (recenzja ekonomii R2: G2 zdejmuje skok ceny z 'ponad budzet' z samej definicji): ziarno i sol z oszczednosci = ponad budzet + skok
+                                  # ceny z nadwyzki (n32 6401 + 0 zl/d)
+M5G_POOR = 0.11                   # M5G-7: wsi z kiesa < min(1000 zl, skrzynia) - nie gorzej niz n32 (10.7-10.9%; csv wsie-kiesy 108871 62 z 571)
+M5G_POOR_SLOPE = 0.45             # M5G-7: nachylenie liczby tych wsi MNK 28 dob (wsi/d; n32 +0.43, n31 +0.73, 13-37-13 +0.51 - csv wsie-kiesy)
+M5G_POOR_GOAL = (0.07, 0.1)       # M5G-7b: cel (DECYZJA) - recenzja ekonomii R1: G4 prawie nie dociera do wsi biednych (5-7 z 52 W) - czesc 4 go nie osiaga (P0 1.1%)
 M5G_LORDS = 0.514                 # M5G-8: (udzial pana przy wozie + czynsz + danina od skarbca wsi do panow) / oddane (n31 0.514, n32 0.556)
 M5G_RENT = 1500.0                 # M5G-8b: czynsz po chlebie - rata dnia do ksiegi zaleglosci (zl/d)
 M5G_BUYNET = 0.90                 # M5G-9: M3W-3 zakupy / wplyw netto (n32 0.83; czesc 4 ok. 0.86)
 M5G_EAT = (77.0, 74.0)            # M5G-12: M3W-9 miasta stac na cale jedzenie - z 84 linii / z 28 ostatnich (straznik; n32 77-82% w oknach 14 dob, 75.1% w ostatnich 28)
 M5G_CAS_P = (20000.0, 200.0)      # M5G-13: zamki, nowa kampania (prolog): zaleglosci <= 20 tys. i MNK 28 dob <= +0.2 tys./d (n32 39.0 tys., +0.8 tys./d)
-M5G_CAS_S = (270000.0, 1000.0)    # M5G-14: zamki, bieg z zapisu: zaleglosci <= 270 tys. i MNK 28 dob <= +1 tys./d (13-37-13: 449 tys., +6.8 tys./d)
+M5G_CAS_S = (320000.0, 1000.0)    # M5G-14: zamki, bieg ze starego zapisu: zaleglosci <= 320 tys. i MNK 28 dob <= +1 tys./d (13-37-13: 449 tys., +6.8 tys./d; recenzja kodu R4:
+                                  # projekt p4_zamki 260-310 tys. w horyzoncie B4 - dotad prog 270 tys. ponizej gornej granicy przewidywania)
 M5G_ERR = ("TownFolk.Zc4BuyVillage(skok ceny z nadwyzki)", "TownFolk.Zc4BuyVillage(nadwyzka na skok ceny)", "TownFolk.Zc4BuyVillage(skrzynia z budzetu)",
            "TownFolk.Zc4BuyVillage(swoje ziarno przed oszczednosciami)", "TownFolk.Zc4BuyVillage(wies je swoje)", "TownFolk.Zc4BuyVillage(budzet z wplywu)",
-           "DsVillage.SpikeNote", "DsVillage.SurplusDay", "DsVillage.RentPay", "DsVillage.AkNote", "DsTowns.SurplusReview", "DsTowns.Review", "DsTowns.Daily")
+           "DsVillage.SpikeNote", "DsVillage.SurplusDay", "DsVillage.RentPay", "DsVillage.AkNote", "DsTowns.SurplusReview", "DsTowns.Review", "DsTowns.Daily",
+           # recenzja kodu R5: wyjatki ZcCheapKcal, ZcDrinkSwap, G4 w ZcLadder i Zc4NoteM105 trafiaja do Stumble("Villages(wies)") (Zc4BuyVillage ma tylko try/finally)
+           "TownFolk.Villages(wies)", "TownFolk.VillageBuyDays")
 
 
 def _m5g_slope(xs, ys):
@@ -58559,7 +58578,7 @@ def m105gosp4_main(logp):
         rep.show()
         return 0
     z, ds, ak, tw, vl, fz = {}, {}, {}, {}, {}, {}
-    errs, loaded, newc = 0, False, False
+    errs, loaded, newc, prol = 0, False, False, False
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\r\n"))
@@ -58575,11 +58594,13 @@ def m105gosp4_main(logp):
                      "p1m": M5G_RX["p1m"].search(s), "stum": M3W_RX["stum"].search(s)}
                 r = {k: (v.groups() if v else None) for k, v in r.items()}
                 r["k8"] = {g[0]: g[1:] for g in M3W_RX["k8"].findall(s)}
+                r["raw"] = "| m105 gosp4 (Cheap Kcal First" in s                # recenzja kodu R5: segment w zlym formacie (regex go nie czyta) - M5G-0 NIE
                 z[d] = r
             elif s.startswith("Daniny wsi (DS): dzien "):
                 d = num(r"dzien (-?\d+)", s[:60])
                 if d is not None:
                     ds[d] = {k: (M5G_RX[k].search(s).groups() if M5G_RX[k].search(s) else None) for k in ("ds", "carts", "rent", "dsst")}
+                    ds[d]["g2raw"] = "| m105 gosp4 (Grain Spike From Surplus TAK" in s   # R5: G2 TAK - linie ZC4 z budzetem W1 musza miec segment
             elif s.startswith(M3W_AK):
                 d = num(r"dzien (-?\d+)", s[:60])
                 if d is not None:
@@ -58601,20 +58622,33 @@ def m105gosp4_main(logp):
                     fz[d] = {k: (rx.search(s).groups() if rx.search(s) else None) for k, rx in (("arr", M3P_RX["arr"]), ("zam", M5G_RX["zam"]), ("stum", M3P_RX["stum"]))}
             elif s.startswith("Klimat: wczytano") or s.startswith("Wyrzutki: wczytano") or s.startswith("Stany (ZC2): wczytanie"):
                 loaded = True
+            elif s.startswith("Prolog (m101): start sesji"):
+                if "| prolog TAK" in s:
+                    prol = True                                              # Prologue.Active jest w zapisie - kampania z prologiem przez cala gre
             elif s.startswith("Prolog (m101): nowa kampania") or s.startswith("Wiedza (m96-wzory): nowa kampania"):
                 newc = True
-    save = loaded and not newc
+    # recenzja kodu R3: zapis kampanii z prologiem (15-19-59, kampania Jeffa) to nie stary zapis z firmami zamkow kodu 101 - liczy sie M5G-13 (jak nowa kampania), M5G-14
+    # i M5G-15 INFO; stary zapis bez prologu (13-37-13, B4) - M5G-14 i M5G-15
+    save = loaded and not newc and not prol
+    mode = "bieg ze starego zapisu (bez prologu)" if save else ("zapis kampanii z prologiem" if (loaded and not newc) else "nowa kampania")
     zd = sorted(z)
     buyd = [d for d in zd if z[d]["vb"] and int(z[d]["vb"][0]) > 0]
     w1d = [d for d in buyd if z[d]["seg3"]]
     sd = [d for d in w1d if z[d]["seg"]]
-    print(f"plik: {logp} | {'bieg z zapisu' if save else 'nowa kampania (prolog)'} | linii ZC4 {len(zd)} (z zakupami wsi {len(buyd)}, z budzetem W1 {len(w1d)}, z segmentem m105 "
+    print(f"plik: {logp} | {mode} | linii ZC4 {len(zd)} (z zakupami wsi {len(buyd)}, z budzetem W1 {len(w1d)}, z segmentem m105 "
           f"{len(sd)}), linii 'Daniny wsi (DS)' {len(ds)}, Akumulator {len(ak)}, Towary grain {len(tw)}, linii firm DS {len(fz)}, ERROR nowych funkcji {errs}")
-    on = bool(sd)
+    # recenzja kodu R5: segment w zlym formacie (podciag jest, regex go nie czyta) albo G2 TAK w linii DS bez segmentu w liniach ZC4 z budzetem W1 - NIE (dotad INFO,
+    # a blok G1-G4 nizej pomijal M5G-4/4a/4b/4c/5 bez sladu)
+    drift = [d for d in zd if z[d]["raw"] and not z[d]["seg"]]
+    g2ds = any(ds[d]["g2raw"] for d in ds)
+    on = bool(sd) or bool(drift) or (g2ds and bool(w1d))
     keys = z[sd[-1]]["seg"][:4] if sd else None
     rep.add("M5G-0: segment 'm105 gosp4' w kazdej linii ZC4 z zakupami drabiny 1 przy budzecie W1 (klucze G1-G4)",
-            f"{len(sd)} z {len(w1d)} linii" + (f" (doby {sd[0]}-{sd[-1]}; G1/G2/G3/G4: {'/'.join(keys)})" if sd else ""),
-            "kazda linia z segmentem 'm103 wsie' przy ktoryms kluczu TAK (brak - INFO: klucze G1-G4 NIE, W1 NIE albo log sprzed m105)", (len(sd) == len(w1d)) if on else None)
+            f"{len(sd)} z {len(w1d)} linii" + (f" (doby {sd[0]}-{sd[-1]}; G1/G2/G3/G4: {'/'.join(keys)})" if sd else "")
+            + (f"; segment w zlym formacie (regex go nie czyta) w {len(drift)} liniach, pierwsza doba {drift[0]}" if drift else "")
+            + ("; linia 'Daniny wsi (DS)' ma Grain Spike From Surplus TAK" if g2ds else ""),
+            "kazda linia z segmentem 'm103 wsie' przy ktoryms kluczu TAK, bez linii w zlym formacie (brak segmentow - INFO: klucze G1-G4 NIE, W1 NIE albo log sprzed m105; "
+            "G2 TAK w linii DS bez segmentu w liniach ZC4 - NIE)", (len(sd) == len(w1d) and not drift) if on else None)
     w28 = buyd[-28:]
 
     def k8avg(mk, i):
@@ -58627,8 +58661,8 @@ def m105gosp4_main(logp):
     mw, _ = k8avg("Westeros", 5)
     if uw is not None:
         rep.add(f"M5G-1: bez pokrycia kcal koszyka wsi Westeros (M3W-7 W, srednio {nw} linii) - nie gorzej niz baza n31",
-                f"{uw:.2f}% (kupione {kw:.1f}%, robione w domu {hw:.1f}%, z magazynu {mw:.1f}%)", f"<= {M5G_W_BASE}% (n31 11.4%, n32 12.5%; czesc 4 przewiduje 10.9-11.3%)",
-                uw <= M5G_W_BASE)
+                f"{uw:.2f}% (kupione {kw:.1f}%, robione w domu {hw:.1f}%, z magazynu {mw:.1f}%)", f"<= {M5G_W_BASE}% po zaokragleniu do 0.1 (n31 11.42%, n32 12.5%; czesc 4 po poprawkach ok. 11.2-11.9% - granicznie, G4 podnosi o 0.15-0.55 pp; przy NIE najpierw "
+                "A4-x z G4 NIE)", round(uw, 1) <= M5G_W_BASE)
         rep.add("M5G-1b: bez pokrycia kcal koszyka wsi Westeros - cel M3W-7", f"{uw:.1f}%",
                 f"<= {M5G_W_GOAL:.0f}% (niespelniony = DECYZJA: reszta to brak zboza na polkach Westeros - wozy wioza 2 x wiecej ziarna przy tej samej liczbie, bandy E5 - i warstwa "
                 "Planu (5.3-8.1% kcal W bez pokrycia, 57% z tego Reach); pieniadzem wsi nieosiagalne - osobny tor K-D: logistyka zboza, najpierw diagnoza; M5G-11)",
@@ -58640,7 +58674,8 @@ def m105gosp4_main(logp):
         rep.add(f"M5G-2: bez pokrycia kcal koszyka wsi Essos (M3W-7 E, srednio {ne} linii)", f"{ue:.1f}% (kupione {me:.1f}%)", f"<= {M5G_E:.1f}% (n32 3.6%; czesc 4 3.0-3.3%)",
                 ue <= M5G_E)
     if kw is not None:
-        rep.add("M5G-3: kcal koszyka wsi kupione - Westeros (krok 8 linii ZC4)", f"{kw:.1f}%", f">= {M5G_BUYW:.1f}% (n32 29.1%, n31 35.9%; G1 + G2 + G5 przewiduja +1.5..2 pp)", kw >= M5G_BUYW)
+        rep.add("M5G-3: kcal koszyka wsi kupione - Westeros (krok 8 linii ZC4)", f"{kw:.1f}%", f">= {M5G_BUYW:.1f}% (n32 29.1%, n31 35.9%; G1 + G2 + G5 +1.9..2.2 pp, G3 -1.1 pp - zjedzone swoje ziarno liczy sie w "
+                f"'z magazynu', G4 -0.15..-0.55 pp; czesc 4 ok. 29.4-30.1%; przy NIE najpierw A4-x z G4 NIE)", kw >= M5G_BUYW)
     # ---- G1, G2, G3, G4 z segmentu (ostatnie 28 linii z segmentem)
     s28 = [z[d]["seg"] for d in sd[-28:]]
     if s28:
@@ -58664,23 +58699,46 @@ def m105gosp4_main(logp):
             cut_all = sum(int(ds[d]["ds"][2]) for d in dsd)
             owed = int(ds[dsd[-1]]["ds"][4])
             diff = sp_all - cut_all - owed
-            rep.add("M5G-5 (G2): krok 5 mniejszy o skok ceny chleba = skok ceny z nadwyzki (bez podwojnego wydatku; caly log)",
+            rep.add("M5G-5 (G2): kontrola ksiegowa - skok ceny z nadwyzki = krok 5 mniej + czeka na nastepne doby (caly log)",
                     f"skok ceny z nadwyzki {sp_all} zl - krok 5 mniej {cut_all} zl - czeka na nastepne doby {owed} zl = {diff:+d} zl ({100.0 * diff / max(1, sp_all):+.2f}%)",
-                    f"|roznica| <= {100 * M5G_SPIKE_TOL:.0f}% skoku ceny + 100 zl", abs(diff) <= M5G_SPIKE_TOL * sp_all + 100)
+                    f"|roznica| <= {100 * M5G_SPIKE_TOL:.0f}% skoku ceny + 100 zl (tozsamosc SpikeNote/SpikeTake - wykrywa tylko blad ksiegowania albo logu; tempo kroku 5 - M5G-5b)",
+                    abs(diff) <= M5G_SPIKE_TOL * sp_all + 100)
+            # M5G-5b (recenzja kodu R1): skok ceny nie wyprzedza kroku 5 - 'czeka na nastepne doby' nie rosnie (tempo; dlug przy P5 za malym tylko zmniejsza P5 pozniej)
+            o28 = dsd[-28:]
+            oy = [int(ds[d]["ds"][4]) for d in o28]
+            spd = sum(int(g[10]) + int(g[12]) for g in s28) / n
+            osl = _m5g_slope(o28, oy)
+            rep.add(f"M5G-5b (G2): czeka na nastepne doby - na koniec i nachylenie MNK {len(o28)} dob (skok ceny nie wyprzedza kroku 5)",
+                    f"na koniec {oy[-1]} zl, nachylenie {osl:+.0f} zl/d; sredni skok ceny doby {spd:.0f} zl ({n} linii ZC4)",
+                    f"na koniec <= {M5G_OWED[0]:.0f} x sredni skok ceny doby + 100 zl i nachylenie <= +{M5G_OWED[1]:.2f} x sredni skok ceny doby na dobe + 10 zl (szum zakupow co 2. doba)",
+                    oy[-1] <= M5G_OWED[0] * spd + 100 and osl <= M5G_OWED[1] * spd + 10)
         elif g2:
             rep.add("M5G-5 (G2): krok 5 mniejszy o skok ceny chleba", "brak segmentu 'm105 gosp4' w linii 'Daniny wsi (DS)'", "INFO (Dues Medieval NIE albo log sprzed m105)", None)
         own = sum(int(g[14]) for g in s28) / n
+        ownzl = sum(int(g[15]) for g in s28) / n
+        f28 = [z[d]["seg"] for d in sd[:28]]
+        ownzl0 = sum(int(g[15]) for g in f28) / len(f28)
+        # recenzja kodu R8 (NIEPEWNE - plan autotestu): petla mniejszy utarg -> mniejszy budzet -> wiecej G3; pierwsze i ostatnie 28 linii (wzrost > 1.5 x = petla)
         rep.add(f"M5G-4b (G3): swoje ziarno i sol zamiast oszczednosci (srednio {n} linii)",
-                f"{own:.0f} szt./d za {sum(int(g[15]) for g in s28) / n:.0f} zl/d przy cenie polki ({sum(int(g[16]) for g in s28) / n:.0f} wsi/d; klucz G3 {keys[2]})",
-                "INFO (projekt ok. 1.4 tys. zl/d mniej z oszczednosci; NKS-25 - wies je swoje <= 8% kcal koszyka - w grupie nks)", None)
+                f"{own:.0f} szt./d za {ownzl:.0f} zl/d przy cenie polki ({sum(int(g[16]) for g in s28) / n:.0f} wsi/d; klucz G3 {keys[2]}); pierwsze {len(f28)} linii {ownzl0:.0f} zl/d"
+                + (f" - ostatnie / pierwsze {ownzl / ownzl0:.2f} x" if ownzl0 > 0 else ""),
+                "INFO (projekt po recenzji ekonomii R3: ok. 0.5-1.5 tys. zl/d - G3 bierze tylko ziarno i sol, wiec dziala w wheat_farm (124 wsie) i salt_mine (12); W ok. "
+                "1.06 tys. zl/d w 29 wsiach = ok. 1.06 pp kcal W z 'kupione' do 'z magazynu'; pan traci ok. 0.45 x wartosci zjedzonego ziarna przy wozie; ostatnie / "
+                "pierwsze 28 linii > 1.5 x - petla utarg -> budzet -> G3 (recenzja kodu R8); NKS-25 - wies je swoje <= 8% kcal koszyka - w grupie nks)", None)
         rep.add(f"M5G-4c (G4): wsie ponizej skrzyni - budzet reszty drabiny mniejszy (srednio {n} linii)",
                 f"{sum(int(g[17]) for g in s28) / n:.0f} wsi/d, budzet mniej o {sum(int(g[18]) for g in s28) / n:.0f} zl/d (klucz G4 {keys[3]})",
-                "INFO (projekt ok. 2.7 tys. zl/d zostaje w kiesach - 73 wsie W, 31 E)", None)
-    s3 = [z[d]["seg3"] for d in w1d[-28:]]
-    if s3:
-        gs = sum(int(g[15]) for g in s3) / len(s3)
-        rep.add(f"M5G-6: ziarno i sol ponad budzet z wplywu (segment 'm103 wsie', srednio {len(s3)} linii)", f"{gs:.0f} zl/d ({sum(int(g[16]) for g in s3) / len(s3):.0f} zakupow)",
-                f"<= {M5G_GS:.0f} zl/d (n32 6.4 tys./d; G2 - skok ceny z nadwyzki poza budzetem, G3 - swoje ziarno zamiast oszczednosci)", gs <= M5G_GS)
+                "INFO (projekt po recenzji ekonomii R1, najwyzej polowa reszty budzetu po ziarnie i soli: ok. 1.5-2.5 tys. zl/d - W 0.9-1.7 tys. w 16-26 wsiach, E 0.5-0.8 "
+                "tys. w 20-21; wies z kiesa ponizej zapasu 7 dob ziarna i soli albo z ziarnem ponad budzet nic nie odklada - do wsi biednych prawie nie dociera)", None)
+    # recenzja ekonomii R2: G2 zdejmuje skok ceny z 'ponad budzet' z samej definicji (GsPaid += paid - fromS) - sam licznik m103 spadal bez zmiany wydatku z oszczednosci;
+    # miara: ponad budzet + skok ceny z nadwyzki tych samych linii = ziarno i sol z oszczednosci (INFO; G3 - M5G-4b)
+    w3 = w1d[-28:]
+    if w3:
+        gs = sum(int(z[d]["seg3"][15]) for d in w3) / len(w3)
+        spk = sum(int(z[d]["seg"][10]) + int(z[d]["seg"][12]) for d in w3 if z[d]["seg"]) / len(w3)
+        rep.add(f"M5G-6: ziarno i sol z oszczednosci - ponad budzet z wplywu (segment 'm103 wsie') + skok ceny z nadwyzki (segment 'm105 gosp4'), srednio {len(w3)} linii",
+                f"{gs:.0f} + {spk:.0f} = {gs + spk:.0f} zl/d ({sum(int(z[d]['seg3'][16]) for d in w3) / len(w3):.0f} zakupow ponad budzet)",
+                f"INFO (n32 {M5G_GS_N32:.0f} + 0 zl/d; skok ceny to nowy wydatek bogatych wsi z nadwyzki - krok 5 i tak wydawal ok. 14% P5; G3 zmniejsza czesc 'ponad budzet' - M5G-4b)",
+                None)
     # ---- M5G-7 wsie biedne (kiesa < min(1000, skrzynia)) i nachylenie liczby
     akp = sorted(d for d in ak if ak[d][1])
     if akp:
@@ -58688,15 +58746,20 @@ def m105gosp4_main(logp):
         x = sum(int(ak[d][1][0]) / max(1, int(ak[d][1][1])) for d in l7) / len(l7)
         t28 = akp[-28:]
         sl = _m5g_slope(t28, [int(ak[d][1][0]) for d in t28])
-        rep.add("M5G-7: wsie biedne - kiesa < min(1000 zl, skrzynia) (srednio 7 ostatnich dob) i nachylenie ich liczby MNK 28 dob (linia Akumulator kies)",
-                f"{100 * x:.1f}% (ostatnia doba {ak[akp[-1]][1][0]} z {ak[akp[-1]][1][1]}); nachylenie {sl:+.2f} wsi/d ({len(t28)} dob)",
-                f"<= {100 * M5G_POOR:.0f}% i nachylenie <= +{M5G_POOR_SLOPE} wsi/d (n32 10.7%, ok. +0.5/d; P0 1.1%; wies trzymajaca pelna skrzynie nie jest biedna)",
-                x <= M5G_POOR and sl <= M5G_POOR_SLOPE)
+        val7 = f"{100 * x:.1f}% (ostatnia doba {ak[akp[-1]][1][0]} z {ak[akp[-1]][1][1]}); nachylenie {sl:+.2f} wsi/d ({len(t28)} dob)"
+        rep.add("M5G-7: wsie biedne - kiesa < min(1000 zl, skrzynia) (srednio 7 ostatnich dob) i nachylenie ich liczby MNK 28 dob (linia Akumulator kies) - nie gorzej niz n32",
+                val7, f"<= {100 * M5G_POOR:.0f}% i nachylenie <= +{M5G_POOR_SLOPE} wsi/d (n32 10.7-10.9%, +0.43/d - csv wsie-kiesy; czesc 4: G5 czynsz po chlebie - lekko w dol; "
+                "wies trzymajaca pelna skrzynie nie jest biedna)", x <= M5G_POOR and sl <= M5G_POOR_SLOPE)
+        rep.add("M5G-7b: wsie biedne - cel (M3W-2 w mierze 'kiesa < min(1000 zl, skrzynia)')", val7,
+                f"<= {100 * M5G_POOR_GOAL[0]:.0f}% i nachylenie <= +{M5G_POOR_GOAL[1]} wsi/d (niespelniony = DECYZJA: recenzja ekonomii R1 - G4 prawie nie dociera do wsi biednych, "
+                "5-7 z 52 W ma kiese ponad zapas 7 dob i reszte budzetu; biedna wies placi z oszczednosci samo ziarno i sol ponad budzet - ziarno W 2.24 x startu - osobny krok; P0 1.1%)",
+                x <= M5G_POOR_GOAL[0] and sl <= M5G_POOR_GOAL[1], decide=True)
     else:
         vd = sorted(vl)[-28:]
         rep.add("M5G-7: wsie biedne (linia Akumulator kies)",
                 ("brak segmentu 'm105 wsie biedne'" + (f"; wsi < 1000 zl (Przeplywy osad): {vl[vd[-1]]}, nachylenie {_m5g_slope(vd, [vl[d] for d in vd]):+.2f}/d w {len(vd)} dobach" if vd else "")),
-                "INFO (klucze G4 i G5 NIE albo log sprzed m105; prog: <= 7% i nachylenie <= +0.1 wsi/d)", None)
+                f"INFO (klucze G4 i G5 NIE albo log sprzed m105; prog: <= {100 * M5G_POOR:.0f}% i nachylenie <= +{M5G_POOR_SLOPE} wsi/d, cel M5G-7b <= {100 * M5G_POOR_GOAL[0]:.0f}% "
+                f"i <= +{M5G_POOR_GOAL[1]} wsi/d)", None)
     # ---- M5G-8 panowie bezposrednio / oddane, M5G-8b czynsz po chlebie
     d28 = [d for d in sorted(ds) if ds[d]["carts"]][-28:]
     if d28:
@@ -58715,7 +58778,8 @@ def m105gosp4_main(logp):
             g5 = ds[dsg[-1]]["ds"][1] == "TAK"
             rep.add(f"M5G-8b (G5): czynsz po chlebie - rata dnia do ksiegi zaleglosci (srednio {len(dsg)} dob)",
                     f"{rb:.0f} zl/d ({sum(int(ds[d]['ds'][7]) for d in dsg) / len(dsg):.0f} wsi/d; klucz G5 {'TAK' if g5 else 'NIE'})",
-                    f"<= {M5G_RENT:.0f} zl/d (projekt 0.5-0.75 tys./d - 33 wsie W, 5 E; zaleglosci czynszu i darowane po roku - linia DS, grupa nds)", (rb <= M5G_RENT) if g5 else None)
+                    f"<= {M5G_RENT:.0f} zl/d (projekt 0.6-0.75 tys./d - 33 wsie W, 5 E przy koszyku 2 dob w dobie zakupu, recenzja kodu R9; zaleglosci czynszu i darowane po roku - "
+                    f"linia DS, grupa nds)", (rb <= M5G_RENT) if g5 else None)
     # ---- M5G-9 M3W-3 (ta sama miara co m103wsie)
     if w28:
         buy = sum(int(z[d]["k8"][mm][2]) for d in w28 for mm in z[d]["k8"])
@@ -58763,19 +58827,23 @@ def m105gosp4_main(logp):
         sl = _m5g_slope(x28, ys)
         last = ys[-1]
         txt = f"{last} zl u {fz[fa[-1]]['arr'][3]} zamkow (doba {fa[-1]}); nachylenie MNK {len(x28)} dob {sl:+.0f} zl/d"
-        rep.add("M5G-13: zaleglosci zamkow - nowa kampania (prolog)", txt,
-                f"<= {M5G_CAS_P[0]:.0f} zl i nachylenie <= +{M5G_CAS_P[1]:.0f} zl/d (n32 39.0 tys., +0.8 tys./d); bieg z zapisu - INFO (M5G-14)",
+        rep.add("M5G-13: zaleglosci zamkow - nowa kampania i zapis kampanii z prologiem", txt,
+                f"<= {M5G_CAS_P[0]:.0f} zl i nachylenie <= +{M5G_CAS_P[1]:.0f} zl/d (n32 39.0 tys., +0.8 tys./d; liczy sie takze zapis kampanii z prologiem); bieg ze starego zapisu "
+                "bez prologu - INFO (M5G-14)",
                 (last <= M5G_CAS_P[0] and sl <= M5G_CAS_P[1]) if not save else None)
-        rep.add("M5G-14: zaleglosci zamkow - bieg z zapisu (firmy ustalone kodem 101)", txt,
-                f"<= {M5G_CAS_S[0]:.0f} zl i nachylenie <= +{M5G_CAS_S[1]:.0f} zl/d (13-37-13: 449 tys., +6.8 tys./d; M3P-7 <= 200 tys. zostaje dla prologu); nowa kampania - INFO",
+        rep.add("M5G-14: zaleglosci zamkow - bieg ze starego zapisu bez prologu (firmy ustalone kodem 101)", txt,
+                f"<= {M5G_CAS_S[0]:.0f} zl i nachylenie <= +{M5G_CAS_S[1]:.0f} zl/d (13-37-13: 449 tys., +6.8 tys./d; projekt p4_zamki 260-310 tys. w horyzoncie B4; M3P-7 "
+                "<= 200 tys. zostaje dla prologu); nowa kampania i zapis kampanii z prologiem - INFO",
                 (last <= M5G_CAS_S[0] and sl <= M5G_CAS_S[1]) if save else None)
     zz = [d for d in sorted(fz) if fz[d]["zam"]]
     if zz:
         g = fz[zz[-1]]["zam"]
         on6 = g[0] == "TAK"
+        full6 = len(fz) >= 28                                                 # recenzja kodu R3: cykl obnizki i pamiec doplywu sa sesyjne - krotki bieg da falszywe NIE
         rep.add("M5G-15 (G6): obnizki z dochodu zamkow w sesji (linia 'Firmy miast i zamkow (DS)', segment 'm105 zamki')",
-                f"{g[3]} obnizek (-{g[4]} zl/rok), udzial zamku > 1 liczony jak 1: {g[6]} (klucz G6 {g[0]})",
-                "> 0 w biegu z zapisu (stare firmy zamkow ponad doplyw); nowa kampania albo klucz nieczynny - INFO", (int(g[3]) > 0) if (save and on6) else None)
+                f"{g[3]} obnizek (-{g[4]} zl/rok), udzial zamku > 1 liczony jak 1: {g[6]} (klucz G6 {g[0]})" + ("" if full6 else f"; linii firm DS {len(fz)} < 28 - za krotki bieg"),
+                "> 0 w biegu ze starego zapisu bez prologu (stare firmy zamkow ponad doplyw; zamek z zaleglosciami - pierwsza obnizka po 7 dobach, dalsze co cykl); nowa kampania, "
+                "zapis kampanii z prologiem, mniej niz 28 linii firm DS albo klucz nieczynny - INFO", (int(g[3]) > 0) if (save and on6 and full6) else None)
     else:
         rep.add("M5G-15 (G6): obnizki z dochodu zamkow", "brak segmentu 'm105 zamki'", "INFO (klucz Ds Castle Income Cut NIE, firmy DS nieustalone albo log sprzed m105)", None)
     st = sum(int(z[d]["stum"][0]) for d in zd if z[d]["stum"])
