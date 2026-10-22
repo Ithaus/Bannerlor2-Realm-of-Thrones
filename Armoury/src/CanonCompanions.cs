@@ -204,7 +204,9 @@ namespace Armoury
                         string v;
                         if (_done.TryGetValue(l[j].Id, out v) && v.EndsWith("|ok", StringComparison.Ordinal)) last = j;
                     }
-                    if (last < 0 || l[last].Action != "prisoner") continue;
+                    // recenzja m107 T5/C1: tylko wiersze niewoli trybu prolog (p01 Tyrion, p10 Jaime - jedyne ze straza HoldKey); niewola z kampanii (m19 -> m28,
+                    // m31 -> m32, m35 -> m36) nie jest trzymana - inaczej HeldCount > 0 wlaczal co 10 dni linie doby E5 i WorldStep (Prologue.World) bez strazy
+                    if (last < 0 || l[last].Action != "prisoner" || l[last].Mode != "prolog") continue;
                     bool freeLater = false;
                     for (int j = last + 1; j < l.Count; j++) if (l[j].Action == "free" && !_done.ContainsKey(l[j].Id)) { freeLater = true; break; }
                     if (!freeLater) continue;
@@ -1187,7 +1189,9 @@ namespace Armoury
             if (i > 0 && int.TryParse(term.Substring(i + 1), NumberStyles.Integer, Inv, out plus)) bas = term.Substring(0, i);
             else plus = 0;
             bool kr = bas.StartsWith("kr:", StringComparison.Ordinal);
-            if (kr && !Chronicle.KeyOn) { never = true; return false; }   // A4: Kronika wylaczona - kr: falsz "nigdy" takze z pamiecia +N (FORMAT 3.3)
+            // A4: Kronika wylaczona - kr: falsz "nigdy" takze z pamiecia +N (FORMAT 3.3). m107 (recenzja T1): klucz Chronicle World Changes NIE tak samo - zmiana strony
+            // z okna Kroniki jest zmiana swiata (opis klucza: "deaths, side changes ..."); tylko tu, nie w Terms.KrTrue (okna przy World NIE dalej sie rozstrzygaja)
+            if (kr && (!Chronicle.KeyOn || !Chronicle.KeyWorld)) { never = true; return false; }
             int f;
             if (!_first.TryGetValue(bas, out f))
             {
@@ -1210,8 +1214,9 @@ namespace Armoury
                 bool nv;
                 // m107-kronika: term kr: okna rozstrzygnietego przed dniem, od ktorego wiersz jest w zapisie (wiersz dopisany do trwajacej kampanii), ktorego
                 // zaden wiersz jeszcze nie widzial prawdziwym (brak pamieci _first - stary wiersz, ktory juz zaszedl i czeka za wczesniejszym, ma pamiec) - dla
-                // tego wiersza "nigdy" (bez wstecznej zmiany strony; inne termy wiersza dzialaja jak dotad)
-                if (hasSeen && t.StartsWith("kr:", StringComparison.Ordinal))
+                // tego wiersza "nigdy" (bez wstecznej zmiany strony; inne termy wiersza dzialaja jak dotad). Recenzja T4: bez termow z wyborem (kr:NNN.w=x) -
+                // wybor zapada w dniu wyboru (dzien okna to dzien rozstrzygniecia), a lista mogla czekac przez wczytanie; =x ma tylko stary wiersz m02
+                if (hasSeen && t.StartsWith("kr:", StringComparison.Ordinal) && t.IndexOf('=') < 0)
                 {
                     string ka = t.Substring(3);
                     int pi = ka.LastIndexOf('+');

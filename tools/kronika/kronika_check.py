@@ -1064,7 +1064,8 @@ def chk_act(raw, ctx, rep, world, refs, what):
     elif name in ('marry', 'wed'):
         good = need(2, 2, '%s:<bohater>:<bohater>' % name) and R(a[0], 'hero') and R(a[1], 'hero')
     elif name == 'succeed':
-        good = need(2, 2, 'succeed:<umierajacy>:<dziedzic>') and R(a[0], 'hero') and R(a[1], 'hero')
+        # m107 (recenzja A1): dziedzic @dziedzic - wybiera gra (Chronicle.Actions.PickHeir: kandydaci gry bez postaci z #move, gracza i ukrytych)
+        good = need(2, 2, 'succeed:<umierajacy>:<dziedzic|@dziedzic>') and R(a[0], 'hero') and (a[1] == '@dziedzic' or R(a[1], 'hero'))
     elif name == 'own':
         good = need(2, 2, 'own:<osada>:<rod>') and R(a[0], 'settlement') and R(a[1], 'clan')
     elif name == 'ruler':
@@ -1683,8 +1684,8 @@ def main():
     for mid, (who, trig) in world.moves.items():
         tt = [t.strip() for t in trig.split('|') if t.strip()]
         if tt and all(t.startswith('kr:') for t in tt):
-            # przy wylaczonej Kronice kr: = nigdy (rozdz. 3.3) - wiersz bez starego wyzwalacza nie ruszy wtedy wcale
-            rep.w('arm_canon_moves.tsv:%d' % world.moves_line.get(mid, 0), 'wiersz %s ma tylko termy kr: - przy ChronicleOfWesteros=NIE nie ruszy nigdy (stary wyzwalacz zostaje jako zapas, rozdz. 8)' % mid)
+            # przy wylaczonej Kronice kr: = nigdy (rozdz. 3.3; m107 T1: takze przy ChronicleWorldChanges=NIE) - wiersz bez starego wyzwalacza nie ruszy wtedy wcale
+            rep.w('arm_canon_moves.tsv:%d' % world.moves_line.get(mid, 0), 'wiersz %s ma tylko termy kr: - przy ChronicleOfWesteros=NIE albo ChronicleWorldChanges=NIE nie ruszy nigdy (stary wyzwalacz zostaje jako zapas, rozdz. 3.3 i 8)' % mid)
         for t in trig.split('|'):
             t = t.strip()
             mwhere = 'arm_canon_moves.tsv:%d' % world.moves_line.get(mid, 0)

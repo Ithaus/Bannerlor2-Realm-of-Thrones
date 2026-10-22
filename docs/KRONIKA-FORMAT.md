@@ -113,10 +113,16 @@ pola z wlasnymi id (`..._1b_T`, `_1b_U`, `_1b_L`).
   smierci, ktorej akcja swiata by nie zrobila). Linia startu: `..., Player Choices X, Canon Deaths X (wierszy smierci N)`; przy rozstrzygnieciu okna z wierszami smierc
   linie `smierc kanonu NNN.wX TAK - okno ... wierszem smierci (klucze: ...)` / `smierc kanonu NNN.wX nie: <pierwszy falszywy term> | okno ... wierszem ...`; akcje wiersza
   smierc z dopiskiem `| smierc kanonu`; `succeed`/`die` POMINIETE z wiersza smierc - linia `KANON: smierc z NNN.wX nie weszla - <akcja> (<powod>)`.
+  (Recenzja T3) Wiersz smierc NIE bierze udzialu w wyborze wiersza, gdy cel jego `succeed` (umierajacy albo dziedzic), `die` albo `hide` (skutki wiersza i jego
+  opcji) jest po stronie gracza (gracz, jego rod, towarzysz, druzyna, jeniec gracza - akcja by ja pominela) albo `succeed:<b>:@dziedzic` nie ma dziedzica
+  (Chronicle.Actions.DeathBlock) - okno idzie nastepnym wierszem, a linia `smierc kanonu NNN.wX nie: <akcja>: <postac> - <powod> | okno ...`.
 - Klucz **ChronicleOfWesteros=NIE** = brak okien; termy `kr:` (w oknach i w arm_canon_moves) sa wtedy **FALSZYWE na zawsze** ("nigdy", jak dzis
   nieznany term w `CanonCompanions.BaseTrue`) - wiersz `#move` z wyzwalaczem `stary|kr:NNN.w` rusza wtedy od starego wyzwalacza, bo `|` = lub.
   (Poprawka 21.10: pierwsza wersja mowila "prawdziwe" - przy alternatywie `|` m02, m04, m18 i m22 ruszylyby w dniu startu kampanii;
   zglosili to wszyscy autorzy K1-K10.) Wiersz z samymi termami `kr:` przy wylaczonej Kronice nie rusza wcale (walidator: UWAGA).
+- (m107, recenzja T1) Klucz **ChronicleWorldChanges=NIE** robi z termami `kr:` w wyzwalaczach `#move` to samo co ChronicleOfWesteros=NIE (falsz "nigdy",
+  CanonCompanions.TermTrue) - zmiana strony z okna Kroniki jest zmiana swiata (opis klucza: "deaths, side changes ..."). Okna dalej sie rozstrzygaja
+  (Terms.KrTrue bez zmian), wiec `kr:` w warunkach okien dziala jak dotad. Wiersze ze starym wyzwalaczem (m02, m04, m18, m22) ruszaja wtedy od niego.
 - Ten sam "nigdy" konczy ukrycie z koncem `kr:` (rozdz. 11): przy kluczu NIE ukryci z takim koncem wracaja w najblizszej dobie, a konce `rotday:`,
   `ev:` itd. licza sie jak zawsze (poprawka K0 R-1, 22.10 - wczesniej doba przy kluczu NIE pomijala kazdy koniec ukrycia: Melisandre i Brienne
   zostawaly ukryte na zawsze). Ponowne wlaczenie klucza nie ukrywa ich drugi raz.
@@ -388,7 +394,7 @@ Wzorce: "N dni przed wydarzeniem ROT X" = `warunki: plan:X-N` + `przed: ev:X` + 
 | `skill:<bohater>:<umiejetnosc>:<d>` | OneHanded, TwoHanded, Polearm, Bow, Crossbow, Throwing, Riding, Athletics, Crafting, Scouting, Tactics, Roguery, Charm, Leadership, Trade, Steward, Medicine, Engineering (+Mariner/Boatswain/Shipmaster) | S | K4 | zmiana umiejetnosci (Jaime nr 37) |
 | `item:<bohater>:<przedmiot>:<skad>` | skad = bohater/rod/osada | S | K1+ | przedmiot unikatowy ROT (ROTassets.xml) PRZENOSZONY od posiadacza - nigdy z niczego; `dragon_*` zakazane (P4) |
 | `clan:<b>:<rod>` `court:<b>:<rod>` `lead:<b>` `prisoner:<b>:<rod\|osada>` `free:<b>:<rod>` `wander:<b>:<kultura>` `die:<b>` `marry:<b>:<b2>` `wed:<b>:<b2>` | jak arm_canon_moves | S | K0 | akcje CanonCompanions.ApplyAction dla postaci BEZ wierszy #move (rozdz. 8). `die` glowy rodu/wladcy = BLAD (uzyj `succeed`) |
-| `succeed:<umierajacy>:<dziedzic>` | | S | K4 | dziedzic zostaje glowa rodu (i wladca), potem smierc (wzor Prologue.End). **Tylko pelna**, wyjatki lekkie: nr 42, 49, 52, 80; (m107) wolno tez w wierszu `smierc` i w opcjach nalezacych tylko do wierszy pelna/smierc |
+| `succeed:<umierajacy>:<dziedzic>` | `<dziedzic>` = id albo (m107) `@dziedzic` | S | K4 | dziedzic zostaje glowa rodu (i wladca), potem smierc (wzor Prologue.End). **Tylko pelna**, wyjatki lekkie: nr 42, 49, 52, 80; (m107) wolno tez w wierszu `smierc` i w opcjach nalezacych tylko do wierszy pelna/smierc. (m107, recenzja A1) `@dziedzic` - dziedzica wybiera gra: kandydaci Clan.GetHeirApparents rodu umierajacego (punkty dziedziczenia, potem wiek) bez postaci z wierszami #move, po stronie gracza, ukrytych i dzieci (Chronicle.Actions.PickHeir); brak dziedzica - wiersz smierc nie bierze udzialu (3.3); linia akcji z dopiskiem `(@dziedzic - wybor gry)` (115.2e) |
 | `own:<osada>:<rod>` | | S | K9 | zmiana wlasciciela - **tylko pelna** |
 | `ruler:<krolestwo>:<rod>` | | S | K9 | rod rzadzacy - **tylko pelna** |
 | `leader:<rod>:<bohater>` | | S | K9 | glowa rodu - **tylko pelna** |
@@ -678,6 +684,8 @@ okna nie jest `obie`, BLAD przy own/ruler/leader/alliance/truce (wolno tylko suc
 w skutkach i opcjach; lektor: wiersz smierc jak obie (UWAGA bez nagrania - nagraj_kronika.py nagrywa `wersja != pelna`); termy `near:<bohater>:<osada>:<1-500>`,
 `region:<bohater>:<krolestwo>`; `kr:NNN.w~R` - R z `0` i liter, kazda litera to wariant okna (BLAD), nie razem z `=x`, BLAD dla okna powracajacego; wyzwalacze
 `#move`: rodzaj termu znany CanonCompanions.BaseTrue (ev, done, dead, rotday, prolday, war, own, kr), `kr:` z opcja/wariantami, ktore istnieja (BLAD).
+Poprawki po recenzji m107: `succeed:<b>:@dziedzic` dozwolone (drugi argument; gdzie indziej token nieznany - BLAD); UWAGA wierszy #move z samymi `kr:` mowi o obu kluczach
+(ChronicleOfWesteros=NIE albo ChronicleWorldChanges=NIE).
 `tools/kronika/kronika_silnik.py` dodatkowo porownuje rodzaje termow z danych z Terms.Kinds / PlayerKinds silnika.
 
 ## 18. Podzial na paczki K1-K10

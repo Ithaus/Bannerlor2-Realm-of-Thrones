@@ -411,7 +411,8 @@ namespace Armoury
                 if (why == null)
                 {
                     bool nv; string vw;
-                    if (Terms.Eval(v.Cond, tok, v.Key + " warunki", out nv, out vw)) why = "warunki prawdziwe, wygral wiersz " + p.Row.Key + " (wczesniejszy w pliku albo zmienne bez wartosci)";
+                    if (Terms.Eval(v.Cond, tok, v.Key + " warunki", out nv, out vw))
+                        why = Actions.DeathBlock(v, tok) ?? ("warunki prawdziwe, wygral wiersz " + p.Row.Key + " (wczesniejszy w pliku albo zmienne bez wartosci)");   // m107 T3
                     else why = vw ?? "?";   // pierwszy falszywy skladnik (przy "nigdy" z dopiskiem)
                 }
                 Log.Info(Tag + "smierc kanonu " + v.Key + " nie: " + why + " | okno " + id + " wierszem " + p.Row.Key + (p.Row.IsDeath ? " (smierc)" : "") + " (" + keys + ").");
@@ -429,6 +430,12 @@ namespace Armoury
                 if (!VersionOk(v.Version, w.HasFull)) continue;
                 bool nv; string vw;
                 if (!Terms.Eval(v.Cond, tok, v.Key + " warunki", out nv, out vw)) continue;
+                if (v.IsDeath)
+                {
+                    // m107 (recenzja T3): smierc, ktora nie weszlaby przez gracza (cel po stronie gracza) albo bez dziedzica (@dziedzic) - wiersz nie bierze udzialu
+                    string db = Actions.DeathBlock(v, tok);
+                    if (db != null) { if (firstWhy == null) firstWhy = v.Key + ": " + db; continue; }
+                }
                 var p = MakePick(v, tok, out vw);
                 if (p != null) return p;
                 if (firstWhy == null) firstWhy = v.Key + ": " + vw;
