@@ -79,6 +79,7 @@ namespace Armoury
         // m105 gosp5 (klucz Ds Lord Relief Below Chest): ulga pana przy wozie (zl, wozy, wsi) i czynsz darowany do skrzyni (zl, wsi) - tylko liczniki linii doby
         private static long _lrZl; private static int _lrN; private static readonly HashSet<string> _lrVil = new HashSet<string>();
         private static double _rChest; private static int _rChestN;
+        private static double _lrNoZl; private static int _lrNoN;                                // m107 (pomiar, zad. 1): woz wsi DS ponizej skrzyni bez przyrostu licznika pana w oknie (zl braku skrzyni, wozy)
 
         private static void ClearCounters()
         {
@@ -97,6 +98,7 @@ namespace Armoury
             _kKept = 0; _kKeptN = 0;
             _kSpike = 0; _kSpikeN = 0; _rBread = 0; _rBreadN = 0;   // m105 gosp4
             _lrZl = 0; _lrN = 0; _lrVil.Clear(); _rChest = 0; _rChestN = 0;   // m105 gosp5
+            _lrNoZl = 0; _lrNoN = 0;                                         // m107 (pomiar)
             _stumbles = 0;
         }
 
@@ -669,6 +671,7 @@ namespace Armoury
         private static readonly Dictionary<string, double> _akChest = new Dictionary<string, double>();   // id wsi -> skrzynia tej doby (SurplusDay)
         private static readonly List<double> _akGold = new List<double>(), _akCh = new List<double>(), _akRat = new List<double>();
         private static int _akDay = -1, _akPoor;
+        private static int _akFullSmall, _akSmallChest;   // m107 (zad. 1, pomiar M3W-2): pelna mala skrzynia (skrzynia <= kiesa < 1000 zl) i skrzynia < 1000 zl - wsie DS kroku 4
 
         /// <summary>m105 gosp4 (linia "Akumulator kies", M5G-7): wsie DS z dzisiejszego kroku 4 z kiesa ponizej min(1000 zl, skrzynia) i wszystkie wsie kroku 4; false - doby nie bylo.</summary>
         internal static bool AkPoor(out int poor, out int n)
@@ -679,17 +682,32 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>m107-gospodarka (zad. 1, linia "Akumulator kies"): wsie DS z dzisiejszego kroku 4 z pelna mala skrzynia (skrzynia &lt; 1000 zl i skrzynia &lt;= kiesa &lt; 1000 zl -
+        /// "ponizej 1000 zl" tylko dlatego, ze skrzynia jest mniejsza: RentPay bierze czynsz ponad skrzynie) i ze skrzynia &lt; 1000 zl; false - doby nie bylo. Tylko licznik.</summary>
+        internal static bool AkPoorMix(out int full, out int small)
+        {
+            full = 0; small = 0;
+            if (_akDay != Today || _akGold.Count == 0) return false;
+            full = _akFullSmall; small = _akSmallChest;
+            return true;
+        }
+
         private static void AkNote(Settlement st, int gold, double chest)
         {
             try
             {
                 int today = Today;
-                if (today != _akDay) { _akDay = today; _akChest.Clear(); _akGold.Clear(); _akCh.Clear(); _akRat.Clear(); _akPoor = 0; }
+                if (today != _akDay) { _akDay = today; _akChest.Clear(); _akGold.Clear(); _akCh.Clear(); _akRat.Clear(); _akPoor = 0; _akFullSmall = _akSmallChest = 0; }
                 if (st == null || st.StringId == null) return;
                 _akChest[st.StringId] = chest;
                 _akGold.Add(Math.Max(0, gold)); _akCh.Add(Math.Max(0, chest));
                 if (chest >= 1) _akRat.Add(Math.Max(0, gold) / chest);
                 if (gold < Math.Min(1000.0, chest)) _akPoor++;                   // m105 gosp4 (M5G-7): wies biedna - kiesa ponizej 1000 zl i ponizej skrzyni (tylko licznik)
+                if (chest < 1000.0)                                              // m107 (pomiar): skrzynia ponizej 1000 zl; pelna - kiesa od skrzyni do 1000 zl
+                {
+                    _akSmallChest++;
+                    if (gold >= chest && gold < 1000) _akFullSmall++;
+                }
             }
             catch (Exception e) { Stumble("AkNote", e); }
         }
@@ -720,6 +738,14 @@ namespace Armoury
                 if (st != null && st.StringId != null) _lrVil.Add(st.StringId);
             }
             catch (Exception e) { Stumble("NoteRelief", e); }
+        }
+
+        /// <summary>m107-gospodarka (zad. 1, POMIAR hipotezy "licznik podatku ujemny"; VillageTakings.LordRelief): woz wrocil do wsi DS z kiesa ponizej skrzyni, a licznik pana
+        /// nie urosl w oknie powrotu (got &lt;= 0 - ulga nie ma z czego) - liczba i brak skrzyni w zl do segmentu 'm105 gosp5' linii 'Daniny wsi (DS)'. Bez zmiany zachowania. Nie rzuca.</summary>
+        internal static void NoteReliefNoTake(Settlement st, double lack)
+        {
+            try { if (lack >= 1 && !double.IsInfinity(lack)) { _lrNoN++; _lrNoZl += lack; } }
+            catch (Exception e) { Stumble("NoteReliefNoTake", e); }
         }
 
         private static double Med(List<double> v)
@@ -921,7 +947,8 @@ namespace Armoury
                 // poza kontrola platnicy - odbiorcy; "pan i majatki (bez zmian)" wyzej jest przed ulga) i czynsz darowany do skrzyni (RentPay, w "wstrzymane")
                 if (s.DsLordReliefBelowChest)
                     sb.Append(" | m105 gosp5 (Lord Relief Below Chest TAK): ulga pana przy wozie ").Append(_lrZl).Append(" zl w ").Append(_lrN).Append(" wozach (").Append(_lrVil.Count)
-                      .Append(" wsi), czynsz darowany do skrzyni ").Append(N0(_rChest)).Append(" zl (").Append(_rChestN).Append(" wsi)");
+                      .Append(" wsi), czynsz darowany do skrzyni ").Append(N0(_rChest)).Append(" zl (").Append(_rChestN).Append(" wsi)")
+                      .Append("; bez ulgi - licznik pana bez przyrostu w oknie ").Append(_lrNoN).Append(" (brak skrzyni ").Append(N0(_lrNoZl)).Append(" zl)");   // m107 (pomiar)
                 sb.Append(" | kontrola: platnicy - odbiorcy = ").Append(ctl);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');

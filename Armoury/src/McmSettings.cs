@@ -2668,7 +2668,7 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartStuckGuard { get; set; } = true;
 
-        [SettingPropertyBool("Village Cart Flee Unload", HintText = "a loaded village cart that the game keeps holding at home because bands roam around its village - it flees back in every time it means to leave - unloads its goods into the village storehouse after three days, and the village sends out no new cart until the danger is gone (looked at once a day, by the game's own judgement of danger; the cart rolls out at most a day after the bands move off). Nothing is made or lost. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Village Cart Flee Unload", HintText = "with Village Cart Stuck Guard: a loaded village cart that the game keeps holding at home because bands roam around its village - it flees back in every time it means to leave - unloads its goods into the village storehouse after three days, and the village sends out no new cart until the danger is gone (looked at once a day, by the game's own judgement of danger; the cart rolls out at most a day after the bands move off). Nothing is made or lost. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
         public bool VillageCartFleeUnload { get; set; } = true;
 

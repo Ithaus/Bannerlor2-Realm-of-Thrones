@@ -688,7 +688,11 @@ namespace Armoury
                 // m105 gosp4 (M5G-7; klucze Ks Village Chest Refill / Ds Rent After Bread - oba NIE: linia jak w WGRANIU 102): wsie biedne - kiesa ponizej 1000 zl i ponizej skrzyni
                 int akP, akN;
                 if ((StartCalibration.SwChestRefill || s.DsRentAfterBread || s.DsLordReliefBelowChest) && DsVillage.AkPoor(out akP, out akN))   // m105 gosp5: takze przy Ds Lord Relief Below Chest
+                {
                     sb.Append(" | m105 wsie biedne (kiesa < min(1000 zl, skrzynia)) ").Append(akP).Append(" z ").Append(akN).Append(" wsi DS");
+                    int akF, akS;   // m107 (zad. 1, pomiar M3W-2): wsie "ponizej 1000 zl" tylko przez mala skrzynie - napis wyzej bez zmian (regex M5G5-2)
+                    if (DsVillage.AkPoorMix(out akF, out akS)) sb.Append("; m107: pelna mala skrzynia (skrzynia <= kiesa < 1000 zl) ").Append(akF).Append(", skrzynia ponizej 1000 zl ").Append(akS);
+                }
                 sb.Append(" | czas ").Append(Ms(_daTicks)).Append(" ms | potkniecia ").Append(_daSt).Append(" (sesja ").Append(_daStSess).Append(").");
                 Log.Info(sb.ToString());
             }

@@ -254,6 +254,7 @@ namespace Armoury
 
         internal static void ApplyAll(Harmony h)
         {
+            CartGuard.Wire(h);   // m107-gospodarka K1: prefiks ThinkAboutSendingItemToTown (wstrzymanie zaladunku wsi pod ucieczka) - wlasny try, niezalezny od latek ponizej
             try
             {
                 var target = AccessTools.Method(typeof(VillagerCampaignBehavior), "SendVillagerPartyToTradeBoundTown");
