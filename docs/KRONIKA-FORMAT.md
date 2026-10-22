@@ -11,7 +11,7 @@ oraz "## kronika:A" i "## kronika:B"; `docs/KRONIKA-WESTEROS-V2-2026-10-21.md` (
 Silnik K0 (Chronicle*.cs) powstanie pozniej i ma czytac DOKLADNIE ten format. Walidator: `tools/kronika/kronika_check.py`.
 **m107-kronika (22.10, galaz `w-toku/m107-kronika`, decyzje Jeffa):** (A) "gina postacie, jesli historia mowi, ze gina; jesli bedzie inne zakonczenie i nie gina, to nie
 gina" - nowa wersja wiersza `smierc` (3.1, 3.3, 11, 16.4), klucz ChronicleCanonDeaths, termy polozenia bohatera `near:`/`region:` (10); (B) "maja przechodzic do innych
-rodow jak w ksiazce" - wiersze #move m28-m38 (Theon, Brienne, Podrick, Jaime) z termem `kr:NNN.w~R` (okno rozstrzygniete wierszem R, 10) i ochrona wierszy dopisanych
+rodow jak w ksiazce" - wiersze #move m28-m40 (Theon, Brienne, Podrick, Jaime; m39/m40 - poprawki recenzji) z termem `kr:NNN.w~R` (okno rozstrzygniete wierszem R, 10) i ochrona wierszy dopisanych
 do trwajacej kampanii (8). Dziennik galezi: `docs/noc-1920/m107-kronika-CHANGELOG.md`.
 
 Spis: 1 pliki | 2 budowa pliku | 3 #okno | 4 #wybor | 5 #tekst | 6 #banda | 7 #zadanie | 8 #para | 9 #usuniete |
