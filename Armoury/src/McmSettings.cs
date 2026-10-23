@@ -392,6 +392,10 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public float RangedHighTierCostFactor { get; set; } = 2f;
 
+        [SettingPropertyBool("Bow Tier Materials", HintText = "bows need more material the higher the tier: a flawless stave is picked out of far more wood (x2 at tier I up to x18 at tier VI - about 20 kg for a tier VI war bow), every bow has a leather grip, composite bows horn and sinew (leather) growing with tier, and a heavier draw takes a thicker string. Off - bows by weight as before", RequireRestart = false)]
+        [SettingPropertyGroup("Mending it yourself")]
+        public bool BowTierMaterials { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Ranged Failure Factor", 0.00f, 2.00f, "0.00", HintText = "ruin-risk multiplier for bows, crossbows and ammunition - wood forgives more than a quench", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
         public float RangedFailureFactor { get; set; } = 0.5f;
@@ -9469,6 +9473,7 @@ namespace Armoury
             s.AmmoBatchStacks = AmmoBatchStacks;
             s.RangedStaminaFactor = RangedStaminaFactor;
             s.RangedHighTierCostFactor = RangedHighTierCostFactor;
+            s.BowTierMaterials = BowTierMaterials;
             s.RangedFailureFactor = RangedFailureFactor;
             s.LegendaryValueFloor = LegendaryValueFloor;
             s.LegendaryMaterialFactor = LegendaryMaterialFactor;

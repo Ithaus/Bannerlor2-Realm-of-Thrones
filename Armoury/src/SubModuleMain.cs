@@ -492,6 +492,12 @@ namespace Armoury
                 try { ForgeTestTick(dt); }
                 catch (Exception e) { _forgeTestFails++; Log.Error("ForgeBillTest.AppTick: nie laduje sie (proba " + _forgeTestFails + "/3)", e); }
             }
+            // m110-ekwipunek: autotest podgladu postaci w ekwipunku (InventoryLookTest - tylko plik armoury-ekwipunek.flag; wlasny try w srodku) - tu tylko blad ladowania
+            if (_invTestFails < 3)
+            {
+                try { InvTestTick(dt); }
+                catch (Exception e) { _invTestFails++; Log.Error("InventoryLookTest.AppTick: nie laduje sie (proba " + _invTestFails + "/3)", e); }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -526,6 +532,13 @@ namespace Armoury
         private static int _musicFails;   // m108-muzyka: blad ladowania typu EventMusic
 
         private static int _forgeTestFails;   // m109-kuznia: blad ladowania typu testu ekranu kucia (ForgeBillTest.AppTick)
+        private static int _invTestFails;     // m110-ekwipunek: blad ladowania typu testu podgladu postaci (InventoryLookTest.AppTick)
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void InvTestTick(float dt)
+        {
+            InventoryLookTest.AppTick(dt);
+        }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void ForgeTestTick(float dt)

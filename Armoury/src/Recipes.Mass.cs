@@ -153,6 +153,10 @@ namespace Armoury
         // stale reguly (Jeff: "nie pytac o parametry" - opisane w CHANGELOG)
         private const float StringKgBow = 0.02f, StringKgXbow = 0.05f, StringWaste = 1.5f;   // cieciwa: gramy lnu (konopi), odpad x1.5
         private const float SteelExtraLoss = 0.05f;
+        // m110-luki (klucz BowTierMaterials): ile drewna przechodzi przez rece na jedna bezbledna klepke, rog i sciegno luku refleksyjnego, skora uchwytu (indeks = tier 1..6)
+        private static readonly float[] StavePick = { 0f, 2f, 3f, 5f, 8f, 12f, 18f };
+        private static readonly float[] HornPick = { 0f, 1f, 1.5f, 2f, 3f, 4f, 6f };
+        private const float GripKg = 0.05f;
 
         /// <summary>Legenda (po recenzji m96-receptury): KAZDY kg przepisu x LegendaryMaterialFactor (MCM, Jeff 4.0) - mistrz bierze tylko najlepsze kawalki
         /// kazdego surowca (klepka, len, skora, stal); metal caly ze stali zamkowej (AddMetal). Ta sama regula dla luku, kuszy, strzal i pancerza; luk dalej bez metalu.</summary>
@@ -177,7 +181,28 @@ namespace Armoury
             float w = Math.Max(0.01f, ArmsPricing.CostWeight(it));
             var l = new List<KgPart>();
             var tp = it.ItemType;
-            if (tp == ItemObject.ItemTypeEnum.Bow)
+            if (tp == ItemObject.ItemTypeEnum.Bow && s.BowTierMaterials)
+            {
+                // m110-luki (Jeff 23.10 20:23, zrzut CRAFT: "luk VI tieru ma takie same wymagania materialowe jak luk I tieru ... utrudnic, aby gracz nie tworzyl
+                // 1000 lukow VI"; 0.4 kg drewna + 0.03 kg lnu na 200-funtowy luk wojenny - ROT wazy luki po 0.1-0.8 kg, wiec przepis z masy dawal grosze).
+                // KLEPKA: luk mocniejszy = grubsza i dluzsza klepka (min. 0.6 kg przy t1 do 1.1 kg przy t6, wiecej, gdy luk wazy wiecej), a mistrz wybiera z klody
+                // tylko bezbledny kawalek - na jedna klepke idzie StavePick[tier] razy wiecej drewna (x2 t1 ... x18 t6; t6 = ok. 20 kg, 5 lukow z ladunku 100 kg).
+                // ROG I SCIEGNO (luk refleksyjny, jako skora): 40% klepki x1.25 x HornPick[tier] (x1 t1 ... x6 t6). UCHWYT ze skory na kazdym luku (0.05 kg x tier) -
+                // kazdy luk ma skore, refleksyjny duzo wiecej (Jeff: "czesc lukow ma skore, czesc nie"). CIECIWA grubsza przy ciezszym naciagu: +30% na tier.
+                float stave = Math.Max(w, 0.5f + 0.1f * tier);
+                bool comp = IsComposite(it);
+                float wood = stave * StavePick[tier];
+                if (comp)
+                {
+                    AddKg(l, _wood, -1, wood * 0.6f, stave * 0.6f, 0f, "core");
+                    AddKg(l, _leather, 0, stave * 0.4f * HornWaste * HornPick[tier], stave * 0.4f, 0f, "horn");
+                }
+                else AddKg(l, _wood, -1, wood, stave, 0f, "stave");
+                AddKg(l, _leather, 0, GripKg * tier, GripKg * tier / 1.2f, 0f, "grip");
+                float str = StringKgBow * (1f + 0.3f * (tier - 1));
+                AddKg(l, StringMat(str * StringWaste), 0, str * StringWaste, str, 0f, "string");
+            }
+            else if (tp == ItemObject.ItemTypeEnum.Bow)
             {
                 float f = tier >= 5 ? Math.Max(1f, s.RangedHighTierCostFactor) : 1f;
                 bool comp = IsComposite(it);

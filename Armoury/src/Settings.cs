@@ -125,6 +125,7 @@ namespace Armoury
         public int AmmoBatchStacks = 3;                    // one fletching job yields this many sheaves of arrows or cases of bolts
         public float RangedStaminaFactor = 0.35f;          // bows and crossbows cost tier x stamina-per-tier x this - bowyery is lighter work than plate, as at the weapon bench
         public float RangedHighTierCostFactor = 2f;        // bows and crossbows of tier 5-6 eat this many times the materials - masterworks are not massed out of a sack of sticks
+        public bool BowTierMaterials = true;               // bows need more material the higher the tier: a flawless stave is picked out of far more wood (x2 at tier I up to x18 at tier VI - about 20 kg for a tier VI war bow), every bow has a leather grip, composite bows horn and sinew (leather) growing with tier, and a heavier draw takes a thicker string. Off - bows by weight as before
         public float RangedFailureFactor = 0.5f;           // ruin-risk multiplier for bows, crossbows and ammunition - wood forgives more than a quench
         public float LegendaryValueFloor = 25000f;         // an unbuyable piece worth at least this much is a LEGEND - legendary bills and the one-of-a-kind rule apply
         public float LegendaryMaterialFactor = 4f;         // a legend's bill: every material count multiplied by this, plus the noblest steel on top. With Recipes By Mass: every kilogram of every material multiplied by this (the master keeps only the best of each) and all its metal is the noblest steel - a bow still takes no metal
