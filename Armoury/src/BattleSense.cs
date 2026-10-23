@@ -53,6 +53,24 @@ namespace Armoury
         }
 
         /// <summary>m111-walka: rodzaj misji i flaga pojedynku; nazwa dopasowanego zachowania do logu raz na misje.</summary>
+        private static int _duelTest = -1;
+
+        /// <summary>m111-walka TEST: plik flagi autotestu (raz na proces); w zwyklej grze (LogGate 0) zawsze false.</summary>
+        private static bool DuelTestFlag()
+        {
+            if (_duelTest >= 0) return _duelTest == 1;
+            _duelTest = 0;
+            try
+            {
+                int mode = LogGate.Mode;
+                if (mode != 1 && mode != 2) return false;
+                var docs = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments);
+                if (System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), "armoury-pojedynek-test.flag"))) _duelTest = 1;
+            }
+            catch { }
+            return _duelTest == 1;
+        }
+
         private static void Classify(Mission m, bool first)
         {
             string kind = MissionTeams.Kind(m);
@@ -76,6 +94,9 @@ namespace Armoury
                     if (n != null && n.Contains("Duel")) { via = n; duel = true; break; }
                 }
             }
+            // m111-walka TEST (tylko DLL autotestu, LogGate 1/2 + plik CrashScribermoury-pojedynek-test.flag): bitwa w polu liczona jak pojedynek - autotest nie
+            // przechodzi ekranow turnieju (TXP, GrandTourney), a w miescie testu trwa turniej (walka cwiczebna niedostepna); tak przechodzi caly kod pojedynku
+            if (!duel && kind == "bitwa" && DuelTestFlag()) { duel = true; via = "TEST bitwa jako pojedynek (armoury-pojedynek-test.flag)"; }
             // po recenzji: wszystkie klucze pojedynku wylaczone = jak dawniej (bez probkowania, list i linii DU)
             if (duel && !DuelGuard.AnyKey(Settings.Current)) duel = false;
             bool was = InDuel(m);
