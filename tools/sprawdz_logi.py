@@ -1870,20 +1870,21 @@ Uzycie (Python 3, tylko odczyt):
                     zapisu>] (strumieniowo; bez logu tylko HP-S i HP-S2). HP-S self-test wyrazen wobec linii kontrolnych jak w kodzie C# (start, bitwa, test,
                     syntetyczne, koniec, zuzycie towarzysza, zmiana stanu, suma, zapis, przepada) i wykrycie bledu +2. HP-S2 test syntetyczny: krzywa 90/2 - 50 przy
                     41/56/78% -> 34/41/47, stan Damaged 42, przedzialy stanow i przyciecie (80.01-100 / 40.01-80 / 10-40 / 0.1-9.99), d 0.1, dobra jakosc (wynik
-                    gry x krzywa), sprawna neutralna, pula 2439 i solidnosc 1.44, ciaglosc; logi dobry, zly (+2, HP poza przedzialem, przeciek 1, zla pula,
+                    gry minus kara w dol), sprawna neutralna (recenzja U1: 50 przy 99.9% -> 50, 8 przy 99.94% -> 8, 50 przy 85% -> 49), pula 2439 i solidnosc 1.44, ciaglosc; logi dobry, zly (+2, HP poza przedzialem, przeciek 1, zla pula,
                     zerwana ciaglosc, wzor testu, brak testu, zla krzywa), bez startu, bez linii m110hp, HP-LC zgodny i niezgodny. HP-0 linia 'HP sprzetu (m110):
                     start' przy kazdej linii m110hp (brak przy innych liniach - NIE; log bez linii m110hp - INFO): kontrola krzywej przeliczona z 'krzywa X/Y' (+-1)
-                    i OK, ochrona TAK - latka Agent.InitializeSpawnEquipment TAK. HP-1 ERROR HeroHp. / HeroBook. / SyncData.arm_condition_heroes / M110HpReset,
+                    i OK, ochrona albo zuzycie towarzyszy TAK - latka Agent.InitializeSpawnEquipment TAK (recenzja R3). HP-1 ERROR HeroHp. / HeroBook. / SyncData.arm_condition_heroes / M110HpReset,
                     potkniecia (start, koniec bitwy), przecieki kopii (koniec bitwy), bledy zuzycia towarzyszy (suma), zly format - 0. HP-2 kazda czesc linii
-                    'bitwa N | bohater X': sprawny / stan - E = max(1, floor(B x SF(d))), dobry - E = floor(X x SF(d)); stan - X = floor(B x SF(wartosc stanu)),
-                    sprawny - X = B (+-1, SF z krzywej linii startu); HP w przedziale stanu (+-0.06) (brak czesci - INFO). HP-3 linie testu (pod flaga):
-                    dokladnie = wzor (+-1) = krzywa z bazy (Sound z X != B - z X); lancuch Head (RBM) = stan -> dokladnie sztuki; MissionWeapon = dokladnie, bez
-                    kopii - NIE; kon agenta kopia TAK i wartosc = dokladnie (bez flagi - INFO). HP-4 linie 'Zuzycie towarzysza (m110)': ksiega b = max(0, a -
+                    'bitwa N | bohater X': stan - E = max(1, floor(B x SF(d))); sprawny (X = B) / dobry - E = X - floor(X x (1 - SF(d))) (recenzja U1: kara
+                    w dol; kara < 0.9 pkt - E = X scisle); stan - X = floor(B x SF(wartosc stanu)), sprawny - X = B (+-1, SF z krzywej linii startu); HP w przedziale stanu (+-0.06) (brak czesci - INFO). HP-3 linie testu (pod flaga):
+                    gracz i towarzysze (recenzja U3/R2): dokladnie = wzor (+-1) = krzywa (poczatek z linii bitwy: stan - z B, sprawny / dobry - kara z X w dol, kara
+                    < 0.9 pkt - dokladnie = X scisle); lancuch Head / Chest (RBM) = stan -> dokladnie sztuki; MissionWeapon = dokladnie, bez kopii - NIE; kon agenta
+                    kopia TAK i wartosc = dokladnie; 'kopia w sprzecie agenta NIE' - NIE (bez flagi - INFO). HP-4 linie 'Zuzycie towarzysza (m110)': ksiega b = max(0, a -
                     trafienia x 100 / pula) albo a - trafienia / solidnosc (+-0.06), liczony = b - (100 - srodek stanu poczatku) (+-0.02), stan = gorszy z (byl,
                     wedlug progow 80/40/10), nigdy lepszy; linie zmiany stanu jak STAN-5 (arm_* z przyrostkiem stanu); ciaglosc - HP tej samej sztuki (bohater,
                     slot, id) w nastepnej linii bitwy = ostatni liczony przyciety do stanu (+-0.1) (brak linii - INFO). HP-5 pokrycie pod flaga (koniec bitwy
                     'test TAK'): linia testu gracza w kazdej bitwie, linii syntetycznych trafien = agentow zuzycia towarzyszy, od 2. bitwy pod flaga >= 1 czesc
-                    towarzysza z kopia (bez flagi - INFO). HP-LC z --baza-doby: ostatnia linia 'zapis' bazy (pod flaga) wobec pierwszej linii startu logu -
+                    towarzysza z kopia i >= 1 linia testu towarzysza (recenzja U3/R2) (bez flagi - INFO); suma - zmienione sztuki (recenzja R1) w HP-4 (INFO). HP-LC z --baza-doby: ostatnia linia 'zapis' bazy (pod flaga) wobec pierwszej linii startu logu -
                     bohaterow i sztuk rowne, ERROR w logu 0; log bez linii m110hp (bieg na DLL 104) - ERROR 0 INFO, inaczej NIE; bez bazy - INFO.
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
@@ -66278,16 +66279,17 @@ M110HP_RX = {
                       r"przecieki (\d+) \| test (TAK|NIE) \(linii (\d+)\) \| potkniecia (\d+)\.$"),
     "test": re.compile(r"^HP sprzetu \(m110\): test - bohater (.+?) \| (.*)\.$"),
     "tseg": re.compile(r"^slot (\d+) (\S+) HP (\d+(?:\.\d+)?)% " + _M110HP_EN + r": sztuka " + _M110HP_KIND + r" baza (\d+), stan (\d+) -> dokladnie (\d+) \(wzor (\d+)\)"
-                       r"(?:, lancuch Head (\d+) -> (\d+) \((RBM|gra|inny)\)|, MissionWeapon (\d+)( \(bez kopii\))?|, kon agenta kopia (TAK|NIE)(?: (\d+))?)?$"),
+                       r"(?:, lancuch (?:Head|Chest) (\d+) -> (\d+) \((RBM|gra|inny)\)|, MissionWeapon (\d+)( \(bez kopii\))?|, kon agenta kopia (TAK|NIE)(?: (\d+))?)?"
+                       r"(, kopia w sprzecie agenta NIE)?$"),
     "synth": re.compile(r"^HP sprzetu \(m110\): test - syntetyczne trafienia (.+?):((?: slot \d+ \+\d+ pkt,?)+| brak sztuk)\.$"),
-    "save": re.compile(r"^HP sprzetu \(m110\): zapis \| ksiegi towarzyszy: bohaterow (\d+), sztuk (\d+), znakow (\d+) \| pominieci poza druzyna (\d+)\.$"),
+    "save": re.compile(r"^HP sprzetu \(m110\): zapis \| ksiegi towarzyszy: bohaterow (\d+), sztuk (\d+), znakow (\d+) \| usunieci \(nie zyja\) (\d+)\.$"),
     "change": re.compile(r"^Zuzycie towarzysza \(m110\): (.+?) slot (\d+) (\S+) -> (\S+) \| ksiega " + _M110HP_NUM + r"%, poczatek " + _M110HP_ST + r", liczony " + _M110HP_NUM
                          + r"% -> " + _M110HP_ST + r" \(byl " + _M110HP_ST + r"\)\.$"),
     "wear": re.compile(r"^Zuzycie towarzysza \(m110\): (.+?) \| (slot .*)\.$"),
     "wseg": re.compile(r"^slot (\d+) (\S+) ksiega " + _M110HP_NUM + r" -> " + _M110HP_NUM + r" \(trafienia " + _M110HP_NUM + r" pkt, (?:pula (\d+)|solidnosc "
                        + _M110HP_NUM + r"); (?:poczatek " + _M110HP_ST + r", liczony " + _M110HP_NUM + r" -> " + _M110HP_ST + r", byl " + _M110HP_ST + r"|(pekla))\)$"),
     "sum": re.compile(r"^Zuzycie towarzyszy \(m110\): bitwa \| bohaterow z trafieniami (\d+) \(pominieci (\d+)\), zuzycie celowane (\d+(?:\.\d+)?) pkt, sztuk w ksiegach "
-                      r"(\d+), nowy stan (\d+), bledy (\d+)\.$"),
+                      r"(\d+), nowy stan (\d+), zmienione sztuki (\d+) \(pkt (\d+(?:\.\d+)?)\), bledy (\d+)\.$"),
     "drop": re.compile(r"^Zuzycie towarzyszy \(m110\): (poczatek bitwy|bitwa przegrana albo opuszczona) - (\d+(?:\.\d+)?) pkt z ksiag ciosow przepada \(bohaterow (\d+)\)\.$"),
     "day": re.compile(r"\bdoba (\d+)\b"),
 }
@@ -66298,26 +66300,31 @@ M110HP_TEST = {
              "towarzyszy: bohaterow 1 (w druzynie 1), sztuk 2, bledne wiersze 0 | krzywa 90/2: 50 przy 41/56/78% -> 34/41/47, stan Damaged 42 - OK | potkniecia 0.",
     "battle_p": "HP sprzetu (m110): bitwa 1 | bohater Jon Snow (gracz) | slot 5 nw_helmet glowa 30 -> 20 (HP 41.0%, Damaged, poczatek stan; stan dalby 25) ; slot 6 "
                 "nw_mail tulow 50 -> 41 (HP 56.0%, Damaged, poczatek stan; stan dalby 42) ; slot 11 nw_barding kon 30 -> 5 (HP 5.0%, Wrecked, poczatek stan; stan "
-                "dalby 5) ; slot 0 nw_sword ciecie 40 -> 39 (HP 92.0%, Sound, poczatek sprawny; stan dalby 40) | zuzycie z trafien TAK.",
+                "dalby 5) ; slot 0 nw_sword ciecie 40 -> 39 (HP 82.0%, Sound, poczatek sprawny; stan dalby 40) | zuzycie z trafien TAK.",
     "battle_c0": "HP sprzetu (m110): bitwa 1 | bohater Urrathon (towarzysz) | bez kopii | zuzycie z trafien TAK.",
     "test": "HP sprzetu (m110): test - bohater Jon Snow | slot 5 nw_helmet HP 41.0% Damaged: sztuka glowa baza 30, stan 25 -> dokladnie 20 (wzor 20), lancuch Head 25 -> "
-            "20 (RBM) ; slot 6 nw_mail HP 56.0% Damaged: sztuka tulow baza 50, stan 42 -> dokladnie 41 (wzor 41) ; slot 11 nw_barding HP 5.0% Wrecked: sztuka kon "
-            "baza 30, stan 5 -> dokladnie 5 (wzor 5), kon agenta kopia TAK 5 ; slot 0 nw_sword HP 92.0% Sound: sztuka ciecie baza 40, stan 40 -> dokladnie 39 (wzor "
+            "20 (RBM) ; slot 6 nw_mail HP 56.0% Damaged: sztuka tulow baza 50, stan 42 -> dokladnie 41 (wzor 41), lancuch Chest 42 -> 41 (RBM) ; slot 11 nw_barding HP 5.0% Wrecked: sztuka kon "
+            "baza 30, stan 5 -> dokladnie 5 (wzor 5), kon agenta kopia TAK 5 ; slot 0 nw_sword HP 82.0% Sound: sztuka ciecie baza 40, stan 40 -> dokladnie 39 (wzor "
             "39), MissionWeapon 39.",
-    "synth": "HP sprzetu (m110): test - syntetyczne trafienia Urrathon: slot 6 +600 pkt, slot 0 +10 pkt.",
+    "test_c": "HP sprzetu (m110): test - bohater Urrathon | slot 6 nw_mail2 HP 87.1% Sound: sztuka tulow baza 50, stan 50 -> dokladnie 50 (wzor 50), lancuch "
+              "Chest 50 -> 50 (RBM) ; slot 0 urr_axe HP 92.4% Sound: sztuka ciecie baza 40, stan 40 -> dokladnie 40 (wzor 40), MissionWeapon 40.",
+    "test_c2": "HP sprzetu (m110): test - bohater Urrathon | slot 6 nw_mail2 HP 74.3% Damaged: sztuka tulow baza 50, stan 42 -> dokladnie 47 (wzor 47), lancuch "
+               "Chest 42 -> 47 (RBM) ; slot 11 urr_barding HP 66.0% Damaged: sztuka kon baza 30, stan 25 -> dokladnie 26 (wzor 26), kon agenta kopia TAK 26.",
+    "synth": "HP sprzetu (m110): test - syntetyczne trafienia Urrathon: slot 6 +600 pkt, slot 11 +600 pkt, slot 0 +10 pkt.",
     "end": "HP sprzetu (m110): koniec bitwy 1 | bohaterow z agentem 2, z kopiami 1, niezgodny sprzet 0 (sloty 0) | kopii 4 (neutralnych 1, przycietych 0, kon agenta 1) | "
            "zuzycie towarzyszy: agentow 1 (bez zgodnej zbroi 0), pkt 611.0 | przecieki 0 | test TAK (linii 1) | potkniecia 0.",
     "wear": "Zuzycie towarzysza (m110): Urrathon | slot 6 nw_mail2 ksiega 100.00 -> 87.14 (trafienia 600.00 pkt, pula 4665; poczatek sprawny, liczony 87.14 -> sprawny, "
             "byl sprawny) ; slot 0 urr_axe ksiega 100.00 -> 92.36 (trafienia 11.00 pkt, solidnosc 1.440; poczatek sprawny, liczony 92.36 -> sprawny, byl sprawny).",
-    "sum": "Zuzycie towarzyszy (m110): bitwa | bohaterow z trafieniami 1 (pominieci 0), zuzycie celowane 611.0 pkt, sztuk w ksiegach 2, nowy stan 0, bledy 0.",
-    "battle_c1": "HP sprzetu (m110): bitwa 2 | bohater Urrathon (towarzysz) | slot 6 nw_mail2 tulow 50 -> 49 (HP 87.1%, Sound, poczatek sprawny; stan dalby 50) ; slot 0 "
-                 "urr_axe ciecie 40 -> 39 (HP 92.4%, Sound, poczatek sprawny; stan dalby 40) | zuzycie z trafien TAK.",
+    "sum": "Zuzycie towarzyszy (m110): bitwa | bohaterow z trafieniami 1 (pominieci 0), zuzycie celowane 611.0 pkt, sztuk w ksiegach 2, nowy stan 0, zmienione sztuki 0 "
+           "(pkt 0.0), bledy 0.",
+    "battle_c1": "HP sprzetu (m110): bitwa 2 | bohater Urrathon (towarzysz) | slot 6 nw_mail2 tulow 50 -> 50 (HP 87.1%, Sound, poczatek sprawny; stan dalby 50) ; slot 0 "
+                 "urr_axe ciecie 40 -> 40 (HP 92.4%, Sound, poczatek sprawny; stan dalby 40) | zuzycie z trafien TAK.",
     "change": "Zuzycie towarzysza (m110): Urrathon slot 6 nw_mail2 -> arm_chain_damaged | ksiega 74.28%, poczatek sprawny, liczony 74.28% -> uszkodzony (byl sprawny).",
     "wear2": "Zuzycie towarzysza (m110): Urrathon | slot 6 nw_mail2 ksiega 87.14 -> 74.28 (trafienia 600.00 pkt, pula 4665; poczatek sprawny, liczony 74.28 -> uszkodzony, "
              "byl sprawny).",
     "battle_c2": "HP sprzetu (m110): bitwa 3 | bohater Urrathon (towarzysz) | slot 6 nw_mail2 tulow 50 -> 47 (HP 74.3%, Damaged, poczatek stan; stan dalby 42) | "
                  "zuzycie z trafien TAK.",
-    "save": "HP sprzetu (m110): zapis | ksiegi towarzyszy: bohaterow 1, sztuk 2, znakow 64 | pominieci poza druzyna 0.",
+    "save": "HP sprzetu (m110): zapis | ksiegi towarzyszy: bohaterow 1, sztuk 2, znakow 64 | usunieci (nie zyja) 0.",
     "drop": "Zuzycie towarzyszy (m110): bitwa przegrana albo opuszczona - 120.0 pkt z ksiag ciosow przepada (bohaterow 1).",
 }
 
@@ -66333,6 +66340,11 @@ def m110hp_sf(d, mx, ex):
 
 def m110hp_val(b, sf):
     return max(1, int(b * sf + 1e-9))   # podloga (wartosci dodatnie) jak Math.Floor w kodzie C#
+
+
+def m110hp_pen(x, sf):
+    """Sztuka sprawna (oryginal brak albo dobra jakosc) - HeroHp.Exact po recenzji U1: X minus kara zaokraglona w dol (najmniejsza rysa nie zabiera punktu)."""
+    return max(1, x - int(x * (1.0 - sf) + 1e-9))
 
 
 def m110hp_of(d):
@@ -66382,11 +66394,16 @@ def m110hp_seg_err(m, curve):
     if not m110hp_inside(d, st):
         err.append("HP %.1f%% poza przedzialem %s" % (d, en))
     sf = m110hp_sf(d, mx, ex)
-    if how == "dobry":
-        want = m110hp_val(x, sf)
+    if how in ("dobry", "sprawny"):
+        xr = x if how == "dobry" else b
+        want = m110hp_pen(xr, sf)
+        if xr * (1.0 - sf) < 0.9 and e != xr:   # recenzja U1: kara ponizej punktu - pelna wartosc scisle
+            err.append("sprawna %s %d -> %d przy karze %.2f pkt (HP %.1f%%)" % (kind, xr, e, xr * (1.0 - sf), d))
+        if how == "sprawny" and abs(b - x) > 1:
+            err.append("stan dalby %d != %d" % (x, b))
     else:
         want = m110hp_val(b, sf)
-        wx = b if how == "sprawny" else m110hp_val(b, m110hp_sf(M110HP_VALUE[st] * 100.0, mx, ex))
+        wx = m110hp_val(b, m110hp_sf(M110HP_VALUE[st] * 100.0, mx, ex))
         if abs(wx - x) > 1:
             err.append("stan dalby %d != %d" % (x, wx))
     if abs(want - e) > 1:
@@ -66394,14 +66411,20 @@ def m110hp_seg_err(m, curve):
     return err
 
 
-def m110hp_tseg_err(m, curve):
-    """HP-3: czesc linii testu -> lista bledow (getter = wzor = krzywa z bazy; lancuch Head (RBM) = sztuka; MissionWeapon i kon agenta = getter)."""
+def m110hp_tseg_err(m, curve, how=None):
+    """HP-3: czesc linii testu -> lista bledow (getter = wzor = krzywa; lancuch Head / Chest (RBM) = sztuka; MissionWeapon i kon agenta = getter; kopia w
+    sprzecie agenta). how - poczatek z linii bitwy tej misji (sprawny / dobry / stan); brak - wedlug stanu (Sound - galaz sztuki sprawnej)."""
     g = m.groups()
     slot, iid, d, en, kind, b, x, got, wz = g[0], g[1], float(g[2]), g[3], g[4], int(g[5]), int(g[6]), int(g[7]), int(g[8])
     st = M110HP_EN.index(en)
     sf = m110hp_sf(d, curve[0], curve[1])
-    want = m110hp_val(x, sf) if (st == 0 and x != b) else m110hp_val(b, sf)
+    sound = how in ("sprawny", "dobry") if how else st == 0
+    want = m110hp_pen(x, sf) if sound else m110hp_val(b, sf)
     err = []
+    if sound and x * (1.0 - sf) < 0.9 and got != x:   # recenzja U1: kara ponizej punktu - pelna wartosc scisle
+        err.append("sprawna dokladnie %d != %d przy karze %.2f pkt" % (got, x, x * (1.0 - sf)))
+    if g[16] is not None:   # recenzja U3: kopii nie ma w sprzecie agenta
+        err.append("kopii brak w sprzecie agenta")
     if abs(got - wz) > 1:
         err.append("dokladnie %d != wzor %d" % (got, wz))
     if abs(wz - want) > 1:
@@ -66498,6 +66521,18 @@ def m110hp_selftest():
     for sg in tsegs:
         if m110hp_tseg_err(sg, curve):
             return "test: %s" % m110hp_tseg_err(sg, curve)
+    for k in ("test_c", "test_c2"):   # recenzja U3/R2: linie testu towarzysza (lancuch Chest, kon agenta)
+        tc = M110HP_RX["test"].match(T[k])
+        tcs = m110hp_segs(tc.group(2), M110HP_RX["tseg"]) if tc else None
+        if not tcs or len(tcs) != 2:
+            return "%s: brak dopasowania" % k
+        for sg in tcs:
+            if m110hp_tseg_err(sg, curve):
+                return "%s: %s" % (k, m110hp_tseg_err(sg, curve))
+    tm = M110HP_RX["test"].match(T["test_c2"].replace("kopia TAK 26.", "kopia TAK 26, kopia w sprzecie agenta NIE."))
+    tms = m110hp_segs(tm.group(2), M110HP_RX["tseg"]) if tm else None
+    if not tms or not m110hp_tseg_err(tms[-1], curve):
+        return "test: brak kopii w sprzecie agenta nie wykryty"
     if not M110HP_RX["synth"].match(T["synth"]):
         return "syntetyczne: brak dopasowania"
     e = M110HP_RX["end"].match(T["end"])
@@ -66521,6 +66556,9 @@ def m110hp_selftest():
     bad = M110HP_RX["battle"].match(T["battle_p"].replace("50 -> 41", "50 -> 43"))
     if not bad or not any(m110hp_seg_err(sg, curve) for sg in m110hp_segs(bad.group(4), M110HP_RX["seg"])):
         return "bitwa: blad +2 nie wykryty"
+    u1 = M110HP_RX["battle"].match(T["battle_c1"].replace("tulow 50 -> 50", "tulow 50 -> 49"))
+    if not u1 or not any(m110hp_seg_err(sg, curve) for sg in m110hp_segs(u1.group(4), M110HP_RX["seg"])):
+        return "bitwa: sprawna 50 -> 49 przy karze ponizej punktu nie wykryta (recenzja U1)"
     return None
 
 
@@ -66539,10 +66577,13 @@ def m110hp_units():
             e.append("przyciecie %g w %s -> %g (oczekiwane %g)" % (d, M110HP_STATES[st], m110hp_clip(d, st), want))
     if m110hp_val(30, m110hp_sf(0.1, mx, ex)) != 3:
         e.append("d 0.1: 30 -> %d (oczekiwane 3)" % m110hp_val(30, m110hp_sf(0.1, mx, ex)))
-    if m110hp_val(55, m110hp_sf(56.0, mx, ex)) != 45:
-        e.append("dobra jakosc 55 przy 56%% -> %d (oczekiwane 45)" % m110hp_val(55, m110hp_sf(56.0, mx, ex)))
-    if m110hp_val(40, m110hp_sf(92.0, mx, ex)) != 39 or m110hp_val(40, m110hp_sf(100.0, mx, ex)) != 40:
-        e.append("sprawna neutralna 40 przy 92/100%")
+    if m110hp_pen(55, m110hp_sf(85.0, mx, ex)) != 54:
+        e.append("dobra jakosc 55 przy 85%% -> %d (oczekiwane 54)" % m110hp_pen(55, m110hp_sf(85.0, mx, ex)))
+    if m110hp_pen(40, m110hp_sf(92.0, mx, ex)) != 40 or m110hp_pen(40, m110hp_sf(100.0, mx, ex)) != 40 or m110hp_pen(40, m110hp_sf(82.0, mx, ex)) != 39:
+        e.append("sprawna neutralna 40 przy 92/100/82%")
+    for b, d, want in ((50, 99.9, 50), (8, 99.94, 8), (50, 95.0, 50), (50, 85.0, 49), (50, 80.01, 49), (8, 81.0, 8)):   # recenzja U1
+        if m110hp_pen(b, m110hp_sf(d, mx, ex)) != want:
+            e.append("sprawna %d przy %g%% -> %d (oczekiwane %d)" % (b, d, m110hp_pen(b, m110hp_sf(d, mx, ex)), want))
     b = max(0.0, 100.0 - 480.0 * 100.0 / 2439)
     if abs(b - 80.32) > 0.01:
         e.append("pula 2439, 480 pkt -> %.2f (oczekiwane 80.32)" % b)
@@ -66555,13 +66596,18 @@ def m110hp_units():
     return "; ".join(e) if e else None
 
 
+def m110hp_cur(n):
+    """Stan biezacej bitwy przy zbieraniu: linie testu (gracz / towarzysz z linii bitwy), syntetyczne, czesci towarzyszy, poczatek czesci (sprawny/dobry/stan)."""
+    return {"n": n, "test": 0, "test_p": 0, "test_c": 0, "synth": 0, "comp_seg": 0, "kinds": {}, "how": {}}
+
+
 def m110hp_collect(logp):
     """m110hp: przebieg logu (strumieniowo) -> linie startu, bitwy, testu, konca, zuzycia towarzyszy, zapisu, bledy; czesci z krzywa ostatniej linii startu."""
     D = {"start": [], "segs": [], "battles": [], "tests": [], "synth": [], "ends": [], "wear": [], "change": [], "sums": [], "drops": [], "save": [], "bad": [],
          "err": 0, "err1": None, "errall": 0, "days": set(), "cont": [], "nohero": 0}
     curve = (90.0, 2.0)
     last = {}          # (bohater, slot, id) -> (liczony, stan) z ostatniej linii zuzycia (ciaglosc)
-    cur = {"n": None, "test": 0, "synth": 0, "comp_seg": 0}
+    cur = m110hp_cur(None)
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\r\n"))
@@ -66591,10 +66637,12 @@ def m110hp_collect(logp):
                         continue
                     n, who, kind = int(mm.group(1)), mm.group(2), mm.group(3)
                     if cur["n"] != n:
-                        cur = {"n": n, "test": 0, "synth": 0, "comp_seg": 0}
+                        cur = m110hp_cur(n)
                     D["battles"].append((n, who, kind, len(segs)))
+                    cur["kinds"][who] = kind
                     for sg in segs:
                         D["segs"].append((sg, curve, who, kind))
+                        cur["how"][(who, int(sg.group(1)))] = sg.group(8)
                         if kind == "towarzysz":
                             cur["comp_seg"] += 1
                             key = (who, int(sg.group(1)), sg.group(2))
@@ -66609,7 +66657,12 @@ def m110hp_collect(logp):
                         D["bad"].append(s[:160])
                         continue
                     cur["test"] += 1
-                    D["tests"].append((cur["n"], [(sg, curve) for sg in segs]))
+                    tw = mm.group(1)
+                    if cur["kinds"].get(tw) == "towarzysz":
+                        cur["test_c"] += 1
+                    else:
+                        cur["test_p"] += 1
+                    D["tests"].append((cur["n"], [(sg, curve, cur["how"].get((tw, int(sg.group(1))))) for sg in segs]))
                 elif body.startswith("test - syntetyczne"):
                     if M110HP_RX["synth"].match(s):
                         cur["synth"] += 1
@@ -66626,8 +66679,9 @@ def m110hp_collect(logp):
                     same = cur["n"] == n
                     D["ends"].append({"n": n, "agents": int(g[1]), "copies": int(g[5]), "wear": int(g[9]), "leaks": int(g[12]), "test": g[13] == "TAK",
                                       "tlines": int(g[14]), "stum": int(g[15]), "seen_test": cur["test"] if same else 0,
-                                      "seen_synth": cur["synth"] if same else 0, "comp_seg": cur["comp_seg"] if same else 0})
-                    cur = {"n": None, "test": 0, "synth": 0, "comp_seg": 0}
+                                      "seen_synth": cur["synth"] if same else 0, "comp_seg": cur["comp_seg"] if same else 0,
+                                      "seen_test_p": cur["test_p"] if same else 0, "comp_test": cur["test_c"] if same else 0})
+                    cur = m110hp_cur(None)
                 elif body.startswith("zapis "):
                     mm = M110HP_RX["save"].match(s)
                     if mm:
@@ -66690,18 +66744,18 @@ def m110hp_rows(rep, D, basep=None):
             got = [int(x[16]), int(x[17]), int(x[18]), int(x[19])]
             if x[20] != "OK" or any(abs(a - b) > 1 for a, b in zip(got, want)):
                 errs.append("krzywa %s/%s: %s != %s (%s)" % (x[14], x[15], got, want, x[20]))
-            if x[0] == "TAK" and x[7] != "TAK":
-                errs.append("ochrona TAK, latka %s" % x[7])
+            if (x[0] == "TAK" or x[4] == "TAK") and x[7] != "TAK":   # recenzja R3: rejestracja do zuzycia towarzyszy idzie tez przez te latke
+                errs.append("ochrona %s, zuzycie towarzyszy %s, latka %s" % (x[0], x[4], x[7]))
         last = D["start"][-1]
         rep.add(nm0, "linii %d, ostatnia: ochrona %s, zuzycie towarzyszy %s, latka %s (inne: %s), ksiega gracza %s, ksiegi towarzyszy %s (w druzynie %s, sztuk %s, "
                      "bledne %s), krzywa %s/%s -> %s/%s/%s stan %s %s%s" % (len(D["start"]), last[0], last[4], last[7], last[8], last[9], last[10], last[11], last[12],
                                                                           last[13], last[14], last[15], last[16], last[17], last[18], last[19], last[20],
                                                                           " | " + "; ".join(errs[:3]) if errs else ""),
-                "ochrona TAK - latka TAK; krzywa = wyliczona z 'krzywa X/Y' (+-1), OK - w kazdej linii", not errs)
+                "ochrona albo zuzycie towarzyszy TAK - latka TAK; krzywa = wyliczona z 'krzywa X/Y' (+-1), OK - w kazdej linii", not errs)
     # HP-1 bledy, potkniecia, przecieki
     stum = sum(int(x[21]) for x in D["start"]) + sum(e["stum"] for e in D["ends"])
     leaks = sum(e["leaks"] for e in D["ends"])
-    berr = sum(int(x[5]) for x in D["sums"])
+    berr = sum(int(x[7]) for x in D["sums"])
     rep.add("HP-1: ERROR HeroHp / HeroBook / arm_condition_heroes, potkniecia, przecieki kopii, bledy zuzycia towarzyszy, zly format",
             "ERROR %d%s, potkniecia %d, przecieki %d, bledy zuzycia %d, zly format %d%s" % (D["err"], " (" + D["err1"] + ")" if D["err1"] else "", stum, leaks, berr,
                                                                                          len(D["bad"]), " (" + D["bad"][0] + ")" if D["bad"] else ""),
@@ -66722,14 +66776,14 @@ def m110hp_rows(rep, D, basep=None):
     # HP-3 pomiar testowy
     terr, tn, rbm = [], 0, 0
     for n, segs in D["tests"]:
-        for sg, curve in segs:
+        for sg, curve, how in segs:
             tn += 1
             if sg.group(12) == "RBM":
                 rbm += 1
-            e = m110hp_tseg_err(sg, curve)
+            e = m110hp_tseg_err(sg, curve, how)
             if e:
                 terr.append("bitwa %s slot %s: %s" % (n, sg.group(1), "; ".join(e)))
-    nm3 = "HP-3: pomiar testowy (armoury-hp.flag) - getter = wzor = krzywa, lancuch Head (RBM), MissionWeapon i kon agenta z kopia"
+    nm3 = "HP-3: pomiar testowy (armoury-hp.flag) - gracz i towarzysze: getter = wzor = krzywa, lancuch Head / Chest (RBM), MissionWeapon i kon agenta z kopia"
     if not D["tests"]:
         rep.add(nm3, "bez linii testu (bieg bez flagi)", "100% czesci (bez flagi - INFO)", None)
     else:
@@ -66743,21 +66797,25 @@ def m110hp_rows(rep, D, basep=None):
     if not D["wear"] and not D["change"]:
         rep.add(nm4, "brak linii zuzycia towarzysza (sum %d, przepada %d)" % (len(D["sums"]), len(D["drops"])), "100% linii (brak - INFO)", None)
     else:
-        rep.add(nm4, "czesci %d, zmian stanu %d, niezgodnych %d%s | ciaglosc: sprawdzonych %d, niezgodnych %d%s" % (
+        rep.add(nm4, "czesci %d, zmian stanu %d, niezgodnych %d%s | ciaglosc: sprawdzonych %d, niezgodnych %d%s | zmienione sztuki %d (pkt %.1f)" % (
             len(D["wear"]), len(D["change"]), len(werr), " (" + "; ".join(werr[:3]) + ")" if werr else "", len(D["cont"]), len(cerr),
-            " (" + "; ".join(cerr[:3]) + ")" if cerr else ""), "100% linii, ciaglosc +-0.1", not werr and not cerr)
+            " (" + "; ".join(cerr[:3]) + ")" if cerr else "", sum(int(x[5]) for x in D["sums"]), sum(x[6] for x in D["sums"])),
+            "100% linii, ciaglosc +-0.1", not werr and not cerr)
     # HP-5 pokrycie pod flaga
     fl = [e for e in D["ends"] if e["test"]]
-    nm5 = "HP-5: pokrycie testu - linia testu gracza w kazdej bitwie, syntetyczne trafienia kazdego towarzysza, linia towarzysza z ksiega (od 2. bitwy)"
+    nm5 = "HP-5: pokrycie testu - linia testu gracza w kazdej bitwie, syntetyczne trafienia kazdego towarzysza, linia bitwy i testu towarzysza z ksiega (od 2. bitwy)"
     if not fl:
-        rep.add(nm5, "bez bitew pod flaga", "flaga: test gracza i syntetyczne w kazdej bitwie, >= 1 linia towarzysza z kopia od 2. bitwy (bez flagi - INFO)", None)
+        rep.add(nm5, "bez bitew pod flaga", "flaga: test gracza i syntetyczne w kazdej bitwie, >= 1 czesc i >= 1 linia testu towarzysza od 2. bitwy (bez flagi - INFO)",
+                None)
     else:
-        notest = [e["n"] for e in fl if e["seen_test"] < 1 or e["tlines"] < 1]
+        notest = [e["n"] for e in fl if e["seen_test_p"] < 1 or e["tlines"] < 1]
         nosyn = [e["n"] for e in fl if e["seen_synth"] != e["wear"]]
         comp = sum(e["comp_seg"] for e in fl[1:])
-        ok = not notest and not nosyn and (len(fl) < 2 or comp > 0)
-        rep.add(nm5, "bitew pod flaga %d: bez linii testu %s, syntetyczne != agentow %s, czesci towarzyszy z kopia od 2. bitwy %d" % (
-            len(fl), notest or "brak", nosyn or "brak", comp), "test w kazdej, syntetyczne = agentow, >= 1 czesc towarzysza od 2. bitwy", ok)
+        ctest = sum(e["comp_test"] for e in fl[1:])   # recenzja U3/R2: pomiar getterami takze u towarzysza
+        ok = not notest and not nosyn and (len(fl) < 2 or (comp > 0 and ctest > 0))
+        rep.add(nm5, "bitew pod flaga %d: bez linii testu gracza %s, syntetyczne != agentow %s, czesci towarzyszy z kopia od 2. bitwy %d, linii testu towarzyszy od 2. "
+                     "bitwy %d" % (len(fl), notest or "brak", nosyn or "brak", comp, ctest),
+                "test gracza w kazdej, syntetyczne = agentow, >= 1 czesc i >= 1 linia testu towarzysza od 2. bitwy", ok)
     # HP-LC cofniecie (zapis nowej DLL -> wczytanie)
     nml = "HP-LC: zapis ksiag towarzyszy -> wczytanie (nowa DLL albo 104)"
     if basep:
@@ -66785,7 +66843,8 @@ def m110hp_synth():
     import shutil
     T = M110HP_TEST
     good = [T["start"], T["battle_p"], T["battle_c0"], T["test"], T["synth"], T["end"], T["wear"], T["sum"],
-            T["battle_p"].replace("bitwa 1", "bitwa 2"), T["battle_c1"], T["test"], T["synth"], T["end"].replace("koniec bitwy 1", "koniec bitwy 2"),
+            T["battle_p"].replace("bitwa 1", "bitwa 2"), T["battle_c1"], T["test"], T["test_c"], T["synth"],
+            T["end"].replace("koniec bitwy 1", "koniec bitwy 2").replace("(linii 1)", "(linii 2)"),
             T["change"], T["wear2"], T["sum"].replace("nowy stan 0", "nowy stan 1"), T["battle_c2"], T["save"], T["drop"]]
 
     def run(kind, base=None):
