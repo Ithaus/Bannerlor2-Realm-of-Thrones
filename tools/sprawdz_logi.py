@@ -57742,7 +57742,7 @@ M109PRZES_RX = {
     "lairyes": re.compile(r"^kryjowka (\S+) \(kultura (\S+), zajeta (TAK|NIE), wypatrzona przed (TAK|NIE) -> po (TAK|NIE), skad (bohater|banda|kultura), (-?[\d.]+) jedn\. od obozu, flaga (TAK|NIE)\)$"),
     "lairno": re.compile(r"^kryjowka - \(cel (\S+), skad (bohater|banda|kultura)\)$"),
     "death": re.compile(r"^smierc szansa ([\d.]+) \(ranny (TAK|NIE), Forgivable Grievances (TAK|NIE)\), rzut ([\d.]+) -> "
-                        r"(TAK \(zwykly, ksiega ludzi straceni 1\)|TAK \(bohater, zyje (?:TAK|NIE)\)|NIE|zablokowana \(CanHeroDie\)|BLAD)$"),
+                        r"(TAK \(zwykly, ksiega ludzi straceni 1\)|TAK \(bohater, zyje (?:TAK|NIE)(?:, sakiewka \d+ -> gracz)?\)|NIE|zablokowana \(CanHeroDie\)|BLAD)$"),
     "mercy": re.compile(r"^Mercy xp (-?\d+) \((-?\d+) -> (-?\d+)\)$"),
     "rel": re.compile(r"^relacje (-?\d+) x (\d+)"),
     "refuse": re.compile(r"odmowa - (limit|brak grupy|brak kryjowki) \| doba (-?\d+) \| grupa (\S+) \| rodzaj (rozmowa|tortury)"),
@@ -57769,6 +57769,11 @@ M109PRZES_TEST = {   # linie kontrolne - napisy jak w kodzie C# (CampInterrogati
             + _M109PRZES_M45 + ") | szansa 0.6058 = baza 0.1000 + miara 0.1125 + ranny 0.0000 + niewola 0.0600 - tier 0.0000 - bohater 0.0000 + tortury 0.3000 + Lotrostwo 0.0333 "
             "+ Scarface 0.0000 | rzut 0.9900 -> MILCZY | kryjowka - (cel hideout_forest_2, skad kultura) | smierc szansa 0.1500 (ranny NIE, Forgivable Grievances NIE), rzut 0.0000 -> "
             "TAK (zwykly, ksiega ludzi straceni 1) | po 1/1 | Mercy xp -60 (0 -> -60) | relacje -2 x 1 (Ser Test) | plotka TAK | XP Urok +0, Lotrostwo +20 | dzis rozmow 1, tortur 1.",
+    "hero": "proba tortury | doba 108700 | grupa h:bk_hero_1 (Ned the Knife, kultura forest_bandits, tier 3, bohater TAK, wybrany zdrowy, w niewoli 2 dob, przed 1/0) | miara 45 ("
+            + _M109PRZES_M45 + ") | szansa 0.3758 = baza 0.1000 + miara 0.1125 + ranny 0.0000 + niewola 0.0400 - tier 0.0600 - bohater 0.1500 + tortury 0.3000 + Lotrostwo 0.0333 "
+            "+ Scarface 0.0000 | rzut 0.2000 -> MOWI | kryjowka hideout_forest_3 (kultura forest_bandits, zajeta TAK, wypatrzona przed NIE -> po TAK, skad bohater, 80.0 jedn. od obozu, "
+            "flaga TAK) | smierc szansa 0.1200 (ranny NIE, Forgivable Grievances TAK), rzut 0.0500 -> TAK (bohater, zyje NIE, sakiewka 120 -> gracz) | po 0/0 | Mercy xp -60 (-100 -> -160) "
+            "| relacje -2 x 0 | plotka TAK | XP Urok +0, Lotrostwo +30 | dzis rozmow 1, tortur 2.",
     "refuse": "odmowa - limit | doba 108700 | grupa forest_bandit | rodzaj rozmowa.",
     "day": "doba 108701 | rozmowy 1 (mowili 1), tortury 1 (mowili 0, zmarli 1: zwykli 1, bohaterowie 0, zablokowane 0), odmowy 1 | ujawnione kryjowki 1 (bohater 0, banda 1, kultura 0) "
            "| pamiec band 4 (nowe dzis 1) | jency-bandyci grup 2, ludzi 6, bohaterow 0 | potkniecia dzis 0.",
@@ -57819,6 +57824,10 @@ def m109przes_selftest():
     r = R["rel"].search(m.group(31))
     if not r or r.groups() != ("-2", "1"):
         return f"rel: {m.group(31)}"
+    m = R["try"].search(T["hero"])
+    d = R["death"].search(m.group(27)) if m else None
+    if not m or m.group(3, 7, 25) != ("h:bk_hero_1", "TAK", "MOWI") or not d or d.group(5) != "TAK (bohater, zyje NIE, sakiewka 120 -> gracz)" or not R["lairyes"].search(m.group(26)):
+        return f"try (bohater): {m.groups() if m else 'brak dopasowania'}"
     m = R["refuse"].search(T["refuse"])
     if not m or m.groups() != ("limit", "108700", "forest_bandit", "rozmowa"):
         return f"refuse: {m.groups() if m else 'brak dopasowania'}"
@@ -58106,7 +58115,8 @@ def m109przes_synth():
         try:
             logp = os.path.join(tmp, "Armoury-test.log")
             P = "[00:00:00] " + M109PRZES_TAG
-            L = [P + T["start"], P + T["mem"], P + T["talk"], P + T["tort"], P + T["refuse"], "[00:00:00] " + T["poch"], P + T["day"], "[00:00:00] " + M98P_PRE + T["cup"], P + T["test"]]
+            L = [P + T["start"], P + T["mem"], P + T["talk"], P + T["tort"], P + T["refuse"], "[00:00:00] " + T["poch"], P + T["day"], "[00:00:00] " + M98P_PRE + T["cup"], P + T["test"],
+                 P + T["hero"]]
             if bad:
                 L[2] = L[2].replace("szansa 0.3225", "szansa 0.4000")                                    # PRZES-2: szansa != suma
                 L[3] = L[3].replace("| po 1/1 |", "| po 2/1 |")                                          # PRZES-3: smierc bez ubytku

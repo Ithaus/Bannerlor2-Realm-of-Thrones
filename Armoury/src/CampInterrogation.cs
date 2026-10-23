@@ -39,7 +39,8 @@ namespace Armoury
     ///    i plotka w karczmach (Rumours.AddCruelty, wiesc NCruel).
     ///  - LIMIT: jedna rozmowa i jedna tortura na grupe na dobe (czas w menu obozu stoi - przesluchanie nie zjada godzin).
     ///  - UJAWNIENIE jak zwiad gry bez zdarzenia gry (bez 100 XP Zwiadu i drugiego meldunku): Hideout.IsSpotted, Settlement.IsVisible, flaga HideoutSpotter.Mark.
-    ///  - Ekonomia: zero przeplywow zlota i towarow (zabity jeniec = utracony okup).
+    ///  - Ekonomia: zero przeplywow zlota i towarow (zabity jeniec = utracony okup). Wyjatek - zamknieta ekonomia: zabity bohater-bandyta z klanu bez glowy (albo sam glowa)
+    ///    oddaje sakiewke graczowi (gra przy smierci daje ja glowie klanu, a bez glowy GiveGoldAction z odbiorca null - zloto przepadloby); log "sakiewka N -> gracz".
     /// Log "Przesluchanie (m109): " - start sesji, pamiec (pierwsze DetailMax na sesje), kazda proba i odmowa, linia doby; tools/sprawdz_logi.py --grupa m109przes.
     /// Bledy liczone per miejsce (pierwsze 3 i co 50. do Log.Error), nic nie gasimy. Autotest (flaga armoury-przesluch.flag) - CampInterrogation.Test.cs.
     /// </summary>
@@ -493,8 +494,7 @@ namespace Armoury
                 res.MercyBefore = MercyXp();
                 try
                 {
-                    TraitLevelingHelper.OnIncidentResolved(DefaultTraits.Mercy, MercyTorture);
-                    if (res.Died) TraitLevelingHelper.OnIncidentResolved(DefaultTraits.Mercy, MercyDeath);
+                    TraitLevelingHelper.OnIncidentResolved(DefaultTraits.Mercy, res.Died ? MercyTorture + MercyDeath : MercyTorture);   // jeden wpis historii gracza
                 }
                 catch (Exception e) { Stumble("Mercy", e); }
                 res.MercyAfter = MercyXp();
@@ -552,11 +552,26 @@ namespace Armoury
                     return "TAK (zwykly, ksiega ludzi straceni 1)";
                 }
                 if (!g.Hero.CanDie(KillCharacterAction.KillCharacterActionDetail.Murdered)) { res.Blocked = true; _dBlocked++; return "zablokowana (CanHeroDie)"; }
+                // zamknieta ekonomia: gra przy smierci daje sakiewke zabitego glowie jego klanu (GiveGoldAction.ApplyBetweenCharacters); klan bandytow bez glowy (albo glowa = on)
+                // - zloto przepadloby w nicosc (odbiorca null), wiec bierze je gracz, ktory trzyma jenca
+                string purse = "";
+                try
+                {
+                    var h = g.Hero;
+                    var lead = h.Clan != null ? h.Clan.Leader : null;
+                    if (h.Gold > 0 && (lead == null || lead == h || !lead.IsAlive))
+                    {
+                        int gold = h.Gold;
+                        GiveGoldAction.ApplyBetweenCharacters(h, Hero.MainHero, gold, false);   // komunikat zlota gry - gracz widzi, skad zloto
+                        purse = ", sakiewka " + gold + " -> gracz";
+                    }
+                }
+                catch (Exception e) { Stumble("Purse", e); }
                 KillCharacterAction.ApplyByMurder(g.Hero, Hero.MainHero, true);
                 bool dead = !g.Hero.IsAlive;
                 if (dead) { res.Died = true; _dDeadHero++; _sum[4]++; }
                 else { res.Blocked = true; _dBlocked++; }
-                return "TAK (bohater, zyje " + (dead ? "NIE" : "TAK") + ")";
+                return "TAK (bohater, zyje " + (dead ? "NIE" : "TAK") + purse + ")";
             }
             catch (Exception e) { Stumble("Kill", e); return "BLAD"; }
         }
