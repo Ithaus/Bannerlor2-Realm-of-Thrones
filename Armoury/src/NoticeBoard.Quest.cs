@@ -54,9 +54,10 @@ namespace Armoury
     /// banda uszla z bitwy - wpis; kazde zdjecie listu (Settle, OnPartyDestroyed, WatchDaily) zamyka zadanie: gracz rozbil bande - Sukces po wyplacie z Pay, termin -
     /// Nieudane, reszta - Anulowane, zawsze z wpisem. Zapis gry bez naszego typu: BountyBeforeSave (przed SyncData zachowan - MbEvent wola ostatnio dopisanych
     /// najpierw) zdejmuje zadania z QuestManager (_quests i sledzone obiekty z korekta licznika VisualTrackerManager) i z zaznaczenia okna Quests, BountySaveOver
-    /// przywraca; w oknie zapisu kampania nie tyka (MapState: IsSaving - tylko SaveTick). Nieudany zapis - zatrzask do konca sesji. Wczytanie: BountySessionStart
+    /// przywraca; w oknie zapisu kampania nie tyka (MapState: IsSaving - tylko SaveTick). Nieudany zapis z naszymi zadaniami - zatrzask do konca sesji. Wczytanie: BountySessionStart
     /// (OnAfterSessionLaunched - po QuestManager.OnGameLoaded, ktory anulowalby zadanie bez sprawy) odtwarza zadania przyjetych listow; wpisy z dziennika gry po id
-    /// zadania (JournalLogEntry - trzyma tylko id), listy sprzed wgrania dostaja nowy opis. Klucz WatchBountyQuests NIE - zadnych zadan, flaga "p" jak dotad.
+    /// zadania (JournalLogEntry - trzyma tylko id), listy sprzed wgrania dostaja nowy opis; tracker zastepuje nasza flage "p" na bandzie. Klucz WatchBountyQuests NIE -
+    /// zadnych zadan (wpis dziennika gry otwarty, przeczytany), flaga "p" jak dotad; przelaczenie NIE -> TAK w grze odtwarza zadania w dobie.
     /// Linie "Listy goncze - zadania (m109)"; hak autotestu tylko pod plikiem CrashScribe\armoury-list-test.flag (LogGate.Mode 1/2).
     /// </summary>
     internal static partial class NoticeBoard
@@ -72,9 +73,10 @@ namespace Armoury
         private static readonly List<BountyQuest> _bq = new List<BountyQuest>();
         private static BountyQuest _closing;          // zamykane przez nasza logike (BountyClose) - OnFinalize nie liczy go jako "przez gre"
         private static BountyQuest _selSaved;         // zaznaczenie okna Quests zdjete przed zapisem
-        private static bool _bqLatch;                 // nieudany zapis - do konca sesji bez zadan (flaga "p" jak dotad)
+        private static bool _bqLatch;                 // nieudany zapis z naszymi zadaniami albo zaznaczeniem - do konca sesji bez zadan (flaga "p" jak dotad)
         private static bool _bqPending, _bqSaveLine;  // zapis w toku (po OnBeforeSave), linia "zapis" wypisana
         private static bool _bqLoaded;                // sesja z wczytanego zapisu (Import arm_board) - do haka autotestu
+        private static bool _bqKeyWas;                // klucz TAK w poprzedniej dobie (start sesji) - przelaczenie NIE -> TAK w grze odtwarza zadania bez wczytania
         private static int _bqWired;                  // nasluchy zapisu wpiete (OnBeforeSave, OnSaveOver)
         private static int _bqWpisLines, _bqOdtwLines;
         private static int _bdStart, _bdWpis, _bdOk, _bdCancel, _bdFail, _bdGame, _bdGrid, _bdSaves, _bdDet, _bdRe, _bdStumb;
@@ -92,10 +94,10 @@ namespace Armoury
         private static void BountyReset()
         {
             _bq.Clear(); _closing = null; _selSaved = null;
-            _bqLatch = _bqPending = _bqSaveLine = _bqLoaded = false;
+            _bqLatch = _bqPending = _bqSaveLine = _bqLoaded = _bqKeyWas = false;
             _bqWpisLines = _bqOdtwLines = 0; _bqStumbles = 0;
             ZeroBountyDay();
-            _listTest = false; _tSaveWait = false; _tDay0 = -1; _tStage = 0; _tSel = null; _tBattle = null; _tMe = null; _tRestored = 0;
+            _listTest = false; _tSaveWait = false; _tDay0 = -1; _tStage = 0; _tSel = null; _tBattle = null; _tMe = null; _tRestored = 0; _tRestChk = false;
         }
 
         private static void ZeroBountyDay() { _bdStart = _bdWpis = _bdOk = _bdCancel = _bdFail = _bdGame = _bdGrid = _bdSaves = _bdDet = _bdRe = _bdStumb = 0; }
@@ -144,6 +146,15 @@ namespace Armoury
             }
             if (open != null) return open;
             return free;
+        }
+
+        /// <summary>Otwarty wpis dziennika gry listu (ostatni id z otwartym wpisem) - null: zapis bez zadania tego listu (44c03a05 albo klucz NIE) albo tylko zamkniete wpisy.</summary>
+        private static JournalLogEntry OpenEntry(Notice n)
+        {
+            string b = BaseId(n);
+            JournalLogEntry open = null;
+            for (int k = 1; k <= BqMaxIds; k++) { var e = EntryOf(IdAt(b, k)); if (e != null && !e.IsEnded()) open = e; }
+            return open;
         }
 
         // ------------------------------------------------------------ teksty zadania (po angielsku)
@@ -274,6 +285,19 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>Nasza flaga na bandzie (flaga "p" przyjetego listu z zapisu 103.5 albo "Mark the band on the map") zdjeta, gdy zadanie przejmuje bande trackerem - inaczej
+        /// licznik VisualTrackerManager 2 i przelacznik sledzenia w Quests nie zdejmuje znacznika (karta listu z zadaniem nie ma "Take the mark off the map"). Poprawka po
+        /// recenzji; tracker dodany wczesniej (licznik nie spada do 0 - bez migniecia).</summary>
+        private static bool DropFlag(ITrackableCampaignObject o)
+        {
+            var f = o != null ? FlagOf(o) : null;
+            if (f == null) return false;
+            _flags.Remove(f);
+            var vt = Campaign.Current != null ? Campaign.Current.VisualTrackerManager : null;
+            if (vt != null && vt.CheckTracked(o)) vt.RemoveTrackedObject(o);
+            return true;
+        }
+
         private static bool BountyStart(Notice n, string how)
         {
             BountyQuest q = null;
@@ -289,11 +313,15 @@ namespace Armoury
                 _bq.Add(q); n.Quest = q;                   // od razu na liscie - zadanie, ktore weszlo do QuestManager, zawsze zdejmowane przed zapisem
                 q.StartQuest();                            // gra: "Quest started", wpis w dzienniku gry (historia - tylko id zadania)
                 q.AddLog(new TextObject("{=!}" + Brief(n)), true);
-                bool tr = false;
-                if (n.Mp != null && n.Mp.IsActive) { q.AddTrackedObject(n.Mp); tr = true; }
+                bool tr = false, fd = false;
+                if (n.Mp != null && n.Mp.IsActive)
+                {
+                    q.AddTrackedObject(n.Mp); tr = true;
+                    try { ResolveFlags(); fd = DropFlag(n.Mp); } catch (Exception fe) { BStumble("Start(flaga)", fe); }   // tracker zastepuje nasza flage na tej bandzie
+                }
                 _bdStart++;
                 Log.Info(PQ + "start - " + id + " (" + n.Town + " " + n.Band + ", rodzaj " + n.Kind + ", kwota " + n.Sum + ", termin doba " + n.Due + ", tracker " + YN(tr)
-                         + ", special " + YN(q.IsSpecialQuest) + ", droga " + how + ") - " + q.Title);
+                         + ", flaga p zdjeta " + YN(fd) + ", special " + YN(q.IsSpecialQuest) + ", droga " + how + ") - " + q.Title);
                 return true;
             }
             catch (Exception e)
@@ -426,7 +454,7 @@ namespace Armoury
             if (c == null) return;
             var qm = c.QuestManager;
             int n = 0, tr = 0, fix = 0, orphan = 0;
-            bool sel = false;
+            bool sel = false, selLive = false;
             _bdSaves++;
             try
             {
@@ -455,17 +483,18 @@ namespace Armoury
             {
                 var vdt = c.GetCampaignBehavior<IViewDataTracker>();
                 var s = vdt != null ? vdt.GetQuestSelection() as BountyQuest : null;
-                if (s != null) { _selSaved = s; vdt.SetQuestSelection(null); sel = true; }
+                if (s != null) { _selSaved = s; vdt.SetQuestSelection(null); sel = true; selLive = s.IsOngoing && _bq.Contains(s); }   // zakonczone zaznaczenie nie wraca
             }
             catch (Exception e) { BStumble("BeforeSave(wybor)", e); }
             _bdGrid += orphan; _bdDet += n;
             _bqPending = true;
             _bqSaveLine = n > 0 || sel || orphan > 0;
-            if (_bqSaveLine) Log.Info(PQ + "zapis - odpiete " + n + " (tracker " + tr + ", korekta flag " + fix + (orphan > 0 ? ", spoza listy " + orphan : "") + "), wybor okna Quests wyzerowany " + YN(sel));
+            if (_bqSaveLine) Log.Info(PQ + "zapis - odpiete " + n + " (tracker " + tr + ", korekta flag " + fix + (orphan > 0 ? ", spoza listy " + orphan : "") + "), wybor okna Quests wyzerowany " + YN(sel) + (sel ? " (trwa " + YN(selLive) + ")" : ""));
         }
 
         /// <summary>CampaignEvents.OnSaveOverEvent: zapis udany i klucz TAK - zadania czynnych przyjetych listow z powrotem w QuestManager (z trackerem), zaznaczenie wraca;
-        /// zapis nieudany - zatrzask: zadania zostaja odpiete do wczytania, ich bandy dostaja flage, nowe listy - flaga zamiast zadania.</summary>
+        /// zapis nieudany z naszymi zadaniami albo zaznaczeniem w oknie zapisu - zatrzask: zadania zostaja odpiete do wczytania, ich bandy dostaja flage, nowe listy - flaga
+        /// zamiast zadania; nieudany bez naszych obiektow (blad pliku, cudzy mod) - nie z naszej winy, bez zatrzasku (poprawka po recenzji).</summary>
         internal static void BountySaveOver(bool ok, string name)
         {
             if (!_bqPending) return;
@@ -477,16 +506,21 @@ namespace Armoury
             foreach (var q in _bq) if (q.Detached) m++;
             if (!ok)
             {
-                _bqLatch = true;
                 int fl = 0;
-                ResolveFlags();   // flagi z zapisu po id - bez drugiej flagi na tej samej bandzie
-                foreach (var q in _bq)
+                if (m > 0 || _selSaved != null)
                 {
-                    var nt = q.Tag as Notice;
-                    try { if (q.Detached && nt != null && ReferenceEquals(nt.Quest, q) && nt.Taken && Live(nt) && FlagTaken(nt)) fl++; } catch (Exception e) { BStumble("SaveOver(flaga)", e); }
+                    _bqLatch = true;
+                    ResolveFlags();   // flagi z zapisu po id - bez drugiej flagi na tej samej bandzie
+                    foreach (var q in _bq)
+                    {
+                        var nt = q.Tag as Notice;
+                        try { if (q.Detached && nt != null && ReferenceEquals(nt.Quest, q) && nt.Taken && Live(nt) && FlagTaken(nt)) fl++; } catch (Exception e) { BStumble("SaveOver(flaga)", e); }
+                    }
                 }
                 _selSaved = null;
-                Log.Info(PQ + "po zapisie NIEUDANY - zadania zostaja odpiete do wczytania (" + m + "); nowe listy bez zadan (flaga na mapie), flagi dla odpietych " + fl + " (zapis " + (name ?? "?") + ")");
+                Log.Info(PQ + "po zapisie NIEUDANY - odpiete " + m + ", zatrzask " + YN(_bqLatch)
+                         + (_bqLatch ? " - zadania zostaja odpiete do wczytania; nowe listy bez zadan (flaga na mapie), flagi dla odpietych " + fl : " - w zapisie nie bylo naszych zadan, zadania dalej")
+                         + " (zapis " + (name ?? "?") + ")");
                 if (_listTest && _tSaveWait) { _tSaveWait = false; Log.Info(PQ + "TEST po zapisie - zapis NIEUDANY - NIE"); }
                 return;
             }
@@ -495,16 +529,7 @@ namespace Armoury
                 foreach (var q in _bq)
                 {
                     if (!q.Detached) continue;
-                    var nt = q.Tag as Notice;
-                    if (!q.IsOngoing || nt == null || !ReferenceEquals(nt.Quest, q) || !nt.Taken || !_notices.Contains(nt)) continue;   // bez listu - siatka doby
-                    try
-                    {
-                        qm.OnQuestStarted(q);   // tylko _quests.Add - bez zdarzen
-                        q.Detached = false;
-                        if (q.Saved != null) foreach (var o in q.Saved) if (o != null) { q.AddTrackedObject(o); tr++; }
-                        q.Saved = null;
-                        r++;
-                    }
+                    try { if (Reattach(q, qm, ref tr)) r++; }   // bez listu - siatka doby
                     catch (Exception e) { BStumble("SaveOver", e); }
                 }
                 try
@@ -524,77 +549,127 @@ namespace Armoury
             if (_listTest && _tSaveWait) { _tSaveWait = false; TestAfterSave(m, r, sel); }
         }
 
+        /// <summary>Odpiete zadanie czynnego przyjetego listu z powrotem w QuestManager (tylko _quests.Add - bez zdarzen) z tymi samymi obiektami sledzonymi: zapis udany albo
+        /// doba przy kluczu TAK po zapisie zrobionym przy kluczu NIE. false - zadanie bez listu (zamknie je siatka doby).</summary>
+        private static bool Reattach(BountyQuest q, QuestManager qm, ref int tr)
+        {
+            var nt = q.Tag as Notice;
+            if (!q.IsOngoing || nt == null || !ReferenceEquals(nt.Quest, q) || !nt.Taken || !_notices.Contains(nt)) return false;
+            qm.OnQuestStarted(q);   // tylko _quests.Add - bez zdarzen
+            q.Detached = false;
+            if (q.Saved != null) foreach (var o in q.Saved) if (o != null) { q.AddTrackedObject(o); tr++; }
+            q.Saved = null;
+            return true;
+        }
+
         // ------------------------------------------------------------ start sesji (po QuestManager.OnGameLoaded) i doba
 
-        /// <summary>ArmouryBehavior: OnAfterSessionLaunchedEvent. Linia "wpiete"; przy kluczu TAK zadania przyjetych listow z arm_board (wpisy z dziennika gry po id;
-        /// listy sprzed wgrania - nowy opis); klucz NIE - flagi "p" przyjetych listow jak przed m109.</summary>
+        private sealed class RestoreCount { public int Q, W, E, X, B, Z, F, Drop; }
+
+        /// <summary>ArmouryBehavior: OnAfterSessionLaunchedEvent. Linia "wpiete"; przy kluczu TAK zadania przyjetych listow z arm_board (RestoreQuest - wpisy z dziennika gry
+        /// po id, listy sprzed wgrania - nowy opis); klucz NIE - bez zadan: flaga "p" tylko listom, ktore mialy w zapisie zadanie (otwarty wpis dziennika gry), i przed dniem
+        /// terminu - zapis z 44c03a05 wraca 1:1 (flagi z arm_board, takze zdjete przez gracza); wpisy tych zadan oznaczone jako przeczytane (alert okna Quests).</summary>
         internal static void BountySessionStart()
         {
             _listTest = ListTestWanted();
             _tDay0 = Today;
+            _bqKeyWas = QuestsOn;
             Log.Info(PQ + "wpiete - klucz Watch Bounty Quests " + YN(QuestsOn) + ", nasluchy zapisu " + _bqWired + "/2 (OnBeforeSave, OnSaveOver), BountyQuest bez definicji zapisu"
                      + " (zdejmowane przed zapisem, odtwarzane z arm_board), test autotestu " + YN(_listTest));
-            int t = 0, q = 0, w = 0, e = 0, x = 0, b = 0, z = 0, f = 0, fl = 0;
+            int t = 0;
             foreach (var n in _notices) if (n.Taken) t++;
-            if (t > 0) ResolveFlags();   // flagi "p" z zapisu (44c03a05) po id - FlagTaken nie stawia drugiej
+            if (t > 0) ResolveFlags();   // flagi "p" z zapisu (44c03a05) po id - FlagTaken nie stawia drugiej, DropFlag zdejmuje
             if (!QuestsOn)
             {
-                foreach (var n in _notices) { try { if (n.Taken && Live(n) && FlagTaken(n)) fl++; } catch (Exception ex) { BStumble("SessionStart(flaga)", ex); } }
-                Log.Info(PQ + "wczytanie - klucz NIE, listy przyjete " + t + ", flagi na mapie dodane " + fl + " (bez zadan, jak przed m109)");
+                int o = 0, fl = 0, seen = 0;
+                foreach (var n in _notices)
+                {
+                    if (!n.Taken) continue;
+                    try
+                    {
+                        var je = OpenEntry(n);   // brak - zapis bez zadania tego listu (44c03a05): flaga albo jej brak z arm_board jak dotad
+                        if (je == null) continue;
+                        o++;
+                        seen += MarkSeen(je.GetEntries());
+                        if (Live(n) && Today < n.Due && FlagTaken(n)) fl++;   // w dobie terminu flaga 44c03a05 juz zdjeta (FlagsDaily: today >= Until = Due)
+                    }
+                    catch (Exception ex) { BStumble("SessionStart(flaga)", ex); }
+                }
+                Log.Info(PQ + "wczytanie - klucz NIE, listy przyjete " + t + ", z otwartym wpisem dziennika " + o + ", flagi na mapie dodane " + fl + ", wpisy oznaczone jako przeczytane " + seen
+                         + " (bez zadan, jak przed m109)");
                 return;
             }
             var qm = Campaign.Current != null ? Campaign.Current.QuestManager : null;
+            var rc = new RestoreCount();
             foreach (var n in _notices)
             {
                 if (!n.Taken || n.Quest != null) continue;
-                try
-                {
-                    bool live = Live(n);   // banda po id (nazwa liczona po wczytaniu)
-                    JournalLogEntry je;
-                    bool closed;
-                    string id = RestoreId(n, out je, out closed);
-                    if (id == null || qm == null)
-                    {
-                        f++;
-                        if (live) FlagTaken(n);
-                        Log.Info(PQ + "odtworzone BLAD - " + n.Town + " " + n.Band + " (brak wolnego id) - flaga na mapie jak dotad");
-                        continue;
-                    }
-                    if (closed && je == null) z++;
-                    var bq = new BountyQuest(id, n, BandTitle(n), n.Due, n.Sum);
-                    _bq.Add(bq); n.Quest = bq;
-                    if (je != null)
-                    {
-                        var list = (MBList<JournalLog>)bq.JournalEntries;   // MBList : MBReadOnlyList - wpisy zadania wprost (bez refleksji)
-                        foreach (var j in je.GetEntries()) if (j != null) { list.Add(j); e++; }
-                        w++;
-                    }
-                    qm.OnQuestStarted(bq);   // tylko _quests.Add - bez zdarzen (bez "Quest started", kar i komunikatow)
-                    if (je == null) { bq.AddLog(new TextObject("{=!}" + Brief(n)), true); x++; }   // gra sama zaklada wpis w dzienniku (OnQuestLogAdded)
-                    if (live) { bq.AddTrackedObject(n.Mp); b++; }
-                    q++;
-                    if (_bqOdtwLines < BqDetail)
-                    {
-                        _bqOdtwLines++;
-                        Log.Info(PQ + "odtworzone - " + id + " (" + n.Town + " " + n.Band + "), wpisy " + bq.JournalEntries.Count + ", z dziennika gry " + YN(je != null) + ", banda na mapie " + YN(live));
-                    }
-                }
-                catch (Exception ex) { f++; BStumble("SessionStart", ex); }
+                try { RestoreQuest(n, qm, rc); }
+                catch (Exception ex) { rc.F++; BStumble("SessionStart", ex); }
             }
-            Log.Info(PQ + "wczytanie - listy przyjete " + t + ", odtworzone " + q + " (z dziennika gry " + w + ", wpisow " + e + "; nowe opisy " + x + " - listy sprzed wgrania), z banda na mapie " + b
-                     + ", pominiete: dziennik zamkniety (nowy id) " + z + ", blad " + f);
-            _tRestored = q;
+            Log.Info(PQ + "wczytanie - " + RestoreText(t, rc));
+            _tRestored = rc.Q;
             if (_listTest && _bqLoaded && t > 0)
-                Log.Info(PQ + "TEST wczytanie - odtworzone " + q + " z " + t + ", z dziennika gry " + w + ", nowe opisy " + x + ", blad " + f + " - " + YN(q == t && f == 0));
+                Log.Info(PQ + "TEST wczytanie - odtworzone " + rc.Q + " z " + t + ", z dziennika gry " + rc.W + ", nowe opisy " + rc.X + ", blad " + rc.F + " - " + YN(rc.Q == t && rc.F == 0));
         }
 
-        /// <summary>NoticeBoard.Daily (po WatchDaily): siatka (zadanie bez listu - Anulowane), klucz NIE - zadania zdjete i zapomniane (flaga "p" jak dotad), hak autotestu,
-        /// linia doby (przy kluczu TAK, gdy cos sie dzialo albo co 10 dob).</summary>
+        /// <summary>Zadanie przyjetego listu z arm_board (start sesji, przelaczenie klucza NIE -> TAK w grze): id wedlug reguly - otwarty wpis dziennika gry -> jego wpisy
+        /// w zadaniu (JournalLogEntry trzyma tylko id), brak (listy sprzed wgrania) - nowy opis; OnQuestStarted bez zdarzen; tracker, gdy banda zyje - nasza flaga na tej
+        /// bandzie zdjeta (tracker ja zastepuje). Przed wolaniem ResolveFlags (flagi z zapisu po id).</summary>
+        private static void RestoreQuest(Notice n, QuestManager qm, RestoreCount rc)
+        {
+            bool live = Live(n);   // banda po id (nazwa liczona po wczytaniu)
+            JournalLogEntry je;
+            bool closed;
+            string id = RestoreId(n, out je, out closed);
+            if (id == null || qm == null)
+            {
+                rc.F++;
+                if (live) FlagTaken(n);
+                Log.Info(PQ + "odtworzone BLAD - " + n.Town + " " + n.Band + " (brak wolnego id) - flaga na mapie jak dotad");
+                return;
+            }
+            if (closed && je == null) rc.Z++;
+            var bq = new BountyQuest(id, n, BandTitle(n), n.Due, n.Sum);
+            _bq.Add(bq); n.Quest = bq;
+            if (je != null)
+            {
+                var list = (MBList<JournalLog>)bq.JournalEntries;   // MBList : MBReadOnlyList - wpisy zadania wprost (bez refleksji)
+                foreach (var j in je.GetEntries()) if (j != null) { list.Add(j); rc.E++; }
+                rc.W++;
+            }
+            qm.OnQuestStarted(bq);   // tylko _quests.Add - bez zdarzen (bez "Quest started", kar i komunikatow)
+            if (je == null) { bq.AddLog(new TextObject("{=!}" + Brief(n)), true); rc.X++; }   // gra sama zaklada wpis w dzienniku (OnQuestLogAdded)
+            bool fd = false;
+            if (live)
+            {
+                bq.AddTrackedObject(n.Mp); rc.B++;
+                try { fd = DropFlag(n.Mp); if (fd) rc.Drop++; } catch (Exception fe) { BStumble("Restore(flaga)", fe); }   // flaga "p" z zapisu 103.5 - inaczej licznik 2
+            }
+            rc.Q++;
+            if (_bqOdtwLines < BqDetail)
+            {
+                _bqOdtwLines++;
+                Log.Info(PQ + "odtworzone - " + id + " (" + n.Town + " " + n.Band + "), wpisy " + bq.JournalEntries.Count + ", z dziennika gry " + YN(je != null) + ", banda na mapie " + YN(live)
+                         + ", flaga p zdjeta " + YN(fd));
+            }
+        }
+
+        private static string RestoreText(int t, RestoreCount rc)
+        {
+            return "listy przyjete " + t + ", odtworzone " + rc.Q + " (z dziennika gry " + rc.W + ", wpisow " + rc.E + "; nowe opisy " + rc.X + " - listy sprzed wgrania), z banda na mapie " + rc.B
+                   + ", flagi p zdjete " + rc.Drop + ", pominiete: dziennik zamkniety (nowy id) " + rc.Z + ", blad " + rc.F;
+        }
+
+        /// <summary>NoticeBoard.Daily (po WatchDaily): siatka (zadanie bez listu - Anulowane), klucz NIE - zadania zdjete i zapomniane (flaga "p" jak dotad), klucz TAK bez
+        /// zatrzasku - BountyKeyOn (odpiete zadania z powrotem, po przelaczeniu NIE -> TAK odtworzenie), hak autotestu, linia doby (przy kluczu TAK, gdy cos sie dzialo
+        /// albo co 10 dob).</summary>
         internal static void BountyDaily(int day)
         {
             if (!QuestsOn)
             {
                 if (_bq.Count > 0) BountyKeyOff();
+                _bqKeyWas = false;
                 ZeroBountyDay();
                 return;
             }
@@ -607,6 +682,8 @@ namespace Armoury
                 try { if (n != null && ReferenceEquals(n.Quest, q)) n.Quest = null; BountyClose(q, n, EndGrid, 0, null, null, null); }
                 catch (Exception e) { BStumble("Daily(siatka)", e); }
             }
+            if (!_bqLatch && !_bqPending) { try { BountyKeyOn(); } catch (Exception e) { BStumble("Daily(klucz TAK)", e); } }
+            _bqKeyWas = true;
             if (_listTest) { try { TestDaily(day); } catch (Exception e) { BStumble("TestDaily", e); } }
             try
             {
@@ -623,19 +700,49 @@ namespace Armoury
             ZeroBountyDay();
         }
 
-        /// <summary>Klucz przelaczony na NIE w trakcie gry: zadania zdjete z QuestManager bez zdarzen i zapomniane (wpis dziennika gry zostaje otwarty - po wczytaniu
-        /// przy kluczu TAK zadanie wraca z tym samym id), zywe przyjete listy - flaga "p" jak przed m109.</summary>
+        /// <summary>Doba przy kluczu TAK bez zatrzasku (poprawka po recenzji): zadania odpiete przez zapis zrobiony przy kluczu NIE wracaja do QuestManager; po dobie z kluczem
+        /// NIE (BountyKeyOff) zadania przyjetych listow odtworzone jak przy wczytaniu - ten sam id i wpisy z otwartego wpisu dziennika gry, flaga "p" bandy zdjeta.</summary>
+        private static void BountyKeyOn()
+        {
+            var qm = Campaign.Current != null ? Campaign.Current.QuestManager : null;
+            if (qm == null) return;
+            int r = 0, m = 0, tr = 0;
+            foreach (var q in _bq)
+            {
+                if (!q.Detached) continue;
+                m++;
+                try { if (Reattach(q, qm, ref tr)) r++; } catch (Exception e) { BStumble("KeyOn(przypiecie)", e); }
+            }
+            if (m > 0) Log.Info(PQ + "klucz TAK - przypiete " + r + " z " + m + " odpietych (tracker " + tr + ") - zapis przy kluczu NIE");
+            if (_bqKeyWas) return;
+            int t = 0;
+            foreach (var n in _notices) if (n.Taken && n.Quest == null) t++;
+            if (t > 0) ResolveFlags();
+            var rc = new RestoreCount();
+            foreach (var n in _notices)
+            {
+                if (!n.Taken || n.Quest != null) continue;
+                try { RestoreQuest(n, qm, rc); }
+                catch (Exception ex) { rc.F++; BStumble("KeyOn", ex); }
+            }
+            Log.Info(PQ + "klucz TAK w grze - " + RestoreText(t, rc));
+        }
+
+        /// <summary>Klucz przelaczony na NIE w trakcie gry: zadania zdjete z QuestManager bez zdarzen i zapomniane - wpis dziennika gry zostaje otwarty (po wczytaniu albo po
+        /// wlaczeniu klucza zadanie wraca z tym samym id), jego wpisy oznaczone jako przeczytane (okno Quests nie pokazuje otwartego wpisu bez zadania, a alert Quests swiecilby
+        /// do wygasniecia wpisu - rok gry; poprawka po recenzji); zywe przyjete listy - flaga "p" jak przed m109.</summary>
         private static void BountyKeyOff()
         {
             var c = Campaign.Current;
             var qm = c != null ? c.QuestManager : null;
-            int n = 0, fl = 0, fix = 0;
+            int n = 0, fl = 0, fix = 0, seen = 0;
             ResolveFlags();
             foreach (var q in _bq)
             {
                 try
                 {
                     if (!q.Detached) { Untrack(q, ref fix); if (qm != null) qm.OnQuestFinalized(q); n++; }
+                    seen += MarkSeen(q.JournalEntries);
                     var nt = q.Tag as Notice;
                     if (nt != null && ReferenceEquals(nt.Quest, q)) { nt.Quest = null; if (nt.Taken && _notices.Contains(nt) && Live(nt) && FlagTaken(nt)) fl++; }
                 }
@@ -645,16 +752,39 @@ namespace Armoury
             try { var vdt = c != null ? c.GetCampaignBehavior<IViewDataTracker>() : null; if (vdt != null && vdt.GetQuestSelection() is BountyQuest) vdt.SetQuestSelection(null); }
             catch (Exception e) { BStumble("KeyOff(wybor)", e); }
             _selSaved = null;
-            Log.Info(PQ + "klucz NIE - odpiete " + n + " zadan, flagi na mapie " + fl + " - wroca po wczytaniu przy kluczu TAK");
+            Log.Info(PQ + "klucz NIE - odpiete " + n + " zadan, flagi na mapie " + fl + ", wpisy oznaczone jako przeczytane " + seen + " - wroca po wczytaniu albo po wlaczeniu klucza");
+        }
+
+        /// <summary>Wpisy zadania oznaczone jako przeczytane (IViewDataTracker.OnQuestLogExamined). Getter UnExaminedQuestLogs najpierw odswieza slownik wpisow, ktory czyta
+        /// OnQuestLogExamined (wpis dodany po ostatnim odswiezeniu - KeyNotFound). Zwraca, ile bylo nieprzeczytanych.</summary>
+        private static int MarkSeen(IEnumerable<JournalLog> logs)
+        {
+            var c = Campaign.Current;
+            var vdt = c != null ? c.GetCampaignBehavior<IViewDataTracker>() : null;
+            if (vdt == null || logs == null) return 0;
+            var un = vdt.UnExaminedQuestLogs;
+            int k = 0;
+            foreach (var j in new List<JournalLog>(logs))
+            {
+                if (j == null) continue;
+                bool was = false;
+                for (int i = 0; i < un.Count; i++) if (ReferenceEquals(un[i], j)) { was = true; break; }
+                if (!was) continue;
+                vdt.OnQuestLogExamined(j);
+                k++;
+            }
+            return k;
         }
 
         // ------------------------------------------------------------ autotest (plik CrashScribe\armoury-list-test.flag, tylko LogGate.Mode 1/2 - w zwyklej grze nic)
         // Nowa kampania (bez wczytania): t=2 przyjecie dwoch listow (A - najwiecej ludzi, B - list soltysa albo najmniejsza banda) i zaznaczenie A w oknie Quests,
         // t=4 zapis "autotest-list-mid" (po nim TEST po zapisie), t=16 przyjecie C, t=18 list D stara droga (flaga, bez zadania - jak przed wgraniem).
-        // Wczytany zapis z przyjetymi listami: start - TEST wczytanie, t=2 termin A' na wczoraj (nastepna doba - Nieudane), t=3 banda B' usunieta (Anulowane).
-        // Bitwa gracza z banda: list (istniejacy albo testowy w najblizszym miescie, ten sam wzor kwoty) przyjety przy MapEventStarted; po bitwie TEST po koncu.
+        // Wczytany zapis z przyjetymi listami: start - TEST wczytanie, t=1 TEST odtworzone (kazde zadanie w QuestManager, tracker, wpisy, otwarty wpis dziennika gry),
+        // t=2 termin A' na wczoraj (nastepna doba - Nieudane), t=3 banda B' usunieta (Anulowane).
+        // Bitwa gracza z banda (tylko wczytany zapis bez odtworzonych zadan - bieg lb; poprawka po recenzji: w l1 / l2 bez listu testowego): list (istniejacy albo testowy
+        // w najblizszym miescie, ten sam wzor kwoty) przyjety przy MapEventStarted; po bitwie TEST po koncu.
 
-        private static bool _listTest, _tSaveWait;
+        private static bool _listTest, _tSaveWait, _tRestChk;
         private static int _tDay0 = -1, _tStage, _tRestored;
         private static BountyQuest _tSel;
         private static Notice _tBattle;
@@ -688,6 +818,25 @@ namespace Armoury
             bool ok = inQm && on && trk && vis && ent >= 1 && hist && !flagP;
             Log.Info(PQ + "TEST przyjecie " + what + " - " + (q != null ? q.StringId : "brak zadania") + " (" + n.Town + " " + n.Band + ", rodzaj " + n.Kind + "): w QuestManager " + YN(inQm)
                      + ", IsOngoing " + YN(on) + ", tracker gry " + YN(trk) + ", flaga na mapie " + YN(vis) + ", wpisy " + ent + ", wpis w historii " + YN(hist) + ", flaga p " + YN(flagP) + " - " + YN(ok));
+        }
+
+        /// <summary>Stan odtworzonego zadania po pierwszej dobie (linia TEST odtworzone): w QuestManager, w toku, tracker gry i flaga na mapie (gdy banda zyje), wpisy, otwarty
+        /// wpis dziennika gry, bez naszej flagi "p" (zdjeta przy odtworzeniu).</summary>
+        private static void TestRestoredLine(Notice n)
+        {
+            var c = Campaign.Current;
+            var q = n.Quest;
+            bool inQm = c.QuestManager.Quests.Contains(q), on = q.IsOngoing;
+            bool live = n.Mp != null && n.Mp.IsActive;
+            bool trk = !live || (c.QuestManager.TrackedObjects.ContainsKey(n.Mp) && c.QuestManager.TrackedObjects[n.Mp].Contains(q));
+            bool vis = !live || c.VisualTrackerManager.CheckTracked(n.Mp);
+            int ent = q.JournalEntries.Count;
+            var je = EntryOf(q.StringId);
+            bool open = je != null && !je.IsEnded();
+            bool flagP = n.Mp != null && FlagOf(n.Mp) != null;
+            bool ok = inQm && on && trk && vis && ent >= 1 && open && !flagP;
+            Log.Info(PQ + "TEST odtworzone - " + q.StringId + " (" + n.Town + " " + n.Band + "): w QuestManager " + YN(inQm) + ", IsOngoing " + YN(on) + ", banda na mapie " + YN(live)
+                     + ", tracker gry " + YN(trk) + ", flaga na mapie " + YN(vis) + ", wpisy " + ent + ", wpis w historii otwarty " + YN(open) + ", flaga p " + YN(flagP) + " - " + YN(ok));
         }
 
         private static void TestDaily(int day)
@@ -750,6 +899,19 @@ namespace Armoury
                 return;
             }
             if (_tRestored <= 0) return;
+            if (!_tRestChk && t >= 1)
+            {
+                _tRestChk = true;   // poprawka po recenzji: po pierwszej dobie zadania naprawde w QuestManager (inny mod albo gra moglyby je zdjac po starcie sesji)
+                int k = 0;
+                foreach (var q in new List<BountyQuest>(_bq))
+                {
+                    var n = q.Tag as Notice;
+                    if (n == null || !ReferenceEquals(n.Quest, q)) continue;
+                    k++;
+                    TestRestoredLine(n);
+                }
+                if (k == 0) Log.Info(PQ + "TEST odtworzone - pominiete (brak zadan po pierwszej dobie)");
+            }
             if (_tStage == 0 && t >= 2)
             {
                 _tStage = 1;
@@ -814,11 +976,12 @@ namespace Armoury
             catch (Exception e) { BStumble("TestAfterEnd", e); }
         }
 
-        /// <summary>ArmouryBehavior: CampaignEvents.MapEventStarted - tylko autotest. Gracz przeciw bandzie: jej list (albo list testowy w najblizszym miescie, ten sam wzor
-        /// kwoty co WatchDaily, placi kasa miasta) przyjety wspolna droga TakeNotice; wynik w OnMapEventEnded (Settle) i TestBattleEnd.</summary>
+        /// <summary>ArmouryBehavior: CampaignEvents.MapEventStarted - tylko autotest, tylko wczytany zapis bez odtworzonych zadan (bieg lb - w l1 i l2 nie ma listu testowego
+        /// bez linii m102 "list -"). Gracz przeciw bandzie: jej list (albo list testowy w najblizszym miescie, ten sam wzor kwoty co WatchDaily, placi kasa miasta) przyjety
+        /// wspolna droga TakeNotice; wynik w OnMapEventEnded (Settle) i TestBattleEnd.</summary>
         internal static void OnMapEventStartedTest(MapEvent me, PartyBase a, PartyBase d)
         {
-            if (!_listTest || me == null || _tBattle != null || !QuestsOn) return;
+            if (!_listTest || me == null || _tBattle != null || !QuestsOn || !_bqLoaded || _tRestored > 0) return;
             try
             {
                 var main = PartyBase.MainParty;
