@@ -119,7 +119,7 @@ namespace Armoury
                                                    "dar startowy kas miast przyciety (raz na kampanie, w nicosc, E5/A1)",
                                                    "udzial korony z zaworu kas miast (kasy miast -> skarbce krolestw, E5/A1)",
                                                    "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)", "(zarezerwowane E5/A1)",   // 14-16: rezerwa A1 (nieuzywane, drukowane tylko != 0)
-                                                   "markietani (E5/A3): sakiewki ludzi w polu -> kasy miast i kiesy wsi; m96: sakiewki zalog -> kasy ich osad i kiesy ludu",
+                                                   "markietani (E5/A3): sakiewki ludzi w polu -> kasy miast i kiesy wsi; m96: sakiewki zalog -> kasy ich osad i kiesy ludu; m109: sakiewki partii na postoju -> kasy miast i zamkow i kiesy ludu",
                                                    "kiesa ludu (E5/B1): place, robocizna, obrot P, roboty gminy, zakupy wsi, dziesiecina (E5/C3), zwrot przy wylaczeniu (kasy osad <-> kiesy ludu i wsi)",
                                                    "zawor dla ludu (E5/B1): 5% zaworu kas miast i 15% zaworu kas zamkow -> kiesy ludu",
                                                    "zapasy startowe kies ludu (E5/B1, raz): z daru kas albo z nadwyzki (stary zapis)",
