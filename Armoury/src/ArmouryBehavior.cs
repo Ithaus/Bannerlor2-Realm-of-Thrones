@@ -2525,6 +2525,8 @@ namespace Armoury
                     // C5: XP rozlozone na prawdziwa dlugosc roboty (dni kowala) - suma XP projektu bez zmian (inaczej 45 dob kolczugi dawaloby XP x 15)
                     if (ForgeClock.LikeTown && p.Kind != "bk")
                         totalDays = MathF.Max(1f / 24f, ForgeClock.WorkHours(p.Item, 1, totalDays * 24f) / 24f * (p.Kind == "van" ? 1f : Project.TimeFactor(p.Tempo)));
+                    else
+                        totalDays *= ForgeClock.TimeMult;   // m109-czas: robota trwa ForgeTimeMult razy dluzej - XP sztuki rozlozone na dluzsza robote, suma bez zmian
                     if (atForge && p.Kind != "bk")   // XP tylko za wlasna prace przy kowadle (bk: XP dal BK przy kliknieciu)
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
                             Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * stepH * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy; m96: XP za przepracowana czesc godziny

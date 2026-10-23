@@ -135,7 +135,7 @@ namespace Armoury
             return st / 6f;
         }
 
-        private static float PrepHours() { return Math.Max(0f, SpentHours() - _pieceOld); }
+        private static float PrepHours() { return Math.Max(0f, SpentHours() - _pieceOld) * ForgeClock.TimeMult; }   // m109-czas: x ForgeTimeMult
 
         /// <summary>Godziny tej wizyty: praca bez sztuki + sztuki wedlug kolejki.</summary>
         private static float SessionHours() { return PrepHours() + _pieceNew; }
@@ -174,7 +174,7 @@ namespace Armoury
             try
             {
                 float spent = SpentHours();
-                float prep = Math.Max(0f, spent - _pieceOld);
+                float prep = Math.Max(0f, spent - _pieceOld) * ForgeClock.TimeMult;   // m109-czas: x ForgeTimeMult (jak PrepHours)
                 float session = prep + _pieceNew;
                 ForgeClock.ResetBkQueued();
                 var b = ArmouryBehavior.Instance;
@@ -214,7 +214,7 @@ namespace Armoury
                 Log.Info("Robota w kuzni (m96): " + here.Name + " - " + why + " | ta wizyta: godzin " + F1(session) + " (praca bez sztuki - wytop, rafinacja, zlecenia, spartaczone - "
                          + F1(prep) + (prepIn ? " h na czele roboty tej kuzni" : " h, za malo na wpis") + "; sztuk " + _pieceItems + " w " + _pieceActs + " czynnosciach, " + F1(_pieceNew)
                          + " h, miara BK " + F1(_pieceOld) + " h), stamina kowali z ekranu " + _stam0.Count + " / 6 = " + F1(spent) + " h | robota sprzed wizyty w tej kuzni " + F1(before)
-                         + " h | razem w tej kuzni " + F1(total) + " h - pasek " + (bar ? "TAK" : (menu ? "NIE" : "NIE (brak menu gry)")) + rent + ", odsiadka BK pominieta | " + Summary(b));
+                         + " h | czas kuzni x" + ForgeClock.TimeMult.ToString("0.##", Inv) + " (m109) | razem w tej kuzni " + F1(total) + " h - pasek " + (bar ? "TAK" : (menu ? "NIE" : "NIE (brak menu gry)")) + rent + ", odsiadka BK pominieta | " + Summary(b));
                 if (bar)
                 {
                     ReturnMenu = _back;
