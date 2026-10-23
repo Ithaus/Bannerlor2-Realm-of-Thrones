@@ -27,6 +27,9 @@ namespace ForgeView
     /// Liczby liczy Armoury.ForgeBill (refleksja, jak PatternGate) - ta sama funkcja, ktora zuzywa. Bez Armoury albo przy kluczu NIE: null = rzad pusty,
     /// rzad BK (skora, len) jak dotad. Odswiezenie: postfiks BK CraftingMixin.OnRefresh (BkMaterialsModeFix.Sync) - biegnie po kazdym UpdateAll gry
     /// (UpdateCraftingStamina), wyborze kafla CRAFT, kuciu i zmianie trybu; kafle uzywane ponownie, gdy zestaw surowcow ten sam (bez nowych miniatur).
+    /// Recenzja KUZ-2: mixin BK przypisany do ekranu przez prywatne pole BK CraftingMixin.crafting; bez niego (inna wersja BK) - do biezacego ekranu (ekran
+    /// kucia jest jeden), zamiast pustego rzedu. Recenzja KUZ-3: bledy rzadu ida takze do logu Armoury (ScreenNote "ForgeView blad ...") - ForgeView.log jest
+    /// nadpisywany przy starcie i autotest go nie zbiera.
     /// </summary>
     [ViewModelMixin]
     internal sealed class ForgeBillMixin : BaseViewModelMixin<CraftingVM>
@@ -53,7 +56,7 @@ namespace ForgeView
             {
                 ForgeBillLink.Ensure();
                 var last = _lastBk;
-                if (last != null && ReferenceEquals(VmOf(last), vm)) Refresh(last, false);   // mixin BK tego ekranu powstal pierwszy - jego odswiezenie juz bylo
+                if (last != null && SameVm(last, vm)) Refresh(last, false);   // mixin BK tego ekranu powstal pierwszy - jego odswiezenie juz bylo
             }
             catch (Exception e) { Error("ForgeBillMixin.ctor", e); }
         }
@@ -63,7 +66,7 @@ namespace ForgeView
             try
             {
                 if (ReferenceEquals(Current, this)) Current = null;
-                if (_lastBk != null && ReferenceEquals(VmOf(_lastBk), _vm)) _lastBk = null;
+                if (_lastBk != null && SameVm(_lastBk, _vm)) _lastBk = null;
                 _bk = null;
             }
             catch { }
@@ -87,7 +90,11 @@ namespace ForgeView
         private static void Error(string where, Exception e)
         {
             _errors++;
-            if (_errors <= 3 || _errors % 100 == 0) Log.Error(where + " (blad " + _errors + ")", e);
+            if (_errors <= 3 || _errors % 100 == 0)
+            {
+                Log.Error(where + " (blad " + _errors + ")", e);
+                ForgeBillLink.Note("ForgeView blad " + where + " (blad " + _errors + "): " + (e != null ? e.GetType().Name + ": " + e.Message : "null"));
+            }
         }
 
         private static void Look()
@@ -98,10 +105,12 @@ namespace ForgeView
             try { _fCrafting = AccessTools.FieldRefAccess<CraftingVM, Crafting>("_crafting"); } catch (Exception e) { _fCrafting = null; Error("ForgeBillMixin.Look(_crafting)", e); }
         }
 
-        private static CraftingVM VmOf(CraftingMixin m)
+        /// <summary>Mixin BK nalezy do ekranu vm. Pole BK nieznane (inna wersja BK) - tak (ekran kucia jest jeden naraz), zamiast pustego rzedu (recenzja KUZ-2).</summary>
+        private static bool SameVm(CraftingMixin m, CraftingVM vm)
         {
+            if (m == null) return false;
             Look();
-            return m != null && _fBkVm != null ? _fBkVm(m) : null;
+            return _fBkVm == null || ReferenceEquals(_fBkVm(m), vm);
         }
 
         private static WeaponDesign DesignOf(CraftingVM vm)
@@ -117,7 +126,7 @@ namespace ForgeView
         {
             _lastBk = m;
             var cur = Current;
-            if (cur != null && ReferenceEquals(cur._vm, VmOf(m))) return cur.Refresh(m, modeOnly);
+            if (cur != null && SameVm(m, cur._vm)) return cur.Refresh(m, modeOnly);
             return ForgeBillLink.Rows(null, null) != null;   // nasz mixin tego ekranu jeszcze nie powstal - sam klucz
         }
 
@@ -222,7 +231,7 @@ namespace ForgeView
             {
                 var cur = Current;
                 if (cur == null) return "BLAD: ekran kucia nie otwarty (brak mixinu)";
-                var bk = cur._bk ?? (_lastBk != null && ReferenceEquals(VmOf(_lastBk), cur._vm) ? _lastBk : null);
+                var bk = cur._bk ?? (_lastBk != null && SameVm(_lastBk, cur._vm) ? _lastBk : null);
                 if (step == 9) { cur._vm.ExecuteCancel(); return "zamkniety"; }
                 if (step == 0)
                 {
@@ -380,9 +389,25 @@ namespace ForgeView
             catch (Exception e)
             {
                 _errors++;
-                if (_errors <= 3 || _errors % 100 == 0) Log.Error("ForgeBillLink.Rows (blad " + _errors + ")", e);
+                if (_errors <= 3 || _errors % 100 == 0)
+                {
+                    Log.Error("ForgeBillLink.Rows (blad " + _errors + ")", e);
+                    var x = e.InnerException ?? e;
+                    Note("ForgeView blad ForgeBillLink.Rows (blad " + _errors + "): " + x.GetType().Name + ": " + x.Message);
+                }
                 return null;
             }
+        }
+
+        /// <summary>Linia do logu Armoury (ScreenNote; recenzja KUZ-3 - bledy rzadu w logu zbieranym przez autotest). Bez Armoury - nic.</summary>
+        internal static void Note(string text)
+        {
+            try
+            {
+                Ensure();
+                if (_note != null) _note.Invoke(null, new object[] { text });
+            }
+            catch { }
         }
     }
 
