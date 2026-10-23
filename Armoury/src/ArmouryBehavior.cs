@@ -1556,7 +1556,7 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => LoreSeedFix.AfterSessionLaunched(LorePurgeOnce));
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => RareMaterials.StartLine());   // m97-surowce: czardrzewo i smocza kosc - surowce, zrodla, doplyw (po cenach HistoricalPrices)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => Recipes.MassStartLine());   // m96-receptury: przepisy z masy po ostatecznych statystykach (ROT-RBM)
-            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { ForgeBill.SessionStart(); } catch (Exception e) { Log.Error("ForgeBill.SessionStart", e); } });   // m109-kuznia: rachunek kuzni - latka przycisku broni, linia startu z probkami (po przepisach z masy)
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { ForgeBill.SessionStart(); } catch (Exception e) { Log.Error("ForgeBill.SessionStart", e); } });   // (dopisany po MassStartLine i RareMaterials.StartLine - biegnie PRZED nimi; probki same robia Resolve surowcow) m109-kuznia: rachunek kuzni - latka przycisku broni, linia startu z probkami (po przepisach z masy)
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => LoreSeedFix.OnNewGame());
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
             // mury oblezen OB1-OB4 (SiegeWalls.cs): rejestr szturmow AI (prog odparcia OB2, bitwa z murow OB3), wynik szturmu, koniec oblezenia (przerwy, OB4),
@@ -1597,10 +1597,11 @@ namespace Armoury
             HideoutHomeGuard.RegisterEvents(this);   // m109-crash: banda bez kryjowki wchodzi do kryjowki - latka BanditSpawnCampaignBehavior.OnHomeHideoutChanged (wywrotka 22.10 23:59)
             RaidTribute.RegisterEvents(this);    // R3-03a (p6-okup): latki i opcja "Demand tribute" w starcie sesji, linia doby "Okup okolicy (R3-03a)"
             TiredLand.RegisterEvents(this);      // R3-06d (p5-stada): reset nowej kampanii
+            CampInterrogation.RegisterEvents(this);   // m109-przesluch: "Question the prisoners" w menu obozu, pamiec band z bitew gracza (MapEventEnded), linia doby - dopisany PRZED CampWalk:
+                                                      // sluchacze OnSessionLaunched biegna od ostatnio dopisanego, wiec AddMenus idzie po Walk/Drill/Sutlers i index 4 = przed "Break camp" (przeglad n34 U1)
             CampWalk.RegisterEvents(this);       // m97-oboz: "Walk through the camp" w menu obozu (scena obozu wedlug druzyny, tylko na zadanie gracza)
             CampDrill.RegisterEvents(this);      // m97-szkolenie: "Train the men" w menu obozu i menu cwiczen (marsz nie uczy)
             CampSutlers.RegisterEvents(this);    // m99-markietani: "Visit the sutlers' row" w menu obozu (duzy oboz) - cyrulicy, zabawa, sklep z polki miasta; linia doby
-            CampInterrogation.RegisterEvents(this);   // m109-przesluch: "Question the prisoners" w menu obozu, pamiec band z bitew gracza (MapEventEnded), linia doby
             CampCart.RegisterEvents(this);       // m97-oboz: woz taborowy i siodla transportowe - reset nowej kampanii, menu miasta (stolarz i garbarz), linia doby, wozy w niewoli
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("UniqueSpoils.OnPartyDestroyed", UniqueSpoils.OnPartyDestroyed));   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("PackSources.OnDestroyed", PackSources.OnDestroyed));   // m6b: znacznik "RemoveParty po zdarzeniu zniszczenia" (konie przy RemoveParty, towar partii usunietych bez zniszczenia)
@@ -2450,7 +2451,7 @@ namespace Armoury
                 {
                     var q = Project.Parse(_projects[i]);
                     if (q.Item == null || q.Kind != "van" || ForgeClock.On || ForgeClock.LikeTown) continue;   // wpis 83: godziny z ekranu BK, bez przycinania; C5: dni kowala, bez przycinania
-                    float cap = MathF.Max(0.1f, Recipes.Grade(q.Item) * Settings.Current.WeaponDaysPerTier);
+                    float cap = MathF.Max(0.1f, Recipes.Grade(q.Item) * Settings.Current.WeaponDaysPerTier) * ForgeClock.TimeMult;   // m109-czas (przeglad n34 Z1): sufit jak start (WorkHours x TimeMult)
                     if (q.DaysLeft > cap) { q.DaysLeft = cap; _projects[i] = q.Serialize(); capped++; }
                 }
                 if (capped > 0) Log.Info("Kuznia: " + capped + " zlecen broni w kolejce skrocono do nowego przelicznika (WeaponDaysPerTier " + Settings.Current.WeaponDaysPerTier + ").");

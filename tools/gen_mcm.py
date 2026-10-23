@@ -548,6 +548,8 @@ RANGES = {
     'LektorGossipDailyChars': (0, 10000, "0"),
     # m109-muzyka (23.10): glosnosc naszej muzyki w bitwie - kod przycina do 1..4 (EventMusic.Level)
     'BattleMusicLoudness': (1, 4, "0"),
+    # m109-czas (23.10): mnoznik czasu kuzni - kod przycina do >= 0.1 (ForgeClock.TimeMult)
+    'ForgeTimeMult': (0.10, 5.0, "0.00"),
     'LektorGossipReserveChars': (0, 30000, "0"),
 }
 

@@ -1106,7 +1106,7 @@ Uzycie (Python 3, tylko odczyt):
                     potkniecia 0, LIST-2 kazde przyjecie m102 ma start zadania, LIST-3 zapis -> po zapisie (przywrocone == odpiete, NIEUDANY 0), LIST-4 wczytanie (odtworzone ==
                     przyjete, blad 0), LIST-5 zakonczenia (raz, Sukces tylko po wyplacie m102 dla gracza z ta sama kwota, jedna wyplata), LIST-6 doby (siatka 0, zatrzask NIE,
                     bez zadania 0), LIST-7 linie TEST (wszystkie TAK, po wczytaniu TEST odtworzone), LIST-8 special NIE, LIST-9 zaznaczenie okna Quests (trwajacego zadania)
-                    wraca po zapisie. LIST-1 liczy tez ERROR NoticeBoard.Bounty* / OnMapEventStartedTest / Daily(zadania). Log bez paczki: INFO.
+                    wraca po zapisie. LIST-1 liczy tez ERROR NoticeBoard.Bounty* / OnMapEventStartedTest / Daily(zadania). LIST-INFO liczniki zadan (INFO). Log bez paczki: INFO.
 --grupa m103lektor : (21.10, w-toku/m103-lektor; Armoury/src/Lektor.cs, Lektor.Live.cs, klucze LektorEnabled, LektorEventWindows, LektorGossipLive, LektorGossipDailyChars,
                     LektorGossipReserveChars) python -I tools/sprawdz_logi.py --grupa m103lektor <Armoury-*.log> [--crashscribe <session-*.log>] (strumieniowo). LK-0 linia startu,
                     LK-1 ERROR lektora i potkniecia 0 (takze watek nagran), LK-2 latka EventScreen OnActivate i OnDeactivate tak, LK-3 nagran okien = wiersze arm_lektor.tsv w repo

@@ -575,7 +575,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ sesja i doba
-        /// <summary>OnAfterSessionLaunched (po Recipes.MassStartLine): latka przycisku broni (raz na proces), linia startu z probkami.</summary>
+        /// <summary>OnAfterSessionLaunched (przed Recipes.MassStartLine i RareMaterials.StartLine): latka przycisku broni (raz na proces), linia startu z probkami.</summary>
         internal static void SessionStart()
         {
             _sRefresh = 0;

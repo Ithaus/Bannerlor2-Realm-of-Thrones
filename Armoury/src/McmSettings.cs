@@ -136,7 +136,7 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOnlyWhileThere { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Forge Time Mult", 0.00f, 5.00f, "0.00", HintText = "all your work at the forge - smelting, refining, weapons, armour, bows, arrows and orders - takes this many times as long (1.25 = a quarter longer). The experience of a piece stays the same, spread over the longer work. 1 = as before", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Forge Time Mult", 0.10f, 5.00f, "0.00", HintText = "all your work at the forge - smelting, refining, weapons, armour, bows, arrows and orders - takes this many times as long (1.25 = a quarter longer). The experience of a piece stays the same, spread over the longer work. 1 = as before", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
         public float ForgeTimeMult { get; set; } = 1.25f;
 

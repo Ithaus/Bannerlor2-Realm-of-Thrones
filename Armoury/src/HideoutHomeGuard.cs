@@ -32,7 +32,7 @@ namespace Armoury
     /// wyjatek z tej metody (licznik, pierwsze 3 do Log.Error) - po nim SetHomeHideout i wejscie do kryjowki koncza sie normalnie (banda ma juz nowy dom).
     /// Jedyny sluchacz zdarzenia w grze i modach to BanditSpawnCampaignBehavior (przeszukane DLL Modules), wiec nikt inny nie dostaje null.
     /// Linie "Dom kryjowki (m109): " - start sesji (latki), pierwsze 5 band szczegolowo (id, klan, kultura, stary dom, kryjowka, zrodlo), doba z wejsciami.
-    /// Autotest: DLL autotestu CrashScribe (LogGate.Mode 1/2) + plik CrashScribermoury-kryjowka.flag - pierwszej doby jedna banda bez kryjowki (najpierw nasza,
+    /// Autotest: DLL autotestu CrashScribe (LogGate.Mode 1/2) + plik CrashScribe/armoury-kryjowka.flag - pierwszej doby jedna banda bez kryjowki (najpierw nasza,
     /// potem szabrownicy) wchodzi do najblizszej kryjowki przez EnterSettlementAction.ApplyForParty (ta sama droga co wywrotka Jeffa); linia "test - ...".
     /// </summary>
     internal static class HideoutHomeGuard
