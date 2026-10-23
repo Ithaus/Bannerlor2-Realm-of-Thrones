@@ -32,7 +32,8 @@ namespace Armoury
     /// Bitwa: liczniki od pierwszego zdarzenia misji albo kolejki lupu (BattlefieldLaw.ShareQueue), zamkniecie przy liscie trofeow Spoils, sakwach,
     /// zwrocie do zbrojowni wojska, ekranie gry albo przy nastepnej bitwie (bez rozliczenia). Linia bitwy z tozsamosciami (sprawdza je grupa m109lup):
     /// A z cial: na cialach = lup + cios + pekniete + zastepcze + odrzut + inne; B kolejka: wczesniej + dzialka + bagaz + send - padle = lista + sakwy
-    /// + zwrot + przepadlo + zostaje; C lista trofeow: na liscie + Spoils wyjal + rezerwa = z kolejki + wraki - przesiane.
+    /// + zwrot + przepadlo + zostaje; C lista trofeow: na liscie + Spoils wyjal + rezerwa = z kolejki + wraki - przesiane, a przesiane = smoki + legendy
+    /// + olbrzymy-egzotyki + zniszczone + wraki ponizej progu (osobny blok linii - recenzja L4).
     /// Hak autotestu (plik CrashScribe/armoury-lup.flag, tryb autotestu LogGate 1/2): wrog bitwy testu (autotest_bitwa_*) w planie mocna dostaje 6 jezdzcow
     /// z koniem, uprzeza i zbroja (sam roster - DTE ubiera bandytow wzorcem jednostki) - w grze Jeffa nic nie robi.
     /// Stan statyczny bez zapisu (Reset z BattlefieldLaw.LReset). Wyjatki liczone (pierwsze 3 i co 50 do Log.Error), bez globalnego wylacznika.
@@ -55,6 +56,10 @@ namespace Armoury
         internal const int BWcz = 0, Dzialka = 1, Bagaz = 2, Send = 3, BPadle = 4, Lista = 5, Sakwy = 6, Zwrot = 7, Przepadlo = 8, BZost = 9, BCols = 10;
         // blok C (lista trofeow Spoils)
         private const int CKol = 0, CWraki = 1, CPrzes = 2, CWyjal = 3, CTrzym = 4, CWroc = 5, CRez = 6, CNa = 7, CCols = 8;
+        // przesiane z listy trofeow wedlug przyczyny (recenzja L4; suma = "przesiane" bloku C): smoki (CleanseDragons), legendy (LegendaryLaw), olbrzymy
+        // i egzotyki (sprzet olbrzymow, wierzchowiec egzotyczny nie dla partii gracza, slonie - CleanseTrash), zniszczone (stan <= LootMinConditionPercent),
+        // wraki ponizej progu zniszczenia (AppendWrecks)
+        internal const int SSmok = 0, SLeg = 1, SEgz = 2, SZnisz = 3, SWrak = 4, SCols = 5;
 
         internal static int KindOf(ItemObject it)
         {
@@ -105,6 +110,7 @@ namespace Armoury
             public readonly long[,] A = new long[Kinds, ACols];
             public readonly long[,] B = new long[Kinds, BCols];
             public readonly long[,] C = new long[Kinds, CCols];
+            public readonly long[,] S = new long[Kinds, SCols];  // przesiane wedlug przyczyny (recenzja L4)
             public readonly long[] SimGain = new long[Kinds];
             public readonly long[] CBefore = new long[Kinds];   // z kolejki + wraki przed przesianiem (do przesianych)
             public int FelledHero, FelledTroop, Riders, HeroesSkipped;
@@ -117,6 +123,7 @@ namespace Armoury
         }
 
         private static Battle _cur;
+        private static bool _sifting;          // recenzja L4: AfterGenerateLoot miedzy WrecksIn a Sifted - przyczyny przesiania listy trofeow liczone
         private static int _battleN;           // numer bitwy w sesji (proces)
         private static int _riderLines;        // linie jezdzcow w sesji
 
@@ -284,6 +291,7 @@ namespace Armoury
         /// <summary>Zamyka biezaca bitwe: linia bitwy (zawsze), linia jezdzcow (pierwsze 3 bitwy sesji, pod flaga testu kazda), liczniki doby.</summary>
         internal static void Close(string how)
         {
+            _sifting = false;
             var b = _cur;
             if (b == null) return;
             _cur = null;
@@ -306,7 +314,8 @@ namespace Armoury
                   .Append("), konnych ").Append(b.Riders).Append(", bohaterow pominietych ").Append(b.HeroesSkipped)
                   .Append(" | z cial [na cialach/lup/cios/pekniete/zastepcze/odrzut/inne]: ").Append(Block(b.A, ACols))
                   .Append(" | kolejka [wczesniej/dzialka/bagaz/send/padle/lista/sakwy/zwrot/przepadlo/zostaje]: ").Append(Block(b.B, BCols))
-                  .Append(" | lista trofeow [z kolejki/wraki/przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: ").Append(b.HasC ? Block(b.C, CCols) : "nie bylo");
+                  .Append(" | lista trofeow [z kolejki/wraki/przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: ").Append(b.HasC ? Block(b.C, CCols) : "nie bylo")
+                  .Append(" | przesiane [smoki/legendy/olbrzymy-egzotyki/zniszczone/wraki ponizej progu]: ").Append(Block(b.S, SCols));
                 if (b.Sim) sb.Append(" | Send troops - lup DTE z poleglych do zbrojowni wojska: ").Append(Row(b.SimGain));
                 sb.Append(" | konie padle pod powalonymi: z kolejki ").Append(b.DeadQ).Append(", ze zbrojowni ").Append(b.DeadArm).Append(", poza lupem ").Append(b.DeadOut).Append(", brak ").Append(b.DeadNone)
                   .Append(" | wraki: cios ").Append(b.WCios).Append(" (w uprzaz ").Append(b.WCiosHarness).Append("), pekniete dodatkowo ").Append(b.PekOne)
@@ -461,9 +470,11 @@ namespace Armoury
             catch (Exception e) { Stumble("ToList", e); }
         }
 
-        /// <summary>AfterGenerateLoot: wraki dosypywane do listy (przed przesianiem; wraki ponizej progu zniszczenia licza sie potem jako przesiane).</summary>
+        /// <summary>AfterGenerateLoot: wraki dosypywane do listy (przed przesianiem; wraki ponizej progu zniszczenia licza sie potem jako przesiane).
+        /// Recenzja L4: od teraz do Sifted przyczyny przesiania tej listy liczone (SiftOut).</summary>
         internal static void WrecksIn(List<ItemObject> wrecks)
         {
+            _sifting = true;
             if (wrecks == null || wrecks.Count == 0) return;
             try
             {
@@ -478,6 +489,7 @@ namespace Armoury
         /// holding - przetrzymane poza Spoils (BattlefieldLaw.HoldMounts, liczy Held), inaczej Spoils je wyjmie (Spoils wyjal); reszta na liscie.</summary>
         internal static void Sifted(ItemRoster list)
         {
+            _sifting = false;
             var b = _cur;
             if (b == null || list == null) return;
             try
@@ -492,6 +504,16 @@ namespace Armoury
                 Array.Clear(b.CBefore, 0, Kinds);
             }
             catch (Exception e) { Stumble("Sifted", e); }
+        }
+
+        /// <summary>Recenzja L4: sztuka zdjeta z listy trofeow przy przesiewaniu (AppendWrecks, CleanseDragons, CleanseTrash) z przyczyna (SSmok..SWrak) -
+        /// tylko miedzy WrecksIn a Sifted w AfterGenerateLoot (te same funkcje na ekranie gry i w sakwach nie licza sie).</summary>
+        internal static void SiftOut(ItemObject it, int n, int why)
+        {
+            if (!_sifting || it == null || n <= 0 || why < 0 || why >= SCols) return;
+            var b = _cur;
+            if (b == null) return;
+            try { b.S[KindOf(it), why] += n; } catch (Exception e) { Stumble("SiftOut", e); }
         }
 
         /// <summary>AfterGenerateLoot na koncu: co zostaje na liscie (bez kluczy - konie i uprzaz liczone jako "Spoils wyjal": Spoils zabierze je do taboru,
@@ -824,7 +846,7 @@ namespace Armoury
         internal static void Reset()
         {
             try { Close("bez rozliczenia - nowa kampania albo wczytanie"); } catch { }
-            _cur = null;
+            _cur = null; _sifting = false;
             ClearDay();
             _testDone.Clear();
         }

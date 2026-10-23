@@ -38,6 +38,10 @@ konie) - po naprawie padly kon wyszedlby na liscie, wiec poprawka jest czescia z
    bron, pociski, tarcza, inne. Linie: `Lup bitwy (m109): start` (klucze, latki 5/5), `Lup bitwy (m109): bitwa N` po kazdej bitwie gracza (zamkniecie: lista trofeow
    Spoils, sakwy, zwrot do zbrojowni wojska, ekran gry albo nastepna bitwa "bez rozliczenia"), `Lup bitwy (m109): jezdzcy bitwy N` (pierwsze 3 bitwy sesji, pod flaga
    testu kazda; do 8 jezdzcow: kon, uprzaz, zbroje z przyczyna), `Lup bitew (m109): doba D` (tylko przy bitwach doby). Bledy liczone (pierwsze 3 i co 50).
+   Recenzja L4 (punkt 1 zadania - "ile odpadlo i dlaczego"): linia bitwy ma blok `przesiane [smoki/legendy/olbrzymy-egzotyki/zniszczone/wraki ponizej progu]`
+   wedlug rodzaju - liczony w AppendWrecks (wraki ponizej progu), CleanseDragons (smoki), CleanseTrash (legendy; sprzet olbrzymow, wierzchowiec egzotyczny
+   nie dla partii gracza i slonie - olbrzymy-egzotyki; stan <= LootMinConditionPercent - zniszczone), tylko miedzy WrecksIn a Sifted w AfterGenerateLoot
+   (te same funkcje na ekranie gry i w sakwach sie nie licza). Suma przyczyn = "przesiane" bloku C (sprawdza LUP-J4).
 2. **FallenRiderHorsesLooted.** AfterGenerateLoot (po przesianiu) przetrzymuje konie i uprzaz w `MountHold`; prefiks Spoils `EquipmentDamageModel.ApplyDamageToLoot`
    (Spoils wola go tylko w :944, zaraz po swojej petli) oddaje je na liste: kon ze znacznikiem "lucky" Spoils (zostaje taki, jak byl pod jezdzcem - bez losowej
    kulawizny), uprzaz ze zuzyciem Spoils jak kazda zbroja, wrak uprzezy zostaje wrakiem. Finalizer Spoils `OnMapEventEnded`: co nie wrocilo (wyjatek w Spoils) - do

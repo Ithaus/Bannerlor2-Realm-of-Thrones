@@ -598,12 +598,14 @@ namespace Armoury
                     {
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         trash += el.Amount;
+                        LootTally.SiftOut(it, el.Amount, LootTally.SEgz);   // m109-lup (recenzja L4): slon - egzotyk
                         continue;
                     }
                     if (LegendaryLaw.IsLegend(it))
                     {
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         legends += el.Amount;
+                        LootTally.SiftOut(it, el.Amount, LootTally.SLeg);   // m109-lup (recenzja L4)
                         continue;
                     }
                     // sprzet olbrzymow (Jeff 14.09): czlowiek go nie uzywa, wiec
@@ -613,6 +615,7 @@ namespace Armoury
                     {
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         legends += el.Amount;
+                        LootTally.SiftOut(it, el.Amount, LootTally.SEgz);   // m109-lup (recenzja L4): olbrzymy i egzotyki
                         continue;
                     }
                     if (s.LootMinConditionPercent > 0)
@@ -622,6 +625,7 @@ namespace Armoury
                         {
                             roster.AddToCounts(el.EquipmentElement, -el.Amount);
                             trash += el.Amount;
+                            LootTally.SiftOut(it, el.Amount, LootTally.SZnisz);   // m109-lup (recenzja L4)
                         }
                     }
                 }
@@ -654,6 +658,7 @@ namespace Armoury
                     if (it.ItemType != ItemObject.ItemTypeEnum.Horse) continue;
                     roster.AddToCounts(el.EquipmentElement, -el.Amount);
                     cut += el.Amount;
+                    LootTally.SiftOut(it, el.Amount, LootTally.SSmok);   // m109-lup (recenzja L4): przyczyna przesiania
                 }
                 if (cut > 0) Log.Info("BattlefieldLaw: " + cut + " smokow wycietych z lupu - smoki nie leza w workach.");
             }
@@ -1307,6 +1312,7 @@ namespace Armoury
                     && mod.PriceMultiplier * 100f <= Settings.Current.LootMinConditionPercent + 0.01f)
                 {
                     int junked = Wrecks.Count;
+                    foreach (var w in Wrecks) LootTally.SiftOut(w, 1, LootTally.SWrak);   // m109-lup (recenzja L4): przyczyna przesiania
                     Wrecks.Clear();
                     Log.Info("BattlefieldLaw: " + junked + " wrakow ponizej progu zniszczenia - zostaly na polu.");
                     return 0;

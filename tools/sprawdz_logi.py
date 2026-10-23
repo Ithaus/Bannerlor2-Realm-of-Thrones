@@ -1764,7 +1764,8 @@ Uzycie (Python 3, tylko odczyt):
                     'Lup bitwy (m109): bitwa N' wedlug rodzaju (kon, uprzaz, tulow, glowa, rece, nogi, peleryna, bron, pociski, tarcza, inne): LUP-J2 tozsamosc A
                     z cial (na cialach = lup + cios + pekniete + zastepcze + odrzut + inne), LUP-J3 tozsamosc B kolejka (wczesniej + dzialka + bagaz + send -
                     padle = lista + sakwy + zwrot + przepadlo + zostaje), LUP-J4 tozsamosc C lista trofeow (na liscie + Spoils wyjal + rezerwa = z kolejki + wraki -
-                    przesiane), przy kluczu konie TAK Spoils wyjal kon = uprzaz = 0 i przetrzymane = wrocone + rezerwa (klucz NIE - INFO, ile przepadlo); kazda
+                    przesiane, a przesiane = smoki + legendy + olbrzymy-egzotyki + zniszczone + wraki ponizej progu z bloku 'przesiane [...]'), przy
+                    kluczu konie TAK Spoils wyjal kon = uprzaz = 0 i przetrzymane = wrocone + rezerwa (klucz NIE - INFO, ile przepadlo); kazda
                     100% bitew. LUP-J5 padle konie powalonych jezdzcow: brak w kolejce i zbrojowni 0 przy HorsesDieOnlyKilled (bez padlych - INFO). LUP-J6 Z2 cios
                     w uprzaz 0 przy kluczu (bez uprzezy na cialach - INFO). LUP-J7 Z1 pekniete dodatkowo = wraki, niejednoznaczne 0 (suma 0 - INFO). LUP-J8
                     pokrycie testu (linie 'test - ...' tylko pod flaga): >= 1 bitwa z lupem kon, uprzaz i tulow >= 1, linia jezdzcow z koniem w lupie, konie
@@ -62062,6 +62063,7 @@ M109LUP_RX = {
     "A": re.compile(r" \| z cial \[na cialach/lup/cios/pekniete/zastepcze/odrzut/inne\]: ([^|]*?) \| "),
     "B": re.compile(r" \| kolejka \[wczesniej/dzialka/bagaz/send/padle/lista/sakwy/zwrot/przepadlo/zostaje\]: ([^|]*?) \| "),
     "C": re.compile(r" \| lista trofeow \[z kolejki/wraki/przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie\]: ([^|]*?) \| "),
+    "S": re.compile(r" \| przesiane \[smoki/legendy/olbrzymy-egzotyki/zniszczone/wraki ponizej progu\]: ([^|]*?) \| "),
     "dead": re.compile(r" \| konie padle pod powalonymi: z kolejki (\d+), ze zbrojowni (\d+), poza lupem (\d+), brak (\d+) \| "),
     "wr": re.compile(r" \| wraki: cios (\d+) \(w uprzaz (\d+)\), pekniete dodatkowo (\d+) -> wraki (\d+), niejednoznaczne (\d+) \| "),
     "tail": re.compile(r" \| koniec: (.*?) \| pomiar (\d+(?:\.\d+)?) ms \| potkniecia (\d+)\.$"),
@@ -62087,12 +62089,14 @@ M109LUP_TEST = {
               "kon 2/2/0/0/0/0/0, uprzaz 2/2/0/0/0/0/0, tulow 13/10/2/1/0/0/0, bron 20/18/0/0/0/0/2 | kolejka [wczesniej/dzialka/bagaz/send/padle/lista/sakwy/"
               "zwrot/przepadlo/zostaje]: kon 0/2/0/0/1/1/0/0/0/0, uprzaz 0/2/0/0/0/2/0/0/0/0, tulow 0/10/0/0/0/10/0/0/0/0, bron 0/18/0/0/0/18/0/0/0/0 | lista "
               "trofeow [z kolejki/wraki/przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: kon 1/0/0/0/1/1/0/1, uprzaz 2/0/0/0/2/2/0/2, "
-              "tulow 10/3/0/0/0/0/0/13, bron 18/0/0/0/0/0/0/18 | konie padle pod powalonymi: z kolejki 1, ze zbrojowni 0, poza lupem 0, brak 0 | wraki: cios 2 "
+              "tulow 10/3/1/0/0/0/0/12, bron 18/0/0/0/0/0/0/18 | przesiane [smoki/legendy/olbrzymy-egzotyki/zniszczone/wraki ponizej progu]: tulow 0/0/0/1/0 "
+              "| konie padle pod powalonymi: z kolejki 1, ze zbrojowni 0, poza lupem 0, brak 0 | wraki: cios 2 "
               "(w uprzaz 0), pekniete dodatkowo 1 -> wraki 1, niejednoznaczne 0 | koniec: lista trofeow Spoils | pomiar 1.2 ms | potkniecia 0.",
     "sim": "Lup bitwy (m109): bitwa 4 | misja NIE, Send troops TAK, klucze konie TAK/uprzaz TAK/pekniete TAK (wraki TAK, konie gina zabite TAK) | powaleni "
            "przez druzyne 0 (Ty i towarzysze 0, zolnierze 0), konnych 0, bohaterow pominietych 0 | z cial [na cialach/lup/cios/pekniete/zastepcze/odrzut/inne]: "
            "brak | kolejka [wczesniej/dzialka/bagaz/send/padle/lista/sakwy/zwrot/przepadlo/zostaje]: kon 0/0/0/1/0/0/1/0/0/0 | lista trofeow [z kolejki/wraki/"
-           "przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: nie bylo | Send troops - lup DTE z poleglych do zbrojowni wojska: kon 3, tulow 9 | "
+           "przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: nie bylo | przesiane [smoki/legendy/olbrzymy-egzotyki/zniszczone/wraki ponizej "
+           "progu]: brak | Send troops - lup DTE z poleglych do zbrojowni wojska: kon 3, tulow 9 | "
            "konie padle pod powalonymi: z kolejki 0, ze zbrojowni 0, poza lupem 0, brak 0 | wraki: cios 0 (w uprzaz 0), pekniete dodatkowo 0 -> wraki 0, "
            "niejednoznaczne 0 | koniec: sakwy - Send troops - ekran lupow Spoils po tej bitwie nie przychodzi (oblezenie, morze) | pomiar 0.1 ms | potkniecia 0.",
     "riders": "Lup bitwy (m109): jezdzcy bitwy 3 - veteran_caravan_guard_battania (Ty, zabity): kon t2_battania_horse lup (padl - z kolejki), uprzaz "
@@ -62133,7 +62137,7 @@ def m109lup_battle(s):
     g = h.groups()
     d = {"n": int(g[0]), "mission": g[1] == "TAK", "sim": g[2] == "TAK", "kh": g[3] == "TAK", "ku": g[4] == "TAK", "kp": g[5] == "TAK", "kw": g[6] == "TAK",
          "kd": g[7] == "TAK", "felled": int(g[8]), "hero": int(g[9]), "troop": int(g[10]), "riders": int(g[11]), "heroes": int(g[12])}
-    seg = {k: M109LUP_RX[k].search(s) for k in ("A", "B", "C", "dead", "wr", "tail")}
+    seg = {k: M109LUP_RX[k].search(s) for k in ("A", "B", "C", "S", "dead", "wr", "tail")}
     miss = [k for k, v in seg.items() if not v]
     if miss:
         return {"bad": "bitwa %d: brak segmentu %s" % (d["n"], ",".join(miss))}
@@ -62141,7 +62145,8 @@ def m109lup_battle(s):
     d["B"] = m109lup_block(seg["B"].group(1), 10)
     d["hasC"] = seg["C"].group(1).strip() != "nie bylo"
     d["C"] = m109lup_block(seg["C"].group(1), 8)
-    if d["A"] is None or d["B"] is None or d["C"] is None:
+    d["S"] = m109lup_block(seg["S"].group(1), 5)   # przesiane wedlug przyczyny (recenzja L4)
+    if d["A"] is None or d["B"] is None or d["C"] is None or d["S"] is None:
         return {"bad": "bitwa %d: zly blok rodzajow" % d["n"]}
     d["dead"] = tuple(int(x) for x in seg["dead"].groups())
     d["wr"] = tuple(int(x) for x in seg["wr"].groups())
@@ -62164,6 +62169,11 @@ def m109lup_ids(d):
         for k, v in d["C"].items():
             if v[7] + v[3] + v[6] != v[0] + v[1] - v[2]:
                 ec.append("bitwa %d %s: na liscie+wyjal+rezerwa %d != %d" % (d["n"], k, v[7] + v[3] + v[6], v[0] + v[1] - v[2]))
+    # recenzja L4: przesiane (blok C) = smoki + legendy + olbrzymy-egzotyki + zniszczone + wraki ponizej progu (bez listy trofeow - przesianych 0)
+    for k in set(d["C"]) | set(d["S"]):
+        p = d["C"].get(k, [0] * 8)[2] if d["hasC"] else 0
+        if p != sum(d["S"].get(k, [0] * 5)):
+            ec.append("bitwa %d %s: przesiane %d != przyczyny %d" % (d["n"], k, p, sum(d["S"].get(k, [0] * 5))))
         if d["kh"]:
             for k in ("kon", "uprzaz"):
                 v = d["C"].get(k)
@@ -62191,6 +62201,11 @@ def m109lup_selftest():
         return "bitwa: bloki rodzajow"
     if any(m109lup_ids(b)):
         return "bitwa: tozsamosci na linii kontrolnej %s" % (m109lup_ids(b),)
+    if b["S"].get("tulow") != [0, 0, 0, 1, 0] or b["C"].get("tulow") != [10, 3, 1, 0, 0, 0, 0, 12]:
+        return "bitwa: blok przesianych wedlug przyczyny"
+    bs = m109lup_battle(M109LUP_TEST["battle"].replace("tulow 0/0/0/1/0", "tulow 0/0/0/0/0"))
+    if not bs or bs.get("bad") or not m109lup_ids(bs)[2]:
+        return "bitwa: przesiane != suma przyczyn nie wykryte"
     s = m109lup_battle(M109LUP_TEST["sim"])
     if not s or s.get("bad") or s["hasC"] or not s["sim"] or s["A"] != {} or s["B"].get("kon") != [0, 0, 0, 1, 0, 0, 1, 0, 0, 0] or any(m109lup_ids(s)):
         return "bitwa Send troops: %s" % (s.get("bad") if s else "brak dopasowania")
