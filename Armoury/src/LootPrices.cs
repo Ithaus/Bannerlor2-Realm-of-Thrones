@@ -73,6 +73,17 @@ namespace Armoury
             return ScrapRule && (IsWreck(m) || cond <= WreckState * 100f + 0.001f);
         }
 
+        /// <summary>m110-stan (recenzja R1): slowo wraku w napisach dla gracza - przy stanach "Wrecked" ("Mangled" to wtedy zmasakrowana sztuka do naprawy),
+        /// inaczej "Mangled" jak dotad.</summary>
+        internal static string WreckWordEn { get { return GearState.On ? "Wrecked" : "Mangled"; } }
+
+        /// <summary>m110-stan (recenzja R1): co jest wrakiem (napis w nawiasie) - przy stanach stan Wrecked, inaczej jak dotad.</summary>
+        internal static string WreckDefEn(bool one)
+        {
+            if (GearState.On) return one ? "Wrecked - less than a tenth of its strength left" : "Wrecked - less than a tenth of their strength left";
+            return one ? "Mangled, or worn to a tenth of its worth or less" : "Mangled, or worn to a tenth of their worth or less";
+        }
+
         /// <summary>Napis dla gracza (po angielsku): co jest wrakiem i co z nim zrobic.</summary>
         internal static string WreckWhatEn(int n)
         {

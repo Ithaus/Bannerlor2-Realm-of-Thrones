@@ -941,7 +941,7 @@ namespace Armoury
             if (wait > 0) sb.Append(' ').Append(wait).Append(wait == 1 ? " piece waits" : " pieces wait").Append(" for materials - the market of ").Append(town)
                             .Append(" has not enough ").Append(Kinds(waitMask, true)).Append('.');
             if (wrecks > 0 && LootPrices.ScrapRule) sb.Append(' ').Append(wrecks).Append(LootPrices.WreckWhatEn(wrecks));   // paczka 158: wraki na zlom (Mangled i stany <= 0.10)
-            else if (wrecks > 0) sb.Append(' ').Append(wrecks).Append(wrecks == 1 ? " wreck (Mangled) is" : " wrecks (Mangled) are")
+            else if (wrecks > 0) sb.Append(' ').Append(wrecks).Append(wrecks == 1 ? " wreck (" + LootPrices.WreckWordEn + ") is" : " wrecks (" + LootPrices.WreckWordEn + ") are")   // m110-stan (recenzja R1)
                               .Append(" not restored here - mend wrecks at a forge with your own materials, or salvage them.");
             if (noSmith > 0) sb.Append(' ').Append(noSmith).Append(noSmith == 1 ? " piece is no smith's work and stays as it is." : " pieces are no smith's work and stay as they are.");
             return sb.ToString();
@@ -1095,7 +1095,9 @@ namespace Armoury
             {
                 int count = (int)_fRepAllN.GetValue(__instance), cost = (int)_fRepAllC.GetValue(__instance), gold = MainGold();
                 var afford = gold >= cost ? new TextObject("{=RL_QM_CanAfford}You have enough gold.") : new TextObject("{=RL_QM_NoGold}Not enough gold for all repairs.");
-                var t = new TextObject("{=RL_QM_RepairText}The quartermaster's smiths can remove the 'Plundered' mark from your equipment \u2014 for a price.\n\nTotal repairable: {COUNT} items\nTotal cost: {COST} denars\nYour gold: {GOLD} denars\n\n{AFFORD}");
+                var t = GearState.On   // m110-stan (recenzja R1): znak Spoils "Plundered" gracz widzi jako stan Damaged, "Damaged" i "Battered" jako Mangled
+                    ? new TextObject("{=arm_qm_repair_st}The quartermaster's smiths can mend the Damaged and Mangled spoils of battle in your equipment back to sound \u2014 for a price.\n\nTotal repairable: {COUNT} items\nTotal cost: {COST} denars\nYour gold: {GOLD} denars\n\n{AFFORD}")
+                    : new TextObject("{=RL_QM_RepairText}The quartermaster's smiths can remove the 'Plundered' mark from your equipment \u2014 for a price.\n\nTotal repairable: {COUNT} items\nTotal cost: {COST} denars\nYour gold: {GOLD} denars\n\n{AFFORD}");
                 t.SetTextVariable("COUNT", count); t.SetTextVariable("COST", cost); t.SetTextVariable("GOLD", gold); t.SetTextVariable("AFFORD", afford.ToString());
                 string note = "\n\nThe smiths of " + _lastTown + " do the work and the coin goes into the town's coffers: " + (MendMaterial.RuleOn ? "their share of the days a master spent making each piece, at the day wage of " + _lastTown : "a quarter of the worth a piece has lost") + " for their labour, plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool; the worse the piece, the more material."
                               + GuildMend.BulkEn(_lastBulkN) + LeftEn(_lastWait, _lastWaitMask, _lastWrecks, _lastNoSmith, _lastTown) + BusyEn(_lastBusy, _lastTown);

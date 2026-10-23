@@ -614,7 +614,7 @@ namespace Armoury
                 if (Wrecks > 0)
                 {
                     if (LootPrices.ScrapRule) sb.Append(' ').Append(Wrecks).Append(LootPrices.WreckWhatEn(Wrecks));   // paczka 158: wraki na zlom
-                    else sb.Append(' ').Append(Wrecks).Append(Wrecks == 1 ? " wreck (Mangled) is" : " wrecks (Mangled) are")
+                    else sb.Append(' ').Append(Wrecks).Append(Wrecks == 1 ? " wreck (" + LootPrices.WreckWordEn + ") is" : " wrecks (" + LootPrices.WreckWordEn + ") are")   // m110-stan (recenzja R1)
                            .Append(" not restored for coin - mend wrecks yourself with your own materials, or melt them down.");
                 }
                 if (NoSmith > 0) sb.Append(' ').Append(NoSmith).Append(NoSmith == 1 ? " piece is no smith's work." : " pieces are no smith's work.");
