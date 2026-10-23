@@ -17,12 +17,17 @@ namespace Armoury
     /// HideoutFlagDays dni i meldunek: ile km, w ktora strone swiata,
     /// przy jakiej osadzie. Po wczytaniu gry juz wypatrzone kryjowki
     /// wpisujemy do pamieci bez meldunku - zero spamu przy starcie.
+    /// m109-przesluch: Where (tekst miejsca z Announce, ten sam co do znaku) i Mark (kryjowka ujawniona przez jenca
+    /// w obozie - CampInterrogation: flaga z terminem jak po zwiadzie, bez drugiego meldunku przegladu godzinnego).
     /// </summary>
     internal sealed class HideoutSpotter : CampaignBehaviorBase
     {
         private readonly HashSet<Settlement> _seen = new HashSet<Settlement>();
         private readonly Dictionary<Settlement, CampaignTime> _flagged = new Dictionary<Settlement, CampaignTime>();
         private bool _seeded;
+        private static HideoutSpotter _inst;   // m109-przesluch: instancja kampanii dla Mark (wzor HideoutSight)
+
+        public HideoutSpotter() { _inst = this; }
 
         public override void RegisterEvents()
         {
@@ -76,25 +81,7 @@ namespace Armoury
         {
             try
             {
-                var mp = MobileParty.MainParty;
-                string where = "";
-                if (mp != null)
-                {
-                    Vec2 me = mp.Position.ToVec2();
-                    Vec2 it = hideout.GetPosition2D;
-                    float dist = me.Distance(it);
-                    int km = (int)Math.Round(dist * Wayfinder.KmPerUnit);
-                    where = "~" + km + " km to the " + Compass(it - me);
-                }
-                Settlement near = null; float best = float.MaxValue;
-                foreach (var st in Settlement.All)
-                {
-                    if (st == null || !(st.IsTown || st.IsCastle || st.IsVillage)) continue;
-                    float d = st.GetPosition2D.Distance(hideout.GetPosition2D);
-                    if (d < best) { best = d; near = st; }
-                }
-                if (near != null)
-                    where += (where.Length > 0 ? ", " : "") + "near " + near.Name + " (" + (int)Math.Round(best * Wayfinder.KmPerUnit) + " km)";
+                string where = Where(hideout);
                 string who = hideout.Hideout.IsInfested && hideout.Hideout.MapFaction != null ? hideout.Hideout.MapFaction.Name.ToString() : "bandits";
                 Log.Player("Hideout spotted: " + who + " lair " + where + ". Flagged on the map for " + s.HideoutFlagDays + " days.", true);
                 Log.Info("HideoutSpotter: " + hideout.StringId + " (" + who + ") " + where + ".");
@@ -105,6 +92,49 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("HideoutSpotter.Announce", e); }
+        }
+
+        /// <summary>m109-przesluch: miejsce kryjowki dla gracza - "~45 km to the north-east, near X (6 km)" (km i strona swiata od partii gracza, najblizsza
+        /// osada gry). Kod wyjety z Announce bez zmian (ten sam tekst meldunku).</summary>
+        internal static string Where(Settlement hideout)
+        {
+            var mp = MobileParty.MainParty;
+            string where = "";
+            if (mp != null)
+            {
+                Vec2 me = mp.Position.ToVec2();
+                Vec2 it = hideout.GetPosition2D;
+                float dist = me.Distance(it);
+                int km = (int)Math.Round(dist * Wayfinder.KmPerUnit);
+                where = "~" + km + " km to the " + Compass(it - me);
+            }
+            Settlement near = null; float best = float.MaxValue;
+            foreach (var st in Settlement.All)
+            {
+                if (st == null || !(st.IsTown || st.IsCastle || st.IsVillage)) continue;
+                float d = st.GetPosition2D.Distance(hideout.GetPosition2D);
+                if (d < best) { best = d; near = st; }
+            }
+            if (near != null)
+                where += (where.Length > 0 ? ", " : "") + "near " + near.Name + " (" + (int)Math.Round(best * Wayfinder.KmPerUnit) + " km)";
+            return where;
+        }
+
+        /// <summary>m109-przesluch: kryjowka ujawniona przez jenca (CampInterrogation ustawil IsSpotted i IsVisible). Wpis do _seen (przeglad godzinny nie melduje
+        /// drugi raz); przy HideoutFlagEnabled i HideoutFlagDays > 0 flaga na mapie z terminem zdjecia, jesli obiektu nikt jeszcze nie sledzi (flaga gracza,
+        /// Wayfinder - nie przejmujemy). Dziala przed i po pierwszym przegladzie (siew tylko dopisuje do _seen, _flagged zostaje). Zwraca, czy flaga stoi.</summary>
+        internal static bool Mark(Settlement hideout)
+        {
+            var me = _inst;
+            if (me == null || hideout == null) return false;
+            me._seen.Add(hideout);
+            var s = Settings.Current;
+            var vt = Campaign.Current != null ? Campaign.Current.VisualTrackerManager : null;
+            if (s == null || !s.HideoutFlagEnabled || s.HideoutFlagDays <= 0 || vt == null) return false;
+            if (vt.CheckTracked(hideout)) return true;   // flaga juz stoi (nasza, gracza albo Wayfindera) - bez przejmowania
+            vt.RegisterObject(hideout);
+            me._flagged[hideout] = CampaignTime.DaysFromNow(s.HideoutFlagDays);
+            return true;
         }
 
         /// <summary>Osiem stron swiata; +Y to polnoc na mapie.</summary>

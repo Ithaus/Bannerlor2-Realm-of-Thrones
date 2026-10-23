@@ -5024,6 +5024,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool GossipPerDrinkByCharm { get; set; } = true;
 
+        [SettingPropertyBool("Gossip Per Drink By Persuasion", HintText = "with Gossip Per Drink By Charm: what loosens tongues over a tankard is your persuasion - your Charm plus what the perks add to persuasion: Imposing Stature +30, Meaningful Favors +10, Moral Leader +25 among folk of your own culture or Natural Leader +25 among strangers, +20 once your Charm reaches 250, +5 or +10 on the easier persuasion settings. The same measure counts when you question prisoners in camp. Off = Charm alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool GossipPerDrinkByPersuasion { get; set; } = true;
+
         [SettingPropertyBool("Gossip Tournaments", HintText = "the gossip tells of tourneys: which town holds one, how far away it is, how long ago it was proclaimed and what the prize is - only tourneys that are really being held (far ones only once the news could have reached the inn). Off = no tourneys in the gossip, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool GossipTournaments { get; set; } = true;
@@ -9140,6 +9144,10 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int SutlerLaundryMenPerWasher { get; set; } = 20;
 
+        [SettingPropertyBool("Camp Interrogation", HintText = "'Question the prisoners' in your camp menu: outlaws you hold captive can tell you where their lair is - their own band's den if you broke the band lately, otherwise the nearest lair of their kind within a few days' ride; the lair is marked on your map. Talk them round (your persuasion: Charm and the perks that help persuasion; a wounded man or one long in chains breaks sooner, veterans and chiefs hold out) or put them to the question - far more likely to talk (Roguery and Scarface help), but a man may die under it (Forgivable Grievances spares some): torture costs you Mercy, a death more, merciful companions in your party think less of you and the tale gets about the inns. Outlaws of each kind (and each chief) once a day for each. Off = no option", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampInterrogation { get; set; } = true;
+
         [SettingPropertyBool("Notice Board", HintText = "'Read the notice board' in every town: everyone with work for you - the townsfolk, the lords in town and those of the town lord's house who are away, and the notables of the town's villages - with what they want, what they pay (the same sum they will name in the conversation), who pays and whether he can, how long the offer stays up and where to find them. From a notice you can go and see the person in town, talk to them at once, or mark them on the map. Off = no board, and no bounties from the watch or the headmen either", RequireRestart = false)]
         [SettingPropertyGroup("Notice board")]
         public bool NoticeBoard { get; set; } = true;
@@ -10555,6 +10563,7 @@ namespace Armoury
             s.InnGossipPages = InnGossipPages;
             s.InnGossipNeedsDrink = InnGossipNeedsDrink;
             s.GossipPerDrinkByCharm = GossipPerDrinkByCharm;
+            s.GossipPerDrinkByPersuasion = GossipPerDrinkByPersuasion;
             s.GossipTournaments = GossipTournaments;
             s.GossipMatchmaking = GossipMatchmaking;
             s.DrinkDrunkHangover = DrinkDrunkHangover;
@@ -11584,6 +11593,7 @@ namespace Armoury
             s.SutlerLaundryCutPercent = SutlerLaundryCutPercent;
             s.SutlerLaundryDays = SutlerLaundryDays;
             s.SutlerLaundryMenPerWasher = SutlerLaundryMenPerWasher;
+            s.CampInterrogation = CampInterrogation;
             s.NoticeBoard = NoticeBoard;
             s.NoticeBoardVillages = NoticeBoardVillages;
             s.NoticeBoardOpening = NoticeBoardOpening;

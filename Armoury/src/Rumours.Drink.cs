@@ -271,7 +271,8 @@ namespace Armoury
             var me = Hero.MainHero;
             if (barred != null || me == null) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}" + (barred ?? "Nobody pours ale here now.")); return true; }   // recenzja (gra): zajazd wroga / rabowany - jak nocleg
             var fresh = Fresh(Pool(at, key), key);
-            int cups = InnDrink.Cups, max = InnDrink.MaxCups(), ch = InnDrink.Charm();
+            Persuasion.Parts pp;
+            int cups = InnDrink.Cups, max = InnDrink.MaxCups(), ch = InnDrink.Talk(priceTown != null ? priceTown.Culture : null, out pp);   // m109-przesluch: miara perswazji (klucz off - Urok)
             if (fresh.Count == 0)
             {
                 args.IsEnabled = false;
@@ -294,7 +295,8 @@ namespace Armoury
             var t = new StringBuilder("Nobody talks to a man with a dry tongue: a tankard of ale costs " + price + " d, and the coin goes to the innkeeper. ");
             t.Append("Over it you hear ").Append(per == fresh.Count ? "all " + fresh.Count : per + " of the " + fresh.Count).Append(fresh.Count == 1 ? " piece" : " pieces")
              .Append(" of news you have not heard here yet");
-            if (InnDrink.ByCharm) t.Append(" (your Charm ").Append(ch).Append(": one piece below 50, two from 50, three from 110, four from 170, everything from 230)");
+            if (InnDrink.ByPersuasion) t.Append(" (your persuasion ").Append(ch).Append(" - ").Append(Persuasion.Words(pp)).Append(": one piece below 50, two from 50, three from 110, four from 170, everything from 230)");
+            else if (InnDrink.ByCharm) t.Append(" (your Charm ").Append(ch).Append(": one piece below 50, two from 50, three from 110, four from 170, everything from 230)");
             t.Append('.');
             if (InnDrink.DrunkOn)
             {
@@ -356,7 +358,8 @@ namespace Armoury
             InnDrink.DCups++; InnDrink.DPaid += paid;
             if (PayNotes.On) PayNotes.Paid("tankard", paid, " for a tankard of ale at " + place + ".");   // m96-wies: komunikat z powodem (klucz wylaczony - komunikat gry)
             string state = InnDrink.OnTankard();
-            int ch = InnDrink.Charm();
+            Persuasion.Parts pp;
+            int ch = InnDrink.Talk(priceTown != null ? priceTown.Culture : null, out pp);   // m109-przesluch: miara perswazji wobec ludzi miasta ceny kufla (klucz off - Urok)
             int n = InnDrink.PerDrink(ch, fresh.Count);
             var take = fresh.GetRange(0, n);
             int left = fresh.Count - n;
@@ -397,6 +400,7 @@ namespace Armoury
                      + " (beczka piwa w " + (priceTown != null ? priceTown.StringId : "-") + " " + cask + "), zaplacil " + paid + " (gracz " + g0 + " -> " + me.Gold + ") -> " + recip
                      + " | kontrola obiegu: roznica " + diff
                      + " | Urok " + ch + " -> plotek " + n + " z " + fresh.Count + " nowych (pula " + pool.Count + ", zostalo " + left + ")"
+                     + (InnDrink.ByPersuasion ? " (perswazja m109: " + Persuasion.LogText(pp) + ")" : "")
                      + " [bandy " + cats[0] + ", kryjowki " + cats[1] + ", wojska " + cats[2] + ", karawany " + cats[3] + ", ceny " + cats[4] + ", wojny " + cats[5]
                      + ", turnieje " + cats[CatTourn] + ", swaty " + cats[CatMatch] + "]"
                      + " | turnieje " + tn + " (prawdziwe " + tTrue + "), swaty " + mn + " (prawdziwe " + mTrue + ")" + (refs.Length > 0 ? ": " + refs : "")

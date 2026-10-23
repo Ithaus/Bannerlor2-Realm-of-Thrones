@@ -51,6 +51,9 @@ namespace Armoury
         private sealed class Band { public int First; public bool Known; public int Raids; public string Name; public bool Female; }
         private sealed class News { public int Kind, Day, N; public float X, Y; public string A = "", B = "", C = ""; }
         private const int NWar = 1, NPeace = 2, NCaptured = 3, NRaided = 4, NBattle = 5, NSiege = 6;
+        // m109-przesluch: wiesc o jencu zameczonym przez gracza w obozie (CampInterrogation - smierc pod torturami); A = gracz, C = najblizsza osada, N = ilu tej doby.
+        // Stary DLL odrzuca rodzaj 7 przy odczycie jako zly wpis (kind > NSiege - bad++), bez wywrotki.
+        private const int NCruel = 7;
         private const int NewsMax = 60, NewsDays = 60, BandsMax = 6000, SaveMaxChars = 400000;
         // n22f (blad galezi p5-kruki: NotYet przy ksiedze 60 z sw-zajazdy): przy RavenNews wiesc zostaje w ksiedze, dopoki moze jeszcze leciec z nia kruk (Ravens.HoldDays),
         // najwyzej NewsMaxRavens. Dowod (8 biegow 19/20.10, linia "wiesci N (nowe dzis M)"): 9.7-12.1 nowych wiesci na dobe, ksiega pelna (60) w 82-97% dob, wiec wiesc
@@ -238,6 +241,28 @@ namespace Armoury
             catch (Exception e) { Stumble("OnMapEventEnded", e); }
         }
 
+        /// <summary>m109-przesluch: wiesc NCruel - gracz (who) zameczyl jenca w obozie przy at; najblizsza nazwana osada do 40 jedn. (jak wielkie bitwy). Druga smierc tej samej
+        /// doby od tego samego who podbija N w tym samym wpisie (C bez zmian - tozsamosc wiesci Item.Id ta sama, wiec karczma nie podaje jej jako nowej).
+        /// false - plotki wylaczone (klucz InnGossip NIE) albo wyjatek.</summary>
+        internal static bool AddCruelty(Vec2 at, string who)
+        {
+            if (!On) return false;
+            try
+            {
+                string a = Clean(who);
+                int today = Today;
+                for (int i = _news.Count - 1; i >= 0; i--)
+                {
+                    var w = _news[i];
+                    if (w.Kind == NCruel && w.Day == today && w.A == a) { w.N = Math.Max(1, w.N) + 1; return true; }
+                }
+                var near = NearestNamed(at, 40f);
+                AddNews(NCruel, at, who, "", near != null ? near.Name.ToString() : "", 1);
+                return true;
+            }
+            catch (Exception e) { Stumble("AddCruelty", e); return false; }
+        }
+
         internal static void OnSiegeStarted(SiegeEvent se)
         {
             if (!On || se == null || se.BesiegedSettlement == null) return;
@@ -390,7 +415,7 @@ namespace Armoury
                     int kind, day, n; float x, y;
                     if (a.Length < 8 || !int.TryParse(a[0], NumberStyles.Integer, Inv, out kind) || !int.TryParse(a[1], NumberStyles.Integer, Inv, out day)
                         || !float.TryParse(a[2], NumberStyles.Float, Inv, out x) || !float.TryParse(a[3], NumberStyles.Float, Inv, out y)
-                        || !int.TryParse(a[4], NumberStyles.Integer, Inv, out n) || kind < NWar || kind > NSiege) { bad++; continue; }
+                        || !int.TryParse(a[4], NumberStyles.Integer, Inv, out n) || kind < NWar || kind > NCruel) { bad++; continue; }   // m109-przesluch: + NCruel
                     if (_news.Count < NewsMaxRavens) _news.Add(new News { Kind = kind, Day = day, X = x, Y = y, N = n, A = a[5], B = a[6], C = a[7] });   // n22f: ksiega z krukami
                 }
                 if (!Ravens.On && _news.Count > NewsMax) _news.RemoveRange(0, _news.Count - NewsMax);   // n22f: klucz wylaczony - 60 najnowszych od razu po wczytaniu, jak AddNews
@@ -1208,6 +1233,10 @@ namespace Armoury
                         break;
                     case NSiege:
                         text = when + " " + (n.A.Length > 0 ? n.A : "a host") + (n.B.Length > 0 ? " of " + n.B : "") + " laid siege to " + (place ?? "a stronghold " + Days(d) + " to the " + Dir(at, p)) + ".";
+                        break;
+                    case NCruel:   // m109-przesluch: jeniec zameczony w obozie gracza
+                        text = when + " " + (n.A.Length > 0 ? n.A : "a lord") + " had " + (n.N <= 1 ? "a captured outlaw" : n.N + " captured outlaws") + " tortured to death "
+                               + (place != null ? "near " + place : Days(d) + " to the " + Dir(at, p)) + ".";
                         break;
                 }
                 if (text == null) continue;

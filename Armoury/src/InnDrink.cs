@@ -43,6 +43,8 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.InnGossip && s.InnGossipNeedsDrink; } }
         internal static bool ByCharm { get { var s = Settings.Current; return s != null && s.GossipPerDrinkByCharm; } }
+        // m109-przesluch (pkt 4c): plotek na kufel wedlug miary perswazji (Persuasion.Measure - ta sama co przy przesluchaniu jencow), nie samego Uroku
+        internal static bool ByPersuasion { get { var s = Settings.Current; return ByCharm && s != null && s.GossipPerDrinkByPersuasion; } }
         internal static bool DrunkOn { get { var s = Settings.Current; return s != null && s.InnGossip && s.InnGossipNeedsDrink && s.DrinkDrunkHangover && s.NightRestEnabled; } }
 
         // ------------------------------------------------------------ stan gracza (zapis arm_drink)
@@ -130,6 +132,16 @@ namespace Armoury
         internal static int Charm()
         {
             try { var me = Hero.MainHero; return me != null ? me.GetSkillValue(DefaultSkills.Charm) : 0; } catch { return 0; }
+        }
+
+        /// <summary>m109-przesluch (pkt 4c): "Urok" kufla - przy ByPersuasion miara perswazji gracza wobec ludzi karczmy (kultura miasta ceny kufla; p - skladniki),
+        /// inaczej sam Urok jak dotad (p puste).</summary>
+        internal static int Talk(CultureObject folk, out Persuasion.Parts p)
+        {
+            p = new Persuasion.Parts { LeaderPerk = "-" };
+            if (!ByPersuasion) return Charm();
+            p = Persuasion.Measure(Hero.MainHero, folk);
+            return p.Total;
         }
 
         private static int DrunkPct(int over)
