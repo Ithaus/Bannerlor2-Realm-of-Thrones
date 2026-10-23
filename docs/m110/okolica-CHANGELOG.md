@@ -14,8 +14,11 @@
   zwykly meldunek "Hideout spotted" z flaga, a znacznik okolicy znika sam.
 - Pomiar na mapie ROT (266 kryjowek): od herszta albo czlowieka z bandy znacznik stoi srednio ok. 4 jedn. mapy (ok. 18 km) od kryjowki - mniej wiecej co drugi raz
   kryjowke widac juz przy znaczniku, prawie zawsze po malym kolku. Od zwyklego bandyty ok. 7 jedn. (ok. 30 km) - trzeba przeszukac okolice.
-- Ten sam jeniec (ta sama banda) nie wskaze drugi raz kryjowki, ktorej juz szukasz. Limity dnia bez zmian.
-- Wylaczasz w MCM: "Interrogation Area Only" (NIE = jeniec pokazuje dokladna kryjowke jak dotad).
+- Ten sam jeniec (ta sama banda) nie wskaze drugi raz kryjowki, ktorej juz szukasz. Wyjatek: jesli szukasz jej tylko po przyblizonej wskazowce zwyklego
+  bandyty ("half a day's ride ..."), a zlapiesz herszta albo czlowieka z tej bandy - on ja doprecyzuje (km), stary znacznik zastapi nowy. Limity dnia bez zmian.
+- Odpiety znacznik zostaje odpiety takze po zapisie gry (wczesniej po kazdym zapisie znowu przyklejal sie do brzegu ekranu).
+- Jesli wylaczysz flagi (Hideout Flag Enabled) i potem wlaczysz, znaczniki trwajacych wskazowek wroca w ciagu godziny gry (nie trzeba wczytywac).
+- Wylaczasz w MCM: "Interrogation Area Only" (NIE = jeniec pokazuje dokladna kryjowke jak dotad - od razu, takze te, ktorych juz szukasz po wskazowce).
 
 **Problem:** Jeff 23.10 ok. 15:50 na pytanie "czy jeniec ma podawac dokladna kryjowke (jak teraz), czy tylko okolice, ktora trzeba jeszcze sprawdzic zwiadem":
 "zwiadem". W 104 (m109-przesluch) jeniec ujawnial dokladna kryjowke: `Hideout.IsSpotted`, `Settlement.IsVisible` i flaga `HideoutSpotter.Mark` - zwiad nie byl potrzebny.
@@ -47,6 +50,28 @@
 - `tools/sprawdz_logi.py`: PRZES-2 przyjmuje MOWI z "po NIE, flaga NIE" + doklejona wskazowke tej kryjowki (przypadki syntetyczne "okolica" TAK i
   "okolica-bez-wskazowki" NIE); nowa grupa `m110okol` (OKOL-S, OKOL-S2, OKOL-0..9; opis w --help).
 
+**Po recenzjach (poprawnosc + kod, 23.10) - weryfikacja i poprawki:**
+- R1 (obie recenzje) PRAWDA: odpiety znacznik po zapisie wygladal na przypiety. Dowod (dekompilacja 1.4.8): `MapMarkerManager.CreateMapMarker` = `RegisterObject`
+  -> `OnMapMarkerCreated` -> `MapTrackerProvider.AddIfEligible` -> `new MapMarkerTrackerItemVM`, konstruktor `MapTrackerItemVM<T>` czyta `IsTracked = CheckTracked`
+  (wtedy TAK), potem zmienia go tylko `Track`/`Untrack` (klik kulki). Poprawka: `PutMarker` po odpieciu oglasza znacznik drugi raz
+  (`CampaignEventDispatcher.Instance.OnMapMarkerRemoved` + `OnMapMarkerCreated`) - provider buduje kafelek od nowa jako odpiety. Nazwy tych zdarzen sa tylko
+  w TaleWorlds.CampaignSystem i SandBox.ViewModelCollection (grep po DLL gry i 51 modulow). Test T12: "kafelek odpietych odswiezony N/N".
+- R2 poprawnosc / R3 kod PRAWDA: klucz NIE nie byl 1:1 przy czynnych wskazowkach z czasu klucza TAK (`Hinted` bez `AreaOn`). Poprawka: `HintBlocks` -
+  przy kluczu NIE nic nie pomija; kryjowka ujawniona dokladnie, wskazowke konczy przeglad godzinny ("znaleziona (droga przeglad)", znacznik zdjety).
+- R3 poprawnosc PRAWDA (zadanie: blokada tylko "ta sama grupa"): herszt / czlowiek bandy pomijal swoja kryjowke, gdy miala wskazowke przyblizona od kogos
+  innego, i wskazywal inna. Poprawka: `HintBlocks(st, exact)` - zrodlo bohater|banda pomija tylko wskazowke dokladna; przyblizona ("kultura") konczy sie
+  linia "koniec wskazowki ... | doprecyzowana" i zaraz po niej idzie nowa (km). Przyblizona na przyblizona i dokladna na dokladna - dalej pominiete.
+  Test T7 (klucz TAK): najpierw probna przyblizona H1, herszt ja doprecyzowuje ("doprecyzowanie TAK"). Prog OKOL-4.
+- R4 (obie) PRAWDA: wlaczenie flag w trakcie sesji nie stawialo znacznikow czynnym wskazowkom (do wczytania). Poprawka: `_markersOwed` (wskazowka bez
+  znacznika przy flagach wylaczonych: `Give`, zapis, start sesji) - pierwszy przeglad godzinny przy flagach wlaczonych stawia brakujace znaczniki raz (linia
+  "flagi wlaczone - znaczniki postawione N z M"). Test T13. Wylaczenie flag bez zmian (znaczniki znikaja przy najblizszym zapisie).
+- R2 kod PRAWDA: OKOL-6 dawal falszywe NIE (a) przy "Save And Exit" - `MbEvent.AddNonSerializedListener` dopisuje na poczatek listy, wiec `MapScreen.OnSaveOver`
+  (pozniej zarejestrowany) idzie przed naszym i konczy gre; (b) przy flagach wylaczonych. Poprawka: linia "po zapisie" i linia doby licza
+  "nieodtworzone: flagi wylaczone N, brak kampanii M"; OKOL-6: odtworzone + nieodtworzone z powodem = zdjete. Zgubiony bez powodu dalej NIE (test syntetyczny).
+- R5 kod NIEPEWNE (interpretacja "wpis o sukcesie"): przy znalezieniu jest linia logu "koniec wskazowki | znaleziona", suma "znalezione" w zapisie i w linii
+  doby; gracz widzi zwykly meldunek HideoutSpotter ("Hideout spotted") z flaga i znika znacznik okolicy. Osobnego komunikatu "to kryjowka z zeznania" nie
+  dodano (zero kodu przy okazji) - do decyzji Jeffa po grze.
+
 **Odstepstwa od projektu (male):**
 - zapis wskazowki ma godzine wskazania (`startH`) zamiast doby (linia konca podaje "od wskazania N godz.");
 - `Give` liczy liczniki doby i sume "wskazane" dla kazdej wskazowki (takze probnej testu) - jedna zasada liczenia z suma "znalezione" w `End`;
@@ -63,8 +88,13 @@
 - `VisualTrackerManager`: MapMarker to osobny obiekt (flagi osad Wayfinder, NoticeBoard, zadan - bez kolizji); `MapMarkerManager` w modach uzywa tylko NavalDLC (wlasne id).
 - Zapis: znacznik zdejmowany przed zapisem - zapis go nie ma; gdyby trafil (potkniecie), nowa DLL sprzata go przy starcie ("stare znaczniki w zapisie N", OKOL-6 NIE).
   Szosta czesc i sumy 6-7: DLL 104 czyta czesci 1-5 i pierwsze 6 sum (`Parse` 104: petla do dlugosci wlasnej tablicy). Stary zapis: brak czesci = brak wskazowek.
-- Klucz NIE: zachowanie 1:1; w zapisie dochodzi pusta szosta czesc i 2 zera sum (dane). Wskazowki z czasu klucza TAK dobiegaja terminu.
-- `HideoutFlagEnabled` przelaczony na NIE w trakcie: znaczniki znikna przy najblizszym zapisie (nie wracaja po nim).
+- Klucz NIE: zachowanie 1:1 (takze przy wskazowkach z czasu klucza TAK - `HintBlocks` nic nie pomija); w zapisie dochodzi pusta szosta czesc i 2 zera sum
+  (dane). Wskazowki z czasu klucza TAK dobiegaja terminu albo koncza sie przy dokladnym ujawnieniu (przeglad godzinny).
+- `HideoutFlagEnabled` przelaczony na NIE w trakcie: znaczniki znikna przy najblizszym zapisie (nie wracaja po nim, linia "nieodtworzone: flagi wylaczone N");
+  z powrotem na TAK - wracaja w pierwszym przegladzie godzinnym (`MarkersOwed`, raz na zmiane stanu).
+- Doprecyzowanie: suma "wskazane" liczy obie wskazowki tej kryjowki (przyblizona i dokladna); termin liczy sie od nowa od dokladnej.
+- Ogloszenie odpietego znacznika drugi raz: zdarzenia `OnMapMarkerRemoved`/`OnMapMarkerCreated` sluchane tylko przez `MapTrackerProvider` (kafelek usuniety
+  i zbudowany od nowa) - tylko przy stawianiu odpietego (po zapisie, po wczytaniu, przeglad po wlaczeniu flag), nie co klatke.
 - Zamknieta ekonomia: zero zlota i towarow. Limity doby, miara perswazji, tortury i kary bez zmian.
 - Niesprawdzone w grze (okno - sprawdza Jeff): wyglad znacznika na mapie ROT (herb bandytow, napis), dymek, odpinanie, teksty. Zasieg wzroku noca i z modelami
   widocznosci BK / BKROTPatch / AIInfluence / NavalDLC nieznany (probka 3.6 jedn. z logu Jeffa).
@@ -73,8 +103,16 @@
 - Galaz m110-stan rownolegle: mozliwy konflikt tekstowy w Settings.cs / McmSettings.cs - po scaleniu `python -I tools/gen_mcm.py`.
 - Slady testu w zapisach autotestu: wskazowka H2 do terminu, `_known` H1/H2.
 
-**Plan autotestu:** p4 (flaga przesluch: T0-T12 TAK albo POMINIETY, grupy m109przes, m110okol, m100kryjowki, m98plotki) -> lc (DLL 104.1 wczytuje zapis p4 po
-nazwie: linia m109 "zapis: pamiec ...", PRZES-1 i KR-1 0) -> c4 (nowa DLL, ten sam zapis: "zapis: wskazowek >= 1 (zlych 0)", "stare znaczniki w zapisie 0",
-koniec H2 droga godzinna) -> p20 -> wczyt (stary zapis: "brak czesci wskazowek" / "brak klucza") -> bitwa (0 ERROR, m110 tylko start i doba).
+**Plan autotestu:** p4 (flaga przesluch: T0-T13 TAK albo POMINIETY, w tym T7 "doprecyzowanie TAK", T12 "kafelek odpietych odswiezony 1/1", T13 TAK;
+grupy m109przes, m110okol, m100kryjowki, m98plotki) -> lc (DLL 104.1 wczytuje zapis p4 po nazwie: linia m109 "zapis: pamiec ...", PRZES-1 i KR-1 0) -> c4
+(nowa DLL, ten sam zapis: "zapis: wskazowek >= 1 (zlych 0)", "stare znaczniki w zapisie 0", koniec H2 droga godzinna) -> p20 -> wczyt (stary zapis: "brak
+czesci wskazowek" / "brak klucza") -> bitwa (0 ERROR, m110 tylko start i doba). We wszystkich: OKOL-4 (doprecyzowanych >= 1 w p4 przy T7), OKOL-6 0
+niezgodnych (pary "po zapisie" z "nieodtworzone: ..."), linia "flagi wlaczone" tylko z T13.
+NIEPEWNE do sprawdzenia (autotest tego nie widzi): wyglad kafelka odpietego po zapisie (R1 - okno, sprawdza Jeff: odpiety znacznik po autozapisie nie wraca na
+brzeg ekranu); "Save And Exit" przy czynnym znaczniku (R2 kod a - w logu "po zapisie ... brak kampanii 1" albo "odtworzone 1", OKOL-6 TAK w obu); klucz NIE
+przy czynnej wskazowce (R2 - tylko w kodzie; bieg z kluczem NIE na zapisie c4: wskazana kryjowka ujawniona dokladnie, koniec "znaleziona (droga przeglad)");
+"wpis o sukcesie" dla gracza (R5 - decyzja Jeffa).
 
-**Status:** DO SPRAWDZENIA (build Armoury 0 bledow; progi: OKOL-S/S2 i PRZES-S/S2 TAK; na logach 104 m110okol - INFO, m109przes bez zmian werdyktow).
+**Status:** DO SPRAWDZENIA (build Armoury 0 bledow; progi: OKOL-S/S2 i PRZES-S/S2 TAK, w tym nowe przypadki syntetyczne zapis bez flag, zapis i wyjscie,
+zgubiony znacznik, doprecyzowanie dobre i zle; na logach 104 m110okol - INFO, m109przes bez zmian werdyktow - PRZES-5 NIE w 109f-p20 jest i w bazie b49bdf78).
+Poprawki po recenzjach: commity 4e3c23c2 (kod), 9072aab9 (progi).
