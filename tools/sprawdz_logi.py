@@ -1793,7 +1793,6 @@ Uzycie (Python 3, tylko odczyt):
                     M7G-9 ERROR nowych funkcji (takze CartGuard.Guard(woz), CartGuard.Unload, DsTowns.*, NoticeBoard.Export, Watch.WatchImport2), zly format segmentu Wozy, proby
                     niezgodne i BLAD eksportu 0. Klucz liczy sie jako TAK tylko z linii startu: log bez linii m107 (sprzed m107) - progi kluczy INFO, bez wyjatku; werdykt bez
                     klucza dalej daja M7G-11 i M7G-9 oraz progi formatu / czasu / poziomu przy obecnych liniach (M7G-12, M7G-24, M7G-31, M7G-33, M7G-41, M7G-44, M7G-53).
-<<<<<<< HEAD
 --grupa m109oboz  : (23.10, w-toku/m109-oboz - Jeff 22.10 21:20 "inny jest oboz, jak wchodze do obozu, a inny, jak jestem atakowany w obozie"; Armoury/src/CampScene.cs
                     BuildLikeWalk, CampWalk.cs CampLayout; klucz Camp Battle Like Walk; pliki testu CrashScribe/armoury-oboz-bitwa.flag i armoury-oboz-spacer.flag)
                     python -I tools/sprawdz_logi.py --grupa m109oboz <Armoury-*.log> (strumieniowo). OBOZ-S self-test wyrazen (linie kontrolne jak w kodzie C#, nowe linie
@@ -1824,10 +1823,6 @@ Uzycie (Python 3, tylko odczyt):
                     (INFO), KUZ-8d wyjscie z ekranu: kazde "ekran zamkniety" (BLAD albo zamkniecie przez Armoury - NIE; brak - INFO). KUZ-9 ERROR SmithXp / ForgeBill / ForgeBillTest 0, linie "ForgeView
                     blad" 0, potkniecia max 0, kwit BK inny niz przepis 0 (kwit wlasny BK - pociski procy itp. - INFO w KUZ-I). KUZ-I ruch ekranu, podpowiedzi przycisku
                     broni, kwit wlasny BK (INFO). Log bez linii m109 - INFO.
---grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
-||||||| 44c03a05
---grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
-=======
 --grupa m109lup   : (23.10, galaz w-toku/m109-lup - Jeff 22.10 pkt 8 "pokonalem robber squires, bylo dwoch konnych - nie dostalem za nich koni ani
                     ich pancerzy koni, ani zbroi"; Armoury/src/LootTally.cs, BattlefieldLaw.cs, HorseFate.cs; klucze Fallen Rider Horses Looted, Rider Blow
                     Spares Harness, Extra Broken Armor Wrecks; plik testu CrashScribe/armoury-lup.flag) python -I tools/sprawdz_logi.py --grupa m109lup
@@ -1846,8 +1841,7 @@ Uzycie (Python 3, tylko odczyt):
                     z dzialki na liste albo do sakw (lista + sakwy = wejscia - padle, zwrot/przepadlo/zostaje 0); flaga bez pokrycia - NIE, bez flagi - INFO.
                     LUP-J9 linie doby 'Lup bitew (m109)': Spoils wyjal kon/uprzaz 0 przy kluczu (brak linii - INFO). LUP-J10 pomiar na bitwe wobec liczby
                     wywolan (kazdy polegly czlowiek misji, takze wlasny): <= 20 ms + 0.05 ms x wywolan TAK, <= 50 ms + 0.2 ms x wywolan INFO, wiecej NIE.
---grupa na7      : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
->>>>>>> w-toku/m109-lup
+--grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
                     kroku A7 od D) i "KS: A7 sezon zamkniety (f5-a7)". NA7-0 linie paczki (nierozpoznanych 0; brak - INFO), NA7-1 linia w kazdej dobie kroku (co 7 dob od D,
@@ -60473,16 +60467,12 @@ def main(argv):
         return m106wozy_main(logp, tabp, until_arg)   # m106wozy (22.10, w-toku/m106-wozy): woz zawsze wraca (drogi ladowe, brama wroga, pamiec tras, straznik, dosypka przy wyjezdzie) i fach wsi pod KS
     if group == "m107gosp" and logp:
         return m107gosp_main(logp, until_arg)   # m107gosp (22.10, w-toku/m107-gospodarka): biedne wsie (miara M3W-2), stojace wozy (K1), zaleglosci zamkow (K2/K3), ziarno (K4/K5), zapis tablicy (K6)
-<<<<<<< HEAD
     if group == "m109oboz" and logp:
         return m109oboz_main(logp)   # m109oboz (23.10, w-toku/m109-oboz): bitwa w obozie stawia ten sam oboz co spacer (CampScene.BuildLikeWalk, CampLayout), test spaceru
     if group == "m109kuz" and logp:
         return m109kuz_main(logp)   # m109kuz (23.10, w-toku/m109-kuznia): kowalstwo wolniej (SmithingXpFactor) i rachunek kuzni na ekranie kucia (ForgeBill, ForgeView)
-||||||| 44c03a05
-=======
     if group == "m109lup":
         return m109lup_main(logp)   # m109lup (23.10, w-toku/m109-lup): konie, uprzaz i zbroja powalonych jezdzcow w lupie gracza - pomiar LootTally, Z1, Z2, hak testu
->>>>>>> w-toku/m109-lup
     if group == "m105gosp5" and logp:
         return m105gosp5_main(logp)   # m105gosp5 (21.10, m105-gospodarka5): ulga pana dla wsi ponizej skrzyni przy wozie i czynsz darowany do skrzyni (VillageTakings.cs, DsVillage.cs)
     if group == "p6a7" and logp:
@@ -64104,7 +64094,6 @@ def m107gosp_main(logp, until=120):
     return 0
 
 
-<<<<<<< HEAD
 # ------------------------------------------------------------ m109oboz (23.10, w-toku/m109-oboz: bitwa w obozie stawia ten sam oboz co spacer po obozie - Armoury/src/
 # CampScene.cs BuildLikeWalk, CampWalk.cs CampLayout; klucz CampBattleLikeWalk; autotest: pliki CrashScribe/armoury-oboz-bitwa.flag i armoury-oboz-spacer.flag)
 M109OBOZ_TAG = "CampScene (m109): "
@@ -65245,8 +65234,6 @@ def m109kuz_main(logp):
     return 0
 
 
-||||||| 44c03a05
-=======
 # ---------------- m109lup (23.10, galaz w-toku/m109-lup - Jeff 22.10 pkt 8: "pokonalem robber squires, bylo dwoch konnych - nie dostalem za nich koni ani
 # ich pancerzy koni, ani zbroi"). Armoury/src/LootTally.cs (pomiar lupu bitwy wedlug rodzaju, hak autotestu CrashScribe/armoury-lup.flag), BattlefieldLaw.cs
 # (HoldMounts / ReturnMounts / MountsFinalizer - klucz Fallen Rider Horses Looted, SpareHarness - Z2 Rider Blow Spares Harness, AddWreck - Z1 Extra Broken
@@ -65670,6 +65657,5 @@ def m109lup_main(logp):
     return 0
 
 
->>>>>>> w-toku/m109-lup
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
