@@ -269,7 +269,8 @@ namespace Armoury
                 int left = Math.Max(0, due - p.Paid);   // z czesci naprawde zaplaconych (takze po wyjatku w drugim platniku)
                 if (left > 0)
                 {
-                    if (DebtsOn && !q.Own) { AddDebt(st, left, mask); p.Debt = left; _newDebtN++; _newDebt += left; }
+                    // m110-jency (recenzja): jency w osadzie gracza - kupuje KASA osady, nie kiesa gracza: reszta to dlug kasy (splata z jej nadwyzki, PayDebts - osada gracza tylko kasa)
+                    if (DebtsOn && (!q.Own || mask == MPrisoners)) { AddDebt(st, left, mask); p.Debt = left; _newDebtN++; _newDebt += left; }
                     else { p.Lost = left; if (q.Own) _cOwnLost += left; }
                 }
                 _chainN++; _cTown += p.Town; _cHost += p.Host; _cRuler += p.Ruler; _cDebt += p.Debt; _cLost += p.Lost;
@@ -285,6 +286,24 @@ namespace Armoury
                 return moved;
             }
         }
+
+        /// <summary>m110-jency (recenzja): osada krolestwa w wojnie z graczem - bez lordow (wrog nie placi od reki), cala reszta w dlug (splata dopiero w pokoju,
+        /// PayDebts). Zwraca czesci jak PayChain (Debt albo Lost przy kluczu TourneyDebts NIE).</summary>
+        internal static Parts DebtOnly(Settlement st, int due, int mask)
+        {
+            var p = new Parts();
+            try
+            {
+                if (st == null || due <= 0) return p;
+                if (DebtsOn) { AddDebt(st, due, mask); p.Debt = due; _newDebtN++; _newDebt += due; }
+                else p.Lost = due;
+                _chainN++; _cDebt += p.Debt; _cLost += p.Lost; _chainShortN++;
+            }
+            catch (Exception e) { Stumble("DebtOnly", e); }
+            return p;
+        }
+
+        internal static bool AtWarWithMe(Settlement st) { try { return st != null && AtWarWithPlayer(st); } catch { return false; } }
 
         private static void AddDebt(Settlement st, long amount, int mask)
         {

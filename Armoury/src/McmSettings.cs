@@ -5548,7 +5548,7 @@ namespace Armoury
         [SettingPropertyGroup("Player fees and bets")]
         public bool TourneyDebts { get; set; } = true;
 
-        [SettingPropertyBool("Prisoner Pay Chain", HintText = "prisoners you sell to a town's ransom broker are paid in full: what the town cannot spare above its merchants' reserve is paid by the clan that holds the town, then by its ruler, and what nobody can pay becomes the town's debt to you (paid back day by day, like tournament debts) - nobody takes your prisoners for nothing. Needs Town Pays Rewards and Tourney Payer Chain or Tourney Debts", RequireRestart = false)]
+        [SettingPropertyBool("Prisoner Pay Chain", HintText = "prisoners you sell to a ransom broker are paid in full. What the town or castle cannot spare above its merchants' reserve is paid by the clan that holds it, then by its ruler (needs Tourney Payer Chain); what nobody can pay becomes that town's debt to you, paid back day by day like tournament debts (needs Tourney Debts - without it the rest is lost). In a town of your own only its treasury pays, the rest is its debt to you; in an enemy town its lords pay nothing until peace - the rest waits as a debt. Off = the town pays only from its surplus, as before", RequireRestart = false)]
         [SettingPropertyGroup("Player fees and bets")]
         public bool PrisonerPayChain { get; set; } = true;
 
