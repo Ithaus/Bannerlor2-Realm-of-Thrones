@@ -9236,6 +9236,10 @@ namespace Armoury
         [SettingPropertyGroup("Notice board")]
         public bool WatchBountyLordTopUp { get; set; } = true;
 
+        [SettingPropertyBool("Bounty Band Marker", HintText = "the band named in a bounty you took up is marked on the map with its name and banner, and the mark follows the band hour by hour (the game itself draws no mark over outlaws). Needs Watch Bounty Quests. Off = as before (no mark)", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool BountyBandMarker { get; set; } = true;
+
         [SettingPropertyBool("Watch Bounty Quests", HintText = "a bounty you take up from the captain of the watch or a village headman appears in your Quests as 'Bounty' and the band's name: who posted it, on whom, the pay and the time left, with the band marked on your map and entries as the hunt goes on. Breaking the band pays you as before and closes it as completed; if someone else breaks them, the band scatters, the time runs out or the notice comes down, it closes unpaid with a note. The entry is not kept in your save - it is rebuilt from the notice board when you load, so your saves stay loadable without the mod. Off = the bounty is only on the board, with a mark on the map", RequireRestart = false)]
         [SettingPropertyGroup("Notice board")]
         public bool WatchBountyQuests { get; set; } = true;
@@ -11676,6 +11680,7 @@ namespace Armoury
             s.WatchBountyDays = WatchBountyDays;
             s.WatchBountyAiLords = WatchBountyAiLords;
             s.WatchBountyLordTopUp = WatchBountyLordTopUp;
+            s.BountyBandMarker = BountyBandMarker;
             s.WatchBountyQuests = WatchBountyQuests;
             s.HeadmanBounties = HeadmanBounties;
             s.NoticeBoardLeanSave = NoticeBoardLeanSave;

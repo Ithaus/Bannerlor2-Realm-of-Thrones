@@ -94,6 +94,7 @@ namespace Armoury
         private static void BountyReset()
         {
             _bq.Clear(); _closing = null; _selSaved = null;
+            BandMarkersReset();   // m110-znacznik
             _bqLatch = _bqPending = _bqSaveLine = _bqLoaded = _bqKeyWas = false;
             _bqWpisLines = _bqOdtwLines = 0; _bqStumbles = 0;
             ZeroBountyDay();
@@ -320,6 +321,7 @@ namespace Armoury
                     try { ResolveFlags(); fd = DropFlag(n.Mp); } catch (Exception fe) { BStumble("Start(flaga)", fe); }   // tracker zastepuje nasza flage na tej bandzie
                 }
                 _bdStart++;
+                BandMarkersSync("start zadania");   // m110-znacznik: znacznik bandy na mapie (tracker gry bandy nie rysuje)
                 Log.Info(PQ + "start - " + id + " (" + n.Town + " " + n.Band + ", rodzaj " + n.Kind + ", kwota " + n.Sum + ", termin doba " + n.Due + ", tracker " + YN(tr)
                          + ", flaga p zdjeta " + YN(fd) + ", special " + YN(q.IsSpecialQuest) + ", droga " + how + ") - " + q.Title);
                 return true;
@@ -402,6 +404,7 @@ namespace Armoury
         internal static void OnBountyFinalized(BountyQuest q)
         {
             if (q == null) return;
+            TakeBandMarker(q);   // m110-znacznik: kazde zamkniecie zdejmuje znacznik bandy
             try { int fix = 0; Untrack(q, ref fix); } catch (Exception e) { BStumble("Finalize(tracker)", e); }
             if (ReferenceEquals(_closing, q)) return;
             try

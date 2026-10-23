@@ -1511,8 +1511,9 @@ namespace Armoury
             NoticeBoard.NoteEventsWired(3);
             // m109-list: przyjety list gonczy jako zadanie w oknie Quests (BountyQuest bez typu w zapisie) - zdjete z QuestManager przed kazdym zapisem (ten sluchacz biegnie
             // przed SyncData zachowan: menedzer zachowan dopisal swoj wczesniej, MbEvent wola od ostatnio dopisanego), po zapisie z powrotem; hak bitwy autotestu (plik flagi)
-            CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this, delegate { try { NoticeBoard.BountyBeforeSave(); } catch (Exception e) { Log.Error("NoticeBoard.BountyBeforeSave", e); } });
-            CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, delegate (bool ok, string name) { try { NoticeBoard.BountySaveOver(ok, name); } catch (Exception e) { Log.Error("NoticeBoard.BountySaveOver", e); } });
+            CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this, delegate { try { NoticeBoard.BandMarkersOff(); NoticeBoard.BountyBeforeSave(); } catch (Exception e) { Log.Error("NoticeBoard.BountyBeforeSave", e); } });   // m110-znacznik: znaczniki band poza zapisem
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { try { NoticeBoard.BandMarkersSync(null); } catch (Exception e) { Log.Error("NoticeBoard.BandMarkersSync", e); } });   // m110-znacznik: znacznik idzie za banda
+            CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, delegate (bool ok, string name) { try { NoticeBoard.BountySaveOver(ok, name); NoticeBoard.BandMarkersSync("po zapisie"); } catch (Exception e) { Log.Error("NoticeBoard.BountySaveOver", e); } });
             NoticeBoard.NoteBountyWired(2);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, delegate (MapEvent me, PartyBase a, PartyBase d) { try { NoticeBoard.OnMapEventStartedTest(me, a, d); } catch (Exception e) { Log.Error("NoticeBoard.OnMapEventStartedTest", e); } });
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, Rumours.OnSiegeStarted);
@@ -1561,7 +1562,7 @@ namespace Armoury
             // O3: opcja "Demand a ransom" w menu oblezenia gry - po wszystkich OnSessionLaunched (menu gry juz jest; wstawiona przed "Leave")
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
             // m109-list: zadania przyjetych listow z arm_board (po QuestManager.OnGameLoaded); dopisane PRZED AddMenus - gra wola je PO nim (linia m109 za liniami m102)
-            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.BountySessionStart(); } catch (Exception e) { Log.Error("NoticeBoard.BountySessionStart", e); } });
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.BountySessionStart(); NoticeBoard.BandMarkersSync("start sesji"); } catch (Exception e) { Log.Error("NoticeBoard.BountySessionStart", e); } });
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.AddMenus(s); } catch (Exception e) { Log.Error("NoticeBoard.AddMenus", e); } });   // m102-tablica: "Read the notice board" w menu miasta - po wszystkich OnSessionLaunched (opcje gry "town" juz stoja; miejsce za karczma)
             // HT (15.10 noc, PatchTarget.cs): linia "Latki czynnego modelu (HT): start sesji" - po OnSessionLaunched wszystkich modow (latki modeli w kampanii)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => PatchTarget.Report());
