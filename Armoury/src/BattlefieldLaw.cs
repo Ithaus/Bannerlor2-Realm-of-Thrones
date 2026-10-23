@@ -318,6 +318,20 @@ namespace Armoury
                 }
                 else Log.Info("BattlefieldLaw: DTE nieobecny - dzialka gracza nieaktywna.");
 
+                // m109-lup Z2 (klucz RiderBlowSparesHarness, czytany w biegu): cios w jezdzca nie rozbija ladrow konia - prefiks selektora DTE dostaje
+                // liste zbroi bez uprzezy (DTE GetAgentArmors bierze sloty 5-11, a ciezka uprzaz ma body_armor wieksze niz kolczuga jezdzca)
+                try
+                {
+                    var selZ2 = FindType("DynamicTroopEquipmentReupload.ArmorSelector");
+                    var pickZ2 = selZ2 != null ? AccessTools.DeclaredMethod(selZ2, "GetRandomArmorByBodyPart") : null;
+                    if (pickZ2 != null)
+                    {
+                        h.Patch(pickZ2, prefix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(SpareHarness)));
+                        SpareHarnessWired = true;
+                    }
+                }
+                catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (m109 Z2)", e); }
+
                 // m109-lup: pomiar lupu bitwy wedlug rodzaju i hak autotestu (LootTally) - latki wpiete zawsze, tylko czytaja
                 if (modelType != null) _lReg = AccessTools.Method(modelType, "RegisterLuckyElement");
                 LootTally.ApplyAll(h);
@@ -1089,6 +1103,25 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------------ wraki
+
+        /// <summary>m109-lup Z2 (RiderBlowSparesHarness): prefiks DTE ArmorSelector.GetRandomArmorByBodyPart(armors, bodyPart) - lista bez uprzezy konia
+        /// (kopia; oryginal DTE uzywa dalej do "dodatkowo peknietej", ktora i tak pomija uprzaz). Cios rozbija czesc zbroi czlowieka albo nic, gdy ten nie
+        /// ma zbroi na trafionej czesci ciala. Ta sama liczba sztuk; wrakiem staje sie zbroja jezdzca, ladry przychodza cale.</summary>
+        public static void SpareHarness(ref List<ItemObject> __0)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (__0 == null || s == null || !s.RiderBlowSparesHarness || !s.BattlefieldLawEnabled) return;
+                bool any = false;
+                foreach (var it in __0) if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) { any = true; break; }
+                if (!any) return;
+                var copy = new List<ItemObject>(__0.Count);
+                foreach (var it in __0) if (it != null && it.ItemType != ItemObject.ItemTypeEnum.HorseHarness) copy.Add(it);
+                __0 = copy;
+            }
+            catch (Exception e) { MountStumble("SpareHarness", e); }
+        }
 
         /// <summary>Postfix na selektorze DTE - zapamietuje, ktora czesc uznano za rozbita.</summary>
         public static void RecordStruckPiece(object __result)
