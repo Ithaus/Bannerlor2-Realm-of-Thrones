@@ -1847,18 +1847,21 @@ Uzycie (Python 3, tylko odczyt):
                     [<Armoury-*.log>] [--baza-doby <log poprzedniego biegu z linia zapisu>] (strumieniowo; bez logu tylko STAN-S i STAN-S2). STAN-S self-test
                     wyrazen wobec linii kontrolnych jak w kodzie C# (start, rynsztunek, zapis, zuzycie, czesc, bitwa, test). STAN-S2 test syntetyczny: granice
                     80/80.01/40/40.01/10/9.99, przyklad Jeffa 480/2000 -> 76 uszkodzony, pula 61 x 13.33 x 3 = 2439, zniszczona <= 3, mapowanie cen starych
-                    modyfikatorow (0.55-0.6 uszkodzony, 0.25-0.4 zmasakrowany, <= 0.10 wrak), logi dobry, zly i bez startu, STAN-LC zgodny i niezgodny. STAN-0
-                    linia 'Stany sprzetu (m110): start' w kazdej sesji: klucz TAK - XML arm_* 48/48, grupy zamienione 16/16, bledy brak, kontrola OK (klucz NIE
-                    albo brak linii - INFO). STAN-1 ERROR GearState.* / LootWear.* / AfterDtePartyItems / AfterGenerateLoot / FlushShareToBaggage / DropShare /
-                    ApplyModifierForCondition / WearTheLoot / WearTheTroops / BattlefieldLaw.SplitWrecks / ShareWithState, potkniecia w liniach startu i bitwy,
-                    zly format linii - 0. STAN-2 kazda linia czesci 'Stan lupu (m110): czesc ...': d = przed - obrazenia x 100 / pula (+-0.6, przyciete 0-100),
-                    przed = srodek stanu (100/60/25/5), stan wedlug progow 80/40/10 (przy granicy +-0.06 dopuszczony sasiad), zniszczona przy d <= 10 (brak linii -
-                    INFO). STAN-3 tozsamosci linii bitwy 'Stan lupu (m110): bitwa N': czesci z ksiega = lup do gracza + zostaje u wojska + cios + pekniete; drogi
+                    modyfikatorow (0.55-0.6 uszkodzony, 0.25-0.4 zmasakrowany, <= 0.10 wrak), logi dobry, zly, zly2 (latki DTE 1/2, prog zniszczenia, bledy
+                    wyrownania), zly3 (statystyki starych zlych), bez startu i bez linii m110, STAN-LC zgodny i niezgodny. STAN-0 linia 'Stany sprzetu (m110):
+                    start' w kazdej sesji: klucz TAK - XML arm_* 48/48, grupy zamienione 16/16, bledy brak, kontrola OK, statystyki starych zlych jak arm_* a/a,
+                    przy 'lup z obrazen TAK' latki DTE 2/2 i Spoils lucky TAK (klucz NIE - INFO; brak linii startu przy innych liniach m110 - NIE; log bez linii
+                    m110 - INFO). STAN-1 ERROR GearState.* / LootWear.* / AfterDtePartyItems / AfterGenerateLoot / FlushShareToBaggage / DropShare /
+                    ApplyModifierForCondition / WearTheLoot / WearTheTroops / BattlefieldLaw.SplitWrecks / ShareWithState / ResyncWornStates, potkniecia w liniach
+                    startu i bitwy, zly format linii - 0. STAN-2 kazda linia czesci 'Stan lupu (m110): czesc ...': d = przed - obrazenia x 100 / pula (+-0.6,
+                    przyciete 0-100), przed = srodek stanu (100/60/25/5), stan wedlug progow 80/40/10 (przy granicy +-0.06 dopuszczony sasiad), zniszczona przy
+                    d <= prog zniszczenia z linii jej bitwy ('prog zniszczenia N%', +-0.06), nie zniszczona - d > prog; czesc bez linii bitwy - zniszczona przy
+                    d <= 10 (brak linii - INFO). STAN-3 tozsamosci linii bitwy 'Stan lupu (m110): bitwa N': czesci z ksiega = lup do gracza + zostaje u wojska + cios + pekniete; drogi
                     ciosu i peknietych (do Ciebie, dzialka, zbrojownia, wraki, przepadly) = czesci bez zniszczonych; wraki nie mniej niz stan wrak (chyba ze
                     przepadly); lucky k = k; trafien = trafien w pomiarze (brak - INFO). STAN-4 pokrycie pod flaga (linie 'test - ...'): w liniach czesci wszystkie
                     4 stany i zniszczona, >= 1 cios albo pekniete zolnierza rozdzielone (dzialka albo zbrojownia), >= 1 uprzaz; bez flagi - INFO. STAN-5 linie
                     'Zuzycie (m110)': liczony = ksiega - (100 - srodek stanu poczatku) (+-0.11), stan wedlug progow, stan gorszy niz byl, arm_* z przyrostkiem
-                    stanu (brak - INFO). STAN-6 pomiar na bitwe: <= 5 ms + 0.002 ms x trafien TAK, <= 20 ms + 0.01 ms x trafien INFO, wiecej NIE. STAN-LC
+                    stanu; linia 'wyrownanie po wczytaniu' (nazwa sztuk na grzbiecie wedlug ksiegi) - bledy 0 (brak linii zuzycia - INFO). STAN-6 pomiar na bitwe: <= 5 ms + 0.002 ms x trafien TAK, <= 20 ms + 0.01 ms x trafien INFO, wiecej NIE. STAN-LC
                     cofniecie: z --baza-doby - ostatnia linia 'zapis' (pod flaga) bazy wobec pierwszej linii rynsztunku logu: arm_* i rl_* rowne, ERROR w logu 0;
                     log bez linii m110 (bieg na DLL 104) - ERROR 0 INFO, inaczej NIE; bez bazy - INFO.
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
@@ -65699,17 +65702,19 @@ M110STAN_LP = "Stan lupu (m110): "
 M110STAN_ZP = "Zuzycie (m110): "
 M110STAN_ERR = ("ERROR in GearState.", "ERROR in LootWear.", "ERROR in AfterDtePartyItems", "ERROR in AfterGenerateLoot", "ERROR in FlushShareToBaggage",
                 "ERROR in DropShare", "ERROR in ApplyModifierForCondition", "ERROR in WearTheLoot", "ERROR in WearTheTroops", "ERROR in BattlefieldLaw.SplitWrecks",
-                "ERROR in BattlefieldLaw.ShareWithState", "ERROR in BattlefieldLaw.AfterGenerateLoot(lucky m110)")
+                "ERROR in BattlefieldLaw.ShareWithState", "ERROR in BattlefieldLaw.AfterGenerateLoot(lucky m110)", "ERROR in ResyncWornStates")
 _M110STAN_ST = r"(sprawny|uszkodzony|zmasakrowany|wrak)"
 _M110STAN_BLK = r"\[sprawny/uszkodzony/zmasakrowany/wrak/zniszczony\]: (\d+)/(\d+)/(\d+)/(\d+)/(\d+) -> do Ciebie (\d+), dzialka (\d+), zbrojownia (\d+), wraki (\d+), przepadly (\d+)"
 M110STAN_RX = {
     "start": re.compile(r"^Stany sprzetu \(m110\): start \| klucz GearFourStates (TAK|NIE) \| XML arm_\* (\d+)/48 \| grupy zamienione (\d+)/(\d+), pominiete \(brak grupy\) (.*?), "
                         r"bledy (.*?) \| stare zle -> stany: uszkodzony (\d+), zmasakrowany (\d+), wrak (\d+) \(rl_\* (\d+)/4, companion (\d+)\) \| progi 80/40/10, wartosci "
-                        r"60/25/5 \| kontrola: (.*?) - (OK|BLAD) \| lup z obrazen (TAK|NIE) \(latki DTE (\d+)/2, Spoils lucky (TAK|NIE)\) \| potkniecia (\d+)\.$"),
+                        r"60/25/5 \| kontrola: (.*?) - (OK|BLAD) \| lup z obrazen (TAK|NIE) \(latki DTE (\d+)/2, Spoils lucky (TAK|NIE)\) \| potkniecia (\d+) \| "
+                        r"statystyki starych zlych jak arm_\* (\d+)/(\d+)\.$"),
     "startno": re.compile(r"^Stany sprzetu \(m110\): start \| klucz GearFourStates (TAK|NIE) \| XML arm_\* (\d+)/48 \| stany NIE - (.*)$"),
     "gear": re.compile(r"^Stany sprzetu \(m110\): rynsztunek i sakwy gracza \| sprawny (\d+), uszkodzony (\d+), zmasakrowany (\d+), wrak (\d+) \| stare \(przemapowane\) (\d+), "
                        r"arm_\* (\d+), rl_\* (\d+) \| ksiega: wpisow (\d+), z przesunieciem (\d+)\.$"),
     "save": re.compile(r"^Stany sprzetu \(m110\): zapis \| gracz arm_\* (\d+) \(rynsztunek (\d+), sakwy (\d+)\), rl_\* (\d+), stare (\d+) \| ksiega wpisow z arm_\* (\d+)\.$"),
+    "resync": re.compile(r"^Stany sprzetu \(m110\): wyrownanie po wczytaniu \| sztuk z ksiega (\d+), nowy stan (\d+), bledy (\d+)\.$"),
     "wear": re.compile(r"^Zuzycie \(m110\): slot (\d+) (\S+) -> (\S+) \| ksiega (-?\d+(?:\.\d+)?)%, poczatek " + _M110STAN_ST + r", liczony (-?\d+(?:\.\d+)?)% -> "
                        + _M110STAN_ST + r" \(byl " + _M110STAN_ST + r"\)\.$"),
     "piece": re.compile(r"^Stan lupu \(m110\): czesc (\w+) (\S+) \((lup|cios|pekniete), (Ty|towarzysz|zolnierz|\?)\): przed " + _M110STAN_ST + r" \((\d+)%\), obrazenia (\d+)/(\d+), "
@@ -65718,7 +65723,7 @@ M110STAN_RX = {
     "battle": re.compile(r"^Stan lupu \(m110\): bitwa (\d+) \| ksiega: wrogow (\d+) \(trafionych (\d+)\), trafien (\d+), przed nie-sprawnych (\d+), czesci z ksiega (\d+) \| "
                          r"lup z cial \[sprawny/uszkodzony/zmasakrowany/wrak/zniszczony\]: do gracza (\d+)/(\d+)/(\d+)/(\d+)/(\d+), zostaje u wojska (\d+) \| cios "
                          + _M110STAN_BLK + r" \| pekniete " + _M110STAN_BLK + r" \| bez ksiegi: lup (\d+), cios/pekniete (\d+) \| koniec: (.*) \(lucky (\d+)/(\d+)\) \| "
-                         r"pomiar (\d+(?:\.\d+)?) ms \(trafien (\d+)\) \| potkniecia (\d+)\.$"),
+                         r"prog zniszczenia (\d+)% \| pomiar (\d+(?:\.\d+)?) ms \(trafien (\d+)\) \| potkniecia (\d+)\.$"),
     "test": re.compile(r"^Stan lupu \(m110\): test - bitwa (\d+): sztuczny stan przed bitwa dla (\d+) wrogow \(sprawny (\d+), uszkodzony (\d+), zmasakrowany (\d+), "
                        r"wrak (\d+)\)\.$"),
     "day": re.compile(r"\bdoba (\d+)\b"),
@@ -65727,18 +65732,20 @@ M110STAN_RX = {
 M110STAN_TEST = {
     "start": "Stany sprzetu (m110): start | klucz GearFourStates TAK | XML arm_* 48/48 | grupy zamienione 16/16, pominiete (brak grupy) brak, bledy brak | stare zle -> "
              "stany: uszkodzony 16, zmasakrowany 17, wrak 26 (rl_* 4/4, companion 2) | progi 80/40/10, wartosci 60/25/5 | kontrola: 480/2000 -> 76% uszkodzony, 80 "
-             "uszkodzony, 80.1 sprawny, 40 zmasakrowany, 10 zmasakrowany, 9.9 wrak - OK | lup z obrazen TAK (latki DTE 2/2, Spoils lucky TAK) | potkniecia 0.",
+             "uszkodzony, 80.1 sprawny, 40 zmasakrowany, 10 zmasakrowany, 9.9 wrak - OK | lup z obrazen TAK (latki DTE 2/2, Spoils lucky TAK) | potkniecia 0 | "
+             "statystyki starych zlych jak arm_* 59/59.",
     "startno": "Stany sprzetu (m110): start | klucz GearFourStates NIE | XML arm_* 48/48 | stany NIE - jak 104 (procent w nazwie, progi ThresholdWorn/Damaged/Ruined).",
     "gear": "Stany sprzetu (m110): rynsztunek i sakwy gracza | sprawny 31, uszkodzony 4, zmasakrowany 2, wrak 1 | stare (przemapowane) 5, arm_* 2, rl_* 0 | ksiega: "
             "wpisow 9, z przesunieciem 1.",
     "save": "Stany sprzetu (m110): zapis | gracz arm_* 2 (rynsztunek 1, sakwy 1), rl_* 3, stare 5 | ksiega wpisow z arm_* 1.",
+    "resync": "Stany sprzetu (m110): wyrownanie po wczytaniu | sztuk z ksiega 9, nowy stan 1, bledy 0.",
     "wear": "Zuzycie (m110): slot 6 stark_armor_1 -> arm_chain_damaged | ksiega 71.3%, poczatek sprawny, liczony 71.3% -> uszkodzony (byl sprawny).",
     "piece": "Stan lupu (m110): czesc tulow stark_armor_1 (lup, Ty): przed sprawny (100%), obrazenia 480/2000, po 76.0% -> uszkodzony | do Ciebie.",
     "battle": "Stan lupu (m110): bitwa 3 | ksiega: wrogow 40 (trafionych 30), trafien 210, przed nie-sprawnych 10, czesci z ksiega 21 | lup z cial [sprawny/uszkodzony/"
               "zmasakrowany/wrak/zniszczony]: do gracza 6/3/2/1/1, zostaje u wojska 4 | cios [sprawny/uszkodzony/zmasakrowany/wrak/zniszczony]: 0/1/1/1/0 -> do Ciebie 1, "
               "dzialka 0, zbrojownia 1, wraki 1, przepadly 0 | pekniete [sprawny/uszkodzony/zmasakrowany/wrak/zniszczony]: 1/0/0/0/0 -> do Ciebie 0, dzialka 1, "
-              "zbrojownia 0, wraki 0, przepadly 0 | bez ksiegi: lup 2, cios/pekniete 0 | koniec: lista trofeow Spoils (lucky 14/14) | pomiar 1.5 ms (trafien 210) | "
-              "potkniecia 0.",
+              "zbrojownia 0, wraki 0, przepadly 0 | bez ksiegi: lup 2, cios/pekniete 0 | koniec: lista trofeow Spoils (lucky 14/14) | prog zniszczenia 3% | "
+              "pomiar 1.5 ms (trafien 210) | potkniecia 0.",
     "test": "Stan lupu (m110): test - bitwa 3: sztuczny stan przed bitwa dla 40 wrogow (sprawny 10, uszkodzony 10, zmasakrowany 10, wrak 10).",
 }
 
@@ -65780,7 +65787,8 @@ def m110stan_battle(s):
     g = [int(x) if re.match(r"^\d+$", x or "") else x for x in m.groups()]
     d = {"n": g[0], "agents": g[1], "enemies": g[2], "hits": g[3], "before": g[4], "pieces": g[5], "lup": g[6:11], "zost": g[11],
          "cios": g[12:17], "rcios": g[17:22], "pek": g[22:27], "rpek": g[27:32], "nolup": g[32], "nowr": g[33], "how": m.group(35),
-         "lok": int(m.group(36)), "lneed": int(m.group(37)), "ms": float(m.group(38)), "mhits": int(m.group(39)), "stum": int(m.group(40))}
+         "lok": int(m.group(36)), "lneed": int(m.group(37)), "min": int(m.group(38)), "ms": float(m.group(39)), "mhits": int(m.group(40)),
+         "stum": int(m.group(41))}
     return d
 
 
@@ -65802,8 +65810,8 @@ def m110stan_ids(b):
     return e
 
 
-def m110stan_piece(m):
-    """Linia czesci -> (bledy, slownik)."""
+def m110stan_piece(m, mn=None):
+    """Linia czesci -> (bledy, slownik). mn - prog zniszczenia bitwy z jej linii ('prog zniszczenia N%', recenzja R8); None - linia bez bitwy (d <= 10)."""
     kind, iid, cause, who, wbefore, before, hits, pool, d, word, route = m.groups()
     before, hits, pool, d = float(before), float(hits), int(pool), float(d)
     e = []
@@ -65815,11 +65823,17 @@ def m110stan_piece(m):
     exp = max(0.0, min(100.0, before - hits * 100.0 / pool))
     if abs(exp - d) > 0.6:
         e.append("d %.1f != %.1f (przed %g - %g x 100 / %d)" % (d, exp, before, hits, pool))
+    lim = 10.0 if mn is None else float(mn)
     if word == "zniszczona":
-        if d > 10.0:
-            e.append("zniszczona przy %.1f%%" % d)
-    elif not m110stan_state_ok(d, word):
-        e.append("stan %s przy %.1f%%" % (word, d))
+        if mn is not None and mn <= 0:
+            e.append("zniszczona przy progu 0 (wylaczony)")
+        elif d > lim + 0.06:
+            e.append("zniszczona przy %.1f%% (prog %g%%)" % (d, lim))
+    else:
+        if not m110stan_state_ok(d, word):
+            e.append("stan %s przy %.1f%%" % (word, d))
+        if mn is not None and mn > 0 and d < lim - 0.06:
+            e.append("nie zniszczona przy %.1f%% (prog %g%%)" % (d, lim))
     if route == "zniszczona" and word != "zniszczona":
         e.append("droga zniszczona przy stanie %s" % word)
     return e, {"kind": kind, "cause": cause, "who": who, "word": word, "route": route, "d": d}
@@ -65848,8 +65862,12 @@ def m110stan_selftest():
     """m110stan: wyrazenia wobec linii kontrolnych M110STAN_TEST i tozsamosci na nich. None = OK, inaczej opis."""
     T = M110STAN_TEST
     m = M110STAN_RX["start"].match(T["start"])
-    if not m or m.group(1) != "TAK" or m.group(2) != "48" or m.group(3) != "16" or m.group(13) != "OK" or m.group(15) != "2" or m.group(17) != "0":
+    if not m or m.group(1) != "TAK" or m.group(2) != "48" or m.group(3) != "16" or m.group(13) != "OK" or m.group(15) != "2" or m.group(17) != "0" \
+            or m.group(18) != "59" or m.group(19) != "59":
         return "start: %s" % (m.groups() if m else "brak dopasowania")
+    r = M110STAN_RX["resync"].match(T["resync"])
+    if not r or r.group(1) != "9" or r.group(2) != "1" or r.group(3) != "0":
+        return "wyrownanie: %s" % (r.groups() if r else "brak dopasowania")
     if M110STAN_RX["start"].match(T["startno"]) or not M110STAN_RX["startno"].match(T["startno"]):
         return "start (klucz NIE)"
     g = M110STAN_RX["gear"].match(T["gear"])
@@ -65864,11 +65882,12 @@ def m110stan_selftest():
     p = M110STAN_RX["piece"].match(T["piece"])
     if not p:
         return "czesc: brak dopasowania"
-    pe, pd = m110stan_piece(p)
+    pe, pd = m110stan_piece(p, 3)
     if pe or pd["word"] != "uszkodzony" or pd["route"] != "do Ciebie":
         return "czesc: %s" % pe
     b = m110stan_battle(T["battle"])
-    if not b or b["n"] != 3 or b["pieces"] != 21 or b["lup"] != [6, 3, 2, 1, 1] or b["rpek"] != [0, 1, 0, 0, 0] or b["how"] != "lista trofeow Spoils" or b["ms"] != 1.5:
+    if not b or b["n"] != 3 or b["pieces"] != 21 or b["lup"] != [6, 3, 2, 1, 1] or b["rpek"] != [0, 1, 0, 0, 0] or b["how"] != "lista trofeow Spoils" or b["ms"] != 1.5 \
+            or b["min"] != 3 or b["mhits"] != 210 or b["stum"] != 0:
         return "bitwa: %s" % (b if b else "brak dopasowania")
     if m110stan_ids(b):
         return "bitwa: tozsamosci na linii kontrolnej %s" % m110stan_ids(b)
@@ -65903,8 +65922,9 @@ def m110stan_units():
 
 def m110stan_collect(logp):
     """m110stan: przebieg logu (strumieniowo) -> linie startu, rynsztunku, zapisu, zuzycia, czesci, bitew, testu, bledy."""
-    D = {"start": [], "startno": [], "gear": [], "save": [], "wear": [], "pieces": [], "battles": [], "tests": [], "bad": [], "err": 0, "err1": None,
+    D = {"start": [], "startno": [], "gear": [], "save": [], "resync": [], "wear": [], "pieces": [], "battles": [], "tests": [], "bad": [], "err": 0, "err1": None,
          "errall": 0, "days": set()}
+    pend = []   # recenzja R8: linie czesci czekajace na linie swojej bitwy (prog zniszczenia); D["pieces"] - pary (linia, prog albo None)
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\r\n"))
@@ -65937,6 +65957,12 @@ def m110stan_collect(logp):
                         D["save"].append([int(x) for x in mm.groups()])
                     else:
                         D["bad"].append(s[:160])
+                elif body.startswith("wyrownanie "):
+                    mm = M110STAN_RX["resync"].match(s)
+                    if mm:
+                        D["resync"].append([int(x) for x in mm.groups()])
+                    else:
+                        D["bad"].append(s[:160])
                 continue
             if s.startswith(M110STAN_ZP):
                 mm = M110STAN_RX["wear"].match(s)
@@ -65950,13 +65976,15 @@ def m110stan_collect(logp):
                 if body.startswith("czesc "):
                     mm = M110STAN_RX["piece"].match(s)
                     if mm:
-                        D["pieces"].append(mm)
+                        pend.append(mm)
                     else:
                         D["bad"].append(s[:160])
                 elif body.startswith("bitwa "):
                     b = m110stan_battle(s)
                     if b:
                         D["battles"].append(b)
+                        D["pieces"] += [(x, b["min"]) for x in pend]
+                        pend = []
                     else:
                         D["bad"].append(s[:160])
                 elif body.startswith("test - "):
@@ -65969,23 +65997,30 @@ def m110stan_collect(logp):
             if " doba " in s:
                 for dm in M110STAN_RX["day"].finditer(s):
                     D["days"].add(int(dm.group(1)))
+    D["pieces"] += [(x, None) for x in pend]   # bez linii bitwy (log urwany) - prog nieznany, zniszczona przy d <= 10
     return D
 
 
 def m110stan_rows(rep, D, basep=None):
     """m110stan: wiersze STAN-0..STAN-6 i STAN-LC - opis w --help."""
     # STAN-0 linia startu
+    other = len(D["gear"]) + len(D["save"]) + len(D["resync"]) + len(D["wear"]) + len(D["pieces"]) + len(D["battles"]) + len(D["tests"]) + len(D["bad"])
     if not D["start"] and not D["startno"]:
-        rep.add("STAN-0: linia 'Stany sprzetu (m110): start' (klucz, XML 48/48, grupy 16/16, kontrola)", "brak linii startu",
-                "w kazdej sesji; klucz TAK: XML 48/48, grupy 16/16, bledy brak, kontrola OK (brak - log sprzed m110, INFO)", None)
+        # recenzja R3 (kod): linie m110 bez linii startu - start nie zalogowany (NIE); log bez zadnej linii m110 - sprzed m110 albo DLL 104 (INFO)
+        rep.add("STAN-0: linia 'Stany sprzetu (m110): start' (klucz, XML 48/48, grupy 16/16, kontrola)",
+                "brak linii startu" + (", a innych linii m110 %d" % other if other else ""),
+                "w kazdej sesji; klucz TAK: XML 48/48, grupy 16/16, bledy brak, kontrola OK (brak przy liniach m110 - NIE; log bez linii m110 - INFO)",
+                False if other else None)
     else:
-        badk = [x for x in D["start"] if x[1] != "48" or x[2] != x[3] or x[2] != "16" or x[5] != "brak" or x[12] != "OK"]
+        # recenzja R3 (kod): przy lupie z obrazen TAK takze latki DTE 2/2 i Spoils lucky TAK; recenzja R2: statystyki wszystkich starych zlych jak arm_*
+        badk = [x for x in D["start"] if x[1] != "48" or x[2] != x[3] or x[2] != "16" or x[5] != "brak" or x[12] != "OK"
+                or (x[13] == "TAK" and (x[14] != "2" or x[15] != "TAK")) or x[17] != x[18]]
         keyno = [x for x in D["startno"] if x[0] == "TAK"]   # klucz TAK, a stany NIE (brak XML, pola, wyjatek)
         last = D["start"][-1] if D["start"] else None
         val = "linii %d (stany TAK %d, stany NIE %d)" % (len(D["start"]) + len(D["startno"]), len(D["start"]), len(D["startno"]))
         if last:
-            val += ", ostatnia: XML %s/48, grupy %s/%s, pominiete %s, bledy %s, stare zle -> uszkodzony %s, zmasakrowany %s, wrak %s (rl_* %s/4, companion %s), kontrola %s, lup z obrazen %s (latki %s/2, lucky %s)" % (
-                last[1], last[2], last[3], last[4], last[5], last[6], last[7], last[8], last[9], last[10], last[12], last[13], last[14], last[15])
+            val += ", ostatnia: XML %s/48, grupy %s/%s, pominiete %s, bledy %s, stare zle -> uszkodzony %s, zmasakrowany %s, wrak %s (rl_* %s/4, companion %s), kontrola %s, lup z obrazen %s (latki %s/2, lucky %s), statystyki jak arm_* %s/%s" % (
+                last[1], last[2], last[3], last[4], last[5], last[6], last[7], last[8], last[9], last[10], last[12], last[13], last[14], last[15], last[17], last[18])
         if keyno:
             val += " | klucz TAK, a stany NIE: " + keyno[-1][2][:160]
         ok = not badk and not keyno
@@ -65993,7 +66028,7 @@ def m110stan_rows(rep, D, basep=None):
             rep.add("STAN-0: linia 'Stany sprzetu (m110): start' (klucz, XML 48/48, grupy 16/16, kontrola)", val, "klucz NIE - INFO (jak 104)", None)
         else:
             rep.add("STAN-0: linia 'Stany sprzetu (m110): start' (klucz, XML 48/48, grupy 16/16, kontrola)", val,
-                    "klucz TAK: XML 48/48, grupy 16/16, bledy brak, kontrola OK w kazdej linii", ok)
+                    "klucz TAK: XML 48/48, grupy 16/16, bledy brak, kontrola OK, statystyki starych zlych a/a, przy lupie z obrazen TAK latki 2/2 i lucky TAK - w kazdej linii", ok)
     # STAN-1 bledy i potkniecia
     stum = sum(int(x[16]) for x in D["start"]) + sum(b["stum"] for b in D["battles"])
     rep.add("STAN-1: ERROR GearState / LootWear / AfterDtePartyItems / AfterGenerateLoot / FlushShareToBaggage / DropShare / ApplyModifierForCondition / WearTheLoot / WearTheTroops, potkniecia, zly format",
@@ -66002,17 +66037,19 @@ def m110stan_rows(rep, D, basep=None):
     # STAN-2 arytmetyka czesci
     P = []
     perr = []
-    for mm in D["pieces"]:
-        e, pd = m110stan_piece(mm)
+    for mm, mn in D["pieces"]:
+        e, pd = m110stan_piece(mm, mn)
         if e:
             perr.append("%s %s: %s" % (mm.group(1), mm.group(2), "; ".join(e)))
         if pd:
             P.append(pd)
+    nomin = sum(1 for x in D["pieces"] if x[1] is None)
     if not D["pieces"]:
-        rep.add("STAN-2: linie czesci - d = przed - obrazenia x 100 / pula (+-0.6) i stan wedlug progow 80/40/10", "brak linii czesci", "100% linii (brak - INFO)", None)
+        rep.add("STAN-2: linie czesci - d = przed - obrazenia x 100 / pula (+-0.6), stan wedlug progow 80/40/10, zniszczona wedlug progu bitwy", "brak linii czesci",
+                "100% linii (brak - INFO)", None)
     else:
-        rep.add("STAN-2: linie czesci - d = przed - obrazenia x 100 / pula (+-0.6) i stan wedlug progow 80/40/10", "linii %d, niezgodnych %d%s" % (
-            len(D["pieces"]), len(perr), " (" + "; ".join(perr[:3]) + ")" if perr else ""), "100% linii", not perr)
+        rep.add("STAN-2: linie czesci - d = przed - obrazenia x 100 / pula (+-0.6), stan wedlug progow 80/40/10, zniszczona wedlug progu bitwy", "linii %d (bez linii bitwy %d), niezgodnych %d%s" % (
+            len(D["pieces"]), nomin, len(perr), " (" + "; ".join(perr[:3]) + ")" if perr else ""), "100% linii", not perr)
     # STAN-3 tozsamosci bitwy
     berr = []
     for b in D["battles"]:
@@ -66045,12 +66082,17 @@ def m110stan_rows(rep, D, basep=None):
         e = m110stan_wear(mm)
         if e:
             werr.append("slot %s %s: %s" % (mm.group(1), mm.group(2), "; ".join(e)))
+    # recenzja R6: wyrownanie nazw po wczytaniu (linie 'Zuzycie (m110)' z niego licza sie tu jak zuzycie; bledy wyrownania - NIE)
+    rsn = "wyrownanie po wczytaniu: linii %d, sztuk z ksiega %d, nowy stan %d, bledy %d" % (
+        len(D["resync"]), sum(x[0] for x in D["resync"]), sum(x[1] for x in D["resync"]), sum(x[2] for x in D["resync"]))
+    rbad = sum(x[2] for x in D["resync"])
     if not D["wear"]:
-        rep.add("STAN-5: linie 'Zuzycie (m110)' - liczony = ksiega - (100 - srodek stanu poczatku), stan wedlug progow, zuzycie nie poprawia", "brak linii",
-                "100% linii (brak - INFO)", None)
+        rep.add("STAN-5: linie 'Zuzycie (m110)' - liczony = ksiega - (100 - srodek stanu poczatku), stan wedlug progow, zuzycie nie poprawia", "brak linii | " + rsn,
+                "100% linii, bledy wyrownania 0 (brak linii - INFO)", False if rbad else None)
     else:
         rep.add("STAN-5: linie 'Zuzycie (m110)' - liczony = ksiega - (100 - srodek stanu poczatku), stan wedlug progow, zuzycie nie poprawia",
-                "linii %d, niezgodnych %d%s" % (len(D["wear"]), len(werr), " (" + "; ".join(werr[:3]) + ")" if werr else ""), "100% linii", not werr)
+                "linii %d, niezgodnych %d%s | %s" % (len(D["wear"]), len(werr), " (" + "; ".join(werr[:3]) + ")" if werr else "", rsn), "100% linii, bledy wyrownania 0",
+                not werr and not rbad)
     # STAN-6 pomiar
     lim = "<= 5 ms + 0.002 ms x trafien TAK, <= 20 ms + 0.01 ms x trafien INFO, wiecej NIE"
     if not D["battles"]:
@@ -66105,7 +66147,15 @@ def m110stan_synth():
             logp = os.path.join(tmp, "Armoury-test.log")
             L = []
             if kind == "good":
-                L += [T["start"], T["gear"], T["test"]] + pieces_good + [T["battle"], T["wear"], T["save"]]
+                L += [T["start"], T["gear"], T["resync"], T["test"]] + pieces_good + [T["battle"], T["wear"], T["save"]]
+            elif kind == "bad2":   # recenzja R3 (kod) / R8: latki DTE 1/2, zniszczona ponad progiem bitwy, nie zniszczona ponizej, bledy wyrownania
+                L += [T["start"].replace("latki DTE 2/2", "latki DTE 1/2"), T["gear"], T["resync"].replace("bledy 0", "bledy 1")]
+                L += ["Stan lupu (m110): czesc tulow mail_c (lup, zolnierz): przed zmasakrowany (25%), obrazenia 170/1000, po 8.0% -> zniszczona | zniszczona.",
+                      "Stan lupu (m110): czesc rece gloves_b (lup, Ty): przed wrak (5%), obrazenia 30/1000, po 2.0% -> wrak | do Ciebie.", T["battle"]]
+            elif kind == "bad3":   # recenzja R2: nie wszystkie stare zle modyfikatory dostaly statystyki arm_*
+                L += [T["start"].replace("arm_* 59/59", "arm_* 50/59"), T["gear"]]
+            elif kind == "old":    # log bez linii m110 (sprzed m110 albo DLL 104)
+                L.append("BattlefieldLaw: lup przesiany - 1 szt. zniszczonych (<=3%) i 0 legendarnych klng odpadlo.")
             elif kind == "bad":
                 L += [T["start"].replace("grupy zamienione 16/16", "grupy zamienione 15/16").replace("wrak - OK", "wrak - BLAD"), T["gear"], T["test"]]
                 L += [T["piece"].replace("po 76.0%", "po 70.0%"), pieces_good[1]]
@@ -66128,14 +66178,21 @@ def m110stan_synth():
             shutil.rmtree(tmp, ignore_errors=True)
 
     good, bad, nost = run("good"), run("bad"), run("nostart")
+    bad2, bad3, old = run("bad2"), run("bad3"), run("old")
     lc_ok = run("lc", T["save"])
     lc_bad = run("lc", T["save"].replace("gracz arm_* 2 (rynsztunek 1, sakwy 1)", "gracz arm_* 3 (rynsztunek 1, sakwy 2)"))
     exp_good = {"STAN-0": "TAK", "STAN-1": "TAK", "STAN-2": "TAK", "STAN-3": "TAK", "STAN-4": "TAK", "STAN-5": "TAK", "STAN-6": "TAK", "STAN-LC": "INFO"}
     exp_bad = {"STAN-0": "NIE", "STAN-1": "NIE", "STAN-2": "NIE", "STAN-3": "NIE", "STAN-4": "NIE", "STAN-5": "NIE", "STAN-6": "NIE", "STAN-LC": "INFO"}
-    exp_nost = {"STAN-0": "INFO", "STAN-1": "TAK", "STAN-2": "INFO", "STAN-3": "TAK", "STAN-4": "INFO", "STAN-5": "INFO", "STAN-6": "TAK", "STAN-LC": "INFO"}
+    exp_nost = {"STAN-0": "NIE", "STAN-1": "TAK", "STAN-2": "INFO", "STAN-3": "TAK", "STAN-4": "INFO", "STAN-5": "INFO", "STAN-6": "TAK", "STAN-LC": "INFO"}
+    exp_bad2 = {"STAN-0": "NIE", "STAN-2": "NIE", "STAN-5": "NIE"}
+    exp_bad3 = {"STAN-0": "NIE"}
+    exp_old = {"STAN-0": "INFO", "STAN-1": "TAK", "STAN-2": "INFO", "STAN-3": "INFO", "STAN-4": "INFO", "STAN-5": "INFO", "STAN-6": "INFO", "STAN-LC": "INFO"}
     diff = ["dobry %s: %s (oczekiwane %s)" % (k, good.get(k), v) for k, v in exp_good.items() if good.get(k) != v]
     diff += ["zly %s: %s (oczekiwane %s)" % (k, bad.get(k), v) for k, v in exp_bad.items() if bad.get(k) != v]
     diff += ["bez startu %s: %s (oczekiwane %s)" % (k, nost.get(k), v) for k, v in exp_nost.items() if nost.get(k) != v]
+    diff += ["zly2 (latki, prog, wyrownanie) %s: %s (oczekiwane %s)" % (k, bad2.get(k), v) for k, v in exp_bad2.items() if bad2.get(k) != v]
+    diff += ["zly3 (statystyki) %s: %s (oczekiwane %s)" % (k, bad3.get(k), v) for k, v in exp_bad3.items() if bad3.get(k) != v]
+    diff += ["bez m110 %s: %s (oczekiwane %s)" % (k, old.get(k), v) for k, v in exp_old.items() if old.get(k) != v]
     if lc_ok.get("STAN-LC") != "TAK":
         diff.append("STAN-LC zgodny: %s (oczekiwane TAK)" % lc_ok.get("STAN-LC"))
     if lc_bad.get("STAN-LC") != "NIE":
