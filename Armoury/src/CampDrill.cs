@@ -52,9 +52,9 @@ namespace Armoury
         private static float _session; private static double _sessionStart;
         private static double _lastDrillAt = -1e9;         // chwila ostatniej godziny cwiczen z menu (ksiega snu - NightRest), bez zapisu
         private static double _auto;                       // godziny samoczynne (oboz oblezenia, cudza armia) od ostatniej linii gracza
-        // m109-musztra (TownStay): postoj gracza w osadzie - poczatek postoju i chwila wyjscia (pelne godziny, -1 brak), godziny w osadzie od switu (czesc
+        // m109-musztra (TownStay): postoj gracza w osadzie - licznik postoju (TownStay.Stay: poczatek, poranki, godziny w polu), godziny w osadzie od switu (czesc
         // _dayHours), najwyzszy limit osady w tej dobie od switu (kontrola), godziny w osadzie czekajace na tick (czesc _owed), od ostatniej linii gracza
-        private static long _stayFrom = -1, _outAt = -1;
+        private static readonly TownStay.Stay _stay = new TownStay.Stay();
         private static float _daySet, _owedSet, _dayCapMax;
         private static double _setLine;
         private static int _stumbles, _sessions;
@@ -68,7 +68,7 @@ namespace Armoury
         internal static void Reset()
         {
             _dayHours = 0f; _dayIdx = -1; _owed = 0f; _leave = false; _session = 0f; _stumbles = 0; _sessions = 0; _pSession = 0; _auto = 0; _lastDrillAt = -1e9;
-            _stayFrom = _outAt = -1; _daySet = _owedSet = _dayCapMax = 0f; _setLine = 0;   // m109-musztra
+            _stay.Clear(); _daySet = _owedSet = _dayCapMax = 0f; _setLine = 0;   // m109-musztra
             _err.Clear(); ClearDay();
             TownStay.Reset();
         }
@@ -120,8 +120,8 @@ namespace Armoury
         /// <summary>m109-musztra: czesc PlayerOwed zrobiona na postoju w osadzie (napis dnia w grze - Drill.DayMessage).</summary>
         internal static float PlayerOwedTown { get { return _owedSet; } }
 
-        /// <summary>m109-musztra: stan postoju gracza (TownStay - linie, komunikat, autotest): poczatek postoju, chwila wyjscia, godziny w osadzie od switu.</summary>
-        internal static void PlayerStay(out long from, out long outAt, out float daySet) { Roll(); from = _stayFrom; outAt = _outAt; daySet = _daySet; }
+        /// <summary>m109-musztra: stan postoju gracza (TownStay - linie, komunikat, autotest; tylko odczyt): licznik postoju i godziny w osadzie od switu.</summary>
+        internal static void PlayerStay(out TownStay.Stay stay, out float daySet) { Roll(); stay = _stay; daySet = _daySet; }
 
         /// <summary>m109-musztra: najwyzszy limit osady w biezacej dobie od switu (0 - bez godziny w osadzie) - kontrola "godziny w osadzie <= limit" (MUSZT-1).</summary>
         internal static float PlayerDayCap { get { Roll(); return _dayCapMax; } }
@@ -143,8 +143,9 @@ namespace Armoury
         /// nieaktywna: Observe jej nie widzi, Drill.Shape daje 0 jak przed m97).
         /// m109-musztra (klucz DrillTownStay, TownStay): postoj w osadzie (miasto, zamek, wies; takze doczepiony do armii w osadzie - gra przenosi CurrentSettlement
         /// na partie doczepione) - ludzie cwicza sami w godzinach cwiczen, z limitem godzin w osadzie na dobe postoju (TownStay.Cap) w tym samym limicie 8 h od switu;
-        /// licznik dob postoju co godzine (takze noca i w karze). Oblezona twierdza - jak oboz oblezenia. Klucz wylaczony - kind 0, zasada jak dotad.</summary>
-        internal static void AutoHour(MobileParty mp, bool rest, long now)
+        /// licznik postoju co godzine (takze noca i w karze; missed - godziny przegapione przez Observe, poza osada). Oblezona twierdza - jak oboz oblezenia.
+        /// Klucz wylaczony - kind 0, zasada jak dotad.</summary>
+        internal static void AutoHour(MobileParty mp, bool rest, long now, int missed)
         {
             try
             {
@@ -152,7 +153,7 @@ namespace Armoury
                 if (mp == null || !PlayerOn(s)) return;
                 var st = mp.CurrentSettlement;
                 int kind = s.DrillTownStay ? TownStay.Kind(st) : TownStay.KNone;
-                TownStay.Step(ref _stayFrom, ref _outAt, kind != TownStay.KNone, now);   // m109: licznik dob postoju (klucz wylaczony - zawsze "poza", licznik pusty)
+                TownStay.Step(_stay, kind != TownStay.KNone, now, missed);   // m109: licznik postoju (klucz wylaczony - zawsze "poza", licznik pusty)
                 if (!rest) return;
                 if (kind == TownStay.KNone)
                 {
@@ -169,7 +170,7 @@ namespace Armoury
                 int cap = 0;
                 if (kind != TownStay.KNone)
                 {
-                    cap = TownStay.Cap(kind, TownStay.Day(_stayFrom, now));
+                    cap = TownStay.Cap(kind, TownStay.DayNow(_stay));   // doba tego poranka (Step policzyl go wyzej)
                     if (cap > _dayCapMax) _dayCapMax = cap;
                     room = Math.Min(room, cap - _daySet);
                 }
@@ -216,12 +217,11 @@ namespace Armoury
             var mp = MobileParty.MainParty;
             var st = mp != null ? mp.CurrentSettlement : null;
             int kind = TownStay.Kind(st);
-            long now = (long)Math.Floor(CampaignTime.Now.ToHours);
-            if (_stayFrom < 0) return "postoj (m109): brak (w polu albo osada bez postoju), dzis w osadzie " + F2(_daySet) + " h";
-            int d = TownStay.Day(_stayFrom, now);
+            if (_stay.From < 0) return "postoj (m109): brak (w polu albo osada bez postoju), dzis w osadzie " + F2(_daySet) + " h";
+            int d = TownStay.DayNow(_stay);
             if (kind != TownStay.KNone)
                 return "postoj (m109): " + TownStay.KindName(kind) + " " + st.Name + " doba " + d + ", limit " + TownStay.Cap(kind, d) + " h, dzis w osadzie " + F2(_daySet) + " h";
-            return "postoj (m109): poza osada od " + (_outAt >= 0 ? now - _outAt : 0) + " h (doba postoju " + d + " trwa do " + TownStay.FieldResetHours + " h w polu), dzis w osadzie "
+            return "postoj (m109): poza osada, w polu " + _stay.Field + " h (doba postoju " + d + " trwa do " + TownStay.FieldResetHours + " h w polu), dzis w osadzie "
                    + F2(_daySet) + " h";
         }
 
@@ -588,20 +588,21 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zapis
-        // m109-musztra: pola 5-9 "|postoj od|poza od|w osadzie od switu|w osadzie do policzenia|limit osady od switu" (wersja zostaje "1": stara DLL czyta
-        // 4 pierwsze pola, nowa DLL ze starego zapisu bierze -1/-1/0/0/0 - postoj od nowa)
+        // m109-musztra: pola 5-12 "|postoj od|godzin w polu|w osadzie od switu|w osadzie do policzenia|limit osady od switu|poranki|doba od switu poranka|godzin
+        // w osadzie bez przerwy" (wersja zostaje "1": stara DLL czyta 4 pierwsze pola, nowa DLL ze starego zapisu - postoj od nowa; zapis 8-9 pol z wczesnej wersji
+        // galezi, nigdy w grze - godziny w osadzie od switu tak, postoj od nowa)
         internal static string Export()
         {
             var ci = CultureInfo.InvariantCulture;
             return "1|" + _dayHours.ToString("0.###", ci) + "|" + _dayIdx.ToString(ci) + "|" + _owed.ToString("0.###", ci)
-                   + "|" + _stayFrom.ToString(ci) + "|" + _outAt.ToString(ci) + "|" + _daySet.ToString("0.###", ci) + "|" + _owedSet.ToString("0.###", ci)
-                   + "|" + _dayCapMax.ToString("0.###", ci);
+                   + "|" + _stay.From.ToString(ci) + "|" + _stay.Field.ToString(ci) + "|" + _daySet.ToString("0.###", ci) + "|" + _owedSet.ToString("0.###", ci)
+                   + "|" + _dayCapMax.ToString("0.###", ci) + "|" + _stay.Day.ToString(ci) + "|" + _stay.Dawn.ToString(ci) + "|" + _stay.Run.ToString(ci);
         }
 
         internal static void Import(string v)
         {
             _dayHours = 0f; _dayIdx = -1; _owed = 0f;
-            _stayFrom = _outAt = -1; _daySet = _owedSet = _dayCapMax = 0f;   // m109-musztra: stary zapis - bez postoju
+            _stay.Clear(); _daySet = _owedSet = _dayCapMax = 0f;   // m109-musztra: stary zapis - bez postoju
             try
             {
                 if (string.IsNullOrEmpty(v)) return;
@@ -614,19 +615,24 @@ namespace Armoury
                 _owed = Math.Max(0f, Math.Min(3f * FullHours, _owed));
                 if (p.Length >= 8)
                 {
-                    if (!long.TryParse(p[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out _stayFrom)) _stayFrom = -1;
-                    if (!long.TryParse(p[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out _outAt)) _outAt = -1;
                     float.TryParse(p[6], NumberStyles.Float, CultureInfo.InvariantCulture, out _daySet);
                     float.TryParse(p[7], NumberStyles.Float, CultureInfo.InvariantCulture, out _owedSet);
                     if (p.Length >= 9) float.TryParse(p[8], NumberStyles.Float, CultureInfo.InvariantCulture, out _dayCapMax);
-                    if (_stayFrom < 0) { _stayFrom = -1; _outAt = -1; }
-                    if (_outAt < -1) _outAt = -1;
                     _daySet = Math.Max(0f, Math.Min(_dayHours, _daySet));
                     _owedSet = Math.Max(0f, Math.Min(_owed, _owedSet));
                     _dayCapMax = Math.Max(0f, Math.Min(FullHours, _dayCapMax));
                 }
+                if (p.Length >= 12)
+                {
+                    long from, dawn; int field, day, run;
+                    if (long.TryParse(p[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out from) && from >= 0
+                        && int.TryParse(p[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out field) && int.TryParse(p[9], NumberStyles.Integer, CultureInfo.InvariantCulture, out day)
+                        && long.TryParse(p[10], NumberStyles.Integer, CultureInfo.InvariantCulture, out dawn) && int.TryParse(p[11], NumberStyles.Integer, CultureInfo.InvariantCulture, out run)
+                        && field >= 0 && field < TownStay.FieldResetHours && day >= 0 && run >= 0 && (day == 0 || dawn != long.MinValue))
+                    { _stay.From = from; _stay.Field = field; _stay.Day = day; _stay.Dawn = day > 0 ? dawn : long.MinValue; _stay.Run = run; }
+                }
             }
-            catch (Exception e) { Stumble("Import", e); _dayHours = 0f; _dayIdx = -1; _owed = 0f; _stayFrom = _outAt = -1; _daySet = _owedSet = _dayCapMax = 0f; }
+            catch (Exception e) { Stumble("Import", e); _dayHours = 0f; _dayIdx = -1; _owed = 0f; _stay.Clear(); _daySet = _owedSet = _dayCapMax = 0f; }
         }
     }
 }

@@ -17,18 +17,27 @@ namespace Armoury
     /// na kobiety itd., wiec nie w glowie im musztra". POSTOJ W OSADZIE - jedna zasada dla wszystkich partii pod zasada obozu m97 (gracz, strona gracza, lordowie AI):
     ///  - musztra w osadzie liczy sie sama, tylko w godzinach cwiczen (CampDrill.DayHour, 3:00-17:59), we wspolnym limicie 8 h od switu, z limitem godzin
     ///    w osadzie malejacym z dobami postoju: miasto 4, 3, 2, od 4. doby 1 (poranny apel); zamek i wies 6, 5, od 3. doby 4 (mniej pokus) - klucz DrillTownStay;
-    ///  - doba postoju liczy sie od chwili wejscia; wypad za brame krotszy niz 24 h nie odnawia dyscypliny, dopiero doba w polu zeruje licznik;
+    ///  - doba postoju = kolejny poranek (godziny cwiczen jednej doby od switu) spedzony w osadzie z postojem - wejscie po poludniu daje 1. dobe do konca porannych
+    ///    godzin, nastepny poranek to 2. doba (recenzja m109 R4: dotad 24 h od wejscia - wejscie o 14:00 dawalo 4/4/3/2/1); godziny poza osada doby nie postarzaja;
+    ///  - postoj konczy dopiero doba w polu: 24 h poza osada, liczone narastajaco - krotki postoj po drodze (ponizej VisitHours = 12 h, np. godzina we wsi) ich
+    ///    nie zeruje, dluzszy pobyt zaczyna je od nowa (recenzja m109 R1: dotad kazda godzina w dowolnej osadzie zerowala 24 h w polu, a zegar od pierwszego wejscia
+    ///    postarzal postoj - partia zagladajaca co dobe do wsi miala w kolejnym miescie od razu limit 1 h);
     ///  - oblezona twierdza (karczmy zamkniete, ludzie na murach) i wies rabowana - bez postoju (Kind 0): jak oboz oblezenia, do 8 h, bez wydatkow;
     ///  - dotad (44c03a05): gracz czekajacy w miescie 0 h (CampDrill.AutoHour tylko oboz oblezenia i cudza armia), lord AI w tym samym miescie pelne 8 h
     ///    (Drill.DayRestHours) - dwie sprzeczne zasady na jedno zjawisko.
-    /// Bez latek Harmony: Drill.Observe (AI - maska godzin w osadzie i doba postoju), CampDrill.AutoHour (gracz), Drill.CtxOf (godziny AI z limitem), blok dobowy.
-    /// Zapis: stan gracza w napisie arm_campdrill (CampDrill.Export, pola 5-9 - stara DLL czyta 4 pierwsze); AI tylko w pamieci - po wczytaniu doba postoju
+    /// Bez latek Harmony: Drill.Observe (AI - maska godzin w osadzie, maska godzin ponad limit poranka i licznik postoju), CampDrill.AutoHour (gracz), Drill.CtxOf
+    /// (godziny AI z limitem), blok dobowy. Gracz i AI licza tak samo (recenzja m109 R4): w kazdym poranku pierwsze godziny w osadzie do limitu doby postoju.
+    /// Zapis: stan gracza w napisie arm_campdrill (CampDrill.Export, pola 5-12 - stara DLL czyta 4 pierwsze); AI tylko w pamieci - po wczytaniu doba postoju
     /// z MobileParty.StationaryStartTime (gra ja zapisuje; partia AI w osadzie nie jest w ruchu, wiec to chwila wejscia albo wczesniejszy postoj pod brama -
-    /// linia "wejscia AI" mierzy roznice). Dyscypliny jako osobnego systemu nie ma w kodzie ani w grze - wyrazaja ja mniejsze godziny musztry.
+    /// linia "wejscia AI" mierzy roznice), godziny postoju w oknie maski z zapisu odtworzone z tego samego poczatku (recenzja kodu R3). Dyscypliny jako osobnego
+    /// systemu nie ma w kodzie ani w grze - wyrazaja ja mniejsze godziny musztry.
     /// WYDATKI (klucz TownStaySpend, blok dobowy ArmouryBehavior po zalogach m96, pozycja ksiegi "markietani" MSutlers): partia rodu (AI i gracz) w miescie albo
     /// zamku wydaje co dobe czesc wolnej sakiewki - ta sama miara co markietani w polu (Sutlers.One, N6) i zalogi (SavingsByNeed.Garrison): SutlerDailyShare
-    /// x min(3, dni wolnej sakiewki / 10) przy SutlersByPurse, z tego, co zostaje po rezerwach markietanow (MenPurse.CampFree: naprawy, odziez, oszczednosci K1).
-    /// Odbiorca jak przy wyjezdzie z miasta (MenPurse.LifeTo): kasa osady i kiesa ludu (75/25, TownFolk.EarnService), te same liczniki (169c, K3, tarcza zoldu, L0).
+    /// x min(3, dni wolnej sakiewki / 10) przy SutlersByPurse, z tego, co zostaje po rezerwach markietanow (MenPurse.CampFree: naprawy, odziez, oszczednosci K1);
+    /// w miescie rezerwa napraw jak przy wyjezdzie (OnLeft) - robocizna i szacunek materialu z polki miasta (recenzja ekonomii R3: kowale miasta placa co godzine
+    /// material z sakiewki), w zamku - robocizna jak w polu (zamek nie ma polki).
+    /// Odbiorca jak przy wyjezdzie z miasta (MenPurse.LifeTo): kasa osady i kiesa ludu (75/25, TownFolk.EarnService), te same liczniki (169c, tarcza zoldu, L0);
+    /// K3 (zwrot korony) tylko w miescie - w zamku zwrot tnie to, co naprawde wrocilo panu zaworem (B-2, CastlePurse.LordDuesToday; recenzja R2).
     /// Kazda partia rodu jest w danej dobie albo w polu (markietani pomijaja partie w osadzie), albo w osadzie (tu) - nic nie liczy sie dwa razy; w miescie reszte
     /// wydaja dalej przy wyjezdzie (OnLeft). Wies, oblezona twierdza, okno lupu (CitySack.StayWindow), bitwa - nic. Morale: +3 na dobe przy >= 1 zl na glowe
     /// (miara zabawy markietanow: 2 zl -> +6; mniej pieniedzy - mniej), ostatnie zdarzenia najwyzej do +5 (polowa pulapu uczty 10; gra zdejmuje 10% na dobe).
@@ -40,7 +49,8 @@ namespace Armoury
         internal const int KNone = 0, KTown = 1, KCastle = 2, KVillage = 3;
         // limit godzin w osadzie na dobe postoju: miasto max(1, 5 - doba) = 4/3/2/1; zamek i wies max(4, 7 - doba) = 6/5/4
         private const int TownTop = 5, TownFloor = 1, KeepTop = 7, KeepFloor = 4;
-        internal const int FieldResetHours = 24;   // doba w polu zeruje licznik dob postoju (krotszy wypad - postoj trwa)
+        internal const int FieldResetHours = 24;   // doba w polu (narastajaco) konczy postoj (krotszy wypad - postoj trwa)
+        internal const int VisitHours = 12;        // pobyt w osadzie od pol doby zaczyna godziny w polu od nowa; krotszy postoj po drodze ich nie zeruje
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         internal static bool DrillOn(Settings s) { return s != null && s.DrillTownStay; }
@@ -67,24 +77,82 @@ namespace Armoury
             return (int)CampDrill.FullHours;
         }
 
-        /// <summary>Doba postoju (od 1) w pelnej godzinie `now` dla postoju od godziny `from`.</summary>
-        internal static int Day(long from, long now) { return from < 0 || now < from ? 1 : (int)((now - from) / 24 + 1); }
-
-        /// <summary>Licznik dob postoju jednej partii, raz na godzine (takze noca i w karze): wejscie - nowy postoj, gdy go nie bylo albo wypad trwal >= 24 h;
-        /// wyjscie - chwila wyjscia; po 24 h w polu - licznik zerowany. Zwraca true, gdy ta godzina zaczela nowy postoj.</summary>
-        internal static bool Step(ref long from, ref long outAt, bool inStay, long now)
+        // ------------------------------------------------------------ licznik postoju (gracz - CampDrill, zapis arm_campdrill; AI - Drill.Track, w pamieci)
+        /// <summary>Stan postoju jednej partii. Doba postoju = poranki (godziny cwiczen jednej doby od switu - CampDrill.DayHour, blok od switu) spedzone w osadzie
+        /// z postojem; godziny poza osada jej nie postarzaja. Postoj konczy doba w polu (FieldResetHours poza osada, narastajaco); pobyt od VisitHours zaczyna
+        /// godziny w polu od nowa, krotszy postoj po drodze ich nie zeruje.</summary>
+        internal sealed class Stay
         {
+            internal long From = -1;               // pierwsza godzina postoju (poczatek godziny), -1 - bez postoju
+            internal int Day;                      // poranki w osadzie w tym postoju (0 - wejscie po porannych godzinach, przed pierwszym porankiem)
+            internal long Dawn = long.MinValue;    // doba od switu ostatniego policzonego poranka
+            internal int Field;                    // godziny w polu od ostatniego pobytu >= VisitHours (FieldResetHours - koniec postoju)
+            internal int Run;                      // godziny w osadzie bez przerwy (biezacy pobyt)
+            internal void Clear() { From = -1; Day = 0; Dawn = long.MinValue; Field = 0; Run = 0; }
+        }
+
+        internal static int Mod24(long h) { return (int)(((h % 24) + 24) % 24); }
+
+        /// <summary>Doba od switu gracza godziny zaczynajacej sie o `h` (jak CampDrill.DawnIdx; godziny cwiczen tworza jeden blok od switu).</summary>
+        internal static long DawnOf(long h) { long x = h - NightRest.PlayerDawn; return x >= 0 ? x / 24 : -((-x + 23) / 24); }
+
+        /// <summary>Pierwsza godzina (swit) doby od switu `d`.</summary>
+        internal static long DawnStart(long d) { return d * 24 + NightRest.PlayerDawn; }
+
+        /// <summary>Licznik postoju, raz na obserwowana godzine [now-1, now) (takze noca i w karze); missed - godziny przegapione przed nia (jak ruch w masce Drill -
+        /// poza osada). W osadzie: nowy postoj, gdy go nie bylo; pierwsza godzina cwiczen nowej doby od switu - kolejna doba postoju; pobyt >= VisitHours zeruje godziny
+        /// w polu. Poza osada: godziny w polu narastaja, FieldResetHours - koniec postoju. Zwraca true, gdy ta godzina zaczela nowy postoj.</summary>
+        internal static bool Step(Stay s, bool inStay, long now, int missed)
+        {
+            if (s == null) return false;
+            if (missed > 0 && s.From >= 0) { s.Run = 0; s.Field += Math.Min(missed, FieldResetHours); if (s.Field >= FieldResetHours) s.Clear(); }
+            long hs = now - 1;
             if (inStay)
             {
-                bool fresh = from < 0 || (outAt >= 0 && now - outAt >= FieldResetHours);
-                if (fresh) from = now;
-                outAt = -1;
+                bool fresh = s.From < 0;
+                if (fresh) { s.Clear(); s.From = hs; }
+                if (s.Run < int.MaxValue) s.Run++;
+                if (s.Run >= VisitHours) s.Field = 0;
+                if (CampDrill.DayHour(Mod24(hs))) { long d = DawnOf(hs); if (d != s.Dawn) { s.Day++; s.Dawn = d; } }
                 return fresh;
             }
-            if (from < 0) { outAt = -1; return false; }
-            if (outAt < 0) outAt = now;
-            if (now - outAt >= FieldResetHours) { from = -1; outAt = -1; }
+            if (s.From < 0) return false;
+            s.Run = 0;
+            if (++s.Field >= FieldResetHours) s.Clear();
             return false;
+        }
+
+        /// <summary>Doba postoju teraz (od 1; po Step w godzinie cwiczen - doba tego poranka); bez postoju albo przed pierwszym porankiem - 1.</summary>
+        internal static int DayNow(Stay s) { return s == null || s.From < 0 ? 1 : Math.Max(1, s.Day); }
+
+        /// <summary>Doba postoju poranka, ktorego godzina zaczyna sie o `hs` (komunikat "rano", "jutro"): poranek juz policzony - ta sama, kolejny - nastepna.</summary>
+        internal static int DayAt(Stay s, long hs)
+        {
+            if (s == null || s.From < 0) return 1;
+            return DawnOf(hs) == s.Dawn ? Math.Max(1, s.Day) : s.Day + 1;
+        }
+
+        /// <summary>Poranki w godzinach [from, upTo) przy postoju bez przerwy (odtworzenie ze StationaryStartTime): doby od switu od tej z `from` do tej z upTo-1;
+        /// pierwsza liczy sie tylko wtedy, gdy `from` wypada w godzinach cwiczen (blok od switu - pozniejsze godziny tej doby to noc).</summary>
+        internal static int Mornings(long from, long upTo)
+        {
+            if (from < 0 || upTo <= from) return 0;
+            long n = DawnOf(upTo - 1) - DawnOf(from) + 1;
+            if (!CampDrill.DayHour(Mod24(from))) n--;
+            return (int)Math.Max(0L, Math.Min(100000L, n));
+        }
+
+        /// <summary>Stan postoju partii, ktora stoi w osadzie bez przerwy od `from` do poczatku godziny upTo (AI po wczytaniu albo nowa partia) - ten sam wynik,
+        /// co Step godzina po godzinie (samotest "R").</summary>
+        internal static void Restore(Stay s, long from, long upTo)
+        {
+            if (s == null) return;
+            s.Clear();
+            if (from < 0) return;
+            s.From = Math.Min(from, upTo);
+            s.Day = Mornings(s.From, upTo);
+            s.Dawn = s.Day > 0 ? DawnOf(upTo - 1) : long.MinValue;
+            s.Run = (int)Math.Max(0L, Math.Min(100000L, upTo - s.From));
         }
 
         /// <summary>Poczatek postoju partii AI widzianej pierwszy raz w osadzie (po wczytaniu albo nowa partia): StationaryStartTime gry (zapisywane), gdy jest
@@ -116,15 +184,15 @@ namespace Armoury
             }
         }
 
-        // ------------------------------------------------------------ pomiar musztry doby (Count z CampDrill.Count, linia DrillLine z CampDrill.Daily)
-        private static readonly int[] _tN = new int[4], _tMax = new int[4];      // miasto: doba 1 / 2 / 3 / 4+
+        // ------------------------------------------------------------ pomiar musztry doby (Count z CampDrill.Count, Morning z Drill, linia DrillLine z CampDrill.Daily)
+        private static readonly int[] _tN = new int[4], _tMax = new int[4];      // miasto: poranki doby 1 / 2 / 3 / 4+
         private static readonly double[] _tSum = new double[4];
-        private static readonly int[] _kN = new int[3], _kMax = new int[3];      // zamek i wies: doba 1 / 2 / 3+
+        private static readonly int[] _kN = new int[3], _kMax = new int[3];      // zamek i wies: poranki doby 1 / 2 / 3+
         private static readonly double[] _kSum = new double[3];
-        private static int _dParties, _dSetParties, _dSetTown, _dSetCastle, _dSetVill, _dSideN;
+        private static int _dParties, _dSetParties, _dSetTown, _dSetCastle, _dSetVill, _dSideN, _dMixed;
         private static double _dS0, _dS1, _dField, _dX0, _dX1, _dSideCut;
-        private static int _dEntries, _dRestored, _dRestoredNever;
-        private static double _dDiffSum, _dDiffMax;
+        private static int _dNew, _dEntries, _dRestored, _dRestoredNever, _dCont, _dContFieldMax, _dContDayMax;
+        private static double _dDiffSum, _dDiffMax, _dContField, _dContDay;
         private static int _stumbles;
         private static readonly Dictionary<string, int> _err = new Dictionary<string, int>();
 
@@ -139,9 +207,9 @@ namespace Armoury
         {
             Array.Clear(_tN, 0, _tN.Length); Array.Clear(_tMax, 0, _tMax.Length); Array.Clear(_tSum, 0, _tSum.Length);
             Array.Clear(_kN, 0, _kN.Length); Array.Clear(_kMax, 0, _kMax.Length); Array.Clear(_kSum, 0, _kSum.Length);
-            _dParties = _dSetParties = _dSetTown = _dSetCastle = _dSetVill = _dSideN = 0;
+            _dParties = _dSetParties = _dSetTown = _dSetCastle = _dSetVill = _dSideN = _dMixed = 0;
             _dS0 = _dS1 = _dField = _dX0 = _dX1 = _dSideCut = 0;
-            _dEntries = _dRestored = _dRestoredNever = 0; _dDiffSum = _dDiffMax = 0;
+            _dNew = _dEntries = _dRestored = _dRestoredNever = _dCont = _dContFieldMax = _dContDayMax = 0; _dDiffSum = _dDiffMax = _dContField = _dContDay = 0;
         }
 
         /// <summary>Wyjatek na jednej partii albo w jednym miejscu - licznik potkniec (bez wylacznika); do logu pierwsze 3 z miejsca i potem co 50.</summary>
@@ -159,11 +227,12 @@ namespace Armoury
         private static string F1(double v) { return v.ToString("0.0", Inv); }
         private static string F2(double v) { return v.ToString("0.00", Inv); }
 
-        /// <summary>Drill.Observe: partia AI widziana w osadzie od nowa (wejscie) - roznica do StationaryStartTime gry (hipoteza H1: postoj pod brama wczesniej).</summary>
+        /// <summary>Drill.Observe: partia AI zaczela w osadzie nowy postoj (wejscie) - roznica do StationaryStartTime gry (hipoteza H1: postoj pod brama wczesniej).</summary>
         internal static void NoteEntry(MobileParty mp, long now)
         {
             try
             {
+                _dNew++;
                 bool never;
                 long sst = FromStationary(mp, now, out never);
                 if (never) return;
@@ -173,11 +242,45 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteEntry", e); }
         }
 
+        /// <summary>Drill.Observe (recenzja ekonomii R1 - pomiar): partia AI wrocila do osady, a postoj trwa (wypad albo krotkie postoje po drodze ponizej doby
+        /// w polu) - godziny w polu przed powrotem i doba postoju.</summary>
+        internal static void NoteCont(Stay s)
+        {
+            if (s == null) return;
+            int d = DayNow(s);
+            _dCont++; _dContField += s.Field; if (s.Field > _dContFieldMax) _dContFieldMax = s.Field;
+            _dContDay += d; if (d > _dContDayMax) _dContDayMax = d;
+        }
+
+        /// <summary>Drill (AI): zakonczony poranek partii w osadzie - koszyk doby postoju; godziny policzone przy zasadzie TAK (z limitem poranka), przy NIE - wszystkie
+        /// godziny w osadzie (pomiar). Poranek w miescie i w zamku albo wsi naraz (rozne limity) - tylko licznik "mieszane".</summary>
+        internal static void Morning(int kind, int day, int set, int used, bool mixed)
+        {
+            try
+            {
+                if (set <= 0 && used <= 0) return;
+                if (mixed) { _dMixed++; return; }
+                int h = DrillOn(Settings.Current) ? used : set;
+                if (kind == KTown)
+                {
+                    int b = Math.Min(4, Math.Max(1, day)) - 1;
+                    _tN[b]++; _tSum[b] += h; if (h > _tMax[b]) _tMax[b] = h;
+                }
+                else
+                {
+                    int b = Math.Min(3, Math.Max(1, day)) - 1;
+                    _kN[b]++; _kSum[b] += h; if (h > _kMax[b]) _kMax[b] = h;
+                }
+            }
+            catch (Exception e) { Stumble("Morning", e); }
+        }
+
         /// <summary>Drill.Observe: partia AI widziana pierwszy raz (po wczytaniu, nowa partia) juz w osadzie - doba postoju odtworzona ze StationaryStartTime.</summary>
         internal static void NoteRestored(bool never) { _dRestored++; if (never) _dRestoredNever++; }
 
         /// <summary>Raz na element oddzialu partii AI pod zasada obozu (CampDrill.Count): XP zasady obozu bez limitu i z limitem (wzor m97 jest liniowy w godzinach -
-        /// D i perki proporcjonalne do H, wiec XP przy innych godzinach = XP x H' / H, bez szacunku); partia - raz (first): koszyki dob postoju i godziny.</summary>
+        /// D i perki proporcjonalne do H, wiec XP przy innych godzinach = XP x H' / H, bez szacunku); partia - raz (first): godziny okna 24 h (koszyki dob postoju
+        /// licza poranki - Morning z Drill.StayHour).</summary>
         internal static void Count(Drill.Ctx c, bool first, double campXp)
         {
             try
@@ -194,21 +297,8 @@ namespace Armoury
                 _dField += c.Hfield;
                 if (c.Hset <= 0) return;
                 _dSetParties++;
-                int capped = Math.Min(c.Hset, c.SCap);
-                int used = DrillOn(Settings.Current) ? capped : c.Hset;   // godziny w osadzie, ktore zasada naprawde liczy (NIE - bez limitu, pomiar)
-                _dS0 += c.Hset; _dS1 += capped;
-                if (c.SKind == KTown)
-                {
-                    _dSetTown++;
-                    int b = Math.Min(4, Math.Max(1, c.SDay)) - 1;
-                    _tN[b]++; _tSum[b] += used; if (used > _tMax[b]) _tMax[b] = used;
-                }
-                else
-                {
-                    if (c.SKind == KCastle) _dSetCastle++; else _dSetVill++;
-                    int b = Math.Min(3, Math.Max(1, c.SDay)) - 1;
-                    _kN[b]++; _kSum[b] += used; if (used > _kMax[b]) _kMax[b] = used;
-                }
+                _dS0 += c.Hset; _dS1 += Math.Max(0, c.Hset - c.Hover);   // godziny w osadzie bez limitu i w limicie poranka (pomiar takze przy NIE)
+                if (c.SKind == KTown) _dSetTown++; else if (c.SKind == KCastle) _dSetCastle++; else _dSetVill++;
             }
             catch (Exception e) { Stumble("Count", e); }
         }
@@ -227,16 +317,20 @@ namespace Armoury
                   .Append(" | miasto: ");
                 for (int b = 0; b < 4; b++)
                     sb.Append(b > 0 ? "; " : "").Append("doba ").Append(b + 1).Append(b == 3 ? "+" : "").Append(" (limit ").Append(Cap(KTown, b + 1)).Append(") ").Append(_tN[b])
-                      .Append(" partii, srednio ").Append(F2(_tN[b] > 0 ? _tSum[b] / _tN[b] : 0)).Append(", najwiecej ").Append(_tMax[b]);
+                      .Append(" porankow, srednio ").Append(F2(_tN[b] > 0 ? _tSum[b] / _tN[b] : 0)).Append(", najwiecej ").Append(_tMax[b]);
                 sb.Append(" | zamek i wies: ");
                 for (int b = 0; b < 3; b++)
                     sb.Append(b > 0 ? "; " : "").Append("doba ").Append(b + 1).Append(b == 2 ? "+" : "").Append(" (limit ").Append(Cap(KCastle, b + 1)).Append(") ").Append(_kN[b])
-                      .Append(" partii, srednio ").Append(F2(_kN[b] > 0 ? _kSum[b] / _kN[b] : 0)).Append(", najwiecej ").Append(_kMax[b]);
-                sb.Append(" | godzin w osadzie bez limitu ").Append(F1(_dS0)).Append(" -> z limitem ").Append(F1(_dS1)).Append(", w polu ").Append(F1(_dField))
+                      .Append(" porankow, srednio ").Append(F2(_kN[b] > 0 ? _kSum[b] / _kN[b] : 0)).Append(", najwiecej ").Append(_kMax[b]);
+                sb.Append(" | poranki mieszane (miasto i zamek albo wies) ").Append(_dMixed)
+                  .Append(" | godzin w osadzie bez limitu ").Append(F1(_dS0)).Append(" -> z limitem ").Append(F1(_dS1)).Append(", w polu ").Append(F1(_dField))
                   .Append(" | XP zasady obozu bez limitu ").Append((long)_dX0).Append(" -> z limitem ").Append((long)_dX1).Append(" (x").Append(F2(_dX0 > 0 ? _dX1 / _dX0 : 1.0)).Append(')')
                   .Append(" | strona gracza: partii ").Append(_dSideN).Append(", odjete ").Append(F1(_dSideCut)).Append(" h")
-                  .Append(" | wejscia AI ").Append(_dEntries).Append(", roznica do StationaryStartTime srednio ").Append(F1(_dEntries > 0 ? _dDiffSum / _dEntries : 0))
-                  .Append(" h, najwiecej ").Append(F1(_dDiffMax)).Append(" h; odtworzone ze StationaryStartTime ").Append(_dRestored).Append(" (Never ").Append(_dRestoredNever).Append(')')
+                  .Append(" | wejscia AI: nowy postoj ").Append(_dNew).Append(" (ze StationaryStartTime ").Append(_dEntries).Append(", roznica srednio ")
+                  .Append(F1(_dEntries > 0 ? _dDiffSum / _dEntries : 0)).Append(" h, najwiecej ").Append(F1(_dDiffMax)).Append(" h), kontynuacja ").Append(_dCont)
+                  .Append(" (w polu przed powrotem srednio ").Append(F1(_dCont > 0 ? _dContField / _dCont : 0)).Append(" h, najwiecej ").Append(_dContFieldMax)
+                  .Append(" h; doba postoju srednio ").Append(F1(_dCont > 0 ? _dContDay / _dCont : 0)).Append(", najwiecej ").Append(_dContDayMax).Append(')')
+                  .Append("; odtworzone ze StationaryStartTime ").Append(_dRestored).Append(" (Never ").Append(_dRestoredNever).Append(')')
                   .Append(" | potkniecia ").Append(_stumbles).Append('.');
                 Log.Info(sb.ToString());
             }
@@ -305,7 +399,9 @@ namespace Armoury
             if (mp.IsMainParty && QuartermasterEscrow.Active) { _sEscrow++; return; }   // ekran zbrojowni gracza otwarty - rozliczenie wkladow w toku
             if (st.Town == null) { _sInactive++; return; }
             if (CitySack.StayWindow(st, mp)) { _sSack++; return; }        // okno lupu: wojsko zdobywcy nie placi w lupionej osadzie (bramka L3, bez jej licznika)
-            long mend = MenPurse.CampMend(mp);
+            // rezerwa napraw: w miescie jak przy wyjezdzie (OnLeft) - robocizna i szacunek materialu z polki (kowale miasta placa material co godzine z sakiewki,
+            // TroopSelfMend.HourlyWithMaterial; recenzja ekonomii R3); w zamku jak w polu (bez polki)
+            long mend = kind == KTown ? Math.Max(0, mp.IsMainParty ? TroopSelfMend.OutstandingCost(st) : AiWear.OutstandingCost(mp, st)) : MenPurse.CampMend(mp);
             int res, kept;
             int free = MenPurse.CampFree(mp, mend, 1f, out res, out kept);
             if (free <= 0) { _sNoFree++; return; }
@@ -350,9 +446,9 @@ namespace Armoury
             if (!drill && !spent) return;
             if (kind == KVillage && !drill) return;
             long now = (long)Math.Floor(CampaignTime.Now.ToHours), morning = NextMorning(now);
-            long from, outAt; float daySet;
-            CampDrill.PlayerStay(out from, out outAt, out daySet);
-            int day = Day(from, morning), cap = Cap(kind, day);
+            Stay ps; float daySet;
+            CampDrill.PlayerStay(out ps, out daySet);
+            int day = DayAt(ps, morning), cap = Cap(kind, day);   // doba postoju najblizszego poranka (poranek juz policzony - ta sama)
             bool fewer = Cap(kind, day + 1) < cap;
             string hours = cap == 1 ? "1 hour" : cap + " hours";
             var sb = new StringBuilder(220);
@@ -398,17 +494,17 @@ namespace Armoury
             var st = mp != null ? mp.CurrentSettlement : null;
             int kind = Kind(st);
             long now = (long)Math.Floor(CampaignTime.Now.ToHours);
-            long from, outAt; float daySet;
-            CampDrill.PlayerStay(out from, out outAt, out daySet);
+            Stay ps; float daySet;
+            CampDrill.PlayerStay(out ps, out daySet);
             float capMax = CampDrill.PlayerDayCap;
             string drilled = ", w osadzie od switu " + F2(daySet) + " h (limit rano " + (capMax > 0f ? ((int)capMax).ToString(Inv) : "-");
             if (kind == KNone)
             {
-                if (from >= 0) return "poza osada od " + (outAt >= 0 ? now - outAt : 0) + " h (doba postoju " + Day(from, now) + " trwa do " + FieldResetHours + " h w polu)" + drilled + ")";
+                if (ps.From >= 0) return "poza osada, w polu " + ps.Field + " h (doba postoju " + DayNow(ps) + " trwa do " + FieldResetHours + " h w polu)" + drilled + ")";
                 return (st != null ? "w osadzie bez postoju (" + st.Name + ")" : "w polu") + drilled + ")";
             }
-            int dNext = Day(from, NextMorning(now));
-            return KindName(kind) + " " + st.Name + ", doba postoju " + Day(from, now) + drilled + ", jutro " + Cap(kind, dNext) + ")"
+            int dNext = DayAt(ps, NextMorning(now));
+            return KindName(kind) + " " + st.Name + ", doba postoju " + DayNow(ps) + drilled + ", jutro " + Cap(kind, dNext) + ")"
                    + (on ? ", wydali " + _pX + ", morale +" + F1(_pGain) + " (" + F1(_pM0) + " -> " + F1(_pGain > 0f ? _pM1 : _pM0) + ")" : "");
         }
 
@@ -427,25 +523,119 @@ namespace Armoury
                     if (mp == null || mp == main || !mp.IsActive || Kind(mp.CurrentSettlement) == KNone) continue;
                     bool nv;
                     long from = FromStationary(mp, now, out nv);
-                    n++; if (nv) never++; days += Day(from, now);
+                    n++; if (nv) never++; days += Math.Max(1, Mornings(from, now));
                 }
-                long pFrom, pOut; float pSet;
-                CampDrill.PlayerStay(out pFrom, out pOut, out pSet);
+                Stay ps; float pSet;
+                CampDrill.PlayerStay(out ps, out pSet);
                 TestClear();
                 _tOn = TestWanted();
                 if (_tOn) _tArmAt = now;
                 Log.Info(P + "start sesji | musztra w osadzie (Drill Town Stay) " + (DrillOn(s) ? "TAK" : "NIE") + " | limit godzin w osadzie na dobe postoju: miasto "
                          + Cap(KTown, 1) + "/" + Cap(KTown, 2) + "/" + Cap(KTown, 3) + "/" + Cap(KTown, 4) + ", zamek i wies " + Cap(KCastle, 1) + "/" + Cap(KCastle, 2) + "/" + Cap(KCastle, 3)
-                         + " (razem z obozem najwyzej " + (int)CampDrill.FullHours + " h od switu) | oblezona - jak oboz oblezenia | wypad < " + FieldResetHours + " h nie zeruje"
+                         + " (razem z obozem najwyzej " + (int)CampDrill.FullHours + " h od switu) | oblezona - jak oboz oblezenia | doba postoju = poranek w osadzie, koniec po "
+                         + FieldResetHours + " h w polu (narastajaco; postoj ponizej " + VisitHours + " h ich nie zeruje)"
                          + " | wydatki (Town Stay Spend) " + (SpendOn(s) ? "TAK: stawka " + (MBMath.ClampFloat(s.SutlerDailyShare, 0f, 1f) * 100f).ToString("0.0", Inv) + "%"
                                                                  + (s.SutlersByPurse ? " x min(3, dni wolnej / 10)" : " (bez mnoznika sakiewki)") + ", miasto i zamek"
                                                                : "NIE (" + (s.TownStaySpend ? "Men Purse Enabled wylaczone" : "klucz wylaczony") + ")")
                          + " | morale +" + (int)MoraleFull + "/dobe do +" + (int)MoraleCap
                          + " | AI odtworzone ze StationaryStartTime " + n + " (srednio doba " + F1(n > 0 ? days / n : 0) + ", Never " + never + ")"
-                         + " | gracz: postoj od " + (pFrom >= 0 ? pFrom.ToString(Inv) + " (doba " + Day(pFrom, now) + ")" : "-") + ", poza od " + (pOut >= 0 ? pOut.ToString(Inv) : "-")
+                         + " | gracz: postoj od " + (ps.From >= 0 ? ps.From.ToString(Inv) + " (doba " + DayNow(ps) + ")" : "-") + ", w polu " + ps.Field + " h"
                          + ", dzis w osadzie " + F2(pSet) + " h | autotest postoju " + (_tOn ? "TAK (plik " + AutoFlagName + ")" : "nie") + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
+            try { Log.Info(P + SelfTest()); } catch (Exception e) { Stumble("SelfTest", e); }   // recenzja R6: zasada wobec przebiegow godzin (prog MUSZT-8)
+        }
+
+        // ------------------------------------------------------------ samotest zasady (recenzja m109 R6: progi doby nie wykrywaly bledow licznika postoju)
+        /// <summary>Samotest zasady raz na start sesji - sama arytmetyka Step / Cap / Restore na przebiegach godzin (bez stanu gry), wynik wobec liczb z opisu zasady
+        /// (MCM: miasto 4/3/2/1, zamek i wies 6/5/4, doba w polu konczy postoj, krotki postoj po drodze jej nie przerywa). Przebiegi z recenzji m109: A - wejscie po
+        /// porannych godzinach (R4), B i C - krotkie postoje po drodze (R1), D - wypad krotszy niz doba, E - doba w polu, F - pobyt od pol doby zaczyna godziny
+        /// w polu od nowa, R - odtworzenie ze StationaryStartTime (Restore) = przebieg godzinowy. Linia "samotest zasady ... | wynik TAK/NIE" (prog MUSZT-8).</summary>
+        private static string SelfTest()
+        {
+            var sb = new StringBuilder(1000);
+            bool all = true;
+            long b = DawnStart(4000);   // swit dowolnej doby
+            bool[] fr;
+            // A: 11 h w polu (od switu), potem miasto 5 dob - poranki 4/3/2/1/1 (pierwszy niepelny, ale 4 godziny cwiczen jeszcze zostaly)
+            var a = Sim(b, new[] { new[] { 11, KNone }, new[] { 120, KTown } }, out fr);
+            var aUsed = new List<int>();
+            foreach (var m in a) if (m[0] == 1 && aUsed.Count < 5) aUsed.Add(m[2]);
+            string aTxt = string.Join("/", aUsed.ConvertAll(x => x.ToString(Inv)).ToArray());
+            bool okA = aTxt == Cap(KTown, 1) + "/" + Cap(KTown, 2) + "/" + Cap(KTown, 3) + "/" + Cap(KTown, 4) + "/" + Cap(KTown, 4) && Cap(KTown, 1) == 4 && Cap(KTown, 4) == 1;
+            sb.Append("samotest zasady | A wejscie po porannych godzinach (miasto): poranki ").Append(aTxt).Append(" (oczekiwane 4/3/2/1/1) ").Append(okA ? "TAK" : "NIE");
+            all &= okA;
+            // B (recenzja kodu R1): wies 1 h, pole 15 h, miasto 2 h, pole 20 h, zamek - w zamku nowy postoj, pierwszy poranek doba 1 (limit 6)
+            all &= SelfCase(sb, "B wies 1 h, pole 15 h, miasto 2 h, pole 20 h, zamek", b, new[] { new[] { 5, KNone }, new[] { 1, KVillage }, new[] { 15, KNone }, new[] { 2, KTown },
+                                                                                        new[] { 20, KNone }, new[] { 48, KCastle } }, true, 1);
+            // C (recenzja ekonomii R1): miasto 2 doby, pole 20 h, wies 2 h, pole 20 h, miasto - nowy postoj, doba 1
+            all &= SelfCase(sb, "C miasto 2 doby, pole 20 h, wies 2 h, pole 20 h, miasto", b, new[] { new[] { 48, KTown }, new[] { 20, KNone }, new[] { 2, KVillage }, new[] { 20, KNone },
+                                                                                       new[] { 48, KTown } }, true, 1);
+            // D: miasto 4 poranki, pole 23 h, powrot - postoj trwa, doba 5 (godziny w polu nie dokladaja dob)
+            all &= SelfCase(sb, "D miasto 4 poranki, pole 23 h, miasto", b, new[] { new[] { 86, KTown }, new[] { 23, KNone }, new[] { 30, KTown } }, false, 5);
+            // E: miasto 3 doby, pole 24 h, miasto - nowy postoj, doba 1
+            all &= SelfCase(sb, "E miasto 3 doby, pole 24 h, miasto", b, new[] { new[] { 72, KTown }, new[] { 24, KNone }, new[] { 48, KTown } }, true, 1);
+            // F: miasto 3 doby, pole 20 h, wies 12 h (pol doby - godziny w polu od nowa), pole 20 h, miasto - postoj trwa, doba 5
+            all &= SelfCase(sb, "F miasto 3 doby, pole 20 h, wies 12 h, pole 20 h, miasto", b, new[] { new[] { 72, KTown }, new[] { 20, KNone }, new[] { 12, KVillage }, new[] { 20, KNone },
+                                                                                               new[] { 30, KTown } }, false, 5);
+            // R (recenzja kodu R3): Restore(from, upTo) = Step godzina po godzinie przy postoju bez przerwy - rozne godziny wejscia i dlugosci
+            int rn = 0, rok = 0;
+            foreach (int o in new[] { 0, 5, 11, 14, 15, 20, 23 })
+                foreach (int len in new[] { 1, 4, 13, 30, 50, 100 })
+                {
+                    var s1 = new Stay();
+                    for (int j = 0; j < len; j++) Step(s1, true, b + o + j + 1, 0);
+                    var s2 = new Stay();
+                    Restore(s2, b + o, b + o + len);
+                    rn++;
+                    if (s1.From == s2.From && s1.Day == s2.Day && s1.Dawn == s2.Dawn && DayNow(s1) == DayNow(s2)) rok++;
+                }
+            bool okR = rok == rn;
+            sb.Append(" | R odtworzenie ze StationaryStartTime = przebieg godzinowy ").Append(rok).Append(" z ").Append(rn).Append(' ').Append(okR ? "TAK" : "NIE");
+            all &= okR;
+            sb.Append(" | wynik ").Append(all ? "TAK" : "NIE").Append('.');
+            return sb.ToString();
+        }
+
+        /// <summary>Samotest: jeden przebieg - czy ostatni odcinek zaczal nowy postoj i doba jego pierwszego poranka wobec oczekiwanych; dopisuje wynik do linii.</summary>
+        private static bool SelfCase(StringBuilder sb, string name, long b, int[][] segs, bool expFresh, int expDay)
+        {
+            bool[] fr;
+            var ms = Sim(b, segs, out fr);
+            int last = segs.Length - 1, day = -1;
+            foreach (var m in ms) if (m[0] == last) { day = m[1]; break; }
+            bool ok = fr[last] == expFresh && day == expDay;
+            sb.Append(" | ").Append(name).Append(": ").Append(fr[last] ? "nowy postoj" : "postoj trwa").Append(", pierwszy poranek doba ").Append(day)
+              .Append(" (oczekiwane ").Append(expFresh ? "nowy postoj" : "postoj trwa").Append(", doba ").Append(expDay).Append(") ").Append(ok ? "TAK" : "NIE");
+            return ok;
+        }
+
+        /// <summary>Samotest: przebieg odcinkow {godzin, rodzaj osady; KNone - pole} od godziny b, Step co godzine. Wynik: poranki w osadzie {odcinek, doba postoju,
+        /// godziny w limicie} - w poranku pierwsze godziny w osadzie do limitu doby (jak gracz w CampDrill.AutoHour i AI w Drill.StayHour); fresh - odcinek zaczal
+        /// nowy postoj (pierwsza godzina).</summary>
+        private static List<int[]> Sim(long b, int[][] segs, out bool[] fresh)
+        {
+            var s = new Stay();
+            var res = new List<int[]>();
+            fresh = new bool[segs.Length];
+            long h = b, dw0 = long.MinValue;
+            int used = 0;
+            for (int i = 0; i < segs.Length; i++)
+            {
+                int kind = segs[i][1];
+                for (int j = 0; j < segs[i][0]; j++, h++)
+                {
+                    bool f = Step(s, kind != KNone, h + 1, 0);
+                    if (j == 0) fresh[i] = f;
+                    if (kind == KNone || !CampDrill.DayHour(Mod24(h))) continue;
+                    long dw = DawnOf(h);
+                    if (dw != dw0) { dw0 = dw; used = 0; }
+                    int day = DayNow(s);
+                    if (res.Count == 0 || res[res.Count - 1][0] != i || (long)res[res.Count - 1][3] != dw) res.Add(new[] { i, day, 0, (int)dw });
+                    if (used < Cap(kind, day)) { used++; res[res.Count - 1][2]++; }
+                }
+            }
+            return res;
         }
 
         /// <summary>CampDrill.RegisterEvents: takt autotestu postoju (TickEvent - tylko przy plynacym czasie; nieuzbrojony - od razu wyjscie).</summary>
@@ -464,7 +654,7 @@ namespace Armoury
         internal const string AutoFlagName = "armoury-postoj.flag";
         private const int PWait = 0, PF1 = 1, PF2Field = 2, PF2Town = 3, PF3Field = 4, PF4Town = 5, PDone = 6;
         private static bool _tOn, _tLocked, _tEntering, _tDrillOn, _tDrillDone, _tF2Cont, _tF4New;
-        private static int _tPhase, _tFails, _tDayLast, _tF2Day, _tF4Mornings;
+        private static int _tPhase, _tFails, _tDayLast, _tF2Day, _tF4Mornings, _tF1LeaveDay;
         private static long _tArmAt, _tAt, _tHour = -1, _tDawn = long.MinValue, _tFrom = -1, _tF4From = -1, _tRowFrom = -1, _tSpent;
         private static float _tSetLast, _tCapLast, _tF3Menu = -1f;
         private static Settlement _tTown;
@@ -475,7 +665,7 @@ namespace Armoury
         private static void TestClear()
         {
             _tLocked = _tEntering = _tDrillOn = _tDrillDone = _tF2Cont = _tF4New = false;
-            _tPhase = PWait; _tFails = 0; _tDayLast = 0; _tF2Day = 0; _tF4Mornings = 0;
+            _tPhase = PWait; _tFails = 0; _tDayLast = 0; _tF2Day = 0; _tF4Mornings = 0; _tF1LeaveDay = 0;
             _tArmAt = _tAt = 0; _tHour = -1; _tDawn = long.MinValue; _tFrom = _tF4From = _tRowFrom = -1; _tSpent = 0;
             _tSetLast = _tCapLast = 0f; _tF3Menu = -1f; _tTown = null;
             _tF1.Clear(); _tF4.Clear(); _tF1Caps.Clear(); _tF1Days.Clear(); _tF4Caps.Clear(); _tF4Set.Clear();
@@ -511,12 +701,12 @@ namespace Armoury
         {
             var mp = MobileParty.MainParty;
             var st = mp != null ? mp.CurrentSettlement : null;
-            long from, outAt; float set;
-            CampDrill.PlayerStay(out from, out outAt, out set);
+            Stay ps; float set;
+            CampDrill.PlayerStay(out ps, out set);
             int kind = Kind(st);
-            int d = Day(from, now);
-            return "menu " + (menu ?? "-") + ", osada " + (st != null ? st.Name.ToString() : "-") + ", godzina " + (now % 24) + ", doba postoju " + (from >= 0 ? d.ToString(Inv) : "-")
-                   + ", limit " + (kind != KNone && from >= 0 ? Cap(kind, d).ToString(Inv) : "-") + ", godzin w osadzie " + F2(set);
+            int d = DayNow(ps);
+            return "menu " + (menu ?? "-") + ", osada " + (st != null ? st.Name.ToString() : "-") + ", godzina " + (now % 24) + ", doba postoju " + (ps.From >= 0 ? d.ToString(Inv) : "-")
+                   + ", limit " + (kind != KNone && ps.From >= 0 ? Cap(kind, d).ToString(Inv) : "-") + ", godzin w osadzie " + F2(set);
         }
 
         private static void TestLine(string what, string menu, long now, string extra)
@@ -602,10 +792,10 @@ namespace Armoury
             if (st == null || Kind(st) != KTown || mp.Army != null) return;
             if (menu == "town" && PlayerEncounter.Current != null) { PlayerEncounter.Current.IsPlayerWaiting = true; GameMenu.SwitchToMenu("town_wait_menus"); return; }
             if (menu != "town_wait_menus") return;
-            long from, outAt; float set;
-            CampDrill.PlayerStay(out from, out outAt, out set);
-            if (from < 0) return;   // licznik postoju rusza w godzinie gry (Drill.Hourly -> CampDrill.AutoHour)
-            _tTown = st; _tFrom = from; _tAt = now; _tPhase = PF1; _tDayLast = Day(from, now);
+            Stay ps; float set;
+            CampDrill.PlayerStay(out ps, out set);
+            if (ps.From < 0) return;   // licznik postoju rusza w godzinie gry (Drill.Hourly -> CampDrill.AutoHour)
+            _tTown = st; _tFrom = ps.From; _tAt = now; _tPhase = PF1; _tDayLast = DayNow(ps);
             TestLine("F1 wejscie", menu, now, "okno lupu " + (CitySack.StayWindow(st, mp) ? "TAK (wydatki wstrzymane)" : "nie") + ", sakiewka ludzi " + MenPurse.Get(mp)
                      + ", zasada gracza " + (CampDrill.PlayerRuleOn ? "TAK" : "NIE") + ", Drill Town Stay " + (DrillOn(Settings.Current) ? "TAK" : "NIE"));
         }
@@ -622,6 +812,7 @@ namespace Armoury
             if (now - _tAt < hours) return;
             if (noon && now % 24 != 12) return;
             TestLine(PhaseName(_tPhase) + " wyjscie", menu, now, "w miescie " + (now - _tAt) + " h");
+            if (_tPhase == PF1) { Stay ps; float set; CampDrill.PlayerStay(out ps, out set); _tF1LeaveDay = DayNow(ps); }   // F2: doba po wypadzie = przy wyjsciu (R1)
             Leave(mp, now);
             _tPhase = _tPhase == PF1 ? PF2Field : PF3Field;
             _tAt = now; _tDrillOn = _tDrillDone = false;
@@ -667,20 +858,22 @@ namespace Armoury
             }
             if (menu != "town_wait_menus") return;
             Unlock();
-            long from, outAt; float set;
-            CampDrill.PlayerStay(out from, out outAt, out set);
+            Stay ps; float set;
+            CampDrill.PlayerStay(out ps, out set);
+            long from = ps.From;
             if (from < 0) return;   // nowy postoj (F4) - licznik rusza w godzinie gry (Drill.Hourly -> CampDrill.AutoHour)
             _tEntering = false; _tHour = now;
             if (_tPhase == PF2Field)
             {
                 _tPhase = PF2Town; _tAt = now;
-                _tF2Day = Day(from, now); _tF2Cont = from >= 0 && from == _tFrom && _tF2Day > 1;
-                TestLine("F2 wejscie", menu, now, "po " + 6 + " h w polu, kontynuacja postoju " + (_tF2Cont ? "TAK" : "NIE") + " (poczatek postoju " + from + ", w F1 " + _tFrom + ")");
+                _tF2Day = DayNow(ps); _tF2Cont = from >= 0 && from == _tFrom && _tF2Day > 1;
+                TestLine("F2 wejscie", menu, now, "po " + 6 + " h w polu, kontynuacja postoju " + (_tF2Cont ? "TAK" : "NIE") + " (poczatek postoju " + from + ", w F1 " + _tFrom
+                         + "), doba jak przy wyjsciu " + (_tF2Day == _tF1LeaveDay ? "TAK" : "NIE") + " (przy wyjsciu " + _tF1LeaveDay + ", w polu " + ps.Field + " h)");
             }
             else
             {
                 _tPhase = PF4Town; _tAt = now; _tF4From = from;
-                _tF4New = from >= 0 && from != _tFrom && Day(from, now) == 1;
+                _tF4New = from >= 0 && from != _tFrom && DayNow(ps) == 1;
                 TestLine("F4 wejscie", menu, now, "po polu (F3), nowy postoj " + (_tF4New ? "TAK" : "NIE") + " (poczatek postoju " + from + ")");
             }
         }
@@ -731,10 +924,10 @@ namespace Armoury
                 _tDawn = dawn; _tCapLast = 0f; _tSetLast = 0f; _tRowFrom = -1;
             }
             if (_tPhase == PWait || _tPhase == PDone) return;
-            long from, outAt; float set;
-            CampDrill.PlayerStay(out from, out outAt, out set);
+            Stay ps; float set;
+            CampDrill.PlayerStay(out ps, out set);
             float cap = CampDrill.PlayerDayCap;
-            if (cap > 0f && _tCapLast <= 0f) { _tDayLast = Day(from, now); _tRowFrom = from; }   // doba postoju poranka - z pierwszej godziny w osadzie tej doby
+            if (cap > 0f && _tCapLast <= 0f) { _tDayLast = DayNow(ps); _tRowFrom = ps.From; }   // doba postoju poranka - z pierwszej godziny w osadzie tej doby
             _tSetLast = set; _tCapLast = cap;
         }
 
@@ -742,12 +935,17 @@ namespace Armoury
         {
             bool f1Down = true; for (int i = 1; i < _tF1Caps.Count; i++) if (_tF1Caps[i] > _tF1Caps[i - 1]) f1Down = false;
             bool f1Floor = true; for (int i = 0; i < _tF1Caps.Count; i++) if (_tF1Days[i] >= 4 && _tF1Caps[i] != Cap(KTown, 4)) f1Floor = false;
+            // recenzja R4: kazdy poranek w miescie to kolejna doba postoju (dotad wejscie po swicie dawalo doba 1 dwa razy) i limit doby z opisu zasady
+            bool f1Seq = _tF1Days.Count > 0; for (int i = 1; i < _tF1Days.Count; i++) if (_tF1Days[i] != _tF1Days[i - 1] + 1) f1Seq = false;
+            bool f1Cap = true; for (int i = 0; i < _tF1Caps.Count; i++) if (_tF1Caps[i] != Cap(KTown, _tF1Days[i])) f1Cap = false;
+            bool f2Same = _tF2Day == _tF1LeaveDay;   // recenzja R1: godziny w polu nie postarzaja postoju
             bool f4 = _tF4Caps.Count >= 3 && _tF4Caps[0] == Cap(KTown, 1) && _tF4Caps[1] == Cap(KTown, 2) && _tF4Caps[2] == Cap(KTown, 3);
             bool f4h = true; for (int i = 0; i < _tF4Set.Count; i++) if (_tF4Set[i] > _tF4Caps[i] + 0.01f || _tF4Set[i] <= 0f) f4h = false;
             bool f3 = _tF3Menu >= CampDrill.FullHours - 0.01f;
-            bool ok = f1Down && f1Floor && _tF2Cont && f3 && _tF4New && f4 && f4h;
+            bool ok = f1Down && f1Floor && f1Seq && f1Cap && _tF2Cont && f2Same && f3 && _tF4New && f4 && f4h;
             Log.Info(P + "autotest - podsumowanie | F1 poranki: " + string.Join("; ", _tF1.ToArray()) + " - limity nierosnace " + (f1Down ? "TAK" : "NIE") + ", od 4. doby limit 1 " + (f1Floor ? "TAK" : "NIE")
-                     + " | F2 kontynuacja " + (_tF2Cont ? "TAK" : "NIE") + " (doba " + _tF2Day + ") | F3 z menu obozu " + F2(_tF3Menu) + " h - " + (f3 ? "TAK" : "NIE")
+                     + ", doby kolejne " + (f1Seq ? "TAK" : "NIE") + ", limit doby " + (f1Cap ? "TAK" : "NIE")
+                     + " | F2 kontynuacja " + (_tF2Cont ? "TAK" : "NIE") + " (doba " + _tF2Day + "), doba jak przy wyjsciu " + (f2Same ? "TAK" : "NIE") + " (" + _tF1LeaveDay + ") | F3 z menu obozu " + F2(_tF3Menu) + " h - " + (f3 ? "TAK" : "NIE")
                      + " | F4 nowy postoj " + (_tF4New ? "TAK" : "NIE") + ", poranki: " + string.Join("; ", _tF4.ToArray()) + " - limity 4/3/2 " + (f4 ? "TAK" : "NIE") + ", godziny w limicie i > 0 " + (f4h ? "TAK" : "NIE")
                      + " | wydatki gracza w tescie " + _tSpent + " | " + Where(menu, now) + " | wynik " + (ok ? "TAK" : "NIE") + ".");
             _tPhase = PDone; _tOn = false;
