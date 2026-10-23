@@ -611,7 +611,7 @@ namespace Armoury
                 if (mission != null && nb2b)
                     mission.AddMissionBehavior(new BattleSense());
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
-                    && NightRest.PlayerCamped)
+                    && (NightRest.PlayerCamped || CampScene.TestWanted()))   // m109-oboz: test autotestu (plik armoury-oboz-bitwa.flag) - kazda bitwa w polu jak w obozie
                     mission.AddMissionBehavior(new CampScene());
                 if (Settings.Current.HideoutAlarmEnabled && Campaign.Current != null && mission != null
                     && HideoutAlarm.IsHideout(mission))

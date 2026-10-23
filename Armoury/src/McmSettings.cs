@@ -5088,6 +5088,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool CampBattlePropsEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Camp Battle Like Walk", HintText = "attacked while encamped (Camp Battle Props Enabled), the field battle gets the very camp you walk through: tents by the number of your healthy men (one per Camp Walk Men Per Tent, a leader's tent, an officers' tent from 60 men), fires, bedrolls, your carts and spare horses - pitched once your men are deployed, behind your lines with the tents facing the enemy; scenery only (no collision: nobody gets stuck, arrows fly through; the horses stand tied and cannot be hurt or mounted), nothing closer than 6 m to you or any soldier; capped like the walk (40 soldiers' tents, 14 fires, 6 carts, 12 horses). Off = the old fixed set: three tents, a fire, four torches and a fence", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool CampBattleLikeWalk { get; set; } = true;
+
         [SettingPropertyBool("Hideout Alarm Enabled", HintText = "a fight in a hideout wakes the camp: bandits within earshot come running - no more men ignoring a brawl ten paces away", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool HideoutAlarmEnabled { get; set; } = true;
@@ -10555,6 +10559,7 @@ namespace Armoury
             s.ArmorOutlierPercentile = ArmorOutlierPercentile;
             s.ArmorOutlierTolerance = ArmorOutlierTolerance;
             s.CampBattlePropsEnabled = CampBattlePropsEnabled;
+            s.CampBattleLikeWalk = CampBattleLikeWalk;
             s.HideoutAlarmEnabled = HideoutAlarmEnabled;
             s.HideoutAlarmScreamRadius = HideoutAlarmScreamRadius;
             s.HideoutAlarmWitnessRadius = HideoutAlarmWitnessRadius;
