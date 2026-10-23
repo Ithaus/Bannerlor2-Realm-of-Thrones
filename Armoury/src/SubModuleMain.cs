@@ -484,6 +484,7 @@ namespace Armoury
                 try { ChatLogTick(dt); }
                 catch (Exception e) { _chatLogFails++; Log.Error("MapChatLog: nie laduje sie (proba " + _chatLogFails + "/3)", e); }
             }
+            CampWalk.TestTick();   // m109-oboz: test spaceru pod plikiem autotestu (armoury-oboz-spacer.flag; w grze zamyka sie po pierwszym sprawdzeniu, wlasny try)
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
