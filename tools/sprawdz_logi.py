@@ -1758,13 +1758,17 @@ Uzycie (Python 3, tylko odczyt):
                     BuildLikeWalk, CampWalk.cs CampLayout; klucz Camp Battle Like Walk; pliki testu CrashScribe/armoury-oboz-bitwa.flag i armoury-oboz-spacer.flag)
                     python -I tools/sprawdz_logi.py --grupa m109oboz <Armoury-*.log> (strumieniowo). OBOZ-S self-test wyrazen (linie kontrolne jak w kodzie C#, nowe linie
                     poza wierszami E7/O2), OBOZ-S2 test syntetyczny (dobry i zly bieg). OBOZ-0 linia startu 'CampScene (m109): start' w kazdej sesji z linia E7/O2 (klucz TAK,
-                    NIE - INFO; limity 40/14/6/12, odstep 6 m, srodek 21 m, zaden prefab '-'), OBOZ-1 ERROR CampScene / CampWalk i potkniecia w liniach ukladu 0, OBOZ-2 kazda
-                    'bitwa w obozie nr' ma wynik zgodny z kluczem (uklad spaceru / stary zestaw przy NIE albo tescie 'stary' / 'bez obozu (nie bitwa w polu)'), OBOZ-3 namioty,
-                    zolnierskie, poslania i ogniska = regula spaceru z ludzi i namiotu na (m109oboz_rule), postawione <= plan, postawione + pominiete = plan, OBOZ-4 najblizej
-                    gracz, wojsko i front obozu za linia >= 6 m, OBOZ-5 czas budowy <= 250 ms i encje <= 520, OBOZ-6 'CampScene: postawiono 10' tylko przy kluczu NIE / tescie
-                    'stary', OBOZ-7 postawione / plan >= 0.8 (przyczyny pominiec w wierszu), OBOZ-8 bitwa z 'test: ludzi' >= 40 namiotow - namioty 42, zolnierskie 40,
-                    ogniska 14, OBOZ-9 zdjecia obozu w tescie TAK, OBOZ-10 test spaceru (regula, postawione / plan >= 0.8, gracz tak, potkniecia 0, potem 'wyjscie po'; brak -
-                    INFO z ostatnim 'czekam'), OBOZ-11 geometria bitwa = spacer (wodz nieprzesuniety w 0.0,12.0, rzad 1 y = 27.5 przy Tent_Leader). Log bez linii m109 - INFO.
+                    NIE - INFO; limity 40/14/6/12, odstep 6 m, srodek 21 m, scenografia do 100 m za granica pola bitwy, zaden prefab '-'), OBOZ-1 ERROR CampScene / CampWalk
+                    i potkniecia w liniach ukladu 0, OBOZ-2 kazda 'bitwa w obozie nr' ma wynik zgodny z kluczem (uklad spaceru / stary zestaw przy NIE albo tescie 'stary' /
+                    'bez obozu (koniec misji przed rozstawieniem / bez gracza na polu)'), OBOZ-3 namioty, zolnierskie, poslania i ogniska = regula spaceru z ludzi i namiotu na
+                    (m109oboz_rule), postawione <= plan, postawione + pominiete = plan, OBOZ-4 najblizej gracz, wojsko i front obozu za linia >= 6 m, OBOZ-5 czas budowy
+                    <= 250 ms i encje <= 520, OBOZ-6 'CampScene: postawiono 10' tylko przy kluczu NIE / tescie 'stary', OBOZ-7 postawione / plan >= 0.8 (przyczyny pominiec,
+                    glebokosc i elementy za granica pola w wierszu), OBOZ-8 bitwa z 'test: ludzi' >= 40 namiotow - namioty 42, zolnierskie 40, ogniska 14, OBOZ-9 zdjecia obozu
+                    w tescie TAK, OBOZ-10 test spaceru (regula, postawione / plan >= 0.8, gracz tak, potkniecia 0, potem 'wyjscie po'; brak - INFO z ostatnim 'czekam'),
+                    OBOZ-11 geometria bitwa = spacer (wodz nieprzesuniety w 0.0,12.0, rzad 1 y = 27.5 przy Tent_Leader; przy przesunieciach 27.5..28.5), OBOZ-12 test
+                    'glebokosc=N' - rzad po = wzor CampLayout.Lay (m109oboz_perrow), glebokosc <= N, OBOZ-13 konie obozu w puli koni bez jezdzca 0 (recenzja W1), OBOZ-14
+                    plan bitwy bez nadpisan testu = plan spaceru tej samej druzyny (ludzi, namioty, zolnierskie, poslania, ogniska, wozy, konie; plan spaceru = regula; same
+                    nadpisania - INFO), OBOZ-15 srodek pojawiania sie posilkow w ukladzie obozu (INFO; y > 0 - za srodkiem obozu). Log bez linii m109 - INFO.
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -62046,15 +62050,21 @@ M109OBOZ_EXIT = "Spacer po obozie (m97): wyjscie po "
 M109OBOZ_RX = {
     "start": re.compile(r"^start \| klucz Camp Battle Like Walk (?P<key>TAK|NIE)(?: \([^)]*\))? \| uklad spaceru: namiot na (?P<pt>\d+) ludzi, namioty do (?P<tents>\d+), "
                         r"ogniska do (?P<fires>\d+), wozy do (?P<carts>\d+), konie taboru do (?P<horses>\d+) \| odstep od wojska (?P<clear>\d+) m, srodek obozu (?P<off>\d+) m "
-                        r"za ostatnim zolnierzem \| prefaby: (?P<pref>[^|]*?) \| test bitwy w obozie (?P<tb>TAK|NIE), test spaceru (?P<tw>TAK|NIE)\.$"),
+                        r"za ostatnim zolnierzem(?:, scenografia do (?P<out>\d+) m za granica pola bitwy)? \| prefaby: (?P<pref>[^|]*?) \| test bitwy w obozie (?P<tb>TAK|NIE), "
+                        r"test spaceru (?P<tw>TAK|NIE)\.$"),
     "nr": re.compile(r"^bitwa w obozie nr (?P<k>\d+) \| klucz (?P<key>TAK|NIE)(?P<note>.*) - oboz stanie po rozstawieniu wojska\.$"),
     "none": re.compile(r"^bitwa w obozie nr (?P<k>\d+) - bez obozu \((?P<why>.*)\)\.$"),
     "lay": re.compile(r"^oboz jak spacer nr (?P<k>\d+) \| (?P<night>noc|dzien)(?:, armia \(kolumna (?P<col>\d+) partii\))? \| ludzi zdrowych (?P<h>\d+)(?P<ht> \(test z pliku\))? "
                       r"\(namiot na (?P<pt>\d+)\) \| wedlug regul spaceru: namioty (?P<tw>\d+) \(zolnierskich (?P<sw>\d+)\), poslania (?P<bw>\d+), ogniska (?P<fw>\d+), "
-                      r"wozy (?P<cw>\d+), konie taboru (?P<kw>\d+) \| postawione: namioty (?P<t>\d+), poslania (?P<b>\d+), ogniska (?P<f>\d+), wozy (?P<c>\d+), konie (?P<kk>\d+) "
+                      r"wozy (?P<cw>\d+), konie taboru (?P<kw>\d+) \| spacer tej druzyny: ludzi zdrowych (?P<wh>\d+), namioty (?P<wtw>\d+) \(zolnierskich (?P<wsw>\d+)\), "
+                      r"poslania (?P<wbw>\d+), ogniska (?P<wfw>\d+), wozy (?P<wcw>\d+), konie taboru (?P<wkw>\d+) \| postawione: namioty (?P<t>\d+), poslania (?P<b>\d+), "
+                      r"ogniska (?P<f>\d+), wozy (?P<c>\d+), konie (?P<kk>\d+) "
                       r"\| pominiete: granica (?P<s_gr>\d+), teren (?P<s_te>\d+), obrysy (?P<s_ob>\d+), wojsko (?P<s_wo>\d+), prefab (?P<s_pr>\d+), bledy (?P<s_bl>\d+) "
-                      r"\| rzad po (?P<row>\d+), glebokosc za srodkiem obozu (?P<depth>\d+) m \| wodz (?P<lead>-|(?P<lx>-?\d+\.\d),(?P<ly>-?\d+\.\d)(?P<ls> przesuniety)?) "
+                      r"\| przesuniete (?P<mv>\d+), poza polem bitwy (?P<po>\d+) "
+                      r"\| rzad po (?P<row>\d+), glebokosc za srodkiem obozu (?P<depth>\d+) m \(pole bitwy (?P<field>\d+) m\) "
+                      r"\| wodz (?P<lead>-|(?P<lx>-?\d+\.\d),(?P<ly>-?\d+\.\d)(?P<ls> przesuniety)?) "
                       r"\| rzad 1 y (?P<r1>-|-?\d+\.\d) \| najblizej: gracz (?P<dm>-|\d+\.\d) m, wojsko (?P<dt>-|\d+\.\d) m \| front obozu (?P<fr>-|-?\d+\.\d) m za linia "
+                      r"\| konie obozu w puli koni bez jezdzca (?P<pu>-?\d+) \| posilki (?P<reinf>-|(?P<px>-?\d+\.\d),(?P<py>-?\d+\.\d)) "
                       r"\| kierunek (?P<src>wrog|wzrok|os X) \| agentow strony gracza (?P<n>\d+) \| encje (?P<ent>\d+) \| czas (?P<ms>\d+) ms \| potkniecia (?P<st>\d+)\.$"),
     "shot": re.compile(r"^test - zdjecie nr (?P<k>\d+): (?P<file>\S+) - (?P<res>TAK|NIE)(?: \((?P<why>.*)\))?\.$"),
     "wait": re.compile(r"^test - czekam \((?P<why>.*)\)\.$"),
@@ -62065,30 +62075,41 @@ M109OBOZ_RX = {
     "exit": re.compile(r"^Spacer po obozie \(m97\): wyjscie po (?P<s>\d+) s"),
     "old": re.compile(r"^CampScene: postawiono (?P<n>\d+) elementow"),
     "tl": re.compile(r" \| test: ludzi (\d+)"),
+    "td": re.compile(r" \| test: glebokosc (\d+)"),
+    "over": re.compile(r" \| test: (?:ludzi|konie|wozy) \d+"),
 }
-# linie kontrolne - napisy jak w kodzie C# (CampScene.StartLine/Announce/BuildLikeWalk/ShotLine, CampWalk.TestStep, CampWalkLogic.Build/OnEndMission)
+# linie kontrolne - napisy jak w kodzie C# (CampScene.StartLine/Announce/BuildLikeWalk/NoCamp/ShotLine, CampWalk.TestStep, CampWalkLogic.Build/OnEndMission)
 M109OBOZ_TEST = {
     "start": "CampScene (m109): start | klucz Camp Battle Like Walk TAK | uklad spaceru: namiot na 6 ludzi, namioty do 40, ogniska do 14, wozy do 6, konie taboru do 12 | "
-             "odstep od wojska 6 m, srodek obozu 21 m za ostatnim zolnierzem | prefaby: Tent_Small, Tent_Leader, Tent_Officer, fire_stones_bonfire, bed_ground_a, bd_cart_a | "
-             "test bitwy w obozie TAK, test spaceru TAK.",
+             "odstep od wojska 6 m, srodek obozu 21 m za ostatnim zolnierzem, scenografia do 100 m za granica pola bitwy | prefaby: Tent_Small, Tent_Leader, Tent_Officer, "
+             "fire_stones_bonfire, bed_ground_a, bd_cart_a | test bitwy w obozie TAK, test spaceru TAK.",
     "start_nie": "CampScene (m109): start | klucz Camp Battle Like Walk NIE (stary zestaw: 3 namioty, ognisko, 4 pochodnie, plot) | uklad spaceru: namiot na 6 ludzi, namioty "
-                 "do 40, ogniska do 14, wozy do 6, konie taboru do 12 | odstep od wojska 6 m, srodek obozu 21 m za ostatnim zolnierzem | prefaby: Tent_Small, Tent_Leader, "
-                 "Tent_Officer, fire_stones_bonfire, bed_ground_a, bd_cart_a | test bitwy w obozie NIE, test spaceru NIE.",
+                 "do 40, ogniska do 14, wozy do 6, konie taboru do 12 | odstep od wojska 6 m, srodek obozu 21 m za ostatnim zolnierzem, scenografia do 100 m za granica pola "
+                 "bitwy | prefaby: Tent_Small, Tent_Leader, Tent_Officer, fire_stones_bonfire, bed_ground_a, bd_cart_a | test bitwy w obozie NIE, test spaceru NIE.",
     "e7": "CampScene (E7/O2): prefaby dostepne - namioty 5/5, ogniska 3/3, pochodnie 2/2, plot 2/2 (bez fizyki) | uzyte: tent_vlandia_c, fire_stones_bonfire, torch_long_d2, barn_fence_a",
-    "nr": "CampScene (m109): bitwa w obozie nr 1 | klucz TAK | test z pliku | test: konie 12 | test: wozy 3 - oboz stanie po rozstawieniu wojska.",
-    "nr_ludzi": "CampScene (m109): bitwa w obozie nr 2 | klucz TAK | test z pliku | test: ludzi 400 - oboz stanie po rozstawieniu wojska.",
-    "nr_stary": "CampScene (m109): bitwa w obozie nr 4 | klucz TAK | test z pliku | test: stary zestaw - oboz stanie po rozstawieniu wojska.",
+    "nr": "CampScene (m109): bitwa w obozie nr 1 | klucz TAK | test z pliku (gracz obozowal: NIE) | test: konie 12 | test: wozy 3 - oboz stanie po rozstawieniu wojska.",
+    "nr_ludzi": "CampScene (m109): bitwa w obozie nr 2 | klucz TAK | test z pliku (gracz obozowal: NIE) | test: ludzi 400 | test: konie 12 | test: wozy 3 - oboz stanie po "
+                "rozstawieniu wojska.",
+    "nr_gleb": "CampScene (m109): bitwa w obozie nr 3 | klucz TAK | test z pliku (gracz obozowal: NIE) | test: ludzi 120 | test: glebokosc 45 - oboz stanie po rozstawieniu wojska.",
+    "nr_czysta": "CampScene (m109): bitwa w obozie nr 5 | klucz TAK | test z pliku (gracz obozowal: TAK) - oboz stanie po rozstawieniu wojska.",
+    "nr_stary": "CampScene (m109): bitwa w obozie nr 6 | klucz TAK | test z pliku (gracz obozowal: NIE) | test: stary zestaw - oboz stanie po rozstawieniu wojska.",
     "lay": "CampScene (m109): oboz jak spacer nr 1 | noc, armia (kolumna 3 partii) | ludzi zdrowych 66 (namiot na 6) | wedlug regul spaceru: namioty 13 (zolnierskich 11), "
-           "poslania 1, ogniska 4, wozy 3, konie taboru 12 | postawione: namioty 13, poslania 1, ogniska 4, wozy 3, konie 12 | pominiete: granica 0, teren 0, obrysy 0, "
-           "wojsko 0, prefab 0, bledy 0 | rzad po 6, glebokosc za srodkiem obozu 120 m | wodz 0.0,12.0 | rzad 1 y 27.5 | najblizej: gracz 7.2 m, wojsko 6.6 m | "
-           "front obozu 6.6 m za linia | kierunek wrog | agentow strony gracza 67 | encje 212 | czas 35 ms | potkniecia 0.",
-    "lay_test": "CampScene (m109): oboz jak spacer nr 3 | dzien | ludzi zdrowych 0 (test z pliku) (namiot na 6) | wedlug regul spaceru: namioty 0 (zolnierskich 0), poslania 1, "
-                "ogniska 1, wozy 0, konie taboru 0 | postawione: namioty 0, poslania 1, ogniska 1, wozy 0, konie 0 | pominiete: granica 0, teren 0, obrysy 0, wojsko 0, "
-                "prefab 0, bledy 0 | rzad po 6, glebokosc za srodkiem obozu 0 m | wodz - | rzad 1 y - | najblizej: gracz - m, wojsko 21.4 m | front obozu -0.4 m za linia | "
-                "kierunek os X | agentow strony gracza 1 | encje 5 | czas 3 ms | potkniecia 0.",
+           "poslania 1, ogniska 4, wozy 3, konie taboru 12 | spacer tej druzyny: ludzi zdrowych 66, namioty 13 (zolnierskich 11), poslania 1, ogniska 4, wozy 1, "
+           "konie taboru 4 | postawione: namioty 13, poslania 1, ogniska 4, wozy 3, konie 12 | pominiete: granica 0, teren 0, obrysy 0, wojsko 0, prefab 0, bledy 0 | "
+           "przesuniete 0, poza polem bitwy 5 | rzad po 6, glebokosc za srodkiem obozu 120 m (pole bitwy 34 m) | wodz 0.0,12.0 | rzad 1 y 27.5 | najblizej: gracz 7.2 m, "
+           "wojsko 6.6 m | front obozu 6.6 m za linia | konie obozu w puli koni bez jezdzca 0 | posilki -3.5,141.0 | kierunek wrog | agentow strony gracza 67 | "
+           "encje 212 | czas 35 ms | potkniecia 0.",
+    "lay_test": "CampScene (m109): oboz jak spacer nr 4 | dzien | ludzi zdrowych 0 (test z pliku) (namiot na 6) | wedlug regul spaceru: namioty 0 (zolnierskich 0), poslania 1, "
+                "ogniska 1, wozy 0, konie taboru 0 | spacer tej druzyny: ludzi zdrowych 14, namioty 4 (zolnierskich 3), poslania 1, ogniska 2, wozy 0, konie taboru 0 | "
+                "postawione: namioty 0, poslania 1, ogniska 1, wozy 0, konie 0 | pominiete: granica 0, teren 0, obrysy 0, wojsko 0, prefab 0, bledy 0 | przesuniete 1, "
+                "poza polem bitwy 0 | rzad po 6, glebokosc za srodkiem obozu 0 m (pole bitwy 0 m) | wodz - | rzad 1 y - | najblizej: gracz - m, wojsko 21.4 m | "
+                "front obozu -0.4 m za linia | konie obozu w puli koni bez jezdzca 0 | posilki - | kierunek os X | agentow strony gracza 1 | encje 5 | czas 3 ms | "
+                "potkniecia 0.",
     "none": "CampScene (m109): bitwa w obozie nr 2 - bez obozu (brak wojska).",
+    "none_end": "CampScene (m109): bitwa w obozie nr 7 - bez obozu (koniec misji przed rozstawieniem).",
     "shot": "CampScene (m109): test - zdjecie nr 1: zdjecia\\oboz-m109-1-20261023-120000.png - TAK.",
     "shot_nie": "CampScene (m109): test - zdjecie nr 2: zdjecia\\- - NIE (brak MissionScreen).",
+    "shot_exc": "CampScene (m109): test - zdjecie nr 2: zdjecia\\oboz-m109-2-20261023-120000.png - NIE (wyjatek).",
     "old": "CampScene: postawiono 10 elementow obozu na polu bitwy (E7/O2: bez fizyki, za linia gracza - front: wrog, najblizej 6 m od gracza).",
     "wait": "Spacer po obozie (m109): test - czekam (w osadzie - spacer po wyjsciu).",
     "open": "Spacer po obozie (m109): test - otwieram spacer (plik armoury-oboz-spacer.flag).",
@@ -62097,12 +62118,16 @@ M109OBOZ_TEST = {
     "exit": "Spacer po obozie (m97): wyjscie po 8 s | potkniecia razem 0.",
 }
 M109OBOZ_CLEAR_M = 6.0            # OBOZ-4: nic blizej niz 6 m od gracza, wojska i linii (ClearM w CampScene)
+M109OBOZ_OUT_M = 100              # OBOZ-0: scenografia do 100 m za granica pola bitwy (OutsideM w CampScene; recenzja R1)
 M109OBOZ_MAX_MS = 250             # OBOZ-5: budowa obozu w jednej klatce przy "Rozpocznij bitwe" (projekt H3; wiecej - budowa na klatki)
 M109OBOZ_MAX_ENT = 520            # OBOZ-5: encje scenografii z dziecmi (projekt: najwyzej ok. 510 przy limitach)
 M109OBOZ_MIN_COVER = 0.8          # OBOZ-7 / OBOZ-10: postawione / plan wedlug regul
 M109OBOZ_LIMITS = (40, 14, 6, 12)  # OBOZ-0: namioty zolnierskie, ogniska, wozy, konie taboru (CampLayout.Max*); namiot na ludzi z ustawienia (6 domyslnie)
 M109OBOZ_ROW1_Y = 27.5            # OBOZ-11: y pierwszego rzedu przy Tent_Leader nieprzesunietym (obrys wodza 12 + 7.5 + 8)
+M109OBOZ_ROW1_Y_MOVED = 28.5      # OBOZ-11: najwiecej przy przesunieciach (namiot oficerski od 60 ludzi przesuniety o 5 m wzdluz osi: obrys 17 + 3.5 + 8)
 M109OBOZ_LEAD = (0.0, 12.0)       # OBOZ-11: namiot wodza nieprzesuniety (C + Up * 12)
+M109OBOZ_ROW_GAP = 11.0           # OBOZ-12: odstep rzedow namiotow (CampLayout.RowGap)
+M109OBOZ_TENT_R = 2.6             # OBOZ-12: polowa obrysu Tent_Small (CampLayout.Lay: room = glebokosc - 2.6 - rzad 1)
 
 
 def m109oboz_rule(h, pt):
@@ -62112,6 +62137,15 @@ def m109oboz_rule(h, pt):
     fw = 1 + sw // 3
     bw = 1 + (min(h, 8) if sw == 0 and h > 0 else 0)
     return tw, sw, bw, fw
+
+
+def m109oboz_perrow(sw, depth, r1):
+    """CampLayout.Lay (bitwa): namiotow w rzedzie przy glebokosci depth za srodkiem obozu i pierwszym rzedzie r1 (6..12)."""
+    if sw <= 0 or r1 is None:
+        return 6
+    room = depth - M109OBOZ_TENT_R - r1
+    fit = 1 if room < 0 else 1 + int(room / M109OBOZ_ROW_GAP)
+    return max(6, min(12, (sw + fit - 1) // fit))
 
 
 def _m109oboz_d(m):
@@ -62134,41 +62168,58 @@ def m109oboz_selftest():
     R, T = M109OBOZ_RX, M109OBOZ_TEST
     tag, wtag = M109OBOZ_TAG, M109OBOZ_WALK_TAG
     m = R["start"].search(T["start"][len(tag):])
-    if not m or (m.group("key"), m.group("pt"), m.group("tents"), m.group("fires"), m.group("carts"), m.group("horses"), m.group("clear"), m.group("off"), m.group("tb"), m.group("tw")) \
-            != ("TAK", "6", "40", "14", "6", "12", "6", "21", "TAK", "TAK") or m.group("pref").split(", ")[1] != "Tent_Leader":
+    if not m or (m.group("key"), m.group("pt"), m.group("tents"), m.group("fires"), m.group("carts"), m.group("horses"), m.group("clear"), m.group("off"), m.group("out"),
+                 m.group("tb"), m.group("tw")) != ("TAK", "6", "40", "14", "6", "12", "6", "21", "100", "TAK", "TAK") or m.group("pref").split(", ")[1] != "Tent_Leader":
         return f"start: {m.groups() if m else 'brak dopasowania'}"
     m = R["start"].search(T["start_nie"][len(tag):])
-    if not m or m.group("key") != "NIE":
+    if not m or m.group("key") != "NIE" or m.group("out") != "100":
         return "start (NIE): brak dopasowania"
     m = R["nr"].search(T["nr"][len(tag):])
-    if not m or m.group("k") != "1" or m.group("key") != "TAK" or " | test z pliku" not in m.group("note") or "test: konie 12" not in m.group("note"):
+    if not m or m.group("k") != "1" or m.group("key") != "TAK" or " | test z pliku" not in m.group("note") or "test: konie 12" not in m.group("note") \
+            or not R["over"].search(m.group("note")):
         return f"nr: {m.groups() if m else 'brak dopasowania'}"
     m = R["nr"].search(T["nr_ludzi"][len(tag):])
     if not m or not R["tl"].search(m.group("note")) or R["tl"].search(m.group("note")).group(1) != "400":
         return "nr (ludzi): brak dopasowania"
+    m = R["nr"].search(T["nr_gleb"][len(tag):])
+    if not m or not R["td"].search(m.group("note")) or R["td"].search(m.group("note")).group(1) != "45":
+        return "nr (glebokosc): brak dopasowania"
+    m = R["nr"].search(T["nr_czysta"][len(tag):])
+    if not m or R["over"].search(m.group("note")) or R["td"].search(m.group("note")) or " | test z pliku" not in m.group("note"):
+        return "nr (bez nadpisan): brak dopasowania"
     m = R["nr"].search(T["nr_stary"][len(tag):])
-    if not m or "test: stary zestaw" not in m.group("note"):
+    if not m or "test: stary zestaw" not in m.group("note") or R["over"].search(m.group("note")):
         return "nr (stary): brak dopasowania"
     m = R["lay"].search(T["lay"][len(tag):])
     if not m:
         return "lay: brak dopasowania"
     d = _m109oboz_d(m)
-    if (d["k"], d["col"], d["h"], d["pt"], d["tw"], d["sw"], d["bw"], d["fw"], d["cw"], d["kw"], d["t"], d["kk"], d["row"], d["depth"], d["lx"], d["ly"], d["r1"], d["dm"], d["dt"],
-            d["fr"], d["src"], d["n"], d["ent"], d["ms"], d["st"]) != (1, 3, 66, 6, 13, 11, 1, 4, 3, 12, 13, 12, 6, 120, 0.0, 12.0, 27.5, 7.2, 6.6, 6.6, "wrog", 67, 212, 35, 0) \
+    if (d["k"], d["col"], d["h"], d["pt"], d["tw"], d["sw"], d["bw"], d["fw"], d["cw"], d["kw"], d["wh"], d["wtw"], d["wsw"], d["wbw"], d["wfw"], d["wcw"], d["wkw"],
+            d["t"], d["kk"], d["mv"], d["po"], d["row"], d["depth"], d["field"], d["lx"], d["ly"], d["r1"], d["dm"], d["dt"], d["fr"], d["pu"], d["px"], d["py"],
+            d["src"], d["n"], d["ent"], d["ms"], d["st"]) \
+            != (1, 3, 66, 6, 13, 11, 1, 4, 3, 12, 66, 13, 11, 1, 4, 1, 4, 13, 12, 0, 5, 6, 120, 34, 0.0, 12.0, 27.5, 7.2, 6.6, 6.6, 0, -3.5, 141.0, "wrog", 67, 212, 35, 0) \
             or d["ht"] is not None or d["ls"] is not None:
         return f"lay: {d}"
     m = R["lay"].search(T["lay_test"][len(tag):])
     if not m:
         return "lay (test, bez wodza): brak dopasowania"
     d = _m109oboz_d(m)
-    if d["ht"] is None or d["lead"] is not None or d["r1"] is not None or d["dm"] is not None or d["fr"] != -0.4 or d["src"] != "os X" or d["h"] != 0:
+    if d["ht"] is None or d["lead"] is not None or d["r1"] is not None or d["dm"] is not None or d["fr"] != -0.4 or d["src"] != "os X" or d["h"] != 0 \
+            or d["reinf"] is not None or d["px"] is not None or d["wh"] != 14 or d["mv"] != 1:
         return f"lay (test): {d}"
     if m109oboz_rule(66, 6) != (13, 11, 1, 4) or m109oboz_rule(400, 6) != (42, 40, 1, 14) or m109oboz_rule(0, 6) != (0, 0, 1, 1) or m109oboz_rule(5, 6) != (0, 0, 6, 1) \
-            or m109oboz_rule(14, 6) != (4, 3, 1, 2) or m109oboz_rule(240, 6) != (42, 40, 1, 14):
+            or m109oboz_rule(14, 6) != (4, 3, 1, 2) or m109oboz_rule(240, 6) != (42, 40, 1, 14) or m109oboz_rule(120, 6) != (22, 20, 1, 7):
         return "m109oboz_rule"
+    # CampLayout.Lay: glebokosc 45, rzad 1 27.5, 20 namiotow - 2 rzedy po 10; 400 ludzi przy 120 m - 6; brak miejsca na 1. rzad - 1 rzad (12); 10 namiotow - 6
+    if m109oboz_perrow(20, 45, 27.5) != 10 or m109oboz_perrow(40, 120, 27.5) != 6 or m109oboz_perrow(40, 20, 27.5) != 12 or m109oboz_perrow(10, 30, 27.5) != 10 \
+            or m109oboz_perrow(0, 0, None) != 6:
+        return "m109oboz_perrow"
     m = R["none"].search(T["none"][len(tag):])
     if not m or m.group("k") != "2" or m.group("why") != "brak wojska":
         return "none: brak dopasowania"
+    m = R["none"].search(T["none_end"][len(tag):])
+    if not m or m.group("why") != "koniec misji przed rozstawieniem":
+        return "none (koniec misji): brak dopasowania"
     if R["nr"].search(T["none"][len(tag):]) or R["none"].search(T["nr"][len(tag):]):
         return "nr / none: wyrazenia sie nakladaja"
     m = R["shot"].search(T["shot"][len(tag):])
@@ -62177,6 +62228,9 @@ def m109oboz_selftest():
     m = R["shot"].search(T["shot_nie"][len(tag):])
     if not m or m.group("res") != "NIE" or m.group("why") != "brak MissionScreen":
         return "shot (NIE): brak dopasowania"
+    m = R["shot"].search(T["shot_exc"][len(tag):])
+    if not m or m.group("res") != "NIE" or m.group("why") != "wyjatek":
+        return "shot (wyjatek): brak dopasowania"
     m = R["old"].search(T["old"])
     if not m or m.group("n") != "10":
         return "old: brak dopasowania"
@@ -62277,8 +62331,10 @@ def m109oboz_collect(logp):
             if m:
                 note = m.group("note")
                 tl = R["tl"].search(note)
+                td = R["td"].search(note)
                 D["battles"].append({"k": int(m.group("k")), "key": m.group("key"), "test": " | test z pliku" in note, "stary": "test: stary zestaw" in note,
-                                     "ludzi": int(tl.group(1)) if tl else None, "note": note.strip(" |"), "res": None, "lay": None, "old": None, "why": None, "shots": []})
+                                     "ludzi": int(tl.group(1)) if tl else None, "gleb": int(td.group(1)) if td else None, "over": bool(R["over"].search(note)),
+                                     "note": note.strip(" |"), "res": None, "lay": None, "old": None, "why": None, "shots": []})
                 continue
             m = R["none"].search(body)
             if m:
@@ -62286,8 +62342,8 @@ def m109oboz_collect(logp):
                 if b is not None:
                     b["res"], b["why"] = "bez", m.group("why")
                 else:
-                    D["battles"].append({"k": int(m.group("k")), "key": "?", "test": False, "stary": False, "ludzi": None, "note": "", "res": "bez",
-                                         "lay": None, "old": None, "why": m.group("why") + " (bez linii nr)", "shots": []})
+                    D["battles"].append({"k": int(m.group("k")), "key": "?", "test": False, "stary": False, "ludzi": None, "gleb": None, "over": False, "note": "",
+                                         "res": "bez", "lay": None, "old": None, "why": m.group("why") + " (bez linii nr)", "shots": []})
                 continue
             m = R["lay"].search(body)
             if m:
@@ -62309,18 +62365,29 @@ def m109oboz_collect(logp):
     return D
 
 
+# OBOZ-2: przyczyny "bez obozu", ktore nie sa bledem obozu (misja skonczyla sie, zanim oboz mogl stanac - CampScene.OnEndMission)
+M109OBOZ_END_OK = ("koniec misji przed rozstawieniem", "koniec misji bez gracza na polu")
+
+
 def _m109oboz_lead_ok(d, leader):
-    """OBOZ-11: (werdykt, opis) dla linii z wodzem - None gdy wodz przesuniety albo brak wodza (INFO)."""
+    """OBOZ-11: werdykt dla linii z wodzem - None gdy wodz przesuniety albo brak wodza (INFO). Rzad 1 = 27.5 przy przesuniete 0; przy przesunieciach
+    (namiot oficerski przesuniety wzdluz osi) 27.5..28.5."""
     if d.get("lx") is None or d.get("ls"):
         return None
     ok = abs(d["lx"] - M109OBOZ_LEAD[0]) < 0.051 and abs(d["ly"] - M109OBOZ_LEAD[1]) < 0.051
     if leader == "Tent_Leader":
-        ok = ok and d.get("r1") is not None and abs(d["r1"] - M109OBOZ_ROW1_Y) < 0.051
+        r1 = d.get("r1")
+        if r1 is None:
+            ok = False
+        elif d.get("mv"):
+            ok = ok and M109OBOZ_ROW1_Y - 0.051 < r1 < M109OBOZ_ROW1_Y_MOVED + 0.051
+        else:
+            ok = ok and abs(r1 - M109OBOZ_ROW1_Y) < 0.051
     return ok
 
 
 def m109oboz_rows(rep, D):
-    """m109oboz: wiersze OBOZ-0..OBOZ-11 (opis w --help) z danych m109oboz_collect."""
+    """m109oboz: wiersze OBOZ-0..OBOZ-15 (opis w --help) z danych m109oboz_collect."""
     if not (D["start"] or D["battles"] or D["walks"] or D["waits"] or D["lay_free"] or D["opens"]):
         rep.add("OBOZ-0: linie 'CampScene (m109): ...'", f"brak w logu (sesji E7/O2 {D['e7']})", "INFO (log sprzed galezi m109-oboz albo Camp Battle Props Enabled NIE)", None)
         rep.add("OBOZ-1: ERROR CampScene / CampWalk", f"ERROR {D['err']}" + (f" (pierwszy: {D['err1']})" if D["err1"] else ""), "0", D["err"] == 0)
@@ -62338,6 +62405,8 @@ def m109oboz_rows(rep, D):
                 bad.append(f"limity {lim}")
             if int(x["clear"]) != int(M109OBOZ_CLEAR_M) or int(x["off"]) != 21:
                 bad.append(f"odstep {x['clear']} / srodek {x['off']}")
+            if x.get("out") is None or int(x["out"]) != M109OBOZ_OUT_M:
+                bad.append(f"scenografia za granica pola {x.get('out') or '-'}")
             pref = [p.strip() for p in x["pref"].split(",")]
             if "-" in pref or len(pref) != 6:
                 bad.append(f"prefaby {x['pref']}")
@@ -62348,8 +62417,9 @@ def m109oboz_rows(rep, D):
         last = st[-1]
         leader = last["pref"].split(", ")[1] if len(last["pref"].split(", ")) > 1 else None
         val = (f"{len(st)} sesji (E7/O2 {D['e7']}); klucz {last['key']}, namiot na {last['pt']}, limity {last['tents']}/{last['fires']}/{last['carts']}/{last['horses']}, "
-               f"prefaby {last['pref']}, test bitwy {last['tb']}, test spaceru {last['tw']}" + (f" | zle: {'; '.join(sorted(set(bad)))}" if bad else ""))
-        rule = f"w kazdej sesji; klucz TAK (NIE - INFO), limity {M109OBOZ_LIMITS}, odstep 6 m, srodek 21 m, zaden prefab '-'"
+               f"za granica pola do {last.get('out') or '-'} m, prefaby {last['pref']}, test bitwy {last['tb']}, test spaceru {last['tw']}"
+               + (f" | zle: {'; '.join(sorted(set(bad)))}" if bad else ""))
+        rule = f"w kazdej sesji; klucz TAK (NIE - INFO), limity {M109OBOZ_LIMITS}, odstep 6 m, srodek 21 m, scenografia do {M109OBOZ_OUT_M} m za granica pola, zaden prefab '-'"
         if last["key"] == "NIE" and not bad:
             rep.add("OBOZ-0: linia startu (m109)", val, rule, None)
         else:
@@ -62364,13 +62434,15 @@ def m109oboz_rows(rep, D):
     if not bs and not D["lay_free"] and not D["old_free"]:
         rep.add("OBOZ-2: bitwy w obozie - wynik", "brak bitew w obozie", "INFO", None)
     else:
-        bad = []
+        bad, ended = [], []
         for b in bs:
             want_old = b["key"] == "NIE" or b["stary"]
             if b["res"] is None:
                 bad.append(f"nr {b['k']}: brak wyniku")
             elif b["res"] == "bez":
-                if b["why"] != "nie bitwa w polu":
+                if b["why"] in M109OBOZ_END_OK:
+                    ended.append(f"nr {b['k']} ({b['why']})")
+                else:
                     bad.append(f"nr {b['k']}: bez obozu ({b['why']})")
             elif want_old and b["res"] != "stary":
                 bad.append(f"nr {b['k']}: oczekiwany stary zestaw, jest {b['res']}")
@@ -62381,8 +62453,10 @@ def m109oboz_rows(rep, D):
         if D["old_free"]:
             bad.append(f"linii 'postawiono' bez linii nr {len(D['old_free'])}")
         res = ", ".join(f"{b['k']}:{b['res'] or '-'}" for b in bs)
-        rep.add("OBOZ-2: bitwy w obozie - wynik", f"{len(bs)} bitew ({res})" + (f" | zle: {' | '.join(bad)}" if bad else ""),
-                "kazda: uklad spaceru (klucz TAK) albo stary zestaw (klucz NIE / test stary) albo 'bez obozu (nie bitwa w polu)'", not bad)
+        rep.add("OBOZ-2: bitwy w obozie - wynik", f"{len(bs)} bitew ({res})" + (f" | misja skonczona przed obozem: {', '.join(ended)}" if ended else "")
+                + (f" | zle: {' | '.join(bad)}" if bad else ""),
+                "kazda: uklad spaceru (klucz TAK) albo stary zestaw (klucz NIE / test stary) albo 'bez obozu (koniec misji przed rozstawieniem / bez gracza na polu)'",
+                not bad)
     # OBOZ-3 reguly i bilans
     if lays:
         bad = []
@@ -62437,7 +62511,8 @@ def m109oboz_rows(rep, D):
             put = d["t"] + d["b"] + d["f"] + d["c"] + d["kk"]
             cov = put / plan if plan else 1.0
             why = ", ".join(f"{n} {d[k]}" for n, k in (("granica", "s_gr"), ("teren", "s_te"), ("obrysy", "s_ob"), ("wojsko", "s_wo"), ("prefab", "s_pr"), ("bledy", "s_bl")) if d[k])
-            rows.append(f"nr {d['k']} {put}/{plan}" + (f" ({why}; glebokosc {d['depth']} m)" if why else ""))
+            rows.append(f"nr {d['k']} {put}/{plan}" + (f" ({why}; glebokosc {d['depth']} m, pole {d['field']} m)" if why else "")
+                        + (f", za granica pola {d['po']}" if d["po"] else ""))
             if cov < M109OBOZ_MIN_COVER:
                 bad.append(d["k"])
         rep.add("OBOZ-7: postawione / plan", "; ".join(rows), f">= {M109OBOZ_MIN_COVER} w kazdej bitwie", not bad)
@@ -62493,13 +62568,70 @@ def m109oboz_rows(rep, D):
     checked = [(n, d, _m109oboz_lead_ok(d, leader)) for n, d in geo]
     real = [(n, d, ok) for n, d, ok in checked if ok is not None]
     if real:
-        bad = [f"{n}: wodz {d['lx']},{d['ly']}, rzad 1 y {d['r1']}" for n, d, ok in real if not ok]
+        bad = [f"{n}: wodz {d['lx']},{d['ly']}, rzad 1 y {d['r1']}, przesuniete {d.get('mv')}" for n, d, ok in real if not ok]
         shifted = [n for n, d, ok in checked if ok is None and d.get("lx") is not None]
+        moved = [n for n, d, ok in real if ok and d.get("mv") and d.get("r1") is not None and abs(d["r1"] - M109OBOZ_ROW1_Y) >= 0.051]
         rep.add("OBOZ-11: geometria obozu bitwa = spacer", f"sprawdzonych {len(real)} (" + ", ".join(n for n, d, ok in real) + ")"
-                + (f"; wodz przesuniety: {', '.join(shifted)}" if shifted else "") + (f" | zle: {' | '.join(bad)}" if bad else ""),
-                f"wodz nieprzesuniety w {M109OBOZ_LEAD[0]},{M109OBOZ_LEAD[1]}, rzad 1 y = {M109OBOZ_ROW1_Y} (przy Tent_Leader; prefab wodza {leader or '?'})", not bad)
+                + (f"; wodz przesuniety: {', '.join(shifted)}" if shifted else "") + (f"; rzad 1 dalej przez przesuniecia: {', '.join(moved)}" if moved else "")
+                + (f" | zle: {' | '.join(bad)}" if bad else ""),
+                f"wodz nieprzesuniety w {M109OBOZ_LEAD[0]},{M109OBOZ_LEAD[1]}, rzad 1 y = {M109OBOZ_ROW1_Y} (przy przesunieciach {M109OBOZ_ROW1_Y}..{M109OBOZ_ROW1_Y_MOVED}; "
+                f"przy Tent_Leader; prefab wodza {leader or '?'})", not bad)
     else:
         rep.add("OBOZ-11: geometria obozu bitwa = spacer", "brak obozu z nieprzesunietym namiotem wodza", "INFO (wodz przesuniety albo oboz bez namiotow)", None)
+    # OBOZ-12 mala glebokosc za linia (test glebokosc=N): rzedy szersze wedlug wzoru CampLayout.Lay, glebokosc <= N
+    gb = [b for b in bs if b["gleb"] is not None and b["lay"]]
+    if gb:
+        bad, rows = [], []
+        for b in gb:
+            d = b["lay"]
+            exp = m109oboz_perrow(d["sw"], d["depth"], d["r1"])
+            rows.append(f"nr {b['k']}: glebokosc {d['depth']} m (test {b['gleb']}), rzad po {d['row']} (wzor {exp}), zolnierskie {d['t']}/{d['tw']} namiotow, granica {d['s_gr']}")
+            if d["row"] != exp or d["depth"] > b["gleb"]:
+                bad.append(f"nr {b['k']}")
+        rep.add("OBOZ-12: mala glebokosc za linia (test glebokosc)", "; ".join(rows) + (f" | zle: {', '.join(bad)}" if bad else ""),
+                "rzad po = wzor CampLayout.Lay (6..12), glebokosc <= test; pokrycie w OBOZ-7", not bad)
+    else:
+        rep.add("OBOZ-12: mala glebokosc za linia (test glebokosc)", "brak bitwy z 'test: glebokosc'", "INFO", None)
+    # OBOZ-13 konie obozu poza pula koni bez jezdzca (recenzja W1: SI z rozkazem Mount siegala po konia bez CommonAIComponent)
+    if lays:
+        bad = [f"nr {d['k']}: {d['pu']}" for d in lays if d["pu"] != 0]
+        rep.add("OBOZ-13: konie obozu w puli koni bez jezdzca", f"{len(lays)} obozow, koni taboru razem {sum(d['kk'] for d in lays)}" + (f" | zle: {', '.join(bad)}" if bad else ""),
+                "0 w kazdej bitwie (-1 - blad odczytu)", not bad)
+    else:
+        rep.add("OBOZ-13: konie obozu w puli koni bez jezdzca", "brak linii ukladu", "INFO", None)
+    # OBOZ-14 plan bitwy = plan spaceru tej samej druzyny (bitwy bez nadpisan testu ludzi/konie/wozy); plan spaceru wedlug reguly zawsze
+    if lays:
+        bad, same, over = [], [], []
+        for b in bs:
+            d = b["lay"]
+            if not d:
+                continue
+            wrule = m109oboz_rule(d["wh"], d["pt"])
+            if (d["wtw"], d["wsw"], d["wbw"], d["wfw"]) != wrule:
+                bad.append(f"nr {b['k']}: plan spaceru {(d['wtw'], d['wsw'], d['wbw'], d['wfw'])} != regula {wrule}")
+            if b["over"] or d["ht"]:
+                over.append(str(b["k"]))
+                continue
+            bp = (d["h"], d["tw"], d["sw"], d["bw"], d["fw"], d["cw"], d["kw"])
+            wp = (d["wh"], d["wtw"], d["wsw"], d["wbw"], d["wfw"], d["wcw"], d["wkw"])
+            if bp != wp:
+                bad.append(f"nr {b['k']}: bitwa {bp} != spacer {wp}")
+            else:
+                same.append(str(b["k"]))
+        val = f"bez nadpisan {len(same)} ({', '.join(same) or '-'}), z nadpisaniami testu {len(over)} ({', '.join(over) or '-'})" + (f" | zle: {' | '.join(bad)}" if bad else "")
+        rule = "bitwa bez nadpisan: ludzi i plan (namioty, zolnierskie, poslania, ogniska, wozy, konie) = spacer tej druzyny; plan spaceru = regula"
+        rep.add("OBOZ-14: plan bitwy = plan spaceru tej samej druzyny", val, rule if same or bad else rule + " (INFO - same nadpisania)", False if bad else (True if same else None))
+    else:
+        rep.add("OBOZ-14: plan bitwy = plan spaceru tej samej druzyny", "brak linii ukladu", "INFO", None)
+    # OBOZ-15 posilki wobec obozu (INFO, recenzja R2: posilki pojawiaja sie za wojskiem - y > 0 to za srodkiem obozu; ocena na zdjeciu)
+    if lays:
+        rr = [d for d in lays if d["py"] is not None]
+        val = "; ".join(f"nr {d['k']}: x {d['px']}, y {d['py']}" for d in rr) or "brak (plan posilkow niedostepny)"
+        behind = sum(1 for d in rr if d["py"] > 0)
+        rep.add("OBOZ-15: srodek pojawiania sie posilkow w ukladzie obozu", f"{val} | za srodkiem obozu {behind} z {len(rr)}",
+                "INFO (y > 0 - posilki ida przez oboz do linii; konie stoja 12 m przed srodkiem, x 6..30 m - zobaczyc na zdjeciu)", None)
+    else:
+        rep.add("OBOZ-15: srodek pojawiania sie posilkow w ukladzie obozu", "brak linii ukladu", "INFO", None)
 
 
 def m109oboz_synth():
@@ -62508,13 +62640,16 @@ def m109oboz_synth():
     import shutil
     T = M109OBOZ_TEST
 
-    def lay(k, h, pt, plan, put, skip, extra=None):
+    def lay(k, h, pt, plan, walk, put, skip, ht=True, extra=None):
         tw, sw, bw, fw, cw, kw = plan
+        wh, wtw, wsw, wbw, wfw, wcw, wkw = walk
         t, b, f, c, kk = put
-        s = (f"CampScene (m109): oboz jak spacer nr {k} | noc | ludzi zdrowych {h} (test z pliku) (namiot na {pt}) | wedlug regul spaceru: namioty {tw} (zolnierskich {sw}), "
-             f"poslania {bw}, ogniska {fw}, wozy {cw}, konie taboru {kw} | postawione: namioty {t}, poslania {b}, ogniska {f}, wozy {c}, konie {kk} | pominiete: granica {skip[0]}, "
-             f"teren {skip[1]}, obrysy {skip[2]}, wojsko {skip[3]}, prefab {skip[4]}, bledy {skip[5]} | rzad po 12, glebokosc za srodkiem obozu 64 m | wodz 0.0,12.0 | "
-             f"rzad 1 y 27.5 | najblizej: gracz 21.3 m, wojsko 6.4 m | front obozu 6.4 m za linia | kierunek wrog | agentow strony gracza 40 | encje 480 | czas 120 ms | potkniecia 0.")
+        s = (f"CampScene (m109): oboz jak spacer nr {k} | noc | ludzi zdrowych {h}{' (test z pliku)' if ht else ''} (namiot na {pt}) | wedlug regul spaceru: namioty {tw} "
+             f"(zolnierskich {sw}), poslania {bw}, ogniska {fw}, wozy {cw}, konie taboru {kw} | spacer tej druzyny: ludzi zdrowych {wh}, namioty {wtw} (zolnierskich {wsw}), "
+             f"poslania {wbw}, ogniska {wfw}, wozy {wcw}, konie taboru {wkw} | postawione: namioty {t}, poslania {b}, ogniska {f}, wozy {c}, konie {kk} | pominiete: "
+             f"granica {skip[0]}, teren {skip[1]}, obrysy {skip[2]}, wojsko {skip[3]}, prefab {skip[4]}, bledy {skip[5]} | przesuniete 0, poza polem bitwy 0 | rzad po 12, "
+             f"glebokosc za srodkiem obozu 64 m (pole bitwy 40 m) | wodz 0.0,12.0 | rzad 1 y 27.5 | najblizej: gracz 21.3 m, wojsko 6.4 m | front obozu 6.4 m za linia | "
+             f"konie obozu w puli koni bez jezdzca 0 | posilki 1.5,150.0 | kierunek wrog | agentow strony gracza 40 | encje 480 | czas 120 ms | potkniecia 0.")
         for a, b2 in (extra or {}).items():
             s = s.replace(a, b2)
         return s
@@ -62523,20 +62658,32 @@ def m109oboz_synth():
         tmp = tempfile.mkdtemp(prefix="m109oboz_")
         try:
             logp = os.path.join(tmp, "Armoury-test.log")
+            b2 = lay(2, 400, 6, (42, 40, 1, 14, 3, 12), (14, 4, 3, 1, 2, 1, 2), (40, 1, 13, 3, 12), (2, 0, 1, 0, 0, 0),
+                     extra={"przesuniete 0": "przesuniete 2", "rzad 1 y 27.5": "rzad 1 y 28.5", "rzad po 12": "rzad po 6",
+                            "glebokosc za srodkiem obozu 64 m": "glebokosc za srodkiem obozu 120 m"}) if not bad else \
+                lay(2, 400, 6, (41, 38, 1, 13, 3, 12), (14, 4, 3, 1, 2, 1, 2), (20, 1, 5, 3, 12), (25, 0, 0, 0, 0, 0))
+            b3 = lay(3, 120, 6, (22, 20, 1, 7, 1, 2), (14, 4, 3, 1, 2, 1, 2), (22, 1, 7, 1, 2), (0, 0, 0, 0, 0, 0),
+                     extra={"rzad po 12": "rzad po 10" if not bad else "rzad po 6", "glebokosc za srodkiem obozu 64 m": "glebokosc za srodkiem obozu 45 m"})
+            b5 = lay(5, 14, 6, (4, 3, 1, 2, 1, 2), (14, 4, 3, 1, 2, 1, 2) if not bad else (14, 5, 4, 1, 2, 1, 2), (4, 1, 2, 1, 2), (0, 0, 0, 0, 0, 0), ht=False,
+                     extra={"rzad po 12": "rzad po 6"})
             L = [T["e7"], T["start"] if not bad else T["start"].replace("bd_cart_a", "-"),
                  T["wait"], T["open"],
                  T["walk"] if not bad else T["walk"].replace("gracz tak", "gracz NIE"), T["exit"],
                  T["nr"], "CampScene (m109): probki terenu 49 | woda 0 | drzewa/skaly 3.",
-                 T["lay"] if not bad else T["lay"].replace("rzad 1 y 27.5", "rzad 1 y 30.5").replace("czas 35 ms", "czas 400 ms").replace("wojsko 6.6 m", "wojsko 4.0 m"),
+                 T["lay"] if not bad else T["lay"].replace("rzad 1 y 27.5", "rzad 1 y 30.5").replace("czas 35 ms", "czas 400 ms").replace("wojsko 6.6 m", "wojsko 4.0 m")
+                 .replace("bez jezdzca 0", "bez jezdzca 3"),
                  T["shot"] if not bad else T["shot"].replace(" - TAK.", " - NIE (brak pliku)."),
-                 T["nr_ludzi"],
-                 lay(2, 400, 6, (42, 40, 1, 14, 0, 0), (40, 1, 13, 0, 0), (2, 0, 1, 0, 0, 0)) if not bad else
-                 lay(2, 400, 6, (41, 38, 1, 13, 0, 0), (20, 1, 5, 0, 0), (25, 0, 0, 0, 0, 0)),
-                 "CampScene (m109): test - zdjecie nr 2: zdjecia\\oboz-m109-2-20261023-120100.png - TAK.",
-                 "CampScene (m109): bitwa w obozie nr 3 | klucz TAK | test z pliku | test: ludzi 0 - oboz stanie po rozstawieniu wojska.",
-                 T["lay_test"].replace("front obozu -0.4 m", "front obozu 12.4 m") if not bad else T["none"].replace("nr 2", "nr 3"),
+                 T["nr_ludzi"], b2,
+                 T["shot_exc"].replace("NIE (wyjatek)", "TAK") if not bad else T["shot_exc"],
+                 T["nr_gleb"], b3,
                  "CampScene (m109): test - zdjecie nr 3: zdjecia\\oboz-m109-3-20261023-120200.png - TAK.",
-                 T["nr_stary"], T["old"] if not bad else T["old"].replace("postawiono 10", "postawiono 9")]
+                 "CampScene (m109): bitwa w obozie nr 4 | klucz TAK | test z pliku (gracz obozowal: NIE) | test: ludzi 0 - oboz stanie po rozstawieniu wojska.",
+                 T["lay_test"].replace("front obozu -0.4 m", "front obozu 12.4 m") if not bad else T["none"].replace("nr 2", "nr 4"),
+                 "CampScene (m109): test - zdjecie nr 4: zdjecia\\oboz-m109-4-20261023-120300.png - TAK.",
+                 T["nr_czysta"], b5,
+                 "CampScene (m109): test - zdjecie nr 5: zdjecia\\oboz-m109-5-20261023-120400.png - TAK.",
+                 T["nr_stary"], T["old"] if not bad else T["old"].replace("postawiono 10", "postawiono 9"),
+                 "CampScene (m109): bitwa w obozie nr 7 | klucz TAK | test z pliku (gracz obozowal: NIE) - oboz stanie po rozstawieniu wojska.", T["none_end"]]
             if bad:
                 L.append("ERROR in CampScene.Put(Tent_Small): System.Exception: test")
             open(logp, "w", encoding="utf-8").write("\n".join("[12:00:00] " + x for x in L) + "\n")
@@ -62547,15 +62694,16 @@ def m109oboz_synth():
             shutil.rmtree(tmp, ignore_errors=True)
 
     good, badr = run(False), run(True)
-    exp_good = {k: "TAK" for k in ("OBOZ-0", "OBOZ-1", "OBOZ-2", "OBOZ-3", "OBOZ-4", "OBOZ-5", "OBOZ-6", "OBOZ-7", "OBOZ-8", "OBOZ-9", "OBOZ-10", "OBOZ-11")}
-    exp_bad = {k: "NIE" for k in ("OBOZ-0", "OBOZ-1", "OBOZ-2", "OBOZ-3", "OBOZ-4", "OBOZ-5", "OBOZ-6", "OBOZ-7", "OBOZ-8", "OBOZ-9", "OBOZ-10", "OBOZ-11")}
+    keys = ("OBOZ-0", "OBOZ-1", "OBOZ-2", "OBOZ-3", "OBOZ-4", "OBOZ-5", "OBOZ-6", "OBOZ-7", "OBOZ-8", "OBOZ-9", "OBOZ-10", "OBOZ-11", "OBOZ-12", "OBOZ-13", "OBOZ-14")
+    exp_good = dict({k: "TAK" for k in keys}, **{"OBOZ-15": "INFO"})
+    exp_bad = dict({k: "NIE" for k in keys}, **{"OBOZ-15": "INFO"})
     diff = [f"dobry {k}: {good.get(k)} (oczekiwane {v})" for k, v in exp_good.items() if good.get(k) != v]
     diff += [f"zly {k}: {badr.get(k)} (oczekiwane {v})" for k, v in exp_bad.items() if badr.get(k) != v]
     return "; ".join(diff) if diff else None
 
 
 def m109oboz_main(logp):
-    """m109oboz (23.10; Jeff 22.10 21:20 "inny jest oboz, jak wchodze do obozu, a inny, jak jestem atakowany w obozie"): OBOZ-S, OBOZ-S2, OBOZ-0..OBOZ-11 - opis w --help.
+    """m109oboz (23.10; Jeff 22.10 21:20 "inny jest oboz, jak wchodze do obozu, a inny, jak jestem atakowany w obozie"): OBOZ-S, OBOZ-S2, OBOZ-0..OBOZ-15 - opis w --help.
     Strumieniowo. Log bez linii m109 - INFO, bez wyjatku."""
     rep = Report()
     s1 = m109oboz_selftest()
