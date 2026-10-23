@@ -52,6 +52,13 @@ namespace Armoury
         private static FieldInfo _rlHeavy;             // EquipmentDamageModel._lootedHeavy
         private static FieldInfo _rlHeavyMax;          // EquipmentDamageModel._lootedHeavyMax
         private static MethodInfo _rlRegisterLucky;    // RealisticLootModel.RegisterLuckyElement
+        // m109-lup: RegisterLuckyElement niezaleznie od WreckSalvageEnabled (konie wracajace na liste trofeow - ReturnMounts) i stan wpiecia do linii
+        // startu LootTally ("Lup bitwy (m109): start")
+        private static MethodInfo _lReg;
+        internal static bool MountReturnWired, MountFinalWired, SpareHarnessWired;
+        internal static bool LuckyFound { get { return _lReg != null; } }
+        /// <summary>m109-lup: kolejka lupu do odczytu przez pomiar LootTally (tylko czyta).</summary>
+        internal static ItemRoster QueueRoster { get { return ShareQueue; } }
 
         private static Type FindType(string fullName)
         {
@@ -281,6 +288,10 @@ namespace Armoury
                     else Log.Info("BattlefieldLaw: nie znalazlem wnetrza DTE - dzialka gracza nieaktywna.");
                 }
                 else Log.Info("BattlefieldLaw: DTE nieobecny - dzialka gracza nieaktywna.");
+
+                // m109-lup: pomiar lupu bitwy wedlug rodzaju i hak autotestu (LootTally) - latki wpiete zawsze, tylko czytaja
+                if (modelType != null) _lReg = AccessTools.Method(modelType, "RegisterLuckyElement");
+                LootTally.ApplyAll(h);
             }
             catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll", e); }
         }
@@ -301,7 +312,7 @@ namespace Armoury
                 // legenda i stal valyrianska z loterii to zawsze kopia (klinge bohatera bierze, jesli w ogole, zwyczaj wojenny - UniqueSpoils.Take);
                 // w bitwie stoczonej osobiscie to samo robi CleanseTrash nizej, w symulacji dotad nic
                 if (__result != null && Settings.Current.NoConjuredLegends) StripLegendCopies(__result);
-                if (RotEnlisted()) { ShareQueue.Clear(); Wrecks.Clear(); return; }
+                if (RotEnlisted()) { LootTally.QueueOut(ShareQueue, LootTally.Przepadlo); ShareQueue.Clear(); Wrecks.Clear(); return; }
                 bool sim = false;
                 if (!RealFoughtBattle())
                 {
@@ -325,20 +336,31 @@ namespace Armoury
                 // dzialke do sakw; loteria na wierzchu bylaby DRUGA nagroda)
                 __result.Clear();
                 ScreenIsRealLoot = true;    // E8/L (252): od teraz na liscie trofeow sa tylko prawdziwe sztuki z pola (albo nic)
-                if (ShareQueue.Count == 0 && Wrecks.Count == 0) return;
+                if (ShareQueue.Count == 0 && Wrecks.Count == 0) { ScreenDone(); return; }
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
                     var el = ShareQueue.GetElementCopyAtIndex(i);
                     __result.AddToCounts(el.EquipmentElement, el.Amount);
+                    LootTally.ToList(el.EquipmentElement.Item, el.Amount);   // m109-lup: pomiar (kolejka -> lista trofeow)
                 }
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana na ekran
+                LootTally.WrecksIn(Wrecks);
                 int wrecks = AppendWrecks(__result);
                 CleanseDragons(__result);
                 CleanseTrash(__result);
+                LootTally.Sifted(__result);
                 Log.Info("BattlefieldLaw: ekran Spoils podmieniony na " + __result.Count + " pozycji prawdziwego lupu"
                          + (wrecks > 0 ? " (w tym " + wrecks + " wrakow przed przesianiem)" : "") + ".");
+                LootTally.OnList(__result, false);
+                ScreenDone();
             }
             catch (Exception e) { Log.Error("AfterGenerateLoot", e); }
+        }
+
+        /// <summary>m109-lup: lista trofeow Spoils z prawdziwym lupem gotowa - pomiar bitwy zamkniety (LootTally).</summary>
+        private static void ScreenDone()
+        {
+            LootTally.Close("lista trofeow Spoils");
         }
 
         private static void StripLegendCopies(ItemRoster roster)
@@ -508,6 +530,7 @@ namespace Armoury
                             int t = Math.Min(left, el.Amount);
                             armory.AddToCounts(el.EquipmentElement, -t);
                             ShareQueue.AddToCounts(el.EquipmentElement, t);
+                            LootTally.Queued(item, t, LootTally.Dzialka);   // m109-lup: pomiar
                             left -= t; moved += t;
                         }
                     }
@@ -664,6 +687,7 @@ namespace Armoury
                                  + ShareQueue.Count + " pozycji); odbierze ja ekran lupow albo sakwy po godzinie.");
                         return;
                     }
+                    LootTally.QueueOut(ShareQueue, LootTally.Przepadlo);   // m109-lup: pomiar
                     ShareQueue.Clear(); Wrecks.Clear(); return;
                 }
 
@@ -676,6 +700,7 @@ namespace Armoury
                         {
                             var el = gainedLoots.GetElementCopyAtIndex(i);
                             ShareQueue.AddToCounts(el.EquipmentElement, el.Amount);
+                            LootTally.Queued(el.EquipmentElement.Item, el.Amount, LootTally.Bagaz);   // m109-lup: pomiar
                         }
                         gainedLoots.Clear();
                     }
@@ -690,11 +715,13 @@ namespace Armoury
                         var el = ShareQueue.GetElementCopyAtIndex(i);
                         gainedLoots.AddToCounts(el.EquipmentElement, el.Amount);
                     }
+                    LootTally.QueueOut(ShareQueue, LootTally.Lista);   // m109-lup: pomiar
                     ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana na ekran gry
                 }
                 AppendWrecks(gainedLoots);
                 CleanseDragons(gainedLoots);
                 CleanseTrash(gainedLoots);
+                LootTally.Close("ekran gry");   // m109-lup: bez Spoils lista trofeow to ekran gry
                 if (!Settings.Current.LootArrivesBattleWorn || _applyDamage == null || gainedLoots.Count == 0) return;
                 var damaged = _applyDamage.Invoke(null, new object[] { gainedLoots, 0f }) as ItemRoster;
                 if (damaged == null || ReferenceEquals(damaged, gainedLoots)) return;
@@ -760,8 +787,12 @@ namespace Armoury
         {
             _simCutSpoils = _simCutBattles = _simCutGame = _lStumbles = 0; ScreenIsRealLoot = false;
             _simPending = false;
+            try { LootTally.Reset(); } catch { }   // m109-lup: PRZED czyszczeniem kolejki (otwarta bitwa zamknieta, "zostaje" = kolejka)
             try { ShareQueue.Clear(); Wrecks.Clear(); } catch { }
         }
+
+        /// <summary>m109-lup: rodzaj zabojcy dla pomiaru LootTally - 1 Ty albo towarzysz (kon zamieniony na jezdzca), 2 zolnierz partii gracza, 3 inni.</summary>
+        internal static int KillerKindOf(Agent a) { return KillerKind(a); }
 
         /// <summary>Liczniki doby do linii "Lup i dary (E8/L)" (HorseFate.LLine) - zwraca tekst i zeruje.</summary>
         internal static string TakeSimCut()
@@ -826,6 +857,7 @@ namespace Armoury
                     return 0;
                 }
                 pct = SimSharePercent();
+                LootTally.SimBody(gained);   // m109-lup: pomiar
                 foreach (var kv in gained)
                 {
                     if (kv.Key == null || kv.Value <= 0) continue;
@@ -839,6 +871,7 @@ namespace Armoury
                             int n = Math.Min(left, el.Amount);
                             armory.AddToCounts(el.EquipmentElement, -n);
                             ShareQueue.AddToCounts(el.EquipmentElement, n);
+                            LootTally.Queued(kv.Key, n, LootTally.Send);   // m109-lup: pomiar
                             left -= n; moved += n;
                         }
                 }
@@ -956,15 +989,20 @@ namespace Armoury
                 // to, co wyjelismy z magazynu wojska na ekran lupow, wraca na polke
                 var armory = _dteArmory != null ? _dteArmory.GetValue(null) as ItemRoster : null;
                 if (armory != null)
+                {
                     for (int i = 0; i < ShareQueue.Count; i++)
                     {
                         var el = ShareQueue.GetElementCopyAtIndex(i);
                         armory.AddToCounts(el.EquipmentElement, el.Amount);
                     }
+                    LootTally.QueueOut(ShareQueue, LootTally.Zwrot);   // m109-lup: pomiar
+                }
+                else LootTally.QueueOut(ShareQueue, LootTally.Przepadlo);
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka wrocila do zbrojowni wojska
                 Wrecks.Clear();
             }
             catch (Exception e) { Log.Error("DropShare", e); }
+            LootTally.Close("zwrot do zbrojowni wojska");   // m109-lup: pole przegrane albo opuszczone
             return n;
         }
 
@@ -989,6 +1027,7 @@ namespace Armoury
             {
                 var bag = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
                 if (bag == null) return 0;
+                LootTally.QueueOut(ShareQueue, LootTally.Sakwy);   // m109-lup: pomiar
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
                     var el = ShareQueue.GetElementCopyAtIndex(i);
@@ -1010,6 +1049,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("FlushShareToBaggage", e); }
+            LootTally.Close("sakwy - " + why);   // m109-lup: pomiar bitwy zamkniety
             return moved;
         }
 
