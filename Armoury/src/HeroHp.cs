@@ -190,13 +190,47 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ misja
-        [HarmonyPatch(typeof(Agent), "InitializeSpawnEquipment")]
+        // m110-animacje (Jeff 23.10 20:19 "postac lezy w ekwipunku, rekawice bez obrazka - blad z dzisiaj"): BEZ atrybutu [HarmonyPatch]. Atrybut wpinal latke
+        // w PatchAll z OnSubModuleLoad, a przygotowanie metody Agent (MonoMod PrepareMethod) odpalalo statyczny konstruktor ActionIndexCache, zanim silnik
+        // wczytal action_types.xml (ok. 2.5 s pozniej) - wszystkie ActionIndexCache.act_* zostawaly -1 do konca sesji: podglad postaci bez animacji (lezy),
+        // obrazek rekawic bez pozy dloni (act_tableau_hand_armor_pose), animacje misji z tych pol (podnoszenie, okrzyki). Dowod: bieg 103 na tym samym
+        // zapisie stoi, 105.1+ lezy; sonda poza gra (adw-aic): latka na tej metodzie = 214 wywolan GetActionCodeWithName. Teraz Install z
+        // OnBeforeInitialModuleScreenSetAsRoot (po wczytaniu akcji) i linia kontrolna indeksow.
         internal static class SpawnPatch
         {
-            private static void Postfix(Agent __instance)
+            internal static void Postfix(Agent __instance)
             {
                 try { Spawned(__instance); } catch (Exception e) { Stumble("HeroHp.Spawn", e); }
             }
+        }
+
+        private static bool _installed;
+
+        /// <summary>m110-animacje: latka Agent.InitializeSpawnEquipment wpinana recznie po wczytaniu akcji silnika (SubModuleMain.OnBeforeInitialModuleScreenSetAsRoot),
+        /// raz na proces; linia "Animacje (m110): ..." - indeksy akcji podgladu postaci i obrazka rekawic (-1 = blad kolejnosci ladowania).</summary>
+        internal static void Install(Harmony h)
+        {
+            string patched = "NIE";
+            try
+            {
+                if (!_installed && h != null)
+                {
+                    var mi = AccessTools.DeclaredMethod(typeof(Agent), "InitializeSpawnEquipment");
+                    var post = AccessTools.Method(typeof(SpawnPatch), "Postfix");
+                    if (mi != null && post != null) { h.Patch(mi, postfix: new HarmonyMethod(post)); _installed = true; patched = "TAK"; }
+                    else patched = "NIE (brak metody " + (mi == null ? "Agent.InitializeSpawnEquipment" : "Postfix") + ")";
+                }
+                else if (_installed) patched = "juz wpieta";
+            }
+            catch (Exception e) { Stumble("HeroHp.Install", e); patched = "BLAD " + e.GetType().Name; }
+            try
+            {
+                int idle = ActionIndexCache.act_inventory_idle_start.Index, hand = ActionIndexCache.act_tableau_hand_armor_pose.Index;
+                bool ok = idle >= 0 && hand >= 0;
+                Log.Info("Animacje (m110): latka Agent.InitializeSpawnEquipment (HP sprzetu) wpieta po wczytaniu akcji: " + patched + " | indeksy akcji: act_inventory_idle_start "
+                         + idle + ", act_tableau_hand_armor_pose " + hand + " - " + (ok ? "OK" : "BLAD (podglad postaci lezy, rekawice bez obrazka)") + ".");
+            }
+            catch (Exception e) { Stumble("HeroHp.Install.Check", e); }
         }
 
         internal sealed class Logic : MissionBehavior

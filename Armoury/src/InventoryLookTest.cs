@@ -191,6 +191,9 @@ namespace Armoury
                 string dir = Path.Combine(CrashScribeDir(), "zdjecia");
                 Directory.CreateDirectory(dir);
                 File.WriteAllLines(Path.Combine(dir, "bez-obrazka-m110.tsv"), rows.ToArray());
+                var names = new List<string>(lods.Keys);
+                names.Sort(StringComparer.OrdinalIgnoreCase);
+                File.WriteAllLines(Path.Combine(dir, "modele-m110.txt"), names.ToArray());   // lista modeli silnika - do podstawienia brakujacych
                 var head = new List<string>();
                 for (int i = 0; i < rows.Count && i < 40; i++) head.Add(rows[i].Replace("\t", " | "));
                 Log.Info(P + "skan obrazkow | modeli w silniku " + list.Count + " (nazw " + lods.Count + ") | przedmiotow " + items + ": brak modelu " + noMesh + ", model bez LOD " + noLod
@@ -207,7 +210,8 @@ namespace Armoury
                 var bp = h.BodyProperties;
                 Log.Info(P + "start | bohater " + h.Name + " | plec " + (h.IsFemale ? "K" : "M") + ", rasa " + (c != null ? c.Race.ToString(Inv) : "?") + ", wiek " + h.Age.ToString("0.#", Inv)
                          + " | cialo: waga " + bp.Weight.ToString("0.###", Inv) + ", budowa " + bp.Build.ToString("0.###", Inv) + ", wiek ciala " + bp.Age.ToString("0.#", Inv)
-                         + " | klucz ciala " + bp.ToString() + " | sprzet cywilny " + h.CivilianEquipment.CalculateEquipmentCode() + ".");
+                         + " | klucz ciala " + bp.ToString() + " | sprzet cywilny " + h.CivilianEquipment.CalculateEquipmentCode() + " | akcje: act_inventory_idle_start "
+                         + ActionIndexCache.act_inventory_idle_start.Index + ", act_tableau_hand_armor_pose " + ActionIndexCache.act_tableau_hand_armor_pose.Index + ".");
                 for (int i = 0; i <= (int)EquipmentIndex.ExtraWeaponSlot; i++)
                 {
                     var it = h.BattleEquipment[i].Item;
