@@ -5548,6 +5548,10 @@ namespace Armoury
         [SettingPropertyGroup("Player fees and bets")]
         public bool TourneyDebts { get; set; } = true;
 
+        [SettingPropertyBool("Prisoner Pay Chain", HintText = "prisoners you sell to a town's ransom broker are paid in full: what the town cannot spare above its merchants' reserve is paid by the clan that holds the town, then by its ruler, and what nobody can pay becomes the town's debt to you (paid back day by day, like tournament debts) - nobody takes your prisoners for nothing. Needs Town Pays Rewards and Tourney Payer Chain or Tourney Debts", RequireRestart = false)]
+        [SettingPropertyGroup("Player fees and bets")]
+        public bool PrisonerPayChain { get; set; } = true;
+
         [SettingPropertyBool("Tourney Seagard Catch Up", HintText = "one-time amends for the Seagard tournament of 16 October in Ithauser's campaign: Seagard owes you the 1,300 of prize money and the 222 of your bet it could not pay, and Seagard, its lord and the ruler pay it in the first hour as a prize would be paid; whatever is left is paid off like any other town debt. Only for a save made before this change, with the hero Ithauser, after that tournament - decided once, at the first load (needs Tourney Debts). Off = no amends", RequireRestart = false)]
         [SettingPropertyGroup("Player fees and bets")]
         public bool TourneySeagardCatchUp { get; set; } = true;
@@ -10766,6 +10770,7 @@ namespace Armoury
             s.PlayerSmallSourcesClosed = PlayerSmallSourcesClosed;
             s.TourneyPayerChain = TourneyPayerChain;
             s.TourneyDebts = TourneyDebts;
+            s.PrisonerPayChain = PrisonerPayChain;
             s.TourneySeagardCatchUp = TourneySeagardCatchUp;
             s.TourneyFolkPurse = TourneyFolkPurse;
             s.TourneyFolkPurseDays = TourneyFolkPurseDays;

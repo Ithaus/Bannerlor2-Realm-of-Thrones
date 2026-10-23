@@ -228,7 +228,8 @@ namespace Armoury
             {
                 var c = __state;
                 if (c.HeroRepay > 0) { _heroLate++; PayHeroes(c); }
-                if (c.PlDue > c.PlPaid)
+                if (c.PlDue > c.PlPaid && c.Kind == KPris && PrisChain(c)) { }   // m110-jency: reszta lancuchem platnikow (rod osady, korona) albo dlug miasta
+                else if (c.PlDue > c.PlPaid)
                 {
                     string town = c.Payer != null ? c.Payer.Name.ToString() : "The town";
                     if (c.Kind == KPris) Log.Player(town + " could pay only " + c.PlPaid + " of " + c.PlDue + " for your prisoners.", true);
@@ -240,6 +241,32 @@ namespace Armoury
             }
             catch (Exception e) { Seal31.Stumble("RealPayer.CtxFin", e); }
         }
+
+        /// <summary>m110-jency (Jeff 23.10 22:28, zrzut Maidenpool: "could pay only 0 of 36 for your prisoners" - "jesli ich nie stac, to nie moga zaplacic, a zabrali
+        /// mi jencow?"): miasto placi graczowi za jencow tylko z NADWYZKI (Seal31.Spare: kasa ponad zapas kupcow), a jency i tak przechodzili - Maidenpool mialo
+        /// 36 723 przy zapasie 39 662, wiec 0. Jak nagroda turnieju (TP): reszte placi lancuch platnikow (TourneyPay.PayChain - rod, do ktorego nalezy miasto,
+        /// potem rod panujacy, kazdy z tego, co moze dac), a czego nikt nie zaplaci - DLUG miasta wobec gracza (rodzaj MPrisoners, splata co dobe jak dlugi
+        /// turniejowe). Tylko miasto (dlugi splacaja miasta) i sprzedaz gracza; klucz PrisonerPayChain (oraz Tourney Payer Chain / Tourney Debts). Wiadomosc:
+        /// kto zaplacil, ile miasto jest winne. false - stara sciezka ("could pay only").</summary>
+        private static bool PrisChain(Ctx c)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.PrisonerPayChain || !TourneyPay.AnyOn || c.Payer == null || !c.Payer.IsTown || c.Payer.Town == null) return false;
+                long left = c.PlDue - c.PlPaid;
+                if (left <= 0 || left > int.MaxValue) return false;
+                TourneyPay.Parts parts;
+                if (!TourneyPay.PayChain(c.Payer, (int)left, 0, true, TourneyPay.MPrisoners, out parts)) return false;   // kasa dala juz swoja nadwyzke - lancuch od rodu
+                _prisChainN++; _prisChainPaid += parts.Paid; _prisChainDebt += parts.Debt; _prisChainLost += parts.Lost;
+                TourneyPay.Tell(TourneyPay.TPris, c.Payer, (int)Math.Min(int.MaxValue, c.PlDue), parts, (int)Math.Min(int.MaxValue, c.PlPaid));
+                return true;
+            }
+            catch (Exception e) { Seal31.Stumble("RealPayer.PrisChain", e); return false; }
+        }
+
+        private static int _prisChainN;
+        private static long _prisChainPaid, _prisChainDebt, _prisChainLost;
 
         // ------------------------------------------------------------ myto (perk Tollgates)
         public struct TollState { public bool On; public int C0; }
@@ -321,6 +348,8 @@ namespace Armoury
             sb.Append(" | kasy osad wydaly dzis ").Append(spent).Append(" w ").Append(spentN).Append(" osadach (nadwyzka z zywej kasy - wyplata juz ja obnizyla)");
             sb.Append(" | czesc za bohaterow jak w grze (z niczego) ").Append(_heroRepay).Append(" (w tym awaryjnie w finalizerze - postfiks nie biegl ").Append(_heroLate).Append(')')
               .Append(" | gracz u posrednika i w miescie: wycena ").Append(_plDue).Append(", zaplacone ").Append(_plPaid)
+              .Append(" (m110-jency: reszta lancuchem ").Append(_prisChainN).Append(" razy - rody zaplacily ").Append(_prisChainPaid).Append(", w dlug miasta ").Append(_prisChainDebt)
+              .Append(", przepadlo ").Append(_prisChainLost).Append(')')
               .Append(" | myto: karawana nie miala ").Append(_tollShort).Append(" (licznik oddal), gra nie dopisala ").Append(_tollNotSeen)
               .Append(" | kontrola (prog 0): bez platnika ").Append(_noPayer).Append(", miasto ponizej zapasu kupcow przez nasza wyplate ").Append(_belowReserve)
               .Append(", zdarzenia z niczego w kontekscie niedopasowane ").Append(_strays).Append(", stos przepelniony ").Append(_overflow);
@@ -331,6 +360,7 @@ namespace Armoury
         {
             Array.Clear(_due, 0, Kinds); Array.Clear(_paid, 0, Kinds); Array.Clear(_n, 0, Kinds); Array.Clear(_noSpare, 0, Kinds);
             _heroRepay = _plDue = _plPaid = _tollShort = 0; _strays = _noPayer = _belowReserve = _tollNotSeen = _overflow = _heroLate = 0;
+            _prisChainN = 0; _prisChainPaid = _prisChainDebt = _prisChainLost = 0;
         }
 
         internal static void Reset() { ClearDay(); Array.Clear(_stack, 0, _stack.Length); _depth = 0; }

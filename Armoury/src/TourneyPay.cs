@@ -71,7 +71,7 @@ namespace Armoury
 
         private const int MinRepay = 50;   // splata dlugu dopiero od min(reszta, 50) - bez codziennych komunikatow o kilku denarach
 
-        internal const int MTourney = 1, MOther = 2;   // rodzaje dlugu: turniej (nagroda, zaklad, cena nagrody) / arena i plansza
+        internal const int MTourney = 1, MOther = 2, MPrisoners = 4;   // rodzaje dlugu: turniej (nagroda, zaklad, cena nagrody) / arena i plansza / jency u posrednika (m110-jency)
 
         private static bool Key(Func<Settings, bool> k) { var s = Settings.Current; return s != null && k(s); }
         internal static bool ChainOn { get { return Key(s => s.TourneyPayerChain); } }
@@ -302,7 +302,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ komunikaty gracza (D4)
 
-        internal const int TPrize = 0, TBonus = 1, TBet = 2, TBoard = 3, TArena = 4, TItem = 5;
+        internal const int TPrize = 0, TBonus = 1, TBet = 2, TBoard = 3, TArena = 4, TItem = 5, TPris = 6;
 
         private static string Join(List<string> l)
         {
@@ -313,10 +313,12 @@ namespace Armoury
         }
 
         /// <summary>Kto zaplacil i co zostalo (wolane, gdy kasa osady sama nie pokryla kwoty).</summary>
-        internal static void Tell(int what, Settlement st, int due, Parts p)
+        internal static void Tell(int what, Settlement st, int due, Parts p, int townBefore = 0)
         {
             try
             {
+                // m110-jency: townBefore - czesc, ktora kasa osady dala juz wczesniej (RealPayer z nadwyzki), lancuch dostal tylko reszte
+                p.Town += Math.Max(0, townBefore);
                 string n = NameOf(st);
                 string subj, verb = "was";
                 if (what == TBonus) subj = "Your match bonus of " + due + " denars";
@@ -324,6 +326,7 @@ namespace Armoury
                 else if (what == TBoard) { subj = "Your winnings of " + due + " denars at the board"; verb = "were"; }
                 else if (what == TArena) subj = "Your purse of " + due + " denars for the arena bouts";
                 else if (what == TItem) subj = "The price of your prize, " + due + " denars,";
+                else if (what == TPris) subj = "The price of your prisoners, " + due + " denars,";
                 else subj = "The prize of " + due + " denars";
                 var who = new List<string>(3);
                 if (p.Town > 0) who.Add(n + " (" + p.Town + ")");
@@ -402,7 +405,7 @@ namespace Armoury
                     if (p.Town > 0) who.Add(n + " " + p.Town);
                     if (p.Host > 0) who.Add(NameOf(p.HostHero) + " " + p.Host);
                     if (p.Ruler > 0) who.Add(NameOf(p.RulerHero) + " " + p.Ruler);
-                    Log.Player(n + " paid you " + paid + " of the " + ((r.Mask & MOther) == 0 ? "tournament money" : "money") + " it owed you (" + Join(who) + "). "
+                    Log.Player(n + " paid you " + paid + " of the " + (r.Mask == MTourney ? "tournament money" : r.Mask == MPrisoners ? "money for your prisoners" : "money") + " it owed you (" + Join(who) + "). "
                                + (r.Amount > 0 ? "It still owes " + r.Amount + "." : "The debt is settled."));
                     Log.Info(P + "splata (" + when + (repay ? "" : ", regula wyplaty") + ") - " + n + ": " + paid + " (kasa osady " + p.Town + ", gospodarz "
                              + (p.Host > 0 ? NameOf(p.HostHero) + " " + p.Host : "0") + ", panujacy " + (p.Ruler > 0 ? NameOf(p.RulerHero) + " " + p.Ruler : "0")
