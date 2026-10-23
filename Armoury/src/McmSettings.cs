@@ -5016,6 +5016,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool GossipPerDrinkByCharm { get; set; } = true;
 
+        [SettingPropertyBool("Gossip Per Drink By Persuasion", HintText = "with Gossip Per Drink By Charm: what loosens tongues over a tankard is your persuasion - your Charm plus what the perks add to persuasion: Imposing Stature +30, Meaningful Favors +10, Moral Leader +25 among folk of your own culture or Natural Leader +25 among strangers, +20 once your Charm reaches 250, +5 or +10 on the easier persuasion settings. The same measure counts when you question prisoners in camp. Off = Charm alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool GossipPerDrinkByPersuasion { get; set; } = true;
+
         [SettingPropertyBool("Gossip Tournaments", HintText = "the gossip tells of tourneys: which town holds one, how far away it is, how long ago it was proclaimed and what the prize is - only tourneys that are really being held (far ones only once the news could have reached the inn). Off = no tourneys in the gossip, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool GossipTournaments { get; set; } = true;
@@ -10537,6 +10541,7 @@ namespace Armoury
             s.InnGossipPages = InnGossipPages;
             s.InnGossipNeedsDrink = InnGossipNeedsDrink;
             s.GossipPerDrinkByCharm = GossipPerDrinkByCharm;
+            s.GossipPerDrinkByPersuasion = GossipPerDrinkByPersuasion;
             s.GossipTournaments = GossipTournaments;
             s.GossipMatchmaking = GossipMatchmaking;
             s.DrinkDrunkHangover = DrinkDrunkHangover;
