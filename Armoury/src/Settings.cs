@@ -73,6 +73,8 @@ namespace Armoury
         public float WeaponDaysPerTier = 0.1f;             // days per tier of a weapon - 0.1 means a tier 4 sword takes under half a day at the anvil (Jeff 14.09: halved; 16.09: four swords took 169 hours, cut by 80 percent)
         public bool WeaponXpFromValueCapped = true;        // native weapon XP follows the sale price - cap it
         public int WeaponXpCapPerTier = 500;               // ceiling per weapon = this times the tier
+        // m109-kuznia (Jeff 23.10 "smithing za szybko rosnie ... zmniejszyc o 30%"): jeden mnoznik XP Smithing w HeroDeveloper.AddSkillXp (SmithXp.cs); 1.00 = jak 44c03a05
+        public float SmithingXpFactor = 0.70f;             // Smithing grows slower: every gain of Smithing experience is multiplied by this - forging weapons, armour, bows, crossbows and arrows, smelting, refining, mending and commissions, for you and any smith at the anvil (0.7 = 30 percent slower, 1 = as before). The character level earned with it shrinks the same way. The caps above (Xp Cap Per Tier, Weapon Xp Cap Per Tier, Refine Xp Cap) count before this cut. A skill level set outright (events, education) is not touched
         // --- Orders from the lords ---
         public bool ArmourOrdersEnabled = true;            // lords leave armour commissions with town smiths
         public float OrderOfferChance = 0.5f;              // chance a fresh offer waits when you ride in

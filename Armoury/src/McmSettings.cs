@@ -212,6 +212,10 @@ namespace Armoury
         [SettingPropertyGroup("Experience")]
         public int WeaponXpCapPerTier { get; set; } = 500;
 
+        [SettingPropertyFloatingInteger("Smithing Xp Factor", 0.00f, 2.80f, "0.00", HintText = "Smithing grows slower: every gain of Smithing experience is multiplied by this - forging weapons, armour, bows, crossbows and arrows, smelting, refining, mending and commissions, for you and any smith at the anvil (0.7 = 30 percent slower, 1 = as before). The character level earned with it shrinks the same way. The caps above (Xp Cap Per Tier, Weapon Xp Cap Per Tier, Refine Xp Cap) count before this cut. A skill level set outright (events, education) is not touched", RequireRestart = false)]
+        [SettingPropertyGroup("Experience")]
+        public float SmithingXpFactor { get; set; } = 0.70f;
+
         [SettingPropertyBool("Armour Orders Enabled", HintText = "lords leave armour commissions with town smiths", RequireRestart = false)]
         [SettingPropertyGroup("Orders from the lords")]
         public bool ArmourOrdersEnabled { get; set; } = true;
@@ -9336,6 +9340,7 @@ namespace Armoury
             s.WeaponDaysPerTier = WeaponDaysPerTier;
             s.WeaponXpFromValueCapped = WeaponXpFromValueCapped;
             s.WeaponXpCapPerTier = WeaponXpCapPerTier;
+            s.SmithingXpFactor = SmithingXpFactor;
             s.ArmourOrdersEnabled = ArmourOrdersEnabled;
             s.OrderOfferChance = OrderOfferChance;
             s.OrderTownCooldownDays = OrderTownCooldownDays;
