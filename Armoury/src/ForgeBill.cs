@@ -24,7 +24,9 @@ namespace Armoury
     /// CO WIDAC = CO ZABRANE: potrzeba z tych samych funkcji, ktore zuzywaja - Recipes.For dla CRAFT (zuzywa Forge.Smith/TakeFor, kwit BK FletchForge.SpendBill
     /// i Recipes.MassCommitBk), koszt modelu kuzni z naszymi latkami + SmithWood/SmithCoal.WeaponKg dla broni (zuzywa CraftingCampaignBehavior.SpendMaterials gry
     /// z prefiksami SmithWood/SmithCoal). Brak = te same warunki co Recipes.HasMaterials, RareMaterials.Ready i BK HasMaterials (sztuki do otwarcia > sakwy).
-    /// Pancerz w CRAFT: kwit BK (GetCraftingInputForArmor, ktory zdejmuje SpendMaterials) porownany z przepisem; inny = wiersze z kwitu BK w sztukach i licznik.
+    /// CRAFT poza lukiem, kusza i amunicja strzelecka (te kuje Forge.Smith z przepisu): kwit BK (GetCraftingInputForArmor, ktory zdejmuje SpendMaterials)
+    /// porownany z przepisem; inny = wiersze z kwitu BK w sztukach. Pancerz i tarcza z przepisu - licznik "kwit BK inny niz przepis" (latki kwitu nie weszly);
+    /// reszta (np. pociski procy, tarcza przy BkShieldBillByRecipe NIE) - BK liczy ja wlasnym kwitem z zalozenia, licznik "kwit wlasny BK" (recenzja KUZ-1).
     /// Linie "Kuznia wymagania (m109): ..." - start sesji z probkami, ekran (pierwsze 10, potem co 50.), doba; bledy liczone, bez wylacznika.
     /// </summary>
     internal static class ForgeBill
@@ -58,12 +60,16 @@ namespace Armoury
             public Recipes.Recipe Recipe;
             public int[] Cost;
             public int Batch = 1;
-            public bool BkTable;            // pancerz: wiersze z kwitu BK (kwit inny niz przepis)
+            public bool BkTable;            // CRAFT: wiersze z kwitu BK (kwit inny niz przepis)
+            public bool BkOwn;              // ...bo BK liczy ten przedmiot wlasnym kwitem (poza pancerzem i tarcza z przepisu)
         }
 
         // ------------------------------------------------------------ liczniki
         private static int _stumbles, _sRefresh;
-        private static int _dCraft, _dWeapon, _dShort, _dBlocked, _dBlockedRare, _dBkOther;
+        private static int _dCraft, _dWeapon, _dShort, _dBlocked, _dBlockedRare, _dBkOther, _dBkOwn, _dWeaponHint;
+        // recenzja KUZ-6: liczniki zdarzen, nie wywolan - przycisk CRAFT liczony przy zablokowaniu nowego przedmiotu, podpowiedz broni przy nowym napisie
+        private static ItemObject _blockedItem;
+        private static string _lastHint;
         private static Harmony _h;
         private static readonly HashSet<System.Reflection.MethodBase> _patched = new HashSet<System.Reflection.MethodBase>();
         private static string _hook = "nie wpiety";
@@ -76,7 +82,7 @@ namespace Armoury
             if (_stumbles <= 3 || _stumbles % 100 == 0) Log.Error("ForgeBill." + where + " (potkniecie " + _stumbles + ")", e);
         }
 
-        private static void ResetDay() { _dCraft = _dWeapon = _dShort = _dBlocked = _dBlockedRare = _dBkOther = 0; }
+        private static void ResetDay() { _dCraft = _dWeapon = _dShort = _dBlocked = _dBlockedRare = _dBkOther = _dBkOwn = _dWeaponHint = 0; }
 
         internal static int Stumbles { get { return _stumbles; } }
 
@@ -140,7 +146,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ CRAFT (pancerz, luk, kusza, amunicja, tarcza) i nasza kuznia
-        /// <summary>Rachunek przedmiotu w zakladce CRAFT BK (ekran, przycisk, test): przepis Recipes.For, pancerz i tarcza - z kwitem BK, ktory tam zdejmuje SpendMaterials.</summary>
+        /// <summary>Rachunek przedmiotu w zakladce CRAFT BK (ekran, przycisk, test): przepis Recipes.For; poza lukiem, kusza i amunicja strzelecka - z kwitem BK,
+        /// ktory tam zdejmuje SpendMaterials.</summary>
         internal static Bill Of(ItemObject item)
         {
             if (item == null) return new Bill();
@@ -185,8 +192,9 @@ namespace Armoury
                 try { u = rm.Weight; } catch { }
                 b.Rows.Add(new Row { Item = rm, Kind = "rare", ByKg = false, Need = need, Bags = have, UnitKg = u, Opens = need, Rare = true });
             }
-            // pancerz i tarcza w CRAFT BK: zdejmuje kwit BK - musi byc kwitem tego przepisu (latki TrueArmourCost / BkArmorBillPostfix); inny = wiersze z kwitu
-            if (craftTab && !FletchForge.RangedType(item) && (item.HasArmorComponent || t == ItemObject.ItemTypeEnum.Shield)) CheckBkTable(b, r);
+            // CRAFT BK poza strzeleckim (BkCraftPrefix przepuszcza do BK wszystko poza RangedType): zdejmuje kwit BK - u pancerza i tarczy z przepisu kwit tego
+            // przepisu (latki TrueArmourCost / BkArmorBillPostfix), u reszty (pociski procy) wlasny kwit BK; inny niz przepis = wiersze z kwitu (recenzja KUZ-1)
+            if (craftTab && !FletchForge.RangedType(item)) CheckBkTable(b, r);
             Finish(b);
             return b;
         }
@@ -225,11 +233,17 @@ namespace Armoury
             bool same = true;
             for (int i = 0; i < 11; i++) if (mine[i] != Math.Max(0, bill[i])) { same = false; break; }
             if (same) return;
-            // kwit BK inny niz przepis (inne klucze niz u Jeffa) - zdejmie kwit BK w calych sztukach, kg nie schodza (FletchForge.MassSpend: BillMatches NIE)
-            _dBkOther++;
+            // kwit BK inny niz przepis - zdejmie kwit BK w calych sztukach, kg nie schodza (FletchForge.MassSpend: BillMatches NIE). Pancerz i tarcza z przepisu:
+            // inne klucze niz u Jeffa albo latki kwitu nie weszly; reszta (pociski procy, tarcza przy BkShieldBillByRecipe NIE) - wlasny kwit BK z zalozenia
+            bool own = !(b.Item.HasArmorComponent || FletchForge.ShieldRecipeOn(b.Item));
+            if (own) _dBkOwn++; else _dBkOther++;
             b.BkTable = true;
+            b.BkOwn = own;
             var keep = new List<Row>();
-            foreach (var w in b.Rows) if (w.Rare || (!w.ByKg && BkIndex(w.Item) < 0)) keep.Add(w);   // surowiec luku i aksamit tarczy - poza tablica BK
+            // poza tablica BK zostaje tylko to, co ktos zdejmuje: surowiec luku (RareMaterials) i aksamit tarczy z przepisu (FletchForge.BkShieldSpendPostfix,
+            // ten sam warunek ShieldRecipeOn - recenzja K5: przy BkShieldBillByRecipe NIE aksamitu nikt nie zdejmuje, wiec nie blokuje)
+            bool velvetTaken = FletchForge.ShieldRecipeOn(b.Item);
+            foreach (var w in b.Rows) if (w.Rare || (velvetTaken && !w.ByKg && w.Item != null && w.Item == Recipes.SoftVelvet)) keep.Add(w);
             b.Rows.Clear();
             for (int i = 0; i < 11; i++)
             {
@@ -398,7 +412,7 @@ namespace Armoury
             if (b.Rows.Count == 0) return "bez surowcow";
             var l = new List<string>();
             foreach (var w in b.Rows) l.Add(RowLog(w));
-            return string.Join("; ", l.ToArray()) + (b.BkTable ? " (kwit BK inny niz przepis)" : "");
+            return string.Join("; ", l.ToArray()) + (b.BkTable ? (b.BkOwn ? " (kwit wlasny BK)" : " (kwit BK inny niz przepis)") : "");
         }
 
         private static string IdOf(Bill b)
@@ -453,9 +467,12 @@ namespace Armoury
             {
                 if (item == null) return null;
                 var b = Of(item);
-                if (!b.Short) return null;
-                if (bkOk)
+                if (!b.Short) { _blockedItem = null; return null; }
+                if (!bkOk) _blockedItem = null;
+                else if (!ReferenceEquals(item, _blockedItem))
                 {
+                    // HasMaterials biegnie przy kazdym odswiezeniu BK - liczone raz na zablokowanie (zmiana przedmiotu albo powrot braku)
+                    _blockedItem = item;
                     _dBlocked++;
                     bool onlyRare = true;
                     foreach (var w in b.Rows) if (w.Short && !w.Rare) { onlyRare = false; break; }
@@ -480,6 +497,8 @@ namespace Armoury
         /// odblokowane, zlecenie wykonalne) - podpowiedz mowi, czego brakuje, zamiast "You don't have all required materials!". Stan przycisku bez zmian.</summary>
         public static void MainActionPostfix(CraftingVM __instance)
         {
+            string prev = _lastHint;
+            _lastHint = null;
             try
             {
                 if (!On || __instance == null || !__instance.IsInCraftingMode || __instance.IsMainActionEnabled || __instance.MainActionHint == null) return;
@@ -499,7 +518,8 @@ namespace Armoury
                 if (!b.Short) return;
                 string text = ShortText(b);
                 __instance.MainActionHint = new BasicTooltipViewModel(() => text);
-                _dBlocked++;
+                _lastHint = text;
+                if (text != prev) _dWeaponHint++;   // przycisk blokuje gra (my tylko napis) - osobny licznik, raz na nowy napis (recenzja KUZ-6)
             }
             catch (Exception e) { Stumble("MainActionPostfix", e); }
         }
@@ -560,6 +580,7 @@ namespace Armoury
         {
             _sRefresh = 0;
             ResetDay();
+            _blockedItem = null; _lastHint = null;
             ForgeBillTest.Reset();
             try
             {
@@ -597,7 +618,8 @@ namespace Armoury
                 int n = _dCraft + _dWeapon;
                 if (n > 0 || _stumbles > 0)
                     Log.Info(P + "dzien " + day + " | odswiezen ekranu " + n + " (CRAFT " + _dCraft + ", bron " + _dWeapon + "), braki " + _dShort + ", przycisk zablokowany rachunkiem "
-                             + _dBlocked + " (rzadki surowiec " + _dBlockedRare + "), kwit BK inny niz przepis " + _dBkOther + ", potkniecia " + _stumbles + ".");
+                             + _dBlocked + " (rzadki surowiec " + _dBlockedRare + "), podpowiedz przycisku broni " + _dWeaponHint + ", kwit BK inny niz przepis " + _dBkOther
+                             + ", kwit wlasny BK (poza pancerzem i tarcza z przepisu) " + _dBkOwn + ", potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("Daily", e); }
             ResetDay();

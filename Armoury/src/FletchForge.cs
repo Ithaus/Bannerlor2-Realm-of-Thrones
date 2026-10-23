@@ -274,7 +274,7 @@ namespace Armoury
             return cur != null ? Traverse.Create(cur).Property("Item").GetValue<ItemObject>() : null;
         }
 
-        private static bool ShieldRecipeOn(ItemObject item)
+        internal static bool ShieldRecipeOn(ItemObject item)   // m109-kuznia: takze ForgeBill.CheckBkTable (aksamit tarczy poza tablica BK)
         {
             return item != null && item.ItemType == ItemObject.ItemTypeEnum.Shield && Settings.Current != null && Settings.Current.BkShieldBillByRecipe;
         }
