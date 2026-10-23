@@ -1540,6 +1540,7 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => LoreSeedFix.AfterSessionLaunched(LorePurgeOnce));
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => RareMaterials.StartLine());   // m97-surowce: czardrzewo i smocza kosc - surowce, zrodla, doplyw (po cenach HistoricalPrices)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => Recipes.MassStartLine());   // m96-receptury: przepisy z masy po ostatecznych statystykach (ROT-RBM)
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { ForgeBill.SessionStart(); } catch (Exception e) { Log.Error("ForgeBill.SessionStart", e); } });   // m109-kuznia: rachunek kuzni - latka przycisku broni, linia startu z probkami (po przepisach z masy)
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => LoreSeedFix.OnNewGame());
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
             // mury oblezen OB1-OB4 (SiegeWalls.cs): rejestr szturmow AI (prog odparcia OB2, bitwa z murow OB3), wynik szturmu, koniec oblezenia (przerwy, OB4),
@@ -2842,6 +2843,7 @@ namespace Armoury
             try { MoneyLedger.Probe169("RoadsideInns.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { MapChatLog.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("MapChatLog.Daily", e); } DayProfile.Lap("MapChatLog.Daily");   // m105-dziennik: linia "Dziennik (m105): dzien N" - przesuniecia, ramka, handel na tabliczkach (tylko log)
             try { SmithXp.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("SmithXp.Daily", e); }   // m109-kuznia: linia "Kowalstwo wolniej (m109): dzien N" i test autotestu (plik armoury-kuznia.flag)
+            try { ForgeBill.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("ForgeBill.Daily", e); }   // m109-kuznia: linia "Kuznia wymagania (m109): dzien N" - odswiezenia ekranu, braki, przycisk
             try { Rumours.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Rumours.Daily", e); } DayProfile.Lap("Rumours.Daily");   // sw-zajazdy: linia "Plotki (PL): dzien N" - sluchane, ksiega band, wiesci
             try { InnDrink.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("InnDrink.Daily", e); }   // m98-plotki: linia "Kufle (m98): dzien N"
             try { Lektor.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Lektor.Daily", e); }   // m103-lektor: linia "Lektor (m103): dzien N" - okna, plotki, znaki, bledy API

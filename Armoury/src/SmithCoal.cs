@@ -120,13 +120,16 @@ namespace Armoury
             catch (Exception e) { Stumble("CostPostfix", e); }
         }
 
+        /// <summary>m109-kuznia (ForgeBill): kg wegla wykucia broni z projektu - ta sama liczba dla ekranu i dla pobrania (SpendPrefix).</summary>
+        internal static float WeaponKg(WeaponDesign d) { return RawForge(d) * PieceKg; }
+
         public static void SpendPrefix(WeaponDesign weaponDesign, out float[] __state)
         {
             __state = null;
             try
             {
                 if (!On || weaponDesign == null) return;
-                float kg = RawForge(weaponDesign) * PieceKg;
+                float kg = WeaponKg(weaponDesign);
                 __state = new float[] { kg, LumpsFor(kg) };
             }
             catch (Exception e) { Stumble("SpendPrefix", e); }

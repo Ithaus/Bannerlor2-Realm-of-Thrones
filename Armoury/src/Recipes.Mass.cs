@@ -258,6 +258,16 @@ namespace Armoury
             return SmithStock.UnitKg(k.Item);
         }
 
+        /// <summary>m109-kuznia (ForgeBill): kg jednej sztuki surowca przepisu - ta sama miara, z ktorej licza sie sztuki do otwarcia i zuzycie.</summary>
+        internal static float UnitKgOf(KgPart k) { return UnitKg(k); }
+
+        /// <summary>m109-kuznia (ForgeBill): kg otwartego ladunku surowca przepisu (metal - skrzynka resztek kuzni, len i skora - SmithStock). Tylko odczyt.</summary>
+        internal static float OpenKgOf(KgPart k)
+        {
+            if (k.Grade >= 1) return SmeltScraps.BoxMilli(k.Grade) / (float)SmeltScraps.Unit * UnitKg(k);
+            return k.Grade == 0 ? SmithStock.OpenKg(k.Item) : 0f;
+        }
+
         private static int Milli(KgPart k, float kg) { return (int)Math.Ceiling(Math.Max(0f, kg) / Math.Max(0.01f, UnitKg(k)) * SmeltScraps.Unit - 1e-3); }
 
         /// <summary>Sztuki z sakw do otwarcia na kg (0, gdy otwarty ladunek starcza).</summary>

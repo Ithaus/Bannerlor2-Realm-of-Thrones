@@ -7704,6 +7704,10 @@ namespace Armoury
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool SmithWoodOnScreen { get; set; } = true;
 
+        [SettingPropertyBool("Forge Bill On Screen", HintText = "the smithing screen and the CRAFT tab show the bill of the chosen piece in a row above the material bar: for each material what this piece takes and what you have - pieces in your bags times their weight plus what is left open at your anvil (wood, charcoal, linen, leather, metal), e.g. need 0.36 kg, have 387 kg (3 x 100 + 87 open). A red number means you are short, and the Craft button then says what is missing (also weirwood and dragonbone). Off: the Banner Kings leather and linen counters as before", RequireRestart = false)]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool ForgeBillOnScreen { get; set; } = true;
+
         [SettingPropertyBool("Self Mend Wood Kg", HintText = "with Smith Wood Kg: mending at your own anvil takes wood by the kilogram of the repair from the open load - a new load of hardwood is asked for only when the open one runs short (off = a share of whole loads, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool SelfMendWoodKg { get; set; } = true;
@@ -11213,6 +11217,7 @@ namespace Armoury
             s.NoTownMines = NoTownMines;
             s.BulkUnitPerCampaign = BulkUnitPerCampaign;
             s.SmithWoodOnScreen = SmithWoodOnScreen;
+            s.ForgeBillOnScreen = ForgeBillOnScreen;
             s.SelfMendWoodKg = SelfMendWoodKg;
             s.FolkCraftWageOnSale = FolkCraftWageOnSale;
             s.SavingsByNeed = SavingsByNeed;

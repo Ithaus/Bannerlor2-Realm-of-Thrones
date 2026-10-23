@@ -2840,7 +2840,7 @@ namespace Armoury
                     string hint = (legend ? (mastered ? "A LEGEND you have mastered - you may forge it again, and the bill is legendary.\n" : "A LEGEND. Only one may ever exist - and the bill is legendary.\n") : "") +
                                   (unknown && !rare ? (PatternGate.IsForgeUnique(item) ? "A famed piece - seize the original and melt it down, or take it apart (200 Smithing).\n"
                                                               : "Pattern NOT yet discovered - the craft itself will teach you (keep making bows and crossbows).\n") : "") +
-                                  Recipes.Describe(r) + stats +
+                                  (ForgeBill.On ? ForgeBill.Describe(ForgeBill.Of(item, r)) : Recipes.Describe(r)) + stats +   // m109-kuznia: ten sam rachunek co rzad na ekranie kucia
                                   "\nStamina " + r.Stamina + " (you have " + Forge.Stamina() + ")" +
                                   "\nSmithing " + r.SkillNeeded + " required (yours: " + skill + ")" +
                                   (locked ? "\nBeyond your hand for now." : "\nRisk of ruining it: " + fail + "%") +

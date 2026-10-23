@@ -236,22 +236,29 @@ namespace Armoury
                 if (cur == null) return true;
                 var item = Traverse.Create(cur).Property("Item").GetValue<ItemObject>();
                 if (item == null) return true;
-
-                var cfg = Traverse.CreateWithType("BannerKings.BannerKingsConfig").Property("Instance").GetValue();
-                var model = cfg != null ? Traverse.Create(cfg).Property("SmithingModel").GetValue() : null;
-                var bill = model != null ? Traverse.Create(model).Method("GetCraftingInputForArmor", item).GetValue<int[]>() : null;
-                if (bill == null || bill.Length < 11) return true;   // nie poznajemy rachunku - niech liczy oryginal
-
-                var roster = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.ItemRoster;
-                for (int l = 0; l < 9; l++)
-                    if (bill[l] != 0)
-                        roster.AddToCounts(Recipes.MaterialItem((CraftingMaterials)l), -bill[l]);
-                if (bill[9] > 0) Recipes.Take(roster, Recipes.SoftLeather, bill[9]);
-                if (bill[10] > 0) Recipes.Take(roster, Recipes.SoftLinen, bill[10]);
-                // n20-kuznia: drewno tarczy w kg i aksamit - BkShieldSpendPostfix (wpiety takze bez AllowRangedCrafting, gdy ten prefiks nie jest wpiety)
-                return false;
+                return !SpendBill(item);   // m109-kuznia: cialo wyjete (SpendBill) - ta sama droga w tescie rachunku ForgeBillTest
             }
             catch (Exception e) { Log.Error("BkSpendMaterials", e); return true; }
+        }
+
+        /// <summary>Kwit BK pancerza (GetCraftingInputForArmor z naszymi latkami) zdjety z sakw: twarde surowce 1:1, skora i len kategoria (Recipes.Take).
+        /// false = kwitu nie znamy (zdejmie oryginal BK). m109-kuznia: wyjete z BkSpendMaterialsPrefix bez zmiany zachowania.</summary>
+        internal static bool SpendBill(ItemObject item)
+        {
+            if (item == null) return false;
+            var cfg = Traverse.CreateWithType("BannerKings.BannerKingsConfig").Property("Instance").GetValue();
+            var model = cfg != null ? Traverse.Create(cfg).Property("SmithingModel").GetValue() : null;
+            var bill = model != null ? Traverse.Create(model).Method("GetCraftingInputForArmor", item).GetValue<int[]>() : null;
+            if (bill == null || bill.Length < 11) return false;   // nie poznajemy rachunku - niech liczy oryginal
+
+            var roster = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.ItemRoster;
+            for (int l = 0; l < 9; l++)
+                if (bill[l] != 0)
+                    roster.AddToCounts(Recipes.MaterialItem((CraftingMaterials)l), -bill[l]);
+            if (bill[9] > 0) Recipes.Take(roster, Recipes.SoftLeather, bill[9]);
+            if (bill[10] > 0) Recipes.Take(roster, Recipes.SoftLinen, bill[10]);
+            // n20-kuznia: drewno tarczy w kg i aksamit - BkShieldSpendPostfix (wpiety takze bez AllowRangedCrafting, gdy ten prefiks nie jest wpiety)
+            return true;
         }
 
         // ------------------------------------------------------------ n20-kuznia po recenzji: tarcza w CRAFT BK - reszta kwitu Recipes.For poza tablica BK
@@ -326,13 +333,24 @@ namespace Armoury
         private static string _massHook = "nie wpiete";
         private static int _massMismatch;
         internal static string MassHookState { get { return _massHook; } }   // linia startu Przepisy z masy (po recenzji: stan latki widoczny co sesje)
+        internal static string ShieldHookState { get { return _shieldHooks; } }   // m109-kuznia: linia startu "Kuznia wymagania (m109)" (czy stac CRAFT)
 
         public static void BkMassSpendPostfix(object __instance)
         {
             try
             {
                 if (!Recipes.MassOn) return;
-                var item = BkCurrentItem(__instance);
+                MassSpend(BkCurrentItem(__instance));   // m109-kuznia: cialo wyjete (MassSpend) - ta sama droga w tescie rachunku ForgeBillTest
+            }
+            catch (Exception e) { Log.Error("BkMassSpend", e); }
+        }
+
+        /// <summary>Kg pancerza wykutego w CRAFT BK z otwartych ladunkow (po zdjeciu kwitu BK). m109-kuznia: wyjete z BkMassSpendPostfix bez zmiany zachowania.</summary>
+        internal static void MassSpend(ItemObject item)
+        {
+            try
+            {
+                if (!Recipes.MassOn) return;
                 if (item == null || !item.HasArmorComponent || !Recipes.MassCovers(item)) return;
                 // kwit, ktory BK wlasnie zdjal (ta sama metoda, otwarte ladunki jeszcze nie ruszone), musi byc kwitem przepisu z masy - inaczej (latki kwitu
                 // wylaczone) zapis kg dalby otwartym ladunkom metal, ktorego nikt nie zdjal z sakw
@@ -355,6 +373,15 @@ namespace Armoury
             try
             {
                 _velvetShort = null;
+                // m109-kuznia (ForgeBillOnScreen): jeden rachunek - kazdy surowiec przepisu (sztuki do otwarcia, cale sztuki, surowiec luku: czardrzewo, smocza
+                // kosc), ten sam, ktory widac w rzedzie nad paskiem; przycisk szary z napisem, czego brakuje (takze gdy BK juz odmowil - jego napis jest ogolny).
+                // Klucz NIE - sprawdzenia skory i aksamitu jak dotad.
+                if (ForgeBill.On)
+                {
+                    string why = ForgeBill.CraftBlock(BkCurrentItem(__instance), __result);
+                    if (why != null) { __result = false; _velvetShort = why; }
+                    return;
+                }
                 if (!__result) return;
                 var item = BkCurrentItem(__instance);
                 // m96-receptury (po recenzji): BK HasMaterials sprawdza skore, a potem NADPISUJE wynik sprawdzeniem lnu (flag2 = ... dwa razy, dekompilacja

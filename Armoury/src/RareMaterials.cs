@@ -181,6 +181,29 @@ namespace Armoury
             catch (Exception e) { Stumble("RareMaterials.Ready", e); return true; }
         }
 
+        /// <summary>m109-kuznia (ForgeBill): surowiec luku i ile go trzeba / ile w sakwach - te same PiecesFor i InBags co Ready i Take. false = luk bez surowca.</summary>
+        internal static bool NeedOf(ItemObject bow, out ItemObject mat, out int need, out int have)
+        {
+            mat = null; need = 0; have = 0;
+            try
+            {
+                if (!Covers(bow)) return false;
+                var m = MatFor(bow);
+                mat = m.Item;
+                need = PiecesFor(bow, m);
+                have = InBags(m.Item);
+                return true;
+            }
+            catch (Exception e) { Stumble("RareMaterials.NeedOf", e); return false; }
+        }
+
+        /// <summary>m109-kuznia (ForgeBill): gdzie surowiec luku sie znajduje (napis podpowiedzi) - null bez surowca.</summary>
+        internal static string WhereOf(ItemObject bow)
+        {
+            try { return Covers(bow) ? MatFor(bow).Where : null; }
+            catch { return null; }
+        }
+
         /// <summary>Kafelek CRAFT (PatternGate.BlockText): znany wzor, brak surowca.</summary>
         internal static string TileText(ItemObject bow)
         {
