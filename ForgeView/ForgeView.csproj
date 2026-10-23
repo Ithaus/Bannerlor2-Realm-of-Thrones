@@ -19,6 +19,7 @@
     <Reference Include="Bannerlord.UIExtenderEx"><HintPath>$(GameLibs)/Bannerlord.UIExtenderEx.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="0Harmony"><HintPath>$(GameLibs)/0Harmony.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.CampaignSystem"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.Core"><HintPath>$(GameLibs)/TaleWorlds.Core.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.Core.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.Core.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.Library"><HintPath>$(GameLibs)/TaleWorlds.Library.dll</HintPath><Private>false</Private></Reference>
