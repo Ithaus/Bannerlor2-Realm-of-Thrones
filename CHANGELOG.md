@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-23 WGRANIE 105.2 (w-toku/n35-calosc 2f2a6f96 = 105.1 + m110-znacznik) - znacznik bandy listu gonczego na mapie
+**Status:** WGRANE 2026-10-23 ok. 20:11 CEST BEZ AUTOTESTU (Jeff: "zbuduj, ja wczytam gre i zobaczymy"); build 0. W GRZE: Armoury 000468da, reszta jak 105.1. Kopie *.bak-2026-10-23-wgranie1052-przed.
+- **Problem:** Jeff 20:02 (zrzut): zadanie listu gonczego mowi "marked on your map", a na mapie nic.
+- **Przyczyna (dekompilacja SandBox MapTrackerProvider.CanAddMobileParty):** gra rysuje znacznik obcej partii tylko dla partii bez bohatera z IsCurrentlyUsedByAQuest - bandy nigdy; BountyQuest rejestrowal bande tylko w VisualTrackerManager.
+- **Zmiana:** NoticeBoard.Marker.cs - MapMarker z nazwa bandy i herbem jej klanu, przesuwany co godzine gry na pozycje bandy, zdejmowany przy zamknieciu zadania i przed kazdym zapisem (stawiany po zapisie i po wczytaniu). Klucz Bounty Band Marker (TAK).
+- **Ryzyko / co sprawdzic:** Jeff wczytuje zapis z zadaniem Harberta Riversa - znacznik ma stac przy bandzie i isc za nia; linia logu "Listy goncze - zadania (m110): znacznik bandy postawiony". Recenzja kodu w toku. Uwaga: przerwany autotest 20:07 (Jeff: bez testu) - DLL przywrocone (-RestoreOnly), engine_config.txt z kopii sprzed testu, flagi usuniete.
+
 ## 2026-10-23 WGRANIE 105.1 (w-toku/n35-calosc d050e842 = 105 + m110-stan krok 2) - ochrona z dokladnego HP noszonego sprzetu, zuzycie sprzetu towarzyszy
 **Status:** WGRANE 2026-10-23 ok. 19:49 CEST po serii 110g (bitwa z armoury-hp/lup/stan, p4, c4, lc = zapis 105.1 na DLL 105, wczyt) - kod 0, ERROR 0, progi m110hp/m110stan/m110okol/m109* 0 NIE. W GRZE: Armoury 1188e347, reszta jak 105.
 - **Problem:** Jeff: "3 x zbroja uszkodzona, HP 41/56/78% - czy kazda moze dawac inny pancerz?" -> "tak" dla sprzetu noszonego.
