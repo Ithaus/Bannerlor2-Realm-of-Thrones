@@ -67,6 +67,11 @@ namespace Armoury
         private static bool _mountArmed;      // MountHold napelniony w tym wywolaniu Spoils
         private static bool _screenThisCall;  // AfterGenerateLoot podmienil liste w tym wywolaniu Spoils - finalizer zamyka pomiar bitwy
         private static int _mountStumbles;
+        // m109-lup (recenzja L2): kopie koni z lupu tej misji, ktore zostaly w zbrojowni wojska po zdjeciu dzialki (count - zdjete) - HorseFate.TakeKill
+        // zdejmuje padlego konia ze zbrojowni najwyzej tyle razy, potem z kolejki; dotad TakeOne bral dowolna sztuke tego id, takze konia gracza, a kopia
+        // padlego zostawala w kolejce. Liczone w AfterDtePartyItems, czyszczone w HorseFate.ApplyMission (finally), nowej misji i LReset
+        private static readonly Dictionary<ItemObject, int> _armLeft = new Dictionary<ItemObject, int>();
+        private static bool _armLeftKnown;    // dzialka tej misji policzona (inaczej -1 - zbrojownia bez limitu, jak dotad)
 
         private static Type FindType(string fullName)
         {
@@ -512,6 +517,24 @@ namespace Armoury
             return moved;
         }
 
+        /// <summary>m109-lup (recenzja L2, HorseFate.TakeKill): ile kopii tego konia z lupu tej misji zostalo w zbrojowni wojska po zdjeciu dzialki;
+        /// -1 - dzialka tej misji nie liczona (zbrojownia bez limitu, jak dotad).</summary>
+        internal static int ArmoryCopiesLeft(ItemObject it)
+        {
+            if (!_armLeftKnown || it == null) return -1;
+            int n;
+            return _armLeft.TryGetValue(it, out n) ? n : 0;
+        }
+
+        /// <summary>m109-lup (recenzja L2): padly kon zdjety ze zbrojowni wojska - jedna kopia mniej.</summary>
+        internal static void UseArmoryCopy(ItemObject it)
+        {
+            int n;
+            if (it != null && _armLeft.TryGetValue(it, out n) && n > 0) _armLeft[it] = n - 1;
+        }
+
+        internal static void ClearArmoryCopies() { _armLeft.Clear(); _armLeftKnown = false; }
+
         /// <summary>m109-lup (HorseFate.TakeKill): padly kon jezdzca powalonego przez druzyne gracza schodzi z kolejki lupu - jedna sztuka, najpierw bez stanu.</summary>
         internal static bool TakeQueuedHorse(ItemObject it)
         {
@@ -642,6 +665,7 @@ namespace Armoury
         {
             try
             {
+                if (isPlayerParty) ClearArmoryCopies();   // m109-lup (recenzja L2): kopie koni w zbrojowni liczone od nowa dla tej misji
                 if (!Settings.Current.BattlefieldLawEnabled || !isPlayerParty || !isVictorious) return;
                 if (RotEnlisted()) return;
                 int pct = PlayerSharePercent();
@@ -672,6 +696,7 @@ namespace Armoury
                     if (key == null || partyId == null || !key.Equals(partyId)) continue;   // tylko rekord partii gracza
                     var looted = _dteLootedItems.GetValue(et.GetProperty("Value").GetValue(entry, null)) as System.Collections.IEnumerable;
                     if (looted == null) continue;
+                    _armLeftKnown = true;   // m109-lup (recenzja L2): rekord gracza liczony - kopie koni w zbrojowni ponizej
                     foreach (var kv in looted)
                     {
                         var kt = kv.GetType();
@@ -687,7 +712,7 @@ namespace Armoury
                             share = WholeShare(count, ref hk, ref tk, third, pct);
                             wHero += hk; wTroop += tk; wUnk += count - hk - tk; wNew += share;
                         }
-                        if (share <= 0) continue;
+                        if (share <= 0) { if (item.IsMountable) _armLeft[item] = count; continue; }   // m109-lup (L2): wszystkie kopie zostaja w zbrojowni
                         // audyt pelny W1: zdejmujemy po wszystkich elementach tej sztuki RAZEM z ich stanem -
                         // wczesniej AddToCounts(item, -take) celowal w element bez modyfikatora, a kolejka i tak
                         // dostawala "take" (towar z niczego, gdy w magazynie byly tylko sztuki zuzyte)
@@ -702,6 +727,7 @@ namespace Armoury
                             ShareQueue.AddToCounts(el.EquipmentElement, t);
                             left -= t; moved += t;
                         }
+                        if (item.IsMountable) _armLeft[item] = count - (share - left);   // m109-lup (L2): kopie tej misji, ktore zostaly w zbrojowni
                     }
                     break;   // rekord partii gracza znaleziony i przetworzony
                 }
@@ -957,7 +983,7 @@ namespace Armoury
             _simCutSpoils = _simCutBattles = _simCutGame = _lStumbles = 0; ScreenIsRealLoot = false;
             _simPending = false;
             try { LootTally.Reset(); } catch { }   // m109-lup: PRZED czyszczeniem kolejki (otwarta bitwa zamknieta, "zostaje" = kolejka)
-            try { ShareQueue.Clear(); Wrecks.Clear(); MountHold.Clear(); } catch { }
+            try { ShareQueue.Clear(); Wrecks.Clear(); MountHold.Clear(); ClearArmoryCopies(); } catch { }
             _mountArmed = false; _screenThisCall = false;
         }
 

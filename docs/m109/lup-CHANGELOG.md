@@ -45,6 +45,12 @@ konie) - po naprawie padly kon wyszedlby na liscie, wiec poprawka jest czescia z
    Reszta rytualu Spoils bez zmian (godziny, podzial, "Leave" -> polka warowni przez SpoilsSeal.RemnantPostfix). "Send troops" tak samo.
    **HorseFate.TakeKill:** padly kon jezdzca powalonego przez gracza/towarzysza - najpierw z kolejki lupu, potem ze zbrojowni; przez zolnierza - najpierw zbrojownia,
    potem kolejka; kon, ktory wedlug pomiaru nie wszedl do lupu gracza - nic nie schodzi. Inni zabojcy i klucz NIE - `TakeOne` jak dotad.
+   Recenzja L2: ze zbrojowni najwyzej tyle, ile kopii tego konia z lupu tej misji zostalo tam po zdjeciu dzialki (`BattlefieldLaw.ArmoryCopiesLeft`,
+   liczone w AfterDtePartyItems: count - zdjete; czyszczone w finally ApplyMission, na starcie AfterDtePartyItems partii gracza i w LReset) - dotad `TakeOne`
+   bral dowolna sztuke tego id: 2 padle konie zolnierskie przy dzialce 1 z 2 = kopia i kon gracza ze zbrojowni, a kopia padlego zostawala w kolejce (na liste
+   trofeow, przy "Leave" na polke warowni). Dzialka nie liczona w tej misji (BattlefieldLaw wylaczony, dzialka 0, przegrana, sluzba w armii ROT) - -1,
+   zbrojownia bez limitu jak dotad. Recenzja R1: `LootTally.Touch()` otwiera pomiar bitwy przed zdjeciem z kolejki (tozsamosc B). Recenzja R4:
+   `LootTally.ReleaseAgents()` w finally ApplyMission - agenci (i przez nich misja) nie sa trzymani do zamkniecia bitwy.
 3. **Z2 RiderBlowSparesHarness.** Prefiks DTE `ArmorSelector.GetRandomArmorByBodyPart`: lista zbroi bez uprzezy (kopia). Cios rozbija czesc zbroi czlowieka; ladry
    przychodza cale. Ta sama liczba sztuk.
 4. **Z1 ExtraBrokenArmorWrecks.** Dokladnie jedna brakujaca czesc zbroi ze slotu 5-9 u wroga od tieru 3 powalonego przez druzyne gracza (po odjeciu lupu, odrzutu

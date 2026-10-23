@@ -358,6 +358,28 @@ namespace Armoury
             catch { return -1; }
         }
 
+        /// <summary>Recenzja R1 (HorseFate.TakeKill): bitwa otwarta PRZED zdjeciem padlego konia z kolejki - otwarcie liczy kolejke jako "wczesniej",
+        /// wiec po zdjeciu bylaby liczona o 1 za malo (tozsamosc B -1).</summary>
+        internal static void Touch()
+        {
+            try { if (_cur == null) Begin(Mission.Current); }
+            catch (Exception e) { Stumble("Touch", e); }
+        }
+
+        /// <summary>Recenzja R4 (HorseFate.ApplyMission, finally): agenci skonczonej misji puszczeni - HorseLoot i jezdzcy sa potrzebni tylko w TakeKill;
+        /// dotad trzymane do zamkniecia bitwy (wygrana bez listy trofeow i kolejki - az do nastepnej bitwy), a agent trzyma misje.</summary>
+        internal static void ReleaseAgents()
+        {
+            try
+            {
+                var b = _cur;
+                if (b == null) return;
+                b.HorseLoot.Clear();
+                foreach (var r in b.RiderList) r.Agent = null;
+            }
+            catch (Exception e) { Stumble("ReleaseAgents", e); }
+        }
+
         private static void Add(long[,] dst, long[,] src, int cols)
         {
             for (int k = 0; k < Kinds; k++) for (int c = 0; c < cols; c++) dst[k, c] += src[k, c];

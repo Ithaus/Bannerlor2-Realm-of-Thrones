@@ -424,31 +424,36 @@ namespace Armoury
                 foreach (var mp in touched) HorseState.Refresh(mp);
             }
             catch (Exception e) { Stumble("ApplyMission", e); }
-            finally { _mDeaths.Clear(); _mRiders = _mHorses = 0; _mRiderGone.Clear(); _mRiderHero.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false; }
+            finally
+            {
+                _mDeaths.Clear(); _mRiders = _mHorses = 0; _mRiderGone.Clear(); _mRiderHero.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
+                BattlefieldLaw.ClearArmoryCopies();   // m109-lup (recenzja L2): kopie koni w zbrojowni wazne tylko dla tej misji
+                LootTally.ReleaseAgents();            // m109-lup (recenzja R4): bez agentow (i misji) w pamieci do zamkniecia pomiaru bitwy
+            }
         }
 
         /// <summary>m109-lup (klucz FallenRiderHorsesLooted): padly kon jezdzca pokonanej strony u zabojcy. ApplyMission biegnie po DTE HandlePartyItems
         /// (postfiks OnEndMission), wiec kopia konia z lupu gracza lezy juz w kolejce ekranu (BattlefieldLaw.AfterDtePartyItems) - dotad TakeOne szukal jej
         /// tylko w zbrojowni wojska i zdejmowal tam konia gracza o tym samym id (padly zyl na liscie trofeow, gdyby Spoils go nie polknal). Teraz: powalil
         /// gracz albo towarzysz (cala sztuka do kolejki) - najpierw kolejka, potem zbrojownia; powalil zolnierz (trzecia kapitana) - najpierw zbrojownia, potem
-        /// kolejka. Kon, ktory wedlug pomiaru nie wszedl do lupu gracza (odrzut DTE) - nic nie schodzi. Inni zabojcy i klucz NIE - TakeOne jak dotad.</summary>
+        /// kolejka. Kon, ktory wedlug pomiaru nie wszedl do lupu gracza (odrzut DTE) - nic nie schodzi. Inni zabojcy i klucz NIE - TakeOne jak dotad.
+        /// Recenzja L2: ze zbrojowni najwyzej tyle, ile kopii z lupu tej misji tam zostalo po zdjeciu dzialki (BattlefieldLaw.ArmoryCopiesLeft) - dotad
+        /// TakeOne bral dowolna sztuke tego id, wiec przy dwoch padlych koniach zolnierskich zdejmowal kopie i konia gracza, a kopia padlego zostawala
+        /// w kolejce; dzialka nie liczona w tej misji (-1) - zbrojownia bez limitu, jak dotad. Recenzja R1: pomiar bitwy otwarty przed zdjeciem z kolejki
+        /// (otwarcie liczy kolejke jako "wczesniej").</summary>
         private static bool TakeKill(MobileParty killer, ItemObject it, Agent rider, HashSet<MobileParty> touched, ref ItemRoster pa)
         {
             var s = Settings.Current;
             if (killer != MobileParty.MainParty || s == null || !s.FallenRiderHorsesLooted) return TakeOne(killer, it, touched, ref pa);
             try
             {
+                LootTally.Touch();
                 if (LootTally.HorseLootState(rider) == 0) { LootTally.DeadHorse(rider, 2); return false; }
-                if (rider != null && _mRiderHero.Contains(rider))
-                {
-                    if (BattlefieldLaw.TakeQueuedHorse(it)) { LootTally.DeadHorse(rider, 0); return true; }
-                    if (TakeOne(killer, it, touched, ref pa)) { LootTally.DeadHorse(rider, 1); return true; }
-                }
-                else
-                {
-                    if (TakeOne(killer, it, touched, ref pa)) { LootTally.DeadHorse(rider, 1); return true; }
-                    if (BattlefieldLaw.TakeQueuedHorse(it)) { LootTally.DeadHorse(rider, 0); return true; }
-                }
+                bool hero = rider != null && _mRiderHero.Contains(rider);
+                int left = BattlefieldLaw.ArmoryCopiesLeft(it);
+                if (hero && BattlefieldLaw.TakeQueuedHorse(it)) { LootTally.DeadHorse(rider, 0); return true; }
+                if (left != 0 && TakeOne(killer, it, touched, ref pa)) { BattlefieldLaw.UseArmoryCopy(it); LootTally.DeadHorse(rider, 1); return true; }
+                if (!hero && BattlefieldLaw.TakeQueuedHorse(it)) { LootTally.DeadHorse(rider, 0); return true; }
                 LootTally.DeadHorse(rider, 3);
                 return false;
             }
