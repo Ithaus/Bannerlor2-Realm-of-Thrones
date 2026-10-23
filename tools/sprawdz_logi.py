@@ -1864,6 +1864,11 @@ Uzycie (Python 3, tylko odczyt):
                     stanu; linia 'wyrownanie po wczytaniu' (nazwa sztuk na grzbiecie wedlug ksiegi) - bledy 0 (brak linii zuzycia - INFO). STAN-6 pomiar na bitwe: <= 5 ms + 0.002 ms x trafien TAK, <= 20 ms + 0.01 ms x trafien INFO, wiecej NIE. STAN-LC
                     cofniecie: z --baza-doby - ostatnia linia 'zapis' (pod flaga) bazy wobec pierwszej linii rynsztunku logu: arm_* i rl_* rowne, ERROR w logu 0;
                     log bez linii m110 (bieg na DLL 104) - ERROR 0 INFO, inaczej NIE; bez bazy - INFO.
+--grupa m110anim  : (23.10, n35 m110-animacje + m110-modele - Jeff 23.10 20:19 "postac lezy w ekwipunku, rekawice bez obrazka - blad z dzisiaj"; HeroHp.Install,
+                    ItemModels.cs; klucz Missing Model Fix) python -I tools/sprawdz_logi.py --grupa m110anim <Armoury-*.log>. ANIM-1 linia 'Animacje (m110):'
+                    w kazdym logu: latka TAK (albo juz wpieta), act_inventory_idle_start i act_tableau_hand_armor_pose >= 0, OK (brak linii - NIE: latka HP
+                    w PatchAll psula indeksy, 105.1-105.3). ANIM-2 linie testu 'Ekwipunek (test m110): start' (armoury-ekwipunek.flag): akcje >= 0 (brak - INFO).
+                    ANIM-3 linia 'Modele przedmiotow (m110): start sesji' przy kazdym wczytaniu (klucz NIE - INFO), ERROR ItemModels. 0; bez zamiennika - INFO.
 --grupa m110hp    : (23.10, galaz w-toku/m110-stan krok 2 - Jeff 23.10 ok. 15:50 "tak": sprzet noszony przez gracza i towarzyszy chroni wedlug dokladnego HP;
                     Armoury/src/HeroHp.cs, HeroBook.cs, FieldCraft.cs, ArmouryBehavior.cs; klucze Worn Exact Hp Protection, Companion Gear Wear; plik testu
                     CrashScribe/armoury-hp.flag) python -I tools/sprawdz_logi.py --grupa m110hp [<Armoury-*.log>] [--baza-doby <log poprzedniego biegu z linia
@@ -61161,6 +61166,8 @@ def main(argv):
         return m109lup_main(logp)   # m109lup (23.10, w-toku/m109-lup): konie, uprzaz i zbroja powalonych jezdzcow w lupie gracza - pomiar LootTally, Z1, Z2, hak testu
     if group == "m110stan":
         return m110stan_main(logp, bdp)   # m110stan (23.10, w-toku/m110-stan): cztery stany sprzetu (GearState) i stan lupu z obrazen (LootWear), --baza-doby = log z linia zapisu (STAN-LC)
+    if group == "m110anim":
+        return m110anim_main(logp)   # m110anim (23.10, n35 m110-animacje + m110-modele): indeksy akcji po wpieciu latki HP sprzetu (postac w ekwipunku, obrazek rekawic) i modele przedmiotow
     if group == "m110hp":
         return m110hp_main(logp, bdp)   # m110hp (23.10, w-toku/m110-stan krok 2): ochrona z dokladnego HP sprzetu noszonego przez gracza i towarzyszy (HeroHp), ksiega i zuzycie sprzetu towarzyszy (HeroBook), --baza-doby = log z linia zapisu (HP-LC)
     if group == "m105gosp5" and logp:
@@ -67553,6 +67560,47 @@ def m110hp_main(logp, basep=None):
         logp, len(D["start"]), len(D["battles"]), len(D["segs"]), len(D["tests"]), len(D["synth"]), len(D["ends"]), len(D["wear"]), len(D["change"]), len(D["save"]),
         D["err"], D["errall"]))
     m110hp_rows(rep, D, basep)
+    rep.show()
+    return 0
+
+
+def m110anim_main(logp):
+    """m110anim (23.10): ANIM-1..ANIM-3 - opis w --help."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("ANIM-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    anim, tests, models, errs = [], [], [], 0
+    rx_a = re.compile(r"Animacje \(m110\): latka .*?wpieta po wczytaniu akcji: (.*?) \| indeksy akcji: act_inventory_idle_start (-?\d+), act_tableau_hand_armor_pose (-?\d+) - (OK|BLAD)")
+    rx_t = re.compile(r"Ekwipunek \(test m110\): start .*akcje: act_inventory_idle_start (-?\d+), act_tableau_hand_armor_pose (-?\d+)")
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Animacje (m110):" in line:
+                m = rx_a.search(line)
+                anim.append(m.groups() if m else None)
+            elif "Ekwipunek (test m110): start" in line:
+                m = rx_t.search(line)
+                tests.append(m.groups() if m else None)
+            elif "Modele przedmiotow (m110):" in line:
+                models.append(line.strip())
+            elif "ERROR" in line and ("ItemModels." in line or "HeroHp.Install" in line):
+                errs += 1
+    bad = [a for a in anim if not a or not (a[0].startswith("TAK") or a[0].startswith("juz")) or int(a[1]) < 0 or int(a[2]) < 0 or a[3] != "OK"]
+    rep.add("ANIM-1: linia 'Animacje (m110)' - latka po wczytaniu akcji, indeksy >= 0",
+            "linii %d, zlych %d%s" % (len(anim), len(bad), (" (" + str(bad[0]) + ")") if bad else ""), "linia jest, zlych 0", bool(anim) and not bad)
+    tb = [t for t in tests if not t or int(t[0]) < 0 or int(t[1]) < 0]
+    rep.add("ANIM-2: test ekwipunku - indeksy akcji przy otwartej mapie", "linii %d, zlych %d" % (len(tests), len(tb)), "zlych 0 (brak testu - INFO)",
+            None if not tests else not tb)
+    started = [m for m in models if "start sesji" in m]
+    off = [m for m in models if "klucz Missing Model Fix NIE" in m]
+    left = 0
+    for m in started:
+        mm = re.search(r"bez zamiennika (\d+)", m)
+        if mm: left = max(left, int(mm.group(1)))
+    rep.add("ANIM-3: 'Modele przedmiotow (m110)' przy wczytaniu, ERROR ItemModels./HeroHp.Install 0",
+            "startow %d (klucz NIE %d), bez zamiennika do %d, ERROR %d" % (len(started), len(off), left, errs), "start jest, ERROR 0",
+            None if (off and not started) else (bool(started) and errs == 0))
     rep.show()
     return 0
 
