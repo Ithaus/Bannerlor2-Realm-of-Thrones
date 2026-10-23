@@ -1045,7 +1045,8 @@ Uzycie (Python 3, tylko odczyt):
                     kluczem (ostatnia linia startu E5) albo pominieta przez zapis sprzed E5 - INFO z powodem (E5-2, E5-4, E5-5, E5-7, E5-8, E5-8b, E5-9).
 --grupa m109crash : (23.10, w-toku/m109-crash; Armoury/src/HideoutHomeGuard.cs; klucz HideoutHomeGuardEnabled) python -I tools/sprawdz_logi.py --grupa m109crash
                     <Armoury-*.log>. HH-0 linia startu sesji (klucz tak, latki 1/1, licznik band kryjowek i stary dom bandy dostepne), HH-1 ERROR HideoutHomeGuard (potkniecia) 0,
-                    HH-2 wyjatki zlapane przez finalizer 0, HH-3 bandy bez kryjowki wpuszczone do kryjowek (liczba i zrodla - INFO; kazda z nich = wywrotka w 103.5).
+                    HH-2 wyjatki zlapane przez finalizer 0, HH-3 bandy bez kryjowki wpuszczone do kryjowek (liczba i zrodla - INFO; kazda z nich = wywrotka w 103.5), HH-4 test autotestu (plik
+                    CrashScribe/armoury-kryjowka.flag: pierwszej doby banda bez kryjowki wchodzi do najblizszej kryjowki) - TAK; bez pliku - INFO.
 --grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
                     python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
                     KO-3 encja kola postawiona, KO-4 potkniecia kola 0.
@@ -38828,6 +38829,8 @@ def m105kolko_main(logp):
 M109CRASH_TAG = "Dom kryjowki (m109): "
 M109CRASH_START = re.compile(r"^start sesji \| klucz Hideout Home Guard Enabled (tak|nie) \| latki (\d+)/(\d+)(.*?) \| licznik band kryjowek gry (tak|nie), stary dom bandy (tak|nie) ")
 M109CRASH_ENTRY = re.compile(r"^banda bez kryjowki weszla do kryjowki .* \| zrodlo (.*?) \| licznik band kryjowek gry ")
+M109CRASH_TEST = re.compile(r"^test - (.*) - (TAK|NIE)\.$")
+M109CRASH_NOTEST = re.compile(r"^test - bez proby \((.*)\)\.")
 M109CRASH_DAY = re.compile(r"^dzien (\d+) \| band bez kryjowki wpuszczonych do kryjowek (\d+) \(zrodla: (.*?)\), wyjatkow zlapanych (\d+) ")
 
 
@@ -38839,7 +38842,7 @@ def m109crash_main(logp):
         rep.add("HH-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    starts, entries, days, n_err, n_caught = [], [], [], 0, 0
+    starts, entries, days, tests, notest, n_err, n_caught = [], [], [], [], [], 0, 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -38853,7 +38856,7 @@ def m109crash_main(logp):
             if not s.startswith(M109CRASH_TAG):
                 continue
             body = s[len(M109CRASH_TAG):]
-            for rx, bucket in ((M109CRASH_START, starts), (M109CRASH_ENTRY, entries), (M109CRASH_DAY, days)):
+            for rx, bucket in ((M109CRASH_START, starts), (M109CRASH_ENTRY, entries), (M109CRASH_DAY, days), (M109CRASH_NOTEST, notest), (M109CRASH_TEST, tests)):
                 mm = rx.search(body)
                 if mm:
                     bucket.append(mm.groups())
@@ -38882,6 +38885,12 @@ def m109crash_main(logp):
                 src[k] = src.get(k, 0) + int(v)
     rep.add("HH-3: bandy bez kryjowki wpuszczone do kryjowek", f"{total} w {len(days)} dobach; zrodla: " + (", ".join(f"{k} {v}" for k, v in sorted(src.items(), key=lambda x: -x[1])) or "-")
             + f"; szczegolowo {len(entries)}", "INFO (kazda = wywrotka w 103.5)", None)
+    if tests:
+        rep.add("HH-4: test autotestu - banda bez kryjowki wchodzi do kryjowki", "; ".join(f"{t[1]} ({t[0][:120]})" for t in tests), "TAK (gra idzie dalej)", all(t[1] == "TAK" for t in tests))
+    elif notest:
+        rep.add("HH-4: test autotestu", "bez proby: " + notest[-1][0], "INFO (brak bandy bez kryjowki)", None)
+    else:
+        rep.add("HH-4: test autotestu", "brak linii testu", "INFO (bieg bez pliku armoury-kryjowka.flag)", None)
     rep.show()
     return 0
 

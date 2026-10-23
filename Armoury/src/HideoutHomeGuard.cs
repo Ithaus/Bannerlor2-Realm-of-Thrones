@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -30,11 +32,15 @@ namespace Armoury
     /// wyjatek z tej metody (licznik, pierwsze 3 do Log.Error) - po nim SetHomeHideout i wejscie do kryjowki koncza sie normalnie (banda ma juz nowy dom).
     /// Jedyny sluchacz zdarzenia w grze i modach to BanditSpawnCampaignBehavior (przeszukane DLL Modules), wiec nikt inny nie dostaje null.
     /// Linie "Dom kryjowki (m109): " - start sesji (latki), pierwsze 5 band szczegolowo (id, klan, kultura, stary dom, kryjowka, zrodlo), doba z wejsciami.
+    /// Autotest: DLL autotestu CrashScribe (LogGate.Mode 1/2) + plik CrashScribermoury-kryjowka.flag - pierwszej doby jedna banda bez kryjowki (najpierw nasza,
+    /// potem szabrownicy) wchodzi do najblizszej kryjowki przez EnterSettlementAction.ApplyForParty (ta sama droga co wywrotka Jeffa); linia "test - ...".
     /// </summary>
     internal static class HideoutHomeGuard
     {
         private const string P = "Dom kryjowki (m109): ";
         private const int DetailMax = 5;
+        internal const string AutoFlagName = "armoury-kryjowka.flag";
+        private static bool _testDone;
 
         private static bool _hooked;
         private static string _wired = "-";
@@ -131,6 +137,47 @@ namespace Armoury
             return null;
         }
 
+        // ------------------------------------------------------------ test autotestu
+        private static bool TestWanted()
+        {
+            int m = LogGate.Mode;
+            if (m != 1 && m != 2) return false;
+            try { return File.Exists(Path.Combine(Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mount and Blade II Bannerlord"), "CrashScribe"), AutoFlagName)); }
+            catch { return false; }
+        }
+
+        /// <summary>Jedna banda bez kryjowki (nasza, a gdy brak - szabrownicy) wchodzi do najblizszej kryjowki - droga Hideout.OnPartyEntered -> SetHomeHideout -> zdarzenie.</summary>
+        private static void TestEnter()
+        {
+            MobileParty pick = null; bool ours = false;
+            foreach (var mp in MobileParty.AllBanditParties)
+            {
+                var c = mp != null ? mp.BanditPartyComponent : null;
+                if (c == null || c.Hideout != null || mp.MapEvent != null || mp.CurrentSettlement != null || mp.MapFaction == null || !mp.MapFaction.IsBanditFaction) continue;
+                bool o = mp.StringId != null && mp.StringId.StartsWith("armoury_", StringComparison.Ordinal);
+                if (pick == null || (o && !ours)) { pick = mp; ours = o; }
+                if (ours) break;
+            }
+            if (pick == null) { Log.Info(P + "test - bez proby (brak bandy bez kryjowki poza osada i bitwa)."); return; }
+            Hideout best = null; float bd = float.MaxValue;
+            var at = pick.Position.ToVec2();
+            foreach (var h in Hideout.All)
+            {
+                if (h == null || h.Settlement == null) continue;
+                float d = at.Distance(h.Settlement.GatePosition.ToVec2());
+                if (d < bd) { bd = d; best = h; }
+            }
+            if (best == null) { Log.Info(P + "test - bez proby (brak kryjowki)."); return; }
+            int before = _fixed;
+            EnterSettlementAction.ApplyForParty(pick, best.Settlement);
+            var bc = pick.BanditPartyComponent;
+            bool home = bc != null && bc.Hideout == best;
+            bool ok = (!On || _fixed == before + 1) && home && pick.CurrentSettlement == best.Settlement;
+            Log.Info(P + "test - " + Describe(bc) + " weszla do " + best.Settlement.StringId + " (" + bd.ToString("0", CultureInfo.InvariantCulture) + " jedn.)"
+                     + " | dom = kryjowka " + (home ? "TAK" : "NIE") + ", w osadzie " + (pick.CurrentSettlement == best.Settlement ? "TAK" : "NIE")
+                     + ", latka policzyla " + (_fixed - before) + " - " + (ok ? "TAK" : "NIE") + ".");
+        }
+
         // ------------------------------------------------------------ meldunki
         private static void Note(BanditPartyComponent c, Settlement oldHome, Settlement newHome, bool counted)
         {
@@ -182,6 +229,7 @@ namespace Armoury
 
         private static void Daily()
         {
+            if (!_testDone && TestWanted()) { _testDone = true; try { TestEnter(); } catch (Exception e) { Stumble("TestEnter", e); } }
             int f, k; string src;
             lock (_lock)
             {
