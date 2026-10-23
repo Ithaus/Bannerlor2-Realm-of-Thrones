@@ -59,6 +59,14 @@ namespace Armoury
         internal static bool LuckyFound { get { return _lReg != null; } }
         /// <summary>m109-lup: kolejka lupu do odczytu przez pomiar LootTally (tylko czyta).</summary>
         internal static ItemRoster QueueRoster { get { return ShareQueue; } }
+        // m109-lup (klucz FallenRiderHorsesLooted): konie i uprzaz z listy trofeow przetrzymane na czas jednego wywolania Spoils
+        // LootCollectionBehavior.OnMapEventEnded - Spoils (:899-941) zdejmowal kazda sztuke IsMountable || HorseHarness do taboru (_horsesFromLoot),
+        // ktory u nas jest zamkniety (NoBaggageTrain), i przepadaly. Wracaja w prefiksie ApplyDamageToLoot (:944, zaraz po petli Spoils), resztka
+        // (wyjatek w Spoils) - finalizer do sakw
+        private static readonly ItemRoster MountHold = new ItemRoster();
+        private static bool _mountArmed;      // MountHold napelniony w tym wywolaniu Spoils
+        private static bool _screenThisCall;  // AfterGenerateLoot podmienil liste w tym wywolaniu Spoils - finalizer zamyka pomiar bitwy
+        private static int _mountStumbles;
 
         private static Type FindType(string fullName)
         {
@@ -164,6 +172,13 @@ namespace Armoury
                     {
                         h.Patch(omee, prefix: new HarmonyMethod(typeof(BattlefieldLaw), "SoldierStandsDown"));
                         Log.Info("BattlefieldLaw: zaciezny nie lupi pola bitwy armii (kwatermistrz to robi).");
+                        // m109-lup: finalizer - konie i uprzaz przetrzymane, ktorych Spoils nie odebral (wyjatek), do sakw; zamkniecie pomiaru bitwy
+                        try
+                        {
+                            h.Patch(omee, finalizer: new HarmonyMethod(typeof(BattlefieldLaw), nameof(MountsFinalizer)));
+                            MountFinalWired = true;
+                        }
+                        catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (m109 finalizer)", e); }
                     }
                 }
 
@@ -183,6 +198,20 @@ namespace Armoury
                 }
 
                 if (dmgType != null) _applyDamage = AccessTools.Method(dmgType, "ApplyDamageToLoot");
+                // m109-lup: konie i uprzaz przetrzymane w AfterGenerateLoot wracaja na liste trofeow (prefiks; Spoils wola ApplyDamageToLoot tylko w :944)
+                if (dmgType != null)
+                {
+                    try
+                    {
+                        var adl = AccessTools.DeclaredMethod(dmgType, "ApplyDamageToLoot", new[] { typeof(ItemRoster), typeof(float) });
+                        if (adl != null)
+                        {
+                            h.Patch(adl, prefix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(ReturnMounts)));
+                            MountReturnWired = true;
+                        }
+                    }
+                    catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (m109 ApplyDamageToLoot)", e); }
+                }
                 var dispatcher = AccessTools.Method(typeof(CampaignEventDispatcher), "OnCollectLootItems");
                 if (dispatcher != null)
                 {
@@ -351,16 +380,142 @@ namespace Armoury
                 LootTally.Sifted(__result);
                 Log.Info("BattlefieldLaw: ekran Spoils podmieniony na " + __result.Count + " pozycji prawdziwego lupu"
                          + (wrecks > 0 ? " (w tym " + wrecks + " wrakow przed przesianiem)" : "") + ".");
-                LootTally.OnList(__result, false);
+                // m109-lup (FallenRiderHorsesLooted): konie i uprzaz poza zasiegiem petli Spoils, ktora zabralaby je do zamknietego taboru - wracaja
+                // w prefiksie ApplyDamageToLoot tego samego wywolania (ReturnMounts); tylko przy obu latkach (inaczej jak dotad)
+                bool hold = Settings.Current.FallenRiderHorsesLooted && MountReturnWired && MountFinalWired;
+                if (hold) HoldMounts(__result);
+                LootTally.OnList(__result, hold);
                 ScreenDone();
             }
             catch (Exception e) { Log.Error("AfterGenerateLoot", e); }
         }
 
-        /// <summary>m109-lup: lista trofeow Spoils z prawdziwym lupem gotowa - pomiar bitwy zamkniety (LootTally).</summary>
+        /// <summary>m109-lup: lista trofeow Spoils z prawdziwym lupem gotowa - pomiar bitwy zamyka finalizer Spoils (po oddaniu koni), bez niego od razu.</summary>
         private static void ScreenDone()
         {
-            LootTally.Close("lista trofeow Spoils");
+            if (MountFinalWired) _screenThisCall = true;
+            else LootTally.Close("lista trofeow Spoils");
+        }
+
+        /// <summary>m109-lup: konie (IsMountable) i uprzaz z listy trofeow do MountHold - ten sam warunek, co petla Spoils OnMapEventEnded :907.</summary>
+        private static void HoldMounts(ItemRoster list)
+        {
+            try
+            {
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    var el = list.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    if (!it.IsMountable && it.ItemType != ItemObject.ItemTypeEnum.HorseHarness) continue;
+                    list.AddToCounts(el.EquipmentElement, -el.Amount);
+                    MountHold.AddToCounts(el.EquipmentElement, el.Amount);
+                    LootTally.Held(it, el.Amount);
+                }
+                _mountArmed = MountHold.Count > 0;
+            }
+            catch (Exception e) { MountStumble("HoldMounts", e); _mountArmed = MountHold.Count > 0; }
+        }
+
+        private static void MountStumble(string where, Exception e)
+        {
+            _mountStumbles++;
+            if (_mountStumbles <= 3 || _mountStumbles % 50 == 0) Log.Error("BattlefieldLaw." + where, e);
+        }
+
+        /// <summary>m109-lup: prefiks Spoils EquipmentDamageModel.ApplyDamageToLoot(lootRoster, ratio) - przetrzymane konie i uprzaz wracaja na liste
+        /// trofeow. Kon dostaje znacznik "lucky" Spoils (RegisterLuckyElement - ApplyDamageToLoot zostawia go 1:1, bez losowej kulawizny), uprzaz zuzycie
+        /// Spoils jak kazda zbroja (wrak uprzezy byl juz zarejestrowany w AppendWrecks). Sztuka schodzi z MountHold dopiero po dopisaniu - bez dubli.</summary>
+        public static void ReturnMounts(ItemRoster __0)
+        {
+            if (!_mountArmed) return;
+            try
+            {
+                if (__0 == null) return;   // finalizer wysypie do sakw
+                var els = new List<ItemRosterElement>();
+                for (int i = 0; i < MountHold.Count; i++) els.Add(MountHold.GetElementCopyAtIndex(i));
+                foreach (var el in els)
+                {
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    if (it.IsMountable && _lReg != null)
+                        for (int n = 0; n < el.Amount; n++)
+                        {
+                            try { _lReg.Invoke(null, new object[] { el.EquipmentElement }); }
+                            catch (Exception e) { MountStumble("ReturnMounts(lucky)", e); break; }
+                        }
+                    __0.AddToCounts(el.EquipmentElement, el.Amount);
+                    MountHold.AddToCounts(el.EquipmentElement, -el.Amount);
+                    LootTally.Returned(it, el.Amount);
+                }
+                _mountArmed = MountHold.Count > 0;
+            }
+            catch (Exception e) { MountStumble("ReturnMounts", e); }
+        }
+
+        /// <summary>m109-lup: finalizer Spoils LootCollectionBehavior.OnMapEventEnded - co z MountHold nie wrocilo na liste (wyjatek w Spoils), do sakw;
+        /// potem zamkniecie pomiaru bitwy. Wyjatek Spoils przechodzi dalej bez zmian.</summary>
+        public static Exception MountsFinalizer(Exception __exception)
+        {
+            try
+            {
+                if (MountHold.Count > 0) FlushMountsToBaggage(__exception != null ? "wyjatek w Spoils" : "Spoils nie oddal listy");
+                _mountArmed = false;
+                if (_screenThisCall) { _screenThisCall = false; LootTally.Close("lista trofeow Spoils"); }
+            }
+            catch (Exception e) { MountStumble("MountsFinalizer", e); }
+            return __exception;
+        }
+
+        /// <summary>m109-lup: rezerwa - konie bez zmian, uprzaz ze stanem bojowym (jak FlushShareToBaggage) do sakw gracza. Zwraca liczbe sztuk.</summary>
+        private static int FlushMountsToBaggage(string why)
+        {
+            int moved = 0;
+            _mountArmed = false;   // przed wysypaniem - prefiks ReturnMounts nie dubluje
+            try
+            {
+                var bag = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                if (bag == null || MountHold.Count == 0) return 0;
+                var els = new List<ItemRosterElement>();
+                for (int i = 0; i < MountHold.Count; i++) els.Add(MountHold.GetElementCopyAtIndex(i));
+                foreach (var el in els)
+                {
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    for (int n = 0; n < el.Amount; n++)
+                        bag.AddToCounts(new EquipmentElement(it, el.EquipmentElement.ItemModifier ?? ArmouryBehavior.PickWornModifier(it)), 1);
+                    MountHold.AddToCounts(el.EquipmentElement, -el.Amount);
+                    LootTally.Reserve(it, el.Amount);
+                    moved += el.Amount;
+                }
+                if (moved > 0)
+                {
+                    Log.Info("BattlefieldLaw (m109): konie i uprzaz powalonych do sakw (" + moved + " szt.) - " + why + ".");
+                    Log.Player("The horses and harness of the fallen are led to your baggage: " + moved + ".", false);
+                }
+            }
+            catch (Exception e) { MountStumble("FlushMountsToBaggage", e); }
+            return moved;
+        }
+
+        /// <summary>m109-lup (HorseFate.TakeKill): padly kon jezdzca powalonego przez druzyne gracza schodzi z kolejki lupu - jedna sztuka, najpierw bez stanu.</summary>
+        internal static bool TakeQueuedHorse(ItemObject it)
+        {
+            try
+            {
+                if (it == null) return false;
+                for (int pass = 0; pass < 2; pass++)
+                    for (int i = 0; i < ShareQueue.Count; i++)
+                    {
+                        var el = ShareQueue.GetElementCopyAtIndex(i);
+                        if (el.EquipmentElement.Item != it || el.Amount <= 0) continue;
+                        if (pass == 0 && el.EquipmentElement.ItemModifier != null) continue;
+                        ShareQueue.AddToCounts(el.EquipmentElement, -1);
+                        return true;
+                    }
+            }
+            catch (Exception e) { MountStumble("TakeQueuedHorse", e); }
+            return false;
         }
 
         private static void StripLegendCopies(ItemRoster roster)
@@ -788,7 +943,8 @@ namespace Armoury
             _simCutSpoils = _simCutBattles = _simCutGame = _lStumbles = 0; ScreenIsRealLoot = false;
             _simPending = false;
             try { LootTally.Reset(); } catch { }   // m109-lup: PRZED czyszczeniem kolejki (otwarta bitwa zamknieta, "zostaje" = kolejka)
-            try { ShareQueue.Clear(); Wrecks.Clear(); } catch { }
+            try { ShareQueue.Clear(); Wrecks.Clear(); MountHold.Clear(); } catch { }
+            _mountArmed = false; _screenThisCall = false;
         }
 
         /// <summary>m109-lup: rodzaj zabojcy dla pomiaru LootTally - 1 Ty albo towarzysz (kon zamieniony na jezdzca), 2 zolnierz partii gracza, 3 inni.</summary>
@@ -996,6 +1152,14 @@ namespace Armoury
                         armory.AddToCounts(el.EquipmentElement, el.Amount);
                     }
                     LootTally.QueueOut(ShareQueue, LootTally.Zwrot);   // m109-lup: pomiar
+                    // m109-lup: siatka bezpieczenstwa - przetrzymane konie i uprzaz (zdjete z kolejki, czyli ze zbrojowni wojska) wracaja tam samo
+                    for (int i = 0; i < MountHold.Count; i++)
+                    {
+                        var el = MountHold.GetElementCopyAtIndex(i);
+                        armory.AddToCounts(el.EquipmentElement, el.Amount);
+                        LootTally.Reserve(el.EquipmentElement.Item, el.Amount);
+                    }
+                    MountHold.Clear(); _mountArmed = false;
                 }
                 else LootTally.QueueOut(ShareQueue, LootTally.Przepadlo);
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka wrocila do zbrojowni wojska
@@ -1009,7 +1173,7 @@ namespace Armoury
         /// <summary>Czy dzialka gracza wciaz lezy w kolejce (ekran lupow nie przyszedl).</summary>
         internal static bool SharePending()
         {
-            try { return ShareQueue.Count > 0 || Wrecks.Count > 0; } catch { return false; }
+            try { return ShareQueue.Count > 0 || Wrecks.Count > 0 || MountHold.Count > 0; } catch { return false; }   // m109-lup: takze przetrzymane konie
         }
 
         /// <summary>
@@ -1042,6 +1206,7 @@ namespace Armoury
                 }
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana do sakw
                 moved += AppendWrecks(bag);
+                if (MountHold.Count > 0) moved += FlushMountsToBaggage(why);   // m109-lup: siatka bezpieczenstwa (MountHold zyje tylko w wywolaniu Spoils)
                 if (moved > 0)
                 {
                     Log.Info("BattlefieldLaw: kolejka lupow wysypana do sakw (" + moved + " szt.) - " + why + ".");

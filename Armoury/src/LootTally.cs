@@ -113,6 +113,7 @@ namespace Armoury
             public long Ticks;
             public int Stumbles;
             public readonly List<Rider> RiderList = new List<Rider>();
+            public readonly Dictionary<Agent, bool> HorseLoot = new Dictionary<Agent, bool>();   // jezdziec -> czy jego kon wszedl do lupu druzyny gracza
         }
 
         private static Battle _cur;
@@ -340,6 +341,21 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Close", e); }
             foreach (var r in b.RiderList) r.Agent = null;
+            b.HorseLoot.Clear();
+        }
+
+        /// <summary>HorseFate.TakeKill: czy kon jezdzca powalonego przez druzyne gracza wszedl do jej lupu (1), nie wszedl (0 - nie ma czego zdejmowac,
+        /// zdjecie trafiloby w konie gracza), nie wiadomo (-1 - pomiar nie widzial jezdzca).</summary>
+        internal static int HorseLootState(Agent rider)
+        {
+            try
+            {
+                bool v;
+                var b = _cur;
+                if (b == null || rider == null || !b.HorseLoot.TryGetValue(rider, out v)) return -1;
+                return v ? 1 : 0;
+            }
+            catch { return -1; }
         }
 
         private static void Add(long[,] dst, long[,] src, int cols)
@@ -705,6 +721,9 @@ namespace Armoury
                 }
                 if (st.Horse != null)
                 {
+                    bool horseLoot = false;
+                    for (int i = 0; i < n; i++) if (st.Slots[i] == (int)EquipmentIndex.Horse && cls[i] == ALup) horseLoot = true;
+                    b.HorseLoot[affectedAgent] = horseLoot;
                     b.Riders++;
                     if (b.RiderList.Count < RidersPerBattle)
                     {
