@@ -97,13 +97,16 @@ namespace Armoury
             catch (Exception e) { Stumble("CostPostfix", e); }
         }
 
+        /// <summary>m109-kuznia (ForgeBill): kg drewna wykucia broni z projektu - ta sama liczba dla ekranu i dla pobrania (SpendPrefix).</summary>
+        internal static float WeaponKg(WeaponDesign d) { return RawWood(d) * PerPiece; }
+
         public static void SpendPrefix(WeaponDesign weaponDesign, out float[] __state)
         {
             __state = null;
             try
             {
                 if (!On) return;
-                float kg = RawWood(weaponDesign) * PerPiece;
+                float kg = WeaponKg(weaponDesign);
                 if (kg <= 0f) return;
                 __state = new float[] { kg, LoadsFor(kg) };
             }

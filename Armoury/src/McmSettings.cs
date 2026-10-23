@@ -216,6 +216,10 @@ namespace Armoury
         [SettingPropertyGroup("Experience")]
         public int WeaponXpCapPerTier { get; set; } = 500;
 
+        [SettingPropertyFloatingInteger("Smithing Xp Factor", 0.00f, 2.80f, "0.00", HintText = "Smithing grows slower: every gain of Smithing experience is multiplied by this - forging weapons, armour, bows, crossbows and arrows, smelting, refining, mending, commissions and any other Smithing experience, for every hero (0.7 = 30 percent slower, 1 = as before). Only the skill is slowed - the character level you earn by smithing grows as before. The caps (Xp Cap Per Tier, Weapon Xp Cap Per Tier, Refine Xp Cap) count before this cut. A skill level set outright (events, education) is not touched", RequireRestart = false)]
+        [SettingPropertyGroup("Experience")]
+        public float SmithingXpFactor { get; set; } = 0.70f;
+
         [SettingPropertyBool("Armour Orders Enabled", HintText = "lords leave armour commissions with town smiths", RequireRestart = false)]
         [SettingPropertyGroup("Orders from the lords")]
         public bool ArmourOrdersEnabled { get; set; } = true;
@@ -7716,6 +7720,10 @@ namespace Armoury
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool SmithWoodOnScreen { get; set; } = true;
 
+        [SettingPropertyBool("Forge Bill On Screen", HintText = "the smithing screen and the CRAFT tab show the bill of the chosen piece in a row above the material bar: for each material what this piece takes and what you have - pieces in your bags times their weight plus what is left open at your anvil (wood, charcoal, linen, leather, metal), e.g. need 0.36 kg, have 387 kg (3 x 100 + 87 open). A red number means you are short, and the Craft button then says what is missing (also weirwood and dragonbone). Off: the Banner Kings leather and linen counters as before", RequireRestart = false)]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool ForgeBillOnScreen { get; set; } = true;
+
         [SettingPropertyBool("Self Mend Wood Kg", HintText = "with Smith Wood Kg: mending at your own anvil takes wood by the kilogram of the repair from the open load - a new load of hardwood is asked for only when the open one runs short (off = a share of whole loads, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool SelfMendWoodKg { get; set; } = true;
@@ -9365,6 +9373,7 @@ namespace Armoury
             s.WeaponDaysPerTier = WeaponDaysPerTier;
             s.WeaponXpFromValueCapped = WeaponXpFromValueCapped;
             s.WeaponXpCapPerTier = WeaponXpCapPerTier;
+            s.SmithingXpFactor = SmithingXpFactor;
             s.ArmourOrdersEnabled = ArmourOrdersEnabled;
             s.OrderOfferChance = OrderOfferChance;
             s.OrderTownCooldownDays = OrderTownCooldownDays;
@@ -11240,6 +11249,7 @@ namespace Armoury
             s.NoTownMines = NoTownMines;
             s.BulkUnitPerCampaign = BulkUnitPerCampaign;
             s.SmithWoodOnScreen = SmithWoodOnScreen;
+            s.ForgeBillOnScreen = ForgeBillOnScreen;
             s.SelfMendWoodKg = SelfMendWoodKg;
             s.FolkCraftWageOnSale = FolkCraftWageOnSale;
             s.SavingsByNeed = SavingsByNeed;

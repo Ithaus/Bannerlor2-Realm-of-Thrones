@@ -280,7 +280,7 @@ namespace Armoury
                 if (skill < r.SkillNeeded)
                 { Log.Player("That is beyond your hand. You need " + r.SkillNeeded + " Smithing.", true); return false; }
                 if (!Recipes.HasMaterials(r))
-                { Log.Player("You lack the materials.", true); return false; }
+                { Log.Player(ForgeBill.On ? ForgeBill.ShortText(ForgeBill.Of(item, r), false) : "You lack the materials.", true); return false; }   // m109-kuznia: napis z rachunku - czego i ile brakuje
                 float reliefPre = Helper.Relief(Helper.Find());
                 int staminaNeed = MathF.Max(1, (int)(r.Stamina * (1f - reliefPre * s.HelperStaminaRelief)));
                 if (Stamina() < staminaNeed)
@@ -304,8 +304,7 @@ namespace Armoury
                 var helper = Helper.Find();
                 float relief = Helper.Relief(helper);
 
-                Recipes.TakeMaterials(r);
-                RareMaterials.Take(item, false);   // m97-surowce: surowiec luku schodzi na starcie roboty, jak reszta materialow
+                TakeFor(item, r);   // m97-surowce: surowiec luku schodzi na starcie roboty, jak reszta materialow (m109-kuznia: jedna funkcja zdjecia - ta sama w tescie rachunku)
                 SpendStamina(MathF.Max(1, (int)(r.Stamina * (1f - relief * s.HelperStaminaRelief))));
                 days = s.ForgeTakesTime ? MathF.Max(0.5f, r.Tier * s.DaysPerTier * Project.TimeFactor(tempo)) * ForgeClock.TimeMult : 0f;   // m109-czas: x ForgeTimeMult
                 // C5 (Jeff 14.10 "jak u kowali AI"): podstawa = dni kowala z warsztatu AI x godziny dnia kowala (tempo i pomocnik jak dotad)
@@ -593,6 +592,13 @@ namespace Armoury
             catch { return true; }
         }
 
+        /// <summary>m109-kuznia: zdjecie materialow udanego kucia (Smith) i startu roboty (Begin) - przepis i surowiec luku; ForgeBillTest bierze ta sama droge.</summary>
+        internal static void TakeFor(ItemObject item, Recipes.Recipe r)
+        {
+            Recipes.TakeMaterials(r);
+            RareMaterials.Take(item, false);
+        }
+
         internal static void Smith(ItemObject item) { Smith(item, null); }
 
         internal static void Smith(ItemObject item, Hero who)
@@ -616,6 +622,7 @@ namespace Armoury
                 if (!Recipes.HasMaterials(r))
                 {
                     // m96-receptury (po recenzji): luk z masy nie bierze metalu - napis mowi, czego brakuje (dotad zawsze "metal")
+                    if (ForgeBill.On) { Log.Player(ForgeBill.ShortText(ForgeBill.Of(item, r), false), true); return; }   // m109-kuznia: napis z rachunku (kg, pamiec, sztuki do otwarcia)
                     var miss = Recipes.MissingParts(r, 1f);
                     Log.Player("You lack the materials for it" + (miss != null && miss.Count > 0 ? ": " + string.Join(", ", miss.ToArray()) : "") + ".", true);
                     return;
@@ -635,8 +642,7 @@ namespace Armoury
                     return;
                 }
 
-                Recipes.TakeMaterials(r);
-                RareMaterials.Take(item, false);   // m97-surowce: surowiec luku (czardrzewo / smocza kosc) z sakw
+                TakeFor(item, r);   // m97-surowce: surowiec luku (czardrzewo / smocza kosc) z sakw (m109-kuznia: jedna funkcja zdjecia - ta sama w tescie rachunku)
                 var quality = RollQuality(item, r, 1, hero);
                 // amunicje robi sie SERIAMI: jedna robota = kilka wiazek strzal/beltow
                 int made = (item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts)
