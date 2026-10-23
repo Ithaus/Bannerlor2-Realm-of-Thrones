@@ -2210,16 +2210,19 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m110okol   : (23.10, galaz w-toku/m110-okolica - Jeff 23.10 "zwiadem"; Armoury/src/CampInterrogation.Area.cs, CampInterrogation.cs, HideoutSight.Knows; klucz Interrogation
                     Area Only) jeniec podaje tylko okolice kryjowki, znacznik obszaru, kryjowke wypatruje zwiad. python -I tools/sprawdz_logi.py --grupa m110okol [<Armoury-*.log>]
                     (strumieniowo; bez logu tylko OKOL-S i OKOL-S2). OKOL-S self-test wyrazen wobec linii kontrolnych jak w kodzie C# (start, wskazowka, koniec, zapis, doba,
-                    test) i reguly OKOL-2 na liniach wzorcowych, OKOL-S2 test syntetyczny (dobry, zly, bez pary, klucz NIE, bez startu). OKOL-0 linia startu m110 (precyzja =
+                    flagi, test) i reguly OKOL-2 na liniach wzorcowych, OKOL-S2 test syntetyczny (dobry, zly, bez pary, klucz NIE, bez startu, zapis bez flag, zapis
+                    i wyjscie, zgubiony znacznik, doprecyzowanie dobre i zle). OKOL-0 linia startu m110 (precyzja =
                     stale M110OKOL_; brak - INFO), OKOL-1 ERROR CampInterrogation.Hint* i potkniecia m110 0, OKOL-2 kazda wskazowka = zasada (kierunek 8 stron, |kat - opisany|
                     <= 22.5; dokladna <=> skad bohater|banda; km co 25 (najmniej 25) / pasma 22/60/110/160 z punktem 16/41/85/135; blad punktu = sqrt(d2 + dq2 - 2 d dq cos D)
                     +-0.05 bez przyciecia; wypatrzona NIE; znacznik / wiedza wobec kluczy z linii startu - INFO), OKOL-3 pary: kazde MOWI z 'po NIE' ma wskazowke tuz po sobie
                     (ta sama kryjowka i zrodlo), kazda wskazowka rozmowa|tortury stoi po takim MOWI, OKOL-4 bez drugiej wskazowki na kryjowke z czynna (stan z linii startu,
-                    wskazowka, koniec), OKOL-5 konce (po terminie w [termin, termin + 1.05 h], znaleziona tylko czynna z 'wypatrzona TAK' przed termin + 1.05 h, doby: U = 0 i
-                    zadna czynna > 1.05 h po terminie, termin = godz. wskazania + doby x 24), OKOL-6 zapis (zostalo w grze 0, odtworzone = zdjete, doby: suma zdjetych =
-                    odtworzonych, stare znaczniki w zapisie 0), OKOL-7 notka zapisu wskazowek zlych 0, OKOL-8 test autotestu (klucz TAK: T1 'wskazowka TAK, wypatrzona NIE',
-                    T1b TAK, T10/T11/T12 TAK albo POMINIETY z powodem; klucz NIE: T1b TAK, T10/T11/T12 POMINIETY; wynik TAK), OKOL-9 uzycie (INFO: zrodla, precyzje, konce,
-                    mediany bledu, drogi wypatrzenia wskazanych z linii m100). Log sprzed galezi - INFO.
+                    wskazowka, koniec; 'doprecyzowana' tylko skad kultura i zaraz po niej wskazowka tej kryjowki skad bohater|banda), OKOL-5 konce (po terminie w [termin,
+                    termin + 1.05 h], znaleziona tylko czynna z 'wypatrzona TAK' przed termin + 1.05 h, doby: U = 0 i zadna czynna > 1.05 h po terminie, termin = godz.
+                    wskazania + doby x 24), OKOL-6 zapis (zostalo w grze 0, odtworzone + nieodtworzone z powodem (flagi wylaczone, brak kampanii) = zdjete, doby: suma
+                    zdjetych = odtworzonych + nieodtworzonych, stare znaczniki w zapisie 0), OKOL-7 notka zapisu wskazowek zlych 0, OKOL-8 test autotestu (klucz TAK: T1
+                    'wskazowka TAK, wypatrzona NIE', T1b TAK, T10/T11/T12/T13 TAK albo POMINIETY z powodem; klucz NIE: T1b TAK, T10/T11/T12/T13 POMINIETY; wynik TAK),
+                    OKOL-9 uzycie (INFO: zrodla, precyzje, konce, mediany bledu, drogi wypatrzenia wskazanych z linii m100, znaczniki po wlaczeniu flag). Log sprzed
+                    galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -59837,12 +59840,14 @@ M110OKOL_RX = {
                        r"\| termin godz\. (-?[\d.]+) \((.*?) od godz\. (-?[\d.]+)\) \| aktywne (\d+)\.$"),
     "opis": re.compile(r"^about (.+?) (" + _M110OKOL_DIR_RX + r") of (.+)$"),
     "end": re.compile(r"^koniec wskazowki \| kryjowka (\S+) \(skad (\S+), wypatrzona (TAK|NIE), zajeta (TAK|NIE)\) "
-                      r"\| (znaleziona \(droga (?:zdarzenie gry|przeglad)\)|po terminie|brak kryjowki|zdjeta \(sprzatanie testu\)) "
+                      r"\| (znaleziona \(droga (?:zdarzenie gry|przeglad)\)|po terminie|brak kryjowki|zdjeta \(sprzatanie testu\)|doprecyzowana) "
                       r"\| od wskazania (-?[\d.]+) godz\., termin godz\. (-?[\d.]+), teraz godz\. (-?[\d.]+) \| znacznik zdjety (TAK|NIE|-) \| aktywne (\d+)\.$"),
     "save": re.compile(r"^zapis - znaczniki zdjete (\d+) \(sledzonych (\d+), zablakanych (\d+)\), zostalo w grze (\d+)\.$"),
-    "over": re.compile(r"^po zapisie \(udany (TAK|NIE)\) - znaczniki odtworzone (\d+) \(niesledzone (\d+)\)\.$"),
+    "over": re.compile(r"^po zapisie \(udany (TAK|NIE)\) - znaczniki odtworzone (\d+) \(niesledzone (\d+)\)(?:, nieodtworzone: flagi wylaczone (\d+), brak kampanii (\d+))?\.$"),
     "day": re.compile(r"^doba (-?\d+) \| godz\. (-?[\d.]+) \| klucz (TAK|NIE) \| wskazowki nowe (\d+) \(bohater (\d+), banda (\d+), kultura (\d+)\), znalezione (\d+), po terminie (\d+), "
-                      r"bez kryjowki (\d+), aktywne (\d+) \(ze znacznikiem (\d+), po terminie ponad godzine (\d+)\) \| zapisy: zdjete (\d+), odtworzone (\d+) \| potkniecia dzis (\d+)\.$"),
+                      r"bez kryjowki (\d+), aktywne (\d+) \(ze znacznikiem (\d+), po terminie ponad godzine (\d+)\) \| zapisy: zdjete (\d+), odtworzone (\d+)(?:, nieodtworzone (\d+))? "
+                      r"\| potkniecia dzis (\d+)\.$"),
+    "flags": re.compile(r"^flagi wlaczone - znaczniki postawione (\d+) z (\d+) \(wskazowki bez znacznika\) \| aktywne (\d+)\.$"),
     "prec": re.compile(r"^bohater i banda co (\d+) km \(najmniej (\d+) km\), kultura pasma ([\d./]+) \(punkt ([\d./]+), dalej ([\d.]+)\)$"),
     "seg": re.compile(r"^(T\w+|sprzatanie) (TAK|NIE|POMINIETY)(?: \((.*)\))?$"),
 }
@@ -59864,15 +59869,20 @@ M110OKOL_TEST = {   # linie kontrolne - napisy jak w kodzie C# (CampInterrogatio
     "end_found": "koniec wskazowki | kryjowka hideout_forest_1 (skad banda, wypatrzona TAK, zajeta TAK) | znaleziona (droga zdarzenie gry) | od wskazania 37.0 godz., termin godz. 2608872.0, "
                  "teraz godz. 2608837.0 | znacznik zdjety TAK | aktywne 0.",
     "save": "zapis - znaczniki zdjete 1 (sledzonych 1, zablakanych 0), zostalo w grze 0.",
-    "over": "po zapisie (udany TAK) - znaczniki odtworzone 1 (niesledzone 0).",
+    "over": "po zapisie (udany TAK) - znaczniki odtworzone 1 (niesledzone 0), nieodtworzone: flagi wylaczone 0, brak kampanii 0.",
     "day": "doba 108700 | godz. 2608824.0 | klucz TAK | wskazowki nowe 2 (bohater 0, banda 1, kultura 1), znalezione 0, po terminie 1, bez kryjowki 0, aktywne 1 (ze znacznikiem 1, "
-           "po terminie ponad godzine 0) | zapisy: zdjete 1, odtworzone 1 | potkniecia dzis 0.",
+           "po terminie ponad godzine 0) | zapisy: zdjete 1, odtworzone 1, nieodtworzone 0 | potkniecia dzis 0.",
+    "flags": "flagi wlaczone - znaczniki postawione 1 z 1 (wskazowki bez znacznika) | aktywne 1.",
+    "end_refine": "koniec wskazowki | kryjowka hideout_forest_4 (skad kultura, wypatrzona NIE, zajeta TAK) | doprecyzowana | od wskazania 0.0 godz., termin godz. 2608799.0, "
+                  "teraz godz. 2608800.0 | znacznik zdjety TAK | aktywne 1.",
     "test": "test - T0 TAK (H1 hideout_forest_1, H2 hideout_forest_1 = H1) | T2 TAK (szansa 0.6058) | " + _M110OKOL_T1 + " | T1b TAK (grupa TAK, Target(A) hideout_forest_2 skad kultura, "
             "H2 wskazana TAK) | T3 TAK (odmowa limit) | T7 POMINIETY (jedna kryjowka kultury - H1 juz wskazana) | T12 TAK (odpiety H2, ze znacznikiem 1, po zdjeciu w grze 0, wpisy bez "
-            "znacznika TAK, odtworzone 1, przypiecie zgodne TAK) | T10 POMINIETY (H1 = H2) | T11 POMINIETY (H1 = H2) | sprzatanie TAK (Mercy xp przed proba 0, teraz -60) (wskazowki "
+            "znacznika TAK, odtworzone 1, przypiecie zgodne TAK, kafelek odpietych odswiezony 1/1) | T13 TAK (wskazowka H2 ze znacznikiem TAK, zdjety TAK, po przegladzie znacznik TAK, "
+            "w grze TAK, przypiecie jak przed TAK) | T10 POMINIETY (H1 = H2) | T11 POMINIETY (H1 = H2) | sprzatanie TAK (Mercy xp przed proba 0, teraz -60) (wskazowki "
             "probne zdjete 0; wskazowki zostaja: hideout_forest_1 (termin godz. 2608872.0)) - wynik TAK.",
     "test104": "test - T0 TAK (H1 hideout_forest_1) | T1 TAK (odmowa -, szansa 0.3225, kryjowka hideout_forest_1, skad banda, wypatrzona TAK, flaga TAK) | T1b TAK (grupa TAK, Target(A) "
-               "hideout_forest_2 skad kultura, H2 wypatrzona TAK) | T12 POMINIETY (klucz Interrogation Area Only NIE) | T10 POMINIETY (klucz Interrogation Area Only NIE) | T11 POMINIETY "
+               "hideout_forest_2 skad kultura, H2 wypatrzona TAK) | T12 POMINIETY (klucz Interrogation Area Only NIE) | T13 POMINIETY (klucz Interrogation Area Only NIE) "
+               "| T10 POMINIETY (klucz Interrogation Area Only NIE) | T11 POMINIETY "
                "(klucz Interrogation Area Only NIE) | sprzatanie TAK (Mercy xp przed proba 0, teraz -60) - wynik TAK.",
 }
 
@@ -59956,11 +59966,17 @@ def m110okol_selftest():
     if not me or me.group(1, 3, 5) != ("hideout_forest_1", "TAK", "znaleziona (droga zdarzenie gry)"):
         return "end_found: %s" % (me.groups() if me else "brak dopasowania")
     ms, mo = R["save"].search(T["save"]), R["over"].search(T["over"])
-    if not ms or ms.groups() != ("1", "1", "0", "0") or not mo or mo.groups() != ("TAK", "1", "0"):
+    if not ms or ms.groups() != ("1", "1", "0", "0") or not mo or mo.groups() != ("TAK", "1", "0", "0", "0"):
         return "save / over"
     md = R["day"].search(T["day"])
-    if not md or md.group(1, 2, 3, 4, 9, 11, 13, 14, 15, 16) != ("108700", "2608824.0", "TAK", "2", "1", "1", "0", "1", "1", "0"):
+    if not md or md.group(1, 2, 3, 4, 9, 11, 13, 14, 15, 16, 17) != ("108700", "2608824.0", "TAK", "2", "1", "1", "0", "1", "1", "0", "0"):
         return "day: %s" % (md.groups() if md else "brak dopasowania")
+    mf = R["flags"].search(T["flags"])
+    if not mf or mf.groups() != ("1", "1", "1"):
+        return "flags: %s" % (mf.groups() if mf else "brak dopasowania")
+    me = R["end"].search(T["end_refine"])
+    if not me or me.group(1, 2, 5, 7) != ("hideout_forest_4", "kultura", "doprecyzowana", "2608799.0"):
+        return "end_refine: %s" % (me.groups() if me else "brak dopasowania")
     for k in ("test", "test104"):
         mt = M109PRZES_RX["test"].search(T[k])
         if not mt:
@@ -59970,7 +59986,7 @@ def m110okol_selftest():
             sg = R["seg"].search(part.strip())
             if sg:
                 segs[sg.group(1)] = (sg.group(2), sg.group(3) or "")
-        need = ("T1", "T1b", "T10", "T11", "T12") + (("sprzatanie",) if k == "test" else ())
+        need = ("T1", "T1b", "T10", "T11", "T12", "T13") + (("sprzatanie",) if k == "test" else ())
         if any(x not in segs for x in need):
             return "%s: odcinki %s" % (k, sorted(segs))
     mt = M109PRZES_RX["try"].search(M109PRZES_TEST["talk"].replace("po TAK, skad banda", "po NIE, skad banda").replace("od obozu, flaga TAK", "od obozu, flaga NIE"))
@@ -59983,7 +59999,7 @@ def m110okol_selftest():
 def m110okol_collect(logp):
     """m110okol: przebieg logu (strumieniowo) - linie m110 i proby m109 w kolejnosci (pary OKOL-3, stan wskazowek OKOL-4/5), linie testu m109 ze stanem kluczy
     z ostatniej linii startu m110, wypatrzenia m100 (OKOL-9)."""
-    D = {"start": [], "hints": [], "ends": [], "saves": [], "overs": [], "days": [], "tests": [], "seq": [], "unread": [], "err": 0, "err1": None}
+    D = {"start": [], "hints": [], "ends": [], "saves": [], "overs": [], "days": [], "flags": [], "tests": [], "seq": [], "unread": [], "err": 0, "err1": None}
     keys = None
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
@@ -60014,7 +60030,8 @@ def m110okol_collect(logp):
             if not s.startswith(M110OKOL_TAG):
                 continue
             t = s[len(M110OKOL_TAG):]
-            for name, kind in (("start", "start sesji"), ("hint", "wskazowka"), ("end", "koniec wskazowki"), ("save", "zapis - "), ("over", "po zapisie"), ("day", "doba ")):
+            for name, kind in (("start", "start sesji"), ("hint", "wskazowka"), ("end", "koniec wskazowki"), ("save", "zapis - "), ("over", "po zapisie"), ("day", "doba "),
+                               ("flags", "flagi wlaczone")):
                 if t.startswith(kind):
                     mm = M110OKOL_RX[name].search(t)
                     if not mm:
@@ -60025,7 +60042,7 @@ def m110okol_collect(logp):
                         keys = {"area": mm.group(1) == "TAK" and mm.group(2) == "TAK", "flag": mm.group(3) == "TAK" and int(mm.group(4)) > 0, "days": max(1, int(mm.group(4))),
                                 "know": mm.group(5) == "TAK" and mm.group(6) == "TAK"}
                     else:
-                        D[{"hint": "hints", "end": "ends", "save": "saves", "over": "overs", "day": "days"}[name]].append((mm, keys))
+                        D[{"hint": "hints", "end": "ends", "save": "saves", "over": "overs", "day": "days", "flags": "flags"}[name]].append((mm, keys))
                     D["seq"].append((name, mm, keys))
                     break
             else:
@@ -60049,7 +60066,7 @@ def m110okol_rows(rep, D):
                 "czytelna, precyzja = stale M110OKOL_, 0 nieczytelnych", prec_ok and not D["unread"])
     # OKOL-1: bledy i potkniecia
     stp = sum(int(m.group(13)) for m in D["start"])
-    sd = sum(int(m.group(16)) for m, _k in D["days"])
+    sd = sum(int(m.group(17)) for m, _k in D["days"])
     rep.add("OKOL-1: ERROR in CampInterrogation.Hint* i potkniecia m110 (start + doby)", f"ERROR {D['err']}" + (f" (np. {D['err1']})" if D["err1"] else "") + f", potkniecia startu {stp}, doby {sd}",
             "0", D["err"] == 0 and stp == 0 and sd == 0)
     # OKOL-2: kazda wskazowka zgodna z zasada
@@ -60100,15 +60117,23 @@ def m110okol_rows(rep, D):
     # OKOL-4 / OKOL-5: stan czynnych wskazowek w kolejnosci linii
     active, dues = set(), {}
     bad4, bad5, term_off, nends, truncated = [], [], [], 0, False
+    refine, nref = None, 0   # doprecyzowanie (recenzja R3): koniec 'doprecyzowana' (skad kultura) -> zaraz wskazowka tej kryjowki skad bohater|banda
     for e in D["seq"]:
         if e[0] == "start":
             ids = e[1].group(10)
             active = set() if ids == "-" else set(x.strip() for x in ids.split(",") if x.strip() and x.strip() != "...")
             truncated = ids.endswith("...")
             dues = {}
+            if refine is not None:
+                bad4.append(f"{refine}: doprecyzowana bez nowej wskazowki")
+            refine = None
         elif e[0] == "hint":
             mh, k = e[1], e[2]
             lair = mh.group(4)
+            if refine is not None:
+                if lair != refine or mh.group(6) not in ("bohater", "banda"):
+                    bad4.append(f"d{mh.group(1)} {lair}: po doprecyzowaniu {refine} wskazowka skad {mh.group(6)}")
+                refine = None
             if lair in active:
                 bad4.append(f"d{mh.group(1)} {lair}: druga wskazowka przy czynnej")
             active.add(lair)
@@ -60128,6 +60153,13 @@ def m110okol_rows(rep, D):
             lair, how = me.group(1), me.group(5)
             term, now = float(me.group(7)), float(me.group(8))
             known = lair in active
+            if how == "doprecyzowana":
+                nref += 1
+                if me.group(2) != "kultura":
+                    bad4.append(f"{lair}: doprecyzowana wskazowka skad {me.group(2)}")
+                if refine is not None:
+                    bad4.append(f"{refine}: doprecyzowana bez nowej wskazowki")
+                refine = lair
             if lair in dues and abs(dues[lair] - term) > M110OKOL_TERM_TOL:
                 bad5.append(f"{lair}: termin konca {term} != wskazowki {dues[lair]}")
             if how == "po terminie" and not (term - 0.05 <= now <= term + M110OKOL_HOUR_TOL):
@@ -60149,8 +60181,10 @@ def m110okol_rows(rep, D):
             late = [x for x, dd in dues.items() if x in active and hour > dd + M110OKOL_HOUR_TOL]
             if late:
                 bad5.append(f"doba {md.group(1)}: czynne po terminie {late[:3]}")
-    rep.add("OKOL-4: brak drugiej wskazowki na kryjowke z czynna wskazowka (stan: lista linii startu, wskazowka, koniec)",
-            f"wskazowek {len(D['hints'])}, niezgodnych {len(bad4)}" + (f" ({bad4[:3]})" if bad4 else ""), "0", (not bad4) if D["hints"] else None)
+    if refine is not None:
+        bad4.append(f"{refine}: doprecyzowana bez nowej wskazowki")
+    rep.add("OKOL-4: brak drugiej wskazowki na kryjowke z czynna wskazowka (stan: lista linii startu, wskazowka, koniec; doprecyzowanie tylko kultura -> bohater|banda)",
+            f"wskazowek {len(D['hints'])}, doprecyzowanych {nref}, niezgodnych {len(bad4)}" + (f" ({bad4[:3]})" if bad4 else ""), "0", (not bad4) if D["hints"] else None)
     if D["hints"] or nends or D["days"]:
         txt5 = (f"koncow {nends}, dob {len(D['days'])}, niezgodnych {len(bad5)}" + (f" ({bad5[:3]})" if bad5 else "")
                 + f"; termin wobec Hideout Flag Days z linii startu niezgodny {len(term_off)}")
@@ -60159,7 +60193,7 @@ def m110okol_rows(rep, D):
     else:
         rep.add("OKOL-5: konce wskazowek", "brak linii", "INFO", None)
     # OKOL-6: zapis - znaczniki poza zapisem gry
-    bad6, s_sum, r_sum, pend = [], 0, 0, None
+    bad6, s_sum, r_sum, pend, n_skip = [], 0, 0, None, 0
     for e in D["seq"]:
         if e[0] == "save":
             ms = e[1]
@@ -60170,22 +60204,26 @@ def m110okol_rows(rep, D):
             pend = int(ms.group(1))
         elif e[0] == "over":
             mo = e[1]
+            skip = int(mo.group(4) or 0) + int(mo.group(5) or 0)   # nieodtworzone z powodem: flagi wylaczone, brak kampanii (recenzja R2 kod)
+            n_skip += skip
             if pend is None:
                 bad6.append("'po zapisie' bez linii zapisu")
-            elif int(mo.group(2)) != pend:
-                bad6.append(f"odtworzone {mo.group(2)} != zdjete {pend}")
+            elif int(mo.group(2)) + skip != pend:
+                bad6.append(f"odtworzone {mo.group(2)} + nieodtworzone {skip} != zdjete {pend}")
             pend = None
         elif e[0] == "day":
             s_sum += int(e[1].group(14))
-            r_sum += int(e[1].group(15))
+            r_sum += int(e[1].group(15)) + int(e[1].group(16) or 0)
     if s_sum != r_sum:
-        bad6.append(f"doby: zdjete {s_sum} != odtworzone {r_sum}")
+        bad6.append(f"doby: zdjete {s_sum} != odtworzone + nieodtworzone {r_sum}")
     stale = [int(m.group(11)) for m in D["start"] if int(m.group(11)) > 0]
     if stale:
         bad6.append(f"stare znaczniki w zapisie {stale[:3]}")
     if D["saves"] or D["overs"] or D["start"]:
-        rep.add("OKOL-6: zapis - 'zostalo w grze 0', odtworzone = zdjete (para linii), doby: suma zdjetych = suma odtworzonych, start: 'stare znaczniki w zapisie 0'",
-                f"zapisow z linia {len(D['saves'])}, po zapisie {len(D['overs'])}, doby zdjete {s_sum} / odtworzone {r_sum}, startow {len(D['start'])}; niezgodnych {len(bad6)}"
+        rep.add("OKOL-6: zapis - 'zostalo w grze 0', odtworzone + nieodtworzone z powodem (flagi wylaczone, brak kampanii) = zdjete (para linii), doby: suma zdjetych = "
+                "odtworzonych + nieodtworzonych, start: 'stare znaczniki w zapisie 0'",
+                f"zapisow z linia {len(D['saves'])}, po zapisie {len(D['overs'])} (nieodtworzonych z powodem {n_skip}), doby zdjete {s_sum} / odtworzone + nieodtworzone {r_sum}, "
+                f"startow {len(D['start'])}; niezgodnych {len(bad6)}"
                 + (f" ({bad6[:3]})" if bad6 else ""), "0", not bad6)
     else:
         rep.add("OKOL-6: zapis", "brak linii", "INFO", None)
@@ -60223,7 +60261,7 @@ def m110okol_rows(rep, D):
             why.append("T1 " + t1[0] + (" bez 'wskazowka TAK, wypatrzona NIE'" if area else ""))
         if segs.get("T1b", ("-",))[0] != "TAK":
             why.append("T1b " + segs.get("T1b", ("-",))[0])
-        for x in ("T10", "T11", "T12"):
+        for x in ("T10", "T11", "T12", "T13"):
             v, body = segs.get(x, ("-", ""))
             if area and not (v == "TAK" or (v == "POMINIETY" and body)):
                 why.append(f"{x} {v}")
@@ -60232,7 +60270,7 @@ def m110okol_rows(rep, D):
         if why:
             bad8.append(("klucz TAK: " if area else "klucz NIE: ") + ", ".join(why))
     if n8:
-        rep.add("OKOL-8: test autotestu - T1 'wskazowka TAK, wypatrzona NIE' (klucz TAK), T1b TAK, T10/T11/T12 TAK albo POMINIETY z powodem (klucz NIE - POMINIETY), wynik TAK",
+        rep.add("OKOL-8: test autotestu - T1 'wskazowka TAK, wypatrzona NIE' (klucz TAK), T1b TAK, T10/T11/T12/T13 TAK albo POMINIETY z powodem (klucz NIE - POMINIETY), wynik TAK",
                 f"testow {n8}, niezgodnych {len(bad8)}" + (f" ({bad8[:2]})" if bad8 else "") + (f"; testow bez linii startu m110 {n_old}" if n_old else ""), "0", not bad8)
     else:
         rep.add("OKOL-8: test autotestu", (f"testow bez linii startu m110 {n_old} (DLL sprzed m110-okolica)" if n_old else "brak linii testu (bieg bez flagi armoury-przesluch.flag)"),
@@ -60253,9 +60291,10 @@ def m110okol_rows(rep, D):
         if e[0] == "spot" and e[1] in hinted:
             paths[e[2]] = paths.get(e[2], 0) + 1
     med = lambda xs: ("%.2f" % st.median(xs)) if xs else "-"
-    rep.add("OKOL-9: uzycie (INFO) - wskazowki wedlug zrodla, skad i precyzji, konce, mediany bledu punktu, drogi wypatrzenia wskazanych (linie m100)",
+    fput, fmiss = sum(int(m.group(1)) for m, _k in D["flags"]), sum(int(m.group(2)) for m, _k in D["flags"])
+    rep.add("OKOL-9: uzycie (INFO) - wskazowki wedlug zrodla, skad i precyzji, konce, mediany bledu punktu, drogi wypatrzenia wskazanych (linie m100), znaczniki po wlaczeniu flag",
             f"wskazowki {sorted(by.items())[:8]}; konce {sorted(outs.items())}; mediana bledu dokladna {med(errs['dokladna'])}, przyblizona {med(errs['przyblizona'])} jedn.; "
-            f"wypatrzenia wskazanych {sorted(paths.items())}", "INFO", None)
+            f"wypatrzenia wskazanych {sorted(paths.items())}; po wlaczeniu flag postawione {fput} z {fmiss} ({len(D['flags'])} linii)", "INFO", None)
 
 
 def m110okol_synth():
@@ -60267,7 +60306,8 @@ def m110okol_synth():
     talk = M109PRZES_TEST["talk"].replace("po TAK, skad banda", "po NIE, skad banda").replace("od obozu, flaga TAK", "od obozu, flaga NIE")
 
     def good():
-        return [P10 + T["start"], P9 + talk, P10 + T["hint"], P10 + T["save"], P10 + T["over"], P10 + T["probe"], P10 + T["end_due"], P10 + T["day"], P10 + T["end_found"], P9 + T["test"]]
+        return [P10 + T["start"], P9 + talk, P10 + T["hint"], P10 + T["save"], P10 + T["over"], P10 + T["probe"], P10 + T["end_due"], P10 + T["day"], P10 + T["flags"],
+                P10 + T["end_found"], P9 + T["test"]]
 
     def bad(L):
         L[2] = L[2].replace("blad 2.52 jedn.", "blad 4.52 jedn.")                                                         # OKOL-2
@@ -60289,6 +60329,27 @@ def m110okol_synth():
     def nostart(L):   # log sprzed m110: same linie m109 (test 104 bez linii startu m110 - OKOL-8 INFO)
         return [P9 + M109PRZES_TEST["start"], P9 + M109PRZES_TEST["talk"], P9 + M109PRZES_TEST["test"]]
 
+    def saveoff(L):   # OKOL-6 (recenzja R2 kod): zapis przy flagach wylaczonych - nieodtworzony z powodem, para i doby zgodne - TAK
+        L[4] = L[4].replace("odtworzone 1 (niesledzone 0), nieodtworzone: flagi wylaczone 0,", "odtworzone 0 (niesledzone 0), nieodtworzone: flagi wylaczone 1,")
+        L[7] = L[7].replace("odtworzone 1, nieodtworzone 0", "odtworzone 0, nieodtworzone 1")
+        return L
+
+    def saveexit(L):   # OKOL-6: "Save And Exit" - gra zamknieta przed naszym sluchaczem (brak kampanii) - TAK
+        L[4] = L[4].replace("odtworzone 1 (niesledzone 0), nieodtworzone: flagi wylaczone 0, brak kampanii 0", "odtworzone 0 (niesledzone 0), nieodtworzone: flagi wylaczone 0, brak kampanii 1")
+        L[7] = L[7].replace("odtworzone 1, nieodtworzone 0", "odtworzone 0, nieodtworzone 1")
+        return L
+
+    def saveloss(L):   # OKOL-6: znacznik zgubiony bez powodu - NIE (para i doby)
+        L[4] = L[4].replace("odtworzone 1 (niesledzone 0)", "odtworzone 0 (niesledzone 0)")
+        L[7] = L[7].replace("odtworzone 1, nieodtworzone 0", "odtworzone 0, nieodtworzone 0")
+        return L
+
+    def refine(L, src="kultura"):   # OKOL-4 (recenzja R3): probna przyblizona H4 -> koniec 'doprecyzowana' -> MOWI i wskazowka H4 skad banda (przed koncem H1)
+        h4 = "hideout_forest_4"
+        L[9:9] = [P10 + T["probe"].replace("hideout_forest_3", h4), P10 + T["end_refine"].replace("(skad kultura", "(skad " + src), P9 + talk.replace("hideout_forest_1", h4),
+                  P10 + T["hint"].replace("hideout_forest_1", h4)]
+        return L
+
     def run(mod):
         tmp = tempfile.mkdtemp(prefix="m110o_")
         try:
@@ -60307,7 +60368,12 @@ def m110okol_synth():
              ("zly", bad, {"OKOL-1": "NIE", "OKOL-2": "NIE", "OKOL-4": "NIE", "OKOL-5": "NIE", "OKOL-6": "NIE", "OKOL-7": "NIE", "OKOL-8": "NIE"}),
              ("bez-pary", nopair, dict(exp_good, **{"OKOL-3": "NIE", "OKOL-5": "NIE"})),
              ("klucz-NIE", keyoff, {"OKOL-0": "TAK", "OKOL-1": "TAK", "OKOL-2": "INFO", "OKOL-3": "INFO", "OKOL-4": "INFO", "OKOL-5": "INFO", "OKOL-8": "TAK"}),
-             ("bez-startu", nostart, {"OKOL-0": "INFO", "OKOL-1": "TAK", "OKOL-2": "INFO", "OKOL-3": "INFO", "OKOL-6": "INFO", "OKOL-7": "INFO", "OKOL-8": "INFO"}))
+             ("bez-startu", nostart, {"OKOL-0": "INFO", "OKOL-1": "TAK", "OKOL-2": "INFO", "OKOL-3": "INFO", "OKOL-6": "INFO", "OKOL-7": "INFO", "OKOL-8": "INFO"}),
+             ("zapis-bez-flag", saveoff, exp_good),
+             ("zapis-i-wyjscie", saveexit, exp_good),
+             ("zgubiony-znacznik", saveloss, dict(exp_good, **{"OKOL-6": "NIE"})),
+             ("doprecyzowanie", refine, exp_good),
+             ("doprecyzowanie-zle", lambda L: refine(L, "banda"), dict(exp_good, **{"OKOL-4": "NIE"})))
     diff = []
     for name, mod, exp in cases:
         got = run(mod)
@@ -60320,13 +60386,14 @@ def m110okol_main(logp):
     OKOL-0..OKOL-9 - opis w --help. Log Armoury strumieniowo; bez logu tylko self-test i test syntetyczny; log bez linii m110 - INFO, bez wyjatku."""
     rep = Report()
     s1 = m110okol_selftest()
-    rep.add("OKOL-S: self-test wyrazen (linie kontrolne jak w kodzie C#: start, wskazowka, koniec, zapis, doba, test; regula OKOL-2 na liniach wzorcowych)", s1 or "OK",
+    rep.add("OKOL-S: self-test wyrazen (linie kontrolne jak w kodzie C#: start, wskazowka, koniec (takze doprecyzowana), zapis, doba, flagi, test; regula OKOL-2 na liniach wzorcowych)", s1 or "OK",
             "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     try:
         s2 = m110okol_synth()
     except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
         s2 = f"wyjatek {type(e).__name__}: {e}"
-    rep.add("OKOL-S2: test syntetyczny (dobry, zly, bez pary, klucz NIE, bez startu - przez te same funkcje progow)", s2 or "OK", "werdykty zgodne", s2 is None)
+    rep.add("OKOL-S2: test syntetyczny (dobry, zly, bez pary, klucz NIE, bez startu, zapis bez flag, zapis i wyjscie, zgubiony znacznik, doprecyzowanie dobre i zle - przez "
+            "te same funkcje progow)", s2 or "OK", "werdykty zgodne", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("OKOL-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
