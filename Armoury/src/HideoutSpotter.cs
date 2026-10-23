@@ -33,6 +33,7 @@ namespace Armoury
         private bool _seeded;
         private static HideoutSpotter _inst;   // m109-przesluch: instancja kampanii dla Mark (wzor HideoutSight)
         private string _loadedFlags;           // m110-flaga: terminy flag z zapisu (id,godzina;) - odtwarzane przy siewie; "" = klucz byl, pusty
+        private int _offLines;                 // m110-flaga: linie zdjecia flagi po terminie (pierwsze 5 na proces)
         private bool _loadedOld;               // m110-flaga: wczytany zapis bez klucza arm_hideout_flags (sprzed m110)
 
         public HideoutSpotter() { _inst = this; }
@@ -119,7 +120,9 @@ namespace Armoury
                     foreach (var st in due)
                     {
                         _flagged.Remove(st);
-                        try { if (vt != null && vt.CheckTracked(st)) vt.RemoveTrackedObject(st); } catch { }
+                        bool had = false;
+                        try { if (vt != null && vt.CheckTracked(st)) { vt.RemoveTrackedObject(st); had = true; } } catch { }
+                        if (_offLines < 5) { _offLines++; Log.Info("HideoutSpotter (m110): flaga " + st.StringId + " zdjeta po terminie (" + (had ? "stala na mapie" : "juz zdjeta") + ")."); }   // m110-flaga: dowod zejscia
                     }
                 }
 
