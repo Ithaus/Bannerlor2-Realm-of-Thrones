@@ -134,7 +134,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s != null && !s.BattleMusicOurs) { _batWhy = "klucz NIE"; return false; }
+                if (s != null && !s.BattleMusicOurs) { _batWhy = "klucz NIE"; _batMission = null; return false; }   // klucz zmieniony w bitwie - obiekt Mission nie zostaje w polu po misji
                 if (Campaign.Current == null) { _batWhy = "wyjscie z kampanii"; _batMission = null; return false; }
                 Mission m = Mission.Current;
                 if (m == null) { _batWhy = "koniec misji"; _batMission = null; return false; }
@@ -206,6 +206,11 @@ namespace Armoury
         {
             _idle = 0f;
             if (_batActive && !ReferenceEquals(_batOnMission, _batMission)) BattleEnd("koniec misji", false);   // nastepna misja bitwy bez przerwy miedzy nimi
+            if (_active && !_batActive)   // okno wydarzenia zamkniete, misja bitwy trwa: koniec okna linia m108 (para do linii okna), wyciszenie zostaje
+            {
+                StopTrack("koniec wydarzenia - bitwa dalej");
+                Log.Info(P + "koniec wydarzenia - bitwa dalej, muzyka gry dalej wyciszona.");
+            }
             if (!_active) { _active = true; DuckStart(); }
             if (!_batActive) BattleBegin();
             if (_mus != null && _musMood != BattleMood) StopTrack(null);   // utwor okna - nie w bitwie
@@ -288,9 +293,9 @@ namespace Armoury
             var cur = _batCur;
             if (ev == null) return;
             if (cur == null) { StopTrack(null); return; }
-            bool stopped = false, paused = false;
+            bool stopped = false, paused = false, threw = false;
             try { stopped = !ev.IsValid || ev.IsStopped(); if (!stopped) paused = ev.IsPaused(); }
-            catch (Exception e) { BattleStumble("Check", e); stopped = true; }
+            catch (Exception e) { threw = true; BattleStumble("Check", e); stopped = true; }
             if (!stopped && !paused && !MBCommon.IsPaused) _batPlayT += dt;
             if (!_batChecked && !stopped && _batPlayT >= CheckSec)
             {
@@ -304,7 +309,8 @@ namespace Armoury
                              + "; " + (_batPrevText ?? ("pierwszy w bitwie" + (_batPrevBattle != null ? " (ostatni wczesniej muz_" + _batPrevBattle + ".ogg)" : ""))) + ".");
             }
             string why = null;
-            if (stopped) why = _batChecked || Now - _batT0 >= NotPlayedRealSec ? "silnik" : null;   // dluga pauza gry przed kontrola 1 s - nie blad
+            if (threw) why = "blad";   // wyjatek juz policzony w BattleStumble - bez drugiego bledu misji (NotPlayed) i bez linii "nie grany"
+            else if (stopped) why = _batChecked || Now - _batT0 >= NotPlayedRealSec ? "silnik" : null;   // dluga pauza gry przed kontrola 1 s - nie blad
             else if (_batTest && _batChecked && Now - _batT0 >= TestCutSec) { why = "test 4 s"; _bEndTest++; }
             else if (_batPlayT >= (cur.Dur > 0 ? cur.Dur + CapExtraSec : CapUnknownSec)) { why = "po czasie pliku - silnik nie zglosil"; _bEndCap++; }
             if (!stopped && why == null) return;
@@ -349,11 +355,21 @@ namespace Armoury
             Log.Info(PB + "muzyka gry wrocila" + (why != null ? " od razu (" + why + ")" : "") + " - psai glosnosc " + got + " (zapamietana " + _saved.ToString("0.00", Inv) + ").");
         }
 
-        /// <summary>RestoreNow: stan bitwy od zera (zestawy utworow i liczniki sesji zostaja).</summary>
-        private static void BattleReset()
+        /// <summary>RestoreNow: stan bitwy od zera (zestawy utworow i liczniki sesji zostaja). Blad ("blad") w trwajacej misji: ta sama misja bez ponownej klasyfikacji,
+        /// w misji bitwy rezygnacja z niej (inaczej przy stalym bledzie psai w kolko bitwa - rezygnacja - powrot co ok. 0,65 s, linie co klatke).</summary>
+        private static void BattleReset(string why)
         {
-            _batMission = null; _batOnMission = null; _batActive = false; _batIs = false; _batGaveUp = false; _batMisFails = 0;
-            _duckBattle = false; _batCur = null; _batGap = 0;
+            if (why == "blad" && _batMission != null)
+            {
+                if (_batIs && !_batGaveUp)
+                {
+                    _batGaveUp = true;
+                    _batMisFails++;
+                    Log.Info(PB + "rezygnacja w tej misji po " + _batMisFails + " bledach (RestoreNow) - muzyka gry wraca, nastepna bitwa od nowa.");
+                }
+            }
+            else { _batMission = null; _batIs = false; _batGaveUp = false; _batMisFails = 0; }
+            _batOnMission = null; _batActive = false; _duckBattle = false; _batCur = null; _batGap = 0;
         }
 
         // ------------------------------------------------------------ bledy: liczone na misje (po 3 rezygnacja tylko z tej misji), w sesji pierwsze 3 i co 50. do logu

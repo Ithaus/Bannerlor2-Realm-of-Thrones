@@ -252,7 +252,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("RestoreNow.Psai", e); }
             _ducked = false; _paused = false; _active = false; _idle = 0f; _cur = _saved;
-            BattleReset();   // m109-muzyka: stan bitwy od zera (wczytanie zapisu z misji, wyjscie do menu, blad)
+            BattleReset(why);   // m109-muzyka: stan bitwy od zera (wczytanie zapisu z misji, wyjscie do menu); blad w misji bitwy - rezygnacja z tej misji
         }
 
         // ------------------------------------------------------------ nasz utwor
