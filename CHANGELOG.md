@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-23 WGRANIE 105.3 (w-toku/n35-calosc cc5e1599 = 105.2 + znacznik "last seen" + muzyka bitwy ciszej)
+**Status:** WGRANE 2026-10-23 ok. 20:26 CEST BEZ AUTOTESTU (drobne, Jeff testuje w grze); build 0. W GRZE: Armoury a57ff7b2, reszta jak 105.2. Kopie *.bak-2026-10-23-wgranie1053-przed.
+- **Znacznik bandy z listu gonczego (Jeff 20:15 "nie jak GPS", 20:20 "tylko tam, gdzie ostatnio byli widziani, i niech gracz szuka"):** znacznik "<banda> - last seen" stoi tam, gdzie banda byla przy przyjeciu listu; przesuwa sie tylko, gdy gracz sam ja zobaczy (na miejsce, gdzie ja widzial); schowany, gdy bande widac na mapie; miejsce w zapisie (klucz zapisu arm_bounty_seen), wiec po wczytaniu nie przeskakuje do bandy. Recenzja U2/U3: sprzatanie zablakanych znacznikow na starcie sesji.
+- **Muzyka bitwy ciszej o ok. 30% (Jeff 20:17):** Battle Music Loudness 4 -> 3 (MCM; dalej za glosno - 2).
+- **Ryzyko / co sprawdzic:** zapis z listem gonczym - znacznik w miejscu przyjecia listu, nie przy bandzie; po zobaczeniu bandy przesuwa sie; po wczytaniu stoi tam, gdzie byl.
+
 ## 2026-10-23 WGRANIE 105.2 (w-toku/n35-calosc 2f2a6f96 = 105.1 + m110-znacznik) - znacznik bandy listu gonczego na mapie
 **Status:** WGRANE 2026-10-23 ok. 20:11 CEST BEZ AUTOTESTU (Jeff: "zbuduj, ja wczytam gre i zobaczymy"); build 0. W GRZE: Armoury 000468da, reszta jak 105.1. Kopie *.bak-2026-10-23-wgranie1052-przed.
 - **Problem:** Jeff 20:02 (zrzut): zadanie listu gonczego mowi "marked on your map", a na mapie nic.
