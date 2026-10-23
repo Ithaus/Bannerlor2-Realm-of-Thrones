@@ -16,6 +16,7 @@ czy po prostu mam surowce, ktore sa w pamieci".
 | B2 | ForgeView ForgeBillRow.cs - rzad kafli (mixin CraftingVM, wstawka Crafting Index 7), BkVmFixes.Sync, TestStep | ZROBIONE (33f21761, build ForgeView 0) |
 | B3 | ForgeBillTest.cs - test (b) rachunek = zuzycie, test (c) ekranu; SubModuleMain/ArmouryBehavior | ZROBIONE (6a187644, build Armoury 0) |
 | P | grupa progow m109kuz w tools/sprawdz_logi.py + KUZ-S / KUZ-S2 (dobry i zly bieg) | ZROBIONE (4273ab70; sprawdz_narzedzie OK; KUZ-S i KUZ-S2 OK; log Jeffa 22.10 - INFO) |
+| F | poprawki wlasnego przegladu: TestStep odswieza BK przy wyborze tego samego kafla; kwit BK porownywany tylko w rachunku zakladki CRAFT (nasza kuznia i menu kowala zdejmuja przepis) | ZROBIONE (6e00720e, 8f3fd11e; build Armoury i ForgeView 0) |
 | R | recenzja | DO ZROBIENIA |
 | AT | autotest (plan nizej) - NIE uruchamialem gry (Jeff gra); nic nie wgrane | DO ZROBIENIA |
 
