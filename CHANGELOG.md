@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-23 WGRANIE 105.1 (w-toku/n35-calosc d050e842 = 105 + m110-stan krok 2) - ochrona z dokladnego HP noszonego sprzetu, zuzycie sprzetu towarzyszy
+**Status:** WGRANE 2026-10-23 ok. 19:49 CEST po serii 110g (bitwa z armoury-hp/lup/stan, p4, c4, lc = zapis 105.1 na DLL 105, wczyt) - kod 0, ERROR 0, progi m110hp/m110stan/m110okol/m109* 0 NIE. W GRZE: Armoury 1188e347, reszta jak 105.
+- **Problem:** Jeff: "3 x zbroja uszkodzona, HP 41/56/78% - czy kazda moze dawac inny pancerz?" -> "tak" dla sprzetu noszonego.
+- **Zmiana:** sprzet noszony przez gracza i towarzyszy w bitwie chroni i rani wedlug dokladnego HP (krzywa stanu; np. zbroja 50: 41% -> 34, 56% -> 41, 78% -> 47; w tescie: Regenard westerlands_garb 33 -> 27 przy HP 56%); sakwy, zolnierze, AI - wedlug stanu. Ksiega HP towarzyszy (arm_condition_heroes) i ZUZYCIE SPRZETU TOWARZYSZY od trafien (dotad nie zuzywal sie wcale). Klucze Worn Exact Hp Protection, Companion Gear Wear (TAK; pelny powrot = oba NIE).
+- **Ryzyko / co sprawdzic:** HP przypisane do gniazda bohatera (zamiana na identyczna sztuke z sakw przejmuje HP poprzedniej, roznica w obrebie stanu); rodzina gracza w krolestwie walczy w sprzecie RBM (bez HP i zuzycia); zapis rosnie z liczba bohaterow (ok. 18 KB przy 30).
+
 ## 2026-10-23 WGRANIE 105 (w-toku/n35-calosc e0cee64d = 104.1 + m110-okolica + m110-stan krok 1 + czcionka dziennika) - 4 stany sprzetu, stan lupu z trafien, przesluchanie: tylko okolica, mniejsza czcionka dziennika
 **Status:** WGRANE 2026-10-23 ok. 18:27 CEST. W GRZE: Armoury 2f2f6323, SubModule.xml b3bc06fa (wezel ItemModifiers), ModuleData/arm_item_modifiers.xml 9e663ed5 (48 stanow); reszta jak 104.1. Kopie *.bak-2026-10-23-wgranie105-przed i na D:.
 **Testy (DLL test/n110e = fe6ac152, bez zmiany czcionki):** 110e bitwa (lup + stan), p4 + c4 (przesluchanie), lc (zapis 105 na DLL 104.1 przy plikach danych 105 - cofniecie = sama DLL), wczyt (stary zapis) - kod 0, ERROR 0, progi m110stan/m110okol/m109* 0 NIE; wczesniej 110c (4 stany) i 110d (okolica) osobno. Czcionka (e0cee64d) - sama wartosc domyslna, bez testu (zasada Jeffa: male zmiany).
