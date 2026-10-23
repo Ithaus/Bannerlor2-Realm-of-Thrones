@@ -441,6 +441,9 @@ namespace Armoury
             var st = mp != null ? mp.CurrentSettlement : null;
             int kind = Kind(st);
             if (kind == KNone) return;
+            // m110-sam (Jeff 23.10 23:00, zrzut King's Landing, druzyna 1: "jak ja nie mam wojska, to co to za raport, ze wojsko cwiczylo") - bez zolnierzy
+            // nie ma kto cwiczyc ani wydawac zoldu (towarzysze nie cwicza musztry) - bez komunikatu
+            if (mp.MemberRoster == null || mp.MemberRoster.TotalRegulars <= 0) return;
             bool drill = DrillOn(s) && CampDrill.PlayerRuleOn;
             bool spent = _pX > 0;
             if (!drill && !spent) return;
