@@ -308,6 +308,7 @@ namespace Armoury
         public float HideoutSearchSoloHours = 24f;         // searching the den alone takes this long - a lone man turns every bedroll himself
         public float HideoutSearchPerManHours = 0.5f;      // every soldier in the party cuts the search by this many hours
         public float HideoutSearchMinHours = 4f;           // the search never drops below this many hours - some stones only come up slowly
+        public bool HideoutHomeGuardEnabled = true;        // a band without a den of its own (Free Folk raiders, the bands of story scenes) may walk into a hideout and settle there - before, the game crashed the moment it did (m109). Off = as before
         public bool HideoutReprisalEnabled = true;         // nearby bands mass to take their den back while you dig - unless your line scares them off
         public float HideoutReprisalRadius = 40f;          // map-distance within which bandit parties join the reprisal
         public float HideoutReprisalFleeOdds = 3f;         // at this strength advantage (yours vs theirs) the reprisal loses its nerve and melts away

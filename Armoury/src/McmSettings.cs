@@ -892,6 +892,10 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public float HideoutSearchMinHours { get; set; } = 4f;
 
+        [SettingPropertyBool("Hideout Home Guard Enabled", HintText = "a band without a den of its own (Free Folk raiders, the bands of story scenes) may walk into a hideout and settle there - before, the game crashed the moment it did (m109). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public bool HideoutHomeGuardEnabled { get; set; } = true;
+
         [SettingPropertyBool("Hideout Reprisal Enabled", HintText = "nearby bands mass to take their den back while you dig - unless your line scares them off", RequireRestart = false)]
         [SettingPropertyGroup("The hideout purge")]
         public bool HideoutReprisalEnabled { get; set; } = true;
@@ -9506,6 +9510,7 @@ namespace Armoury
             s.HideoutSearchSoloHours = HideoutSearchSoloHours;
             s.HideoutSearchPerManHours = HideoutSearchPerManHours;
             s.HideoutSearchMinHours = HideoutSearchMinHours;
+            s.HideoutHomeGuardEnabled = HideoutHomeGuardEnabled;
             s.HideoutReprisalEnabled = HideoutReprisalEnabled;
             s.HideoutReprisalRadius = HideoutReprisalRadius;
             s.HideoutReprisalFleeOdds = HideoutReprisalFleeOdds;

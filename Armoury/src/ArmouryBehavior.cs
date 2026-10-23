@@ -1577,6 +1577,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("AiWear.OnMapEventEnded", AiWear.OnMapEventEnded));   // wpis 85
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, OutlawLaw.OnVillageLooted);
             VillageHerds.RegisterEvents(this);   // R3-06c (p5-stada): reset nowej kampanii, Resolve zapisu, rabunek gry (VillageLooted)
+            HideoutHomeGuard.RegisterEvents(this);   // m109-crash: banda bez kryjowki wchodzi do kryjowki - latka BanditSpawnCampaignBehavior.OnHomeHideoutChanged (wywrotka 22.10 23:59)
             RaidTribute.RegisterEvents(this);    // R3-03a (p6-okup): latki i opcja "Demand tribute" w starcie sesji, linia doby "Okup okolicy (R3-03a)"
             TiredLand.RegisterEvents(this);      // R3-06d (p5-stada): reset nowej kampanii
             CampWalk.RegisterEvents(this);       // m97-oboz: "Walk through the camp" w menu obozu (scena obozu wedlug druzyny, tylko na zadanie gracza)

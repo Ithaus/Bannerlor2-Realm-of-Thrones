@@ -1043,6 +1043,9 @@ Uzycie (Python 3, tylko odczyt):
                     liczba spalonych z linii 'Beric: rusza', gdy jest - wczytanie zapisu po spaleniu),
                     E5-10 po prologu partie pod scena 0, E5-11 straz niewoli (INFO). Log bez prologu: INFO. Recenzja m104: scena wylaczona
                     kluczem (ostatnia linia startu E5) albo pominieta przez zapis sprzed E5 - INFO z powodem (E5-2, E5-4, E5-5, E5-7, E5-8, E5-8b, E5-9).
+--grupa m109crash : (23.10, w-toku/m109-crash; Armoury/src/HideoutHomeGuard.cs; klucz HideoutHomeGuardEnabled) python -I tools/sprawdz_logi.py --grupa m109crash
+                    <Armoury-*.log>. HH-0 linia startu sesji (klucz tak, latki 1/1, licznik band kryjowek i stary dom bandy dostepne), HH-1 ERROR HideoutHomeGuard (potkniecia) 0,
+                    HH-2 wyjatki zlapane przez finalizer 0, HH-3 bandy bez kryjowki wpuszczone do kryjowek (liczba i zrodla - INFO; kazda z nich = wywrotka w 103.5).
 --grupa m105kolko : (21.10, w-toku/m105-kolko; Armoury/src/MapHoverRing.cs; klucz MapHoverRingOurObjects; plik testu CrashScribe/armoury-kolko.flag)
                     python -I tools/sprawdz_logi.py --grupa m105kolko <Armoury-*.log>. KO-1 ERROR 0, KO-2 proby kola NIE 0 i TAK >= 1 (brak prob - INFO),
                     KO-3 encja kola postawiona, KO-4 potkniecia kola 0.
@@ -38820,6 +38823,69 @@ def m105kolko_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m109crash (23.10, w-toku/m109-crash: banda bez kryjowki wchodzi do kryjowki - wywrotka Jeffa 22.10 23:59:40,
+# NullReferenceException w BanditSpawnCampaignBehavior.OnHomeHideoutChanged; Armoury/src/HideoutHomeGuard.cs, klucz HideoutHomeGuardEnabled)
+M109CRASH_TAG = "Dom kryjowki (m109): "
+M109CRASH_START = re.compile(r"^start sesji \| klucz Hideout Home Guard Enabled (tak|nie) \| latki (\d+)/(\d+)(.*?) \| licznik band kryjowek gry (tak|nie), stary dom bandy (tak|nie) ")
+M109CRASH_ENTRY = re.compile(r"^banda bez kryjowki weszla do kryjowki .* \| zrodlo (.*?) \| licznik band kryjowek gry ")
+M109CRASH_DAY = re.compile(r"^dzien (\d+) \| band bez kryjowki wpuszczonych do kryjowek (\d+) \(zrodla: (.*?)\), wyjatkow zlapanych (\d+) ")
+
+
+def m109crash_main(logp):
+    """m109crash (23.10): HH-0 start sesji (klucz tak, latki 1/1, pola tak), HH-1 ERROR HideoutHomeGuard poza finalizerem 0, HH-2 wyjatki zlapane 0,
+    HH-3 bandy bez kryjowki wpuszczone (INFO: liczba, zrodla). Log bez linii m109: INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("HH-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, entries, days, n_err, n_caught = [], [], [], 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in HideoutHomeGuard"):
+                if s.startswith("ERROR in HideoutHomeGuard.OnHomeHideoutChanged"):
+                    n_caught += 1
+                else:
+                    n_err += 1
+                continue
+            if not s.startswith(M109CRASH_TAG):
+                continue
+            body = s[len(M109CRASH_TAG):]
+            for rx, bucket in ((M109CRASH_START, starts), (M109CRASH_ENTRY, entries), (M109CRASH_DAY, days)):
+                mm = rx.search(body)
+                if mm:
+                    bucket.append(mm.groups())
+                    break
+    print(f"plik: {logp} | start {len(starts)}, wejscia szczegolowo {len(entries)}, doby {len(days)}, ERROR {n_err}, wyjatki zlapane {n_caught}")
+    if not starts:
+        rep.add("HH-0: linia 'Dom kryjowki (m109): start sesji'", "brak w logu", "INFO (log sprzed paczki m109-crash)", None)
+        rep.add("HH-1: ERROR HideoutHomeGuard", f"ERROR {n_err}", "0", n_err == 0)
+        rep.show()
+        return 0
+    st = starts[-1]
+    st_ok = all(x[0] == "tak" and x[1] == x[2] and x[1] != "0" and x[4] == "tak" and x[5] == "tak" for x in starts)
+    rep.add("HH-0: start sesji", f"{len(starts)} linii; ostatnia: klucz {st[0]}, latki {st[1]}/{st[2]}{st[3]}, licznik {st[4]}, stary dom {st[5]}",
+            "klucz tak, latki n/n (n >= 1), licznik i stary dom tak", st_ok)
+    rep.add("HH-1: ERROR HideoutHomeGuard (potkniecia)", f"{n_err}", "0", n_err == 0)
+    caught = max([n_caught] + [int(d[3]) for d in days])
+    rep.add("HH-2: wyjatki zlapane przez finalizer", f"{caught} (linie ERROR {n_caught}, maks. z doby {max([0] + [int(d[3]) for d in days])})", "0", caught == 0)
+    total = sum(int(d[1]) for d in days)
+    src = {}
+    for d in days:
+        for part in d[2].split(", "):
+            if part == "-":
+                continue
+            k, _, v = part.rpartition(" ")
+            if v.isdigit():
+                src[k] = src.get(k, 0) + int(v)
+    rep.add("HH-3: bandy bez kryjowki wpuszczone do kryjowek", f"{total} w {len(days)} dobach; zrodla: " + (", ".join(f"{k} {v}" for k, v in sorted(src.items(), key=lambda x: -x[1])) or "-")
+            + f"; szczegolowo {len(entries)}", "INFO (kazda = wywrotka w 103.5)", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m105dziennik (21.10, w-toku/m105-dziennik: dziennik wiadomosci na mapie obok menu osady, ramka w stylu ROT,
 # bez wierszy handlu karawan i wiesniakow nad miastami - Armoury/src/MapChatLog.cs; klucze MapChatLogClearOfMenu, MapChatLogFrame, MapHideTradeNotices;
 # autotest: plik CrashScribe/armoury-dziennik.flag)
@@ -58305,6 +58371,8 @@ def main(argv):
         return m105miasta_main(logp, tabp)   # m105-miasta (21/22.10): szybka obnizka firm ponizej zapasu, skarbiec korony na glod, premia drogi po podlodze, rezerwy zlota wozow
     if group == "m105kolko" and logp:
         return m105kolko_main(logp)   # m105kolko (21.10, w-toku/m105-kolko): kolko najechania przy zajazdach i wioskach pobocznych (MapHoverRing)
+    if group == "m109crash" and logp:
+        return m109crash_main(logp)   # m109crash (23.10, w-toku/m109-crash): banda bez kryjowki wchodzi do kryjowki (HideoutHomeGuard) - wywrotka 22.10 23:59
     if group == "m105dziennik" and logp:
         return m105dziennik_main(logp)   # m105dziennik (21.10, w-toku/m105-dziennik): dziennik obok menu osady, ramka w stylu ROT, bez wierszy handlu nad miastami (MapChatLog)
     if group == "m105drobne" and (logp or csp):
