@@ -47,6 +47,8 @@ namespace Armoury
     ///    wypytani (recenzja R2). Warunek opcji gra liczy tylko przy odswiezeniu menu (GameMenuVM.Refresh(true): wejscie, powrot, odswiezenie kontekstu), co klatke
     ///    czyta zapamietane IsEnabled/Tooltip (GameMenuItemVM.Refresh) - przeglad kryjowek w warunku bez pamieci podrecznej.
     ///  - UJAWNIENIE jak zwiad gry bez zdarzenia gry (bez 100 XP Zwiadu i drugiego meldunku): Hideout.IsSpotted, Settlement.IsVisible, flaga HideoutSpotter.Mark.
+    ///    m110-okolica (Jeff 23.10 "zwiadem", klucz InterrogationAreaOnly TAK): zamiast ujawnienia tylko OKOLICA - wskazowka, znacznik obszaru i wiedza jak plotka
+    ///    (CampInterrogation.Area.cs); kryjowke wypatruje zwykly zwiad. NIE = ujawnienie jak wyzej.
     ///  - Ekonomia: zero przeplywow zlota i towarow (zabity jeniec = utracony okup). Wyjatek - zamknieta ekonomia: zabity bohater-bandyta z klanu bez glowy (albo sam glowa)
     ///    oddaje sakiewke graczowi (gra przy smierci daje ja glowie klanu, a bez glowy GiveGoldAction z odbiorca null - zloto przepadloby); log "sakiewka N -> gracz".
     /// Log "Przesluchanie (m109): " - start sesji, pamiec (pierwsze DetailMax na sesje), kazda proba i odmowa, linia doby; tools/sprawdz_logi.py --grupa m109przes.
@@ -79,8 +81,8 @@ namespace Armoury
         private static readonly List<Band> _bands = new List<Band>();
         private static readonly Dictionary<string, int[]> _used = new Dictionary<string, int[]>(StringComparer.Ordinal);   // LimitKey -> {doba rozmowy, doba tortury}
         private static readonly Dictionary<string, int> _seen = new Dictionary<string, int>(StringComparer.Ordinal);      // klucz grupy (stos) -> pierwsza doba w lochu
-        // sumy kampanii: rozmowy, mowili, tortury, mowili, zmarli, ujawnione
-        private static readonly int[] _sum = new int[6];
+        // sumy kampanii: rozmowy, mowili, tortury, mowili, zmarli, ujawnione; m110-okolica: wskazane, znalezione (DLL 104 czyta pierwsze 6)
+        private static readonly int[] _sum = new int[8];
         private static string _importNote = "brak klucza (stary zapis albo nowa kampania)";
 
         // liczniki doby i sesji
@@ -103,6 +105,7 @@ namespace Armoury
         {
             _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length);
             _importNote = "brak klucza (stary zapis albo nowa kampania)";
+            HintsClear(); _hintNote = "brak klucza (stary zapis albo nowa kampania)";   // m110-okolica
             TestReset();
             DayReset();
         }
@@ -110,6 +113,7 @@ namespace Armoury
         private static void DayReset()
         {
             _dTalk = _dTalkYes = _dTort = _dTortYes = _dDeadMen = _dDeadHero = _dBlocked = _dRevHero = _dRevBand = _dRevKin = _dMemNew = _dRefused = _dStumbles = 0;
+            HintDayReset();   // m110-okolica
         }
 
         // ------------------------------------------------------------ wpiecie (ArmouryBehavior.RegisterEvents - jedna linia)
@@ -118,11 +122,17 @@ namespace Armoury
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(b, delegate { try { Reset(); } catch (Exception e) { Stumble("Reset", e); } });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(b, delegate (CampaignGameStarter s)
             {
-                try { _stumbles = 0; _stumbleAt.Clear(); _detail = 0; _sessionDays = 0; DayReset(); if (s != null) AddMenus(s); SessionStart(); }
+                try { _stumbles = 0; _stumbleAt.Clear(); _detail = 0; _sessionDays = 0; _hStumbles = 0; DayReset(); if (s != null) AddMenus(s); SessionStart(); }
                 catch (Exception e) { Stumble("SessionStart", e); }
+                try { HintsSessionStart(); } catch (Exception e) { HintStumble("HintStart", e); }   // m110-okolica: znaczniki wskazowek z zapisu, linia startu m110 (po linii m109)
             });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(b, delegate { try { Daily(); } catch (Exception e) { Stumble("Daily", e); } });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(b, DayProfile.MapEnd("CampInterrogation.OnMapEventEnded", OnMapEventEnded));
+            // m110-okolica: koniec wskazowek (przeglad godzinny i zdarzenie wypatrzenia gry), znaczniki obszaru poza zapisem gry (zdjete przed zapisem, oddane po nim)
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(b, DayProfile.Hr("CampInterrogation.Hints", delegate { try { HintsHour(); } catch (Exception e) { HintStumble("HintHour", e); } }));
+            CampaignEvents.OnHideoutSpottedEvent.AddNonSerializedListener(b, delegate (PartyBase p, PartyBase h) { try { OnLairSpotted(p, h); } catch (Exception e) { HintStumble("HintSpotted", e); } });
+            CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(b, delegate { try { BeforeSaveHints(); } catch (Exception e) { HintStumble("HintSave", e); } });
+            CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(b, delegate (bool ok, string name) { try { SaveOverHints(ok); } catch (Exception e) { HintStumble("HintSaveOver", e); } });
         }
 
         // ------------------------------------------------------------ pamiec band (MapEventEnded)
@@ -356,7 +366,7 @@ namespace Armoury
             if (c == null) { why = WhyNoKind; whyLog = "brak kultury"; return null; }
             var mp = MobileParty.MainParty;
             Vec2 from = mem != null ? new Vec2(mem.X, mem.Y) : (mp != null ? mp.Position.ToVec2() : Vec2.Zero);
-            int total = 0, held = 0, hidden = 0;
+            int total = 0, held = 0, hidden = 0, hinted = 0;
             Settlement best = null; float bd = LairRange;
             foreach (var h in Hideout.All)
             {
@@ -366,20 +376,22 @@ namespace Armoury
                 if (!h.IsInfested) continue;
                 held++;
                 if (h.IsSpotted) continue;
+                if (Hinted(st)) { hinted++; continue; }   // m110-okolica: czynna wskazowka - nie wskazuje jej drugi raz (jak wypatrzonej)
                 hidden++;
                 float d = st.GetPosition2D.Distance(from);
                 if (d <= bd) { bd = d; best = st; }
             }
             if (best != null) { source = "kultura"; return best; }
             if (total == 0) { why = WhyNoKind; whyLog = "kultura bez kryjowek"; }
+            else if (held > 0 && hidden == 0 && hinted > 0) { why = WhyAllKnownArea; whyLog = "wszystkie znane albo wskazane (wskazanych " + hinted + ")"; }   // m110-okolica
             else if (held > 0 && hidden == 0) { why = WhyAllKnown; whyLog = "wszystkie znane"; }
-            else { why = WhyNoneNear; whyLog = "zadna w zasiegu (zajetych " + held + ", niewypatrzonych " + hidden + ")"; }
+            else { why = WhyNoneNear; whyLog = "zadna w zasiegu (zajetych " + held + ", niewypatrzonych " + (hidden + hinted) + (hinted > 0 ? ", wskazanych " + hinted : "") + ")"; }
             return null;
         }
 
         private static bool Open(Settlement st)
         {
-            return st != null && st.IsHideout && st.Hideout != null && st.Hideout.IsInfested && !st.Hideout.IsSpotted;
+            return st != null && st.IsHideout && st.Hideout != null && st.Hideout.IsInfested && !st.Hideout.IsSpotted && !Hinted(st);   // m110-okolica: bez czynnej wskazowki
         }
 
         // ------------------------------------------------------------ szanse
@@ -454,7 +466,7 @@ namespace Armoury
         // ------------------------------------------------------------ przesluchanie
         internal sealed class Result
         {
-            public bool Refused, Talked, Died, Blocked, Flag, Rumour;
+            public bool Refused, Talked, Died, Blocked, Flag, Rumour, Area, Marker;   // m110-okolica: Area - tylko okolica (wskazowka), Marker - znacznik obszaru stoi
             public string RefuseWhy, Source, Where, Text;
             public float Chance, Roll, DeathChance = -1f, DeathRoll = -1f;
             public Settlement Lair;
@@ -507,24 +519,43 @@ namespace Armoury
             if (torture) _dTort++; else _dTalk++;
             if (torture) _sum[2]++; else _sum[0]++;
 
-            // ujawnienie (jak zwiad gry, bez zdarzenia gry)
+            // ujawnienie (jak zwiad gry, bez zdarzenia gry); m110-okolica (klucz InterrogationAreaOnly): tylko okolica - wskazowka, znacznik obszaru, wiedza jak plotka
+            bool area = AreaOn;
             bool spottedBefore = lair.Hideout.IsSpotted;
-            string lairLog;
+            string lairLog, hintLine = null;
             float dCamp = MobileParty.MainParty != null ? lair.GetPosition2D.Distance(MobileParty.MainParty.Position.ToVec2()) : -1f;
             if (res.Talked)
             {
-                try
+                if (area)
                 {
-                    lair.Hideout.IsSpotted = true;
-                    lair.IsVisible = true;
-                    res.Flag = HideoutSpotter.Mark(lair);
-                    res.Where = HideoutSpotter.Where(lair);
+                    res.Area = true;
+                    try
+                    {
+                        string wh;
+                        var hh = Give(lair, source, kind, g.Key, out wh, out hintLine);
+                        res.Where = wh;
+                        res.Marker = hh != null && hh.Marker != null;
+                    }
+                    catch (Exception e) { HintStumble("HintGive", e); }
                 }
-                catch (Exception e) { Stumble("Reveal", e); }
+                else
+                {
+                    try
+                    {
+                        lair.Hideout.IsSpotted = true;
+                        lair.IsVisible = true;
+                        res.Flag = HideoutSpotter.Mark(lair);
+                        res.Where = HideoutSpotter.Where(lair);
+                    }
+                    catch (Exception e) { Stumble("Reveal", e); }
+                }
                 res.Lair = lair; res.Source = source;
                 if (torture) { _dTortYes++; _sum[3]++; } else { _dTalkYes++; _sum[1]++; }
-                _sum[5]++;
-                if (source == "bohater") _dRevHero++; else if (source == "banda") _dRevBand++; else _dRevKin++;
+                if (!area)   // m110-okolica: wskazowki licza liczniki m110 (Give), ujawnione tylko w trybie dokladnym
+                {
+                    _sum[5]++;
+                    if (source == "bohater") _dRevHero++; else if (source == "banda") _dRevBand++; else _dRevKin++;
+                }
                 lairLog = "kryjowka " + lair.StringId + " (kultura " + (lair.Culture != null ? lair.Culture.StringId : "-") + ", zajeta " + (lair.Hideout.IsInfested ? "TAK" : "NIE")
                           + ", wypatrzona przed " + (spottedBefore ? "TAK" : "NIE") + " -> po " + (lair.Hideout.IsSpotted ? "TAK" : "NIE") + ", skad " + source
                           + ", " + dCamp.ToString("0.0", Inv) + " jedn. od obozu, flaga " + (res.Flag ? "TAK" : "NIE") + ")";
@@ -586,10 +617,12 @@ namespace Armoury
                      + " | miara " + pp.Total + " (" + Persuasion.LogText(pp) + ") | " + OddsLog(o) + " | rzut " + F4(res.Roll) + " -> " + (res.Talked ? "MOWI" : "MILCZY")
                      + " | " + lairLog + " | " + deathLog + " | po " + h1 + "/" + w1 + " | " + mercyLog + " | " + relLog + " | plotka " + rumourLog
                      + " | XP Urok +" + xpCharm + ", Lotrostwo +" + xpRog + " | dzis rozmow " + _dTalk + ", tortur " + _dTort + ".");
+            if (hintLine != null) Log.Info(hintLine);   // m110-okolica: linia "wskazowka" tuz po linii proby m109 (grupa m110okol OKOL-3)
             res.Text = Story(g, torture, res, mem);
             try
             {
-                if (res.Talked) Log.Player("A prisoner talked: an outlaw lair " + res.Where + (res.Flag ? " - flagged on your map." : "."));
+                if (res.Talked && res.Area) Log.Player("A prisoner talked: an outlaw lair " + (res.Where ?? AreaSomewhere) + (res.Marker ? " - the area is marked on your map." : "."));
+                else if (res.Talked) Log.Player("A prisoner talked: an outlaw lair " + res.Where + (res.Flag ? " - flagged on your map." : "."));
                 if (res.Died) Log.Player(g.Name + " died under the irons.", true);
             }
             catch { }
@@ -662,6 +695,7 @@ namespace Armoury
         /// <summary>Tekst okna wyniku (EN).</summary>
         private static string Story(Group g, bool torture, Result r, Band mem)
         {
+            if (r.Talked && r.Area) return AreaStory(torture, r, mem);   // m110-okolica
             string mark = r.Flag ? " It is marked on your map." : " It now shows on your map.";
             string lair = "";
             if (r.Talked)
@@ -675,6 +709,21 @@ namespace Armoury
             if (r.Talked) return (r.Died ? "Under the irons he screams it out before he dies: " + lair : "Under the irons he breaks: " + lair) + mark;   // recenzja R6: bez "where their lair is - their lair lies"
             return r.Died ? "He dies under the irons without a word." : "He takes the pain and tells you nothing.";
         }
+
+        /// <summary>m110-okolica: tekst okna wyniku, gdy jeniec podal okolice (EN).</summary>
+        private static string AreaStory(bool torture, Result r, Band mem)
+        {
+            string where = r.Where ?? AreaSomewhere;
+            string head = !torture ? "The man talks. " : r.Died ? "Under the irons he screams it out before he dies. " : "Under the irons he breaks. ";
+            string mid;
+            if (r.Source == "bohater") mid = "He gives up the den his band holds: " + where + ".";
+            else if (r.Source == "banda") mid = "He gives up his own band's den: " + where + ".";
+            else if (mem != null && mem.Hideout.Length == 0) mid = "His band had no lair of its own, but he has heard of one of his people's: " + where + ".";
+            else mid = "He has heard of a lair of his people: " + where + ".";
+            return head + mid + (r.Marker ? " You will have to find it yourself - the area is marked on your map." : " You will have to find it yourself.");
+        }
+
+        private const string AreaSomewhere = "somewhere out in the wilds";   // m110-okolica: opis sie nie udal (brak osady odniesienia albo potkniecie)
 
         private static string Cap(string s) { return string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s.Substring(1); }
 
@@ -731,8 +780,9 @@ namespace Armoury
                 }
                 var me = Hero.MainHero;
                 var p = Persuasion.Measure(me, null);
-                a.Tooltip = new TextObject("{=!}Have the captive outlaws brought before you and learn where their lair is. Your persuasion: " + p.Total + " (" + Persuasion.Words(p)
-                                           + Persuasion.LeaderNote(me) + ").");
+                a.Tooltip = new TextObject("{=!}" + (AreaOn ? "Have the captive outlaws brought before you and learn which way their lair lies - you will still have to find it."   // m110-okolica
+                                                            : "Have the captive outlaws brought before you and learn where their lair is.")
+                                           + " Your persuasion: " + p.Total + " (" + Persuasion.Words(p) + Persuasion.LeaderNote(me) + ").");
                 return true;
             }
             catch (Exception e) { Stumble("Cond", e); return false; }
@@ -749,6 +799,13 @@ namespace Armoury
 
         private static string LairHint(string source, Band mem)
         {
+            if (AreaOn)   // m110-okolica: jeniec zna tylko okolice
+            {
+                if (source == "bohater") return "He can tell you which way and how far to the lair his band holds.";
+                if (source == "banda") return "He can tell you which way and how far to his own band's den.";
+                if (mem != null && mem.Hideout.Length == 0) return "His band had no lair of its own, but he may have heard where one of his people's lies.";
+                return "He may have heard where a lair of his people lies.";
+            }
             if (source == "bohater") return "He can lead you to the lair his band holds.";
             if (source == "banda") return "He knows his own band's den.";
             if (mem != null && mem.Hideout.Length == 0) return "His band had no lair of its own, but he knows one of his people's.";
@@ -878,6 +935,7 @@ namespace Armoury
                          + " | pamiec band " + _bands.Count + " (nowe dzis " + _dMemNew + ") | jency-bandyci grup " + gr + ", ludzi " + men + ", bohaterow " + he + ", kajdany " + _seen.Count
                          + " | potkniecia dzis " + _dStumbles + ".");
             }
+            try { HintsDaily(today); } catch (Exception e) { HintStumble("HintDaily", e); }   // m110-okolica: linia doby wskazowek
             DayReset();
         }
 
@@ -913,18 +971,20 @@ namespace Armoury
 
         // ------------------------------------------------------------ zapis "arm_interrogation"
         /// <summary>"1|doba,kultura,kryjowka,x,y,banda;...|klucz,dobaR,dobaT;...|rozmowy,mowili,tortury,mowili,zmarli,ujawnione|stos,doba;..." (ponizej 4 KB
-        /// pamieci i uzyc + kajdany najwyzej SeenMax wpisow, ok. 8 KB; limit napisu 32 KB); piata czesc (kajdany) opcjonalna przy odczycie. Klucz wylaczony i stan pusty - "".</summary>
+        /// pamieci i uzyc + kajdany najwyzej SeenMax wpisow, ok. 8 KB; limit napisu 32 KB); piata czesc (kajdany) opcjonalna przy odczycie. Klucz wylaczony i stan pusty - "".
+        /// m110-okolica: sumy + wskazane, znalezione (8 liczb) i szosta czesc - wskazowki "kryjowka,odniesienie,termin,x,y,skad,wskazanie,przypiety;..." (najwyzej po
+        /// jednej na kryjowke, kilka dob - ponizej kilku KB); DLL 104 czyta czesci 1-5 i pierwsze 6 sum, szosta pomija.</summary>
         internal static string Export()
         {
             try
             {
-                if (!On && _bands.Count == 0 && _used.Count == 0 && _seen.Count == 0) return "";
-                return Write(_bands, _used, _sum, _seen);
+                if (!On && _bands.Count == 0 && _used.Count == 0 && _seen.Count == 0 && _hints.Count == 0) return "";
+                return Write(_bands, _used, _sum, _seen, _hints);
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
         }
 
-        private static string Write(List<Band> bands, Dictionary<string, int[]> used, int[] sum, Dictionary<string, int> seen)
+        private static string Write(List<Band> bands, Dictionary<string, int[]> used, int[] sum, Dictionary<string, int> seen, Dictionary<string, Hint> hints)
         {
             var sb = new StringBuilder("1|");
             for (int i = 0; i < bands.Count; i++)
@@ -950,13 +1010,17 @@ namespace Armoury
                 if (n++ > 0) sb.Append(';');
                 sb.Append(kv.Key).Append(',').Append(kv.Value.ToString(Inv));
             }
+            sb.Append('|');
+            WriteHints(sb, hints);   // m110-okolica: szosta czesc
             return sb.ToString();
         }
 
-        /// <summary>Odczyt napisu zapisu do podanych kontenerow (Import i proba testu). Zle wpisy pominiete i policzone; false - nieznany format.</summary>
-        private static bool Parse(string data, List<Band> bands, Dictionary<string, int[]> used, int[] sum, Dictionary<string, int> seen, out int bad)
+        /// <summary>Odczyt napisu zapisu do podanych kontenerow (Import i proba testu). Zle wpisy pominiete i policzone; false - nieznany format.
+        /// m110-okolica: szosta czesc (wskazowki) - hintsPart false = zapis sprzed m110, badHints - zle wpisy wskazowek (osobno od bad).</summary>
+        private static bool Parse(string data, List<Band> bands, Dictionary<string, int[]> used, int[] sum, Dictionary<string, int> seen, Dictionary<string, Hint> hints,
+                                  out int bad, out int badHints, out bool hintsPart)
         {
-            bad = 0;
+            bad = 0; badHints = 0; hintsPart = false;
             var parts = data.Split('|');
             if (parts.Length < 4 || parts[0] != "1") return false;
             foreach (var e in parts[1].Split(';'))
@@ -989,22 +1053,31 @@ namespace Armoury
                     if (seen.Count < SeenMax) seen[a[0]] = d;
                 }
             }
+            if (parts.Length > 5 && hints != null) { hintsPart = true; badHints = ParseHints(parts[5], hints); }   // m110-okolica: wskazowki (zapis sprzed m110 - brak czesci)
             return true;
         }
 
         internal static void Import(string data)
         {
             _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length);
+            HintsClear();   // m110-okolica
             TestReset();
-            if (string.IsNullOrEmpty(data)) { _importNote = "brak klucza (stary zapis albo nowa kampania)"; return; }
+            if (string.IsNullOrEmpty(data)) { _importNote = "brak klucza (stary zapis albo nowa kampania)"; _hintNote = _importNote; return; }
             try
             {
-                int bad;
-                if (!Parse(data, _bands, _used, _sum, _seen, out bad)) { _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); _importNote = "nieznany format - pominiety"; return; }
+                int bad, badH; bool hp;
+                if (!Parse(data, _bands, _used, _sum, _seen, _hints, out bad, out badH, out hp))
+                {
+                    _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); HintsClear(); _importNote = "nieznany format - pominiety"; _hintNote = _importNote; return;
+                }
                 _importNote = "pamiec " + _bands.Count + ", uzycia " + _used.Count + ", kajdany " + _seen.Count + ", sumy kampanii: rozmowy " + _sum[0] + " (mowili " + _sum[1] + "), tortury " + _sum[2]
-                              + " (mowili " + _sum[3] + "), zmarli " + _sum[4] + ", ujawnione " + _sum[5] + (bad > 0 ? ", zlych wpisow " + bad : "");
+                              + " (mowili " + _sum[3] + "), zmarli " + _sum[4] + ", ujawnione " + _sum[5] + ", wskazane " + _sum[6] + ", znalezione " + _sum[7] + (bad > 0 ? ", zlych wpisow " + bad : "");
+                _hintNote = hp ? "wskazowek " + _hints.Count + " (zlych " + badH + ")" : "brak czesci wskazowek (zapis sprzed m110)";
             }
-            catch (Exception e) { _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); _importNote = "blad odczytu - pominiety"; Stumble("Import", e); }
+            catch (Exception e)
+            {
+                _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); HintsClear(); _importNote = "blad odczytu - pominiety"; _hintNote = _importNote; Stumble("Import", e);
+            }
         }
     }
 }

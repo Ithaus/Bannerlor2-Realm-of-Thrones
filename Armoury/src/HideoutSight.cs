@@ -436,6 +436,13 @@ namespace Armoury
             catch (Exception e) { me.Stumble("Heard", e); }
         }
 
+        /// <summary>m110-okolica: czy kryjowka jest znana z plotki (_known) - tylko odczyt (linia wskazowki przesluchania i jego test).</summary>
+        internal static bool Knows(string hideoutId)
+        {
+            var me = _inst;
+            return me != null && !string.IsNullOrEmpty(hideoutId) && me._known.Contains(hideoutId);
+        }
+
         /// <summary>Czy plotka moze mowic o tej kryjowce: przy kluczu tylko zajeta i niewypatrzona.</summary>
         internal static bool RumourFits(Hideout h)
         {
