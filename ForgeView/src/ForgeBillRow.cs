@@ -241,8 +241,9 @@ namespace ForgeView
                     ArmorItemVM pick = null;
                     if (ac.Armors != null) foreach (var a in ac.Armors) if (a != null && a.Item == item) { pick = a; break; }
                     if (pick == null) pick = new ArmorItemVM(ac, item, ac.GetItemType(item));
-                    ac.CurrentItem = pick;   // BK: OnRefresh -> BkMaterialsModeFix.Sync -> Refresh
-                    if (!ReferenceEquals(ac.CurrentItem, pick)) bk.OnRefresh();
+                    bool same = ReferenceEquals(ac.CurrentItem, pick);
+                    ac.CurrentItem = pick;   // BK: OnRefresh -> BkMaterialsModeFix.Sync -> Refresh (setter BK odswieza tylko przy zmianie)
+                    if (same) bk.OnRefresh();
                 }
                 bk = cur._bk ?? bk;
                 string mode;
