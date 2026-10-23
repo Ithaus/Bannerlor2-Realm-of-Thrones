@@ -144,9 +144,10 @@ namespace Armoury
 
         /// <summary>m110-stan (i): podzial wrakow wedlug stanu z obrazen. Czesc z ksiega: zniszczona przepada; wrak (ponizej 10%) zostaje wrakiem (caly dla gracza,
         /// Jeff 12.10); lepsza czesc - jak reszta lupu z tego ciala: powalony przez Ciebie albo towarzysza - do kolejki w calosci, przez zolnierza - trzecia kapitana
-        /// na przedmiot (WholeShare), reszta do zbrojowni wojska bez stanu (DTE rozdaje z niej sztuki bez stanu). Bez zbrojowni - jak dotad (wrak). Czesci bez
-        /// ksiegi i juz podzielone - bez zmian.</summary>
-        private static void SplitWrecks(ItemRoster armory, int third, int pct)
+        /// na przedmiot (WholeShare), reszta do zbrojowni wojska ze swoim stanem (recenzja R1/R4: dotad bez stanu - wartosc z niczego). Bez zbrojowni - jak
+        /// dotad (wrak). Czesci bez ksiegi i juz podzielone - bez zmian. reg - zwykly lup partii gracza z rekordu DTE (cialo po ciele): czesci zolnierza dziela
+        /// sie jednym zaokragleniem z tym lupem (recenzja R4); null - osobno jak dotad.</summary>
+        private static void SplitWrecks(ItemRoster armory, int third, int pct, Dictionary<ItemObject, int> reg)
         {
             if (Wrecks.Count == 0) return;
             var keepW = new List<ItemObject>();
@@ -169,12 +170,32 @@ namespace Armoury
             {
                 var l = kv.Value;
                 for (int i = l.Count - 1; i > 0; i--) { int j = TaleWorlds.Core.MBRandom.RandomInt(i + 1); var x = l[i]; l[i] = l[j]; l[j] = x; }
-                int h = 0, tr = l.Count;
-                int sh = WholeShare(l.Count, ref h, ref tr, third, pct);
+                int sh, rc;
+                if (reg != null && reg.TryGetValue(kv.Key, out rc))
+                {
+                    // recenzja R4: jedno zaokraglenie na przedmiot - dzialka z (zwykly lup + te czesci) minus dzialka samego zwyklego lupu (ta sama regula
+                    // WholeShare, ktora potem liczy zwykla dzialke ponizej); pojedyncza czesc obok zwyklego lupu nie ginie juz w zaokragleniu do zera
+                    int hk, tk;
+                    lock (_lootHero) { _lootHero.TryGetValue(kv.Key, out hk); _lootTroop.TryGetValue(kv.Key, out tk); }
+                    int h0 = hk, t0 = tk, h1 = hk, t1 = tk + l.Count;
+                    sh = WholeShare(rc + l.Count, ref h1, ref t1, third, pct) - WholeShare(rc, ref h0, ref t0, third, pct);
+                    sh = Math.Max(0, Math.Min(l.Count, sh));
+                }
+                else
+                {
+                    int h = 0, tr = l.Count;
+                    sh = WholeShare(l.Count, ref h, ref tr, third, pct);
+                }
                 for (int i = 0; i < l.Count; i++)
                 {
                     if (i < sh) { QueueB(kv.Key, l[i].State, null, null); LootWear.Route(l[i], LootWear.RDz); }
-                    else { armory.AddToCounts(new EquipmentElement(kv.Key), 1); LootWear.Route(l[i], LootWear.RZbr); }
+                    else
+                    {
+                        // recenzja R1 (kod) / R4: do zbrojowni wojska ze swoim stanem (zbrojownia trzyma modyfikatory - WearTheTroops, ShareWithState)
+                        var wm = l[i].State > GearState.Sound ? GearState.ModFor(kv.Key, l[i].State) : null;
+                        armory.AddToCounts(new EquipmentElement(kv.Key, wm), 1);
+                        LootWear.Route(l[i], LootWear.RZbr);
+                    }
                 }
             }
             Wrecks.Clear(); Wrecks.AddRange(keepW);
@@ -819,7 +840,9 @@ namespace Armoury
                     if (s.LootMinConditionPercent > 0)
                     {
                         var mod = el.EquipmentElement.ItemModifier;
-                        if (mod != null && mod.PriceMultiplier * 100f <= s.LootMinConditionPercent + 0.01f)
+                        // m110-stan (recenzja R7): przy stanach - caly przedzial stanu na progu albo nizej (wrak 0.05 nie ginie juz przy progu 5-9)
+                        if (mod != null && (GearState.On ? GearState.BelowDestroy(mod, s.LootMinConditionPercent)
+                                                         : mod.PriceMultiplier * 100f <= s.LootMinConditionPercent + 0.01f))
                         {
                             roster.AddToCounts(el.EquipmentElement, -el.Amount);
                             trash += el.Amount;
@@ -887,14 +910,23 @@ namespace Armoury
                 var armory = _dteArmory.GetValue(null) as ItemRoster;
                 // m110-stan (i): czesci z ciosu i pekniete wedlug stanu z obrazen - przed dzialka (bez zbrojowni - jak dotad, wrak)
                 bool bOn = LootWear.On;
-                if (bOn) { try { SplitWrecks(armory, third, pct); } catch (Exception e) { MountStumble("SplitWrecks", e); } }
+                if (bOn)
+                {
+                    try
+                    {
+                        // recenzja R4: przy lupie cialo po ciele czesci zolnierza dziela sie jednym zaokragleniem ze zwyklym lupem tego przedmiotu
+                        var reg = whole && armory != null ? PlayerLootCounts(__instance, partyId) : null;
+                        SplitWrecks(armory, third, pct, reg);
+                    }
+                    catch (Exception e) { MountStumble("SplitWrecks", e); }
+                }
                 if (pct <= 0 && !whole) { DropPools(); return; }
 
                 if (armory == null) { DropPools(); return; }
 
                 // rekord bitewny partii gracza - jedyny z isPlayerParty
                 var records = _dteRecords.GetValue(__instance) as System.Collections.IEnumerable;
-                if (records == null) return;
+                if (records == null) { DropPools(); return; }   // m110-stan (recenzja R5): pule czesci nie zostaja na nastepna bitwe
                 int moved = 0;
                 foreach (var entry in records)
                 {
@@ -967,7 +999,33 @@ namespace Armoury
                 }
                 DropPools();   // m110-stan: reszta pul - sztuki zostaja u wojska (bez stanu, jak dotad)
             }
-            catch (Exception e) { Log.Error("AfterDtePartyItems", e); }
+            catch (Exception e) { Log.Error("AfterDtePartyItems", e); try { DropPools(); } catch { } }   // m110-stan (recenzja R5): po wyjatku pule tez puszczone
+        }
+
+        /// <summary>m110-stan (recenzja R4): zwykly lup partii gracza z rekordu DTE (przedmiot -> sztuk) - tylko odczyt, ta sama droga co petla dzialki
+        /// w AfterDtePartyItems; null - brak rekordu.</summary>
+        private static Dictionary<ItemObject, int> PlayerLootCounts(object inst, object partyId)
+        {
+            var records = _dteRecords.GetValue(inst) as System.Collections.IEnumerable;
+            if (records == null || partyId == null) return null;
+            foreach (var entry in records)
+            {
+                var et = entry.GetType();
+                var key = et.GetProperty("Key").GetValue(entry, null);
+                if (key == null || !key.Equals(partyId)) continue;
+                var looted = _dteLootedItems.GetValue(et.GetProperty("Value").GetValue(entry, null)) as System.Collections.IEnumerable;
+                if (looted == null) return null;
+                var r = new Dictionary<ItemObject, int>();
+                foreach (var kv in looted)
+                {
+                    var kt = kv.GetType();
+                    var item = kt.GetProperty("Key").GetValue(kv, null) as ItemObject;
+                    int count = (int)kt.GetProperty("Value").GetValue(kv, null);
+                    if (item != null && count > 0) r[item] = count;
+                }
+                return r;
+            }
+            return null;
         }
 
         // E8/A (250; odpowiedz Jeffa 12.10 nr 1 "to, co ja zabilem, idzie do mnie"): LUP CIALO PO CIELE. Wpis 82 liczyl dzialke gracza jako SREDNIA z puli
@@ -1591,8 +1649,11 @@ namespace Armoury
                 var mod = WreckModifier();
                 // wraki zbite ponizej progu zniszczenia w ogole nie wchodza
                 // (Jeff 28.08: "<=3% = zniszczone, nie pojawia sie w loocie")
+                // m110-stan (recenzja R7): przy stanach wrak (0.05) ginie dopiero przy progu 10 i wiecej (jak 104 przy cenie 0.10); czesci z ksiega obrazen
+                // zniszczone wedlug d juz w SplitWrecks (LootWear) - tu tylko wrak bez wiedzy o wytrzymalosci
                 if (mod != null && Settings.Current.LootMinConditionPercent > 0
-                    && mod.PriceMultiplier * 100f <= Settings.Current.LootMinConditionPercent + 0.01f)
+                    && (GearState.On ? GearState.BelowDestroy(mod, Settings.Current.LootMinConditionPercent)
+                                     : mod.PriceMultiplier * 100f <= Settings.Current.LootMinConditionPercent + 0.01f))
                 {
                     int junked = Wrecks.Count;
                     foreach (var w in Wrecks) LootTally.SiftOut(w, 1, LootTally.SWrak);   // m109-lup (recenzja L4): przyczyna przesiania

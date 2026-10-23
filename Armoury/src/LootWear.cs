@@ -63,6 +63,7 @@ namespace Armoury
             public bool Test;
             public readonly int[] TestSt = new int[4];
             public int Lines, Stumbles;
+            public int Min;                                   // recenzja R8: prog zniszczenia (LootMinConditionPercent) tej bitwy - czesci i linia bitwy
             public long Ticks;
             public readonly List<PieceData> Open = new List<PieceData>();
         }
@@ -138,7 +139,8 @@ namespace Armoury
             if (b)
             {
                 if (_t != null && !_t.Closed) Close("bez rozliczenia - nastepna bitwa", 0, 0);
-                _t = new Tally { N = ++_battleN };
+                var s0 = Settings.Current;
+                _t = new Tally { N = ++_battleN, Min = s0 != null ? Math.Max(0, s0.LootMinConditionPercent) : 0 };
                 _test = GearState.TestWanted();
                 _t.Test = _test;
             }
@@ -277,8 +279,7 @@ namespace Armoury
                 int pool = ArmouryBehavior.ArmorPool(it);
                 if (pool <= 0) return null;
                 float d = Math.Max(0f, Math.Min(100f, before - hits * 100f / pool));
-                var s0 = Settings.Current;
-                int min = s0 != null ? s0.LootMinConditionPercent : 0;
+                int min = _t.Min;   // recenzja R8: prog bitwy (ten sam w linii bitwy - STAN-2)
                 var pd = new PieceData
                 {
                     Item = it, Slot = slot, Pool = pool, Before = before, Hits = hits, D = d, State = GearState.OfCondition(d),
@@ -380,6 +381,7 @@ namespace Armoury
                 }
                 sb.Append(" | bez ksiegi: lup ").Append(t.NoBookLup).Append(", cios/pekniete ").Append(t.NoBookWr)
                   .Append(" | koniec: ").Append(how).Append(" (lucky ").Append(luckyOk).Append('/').Append(luckyNeed).Append(')')
+                  .Append(" | prog zniszczenia ").Append(t.Min).Append('%')   // recenzja R8: STAN-2 sprawdza "zniszczona" wobec tego progu
                   .Append(" | pomiar ").Append((t.Ticks * 1000.0 / Stopwatch.Frequency).ToString("0.0", CultureInfo.InvariantCulture)).Append(" ms (trafien ").Append(t.Hits).Append(')')
                   .Append(" | potkniecia ").Append(t.Stumbles).Append('.');
                 Log.Info(sb.ToString());
