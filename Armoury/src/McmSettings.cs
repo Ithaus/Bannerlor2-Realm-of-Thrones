@@ -5996,6 +5996,10 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillSiegeArmy { get; set; } = true;
 
+        [SettingPropertyBool("Drill Town Stay", HintText = "with Drill Camp Only: while you wait in a town, castle or village, your men - and every lord's - drill by themselves in the morning, but less than in camp and less each day they stay: in a town 4 hours on the first day, then 3, 2 and from the fourth day 1; in a castle or village 6, then 5, then 4. A short ride out (under a day) does not restore their discipline - a full day in the field does. Under siege there are no taverns: the men on the walls drill like a siege camp. Off = as before (your men drill only in camp; lords drill full days in settlements)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillTownStay { get; set; } = true;
+
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)", RequireRestart = false)]
         [SettingPropertyGroup("Arms production")]
         public bool ArmsNotHouseholdGoods { get; set; } = true;
@@ -10782,6 +10786,7 @@ namespace Armoury
             s.DrillCampOnlyAi = DrillCampOnlyAi;
             s.DrillMaster = DrillMaster;
             s.DrillSiegeArmy = DrillSiegeArmy;
+            s.DrillTownStay = DrillTownStay;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;

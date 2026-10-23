@@ -83,7 +83,14 @@ namespace Armoury
         private static bool Active(Settings s) { return s != null && (s.DrillLaw || s.DrillStockAi || s.DrillLawAi || s.DrillPenaltyAi || s.DrillLog); }
 
         // ------------------------------------------------------------ stan
-        private sealed class Track { internal Vec2 Pos; internal long Stamp = -1; internal int Mask = AllHours; }
+        // m109-musztra (TownStay, tylko w pamieci - Export M=/T= bez zmian): SMask - godziny postoju w osadzie (1 = osada z postojem, maska jak Mask), poczatek
+        // postoju i chwila wyjscia, rodzaj osady, doba postoju i limit godzin w osadzie z ostatniej godziny postoju; StayInit - doba postoju juz rozstrzygnieta
+        // (pierwsza pelna obserwacja: partia juz w osadzie - poczatek ze StationaryStartTime gry)
+        private sealed class Track
+        {
+            internal Vec2 Pos; internal long Stamp = -1; internal int Mask = AllHours;
+            internal int SMask; internal long StayFrom = -1, OutAt = -1; internal int SKind, SDay = 1, SCap = (int)CampDrill.FullHours; internal bool StayInit;
+        }
         private static readonly Dictionary<MobileParty, Track> _tr = new Dictionary<MobileParty, Track>();
         private static int _pendingMainMask = -1;
         // MUSZTRA-jp (recenzja 1): maski godzin ruchu WSZYSTKICH partii lordow poza graczem z zapisu (segment "T=" napisu arm_drill): id -> maska, wiek
@@ -108,6 +115,8 @@ namespace Armoury
             // (null = zasada obozu nie liczona: ani czynna, ani pomiar); Master - Przywodztwo mistrza musztry (-1 brak)
             internal bool Camp, CampCounted; internal float H, Hf, Lold = LeadMin, Dold = MarchDay, Lcamp = LeadMin, Dcamp; internal int Master = -1; internal string MasterName;
             internal float[] PerkV;
+            // m109-musztra (DayDrillHours): godziny cwiczen bez limitu postoju i z limitem, godziny za dnia w osadzie i w polu, doba postoju, rodzaj osady, limit
+            internal float Hraw, Hcap; internal int Hset, Hfield, SDay = 1, SKind, SCap = (int)CampDrill.FullHours;
             internal int StockW { get { return GivenW + SurW; } }
             internal int StockA { get { return GivenA + SurA; } }
         }
@@ -353,17 +362,49 @@ namespace Armoury
                     t = new Track();   // pierwsza obserwacja: cala doba jako ruch (bez darmowego postoju)
                     if (mp == MobileParty.MainParty && _pendingMainMask >= 0) { t.Mask = _pendingMainMask & AllHours; _pendingMainMask = -1; }
                     t.Pos = pos; t.Stamp = now; _tr[mp] = t;
+                    if (mp != MobileParty.MainParty) StayInit(mp, t, now);   // m109-musztra: partia juz w osadzie - doba postoju ze StationaryStartTime
                     return;
                 }
                 long gap = now - t.Stamp;
                 if (gap <= 0) return;
-                if (gap > 1) { int k = (int)Math.Min(24, gap - 1); t.Mask = ((t.Mask << k) | ((1 << k) - 1)) & AllHours; }   // przegapione godziny = ruch
+                if (gap > 1) { int k = (int)Math.Min(24, gap - 1); t.Mask = ((t.Mask << k) | ((1 << k) - 1)) & AllHours; t.SMask = (t.SMask << k) & AllHours; }   // przegapione godziny = ruch (m109: poza osada)
                 bool rest = RestHour(mp, pos.Distance(t.Pos));
                 t.Mask = ((t.Mask << 1) | (rest ? 0 : 1)) & AllHours;
                 t.Pos = pos; t.Stamp = now;
                 if (mp == MobileParty.MainParty) CampDrill.AutoHour(mp, rest, now);   // m97-szkolenie (recenzja 2): oboz oblezenia, cudza armia - cwiczenia same za dnia
+                else StayHour(mp, t, now);                                             // m109-musztra: godzina postoju w osadzie partii AI (wlasny try)
             }
             catch (Exception e) { Stumble("Observe", e); }
+        }
+
+        /// <summary>m109-musztra (TownStay): doba postoju partii AI rozstrzygana raz - przy pierwszej obserwacji (albo pierwszej godzinie po masce z zapisu):
+        /// partia juz w osadzie z postojem - poczatek postoju ze StationaryStartTime gry (wczytanie, nowa partia), inaczej bez postoju.</summary>
+        private static void StayInit(MobileParty mp, Track t, long now)
+        {
+            try
+            {
+                t.StayInit = true;
+                if (TownStay.Kind(mp.CurrentSettlement) == TownStay.KNone) return;
+                bool never;
+                t.StayFrom = TownStay.FromStationary(mp, now, out never); t.OutAt = -1;
+                TownStay.NoteRestored(never);
+            }
+            catch (Exception e) { TownStay.Stumble("StayInit", e); }
+        }
+
+        /// <summary>m109-musztra (TownStay): godzina partii AI - maska godzin w osadzie z postojem, licznik dob postoju (wejscie, wypad < 24 h, doba w polu zeruje),
+        /// rodzaj osady, doba postoju i limit godzin w osadzie z ostatniej godziny postoju. RestHour bez zmian (sen NightRest i NightMarch z niego korzysta).</summary>
+        private static void StayHour(MobileParty mp, Track t, long now)
+        {
+            try
+            {
+                int kind = TownStay.Kind(mp.CurrentSettlement);
+                t.SMask = ((t.SMask << 1) | (kind != TownStay.KNone ? 1 : 0)) & AllHours;
+                if (!t.StayInit) StayInit(mp, t, now);
+                if (TownStay.Step(ref t.StayFrom, ref t.OutAt, kind != TownStay.KNone, now)) TownStay.NoteEntry(mp, now);
+                if (kind != TownStay.KNone) { t.SKind = kind; t.SDay = TownStay.Day(t.StayFrom, now); t.SCap = TownStay.Cap(kind, t.SDay); }
+            }
+            catch (Exception e) { TownStay.Stumble("StayHour", e); }
         }
 
         /// <summary>m97-szkolenie: godziny postoju ZA DNIA w oknie 24 h maski (bit k = godzina od Stamp-k-1 do Stamp-k; noc snu NightRest.MenuNight
@@ -380,6 +421,26 @@ namespace Armoury
                 if (CampDrill.DayHour(h)) n++;
             }
             return n;
+        }
+
+        /// <summary>m109-musztra (TownStay): godziny cwiczen partii AI w oknie 24 h maski - te same godziny postoju za dnia co DayRestHours, podzielone na pole
+        /// i osade z postojem (SMask); w osadzie najwyzej limit doby postoju (TownStay.Cap z ostatniej godziny postoju), razem najwyzej 8. Klucz DrillTownStay
+        /// wylaczony - bez limitu, czyli min(8, DayRestHours) jak dotad. Do kontekstu c obie wartosci i skladniki (pomiar TownStay.Count).</summary>
+        internal static float DayDrillHours(MobileParty mp, Settings s, Ctx c)
+        {
+            Track t;
+            if (mp == null || !_tr.TryGetValue(mp, out t)) return 0f;
+            int field = 0, set = 0;
+            for (int k = 0; k < 24; k++)
+            {
+                if ((t.Mask & (1 << k)) != 0) continue;
+                int h = (int)(((t.Stamp - k - 1) % 24 + 24) % 24);
+                if (!CampDrill.DayHour(h)) continue;
+                if ((t.SMask & (1 << k)) != 0) set++; else field++;
+            }
+            float raw = Math.Min(CampDrill.FullHours, field + set), cap = Math.Min(CampDrill.FullHours, field + Math.Min(set, t.SCap));
+            if (c != null) { c.Hraw = raw; c.Hcap = cap; c.Hset = set; c.Hfield = field; c.SDay = t.SDay; c.SKind = t.SKind; c.SCap = t.SCap; }
+            return TownStay.DrillOn(s) ? cap : raw;
         }
 
         internal static int MovedHours(MobileParty mp)
@@ -474,7 +535,7 @@ namespace Armoury
                 {
                     try
                     {
-                        c.H = c.Main ? CampDrill.PlayerOwed : Math.Min(CampDrill.FullHours, DayRestHours(mp));
+                        c.H = c.Main ? CampDrill.PlayerOwed : DayDrillHours(mp, s, c);   // m109-musztra: w osadzie z limitem doby postoju (klucz NIE - min(8, DayRestHours) jak dotad)
                         c.Hf = c.H / CampDrill.FullHours;
                         // recenzja 1: gracz - kare (glod, dlug o swicie) pilnuje menu w chwili cwiczen; godziny juz zrobione licza sie, choc tick wypadl po
                         // kolejnym swicie albo w glodzie (inaczej kara dzialalaby wstecz). Strona gracza i AI - kara z chwili ticku jak dotad
@@ -872,10 +933,13 @@ namespace Armoury
                 double sk = c.StockOn ? c.S : 1.0;
                 double armed = r.N > 0 ? r.ShN / r.N : 1.0;
                 double perks = men > 0 ? r.P / men : 0;
+                bool stay = TownStay.DrillOn(Settings.Current);   // m109-musztra: napisy postoju tylko przy kluczu Drill Town Stay (NIE - jak dotad)
                 if (c.Camp && c.H <= 0f)
                 {
                     // m97-szkolenie: marsz nie uczy - dzien bez godziny cwiczen w obozie; noc bez snu oglosil juz swit (NightRest "No drill today ...") - bez drugiego zdania
-                    if (!c.Sleepless) Log.Player("No drill today: your men drill only in camp (camp menu - Train the men, by day); marching teaches nothing.");
+                    if (!c.Sleepless)
+                        Log.Player(stay ? "No drill today: your men drill in camp (camp menu - Train the men, by day) or a few morning hours while you wait in a town, castle or village; marching teaches nothing."
+                                        : "No drill today: your men drill only in camp (camp menu - Train the men, by day); marching teaches nothing.");
                     return;
                 }
                 var sb = new StringBuilder("Drill today: ").Append(xp).Append(" XP (").Append(F1(men > 0 ? xp / men : 0)).Append(" per man) - Leadership x").Append(F2(c.L));
@@ -883,7 +947,12 @@ namespace Armoury
                 {
                     if (c.MasterName != null && c.Master > 0) sb.Append(" (drill master ").Append(c.MasterName).Append(")");
                     // recenzja 3: godziny od ostatniego liczenia (tick treningu raz na dobe o swojej porze - moga byc z dwoch dni, kazdy najwyzej 8 h)
-                    sb.Append(", ").Append(F1(c.H)).Append(" h of drill in camp since the last count x").Append(F2(c.D)).Append(" (a full day of 8 h x").Append(F2(CampDrill.DayFull)).Append(")");
+                    float hs = stay ? Math.Min(c.H, CampDrill.PlayerOwedTown) : 0f;   // m109-musztra: czesc godzin z postoju w osadzie (zuzywa ja ten sam tick)
+                    if (hs > 0f)
+                        sb.Append(", ").Append(F1(c.H)).Append(" h of drill since the last count (").Append(F1(hs)).Append(" h of it ").Append(TownStay.WhereText())
+                          .Append(") x").Append(F2(c.D)).Append(" (a full day of 8 h x").Append(F2(CampDrill.DayFull)).Append(")");
+                    else
+                        sb.Append(", ").Append(F1(c.H)).Append(" h of drill in camp since the last count x").Append(F2(c.D)).Append(" (a full day of 8 h x").Append(F2(CampDrill.DayFull)).Append(")");
                 }
                 else sb.Append(c.Rest ? ", at rest x" : ", marching x").Append(F2(c.D));
                 sb.Append(", drill kit x").Append(F2(sk))
