@@ -1423,6 +1423,8 @@ namespace Armoury
             // m107-gospodarka K6 (Notice Board Lean Save): nb3 z proba odczytu (niezgodnosc - nb2) i linia "Tablica (m107): zapis gry"; klucz wylaczony - Export jak dotad
             try { string nb = dataStore.IsSaving ? NoticeBoard.ExportSave() : null; if (!dataStore.IsSaving || nb != null) SaveText.Sync(dataStore, "arm_board", ref nb); if (dataStore.IsLoading) NoticeBoard.Import(nb); }
             catch (Exception e) { Log.Error("SyncData.arm_board", e); }
+            try { string bs = dataStore.IsSaving ? NoticeBoard.ExportBandSpots() : null; SaveText.Sync(dataStore, "arm_bounty_seen", ref bs); if (dataStore.IsLoading) NoticeBoard.ImportBandSpots(bs); }   // m110-znacznik: miejsca 'last seen'
+            catch (Exception e) { Log.Error("SyncData.arm_bounty_seen", e); }
             // m106-wozy W2 (Village Cart Route Risk): pamiec tras wozow wsi ("m106r1~doba~swiat~region|miasto:A:N:doba!..."); wlasny try; klucz wylaczony - napis z zapisu
             // oddawany bez zmian (nowa kampania bez napisu - klucz nie pisany); brak klucza (stary zapis) = pamiec pusta; starsza DLL klucz pomija. Reset w konstruktorze
             try { string cr = dataStore.IsSaving ? CartRisk.Export() : null; if (!dataStore.IsSaving || cr != null) SaveText.Sync(dataStore, "arm_cart_risk", ref cr); if (dataStore.IsLoading) CartRisk.Import(cr); }
@@ -1562,7 +1564,7 @@ namespace Armoury
             // O3: opcja "Demand a ransom" w menu oblezenia gry - po wszystkich OnSessionLaunched (menu gry juz jest; wstawiona przed "Leave")
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
             // m109-list: zadania przyjetych listow z arm_board (po QuestManager.OnGameLoaded); dopisane PRZED AddMenus - gra wola je PO nim (linia m109 za liniami m102)
-            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.BountySessionStart(); NoticeBoard.BandMarkersSync("start sesji"); } catch (Exception e) { Log.Error("NoticeBoard.BountySessionStart", e); } });
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.BountySessionStart(); NoticeBoard.BandMarkersOff(); NoticeBoard.BandMarkersSync("start sesji"); } catch (Exception e) { Log.Error("NoticeBoard.BountySessionStart", e); } });
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.AddMenus(s); } catch (Exception e) { Log.Error("NoticeBoard.AddMenus", e); } });   // m102-tablica: "Read the notice board" w menu miasta - po wszystkich OnSessionLaunched (opcje gry "town" juz stoja; miejsce za karczma)
             // HT (15.10 noc, PatchTarget.cs): linia "Latki czynnego modelu (HT): start sesji" - po OnSessionLaunched wszystkich modow (latki modeli w kampanii)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => PatchTarget.Report());

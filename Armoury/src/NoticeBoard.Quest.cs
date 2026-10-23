@@ -404,7 +404,7 @@ namespace Armoury
         internal static void OnBountyFinalized(BountyQuest q)
         {
             if (q == null) return;
-            TakeBandMarker(q);   // m110-znacznik: kazde zamkniecie zdejmuje znacznik bandy
+            TakeBandMarker(q); ForgetBandSpot(q);   // m110-znacznik: kazde zamkniecie zdejmuje znacznik bandy i zapomina miejsce
             try { int fix = 0; Untrack(q, ref fix); } catch (Exception e) { BStumble("Finalize(tracker)", e); }
             if (ReferenceEquals(_closing, q)) return;
             try
