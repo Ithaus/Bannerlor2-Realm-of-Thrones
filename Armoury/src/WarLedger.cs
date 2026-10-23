@@ -93,7 +93,7 @@ namespace Armoury
                     if (over > overCap) over = overCap;           // bez sufitu dlug sprzed tygodni wykrwawia armie w kilka dni
                     if (over <= 0)
                     {
-                        if (mp == MobileParty.MainParty)
+                        if (mp == MobileParty.MainParty && !PartyWords.NoTroops)   // m110-sam: bez zolnierzy nie ma kto szemrac ani odejsc - bez komunikatu (licznik dni jak dotad)
                             Log.Player("The war chest is empty - the men grumble. Pay them, or they will start walking.", true);
                         continue;
                     }

@@ -314,7 +314,19 @@ namespace Armoury
                     if (m.R.St == null || !_byS.TryGetValue(m.R.St, out r) || r == null) r = m.R;   // spis osad od nowa miedzy rozliczeniem przy zapisie a switem - wpis biezacy
                     double now = r.DSrc == 0 ? r.D0 : double.NaN;
                     var sb = new StringBuilder(300);
-                    sb.Append(m.Player ? "Your men struck the countryside of " : "Raiders struck the countryside of ").Append(r.Name).Append(": ").Append(Num(m.Struck))
+                    string who = m.Player ? "Your men" : "Raiders";
+                    if (m.Player && PartyWords.NoTroops)
+                    {
+                        // m110-sam: bez wlasnych zolnierzy - armia, z ktora jedzie, albo on sam ("You" / "You and your companions"), nie "Your men"
+                        try
+                        {
+                            var mp = MobileParty.MainParty;
+                            var a = mp != null ? mp.Army : null;
+                            who = a == null ? PartyWords.MenCap() : a.LeaderParty == mp ? "Your army" : "The army you ride with";
+                        }
+                        catch { who = "Your men"; }
+                    }
+                    sb.Append(who).Append(" struck the countryside of ").Append(r.Name).Append(": ").Append(Num(m.Struck))
                       .Append(" of its people were driven from their homes or killed");
                     if (m.Craft >= 0.5) sb.Append(", and ").Append(Num(m.Craft)).Append(" craftsmen lost their trade");
                     sb.Append('.');

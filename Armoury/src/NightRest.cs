@@ -286,7 +286,10 @@ namespace Armoury
                         _campMsgNight = nightId; _autoCampDay++;
                         // poprawka recenzji 6: oboz obleznikow to postoj (Drill.RestHour), ale nie nocny postoj kolumny - bez komunikatu co noc
                         bool show = s.NightMarchNotice && !_sleeping && !captive && !enl && mp.BesiegerCamp == null;
-                        if (show) Msg("The column halts for the night - camp is pitched where it stands.", Colors.White);
+                        // m110-sam: bez wojska nie ma kolumny - tekst do gracza (oboz i sen licza sie jak dotad)
+                        if (show) Msg(PartyWords.Pick("The column halts for the night - camp is pitched where it stands.",
+                            "You halt for the night and make camp where you stand.",
+                            "You and your companions halt for the night and make camp where you stand."), Colors.White);
                         Log.Info("Nocleg: gracz - oboz automatyczny o " + h + ":00 (postoj noca poza osada), noc " + nightId + (show ? "" : " - bez komunikatu") + ".");
                     }
                 }
@@ -342,7 +345,8 @@ namespace Armoury
                              + (CampPromptMode == 1 ? " (always make camp - oboz z rozkazu)" : " (ask - pytanie Night Falls)") + ", noc " + nightId + ".");
                     if (CampPromptMode == 1)
                     {
-                        Msg("Night falls - the column makes camp.", Colors.White);
+                        Msg(PartyWords.Pick("Night falls - the column makes camp.", "Night falls - you make camp.",
+                            "Night falls - you and your companions make camp."), Colors.White);   // m110-sam: bez wojska bez kolumny
                         // poprawka recenzji 2: z ticku godzinowego (przy kluczu czesciej niz dotad o 0:00) zawsze WLASNY oboz, nie oboz BK - flaga camping BK
                         // nie schodzi nigdy (BKCampingBehavior.cs:55-61, 126-135). W tej wersji BK zachowanie nie jest rejestrowane (Main.cs bez AddBehavior),
                         // wiec TryBkCamp i tak dawal false -> OwnCamp - bez zmiany zachowania. Klawisz O i pytanie Night Falls - MakeCampNow jak dotad
@@ -370,8 +374,12 @@ namespace Armoury
                     {
                         _warnNight = nightId;
                         int nd = Math.Min(3, Debt + 1);
-                        Msg("Your column marches on through the night - the men get no sleep. They have rested " + F1(_restTonight) + "h of the "
-                            + F1(bazaW) + "h they need today; fall short at dawn and they wake weary (speed -" + SpdPenalty[nd] + "%, morale -" + MorPenalty[nd] + "%).",
+                        // m110-sam: bez wojska (sam albo sami towarzysze) - zdanie do gracza, kara snu ta sama
+                        string they = PartyWords.NoTroops ? "you" : "they";
+                        Msg(PartyWords.Pick("Your column marches on through the night - the men get no sleep. They have rested ",
+                                "You press on through the night without sleep. You have rested ",
+                                "You and your companions press on through the night without sleep. You have rested ") + F1(_restTonight) + "h of the "
+                            + F1(bazaW) + "h " + they + " need today; fall short at dawn and " + they + " wake weary (speed -" + SpdPenalty[nd] + "%, morale -" + MorPenalty[nd] + "%).",
                             Colors.Yellow);
                         Log.Info("NocnyMarsz: gracz idzie noca - ostrzezenie o " + h + ":00 (odpoczynek doby " + F1(_restTonight) + " h z " + F1(bazaW)
                                  + " h, dlug " + Debt + "), noc " + nightId + ".");
@@ -415,7 +423,9 @@ namespace Armoury
                 Debt = 0;   // odespali baze i wszystkie odsetki naraz
                 // MUSZTRA-jp (recenzja 8): dzien cwiczen rozstrzyga swit (DawnDebt) - splata zdejmuje kare marszu od reki, a musztra wraca od nastepnego
                 // switu (przespana baza jest juz w _restTonight, wiec swit nie doliczy dlugu); bez tego zdania "wake fresh" kloci sie z dniem bez cwiczen
-                Msg("The debt is paid in full - the men wake fresh again." + (DawnDebt > 0 && s != null && s.DrillLaw ? " Drill resumes at the next dawn." : ""), Colors.Green);
+                // m110-sam: bez wojska "you" i bez zdania o musztrze (nie ma kogo cwiczyc)
+                Msg("The debt is paid in full - " + PartyWords.Men() + " wake fresh again."
+                    + (!PartyWords.NoTroops && DawnDebt > 0 && s != null && s.DrillLaw ? " Drill resumes at the next dawn." : ""), Colors.Green);
             }
         }
 
@@ -423,7 +433,8 @@ namespace Armoury
         /// DawnDebt), a niesplacony do nastepnego switu dlug zabiera tez nastepny. Tylko przy Drill Law (bez niej musztry gracza nie ma).</summary>
         private static string DrillNote(Settings s)
         {
-            return Debt > 0 && s != null && s.DrillLaw ? " No drill today - sleep the debt off before the next dawn, or tomorrow's drill is lost too." : "";
+            // m110-sam: bez zolnierzy nie ma musztry (towarzysze nie cwicza) - bez zdania o musztrze
+            return Debt > 0 && s != null && s.DrillLaw && !PartyWords.NoTroops ? " No drill today - sleep the debt off before the next dawn, or tomorrow's drill is lost too." : "";
         }
 
         // ------------------------------------------------------------ swiat tez spi
@@ -1703,8 +1714,11 @@ namespace Armoury
                 }
                 _dawnOwed = slept + 0.01f >= baza ? 0f : baza - slept;
                 if (_dawnOwed > 0f && notice)
-                    MsgLog("Dawn finds the men still abed - they need " + F1(_dawnOwed) + "h more sleep before they rise, or last night counts as sleepless.",
-                           Colors.White);
+                {
+                    string they = PartyWords.NoTroops ? "you" : "they";   // m110-sam: bez wojska zdanie do gracza
+                    MsgLog("Dawn finds " + PartyWords.Men() + " still abed - " + they + " need " + F1(_dawnOwed) + "h more sleep before " + they
+                           + " rise, or last night counts as sleepless.", Colors.White);
+                }
             }
 
             if (sleptBase)
@@ -1720,14 +1734,16 @@ namespace Armoury
                     // noc 15/16.10 (NightMarchNotice): marsz noca przy przespanej bazie - powiedziane wprost, dlaczego dlugu nie ma (zasada Jeffa 30.08:
                     // sen o kazdej porze, dzien slabiej - odpoczynek w osadzie za dnia pokrywa noc w marszu)
                     // poprawka recenzji 8: liczba w kulturze niezmiennej (kropka) - komunikat jest tez w logu
+                    // m110-sam: bez wojska (sam albo sami towarzysze) - "you" zamiast kolumny i ludzi
                     if (notice && _marchHoursDay > 0)
-                        MsgLog("The column marched " + _marchHoursDay + "h through the night, but the men rested " + shown.ToString("0.#", CultureInfo.InvariantCulture)
+                        MsgLog(PartyWords.Pick("The column marched ", "You travelled ", "You and your companions travelled ") + _marchHoursDay + "h through the night, but "
+                               + (PartyWords.NoTroops ? "" : "the men ") + "rested " + shown.ToString("0.#", CultureInfo.InvariantCulture)
                                + "h today - no sleep debt.", Colors.White);
                     else
-                        MsgLog("The night gave the men about " + shown.ToString("0.#", CultureInfo.InvariantCulture) + "h of sleep.", Colors.White);
+                        MsgLog("The night gave " + PartyWords.Men() + " about " + shown.ToString("0.#", CultureInfo.InvariantCulture) + "h of sleep.", Colors.White);
                 }
                 if (Debt > 0 && !paidInFull)
-                    MsgLog("The men slept, but old weariness lingers - a full rest takes "
+                    MsgLog(PartyWords.MenCap() + " slept, but old weariness lingers - a full rest takes "
                         + (int)Math.Ceiling(NeededHours()) + " hours." + DrillNote(s), Colors.Yellow);
                 return;
             }
@@ -1735,16 +1751,20 @@ namespace Armoury
             Debt = Math.Min(3, Debt + 1);
             // noc 15/16.10 (NightMarchNotice): ile bylo odpoczynku tej doby wobec bazy - kara z liczbami
             string rested = notice ? " Rested " + F1(sleptH) + "h of the " + F1(baza) + "h needed." : "";
+            // m110-sam: bez wojska (sam albo sami towarzysze) - kara ta sama, zdanie do gracza; DrillNote sam pomija musztre
             if (Debt == 1)
-                MsgLog("The men marched through the night. One sleepless night - speed -" + SpdPenalty[1] + "%, morale -"
+                MsgLog(PartyWords.Pick("The men marched through the night.", "You went without sleep last night.", "You and your companions went without sleep last night.")
+                    + " One sleepless night - speed -" + SpdPenalty[1] + "%, morale -"
                     + MorPenalty[1] + "%; paying it back will take " + (int)Math.Ceiling(NeededHours()) + " hours of rest." + rested + DrillNote(s), Colors.Yellow);
             else if (Debt == 2)
-                MsgLog("Second night without sleep - the column staggers (speed -" + SpdPenalty[2] + "%, morale -"
+                MsgLog("Second night without sleep - " + PartyWords.Pick("the column staggers", "you stagger on, half asleep", "you and your companions stagger on")
+                    + " (speed -" + SpdPenalty[2] + "%, morale -"
                     + MorPenalty[2] + "%). A full rest now takes " + (int)Math.Ceiling(NeededHours()) + " hours." + rested + DrillNote(s), Colors.Red);
             else
             {
-                MsgLog("Third sleepless night - the company collapses where it stands (speed -" + SpdPenalty[3]
-                    + "%, morale -" + MorPenalty[3] + "%). They need " + (int)Math.Ceiling(NeededHours())
+                MsgLog("Third sleepless night - " + PartyWords.Pick("the company collapses where it stands", "you collapse where you stand",
+                        "you and your companions collapse where you stand") + " (speed -" + SpdPenalty[3]
+                    + "%, morale -" + MorPenalty[3] + "%). " + (PartyWords.NoTroops ? "You" : "They") + " need " + (int)Math.Ceiling(NeededHours())
                     + " hours of rest." + rested + DrillNote(s), Colors.Red);
                 // wojsko ZASYPIA: kolumna staje w miejscu (raz, przy zapasci -
                 // jesli gracz mimo to pogna dalej, powlecze sie na 10% predkosci)
@@ -1837,7 +1857,9 @@ namespace Armoury
                 if (whole + 0.01f < _menuNeeded || Debt > _menuDebt0) return false;
                 int before = Debt;
                 Debt = 0; _credited = true;
-                Msg("The debt is paid in full - the men wake fresh again." + (DawnDebt > 0 && s.DrillLaw ? " Drill resumes at the next dawn." : ""), Colors.Green);
+                // m110-sam: jak CreditRest - bez wojska "you" i bez zdania o musztrze
+                Msg("The debt is paid in full - " + PartyWords.Men() + " wake fresh again."
+                    + (!PartyWords.NoTroops && DawnDebt > 0 && s.DrillLaw ? " Drill resumes at the next dawn." : ""), Colors.Green);
                 Log.Info("Nocleg: splata dlugu calym snem w menu - pasek " + F2(whole) + " h z " + F2(_menuNeeded) + " h (przez swit "
                          + (_menuDawns > 0 ? "tak, switow " + _menuDawns : "nie") + "), odpoczynek doby " + F2(_restTonight) + " h, dlug " + before + " -> 0.");
                 return true;
@@ -1867,7 +1889,12 @@ namespace Armoury
                 Debt = Math.Min(3, Debt + 1);
                 DawnDebt = Math.Max(DawnDebt, Debt);
                 // poprawka recenzji 7: sen przerwany atakiem / innym menu - gracz nie budzil ludzi sam
-                string who = how == "sen przerwany" ? "The camp was roused before the men had slept their fill" : "You roused the men before they had slept their fill";
+                // m110-sam: bez wojska (sam albo sami towarzysze) - zdanie o graczu, nie o ludziach
+                string who = how == "sen przerwany"
+                    ? PartyWords.Pick("The camp was roused before the men had slept their fill", "You were woken before you had slept your fill",
+                        "You and your companions were roused before you had slept your fill")
+                    : PartyWords.Pick("You roused the men before they had slept their fill", "You rose before you had slept your fill",
+                        "You and your companions rose before you had slept your fill");
                 Msg(who + " - last night counts as sleepless (speed -" + SpdPenalty[Debt] + "%, morale -" + MorPenalty[Debt] + "%).", Colors.Yellow);
             }
             string t = "dlug odlozony: po swicie " + F2(after) + " h z brakujacych " + F2(owed) + " h (brak pokryty " + (covered ? "tak" : "nie") + ") -> dlug "
@@ -2120,14 +2147,15 @@ namespace Armoury
                 string cur0 = CampPromptMode == 0 ? " (current)" : "";
                 string cur1 = CampPromptMode == 1 ? " (current)" : "";
                 string cur2 = CampPromptMode == 2 ? " (current)" : "";
+                bool noTroops = PartyWords.NoTroops;   // m110-sam: bez wojska nie ma kolumny - opisy do gracza
                 var copts = new System.Collections.Generic.List<InquiryElement>
                 {
                     new InquiryElement(0, "Make camp here", null, true,
                         "Pitch the tents on this spot. Breaking camp leaves the party disorganized for a while."),
                     new InquiryElement(1, "Nightfall orders: ask me at dusk" + cur0, null, true,
-                        "Each night on the march the column asks whether to make camp."),
+                        noTroops ? "Each night on the march you will be asked whether to make camp." : "Each night on the march the column asks whether to make camp."),
                     new InquiryElement(2, "Nightfall orders: always make camp" + cur1, null, true,
-                        "At dusk the column camps on its own - no questions."),
+                        noTroops ? "At dusk you make camp on your own - no questions." : "At dusk the column camps on its own - no questions."),
                     new InquiryElement(3, "Nightfall orders: never ask" + cur2, null, true,
                         "March freely at night; camp only when you press O.")
                 };
@@ -2146,8 +2174,8 @@ namespace Armoury
                             switch ((int)sel[0].Identifier)
                             {
                                 case 0: MakeCampNow(); break;
-                                case 1: CampPromptMode = 0; Msg("Nightfall orders: the column will ask at dusk.", Colors.White); break;
-                                case 2: CampPromptMode = 1; Msg("Nightfall orders: the column will camp at dusk on its own.", Colors.White); break;
+                                case 1: CampPromptMode = 0; Msg(PartyWords.NoTroops ? "Nightfall orders: you will be asked at dusk." : "Nightfall orders: the column will ask at dusk.", Colors.White); break;
+                                case 2: CampPromptMode = 1; Msg(PartyWords.NoTroops ? "Nightfall orders: you will make camp at dusk on your own." : "Nightfall orders: the column will camp at dusk on its own.", Colors.White); break;
                                 case 3: CampPromptMode = 2; Msg("Nightfall orders: no questions - march at will.", Colors.White); break;
                                 case 4: ForcedMarch.Toggle("klawisz O"); break;   // R3-08c
                             }
@@ -2163,6 +2191,7 @@ namespace Armoury
         {
             try
             {
+                bool noTroops = PartyWords.NoTroops;   // m110-sam: bez wojska nie ma kolumny - tekst do gracza
                 var opts = new System.Collections.Generic.List<InquiryElement>
                 {
                     new InquiryElement(0, "Make camp", null, true,
@@ -2170,7 +2199,7 @@ namespace Armoury
                     new InquiryElement(1, "March on", null, true,
                         "Ride through the darkness - the sleep debt will follow."),
                     new InquiryElement(2, "Always make camp at nightfall", null, true,
-                        "From now on the column camps at dusk on its own - no more asking."),
+                        noTroops ? "From now on you make camp at dusk on your own - no more asking." : "From now on the column camps at dusk on its own - no more asking."),
                     new InquiryElement(3, "Never ask again", null, true,
                         "March freely at night; you can still camp with the O key.")
                 };
@@ -2179,7 +2208,7 @@ namespace Armoury
                     opts.Add(new InquiryElement(4, "Forced march", null, true, ForcedMarch.Hint()));
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "Night Falls",
-                    "Darkness gathers over the column and the road ahead disappears. Make camp?",
+                    noTroops ? "Darkness gathers and the road ahead disappears. Make camp?" : "Darkness gathers over the column and the road ahead disappears. Make camp?",
                     opts, true, 1, 1, "Choose", "Later",
                     delegate (System.Collections.Generic.List<InquiryElement> sel)
                     {
@@ -2265,8 +2294,20 @@ namespace Armoury
                 // ZWYKLE menu, nie "wait": oboz to twarda PAUZA - czas rusza
                 // dopiero po wybraniu snu (arm_sleep_wait)
                 starter.AddGameMenu("arm_camp_wait",
-                    "{=!}You are encamped. The fires are lit, the men tend the horses and the wind worries the tents.",
-                    delegate (MenuCallbackArgs a) { SetCampBackground(a); });
+                    "{=!}{ARM_CAMP_TEXT}",
+                    delegate (MenuCallbackArgs a)
+                    {
+                        SetCampBackground(a);
+                        // m110-sam: tekst obozu wedlug skladu - bez wojska (sam albo sami towarzysze) bez "the men"
+                        try
+                        {
+                            MBTextManager.SetTextVariable("ARM_CAMP_TEXT", PartyWords.Pick(
+                                "You are encamped. The fires are lit, the men tend the horses and the wind worries the tents.",
+                                "You are encamped. Your fire is lit, your gear is stowed and the wind worries your tent.",
+                                "You are encamped. The fire is lit, you and your companions sit around it and the wind worries the tents."));
+                        }
+                        catch { }
+                    });
                 starter.AddGameMenuOption("arm_camp_wait", "arm_camp_sleep",
                     "{=!}Bed down and sleep", SleepOptionCondition,
                     delegate (MenuCallbackArgs a) { _sleepReturn = "arm_camp_wait"; GameMenu.SwitchToMenu("arm_sleep_wait"); }, false, 1);
@@ -2285,7 +2326,10 @@ namespace Armoury
                         }
                         catch { }
                         Tent(MobileParty.MainParty, false);
-                        Msg("The camp is struck - an hour to form the column, then we march.", Colors.Yellow);
+                        // m110-sam: bez wojska bez "kolumny" i "my" - zdanie do gracza (godzina dezorganizacji jak dotad)
+                        Msg(PartyWords.Pick("The camp is struck - an hour to form the column, then we march.",
+                            "You strike camp - an hour to pack up, then you move on.",
+                            "You and your companions strike camp - an hour to pack up, then you move on."), Colors.Yellow);
                         GameMenu.ExitToLast();
                     }, true, 9);
 
@@ -2294,8 +2338,14 @@ namespace Armoury
                     SleepInit, delegate (MenuCallbackArgs a) { return true; }, null, SleepTick,
                     GameMenu.MenuAndOptionType.WaitMenuShowProgressAndHoursOption);
                 starter.AddGameMenuOption("arm_sleep_wait", "arm_sleep_stop",
-                    "{=!}Rouse the men early",
-                    delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
+                    "{=!}{ARM_SLEEP_STOP}",
+                    delegate (MenuCallbackArgs a)
+                    {
+                        a.optionLeaveType = GameMenuOption.LeaveType.Leave;
+                        // m110-sam: bez wojska nie ma kogo budzic - napis "Get up early" (warunek liczony przed napisem, jak TownMenus.SetBackLabel)
+                        try { if (a.Text != null) a.Text.SetTextVariable("ARM_SLEEP_STOP", PartyWords.NoTroops ? "Get up early" : "Rouse the men early"); } catch { }
+                        return true;
+                    },
                     delegate (MenuCallbackArgs a)
                     {
                         // KA (karczmy): w osadzie pobudka z ticku snu (flaga) - z opcji menu oczekiwania nie wolno SwitchToMenu, a ExitToLast laduje w town_outside;
@@ -2476,10 +2526,11 @@ namespace Armoury
                 _rouseAsked = false;
                 // KA (karczmy): sen w osadzie po oplaconym noclegu - pobudka nie przed switem (gdy swit w 12 h), tlo miasta, wlasny tekst (null = jak dotad)
                 string inn = TownInns.OnSleepInit(args);
+                // m110-sam: bez wojska (sam albo sami towarzysze) - "You ..." zamiast "The men ..."
                 MBTextManager.SetTextVariable("ARM_SLEEP_TEXT", inn ??
                     (_restTonight >= needed
-                        ? "The men have already slept their fill today - but a little more never hurt."
-                        : ("The men bed down and sleep" + (night ? "." : " - by daylight the rest comes slower."))));
+                        ? PartyWords.MenCap() + " have already slept " + (PartyWords.NoTroops ? "your" : "their") + " fill today - but a little more never hurt."
+                        : (PartyWords.MenCap() + " bed down and sleep" + (night ? "." : " - by daylight the rest comes slower."))));
                 args.MenuContext.GameMenu.StartWait();
             }
             catch (Exception e) { Log.Error("NightRest.SleepInit", e); }
@@ -2513,7 +2564,9 @@ namespace Armoury
                 string why = siege ? "oblezenie" : mp.MapEvent != null ? "bitwa druzyny" : here.Party != null && here.Party.MapEvent != null ? "bitwa osady" : "armia";
                 if (_sleeping) EndSleepQuiet(s, "przerwanie w osadzie (" + why + ") -> " + g);
                 else TownInns.OnInterrupted(_menuRest, "przerwanie w osadzie (" + why + ") -> " + g);   // menu snu bez SleepInit (wczytanie) - sam rachunek karczmy
-                Msg(siege ? "While you slept, a host arrived outside the walls - the men are roused." : "Your rest is broken - the men are roused.", Colors.Yellow);
+                // m110-sam: bez wojska bez "the men" - sam bohater: "you are roused" / samo "Your rest is broken."
+                Msg(siege ? "While you slept, a host arrived outside the walls - " + PartyWords.Men() + " are roused."
+                          : (PartyWords.IsAlone ? "Your rest is broken." : "Your rest is broken - " + PartyWords.Men() + " are roused."), Colors.Yellow);
                 Log.Info("Nocleg: sen w osadzie " + here.Name + " przerwany przez stan gry (" + why + ") - menu '" + g + "'.");
                 GameMenu.SwitchToMenu(g);
                 return true;

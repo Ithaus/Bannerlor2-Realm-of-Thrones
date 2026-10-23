@@ -1231,6 +1231,7 @@ namespace Armoury
         }
 
         private const string DrillSentence = "\nArms you leave behind go to your men's drill stock while there is room; the rest stay on the field.";
+        private const string LeaveSentence = "\nItems you leave behind stay on the field.";   // m110-sam: bez zolnierzy zapas nic nie przyjmuje (Drill.Accept: cap 0)
 
         /// <summary>Wstawiane za stala napisu menu po zbieraniu trofeow: bez zdania o treningu; przy zapasie cwiczebnym (Drill.LeaveOn: DrillStock, DrillLaw,
         /// DonationXpOff i wpiety prefiks Leave) - zdanie o zapasie. Przy wylaczonym Z1 zapas nic nie przyjmuje, wiec zostaje oryginal Spoils (XP z resztek).</summary>
@@ -1239,7 +1240,7 @@ namespace Armoury
             try
             {
                 if (s == null) return s;
-                if (Drill.LeaveOn) return s.Replace(TrainSentence, DrillSentence);   // zapas czynny (musztra, Z1) i prefiks Leave wpiety - inaczej bez obietnicy
+                if (Drill.LeaveOn) return s.Replace(TrainSentence, PartyWords.NoTroops ? LeaveSentence : DrillSentence);   // zapas czynny (musztra, Z1) i prefiks Leave wpiety - inaczej bez obietnicy
                 return DonationXpLaw.On ? s.Replace(TrainSentence, "") : s;
             }
             catch { return s; }

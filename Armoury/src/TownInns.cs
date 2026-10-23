@@ -363,7 +363,7 @@ namespace Armoury
             if (NightRest.EnlistedNow) { why = "In service your lord decides where the men sleep."; return false; }
             if (mp.Army != null && mp.Army.LeaderParty != mp) { why = "You march in another lord's army - he decides where the host sleeps."; return false; }
             // recenzja 16.10: flaga snu i menu snu naraz - przy wylaczonym PlayerSleepGuard flaga po przerwanym snie w obozie bywa nieaktualna
-            if (InSleepMenu()) { why = "The men are already asleep."; return false; }
+            if (InSleepMenu()) { why = PartyWords.MenCap() + " are already asleep."; return false; }   // m110-sam: bez zolnierzy "You ..."
             return true;
         }
 
@@ -429,8 +429,9 @@ namespace Armoury
                 if (!On || st == null || !st.IsTown) return false;
                 string why;
                 if (!Allowed(st, out why)) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}" + why); }
-                else args.Tooltip = new TextObject("{=!}A common room, a decent inn or a good house - the men pay for themselves. Taken from " + HoldFrom()
-                                                   + " on, you sleep until dawn; by day, until the men have slept. You wake rested until dusk, at most 12 hours.");
+                // m110-sam: bez zolnierzy (sam albo z towarzyszami) - podpowiedz do gracza, nie o "ludziach"
+                else args.Tooltip = new TextObject("{=!}A common room, a decent inn or a good house" + PartyWords.Pick(" - the men pay for themselves", "", " - your companions pay for themselves") + ". Taken from " + HoldFrom()
+                                                   + " on, you sleep until dawn; by day, until " + PartyWords.Pick("the men have slept", "you have slept enough", "you and your companions have slept") + ". You wake rested until dusk, at most 12 hours.");
                 return true;
             }
             catch (Exception e) { Stumble("EnterCondition", e); return false; }
@@ -443,23 +444,33 @@ namespace Armoury
                 var st = Settlement.CurrentSettlement;
                 try { if (st != null && st.SettlementComponent != null && !string.IsNullOrEmpty(st.SettlementComponent.WaitMeshName)) args.MenuContext.SetBackgroundMeshName(st.SettlementComponent.WaitMeshName); } catch { }
                 var sb = new StringBuilder();
+                // m110-sam: bez zolnierzy (sam albo z towarzyszami) - bez zdan o zolnierzach, ich sakiewkach i wozach; sen "you"
+                bool troops = !PartyWords.NoTroops, alone = PartyWords.IsAlone;
                 sb.Append("The inns of ").Append(st != null ? st.Name.ToString() : "the town").Append(" offer three kinds of night (a man / a horse / your own room):\n");
-                sb.Append("\nCommon room - straw and a roof: 1 / 1 / ").Append(RoomOf(0)).Append(RoomOf(0) == PMan[0] ? " (you sleep on the straw among your men)" : "").Append(". Rested until dusk: +5% speed on the map, +2 morale.");
+                sb.Append("\nCommon room - straw and a roof: 1 / 1 / ").Append(RoomOf(0)).Append(RoomOf(0) == PMan[0] ? PartyWords.Pick(" (you sleep on the straw among your men)", " (you sleep on the straw)", " (you sleep on the straw among your companions)") : "").Append(". Rested until dusk: +5% speed on the map, +2 morale.");
                 sb.Append("\nDecent inn - beds, a warm hearth and ale: 2 / 2 / 8. +10% speed, +5 morale, and sleep comes a quarter faster (sleep debt is paid off sooner).");
                 sb.Append("\nGood house - rooms, wine and a bath: 4 / 3 / 20. +12% speed, +8 morale, sleep a quarter faster, the wounded heal half again as fast that night");
                 sb.Append(PriceKey ? ", and after a night there you trade up to 3% better in this town until dusk." : ".");
-                sb.Append("\n\nEvery soldier pays for himself and his horse out of his own purse - they draw their pay for it. A man who cannot afford your choice takes the best cheaper bed he can, or sleeps in the stable for free, as in camp. " + (CompanionWage.On ? "Companions pay from their own purses, where their pay goes." : "Companions pay from their own purses first and the rest from the men's purse, where their pay goes.") + " You pay for yourself, your horse and every horse that carries nobody - in the baggage or in the armoury. The men eat from their own wagons, as on the road. The party's rest follows how many slept in each kind of bed.");
-                sb.Append("\nTaken from ").Append(HoldFrom()).Append(" on, you sleep until dawn; by day, until the men have slept. You wake rested until dusk, at most 12 hours - unless the men still owe sleep.");
+                sb.Append("\n\n");
+                if (troops) sb.Append("Every soldier pays for himself and his horse out of his own purse - they draw their pay for it. A man who cannot afford your choice takes the best cheaper bed he can, or sleeps in the stable for free, as in camp. ");
+                if (!alone) sb.Append(CompanionWage.On ? "Companions pay from their own purses, where their pay goes. " : "Companions pay from their own purses first and the rest from the men's purse, where their pay goes. ");
+                sb.Append("You pay for yourself, your horse and every horse that carries nobody - in the baggage or in the armoury.");
+                if (troops) sb.Append(" The men eat from their own wagons, as on the road.");
+                if (!alone) sb.Append(" The party's rest follows how many slept in each kind of bed.");
+                sb.Append("\nTaken from ").Append(HoldFrom()).Append(" on, you sleep until dawn; by day, until ").Append(PartyWords.Pick("the men have slept", "you have slept enough", "you and your companions have slept"))
+                  .Append(". You wake rested until dusk, at most 12 hours - unless ").Append(PartyWords.Men()).Append(" still owe sleep.");
                 var mp = MobileParty.MainParty;
                 if (mp != null && st != null)
                 {
                     if (MenPurse.On)
                     {
                         int purse; int free = MenFree(mp, st, true, out purse);
-                        sb.Append("\n\nYour men have ").Append(free).Append(" denars to spare (purse ").Append(purse).Append(", the rest is kept for mending and better kit).");
-                        if (SackedHere(st, mp)) sb.Append(" The town is yours by the sack - the men take their beds without paying.");
+                        // m110-sam: sam bohater - bez linii sakiewki ludzi; sami towarzysze - tylko gdy z niej doplacaja (CompanionWage wylaczony)
+                        if (troops || (!alone && !CompanionWage.On))
+                            sb.Append("\n\n").Append(troops ? "Your men have " : "The men's purse has ").Append(free).Append(" denars to spare (purse ").Append(purse).Append(", the rest is kept for mending and better kit).");
+                        if (troops && SackedHere(st, mp)) sb.Append(" The town is yours by the sack - the men take their beds without paying.");
                     }
-                    else sb.Append("\n\nYour men keep no purses (Men Purse is off) - they sleep in the stable.");
+                    else if (troops) sb.Append("\n\nYour men keep no purses (Men Purse is off) - they sleep in the stable.");
                     int spare = SpareHorses(mp), am, ap, arm = 0;
                     if (ArmoryHorses(out am, out ap))
                     {
@@ -525,13 +536,14 @@ namespace Armoury
                 // recenzja 16.10: godzina pobudki wprost - wieczorem i w nocy do switu, w dzien do wyspania
                 bool atDawn; long dawn;
                 long wake = PredictWake(NowMin(), sl, out atDawn, out dawn);
-                t.Append(!atDawn ? "\nBy day you sleep until the men have slept (about " : wake <= dawn ? "\nYou sleep until dawn (" : "\nYou sleep past dawn, until the men have slept (about ")
+                string slept = PartyWords.Pick("the men have slept", "you have slept enough", "you and your companions have slept");   // m110-sam: bez zolnierzy - o graczu
+                t.Append(!atDawn ? "\nBy day you sleep until " + slept + " (about " : wake <= dawn ? "\nYou sleep until dawn (" : "\nYou sleep past dawn, until " + slept + " (about ")
                  .Append(Clock(wake)).Append(") and wake rested until ").Append(Clock(RestedUntil(wake))).Append(": +").Append(F1(sp)).Append("% speed, +").Append(F1(mo)).Append(" morale");
                 if (sl > 1.001f) t.Append(", sleep x").Append(sl.ToString("0.00", Inv));
                 if (he > 0.001f) t.Append(", healing tonight +").Append((he * 100f).ToString("0", Inv)).Append("%");
                 if (q == 2 && PriceKey) t.Append(atDawn ? ", you trade up to 3% better here" : " (better prices here only after a night until dawn)");
                 t.Append(".");
-                if (NightRest.Debt > 0) t.Append(" The men still owe sleep - the bed's comfort shows once it is paid off.");
+                if (NightRest.Debt > 0) t.Append(" ").Append(PartyWords.MenCap()).Append(" still owe sleep - the bed's comfort shows once it is paid off.");
                 if (!b.PlayerCan) { args.IsEnabled = false; t.Append("\nYou cannot pay your own part (").Append(b.PlayerCost).Append(" d)."); }
                 args.Tooltip = new TextObject("{=!}" + t.ToString());
                 return true;
@@ -650,9 +662,16 @@ namespace Armoury
                              + ", sen x" + r.Sleep.ToString("0.00", Inv) + ", gojenie +" + (r.Heal * 100f).ToString("0", Inv) + "%.");
                 }
                 try { if (st.SettlementComponent != null && !string.IsNullOrEmpty(st.SettlementComponent.WaitMeshName)) args.MenuContext.SetBackgroundMeshName(st.SettlementComponent.WaitMeshName); } catch { }
-                string bed = r.Q == 2 ? "The house gives you rooms, a bath and wine; the men sleep in proper beds between clean sheets"
-                           : r.Q == 1 ? "The men drink their ale by the hearth and sleep in beds"
-                           : "The men bed down on the straw of the common room";
+                // m110-sam: bez zolnierzy - tekst snu o graczu (sam) albo o nim i towarzyszach
+                string bed = r.Q == 2 ? PartyWords.Pick("The house gives you rooms, a bath and wine; the men sleep in proper beds between clean sheets",
+                                                        "The house gives you a room, a bath and wine; you sleep in a proper bed between clean sheets",
+                                                        "The house gives you rooms, a bath and wine; you and your companions sleep in proper beds between clean sheets")
+                           : r.Q == 1 ? PartyWords.Pick("The men drink their ale by the hearth and sleep in beds",
+                                                        "You drink your ale by the hearth and sleep in a bed",
+                                                        "You and your companions drink your ale by the hearth and sleep in beds")
+                           : PartyWords.Pick("The men bed down on the straw of the common room",
+                                             "You bed down on the straw of the common room",
+                                             "You and your companions bed down on the straw of the common room");
                 return bed + (r.WakeMin > 0 ? " - nobody stirs before dawn." : ".");
             }
             catch (Exception e) { Stumble("OnSleepInit", e); return null; }
@@ -729,7 +748,14 @@ namespace Armoury
                 if (!ok)
                 {
                     _rest = null; _dNoRest++;
-                    Log.Player(r.HostUid != null ? "The men were up before they had slept their fill " + HostWhere(r) + " - nobody wakes rested." : "The men were up before they had slept in their beds - the lodging is paid, but nobody wakes rested.", true);
+                    // m110-sam: bez zolnierzy - komunikat do gracza (sam) albo do niego i towarzyszy
+                    Log.Player(r.HostUid != null
+                        ? PartyWords.Pick("The men were up before they had slept their fill " + HostWhere(r) + " - nobody wakes rested.",
+                                          "You were up before you had slept your fill " + HostWhere(r) + " - you do not wake rested.",
+                                          "You and your companions were up before you had slept your fill " + HostWhere(r) + " - nobody wakes rested.")
+                        : PartyWords.Pick("The men were up before they had slept in their beds - the lodging is paid, but nobody wakes rested.",
+                                          "You were up before you had slept in your bed - the lodging is paid, but you do not wake rested.",
+                                          "You and your companions were up before you had slept in your beds - the lodging is paid, but nobody wakes rested."), true);
                     Log.Info(P + how + " w " + r.Town + " " + When(now) + " - w menu " + F1(menuRest) + " h z bazy " + F1(baseH) + " h, pelny pasek nie -> bez premii.");
                     return;
                 }
@@ -739,7 +765,8 @@ namespace Armoury
                 n.UntilMin = RestedUntil(now);
                 n.Price = r.Price && r.WakeMin > 0;
                 _rest = n; _dWoke++;
-                var msg = new StringBuilder((n.HostUid != null ? (IsHouse(n) ? "Rested in your own house: until " : "Rested under your villagers' roofs: until ") : "Rested in a bed: until ") + Clock(n.UntilMin) + " the column marches " + F1(n.Speed) + "% faster and morale is +" + F1(n.Morale) + ".");
+                // m110-sam: "the column" tylko przy wojsku; sam - "you march", sami towarzysze - "your party marches"
+                var msg = new StringBuilder((n.HostUid != null ? (IsHouse(n) ? "Rested in your own house: until " : "Rested under your villagers' roofs: until ") : "Rested in a bed: until ") + Clock(n.UntilMin) + PartyWords.Pick(" the column marches ", " you march ", " your party marches ") + F1(n.Speed) + "% faster and morale is +" + F1(n.Morale) + ".");
                 if (n.Price && PriceKey) msg.Append(" The good house's name opens doors - you trade up to 3% better in ").Append(n.Town).Append(" until ").Append(Clock(n.UntilMin)).Append(".");
                 if (NightRest.Debt > 0) msg.Append(n.HostUid != null ? " Old weariness still lingers - the night's rest shows once the sleep debt is paid off." : " Old weariness still lingers - the bed's comfort shows once the sleep debt is paid off.");
                 // m98-plotki (recenzja gra, wazne): pijany albo skacowany - premia lozka wstrzymana w latkach NightRest (InnDrink.SpoilsRest), komunikat to mowi

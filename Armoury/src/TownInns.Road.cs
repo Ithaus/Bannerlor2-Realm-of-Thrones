@@ -99,10 +99,19 @@ namespace Armoury
             }
             catch { }
             RoadsideInnStay.OnSleepInit(args, r.RoadUid);   // m95-zajazd: sen w zajezdzie - partia schowana (po wczytaniu w trakcie snu tez; wlasny try); dzwiek - RoadsideInnStay.InnSleepSound
-            string bed = IsVillageInn(r.RoadUid) ? "The villagers of " + r.Town + " take the men in for coin - straw in their barns and lofts, the horses in the yards"   // m97-wioski
-                       : r.Q == 2 ? "The keeper of " + r.Town + " gives you his best rooms and the men sleep in proper beds"
-                       : r.Q == 1 ? "The men drink their ale by the hearth of " + r.Town + " and sleep in beds"
-                       : "The men bed down on the straw of the common room of " + r.Town + ", the horses in the yard";
+            // m110-sam: bez zolnierzy - tekst snu o graczu (sam) albo o nim i towarzyszach
+            string bed = IsVillageInn(r.RoadUid) ? PartyWords.Pick("The villagers of " + r.Town + " take the men in for coin - straw in their barns and lofts, the horses in the yards",   // m97-wioski
+                                                                   "The villagers of " + r.Town + " take you in for coin - straw in a barn loft",
+                                                                   "The villagers of " + r.Town + " take you and your companions in for coin - straw in their barns and lofts, the horses in the yards")
+                       : r.Q == 2 ? PartyWords.Pick("The keeper of " + r.Town + " gives you his best rooms and the men sleep in proper beds",
+                                                    "The keeper of " + r.Town + " gives you his best room",
+                                                    "The keeper of " + r.Town + " gives you and your companions his best rooms")
+                       : r.Q == 1 ? PartyWords.Pick("The men drink their ale by the hearth of " + r.Town + " and sleep in beds",
+                                                    "You drink your ale by the hearth of " + r.Town + " and sleep in a bed",
+                                                    "You and your companions drink your ale by the hearth of " + r.Town + " and sleep in beds")
+                       : PartyWords.Pick("The men bed down on the straw of the common room of " + r.Town + ", the horses in the yard",
+                                         "You bed down on the straw of the common room of " + r.Town,
+                                         "You and your companions bed down on the straw of the common room of " + r.Town + ", the horses in the yard");
             return bed + (r.WakeMin > 0 ? " - nobody stirs before dawn." : ".");
         }
 
@@ -128,7 +137,7 @@ namespace Armoury
             if (Campaign.Current != null && Campaign.Current.IsMainHeroDisguised) { why = "In disguise you cannot bring your company to an inn."; return false; }
             if (NightRest.EnlistedNow) { why = "In service your lord decides where the men sleep."; return false; }
             if (mp.Army != null && mp.Army.LeaderParty != mp) { why = "You march in another lord's army - he decides where the host sleeps."; return false; }
-            if (InSleepMenu()) { why = "The men are already asleep."; return false; }
+            if (InSleepMenu()) { why = PartyWords.MenCap() + " are already asleep."; return false; }   // m110-sam: bez zolnierzy "You ..."
             var v = inn.Village.Village;
             if (v != null && v.VillageState == Village.VillageStates.BeingRaided) { why = vil ? "Raiders are on these lands - the villagers have barred their doors." : "Raiders are on these lands - the inn is barred and the keeper hides."; return false; }
             return true;
@@ -187,12 +196,13 @@ namespace Armoury
                 float sp, mo, sl, he; Bonus(b, out sp, out mo, out sl, out he);
                 bool atDawn; long dawn;
                 long wake = PredictWake(NowMin(), sl, out atDawn, out dawn);
-                t.Append(!atDawn ? "\nBy day you sleep until the men have slept (about " : wake <= dawn ? "\nYou sleep until dawn (" : "\nYou sleep past dawn, until the men have slept (about ")
+                string slept = PartyWords.Pick("the men have slept", "you have slept enough", "you and your companions have slept");   // m110-sam: bez zolnierzy - o graczu
+                t.Append(!atDawn ? "\nBy day you sleep until " + slept + " (about " : wake <= dawn ? "\nYou sleep until dawn (" : "\nYou sleep past dawn, until " + slept + " (about ")
                  .Append(Clock(wake)).Append(") and wake rested until ").Append(Clock(RestedUntil(wake))).Append(": +").Append(F1(sp)).Append("% speed, +").Append(F1(mo)).Append(" morale");
                 if (sl > 1.001f) t.Append(", sleep x").Append(sl.ToString("0.00", Inv));
                 if (he > 0.001f) t.Append(", healing tonight +").Append((he * 100f).ToString("0", Inv)).Append("%");
                 t.Append(". The coin goes to the village of ").Append(inn.Village.Name).Append(RoadTax(inn.Village, 100) > 0 ? " (its lord takes his share)." : ".");
-                if (NightRest.Debt > 0) t.Append(" The men still owe sleep - the bed's comfort shows once it is paid off.");
+                if (NightRest.Debt > 0) t.Append(" ").Append(PartyWords.MenCap()).Append(" still owe sleep - the bed's comfort shows once it is paid off.");
                 if (!b.PlayerCan) { args.IsEnabled = false; t.Append("\nYou cannot pay your own part (").Append(b.PlayerCost).Append(" d)."); }
                 args.Tooltip = new TextObject("{=!}" + t.ToString());
                 return true;

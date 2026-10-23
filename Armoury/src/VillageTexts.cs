@@ -25,7 +25,10 @@ namespace Armoury.Villages
         public const string VilLogBurning = "{=arm_vil_log_burning}{RAIDER} is burning {VILLAGE} in the {DISTRICT} district.";
         public const string VilLogBurningOwn = "{=arm_vil_log_burning_own}Smoke over {VILLAGE}: {RAIDER} is burning your village in the {DISTRICT} district.";
         public const string VilLogBurned = "{=arm_vil_log_burned}{VILLAGE} in the {DISTRICT} district has been burned by {RAIDER}.";
-        public const string VilLogBurnedPlayer = "{=arm_vil_log_burned_player}Your men have burned {VILLAGE}.";
+        // m110-sam: gracz bez zolnierzy (PartyWords.NoTroops) - "You have ...", nie "Your men have ..." (stala -> wlasciwosc, wolajacy bez zmian)
+        public static string VilLogBurnedPlayer { get { return PartyWords.NoTroops ? VilLogBurnedPlayerYou : VilLogBurnedPlayerMen; } }
+        public const string VilLogBurnedPlayerMen = "{=arm_vil_log_burned_player}Your men have burned {VILLAGE}.";
+        public const string VilLogBurnedPlayerYou = "{=arm_vil_log_burned_player_you}You have burned {VILLAGE}.";
         public const string VilLogReturning = "{=arm_vil_log_returning}People are returning to {VILLAGE} in the {DISTRICT} district.";
         public const string VilLogRebuilt = "{=arm_vil_log_rebuilt}{VILLAGE} in the {DISTRICT} district has been rebuilt. Its people have come home.";
         public const string VilLogAbandoned = "{=arm_vil_log_abandoned}The people of {VILLAGE} have left their homes.";
@@ -73,7 +76,10 @@ namespace Armoury.Villages
         public const string RaidRide = "{=arm_raid_ride}Your men ride out to {VILLAGE}. Burning its next settlement ({PEOPLE} souls) will take about {DAYS} days.";
         public const string RaidWait = "{=arm_raid_wait}{VILLAGE} - settlement {K}, about {X} days left";
         public const string RaidStepTitle = "{=arm_raid_step_title}{VILLAGE} burns";
-        public const string RaidStepBody = "{=arm_raid_step_body}Your men have searched and burned a settlement of {VILLAGE} ({PEOPLE} souls). Killed: {K}. Taken captive: {C}. Fled to the castle and the neighbours: {R}. Gone to the woods: {O}. Loot: {ITEMS}; {GOLD} denars from the villagers' purse. The granary lost {DAYS_FOOD} days of food; your men ate {FOOD} of it. {STANDING} of {N} settlements of {VILLAGE} still stand.";
+        // m110-sam: gracz bez zolnierzy - "You have searched ... you ate", nie "Your men" (stala -> wlasciwosc, wolajacy bez zmian)
+        public static string RaidStepBody { get { return PartyWords.NoTroops ? RaidStepBodyYou : RaidStepBodyMen; } }
+        public const string RaidStepBodyMen = "{=arm_raid_step_body}Your men have searched and burned a settlement of {VILLAGE} ({PEOPLE} souls). Killed: {K}. Taken captive: {C}. Fled to the castle and the neighbours: {R}. Gone to the woods: {O}. Loot: {ITEMS}; {GOLD} denars from the villagers' purse. The granary lost {DAYS_FOOD} days of food; your men ate {FOOD} of it. {STANDING} of {N} settlements of {VILLAGE} still stand.";
+        public const string RaidStepBodyYou = "{=arm_raid_step_body_you}You have searched and burned a settlement of {VILLAGE} ({PEOPLE} souls). Killed: {K}. Taken captive: {C}. Fled to the castle and the neighbours: {R}. Gone to the woods: {O}. Loot: {ITEMS}; {GOLD} denars from the villagers' purse. The granary lost {DAYS_FOOD} days of food; you ate {FOOD} of it. {STANDING} of {N} settlements of {VILLAGE} still stand.";
         public const string RaidVillageDown = "{=arm_raid_village_down}{VILLAGE} has been burned. {LEFT} villages of the {DISTRICT} district still stand; the nearest is {NEXT}, about {KM} km away.";
         public const string RaidNext = "{=arm_raid_next}Raid the next settlement (about {DAYS} days)";
         public const string RaidNextShort = "{=arm_raid_next_short}Raid on";   // n20-napisy: przycisk okna rabunku (klucz Short Button Labels)
@@ -82,13 +88,17 @@ namespace Armoury.Villages
         // E7/R2 (236, R15): okienko gracza po kazdej osadzie - krok kilku oddzialow naraz, lup w sztukach, brak osad w zasiegu - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
         public const string RaidStepBodyMany = "{=arm_raid_step_body_many}Your detachments have searched and burned {M} settlements of {VILLAGE} ({PEOPLE} souls). Killed: {K}. Taken captive: {C}. Fled to the castle and the neighbours: {R}. Gone to the woods: {O}. Loot: {ITEMS}; {GOLD} denars from the villagers' purse. The granary lost {DAYS_FOOD} days of food; your men ate {FOOD} of it. {STANDING} of {N} settlements of {VILLAGE} still stand.";
         public const string RaidNextMany = "{=arm_raid_next_many}Raid the next {M} settlements (about {DAYS} days)";
-        public const string RaidStepNoMore = "{=arm_raid_step_no_more}Nothing more of this district lies within your men's reach.";
+        public static string RaidStepNoMore { get { return PartyWords.NoTroops ? RaidStepNoMoreYou : RaidStepNoMoreMen; } }   // m110-sam: bez zolnierzy - "your reach"
+        public const string RaidStepNoMoreMen = "{=arm_raid_step_no_more}Nothing more of this district lies within your men's reach.";
+        public const string RaidStepNoMoreYou = "{=arm_raid_step_no_more_you}Nothing more of this district lies within your reach.";
         public const string RaidItemsNone = "{=arm_raid_items_none}no goods";
         public const string RaidItems = "{=arm_raid_items}{TAKEN} pieces of goods";
         public const string RaidItemsBurned = "{=arm_raid_items_burned}{TAKEN} pieces of goods, {BURNED} more burned for want of pack room";
         // E7/W1 (232, R10/R14): splondrowana bez spalenia w ksiedze i pamiec wojny (dymek W2) - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
         public const string VilLogPlundered = "{=arm_vil_log_plundered}{RAIDER} has plundered {VILLAGE} in the {DISTRICT} district: {BURNED} of {N} settlements burned.";
-        public const string VilLogPlunderedPlayer = "{=arm_vil_log_plundered_player}Your men have plundered {VILLAGE}: {BURNED} of {N} settlements burned.";
+        public static string VilLogPlunderedPlayer { get { return PartyWords.NoTroops ? VilLogPlunderedPlayerYou : VilLogPlunderedPlayerMen; } }   // m110-sam: bez zolnierzy - "You have plundered"
+        public const string VilLogPlunderedPlayerMen = "{=arm_vil_log_plundered_player}Your men have plundered {VILLAGE}: {BURNED} of {N} settlements burned.";
+        public const string VilLogPlunderedPlayerYou = "{=arm_vil_log_plundered_player_you}You have plundered {VILLAGE}: {BURNED} of {N} settlements burned.";
         public const string VilMemBurned = "{=arm_vil_mem_burned}Burned by {RAIDER} in the {SEASON} of {YEAR} AC; about {FLED} souls fled and {DEAD} were killed.";
         public const string VilMemPlundered = "{=arm_vil_mem_plundered}Plundered by {RAIDER} in the {SEASON} of {YEAR} AC; about {FLED} souls fled and {DEAD} were killed.";
         public const string VilMemGone = "{=arm_vil_mem_gone}a raider long gone";

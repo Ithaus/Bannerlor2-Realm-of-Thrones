@@ -868,10 +868,14 @@ namespace Armoury
                         if (mp != null && mp.Army != null && mp.Army.LeaderParty != mp) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You march in another lord's army - he decides where the host sleeps."); return true; }
                         string why;
                         // recenzja (WAZNE): podpowiedz mowi prawde - pod dachem (stan noclegu karczmy, TownInns.Host) albo jak w obozie z powodem
+                        // m110-sam: bez zolnierzy - podpowiedz o graczu (sam) albo o nim i towarzyszach
                         if (RoofOk(out why))
-                            a.Tooltip = new TextObject("{=!}Your villagers take the men in for the night - no charge. They sleep on straw under roofs, by night until dawn, and wake rested if they sleep their fill: "
+                            a.Tooltip = new TextObject("{=!}Your villagers take " + PartyWords.Men() + " in for the night - no charge. "
+                                                       + PartyWords.Pick("They sleep on straw under roofs, by night until dawn, and wake rested if they sleep their fill: ",
+                                                                         "You sleep on straw under a roof, by night until dawn, and wake rested if you sleep your fill: ",
+                                                                         "You sleep on straw under roofs, by night until dawn, and wake rested if you sleep your fill: ")
                                                        + TownInns.HostBonusText() + " (like the common room of an inn).");
-                        else a.Tooltip = new TextObject("{=!}The men camp by the village for the night, as anywhere on the map: " + why);
+                        else a.Tooltip = new TextObject("{=!}" + PartyWords.MenCap() + " camp by the village for the night, as anywhere on the map: " + why);
                         return true;
                     },
                     delegate (MenuCallbackArgs a)
@@ -953,7 +957,7 @@ namespace Armoury
             if (st == null || st.Village == null) { why = "the village is not known."; return false; }
             if (!TownInns.HostNearNow(_dist, _uid)) { why = "you are not at the village."; return false; }
             IFaction mf = Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null, df = st.MapFaction;
-            if (mf != null && df != null && !ReferenceEquals(mf, df) && FactionManager.IsAtWarAgainstFaction(mf, df)) { why = "while you are at war with its lord's realm, your villagers dare not take your men in."; return false; }
+            if (mf != null && df != null && !ReferenceEquals(mf, df) && FactionManager.IsAtWarAgainstFaction(mf, df)) { why = "while you are at war with its lord's realm, your villagers dare not take " + PartyWords.Pick("your men", "you", "you and your companions") + " in."; return false; }   // m110-sam: bez zolnierzy - o graczu
             if (st.Village.VillageState == Village.VillageStates.BeingRaided) { why = "raiders are on these lands and your villagers have fled."; return false; }
             VillageBook.VState vs;
             if (VillageBook.StateOf(_uid, out vs) && (vs.State == VillageBook.SBurned || vs.State == VillageBook.SBurning || vs.State == VillageBook.SAbandoned))

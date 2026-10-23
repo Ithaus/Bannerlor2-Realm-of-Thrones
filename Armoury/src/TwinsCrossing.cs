@@ -422,7 +422,16 @@ namespace Armoury
                 if (paid <= 0) _tZero++;
                 _tN[k]++; _tPaid[k] += paid; _tSession += paid;
                 if (lost) _tLost++;
-                if (mp.IsMainParty)
+                if (mp.IsMainParty && PartyWords.IsAlone)
+                {
+                    // m110-sam: sam bohater - "for you" (i jency, zwierzeta), nie "1 men"; bez zoldu - "a day's keep", nie "your wages"
+                    int pr = Math.Max(0, men - 1), b = Math.Max(0, animals);
+                    string who = "you" + (pr > 0 ? (b > 0 ? ", " : " and ") + pr + (pr == 1 ? " prisoner" : " prisoners") : "") + (b > 0 ? " and " + b + (b == 1 ? " beast" : " beasts") : "");
+                    Log.Player("Toll at the Twins: " + paid + (paid == 1 ? " denar" : " denars") + " to " + PayeeName(oc) + " for " + who
+                               + (cut ? " - no more than a day's keep, what the long way round would cost" : "")
+                               + (paid < due ? " - all the coin you had" : "") + ".");
+                }
+                else if (mp.IsMainParty)
                     Log.Player("Toll at the Twins: " + paid + " denars to " + PayeeName(oc) + " for " + Math.Max(0, men) + " men and " + Math.Max(0, animals) + " beasts"
                                + (cut ? " - no more than a day of your wages, what the long way round would cost" : "")
                                + (paid < due ? " - all the coin you had" : "") + ".");

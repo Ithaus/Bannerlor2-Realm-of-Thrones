@@ -25,6 +25,8 @@ namespace Armoury
             try
             {
                 args.optionLeaveType = GameMenuOption.LeaveType.Craft;
+                bool men = !PartyWords.NoTroops;   // m110-sam (recenzja): napis dlugi ustawiony przed skanami - wyjatek skanu (catch -> true) nie zostawia pustej zmiennej
+                MBTextManager.SetTextVariable("ARM_MEND_BENCH_LONG", men ? "The mending bench - your gear and the men's" : "The mending bench - your gear", false);
                 int bags, bagsCost; ScanBattleWorn(out bags, out bagsCost);
                 int worn = 0;
                 try
@@ -36,7 +38,11 @@ namespace Armoury
                 catch { }
                 int racks = 0, racksCost, cp, cc, dd;
                 if (Settings.Current.TroopMendEnabled) ScanTroopWorn(out racks, out racksCost, out cp, out cc, out dd);
-                args.Tooltip = new TextObject("{=!}Worn: {W} on your back, {B} in your bags, {R} on the men's racks.")
+                // m110-sam: bez zolnierzy (sam / sami towarzysze) bez "the men's" - naprawa polek wojska wtedy ukryta (MendTroopsCondition); napis dlugi
+                // i dopisek krotkich napisow (dawniej staly z ShortLabels.Tip) liczone tutaj, bo zaleza od skladu druzyny
+                string tip = men ? "Worn: {W} on your back, {B} in your bags, {R} on the men's racks." : "Worn: {W} on your back, {B} in your bags.";
+                if (ShortLabels.On) tip = (men ? "Mend your own gear and the men's." : "Mend your own gear.") + "\n" + tip;
+                args.Tooltip = new TextObject("{=!}" + tip)
                     .SetTextVariable("W", worn).SetTextVariable("B", bags).SetTextVariable("R", racks);
                 return true;
             }
@@ -87,7 +93,7 @@ namespace Armoury
             // sens i czy czegos nie wywalic" - piec pozycji naprawczych na glownym
             // menu mylilo, teraz siedza pod warsztatem)
             starter.AddGameMenuOption(Menu, "arm_mend_bench",
-                ShortLabels.Menu("{=!}The mending bench", "{=!}The mending bench - your gear and the men's"), ShortLabels.Tip(MendBenchCondition, "Mend your own gear and the men's."),
+                ShortLabels.Menu("{=!}The mending bench", "{=!}{ARM_MEND_BENCH_LONG}"), MendBenchCondition,   // m110-sam: napis dlugi i dopisek podpowiedzi wedlug skladu druzyny - w MendBenchCondition
                 delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(MendMenu); }, false, 2);
 
             // tygiel WYPADL z tego menu (Jeff 27.08: "smelt mozna robic
@@ -106,7 +112,7 @@ namespace Armoury
                 OnMenuInit, GameMenu.MenuOverlayType.SettlementWithBoth);
 
             starter.AddGameMenuOption(MendMenu, "arm_kit_report",
-                ShortLabels.Menu("{=!}The quartermaster's report", "{=!}Muster the men's kit - the quartermaster's report"), ShortLabels.Tip(KitReportCondition, "Muster the men's kit."), KitReportConsequence, false, 0);
+                ShortLabels.Menu("{=!}The quartermaster's report", "{=!}{ARM_KIT_REPORT_LONG}"), KitReportCondition, KitReportConsequence, false, 0);   // m110-sam: napis dlugi i dopisek podpowiedzi wedlug skladu druzyny - w KitReportCondition
 
             starter.AddGameMenuOption(MendMenu, "arm_mend_pick",
                 "{=!}Pick a damaged piece to mend", MendPickCondition, MendPickConsequence, false, 0);
@@ -1342,6 +1348,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.TroopMendEnabled) return false;
                 if (QuartermasterLaw.DteArmory() == null) return false;      // bez DTE nie ma zbrojowni
+                if (PartyWords.NoTroops) return false;                         // m110-sam: bez zolnierzy (sam / sami towarzysze) nie ma polek wojska - opcja ukryta
                 if (MarketRule)
                 {
                     int dp = 0, racks = 0;
@@ -1484,7 +1491,14 @@ namespace Armoury
         {
             args.optionLeaveType = GameMenuOption.LeaveType.Trade;
             if (QuartermasterLaw.DteArmory() == null) return false;
-            args.Tooltip = new TextObject("{=!}Counts, shortages, average condition and grade of every kind of kit the men own.");
+            // m110-sam: bez zolnierzy (sam / sami towarzysze) raport mowi o zbrojowni, nie o "ludziach"; napis dlugi i dopisek krotkich napisow
+            // (dawniej staly z ShortLabels.Tip) liczone tutaj, bo zaleza od skladu druzyny
+            bool men = !PartyWords.NoTroops;
+            MBTextManager.SetTextVariable("ARM_KIT_REPORT_LONG", men ? "Muster the men's kit - the quartermaster's report" : "Muster the armoury - the quartermaster's report", false);
+            string tip = men ? "Counts, shortages, average condition and grade of every kind of kit the men own."
+                             : "Counts, average condition and grade of every kind of kit in the armoury.";
+            if (ShortLabels.On) tip = (men ? "Muster the men's kit." : "Muster the armoury.") + "\n" + tip;
+            args.Tooltip = new TextObject("{=!}" + tip);
             return true;
         }
 
@@ -1582,6 +1596,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.TroopOrderEnabled) return false;
                 if (QuartermasterLaw.DteArmory() == null) return false;
+                if (PartyWords.NoTroops) return false;   // m110-sam: bez zolnierzy (sam / sami towarzysze) nie ma kogo uzbroic - opcja ukryta
                 var shortages = QuartermasterLaw.ShortageLines();
                 if (s.TroopOrderFromShelf)
                 {

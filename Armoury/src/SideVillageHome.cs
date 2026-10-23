@@ -326,7 +326,9 @@ namespace Armoury
                 if (NightRest.EnlistedNow) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}Your lord decides when the men sleep."); return true; }
                 if (mp != null && mp.Army != null && mp.Army.LeaderParty != mp) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You march in another lord's army - he decides where the host sleeps."); return true; }
                 string why;
-                if (BedOk(out why)) a.Tooltip = new TextObject("{=!}You sleep in your own bed and the men in the hall and the barns - no charge. Nobody stirs before dawn, and if they sleep their fill: "
+                // m110-sam: bez zolnierzy - bez ludzi w sali; sam - "you sleep your fill"
+                if (BedOk(out why)) a.Tooltip = new TextObject("{=!}You sleep in your own bed" + PartyWords.Pick(" and the men in the hall and the barns", "", " and your companions in the hall")
+                                                              + " - no charge. Nobody stirs before dawn, and if " + PartyWords.Pick("they sleep their fill: ", "you sleep your fill: ", "you all sleep your fill: ")
                                                               + TownInns.HouseBonusText() + " (the best rest there is).");
                 else { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}Not tonight: " + why + " 'Rest the night here' in the village menu still works."); }
                 return true;

@@ -186,8 +186,9 @@ namespace Armoury
                 _hourMended += mended; _hourPaid += paid;
                 if (_hourMended > 0 && (TaleWorlds.CampaignSystem.CampaignTime.Now.GetHourOfDay == 22 || broke))
                 {
-                    Log.Player("The smiths of " + st.Name + " mended " + _hourMended + " pieces of your men's kit today for " + _hourPaid
-                               + " denars from the men's purse." + (broke ? " The men's purse is empty - the rest waits (or pay the smith yourself)." : ""), true);
+                    if (!PartyWords.NoTroops)   // m110-sam: bez zolnierzy bez komunikatu o sprzecie ludzi (naprawa jak dotad)
+                        Log.Player("The smiths of " + st.Name + " mended " + _hourMended + " pieces of your men's kit today for " + _hourPaid
+                                   + " denars from the men's purse." + (broke ? " The men's purse is empty - the rest waits (or pay the smith yourself)." : ""), true);
                     Log.Info("TroopSelfMend: " + st.Name + " - naprawiono " + _hourMended + " szt. za " + _hourPaid + " z sakiewki ludzi" + (broke ? " (sakiewka pusta)" : "") + ".");
                     _hourMended = 0; _hourPaid = 0;
                 }
@@ -247,10 +248,13 @@ namespace Armoury
             {
                 string wait = o.Wait > 0 ? " " + o.Wait + (o.Wait == 1 ? " piece waits" : " pieces wait") + " for materials - the market of " + st.Name + " has not enough "
                                            + MendMaterial.KindsEn(o.WaitMask) + "." : "";
-                if (_hourMended > 0)
-                    Log.Player("The smiths of " + st.Name + " mended " + _hourMended + " pieces of your men's kit today for " + _hourPaid
-                               + " denars from the men's purse (work and materials)." + (broke ? " The men's purse is empty - the rest waits (or pay the smith yourself)." : "") + wait, true);
-                else Log.Player("The smiths of " + st.Name + " could not mend your men's kit today." + wait, true);
+                if (!PartyWords.NoTroops)   // m110-sam: bez zolnierzy bez komunikatu o sprzecie ludzi (naprawa i liczniki jak dotad)
+                {
+                    if (_hourMended > 0)
+                        Log.Player("The smiths of " + st.Name + " mended " + _hourMended + " pieces of your men's kit today for " + _hourPaid
+                                   + " denars from the men's purse (work and materials)." + (broke ? " The men's purse is empty - the rest waits (or pay the smith yourself)." : "") + wait, true);
+                    else Log.Player("The smiths of " + st.Name + " could not mend your men's kit today." + wait, true);
+                }
                 Log.Info("TroopSelfMend: " + st.Name + " - naprawiono " + _hourMended + " szt. za " + _hourPaid + " z sakiewki ludzi (w tym material " + _hourMat
                          + " zl; zuzyto kg: metal " + F(_hourKg[MendMaterial.Metal]) + ", drewno " + F(_hourKg[MendMaterial.Wood]) + ", skora " + F(_hourKg[MendMaterial.Leather])
                          + ", plotno " + F(_hourKg[MendMaterial.Cloth]) + ")" + (broke ? " (sakiewka pusta)" : "") + "; czeka na material " + o.Wait
@@ -331,8 +335,12 @@ namespace Armoury
                 if (mended > 0)
                 {
                     Log.Info("TroopSelfMend: wojsko naprawilo " + mended + " sztuk w " + st.Name + " za " + paidAll + " zl do kasy miasta.");
-                    Log.Player("The men see to their own kit at " + st.Name + " - " + mended
-                               + " pieces mended by the town smiths for " + paidAll + " gold.", true);
+                    // m110-sam: bez zolnierzy - kowale miasta naprawili sztuki z Twoich zapasow (placisz Ty)
+                    if (PartyWords.NoTroops)
+                        Log.Player("The smiths of " + st.Name + " mended " + mended + (mended == 1 ? " worn piece" : " worn pieces") + " in your stores for " + paidAll + " gold.", true);
+                    else
+                        Log.Player("The men see to their own kit at " + st.Name + " - " + mended
+                                   + " pieces mended by the town smiths for " + paidAll + " gold.", true);
                 }
             }
             catch (Exception e) { Log.Error("TroopSelfMend.Run", e); }
@@ -371,8 +379,12 @@ namespace Armoury
             int paid = o.Total;
             Pay.ToSettlement(paid);
             Log.Info("TroopSelfMend: wojsko naprawilo " + mended + " sztuk w " + st.Name + " - " + o.LogPl());
-            Log.Player("The men see to their own kit at " + st.Name + " - " + mended + " pieces mended by the town smiths for " + paid + " gold (work and materials)."
-                       + o.LeftEn(st.Name.ToString()), true);
+            if (PartyWords.NoTroops)   // m110-sam: bez zolnierzy - kowale miasta naprawili sztuki z Twoich zapasow (placisz Ty)
+                Log.Player("The smiths of " + st.Name + " mended " + mended + (mended == 1 ? " worn piece" : " worn pieces") + " in your stores for " + paid + " gold (work and materials)."
+                           + o.LeftEn(st.Name.ToString()), true);
+            else
+                Log.Player("The men see to their own kit at " + st.Name + " - " + mended + " pieces mended by the town smiths for " + paid + " gold (work and materials)."
+                           + o.LeftEn(st.Name.ToString()), true);
         }
     }
 }

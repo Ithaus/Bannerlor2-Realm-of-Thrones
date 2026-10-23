@@ -291,8 +291,9 @@ namespace Armoury
             _hangMsg = false;
             if (_hangUntil <= 0) return;
             string until = ((_hangUntil / 60) % 24) == 18 ? "dusk." : ((_hangUntil / 60) % 24) + ":00.";
+            // m110-sam: sam bohater - bez zdania o morale ludzi; sami towarzysze - morale druzyny
             Msg((wake ? "You wake with a hangover - your head pounds: your party moves " : "The ale wears off, but a hangover follows - your party moves ")
-                + _spdPct + "% slower and the men's morale is " + _morPct + "% lower until " + until, Colors.Yellow);
+                + _spdPct + "% slower" + PartyWords.Pick(" and the men's morale is " + _morPct + "% lower", " and your morale is " + _morPct + "% lower", " and your party's morale is " + _morPct + "% lower") + " until " + until, Colors.Yellow);
         }
 
         // ------------------------------------------------------------ sen w menu (NightRest.SleepInit / LeaveSleep / EndSleepQuiet)

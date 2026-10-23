@@ -470,7 +470,7 @@ namespace Armoury
             if (st.Village.VillageState == Village.VillageStates.BeingRaided) sb.Append("Raiders are on the lands of ").Append(dn).Append(" - the village is barred and quiet.\n");
             string tri = TributeLine(st);
             if (tri != null) sb.Append(tri).Append('\n');
-            if (AtWar(st)) sb.Append("You are at war with ").Append(Txt(st.MapFaction.Name)).Append(": the villagers watch your men from behind their doors.");
+            if (AtWar(st)) sb.Append("You are at war with ").Append(Txt(st.MapFaction.Name)).Append(": the villagers watch ").Append(PartyWords.Pick("your men", "you", "you and your companions")).Append(" from behind their doors.");   // m110-sam: bez zolnierzy - o graczu
             else if (OwnLands(st)) sb.Append("These are your own lands.");
             return sb.ToString().TrimEnd('\n');
         }
@@ -492,7 +492,11 @@ namespace Armoury
                 if (OwnLands(st))
                 {
                     if (!TownInns.On) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}Lodgings need Town Inns and Night Rest (mod settings)."); return true; }
-                    a.Tooltip = new TextObject("{=!}Your own villagers take the men in for the night - no charge. They sleep on straw under roofs until dawn and wake rested if they sleep their fill: "
+                    // m110-sam: bez zolnierzy - podpowiedz o graczu (sam) albo o nim i towarzyszach
+                    a.Tooltip = new TextObject("{=!}Your own villagers take " + PartyWords.Men() + " in for the night - no charge. "
+                                               + PartyWords.Pick("They sleep on straw under roofs until dawn and wake rested if they sleep their fill: ",
+                                                                 "You sleep on straw under a roof until dawn and wake rested if you sleep your fill: ",
+                                                                 "You sleep on straw under roofs until dawn and wake rested if you sleep your fill: ")
                                                + TownInns.HostBonusText() + ".");
                     return true;
                 }
@@ -510,7 +514,7 @@ namespace Armoury
         private static string RestBlock(Settlement st)
         {
             if (!AtVillage()) return "You are not at the village.";
-            if (AtWar(st)) return "At war with " + Txt(st.MapFaction.Name) + " - nobody here will take your men in.";
+            if (AtWar(st)) return "At war with " + Txt(st.MapFaction.Name) + " - nobody here will take " + PartyWords.Pick("your men", "you", "you and your companions") + " in.";   // m110-sam: bez zolnierzy - o graczu
             if (st.Village.VillageState == Village.VillageStates.BeingRaided) return "Raiders are on these lands - the villagers have barred their doors.";
             VillageBook.PartView me; double h, n;
             if (PartOf(st, _uid, out me, out h, out n) && Burned(me)) return "The village is burned - there are no roofs left to sleep under.";

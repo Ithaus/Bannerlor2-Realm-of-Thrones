@@ -286,13 +286,15 @@ namespace Armoury
                     if (sutler)
                     {
                         _dSutPlayer++;
-                        Log.Player("The sutlers brought your men " + List(got) + " from " + st.Name + " for " + taken + " denars from their purse - shoes, clothes and tents worn out on the march.");
+                        if (!PartyWords.NoTroops)   // m110-sam: bez zolnierzy bez komunikatu (zakup jak dotad)
+                            Log.Player("The sutlers brought your men " + List(got) + " from " + st.Name + " for " + taken + " denars from their purse - shoes, clothes and tents worn out on the march.");
                         Log.Info("Odziez wojska (150): gracz w polu - markietani przywiezli z " + st.Name + " " + Pl(got) + " za " + taken + " z sakiewki ludzi (T3-K1); czeka " + Pl(need) + ".");
                     }
                     else
                     {
                         _dPlayerVisits++;
-                        Log.Player("Your men bought " + List(got) + " in " + st.Name + " for " + taken + " denars from their purse - shoes, clothes and tents worn out on the march.");
+                        if (!PartyWords.NoTroops)   // m110-sam: bez zolnierzy bez komunikatu (zakup jak dotad)
+                            Log.Player("Your men bought " + List(got) + " in " + st.Name + " for " + taken + " denars from their purse - shoes, clothes and tents worn out on the march.");
                         Log.Info("Odziez wojska (150): gracz w " + st.Name + " - kupili " + Pl(got) + " za " + taken + " z sakiewki ludzi; czeka " + Pl(need) + ".");
                     }
                 }

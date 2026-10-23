@@ -86,10 +86,13 @@ namespace Armoury
                 if (!string.IsNullOrEmpty(mesh)) args.MenuContext.SetBackgroundMeshName(mesh);
             }
             catch { }
+            // m110-sam: bez zolnierzy - tekst snu o graczu (sam) albo o nim i towarzyszach
             if (IsHouse(r))   // r4-dom: wlasny dom w wiosce gracza (dobry dom)
-                return "You sleep in your own bed in your house at " + r.Town + "; the men bed down in its hall and the horses in its barns"
+                return "You sleep in your own bed in your house at " + r.Town + PartyWords.Pick("; the men bed down in its hall and the horses in its barns", "", "; your companions bed down in its hall and the horses in its barns")
                        + (r.WakeMin > 0 ? " - nobody stirs before dawn." : ".");
-            return "Your people of " + r.Town + " take the men in for the night: they sleep on straw under roofs, the horses in the barns"
+            return "Your people of " + r.Town + PartyWords.Pick(" take the men in for the night: they sleep on straw under roofs, the horses in the barns",
+                                                                " take you in for the night: you sleep on straw under a roof",
+                                                                " take you and your companions in for the night: you sleep on straw under their roofs, the horses in the barns")
                    + (r.WakeMin > 0 ? " - nobody stirs before dawn." : ".");
         }
     }

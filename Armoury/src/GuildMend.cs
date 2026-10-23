@@ -804,9 +804,10 @@ namespace Armoury
             int hour = CampaignTime.Now.GetHourOfDay;
             if (_menDayMended > 0 && (hour == 22 || broke))
             {
-                Log.Player("The town trades of " + st.Name + " mended " + _menDayMended + " pieces of your men's kit today for " + _menDayPaid
-                           + " denars from the men's purse." + (broke ? " The men's purse is empty - the rest waits (or pay the smith yourself)." : "")
-                           + (_menDayWait > 0 ? " " + _menDayWait + " wait for materials - the market has not enough " + MendMaterial.KindsEn(_menDayWaitMask) + "." : ""), true);
+                if (!PartyWords.NoTroops)   // m110-sam: bez zolnierzy bez komunikatu o sprzecie ludzi (naprawa i liczniki jak dotad)
+                    Log.Player("The town trades of " + st.Name + " mended " + _menDayMended + " pieces of your men's kit today for " + _menDayPaid
+                               + " denars from the men's purse." + (broke ? " The men's purse is empty - the rest waits (or pay the smith yourself)." : "")
+                               + (_menDayWait > 0 ? " " + _menDayWait + " wait for materials - the market has not enough " + MendMaterial.KindsEn(_menDayWaitMask) + "." : ""), true);
                 Log.Info("GuildMend ludzie: " + st.Name + " - naprawiono " + _menDayMended + " szt. za " + _menDayPaid + " z sakiewki ludzi (material " + _menDayMat
                          + "), rabat hurtowy " + (int)Math.Round(BulkCut(_bulkN) * 100f) + "% przy " + _bulkN + " szt. rano; lawy cechow: " + Bench() + (broke ? " (sakiewka pusta)" : "")
                          + "; czeka na material " + _menDayWait + ".");

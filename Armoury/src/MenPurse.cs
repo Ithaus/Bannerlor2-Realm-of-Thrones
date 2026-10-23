@@ -319,13 +319,13 @@ namespace Armoury
                 int life = avail - kept - saved;
                 if (life <= 0)
                 {
-                    if (mp.IsMainParty && saved > 0) Log.Player("Your men put by " + saved + " for better kit (saved " + (kept + saved) + ", purse " + Get(mp) + ").");
+                    if (mp.IsMainParty && saved > 0 && !PartyWords.NoTroops) Log.Player("Your men put by " + saved + " for better kit (saved " + (kept + saved) + ", purse " + Get(mp) + ").");   // m110-sam: bez zolnierzy bez komunikatu
                     return;
                 }
                 if (CitySack.NoSpend(st, mp, life)) return;   // lup miast L3: w lupionym miescie wojsko krolestwa zdobywcy nie placi - zold zostaje w sakiewce (wlasny try)
                 Take(mp, life);
                 LifeTo(mp, st, life);   // m109-musztra: wplata "na zycie" wydzielona bez zmian (ta sama droga dla wydatkow doby postoju - TownStay)
-                if (mp.IsMainParty)
+                if (mp.IsMainParty && !PartyWords.NoTroops)   // m110-sam: bez zolnierzy nie ma "ludzi", ktorzy wydaja - bez komunikatu (wydatek jak dotad)
                     Log.Player("Your men spent " + life + " denars in " + st.Name + " - food, drink, dice and company." + (reserve > 0 ? " They kept " + Math.Min(purse, reserve) + " for mending their kit." : "")
                                + (saved > 0 ? " They put by " + saved + " for better kit (saved " + (kept + saved) + ", purse " + Get(mp) + ")." : ""));
             }
@@ -619,8 +619,9 @@ namespace Armoury
             if (sold > 0)
             {
                 _daySold += sold; _dayGold += gold;
-                Log.Player("Your men sold " + sold + " spare pieces" + (horses > 0 ? " (" + horses + (horses == 1 ? " of them a horse)" : " of them horses)") : "") + " from the stores to the merchants of " + st.Name + " for " + gold
-                           + " denars - their share of the spoils. Purse of the men: " + Get(main) + ".");
+                if (!PartyWords.NoTroops)   // m110-sam: bez zolnierzy bez komunikatu "Your men sold" (sprzedaz jak dotad)
+                    Log.Player("Your men sold " + sold + " spare pieces" + (horses > 0 ? " (" + horses + (horses == 1 ? " of them a horse)" : " of them horses)") : "") + " from the stores to the merchants of " + st.Name + " for " + gold
+                               + " denars - their share of the spoils. Purse of the men: " + Get(main) + ".");
                 Log.Info("Sakiewka ludzi: gracz w " + st.Name + " - nadwyzki " + sold + " szt. za " + gold + " (w tym konie " + horses + " za " + horseGold + "), sakiewka " + Get(main) + ".");
             }
         }

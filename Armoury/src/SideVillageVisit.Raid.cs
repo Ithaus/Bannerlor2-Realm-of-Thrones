@@ -254,7 +254,9 @@ namespace Armoury
                     if (DefOn) DefHostileText(sb, r, me, def);
                     else {
                     sb.Append("The people of ").Append(NameOf(r)).Append(" watch you from behind their doors. The militia of ").Append(Txt(st.Name)).Append(" - about ").Append(def)
-                      .Append(def == 1 ? " man" : " men").Append(" - keeps watch over all its lands and would come to drive you off. You have ").Append(MenNow()).Append(" fit men.");
+                      .Append(def == 1 ? " man" : " men").Append(" - keeps watch over all its lands and would come to drive you off.");
+                    int men0 = MenNow();   // m110-sam: bez zolnierzy i najwyzej 1 zdrowy - nie "You have 1 fit men."
+                    sb.Append(PartyWords.NoTroops && men0 <= 1 ? (men0 == 1 ? (PartyWords.IsAlone ? " You are on your own." : " You are the only one fit to fight.") : " You have no one fit to fight.") : " You have " + men0 + " fit men.");
                     if (def > MenNow()) sb.Append(" Beat the militia at ").Append(Txt(st.Name)).Append(" first, or come with more men.");
                     }
                 }
@@ -373,7 +375,10 @@ namespace Armoury
                 {
                     _raid.Misses = 0;
                     if (_raid.Name == null || _raid.Name == "?") _raid.Name = NameOf(Rec(_raid.Uid));
-                    MBTextManager.SetTextVariable("ARM_SIDEVIL_RAID", "Your men go through " + _raid.Name + " house by house - driving off the people, taking what can be carried and burning the rest.");
+                    // m110-sam: bez zolnierzy (i bez ludzi armii) - "You" / "You and your companions", nie "Your men"
+                    var mp0 = MobileParty.MainParty;
+                    string who = !PartyWords.NoTroops || (_raid.Men > 1 && mp0 != null && mp0.Army != null) ? "Your men" : _raid.Men <= 1 ? "You" : PartyWords.MenCap();
+                    MBTextManager.SetTextVariable("ARM_SIDEVIL_RAID", who + " go through " + _raid.Name + " house by house - driving off the people, taking what can be carried and burning the rest.");
                     args.MenuContext.GameMenu.StartWait();
                     args.MenuContext.GameMenu.SetProgressOfWaitingInMenu((float)Math.Min(1.0, _raid.HoursDone / Math.Max(0.01, _raid.Hours)));
                 }
@@ -489,7 +494,7 @@ namespace Armoury
                     Log.Player(rd.Hit > 0.5
                         ? "You raided " + rd.Name + ": " + Math.Round(rd.Hit).ToString("N0", Inv) + " people driven off" + (rd.Dead >= 0.5 ? " (" + Math.Round(rd.Dead).ToString("N0", Inv) + " killed)" : "")
                           + ", " + gold.ToString("N0", Inv) + " denars and " + take.ToString("N0", Inv) + " goods taken" + (burn > 0 ? ", " + burn.ToString("N0", Inv) + " burned" : "") + "."
-                        : "Your men found nothing in " + rd.Name + ".", true);
+                        : (!PartyWords.NoTroops || (rd.Men > 1 && mp.Army != null) ? "Your men" : rd.Men <= 1 ? "You" : PartyWords.MenCap()) + " found nothing in " + rd.Name + ".", true);   // m110-sam: bez zolnierzy - "You", jak przy starcie rabunku
             }
             catch (Exception e) { Stumble("FinishRaid", e); }
         }
@@ -623,7 +628,7 @@ namespace Armoury
                 }
                 if (why != null) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
                 a.Tooltip = new TextObject("{=!}" + (DefOn ? DefTip(def, men) + (Surrenders(def, men) ? " " : " Then ") : "") + NameOf(r) + " pays " + t.ToString("N0", Inv) + " denars (" + Math.Round(100 * rate).ToString("0", Inv) + "% of its share of the purse of " + Txt(st.Name)
-                                           + ": " + Math.Round(100 * share).ToString("0", Inv) + "% of " + st.Village.Gold.ToString("N0", Inv) + "; your " + men + " men against " + def
+                                           + ": " + Math.Round(100 * share).ToString("0", Inv) + "% of " + st.Village.Gold.ToString("N0", Inv) + "; " + (PartyWords.NoTroops && men <= 1 ? (men == 1 ? "you alone" : "no one fit to fight") : "your " + men + " men") + " against " + def   // m110-sam: nie "your 1 men"
                                            + (DefOn ? " of its men" : " of its militia") + ") and your realm spares it for " + SpareDays + " days: you will not raid it, and raids on " + Txt(st.Name) + " by your realm pass it by.");
                 return true;
             }

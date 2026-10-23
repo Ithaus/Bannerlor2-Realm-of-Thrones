@@ -449,7 +449,7 @@ namespace Armoury
                 // Ten sam AddWaitGameMenu co sen w obozie; nagrody dopiero
                 // po dojechaniu paska do konca.
                 starter.AddWaitGameMenu("arm_hideout_search_wait",
-                    "{=!}The men turn the hideout over - bedrolls, false floors, the cold ashes of the fire pits.",
+                    "{=!}{ARM_SEARCH_TEXT}",   // m110-sam: tekst w SearchInit wedlug skladu druzyny
                     SearchInit, delegate (MenuCallbackArgs a) { return true; }, null, SearchTick,
                     GameMenu.MenuAndOptionType.WaitMenuShowProgressAndHoursOption);
                 starter.AddGameMenuOption("arm_hideout_search_wait", "arm_hideout_search_stop",
@@ -475,6 +475,8 @@ namespace Armoury
             try
             {
                 _searchLeave = false;
+                // m110-sam: "The men" / "You" / "You and your companions" - ustawione najpierw, zeby blad nizej nie zostawil pustego paska
+                MBTextManager.SetTextVariable("ARM_SEARCH_TEXT", PartyWords.MenCap() + " turn the hideout over - bedrolls, false floors, the cold ashes of the fire pits.");
                 SetSceneBackground(args);
                 var c = Settings.Current;
                 // czas od liczby rak (Jeff): sam grzebiesz caly dzien, kazdy

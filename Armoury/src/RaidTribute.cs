@@ -557,10 +557,12 @@ namespace Armoury
                     return true;
                 }
                 var q = QuoteOf(main, st);
+                // m110-sam: bez zolnierzy i najwyzej 1 zdrowy - "you alone", nie "your 1 men"
+                string side = PartyWords.NoTroops && q.Men <= 1 ? (q.Men == 1 ? "you alone" : "no one fit to fight") : "your " + q.Men + " men";
                 if (q.Q < 1.0)
                 {
                     args.IsEnabled = false;
-                    args.Tooltip = new TextObject("{=!}The villagers think they can fight you off: " + q.Def + " defenders against your " + q.Men + " men.");
+                    args.Tooltip = new TextObject("{=!}The villagers think they can fight you off: " + q.Def + " defenders against " + side + ".");
                     return true;
                 }
                 if (q.T < 1)
@@ -571,7 +573,7 @@ namespace Armoury
                 }
                 args.Tooltip = new TextObject("{=!}The elders will pay " + q.T + " denars (" + F(q.Rate * 100.0, "0") + "% of the village purse of " + q.Purse
                                               + (q.Paid > 0.0005 ? " less the " + F(q.Paid * 100.0, "0") + "% of its lands whose villages already paid you" : "")   // m97-wioski
-                                              + "; your " + q.Men + " men against " + q.Def + " defenders) to be spared. The village is not burned, but its lord and elders will think less of you."
+                                              + "; " + side + " against " + q.Def + " defenders) to be spared. The village is not burned, but its lord and elders will think less of you."
                                               + " Your realm will leave it in peace for " + SpareDays + " days.");
                 return true;
             }

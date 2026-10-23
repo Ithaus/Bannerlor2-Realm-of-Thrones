@@ -120,26 +120,30 @@ namespace Armoury
                 sb.Append(Dot).Append("Little is left here: ").Append(town).Append(" was sacked ").Append(ago <= 0 ? "today" : ago == 1 ? "yesterday" : ago + " days ago").Append('.');
             }
             bool castle = k.Castle;                     // poprawka po audycie (gracz 8): zamek - skarbiec zamku i ludzie podzamcza, nie kupcy i mieszczanie
+            // m110-sam: bez zolnierzy i bez armii (sam / sami towarzysze) - zdania do gracza, bez "your men"; podzial lupu bez zmian
+            var mpP = MobileParty.MainParty;
+            bool noMen = PartyWords.NoTroops && (mpP == null || mpP.Army == null);
             if (kind == KMercy)
             {
                 sb.Append(Dot).Append(castle ? "No sack: the castle treasury keeps " : "No sack: the merchants keep ").Append(N(k.Kasa));
                 if (k.FolkLive) sb.Append(castle ? " and the castle folk " : " and the townsfolk ").Append(N(k.FolkSum));
-                sb.Append(castle ? ". Your men get nothing from the castle." : ". Your men get nothing from the town - they will spend their pay here as in any town.");
+                if (noMen) sb.Append(castle ? ". You get nothing from the castle." : ". You get nothing from the town.");
+                else sb.Append(castle ? ". Your men get nothing from the castle." : ". Your men get nothing from the town - they will spend their pay here as in any town.");
             }
             else
             {
                 sb.Append(Dot).Append("The sack: ").Append(ShareWords(share)).Append(" of all the denars in ").Append(town).Append('.');
                 sb.Append(Dot).Append(castle ? "Castle treasury: " : "Merchants' coin: ").Append(N(k.Kasa)).Append(" - the army takes ").Append(N(m)).Append('.');
                 if (k.FolkLive) sb.Append(Dot).Append(castle ? "Castle folk's coin: " : "Townsfolk's coin: ").Append(N(k.FolkSum)).Append(" - the army takes ").Append(N(f)).Append('.');
-                sb.Append(Dot).Append("Your party (").Append(N(me != null ? me.Men : 0)).Append(" of ").Append(N(men)).Append(" men): ").Append(N(pShare));
-                if (MenPurse.On) sb.Append(" - your men ").Append(N(pMen)).Append(", you ").Append(N(pLead));
+                sb.Append(Dot).Append("Your party (").Append(N(me != null ? me.Men : 0)).Append(" of ").Append(N(men)).Append(men == 1 ? " man): " : " men): ").Append(N(pShare));
+                if (MenPurse.On) sb.Append(PartyWords.NoTroops ? " - the common purse " : " - your men ").Append(N(pMen)).Append(", you ").Append(N(pLead));   // m110-sam: bez zolnierzy nie "your men" (kwoty jak dotad)
                 else sb.Append(" - all of it yours");
                 if (pCrown > 0) sb.Append(" (the crown will claim ").Append(N(pCrown)).Append(" of your part)");
                 sb.Append('.');
                 sb.Append(Dot).Append(castle ? "Afterwards: the castle treasury keeps " : "Afterwards: the merchants keep ").Append(N(k.Kasa - m));
                 if (k.FolkLive) sb.Append(castle ? ", the castle folk " : ", the townsfolk ").Append(N(k.FolkSum - f));
                 sb.Append('.');
-                if (NoSpendOn && WindowDays > 0) sb.Append(" For ").Append(DaysWords(WindowDays)).Append(" your men will take what they want here and pay for nothing.");
+                if (NoSpendOn && WindowDays > 0 && !noMen) sb.Append(" For ").Append(DaysWords(WindowDays)).Append(" your men will take what they want here and pay for nothing.");
                 // poprawka po audycie (gracz 9, drobne2): towar z polek (L7) - ta sama czesc co moneta; liczby z tego samego planu co SackGoods (tylko odczyt)
                 long gp, gv, gw;
                 if (GoodsOn && GoodsPreview(st, share, out gp, out gv, out gw))
@@ -148,8 +152,12 @@ namespace Armoury
                     sb.Append(Dot).Append("Goods: ").Append(ShareWords(share)).Append(castle ? " of what lies in the castle's stores - about " : " of what lies on the shelves - about ")
                       .Append(N(gp)).Append(" pieces worth about ").Append(N(gv)).Append(" denars");
                     if (gw > 0) sb.Append(", ").Append(N(gw)).Append(" of them horses and beasts");
-                    sb.Append(". Horses go only as far as your army can lead them, food only up to ten days' rations, the rest as much as your men can carry")
-                      .Append(kind == KDevastate ? " - what they cannot carry burns." : " - what they cannot carry stays.");
+                    if (noMen)
+                        sb.Append(". Horses go only as far as ").Append(PartyWords.Men()).Append(" can lead them, food only up to ten days' rations, the rest as much as ").Append(PartyWords.Men()).Append(" can carry")
+                          .Append(kind == KDevastate ? " - what you cannot carry burns." : " - what you cannot carry stays.");
+                    else
+                        sb.Append(". Horses go only as far as your army can lead them, food only up to ten days' rations, the rest as much as your men can carry")
+                          .Append(kind == KDevastate ? " - what they cannot carry burns." : " - what they cannot carry stays.");
                 }
             }
             string key = "okno gracza - " + KName[kind] + " " + st.StringId + ": kupcy " + k.Kasa + " -> armia " + m + "; lud " + k.FolkSum + " -> armia " + f
@@ -167,7 +175,9 @@ namespace Armoury
                 var k = Read(st);
                 L5Log("podsumowanie - laska " + st.StringId + ": kupcy " + k.Kasa + ", lud " + k.FolkSum);
                 if (castle) return Dot + "No sack: the castle treasury keeps " + N(k.Kasa) + (k.FolkLive ? " and the castle folk " + N(k.FolkSum) : "") + ".";
-                return Dot + "No sack: the merchants keep " + N(k.Kasa) + (k.FolkLive ? " and the townsfolk " + N(k.FolkSum) : "") + ". Your men will spend their pay here as in any town.";
+                var mpS = MobileParty.MainParty;
+                bool noMen = PartyWords.NoTroops && (mpS == null || mpS.Army == null);   // m110-sam: bez zolnierzy i bez armii - bez zdania o wydatkach ludzi
+                return Dot + "No sack: the merchants keep " + N(k.Kasa) + (k.FolkLive ? " and the townsfolk " + N(k.FolkSum) : "") + "." + (noMen ? "" : " Your men will spend their pay here as in any town.");
             }
             if (r == null || r.St != st || r.Kind != kind) return null;            // brak wyniku L2 tej osady - tekst gry bez zmian
             L5Log("podsumowanie - " + KName[kind] + " " + st.StringId + ": wziete " + r.Pool + " (kupcy " + r.Merch + ", lud " + r.Folk + "), ludzie gracza " + r.PlayerMen + ", gracz " + r.PlayerLead

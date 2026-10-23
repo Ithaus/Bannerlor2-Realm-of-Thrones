@@ -362,7 +362,7 @@ namespace Armoury
                            + ": barber-surgeons, field armourers, an ale tent with dice and a minstrel, and carts of food, drink, tools and arrows"
                            + (src != null ? " brought from " + src.Name + "." : ".")
                            + " Their prices are the town's, with " + (Markup() * 100f).ToString("0", Inv) + "% for the cartage.";
-                    if (HoursSinceRevel() < 24) text += " The men had their revel " + (int)HoursSinceRevel() + " hours ago.";
+                    if (HoursSinceRevel() < 24 && !PartyWords.NoTroops) text += " The men had their revel " + (int)HoursSinceRevel() + " hours ago.";   // m110-sam: bez zolnierzy nie ma czyjej zabawy wspominac
                 }
                 MBTextManager.SetTextVariable("ARM_ROW_TEXT", text, false);
             }
@@ -463,7 +463,7 @@ namespace Armoury
                 }
                 int n = TreatPlan(stalls, out price, out wounded);
                 MBTextManager.SetTextVariable("ARM_ROW_SURGEON", n > 0 ? "Pay the barber-surgeons to tend " + n + " wounded (" + price + " denars)" : "Pay the barber-surgeons to tend the wounded", false);
-                if (wounded <= 0) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}None of your soldiers is wounded."); }
+                if (wounded <= 0) { a.IsEnabled = false; a.Tooltip = new TextObject(PartyWords.NoTroops ? "{=!}You have no soldiers for the surgeons to tend." : "{=!}None of your soldiers is wounded."); }   // m110-sam: bez zolnierzy inny opis
                 else if (n <= 0) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}The surgeons have done all they can today (" + stalls * SurgeonPer() + " men a day at " + stalls + (stalls == 1 ? " stall" : " stalls") + ")."); }
                 else if (Hero.MainHero.Gold < price) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You cannot pay " + price + " denars."); }
                 else a.Tooltip = new TextObject("{=!}The surgeons dress the wounds of " + n + " of your " + wounded + " wounded soldiers, the most seasoned first, and they return to duty. " + SurgeonFee() + " denars x (tier + 1) a man; at most " + stalls * SurgeonPer() + " men a day.");
@@ -568,6 +568,7 @@ namespace Armoury
             {
                 a.optionLeaveType = GameMenuOption.LeaveType.Craft;
                 Roll();
+                if (PartyWords.NoTroops) return false;   // m110-sam: bez zolnierzy (sam / sami towarzysze) nie ma sprzetu ludzi do naprawy - opcja ukryta
                 int men, stalls; string why;
                 MBTextManager.SetTextVariable("ARM_ROW_MEND", "Have the field armourers mend the men's worn gear", false);
                 if (!Can(out men, out stalls, out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
@@ -603,6 +604,7 @@ namespace Armoury
                 Roll();
                 int men, stalls; string why;
                 if (!Can(out men, out stalls, out why)) { Log.Player(why, true); return; }
+                if (PartyWords.NoTroops) { Log.Player("You have no men whose gear needs mending.", true); return; }   // m110-sam: straz jak w MendCondition (menu moglo zostac otwarte)
                 var src = Source();
                 var armory = QuartermasterLaw.DteArmory();
                 if (src == null || armory == null) { Log.Player("No armourers can reach you here.", true); return; }
@@ -660,6 +662,7 @@ namespace Armoury
             {
                 a.optionLeaveType = GameMenuOption.LeaveType.Wait;
                 Roll();
+                if (PartyWords.NoTroops) return false;   // m110-sam: bez zolnierzy (sam / sami towarzysze) nie ma komu stawiac - opcja ukryta
                 int men, stalls; string why;
                 var mp = MobileParty.MainParty;
                 float gain = RevelGain(mp);
@@ -685,6 +688,7 @@ namespace Armoury
                 Roll();
                 int men, stalls; string why;
                 if (!Can(out men, out stalls, out why)) { Log.Player(why, true); return; }
+                if (PartyWords.NoTroops) { Log.Player("You have no men to stand a round.", true); return; }   // m110-sam: straz jak w RevelCondition (menu moglo zostac otwarte)
                 if (HoursSinceRevel() < 24) return;
                 var src = Source();
                 var mp = MobileParty.MainParty;
@@ -741,6 +745,7 @@ namespace Armoury
                 if (!ClotheOn) return false;
                 a.optionLeaveType = GameMenuOption.LeaveType.Trade;
                 Roll();
+                if (PartyWords.NoTroops) return false;   // m110-sam: bez zolnierzy (sam / sami towarzysze) nie ma kogo ubierac - opcja ukryta, takze przy starej potrzebie po dawnym wojsku
                 MBTextManager.SetTextVariable("ARM_ROW_CLOTHE", "Clothe the men from the sutlers' carts", false);
                 int men, stalls; string why;
                 if (!Can(out men, out stalls, out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
@@ -773,6 +778,7 @@ namespace Armoury
                 Roll();
                 int men, stalls; string why;
                 if (!Can(out men, out stalls, out why)) { Log.Player(why, true); return; }
+                if (PartyWords.NoTroops) { Log.Player("You have no men to clothe.", true); return; }   // m110-sam: straz jak w ClotheCondition (menu moglo zostac otwarte)
                 var src = Source();
                 if (src == null || !ClotheOn) { Log.Player("No sutlers can reach you here.", true); return; }
                 if (src.IsUnderSiege) { Log.Player("The market of " + src.Name + " is under siege.", true); return; }   // poprawka po recenzji: jak FromSutlers (T3-K1)

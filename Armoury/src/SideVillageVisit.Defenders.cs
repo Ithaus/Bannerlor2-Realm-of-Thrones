@@ -215,11 +215,13 @@ namespace Armoury
         {
             int men = MenNow();
             double home = me != null ? me.Home : 0.0;
+            // m110-sam: bez zolnierzy i najwyzej 1 zdrowy - nie "You have 1 fit men."
+            string fit = PartyWords.NoTroops && men <= 1 ? (men == 1 ? (PartyWords.IsAlone ? " You are on your own." : " You are the only one fit to fight.") : " You have no one fit to fight.") : " You have " + men + " fit men.";
             sb.Append("The people of ").Append(NameOf(r)).Append(" watch you from behind their doors.");
-            if (def <= 0) { sb.Append(" There is nobody left here to fight you. You have ").Append(men).Append(" fit men."); return; }
+            if (def <= 0) { sb.Append(" There is nobody left here to fight you.").Append(fit); return; }
             sb.Append(" About ").Append(def).Append(def == 1 ? " man" : " men").Append(" of its ").Append(Math.Round(home).ToString("N0", Inv)).Append(" people would take up flails, spears and bows to defend it");
             if (Fallen(_uid) >= 0.5) sb.Append(" (fewer than before - it has buried and nursed its men of late)");
-            sb.Append(". You have ").Append(men).Append(" fit men.");
+            sb.Append('.').Append(fit);
             if (men >= SurrenderRatio * def) sb.Append(" They are too few to stand against you - they would give in without a fight.");
             else sb.Append(" They will come out and fight you by the village.");
         }
@@ -652,7 +654,8 @@ namespace Armoury
                 PartOf(st, f.Uid, out me, out homeAll, out nAll);
                 if (f.Kind == KRaid)
                 {
-                    Log.Player("You beat the villagers of " + f.Name + " - your men go into the village.");
+                    int men = MenNow();   // m110-sam: bez zolnierzy (i bez ludzi armii) - "you go", nie "your men go"
+                    Log.Player("You beat the villagers of " + f.Name + " - " + (!PartyWords.NoTroops || (men > 1 && mp.Army != null) ? "your men" : men <= 1 ? "you" : PartyWords.Men()) + " go into the village.");
                     if (BeginRaid(st, r, me, nAll, "po bitwie z obroncami")) GameMenu.ActivateGameMenu(RaidMenu);   // z ticku na mapie (bez menu) - wolno
                     else GameMenu.ActivateGameMenu(Menu);
                 }

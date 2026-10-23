@@ -732,6 +732,7 @@ namespace Armoury
                 if (toPlayer > 0 || toMen > 0)
                     Log.Info("Kwatermistrz: porzadek w skarbcu - " + toPlayer + " szt. na liste gracza, " + toMen
                              + " szt. na stan wojska [" + string.Join(", ", perType.ToArray()) + "].");
+                bool noMen = PartyWords.NoTroops;   // m110-sam: bez zolnierzy (sam / sami towarzysze) - zdania kwatermistrza do gracza, nie o "ludziach"
                 if (swapRule)
                 {
                     // K1 (Jeff 09.10 04:40): sztuki gracza, ktorych nikt nie nosi, zostaja w oknie - z powodem: nikt ich nie chcial (gorsze albo rowne)
@@ -743,8 +744,8 @@ namespace Armoury
                     {
                         var kn = new List<string>();
                         foreach (var kv in dep.Kept) { if (kn.Count >= 4) { kn.Add("..."); break; } kn.Add(kv.Value + "x " + PieceName(kv.Key)); }
-                        kept = dep.Kept0 + " pcs you put in stay yours in the stash" + KeptWhy(dep.KeptWorse, dep.KeptHard, dep.KeptBarred, "are never issued (heirlooms, lore blades, the dead's kit)",
-                                                                                                         GearFit.On || GearFit.CultureOn ? "skill requirement, a rider's saddle or their people's style" : "skill requirement")
+                        kept = dep.Kept0 + " pcs you put in stay yours in the stash" + (noMen ? "" : KeptWhy(dep.KeptWorse, dep.KeptHard, dep.KeptBarred, "are never issued (heirlooms, lore blades, the dead's kit)",
+                                                                                                         GearFit.On || GearFit.CultureOn ? "skill requirement, a rider's saddle or their people's style" : "skill requirement"))   // m110-sam: bez zolnierzy bez powodu "nikt nie chcial"
                                + " (" + string.Join(", ", kn.ToArray()) + ")";
                     }
                     if (deposits != null && dep.Moved > 0)
@@ -777,10 +778,10 @@ namespace Armoury
                         {
                             // Jeff 09.10 04:40: "oni tego tez nie biora, zostaje po prostu w okienku DTE"
                             Log.Info("Wymiana: ludzie nie wzieli nic z Twojego schowka; nienoszone sztuki gracza " + sKept + " (nie lepsze od ich " + sKeptWorse + ", za trudne " + sKeptHard + ")" + depLog + ".");
-                            Log.Player("QM: " + (moved.Length > 0 ? moved + (kept.Length > 0 ? "; " + kept : "") : "the men took nothing - " + kept) + ".");
+                            Log.Player("QM: " + (moved.Length > 0 ? moved + (kept.Length > 0 ? "; " + kept : "") : (noMen ? "you lead no troops - " : "the men took nothing - ") + kept) + ".");
                         }
-                        if (toPlayer > 0)
-                            Log.Player("QM: " + toPlayer + " pcs the men may not carry into battle are yours in the stash ("
+                        if (toPlayer > 0)   // m110-sam: bez zolnierzy na liste gracza przechodza tylko sztuki wykluczone - bez "the men"
+                            Log.Player("QM: " + toPlayer + (noMen ? " pcs that are never issued (heirlooms, lore blades, the dead's kit)" : " pcs the men may not carry into battle") + " are yours in the stash ("
                                        + string.Join(", ", names.ToArray()) + (nameKinds > names.Count ? ", ..." : "") + ").");
                     }
                 }
@@ -790,9 +791,9 @@ namespace Armoury
                     string took = toMen > 0
                         ? "the men took " + toMen + " pcs of yours (" + string.Join(", ", takenNames.ToArray())
                           + (takenKinds > takenNames.Count ? ", ..." : "") + ")"
-                        : "the men took nothing";
+                        : (noMen ? "you lead no troops" : "the men took nothing");   // m110-sam: bez zolnierzy caly magazyn przechodzi na gracza
                     string back = toPlayer > 0
-                        ? toPlayer + " pcs no man wears are yours in the stash ("
+                        ? toPlayer + (noMen ? " pcs from the armoury are yours in the stash (" : " pcs no man wears are yours in the stash (")
                           + string.Join(", ", names.ToArray()) + (nameKinds > names.Count ? ", ..." : "") + ")"
                         : "nothing was displaced - they had empty hands";
                     Log.Player("QM: " + took + "; " + back + ".");
@@ -1113,7 +1114,9 @@ namespace Armoury
                 if ((DateTime.Now - _lastShout).TotalMilliseconds > 700)
                 {
                     _lastShout = DateTime.Now;
-                    InformationManager.DisplayMessage(new InformationMessage("Quartermaster: that is the men's kit - they want " + owe + " denars on closing for what you took, and your purse holds "
+                    // m110-sam: bez zolnierzy (zapas po dawnym wojsku) - bez "the men", blokada i cena jak dotad
+                    InformationManager.DisplayMessage(new InformationMessage((PartyWords.NoTroops ? "Quartermaster: that kit is not yours - it costs " + owe + " denars on closing for what you took, and your purse holds "
+                                                                                                  : "Quartermaster: that is the men's kit - they want " + owe + " denars on closing for what you took, and your purse holds ")
                                                                              + Hero.MainHero.Gold + ".", Colors.Red));
                 }
                 return false;
@@ -1507,8 +1510,12 @@ namespace Armoury
                 {
                     Log.Info("Wymiana: ekran zbrojowni - widoczne sztuki gracza " + visOwn + " (w tym zwroty z wymiany od ostatniego otwarcia " + xBack + "), zapas ludzi " + visSpare
                              + (onlyYours ? " (ukryty - widok tylko Twoje)." : " (do kupienia)."));
+                    // m110-sam: bez zolnierzy i bez zapasu po dawnym wojsku - tylko Twoje sztuki, bez zdania o ludziach (zapas jest - zdanie zostaje, bo zapas dalej jest ich)
+                    bool noMen = PartyWords.NoTroops && visSpare <= 0;
                     if (visOwn + visSpare > 0)
-                        InformationManager.DisplayMessage(new InformationMessage(onlyYours
+                        InformationManager.DisplayMessage(new InformationMessage(noMen
+                            ? "QM: listed - " + visOwn + " pcs, all yours and free to take" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "") + "."
+                            : onlyYours
                             ? "QM: listed - " + visOwn + " pcs, all yours and free to take" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "")
                               + ". The men's own kit is not listed - what they wear and " + (visSpare - horseSpareVis) + " spare pcs from their share of the spoils; they sell the spare in the next town."
                               + (horseSpareVis > 0 ? " Their " + horseSpareVis + " spare horses are listed, as they do not sell horses - take one and you pay them the merchant's price on closing." : "")
@@ -1544,7 +1551,7 @@ namespace Armoury
                             "QM: listed = what no man wears; the men's kit stays hidden.",
                             Colors.Yellow));
                 }
-                if (!anyShort)
+                if (!anyShort && !PartyWords.NoTroops)   // m110-sam: bez zolnierzy (sam / sami towarzysze) nie ma kogo uzbrajac - kwatermistrz milczy
                 {
                     InformationManager.DisplayMessage(new InformationMessage(
                         "QM: every man fully kitted.", Colors.Green));
@@ -1740,7 +1747,7 @@ namespace Armoury
             try
             {
                 int best; string sk;
-                if (it != null && !AnyoneCanUse(it, out best, out sk))
+                if (it != null && !PartyWords.NoTroops && !AnyoneCanUse(it, out best, out sk))   // m110-sam: bez zolnierzy nie ma komu wydac - bez "no man can use"
                     Log.Player("QM: no man can use " + it.Name + " (needs " + sk + " " + it.Difficulty + ", best " + best + ") - stays yours.", true);
             }
             catch (Exception e) { Log.Error("Escrow.ShoutIfNoUse", e); }
@@ -1766,7 +1773,7 @@ namespace Armoury
                     var it = dep.Key;
                     if (it == null) continue;
                     int bestSkill; string skillName;
-                    if (!AnyoneCanUse(it, out bestSkill, out skillName))
+                    if (!PartyWords.NoTroops && !AnyoneCanUse(it, out bestSkill, out skillName))   // m110-sam: bez zolnierzy nie ma komu wydac - o wkladach mowi PurgeUnusable
                         Log.Player("QM: no man can use " + it.Name + " (needs " + skillName + " " + it.Difficulty
                                    + ", best " + bestSkill + ") - stays yours.", true);
                 }

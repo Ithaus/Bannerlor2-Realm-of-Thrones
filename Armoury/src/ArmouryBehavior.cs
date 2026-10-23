@@ -84,7 +84,7 @@ namespace Armoury
             {
                 if (it == null || UniqueLore.Contains(it.StringId)) return;
                 UniqueLore.Add(it.StringId);
-                Log.Player("You have studied the make of " + it.Name + " - the CRAFT bench can now reproduce it, and your men may wear it.");
+                Log.Player("You have studied the make of " + it.Name + " - the CRAFT bench can now reproduce it" + (PartyWords.NoTroops ? "." : ", and your men may wear it."));   // m110-sam: bez zolnierzy bez "your men"
                 Log.Info("UniqueLore: nauczono " + it.StringId + " (razem " + UniqueLore.Count + ").");
             }
             catch (Exception e) { Log.Error("LearnUnique", e); }

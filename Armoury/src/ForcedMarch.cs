@@ -71,10 +71,11 @@ namespace Armoury
         {
             var s = Settings.Current;
             int pct = (int)Math.Round(Pct(s) * 100f);
-            string tired = _hours >= 0.5f ? " The men already carry " + F1(_hours) + "h of forced-march weariness." : "";
+            // m110-sam: bez zolnierzy (sam / sami towarzysze) napisy mowia do gracza (PartyWords), z wojskiem jak dotad
+            string tired = _hours >= 0.5f ? " " + PartyWords.MenCap() + " already carry " + F1(_hours) + "h of forced-march weariness." : "";
             if (_on)
-                return "Let the men sleep again. Weariness so far: " + F1(_hours) + "h of the " + F1(DebtHours) + "h that cost one more night's sleep; it fades with proper rest.";
-            return "+" + pct + "% speed. No one sleeps while it lasts, and every " + F1(DebtHours) + "h of it costs one more sleepless night on top of the nights they miss." + tired;
+                return PartyWords.Pick("Let the men sleep again.", "Sleep again.", "Let everyone sleep again.") + " Weariness so far: " + F1(_hours) + "h of the " + F1(DebtHours) + "h that cost one more night's sleep; it fades with proper rest.";
+            return "+" + pct + "% speed. No one sleeps while it lasts, and every " + F1(DebtHours) + "h of it costs one more sleepless night on top of the nights " + PartyWords.Pick("they", "you", "you") + " miss." + tired;
         }
 
         /// <summary>Panel O: przelacznik.</summary>
@@ -104,7 +105,7 @@ namespace Armoury
                 _on = true;
                 _dStarts++;
                 int pct = (int)Math.Round(Pct(s) * 100f);
-                Msg("Forced march! The column pushes on at +" + pct + "% speed. No one sleeps while it lasts, and every " + F1(DebtHours)
+                Msg("Forced march! " + PartyWords.Pick("The column pushes on", "You push on", "You and your companions push on") + " at +" + pct + "% speed. No one sleeps while it lasts, and every " + F1(DebtHours)
                     + "h of it costs one more night's sleep." + (_hours >= 0.5f ? " (Weariness already carried: " + F1(_hours) + "h.)" : ""), Colors.Yellow);
                 Log.Info("Marsz forsowny (R3-08c): wlaczony (" + where + ") - predkosc +" + pct + "%, zmeczenie " + F1(_hours) + "/" + F1(DebtHours) + " h, dlug " + NightRest.Debt + ".");
             }
@@ -116,13 +117,13 @@ namespace Armoury
         {
             if (TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive) return "you are a captive";
             if (NightRest.EnlistedNow) return "your lord decides the marches";
-            if (mp.CurrentSettlement != null) return "the column is inside a settlement";
+            if (mp.CurrentSettlement != null) return PartyWords.Pick("the column is inside a settlement", "you are inside a settlement", "you are inside a settlement");   // m110-sam: bez zolnierzy do gracza
             if (mp.BesiegerCamp != null) return "the army is encamped for a siege";
             if (mp.IsCurrentlyAtSea) return "the crews already sail in watches";
             if (mp.AttachedTo != null) return "you march in another lord's army";
-            if (NightRest.SleepingNow) return "the men are asleep";
+            if (NightRest.SleepingNow) return PartyWords.Men() + " are asleep";
             if (Undead.Party(mp)) return "the dead do not tire";
-            if (NightRest.Debt >= 3) return "the men can go no further";
+            if (NightRest.Debt >= 3) return PartyWords.Men() + " can go no further";
             return null;
         }
 
@@ -132,7 +133,7 @@ namespace Armoury
             _on = false;
             _dEnds++;
             _dEndWhy = _dEndWhy.Length == 0 ? why : (_dEndWhy.Length < 200 ? _dEndWhy + ", " + why : _dEndWhy);
-            if (tell) Msg("The forced march ends." + (_hours >= 0.5f ? " The men carry " + F1(_hours) + "h of its weariness; it fades with proper rest." : ""), Colors.White);
+            if (tell) Msg("The forced march ends." + (_hours >= 0.5f ? " " + PartyWords.MenCap() + " carry " + F1(_hours) + "h of its weariness; it fades with proper rest." : ""), Colors.White);
             Log.Info("Marsz forsowny (R3-08c): koniec - " + why + "; zmeczenie " + F1(_hours) + "/" + F1(DebtHours) + " h, dlug " + NightRest.Debt + ".");
         }
 
@@ -170,7 +171,7 @@ namespace Armoury
                     else if (mp.IsCurrentlyAtSea) why = "morze";
                     else if (Undead.Party(mp)) why = "Nieumarli";
                     else if (NightRest.Debt >= 3) why = "dlug 3 (zapasc o swicie)";
-                    if (still) Msg("The column has stood still for " + _stillH + " hours.", Colors.White);
+                    if (still) Msg(PartyWords.Pick("The column has", "You have", "You and your companions have") + " stood still for " + _stillH + " hours.", Colors.White);   // m110-sam: bez zolnierzy do gracza
                     if (why != null) Stop(why, true);
                 }
                 bool counted = false;
@@ -189,11 +190,12 @@ namespace Armoury
                         Log.Info("Marsz forsowny (R3-08c): " + F1(DebtHours) + " h marszu forsownego - dodatkowa noc dlugu, dlug " + before + " -> " + d + ".");
                         if (d >= 3)
                         {
-                            Msg("The forced march breaks the men - they collapse where they stand.", Colors.Red);
+                            Msg(PartyWords.Pick("The forced march breaks the men - they collapse where they stand.", "The forced march breaks you - you collapse where you stand.",
+                                "The forced march breaks you and your companions - you collapse where you stand."), Colors.Red);
                             Stop("dlug 3 (zapasc)", false);
                             try { if (mp != null && mp.CurrentSettlement == null && mp.MapEvent == null) mp.SetMoveModeHold(); } catch { }
                         }
-                        else Msg("A whole day of forced march - the men owe one more night's sleep (sleep debt " + d + ").", Colors.Yellow);
+                        else Msg("A whole day of forced march - " + PartyWords.Men() + " owe one more night's sleep (sleep debt " + d + ").", Colors.Yellow);
                     }
                 }
                 return counted;

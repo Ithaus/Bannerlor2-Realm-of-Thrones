@@ -336,7 +336,8 @@ namespace Armoury
             string t = "Carpenters and tanners work the yards by the gate. ";
             if (s != null && s.CampCartEnabled)
                 t += "A supply cart takes " + CartWood + " hardwood and " + CartTools + " tools from the market, plus the carpenter's fee. One pack animal pulls it and hauls "
-                     + CartLoad(s) + " kg instead of " + GamePackKg + " kg, but the column moves " + SlowPct(s).ToString("0", CultureInfo.InvariantCulture) + "% slower (one cart or many - the column keeps the carts' pace). ";
+                     + CartLoad(s) + " kg instead of " + GamePackKg + " kg, but " + PartyWords.Pick("the column moves ", "you move ", "your party moves ") + SlowPct(s).ToString("0", CultureInfo.InvariantCulture)
+                     + "% slower (one cart or many - " + PartyWords.Pick("the column keeps", "you keep", "your party keeps") + " the carts' pace). ";   // m110-sam: bez zolnierzy nie "kolumna"
             if (s != null && s.PackSaddleEnabled)
                 t += "A pack saddle takes " + SaddleLeather + " leather and " + SaddleWood + " hardwood, plus the tanner's fee. On a free pack animal (one not pulling a cart) it adds " + SaddleKg(s)
                      + " kg and carries its own weight; without such an animal it is just " + (_madeSaddle != null ? _madeSaddle.Weight : 0f).ToString("0", CultureInfo.InvariantCulture) + " kg of baggage. ";
@@ -426,7 +427,7 @@ namespace Armoury
             _carts++;
             _dBuilt++;
             Log.Player("The carpenter builds you a supply cart for " + (paid + labor) + " denars. Hitch a pack animal to it: it hauls " + CartLoad(s) + " kg instead of "
-                       + GamePackKg + " kg, and the column moves " + SlowPct(s).ToString("0", CultureInfo.InvariantCulture) + "% slower.");
+                       + GamePackKg + " kg, and " + PartyWords.Pick("the column moves ", "you move ", "your party moves ") + SlowPct(s).ToString("0", CultureInfo.InvariantCulture) + "% slower.");   // m110-sam: bez zolnierzy nie "kolumna"
             Log.Info(P + "woz zbudowany w " + st.Name + " | material " + paid + " zl do kasy miasta, robocizna " + labor + " zl (" + (w.Owner != null ? w.Owner.Name.ToString() : "kasa miasta")
                      + ") | wozy gracza " + _carts + ", w zaprzegu " + Pulled() + ".");
         }

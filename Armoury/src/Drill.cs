@@ -1186,8 +1186,9 @@ namespace Armoury
             {
                 if (MenPurse.On) MenPurse.Add(mp, pay); else Hero.MainHero.ChangeHeroGold(pay);
                 _pSoldU += n; _pSoldGold += pay;
-                Log.Player("The smiths of " + st.Name + " bought " + n + " loads of scrap iron from your men's worn drill kit for " + pay + " denars - "
-                           + (MenPurse.On ? "the coin went to the men's purse." : "the coin is yours."));
+                bool noMen = PartyWords.NoTroops;   // m110-sam: bez zolnierzy (zlom z dawnego zapasu) - napis bez "your men", kasa jak dotad
+                Log.Player("The smiths of " + st.Name + " bought " + n + " loads of scrap iron from " + (noMen ? "your old drill kit" : "your men's worn drill kit") + " for " + pay + " denars - "
+                           + (MenPurse.On ? (noMen ? "the coin waits in the men's purse for the soldiers you hire." : "the coin went to the men's purse.") : "the coin is yours."));
             }
             else
             {
@@ -1252,9 +1253,7 @@ namespace Armoury
                 if (men > 0)
                     foreach (var kv in PlayerSurplus()) { int g = TypeGroup((int)kv.Key); if (g == GW) surW += kv.Value.Count; else if (g == GA) surA += kv.Value.Count; }
                 int roomW = Math.Max(0, cap - cur[GW]), roomA = Math.Max(0, cap - cur[GA]);
-                if (men <= 0)
-                    Log.Player("Your men took nothing into their drill stock - you have no soldiers to drill. " + noRoom + " pieces " + rest + ".", true);
-                else
+                if (men > 0)   // m110-sam: bez zolnierzy (sam / sami bohaterowie) bez napisu - zapas nic nie przyjmuje (cap 0), rzeczy jak w grze
                     Log.Player("Your men took " + taken + " pieces into their drill stock. They now drill with " + (cur[GW] + surW) + " weapons and " + (cur[GA] + surA)
                                + " pieces of armour, their spare kit in the armoury included (a full set is " + full + " of each - one per three men). They will take "
                                + roomW + " more weapons and " + roomA + " more pieces of armour from you." + (noRoom > 0 ? " " + noRoom + " pieces " + rest + " - no room." : ""),
@@ -1281,6 +1280,7 @@ namespace Armoury
                 room = Math.Max(0, IntakeSets * full - w) + Math.Max(0, IntakeSets * full - a);
             }
             catch (Exception e) { Stumble("TrophyTip", e); }
+            if (PartyWords.NoTroops) return "Remaining {COUNT} items will be left on the field.";   // m110-sam: bez zolnierzy zapas nic nie przyjmuje - jak LeftBehindTip
             return "Remaining {COUNT} items: your men keep up to " + room + " pieces of arms and armour for their drill stock, the rest stay on the field.";
         }
 

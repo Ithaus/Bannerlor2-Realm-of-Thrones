@@ -85,7 +85,7 @@ namespace Armoury
                          + ", w tym konie " + h + "), zostalo u gracza " + k + " (nikt nie przyjal) | w tej sesji pojman " + _events + ", oddane " + (_toArmory + _toRoster)
                          + " (zbrojownie " + _toArmory + ", juki / zapas " + _toRoster + ", konie " + _horses + "), zostalo " + _kept + ", potkniecia " + _stumbles + ".");
                 if (a + r > 0)
-                    Log.Player("Your company's armoury - " + (a + r) + " pieces - is your captors' now, as a beaten lord's armoury goes to his victors.", true);
+                    Log.Player((PartyWords.NoTroops ? "Your armoury - " : "Your company's armoury - ") + (a + r) + " pieces - is your captors' now, as a beaten lord's armoury goes to his victors.", true);
             }
             catch (Exception e) { _stumbles++; Log.Error("CaptiveArmory.OnPrisonerTaken", e); }
         }

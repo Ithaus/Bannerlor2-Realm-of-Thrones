@@ -267,7 +267,7 @@ namespace Armoury
                 if (pay > 0) GiveGoldAction.ApplyBetweenCharacters(lord, Hero.MainHero, pay, true);
                 _pDue += due; _pPaid += pay; _pHeroes = heroes; _pLord = lord.Name != null ? lord.Name.ToString() : lord.StringId;
                 if (pay < due)
-                    Log.Player(_pLord + " could not pay your company in full today: " + pay + " of " + due + " coins.", true);
+                    Log.Player(_pLord + " could not pay " + (PartyWords.IsAlone ? "you" : "your company") + " in full today: " + pay + " of " + due + " coins.", true);   // m110-sam: sam bohater - "you"
             }
             catch (Exception e) { PayStumble(e); }
         }

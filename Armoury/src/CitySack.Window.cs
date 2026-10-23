@@ -46,7 +46,7 @@ namespace Armoury
                 {
                     _dBlockLifeN++; _dBlockLife += amount;
                     // poprawka po audycie (gracz 5): regula obejmuje cale wojsko krolestwa zdobywcy (decyzja 3) - gracz, ktory nie lupil, dostaje napis bez twierdzenia, ze lupil
-                    if (mp.IsMainParty)
+                    if (mp.IsMainParty && !PartyWords.NoTroops)   // m110-sam: bez zolnierzy bez napisu o ludziach (blokada wydatku jak dotad)
                         Log.Player(t.PlayerIn ? "Your men are still gorged on the sack of " + st.Name + " - they spend nothing here."
                                               : "Your realm's army sacked " + st.Name + " only days ago - like all its soldiers, your men pay for nothing here.");
                 }

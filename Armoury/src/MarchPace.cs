@@ -148,7 +148,14 @@ namespace Armoury
                 // docinal reszte po cichu. 13.09.
                 if (current > cap)
                 {
-                    TextObject why = kind == 0 ? new TextObject("{=!}Marching column: {N} afoot").SetTextVariable("N", n)
+                    // m110-sam: sam bohater gracza (bez nikogo, bez doczepionych partii i jencow) - wpis mowi o nim; przedrostek "Marching column" zostaje (TerrainEase StartsWith)
+                    bool alone = mp == MobileParty.MainParty && men == 1 && prisoners == 0;
+                    TextObject why = alone
+                                   ? (kind == 0 ? new TextObject("{=!}Marching column: you walk")
+                                    : kind == 2 ? new TextObject("{=!}Marching column: you ride a spare horse")
+                                    : kind == 3 ? new TextObject("{=!}Marching column: your pack animals")
+                                    : new TextObject("{=!}Marching column: riding pace"))
+                                   : kind == 0 ? new TextObject("{=!}Marching column: {N} afoot").SetTextVariable("N", n)
                                    : kind == 2 ? new TextObject("{=!}Marching column: {N} footmen on spare horses").SetTextVariable("N", n)
                                    : kind == 3 ? new TextObject("{=!}Marching column: baggage train")
                                    : new TextObject("{=!}Marching column: all riders");
