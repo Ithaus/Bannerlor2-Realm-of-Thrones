@@ -62,6 +62,7 @@ namespace Armoury
             public string Village = "";
             public Settlement St;                      // sesja
             public MobileParty Mp;
+            public BountyQuest Quest;                  // m109-list: zadanie gry przyjetego listu (tylko sesja - nie w zapisie, nie w eksporcie ani w porownaniu nb3)
         }
 
         private struct Harm { public int Day; public byte Kind; public string Town, Vil; }   // Kind 0 - wies zlupiona (Vil - ta wies, E2b), 1 - karawana / woz wiejski rozbity
@@ -98,6 +99,7 @@ namespace Armoury
             _leanMeasured = false; _secV1Day = -2; _secVer = ""; _secBytes = -1; _secDay = -1; _nb3Bad = _nb3Ok = 0;   // m107 K6: pomiar zapisu w pierwszej dobie sesji
             _captainTalk = false; _captainChar = null; _talkNotice = null;
             ZeroWatchDay();
+            BountyReset();   // m109-list
         }
 
         private static void ZeroWatchDay()
@@ -420,16 +422,7 @@ namespace Armoury
             try
             {
                 var n = _talkNotice;
-                if (!Live(n)) return;
-                if (!n.Taken) { n.Taken = true; _wTakenToday++; }
-                var vt = Campaign.Current != null ? Campaign.Current.VisualTrackerManager : null;
-                if (vt != null && n.Mp != null && FlagOf(n.Mp) == null)
-                {
-                    vt.RegisterObject(n.Mp);
-                    _flags.Add(new Flag { Kind = "p", Id = n.Band, Until = Math.Max(Today + 1, n.Due), Obj = n.Mp });
-                    _dFlag++;
-                }
-                Log.Info(PW + "przyjety przez gracza - " + n.Town + " " + n.Band + " (" + n.Men + " ludzi) = " + n.Sum);
+                TakeNotice(n, n != null && n.Kind == 1 ? "soltys" : "kapitan", true);   // m109-list: wspolna droga przyjecia (NoticeBoard.Quest.cs) - zadanie w Quests albo flaga jak dotad
             }
             catch (Exception e) { WStumble("CaptainTakeCons", e); }
         }
@@ -498,20 +491,22 @@ namespace Armoury
                 }
             }
             catch (Exception e) { WStumble("OnMapEventEnded", e); }
+            finally { if (_tMe != null && ReferenceEquals(_tMe, me)) { try { TestBattleEnd(me); } catch (Exception e) { BStumble("TestBattleEnd", e); } } }   // m109-list: tylko autotest
         }
 
         private static void Settle(Notice n, MobileParty band, MapEvent me, MapEventSide winSide, BattleSideEnum win)
         {
             if (string.IsNullOrEmpty(n.Name)) n.Name = BandNameOf(band);
             int left = band.Party != null ? band.Party.NumberOfHealthyMembers : 0;
-            if (band.IsActive && left >= Math.Max(1, (int)Math.Ceiling(n.Men * BrokenShare))) return;   // uszla z sila - list stoi
+            if (band.IsActive && left >= Math.Max(1, (int)Math.Ceiling(n.Men * BrokenShare))) { BountyProgress(n, me, winSide, left); return; }   // uszla z sila - list stoi (m109-list: wpis w zadaniu)
             var st = n.St ?? Settlement.Find(n.Town);
             _notices.Remove(n);
-            if (st == null || st.Town == null) { _wDropGone++; return; }
+            if (st == null || st.Town == null) { _wDropGone++; BountyEnd(n, EndGone); return; }   // m109-list: kazde zdjecie listu zamyka jego zadanie (bez zadania - nic)
             if (!KindOn(n))   // poprawka po recenzji: wylaczony klucz (albo cala tablica) - list zdjety bez wyplaty, kasa nie placi za niewidoczne listy
             {
                 _wDropKey++;
                 Log.Info(PW + "zdjety bez wyplaty - " + n.Town + " " + n.Band + " (rodzaj " + n.Kind + ") - klucz NIE");
+                BountyEnd(n, EndKey);
                 return;
             }
             Hero payee = null;
@@ -529,6 +524,7 @@ namespace Armoury
                 {
                     _wDropGuard++;
                     Log.Info(PW + "zdjety bez wyplaty - " + n.Town + " " + n.Band + " rozbita przez " + (lm != null ? (lm.IsGarrison ? "zaloge" : lm.IsMilitia ? "milicje" : lm.IsCaravan ? "karawane" : lm.IsVillager ? "wiesniakow" : lm.IsBandit ? "bandytow" : lm.IsLordParty ? "lorda (klucz AI Lords NIE)" : "inna partie") : "nieznanego"));
+                    BountyEnd(n, EndOthers, 0, null, lm, me);
                     return;
                 }
             }
@@ -540,15 +536,18 @@ namespace Armoury
                     _wDropEnemy++;
                     Log.Info(PW + "zdjety bez wyplaty - " + n.Town + " " + n.Band + " rozbita przez wroga miasta (" + who + ")");
                     if (payee == Hero.MainHero) Log.Player("The " + GuardName(st).Replace("the ", "") + " of " + st.Name + " will pay no bounty to an enemy of their town.");
+                    BountyEnd(n, EndEnemy, 0, payee, null, me);
                     return;
                 }
             }
             catch (Exception e) { WStumble("Settle(wrog)", e); }
-            Pay(n, st, payee, who);
+            int paid = Pay(n, st, payee, who);
+            BountyEnd(n, payee == Hero.MainHero ? EndPaid : EndLord, paid, payee, null, me);   // m109-list: gracz - Sukces po wyplacie, lord AI - Anulowane
         }
 
-        /// <summary>Wyplata: kasa miasta (wolna kasa) -> odbiorca; reszta od pana miasta (ponad rezerwe); brak - niedoplata. Zawsze z platnikiem (nic z niczego).</summary>
-        private static void Pay(Notice n, Settlement st, Hero payee, string who)
+        /// <summary>Wyplata: kasa miasta (wolna kasa) -> odbiorca; reszta od pana miasta (ponad rezerwe); brak - niedoplata. Zawsze z platnikiem (nic z niczego).
+        /// m109-list: zwraca wyplacone (kasa + pan / wies) - do wpisu zadania (jedyny wolajacy: Settle).</summary>
+        private static int Pay(Notice n, Settlement st, Hero payee, string who)
         {
             var town = st.Town;
             int g0 = town.Gold;
@@ -595,6 +594,7 @@ namespace Armoury
                 if (paid > 0) Log.Player(by + " pays you " + paid.ToString("N0", Inv) + " for breaking " + n.Name + ".");
                 if (shortfall > 0) Log.Player((n.Kind == 1 ? "The village" : "The council") + " could pay only " + paid.ToString("N0", Inv) + " of the promised " + n.Sum.ToString("N0", Inv) + ".", true);
             }
+            return paid;
         }
 
         private static double Keep(Settlement st)
@@ -611,7 +611,7 @@ namespace Armoury
             try
             {
                 for (int i = _notices.Count - 1; i >= 0; i--)
-                    if (_notices[i].Band == mp.StringId) { _notices.RemoveAt(i); _wDropGone++; }
+                    if (_notices[i].Band == mp.StringId) { var n = _notices[i]; _notices.RemoveAt(i); _wDropGone++; BountyEnd(n, EndGone); }   // m109-list: zadanie Anulowane
                 _harm.Remove(mp.StringId ?? "");
             }
             catch (Exception e) { WStumble("OnPartyDestroyed", e); }
@@ -658,11 +658,12 @@ namespace Armoury
                     if (n.St == null) n.St = Settlement.Find(n.Town);
                     if (n.Mp == null && byId != null) { MobileParty f; if (byId.TryGetValue(n.Band ?? "", out f)) n.Mp = f; }
                     if (n.Mp != null && string.IsNullOrEmpty(n.Name)) n.Name = BandNameOf(n.Mp);
-                    if (n.St == null || n.St.Town == null || n.Mp == null || !n.Mp.IsActive) { _notices.RemoveAt(i); _wDropGone++; continue; }
-                    if (!KindOn(n)) { _notices.RemoveAt(i); _wDropKey++; continue; }   // poprawka po recenzji: klucz rodzaju albo tablica wylaczone
-                    if (day > n.Due) { _notices.RemoveAt(i); _wDropDue++; continue; }
+                    // m109-list: kazde zdjecie listu zamyka jego zadanie (BountyEnd - bez zadania nic): banda znikla, klucz, zmiana pana - Anulowane, termin - Nieudane
+                    if (n.St == null || n.St.Town == null || n.Mp == null || !n.Mp.IsActive) { _notices.RemoveAt(i); _wDropGone++; BountyEnd(n, EndGone); continue; }
+                    if (!KindOn(n)) { _notices.RemoveAt(i); _wDropKey++; BountyEnd(n, EndKey); continue; }   // poprawka po recenzji: klucz rodzaju albo tablica wylaczone
+                    if (day > n.Due) { _notices.RemoveAt(i); _wDropDue++; BountyEnd(n, EndDue); continue; }
                     string owner = n.St.OwnerClan != null ? n.St.OwnerClan.StringId : "";
-                    if (owner != n.Owner) { _notices.RemoveAt(i); _wDropOwner++; continue; }
+                    if (owner != n.Owner) { _notices.RemoveAt(i); _wDropOwner++; BountyEnd(n, EndOwner); continue; }
                 }
                 catch (Exception e) { WStumble("WatchDaily(zdjecie)", e); }
             }

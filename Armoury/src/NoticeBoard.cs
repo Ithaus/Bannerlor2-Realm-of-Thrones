@@ -749,6 +749,7 @@ namespace Armoury
             if (!Valid(e)) return false;
             try
             {
+                if ((e.K == Kind.Watch || e.K == Kind.Headman) && NoticeOf(e) != null && NoticeOf(e).Quest != null) return false;   // m109-list: list z zadaniem - tracker i przelacznik sledzenia w Quests
                 var o = MarkTarget(e);
                 if (o == null) return false;
                 ResolveFlags();
@@ -880,6 +881,7 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             try { FlagsDaily(); } catch (Exception e) { Stumble("Daily(flagi)", e); }
             try { WatchDaily(day); } catch (Exception e) { Stumble("Daily(listy)", e); }
+            try { BountyDaily(day); } catch (Exception e) { Stumble("Daily(zadania)", e); }   // m109-list: zadania przyjetych listow (siatka, klucz NIE, linia doby)
             string probe = "-";
             if (day % 30 == 5) { try { probe = Probe(); } catch (Exception e) { Stumble("Probe", e); probe = "BLAD"; } }
             double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
@@ -1057,6 +1059,7 @@ namespace Armoury
 
         internal static void Import(string s)
         {
+            _bqLoaded = true;   // m109-list: sesja z wczytanego zapisu (hak autotestu)
             _flags.Clear();
             if (string.IsNullOrEmpty(s)) return;
             try
