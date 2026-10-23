@@ -637,6 +637,9 @@ namespace Armoury
                 {
                     var s = Settings.Current;
                     if (s == null || !s.ConditionScalesStats) return;
+                    // m110-stan krok 2 (WornExactHpProtection): kopia modyfikatora sztuki noszonej przez bohatera druzyny gracza w bitwie - krzywa z dokladnego HP
+                    ItemModifier orig; float d;
+                    if (HeroHp.TryCopy(__instance, out orig, out d)) { __result = HeroHp.Exact(armorValue, __result, orig, d); return; }
                     float pm = ConditionOf(__instance);
                     if (pm >= 0.999f || pm <= 0f) return;
                     __result = Math.Max(1, (int)Math.Floor(armorValue * StatFactor(pm)));
@@ -654,6 +657,9 @@ namespace Armoury
                 {
                     var s = Settings.Current;
                     if (s == null || !s.ConditionScalesStats) return;
+                    // m110-stan krok 2 (WornExactHpProtection): bron noszona przez bohatera druzyny gracza w bitwie - ta sama zasada co pancerz
+                    ItemModifier orig; float d;
+                    if (HeroHp.TryCopy(__instance, out orig, out d)) { __result = HeroHp.Exact(baseDamage, __result, orig, d); return; }
                     float pm = ConditionOf(__instance);
                     if (pm >= 0.999f || pm <= 0f) return;
                     __result = Math.Max(1, (int)Math.Floor(baseDamage * StatFactor(pm)));

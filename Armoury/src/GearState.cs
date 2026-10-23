@@ -98,6 +98,9 @@ namespace Armoury
             if (m == null) return Sound;
             int s;
             if (_state.TryGetValue(m, out s)) return s;
+            // m110-stan krok 2: kopia modyfikatora w klonie sprzetu agenta (HeroHp - slownik po referencji, kopii tu nie ma) - stan oryginalu
+            ItemModifier o;
+            if (HeroHp.CopyOrig(m, out o)) return o == null ? Sound : Of(o);
             return m.PriceMultiplier >= 0.999f ? Sound : -1;
         }
 
