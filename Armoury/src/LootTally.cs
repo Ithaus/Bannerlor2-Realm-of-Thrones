@@ -705,6 +705,8 @@ namespace Armoury
                     int i = cand[0];
                     cls[i] = APek;
                     b.PekOne++;
+                    var s = Settings.Current;   // Z1 (ExtraBrokenArmorWrecks): jak czesc rozbita ciosem - wrak do lupu (regula Jeffa 04.10)
+                    if (s != null && s.ExtraBrokenArmorWrecks && s.WreckSalvageEnabled && BattlefieldLaw.AddWreck(st.Items[i])) { b.PekWreck++; wreck = true; }
                 }
                 else if (cand.Count > 1)
                 {

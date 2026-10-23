@@ -698,8 +698,8 @@ namespace Armoury
                             if (el.EquipmentElement.Item != item || el.Amount <= 0) continue;
                             int t = Math.Min(left, el.Amount);
                             armory.AddToCounts(el.EquipmentElement, -t);
+                            LootTally.Queued(item, t, LootTally.Dzialka);   // m109-lup: pomiar (przed dopisaniem - otwarcie bitwy liczy kolejke jako 'wczesniej')
                             ShareQueue.AddToCounts(el.EquipmentElement, t);
-                            LootTally.Queued(item, t, LootTally.Dzialka);   // m109-lup: pomiar
                             left -= t; moved += t;
                         }
                     }
@@ -868,8 +868,8 @@ namespace Armoury
                         for (int i = 0; i < gainedLoots.Count; i++)
                         {
                             var el = gainedLoots.GetElementCopyAtIndex(i);
+                            LootTally.Queued(el.EquipmentElement.Item, el.Amount, LootTally.Bagaz);   // m109-lup: pomiar (przed dopisaniem)
                             ShareQueue.AddToCounts(el.EquipmentElement, el.Amount);
-                            LootTally.Queued(el.EquipmentElement.Item, el.Amount, LootTally.Bagaz);   // m109-lup: pomiar
                         }
                         gainedLoots.Clear();
                     }
@@ -1040,8 +1040,8 @@ namespace Armoury
                             if (pass == 0 && el.EquipmentElement.ItemModifier != null) continue;
                             int n = Math.Min(left, el.Amount);
                             armory.AddToCounts(el.EquipmentElement, -n);
+                            LootTally.Queued(kv.Key, n, LootTally.Send);   // m109-lup: pomiar (przed dopisaniem)
                             ShareQueue.AddToCounts(el.EquipmentElement, n);
-                            LootTally.Queued(kv.Key, n, LootTally.Send);   // m109-lup: pomiar
                             left -= n; moved += n;
                         }
                 }
@@ -1146,6 +1146,23 @@ namespace Armoury
             }
             catch { }
             _lastPick = null;
+        }
+
+        /// <summary>m109-lup Z1 (ExtraBrokenArmorWrecks, wolane z LootTally.FelledPost): "dodatkowo peknieta" czesc zbroi wroga powalonego przez druzyne
+        /// gracza do worka z wrakami - te same bramki co QueueWreck (klucze, limit 400) i tylko, gdy znamy stan wraka (modyfikator Spoils wpiety przy starcie
+        /// z WreckSalvageEnabled) - bez niego wrak przyszedlby jako cala sztuka. DTE tej sztuki nie dopisuje nigdzie (AddItemToRecover ja pomija), wiec wrak
+        /// to jedyna kopia. true - dodany.</summary>
+        internal static bool AddWreck(ItemObject it)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (it == null || s == null || !s.WreckSalvageEnabled || !s.BattlefieldLawEnabled || Wrecks.Count >= 400) return false;
+                if (_rlHeavy == null && _rlHeavyMax == null) return false;
+                Wrecks.Add(it);
+                return true;
+            }
+            catch (Exception e) { MountStumble("AddWreck", e); return false; }
         }
 
         /// <summary>Najciezszy modyfikator zuzycia Spoils - stan wraka.</summary>
