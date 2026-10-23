@@ -422,6 +422,7 @@ namespace Armoury
         internal static void RegisterEvents(CampaignBehaviorBase b)
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(b, delegate (CampaignGameStarter st) { try { _leave = false; if (st != null) AddMenus(st); } catch (Exception e) { Stumble("RegisterEvents", e); } });
+            TownStay.RegisterEvents(b);   // m109-musztra: takt autotestu postoju (tylko przy pliku armoury-postoj.flag w autotescie; w grze od razu wyjscie)
         }
 
         private static void AddMenus(CampaignGameStarter starter)

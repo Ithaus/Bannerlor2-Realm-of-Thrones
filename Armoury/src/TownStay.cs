@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -130,6 +132,7 @@ namespace Armoury
         {
             _stumbles = 0; _err.Clear();
             ClearDrill(); ClearSpend();
+            TestClear(); _tOn = false;   // autotest: nowa kampania albo wczytanie - decyzja od nowa w SessionStart (blokada zegara zyje w starej kampanii)
         }
 
         private static void ClearDrill()
@@ -275,6 +278,7 @@ namespace Armoury
                 if (main != null) OneSafe(main, rate, s);
             }
             sw.Stop();
+            if (_tOn && _tPhase > 0 && _tPhase < PDone) _tSpent += _pX;   // autotest: wydatki gracza w trakcie testu (MUSZT-6)
             try { PlayerMessage(s); } catch (Exception e) { Stumble("PlayerMessage", e); }
             try { if (s.LogEnabled) Log.Info(SpendLine(s, on, rate, sw.Elapsed.TotalMilliseconds)); } catch (Exception e) { Stumble("SpendLine", e); }
         }
@@ -427,6 +431,9 @@ namespace Armoury
                 }
                 long pFrom, pOut; float pSet;
                 CampDrill.PlayerStay(out pFrom, out pOut, out pSet);
+                TestClear();
+                _tOn = TestWanted();
+                if (_tOn) _tArmAt = now;
                 Log.Info(P + "start sesji | musztra w osadzie (Drill Town Stay) " + (DrillOn(s) ? "TAK" : "NIE") + " | limit godzin w osadzie na dobe postoju: miasto "
                          + Cap(KTown, 1) + "/" + Cap(KTown, 2) + "/" + Cap(KTown, 3) + "/" + Cap(KTown, 4) + ", zamek i wies " + Cap(KCastle, 1) + "/" + Cap(KCastle, 2) + "/" + Cap(KCastle, 3)
                          + " (razem z obozem najwyzej " + (int)CampDrill.FullHours + " h od switu) | oblezona - jak oboz oblezenia | wypad < " + FieldResetHours + " h nie zeruje"
@@ -436,9 +443,315 @@ namespace Armoury
                          + " | morale +" + (int)MoraleFull + "/dobe do +" + (int)MoraleCap
                          + " | AI odtworzone ze StationaryStartTime " + n + " (srednio doba " + F1(n > 0 ? days / n : 0) + ", Never " + never + ")"
                          + " | gracz: postoj od " + (pFrom >= 0 ? pFrom.ToString(Inv) + " (doba " + Day(pFrom, now) + ")" : "-") + ", poza od " + (pOut >= 0 ? pOut.ToString(Inv) : "-")
-                         + ", dzis w osadzie " + F2(pSet) + " h.");
+                         + ", dzis w osadzie " + F2(pSet) + " h | autotest postoju " + (_tOn ? "TAK (plik " + AutoFlagName + ")" : "nie") + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
+        }
+
+        /// <summary>CampDrill.RegisterEvents: takt autotestu postoju (TickEvent - tylko przy plynacym czasie; nieuzbrojony - od razu wyjscie).</summary>
+        internal static void RegisterEvents(CampaignBehaviorBase b)
+        {
+            CampaignEvents.TickEvent.AddNonSerializedListener(b, delegate (float dt) { if (_tOn) TestTick(); });
+        }
+
+        // ------------------------------------------------------------ autotest postoju (plik CrashScribe\armoury-postoj.flag + DLL autotestu, LogGate.Mode 1/2)
+        // DLL autotestu sama osadza gracza w miescie i czeka tam (town_wait_menus); poza miastem zatrzymuje zegar, a na czystej mapie przenosi gracza do miasta.
+        // Driver: F1 postoj w tym miescie >= 100 h, wyjscie o 12:00; F2 6 h w polu, powrot do tego samego miasta na 26 h (doba postoju trwa); F3 >= 24 h w polu
+        // z cwiczeniami z menu obozu (Train the men, 8 h) i powrot o 2:00 (przed switem); F4 nowy postoj - trzy poranki (limit 4, 3, 2), podsumowanie, gracz
+        // zostaje w miescie. W polu gracz stoi w menu obozu arm_camp_wait z zegarem plynacym i zablokowanym (SetTimeControlModeLock) - inaczej DLL zatrzymalaby
+        // zegar i przeniosla gracza; blokada zdjeta przy kazdym wejsciu do miasta i przy przerwaniu. Kroki tylko z TickEvent (nigdy z opcji menu oczekiwania).
+        // Kazda faza ma limit czasu; po przekroczeniu albo po 3 wyjatkach - linia "przerwany" i rozbrojenie drivera (funkcja gry dziala dalej).
+        internal const string AutoFlagName = "armoury-postoj.flag";
+        private const int PWait = 0, PF1 = 1, PF2Field = 2, PF2Town = 3, PF3Field = 4, PF4Town = 5, PDone = 6;
+        private static bool _tOn, _tLocked, _tEntering, _tDrillOn, _tDrillDone, _tF2Cont, _tF4New;
+        private static int _tPhase, _tFails, _tDayLast, _tF2Day, _tF4Mornings;
+        private static long _tArmAt, _tAt, _tHour = -1, _tDawn = long.MinValue, _tFrom = -1, _tF4From = -1, _tRowFrom = -1, _tSpent;
+        private static float _tSetLast, _tCapLast, _tF3Menu = -1f;
+        private static Settlement _tTown;
+        private static readonly List<string> _tF1 = new List<string>(), _tF4 = new List<string>();
+        private static readonly List<int> _tF1Caps = new List<int>(), _tF1Days = new List<int>(), _tF4Caps = new List<int>();
+        private static readonly List<float> _tF4Set = new List<float>();
+
+        private static void TestClear()
+        {
+            _tLocked = _tEntering = _tDrillOn = _tDrillDone = _tF2Cont = _tF4New = false;
+            _tPhase = PWait; _tFails = 0; _tDayLast = 0; _tF2Day = 0; _tF4Mornings = 0;
+            _tArmAt = _tAt = 0; _tHour = -1; _tDawn = long.MinValue; _tFrom = _tF4From = _tRowFrom = -1; _tSpent = 0;
+            _tSetLast = _tCapLast = 0f; _tF3Menu = -1f; _tTown = null;
+            _tF1.Clear(); _tF4.Clear(); _tF1Caps.Clear(); _tF1Days.Clear(); _tF4Caps.Clear(); _tF4Set.Clear();
+        }
+
+        private static bool TestWanted()
+        {
+            int m = LogGate.Mode;
+            if (m != 1 && m != 2) return false;
+            try
+            {
+                var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                return System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), AutoFlagName));
+            }
+            catch { return false; }
+        }
+
+        private static string PhaseName(int p)
+        {
+            switch (p)
+            {
+                case PWait: return "F0";
+                case PF1: return "F1";
+                case PF2Field: case PF2Town: return "F2";
+                case PF3Field: return "F3";
+                case PF4Town: return "F4";
+                default: return "koniec";
+            }
+        }
+
+        /// <summary>Czesc wspolna linii autotestu: menu, osada, godzina, doba postoju, limit, godziny w osadzie od switu.</summary>
+        private static string Where(string menu, long now)
+        {
+            var mp = MobileParty.MainParty;
+            var st = mp != null ? mp.CurrentSettlement : null;
+            long from, outAt; float set;
+            CampDrill.PlayerStay(out from, out outAt, out set);
+            int kind = Kind(st);
+            int d = Day(from, now);
+            return "menu " + (menu ?? "-") + ", osada " + (st != null ? st.Name.ToString() : "-") + ", godzina " + (now % 24) + ", doba postoju " + (from >= 0 ? d.ToString(Inv) : "-")
+                   + ", limit " + (kind != KNone && from >= 0 ? Cap(kind, d).ToString(Inv) : "-") + ", godzin w osadzie " + F2(set);
+        }
+
+        private static void TestLine(string what, string menu, long now, string extra)
+        {
+            Log.Info(P + "autotest - " + what + " | " + Where(menu, now) + (extra != null ? " | " + extra : "") + ".");
+        }
+
+        private static void Unlock()
+        {
+            if (!_tLocked) return;
+            _tLocked = false;
+            try { if (Campaign.Current != null) Campaign.Current.SetTimeControlModeLock(false); } catch (Exception e) { Stumble("Autotest.Unlock", e); }
+        }
+
+        private static void Lock()
+        {
+            var c = Campaign.Current;
+            if (c == null) return;
+            if (c.TimeControlModeLock && !_tLocked) return;   // cudza blokada (okno portretu) - nie ruszamy
+            if (!c.TimeControlModeLock) { c.TimeControlMode = CampaignTimeControlMode.UnstoppableFastForward; c.SetTimeControlModeLock(true); }
+            _tLocked = true;
+        }
+
+        /// <summary>Przerwanie drivera: linia, zdjecie blokady zegara; w polu wyjscie z menu obozu (DLL autotestu osadzi gracza w miescie).</summary>
+        private static void TestAbort(string why, string menu, long now)
+        {
+            try { TestLine("przerwany", menu, now, "faza " + PhaseName(_tPhase) + ", powod: " + why); } catch { }
+            _tOn = false;
+            Unlock();
+            try
+            {
+                var mp = MobileParty.MainParty;
+                if (mp != null && mp.CurrentSettlement == null && (menu == "arm_camp_wait" || menu == "arm_camp_drill_wait") && Campaign.Current.CurrentMenuContext != null) GameMenu.ExitToLast();
+            }
+            catch (Exception e) { Stumble("Autotest.Abort", e); }
+        }
+
+        private static void TestTick()
+        {
+            long now = 0; string menu = null;
+            try
+            {
+                var c = Campaign.Current;
+                var mp = MobileParty.MainParty;
+                if (c == null || mp == null) return;
+                if (!(TaleWorlds.Core.GameStateManager.Current != null && TaleWorlds.Core.GameStateManager.Current.ActiveState is TaleWorlds.CampaignSystem.GameState.MapState)) return;   // misja, inne stany
+                if (c.ConversationManager != null && c.ConversationManager.IsConversationInProgress) return;
+                now = (long)Math.Floor(CampaignTime.Now.ToHours);
+                var ctx = c.CurrentMenuContext;
+                menu = ctx != null && ctx.GameMenu != null ? ctx.GameMenu.StringId : null;
+                bool field = _tPhase == PF2Field || _tPhase == PF3Field;
+                if (mp.MapEvent != null) { if (field) TestAbort("bitwa w polu", menu, now); return; }
+                if (field && !_tEntering && PlayerEncounter.Current != null) { TestAbort("spotkanie w polu", menu, now); return; }
+                if (_tEntering) { Entering(mp, menu, now); return; }
+                // w polu gracz stoi w menu obozu - na czystej mapie DLL autotestu przenioslaby go do miasta (z ticku kampanii wolno otworzyc menu)
+                if (field && menu == null) { GameMenu.ActivateGameMenu("arm_camp_wait"); return; }
+                Mornings(menu, now);
+                if (now == _tHour) return;   // reszta - raz na godzine gry
+                _tHour = now;
+                if (field && !_tLocked) Lock();   // ktos zdjal blokade (nie powinno sie zdarzyc) - z powrotem
+                switch (_tPhase)
+                {
+                    case PWait: StepWait(mp, menu, now); break;
+                    case PF1: StepTown(mp, menu, now, 100, true); break;
+                    case PF2Field: if (now - _tAt >= 6) Enter(mp, menu, now); break;   // krotki wypad: 6 h w polu
+                    case PF2Town: StepTown(mp, menu, now, 26, false); break;
+                    case PF3Field: StepField(mp, menu, now); break;
+                    case PF4Town: StepF4(mp, menu, now); break;
+                }
+            }
+            catch (Exception e)
+            {
+                Stumble("Autotest", e);
+                if (++_tFails >= 3) TestAbort("3 wyjatki drivera (pierwszy w logu jako ERROR)", menu, now);
+            }
+        }
+
+        /// <summary>F0: czeka, az DLL autotestu osadzi gracza w miescie (town_wait_menus) i licznik postoju ruszy; menu "town" - czekanie jak opcja gry town_wait.</summary>
+        private static void StepWait(MobileParty mp, string menu, long now)
+        {
+            var st = mp.CurrentSettlement;
+            if (now - _tArmAt > 72) { TestAbort("F0 - gracz nie czeka w miescie po 72 h", menu, now); return; }
+            if (st == null || Kind(st) != KTown || mp.Army != null) return;
+            if (menu == "town" && PlayerEncounter.Current != null) { PlayerEncounter.Current.IsPlayerWaiting = true; GameMenu.SwitchToMenu("town_wait_menus"); return; }
+            if (menu != "town_wait_menus") return;
+            long from, outAt; float set;
+            CampDrill.PlayerStay(out from, out outAt, out set);
+            if (from < 0) return;   // licznik postoju rusza w godzinie gry (Drill.Hourly -> CampDrill.AutoHour)
+            _tTown = st; _tFrom = from; _tAt = now; _tPhase = PF1; _tDayLast = Day(from, now);
+            TestLine("F1 wejscie", menu, now, "okno lupu " + (CitySack.StayWindow(st, mp) ? "TAK (wydatki wstrzymane)" : "nie") + ", sakiewka ludzi " + MenPurse.Get(mp)
+                     + ", zasada gracza " + (CampDrill.PlayerRuleOn ? "TAK" : "NIE") + ", Drill Town Stay " + (DrillOn(Settings.Current) ? "TAK" : "NIE"));
+        }
+
+        /// <summary>F1 i F2 w miescie: postoj w miescie testu; wyjscie po `hours` h (F1 - dopiero o 12:00).</summary>
+        private static void StepTown(MobileParty mp, string menu, long now, int hours, bool noon)
+        {
+            if (mp.CurrentSettlement != _tTown || menu != "town_wait_menus")
+            {
+                if (now - _tAt > hours + 48) TestAbort(PhaseName(_tPhase) + " - gracz nie czeka w miescie testu (" + (mp.CurrentSettlement != null ? mp.CurrentSettlement.Name.ToString() : "pole") + ")", menu, now);
+                return;
+            }
+            if (now - _tAt > hours + 48) { TestAbort(PhaseName(_tPhase) + " - limit czasu w miescie", menu, now); return; }
+            if (now - _tAt < hours) return;
+            if (noon && now % 24 != 12) return;
+            TestLine(PhaseName(_tPhase) + " wyjscie", menu, now, "w miescie " + (now - _tAt) + " h");
+            Leave(mp, now);
+            _tPhase = _tPhase == PF1 ? PF2Field : PF3Field;
+            _tAt = now; _tDrillOn = _tDrillDone = false;
+        }
+
+        /// <summary>Wyjscie z miasta w jednym takcie (jak opcja gry "Leave" - game_menu_settlement_leave_on_consequence) z zegarem zablokowanym na biegu i od razu
+        /// menu obozu (gracz w polu w menu - DLL autotestu go nie przenosi). Z ticku kampanii, nie z opcji menu.</summary>
+        private static void Leave(MobileParty mp, long now)
+        {
+            Lock();
+            if (PlayerEncounter.Current != null) PlayerEncounter.Current.IsPlayerWaiting = false;
+            var st = mp.CurrentSettlement;
+            if (st != null) mp.Position = st.GatePosition;
+            PlayerEncounter.LeaveSettlement();
+            PlayerEncounter.Finish();
+            mp.SetMoveModeHold();
+            GameMenu.ActivateGameMenu("arm_camp_wait");
+        }
+
+        /// <summary>Powrot do miasta testu: wyjscie z menu obozu, pod brame i zwykle spotkanie z osada (jak DLL autotestu); dalej Entering.</summary>
+        private static void Enter(MobileParty mp, string menu, long now)
+        {
+            if (_tTown == null) { TestAbort("brak miasta testu", menu, now); return; }
+            if (Campaign.Current.CurrentMenuContext != null) GameMenu.ExitToLast();
+            mp.SetMoveModeHold();
+            mp.Position = _tTown.GatePosition;
+            EncounterManager.StartSettlementEncounter(mp, _tTown);
+            _tEntering = true; _tAt = now;
+        }
+
+        /// <summary>Po spotkaniu z miastem: menu "town" - zdjecie blokady zegara i czekanie (jak opcja gry town_wait); town_wait_menus - linia wejscia i faza miasta.</summary>
+        private static void Entering(MobileParty mp, string menu, long now)
+        {
+            if (menu != null && menu.EndsWith("_outside", StringComparison.Ordinal)) { TestAbort("nie wpuszczono do miasta (menu " + menu + ")", menu, now); return; }
+            if (now - _tAt > 6) { TestAbort("wejscie do miasta trwa ponad 6 h", menu, now); return; }
+            if (mp.CurrentSettlement != _tTown) return;
+            if (menu == "town")
+            {
+                Unlock();   // czekanie w miescie - zegar prowadzi menu oczekiwania (StartWait), jak u DLL autotestu
+                if (PlayerEncounter.Current != null) PlayerEncounter.Current.IsPlayerWaiting = true;
+                GameMenu.SwitchToMenu("town_wait_menus");
+                return;
+            }
+            if (menu != "town_wait_menus") return;
+            Unlock();
+            long from, outAt; float set;
+            CampDrill.PlayerStay(out from, out outAt, out set);
+            if (from < 0) return;   // nowy postoj (F4) - licznik rusza w godzinie gry (Drill.Hourly -> CampDrill.AutoHour)
+            _tEntering = false; _tHour = now;
+            if (_tPhase == PF2Field)
+            {
+                _tPhase = PF2Town; _tAt = now;
+                _tF2Day = Day(from, now); _tF2Cont = from >= 0 && from == _tFrom && _tF2Day > 1;
+                TestLine("F2 wejscie", menu, now, "po " + 6 + " h w polu, kontynuacja postoju " + (_tF2Cont ? "TAK" : "NIE") + " (poczatek postoju " + from + ", w F1 " + _tFrom + ")");
+            }
+            else
+            {
+                _tPhase = PF4Town; _tAt = now; _tF4From = from;
+                _tF4New = from >= 0 && from != _tFrom && Day(from, now) == 1;
+                TestLine("F4 wejscie", menu, now, "po polu (F3), nowy postoj " + (_tF4New ? "TAK" : "NIE") + " (poczatek postoju " + from + ")");
+            }
+        }
+
+        /// <summary>F3: >= 24 h w polu w menu obozu, w dzien cwiczenia z menu (arm_camp_drill_wait - pelny dzien 8 h), powrot o 2:00 (przed switem).</summary>
+        private static void StepField(MobileParty mp, string menu, long now)
+        {
+            if (now - _tAt > 60) { TestAbort("F3 - limit czasu w polu", menu, now); return; }
+            int hod = (int)(now % 24);
+            if (menu == "arm_camp_wait" && _tDrillOn && !_tDrillDone)
+            {
+                _tDrillDone = true; _tF3Menu = CampDrill.PlayerDayHours;
+                TestLine("F3 cwiczenia koniec", menu, now, "z menu obozu dzis od switu " + F2(_tF3Menu) + " h");
+            }
+            if (menu == "arm_camp_wait" && !_tDrillOn && hod >= 6 && hod < 12 && CampDrill.DayHour(hod) && NightRest.DawnDebtOf(mp) < 1 && CampDrill.PlayerDayHours < 0.01f)
+            {
+                _tDrillOn = true;
+                GameMenu.SwitchToMenu("arm_camp_drill_wait");   // zwykle menu obozu -> menu cwiczen (z ticku kampanii; menu cwiczen samo startuje czekanie)
+                TestLine("F3 cwiczenia start", "arm_camp_drill_wait", now, "w polu od " + (now - _tAt) + " h");
+                return;
+            }
+            if (_tDrillDone && now - _tAt >= FieldResetHours && hod == 2) { TestLine("F3 powrot", menu, now, "w polu " + (now - _tAt) + " h"); Enter(mp, menu, now); }
+        }
+
+        /// <summary>F4: nowy postoj w miescie testu - trzy poranki (Mornings), potem podsumowanie; gracz zostaje w miescie.</summary>
+        private static void StepF4(MobileParty mp, string menu, long now)
+        {
+            if (now - _tAt > 96) { TestAbort("F4 - limit czasu w miescie", menu, now); return; }
+            if (_tF4Mornings >= 3) Summary(menu, now);
+        }
+
+        /// <summary>Raz na dobe od switu gracza: godziny w osadzie zakonczonej doby i limit jej poranka (najwyzszy limit tej doby - z pierwszej godziny w osadzie),
+        /// przypisane do pobytu wedlug poczatku postoju: pobyt 1 (F1 i F2 - linie "F1 rano"), pobyt 2 (F4 - "F4 rano").</summary>
+        private static void Mornings(string menu, long now)
+        {
+            long dawn = (long)Math.Floor((CampaignTime.Now.ToHours - NightRest.PlayerDawn) / 24.0);
+            if (_tDawn == long.MinValue) { _tDawn = dawn; return; }
+            if (dawn != _tDawn)
+            {
+                if (_tCapLast > 0f && _tRowFrom >= 0 && (_tRowFrom == _tFrom || _tRowFrom == _tF4From))
+                {
+                    bool f4 = _tRowFrom == _tF4From;
+                    string row = "doba " + _tDayLast + " limit " + (int)_tCapLast + " godzin " + F2(_tSetLast);
+                    if (f4) { _tF4.Add(row); _tF4Caps.Add((int)_tCapLast); _tF4Set.Add(_tSetLast); _tF4Mornings++; }
+                    else { _tF1.Add(row); _tF1Caps.Add((int)_tCapLast); _tF1Days.Add(_tDayLast); }
+                    Log.Info(P + "autotest - " + (f4 ? "F4" : "F1") + " rano | doba postoju " + _tDayLast + ", limit " + (int)_tCapLast + ", godzin w osadzie " + F2(_tSetLast) + ".");
+                }
+                _tDawn = dawn; _tCapLast = 0f; _tSetLast = 0f; _tRowFrom = -1;
+            }
+            if (_tPhase == PWait || _tPhase == PDone) return;
+            long from, outAt; float set;
+            CampDrill.PlayerStay(out from, out outAt, out set);
+            float cap = CampDrill.PlayerDayCap;
+            if (cap > 0f && _tCapLast <= 0f) { _tDayLast = Day(from, now); _tRowFrom = from; }   // doba postoju poranka - z pierwszej godziny w osadzie tej doby
+            _tSetLast = set; _tCapLast = cap;
+        }
+
+        private static void Summary(string menu, long now)
+        {
+            bool f1Down = true; for (int i = 1; i < _tF1Caps.Count; i++) if (_tF1Caps[i] > _tF1Caps[i - 1]) f1Down = false;
+            bool f1Floor = true; for (int i = 0; i < _tF1Caps.Count; i++) if (_tF1Days[i] >= 4 && _tF1Caps[i] != Cap(KTown, 4)) f1Floor = false;
+            bool f4 = _tF4Caps.Count >= 3 && _tF4Caps[0] == Cap(KTown, 1) && _tF4Caps[1] == Cap(KTown, 2) && _tF4Caps[2] == Cap(KTown, 3);
+            bool f4h = true; for (int i = 0; i < _tF4Set.Count; i++) if (_tF4Set[i] > _tF4Caps[i] + 0.01f || _tF4Set[i] <= 0f) f4h = false;
+            bool f3 = _tF3Menu >= CampDrill.FullHours - 0.01f;
+            bool ok = f1Down && f1Floor && _tF2Cont && f3 && _tF4New && f4 && f4h;
+            Log.Info(P + "autotest - podsumowanie | F1 poranki: " + string.Join("; ", _tF1.ToArray()) + " - limity nierosnace " + (f1Down ? "TAK" : "NIE") + ", od 4. doby limit 1 " + (f1Floor ? "TAK" : "NIE")
+                     + " | F2 kontynuacja " + (_tF2Cont ? "TAK" : "NIE") + " (doba " + _tF2Day + ") | F3 z menu obozu " + F2(_tF3Menu) + " h - " + (f3 ? "TAK" : "NIE")
+                     + " | F4 nowy postoj " + (_tF4New ? "TAK" : "NIE") + ", poranki: " + string.Join("; ", _tF4.ToArray()) + " - limity 4/3/2 " + (f4 ? "TAK" : "NIE") + ", godziny w limicie i > 0 " + (f4h ? "TAK" : "NIE")
+                     + " | wydatki gracza w tescie " + _tSpent + " | " + Where(menu, now) + " | wynik " + (ok ? "TAK" : "NIE") + ".");
+            _tPhase = PDone; _tOn = false;
+            Unlock();
         }
     }
 }
