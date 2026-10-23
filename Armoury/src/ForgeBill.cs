@@ -106,6 +106,21 @@ namespace Armoury
             return new Row { Item = it, Kind = kind, ByKg = false, Need = Math.Max(0, need), Bags = Recipes.CountInInventory(it), UnitKg = u, Opens = Math.Max(0, need) };
         }
 
+        /// <summary>Pamiec wiersza teraz (kg otwartej sztuki) - test zuzycia czyta ja przed i po kuciu.</summary>
+        internal static float OpenNow(Row w)
+        {
+            if (w == null || !w.ByKg) return 0f;
+            if (w.Kind == "wood") return SmithWood.OpenKg;
+            if (w.Kind == "coal") return SmithCoal.OpenKg;
+            if (w.Kind == "metal")
+            {
+                for (int g = 1; g <= 6; g++)
+                    if (w.Item == Recipes.MaterialItem((CraftingMaterials)g)) return SmeltScraps.BoxMilli(g) / (float)SmeltScraps.Unit * w.UnitKg;
+                return 0f;
+            }
+            return SmithStock.OpenKg(w.Item);
+        }
+
         private static bool InKg(Recipes.Recipe r, ItemObject it)
         {
             if (r.Kg == null || it == null) return false;
@@ -543,6 +558,7 @@ namespace Armoury
         {
             _sRefresh = 0;
             ResetDay();
+            ForgeBillTest.Reset();
             try
             {
                 if (_h == null) _h = new Harmony("com.jeff.armoury.forgebill");
