@@ -69,6 +69,7 @@ namespace Armoury
             public bool Player;
             public float[] Hits;           // ksiega ciosow tej misji (towarzysz przy CompanionGearWear) - pisze FieldCraft, koniec misji przenosi do HeroBook
             public bool[] Match;           // gniazda zgodne z BattleEquipment bohatera (tylko one sie zuzywaja)
+            public string[] Ids;           // recenzja R1: tozsamosc sztuki noszonej w bitwie (przedmiot|modyfikator z BattleEquipment przy wejsciu agenta) - ciosy tylko w nia
             public readonly List<KeyValuePair<ItemModifier, CopyInfo>> Copies = new List<KeyValuePair<ItemModifier, CopyInfo>>();
         }
 
@@ -146,13 +147,24 @@ namespace Armoury
             return TryCopy(m, out orig, out d);
         }
 
-        /// <summary>Wartosc sztuki z dokladnego HP d (procent) - ta sama krzywa co stan (ConditionScaling.StatFactor). Oryginal brak albo dobra jakosc: wynik gry
-        /// (RBM) razy krzywa; oryginal zly (stan): wartosc bazowa razy krzywa (jak ArmorPatch dla stanu). Panel "Armoury Stats" liczy ta sama funkcja.</summary>
+        /// <summary>Wartosc sztuki z dokladnego HP d (procent) - ta sama krzywa co stan (ConditionScaling.StatFactor). Oryginal brak albo dobra jakosc (sztuka
+        /// sprawna): wynik gry (RBM) minus kara zaokraglona W DOL - punkt ochrony ubywa dopiero, gdy zuzycie zjadlo caly punkt (recenzja U1: podloga wartosci zabierala
+        /// punkt przy najmniejszej rysie - kolczuga 50 przy 99.9% -> 49, rekawice 8 -> 7; do kroku 1 sprawna dawala zawsze pelna wartosc); oryginal zly (stan):
+        /// wartosc bazowa razy krzywa, podloga (jak ArmorPatch dla stanu - 34/41/47 przy 41/56/78%). Panel "Armoury Stats" liczy ta sama funkcja.</summary>
         internal static int Exact(int baseVal, int result, ItemModifier orig, float d)
         {
-            float sf = ConditionScaling.StatFactor(d / 100f);
-            if (orig == null || ConditionScaling.ConditionOf(orig) >= 0.999f) return Math.Max(1, (int)Math.Floor(result * sf));
-            return Math.Max(1, (int)Math.Floor(baseVal * sf));
+            if (orig == null || ConditionScaling.ConditionOf(orig) >= 0.999f)
+            {
+                float sf = ConditionScaling.StatFactor(d / 100f);
+                return Math.Max(1, result - (int)Math.Floor(result * (1f - sf)));
+            }
+            return ExactState(baseVal, d);
+        }
+
+        /// <summary>Wartosc sztuki w zlym stanie z dokladnego HP d: wartosc bazowa razy krzywa, podloga (jak ArmorPatch dla stanu).</summary>
+        internal static int ExactState(int baseVal, float d)
+        {
+            return Math.Max(1, (int)Math.Floor(baseVal * ConditionScaling.StatFactor(d / 100f)));
         }
 
         /// <summary>d przyciete do przedzialu stanu widocznego w nazwie (sprawny (80,100], uszkodzony (40,80], zmasakrowany [10,40], wrak [0.1,10)) - ochrona
@@ -264,7 +276,7 @@ namespace Armoury
             var beh = player ? ArmouryBehavior.Instance : null;
             if (!_heroes.Contains(hero)) _heroes.Add(hero);
             t.Agents++;
-            var ai = new AgentInfo { Hero = hero, Player = player, Match = new bool[12] };
+            var ai = new AgentInfo { Hero = hero, Player = player, Match = new bool[12], Ids = new string[12] };
             int mism = 0;
             var put = new List<KeyValuePair<int, ItemModifier>>();
             for (int k = 0; k < Slots.Length; k++)
@@ -276,6 +288,7 @@ namespace Armoury
                     var hel = heq[slot];
                     if (el.Item != hel.Item || !ReferenceEquals(el.ItemModifier, hel.ItemModifier)) { mism++; continue; }   // lord RBM, oblezenie bez konia, inny stroj
                     ai.Match[slot] = true;
+                    ai.Ids[slot] = HeroBook.Ident(hel);   // recenzja R1: sztuka noszona w bitwie - po bitwie ciosy tylko w nia (zmiana sztuki przed koncem zdarzenia)
                     if (!prot || el.Item == null || ArmouryBehavior.NoWear(el.Item) || !GearState.Handles(el.Item)) continue;
                     var cur = el.ItemModifier;
                     if (cur != null && _copies.ContainsKey(cur)) continue;   // juz kopia (drugie wejscie tego samego sprzetu)
@@ -469,13 +482,14 @@ namespace Armoury
             Log.Info(sb.ToString());
         }
 
-        // ------------------------------------------------------------ hak testu (pod flaga): pomiar ochrony gracza przez gettery gry
+        // ------------------------------------------------------------ hak testu (pod flaga): pomiar ochrony gracza i towarzyszy przez gettery gry
         private static void Built(Agent agent)
         {
             var t = _t;
             if (!_test || t == null || agent == null) return;
             AgentInfo ai;
-            if (!_agents.TryGetValue(agent, out ai) || !ai.Player || ai.Copies.Count == 0) return;
+            // recenzja U3/R2: takze towarzysze z kopiami (klon RBM jako SpawnEquipment, MissionWeapon z klonu, uprzaz konia przez MountTakes) - dotad tylko gracz
+            if (!_agents.TryGetValue(agent, out ai) || ai.Copies.Count == 0) return;
             var eq = agent.SpawnEquipment;
             var sb = new StringBuilder(P);
             sb.Append("test - bohater ").Append(ai.Hero.Name).Append(" | ");
@@ -486,7 +500,9 @@ namespace Armoury
                 try
                 {
                     var el = eq[ci.Slot];
-                    if (!ReferenceEquals(el.ItemModifier, kv.Key)) continue;   // RBM obnizyl juz sztuke (nie przed pierwszym ciosem)
+                    // recenzja U3: kopii nie ma w sprzecie agenta (przed pierwszym ciosem RBM jej nie obniza) - pomiar tego, co agent naprawde nosi, i znacznik na
+                    // koncu czesci (dotad cichy pominiety - zly obiekt Equipment nie dawal sladu)
+                    bool inEq = ReferenceEquals(el.ItemModifier, kv.Key);
                     var it = el.Item;
                     int b;
                     int kind = KindOf(it, ci.Slot, out b);
@@ -498,17 +514,20 @@ namespace Armoury
                     sb.Append("slot ").Append(ci.Slot).Append(' ').Append(it.StringId).Append(" HP ").Append(ci.D.ToString("0.0", CI)).Append("% ").Append(GearState.En[ci.State])
                       .Append(": sztuka ").Append(KindName[kind]).Append(" baza ").Append(b).Append(", stan ").Append(x).Append(" -> dokladnie ").Append(got)
                       .Append(" (wzor ").Append(wz).Append(')');
-                    if (ci.Slot == (int)EquipmentIndex.Head && kind == KHead)
+                    bool head = ci.Slot == (int)EquipmentIndex.Head && kind == KHead;
+                    if (head || (ci.Slot == (int)EquipmentIndex.Body && kind == KBody && it.ItemType == ItemObject.ItemTypeEnum.BodyArmor))
                     {
-                        // lancuch ochrony glowy agenta (RBM liczy ja z helmu w SpawnEquipment) - z kopia i chwilowo z oryginalem
-                        float now = agent.GetBaseArmorEffectivenessForBodyPart(BoneBodyPartType.Head);
+                        // lancuch ochrony czesci ciala agenta (RBM liczy glowe z helmu, tulow z pancerza tulowia w SpawnEquipment - recenzja U3: takze tulow) - z kopia
+                        // i chwilowo z oryginalem
+                        var part = head ? BoneBodyPartType.Head : BoneBodyPartType.Chest;
+                        float now = agent.GetBaseArmorEffectivenessForBodyPart(part);
                         float was;
                         var tmp = el;
                         tmp.SetModifier(ci.Orig);
                         eq[ci.Slot] = tmp;
-                        try { was = agent.GetBaseArmorEffectivenessForBodyPart(BoneBodyPartType.Head); }
+                        try { was = agent.GetBaseArmorEffectivenessForBodyPart(part); }
                         finally { eq[ci.Slot] = el; }
-                        sb.Append(", lancuch Head ").Append((int)Math.Round(was)).Append(" -> ").Append((int)Math.Round(now)).Append(ChainOwner());
+                        sb.Append(head ? ", lancuch Head " : ", lancuch Chest ").Append((int)Math.Round(was)).Append(" -> ").Append((int)Math.Round(now)).Append(ChainOwner());
                     }
                     else if (ci.Slot <= (int)EquipmentIndex.Weapon3)
                     {
@@ -525,6 +544,7 @@ namespace Armoury
                         sb.Append(", kon agenta kopia ").Append(has ? "TAK" : "NIE");
                         if (has) sb.Append(' ').Append(hel.GetModifiedMountBodyArmor());
                     }
+                    if (!inEq) sb.Append(", kopia w sprzecie agenta NIE");
                 }
                 catch (Exception ex) { Stumble("HeroHp.Test", ex); }
             }
@@ -599,6 +619,10 @@ namespace Armoury
                         int n = 0;
                         if (ai.Match[(int)EquipmentIndex.Body] && heq[(int)EquipmentIndex.Body].Item != null)
                         { ai.Hits[(int)EquipmentIndex.Body] += 600f; sb.Append(" slot 6 +600 pkt"); n++; }
+                        // recenzja R2: uprzaz konia towarzysza - od 2. bitwy kopia przez MountTakes i pomiar "kon agenta" (dotad gniazdo 11 towarzysza bez trafien)
+                        var hh = heq[(int)EquipmentIndex.HorseHarness].Item;
+                        if (ai.Match[(int)EquipmentIndex.HorseHarness] && hh != null && !ArmouryBehavior.NoWear(hh) && GearState.Handles(hh))
+                        { ai.Hits[(int)EquipmentIndex.HorseHarness] += 600f; sb.Append(n > 0 ? "," : "").Append(" slot 11 +600 pkt"); n++; }
                         for (int w = 0; w < 4; w++)
                         {
                             var it = heq[w].Item;
@@ -612,7 +636,7 @@ namespace Armoury
                         Log.Info(sb.Append('.').ToString());
                     }
                     for (int i = 0; i < 12; i++) pts += ai.Hits[i];
-                    HeroBook.AddHits(ai.Hero, ai.Hits, ai.Match);
+                    HeroBook.AddHits(ai.Hero, ai.Hits, ai.Match, ai.Ids);
                 }
                 catch (Exception e) { Stumble("HeroHp.Hits", e); }
             }
@@ -666,10 +690,11 @@ namespace Armoury
 
         private static string YN(bool b) { return b ? "TAK" : "NIE"; }
 
-        /// <summary>Kontrola krzywej: kolczuga 50 przy 41/56/78% i stan Damaged (ta sama funkcja Exact co w bitwie i w panelu).</summary>
+        /// <summary>Kontrola krzywej: uszkodzona kolczuga 50 przy 41/56/78% i stan Damaged (ExactState - ta sama funkcja co Exact w bitwie i w panelu dla sztuki
+        /// w zlym stanie; recenzja U1: Exact z oryginalem null to dzis galaz sztuki sprawnej).</summary>
         private static string Curve(Settings s)
         {
-            int a = Exact(50, 50, null, 41f), b = Exact(50, 50, null, 56f), c = Exact(50, 50, null, 78f);
+            int a = ExactState(50, 41f), b = ExactState(50, 56f), c = ExactState(50, 78f);
             int st = Math.Max(1, (int)Math.Floor(50 * ConditionScaling.StatFactor(GearState.Value[GearState.Damaged])));
             bool ok = a <= b && b <= c && c <= 50 && a >= 1 && a == Math.Max(1, (int)Math.Floor(50 * ConditionScaling.StatFactor(0.41f)));
             return "krzywa " + s.ConditionPenaltyMax.ToString("0.##", CI) + "/" + s.ConditionPenaltyExponent.ToString("0.##", CI) + ": 50 przy 41/56/78% -> " + a + "/" + b + "/" + c

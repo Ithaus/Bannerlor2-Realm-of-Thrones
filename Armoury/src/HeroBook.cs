@@ -16,8 +16,10 @@ namespace Armoury
     /// poczatku), zuzycie nigdy nie poprawia. Kleska albo poczatek bitwy - ksiegi ciosow przepadaja (jak u gracza, ArenaNoWear).
     /// Wpis: slot|ksiega|stan poczatku|przedmiot|stan teraz - jak piecio-polowy wpis gracza; tozsamosc sztuki = przedmiot + obecny modyfikator: kazda zmiana
     /// sztuki w gniezdzie (inny przedmiot albo inny stan) zaczyna ksiege od stanu (dokladne HP zdjetej sztuki przepada - stos w sakwach jest wedlug stanu).
-    /// Zapis: SaveText "arm_condition_heroes" (klucz CompanionGearWear; NIE albo brak ksiag - klucza w zapisie nie ma); przy zapisie przyciete do bohaterow w
-    /// druzynie gracza (kto odchodzi z druzyny, traci dokladne HP, zostaje mu stan). Stary zapis - ksiag brak (start od stanu wedlug modyfikatora).
+    /// Zapis: SaveText "arm_condition_heroes" (klucz CompanionGearWear; NIE albo brak ksiag - klucza w zapisie nie ma); ksiega zostaje przy bohaterze takze poza
+    /// druzyna (recenzja U5: dotad przyciecie do druzyny przy zapisie - wynik zalezal od tego, czy po drodze byl zapis), przy zapisie usuwane tylko ksiegi
+    /// bohaterow, ktorzy nie zyja; zuzycie i ochrona z ksiegi - tylko w druzynie gracza. Stary zapis - ksiag brak (start od stanu wedlug modyfikatora).
+    /// Ciosy bitwy ida tylko w sztuke noszona w bitwie (recenzja R1: tozsamosc z wejscia agenta; inna sztuka w gniezdzie po bitwie - ciosy przepadaja, liczone).
     /// Bledy liczone per sztuka i wiersz, bez globalnego wylacznika.
     /// </summary>
     internal static class HeroBook
@@ -27,6 +29,9 @@ namespace Armoury
         private static readonly CultureInfo CI = CultureInfo.InvariantCulture;
         private static readonly Dictionary<string, List<string>> _books = new Dictionary<string, List<string>>();   // id bohatera -> wpisy
         private static readonly Dictionary<Hero, float[]> _hits = new Dictionary<Hero, float[]>();                // ksiega ciosow do najblizszej wygranej
+        private static readonly Dictionary<Hero, string[]> _worn = new Dictionary<Hero, string[]>();              // recenzja R1: sztuka (przedmiot|modyfikator), do ktorej naleza ciosy gniazda
+        private static float _lostPts;     // recenzja R1: ciosy sztuki zmienionej miedzy misjami tego samego zdarzenia (do linii sumy po wygranej)
+        private static int _lostN;
         private static int _bad, _stumbles;
 
         /// <summary>Zuzycie sprzetu towarzyszy: klucz CompanionGearWear, stany (GearFourStates) i zuzycie (WearEnabled).</summary>
@@ -37,10 +42,13 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _books.Clear(); _hits.Clear(); _bad = 0;
+            _books.Clear(); _hits.Clear(); _worn.Clear(); _lostPts = 0f; _lostN = 0; _bad = 0;
         }
 
         private static string ModId(EquipmentElement el) { return el.ItemModifier != null ? el.ItemModifier.StringId : ""; }
+
+        /// <summary>Tozsamosc sztuki w gniezdzie: przedmiot|modyfikator (jak pola 3 i 4 wpisu ksiegi) - pusty gniazdo "|".</summary>
+        internal static string Ident(EquipmentElement el) { return (el.Item != null ? el.Item.StringId : "") + "|" + ModId(el); }
 
         private static int Find(List<string> list, int slot)
         {
@@ -74,14 +82,26 @@ namespace Armoury
             return true;
         }
 
-        /// <summary>Koniec misji (HeroHp): ciosy agenta towarzysza do ksiegi ciosow bohatera - tylko gniazda zgodne z jego BattleEquipment.</summary>
-        internal static void AddHits(Hero h, float[] hits, bool[] match)
+        /// <summary>Koniec misji (HeroHp): ciosy agenta towarzysza do ksiegi ciosow bohatera - tylko gniazda zgodne z jego BattleEquipment; ids - sztuka noszona w
+        /// bitwie (recenzja R1): inna sztuka w gniezdzie niz w poprzedniej misji tego samego zdarzenia - ciosy poprzedniej przepadaja (liczone).</summary>
+        internal static void AddHits(Hero h, float[] hits, bool[] match, string[] ids)
         {
             if (h == null || hits == null) return;
             float[] a;
             if (!_hits.TryGetValue(h, out a)) { a = new float[12]; _hits[h] = a; }
+            string[] w;
+            if (!_worn.TryGetValue(h, out w)) { w = new string[12]; _worn[h] = w; }
             for (int i = 0; i < 12 && i < hits.Length; i++)
-                if (match == null || (i < match.Length && match[i])) a[i] += hits[i];
+            {
+                if (match != null && (i >= match.Length || !match[i])) continue;
+                string id = ids != null && i < ids.Length ? ids[i] : null;
+                if (hits[i] > 0.01f && id != null)
+                {
+                    if (a[i] > 0.01f && w[i] != null && w[i] != id) { _lostPts += a[i]; _lostN++; a[i] = 0f; }
+                    w[i] = id;
+                }
+                a[i] += hits[i];
+            }
         }
 
         /// <summary>Ksiegi ciosow przepadaja (poczatek bitwy gracza, bitwa przegrana albo opuszczona) - jak FieldCraft.DropLedger gracza.</summary>
@@ -98,7 +118,7 @@ namespace Armoury
                     foreach (var v in kv.Value) s0 += v;
                     if (s0 > 0.01f) { sum += s0; n++; }
                 }
-                _hits.Clear();
+                _hits.Clear(); _worn.Clear(); _lostPts = 0f; _lostN = 0;
                 if (sum > 0.01f) Log.Info(PS + why + " - " + sum.ToString("0.0", CI) + " pkt z ksiag ciosow przepada (bohaterow " + n + ").");
             }
             catch (Exception e) { Stumble("HeroBook.DropLedgers", e); }
@@ -111,6 +131,8 @@ namespace Armoury
             if (_hits.Count == 0) return;
             int heroes = 0, skipped = 0, newState = 0, errors = 0;
             float total = 0f;
+            int changed = _lostN;          // recenzja R1: sztuka zmieniona po bitwie (ekran lupu gry przed koncem zdarzenia) albo miedzy misjami - ciosy przepadaja
+            float changedPts = _lostPts;
             try
             {
                 var cfg = Settings.Current;
@@ -131,6 +153,8 @@ namespace Armoury
                     List<string> list;
                     if (!_books.TryGetValue(hid, out list)) { list = new List<string>(); _books[hid] = list; }
                     var segs = new List<string>();
+                    string[] worn;
+                    _worn.TryGetValue(h, out worn);
                     for (int slot = 0; slot < 12; slot++)
                     {
                         float amount = a[slot];
@@ -138,6 +162,9 @@ namespace Armoury
                         try
                         {
                             var el = eq[slot];
+                            // recenzja R1: ciosy tylko w sztuke noszona w bitwie - inna sztuka w gniezdzie (zalozona na ekranie lupu przed koncem zdarzenia, zdjeta) nie
+                            // zuzywa sie cudzymi ciosami; ciosy przepadaja, liczone w linii sumy
+                            if (worn != null && worn[slot] != null && worn[slot] != Ident(el)) { changed++; changedPts += amount; continue; }
                             if (el.Item == null || ArmouryBehavior.NoWear(el.Item) || !GearState.Handles(el.Item)) continue;
                             var group = el.Item.ItemComponent.ItemModifierGroup;
                             string id = el.Item.StringId, mod = ModId(el);
@@ -200,9 +227,9 @@ namespace Armoury
                 }
             }
             catch (Exception e) { errors++; Stumble("HeroBook.ApplyBattle", e); }
-            _hits.Clear();
+            _hits.Clear(); _worn.Clear(); _lostPts = 0f; _lostN = 0;
             Log.Info(PS + "bitwa | bohaterow z trafieniami " + heroes + " (pominieci " + skipped + "), zuzycie celowane " + total.ToString("0.0", CI) + " pkt, sztuk w ksiegach "
-                     + Entries() + ", nowy stan " + newState + ", bledy " + errors + ".");
+                     + Entries() + ", nowy stan " + newState + ", zmienione sztuki " + changed + " (pkt " + changedPts.ToString("0.0", CI) + "), bledy " + errors + ".");
         }
 
         private static int Entries()
@@ -241,7 +268,17 @@ namespace Armoury
             return ids;
         }
 
-        /// <summary>Zapis (SyncData): ksiegi bohaterow w druzynie gracza; null - klucz CompanionGearWear NIE albo brak ksiag (klucza w zapisie nie ma).</summary>
+        /// <summary>Id zywych bohaterow (przy zapisie); null - brak kampanii.</summary>
+        private static HashSet<string> AliveHeroIds()
+        {
+            if (Campaign.Current == null) return null;
+            var ids = new HashSet<string>();
+            foreach (var h in Hero.AllAliveHeroes) if (h != null && h.StringId != null) ids.Add(h.StringId);
+            return ids;
+        }
+
+        /// <summary>Zapis (SyncData): ksiegi zywych bohaterow (recenzja U5: takze poza druzyna gracza - zapis nie zmienia gry); null - klucz CompanionGearWear NIE
+        /// albo brak ksiag (klucza w zapisie nie ma).</summary>
         internal static string Export()
         {
             try
@@ -249,7 +286,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.CompanionGearWear) return null;
                 int pruned = 0;
-                var ids = PartyHeroIds();
+                var ids = AliveHeroIds();
                 if (ids != null)
                     foreach (var k in new List<string>(_books.Keys))
                         if (!ids.Contains(k) || _books[k].Count == 0) { _books.Remove(k); pruned++; }
@@ -266,7 +303,7 @@ namespace Armoury
                 }
                 if (HeroHp.TestWanted())
                     Log.Info("HP sprzetu (m110): zapis | ksiegi towarzyszy: bohaterow " + _books.Count + ", sztuk " + Entries() + ", znakow " + (r != null ? r.Length : 0)
-                             + " | pominieci poza druzyna " + pruned + ".");
+                             + " | usunieci (nie zyja) " + pruned + ".");
                 return r;
             }
             catch (Exception e) { Stumble("HeroBook.Export", e); return null; }
@@ -275,7 +312,7 @@ namespace Armoury
         /// <summary>Wczytanie (SyncData): wiersze "id=wpis;wpis" - bledne wiersze i wpisy liczone (bez wywrotki), jeden wpis na gniazdo.</summary>
         internal static void Import(string s)
         {
-            _books.Clear(); _hits.Clear(); _bad = 0;
+            _books.Clear(); _hits.Clear(); _worn.Clear(); _lostPts = 0f; _lostN = 0; _bad = 0;
             if (string.IsNullOrEmpty(s)) return;
             try
             {
