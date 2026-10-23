@@ -1,6 +1,7 @@
 # m109-muzyka (4b) - nasze 6 utworow w bitwie zamiast muzyki gry
 
-Galaz `w-toku/m109-muzyka` od 44c03a05 (WGRANIE 103.5). Commity: 8f9164f0 (pliki), 7ffc089b (kod, klucze), fc6cacb1 (grupa m109muz), ten wpis.
+Galaz `w-toku/m109-muzyka` od 44c03a05 (WGRANIE 103.5). Commity: 8f9164f0 (pliki), 7ffc089b (kod, klucze), fc6cacb1 (grupa m109muz), 53d6d11b (ten wpis),
+4c8eb0e5 i b22d8fc3 (poprawki po recenzji - krok 5).
 Gry nie uruchamialem; nic nie wgrane.
 
 ## Problem
@@ -35,6 +36,7 @@ Nie blad - nowa funkcja. Muzyke bitwy wlacza gra: widok `MusicBattleMissionView`
      (`!IsValid` / `IsStopped`) albo czas pliku + 5 s (dlugosc z naglowka Ogg; bez dlugosci 150 s), czas liczony bez pauzy gry. Po misji (takze wyjscie do menu,
      wczytanie, wywrotka misji) muzyka gry wraca w 2 s, przy `RestoreNow` od razu. Bledy liczone na misje: po 3 rezygnacja tylko z tej misji (muzyka gry wraca),
      nastepna od nowa; w logu pierwsze 3 i co 50. Pliki: 4 zestawy raz na sesje, pliki > 4 KB z naglowkiem OggS (inne - "odrzucone").
+     Blad w zwyklej sciezce (`RestoreNow("blad")`, np. przy powrocie muzyki gry) w misji bitwy - od razu rezygnacja z tej misji (krok 5).
    - Klucze (grupa Narrator, zaraz po `EventMusicEnabled`; czytane na zywo; MCM Jeffa ich nie ma - dzialaja domyslne): `BattleMusicOurs` (TAK) - "Battle Music
      Ours"; `BattleMusicLoudness` (1-4, 4) - "Battle Music Loudness" (4 = -17 LUFS, kazdy krok w dol 3 dB, 1 = -26 LUFS; nowe ustawienie od nastepnego utworu).
      Klucz NIE = bitwy z muzyka gry jak w 103.5 (sciezka okien bez zmian; jedyna roznica - linia startu "klucz NIE" raz na kampanie). gen_mcm: RANGES (1, 4).
@@ -50,6 +52,27 @@ Nie blad - nowa funkcja. Muzyke bitwy wlacza gra: widok `MusicBattleMissionView`
    MUZ-0 start, MUZ-1 wyciszenie kazdej bitwy (+ z `--crashscribe` liczba bitew = linie "AUTOTEST BITWA n/N [..]: misja ruszyla"), MUZ-2 utwory po kolei,
    MUZ-3 koniec bitwy i powrot muzyki gry, MUZ-4 misje bez zmian, MUZ-5 bledy, MUZ-6 regresja okien m108. `sprawdz_narzedzie.py`: OK. Na logu Jeffa 22.10 (sprzed
    m109): MUZ-S/S2 TAK, MUZ-5 TAK, MUZ-6 TAK (8 okien zamknietych, SetPaused 0), reszta INFO.
+4. **Poprawki po recenzji (krok 5, 4c8eb0e5 C#, b22d8fc3 progi).** Dwie recenzje (poprawnosc, kod); kazda uwaga najpierw proba obalenia w kodzie:
+   - **Okno wydarzenia w trwajacej bitwie (recenzja poprawnosci R1 = recenzja kodu R3) - PRAWDA.** Sciezka `Step` -> `BattleEnd("okno wydarzenia")` ->
+     (okno zamkniete, misja trwa) `BattleStep` -> `BattleBegin` dawala nowa linie "bitwa" bez "wrocila" i bez konca okna m108 - dzwiek dobry, progi MUZ-3 / MUZ-6
+     NIE, MUZ-1 o jedna bitwe za duzo. Zmiana: `BattleStep` przy przejsciu okno -> bitwa (`_active && !_batActive`) pisze m108 "stop muz_X.ogg (koniec
+     wydarzenia - bitwa dalej)" i "koniec wydarzenia - bitwa dalej, muzyka gry dalej wyciszona."; progi: `winend` przyjmuje te linie, bitwa zakonczona "okno
+     wydarzenia" + ta linia + nowa "bitwa" tej samej misji = MUZ-3 bez wymogu "wrocila", MUZ-1 nie liczy jej do AUTOTEST. Rzadkie (ROT otwiera EventPopupState
+     tylko przez `EventBase.OpenPopup`, nie z kodu misji - recenzja poprawnosci).
+   - **Rezygnacja kasowana przez `RestoreNow("blad")` (kod R1) - PRAWDA.** Przy stalym wyjatku `SetVolume` psai (GetVolume dziala): 3x FadeDown -> rezygnacja,
+     0,6 s -> koniec bitwy, `FadeUp` rzuca -> `RestoreNow("blad")` -> `BattleReset` zerowal `_batMission` i `_batGaveUp` -> nastepna klatka `Classify` i bitwa od
+     nowa: petla co ok. 0,65 s, 3-5 linii na sekunde. Zmiana: `BattleReset(why)` - przy "blad" ta sama misja zostaje (bez ponownej klasyfikacji), w misji bitwy
+     `_batGaveUp = true` i linia "rezygnacja w tej misji po N bledach (RestoreNow)"; pelne zerowanie tylko przy innych powodach (wyjscie z kampanii).
+   - **Klucz NIE w czasie bitwy trzyma obiekt Mission (kod R2) - PRAWDA.** `BattleWanted` przy kluczu NIE wychodzil przed `_batMission = null`. Zmiana:
+     `_batMission = null` w tej galezi (przy kluczu NIE od startu pole i tak puste - zachowanie 1:1).
+   - **MUZ-1 NIE przy kluczu NIE z `--crashscribe` (kod R4) - PRAWDA.** `bats` puste, `cs_n` = 4 -> NIE. Zmiana: bez bitew i (klucz NIE albo log bez linii m109)
+     - INFO; test syntetyczny "keyno" i "nostart" teraz z `--crashscribe`.
+   - **Wyjatek w `BattleCheck` liczony 2 razy (kod R5) - PRAWDA.** `BattleStumble("Check")` (MisFail) i potem `MisFail("NotPlayed")` z falszywa linia "nie
+     grany". Zmiana: flaga `threw` -> koniec utworu "blad" (linia nastepnego utworu: "poprzedni ... skonczony po N s (blad)"), bez "nie grany". Uwaga: gdy rzuca
+     natywne `IsValid`, `Release` zwykle tez rzuci - to osobne wywolanie i liczy sie jako osobny blad (zwolnienia zdarzenia nie pomijamy - utwor moglby grac dalej).
+   - Weryfikacja: build Armoury kod 0 (0 bledow, bez nowych ostrzezen), gen_mcm bez zmian w McmSettings (Settings.cs nietkniety), `sprawdz_narzedzie.py` OK,
+     MUZ-S / MUZ-S2 TAK (nowe przypadki syntetyczne: "winbat" - okno w bitwie i ta sama misja dalej - wszystko TAK; "winbad" - okno bez konca i inna misja bez
+     "wrocila" - MUZ-1 / MUZ-3 / MUZ-6 NIE), log Jeffa 22.10 z `--crashscribe`: MUZ-5 / MUZ-6 TAK, reszta INFO, kod 0.
 
 **Odstepstwa od projektu:**
 - Linia startu raz na kampanie przez slaby odnosnik do obiektu `Campaign` (`BattleStartCheck`) zamiast flagi `_batStartLogged` zerowanej w `RestoreNow` - flaga
@@ -67,7 +90,9 @@ Nie blad - nowa funkcja. Muzyke bitwy wlacza gra: widok `MusicBattleMissionView`
 
 - **Kto pisze glosnosc psai:** w DLL gry i modow brak SetVolume / GetVolume / SetPaused psai (dekompilacja w rozpoznaniu); pisze tylko EventMusic, bitwa uzywa
   tego samego stanu (`_ducked`, `_saved`, `_cur`, `_active`, `_mus`) - okno i bitwa nie przywracaja sie nawzajem. Okno w czasie bitwy: bitwa konczy sie linia
-  "okno wydarzenia", wyciszenie zostaje, po oknie powrot (linia "wrocila" po oknie). `event:/Extra/external` - jedno gniazdo `_mus`, dwa nasze utwory naraz nie zagraja.
+  "koniec bitwy (okno wydarzenia ...)", wyciszenie zostaje. Po zamknieciu okna: gdy misja juz sie skonczyla - m108 "koniec wydarzenia - muzyka gry wraca" i
+  "wrocila"; gdy misja bitwy trwa - m108 "koniec wydarzenia - bitwa dalej, muzyka gry dalej wyciszona" i nowa linia "bitwa" tej samej misji, bez "wrocila"
+  (wyciszenie trwa; progi MUZ-1 / MUZ-3 / MUZ-6 to uwzgledniaja). `event:/Extra/external` - jedno gniazdo `_mus`, dwa nasze utwory naraz nie zagraja.
 - **Klucz NIE:** `BattleWanted` konczy sie na pierwszym warunku; okna jak w 44c03a05 (linie m108 te same; tylko kolejnosc `_paused = false` i linii "koniec
   wydarzenia" w galezi zwolnienia - bez skutku).
 - **Wydajnosc:** co klatke na mapie - odczyt Settings, `Campaign.Current`, `Mission.Current`, slaby odnosnik; w misji - stan misji; skan zachowan misji raz na
@@ -102,3 +127,7 @@ Nie blad - nowa funkcja. Muzyke bitwy wlacza gra: widok `MusicBattleMissionView`
    (MUZ-0 TAK, MUZ-6 TAK; MUZ-1..4 INFO bez bitew).
 
 Biegu "wczyt" nie trzeba: brak stanu w zapisie i nowych typow zapisu.
+
+Do obejrzenia w logach (autotest tego nie wywola - zostaje NIEPEWNE do gry Jeffa): okno wydarzenia nad trwajaca bitwa - jesli sie zdarzy, para m108 "okno ..." ->
+"koniec wydarzenia - bitwa dalej" -> "bitwa - misja <ta sama>", MUZ-1 / MUZ-3 / MUZ-6 TAK; staly blad psai (rezygnacja "(RestoreNow)") - najwyzej 3 linie m109 na
+misje, nie co klatke. Biegu z kluczem NIE nie trzeba osobno (sciezka okien 1:1), ale jesli bedzie - MUZ-1 ma byc INFO takze z `--crashscribe`.
