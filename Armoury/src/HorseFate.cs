@@ -83,6 +83,9 @@ namespace Armoury
         // recenzja K1: DTE FinalizeMission nie oddaje POKONANEJ stronie rynsztunku jezdzcow zdjetych z pola przed rozliczeniem (kon zszedl ze zbrojowni przy
         // spawnie), a zabojca (strona zwycieska) dostaje kopie (LootedItems, DropRate) - padly kon zylby u zabojcy, a K1 zdejmowal pokonanemu innego, zywego konia
         private static readonly Dictionary<Agent, MobileParty> _mRiderGone = new Dictionary<Agent, MobileParty>();   // jezdziec zdjety z pola przed rozliczeniem DTE -> zabojca (strona przeciwna) albo null
+        // m109-lup: jezdzcy powaleni przez gracza albo towarzysza (kon zabojcy = jego jezdziec) - ich lup idzie w calosci do kolejki ekranu (BattlefieldLaw,
+        // cialo po ciele), wiec padly kon szukany najpierw tam (TakeKill)
+        private static readonly HashSet<Agent> _mRiderHero = new HashSet<Agent>();
         private static BattleSideEnum _mDefeated = BattleSideEnum.None;   // strona pokonana w rozliczeniu DTE (prefiks FinalizeMission, ten sam MissionResult)
         private static bool _mFinalized;
         private static System.Reflection.FieldInfo _fDteEnded, _fDteInit;
@@ -126,7 +129,7 @@ namespace Armoury
         {
             _obs = _obsRiders = _obsHorses = 0; _vetPool.Clear(); _pending = null;
             _mDeaths.Clear(); _mRiders = _mHorses = 0; _missionEvent = null; _beaten.Clear();
-            _mRiderGone.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
+            _mRiderGone.Clear(); _mRiderHero.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
             ClearDay(); _stumbles = 0; _errSites.Clear(); _giftRun = false;
             _p2Event = null; _p2Win.Clear(); _p2WinBefore.Clear(); _p2Lose.Clear(); _p2Open.Clear();   // E8/P2 (244): pomiar kopii lupu - stan miedzy kampaniami
             BattlefieldLaw.LReset();   // E8/L (252): liczniki "Send troops" i flaga listy trofeow - ten sam moment
@@ -300,7 +303,7 @@ namespace Armoury
             {
                 // dane poprzedniej misji bez rozliczenia (nie powinno sie zdarzyc - HorseFateMission rozlicza misje bez logiki DTE): droga wlasciciela, potem stan od nowa
                 if (_mDeaths.Count > 0 || _mRiders > 0) { _mDefeated = BattleSideEnum.None; ApplyMission(); }
-                _mRiderGone.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
+                _mRiderGone.Clear(); _mRiderHero.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
                 m.AddMissionBehavior(new HorseFateMission());
                 var me = MapEvent.PlayerMapEvent;
                 if (me != null) _missionEvent = me;
@@ -318,11 +321,13 @@ namespace Armoury
 
         internal static void NoteMissionRider() { _mRiders++; }
 
-        /// <summary>Jezdziec zdjety z pola (zabity, ranny, rozbity, usuniety) przed rozliczeniem DTE: zabojca ze strony przeciwnej (zabity/ranny) albo null.</summary>
-        internal static void NoteMissionRiderGone(Agent rider, MobileParty killer)
+        /// <summary>Jezdziec zdjety z pola (zabity, ranny, rozbity, usuniety) przed rozliczeniem DTE: zabojca ze strony przeciwnej (zabity/ranny) albo null.
+        /// m109-lup: heroKill - powalil go gracz albo towarzysz (zabojca = druzyna gracza).</summary>
+        internal static void NoteMissionRiderGone(Agent rider, MobileParty killer, bool heroKill = false)
         {
             if (rider == null || _mFinalized) return;   // po rozliczeniu DTE rynsztunek juz wrocil (jezdziec byl czynny) - droga wlasciciela
             _mRiderGone[rider] = killer;
+            if (heroKill) _mRiderHero.Add(rider); else _mRiderHero.Remove(rider);
         }
 
         /// <summary>Prefiks DTE DynamicTroopMissionLogic.FinalizeMission (prywatna; pierwsze wywolanie robi zwroty): strona pokonana wedlug tej samej reguly co DTE
@@ -405,7 +410,7 @@ namespace Armoury
                         {
                             // pokonany: DTE nie oddal mu rynsztunku jezdzca zdjetego z pola (kon zszedl z jego zbrojowni przy spawnie); kopia konia poszla zabojcy
                             // jako lup z ciala - padly kon schodzi u zabojcy; bez kopii (zabojca spoza bitwy, DropRate) - kon juz poza stanem, tylko zgon
-                            if (killer != null && TakeOne(killer, d.Item, touched, ref pa)) _dMissionKiller++;
+                            if (killer != null && TakeKill(killer, d.Item, d.Rider, touched, ref pa)) _dMissionKiller++;
                             else _dMissionGone++;
                             _dDeadMission[cat]++;
                             continue;
@@ -419,7 +424,40 @@ namespace Armoury
                 foreach (var mp in touched) HorseState.Refresh(mp);
             }
             catch (Exception e) { Stumble("ApplyMission", e); }
-            finally { _mDeaths.Clear(); _mRiders = _mHorses = 0; _mRiderGone.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false; }
+            finally
+            {
+                _mDeaths.Clear(); _mRiders = _mHorses = 0; _mRiderGone.Clear(); _mRiderHero.Clear(); _mDefeated = BattleSideEnum.None; _mFinalized = false;
+                BattlefieldLaw.ClearArmoryCopies();   // m109-lup (recenzja L2): kopie koni w zbrojowni wazne tylko dla tej misji
+                LootTally.ReleaseAgents();            // m109-lup (recenzja R4): bez agentow (i misji) w pamieci do zamkniecia pomiaru bitwy
+            }
+        }
+
+        /// <summary>m109-lup (klucz FallenRiderHorsesLooted): padly kon jezdzca pokonanej strony u zabojcy. ApplyMission biegnie po DTE HandlePartyItems
+        /// (postfiks OnEndMission), wiec kopia konia z lupu gracza lezy juz w kolejce ekranu (BattlefieldLaw.AfterDtePartyItems) - dotad TakeOne szukal jej
+        /// tylko w zbrojowni wojska i zdejmowal tam konia gracza o tym samym id (padly zyl na liscie trofeow, gdyby Spoils go nie polknal). Teraz: powalil
+        /// gracz albo towarzysz (cala sztuka do kolejki) - najpierw kolejka, potem zbrojownia; powalil zolnierz (trzecia kapitana) - najpierw zbrojownia, potem
+        /// kolejka. Kon, ktory wedlug pomiaru nie wszedl do lupu gracza (odrzut DTE) - nic nie schodzi. Inni zabojcy i klucz NIE - TakeOne jak dotad.
+        /// Recenzja L2: ze zbrojowni najwyzej tyle, ile kopii z lupu tej misji tam zostalo po zdjeciu dzialki (BattlefieldLaw.ArmoryCopiesLeft) - dotad
+        /// TakeOne bral dowolna sztuke tego id, wiec przy dwoch padlych koniach zolnierskich zdejmowal kopie i konia gracza, a kopia padlego zostawala
+        /// w kolejce; dzialka nie liczona w tej misji (-1) - zbrojownia bez limitu, jak dotad. Recenzja R1: pomiar bitwy otwarty przed zdjeciem z kolejki
+        /// (otwarcie liczy kolejke jako "wczesniej").</summary>
+        private static bool TakeKill(MobileParty killer, ItemObject it, Agent rider, HashSet<MobileParty> touched, ref ItemRoster pa)
+        {
+            var s = Settings.Current;
+            if (killer != MobileParty.MainParty || s == null || !s.FallenRiderHorsesLooted) return TakeOne(killer, it, touched, ref pa);
+            try
+            {
+                LootTally.Touch();
+                if (LootTally.HorseLootState(rider) == 0) { LootTally.DeadHorse(rider, 2); return false; }
+                bool hero = rider != null && _mRiderHero.Contains(rider);
+                int left = BattlefieldLaw.ArmoryCopiesLeft(it);
+                if (hero && BattlefieldLaw.TakeQueuedHorse(it)) { LootTally.DeadHorse(rider, 0); return true; }
+                if (left != 0 && TakeOne(killer, it, touched, ref pa)) { BattlefieldLaw.UseArmoryCopy(it); LootTally.DeadHorse(rider, 1); return true; }
+                if (!hero && BattlefieldLaw.TakeQueuedHorse(it)) { LootTally.DeadHorse(rider, 0); return true; }
+                LootTally.DeadHorse(rider, 3);
+                return false;
+            }
+            catch (Exception e) { Stumble("TakeKill", e); return false; }
         }
 
         /// <summary>W z misji: do HorseDeathRatioMinBattles obserwacji 1.0.</summary>
@@ -1648,10 +1686,16 @@ namespace Armoury
                     if (agentState == AgentState.Killed) HorseFate.NoteMissionRider();
                     // recenzja K1: zabity/ranny jezdziec - kopie jego rynsztunku DTE daje partii zabojcy ze strony przeciwnej (LootedItems); rozbity/usuniety - bez kopii
                     MobileParty killer = null;
+                    bool heroKill = false;
                     if ((agentState == AgentState.Killed || agentState == AgentState.Unconscious) && affectorAgent != null && affectorAgent.Team != null
                         && affectedAgent.Team != null && affectorAgent.Team.Side != affectedAgent.Team.Side)
+                    {
                         killer = PartyOf(affectorAgent);
-                    HorseFate.NoteMissionRiderGone(affectedAgent, killer);
+                        // m109-lup: powalil gracz albo towarzysz (kon zabojcy = jego jezdziec, jak BattlefieldLaw.KillerKind)
+                        var a = affectorAgent.IsMount && affectorAgent.RiderAgent != null ? affectorAgent.RiderAgent : affectorAgent;
+                        heroKill = killer == MobileParty.MainParty && (a == Agent.Main || a.IsHero);
+                    }
+                    HorseFate.NoteMissionRiderGone(affectedAgent, killer, heroKill);
                 }
             }
             catch { }

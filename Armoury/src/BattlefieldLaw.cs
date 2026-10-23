@@ -52,6 +52,26 @@ namespace Armoury
         private static FieldInfo _rlHeavy;             // EquipmentDamageModel._lootedHeavy
         private static FieldInfo _rlHeavyMax;          // EquipmentDamageModel._lootedHeavyMax
         private static MethodInfo _rlRegisterLucky;    // RealisticLootModel.RegisterLuckyElement
+        // m109-lup: RegisterLuckyElement niezaleznie od WreckSalvageEnabled (konie wracajace na liste trofeow - ReturnMounts) i stan wpiecia do linii
+        // startu LootTally ("Lup bitwy (m109): start")
+        private static MethodInfo _lReg;
+        internal static bool MountReturnWired, MountFinalWired, SpareHarnessWired;
+        internal static bool LuckyFound { get { return _lReg != null; } }
+        /// <summary>m109-lup: kolejka lupu do odczytu przez pomiar LootTally (tylko czyta).</summary>
+        internal static ItemRoster QueueRoster { get { return ShareQueue; } }
+        // m109-lup (klucz FallenRiderHorsesLooted): konie i uprzaz z listy trofeow przetrzymane na czas jednego wywolania Spoils
+        // LootCollectionBehavior.OnMapEventEnded - Spoils (:899-941) zdejmowal kazda sztuke IsMountable || HorseHarness do taboru (_horsesFromLoot),
+        // ktory u nas jest zamkniety (NoBaggageTrain), i przepadaly. Wracaja w prefiksie ApplyDamageToLoot (:944, zaraz po petli Spoils), resztka
+        // (wyjatek w Spoils) - finalizer do sakw
+        private static readonly ItemRoster MountHold = new ItemRoster();
+        private static bool _mountArmed;      // MountHold napelniony w tym wywolaniu Spoils
+        private static bool _screenThisCall;  // AfterGenerateLoot podmienil liste w tym wywolaniu Spoils - finalizer zamyka pomiar bitwy
+        private static int _mountStumbles;
+        // m109-lup (recenzja L2): kopie koni z lupu tej misji, ktore zostaly w zbrojowni wojska po zdjeciu dzialki (count - zdjete) - HorseFate.TakeKill
+        // zdejmuje padlego konia ze zbrojowni najwyzej tyle razy, potem z kolejki; dotad TakeOne bral dowolna sztuke tego id, takze konia gracza, a kopia
+        // padlego zostawala w kolejce. Liczone w AfterDtePartyItems, czyszczone w HorseFate.ApplyMission (finally), nowej misji i LReset
+        private static readonly Dictionary<ItemObject, int> _armLeft = new Dictionary<ItemObject, int>();
+        private static bool _armLeftKnown;    // dzialka tej misji policzona (inaczej -1 - zbrojownia bez limitu, jak dotad)
 
         private static Type FindType(string fullName)
         {
@@ -157,6 +177,13 @@ namespace Armoury
                     {
                         h.Patch(omee, prefix: new HarmonyMethod(typeof(BattlefieldLaw), "SoldierStandsDown"));
                         Log.Info("BattlefieldLaw: zaciezny nie lupi pola bitwy armii (kwatermistrz to robi).");
+                        // m109-lup: finalizer - konie i uprzaz przetrzymane, ktorych Spoils nie odebral (wyjatek), do sakw; zamkniecie pomiaru bitwy
+                        try
+                        {
+                            h.Patch(omee, finalizer: new HarmonyMethod(typeof(BattlefieldLaw), nameof(MountsFinalizer)));
+                            MountFinalWired = true;
+                        }
+                        catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (m109 finalizer)", e); }
                     }
                 }
 
@@ -176,6 +203,20 @@ namespace Armoury
                 }
 
                 if (dmgType != null) _applyDamage = AccessTools.Method(dmgType, "ApplyDamageToLoot");
+                // m109-lup: konie i uprzaz przetrzymane w AfterGenerateLoot wracaja na liste trofeow (prefiks; Spoils wola ApplyDamageToLoot tylko w :944)
+                if (dmgType != null)
+                {
+                    try
+                    {
+                        var adl = AccessTools.DeclaredMethod(dmgType, "ApplyDamageToLoot", new[] { typeof(ItemRoster), typeof(float) });
+                        if (adl != null)
+                        {
+                            h.Patch(adl, prefix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(ReturnMounts)));
+                            MountReturnWired = true;
+                        }
+                    }
+                    catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (m109 ApplyDamageToLoot)", e); }
+                }
                 var dispatcher = AccessTools.Method(typeof(CampaignEventDispatcher), "OnCollectLootItems");
                 if (dispatcher != null)
                 {
@@ -281,6 +322,24 @@ namespace Armoury
                     else Log.Info("BattlefieldLaw: nie znalazlem wnetrza DTE - dzialka gracza nieaktywna.");
                 }
                 else Log.Info("BattlefieldLaw: DTE nieobecny - dzialka gracza nieaktywna.");
+
+                // m109-lup Z2 (klucz RiderBlowSparesHarness, czytany w biegu): cios w jezdzca nie rozbija ladrow konia - prefiks selektora DTE dostaje
+                // liste zbroi bez uprzezy (DTE GetAgentArmors bierze sloty 5-11, a ciezka uprzaz ma body_armor wieksze niz kolczuga jezdzca)
+                try
+                {
+                    var selZ2 = FindType("DynamicTroopEquipmentReupload.ArmorSelector");
+                    var pickZ2 = selZ2 != null ? AccessTools.DeclaredMethod(selZ2, "GetRandomArmorByBodyPart") : null;
+                    if (pickZ2 != null)
+                    {
+                        h.Patch(pickZ2, prefix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(SpareHarness)));
+                        SpareHarnessWired = true;
+                    }
+                }
+                catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (m109 Z2)", e); }
+
+                // m109-lup: pomiar lupu bitwy wedlug rodzaju i hak autotestu (LootTally) - latki wpiete zawsze, tylko czytaja
+                if (modelType != null) _lReg = AccessTools.Method(modelType, "RegisterLuckyElement");
+                LootTally.ApplyAll(h);
             }
             catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll", e); }
         }
@@ -301,7 +360,7 @@ namespace Armoury
                 // legenda i stal valyrianska z loterii to zawsze kopia (klinge bohatera bierze, jesli w ogole, zwyczaj wojenny - UniqueSpoils.Take);
                 // w bitwie stoczonej osobiscie to samo robi CleanseTrash nizej, w symulacji dotad nic
                 if (__result != null && Settings.Current.NoConjuredLegends) StripLegendCopies(__result);
-                if (RotEnlisted()) { ShareQueue.Clear(); Wrecks.Clear(); return; }
+                if (RotEnlisted()) { LootTally.QueueOut(ShareQueue, LootTally.Przepadlo); ShareQueue.Clear(); Wrecks.Clear(); return; }
                 bool sim = false;
                 if (!RealFoughtBattle())
                 {
@@ -325,20 +384,175 @@ namespace Armoury
                 // dzialke do sakw; loteria na wierzchu bylaby DRUGA nagroda)
                 __result.Clear();
                 ScreenIsRealLoot = true;    // E8/L (252): od teraz na liscie trofeow sa tylko prawdziwe sztuki z pola (albo nic)
-                if (ShareQueue.Count == 0 && Wrecks.Count == 0) return;
+                if (ShareQueue.Count == 0 && Wrecks.Count == 0) { ScreenDone(); return; }
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
                     var el = ShareQueue.GetElementCopyAtIndex(i);
                     __result.AddToCounts(el.EquipmentElement, el.Amount);
+                    LootTally.ToList(el.EquipmentElement.Item, el.Amount);   // m109-lup: pomiar (kolejka -> lista trofeow)
                 }
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana na ekran
+                LootTally.WrecksIn(Wrecks);
                 int wrecks = AppendWrecks(__result);
                 CleanseDragons(__result);
                 CleanseTrash(__result);
+                LootTally.Sifted(__result);
                 Log.Info("BattlefieldLaw: ekran Spoils podmieniony na " + __result.Count + " pozycji prawdziwego lupu"
                          + (wrecks > 0 ? " (w tym " + wrecks + " wrakow przed przesianiem)" : "") + ".");
+                // m109-lup (FallenRiderHorsesLooted): konie i uprzaz poza zasiegiem petli Spoils, ktora zabralaby je do zamknietego taboru - wracaja
+                // w prefiksie ApplyDamageToLoot tego samego wywolania (ReturnMounts); tylko przy obu latkach (inaczej jak dotad)
+                bool hold = Settings.Current.FallenRiderHorsesLooted && MountReturnWired && MountFinalWired;
+                if (hold) HoldMounts(__result);
+                LootTally.OnList(__result, hold);
+                ScreenDone();
             }
             catch (Exception e) { Log.Error("AfterGenerateLoot", e); }
+        }
+
+        /// <summary>m109-lup: lista trofeow Spoils z prawdziwym lupem gotowa - pomiar bitwy zamyka finalizer Spoils (po oddaniu koni), bez niego od razu.</summary>
+        private static void ScreenDone()
+        {
+            if (MountFinalWired) _screenThisCall = true;
+            else LootTally.Close("lista trofeow Spoils");
+        }
+
+        /// <summary>m109-lup: konie (IsMountable) i uprzaz z listy trofeow do MountHold - ten sam warunek, co petla Spoils OnMapEventEnded :907.</summary>
+        private static void HoldMounts(ItemRoster list)
+        {
+            try
+            {
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    var el = list.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    if (!it.IsMountable && it.ItemType != ItemObject.ItemTypeEnum.HorseHarness) continue;
+                    list.AddToCounts(el.EquipmentElement, -el.Amount);
+                    MountHold.AddToCounts(el.EquipmentElement, el.Amount);
+                    LootTally.Held(it, el.Amount);
+                }
+                _mountArmed = MountHold.Count > 0;
+            }
+            catch (Exception e) { MountStumble("HoldMounts", e); _mountArmed = MountHold.Count > 0; }
+        }
+
+        private static void MountStumble(string where, Exception e)
+        {
+            _mountStumbles++;
+            if (_mountStumbles <= 3 || _mountStumbles % 50 == 0) Log.Error("BattlefieldLaw." + where, e);
+        }
+
+        /// <summary>m109-lup: prefiks Spoils EquipmentDamageModel.ApplyDamageToLoot(lootRoster, ratio) - przetrzymane konie i uprzaz wracaja na liste
+        /// trofeow. Kon dostaje znacznik "lucky" Spoils (RegisterLuckyElement - ApplyDamageToLoot zostawia go 1:1, bez losowej kulawizny), uprzaz zuzycie
+        /// Spoils jak kazda zbroja (wrak uprzezy byl juz zarejestrowany w AppendWrecks). Sztuka schodzi z MountHold dopiero po dopisaniu - bez dubli.</summary>
+        public static void ReturnMounts(ItemRoster __0)
+        {
+            if (!_mountArmed) return;
+            try
+            {
+                if (__0 == null) return;   // finalizer wysypie do sakw
+                var els = new List<ItemRosterElement>();
+                for (int i = 0; i < MountHold.Count; i++) els.Add(MountHold.GetElementCopyAtIndex(i));
+                foreach (var el in els)
+                {
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    if (it.IsMountable && _lReg != null)
+                        for (int n = 0; n < el.Amount; n++)
+                        {
+                            try { _lReg.Invoke(null, new object[] { el.EquipmentElement }); }
+                            catch (Exception e) { MountStumble("ReturnMounts(lucky)", e); break; }
+                        }
+                    __0.AddToCounts(el.EquipmentElement, el.Amount);
+                    MountHold.AddToCounts(el.EquipmentElement, -el.Amount);
+                    LootTally.Returned(it, el.Amount);
+                }
+                _mountArmed = MountHold.Count > 0;
+            }
+            catch (Exception e) { MountStumble("ReturnMounts", e); }
+        }
+
+        /// <summary>m109-lup: finalizer Spoils LootCollectionBehavior.OnMapEventEnded - co z MountHold nie wrocilo na liste (wyjatek w Spoils), do sakw;
+        /// potem zamkniecie pomiaru bitwy. Wyjatek Spoils przechodzi dalej bez zmian.</summary>
+        public static Exception MountsFinalizer(Exception __exception)
+        {
+            try
+            {
+                if (MountHold.Count > 0) FlushMountsToBaggage(__exception != null ? "wyjatek w Spoils" : "Spoils nie oddal listy");
+                _mountArmed = false;
+                if (_screenThisCall) { _screenThisCall = false; LootTally.Close("lista trofeow Spoils"); }
+            }
+            catch (Exception e) { MountStumble("MountsFinalizer", e); }
+            return __exception;
+        }
+
+        /// <summary>m109-lup: rezerwa - konie bez zmian, uprzaz ze stanem bojowym (jak FlushShareToBaggage) do sakw gracza. Zwraca liczbe sztuk.</summary>
+        private static int FlushMountsToBaggage(string why)
+        {
+            int moved = 0;
+            _mountArmed = false;   // przed wysypaniem - prefiks ReturnMounts nie dubluje
+            try
+            {
+                var bag = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                if (bag == null || MountHold.Count == 0) return 0;
+                var els = new List<ItemRosterElement>();
+                for (int i = 0; i < MountHold.Count; i++) els.Add(MountHold.GetElementCopyAtIndex(i));
+                foreach (var el in els)
+                {
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    for (int n = 0; n < el.Amount; n++)
+                        bag.AddToCounts(new EquipmentElement(it, el.EquipmentElement.ItemModifier ?? ArmouryBehavior.PickWornModifier(it)), 1);
+                    MountHold.AddToCounts(el.EquipmentElement, -el.Amount);
+                    LootTally.Reserve(it, el.Amount);
+                    moved += el.Amount;
+                }
+                if (moved > 0)
+                {
+                    Log.Info("BattlefieldLaw (m109): konie i uprzaz powalonych do sakw (" + moved + " szt.) - " + why + ".");
+                    Log.Player("The horses and harness of the fallen are led to your baggage: " + moved + ".", false);
+                }
+            }
+            catch (Exception e) { MountStumble("FlushMountsToBaggage", e); }
+            return moved;
+        }
+
+        /// <summary>m109-lup (recenzja L2, HorseFate.TakeKill): ile kopii tego konia z lupu tej misji zostalo w zbrojowni wojska po zdjeciu dzialki;
+        /// -1 - dzialka tej misji nie liczona (zbrojownia bez limitu, jak dotad).</summary>
+        internal static int ArmoryCopiesLeft(ItemObject it)
+        {
+            if (!_armLeftKnown || it == null) return -1;
+            int n;
+            return _armLeft.TryGetValue(it, out n) ? n : 0;
+        }
+
+        /// <summary>m109-lup (recenzja L2): padly kon zdjety ze zbrojowni wojska - jedna kopia mniej.</summary>
+        internal static void UseArmoryCopy(ItemObject it)
+        {
+            int n;
+            if (it != null && _armLeft.TryGetValue(it, out n) && n > 0) _armLeft[it] = n - 1;
+        }
+
+        internal static void ClearArmoryCopies() { _armLeft.Clear(); _armLeftKnown = false; }
+
+        /// <summary>m109-lup (HorseFate.TakeKill): padly kon jezdzca powalonego przez druzyne gracza schodzi z kolejki lupu - jedna sztuka, najpierw bez stanu.</summary>
+        internal static bool TakeQueuedHorse(ItemObject it)
+        {
+            try
+            {
+                if (it == null) return false;
+                for (int pass = 0; pass < 2; pass++)
+                    for (int i = 0; i < ShareQueue.Count; i++)
+                    {
+                        var el = ShareQueue.GetElementCopyAtIndex(i);
+                        if (el.EquipmentElement.Item != it || el.Amount <= 0) continue;
+                        if (pass == 0 && el.EquipmentElement.ItemModifier != null) continue;
+                        ShareQueue.AddToCounts(el.EquipmentElement, -1);
+                        return true;
+                    }
+            }
+            catch (Exception e) { MountStumble("TakeQueuedHorse", e); }
+            return false;
         }
 
         private static void StripLegendCopies(ItemRoster roster)
@@ -384,12 +598,14 @@ namespace Armoury
                     {
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         trash += el.Amount;
+                        LootTally.SiftOut(it, el.Amount, LootTally.SEgz);   // m109-lup (recenzja L4): slon - egzotyk
                         continue;
                     }
                     if (LegendaryLaw.IsLegend(it))
                     {
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         legends += el.Amount;
+                        LootTally.SiftOut(it, el.Amount, LootTally.SLeg);   // m109-lup (recenzja L4)
                         continue;
                     }
                     // sprzet olbrzymow (Jeff 14.09): czlowiek go nie uzywa, wiec
@@ -399,6 +615,7 @@ namespace Armoury
                     {
                         roster.AddToCounts(el.EquipmentElement, -el.Amount);
                         legends += el.Amount;
+                        LootTally.SiftOut(it, el.Amount, LootTally.SEgz);   // m109-lup (recenzja L4): olbrzymy i egzotyki
                         continue;
                     }
                     if (s.LootMinConditionPercent > 0)
@@ -408,6 +625,7 @@ namespace Armoury
                         {
                             roster.AddToCounts(el.EquipmentElement, -el.Amount);
                             trash += el.Amount;
+                            LootTally.SiftOut(it, el.Amount, LootTally.SZnisz);   // m109-lup (recenzja L4)
                         }
                     }
                 }
@@ -440,6 +658,7 @@ namespace Armoury
                     if (it.ItemType != ItemObject.ItemTypeEnum.Horse) continue;
                     roster.AddToCounts(el.EquipmentElement, -el.Amount);
                     cut += el.Amount;
+                    LootTally.SiftOut(it, el.Amount, LootTally.SSmok);   // m109-lup (recenzja L4): przyczyna przesiania
                 }
                 if (cut > 0) Log.Info("BattlefieldLaw: " + cut + " smokow wycietych z lupu - smoki nie leza w workach.");
             }
@@ -451,6 +670,7 @@ namespace Armoury
         {
             try
             {
+                if (isPlayerParty) ClearArmoryCopies();   // m109-lup (recenzja L2): kopie koni w zbrojowni liczone od nowa dla tej misji
                 if (!Settings.Current.BattlefieldLawEnabled || !isPlayerParty || !isVictorious) return;
                 if (RotEnlisted()) return;
                 int pct = PlayerSharePercent();
@@ -481,6 +701,7 @@ namespace Armoury
                     if (key == null || partyId == null || !key.Equals(partyId)) continue;   // tylko rekord partii gracza
                     var looted = _dteLootedItems.GetValue(et.GetProperty("Value").GetValue(entry, null)) as System.Collections.IEnumerable;
                     if (looted == null) continue;
+                    _armLeftKnown = true;   // m109-lup (recenzja L2): rekord gracza liczony - kopie koni w zbrojowni ponizej
                     foreach (var kv in looted)
                     {
                         var kt = kv.GetType();
@@ -496,7 +717,7 @@ namespace Armoury
                             share = WholeShare(count, ref hk, ref tk, third, pct);
                             wHero += hk; wTroop += tk; wUnk += count - hk - tk; wNew += share;
                         }
-                        if (share <= 0) continue;
+                        if (share <= 0) { if (item.IsMountable) _armLeft[item] = count; continue; }   // m109-lup (L2): wszystkie kopie zostaja w zbrojowni
                         // audyt pelny W1: zdejmujemy po wszystkich elementach tej sztuki RAZEM z ich stanem -
                         // wczesniej AddToCounts(item, -take) celowal w element bez modyfikatora, a kolejka i tak
                         // dostawala "take" (towar z niczego, gdy w magazynie byly tylko sztuki zuzyte)
@@ -507,9 +728,11 @@ namespace Armoury
                             if (el.EquipmentElement.Item != item || el.Amount <= 0) continue;
                             int t = Math.Min(left, el.Amount);
                             armory.AddToCounts(el.EquipmentElement, -t);
+                            LootTally.Queued(item, t, LootTally.Dzialka);   // m109-lup: pomiar (przed dopisaniem - otwarcie bitwy liczy kolejke jako 'wczesniej')
                             ShareQueue.AddToCounts(el.EquipmentElement, t);
                             left -= t; moved += t;
                         }
+                        if (item.IsMountable) _armLeft[item] = count - (share - left);   // m109-lup (L2): kopie tej misji, ktore zostaly w zbrojowni
                     }
                     break;   // rekord partii gracza znaleziony i przetworzony
                 }
@@ -664,6 +887,7 @@ namespace Armoury
                                  + ShareQueue.Count + " pozycji); odbierze ja ekran lupow albo sakwy po godzinie.");
                         return;
                     }
+                    LootTally.QueueOut(ShareQueue, LootTally.Przepadlo);   // m109-lup: pomiar
                     ShareQueue.Clear(); Wrecks.Clear(); return;
                 }
 
@@ -675,6 +899,7 @@ namespace Armoury
                         for (int i = 0; i < gainedLoots.Count; i++)
                         {
                             var el = gainedLoots.GetElementCopyAtIndex(i);
+                            LootTally.Queued(el.EquipmentElement.Item, el.Amount, LootTally.Bagaz);   // m109-lup: pomiar (przed dopisaniem)
                             ShareQueue.AddToCounts(el.EquipmentElement, el.Amount);
                         }
                         gainedLoots.Clear();
@@ -690,11 +915,13 @@ namespace Armoury
                         var el = ShareQueue.GetElementCopyAtIndex(i);
                         gainedLoots.AddToCounts(el.EquipmentElement, el.Amount);
                     }
+                    LootTally.QueueOut(ShareQueue, LootTally.Lista);   // m109-lup: pomiar
                     ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana na ekran gry
                 }
                 AppendWrecks(gainedLoots);
                 CleanseDragons(gainedLoots);
                 CleanseTrash(gainedLoots);
+                LootTally.Close("ekran gry");   // m109-lup: bez Spoils lista trofeow to ekran gry
                 if (!Settings.Current.LootArrivesBattleWorn || _applyDamage == null || gainedLoots.Count == 0) return;
                 var damaged = _applyDamage.Invoke(null, new object[] { gainedLoots, 0f }) as ItemRoster;
                 if (damaged == null || ReferenceEquals(damaged, gainedLoots)) return;
@@ -760,8 +987,13 @@ namespace Armoury
         {
             _simCutSpoils = _simCutBattles = _simCutGame = _lStumbles = 0; ScreenIsRealLoot = false;
             _simPending = false;
-            try { ShareQueue.Clear(); Wrecks.Clear(); } catch { }
+            try { LootTally.Reset(); } catch { }   // m109-lup: PRZED czyszczeniem kolejki (otwarta bitwa zamknieta, "zostaje" = kolejka)
+            try { ShareQueue.Clear(); Wrecks.Clear(); MountHold.Clear(); ClearArmoryCopies(); } catch { }
+            _mountArmed = false; _screenThisCall = false;
         }
+
+        /// <summary>m109-lup: rodzaj zabojcy dla pomiaru LootTally - 1 Ty albo towarzysz (kon zamieniony na jezdzca), 2 zolnierz partii gracza, 3 inni.</summary>
+        internal static int KillerKindOf(Agent a) { return KillerKind(a); }
 
         /// <summary>Liczniki doby do linii "Lup i dary (E8/L)" (HorseFate.LLine) - zwraca tekst i zeruje.</summary>
         internal static string TakeSimCut()
@@ -826,6 +1058,7 @@ namespace Armoury
                     return 0;
                 }
                 pct = SimSharePercent();
+                LootTally.SimBody(gained);   // m109-lup: pomiar
                 foreach (var kv in gained)
                 {
                     if (kv.Key == null || kv.Value <= 0) continue;
@@ -838,6 +1071,7 @@ namespace Armoury
                             if (pass == 0 && el.EquipmentElement.ItemModifier != null) continue;
                             int n = Math.Min(left, el.Amount);
                             armory.AddToCounts(el.EquipmentElement, -n);
+                            LootTally.Queued(kv.Key, n, LootTally.Send);   // m109-lup: pomiar (przed dopisaniem)
                             ShareQueue.AddToCounts(el.EquipmentElement, n);
                             left -= n; moved += n;
                         }
@@ -901,6 +1135,25 @@ namespace Armoury
 
         // ------------------------------------------------------------------ wraki
 
+        /// <summary>m109-lup Z2 (RiderBlowSparesHarness): prefiks DTE ArmorSelector.GetRandomArmorByBodyPart(armors, bodyPart) - lista bez uprzezy konia
+        /// (kopia; oryginal DTE uzywa dalej do "dodatkowo peknietej", ktora i tak pomija uprzaz). Cios rozbija czesc zbroi czlowieka albo nic, gdy ten nie
+        /// ma zbroi na trafionej czesci ciala. Ta sama liczba sztuk; wrakiem staje sie zbroja jezdzca, ladry przychodza cale.</summary>
+        public static void SpareHarness(ref List<ItemObject> __0)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (__0 == null || s == null || !s.RiderBlowSparesHarness || !s.BattlefieldLawEnabled) return;
+                bool any = false;
+                foreach (var it in __0) if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness) { any = true; break; }
+                if (!any) return;
+                var copy = new List<ItemObject>(__0.Count);
+                foreach (var it in __0) if (it != null && it.ItemType != ItemObject.ItemTypeEnum.HorseHarness) copy.Add(it);
+                __0 = copy;
+            }
+            catch (Exception e) { MountStumble("SpareHarness", e); }
+        }
+
         /// <summary>Postfix na selektorze DTE - zapamietuje, ktora czesc uznano za rozbita.</summary>
         public static void RecordStruckPiece(object __result)
         {
@@ -924,6 +1177,23 @@ namespace Armoury
             }
             catch { }
             _lastPick = null;
+        }
+
+        /// <summary>m109-lup Z1 (ExtraBrokenArmorWrecks, wolane z LootTally.FelledPost): "dodatkowo peknieta" czesc zbroi wroga powalonego przez druzyne
+        /// gracza do worka z wrakami - te same bramki co QueueWreck (klucze, limit 400) i tylko, gdy znamy stan wraka (modyfikator Spoils wpiety przy starcie
+        /// z WreckSalvageEnabled) - bez niego wrak przyszedlby jako cala sztuka. DTE tej sztuki nie dopisuje nigdzie (AddItemToRecover ja pomija), wiec wrak
+        /// to jedyna kopia. true - dodany.</summary>
+        internal static bool AddWreck(ItemObject it)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (it == null || s == null || !s.WreckSalvageEnabled || !s.BattlefieldLawEnabled || Wrecks.Count >= 400) return false;
+                if (_rlHeavy == null && _rlHeavyMax == null) return false;
+                Wrecks.Add(it);
+                return true;
+            }
+            catch (Exception e) { MountStumble("AddWreck", e); return false; }
         }
 
         /// <summary>Najciezszy modyfikator zuzycia Spoils - stan wraka.</summary>
@@ -956,22 +1226,35 @@ namespace Armoury
                 // to, co wyjelismy z magazynu wojska na ekran lupow, wraca na polke
                 var armory = _dteArmory != null ? _dteArmory.GetValue(null) as ItemRoster : null;
                 if (armory != null)
+                {
                     for (int i = 0; i < ShareQueue.Count; i++)
                     {
                         var el = ShareQueue.GetElementCopyAtIndex(i);
                         armory.AddToCounts(el.EquipmentElement, el.Amount);
                     }
+                    LootTally.QueueOut(ShareQueue, LootTally.Zwrot);   // m109-lup: pomiar
+                    // m109-lup: siatka bezpieczenstwa - przetrzymane konie i uprzaz (zdjete z kolejki, czyli ze zbrojowni wojska) wracaja tam samo
+                    for (int i = 0; i < MountHold.Count; i++)
+                    {
+                        var el = MountHold.GetElementCopyAtIndex(i);
+                        armory.AddToCounts(el.EquipmentElement, el.Amount);
+                        LootTally.Reserve(el.EquipmentElement.Item, el.Amount);
+                    }
+                    MountHold.Clear(); _mountArmed = false;
+                }
+                else LootTally.QueueOut(ShareQueue, LootTally.Przepadlo);
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka wrocila do zbrojowni wojska
                 Wrecks.Clear();
             }
             catch (Exception e) { Log.Error("DropShare", e); }
+            LootTally.Close("zwrot do zbrojowni wojska");   // m109-lup: pole przegrane albo opuszczone
             return n;
         }
 
         /// <summary>Czy dzialka gracza wciaz lezy w kolejce (ekran lupow nie przyszedl).</summary>
         internal static bool SharePending()
         {
-            try { return ShareQueue.Count > 0 || Wrecks.Count > 0; } catch { return false; }
+            try { return ShareQueue.Count > 0 || Wrecks.Count > 0 || MountHold.Count > 0; } catch { return false; }   // m109-lup: takze przetrzymane konie
         }
 
         /// <summary>
@@ -989,6 +1272,7 @@ namespace Armoury
             {
                 var bag = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
                 if (bag == null) return 0;
+                LootTally.QueueOut(ShareQueue, LootTally.Sakwy);   // m109-lup: pomiar
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
                     var el = ShareQueue.GetElementCopyAtIndex(i);
@@ -1003,6 +1287,7 @@ namespace Armoury
                 }
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana do sakw
                 moved += AppendWrecks(bag);
+                if (MountHold.Count > 0) moved += FlushMountsToBaggage(why);   // m109-lup: siatka bezpieczenstwa (MountHold zyje tylko w wywolaniu Spoils)
                 if (moved > 0)
                 {
                     Log.Info("BattlefieldLaw: kolejka lupow wysypana do sakw (" + moved + " szt.) - " + why + ".");
@@ -1010,6 +1295,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("FlushShareToBaggage", e); }
+            LootTally.Close("sakwy - " + why);   // m109-lup: pomiar bitwy zamkniety
             return moved;
         }
 
@@ -1026,6 +1312,7 @@ namespace Armoury
                     && mod.PriceMultiplier * 100f <= Settings.Current.LootMinConditionPercent + 0.01f)
                 {
                     int junked = Wrecks.Count;
+                    foreach (var w in Wrecks) LootTally.SiftOut(w, 1, LootTally.SWrak);   // m109-lup (recenzja L4): przyczyna przesiania
                     Wrecks.Clear();
                     Log.Info("BattlefieldLaw: " + junked + " wrakow ponizej progu zniszczenia - zostaly na polu.");
                     return 0;
