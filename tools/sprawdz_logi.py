@@ -59393,6 +59393,7 @@ def m109przes_collect(logp):
     CampInterrogation.Import, "straceni" PeopleBook.Import -> ResetOrigin - wraca do chwili zapisu); PRZES-3 i PRZES-5 licza w obrebie odcinka."""
     D = {"start": [], "tries": [], "refuse": [], "days": [], "mem": [], "test": [], "testskip": [], "cups": [], "seq": [], "unread": [], "err": 0, "err1": None}
     state = {"gpd": None, "byc": None, "inn": None, "seg": 0}
+    in_test = False   # 23.10: miedzy "test - start" a linia wyniku testu - proby testu (PRZES-5 je pomija)
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
@@ -59420,7 +59421,7 @@ def m109przes_collect(logp):
             elif t.startswith("proba "):
                 mt = M109PRZES_RX["try"].search(t)
                 if mt:
-                    D["tries"].append((mt, dict(state)))
+                    D["tries"].append((mt, dict(state, test=in_test)))
                     if mt.group(27).endswith("TAK (zwykly, ksiega ludzi straceni 1)"):
                         D["seq"].append(("d", 1.0, state["seg"]))
                 else:
@@ -59431,10 +59432,13 @@ def m109przes_collect(logp):
                 D["days"].append(t)
             elif t.startswith("pamiec - "):
                 D["mem"].append(t)
+            elif t.startswith("test - start"):
+                in_test = True
             elif t.startswith("test - bez proby"):
                 D["testskip"].append(t)
             elif t.startswith("test - "):
                 D["test"].append(t)
+                in_test = False
     return D
 
 
@@ -59607,14 +59611,18 @@ def m109przes_rows(rep, D):
     # PRZES-5: limit doby - klucz limitu jak CampInterrogation.LimitKey (bohater - grupa; zwykli - rodzaj bandy "c:" + kultura, recenzja R3), w obrebie odcinka
     # (recenzja kod R1: wczytanie zapisu w tej samej sesji odtwarza limit z zapisu - ta sama proba po wczytaniu jest dozwolona)
     cnt = {}
+    ntest = 0
     for m, s in tries:
+        if s.get("test"):
+            ntest += 1
+            continue
         lk = m.group(3) if m.group(7) == "TAK" or m.group(5) == "-" else "c:" + m.group(5)
         k = (s.get("seg", 0), m.group(2), lk, m.group(1))
         cnt[k] = cnt.get(k, 0) + 1
     over = [f"odc{k[0]} d{k[1]} {k[2]} {k[3]} x{v}" for k, v in cnt.items() if v > 1]
     nlim = sum(1 for x in D["refuse"] if x.startswith("odmowa - limit"))
     rep.add("PRZES-5: limit doby - (odcinek, doba, klucz limitu: bohater albo rodzaj bandy, rodzaj proby) najwyzej 1 proba (odmowy sie nie licza)",
-            f"par {len(cnt)}, ponad limit {len(over)}" + (f" ({over[:3]})" if over else "") + f"; odmow: limit {nlim}, wszystkich {len(D['refuse'])}; odcinkow {len(D['start'])}",
+            f"par {len(cnt)}, ponad limit {len(over)}" + (f" ({over[:3]})" if over else "") + f"; prob testu pominietych {ntest}; odmow: limit {nlim}, wszystkich {len(D['refuse'])}; odcinkow {len(D['start'])}",
             "0", not over if tries else None)
     # PRZES-6: kufle - Urok = miara z dopisku, KP-5; dopisek wobec stanu klucza z linii startu osobno (recenzja kod R1: klucze MCM bez restartu - przelaczenie
     # w trakcie sesji nie daje nowej linii startu; niezgodnosc ze stanem = INFO "sprawdz recznie", nie NIE)

@@ -103,6 +103,8 @@ namespace Armoury
             var s = Settings.Current;
             var pts = new List<string>();
             bool ok = true;
+            // 23.10 test 109f: znacznik poczatku - proby testu (do linii wyniku) nie sa gra: test zwalnia slot rodzaju bandy po T3b (PRZES-5 je pomija)
+            Log.Info(P + "test - start (proby testu do linii wyniku; slot rodzaju bandy zwalniany po T3b jak nowa doba).");
             // ---------------- T0: kryjowki, kultura, rodzaje jencow
             Settlement h1 = null, h2 = null; Clan clan = null; CultureObject c = null; CharacterObject ta = null, tb = null, tl = null;
             float best = float.MaxValue;
