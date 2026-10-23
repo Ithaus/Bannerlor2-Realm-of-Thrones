@@ -86,7 +86,8 @@ namespace Armoury
     {
         private static System.Reflection.FieldInfo _targetField;
 
-        private static void Postfix(TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemMenuVM __instance)
+        private static void Postfix(TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemMenuVM __instance,
+                                    [HarmonyArgument("item")] TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.SPItemVM spItem, BasicCharacterObject character)
         {
             try
             {
@@ -110,7 +111,11 @@ namespace Armoury
                     // tylko, gdy znana dokladnie (ksiega) albo sztuka sprawna bez ksiegi
                     int st = GearState.Of(m);
                     float dEx = -1f;
-                    try { var beh0 = ArmouryBehavior.Instance; if (beh0 != null) dEx = beh0.WornEffective(item); } catch { dEx = -1f; }
+                    // m110-stan krok 2 (WornExactHpProtection): dokladna wytrzymalosc tylko sztuki noszonej w bitwie przez te postac (gracz albo towarzysz) - sakwy,
+                    // kupiec i stroj cywilny bez niej (dotad WornEffective szukal po samym przedmiocie u gracza: kopia w sakwach dostawala HP sztuki z grzbietu)
+                    bool exact = ExactOn();
+                    if (exact) { try { dEx = WornD(spItem, character, el); } catch { dEx = -1f; } }
+                    else try { var beh0 = ArmouryBehavior.Instance; if (beh0 != null) dEx = beh0.WornEffective(item); } catch { dEx = -1f; }
                     if (dEx >= 0f) st = Math.Max(st, GearState.OfCondition(dEx));
                     var list0 = __instance.TargetItemProperties;
                     if (list0 == null) return;
@@ -123,28 +128,30 @@ namespace Armoury
                         if (pool0 > 0 && dEx >= 0f) Add(list0, "Durability", (int)Math.Round(pool0 * Math.Min(100f, dEx) / 100.0) + " / " + pool0);
                         else if (pool0 > 0 && st == GearState.Sound) Add(list0, "Durability", pool0 + " / " + pool0);
                     }
-                    if (m == null || m.PriceMultiplier >= 0.999f) return;   // bez modyfikatora stanu - bez rozpiski strat
+                    // m110-stan krok 2: sztuka noszona z dokladna wytrzymaloscia (takze sprawna, d < 100) - pancerz i obrazenia jak w bitwie (HeroHp.Exact)
+                    bool exRows = exact && dEx >= 0f && dEx < 99.95f;
+                    if (!exRows && (m == null || m.PriceMultiplier >= 0.999f)) return;   // bez modyfikatora stanu - bez rozpiski strat
                     if (item.HasArmorComponent)
                     {
                         var a0 = item.ArmorComponent;
                         if (item.Type == ItemObject.ItemTypeEnum.HorseHarness)
-                            Delta(list0, "Horse Armor", a0.BodyArmor, el.GetModifiedMountBodyArmor());
+                            Delta(list0, "Horse Armor", a0.BodyArmor, Ex(exRows, a0.BodyArmor, el.GetModifiedMountBodyArmor(), m, dEx));
                         else
                         {
-                            Delta(list0, "Head Armor", a0.HeadArmor, el.GetModifiedHeadArmor());
-                            Delta(list0, "Body Armor", a0.BodyArmor, el.GetModifiedBodyArmor());
-                            Delta(list0, "Leg Armor", a0.LegArmor, el.GetModifiedLegArmor());
-                            Delta(list0, "Arm Armor", a0.ArmArmor, el.GetModifiedArmArmor());
+                            Delta(list0, "Head Armor", a0.HeadArmor, Ex(exRows, a0.HeadArmor, el.GetModifiedHeadArmor(), m, dEx));
+                            Delta(list0, "Body Armor", a0.BodyArmor, Ex(exRows, a0.BodyArmor, el.GetModifiedBodyArmor(), m, dEx));
+                            Delta(list0, "Leg Armor", a0.LegArmor, Ex(exRows, a0.LegArmor, el.GetModifiedLegArmor(), m, dEx));
+                            Delta(list0, "Arm Armor", a0.ArmArmor, Ex(exRows, a0.ArmArmor, el.GetModifiedArmArmor(), m, dEx));
                         }
                     }
                     if (item.HasWeaponComponent && item.WeaponComponent.PrimaryWeapon != null)
                     {
                         var w0 = item.WeaponComponent.PrimaryWeapon;
-                        Delta(list0, "Swing Damage", w0.SwingDamage, el.GetModifiedSwingDamageForUsage(0));
-                        Delta(list0, "Thrust Damage", w0.ThrustDamage, el.GetModifiedThrustDamageForUsage(0));
+                        Delta(list0, "Swing Damage", w0.SwingDamage, Ex(exRows, w0.SwingDamage, el.GetModifiedSwingDamageForUsage(0), m, dEx));
+                        Delta(list0, "Thrust Damage", w0.ThrustDamage, Ex(exRows, w0.ThrustDamage, el.GetModifiedThrustDamageForUsage(0), m, dEx));
                         Delta(list0, "Swing Speed", w0.SwingSpeed, el.GetModifiedSwingSpeedForUsage(0));
                         Delta(list0, "Thrust Speed", w0.ThrustSpeed, el.GetModifiedThrustSpeedForUsage(0));
-                        Delta(list0, "Missile Damage", w0.MissileDamage, el.GetModifiedMissileDamageForUsage(0));
+                        Delta(list0, "Missile Damage", w0.MissileDamage, Ex(exRows, w0.MissileDamage, el.GetModifiedMissileDamageForUsage(0), m, dEx));
                         Delta(list0, "Missile Speed", w0.MissileSpeed, el.GetModifiedMissileSpeedForUsage(0));
                         Delta(list0, "Hit Points", w0.MaxDataValue, el.GetModifiedMaximumHitPointsForUsage(0));
                     }
@@ -205,6 +212,48 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("ArmouryStats", e); }
+        }
+
+        /// <summary>m110-stan krok 2: panel przy kluczu WornExactHpProtection (z GearFourStates i ConditionScalesStats - jak w bitwie); NIE - panel jak 6f3e0314.</summary>
+        private static bool ExactOn()
+        {
+            var s = Settings.Current;
+            return s != null && s.WornExactHpProtection && s.ConditionScalesStats && GearState.On;
+        }
+
+        /// <summary>m110-stan krok 2: wartosc wiersza z dokladnego HP (HeroHp.Exact - ta sama funkcja co w bitwie); wylaczone albo baza 0 - wartosc gry.</summary>
+        private static int Ex(bool on, int baseVal, int now, ItemModifier m, float d)
+        {
+            return on && baseVal > 0 ? HeroHp.Exact(baseVal, now, m, d) : now;
+        }
+
+        /// <summary>m110-stan krok 2: dokladna wytrzymalosc (procent puli, przycieta do przedzialu stanu jak w bitwie) sztuki noszonej w bitwie przez te postac -
+        /// panel ekwipunku po stronie rynsztunku bojowego (gniazdo z ItemType), ten sam przedmiot i modyfikator co w BattleEquipment bohatera; -1 - sakwy,
+        /// kupiec, stroj cywilny, inna sztuka albo ksiega jej nie zna.</summary>
+        private static float WornD(TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.SPItemVM vm, BasicCharacterObject character, EquipmentElement el)
+        {
+            if (vm == null || el.Item == null || vm.InventorySide != TaleWorlds.CampaignSystem.Inventory.InventoryLogic.InventorySide.BattleEquipment) return -1f;
+            int slot = (int)vm.ItemType;
+            if (slot < 0 || slot >= 12) return -1f;
+            var co = character as TaleWorlds.CampaignSystem.CharacterObject;
+            var hero = co != null ? co.HeroObject : null;
+            if (hero == null || TaleWorlds.CampaignSystem.Campaign.Current == null) return -1f;
+            var heq = hero.BattleEquipment;
+            if (heq == null || ReferenceEquals(heq, TaleWorlds.CampaignSystem.Campaign.Current.DeadBattleEquipment)) return -1f;
+            var hel = heq[slot];
+            if (hel.Item != el.Item || !ReferenceEquals(hel.ItemModifier, el.ItemModifier)) return -1f;
+            if (ArmouryBehavior.NoWear(el.Item) || !GearState.Handles(el.Item)) return -1f;
+            int st = GearState.Of(el.ItemModifier);
+            if (st < 0) return -1f;
+            float d;
+            if (hero == TaleWorlds.CampaignSystem.Hero.MainHero)
+            {
+                var beh = ArmouryBehavior.Instance;
+                if (beh == null || !beh.WornExactD(slot, out d)) return -1f;
+            }
+            else return -1f;
+            bool clipped;
+            return HeroHp.Clip(d, st, out clipped);
         }
 
         private static void Add(
