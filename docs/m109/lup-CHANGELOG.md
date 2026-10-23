@@ -2,7 +2,9 @@
 
 **Mod:** Armoury | **Galaz:** `w-toku/m109-lup` (od `44c03a05` = WGRANIE 103.5) | **Tor:** M (jedna galaz, recenzja, biegi autotestu - gry nie uruchamialem, Jeff gra)
 **Commity:** `d1b3ecb3` (klucze + gen_mcm), `66e8b042` (pomiar LootTally, linie, hak testu, linia doby), `04712090` (konie i uprzaz poza Spoils + HorseFate.TakeKill),
-`63950021` (Z2), `2e4bec6b` (Z1 + kolejnosc pomiaru), `630eebd9` (pomiar padlych koni: poza lupem / brak), `f6df0aff` (grupa progow m109lup)
+`63950021` (Z2), `2e4bec6b` (Z1 + kolejnosc pomiaru), `630eebd9` (pomiar padlych koni: poza lupem / brak), `f6df0aff` (grupa progow m109lup);
+po recenzji: `284c1a13` (L1 hak testu bez zbrojowni), `1fd89fa1` (L2 kopie w zbrojowni, R1 Touch, R4 ReleaseAgents), `4cca3102` (L4 przesiane wedlug przyczyny),
+`e9d428fe` (R2 wywolania i prog J10, R3 Lap doby), wpis weryfikacji (L3, L5, plan)
 **Build:** Armoury 0 bledow (kod wyjscia 0), gen_mcm Armoury 2321 ustawien; `sprawdz_narzedzie.py tools/sprawdz_logi.py` bez uwag; `--grupa m109lup` bez logu: LUP-JS i LUP-JS2 OK
 **Klucze (nowe, domyslnie TAK, obok Wreck Salvage Enabled; w Armoury.json Jeffa ich nie ma - wchodza domyslne z kodu):** `FallenRiderHorsesLooted`, `RiderBlowSparesHarness`, `ExtraBrokenArmorWrecks`
 **Zapis:** bez zmian (stan statyczny, czyszczony w BattlefieldLaw.LReset - stare zapisy wczytuja sie jak dotad)
@@ -28,6 +30,11 @@ konie) - po naprawie padly kon wyszedlby na liscie, wiec poprawka jest czescia z
 - w logu brak linii "lup przesiany" i "wrakow ponizej progu", miara wrakow bez zmian); (b) DTE `extraBrokenArmor` (:332-369) - druga czesc zbroi wroga od tieru 3
 (25/35/45/60%) znika bez sladu; (c) czesc zastepcza DTE (`MarkSlotAsTemporary`) - zbroja z niczego, DTE jej nie lupi; (d) strzal w piers wybieral ciezka uprzaz
 (body_armor 55) zamiast kolczugi - wrakiem byla uprzaz.
+**Zawezenie dla bandy Jeffa (recenzja L5, sprawdzone w ROT-Troops.xml i dekompilacji DTE):** "Robber Squire" to `robber_scout` (level 11, piechota, bez konia);
+konni w bandzie Robber Knights to `robber_horseman` (level 16 = tier 3, vlandia_horse + light_harness, common_armor; extraBroken 25%) albo `robber_knight`
+(level 21 = tier 4, t2_vlandia_horse + chain_horse_harness, common_armor; 35%). (c) u Jeffa WYKLUCZONE - banda to IsBandit: DTE `SpawnAgentPatch.Prefix` wraca
+przed `__state` (IsPartyValidForProcessing = false), wiec Assignment nie trafia do `_assignmentByAgent` i slotow tymczasowych nie ma. (d) tlumaczy tylko ladry
+(cios w uprzaz = zbroja jezdzca przyszla cala). Brak zbroi jezdzca u Jeffa to wiec (a) wrak "Mangled" na liscie albo (b) extraBroken - (b) naprawia Z1.
 
 ### Zmiana
 
@@ -93,13 +100,21 @@ HorseFate `TakeOne` jak dotad. Pomiar i linie logu dzialaja zawsze (tylko czytaj
 - **Odczuwalne dla gracza:** wiecej koni na liscie trofeow (waga, kara stada - gracz wybiera na ekranie); konie bez losowej kulawizny Spoils (losowanie z niczego) -
   swiadoma decyzja; Z2 przesuwa wraki z ladrow na zbroje jezdzca przy tej samej liczbie sztuk (dotyczy tez wlasnych poleglych jezdzcow - jedna zasada); HorseFate nie
   zdejmuje juz graczowi jego konia za padlego konia wroga.
+  **Do raportu dla Jeffa (recenzja L3):** po wgraniu ladry przyjda cale, ale zbroja jezdzca trafionego w piers czesciej przyjdzie jako wrak "Mangled" do kuzni.
+  DTE wybiera rozbita czesc losem wazonym ochrona tej czesci ciala; u robber_knight przy strzale w piers: common_armor 42, naramienniki 14, chain_horse_harness 55 -
+  dotad tulow ok. 38%, ladry ok. 50% (wrak ladrow i tak polykal Spoils), teraz tulow ok. 75%, ladry 0% (liczby z wag recenzji - NIEPEWNE, sprawdzi linia
+  jezdzcow). Liczba sztuk ta sama. Jeff skarzyl sie na brak zbroi - to jego decyzja, czy tak ma byc (klucz Rider Blow Spares Harness NIE = jak dotad).
 - **Pomiar:** prefiks/postfiks OnAgentRemoved z wczesnymi wyjsciami, najwyzej 22 odczyty slownika na powalonego, w try z licznikiem; bez latek na malych metodach
   (AddItemToRecover zastapiony roznica licznikow - pamiec o zawieszeniu GC). Wlasny odczyt ciosu (`_pick`) - bez zaleznosci od kolejnosci z QueueWreck. Wpis do
   kolejki liczony przed dopisaniem (otwarcie bitwy liczy zawartosc kolejki jako "wczesniej").
 - **Zmiany Spoils albo DTE:** brak latki -> "BRAK" w linii startu; HoldMounts tylko przy obu latkach (ApplyDamageToLoot + finalizer) - bez nich stare zachowanie,
   bez strat i bez dubli.
 - **Hak testu:** w bitwach 1 i 4 biegu bitwa wrog ma +6 ludzi (`_enemyMen` w linii CrashScribe dalej 30/40) - grupy porownujace liczby wrogow moga sie roznic;
-  dlatego osobny bieg bitwa-lup, zwykly bieg bitwa zostaje odniesieniem.
+  dlatego osobny bieg bitwa-lup, zwykly bieg bitwa zostaje odniesieniem. Po recenzji L1 hak nie dotyka zbrojowni DTE (zadnych sztuk z niczego, HorseBook
+  i ArmsBook bez reszty niewyjasnionej z testu, konie na liscie tylko z cial).
+- **Kopie w zbrojowni (recenzja L2):** nowy stan `_armLeft` (BattlefieldLaw) pisze tylko AfterDtePartyItems (rekord gracza, konie), czyta i zmniejsza tylko
+  HorseFate.TakeKill pod kluczem FallenRiderHorsesLooted; czyszczony w finally ApplyMission, na starcie AfterDtePartyItems partii gracza i w LReset - nie
+  przechodzi do nastepnej misji. Bez policzonej dzialki (-1) TakeKill jak przed recenzja (zbrojownia bez limitu).
 - **Scalanie:** Settings.cs - klucze obok WreckSalvageEnabled; ArmouryBehavior.cs - 1 linia przy HorseFate.Daily; sprawdz_logi.py - pomoc (przed na7) i dispatch
   (po m107gosp) - konflikt z rownoleglymi galeziami mozliwy (scal.sh); AutotestBattleKit.cs i SubModuleMain.cs nietkniete.
 
@@ -116,6 +131,20 @@ HorseFate `TakeOne` jak dotad. Pomiar i linie logu dzialaja zawsze (tylko czytaj
 - `EncounterManager` jest w przestrzeni `TaleWorlds.CampaignSystem` (nie `...Encounters`, jak w projekcie) - sprawdzone w dekompilacji 1.4.8.
 - Linia bitwy zawsze (nie tylko 3 pierwsze bitwy) - tozsamosci sprawdzane w kazdej bitwie; ograniczenie 3 / pod flaga dotyczy linii jezdzcow.
 
+### Weryfikacja recenzji (23.10; recenzje "poprawnosc" L1-L5 i "kod" R1-R4)
+
+| Uwaga | Werdykt | Dowod | Co zrobione |
+|---|---|---|---|
+| L1 hak testu dokladal zestaw do zbrojowni DTE bandy | PRAWDA | `SpawnAgentPatch.IsPartyValidForProcessing` false dla IsBandit; banda testu z `BanditPartyComponent.CreateBanditParty` (at-AutotestBattle :1410); `Assignment.FillEmptySlots` daje sloty 10-11 z wzorca; `ItemRosterForPlayerLootSharePatch` :54/:76 oddaje udzial ze zbrojowni pokonanych | petla `AiGear.AddToArmory` usunieta, sam roster; linia, regex `test`, linia kontrolna (`284c1a13`) |
+| L2 padly kon zolnierski zdejmowal konia gracza | PRAWDA | `TakeOne` bierze dowolna sztuke id; dzialka round(2 x 33%) = 1, druga kopia w zbrojowni | `ArmoryCopiesLeft` / `UseArmoryCopy` z AfterDtePartyItems, TakeKill: zbrojownia najwyzej tyle kopii, potem kolejka (`1fd89fa1`) |
+| L3 Z2 czesciej robi wrak ze zbroi tulowia | PRAWDA (kierunek), liczby NIEPEWNE | `ArmorSelector.SelectArmorBasedOnWeight` - los wazony `GetArmorValueForBodyPart` | bez zmiany kodu; opis do raportu dla Jeffa (Ryzyko - Odczuwalne) |
+| L4 "przesiane" bez przyczyny | PRAWDA | CPrzes = przed - po, przyczyny tylko w zbiorczych liniach | blok `przesiane [smoki/legendy/olbrzymy-egzotyki/zniszczone/wraki ponizej progu]`, LUP-J4 suma (`4cca3102`) |
+| L5 hipoteza (c) niemozliwa u Jeffa | PRAWDA | SpawnAgentPatch.Prefix wraca przed `__state` dla bandytow; ROT-Troops.xml: robber_scout bez konia, robber_horseman/robber_knight konni | zawezenie w "Przyczyna" |
+| R1 tozsamosc B -1 przy otwarciu bitwy w DeadHorse | PRAWDA | `Begin` czyta kolejke przy otwarciu, TakeKill zdejmowal przed `DeadHorse` | `LootTally.Touch()` na poczatku TakeKill (`1fd89fa1`) |
+| R2 LUP-J10 suma bez liczby wywolan; `_dTicks` przez doby | PRAWDA | `Lap` w finally FelledPre/FelledPost dla kazdego poleglego; `return` w try `Daily` omijal `ClearDay` | `(wywolan N)` w linii, prog od liczby, `ClearDay` przy wczesnym wyjsciu (`e9d428fe`) |
+| R3 brak `DayProfile.Lap("LootTally.Daily")` | PRAWDA | `Lap` mierzy od poprzedniego Lap | dopisany (`e9d428fe`) |
+| R4 agenci trzymani do zamkniecia bitwy | PRAWDA (rozmiaru nie mierzono) | `Battle.HorseLoot`, `Rider.Agent` puszczane tylko w `Close` | `LootTally.ReleaseAgents()` w finally ApplyMission (`1fd89fa1`) |
+
 ### Status: DO SPRAWDZENIA
 
 ### Plan autotestu (sesja glowna, gdy gra Jeffa zamknieta; najpierw kopia logow Jeffa z dnia)
@@ -126,10 +155,21 @@ Biegi: `testy-1033.ps1 -Dll n109lup -Tree zb/m109-lup -Prefix 109l -CsAt test/Cr
 
 | Bieg | Parametry | Sprawdzic |
 |---|---|---|
-| bitwa-lup (nowy) | `-Runs bitwa -ExtraFlags armoury-lup.flag` (zapis autotest-F-d240, 4 bitwy, w 1 i 4 po 6 konnych T5) | LUP-J0..J10 TAK, w szczegolnosci J4 (Spoils wyjal 0), J5, J6, J8; linie jezdzcow: kon, uprzaz, tulow; istniejace grupy bitewne bez nowych NIE poza liczba wrogow (+6) |
+| bitwa-lup (nowy) | `-Runs bitwa -ExtraFlags armoury-lup.flag` (zapis autotest-F-d240, 4 bitwy, w 1 i 4 po 6 konnych T5) | LUP-J0..J10 TAK, w szczegolnosci J4 (Spoils wyjal 0, przesiane = suma przyczyn), J5, J6, J8; linie jezdzcow: kon, uprzaz, tulow; istniejace grupy bitewne bez nowych NIE poza liczba wrogow (+6) |
 | p20 | prolog 20 dob | LUP-J0, J1 TAK, reszta INFO; m105dziennik, m103lektor, m103sceny, m101prolog jak w 108d |
 | wczyt | autotest-dlugi + 20 dob, stary zapis | wczytanie, LUP-J0, J1; brak nowych kluczy zapisu |
 | bitwa bez flagi (opcja) | regresja grup bitewnych bez dolozonych jezdzcow | jak dotad |
 
 Sciezki Jeffa (100% zabojstw bohatera, luk) test nie wymusi - po wgraniu poprosic Jeffa o walke z konnymi bandytami: na liscie trofeow maja byc konie i ladry,
 w logu linia `Lup bitwy (m109): jezdzcy bitwy N`.
+
+**NIEPEWNE z weryfikacji recenzji - sprawdzic w biegu bitwa-lup:**
+- L1: jezdzcy testu bez zestawu w zbrojowni bandy przychodza konno (zalozenie z dekompilacji DTE: bandyci ubierani wzorcem jednostki, sloty 10-11 z wzorca;
+  przy RandomizeNonHeroLedAiPartiesArmor NIE - zestaw gry) - linia startu CrashScribe "koni N" w bitwach 1 i 4 > 0, w linii bitwy "konnych" >= 1, LUP-J8 TAK;
+  bagaz w tych bitwach (kolejka "bagaz") bez koni i uprzezy (dawniej z zestawu z niczego).
+- L3: udzial "cios" na tulowiu jezdzcow wobec ladrow w liniach jezdzcow (ladry "cios" 0 - LUP-J6; tulow "cios" czesciej niz dotad) - liczby z recenzji (38% -> 75%)
+  sa szacunkiem z wag; do raportu dla Jeffa podac to, co pokaze log.
+- L2: padly kon jezdzca powalonego przez zolnierza - linia bitwy "konie padle ... ze zbrojowni" nie wiecej niz kopie w zbrojowni, "brak" 0 (LUP-J5); linia
+  "Konie (E6/0)" HorseBook bez reszty niewyjasnionej w dniu bitwy (test tego nie wymusi - zalezy od tego, czy zolnierze powala konnych na padlych koniach).
+- R2: kalibracja progu LUP-J10 - ms na wywolanie w 4 bitwach testu (oczekiwane ponizej 0.05 ms; jesli wyzej przy braku bledow - poprawic prog z uzasadnieniem).
+- R4: brak wplywu na pomiar - linie jezdzcow z "(padl - ...)" dalej wypelnione (ReleaseAgents biegnie po TakeKill).
