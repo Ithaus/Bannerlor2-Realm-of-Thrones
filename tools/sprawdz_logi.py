@@ -1113,7 +1113,7 @@ Uzycie (Python 3, tylko odczyt):
                     TAK, psai TAK, 4 x 6 utworow (lufs17/20/23/26), dlugosci 85-95 s, odrzucone 0 (klucz NIE / log sprzed m109 - INFO); MUZ-1 kazda bitwa ('bitwa - misja')
                     ma 'muzyka gry wyciszona ... teraz <= 0.01', misja nie z listy bez zmian (turniej, arena, kryjowka, spacer, rozmowy; nieznana - INFO), z --crashscribe:
                     bitew = linii 'AUTOTEST BITWA n/N [..]: misja ruszyla' (bitwa dalej po oknie wydarzenia sie nie liczy; bez bitew przy kluczu NIE / logu sprzed m109 -
-                    INFO); MUZ-2 utwory: pod flaga armoury-muzyka-bitwy.flag bitwa >= 8 s ma >= 2 utwory, konce '(test 4 s)',
+                    INFO); MUZ-2 utwory: pod flaga armoury-muzyka-bitwy.flag bitwa >= 15 s ma >= 2 utwory, konce '(test 4 s)',
                     >= 3 rozne; zawsze 0 powtorek z rzedu (takze miedzy bitwami) i kazdy 'grany po 1 s TAK'; MUZ-3 bitwa -> 'koniec bitwy' (koniec misji / wyjscie z kampanii /
                     klucz NIE / okno wydarzenia) -> 'muzyka gry wrocila' przed nastepna bitwa, glosnosc >= zapamietana - 0.01, zapamietana >= 0.95 (okno wydarzenia, po ktorym
                     ta sama misja dalej - m108 'koniec wydarzenia - bitwa dalej' - bez 'wrocila'; log uciety - INFO); MUZ-4
@@ -39946,7 +39946,7 @@ M109MUZ_M108 = "Muzyka (m108): "
 M109MUZ_LEVELS = (17, 20, 23, 26)
 M109MUZ_TRACKS = 6
 M109MUZ_DUR = (85.0, 95.0)
-M109MUZ_MIN_BATTLE_SEC = 8
+M109MUZ_MIN_BATTLE_SEC = 15   # 23.10 test 109c: bitwa przegranej "slaba" - walka 4 s, potem ekran konca (10 s misji, 1 utwor) - 8 s za scisle
 M109MUZ_MIN_TRACKS_TEST = 2
 M109MUZ_MIN_DISTINCT = 3
 M109MUZ_BACK_TOL = 0.01
@@ -40278,7 +40278,7 @@ def m109muz_rows(rep, D):
             probs.append(f"roznych utworow {len(distinct)}")
         rep.add("MUZ-2: utwory po kolei", f"utworow z linia {len(trks)} w {len(bats)} bitwach (pod flaga {len(flagged)}), roznych {len(distinct)}, powtorki {len(reps)}/{rep4}, "
                 f"grany po 1 s NIE {len(no1s)}/{no4}" + (" | " + "; ".join(probs[:3]) if probs else ""),
-                "pod flaga: bitwa >= 8 s ma >= 2 utwory, konce '(test 4 s)', >= 3 rozne; zawsze: 0 powtorek z rzedu, kazdy 'grany po 1 s TAK'",
+                "pod flaga: bitwa >= 15 s ma >= 2 utwory, konce '(test 4 s)', >= 3 rozne; zawsze: 0 powtorek z rzedu, kazdy 'grany po 1 s TAK'",
                 (not probs) if (flagged or trks) else None)
     # MUZ-3 koniec bitwy i powrot muzyki gry
     if not bats:
