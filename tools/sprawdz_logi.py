@@ -1754,6 +1754,23 @@ Uzycie (Python 3, tylko odczyt):
                     M7G-9 ERROR nowych funkcji (takze CartGuard.Guard(woz), CartGuard.Unload, DsTowns.*, NoticeBoard.Export, Watch.WatchImport2), zly format segmentu Wozy, proby
                     niezgodne i BLAD eksportu 0. Klucz liczy sie jako TAK tylko z linii startu: log bez linii m107 (sprzed m107) - progi kluczy INFO, bez wyjatku; werdykt bez
                     klucza dalej daja M7G-11 i M7G-9 oraz progi formatu / czasu / poziomu przy obecnych liniach (M7G-12, M7G-24, M7G-31, M7G-33, M7G-41, M7G-44, M7G-53).
+--grupa m109lup   : (23.10, galaz w-toku/m109-lup - Jeff 22.10 pkt 8 "pokonalem robber squires, bylo dwoch konnych - nie dostalem za nich koni ani
+                    ich pancerzy koni, ani zbroi"; Armoury/src/LootTally.cs, BattlefieldLaw.cs, HorseFate.cs; klucze Fallen Rider Horses Looted, Rider Blow
+                    Spares Harness, Extra Broken Armor Wrecks; plik testu CrashScribe/armoury-lup.flag) python -I tools/sprawdz_logi.py --grupa m109lup
+                    [<Armoury-*.log>] (strumieniowo; bez logu tylko LUP-JS i LUP-JS2). LUP-JS self-test wyrazen wobec linii kontrolnych jak w kodzie C# (start,
+                    bitwa, Send troops, jezdzcy, test, doba), LUP-JS2 test syntetyczny (dobry, zly i bez startu). LUP-J0 linia 'Lup bitwy (m109): start' z latkami
+                    k/n przy k == n (brak - INFO). LUP-J1 ERROR LootTally.*, BattlefieldLaw.ReturnMounts/HoldMounts/MountsFinalizer/AddWreck/TakeQueuedHorse/
+                    FlushMountsToBaggage/SpareHarness/ApplyAll (m109, HorseFate.TakeKill, potkniecia w liniach bitwy i doby, zly format linii - 0. Linia bitwy
+                    'Lup bitwy (m109): bitwa N' wedlug rodzaju (kon, uprzaz, tulow, glowa, rece, nogi, peleryna, bron, pociski, tarcza, inne): LUP-J2 tozsamosc A
+                    z cial (na cialach = lup + cios + pekniete + zastepcze + odrzut + inne), LUP-J3 tozsamosc B kolejka (wczesniej + dzialka + bagaz + send -
+                    padle = lista + sakwy + zwrot + przepadlo + zostaje), LUP-J4 tozsamosc C lista trofeow (na liscie + Spoils wyjal + rezerwa = z kolejki + wraki -
+                    przesiane), przy kluczu konie TAK Spoils wyjal kon = uprzaz = 0 i przetrzymane = wrocone + rezerwa (klucz NIE - INFO, ile przepadlo); kazda
+                    100% bitew. LUP-J5 padle konie powalonych jezdzcow: brak w kolejce i zbrojowni 0 przy HorsesDieOnlyKilled (bez padlych - INFO). LUP-J6 Z2 cios
+                    w uprzaz 0 przy kluczu (bez uprzezy na cialach - INFO). LUP-J7 Z1 pekniete dodatkowo = wraki, niejednoznaczne 0 (suma 0 - INFO). LUP-J8
+                    pokrycie testu (linie 'test - ...' tylko pod flaga): >= 1 bitwa z lupem kon, uprzaz i tulow >= 1, linia jezdzcow z koniem w lupie, konie
+                    z dzialki na liste albo do sakw (lista + sakwy = wejscia - padle, zwrot/przepadlo/zostaje 0); flaga bez pokrycia - NIE, bez flagi - INFO.
+                    LUP-J9 linie doby 'Lup bitew (m109)': Spoils wyjal kon/uprzaz 0 przy kluczu (brak linii - INFO). LUP-J10 pomiar na bitwe <= 20 ms TAK,
+                    <= 50 INFO, > 50 NIE.
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -58405,6 +58422,8 @@ def main(argv):
         return m106wozy_main(logp, tabp, until_arg)   # m106wozy (22.10, w-toku/m106-wozy): woz zawsze wraca (drogi ladowe, brama wroga, pamiec tras, straznik, dosypka przy wyjezdzie) i fach wsi pod KS
     if group == "m107gosp" and logp:
         return m107gosp_main(logp, until_arg)   # m107gosp (22.10, w-toku/m107-gospodarka): biedne wsie (miara M3W-2), stojace wozy (K1), zaleglosci zamkow (K2/K3), ziarno (K4/K5), zapis tablicy (K6)
+    if group == "m109lup":
+        return m109lup_main(logp)   # m109lup (23.10, w-toku/m109-lup): konie, uprzaz i zbroja powalonych jezdzcow w lupie gracza - pomiar LootTally, Z1, Z2, hak testu
     if group == "m105gosp5" and logp:
         return m105gosp5_main(logp)   # m105gosp5 (21.10, m105-gospodarka5): ulga pana dla wsi ponizej skrzyni przy wozie i czynsz darowany do skrzyni (VillageTakings.cs, DsVillage.cs)
     if group == "p6a7" and logp:
@@ -62020,6 +62039,407 @@ def m107gosp_main(logp, until=120):
     print(f"plik: {logp} | tryb {D['mode']} | startow m107 {len(D['start'])}, linii Wozy {len(D['wz'])}, Firm DS {len(D['fz'])}, Planow {len(D['plans'])}, zapisow gry {len(D['save'])}, "
           f"wczytan nb3 {len(D['load3'])} / nb2 {len(D['load2'])}, ERROR {D['err']}")
     m107_rows(rep, D, nks_rows)
+    rep.show()
+    return 0
+
+
+# ---------------- m109lup (23.10, galaz w-toku/m109-lup - Jeff 22.10 pkt 8: "pokonalem robber squires, bylo dwoch konnych - nie dostalem za nich koni ani
+# ich pancerzy koni, ani zbroi"). Armoury/src/LootTally.cs (pomiar lupu bitwy wedlug rodzaju, hak autotestu CrashScribe/armoury-lup.flag), BattlefieldLaw.cs
+# (HoldMounts / ReturnMounts / MountsFinalizer - klucz Fallen Rider Horses Looted, SpareHarness - Z2 Rider Blow Spares Harness, AddWreck - Z1 Extra Broken
+# Armor Wrecks), HorseFate.cs (TakeKill). Stale z prefiksem M109LUP_, wiersze LUP-J* (LUP-1..19 i LUP-B* ma grupa lup - lup miast).
+M109LUP_KINDS = ("kon", "uprzaz", "tulow", "glowa", "rece", "nogi", "peleryna", "bron", "pociski", "tarcza", "inne")
+M109LUP_P = "Lup bitwy (m109): "
+M109LUP_DAYP = "Lup bitew (m109): doba "
+M109LUP_ERR = ("ERROR in LootTally.", "ERROR in BattlefieldLaw.ReturnMounts", "ERROR in BattlefieldLaw.HoldMounts", "ERROR in BattlefieldLaw.MountsFinalizer",
+               "ERROR in BattlefieldLaw.AddWreck", "ERROR in BattlefieldLaw.TakeQueuedHorse", "ERROR in BattlefieldLaw.FlushMountsToBaggage",
+               "ERROR in BattlefieldLaw.SpareHarness", "ERROR in BattlefieldLaw.ApplyAll (m109", "ERROR in HorseFate.TakeKill")
+M109LUP_RX = {
+    "start": re.compile(r"^Lup bitwy \(m109\): start \| klucze FallenRiderHorsesLooted (TAK|NIE), RiderBlowSparesHarness (TAK|NIE), ExtraBrokenArmorWrecks (TAK|NIE) "
+                        r"\(WreckSalvageEnabled (TAK|NIE), HorsesDieOnlyKilled (TAK|NIE)\) \| latki (\d+)/(\d+): (.*?) \| odczyt: (.*)\.$"),
+    "head": re.compile(r"^Lup bitwy \(m109\): bitwa (\d+) \| misja (TAK|NIE), Send troops (TAK|NIE), klucze konie (TAK|NIE)/uprzaz (TAK|NIE)/pekniete (TAK|NIE) "
+                       r"\(wraki (TAK|NIE), konie gina zabite (TAK|NIE)\) \| powaleni przez druzyne (\d+) \(Ty i towarzysze (\d+), zolnierze (\d+)\), konnych (\d+), "
+                       r"bohaterow pominietych (\d+) \| "),
+    "A": re.compile(r" \| z cial \[na cialach/lup/cios/pekniete/zastepcze/odrzut/inne\]: ([^|]*?) \| "),
+    "B": re.compile(r" \| kolejka \[wczesniej/dzialka/bagaz/send/padle/lista/sakwy/zwrot/przepadlo/zostaje\]: ([^|]*?) \| "),
+    "C": re.compile(r" \| lista trofeow \[z kolejki/wraki/przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie\]: ([^|]*?) \| "),
+    "dead": re.compile(r" \| konie padle pod powalonymi: z kolejki (\d+), ze zbrojowni (\d+), poza lupem (\d+), brak (\d+) \| "),
+    "wr": re.compile(r" \| wraki: cios (\d+) \(w uprzaz (\d+)\), pekniete dodatkowo (\d+) -> wraki (\d+), niejednoznaczne (\d+) \| "),
+    "tail": re.compile(r" \| koniec: (.*?) \| pomiar (\d+(?:\.\d+)?) ms \| potkniecia (\d+)\.$"),
+    "riders": re.compile(r"^Lup bitwy \(m109\): jezdzcy bitwy (\d+) - (.*)\.$"),
+    "rhorse": re.compile(r"(?:^|\| )\S+ \([^)]*\): kon \S+ lup\b"),
+    "test": re.compile(r"^Lup bitwy \(m109\): test - wrog (\S+) \(plan (\w+)\): dolozono (\d+) x (\S+) \(kon (\S+), uprzaz (\S+), tulow (\S+)\) "
+                       r"i ich zestaw do zbrojowni DTE bandy: (\d+) szt\. \(odmowy (\d+)\)\.$"),
+    "testno": re.compile(r"^Lup bitwy \(m109\): test - (plan \w+: bez jezdzcow|brak jezdzca z koniem i uprzeza \(.*\))\.$"),
+    "day": re.compile(r"^Lup bitew \(m109\): doba (\d+) \| klucz konie (TAK|NIE) \| bitew (\d+) \(lista trofeow (\d+), sakwy (\d+), zwrot (\d+), inne (\d+)\) "
+                      r"\| konie: z cial (\d+), lup (\d+), dzialka (\d+), na liscie (\d+), do sakw (\d+), Spoils wyjal (\d+), padle zdjete "
+                      r"\(z kolejki/ze zbrojowni/poza lupem/brak\) (\d+)/(\d+)/(\d+)/(\d+) \| uprzaz: z cial (\d+), lup (\d+), cios (\d+), na liscie (\d+), "
+                      r"Spoils wyjal (\d+) \| zbroje ludzi: z cial (\d+), lup (\d+), cios (\d+), pekniete dodatkowo (\d+) -> wraki (\d+) \(niejednoznaczne (\d+)\), "
+                      r"zastepcze (\d+) \| rezerwa do sakw (\d+) \| pomiar (\d+(?:\.\d+)?) ms \| potkniecia (\d+) \(sesja (\d+)\)\.$"),
+}
+# linie kontrolne - napisy jak w kodzie C# (LootTally.ApplyAll, Close, TestRiders, Daily); tozsamosci A/B/C spelnione
+M109LUP_TEST = {
+    "start": "Lup bitwy (m109): start | klucze FallenRiderHorsesLooted TAK, RiderBlowSparesHarness TAK, ExtraBrokenArmorWrecks TAK (WreckSalvageEnabled TAK, "
+             "HorsesDieOnlyKilled TAK) | latki 5/5: Spoils ApplyDamageToLoot TAK, Spoils OnMapEventEnded (rezerwa) TAK, DTE OnAgentRemoved (pomiar) TAK, "
+             "DTE GetRandomArmorByBodyPart (uprzaz, pomiar) TAK, EncounterManager.StartPartyEncounter (test) TAK | odczyt: rekordy DTE TAK, zastepcze sloty TAK, "
+             "czarna lista TAK, Spoils RegisterLuckyElement TAK.",
+    "battle": "Lup bitwy (m109): bitwa 3 | misja TAK, Send troops NIE, klucze konie TAK/uprzaz TAK/pekniete TAK (wraki TAK, konie gina zabite TAK) | powaleni "
+              "przez druzyne 13 (Ty i towarzysze 13, zolnierze 0), konnych 2, bohaterow pominietych 0 | z cial [na cialach/lup/cios/pekniete/zastepcze/odrzut/inne]: "
+              "kon 2/2/0/0/0/0/0, uprzaz 2/2/0/0/0/0/0, tulow 13/10/2/1/0/0/0, bron 20/18/0/0/0/0/2 | kolejka [wczesniej/dzialka/bagaz/send/padle/lista/sakwy/"
+              "zwrot/przepadlo/zostaje]: kon 0/2/0/0/1/1/0/0/0/0, uprzaz 0/2/0/0/0/2/0/0/0/0, tulow 0/10/0/0/0/10/0/0/0/0, bron 0/18/0/0/0/18/0/0/0/0 | lista "
+              "trofeow [z kolejki/wraki/przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: kon 1/0/0/0/1/1/0/1, uprzaz 2/0/0/0/2/2/0/2, "
+              "tulow 10/3/0/0/0/0/0/13, bron 18/0/0/0/0/0/0/18 | konie padle pod powalonymi: z kolejki 1, ze zbrojowni 0, poza lupem 0, brak 0 | wraki: cios 2 "
+              "(w uprzaz 0), pekniete dodatkowo 1 -> wraki 1, niejednoznaczne 0 | koniec: lista trofeow Spoils | pomiar 1.2 ms | potkniecia 0.",
+    "sim": "Lup bitwy (m109): bitwa 4 | misja NIE, Send troops TAK, klucze konie TAK/uprzaz TAK/pekniete TAK (wraki TAK, konie gina zabite TAK) | powaleni "
+           "przez druzyne 0 (Ty i towarzysze 0, zolnierze 0), konnych 0, bohaterow pominietych 0 | z cial [na cialach/lup/cios/pekniete/zastepcze/odrzut/inne]: "
+           "brak | kolejka [wczesniej/dzialka/bagaz/send/padle/lista/sakwy/zwrot/przepadlo/zostaje]: kon 0/0/0/1/0/0/1/0/0/0 | lista trofeow [z kolejki/wraki/"
+           "przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: nie bylo | Send troops - lup DTE z poleglych do zbrojowni wojska: kon 3, tulow 9 | "
+           "konie padle pod powalonymi: z kolejki 0, ze zbrojowni 0, poza lupem 0, brak 0 | wraki: cios 0 (w uprzaz 0), pekniete dodatkowo 0 -> wraki 0, "
+           "niejednoznaczne 0 | koniec: sakwy - Send troops - ekran lupow Spoils po tej bitwie nie przychodzi (oblezenie, morze) | pomiar 0.1 ms | potkniecia 0.",
+    "riders": "Lup bitwy (m109): jezdzcy bitwy 3 - veteran_caravan_guard_battania (Ty, zabity): kon t2_battania_horse lup (padl - z kolejki), uprzaz "
+              "chain_horse_harness lup, tulow stark_armor_1 pekniete->wrak, glowa x_helmet lup | veteran_caravan_guard_battania (Ty, ogluszony): kon "
+              "t2_battania_horse lup, uprzaz chain_horse_harness lup, tulow stark_armor_1 lup.",
+    "test": "Lup bitwy (m109): test - wrog autotest_bitwa_1_231500 (plan mocna): dolozono 6 x veteran_caravan_guard_battania (kon t2_battania_horse, uprzaz "
+            "chain_horse_harness, tulow stark_armor_1) i ich zestaw do zbrojowni DTE bandy: 48 szt. (odmowy 0).",
+    "testno": "Lup bitwy (m109): test - plan odwrot: bez jezdzcow.",
+    "day": "Lup bitew (m109): doba 108700 | klucz konie TAK | bitew 1 (lista trofeow 1, sakwy 0, zwrot 0, inne 0) | konie: z cial 2, lup 2, dzialka 2, na liscie 1, "
+           "do sakw 0, Spoils wyjal 0, padle zdjete (z kolejki/ze zbrojowni/poza lupem/brak) 1/0/0/0 | uprzaz: z cial 2, lup 2, cios 0, na liscie 2, Spoils wyjal 0 "
+           "| zbroje ludzi: z cial 13, lup 10, cios 2, pekniete dodatkowo 1 -> wraki 1 (niejednoznaczne 0), zastepcze 0 | rezerwa do sakw 0 | pomiar 1.2 ms | "
+           "potkniecia 0 (sesja 0).",
+}
+
+
+def m109lup_block(txt, cols):
+    """'kon 2/2/0/0/0/0/0, uprzaz ...' -> {rodzaj: [liczby]}; 'brak' / 'nie bylo' -> {}; zly format -> None."""
+    txt = txt.strip()
+    if txt in ("brak", "nie bylo"):
+        return {}
+    out = {}
+    for part in txt.split(", "):
+        m = re.match(r"^(\w+) (-?\d+(?:/-?\d+)*)$", part)
+        if not m or m.group(1) not in M109LUP_KINDS or m.group(1) in out:
+            return None
+        v = [int(x) for x in m.group(2).split("/")]
+        if len(v) != cols:
+            return None
+        out[m.group(1)] = v
+    return out
+
+
+def m109lup_battle(s):
+    """Linia bitwy -> slownik; None - nie linia bitwy; {'bad': opis} - zly format."""
+    h = M109LUP_RX["head"].match(s)
+    if not h:
+        return None
+    g = h.groups()
+    d = {"n": int(g[0]), "mission": g[1] == "TAK", "sim": g[2] == "TAK", "kh": g[3] == "TAK", "ku": g[4] == "TAK", "kp": g[5] == "TAK", "kw": g[6] == "TAK",
+         "kd": g[7] == "TAK", "felled": int(g[8]), "hero": int(g[9]), "troop": int(g[10]), "riders": int(g[11]), "heroes": int(g[12])}
+    seg = {k: M109LUP_RX[k].search(s) for k in ("A", "B", "C", "dead", "wr", "tail")}
+    miss = [k for k, v in seg.items() if not v]
+    if miss:
+        return {"bad": "bitwa %d: brak segmentu %s" % (d["n"], ",".join(miss))}
+    d["A"] = m109lup_block(seg["A"].group(1), 7)
+    d["B"] = m109lup_block(seg["B"].group(1), 10)
+    d["hasC"] = seg["C"].group(1).strip() != "nie bylo"
+    d["C"] = m109lup_block(seg["C"].group(1), 8)
+    if d["A"] is None or d["B"] is None or d["C"] is None:
+        return {"bad": "bitwa %d: zly blok rodzajow" % d["n"]}
+    d["dead"] = tuple(int(x) for x in seg["dead"].groups())
+    d["wr"] = tuple(int(x) for x in seg["wr"].groups())
+    d["how"] = seg["tail"].group(1)
+    d["ms"] = float(seg["tail"].group(2))
+    d["stum"] = int(seg["tail"].group(3))
+    return d
+
+
+def m109lup_ids(d):
+    """Tozsamosci jednej bitwy -> (lista bledow A, B, C, J4-kluczowych)."""
+    ea, eb, ec, e4 = [], [], [], []
+    for k, v in d["A"].items():
+        if v[0] != sum(v[1:7]):
+            ea.append("bitwa %d %s: na cialach %d != %d" % (d["n"], k, v[0], sum(v[1:7])))
+    for k, v in d["B"].items():
+        if v[0] + v[1] + v[2] + v[3] - v[4] != sum(v[5:10]):
+            eb.append("bitwa %d %s: wejscia %d != wyjscia %d" % (d["n"], k, v[0] + v[1] + v[2] + v[3] - v[4], sum(v[5:10])))
+    if d["hasC"]:
+        for k, v in d["C"].items():
+            if v[7] + v[3] + v[6] != v[0] + v[1] - v[2]:
+                ec.append("bitwa %d %s: na liscie+wyjal+rezerwa %d != %d" % (d["n"], k, v[7] + v[3] + v[6], v[0] + v[1] - v[2]))
+        if d["kh"]:
+            for k in ("kon", "uprzaz"):
+                v = d["C"].get(k)
+                if not v:
+                    continue
+                if v[3] != 0:
+                    e4.append("bitwa %d %s: Spoils wyjal %d" % (d["n"], k, v[3]))
+                if v[4] != v[5] + v[6]:
+                    e4.append("bitwa %d %s: przetrzymane %d != wrocone %d + rezerwa %d" % (d["n"], k, v[4], v[5], v[6]))
+    return ea, eb, ec, e4
+
+
+def m109lup_selftest():
+    """m109lup: wyrazenia wobec linii kontrolnych M109LUP_TEST i tozsamosci na nich. None = OK, inaczej opis."""
+    m = M109LUP_RX["start"].match(M109LUP_TEST["start"])
+    if not m or m.groups()[:7] != ("TAK", "TAK", "TAK", "TAK", "TAK", "5", "5"):
+        return "start: %s" % (m.groups() if m else "brak dopasowania")
+    b = m109lup_battle(M109LUP_TEST["battle"])
+    if not b or b.get("bad"):
+        return "bitwa: %s" % (b.get("bad") if b else "brak dopasowania")
+    if (b["n"], b["felled"], b["hero"], b["riders"], b["dead"], b["wr"], b["how"], b["ms"], b["stum"]) != (3, 13, 13, 2, (1, 0, 0, 0), (2, 0, 1, 1, 0),
+                                                                                                         "lista trofeow Spoils", 1.2, 0):
+        return "bitwa: pola %s" % ((b["n"], b["felled"], b["dead"], b["wr"], b["how"], b["ms"]),)
+    if b["A"].get("tulow") != [13, 10, 2, 1, 0, 0, 0] or b["B"].get("kon") != [0, 2, 0, 0, 1, 1, 0, 0, 0, 0] or b["C"].get("uprzaz") != [2, 0, 0, 0, 2, 2, 0, 2]:
+        return "bitwa: bloki rodzajow"
+    if any(m109lup_ids(b)):
+        return "bitwa: tozsamosci na linii kontrolnej %s" % (m109lup_ids(b),)
+    s = m109lup_battle(M109LUP_TEST["sim"])
+    if not s or s.get("bad") or s["hasC"] or not s["sim"] or s["A"] != {} or s["B"].get("kon") != [0, 0, 0, 1, 0, 0, 1, 0, 0, 0] or any(m109lup_ids(s)):
+        return "bitwa Send troops: %s" % (s.get("bad") if s else "brak dopasowania")
+    r = M109LUP_RX["riders"].match(M109LUP_TEST["riders"])
+    if not r or r.group(1) != "3" or len(M109LUP_RX["rhorse"].findall(r.group(2))) != 2:
+        return "jezdzcy"
+    t = M109LUP_RX["test"].match(M109LUP_TEST["test"])
+    if not t or t.group(2) != "mocna" or t.group(3) != "6" or t.group(8) != "48":
+        return "test: %s" % (t.groups() if t else "brak dopasowania")
+    if not M109LUP_RX["testno"].match(M109LUP_TEST["testno"]):
+        return "test (bez jezdzcow)"
+    dd = M109LUP_RX["day"].match(M109LUP_TEST["day"])
+    if not dd or dd.group(1) != "108700" or dd.group(2) != "TAK" or dd.group(13) != "0" or dd.group(22) != "0" or dd.group(31) != "1.2":
+        return "doba: %s" % (dd.groups() if dd else "brak dopasowania")
+    if m109lup_block("kon 1/2", 7) is not None or m109lup_block("smok 1/1/1/1/1/1/1", 7) is not None or m109lup_block("brak", 7) != {}:
+        return "blok: zly format przechodzi"
+    return None
+
+
+def m109lup_collect(logp):
+    """m109lup: przebieg logu (strumieniowo) -> linie startu, bitew, jezdzcow, testu, doby, bledy."""
+    D = {"start": [], "battles": [], "bad": [], "riders": [], "tests": [], "testno": [], "days": [], "baddays": [], "err": 0, "err1": None}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if any(s.startswith(e) for e in M109LUP_ERR):
+                    D["err"] += 1
+                    D["err1"] = D["err1"] or s[:200]
+                continue
+            if s.startswith(M109LUP_P):
+                body = s[len(M109LUP_P):]
+                if body.startswith("start "):
+                    mm = M109LUP_RX["start"].match(s)
+                    D["start"].append(mm.groups() if mm else None)
+                elif body.startswith("bitwa "):
+                    b = m109lup_battle(s)
+                    if b is None or b.get("bad"):
+                        D["bad"].append(b["bad"] if b else s[:160])
+                    else:
+                        D["battles"].append(b)
+                elif body.startswith("jezdzcy bitwy "):
+                    mm = M109LUP_RX["riders"].match(s)
+                    if mm:
+                        D["riders"].append((int(mm.group(1)), len(M109LUP_RX["rhorse"].findall(mm.group(2)))))
+                    else:
+                        D["bad"].append(s[:160])
+                elif body.startswith("test - "):
+                    mm = M109LUP_RX["test"].match(s)
+                    if mm:
+                        D["tests"].append(mm.groups())
+                    elif M109LUP_RX["testno"].match(s):
+                        D["testno"].append(body[7:120])
+                    else:
+                        D["bad"].append(s[:160])
+                continue
+            if s.startswith(M109LUP_DAYP):
+                mm = M109LUP_RX["day"].match(s)
+                if mm:
+                    D["days"].append(mm.groups())
+                else:
+                    D["baddays"].append(s[:160])
+    return D
+
+
+def m109lup_rows(rep, D):
+    """m109lup: wiersze LUP-J0..LUP-J10 - opis w --help."""
+    B = D["battles"]
+    # LUP-J0 linia startu
+    if not D["start"]:
+        rep.add("LUP-J0: linia 'Lup bitwy (m109): start' (klucze, latki k/n)", "brak linii startu", "latki k == n (brak linii - log sprzed m109 albo BattlefieldLaw wylaczone)", None)
+    else:
+        badf = [x for x in D["start"] if x is None]
+        low = [x for x in D["start"] if x is not None and x[5] != x[6]]
+        last = D["start"][-1]
+        val = "linii %d" % len(D["start"]) + ("" if last is None else ", ostatnia: klucze konie %s, uprzaz %s, pekniete %s (wraki %s, konie gina zabite %s), latki %s/%s"
+                                              % (last[0], last[1], last[2], last[3], last[4], last[5], last[6]))
+        if low:
+            val += " | BRAK latek: " + low[-1][7][:200]
+        rep.add("LUP-J0: linia 'Lup bitwy (m109): start' (klucze, latki k/n)", val + (" | zly format %d" % len(badf) if badf else ""), "latki k == n w kazdej linii", not badf and not low)
+    # LUP-J1 bledy i potkniecia
+    stum = sum(b["stum"] for b in B) + sum(int(d[31]) for d in D["days"])
+    rep.add("LUP-J1: ERROR LootTally.* / BattlefieldLaw (m109) / HorseFate.TakeKill, potkniecia w liniach, zly format linii",
+            "ERROR %d%s, potkniecia (bitwy + doby) %d, zly format linii %d%s, zly format doby %d" % (D["err"], " (" + D["err1"] + ")" if D["err1"] else "", stum, len(D["bad"]),
+                                                                                                  " (" + D["bad"][0] + ")" if D["bad"] else "", len(D["baddays"])),
+            "0 / 0 / 0 / 0", D["err"] == 0 and stum == 0 and not D["bad"] and not D["baddays"])
+    # LUP-J2..J4 tozsamosci
+    ea, eb, ec, e4 = [], [], [], []
+    for b in B:
+        a1, b1, c1, d1 = m109lup_ids(b)
+        ea += a1; eb += b1; ec += c1; e4 += d1
+    if not B:
+        for name in ("LUP-J2: tozsamosc A z cial (na cialach = lup + cios + pekniete + zastepcze + odrzut + inne)",
+                     "LUP-J3: tozsamosc B kolejka (wczesniej + dzialka + bagaz + send - padle = lista + sakwy + zwrot + przepadlo + zostaje)",
+                     "LUP-J4: tozsamosc C lista trofeow i konie poza Spoils"):
+            rep.add(name, "brak linii bitwy", "100% bitew", None)
+    else:
+        rep.add("LUP-J2: tozsamosc A z cial (na cialach = lup + cios + pekniete + zastepcze + odrzut + inne)",
+                "bitew %d, niezgodnych %d%s" % (len(B), len(ea), " (" + "; ".join(ea[:3]) + ")" if ea else ""), "100% bitew, kazdy rodzaj", not ea)
+        rep.add("LUP-J3: tozsamosc B kolejka (wczesniej + dzialka + bagaz + send - padle = lista + sakwy + zwrot + przepadlo + zostaje)",
+                "bitew %d, niezgodnych %d%s" % (len(B), len(eb), " (" + "; ".join(eb[:3]) + ")" if eb else ""), "100% bitew, kazdy rodzaj", not eb)
+        withc = [b for b in B if b["hasC"]]
+        keyed = [b for b in withc if b["kh"]]
+        lost = sum(b["C"].get(k, [0] * 8)[3] for b in withc if not b["kh"] for k in ("kon", "uprzaz"))
+        val = "bitew z lista trofeow %d (klucz konie TAK %d), tozsamosc C niezgodnych %d%s, konie/uprzaz przy kluczu: bledow %d%s | bez klucza Spoils wyjal (przepadlo) %d" % (
+            len(withc), len(keyed), len(ec), " (" + "; ".join(ec[:3]) + ")" if ec else "", len(e4), " (" + "; ".join(e4[:3]) + ")" if e4 else "", lost)
+        if not withc:
+            rep.add("LUP-J4: tozsamosc C lista trofeow i konie poza Spoils", val, "C 100%; klucz TAK: Spoils wyjal kon = uprzaz = 0, przetrzymane = wrocone + rezerwa", None)
+        elif not keyed:
+            rep.add("LUP-J4: tozsamosc C lista trofeow i konie poza Spoils", val, "C 100%; klucz NIE - INFO (ile przepadlo)", None if not ec else False)
+        else:
+            rep.add("LUP-J4: tozsamosc C lista trofeow i konie poza Spoils", val, "C 100%; klucz TAK: Spoils wyjal kon = uprzaz = 0, przetrzymane = wrocone + rezerwa",
+                    not ec and not e4)
+    # LUP-J5 konie padle
+    kd = [b for b in B if b["kd"]]
+    dead = [sum(x) for x in zip(*[b["dead"] for b in kd])] if kd else [0, 0, 0, 0]
+    val = "bitew (konie gina zabite TAK) %d: z kolejki %d, ze zbrojowni %d, poza lupem %d, brak %d" % (len(kd), dead[0], dead[1], dead[2], dead[3])
+    rep.add("LUP-J5: padle konie powalonych jezdzcow zdjete z dzialki (brak w kolejce i zbrojowni)", val, "brak = 0 (bez padlych - INFO)",
+            None if sum(dead) == 0 else dead[3] == 0)
+    # LUP-J6 Z2
+    ku = [b for b in B if b["ku"]]
+    harn = sum(b["A"].get("uprzaz", [0] * 7)[0] for b in ku)
+    hit = sum(b["wr"][1] for b in ku)
+    hit_off = sum(b["wr"][1] for b in B if not b["ku"])
+    val = "bitew z kluczem uprzaz TAK %d (uprzezy na cialach %d), cios w uprzaz %d | bez klucza: cios w uprzaz %d" % (len(ku), harn, hit, hit_off)
+    rep.add("LUP-J6: Z2 - cios w jezdzca nie rozbija ladrow (Rider Blow Spares Harness)", val, "0 przy kluczu TAK (bez uprzezy na cialach albo klucz NIE - INFO)",
+            None if not ku or harn == 0 else hit == 0)
+    # LUP-J7 Z1
+    kp = [b for b in B if b["kp"] and b["kw"]]
+    bad7 = ["bitwa %d: pekniete %d -> wraki %d, niejednoznaczne %d" % (b["n"], b["wr"][2], b["wr"][3], b["wr"][4]) for b in kp if b["wr"][2] != b["wr"][3] or b["wr"][4] != 0]
+    tot = sum(b["wr"][2] + b["wr"][3] + b["wr"][4] for b in kp)
+    val = "bitew z kluczami %d: pekniete dodatkowo %d -> wraki %d, niejednoznaczne %d%s" % (len(kp), sum(b["wr"][2] for b in kp), sum(b["wr"][3] for b in kp),
+                                                                                       sum(b["wr"][4] for b in kp), " | " + "; ".join(bad7[:3]) if bad7 else "")
+    rep.add("LUP-J7: Z1 - dodatkowo peknieta czesc zbroi DTE jako wrak (Extra Broken Armor Wrecks)", val,
+            "pekniete = wraki, niejednoznaczne 0 (suma 0 albo klucze NIE - INFO)", None if not kp or tot == 0 else not bad7)
+    # LUP-J8 pokrycie testu
+    if not D["tests"] and not D["testno"]:
+        rep.add("LUP-J8: pokrycie testu (armoury-lup.flag: jezdzcy wroga - kon, uprzaz, tulow w lupie; konie z dzialki na liste albo do sakw)",
+                "bez linii testu (bieg bez flagi)", "flaga: >= 1 bitwa z lupem kon/uprzaz/tulow >= 1 i linia jezdzcow z koniem w lupie", None)
+    else:
+        cov = [b for b in B if b["A"].get("kon", [0, 0])[1] >= 1 and b["A"].get("uprzaz", [0, 0])[1] >= 1 and b["A"].get("tulow", [0, 0])[1] >= 1]
+        horse_rows = sum(r[1] for r in D["riders"])
+        bad8 = []
+        for b in B:
+            v = b["B"].get("kon")
+            if not v or v[1] < 1:
+                continue
+            if v[7] + v[8] + v[9] != 0 or v[5] + v[6] != v[0] + v[1] + v[2] + v[3] - v[4]:
+                bad8.append("bitwa %d kon: lista %d + sakwy %d, zwrot/przepadlo/zostaje %d/%d/%d" % (b["n"], v[5], v[6], v[7], v[8], v[9]))
+        val = "linii testu: dolozono %d, bez jezdzcow %d | bitew z lupem kon+uprzaz+tulow %d (%s), jezdzcow z koniem w lupie w liniach jezdzcow %d | konie z dzialki: bledow %d%s" % (
+            len(D["tests"]), len(D["testno"]), len(cov), ", ".join("bitwa %d: kon %d, uprzaz %d, tulow %d" % (b["n"], b["A"]["kon"][1], b["A"]["uprzaz"][1], b["A"]["tulow"][1])
+                                                                  for b in cov[:3]), horse_rows, len(bad8), " (" + "; ".join(bad8[:3]) + ")" if bad8 else "")
+        rep.add("LUP-J8: pokrycie testu (armoury-lup.flag: jezdzcy wroga - kon, uprzaz, tulow w lupie; konie z dzialki na liste albo do sakw)", val,
+                ">= 1 bitwa z lupem kon/uprzaz/tulow >= 1, linia jezdzcow z koniem w lupie, konie z dzialki: lista + sakwy = wejscia - padle (flaga bez pokrycia - NIE)",
+                bool(D["tests"]) and bool(cov) and horse_rows >= 1 and not bad8)
+    # LUP-J9 linie doby
+    if not D["days"]:
+        rep.add("LUP-J9: linie doby 'Lup bitew (m109)' - Spoils wyjal kon/uprzaz przy kluczu", "brak linii doby" + (" (zly format %d)" % len(D["baddays"]) if D["baddays"] else ""),
+                "0 przy kluczu TAK (brak linii - INFO)", None if not D["baddays"] else False)
+    else:
+        kday = [d for d in D["days"] if d[1] == "TAK"]
+        wy = sum(int(d[12]) + int(d[21]) for d in kday)
+        wy_off = sum(int(d[12]) + int(d[21]) for d in D["days"] if d[1] != "TAK")
+        val = "linii %d (klucz TAK %d): Spoils wyjal kon+uprzaz przy kluczu %d, bez klucza %d | konie na liscie %d, do sakw %d" % (
+            len(D["days"]), len(kday), wy, wy_off, sum(int(d[10]) for d in D["days"]), sum(int(d[11]) for d in D["days"]))
+        rep.add("LUP-J9: linie doby 'Lup bitew (m109)' - Spoils wyjal kon/uprzaz przy kluczu", val, "0 przy kluczu TAK (klucz NIE - INFO)",
+                None if not kday else wy == 0)
+    # LUP-J10 czas pomiaru
+    if not B:
+        rep.add("LUP-J10: pomiar ms na bitwe", "brak linii bitwy", "<= 20 TAK, <= 50 INFO, > 50 NIE", None)
+    else:
+        mx = max(b["ms"] for b in B)
+        rep.add("LUP-J10: pomiar ms na bitwe", "najwiecej %.1f ms (bitwa %d), srednio %.1f ms" % (mx, max(B, key=lambda b: b["ms"])["n"], sum(b["ms"] for b in B) / len(B)),
+                "<= 20 TAK, <= 50 INFO, > 50 NIE", True if mx <= 20 else (None if mx <= 50 else False))
+
+
+def m109lup_synth():
+    """m109lup - test syntetyczny: dobry, zly i bez startu przez m109lup_collect / m109lup_rows. None = werdykty zgodne z oczekiwanymi, inaczej opis."""
+    import tempfile
+    import shutil
+    T = M109LUP_TEST
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="m109lup_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind != "nostart":
+                L.append(T["start"] if kind != "bad" else T["start"].replace("latki 5/5", "latki 4/5").replace("Spoils ApplyDamageToLoot TAK", "Spoils ApplyDamageToLoot BRAK"))
+            if kind != "nostart":
+                L.append(T["test"])
+                L.append(T["testno"])
+            bt = T["battle"]
+            if kind == "bad":
+                # A: tulow 13 != 10+2+1+1; B: kon wejscia 1, wyjscia 0; C: Spoils wyjal kon 1 przy kluczu; padly kon brak 1; cios w uprzaz 1; pekniete bez wraka; 80 ms
+                bt = (bt.replace("tulow 13/10/2/1/0/0/0", "tulow 13/10/2/1/1/0/0").replace("kon 0/2/0/0/1/1/0/0/0/0", "kon 0/2/0/0/1/0/0/0/0/0")
+                      .replace("kon 1/0/0/0/1/1/0/1", "kon 1/0/0/1/0/0/0/0").replace("poza lupem 0, brak 0", "poza lupem 0, brak 1")
+                      .replace("cios 2 (w uprzaz 0)", "cios 2 (w uprzaz 1)").replace("-> wraki 1, niejednoznaczne 0", "-> wraki 0, niejednoznaczne 2")
+                      .replace("pomiar 1.2 ms", "pomiar 80.0 ms"))
+            if kind == "nostart":
+                L.append(T["sim"])
+            else:
+                L.append(bt)
+                L.append(T["riders"] if kind != "bad" else T["riders"].replace("kon t2_battania_horse lup", "kon t2_battania_horse inne"))
+                L.append(T["sim"])
+            L.append(T["day"] if kind != "bad" else T["day"].replace("Spoils wyjal 0, padle", "Spoils wyjal 2, padle"))
+            if kind == "bad":
+                L.append("ERROR in LootTally.FelledPost: System.Exception: test")
+            open(logp, "w", encoding="utf-8").write("\n".join("[00:00:00] " + x for x in L) + "\n")
+            rep = Report()
+            m109lup_rows(rep, m109lup_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    good, bad, nost = run("good"), run("bad"), run("nostart")
+    exp_good = {"LUP-J0": "TAK", "LUP-J1": "TAK", "LUP-J2": "TAK", "LUP-J3": "TAK", "LUP-J4": "TAK", "LUP-J5": "TAK", "LUP-J6": "TAK", "LUP-J7": "TAK",
+                "LUP-J8": "TAK", "LUP-J9": "TAK", "LUP-J10": "TAK"}
+    exp_bad = {"LUP-J0": "NIE", "LUP-J1": "NIE", "LUP-J2": "NIE", "LUP-J3": "NIE", "LUP-J4": "NIE", "LUP-J5": "NIE", "LUP-J6": "NIE", "LUP-J7": "NIE",
+               "LUP-J8": "NIE", "LUP-J9": "NIE", "LUP-J10": "NIE"}
+    # bez linii startu i testu (log sprzed m109 / bieg bez flagi, tylko Send troops) - J0, J4, J5, J6, J7, J8 INFO; tozsamosci i doba dalej daja werdykt
+    exp_nost = {"LUP-J0": "INFO", "LUP-J1": "TAK", "LUP-J2": "TAK", "LUP-J3": "TAK", "LUP-J4": "INFO", "LUP-J5": "INFO", "LUP-J6": "INFO", "LUP-J7": "INFO",
+                "LUP-J8": "INFO", "LUP-J9": "TAK", "LUP-J10": "TAK"}
+    diff = ["dobry %s: %s (oczekiwane %s)" % (k, good.get(k), v) for k, v in exp_good.items() if good.get(k) != v]
+    diff += ["zly %s: %s (oczekiwane %s)" % (k, bad.get(k), v) for k, v in exp_bad.items() if bad.get(k) != v]
+    diff += ["bez startu %s: %s (oczekiwane %s)" % (k, nost.get(k), v) for k, v in exp_nost.items() if nost.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def m109lup_main(logp):
+    """m109lup (23.10; m109-lup): LUP-JS, LUP-JS2, LUP-J0..LUP-J10 - opis w --help. Strumieniowo; bez logu tylko self-test i test syntetyczny."""
+    rep = Report()
+    s1 = m109lup_selftest()
+    rep.add("LUP-JS: self-test wyrazen (linie kontrolne jak w kodzie C#: start, bitwa, Send troops, jezdzcy, test, doba)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = m109lup_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = "wyjatek %s: %s" % (type(e).__name__, e)
+    rep.add("LUP-JS2: test syntetyczny (dobry, zly i bez startu przez te same funkcje progow)", s2 or "OK", "werdykty zgodne", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("LUP-J0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = m109lup_collect(logp)
+    print("plik: %s | startow %d, bitew %d (zly format %d), linii jezdzcow %d, linii testu %d / %d, dob %d, ERROR %d" % (
+        logp, len(D["start"]), len(D["battles"]), len(D["bad"]), len(D["riders"]), len(D["tests"]), len(D["testno"]), len(D["days"]), D["err"]))
+    m109lup_rows(rep, D)
     rep.show()
     return 0
 
