@@ -2345,6 +2345,8 @@ namespace Armoury
             // dopisanego (MbEvent: lista z wstawianiem na poczatek), wiec WorkshopTradeBehavior (dodany po nas) szedl PRZED przeliczeniem cen
             try { var seed = WorkshopTrade.SeedNewCampaign(); if (seed != null) Log.Info("WorkshopTrade: " + seed); } catch (Exception e) { Log.Error("WorkshopTrade.SeedNewCampaign", e); }
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
+            try { GearState.SessionLine(); } catch (Exception e) { Log.Error("GearState.SessionLine", e); }   // m110-stan (recenzja R3): linia "rynsztunek i sakwy gracza" PO WearGroups.Fix (uprzaz, luki i kusze z grupa) - stan z zapisu, przed wyrownaniem
+            try { ResyncWornStates(); } catch (Exception e) { Log.Error("ResyncWornStates", e); }   // m110-stan (recenzja R6): nazwa i cena sztuk na grzbiecie wedlug ksiegi (progi 80/40/10) - PO WearGroups.Fix
             try { RaceLaw.OnSessionLaunched(); } catch (Exception e) { Log.Error("RaceLaw.OnSessionLaunched", e); }   // Jeff 10.10: postfiks rasy takze na nadpisaniu w modelu slubu, ktory gra uzywa (ROT); linia "Rasy: start sesji"
             try { AiDowry.OnSessionLaunched(); } catch (Exception e) { Log.Error("AiDowry.OnSessionLaunched", e); }   // R3-01c: latka kontraktu BK i przechyl swatow na modelu slubu, ktory gra uzywa (ROT)
             try { SellByCondition.OnSessionLaunched(); } catch (Exception e) { Log.Error("SellByCondition.OnSessionLaunched", e); }   // cena sprzedazy sprzetu: wylacznik kary BK z MCM (PO McmSettings.Apply wyzej) i kontrola "Kara handlowa BK: x5.0"; ksiega skupu od zera
@@ -4060,8 +4062,55 @@ namespace Armoury
             return cond - (100f - GearState.Mid[so]);
         }
 
-        /// <summary>Dobiera modyfikator z wlasnej grupy przedmiotu - im gorszy stan, tym gorszy modyfikator.</summary>
-        private void ApplyModifierForCondition(int slot, float cond)
+        /// <summary>m110-stan (recenzja R6): po wczytaniu (klucz GearFourStates) nazwa i cena sztuk na grzbiecie wedlug ksiegi zuzycia. Zapis 104 trzymal
+        /// sztuki z ksiega 70-80% bez modyfikatora (stary prog ThresholdWorn 70), a podpowiedz "Armoury Stats" liczy stan z ksiegi (progi 80/40/10) - do
+        /// nastepnej bitwy nazwa byla czysta i cena pelna przy "Condition: Damaged". Tylko wpis tej samej sztuki (BookOf - jak GetConditionQuiet); stan
+        /// tylko sie pogarsza (ApplyModifierForCondition), bez komunikatu dla gracza - linie "Zuzycie (m110)" i jedna linia sesji w logu.</summary>
+        private void ResyncWornStates()
+        {
+            if (!GearState.On || _condition == null || Hero.MainHero == null) return;
+            var eq = Hero.MainHero.BattleEquipment;
+            int seen = 0, changed = 0, bad = 0;
+            for (int slot = 0; slot < 12; slot++)
+            {
+                try
+                {
+                    var el = eq[slot];
+                    if (el.Item == null || NoWear(el.Item) || !GearState.Handles(el.Item)) continue;
+                    float cond;
+                    if (!BookOf(slot, el, out cond)) continue;
+                    seen++;
+                    ApplyModifierForCondition(slot, cond, true);
+                    if (eq[slot].ItemModifier != el.ItemModifier) changed++;
+                }
+                catch (Exception e) { if (++bad <= 3) Log.Error("ResyncWornStates(" + slot + ")", e); }
+            }
+            Log.Info("Stany sprzetu (m110): wyrownanie po wczytaniu | sztuk z ksiega " + seen + ", nowy stan " + changed + ", bledy " + bad + ".");
+        }
+
+        /// <summary>m110-stan (recenzja R6): wpis ksiegi TEJ sztuki w slocie (id i - przy jakosci zbroi z kuzni - stan jak SamePiece); stary wpis bez id albo
+        /// inna czesc - false (bez wyrownania). Tylko odczyt.</summary>
+        private bool BookOf(int slot, EquipmentElement cur, out float cond)
+        {
+            cond = 100f;
+            string id = cur.Item != null ? cur.Item.StringId : "";
+            foreach (var c in _condition)
+            {
+                if (string.IsNullOrEmpty(c)) continue;
+                var p = c.Split('|');
+                int sl;
+                if (p.Length < 2 || !int.TryParse(p[0], out sl) || sl != slot) continue;
+                string had = p.Length > 3 ? p[3] : "";
+                if (had.Length == 0 || id.Length == 0 || had != id) return false;
+                if (ArmourQuality.On && !SamePiece(p, cur)) return false;
+                return float.TryParse(p[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out cond);
+            }
+            return false;
+        }
+
+        /// <summary>Dobiera modyfikator z wlasnej grupy przedmiotu - im gorszy stan, tym gorszy modyfikator. quiet - bez komunikatu dla gracza (wyrownanie po
+        /// wczytaniu, m110-stan R6).</summary>
+        private void ApplyModifierForCondition(int slot, float cond, bool quiet = false)
         {
             try
             {
@@ -4089,7 +4138,7 @@ namespace Armoury
                     Log.Info("Zuzycie (m110): slot " + slot + " " + el.Item.StringId + " -> " + gsMod.StringId + " | ksiega "
                              + cond.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%, poczatek " + GearState.Pl[so] + ", liczony "
                              + d.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "% -> " + GearState.Pl[st] + " (byl " + GearState.Pl[was] + ").");
-                    Log.Player(el.Item.Name + " is now " + GearState.En[st] + ".", true);
+                    if (!quiet) Log.Player(el.Item.Name + " is now " + GearState.En[st] + ".", true);
                     return;
                 }
 

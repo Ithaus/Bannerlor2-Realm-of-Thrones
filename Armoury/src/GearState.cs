@@ -37,6 +37,9 @@ namespace Armoury
         internal static readonly float[] Mid = { 100f, 60f, 25f, 5f };
         /// <summary>Progi Jeffa (stale): sprawny d > 80, uszkodzony d > 40, zmasakrowany d >= 10, wrak ponizej.</summary>
         internal const float SoundAbove = 80f, DamagedAbove = 40f, WreckBelow = 10f;
+        /// <summary>Gorna granica wytrzymalosci stanu w punktach procentowych (sprawny 100, uszkodzony 80, zmasakrowany 40, wrak 10) - prog zniszczenia
+        /// sztuki bez wiedzy o dokladnej wytrzymalosci (BelowDestroy).</summary>
+        internal static readonly float[] Upper = { 100f, 80f, 40f, 10f };
         internal static readonly string[] Families = { "plate", "chain", "leather", "cloth", "cloth_unarmoured", "sword", "polearm", "mace", "axe", "cheap_weapon",
                                                         "axe_throwing", "knife_throwing", "spear_dart_throwing", "shield", "bow", "crossbow" };
         private static readonly string[] Suffix = { null, "_damaged", "_mangled", "_wrecked" };
@@ -50,7 +53,12 @@ namespace Armoury
         internal static bool On { get; private set; }
 
         // ---- kopie oryginalow (per MBObjectManager - nowe wczytanie gry tworzy nowe obiekty)
-        private sealed class ModOrig { public TextObject Name; public float Price; }
+        private sealed class ModOrig
+        {
+            public TextObject Name; public float Price;
+            public int Damage, Speed, MissileSpeed, Armor; public short HitPoints;   // recenzja R2: statystyki z XML (wracaja tylko, gdy Stats)
+            public bool Stats;
+        }
         private sealed class GroupOrig { public List<ItemModifier> Mods; public List<(ItemModifier, float)> Loot, Prod; }
         private static object _mgr;
         private static readonly Dictionary<ItemModifier, ModOrig> _modOrig = new Dictionary<ItemModifier, ModOrig>();
@@ -69,6 +77,9 @@ namespace Armoury
         private static FieldInfo _fMods, _fLoot, _fProd;
         private static MethodInfo _setName, _setPrice;
         private static FieldInfo _fName, _fPrice;
+        // recenzja R2: setery statystyk (Damage, Speed, MissileSpeed, Armor, HitPoints) - stary zly modyfikator rodziny dostaje statystyki arm_* swojego stanu
+        private static readonly string[] StatProps = { "Damage", "Speed", "MissileSpeed", "Armor", "HitPoints" };
+        private static MethodInfo[] _setStat;
 
         // ------------------------------------------------------------ stany
         /// <summary>Stan wedlug pozostalej wytrzymalosci d (procent puli): 0 sprawny (d > 80), 1 uszkodzony (40 &lt; d &lt;= 80), 2 zmasakrowany (10 &lt;= d &lt;= 40), 3 wrak.</summary>
@@ -203,6 +214,17 @@ namespace Armoury
             return m != null && _origin.TryGetValue(m, out o) ? o : 0;
         }
 
+        /// <summary>Recenzja R7: sztuka ponizej progu zniszczenia min (LootMinConditionPercent) bez wiedzy o dokladnej wytrzymalosci - przy stanach caly
+        /// przedzial stanu musi lezec na progu albo nizej (wrak dopiero od progu 10 - jak 104, gdzie wrak kosztowal 0.10; cena wraku 0.05 nie niszczy go juz
+        /// przy progu 5-9); inne modyfikatory - cena x 100 &lt;= min jak dotad. Czesc z ciala z ksiega obrazen niszczy LootWear wedlug d.</summary>
+        internal static bool BelowDestroy(ItemModifier m, int min)
+        {
+            if (m == null || min <= 0) return false;
+            int s = Shown(m);
+            if (s > 0) return Upper[s] <= min + 0.01f;
+            return m.PriceMultiplier * 100f <= min + 0.01f;
+        }
+
         // ------------------------------------------------------------ start sesji
         /// <summary>PRZED LootPrices.Apply: nowy MBObjectManager - kopie od zera; ten sam (nowa sesja w tym samym zestawie obiektow) - powrot do oryginalu,
         /// zeby LootPrices i Apply liczyly od stanu z XML.</summary>
@@ -223,7 +245,32 @@ namespace Armoury
         private static void Capture(ItemModifier m)
         {
             if (m == null || _modOrig.ContainsKey(m)) return;
-            _modOrig[m] = new ModOrig { Name = m.Name, Price = m.PriceMultiplier };
+            _modOrig[m] = new ModOrig { Name = m.Name, Price = m.PriceMultiplier, Damage = m.Damage, Speed = m.Speed, MissileSpeed = m.MissileSpeed, Armor = m.Armor, HitPoints = m.HitPoints };
+        }
+
+        /// <summary>Recenzja R2: statystyki modyfikatora (wszystkie 5 seterow albo nic). false - setery nie pasuja.</summary>
+        private static bool SetStats(ItemModifier m, int damage, int speed, int missileSpeed, int armor, short hitPoints)
+        {
+            if (_setStat == null) return false;
+            foreach (var s in _setStat) if (s == null) return false;
+            _setStat[0].Invoke(m, new object[] { damage });
+            _setStat[1].Invoke(m, new object[] { speed });
+            _setStat[2].Invoke(m, new object[] { missileSpeed });
+            _setStat[3].Invoke(m, new object[] { armor });
+            _setStat[4].Invoke(m, new object[] { hitPoints });
+            return true;
+        }
+
+        /// <summary>Recenzja R2: stary zly modyfikator rodziny (dull_sword, rusty_plate, chain_damage_95...) dostaje statystyki arm_* swojego stanu - jeden
+        /// stan w nazwie = jedne statystyki (szybkosc, wytrzymalosc tarczy, pocisk; pancerz i obrazenia przy wylaczonym ConditionScalesStats). Oryginal w kopii
+        /// (Restore). false - setery nie pasuja albo brak kopii.</summary>
+        private static bool AlignStats(ItemModifier m, ItemModifier canon)
+        {
+            ModOrig o;
+            if (m == null || canon == null || !_modOrig.TryGetValue(m, out o)) return false;
+            if (!SetStats(m, canon.Damage, canon.Speed, canon.MissileSpeed, canon.Armor, canon.HitPoints)) return false;
+            o.Stats = true;
+            return true;
         }
 
         private static float OrigPrice(ItemModifier m)
@@ -271,6 +318,8 @@ namespace Armoury
             _setPrice = AccessTools.PropertySetter(typeof(ItemModifier), "PriceMultiplier");
             _fName = _setName == null ? AccessTools.Field(typeof(ItemModifier), "<Name>k__BackingField") : null;
             _fPrice = _setPrice == null ? AccessTools.Field(typeof(ItemModifier), "<PriceMultiplier>k__BackingField") : null;
+            _setStat = new MethodInfo[StatProps.Length];
+            for (int i = 0; i < StatProps.Length; i++) _setStat[i] = AccessTools.PropertySetter(typeof(ItemModifier), StatProps[i]);   // recenzja R2 (brak - statystyki bez zmian)
             return _fMods != null && _fLoot != null && _fProd != null && (_setName != null || _fName != null) && (_setPrice != null || _fPrice != null);
         }
 
@@ -280,7 +329,13 @@ namespace Armoury
             if (_modOrig.Count == 0 && _groupOrig.Count == 0) return;
             if (!Reflect()) return;
             foreach (var kv in _modOrig)
-                try { SetNamePrice(kv.Key, kv.Value.Name, kv.Value.Price); } catch (Exception e) { Stumble("GearState.Restore(mod)", e); }
+                try
+                {
+                    var o = kv.Value;
+                    SetNamePrice(kv.Key, o.Name, o.Price);
+                    if (o.Stats && SetStats(kv.Key, o.Damage, o.Speed, o.MissileSpeed, o.Armor, o.HitPoints)) o.Stats = false;   // recenzja R2: tylko zmienione
+                }
+                catch (Exception e) { Stumble("GearState.Restore(mod)", e); }
             foreach (var kv in _groupOrig)
                 try { SetGroup(kv.Key, kv.Value.Mods, kv.Value.Loot, kv.Value.Prod); } catch (Exception e) { Stumble("GearState.Restore(grupa)", e); }
         }
@@ -338,7 +393,7 @@ namespace Armoury
                 for (int f = 0; f < Families.Length; f++)
                     for (int st = Damaged; st <= Wrecked; st++) { _state[arm[f, st]] = st; _origin[arm[f, st]] = 1; }
 
-                int swapped = 0, nDam = 0, nMan = 0, nWr = 0;
+                int swapped = 0, nDam = 0, nMan = 0, nWr = 0, nStat = 0;
                 var skipped = new List<string>();
                 var failed = new List<string>();
                 for (int f = 0; f < Families.Length; f++)
@@ -364,6 +419,7 @@ namespace Armoury
                             if (st == Wrecked) _hadWreck.Add(g);
                             if (byState[st] == null || p > OrigPrice(byState[st])) byState[st] = m;
                             SetNamePrice(m, new TextObject(NameText[st]), Value[st]);
+                            if (AlignStats(m, arm[f, st])) nStat++;   // recenzja R2: statystyki arm_* tego stanu (rl_* i companion - wspolne dla rodzin, bez zmian)
                         }
                         _oldByState[g] = byState;
                         var a1 = arm[f, Damaged];
@@ -429,7 +485,8 @@ namespace Armoury
                   .Append(" | kontrola: ").Append(check)
                   .Append(" | lup z obrazen ").Append(s.LootStateFromWounds && s.BattlefieldLawEnabled ? "TAK" : "NIE")
                   .Append(" (latki DTE ").Append(BattlefieldLaw.LootWiredCount).Append("/2, Spoils lucky ").Append(BattlefieldLaw.LuckyFound ? "TAK" : "NIE").Append(')')
-                  .Append(" | potkniecia ").Append(_stumbles).Append('.');
+                  .Append(" | potkniecia ").Append(_stumbles)
+                  .Append(" | statystyki starych zlych jak arm_* ").Append(nStat).Append('/').Append(nDam + nMan + nWr).Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e)
@@ -442,6 +499,12 @@ namespace Armoury
                 _state.Clear(); _origin.Clear(); _canon.Clear(); _oldByState.Clear(); _hadWreck.Clear();
                 return;
             }
+        }
+
+        /// <summary>Recenzja R3: linia "rynsztunek i sakwy gracza" PO WearGroups.Fix (ArmouryBehavior.OnSessionLaunched) - dopiero wtedy uprzaz, luki i kusze bez
+        /// grupy w XML maja grupe i sa liczone (jak w linii "zapis"); dotad linia z Apply pomijala je i STAN-LC dawal falszywe NIE.</summary>
+        internal static void SessionLine()
+        {
             try { GearLine("rynsztunek i sakwy gracza"); } catch (Exception e) { Stumble("GearState.GearLine", e); }
         }
 
