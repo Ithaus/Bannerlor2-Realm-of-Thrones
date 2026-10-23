@@ -988,6 +988,18 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool WreckSalvageEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Fallen Rider Horses Looted", HintText = "horses and horse harness from the foes you bring down reach your trophies: Spoils of War took every horse and every harness off the trophy list for its baggage train, which stays closed in this mod, so they were lost. Now they stay on the trophy list - a horse as it was under its rider, harness battle-worn like other armour - or go to your baggage when no trophy list comes. A horse killed in the battle never comes to you: it is taken out of your share, not out of your own horses. 'Send troops' too (off = as before: lost)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool FallenRiderHorsesLooted { get; set; } = true;
+
+        [SettingPropertyBool("Rider Blow Spares Harness", HintText = "the blow that brings a rider down breaks a piece of his own armour, never his horse's barding - before, heavy chain barding often outweighed his mail, so an arrow in the rider's chest wrecked the barding instead (off = as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool RiderBlowSparesHarness { get; set; } = true;
+
+        [SettingPropertyBool("Extra Broken Armor Wrecks", HintText = "the second piece of armour that Dynamic Troop Equipment counts as broken on a fallen foe of tier 3 and up (a quarter to over half of them) is not lost: it comes to your loot as a wreck, like the piece smashed by the killing blow - only for foes your party brought down (needs Wreck Salvage Enabled; off = as before: it vanishes)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool ExtraBrokenArmorWrecks { get; set; } = true;
+
         [SettingPropertyInteger("Loot Min Condition Percent", 0, 12, "0", HintText = "gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public int LootMinConditionPercent { get; set; } = 3;
@@ -9530,6 +9542,9 @@ namespace Armoury
             s.LootIsTransfer = LootIsTransfer;
             s.SendTroopsOneLoot = SendTroopsOneLoot;
             s.WreckSalvageEnabled = WreckSalvageEnabled;
+            s.FallenRiderHorsesLooted = FallenRiderHorsesLooted;
+            s.RiderBlowSparesHarness = RiderBlowSparesHarness;
+            s.ExtraBrokenArmorWrecks = ExtraBrokenArmorWrecks;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
             s.LegendarySweepLazy = LegendarySweepLazy;
