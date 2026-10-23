@@ -76,7 +76,7 @@ namespace Armoury
         {
             public int N;
             public bool Test, Done;
-            public int Agents, WithCopies, MismHeroes, MismSlots, Copies, Neutral, Clipped, Horse, Lines, Stumbles, TestLines;
+            public int Agents, WithCopies, MismHeroes, MismSlots, Copies, Neutral, Clipped, Horse, Lines, Stumbles, TestLines, WearAgents, WearSkipped;
         }
 
         private static readonly RefEq<ItemModifier> ModCmp = new RefEq<ItemModifier>();
@@ -119,6 +119,24 @@ namespace Armoury
             if (m == null || reg.Count == 0 || !reg.TryGetValue(m, out ci)) return false;
             orig = ci.Orig; d = ci.D;
             return true;
+        }
+
+        /// <summary>Ksiega ciosow misji agenta towarzysza zarejestrowanego do zuzycia (FieldCraft.LedgerOf); null - inny agent albo klucz CompanionGearWear NIE.</summary>
+        internal static float[] LedgerOf(Agent a)
+        {
+            var reg = _agents;
+            AgentInfo ai;
+            if (a == null || reg.Count == 0 || !reg.TryGetValue(a, out ai)) return null;
+            return ai.Hits;
+        }
+
+        /// <summary>Bohater agenta druzyny gracza w tej misji (umiejetnosc strzelca w FieldCraft); null - inny agent.</summary>
+        internal static Hero HeroOf(Agent a)
+        {
+            var reg = _agents;
+            AgentInfo ai;
+            if (a == null || reg.Count == 0 || !reg.TryGetValue(a, out ai)) return null;
+            return ai.Hero;
         }
 
         /// <summary>Oryginal kopii (GearState.Of: nazwa, cena i stan kopii jak oryginalu); null - kopia neutralna (sprawna).</summary>
@@ -218,11 +236,14 @@ namespace Armoury
             return s != null && s.WornExactHpProtection && s.ConditionScalesStats && GearState.On;
         }
 
-        /// <summary>Postfiks Agent.InitializeSpawnEquipment: kopie modyfikatorow sztuk bohatera druzyny gracza z dokladnym HP (klon sprzetu agenta), linia bitwy.</summary>
+        /// <summary>Postfiks Agent.InitializeSpawnEquipment: kopie modyfikatorow sztuk bohatera druzyny gracza z dokladnym HP (klon sprzetu agenta), rejestracja
+        /// agenta towarzysza do zuzycia z trafien (CompanionGearWear - klucze niezalezne), linia bitwy.</summary>
         private static void Spawned(Agent agent)
         {
             var s = Settings.Current;
-            if (agent == null || !ProtOn(s) || Campaign.Current == null) return;
+            bool prot = ProtOn(s);
+            bool wearOn = HeroBook.On;
+            if (agent == null || (!prot && !wearOn) || Campaign.Current == null) return;
             var m = agent.Mission ?? Mission.Current;
             if (!Battle(m)) return;
             var eq = agent.SpawnEquipment;
@@ -239,7 +260,7 @@ namespace Armoury
             var t = _t;
             if (t == null) return;
             bool player = hero == Hero.MainHero;
-            bool test = player && _test;
+            bool test = player && _test && prot;
             var beh = player ? ArmouryBehavior.Instance : null;
             if (!_heroes.Contains(hero)) _heroes.Add(hero);
             t.Agents++;
@@ -255,7 +276,7 @@ namespace Armoury
                     var hel = heq[slot];
                     if (el.Item != hel.Item || !ReferenceEquals(el.ItemModifier, hel.ItemModifier)) { mism++; continue; }   // lord RBM, oblezenie bez konia, inny stroj
                     ai.Match[slot] = true;
-                    if (el.Item == null || ArmouryBehavior.NoWear(el.Item) || !GearState.Handles(el.Item)) continue;
+                    if (!prot || el.Item == null || ArmouryBehavior.NoWear(el.Item) || !GearState.Handles(el.Item)) continue;
                     var cur = el.ItemModifier;
                     if (cur != null && _copies.ContainsKey(cur)) continue;   // juz kopia (drugie wejscie tego samego sprzetu)
                     int st = GearState.Of(cur);
@@ -274,7 +295,7 @@ namespace Armoury
                     {
                         if (beh == null || !beh.WornExactD(slot, out d)) continue;
                     }
-                    else continue;
+                    else if (!HeroBook.ExactD(hero, slot, el, out d)) continue;   // towarzysz: ksiega tej sztuki (CompanionGearWear)
                     bool clipped;
                     d = Clip(d, st, out clipped);
                     if (!test && SameAsState(d, st)) continue;   // wynik jak ze stanu - bez kopii
@@ -285,6 +306,14 @@ namespace Armoury
                     put.Add(new KeyValuePair<int, ItemModifier>(slot, copy));
                 }
                 catch (Exception e) { Stumble("HeroHp.Spawn(" + slot + ")", e); }
+            }
+            // zuzycie z trafien (CompanionGearWear): towarzysz, ktory nosi w bitwie swoja zbroje (gniazda 5-9 zgodne) - czego nie nosi, to sie nie zuzywa
+            if (!player && wearOn)
+            {
+                bool armour = true;
+                for (int sl = 5; sl <= 9; sl++) if (!ai.Match[sl]) { armour = false; break; }
+                if (armour) { ai.Hits = new float[12]; t.WearAgents++; }
+                else t.WearSkipped++;
             }
             // rejestr najpierw (odczyty na innych watkach widza kopie od razu z jej d), potem kopie do klonu sprzetu agenta
             if (ai.Copies.Count > 0)
@@ -554,6 +583,39 @@ namespace Armoury
             int leaks = 0;
             var reg = _copies;
             var dead = Campaign.Current != null ? Campaign.Current.DeadBattleEquipment : null;
+            // zuzycie towarzyszy (CompanionGearWear): ksiegi ciosow misji do HeroBook (tylko gniazda zgodne); hak testu - syntetyczne trafienia (+600 pkt w tulow,
+            // +10 pkt w pierwsza bron) dla kazdego zarejestrowanego towarzysza: zuzycie, zmiana stanu i ciaglosc w kolejnych bitwach
+            float pts = 0f;
+            foreach (var kv in _agents)
+            {
+                var ai = kv.Value;
+                if (ai.Hits == null) continue;
+                try
+                {
+                    if (t.Test)
+                    {
+                        var heq = ai.Hero.BattleEquipment;
+                        var sb = new StringBuilder(P + "test - syntetyczne trafienia " + ai.Hero.Name + ":");
+                        int n = 0;
+                        if (ai.Match[(int)EquipmentIndex.Body] && heq[(int)EquipmentIndex.Body].Item != null)
+                        { ai.Hits[(int)EquipmentIndex.Body] += 600f; sb.Append(" slot 6 +600 pkt"); n++; }
+                        for (int w = 0; w < 4; w++)
+                        {
+                            var it = heq[w].Item;
+                            if (!ai.Match[w] || it == null || ArmouryBehavior.NoWear(it) || !GearState.Handles(it)) continue;
+                            ai.Hits[w] += 10f;
+                            sb.Append(n > 0 ? "," : "").Append(" slot ").Append(w).Append(" +10 pkt");
+                            n++;
+                            break;
+                        }
+                        if (n == 0) sb.Append(" brak sztuk");
+                        Log.Info(sb.Append('.').ToString());
+                    }
+                    for (int i = 0; i < 12; i++) pts += ai.Hits[i];
+                    HeroBook.AddHits(ai.Hero, ai.Hits, ai.Match);
+                }
+                catch (Exception e) { Stumble("HeroHp.Hits", e); }
+            }
             foreach (var h in _heroes)
             {
                 try
@@ -573,8 +635,9 @@ namespace Armoury
                 catch (Exception e) { Stumble("HeroHp.Leaks", e); }
             }
             Log.Info(P + "koniec bitwy " + t.N + " | bohaterow z agentem " + t.Agents + ", z kopiami " + t.WithCopies + ", niezgodny sprzet " + t.MismHeroes + " (sloty "
-                     + t.MismSlots + ") | kopii " + t.Copies + " (neutralnych " + t.Neutral + ", przycietych " + t.Clipped + ", kon agenta " + t.Horse + ") | przecieki "
-                     + leaks + " | test " + (t.Test ? "TAK" : "NIE") + " (linii " + t.TestLines + ") | potkniecia " + t.Stumbles + ".");
+                     + t.MismSlots + ") | kopii " + t.Copies + " (neutralnych " + t.Neutral + ", przycietych " + t.Clipped + ", kon agenta " + t.Horse + ") | zuzycie towarzyszy: "
+                     + "agentow " + t.WearAgents + " (bez zgodnej zbroi " + t.WearSkipped + "), pkt " + pts.ToString("0.0", CI) + " | przecieki " + leaks + " | test "
+                     + (t.Test ? "TAK" : "NIE") + " (linii " + t.TestLines + ") | potkniecia " + t.Stumbles + ".");
             Clear();
         }
 
@@ -590,10 +653,13 @@ namespace Armoury
                 var beh = ArmouryBehavior.Instance;
                 if (beh != null && Hero.MainHero != null)
                     for (int slot = 0; slot < 12; slot++) { float d; if (beh.WornExactD(slot, out d)) pl++; }
+                int h, k, e, bad;
+                HeroBook.Stats(out h, out k, out e, out bad);
                 Log.Info(P + "start | ochrona z HP " + YN(prot) + " (WornExactHpProtection " + YN(s.WornExactHpProtection) + ", GearFourStates " + YN(GearState.On)
-                         + ", ConditionScalesStats " + YN(s.ConditionScalesStats) + "), zuzycie towarzyszy NIE | latka Agent.InitializeSpawnEquipment " + PatchState()
-                         + " | ksiega gracza: sztuk z HP " + pl + " | ksiegi towarzyszy: bohaterow 0 (w druzynie 0), sztuk 0, bledne wiersze 0 | " + Curve(s)
-                         + " | potkniecia " + _stumbles + ".");
+                         + ", ConditionScalesStats " + YN(s.ConditionScalesStats) + "), zuzycie towarzyszy " + YN(HeroBook.On) + " (CompanionGearWear "
+                         + YN(s.CompanionGearWear) + ", WearEnabled " + YN(s.WearEnabled) + ") | latka Agent.InitializeSpawnEquipment " + PatchState()
+                         + " | ksiega gracza: sztuk z HP " + pl + " | ksiegi towarzyszy: bohaterow " + h + " (w druzynie " + k + "), sztuk " + e + ", bledne wiersze " + bad
+                         + " | " + Curve(s) + " | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("HeroHp.StartLine", e); }
         }

@@ -251,7 +251,7 @@ namespace Armoury
                 var beh = ArmouryBehavior.Instance;
                 if (beh == null || !beh.WornExactD(slot, out d)) return -1f;
             }
-            else return -1f;
+            else if (!HeroBook.ExactD(hero, slot, el, out d)) return -1f;   // towarzysz: ksiega tej sztuki (CompanionGearWear)
             bool clipped;
             return HeroHp.Clip(d, st, out clipped);
         }

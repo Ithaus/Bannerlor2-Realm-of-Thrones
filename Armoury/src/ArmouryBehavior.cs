@@ -731,7 +731,7 @@ namespace Armoury
         private readonly bool _r4MurReset = R4MurReset();
         private static bool R4MurReset() { WallTribute.Reset(); FreeFolkRaids.Reset(); return true; }
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); WarFront.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); CartRisk.Reset(); CartGuard.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); StragglersRally.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); DayProfile.Reset(); SkillLedger.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); PackSources.Reset(); AlleyProbe.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); SlaughterHides.Reset(); WorkshopInputsFix.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); DistrictRaid.Reset(); MapVillageLore.Reset(); VillageHolders.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); CitySack.Reset(); PeopleScale.Reset(); VillageByPeople.Reset(); PeopleMarket.Reset(); PeopleLevy.Reset(); GoodsRates.Reset(); GoodsPaths.Reset(); TownInns.Reset(); BulkUnit.Reset(); NightEcon.Reset(); GentryNames.Reset(); FiefGrants.Reset(); ReaverLaw.Reset(); DoomedPartyMen.Reset(); UniqueShelf.Reset(); OthersDuel.Reset(); A17Diag.Reset(); SiegeRansom.Reset(); VineOlive.Reset(); DayHeld.Reset(); FallenCrown.Reset(); RockGold.Reset(); DragonFeed.Reset(); MercTenure.Reset(); RansomRepeat.Reset(); PeaceHold.Reset(); TaxCounterGuard.Reset(); CaptiveArmory.Reset(); VetKit.Reset(); GearFit.Reset(); CaravanGoods.Reset(); TownToll.Reset(); CourtGoods.Reset(); MenUpgradeOrders.Reset(); DailyLife.Reset(); DsVillage.Reset(); DsTowns.Reset(); DsSeason.Reset(); StartCalibration.Reset(); KsFoodCarts.Reset(); RoadsideInns.Reset(); Rumours.Reset(); InnDrink.Reset(); TownInns.RoadDayReset(); SideVillageFief.Reset(); VillageClimate.Reset(); ForcedMarch.Reset(); ArmyRestDay.Reset(); HeroHp.Reset(); }
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); WarFront.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); CartRisk.Reset(); CartGuard.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); StragglersRally.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); DayProfile.Reset(); SkillLedger.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); PackSources.Reset(); AlleyProbe.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); SlaughterHides.Reset(); WorkshopInputsFix.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); DistrictRaid.Reset(); MapVillageLore.Reset(); VillageHolders.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); CitySack.Reset(); PeopleScale.Reset(); VillageByPeople.Reset(); PeopleMarket.Reset(); PeopleLevy.Reset(); GoodsRates.Reset(); GoodsPaths.Reset(); TownInns.Reset(); BulkUnit.Reset(); NightEcon.Reset(); GentryNames.Reset(); FiefGrants.Reset(); ReaverLaw.Reset(); DoomedPartyMen.Reset(); UniqueShelf.Reset(); OthersDuel.Reset(); A17Diag.Reset(); SiegeRansom.Reset(); VineOlive.Reset(); DayHeld.Reset(); FallenCrown.Reset(); RockGold.Reset(); DragonFeed.Reset(); MercTenure.Reset(); RansomRepeat.Reset(); PeaceHold.Reset(); TaxCounterGuard.Reset(); CaptiveArmory.Reset(); VetKit.Reset(); GearFit.Reset(); CaravanGoods.Reset(); TownToll.Reset(); CourtGoods.Reset(); MenUpgradeOrders.Reset(); DailyLife.Reset(); DsVillage.Reset(); DsTowns.Reset(); DsSeason.Reset(); StartCalibration.Reset(); KsFoodCarts.Reset(); RoadsideInns.Reset(); Rumours.Reset(); InnDrink.Reset(); TownInns.RoadDayReset(); SideVillageFief.Reset(); VillageClimate.Reset(); ForcedMarch.Reset(); ArmyRestDay.Reset(); }
 
         // inwest (noc 17/18.10): stan kampanii zajec wiosek, ikon i prac okregu od zera przy kazdym nowym zachowaniu (jak Reset w konstruktorze; osobna linia - bez zmiany
         // wspolnej linii konstruktora, ktora dopisuja inne paczki)
@@ -743,6 +743,9 @@ namespace Armoury
         // f9-predkosc: liczniki linii "Predkosc mapy (f9)" od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _f9Reset = F9Reset();
         private static bool F9Reset() { try { MapSpeedProfile.Reset(); } catch (Exception e) { Log.Error("F9Reset", e); } return true; }
+        // m110-stan krok 2: rejestry misji ochrony z dokladnego HP i ksiegi sprzetu towarzyszy od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
+        private readonly bool _m110HpReset = M110HpReset();
+        private static bool M110HpReset() { try { HeroHp.Reset(); HeroBook.Reset(); } catch (Exception e) { Log.Error("M110HpReset", e); } return true; }
         // r4-przetop: skrzynka resztek przetopu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _r4ScrapsReset = R4ScrapsReset();
         private static bool R4ScrapsReset() { try { SmeltScraps.Reset(); } catch (Exception e) { Log.Error("R4ScrapsReset", e); } return true; }
@@ -1134,6 +1137,15 @@ namespace Armoury
                 }
                 catch (Exception e) { Log.Error("SaveSize.Note", e); }
             if (dataStore.IsSaving) GearState.SaveLine();   // m110-stan: linia "Stany sprzetu (m110): zapis" - tylko pod flaga testu stanu (zgodnosc po wczytaniu)
+            // m110-stan krok 2 (CompanionGearWear): ksiegi dokladnej wytrzymalosci sprzetu towarzyszy - osobny klucz; zapis tylko przy kluczu i ksiegach (inaczej klucza
+            // w zapisie nie ma); stary zapis bez klucza = ksiegi puste (start od stanu); DLL 104 klucz pomija; arm_condition gracza bez zmian formatu
+            try
+            {
+                string heroBook = dataStore.IsSaving ? HeroBook.Export() : null;
+                if (dataStore.IsLoading || heroBook != null) SaveText.Sync(dataStore, "arm_condition_heroes", ref heroBook);
+                if (dataStore.IsLoading) HeroBook.Import(heroBook);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_condition_heroes", e); }
             // ZB-1 (noc 17/18.10): rozbicie ksiegi gracza na egzemplarze (id|mod -> ile) - wlasny try, PO arm_player_stock (przyciecie do ksiegi id); brak klucza
             // (stary zapis) = puste rozbicie i migracja przy pierwszym porzadku; starsza DLL klucz pomija; klucz ArmouryBookPerModifier wylaczony - zapis pusty
             try
@@ -3151,6 +3163,7 @@ namespace Armoury
                     {
                         float stale = FieldCraft.DropLedger();
                         if (stale > 0.01f) Log.Info("Zuzycie (E8/A): poczatek bitwy - ksiega ciosow wyzerowana, " + stale.ToString("0.0") + " pkt sprzed tej bitwy przepada (rynsztunek bez zmian).");
+                        HeroBook.DropLedgers("poczatek bitwy");   // m110-stan krok 2 (CompanionGearWear): ksiegi ciosow towarzyszy - ta sama regula
                     }
                 }
                 catch (Exception e) { Log.Error("OnMapEventStarted.DropLedger", e); }
@@ -3192,6 +3205,7 @@ namespace Armoury
                         {
                             float lostWear = FieldCraft.DropLedger();
                             if (lostWear > 0.01f) Log.Info("Zuzycie (E8/A): bitwa przegrana albo opuszczona - " + lostWear.ToString("0.0") + " pkt z ksiegi ciosow przepada (kleska nie obija, jak dotad).");
+                            HeroBook.DropLedgers("bitwa przegrana albo opuszczona");   // m110-stan krok 2: towarzysze jak gracz
                         }
                     }
                     catch (Exception e) { Log.Error("OnMapEventEnded.DropLedger", e); }
@@ -3254,6 +3268,8 @@ namespace Armoury
                     Log.Info("Bitwa zakonczona (auto): obrazenia " + damage + ", zuzycie " + wear.ToString("0.0"));
                     ApplyWear(wear);
                 }
+                // m110-stan krok 2 (CompanionGearWear): sprzet towarzyszy z ich ksiag ciosow (misja) - te same reguly co gracz; autobitwa bez trafien - bez zuzycia
+                try { HeroBook.ApplyBattle(); } catch (Exception e) { Log.Error("HeroBook.ApplyBattle", e); }
 
                 CleanseAmmo();   // lupy moga przyniesc "zuzyte" strzaly z cudzych systemow - czyscimy
             }
@@ -3798,6 +3814,28 @@ namespace Armoury
             catch { return 0; }
         }
 
+        /// <summary>m110-stan krok 2: ksiega sztuki po zuzyciu z ciosow (wydzielone z ApplyWearPerSlot - to samo wyrazenie, wynik bit w bit jak dotad; towarzysze -
+        /// HeroBook.ApplyBattle). Pancerz: ksiega niesie SUROWE obrazenia, pula = pancerz x DurabilityPerArmorPoint x tier, kazdy punkt obrazen zdejmuje jeden punkt
+        /// puli; reszta (bron, tarcza, luk): punkty przez solidnosc tieru.</summary>
+        internal static float WearAfter(ItemObject it, float cond, float amount)
+        {
+            if (it.HasArmorComponent)
+            {
+                int pool = ArmorPool(it);
+                if (pool > 0) cond = MathF.Max(0f, cond - amount * 100f / pool);
+                return cond;
+            }
+            float sturdiness = Sturdiness(it);
+            return MathF.Max(0f, cond - amount / sturdiness);
+        }
+
+        /// <summary>m110-stan krok 2: solidnosc tieru (1 + (tier - 1) x TierDurabilityFactor) - jak w ApplyWearPerSlot.</summary>
+        internal static float Sturdiness(ItemObject it)
+        {
+            int tier = Recipes.Grade(it);
+            return 1f + MathF.Max(0, tier - 1) * Settings.Current.TierDurabilityFactor;
+        }
+
         /// <summary>Zuzycie per slot z ksiegi bitwy + ewentualna baza rozlozona po staremu.</summary>
         private void ApplyWearPerSlot(float[] perSlot, float flat)
         {
@@ -3811,20 +3849,7 @@ namespace Armoury
                     var el = eq[slot];
                     if (el.Item == null || NoWear(el.Item)) continue;
                     if (el.Item.ItemComponent == null || el.Item.ItemComponent.ItemModifierGroup == null) continue;
-                    float cond = GetCondition(slot, el);
-                    if (el.Item.HasArmorComponent)
-                    {
-                        // pancerz: ksiega niesie SUROWE obrazenia; pula = pancerz x 20 x tier,
-                        // kazdy punkt obrazen zdejmuje jeden punkt puli
-                        int pool = ArmorPool(el.Item);
-                        if (pool > 0) cond = MathF.Max(0f, cond - amount * 100f / pool);
-                    }
-                    else
-                    {
-                        int tier = Recipes.Grade(el.Item);
-                        float sturdiness = 1f + MathF.Max(0, tier - 1) * Settings.Current.TierDurabilityFactor;
-                        cond = MathF.Max(0f, cond - amount / sturdiness);
-                    }
+                    float cond = WearAfter(el.Item, GetCondition(slot, el), amount);   // m110-stan krok 2: arytmetyka wydzielona (ta sama dla towarzyszy - HeroBook)
                     SetCondition(slot, cond);
                     if (cond <= 0f && Settings.Current.BreakAtZeroCondition)
                     {

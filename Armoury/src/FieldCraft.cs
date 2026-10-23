@@ -228,6 +228,15 @@ namespace Armoury
             for (int i = 0; i < 12; i++) { into[i] = WearLedger[i]; WearLedger[i] = 0f; }
         }
 
+        /// <summary>m110-stan krok 2 (CompanionGearWear): ksiega ciosow agenta - gracz WearLedger (jak dotad), towarzysz w druzynie gracza zarejestrowany przy wejsciu
+        /// do bitwy (HeroHp, zgodna zbroja) - jego ksiega misji (koniec misji przenosi ja do HeroBook); reszta (i klucz NIE) - null.</summary>
+        internal static float[] LedgerOf(Agent a)
+        {
+            if (a == null) return null;
+            if (a.IsMainAgent) return WearLedger;
+            return HeroHp.LedgerOf(a);
+        }
+
         // E8/A (250, PLAN 8.8e, regula R4 "arena i turniej nie obijaja"): ksiegi zuzycia (WearLedger bohatera i TroopWearLedger wojska) pisza tylko w BITWIE
         // kampanii - misja z bitwa gracza na mapie (MapEvent.PlayerMapEvent) i CombatType Combat. Sam CombatType nie wystarcza: zaden zarzadzany kod gry
         // 1.4.8 go nie ustawia (recenzja E8/X), wiec arena i turniej moga miec Combat; rozstrzyga bitwa na mapie - ten sam warunek co strzal w
@@ -331,7 +340,9 @@ namespace Armoury
                     var ti = shooterAgent.SpawnEquipment[weaponIndex].Item;
                     if (ti != null && (ti.ItemType == ItemObject.ItemTypeEnum.Bow || ti.ItemType == ItemObject.ItemTypeEnum.Crossbow)) TroopWearLedger.Add(ti.ItemType, 1f);
                 }
-                if (!c.WearEnabled || shooterAgent == null || !shooterAgent.IsMainAgent) return;
+                if (!c.WearEnabled || shooterAgent == null) return;
+                var led = LedgerOf(shooterAgent);   // m110-stan krok 2: gracz albo towarzysz z ksiega misji (CompanionGearWear)
+                if (led == null) return;
                 var item = shooterAgent.SpawnEquipment[weaponIndex].Item;
                 if (item == null) return;
                 if (item.ItemType != ItemObject.ItemTypeEnum.Bow && item.ItemType != ItemObject.ItemTypeEnum.Crossbow) return;
@@ -340,7 +351,8 @@ namespace Armoury
                 int skill = 0;
                 try
                 {
-                    skill = Hero.MainHero.GetSkillValue(item.ItemType == ItemObject.ItemTypeEnum.Bow
+                    var who = shooterAgent.IsMainAgent ? Hero.MainHero : (HeroHp.HeroOf(shooterAgent) ?? Hero.MainHero);   // umiejetnosc strzelca
+                    skill = who.GetSkillValue(item.ItemType == ItemObject.ItemTypeEnum.Bow
                         ? TaleWorlds.Core.DefaultSkills.Bow : TaleWorlds.Core.DefaultSkills.Crossbow);
                 }
                 catch { }
@@ -349,7 +361,7 @@ namespace Armoury
                 // ApplyWear dzieli potem przez solidnosc tieru - kompensujemy, zeby liczby Jeffa trzymaly co do sztuki
                 float sturdiness = 1f + Math.Max(0, tier - 1) * Settings.Current.TierDurabilityFactor;
                 int slot = (int)weaponIndex;
-                if (slot >= 0 && slot < 4) WearLedger[slot] += 100f / uses * sturdiness;
+                if (slot >= 0 && slot < 4) led[slot] += 100f / uses * sturdiness;
             }
             catch { }
         }
@@ -393,7 +405,9 @@ namespace Armoury
                     float missileScale = blow.IsMissile
                         ? Math.Max(0f, Math.Min(100f, c.MissileArmorWearPercent)) / 100f
                         : 1f;
-                    if (affectedAgent != null && affectedAgent.IsMainAgent && raw > 0)
+                    // m110-stan krok 2: ksiega ofiary - gracz (WearLedger, jak dotad) albo towarzysz z ksiega misji (CompanionGearWear)
+                    var vled = affectedAgent != null && raw > 0 ? LedgerOf(affectedAgent) : null;
+                    if (vled != null)
                     {
                         if (attackCollisionData.AttackBlockedWithShield)
                         {
@@ -415,32 +429,34 @@ namespace Armoury
                             float shieldMissile = blow.IsMissile
                                 ? Math.Max(0f, Math.Min(100f, c.MissileShieldDamagePercent)) / 100f
                                 : 1f;
-                            if (sh >= 0) WearLedger[sh] += raw * c.WearDamageFactor * Math.Max(0f, c.WearShieldFactor) * shieldMissile;
+                            if (sh >= 0) vled[sh] += raw * c.WearDamageFactor * Math.Max(0f, c.WearShieldFactor) * shieldMissile;
                         }
                         else
                         {
                             int slot = ArmorSlotFor(blow.VictimBodyPart, affectedAgent);
                             // model Jeffa: do ksiegi idzie SUROWY cios - na stan przeliczy go
                             // pula wytrzymalosci sztuki (pancerz x 20 x tier), jeden za jeden
-                            WearLedger[slot] += raw * missileScale;
+                            vled[slot] += raw * missileScale;
                         }
                     }
                     // Twoj celny cios zuzywa TWOJA bron BIALA; luki i kusze placa
                     // ZA STRZAL (OnAgentShootMissile), nie za trafienie
-                    if (affectorAgent != null && affectorAgent.IsMainAgent && raw > 0
+                    // m110-stan krok 2: takze bron towarzysza z ksiega misji (LedgerOf)
+                    var aled = affectorAgent != null && raw > 0
                         && affectorWeapon.Item != null
                         && affectorWeapon.Item.ItemType != ItemObject.ItemTypeEnum.Bow
                         && affectorWeapon.Item.ItemType != ItemObject.ItemTypeEnum.Crossbow
-                        && affectorWeapon.Item.ItemType != ItemObject.ItemTypeEnum.Thrown)
+                        && affectorWeapon.Item.ItemType != ItemObject.ItemTypeEnum.Thrown ? LedgerOf(affectorAgent) : null;
+                    if (aled != null)
                     {
                         int ws = WeaponSlotFor(affectorAgent, affectorWeapon.Item);
-                        if (ws >= 0) WearLedger[ws] += Math.Max(0f, c.WearWeaponPerHit);
+                        if (ws >= 0) aled[ws] += Math.Max(0f, c.WearWeaponPerHit);
                     }
                     // kon gracza obrywa - cierpi uprzaz (ulamek, nie polowa:
-                    // kon to wielki cel i przy 0.5 siodla sypaly sie seriami)
-                    if (affectedAgent != null && affectedAgent.IsMount && affectedAgent.RiderAgent != null
-                        && affectedAgent.RiderAgent.IsMainAgent && raw > 0)
-                        WearLedger[11] += raw * Math.Max(0f, c.HarnessWearFactor) * missileScale;
+                    // kon to wielki cel i przy 0.5 siodla sypaly sie seriami); m110-stan krok 2: takze kon towarzysza z ksiega misji
+                    var hled = affectedAgent != null && affectedAgent.IsMount && affectedAgent.RiderAgent != null && raw > 0 ? LedgerOf(affectedAgent.RiderAgent) : null;
+                    if (hled != null)
+                        hled[11] += raw * Math.Max(0f, c.HarnessWearFactor) * missileScale;
                 }
 
                 if (!c.ArrowUnstickEnabled || affectedAgent == null || !affectedAgent.IsHuman) return;
