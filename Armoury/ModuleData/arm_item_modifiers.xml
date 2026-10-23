@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ItemModifiers>
+  <!-- m110-stan (Jeff 23.10): cztery stany sprzetu - Sound (bez modyfikatora), Damaged, Mangled, Wrecked. 48 modyfikatorow (16 rodzin x 3)
+       BEZ modifier_group: do grup dopisuje je Armoury w pamieci przy starcie sesji (GearState.Apply, klucz Gear Four States); bez Armoury
+       albo przy kluczu NIE nie ma ich w zadnej grupie. Pancerz i obrazenia wedlug krzywej stanu (RBM czyta je jako procent);
+       pozostale pola jak dzisiejsze "inferior" / "poor" / poor x 1.5. -->
+  <!-- plate -->
+  <ItemModifier
+    id="arm_plate_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    armor="-14"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_plate_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    armor="-51"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_plate_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    armor="-81"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- chain -->
+  <ItemModifier
+    id="arm_chain_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    armor="-14"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_chain_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    armor="-51"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_chain_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    armor="-81"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- leather -->
+  <ItemModifier
+    id="arm_leather_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    armor="-14"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_leather_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    armor="-51"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_leather_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    armor="-81"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- cloth -->
+  <ItemModifier
+    id="arm_cloth_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    armor="-14"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_cloth_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    armor="-51"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_cloth_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    armor="-81"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- cloth_unarmoured -->
+  <ItemModifier
+    id="arm_cloth_unarmoured_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    armor="-14"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_cloth_unarmoured_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    armor="-51"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_cloth_unarmoured_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    armor="-81"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- sword -->
+  <ItemModifier
+    id="arm_sword_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    speed="-2"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_sword_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    speed="-4"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_sword_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    speed="-6"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- polearm -->
+  <ItemModifier
+    id="arm_polearm_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    speed="-2"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_polearm_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    speed="-4"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_polearm_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    speed="-6"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- mace -->
+  <ItemModifier
+    id="arm_mace_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    speed="-2"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_mace_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    speed="-4"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_mace_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    speed="-6"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- axe -->
+  <ItemModifier
+    id="arm_axe_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    speed="-2"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_axe_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    speed="-4"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_axe_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    speed="-6"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- cheap_weapon -->
+  <ItemModifier
+    id="arm_cheap_weapon_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    speed="-2"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_cheap_weapon_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    speed="-4"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_cheap_weapon_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    speed="-6"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- axe_throwing -->
+  <ItemModifier
+    id="arm_axe_throwing_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    speed="0"
+    missile_speed="0"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_axe_throwing_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    speed="0"
+    missile_speed="0"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_axe_throwing_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    speed="0"
+    missile_speed="0"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- knife_throwing -->
+  <ItemModifier
+    id="arm_knife_throwing_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    speed="0"
+    missile_speed="0"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_knife_throwing_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    speed="0"
+    missile_speed="0"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_knife_throwing_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    speed="0"
+    missile_speed="0"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- spear_dart_throwing -->
+  <ItemModifier
+    id="arm_spear_dart_throwing_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    speed="0"
+    missile_speed="0"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_spear_dart_throwing_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    speed="0"
+    missile_speed="0"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_spear_dart_throwing_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    speed="0"
+    missile_speed="0"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- shield -->
+  <ItemModifier
+    id="arm_shield_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    armor="-14"
+    hit_points="-70"
+    speed="-2"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_shield_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    armor="-51"
+    hit_points="-100"
+    speed="-2"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_shield_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    armor="-81"
+    hit_points="-150"
+    speed="-3"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- bow -->
+  <ItemModifier
+    id="arm_bow_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    hit_points="-10"
+    speed="-5"
+    missile_speed="-3"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_bow_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    hit_points="-15"
+    speed="-10"
+    missile_speed="-6"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_bow_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    hit_points="-22"
+    speed="-15"
+    missile_speed="-9"
+    price_factor="0.05"
+    quality="poor" />
+  <!-- crossbow -->
+  <ItemModifier
+    id="arm_crossbow_damaged"
+    name="{=arm_st_damaged}Damaged {ITEMNAME}"
+    loot_drop_score="13"
+    production_drop_score="5"
+    damage="-14"
+    hit_points="-15"
+    speed="-10"
+    missile_speed="-3"
+    price_factor="0.6"
+    quality="inferior" />
+  <ItemModifier
+    id="arm_crossbow_mangled"
+    name="{=arm_st_mangled}Mangled {ITEMNAME}"
+    loot_drop_score="15"
+    production_drop_score="5"
+    damage="-51"
+    hit_points="-22"
+    speed="-15"
+    missile_speed="-6"
+    price_factor="0.25"
+    quality="poor" />
+  <ItemModifier
+    id="arm_crossbow_wrecked"
+    name="{=arm_st_wrecked}Wrecked {ITEMNAME}"
+    loot_drop_score="0"
+    production_drop_score="0"
+    damage="-81"
+    hit_points="-33"
+    speed="-22"
+    missile_speed="-9"
+    price_factor="0.05"
+    quality="poor" />
+</ItemModifiers>

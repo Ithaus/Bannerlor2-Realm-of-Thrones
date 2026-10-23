@@ -56,6 +56,15 @@
         <GameType value="CampaignStoryMode" />
       </IncludedGameTypes>
     </XmlNode>
+    <!-- m110-stan: cztery stany sprzetu - 48 modyfikatorow stanu bez grupy (do grup dopisuje je GearState przy starcie sesji; po cofnieciu
+         DLL ten plik MUSI zostac w grze - zapis zna sztuki z tymi modyfikatorami) -->
+    <XmlNode>
+      <XmlName id="ItemModifiers" path="arm_item_modifiers" />
+      <IncludedGameTypes>
+        <GameType value="Campaign" />
+        <GameType value="CampaignStoryMode" />
+      </IncludedGameTypes>
+    </XmlNode>
     <XmlNode>
       <XmlName id="GameText" path="arm_strings" />
     </XmlNode>
