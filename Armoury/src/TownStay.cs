@@ -296,7 +296,7 @@ namespace Armoury
             if (st == null) return;                                         // w polu - markietani (Sutlers.One), tu nie liczone
             if (!mp.IsActive || mp.IsDisbanding) { _sInactive++; return; }
             int kind = Kind(st);
-            if (kind == KNone) { if (st.IsVillage) _sVill++; else _sSiege++; return; }   // oblezona twierdza (karczmy zamkniete), rabowana wies, kryjowka
+            if (kind == KNone) { if (st.IsVillage) _sVill++; else if (Besieged(st)) _sSiege++; return; }   // oblezona twierdza (karczmy zamkniete), rabowana wies, kryjowka
             _sP++;
             if (kind == KTown) _sTownN++; else if (kind == KCastle) _sCastleN++; else _sVillN++;
             if (kind == KVillage) { _sVill++; return; }                     // we wsi nic nie wydaja (jak dotad)
