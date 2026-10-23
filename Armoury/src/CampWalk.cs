@@ -344,6 +344,7 @@ namespace Armoury
             var party = MobileParty.MainParty;
             _test = CampWalk.TestWalkPending;
             CampWalk.TestWalkPending = false;
+            if (_test) _testClock = System.Diagnostics.Stopwatch.StartNew();   // m109-oboz (test): zegar wyjscia od razu - wywrotka albo wczesne wyjscie z Build tez zamyka spacer po 8 s
             if (m == null || m.Scene == null || hero == null || party == null) return;
             var s = Settings.Current;
             int cap = s != null ? Math.Max(0, Math.Min(100, s.CampWalkMaxMen)) : 40;
@@ -443,12 +444,11 @@ namespace Armoury
                      + " | srodek " + c.x.ToString("0", CultureInfo.InvariantCulture) + "," + c.y.ToString("0", CultureInfo.InvariantCulture) + ".");
             if (_test)
             {
-                // m109-oboz (test): uklad wobec regul (te same liczby co linia bitwy w obozie) i wyjscie po 8 s rzeczywistych
+                // m109-oboz (test): uklad wobec regul (te same liczby co linia bitwy w obozie); wyjscie po 8 s rzeczywistych od poczatku Build
                 Log.Info(CampWalk.P109 + "test - uklad: ludzi zdrowych " + healthy + " (namiot na " + perTent + ") | wedlug regul: " + _lay.PlanText(plan)
                          + " | postawione: namioty " + _lay.Tents + ", poslania " + _lay.Beds + ", ogniska " + _lay.Fires + ", wozy " + _lay.Carts + ", konie taboru " + _lay.TrainHorses
                          + " (jezdzcow " + _lay.RiderHorsesN + ") | przesuniete " + _lay.Moved + " | " + _lay.GeometryText() + " | gracz " + (player != null ? "tak" : "NIE")
                          + " | potkniecia " + (CampWalk.Stumbles - st0) + ".");
-                _testClock = System.Diagnostics.Stopwatch.StartNew();
             }
         }
 
@@ -595,6 +595,8 @@ namespace Armoury
     /// tymi samymi wyrazeniami co dawny spacer (C + Up * 12 itd.). Spacer: Up = (0, 1), Right = (1, 0) - obrysy dawnego spaceru przesuniete o srodek (test
     /// nakladania bez zmian). Bitwa: Clear 6 m od kazdego agenta (migawka SetTroops) i zaden obrys blizej linii wojska niz Clear (FrontY), bez koni jezdzcow
     /// i bez ludzi (haki null - miejsce gracza i jego konia zarezerwowane, puste); DepthLimit poszerza rzedy namiotow (6..12), gdy za linia malo miejsca.
+    /// Recenzja m109: w bitwie scenografia (bez koni) moze stac do OutsideMax za granica pola bitwy (Inside - w granicach sceny silnika), bo za wojskiem
+    /// na koncu sciezki rozstawienia bywa 50-60 m pola; konie obozu w bitwie poza pula koni bez jezdzca (Unpool - SI nie siega po konia bez CommonAIComponent).
     /// Ludzie spaceru (gracz, siedzacy, chorazy) zostaja w CampWalkLogic (haki OnPlayerSpot, OnHeroHorseSpot, OnLeaderTent).
     /// </summary>
     internal sealed class CampLayout
@@ -603,6 +605,7 @@ namespace Armoury
         internal const float RowGap = 11f;        // odstep rzedow namiotow (obrys Tent_Small 5.2 m + ognisko 5.5 m przed namiotem z siedzacymi)
         internal const float HoldEvery = 1.5f;    // pilnowanie uwiazanych koni (jak PoseEvery spaceru)
         internal const float FrontReach = 15f;    // najdalszy element przed srodkiem obozu: rzad wozow 12 m + obrys woza 2.4 m + 0.6 m zapasu
+        internal const float SceneMargin = 10f;   // bitwa: scenografia za granica pola bitwy nie blizej niz tyle od granic sceny silnika (krawedz terenu)
 
         internal static readonly string[] TentSmall = { "Tent_Small", "Tent_Small_Campfire", "tent_vlandia_c", "tent_vlandia_a" };
         internal static readonly string[] TentLeader = { "Tent_Leader", "tent_vlandia_b", "tent_vlandia_c" };
@@ -667,6 +670,8 @@ namespace Armoury
         private readonly List<Vec2> _troops = new List<Vec2>(); // bitwa: migawka agentow w ukladzie lokalnym (SetTroops)
         private bool _waterOff, _topOff;   // jak PD: odczyt wody albo cial, ktory "zalewa" prawie cala scene (ponad 90% probek), jest dla tej sceny pomijany
         private int _why;                  // przyczyna ostatniej porazki FreeSpot: 0 granica, 1 teren, 2 obrysy, 3 wojsko
+        private bool _limRead, _limOk;     // bitwa: granice sceny silnika (GetSceneLimits) odczytane raz na uklad, pomniejszone o SceneMargin
+        private Vec2 _limMin, _limMax;
 
         // parametry (spacer: 0 / brak / true / false)
         internal float Clear;                          // bitwa: nic blizej niz tyle metrow od agenta i od linii wojska
@@ -674,10 +679,13 @@ namespace Armoury
         internal float DepthLimit = float.MaxValue;    // bitwa: miejsce za srodkiem obozu do granicy sceny (poszerzanie rzedow)
         internal bool RiderHorses = true;              // konie jezdzcow kolumny (spacer; w bitwie sa pod jezdzcami)
         internal bool CountEntities;                   // bitwa: licz encje scenografii z dziecmi (koszt)
+        internal float OutsideMax;                     // bitwa: scenografia (bez koni) do tylu metrow za granica pola bitwy (granica miekka), w granicach sceny silnika
+        internal float MaxY = float.MaxValue;          // test bitwy "glebokosc=N": nic dalej niz N m za srodkiem obozu (lokalnie y) - sciezka malej glebokosci
+        internal bool Unpool;                          // bitwa: uwiazane konie poza Mission.MountsWithoutRiders (Tie zdejmuje im CommonAIComponent)
         internal Action<Vec2> OnPlayerSpot, OnHeroHorseSpot, OnLeaderTent;
 
         // wyniki
-        internal int Tents, Fires, Beds, Carts, Horses, RiderHorsesN, TrainHorses, Props, Failed, Moved, BlockedN, Overlap;
+        internal int Tents, Fires, Beds, Carts, Horses, RiderHorsesN, TrainHorses, Props, Failed, Moved, BlockedN, Overlap, OutsideField;
         internal int SkipBorder, SkipTerrain, SkipOverlap, SkipTroops, SkipPrefab, SkipError, Entities, PerRow = 6;
         internal float RowY = float.NaN;
         internal Vec2 LeaderLocal, MainFire, PlayerSpot;
@@ -971,6 +979,48 @@ namespace Armoury
             return (float)Math.Sqrt(dx * dx + dy * dy);
         }
 
+        /// <summary>Czy w punkcie swiata p moze stanac element obozu: w granicach pola (granica miekka sceny) - spacer i konie; w bitwie scenografia (prop)
+        /// takze do OutsideMax za granica pola, w granicach sceny silnika pomniejszonych o SceneMargin (to tylko wyglad - bez fizyki, ludzie tam nie walcza).
+        /// Test "glebokosc=N" (MaxY) - nic dalej niz N m za srodkiem. Spacer (OutsideMax 0, MaxY brak) - jak dotad IsPositionInsideBoundaries.</summary>
+        internal bool Inside(Vec2 p, bool prop)
+        {
+            if (MaxY < float.MaxValue && L(p).y > MaxY) return false;
+            if (M.IsPositionInsideBoundaries(p)) return true;
+            if (!prop || OutsideMax <= 0f) return false;
+            if (!_limRead)
+            {
+                _limRead = true;
+                try
+                {
+                    Vec3 a, b;
+                    M.Scene.GetSceneLimits(out a, out b);
+                    _limOk = Fin(a.x) && Fin(a.y) && Fin(b.x) && Fin(b.y) && b.x - a.x > 4f * SceneMargin && b.y - a.y > 4f * SceneMargin;
+                    _limMin = new Vec2(a.x + SceneMargin, a.y + SceneMargin);
+                    _limMax = new Vec2(b.x - SceneMargin, b.y - SceneMargin);
+                }
+                catch (Exception e) { _limOk = false; _stumble("SceneLimits", e); }
+            }
+            if (!_limOk || p.x < _limMin.x || p.y < _limMin.y || p.x > _limMax.x || p.y > _limMax.y) return false;
+            try { return (M.GetClosestBoundaryPosition(p) - p).Length <= OutsideMax; }
+            catch (Exception e) { _stumble("ClosestBoundary", e); return false; }
+        }
+
+        private static bool Fin(float v) { return !float.IsNaN(v) && !float.IsInfinity(v); }
+
+        /// <summary>Bitwa: ile uwiazanych koni obozu jest w Mission.MountsWithoutRiders (po Unpool ma byc 0). Tylko odczyt.</summary>
+        internal int TiedInPool()
+        {
+            int n = 0;
+            try
+            {
+                var set = new HashSet<Agent>();
+                foreach (var t in TiedHorses) if (t.Agent != null) set.Add(t.Agent);
+                foreach (var kv in M.MountsWithoutRiders) if (kv.Key != null && set.Contains(kv.Key)) n++;
+            }
+            catch (Exception e) { _stumble("TiedInPool", e); return -1; }
+            return n;
+        }
+
         /// <summary>Czy w promieniu r wokol punktu cos stoi (drzewo, skala - cialo wyzej niz 0.8 m nad terenem) albo jest woda. Tylko odczyt sceny.</summary>
         internal bool Blocked(Vec2 at, float r)
         {
@@ -1005,7 +1055,7 @@ namespace Armoury
                     for (int iy = -3; iy <= 3; iy++)
                     {
                         Vec2 p = C + new Vec2(ix * 10f, iy * 10f);
-                        if (!M.IsPositionInsideBoundaries(p)) continue;
+                        if (!Inside(p, true)) continue;
                         all++;
                         float g = sc.GetTerrainHeight(p, true);
                         float t = sc.GetGroundHeightAtPosition(new Vec3(p.x, p.y, 1000f, -1f), TopMask);
@@ -1033,7 +1083,7 @@ namespace Armoury
             for (int i = 0; i < Shifts.GetLength(0); i++)
             {
                 Vec2 p = at + side * Shifts[i, 0] + facing * Shifts[i, 1];
-                if (!M.IsPositionInsideBoundaries(p)) continue;
+                if (!Inside(p, true)) continue;
                 if (Blocked(p, r)) { terrain = true; continue; }
                 var box = Rect(name, r, p, facing);
                 if (Hits(box)) { overlap = true; continue; }
@@ -1078,6 +1128,7 @@ namespace Armoury
                 if (solid) Occupy(box);
                 Placed.Add(box);
                 Props++;
+                if (OutsideMax > 0f && !M.IsPositionInsideBoundaries(at)) OutsideField++;   // bitwa: stoi za granica pola (linia ukladu)
                 if (CountEntities)
                 {
                     try { var ch = new List<GameEntity>(); ent.GetChildrenRecursive(ref ch); Entities += 1 + ch.Count; }
@@ -1116,7 +1167,7 @@ namespace Armoury
                     Vec2 p = start + along * (n * 2.2f) + side * (float)(_rng.NextDouble() * 0.6);
                     n++;
                     var box = Sq(p, 1f);
-                    if (!M.IsPositionInsideBoundaries(p)) { SkipBorder++; done++; continue; }
+                    if (!Inside(p, false)) { SkipBorder++; done++; continue; }   // konie tylko w polu bitwy (agenci)
                     if (Blocked(p, 1f)) { SkipTerrain++; done++; continue; }
                     if (Hits(box)) { SkipOverlap++; done++; continue; }
                     if (NearTroops(box)) { SkipTroops++; done++; continue; }
@@ -1157,7 +1208,9 @@ namespace Armoury
         // ------------------------------------------------------------ uwiazane konie (wzor Practice Drills DrillCampLogic.Tether / Hold / HoldAnimals)
 
         /// <summary>Kon na postoju: bez wedrowania (gra zdejmuje CanWander tylko zwierzetom sceny - AnimalSpawnSettings) i bez wsiadania (Mountable),
-        /// Controller None, predkosc 0, niesmiertelny; miejsce pilnowane w HoldHorses.</summary>
+        /// Controller None, predkosc 0, niesmiertelny; miejsce pilnowane w HoldHorses. Bitwa (Unpool): kon zdjety z Mission.MountsWithoutRiders - Agent.Build
+        /// wpisuje tam konia bez jezdzca, a Controller None zdejmuje mu CommonAIComponent; spieszony zolnierz SI z rozkazem "Mount" (HumanAIComponent.
+        /// FindClosestMountAvailable / ReserveMount) czyta CommonAIComponent konia z puli bez sprawdzenia null - wywrotka w ticku agenta.</summary>
         private bool Tether(EquipmentElement horse, EquipmentElement harness, Vec2 at, Vec2 facing)
         {
             var pos = Ground(at);
@@ -1167,6 +1220,7 @@ namespace Armoury
             if (a == null) return false;
             var t = new Tied { Agent = a, Spot = pos, Facing = facing };
             Tie(a);
+            if (Unpool) { try { M.RemoveMountWithoutRider(a); } catch (Exception e) { _stumble("RemoveMountWithoutRider", e); } }
             TiedHorses.Add(t);
             return true;
         }

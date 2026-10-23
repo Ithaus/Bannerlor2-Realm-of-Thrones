@@ -35,8 +35,10 @@ namespace Armoury
     /// stary zestaw Native ponizej (Build) 1:1. Jency nie dodaja namiotow (ani tu, ani w spacerze - liczy sie MemberRoster bez bohaterow).
     /// Linie "CampScene (m109): " - start, "bitwa w obozie nr", uklad ("oboz jak spacer nr", liczby wedlug regul, postawione, pominiete z przyczyna, odleglosci,
     /// encje, czas), bledy "ERROR in CampScene.<miejsce>" (pierwsze 3 i co 50 na miejsce). Test autotestu (LogGate.Mode 1/2 + plik CrashScribe\
-    /// armoury-oboz-bitwa.flag): kazda bitwa w polu jak w obozie (NightRest bez zmian), linie "bitwaK: ludzi=N konie=N wozy=N" albo "bitwaK: stary"
+    /// armoury-oboz-bitwa.flag): kazda bitwa w polu jak w obozie (NightRest bez zmian), linie "bitwaK: ludzi=N konie=N wozy=N glebokosc=N" albo "bitwaK: stary"
     /// zmieniaja plan i scenografie (roster bez zmian), zdjecie obozu z kamery nad linia.
+    /// Recenzja m109: scenografia (bez koni) do OutsideM za granica pola bitwy (za wojskiem na koncu sciezki rozstawienia bywa 50-60 m pola), konie obozu poza
+    /// pula koni bez jezdzca (Unpool), w linii ukladu plan spaceru tej samej druzyny, przesuniecia, elementy za granica pola, konie w puli, srodek posilkow.
     /// </summary>
     internal sealed class CampScene : MissionBehavior
     {
@@ -62,12 +64,16 @@ namespace Armoury
         internal const string P = "CampScene (m109): ";
         internal const string TestFlag = "armoury-oboz-bitwa.flag";
         private const float ClearM = 6f;                  // nic blizej niz 6 m od agentow i od linii wojska (jak E7/O2 od gracza)
+        // recenzja m109 (R1): scenografia do 100 m za granica pola bitwy - najglebszy oboz przy limicie (40 namiotow po 12 w rzedzie = 4 rzedy, 63 m za srodkiem)
+        // + srodek do 21 m za granica, gdy ostatni zolnierz stoi na niej = 84 m; teren scen bitew siega 100-350 m za granice pola (scene.xscene: battle_terrain_a/b/f/s/z/
+        // 011/021/026/033/J/L); konie zostaja w polu
+        private const float OutsideM = 100f;
         private static int _battleNo, _stumbles;          // numer bitwy w obozie w procesie (test: "bitwaK"), potkniecia razem
         private static readonly Dictionary<string, int> _stumbleAt = new Dictionary<string, int>();
         private static Dictionary<int, string> _spec;      // test: tresc pliku (bitwaK -> reszta linii), czytana raz na proces
         private int _no, _shotStage;
-        private bool _tried, _test, _tOld;
-        private int? _tHealthy, _tHorses, _tCarts;
+        private bool _tried, _test, _tOld, _deployed;
+        private int? _tHealthy, _tHorses, _tCarts, _tDepth;
         private CampLayout _lay;
         private float _holdT;
         private Vec2 _shotC, _shotUp;
@@ -147,7 +153,7 @@ namespace Armoury
                 Log.Info(P + "start | klucz Camp Battle Like Walk " + (s.CampBattleLikeWalk ? "TAK" : "NIE (stary zestaw: 3 namioty, ognisko, 4 pochodnie, plot)")
                          + " | uklad spaceru: namiot na " + pt + " ludzi, namioty do " + CampLayout.MaxTents + ", ogniska do " + CampLayout.MaxFires + ", wozy do " + CampLayout.MaxCarts
                          + ", konie taboru do " + CampLayout.MaxHorses + " | odstep od wojska " + ClearM.ToString("0", ci) + " m, srodek obozu "
-                         + (ClearM + CampLayout.FrontReach).ToString("0", ci) + " m za ostatnim zolnierzem"
+                         + (ClearM + CampLayout.FrontReach).ToString("0", ci) + " m za ostatnim zolnierzem, scenografia do " + OutsideM.ToString("0", ci) + " m za granica pola bitwy"
                          + " | prefaby: " + Pf(CampLayout.TentSmall) + ", " + Pf(CampLayout.TentLeader) + ", " + Pf(CampLayout.TentOfficer) + ", " + Pf(CampLayout.Fire)
                          + ", " + Pf(CampLayout.Bed) + ", " + Pf(CampLayout.Cart)
                          + " | test bitwy w obozie " + (TestWanted() ? "TAK" : "NIE") + ", test spaceru " + (CampWalk.TestWanted() ? "TAK" : "NIE") + ".");
@@ -159,16 +165,26 @@ namespace Armoury
 
         public override void OnMissionTick(float dt)
         {
-            // m109-oboz: uwiazane konie obozu na miejsce (co HoldEvery) i kroki zdjecia testu
+            // m109-oboz: uwiazane konie obozu na miejsce (co HoldEvery) i kroki zdjecia testu (wywrotka zdjecia - kamera gry z powrotem i linia testu)
             if (_lay != null)
             {
                 try
                 {
                     _holdT += dt;
                     if (_holdT >= CampLayout.HoldEvery) { _holdT = 0f; _lay.HoldHorses(); }
-                    if (_shotStage > 0) ShotTick();
                 }
-                catch (Exception e) { _shotStage = 0; Stumble("Tick", e); }
+                catch (Exception e) { Stumble("Tick", e); }
+                if (_shotStage > 0)
+                {
+                    try { ShotTick(); }
+                    catch (Exception e)
+                    {
+                        _shotStage = 0;
+                        Stumble("Shot", e);
+                        try { ShotRestore(); } catch (Exception e2) { Stumble("ShotRestore", e2); }
+                        ShotLine("NIE (wyjatek)");
+                    }
+                }
             }
             try
             {
@@ -181,6 +197,7 @@ namespace Armoury
                 if (!m.IsFieldBattle) { _done = true; return; }   // oblezenia, kryjowki, areny - nie
                 if (_no == 0) Announce(s);                        // m109: raz na bitwe w polu - numer bitwy w obozie i linia "nr"
                 if (m.Mode == MissionMode.Deployment) return;     // E7/O2: czekamy na koniec rozstawienia - gracz moze jeszcze przesunac szyk
+                _deployed = true;                                 // m109: koniec rozstawienia widziany (przyczyna "bez obozu" w OnEndMission)
                 var main = Agent.Main;
                 if (main == null) return;                         // czekamy, az gracz stanie na polu
                 _done = true;
@@ -195,7 +212,7 @@ namespace Armoury
         {
             try
             {
-                if (_no > 0 && !_tried) Log.Info(P + "bitwa w obozie nr " + _no + " - bez obozu (koniec misji przed rozstawieniem).");
+                if (_no > 0 && !_tried) NoCamp(_deployed ? "koniec misji bez gracza na polu" : "koniec misji przed rozstawieniem");
                 if (_shotStage > 0)
                 {
                     ShotRestore();
@@ -216,13 +233,14 @@ namespace Armoury
             string note = "";
             if (_test)
             {
-                note += " | test z pliku";
+                // test: oboz stoi bez wzgledu na NightRest.PlayerCamped (wyzwalacz gry bez zmian od 44c03a05) - w linii, czy gracz naprawde obozowal
+                note += " | test z pliku (gracz obozowal: " + (NightRest.PlayerCamped ? "TAK" : "NIE") + ")";
                 try { TestSpec(_no, ref note); } catch (Exception e) { Stumble("TestSpec", e); }
             }
             Log.Info(P + "bitwa w obozie nr " + _no + " | klucz " + (s.CampBattleLikeWalk ? "TAK" : "NIE") + note + " - oboz stanie po rozstawieniu wojska.");
         }
 
-        /// <summary>Test: linia "bitwaK: ludzi=N konie=N wozy=N" albo "bitwaK: stary" dla tej bitwy; nieznane - w linii "nr".</summary>
+        /// <summary>Test: linia "bitwaK: ludzi=N konie=N wozy=N glebokosc=N" albo "bitwaK: stary" dla tej bitwy; nieznane - w linii "nr".</summary>
         private void TestSpec(int k, ref string note)
         {
             if (_spec == null)
@@ -251,6 +269,7 @@ namespace Armoury
                     if (key == "ludzi") { _tHealthy = v; note += " | test: ludzi " + v; continue; }
                     if (key == "konie") { _tHorses = v; note += " | test: konie " + v; continue; }
                     if (key == "wozy") { _tCarts = v; note += " | test: wozy " + v; continue; }
+                    if (key == "glebokosc") { _tDepth = v; note += " | test: glebokosc " + v; continue; }   // recenzja R1: sciezka malej glebokosci za linia
                 }
                 note += " | test: nieznane " + t;
             }
@@ -301,15 +320,20 @@ namespace Armoury
             }
             float off = ClearM + CampLayout.FrontReach;   // linia wojska w ukladzie obozu: y = -off
             var c = g + up * (rear + off);
-            float depth = 0f;
-            if (m.IsPositionInsideBoundaries(c))
-                while (depth < 400f && m.IsPositionInsideBoundaries(c + up * (depth + 2f))) depth += 2f;
             int perTent = s != null ? Math.Max(2, Math.Min(20, s.CampWalkMenPerTent)) : 6;
             var rng = new Random();
             var lay = new CampLayout(m, c, up, P, Stumble, rng)
             {
-                Clear = ClearM, FrontY = ClearM - off, RiderHorses = false, DepthLimit = depth, CountEntities = true
+                Clear = ClearM, FrontY = ClearM - off, RiderHorses = false, CountEntities = true, OutsideMax = OutsideM, Unpool = true
             };
+            if (_tDepth.HasValue) lay.MaxY = _tDepth.Value;
+            // glebokosc za srodkiem obozu: z pasem za granica pola (scenografia - Inside) i samo pole bitwy (linia ukladu)
+            float depth = 0f, field = 0f;
+            if (lay.Inside(c, true))
+                while (depth < 400f && lay.Inside(c + up * (depth + 2f), true)) depth += 2f;
+            if (m.IsPositionInsideBoundaries(c))
+                while (field < 400f && m.IsPositionInsideBoundaries(c + up * (field + 2f))) field += 2f;
+            lay.DepthLimit = depth;
             var pts = new List<Vec2>();
             foreach (var a in m.Agents) if (a != null) pts.Add(a.Position.AsVec2);
             lay.SetTroops(pts);
@@ -342,15 +366,33 @@ namespace Armoury
             float frontD = minY0 < float.MaxValue ? minY0 + off : float.MaxValue;
             bool night = CampaignTime.Now.IsNightTime || NightRest.InCamp(CampaignTime.Now.GetHourOfDay);
             var ci = CultureInfo.InvariantCulture;
+            // recenzja m109: plan spaceru tej samej druzyny (bez nadpisan testu - porownanie z planem bitwy), konie obozu w puli koni bez jezdzca (ma byc 0),
+            // srodek pojawiania sie posilkow strony gracza w ukladzie obozu (y > 0 - za srodkiem obozu: posilki ida przez oboz do linii)
+            var walkPlan = CampLayout.Count(party, perTent, new Random(), null);
+            int pooled = lay.TiedInPool();
+            string reinf = "-";
+            try
+            {
+                DefaultMissionDeploymentPlan dp;
+                if (m.GetDeploymentPlan<DefaultMissionDeploymentPlan>(out dp) && dp.IsReinforcementPlanMade(pteam))
+                {
+                    var r = lay.L(dp.GetMeanPosition(pteam, true).AsVec2);
+                    reinf = r.x.ToString("0.0", ci) + "," + r.y.ToString("0.0", ci);
+                }
+            }
+            catch (Exception e) { Stumble("Reinforcements", e); }
             long ms = sw.ElapsedMilliseconds;
             Log.Info(P + "oboz jak spacer nr " + _no + " | " + (night ? "noc" : "dzien") + (plan.Army ? ", armia (kolumna " + plan.Column.Count + " partii)" : "")
                      + " | ludzi zdrowych " + plan.Healthy + (plan.HealthyFromTest ? " (test z pliku)" : "") + " (namiot na " + perTent + ")"
                      + " | wedlug regul spaceru: " + lay.PlanText(plan)
+                     + " | spacer tej druzyny: ludzi zdrowych " + walkPlan.Healthy + ", " + lay.PlanText(walkPlan)
                      + " | postawione: namioty " + lay.Tents + ", poslania " + lay.Beds + ", ogniska " + lay.Fires + ", wozy " + lay.Carts + ", konie " + lay.TrainHorses
                      + " | pominiete: granica " + lay.SkipBorder + ", teren " + lay.SkipTerrain + ", obrysy " + lay.SkipOverlap + ", wojsko " + lay.SkipTroops
-                     + ", prefab " + lay.SkipPrefab + ", bledy " + lay.SkipError
-                     + " | rzad po " + lay.PerRow + ", glebokosc za srodkiem obozu " + depth.ToString("0", ci) + " m | " + lay.GeometryText()
+                     + ", prefab " + lay.SkipPrefab + ", bledy " + lay.SkipError + " | przesuniete " + lay.Moved + ", poza polem bitwy " + lay.OutsideField
+                     + " | rzad po " + lay.PerRow + ", glebokosc za srodkiem obozu " + depth.ToString("0", ci) + " m (pole bitwy " + field.ToString("0", ci) + " m) | "
+                     + lay.GeometryText()
                      + " | najblizej: gracz " + D1(dMain) + " m, wojsko " + D1(dTroop) + " m | front obozu " + D1(frontD) + " m za linia"
+                     + " | konie obozu w puli koni bez jezdzca " + pooled + " | posilki " + reinf
                      + " | kierunek " + src + " | agentow strony gracza " + mine.Count + " | encje " + lay.Entities
                      + " | czas " + ms + " ms | potkniecia " + (_stumbles - st0) + ".");
             if (_test)
