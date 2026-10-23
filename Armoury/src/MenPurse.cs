@@ -324,21 +324,31 @@ namespace Armoury
                 }
                 if (CitySack.NoSpend(st, mp, life)) return;   // lup miast L3: w lupionym miescie wojsko krolestwa zdobywcy nie placi - zold zostaje w sakiewce (wlasny try)
                 Take(mp, life);
-                int folk = TownFolk.EarnService(st, life, TownFolk.KLife);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca); kupcy reszte
-                st.Town.ChangeGold(life - folk);    // karczma, jedzenie, gra, kobiety - pieniadze zostaja w miescie
-                ClanIncomeBook.NoteOwnPaid(st, mp.ActualClan, life);   // 169c: "wlasne" D stalego - wydatki ludzi rodu w jego miescie (tylko licznik)
-                if ((mp.IsLordParty || mp.IsMainParty) && mp.ActualClan != null && ReferenceEquals(st.OwnerClan, mp.ActualClan))
-                    CrownIncome.NoteOwnSpend(mp.ActualClan, life);   // 165 (K3): zold wydany we wlasnym miescie rodu wraca zaworem - bez zwrotu korony od niego (gracz tez - jedna regula)
-                MoneyLedger.Note(MoneyLedger.NLife, st, life - folk);   // ksiega przeplywow osad (tylko licznik) - czesc w kasie (E5/B1: czesc ludu w kiesie, posiadacz H22/H23)
-                try { TownFolk.Note(st, life, TownFolk.KLife); } catch { }   // E5/0 (195): zycie zolnierzy w miescie - okno kiesy ludu (calosc; E5/B1: podstawa robocizny 75%)
-                SoldierPay.Hold(st, life);          // tarcza zoldu (gdy wlaczona): regulator kasy nie skasuje tych pieniedzy, zanim zawor renty odda je panu
-                _dayLife += life;
-                CitySack.NoteSpend(st, mp, life);   // lup miast (L0): zycie zostawione w osadzie po nastepstwach oblezenia (tylko licznik, wlasny try)
+                LifeTo(mp, st, life);   // m109-musztra: wplata "na zycie" wydzielona bez zmian (ta sama droga dla wydatkow doby postoju - TownStay)
                 if (mp.IsMainParty)
                     Log.Player("Your men spent " + life + " denars in " + st.Name + " - food, drink, dice and company." + (reserve > 0 ? " They kept " + Math.Min(purse, reserve) + " for mending their kit." : "")
                                + (saved > 0 ? " They put by " + saved + " for better kit (saved " + (kept + saved) + ", purse " + Get(mp) + ")." : ""));
             }
             catch (Exception e) { Log.Error("MenPurse.OnLeft", e); }
+        }
+
+        /// <summary>m109-musztra: wplata "na zycie" juz zdjetej z sakiewki kwoty `life` do osady `st` (kasa + kiesa ludu) i jej liczniki - wydzielone z OnLeft
+        /// bez zmian, w tej samej kolejnosci (Day idempotentne w dobie). Wola OnLeft (wyjazd z miasta) i TownStay (wydatki doby postoju w miescie i zamku).
+        /// Zwraca czesc przyjeta przez kiese ludu (reszta w kasie osady). Bez wlasnego catch - wyjatek liczy wolajacy.</summary>
+        internal static int LifeTo(MobileParty mp, Settlement st, int life)
+        {
+            Day();
+            int folk = TownFolk.EarnService(st, life, TownFolk.KLife);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca); kupcy reszte
+            st.Town.ChangeGold(life - folk);    // karczma, jedzenie, gra, kobiety - pieniadze zostaja w miescie
+            ClanIncomeBook.NoteOwnPaid(st, mp.ActualClan, life);   // 169c: "wlasne" D stalego - wydatki ludzi rodu w jego miescie (tylko licznik)
+            if ((mp.IsLordParty || mp.IsMainParty) && mp.ActualClan != null && ReferenceEquals(st.OwnerClan, mp.ActualClan))
+                CrownIncome.NoteOwnSpend(mp.ActualClan, life);   // 165 (K3): zold wydany we wlasnym miescie rodu wraca zaworem - bez zwrotu korony od niego (gracz tez - jedna regula)
+            MoneyLedger.Note(MoneyLedger.NLife, st, life - folk);   // ksiega przeplywow osad (tylko licznik) - czesc w kasie (E5/B1: czesc ludu w kiesie, posiadacz H22/H23)
+            try { TownFolk.Note(st, life, TownFolk.KLife); } catch { }   // E5/0 (195): zycie zolnierzy w miescie - okno kiesy ludu (calosc; E5/B1: podstawa robocizny 75%)
+            SoldierPay.Hold(st, life);          // tarcza zoldu (gdy wlaczona): regulator kasy nie skasuje tych pieniedzy, zanim zawor renty odda je panu
+            _dayLife += life;
+            CitySack.NoteSpend(st, mp, life);   // lup miast (L0): zycie zostawione w osadzie po nastepstwach oblezenia (tylko licznik, wlasny try)
+            return folk;
         }
 
         private static int Wage(MobileParty mp)
