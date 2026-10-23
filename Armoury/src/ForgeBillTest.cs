@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -28,7 +29,11 @@ namespace Armoury
     /// (c) test ekranu (OnApplicationTick, najwyzej 3 proby na sesje, >= 30 s po (b)): gracz w menu miasta bez okien, bez misji i rozmowy, bez roboty w tej
     ///     kuzni (ProjectHoursLeftHere - wyjscie z ekranu nie otworzy paska ForgeJob ani doby kuzni) - CraftingHelper.OpenCrafting, co 2 s krok ForgeView
     ///     (ForgeBillMixin.TestStep: bron, zbroja, luk, strzaly - kafle VM wobec rachunku), zdjecie silnika, na koncu ExecuteCancel. HIPOTEZA: PushState z taktu
-    ///     aplikacji przejdzie; dowodem jest odczyt VM, zdjecie - dodatek.
+    ///     aplikacji przejdzie; dowodem jest odczyt VM, zdjecie - dodatek. Recenzja K1: kazde przerwanie (ekran bez mixinu ForgeView, wyjatek, limit 60 s na
+    ///     ekranie) i koniec zamykaja ekran takze bez ForgeView (CloseScreen - ExecuteCancel na VM zlapanym przy otwarciu przez ForgeJob.VmCtorPost) - inaczej
+    ///     otwarty ekran kucia stalby do konca biegu (czas kampanii stoi, Blocker nie widzi MapScreen).
+    /// KUZ-5: kucia probne (b) przechodza prawdziwa droga zuzycia - ich linie "Drewno/Wegiel/Surowce w kuzni" i komunikaty kuzni stoja miedzy "test - zuzycie
+    ///     probne: poczatek" a "test - wynik", a liczniki doby drewna, wegla i przepisow z masy pierwszej doby je licza (sakwy i pamiec wracaja).
     /// </summary>
     internal static class ForgeBillTest
     {
@@ -40,6 +45,8 @@ namespace Armoury
         private static string _pendingLine, _pendingMode;
         private static MethodInfo _testStep;
         private static bool _stepLooked;
+        private static WeakReference _vm;          // VM ekranu otwartego przez test (ForgeJob.VmCtorPost -> NoteVm) - wyjscie bez ForgeView
+        private const float ScreenLimit = 60f;     // najdluzej na ekranie (kroki ok. 15 s) - potem wyjscie i nastepna proba
 
         private static void Stumble(string where, Exception e)
         {
@@ -54,7 +61,7 @@ namespace Armoury
         internal static void Reset()
         {
             _billsDone = false; _screenDone = false; _billsAt = -1f;
-            _tries = 0; _stage = 0; _step = 0; _screenN = 0; _screenOk = 0; _pendingLine = null;
+            _tries = 0; _stage = 0; _step = 0; _screenN = 0; _screenOk = 0; _pendingLine = null; _vm = null;
         }
 
         // ============================================================ (b) rachunek wobec zuzycia
@@ -146,6 +153,8 @@ namespace Armoury
             var roster = party != null ? party.ItemRoster : null;
             if (roster == null || Campaign.Current == null) { Log.Info(P + "test - wynik: pominiety (brak sakw gracza)."); return; }
             var state = Save(roster);
+            Log.Info(P + "test - zuzycie probne: poczatek | linie 'Drewno w kuzni (kg)', 'Wegiel w kuzni (kg)', 'Surowce w kuzni (kg) (m96-receptury)' i komunikaty kuzni "
+                     + "do linii 'test - wynik' to kucia probne; liczniki doby drewna, wegla i przepisow z masy licza je, sakwy i pamiec wracaja do stanu sprzed testu.");
             int items = 0, ok = 0, added = 0;
             bool restored = true;
             foreach (var kv in ForgeBill.Samples())
@@ -273,6 +282,36 @@ namespace Armoury
             return _testStep.Invoke(null, new object[] { step, id }) as string;
         }
 
+        /// <summary>ForgeJob.VmCtorPost (postfiks konstruktora CraftingVM, wpiety zawsze): VM ekranu otwartego przez test - tylko miedzy OpenCrafting a wyjsciem.</summary>
+        internal static void NoteVm(CraftingVM vm)
+        {
+            if (_stage == 0 || _screenDone || vm == null) return;
+            try { _vm = new WeakReference(vm); } catch { }
+        }
+
+        /// <summary>Wyjscie z ekranu kucia bez ForgeView (recenzja K1): ExecuteCancel na VM z otwarcia - ten sam koniec co Done/Esc (ForgeJob.CancelPost;
+        /// najpierw zamyka okienka, stad kilka prob). Bez VM albo gdy ekran dalej stoi (np. etap koncowy kucia) - PopState: lepsze niz ekran do konca biegu
+        /// (ForgeJob bez CancelPost zamknie swoja wizyte przy nastepnym otwarciu ekranu - "nowy ekran bez wyjscia z poprzedniego").</summary>
+        private static string CloseScreen()
+        {
+            var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
+            if (gsm == null || !(gsm.ActiveState is CraftingState)) return "ekran zamkniety";
+            var vm = _vm != null ? _vm.Target as CraftingVM : null;
+            if (vm != null)
+            {
+                for (int i = 0; i < 4 && gsm.ActiveState is CraftingState; i++) vm.ExecuteCancel();
+                if (!(gsm.ActiveState is CraftingState)) return "zamkniety (Armoury ExecuteCancel)";
+            }
+            gsm.PopState();
+            return (gsm.ActiveState is CraftingState ? "BLAD: ekran dalej otwarty" : "zamkniety (Armoury PopState" + (vm == null ? ", brak VM" : "") + ")");
+        }
+
+        private static string SafeClose()
+        {
+            try { return CloseScreen(); }
+            catch (Exception e) { Stumble("CloseScreen", e); return "BLAD (" + e.GetType().Name + ")"; }
+        }
+
         /// <summary>Powod, dla ktorego teraz nie otwieramy ekranu (null = mozna).</summary>
         private static string Blocker()
         {
@@ -307,7 +346,17 @@ namespace Armoury
             if (_acc < 0.5f) return;
             _acc = 0f;
             try { Step(); }
-            catch (Exception e) { Stumble("AppTick", e); _stage = 0; _tries++; if (_tries >= 3) _screenDone = true; }
+            catch (Exception e)
+            {
+                Stumble("AppTick", e);
+                if (_stage != 0)
+                {
+                    string cl = SafeClose();
+                    Log.Info(P + "test ekranu - pominiety (wyjatek " + e.GetType().Name + "; wyjscie z ekranu: " + cl + "), proba " + _tries + "/3.");
+                }
+                _stage = 0; _tries++; _at = _clock + 60f;
+                if (_tries >= 3) _screenDone = true;
+            }
         }
 
         private static void Step()
@@ -324,8 +373,15 @@ namespace Armoury
                 if (tpl == null && CraftingTemplate.All.Count > 0) tpl = CraftingTemplate.All[0];
                 if (tpl == null) { _screenDone = true; Log.Info(P + "test ekranu - pominiety (brak szablonu broni)."); return; }
                 _tries++;
+                _stage = 1; _step = 0; _at = _clock + 2f; _openedAt = _clock; _pendingLine = null; _vm = null;   // _stage przed otwarciem - NoteVm lapie VM
                 Helpers.CraftingHelper.OpenCrafting(tpl);
-                _stage = 1; _step = 0; _at = _clock + 2f; _openedAt = _clock; _pendingLine = null;
+                return;
+            }
+            if (_clock - _openedAt > ScreenLimit)
+            {
+                string cl = SafeClose();
+                Log.Info(P + "test ekranu - pominiety (limit " + ScreenLimit.ToString("0", Inv) + " s na ekranie; wyjscie z ekranu: " + cl + "), proba " + _tries + "/3.");
+                _stage = 0; _at = _clock + 60f; _pendingLine = null;
                 return;
             }
             if (_clock < _at) return;
@@ -355,7 +411,8 @@ namespace Armoury
                 if (res == null || res.StartsWith("BLAD: ekran kucia nie otwarty", StringComparison.Ordinal))
                 {
                     if (_step == 0 && _clock - _openedAt < 6f) { _at = _clock + 1f; return; }   // ekran moze ladowac sie kilka klatek
-                    Log.Info(P + "test ekranu - pominiety (ekran kucia nie otworzyl sie: " + (res ?? "null") + "), proba " + _tries + "/3.");
+                    string cl = SafeClose();   // recenzja K1: ekran mogl sie otworzyc bez mixinu ForgeView - zamkniety tu, inaczej stoi do konca biegu
+                    Log.Info(P + "test ekranu - pominiety (ekran kucia nie otworzyl sie: " + (res ?? "null") + "; wyjscie z ekranu: " + cl + "), proba " + _tries + "/3.");
                     _stage = 0; _at = _clock + 60f;
                     return;
                 }
@@ -370,7 +427,8 @@ namespace Armoury
             // koniec: wyjscie z ekranu
             string close = null;
             try { close = StepRaw(9, null); } catch (Exception e) { Stumble("Close", e); }
-            Log.Info(P + "test ekranu - koniec: probek " + _screenN + ", zgodnych " + _screenOk + " (wyjscie z ekranu: " + (close ?? "null") + ").");
+            string after = SafeClose();   // recenzja K1: ForgeView nie zamknal (brak mixinu, wyjatek) - zamyka Armoury
+            Log.Info(P + "test ekranu - koniec: probek " + _screenN + ", zgodnych " + _screenOk + " (wyjscie z ekranu: " + (close ?? "null") + " | po wyjsciu: " + after + ").");
             _screenDone = true;
             _stage = 0;
         }

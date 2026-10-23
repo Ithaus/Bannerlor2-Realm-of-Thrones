@@ -80,6 +80,7 @@ namespace Armoury
         /// <summary>Postfiks konstruktora CraftingVM: ekran kuzni otwarty - stamina wszystkich kowali z listy ekranu na starcie.</summary>
         public static void VmCtorPost(CraftingVM __instance)
         {
+            ForgeBillTest.NoteVm(__instance);   // m109-kuznia: autotest ekranu kucia - VM do wyjscia bez ForgeView (tylko ekran otwarty przez test; wlasny try)
             try
             {
                 if (_open) Close(false, "nowy ekran bez wyjscia z poprzedniego");   // poprzednia wizyta bez ExecuteCancel - jej godziny do kolejki, bez paska
