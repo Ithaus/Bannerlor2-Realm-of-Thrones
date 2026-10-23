@@ -609,6 +609,9 @@ namespace Armoury
                 // m110-stan (LootStateFromWounds): ksiega obrazen czesci zbroi wrogow w bitwie - stan lupu z prawdziwych obrazen (bez latki, sama misja)
                 if (LootWear.On && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new LootWear.Logic());
+                // m110-stan krok 2: ochrona z dokladnego HP i zuzycie sprzetu towarzyszy - pomiar haka testu, przeciek kopii i koniec misji (kopie robi postfiks spawnu)
+                if (Campaign.Current != null && mission != null && (Settings.Current.WornExactHpProtection || Settings.Current.CompanionGearWear))
+                    mission.AddMissionBehavior(new HeroHp.Logic());
                 // n20-herby: linia "Tarcze band (herby):" po rozstawieniu i na koniec misji (sam herb idzie w prefiksie SpawnAgent)
                 if (Settings.Current.BandShieldsStolenArms && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new BandShieldsWatch());

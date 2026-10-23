@@ -743,6 +743,9 @@ namespace Armoury
         // f9-predkosc: liczniki linii "Predkosc mapy (f9)" od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _f9Reset = F9Reset();
         private static bool F9Reset() { try { MapSpeedProfile.Reset(); } catch (Exception e) { Log.Error("F9Reset", e); } return true; }
+        // m110-stan krok 2: rejestry misji ochrony z dokladnego HP i ksiegi sprzetu towarzyszy od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
+        private readonly bool _m110HpReset = M110HpReset();
+        private static bool M110HpReset() { try { HeroHp.Reset(); HeroBook.Reset(); } catch (Exception e) { Log.Error("M110HpReset", e); } return true; }
         // r4-przetop: skrzynka resztek przetopu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _r4ScrapsReset = R4ScrapsReset();
         private static bool R4ScrapsReset() { try { SmeltScraps.Reset(); } catch (Exception e) { Log.Error("R4ScrapsReset", e); } return true; }
@@ -1134,6 +1137,15 @@ namespace Armoury
                 }
                 catch (Exception e) { Log.Error("SaveSize.Note", e); }
             if (dataStore.IsSaving) GearState.SaveLine();   // m110-stan: linia "Stany sprzetu (m110): zapis" - tylko pod flaga testu stanu (zgodnosc po wczytaniu)
+            // m110-stan krok 2 (CompanionGearWear): ksiegi dokladnej wytrzymalosci sprzetu towarzyszy - osobny klucz; zapis tylko przy kluczu i ksiegach (inaczej klucza
+            // w zapisie nie ma); stary zapis bez klucza = ksiegi puste (start od stanu); DLL 104 klucz pomija; arm_condition gracza bez zmian formatu
+            try
+            {
+                string heroBook = dataStore.IsSaving ? HeroBook.Export() : null;
+                if (dataStore.IsLoading || heroBook != null) SaveText.Sync(dataStore, "arm_condition_heroes", ref heroBook);
+                if (dataStore.IsLoading) HeroBook.Import(heroBook);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_condition_heroes", e); }
             // ZB-1 (noc 17/18.10): rozbicie ksiegi gracza na egzemplarze (id|mod -> ile) - wlasny try, PO arm_player_stock (przyciecie do ksiegi id); brak klucza
             // (stary zapis) = puste rozbicie i migracja przy pierwszym porzadku; starsza DLL klucz pomija; klucz ArmouryBookPerModifier wylaczony - zapis pusty
             try
@@ -2347,6 +2359,7 @@ namespace Armoury
             try { WearGroups.Fix(); } catch (Exception e) { Log.Error("WearGroups.Fix", e); }
             try { GearState.SessionLine(); } catch (Exception e) { Log.Error("GearState.SessionLine", e); }   // m110-stan (recenzja R3): linia "rynsztunek i sakwy gracza" PO WearGroups.Fix (uprzaz, luki i kusze z grupa) - stan z zapisu, przed wyrownaniem
             try { ResyncWornStates(); } catch (Exception e) { Log.Error("ResyncWornStates", e); }   // m110-stan (recenzja R6): nazwa i cena sztuk na grzbiecie wedlug ksiegi (progi 80/40/10) - PO WearGroups.Fix
+            HeroHp.StartLine();   // m110-stan krok 2: linia "HP sprzetu (m110): start" (klucze, latka, ksiegi, kontrola krzywej) - PO wyrownaniu nazw; wlasny try w srodku
             try { RaceLaw.OnSessionLaunched(); } catch (Exception e) { Log.Error("RaceLaw.OnSessionLaunched", e); }   // Jeff 10.10: postfiks rasy takze na nadpisaniu w modelu slubu, ktory gra uzywa (ROT); linia "Rasy: start sesji"
             try { AiDowry.OnSessionLaunched(); } catch (Exception e) { Log.Error("AiDowry.OnSessionLaunched", e); }   // R3-01c: latka kontraktu BK i przechyl swatow na modelu slubu, ktory gra uzywa (ROT)
             try { SellByCondition.OnSessionLaunched(); } catch (Exception e) { Log.Error("SellByCondition.OnSessionLaunched", e); }   // cena sprzedazy sprzetu: wylacznik kary BK z MCM (PO McmSettings.Apply wyzej) i kontrola "Kara handlowa BK: x5.0"; ksiega skupu od zera
@@ -3150,6 +3163,7 @@ namespace Armoury
                     {
                         float stale = FieldCraft.DropLedger();
                         if (stale > 0.01f) Log.Info("Zuzycie (E8/A): poczatek bitwy - ksiega ciosow wyzerowana, " + stale.ToString("0.0") + " pkt sprzed tej bitwy przepada (rynsztunek bez zmian).");
+                        HeroBook.DropLedgers("poczatek bitwy");   // m110-stan krok 2 (CompanionGearWear): ksiegi ciosow towarzyszy - ta sama regula
                     }
                 }
                 catch (Exception e) { Log.Error("OnMapEventStarted.DropLedger", e); }
@@ -3191,6 +3205,7 @@ namespace Armoury
                         {
                             float lostWear = FieldCraft.DropLedger();
                             if (lostWear > 0.01f) Log.Info("Zuzycie (E8/A): bitwa przegrana albo opuszczona - " + lostWear.ToString("0.0") + " pkt z ksiegi ciosow przepada (kleska nie obija, jak dotad).");
+                            HeroBook.DropLedgers("bitwa przegrana albo opuszczona");   // m110-stan krok 2: towarzysze jak gracz
                         }
                     }
                     catch (Exception e) { Log.Error("OnMapEventEnded.DropLedger", e); }
@@ -3253,6 +3268,8 @@ namespace Armoury
                     Log.Info("Bitwa zakonczona (auto): obrazenia " + damage + ", zuzycie " + wear.ToString("0.0"));
                     ApplyWear(wear);
                 }
+                // m110-stan krok 2 (CompanionGearWear): sprzet towarzyszy z ich ksiag ciosow (misja) - te same reguly co gracz; autobitwa bez trafien - bez zuzycia
+                try { HeroBook.ApplyBattle(); } catch (Exception e) { Log.Error("HeroBook.ApplyBattle", e); }
 
                 CleanseAmmo();   // lupy moga przyniesc "zuzyte" strzaly z cudzych systemow - czyscimy
             }
@@ -3797,6 +3814,28 @@ namespace Armoury
             catch { return 0; }
         }
 
+        /// <summary>m110-stan krok 2: ksiega sztuki po zuzyciu z ciosow (wydzielone z ApplyWearPerSlot - to samo wyrazenie, wynik bit w bit jak dotad; towarzysze -
+        /// HeroBook.ApplyBattle). Pancerz: ksiega niesie SUROWE obrazenia, pula = pancerz x DurabilityPerArmorPoint x tier, kazdy punkt obrazen zdejmuje jeden punkt
+        /// puli; reszta (bron, tarcza, luk): punkty przez solidnosc tieru.</summary>
+        internal static float WearAfter(ItemObject it, float cond, float amount)
+        {
+            if (it.HasArmorComponent)
+            {
+                int pool = ArmorPool(it);
+                if (pool > 0) cond = MathF.Max(0f, cond - amount * 100f / pool);
+                return cond;
+            }
+            float sturdiness = Sturdiness(it);
+            return MathF.Max(0f, cond - amount / sturdiness);
+        }
+
+        /// <summary>m110-stan krok 2: solidnosc tieru (1 + (tier - 1) x TierDurabilityFactor) - jak w ApplyWearPerSlot.</summary>
+        internal static float Sturdiness(ItemObject it)
+        {
+            int tier = Recipes.Grade(it);
+            return 1f + MathF.Max(0, tier - 1) * Settings.Current.TierDurabilityFactor;
+        }
+
         /// <summary>Zuzycie per slot z ksiegi bitwy + ewentualna baza rozlozona po staremu.</summary>
         private void ApplyWearPerSlot(float[] perSlot, float flat)
         {
@@ -3810,20 +3849,7 @@ namespace Armoury
                     var el = eq[slot];
                     if (el.Item == null || NoWear(el.Item)) continue;
                     if (el.Item.ItemComponent == null || el.Item.ItemComponent.ItemModifierGroup == null) continue;
-                    float cond = GetCondition(slot, el);
-                    if (el.Item.HasArmorComponent)
-                    {
-                        // pancerz: ksiega niesie SUROWE obrazenia; pula = pancerz x 20 x tier,
-                        // kazdy punkt obrazen zdejmuje jeden punkt puli
-                        int pool = ArmorPool(el.Item);
-                        if (pool > 0) cond = MathF.Max(0f, cond - amount * 100f / pool);
-                    }
-                    else
-                    {
-                        int tier = Recipes.Grade(el.Item);
-                        float sturdiness = 1f + MathF.Max(0, tier - 1) * Settings.Current.TierDurabilityFactor;
-                        cond = MathF.Max(0f, cond - amount / sturdiness);
-                    }
+                    float cond = WearAfter(el.Item, GetCondition(slot, el), amount);   // m110-stan krok 2: arytmetyka wydzielona (ta sama dla towarzyszy - HeroBook)
                     SetCondition(slot, cond);
                     if (cond <= 0f && Settings.Current.BreakAtZeroCondition)
                     {
@@ -4292,6 +4318,17 @@ namespace Armoury
         }
 
         internal float ConditionQuietOf(int slot) { return GetConditionQuiet(slot); }   // R3-02 (GuildMend): stan czesci uprzezy - godziny cechow i rabat zlecenia
+
+        /// <summary>m110-stan krok 2 (WornExactHpProtection): dokladna wytrzymalosc d (procent puli) sztuki gracza w gniezdzie - ksiega tej sztuki bita (ponizej
+        /// 100) wzgledem stanu, w jakim weszla do ksiegi (EffectiveCondition); false - ksiega jej nie zna albo swiezy wpis (ochrona wedlug stanu). Tylko odczyt.</summary>
+        internal bool WornExactD(int slot, out float d)
+        {
+            d = 100f;
+            float cond = GetConditionQuiet(slot);
+            if (cond >= 100f) return false;
+            d = EffectiveCondition(cond, OriginalModifier(slot));
+            return true;
+        }
 
         /// <summary>m110-stan: wytrzymalosc d (procent puli) tej sztuki na grzbiecie z ksiegi zuzycia (ArmouryStats); -1 - sztuki nie ma na grzbiecie albo ksiega
         /// jej nie bila (stan tylko z modyfikatora - wytrzymalosc nieznana dokladnie).</summary>
