@@ -1770,9 +1770,9 @@ Uzycie (Python 3, tylko odczyt):
                     w uprzaz 0 przy kluczu (bez uprzezy na cialach - INFO). LUP-J7 Z1 pekniete dodatkowo = wraki, niejednoznaczne 0 (suma 0 - INFO). LUP-J8
                     pokrycie testu (linie 'test - ...' tylko pod flaga): >= 1 bitwa z lupem kon, uprzaz i tulow >= 1, linia jezdzcow z koniem w lupie, konie
                     z dzialki na liste albo do sakw (lista + sakwy = wejscia - padle, zwrot/przepadlo/zostaje 0); flaga bez pokrycia - NIE, bez flagi - INFO.
-                    LUP-J9 linie doby 'Lup bitew (m109)': Spoils wyjal kon/uprzaz 0 przy kluczu (brak linii - INFO). LUP-J10 pomiar na bitwe <= 20 ms TAK,
-                    <= 50 INFO, > 50 NIE.
---grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
+                    LUP-J9 linie doby 'Lup bitew (m109)': Spoils wyjal kon/uprzaz 0 przy kluczu (brak linii - INFO). LUP-J10 pomiar na bitwe wobec liczby
+                    wywolan (kazdy polegly czlowiek misji, takze wlasny): <= 20 ms + 0.05 ms x wywolan TAK, <= 50 ms + 0.2 ms x wywolan INFO, wiecej NIE.
+--grupa na7      : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
                     kroku A7 od D) i "KS: A7 sezon zamkniety (f5-a7)". NA7-0 linie paczki (nierozpoznanych 0; brak - INFO), NA7-1 linia w kazdej dobie kroku (co 7 dob od D,
@@ -62066,7 +62066,7 @@ M109LUP_RX = {
     "S": re.compile(r" \| przesiane \[smoki/legendy/olbrzymy-egzotyki/zniszczone/wraki ponizej progu\]: ([^|]*?) \| "),
     "dead": re.compile(r" \| konie padle pod powalonymi: z kolejki (\d+), ze zbrojowni (\d+), poza lupem (\d+), brak (\d+) \| "),
     "wr": re.compile(r" \| wraki: cios (\d+) \(w uprzaz (\d+)\), pekniete dodatkowo (\d+) -> wraki (\d+), niejednoznaczne (\d+) \| "),
-    "tail": re.compile(r" \| koniec: (.*?) \| pomiar (\d+(?:\.\d+)?) ms \| potkniecia (\d+)\.$"),
+    "tail": re.compile(r" \| koniec: (.*?) \| pomiar (\d+(?:\.\d+)?) ms \(wywolan (\d+)\) \| potkniecia (\d+)\.$"),
     "riders": re.compile(r"^Lup bitwy \(m109\): jezdzcy bitwy (\d+) - (.*)\.$"),
     "rhorse": re.compile(r"(?:^|\| )\S+ \([^)]*\): kon \S+ lup\b"),
     "test": re.compile(r"^Lup bitwy \(m109\): test - wrog (\S+) \(plan (\w+)\): dolozono (\d+) x (\S+) \(kon (\S+), uprzaz (\S+), tulow (\S+)\) "
@@ -62091,14 +62091,14 @@ M109LUP_TEST = {
               "trofeow [z kolejki/wraki/przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: kon 1/0/0/0/1/1/0/1, uprzaz 2/0/0/0/2/2/0/2, "
               "tulow 10/3/1/0/0/0/0/12, bron 18/0/0/0/0/0/0/18 | przesiane [smoki/legendy/olbrzymy-egzotyki/zniszczone/wraki ponizej progu]: tulow 0/0/0/1/0 "
               "| konie padle pod powalonymi: z kolejki 1, ze zbrojowni 0, poza lupem 0, brak 0 | wraki: cios 2 "
-              "(w uprzaz 0), pekniete dodatkowo 1 -> wraki 1, niejednoznaczne 0 | koniec: lista trofeow Spoils | pomiar 1.2 ms | potkniecia 0.",
+              "(w uprzaz 0), pekniete dodatkowo 1 -> wraki 1, niejednoznaczne 0 | koniec: lista trofeow Spoils | pomiar 1.2 ms (wywolan 30) | potkniecia 0.",
     "sim": "Lup bitwy (m109): bitwa 4 | misja NIE, Send troops TAK, klucze konie TAK/uprzaz TAK/pekniete TAK (wraki TAK, konie gina zabite TAK) | powaleni "
            "przez druzyne 0 (Ty i towarzysze 0, zolnierze 0), konnych 0, bohaterow pominietych 0 | z cial [na cialach/lup/cios/pekniete/zastepcze/odrzut/inne]: "
            "brak | kolejka [wczesniej/dzialka/bagaz/send/padle/lista/sakwy/zwrot/przepadlo/zostaje]: kon 0/0/0/1/0/0/1/0/0/0 | lista trofeow [z kolejki/wraki/"
            "przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: nie bylo | przesiane [smoki/legendy/olbrzymy-egzotyki/zniszczone/wraki ponizej "
            "progu]: brak | Send troops - lup DTE z poleglych do zbrojowni wojska: kon 3, tulow 9 | "
            "konie padle pod powalonymi: z kolejki 0, ze zbrojowni 0, poza lupem 0, brak 0 | wraki: cios 0 (w uprzaz 0), pekniete dodatkowo 0 -> wraki 0, "
-           "niejednoznaczne 0 | koniec: sakwy - Send troops - ekran lupow Spoils po tej bitwie nie przychodzi (oblezenie, morze) | pomiar 0.1 ms | potkniecia 0.",
+           "niejednoznaczne 0 | koniec: sakwy - Send troops - ekran lupow Spoils po tej bitwie nie przychodzi (oblezenie, morze) | pomiar 0.1 ms (wywolan 0) | potkniecia 0.",
     "riders": "Lup bitwy (m109): jezdzcy bitwy 3 - veteran_caravan_guard_battania (Ty, zabity): kon t2_battania_horse lup (padl - z kolejki), uprzaz "
               "chain_horse_harness lup, tulow stark_armor_1 pekniete->wrak, glowa x_helmet lup | veteran_caravan_guard_battania (Ty, ogluszony): kon "
               "t2_battania_horse lup, uprzaz chain_horse_harness lup, tulow stark_armor_1 lup.",
@@ -62152,7 +62152,8 @@ def m109lup_battle(s):
     d["wr"] = tuple(int(x) for x in seg["wr"].groups())
     d["how"] = seg["tail"].group(1)
     d["ms"] = float(seg["tail"].group(2))
-    d["stum"] = int(seg["tail"].group(3))
+    d["calls"] = int(seg["tail"].group(3))   # recenzja R2: wywolania pomiaru - prog czasu od liczby
+    d["stum"] = int(seg["tail"].group(4))
     return d
 
 
@@ -62194,9 +62195,9 @@ def m109lup_selftest():
     b = m109lup_battle(M109LUP_TEST["battle"])
     if not b or b.get("bad"):
         return "bitwa: %s" % (b.get("bad") if b else "brak dopasowania")
-    if (b["n"], b["felled"], b["hero"], b["riders"], b["dead"], b["wr"], b["how"], b["ms"], b["stum"]) != (3, 13, 13, 2, (1, 0, 0, 0), (2, 0, 1, 1, 0),
-                                                                                                         "lista trofeow Spoils", 1.2, 0):
-        return "bitwa: pola %s" % ((b["n"], b["felled"], b["dead"], b["wr"], b["how"], b["ms"]),)
+    if (b["n"], b["felled"], b["hero"], b["riders"], b["dead"], b["wr"], b["how"], b["ms"], b["calls"], b["stum"]) != (
+            3, 13, 13, 2, (1, 0, 0, 0), (2, 0, 1, 1, 0), "lista trofeow Spoils", 1.2, 30, 0):
+        return "bitwa: pola %s" % ((b["n"], b["felled"], b["dead"], b["wr"], b["how"], b["ms"], b["calls"]),)
     if b["A"].get("tulow") != [13, 10, 2, 1, 0, 0, 0] or b["B"].get("kon") != [0, 2, 0, 0, 1, 1, 0, 0, 0, 0] or b["C"].get("uprzaz") != [2, 0, 0, 0, 2, 2, 0, 2]:
         return "bitwa: bloki rodzajow"
     if any(m109lup_ids(b)):
@@ -62374,13 +62375,20 @@ def m109lup_rows(rep, D):
             len(D["days"]), len(kday), wy, wy_off, sum(int(d[10]) for d in D["days"]), sum(int(d[11]) for d in D["days"]))
         rep.add("LUP-J9: linie doby 'Lup bitew (m109)' - Spoils wyjal kon/uprzaz przy kluczu", val, "0 przy kluczu TAK (klucz NIE - INFO)",
                 None if not kday else wy == 0)
-    # LUP-J10 czas pomiaru
+    # LUP-J10 czas pomiaru - recenzja R2: suma bitwy rosnie z liczba poleglych w misji (kazdy zabity/ogluszony czlowiek to wywolanie, takze straty
+    # wlasne), wiec prog od liczby wywolan: 20 ms (JIT pierwszych wywolan) + 0.05 ms na wywolanie TAK, 50 ms + 0.2 ms na wywolanie INFO, wiecej NIE
+    lim = "<= 20 ms + 0.05 ms x wywolan TAK, <= 50 ms + 0.2 ms x wywolan INFO, wiecej NIE"
     if not B:
-        rep.add("LUP-J10: pomiar ms na bitwe", "brak linii bitwy", "<= 20 TAK, <= 50 INFO, > 50 NIE", None)
+        rep.add("LUP-J10: pomiar ms na bitwe wobec liczby wywolan", "brak linii bitwy", lim, None)
     else:
-        mx = max(b["ms"] for b in B)
-        rep.add("LUP-J10: pomiar ms na bitwe", "najwiecej %.1f ms (bitwa %d), srednio %.1f ms" % (mx, max(B, key=lambda b: b["ms"])["n"], sum(b["ms"] for b in B) / len(B)),
-                "<= 20 TAK, <= 50 INFO, > 50 NIE", True if mx <= 20 else (None if mx <= 50 else False))
+        def j10(b):
+            return 0 if b["ms"] <= 20 + 0.05 * b["calls"] else (1 if b["ms"] <= 50 + 0.2 * b["calls"] else 2)
+        worst = max(B, key=lambda b: (j10(b), b["ms"]))
+        lv = j10(worst)
+        calls = sum(b["calls"] for b in B)
+        rep.add("LUP-J10: pomiar ms na bitwe wobec liczby wywolan", "najgorsza bitwa %d: %.1f ms przy %d wywolan; razem %.1f ms / %d wywolan (%.3f ms na wywolanie)" % (
+            worst["n"], worst["ms"], worst["calls"], sum(b["ms"] for b in B), calls, sum(b["ms"] for b in B) / calls if calls else 0.0),
+            lim, True if lv == 0 else (None if lv == 1 else False))
 
 
 def m109lup_synth():

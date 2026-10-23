@@ -117,6 +117,7 @@ namespace Armoury
             public int DeadQ, DeadArm, DeadOut, DeadNone;
             public int WCios, WCiosHarness, PekOne, PekWreck, Ambig;
             public long Ticks;
+            public int Calls;                       // recenzja R2: wywolania pomiaru w misji (prefiks i postfiks OnAgentRemoved) - prog czasu od liczby
             public int Stumbles;
             public readonly List<Rider> RiderList = new List<Rider>();
             public readonly Dictionary<Agent, bool> HorseLoot = new Dictionary<Agent, bool>();   // jezdziec -> czy jego kon wszedl do lupu druzyny gracza
@@ -234,6 +235,7 @@ namespace Armoury
         private static void Lap(long t0)
         {
             long d = Stopwatch.GetTimestamp() - t0;
+            if (_cur != null) _cur.Calls++;
             if (d <= 0) return;
             _dTicks += d;
             if (_cur != null) _cur.Ticks += d;
@@ -320,7 +322,7 @@ namespace Armoury
                 sb.Append(" | konie padle pod powalonymi: z kolejki ").Append(b.DeadQ).Append(", ze zbrojowni ").Append(b.DeadArm).Append(", poza lupem ").Append(b.DeadOut).Append(", brak ").Append(b.DeadNone)
                   .Append(" | wraki: cios ").Append(b.WCios).Append(" (w uprzaz ").Append(b.WCiosHarness).Append("), pekniete dodatkowo ").Append(b.PekOne)
                   .Append(" -> wraki ").Append(b.PekWreck).Append(", niejednoznaczne ").Append(b.Ambig)
-                  .Append(" | koniec: ").Append(how).Append(" | pomiar ").Append(Ms(b.Ticks)).Append(" ms | potkniecia ").Append(b.Stumbles).Append('.');
+                  .Append(" | koniec: ").Append(how).Append(" | pomiar ").Append(Ms(b.Ticks)).Append(" ms (wywolan ").Append(b.Calls).Append(") | potkniecia ").Append(b.Stumbles).Append('.');
                 Log.Info(sb.ToString());
                 if (b.RiderList.Count > 0 && (_riderLines < RiderLinesSession || TestWanted()))
                 {
@@ -809,7 +811,7 @@ namespace Armoury
         {
             try
             {
-                if (_dBattles == 0 && _dStumbles == 0) return;
+                if (_dBattles == 0 && _dStumbles == 0) { ClearDay(); return; }   // recenzja R2: czas pomiaru doby bez bitew nie przechodzi na nastepna dobe
                 int day = (int)CampaignTime.Now.ToDays;
                 var s = Settings.Current;
                 long armNa = 0, armLup = 0, armCios = 0, armZast = 0, rez = 0;

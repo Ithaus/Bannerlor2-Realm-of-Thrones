@@ -42,6 +42,10 @@ konie) - po naprawie padly kon wyszedlby na liscie, wiec poprawka jest czescia z
    wedlug rodzaju - liczony w AppendWrecks (wraki ponizej progu), CleanseDragons (smoki), CleanseTrash (legendy; sprzet olbrzymow, wierzchowiec egzotyczny
    nie dla partii gracza i slonie - olbrzymy-egzotyki; stan <= LootMinConditionPercent - zniszczone), tylko miedzy WrecksIn a Sifted w AfterGenerateLoot
    (te same funkcje na ekranie gry i w sakwach sie nie licza). Suma przyczyn = "przesiane" bloku C (sprawdza LUP-J4).
+   Recenzja R2: linia bitwy `pomiar X ms (wywolan N)` - kazdy zabity albo ogluszony czlowiek misji (takze straty wlasne) to wywolanie pomiaru, wiec LUP-J10
+   progi od liczby wywolan: <= 20 ms + 0.05 ms x N TAK, <= 50 ms + 0.2 ms x N INFO, wiecej NIE (dawniej suma <= 20/50 ms - wielka bitwa ROT dalaby
+   falszywe NIE); `Daily` zeruje dobe takze bez bitew (czas pomiaru nie przechodzi na nastepna dobe). Recenzja R3: `DayProfile.Lap("LootTally.Daily")`
+   w ArmouryBehavior - czas linii doby nie wpada do odcinka PackMarket.Daily.
 2. **FallenRiderHorsesLooted.** AfterGenerateLoot (po przesianiu) przetrzymuje konie i uprzaz w `MountHold`; prefiks Spoils `EquipmentDamageModel.ApplyDamageToLoot`
    (Spoils wola go tylko w :944, zaraz po swojej petli) oddaje je na liste: kon ze znacznikiem "lucky" Spoils (zostaje taki, jak byl pod jezdzcem - bez losowej
    kulawizny), uprzaz ze zuzyciem Spoils jak kazda zbroja, wrak uprzezy zostaje wrakiem. Finalizer Spoils `OnMapEventEnded`: co nie wrocilo (wyjatek w Spoils) - do
