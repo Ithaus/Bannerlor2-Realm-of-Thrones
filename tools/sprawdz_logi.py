@@ -1754,6 +1754,17 @@ Uzycie (Python 3, tylko odczyt):
                     M7G-9 ERROR nowych funkcji (takze CartGuard.Guard(woz), CartGuard.Unload, DsTowns.*, NoticeBoard.Export, Watch.WatchImport2), zly format segmentu Wozy, proby
                     niezgodne i BLAD eksportu 0. Klucz liczy sie jako TAK tylko z linii startu: log bez linii m107 (sprzed m107) - progi kluczy INFO, bez wyjatku; werdykt bez
                     klucza dalej daja M7G-11 i M7G-9 oraz progi formatu / czasu / poziomu przy obecnych liniach (M7G-12, M7G-24, M7G-31, M7G-33, M7G-41, M7G-44, M7G-53).
+--grupa m109kuz   : (23.10, galaz w-toku/m109-kuznia - Jeff 23.10 "smithing za szybko rosnie, zmniejszyc o 30%" i "przy lukach nie ma w ogole pokazanych wymagan ...
+                    liczby nad ikonkami: 3 drewna = 300 kg i 87 kg w pamieci"; klucze Smithing Xp Factor (SmithXp.cs) i Forge Bill On Screen (ForgeBill.cs, ForgeBillTest.cs,
+                    ForgeView ForgeBillRow.cs)) python -I tools/sprawdz_logi.py --grupa m109kuz <Armoury-*.log> (strumieniowo). KUZ-S self-test wyrazen wobec linii
+                    kontrolnych jak w kodzie C#, KUZ-S2 test syntetyczny (dobry i zly bieg przez m109kuz_collect / m109kuz_rows). KUZ-0 linie startu "Kowalstwo wolniej
+                    (m109)" i "Kuznia wymagania (m109)" w kazdej sesji (tyle samo), latka HeroDeveloper.AddSkillXp 'wpieta' (klucz != 1.00), czy stac CRAFT 'wpiete', przycisk
+                    broni (RefreshEnableMainAction) 'wpiety'. KUZ-1 test A (plik armoury-kuznia.flag): proporcja XP Smithing wobec klucza +- 0.01, KUZ-2 ustawianie poziomu
+                    1.000 +- 0.005, KUZ-3 kontrola Athletics 1.000 +- 0.005 (bez testu - INFO; plik testu bez linii testu - NIE). KUZ-4 doby A: suma XP po / przed = klucz
+                    +- 0.005 i potkniecia 0 (bez kucia - INFO). KUZ-5 probki rachunku z linii startu B: kazda >= 1 wiersz z potrzeba > 0, luk >= 2 (takze przy otwarciu 0 -
+                    luki maja wymagania). KUZ-6 test zuzycia: kazda linia przedmiotu zgodnosc TAK, zgodnych == przedmiotow i >= 4; KUZ-7 stan przywrocony TAK (bez testu -
+                    INFO; plik testu bez linii testu - NIE). KUZ-8 test ekranu: kazda probka zgodne TAK (brak - INFO z powodem), KUZ-8b zdjecia, KUZ-8c ForgeView podpiety
+                    (INFO). KUZ-9 ERROR SmithXp / ForgeBill / ForgeBillTest 0, potkniecia max 0, kwit BK inny niz przepis 0. KUZ-I ruch ekranu (INFO). Log bez linii m109 - INFO.
 --grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
                     Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
                     Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
@@ -58405,6 +58416,8 @@ def main(argv):
         return m106wozy_main(logp, tabp, until_arg)   # m106wozy (22.10, w-toku/m106-wozy): woz zawsze wraca (drogi ladowe, brama wroga, pamiec tras, straznik, dosypka przy wyjezdzie) i fach wsi pod KS
     if group == "m107gosp" and logp:
         return m107gosp_main(logp, until_arg)   # m107gosp (22.10, w-toku/m107-gospodarka): biedne wsie (miara M3W-2), stojace wozy (K1), zaleglosci zamkow (K2/K3), ziarno (K4/K5), zapis tablicy (K6)
+    if group == "m109kuz" and logp:
+        return m109kuz_main(logp)   # m109kuz (23.10, w-toku/m109-kuznia): kowalstwo wolniej (SmithingXpFactor) i rachunek kuzni na ekranie kucia (ForgeBill, ForgeView)
     if group == "m105gosp5" and logp:
         return m105gosp5_main(logp)   # m105gosp5 (21.10, m105-gospodarka5): ulga pana dla wsi ponizej skrzyni przy wozie i czynsz darowany do skrzyni (VillageTakings.cs, DsVillage.cs)
     if group == "p6a7" and logp:
@@ -62020,6 +62033,377 @@ def m107gosp_main(logp, until=120):
     print(f"plik: {logp} | tryb {D['mode']} | startow m107 {len(D['start'])}, linii Wozy {len(D['wz'])}, Firm DS {len(D['fz'])}, Planow {len(D['plans'])}, zapisow gry {len(D['save'])}, "
           f"wczytan nb3 {len(D['load3'])} / nb2 {len(D['load2'])}, ERROR {D['err']}")
     m107_rows(rep, D, nks_rows)
+    rep.show()
+    return 0
+
+
+# ---------------- m109kuz (23.10, galaz w-toku/m109-kuznia - Jeff 23.10 "smithing za szybko rosnie, zmniejszyc o 30%" i "przy lukach nie ma w ogole pokazanych
+# wymagan ... liczby nad ikonkami: 3 drewna = 300 kg i 87 kg w pamieci"): A - SmithingXpFactor (SmithXp.cs, prefiks HeroDeveloper.AddSkillXp), B - rachunek kuzni
+# ForgeBillOnScreen (ForgeBill.cs, ForgeBillTest.cs, ForgeView ForgeBillRow.cs). Linie "Kowalstwo wolniej (m109): " i "Kuznia wymagania (m109): ".
+M109KUZ_TAG_A = "Kowalstwo wolniej (m109): "
+M109KUZ_TAG_B = "Kuznia wymagania (m109): "
+M109KUZ_ERR = ("ERROR in SmithXp", "ERROR in ForgeBill")   # ForgeBill, ForgeBillTest, wywolania z ArmouryBehavior / SubModuleMain
+M109KUZ_TOL_P = 0.01            # KUZ-1: |proporcja testu - klucz|
+M109KUZ_TOL_1 = 0.005           # KUZ-2 / KUZ-3: proporcja ustawiania poziomu i kontroli Athletics wobec 1.000
+M109KUZ_TOL_DAY = 0.005         # KUZ-4: suma XP po / przed z linii doby wobec klucza
+M109KUZ_MIN_ITEMS = 4           # KUZ-6: najmniej przedmiotow zgodnych w tescie zuzycia (luk, kusza, zbroja, bron, strzaly)
+M109KUZ_KINDS = ("luk", "kusza", "zbroja", "bron", "strzaly")
+M109KUZ_RX = {
+    "a_start": re.compile(r"^start sesji \| klucz SmithingXpFactor ([\d.]+).*? \| latka HeroDeveloper\.AddSkillXp (.+?) \(Priority\.First\) \| inne latki na celu (\S+) "
+                          r"\| test autotestu (TAK|NIE) \| potkniecia (\d+)\."),
+    "a_xp": re.compile(r"^XP .+ \((gracz|rod|inni)\) ([\d.]+) -> ([\d.]+) \| wywolanie (\d+) w sesji\."),
+    "a_day": re.compile(r"^dzien (\d+) \| wywolan (\d+) \(gracz (\d+), rod (\d+), inni (\d+)\), XP przed ([\d.]+) -> po ([\d.]+) \(gracz ([\d.]+) -> ([\d.]+)\), "
+                        r"bez mnoznika \(ustawianie poziomu\) (\d+), potkniecia (\d+)\."),
+    "a_test": re.compile(r"^test - Smithing 5 XP: przyrost (-?[\d.]+) wobec (-?[\d.]+) bez mnoznika, proporcja (-?[\d.]+) \(klucz ([\d.]+)\) \| kontrola Athletics proporcja "
+                         r"(-?[\d.]+) \| ustawianie poziomu proporcja (-?[\d.]+) - (TAK|NIE)\."),
+    "a_skip": re.compile(r"^test - pominiety \((.*)\)\.$"),
+    "b_start": re.compile(r"^start sesji \| klucz ForgeBillOnScreen (TAK|NIE) \| latki: czy stac CRAFT (.+?), przycisk broni \(RefreshEnableMainAction\) (.+?) "
+                          r"\| test autotestu (TAK|NIE) \| probki: (.*) \| potkniecia (\d+)\.$"),
+    "b_sample": re.compile(r"(\S+) \((luk|kusza|zbroja|bron|strzaly)\) \[(.*?)\](?:; |$)"),
+    "b_need": re.compile(r"potrzeba ([\d.]+)"),
+    "b_screen": re.compile(r"^ekran (CRAFT|bron) (\S+) \| (.*) \| da sie wykuc (TAK|NIE) \| odswiezen w sesji (\d+)\."),
+    "b_day": re.compile(r"^dzien (\d+) \| odswiezen ekranu (\d+) \(CRAFT (\d+), bron (\d+)\), braki (\d+), przycisk zablokowany rachunkiem (\d+) \(rzadki surowiec (\d+)\), "
+                        r"kwit BK inny niz przepis (\d+), potkniecia (\d+)\."),
+    "b_item": re.compile(r"^test - (\S+) \((luk|kusza|zbroja|bron|strzaly)\) \| .* - zgodnosc (TAK|NIE)"),
+    "b_sum": re.compile(r"^test - wynik: przedmiotow (\d+), zgodnych (\d+), dolozone na probe (\d+) szt\., stan przywrocony (TAK|NIE), potkniecia (\d+)\."),
+    "b_sumskip": re.compile(r"^test - wynik: (pominiety|przerwany) (.*)$"),
+    "b_scr": re.compile(r"^test ekranu - (bron|zbroja|luk|strzaly) \| .*\| zgodne (TAK|NIE) \| zdjecie (.*)\.$"),
+    "b_scrskip": re.compile(r"^test ekranu - pominiety \((.*)\)"),
+    "b_scrend": re.compile(r"^test ekranu - koniec: probek (\d+), zgodnych (\d+)"),
+    "b_fv": re.compile(r"^ForgeView rzad wymagan - wpiety .*Armoury (PODPIETY|BRAK)"),
+}
+# linie kontrolne - napisy jak w kodzie C# (SmithXp.cs, ForgeBill.cs, ForgeBillTest.cs, ForgeView ForgeBillRow.cs)
+M109KUZ_TEST = {
+    "a_start": "start sesji | klucz SmithingXpFactor 0.70 | latka HeroDeveloper.AddSkillXp wpieta (Priority.First) | inne latki na celu 2 | test autotestu TAK | potkniecia 0.",
+    "a_start1": "start sesji | klucz SmithingXpFactor 1.00 (1.00 - XP jak dotad, latka nic nie zmienia) | latka HeroDeveloper.AddSkillXp wpieta (Priority.First) | inne latki "
+                "na celu ? | test autotestu NIE | potkniecia 0.",
+    "a_xp": "XP Jeff Snow (gracz) 240 -> 168 | wywolanie 1 w sesji.",
+    "a_day": "dzien 108900 | wywolan 12 (gracz 10, rod 2, inni 0), XP przed 1000 -> po 700 (gracz 900 -> 630), bez mnoznika (ustawianie poziomu) 1, potkniecia 0.",
+    "a_test": "test - Smithing 5 XP: przyrost 3.5 wobec 5 bez mnoznika, proporcja 0.700 (klucz 0.70) | kontrola Athletics proporcja 1.000 | ustawianie poziomu proporcja 1.000 - TAK.",
+    "a_skip": "test - pominiety (gracz na sluzbie u lorda ROT - patch30 mnozy XP przez GlobalXPBonus).",
+    "b_start": "start sesji | klucz ForgeBillOnScreen TAK | latki: czy stac CRAFT wpiete, przycisk broni (RefreshEnableMainAction) wpiety | test autotestu TAK | probki: "
+               "composite_bow (luk) [hardwood potrzeba 1.2 kg, jest 3 x 100 + 87 = 387 kg, otwarcie 0; leather potrzeba 0.18 kg, jest 2 x 10 + 0 = 20 kg, otwarcie 1; "
+               "linen potrzeba 0.03 kg, jest 1 x 10 + 9.97 = 19.97 kg, otwarcie 0]; crossbow_a (kusza) [hardwood potrzeba 3.6 kg, jest 3 x 100 + 87 = 387 kg, otwarcie 0; "
+               "ironIngot2 potrzeba 0.56 kg, jest 4 x 0.5 + 0.2 = 2.2 kg, otwarcie 1]; royce_armor (zbroja) [ironIngot5 potrzeba 20.16 kg, jest 0 x 0.5 + 0 = 0 kg, "
+               "otwarcie 41 BRAK; linen potrzeba 1.76 kg, jest 1 x 10 + 9.97 = 19.97 kg, otwarcie 0]; sword_t2 (bron) [hardwood potrzeba 2 kg, jest 3 x 100 + 87 = 387 kg, "
+               "otwarcie 0; ironIngot2 potrzeba 2 szt., jest 4; charcoal potrzeba 0.5 kg, jest 0 x 5 + 0.5 = 0.5 kg, otwarcie 0]; default_arrows (strzaly) "
+               "[hardwood potrzeba 4.8 kg, jest 3 x 100 + 87 = 387 kg, otwarcie 0; ironIngot2 potrzeba 0.81 kg, jest 4 x 0.5 + 0.2 = 2.2 kg, otwarcie 2] | potkniecia 0.",
+    "b_screen": "ekran CRAFT composite_bow | hardwood potrzeba 1.2 kg, jest 3 x 100 + 87 = 387 kg, otwarcie 0 | da sie wykuc TAK | odswiezen w sesji 1.",
+    "b_day": "dzien 108900 | odswiezen ekranu 30 (CRAFT 20, bron 10), braki 2, przycisk zablokowany rachunkiem 1 (rzadki surowiec 0), kwit BK inny niz przepis 0, potkniecia 0.",
+    "b_item": "test - composite_bow (luk) | hardwood potrzeba 1.2 kg, otwarcie 0 -> zuzyte 1.2 kg (z sakw 0 x 100, z otwartych 1.2); leather potrzeba 0.18 kg, otwarcie 1 -> "
+              "zuzyte 0.18 kg (z sakw 1 x 10, z otwartych -9.82) | droga Forge.TakeFor - zgodnosc TAK.",
+    "b_itembad": "test - royce_armor (zbroja) | ironIngot5 potrzeba 20.16 kg, otwarcie 41 -> zuzyte 20 kg (z sakw 40 x 0.5, z otwartych 0) | droga kwit BK + kg - zgodnosc NIE "
+                 "(ironIngot5 otwarcie 40 zamiast 41; ironIngot5 kg 20 zamiast 20.16).",
+    "b_sum": "test - wynik: przedmiotow 5, zgodnych 5, dolozone na probe 3 szt., stan przywrocony TAK, potkniecia 0.",
+    "b_scr": "test ekranu - luk | CRAFT composite_bow | ekran: hardwood|-1.2 kg|387 kg|jest; leather|-0.18 kg|20 kg|jest | rachunek: hardwood|-1.2 kg|387 kg|jest; "
+             "leather|-0.18 kg|20 kg|jest | zgodne TAK | zdjecie zdjecia\\kuznia-m109-luk-20261023-120000.png.",
+    "b_scrblad": "test ekranu - zbroja | BLAD: brak przedmiotu royce_armor | zgodne NIE | zdjecie zdjecia\\kuznia-m109-zbroja-20261023-120002.png.",
+    "b_scrskip": "test ekranu - pominiety (ekran kucia nie otworzyl sie: null), proba 1/3.",
+    "b_scrend": "test ekranu - koniec: probek 4, zgodnych 4 (wyjscie z ekranu: zamkniety).",
+    "b_fv": "ForgeView rzad wymagan - wpiety (mixin CraftingVM, wstawka Crafting Index 7), Armoury PODPIETY (Armoury.ForgeBill.ScreenRows).",
+}
+
+
+def m109kuz_selftest():
+    """m109kuz: wyrazenia wobec linii kontrolnych M109KUZ_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    R, T = M109KUZ_RX, M109KUZ_TEST
+    m = R["a_start"].search(T["a_start"])
+    if not m or m.groups() != ("0.70", "wpieta", "2", "TAK", "0"):
+        return f"a_start: {m.groups() if m else 'brak dopasowania'}"
+    m = R["a_start"].search(T["a_start1"])
+    if not m or m.groups() != ("1.00", "wpieta", "?", "NIE", "0"):
+        return f"a_start1: {m.groups() if m else 'brak dopasowania'}"
+    m = R["a_xp"].search(T["a_xp"])
+    if not m or m.groups() != ("gracz", "240", "168", "1"):
+        return f"a_xp: {m.groups() if m else 'brak dopasowania'}"
+    m = R["a_day"].search(T["a_day"])
+    if not m or m.groups() != ("108900", "12", "10", "2", "0", "1000", "700", "900", "630", "1", "0"):
+        return f"a_day: {m.groups() if m else 'brak dopasowania'}"
+    m = R["a_test"].search(T["a_test"])
+    if not m or m.groups() != ("3.5", "5", "0.700", "0.70", "1.000", "1.000", "TAK"):
+        return f"a_test: {m.groups() if m else 'brak dopasowania'}"
+    m = R["a_skip"].search(T["a_skip"])
+    if not m or not m.group(1).startswith("gracz na sluzbie"):
+        return "a_skip"
+    m = R["b_start"].search(T["b_start"])
+    if not m or m.groups()[:4] != ("TAK", "wpiete", "wpiety", "TAK") or m.group(6) != "0":
+        return f"b_start: {m.groups()[:4] if m else 'brak dopasowania'}"
+    smp = R["b_sample"].findall(m.group(5))
+    if [(s[0], s[1]) for s in smp] != [("composite_bow", "luk"), ("crossbow_a", "kusza"), ("royce_armor", "zbroja"), ("sword_t2", "bron"), ("default_arrows", "strzaly")]:
+        return f"b_sample: {[(s[0], s[1]) for s in smp]}"
+    if [float(x) for x in R["b_need"].findall(smp[0][2])] != [1.2, 0.18, 0.03] or len(R["b_need"].findall(smp[3][2])) != 3:
+        return "b_need"
+    m = R["b_screen"].search(T["b_screen"])
+    if not m or m.group(1) != "CRAFT" or m.group(2) != "composite_bow" or m.group(4) != "TAK" or m.group(5) != "1":
+        return f"b_screen: {m.groups() if m else 'brak dopasowania'}"
+    m = R["b_day"].search(T["b_day"])
+    if not m or m.groups() != ("108900", "30", "20", "10", "2", "1", "0", "0", "0"):
+        return f"b_day: {m.groups() if m else 'brak dopasowania'}"
+    m = R["b_item"].search(T["b_item"])
+    if not m or m.groups() != ("composite_bow", "luk", "TAK"):
+        return f"b_item: {m.groups() if m else 'brak dopasowania'}"
+    m = R["b_item"].search(T["b_itembad"])
+    if not m or m.groups() != ("royce_armor", "zbroja", "NIE"):
+        return f"b_itembad: {m.groups() if m else 'brak dopasowania'}"
+    if R["b_item"].search(T["b_sum"]) or R["b_item"].search("test - royce_armor: dolozone na probe 41 szt. (41 x ironIngot5)."):
+        return "b_item lapie linie wyniku albo dolozenia"
+    m = R["b_sum"].search(T["b_sum"])
+    if not m or m.groups() != ("5", "5", "3", "TAK", "0"):
+        return f"b_sum: {m.groups() if m else 'brak dopasowania'}"
+    m = R["b_scr"].search(T["b_scr"])
+    if not m or m.group(1) != "luk" or m.group(2) != "TAK" or not m.group(3).startswith("zdjecia"):
+        return f"b_scr: {m.groups() if m else 'brak dopasowania'}"
+    m = R["b_scr"].search(T["b_scrblad"])
+    if not m or m.group(1) != "zbroja" or m.group(2) != "NIE":
+        return f"b_scrblad: {m.groups() if m else 'brak dopasowania'}"
+    if not R["b_scrskip"].search(T["b_scrskip"]) or R["b_scr"].search(T["b_scrskip"]):
+        return "b_scrskip"
+    m = R["b_scrend"].search(T["b_scrend"])
+    if not m or m.groups() != ("4", "4"):
+        return "b_scrend"
+    m = R["b_fv"].search(T["b_fv"])
+    if not m or m.group(1) != "PODPIETY":
+        return "b_fv"
+    return None
+
+
+def m109kuz_collect(logp):
+    """m109kuz: przebieg logu (strumieniowo) -> linie A (Kowalstwo wolniej) i B (Kuznia wymagania) oraz ERROR nowego kodu."""
+    R = M109KUZ_RX
+    D = {"a_start": [], "a_xp": 0, "a_day": [], "a_test": [], "a_skip": [], "b_start": [], "b_screen": 0, "b_day": [], "b_item": [], "b_sum": [], "b_sumskip": [],
+         "b_scr": [], "b_scrskip": [], "b_scrend": [], "b_fv": [], "err": 0, "err1": None}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            mt = TS.match(ln.rstrip("\n"))
+            s = mt.group(2) if mt else ln.rstrip("\n")
+            if s.startswith(M109KUZ_ERR):
+                D["err"] += 1
+                if D["err1"] is None:
+                    D["err1"] = s[:160]
+                continue
+            if s.startswith(M109KUZ_TAG_A):
+                body = s[len(M109KUZ_TAG_A):]
+                for k in ("a_start", "a_day", "a_test", "a_skip"):
+                    m = R[k].search(body)
+                    if m:
+                        D[k].append(m.groups())
+                        break
+                else:
+                    if R["a_xp"].search(body):
+                        D["a_xp"] += 1
+                continue
+            if s.startswith(M109KUZ_TAG_B):
+                body = s[len(M109KUZ_TAG_B):]
+                if R["b_screen"].search(body):
+                    D["b_screen"] += 1
+                    continue
+                for k in ("b_start", "b_day", "b_item", "b_sum", "b_sumskip", "b_scr", "b_scrskip", "b_scrend", "b_fv"):
+                    m = R[k].search(body)
+                    if m:
+                        D[k].append(m.groups())
+                        break
+    return D
+
+
+def m109kuz_rows(rep, D):
+    """m109kuz: wiersze KUZ-0..KUZ-9 - opis w --help. Log bez linii m109 - INFO."""
+    A0, B0 = D["a_start"], D["b_start"]
+    if not (A0 or B0 or D["a_day"] or D["b_day"] or D["b_item"] or D["b_scr"]):
+        rep.add("KUZ-0: linie 'Kowalstwo wolniej (m109)' i 'Kuznia wymagania (m109)'", "brak w logu", "INFO (log sprzed galezi m109-kuznia)", None)
+        rep.add("KUZ-9: ERROR SmithXp / ForgeBill / ForgeBillTest", f"ERROR {D['err']}", "0", D["err"] == 0)
+        return
+    # KUZ-0 linie startu i latki
+    f = float(A0[-1][0]) if A0 else 1.0
+    neutral = abs(f - 1.0) < 0.001
+    bad = []
+    if not A0:
+        bad.append("brak startu A")
+    if not B0:
+        bad.append("brak startu B")
+    if A0 and B0 and len(A0) != len(B0):
+        bad.append(f"startow A {len(A0)}, B {len(B0)}")
+    for a in A0:
+        if a[1] != "wpieta" and not neutral:
+            bad.append(f"latka A {a[1]}")
+    for b in B0:
+        if b[1] != "wpiete":
+            bad.append(f"czy stac CRAFT {b[1]}")
+        if b[2] != "wpiety":
+            bad.append(f"przycisk broni {b[2]}")
+    val = (f"startow A {len(A0)} (klucz {A0[-1][0] if A0 else '-'}, latka {A0[-1][1] if A0 else '-'}, inne latki {A0[-1][2] if A0 else '-'}), "
+           f"B {len(B0)} (klucz {B0[-1][0] if B0 else '-'}, czy stac CRAFT {B0[-1][1] if B0 else '-'}, przycisk broni {B0[-1][2] if B0 else '-'})")
+    rep.add("KUZ-0: linie startu A i B, latki", val + (f" | zle: {'; '.join(bad)}" if bad else ""),
+            "start A i B w kazdej sesji (tyle samo); latka A 'wpieta' (klucz != 1.00), czy stac CRAFT 'wpiete', przycisk broni 'wpiety'", not bad)
+    test_a = any(a[3] == "TAK" for a in A0)
+    test_b = any(b[3] == "TAK" for b in B0)
+    # KUZ-1..3 test A
+    if D["a_test"]:
+        t = D["a_test"][-1]
+        p, fk, c, z = float(t[2]), float(t[3]), float(t[4]), float(t[5])
+        want = 1.0 if abs(fk - 1.0) < 0.001 else fk
+        rep.add("KUZ-1: test A - proporcja XP Smithing wobec klucza", f"proporcja {t[2]} (klucz {t[3]}; przyrost {t[0]} wobec {t[1]}), testow {len(D['a_test'])}",
+                f"|p - klucz| <= {M109KUZ_TOL_P}", abs(p - want) <= M109KUZ_TOL_P)
+        rep.add("KUZ-2: test A - ustawianie poziomu bez mnoznika", f"proporcja {t[5]}", f"1.000 +- {M109KUZ_TOL_1}", abs(z - 1.0) <= M109KUZ_TOL_1)
+        rep.add("KUZ-3: test A - kontrola Athletics", f"proporcja {t[4]}", f"1.000 +- {M109KUZ_TOL_1}", abs(c - 1.0) <= M109KUZ_TOL_1)
+    else:
+        why = D["a_skip"][-1][0] if D["a_skip"] else None
+        if why:
+            v, ok = f"pominiety ({why})", None
+        elif test_a:
+            v, ok = "brak linii testu (test autotestu TAK)", False
+        else:
+            v, ok = "brak (bez pliku armoury-kuznia.flag)", None
+        for name in ("KUZ-1: test A - proporcja XP Smithing wobec klucza", "KUZ-2: test A - ustawianie poziomu bez mnoznika", "KUZ-3: test A - kontrola Athletics"):
+            rep.add(name, v, "INFO bez testu; plik testu bez linii testu - NIE", ok)
+    # KUZ-4 doby A
+    days = D["a_day"]
+    sp = sum(float(d[5]) for d in days)
+    sq = sum(float(d[6]) for d in days)
+    st_a = max((int(d[10]) for d in days), default=0)
+    calls = sum(int(d[1]) for d in days)
+    plain = sum(int(d[9]) for d in days)
+    if neutral:
+        rep.add("KUZ-4: doby A - XP po / przed", f"klucz 1.00, dob {len(days)}, wywolan {calls}", "INFO - klucz 1.00 (latka nic nie zmienia)", None)
+    elif sp <= 0:
+        rep.add("KUZ-4: doby A - XP po / przed", f"dob {len(days)}, XP przed 0 (bez ustawiania poziomu {plain})", "INFO - w biegu nikt nie kul", None if st_a == 0 else False)
+    else:
+        r = sq / sp
+        rep.add("KUZ-4: doby A - XP po / przed", f"{r:.4f} (przed {sp:.1f}, po {sq:.1f}, dob {len(days)}, wywolan {calls}, ustawianie poziomu {plain}), potkniecia {st_a}",
+                f"klucz {f:.2f} +- {M109KUZ_TOL_DAY}; potkniecia 0", abs(r - f) <= M109KUZ_TOL_DAY and st_a == 0)
+    # KUZ-5 probki B: luki maja wymagania
+    if B0:
+        smp = M109KUZ_RX["b_sample"].findall(B0[-1][4])
+        bad = []
+        kinds = {}
+        for sid, kind, rows in smp:
+            needs = [float(x) for x in M109KUZ_RX["b_need"].findall(rows) if float(x) > 0]
+            kinds[kind] = (sid, len(needs))
+            if not needs:
+                bad.append(f"{sid} ({kind}) bez potrzeby > 0")
+        if "luk" not in kinds:
+            bad.append("brak probki luku")
+        elif kinds["luk"][1] < 2:
+            bad.append(f"luk {kinds['luk'][0]}: wierszy z potrzeba > 0 {kinds['luk'][1]}")
+        val = ", ".join(f"{k} {v[0]} {v[1]}" for k, v in kinds.items()) or "brak probek"
+        rep.add("KUZ-5: probki rachunku (wiersze z potrzeba > 0)", val + (f" | zle: {'; '.join(bad)}" if bad else ""),
+                "kazda probka >= 1 wiersz z potrzeba > 0, luk >= 2 (takze przy otwarciu 0 - luki maja wymagania)", not bad)
+    else:
+        rep.add("KUZ-5: probki rachunku (wiersze z potrzeba > 0)", "brak linii startu B", "INFO", None)
+    # KUZ-6 / KUZ-7 test zuzycia
+    items, sums = D["b_item"], D["b_sum"]
+    if sums or items:
+        bad_items = [f"{i[0]} ({i[1]})" for i in items if i[2] != "TAK"]
+        n_ok = sum(1 for i in items if i[2] == "TAK")
+        sm = sums[-1] if sums else None
+        sum_ok = sm is not None and sm[0] == sm[1] and int(sm[1]) >= M109KUZ_MIN_ITEMS
+        val = f"linii przedmiotow {len(items)} (zgodnych {n_ok})" + (f", wynik: przedmiotow {sm[0]}, zgodnych {sm[1]}, dolozone {sm[2]} szt." if sm else ", brak linii wyniku")
+        rep.add("KUZ-6: test zuzycia - rachunek = zuzycie jednego kucia", val + (f" | niezgodne: {', '.join(bad_items)}" if bad_items else ""),
+                f"kazda linia przedmiotu zgodnosc TAK; zgodnych == przedmiotow i >= {M109KUZ_MIN_ITEMS}", not bad_items and sum_ok)
+        rep.add("KUZ-7: test zuzycia - stan przywrocony", f"{sm[3] if sm else 'brak linii wyniku'}", "TAK", sm is not None and sm[3] == "TAK")
+    else:
+        skip = D["b_sumskip"][-1] if D["b_sumskip"] else None
+        if skip:
+            v, ok = f"{skip[0]} {skip[1]}", False if skip[0] == "przerwany" else None
+        elif test_b:
+            v, ok = "brak linii testu (test autotestu TAK)", False
+        else:
+            v, ok = "brak (bez pliku armoury-kuznia.flag)", None
+        rep.add("KUZ-6: test zuzycia - rachunek = zuzycie jednego kucia", v, "INFO bez testu; plik testu bez linii testu - NIE", ok)
+        rep.add("KUZ-7: test zuzycia - stan przywrocony", v, "INFO bez testu; plik testu bez linii testu - NIE", ok)
+    # KUZ-8 test ekranu
+    scr = D["b_scr"]
+    if scr:
+        bad = [s[0] for s in scr if s[1] != "TAK"]
+        shots = [s[2] for s in scr]
+        rep.add("KUZ-8: test ekranu - kafle VM = rachunek", f"probek {len(scr)} (zgodnych {len(scr) - len(bad)})" + (f" | niezgodne: {', '.join(bad)}" if bad else ""),
+                "kazda probka zgodne TAK", not bad)
+        rep.add("KUZ-8b: test ekranu - zdjecia", "; ".join(shots), "INFO (ocena zdjec recznie)", None)
+    else:
+        why = D["b_scrskip"][-1][0] if D["b_scrskip"] else ("koniec bez probek" if D["b_scrend"] else "brak linii")
+        rep.add("KUZ-8: test ekranu - kafle VM = rachunek", f"brak probek ({why})", "INFO z powodem (ekran otwiera sie tylko w menu miasta bez roboty w kuzni)", None)
+    if D["b_fv"]:
+        rep.add("KUZ-8c: ForgeView podpiety do rachunku", ", ".join(x[0] for x in D["b_fv"]), "INFO (linia tylko po otwarciu ekranu kucia)", None)
+    # KUZ-9 bledy, potkniecia, kwit BK
+    st_b = max((int(d[8]) for d in D["b_day"]), default=0)
+    st_s = max([int(a[4]) for a in A0] + [int(b[5]) for b in B0] + [int(s[4]) for s in sums] + [0])
+    bk = sum(int(d[7]) for d in D["b_day"])
+    scr_n = sum(int(d[1]) for d in D["b_day"])
+    val = f"ERROR {D['err']}" + (f" (pierwszy: {D['err1']})" if D["err1"] else "") + f", potkniecia max {max(st_a, st_b, st_s)}, kwit BK inny niz przepis {bk}"
+    rep.add("KUZ-9: ERROR SmithXp / ForgeBill / ForgeBillTest, potkniecia, kwit BK", val, "0 / 0 / 0", D["err"] == 0 and max(st_a, st_b, st_s) == 0 and bk == 0)
+    rep.add("KUZ-I: ruch ekranu (INFO)", f"odswiezen w liniach doby {scr_n}, linii ekranu {D['b_screen']}, pierwszych linii XP {D['a_xp']}", "INFO", None)
+
+
+def m109kuz_synth():
+    """m109kuz - test syntetyczny: dobry i zly bieg przez m109kuz_collect / m109kuz_rows. None = werdykty zgodne z oczekiwanymi, inaczej opis roznicy."""
+    import tempfile
+    import shutil
+    T, A, B = M109KUZ_TEST, M109KUZ_TAG_A, M109KUZ_TAG_B
+
+    def run(bad, nolines=False):
+        tmp = tempfile.mkdtemp(prefix="m109k_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = ["[00:00:00] Prolog (m101): nowa kampania z PROLOGIEM 298 (test)"]
+            if not nolines:
+                L.append("[00:00:00] " + A + T["a_start"])
+                L.append("[00:00:00] " + B + (T["b_start"].replace("composite_bow (luk) [hardwood potrzeba 1.2 kg", "composite_bow (luk) [hardwood potrzeba 0 kg")
+                                              .replace("; leather potrzeba 0.18 kg", "; leather potrzeba 0 kg") if bad else T["b_start"]))
+                L.append("[00:00:00] " + A + T["a_xp"])
+                for d in range(108900, 108905):
+                    day = T["a_day"].replace("dzien 108900", "dzien %d" % d)
+                    if bad:
+                        day = day.replace("po 700 (", "po 1000 (")
+                    L.append("[00:00:00] " + A + day)
+                    L.append("[00:00:00] " + B + T["b_day"].replace("dzien 108900", "dzien %d" % d).replace("przepis 0,", "przepis %d," % (1 if bad else 0)))
+                L.append("[00:00:00] " + A + (T["a_test"].replace("proporcja 0.700", "proporcja 1.000") if bad else T["a_test"]))
+                for k in M109KUZ_KINDS:
+                    line = T["b_item"].replace("composite_bow (luk)", "x_%s (%s)" % (k, k))
+                    if bad and k == "zbroja":
+                        line = T["b_itembad"]
+                    L.append("[00:00:00] " + B + line)
+                L.append("[00:00:00] " + B + (T["b_sum"].replace("zgodnych 5", "zgodnych 4").replace("przywrocony TAK", "przywrocony NIE") if bad else T["b_sum"]))
+                L.append("[00:00:00] " + B + T["b_fv"])
+                L.append("[00:00:00] " + B + T["b_scr"])
+                L.append("[00:00:00] " + B + (T["b_scrblad"] if bad else T["b_scr"].replace("test ekranu - luk", "test ekranu - zbroja")))
+                L.append("[00:00:00] " + B + T["b_scrend"])
+                if bad:
+                    L.append("[00:00:00] ERROR in ForgeBill.ScreenRows (potkniecie 1): System.Exception: test")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            m109kuz_rows(rep, m109kuz_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    good, badr, none = run(False), run(True), run(False, True)
+    exp_good = {"KUZ-0": "TAK", "KUZ-1": "TAK", "KUZ-2": "TAK", "KUZ-3": "TAK", "KUZ-4": "TAK", "KUZ-5": "TAK", "KUZ-6": "TAK", "KUZ-7": "TAK", "KUZ-8": "TAK",
+                "KUZ-8b": "INFO", "KUZ-8c": "INFO", "KUZ-9": "TAK"}
+    exp_bad = {"KUZ-0": "TAK", "KUZ-1": "NIE", "KUZ-4": "NIE", "KUZ-5": "NIE", "KUZ-6": "NIE", "KUZ-7": "NIE", "KUZ-8": "NIE", "KUZ-9": "NIE"}
+    exp_none = {"KUZ-0": "INFO", "KUZ-9": "TAK"}
+    diff = [f"dobry {k}: {good.get(k)} (oczekiwane {v})" for k, v in exp_good.items() if good.get(k) != v]
+    diff += [f"zly {k}: {badr.get(k)} (oczekiwane {v})" for k, v in exp_bad.items() if badr.get(k) != v]
+    diff += [f"bez linii {k}: {none.get(k)} (oczekiwane {v})" for k, v in exp_none.items() if none.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def m109kuz_main(logp):
+    """m109kuz (23.10, w-toku/m109-kuznia): KUZ-S, KUZ-S2, KUZ-0..KUZ-9 - opis w --help. Strumieniowo; log bez linii m109 - INFO."""
+    rep = Report()
+    s1 = m109kuz_selftest()
+    rep.add("KUZ-S: self-test wyrazen (linie kontrolne jak w kodzie C#)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = m109kuz_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("KUZ-S2: test syntetyczny (dobry i zly bieg przez te same funkcje progow)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("KUZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = m109kuz_collect(logp)
+    print(f"plik: {logp} | startow A {len(D['a_start'])}, B {len(D['b_start'])}, dob A {len(D['a_day'])}, B {len(D['b_day'])}, testow A {len(D['a_test'])}, "
+          f"linii testu zuzycia {len(D['b_item'])}, probek ekranu {len(D['b_scr'])}, ERROR {D['err']}")
+    m109kuz_rows(rep, D)
     rep.show()
     return 0
 
