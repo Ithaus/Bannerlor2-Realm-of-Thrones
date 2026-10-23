@@ -449,7 +449,7 @@ namespace Armoury
                     if (TakeOne(killer, it, touched, ref pa)) { LootTally.DeadHorse(rider, 1); return true; }
                     if (BattlefieldLaw.TakeQueuedHorse(it)) { LootTally.DeadHorse(rider, 0); return true; }
                 }
-                LootTally.DeadHorse(rider, 2);
+                LootTally.DeadHorse(rider, 3);
                 return false;
             }
             catch (Exception e) { Stumble("TakeKill", e); return false; }

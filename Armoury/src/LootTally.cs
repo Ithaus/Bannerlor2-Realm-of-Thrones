@@ -94,7 +94,7 @@ namespace Armoury
             public string Head;                     // "id (Ty, zabity)"
             public string HorsePart;                // "kon X lup"
             public readonly List<string> Parts = new List<string>();
-            public int Dead = -1;                   // padly kon: 0 z kolejki, 1 ze zbrojowni, 2 brak
+            public int Dead = -1;                   // padly kon: 0 z kolejki, 1 ze zbrojowni, 2 poza lupem (nic do zdjecia), 3 brak
         }
 
         private sealed class Battle
@@ -108,7 +108,7 @@ namespace Armoury
             public readonly long[] SimGain = new long[Kinds];
             public readonly long[] CBefore = new long[Kinds];   // z kolejki + wraki przed przesianiem (do przesianych)
             public int FelledHero, FelledTroop, Riders, HeroesSkipped;
-            public int DeadQ, DeadArm, DeadNone;
+            public int DeadQ, DeadArm, DeadOut, DeadNone;
             public int WCios, WCiosHarness, PekOne, PekWreck, Ambig;
             public long Ticks;
             public int Stumbles;
@@ -122,7 +122,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ doba
         private static readonly long[,] DayA = new long[Kinds, ACols], DayB = new long[Kinds, BCols], DayC = new long[Kinds, CCols];
-        private static int _dBattles, _dList, _dBag, _dBack, _dOther, _dDeadQ, _dDeadArm, _dDeadNone, _dPekOne, _dPekWreck, _dAmbig, _dStumbles;
+        private static int _dBattles, _dList, _dBag, _dBack, _dOther, _dDeadQ, _dDeadArm, _dDeadOut, _dDeadNone, _dPekOne, _dPekWreck, _dAmbig, _dStumbles;
         private static long _dTicks;
         private static int _stumbles;          // sesja
 
@@ -308,7 +308,7 @@ namespace Armoury
                   .Append(" | kolejka [wczesniej/dzialka/bagaz/send/padle/lista/sakwy/zwrot/przepadlo/zostaje]: ").Append(Block(b.B, BCols))
                   .Append(" | lista trofeow [z kolejki/wraki/przesiane/Spoils wyjal/przetrzymane/wrocone/rezerwa/na liscie]: ").Append(b.HasC ? Block(b.C, CCols) : "nie bylo");
                 if (b.Sim) sb.Append(" | Send troops - lup DTE z poleglych do zbrojowni wojska: ").Append(Row(b.SimGain));
-                sb.Append(" | konie padle pod powalonymi: z kolejki ").Append(b.DeadQ).Append(", ze zbrojowni ").Append(b.DeadArm).Append(", brak ").Append(b.DeadNone)
+                sb.Append(" | konie padle pod powalonymi: z kolejki ").Append(b.DeadQ).Append(", ze zbrojowni ").Append(b.DeadArm).Append(", poza lupem ").Append(b.DeadOut).Append(", brak ").Append(b.DeadNone)
                   .Append(" | wraki: cios ").Append(b.WCios).Append(" (w uprzaz ").Append(b.WCiosHarness).Append("), pekniete dodatkowo ").Append(b.PekOne)
                   .Append(" -> wraki ").Append(b.PekWreck).Append(", niejednoznaczne ").Append(b.Ambig)
                   .Append(" | koniec: ").Append(how).Append(" | pomiar ").Append(Ms(b.Ticks)).Append(" ms | potkniecia ").Append(b.Stumbles).Append('.');
@@ -322,7 +322,7 @@ namespace Armoury
                         var r = b.RiderList[i];
                         if (i > 0) rb.Append(" | ");
                         rb.Append(r.Head).Append(": ").Append(r.HorsePart ?? "kon -");
-                        if (r.Dead >= 0) rb.Append(" (padl - ").Append(r.Dead == 0 ? "z kolejki" : r.Dead == 1 ? "ze zbrojowni" : "brak w kolejce i zbrojowni").Append(')');
+                        if (r.Dead >= 0) rb.Append(" (padl - ").Append(r.Dead == 0 ? "z kolejki" : r.Dead == 1 ? "ze zbrojowni" : r.Dead == 2 ? "nie w lupie" : "brak w kolejce i zbrojowni").Append(')');
                         foreach (var p in r.Parts) rb.Append(", ").Append(p);
                     }
                     if (b.Riders > b.RiderList.Count) rb.Append(" | pozostalych jezdzcow ").Append(b.Riders - b.RiderList.Count);
@@ -336,7 +336,7 @@ namespace Armoury
                 else if (how.StartsWith("zwrot")) _dBack++;
                 else _dOther++;
                 Add(DayA, b.A, ACols); Add(DayB, b.B, BCols); Add(DayC, b.C, CCols);
-                _dDeadQ += b.DeadQ; _dDeadArm += b.DeadArm; _dDeadNone += b.DeadNone;
+                _dDeadQ += b.DeadQ; _dDeadArm += b.DeadArm; _dDeadOut += b.DeadOut; _dDeadNone += b.DeadNone;
                 _dPekOne += b.PekOne; _dPekWreck += b.PekWreck; _dAmbig += b.Ambig;
             }
             catch (Exception e) { Stumble("Close", e); }
@@ -505,7 +505,8 @@ namespace Armoury
             try { b.C[KindOf(it), col] += n; b.HasC = true; } catch (Exception e) { Stumble("Col", e); }
         }
 
-        /// <summary>HorseFate.TakeKill: padly kon jezdzca powalonego przez druzyne gracza zdjety z kolejki (0), ze zbrojowni (1) albo nigdzie go nie bylo (2).</summary>
+        /// <summary>HorseFate.TakeKill: padly kon jezdzca powalonego przez druzyne gracza zdjety z kolejki (0), ze zbrojowni (1), nie wszedl do lupu - nic
+        /// do zdjecia (2) albo wszedl, a nie ma go ani w kolejce, ani w zbrojowni (3).</summary>
         internal static void DeadHorse(Agent rider, int where)
         {
             try
@@ -514,6 +515,7 @@ namespace Armoury
                 if (b == null) b = Begin(Mission.Current);
                 if (where == 0) { b.DeadQ++; b.B[Kon, BPadle]++; }
                 else if (where == 1) b.DeadArm++;
+                else if (where == 2) b.DeadOut++;
                 else b.DeadNone++;
                 if (rider != null)
                     foreach (var r in b.RiderList) if (ReferenceEquals(r.Agent, rider)) { r.Dead = where; break; }
@@ -775,7 +777,7 @@ namespace Armoury
                     .Append(", inne ").Append(_dOther).Append(')')
                     .Append(" | konie: z cial ").Append(DayA[Kon, ANa]).Append(", lup ").Append(DayA[Kon, ALup]).Append(", dzialka ").Append(DayB[Kon, Dzialka])
                     .Append(", na liscie ").Append(DayC[Kon, CNa]).Append(", do sakw ").Append(DayB[Kon, Sakwy] + DayC[Kon, CRez]).Append(", Spoils wyjal ").Append(DayC[Kon, CWyjal])
-                    .Append(", padle zdjete (z kolejki/ze zbrojowni/brak) ").Append(_dDeadQ).Append('/').Append(_dDeadArm).Append('/').Append(_dDeadNone)
+                    .Append(", padle zdjete (z kolejki/ze zbrojowni/poza lupem/brak) ").Append(_dDeadQ).Append('/').Append(_dDeadArm).Append('/').Append(_dDeadOut).Append('/').Append(_dDeadNone)
                     .Append(" | uprzaz: z cial ").Append(DayA[Uprzaz, ANa]).Append(", lup ").Append(DayA[Uprzaz, ALup]).Append(", cios ").Append(DayA[Uprzaz, ACios])
                     .Append(", na liscie ").Append(DayC[Uprzaz, CNa]).Append(", Spoils wyjal ").Append(DayC[Uprzaz, CWyjal])
                     .Append(" | zbroje ludzi: z cial ").Append(armNa).Append(", lup ").Append(armLup).Append(", cios ").Append(armCios)
@@ -792,7 +794,7 @@ namespace Armoury
         private static void ClearDay()
         {
             Array.Clear(DayA, 0, DayA.Length); Array.Clear(DayB, 0, DayB.Length); Array.Clear(DayC, 0, DayC.Length);
-            _dBattles = _dList = _dBag = _dBack = _dOther = _dDeadQ = _dDeadArm = _dDeadNone = _dPekOne = _dPekWreck = _dAmbig = _dStumbles = 0;
+            _dBattles = _dList = _dBag = _dBack = _dOther = _dDeadQ = _dDeadArm = _dDeadOut = _dDeadNone = _dPekOne = _dPekWreck = _dAmbig = _dStumbles = 0;
             _dTicks = 0;
         }
 
