@@ -2112,10 +2112,13 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m109przes  : (23.10, galaz w-toku/m109-przesluch; Armoury/src/CampInterrogation.cs, Persuasion.cs, InnDrink.cs, Rumours.Drink.cs) przesluchanie jencow w obozie
                     i jedna miara perswazji (kufle). python -I tools/sprawdz_logi.py --grupa m109przes <Armoury-*.log> (strumieniowo). PRZES-S self-test wyrazen, PRZES-S2
                     test syntetyczny, PRZES-0 linia startu (klucze, obie miary = suma skladnikow), PRZES-1 ERROR CampInterrogation./Persuasion./SyncData.arm_interrogation
-                    i potkniecia 0, PRZES-2 szansa = clamp(suma skladnikow) +-0.002 i MOWI <=> rzut < szansa (MOWI => kryjowka wypatrzona przed NIE -> po TAK), PRZES-3
-                    smierc tylko w torturach (0.15/0.30 x 0.8 FG, ubytek w wybranej kolumnie, bohater zyje NIE / zablokowana, zgony <= straceni linii Pochodzenie),
-                    PRZES-4 kary i XP (Mercy -20/-60, relacje i plotka tylko przy smierci), PRZES-5 limit doby, PRZES-6 kufle (Urok = miara z dopisku, KP-5),
-                    PRZES-7 test autotestu (flaga armoury-przesluch.flag), PRZES-8 doby (INFO), PRZES-9 pamiec band <= 30. Log sprzed galezi - INFO.
+                    i potkniecia 0, PRZES-2 szansa = clamp(suma skladnikow) +-0.002, skladniki wobec pol linii (ranny, doby niewoli, tier, bohater, tortury,
+                    Scarface) i MOWI <=> rzut < szansa (MOWI => kryjowka wypatrzona przed NIE -> po TAK), PRZES-3 smierc tylko w torturach (0.15/0.30 x 0.8 FG,
+                    ubytek w wybranej kolumnie, bohater zyje NIE / zablokowana, zgony <= straceni linii Pochodzenie w obrebie odcinka), PRZES-4 kary i XP
+                    (Mercy -20/-60, relacje i plotka tylko przy smierci), PRZES-5 limit doby (klucz: bohater albo rodzaj bandy "c:" + kultura; w obrebie odcinka),
+                    PRZES-6 kufle (Urok = miara z dopisku, KP-5; dopisek niezgodny ze stanem klucza z linii startu - INFO, klucze MCM bez restartu),
+                    PRZES-7 test autotestu (flaga armoury-przesluch.flag), PRZES-8 doby (INFO), PRZES-9 pamiec band <= 30. Odcinek = od linii startu m109 do
+                    nastepnej (wczytanie zapisu w tej samej sesji gry odtwarza limit doby i "straceni" z zapisu). Log sprzed galezi - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -57727,6 +57730,7 @@ M109PRZES_TORT = (0.05, 0.95)     # clamp tortur (TortureMin, TortureMax)
 M109PRZES_DEATH = (0.15, 0.30, 0.8)   # smierc: zdrowy, ranny, x Forgivable Grievances
 M109PRZES_MERCY = (-20, -40)      # Mercy xp: tortura, wiecej za smierc
 M109PRZES_XP = (20, 5, 20, 10)    # XP: Urok sukces / porazka, Lotrostwo za torture / wiecej gdy mowi
+M109PRZES_PARTS = {"ranny": 0.05, "niewola": 0.02, "niewola_max": 5, "tier": 0.03, "bohater": 0.15, "tortury": 0.30, "scarface": 0.10}   # PRZES-2: skladniki (CampInterrogation stale)
 M109PRZES_ERR = ("ERROR in CampInterrogation.", "ERROR in Persuasion.", "ERROR in SyncData.arm_interrogation")
 _M109PRZES_MEAS = r"Urok (\d+) \+ Imposing Stature (\d+) \+ Meaningful Favors (\d+) \+ przywodca (\d+) \((\S+)\) \+ mistrz (\d+) \+ trudnosc (\d+) = (\d+)"
 M109PRZES_RX = {
@@ -57747,8 +57751,8 @@ M109PRZES_RX = {
     "rel": re.compile(r"^relacje (-?\d+) x (\d+)"),
     "refuse": re.compile(r"odmowa - (limit|brak grupy|brak kryjowki) \| doba (-?\d+) \| grupa (\S+) \| rodzaj (rozmowa|tortury)"),
     "day": re.compile(r"doba (-?\d+) \| rozmowy (\d+) \(mowili (\d+)\), tortury (\d+) \(mowili (\d+), zmarli (\d+): zwykli (\d+), bohaterowie (\d+), zablokowane (\d+)\), odmowy (\d+) "
-                      r"\| ujawnione kryjowki (\d+) \(bohater (\d+), banda (\d+), kultura (\d+)\) \| pamiec band (\d+) \(nowe dzis (\d+)\) \| jency-bandyci grup (\d+), ludzi (\d+), bohaterow (\d+) "
-                      r"\| potkniecia dzis (\d+)\.$"),
+                      r"\| ujawnione kryjowki (\d+) \(bohater (\d+), banda (\d+), kultura (\d+)\) \| pamiec band (\d+) \(nowe dzis (\d+)\) \| jency-bandyci grup (\d+), ludzi (\d+), bohaterow (\d+)"
+                      r"(?:, kajdany \d+)? \| potkniecia dzis (\d+)\.$"),
     "mem": re.compile(r"pamiec - banda (\S+) \((.*?), kultura (\S+)\) \| kryjowka (\S+) \(zajeta (TAK|NIE)\) \| miejsce (-?[\d.]+),(-?[\d.]+) \| doba (-?\d+) \| pamiec (\d+)\.$"),
     "test": re.compile(r"^test - (.*) - wynik (TAK|NIE)\.$"),
     "testskip": re.compile(r"^test - bez proby \((.*)\)\.$"),
@@ -57776,7 +57780,7 @@ M109PRZES_TEST = {   # linie kontrolne - napisy jak w kodzie C# (CampInterrogati
             "| relacje -2 x 0 | plotka TAK | XP Urok +0, Lotrostwo +30 | dzis rozmow 1, tortur 2.",
     "refuse": "odmowa - limit | doba 108700 | grupa forest_bandit | rodzaj rozmowa.",
     "day": "doba 108701 | rozmowy 1 (mowili 1), tortury 1 (mowili 0, zmarli 1: zwykli 1, bohaterowie 0, zablokowane 0), odmowy 1 | ujawnione kryjowki 1 (bohater 0, banda 1, kultura 0) "
-           "| pamiec band 4 (nowe dzis 1) | jency-bandyci grup 2, ludzi 6, bohaterow 0 | potkniecia dzis 0.",
+           "| pamiec band 4 (nowe dzis 1) | jency-bandyci grup 2, ludzi 6, bohaterow 0, kajdany 2 | potkniecia dzis 0.",
     "mem": "pamiec - banda bandit_party_12 (Forest Bandits, kultura forest_bandits) | kryjowka hideout_forest_1 (zajeta TAK) | miejsce 123.4,567.8 | doba 108700 | pamiec 4.",
     "test": "test - T0 TAK (H1 hideout_forest_1) | T2 TAK (szansa 0.6058) | T1 TAK (skad banda) - wynik TAK.",
     "testskip": "test - bez proby (bitwa albo spotkanie, do 10. doby sesji).",
@@ -57853,9 +57857,11 @@ def m109przes_selftest():
 
 
 def m109przes_collect(logp):
-    """m109przes: przebieg logu (strumieniowo) -> linie przesluchania, kufle (ze stanem kluczy z ostatniej linii startu m109), Pochodzenie (straceni) w kolejnosci."""
+    """m109przes: przebieg logu (strumieniowo) -> linie przesluchania, kufle (ze stanem kluczy z ostatniej linii startu m109), Pochodzenie (straceni) w kolejnosci.
+    Odcinek ("seg") = numer linii startu m109 (recenzja kod R1: wczytanie zapisu w tej samej sesji gry daje nowa linie startu, a stan - limit doby
+    CampInterrogation.Import, "straceni" PeopleBook.Import -> ResetOrigin - wraca do chwili zapisu); PRZES-3 i PRZES-5 licza w obrebie odcinka."""
     D = {"start": [], "tries": [], "refuse": [], "days": [], "mem": [], "test": [], "testskip": [], "cups": [], "seq": [], "unread": [], "err": 0, "err1": None}
-    state = {"gpd": None, "byc": None, "inn": None}
+    state = {"gpd": None, "byc": None, "inn": None, "seg": 0}
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             m = TS.match(ln.rstrip("\n"))
@@ -57867,7 +57873,7 @@ def m109przes_collect(logp):
             if s.startswith("Pochodzenie (E4/7): dzien "):
                 mp = M109PRZES_RX["poch"].search(s)
                 if mp:
-                    D["seq"].append(("p", float(mp.group(1))))
+                    D["seq"].append(("p", float(mp.group(1)), state["seg"]))
                 continue
             if s.startswith(M98P_PRE + "kufel w "):
                 D["cups"].append((s[len(M98P_PRE):], dict(state)))
@@ -57877,15 +57883,15 @@ def m109przes_collect(logp):
             t = s[len(M109PRZES_TAG):]
             if t.startswith("start sesji"):
                 D["start"].append(t)
+                seg = state["seg"] + 1
                 ms = M109PRZES_RX["start"].search(t)
-                if ms:
-                    state = {"gpd": ms.group(2), "byc": ms.group(3), "inn": ms.group(4)}
+                state = {"gpd": ms.group(2), "byc": ms.group(3), "inn": ms.group(4), "seg": seg} if ms else dict(state, seg=seg)
             elif t.startswith("proba "):
                 mt = M109PRZES_RX["try"].search(t)
                 if mt:
                     D["tries"].append((mt, dict(state)))
                     if mt.group(27).endswith("TAK (zwykly, ksiega ludzi straceni 1)"):
-                        D["seq"].append(("d", 1.0))
+                        D["seq"].append(("d", 1.0, state["seg"]))
                 else:
                     D["unread"].append(t[:120])
             elif t.startswith("odmowa - "):
@@ -57940,6 +57946,19 @@ def m109przes_rows(rep, D):
             why.append("miara")
         if kind == "rozmowa" and (c[6] or c[7] or c[8]):
             why.append("skladniki tortur w rozmowie")
+        # recenzja kod R2: skladniki wobec pol tej samej linii (blad w Chance z suma zgodna z wypisana szansa)
+        comp_exp = ((2, "ranny", M109PRZES_PARTS["ranny"] if m.group(8) == "ranny" else 0.0),
+                    (3, "niewola", M109PRZES_PARTS["niewola"] * min(M109PRZES_PARTS["niewola_max"], int(m.group(9)))),
+                    (4, "tier", M109PRZES_PARTS["tier"] * (max(1, int(m.group(6))) - 1)),
+                    (5, "bohater", M109PRZES_PARTS["bohater"] if m.group(7) == "TAK" else 0.0),
+                    (6, "tortury", M109PRZES_PARTS["tortury"] if kind == "tortury" else 0.0))
+        for i, nm, ev in comp_exp:
+            if abs(c[i] - ev) > tol:
+                why.append(f"{nm} {c[i]:.4f} != {ev:.4f}")
+        if all(abs(c[8] - v) > tol for v in (0.0, M109PRZES_PARTS["scarface"])):
+            why.append(f"Scarface {c[8]:.4f}")
+        if c[7] < -tol:
+            why.append(f"Lotrostwo {c[7]:.4f} < 0")
         talked = m.group(25) == "MOWI"
         if talked != (roll < ch):
             why.append(f"rzut {roll} -> {m.group(25)}")
@@ -57952,7 +57971,8 @@ def m109przes_rows(rep, D):
         if why:
             bad2.append(f"d{m.group(2)} {m.group(3)} {kind}: " + ", ".join(why))
     if tries:
-        rep.add("PRZES-2: kazda proba - szansa = clamp(suma skladnikow), MOWI <=> rzut < szansa, MOWI => kryjowka zajeta i wypatrzona (przed NIE -> po TAK)",
+        rep.add("PRZES-2: kazda proba - szansa = clamp(suma skladnikow), skladniki wobec pol linii (ranny, doby niewoli, tier, bohater, tortury, Scarface), "
+                "MOWI <=> rzut < szansa, MOWI => kryjowka zajeta i wypatrzona (przed NIE -> po TAK)",
                 f"prob {len(tries)} (nieczytelnych {len(D['unread'])}), niezgodnych {len(bad2)}" + (f" ({bad2[:3]})" if bad2 else ""), "0 niezgodnych i 0 nieczytelnych",
                 not bad2 and not D["unread"])
     else:
@@ -57994,13 +58014,25 @@ def m109przes_rows(rep, D):
                 bad3.append(f"{tag}: {out}")
         else:
             bad3.append(f"{tag}: {out}")
-    poch = [v for k, v in D["seq"] if k == "p"]
+    poch = [v for k, v, _g in D["seq"] if k == "p"]
     straceni_txt, straceni_ok = "linii Pochodzenie (E4/7) brak - porownanie INFO", True
     if poch:
-        last_p = max(i for i, (k, _v) in enumerate(D["seq"]) if k == "p")
-        before = sum(v for i, (k, v) in enumerate(D["seq"]) if k == "d" and i < last_p)
-        straceni_ok = before <= sum(poch) + 1e-6
-        straceni_txt = f"zgonow zwyklych przed ostatnia linia Pochodzenie {before:g}, straceni w liniach {sum(poch):g}"
+        # w obrebie odcinka (recenzja kod R1): zgon przed wczytaniem zapisu nie trafia do "straceni" po wczytaniu (PeopleBook.Import -> ResetOrigin)
+        before_all, poch_all, bad_seg = 0.0, 0.0, []
+        for sg in sorted({g for _k, _v, g in D["seq"]}):
+            seq = [(k, v) for k, v, g in D["seq"] if g == sg]
+            ps = [i for i, (k, _v) in enumerate(seq) if k == "p"]
+            if not ps:
+                continue
+            before = sum(v for i, (k, v) in enumerate(seq) if k == "d" and i < ps[-1])
+            sp = sum(v for k, v in seq if k == "p")
+            before_all += before
+            poch_all += sp
+            if before > sp + 1e-6:
+                bad_seg.append(f"odcinek {sg}: {before:g} > {sp:g}")
+        straceni_ok = not bad_seg
+        straceni_txt = (f"zgonow zwyklych przed ostatnia linia Pochodzenie odcinka {before_all:g}, straceni w liniach {poch_all:g} (odcinkow {len(D['start'])}"
+                        + (f", ponad straceni: {bad_seg[:3]}" if bad_seg else "") + ")")
     if ntort or any(m.group(1) == "rozmowa" for m, _s in tries):
         rep.add("PRZES-3: smierc tylko w torturach, TAK <=> rzut < szansa (0.15/0.30 x 0.8 FG), ubytek w wybranej kolumnie, bohater zyje NIE / zablokowana, <= straceni ksiegi ludzi",
                 f"tortur {ntort}, zgonow zwyklych {ndead}, niezgodnych {len(bad3)}" + (f" ({bad3[:3]})" if bad3 else "") + f"; {straceni_txt}", "0 niezgodnych; zgony <= straceni",
@@ -58041,17 +58073,21 @@ def m109przes_rows(rep, D):
                 f"prob {len(tries)}, niezgodnych {len(bad4)}" + (f" ({bad4[:3]})" if bad4 else ""), "0", not bad4)
     else:
         rep.add("PRZES-4: kary i XP", "brak prob w logu", "INFO", None)
-    # PRZES-5: limit doby
+    # PRZES-5: limit doby - klucz limitu jak CampInterrogation.LimitKey (bohater - grupa; zwykli - rodzaj bandy "c:" + kultura, recenzja R3), w obrebie odcinka
+    # (recenzja kod R1: wczytanie zapisu w tej samej sesji odtwarza limit z zapisu - ta sama proba po wczytaniu jest dozwolona)
     cnt = {}
-    for m, _s in tries:
-        k = (m.group(2), m.group(3), m.group(1))
+    for m, s in tries:
+        lk = m.group(3) if m.group(7) == "TAK" or m.group(5) == "-" else "c:" + m.group(5)
+        k = (s.get("seg", 0), m.group(2), lk, m.group(1))
         cnt[k] = cnt.get(k, 0) + 1
-    over = [f"d{k[0]} {k[1]} {k[2]} x{v}" for k, v in cnt.items() if v > 1]
+    over = [f"odc{k[0]} d{k[1]} {k[2]} {k[3]} x{v}" for k, v in cnt.items() if v > 1]
     nlim = sum(1 for x in D["refuse"] if x.startswith("odmowa - limit"))
-    rep.add("PRZES-5: limit doby - (doba, grupa, rodzaj) najwyzej 1 proba (odmowy sie nie licza)", f"par {len(cnt)}, ponad limit {len(over)}" + (f" ({over[:3]})" if over else "")
-            + f"; odmow: limit {nlim}, wszystkich {len(D['refuse'])}", "0", not over if tries else None)
-    # PRZES-6: kufle - Urok = miara z dopisku, dopisek wedlug klucza, KP-5
-    bad6, known, unknown = [], 0, 0
+    rep.add("PRZES-5: limit doby - (odcinek, doba, klucz limitu: bohater albo rodzaj bandy, rodzaj proby) najwyzej 1 proba (odmowy sie nie licza)",
+            f"par {len(cnt)}, ponad limit {len(over)}" + (f" ({over[:3]})" if over else "") + f"; odmow: limit {nlim}, wszystkich {len(D['refuse'])}; odcinkow {len(D['start'])}",
+            "0", not over if tries else None)
+    # PRZES-6: kufle - Urok = miara z dopisku, KP-5; dopisek wobec stanu klucza z linii startu osobno (recenzja kod R1: klucze MCM bez restartu - przelaczenie
+    # w trakcie sesji nie daje nowej linii startu; niezgodnosc ze stanem = INFO "sprawdz recznie", nie NIE)
+    bad6, known, unknown, toggled = [], 0, 0, []
     for t, s in D["cups"]:
         if "zaplata nie przeszla" in t:
             continue
@@ -58066,17 +58102,24 @@ def m109przes_rows(rep, D):
         on = s.get("gpd") == "tak" and s.get("byc") == "tak"
         mx = R["cupx"].search(t)
         urok, n, fresh = int(mc.group(13)), int(mc.group(14)), int(mc.group(15))
-        if on:
-            ok_, val = m109przes_meas_ok(mx.group(1)) if mx else (False, None)
+        if mx:
+            ok_, val = m109przes_meas_ok(mx.group(1))
             if not ok_ or val != urok:
                 bad6.append(f"{mc.group(3)} d{mc.group(4)}: Urok {urok}, dopisek {val}")
-        elif mx:
-            bad6.append(f"{mc.group(3)} d{mc.group(4)}: dopisek przy kluczu NIE")
+        if on != bool(mx):
+            toggled.append(f"{mc.group(3)} d{mc.group(4)}: " + ("bez dopisku przy kluczu tak" if on else "dopisek przy kluczu NIE"))
         if n != m98_per_drink(urok, fresh, s.get("byc") == "tak"):
             bad6.append(f"{mc.group(3)} d{mc.group(4)}: KP-5 Urok {urok}, nowych {fresh}, plotek {n}")
     if known or bad6:
-        rep.add("PRZES-6: kufle - 'Urok N' = miara z dopisku (= suma skladnikow), dopisek przy kluczu tak i bez niego przy NIE, KP-5 dalej wazny",
-                f"kufli z kluczem z linii startu {known} (bez linii startu m109 przed kuflem {unknown}), niezgodnych {len(bad6)}" + (f" ({bad6[:3]})" if bad6 else ""), "0", not bad6)
+        txt6 = (f"kufli z kluczem z linii startu {known} (bez linii startu m109 przed kuflem {unknown}), niezgodnych {len(bad6)}" + (f" ({bad6[:3]})" if bad6 else "")
+                + f"; dopisek niezgodny ze stanem klucza z linii startu {len(toggled)}" + (f" ({toggled[:2]})" if toggled else ""))
+        if bad6:
+            rep.add("PRZES-6: kufle - 'Urok N' = miara z dopisku (= suma skladnikow), KP-5 dalej wazny; dopisek wedlug stanu klucza", txt6, "0", False)
+        elif toggled:
+            rep.add("PRZES-6: kufle - 'Urok N' = miara z dopisku (= suma skladnikow), KP-5 dalej wazny; dopisek wedlug stanu klucza", txt6,
+                    "INFO (klucz przelaczony w MCM w trakcie sesji albo blad - sprawdz recznie; w autotescie klucze stoja - tam ma byc 0)", None)
+        else:
+            rep.add("PRZES-6: kufle - 'Urok N' = miara z dopisku (= suma skladnikow), KP-5 dalej wazny; dopisek wedlug stanu klucza", txt6, "0", True)
     else:
         rep.add("PRZES-6: kufle", "brak kufli po linii startu m109" + (f" (kufli bez linii startu {unknown})" if unknown else ""), "INFO", None)
     # PRZES-7: test autotestu
@@ -58110,34 +58153,60 @@ def m109przes_synth():
     import shutil
     T = M109PRZES_TEST
 
-    def run(bad):
+    P = "[00:00:00] " + M109PRZES_TAG
+    talk2 = P + T["talk"].replace("rzut 0.1000 -> MOWI", "rzut 0.9000 -> MILCZY").replace(
+        "kryjowka hideout_forest_1 (kultura forest_bandits, zajeta TAK, wypatrzona przed NIE -> po TAK, skad banda, 42.5 jedn. od obozu, flaga TAK)",
+        "kryjowka - (cel hideout_forest_1, skad banda)").replace("XP Urok +20", "XP Urok +5")   # druga rozmowa tej doby (MILCZY)
+
+    def bad(L):
+        L[2] = L[2].replace("szansa 0.3225", "szansa 0.4000")                                    # PRZES-2: szansa != suma
+        L[3] = L[3].replace("| po 1/1 |", "| po 2/1 |")                                          # PRZES-3: smierc bez ubytku
+        L.append(talk2.replace("grupa forest_bandit (Forest Bandit,", "grupa forest_raider (Forest Raider,"))   # PRZES-5: inny stos, ten sam rodzaj bandy (R3)
+        L[7] = L[7].replace("Urok 45 -> plotek 1", "Urok 15 -> plotek 1")                        # PRZES-6: Urok != miara
+        L[8] = L[8].replace("wynik TAK", "wynik NIE")                                             # PRZES-7
+        L[1] = L[1].replace("| pamiec 4.", "| pamiec 31.")                                        # PRZES-9
+        return L
+
+    def comp(L):   # PRZES-2 (recenzja kod R2): skladnik tier niezgodny z polem "tier 3", suma i szansa zgodne
+        L[2] = L[2].replace("tier 1, bohater NIE", "tier 3, bohater NIE")
+        return L
+
+    def reload(L):   # recenzja kod R1: wczytanie zapisu w tej samej sesji - nowa linia startu, ta sama proba jeszcze raz, zgon przed wczytaniem bez "straceni"
+        return L + [P + T["start"], P + T["tort"], P + T["start"], P + T["talk"], P + T["tort"], "[00:00:00] " + T["poch"]]
+
+    def reload_bad(L):   # ta sama proba drugi raz w jednym odcinku i zgon ponad "straceni" odcinka - nadal NIE
+        return L + [P + T["start"], P + T["tort"], P + T["tort"], "[00:00:00] " + T["poch"].replace("straceni 1,", "straceni 0,")]
+
+    def toggle(L):   # recenzja kod R1: klucz kufla przelaczony w MCM w trakcie sesji (linia startu mowi tak, kufel bez dopisku) - INFO, nie NIE
+        L[7] = L[7].replace(" (perswazja m109: " + _M109PRZES_M45 + ")", "").replace("Urok 45 -> plotek 1", "Urok 15 -> plotek 1")
+        return L
+
+    def run(mod):
         tmp = tempfile.mkdtemp(prefix="m109p_")
         try:
             logp = os.path.join(tmp, "Armoury-test.log")
-            P = "[00:00:00] " + M109PRZES_TAG
             L = [P + T["start"], P + T["mem"], P + T["talk"], P + T["tort"], P + T["refuse"], "[00:00:00] " + T["poch"], P + T["day"], "[00:00:00] " + M98P_PRE + T["cup"], P + T["test"],
                  P + T["hero"]]
-            if bad:
-                L[2] = L[2].replace("szansa 0.3225", "szansa 0.4000")                                    # PRZES-2: szansa != suma
-                L[3] = L[3].replace("| po 1/1 |", "| po 2/1 |")                                          # PRZES-3: smierc bez ubytku
-                L.append(P + T["talk"].replace("rzut 0.1000 -> MOWI", "rzut 0.9000 -> MILCZY").replace(
-                    "kryjowka hideout_forest_1 (kultura forest_bandits, zajeta TAK, wypatrzona przed NIE -> po TAK, skad banda, 42.5 jedn. od obozu, flaga TAK)",
-                    "kryjowka - (cel hideout_forest_1, skad banda)").replace("XP Urok +20", "XP Urok +5"))   # PRZES-5: druga rozmowa tej doby
-                L[7] = L[7].replace("Urok 45 -> plotek 1", "Urok 15 -> plotek 1")                        # PRZES-6: Urok != miara
-                L[8] = L[8].replace("wynik TAK", "wynik NIE")                                             # PRZES-7
-                L[1] = L[1].replace("| pamiec 4.", "| pamiec 31.")                                        # PRZES-9
+            if mod:
+                L = mod(L)
             open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
             rep = Report()
             m109przes_rows(rep, m109przes_collect(logp))
             return {r[0].split(":")[0]: r[3] for r in rep.rows}
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-    good, badr = run(False), run(True)
     exp_good = {"PRZES-0": "TAK", "PRZES-1": "TAK", "PRZES-2": "TAK", "PRZES-3": "TAK", "PRZES-4": "TAK", "PRZES-5": "TAK", "PRZES-6": "TAK", "PRZES-7": "TAK",
                 "PRZES-8": "INFO", "PRZES-9": "TAK"}
-    exp_bad = {"PRZES-0": "TAK", "PRZES-2": "NIE", "PRZES-3": "NIE", "PRZES-5": "NIE", "PRZES-6": "NIE", "PRZES-7": "NIE", "PRZES-9": "NIE"}
-    diff = [f"dobry {k}: {good.get(k)} (oczekiwane {v})" for k, v in exp_good.items() if good.get(k) != v]
-    diff += [f"zly {k}: {badr.get(k)} (oczekiwane {v})" for k, v in exp_bad.items() if badr.get(k) != v]
+    cases = (("dobry", None, exp_good),
+             ("zly", bad, {"PRZES-0": "TAK", "PRZES-2": "NIE", "PRZES-3": "NIE", "PRZES-5": "NIE", "PRZES-6": "NIE", "PRZES-7": "NIE", "PRZES-9": "NIE"}),
+             ("skladnik", comp, dict(exp_good, **{"PRZES-2": "NIE"})),
+             ("wczytanie", reload, exp_good),
+             ("wczytanie-zly", reload_bad, dict(exp_good, **{"PRZES-3": "NIE", "PRZES-5": "NIE"})),
+             ("przelacznik", toggle, dict(exp_good, **{"PRZES-6": "INFO"})))
+    diff = []
+    for name, mod, exp in cases:
+        got = run(mod)
+        diff += [f"{name} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp.items() if got.get(k) != v]
     return "; ".join(diff) if diff else None
 
 
