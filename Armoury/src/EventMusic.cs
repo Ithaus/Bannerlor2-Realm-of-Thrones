@@ -14,16 +14,18 @@ namespace Armoury
     /// ciszej, aby posluchac"; "plotkowanie, cale wydarzenie - muzyka tylko nasza i zeby nie przeszkadzala"). Klucz EventMusicEnabled (TAK).
     ///  - Kiedy: przez cale okno wydarzenia (stan gry ROT EventPopupState - okna ROT, Kronika, sceny prologu; Lektor.EventStateActive) i przez czytanie strony
     ///    plotek (Lektor.GossipPageActive). Sprawdzane co klatke z SubModuleMain.OnApplicationTick (bez latek - sam odczyt stanu).
-    ///  - Muzyka gry: psai (TaleWorlds.PSAI, psai.net.PsaiCore - odbicie, bez referencji): GetVolume zapamietane, SetVolume plynnie do 0 w 1,2 s, potem SetPaused(true);
-    ///    po wydarzeniu (0,6 s bez okna i plotek - kolejne okno zaraz po zamknieciu nie przywraca) SetPaused(false) i SetVolume plynnie do zapamietanej w 2 s.
-    ///    Wyjscie z kampanii / blad - przywrocenie od razu. Glosnosci gracza nie zmieniamy w ustawieniach.
+    ///  - Muzyka gry: psai (TaleWorlds.PSAI, psai.net.PsaiCore - odbicie, bez referencji): GetVolume zapamietane, SetVolume plynnie do 0 w 1,2 s i 0 trzymane
+    ///    co klatke (bez SetPaused - 103.5, Jeff 22.10 "w bitwie muzyka chwile gra i nagle cichnie"); po wydarzeniu (0,6 s bez okna i plotek - kolejne okno zaraz
+    ///    po zamknieciu nie przywraca) SetVolume plynnie do zapamietanej w 2 s. Wyjscie z kampanii / blad - przywrocenie od razu. Glosnosci gracza nie zmieniamy w ustawieniach.
+    ///  - m109-muzyka (EventMusic.Bitwa.cs): w misji bitwy nasze 6 utworow bitewnych losowo zamiast muzyki gry - ten sam stan wyciszenia psai (_ducked, _saved, _cur,
+    ///    _active, _mus) i te same DuckStart / FadeDown / FadeUp: jeden wlasciciel glosnosci psai, okno i bitwa nie przywracaja sie nawzajem.
     ///  - Nasz utwor: ModuleData/Lektor/Muzyka/muz_[nastroj].ogg (ElevenLabs Music, instrumentalne, -28 LUFS - ok. 13 dB pod lektorem -14.5 LUFS, pasmo 2.5 kHz -3 dB
     ///    pod glos; tools/muzyka). Odtwarzanie jak lektor: SoundEvent.CreateEventFromExternalFile("event:/Extra/external", ...) - zdarzenie z instrumentem
     ///    programisty (MasterBank.strings: Extra/external obok Extra/voiceover; voiceover NIE - jeden glos naraz, uciszylby lektora). Po koncu utworu - od nowa.
     ///    Nastroj z tytulu, klucza i tekstu okna (slowa: smierc -> zaloba, wojna, Polnoc, korona i smoki, reszta intryga); plotki - plotka.
     ///  - Linie "Muzyka (m108): ..." (start okna z nastrojem i glosnoscia psai, koniec, bledy pierwsze 3). Potkniecia liczone, bez wylacznika.
     /// </summary>
-    internal static class EventMusic
+    internal static partial class EventMusic
     {
         internal const string P = "Muzyka (m108): ";
         private const string MusicEvent = "event:/Extra/external";
@@ -98,22 +100,30 @@ namespace Armoury
             double now = Now;
             float dt = _lastTick > 0 ? (float)Math.Min(0.25, now - _lastTick) : 0f;
             _lastTick = now;
+            BattleStartCheck();   // m109-muzyka: linia startu raz na kampanie (wlasny try w srodku)
             bool win = false, gossip = false;
             if (KeyOn)
             {
                 try { win = Lektor.MusicWindowActive(); } catch (Exception e) { Stumble("Window", e); }
                 if (!win) { try { gossip = Lektor.MusicGossipActive(); } catch (Exception e) { Stumble("Gossip", e); } }
             }
-            bool want = win || gossip;
+            bool battle = !win && !gossip && BattleWanted();   // m109-muzyka: okno i plotki maja pierwszenstwo (wlasny try w srodku)
+            bool want = win || gossip || battle;
             if (!want && !_active && !_ducked && _mus == null) return;   // nic nie gra i nic nie czeka
-            try { Step(want, win, dt); }
-            catch (Exception e) { Stumble("Step", e); RestoreNow("blad"); }
+            try { Step(want, win, battle, dt); }
+            catch (Exception e)
+            {
+                if (battle) BattleStumble("Step", e);   // m109-muzyka: blad w bitwie liczony na misje (po 3 rezygnacja z tej misji), bez przywracania co klatke
+                else { Stumble("Step", e); RestoreNow("blad"); }
+            }
         }
 
-        private static void Step(bool want, bool win, float dt)
+        private static void Step(bool want, bool win, bool battle, float dt)
         {
             if (want)
             {
+                if (battle) { BattleStep(dt); FadeDown(dt); return; }   // m109-muzyka: nasze utwory bitewne, psai trzymane na 0
+                if (_batActive) BattleEnd("okno wydarzenia", false);    // m109-muzyka: okno wydarzenia przejmuje (wyciszenie zostaje)
                 _idle = 0f;
                 string mood = win ? _mood : "plotka";
                 if (!_active)
@@ -134,9 +144,13 @@ namespace Armoury
             if (_active && _idle >= ReleaseDelay)
             {
                 _active = false;
-                StopTrack("koniec wydarzenia");
+                if (_batActive) BattleEnd(_batWhy, false);   // m109-muzyka: koniec bitwy (powod z BattleWanted) - linia bitwy zamiast linii wydarzenia
+                else
+                {
+                    StopTrack("koniec wydarzenia");
+                    Log.Info(P + "koniec wydarzenia - muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s).");
+                }
                 _paused = false;
-                Log.Info(P + "koniec wydarzenia - muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s).");
             }
             if (!_active && _ducked) FadeUp(dt);
         }
@@ -206,10 +220,10 @@ namespace Armoury
         private static void FadeUp(float dt)
         {
             object ps = Psai();
-            if (ps == null) { _ducked = false; return; }
+            if (ps == null) { _ducked = false; BattleUnducked(null, null); return; }
             _cur = Math.Min(_saved, _cur + dt * Math.Max(_saved, 0.1f) / FadeInSec);
             _mSetVol.Invoke(ps, new object[] { _cur });
-            if (_cur >= _saved - 0.0001f) _ducked = false;
+            if (_cur >= _saved - 0.0001f) { _ducked = false; BattleUnducked(ps, null); }   // m109-muzyka: linia powrotu po bitwie
         }
 
         private static void PsaiPause(bool p)
@@ -221,6 +235,7 @@ namespace Armoury
         /// <summary>Wyjscie z kampanii albo blad: utwor stop, muzyka gry od razu z powrotem.</summary>
         internal static void RestoreNow(string why)
         {
+            try { if (_batActive) BattleEnd(why, true); } catch (Exception e) { Stumble("RestoreNow.Bitwa", e); }   // m109-muzyka: podsumowanie bitwy i stop utworu
             try { StopTrack(why); } catch (Exception e) { Stumble("RestoreNow.Stop", e); }
             try
             {
@@ -232,10 +247,12 @@ namespace Armoury
                         _mSetVol.Invoke(ps, new object[] { _saved });
                     }
                     Log.Info(P + "muzyka gry przywrocona od razu (" + why + ").");
+                    BattleUnducked(ps, why);   // m109-muzyka: linia powrotu po bitwie "od razu"
                 }
             }
             catch (Exception e) { Stumble("RestoreNow.Psai", e); }
             _ducked = false; _paused = false; _active = false; _idle = 0f; _cur = _saved;
+            BattleReset(why);   // m109-muzyka: stan bitwy od zera (wczytanie zapisu z misji, wyjscie do menu); blad w misji bitwy - rezygnacja z tej misji
         }
 
         // ------------------------------------------------------------ nasz utwor

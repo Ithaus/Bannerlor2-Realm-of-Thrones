@@ -1107,6 +1107,20 @@ Uzycie (Python 3, tylko odczyt):
                     (odrzucone 0), LK-4 w autotescie 0 zapytan API (bez "nowe nagranie", "konto ElevenLabs"; plik armoury-lektor-live.flag - INFO), LK-5 okna ROT z nagraniem
                     odtworzone (start > 0; z --crashscribe: okna zamkniete przez autotest z tytulem z tsv -> start > 0), LK-6 grane po 0,5 s NIE 0 i koniec za wczesnie 0,
                     LK-7 kazdy start okna ma stop albo koniec, LK-8 znaki dzis <= limit, LK-9 plotki (INFO). Log bez paczki: INFO.
+--grupa m109muz   : (23.10, w-toku/m109-muzyka - Jeff 22.10 "muzyka w czasie bitwy jest strasznie slaba, zastap ja naszymi 6 utworami, ktore leca losowo"; Armoury/src/
+                    EventMusic.Bitwa.cs, EventMusic.cs, klucze BattleMusicOurs, BattleMusicLoudness) python -I tools/sprawdz_logi.py --grupa m109muz <Armoury-*.log>
+                    [--crashscribe <session-*.log>] (strumieniowo). Linie 'Muzyka bitwy (m109): '. MUZ-S self-test wyrazen, MUZ-S2 test syntetyczny. MUZ-0 linia startu: klucz
+                    TAK, psai TAK, 4 x 6 utworow (lufs17/20/23/26), dlugosci 85-95 s, odrzucone 0 (klucz NIE / log sprzed m109 - INFO); MUZ-1 kazda bitwa ('bitwa - misja')
+                    ma 'muzyka gry wyciszona ... teraz <= 0.01', misja nie z listy bez zmian (turniej, arena, kryjowka, spacer, rozmowy; nieznana - INFO), z --crashscribe:
+                    bitew = linii 'AUTOTEST BITWA n/N [..]: misja ruszyla' (bitwa dalej po oknie wydarzenia sie nie liczy; bez bitew przy kluczu NIE / logu sprzed m109 -
+                    INFO); MUZ-2 utwory: pod flaga armoury-muzyka-bitwy.flag bitwa >= 8 s ma >= 2 utwory, konce '(test 4 s)',
+                    >= 3 rozne; zawsze 0 powtorek z rzedu (takze miedzy bitwami) i kazdy 'grany po 1 s TAK'; MUZ-3 bitwa -> 'koniec bitwy' (koniec misji / wyjscie z kampanii /
+                    klucz NIE / okno wydarzenia) -> 'muzyka gry wrocila' przed nastepna bitwa, glosnosc >= zapamietana - 0.01, zapamietana >= 0.95 (okno wydarzenia, po ktorym
+                    ta sama misja dalej - m108 'koniec wydarzenia - bitwa dalej' - bez 'wrocila'; log uciety - INFO); MUZ-4
+                    misje bez zmian: zadna z listy bitew i zadna bitwa z listy bez zmian (brak linii - INFO); MUZ-5 ERROR EventMusic, rezygnacje, 'silnik nie przyjal',
+                    'po czasie pliku', 'nie grany', brak psai / utworow - 0; MUZ-6 regresja m108: kazde okno / plotki zamkniete ('koniec wydarzenia - muzyka gry wraca' /
+                    '- bitwa dalej' / 'przywrocona od razu') przed nastepnym, linii z SetPaused 0 (poza
+                    linia 'psai TAK (GetVolume/SetVolume/SetPaused)'; bez okien - INFO).
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -39924,6 +39938,518 @@ def m103lektor_main(logp, csp=None):
     rep.show()
     return 0
 
+# ------------------------------------------------------------ m109muz (23.10, w-toku/m109-muzyka: nasze 6 utworow w bitwie zamiast muzyki gry - Jeff 22.10 "muzyka w czasie bitwy
+# jest strasznie slaba, zastap ja naszymi 6 utworami, ktore leca losowo"; Armoury/src/EventMusic.Bitwa.cs, EventMusic.cs; klucze BattleMusicOurs, BattleMusicLoudness;
+# pliki Armoury/ModuleData/Lektor/Muzyka/Bitwa/lufs{17,20,23,26}/muz_*.ogg z tools/muzyka/bitwa_glosnosc.py)
+M109MUZ_TAG = "Muzyka bitwy (m109): "
+M109MUZ_M108 = "Muzyka (m108): "
+M109MUZ_LEVELS = (17, 20, 23, 26)
+M109MUZ_TRACKS = 6
+M109MUZ_DUR = (85.0, 95.0)
+M109MUZ_MIN_BATTLE_SEC = 8
+M109MUZ_MIN_TRACKS_TEST = 2
+M109MUZ_MIN_DISTINCT = 3
+M109MUZ_BACK_TOL = 0.01
+M109MUZ_SAVED_MIN = 0.95
+M109MUZ_BATTLE_MISSIONS = {"Battle", "SiegeMissionWithDeployment", "SiegeMissionNoDeployment", "NavalBattle", "NavalRaid"}
+M109MUZ_SKIP_MISSIONS = {"TournamentFight", "ArenaPracticeFight", "ArenaDuel", "ArenaDuelMission", "HideoutBattle", "HideoutAmbushMission", "Indoor", "PrisonBreak",
+                         "TownCenter", "Village", "Alley", "AlleyFight", "CombatWithDialogue", "EnteringSettlementBattle", "SiegeLordsHallFightMission", "Conversation",
+                         "Camp", "CampWalk", "NavalCaptivityBattle", "BlockedEstuary", "DisguiseMission", "Retirement", "NavalFinalConversationMission"}
+M109MUZ_END_OK = {"koniec misji", "wyjscie z kampanii", "klucz NIE", "okno wydarzenia"}
+M109MUZ_RX = {
+    "start": re.compile(r"^start - klucz BattleMusicOurs (TAK|NIE)\b"),
+    "full": re.compile(r"^start - klucz BattleMusicOurs TAK, glosnosc (\d) \(-(\d+) LUFS\), utwory bitewne lufs17 (\d+), lufs20 (\d+), lufs23 (\d+), lufs26 (\d+) "
+                       r"\(([^)]*)\), odrzucone (\d+), psai (TAK|NIE), test autotestu (TAK|NIE)\.$"),
+    "dur": re.compile(r"([a-z]+) ([\d.]+) s"),
+    "bat": re.compile(r"^bitwa - misja (\S+) \(mapa ([^,]*), ([^,]*), scena ([^,]*), oboz (TAK|NIE), widok ([^,)]*)(, test autotestu TAK)?\) - muzyka gry cichnie "
+                      r"\(psai (?:glosnosc ([\d.]+)|BRAK)\), nasza: glosnosc (\d) \(-(\d+) LUFS\), utworow (\d+)\.$"),
+    "duck": re.compile(r"^muzyka gry wyciszona \(bez pauzy psai; psai glosnosc teraz (-?[\d.]+), zapamietana ([\d.]+)\)\.$"),
+    "trk": re.compile(r"^utwor (\d+) - (muz_[a-z]+\.ogg) \(lufs(\d+), (?:([\d.]+) s|dlugosc \?)\), grany po 1 s (TAK|NIE); "
+                      r"(?:poprzedni (muz_[a-z]+\.ogg) (?:skonczony po ([\d.]+) s \(([^)]*)\)|nie grany)|pierwszy w bitwie(?: \(ostatni wczesniej (muz_[a-z]+\.ogg)\))?)\.$"),
+    "notp": re.compile(r"^utwor (\d+) - (muz_[a-z]+\.ogg) \(lufs(\d+), [^)]*\), nie grany - silnik skonczyl po ([\d.]+) s"),
+    "rej": re.compile(r"^silnik nie przyjal (\S+) \(zdarzenie "),
+    "end": re.compile(r"^koniec bitwy \(([^,]+), misja (\S+), (\d+) s\) - utworow (\d+) \(koniec silnik (\d+), po czasie (\d+), test (\d+), nie grane (\d+), "
+                      r"grane po 1 s NIE (\d+)\), powtorki z rzedu (\d+), bledy (\d+), (?:stop (\S+)|bez utworu) - (.*)\.$"),
+    "back": re.compile(r"^muzyka gry wrocila(?: od razu \(([^)]*)\))? - psai glosnosc (-?[\d.]+|\?) \(zapamietana ([\d.]+)\)\.$"),
+    "skip": re.compile(r"^misja (\S+) - muzyka gry (.+?), nie bitwa - bez zmian"),
+    "gave": re.compile(r"^rezygnacja w tej misji po (\d+) bledach \(([^)]*)\)"),
+    "nores": re.compile(r"^(?:brak utworow bitewnych w .* - bitwy z muzyka gry|psai NIE - bitwy z muzyka gry)\.$"),
+    "win": re.compile(r"^(?:okno \".*\"|plotki) - nastroj \S+, muzyka gry cichnie"),
+    "winend": re.compile(r"^(?:koniec wydarzenia - (?:muzyka gry wraca|bitwa dalej)|muzyka gry przywrocona od razu)"),
+    "windalej": re.compile(r"^koniec wydarzenia - bitwa dalej\b"),
+    "cs": re.compile(r"AUTOTEST BITWA (\d+)/(\d+) \[[^\]]*\]: misja ruszyla"),
+}
+# linie kontrolne - napisy jak w kodzie C# (EventMusic.Bitwa.cs; m108 z EventMusic.cs, linie okna z logu Jeffa 22.10)
+M109MUZ_TEST = {
+    "start": "start - klucz BattleMusicOurs TAK, glosnosc 4 (-17 LUFS), utwory bitewne lufs17 6, lufs20 6, lufs23 6, lufs26 6 (intryga 90.1 s, korona 90.1 s, "
+             "plotka 90.1 s, polnoc 90.1 s, wojna 90.1 s, zaloba 90.0 s), odrzucone 0, psai TAK, test autotestu TAK.",
+    "startno": "start - klucz BattleMusicOurs NIE - bitwy z muzyka gry (jak w 103.5).",
+    "bat": "bitwa - misja Battle (mapa FieldBattle, pole, scena battle_terrain_biome_040, oboz NIE, widok MusicBattleMissionView, test autotestu TAK) - muzyka gry cichnie "
+           "(psai glosnosc 1.00), nasza: glosnosc 4 (-17 LUFS), utworow 6.",
+    "duck": "muzyka gry wyciszona (bez pauzy psai; psai glosnosc teraz 0.00, zapamietana 1.00).",
+    "trk1": "utwor 1 - muz_wojna.ogg (lufs17, 90.1 s), grany po 1 s TAK; pierwszy w bitwie (ostatni wczesniej muz_korona.ogg).",
+    "trk2": "utwor 2 - muz_zaloba.ogg (lufs17, 90.0 s), grany po 1 s TAK; poprzedni muz_wojna.ogg skonczony po 4.0 s (test 4 s).",
+    "trk3": "utwor 3 - muz_plotka.ogg (lufs17, 90.1 s), grany po 1 s NIE; poprzedni muz_zaloba.ogg nie grany.",
+    "notp": "utwor 3 - muz_plotka.ogg (lufs17, 90.1 s), nie grany - silnik skonczyl po 0.2 s; nastepny za 3 s.",
+    "rej": "silnik nie przyjal muz_plotka.ogg (zdarzenie event:/Extra/external) - nastepny za 3 s.",
+    "end": "koniec bitwy (koniec misji, misja Battle, 22 s) - utworow 4 (koniec silnik 0, po czasie 0, test 3, nie grane 0, grane po 1 s NIE 0), powtorki z rzedu 0, "
+           "bledy 0, stop muz_zaloba.ogg - muzyka gry wraca (2.0 s).",
+    "back": "muzyka gry wrocila - psai glosnosc 1.00 (zapamietana 1.00).",
+    "back2": "muzyka gry wrocila od razu (wyjscie z kampanii) - psai glosnosc 1.00 (zapamietana 1.00).",
+    "skip": "misja TournamentFight - muzyka gry MusicTournamentMissionView, nie bitwa - bez zmian.",
+    "gave": "rezygnacja w tej misji po 3 bledach (Next) - muzyka gry wraca, nastepna bitwa od nowa.",
+    "nores": "psai NIE - bitwy z muzyka gry.",
+    "win": "okno \"The King in Winterfell\" - nastroj polnoc, muzyka gry cichnie (psai glosnosc 1.00).",
+    "winend": "koniec wydarzenia - muzyka gry wraca (2.0 s).",
+    "winbat": "koniec wydarzenia - bitwa dalej, muzyka gry dalej wyciszona.",
+    "endwin": "koniec bitwy (okno wydarzenia, misja Battle, 10 s) - utworow 3 (koniec silnik 0, po czasie 0, test 2, nie grane 0, grane po 1 s NIE 0), powtorki z rzedu 0, "
+              "bledy 0, stop muz_wojna.ogg - muzyka gry dalej wyciszona (okno wydarzenia).",
+    "gave2": "rezygnacja w tej misji po 1 bledach (RestoreNow) - muzyka gry wraca, nastepna bitwa od nowa.",
+    "trkerr": "utwor 2 - muz_zaloba.ogg (lufs17, 90.0 s), grany po 1 s TAK; poprzedni muz_wojna.ogg skonczony po 0.5 s (blad).",
+    "psai": "psai TAK (GetVolume/SetVolume/SetPaused).",
+    "cs": "[06:25:18] AUTOTEST: AUTOTEST BITWA 1/4 [mocna]: misja ruszyla po 3 s ladowania (scena battle_terrain_biome_040, Mission)",
+}
+
+
+def m109muz_selftest():
+    """m109muz: wyrazenia wobec linii kontrolnych M109MUZ_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    RX, T = M109MUZ_RX, M109MUZ_TEST
+    m = RX["full"].match(T["start"])
+    if not m or m.groups()[:6] != ("4", "17", "6", "6", "6", "6") or m.groups()[7:] != ("0", "TAK", "TAK"):
+        return f"start: {m.groups() if m else 'brak dopasowania'}"
+    durs = RX["dur"].findall(m.group(7))
+    if len(durs) != 6 or durs[5] != ("zaloba", "90.0"):
+        return f"dur: {durs}"
+    if not RX["start"].match(T["startno"]) or RX["start"].match(T["startno"]).group(1) != "NIE" or RX["full"].match(T["startno"]):
+        return "startno"
+    m = RX["bat"].match(T["bat"])
+    if not m or m.group(1) != "Battle" or m.group(2) != "FieldBattle" or m.group(6) != "MusicBattleMissionView" or not m.group(7) or m.group(8) != "1.00" \
+            or m.groups()[8:] != ("4", "17", "6"):
+        return f"bat: {m.groups() if m else 'brak dopasowania'}"
+    if RX["bat"].match(T["bat"].replace(", test autotestu TAK", "")).group(7) is not None:
+        return "bat bez testu"
+    m = RX["duck"].match(T["duck"])
+    if not m or m.groups() != ("0.00", "1.00"):
+        return f"duck: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["trk"].match(T["trk1"])
+    if not m or m.group(1) != "1" or m.group(2) != "muz_wojna.ogg" or m.group(5) != "TAK" or m.group(6) is not None or m.group(9) != "muz_korona.ogg":
+        return f"trk1: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["trk"].match(T["trk1"].replace(" (ostatni wczesniej muz_korona.ogg)", ""))
+    if not m or m.group(9) is not None:
+        return "trk1 bez poprzedniej bitwy"
+    m = RX["trk"].match(T["trk2"])
+    if not m or m.groups()[:8] != ("2", "muz_zaloba.ogg", "17", "90.0", "TAK", "muz_wojna.ogg", "4.0", "test 4 s"):
+        return f"trk2: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["trk"].match(T["trk3"])
+    if not m or m.group(5) != "NIE" or m.group(6) != "muz_zaloba.ogg" or m.group(8) is not None:
+        return f"trk3: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["notp"].match(T["notp"])
+    if not m or m.groups() != ("3", "muz_plotka.ogg", "17", "0.2") or RX["trk"].match(T["notp"]):
+        return f"notp: {m.groups() if m else 'brak dopasowania'}"
+    if not RX["rej"].match(T["rej"]):
+        return "rej"
+    m = RX["end"].match(T["end"])
+    if not m or m.groups() != ("koniec misji", "Battle", "22", "4", "0", "0", "3", "0", "0", "0", "0", "muz_zaloba.ogg", "muzyka gry wraca (2.0 s)"):
+        return f"end: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["end"].match(T["end"].replace("stop muz_zaloba.ogg", "bez utworu"))
+    if not m or m.group(12) is not None:
+        return "end bez utworu"
+    m = RX["back"].match(T["back"])
+    if not m or m.groups() != (None, "1.00", "1.00"):
+        return f"back: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["back"].match(T["back2"])
+    if not m or m.groups() != ("wyjscie z kampanii", "1.00", "1.00"):
+        return f"back2: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["skip"].match(T["skip"])
+    if not m or m.groups() != ("TournamentFight", "MusicTournamentMissionView"):
+        return f"skip: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["skip"].match(T["skip"].replace(" - bez zmian.", " - bez zmian (misji bez zmian w sesji 70)."))
+    if not m or m.group(1) != "TournamentFight":
+        return "skip z licznikiem"
+    if not RX["gave"].match(T["gave"]) or not RX["nores"].match(T["nores"]):
+        return "gave / nores"
+    if not RX["win"].match(T["win"]) or not RX["win"].match("plotki - nastroj plotka, muzyka gry cichnie (psai glosnosc 1.00).") or not RX["winend"].match(T["winend"]) \
+            or not RX["winend"].match("muzyka gry przywrocona od razu (wyjscie z kampanii)."):
+        return "win / winend (linie m108)"
+    if not RX["winend"].match(T["winbat"]) or not RX["windalej"].match(T["winbat"]) or RX["windalej"].match(T["winend"]):
+        return "winbat (linia m108 koniec okna - bitwa dalej)"
+    m = RX["end"].match(T["endwin"])
+    if not m or m.group(1) != "okno wydarzenia" or m.group(13) != "muzyka gry dalej wyciszona (okno wydarzenia)":
+        return f"endwin: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["gave"].match(T["gave2"])
+    if not m or m.groups() != ("1", "RestoreNow"):
+        return "gave2 (rezygnacja z RestoreNow)"
+    m = RX["trk"].match(T["trkerr"])
+    if not m or m.group(8) != "blad":
+        return "trkerr (koniec utworu po bledzie odczytu)"
+    m = RX["cs"].search(T["cs"])
+    if not m or m.groups() != ("1", "4"):
+        return "cs (AUTOTEST BITWA misja ruszyla)"
+    for k in ("start", "bat", "trk1", "trk2", "end", "endwin", "back", "skip", "gave2"):        # linie m109 nie wpadaja w wyrazenia okien m108 i odwrotnie
+        if RX["win"].match(T[k]) or RX["winend"].match(T[k]):
+            return f"{k}: linia m109 wpada w wyrazenie okna m108"
+    return None
+
+
+def m109muz_collect(logp, csp=None):
+    """m109muz: przebieg logu (strumieniowo) -> linie startu, bitwy (L1 z wyciszeniem, utworami, koncem i powrotem), misje bez zmian, bledy, okna m108; z csp - bitwy autotestu."""
+    RX = M109MUZ_RX
+    D = {"starts": [], "battles": [], "skips": [], "gave": 0, "rej": 0, "notp": 0, "nores": 0, "err": 0, "err1": "", "setpaused": 0, "sp1": "", "wins": 0, "win_bad": 0,
+         "orphan": 0, "lines": 0, "cs_n": None}
+    cur = pend = None
+    win_open = False
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in ") and "EventMusic" in s[:90]:
+                D["err"] += 1
+                D["err1"] = D["err1"] or s[:200]
+                continue
+            if "SetPaused" in s and "(GetVolume/SetVolume/SetPaused)" not in s:
+                D["setpaused"] += 1
+                D["sp1"] = D["sp1"] or s[:200]
+            if s.startswith(M109MUZ_M108):
+                b = s[len(M109MUZ_M108):]
+                mm = RX["duck"].match(b)
+                if mm:
+                    if cur is not None:
+                        cur["ducks"].append(float(mm.group(1)))
+                elif RX["win"].match(b):
+                    D["wins"] += 1
+                    if win_open:
+                        D["win_bad"] += 1
+                    win_open = True
+                elif RX["winend"].match(b):
+                    win_open = False
+                    if pend is not None and RX["windalej"].match(b):
+                        pend["dalej"] = True       # okno w bitwie zamkniete, misja bitwy trwa
+                continue
+            if not s.startswith(M109MUZ_TAG):
+                continue
+            b = s[len(M109MUZ_TAG):]
+            D["lines"] += 1
+            mm = RX["start"].match(b)
+            if mm:
+                D["starts"].append((mm.group(1), RX["full"].match(b), b))
+                continue
+            mm = RX["bat"].match(b)
+            if mm:
+                if cur is not None:
+                    cur["noend"] = True
+                resumed = bool(pend is not None and pend.get("dalej") and pend["end"]["why"] == "okno wydarzenia" and pend["name"] == mm.group(1))
+                if resumed:
+                    pend["cont"] = True            # okno wydarzenia w bitwie, po nim ta sama misja dalej - wyciszenie trwa, bez 'wrocila'
+                pend = None
+                cur = {"name": mm.group(1), "test": bool(mm.group(7)), "ducks": [], "trk": [], "end": None, "back": None, "noend": False, "cut": False, "tail": False,
+                       "txt": b[:140], "resumed": resumed}
+                D["battles"].append(cur)
+                continue
+            mm = RX["trk"].match(b)
+            if mm:
+                t = {"n": int(mm.group(1)), "file": mm.group(2), "ok1s": mm.group(5), "prev": mm.group(6) or mm.group(9), "why": mm.group(8)}
+                if cur is not None:
+                    cur["trk"].append(t)
+                else:
+                    D["orphan"] += 1
+                continue
+            if RX["notp"].match(b):
+                D["notp"] += 1
+                continue
+            if RX["rej"].match(b):
+                D["rej"] += 1
+                continue
+            mm = RX["end"].match(b)
+            if mm:
+                e = {"why": mm.group(1), "sec": int(mm.group(3)), "n": int(mm.group(4)), "cap": int(mm.group(6)), "notp": int(mm.group(8)), "no1s": int(mm.group(9)),
+                     "rep": int(mm.group(10)), "err": int(mm.group(11))}
+                if cur is not None:
+                    cur["end"] = e
+                    pend, cur = cur, None
+                else:
+                    D["orphan"] += 1
+                continue
+            mm = RX["back"].match(b)
+            if mm:
+                if pend is not None:
+                    pend["back"] = (mm.group(2), float(mm.group(3)), mm.group(1))
+                    pend = None
+                else:
+                    D["orphan"] += 1
+                continue
+            mm = RX["skip"].match(b)
+            if mm:
+                D["skips"].append((mm.group(1), mm.group(2)))
+                continue
+            if RX["gave"].match(b):
+                D["gave"] += 1
+                continue
+            if RX["nores"].match(b):
+                D["nores"] += 1
+                continue
+    if cur is not None:
+        cur["cut"] = True              # log uciety w bitwie
+    if pend is not None:
+        pend["tail"] = True            # log uciety miedzy koncem bitwy a powrotem muzyki gry
+    if csp:
+        n = 0
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if RX["cs"].search(ln):
+                    n += 1
+        D["cs_n"] = n
+    return D
+
+
+def m109muz_rows(rep, D):
+    """m109muz: wiersze MUZ-0..MUZ-6 z danych m109muz_collect - opis w --help."""
+    RX = M109MUZ_RX
+    starts, bats = D["starts"], D["battles"]
+    # MUZ-0 linia startu
+    tak = [x for x in starts if x[0] == "TAK"]
+    if not starts:
+        rep.add("MUZ-0: linia startu (klucz, psai, 4 x 6 utworow)", "brak linii m109 (log sprzed m109)", "INFO", None)
+    elif not tak:
+        rep.add("MUZ-0: linia startu (klucz, psai, 4 x 6 utworow)", f"klucz BattleMusicOurs NIE ({len(starts)} linii) - bitwy z muzyka gry", "INFO", None)
+    else:
+        probs = []
+        for _, full, b in tak:
+            if not full:
+                probs.append("zly format: " + b[:90])
+                continue
+            cnt = [int(full.group(i)) for i in (3, 4, 5, 6)]
+            if cnt != [M109MUZ_TRACKS] * len(M109MUZ_LEVELS):
+                probs.append(f"zestawy lufs17/20/23/26 {cnt}")
+            durs = [(n, float(d)) for n, d in RX["dur"].findall(full.group(7))]
+            badd = [f"{n} {d}" for n, d in durs if not (M109MUZ_DUR[0] <= d <= M109MUZ_DUR[1])]
+            if len(durs) != M109MUZ_TRACKS or badd:
+                probs.append(f"dlugosci {len(durs)} utworow, poza {M109MUZ_DUR[0]:.0f}-{M109MUZ_DUR[1]:.0f} s: {badd}")
+            if full.group(8) != "0":
+                probs.append(f"odrzucone pliki {full.group(8)}")
+            if full.group(9) != "TAK":
+                probs.append("psai NIE")
+        last = tak[-1][1]
+        rep.add("MUZ-0: linia startu (klucz, psai, 4 x 6 utworow)", f"linii startu {len(starts)} (klucz TAK {len(tak)})"
+                + (f", glosnosc {last.group(1)} (-{last.group(2)} LUFS), test autotestu {last.group(10)}" if last else "") + (" | " + "; ".join(probs[:3]) if probs else ""),
+                "klucz TAK, psai TAK, 4 x 6 utworow, dlugosci 85-95 s, odrzucone 0", not probs)
+    # MUZ-1 bitwy: wyciszenie, nazwy misji, liczba wobec autotestu
+    cs_n = D["cs_n"]
+    keyno = bool(starts) and not tak
+    if not bats and (not cs_n or keyno or D["lines"] == 0):
+        rep.add("MUZ-1: bitwy z wyciszeniem muzyki gry", "bitew 0" + (f", autotest bitew {cs_n}" if cs_n is not None else "")
+                + (" - klucz BattleMusicOurs NIE" if keyno else " - brak linii m109" if D["lines"] == 0 else ""), "INFO (bez bitew, klucz NIE albo log sprzed m109)", None)
+    else:
+        skipn = [b["name"] for b in bats if b["name"] in M109MUZ_SKIP_MISSIONS]
+        unk = sorted({b["name"] for b in bats if b["name"] not in M109MUZ_BATTLE_MISSIONS and b["name"] not in M109MUZ_SKIP_MISSIONS})
+        noduck = [b["name"] for b in bats if not b["cut"] and (not b["ducks"] or min(b["ducks"]) > M109MUZ_BACK_TOL)]
+        nres = sum(1 for b in bats if b.get("resumed"))
+        cs_ok = cs_n is None or cs_n == len(bats) - nres
+        ok = not skipn and not noduck and cs_ok
+        rep.add("MUZ-1: bitwy z wyciszeniem muzyki gry", f"bitew {len(bats)}" + (f" (w tym dalej po oknie wydarzenia {nres})" if nres else "")
+                + f" ({', '.join(sorted({b['name'] for b in bats}))})"
+                + (f", autotest bitew {cs_n}" if cs_n is not None else ", bez --crashscribe") + f", bez 'wyciszona ... teraz <= 0.01' {len(noduck)}"
+                + (f", z listy bez zmian {skipn}" if skipn else "") + (f", nieznane {unk}" if unk else ""),
+                "kazda bitwa wyciszona (teraz <= 0.01), zadna z listy bez zmian, bitew (bez dalszych po oknie) = AUTOTEST 'misja ruszyla' (nieznana nazwa - INFO)",
+                ok if (not ok or not unk) else None)
+    # MUZ-2 utwory
+    if not bats:
+        rep.add("MUZ-2: utwory po kolei", "bitew 0", "INFO (bez bitew)", None)
+    else:
+        trks = [t for b in bats for t in b["trk"]]
+        probs = []
+        flagged = [b for b in bats if b["test"]]
+        for b in flagged:
+            sec = b["end"]["sec"] if b["end"] else None
+            if sec is not None and sec >= M109MUZ_MIN_BATTLE_SEC and len(b["trk"]) < M109MUZ_MIN_TRACKS_TEST:
+                probs.append(f"bitwa {b['name']} {sec} s: utworow z linia {len(b['trk'])}")
+            badend = [t["why"] for t in b["trk"] if t["why"] is not None and t["why"] != "test 4 s"]
+            if badend:
+                probs.append(f"konce pod flaga {badend[:3]}")
+        reps = [t["file"] for t in trks if t["prev"] and t["prev"] == t["file"]]
+        rep4 = sum(b["end"]["rep"] for b in bats if b["end"])
+        no1s = [t["file"] for t in trks if t["ok1s"] != "TAK"]
+        no4 = sum(b["end"]["no1s"] for b in bats if b["end"])
+        distinct = sorted({t["file"] for t in trks})
+        if reps or rep4:
+            probs.append(f"powtorki z rzedu {len(reps)} (linie) / {rep4} (koniec bitwy)")
+        if no1s or no4:
+            probs.append(f"grany po 1 s NIE {len(no1s)} / {no4}")
+        if flagged and len(distinct) < M109MUZ_MIN_DISTINCT:
+            probs.append(f"roznych utworow {len(distinct)}")
+        rep.add("MUZ-2: utwory po kolei", f"utworow z linia {len(trks)} w {len(bats)} bitwach (pod flaga {len(flagged)}), roznych {len(distinct)}, powtorki {len(reps)}/{rep4}, "
+                f"grany po 1 s NIE {len(no1s)}/{no4}" + (" | " + "; ".join(probs[:3]) if probs else ""),
+                "pod flaga: bitwa >= 8 s ma >= 2 utwory, konce '(test 4 s)', >= 3 rozne; zawsze: 0 powtorek z rzedu, kazdy 'grany po 1 s TAK'",
+                (not probs) if (flagged or trks) else None)
+    # MUZ-3 koniec bitwy i powrot muzyki gry
+    if not bats:
+        rep.add("MUZ-3: koniec bitwy i powrot muzyki gry", "bitew 0", "INFO (bez bitew)", None)
+    else:
+        probs, cutn, whys, conts = [], 0, {}, 0
+        for b in bats:
+            if b["cut"]:
+                cutn += 1
+                continue
+            if b["noend"] or b["end"] is None:
+                probs.append(f"{b['name']}: bitwa bez 'koniec bitwy'")
+                continue
+            why = b["end"]["why"]
+            whys[why] = whys.get(why, 0) + 1
+            if why not in M109MUZ_END_OK:
+                probs.append(f"{b['name']}: koniec ({why})")
+            if b["back"] is None:
+                if b.get("cont"):
+                    conts += 1                 # okno wydarzenia w bitwie, po nim ta sama misja dalej - wyciszenie trwa
+                elif b["tail"]:
+                    cutn += 1
+                else:
+                    probs.append(f"{b['name']}: brak 'muzyka gry wrocila' przed nastepna bitwa")
+                continue
+            now, saved, _ = b["back"]
+            if now == "?" or float(now) < saved - M109MUZ_BACK_TOL or saved < M109MUZ_SAVED_MIN:
+                probs.append(f"{b['name']}: wrocila {now} (zapamietana {saved:.2f})")
+        done = len(bats) - cutn
+        rep.add("MUZ-3: koniec bitwy i powrot muzyki gry", f"bitew zamknietych {done}, ucietych logiem {cutn}" + (f", okno i ta sama misja dalej {conts}" if conts else "")
+                + f", konce {whys}" + (" | " + "; ".join(probs[:3]) if probs else ""),
+                "kazda bitwa: 'koniec bitwy' (koniec misji / wyjscie z kampanii / klucz NIE / okno wydarzenia) i 'wrocila' >= zapamietana - 0.01, zapamietana >= 0.95 "
+                "(okno, po ktorym ta sama misja dalej - bez 'wrocila'; log uciety - INFO)",
+                (not probs) if (done > 0 or probs) else None)
+    # MUZ-4 misje bez zmian
+    skips = D["skips"]
+    bad = sorted({n for n, _ in skips if n in M109MUZ_BATTLE_MISSIONS})
+    l1skip = sorted({b["name"] for b in bats if b["name"] in M109MUZ_SKIP_MISSIONS})
+    names = {}
+    for n, v in skips:
+        names[n] = v
+    rep.add("MUZ-4: misje bez zmian (turniej, arena, kryjowka, spacer, rozmowy)", f"linii {len(skips)} ({', '.join(f'{n}: {v}' for n, v in sorted(names.items())[:8])})"
+            + (f" | bitwy bez widoku muzyki bitewnej: {bad}" if bad else "") + (f" | nasza muzyka w misji z listy bez zmian: {l1skip}" if l1skip else ""),
+            "zadna z listy bitew; zadna bitwa z listy bez zmian (brak linii - INFO)", (not bad and not l1skip) if (skips or l1skip) else None)
+    # MUZ-5 bledy
+    cap = sum(b["end"]["cap"] for b in bats if b["end"])
+    capl = sum(1 for b in bats for t in b["trk"] if t["why"] and t["why"].startswith("po czasie pliku"))
+    notp = max(D["notp"], sum(b["end"]["notp"] for b in bats if b["end"]))
+    vals = {"ERROR EventMusic": D["err"], "rezygnacje": D["gave"], "silnik nie przyjal": D["rej"], "po czasie pliku": max(cap, capl), "nie grany": notp,
+            "brak psai / utworow": D["nores"]}
+    rep.add("MUZ-5: bledy muzyki bitwy", ", ".join(f"{k} {v}" for k, v in vals.items()) + (f" | {D['err1']}" if D["err1"] else ""), "wszystko 0",
+            all(v == 0 for v in vals.values()))
+    # MUZ-6 regresja m108 (okna wydarzen)
+    probs = []
+    if D["setpaused"]:
+        probs.append(f"linie z SetPaused {D['setpaused']} ({D['sp1'][:80]})")
+    if D["win_bad"]:
+        probs.append(f"okno / plotki bez konca przed nastepnym {D['win_bad']}")
+    rep.add("MUZ-6: regresja muzyki wydarzen m108", f"okien / plotek {D['wins']}, bez konca przed nastepnym {D['win_bad']}, linii z SetPaused {D['setpaused']}"
+            + (" | " + "; ".join(probs) if probs else ""), "kazde okno zamkniete przed nastepnym (ostatnie moze trwac), SetPaused 0 (bez okien - INFO)",
+            False if probs else (True if D["wins"] else None))
+
+
+def m109muz_synth():
+    """m109muz - test syntetyczny: dobry, zly, bez linii m109, klucz NIE (z --crashscribe), log uciety w bitwie, okno wydarzenia w bitwie (ta sama misja dalej / zle)
+    przez m109muz_collect / m109muz_rows. None = werdykty zgodne, inaczej opis."""
+    import tempfile
+    import shutil
+    T = M109MUZ_TEST
+    P, P8 = "[10:00:00] " + M109MUZ_TAG, "[10:00:00] " + M109MUZ_M108
+    seqs = [("wojna", "zaloba", "korona"), ("intryga", "polnoc", "wojna"), ("plotka", "zaloba", "intryga"), ("korona", "wojna", "polnoc")]
+
+    def battle(L, i, bad, cut=False, win=None):
+        name = "TournamentFight" if (bad and i == 3) else "Battle"
+        L.append(P + T["bat"].replace("misja Battle", "misja " + name))
+        L.append(P8 + T["duck"])
+        last = seqs[i - 1][-1] if i > 0 else None
+        for k, nm in enumerate(seqs[i]):
+            f = "muz_" + nm + ".ogg"
+            if bad and i == 1 and k == 1:
+                f = "muz_intryga.ogg"                       # powtorka z rzedu
+            ok = "NIE" if (bad and i == 2 and k == 2) else "TAK"
+            if k == 0:
+                tail = "pierwszy w bitwie" + (" (ostatni wczesniej muz_" + last + ".ogg)" if last else "")
+            else:
+                tail = "poprzedni muz_" + (seqs[i][k - 1]) + ".ogg skonczony po 4.0 s (test 4 s)"
+            L.append(P + "utwor %d - %s (lufs17, 90.1 s), grany po 1 s %s; %s." % (k + 1, f, ok, tail))
+        if win and i == 1:                                  # okno wydarzenia w bitwie 2: koniec "okno wydarzenia", potem ta sama misja dalej (bat) albo inna bez 'wrocila' (bad)
+            L.append(P + T["endwin"])
+            L.append(P8 + T["win"])
+            if win == "bat":
+                L.append(P8 + "stop muz_polnoc.ogg (koniec wydarzenia - bitwa dalej).")
+                L.append(P8 + T["winbat"])
+            L.append(P + T["bat"].replace("misja Battle", "misja " + (name if win == "bat" else "SiegeMissionWithDeployment")))
+            L.append(P8 + T["duck"])
+            L.append(P + "utwor 1 - muz_zaloba.ogg (lufs17, 90.0 s), grany po 1 s TAK; pierwszy w bitwie (ostatni wczesniej muz_wojna.ogg).")
+            L.append(P + "utwor 2 - muz_korona.ogg (lufs17, 90.1 s), grany po 1 s TAK; poprzedni muz_zaloba.ogg skonczony po 4.0 s (test 4 s).")
+            if win == "bad":
+                L.append(P8 + T["win"])                     # nastepne okno - poprzednie bez konca
+        if cut:
+            return
+        L.append(P + T["end"].replace("misja Battle", "misja " + name).replace("utworow 4", "utworow 3"))
+        if not (bad and i == 0):                            # brak powrotu muzyki gry po bitwie 1
+            L.append(P + T["back"])
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="m109muz_")
+        try:
+            logp, csp = os.path.join(tmp, "Armoury-test.log"), os.path.join(tmp, "session-test.log")
+            L = [P8 + T["psai"]]
+            if kind in ("good", "bad", "cut", "winbat", "winbad"):
+                L.append(P + (T["start"] if kind != "bad" else T["start"].replace("lufs26 6", "lufs26 5")))
+            elif kind == "keyno":
+                L.append(P + T["startno"])
+            L += [P8 + T["win"], P8 + T["duck"], P8 + T["winend"]]
+            if kind in ("good", "bad", "cut", "winbat", "winbad"):
+                L.append(P + T["skip"])
+                for i in range(4):
+                    battle(L, i, kind == "bad", cut=(kind == "cut" and i == 3), win=kind[3:] if kind.startswith("win") else None)
+            if kind == "bad":
+                L.append("[10:00:00] ERROR in EventMusic.Bitwa.Step (potkniecie 1): System.Exception: test")
+                L.append(P8 + "psai SetPaused(true) - test")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            open(csp, "w", encoding="utf-8").write("\n".join(T["cs"].replace("BITWA 1/4", "BITWA %d/4" % (i + 1)) for i in range(4)) + "\n")
+            rep = Report()
+            D = m109muz_collect(logp, csp)                  # 4 bitwy autotestu we wszystkich (klucz NIE / bez linii m109 - MUZ-1 INFO)
+            m109muz_rows(rep, D)
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"MUZ-0": "TAK", "MUZ-1": "TAK", "MUZ-2": "TAK", "MUZ-3": "TAK", "MUZ-4": "TAK", "MUZ-5": "TAK", "MUZ-6": "TAK"},
+        "bad": {"MUZ-0": "NIE", "MUZ-1": "NIE", "MUZ-2": "NIE", "MUZ-3": "NIE", "MUZ-4": "NIE", "MUZ-5": "NIE", "MUZ-6": "NIE"},
+        "nostart": {"MUZ-0": "INFO", "MUZ-1": "INFO", "MUZ-2": "INFO", "MUZ-3": "INFO", "MUZ-4": "INFO", "MUZ-5": "TAK", "MUZ-6": "TAK"},
+        "keyno": {"MUZ-0": "INFO", "MUZ-1": "INFO", "MUZ-2": "INFO", "MUZ-3": "INFO", "MUZ-4": "INFO", "MUZ-5": "TAK", "MUZ-6": "TAK"},
+        "cut": {"MUZ-0": "TAK", "MUZ-1": "TAK", "MUZ-2": "TAK", "MUZ-3": "TAK", "MUZ-4": "TAK", "MUZ-5": "TAK", "MUZ-6": "TAK"},
+        "winbat": {"MUZ-0": "TAK", "MUZ-1": "TAK", "MUZ-2": "TAK", "MUZ-3": "TAK", "MUZ-4": "TAK", "MUZ-5": "TAK", "MUZ-6": "TAK"},
+        "winbad": {"MUZ-0": "TAK", "MUZ-1": "NIE", "MUZ-2": "TAK", "MUZ-3": "NIE", "MUZ-4": "TAK", "MUZ-5": "TAK", "MUZ-6": "NIE"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def m109muz_main(logp, csp=None):
+    """m109muz (23.10; projekt m109-muzyka 4b): MUZ-S, MUZ-S2, MUZ-0..MUZ-6 - opis w --help. Strumieniowo; --crashscribe <session-*.log> - liczba bitew autotestu do MUZ-1."""
+    rep = Report()
+    s1 = m109muz_selftest()
+    rep.add("MUZ-S: self-test wyrazen (linie kontrolne jak w kodzie C#: EventMusic.Bitwa.cs, EventMusic.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)",
+            s1 is None)
+    try:
+        s2 = m109muz_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("MUZ-S2: test syntetyczny (dobry, zly, bez linii m109, klucz NIE, log uciety w bitwie, okno w bitwie)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("MUZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    if csp and not os.path.isfile(csp):
+        rep.add("MUZ-1: log sesji CrashScribe", f"brak pliku {csp}", "--crashscribe <session-*.log>", None)
+        csp = None
+    D = m109muz_collect(logp, csp)
+    print(f"plik: {logp} | linii m109 {D['lines']}, startow {len(D['starts'])}, bitew {len(D['battles'])}, utworow z linia {sum(len(b['trk']) for b in D['battles'])}, "
+          f"misji bez zmian {len(D['skips'])}, okien m108 {D['wins']}, ERROR {D['err']}" + (f" | autotest bitew {D['cs_n']}" if D["cs_n"] is not None else ""))
+    m109muz_rows(rep, D)
+    rep.show()
+    return 0
+
 # ------------------------------------------------------------ m105kronika (21.10, w-toku/kronika-00-silnik: Kronika Westeros K0 - 117 wydarzen z ksiazek i serialu w oknach
 # ROT, wiesciach i liniach logu wedlug dnia opowiesci i stanu swiata; Armoury/src/Chronicle*.cs, CanonCompanions.cs (hide/unhide, term kr:); dane
 # Armoury/ModuleData/arm_kronika_kNN.tsv; klucze ChronicleOfWesteros, ChronicleWorldChanges, ChronicleFullVersions, ChroniclePlayerChoices;
@@ -58396,6 +58922,8 @@ def main(argv):
         return m102tablica_main(logp)   # m102tablica (21.10, w-toku/m102-tablica): tablica ogloszen - zadania gry, rozmowa z tablicy, listy gonczne kapitana strazy (NoticeBoard)
     if group == "m103lektor" and logp:
         return m103lektor_main(logp, csp)   # m103lektor (21.10, w-toku/m103-lektor): lektor - okna wydarzen ROT z nagran Davida, plotki na zywo przez ElevenLabs z pamiecia nagran (Lektor)
+    if group == "m109muz" and logp:
+        return m109muz_main(logp, csp)   # m109muz (23.10, w-toku/m109-muzyka): nasze 6 utworow w bitwie zamiast muzyki gry - wyciszenie psai, utwory po kolei, powrot po misji (EventMusic.Bitwa)
     if group == "m99markietani" and logp:
         return m99markietani_main(logp)   # m99markietani (21.10, w-toku/m99-markietani): rzad markietanow w obozie gracza - uslugi, zabawa, sklep z polki miasta (CampSutlers)
     if group == "m97posilki" and logp:
