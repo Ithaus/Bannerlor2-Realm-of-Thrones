@@ -14,15 +14,18 @@ namespace Armoury
     /// spowolnic"). Klucz SmithingXpFactor (0.70 = 30% wolniej, 1.00 = jak 44c03a05).
     /// DOWOD (log Jeffa 22.10 22:28-23:59, Armoury-2026-10-22_22-28-22): Smithing 63 -> 122 w jednej sesji, surowe XP kuzni 31 744, z tego ok. 58% luki
     /// (Forge.Smith: klik luku t1 60, t2 240, t3 540, t4 960 XP; pekniecie 30% tej kwoty; zlecenie kowalskie ok. 343 XP).
-    /// JEDNO MIEJSCE: prefiks Priority.First na HeroDeveloper.AddSkillXp(SkillObject, float, bool, bool) (klasa deklarujaca). Kazda droga XP kuzni konczy sie
+    /// JEDNO MIEJSCE: prefiks Priority.Low na HeroDeveloper.AddSkillXp(SkillObject, float, bool, bool) (klasa deklarujaca). Kazda droga XP kuzni konczy sie
     /// tutaj (Hero.AddSkillXp tylko do niej przekazuje): kucie broni gry (CraftingCampaignBehavior - wolne kucie, zlecenia, przetop, rafinacja), CRAFT BK
     /// (ExecuteMainActionBK), nasze Forge.Smith / Begin / Finish / Smelt / SelfRepair, ForgeJob i zlecenia, SmithMenu, kowal polowy, pomocnik, SmeltTab, RBL.
     /// Nikt nie wola jej drugi raz za ta sama robote, wiec ciecie jest raz. Mnozymy rawXp tylko przy Crafting, isAffectedByFocusFactor = true i rawXp > 0:
     /// HeroDeveloper.ChangeSkillLevel (poziom ustawiany wprost - zdarzenia, edukacja, Kronika) wola ja z false i zostaje dokladne.
-    /// Skutek uboczny (zgodny z "to wszystko zmniejszyc o 30%"): GainRawXp dostaje to samo rawXp, wiec poziom postaci z kowalstwa tez -30%.
-    /// Kolejnosc na celu: nasz (First) -> ROT patch30 (x GlobalXPBonus na sluzbie u lorda - mnozenie przemienne) -> ksiega E8/P1 (SkillLedger, Last - liczy
-    /// juz po cieciu). Odrzucone: postfiks GetFocusFactor (jednolinijkowa metoda - JIT moze ja wkleic w AddSkillXp i latka po cichu nie dziala, pulapka 19.10),
-    /// ok. 12 miejsc w kodzie kuzni (latwo pominac albo przyciac dwa razy). Sufity (WeaponXpCapPerTier, XpCapPerTier, RefineXpCap) licza sie przed cieciem.
+    /// TYLKO UMIEJETNOSC (recenzja K3 - Jeff mowil o kowalstwie, nie o poziomie postaci): oryginal daje GainRawXp juz uciete rawXp, wiec prefiks oddaje
+    /// poziomowi postaci roznice sam - GainRawXp(Round(przed) - Round(po)) przez delegat na prywatna metode gry; gra zaokragla kazde wywolanie GainRawXp,
+    /// wiec suma = Round(przed), jak bez ciecia. Bez delegata (inna wersja gry) poziom postaci z kowalstwa tez wolniej - linia startu to mowi.
+    /// Kolejnosc na celu: ROT patch30 (Normal - x GlobalXPBonus na sluzbie u lorda) -> nasz (Low - tnie i oddaje poziomowi juz z premia ROT, wiec poziom
+    /// dokladnie jak bez ciecia) -> ksiega E8/P1 (SkillLedger, Last - liczy juz po cieciu). Odrzucone: postfiks GetFocusFactor (jednolinijkowa metoda - JIT
+    /// moze ja wkleic w AddSkillXp i latka po cichu nie dziala, pulapka 19.10), ok. 12 miejsc w kodzie kuzni (latwo pominac albo przyciac dwa razy).
+    /// Sufity (WeaponXpCapPerTier, XpCapPerTier, RefineXpCap) licza sie przed cieciem.
     /// Goracy punkt (ok. 20 tys. wywolan na dobe): dwa porownania przed wszystkim, bez alokacji poza 5 pierwszymi liniami sesji. Bledy liczone, bez wylacznika.
     /// Linie "Kowalstwo wolniej (m109): ..." - start sesji, pierwsze 5 wywolan, doba, test autotestu (plik armoury-kuznia.flag). Bez zapisu.
     /// </summary>
@@ -40,6 +43,13 @@ namespace Armoury
         private static readonly double[] _dBefore = new double[3], _dAfter = new double[3];
         private static int _dPlain;   // Crafting z isAffectedByFocusFactor = false (ustawianie poziomu) - bez mnoznika
         private static bool _testDone;
+        // recenzja K3: poziom postaci bez ciecia - delegat na prywatne HeroDeveloper.GainRawXp(float, bool) (raz na proces)
+        private static Action<HeroDeveloper, float, bool> _gainRaw;
+        private static bool _gainLooked;
+        private static string _gainHook = "nie szukany";
+        // recenzja K2: test A mierzy ciecie w samej latce (przed -> po), niezaleznie od czynnika nauki
+        private static bool _probe;
+        private static float _pBefore = -1f, _pAfter = -1f;
 
         internal static float Factor
         {
@@ -79,7 +89,7 @@ namespace Armoury
                 {
                     if (!_patched.Contains(m))
                     {
-                        _h.Patch(m, prefix: new HarmonyMethod(typeof(SmithXp), nameof(XpPrefix)) { priority = Priority.First });
+                        _h.Patch(m, prefix: new HarmonyMethod(typeof(SmithXp), nameof(XpPrefix)) { priority = Priority.Low });   // po ROT patch30 (Normal), przed ksiega (Last)
                         _patched.Add(m);
                     }
                     _hook = "wpieta";
@@ -99,9 +109,20 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _hook = "wyjatek " + e.GetType().Name; Stumble("EnsureHooks", e); }
+            if (!_gainLooked)
+            {
+                _gainLooked = true;
+                try
+                {
+                    var g = AccessTools.DeclaredMethod(typeof(HeroDeveloper), "GainRawXp", new[] { typeof(float), typeof(bool) });
+                    _gainRaw = g != null ? AccessTools.MethodDelegate<Action<HeroDeveloper, float, bool>>(g) : null;
+                    _gainHook = _gainRaw != null ? "TAK (GainRawXp)" : "NIE (brak GainRawXp - poziom postaci z kowalstwa tez wolniej)";
+                }
+                catch (Exception e) { _gainRaw = null; _gainHook = "NIE (wyjatek " + e.GetType().Name + " - poziom postaci z kowalstwa tez wolniej)"; Stumble("EnsureHooks(GainRawXp)", e); }
+            }
             Log.Info(P + "start sesji | klucz SmithingXpFactor " + F2(Factor) + (Neutral(Factor) ? " (1.00 - XP jak dotad, latka nic nie zmienia)" : "")
-                     + " | latka HeroDeveloper.AddSkillXp " + _hook + " (Priority.First) | inne latki na celu " + (others >= 0 ? others.ToString(Inv) : "?")
-                     + " | test autotestu " + (TestWanted() ? "TAK" : "NIE") + " | potkniecia " + _stumbles + ".");
+                     + " | latka HeroDeveloper.AddSkillXp " + _hook + " (Priority.Low - po ROT patch30, przed ksiega E8/P1) | poziom postaci bez ciecia " + _gainHook
+                     + " | inne latki na celu " + (others >= 0 ? others.ToString(Inv) : "?") + " | test autotestu " + (TestWanted() ? "TAK" : "NIE") + " | potkniecia " + _stumbles + ".");
         }
 
         private static int GroupOf(Hero h)
@@ -114,8 +135,9 @@ namespace Armoury
 
         private static readonly string[] GroupNames = { "gracz", "rod", "inni" };
 
-        /// <summary>Prefiks Priority.First HeroDeveloper.AddSkillXp: XP Smithing z czynnikiem nauki x SmithingXpFactor. Nic innego nie zmienia.</summary>
-        public static void XpPrefix(HeroDeveloper __instance, SkillObject skill, ref float rawXp, bool isAffectedByFocusFactor)
+        /// <summary>Prefiks Priority.Low HeroDeveloper.AddSkillXp: XP Smithing z czynnikiem nauki x SmithingXpFactor; poziom postaci dostaje roznice od razu
+        /// (GainRawXp), wiec rosnie jak bez ciecia. Nic innego nie zmienia.</summary>
+        public static void XpPrefix(HeroDeveloper __instance, SkillObject skill, ref float rawXp, bool isAffectedByFocusFactor, bool shouldNotify)
         {
             if (!(rawXp > 0f) || skill == null || (object)skill != (object)_crafting) return;
             try
@@ -125,6 +147,13 @@ namespace Armoury
                 if (Neutral(f)) return;
                 float before = rawXp;
                 rawXp = before * f;
+                if (_probe) { _pBefore = before; _pAfter = rawXp; }
+                // poziom postaci bez ciecia: oryginal da GainRawXp(Round(po)), tu reszta do Round(przed) (przy kluczu > 1 ujemna - poziom tez jak bez mnoznika)
+                if (_gainRaw != null && __instance != null)
+                {
+                    int give = TaleWorlds.Library.MathF.Round(before) - TaleWorlds.Library.MathF.Round(rawXp);
+                    if (give != 0) _gainRaw(__instance, give, shouldNotify);
+                }
                 int g = GroupOf(__instance != null ? __instance.Hero : null);
                 _dN[g]++; _dBefore[g] += before; _dAfter[g] += rawXp;
                 _sessionCalls++;
@@ -183,9 +212,17 @@ namespace Armoury
             catch { return false; }
         }
 
-        /// <summary>Test na Hero.MainHero: 5 XP Smithing (przyrost wobec 5 x mnoznik gry x czynnik nauki - proporcja = klucz), kontrola Athletics (1.00),
-        /// droga ustawiania poziomu (isAffectedByFocusFactor false - 1.00). Skutek dla bohatera pomijalny (kilka XP). Na sluzbie u lorda ROT pominiety
-        /// (ROT patch30 mnozy wtedy XP przez GlobalXPBonus).</summary>
+        private const float TestXp = 100f;   // recenzja K2: 100 XP - przyrost mierzalny takze przy duzym XP umiejetnosci (float)
+
+        /// <summary>Przyrost mierzalny: blad float przy odejmowaniu XP to ok. 2 ulp (2 x 2.4e-7 x XP) - musi byc maly wobec tolerancji proporcji.</summary>
+        private static bool Measurable(float x0, float expected, double tol) { return expected > 0f && Math.Abs(x0) * 4.8e-7 < expected * tol; }
+
+        private static string Why(float expected) { return expected > 0f ? "przyrost za maly do pomiaru" : "czynnik nauki 0 - ponad limit nauki"; }
+
+        /// <summary>Test na Hero.MainHero (recenzja K2): 100 XP Smithing - (1) ciecie zmierzone w samej latce (przed -> po = klucz, niezaleznie od czynnika
+        /// nauki), (2) przyrost XP umiejetnosci wobec 100 x mnoznik gry x czynnik nauki (proporcja = klucz; pominiety z powodem, gdy czynnik nauki 0 albo przyrost
+        /// za maly do pomiaru), (3) poziom postaci +100 (recenzja K3 - bez ciecia; pominiety przy suficie XP); kontrola Athletics (1.00), droga ustawiania poziomu
+        /// (isAffectedByFocusFactor false - 1.00). Skutek dla bohatera pomijalny. Na sluzbie u lorda ROT pominiety (ROT patch30 mnozy wtedy XP przez GlobalXPBonus).</summary>
         private static void SelfTest()
         {
             try
@@ -200,25 +237,50 @@ namespace Armoury
                 var craft = DefaultSkills.Crafting;
                 var ath = DefaultSkills.Athletics;
                 float f = Factor;
-                // Smithing z czynnikiem nauki
-                float e1 = 5f * mult * dev.GetFocusFactor(craft);
+                bool neutral = Neutral(f);
+                float want = neutral ? 1f : f;
+                // Smithing z czynnikiem nauki: ciecie w latce, przyrost umiejetnosci, poziom postaci
+                float e1 = TestXp * mult * dev.GetFocusFactor(craft);
                 float x0 = dev.GetSkillXp(craft);
-                dev.AddSkillXp(craft, 5f, true, false);
+                int t0 = dev.TotalXp;
+                int el = TaleWorlds.Library.MathF.Round(TestXp);
+                bool lvlCap = (long)t0 + el >= Campaign.Current.Models.CharacterDevelopmentModel.GetMaxSkillPoint();
+                _pBefore = _pAfter = -1f;
+                _probe = true;
+                try { dev.AddSkillXp(craft, TestXp, true, false); }
+                finally { _probe = false; }
                 float d1 = dev.GetSkillXp(craft) - x0;
+                int dl = dev.TotalXp - t0;
+                double cut = _pBefore > 0f ? _pAfter / (double)_pBefore : -1;
+                bool cutOk = neutral ? _pBefore < 0f : Math.Abs(cut - f) <= 0.001;
+                bool pMeas = Measurable(x0, e1 * want, 0.01);
+                double p = e1 > 0f ? d1 / e1 : 0;
+                bool pOk = !pMeas || Math.Abs(p - want) <= 0.01;
+                bool lvlOk = lvlCap || dl == el;
                 // kontrola: inna umiejetnosc
-                float e2 = 5f * mult * dev.GetFocusFactor(ath);
+                float e2 = TestXp * mult * dev.GetFocusFactor(ath);
                 float y0 = dev.GetSkillXp(ath);
-                dev.AddSkillXp(ath, 5f, true, false);
+                dev.AddSkillXp(ath, TestXp, true, false);
                 float d2 = dev.GetSkillXp(ath) - y0;
+                bool cMeas = Measurable(y0, e2, 0.005);
+                double c = e2 > 0f ? d2 / e2 : 0;
+                bool cOk = !cMeas || Math.Abs(c - 1) <= 0.005;
                 // ustawianie poziomu (droga ChangeSkillLevel)
-                float e3 = 5f * mult;
+                float e3 = TestXp * mult;
                 float z0 = dev.GetSkillXp(craft);
-                dev.AddSkillXp(craft, 5f, false, false);
+                dev.AddSkillXp(craft, TestXp, false, false);
                 float d3 = dev.GetSkillXp(craft) - z0;
-                double p = e1 > 0f ? d1 / e1 : 0, c = e2 > 0f ? d2 / e2 : 0, z = e3 > 0f ? d3 / e3 : 0;
-                bool ok = Math.Abs(p - (Neutral(f) ? 1f : f)) <= 0.01 && Math.Abs(c - 1) <= 0.005 && Math.Abs(z - 1) <= 0.005;
-                Log.Info(P + "test - Smithing 5 XP: przyrost " + d1.ToString("0.###", Inv) + " wobec " + e1.ToString("0.###", Inv) + " bez mnoznika, proporcja " + p.ToString("0.000", Inv)
-                         + " (klucz " + F2(f) + ") | kontrola Athletics proporcja " + c.ToString("0.000", Inv) + " | ustawianie poziomu proporcja " + z.ToString("0.000", Inv)
+                bool zMeas = Measurable(z0, e3, 0.005);
+                double z = e3 > 0f ? d3 / e3 : 0;
+                bool zOk = !zMeas || Math.Abs(z - 1) <= 0.005;
+                bool ok = cutOk && pOk && lvlOk && cOk && zOk;
+                Log.Info(P + "test - Smithing " + F1(TestXp) + " XP: ciecie w latce " + (_pBefore > 0f ? F1(_pBefore) + " -> " + F1(_pAfter) : "- -> -")
+                         + " (proporcja " + (cut >= 0 ? cut.ToString("0.000", Inv) : "-") + ", klucz " + F2(f) + ")"
+                         + " | umiejetnosc: " + (pMeas ? "przyrost " + d1.ToString("0.###", Inv) + " wobec " + e1.ToString("0.###", Inv) + " bez mnoznika, proporcja " + p.ToString("0.000", Inv)
+                                                        : "pominieta (" + Why(e1) + ")")
+                         + " | poziom postaci " + (lvlCap ? "pominiety (sufit XP)" : "+" + dl.ToString(Inv) + " wobec " + el.ToString(Inv))
+                         + " | kontrola Athletics " + (cMeas ? "proporcja " + c.ToString("0.000", Inv) : "pominieta (" + Why(e2) + ")")
+                         + " | ustawianie poziomu " + (zMeas ? "proporcja " + z.ToString("0.000", Inv) : "pominiete (" + Why(e3) + ")")
                          + " - " + (ok ? "TAK" : "NIE") + ".");
             }
             catch (Exception e) { Stumble("SelfTest", e); Log.Info(P + "test - pominiety (wyjatek " + e.GetType().Name + ")."); }

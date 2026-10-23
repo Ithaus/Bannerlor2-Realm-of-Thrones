@@ -212,7 +212,7 @@ namespace Armoury
         [SettingPropertyGroup("Experience")]
         public int WeaponXpCapPerTier { get; set; } = 500;
 
-        [SettingPropertyFloatingInteger("Smithing Xp Factor", 0.00f, 2.80f, "0.00", HintText = "Smithing grows slower: every gain of Smithing experience is multiplied by this - forging weapons, armour, bows, crossbows and arrows, smelting, refining, mending and commissions, for you and any smith at the anvil (0.7 = 30 percent slower, 1 = as before). The character level earned with it shrinks the same way. The caps above (Xp Cap Per Tier, Weapon Xp Cap Per Tier, Refine Xp Cap) count before this cut. A skill level set outright (events, education) is not touched", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Smithing Xp Factor", 0.00f, 2.80f, "0.00", HintText = "Smithing grows slower: every gain of Smithing experience is multiplied by this - forging weapons, armour, bows, crossbows and arrows, smelting, refining, mending, commissions and any other Smithing experience, for every hero (0.7 = 30 percent slower, 1 = as before). Only the skill is slowed - the character level you earn by smithing grows as before. The caps (Xp Cap Per Tier, Weapon Xp Cap Per Tier, Refine Xp Cap) count before this cut. A skill level set outright (events, education) is not touched", RequireRestart = false)]
         [SettingPropertyGroup("Experience")]
         public float SmithingXpFactor { get; set; } = 0.70f;
 
