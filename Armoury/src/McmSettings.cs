@@ -584,6 +584,14 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool GearFourStates { get; set; } = true;
 
+        [SettingPropertyBool("Worn Exact Hp Protection", HintText = "the armour, weapons and shields you and the companions in your party wear fight at their exact strength: a Damaged mail shirt with 56% of its strength left guards 41 of its 50, one with 78% guards 47 (the state alone gave 42 to both). Pieces in your bags and on traders stay by their state. Needs Gear Four States and Condition Scales Stats. Off: as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool WornExactHpProtection { get; set; } = true;
+
+        [SettingPropertyBool("Companion Gear Wear", HintText = "the gear your companions wear in your party wears in battle exactly as yours does - where the blow lands, from what is left of each piece's strength; worn past a threshold it takes the next state's name. Mend it in your bags. Off: as before (companions' gear does not wear)", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool CompanionGearWear { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Repair Cost Factor", 0.00f, 2.00f, "0.00", HintText = "share of item value for a full repair (with Smith Mend From Market on, the town smiths charge by their day wages instead - this share is left only for pieces they have no recipe for)", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public float RepairCostFactor { get; set; } = 0.5f;
@@ -9497,6 +9505,8 @@ namespace Armoury
             s.ThresholdDamaged = ThresholdDamaged;
             s.ThresholdRuined = ThresholdRuined;
             s.GearFourStates = GearFourStates;
+            s.WornExactHpProtection = WornExactHpProtection;
+            s.CompanionGearWear = CompanionGearWear;
             s.RepairCostFactor = RepairCostFactor;
             s.BreakAtZeroCondition = BreakAtZeroCondition;
             s.ArenaNoWear = ArenaNoWear;
