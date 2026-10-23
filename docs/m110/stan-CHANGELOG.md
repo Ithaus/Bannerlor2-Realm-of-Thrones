@@ -1,3 +1,197 @@
+# m110-stan krok 2 - ochrona z dokladnego HP sprzetu noszonego przez gracza i towarzyszy; ksiega i zuzycie sprzetu towarzyszy
+
+Galaz `w-toku/m110-stan` (od `6f3e0314` = krok 1, NIEWGRANY). Mod: Armoury (+ `tools/sprawdz_logi.py`). Tor L (nowa mechanika, zapis, kilka systemow). Projekt: wariant
+F1 + W2 (etap PROJEKT, glowna sesja); parametry ustalal Claude.
+
+Jeff 23.10 ok. 15:10: "3 x zbroja Nocnej Strazy, ktore sa uszkodzone, ale jedna ma hp 41%, druga 56%, trzecia 78% - kazda daje inny pancerz z tytulu uszkodzen,
+np. 28/50, 38/50, 40/50?" Odpowiedz (przyjeta): w stosie w sakwach sztuki sa identyczne (przedmiot + stan) - ochrona wedlug stanu; sprzet NOSZONY przez gracza i
+towarzyszy ma ksiege dokladnej wytrzymalosci i jego ochrona (i obrazenia broni - jedna zasada) ida za dokladnym HP wedlug obecnej krzywej (ConditionPenaltyMax 90,
+wykladnik 2: pancerz 50 przy 41% -> 34, 56% -> 41, 78% -> 47; sam stan Damaged daje 42). Ok. 15:50 na pytanie "czy dla sprzetu, ktory nosisz ty i towarzysze,
+ochrona ma sie liczyc z dokladnego HP": "tak".
+
+## Stan pracy (krok 2)
+
+| Krok | Co | Stan |
+|---|---|---|
+| A1 | klucze `WornExactHpProtection`, `CompanionGearWear` (Wear and tear, obok GearFourStates; gen_mcm - Armoury 2337 ustawien) | ZROBIONE (`7029db68`) |
+| A2 | `HeroHp.cs` (postfiks `Agent.InitializeSpawnEquipment`, kopie, rejestry, linie, hak testu), `Patches.cs` ConditionScaling, `GearState.Of`, `ArmouryBehavior.WornExactD` + linia startu, `SubModuleMain` | ZROBIONE (`d175055c`) |
+| A3 | `TooltipCondition.cs` panel "Armoury Stats" - dokladna ochrona sztuki noszonej przez wybrana postac | ZROBIONE (`f3739268`) |
+| B1 | `HeroBook.cs` (ksiega i zuzycie towarzyszy, zapis), `FieldCraft.LedgerOf` (4 miejsca), `ArmouryBehavior` (WearAfter, MapEvent, SyncData, reset), HeroHp i panel - towarzysze | ZROBIONE (`4e1eeaca`) |
+| T | grupa progow `m110hp` (HP-S, HP-S2, HP-0..HP-5, HP-LC) | ZROBIONE (`c05573f4`; `sprawdz_narzedzie.py` bez uwag; HP-S i HP-S2 TAK; log 109f-bitwa5 (DLL 104) - INFO, HP-1 TAK; m110stan dalej STAN-S/S2 TAK) |
+| AT | autotest (plan nizej) - gry NIE uruchamialem (zakaz etapu); nic nie wgrane | DO ZROBIENIA (glowna sesja) |
+
+**Build:** Armoury po kazdym commicie - kod wyjscia 0, 0 bledow.
+
+## Problem
+
+1. Po kroku 1 ochrona i obrazenia szly wedlug STANU (jedna wartosc na stan: Damaged = srodek 60% -> x0.856). Trzy "Damaged" kolczugi 50 z 41/56/78% wytrzymalosci
+   chronily tak samo (42), choc ksiega gracza znala dokladne HP kazdej sztuki na grzbiecie.
+2. Sprzet towarzyszy nie zuzywal sie wcale (ksiega `arm_condition` i zuzycie z trafien - tylko gracz: `FieldCraft` pisal tylko dla `IsMainAgent`, `GetCondition` /
+   `ApplyWearPerSlot` czytaja `Hero.MainHero.BattleEquipment`) - nie mieli dokladnego HP, ktore mogloby isc do ochrony.
+
+## Przyczyna (kod)
+
+- `ConditionScaling.ArmorPatch/DamagePatch` (postfiksy `ItemModifier.ModifyArmor/ModifyDamage`) licza z `ConditionOf(modyfikator)` = wartosc stanu - modyfikator nie
+  wie, czyja to sztuka. `ItemModifier` jest wspolny dla wszystkich sztuk tego stanu (obiekt z MBObjectManager).
+- Ksiega `ArmouryBehavior._condition` ma tylko wpisy gracza (`int.Parse(slot)` - format bez bohatera); `FieldCraft.WearLedger` - jedna tablica gracza.
+
+## Zmiana
+
+### A - ochrona z dokladnego HP (klucz `WornExactHpProtection`, domyslnie TAK; wymaga GearFourStates i ConditionScalesStats; NIE = 1:1 jak `6f3e0314`)
+
+- **`HeroHp.SpawnPatch`** - postfiks `Agent.InitializeSpawnEquipment` (dekompilacja: `Mission.SpawnAgent` :4273 wola go PRZED `InitializeMissionEquipment` :4274 i `BuildAgent`;
+  RBM latkuje ten sam cel prefiksem `CampaignChanges.InitializeSpawnEquipmentPatch` - dla bohaterow nie-gracza daje klon, dla lordow krolestw podmienia modyfikatory).
+  Tylko bitwa kampanii (`MapEvent.PlayerMapEvent` i CombatType Combat - jak FieldCraft.InBattle), tylko bohaterowie z `PartyBelongedTo == MainParty`. Gniazda 0-3, 5-9, 11:
+  element agenta musi miec ten sam przedmiot i TEN SAM modyfikator (referencja) co `hero.BattleEquipment` (lord RBM, oblezenie bez konia, inny stroj - "niezgodny");
+  `GearState.Handles`, nie `NoWear`; d z ksiegi (gracz `ArmouryBehavior.WornExactD` - `GetConditionQuiet` < 100 i `EffectiveCondition`; towarzysz `HeroBook.ExactD`),
+  przyciete do przedzialu stanu z nazwy (sprawny 80.01-100, uszkodzony 40.01-80, zmasakrowany 10-40, wrak 0.1-9.99); d rowne srodkowi stanu - bez kopii.
+- **Kopia modyfikatora** w klonie sprzetu agenta (`SetModifier` na kopii elementu - zachowuje wyglad i znacznik questu): `MemberwiseClone` oryginalu (ten sam StringId,
+  Id, nazwa, pola dodawane wprost); sztuka sprawna bez modyfikatora - kopia neutralna (`new ItemModifier()`, nazwa "{ITEMNAME}", cena 1, jakosc Common, StringId "").
+  Rejestr kopia -> (oryginal, d) po referencji (`ItemModifier` nie ma `Equals(object)` - dekompilacja; slowniki GearState kopii nie znaja), migawka podmieniana przy
+  zapisie, czytana bez blokady; najpierw rejestr, potem kopia do sprzetu agenta.
+- **Uprzaz konia:** gracz - kon powstaje z tego samego obiektu sprzetu (kopia juz tam jest); towarzysz - RBM dal jezdzcowi klon, a kon powstaje z `equipment` sprzed klonu
+  (Mission.cs :4290) - kopia z gniazda 11 jezdzca czeka na `InitializeSpawnEquipment` konia (ta sama metoda, kon bez postaci) i wchodzi tylko w ten sam przedmiot z tym
+  samym oryginalem (`MountTakes`).
+- **Wynik (`HeroHp.Exact`, jedna funkcja dla pancerza, obrazen broni i pancerza tarczy):** oryginal brak albo dobra jakosc - wynik gry/RBM x StatFactor(d); oryginal zly
+  (stan) - wartosc bazowa x StatFactor(d) (jak ArmorPatch dla stanu); `max(1, floor)`. `ConditionScaling.ArmorPatch/DamagePatch`: przy kopii z rejestru `Exact` i
+  koniec; reszta bez zmian (`ConditionOf` = wartosc stanu - ceny, naprawy, podpowiedzi bez zmian). Pola dodawane wprost (szybkosc, wytrzymalosc tarczy, pocisk)
+  zostaja wedlug stanu. Kopia jest na miejscu przed `InitializeMissionEquipment` (MissionWeapon niesie kopie - RBM `getSwingDamageFactor` liczy z niej obrazenia),
+  `BuildAgent` (statystyki agenta, RBMAI) i `GetBaseArmorEffectivenessForBodyPart` (RBM czyta helm z SpawnEquipment) - bez `UpdateAgentProperties`.
+- **`GearState.Of`:** kopia -> stan oryginalu (neutralna - sprawny): nazwa "Damaged X", `Shown`, `ConditionOf` kopii jak oryginalu.
+- **Koniec misji (`HeroHp.Logic.OnEndMission`):** kontrola przeciekow - kopia w `BattleEquipment` bohatera z agentem wraca na modyfikator bohatera i jest liczona;
+  rejestry czyszczone (takze przy zmianie misji). Zadnej pracy co klatke: postfiks przy wejsciu agenta, jedno wyszukiwanie w slowniku na `ModifyArmor/ModifyDamage`
+  tylko przy niepustym rejestrze.
+- **Panel "Armoury Stats" (`ItemMenuVM.SetItem`, klucz TAK):** d tylko dla sztuki noszonej w bitwie przez wybrana postac (strona `BattleEquipment`, gniazdo z
+  `ItemType`, ten sam przedmiot i modyfikator co u bohatera, ksiega gracza albo towarzysza, przyciecie jak w bitwie); wiersze pancerza i obrazen z `HeroHp.Exact`
+  ("Body Armor 50 -> 41 (-9)"), takze dla sztuki sprawnej z d < 100; "Durability" z tego d. Sakwy, kupiec, stroj cywilny - bez dokladnego HP (dotad `WornEffective`
+  szukal po samym przedmiocie u gracza: kopia w sakwach dostawala HP sztuki z grzbietu). Podpowiedz po najechaniu - wedlug stanu (nie wie, kto nosi). Klucz NIE - 1:1.
+
+### B - ksiega i zuzycie sprzetu towarzyszy (klucz `CompanionGearWear`, domyslnie TAK; wymaga GearFourStates i WearEnabled; NIE = 1:1)
+
+- **Rejestracja (HeroHp):** agent towarzysza z druzyny gracza, ktory nosi w bitwie swoja zbroje (gniazda 5-9 zgodne) - dostaje ksiege ciosow misji; czego nie nosi, to
+  sie nie zuzywa. Klucze niezalezne (ochrona NIE + zuzycie TAK - zuzywa sie, chroni wedlug stanu).
+- **`FieldCraft.LedgerOf(agent)`** - gracz `WearLedger` (1:1), towarzysz zarejestrowany - jego ksiega misji, reszta null; w 4 miejscach `IsMainAgent`: pancerz i tarcza
+  ofiary, bron atakujacego, uprzaz (przez `RiderAgent`), strzal z luku (umiejetnosc z bohatera strzelca). Licznik `_skipHits` i zuzycie wojska bez zmian.
+- **Koniec misji:** ciosy do `HeroBook` (tylko gniazda zgodne). Po wygranej (`OnMapEventEnded`, po zuzyciu gracza, przed `CleanseAmmo`) `HeroBook.ApplyBattle`:
+  `ArmouryBehavior.WearAfter` (wydzielone z `ApplyWearPerSlot` - to samo wyrazenie, gracz bit w bit jak dotad), d = ksiega - (100 - srodek stanu poczatku), progi 80/40/10,
+  nowy stan tylko gorszy - `GearState.ModForGroup`, komunikat "{Hero}'s {Item} is now Damaged."; `BreakAtZeroCondition` jak u gracza (u Jeffa wylaczone). Przegrana
+  albo opuszczona bitwa i poczatek bitwy (przy ArenaNoWear) - ksiegi ciosow przepadaja (jak gracz). Autobitwa - bez trafien, bez zuzycia.
+- **Wpis:** `slot|ksiega|stan poczatku|przedmiot|stan teraz` (format piecio-polowego wpisu gracza), ksiega z 2 miejscami po przecinku. Tozsamosc sztuki = przedmiot +
+  obecny modyfikator: kazda zmiana sztuki w gniezdzie (inny przedmiot albo inny stan) zaczyna ksiege od stanu (D3 - jak dzis: zdjeta sztuka wpada do stosu swojego stanu,
+  dokladne HP przepada; ten sam przedmiot w tym samym stanie zdjety i zalozony zachowuje HP - roznica w jednym przedziale stanu).
+- **Zapis:** SaveText `arm_condition_heroes` (wiersze `id bohatera=wpis;wpis`); przy zapisie przyciete do zywych bohaterow w druzynie gracza (kto odchodzi z druzyny,
+  traci dokladne HP, zostaje mu stan); klucz NIE albo brak ksiag - klucza w zapisie nie ma (wywolanie pominiete). Wczytanie: bledne wiersze liczone. `arm_condition`
+  gracza bez zmian formatu. Reset `HeroHp` i `HeroBook` w osobnej linii inicjalizatora `ArmouryBehavior` (jak inwest - bez zmiany wspolnej linii konstruktora).
+
+## Klucze MCM
+
+- `WornExactHpProtection` ("Worn Exact Hp Protection") i `CompanionGearWear` ("Companion Gear Wear") - Wear and tear, obok Gear Four States; domyslnie TAK, w Armoury.json
+  Jeffa ich nie ma (wejda domyslne). Opisy po angielsku slowami gracza (Settings.cs). Ochrona: NIE - zadnych kopii, panel jak dotad. Zuzycie towarzyszy: NIE - resolver
+  oddaje tylko gracza, ksiegi towarzyszy nie chronia, w zapisie nie ma klucza (ksiegi zapisane wczesniej przepadaja przy nastepnym zapisie, modyfikatory zostaja).
+
+## Linie logu (Log.Info)
+
+- `HP sprzetu (m110): start | ochrona z HP TAK (WornExactHpProtection TAK, GearFourStates TAK, ConditionScalesStats TAK), zuzycie towarzyszy TAK (CompanionGearWear TAK,
+  WearEnabled TAK) | latka Agent.InitializeSpawnEquipment TAK (inne: <wlasciciele latek>) | ksiega gracza: sztuk z HP n | ksiegi towarzyszy: bohaterow h (w druzynie k),
+  sztuk e, bledne wiersze b | krzywa 90/2: 50 przy 41/56/78% -> 34/41/47, stan Damaged 42 - OK | potkniecia 0.` (OnSessionLaunched, po wyrownaniu nazw)
+- `HP sprzetu (m110): bitwa N | bohater <Imie> (gracz|towarzysz) | slot 6 <id> tulow 50 -> 41 (HP 56.0%, Damaged, poczatek stan; stan dalby 42) ; ... | zuzycie z
+  trafien TAK.` (rodzaj: glowa/tulow/rece/nogi/kon/ciecie/pchniecie/pocisk/tarcza; poczatek: sprawny/dobry/stan; ", przyciete" przy przycieciu; bohater bez kopii -
+  "bez kopii"; 20 linii na bitwe, pod flaga wszystkie)
+- `HP sprzetu (m110): koniec bitwy N | bohaterow z agentem a, z kopiami k, niezgodny sprzet n (sloty m) | kopii c (neutralnych z, przycietych t, kon agenta h) |
+  zuzycie towarzyszy: agentow r (bez zgodnej zbroi s), pkt x | przecieki 0 | test TAK|NIE (linii n) | potkniecia 0.`
+- `Zuzycie towarzysza (m110): <Imie> | slot 6 <id> ksiega 100.00 -> 87.14 (trafienia 600.00 pkt, pula 4665; poczatek sprawny, liczony 87.14 -> sprawny, byl sprawny) ;
+  slot 0 <id> ksiega ... (trafienia 11.00 pkt, solidnosc 1.440; ...).` i przy nowym stanie `Zuzycie towarzysza (m110): <Imie> slot 6 <id> -> <mod> | ksiega 74.28%,
+  poczatek sprawny, liczony 74.28% -> uszkodzony (byl sprawny).`
+- `Zuzycie towarzyszy (m110): bitwa | bohaterow z trafieniami n (pominieci p), zuzycie celowane x pkt, sztuk w ksiegach k, nowy stan s, bledy 0.` i
+  `Zuzycie towarzyszy (m110): <poczatek bitwy|bitwa przegrana albo opuszczona> - x pkt z ksiag ciosow przepada (bohaterow n).`
+- Pod flaga: `HP sprzetu (m110): test - bohater <Imie> | slot 5 <id> HP 41.0% Damaged: sztuka glowa baza 30, stan 25 -> dokladnie 20 (wzor 20), lancuch Head 25 -> 20
+  (RBM) ; slot 0 ... MissionWeapon 39 ; slot 11 ... kon agenta kopia TAK 5.`, `HP sprzetu (m110): test - syntetyczne trafienia <Imie>: slot 6 +600 pkt, slot 0 +10 pkt.`,
+  `HP sprzetu (m110): zapis | ksiegi towarzyszy: bohaterow n, sztuk e, znakow c | pominieci poza druzyna p.`
+
+## Progi - grupa `m110hp`
+
+`python -I tools/sprawdz_logi.py --grupa m110hp [<Armoury-*.log>] [--baza-doby <log z linia zapisu>]` - opis w `--help`. HP-S self-test wyrazen (linie kontrolne jak w
+kodzie C#), HP-S2 test syntetyczny (krzywa 34/41/47 i stan 42, przedzialy i przyciecie, d 0.1, dobra jakosc, sprawna, pula 2439 i solidnosc 1.44, ciaglosc; logi dobry /
+zly / bez startu / bez m110hp / HP-LC), HP-0 start (krzywa przeliczona z "krzywa X/Y", latka TAK przy ochronie TAK), HP-1 bledy, potkniecia, przecieki, bledy zuzycia,
+format, HP-2 arytmetyka linii bitwy (+-1, HP w przedziale stanu), HP-3 pomiar testowy (getter = wzor = krzywa, lancuch Head RBM, MissionWeapon i kon z kopia), HP-4
+zuzycie towarzyszy (+-0.06, liczony +-0.02, stan nigdy lepszy, ciaglosc HP w nastepnej bitwie +-0.1), HP-5 pokrycie pod flaga, HP-LC zapis -> wczytanie.
+
+## Hak autotestu
+
+Plik `Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-hp.flag`, tylko przy LogGate.Mode 1/2 (czytany raz na misje). Gracz: w klonie agenta sztuczne d gniazd
+po kolei 5, 6, 7, 8, 9, 11, 0-3: 41, 56, 78, 92, 25, 5, 63, 88 (kopia kanonicznego modyfikatora stanu tego d; sprawny - neutralna albo dobrej jakosci gracza; kopia
+takze przy d rownym srodkowi stanu - sprawdza, ze kopia daje wartosc stanu); `OnAgentBuild` mierzy getterami gry (sztuka, `GetBaseArmorEffectivenessForBodyPart(Head)`
+z kopia i chwilowo z oryginalem, `MissionWeapon`, uprzaz konia agenta). Towarzysze: na koncu misji +600 pkt w tulow i +10 pkt w pierwsza bron (zuzycie, zmiana stanu,
+ciaglosc w kolejnych bitwach). Linia "zapis". W grze Jeffa (bez flagi) nic nie robi.
+
+## Plan autotestu (dla glownej sesji)
+
+Wczesniej: kopia logow Jeffa z dnia. Do gry ida DLL, `arm_item_modifiers.xml` i `SubModule.xml` jak w kroku 1 (krok 1 nie jest jeszcze wgrany - autotest kroku 1 z
+planu nizej razem z tym).
+
+| Bieg | Parametry | Co sprawdzic |
+|---|---|---|
+| bitwa | autotest-F-d240, 4 bitwy, flagi `armoury-hp.flag` + `armoury-lup.flag` (+ `armoury-stan.flag`) | HP-S..HP-5 TAK; m110stan i m109lup dalej TAK; inne grupy bitewne bez nowych NIE |
+| bitwa-real | jak wyzej, tylko flaga lup | liczby dla Jeffa: o ile ochrona gracza i towarzysza (np. Urrathon) rozni sie od stanu; zuzycie towarzysza z prawdziwych trafien na bitwe; HP-0/1/2/4 |
+| p20 | prolog 20 dob | HP-0/1; brak ERROR; E8/W i P2 bez przesuniec (zuzycie AI nie ruszane) |
+| wczyt | zapis autotest-dlugi (zapis 104) + 20 dob | start "ksiegi towarzyszy: bohaterow 0"; HP-0/1; STAN-5 gracza bez zmian formatu (WearAfter 1:1) |
+| lc | nowa DLL: bitwa z flaga hp i zapis (ksiega towarzysza) -> DLL 104 (fd209d68, nowy SubModule.xml i XML): wczytanie + 20 dob -> nowa DLL: wczytanie zapisu z nowej DLL i zapisu z 104 | HP-LC TAK (`--baza-doby` = log z linia zapisu); na 104: 0 bledow CrashScribe i Armoury; zapis z 104 na nowej DLL: ksiegi 0, modyfikatory arm_* zostaja |
+
+**Do powiedzenia Jeffowi (jednym zdaniem, decyzja D1 z projektu):** sprzet towarzyszy zacznie sie zuzywac od trafien (dotad nie zuzywal sie wcale); naprawa przez sakwy
+(zdjac, naprawic, zalozyc - ksiega zaczyna od nowa); wylacznik `Companion Gear Wear`.
+
+## Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0)
+
+1. **Ten sam cel latki:** `ModifyArmor` / `ModifyDamage` - prefiks RBM bez oryginalu + nasz postfiks; nowa galaz tylko dla kopii (pusty rejestr - 1:1).
+   `Agent.InitializeSpawnEquipment` - prefiks RBM (klon / lordowie); nasz postfiks pomija niezgodne gniazda (lordowie RBM). `GearState.Of` - galaz tylko dla kopii.
+   `ItemMenuVM.SetItem` - nasz postfiks (nowe argumenty `item`, `character`), galaz pod kluczem. Metoda `InitializeSpawnEquipment` jest bardzo krotka (19.10: GC na
+   1-bajtowej metodzie z detourem) - RBM juz ja latkuje, nasz postfiks nie dodaje nowego miejsca przejecia; pilnuje UnwindRepair CrashScribe.
+2. **Przeciek kopii do kampanii:** kopie tylko w klonach agenta; nic nie przepisuje sprzetu agenta do bohatera (DTE i LootWear pomijaja bohaterow, AiWear pomija druzyne
+   gracza, lup po ItemObject); kontrola na koncu misji naprawia i liczy (HP-1: 0). Kopia MemberwiseClone ma Id i StringId oryginalu; neutralna - cena 1, StringId "".
+   Po koncu misji rejestr pusty - kopia czytana jeszcze przez cudzy kod daje wartosc stanu (cena kopii = cena stanu) albo pelna (neutralna).
+3. **Bilans:** ochrona gracza idzie za HP - sprawna sztuka traci do 3.6% (x0.964 przy 80%), uszkodzona przy 80% ma x0.964 zamiast x0.856, przy 41% x0.687. Towarzysze
+   dotad nie zuzywali sprzetu - teraz tak; rosna naprawy (istniejace drogi napraw, zamknieta ekonomia - zuzycie zmniejsza wartosc sztuk, zlota z niczego nie przybywa).
+4. **Progi czytajace pancerz** (BattleWind :104 >= 30, kondycja i postawa RBMAI, skradanie, kara RBM przy strzelaniu) widza dokladna wartosc - male przesuniecia.
+5. **RBM obniza modyfikator w walce** (`lowerArmorQuality`: pierwszy z grupy o mniejszym `ModifyArmor(100)`) - kopia zamienia sie na kanoniczny gorszy stan, ochrona spada
+   do stanu i nigdy nie rosnie (tylko w misji; tak samo jak dotad sprawna bez modyfikatora -> Damaged).
+6. **Niezgodny sprzet:** lordowie RBM (rodzina gracza w krolestwie), oblezenie bez konia, inny stroj - bez kopii i bez zuzycia (czego nie nosi, to sie nie zuzywa).
+7. **Zapis:** nowy klucz SaveText `arm_condition_heroes` (ok. 60 B na sztuke, ok. 12 KB przy 16 bohaterach, w kawalkach SaveText); stary zapis bez klucza - ksiegi puste;
+   DLL 104 klucz pomija; `arm_condition` gracza bez zmian. Cofniecie: zapis z ksiegami na 104 - wczytanie bez bledu (HIPOTEZA z kodu, do sprawdzenia w biegu lc).
+8. **Wydajnosc:** postfiks spawnu - kilka sprawdzen na agenta (zolnierz wychodzi po `IsHero`); `ModifyArmor` - jedno wyszukiwanie przy niepustym rejestrze (pasek pancerza
+   RBM co klatke - kilka sztuk gracza); trafienie - jedno wyszukiwanie agenta. Wlasnej pracy co klatke brak.
+9. **Watki:** rejestry jako migawki podmieniane przy zapisie (zapis tylko przy wejsciu agentow na watku glownym), odczyt bez blokady.
+10. **`WearAfter` wydzielone** - to samo wyrazenie (float, `MathF` gry) - gracz bit w bit; STAN-5 w biegach bitwa i wczyt.
+11. **Naprawa sprzetu towarzyszy** tylko przez sakwy; "Mend everything you wear" - tylko gracz; CompanionGear nie wymienia zuzytej sztuki tego samego tieru (zmiana sztuki
+    zaczyna ksiege od nowa). Do decyzji Jeffa (krok 3: naprawa sprzetu towarzyszy u kowala).
+12. **Startowy sprzet wedrowcow** (companion_armor/weapon) jest po kroku 1 "Mangled" - krok 2 tego nie zmienia (osobna decyzja).
+13. **Grupy progow:** linie towarzyszy maja prefiks "Zuzycie towarzysza (m110)" - STAN-5 ich nie lapie; "Bitwa zakonczona: obrazenia" i E8 bez zmian.
+14. **Misje z bitwa na mapie poza walka** (rozmowa przy spotkaniu, gdy MapEvent juz jest) - kopie dla agenta bohatera tez powstaja (warunek jak FieldCraft.InBattle);
+    nieszkodliwe - koniec misji czysci, przeciek liczony.
+15. **Sprzatanie stanu:** rejestry misji - koniec misji i zmiana misji; ksiegi i ciosy - `HeroBook.Reset` przy nowej kampanii / wczytaniu. Bledy liczone per obiekt.
+
+## Odstepstwa od projektu (krok 2)
+
+1. **Uprzaz konia towarzysza:** projekt zakladal, ze kon dostaje kopie przez wspolny obiekt `equipment` (Mission.cs :4290) - prawda tylko dla gracza; dla towarzysza RBM
+   daje jezdzcowi klon, wiec kopia przechodzi na konia w jego `InitializeSpawnEquipment` (ta sama latka, `MountTakes`).
+2. **Ksiega ciosow towarzysza:** tablica misji agenta (nie tablica z HeroBook) przenoszona na koncu misji tylko dla gniazd zgodnych (maska) - zuzycie nie trafia w sztuke,
+   ktorej bohater w bitwie nie nosil.
+3. **Postfiks spawnu dziala przy kazdym z kluczy** (rejestracja do zuzycia bez ochrony - klucze niezalezne, jak w projekcie rozdz. 4).
+4. **Linie:** start - dopisane "(CompanionGearWear X, WearEnabled Y)" i "bledne wiersze b"; bitwa - linia takze dla bohatera bez kopii ("bez kopii"); koniec - "kon agenta h"
+   w kopiach, "zuzycie towarzyszy: agentow r (bez zgodnej zbroi s), pkt x" zamiast "trafien h" (suma punktow, nie liczba ciosow), "test TAK|NIE (linii n)" (HP-5).
+   Linie zuzycia towarzysza - ksiega, trafienia i liczony z 2 miejscami po przecinku (ksiega zapisana "0.##"; gracz zostaje "0.#") - tolerancja HP-4 +-0.06.
+5. **Hak testu:** kopia takze przy d rownym srodkowi stanu (25, 5) - sprawdza, ze kopia daje wartosc stanu.
+6. **`HeroBook.ExactD` przy CompanionGearWear NIE - false** (ksiegi wczytane z zapisu nie chronia - klucz NIE = towarzysze jak `6f3e0314`).
+7. **Zapis:** przy braku ksiag / kluczu NIE wywolanie SaveText pominiete (klucza w zapisie nie ma - `SaveText.Sync` z null zapisalby pusty napis).
+8. **Reset** `HeroHp` i `HeroBook` w osobnej linii inicjalizatora `ArmouryBehavior` (zasada repo przy scaleniach), nie w linii konstruktora.
+9. **Panel:** dokladne wiersze tylko przy ConditionScalesStats TAK (jak w bitwie); "Durability" z d przycietego do stanu (zgodne z nazwa i ochrona).
+
+## Status
+
+DO SPRAWDZENIA - kod, klucze, linie, progi i build gotowe na galezi; autotest (plan wyzej) i decyzja o wgraniu - glowna sesja. Nic nie wgrane. Krok 1 (nizej) tez
+niewgrany.
+
+---
+
 # m110-stan - cztery nazwane stany sprzetu (sprawny / uszkodzony / zmasakrowany / wrak) i stan lupu z prawdziwych obrazen
 
 Galaz `w-toku/m110-stan` (baza `502833b6` = WGRANIE 104). Mod: Armoury (+ `tools/sprawdz_logi.py`). Tor L (gospodarka, lup, zapis). Parametry ustalal Claude.
