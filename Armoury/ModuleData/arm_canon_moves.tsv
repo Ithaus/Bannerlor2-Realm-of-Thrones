@@ -97,6 +97,8 @@ p02	ROTwanderer8	Tyrion Lannister	prolday:132	free:clan_vlandia_1	prolog		trial 
 m03	ROTwanderer8	Tyrion Lannister	ev:JoffreyEvent+40	clan:clan_khuzait_2		Tyrion Lannister has fled across the narrow sea.	accused of Joffrey's death, kills Tywin and flees; in Essos with the Second Sons (A Dance with Dragons)
 m04	ROTwanderer8	Tyrion Lannister	ev:DanyInvasionEvent|kr:099.2	clan:clan_empire_south_1		Tyrion Lannister sails with Daenerys Targaryen as her Hand.	Hand of the Queen
 p03	ROTwanderer4	Bronn of the Blackwater	prolday:0	wander:river	prolog		sellsword on the roads of the Riverlands until the crossroads inn
+p03b	ROTwanderer4	Bronn of the Blackwater	prolday:110	hide	prolog		Jeff 23.10: rides with Catelyn's party that takes Tyrion from the crossroads inn to the Eyrie - not for hire on the way (was free in Riverrun taverns days 110-132)
+p03c	ROTwanderer4	Bronn of the Blackwater	prolday:132	unhide:town_EN1	prolog		arrives at the Eyrie with the prisoner; the next row makes him Tyrion's man
 p04	ROTwanderer4	Bronn of the Blackwater	prolday:132	court:clan_vlandia_1	prolog		Tyrion's champion at the Eyrie, then his man (no party of his own until knighted - m05)
 m05	ROTwanderer4	Bronn of the Blackwater	done:BlackwaterEvent	lead			knighted after the Blackwater - may lead men
 m06	ROTwanderer4	Bronn of the Blackwater	ev:JoffreyEvent+30	clan:clan_nord_1			will not fight for Tyrion; weds Lollys Stokeworth - no House Stokeworth in ROT, so he stays with the crown
