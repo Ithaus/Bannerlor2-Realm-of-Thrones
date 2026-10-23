@@ -1114,6 +1114,17 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m97szkolenie : (20.10, Jeff "szkolenie wojska nie odbywa sie w marszu"; Armoury/src/CampDrill.cs, klucze DrillCampOnly, DrillCampOnlyAi, DrillMaster)
                     python -I tools/sprawdz_logi.py --grupa m97szkolenie <Armoury-*.log> (strumieniowo). SZ-0 start sesji i perki przerobione, SZ-1 zero XP z marszu
                     (gracz), SZ-2 godziny tylko z menu obozu (albo samoczynnie w obozie oblezenia / cudzej armii), SZ-3 ERROR 0, SZ-4 XP z marszu 0 przy czynnej zasadzie (AI, strona gracza), SZ-5 AI wobec dawnej reguly (INFO), SZ-6 potkniecia 0.
+--grupa m109muszt  : (23.10, galaz w-toku/m109-musztra - Jeff 22.10 "jak czekam w miescie, wojsko ma rozkaz drill, ale mniej, bo wydaja kase, pija, chodza na kobiety";
+                    Armoury/src/TownStay.cs, CampDrill.cs, Drill.cs; klucze DrillTownStay i TownStaySpend) python -I tools/sprawdz_logi.py --grupa m109muszt <Armoury-*.log>
+                    (strumieniowo). MUSZT-S self-test wyrazen wobec linii kontrolnych jak w kodzie C# (takze wyrazenie gracza m97szkolenie: nowa i stara linia), MUSZT-S2
+                    test syntetyczny (dobry, zly, log sprzed m109). MUSZT-0 linia startu i klucze (INFO; brak - log sprzed m109), MUSZT-0b linie rozpoznane. MUSZT-1 gracz:
+                    godziny w osadzie od switu <= limit rano (linia wydatkow) i <= godziny ticku (linia m97) - 0 naruszen. MUSZT-2 AI: w kazdym koszyku dob postoju
+                    "najwiecej" <= limit doby, godziny z limitem <= bez limitu (linie z zasada TAK) - 0. MUSZT-3 obieg: zeszlo z sakiewek = przybylo w kasach + kiesy
+                    ludu (roznica 0 kazdej doby). MUSZT-4 rezerwy naruszone 0. MUSZT-5 morale: ponad pulap 5 po dodaniu 0 i dodane <= 3 x partii. MUSZT-6 autotest
+                    (plik armoury-postoj.flag): poranki F1 - limity nierosnace, od 4. doby 1; F2 kontynuacja (doba > 1); F3 8 h z menu obozu; F4 nowy postoj, poranki
+                    4/3/2 z godzinami > 0 i w limicie; wydatki gracza > 0; bez "przerwany"; podsumowanie "wynik TAK" (bez linii autotestu - INFO). MUSZT-7 XP AI z
+                    limitem wobec bez limitu, udzial partio-dob w osadzie, roznica wejsc do StationaryStartTime (INFO; spadek > 30% - DECYZJA Jeffa). MUSZT-9 ERROR
+                    TownStay / SyncData.arm_campdrill 0 i potkniecia 0. Log bez linii m109 - progi INFO, bez wyjatku.
 --grupa m96wzory  : (20.10, w-toku/m96-wzory - Jeff "moge stworzyc luki tier 6 od poczatku gry"; Armoury/src/LoreSeedFix.cs, PatternGate.cs, LegendTwins.cs)
                     python -I tools/sprawdz_logi.py --grupa m96wzory <Armoury-*.log> (strumieniowo). W96-0 linia startu sesji, W96-1 ROT-RBM przed linia m96,
                     W96-2 rozdanie tieru 1 nie przed ROT-RBM w tej samej sesji, W96-3 ksiega lukow (t6 0) i kusz (t2+ 0) po rozdaniu/naprawie, W96-4 naprawa
@@ -36979,7 +36990,9 @@ def nkarczmy_main(logp):
 M97SZ_HEAD = "Szkolenie w obozie (m97): "
 M97SZ_ERR = ("ERROR in CampDrill", "ERROR in SyncData.arm_campdrill", "CtxOf.Camp")
 # recenzja 2: godziny samoczynne (oboz oblezenia, cudza armia - klucz DrillSiegeArmy) - grupa opcjonalna (linia sprzed poprawki: 0)
-M97SZ_PLAYER = re.compile(r"gracz dzien (\d+) \| godzin cwiczen ([\d.]+) \(z menu obozu od ostatniej linii ([\d.]+)(?:, samoczynnie w obozie oblezenia albo w cudzej armii ([\d.]+))?;"
+# m109-musztra: dopisek "w osadzie (m109) Y" (godziny postoju w osadzie, klucz DrillTownStay) - grupa opcjonalna 5 (linia sprzed m109: 0); XP i potkniecia - grupy 6 i 7
+M97SZ_PLAYER = re.compile(r"gracz dzien (\d+) \| godzin cwiczen ([\d.]+) \(z menu obozu od ostatniej linii ([\d.]+)(?:, samoczynnie w obozie oblezenia albo w cudzej armii ([\d.]+))?"
+                          r"(?:, w osadzie \(m109\) ([\d.]+))?;"
                           r".*?\| XP przyjete (\d+) .*?potkniecia (\d+)\.")
 M97SZ_AI = re.compile(r"AI dzien (\d+) \| zasada AI (TAK|NIE)[^|]*\| partii (\d+) \(ludzio-dni (\d+)\) \| godzin postoju za dnia \(najwyzej 8\) srednio ([\d.]+): 0 h (\d+), 1-7 h (-?\d+), 8 h (\d+)"
                       r" \| XP po broni: dawna regula (\d+) -> zasada obozu (\d+) \(x([\d.]+)\), na glowe na dobe ([\d.]+) -> ([\d.]+), dane naprawde (\d+)"
@@ -37012,8 +37025,8 @@ def m97szkolenie_main(logp):
                 elif rest.startswith("gracz dzien"):
                     mp = M97SZ_PLAYER.search(rest)
                     if mp:
-                        players.append((int(mp.group(1)), float(mp.group(2)), float(mp.group(3)), int(mp.group(5)), int(mp.group(6)), after_start,
-                                        float(mp.group(4)) if mp.group(4) else 0.0))
+                        players.append((int(mp.group(1)), float(mp.group(2)), float(mp.group(3)), int(mp.group(6)), int(mp.group(7)), after_start,
+                                        float(mp.group(4)) if mp.group(4) else 0.0, float(mp.group(5)) if mp.group(5) else 0.0))   # m109-musztra: 8. element - godziny w osadzie
                     else:
                         bad.append(s)
                     after_start = False
@@ -37046,11 +37059,12 @@ def m97szkolenie_main(logp):
         bad0 = [p[0] for p in zero if p[3] > 0]
         rep.add("SZ-1: zero XP z marszu - doby gracza bez godziny cwiczen w obozie", f"dob bez cwiczen {len(zero)} z {len(players)}, z XP > 0: {len(bad0)}" + (f" (np. dzien {bad0[0]})" if bad0 else ""),
                 "0", not bad0)
-        notcamp = [p[0] for p in players if p[1] > p[2] + p[6] + 0.05 and not p[5]]
+        notcamp = [p[0] for p in players if p[1] > p[2] + p[6] + p[7] + 0.05 and not p[5]]   # m109-musztra: godziny postoju w osadzie (p[7]) - tez samoczynne
         trained = [p for p in players if p[1] > 0.0]
         auto_h = sum(p[6] for p in players)
-        rep.add("SZ-2: godziny cwiczen gracza tylko z menu obozu (albo samoczynnie: oboz oblezenia, cudza armia)",
-                f"dob z cwiczeniami {len(trained)}, godzin razem {sum(p[1] for p in trained):.1f} (samoczynnie {auto_h:.1f}); dob z godzinami ponad menu i samoczynne {len(notcamp)}"
+        set_h = sum(p[7] for p in players)
+        rep.add("SZ-2: godziny cwiczen gracza tylko z menu obozu (albo samoczynnie: oboz oblezenia, cudza armia, postoj w osadzie m109)",
+                f"dob z cwiczeniami {len(trained)}, godzin razem {sum(p[1] for p in trained):.1f} (samoczynnie {auto_h:.1f}, w osadzie {set_h:.1f}); dob z godzinami ponad menu i samoczynne {len(notcamp)}"
                 + (f" (np. dzien {notcamp[0]})" if notcamp else "") + f"; linii konca cwiczen {len(ends)}", "0 (pierwsza doba po wczytaniu moze niesc godziny z zapisu)", not notcamp)
         if trained:
             per = [p[3] / max(0.01, p[1]) for p in trained]
@@ -37080,6 +37094,404 @@ def m97szkolenie_main(logp):
         rep.add("SZ-6: potkniecia CampDrill (ostatnia linia AI)", str(st_last), "0", st_last == 0)
     else:
         rep.add("SZ-4: linie AI", "brak", "INFO (Drill Log wylaczony)", None)
+    rep.show()
+    return 0
+
+
+# ------------------------------------------------------------ m109muszt (23.10, galaz w-toku/m109-musztra - Jeff 22.10 "jak czekam w miescie, wojsko ma rozkaz
+# drill, ale mniej, bo wydaja kase, pija, chodza na kobiety"; Armoury/src/TownStay.cs, CampDrill.cs, Drill.cs, klucze DrillTownStay i TownStaySpend)
+M109MUSZT_HEAD = "Postoj w osadzie (m109): "
+M109MUSZT_ERR = ("ERROR in TownStay.", "ERROR in SyncData.arm_campdrill")
+M109MUSZT_TOWN_CAPS = {1: 4, 2: 3, 3: 2, 4: 1}     # miasto max(1, 5 - doba) - jak TownStay.Cap
+M109MUSZT_KEEP_CAPS = {1: 6, 2: 5, 3: 4}           # zamek i wies max(4, 7 - doba)
+M109MUSZT_RX = {
+    "start": re.compile(r"^start sesji \| musztra w osadzie \(Drill Town Stay\) (TAK|NIE) .*?\| wydatki \(Town Stay Spend\) (TAK|NIE).*?\| autotest postoju (TAK|nie)"),
+    "dhead": re.compile(r"^musztra dzien (\d+) \| zasada (TAK|NIE)"),
+    "dparties": re.compile(r"\| partii pod pomiarem (\d+), z godzinami w osadzie (\d+) \(miasto (\d+), zamek (\d+), wies (\d+)\)"),
+    "bucket": re.compile(r"doba (\d)\+? \(limit (\d+)\) (\d+) partii, srednio ([\d.]+), najwiecej (\d+)"),
+    "dhours": re.compile(r"\| godzin w osadzie bez limitu ([\d.]+) -> z limitem ([\d.]+), w polu ([\d.]+)"),
+    "dxp": re.compile(r"\| XP zasady obozu bez limitu (-?\d+) -> z limitem (-?\d+) \(x([\d.]+)\)"),
+    "dentry": re.compile(r"\| wejscia AI (\d+), roznica do StationaryStartTime srednio (-?[\d.]+) h, najwiecej (-?[\d.]+) h; odtworzone ze StationaryStartTime (\d+) \(Never (\d+)\)"),
+    "stumb": re.compile(r"\| potkniecia (\d+)\.$"),
+    "shead": re.compile(r"^wydatki dzien (\d+) \| (wylaczone|stawka)"),
+    "spaid": re.compile(r"wydaly (\d+): z sakiewek (\d+) -> kasy miast (\d+) \(w tym kiesy ludu (\d+)\), kasy zamkow (\d+) \((\d+)\)"),
+    "sctl": re.compile(r"\| kontrola: zeszlo (-?\d+) = przybylo w kasach (-?\d+) \+ kiesy ludu (-?\d+) \(roznica (-?\d+)\)"),
+    "sres": re.compile(r"\| rezerwy naruszone (\d+)"),
+    "smor": re.compile(r"\| morale: partii (\d+), dodane ([\d.]+), ponad pulap 5 po dodaniu (\d+)"),
+    "splayer": re.compile(r"\| gracz: (.*?) \| (?:koszt|potkniecia)"),
+    "pset": re.compile(r"w osadzie od switu ([\d.]+) h \(limit rano (\d+|-)"),
+    "pspent": re.compile(r"wydali (\d+)"),
+    "auto": re.compile(r"^autotest - (F\d (?:wejscie|wyjscie|rano|powrot|cwiczenia start|cwiczenia koniec)|podsumowanie|przerwany)\b"),
+    "arow": re.compile(r"doba postoju (\d+|-), limit (\d+|-), godzin w osadzie (\d+(?:\.\d+)?)"),
+    "acont": re.compile(r"kontynuacja postoju (TAK|NIE)"),
+    "anew": re.compile(r"nowy postoj (TAK|NIE)"),
+    "amenu": re.compile(r"z menu obozu dzis od switu ([\d.]+) h"),
+    "aspent": re.compile(r"wydatki gracza w tescie (-?\d+)"),
+    "aresult": re.compile(r"\| wynik (TAK|NIE)\.$"),
+}
+# linie kontrolne - napisy jak w kodzie C# (TownStay.SessionStart / DrillLine / SpendLine / autotest, CampDrill.AfterPlayerTick)
+M109MUSZT_TEST = {
+    "start": "start sesji | musztra w osadzie (Drill Town Stay) TAK | limit godzin w osadzie na dobe postoju: miasto 4/3/2/1, zamek i wies 6/5/4 (razem z obozem najwyzej 8 h od switu)"
+             " | oblezona - jak oboz oblezenia | wypad < 24 h nie zeruje | wydatki (Town Stay Spend) TAK: stawka 10.0% x min(3, dni wolnej / 10), miasto i zamek | morale +3/dobe do +5"
+             " | AI odtworzone ze StationaryStartTime 52 (srednio doba 2.4, Never 0) | gracz: postoj od -, poza od -, dzis w osadzie 0.00 h | autotest postoju TAK (plik armoury-postoj.flag).",
+    "drill": "musztra dzien 108700 | zasada TAK | partii pod pomiarem 330, z godzinami w osadzie 52 (miasto 30, zamek 15, wies 7) | miasto: doba 1 (limit 4) 10 partii, srednio 3.50, najwiecej 4;"
+             " doba 2 (limit 3) 8 partii, srednio 2.75, najwiecej 3; doba 3 (limit 2) 5 partii, srednio 2.00, najwiecej 2; doba 4+ (limit 1) 7 partii, srednio 1.00, najwiecej 1"
+             " | zamek i wies: doba 1 (limit 6) 9 partii, srednio 5.00, najwiecej 6; doba 2 (limit 5) 6 partii, srednio 4.50, najwiecej 5; doba 3+ (limit 4) 7 partii, srednio 4.00, najwiecej 4"
+             " | godzin w osadzie bez limitu 380.0 -> z limitem 210.0, w polu 900.0 | XP zasady obozu bez limitu 1200000 -> z limitem 1050000 (x0.88) | strona gracza: partii 2, odjete 6.0 h"
+             " | wejscia AI 14, roznica do StationaryStartTime srednio 0.5 h, najwiecej 3.0 h; odtworzone ze StationaryStartTime 0 (Never 0) | potkniecia 0.",
+    "spend": "wydatki dzien 108700 | stawka 10.0% x min(3, dni wolnej / 10) | partii w osadach 52 (miasta 30, zamki 15, wsie 7), wydaly 40: z sakiewek 250000 -> kasy miast 200000"
+             " (w tym kiesy ludu 50000), kasy zamkow 50000 (0) | kontrola: zeszlo 250000 = przybylo w kasach 200000 + kiesy ludu 50000 (roznica 0) | rezerwy naruszone 0"
+             " | morale: partii 38, dodane 95.0, ponad pulap 5 po dodaniu 0 | pominiete: wsie 7, oblezone 1, okno lupu 0, w bitwie 0, puste 3, nic wolnego 2, nieczynne 0, ekran zbrojowni gracza 0"
+             " | gracz: miasto Winterfell, doba postoju 3, w osadzie od switu 2.00 h (limit rano 2, jutro 1), wydali 312, morale +3.0 (2.1 -> 5.0) | koszt 4.2 ms | potkniecia 0.",
+    "spendoff": "wydatki dzien 108700 | wylaczone (Town Stay Spend / Men Purse Enabled) - zold wydaja tylko przy wyjezdzie z miasta, jak dotad | gracz: w polu, w osadzie od switu 0.00 h (limit rano -) | potkniecia 0.",
+    "m97": "gracz dzien 108700 | godzin cwiczen 3.00 (z menu obozu od ostatniej linii 0.00, samoczynnie w obozie oblezenia albo w cudzej armii 0.00, w osadzie (m109) 3.00; dzis od switu 3.00 z 8)"
+           " -> dzien x0.84 (pelny x2.25), godzin ruchu w dobie 0 (dawna regula x1.50) | XP przyjete 1200 (na glowe 35.3, ludzi 34), perki +2.0 na glowe | Przywodztwo x0.50 (dowodca 10,"
+           " mistrz musztry brak; bez mistrza x0.50) | zapas x1.00 | uzbrojeni 100% | kara w chwili ticku: brak | postoj (m109): miasto Winterfell doba 3, limit 2 h, dzis w osadzie 2.00 h"
+           " | wejsc w Train the men 0, potkniecia 0.",
+    "m97old": "gracz dzien 108700 | godzin cwiczen 8.00 (z menu obozu od ostatniej linii 8.00, samoczynnie w obozie oblezenia albo w cudzej armii 0.00; dzis od switu 8.00 z 8)"
+              " -> dzien x2.25 (pelny x2.25), godzin ruchu w dobie 0 (dawna regula x1.50) | XP przyjete 3000 (na glowe 88.2, ludzi 34), perki +2.0 na glowe | Przywodztwo x0.50 (dowodca 10,"
+              " mistrz musztry brak; bez mistrza x0.50) | zapas x1.00 | uzbrojeni 100% | kara w chwili ticku: brak | wejsc w Train the men 1, potkniecia 0.",
+    "a_f1in": "autotest - F1 wejscie | menu town_wait_menus, osada Winterfell, godzina 14, doba postoju 1, limit 4, godzin w osadzie 0.00 | okno lupu nie, sakiewka ludzi 500, zasada gracza TAK, Drill Town Stay TAK.",
+    "a_rano": "autotest - F1 rano | doba postoju 1, limit 4, godzin w osadzie 4.00.",
+    "a_f2in": "autotest - F2 wejscie | menu town_wait_menus, osada Winterfell, godzina 18, doba postoju 5, limit 1, godzin w osadzie 1.00 | po 6 h w polu, kontynuacja postoju TAK (poczatek postoju 100, w F1 100).",
+    "a_f3": "autotest - F3 cwiczenia koniec | menu arm_camp_wait, osada -, godzina 14, doba postoju -, limit -, godzin w osadzie 0.00 | z menu obozu dzis od switu 8.00 h.",
+    "a_f4in": "autotest - F4 wejscie | menu town_wait_menus, osada Winterfell, godzina 3, doba postoju 1, limit 4, godzin w osadzie 0.00 | po polu (F3), nowy postoj TAK (poczatek postoju 300).",
+    "a_sum": "autotest - podsumowanie | F1 poranki: doba 1 limit 4 godzin 4.00 - limity nierosnace TAK, od 4. doby limit 1 TAK | F2 kontynuacja TAK (doba 5) | F3 z menu obozu 8.00 h - TAK"
+             " | F4 nowy postoj TAK, poranki: doba 1 limit 4 godzin 4.00 - limity 4/3/2 TAK, godziny w limicie i > 0 TAK | wydatki gracza w tescie 900 | menu town_wait_menus, osada Winterfell,"
+             " godzina 5, doba postoju 3, limit 2, godzin w osadzie 2.00 | wynik TAK.",
+}
+
+
+def m109muszt_selftest():
+    """m109muszt: wyrazenia wobec linii kontrolnych M109MUSZT_TEST (napisy jak w kodzie C#) i regresja wyrazenia gracza grupy m97szkolenie (nowa linia i stara). None = OK."""
+    R, T = M109MUSZT_RX, M109MUSZT_TEST
+    m = R["start"].search(T["start"])
+    if not m or m.groups() != ("TAK", "TAK", "TAK"):
+        return f"start: {m.groups() if m else 'brak dopasowania'}"
+    m = R["dhead"].search(T["drill"])
+    if not m or m.groups() != ("108700", "TAK"):
+        return f"dhead: {m.groups() if m else 'brak dopasowania'}"
+    m = R["dparties"].search(T["drill"])
+    if not m or m.groups() != ("330", "52", "30", "15", "7"):
+        return f"dparties: {m.groups() if m else 'brak dopasowania'}"
+    b = R["bucket"].findall(T["drill"])
+    if len(b) != 7 or b[0] != ("1", "4", "10", "3.50", "4") or b[3] != ("4", "1", "7", "1.00", "1") or b[6] != ("3", "4", "7", "4.00", "4"):
+        return f"bucket: {b}"
+    m = R["dhours"].search(T["drill"])
+    if not m or m.groups() != ("380.0", "210.0", "900.0"):
+        return f"dhours: {m.groups() if m else 'brak dopasowania'}"
+    m = R["dxp"].search(T["drill"])
+    if not m or m.groups() != ("1200000", "1050000", "0.88"):
+        return f"dxp: {m.groups() if m else 'brak dopasowania'}"
+    m = R["dentry"].search(T["drill"])
+    if not m or m.groups() != ("14", "0.5", "3.0", "0", "0"):
+        return f"dentry: {m.groups() if m else 'brak dopasowania'}"
+    for k in ("drill", "spend", "spendoff"):
+        m = R["stumb"].search(T[k])
+        if not m or m.group(1) != "0":
+            return f"stumb ({k}): {m.groups() if m else 'brak dopasowania'}"
+    m = R["shead"].search(T["spend"])
+    if not m or m.groups() != ("108700", "stawka"):
+        return f"shead: {m.groups() if m else 'brak dopasowania'}"
+    m = R["shead"].search(T["spendoff"])
+    if not m or m.groups() != ("108700", "wylaczone"):
+        return f"shead off: {m.groups() if m else 'brak dopasowania'}"
+    m = R["spaid"].search(T["spend"])
+    if not m or m.groups() != ("40", "250000", "200000", "50000", "50000", "0"):
+        return f"spaid: {m.groups() if m else 'brak dopasowania'}"
+    m = R["sctl"].search(T["spend"])
+    if not m or m.groups() != ("250000", "200000", "50000", "0"):
+        return f"sctl: {m.groups() if m else 'brak dopasowania'}"
+    m = R["sres"].search(T["spend"])
+    if not m or m.group(1) != "0":
+        return "sres"
+    m = R["smor"].search(T["spend"])
+    if not m or m.groups() != ("38", "95.0", "0"):
+        return f"smor: {m.groups() if m else 'brak dopasowania'}"
+    for k, exp in (("spend", ("2.00", "2", "312")), ("spendoff", ("0.00", "-", None))):
+        m = R["splayer"].search(T[k])
+        if not m:
+            return f"splayer ({k}): brak dopasowania"
+        ps, pp = R["pset"].search(m.group(1)), R["pspent"].search(m.group(1))
+        if not ps or ps.groups() != exp[:2] or (pp.group(1) if pp else None) != exp[2]:
+            return f"pset/pspent ({k}): {ps.groups() if ps else None}, {pp.group(1) if pp else None}"
+    for k, exp in (("m97", ("108700", "3.00", "0.00", "0.00", "3.00", "1200", "0")), ("m97old", ("108700", "8.00", "8.00", "0.00", None, "3000", "0"))):
+        m = M97SZ_PLAYER.search(T[k])   # grupa m97szkolenie czyta te same linie (dopisek m109 opcjonalny)
+        if not m or m.groups() != exp:
+            return f"m97 ({k}): {m.groups() if m else 'brak dopasowania'}"
+    m = R["auto"].search(T["a_rano"])
+    if not m or m.group(1) != "F1 rano":
+        return "auto: F1 rano"
+    m = R["arow"].search(T["a_rano"])
+    if not m or m.groups() != ("1", "4", "4.00"):
+        return f"arow: {m.groups() if m else 'brak dopasowania'}"
+    m = R["arow"].search(T["a_f3"])
+    if not m or m.groups() != ("-", "-", "0.00"):
+        return f"arow (pole): {m.groups() if m else 'brak dopasowania'}"
+    m = R["acont"].search(T["a_f2in"])
+    if not m or m.group(1) != "TAK":
+        return "acont"
+    m = R["anew"].search(T["a_f4in"])
+    if not m or m.group(1) != "TAK":
+        return "anew"
+    m = R["amenu"].search(T["a_f3"])
+    if not m or m.group(1) != "8.00":
+        return "amenu"
+    m, m2 = R["aspent"].search(T["a_sum"]), R["aresult"].search(T["a_sum"])
+    if not m or m.group(1) != "900" or not m2 or m2.group(1) != "TAK":
+        return "aspent/aresult"
+    for k in ("a_f1in", "a_f2in", "a_f3", "a_f4in", "a_sum"):
+        if not R["auto"].search(T[k]):
+            return f"auto ({k})"
+    return None
+
+
+def m109muszt_collect(logp):
+    """m109muszt: przebieg logu (strumieniowo) - linie m109 (start, musztra doby, wydatki doby, autotest), linie gracza m97 i ERROR nowego kodu."""
+    R = M109MUSZT_RX
+    D = {"start": [], "drill": [], "spend": [], "m97": [], "auto": [], "bad": [], "err": 0, "err_first": None}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M109MUSZT_HEAD):
+                rest = s[len(M109MUSZT_HEAD):]
+                if rest.startswith("start sesji"):
+                    D["start"].append(rest)
+                elif rest.startswith("musztra dzien"):
+                    D["drill"].append(rest) if R["dhead"].search(rest) and R["dhours"].search(rest) else D["bad"].append(s)
+                elif rest.startswith("wydatki dzien"):
+                    D["spend"].append(rest) if R["shead"].search(rest) else D["bad"].append(s)
+                elif rest.startswith("autotest - "):
+                    ma = R["auto"].search(rest)
+                    if ma:
+                        D["auto"].append((ma.group(1), rest))
+                    elif not rest.startswith("autotest - F3 cwiczenia start"):
+                        D["bad"].append(s)
+            elif s.startswith(M97SZ_HEAD + "gracz dzien"):
+                mp = M97SZ_PLAYER.search(s[len(M97SZ_HEAD):])
+                if mp and mp.group(5) is not None:
+                    D["m97"].append((int(mp.group(1)), float(mp.group(2)), float(mp.group(5))))
+            elif "ERROR" in s and any(e in s for e in M109MUSZT_ERR):
+                D["err"] += 1
+                if D["err_first"] is None:
+                    D["err_first"] = s[:200]
+    return D
+
+
+def m109muszt_rows(rep, D):
+    """m109muszt: wiersze MUSZT-0..7 i MUSZT-9 - opis w --help."""
+    R = M109MUSZT_RX
+    have = bool(D["start"] or D["drill"] or D["spend"] or D["auto"])
+    # MUSZT-0: linia startu i klucze
+    if D["start"]:
+        m = R["start"].search(D["start"][-1])
+        rep.add("MUSZT-0: start sesji (Drill Town Stay, Town Stay Spend, autotest)", (f"Drill Town Stay {m.group(1)}, Town Stay Spend {m.group(2)}, autotest {m.group(3)}" if m else D["start"][-1][:200]),
+                "INFO (klucze domyslnie TAK)", None)
+    else:
+        rep.add("MUSZT-0: linia 'Postoj w osadzie (m109): start sesji'", "brak", "INFO (log sprzed m109)", None)
+    rep.add("MUSZT-0b: linie m109 rozpoznane", f"nierozpoznane {len(D['bad'])}" + (f" (pierwsza: {D['bad'][0][:160]})" if D["bad"] else ""), "0", not D["bad"])
+    if not have:
+        for k, n in (("MUSZT-1", "gracz: godziny w osadzie w limicie"), ("MUSZT-2", "AI: koszyki dob postoju w limicie"), ("MUSZT-3", "obieg wydatkow"),
+                     ("MUSZT-4", "rezerwy sakiewek"), ("MUSZT-5", "morale z postoju"), ("MUSZT-6", "autotest postoju"), ("MUSZT-7", "XP AI z limitem (decyzja)")):
+            rep.add(f"{k}: {n}", "brak linii m109", "INFO (log sprzed m109)", None)
+    else:
+        # MUSZT-1: gracz - godziny w osadzie od switu <= limit rano (linia wydatkow), godziny w osadzie z linii m97 <= godziny ticku
+        b1, n1 = [], 0
+        for rest in D["spend"]:
+            mp = R["splayer"].search(rest)
+            ps = R["pset"].search(mp.group(1)) if mp else None
+            if not ps:
+                b1.append(rest[:60]); continue
+            n1 += 1
+            y, lim = float(ps.group(1)), ps.group(2)
+            if (lim == "-" and y > 0.005) or (lim != "-" and y > int(lim) + 0.005):
+                b1.append(f"{rest[:22]}: {y:.2f} h przy limicie {lim}")
+        b1b = [f"dzien {d}: w osadzie {t:.2f} > godzin ticku {h:.2f}" for d, h, t in D["m97"] if t > h + 0.05]
+        rep.add("MUSZT-1: gracz - godziny w osadzie od switu <= limit rano (linia wydatkow) i <= godziny ticku (linia m97)",
+                f"linii wydatkow z gracza {n1}, linii m97 z dopiskiem {len(D['m97'])}; naruszen {len(b1) + len(b1b)}" + (f" (np. {(b1 + b1b)[0]})" if b1 or b1b else ""),
+                "0", not b1 and not b1b if (n1 or D["m97"]) else None)
+        # MUSZT-2: AI - w kazdym koszyku "najwiecej" <= limit doby; S1 <= S0 (linie z zasada TAK)
+        b2, n2 = [], 0
+        for rest in D["drill"]:
+            h = R["dhead"].search(rest)
+            if h.group(2) != "TAK":
+                continue
+            n2 += 1
+            for (d, lim, n, avg, mx) in R["bucket"].findall(rest):
+                if int(n) > 0 and int(mx) > int(lim):
+                    b2.append(f"dzien {h.group(1)}: doba {d} najwiecej {mx} > limit {lim}")
+            hh = R["dhours"].search(rest)
+            if float(hh.group(2)) > float(hh.group(1)) + 0.05:
+                b2.append(f"dzien {h.group(1)}: S1 {hh.group(2)} > S0 {hh.group(1)}")
+        rep.add("MUSZT-2: AI - koszyki dob postoju 'najwiecej' <= limit doby, godziny z limitem <= bez limitu", f"linii z zasada TAK {n2} z {len(D['drill'])}; naruszen {len(b2)}"
+                + (f" (np. {b2[0]})" if b2 else ""), "0", (not b2) if n2 else None)
+        # MUSZT-3..5: wydatki (linie z czynnymi wydatkami)
+        on = [r for r in D["spend"] if R["shead"].search(r).group(2) == "stawka"]
+        ctl = [(R["shead"].search(r).group(1), R["sctl"].search(r)) for r in on]
+        b3 = [f"dzien {d}: roznica {m.group(4)}" if m else f"dzien {d}: brak kontroli" for d, m in ctl if not m or int(m.group(4)) != 0]
+        taken = sum(int(R["spaid"].search(r).group(2)) for r in on if R["spaid"].search(r))
+        rep.add("MUSZT-3: obieg - zeszlo z sakiewek = przybylo w kasach + kiesy ludu (kazda doba)", f"dob z wydatkami {len(on)}, wydane razem {taken}; dob z roznica {len(b3)}"
+                + (f" (np. {b3[0]})" if b3 else ""), "0 kazdej doby", (not b3) if on else None)
+        b4 = [R["shead"].search(r).group(1) for r in on if not R["sres"].search(r) or int(R["sres"].search(r).group(1)) != 0]
+        rep.add("MUSZT-4: rezerwy sakiewek (naprawy, odziez, oszczednosci K1) nienaruszone", f"dob z naruszeniem {len(b4)}" + (f" (np. dzien {b4[0]})" if b4 else ""), "0", (not b4) if on else None)
+        b5 = []
+        for r in on:
+            m = R["smor"].search(r)
+            d = R["shead"].search(r).group(1)
+            if not m:
+                b5.append(f"dzien {d}: brak morale"); continue
+            if int(m.group(3)) != 0 or float(m.group(2)) > 3.0 * int(m.group(1)) + 0.05:
+                b5.append(f"dzien {d}: ponad pulap {m.group(3)}, dodane {m.group(2)} przy {m.group(1)} partiach")
+        rep.add("MUSZT-5: morale - ponad pulap 5 po dodaniu 0 i dodane <= 3 x partii", f"dob z naruszeniem {len(b5)}" + (f" (np. {b5[0]})" if b5 else ""), "0", (not b5) if on else None)
+        # MUSZT-6: sekwencja autotestu
+        if not D["auto"]:
+            rep.add("MUSZT-6: autotest postoju (plik armoury-postoj.flag)", "brak linii autotestu", "INFO (bieg bez pliku flagi)", None)
+        else:
+            fails = []
+            ab = [r for k, r in D["auto"] if k == "przerwany"]
+            if ab:
+                fails.append("przerwany: " + ab[0][:160])
+            f1 = [R["arow"].search(r) for k, r in D["auto"] if k == "F1 rano"]
+            f1 = [(int(m.group(1)), int(m.group(2)), float(m.group(3))) for m in f1 if m and m.group(1) != "-" and m.group(2) != "-"]
+            if not f1:
+                fails.append("brak porankow F1")
+            for i in range(1, len(f1)):
+                if f1[i][1] > f1[i - 1][1]:
+                    fails.append(f"F1 limit rosnie ({f1[i - 1][1]} -> {f1[i][1]})")
+            fails += [f"F1 doba {d}: limit {l} (od 4. doby 1)" for d, l, y in f1 if d >= 4 and l != M109MUSZT_TOWN_CAPS[4]]
+            fails += [f"F1 doba {d}: godzin {y:.2f} > limit {l}" for d, l, y in f1 if y > l + 0.005]
+            f2 = [r for k, r in D["auto"] if k == "F2 wejscie"]
+            if not f2:
+                fails.append("brak F2 wejscie")
+            else:
+                mc, mr = R["acont"].search(f2[-1]), R["arow"].search(f2[-1])
+                if not mc or mc.group(1) != "TAK" or not mr or mr.group(1) == "-" or int(mr.group(1)) <= 1:
+                    fails.append("F2 bez kontynuacji postoju (doba > 1)")
+            f3 = [R["amenu"].search(r) for k, r in D["auto"] if k == "F3 cwiczenia koniec"]
+            if not f3 or not f3[-1] or float(f3[-1].group(1)) < 7.99:
+                fails.append("F3: cwiczen z menu obozu < 8 h" if f3 and f3[-1] else "brak F3 cwiczenia koniec")
+            f4 = [r for k, r in D["auto"] if k == "F4 wejscie"]
+            if not f4:
+                fails.append("brak F4 wejscie")
+            else:
+                mn, mr = R["anew"].search(f4[-1]), R["arow"].search(f4[-1])
+                if not mn or mn.group(1) != "TAK" or not mr or mr.group(1) != "1" or mr.group(2) != str(M109MUSZT_TOWN_CAPS[1]):
+                    fails.append("F4: nie nowy postoj z doba 1 i limitem 4")
+            f4r = [R["arow"].search(r) for k, r in D["auto"] if k == "F4 rano"]
+            f4r = [(int(m.group(1)), int(m.group(2)), float(m.group(3))) for m in f4r if m and m.group(1) != "-" and m.group(2) != "-"]
+            if [l for d, l, y in f4r[:3]] != [M109MUSZT_TOWN_CAPS[1], M109MUSZT_TOWN_CAPS[2], M109MUSZT_TOWN_CAPS[3]]:
+                fails.append(f"F4 poranki: limity {[l for d, l, y in f4r[:3]]} (oczekiwane 4, 3, 2)")
+            fails += [f"F4 doba {d}: godzin {y:.2f} (limit {l}, oczekiwane > 0 i <= limit)" for d, l, y in f4r[:3] if y > l + 0.005 or y <= 0.0]
+            sm = [r for k, r in D["auto"] if k == "podsumowanie"]
+            if not sm:
+                fails.append("brak podsumowania")
+            else:
+                ms, mres = R["aspent"].search(sm[-1]), R["aresult"].search(sm[-1])
+                if not ms or int(ms.group(1)) <= 0:
+                    fails.append("wydatki gracza w tescie 0")
+                if not mres or mres.group(1) != "TAK":
+                    fails.append("podsumowanie: wynik NIE")
+            rep.add("MUSZT-6: autotest postoju - poranki F1 (limity nierosnace, od 4. doby 1), F2 kontynuacja, F3 8 h z menu, F4 nowy postoj 4/3/2, wydatki > 0",
+                    f"linii autotestu {len(D['auto'])}, porankow F1 {len(f1)}, F4 {len(f4r)}; " + ("; ".join(fails[:4]) if fails else "sekwencja zgodna"), "TAK", not fails)
+        # MUSZT-7 (INFO / DECYZJA): XP AI z limitem wobec bez limitu, udzial partio-dob w osadzie, roznica do StationaryStartTime
+        x0 = sum(int(R["dxp"].search(r).group(1)) for r in D["drill"] if R["dxp"].search(r))
+        x1 = sum(int(R["dxp"].search(r).group(2)) for r in D["drill"] if R["dxp"].search(r))
+        pd = sum(int(R["dparties"].search(r).group(1)) for r in D["drill"] if R["dparties"].search(r))
+        qd = sum(int(R["dparties"].search(r).group(2)) for r in D["drill"] if R["dparties"].search(r))
+        en = [R["dentry"].search(r) for r in D["drill"]]
+        en = [m for m in en if m]
+        ne = sum(int(m.group(1)) for m in en)
+        avg = sum(int(m.group(1)) * float(m.group(2)) for m in en) / ne if ne else 0.0
+        mx = max([float(m.group(3)) for m in en] + [0.0])
+        ratio = x1 / x0 if x0 else 1.0
+        drop = 1.0 - ratio
+        rep.add("MUSZT-7: XP AI zasady obozu z limitem postoju wobec bez limitu (decyzja Jeffa przy spadku > 30%)",
+                f"XP bez limitu {x0} -> z limitem {x1} (x{ratio:.2f}, spadek {max(0.0, drop) * 100:.0f}%); partio-dob z godzinami w osadzie {qd} z {pd} ({100.0 * qd / max(1, pd):.0f}%);"
+                f" wejscia AI {ne}, roznica do StationaryStartTime srednio {avg:.1f} h, najwiecej {mx:.1f} h", "INFO (spadek > 30% - DECYZJA)",
+                None if drop <= 0.30 or not x0 else False, decide=True)
+    # MUSZT-9: ERROR nowego kodu i potkniecia (ostatnia linia m109 z polem potkniec)
+    last = [R["stumb"].search(r) for r in (D["drill"] + D["spend"])]
+    last = [m for m in last if m]
+    st = max([int(m.group(1)) for m in last] + [0])
+    rep.add("MUSZT-9: ERROR TownStay / SyncData.arm_campdrill i potkniecia TownStay", f"ERROR {D['err']}" + (f" ({D['err_first']})" if D["err_first"] else "") + f", potkniecia najwiecej {st}",
+            "0 / 0", D["err"] == 0 and st == 0)
+
+
+def m109muszt_synth():
+    """m109muszt - test syntetyczny: dobry, zly i bez linii m109 (log sprzed m109) przez m109muszt_collect / m109muszt_rows. None = werdykty zgodne z oczekiwanymi."""
+    import tempfile
+    import shutil
+    T = M109MUSZT_TEST
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="m109m_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind == "old":
+                for d in range(108700, 108705):
+                    L.append("[00:00:00] " + M97SZ_HEAD + T["m97old"].replace("dzien 108700", "dzien %d" % d))
+            else:
+                L.append("[00:00:00] " + M109MUSZT_HEAD + T["start"])
+                for d in range(108700, 108712):
+                    dr = T["drill"].replace("dzien 108700", "dzien %d" % d)
+                    sp = T["spend"].replace("dzien 108700", "dzien %d" % d)
+                    m9 = T["m97"].replace("dzien 108700", "dzien %d" % d)
+                    if kind == "bad" and d == 108705:
+                        dr = dr.replace("srednio 3.50, najwiecej 4;", "srednio 3.50, najwiecej 5;").replace("(x0.88)", "(x0.60)").replace("z limitem 1050000", "z limitem 720000")
+                        sp = sp.replace("(roznica 0)", "(roznica 5)").replace("rezerwy naruszone 0", "rezerwy naruszone 1").replace("po dodaniu 0", "po dodaniu 1")
+                        sp = sp.replace("od switu 2.00 h (limit rano 2,", "od switu 3.00 h (limit rano 2,")
+                        m9 = m9.replace("w osadzie (m109) 3.00;", "w osadzie (m109) 4.00;")
+                    L += ["[00:00:00] " + M109MUSZT_HEAD + dr, "[00:00:00] " + M109MUSZT_HEAD + sp, "[00:00:00] " + M97SZ_HEAD + m9]
+                L.append("[00:00:00] " + M109MUSZT_HEAD + T["a_f1in"])
+                for dd, lim, y in ((1, 4, 4.0), (2, 3, 3.0), (3, 2, 2.0), (4, 1, 1.0), (5, 1, 1.0)):
+                    L.append("[00:00:00] " + M109MUSZT_HEAD + "autotest - F1 rano | doba postoju %d, limit %d, godzin w osadzie %.2f." % (dd, lim if not (kind == "bad" and dd == 4) else 2, y))
+                L.append("[00:00:00] " + M109MUSZT_HEAD + T["a_f2in"])
+                L.append("[00:00:00] " + M109MUSZT_HEAD + T["a_f3"])
+                if kind == "bad":
+                    L.append("[00:00:00] " + M109MUSZT_HEAD + "autotest - przerwany | menu arm_camp_wait, osada -, godzina 2, doba postoju -, limit -, godzin w osadzie 0.00 | faza F3, powod: spotkanie w polu.")
+                    L.append("[00:00:00] ERROR in TownStay.One (1. raz): System.Exception: test")
+                else:
+                    L.append("[00:00:00] " + M109MUSZT_HEAD + T["a_f4in"])
+                    for dd, lim in ((1, 4), (2, 3), (3, 2)):
+                        L.append("[00:00:00] " + M109MUSZT_HEAD + "autotest - F4 rano | doba postoju %d, limit %d, godzin w osadzie %d.00." % (dd, lim, lim))
+                    L.append("[00:00:00] " + M109MUSZT_HEAD + T["a_sum"])
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            m109muszt_rows(rep, m109muszt_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    good, bad, old = run("good"), run("bad"), run("old")
+    exp_good = {"MUSZT-0": "INFO", "MUSZT-0b": "TAK", "MUSZT-1": "TAK", "MUSZT-2": "TAK", "MUSZT-3": "TAK", "MUSZT-4": "TAK", "MUSZT-5": "TAK", "MUSZT-6": "TAK", "MUSZT-7": "INFO", "MUSZT-9": "TAK"}
+    exp_bad = {"MUSZT-1": "NIE", "MUSZT-2": "NIE", "MUSZT-3": "NIE", "MUSZT-4": "NIE", "MUSZT-5": "NIE", "MUSZT-6": "NIE", "MUSZT-9": "NIE"}
+    exp_old = {"MUSZT-0": "INFO", "MUSZT-0b": "TAK", "MUSZT-1": "INFO", "MUSZT-2": "INFO", "MUSZT-6": "INFO", "MUSZT-7": "INFO", "MUSZT-9": "TAK"}
+    diff = [f"dobry {k}: {good.get(k)} (oczekiwane {v})" for k, v in exp_good.items() if good.get(k) != v]
+    diff += [f"zly {k}: {bad.get(k)} (oczekiwane {v})" for k, v in exp_bad.items() if bad.get(k) != v]
+    diff += [f"sprzed m109 {k}: {old.get(k)} (oczekiwane {v})" for k, v in exp_old.items() if old.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def m109muszt_main(logp):
+    """m109muszt (23.10; Armoury/src/TownStay.cs): postoj w osadzie - musztra z limitem godzin na dobe postoju (miasto 4/3/2/1, zamek i wies 6/5/4), wydatki zoldu
+    w miescie i zamku (miara markietanow N6, odbiorca jak przy wyjezdzie), morale do +5. MUSZT-S, MUSZT-S2, MUSZT-0..7, MUSZT-9 - opis w --help. Strumieniowo."""
+    rep = Report()
+    s1 = m109muszt_selftest()
+    rep.add("MUSZT-S: self-test wyrazen (linie kontrolne jak w kodzie C#; wyrazenie gracza grupy m97szkolenie - nowa i stara linia)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = m109muszt_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("MUSZT-S2: test syntetyczny (dobry, zly i log sprzed m109 przez te same funkcje progow)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("MUSZT-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = m109muszt_collect(logp)
+    print(f"plik: {logp} | startow m109 {len(D['start'])}, dob musztry {len(D['drill'])}, dob wydatkow {len(D['spend'])}, linii m97 z dopiskiem {len(D['m97'])},"
+          f" linii autotestu {len(D['auto'])}, nierozpoznanych {len(D['bad'])}, ERROR {D['err']}")
+    m109muszt_rows(rep, D)
     rep.show()
     return 0
 
@@ -58333,6 +58745,8 @@ def main(argv):
         return m96zamek_main(logp)   # m96zamek (20.10, m96-zamek): porzadek menu zamku - przeniesione, wejscia, nic nie zginelo (CastleMenus)
     if group == "m97szkolenie" and logp:
         return m97szkolenie_main(logp)   # m97szkolenie (20.10, Jeff "w marszu jest marsz"): cwiczenia tylko z obozu, zero XP z marszu, AI wobec dawnej reguly (CampDrill)
+    if group == "m109muszt" and logp:
+        return m109muszt_main(logp)   # m109muszt (23.10, Jeff "jak czekam w miescie ... nie w glowie im musztra"): postoj w osadzie - limit musztry z dobami postoju, wydatki zoldu, morale (TownStay)
     if group == "m96jakosc" and logp:
         return m96jakosc_main(logp)   # m96jakosc (20.10, Jeff "za duzo legendary"): rzadkosc legendarnych i mistrzowskich - limit na rodzaj, wyrownanie polek do zwyklej (QualityScarcity)
     if group == "nzajazdy" and logp:
