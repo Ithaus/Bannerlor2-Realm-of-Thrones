@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-23 WGRANIE 103.6 (w-toku/m109-crash 508e753d = 103.5 + HideoutHomeGuard) - koniec wywrotki, gdy banda wchodzi do kryjowki
+**Status:** WGRANE 2026-10-23 ok. 11:42 CEST (po autotescie 109a: wczytanie autotest-dlugi + 20 dob, kod 0, ERROR 0, latka 1/1, zapisy Jeffa nietkniete). W GRZE: Armoury 5082dd76, reszta jak 103.5 (CS 84205371, RC 8528f098, GT cafa41c7, FV 98890d38). Kopie *.bak-2026-10-23-wgranie1036-przed i na D: (wgrane/2026-10-23-wgranie1036-przed).
+- **Problem:** Jeff 22.10 23:59:40 - wywrotka na mapie (NullReferenceException w BanditSpawnCampaignBehavior.OnHomeHideoutChanged, banda AI wchodzi do kryjowki).
+- **Przyczyna:** gra przy wejsciu bandy do kryjowki odejmuje ja od starej kryjowki bez sprawdzenia, czy ja miala. Bez kryjowki sa bandy z CreateLooterParty - w grze szabrownicy i dezerterzy (AI nie prowadzi ich do kryjowek, bo ich kultura nie ma osad), u nas najazdy Wolnych Ludzi (armoury_ffraid) i bandy scen prologu/Kroniki (armoury_prl_*, armoury_kr_*) - AI wazy je jako gosci kryjowek, pierwsze wejscie konczylo gre.
+- **Zmiana:** HideoutHomeGuard (klucz Hideout Home Guard Enabled, domyslnie tak): przy braku starej kryjowki latka liczy bandy tak jak gra (stary dom -1, kryjowka +1) i banda osiada w kryjowce; finalizer lapie kazdy inny wyjatek tej metody. Linie "Dom kryjowki (m109): " (start sesji, 5 pierwszych band szczegolowo ze zrodlem, doba). Progi --grupa m109crash.
+- **Ryzyko / co sprawdzic:** sama chwila wejscia bandy bez kryjowki nie wystapila w 20 dobach testu - w logu Jeffa linia "banda bez kryjowki weszla do kryjowki" pokaze, czyja to banda (zrodlo); po niej gra ma isc dalej. Bandy prologu po wejsciu maja dom = kryjowka (liczenie band klanow gorskich wedlug domu).
+
 ## 2026-10-22 WGRANIE 103.5 (w-toku/m108-dziennik 44c03a05) - kon pod jezdzcem niesie juki, muzyka wydarzen bez pauzy
 **Status:** WGRANE 2026-10-22 ok. 21:41 CEST (Jeff: "wgraj"; test p20 kod 0). W GRZE: Armoury e0008b00, reszta jak 103.4. Kopie *.bak-2026-10-22-wgranie1035-przed i na D:. safely_exited 1.
 - m108-jezdziec: kazdy kon pod jezdzcem (gracz, towarzysze, jazda) niesie 20 kg jukow (RiderHorseCarryKg; gra liczyla tylko luzaki).
