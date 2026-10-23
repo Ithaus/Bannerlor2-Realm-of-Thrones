@@ -5844,9 +5844,9 @@ namespace Armoury
         [SettingPropertyGroup("Map news")]
         public bool MapChatLogClearOfMenu { get; set; } = false;
 
-        [SettingPropertyInteger("Map Chat Log Font Size", 10, 24, "0", HintText = "Chat Log Text Size: size of the letters of the message log on the campaign map (the game's own size is 20) - 16 is a fifth smaller, so the log covers less of the town menu; 20 = as in the game", RequireRestart = false)]
+        [SettingPropertyInteger("Map Chat Log Font Size", 8, 24, "0", HintText = "Chat Log Text Size: size of the letters of the message log on the campaign map (the game's own size is 20) - 10 is half the game's size, so the log covers little of the town menu; 20 = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Map news")]
-        public int MapChatLogFontSize { get; set; } = 16;
+        public int MapChatLogFontSize { get; set; } = 10;
 
         [SettingPropertyInteger("Map Chat Log Height Pct", 40, 100, "0", HintText = "Chat Log Height Percent: how much of the game's height the lines of the message log take while you are not reading it - 75 is a quarter lower (the bottom stays put, the top comes down, older lines go out of sight sooner); opening the log to read it gives the full height back; 100 = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Map news")]
