@@ -61,7 +61,7 @@ namespace Armoury
             var mp = MobileParty.MainParty;
             if (!On) why = "klucz Camp Interrogation NIE";
             else if (mp == null || Hero.MainHero == null) why = "brak partii gracza";
-            else if (mp.MapEvent != null || mp.SiegeEvent != null || PlayerEncounter.Current != null) why = "bitwa albo spotkanie";
+            else if (mp.MapEvent != null || mp.SiegeEvent != null || (PlayerEncounter.Current != null && PlayerEncounter.EncounterSettlement == null)) why = "bitwa albo spotkanie";   // 23.10 test 109d: postoj w osadzie (PlayerEncounter z osada) nie blokuje - autotest stoi w miescie
             else if (!Hero.MainHero.IsAlive || Hero.MainHero.IsPrisoner) why = "gracz w niewoli";
             if (why != null)
             {
