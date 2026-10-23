@@ -140,15 +140,17 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ CRAFT (pancerz, luk, kusza, amunicja, tarcza) i nasza kuznia
-        /// <summary>Rachunek przedmiotu z przepisu Recipes.For (CRAFT BK, nasza kuznia, menu kowala).</summary>
+        /// <summary>Rachunek przedmiotu w zakladce CRAFT BK (ekran, przycisk, test): przepis Recipes.For, pancerz i tarcza - z kwitem BK, ktory tam zdejmuje SpendMaterials.</summary>
         internal static Bill Of(ItemObject item)
         {
             if (item == null) return new Bill();
-            return Of(item, Recipes.For(item));
+            return Of(item, Recipes.For(item), true);
         }
 
-        /// <summary>Rachunek z podanego przepisu - Forge.Smith / Begin i test zuzycia biora ten sam przepis, ktory potem zdejmuja.</summary>
-        internal static Bill Of(ItemObject item, Recipes.Recipe r)
+        /// <summary>Rachunek z podanego przepisu w naszej kuzni i menu kowala (Forge.Smith / Begin zdejmuja ten sam przepis - Forge.TakeFor), bez kwitu BK.</summary>
+        internal static Bill Of(ItemObject item, Recipes.Recipe r) { return Of(item, r, false); }
+
+        private static Bill Of(ItemObject item, Recipes.Recipe r, bool craftTab)
         {
             var b = new Bill { Item = item, Recipe = r };
             if (item == null) return b;
@@ -184,7 +186,7 @@ namespace Armoury
                 b.Rows.Add(new Row { Item = rm, Kind = "rare", ByKg = false, Need = need, Bags = have, UnitKg = u, Opens = need, Rare = true });
             }
             // pancerz i tarcza w CRAFT BK: zdejmuje kwit BK - musi byc kwitem tego przepisu (latki TrueArmourCost / BkArmorBillPostfix); inny = wiersze z kwitu
-            if (!FletchForge.RangedType(item) && (item.HasArmorComponent || t == ItemObject.ItemTypeEnum.Shield)) CheckBkTable(b, r);
+            if (craftTab && !FletchForge.RangedType(item) && (item.HasArmorComponent || t == ItemObject.ItemTypeEnum.Shield)) CheckBkTable(b, r);
             Finish(b);
             return b;
         }
