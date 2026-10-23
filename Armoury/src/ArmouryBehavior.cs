@@ -3925,6 +3925,8 @@ namespace Armoury
                 return true;   // nieczytelny wpis - jak dotad (po samej nazwie)
             var group = el.Item != null && el.Item.ItemComponent != null ? el.Item.ItemComponent.ItemModifierGroup : null;
             var worn = WornModifierFor(group, cond, orig);
+            // m110-stan (GearFourStates): ta sama sztuka = ten sam STAN (stary modyfikator zuzycia sprzed paczki i kanoniczny arm_* tego stanu to jedno)
+            if (worn != null && GearState.HandlesGroup(group)) return GearState.Of(worn) == GearState.Of(el.ItemModifier);
             return worn != null && worn == el.ItemModifier;
         }
 
@@ -4242,7 +4244,8 @@ namespace Armoury
 
         internal float ConditionQuietOf(int slot) { return GetConditionQuiet(slot); }   // R3-02 (GuildMend): stan czesci uprzezy - godziny cechow i rabat zlecenia
 
-        /// <summary>m110-stan: wytrzymalosc d (procent puli) tej sztuki na grzbiecie z ksiegi zuzycia (ArmouryStats); -1 - sztuki nie ma na grzbiecie.</summary>
+        /// <summary>m110-stan: wytrzymalosc d (procent puli) tej sztuki na grzbiecie z ksiegi zuzycia (ArmouryStats); -1 - sztuki nie ma na grzbiecie albo ksiega
+        /// jej nie bila (stan tylko z modyfikatora - wytrzymalosc nieznana dokladnie).</summary>
         internal float WornEffective(ItemObject item)
         {
             try
@@ -4252,7 +4255,9 @@ namespace Armoury
                 for (int slot = 0; slot < 12; slot++)
                 {
                     if (eq[slot].Item != item) continue;
-                    return Math.Max(0f, EffectiveCondition(GetConditionQuiet(slot), OriginalModifier(slot)));
+                    float cond = GetConditionQuiet(slot);
+                    if (cond >= 100f) return -1f;
+                    return Math.Max(0f, EffectiveCondition(cond, OriginalModifier(slot)));
                 }
             }
             catch { }
