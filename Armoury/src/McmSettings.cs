@@ -5548,6 +5548,10 @@ namespace Armoury
         [SettingPropertyGroup("Hideout spotted")]
         public int HideoutFlagDays { get; set; } = 3;
 
+        [SettingPropertyBool("Hideout Flag Keeps Deadline", HintText = "the flag's last day is kept in the save, so a flag set before saving (spotted or named by a prisoner) still comes down on time after loading; flags left from older saves get Hideout Flag Days from the first load. Off = as before (after loading the flag stays until you untrack it)", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutFlagKeepsDeadline { get; set; } = true;
+
         [SettingPropertyBool("Hideout Scouting Chance", HintText = "coming within sight of a bandit hideout no longer shows it for sure: your scout gets one try per approach, and the chance grows with Scouting - none at all up to Hideout Scouting Min, full at Hideout Scouting Full. Hideouts you heard of in a tavern or inn show as before. Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Hideout spotted")]
         public bool HideoutScoutingChance { get; set; } = true;
@@ -10730,6 +10734,7 @@ namespace Armoury
             s.TourneyFolkPurseMin = TourneyFolkPurseMin;
             s.HideoutFlagEnabled = HideoutFlagEnabled;
             s.HideoutFlagDays = HideoutFlagDays;
+            s.HideoutFlagKeepsDeadline = HideoutFlagKeepsDeadline;
             s.HideoutScoutingChance = HideoutScoutingChance;
             s.HideoutScoutingMin = HideoutScoutingMin;
             s.HideoutScoutingFull = HideoutScoutingFull;

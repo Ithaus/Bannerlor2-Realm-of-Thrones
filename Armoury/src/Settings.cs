@@ -2060,6 +2060,7 @@ namespace Armoury
         // --- Hideout spotted ---
         public bool HideoutFlagEnabled = true;             // a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there
         public int HideoutFlagDays = 3;                    // how many days the flag stays on the map
+        public bool HideoutFlagKeepsDeadline = true;       // the flag's last day is kept in the save, so a flag set before saving (spotted or named by a prisoner) still comes down on time after loading; flags left from older saves get Hideout Flag Days from the first load. Off = as before (after loading the flag stays until you untrack it)
         // m100-kryjowki (Jeff 21.10): wypatrzenie kryjowek z szansy ze Zwiadu, plotka odslania, nowe kryjowki z dala od osad i nie tam, gdzie ostatnio rozbita
         // (HideoutSight.cs; latki HideoutCampaignBehavior.HourlyTickSettlement, BanditSpawnCampaignBehavior.OnSettlementEntered / CheckForSpawningBanditBoss /
         // SelectANonInfestedHideoutOfSameCultureByWeight; zapis arm_hideout_sight)

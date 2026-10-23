@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -19,6 +21,10 @@ namespace Armoury
     /// wpisujemy do pamieci bez meldunku - zero spamu przy starcie.
     /// m109-przesluch: Where (tekst miejsca z Announce, ten sam co do znaku) i Mark (kryjowka ujawniona przez jenca
     /// w obozie - CampInterrogation: flaga z terminem jak po zwiadzie, bez drugiego meldunku przegladu godzinnego).
+    /// m110-flaga (Jeff 23.10 "popraw ten znacznik"): flaga jest w zapisie gry (VisualTrackerManager), a termin jej zdjecia (_flagged) zyl tylko w pamieci -
+    /// po wczytaniu flaga stala do odznaczenia recznie. Teraz termin idzie do zapisu (SaveText arm_hideout_flags: "id,godzina;"), odtwarzany przy siewie
+    /// po wczytaniu (godzina po terminie - flaga schodzi w najblizszej godzinie). Stary zapis bez klucza: kazda sledzona kryjowka dostaje HideoutFlagDays
+    /// od wczytania (nie da sie odroznic naszej flagi od recznej - kryjowek nikt inny nie oznacza na stale). Klucz HideoutFlagKeepsDeadline.
     /// </summary>
     internal sealed class HideoutSpotter : CampaignBehaviorBase
     {
@@ -26,6 +32,8 @@ namespace Armoury
         private readonly Dictionary<Settlement, CampaignTime> _flagged = new Dictionary<Settlement, CampaignTime>();
         private bool _seeded;
         private static HideoutSpotter _inst;   // m109-przesluch: instancja kampanii dla Mark (wzor HideoutSight)
+        private string _loadedFlags;           // m110-flaga: terminy flag z zapisu (id,godzina;) - odtwarzane przy siewie; "" = klucz byl, pusty
+        private bool _loadedOld;               // m110-flaga: wczytany zapis bez klucza arm_hideout_flags (sprzed m110)
 
         public HideoutSpotter() { _inst = this; }
 
@@ -35,7 +43,56 @@ namespace Armoury
             CampaignEvents.OnGameLoadedEvent.AddNonSerializedListener(this, _ => { _seeded = false; });
         }
 
-        public override void SyncData(IDataStore dataStore) { }
+        public override void SyncData(IDataStore dataStore)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.HideoutFlagKeepsDeadline) return;
+            try
+            {
+                string txt = null;
+                if (dataStore.IsSaving)
+                {
+                    var sb = new StringBuilder(_loadedFlags ?? "");   // zapis przed siewem (pierwsza godzina po wczytaniu) nie gubi terminow z wczytania
+                    foreach (var kv in _flagged)
+                        if (kv.Key != null) sb.Append(kv.Key.StringId).Append(',').Append(kv.Value.ToHours.ToString("R", CultureInfo.InvariantCulture)).Append(';');
+                    txt = sb.ToString();
+                }
+                SaveText.Sync(dataStore, "arm_hideout_flags", ref txt);
+                if (dataStore.IsLoading) { _loadedOld = txt == null; _loadedFlags = txt; }
+            }
+            catch (Exception e) { Log.Error("HideoutSpotter.SyncData", e); }
+        }
+
+        /// <summary>m110-flaga: terminy flag z zapisu do _flagged (raz, przy siewie po wczytaniu). Stary zapis - kazda sledzona kryjowka HideoutFlagDays od teraz.</summary>
+        private void RestoreFlags(VisualTrackerManager vt, Settings s)
+        {
+            string txt = _loadedFlags; bool old = _loadedOld;
+            _loadedFlags = null; _loadedOld = false;
+            if (vt == null || !s.HideoutFlagKeepsDeadline) return;
+            int back = 0, due = 0, gone = 0, oldN = 0;
+            double now = CampaignTime.Now.ToHours;
+            if (!string.IsNullOrEmpty(txt))
+                foreach (var part in txt.Split(';'))
+                {
+                    var p = part.Split(',');
+                    double h;
+                    if (p.Length != 2 || !double.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out h)) continue;
+                    var st = Settlement.Find(p[0]);
+                    if (st == null || !st.IsHideout || !vt.CheckTracked(st)) { gone++; continue; }   // flagi juz nie ma (zdjeta recznie) - nic do pilnowania
+                    if (_flagged.ContainsKey(st)) continue;
+                    _flagged[st] = CampaignTime.HoursFromNow((float)(h - now));   // po terminie - zejdzie w najblizszej godzinie
+                    back++; if (h <= now) due++;
+                }
+            if (old && s.HideoutFlagDays > 0)
+                foreach (var st in Settlement.All)
+                    if (st != null && st.IsHideout && !_flagged.ContainsKey(st) && vt.CheckTracked(st))
+                    {
+                        _flagged[st] = CampaignTime.DaysFromNow(s.HideoutFlagDays);
+                        oldN++;
+                    }
+            Log.Info("HideoutSpotter (m110): terminy flag z zapisu - odtworzone " + back + " (po terminie " + due + "), bez flagi na mapie " + gone
+                     + (old ? " | zapis sprzed m110: sledzonych kryjowek bez terminu " + oldN + " -> " + s.HideoutFlagDays + " dob od teraz" : "") + ".");
+        }
 
         private void OnHourly()
         {
@@ -46,6 +103,7 @@ namespace Armoury
                 if (!_seeded)
                 {
                     _seeded = true;
+                    try { RestoreFlags(Campaign.Current != null ? Campaign.Current.VisualTrackerManager : null, s); } catch (Exception e) { Log.Error("HideoutSpotter.RestoreFlags", e); }   // m110-flaga
                     foreach (var st in Settlement.All)
                         if (st != null && st.IsHideout && st.Hideout != null && st.Hideout.IsSpotted) _seen.Add(st);
                     Log.Info("HideoutSpotter: na starcie wypatrzonych kryjowek " + _seen.Count + " (bez meldunku).");
