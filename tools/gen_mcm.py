@@ -546,6 +546,8 @@ RANGES = {
     'RiderHorseCarryKg': (0, 60, "0"),
     'MapChatLogHeightPct': (40, 100, "0"),
     'LektorGossipDailyChars': (0, 10000, "0"),
+    # m109-muzyka (23.10): glosnosc naszej muzyki w bitwie - kod przycina do 1..4 (EventMusic.Level)
+    'BattleMusicLoudness': (1, 4, "0"),
     'LektorGossipReserveChars': (0, 30000, "0"),
 }
 

@@ -9260,6 +9260,14 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public bool EventMusicEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Battle Music Ours", HintText = "in field battles, fights with bandits, battles at your camp, raids on villages and their defence, sieges, sallies and battles at sea, the game's own battle music fades away and the mod's six pieces play instead - one after another in random order, never the same piece twice in a row; when you leave the battle the game's music comes back. Tournaments, the arena, hideouts and walks through towns, villages and your camp keep the game's music. Off = the game's battle music, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool BattleMusicOurs { get; set; } = true;
+
+        [SettingPropertyInteger("Battle Music Loudness", 1, 4, "0", HintText = "how loud the mod's music plays in battle, 1 to 4: 4 is loud enough to carry over the clash of a big battle, each step down is a notch quieter (about a fifth to the ear), and 1 is almost as soft as the music under the narrator. A new setting is heard from the next piece", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public int BattleMusicLoudness { get; set; } = 4;
+
         [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public int LektorGossipReserveChars { get; set; } = 3000;
@@ -11598,6 +11606,8 @@ namespace Armoury
             s.LektorGossipLive = LektorGossipLive;
             s.LektorGossipDailyChars = LektorGossipDailyChars;
             s.EventMusicEnabled = EventMusicEnabled;
+            s.BattleMusicOurs = BattleMusicOurs;
+            s.BattleMusicLoudness = BattleMusicLoudness;
             s.LektorGossipReserveChars = LektorGossipReserveChars;
             s.ChronicleOfWesteros = ChronicleOfWesteros;
             s.ChronicleWorldChanges = ChronicleWorldChanges;
