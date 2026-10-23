@@ -136,6 +136,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOnlyWhileThere { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Forge Time Mult", 0.00f, 5.00f, "0.00", HintText = "all your work at the forge - smelting, refining, weapons, armour, bows, arrows and orders - takes this many times as long (1.25 = a quarter longer). The experience of a piece stays the same, spread over the longer work. 1 = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the anvil")]
+        public float ForgeTimeMult { get; set; } = 1.25f;
+
         [SettingPropertyBool("Forge One Job", HintText = "the forge screen is one job: smelting, refining, weapons, armour, bows and orders all add their hours to one job at that forge, and leaving the screen (Done or Esc) always opens one wait with one bar for all of it - the hours the screen shows. Pieces come off the anvil in turn as the bar passes them; step away and you keep what is finished, the rest waits at that forge until you come back. Off = as before (a Banner Kings wait for smelting and refining, the bench queue for pieces)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOneJob { get; set; } = true;
@@ -9321,6 +9325,7 @@ namespace Armoury
             s.SmithNoCrudeInput = SmithNoCrudeInput;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
+            s.ForgeTimeMult = ForgeTimeMult;
             s.ForgeOneJob = ForgeOneJob;
             s.ForgeLikeTownSmith = ForgeLikeTownSmith;
             s.ForgeTakesTime = ForgeTakesTime;

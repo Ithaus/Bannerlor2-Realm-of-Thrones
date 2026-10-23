@@ -49,13 +49,17 @@ namespace Armoury
             catch { return 0f; }
         }
 
-        /// <summary>C5: godziny przy kowadle dla count sztuk (seria amunicji). Klucz wylaczony albo brak receptury - fallback (jak dotad).</summary>
+        /// <summary>m109-czas: mnoznik godzin calej pracy gracza przy kowadle (ForgeTimeMult; 1 = jak przed 23.10).</summary>
+        internal static float TimeMult { get { var s = Settings.Current; return s != null ? Math.Max(0.1f, s.ForgeTimeMult) : 1f; } }
+
+        /// <summary>C5: godziny przy kowadle dla count sztuk (seria amunicji). Klucz wylaczony albo brak receptury - fallback (jak dotad).
+        /// m109-czas: wynik x TimeMult - jedyne miejsce mnoznika dla sztuk (bron "van", CRAFT BK, luki i amunicja Forge.Smith, termin zamowien przy C5).</summary>
         internal static float WorkHours(ItemObject item, int count, float fallback)
         {
-            if (!LikeTown) return fallback;
+            if (!LikeTown) return fallback * TimeMult;
             float d = SmithDays(item);
-            if (d <= 0f) return fallback;
-            return Math.Max(0.25f, d * Math.Max(1f, Settings.Current.WorkHoursPerManDay) * Math.Max(1, count));
+            if (d <= 0f) return fallback * TimeMult;
+            return Math.Max(0.25f, d * Math.Max(1f, Settings.Current.WorkHoursPerManDay) * Math.Max(1, count)) * TimeMult;
         }
 
         /// <summary>C5: godziny pracy na dobe przy kowadle (przerwa nocna 23-5 przy WorkshopNightRest - AdvanceProjects).</summary>

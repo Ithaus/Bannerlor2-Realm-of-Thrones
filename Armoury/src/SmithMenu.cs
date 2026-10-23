@@ -2210,7 +2210,8 @@ namespace Armoury
                 var r = Recipes.For(item);
                 var s = Settings.Current;
                 float baseDays = r.Tier * s.DaysPerTier;
-                if (ForgeClock.LikeTown) baseDays = ForgeClock.WorkHours(item, 1, baseDays * 24f) / 24f;   // C5: dni kowala z warsztatu AI (Forge.Begin liczy tak samo)
+                if (ForgeClock.LikeTown) baseDays = ForgeClock.WorkHours(item, 1, baseDays * 24f) / 24f;
+                else baseDays *= ForgeClock.TimeMult;   // m109-czas: jak Forge.Begin   // C5: dni kowala z warsztatu AI (Forge.Begin liczy tak samo)
 
                 var opts = new List<InquiryElement>
                 {
