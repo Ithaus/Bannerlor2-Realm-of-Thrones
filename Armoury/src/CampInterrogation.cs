@@ -376,7 +376,7 @@ namespace Armoury
                 if (!h.IsInfested) continue;
                 held++;
                 if (h.IsSpotted) continue;
-                if (Hinted(st)) { hinted++; continue; }   // m110-okolica: czynna wskazowka - nie wskazuje jej drugi raz (jak wypatrzonej)
+                if (HintBlocks(st, false)) { hinted++; continue; }   // m110-okolica: czynna wskazowka - nie wskazuje jej drugi raz (jak wypatrzonej); klucz NIE - bez pomijania
                 hidden++;
                 float d = st.GetPosition2D.Distance(from);
                 if (d <= bd) { bd = d; best = st; }
@@ -391,7 +391,8 @@ namespace Armoury
 
         private static bool Open(Settlement st)
         {
-            return st != null && st.IsHideout && st.Hideout != null && st.Hideout.IsInfested && !st.Hideout.IsSpotted && !Hinted(st);   // m110-okolica: bez czynnej wskazowki
+            // m110-okolica: bez czynnej wskazowki dokladnej (przyblizona herszt i czlowiek bandy doprecyzuja - recenzja R3; klucz NIE - bez pomijania, recenzja R2)
+            return st != null && st.IsHideout && st.Hideout != null && st.Hideout.IsInfested && !st.Hideout.IsSpotted && !HintBlocks(st, true);
         }
 
         // ------------------------------------------------------------ szanse

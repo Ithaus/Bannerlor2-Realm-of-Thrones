@@ -28,8 +28,9 @@ namespace Armoury
     ///  zdejmuje udzialy lochu gracza (recenzja kod R3 - artefakt biegu testowego, opis w planie autotestu).
     /// m110-okolica (klucz InterrogationAreaOnly TAK): T0 - H1/H2 takze bez czynnej wskazowki; T1 - wskazowka H2 czynna, H2 NIE wypatrzona (IsVisible jak przed),
     ///  znacznik obszaru przy flagach (przypiety), wiedza (HideoutSight.Knows) przy Hideout Scouting Chance i Hideout Rumour Reveals, opis z nazwa osady odniesienia;
-    ///  T1b (oba tryby) - Target(A) nie wskazuje H2 drugi raz; T7 - wskazowka H1, H1 niewypatrzona; T12 - zapis: BeforeSaveHints zdejmuje wszystkie znaczniki
-    ///  (odpiety H1 albo H2), SaveOverHints oddaje je z przypieciem; T10 - H1 IsSpotted na chwile -> HintsHour "znaleziona", znacznik zdjety, suma +1;
+    ///  T1b (oba tryby) - Target(A) nie wskazuje H2 drugi raz; T7 - wskazowka H1, H1 niewypatrzona (najpierw probna przyblizona H1 - herszt ja doprecyzowuje,
+    ///  recenzja R3); T12 - zapis: BeforeSaveHints zdejmuje wszystkie znaczniki (odpiety H1 albo H2), SaveOverHints oddaje je z przypieciem, kazdy odpiety
+    ///  ogloszony grze drugi raz (kafelek trackera, recenzja R1); T13 - znacznik H2 zdjety jak przy flagach wylaczonych, przeglad godzinny stawia go (R4); T10 - H1 IsSpotted na chwile -> HintsHour "znaleziona", znacznik zdjety, suma +1;
     ///  T11 - probna wskazowka H1 po terminie -> "po terminie"; T4 - MOWI => wskazowka czynna i niewypatrzona; T9 - zapis tam i z powrotem z wskazowkami.
     ///  Sprzatanie: probne wskazowki zdjete, wskazowki prob (H2 z T1, ewentualne z T4/T5) i wiedza H1/H2 zostaja jako slad biegu (jak w 104 wypatrzona H2 z flaga).
     /// Linia "Przesluchanie (m109): test - ... - wynik TAK|NIE." (grupa m109przes PRZES-7, m110okol OKOL-8).
@@ -261,14 +262,20 @@ namespace Armoury
                         hero = HeroCreator.CreateSpecialHero(tpl, h1, clan, null, 30);
                         TakePrisonerAction.Apply(mp.Party, hero);
                         var g = Find(Clean("h:" + hero.StringId));
+                        // m110-okolica (recenzja R3): klucz TAK - H1 najpierw z probna wskazowka przyblizona ("kultura"); herszt ja doprecyzowuje (Target jej nie pomija)
+                        Hint pre = null, cur = null;
+                        if (area && !Hinted(h1)) { string pw, pl; pre = Give(h1, "kultura", ProbeHow, "-", out pw, out pl); if (pl != null) Log.Info(pl); }
                         var res = Act(g, true, 0f, 0f);
                         bool gone = Find(Clean("h:" + hero.StringId)) == null;
+                        if (area) _hints.TryGetValue(h1.StringId ?? "", out cur);
+                        bool refine = pre == null || (pre.Ended == "doprecyzowana" && cur != null && cur != pre && cur.Src == "bohater" && !cur.Probe);
                         bool t = g != null && !res.Refused && res.Talked && res.Source == "bohater" && res.Lair == h1 && ((res.Died && !hero.IsAlive && gone) || res.Blocked)
-                                 && (!area || (Hinted(h1) && !h1.Hideout.IsSpotted));   // m110-okolica: wskazowka H1, H1 niewypatrzona
+                                 && (!area || (Hinted(h1) && !h1.Hideout.IsSpotted && refine));   // m110-okolica: wskazowka H1 (doprecyzowana), H1 niewypatrzona
                         ok &= t;
                         pts.Add("T7 " + (t ? "TAK" : "NIE") + " (wzor " + tpl.StringId + ", grupa " + (g != null ? "TAK" : "NIE") + ", odmowa " + (res.Refused ? res.RefuseWhy : "-") + ", szansa " + F4(res.Chance)
                                 + ", skad " + (res.Source ?? "-") + ", smierc " + (res.Died ? "TAK" : res.Blocked ? "zablokowana" : "NIE") + ", zyje " + (hero.IsAlive ? "TAK" : "NIE")
-                                + ", w lochu " + (gone ? "NIE" : "TAK") + (area ? ", wskazowka H1 " + YN(Hinted(h1)) + ", H1 wypatrzona " + YN(h1.Hideout.IsSpotted) : "") + ")");
+                                + ", w lochu " + (gone ? "NIE" : "TAK") + (area ? ", wskazowka H1 " + YN(Hinted(h1)) + ", H1 wypatrzona " + YN(h1.Hideout.IsSpotted)
+                                + ", doprecyzowanie " + (pre == null ? "-" : YN(refine) + " (probna " + (pre.Ended ?? "czynna") + ", nowa skad " + (cur != null ? cur.Src : "-") + ")") : "") + ")");
                     }
                 }
                 // ---------------- T12 (m110-okolica): zapis - znaczniki zdjete przed zapisem (odpiety H1, inaczej H2), oddane po zapisie z przypieciem
@@ -287,7 +294,10 @@ namespace Armoury
                     int left = MarkersInGame();
                     bool nulls = true;
                     foreach (var h in _hints.Values) if (h.Marker != null) nulls = false;
+                    int loose = 0, redo0 = _vmRedo;
+                    foreach (var h in withMarker) if (!h.Pinned) loose++;
                     SaveOverHints(true);
+                    int redo = _vmRedo - redo0;   // recenzja R1: kazdy odpiety ogloszony grze drugi raz (kafelek od nowa jako odpiety)
                     int back = 0; bool pins = true;
                     foreach (var h in withMarker)
                     {
@@ -295,11 +305,36 @@ namespace Armoury
                         back++;
                         if (vt.CheckTracked(h.Marker) != (h != un)) pins = false;
                     }
-                    bool t = unOk0 && left == 0 && nulls && back == withMarker.Count && pins;
+                    bool t = unOk0 && left == 0 && nulls && back == withMarker.Count && pins && loose >= 1 && redo == loose;
                     if (un != null && un.Marker != null && !vt.CheckTracked(un.Marker)) vt.RegisterObject(un.Marker);   // przypiecie z powrotem (slad biegu jak przed krokiem)
                     ok &= t;
                     pts.Add("T12 " + YN(t) + " (odpiety " + (un == a1 && a1 != null ? "H1" : un != null ? "H2" : "-") + ", ze znacznikiem " + withMarker.Count + ", po zdjeciu w grze " + left
-                            + ", wpisy bez znacznika " + YN(nulls) + ", odtworzone " + back + ", przypiecie zgodne " + YN(pins) + ")");
+                            + ", wpisy bez znacznika " + YN(nulls) + ", odtworzone " + back + ", przypiecie zgodne " + YN(pins) + ", kafelek odpietych odswiezony " + redo + "/" + loose + ")");
+                }
+                // ---------------- T13 (m110-okolica, recenzja R4): wskazowka bez znacznika (jak przy flagach wylaczonych) - przeglad godzinny stawia go, przypiecie jak przed
+                if (!area || !flagWant) pts.Add("T13 POMINIETY (" + (!area ? "klucz Interrogation Area Only NIE" : "flagi wylaczone") + ")");
+                else
+                {
+                    Hint a2;
+                    _hints.TryGetValue(h2.StringId ?? "", out a2);
+                    bool had = a2 != null && a2.Marker != null, pin0 = had && vt.CheckTracked(a2.Marker);
+                    bool t = false, off = false, back = false, inGame = false, pinOk = false;
+                    if (had)
+                    {
+                        var old = a2.Marker;
+                        a2.Pinned = pin0;
+                        TakeMarker(a2);
+                        off = a2.Marker == null && !MarkerInGame(old);
+                        _markersOwed = true;
+                        HintsHour();
+                        back = a2.Marker != null;
+                        inGame = back && MarkerInGame(a2.Marker);
+                        pinOk = back && vt.CheckTracked(a2.Marker) == pin0;
+                        t = off && back && inGame && pinOk && !_markersOwed && Hinted(h2);
+                    }
+                    ok &= t;
+                    pts.Add("T13 " + YN(t) + " (wskazowka H2 ze znacznikiem " + YN(had) + ", zdjety " + YN(off) + ", po przegladzie znacznik " + YN(back) + ", w grze " + YN(inGame)
+                            + ", przypiecie jak przed " + YN(pinOk) + ")");
                 }
                 // ---------------- T10 (m110-okolica): wypatrzenie wskazanej H1 - przeglad godzinny konczy wskazowke "znaleziona", znacznik zdjety, suma znalezionych +1
                 if (!area || h1 == h2) pts.Add("T10 POMINIETY (" + (!area ? "klucz Interrogation Area Only NIE" : "H1 = H2") + ")");

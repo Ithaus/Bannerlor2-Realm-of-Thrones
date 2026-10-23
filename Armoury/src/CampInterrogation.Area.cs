@@ -22,10 +22,14 @@ namespace Armoury
     ///    Campaign.Min/MaxSettlement*), przy HideoutFlagEnabled i HideoutFlagDays &gt; 0. Zdejmowany PRZED kazdym zapisem (OnBeforeSaveEvent) i stawiany z powrotem
     ///    po zapisie (OnSaveOverEvent, takze nieudanym) oraz po wczytaniu (start sesji) z wpisow wskazowek - zapis gry nigdy nie ma naszego znacznika (po cofnieciu
     ///    DLL nic nie zostaje; wzor NoticeBoard.BountyBeforeSave / FreeFolkRaids.BeforeSave). Odpiecie przez gracza (kulka trackera) pamietane (Pinned).
+    ///    Odpiety stawiany znowu (po zapisie / wczytaniu) - ogloszony grze drugi raz (OnMapMarkerRemoved + OnMapMarkerCreated): kafelek trackera budowany od nowa
+    ///    jako odpiety (recenzja R1). Flagi wylaczone przy wskazowce, zapisie albo starcie sesji - znaczniki stawia pierwszy przeglad godzinny po ich wlaczeniu (R4).
     ///  - WIEDZA: HideoutSight.Heard - jak plotka z karczmy (przy HideoutScoutingChance i HideoutRumourReveals wypatrzenie jak w grze, gdy gracz podejdzie).
     ///  - KONIEC: zdarzenie gry OnHideoutSpottedEvent (od razu - gra zeruje IsSpotted przy oproznieniu kryjowki) albo przeglad co godzine (IsSpotted bez
     ///    zdarzenia, termin, kryjowki juz nie ma). Termin = HideoutFlagDays dob (co najmniej 1). Meldunek "Hideout spotted" i flage na samej kryjowce daje jak
-    ///    dotad HideoutSpotter (bez zmian). Kryjowka z czynna wskazowka pomijana w Target (ta sama grupa nie wskaze jej drugi raz, dopoki wskazowka trwa).
+    ///    dotad HideoutSpotter (bez zmian). Kryjowka z czynna wskazowka pomijana w Target (HintBlocks; ta sama grupa nie wskaze jej drugi raz, dopoki wskazowka trwa)
+    ///    z wyjatkiem doprecyzowania: herszt i czlowiek bandy podaja km na kryjowke z wskazowka przyblizona (stara konczy sie "doprecyzowana", recenzja R3);
+    ///    klucz NIE - bez pomijania (dokladna kryjowka jak b49bdf78 takze przy wskazowkach z czasu klucza TAK; wskazowke konczy przeglad godzinny).
     ///  - ZAPIS: szosta czesc arm_interrogation "kryjowka,odniesienie,termin,x,y,skad,wskazanie,przypiety;..." (godziny kampanii) i sumy 6-7 (wskazane,
     ///    znalezione); DLL 104 czyta czesci 1-5 i pierwsze 6 sum. Bez nowych typow zapisu.
     /// Log "Przesluchanie (m110): " - start sesji, wskazowka (po linii proby m109), koniec wskazowki, zapis (pierwsze 5 na proces), doba; grupa progow m110okol.
@@ -65,14 +69,14 @@ namespace Armoury
 
         private static readonly Dictionary<string, Hint> _hints = new Dictionary<string, Hint>(StringComparer.Ordinal);   // id kryjowki -> wskazowka
         private static string _hintNote = "brak klucza (stary zapis albo nowa kampania)";
-        private static int _staleMarkers, _saveLines, _hStumbles;
-        private static bool _saveLogged;
+        private static int _staleMarkers, _saveLines, _hStumbles, _vmRedo;   // _vmRedo - odpiete ogloszone grze drugi raz (test T12)
+        private static bool _saveLogged, _markersOwed;   // _markersOwed - wskazowka bez znacznika przy flagach wylaczonych (recenzja R4)
         // liczniki doby m110
-        private static int _dHHero, _dHBand, _dHKin, _dHFound, _dHDue, _dHGone, _dHSaveOff, _dHSaveOn, _dHStumbles;
+        private static int _dHHero, _dHBand, _dHKin, _dHFound, _dHDue, _dHGone, _dHSaveOff, _dHSaveOn, _dHSaveSkip, _dHStumbles;
 
-        private static void HintDayReset() { _dHHero = _dHBand = _dHKin = _dHFound = _dHDue = _dHGone = _dHSaveOff = _dHSaveOn = _dHStumbles = 0; }
+        private static void HintDayReset() { _dHHero = _dHBand = _dHKin = _dHFound = _dHDue = _dHGone = _dHSaveOff = _dHSaveOn = _dHSaveSkip = _dHStumbles = 0; }
 
-        private static void HintsClear() { _hints.Clear(); _staleMarkers = 0; _saveLogged = false; }
+        private static void HintsClear() { _hints.Clear(); _staleMarkers = 0; _saveLogged = false; _markersOwed = false; }
 
         private static void HintStumble(string where, Exception e) { _hStumbles++; _dHStumbles++; Stumble(where, e); }
 
@@ -82,6 +86,16 @@ namespace Armoury
 
         /// <summary>Czy kryjowka ma czynna wskazowke (Target i Open ja pomijaja).</summary>
         internal static bool Hinted(Settlement st) { return st != null && _hints.Count > 0 && _hints.ContainsKey(st.StringId ?? ""); }
+
+        /// <summary>Czy czynna wskazowka zamyka kryjowke dla Target / Open. Klucz NIE - nigdy (recenzja R2: NIE 1:1 jak b49bdf78 takze przy wskazowkach z czasu
+        /// klucza TAK). exact (skad bohater | banda) - tylko wskazowka dokladna; przyblizona ("kultura") herszt i czlowiek bandy doprecyzuja (recenzja R3).</summary>
+        internal static bool HintBlocks(Settlement st, bool exact)
+        {
+            if (st == null || _hints.Count == 0 || !AreaOn) return false;
+            Hint h;
+            if (!_hints.TryGetValue(st.StringId ?? "", out h)) return false;
+            return !exact || h.Src != "kultura";
+        }
 
         // ------------------------------------------------------------ opis okolicy
         internal sealed class AreaFix
@@ -165,7 +179,11 @@ namespace Armoury
             int days = s != null ? Math.Max(1, s.HideoutFlagDays) : 1;
             var h = new Hint { Lair = lair.StringId ?? "", Ref = f.Ref.StringId ?? "", Src = source, Start = now, Due = due >= 0.0 ? due : now + days * 24.0, X = f.X, Y = f.Y, Probe = how == ProbeHow };
             Hint old;
-            if (_hints.TryGetValue(h.Lair, out old) && old.Marker != null) { try { TakeMarker(old); } catch (Exception e) { HintStumble("HintMarker", e); } }   // Target pomija wskazane - bez sieroty
+            if (_hints.TryGetValue(h.Lair, out old))   // recenzja R3: doprecyzowanie (herszt / czlowiek bandy na wskazowke przyblizona) - stara konczy sie linia konca, znacznik zdjety
+            {
+                try { End(old, "doprecyzowana", lair); }
+                catch (Exception e) { _hints.Remove(h.Lair); HintStumble("HintEnd", e); }
+            }
             _hints[h.Lair] = h;
             if (source == "bohater") _dHHero++; else if (source == "banda") _dHBand++; else _dHKin++;
             _sum[6]++;
@@ -183,6 +201,7 @@ namespace Armoury
                 }
                 catch (Exception e) { HintStumble("HintMarker", e); }
             }
+            else _markersOwed = true;   // recenzja R4: znacznik postawi przeglad godzinny po wlaczeniu flag
             line = P10 + "wskazowka | doba " + Today + " | zrodlo " + how + " | grupa " + (string.IsNullOrEmpty(group) ? "-" : group) + " | kryjowka " + h.Lair
                    + " (kultura " + (lair.Culture != null ? lair.Culture.StringId : "-") + ", skad " + source + ", wypatrzona " + YN(lair.Hideout != null && lair.Hideout.IsSpotted) + ")"
                    + " | odniesienie " + h.Ref + " (" + f.Ref.Name + ", " + f.RefKind + ") | prawdziwa " + F2(f.D) + " jedn. na " + F2(f.Ang) + " st."
@@ -211,7 +230,18 @@ namespace Armoury
             if (b == null) return false;
             var pos = new CampaignVec2(new Vec2(h.X, h.Y), true).AsVec3();   // wysokosc z mapy (brak trafienia - 0, bez wyjatku)
             h.Marker = mm.CreateMapMarker(b, new TextObject("{=!}" + MarkerName), pos, true, MarkerTag);   // gra od razu RegisterObject - przypiety
-            if (h.Marker != null && !h.Pinned && vt.CheckTracked(h.Marker)) vt.RemoveTrackedObject(h.Marker, true);
+            if (h.Marker != null && !h.Pinned && vt.CheckTracked(h.Marker))
+            {
+                vt.RemoveTrackedObject(h.Marker, true);
+                // recenzja R1: kafelek trackera (MapMarkerTrackerItemVM) powstal w CreateMapMarker jako przypiety, a IsTracked zmienia tylko klik kulki - znacznik
+                // ogloszony drugi raz, MapTrackerProvider buduje kafelek od nowa jako odpiety (tych zdarzen sluchaja tylko CampaignSystem i SandBox.ViewModelCollection)
+                try
+                {
+                    var ed = CampaignEventDispatcher.Instance;
+                    if (ed != null) { ed.OnMapMarkerRemoved(h.Marker); ed.OnMapMarkerCreated(h.Marker); _vmRedo++; }
+                }
+                catch (Exception e) { HintStumble("HintMarkerTile", e); }
+            }
             return h.Marker != null;
         }
 
@@ -278,12 +308,30 @@ namespace Armoury
                 if (end == null) { end = new List<Hint>(); how = new List<string>(); }
                 end.Add(h); how.Add(w);
             }
-            if (end == null) return;
-            for (int i = 0; i < end.Count; i++)
+            if (end != null)
+                for (int i = 0; i < end.Count; i++)
+                {
+                    try { End(end[i], how[i], Settlement.Find(end[i].Lair)); }
+                    catch (Exception e) { _hints.Remove(end[i].Lair); HintStumble("HintEnd", e); }
+                }
+            if (_markersOwed) MarkersOwed();   // recenzja R4: flagi wlaczone po wskazowce bez znacznika
+        }
+
+        /// <summary>Recenzja R4: wskazowki bez znacznika, bo flagi byly wylaczone (Give, zapis, start sesji) - przy flagach wlaczonych znaczniki stawiane raz
+        /// (pierwszy przeglad godzinny po wlaczeniu); linia logu, gdy jakiegos brakowalo.</summary>
+        private static void MarkersOwed()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.HideoutFlagEnabled || s.HideoutFlagDays <= 0) return;
+            _markersOwed = false;
+            int miss = 0, put = 0;
+            foreach (var h in _hints.Values)
             {
-                try { End(end[i], how[i], Settlement.Find(end[i].Lair)); }
-                catch (Exception e) { _hints.Remove(end[i].Lair); HintStumble("HintEnd", e); }
+                if (h.Marker != null || h.Off) continue;
+                miss++;
+                try { if (PutMarker(h)) put++; } catch (Exception e) { HintStumble("HintFlagsOn", e); }
             }
+            if (miss > 0) Log.Info(P10 + "flagi wlaczone - znaczniki postawione " + put + " z " + miss + " (wskazowki bez znacznika) | aktywne " + _hints.Count + ".");
         }
 
         private static void End(Hint h, string how, Settlement st)
@@ -349,25 +397,31 @@ namespace Armoury
             }
         }
 
-        /// <summary>OnSaveOverEvent (takze nieudany zapis): znaczniki zdjete przed zapisem wracaja (przy HideoutFlagEnabled i dobach &gt; 0), odpiete - odpiete.</summary>
+        /// <summary>OnSaveOverEvent (takze nieudany zapis): znaczniki zdjete przed zapisem wracaja (przy HideoutFlagEnabled i dobach &gt; 0), odpiete - odpiete.
+        /// Recenzja R2 (kod): nieodtworzone liczone z powodem - flagi wylaczone (wroca po wlaczeniu, R4) i brak kampanii ("Save And Exit": MapScreen konczy gre
+        /// w swoim sluchaczu OnSaveOver, wolanym przed naszym).</summary>
         internal static void SaveOverHints(bool ok)
         {
             var s = Settings.Current;
             bool flags = s != null && s.HideoutFlagEnabled && s.HideoutFlagDays > 0;
-            int back = 0, loose = 0;
+            bool gone = Campaign.Current == null;
+            int back = 0, loose = 0, offFlags = 0, offGone = 0;
             foreach (var h in _hints.Values)
             {
                 if (!h.Off) continue;
                 h.Off = false;
-                if (!flags) continue;
+                if (!flags) { offFlags++; continue; }
+                if (gone) { offGone++; continue; }
                 try { if (PutMarker(h)) { back++; if (!h.Pinned) loose++; } }
                 catch (Exception e) { HintStumble("HintSaveOver", e); }
             }
-            _dHSaveOn += back;
+            if (offFlags > 0) _markersOwed = true;
+            _dHSaveOn += back; _dHSaveSkip += offFlags + offGone;
             if (_saveLogged)
             {
                 _saveLogged = false;
-                Log.Info(P10 + "po zapisie (udany " + YN(ok) + ") - znaczniki odtworzone " + back + " (niesledzone " + loose + ").");
+                Log.Info(P10 + "po zapisie (udany " + YN(ok) + ") - znaczniki odtworzone " + back + " (niesledzone " + loose + "), nieodtworzone: flagi wylaczone " + offFlags
+                         + ", brak kampanii " + offGone + ".");
             }
         }
 
@@ -387,7 +441,7 @@ namespace Armoury
             }
             var s = Settings.Current;
             foreach (var h in _hints.Values) { h.Marker = null; h.Off = false; }
-            if (s == null || !s.HideoutFlagEnabled || s.HideoutFlagDays <= 0) return;
+            if (s == null || !s.HideoutFlagEnabled || s.HideoutFlagDays <= 0) { if (_hints.Count > 0) _markersOwed = true; return; }   // recenzja R4
             foreach (var h in _hints.Values)
             {
                 try { PutMarker(h); } catch (Exception e) { HintStumble("HintRestore", e); }
@@ -416,11 +470,12 @@ namespace Armoury
             int marked = 0, late = 0;
             foreach (var h in _hints.Values) { if (h.Marker != null) marked++; if (now > h.Due + 1.0) late++; }
             int fresh = _dHHero + _dHBand + _dHKin;
-            bool act = fresh + _dHFound + _dHDue + _dHGone + _dHSaveOff + _dHSaveOn + _dHStumbles > 0 || _hints.Count > 0;
+            bool act = fresh + _dHFound + _dHDue + _dHGone + _dHSaveOff + _dHSaveOn + _dHSaveSkip + _dHStumbles > 0 || _hints.Count > 0;
             if (!AreaOn && !act) return;
             Log.Info(P10 + "doba " + today + " | godz. " + Fh(now) + " | klucz " + YN(AreaOn) + " | wskazowki nowe " + fresh + " (bohater " + _dHHero + ", banda " + _dHBand + ", kultura " + _dHKin + ")"
                      + ", znalezione " + _dHFound + ", po terminie " + _dHDue + ", bez kryjowki " + _dHGone + ", aktywne " + _hints.Count + " (ze znacznikiem " + marked
-                     + ", po terminie ponad godzine " + late + ") | zapisy: zdjete " + _dHSaveOff + ", odtworzone " + _dHSaveOn + " | potkniecia dzis " + _dHStumbles + ".");
+                     + ", po terminie ponad godzine " + late + ") | zapisy: zdjete " + _dHSaveOff + ", odtworzone " + _dHSaveOn + ", nieodtworzone " + _dHSaveSkip
+                     + " | potkniecia dzis " + _dHStumbles + ".");
         }
 
         // ------------------------------------------------------------ zapis "arm_interrogation" - szosta czesc
