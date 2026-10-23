@@ -34,7 +34,7 @@ namespace Armoury
     /// A z cial: na cialach = lup + cios + pekniete + zastepcze + odrzut + inne; B kolejka: wczesniej + dzialka + bagaz + send - padle = lista + sakwy
     /// + zwrot + przepadlo + zostaje; C lista trofeow: na liscie + Spoils wyjal + rezerwa = z kolejki + wraki - przesiane.
     /// Hak autotestu (plik CrashScribe/armoury-lup.flag, tryb autotestu LogGate 1/2): wrog bitwy testu (autotest_bitwa_*) w planie mocna dostaje 6 jezdzcow
-    /// z koniem, uprzeza i zbroja oraz ich zestaw do zbrojowni DTE bandy - w grze Jeffa nic nie robi.
+    /// z koniem, uprzeza i zbroja (sam roster - DTE ubiera bandytow wzorcem jednostki) - w grze Jeffa nic nie robi.
     /// Stan statyczny bez zapisu (Reset z BattlefieldLaw.LReset). Wyjatki liczone (pierwsze 3 i co 50 do Log.Error), bez globalnego wylacznika.
     /// </summary>
     internal static class LootTally
@@ -881,9 +881,12 @@ namespace Armoury
         }
 
         /// <summary>Prefiks EncounterManager.StartPartyEncounter - tylko autotest (plik armoury-lup.flag, LogGate 1/2) i tylko wrog bitwy testu CrashScribe
-        /// (autotest_bitwa_*) w planie mocna: 6 jezdzcow z koniem, uprzeza i zbroja do bandy oraz ich zestaw (bez choragwi) do zbrojowni DTE bandy -
-        /// bitwa testu jest z bandytami bez koni, a partia testu powstaje z pustym rosterem (DTE dalby im sztuki zastepcze, bez koni). Przed MapEvent,
-        /// wiec przed migawka Spoils i rozdzielaczami DTE. W grze Jeffa: brak pliku, inny tryb i brak takiej partii - koniec od razu.</summary>
+        /// (autotest_bitwa_*) w planie mocna: 6 jezdzcow z koniem, uprzeza i zbroja do bandy (bitwa testu jest z bandytami bez koni). Sam roster -
+        /// recenzja L1: banda testu to partia bandytow (BanditPartyComponent), a DTE nie ubiera bandytow ze zbrojowni (SpawnAgentPatch
+        /// IsPartyValidForProcessing - IsBandit), tylko wzorcem jednostki (Assignment.FillEmptySlots: sloty 10-11 z wzorca w bitwie polowej) - jezdzcy
+        /// przychodza konno; zestaw dolozony do zbrojowni bandy bylby sprzetem z niczego (udzial gracza ze zbrojowni pokonanych - DTE
+        /// ItemRosterForPlayerLootSharePatch - jako bagaz na liste trofeow). Przed MapEvent, wiec przed migawka Spoils i rozdzielaczami DTE.
+        /// W grze Jeffa: brak pliku, inny tryb i brak takiej partii - koniec od razu.</summary>
         public static void TestRiders(PartyBase attackerParty, PartyBase defenderParty)
         {
             try
@@ -899,24 +902,9 @@ namespace Armoury
                 var set = RiderSet(troop);
                 if (troop == null || set == null) { Log.Info(P + "test - brak jezdzca z koniem i uprzeza (" + (why ?? "?") + ")."); return; }
                 mp.MemberRoster.AddToCounts(troop, TestRidersCount);
-                var sets = new List<Equipment>();
-                foreach (var e in troop.BattleEquipments) if (RiderKit(e)) sets.Add(e);
-                if (sets.Count == 0) sets.Add(set);
-                int added = 0, refused = 0;
-                for (int i = 0; i < TestRidersCount; i++)
-                {
-                    var eq = sets[i % sets.Count];
-                    for (int slot = 0; slot < 12; slot++)
-                    {
-                        if (slot == (int)EquipmentIndex.ExtraWeaponSlot) continue;
-                        var it = eq[(EquipmentIndex)slot].Item;
-                        if (it == null || it.IsBannerItem || it.ItemType == ItemObject.ItemTypeEnum.Banner) continue;
-                        if (AiGear.AddToArmory(mp, it, 1)) added++; else refused++;
-                    }
-                }
                 Log.Info(P + "test - wrog " + mp.StringId + " (plan " + PlanName(plan) + "): dolozono " + TestRidersCount + " x " + troop.StringId + " (kon "
                          + set[EquipmentIndex.Horse].Item.StringId + ", uprzaz " + set[EquipmentIndex.HorseHarness].Item.StringId + ", tulow " + set[EquipmentIndex.Body].Item.StringId
-                         + ") i ich zestaw do zbrojowni DTE bandy: " + added + " szt. (odmowy " + refused + ").");
+                         + ") - bez zbrojowni (DTE ubiera bandytow wzorcem jednostki).");
             }
             catch (Exception e) { Stumble("TestRiders", e); }
         }

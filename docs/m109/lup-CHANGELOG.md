@@ -52,7 +52,10 @@ konie) - po naprawie padly kon wyszedlby na liscie, wiec poprawka jest czescia z
    niz jedna brakujaca - "niejednoznaczne", bez wraka. Nie w bitwie morskiej. Czesci zastepczych (c) nie zmieniam - to rzeczy z niczego; pomiar je pokaze.
 5. **Hak autotestu** (plik `Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-lup.flag`, LogGate 1/2): prefiks `EncounterManager.StartPartyEncounter` -
    wrog bitwy testu (`autotest_bitwa_*`) w planie mocna dostaje 6 x `veteran_caravan_guard_battania` (zapasowo pierwszy wedlug StringId nie-bohater od tieru 3
-   z koniem, uprzeza i zbroja) i ich zestaw do zbrojowni DTE bandy (AiGear.AddToArmory). Linia `Lup bitwy (m109): test - ...`. W grze Jeffa nic nie robi.
+   z koniem, uprzeza i zbroja) - sam roster (recenzja L1: DTE nie ubiera bandytow ze zbrojowni - `SpawnAgentPatch.IsPartyValidForProcessing` = false
+   dla IsBandit - tylko wzorcem jednostki, `Assignment.FillEmptySlots` daje sloty 10-11 z wzorca; zestaw dolozony do zbrojowni bandy byl sprzetem z niczego,
+   ktory DTE `ItemRosterForPlayerLootSharePatch` oddawal graczowi jako bagaz - usuniety). Linia `Lup bitwy (m109): test - ... - bez zbrojowni (DTE ubiera
+   bandytow wzorcem jednostki).` W grze Jeffa nic nie robi.
 
 **Klucz NIE = zachowanie 1:1 jak 44c03a05:** bez HoldMounts (konie jak dotad zabiera Spoils - w linii "Spoils wyjal"), SpareHarness bez zmian listy, bez AddWreck,
 HorseFate `TakeOne` jak dotad. Pomiar i linie logu dzialaja zawsze (tylko czytaja).

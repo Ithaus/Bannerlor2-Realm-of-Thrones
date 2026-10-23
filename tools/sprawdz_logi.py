@@ -62068,7 +62068,7 @@ M109LUP_RX = {
     "riders": re.compile(r"^Lup bitwy \(m109\): jezdzcy bitwy (\d+) - (.*)\.$"),
     "rhorse": re.compile(r"(?:^|\| )\S+ \([^)]*\): kon \S+ lup\b"),
     "test": re.compile(r"^Lup bitwy \(m109\): test - wrog (\S+) \(plan (\w+)\): dolozono (\d+) x (\S+) \(kon (\S+), uprzaz (\S+), tulow (\S+)\) "
-                       r"i ich zestaw do zbrojowni DTE bandy: (\d+) szt\. \(odmowy (\d+)\)\.$"),
+                       r"- bez zbrojowni \(DTE ubiera bandytow wzorcem jednostki\)\.$"),
     "testno": re.compile(r"^Lup bitwy \(m109\): test - (plan \w+: bez jezdzcow|brak jezdzca z koniem i uprzeza \(.*\))\.$"),
     "day": re.compile(r"^Lup bitew \(m109\): doba (\d+) \| klucz konie (TAK|NIE) \| bitew (\d+) \(lista trofeow (\d+), sakwy (\d+), zwrot (\d+), inne (\d+)\) "
                       r"\| konie: z cial (\d+), lup (\d+), dzialka (\d+), na liscie (\d+), do sakw (\d+), Spoils wyjal (\d+), padle zdjete "
@@ -62099,7 +62099,7 @@ M109LUP_TEST = {
               "chain_horse_harness lup, tulow stark_armor_1 pekniete->wrak, glowa x_helmet lup | veteran_caravan_guard_battania (Ty, ogluszony): kon "
               "t2_battania_horse lup, uprzaz chain_horse_harness lup, tulow stark_armor_1 lup.",
     "test": "Lup bitwy (m109): test - wrog autotest_bitwa_1_231500 (plan mocna): dolozono 6 x veteran_caravan_guard_battania (kon t2_battania_horse, uprzaz "
-            "chain_horse_harness, tulow stark_armor_1) i ich zestaw do zbrojowni DTE bandy: 48 szt. (odmowy 0).",
+            "chain_horse_harness, tulow stark_armor_1) - bez zbrojowni (DTE ubiera bandytow wzorcem jednostki).",
     "testno": "Lup bitwy (m109): test - plan odwrot: bez jezdzcow.",
     "day": "Lup bitew (m109): doba 108700 | klucz konie TAK | bitew 1 (lista trofeow 1, sakwy 0, zwrot 0, inne 0) | konie: z cial 2, lup 2, dzialka 2, na liscie 1, "
            "do sakw 0, Spoils wyjal 0, padle zdjete (z kolejki/ze zbrojowni/poza lupem/brak) 1/0/0/0 | uprzaz: z cial 2, lup 2, cios 0, na liscie 2, Spoils wyjal 0 "
@@ -62198,7 +62198,7 @@ def m109lup_selftest():
     if not r or r.group(1) != "3" or len(M109LUP_RX["rhorse"].findall(r.group(2))) != 2:
         return "jezdzcy"
     t = M109LUP_RX["test"].match(M109LUP_TEST["test"])
-    if not t or t.group(2) != "mocna" or t.group(3) != "6" or t.group(8) != "48":
+    if not t or t.group(2) != "mocna" or t.group(3) != "6" or t.group(5) != "t2_battania_horse":
         return "test: %s" % (t.groups() if t else "brak dopasowania")
     if not M109LUP_RX["testno"].match(M109LUP_TEST["testno"]):
         return "test (bez jezdzcow)"
