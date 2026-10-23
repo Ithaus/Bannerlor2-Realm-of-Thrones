@@ -473,7 +473,7 @@ namespace Armoury
             else if (details == IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest) Freeze(issue, null, "wyslani ludzie");
         }
 
-        private static void OnQuestStarted(QuestBase quest) { if (quest != null) Freeze(IssueOf(quest), quest, "zadanie"); }
+        private static void OnQuestStarted(QuestBase quest) { if (quest != null && !NoticeBoard.IsOurQuest(quest)) Freeze(IssueOf(quest), quest, "zadanie"); }   // m109-list: list gonczy (BountyQuest) placi NoticeBoard.Pay - bez zamrozonej kwoty
 
         /// <summary>Postfiks getterow RewardGold spraw: oferta w rozmowie i kwota wpisana do zadania pokazuja te sama liczbe, ktora wyplaci wrapper.</summary>
         public static void RewardShown(IssueBase __instance, ref int __result)

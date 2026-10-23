@@ -1101,6 +1101,12 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m102tablica <Armoury-*.log> (strumieniowo). T-1 wpieta, T-2 doby, T-3 ERROR i potkniecia 0, T-4 nagroda czytelna, T-5 tokeny <= 2%,
                     T-6 koszt otwarcia <= 5 ms, T-7 proba (INFO); L-1 wpiete, L-2 doby, L-3 wyplata = pobrane z kasy / od pana / z kiesy wsi (pomiar, z niczego 0), L-4 kasa po >= Keep, L-5 inne 0, L-6 listy od d7,
                     L-7 lordom <= 1% kas miast, L-8 zapis <= 12 KB (m103-drobne, nb2), L-8b nb2 wobec nb1 (INFO), L-9 doba <= 3 ms, L-10 wyplata tylko za bande z listem (gracz / lord), L-K potkniecia 0. Log bez paczki: INFO.
+--grupa m109list : (23.10, w-toku/m109-list; Armoury/src/NoticeBoard.Quest.cs, klucz WatchBountyQuests) python -I tools/sprawdz_logi.py --grupa m109list <Armoury-*.log>
+                    (strumieniowo). LIST-S1 wyrazenia wobec linii wzorcowych, LIST-S2 test syntetyczny, LIST-0 wpiete (nasluchy zapisu 2/2), LIST-1 ERROR Bounty / start BLAD /
+                    potkniecia 0, LIST-2 kazde przyjecie m102 ma start zadania, LIST-3 zapis -> po zapisie (przywrocone == odpiete, NIEUDANY 0), LIST-4 wczytanie (odtworzone ==
+                    przyjete, blad 0), LIST-5 zakonczenia (raz, Sukces tylko po wyplacie m102 dla gracza z ta sama kwota, jedna wyplata), LIST-6 doby (siatka 0, zatrzask NIE,
+                    bez zadania 0), LIST-7 linie TEST (wszystkie TAK, po wczytaniu TEST odtworzone), LIST-8 special NIE, LIST-9 zaznaczenie okna Quests (trwajacego zadania)
+                    wraca po zapisie. LIST-1 liczy tez ERROR NoticeBoard.Bounty* / OnMapEventStartedTest / Daily(zadania). Log bez paczki: INFO.
 --grupa m103lektor : (21.10, w-toku/m103-lektor; Armoury/src/Lektor.cs, Lektor.Live.cs, klucze LektorEnabled, LektorEventWindows, LektorGossipLive, LektorGossipDailyChars,
                     LektorGossipReserveChars) python -I tools/sprawdz_logi.py --grupa m103lektor <Armoury-*.log> [--crashscribe <session-*.log>] (strumieniowo). LK-0 linia startu,
                     LK-1 ERROR lektora i potkniecia 0 (takze watek nagran), LK-2 latka EventScreen OnActivate i OnDeactivate tak, LK-3 nagran okien = wiersze arm_lektor.tsv w repo
@@ -41281,6 +41287,398 @@ def m102tablica_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ m109list (23.10, w-toku/m109-list: przyjety list gonczy jako zadanie gry "Bounty: banda" w oknie Quests -
+# BountyQuest bez typu w zapisie, zdejmowany z QuestManager przed kazdym zapisem i odtwarzany po wczytaniu z arm_board; Armoury/src/NoticeBoard.Quest.cs; klucz WatchBountyQuests)
+M109LIST_P = "Listy goncze - zadania (m109): "
+M109LIST_LG = "Listy goncze (m102): "
+# bledy tej galezi: WStumble("Bounty.*"), opakowania w ArmouryBehavior (BountyBeforeSave / BountySaveOver / BountySessionStart / OnMapEventStartedTest) i doba
+# (NoticeBoard.Daily -> Stumble("Daily(zadania)")) - krotka przedrostkow dla str.startswith (poprawka po recenzji: wyjatek ResolveFlags poza try dawal TAK)
+M109LIST_ERR = ("ERROR in NoticeBoard.Watch.Bounty", "ERROR in NoticeBoard.Bounty", "ERROR in NoticeBoard.OnMapEventStartedTest", "ERROR in NoticeBoard.Daily(zadania)")
+M109LIST_LOADTAIL = (r"listy przyjete (\d+), odtworzone (\d+) \(z dziennika gry (\d+), wpisow (\d+); nowe opisy (\d+) - listy sprzed wgrania\), z banda na mapie (\d+), "
+                     r"flagi p zdjete (\d+), pominiete: dziennik zamkniety \(nowy id\) (\d+), blad (\d+)")
+M109LIST_RX = {
+    "wired": re.compile(r"wpiete - klucz Watch Bounty Quests (TAK|NIE), nasluchy zapisu (\d+)/2 .*?, test autotestu (TAK|NIE)"),
+    "start": re.compile(r"start - (\S+) \((\S+) (\S+), rodzaj (\d+), kwota (\d+), termin doba (-?\d+), tracker (TAK|NIE), flaga p zdjeta (TAK|NIE), special (TAK|NIE), droga ([^)]*)\) - "),
+    "startbad": re.compile(r"start BLAD - (\S+) (\S+) "),
+    "wpis": re.compile(r"wpis - (\S+) banda uszla z bitwy \(zostalo (\d+) z (\d+) ludzi\), zwyciezca (\S+), bitwa gracza (TAK|NIE)"),
+    "end": re.compile(r"koniec - (\S+) \[(\S+) (\S+)\] (Sukces|Anulowane|Nieudane|Termin gry|Zdrada|BLAD) \(([^)]*)\), wyplacone (-?\d+) z (\d+), wpisy (\d+)"),
+    "game": re.compile(r"zamkniete przez gre - (\S+) \("),
+    "save": re.compile(r"zapis - odpiete (\d+) \(tracker (\d+), korekta flag (\d+)(?:, spoza listy (\d+))?\), wybor okna Quests wyzerowany (TAK|NIE)(?: \(trwa (TAK|NIE)\))?"),
+    "saveok": re.compile(r"po zapisie OK - przywrocone (\d+) z (\d+) \(tracker (\d+)\), wybor przywrocony (TAK|NIE)( \(klucz NIE\))?"),
+    "savebad": re.compile(r"po zapisie NIEUDANY - odpiete (\d+), zatrzask (TAK|NIE)"),
+    "load": re.compile(r"wczytanie - " + M109LIST_LOADTAIL),
+    "keyon": re.compile(r"klucz TAK w grze - " + M109LIST_LOADTAIL),
+    "loadoff": re.compile(r"wczytanie - klucz NIE, listy przyjete (\d+), z otwartym wpisem dziennika (\d+), flagi na mapie dodane (\d+), wpisy oznaczone jako przeczytane (\d+)"),
+    "restored": re.compile(r"odtworzone - (\S+) \((\S+) (\S+)\), wpisy (\d+), z dziennika gry (TAK|NIE), banda na mapie (TAK|NIE)(?:, flaga p zdjeta (TAK|NIE))?"),
+    "restbad": re.compile(r"odtworzone BLAD - (\S+) (\S+) "),
+    "day": re.compile(r"dzien (-?\d+), klucz TAK, czynne (\d+) \(tracker (\d+)\), przyjete (\d+) \(bez zadania (\d+)\); dzis: start (\d+), wpisy (\d+), sukces (\d+), anulowane (\d+), "
+                      r"nieudane (\d+), przez gre (\d+), siatka (\d+); zapisy (\d+) \(odpiete (\d+), przywrocone (\d+)\); zatrzask (TAK|NIE); potkniecia (\d+) \(sesja (\d+)\)"),
+    "keyoff": re.compile(r"klucz NIE - odpiete (\d+) zadan, flagi na mapie (\d+), wpisy oznaczone jako przeczytane (\d+)"),
+    "test": re.compile(r"TEST (.*) - (TAK|NIE)$"),
+    "oldway": re.compile(r"TEST stara droga - (\S+) (\S+): .* - TAK$"),
+    "taken": re.compile(r"przyjety przez gracza - (\S+) (\S+) \((\d+) ludzi\) = (\d+)"),
+    "pay": re.compile(r"wyplata - (\S+) (\S+) obiecane (\d+), kasa (\d+) \+ (?:pan|wies) (\d+), niedoplata (\d+), dla (gracz|lord \S+);"),
+}
+# linie wzorcowe - napisy jak w kodzie C# (NoticeBoard.Quest.cs, NoticeBoard.Watch.cs)
+M109LIST_TEST = {
+    "wired": "wpiete - klucz Watch Bounty Quests TAK, nasluchy zapisu 2/2 (OnBeforeSave, OnSaveOver), BountyQuest bez definicji zapisu (zdejmowane przed zapisem, odtwarzane z arm_board), test autotestu NIE",
+    "start": "start - arm_bounty_0_town_B2_robber_knights_171_108709 (town_B2 robber_knights_171, rodzaj 0, kwota 131, termin doba 108709, tracker TAK, flaga p zdjeta NIE, special NIE, droga TEST bitwa) - Bounty: Jon Rivers and his bandits",
+    "startbad": "start BLAD - town_B2 robber_knights_171 (Object reference not set to an instance of an object.) - flaga na mapie jak dotad",
+    "wpis": "wpis - arm_bounty_0_town_B2_robber_knights_171_108709 banda uszla z bitwy (zostalo 9 z 14 ludzi), zwyciezca lord_1_40, bitwa gracza NIE",
+    "end": "koniec - arm_bounty_0_town_B2_robber_knights_171_108709 [town_B2 robber_knights_171] Sukces (wyplata gracz), wyplacone 131 z 131, wpisy 3",
+    "game": "zamkniete przez gre - arm_bounty_0_town_B2_robber_knights_171_108709 (Anulowane, list czynny) - list znow wolny (przyjety NIE)",
+    "save": "zapis - odpiete 2 (tracker 2, korekta flag 0), wybor okna Quests wyzerowany TAK (trwa TAK)",
+    "saveok": "po zapisie OK - przywrocone 2 z 2 (tracker 2), wybor przywrocony TAK",
+    "savebad": "po zapisie NIEUDANY - odpiete 2, zatrzask TAK - zadania zostaja odpiete do wczytania; nowe listy bez zadan (flaga na mapie), flagi dla odpietych 2 (zapis autotest-list-mid)",
+    "load": "wczytanie - listy przyjete 2, odtworzone 2 (z dziennika gry 1, wpisow 3; nowe opisy 1 - listy sprzed wgrania), z banda na mapie 2, flagi p zdjete 1, pominiete: dziennik zamkniety (nowy id) 0, blad 0",
+    "keyon": "klucz TAK w grze - listy przyjete 1, odtworzone 1 (z dziennika gry 1, wpisow 2; nowe opisy 0 - listy sprzed wgrania), z banda na mapie 1, flagi p zdjete 1, pominiete: dziennik zamkniety (nowy id) 0, blad 0",
+    "loadoff": "wczytanie - klucz NIE, listy przyjete 1, z otwartym wpisem dziennika 1, flagi na mapie dodane 1, wpisy oznaczone jako przeczytane 2 (bez zadan, jak przed m109)",
+    "restored": "odtworzone - arm_bounty_1_town_B2_looters_5_108720 (town_B2 looters_5), wpisy 1, z dziennika gry NIE, banda na mapie TAK, flaga p zdjeta TAK",
+    "day": "dzien 108700, klucz TAK, czynne 2 (tracker 2), przyjete 3 (bez zadania 1); dzis: start 1, wpisy 4, sukces 0, anulowane 2, nieudane 1, przez gre 0, siatka 0; "
+           "zapisy 1 (odpiete 2, przywrocone 2); zatrzask NIE; potkniecia 0 (sesja 0)",
+    "keyoff": "klucz NIE - odpiete 2 zadan, flagi na mapie 2, wpisy oznaczone jako przeczytane 3 - wroca po wczytaniu albo po wlaczeniu klucza",
+    "test": "TEST po zapisie - zapis OK TAK, odpiete 2, wrocily 2, w QuestManager 2/2, tracker 2/2, zaznaczenie TAK - TAK",
+    "oldway": "TEST stara droga - town_B2 looters_9: przyjety TAK, zadanie NIE, flaga na mapie TAK - TAK",
+    "taken": "przyjety przez gracza - town_B2 robber_knights_171 (14 ludzi) = 131",
+    "pay": "wyplata - town_B2 robber_knights_171 obiecane 131, kasa 100 + pan 31, niedoplata 0, dla gracz; kasa przed 5000 po 4900 (Keep 1000); odbiorca 131, platnicy 131, z niczego 0",
+}
+
+
+def m109list_selftest():
+    """m109list: wyrazenia wobec linii wzorcowych M109LIST_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    R, T = M109LIST_RX, M109LIST_TEST
+    want = {
+        "wired": ("TAK", "2", "NIE"),
+        "start": ("arm_bounty_0_town_B2_robber_knights_171_108709", "town_B2", "robber_knights_171", "0", "131", "108709", "TAK", "NIE", "NIE", "TEST bitwa"),
+        "startbad": ("town_B2", "robber_knights_171"),
+        "wpis": ("arm_bounty_0_town_B2_robber_knights_171_108709", "9", "14", "lord_1_40", "NIE"),
+        "end": ("arm_bounty_0_town_B2_robber_knights_171_108709", "town_B2", "robber_knights_171", "Sukces", "wyplata gracz", "131", "131", "3"),
+        "game": ("arm_bounty_0_town_B2_robber_knights_171_108709",),
+        "save": ("2", "2", "0", None, "TAK", "TAK"),
+        "saveok": ("2", "2", "2", "TAK", None),
+        "savebad": ("2", "TAK"),
+        "load": ("2", "2", "1", "3", "1", "2", "1", "0", "0"),
+        "keyon": ("1", "1", "1", "2", "0", "1", "1", "0", "0"),
+        "loadoff": ("1", "1", "1", "2"),
+        "restored": ("arm_bounty_1_town_B2_looters_5_108720", "town_B2", "looters_5", "1", "NIE", "TAK", "TAK"),
+        "day": ("108700", "2", "2", "3", "1", "1", "4", "0", "2", "1", "0", "0", "1", "2", "2", "NIE", "0", "0"),
+        "keyoff": ("2", "2", "3"),
+        "test": ("po zapisie - zapis OK TAK, odpiete 2, wrocily 2, w QuestManager 2/2, tracker 2/2, zaznaczenie TAK", "TAK"),
+        "oldway": ("town_B2", "looters_9"),
+        "taken": ("town_B2", "robber_knights_171", "14", "131"),
+        "pay": ("town_B2", "robber_knights_171", "131", "100", "31", "0", "gracz"),
+    }
+    for k, w in want.items():
+        m = R[k].match(T[k])
+        if not m or m.groups() != w:
+            return f"{k}: {m.groups() if m else 'brak dopasowania'}"
+    if R["test"].match("TEST zapis - SaveAs autotest-list-mid (czynne zadania 2, zaznaczenie TAK)"):
+        return "test: linia informacyjna liczona jako TAK/NIE"
+    if not R["save"].match("zapis - odpiete 1 (tracker 1, korekta flag 0), wybor okna Quests wyzerowany NIE") or R["save"].match("zapis - odpiete 1 (tracker 1, korekta flag 0), wybor okna Quests wyzerowany NIE").group(6) is not None:
+        return "save: linia bez zaznaczenia (bez pola trwa)"
+    if not R["restored"].match("odtworzone - a (t b), wpisy 1, z dziennika gry TAK, banda na mapie NIE"):
+        return "restored: linia bez pola flaga p (banda nie zyje)"
+    if not all(s.startswith(M109LIST_ERR) for s in ("ERROR in NoticeBoard.BountySaveOver: x", "ERROR in NoticeBoard.Daily(zadania) (potkniecie 1): x",
+                                                     "ERROR in NoticeBoard.OnMapEventStartedTest: x", "ERROR in NoticeBoard.Watch.Bounty.Start (potkniecie 1): x")) \
+            or "ERROR in NoticeBoard.MarkCond (potkniecie 1): x".startswith(M109LIST_ERR) or "ERROR in NoticeBoard.Daily(listy) (potkniecie 1): x".startswith(M109LIST_ERR):
+        return "err: przedrostki bledow galezi"
+    return None
+
+
+def m109list_collect(logp):
+    """m109list: przebieg logu (strumieniowo). Sesja = od linii 'wpiete' (wczytanie innego zapisu w tej samej grze - nowa sesja: id zadan od nowa)."""
+    R = M109LIST_RX
+    D = {"wired": [], "start": [], "startbad": [], "wpis": [], "end": [], "game": [], "seq": [], "load": [], "loadoff": [], "restored": [], "restbad": [],
+         "day": [], "keyoff": [], "keyon": [], "test": [], "testinfo": [], "oldway": [], "taken": [], "pay": [], "err": 0, "err1": None}
+    i, sess = 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            i += 1
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(M109LIST_ERR):
+                D["err"] += 1
+                if D["err1"] is None:
+                    D["err1"] = s[:160]
+                continue
+            if s.startswith(M109LIST_LG):
+                b = s[len(M109LIST_LG):]
+                mt = R["taken"].match(b)
+                if mt:
+                    D["taken"].append((i, sess, mt))
+                    continue
+                mp = R["pay"].match(b)
+                if mp:
+                    D["pay"].append((i, sess, mp))
+                continue
+            if not s.startswith(M109LIST_P):
+                continue
+            b = s[len(M109LIST_P):]
+            if b.startswith("wpiete"):
+                sess += 1
+                mw = R["wired"].match(b)
+                D["wired"].append((i, sess, mw if mw else b))
+                continue
+            if b.startswith("TEST "):
+                mt = R["test"].match(b)
+                if mt:
+                    D["test"].append((i, sess, mt))
+                    mo = R["oldway"].match(b)
+                    if mo:
+                        D["oldway"].append((i, sess, mo))
+                else:
+                    D["testinfo"].append((i, sess, b))
+                continue
+            for k in ("startbad", "start", "wpis", "end", "game", "load", "loadoff", "keyon", "restbad", "restored", "day", "keyoff"):
+                mk = R[k].match(b)
+                if mk:
+                    D[k].append((i, sess, mk))
+                    break
+            else:
+                ms = R["save"].match(b)
+                if ms:
+                    D["seq"].append((i, sess, "zapis", ms))
+                    continue
+                mo = R["saveok"].match(b)
+                if mo:
+                    D["seq"].append((i, sess, "ok", mo))
+                    continue
+                mb = R["savebad"].match(b)
+                if mb:
+                    D["seq"].append((i, sess, "bad", mb))
+    return D
+
+
+def m109list_rows(rep, D):
+    """m109list: wiersze progow LIST-0..LIST-9 i INFO z zebranego logu (te same funkcje dla logu gry i testu syntetycznego)."""
+    if not D["wired"] and not D["start"] and not D["day"] and not D["load"] and not D["end"]:
+        rep.add("LIST-0: linia 'Listy goncze - zadania (m109): wpiete'", "brak w logu", "INFO (log sprzed paczki m109-list albo menu glowne)", None)
+        return
+    wl = [w for _, _, w in D["wired"] if not isinstance(w, str)]
+    last = wl[-1] if wl else None
+    keyon = all(w.group(1) == "TAK" for w in wl) if wl else True
+    test_on = any(w.group(3) == "TAK" for w in wl)
+    rep.add("LIST-0: linia 'wpiete' (nasluchy zapisu 2/2)", (last.string[:150] + "...") if last else ("linia nieczytelna" if D["wired"] else "brak"), "jest w kazdej sesji, nasluchy 2/2",
+            bool(wl) and len(wl) == len(D["wired"]) and all(w.group(2) == "2" for w in wl))
+    days = [m for _, _, m in D["day"]]
+    stumb = max([int(d.group(17)) for d in days] + [0])
+    rep.add("LIST-1: ERROR NoticeBoard.Watch.Bounty / NoticeBoard.Bounty* / OnMapEventStartedTest / Daily(zadania), start BLAD, odtworzone BLAD, potkniecia doby",
+            f"ERROR {D['err']}, start BLAD {len(D['startbad'])}, odtworzone BLAD {len(D['restbad'])}, potkniecia (max doby) {stumb}" + (f" (np. {D['err1']})" if D["err1"] else ""),
+            "0", D["err"] == 0 and not D["startbad"] and not D["restbad"] and stumb == 0)
+    # LIST-2: kazde przyjecie (m102) przy kluczu TAK ma start zadania (to samo miasto i banda); lista starej drogi autotestu (TEST stara droga) - bez zadania
+    old = {(m.group(1), m.group(2)) for _, _, m in D["oldway"]}
+    started = {(m.group(2), m.group(3)) for _, _, m in D["start"]} | {(m.group(1), m.group(2)) for _, _, m in D["startbad"]}
+    taken = {(m.group(1), m.group(2)) for _, _, m in D["taken"]}
+    miss = sorted(taken - started - old)
+    if not keyon or D["keyoff"]:
+        rep.add("LIST-2: przyjety list ma zadanie", f"klucz Watch Bounty Quests NIE w logu (sesje {len(wl)}, przelaczenia {len(D['keyoff'])}); przyjetych {len(taken)}", "INFO (klucz NIE - flaga jak dotad)", None)
+    else:
+        rep.add("LIST-2: kazde m102 'przyjety przez gracza' ma linie 'start' (to samo miasto i banda)",
+                f"przyjetych {len(taken)}, ze startem {len(taken & started)}, stara droga (TEST) {len(taken & old)}, bez startu {len(miss)}" + (f" (np. {miss[0][0]} {miss[0][1]})" if miss else ""),
+                "0 bez startu", (len(miss) == 0) if taken else None)
+    # LIST-3: kazdy 'zapis' ma swoje 'po zapisie' (przed nastepnym zapisem); OK - przywrocone == odpiete; NIEUDANY 0
+    pend, pairs, unpaired, nbad = None, [], 0, 0
+    for _, _, kind, m in D["seq"]:
+        if kind == "zapis":
+            if pend is not None:
+                unpaired += 1
+            pend = m
+            continue
+        if kind == "bad":
+            nbad += 1
+        if pend is None:
+            if kind == "ok":
+                unpaired += 1
+            continue
+        pairs.append((pend, kind, m))
+        pend = None
+    if pend is not None:
+        unpaired += 1
+    mism = [(z, m) for z, k, m in pairs if k == "ok" and m.group(5) is None and int(m.group(1)) != int(z.group(1))]
+    nz = sum(1 for x in D["seq"] if x[2] == "zapis")
+    rep.add("LIST-3: zapis -> po zapisie (przywrocone == odpiete), NIEUDANY 0",
+            f"zapisow z zadaniami {nz}, par {len(pairs)}, bez pary {unpaired}, przywrocone != odpiete {len(mism)}, NIEUDANY {nbad}"
+            + (f" (np. odpiete {mism[0][0].group(1)}, przywrocone {mism[0][1].group(1)})" if mism else ""),
+            "bez pary 0, roznic 0, NIEUDANY 0", (unpaired == 0 and not mism and nbad == 0) if D["seq"] else None)
+    # LIST-4: wczytanie (i odtworzenie po wlaczeniu klucza w grze) - odtworzone == przyjete, blad 0, dziennik zamkniety 0
+    loads = [m for _, _, m in D["load"]] + [m for _, _, m in D["keyon"]]
+    badl = [m for m in loads if int(m.group(2)) != int(m.group(1)) or int(m.group(8)) != 0 or int(m.group(9)) != 0]
+    rep.add("LIST-4: wczytanie / klucz TAK w grze - odtworzone == przyjete, blad 0, dziennik zamkniety 0",
+            f"linii {len(loads)}, przyjete {sum(int(m.group(1)) for m in loads)}, odtworzone {sum(int(m.group(2)) for m in loads)} (z dziennika gry {sum(int(m.group(3)) for m in loads)}, "
+            f"nowe opisy {sum(int(m.group(5)) for m in loads)}, flagi p zdjete {sum(int(m.group(7)) for m in loads)}), klucz TAK w grze {len(D['keyon'])}, zlych {len(badl)}"
+            + (f" (np. {badl[0].group(0)[:140]})" if badl else "")
+            + (f"; klucz NIE: {len(D['loadoff'])}" if D["loadoff"] else ""),
+            "0 zlych", (len(badl) == 0) if loads else None)
+    # LIST-5: zakonczenia - id ma wczesniej start albo odtworzone (ta sama sesja), nie konczy sie dwa razy, Sukces tylko po wyplacie m102 dla gracza z ta sama kwota,
+    # wyplat m102 tej bandy miedzy startem a koncem: Sukces i lord - 1, reszta - 0
+    begin = {}
+    for i, s, m in D["start"]:
+        begin.setdefault((s, m.group(1)), (i, m.group(2), m.group(3)))
+    for i, s, m in D["restored"]:
+        begin.setdefault((s, m.group(1)), (i, m.group(2), m.group(3)))
+    allow = {}
+    for _, s, m in D["load"] + D["keyon"]:
+        allow[s] = allow.get(s, 0) + int(m.group(2))
+    for _, s, _m in D["restored"]:
+        allow[s] = allow.get(s, 0) - 1
+    seen, dup, nobeg, badpay, nopay, badcnt, blad = set(), [], [], [], [], [], []
+    for i, s, m in D["end"]:
+        key = (s, m.group(1))
+        if key in seen:
+            dup.append(m.group(1))
+        seen.add(key)
+        if m.group(4) == "BLAD":
+            blad.append(m.group(1))
+        b = begin.get(key)
+        if b is None or b[0] > i:
+            if allow.get(s, 0) > 0:
+                allow[s] -= 1
+            else:
+                nobeg.append(m.group(1))
+        town, band, paid = m.group(2), m.group(3), int(m.group(6))
+        lo = b[0] if b else -1
+        pays = [p for pi, ps, p in D["pay"] if ps == s and lo < pi < i and p.group(1) == town and p.group(2) == band]
+        if m.group(4) == "Sukces":
+            if not pays:
+                nopay.append(m.group(1))
+            elif pays[-1].group(7) != "gracz" or int(pays[-1].group(4)) + int(pays[-1].group(5)) != paid:
+                badpay.append(m.group(1))
+        want = 1 if (m.group(4) == "Sukces" or m.group(5).startswith("lord ")) else 0
+        if len(pays) != want and b is not None:
+            badcnt.append(f"{m.group(1)} ({m.group(5)}: wyplat {len(pays)})")
+    ok5 = not dup and not nobeg and not badpay and not nopay and not badcnt and not blad
+    rep.add("LIST-5: zakonczenia - start przed koncem, raz, Sukces po wyplacie gracza (ta sama kwota), wyplat tej bandy: Sukces/lord 1, reszta 0",
+            f"koncow {len(D['end'])}, bez startu {len(nobeg)}, podwojne {len(dup)}, Sukces bez wyplaty {len(nopay)}, Sukces z inna wyplata {len(badpay)}, zla liczba wyplat {len(badcnt)}, BLAD {len(blad)}"
+            + (f" (np. {(dup + nobeg + nopay + badpay + badcnt + blad)[0]})" if not ok5 else ""),
+            "0 we wszystkich", ok5 if D["end"] else None)
+    # LIST-6: doby - siatka 0, zatrzask NIE, bez zadania 0 (lista starej drogi autotestu - najwyzej tyle, ile linii TEST stara droga)
+    grid = sum(int(d.group(12)) for d in days)
+    latch = [d for d in days if d.group(16) == "TAK"]
+    noq = max([int(d.group(5)) for d in days] + [0])
+    nold = len(D["oldway"])
+    ok6 = grid == 0 and not latch and (noq <= nold or bool(D["keyoff"]))
+    rep.add("LIST-6: linia doby - siatka 0, zatrzask NIE, przyjete bez zadania 0", f"dob {len(days)}, siatka {grid}, z zatrzaskiem {len(latch)}, bez zadania (max) {noq} (stara droga TEST {nold})",
+            "siatka 0, zatrzask 0, bez zadania <= stara droga", ok6 if days else None)
+    # LIST-7: linie TEST autotestu - wszystkie TAK; zapis autotestu ma 'TEST po zapisie'
+    tl = [m for _, _, m in D["test"]]
+    nie = [m for m in tl if m.group(2) == "NIE"]
+    need = []
+    infos = [b for _, _, b in D["testinfo"]]
+    if any(x.startswith("TEST zapis - SaveAs") for x in infos) and not any(m.group(1).startswith("po zapisie") for m in tl):
+        need.append("po zapisie (brak linii)")
+    if any(x.startswith("TEST list testowy - ") and "pominiete" not in x for x in infos) and not any(m.group(1).startswith("po koncu") for m in tl):
+        need.append("po koncu bitwy (brak linii)")
+    if any(m.group(1).startswith("wczytanie") for m in tl) and not any(m.group(1).startswith("odtworzone") for m in tl) and not any(x.startswith("TEST odtworzone") for x in infos):
+        need.append("odtworzone po pierwszej dobie (brak linii)")
+    kinds = {}
+    for m in tl:
+        k = m.group(1).split(" - ")[0]
+        kinds[k] = kinds.get(k, 0) + 1
+    if not tl and not infos:
+        rep.add("LIST-7: linie TEST autotestu", "brak (test autotestu " + ("TAK" if test_on else "NIE") + ")", "INFO (bez pliku armoury-list-test.flag)", None if not test_on else False)
+    else:
+        rep.add("LIST-7: linie TEST autotestu - wszystkie TAK", f"TAK {len(tl) - len(nie)}, NIE {len(nie)}, informacyjne {len(infos)}, rodzaje {kinds}" + (f"; brakuje: {', '.join(need)}" if need else "")
+                + (f" (np. {nie[0].group(0)[:160]})" if nie else ""), "NIE 0, bez brakow", not nie and not need)
+    # LIST-8: special (latka AIInfluence IsSpecialQuest)
+    spec = [m for _, _, m in D["start"] if m.group(9) == "TAK"]
+    rep.add("LIST-8: zadanie zwykle (special NIE w liniach start)", f"startow {len(D['start'])}, special TAK {len(spec)}", "0", (len(spec) == 0) if D["start"] else None)
+    # LIST-9: zaznaczenie okna Quests zerowane przed zapisem wraca po zapisie - tylko zadanie, ktore trwalo (ViewDataTracker trzyma tez zakonczone - to nie wraca)
+    zs = [(z, m) for z, k, m in pairs if k == "ok" and z.group(5) == "TAK" and z.group(6) != "NIE" and m.group(5) is None]
+    lost = [x for x in zs if x[1].group(4) != "TAK"]
+    rep.add("LIST-9: zaznaczenie okna Quests wraca po zapisie", f"zerowanych {len(zs)}, nie wrocilo {len(lost)}", "0", (len(lost) == 0) if zs else None)
+    ends = {}
+    for _, _, m in D["end"]:
+        ends[m.group(4)] = ends.get(m.group(4), 0) + 1
+    rep.add("LIST-INFO: zadania", f"start {len(D['start'])}, odtworzone {len(D['restored'])}, wpisy {len(D['wpis'])}, zakonczenia {ends}, przez gre {len(D['game'])}, zapisy z zadaniami {nz}, "
+            f"klucz NIE {len(D['keyoff'])}, klucz TAK w grze {len(D['keyon'])}", "INFO", None)
+
+
+def m109list_synth():
+    """m109list - test syntetyczny: dobry i zly bieg (log w katalogu tymczasowym) przez m109list_collect / m109list_rows. None = werdykty zgodne z oczekiwanymi."""
+    import tempfile
+    import shutil
+    T, P, LG = M109LIST_TEST, M109LIST_P, M109LIST_LG
+    def run(bad):
+        tmp = tempfile.mkdtemp(prefix="m109list_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            ida, idb = "arm_bounty_0_town_A_band_a_100010", "arm_bounty_1_town_B_band_b_100012"
+            L = [P + T["wired"].replace("test autotestu NIE", "test autotestu TAK").replace("nasluchy zapisu 2/2", "nasluchy zapisu 1/2" if bad else "nasluchy zapisu 2/2"),
+                 P + "wczytanie - listy przyjete 2, odtworzone " + ("1" if bad else "2") + " (z dziennika gry 1, wpisow 3; nowe opisy 1 - listy sprzed wgrania), z banda na mapie 2, flagi p zdjete 1, pominiete: dziennik zamkniety (nowy id) 0, blad 0",
+                 P + "TEST wczytanie - odtworzone 2 z 2, z dziennika gry 1, nowe opisy 1, blad 0 - TAK",
+                 P + "start - " + ida + " (town_A band_a, rodzaj 0, kwota 131, termin doba 100010, tracker TAK, flaga p zdjeta NIE, special " + ("TAK" if bad else "NIE") + ", droga TEST) - Bounty: A",
+                 LG + "przyjety przez gracza - town_A band_a (14 ludzi) = 131",
+                 P + "start - " + idb + " (town_B band_b, rodzaj 1, kwota 90, termin doba 100012, tracker TAK, flaga p zdjeta TAK, special NIE, droga TEST) - Bounty: B",
+                 LG + "przyjety przez gracza - town_B band_b (9 ludzi) = 90",
+                 P + "TEST przyjecie A - " + ida + " (town_A band_a, rodzaj 0): w QuestManager TAK, IsOngoing TAK, tracker gry TAK, flaga na mapie TAK, wpisy 1, wpis w historii TAK, flaga p NIE - TAK",
+                 P + "TEST zapis - SaveAs autotest-list-mid (czynne zadania 2, zaznaczenie TAK)",
+                 P + "zapis - odpiete 2 (tracker 2, korekta flag 0), wybor okna Quests wyzerowany TAK (trwa TAK)",
+                 P + "po zapisie OK - przywrocone " + ("1" if bad else "2") + " z 2 (tracker 2), wybor przywrocony " + ("NIE" if bad else "TAK"),
+                 # zaznaczone zadanie zakonczone przed zapisem - nie wraca i nie liczy sie w LIST-9
+                 P + "zapis - odpiete 2 (tracker 2, korekta flag 0), wybor okna Quests wyzerowany TAK (trwa NIE)",
+                 P + "po zapisie OK - przywrocone 2 z 2 (tracker 2), wybor przywrocony NIE",
+                 P + "klucz TAK w grze - listy przyjete 1, odtworzone " + ("0" if bad else "1") + " (z dziennika gry 1, wpisow 2; nowe opisy 0 - listy sprzed wgrania), z banda na mapie 1, flagi p zdjete 1, pominiete: dziennik zamkniety (nowy id) 0, blad 0",
+                 P + "TEST po zapisie - zapis OK TAK, odpiete 2, wrocily 2, w QuestManager 2/2, tracker 2/2, zaznaczenie TAK - " + ("NIE" if bad else "TAK"),
+                 "ERROR in NoticeBoard.MarkCond (potkniecie 1): System.Exception: test (blad m102 - nie tej galezi)",
+                 P + "wpis - " + ida + " banda uszla z bitwy (zostalo 9 z 14 ludzi), zwyciezca lord_1_40, bitwa gracza NIE"]
+            if not bad:
+                L.append(LG + "wyplata - town_A band_a obiecane 131, kasa 100 + pan 31, niedoplata 0, dla gracz; kasa przed 5000 po 4900 (Keep 1000); odbiorca 131, platnicy 131, z niczego 0")
+            L.append(P + "koniec - " + ida + " [town_A band_a] Sukces (wyplata gracz), wyplacone 131 z 131, wpisy 3")
+            L.append(P + "TEST po koncu - " + ida + " Sukces: poza QuestManager TAK, wpis w historii zamkniety TAK, tracker zdjety TAK - TAK")
+            L.append(P + "koniec - " + idb + " [town_B band_b] Nieudane (termin), wyplacone 0 z 90, wpisy 2")
+            if bad:
+                L.append(P + "koniec - " + idb + " [town_B band_b] Anulowane (banda znikla), wyplacone 0 z 90, wpisy 3")
+                L.append(LG + "przyjety przez gracza - town_X band_x (12 ludzi) = 100")
+                L.append("ERROR in NoticeBoard.BountySaveOver: System.Exception: test")   # opakowanie ArmouryBehavior (przedrostek spoza Watch.Bounty)
+            L.append(LG + "przyjety przez gracza - town_C band_c (20 ludzi) = 150")
+            L.append(P + "TEST stara droga - town_C band_c: przyjety TAK, zadanie NIE, flaga na mapie TAK - TAK")
+            if not bad:
+                L.append(P + "TEST odtworzone - " + idb + " (town_B band_b): w QuestManager TAK, IsOngoing TAK, banda na mapie TAK, tracker gry TAK, flaga na mapie TAK, wpisy 2, "
+                         "wpis w historii otwarty TAK, flaga p NIE - TAK")
+            for d in range(100005, 100012):
+                day = T["day"].replace("dzien 108700", "dzien %d" % d)
+                if bad and d == 100008:
+                    day = day.replace("siatka 0;", "siatka 1;")
+                L.append(P + day)
+            open(logp, "w", encoding="utf-8").write("\n".join("[00:00:00] " + x for x in L) + "\n")
+            rep = Report()
+            m109list_rows(rep, m109list_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    good, badr = run(False), run(True)
+    exp_good = {k: "TAK" for k in ("LIST-0", "LIST-1", "LIST-2", "LIST-3", "LIST-4", "LIST-5", "LIST-6", "LIST-7", "LIST-8", "LIST-9")}
+    exp_bad = {k: "NIE" for k in ("LIST-0", "LIST-1", "LIST-2", "LIST-3", "LIST-4", "LIST-5", "LIST-6", "LIST-7", "LIST-8", "LIST-9")}
+    diff = [f"dobry {k}: {good.get(k)} (oczekiwane {v})" for k, v in exp_good.items() if good.get(k) != v]
+    diff += [f"zly {k}: {badr.get(k)} (oczekiwane {v})" for k, v in exp_bad.items() if badr.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def m109list_main(logp):
+    """m109list (23.10, w-toku/m109-list; Jeff 22.10 23:05 "jak wchodze na zadanie od kapitana i je biore, nie dostaje tego zadania w Quests"; projekt m109-list pkt 5):
+    LIST-S1 wyrazenia wobec linii wzorcowych, LIST-S2 test syntetyczny; LIST-0 linia 'wpiete' (nasluchy zapisu 2/2), LIST-1 ERROR Bounty / start BLAD / potkniecia 0,
+    LIST-2 kazde przyjecie m102 ma start zadania, LIST-3 zapis -> po zapisie (przywrocone == odpiete, NIEUDANY 0), LIST-4 wczytanie (odtworzone == przyjete, blad 0),
+    LIST-5 zakonczenia (start przed koncem, raz, Sukces tylko po wyplacie m102 dla gracza z ta sama kwota, jedna wyplata), LIST-6 doby (siatka 0, zatrzask NIE,
+    bez zadania 0), LIST-7 linie TEST (wszystkie TAK), LIST-8 special NIE, LIST-9 zaznaczenie okna Quests wraca po zapisie. Log bez paczki: INFO."""
+    rep = Report()
+    s1 = m109list_selftest()
+    rep.add("LIST-S1: wyrazenia wobec linii wzorcowych (napisy jak w kodzie C#)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = m109list_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("LIST-S2: test syntetyczny (dobry i zly bieg przez te same funkcje progow)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("LIST-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = m109list_collect(logp)
+    print(f"plik: {logp} | sesji {len(D['wired'])}, start {len(D['start'])}, odtworzone {len(D['restored'])}, koniec {len(D['end'])}, zapisy {len(D['seq'])}, dob {len(D['day'])}, TEST {len(D['test'])}, ERROR {D['err']}")
+    m109list_rows(rep, D)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ m99markietani (21.10, w-toku/m99-markietani: rzad markietanow w menu obozu gracza - cyrulicy, zabawa,
 # sklep z polki miasta z narzutem, tylko duzy oboz; Armoury/src/CampSutlers.cs; klucz CampSutlersRow)
 M99M_TAG = "Markietani obozu (m99): "
@@ -59473,6 +59871,8 @@ def main(argv):
         return m100kryjowki_main(logp)   # m100kryjowki (21.10, w-toku/m100-kryjowki): wypatrzenie kryjowek ze Zwiadu, plotka odslania, miejsce nowych kryjowek (HideoutSight)
     if group == "m102tablica" and logp:
         return m102tablica_main(logp)   # m102tablica (21.10, w-toku/m102-tablica): tablica ogloszen - zadania gry, rozmowa z tablicy, listy gonczne kapitana strazy (NoticeBoard)
+    if group == "m109list" and logp:
+        return m109list_main(logp)   # m109list (23.10, w-toku/m109-list): przyjety list gonczy jako zadanie w oknie Quests - zdejmowane przed zapisem, odtwarzane po wczytaniu (NoticeBoard.Quest)
     if group == "m103lektor" and logp:
         return m103lektor_main(logp, csp)   # m103lektor (21.10, w-toku/m103-lektor): lektor - okna wydarzen ROT z nagran Davida, plotki na zywo przez ElevenLabs z pamiecia nagran (Lektor)
     if group == "m109muz" and logp:

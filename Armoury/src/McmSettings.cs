@@ -9192,6 +9192,10 @@ namespace Armoury
         [SettingPropertyGroup("Notice board")]
         public bool WatchBountyLordTopUp { get; set; } = true;
 
+        [SettingPropertyBool("Watch Bounty Quests", HintText = "a bounty you take up from the captain of the watch or a village headman appears in your Quests as 'Bounty' and the band's name: who posted it, on whom, the pay and the time left, with the band marked on your map and entries as the hunt goes on. Breaking the band pays you as before and closes it as completed; if someone else breaks them, the band scatters, the time runs out or the notice comes down, it closes unpaid with a note. The entry is not kept in your save - it is rebuilt from the notice board when you load, so your saves stay loadable without the mod. Off = the bounty is only on the board, with a mark on the map", RequireRestart = false)]
+        [SettingPropertyGroup("Notice board")]
+        public bool WatchBountyQuests { get; set; } = true;
+
         [SettingPropertyBool("Headman Bounties", HintText = "when a band has plundered one of the town's villages in the last 30 days and the village headman has no other work to offer, his notice is pinned on the town's board: the same pay as the watch's (the wages of the town's guardsmen), paid from the village purse above what the village keeps for hard times (a notice at most a quarter of that), at once to whoever breaks the band; you also gain +2 with the headman. You speak with him in the village (the notice marks it on your map). Needs the notice board with its villages on. Off = no headmen's notices", RequireRestart = false)]
         [SettingPropertyGroup("Notice board")]
         public bool HeadmanBounties { get; set; } = true;
@@ -11617,6 +11621,7 @@ namespace Armoury
             s.WatchBountyDays = WatchBountyDays;
             s.WatchBountyAiLords = WatchBountyAiLords;
             s.WatchBountyLordTopUp = WatchBountyLordTopUp;
+            s.WatchBountyQuests = WatchBountyQuests;
             s.HeadmanBounties = HeadmanBounties;
             s.NoticeBoardLeanSave = NoticeBoardLeanSave;
             s.PrologueEnabled = PrologueEnabled;

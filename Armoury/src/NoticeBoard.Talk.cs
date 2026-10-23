@@ -121,6 +121,7 @@ namespace Armoury
                     try
                     {
                         if (q == null || !q.IsOngoing) continue;
+                        if (IsOurQuest(q)) continue;   // m109-list: list gonczy z zadaniem stoi na tablicy jako list ("you took it up") - bez drugiego wpisu
                         var e = new Entry { K = Kind.Task, Quest = q, Hero = q.QuestGiver, Group = 0 };
                         e.Reward = QuestPay8.PromisedReward(q);
                         string title = Clean(SafeText(() => q.Title), 100) ?? "A task";
