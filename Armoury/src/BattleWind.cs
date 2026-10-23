@@ -199,6 +199,10 @@ namespace Armoury
                     // m111-walka (24.10): pojedynek (turniej, arena, pojedynek ROT) przy DuelFairGuard - Endurance najwyzej x DuelGuardEnduranceCap,
                     // razy mnoznik umiejetnosci SkillGuard; bitwy bez zmian
                     var cd = Settings.Current;
+                    // m111-postawa (Jeff 24.10: "czemu moj pasek postawy jest powiekszany, to cheatowanie, to bylo nieporozumienie" - 26.08 chodzilo o oddech,
+                    // nie o garde): klucz HeroPostureFromSkill - postura bohatera z umiejetnosci broni w reku (SkillGuard x0.75..1.5, jak szeregowi z tieru),
+                    // w bitwie i w pojedynku; Endurance juz nie powieksza gardy (zostaje przy oddechu - StaminaInitPostfix)
+                    if (cd != null && cd.HeroPostureFromSkill) { SkillPosture(agent, stance, cd); return; }
                     if (cd != null && cd.DuelFairGuard && BattleSense.InDuel(agent.Mission)) { DuelPosture(agent, hero, stance, cd); return; }
                     if (!Active) return;     // oddech bohaterow wylaczony przy starcie (BattleStaminaEnabled) - jak dotad bez mnoznika
                     float mul = EnduranceMul(hero);
@@ -224,10 +228,18 @@ namespace Armoury
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePosture, "BattleWind.PostureInit", e); }
         }
 
-        /// <summary>m111-walka: mnoznik postury z umiejetnosci pojedynku: clamp(0.75 + s / 400, 0.75, 1.5) - 24 x0.81, 100 x1.0, 180 x1.2, 250 x1.375.</summary>
+        /// <summary>m111-postawa: mnoznik postury bohatera z umiejetnosci broni - TA SAMA skala co szeregowi wedlug tieru (SoldierMul), tier rownowazny
+        /// t = 1 + (s - 20) / 32 (ciagly, 1..7: umiejetnosc 20 = T1, 84 = T3, 148 = T5, 180 = T6, 212+ = T7) - lord 180 broni sie jak szeregowy T6.
+        /// Przy domyslnych suwakach: 24 x0.86, 100 x1.20, 140 x1.43, 180 x1.70, 212+ x1.95. (Dotad m111-walka: 0.75 + s / 400 - lord 180 x1.2 przy T6 x1.7.)</summary>
         internal static float SkillGuard(int s)
         {
-            return Clamp(0.75f + s / 400f, 0.75f, 1.5f);
+            var c = Settings.Current;
+            float m1 = Clamp(c != null ? c.SoldierPostureTier1Multiplier : 0.85f, 0.5f, 1.5f);
+            float m6 = Clamp(c != null ? c.SoldierPostureTier6Multiplier : 1.7f, 1f, 3f);
+            double t = 1.0 + (s - 20) / 32.0;
+            if (t < 1.0) t = 1.0;
+            if (t > 7.0) t = 7.0;
+            return (float)(m1 * Math.Pow(m6 / m1, (t - 1.0) / 5.0));
         }
 
         /// <summary>m111-walka: najwyzszy mnoznik Endurance w pojedynku (klucz DuelGuardEnduranceCap, przyciety jak suwak 1..4).</summary>
@@ -270,6 +282,37 @@ namespace Armoury
                     Log.Info("BattleWind: gracz w pojedynku postura x" + mul.ToString("0.00", inv) + " (END x" + end.ToString("0.00", inv) + ", cap "
                              + cap.ToString("0.0#", inv) + ", skill " + s + (best > 0 ? ", najlepsza " + best : "") + ", pula "
                              + ((float)_fMaxPosture.GetValue(stance)).ToString("0", inv) + ").");
+                }
+            }
+        }
+
+        private static WeakReference _skillLogM;
+        private static float _skillLogMul = -1f;
+
+        /// <summary>m111-postawa: postura bohatera z umiejetnosci broni w reku (DuelAi.DuelSkill - bohater co najmniej udzial najlepszej) - pula i regeneracja
+        /// x SkillGuard(s); bez Endurance. Linia gracza raz na misje i przy zmianie mnoznika.</summary>
+        private static void SkillPosture(Agent agent, object stance, Settings c)
+        {
+            int held, best;
+            int s = DuelAi.DuelSkill(agent, c, out held, out best);
+            float mul = SkillGuard(s);
+            _fMaxPosture.SetValue(stance, (float)_fMaxPosture.GetValue(stance) * mul);
+            _fPosture.SetValue(stance, (float)_fPosture.GetValue(stance) * mul);
+            _fPostureRegen.SetValue(stance, (float)_fPostureRegen.GetValue(stance) * mul);
+            RoutHold.PostureHero(agent);
+            if (BattleSense.InDuel(agent.Mission)) DuelGuard.NotePosture(agent, mul, false);
+            if (agent.IsPlayerControlled)
+            {
+                var w = _skillLogM;
+                bool same = w != null && ReferenceEquals(w.Target, agent.Mission) && Math.Abs(_skillLogMul - mul) < 0.005f;
+                if (!same)
+                {
+                    _skillLogM = new WeakReference(agent.Mission);
+                    _skillLogMul = mul;
+                    var inv = System.Globalization.CultureInfo.InvariantCulture;
+                    Log.Info("BattleWind (m111-postawa): gracz postura x" + mul.ToString("0.00", inv) + " z umiejetnosci broni (skill " + s + ", w reku " + held
+                             + (best > 0 ? ", najlepsza " + best : "") + ", Endurance bez wplywu na garde" + (BattleSense.InDuel(agent.Mission) ? ", pojedynek" : ", bitwa")
+                             + ", pula " + ((float)_fMaxPosture.GetValue(stance)).ToString("0", inv) + ").");
                 }
             }
         }
@@ -344,8 +387,9 @@ namespace Armoury
                 // m111-walka (po recenzji): Duel Fair Guard tez potrzebuje latki InitializePosture - dotad przy wylaczonym oddechu i tierach nie dzialal,
                 // a linia "DuelAi tabela" mowila TAK; bitwy bez zmian (_baseOn = false -> postfiks poza pojedynkiem wychodzi od razu)
                 bool duelGuard = c != null && c.DuelFairGuard;
-                _baseOn = wind || tiers;
-                if (!wind && !tiers && !duelGuard) { Log.Info("BattleWind: wylaczone."); return; }
+                bool heroSkill = c != null && c.HeroPostureFromSkill;   // m111-postawa: postura bohaterow z umiejetnosci tez w bitwie - latka potrzebna poza pojedynkiem
+                _baseOn = wind || tiers || heroSkill;
+                if (!wind && !tiers && !duelGuard && !heroSkill) { Log.Info("BattleWind: wylaczone."); return; }
                 var tStance = QuartermasterLaw.FindType("RBMAI.Stance");
                 if (tStance == null) { Log.Info("BattleWind: RBM nieobecny - nic do roboty."); return; }
 

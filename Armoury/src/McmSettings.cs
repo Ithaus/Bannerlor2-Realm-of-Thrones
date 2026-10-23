@@ -1492,11 +1492,15 @@ namespace Armoury
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelPressureBursts { get; set; } = true;
 
+        [SettingPropertyBool("Hero Posture From Skill", HintText = "a hero's guard (RBM posture) follows the skill of the weapon in his hands - on the same scale as soldiers' guard by tier: skill 180 guards like a tier VI soldier (x1.7), a novice like a recruit (x0.85) - in battles and duels alike; Endurance no longer enlarges the guard, only the breath (stamina). Off = Endurance multiplies the guard as before", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public bool HeroPostureFromSkill { get; set; } = true;
+
         [SettingPropertyBool("Duel Fair Guard", HintText = "in tournaments, the arena and duels the guard (RBM posture) of a hero follows his weapon skill, and Endurance gives at most the bonus below: a novice's guard is smaller, a master's larger. Field battles keep the Endurance rule unchanged. Off = Endurance alone, as before", RequireRestart = false)]
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelFairGuard { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Duel Guard Endurance Cap", 1.00f, 4.00f, "0.00", HintText = "with Duel Fair Guard: the most Endurance can multiply a hero's guard in a duel (1.5 = half again; the field rule can give x3 and more)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Duel Guard Endurance Cap", 1.00f, 4.00f, "0.00", HintText = "only with Hero Posture From Skill off and Duel Fair Guard on: the most Endurance can multiply a hero's guard in a duel (1.5 = half again; the field rule can give x3 and more)", RequireRestart = false)]
         [SettingPropertyGroup("Duels and tournaments")]
         public float DuelGuardEnduranceCap { get; set; } = 1.5f;
 
@@ -9796,6 +9800,7 @@ namespace Armoury
             s.DuelAiBestSkillShare = DuelAiBestSkillShare;
             s.DuelAiTourneyRoundStep = DuelAiTourneyRoundStep;
             s.DuelPressureBursts = DuelPressureBursts;
+            s.HeroPostureFromSkill = HeroPostureFromSkill;
             s.DuelFairGuard = DuelFairGuard;
             s.DuelGuardEnduranceCap = DuelGuardEnduranceCap;
             s.DuelSkillGapWeight = DuelSkillGapWeight;
