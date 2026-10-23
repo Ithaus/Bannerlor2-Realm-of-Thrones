@@ -588,6 +588,10 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool GearFourStates { get; set; } = true;
 
+        [SettingPropertyBool("Missing Model Fix", HintText = "items whose 3D model the game cannot find get one at campaign start: the same model under its exact name (wrong letter case or a doubled underscore in a mod's file) or a similar game model for trade goods without one (limestone, marble, gold ore, gold ingot, gems) - so they show an icon and a look instead of nothing", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool MissingModelFix { get; set; } = true;
+
         [SettingPropertyBool("Worn Exact Hp Protection", HintText = "the armour, weapons and shields you and the companions in your party wear fight at their exact strength: a Damaged mail shirt with 56% of its strength left guards 41 of its 50, one with 78% guards 47 (the state alone gave 42 to both). Pieces in your bags and on traders stay by their state. Needs Gear Four States and Condition Scales Stats. Off: as before", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public bool WornExactHpProtection { get; set; } = true;
@@ -9522,6 +9526,7 @@ namespace Armoury
             s.ThresholdDamaged = ThresholdDamaged;
             s.ThresholdRuined = ThresholdRuined;
             s.GearFourStates = GearFourStates;
+            s.MissingModelFix = MissingModelFix;
             s.WornExactHpProtection = WornExactHpProtection;
             s.CompanionGearWear = CompanionGearWear;
             s.RepairCostFactor = RepairCostFactor;
