@@ -314,6 +314,8 @@ namespace Armoury
                 BattleWind.ApplyAll(_harmony);
                 // NB2 czesc 2 (16.10): weterani wedlug tieru - postfiks SetAiRelatedProperties po RBM (Priority.Last, after com.rbmai); wlasny try
                 try { VeteranAi.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VeteranAi.ApplyAll", e); }
+                // m111-walka (24.10): haki postury w pojedynku (RBM calculate*PostureDamage, handleDefender/handleAttacker, HitStopLogic.TriggerHitStop, Artem OnAgentHit)
+                try { DuelGuard.ApplyAll(_harmony); } catch (Exception e) { Log.Error("DuelGuard.ApplyAll", e); }
                 BkSupplyTemper.ApplyAll(_harmony);
                 try { BkSupplyMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSupplyMarket.ApplyAll", e); }   // 3.4: zakupy zaopatrzenia BK wedlug zapasu partii, zaplata do kasy osady (PRZED ksiega towarow)
                 try { BkSeal34.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSeal34.ApplyAll", e); }               // 3.4: rynek wsi BK, sprzedaz niewolnikow, wyposazenie rycerza BKROT - bez zlota z niczego (PRZED oknami ksiegi obiegu)
@@ -644,7 +646,8 @@ namespace Armoury
                         || (Settings.Current.FieldCraftEnabled && Settings.Current.AiFleeWhenNearDeath && Campaign.Current != null)))
                         || Settings.Current.SoldierPostureByTier || nb2b))
                     mission.AddMissionBehavior(new RoutKeeper());
-                if (mission != null && nb2b)
+                // m111-walka (24.10): BattleSense niesie tez flage pojedynku (turniej, arena, pojedynek ROT) dla DuelAi / DuelCraft / DuelGuard / BattleWind
+                if (mission != null && (nb2b || DuelGuard.AnyKey(Settings.Current)))
                     mission.AddMissionBehavior(new BattleSense());
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
                     && (NightRest.PlayerCamped || CampScene.TestWanted()))   // m109-oboz: test autotestu (plik armoury-oboz-bitwa.flag) - kazda bitwa w polu jak w obozie

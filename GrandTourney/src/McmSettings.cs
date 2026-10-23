@@ -160,9 +160,9 @@ namespace GrandTourney
         [SettingPropertyGroup("The lists themselves")]
         public bool NoblesFightInTournaments { get; set; } = true;
 
-        [SettingPropertyBool("Nobles Ignore Skill Gate", HintText = "a lord enters even below the games' skill bar - pride before prudence (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyBool("Nobles Ignore Skill Gate", HintText = "a lord enters even below the games' skill bar (100 in one-handed, two-handed or polearm) - pride before prudence; off = only lords who can really fight take places, skilled fighters fill the rest (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The lists themselves")]
-        public bool NoblesIgnoreSkillGate { get; set; } = true;
+        public bool NoblesIgnoreSkillGate { get; set; } = false;
 
         [SettingPropertyInteger("Max Nobles In Bracket", 0, 60, "0", HintText = "at most this many of the sixteen places go to lords (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The lists themselves")]

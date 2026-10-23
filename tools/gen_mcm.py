@@ -412,6 +412,11 @@ RANGES = {
     # NB2 (16.10): mnozniki postury szeregowych wedlug tieru - kod przycina do 0.5..1.5 (T1) i 1.0..3.0 (T6) (BattleWind.SoldierMul)
     'SoldierPostureTier1Multiplier': (0.5, 1.5, "0.00"),
     'SoldierPostureTier6Multiplier': (1.0, 3.0, "0.00"),
+    # m111-walka (24.10): pojedynki - kod przycina do 0..1, 0..0.2, 1..4, 0..1 (DuelAi.Share / RoundStep, BattleWind.DuelPostureMul, DuelGuard.Weight)
+    'DuelAiBestSkillShare': (0.0, 1.0, "0.00"),
+    'DuelAiTourneyRoundStep': (0.0, 0.2, "0.00"),
+    'DuelGuardEnduranceCap': (1.0, 4.0, "0.00"),
+    'DuelSkillGapWeight': (0.0, 1.0, "0.00"),
     # ZC0 (16.10): skala targu sigma - kod przycina do 28..73 (DailyLife.SigmaFromMcm; widelki projektu rozdz. 4)
     'DailyLifeMarketScale': (28, 73, "0"),
     # KS-R4 r4-kupcy (noc 17/18.10): kredyt kupcow KS-H - udzialy przycinane w kodzie do 0..1, zwloka 1..364 dob (KsFoodCarts.ConsignFloor / SrcExposure / OverdueDays)

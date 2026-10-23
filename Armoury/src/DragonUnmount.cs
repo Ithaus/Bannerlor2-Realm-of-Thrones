@@ -334,7 +334,8 @@ namespace Armoury
                             var swap = SkillsDecide.PatternFor(w.ItemType, sk);
                             if (swap == null) continue;
                             eq[(EquipmentIndex)slot] = new EquipmentElement(swap);
-                            if (_floorLog++ < 20)
+                            // m111-walka (24.10): w turnieju bez limitu 20 linii - lista broni wydanych rycerzom (dotad 4 linie na caly turniej KP)
+                            if (_floorLog++ < 20 || BattleSense.TourneyNow())
                                 Log.Info("ItemReq: bohater " + soldier.StringId + " nie udzwignie " + w.StringId
                                          + " (" + whyNot + ") - dostaje " + swap.StringId + ".");
                         }

@@ -30,6 +30,9 @@ namespace Armoury
     ///  - agresja wedlug tieru: obie szanse ataku x (0.8 + 0.08 x (tier - 1)) - T1 x0.80, T4 x1.04, T6 x1.20, T7 x1.28.
     /// Wydajnosc: RBM wola to dla kazdego czlowieka co 3 s (StanceLogic.cs:1923-1932) - bez LINQ i alokacji (poza zbiorem liczb do linii misji).
     /// Wyjatek liczony (RoutHold.Stumble, miejsce "weteran"), funkcja dalej dziala.
+    /// m111-walka faza 1 (24.10): ten sam postfiks niesie profil pojedynku (DuelAi, klucz DuelAiEnabled) - latka wpinana, gdy VeteransByTier
+    /// albo DuelAiEnabled; w misji pojedynku (BattleSense.InDuel) przy DuelAiEnabled biegnie DuelAi.Apply i wyjscie, w bitwie kod weteranow bez
+    /// zmian. Brama galezi RBM (RbmBranchOn) wspolna; czynnik zmeczenia RBM sFac = clamp(AIDecideOnAttackChance / 0.5, 0.85, 1) czytany na wejsciu.
     /// </summary>
     internal static class VeteranAi
     {
@@ -88,7 +91,7 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                if (c == null || !c.VeteransByTier) { Log.Info("VeteranAi (NB2): weterani wedlug tieru wylaczeni przy starcie (VeteransByTier) - latka niewpieta."); return; }
+                if (c == null || (!c.VeteransByTier && !c.DuelAiEnabled)) { Log.Info("VeteranAi (NB2): weterani wedlug tieru i Duel AI wylaczeni przy starcie (VeteransByTier, DuelAiEnabled) - latka niewpieta."); return; }
                 if (QuartermasterLaw.FindType("RBMAI.AgentAi") == null) { Log.Info("VeteranAi (NB2): RBM nieobecny - latka niewpieta (wspolczynniki gry bez zmian)."); return; }
                 _target = AccessTools.DeclaredMethod(typeof(AgentStatCalculateModel), "SetAiRelatedProperties");
                 if (_target == null) { Log.Info("VeteranAi (NB2): brak AgentStatCalculateModel.SetAiRelatedProperties - latka niewpieta."); return; }
@@ -96,7 +99,8 @@ namespace Armoury
                 var r = h.Patch(_target, postfix: hm);
                 Patched = r != null && Owned(_target, h.Id);
                 Log.Info("VeteranAi (NB2): weterani wedlug tieru - latka SetAiRelatedProperties " + (Patched ? "wpieta" : "NIEWPIETA")
-                         + " (postfiks Priority.Last po com.rbmai; klucz VeteransByTier na zywo, przy starcie TAK; prog tieru 0.05 + 0.13 x (T-1), limity RBM wyzej od T5, agresja x0.80..x1.28).");
+                         + " (postfiks Priority.Last po com.rbmai; klucze VeteransByTier i DuelAiEnabled na zywo, przy starcie " + (c.VeteransByTier ? "TAK" : "NIE") + " / "
+                         + (c.DuelAiEnabled ? "TAK" : "NIE") + "; prog tieru 0.05 + 0.13 x (T-1), limity RBM wyzej od T5, agresja x0.80..x1.28; w pojedynku profil DuelAi).");
             }
             catch (Exception e) { Log.Error("VeteranAi.ApplyAll", e); }
         }
@@ -165,6 +169,9 @@ namespace Armoury
             return dflt;
         }
 
+        /// <summary>m111-walka: mnoznik trudnosci RBM teraz (tabela DuelAi, lista meczu, poziom w hakach postury).</summary>
+        internal static float DiffMulNow() { return DiffMul(); }
+
         /// <summary>RBM: CampaignOptions.CombatAIDifficulty 0 / 1 / 2 -> 0.7 / 0.85 / 1.0 (Utilities.GetCombatAIDifficultyMultiplier, bez vanillaCombatAi).</summary>
         private static float DiffMul()
         {
@@ -183,6 +190,13 @@ namespace Armoury
         {
             dm = 1f;
             if (!BattleSense.InBattle(m)) return false;
+            return RbmBranchOn(m, out dm);
+        }
+
+        /// <summary>m111-walka: galaz RBM "postura, bez vanillaCombatAi" i mnoznik trudnosci - liczone raz na misje (wspolne dla bitwy i pojedynku).</summary>
+        internal static bool RbmBranchOn(Mission m, out float dm)
+        {
+            dm = 1f;
             var gm = _gm;
             if (gm != null && ReferenceEquals(gm.Target, m)) { dm = _gDm; return _gOn; }
             bool on = false;
@@ -219,7 +233,7 @@ namespace Armoury
         }
 
         /// <summary>Tarcza w drugiej rece (jak flaga RBM: bron drugiej reki to tarcza).</summary>
-        private static bool HasShield(Agent agent)
+        internal static bool HasShield(Agent agent)
         {
             var idx = agent.GetOffhandWieldedItemIndex();
             if (idx < EquipmentIndex.WeaponItemBeginSlot || idx >= EquipmentIndex.NumAllWeaponSlots) return false;
@@ -235,11 +249,21 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                if (c == null || !c.VeteransByTier) return;
+                if (c == null) return;
                 if (agent == null || agentDrivenProperties == null || __instance == null) return;
                 var m = agent.Mission;
                 if (m == null) return;
                 float dm;
+                // m111-walka: pojedynek (turniej, arena, pojedynek ROT) - profil DuelAi zamiast weteranow; czynnik zmeczenia RBM z jego wyniku
+                if (c.DuelAiEnabled && BattleSense.InDuel(m))
+                {
+                    if (!RbmBranchOn(m, out dm)) return;
+                    float sFac = Clamp(agentDrivenProperties.AIDecideOnAttackChance / 0.5f, 0.85f, 1f);
+                    try { DuelAi.Apply(agent, agentDrivenProperties, equippedItem, secondaryItem, __instance, dm, sFac, c); }
+                    catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelAi.Apply", e); }
+                    return;
+                }
+                if (!c.VeteransByTier) return;
                 if (!GateFor(m, out dm)) return;
                 if (!agent.IsHuman || agent.IsMainAgent || !agent.IsAIControlled) return;
                 var ch = agent.Character;

@@ -1476,6 +1476,46 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool AutoParryMirrorSides { get; set; } = true;
 
+        [SettingPropertyBool("Duel Ai Enabled", HintText = "in tournaments, the arena and duels a skilled opponent fights like one: he attacks on his own, ripostes after a parry, feints and kicks, and does not stand behind his guard waiting for you - from skill 100 up, the higher his skill the bolder he is; at 100 and below he fights as RBM sets him. A knight handed an unfamiliar weapon in the lists still fights with most of his best skill, and later rounds of a tournament field harder opponents. Needs RBM with posture; field battles are not touched. Off = plain RBM in duels, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public bool DuelAiEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Duel Ai Best Skill Share", 0.00f, 1.00f, "0.00", HintText = "with Duel AI: a hero's fighting skill in a duel is at least this share of his best skill in one-handed, two-handed or polearm, whatever weapon the lists hand him (you too, for the guard rules) - 0.8 = a 180 swordsman fights with a polearm as a 144; 0 = only the skill of the weapon in hand", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public float DuelAiBestSkillShare { get; set; } = 0.8f;
+
+        [SettingPropertyFloatingInteger("Duel Ai Tourney Round Step", 0.00f, 0.20f, "0.00", HintText = "with Duel AI: each round of a tournament raises the opponents' fighting level by this share (0.08 = +8% in the second round, +24% in the final), as the game intends and RBM forgets; 0 = every round alike", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public float DuelAiTourneyRoundStep { get; set; } = 0.08f;
+
+        [SettingPropertyBool("Duel Pressure Bursts", HintText = "with Duel AI: a skilled opponent seizes his moment - when your guard breaks on him he strikes back at once (about a second), and when you keep him on the defence he answers with a quick flurry of attacks, kicks and counter-strikes instead of only blocking (from skill 140, at most every 3 seconds). Off = steady behaviour only", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public bool DuelPressureBursts { get; set; } = true;
+
+        [SettingPropertyBool("Duel Fair Guard", HintText = "in tournaments, the arena and duels the guard (RBM posture) of a hero follows his weapon skill, and Endurance gives at most the bonus below: a novice's guard is smaller, a master's larger. Field battles keep the Endurance rule unchanged. Off = Endurance alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public bool DuelFairGuard { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Duel Guard Endurance Cap", 1.00f, 4.00f, "0.00", HintText = "with Duel Fair Guard: the most Endurance can multiply a hero's guard in a duel (1.5 = half again; the field rule can give x3 and more)", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public float DuelGuardEnduranceCap { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Duel Skill Gap Weight", 0.00f, 1.00f, "0.00", HintText = "in tournaments, the arena and duels a weapon skill gap counts in every clash of blades: the better fighter's guard suffers less from your blocked or parried blows and yours more - 0.5 = a 156-point gap costs you about 30% more guard per blow and him 30% less (limits 0.6x-1.4x); 0 = RBM only (the gap barely counts)", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public float DuelSkillGapWeight { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Duel Perfect Defence", HintText = "in tournaments, the arena and duels a clean parry costs the defender half the guard of a plain block (a parry with the shield 80%), and a chamber - meeting the blow with your own - costs him a quarter and the attacker double, as RBM meant but never applied. Off = plain RBM", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public bool DuelPerfectDefence { get; set; } = true;
+
+        [SettingPropertyBool("Duel No Slow Motion", HintText = "in tournaments, the arena and duels breaking someone's guard does not slow the game down (RBM's slow motion, which gave you free time to strike); slow motion on a kill and everything in field battles stay as they are. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public bool DuelNoSlowMotion { get; set; } = true;
+
+        [SettingPropertyBool("Duel No Injured Collapse", HintText = "in tournaments, the arena and duels an AI fighter badly hurt (Artem's Lively Animations below its health threshold) no longer staggers, falls on a leg hit and fights on crippled at half speed - he fights to the end. You and field battles keep the animations. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Duels and tournaments")]
+        public bool DuelNoInjuredCollapse { get; set; } = true;
+
         [SettingPropertyBool("Autotest Battle Kit", HintText = "test runs only (the CrashScribe automatic test, switched on by its autotest.json file) - no effect in your game: before a test battle the test company's men get the missing pieces of their own troop kit into the company stores, as recruits bring theirs, so the battle test fights armed; after the battle the same pieces are taken away again. Off = test men fight with whatever the stores hold, as before", RequireRestart = false)]
         [SettingPropertyGroup("Automatic test only")]
         public bool AutotestBattleKit { get; set; } = true;
@@ -9752,6 +9792,16 @@ namespace Armoury
             s.AutoParryFullDiff = AutoParryFullDiff;
             s.AutoParryTwoHandedOnly = AutoParryTwoHandedOnly;
             s.AutoParryMirrorSides = AutoParryMirrorSides;
+            s.DuelAiEnabled = DuelAiEnabled;
+            s.DuelAiBestSkillShare = DuelAiBestSkillShare;
+            s.DuelAiTourneyRoundStep = DuelAiTourneyRoundStep;
+            s.DuelPressureBursts = DuelPressureBursts;
+            s.DuelFairGuard = DuelFairGuard;
+            s.DuelGuardEnduranceCap = DuelGuardEnduranceCap;
+            s.DuelSkillGapWeight = DuelSkillGapWeight;
+            s.DuelPerfectDefence = DuelPerfectDefence;
+            s.DuelNoSlowMotion = DuelNoSlowMotion;
+            s.DuelNoInjuredCollapse = DuelNoInjuredCollapse;
             s.AutotestBattleKit = AutotestBattleKit;
             s.CavalryNeedsMounts = CavalryNeedsMounts;
             s.WarHorseFromTier = WarHorseFromTier;

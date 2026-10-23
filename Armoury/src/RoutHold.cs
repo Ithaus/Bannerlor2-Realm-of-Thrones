@@ -53,8 +53,10 @@ namespace Armoury
         internal const int SiteTactics = 3, SiteVeteran = 4, SiteGore = 5, SiteVoice = 6;
         // NB2 czesc 3 (16.10): kaluze krwi na ziemi (BloodPools)
         internal const int SitePools = 7;
-        private const int Sites = 8;
-        private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze" };
+        // m111-walka (24.10): pojedynki - DuelAi, DuelCraft, DuelGuard (turniej, arena, pojedynek ROT)
+        internal const int SiteDuel = 8;
+        private const int Sites = 9;
+        private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -174,6 +176,12 @@ namespace Armoury
                 }
             }
             catch { }
+        }
+
+        /// <summary>m111-walka: potkniecia miejsca w biezacej misji (do linii "Pojedynek (DU)") - wolajacy trzyma Gate.</summary>
+        internal static int StumblesLocked(int site)
+        {
+            return site >= 0 && site < Sites ? Stum[site] : 0;
         }
 
         // ------------------------------------------------------------ misja

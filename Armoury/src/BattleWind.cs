@@ -191,6 +191,10 @@ namespace Armoury
                 var hero = HeroOf(agent);
                 if (hero != null)
                 {
+                    // m111-walka (24.10): pojedynek (turniej, arena, pojedynek ROT) przy DuelFairGuard - Endurance najwyzej x DuelGuardEnduranceCap,
+                    // razy mnoznik umiejetnosci SkillGuard; bitwy bez zmian
+                    var cd = Settings.Current;
+                    if (cd != null && cd.DuelFairGuard && BattleSense.InDuel(agent.Mission)) { DuelPosture(agent, hero, stance, cd); return; }
                     if (!Active) return;     // oddech bohaterow wylaczony przy starcie (BattleStaminaEnabled) - jak dotad bez mnoznika
                     float mul = EnduranceMul(hero);
                     _fMaxPosture.SetValue(stance, (float)_fMaxPosture.GetValue(stance) * mul);
@@ -213,6 +217,56 @@ namespace Armoury
                 RoutHold.PostureSoldier(agent, tier, max0, max0 * k);
             }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePosture, "BattleWind.PostureInit", e); }
+        }
+
+        /// <summary>m111-walka: mnoznik postury z umiejetnosci pojedynku: clamp(0.75 + s / 400, 0.75, 1.5) - 24 x0.81, 100 x1.0, 180 x1.2, 250 x1.375.</summary>
+        internal static float SkillGuard(int s)
+        {
+            return Clamp(0.75f + s / 400f, 0.75f, 1.5f);
+        }
+
+        /// <summary>m111-walka: najwyzszy mnoznik Endurance w pojedynku (klucz DuelGuardEnduranceCap, przyciety jak suwak 1..4).</summary>
+        internal static float DuelCap(Settings c)
+        {
+            return Clamp(c != null ? c.DuelGuardEnduranceCap : 1.5f, 1f, 4f);
+        }
+
+        private static WeakReference _duelLogM;
+        private static float _duelLogMul = -1f;
+
+        /// <summary>
+        /// m111-walka faza 1 (24.10, Jeff: "z drzewcem, ktorego sie dopiero ucze, bije duzo wyzsze poziomy"): POSTURA BOHATERA W POJEDYNKU (klucz DuelFairGuard).
+        /// Dowod [K/L]: pula postury bohatera rosla tylko z Endurance (2^((END-2.5)/2.5) - gracz x3.48, ok. 550 pkt), a RBM liczy ja prawie bez umiejetnosci
+        /// broni - nowicjusz z drzewcem mial garde 2-3 razy wieksza niz rycerz 180. Zasada: mnoznik = min(Endurance, DuelGuardEnduranceCap) x SkillGuard(s),
+        /// s - umiejetnosc pojedynku (DuelAi.DuelSkill: bron w reku, bohater co najmniej udzial najlepszej); pula i regeneracja postury x mnoznik,
+        /// stamina bez zmian. Bez oddechu bohaterow (BattleStaminaEnabled wylaczony) Endurance liczy sie x1. Linia gracza raz na misje i przy zmianie.
+        /// </summary>
+        private static void DuelPosture(Agent agent, Hero hero, object stance, Settings c)
+        {
+            float end = Active ? EnduranceMul(hero) : 1f;
+            float cap = DuelCap(c);
+            int held, best;
+            int s = DuelAi.DuelSkill(agent, c, out held, out best);
+            float mul = Math.Min(end, cap) * SkillGuard(s);
+            _fMaxPosture.SetValue(stance, (float)_fMaxPosture.GetValue(stance) * mul);
+            _fPosture.SetValue(stance, (float)_fPosture.GetValue(stance) * mul);
+            _fPostureRegen.SetValue(stance, (float)_fPostureRegen.GetValue(stance) * mul);
+            RoutHold.PostureHero(agent);
+            DuelGuard.NotePosture(agent, mul, end > cap + 1e-4f);
+            if (agent.IsPlayerControlled)
+            {
+                var w = _duelLogM;
+                bool same = w != null && ReferenceEquals(w.Target, agent.Mission) && Math.Abs(_duelLogMul - mul) < 0.005f;
+                if (!same)
+                {
+                    _duelLogM = new WeakReference(agent.Mission);
+                    _duelLogMul = mul;
+                    var inv = System.Globalization.CultureInfo.InvariantCulture;
+                    Log.Info("BattleWind: gracz w pojedynku postura x" + mul.ToString("0.00", inv) + " (END x" + end.ToString("0.00", inv) + ", cap "
+                             + cap.ToString("0.0#", inv) + ", skill " + s + (best > 0 ? ", najlepsza " + best : "") + ", pula "
+                             + ((float)_fMaxPosture.GetValue(stance)).ToString("0", inv) + ").");
+                }
+            }
         }
 
         /// <summary>NB2: tier jednostki z poziomu jak w grze (DefaultCharacterStatsModel.GetTier: ceil((Level - 5) / 5)), 1..7. Bez

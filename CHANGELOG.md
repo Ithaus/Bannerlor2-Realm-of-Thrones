@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## m111-walka faza 1 (galaz w-toku/m111-walka) - 24.10.2026: grozni przeciwnicy w turnieju, na arenie i w pojedynku (bitwy bez zmian)
+
+**Problem:** Jeff (23.10): "jak atakuje caly czas, przeciwnik sie tylko broni; z drzewcem, ktorego sie dopiero ucze, bije duzo wyzsze poziomy; nie czulem,
+ze rycerz Gwardii Krolewskiej jest mocny". Log 22.10/23.10: gracz Polearm 24 wygral Duskendale i King's Landing (final 25 s); 'Requires Polearm 175 - this troop has 0'.
+**Przyczyna (rozpoznanie m110 walka-recon.json, dekompilacja RBM/gra/Artem):** (1) RBM w galezi z postura daje kazdemu od ok. 100 umiejetnosci zolwia
+(AgentAi.cs:95-121: decyzja o ataku 0.5, atak po decyzji 0.15, trzymanie zamachu 1 s, atak po parowaniu <= 0.4), a VeteranAi dzialal tylko w bitwach;
+(2) poziom AI = umiejetnosc broni wydanej przez mecz (rycerz 180 z halabarda = nowicjusz), mnoznik rundy gry nie dochodzi (RBM go nie czyta, trafia na opakowanie Artema);
+(3) postura: pula bohatera tylko z Endurance (gracz x3.48), roznica umiejetnosci liczy sie ok. 20%, modyfikatory parowania/chamber RBM nadpisane na 1 (StanceLogic.cs:843, :912),
+zwolnione tempo po zlamaniu gardy tylko dla gracza; (4) Artem ponizej 20 HP wali AI na ziemie i tnie predkosc ciosu do x0.45; (5) GrandTourney wpuszczal lordow bez progu.
+**Zmiana (faza 1 planu, tylko misje pojedynku - BattleSense.InDuel: rodzaj turniej / arena albo bez bitwy na mapie i zachowanie z "Duel" w nazwie):**
+- BattleSense: flaga pojedynku i runda (TournamentBehavior.CurrentRoundIndex 0..3) liczone w EarlyStart (OnBehaviorInitialize nie biegnie dla naszych zachowan) i AfterStart;
+  tick pojedynku (zrywy, probkowanie, lista meczu, linie DU), OnMeleeHit; rejestracja takze przy kluczach pojedynku. Linia "pojedynek: <rodzaj> przez <typ>".
+- DuelAi.cs (z VeteranAi.Postfix, ta sama latka SetAiRelatedProperties po com.rbmai; latka wpinana przy VeteransByTier albo DuelAiEnabled): s = umiejetnosc broni w reku,
+  bohater co najmniej 0.8 x najlepsza z OH/2H/Polearm; L = s/250 x trudnosc x (1 + 0.08 x runda); od L 0.40 profil Shape (przy 100 = RBM, przy 250: AoD 0.45, DoA 0.35,
+  AoP 0.6, parowanie 0.85, wyczucie bloku 0.6, trzymanie 0.12 s, chamber 0.15, kopniecie 0.4) + pola gry wedlug L; ponizej 0.40 RBM bez zmian.
+- DuelCraft.cs: zrywy - OTWARCIE 1.2 s po zlamaniu gardy atakujacego na obronie AI (L >= 0.40), NACISK 1.5 s po 3 obronach w 4 s albo posturze < 40% (L >= 0.56, przerwa 3 s);
+  UpdateAgentStats tylko z OnMissionTick, najwyzej 8 na klatke; tablice czytane przez postfiks rosna tylko w ticku.
+- DuelGuard.cs: hak A postfiksy calculateDefender/AttackerPostureDamage (roznica umiejetnosci x clamp(1 -/+ 0.5 g, 0.6, 1.4), parowanie x0.5, tarcza x0.8, chamber x0.25 / x2.0);
+  hak B prefiks+postfiks handleDefender/handleAttacker (zlamania, zrywy, komunikat gracza "{FOE} turns your blow aside - your guard is broken!" raz na 6 s przy g >= 0.24);
+  hak C prefiks HitStopLogic.TriggerHitStop (priorytet 3 odrzucony w pojedynku); hak D prefiks Artem OnAgentHit (AI w pojedynku pominiete). Sygnatury sprawdzane, linia wpieta/NIEWPIETA.
+  Rodzaj ciosu z danych kolizji wedlug tablicy RBM (bez __args - bez pudelkowania przy kazdym ciosie w bitwach). NIE latane TriggerParryHitStop / TriggerPostureBreakHitStop (lekcja GC 19.10).
+- BattleWind: bohater w pojedynku - postura x min(Endurance, 1.5) x SkillGuard(s) = clamp(0.75 + s/400, 0.75, 1.5); linia "BattleWind: gracz w pojedynku postura x...".
+- GrandTourney: NoblesIgnoreSkillGate domyslnie false, prog = OH/2H/Polearm >= 100 (Polearm dotad brakowal). ItemReq w turnieju bez limitu 20 linii.
+- Linie: "DuelAi tabela (m111-walka)" (start sesji), "DuelGuard (m111-walka): haki ..." (start procesu), "DU agent ..." (najwyzej 40 na misje), "Turniej (DU): runda R, mecz N | ...",
+  "Pojedynek (DU): misja ..." (koniec misji: pasma AI, probkowanie akcji co 0.1 s najwyzej 32 AI, kontakty, zlamania, zrywy, zwolnienia, Artem, postura, haki, czas hakow, potkniecia).
+- Klucze (grupa MCM "Duels and tournaments"): DuelAiEnabled, DuelAiBestSkillShare 0.8, DuelAiTourneyRoundStep 0.08, DuelPressureBursts, DuelFairGuard, DuelGuardEnduranceCap 1.5,
+  DuelSkillGapWeight 0.5, DuelPerfectDefence, DuelNoSlowMotion, DuelNoInjuredCollapse; nowe miejsce potkniec RoutHold "pojedynek".
+**Ryzyko / co sprawdzic:** znaczenie natywnych pol AI wnioskowane (kod C++) - kierunek potwierdzi dopiero probkowanie DU (zamachy na minute, % obrony, riposty); suma zmian
+(postura x SkillGuard, roznica, parowanie, zrywy) moze zrobic turnieje duzo trudniejsze - stroic najpierw DuelSkillGapWeight, potem DuelGuardEnduranceCap; pojedynek ROT
+niezweryfikowany (linia "pojedynek: ... przez ..."); gracz tez dostaje 0.8 x najlepsza w posturze; Artem pominiety w pojedynku takze bez krwawienia AI. Bitwy: haki wychodza
+po odczycie flagi, VeteranAi w bitwie bez zmian. Faza 2 (bitwy) nie robiona. Autotest areny (pkt 9 planu) nie robiony.
+**Status:** DO SPRAWDZENIA (build Armoury i GrandTourney kod 0; bez autotestu).
+
 ## n32 + m103-gospodarka3 (kandydat WGRANIA 102) - 21.10.2026
 
 - Scalone: w-toku/m103-gospodarka3 (czesc 3: koszyk wsi ZC4 przy cenach polki z budzetu z biezacego utargu - klucz KsVillageBasketAtShelf; grupa m103wsie) bez konfliktow; gen_mcm Armoury 2273; build 5 modow kod 0; ast sprawdz_logi bez dubli.

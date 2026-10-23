@@ -164,8 +164,10 @@ namespace GrandTourney
                         if (h.Age < (float)comesOfAge) { other++; return; }
                         if (!s.NoblesIgnoreSkillGate)
                         {
+                            // m111-walka (24.10): prog gry = najlepsza z trzech broni bialych >= 100 (dotad bez Polearm - wlocznik 150 odpadal)
                             if (h.GetSkillValue(TaleWorlds.Core.DefaultSkills.OneHanded) < 100 &&
-                                h.GetSkillValue(TaleWorlds.Core.DefaultSkills.TwoHanded) < 100) { unskilled++; return; }
+                                h.GetSkillValue(TaleWorlds.Core.DefaultSkills.TwoHanded) < 100 &&
+                                h.GetSkillValue(TaleWorlds.Core.DefaultSkills.Polearm) < 100) { unskilled++; return; }
                         }
                         if (list.Contains(h.CharacterObject)) return;
                         if (!cands.Contains(h)) cands.Add(h);

@@ -53,7 +53,9 @@ namespace GrandTourney
 
         // --- The lists themselves ---
         public bool NoblesFightInTournaments = true;       // lords present in town take their rightful places in the bracket - troops only fill what remains
-        public bool NoblesIgnoreSkillGate = true;          // a lord enters even below the games' skill bar - pride before prudence
+        // m111-walka (24.10): domyslnie wylaczone - lordowie ponizej progu (100 w jednej z broni bialych) wchodzili do drabinki z Polearm 0 i dostawali
+        // wydana bron, ktorej nie umieja (log 22:52:42 'Requires Polearm 175 - this troop has 0'); miejsca biora wtedy wprawni zastepcy RBM (tier 5+)
+        public bool NoblesIgnoreSkillGate = false;         // a lord enters even below the games' skill bar (100 in one-handed, two-handed or polearm) - pride before prudence; off = only lords who can really fight take places, skilled fighters fill the rest
         public int MaxNoblesInBracket = 15;                // at most this many of the sixteen places go to lords
         public bool TourneyRansom = true;                  // whoever loses a fight in the lists forfeits his own horse and armour to the victor, or buys them back at their worth in their present state (worn gear is cheaper); you, your companions (only when you ride in the lists yourself) and the AI knights alike - a common soldier fights in borrowed kit, ladies and townsfolk wager nothing, kin never ransom kin, a tourney called off costs nobody; an AI lord pays only from what his house can spare beyond its war chest, the victor wears what is better than his own, and the vanquished buys plain kit at the market
 
