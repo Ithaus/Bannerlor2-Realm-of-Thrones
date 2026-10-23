@@ -73,6 +73,26 @@ namespace Armoury
             return s;
         }
 
+        /// <summary>Dopisek dla gracza (EN) przy mierze bez rozmowcy (Measure(me, null) - bez premii przywodcy; recenzja R4 m109-przesluch): "; Natural Leader adds +25
+        /// with men of other peoples". Bez perkow przywodcy - "".</summary>
+        internal static string LeaderNote(Hero me)
+        {
+            if (me == null) return "";
+            try
+            {
+                bool moral = me.GetPerkValue(DefaultPerks.Charm.MoralLeader), natural = me.GetPerkValue(DefaultPerks.Charm.NaturalLeader);
+                if (moral && natural) return "; Moral Leader adds +" + LeaderBonus + " with men of your own people, Natural Leader +" + LeaderBonus + " with all others";
+                if (moral) return "; Moral Leader adds +" + LeaderBonus + " with men of your own people";
+                if (natural) return "; Natural Leader adds +" + LeaderBonus + " with men of other peoples";
+            }
+            catch (Exception e)
+            {
+                _stumbles++;
+                if (_stumbles <= 3 || _stumbles % 50 == 0) Log.Error("Persuasion.LeaderNote (potkniecie " + _stumbles + ")", e);
+            }
+            return "";
+        }
+
         /// <summary>Do logu (PL): "Urok 15 + Imposing Stature 0 + Meaningful Favors 0 + przywodca 0 (-) + mistrz 0 + trudnosc 0 = 15".</summary>
         internal static string LogText(Parts p)
         {

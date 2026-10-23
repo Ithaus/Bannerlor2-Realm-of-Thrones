@@ -23,21 +23,29 @@ namespace Armoury
     /// Opcja "Question the prisoners" w naszym menu obozu arm_camp_wait (ZWYKLE menu, czas stoi - bez SwitchToMenu, okna przez inquiry jak DistrictMenu/MusterBook).
     ///  - JENCY-BANDYCI: zwykly zolnierz Occupation Bandit albo kultura bandytow (jak PrisonerLaw.Criminal); bohater Occupation Bandit albo z klanu bandytow; nigdy
     ///    wight (PeopleBook.IsWight). Grupa = stos jednego rodzaju zolnierza (klucz StringId) albo jeden bohater ("h:" + StringId).
-    ///  - PAMIEC BAND (zapis arm_interrogation): po kazdej WYGRANEJ bitwie gracza z banda wpis kultura bandy (klan), jej kryjowka (BanditPartyComponent.Hideout),
+    ///  - PAMIEC BAND (zapis arm_interrogation): po kazdej WYGRANEJ bitwie gracza z banda wpis kultura bandy, jej kryjowka (BanditPartyComponent.Hideout),
     ///    miejsce bitwy, doba; najwyzej MemoryMax (30) wpisow, starsze niz MemoryDays (60) dob odpadaja. Skladu bandy nie zapisujemy (MapEventParty.Troops jest
-    ///    przebudowywane z biezacego skladu - w MapEventEnded bywa puste).
+    ///    przebudowywane z biezacego skladu - w MapEventEnded bywa puste). Kultura bandy = kultura jej zolnierzy z szablonu klanu (BandCulture; recenzja R4:
+    ///    northern_pirates z NavalDLC ma klan kultury looters, a zolnierzy sea_raiders), bez zolnierza-bandyty w szablonie - kultura klanu.
+    ///  - KAJDANY (zapis arm_interrogation, recenzja R5): stos jencow-bandytow (klucz grupy) -> pierwsza doba w lochu gracza; uzupelniane w linii doby (doba - 1:
+    ///    pojmani najpozniej wczoraj), stosy, ktorych juz nie ma, odpadaja. Bez wpisu (pojmani dzis) - doba dzis. Bohater - CaptivityStartTime.
     ///  - KTORA KRYJOWKE ZNA JENIEC, po kolei: (a) bohater - BornSettlement, gdy to kryjowka zajeta i niewypatrzona (BK rodzi herszta w kryjowce jego bandy);
-    ///    (b) pamiec bandy - najnowszy wpis tej kultury, jego kryjowka zajeta i niewypatrzona, w dowolnej odleglosci; (c) kryjowka jego ludzi - najblizsza zajeta,
-    ///    niewypatrzona kryjowka tej kultury do LairRange (160 jedn., jak plotka o kryjowce) od miejsca bitwy z wpisu, bez wpisu od obozu; (d) nic - grupa szara
-    ///    z powodem (kultura bez kryjowek / wszystkie znane / zadnej w zasiegu). Kultura kryjowki = Settlement.Culture (gra osadza bandy w kryjowkach swojej kultury).
-    ///  - ROZMOWA: clamp(0.10 + P/400 + 0.05 ranny + 0.02 x min(5, doby od bitwy | doby niewoli bohatera) - 0.03 x (tier - 1) - 0.15 bohater, 0.05, 0.85);
+    ///    (b) pamiec bandy - najnowszy wpis tej kultury nie pozniejszy niz pierwsza doba jenca w lochu (banda pobita po jego pojmaniu to nie jego banda), jego
+    ///    kryjowka zajeta i niewypatrzona, w dowolnej odleglosci; (c) kryjowka jego ludzi - najblizsza zajeta, niewypatrzona kryjowka tej kultury do LairRange
+    ///    (160 jedn., jak plotka o kryjowce) od miejsca bitwy z tego wpisu, bez wpisu od obozu; (d) nic - grupa szara z powodem (kultura bez kryjowek / wszystkie
+    ///    znane / zadnej w zasiegu). Kultura kryjowki = Settlement.Culture (gra osadza bandy w kryjowkach swojej kultury).
+    ///  - ROZMOWA: clamp(0.10 + P/400 + 0.05 ranny + 0.02 x min(5, doby w lochu | doby niewoli bohatera) - 0.03 x (tier - 1) - 0.15 bohater, 0.05, 0.85);
     ///    P = Persuasion.Measure (Urok i perki perswazji) wobec kultury jenca; wybrany ranny, jesli jest. XP Uroku +20 za sukces, +5 za porazke.
     ///  - TORTURY: clamp(skladniki rozmowy + 0.30 + Lotrostwo/600 + 0.10 Scarface, 0.05, 0.95); wybrany zdrowy, jesli jest. Smierc (rzut niezalezny): 0.15 zdrowy,
     ///    0.30 ranny, x 0.8 z Forgivable Grievances. Zwykly: zdjety z lochu i "straceni" ksiegi ludzi (PeopleBook FDieExec, jak OthersRise); bohater:
     ///    KillCharacterAction.ApplyByMurder (bez Honoru -1000 egzekucji; weto CanHeroDie - przezywa, log). XP Lotrostwa +20, +10 gdy mowi.
     ///    Kary: Mercy -20 za torture, -40 wiecej za smierc (TraitLevelingHelper.OnIncidentResolved); przy smierci -2 relacji z bohaterami druzyny z Mercy >= 1
     ///    i plotka w karczmach (Rumours.AddCruelty, wiesc NCruel).
-    ///  - LIMIT: jedna rozmowa i jedna tortura na grupe na dobe (czas w menu obozu stoi - przesluchanie nie zjada godzin).
+    ///  - LIMIT: jedna rozmowa i jedna tortura na dobe na rodzaj bandy (kultura jencow - LimitKey; szablon bandy ROT ma 3 rodzaje zolnierzy, a wszystkie wskazuja
+    ///    te sama kryjowke - recenzja R3) albo na bohatera (czas w menu obozu stoi - przesluchanie nie zjada godzin).
+    ///  - OPCJA w menu tylko przy jencach-bandytach (recenzja R1); szara z powodem, gdy zaden nie zna kryjowki do wskazania albo wszyscy, ktorzy znaja, sa dzis
+    ///    wypytani (recenzja R2). Warunek opcji gra liczy tylko przy odswiezeniu menu (GameMenuVM.Refresh(true): wejscie, powrot, odswiezenie kontekstu), co klatke
+    ///    czyta zapamietane IsEnabled/Tooltip (GameMenuItemVM.Refresh) - przeglad kryjowek w warunku bez pamieci podrecznej.
     ///  - UJAWNIENIE jak zwiad gry bez zdarzenia gry (bez 100 XP Zwiadu i drugiego meldunku): Hideout.IsSpotted, Settlement.IsVisible, flaga HideoutSpotter.Mark.
     ///  - Ekonomia: zero przeplywow zlota i towarow (zabity jeniec = utracony okup). Wyjatek - zamknieta ekonomia: zabity bohater-bandyta z klanu bez glowy (albo sam glowa)
     ///    oddaje sakiewke graczowi (gra przy smierci daje ja glowie klanu, a bez glowy GiveGoldAction z odbiorca null - zloto przepadloby); log "sakiewka N -> gracz".
@@ -58,7 +66,7 @@ namespace Armoury
         internal const int CharmXpWin = 20, CharmXpFail = 5, RogueryXpTorture = 20, RogueryXpTalked = 10;
         internal const int MercyTorture = -20, MercyDeath = -40, RelationDeath = -2;
         internal const float LairRange = 160f;
-        internal const int MemoryMax = 30, MemoryDays = 60, DetailMax = 10;
+        internal const int MemoryMax = 30, MemoryDays = 60, DetailMax = 10, SeenMax = 200;
 
         internal const string WhyNoKind = "Outlaws of this kind keep no lair - they live off the road.";
         internal const string WhyAllKnown = "Every lair of his people that he could know of is already known to you.";
@@ -69,7 +77,8 @@ namespace Armoury
         // ------------------------------------------------------------ stan (zapis arm_interrogation)
         internal sealed class Band { public int Day; public string Culture = "", Hideout = "", Party = ""; public float X, Y; }
         private static readonly List<Band> _bands = new List<Band>();
-        private static readonly Dictionary<string, int[]> _used = new Dictionary<string, int[]>(StringComparer.Ordinal);   // klucz grupy -> {doba rozmowy, doba tortury}
+        private static readonly Dictionary<string, int[]> _used = new Dictionary<string, int[]>(StringComparer.Ordinal);   // LimitKey -> {doba rozmowy, doba tortury}
+        private static readonly Dictionary<string, int> _seen = new Dictionary<string, int>(StringComparer.Ordinal);      // klucz grupy (stos) -> pierwsza doba w lochu
         // sumy kampanii: rozmowy, mowili, tortury, mowili, zmarli, ujawnione
         private static readonly int[] _sum = new int[6];
         private static string _importNote = "brak klucza (stary zapis albo nowa kampania)";
@@ -92,7 +101,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _bands.Clear(); _used.Clear(); Array.Clear(_sum, 0, _sum.Length);
+            _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length);
             _importNote = "brak klucza (stary zapis albo nowa kampania)";
             TestReset();
             DayReset();
@@ -159,7 +168,7 @@ namespace Armoury
         private static void Remember(MobileParty m, Vec2 pos, int today)
         {
             var clan = m.ActualClan;
-            var cul = clan != null && clan.Culture != null ? clan.Culture : (m.Party != null ? m.Party.Culture : null);
+            var cul = BandCulture(clan) ?? (m.Party != null ? m.Party.Culture : null);
             if (cul == null || string.IsNullOrEmpty(cul.StringId)) return;
             var hc = m.BanditPartyComponent;
             var hs = hc != null && hc.Hideout != null ? hc.Hideout.Settlement : null;
@@ -187,15 +196,27 @@ namespace Armoury
             return sb.ToString();
         }
 
-        /// <summary>Najnowszy wpis pamieci tej kultury z ostatnich MemoryDays dob (null - brak).</summary>
-        internal static Band Memory(CultureObject c)
+        /// <summary>Kultura zolnierzy bandy klanu: pierwszy zolnierz-bandyta z kultura w szablonie klanu (jency tej bandy maja te kulture), inaczej kultura klanu.
+        /// Recenzja R4: northern_pirates (NavalDLC, ROT-Content spclans.xml) - klan Culture.looters, szablon northern_pirates_template z sea_raiders_bandit/raider/chief.</summary>
+        internal static CultureObject BandCulture(Clan clan)
+        {
+            if (clan == null) return null;
+            var t = clan.DefaultPartyTemplate;
+            if (t != null && t.Stacks != null)
+                foreach (var ps in t.Stacks)
+                    if (BanditTroop(ps.Character) && ps.Character.Culture != null) return ps.Character.Culture;
+            return clan.Culture;
+        }
+
+        /// <summary>Najnowszy wpis pamieci tej kultury z ostatnich MemoryDays dob, nie pozniejszy niz doba upTo (pierwsza doba jenca w lochu); null - brak.</summary>
+        internal static Band Memory(CultureObject c, int upTo)
         {
             if (c == null) return null;
             int today = Today;
             for (int i = _bands.Count - 1; i >= 0; i--)
             {
                 var b = _bands[i];
-                if (b.Culture == c.StringId && today - b.Day <= MemoryDays) return b;
+                if (b.Culture == c.StringId && today - b.Day <= MemoryDays && b.Day <= upTo) return b;
             }
             return null;
         }
@@ -250,7 +271,7 @@ namespace Armoury
                         if (!BanditHero(h)) continue;
                         bool w = h.IsWounded;
                         res.Add(new Group { Key = Clean("h:" + h.StringId), Name = h.Name.ToString(), Troop = ch, Hero = h, Healthy = w ? 0 : 1, Wounded = w ? 1 : 0, Tier = TierOf(ch),
-                                            Culture = h.Clan != null && h.Clan.IsBanditFaction && h.Clan.Culture != null ? h.Clan.Culture : h.Culture, PersonCulture = h.Culture });
+                                            Culture = (h.Clan != null && h.Clan.IsBanditFaction ? BandCulture(h.Clan) : null) ?? h.Culture, PersonCulture = h.Culture });
                     }
                     else
                     {
@@ -277,19 +298,56 @@ namespace Armoury
             foreach (var g in Groups()) { groups++; if (g.Hero != null) heroes++; else men += g.Healthy + g.Wounded; }
         }
 
+        /// <summary>Klucz limitu doby: bohater - on sam; zwykli - rodzaj bandy (kultura jencow, "c:" + kultura; bez kultury - stos).</summary>
+        internal static string LimitKey(Group g)
+        {
+            if (g.Hero != null || g.Culture == null || string.IsNullOrEmpty(g.Culture.StringId)) return g.Key;
+            return "c:" + Clean(g.Culture.StringId);
+        }
+
+        /// <summary>Pierwsza doba jenca w lochu gracza: bohater - CaptivityStartTime; stos - wpis kajdan (bez wpisu - dzis, pojmani dzis).</summary>
+        private static int FirstDay(Group g)
+        {
+            int today = Today;
+            try
+            {
+                if (g.Hero != null) return Math.Min(today, (int)g.Hero.CaptivityStartTime.ToDays);
+                int d;
+                if (_seen.TryGetValue(g.Key, out d)) return Math.Min(today, d);
+            }
+            catch (Exception e) { Stumble("FirstDay", e); }
+            return today;
+        }
+
+        /// <summary>Linia doby: nowe stosy jencow-bandytow dostaja doba - 1 (pojmani najpozniej wczoraj), stosy, ktorych juz nie ma, odpadaja.</summary>
+        private static void NoteSeen(int today)
+        {
+            var keep = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var g in Groups())
+            {
+                if (g.Hero != null) continue;
+                keep.Add(g.Key);
+                if (!_seen.ContainsKey(g.Key) && _seen.Count < SeenMax) _seen[g.Key] = today - 1;
+            }
+            var gone = new List<string>();
+            foreach (var k in _seen.Keys) if (!keep.Contains(k)) gone.Add(k);
+            foreach (var k in gone) _seen.Remove(k);
+        }
+
         // ------------------------------------------------------------ kryjowka jenca
         /// <summary>Kryjowka, ktora zna jeniec: (a) bohater - BornSettlement, (b) pamiec bandy, (c) najblizsza kryjowka kultury do LairRange; null - (d) z powodem
         /// (why - dla gracza, whyLog - do logu). source: "bohater" | "banda" | "kultura".</summary>
         internal static Settlement Target(Group g, out string source, out Band mem, out string why, out string whyLog)
         {
             source = null; why = null; whyLog = null; mem = null;
+            int upTo = FirstDay(g);
             if (g.Hero != null)
             {
                 var born = g.Hero.BornSettlement;
-                if (Open(born)) { source = "bohater"; mem = Memory(g.Culture); return born; }
+                if (Open(born)) { source = "bohater"; mem = Memory(g.Culture, upTo); return born; }
             }
             var c = g.Culture;
-            mem = Memory(c);
+            mem = Memory(c, upTo);
             if (mem != null && mem.Hideout.Length > 0)
             {
                 var st = Settlement.Find(mem.Hideout);
@@ -332,21 +390,21 @@ namespace Armoury
             public bool PickWounded;
         }
 
-        private static int ChainsDays(Group g, Band mem)
+        private static int ChainsDays(Group g)
         {
             try
             {
                 if (g.Hero != null) return Math.Max(0, (int)(CampaignTime.Now - g.Hero.CaptivityStartTime).ToDays);
-                return mem != null ? Math.Max(0, Today - mem.Day) : 0;
+                return Math.Max(0, Today - FirstDay(g));   // recenzja R5: doby w lochu stosu (kajdany), nie od ostatniej bitwy z banda tej kultury
             }
             catch { return 0; }
         }
 
-        internal static Odds Chance(Group g, Persuasion.Parts p, bool torture, Band mem)
+        internal static Odds Chance(Group g, Persuasion.Parts p, bool torture)
         {
             var o = new Odds();
             o.PickWounded = torture ? g.Healthy <= 0 && g.Wounded > 0 : g.Wounded > 0;
-            o.ChainsDays = ChainsDays(g, mem);
+            o.ChainsDays = ChainsDays(g);
             o.Base = TalkBase;
             o.Measure = p.Total / PointsDiv;
             o.Wounded = o.PickWounded ? WoundedBonus : 0f;
@@ -421,7 +479,8 @@ namespace Armoury
                 Log.Info(P + "odmowa - brak grupy | doba " + today + " | grupa " + (g0 != null ? g0.Key : "-") + " | rodzaj " + kind + ".");
                 return res;
             }
-            if (Used(g.Key, torture ? 1 : 0, today))
+            string lk = LimitKey(g);
+            if (Used(lk, torture ? 1 : 0, today))
             {
                 res.Refused = true; res.RefuseWhy = "limit"; _dRefused++;
                 Log.Info(P + "odmowa - limit | doba " + today + " | grupa " + g.Key + " | rodzaj " + kind + ".");
@@ -437,13 +496,13 @@ namespace Armoury
             }
             var me = Hero.MainHero;
             var pp = Persuasion.Measure(me, g.PersonCulture);
-            var o = Chance(g, pp, torture, mem);
+            var o = Chance(g, pp, torture);
             res.Chance = o.Chance;
             res.Roll = rollTalk >= 0f ? rollTalk : MBRandom.RandomFloat;
             res.Talked = res.Roll < o.Chance;
             int h0 = g.Healthy, w0 = g.Wounded;
             int[] slot;
-            if (!_used.TryGetValue(g.Key, out slot)) { slot = new[] { -1, -1 }; _used[g.Key] = slot; }
+            if (!_used.TryGetValue(lk, out slot)) { slot = new[] { -1, -1 }; _used[lk] = slot; }
             slot[torture ? 1 : 0] = today;
             if (torture) _dTort++; else _dTalk++;
             if (torture) _sum[2]++; else _sum[0]++;
@@ -613,7 +672,7 @@ namespace Armoury
                 else lair = "he names a lair of his people: " + r.Where + ".";
             }
             if (!torture) return r.Talked ? "The man talks. " + Cap(lair) + mark : "He spits and holds his tongue. Perhaps tomorrow.";
-            if (r.Talked) return (r.Died ? "Under the irons he screams out where their lair is - " + lair + " He dies before the night is out." : "Under the irons he breaks: " + lair) + mark;
+            if (r.Talked) return (r.Died ? "Under the irons he screams it out before he dies: " + lair : "Under the irons he breaks: " + lair) + mark;   // recenzja R6: bez "where their lair is - their lair lies"
             return r.Died ? "He dies under the irons without a word." : "He takes the pain and tells you nothing.";
         }
 
@@ -646,12 +705,34 @@ namespace Armoury
             try
             {
                 if (!On) return false;
+                var gs = Groups();
+                if (gs.Count == 0) return false;   // recenzja R1: opcja tylko przy jencach-bandytach
                 a.optionLeaveType = GameMenuOption.LeaveType.Conversation;
                 string why;
                 if (!Can(out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
-                if (Groups().Count == 0) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You hold no outlaws to question."); return true; }
-                var p = Persuasion.Measure(Hero.MainHero, null);
-                a.Tooltip = new TextObject("{=!}Have the captive outlaws brought before you and learn where their lair is. Your persuasion: " + p.Total + " (" + Persuasion.Words(p) + ").");
+                // recenzja R2: szara, gdy zaden jeniec nie zna kryjowki do wskazania albo wszyscy, ktorzy znaja, sa dzis wypytani (rozmowa i tortury)
+                int today = Today;
+                bool known = false, free = false;
+                string none = null;
+                foreach (var g in gs)
+                {
+                    string src, w, wl; Band mem;
+                    if (Target(g, out src, out mem, out w, out wl) == null) { if (none == null) none = w; continue; }
+                    known = true;
+                    string lk = LimitKey(g);
+                    if (!Used(lk, 0, today) || !Used(lk, 1, today)) { free = true; break; }
+                }
+                if (!free)
+                {
+                    a.IsEnabled = false;
+                    a.Tooltip = new TextObject("{=!}" + (known ? "Every captive who knows of a lair has been questioned today - try again tomorrow."
+                                                               : "None of the outlaws you hold knows of a lair you could find. " + (none ?? "")));
+                    return true;
+                }
+                var me = Hero.MainHero;
+                var p = Persuasion.Measure(me, null);
+                a.Tooltip = new TextObject("{=!}Have the captive outlaws brought before you and learn where their lair is. Your persuasion: " + p.Total + " (" + Persuasion.Words(p)
+                                           + Persuasion.LeaderNote(me) + ").");
                 return true;
             }
             catch (Exception e) { Stumble("Cond", e); return false; }
@@ -689,24 +770,27 @@ namespace Armoury
                 string src, w, wl; Band mem;
                 var lair = Target(g, out src, out mem, out w, out wl);
                 var p = Persuasion.Measure(me, g.PersonCulture);
-                var ot = Chance(g, p, false, mem);
-                var oo = Chance(g, p, true, mem);
+                var ot = Chance(g, p, false);
+                var oo = Chance(g, p, true);
                 bool fg; float dc = DeathChance(oo.PickWounded, out fg);
-                bool tu = Used(g.Key, 0, today), ru = Used(g.Key, 1, today);
+                string lk = LimitKey(g);
+                bool tu = Used(lk, 0, today), ru = Used(lk, 1, today);
                 var hint = new List<string>(4);
                 if (lair == null) hint.Add(w);
                 else
                 {
                     hint.Add(LairHint(src, mem));
-                    hint.Add(tu ? "Questioned today." : "Talk him round: " + Pct(ot.Chance) + ".");
-                    hint.Add(ru ? "Put to the question today." : "Put him to the question: " + Pct(oo.Chance) + ", he may die (" + Pct(dc) + ").");
+                    hint.Add(tu ? (g.Hero != null ? "Questioned today." : "Outlaws of his kind were questioned today.") : "Talk him round: " + Pct(ot.Chance) + ".");
+                    hint.Add(ru ? (g.Hero != null ? "Put to the question today." : "Outlaws of his kind were put to the question today.")
+                                : "Put him to the question: " + Pct(oo.Chance) + ", he may die (" + Pct(dc) + ").");
                 }
                 ImageIdentifier img = null;
                 try { img = new CharacterImageIdentifier(CharacterCode.CreateFrom(g.Troop)); } catch { img = null; }
                 list.Add(new InquiryElement(g, Title(g), img, lair != null && !(tu && ru), string.Join("\n", hint.ToArray())));
             }
             var mine = Persuasion.Measure(me, null);
-            string head = "Your persuasion: " + mine.Total + " (" + Persuasion.Words(mine) + "). Each group once a day to talk, once to put to the question.";
+            string head = "Your persuasion: " + mine.Total + " (" + Persuasion.Words(mine) + Persuasion.LeaderNote(me) + "). Outlaws of each kind (and each chief) once a day"
+                          + " to talk, once to put to the question.";
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Question the prisoners", head, list, true, 1, 1, "Choose", "Leave",
                 delegate (List<InquiryElement> picked)
                 {
@@ -725,11 +809,12 @@ namespace Armoury
             var lair = Target(g, out src, out mem, out w, out wl);
             if (lair == null) { InformationManager.ShowInquiry(new InquiryData(g.Name, w, true, false, "Back", null, delegate { OpenSafe(); }, null), true); return; }
             var p = Persuasion.Measure(me, g.PersonCulture);
-            var ot = Chance(g, p, false, mem);
-            var oo = Chance(g, p, true, mem);
+            var ot = Chance(g, p, false);
+            var oo = Chance(g, p, true);
             bool fg; float dc = DeathChance(oo.PickWounded, out fg);
             int today = Today;
-            bool tu = Used(g.Key, 0, today), ru = Used(g.Key, 1, today);
+            string lk = LimitKey(g);
+            bool tu = Used(lk, 0, today), ru = Used(lk, 1, today);
             var parts = new List<string> { "your persuasion " + p.Total + " (" + Persuasion.Words(p) + ")" };
             if (ot.Wounded > 0f) parts.Add("a wounded man breaks sooner");
             if (ot.ChainsDays > 0) parts.Add(Math.Min(ChainsDaysMax, ot.ChainsDays) + (ot.ChainsDays == 1 ? " day" : " days") + " in chains");
@@ -760,7 +845,8 @@ namespace Armoury
 
         private static void ShowResult(Group g, Result r)
         {
-            string text = r.Refused ? (r.RefuseWhy == "limit" ? "He has had enough for today - try again tomorrow." : r.RefuseWhy == "brak grupy" ? "He is no longer in your keeping." : r.RefuseWhy) : r.Text;
+            string text = r.Refused ? (r.RefuseWhy == "limit" ? (g.Hero != null ? "He has had enough for today - try again tomorrow." : "Outlaws of his kind have had enough for today - try again tomorrow.")
+                                       : r.RefuseWhy == "brak grupy" ? "He is no longer in your keeping." : r.RefuseWhy) : r.Text;
             bool more = false;
             try { string why; more = Can(out why) && Groups().Count > 0; } catch { more = false; }
             InformationManager.ShowInquiry(new InquiryData("Question the prisoners", text ?? "", true, more, "Done", "Question others", null, delegate { OpenSafe(); }), true);
@@ -779,6 +865,7 @@ namespace Armoury
                 foreach (var k in old) _used.Remove(k);
             }
             catch (Exception e) { Stumble("Prune", e); }
+            if (On) { try { NoteSeen(today); } catch (Exception e) { Stumble("Seen", e); } }
             try { TestStep(today); } catch (Exception e) { Stumble("Test", e); }
             bool act = _dTalk + _dTort + _dRefused + _dMemNew + _dStumbles > 0;
             if (On || act)
@@ -788,7 +875,7 @@ namespace Armoury
                 Log.Info(P + "doba " + today + " | rozmowy " + _dTalk + " (mowili " + _dTalkYes + "), tortury " + _dTort + " (mowili " + _dTortYes + ", zmarli " + (_dDeadMen + _dDeadHero)
                          + ": zwykli " + _dDeadMen + ", bohaterowie " + _dDeadHero + ", zablokowane " + _dBlocked + "), odmowy " + _dRefused
                          + " | ujawnione kryjowki " + (_dRevHero + _dRevBand + _dRevKin) + " (bohater " + _dRevHero + ", banda " + _dRevBand + ", kultura " + _dRevKin + ")"
-                         + " | pamiec band " + _bands.Count + " (nowe dzis " + _dMemNew + ") | jency-bandyci grup " + gr + ", ludzi " + men + ", bohaterow " + he
+                         + " | pamiec band " + _bands.Count + " (nowe dzis " + _dMemNew + ") | jency-bandyci grup " + gr + ", ludzi " + men + ", bohaterow " + he + ", kajdany " + _seen.Count
                          + " | potkniecia dzis " + _dStumbles + ".");
             }
             DayReset();
@@ -825,19 +912,19 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zapis "arm_interrogation"
-        /// <summary>"1|doba,kultura,kryjowka,x,y,banda;...|klucz,dobaR,dobaT;...|rozmowy,mowili,tortury,mowili,zmarli,ujawnione" (ponizej 4 KB);
-        /// klucz wylaczony i stan pusty - "".</summary>
+        /// <summary>"1|doba,kultura,kryjowka,x,y,banda;...|klucz,dobaR,dobaT;...|rozmowy,mowili,tortury,mowili,zmarli,ujawnione|stos,doba;..." (ponizej 4 KB
+        /// pamieci i uzyc + kajdany najwyzej SeenMax wpisow, ok. 8 KB; limit napisu 32 KB); piata czesc (kajdany) opcjonalna przy odczycie. Klucz wylaczony i stan pusty - "".</summary>
         internal static string Export()
         {
             try
             {
-                if (!On && _bands.Count == 0 && _used.Count == 0) return "";
-                return Write(_bands, _used, _sum);
+                if (!On && _bands.Count == 0 && _used.Count == 0 && _seen.Count == 0) return "";
+                return Write(_bands, _used, _sum, _seen);
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
         }
 
-        private static string Write(List<Band> bands, Dictionary<string, int[]> used, int[] sum)
+        private static string Write(List<Band> bands, Dictionary<string, int[]> used, int[] sum, Dictionary<string, int> seen)
         {
             var sb = new StringBuilder("1|");
             for (int i = 0; i < bands.Count; i++)
@@ -856,11 +943,18 @@ namespace Armoury
             }
             sb.Append('|');
             for (int i = 0; i < sum.Length; i++) { if (i > 0) sb.Append(','); sb.Append(sum[i].ToString(Inv)); }
+            sb.Append('|');
+            n = 0;
+            foreach (var kv in seen)
+            {
+                if (n++ > 0) sb.Append(';');
+                sb.Append(kv.Key).Append(',').Append(kv.Value.ToString(Inv));
+            }
             return sb.ToString();
         }
 
         /// <summary>Odczyt napisu zapisu do podanych kontenerow (Import i proba testu). Zle wpisy pominiete i policzone; false - nieznany format.</summary>
-        private static bool Parse(string data, List<Band> bands, Dictionary<string, int[]> used, int[] sum, out int bad)
+        private static bool Parse(string data, List<Band> bands, Dictionary<string, int[]> used, int[] sum, Dictionary<string, int> seen, out int bad)
         {
             bad = 0;
             var parts = data.Split('|');
@@ -884,22 +978,33 @@ namespace Armoury
             }
             var s = parts[3].Split(',');
             for (int i = 0; i < sum.Length && i < s.Length; i++) { int v; if (int.TryParse(s[i], NumberStyles.Integer, Inv, out v)) sum[i] = Math.Max(0, v); else bad++; }
+            if (parts.Length > 4)   // kajdany (recenzja R5) - zapis bez piatej czesci: pusto, linia doby uzupelni
+            {
+                foreach (var e in parts[4].Split(';'))
+                {
+                    if (e.Length == 0) continue;
+                    var a = e.Split(',');
+                    int d;
+                    if (a.Length < 2 || a[0].Length == 0 || !int.TryParse(a[1], NumberStyles.Integer, Inv, out d)) { bad++; continue; }
+                    if (seen.Count < SeenMax) seen[a[0]] = d;
+                }
+            }
             return true;
         }
 
         internal static void Import(string data)
         {
-            _bands.Clear(); _used.Clear(); Array.Clear(_sum, 0, _sum.Length);
+            _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length);
             TestReset();
             if (string.IsNullOrEmpty(data)) { _importNote = "brak klucza (stary zapis albo nowa kampania)"; return; }
             try
             {
                 int bad;
-                if (!Parse(data, _bands, _used, _sum, out bad)) { _bands.Clear(); _used.Clear(); Array.Clear(_sum, 0, _sum.Length); _importNote = "nieznany format - pominiety"; return; }
-                _importNote = "pamiec " + _bands.Count + ", uzycia " + _used.Count + ", sumy kampanii: rozmowy " + _sum[0] + " (mowili " + _sum[1] + "), tortury " + _sum[2] + " (mowili " + _sum[3]
-                              + "), zmarli " + _sum[4] + ", ujawnione " + _sum[5] + (bad > 0 ? ", zlych wpisow " + bad : "");
+                if (!Parse(data, _bands, _used, _sum, _seen, out bad)) { _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); _importNote = "nieznany format - pominiety"; return; }
+                _importNote = "pamiec " + _bands.Count + ", uzycia " + _used.Count + ", kajdany " + _seen.Count + ", sumy kampanii: rozmowy " + _sum[0] + " (mowili " + _sum[1] + "), tortury " + _sum[2]
+                              + " (mowili " + _sum[3] + "), zmarli " + _sum[4] + ", ujawnione " + _sum[5] + (bad > 0 ? ", zlych wpisow " + bad : "");
             }
-            catch (Exception e) { _bands.Clear(); _used.Clear(); Array.Clear(_sum, 0, _sum.Length); _importNote = "blad odczytu - pominiety"; Stumble("Import", e); }
+            catch (Exception e) { _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); _importNote = "blad odczytu - pominiety"; Stumble("Import", e); }
         }
     }
 }

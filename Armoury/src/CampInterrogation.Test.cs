@@ -19,10 +19,13 @@ namespace Armoury
     ///     A (3 zdrowych), B (inny rodzaj: 1 zdrowy i 1 ranny; brak - pominiete), L (zolnierz kultury bez kryjowek); pamiec gracza na czas proby odlozona.
     ///  T2 tortury A rzutami 0.99 / 0.0 (wpis pamieci {C, H2, doba -3}): milczy i umiera - A -1, Mercy -60, plotka (przy Inn Gossip);
     ///  T1 rozmowa A rzutem 0: H2 ujawniona "skad banda" (+ flaga przy HideoutFlagEnabled); T3 rozmowa A drugi raz - odmowa (limit);
+    ///  T3b rozmowa B (inny stos, ten sam rodzaj bandy) - odmowa (limit rodzaju bandy, recenzja R3); potem slot rodzaju zwolniony (jak nowa doba);
     ///  T7 bohater BK (wzor bannerkings_bandithero, ur. w H1, klan C) - tortury 0 / 0: mowi "skad bohater" i umiera (brak wzoru albo H1 = H2 - POMINIETY);
     ///  T4/T5 bez wpisu pamieci rozmowa i tortury B zwyklymi rzutami - zgodnosc szansy, rzutu i skutku ("skad kultura" albo odmowa bez kryjowki);
     ///  T6 Target(L) - "kultura bez kryjowek"; T8 miara perswazji wobec ludzi najblizszego miasta = suma skladnikow, plotek na kufel; T9 zapis tam i z powrotem.
-    ///  Sprzatanie: jency testowi zdjeci (stan lochu jak przed proba), pamiec i uzycia gracza wrocone. Mercy, relacje, ujawnione kryjowki i plotka zostaja (bieg testowy).
+    ///  Sprzatanie: jency testowi zdjeci (stan lochu jak przed proba), pamiec, uzycia i kajdany gracza wrocone (na czas proby wpisy kajdan rodzajow A, B, L zdjete -
+    ///  jency testowi "pojmani dzis"). Mercy, relacje, ujawnione kryjowki i plotka zostaja (bieg testowy). Ksiega ludzi: jency testowi bez Give, zgon przez Take
+    ///  zdejmuje udzialy lochu gracza (recenzja kod R3 - artefakt biegu testowego, opis w planie autotestu).
     /// Linia "Przesluchanie (m109): test - ... - wynik TAK|NIE." (grupa m109przes PRZES-7).
     /// </summary>
     internal static partial class CampInterrogation
@@ -80,6 +83,12 @@ namespace Armoury
             return c;
         }
 
+        /// <summary>LimitKey stosu rodzaju t (jak LimitKey(Group) dla zwyklych jencow: Group.Culture = t.Culture, Key = Clean(t.StringId)).</summary>
+        private static string TestLimitKey(CharacterObject t)
+        {
+            return t.Culture != null && !string.IsNullOrEmpty(t.Culture.StringId) ? "c:" + Clean(t.Culture.StringId) : Clean(t.StringId);
+        }
+
         private static bool NoLairCulture(CultureObject c)
         {
             if (c == null) return false;
@@ -135,11 +144,17 @@ namespace Armoury
             Cnt a0 = CountOf(ta), bb0 = CountOf(tb), l0 = CountOf(tl);
             int mercy0 = MercyXp();
             var stash = new List<Band>(_bands);
-            var keys = new List<string> { Clean(ta.StringId) };
-            if (tb != null) keys.Add(Clean(tb.StringId));
-            if (tl != null) keys.Add(Clean(tl.StringId));
+            string kA = TestLimitKey(ta);   // A i B - ten sam rodzaj bandy (kultura kryjowki H1)
+            var keys = new List<string> { kA };
+            if (tb != null && !keys.Contains(TestLimitKey(tb))) keys.Add(TestLimitKey(tb));
+            if (tl != null && !keys.Contains(TestLimitKey(tl))) keys.Add(TestLimitKey(tl));
             var usedStash = new Dictionary<string, int[]>(StringComparer.Ordinal);
             foreach (var k in keys) { int[] u; if (_used.TryGetValue(k, out u)) { usedStash[k] = u; _used.Remove(k); } }
+            var seenKeys = new List<string> { Clean(ta.StringId) };
+            if (tb != null) seenKeys.Add(Clean(tb.StringId));
+            if (tl != null) seenKeys.Add(Clean(tl.StringId));
+            var seenStash = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var k in seenKeys) { int d; if (_seen.TryGetValue(k, out d)) { seenStash[k] = d; _seen.Remove(k); } }
             Hero hero = null;
             pts.Add("T0 TAK (H1 " + h1.StringId + ", H2 " + h2.StringId + (h2 == h1 ? " = H1" : "") + ", kultura " + c.StringId + ", klan " + clan.StringId + ", A " + ta.StringId
                     + ", B " + (tb != null ? tb.StringId : "-") + ", L " + (tl != null ? tl.StringId : "-") + ", od obozu " + best.ToString("0.0", Inv) + " jedn.)");
@@ -180,6 +195,14 @@ namespace Armoury
                     ok &= t;
                     pts.Add("T3 " + (t ? "TAK" : "NIE") + " (odmowa " + (res.Refused ? res.RefuseWhy : "-") + ")");
                 }
+                // ---------------- T3b: rozmowa B (inny stos, ten sam rodzaj bandy) - limit rodzaju bandy
+                if (tb == null) pts.Add("T3b POMINIETY (brak drugiego rodzaju)"); else
+                {
+                    var res = Act(Find(Clean(tb.StringId)), false, 0f);
+                    bool t = res.Refused && res.RefuseWhy == "limit";
+                    ok &= t;
+                    pts.Add("T3b " + (t ? "TAK" : "NIE") + " (B, klucz limitu " + kA + ": odmowa " + (res.Refused ? res.RefuseWhy : "-") + ")");
+                }
                 // ---------------- T7: bohater BK (opcjonalny)
                 {
                     string skip = null;
@@ -205,8 +228,9 @@ namespace Armoury
                                 + ", w lochu " + (gone ? "NIE" : "TAK") + ")");
                     }
                 }
-                // ---------------- T4/T5: B zwyklymi rzutami bez wpisu pamieci
+                // ---------------- T4/T5: B zwyklymi rzutami bez wpisu pamieci (slot rodzaju bandy wolny - jak nowa doba)
                 _bands.Clear();
+                _used.Remove(kA);
                 if (tb == null) pts.Add("T4 POMINIETY (brak drugiego rodzaju)"); else
                 {
                     var res = Act(Find(Clean(tb.StringId)), false);
@@ -267,6 +291,8 @@ namespace Armoury
             foreach (var k in keys) _used.Remove(k);
             if (hero != null) _used.Remove(Clean("h:" + hero.StringId));
             foreach (var kv in usedStash) _used[kv.Key] = kv.Value;
+            foreach (var k in seenKeys) _seen.Remove(k);
+            foreach (var kv in seenStash) _seen[kv.Key] = kv.Value;
             ok &= clean;
             // ---------------- T8: miara w karczmie najblizszego miasta
             try
@@ -284,13 +310,16 @@ namespace Armoury
             // ---------------- T9: zapis tam i z powrotem
             try
             {
-                string ex = Write(_bands, _used, _sum);
+                string ex = Write(_bands, _used, _sum, _seen);
                 var bands = new List<Band>(); var used = new Dictionary<string, int[]>(StringComparer.Ordinal); var sum = new int[_sum.Length]; int bad;
-                bool parsed = Parse(ex, bands, used, sum, out bad);
-                bool same = parsed && bad == 0 && bands.Count == _bands.Count && used.Count == _used.Count;
+                var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+                bool parsed = Parse(ex, bands, used, sum, seen, out bad);
+                bool same = parsed && bad == 0 && bands.Count == _bands.Count && used.Count == _used.Count && seen.Count == _seen.Count;
                 for (int i = 0; same && i < sum.Length; i++) same = sum[i] == _sum[i];
+                foreach (var kv in _seen) { int d; if (!seen.TryGetValue(kv.Key, out d) || d != kv.Value) same = false; }
                 ok &= same;
-                pts.Add("T9 " + (same ? "TAK" : "NIE") + " (" + ex.Length + " znakow, pamiec " + bands.Count + "/" + _bands.Count + ", uzycia " + used.Count + "/" + _used.Count + ", zlych " + bad + ")");
+                pts.Add("T9 " + (same ? "TAK" : "NIE") + " (" + ex.Length + " znakow, pamiec " + bands.Count + "/" + _bands.Count + ", uzycia " + used.Count + "/" + _used.Count
+                        + ", kajdany " + seen.Count + "/" + _seen.Count + ", zlych " + bad + ")");
             }
             catch (Exception e) { ok = false; pts.Add("T9 NIE (wyjatek " + e.GetType().Name + ")"); Stumble("TestT9", e); }
             pts.Add("sprzatanie " + (clean ? "TAK" : "NIE") + " (Mercy xp przed proba " + mercy0 + ", teraz " + MercyXp() + ")");
