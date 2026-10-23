@@ -582,6 +582,8 @@ namespace Armoury
         {
             try
             {
+                ItemModifier gs;   // m110-stan (GearFourStates): o jeden stan az do wraku (takze bron, tarcze i luki); wrak - dno
+                if (GearState.TryNext(it, cur, out gs)) return gs;
                 if (LootPrices.IsWreck(cur) || it.ItemComponent == null || it.ItemComponent.ItemModifierGroup == null) return null;
                 ItemModifier best = null;
                 foreach (var m in it.ItemComponent.ItemModifierGroup.ItemModifiers)

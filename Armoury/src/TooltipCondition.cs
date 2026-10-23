@@ -33,7 +33,7 @@ namespace Armoury
                 var vm = propertyBasedTooltipVM;
                 vm.AddProperty(" ", " ");
                 vm.AddProperty(" ", " ", 0, TooltipProperty.TooltipPropertyFlags.RundownSeperator);
-                vm.AddProperty("Condition", pct + "%");
+                vm.AddProperty("Condition", GearState.CondText(m, pct));   // m110-stan: slowo stanu zamiast procentu
 
                 if (item.HasArmorComponent)
                 {
@@ -104,6 +104,52 @@ namespace Armoury
                 if (!item.HasArmorComponent && !item.HasWeaponComponent) return;
                 if (ArmouryBehavior.NoState(item)) return;   // E8/C: NoState
                 var m = el.ItemModifier;
+                if (GearState.Handles(item) && GearState.Of(m) >= 0)
+                {
+                    // m110-stan (GearFourStates): stan slowem - gorszy z (stan modyfikatora, stan z ksiegi zuzycia sztuki na grzbiecie); wytrzymalosc w punktach
+                    // tylko, gdy znana dokladnie (ksiega) albo sztuka sprawna bez ksiegi
+                    int st = GearState.Of(m);
+                    float dEx = -1f;
+                    try { var beh0 = ArmouryBehavior.Instance; if (beh0 != null) dEx = beh0.WornEffective(item); } catch { dEx = -1f; }
+                    if (dEx >= 0f) st = Math.Max(st, GearState.OfCondition(dEx));
+                    var list0 = __instance.TargetItemProperties;
+                    if (list0 == null) return;
+                    Add(list0, " ", " ");
+                    Add(list0, "Armoury Stats", " ");
+                    Add(list0, "Condition", GearState.En[st] + (st == GearState.Sound && m == null && (dEx < 0f || dEx >= 99.95f) ? "  (New)" : ""));
+                    if (item.HasArmorComponent)
+                    {
+                        int pool0 = ArmouryBehavior.ArmorPool(item);
+                        if (pool0 > 0 && dEx >= 0f) Add(list0, "Durability", (int)Math.Round(pool0 * Math.Min(100f, dEx) / 100.0) + " / " + pool0);
+                        else if (pool0 > 0 && st == GearState.Sound) Add(list0, "Durability", pool0 + " / " + pool0);
+                    }
+                    if (m == null || m.PriceMultiplier >= 0.999f) return;   // bez modyfikatora stanu - bez rozpiski strat
+                    if (item.HasArmorComponent)
+                    {
+                        var a0 = item.ArmorComponent;
+                        if (item.Type == ItemObject.ItemTypeEnum.HorseHarness)
+                            Delta(list0, "Horse Armor", a0.BodyArmor, el.GetModifiedMountBodyArmor());
+                        else
+                        {
+                            Delta(list0, "Head Armor", a0.HeadArmor, el.GetModifiedHeadArmor());
+                            Delta(list0, "Body Armor", a0.BodyArmor, el.GetModifiedBodyArmor());
+                            Delta(list0, "Leg Armor", a0.LegArmor, el.GetModifiedLegArmor());
+                            Delta(list0, "Arm Armor", a0.ArmArmor, el.GetModifiedArmArmor());
+                        }
+                    }
+                    if (item.HasWeaponComponent && item.WeaponComponent.PrimaryWeapon != null)
+                    {
+                        var w0 = item.WeaponComponent.PrimaryWeapon;
+                        Delta(list0, "Swing Damage", w0.SwingDamage, el.GetModifiedSwingDamageForUsage(0));
+                        Delta(list0, "Thrust Damage", w0.ThrustDamage, el.GetModifiedThrustDamageForUsage(0));
+                        Delta(list0, "Swing Speed", w0.SwingSpeed, el.GetModifiedSwingSpeedForUsage(0));
+                        Delta(list0, "Thrust Speed", w0.ThrustSpeed, el.GetModifiedThrustSpeedForUsage(0));
+                        Delta(list0, "Missile Damage", w0.MissileDamage, el.GetModifiedMissileDamageForUsage(0));
+                        Delta(list0, "Missile Speed", w0.MissileSpeed, el.GetModifiedMissileSpeedForUsage(0));
+                        Delta(list0, "Hit Points", w0.MaxDataValue, el.GetModifiedMaximumHitPointsForUsage(0));
+                    }
+                    return;
+                }
                 float pm = m != null ? m.PriceMultiplier : 1f;
                 bool damaged = m != null && pm < 0.999f && pm > 0f;
                 int pct = damaged ? Math.Max(1, (int)Math.Round(pm * 100f)) : 100;

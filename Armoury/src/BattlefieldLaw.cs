@@ -57,6 +57,20 @@ namespace Armoury
         private static MethodInfo _lReg;
         internal static bool MountReturnWired, MountFinalWired, SpareHarnessWired;
         internal static bool LuckyFound { get { return _lReg != null; } }
+        /// <summary>m110-stan: latki lupu cialo po ciele wpiete (DTE OnAgentRemoved - zabojca i ofiara, PartyBattleRecord.AddLootedItem - sztuka) - linia startu stanow.</summary>
+        internal static int LootWiredCount { get { return _lootWired; } }
+        // m110-stan (LootStateFromWounds): sprawne sztuki lupu z obrazen wysypane do sakw (FlushShareToBaggage, FlushMountsToBaggage) - WearTheLoot nie daje im
+        // loterii stanu (kryjowka: sakwy przed WearTheLoot); czyszczone przy odczycie i na poczatku rozliczenia nastepnej bitwy
+        private static readonly Dictionary<ItemObject, int> _soundFlushed = new Dictionary<ItemObject, int>();
+
+        /// <summary>m110-stan: sprawne sztuki B wysypane do sakw od ostatniego odczytu (przedmiot -> ile) - zwraca kopie i czysci; null - brak.</summary>
+        internal static Dictionary<ItemObject, int> TakeSoundFlushed()
+        {
+            if (_soundFlushed.Count == 0) return null;
+            var r = new Dictionary<ItemObject, int>(_soundFlushed);
+            _soundFlushed.Clear();
+            return r;
+        }
         /// <summary>m109-lup: kolejka lupu do odczytu przez pomiar LootTally (tylko czyta).</summary>
         internal static ItemRoster QueueRoster { get { return ShareQueue; } }
         // m109-lup (klucz FallenRiderHorsesLooted): konie i uprzaz z listy trofeow przetrzymane na czas jednego wywolania Spoils

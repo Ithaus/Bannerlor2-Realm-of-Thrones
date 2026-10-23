@@ -67,6 +67,9 @@ namespace Armoury
             Clear(); Refused = false; _hintItem = null;
         }
 
+        /// <summary>m110-stan: drabinki jakosci od nowa po zamianie stanow w grupach (GearState.Apply) - liczniki zostaja.</summary>
+        internal static void ClearLadders() { _ladders.Clear(); }
+
         private static void Touch()
         {
             try

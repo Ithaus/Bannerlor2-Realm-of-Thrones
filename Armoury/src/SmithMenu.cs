@@ -871,7 +871,7 @@ namespace Armoury
                         if (sb0.Length > 0) sb0.Append(", ");
                         sb0.Append(p.Count + "x " + p.Item.Name + " (" + Recipes.CountInInventory(p.Item) + ")");
                     }
-                    string hint0 = "EQUIPPED - you wear this now.\nCondition " + pct0 + "%" +
+                    string hint0 = "EQUIPPED - you wear this now.\nCondition " + GearState.CondText(ee0.ItemModifier, pct0) +
                                    "\n" + SmithLine(quote, ee0, slot) +
                                    "\nYourself: " + (sb0.Length > 0 ? sb0.ToString() : "no materials") +
                                    "\n  + stamina " + SelfMendStamina(ee0) + " (you have " + Forge.Stamina() + ")" +
@@ -903,7 +903,7 @@ namespace Armoury
                             if (sb.Length > 0) sb.Append(", ");
                             sb.Append(p.Count + "x " + p.Item.Name + " (" + Recipes.CountInInventory(p.Item) + ")");
                         }
-                        string hint = "Condition " + pct + "%" +
+                        string hint = "Condition " + GearState.CondText(ee.ItemModifier, pct) +
                                       "\n" + SmithLine(quote, ee) +
                                       "\nYourself: " + (sb.Length > 0 ? sb.ToString() : "no materials") +
                                       "\n  + stamina " + SelfMendStamina(ee) + " (you have " + Forge.Stamina() + ")" +
@@ -927,7 +927,7 @@ namespace Armoury
                             var ee = el.EquipmentElement;
                             if (ee.Item == null || el.Amount <= 0 || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
                             int pct2 = Math.Max(1, (int)Math.Round(ee.ItemModifier.PriceMultiplier * 100f));
-                            string hint2 = "COMPANY STORES - the men's kit.\nCondition " + pct2 + "%" +
+                            string hint2 = "COMPANY STORES - the men's kit.\nCondition " + GearState.CondText(ee.ItemModifier, pct2) +
                                            "\n" + SmithLine(quote, ee);
                             found.Add(ee); slots.Add(-2);
                             elements.Add(new InquiryElement(found.Count - 1,

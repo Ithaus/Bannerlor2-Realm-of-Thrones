@@ -280,7 +280,7 @@ namespace Armoury
             base.AfterStart();
         }
 
-        private static int ArmorSlotFor(BoneBodyPartType part, Agent a)
+        internal static int ArmorSlotFor(BoneBodyPartType part, Agent a)   // m110-stan: takze LootWear (ta sama czesc ciala -> slot zbroi co u gracza)
         {
             switch (part)
             {
