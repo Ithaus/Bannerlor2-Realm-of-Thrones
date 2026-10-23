@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace Armoury
 {
@@ -21,6 +23,14 @@ namespace Armoury
     /// Zapis: stan gracza w napisie arm_campdrill (CampDrill.Export, pola 5-9 - stara DLL czyta 4 pierwsze); AI tylko w pamieci - po wczytaniu doba postoju
     /// z MobileParty.StationaryStartTime (gra ja zapisuje; partia AI w osadzie nie jest w ruchu, wiec to chwila wejscia albo wczesniejszy postoj pod brama -
     /// linia "wejscia AI" mierzy roznice). Dyscypliny jako osobnego systemu nie ma w kodzie ani w grze - wyrazaja ja mniejsze godziny musztry.
+    /// WYDATKI (klucz TownStaySpend, blok dobowy ArmouryBehavior po zalogach m96, pozycja ksiegi "markietani" MSutlers): partia rodu (AI i gracz) w miescie albo
+    /// zamku wydaje co dobe czesc wolnej sakiewki - ta sama miara co markietani w polu (Sutlers.One, N6) i zalogi (SavingsByNeed.Garrison): SutlerDailyShare
+    /// x min(3, dni wolnej sakiewki / 10) przy SutlersByPurse, z tego, co zostaje po rezerwach markietanow (MenPurse.CampFree: naprawy, odziez, oszczednosci K1).
+    /// Odbiorca jak przy wyjezdzie z miasta (MenPurse.LifeTo): kasa osady i kiesa ludu (75/25, TownFolk.EarnService), te same liczniki (169c, K3, tarcza zoldu, L0).
+    /// Kazda partia rodu jest w danej dobie albo w polu (markietani pomijaja partie w osadzie), albo w osadzie (tu) - nic nie liczy sie dwa razy; w miescie reszte
+    /// wydaja dalej przy wyjezdzie (OnLeft). Wies, oblezona twierdza, okno lupu (CitySack.StayWindow), bitwa - nic. Morale: +3 na dobe przy >= 1 zl na glowe
+    /// (miara zabawy markietanow: 2 zl -> +6; mniej pieniedzy - mniej), ostatnie zdarzenia najwyzej do +5 (polowa pulapu uczty 10; gra zdejmuje 10% na dobe).
+    /// Zloto nie powstaje i nie znika: sakiewka ludzi -> kasa osady + kiesa ludu; kontrola w linii z odczytow przed/po (zeszlo z sakiewek = przybylo w kasach + kiesy).
     /// </summary>
     internal static class TownStay
     {
@@ -119,7 +129,7 @@ namespace Armoury
         internal static void Reset()
         {
             _stumbles = 0; _err.Clear();
-            ClearDrill();
+            ClearDrill(); ClearSpend();
         }
 
         private static void ClearDrill()
@@ -231,6 +241,173 @@ namespace Armoury
             finally { ClearDrill(); }
         }
 
+        // ------------------------------------------------------------ wydatki doby postoju (klucz TownStaySpend)
+        private const double ByPurseCap = 3.0, ByPurseDays = 10.0;   // ta sama miara co markietani N6 (Sutlers) i zalogi m96 (SavingsByNeed)
+        private const float MoraleFull = 3f, MoraleCap = 5f;          // +3 na dobe przy >= 1 zl na glowe; ostatnie zdarzenia najwyzej do +5 (polowa pulapu uczty 10)
+        private static int _sP, _sTownN, _sCastleN, _sVillN, _sPaid, _sVill, _sSiege, _sSack, _sBattle, _sEmpty, _sNoFree, _sInactive, _sEscrow, _sResBroken, _sMorN, _sMorOver;
+        private static long _sTaken, _sTown, _sTownFolk, _sCastle, _sCastleFolk, _sOut, _sCoffer, _sFolk;
+        private static double _sMorG;
+        private static int _pX; private static float _pM0, _pM1, _pGain;   // gracz tej doby: wydane, morale przed i po, dodane
+
+        internal static bool SpendOn(Settings s) { return s != null && s.TownStaySpend && MenPurse.On; }
+
+        private static void ClearSpend()
+        {
+            _sP = _sTownN = _sCastleN = _sVillN = _sPaid = _sVill = _sSiege = _sSack = _sBattle = _sEmpty = _sNoFree = _sInactive = _sEscrow = _sResBroken = _sMorN = _sMorOver = 0;
+            _sTaken = _sTown = _sTownFolk = _sCastle = _sCastleFolk = _sOut = _sCoffer = _sFolk = 0;
+            _sMorG = 0; _pX = 0; _pM0 = _pM1 = _pGain = 0f;
+        }
+
+        /// <summary>Raz na dobe (ArmouryBehavior, blok dobowy: po markietanach i zalogach m96, przed Mark(MSutlers)): partie rodow w osadach - wydatki, morale,
+        /// komunikat gracza i linia doby. Lista jak Sutlers.Daily: AllLordParties bez gracza i gracz osobno (jedna regula).</summary>
+        internal static void Daily()
+        {
+            var s = Settings.Current;
+            if (Campaign.Current == null || s == null) return;
+            ClearSpend();
+            var sw = Stopwatch.StartNew();
+            bool on = SpendOn(s);
+            float rate = MBMath.ClampFloat(s.SutlerDailyShare, 0f, 1f);
+            if (on && rate > 0f)
+            {
+                var main = MobileParty.MainParty;
+                foreach (var mp in MobileParty.AllLordParties) if (mp != null && mp != main) OneSafe(mp, rate, s);
+                if (main != null) OneSafe(main, rate, s);
+            }
+            sw.Stop();
+            try { PlayerMessage(s); } catch (Exception e) { Stumble("PlayerMessage", e); }
+            try { if (s.LogEnabled) Log.Info(SpendLine(s, on, rate, sw.Elapsed.TotalMilliseconds)); } catch (Exception e) { Stumble("SpendLine", e); }
+        }
+
+        private static void OneSafe(MobileParty mp, float rate, Settings s)
+        {
+            try { One(mp, rate, s); }
+            catch (Exception e) { Stumble("One", e); }   // wyjatek jednej partii - licznik, reszta biegnie dalej (bez globalnego wylacznika)
+        }
+
+        /// <summary>Jedna partia: warunki, wolna sakiewka (rezerwy markietanow), kwota (miara N6), zdjecie i wplata (MenPurse.LifeTo), kontrola, morale.</summary>
+        private static void One(MobileParty mp, float rate, Settings s)
+        {
+            var st = mp.CurrentSettlement;
+            if (st == null) return;                                         // w polu - markietani (Sutlers.One), tu nie liczone
+            if (!mp.IsActive || mp.IsDisbanding) { _sInactive++; return; }
+            int kind = Kind(st);
+            if (kind == KNone) { if (st.IsVillage) _sVill++; else _sSiege++; return; }   // oblezona twierdza (karczmy zamkniete), rabowana wies, kryjowka
+            _sP++;
+            if (kind == KTown) _sTownN++; else if (kind == KCastle) _sCastleN++; else _sVillN++;
+            if (kind == KVillage) { _sVill++; return; }                     // we wsi nic nie wydaja (jak dotad)
+            if (mp.MapEvent != null) { _sBattle++; return; }
+            if (MenPurse.Get(mp) <= 0) { _sEmpty++; return; }
+            if (mp.IsMainParty && QuartermasterEscrow.Active) { _sEscrow++; return; }   // ekran zbrojowni gracza otwarty - rozliczenie wkladow w toku
+            if (st.Town == null) { _sInactive++; return; }
+            if (CitySack.StayWindow(st, mp)) { _sSack++; return; }        // okno lupu: wojsko zdobywcy nie placi w lupionej osadzie (bramka L3, bez jej licznika)
+            long mend = MenPurse.CampMend(mp);
+            int res, kept;
+            int free = MenPurse.CampFree(mp, mend, 1f, out res, out kept);
+            if (free <= 0) { _sNoFree++; return; }
+            double fac = s.SutlersByPurse ? Math.Min(ByPurseCap, free / (double)Math.Max(1, MenPurse.WageOf(mp)) / ByPurseDays) : 1.0;
+            int want = (int)Math.Min(free, (long)(free * Math.Min(1.0, rate * fac)));
+            if (want <= 0) { _sNoFree++; return; }
+            int men = mp.MemberRoster != null ? mp.MemberRoster.TotalRegulars : 0;
+            // ---- od zdjecia do wplaty tylko arytmetyka i wplata (MenPurse.LifeTo - ta sama droga co "zycie" przy wyjezdzie); kontrola z odczytow przed/po
+            int p0 = MenPurse.Get(mp), g0 = st.Town.Gold;
+            int x = MenPurse.Take(mp, want);
+            if (x <= 0) return;
+            int folk = MenPurse.LifeTo(mp, st, x);
+            long outd = p0 - MenPurse.Get(mp), cof = (long)st.Town.Gold - g0;
+            // ---- liczniki (zloto juz na miejscu)
+            _sPaid++; _sTaken += x; _sOut += outd; _sCoffer += cof; _sFolk += folk;
+            if (kind == KTown) { _sTown += x; _sTownFolk += folk; } else { _sCastle += x; _sCastleFolk += folk; }
+            if (MenPurse.Get(mp) < (long)res + kept) _sResBroken++;         // rezerwy (naprawy, odziez, oszczednosci K1) nietkniete - ma byc 0
+            // ---- morale: +3 na dobe przy >= 1 zl na glowe (mniej - mniej), ostatnie zdarzenia najwyzej do +5 (gra zdejmuje 10% na dobe)
+            float m0 = mp.RecentEventsMorale;
+            float gain = Math.Min(MoraleFull, Math.Min(MoraleFull * x / Math.Max(1, men), Math.Max(0f, MoraleCap - m0)));
+            if (gain > 0f)
+            {
+                mp.RecentEventsMorale = m0 + gain;
+                _sMorN++; _sMorG += gain;
+                if (mp.RecentEventsMorale > MoraleCap + 0.001f) _sMorOver++;
+            }
+            if (mp.IsMainParty) { _pX = x; _pM0 = m0; _pM1 = mp.RecentEventsMorale; _pGain = gain; }
+        }
+
+        /// <summary>Najblizszy swit gracza (pelna godzina) - limit "rano" w komunikacie i w linii.</summary>
+        private static long NextMorning(long now) { return now + (((NightRest.PlayerDawn - (int)(now % 24)) % 24) + 24) % 24; }
+
+        /// <summary>Komunikat gracza raz na dobe, gdy czeka w osadzie z postojem (EN): wydatki i morale, limit musztry rano.</summary>
+        private static void PlayerMessage(Settings s)
+        {
+            var mp = MobileParty.MainParty;
+            var st = mp != null ? mp.CurrentSettlement : null;
+            int kind = Kind(st);
+            if (kind == KNone) return;
+            bool drill = DrillOn(s) && CampDrill.PlayerRuleOn;
+            bool spent = _pX > 0;
+            if (!drill && !spent) return;
+            if (kind == KVillage && !drill) return;
+            long now = (long)Math.Floor(CampaignTime.Now.ToHours), morning = NextMorning(now);
+            long from, outAt; float daySet;
+            CampDrill.PlayerStay(out from, out outAt, out daySet);
+            int day = Day(from, morning), cap = Cap(kind, day);
+            bool fewer = Cap(kind, day + 1) < cap;
+            string hours = cap == 1 ? "1 hour" : cap + " hours";
+            var sb = new StringBuilder(220);
+            sb.Append(drill ? "Day " + day + " in " : "In ").Append(st.Name).Append(": ");
+            if (kind == KVillage)
+                sb.Append("the men idle about the village - they drill only ").Append(hours).Append(" each morning here (8 in camp)").Append(fewer ? ", and fewer each day they stay." : ".");
+            else
+            {
+                if (spent) sb.Append("your men spent ").Append(_pX).Append(" denars on drink, dice and company").Append(_pGain >= 0.05f ? " (morale +" + _pGain.ToString("0.#", Inv) + ")" : "").Append('.');
+                if (drill) sb.Append(spent ? " Here they" : "your men").Append(" drill only ").Append(hours).Append(" each morning (8 in camp)").Append(fewer ? ", and fewer each day they stay." : ".");
+            }
+            Log.Player(sb.ToString());
+        }
+
+        private static string SpendLine(Settings s, bool on, float rate, double ms)
+        {
+            var sb = new StringBuilder(1100);
+            sb.Append(P).Append("wydatki dzien ").Append((int)CampaignTime.Now.ToDays);
+            if (!on)
+                sb.Append(" | wylaczone (Town Stay Spend / Men Purse Enabled) - zold wydaja tylko przy wyjezdzie z miasta, jak dotad");
+            else
+            {
+                long ctl = _sOut - (_sCoffer + _sFolk);
+                sb.Append(" | stawka ").Append((rate * 100f).ToString("0.0", Inv)).Append('%').Append(s.SutlersByPurse ? " x min(3, dni wolnej / 10)" : " (Sutlers By Purse wylaczone - bez mnoznika)")
+                  .Append(" | partii w osadach ").Append(_sP).Append(" (miasta ").Append(_sTownN).Append(", zamki ").Append(_sCastleN).Append(", wsie ").Append(_sVillN).Append(')')
+                  .Append(", wydaly ").Append(_sPaid).Append(": z sakiewek ").Append(_sTaken).Append(" -> kasy miast ").Append(_sTown).Append(" (w tym kiesy ludu ").Append(_sTownFolk)
+                  .Append("), kasy zamkow ").Append(_sCastle).Append(" (").Append(_sCastleFolk).Append(')')
+                  .Append(" | kontrola: zeszlo ").Append(_sOut).Append(" = przybylo w kasach ").Append(_sCoffer).Append(" + kiesy ludu ").Append(_sFolk).Append(" (roznica ").Append(ctl).Append(')')
+                  .Append(" | rezerwy naruszone ").Append(_sResBroken)
+                  .Append(" | morale: partii ").Append(_sMorN).Append(", dodane ").Append(F1(_sMorG)).Append(", ponad pulap ").Append((int)MoraleCap).Append(" po dodaniu ").Append(_sMorOver)
+                  .Append(" | pominiete: wsie ").Append(_sVill).Append(", oblezone ").Append(_sSiege).Append(", okno lupu ").Append(_sSack).Append(", w bitwie ").Append(_sBattle)
+                  .Append(", puste ").Append(_sEmpty).Append(", nic wolnego ").Append(_sNoFree).Append(", nieczynne ").Append(_sInactive).Append(", ekran zbrojowni gracza ").Append(_sEscrow);
+            }
+            sb.Append(" | gracz: ").Append(PlayerPart(on));
+            if (on) sb.Append(" | koszt ").Append(F1(ms)).Append(" ms");
+            sb.Append(" | potkniecia ").Append(_stumbles).Append('.');
+            return sb.ToString();
+        }
+
+        private static string PlayerPart(bool on)
+        {
+            var mp = MobileParty.MainParty;
+            var st = mp != null ? mp.CurrentSettlement : null;
+            int kind = Kind(st);
+            long now = (long)Math.Floor(CampaignTime.Now.ToHours);
+            long from, outAt; float daySet;
+            CampDrill.PlayerStay(out from, out outAt, out daySet);
+            float capMax = CampDrill.PlayerDayCap;
+            string drilled = ", w osadzie od switu " + F2(daySet) + " h (limit rano " + (capMax > 0f ? ((int)capMax).ToString(Inv) : "-");
+            if (kind == KNone)
+            {
+                if (from >= 0) return "poza osada od " + (outAt >= 0 ? now - outAt : 0) + " h (doba postoju " + Day(from, now) + " trwa do " + FieldResetHours + " h w polu)" + drilled + ")";
+                return (st != null ? "w osadzie bez postoju (" + st.Name + ")" : "w polu") + drilled + ")";
+            }
+            int dNext = Day(from, NextMorning(now));
+            return KindName(kind) + " " + st.Name + ", doba postoju " + Day(from, now) + drilled + ", jutro " + Cap(kind, dNext) + ")"
+                   + (on ? ", wydali " + _pX + ", morale +" + F1(_pGain) + " (" + F1(_pM0) + " -> " + F1(_pGain > 0f ? _pM1 : _pM0) + ")" : "");
+        }
+
         // ------------------------------------------------------------ start sesji
         internal static void SessionStart()
         {
@@ -253,6 +430,10 @@ namespace Armoury
                 Log.Info(P + "start sesji | musztra w osadzie (Drill Town Stay) " + (DrillOn(s) ? "TAK" : "NIE") + " | limit godzin w osadzie na dobe postoju: miasto "
                          + Cap(KTown, 1) + "/" + Cap(KTown, 2) + "/" + Cap(KTown, 3) + "/" + Cap(KTown, 4) + ", zamek i wies " + Cap(KCastle, 1) + "/" + Cap(KCastle, 2) + "/" + Cap(KCastle, 3)
                          + " (razem z obozem najwyzej " + (int)CampDrill.FullHours + " h od switu) | oblezona - jak oboz oblezenia | wypad < " + FieldResetHours + " h nie zeruje"
+                         + " | wydatki (Town Stay Spend) " + (SpendOn(s) ? "TAK: stawka " + (MBMath.ClampFloat(s.SutlerDailyShare, 0f, 1f) * 100f).ToString("0.0", Inv) + "%"
+                                                                 + (s.SutlersByPurse ? " x min(3, dni wolnej / 10)" : " (bez mnoznika sakiewki)") + ", miasto i zamek"
+                                                               : "NIE (" + (s.TownStaySpend ? "Men Purse Enabled wylaczone" : "klucz wylaczony") + ")")
+                         + " | morale +" + (int)MoraleFull + "/dobe do +" + (int)MoraleCap
                          + " | AI odtworzone ze StationaryStartTime " + n + " (srednio doba " + F1(n > 0 ? days / n : 0) + ", Never " + never + ")"
                          + " | gracz: postoj od " + (pFrom >= 0 ? pFrom.ToString(Inv) + " (doba " + Day(pFrom, now) + ")" : "-") + ", poza od " + (pOut >= 0 ? pOut.ToString(Inv) : "-")
                          + ", dzis w osadzie " + F2(pSet) + " h.");

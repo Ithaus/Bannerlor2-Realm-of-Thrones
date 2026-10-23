@@ -716,6 +716,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public float SutlerTownShare { get; set; } = 0.85f;
 
+        [SettingPropertyBool("Town Stay Spend", HintText = "soldiers waiting in a town or castle spend part of their pay there every day - taverns, dice and company: the same daily share as with the sutlers in the field (Sutler Daily Share, up to three times more when their purse is fat), only from what is left after mending, clothes and savings for better kit. The money goes to the town's merchants and common folk (or the castle), and morale rises a little (up to +5 from recent events). In a town they still spend the rest when they leave. Needs Men Purse Enabled. Off = as before (they spend only when leaving a town)", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool TownStaySpend { get; set; } = true;
+
         [SettingPropertyBool("Sutler Clothing", HintText = "the sutlers who follow the men in the field also bring them the leather, felt and linen they wear out on the march: once a day, from the stalls of the town the sutlers trade with (the nearest town not at war with them; nothing while it is under siege or was sacked by their realm in the last days), at that market's price, paid from the men's purse after the coin kept for mending and before the rest goes to the sutlers - you and the AI alike. A party in a town still buys when it leaves, as before. Needs Sutlers Enabled and Army Clothing Enabled. Off = the men buy clothes only when they leave a town, as before", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool SutlerClothing { get; set; } = true;
@@ -9466,6 +9470,7 @@ namespace Armoury
             s.SutlersEnabled = SutlersEnabled;
             s.SutlerDailyShare = SutlerDailyShare;
             s.SutlerTownShare = SutlerTownShare;
+            s.TownStaySpend = TownStaySpend;
             s.SutlerClothing = SutlerClothing;
             s.SutlerRampDays = SutlerRampDays;
             s.MenUpgradeMinGainPercent = MenUpgradeMinGainPercent;

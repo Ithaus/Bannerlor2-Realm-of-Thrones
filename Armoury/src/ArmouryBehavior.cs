@@ -2815,6 +2815,7 @@ namespace Armoury
             // (MSutlers); po zwrocie korony i Banku (K3 licznik na jutro, jak OnLeft), przed budzetem rodow (projekt etapu 5, rozdz. 5.2 pkt 6)
             try { Sutlers.Daily(); } catch (Exception e) { Log.Error("Sutlers.Daily", e); } DayProfile.Lap("Sutlers.Daily");   // linia "Markietani (E5/A3)"
             try { SavingsByNeed.Daily(); } catch (Exception e) { Log.Error("SavingsByNeed.Daily", e); } DayProfile.Lap("SavingsByNeed.Daily");   // m96: zalogi wydaja wolna sakiewke w osadzie - ta sama pozycja ksiegi (MSutlers); linia "Sakiewki wedlug potrzeby (m96)"
+            try { TownStay.Daily(); } catch (Exception e) { Log.Error("TownStay.Daily", e); } DayProfile.Lap("TownStay.Daily");   // m109-musztra: partie rodow na postoju w miescie i zamku wydaja czesc wolnej sakiewki - ta sama pozycja ksiegi (MSutlers); linia "Postoj w osadzie (m109): wydatki"
             try { MoneyLedger.Mark(MoneyLedger.MSutlers); } catch { }
             // E5/B6 (201): pula sakiewek weteranow wydana w miastach karczm (zycie, SutlerDailyShare; pule bez weteranow - cale); osobna pozycja ksiegi (MVetPurse);
             // przed budzetem rodow - sakiewki zwolnionych 166 tej doby wchodza do puli jutro wydawane

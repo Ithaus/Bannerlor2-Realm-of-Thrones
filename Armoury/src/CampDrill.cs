@@ -121,10 +121,10 @@ namespace Armoury
         internal static float PlayerOwedTown { get { return _owedSet; } }
 
         /// <summary>m109-musztra: stan postoju gracza (TownStay - linie, komunikat, autotest): poczatek postoju, chwila wyjscia, godziny w osadzie od switu.</summary>
-        internal static void PlayerStay(out long from, out long outAt, out float daySet) { from = _stayFrom; outAt = _outAt; daySet = _daySet; }
+        internal static void PlayerStay(out long from, out long outAt, out float daySet) { Roll(); from = _stayFrom; outAt = _outAt; daySet = _daySet; }
 
         /// <summary>m109-musztra: najwyzszy limit osady w biezacej dobie od switu (0 - bez godziny w osadzie) - kontrola "godziny w osadzie <= limit" (MUSZT-1).</summary>
-        internal static float PlayerDayCap { get { return _dayCapMax; } }
+        internal static float PlayerDayCap { get { Roll(); return _dayCapMax; } }
 
         /// <summary>m109-musztra: godziny cwiczen gracza od switu (wspolny limit 8 h - autotest).</summary>
         internal static float PlayerDayHours { get { Roll(); return _dayHours; } }
