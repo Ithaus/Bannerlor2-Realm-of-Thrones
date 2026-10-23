@@ -57,6 +57,188 @@ namespace Armoury
         private static MethodInfo _lReg;
         internal static bool MountReturnWired, MountFinalWired, SpareHarnessWired;
         internal static bool LuckyFound { get { return _lReg != null; } }
+        /// <summary>m110-stan: latki lupu cialo po ciele wpiete (DTE OnAgentRemoved - zabojca i ofiara, PartyBattleRecord.AddLootedItem - sztuka) - linia startu stanow.</summary>
+        internal static int LootWiredCount { get { return _lootWired; } }
+        // m110-stan (LootStateFromWounds): sprawne sztuki lupu z obrazen wysypane do sakw (FlushShareToBaggage, FlushMountsToBaggage) - WearTheLoot nie daje im
+        // loterii stanu (kryjowka: sakwy przed WearTheLoot); czyszczone przy odczycie i na poczatku rozliczenia nastepnej bitwy
+        private static readonly Dictionary<ItemObject, int> _soundFlushed = new Dictionary<ItemObject, int>();
+
+        /// <summary>m110-stan: sprawne sztuki B wysypane do sakw od ostatniego odczytu (przedmiot -> ile) - zwraca kopie i czysci; null - brak.</summary>
+        internal static Dictionary<ItemObject, int> TakeSoundFlushed()
+        {
+            if (_soundFlushed.Count == 0) return null;
+            var r = new Dictionary<ItemObject, int>(_soundFlushed);
+            _soundFlushed.Clear();
+            return r;
+        }
+
+        // m110-stan (LootStateFromWounds, LootWear): stan lupu z obrazen - czesci zbroi z cial wrogow powalonych przez druzyne gracza.
+        // Pule czesci z lupu (LootTag): przedmiot -> dane czesci z cial powalonych przez Ciebie i towarzyszy / przez zolnierzy (pod lockiem _lootHero);
+        // dane czesci rownolegle do Wrecks (cios - QueueWreck, pekniete - AddWreck; null = bez ksiegi). Sztuki B w kolejce lupu: z nowym stanem (_bQueued -
+        // znacznik lucky Spoils, odjete przy zwrocie), ich oryginaly ze zbrojowni wojska (_bOrig - wracaja przy zwrocie), sprawne bez modyfikatora (_bSound -
+        // sakwy bez loterii stanu). Zyja od AfterDtePartyItems do oddania kolejki (lista trofeow, sakwy, zwrot, ekran gry); bez zapisu, czyszczone w LReset.
+        [ThreadStatic] private static Agent _lootVictim;   // ofiara w biegu DTE OnAgentRemoved (prefiks ustawia, finalizer czysci)
+        private static readonly Dictionary<ItemObject, List<LootWear.PieceData>> _pdHero = new Dictionary<ItemObject, List<LootWear.PieceData>>();
+        private static readonly Dictionary<ItemObject, List<LootWear.PieceData>> _pdTroop = new Dictionary<ItemObject, List<LootWear.PieceData>>();
+        private static readonly List<LootWear.PieceData> WreckData = new List<LootWear.PieceData>();
+        private static readonly ItemRoster _bQueued = new ItemRoster();
+        private static readonly ItemRoster _bOrig = new ItemRoster();
+        private static readonly Dictionary<ItemObject, int> _bSound = new Dictionary<ItemObject, int>();
+        private static bool _bSoundHeld;   // AfterGenerateLoot zostawil _bSound dla przetrzymanych koni i uprzezy - finalizer Spoils czysci
+
+        /// <summary>m110-stan: pule czesci z lupu zdjete (pod lockiem) - do zwrotu drogi "zostaje u wojska".</summary>
+        private static List<LootWear.PieceData> TakePoolsLocked()
+        {
+            if (_pdHero.Count == 0 && _pdTroop.Count == 0) return null;
+            var r = new List<LootWear.PieceData>();
+            foreach (var l in _pdHero.Values) r.AddRange(l);
+            foreach (var l in _pdTroop.Values) r.AddRange(l);
+            _pdHero.Clear(); _pdTroop.Clear();
+            return r;
+        }
+
+        /// <summary>m110-stan: reszta pul (sztuki zostaja w zbrojowni wojska bez stanu, jak dotad) - droga "zostaje u wojska".</summary>
+        private static void DropPools()
+        {
+            List<LootWear.PieceData> l;
+            lock (_lootHero) l = TakePoolsLocked();
+            if (l != null) foreach (var pd in l) LootWear.Route(pd, LootWear.RZost);
+        }
+
+        /// <summary>m110-stan: kolejka oddana albo wyczyszczona - ewidencja sztuk B od nowa.</summary>
+        private static void ClearB()
+        {
+            _bQueued.Clear(); _bOrig.Clear(); _bSound.Clear(); _bSoundHeld = false;
+        }
+
+        private static void ClearWrecks() { Wrecks.Clear(); WreckData.Clear(); }
+
+        /// <summary>m110-stan: sztuka B do kolejki lupu (dzialka) ze stanem z obrazen; orig - element zdjety ze zbrojowni wojska (wraca przy zwrocie kolejki).</summary>
+        private static void QueueB(ItemObject it, int st, ItemModifier soundMod, EquipmentElement? orig)
+        {
+            var mod = st <= GearState.Sound ? soundMod : GearState.LootMod(it, st);
+            var ne = new EquipmentElement(it, mod);
+            LootTally.Queued(it, 1, LootTally.Dzialka);   // m109-lup: pomiar (przed dopisaniem)
+            ShareQueue.AddToCounts(ne, 1);
+            _bQueued.AddToCounts(ne, 1);
+            if (orig.HasValue) _bOrig.AddToCounts(orig.Value, 1);
+            if (mod == null) { int v; _bSound.TryGetValue(it, out v); _bSound[it] = v + 1; }
+        }
+
+        /// <summary>m110-stan: sprawna sztuka B tego przedmiotu wysypywana do sakw - bez loterii stanu (true) i zapamietana dla WearTheLoot.</summary>
+        private static bool TakeBSound(ItemObject it)
+        {
+            int v;
+            if (it == null || !_bSound.TryGetValue(it, out v) || v <= 0) return false;
+            _bSound[it] = v - 1;
+            int f; _soundFlushed.TryGetValue(it, out f); _soundFlushed[it] = f + 1;
+            return true;
+        }
+
+        private static LootWear.PieceData TakePiece(List<LootWear.PieceData> ph, List<LootWear.PieceData> pt)
+        {
+            if (ph != null && ph.Count > 0) { var x = ph[0]; ph.RemoveAt(0); return x; }
+            if (pt != null && pt.Count > 0) { int i = TaleWorlds.Core.MBRandom.RandomInt(pt.Count); var x = pt[i]; pt.RemoveAt(i); return x; }
+            return null;
+        }
+
+        /// <summary>m110-stan (i): podzial wrakow wedlug stanu z obrazen. Czesc z ksiega: zniszczona przepada; wrak (ponizej 10%) zostaje wrakiem (caly dla gracza,
+        /// Jeff 12.10); lepsza czesc - jak reszta lupu z tego ciala: powalony przez Ciebie albo towarzysza - do kolejki w calosci, przez zolnierza - trzecia kapitana
+        /// na przedmiot (WholeShare), reszta do zbrojowni wojska ze swoim stanem (recenzja R1/R4: dotad bez stanu - wartosc z niczego). Bez zbrojowni - jak
+        /// dotad (wrak). Czesci bez ksiegi i juz podzielone - bez zmian. reg - zwykly lup partii gracza z rekordu DTE (cialo po ciele): czesci zolnierza dziela
+        /// sie jednym zaokragleniem z tym lupem (recenzja R4); null - osobno jak dotad.</summary>
+        private static void SplitWrecks(ItemRoster armory, int third, int pct, Dictionary<ItemObject, int> reg)
+        {
+            if (Wrecks.Count == 0) return;
+            var keepW = new List<ItemObject>();
+            var keepD = new List<LootWear.PieceData>();
+            var troop = new Dictionary<ItemObject, List<LootWear.PieceData>>();
+            for (int i = 0; i < Wrecks.Count; i++)
+            {
+                var it = Wrecks[i];
+                var pd = i < WreckData.Count ? WreckData[i] : null;
+                if (pd == null || pd.Split || it == null) { keepW.Add(it); keepD.Add(pd); continue; }
+                pd.Split = true;
+                if (pd.Destroyed) { LootWear.Route(pd, LootWear.RZn); continue; }
+                if (pd.State == GearState.Wrecked || armory == null) { keepW.Add(it); keepD.Add(pd); LootWear.Route(pd, LootWear.RWrak); continue; }
+                if (pd.Kind == 1) { QueueB(it, pd.State, null, null); LootWear.Route(pd, LootWear.RTy); continue; }
+                List<LootWear.PieceData> l;
+                if (!troop.TryGetValue(it, out l)) { l = new List<LootWear.PieceData>(); troop[it] = l; }
+                l.Add(pd);
+            }
+            foreach (var kv in troop)
+            {
+                var l = kv.Value;
+                for (int i = l.Count - 1; i > 0; i--) { int j = TaleWorlds.Core.MBRandom.RandomInt(i + 1); var x = l[i]; l[i] = l[j]; l[j] = x; }
+                int sh, rc;
+                if (reg != null && reg.TryGetValue(kv.Key, out rc))
+                {
+                    // recenzja R4: jedno zaokraglenie na przedmiot - dzialka z (zwykly lup + te czesci) minus dzialka samego zwyklego lupu (ta sama regula
+                    // WholeShare, ktora potem liczy zwykla dzialke ponizej); pojedyncza czesc obok zwyklego lupu nie ginie juz w zaokragleniu do zera
+                    int hk, tk;
+                    lock (_lootHero) { _lootHero.TryGetValue(kv.Key, out hk); _lootTroop.TryGetValue(kv.Key, out tk); }
+                    int h0 = hk, t0 = tk, h1 = hk, t1 = tk + l.Count;
+                    sh = WholeShare(rc + l.Count, ref h1, ref t1, third, pct) - WholeShare(rc, ref h0, ref t0, third, pct);
+                    sh = Math.Max(0, Math.Min(l.Count, sh));
+                }
+                else
+                {
+                    int h = 0, tr = l.Count;
+                    sh = WholeShare(l.Count, ref h, ref tr, third, pct);
+                }
+                for (int i = 0; i < l.Count; i++)
+                {
+                    if (i < sh) { QueueB(kv.Key, l[i].State, null, null); LootWear.Route(l[i], LootWear.RDz); }
+                    else
+                    {
+                        // recenzja R1 (kod) / R4: do zbrojowni wojska ze swoim stanem (zbrojownia trzyma modyfikatory - WearTheTroops, ShareWithState)
+                        var wm = l[i].State > GearState.Sound ? GearState.ModFor(kv.Key, l[i].State) : null;
+                        armory.AddToCounts(new EquipmentElement(kv.Key, wm), 1);
+                        LootWear.Route(l[i], LootWear.RZbr);
+                    }
+                }
+            }
+            Wrecks.Clear(); Wrecks.AddRange(keepW);
+            WreckData.Clear(); WreckData.AddRange(keepD);
+        }
+
+        /// <summary>m110-stan (ii): dzialka jednego przedmiotu ze stanem z obrazen - najpierw sztuki sprawne ze zbrojowni, kazda dostaje dane czesci (najpierw
+        /// pula "Ty", potem losowo z puli "zolnierz"); zniszczona - zdjeta ze zbrojowni, nie trafia do kolejki; inna - do kolejki ze stanem gorszym z (stan
+        /// z obrazen, stan zdjetej sztuki), sprawna zachowuje swoj modyfikator; sztuka bez danych - jak dotad. Zwraca liczbe sztuk w kolejce, left - niezdjete.</summary>
+        private static int ShareWithState(ItemRoster armory, ItemObject item, int share, List<LootWear.PieceData> ph, List<LootWear.PieceData> pt, out int left)
+        {
+            left = share;
+            int moved = 0;
+            for (int pass = 0; pass < 2 && left > 0; pass++)
+                for (int i = armory.Count - 1; i >= 0 && left > 0; i--)
+                {
+                    var el = armory.GetElementCopyAtIndex(i);
+                    if (el.EquipmentElement.Item != item || el.Amount <= 0) continue;
+                    int sEl = GearState.Of(el.EquipmentElement.ItemModifier);
+                    bool sound = sEl == GearState.Sound;
+                    if ((pass == 0) != sound) continue;
+                    int t = Math.Min(left, el.Amount);
+                    for (int n = 0; n < t; n++)
+                    {
+                        var pd = TakePiece(ph, pt);
+                        armory.AddToCounts(el.EquipmentElement, -1);
+                        left--;
+                        if (pd == null)
+                        {
+                            LootTally.Queued(item, 1, LootTally.Dzialka);   // m109-lup: pomiar (przed dopisaniem)
+                            ShareQueue.AddToCounts(el.EquipmentElement, 1);
+                            moved++;
+                            LootWear.NoBook(false);
+                            continue;
+                        }
+                        if (pd.Destroyed) { LootWear.Route(pd, LootWear.RZn); continue; }
+                        QueueB(item, Math.Max(pd.State, Math.Max(GearState.Sound, sEl)), el.EquipmentElement.ItemModifier, el.EquipmentElement);
+                        moved++;
+                        LootWear.Route(pd, pd.Kind == 1 ? LootWear.RTy : LootWear.RDz);
+                    }
+                }
+            return moved;
+        }
         /// <summary>m109-lup: kolejka lupu do odczytu przez pomiar LootTally (tylko czyta).</summary>
         internal static ItemRoster QueueRoster { get { return ShareQueue; } }
         // m109-lup (klucz FallenRiderHorsesLooted): konie i uprzaz z listy trofeow przetrzymane na czas jednego wywolania Spoils
@@ -360,7 +542,7 @@ namespace Armoury
                 // legenda i stal valyrianska z loterii to zawsze kopia (klinge bohatera bierze, jesli w ogole, zwyczaj wojenny - UniqueSpoils.Take);
                 // w bitwie stoczonej osobiscie to samo robi CleanseTrash nizej, w symulacji dotad nic
                 if (__result != null && Settings.Current.NoConjuredLegends) StripLegendCopies(__result);
-                if (RotEnlisted()) { LootTally.QueueOut(ShareQueue, LootTally.Przepadlo); ShareQueue.Clear(); Wrecks.Clear(); return; }
+                if (RotEnlisted()) { LootTally.QueueOut(ShareQueue, LootTally.Przepadlo); ShareQueue.Clear(); ClearWrecks(); ClearB(); LootWear.Close("zaciezny - lup zostaje przy armii", 0, 0); return; }
                 bool sim = false;
                 if (!RealFoughtBattle())
                 {
@@ -384,13 +566,29 @@ namespace Armoury
                 // dzialke do sakw; loteria na wierzchu bylaby DRUGA nagroda)
                 __result.Clear();
                 ScreenIsRealLoot = true;    // E8/L (252): od teraz na liscie trofeow sa tylko prawdziwe sztuki z pola (albo nic)
-                if (ShareQueue.Count == 0 && Wrecks.Count == 0) { ScreenDone(); return; }
+                if (ShareQueue.Count == 0 && Wrecks.Count == 0) { ClearB(); LootWear.Close("lista trofeow Spoils", 0, 0); ScreenDone(); return; }
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
                     var el = ShareQueue.GetElementCopyAtIndex(i);
                     __result.AddToCounts(el.EquipmentElement, el.Amount);
                     LootTally.ToList(el.EquipmentElement.Item, el.Amount);   // m109-lup: pomiar (kolejka -> lista trofeow)
                 }
+                // m110-stan: sztuki ze stanem z obrazen chronione przed loteria stanu Spoils (ApplyDamageToLoot zachowuje zarejestrowane 1:1; ClearLuckyItems
+                // biegl na poczatku GenerateLootFromUnitList, przed tym postfiksem) - takze sprawne (klucz "id|")
+                int bOk = 0, bNeed = 0;
+                for (int i = 0; i < _bQueued.Count; i++)
+                {
+                    var el = _bQueued.GetElementCopyAtIndex(i);
+                    if (el.EquipmentElement.Item == null || el.Amount <= 0) continue;
+                    bNeed += el.Amount;
+                    if (_lReg == null) continue;
+                    for (int n = 0; n < el.Amount; n++)
+                    {
+                        try { _lReg.Invoke(null, new object[] { el.EquipmentElement }); bOk++; }
+                        catch (Exception e) { MountStumble("AfterGenerateLoot(lucky m110)", e); break; }
+                    }
+                }
+                _bQueued.Clear(); _bOrig.Clear();
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana na ekran
                 LootTally.WrecksIn(Wrecks);
                 int wrecks = AppendWrecks(__result);
@@ -403,7 +601,23 @@ namespace Armoury
                 // w prefiksie ApplyDamageToLoot tego samego wywolania (ReturnMounts); tylko przy obu latkach (inaczej jak dotad)
                 bool hold = Settings.Current.FallenRiderHorsesLooted && MountReturnWired && MountFinalWired;
                 if (hold) HoldMounts(__result);
+                // m110-stan: sprawne sztuki B zostaja w ewidencji tylko dla przetrzymanych koni i uprzezy (rezerwa do sakw w finalizerze), reszta - lista trofeow
+                if (_bSound.Count > 0)
+                {
+                    var keep = new Dictionary<ItemObject, int>();
+                    if (hold)
+                        for (int i = 0; i < MountHold.Count; i++)
+                        {
+                            var it = MountHold.GetElementCopyAtIndex(i).EquipmentElement.Item;
+                            int v;
+                            if (it != null && _bSound.TryGetValue(it, out v) && v > 0) keep[it] = v;
+                        }
+                    _bSound.Clear();
+                    foreach (var kv in keep) _bSound[kv.Key] = kv.Value;
+                    _bSoundHeld = _bSound.Count > 0;
+                }
                 LootTally.OnList(__result, hold);
+                LootWear.Close("lista trofeow Spoils", bOk, bNeed);
                 ScreenDone();
             }
             catch (Exception e) { Log.Error("AfterGenerateLoot", e); }
@@ -480,6 +694,7 @@ namespace Armoury
             {
                 if (MountHold.Count > 0) FlushMountsToBaggage(__exception != null ? "wyjatek w Spoils" : "Spoils nie oddal listy");
                 _mountArmed = false;
+                if (_bSoundHeld) { _bSound.Clear(); _bSoundHeld = false; }   // m110-stan: ewidencja sprawnych B dla przetrzymanych - tylko w tym wywolaniu Spoils
                 if (_screenThisCall) { _screenThisCall = false; LootTally.Close("lista trofeow Spoils"); }
             }
             catch (Exception e) { MountStumble("MountsFinalizer", e); }
@@ -502,7 +717,11 @@ namespace Armoury
                     var it = el.EquipmentElement.Item;
                     if (it == null || el.Amount <= 0) continue;
                     for (int n = 0; n < el.Amount; n++)
-                        bag.AddToCounts(new EquipmentElement(it, el.EquipmentElement.ItemModifier ?? ArmouryBehavior.PickWornModifier(it)), 1);
+                    {
+                        var mod = el.EquipmentElement.ItemModifier;
+                        if (mod == null && !TakeBSound(it)) mod = ArmouryBehavior.PickWornModifier(it);   // m110-stan: sprawna sztuka B zostaje sprawna
+                        bag.AddToCounts(new EquipmentElement(it, mod), 1);
+                    }
                     MountHold.AddToCounts(el.EquipmentElement, -el.Amount);
                     LootTally.Reserve(it, el.Amount);
                     moved += el.Amount;
@@ -621,7 +840,9 @@ namespace Armoury
                     if (s.LootMinConditionPercent > 0)
                     {
                         var mod = el.EquipmentElement.ItemModifier;
-                        if (mod != null && mod.PriceMultiplier * 100f <= s.LootMinConditionPercent + 0.01f)
+                        // m110-stan (recenzja R7): przy stanach - caly przedzial stanu na progu albo nizej (wrak 0.05 nie ginie juz przy progu 5-9)
+                        if (mod != null && (GearState.On ? GearState.BelowDestroy(mod, s.LootMinConditionPercent)
+                                                         : mod.PriceMultiplier * 100f <= s.LootMinConditionPercent + 0.01f))
                         {
                             roster.AddToCounts(el.EquipmentElement, -el.Amount);
                             trash += el.Amount;
@@ -671,8 +892,9 @@ namespace Armoury
             try
             {
                 if (isPlayerParty) ClearArmoryCopies();   // m109-lup (recenzja L2): kopie koni w zbrojowni liczone od nowa dla tej misji
-                if (!Settings.Current.BattlefieldLawEnabled || !isPlayerParty || !isVictorious) return;
-                if (RotEnlisted()) return;
+                if (isPlayerParty) _soundFlushed.Clear();  // m110-stan: nowe rozliczenie - sprawne B poprzedniej bitwy juz nie czekaja na WearTheLoot
+                if (!Settings.Current.BattlefieldLawEnabled || !isPlayerParty || !isVictorious) { if (isPlayerParty) DropPools(); return; }
+                if (RotEnlisted()) { DropPools(); return; }
                 int pct = PlayerSharePercent();
                 // E8/A (250, odpowiedz Jeffa 1): cialo po ciele - sztuki z cial powalonych przez Ciebie i towarzyszy w calosci, przez zolnierzy trzecia
                 // kapitana, bez znanego zabojcy (lup morski z losowania DTE) srednia z puli jak dotad; brak znacznikow z tej misji = sama srednia (kod sprzed)
@@ -685,14 +907,26 @@ namespace Armoury
                         whole = Settings.Current.OwnKillsLootWhole && ReferenceEquals(Mission.Current, _lootMission) && _lootHero.Count + _lootTroop.Count > 0;
                 }
                 catch { whole = false; }
-                if (pct <= 0 && !whole) return;
-
                 var armory = _dteArmory.GetValue(null) as ItemRoster;
-                if (armory == null) return;
+                // m110-stan (i): czesci z ciosu i pekniete wedlug stanu z obrazen - przed dzialka (bez zbrojowni - jak dotad, wrak)
+                bool bOn = LootWear.On;
+                if (bOn)
+                {
+                    try
+                    {
+                        // recenzja R4: przy lupie cialo po ciele czesci zolnierza dziela sie jednym zaokragleniem ze zwyklym lupem tego przedmiotu
+                        var reg = whole && armory != null ? PlayerLootCounts(__instance, partyId) : null;
+                        SplitWrecks(armory, third, pct, reg);
+                    }
+                    catch (Exception e) { MountStumble("SplitWrecks", e); }
+                }
+                if (pct <= 0 && !whole) { DropPools(); return; }
+
+                if (armory == null) { DropPools(); return; }
 
                 // rekord bitewny partii gracza - jedyny z isPlayerParty
                 var records = _dteRecords.GetValue(__instance) as System.Collections.IEnumerable;
-                if (records == null) return;
+                if (records == null) { DropPools(); return; }   // m110-stan (recenzja R5): pule czesci nie zostaja na nastepna bitwe
                 int moved = 0;
                 foreach (var entry in records)
                 {
@@ -718,6 +952,24 @@ namespace Armoury
                             wHero += hk; wTroop += tk; wUnk += count - hk - tk; wNew += share;
                         }
                         if (share <= 0) { if (item.IsMountable) _armLeft[item] = count; continue; }   // m109-lup (L2): wszystkie kopie zostaja w zbrojowni
+                        // m110-stan (ii): przedmiot z danymi czesci z cial (LootTag) - dzialka ze stanem z obrazen
+                        List<LootWear.PieceData> ph = null, pt = null;
+                        if (bOn)
+                            lock (_lootHero)
+                            {
+                                if (_pdHero.TryGetValue(item, out ph)) _pdHero.Remove(item);
+                                if (_pdTroop.TryGetValue(item, out pt)) _pdTroop.Remove(item);
+                            }
+                        if ((ph != null && ph.Count > 0) || (pt != null && pt.Count > 0))
+                        {
+                            int leftB;
+                            try { moved += ShareWithState(armory, item, share, ph, pt, out leftB); }
+                            catch (Exception e) { leftB = 0; MountStumble("ShareWithState", e); }
+                            if (ph != null) foreach (var x in ph) LootWear.Route(x, LootWear.RZost);
+                            if (pt != null) foreach (var x in pt) LootWear.Route(x, LootWear.RZost);
+                            if (item.IsMountable) _armLeft[item] = count - (share - leftB);
+                            continue;
+                        }
                         // audyt pelny W1: zdejmujemy po wszystkich elementach tej sztuki RAZEM z ich stanem -
                         // wczesniej AddToCounts(item, -take) celowal w element bez modyfikatora, a kolejka i tak
                         // dostawala "take" (towar z niczego, gdy w magazynie byly tylko sztuki zuzyte)
@@ -745,8 +997,35 @@ namespace Armoury
                              + "), srednia z puli dalaby " + wAvg + " szt. | potkniecia (sesja) " + _lootStumbles + ".");
                     lock (_lootHero) { _lootHero.Clear(); _lootTroop.Clear(); _lootMission = null; }
                 }
+                DropPools();   // m110-stan: reszta pul - sztuki zostaja u wojska (bez stanu, jak dotad)
             }
-            catch (Exception e) { Log.Error("AfterDtePartyItems", e); }
+            catch (Exception e) { Log.Error("AfterDtePartyItems", e); try { DropPools(); } catch { } }   // m110-stan (recenzja R5): po wyjatku pule tez puszczone
+        }
+
+        /// <summary>m110-stan (recenzja R4): zwykly lup partii gracza z rekordu DTE (przedmiot -> sztuk) - tylko odczyt, ta sama droga co petla dzialki
+        /// w AfterDtePartyItems; null - brak rekordu.</summary>
+        private static Dictionary<ItemObject, int> PlayerLootCounts(object inst, object partyId)
+        {
+            var records = _dteRecords.GetValue(inst) as System.Collections.IEnumerable;
+            if (records == null || partyId == null) return null;
+            foreach (var entry in records)
+            {
+                var et = entry.GetType();
+                var key = et.GetProperty("Key").GetValue(entry, null);
+                if (key == null || !key.Equals(partyId)) continue;
+                var looted = _dteLootedItems.GetValue(et.GetProperty("Value").GetValue(entry, null)) as System.Collections.IEnumerable;
+                if (looted == null) return null;
+                var r = new Dictionary<ItemObject, int>();
+                foreach (var kv in looted)
+                {
+                    var kt = kv.GetType();
+                    var item = kt.GetProperty("Key").GetValue(kv, null) as ItemObject;
+                    int count = (int)kt.GetProperty("Value").GetValue(kv, null);
+                    if (item != null && count > 0) r[item] = count;
+                }
+                return r;
+            }
+            return null;
         }
 
         // E8/A (250; odpowiedz Jeffa 12.10 nr 1 "to, co ja zabilem, idzie do mnie"): LUP CIALO PO CIELE. Wpis 82 liczyl dzialke gracza jako SREDNIA z puli
@@ -773,9 +1052,9 @@ namespace Armoury
             return Math.Min(count, hero + (int)Math.Round((troop * third + unk * pct) / 100.0, MidpointRounding.AwayFromZero));
         }
 
-        public static void LootKillPrefix(Agent __1) { _lootKiller = __1; _lootKind = -1; }
+        public static void LootKillPrefix(Agent __0, Agent __1) { _lootKiller = __1; _lootVictim = __0; _lootKind = -1; }   // m110-stan: takze ofiara (DTE OnAgentRemoved: __0 ofiara, __1 zabojca)
 
-        public static void LootKillFinalizer() { _lootKiller = null; _lootKind = 0; }
+        public static void LootKillFinalizer() { _lootKiller = null; _lootVictim = null; _lootKind = 0; }
 
         /// <summary>Prefiks DTE PartyBattleRecord.AddLootedItem(ItemObject): sztuka idzie do lupu partii zabojcy - zapamietaj, czy powalil bohater partii
         /// gracza, czy jej zolnierz (partia zabojcy = partia gracza, wiec to jej rekord). Tylko licznik; nie rzuca.</summary>
@@ -785,16 +1064,32 @@ namespace Armoury
             {
                 if (_lootKind == 0 || __0 == null) return;
                 var s = Settings.Current;
-                if (s == null || !s.OwnKillsLootWhole || !s.BattlefieldLawEnabled) return;
+                if (s == null || !s.BattlefieldLawEnabled) return;
+                bool own = s.OwnKillsLootWhole;
+                bool st = LootWear.On;   // m110-stan (LootStateFromWounds): stan czesci z obrazen do puli wedlug zabojcy
+                if (!own && !st) return;
                 if (_lootKind < 0) _lootKind = KillerKind(_lootKiller);
                 if (_lootKind != 1 && _lootKind != 2) return;
                 var m = Mission.Current;
+                var pd = st ? LootWear.Piece(_lootVictim, __0, -1, LootWear.CLup, _lootKind, LootWear.WhoOf(_lootKind, _lootKiller)) : null;
+                List<LootWear.PieceData> stale = null;
                 lock (_lootHero)
                 {
-                    if (!ReferenceEquals(m, _lootMission)) { _lootMission = m; _lootHero.Clear(); _lootTroop.Clear(); }
-                    var d = _lootKind == 1 ? _lootHero : _lootTroop;
-                    int n; d.TryGetValue(__0, out n); d[__0] = n + 1;
+                    if (!ReferenceEquals(m, _lootMission)) { _lootMission = m; _lootHero.Clear(); _lootTroop.Clear(); stale = TakePoolsLocked(); }
+                    if (own)
+                    {
+                        var d = _lootKind == 1 ? _lootHero : _lootTroop;
+                        int n; d.TryGetValue(__0, out n); d[__0] = n + 1;
+                    }
+                    if (pd != null)
+                    {
+                        var dd = _lootKind == 1 ? _pdHero : _pdTroop;
+                        List<LootWear.PieceData> l;
+                        if (!dd.TryGetValue(__0, out l)) { l = new List<LootWear.PieceData>(); dd[__0] = l; }
+                        l.Add(pd);
+                    }
                 }
+                if (stale != null) foreach (var x in stale) LootWear.Route(x, LootWear.RZost);
             }
             catch { _lootStumbles++; }
         }
@@ -888,7 +1183,7 @@ namespace Armoury
                         return;
                     }
                     LootTally.QueueOut(ShareQueue, LootTally.Przepadlo);   // m109-lup: pomiar
-                    ShareQueue.Clear(); Wrecks.Clear(); return;
+                    ShareQueue.Clear(); ClearWrecks(); ClearB(); LootWear.Close("przepadlo - rozliczenie bitwy bez misji", 0, 0); return;
                 }
 
                 if (_rlPresent)
@@ -918,10 +1213,12 @@ namespace Armoury
                     LootTally.QueueOut(ShareQueue, LootTally.Lista);   // m109-lup: pomiar
                     ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana na ekran gry
                 }
+                ClearB();   // m110-stan: bez Spoils nikt nie losuje stanu - sztuki B maja arm_* (GearState.LootMod)
                 AppendWrecks(gainedLoots);
                 CleanseDragons(gainedLoots);
                 CleanseTrash(gainedLoots);
                 LootTally.Close("ekran gry");   // m109-lup: bez Spoils lista trofeow to ekran gry
+                LootWear.Close("ekran gry", 0, 0);
                 if (!Settings.Current.LootArrivesBattleWorn || _applyDamage == null || gainedLoots.Count == 0) return;
                 var damaged = _applyDamage.Invoke(null, new object[] { gainedLoots, 0f }) as ItemRoster;
                 if (damaged == null || ReferenceEquals(damaged, gainedLoots)) return;
@@ -988,7 +1285,8 @@ namespace Armoury
             _simCutSpoils = _simCutBattles = _simCutGame = _lStumbles = 0; ScreenIsRealLoot = false;
             _simPending = false;
             try { LootTally.Reset(); } catch { }   // m109-lup: PRZED czyszczeniem kolejki (otwarta bitwa zamknieta, "zostaje" = kolejka)
-            try { ShareQueue.Clear(); Wrecks.Clear(); MountHold.Clear(); ClearArmoryCopies(); } catch { }
+            try { LootWear.Reset(); } catch { }    // m110-stan: otwarta bitwa stanu lupu zamknieta, ksiega misji od zera
+            try { ShareQueue.Clear(); ClearWrecks(); MountHold.Clear(); ClearArmoryCopies(); ClearB(); _soundFlushed.Clear(); lock (_lootHero) TakePoolsLocked(); } catch { }
             _mountArmed = false; _screenThisCall = false;
         }
 
@@ -1173,7 +1471,21 @@ namespace Armoury
                 if (_lastPick != null && Settings.Current.WreckSalvageEnabled &&
                     Settings.Current.BattlefieldLawEnabled && Wrecks.Count < 400 &&
                     (IsMainPartyAgent(affectorAgent) || IsMainPartyAgent(affectedAgent)))
+                {
+                    // m110-stan (LootStateFromWounds): czesc rozbita ciosem wroga powalonego przez druzyne gracza - stan z obrazen (nie z automatu wrak)
+                    LootWear.PieceData pd = null;
+                    if (LootWear.On)
+                    {
+                        int k = KillerKind(affectorAgent);
+                        if (k == 1 || k == 2)
+                        {
+                            pd = LootWear.Piece(affectedAgent, _lastPick, -1, LootWear.CCios, k, LootWear.WhoOf(k, affectorAgent));
+                            if (pd == null && affectedAgent != null && Mission.Current != null && MissionTeams.Enemies(affectedAgent.Team, Mission.Current.PlayerTeam)) LootWear.NoBook(true);
+                        }
+                    }
                     Wrecks.Add(_lastPick);
+                    WreckData.Add(pd);
+                }
             }
             catch { }
             _lastPick = null;
@@ -1183,7 +1495,10 @@ namespace Armoury
         /// gracza do worka z wrakami - te same bramki co QueueWreck (klucze, limit 400) i tylko, gdy znamy stan wraka (modyfikator Spoils wpiety przy starcie
         /// z WreckSalvageEnabled) - bez niego wrak przyszedlby jako cala sztuka. DTE tej sztuki nie dopisuje nigdzie (AddItemToRecover ja pomija), wiec wrak
         /// to jedyna kopia. true - dodany.</summary>
-        internal static bool AddWreck(ItemObject it)
+        internal static bool AddWreck(ItemObject it) { return AddWreck(it, null); }
+
+        /// <summary>m110-stan: jak AddWreck - z danymi czesci (stan z obrazen; null - bez ksiegi) rownolegle do Wrecks.</summary>
+        internal static bool AddWreck(ItemObject it, LootWear.PieceData pd)
         {
             try
             {
@@ -1191,6 +1506,7 @@ namespace Armoury
                 if (it == null || s == null || !s.WreckSalvageEnabled || !s.BattlefieldLawEnabled || Wrecks.Count >= 400) return false;
                 if (_rlHeavy == null && _rlHeavyMax == null) return false;
                 Wrecks.Add(it);
+                WreckData.Add(pd);
                 return true;
             }
             catch (Exception e) { MountStumble("AddWreck", e); return false; }
@@ -1227,10 +1543,31 @@ namespace Armoury
                 var armory = _dteArmory != null ? _dteArmory.GetValue(null) as ItemRoster : null;
                 if (armory != null)
                 {
+                    // m110-stan: sztuki B wracaja jako ich oryginaly ze zbrojowni (bez stanu z obrazen); B z podzialu wrakow przepadaja jak wraki
+                    var bq = new Dictionary<string, int>();
+                    for (int i = 0; i < _bQueued.Count; i++)
+                    {
+                        var be = _bQueued.GetElementCopyAtIndex(i);
+                        if (be.EquipmentElement.Item == null || be.Amount <= 0) continue;
+                        string k = be.EquipmentElement.Item.StringId + "|" + (be.EquipmentElement.ItemModifier != null ? be.EquipmentElement.ItemModifier.StringId : "");
+                        int v; bq.TryGetValue(k, out v); bq[k] = v + be.Amount;
+                    }
                     for (int i = 0; i < ShareQueue.Count; i++)
                     {
                         var el = ShareQueue.GetElementCopyAtIndex(i);
-                        armory.AddToCounts(el.EquipmentElement, el.Amount);
+                        int amt = el.Amount;
+                        if (bq.Count > 0 && el.EquipmentElement.Item != null)
+                        {
+                            string k = el.EquipmentElement.Item.StringId + "|" + (el.EquipmentElement.ItemModifier != null ? el.EquipmentElement.ItemModifier.StringId : "");
+                            int v;
+                            if (bq.TryGetValue(k, out v) && v > 0) { int b = Math.Min(v, amt); amt -= b; bq[k] = v - b; }
+                        }
+                        if (amt > 0) armory.AddToCounts(el.EquipmentElement, amt);
+                    }
+                    for (int i = 0; i < _bOrig.Count; i++)
+                    {
+                        var oe = _bOrig.GetElementCopyAtIndex(i);
+                        if (oe.EquipmentElement.Item != null && oe.Amount > 0) armory.AddToCounts(oe.EquipmentElement, oe.Amount);
                     }
                     LootTally.QueueOut(ShareQueue, LootTally.Zwrot);   // m109-lup: pomiar
                     // m109-lup: siatka bezpieczenstwa - przetrzymane konie i uprzaz (zdjete z kolejki, czyli ze zbrojowni wojska) wracaja tam samo
@@ -1244,10 +1581,11 @@ namespace Armoury
                 }
                 else LootTally.QueueOut(ShareQueue, LootTally.Przepadlo);
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka wrocila do zbrojowni wojska
-                Wrecks.Clear();
+                ClearWrecks(); ClearB();
             }
             catch (Exception e) { Log.Error("DropShare", e); }
             LootTally.Close("zwrot do zbrojowni wojska");   // m109-lup: pole przegrane albo opuszczone
+            LootWear.Close("zwrot do zbrojowni wojska", 0, 0);   // m110-stan
             return n;
         }
 
@@ -1280,7 +1618,8 @@ namespace Armoury
                     if (item == null) continue;
                     for (int n = 0; n < el.Amount; n++)
                     {
-                        var mod = el.EquipmentElement.ItemModifier ?? ArmouryBehavior.PickWornModifier(item);
+                        var mod = el.EquipmentElement.ItemModifier;
+                        if (mod == null && !TakeBSound(item)) mod = ArmouryBehavior.PickWornModifier(item);   // m110-stan: sprawna sztuka B zostaje sprawna
                         bag.AddToCounts(new EquipmentElement(item, mod), 1);
                         moved++;
                     }
@@ -1295,7 +1634,9 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("FlushShareToBaggage", e); }
+            ClearB();   // m110-stan: kolejka oddana (sprawne B wysypane - _soundFlushed dla WearTheLoot)
             LootTally.Close("sakwy - " + why);   // m109-lup: pomiar bitwy zamkniety
+            LootWear.Close("sakwy - " + why, 0, 0);
             return moved;
         }
 
@@ -1308,12 +1649,15 @@ namespace Armoury
                 var mod = WreckModifier();
                 // wraki zbite ponizej progu zniszczenia w ogole nie wchodza
                 // (Jeff 28.08: "<=3% = zniszczone, nie pojawia sie w loocie")
+                // m110-stan (recenzja R7): przy stanach wrak (0.05) ginie dopiero przy progu 10 i wiecej (jak 104 przy cenie 0.10); czesci z ksiega obrazen
+                // zniszczone wedlug d juz w SplitWrecks (LootWear) - tu tylko wrak bez wiedzy o wytrzymalosci
                 if (mod != null && Settings.Current.LootMinConditionPercent > 0
-                    && mod.PriceMultiplier * 100f <= Settings.Current.LootMinConditionPercent + 0.01f)
+                    && (GearState.On ? GearState.BelowDestroy(mod, Settings.Current.LootMinConditionPercent)
+                                     : mod.PriceMultiplier * 100f <= Settings.Current.LootMinConditionPercent + 0.01f))
                 {
                     int junked = Wrecks.Count;
                     foreach (var w in Wrecks) LootTally.SiftOut(w, 1, LootTally.SWrak);   // m109-lup (recenzja L4): przyczyna przesiania
-                    Wrecks.Clear();
+                    ClearWrecks();
                     Log.Info("BattlefieldLaw: " + junked + " wrakow ponizej progu zniszczenia - zostaly na polu.");
                     return 0;
                 }
@@ -1330,7 +1674,7 @@ namespace Armoury
                     roster.AddToCounts(el, 1);
                     n++;
                 }
-                Wrecks.Clear();
+                ClearWrecks();
             }
             catch (Exception e) { Log.Error("AppendWrecks", e); }
             return n;

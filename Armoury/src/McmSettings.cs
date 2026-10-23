@@ -492,7 +492,7 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float TroopWearBaseCasualtyShare { get; set; } = 0.10f;
 
-        [SettingPropertyBool("Loot Price Follows Condition", HintText = "Spoils of War loot is priced by its condition (Plundered 55%, Damaged 40%, Battered 25%, Mangled 10% - a wreck) (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyBool("Loot Price Follows Condition", HintText = "Spoils of War loot is priced by its condition (Plundered 55%, Damaged 40%, Battered 25%, Mangled 10% - a wreck); with Gear Four States on, these marks are shown and priced as their state instead: Plundered as Damaged (60%), Damaged and Battered as Mangled (25%), Mangled as Wrecked (5%) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public bool LootPriceFollowsCondition { get; set; } = true;
 
@@ -500,7 +500,7 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool WearEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Show Condition Percent", HintText = "damaged gear carries its state in the name - (100%) is mint, (1%) is a wreck", RequireRestart = false)]
+        [SettingPropertyBool("Show Condition Percent", HintText = "damaged gear carries its state in the name - (100%) is mint, (1%) is a wreck; with Gear Four States on the name carries the state's word instead (Damaged, Mangled, Wrecked) and a sound piece keeps its plain name", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public bool ShowConditionPercent { get; set; } = true;
 
@@ -568,17 +568,21 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float TierDurabilityFactor { get; set; } = 0.22f;
 
-        [SettingPropertyInteger("Threshold Worn", 0, 280, "0", HintText = "below this the gear starts to show", RequireRestart = false)]
+        [SettingPropertyInteger("Threshold Worn", 0, 280, "0", HintText = "below this the gear starts to show (not used with Gear Four States on - there a piece is Damaged at 80% of its strength or less)", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ThresholdWorn { get; set; } = 70;
 
-        [SettingPropertyInteger("Threshold Damaged", 0, 180, "0", HintText = "below this it is plainly damaged and worth less", RequireRestart = false)]
+        [SettingPropertyInteger("Threshold Damaged", 0, 180, "0", HintText = "below this it is plainly damaged and worth less (not used with Gear Four States on - there a piece is Mangled at 40% or less)", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ThresholdDamaged { get; set; } = 45;
 
-        [SettingPropertyInteger("Threshold Ruined", 0, 80, "0", HintText = "below this it is barely worth carrying", RequireRestart = false)]
+        [SettingPropertyInteger("Threshold Ruined", 0, 80, "0", HintText = "below this it is barely worth carrying (not used with Gear Four States on - there a piece is Wrecked under 10%)", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ThresholdRuined { get; set; } = 20;
+
+        [SettingPropertyBool("Gear Four States", HintText = "gear has four named states by how much of its strength is left: Sound (over 80% - full worth and protection; only sound pieces keep a fine, lordly or legendary make), Damaged (over 40% - 60% of the worth, about -14% protection and edge), Mangled (10-40% - 25%, about -51%) and Wrecked (under 10% - 5%, about -81%; a wreck is scrap). The name shows the state instead of a percent; old worn makes (rusty, dented, loose, Plundered, Battered...) count as their state. Takes effect on the next load. Off: as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool GearFourStates { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Repair Cost Factor", 0.00f, 2.00f, "0.00", HintText = "share of item value for a full repair (with Smith Mend From Market on, the town smiths charge by their day wages instead - this share is left only for pieces they have no recipe for)", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
@@ -1000,7 +1004,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SendTroopsOneLoot { get; set; } = true;
 
-        [SettingPropertyBool("Wreck Salvage Enabled", HintText = "the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge", RequireRestart = false)]
+        [SettingPropertyBool("Wreck Salvage Enabled", HintText = "the piece smashed by the killing blow is not lost - it lands in the loot as a wreck to mend at the forge (with Loot State From Wounds on, in the state the blows left it in: only a true wreck comes as a wreck)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool WreckSalvageEnabled { get; set; } = true;
 
@@ -1016,7 +1020,11 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool ExtraBrokenArmorWrecks { get; set; } = true;
 
-        [SettingPropertyInteger("Loot Min Condition Percent", 0, 12, "0", HintText = "gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off)", RequireRestart = false)]
+        [SettingPropertyBool("Loot State From Wounds", HintText = "armour stripped from a foe your party brought down comes in the state the blows left it in: every hit of this battle wears the piece it struck exactly as your own armour wears, from the state it had before the battle (480 points off a 2000-point mail shirt leaves 76% - Damaged). The piece smashed by the killing blow and the piece Dynamic Troop Equipment counts as broken are judged the same way: only a true wreck comes to you whole; a better piece is shared like the rest of that foe's gear (yours whole if you or a companion felled him, the captain's share if your men did - the rest to the army armoury). Gear battered to Loot Min Condition Percent or less is destroyed. Needs Gear Four States. Off: as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool LootStateFromWounds { get; set; } = true;
+
+        [SettingPropertyInteger("Loot Min Condition Percent", 0, 12, "0", HintText = "gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off); with Loot State From Wounds on, armour stripped from a foe is destroyed when the blows left it this percent of its strength or less; with Gear Four States on, a Wrecked piece whose exact strength is not known (a wreck is anything under a tenth) is destroyed only at 10 or more", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public int LootMinConditionPercent { get; set; } = 3;
 
@@ -1048,7 +1056,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool HistDonateRenownOldCoin { get; set; } = true;
 
-        [SettingPropertyBool("Spoils Quartermaster Repair", HintText = "the Spoils of War quartermaster's repairs are done by this town's smiths, like every other repair in Armoury: you pay into the town's coffers the smiths' work (with Smith Mend From Market on: its share of the days a master spent making the piece, at the town's day wage; off: a quarter of the worth it has lost), plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled, or worn to a tenth of their worth or less - see Wrecks To Scrap) are not restored here - mend them at a forge with your own materials, or salvage them (off = Spoils of War as before: its price, the coin vanishes, no materials, wrecks restored; the day's log line shows how much either way)", RequireRestart = false)]
+        [SettingPropertyBool("Spoils Quartermaster Repair", HintText = "the Spoils of War quartermaster's repairs are done by this town's smiths, like every other repair in Armoury: you pay into the town's coffers the smiths' work (with Smith Mend From Market on: its share of the days a master spent making the piece, at the town's day wage; off: a quarter of the worth it has lost), plus the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled, or worn to a tenth of their worth or less; with Gear Four States on, Wrecked pieces - see Wrecks To Scrap) are not restored here - mend them at a forge with your own materials, or salvage them (off = Spoils of War as before: its price, the coin vanishes, no materials, wrecks restored; the day's log line shows how much either way)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsQuartermasterRepair { get; set; } = true;
 
@@ -5316,15 +5324,15 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public float MendMaterialMaxShare { get; set; } = 0.20f;
 
-        [SettingPropertyBool("Smith Mend From Market", HintText = "the town smiths' rule for every repair in a town (the mending bench, the quartermaster, your men, the lords' men): the work is paid like the making of the piece - its share of the days a master spent forging it, at the master's historical day wage, as dear as the town is prosperous; the mending bench (and, with Mend Material Men And Lords, your men's and the lords' repairs) also charges the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled, or worn to a tenth of their worth or less - see Wrecks To Scrap) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)", RequireRestart = false)]
+        [SettingPropertyBool("Smith Mend From Market", HintText = "the town smiths' rule for every repair in a town (the mending bench, the quartermaster, your men, the lords' men): the work is paid like the making of the piece - its share of the days a master spent forging it, at the master's historical day wage, as dear as the town is prosperous; the mending bench (and, with Mend Material Men And Lords, your men's and the lords' repairs) also charges the materials they take from this market at its prices - iron (crude iron, scrap from wrecks or ore), wood, leather, linen or wool, more the worse the piece; with no such materials on the market the piece waits; wrecks (Mangled, or worn to a tenth of their worth or less; with Gear Four States on, Wrecked pieces - see Wrecks To Scrap) are not restored for coin - mend them yourself with your own materials, or melt them down (off = as before: the smith's price only, no materials, wrecks restored)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool SmithMendFromMarket { get; set; } = true;
 
-        [SettingPropertyBool("Wrecks To Scrap", HintText = "wrecks go to the scrap heap: no town smith restores a wreck for coin on any road - not the mending bench, not 'Pick a piece', not the men's racks (with Smith Mend From Market on or off), not your harness, not your men's or the lords' repairs. A wreck is Mangled loot or any piece worn to a tenth of its worth or less (on your back: worn to 10% or less); it stays a wreck - melt it down (the smiths also take wrecks off the market as scrap iron for their mending), or mend it at your own anvil with your own materials (off = as before: wrecks below a tenth are refused, a piece at exactly a tenth is restored, and with Smith Mend From Market off the men's racks restore wrecks for Troop Mend Wreck Share of their worth)", RequireRestart = false)]
+        [SettingPropertyBool("Wrecks To Scrap", HintText = "wrecks go to the scrap heap: no town smith restores a wreck for coin on any road - not the mending bench, not 'Pick a piece', not the men's racks (with Smith Mend From Market on or off), not your harness, not your men's or the lords' repairs. A wreck is Mangled loot or any piece worn to a tenth of its worth or less (on your back: worn to 10% or less); with Gear Four States on, a wreck is any Wrecked piece - less than a tenth of its strength left (a piece at exactly a tenth is Mangled and can be mended); it stays a wreck - melt it down (the smiths also take wrecks off the market as scrap iron for their mending), or mend it at your own anvil with your own materials (off = as before: wrecks below a tenth are refused, a piece at exactly a tenth is restored, and with Smith Mend From Market off the men's racks restore wrecks for Troop Mend Wreck Share of their worth)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool WrecksToScrap { get; set; } = true;
 
-        [SettingPropertyBool("Mend Metal By Kind", HintText = "town smiths mending a piece take only the new iron that mending really needs, not a fixed share of a new piece: rivets and a few plates for plate (1% of its iron Plundered, 2% Damaged, 4% Battered), buckles and studs for leather and cloth (2/3/6%), almost none for blades (0/0.5/1.5%) and spear heads (0/0.5/2%), more for shield rims and bosses (4/8/12%) and crossbow locks (3/6/11%); other states (e.g. Dented, Rusty) fall between these points by how much of the piece is lost; the forge fuel follows the iron; mail keeps the old rule (badly cut mail needs many new rings); the work, the wood, leather and cloth are paid as before (off = iron and forge fuel at Mend Material Max Share times the damage, as before: 9/12/15% of the recipe Plundered/Damaged/Battered)", RequireRestart = false)]
+        [SettingPropertyBool("Mend Metal By Kind", HintText = "town smiths mending a piece take only the new iron that mending really needs, not a fixed share of a new piece: rivets and a few plates for plate (1% of its iron Plundered, 2% Damaged, 4% Battered - the Spoils of War marks; with Gear Four States on, a Damaged piece takes a little less than the first figure and a Mangled one the last), buckles and studs for leather and cloth (2/3/6%), almost none for blades (0/0.5/1.5%) and spear heads (0/0.5/2%), more for shield rims and bosses (4/8/12%) and crossbow locks (3/6/11%); other states (e.g. Dented, Rusty) fall between these points by how much of the piece is lost; the forge fuel follows the iron; mail keeps the old rule (badly cut mail needs many new rings); the work, the wood, leather and cloth are paid as before (off = iron and forge fuel at Mend Material Max Share times the damage, as before: 9/12/15% of the recipe Plundered/Damaged/Battered; with Gear Four States on 8% Damaged, 15% Mangled)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool MendMetalByKind { get; set; } = true;
 
@@ -9496,6 +9504,7 @@ namespace Armoury
             s.ThresholdWorn = ThresholdWorn;
             s.ThresholdDamaged = ThresholdDamaged;
             s.ThresholdRuined = ThresholdRuined;
+            s.GearFourStates = GearFourStates;
             s.RepairCostFactor = RepairCostFactor;
             s.BreakAtZeroCondition = BreakAtZeroCondition;
             s.ArenaNoWear = ArenaNoWear;
@@ -9605,6 +9614,7 @@ namespace Armoury
             s.FallenRiderHorsesLooted = FallenRiderHorsesLooted;
             s.RiderBlowSparesHarness = RiderBlowSparesHarness;
             s.ExtraBrokenArmorWrecks = ExtraBrokenArmorWrecks;
+            s.LootStateFromWounds = LootStateFromWounds;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
             s.LegendarySweepLazy = LegendarySweepLazy;

@@ -175,6 +175,9 @@ namespace Armoury
         private static int _lastLineDay = -1;
         private static double _startMs;
 
+        /// <summary>m110-stan: modyfikatory jakosci grup od nowa po zamianie stanow w grupach (GearState.Apply) - liczniki zostaja.</summary>
+        internal static void ClearModCache() { lock (_modsLock) _mods.Clear(); }
+
         internal static void Reset()
         {
             _censusDay = -1;

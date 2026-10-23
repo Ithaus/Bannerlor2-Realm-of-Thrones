@@ -602,6 +602,11 @@ namespace Armoury
         internal static float ConditionOf(ItemModifier m)
         {
             if (m == null) return 1f;
+            if (GearState.On)
+            {
+                int st = GearState.Of(m);   // m110-stan (GearFourStates): jedna wartosc na stan - 60 / 25 / 5%
+                if (st >= GearState.Damaged) return GearState.Value[st];
+            }
             switch (m.StringId)
             {
                 case "rl_looted": return 0.55f;
@@ -832,6 +837,14 @@ namespace Armoury
                 if (ArmouryBehavior.NoState(__instance.Item)) return;   // amunicja bez dopiskow stanu (E8/C: NoState - obity oszczep dalej pokazuje stan)
                 var m = __instance.ItemModifier;
                 if (m == null) return;
+                int gs = GearState.Shown(m);
+                if (gs > 0)
+                {
+                    // m110-stan (Jeff 23.10: "okreslajmy go nazwami, nie procentami"): slowo stanu przed nazwa - "Damaged X", "Mangled X", "Wrecked X"
+                    string bn = __instance.Item != null && __instance.Item.Name != null ? __instance.Item.Name.ToString() : __result.ToString();
+                    __result = new TaleWorlds.Localization.TextObject("{=!}" + GearState.En[gs] + " " + bn);
+                    return;
+                }
                 float pm = m.PriceMultiplier;
                 if (pm >= 0.999f || pm <= 0f) return;          // nowe albo lepsze niz nowe - bez dopisku
                 int pct = (int)Math.Round(pm * 100f);

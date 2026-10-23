@@ -635,7 +635,7 @@ namespace Armoury
                             {
                                 var el = ElOf(p);
                                 if (el.Item == null) continue;
-                                string nm = el.Item.Name + (el.ItemModifier != null ? " (" + el.ItemModifier.Name + ")" : "");
+                                string nm = el.Item.Name + (el.ItemModifier != null ? " (" + GearState.ModName(el.ItemModifier) + ")" : "");   // m110-stan: slowo stanu
                                 if (p.OwnWorn > 0) { wornKinds++; if (wornNames.Count < 4) wornNames.Add(p.OwnWorn + "x " + nm); }
                                 if (p.Back > 0)
                                 {
@@ -838,7 +838,7 @@ namespace Armoury
             {
                 var el = ElOf(p);
                 if (el.Item == null) return p != null ? p.Id : "?";
-                return el.Item.Name + (el.ItemModifier != null ? " (" + el.ItemModifier.Name + ")" : "");
+                return el.Item.Name + (el.ItemModifier != null ? " (" + GearState.ModName(el.ItemModifier) + ")" : "");   // m110-stan: slowo stanu
             }
             catch { return p != null ? p.Id : "?"; }
         }

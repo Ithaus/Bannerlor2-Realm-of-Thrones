@@ -43,6 +43,13 @@ namespace Armoury
         internal static bool IsWreck(ItemModifier m)
         {
             if (m == null) return false;
+            if (GearState.On)
+            {
+                // m110-stan (GearFourStates): wrakiem jest stan Wrecked (arm_*_wrecked, rl_looted_heavy_max, stare zle po 0.1 - RBM *_damage_*);
+                // modyfikatory spoza czterech stanow (konie, towary BK) - jak dotad
+                int st = GearState.Of(m);
+                if (st >= 0) return st == GearState.Wrecked;
+            }
             if (m.StringId == "rl_looted_heavy_max") return true;
             if (ScrapRule) return ConditionScaling.ConditionOf(m) <= WreckState + 0.0001f;
             return m.PriceMultiplier < 0.1f;
@@ -59,11 +66,31 @@ namespace Armoury
         internal static bool SmithRefuses(ItemModifier m) { return ScrapRule && IsWreck(m); }
 
         /// <summary>Paczka 158: czesc uprzezy gracza jest wrakiem - modyfikator wraku albo stan w ksiedze zuzycia <= 10%.</summary>
-        internal static bool HarnessWreck(ItemModifier m, float cond) { return ScrapRule && (IsWreck(m) || cond <= WreckState * 100f + 0.001f); }
+        internal static bool HarnessWreck(ItemModifier m, float cond)
+        {
+            // m110-stan (GearFourStates): wrak ponizej 10% (dokladnie 10% to zmasakrowana - do naprawy)
+            if (GearState.On) return ScrapRule && (IsWreck(m) || cond < WreckState * 100f - 0.001f);
+            return ScrapRule && (IsWreck(m) || cond <= WreckState * 100f + 0.001f);
+        }
+
+        /// <summary>m110-stan (recenzja R1): slowo wraku w napisach dla gracza - przy stanach "Wrecked" ("Mangled" to wtedy zmasakrowana sztuka do naprawy),
+        /// inaczej "Mangled" jak dotad.</summary>
+        internal static string WreckWordEn { get { return GearState.On ? "Wrecked" : "Mangled"; } }
+
+        /// <summary>m110-stan (recenzja R1): co jest wrakiem (napis w nawiasie) - przy stanach stan Wrecked, inaczej jak dotad.</summary>
+        internal static string WreckDefEn(bool one)
+        {
+            if (GearState.On) return one ? "Wrecked - less than a tenth of its strength left" : "Wrecked - less than a tenth of their strength left";
+            return one ? "Mangled, or worn to a tenth of its worth or less" : "Mangled, or worn to a tenth of their worth or less";
+        }
 
         /// <summary>Napis dla gracza (po angielsku): co jest wrakiem i co z nim zrobic.</summary>
         internal static string WreckWhatEn(int n)
         {
+            if (GearState.On)   // m110-stan: wrak to stan Wrecked
+                return n == 1
+                    ? " wreck (Wrecked - less than a tenth of its strength left) is not restored for coin by the town's smiths - a wreck is scrap: melt it down, or mend it at your own anvil with your own materials."
+                    : " wrecks (Wrecked - less than a tenth of their strength left) are not restored for coin by the town's smiths - wrecks are scrap: melt them down, or mend them at your own anvil with your own materials.";
             return n == 1
                 ? " wreck (Mangled, or worn to a tenth of its worth or less) is not restored for coin by the town's smiths - a wreck is scrap: melt it down, or mend it at your own anvil with your own materials."
                 : " wrecks (Mangled, or worn to a tenth of their worth or less) are not restored for coin by the town's smiths - wrecks are scrap: melt them down, or mend them at your own anvil with your own materials.";

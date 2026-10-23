@@ -754,7 +754,14 @@ namespace Armoury
                     cls[i] = APek;
                     b.PekOne++;
                     var s = Settings.Current;   // Z1 (ExtraBrokenArmorWrecks): jak czesc rozbita ciosem - wrak do lupu (regula Jeffa 04.10)
-                    if (s != null && s.ExtraBrokenArmorWrecks && s.WreckSalvageEnabled && BattlefieldLaw.AddWreck(st.Items[i])) { b.PekWreck++; wreck = true; }
+                    if (s != null && s.ExtraBrokenArmorWrecks && s.WreckSalvageEnabled)
+                    {
+                        // m110-stan (LootStateFromWounds): stan peknietej czesci z obrazen - nietrafiona wraca w swoim stanie sprzed bitwy (podzial w AfterDtePartyItems)
+                        var pdw = LootWear.On ? LootWear.Piece(affectedAgent, st.Items[i], st.Slots[i], LootWear.CPek, st.Kind, st.Who) : null;
+                        if (pdw == null && LootWear.On) LootWear.NoBook(true);
+                        if (BattlefieldLaw.AddWreck(st.Items[i], pdw)) { b.PekWreck++; wreck = true; }
+                        else LootWear.Route(pdw, LootWear.RPrzep);
+                    }
                 }
                 else if (cand.Count > 1)
                 {

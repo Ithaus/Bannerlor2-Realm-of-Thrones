@@ -611,7 +611,9 @@ namespace Armoury
         private static string SmithLine(MendMaterial.Order q, EquipmentElement ee, int slot = -1)
         {
             string hrs = GuildMend.On ? GuildMend.F1(slot >= 0 ? GuildMend.PieceTally(ee, slot).Total : GuildMend.Hours(ee)) + "h of the " + GuildMend.TradeEn[GuildMend.TradeOf(ee.Item)] : Settings.Current.MendLootHoursPerPiece.ToString("0.#") + "h";   // R3-02 (na grzbiecie - stan z ksiegi, jak robota)
-            const string scrap = "Smith: not for coin - a wreck (worn to a tenth of its worth or less) is scrap: melt it down, or mend it at your own anvil";   // paczka 158
+            string scrap = GearState.On   // m110-stan (recenzja R1): przy stanach wrak to stan Wrecked
+                ? "Smith: not for coin - a wreck (Wrecked - less than a tenth of its strength left) is scrap: melt it down, or mend it at your own anvil"
+                : "Smith: not for coin - a wreck (worn to a tenth of its worth or less) is scrap: melt it down, or mend it at your own anvil";   // paczka 158
             if (SmithRefusesHere(ee, slot)) return scrap;   // recenzja 158: na grzbiecie takze stan w ksiedze
             int labor = PieceCostAt(ee, slot);   // E8/B: zalozona sztuka - wycena ksiegi (jedna cena z "Mend everything you wear")
             if (q == null) return "Smith: " + labor + " gold, " + hrs;
@@ -871,7 +873,7 @@ namespace Armoury
                         if (sb0.Length > 0) sb0.Append(", ");
                         sb0.Append(p.Count + "x " + p.Item.Name + " (" + Recipes.CountInInventory(p.Item) + ")");
                     }
-                    string hint0 = "EQUIPPED - you wear this now.\nCondition " + pct0 + "%" +
+                    string hint0 = "EQUIPPED - you wear this now.\nCondition " + GearState.CondText(ee0.ItemModifier, pct0) +
                                    "\n" + SmithLine(quote, ee0, slot) +
                                    "\nYourself: " + (sb0.Length > 0 ? sb0.ToString() : "no materials") +
                                    "\n  + stamina " + SelfMendStamina(ee0) + " (you have " + Forge.Stamina() + ")" +
@@ -903,7 +905,7 @@ namespace Armoury
                             if (sb.Length > 0) sb.Append(", ");
                             sb.Append(p.Count + "x " + p.Item.Name + " (" + Recipes.CountInInventory(p.Item) + ")");
                         }
-                        string hint = "Condition " + pct + "%" +
+                        string hint = "Condition " + GearState.CondText(ee.ItemModifier, pct) +
                                       "\n" + SmithLine(quote, ee) +
                                       "\nYourself: " + (sb.Length > 0 ? sb.ToString() : "no materials") +
                                       "\n  + stamina " + SelfMendStamina(ee) + " (you have " + Forge.Stamina() + ")" +
@@ -927,7 +929,7 @@ namespace Armoury
                             var ee = el.EquipmentElement;
                             if (ee.Item == null || el.Amount <= 0 || !IsBattleWorn(ee.Item, ee.ItemModifier)) continue;
                             int pct2 = Math.Max(1, (int)Math.Round(ee.ItemModifier.PriceMultiplier * 100f));
-                            string hint2 = "COMPANY STORES - the men's kit.\nCondition " + pct2 + "%" +
+                            string hint2 = "COMPANY STORES - the men's kit.\nCondition " + GearState.CondText(ee.ItemModifier, pct2) +
                                            "\n" + SmithLine(quote, ee);
                             found.Add(ee); slots.Add(-2);
                             elements.Add(new InquiryElement(found.Count - 1,
@@ -1044,7 +1046,7 @@ namespace Armoury
                     // paczka 158 (decyzja Jeffa 07.10 "wraki ida na zlom"): na kazdej drodze, takze bez reguly kowali miasta
                     smithOk = false;
                     smithTitle = "The smiths will not restore a wreck for coin";
-                    smithHint = "A wreck (Mangled, or worn to a tenth of its worth or less) is scrap - it is mended only with your own materials at your own anvil, or melted down.";
+                    smithHint = "A wreck (" + LootPrices.WreckDefEn(true) + ") is scrap - it is mended only with your own materials at your own anvil, or melted down.";   // m110-stan (recenzja R1)
                 }
                 else if (MarketRule)
                 {
@@ -1055,7 +1057,7 @@ namespace Armoury
                     string town = TownName();
                     smithOk = false;
                     if (r == MendMaterial.Wreck)
-                    { smithTitle = "The smith will not restore a wreck for coin"; smithHint = "A wreck (Mangled) is mended only with your own materials - or melt it down."; }
+                    { smithTitle = "The smith will not restore a wreck for coin"; smithHint = "A wreck (" + LootPrices.WreckWordEn + ") is mended only with your own materials - or melt it down."; }   // m110-stan (recenzja R1)
                     else if (r == MendMaterial.NoRecipe)
                     { smithTitle = "No smith's work"; smithHint = "The smiths of " + town + " do not mend this."; }
                     else if (!q.Ok)
@@ -1128,7 +1130,7 @@ namespace Armoury
             {
                 string why = !o.Ok ? "There are no town smiths here - nothing was mended."
                            : o.Wrecks > 0 ? (LootPrices.ScrapRule ? "A" + LootPrices.WreckWhatEn(1)
-                                                                  : "The smiths will not restore a wreck (Mangled) for coin - mend it yourself with your own materials, or melt it down.")
+                                                                  : "The smiths will not restore a wreck (" + LootPrices.WreckWordEn + ") for coin - mend it yourself with your own materials, or melt it down.")   // m110-stan (recenzja R1)
                            : o.NoSmith > 0 ? "That is no smith's work - nothing was mended."
                            : o.Wait > 0 ? "The smiths of " + town + " ran short of " + MendMaterial.KindsEn(o.WaitMask) + " - the piece waits, nothing paid."
                            : "Your purse came up short.";
