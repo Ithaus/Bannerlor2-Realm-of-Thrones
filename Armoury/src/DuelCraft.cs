@@ -14,7 +14,8 @@ namespace Armoury
     ///  - OTWARCIE: postura atakujacego peka na obronie AI (DuelGuard, hak handleAttacker), obronca ma poziom >= 0.40 - przez 1.2 s atak po decyzji
     ///    0.90, decyzja o ataku 0.10, bez trzymania zamachu;
     ///  - NACISK: AI obronilo sie 3 razy w 4 s albo po kontakcie ma postury ponizej 40% maksimum, poziom >= 0.56 - przez 1.5 s atak po decyzji
-    ///    co najmniej 0.60, decyzja o ataku x0.6, atak po parowaniu co najmniej 0.80, kopniecie 0.45, chamber 0.20, trzymanie 0.05 s; potem 3 s przerwy;
+    ///    co najmniej 0.60, decyzja o ataku x0.6, atak po parowaniu co najmniej 0.80, kopniecie 0.45, chamber 0.20, trzymanie 0.05 s; potem 3 s przerwy
+    ///    (tylko dla nacisku - otwarcie startuje zawsze i przykrywa trwajacy nacisk);
     ///  - nakladke robi DuelAi.Apply (postfiks SetAiRelatedProperties); start i koniec zrywu - agent.UpdateAgentStats() TYLKO z OnMissionTick
     ///    (BattleSense, glowny watek), najwyzej 8 na klatke, nigdy z wnetrza wywolania ciosu;
     ///  - stan bez blokad dla czytelnika: tablice wedlug agent.Index, ROSNA tylko w ticku (glowny watek) przez podmiane referencji; postfiks moze
@@ -61,7 +62,7 @@ namespace Armoury
             Array.Clear(_until, 0, _until.Length);
             Array.Clear(_kind, 0, _kind.Length);
             Array.Clear(_cool, 0, _cool.Length);
-            Array.Clear(_started, 0, _started.Length);
+            for (int i = 0; i < _started.Length; i++) _started[i] = -1f;   // -1 = "bez zrywu" jak w Grow (0 liczylo zamachy z pierwszych 1.2 s misji)
             _active.Clear();
             _refresh.Clear();
             StartedOpening = StartedPressed = Dropped = Cooled = Refreshed = WithSwing = 0;
@@ -156,8 +157,13 @@ namespace Armoury
                     int idx = a.Index;
                     if (idx < 0) continue;
                     Grow(idx);
-                    if (now < _cool[idx]) { Cooled++; continue; }
-                    if (now < _until[idx] && _kind[idx] == Opening && kind == Pressed) continue;   // trwa otwarcie - nacisk poczeka
+                    // przerwa 3 s tylko dla NACISKU (plan pkt 3); OTWARCIE zawsze startuje (1.2 s) i przykrywa trwajacy nacisk - po recenzji: RBM wola
+                    // handleDefender przed handleAttacker (StanceLogic.cs:523/527), wiec ten sam cios dawal [nacisk, otwarcie] i otwarcie ginelo w przerwie
+                    if (kind == Pressed)
+                    {
+                        if (now < _cool[idx]) { Cooled++; continue; }
+                        if (now < _until[idx] && _kind[idx] == Opening) continue;   // trwa otwarcie - nacisk poczeka
+                    }
                     float dur = kind == Opening ? OpeningSeconds : PressedSeconds;
                     _kind[idx] = (byte)kind;
                     _until[idx] = now + dur;

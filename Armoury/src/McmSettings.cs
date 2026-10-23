@@ -1476,7 +1476,7 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool AutoParryMirrorSides { get; set; } = true;
 
-        [SettingPropertyBool("Duel Ai Enabled", HintText = "in tournaments, the arena and duels a skilled opponent fights like one: he attacks on his own, ripostes after a parry, feints and kicks, and does not stand behind his guard waiting for you - from skill 100 up, the higher his skill the bolder he is; at 100 and below he fights as RBM sets him. A knight handed an unfamiliar weapon in the lists still fights with most of his best skill, and later rounds of a tournament field harder opponents. Needs RBM with posture; field battles are not touched. Off = plain RBM in duels, as before", RequireRestart = false)]
+        [SettingPropertyBool("Duel Ai Enabled", HintText = "in tournaments, the arena and duels a skilled opponent fights like one: he attacks on his own, ripostes after a parry, feints and kicks, and does not stand behind his guard waiting for you - from about skill 100 up (on Realistic; a lower difficulty raises this, later tournament rounds lower it), the higher his skill the bolder he is; below that he fights as RBM sets him. A knight handed an unfamiliar weapon in the lists still fights with most of his best skill, and later rounds of a tournament field harder opponents. Needs RBM with posture; field battles are not touched. Off = plain RBM in duels, as before", RequireRestart = false)]
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelAiEnabled { get; set; } = true;
 
@@ -1488,7 +1488,7 @@ namespace Armoury
         [SettingPropertyGroup("Duels and tournaments")]
         public float DuelAiTourneyRoundStep { get; set; } = 0.08f;
 
-        [SettingPropertyBool("Duel Pressure Bursts", HintText = "with Duel AI: a skilled opponent seizes his moment - when your guard breaks on him he strikes back at once (about a second), and when you keep him on the defence he answers with a quick flurry of attacks, kicks and counter-strikes instead of only blocking (from skill 140, at most every 3 seconds). Off = steady behaviour only", RequireRestart = false)]
+        [SettingPropertyBool("Duel Pressure Bursts", HintText = "with Duel AI: a skilled opponent seizes his moment - when your guard breaks on him he strikes back at once (about a second), and when you keep him on the defence he answers with a quick flurry of attacks, kicks and counter-strikes instead of only blocking (the flurry from skill 140, then at least 3 seconds' rest; the strike-back from skill 100). Off = steady behaviour only", RequireRestart = false)]
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelPressureBursts { get; set; } = true;
 
@@ -1504,7 +1504,7 @@ namespace Armoury
         [SettingPropertyGroup("Duels and tournaments")]
         public float DuelSkillGapWeight { get; set; } = 0.5f;
 
-        [SettingPropertyBool("Duel Perfect Defence", HintText = "in tournaments, the arena and duels a clean parry costs the defender half the guard of a plain block (a parry with the shield 80%), and a chamber - meeting the blow with your own - costs him a quarter and the attacker double, as RBM meant but never applied. Off = plain RBM", RequireRestart = false)]
+        [SettingPropertyBool("Duel Perfect Defence", HintText = "in tournaments, the arena and duels a clean parry costs the defender only half of the guard RBM charges for it (a parry with the shield 80%), and a chamber - meeting the blow with your own - costs him a quarter and the attacker double: the modifiers RBM passes but overwrites with 1. Plain blocks are unchanged. Off = plain RBM", RequireRestart = false)]
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelPerfectDefence { get; set; } = true;
 

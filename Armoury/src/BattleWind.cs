@@ -33,6 +33,10 @@ namespace Armoury
         /// <summary>NB2: latka na RBMAI.Stance.InitializePosture wpieta (oddech bohaterow albo postura szeregowych wedlug tieru).</summary>
         internal static bool PosturePatched;
 
+        /// <summary>m111-walka (po recenzji): latka wpieta z powodu oddechu albo postury szeregowych (stan przy starcie). False = wpieta tylko dla
+        /// Duel Fair Guard - poza pojedynkiem postfiks wychodzi od razu (bitwy jak bez latki).</summary>
+        private static bool _baseOn;
+
         // regen RBM biega co 0,5 s z tickCount=30 - stad przelicznik pkt/s -> add
         private const float RbmTickSeconds = 0.5f;
         private const int RbmTickCount = 30;
@@ -177,6 +181,7 @@ namespace Armoury
             try
             {
                 if (agent == null || stance == null) return;
+                if (!_baseOn && !BattleSense.InDuel(agent.Mission)) return;   // m111-walka: latka tylko dla pojedynku - poza nim nic (ani trupy, ani NB2)
                 if (Undead.Character(agent.Character))
                 {
                     // trupa nie zmeczysz w klinczu - postura bez dna (RBM liczy
@@ -336,7 +341,11 @@ namespace Armoury
                 // ticki dalej tylko przy BattleStaminaEnabled, Active tylko przy staminie bohaterow (czyta to FieldCraft - Endurance nie dwa razy)
                 bool wind = c != null && c.BattleStaminaEnabled;
                 bool tiers = c != null && c.SoldierPostureByTier;
-                if (!wind && !tiers) { Log.Info("BattleWind: wylaczone."); return; }
+                // m111-walka (po recenzji): Duel Fair Guard tez potrzebuje latki InitializePosture - dotad przy wylaczonym oddechu i tierach nie dzialal,
+                // a linia "DuelAi tabela" mowila TAK; bitwy bez zmian (_baseOn = false -> postfiks poza pojedynkiem wychodzi od razu)
+                bool duelGuard = c != null && c.DuelFairGuard;
+                _baseOn = wind || tiers;
+                if (!wind && !tiers && !duelGuard) { Log.Info("BattleWind: wylaczone."); return; }
                 var tStance = QuartermasterLaw.FindType("RBMAI.Stance");
                 if (tStance == null) { Log.Info("BattleWind: RBM nieobecny - nic do roboty."); return; }
 
@@ -374,9 +383,11 @@ namespace Armoury
                              + (int)Settings.Current.BattleRegenAtEnd1 + "-" + (int)Settings.Current.BattleRegenAtEnd10
                              + " pkt/s, zadyszka " + Settings.Current.BattleWindedFloor.ToString("0.00") + ").");
                 }
-                else Log.Info("BattleWind: oddech bohaterow wylaczony (BattleStaminaEnabled) - wpieta tylko postura szeregowych wedlug tieru.");
+                else if (tiers) Log.Info("BattleWind: oddech bohaterow wylaczony (BattleStaminaEnabled) - wpieta tylko postura szeregowych wedlug tieru.");
+                else Log.Info("BattleWind: oddech bohaterow i postura szeregowych wylaczone - latka InitializePosture wpieta tylko dla postury w pojedynku (DuelFairGuard).");
                 Log.Info("BattleWind (NB2): postura szeregowych wedlug tieru - latka InitializePosture wpieta (klucz SoldierPostureByTier na zywo"
-                         + ", przy starcie " + (tiers ? "TAK" : "NIE") + "); bez broni glownej bez ponownego mnozenia.");
+                         + ", przy starcie " + (tiers ? "TAK" : "NIE") + "); bez broni glownej bez ponownego mnozenia; postura bohatera w pojedynku (DuelFairGuard) "
+                         + (duelGuard ? "TAK" : "NIE") + (_baseOn ? "" : ", poza pojedynkiem latka nic nie robi") + ".");
             }
             catch (Exception e) { Log.Error("BattleWind.ApplyAll", e); }
         }

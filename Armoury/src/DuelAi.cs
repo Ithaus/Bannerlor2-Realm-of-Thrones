@@ -26,7 +26,8 @@ namespace Armoury
     ///    (rekrut i dama zostaja slabi); powyzej t = (L - 0.4) / 0.6 i profil Shape (przy 100 rowny RBM, przy 250: atak po decyzji 0.45, decyzja
     ///    o ataku 0.35, atak po parowaniu 0.6, parowanie 0.85, wyczucie bloku 0.6, trzymanie zamachu 0.12 s, chamber 0.15, kopniecie 0.4);
     ///  - pola, ktore RBM mnozy przez zmeczenie, dostaja ten sam czynnik sFac (odczytany z wyniku RBM na wejsciu postfiksu);
-    ///  - pola zostawione z gry (RBM ich nie pisze) - wzory gry z poziomem L;
+    ///  - pola zostawione z gry (RBM ich nie pisze) - wzory gry z poziomem L; kopniecie i chamber nigdy ponizej wartosci gry, blok
+    ///    max(RBM, clamp(2L, 0.3, 1)) - wzor RBM z poziomem pojedynku (po recenzji);
     ///  - zryw (DuelCraft) nadpisuje kilka pol na 1.2-1.5 s.
     /// Wydajnosc: RBM wola to dla kazdego czlowieka co 3 s; bez LINQ i alokacji (linia DU: najwyzej 40 migawek na misje w tablicy struktur).
     /// Postfiks bywa wolany z ticku asynchronicznego druzyn: czyta tylko statyki (BattleSense, DuelCraft), liczniki pod RoutHold.Gate.
@@ -182,9 +183,14 @@ namespace Armoury
             p.AIParryOnDecideAbility = sh.Parry;
             p.AIDecideOnRealizeEnemyBlockingAttackAbility = sh.Feint;
             p.AIRealizeBlockingFromIncorrectSideAbility = sh.Incorrect;
-            p.AiTryChamberAttackOnDecide = sh.Chamber;
-            p.AiKick = sh.Kick;
+            // po recenzji: kopniecie i chamber nigdy ponizej wartosci gry na wejsciu (RBM ich nie pisze; gra: kopniecie -0.1 + min(n, 0.4) = 0.30
+            // od umiejetnosci 125, chamber (n - 0.15) x 0.1) - profil ma byc smielszy, nie ostrozniejszy
+            p.AiTryChamberAttackOnDecide = Math.Max(p.AiTryChamberAttackOnDecide, sh.Chamber);
+            p.AiKick = Math.Max(p.AiKick, sh.Kick);
             p.AiAttackCalculationMaxTimeFactor = sh.MaxTime;
+            // po recenzji: blok wedlug poziomu pojedynku - wzor RBM clamp(2 x poziom, 0.3, 1) (AgentAi.cs:95) z L zamiast umiejetnosci broni w reku;
+            // nigdy ponizej RBM (rycerz 180 z obca bronia blokuje jak rycerz, nie jak nowicjusz)
+            p.AIBlockOnDecideAbility = Math.Max(p.AIBlockOnDecideAbility, Clamp(2f * lvl, 0.3f, 1f));
             bool melee = !agent.IsRangedCached;
             if (melee)
             {
@@ -237,9 +243,9 @@ namespace Armoury
         private struct Snap
         {
             public Agent A;
-            public string Weapon;
+            public WeaponComponentData Eq;      // nazwe broni bierze Flush (glowny watek) - postfiks nie wola silnika
             public int Held, Best, S, Round, Burst;
-            public float Lvl, AoD, DoA, AoP, Par, Feint, Ch, Kick, Hold;
+            public float Lvl, AoD, DoA, AoP, Par, Feint, Ch, Kick, Hold, Block;
             public bool Rbm;
         }
 
@@ -271,14 +277,13 @@ namespace Armoury
                 if (_snapCount >= MaxSnaps) return;
                 int key = id * 4 + (round < 0 ? 0 : (round > 3 ? 3 : round));
                 if (!_snapKeys.Add(key)) return;
-                var sn = new Snap { A = a, Held = held, Best = best, S = s, Round = round, Lvl = lvl, Burst = burst, Rbm = p == null };
-                var ww = a.WieldedWeapon;
-                sn.Weapon = !ww.IsEmpty && ww.Item != null ? ww.Item.StringId : (eq != null ? eq.WeaponClass.ToString() : "-");
+                // po recenzji: pod blokada tylko kopie i liczniki - bez a.WieldedWeapon (wywolanie silnika) i Enum.ToString (tick asynchroniczny)
+                var sn = new Snap { A = a, Eq = eq, Held = held, Best = best, S = s, Round = round, Lvl = lvl, Burst = burst, Rbm = p == null };
                 if (p != null)
                 {
                     sn.AoD = p.AIAttackOnDecideChance; sn.DoA = p.AIDecideOnAttackChance; sn.AoP = p.AIAttackOnParryChance;
                     sn.Par = p.AIParryOnDecideAbility; sn.Feint = p.AIDecideOnRealizeEnemyBlockingAttackAbility; sn.Ch = p.AiTryChamberAttackOnDecide;
-                    sn.Kick = p.AiKick; sn.Hold = p.AIHoldingReadyMaxDuration;
+                    sn.Kick = p.AiKick; sn.Hold = p.AIHoldingReadyMaxDuration; sn.Block = p.AIBlockOnDecideAbility;
                 }
                 _snaps[_snapCount++] = sn;
             }
@@ -305,13 +310,24 @@ namespace Armoury
                 var a = sn.A;
                 string name = "?";
                 try { name = a != null && a.Character != null ? a.Character.StringId : "?"; } catch { }
-                sb.Append("DU agent ").Append(a != null ? a.Index : -1).Append(' ').Append(name).Append(' ').Append(sn.Weapon).Append(' ').Append(sn.Held)
+                string weapon = sn.Eq != null ? sn.Eq.WeaponClass.ToString() : "-";
+                try
+                {
+                    if (a != null && a.IsActive())
+                    {
+                        var ww = a.WieldedWeapon;
+                        if (!ww.IsEmpty && ww.Item != null) weapon = ww.Item.StringId;
+                    }
+                }
+                catch { }
+                sb.Append("DU agent ").Append(a != null ? a.Index : -1).Append(' ').Append(name).Append(' ').Append(weapon).Append(' ').Append(sn.Held)
                   .Append(" (najlepsza ").Append(sn.Best).Append(", s ").Append(sn.S).Append(") runda ").Append(sn.Round)
                   .Append(" poziom ").Append(sn.Lvl.ToString("0.00", Inv)).Append(" -> ");
                 if (sn.Rbm) sb.Append("RBM bez zmian (ponizej ").Append(Floor.ToString("0.00", Inv)).Append(')');
                 else
                     sb.Append("AoD ").Append(F(sn.AoD)).Append(" DoA ").Append(F(sn.DoA)).Append(" AoP ").Append(F(sn.AoP)).Append(" Par ").Append(F(sn.Par))
                       .Append(" Feint ").Append(F(sn.Feint)).Append(" Ch ").Append(F(sn.Ch)).Append(" Kick ").Append(F(sn.Kick)).Append(" Hold ").Append(F(sn.Hold))
+                      .Append(" Block ").Append(F(sn.Block))
                       .Append(sn.Burst == DuelCraft.Opening ? " (zryw: otwarcie)" : (sn.Burst == DuelCraft.Pressed ? " (zryw: nacisk)" : ""));
                 sb.Append(" | postura ");
                 DuelGuard.AppendPosture(sb, a);
@@ -352,7 +368,8 @@ namespace Armoury
                 }
             sb.Append(" | zrywy ").Append(c.DuelPressureBursts ? "TAK" : "NIE").Append(" (otwarcie ").Append(F(DuelCraft.OpeningSeconds)).Append(" s od L")
               .Append(F(Floor)).Append(", nacisk ").Append(F(DuelCraft.PressedSeconds)).Append(" s od L").Append(F(PressedFrom)).Append(", przerwa ")
-              .Append(F(DuelCraft.Cooldown)).Append(" s) | postura: Duel Fair Guard ").Append(c.DuelFairGuard ? "TAK" : "NIE").Append(" (END najwyzej x")
+              .Append(F(DuelCraft.Cooldown)).Append(" s, tylko nacisk) | postura: Duel Fair Guard ").Append(c.DuelFairGuard ? "TAK" : "NIE")
+              .Append(BattleWind.PosturePatched ? "" : " (latka InitializePosture NIEWPIETA - bez efektu)").Append(" (END najwyzej x")
               .Append(F(BattleWind.DuelCap(c))).Append(", umiejetnosc 24 x").Append(F(BattleWind.SkillGuard(24))).Append(", 100 x").Append(F(BattleWind.SkillGuard(100)))
               .Append(", 180 x").Append(F(BattleWind.SkillGuard(180))).Append(", 250 x").Append(F(BattleWind.SkillGuard(250))).Append("), roznica umiejetnosci waga ")
               .Append(F(DuelGuard.Weight(c))).Append(", Duel Perfect Defence ").Append(c.DuelPerfectDefence ? "TAK" : "NIE").Append(", bez zwolnienia ")

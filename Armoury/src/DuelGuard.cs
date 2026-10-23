@@ -40,7 +40,9 @@ namespace Armoury
     ///     model Artema nie daje kary x0.45); gracz i bitwy bez zmian.
     /// Rodzaj ciosu w hakach A i B z danych kolizji wedlug tej samej tablicy co RBM (StanceLogic.cs:507-590) - bez __args (pudelkowanie 8-18
     /// argumentow, w tym AttackCollisionData i MissionWeapon, przy kazdym ciosie takze w bitwach). Haki poza pojedynkiem wychodza po dwoch odczytach pol.
-    /// Wyjatek liczony (RoutHold.Stumble, miejsce "pojedynek"), nigdy nie wychodzi z haka.
+    /// Wyjatek liczony (RoutHold.Stumble, miejsce "pojedynek"), nigdy nie wychodzi z haka. Po recenzji: kazdy hak wpinany we wlasnym try (cele
+    /// szukane bez AmbiguousMatchException - pierwsza metoda o nazwie i pasujacej sygnaturze), linia stanu hakow zawsze; pola postury przez
+    /// typowany FieldRef (bez pudelkowania); po misji End() zwalnia agentow i mecz.
     /// Ten sam plik: probkowanie akcji AI co 0.1 s (najwyzej 32 agentow, tylko pojedynek), liczniki kontaktow (OnMeleeHit), lista uczestnikow meczu
     /// turnieju i linia misji "Pojedynek (DU)".
     /// </summary>
@@ -53,6 +55,11 @@ namespace Armoury
         private static bool _okA1, _okA2, _okB1, _okB2, _okC, _okD;
         private static string _whyA = "-", _whyB = "-", _whyC = "-", _whyD = "-";
         private static FieldInfo _fPosture, _fMax, _fStances;
+        private static AccessTools.FieldRef<object, float> _rPosture, _rMax;
+        private static FieldInfo _fArtSettings;
+        private static PropertyInfo _pArtHp;
+        private static float _artemHp = -1f;          // prog Artema na te misje (-1 = jeszcze nie czytany)
+        private static bool _artemHpGuess;            // nieczytelny - licze od 33 (domyslny Artema)
         private static string _order = "?";
 
         internal static float Weight(Settings c) { return Clamp(c != null ? c.DuelSkillGapWeight : 0.5f, 0f, 1f); }
@@ -91,46 +98,85 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>Po recenzji: kandydat bez AmbiguousMatchException - pierwsza metoda deklarowana o tej nazwie, ktora przechodzi sprawdzenie
+        /// sygnatury (aktualizacja RBM / Artema moze dodac przeciazenie).</summary>
+        private static MethodInfo FindDeclared(Type t, string name, Func<MethodInfo, bool> sig)
+        {
+            if (t == null) return null;
+            MethodInfo first = null;
+            foreach (var mi in t.GetMethods(AccessTools.allDeclared))
+            {
+                if (mi == null || mi.Name != name) continue;
+                if (sig(mi)) return mi;
+                if (first == null) first = mi;
+            }
+            return first;   // zadna nie pasuje - pierwsza (sprawdzenie sygnatury ja odrzuci i napisze powod)
+        }
+
+        private static bool ArtemSig(MethodInfo mi)
+        {
+            var ps = mi != null ? mi.GetParameters() : null;
+            return ps != null && ps.Length == 5 && ps[0].ParameterType == typeof(Agent) && ps[1].ParameterType == typeof(Agent);
+        }
+
         internal static void ApplyAll(Harmony h)
         {
+            var c = Settings.Current;
+            if (!AnyKey(c)) { Log.Info("DuelGuard (m111-walka): wszystkie klucze pojedynku wylaczone przy starcie - haki niewpiete."); return; }
+            // po recenzji: kazdy hak we wlasnym try - wyjatek jednego (przeciazenie po aktualizacji, h.Patch) nie wylacza pozostalych,
+            // a linia stanu hakow pisze sie zawsze (finally)
             try
             {
-                var c = Settings.Current;
-                if (!AnyKey(c)) { Log.Info("DuelGuard (m111-walka): wszystkie klucze pojedynku wylaczone przy starcie - haki niewpiete."); return; }
-                var tStance = QuartermasterLaw.FindType("RBMAI.Stance");
-                var tLogic = QuartermasterLaw.FindType("RBMAI.StanceLogic");
-                var tStances = QuartermasterLaw.FindType("RBMAI.AgentStances");
-                if (tStance == null || tLogic == null)
+                Type tStance = null, tLogic = null, tStances = null, inner = null;
+                try
                 {
-                    _whyA = _whyB = _whyC = "RBM nieobecny";
-                }
-                else
-                {
-                    _fPosture = AccessTools.Field(tStance, "posture");
-                    _fMax = AccessTools.Field(tStance, "maxPosture");
-                    if (tStances != null) _fStances = AccessTools.Field(tStances, "values");
-                    var inner = AccessTools.Inner(tLogic, "CreateMeleeBlowPatch");
-
-                    // A) calculateDefenderPostureDamage / calculateAttackerPostureDamage
-                    if (inner == null) _whyA = _whyB = "brak StanceLogic+CreateMeleeBlowPatch";
+                    tStance = QuartermasterLaw.FindType("RBMAI.Stance");
+                    tLogic = QuartermasterLaw.FindType("RBMAI.StanceLogic");
+                    tStances = QuartermasterLaw.FindType("RBMAI.AgentStances");
+                    if (tStance == null || tLogic == null) _whyA = _whyB = _whyC = "RBM nieobecny";
                     else
                     {
-                        _mCalcDef = AccessTools.DeclaredMethod(inner, "calculateDefenderPostureDamage");
-                        _mCalcAtt = AccessTools.DeclaredMethod(inner, "calculateAttackerPostureDamage");
+                        _fPosture = AccessTools.Field(tStance, "posture");
+                        _fMax = AccessTools.Field(tStance, "maxPosture");
+                        if (tStances != null) _fStances = AccessTools.Field(tStances, "values");
+                        inner = AccessTools.Inner(tLogic, "CreateMeleeBlowPatch");
+                        if (inner == null) _whyA = _whyB = "brak StanceLogic+CreateMeleeBlowPatch";
+                        if (_fPosture != null && _fMax != null && _fPosture.FieldType == typeof(float) && _fMax.FieldType == typeof(float))
+                        {
+                            // po recenzji: typowany dostep do pol (bez FieldInfo.GetValue - pudelkowanie float przy kazdym kontakcie)
+                            _rPosture = AccessTools.FieldRefAccess<float>(tStance, "posture");
+                            _rMax = AccessTools.FieldRefAccess<float>(tStance, "maxPosture");
+                        }
+                    }
+                }
+                catch (Exception e) { tStance = null; inner = null; _whyA = _whyB = _whyC = "wyjatek " + e.GetType().Name; Log.Error("DuelGuard.ApplyAll typy RBM", e); }
+
+                // A) calculateDefenderPostureDamage / calculateAttackerPostureDamage
+                if (inner != null)
+                {
+                    try
+                    {
+                        _mCalcDef = FindDeclared(inner, "calculateDefenderPostureDamage", CalcSig);
+                        _mCalcAtt = FindDeclared(inner, "calculateAttackerPostureDamage", CalcSig);
                         if (!CalcSig(_mCalcDef) || !CalcSig(_mCalcAtt)) _whyA = "sygnatura calculate*PostureDamage nie pasuje (8 parametrow, [6] MeleeHitType)";
                         else
                         {
                             h.Patch(_mCalcDef, postfix: new HarmonyMethod(typeof(DuelGuard), nameof(DefDamagePostfix)));
-                            h.Patch(_mCalcAtt, postfix: new HarmonyMethod(typeof(DuelGuard), nameof(AttDamagePostfix)));
                             _okA1 = Owned(_mCalcDef, h.Id);
+                            h.Patch(_mCalcAtt, postfix: new HarmonyMethod(typeof(DuelGuard), nameof(AttDamagePostfix)));
                             _okA2 = Owned(_mCalcAtt, h.Id);
                             _whyA = "sygnatura OK";
                         }
+                    }
+                    catch (Exception e) { _whyA = "wyjatek " + e.GetType().Name; Log.Error("DuelGuard.ApplyAll hak A", e); }
 
-                        // B) handleDefender / handleAttacker
-                        _mHDef = AccessTools.DeclaredMethod(inner, "handleDefender");
-                        _mHAtt = AccessTools.DeclaredMethod(inner, "handleAttacker");
-                        if (_fPosture == null || _fMax == null || _fPosture.FieldType != typeof(float) || _fMax.FieldType != typeof(float))
+                    // B) handleDefender / handleAttacker
+                    try
+                    {
+                        var ts = tStance;
+                        _mHDef = FindDeclared(inner, "handleDefender", mi => HandleSig(mi, ts, 18, 15));
+                        _mHAtt = FindDeclared(inner, "handleAttacker", mi => HandleSig(mi, ts, 16, 14));
+                        if (_rPosture == null || _rMax == null)
                             _whyB = "pola Stance.posture / maxPosture nie pasuja";
                         else if (!HandleSig(_mHDef, tStance, 18, 15) || !HandleSig(_mHAtt, tStance, 16, 14))
                             _whyB = "sygnatura handleDefender (18, [15]) / handleAttacker (16, [14]) nie pasuje";
@@ -138,49 +184,71 @@ namespace Armoury
                         {
                             h.Patch(_mHDef, prefix: new HarmonyMethod(typeof(DuelGuard), nameof(HandlePrefix)),
                                     postfix: new HarmonyMethod(typeof(DuelGuard), nameof(DefenderPostfix)));
+                            _okB1 = Owned(_mHDef, h.Id);
                             h.Patch(_mHAtt, prefix: new HarmonyMethod(typeof(DuelGuard), nameof(HandlePrefix)),
                                     postfix: new HarmonyMethod(typeof(DuelGuard), nameof(AttackerPostfix)));
-                            _okB1 = Owned(_mHDef, h.Id);
                             _okB2 = Owned(_mHAtt, h.Id);
                             _whyB = "sygnatura OK";
                         }
                     }
+                    catch (Exception e) { _whyB = "wyjatek " + e.GetType().Name; Log.Error("DuelGuard.ApplyAll hak B", e); }
+                }
 
-                    // C) HitStopLogic.TriggerHitStop(float, float, int) - prywatna, instancyjna (NIE TriggerPostureBreakHitStop - jednolinijkowa)
-                    var tHit = QuartermasterLaw.FindType("RBMAI.HitStopLogic");
-                    if (tHit == null) _whyC = "brak RBMAI.HitStopLogic";
-                    else
+                // C) HitStopLogic.TriggerHitStop(float, float, int) - prywatna, instancyjna (NIE TriggerPostureBreakHitStop - jednolinijkowa)
+                if (tStance != null)
+                {
+                    try
                     {
-                        _mHitStop = AccessTools.DeclaredMethod(tHit, "TriggerHitStop", new[] { typeof(float), typeof(float), typeof(int) });
-                        if (_mHitStop == null || _mHitStop.IsStatic || _mHitStop.ReturnType != typeof(void)) _whyC = "sygnatura TriggerHitStop(float, float, int) nie pasuje";
+                        var tHit = QuartermasterLaw.FindType("RBMAI.HitStopLogic");
+                        if (tHit == null) _whyC = "brak RBMAI.HitStopLogic";
                         else
                         {
-                            h.Patch(_mHitStop, prefix: new HarmonyMethod(typeof(DuelGuard), nameof(HitStopPrefix)));
-                            _okC = Owned(_mHitStop, h.Id);
-                            _whyC = "sygnatura OK";
+                            _mHitStop = AccessTools.DeclaredMethod(tHit, "TriggerHitStop", new[] { typeof(float), typeof(float), typeof(int) });
+                            if (_mHitStop == null || _mHitStop.IsStatic || _mHitStop.ReturnType != typeof(void)) _whyC = "sygnatura TriggerHitStop(float, float, int) nie pasuje";
+                            else
+                            {
+                                h.Patch(_mHitStop, prefix: new HarmonyMethod(typeof(DuelGuard), nameof(HitStopPrefix)));
+                                _okC = Owned(_mHitStop, h.Id);
+                                _whyC = "sygnatura OK";
+                            }
                         }
                     }
+                    catch (Exception e) { _whyC = "wyjatek " + e.GetType().Name; Log.Error("DuelGuard.ApplyAll hak C", e); }
                 }
 
                 // D) Artem - OnAgentHit (bez RBM tez)
-                var tArt = QuartermasterLaw.FindType("ArtemsLivelyAnimations.ArtemsLivelyAnimationsMissionLogic");
-                if (tArt == null) _whyD = "Artem nieobecny";
-                else
+                try
                 {
-                    _mArtem = AccessTools.DeclaredMethod(tArt, "OnAgentHit");
-                    var ps = _mArtem != null ? _mArtem.GetParameters() : null;
-                    if (ps == null || ps.Length != 5 || ps[0].ParameterType != typeof(Agent) || ps[1].ParameterType != typeof(Agent)) _whyD = "sygnatura OnAgentHit nie pasuje";
+                    var tArt = QuartermasterLaw.FindType("ArtemsLivelyAnimations.ArtemsLivelyAnimationsMissionLogic");
+                    if (tArt == null) _whyD = "Artem nieobecny";
                     else
                     {
-                        h.Patch(_mArtem, prefix: new HarmonyMethod(typeof(DuelGuard), nameof(ArtemHitPrefix)));
-                        _okD = Owned(_mArtem, h.Id);
-                        _whyD = "sygnatura OK";
+                        _mArtem = FindDeclared(tArt, "OnAgentHit", ArtemSig);
+                        if (!ArtemSig(_mArtem)) _whyD = "sygnatura OnAgentHit nie pasuje";
+                        else
+                        {
+                            // po recenzji: prog Artema (settings.HPThreshold, ArtemsLivelyAnimationsMissionLogic.cs:201; Jeff 20) do licznika
+                            // "upadek Artema pominiety" - czytany raz na misje z instancji w prefiksie
+                            try
+                            {
+                                _fArtSettings = AccessTools.Field(tArt, "settings");
+                                _pArtHp = _fArtSettings != null ? AccessTools.Property(_fArtSettings.FieldType, "HPThreshold") : null;
+                            }
+                            catch { _fArtSettings = null; _pArtHp = null; }
+                            h.Patch(_mArtem, prefix: new HarmonyMethod(typeof(DuelGuard), nameof(ArtemHitPrefix)));
+                            _okD = Owned(_mArtem, h.Id);
+                            _whyD = "sygnatura OK" + (_pArtHp != null ? "" : ", prog HP nieczytelny - licze od 33");
+                        }
                     }
                 }
+                catch (Exception e) { _whyD = "wyjatek " + e.GetType().Name; Log.Error("DuelGuard.ApplyAll hak D", e); }
+            }
+            catch (Exception e) { Log.Error("DuelGuard.ApplyAll", e); }
+            finally
+            {
                 Log.Info("DuelGuard (m111-walka): haki postury w pojedynku - " + HookState() + "; klucze czytane na zywo (DuelSkillGapWeight, DuelPerfectDefence, "
                          + "DuelPressureBursts, DuelNoSlowMotion, DuelNoInjuredCollapse), poza turniejem / arena / pojedynkiem bez zmian.");
             }
-            catch (Exception e) { Log.Error("DuelGuard.ApplyAll", e); }
         }
 
         private static bool CalcSig(MethodInfo mi)
@@ -309,7 +377,7 @@ namespace Armoury
 
         private static float PostureOf(object stance)
         {
-            return (float)_fPosture.GetValue(stance);
+            return _rPosture(stance);
         }
 
         public static void HandlePrefix(object __0, out float __state)
@@ -344,7 +412,7 @@ namespace Armoury
                 float now = m.CurrentTime;
                 bool three = DuelCraft.NoteDefence(__1.Index, now);
                 if (!c.DuelPressureBursts || !c.DuelAiEnabled) return;
-                float max = (float)_fMax.GetValue(__0);
+                float max = _rMax(__0);
                 bool low = max > 1f && after / max < DuelCraft.PressedPostureFrac;
                 if ((three || low) && DuelAi.LevelOf(__1, c) >= DuelAi.PressedFrom) DuelCraft.Request(__1, DuelCraft.Pressed);
             }
@@ -406,17 +474,40 @@ namespace Armoury
         }
 
         /// <summary>Artem OnAgentHit(affectedAgent, ...): AI w pojedynku bez zestawu "injured" i bez powalenia.</summary>
-        public static bool ArtemHitPrefix(Agent __0)
+        public static bool ArtemHitPrefix(object __instance, Agent __0)
         {
             try
             {
-                if (__0 == null || __0.IsMainAgent || !__0.IsAIControlled) return true;
+                // po recenzji: najpierw flaga pojedynku (w bitwach w polu wyjscie po odczycie statykow)
+                if (!BattleSense.InDuel(Mission.Current)) return true;
                 var c = Settings.Current;
-                if (c == null || !c.DuelNoInjuredCollapse || !BattleSense.InDuel(Mission.Current)) return true;
-                if (__0.IsHuman && __0.Health > 0f && __0.Health < 34f) lock (RoutHold.Gate) { _artemSkip++; }   // liczymy tylko trafienia, ktore moglyby zwalic (prog Artema domyslnie 33)
+                if (c == null || !c.DuelNoInjuredCollapse) return true;
+                if (__0 == null || __0.IsMainAgent || !__0.IsAIControlled) return true;
+                // liczymy tylko trafienia, ktore moglyby zwalic - ponizej progu Artema (Health < HPThreshold, ArtemsLivelyAnimationsMissionLogic.cs:201)
+                if (__0.IsHuman && __0.Health > 0f)
+                {
+                    if (_artemHp < 0f) ReadArtemHp(__instance);
+                    if (__0.Health < _artemHp) lock (RoutHold.Gate) { _artemSkip++; }
+                }
                 return false;
             }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.ArtemHitPrefix", e); return true; }
+        }
+
+        /// <summary>Prog HP Artema raz na misje (z instancji logiki misji); nieczytelny - 33 (domyslny Artema) i "(prog ?)" w linii misji.</summary>
+        private static void ReadArtemHp(object inst)
+        {
+            float v = -1f;
+            try
+            {
+                var st = _fArtSettings != null && inst != null ? _fArtSettings.GetValue(inst) : null;
+                var o = st != null && _pArtHp != null ? _pArtHp.GetValue(st, null) : null;
+                if (o is int) v = (int)o;
+                else if (o is float) v = (float)o;
+            }
+            catch { v = -1f; }
+            _artemHpGuess = v <= 0f;
+            _artemHp = v > 0f ? v : 33f;
         }
 
         // ------------------------------------------------------------ postura (BattleWind, glowny watek)
@@ -429,15 +520,16 @@ namespace Armoury
         {
             int idx = a.Index;
             if (idx < 0) return;
-            if (idx >= _pMul.Length)
-            {
-                var n = new float[Math.Max(idx + 1, _pMul.Length * 2 + 32)];
-                Array.Copy(_pMul, n, _pMul.Length);
-                _pMul = n;
-            }
-            _pMul[idx] = mul;
+            // po recenzji: wzrost i zapis tablicy pod blokada (InitializePosture idzie z wywolania zwrotnego zmiany broni - watek niepewny)
             lock (RoutHold.Gate)
             {
+                if (idx >= _pMul.Length)
+                {
+                    var n = new float[Math.Max(idx + 1, _pMul.Length * 2 + 32)];
+                    Array.Copy(_pMul, n, _pMul.Length);
+                    _pMul = n;
+                }
+                _pMul[idx] = mul;
                 if (_guardIds.Add(idx)) _guarded++;
                 if (capped && _cappedIds.Add(idx)) _capped++;
             }
@@ -450,8 +542,8 @@ namespace Armoury
             {
                 var dict = _fStances != null ? _fStances.GetValue(null) as IDictionary : null;
                 object st = dict != null && a != null && dict.Contains(a) ? dict[a] : null;
-                if (st == null || _fPosture == null || _fMax == null) { sb.Append('-'); return; }
-                sb.Append(((float)_fPosture.GetValue(st)).ToString("0", Inv)).Append('/').Append(((float)_fMax.GetValue(st)).ToString("0", Inv));
+                if (st == null || _rPosture == null || _rMax == null) { sb.Append('-'); return; }
+                sb.Append(_rPosture(st).ToString("0", Inv)).Append('/').Append(_rMax(st).ToString("0", Inv));
                 int idx = a.Index;
                 var pm = _pMul;
                 if (idx >= 0 && idx < pm.Length && pm[idx] > 0f) sb.Append(" (x").Append(pm[idx].ToString("0.00", Inv)).Append(')');
@@ -550,16 +642,24 @@ namespace Armoury
 
         private static object _lastMatch;
         private static float _rosterAt = -1f;
-        private static int _rosters;
+        private static int _rosters, _rosterTries;
 
         /// <summary>BattleSense.OnMissionTick w turnieju: 2 s po starcie meczu jedna linia - bron wydana, wymagana umiejetnosc, umiejetnosc w rece, s, L.</summary>
         internal static void Roster(Mission m, TournamentBehavior tb)
         {
             if (tb == null) return;
+            // po recenzji: CurrentMatch zmienia sie w EndCurrentMatch (gracz jeszcze na drabince, nikt nie stoi) - zegar startuje dopiero, gdy
+            // mecz ruszyl (State == 1 Started, jak sam TournamentBehavior.OnMissionTick); mecze pominiete (SkipMatch) nigdy nie stoja w Started
             object match = null;
-            try { match = tb.CurrentRoundIndex >= 0 ? (object)tb.CurrentMatch : null; } catch { match = null; }
+            try
+            {
+                int ri = tb.CurrentRoundIndex;
+                var cm = ri >= 0 && ri <= 3 ? tb.CurrentMatch : null;
+                match = cm != null && (int)cm.State == 1 ? cm : null;
+            }
+            catch { match = null; }
             float now = m.CurrentTime;
-            if (match != null && !ReferenceEquals(match, _lastMatch)) { _lastMatch = match; _rosterAt = now + 2f; return; }
+            if (match != null && !ReferenceEquals(match, _lastMatch)) { _lastMatch = match; _rosterAt = now + 2f; _rosterTries = 0; return; }
             if (_rosterAt < 0f || now < _rosterAt) return;
             _rosterAt = -1f;
             var c = Settings.Current;
@@ -586,6 +686,7 @@ namespace Armoury
                   .Append(a.IsMainAgent ? "" : (lvl < DuelAi.Floor ? " RBM" : " profil")).Append(';');
             }
             if (n > 0) Log.Info(sb.ToString());
+            else if (++_rosterTries < 5) _rosterAt = now + 1f;   // jeszcze nikt nie wyciagnal broni - sprobuj za 1 s (najwyzej 5 razy)
         }
 
         // ------------------------------------------------------------ misja
@@ -604,8 +705,10 @@ namespace Armoury
                 _capped = _guarded = 0;
                 _cappedIds.Clear(); _guardIds.Clear();
                 DuelAi.ResetLocked();
+                Array.Clear(_pMul, 0, _pMul.Length);
                 _order = "?";
             }
+            _artemHp = -1f; _artemHpGuess = false;
             _lastMsg = -100f;
             _gDef = _gAtt = null; _gTime = -1f;
             System.Threading.Interlocked.Exchange(ref _hookTicks, 0L);
@@ -614,13 +717,22 @@ namespace Armoury
             Array.Clear(_readyOpen, 0, _readyOpen.Length);
             for (int i = 0; i < _lastDef.Length; i++) _lastDef[i] = -100f;
             for (int i = 0; i < _swingFor.Length; i++) _swingFor[i] = -100f;
-            Array.Clear(_pMul, 0, _pMul.Length);
             _samples = _defSamples = _attacks = _ripostes = _feints = _kicks = _sampled = 0;
             _sampledIds.Clear();
             Array.Clear(_contacts, 0, _contacts.Length);
-            _lastMatch = null; _rosterAt = -1f; _rosters = 0;
+            _lastMatch = null; _rosterAt = -1f; _rosters = 0; _rosterTries = 0;
             _maxRound = 0;
             DuelCraft.Reset();
+        }
+
+        /// <summary>Po recenzji: koniec misji pojedynku (BattleSense.Clean, po Write) - zadnych silnych odwolan do agentow ani meczu w statykach
+        /// (Agent trzyma Mission - skonczony turniej wisialby w pamieci do nastepnego pojedynku).</summary>
+        internal static void End()
+        {
+            lock (RoutHold.Gate) { DuelAi.ResetLocked(); }
+            DuelCraft.Reset();
+            _gDef = _gAtt = null; _gTime = -1f;
+            _lastMatch = null; _rosterAt = -1f;
         }
 
         /// <summary>Koniec misji pojedynku (BattleSense.Clean): linia "Pojedynek (DU)".</summary>
@@ -656,6 +768,7 @@ namespace Armoury
                   .Append(DuelCraft.SwingAfter.ToString("0.0", Inv)).Append(" s ").Append(DuelCraft.WithSwing).Append("; w przerwie ").Append(DuelCraft.Cooled)
                   .Append(", kolejka pelna ").Append(DuelCraft.Dropped).Append(", odswiezen ").Append(DuelCraft.Refreshed).Append(')')
                   .Append(" | zwolnienie tempa odrzucone ").Append(_slowCut).Append(", upadek Artema pominiety ").Append(_artemSkip)
+                  .Append(" (prog HP ").Append(_artemHp > 0f ? _artemHp.ToString("0", Inv) : "-").Append(_artemHpGuess ? " ?" : "").Append(')')
                   .Append(", postura bohaterow w pojedynku ").Append(_guarded).Append(" (przycieta ").Append(_capped).Append("), komunikat gardy ").Append(_guardMsg)
                   .Append(", list meczu ").Append(_rosters)
                   .Append(" | haki ").Append(_order).Append(", czas hakow ").Append(ms.ToString("0.0", Inv)).Append(" ms")

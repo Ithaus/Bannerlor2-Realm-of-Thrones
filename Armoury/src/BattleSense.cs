@@ -76,6 +76,8 @@ namespace Armoury
                     if (n != null && n.Contains("Duel")) { via = n; duel = true; break; }
                 }
             }
+            // po recenzji: wszystkie klucze pojedynku wylaczone = jak dawniej (bez probkowania, list i linii DU)
+            if (duel && !DuelGuard.AnyKey(Settings.Current)) duel = false;
             bool was = InDuel(m);
             _duel = duel;
             _duelKind = duel ? (kind == "inna" ? "pojedynek" : kind) : "-";
@@ -199,6 +201,7 @@ namespace Armoury
                 _duelDone = true;
                 try { DuelAi.Flush(); } catch { }
                 try { DuelGuard.Write(Mission, _duelKind); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.Write", e); }
+                try { DuelGuard.End(); } catch { }   // po recenzji: statyki bez agentow i meczu (skonczona misja nie wisi w pamieci)
             }
             var w = _m;
             if (w != null && ReferenceEquals(w.Target, Mission)) { _battle = false; _duel = false; _duelKind = "-"; _tb = null; Round = 0; _m = null; }
