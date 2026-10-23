@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-23 WGRANIE 104.1 (w-toku/m110-flaga = 104 + termin flagi kryjowki w zapisie) - znacznik kryjowki znika po terminie takze po wczytaniu
+**Status:** WGRANE 2026-10-23 ok. 15:19 CEST (po tescie 110b: prolog 4 doby z przesluchaniem + wczytanie i 4 doby, kod 0, ERROR 0). W GRZE: Armoury abfbeb1a, reszta jak 104 (ForgeView f8c2796e). Kopie *.bak-2026-10-23-wgranie1041-przed i na D:.
+- **Problem:** Jeff: znacznik kryjowki (zwiad, przesluchanie) po wczytaniu zapisu nie znikal po 3 dobach.
+- **Przyczyna:** flaga jest w zapisie gry, a termin jej zdjecia (HideoutSpotter) zyl tylko w pamieci.
+- **Zmiana:** klucz Hideout Flag Keeps Deadline (TAK): termin w zapisie (arm_hideout_flags), odtwarzany po wczytaniu; zapis sprzed 104.1 - kazda oznaczona kryjowka dostaje 3 doby od wczytania (flagi, ktore u Jeffa wisza, zejda).
+- **Test:** 110b-c4 - "terminy flag z zapisu - odtworzone 2", potem "flaga hideout_mountain_4 / hideout_mountain_14 zdjeta po terminie (stala na mapie)".
+- **Ryzyko:** flaga postawiona recznie na kryjowce w starym zapisie tez zejdzie po 3 dobach.
+
 ## 2026-10-23 WGRANIE 104 (w-toku/n34-calosc 502833b6 = 103.6 + 8 galezi m109) - lup z konnych, list gonczy w Quests, oboz w bitwie, przesluchanie jencow, nasza muzyka w bitwie, postoj w miescie, kuznia (Smithing -30%, czas +25%, wymagania na ekranie)
 **Status:** WGRANE 2026-10-23 ok. 14:30 CEST (Jeff 23.10: wszystko naraz, jedna paczka). W GRZE: Armoury fd209d68, ForgeView f8c2796e, reszta jak 103.6 (CS 84205371, RC 8528f098, GT cafa41c7) + 24 pliki Lektor/Muzyka/Bitwa/lufs*/muz_*.ogg. Kopie *.bak-2026-10-23-wgranie104-przed i na D:.
 **Testy (DLL test/n109f, seria 13:33-14:21, kazdy bieg kod 0, ERROR 0, zapisy Jeffa nietkniete):** p20 + c20 (przesluchanie, kuznia, list gonczy), lc (zapis nowej wersji wczytany na 103.5 - cofniecie bezpieczne), wczyt (stary zapis), postoj (16 dob), bitwa5 (oboz, lup, muzyka), bitwa (list gonczy, kuznia); progi 8 grup m109 bez NIE poza artefaktami testu (opisane w STAN-PRAC 111). Kontrola po poprawkach przegladu: n109g p20 (109g p20 kod 0, ERROR 0, 12 grup progow 0 NIE - w tym przesluchanie PRZES-0..9 TAK, kuznia, list, musztra, lup, muzyka, oboz). Przeglad scalenia (3 recenzentow): 0 wywrotek, drobne poprawione.
