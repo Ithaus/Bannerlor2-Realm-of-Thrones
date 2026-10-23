@@ -246,7 +246,7 @@ namespace Armoury
         private static float WoodKgNeed(ItemObject it, float share)
         {
             if (it == null || !SmithWood.MendKgOn) return 0f;
-            try { return Recipes.WoodKgOf(Recipes.For(it)) * Math.Max(0f, share); }
+            try { return Recipes.WoodKgOf(Recipes.ForRepair(it)) * Math.Max(0f, share); }   // m110-luki: luk bez wyboru klepki
             catch { return 0f; }
         }
 
@@ -260,7 +260,7 @@ namespace Armoury
             share = Math.Max(0f, share);
             float ms = loss >= 1f - LootPrices.WreckState - Eps ? -1f : MetalShare(it, loss);
             if (ms < 0f) ms = share; else ms = Math.Min(ms, share);   // tylko obnizki - jak NeedsShare
-            var r = Recipes.For(it);
+            var r = Recipes.ForRepair(it);   // m110-luki: naprawa luku bez wyboru klepki (jak kowal w miescie, R16)
             if (r.Parts == null) return list;
             foreach (var p in Recipes.ExactUnits(r))   // m96-receptury: przy przepisie z masy dokladne sztuki (kg / waga sztuki), nie sztuki do otwarcia
             {

@@ -517,7 +517,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                var r = Recipes.For(item);
+                var r = Recipes.ForRepair(item);   // m110-luki: naprawa luku bez wyboru klepki (jak kowal w miescie)
                 int skill = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
                 if (skill < r.SkillNeeded)
                 { reason = "Smithing " + r.SkillNeeded + " (you have " + skill + ")"; return false; }

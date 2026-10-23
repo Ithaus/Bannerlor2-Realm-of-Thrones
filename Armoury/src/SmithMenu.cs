@@ -787,7 +787,7 @@ namespace Armoury
             var list = new List<Recipes.Part>();
             try
             {
-                var r = Recipes.For(el.Item);
+                var r = Recipes.ForRepair(el.Item);   // m110-luki: naprawa luku bez wyboru klepki
                 float share = Math.Max(0f, Settings.Current.MendMaterialMaxShare) * MendShare(el);
                 foreach (var p in Recipes.ExactUnits(r))   // m96-receptury: przy przepisie z masy dokladne sztuki (kg / waga sztuki), nie sztuki do otwarcia
                 {

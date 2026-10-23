@@ -150,7 +150,8 @@ namespace Armoury
             catch (Exception e) { Stumble("RareMaterials.Covers", e); return false; }
         }
 
-        /// <summary>Sztuk surowca na jeden luk: klepka 2 x masa luku (t5-6 jeszcze x2 - regula przepisu z masy), najmniej 1 cala sztuka.</summary>
+        /// <summary>Sztuk surowca na jeden luk: klepka 2 x masa luku (t5-6 jeszcze x2 - stara regula przepisu z masy), najmniej 1 cala sztuka. m110-luki: celowo
+        /// po staremu - przy BowTierMaterials ten surowiec JEST klepka (przepis z masy nie dolicza wtedy wyboru klepki z drewna, tylko majdan, uchwyt i cieciwe).</summary>
         private static int PiecesFor(ItemObject bow, Mat m)
         {
             float stave = bow.Weight * 2f * (Recipes.Grade(bow) >= 5 ? 2f : 1f);

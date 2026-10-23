@@ -388,11 +388,11 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public float RangedStaminaFactor { get; set; } = 0.35f;
 
-        [SettingPropertyFloatingInteger("Ranged High Tier Cost Factor", 0.00f, 8.00f, "0.00", HintText = "bows and crossbows of tier 5-6 eat this many times the materials - masterworks are not massed out of a sack of sticks", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Ranged High Tier Cost Factor", 0.00f, 8.00f, "0.00", HintText = "bows and crossbows of tier 5-6 eat this many times the materials - masterworks are not massed out of a sack of sticks. Used by the old piece recipes (Recipes By Mass off) and by bows when Bow Tier Materials is off", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
         public float RangedHighTierCostFactor { get; set; } = 2f;
 
-        [SettingPropertyBool("Bow Tier Materials", HintText = "bows need more material the higher the tier: a flawless stave is picked out of far more wood (x2 at tier I up to x18 at tier VI - about 20 kg for a tier VI war bow), every bow has a leather grip, composite bows horn and sinew (leather) growing with tier, and a heavier draw takes a thicker string. Off - bows by weight as before", RequireRestart = false)]
+        [SettingPropertyBool("Bow Tier Materials", HintText = "bows need more material the higher the tier: a flawless stave is picked out of far more wood (x2 at tier I up to x18 at tier VI - about 20 kg for a tier VI war bow), every bow has a leather grip, composite bows horn and sinew (leather) growing with tier, and a heavier draw takes a thicker string. Needs Recipes By Mass; replaces Ranged High Tier Cost Factor for bows; a legend multiplies it all by Legendary Material Factor; a bow of a rare stave (weirwood, dragonbone) skips the stave picking; repairs count the bow as before. Off - bows by weight as before", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
         public bool BowTierMaterials { get; set; } = true;
 

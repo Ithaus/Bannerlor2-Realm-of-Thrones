@@ -24,7 +24,9 @@ namespace Armoury
     /// u slabszych kusz; strzaly i belty - groty i drzewca serii (AmmoBatchStacks kolczanow), lotki pominiete; pancerz metalowy 80% metalu swojego tieru +
     /// 20% tier nizej (regula Jeffa 01.09) + len podszycia, skorzany skora + okucia, tkany len. Tier zmienia GATUNEK metalu, nie ilosc. Legenda: caly metal ze
     /// stali zamkowej (Iron6) i x2 metalu (mistrz odrzuca kazdy gorszy kawalek), stamina x3 i prog legendy jak dotad; luki t5-6 - x RangedHighTierCostFactor
-    /// drewna (dobra klepka: z klody wychodzi mniej sztuk), nie metalu.
+    /// drewna (dobra klepka: z klody wychodzi mniej sztuk), nie metalu. m110-luki (klucz BowTierMaterials, Jeff 23.10): luki wedlug tieru - klepka x2..x18
+    /// drewna (wybor bezblednej klepki), uchwyt ze skory na kazdym luku, rog i sciegno refleksyjnych x1..x6, cieciwa +30%/tier; zastepuje RangedHighTierCostFactor
+    /// dla lukow; luk z rzadkiego surowca (RareMaterials) bez wyboru klepki; naprawa (ForRepair) liczy luk po staremu - jak kowal w miescie (R16).
     /// OTWARTE LADUNKI (jak drewno SmithWood): niepelna jednostka zostaje otwarta i starcza na kolejne sztuki; nowa sztuka z sakw dopiero, gdy otwarta sie
     /// skonczy. Metal - skrzynka resztek kuzni (SmeltScraps, tysiaczne sztaby, zapis arm_smeltscraps): napoczeta sztaba i resztki przetopu to ten sam metal;
     /// len i skora - SmithStock (kg, zapis arm_smith_stock); drewno - SmithWood (kg, bez zmian). Ekran CRAFT i nasze menu pokazuja sztuki do otwarcia (0, gdy
@@ -50,6 +52,17 @@ namespace Armoury
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         [ThreadStatic] private static bool _massOff;   // linia startu: stary przepis do porownania
+        [ThreadStatic] private static bool _repairBasis;   // m110-luki (recenzja): przepis naprawy - luk bez wyboru klepki (ForRepair)
+
+        /// <summary>m110-luki (recenzja): przepis do naprawy wlasnymi rekami (Forge.SelfRepair, SmithMenu, MendMaterial) - luk po staremu (bez wyboru klepki,
+        /// rogu x tier i uchwytu), tak jak licza go kowale miasta (ArmsPricing.CostOf, R16); pekniecie przy kuciu (MaterialLossOnFailure) dalej z pelnego przepisu.</summary>
+        internal static Recipe ForRepair(ItemObject item)
+        {
+            bool keep = _repairBasis;
+            _repairBasis = true;
+            try { return For(item); }
+            finally { _repairBasis = keep; }
+        }
         private static int _massStumbles, _massUses, _massOpened, _massLines;
 
         internal static bool MassOn { get { var s = Settings.Current; return s != null && s.RecipesByMass; } }
@@ -127,7 +140,13 @@ namespace Armoury
         /// <summary>Luk refleksyjny (rog i sciegno na drewnianym rdzeniu): id albo nazwa (RBM: "Composite Bow").</summary>
         private static bool IsComposite(ItemObject it)
         {
-            try { return Composite.IsMatch(it.StringId ?? "") || (it.Name != null && Composite.IsMatch(it.Name.ToString())); }
+            try
+            {
+                // m110-luki (recenzja): luk dlugi to klepka, nie luk refleksyjny - RBM ma longbowy z "nomad"/"desert" w id (przy HornPick x6 dostawaly 6-12x skory)
+                string nm = it.Name != null ? it.Name.ToString() : "";
+                if ((it.StringId ?? "").IndexOf("longbow", StringComparison.OrdinalIgnoreCase) >= 0 || nm.IndexOf("longbow", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+                return Composite.IsMatch(it.StringId ?? "") || Composite.IsMatch(nm);
+            }
             catch { return false; }
         }
 
@@ -181,7 +200,7 @@ namespace Armoury
             float w = Math.Max(0.01f, ArmsPricing.CostWeight(it));
             var l = new List<KgPart>();
             var tp = it.ItemType;
-            if (tp == ItemObject.ItemTypeEnum.Bow && s.BowTierMaterials)
+            if (tp == ItemObject.ItemTypeEnum.Bow && s.BowTierMaterials && !_repairBasis)
             {
                 // m110-luki (Jeff 23.10 20:23, zrzut CRAFT: "luk VI tieru ma takie same wymagania materialowe jak luk I tieru ... utrudnic, aby gracz nie tworzyl
                 // 1000 lukow VI"; 0.4 kg drewna + 0.03 kg lnu na 200-funtowy luk wojenny - ROT wazy luki po 0.1-0.8 kg, wiec przepis z masy dawal grosze).
@@ -189,9 +208,13 @@ namespace Armoury
                 // tylko bezbledny kawalek - na jedna klepke idzie StavePick[tier] razy wiecej drewna (x2 t1 ... x18 t6; t6 = ok. 20 kg, 5 lukow z ladunku 100 kg).
                 // ROG I SCIEGNO (luk refleksyjny, jako skora): 40% klepki x1.25 x HornPick[tier] (x1 t1 ... x6 t6). UCHWYT ze skory na kazdym luku (0.05 kg x tier) -
                 // kazdy luk ma skore, refleksyjny duzo wiecej (Jeff: "czesc lukow ma skore, czesc nie"). CIECIWA grubsza przy ciezszym naciagu: +30% na tier.
+                // Luk z rzadkiego surowca (czardrzewo, smocza kosc - RareMaterials.Covers): klepka to ten surowiec - drewno tylko na majdan, bez wyboru klepki (recenzja).
                 float stave = Math.Max(w, 0.5f + 0.1f * tier);
                 bool comp = IsComposite(it);
-                float wood = stave * StavePick[tier];
+                bool rare = false;
+                try { rare = RareMaterials.Covers(it); } catch { }
+                float wood = stave * (rare ? 1f : StavePick[tier]);
+                float lf = legend ? LegendFactor() : 1f;   // recenzja: wybor lnu albo skory na cieciwe wobec kg PO mnozniku legendy (mnozy koniec MassKg)
                 if (comp)
                 {
                     AddKg(l, _wood, -1, wood * 0.6f, stave * 0.6f, 0f, "core");
@@ -200,7 +223,8 @@ namespace Armoury
                 else AddKg(l, _wood, -1, wood, stave, 0f, "stave");
                 AddKg(l, _leather, 0, GripKg * tier, GripKg * tier / 1.2f, 0f, "grip");
                 float str = StringKgBow * (1f + 0.3f * (tier - 1));
-                AddKg(l, StringMat(str * StringWaste), 0, str * StringWaste, str, 0f, "string");
+                float hide = (comp ? stave * 0.4f * HornWaste * HornPick[tier] : 0f) + GripKg * tier;
+                AddKg(l, StringMat(str * StringWaste * lf, hide * lf), 0, str * StringWaste, str, 0f, "string");
             }
             else if (tp == ItemObject.ItemTypeEnum.Bow)
             {
@@ -222,7 +246,7 @@ namespace Armoury
                 AddMetal(l, CraftingMaterials.Iron2, w * 0.1f * MetalWaste, w * 0.1f, LossRanged, "lock", legend);
                 if (ft >= 4) AddMetal(l, IronForTier(ft), w * 0.2f * MetalWaste, w * 0.2f, LossRanged, "prod", legend);
                 else AddKg(l, _wood, -1, w * 0.2f * WoodWaste, w * 0.2f, 0f, "prod");
-                AddKg(l, StringMat(StringKgXbow * StringWaste), 0, StringKgXbow * StringWaste, StringKgXbow, 0f, "string");
+                AddKg(l, StringMat(StringKgXbow * StringWaste * (legend ? LegendFactor() : 1f)), 0, StringKgXbow * StringWaste, StringKgXbow, 0f, "string");   // recenzja m110-luki: kg po mnozniku legendy
             }
             else if (tp == ItemObject.ItemTypeEnum.Arrows || tp == ItemObject.ItemTypeEnum.Bolts)
             {
@@ -269,11 +293,11 @@ namespace Armoury
         }
 
         /// <summary>Cieciwa: len (konopie) - a gdy lnu nie ma ani w sakwach, ani w otwartym ladunku, starczy rzemien ze skory (jak dotad).</summary>
-        private static ItemObject StringMat(float kg)
+        private static ItemObject StringMat(float kg, float leatherKg = 0f)
         {
             if (_linen == null) return _leather;
             if (SmithStock.OpenKg(_linen) >= kg || CountInInventory(_linen) > 0 || _leather == null) return _linen;
-            if (SmithStock.OpenKg(_leather) >= kg || CountInInventory(_leather) > 0) return _leather;
+            if (SmithStock.OpenKg(_leather) >= kg + leatherKg || CountInInventory(_leather) > 0) return _leather;   // m110-luki: skora uchwytu i rogu tego luku tez z otwartej
             return _linen;
         }
 
