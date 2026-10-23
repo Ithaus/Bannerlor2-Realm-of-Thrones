@@ -830,6 +830,14 @@ namespace Armoury
                 if (dataStore.IsLoading) CampSutlers.Import(sutlerRow);
             }
             catch (Exception e) { Log.Error("SyncData.arm_sutlerrow", e); }
+            // m109-przesluch: pamiec band z bitew gracza, uzycia doby i sumy przesluchan "1|pamiec|uzycia|sumy" - brak klucza = stary zapis (stan pusty); osobny try
+            try
+            {
+                string interrogation = dataStore.IsSaving ? CampInterrogation.Export() : null;
+                SaveText.Sync(dataStore, "arm_interrogation", ref interrogation);
+                if (dataStore.IsLoading) CampInterrogation.Import(interrogation);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_interrogation", e); }
             // R3-05e: rok urodzaju (doba losowania, siatka i wezly pola pogody) - brak klucza = stary zapis (x1 do nastepnego okna zniw); osobny try
             try
             {
@@ -1582,6 +1590,7 @@ namespace Armoury
             CampWalk.RegisterEvents(this);       // m97-oboz: "Walk through the camp" w menu obozu (scena obozu wedlug druzyny, tylko na zadanie gracza)
             CampDrill.RegisterEvents(this);      // m97-szkolenie: "Train the men" w menu obozu i menu cwiczen (marsz nie uczy)
             CampSutlers.RegisterEvents(this);    // m99-markietani: "Visit the sutlers' row" w menu obozu (duzy oboz) - cyrulicy, zabawa, sklep z polki miasta; linia doby
+            CampInterrogation.RegisterEvents(this);   // m109-przesluch: "Question the prisoners" w menu obozu, pamiec band z bitew gracza (MapEventEnded), linia doby
             CampCart.RegisterEvents(this);       // m97-oboz: woz taborowy i siodla transportowe - reset nowej kampanii, menu miasta (stolarz i garbarz), linia doby, wozy w niewoli
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("UniqueSpoils.OnPartyDestroyed", UniqueSpoils.OnPartyDestroyed));   // 177-2: unikaty i stal valyrianska z taboru znikajacej partii - zwyciezcy, wlascicielowi albo na polke (ksiega towarow liczy tylko towary - kolejnosc bez znaczenia)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("PackSources.OnDestroyed", PackSources.OnDestroyed));   // m6b: znacznik "RemoveParty po zdarzeniu zniszczenia" (konie przy RemoveParty, towar partii usunietych bez zniszczenia)

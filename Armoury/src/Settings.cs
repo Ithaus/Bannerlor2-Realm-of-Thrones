@@ -4081,6 +4081,10 @@ namespace Armoury
         public int SutlerLaundryCutPercent = 25;           // how much less clothing your party wears out while the washerwomen work (0 to 75%)
         public int SutlerLaundryDays = 7;                  // how many days the hired washerwomen work for your party (1 to 28)
         public int SutlerLaundryMenPerWasher = 20;         // men of your party one washerwoman keeps in clean, darned clothes (5 to 100)
+        // m109-przesluch (Jeff 22.10 21:40, pkt 4a/4c): CampInterrogation.cs - "Question the prisoners" w menu obozu (arm_camp_wait): jency-bandyci wskazuja kryjowke
+        // (wlasna bandy z pamieci bitew gracza albo najblizsza swojej kultury), rozmowa wedlug miary perswazji (Persuasion.cs) albo tortury (Lotrostwo, Scarface; smierc jenca,
+        // Mercy, relacje, plotka); raz na grupe na dobe; kryjowka wypatrzona i z flaga jak po zwiadzie. Liczby stale w kodzie. NIE = brak opcji (zachowanie jak 44c03a05)
+        public bool CampInterrogation = true;              // "Question the prisoners" in your camp menu: outlaws you hold captive can tell you where their lair is - their own band's den if you broke the band lately, otherwise the nearest lair of their kind within a few days' ride; the lair is marked on your map. Talk them round (your persuasion: Charm and the perks that help persuasion; a wounded man or one long in chains breaks sooner, veterans and chiefs hold out) or put them to the question - far more likely to talk (Roguery and Scarface help), but a man may die under it (Forgivable Grievances spares some): torture costs you Mercy, a death more, merciful companions in your party think less of you and the tale gets about the inns. Each group of prisoners once a day for each. Off = no option
 
         // --- Notice board ---
         // m102-tablica (Jeff 20.10: "tablice ogloszen jak w grach RPG z misjami ... w miescie byla tablica i jak wchodze, mam liste lordow, kapitana strazy etc., ktorzy daja misje,
