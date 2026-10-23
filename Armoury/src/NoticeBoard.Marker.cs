@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace Armoury
@@ -19,6 +20,9 @@ namespace Armoury
     /// godzine gry na pozycje bandy (setter Position przez odbicie). Zdejmowany przed kazdym zapisem i stawiany po nim oraz po wczytaniu (BandMarkersSync -
     /// stan znacznikow = zadania _bq w toku z czynna banda), wiec zapis nie ma naszych znacznikow (cofniecie DLL bez sladu - wzor m110-okolica). Klucz
     /// BountyBandMarker (NIE = jak 105.1: tylko tracker gry, niewidoczny). Linie "Listy goncze - zadania (m110): znacznik ...".
+    /// Jeff 23.10 20:15 (105.2): "dziala, ale nie moze dzialac jak GPS - powinien ogolnie zaznaczyc okolice, a gracz juz sam sprawdzi". Znacznik to "<banda> - last
+    /// seen": miejsce wiesci 2-6 jedn. od bandy w losowym kierunku (jeden-dwa zasiegi wzroku - okolica do przeszukania zwiadem), nowe wiesci raz na dobe gry albo
+    /// od razu, gdy banda odejdzie ponad 15 jedn. od znacznika. Po wczytaniu - swieze wiesci (miejsce nie idzie do zapisu).
     /// </summary>
     internal static partial class NoticeBoard
     {
@@ -26,6 +30,10 @@ namespace Armoury
         private const string BandMarkerTag = "arm_bounty_band";
         private const int BandMarkerDetail = 20;
         private static readonly Dictionary<BountyQuest, MapMarker> _bmk = new Dictionary<BountyQuest, MapMarker>();
+        private static readonly Dictionary<BountyQuest, double> _bmkAt = new Dictionary<BountyQuest, double>();   // godzina kampanii ostatnich wiesci
+        private const float SeenMin = 2f, SeenMax = 6f;   // rozrzut miejsca wiesci od bandy (jedn. mapy; zasieg wzroku gracza ok. 3-4)
+        private const float SeenFar = 15f;                // banda dalej od znacznika - wiesci od razu
+        private const double SeenEveryHours = 24.0;       // nowe wiesci raz na dobe gry
         private static MethodInfo _bmkPosSet;
         private static bool _bmkPosTried;
         private static int _bmkLines, _bmkPut, _bmkTake, _bmkMove, _bmkStumbles;
@@ -39,7 +47,31 @@ namespace Armoury
         }
 
         /// <summary>ResetWatch (nowa kampania i wczytanie): tylko pamiec - znaczniki starej kampanii zniknely razem z nia.</summary>
-        private static void BandMarkersReset() { _bmk.Clear(); }
+        private static void BandMarkersReset() { _bmk.Clear(); _bmkAt.Clear(); }
+
+        /// <summary>Miejsce wiesci: SeenMin-SeenMax jedn. od bandy w losowym kierunku, w granicach mapy osad.</summary>
+        private static Vec3 SeenSpot(MobileParty mp)
+        {
+            Vec2 at = mp.Position.ToVec2();
+            float a = MBRandom.RandomFloat * 6.2831853f, d = SeenMin + MBRandom.RandomFloat * (SeenMax - SeenMin);
+            float x = at.x + (float)Math.Cos(a) * d, y = at.y + (float)Math.Sin(a) * d;
+            var c = Campaign.Current;
+            if (c != null && c.MinSettlementX <= c.MaxSettlementX && c.MinSettlementY <= c.MaxSettlementY)
+            {
+                x = Math.Max(c.MinSettlementX, Math.Min(c.MaxSettlementX, x));
+                y = Math.Max(c.MinSettlementY, Math.Min(c.MaxSettlementY, y));
+            }
+            return new CampaignVec2(new Vec2(x, y), true).AsVec3();   // wysokosc z mapy (brak trafienia - 0, bez wyjatku)
+        }
+
+        /// <summary>Czy pora na nowe wiesci: doba od ostatnich albo banda odeszla od znacznika ponad SeenFar.</summary>
+        private static bool SeenDue(BountyQuest q, MapMarker m, MobileParty mp)
+        {
+            double at;
+            if (!_bmkAt.TryGetValue(q, out at)) return true;
+            if (CampaignTime.Now.ToHours - at >= SeenEveryHours) return true;
+            return m.Position.AsVec2.DistanceSquared(mp.Position.ToVec2()) > SeenFar * SeenFar;
+        }
 
         private static bool BandLive(BountyQuest q, out MobileParty mp)
         {
@@ -83,15 +115,15 @@ namespace Armoury
                         MapMarker m;
                         if (_bmk.TryGetValue(q, out m) && m != null)
                         {
-                            if (MoveBandMarker(m, mp)) move++;
+                            if (SeenDue(q, m, mp) && MoveBandMarker(m, SeenSpot(mp))) { _bmkAt[q] = CampaignTime.Now.ToHours; move++; }   // nowe wiesci - nie GPS
                             continue;
                         }
                         var b = BandBanner(mp);
                         if (b == null) continue;
                         var n = q.Tag as Notice;
-                        m = mm.CreateMapMarker(b, new TextObject("{=!}" + BandTitle(n)), mp.Position.AsVec3(), true, BandMarkerTag);   // gra od razu RegisterObject - przypiety
+                        m = mm.CreateMapMarker(b, new TextObject("{=!}" + BandTitle(n) + " - last seen"), SeenSpot(mp), true, BandMarkerTag);   // gra od razu RegisterObject - przypiety
                         if (m == null) continue;
-                        _bmk[q] = m; put++;
+                        _bmk[q] = m; _bmkAt[q] = CampaignTime.Now.ToHours; put++;
                         if (_bmkLines < BandMarkerDetail)
                         {
                             _bmkLines++;
@@ -107,13 +139,12 @@ namespace Armoury
                          + _bmkPut + ", zdjete " + _bmkTake + ", przesuniecia " + _bmkMove + ", potkniecia " + _bmkStumbles + ".");
         }
 
-        private static bool MoveBandMarker(MapMarker m, MobileParty mp)
+        private static bool MoveBandMarker(MapMarker m, Vec3 p)
         {
             try
             {
                 if (!_bmkPosTried) { _bmkPosTried = true; _bmkPosSet = AccessTools.PropertySetter(typeof(MapMarker), "Position"); }
                 if (_bmkPosSet == null) return false;
-                var p = mp.Position.AsVec3();
                 if (m.Position.AsVec2.DistanceSquared(p.AsVec2) < 0.0001f) return false;
                 _bmkPosSet.Invoke(m, new object[] { p });
                 return true;
@@ -126,7 +157,7 @@ namespace Armoury
         {
             MapMarker m;
             if (q == null || !_bmk.TryGetValue(q, out m)) return false;
-            _bmk.Remove(q);
+            _bmk.Remove(q); _bmkAt.Remove(q);
             try
             {
                 var c = Campaign.Current;
