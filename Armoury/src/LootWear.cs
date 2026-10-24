@@ -355,7 +355,10 @@ namespace Armoury
         // ------------------------------------------------------------ zamkniecie bitwy
         /// <summary>Kolejka lupu oddana (lista trofeow, sakwy, zwrot, ekran gry) albo nastepna bitwa: linia bitwy; czesci bez drogi - lup zostaje u wojska,
         /// cios/pekniete przepadly.</summary>
-        internal static void Close(string how, int luckyOk, int luckyNeed)
+        /// <param name="wOk">m114-lup: bron, tarcze i amunicja bez loterii stanu (znacznik lucky Spoils albo sakwy bez PickWornModifier); -1 - klucz
+        /// LootWeaponsKeepCondition wylaczony albo droga bez listy trofeow i sakw (bez odcinka w linii). wNeed - sztuk broni do oznaczenia, wMod - z nich
+        /// z modyfikatorem (stan inny niz sprawny, zachowany).</param>
+        internal static void Close(string how, int luckyOk, int luckyNeed, int wOk = -1, int wNeed = 0, int wMod = 0)
         {
             var t = _t;
             if (t == null || t.Closed) return;
@@ -383,7 +386,9 @@ namespace Armoury
                   .Append(" | koniec: ").Append(how).Append(" (lucky ").Append(luckyOk).Append('/').Append(luckyNeed).Append(')')
                   .Append(" | prog zniszczenia ").Append(t.Min).Append('%')   // recenzja R8: STAN-2 sprawdza "zniszczona" wobec tego progu
                   .Append(" | pomiar ").Append((t.Ticks * 1000.0 / Stopwatch.Frequency).ToString("0.0", CultureInfo.InvariantCulture)).Append(" ms (trafien ").Append(t.Hits).Append(')')
-                  .Append(" | potkniecia ").Append(t.Stumbles).Append('.');
+                  .Append(" | potkniecia ").Append(t.Stumbles);
+                if (wOk >= 0) sb.Append(" | bron bez loterii stanu (m114) ").Append(wOk).Append('/').Append(wNeed).Append(", z modyfikatorem ").Append(wMod);
+                sb.Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("LootWear.Close", e); }

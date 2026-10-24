@@ -1869,7 +1869,8 @@ Uzycie (Python 3, tylko odczyt):
                     d <= prog zniszczenia z linii jej bitwy ('prog zniszczenia N%', +-0.06), nie zniszczona - d > prog; czesc bez linii bitwy - zniszczona przy
                     d <= 10 (brak linii - INFO). STAN-3 tozsamosci linii bitwy 'Stan lupu (m110): bitwa N': czesci z ksiega = lup do gracza + zostaje u wojska + cios + pekniete; drogi
                     ciosu i peknietych (do Ciebie, dzialka, zbrojownia, wraki, przepadly) = czesci bez zniszczonych; wraki nie mniej niz stan wrak (chyba ze
-                    przepadly); lucky k = k; trafien = trafien w pomiarze (brak - INFO). STAN-4 pokrycie pod flaga (linie 'test - ...'): w liniach czesci wszystkie
+                    przepadly); lucky k = k; odcinek 'bron bez loterii stanu (m114) k/n, z modyfikatorem m' (m114-lup, klucz Loot Weapons Keep Condition - bron, tarcze
+                    i amunicja z lucky Spoils albo sakwy bez loterii; brak odcinka - klucz NIE albo DLL sprzed m114): k = n, m <= n; trafien = trafien w pomiarze (brak - INFO). STAN-4 pokrycie pod flaga (linie 'test - ...'): w liniach czesci wszystkie
                     4 stany i zniszczona, >= 1 cios albo pekniete zolnierza rozdzielone (dzialka albo zbrojownia), >= 1 uprzaz; bez flagi - INFO. STAN-5 linie
                     'Zuzycie (m110)': liczony = ksiega - (100 - srodek stanu poczatku) (+-0.11), stan wedlug progow, stan gorszy niz byl, arm_* z przyrostkiem
                     stanu; linia 'wyrownanie po wczytaniu' (nazwa sztuk na grzbiecie wedlug ksiegi) - bledy 0 (brak linii zuzycia - INFO). STAN-6 pomiar na bitwe: <= 5 ms + 0.002 ms x trafien TAK, <= 20 ms + 0.01 ms x trafien INFO, wiecej NIE. STAN-LC
@@ -66686,7 +66687,8 @@ M110STAN_LP = "Stan lupu (m110): "
 M110STAN_ZP = "Zuzycie (m110): "
 M110STAN_ERR = ("ERROR in GearState.", "ERROR in LootWear.", "ERROR in AfterDtePartyItems", "ERROR in AfterGenerateLoot", "ERROR in FlushShareToBaggage",
                 "ERROR in DropShare", "ERROR in ApplyModifierForCondition", "ERROR in WearTheLoot", "ERROR in WearTheTroops", "ERROR in BattlefieldLaw.SplitWrecks",
-                "ERROR in BattlefieldLaw.ShareWithState", "ERROR in BattlefieldLaw.AfterGenerateLoot(lucky m110)", "ERROR in ResyncWornStates")
+                "ERROR in BattlefieldLaw.ShareWithState", "ERROR in BattlefieldLaw.AfterGenerateLoot(lucky m110)", "ERROR in ResyncWornStates",
+                "ERROR in BattlefieldLaw.AfterGenerateLoot(lucky m114)")
 _M110STAN_ST = r"(sprawny|uszkodzony|zmasakrowany|wrak)"
 _M110STAN_BLK = r"\[sprawny/uszkodzony/zmasakrowany/wrak/zniszczony\]: (\d+)/(\d+)/(\d+)/(\d+)/(\d+) -> do Ciebie (\d+), dzialka (\d+), zbrojownia (\d+), wraki (\d+), przepadly (\d+)"
 M110STAN_RX = {
@@ -66707,7 +66709,8 @@ M110STAN_RX = {
     "battle": re.compile(r"^Stan lupu \(m110\): bitwa (\d+) \| ksiega: wrogow (\d+) \(trafionych (\d+)\), trafien (\d+), przed nie-sprawnych (\d+), czesci z ksiega (\d+) \| "
                          r"lup z cial \[sprawny/uszkodzony/zmasakrowany/wrak/zniszczony\]: do gracza (\d+)/(\d+)/(\d+)/(\d+)/(\d+), zostaje u wojska (\d+) \| cios "
                          + _M110STAN_BLK + r" \| pekniete " + _M110STAN_BLK + r" \| bez ksiegi: lup (\d+), cios/pekniete (\d+) \| koniec: (.*) \(lucky (\d+)/(\d+)\) \| "
-                         r"prog zniszczenia (\d+)% \| pomiar (\d+(?:\.\d+)?) ms \(trafien (\d+)\) \| potkniecia (\d+)\.$"),
+                         r"prog zniszczenia (\d+)% \| pomiar (\d+(?:\.\d+)?) ms \(trafien (\d+)\) \| potkniecia (\d+)"
+                         r"(?: \| bron bez loterii stanu \(m114\) (\d+)/(\d+), z modyfikatorem (\d+))?\.$"),
     "test": re.compile(r"^Stan lupu \(m110\): test - bitwa (\d+): sztuczny stan przed bitwa dla (\d+) wrogow \(sprawny (\d+), uszkodzony (\d+), zmasakrowany (\d+), "
                        r"wrak (\d+)\)\.$"),
     "day": re.compile(r"\bdoba (\d+)\b"),
@@ -66772,7 +66775,10 @@ def m110stan_battle(s):
     d = {"n": g[0], "agents": g[1], "enemies": g[2], "hits": g[3], "before": g[4], "pieces": g[5], "lup": g[6:11], "zost": g[11],
          "cios": g[12:17], "rcios": g[17:22], "pek": g[22:27], "rpek": g[27:32], "nolup": g[32], "nowr": g[33], "how": m.group(35),
          "lok": int(m.group(36)), "lneed": int(m.group(37)), "min": int(m.group(38)), "ms": float(m.group(39)), "mhits": int(m.group(40)),
-         "stum": int(m.group(41))}
+         "stum": int(m.group(41)),
+         # m114-lup: odcinek broni (brak - None)
+         "wok": int(m.group(42)) if m.group(42) is not None else None, "wneed": int(m.group(43)) if m.group(43) is not None else None,
+         "wmod": int(m.group(44)) if m.group(44) is not None else None}
     return d
 
 
@@ -66789,6 +66795,11 @@ def m110stan_ids(b):
             e.append("bitwa %d %s: wrakow %d, a do wrakow poszlo %d" % (b["n"], nm, st[3], r[3]))
     if b["lok"] != b["lneed"]:
         e.append("bitwa %d: lucky %d/%d" % (b["n"], b["lok"], b["lneed"]))
+    if b.get("wok") is not None:   # m114-lup: bron bez loterii stanu - wszystkie oznaczone, z modyfikatorem nie wiecej niz oznaczonych
+        if b["wok"] != b["wneed"]:
+            e.append("bitwa %d: bron bez loterii stanu %d/%d" % (b["n"], b["wok"], b["wneed"]))
+        if b["wmod"] > b["wneed"]:
+            e.append("bitwa %d: bron z modyfikatorem %d > %d" % (b["n"], b["wmod"], b["wneed"]))
     if b["hits"] != b["mhits"]:
         e.append("bitwa %d: trafien %d != %d w pomiarze" % (b["n"], b["hits"], b["mhits"]))
     return e
@@ -66875,6 +66886,17 @@ def m110stan_selftest():
         return "bitwa: %s" % (b if b else "brak dopasowania")
     if m110stan_ids(b):
         return "bitwa: tozsamosci na linii kontrolnej %s" % m110stan_ids(b)
+    if b["wok"] is not None:
+        return "bitwa: odcinek broni (m114) w linii bez odcinka"
+    # m114-lup: odcinek broni - zgodny, niezgodny (k != n) i z modyfikatorem ponad oznaczone
+    W = " | bron bez loterii stanu (m114) %d/%d, z modyfikatorem %d."
+    bw = m110stan_battle(T["battle"][:-1] + W % (9, 9, 3))
+    if not bw or bw["wok"] != 9 or bw["wneed"] != 9 or bw["wmod"] != 3 or bw["stum"] != 0 or m110stan_ids(bw):
+        return "bitwa (bron m114): %s" % (bw if bw else "brak dopasowania")
+    for bad in ((8, 9, 3), (9, 9, 10)):
+        bx = m110stan_battle(T["battle"][:-1] + W % bad)
+        if not bx or not m110stan_ids(bx):
+            return "bitwa (bron m114): niezgodnosc %s nie wykryta" % (bad,)
     bb = m110stan_battle(T["battle"].replace("czesci z ksiega 21", "czesci z ksiega 22"))
     if not bb or not m110stan_ids(bb):
         return "bitwa: niezgodna suma czesci nie wykryta"
@@ -67043,9 +67065,10 @@ def m110stan_rows(rep, D, basep=None):
                 "brak linii bitwy", "100% bitew (brak - INFO)", None)
     else:
         rep.add("STAN-3: tozsamosci bitwy (czesci z ksiega = lup + zostaje + cios + pekniete; drogi ciosu i peknietych = czesci bez zniszczonych; lucky k = k)",
-                "bitew %d (czesci %d, lup do gracza %d, zostaje %d), niezgodnych %d%s" % (len(D["battles"]), sum(b["pieces"] for b in D["battles"]),
-                                                                                  sum(sum(b["lup"]) for b in D["battles"]), sum(b["zost"] for b in D["battles"]),
-                                                                                  len(berr), " (" + "; ".join(berr[:3]) + ")" if berr else ""), "100% bitew", not berr)
+                "bitew %d (czesci %d, lup do gracza %d, zostaje %d; bron bez loterii stanu (m114) %d/%d, z modyfikatorem %d, bitew z odcinkiem %d), niezgodnych %d%s" % (
+                    len(D["battles"]), sum(b["pieces"] for b in D["battles"]), sum(sum(b["lup"]) for b in D["battles"]), sum(b["zost"] for b in D["battles"]),
+                    sum(b.get("wok") or 0 for b in D["battles"]), sum(b.get("wneed") or 0 for b in D["battles"]), sum(b.get("wmod") or 0 for b in D["battles"]),
+                    sum(1 for b in D["battles"] if b.get("wok") is not None), len(berr), " (" + "; ".join(berr[:3]) + ")" if berr else ""), "100% bitew", not berr)
     # STAN-4 pokrycie pod flaga
     if not D["tests"]:
         rep.add("STAN-4: pokrycie testu (armoury-stan.flag): w lupie wszystkie 4 stany i zniszczona, cios/pekniete zolnierza rozdzielone, uprzaz",

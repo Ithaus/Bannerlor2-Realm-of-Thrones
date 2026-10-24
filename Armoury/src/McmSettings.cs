@@ -1044,6 +1044,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool LootStateFromWounds { get; set; } = true;
 
+        [SettingPropertyBool("Loot Weapons Keep Condition", HintText = "weapons, shields and ammunition stripped from the foes come in the state they were in on the body: Spoils of War gave every one of them random battle wear (40-85%, never sound) - the blows strike the man and his armour, not the sword in his hand. Armour keeps its state from the blows (Loot State From Wounds). Off: Spoils wear as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool LootWeaponsKeepCondition { get; set; } = true;
+
         [SettingPropertyInteger("Loot Min Condition Percent", 0, 12, "0", HintText = "gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off); with Loot State From Wounds on, armour stripped from a foe is destroyed when the blows left it this percent of its strength or less; with Gear Four States on, a Wrecked piece whose exact strength is not known (a wreck is anything under a tenth) is destroyed only at 10 or more", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public int LootMinConditionPercent { get; set; } = 3;
@@ -9856,6 +9860,7 @@ namespace Armoury
             s.RiderBlowSparesHarness = RiderBlowSparesHarness;
             s.ExtraBrokenArmorWrecks = ExtraBrokenArmorWrecks;
             s.LootStateFromWounds = LootStateFromWounds;
+            s.LootWeaponsKeepCondition = LootWeaponsKeepCondition;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
             s.LegendarySweepLazy = LegendarySweepLazy;
