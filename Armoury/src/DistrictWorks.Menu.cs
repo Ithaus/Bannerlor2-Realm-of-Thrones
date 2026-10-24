@@ -259,6 +259,10 @@ namespace Armoury
                 sb.Append("Your money: ").Append(Math.Round(100 * (1 - KM[q.WKind]))).Append("% wages to the villagers of ").Append(Name(v)).Append(", ").Append(Math.Round(100 * KM[q.WKind]))
                   .Append(q.WKind == KHerd ? "% for animals bought at " : "% for timber, tools and other goods bought at ").Append(tname).Append(". Ready in ").Append(KReady[q.WKind]).Append(" days.\n");
                 sb.Append(q.Name).Append(" then makes more, and half of what the extra sells for is yours, paid whenever ").Append(Name(v)).Append("'s carts come back from market. The lord and the village share the other half as usual. The first coins earn the most.\n");
+                // m114-prace: wycena z tego samego wzoru co wyplata - towar okregu na targ i prawdziwy utarg wozow (bez 7 dob pomiaru - srednia swiata)
+                if (q.ByMkt && q.MkDay > 0)
+                    sb.Append(Name(v)).Append(" eats what it ate before - the extra all goes to market, where the district's goods for sale are worth about ").Append(Math.Round(q.MkDay).ToString("N0", Inv))
+                      .Append(" a day").Append(q.HdDay > 0 ? " and its carts have lately brought home about " + Math.Round(q.HdDay).ToString("N0", Inv) + " a day" : "").Append(".\n");
                 sb.Append("If raiders empty homesteads of ").Append(q.Name).Append(", ").Append(q.WKind == KHerd ? "they drive off your animals there - that part is lost; when people return you can buy them again." : "your works there burn" + (KL[q.WKind] < 1 ? " in part" : "") + "; when people return you can rebuild them for " + Math.Round(100 * KR[q.WKind]) + "% of the price.")
                   .Append(" At war with ").Append(st.MapFaction != null && st.MapFaction.Name != null ? st.MapFaction.Name.ToString() : "this realm").Append(" you are paid nothing. Your gold: ").Append(gold.ToString("N0", Inv)).Append('.');
                 var amounts = new List<KeyValuePair<int, string>>

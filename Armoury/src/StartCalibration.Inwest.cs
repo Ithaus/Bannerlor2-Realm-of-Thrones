@@ -58,6 +58,32 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>m114-prace: wartosc dnia towaru okregu NA TARG (to, co wozy wioza) i dodatku prac, ktory idzie na targ - z ostatniego rachunku okregu (ld.Res, po zimie
+        /// i czynnikach rak), w cenie miasta targowego (VillageCrafts.Price - jak ValDay). false - okreg poza KS, bez rachunku albo bez towaru na targ. Watek glowny, nie rzuca.</summary>
+        internal static bool WorksMarketOf(Village v, out double market, out double extra)
+        {
+            market = 0; extra = 0;
+            if (v == null || !KsDistrictLive(v)) return false;
+            try
+            {
+                LiveDist ld;
+                if (!_live.TryGetValue(v.Settlement.StringId, out ld) || ld == null || ld.Res == null || _items == null) return false;
+                Town town = v.TradeBound != null ? v.TradeBound.Town : (v.Bound != null ? v.Bound.Town : null);
+                var r = ld.Res;
+                for (int i = 0; i < ItemCount; i++)
+                {
+                    var it = _items[i];
+                    if (it == null) continue;
+                    double p = VillageCrafts.Price(town, it);
+                    if (r.Market[i] > 0) market += r.Market[i] * p;
+                    if (r.WorksMkt != null && r.WorksMkt[i] > 0) extra += r.WorksMkt[i] * p;
+                }
+                if (double.IsNaN(market) || double.IsInfinity(market) || double.IsNaN(extra) || double.IsInfinity(extra)) { market = extra = 0; return false; }
+                return market > 0;
+            }
+            catch { market = extra = 0; return false; }
+        }
+
         /// <summary>inwest: wiersze ziemi wiosek pobocznych okregu (plik ziemi KS po nakladce przysiolkow v6) - zajecia startowe i kandydaci drogi bez KS.
         /// false - brak pliku ziemi albo okregu.</summary>
         internal static bool SideRows(string districtId, List<LandRow> into)
@@ -206,10 +232,10 @@ namespace Armoury
         /// <summary>ComputeDistrict (zaraz po KsDeliver.Produce, przed zima i czynnikami rak): dodatek prac okregu - dla czesci z pracami b x kg zajecia prac tej czesci
         /// (wies gry - 20 blokow, wioska poboczna - jej blok). Klucz District Works wylaczony albo okreg bez prac - nic. Dodatek zapamietany w pracach okregu
         /// (sztuki gry na dobe przed zima - udzial dodatku w utargu przy wozie).</summary>
-        private static void WorksKs(LiveDist ld, double[] prod)
+        private static double[] WorksKs(LiveDist ld, double[] prod)
         {
-            if (ld == null || ld.TF || ld.V == null || ld.B == null || ld.K == null || prod == null) return;
-            if (!DistrictWorks.HasWorks(ld.V)) return;
+            if (ld == null || ld.TF || ld.V == null || ld.B == null || ld.K == null || prod == null) return null;
+            if (!DistrictWorks.HasWorks(ld.V)) return null;
             try
             {
                 _wkCalls++;
@@ -240,8 +266,9 @@ namespace Armoury
                 }
                 _wkKg += kg;
                 DistrictWorks.NoteKsExtra(ld.V, _items, pcs);
+                return kg > 0 ? extra : null;                       // m114-prace: kg dodatku (przed zima) - ComputeDistrict liczy z niego dodatek na targ
             }
-            catch (Exception e) { Stumble("WorksKs", e); }
+            catch (Exception e) { Stumble("WorksKs", e); return null; }
         }
 
         /// <summary>inwest: blok z pracami okregu nie zmienia zajecia (regula A7) - wioska z pracami (Uid) albo wies gry (Main), gdy prace sa w wsi gry.</summary>

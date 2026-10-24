@@ -146,9 +146,25 @@ namespace Armoury
         // pamiec sesji: dodatek czesci (czytany z modelu produkcji - jedna referencja), wartosci okregow (doba)
         private sealed class Bonus { public int Craft; public double B; }
         private static volatile Dictionary<Village, Dictionary<string, Bonus>> _bonus = new Dictionary<Village, Dictionary<string, Bonus>>();
-        private sealed class DistVal { public int Day; public double V, E; public readonly Dictionary<string, double> EPart = new Dictionary<string, double>(StringComparer.Ordinal); public readonly Dictionary<string, double> VPart = new Dictionary<string, double>(StringComparer.Ordinal); }
+        private sealed class DistVal { public int Day; public double V, E;
+            public double Mk, Em; public bool Mkt;                // m114-prace: wartosc dnia towaru okregu na targ i dodatku na targ (KS); Mkt - sa liczby targu
+            public readonly Dictionary<string, double> EPart = new Dictionary<string, double>(StringComparer.Ordinal); public readonly Dictionary<string, double> VPart = new Dictionary<string, double>(StringComparer.Ordinal); }
         private static readonly Dictionary<string, DistVal> _val = new Dictionary<string, DistVal>(StringComparer.Ordinal);
         private static readonly Dictionary<Village, double[]> _ksExtra = new Dictionary<Village, double[]>();   // pod KS: sztuki dodatku na dobe (ostatni rachunek okregu)
+
+        // m114-prace (klucz Works Pay Market Share; Jeff: prace w Stoneknoll placily ok. 1.7 dziennie, okno obiecywalo ok. 7.1): pula = udzial x (dodatek NA TARG / towar
+        // okregu NA TARG) x utarg wozu. Okreg zjada stala ilosc (KsDeliver.Own = min(produkcja, potrzeba)), dodatek wchodzi przed stolem - caly idzie na targ, a utarg
+        // wozu to tylko towar na targ; dawne E/V dzielilo dodatek przez CALA produkcje (z tym, co okreg zje). Bez liczb targu (okreg poza KS, brak rachunku) - dawne E/V.
+        // Wycena okna: utarg wozow liczony dla KAZDEGO okregu (dawniej tylko z pracami - reszta brala srednia swiata 0.868), r = utarg na dobe / towar na targ.
+        internal static bool MarketShareOn { get { var s = Settings.Current; return On && s != null && s.WorksPayMarketShare; } }
+        private sealed class MkC { public int Day; public double Mk, Em; }
+        private static readonly Dictionary<string, MkC> _mkt = new Dictionary<string, MkC>(StringComparer.Ordinal);   // okreg -> ostatnie liczby targu (gdy rachunek KS chwilowo skasowany)
+        private static double _worldR; private static int _worldRDay = int.MinValue, _worldRN;   // r swiata (okregi z pomiarem utargu) - wycena okregu bez 7 dob pomiaru
+        private static bool _recalcDone;                                                         // komunikat "income has been recalculated" - raz po wczytaniu
+        private sealed class HrC { public int Day; public double Old, New, Vd; }
+        private static readonly Dictionary<string, HrC> _hrSeen = new Dictionary<string, HrC>(StringComparer.Ordinal);   // ryzyko 3: H wiosek pobocznych stare vs nowe
+        private static int _hrLastLine = int.MinValue;
+        private static long _dPoolOld, _dPoolNew; private static double _dShOldW, _dShNewW, _dShHand; private static int _dMkPays, _dMkFall, _dMkRec;
 
         // liczniki do linii (od ostatniej linii)
         private static int _st, _stAll, _dNew, _dNewAi, _dPays, _dWar, _dBurnN, _dIdleN, _dBackN, _dRebN, _dExpN, _dRemN, _dLocked, _dHerdN, _dRel, _dViolate, _dNoCart;
@@ -170,6 +186,7 @@ namespace Armoury
                 _bonus = new Dictionary<Village, Dictionary<string, Bonus>>(); _val.Clear(); _ksExtra.Clear();
                 _st = _stAll = 0; ZeroDay(); _err.Clear(); _dNotes.Clear(); _startLogged = false; _lastWeek = -1;
                 _preDay = int.MinValue; _preMs = 0;
+                _mkt.Clear(); _hrSeen.Clear(); _hrLastLine = int.MinValue; _worldR = 0; _worldRDay = int.MinValue; _worldRN = 0; _recalcDone = false;   // m114-prace
             }
             ViewDirty(); _dVwBox = _dVwTip = _vwStumble = 0;   // m115: widok finansow od nowa
             MenuReset();
@@ -182,6 +199,7 @@ namespace Armoury
             _dNoPath = _dDirty = 0;
             _dWage = _dMatTown = _dMatVil = _dPaidTax = _dPaidVil = _dPool = _dHanded = _dExpected = _dRebG = _dIn = _dLostG = _dHerdPcs = _dMatPcs = 0;
             _dBurnU = _dIdleU = _dBackU = _dRebU = _dExpU = _dHerdU = 0;
+            _dPoolOld = _dPoolNew = 0; _dShOldW = _dShNewW = _dShHand = 0; _dMkPays = _dMkFall = _dMkRec = 0;   // m114-prace
         }
 
         private static void Stumble(string where, Exception e)
@@ -269,6 +287,9 @@ namespace Armoury
             public int Craft = -1, WKind = -1; public double N, S, Empty, Br, Bf, Home; public int State;
             public double KitPer, V, VNorm, Winter, UEff, UHeld, UMine, B, Bmax, Room, Sensible, ShareDist, VDist, H = DefaultH;
             public VillageCrafts.PartCraft Pc;
+            // m114-prace: H dawnego wzoru (utarg / cala produkcja) do porownania; ByMkt - H to r (utarg / towar na targ, klucz Works Pay Market Share); HdDay - utarg wozow na dobe
+            // (0 - bez 7 dob pomiaru), MkDay - wartosc dnia towaru okregu na targ
+            public double Hold = DefaultH, HdDay, MkDay; public bool ByMkt;
         }
 
         /// <summary>Wyceny wszystkich czesci okregu (do menu, opisu, dymka, AI). false - okreg nieznany.</summary>
@@ -289,14 +310,16 @@ namespace Armoury
                 float bSide = s != null ? Math.Max(0f, Math.Min(2f, s.DistrictWorksBonusSide)) : 0.30f, bMain = s != null ? Math.Max(0f, Math.Min(2f, s.DistrictWorksBonusMain)) : 0.20f;
                 float years = s != null ? Math.Max(0.1f, Math.Min(10f, s.DistrictWorksKitYears)) : 1f;
                 double vd = 0; foreach (var p in parts) vd += p.ValDay;
-                double H = HOf(v, vd);
+                double H = HOf(v, vd), Hold = H, hdDay = 0, mkDay = 0; bool byMkt = false;
+                if (MarketShareOn) byMkt = RateOf(v, out H, out hdDay, out mkDay);   // m114-prace: r = utarg / towar na targ (ten sam wzor co wyplata); bez liczb targu - dawne H
+                if (!byMkt) H = Hold;
                 int today = Today();
                 bool watch = false; try { watch = PeopleScale.WatchException(v.Settlement); } catch { watch = false; }
                 bool path = PathOf(v);                                     // recenzja: bez drogi produkcji dodatku - bez nowych prac
                 string id = v.Settlement.StringId;
                 foreach (var pc in parts)
                 {
-                    var q = new Quote { Uid = pc.Uid, Name = pc.Name, Kind = pc.Kind, Main = pc.Main, Ks = ks, Pc = pc, H = H, VDist = vd };
+                    var q = new Quote { Uid = pc.Uid, Name = pc.Name, Kind = pc.Kind, Main = pc.Main, Ks = ks, Pc = pc, H = H, VDist = vd, Hold = Hold, ByMkt = byMkt, HdDay = hdDay, MkDay = mkDay };
                     var b = pc.Book;
                     q.N = b != null ? b.Nw : 0; q.Br = b != null ? b.Br : 0; q.Bf = b != null ? b.Bf : 0; q.Empty = q.Br + q.Bf; q.S = Math.Max(0, q.N - q.Empty); q.Home = b != null ? b.Home : 0;
                     q.State = b != null ? b.State : VillageBook.SStanding;
@@ -342,28 +365,121 @@ namespace Armoury
         }
 
         /// <summary>r4-wioska (recenzja): H okregu dla dochodu wioski pobocznej gracza (SideVillageFief.Due) - ta sama liczba co okno prac (QuotesOf: vd = suma ValDay czesci).</summary>
-        internal static double HandedRatio(Village v, double vd) { return v != null && v.Settlement != null ? HOf(v, vd) : DefaultH; }
+        internal static double HandedRatio(Village v, double vd)
+        {
+            if (v == null || v.Settlement == null) return DefaultH;
+            double h = HOf(v, vd);
+            if (MarketShareOn) NoteSideH(v, vd, h);                       // m114-prace (ryzyko 3): utarg mierzony w kazdym okregu - H wiosek pobocznych z pomiaru, nie 0.868
+            return h;
+        }
 
-        /// <summary>H okregu (F10): utarg oddany przy wozach / wartosc produkcji dnia - zmierzone (okreg z pracami), inaczej srednia swiata 0.868.</summary>
+        /// <summary>H okregu (F10): utarg oddany przy wozach / wartosc produkcji dnia - zmierzone, inaczej srednia swiata 0.868. Klucz Works Pay Market Share wylaczony -
+        /// pomiar tylko okregow z pracami (jak dotad; utarg zebrany przy kluczu wlaczonym nie zmienia innych okregow).</summary>
         private static double HOf(Village v, double vd)
         {
             try
             {
                 string id = v.Settlement.StringId;
-                lock (Gate) { double h = HandedPerDay(id); if (vd > 0 && h > 0) return Math.Max(0.2, Math.Min(1.5, h / vd)); }
+                bool mk = MarketShareOn;
+                lock (Gate)
+                {
+                    if (!mk && !HasRowsIn(id)) return DefaultH;
+                    double h = HandedPerDay(id); if (vd > 0 && h > 0) return Math.Max(0.2, Math.Min(1.5, h / vd));
+                }
             }
             catch { }
             return DefaultH;
         }
 
-        /// <summary>Dochod dnia posiadacza z czesci przy jednostkach mine wobec wszystkich all (F8, F10): 364 x Share x H x E_h / 364.</summary>
-        internal static double IncomeDay(Quote q, double mine, double all)
+        private static bool HasRowsIn(string id) { foreach (var r in _rows) if (r.Dist == id) return true; return false; }   // pod Gate
+
+        /// <summary>m114-prace: liczby targu okregu (StartCalibration.WorksMarketOf - ostatni rachunek KS), a gdy rachunek chwilowo skasowany (KsDirty) - ostatnie znane
+        /// z 28 dob. false - okreg poza KS albo bez towaru na targ. Nie rzuca.</summary>
+        private static bool MarketNow(Village v, out double mk, out double em)
+        {
+            mk = em = 0;
+            if (v == null || v.Settlement == null) return false;
+            string id = v.Settlement.StringId;
+            bool ok;
+            try { ok = StartCalibration.WorksMarketOf(v, out mk, out em); } catch { ok = false; mk = em = 0; }
+            int today = Today();
+            lock (Gate)
+            {
+                MkC c;
+                if (ok) { if (!_mkt.TryGetValue(id, out c)) { c = new MkC(); _mkt[id] = c; } c.Day = today; c.Mk = mk; c.Em = em; }
+                else if (StartCalibration.KsDistrictLive(v) && _mkt.TryGetValue(id, out c) && today - c.Day <= 28) { mk = c.Mk; em = c.Em; ok = true; }
+            }
+            return ok && mk > 0;
+        }
+
+        /// <summary>m114-prace: r okregu = utarg wozow na dobe (okno 28 dob, od 7 dob) / wartosc dnia towaru na targ - ten sam wzor co wyplata (udzial x dodatek na targ / targ
+        /// x utarg = udzial x r x dodatek). Bez 7 dob pomiaru - r swiata (WorldR). false - bez liczb targu (wycena dawnym H).</summary>
+        private static bool RateOf(Village v, out double r, out double hdDay, out double mkDay)
+        {
+            r = DefaultH; hdDay = 0; mkDay = 0;
+            double mk, em;
+            if (!MarketNow(v, out mk, out em)) return false;
+            mkDay = mk;
+            lock (Gate) hdDay = HandedPerDay(v.Settlement.StringId);
+            r = hdDay > 0 ? Math.Max(0.2, Math.Min(1.5, hdDay / mk)) : WorldR();
+            return true;
+        }
+
+        /// <summary>m114-prace: r swiata - suma utargu na dobe / suma towaru na targ okregow z pomiarem (od 5 okregow; raz na dobe), inaczej 0.868.</summary>
+        private static double WorldR()
+        {
+            int today = Today();
+            if (_worldRDay != today)
+            {
+                _worldRDay = today;
+                var ids = new List<KeyValuePair<string, double>>();
+                lock (Gate) foreach (var k in _handed.Keys) { double h = HandedPerDay(k); if (h > 0) ids.Add(new KeyValuePair<string, double>(k, h)); }
+                double sh = 0, sm = 0; int n = 0;
+                foreach (var kv in ids)
+                {
+                    try
+                    {
+                        var st = Settlement.Find(kv.Key); var v = st != null ? st.Village : null;
+                        double mk, em;
+                        if (v == null || !MarketNow(v, out mk, out em)) continue;
+                        sh += kv.Value; sm += mk; n++;
+                    }
+                    catch { }
+                }
+                _worldRN = n;
+                _worldR = n >= 5 && sm > 0 ? Math.Max(0.2, Math.Min(1.5, sh / sm)) : 0;
+            }
+            return _worldR > 0 ? _worldR : DefaultH;
+        }
+
+        /// <summary>m114-prace (ryzyko 3): H wioski pobocznej (naleznosc i cena ziemi - SideVillageFief) stare (pomiar tylko okregu z pracami, inaczej 0.868) i nowe - do linii.</summary>
+        private static void NoteSideH(Village v, double vd, double hNew)
+        {
+            try
+            {
+                string id = v.Settlement.StringId;
+                lock (Gate)
+                {
+                    double hOld = DefaultH;
+                    if (HasRowsIn(id)) { double h = HandedPerDay(id); if (vd > 0 && h > 0) hOld = Math.Max(0.2, Math.Min(1.5, h / vd)); }
+                    HrC c; if (!_hrSeen.TryGetValue(id, out c)) { c = new HrC(); _hrSeen[id] = c; }
+                    c.Day = Today(); c.Old = hOld; c.New = hNew; c.Vd = vd;
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>Dochod dnia posiadacza z czesci przy jednostkach mine wobec wszystkich all (F8, F10): 364 x Share x H x E_h / 364.
+        /// m114-prace: przy kluczu Works Pay Market Share q.H to r okregu (utarg / towar na targ), a b x V to dodatek, ktory caly idzie na targ - ta sama liczba co pula wyplaty.</summary>
+        internal static double IncomeDay(Quote q, double mine, double all) { return IncomeDayH(q, mine, all, q.H); }
+
+        private static double IncomeDayH(Quote q, double mine, double all, double H)
         {
             var s = Settings.Current;
             double share = s != null ? Math.Max(0f, Math.Min(1f, s.DistrictWorksShare)) : 0.5;
             if (!(q.S > 0) || !(all > 0) || !(mine > 0)) return 0;
             double x = Math.Min(1.0, all / q.S), b = q.Bmax * (2 * x - x * x);
-            return share * q.H * b * q.V * mine / all;
+            return share * H * b * q.V * mine / all;
         }
 
         // ============================================================ zakup i odbudowa (pieniadze: money_routes 1 i 5)
@@ -775,11 +891,14 @@ namespace Armoury
             string id = home.Settlement.StringId;
             try
             {
+                bool mkOn = MarketShareOn;
                 lock (Gate)
                 {
                     bool any = false; foreach (var r in _rows) if (r.Dist == id) { any = true; break; }
-                    if (!any) return;                                 // okreg bez prac - nic (bez pamieci utargu: wycena bierze srednia swiata H)
-                    double h; _handToday.TryGetValue(id, out h); _handToday[id] = h + handed;   // utarg doby (H okregu = utarg na dobe / wartosc produkcji dnia)
+                    // m114-prace: przy kluczu Works Pay Market Share utarg doby liczony w KAZDYM okregu (wycena okna z prawdziwego utargu, nie ze sredniej swiata);
+                    // bez klucza - jak dotad tylko okreg z pracami (bez pamieci utargu: wycena bierze srednia swiata H)
+                    if (any || mkOn) { double h; _handToday.TryGetValue(id, out h); _handToday[id] = h + handed; }   // utarg doby (H okregu = utarg na dobe / wartosc produkcji dnia)
+                    if (!any) { if (mkOn) _dMkRec++; return; }        // okreg bez prac - bez wyplaty
                 }
                 if (!PathOf(home)) { lock (Gate) _dNoPath++; return; }       // recenzja: bez drogi produkcji dodatku (rampa KS, produkcja wsi niewpieta) - bez wyplaty, zloto w zwyklym podziale
                 var s = Settings.Current;
@@ -787,8 +906,20 @@ namespace Armoury
                 DistVal dv = ValOf(home);
                 if (dv == null || !(dv.V > 0) || !(dv.E > 0)) { _dNoCart++; return; }
                 long inWin = Math.Max(0L, tax) + Math.Max(0L, purse);
-                double pool = share * (dv.E / dv.V) * handed;
+                // m114-prace: udzial dodatku w utargu - dodatek na targ / towar okregu na targ (klucz Works Pay Market Share, liczby targu KS); bez nich - dawne E/V.
+                // Sufity bez zmian: najwyzej polowa utargu i najwyzej to, co weszlo w oknie (licznik pana + kiesa wsi). Jedna pula na powrot wozu - nic podwojnie.
+                double shOld = dv.E / dv.V, shNew = shOld;
+                bool byMkt = mkOn && dv.Mkt && dv.Mk > 0 && dv.Em > 0;
+                if (byMkt) shNew = Math.Min(1.0, dv.Em / dv.Mk);
+                double poolOld = Math.Min(share * shOld * handed, Math.Min(0.5 * handed, inWin));
+                double pool = share * shNew * handed;
                 pool = Math.Min(pool, Math.Min(0.5 * handed, inWin));
+                lock (Gate)
+                {
+                    _dShHand += handed; _dShOldW += shOld * handed; _dShNewW += shNew * handed;
+                    _dPoolOld += (long)Math.Floor(Math.Max(0, poolOld)); _dPoolNew += (long)Math.Floor(Math.Max(0, pool));
+                    if (byMkt) _dMkPays++; else if (mkOn) _dMkFall++;
+                }
                 if (!(pool >= 1)) return;
                 int today = Today();
                 string pid = PlayerClanId();                                  // m112-inwest: wyplaty wedlug dob tylko dla wierszy gracza
@@ -882,6 +1013,11 @@ namespace Armoury
                 if (e > 0) { d.EPart[part] = e; d.E += e; }
             }
             d.V += d.E;
+            if (MarketShareOn)
+            {
+                double mk, em;                                                // m114-prace: towar okregu na targ i dodatek na targ (ten sam rachunek KS co stawki wozow)
+                if (MarketNow(v, out mk, out em)) { d.Mk = mk; d.Em = em; d.Mkt = true; }
+            }
             lock (Gate)
             {
                 _val[id] = d;
@@ -954,8 +1090,15 @@ namespace Armoury
                 lock (Gate)
                 {
                     foreach (var r in _rows) dists.Add(r.Dist);
-                    // utarg doby do okna ok. 28 dob (suma zanikajaca 27/28 po 28 dobach)
-                    foreach (var id in dists)
+                    // utarg doby do okna ok. 28 dob (suma zanikajaca 27/28 po 28 dobach); m114-prace: przy kluczu Works Pay Market Share - kazdy okreg z utargiem
+                    var win = dists;
+                    if (MarketShareOn)
+                    {
+                        win = new HashSet<string>(dists, StringComparer.Ordinal);
+                        foreach (var k in _handed.Keys) win.Add(k);
+                        foreach (var k in _handToday.Keys) win.Add(k);
+                    }
+                    foreach (var id in win)
                     {
                         double t; _handToday.TryGetValue(id, out t);
                         double s0; _handed.TryGetValue(id, out s0); int d0; _handedDays.TryGetValue(id, out d0);
@@ -980,6 +1123,8 @@ namespace Armoury
                     var dv = ValOf(v);
                     if (dv != null) lock (Gate) _dExpected += (long)Math.Round(OwnShareExpected(id, dv));
                 }
+                if (!_recalcDone) RecalcNote();                              // m114-prace: raz po wczytaniu - komunikat, gdy dochod prac gracza po nowym wzorze inny
+                SideHLine(today);                                            // m114-prace (ryzyko 3): H wiosek pobocznych stare vs nowe - pierwsza doba i co 7 dob
                 DistrictWorksAi.Daily(today);
                 if (today % 7 == 0 && today != _lastWeek) { _lastWeek = today; Week(today); }
                 if (TestWanted(today)) Test(today);                         // proba autotestu (plik armoury-po-test.flag, tylko DLL autotestu)
@@ -998,11 +1143,95 @@ namespace Armoury
             double h; lock (Gate) h = HandedPerDay(id);
             double H = dv.V > 0 && h > 0 ? Math.Max(0.2, Math.Min(1.5, h / dv.V)) : DefaultH;
             double e = share * H * dv.E;
+            // m114-prace: przy liczbach targu - udzial x r x dodatek na targ (r = utarg / towar na targ; ta sama pula co przy wozach)
+            if (MarketShareOn && dv.Mkt && dv.Mk > 0 && dv.Em > 0) e = share * (h > 0 ? Math.Max(0.2, Math.Min(1.5, h / dv.Mk)) : WorldR()) * dv.Em;
             lock (Gate) foreach (var r in _rows) if (r.Dist == id) { double ep; if (dv.EPart.TryGetValue(r.Part, out ep)) r.Exp7 += e > 0 && dv.E > 0 ? e * ep / dv.E / Math.Max(1, CountPart(id, r.Part)) : 0; }
             return e;
         }
 
         private static int CountPart(string id, string part) { int n = 0; foreach (var r in _rows) if (r.Dist == id && r.Part == part) n++; return n; }
+
+        private static string Pct(double x) { return (100.0 * x).ToString("0.0", Inv) + "%"; }
+
+        /// <summary>m114-prace: raz po wczytaniu (pierwsza doba): dochod dnia prac gracza dawnym wzorem (E/V: H = utarg / cala produkcja okregu) i nowym (r x dodatek na targ)
+        /// - linia logu z okregami; komunikat gracza, gdy roznica >= 10% i >= 0.5 dziennie. Klucz wylaczony albo gracz bez prac - nic. Nie rzuca.</summary>
+        private static void RecalcNote()
+        {
+            _recalcDone = true;
+            try
+            {
+                if (!MarketShareOn) return;
+                string pid = PlayerClanId();
+                var pc = Clan.PlayerClan;
+                if (pid == null || pc == null) return;
+                var dists = new HashSet<string>(StringComparer.Ordinal);
+                lock (Gate) foreach (var r in _rows) if (r.Clan == pid && r.Held() > 1e-6) dists.Add(r.Dist);
+                if (dists.Count == 0) return;
+                double incOld = 0, incNew = 0; int mkN = 0;
+                var sb = new StringBuilder(400);
+                foreach (var id in dists)
+                {
+                    var st = Settlement.Find(id); var v = st != null ? st.Village : null;
+                    if (v == null) continue;
+                    var qs = new List<Quote>();
+                    if (!QuotesOf(v, qs, pc)) continue;
+                    double o = 0, n = 0, hold = DefaultH, hnew = DefaultH; bool by = false;
+                    foreach (var q in qs)
+                    {
+                        hold = q.Hold; hnew = q.H; by = q.ByMkt;
+                        if (q.UMine > 0) { o += IncomeDayH(q, q.UMine, q.UEff, q.Hold); n += IncomeDay(q, q.UMine, q.UEff); }
+                    }
+                    incOld += o; incNew += n; if (by) mkN++;
+                    DistVal dv = ValOf(v);
+                    string shares = dv != null && dv.V > 0
+                        ? "udzial E/V " + Pct(dv.E / dv.V) + (dv.Mkt && dv.Mk > 0 ? ", dodatek na targ / targ " + Pct(dv.Em / dv.Mk) + " (targ " + Math.Round(dv.Mk).ToString("0", Inv) + "/dobe z produkcji " + Math.Round(dv.V).ToString("0", Inv) + ")" : ", bez liczb targu (dawny wzor)")
+                        : "bez wyceny";
+                    sb.Append(sb.Length > 0 ? "; " : "").Append(Name(v)).Append(": ").Append(o.ToString("0.0", Inv)).Append(" -> ").Append(n.ToString("0.0", Inv)).Append("/dobe, H ")
+                      .Append(hold.ToString("0.00", Inv)).Append(by ? " -> r " : " -> H ").Append(hnew.ToString("0.00", Inv)).Append(", ").Append(shares);
+                }
+                bool tell = Math.Abs(incNew - incOld) >= Math.Max(0.5, 0.1 * incOld);
+                Log.Info(P + "przeliczenie dochodu prac gracza po wczytaniu (klucz Works Pay Market Share): dawny wzor " + incOld.ToString("0.0", Inv) + "/dobe, nowy " + incNew.ToString("0.0", Inv)
+                         + "/dobe (okregow " + dists.Count + ", z liczbami targu " + mkN + ", r swiata " + WorldR().ToString("0.00", Inv) + " z " + _worldRN + " okregow) | " + sb
+                         + " | komunikat gracza " + (tell ? "TAK" : "NIE (roznica ponizej 10% albo 0.5/dobe)") + ".");
+                if (tell) Msg("Your works' income has been recalculated: about " + incNew.ToString("0.0", Inv) + " a day (" + Math.Round(incNew * 364).ToString("N0", Inv) + " a year; before: about " + incOld.ToString("0.0", Inv) + " a day).");
+            }
+            catch (Exception e) { Stumble("RecalcNote", e); }
+        }
+
+        /// <summary>m114-prace (ryzyko 3): H wiosek pobocznych (naleznosc pana i cena ziemi SideVillageFief = wartosc x H x stawka) - dawne (pomiar tylko okregu z pracami,
+        /// inaczej 0.868) wobec nowego (pomiar w kazdym okregu). Pierwsza doba z danymi i co 7 dob. Nie rzuca.</summary>
+        private static void SideHLine(int today)
+        {
+            try
+            {
+                if (!MarketShareOn) return;
+                if (_hrLastLine != int.MinValue && today - _hrLastLine < 7) return;
+                var list = new List<KeyValuePair<string, HrC>>();
+                lock (Gate) foreach (var kv in _hrSeen) if (today - kv.Value.Day <= 7 && kv.Value.Old > 0) list.Add(kv);
+                if (list.Count == 0) return;
+                _hrLastLine = today;
+                int meas = 0, down = 0, up = 0; double wo = 0, wn = 0;
+                foreach (var kv in list)
+                {
+                    var c = kv.Value;
+                    if (Math.Abs(c.New - c.Old) > 1e-9) meas++;
+                    if (c.New < 0.8 * c.Old) down++; else if (c.New > 1.2 * c.Old) up++;
+                    wo += Math.Max(0, c.Vd) * c.Old; wn += Math.Max(0, c.Vd) * c.New;
+                }
+                list.Sort((a, b) => (a.Value.New / a.Value.Old).CompareTo(b.Value.New / b.Value.Old));
+                var lo = new StringBuilder(); var hi = new StringBuilder();
+                for (int i = 0; i < list.Count && i < 3; i++) { var c = list[i].Value; if (!(c.New < c.Old - 1e-9)) break; lo.Append(lo.Length > 0 ? ", " : "").Append(DistName(list[i].Key)).Append(" H ").Append(c.Old.ToString("0.00", Inv)).Append(" -> ").Append(c.New.ToString("0.00", Inv)).Append(" (x").Append((c.New / c.Old).ToString("0.00", Inv)).Append(")"); }
+                for (int i = list.Count - 1; i >= 0 && i >= list.Count - 3; i--) { var c = list[i].Value; if (!(c.New > c.Old + 1e-9)) break; hi.Append(hi.Length > 0 ? ", " : "").Append(DistName(list[i].Key)).Append(" H ").Append(c.Old.ToString("0.00", Inv)).Append(" -> ").Append(c.New.ToString("0.00", Inv)).Append(" (x").Append((c.New / c.Old).ToString("0.00", Inv)).Append(")"); }
+                Log.Info(P + "wioski poboczne (m114 ryzyko 3: naleznosc pana i cena ziemi = wartosc x H x stawka; H z utargu mierzonego w kazdym okregu zamiast 0.868): okregow " + list.Count
+                         + ", H inne niz dawniej " + meas + ", srednio (wagi - wartosc dnia okregu) dawne " + (wo > 0 ? (wo / Math.Max(1e-9, SumVd(list))).ToString("0.000", Inv) : "-")
+                         + " -> nowe " + (wn > 0 ? (wn / Math.Max(1e-9, SumVd(list))).ToString("0.000", Inv) : "-") + " (naleznosci i ceny ziemi x" + (wo > 0 ? (wn / wo).ToString("0.000", Inv) : "-")
+                         + "), nizej o ponad 20%: " + down + ", wyzej o ponad 20%: " + up + " | najnizej: " + (lo.Length > 0 ? lo.ToString() : "-") + " | najwyzej: " + (hi.Length > 0 ? hi.ToString() : "-") + ".");
+            }
+            catch (Exception e) { Stumble("SideHLine", e); }
+        }
+
+        private static double SumVd(List<KeyValuePair<string, HrC>> l) { double s = 0; foreach (var kv in l) s += Math.Max(0, kv.Value.Vd); return s; }
+        private static string DistName(string id) { try { var st = Settlement.Find(id); return st != null && st.Name != null ? st.Name.ToString() : id; } catch { return id; } }
 
         /// <summary>Odbudowa: samoczynna (klucz Auto Rebuild i Keep Wage Days zoldu druzyny w kiesie po zaplacie), przypomnienie 14 dob przed terminem, prawo przepada po terminie.</summary>
         private static void Rebuilds(Village v, int today)
@@ -1181,7 +1410,8 @@ namespace Armoury
                          + " | z zapisu: " + _loadNote + "; prac " + rows + " w " + dists + " okregach, kapital " + Math.Round(cap).ToString("0", Inv) + " zl, jednostek " + units.ToString("0.00", Inv)
                          + " | dodatek: wioska " + (s != null ? s.DistrictWorksBonusSide : 0.3f).ToString("0.00", Inv) + ", wies gry " + (s != null ? s.DistrictWorksBonusMain : 0.2f).ToString("0.00", Inv)
                          + ", udzial inwestora " + (s != null ? s.DistrictWorksShare : 0.5f).ToString("0.00", Inv) + ", sprzet = " + (s != null ? s.DistrictWorksKitYears : 1f).ToString("0.0", Inv) + " roku produkcji osady"
-                         + " | tabela rodzajow: " + kinds + ".");
+                         + " | tabela rodzajow: " + kinds
+                         + " | m114 wyplata z udzialu w towarze na targ (Works Pay Market Share): " + (MarketShareOn ? "TAK - utarg wozow liczony w kazdym okregu" : "NIE - dawne E/V") + ".");
             }
             catch (Exception e) { Stumble("StartLine", e); }
         }
@@ -1206,6 +1436,12 @@ namespace Armoury
                       .Append(" | wyplaty: powrotow ").Append(_dPays).Append(", utarg ").Append(_dHanded).Append(", pula ").Append(_dPool).Append(", wyplacone ").Append(paidOut).Append(" = z licznika pana ").Append(_dPaidTax)
                       .Append(" + z kiesy wsi ").Append(_dPaidVil).Append(" (oczekiwane ").Append(_dExpected).Append(", wstrzymane wojna ").Append(_dWar).Append(", powroty bez wyceny ").Append(_dNoCart)
                       .Append(", bez drogi produkcji ").Append(_dNoPath).Append(")")
+                      .Append(" | udzial dodatku w utargu (klucz Works Pay Market Share ").Append(MarketShareOn ? "TAK" : "NIE").Append("): dawny E/V ")
+                      .Append(_dShHand > 0 ? Pct(_dShOldW / _dShHand) : "-").Append(", nowy dodatek na targ / targ okregu ").Append(_dShHand > 0 ? Pct(_dShNewW / _dShHand) : "-")
+                      .Append(" (srednie wazone utargiem ").Append(Math.Round(_dShHand).ToString("0", Inv)).Append("), pula dawna ").Append(_dPoolOld).Append(" / nowa ").Append(_dPoolNew)
+                      .Append(" (po sufitach pol utargu i okna), powrotow wedlug targu ").Append(_dMkPays).Append(", dawnym wzorem (bez liczb targu) ").Append(_dMkFall)
+                      .Append(", utarg zapisany z okregow bez prac ").Append(_dMkRec).Append(" powrotow, okregow z utargiem ").Append(_handed.Count)
+                      .Append(", r swiata ").Append(_worldR > 0 ? _worldR.ToString("0.00", Inv) + " z " + _worldRN + " okregow" : "brak (0.868)")
                       .Append(" | ogien: uderzen ").Append(_dBurnN).Append(", stracone ").Append(_dBurnU.ToString("0.00", Inv)).Append(" jedn. (").Append(_dLostG).Append(" zl), bezczynne ").Append(_dIdleU.ToString("0.00", Inv))
                       .Append(", stada do napastnikow ").Append(_dHerdN).Append(" (szt. ").Append(_dHerdPcs).Append("), wrocilo do pracy ").Append(_dBackU.ToString("0.00", Inv))
                       .Append(" | odbudowa: ").Append(_dRebN).Append(" (").Append(_dRebU.ToString("0.00", Inv)).Append(" jedn., ").Append(_dRebG).Append(" zl), przypomnienia ").Append(_dRemN).Append(", przepadlo ").Append(_dExpN)
@@ -1259,7 +1495,7 @@ namespace Armoury
                         if (!f) sb.Append(','); f = false;
                         int rd; _relDay.TryGetValue(kv.Key, out rd);
                         int hd; _handedDays.TryGetValue(kv.Key, out hd);
-                        sb.Append(C(kv.Key)).Append('=').Append(D(kv.Value)).Append(':').Append(_relDay.ContainsKey(kv.Key) ? rd : -1).Append(':').Append(hd);
+                        sb.Append(C(kv.Key)).Append('=').Append(D(Math.Round(kv.Value, 1))).Append(':').Append(_relDay.ContainsKey(kv.Key) ? rd : -1).Append(':').Append(hd);
                     }
                     sb.Append("|a:").Append(_autoOff ? 0 : 1);                 // przelacznik odbudowy samoczynnej gracza z okna (1 - wedlug klucza)
                     // m112-inwest (po recenzji): wyplaty gracza wedlug dob - piata sekcja (starsza DLL jej nie czyta, prace zostaja)

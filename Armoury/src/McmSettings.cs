@@ -8980,6 +8980,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float DistrictWorksAiWorldPace { get; set; } = 0.005f;
 
+        [SettingPropertyBool("Works Pay Market Share", HintText = "with District Works: your works are paid their true share of what the district's carts sell - the extra goods all go to market (the district eats the same as before), so your share is the extra's part of the goods sold, not of everything the district makes (which paid about a third of what the works window promised); the works window counts its expected income from the carts' real takings in every district. Off = the old, smaller share of the district's whole production", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool WorksPayMarketShare { get; set; } = true;
+
         [SettingPropertyBool("Side Village Fief Start", HintText = "Banner Kings start 'Indebted Lord': instead of the lordship title of a main village (which stays with its lord), you are given one side village of the realm you join, close to where you start - it is yours, it flies your banner on the map and pays you its share of the lord's taxes. Off = Banner Kings gives the main village title, as before", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefStart { get; set; } = true;
@@ -11848,6 +11852,7 @@ namespace Armoury
             s.DistrictWorksAiReserveDays = DistrictWorksAiReserveDays;
             s.DistrictWorksAiReserveFlat = DistrictWorksAiReserveFlat;
             s.DistrictWorksAiWorldPace = DistrictWorksAiWorldPace;
+            s.WorksPayMarketShare = WorksPayMarketShare;
             s.SideVillageFiefStart = SideVillageFiefStart;
             s.SideVillageFiefIncome = SideVillageFiefIncome;
             s.SideVillageFiefMenu = SideVillageFiefMenu;
