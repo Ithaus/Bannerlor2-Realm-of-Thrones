@@ -141,7 +141,9 @@ nie ma sztuki, a DressCode tych ludzi celowo nie ubiera (ubranie ze wzorca bez o
 stare CS0169 BattlefieldLaw:34); Armoury.dll md5 f788045fed4df7305afce323114d2183; po recenzji (LootTally zapas IsWorn, CivilDress bez umarlych) md5
 306c634c3221aefa5937687ab950bc03 wedlug agenta poprawek - przebudowa z zatwierdzonego cb14b27d (dwa razy, czyste drzewo) daje 14e193c732225756fb271b57acae97dd
 (v1, NIEAKTUALNE). v2 (25.10): ZBUDOWANE, NIEWGRANE - czeka na autotest i wgranie; build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Civvies/GarrisonKit);
-Armoury.dll md5 4a4a8b5f49b8623bfdf6daba8fdaa6ee (drzewo zb\m117-ubranie - przy wgraniu przebudowac z commitu v2 i porownac).
+Armoury.dll z pelnej przebudowy (--no-incremental, dwa razy to samo) na commicie kodu v2 bb2cee99: md5 c9af5224b7afe3d5cb6bf60f728d3234. UWAGA: DLL zawiera
+hash biezacego commitu (sprawdzone: "bb2cee99" w pliku), wiec md5 zmienia sie z KAZDYM commitem, takze samego CHANGELOG - stad rozne md5 v1 (14e193c7 na cb14b27d,
+a0f64bdd na bb367a94). Przy wgraniu liczy sie md5 przebudowy z HEAD galezi, porownany z plikiem wgrywanym.
 
 ## n36 cena ziemi wedlug stosunku 14-20 lat (galaz w-toku/m113-cena) - 24.10.2026
 
