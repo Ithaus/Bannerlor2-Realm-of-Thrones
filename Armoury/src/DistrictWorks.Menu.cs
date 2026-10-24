@@ -251,6 +251,10 @@ namespace Armoury
                 var town = MarketOf(v);
                 string tname = town != null && town.Name != null ? town.Name.ToString() : "the market";
                 double full = q.KitPer * q.S;
+                // m115-okno (Jeff 24.10 20:15: "za maly prostokat z oferta, nie widac co moge zainwestowac, bo obszar tekstu za duzy na gorze"): okno ma stala wysokosc 645 px
+                // (MultiSelectionQueryPopup.xml ROT-Content), opis rosnie do 480 px i zjada liste kwot (16 linii = jeden sciesniony wiersz). Na gorze najwyzej 5 krotkich linii
+                // z liczbami (FiraSansExtraCondensed 20, 482 px - linia ok. 55 znakow); dawny pelny opis bez zmian w wierszu "About these works" (podpowiedz i okienko po wyborze),
+                // zasady (gotowosc, najazd, wojna) w podpowiedzi kazdej kwoty. Liczby z tych samych wzorow co dotad.
                 var sb = new StringBuilder(1200);
                 sb.Append(q.Name).Append(q.Main ? " (the main village)" : "").Append(" works at ").Append(craft).Append(": ").Append(m != null ? m.GoodsText : craft).Append(", about ")
                   .Append(Math.Round(q.V).ToString("N0", Inv)).Append(" a day (").Append(Math.Round(q.V * 364).ToString("N0", Inv)).Append(" a year).\n");
@@ -275,6 +279,38 @@ namespace Armoury
                 }
                 sb.Append("If raiders empty homesteads of ").Append(q.Name).Append(", ").Append(q.WKind == KHerd ? "they drive off your animals there - that part is lost; when people return you can buy them again." : "your works there burn" + (KL[q.WKind] < 1 ? " in part" : "") + "; when people return you can rebuild them for " + Math.Round(100 * KR[q.WKind]) + "% of the price.")
                   .Append(" At war with ").Append(st.MapFaction != null && st.MapFaction.Name != null ? st.MapFaction.Name.ToString() : "this realm").Append(" you are paid nothing. Your gold: ").Append(gold.ToString("N0", Inv)).Append('.');
+                string about = sb.ToString();
+                string realm = st.MapFaction != null && st.MapFaction.Name != null ? st.MapFaction.Name.ToString() : "this realm";
+                string rules = "Ready in " + KReady[q.WKind] + " days; paid when " + Name(v) + "'s carts come back. "
+                               + (q.WKind == KHerd ? "Raiders drive off the animals" : "Raiders burn the works" + (KL[q.WKind] < 1 ? " in part" : "") + " (rebuild for " + Math.Round(100 * KR[q.WKind]) + "%)")
+                               + "; at war with " + realm + " you are paid nothing.";
+                // krotki opis (m115-okno): co robi, pelny sprzet i ile stoi, dochod z reszty sprzetu (ten sam wzor co wiersz "full kit"), targ i wozy, zloto
+                var top = new StringBuilder(400);
+                top.Append("Makes ").Append(craft).Append(" worth about ").Append(Math.Round(q.V).ToString("N0", Inv)).Append(" a day (").Append(Math.Round(q.V * 364).ToString("N0", Inv)).Append(" a year).\n");
+                top.Append("Full kit for ").Append(Math.Round(q.S)).Append(" homesteads: ").Append(Math.Round(full).ToString("N0", Inv)).Append(". In place: ")
+                   .Append(Math.Round(100 * Math.Min(1, q.S > 0 ? q.UEff / q.S : 0))).Append("%.\n");
+                int kFull = (int)Math.Floor(q.Room);
+                if (kFull >= 1)
+                {
+                    double uF = kFull / Math.Max(1e-6, q.KitPer);
+                    double incF = IncomeDay(q, q.UMine + uF, q.UEff + uF) - IncomeDay(q, q.UMine, q.UEff);
+                    top.Append("The rest (").Append(kFull.ToString("N0", Inv)).Append(") pays you about ").Append(incF.ToString("0.0", Inv)).Append(" a day (").Append(Math.Round(incF * 364).ToString("N0", Inv)).Append(" a year).\n");
+                }
+                else
+                {
+                    double incN = IncomeDay(q, q.UMine, q.UEff);
+                    top.Append("Your works here pay about ").Append(incN.ToString("0.0", Inv)).Append(" a day (").Append(Math.Round(incN * 364).ToString("N0", Inv)).Append(" a year).\n");
+                }
+                if (q.ByMkt && q.MkDay > 0)
+                {
+                    if (q.Phi >= 0.9)
+                        top.Append("Market: goods about ").Append(Math.Round(q.MkDay).ToString("N0", Inv)).Append(" a day").Append(q.HdDay > 0 ? ", carts about " + Math.Round(q.HdDay).ToString("N0", Inv) + " a day" : "").Append(".\n");
+                    else if (q.Phi > 0.005)
+                        top.Append("Only ").Append(Math.Round(100 * q.Phi)).Append("% of the extra reaches market; goods about ").Append(Math.Round(q.MkDay).ToString("N0", Inv)).Append(" a day.\n");
+                    else
+                        top.Append("The district eats all the extra for now - no coins yet.\n");
+                }
+                top.Append("Your gold: ").Append(gold.ToString("N0", Inv)).Append(". Hover a row for more.");
                 var amounts = new List<KeyValuePair<int, string>>
                 {
                     new KeyValuePair<int, string>(1000, ""), new KeyValuePair<int, string>(2500, ""), new KeyValuePair<int, string>(5000, ""),
@@ -301,21 +337,29 @@ namespace Armoury
                     // n20-napisy: na przycisku kwota i dochod; przyrost towaru, rok i udzial w podpowiedzi (przy kwocie niedostepnej powod na gorze)
                     // recenzja: kwota "still 12% on the last coin" to najwiecej przy 12% na ostatniej monecie, nie "najlepszy zakup" (mniejsze kwoty maja wyzszy procent)
                     string tag = a.Value.Length == 0 ? "" : a.Value == " (all you have)" ? " (all)" : a.Value == " (full kit)" ? " (full kit)" : " (last coin 12%)";
-                    string shortText = k.ToString("N0", Inv) + tag + " - " + inc.ToString("0.0", Inv) + " a day (" + Math.Round(100 * inc * 364 / Math.Max(1, k)) + "% a year)";
+                    // m115-okno: wiersz "Pay 1,000 - about +0.3 a day (12% a year)" (najwyzej 2 linie wiersza 419 px)
+                    string shortText = "Pay " + k.ToString("N0", Inv) + tag + " - about +" + inc.ToString("0.0", Inv) + " a day (" + Math.Round(100 * inc * 364 / Math.Max(1, k)) + "% a year)";
                     string details = (a.Value.Length == 0 ? "" : a.Value == " (all you have)" ? "All the gold you have. " : a.Value == " (full kit)" ? "Enough for the full kit. "
                                       : "The most that still earns 12% a year on the last coin. ")
                                    + "+" + (100 * b1).ToString("0.0", Inv) + "% " + craft + " in " + q.Name + ". About " + inc.ToString("0.0", Inv) + " a day, " + Math.Round(inc * 364).ToString("N0", Inv)
                                    + " a year (" + Math.Round(100 * inc * 364 / Math.Max(1, k)) + "% of what you pay). " + (100 * myShare).ToString("0.0", Inv) + "% of its " + craft + " yours.";
-                    string rowHint = ShortLabels.On ? (why != null ? why + ".\n" + details : details) : (why ?? text);
+                    string rowHint = ShortLabels.On ? (why != null ? why + ".\n" + details : details) + "\n" + rules : (why ?? text);
                     list.Add(new InquiryElement(k, ShortLabels.Pick(shortText, text), null, why == null, rowHint));
                 }
-                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(q.Name + " - " + KindName[q.WKind], sb.ToString(), list, true, 1, 1, "Pay", GameTexts.FindText("str_cancel").ToString(),
+                // m115-okno: dawny pelny opis w jednym wierszu na koncu listy (podpowiedz; wybor + "Pay" pokazuje go w okienku i wraca tutaj)
+                list.Add(new InquiryElement(-1, "About these works", null, true, about));
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(q.Name + " - " + KindName[q.WKind], top.ToString(), list, true, 1, 1, "Pay", GameTexts.FindText("str_cancel").ToString(),
                     delegate (List<InquiryElement> sel)
                     {
                         try
                         {
                             if (sel == null || sel.Count == 0) return;
                             int k = (int)sel[0].Identifier;
+                            if (k < 1)
+                            {
+                                InformationManager.ShowInquiry(new InquiryData(q.Name + " - " + KindName[q.WKind], about, true, false, "Back", null, delegate { OpenPart(st, uid); }, null), true);
+                                return;
+                            }
                             var res = Buy(Hero.MainHero, Clan.PlayerClan, st.Village, uid, k, 0, false);
                             if (!res.Ok) { Log.Player(res.Why, true); return; }
                             _mBuy++;
