@@ -1532,7 +1532,7 @@ namespace Armoury
         [SettingPropertyGroup("Field battle combat")]
         public bool VeteranAggressionFix { get; set; } = true;
 
-        [SettingPropertyBool("Duel Skill Gap In Battles", HintText = "in battles and hideouts the Duel Skill Gap Weight rule also counts in your own clashes (when you strike or are struck), but only against you: a better opponent's guard suffers less from your blocked or parried blows and yours more (limits 0.75x-1.25x, as soldiers' guards already grow with their tier); outskilling a weaker opponent gives you nothing over plain RBM. Clashes between other fighters are untouched. Off = plain RBM in battles, as before", RequireRestart = false)]
+        [SettingPropertyBool("Duel Skill Gap In Battles", HintText = "in battles and hideouts the Duel Skill Gap Weight rule also counts in your own clashes (when you strike or are struck), the same rule both ways as in the lists: the better fighter's guard suffers less from blocked or parried blows and the weaker one's more (limits 0.75x-1.25x, as soldiers' guards already grow with their tier). Clashes between other fighters are untouched. Off = plain RBM in battles, as before", RequireRestart = false)]
         [SettingPropertyGroup("Field battle combat")]
         public bool DuelSkillGapInBattles { get; set; } = true;
 

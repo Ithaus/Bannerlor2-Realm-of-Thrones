@@ -338,16 +338,17 @@ namespace Armoury
             return main != null && (ReferenceEquals(a, main) || ReferenceEquals(b, main));
         }
 
-        // po recenzji: w bitwie roznica umiejetnosci tylko przeciw graczowi i w wezszych granicach - garda gracza nigdy mniej niz RBM, garda
-        // przeciwnika nigdy wiecej; 0.75-1.25 zamiast 0.6-1.4, bo w bitwie szeregowy ma juz pule postury wedlug tieru (SoldierPostureByTier, T6 x1.7):
-        // gracz 24 na T6 180 z tarcza przy 0.6 musial zablokowac ok. 2.6 raza wiecej ciosow niz w RBM, przy 0.75 ok. 2.3 raza
+        // po recenzji: w bitwie wezsze granice 0.75-1.25 zamiast 0.6-1.4, bo szeregowy ma juz pule postury wedlug tieru (SoldierPostureByTier, T6 x1.7):
+        // gracz 24 na T6 180 z tarcza przy 0.6 musial zablokowac ok. 2.6 raza wiecej ciosow niz w RBM, przy 0.75 ok. 2.3 raza.
+        // Recenzja chciala roznicy tylko przeciw graczowi (garda gracza >= x1, przeciwnika <= x1) - odrzucone 24.10: Jeff ("to cheatowanie", premia
+        // postury gracza z Endurance) chce jednej reguly dla gracza i AI, jak w szrankach; gracz slaby w broni (polearm "dopiero sie ucze") i tak
+        // dostaje trudniej, a wyuczona umiejetnosc ma sie liczyc w obie strony
         internal const float FieldGapLo = 0.75f, FieldGapHi = 1.25f;
 
-        /// <summary>Mnoznik bitwy: mine - strona tego haka to gracz (jego garda: co najmniej x1), inaczej przeciwnik gracza (najwyzej x1).</summary>
+        /// <summary>Mnoznik bitwy (ta sama regula dla gracza i przeciwnika, granice bitwy). mine - tylko do licznikow.</summary>
         internal static float FieldGapMul(float raw, bool mine)
         {
-            float f = Clamp(raw, FieldGapLo, FieldGapHi);
-            return mine ? (f < 1f ? 1f : f) : (f > 1f ? 1f : f);
+            return Clamp(raw, FieldGapLo, FieldGapHi);
         }
 
         /// <summary>Brama hakow A: pojedynek albo kontakt gracza w bitwie. Po recenzji w try - wyjatek liczony, kontakt bez zmian.</summary>

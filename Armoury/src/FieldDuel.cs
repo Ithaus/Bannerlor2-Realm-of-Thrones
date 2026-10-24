@@ -22,7 +22,7 @@ namespace Armoury
     ///  - HeroTierFromSkill: bohater bez profilu - tier = max(TierOf(poziom), clamp(1 + (najlepsza - 40) / 30, 1, 7)) (VeteranAi.SkillTier);
     ///  - VeteranAggressionFix: AIDecideOnAttackChance bez mnozenia w gore od T4 (T1-T3 jak w 106: x0.80 / x0.88 / x0.96);
     ///  - DuelSkillGapInBattles: hak A DuelGuard (roznica umiejetnosci, waga DuelSkillGapWeight) w kontaktach gracza - bez DuelPerfectDefence;
-    ///    po recenzji tylko przeciw graczowi (DuelGuard.FieldGapMul: garda gracza co najmniej x1, przeciwnika najwyzej x1, granice 0.75-1.25);
+    ///    granice bitwy 0.75-1.25 (DuelGuard.FieldGapMul), ta sama regula w obie strony (24.10: recenzja chciala tylko przeciw graczowi - odrzucone, jedna regula);
     ///  - DuelistBurstsInBattles: zrywy DuelCraft (otwarcie / nacisk) dla bohaterow AI - zgloszenia tylko z obrony bohatera (FieldTrack), tick
     ///    DuelCraft z BattleSense.OnMissionTick, najwyzej 8 UpdateAgentStats na klatke (liczba ludzi ograniczona do bohaterow); po recenzji
     ///    w bitwie przerwa nacisku 6 s, po otwarciu 2 s, otwarcie w trakcie otwarcia odrzucone (DuelCraft.Field*Cooldown).
@@ -234,7 +234,7 @@ namespace Armoury
             float fFoe = DuelGuard.FieldGapMul(1f - w * gA, false), fOwnAtt = DuelGuard.FieldGapMul(1f + w * gA, true), fOwnDef = DuelGuard.FieldGapMul(1f - w * gD, true);
             float pool = c.SoldierPostureByTier ? BattleWind.SoldierMul(6) : 1f;
             sb.Append(" | Duel Skill Gap In Battles ").Append(c.DuelSkillGapInBattles ? "TAK" : "NIE").Append(" (waga ").Append(F(w))
-              .Append(", tylko przeciw graczowi, granice ").Append(F(DuelGuard.FieldGapLo)).Append('-').Append(F(DuelGuard.FieldGapHi))
+              .Append(", w obie strony, granice ").Append(F(DuelGuard.FieldGapLo)).Append('-').Append(F(DuelGuard.FieldGapHi))
               .Append(", bez Perfect Defence; gracz 24 z tarcza na T6 180 z tarcza: garda T6 x").Append(F(fFoe)).Append(" przy puli postury T6 x").Append(F(pool))
               .Append(" = ").Append(F(pool / fFoe)).Append(" raza wiecej ciosow niz RBM, koszt ciosu gracza x").Append(F(fOwnAtt)).Append(", garda gracza pod ciosem T6 x").Append(F(fOwnDef))
               .Append("; gracz 220 na rekrucie 50: garda rekruta x").Append(F(DuelGuard.FieldGapMul(1f - w * gR, false))).Append(", garda gracza x")
