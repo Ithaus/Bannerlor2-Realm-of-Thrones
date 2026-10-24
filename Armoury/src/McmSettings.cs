@@ -9000,6 +9000,34 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageDefendersNoReinforcements { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Recruit", HintText = "'Recruit men of the village' in every side village you can enter, and 'Recruit men of your village' in your own: a side village has its own young men - at most Side Recruit Pool Percent of its people (10% - what a village could give in a general levy). Every man you take leaves that village for good: fewer hands in its fields, less made and earned there and in its district, and the farms he leaves are resettled from the rest of the district only slowly (Side Recruit Resettle Days). The pool grows back only as boys come of age (Side Recruit Youth Percent): an average village of about 5,300 people gives about 526 men, about 4 boys come of age there a month, and it takes about 10 years to fill again. How many come in a day depends on how well its folk know you (as with notables; your own village and lands trust you fully). When the willing are gone, families want more for their sons (Side Recruit Levy Price, Side Recruit General Levy Price). The money goes to the families (the purse of its main village). The same men defend the village - those you take, and those who fall defending it, are not there to stand against raiders. The main village's notables recruit as before. Not for the Night's Watch. Off = no such option, and the pools and empty farms you left stop counting (they stay in the save)", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageRecruit { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Side Recruit Pool Percent", 1.00f, 20.00f, "0.0", HintText = "with Side Village Recruit: the most men a side village can give, as a share of its people (10 = 10%: a general levy in need - ordinary levies took far fewer, such as one man from every five hides)", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float SideRecruitPoolPercent { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Side Recruit Youth Percent", 0.00f, 3.00f, "0.00", HintText = "with Side Village Recruit: the share of a village's people who come of age as young men each year (1.0 = 1%: about 40 born and 35 dying per 1,000 a year, half the children dying young) - the only way its pool fills again, a little every 28 days, never above the pool's ceiling", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float SideRecruitYouthPercent { get; set; } = 1.0f;
+
+        [SettingPropertyFloatingInteger("Side Recruit Daily Percent", 0.50f, 10.00f, "0.0", HintText = "with Side Village Recruit: the most men who come in one day, as a share of the pool's ceiling (3 = 3%), for someone its folk trust fully; fewer for strangers, half once only a levy is left and a quarter at the general levy", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float SideRecruitDailyPercent { get; set; } = 3.0f;
+
+        [SettingPropertyFloatingInteger("Side Recruit Levy Price", 1.00f, 4.00f, "0.00", HintText = "with Side Village Recruit: what a man costs, as a multiple of the usual recruit price, once the willing are gone (60% of the pool or less is left, or the land has no free hands)", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float SideRecruitLevyPrice { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Side Recruit General Levy Price", 1.00f, 5.00f, "0.00", HintText = "with Side Village Recruit: the same for the general levy - the last men of the village (30% of the pool or less is left)", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float SideRecruitGeneralLevyPrice { get; set; } = 2.0f;
+
+        [SettingPropertyInteger("Side Recruit Resettle Days", 28, 1092, "0", HintText = "with Side Village Recruit: the days over which the farms emptied by your recruiting are taken up again by people from the rest of the district (until then that village alone has fewer hands; the district keeps fewer people for good)", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int SideRecruitResettleDays { get; set; } = 364;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -11685,6 +11713,13 @@ namespace Armoury
             s.SideVillagesEnterable = SideVillagesEnterable;
             s.SideVillageDefenders = SideVillageDefenders;
             s.SideVillageDefendersNoReinforcements = SideVillageDefendersNoReinforcements;
+            s.SideVillageRecruit = SideVillageRecruit;
+            s.SideRecruitPoolPercent = SideRecruitPoolPercent;
+            s.SideRecruitYouthPercent = SideRecruitYouthPercent;
+            s.SideRecruitDailyPercent = SideRecruitDailyPercent;
+            s.SideRecruitLevyPrice = SideRecruitLevyPrice;
+            s.SideRecruitGeneralLevyPrice = SideRecruitGeneralLevyPrice;
+            s.SideRecruitResettleDays = SideRecruitResettleDays;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;

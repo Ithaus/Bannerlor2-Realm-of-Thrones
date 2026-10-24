@@ -529,6 +529,13 @@ RANGES = {
     'DistrictWorksBonusSide': (0.0, 2.0, "0.00"),
     'DistrictWorksBonusMain': (0.0, 2.0, "0.00"),
     'DistrictWorksKitYears': (0.1, 10.0, "0.0"),
+    # m113-pobor (24.10): pobor z wiosek pobocznych (SideVillageVisit.Levy.cs)
+    'SideRecruitPoolPercent': (1.0, 20.0, "0.0"),
+    'SideRecruitYouthPercent': (0.0, 3.0, "0.00"),
+    'SideRecruitDailyPercent': (0.5, 10.0, "0.0"),
+    'SideRecruitLevyPrice': (1.0, 4.0, "0.00"),
+    'SideRecruitGeneralLevyPrice': (1.0, 5.0, "0.00"),
+    'SideRecruitResettleDays': (28, 1092, "0"),
     'DistrictWorksMinGold': (0, 10000, "0"),
     'DistrictWorksRebuildDays': (1, 728, "0"),
     'DistrictWorksKeepWageDays': (0, 364, "0"),

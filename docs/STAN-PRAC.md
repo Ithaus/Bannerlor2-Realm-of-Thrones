@@ -181,3 +181,11 @@ i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem go
 - Jedna zmiana = wpis w CHANGELOG (Problem / Przyczyna / Zmiana / Ryzyko - wynik kontroli wg zasady 0 / Status) + commit + push.
 - DLL wgrywac tylko przy zamknietej grze (`tasklist | grep -i bannerlord`), z kopia `.bak-<data>-przed-NN`.
 - Galaz robocza: `claude/bannerlord-rot-setup-o75kvo`; `main` przesuniety do niej 05.10.
+
+### 112. 24.10 - m113-pobor (galaz w-toku/m113-rekrutacja, z 987e10eb)
+
+- Pobor gracza z wioski pobocznej z jej wlasnej puli mlodych (opis w CHANGELOG, kod SideVillageVisit.Levy.cs). Build Armoury kod 0, gen_mcm zrobiony.
+- NIE zrobione w tym kroku: autotest (sonda armoury-pobor.flag, bieg-bitwa.ps1 -Days 60 na kopii zapisu Jeffa, zapis w dobie 30 i wczytanie -Days 3, stary zapis),
+  sprawdz_logi --grupa m113pobor na wyniku, kontrola E4/3 i E4/7 KONTROLA wobec bazy, MoneyLedger, wgranie. Przed testem: kopia wszystkich logow Jeffa z dnia.
+- Dla Jeffa po tescie: srednia wioska (ok. 5 300 ludzi) da ok. 526 ludzi, dorasta tam ok. 4 chlopcow na miesiac, pelna pula wraca po ok. 10 latach, a puste zagrody
+  zasiedla reszta okregu przez rok.

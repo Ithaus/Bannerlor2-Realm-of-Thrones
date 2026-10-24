@@ -1116,13 +1116,30 @@ namespace Armoury
         }
 
         /// <summary>m97-wioski krok 2 (recenzja: obroncy maja byc ludzmi TEJ wioski): pobor tylko z DOM jednej wsi s (wies okregu wioski pobocznej - jej ludzie sa czescia
-        /// DOM tej wsi), bez innych wsi regionu i bez miasta. Ta sama droga i podloga 50 hearth co TakeLevy (FromVillage). Zwraca, ilu zdjeto; region - warownia regionu.</summary>
+        /// DOM tej wsi), bez innych wsi regionu i bez miasta. Ta sama droga i podloga 50 hearth co TakeLevy (FromVillage). Zwraca, ilu zdjeto; region - warownia regionu.
+        /// m113-pobor (pobor gracza z wioski pobocznej, MLevyVillage): pobor E4/7 (MLevyVillage, MLevyA5) liczy VillOut regionu i "pobor na podlodze" tak samo jak TakeLevy;
+        /// obroncy (MLevyMilitia, E4/8) bez zmian.</summary>
         internal static double TakeLevyHere(Settlement s, double n, int causeM, out Settlement region)
         {
             region = s != null ? OutlawLaw.RegionFor(s) : null;
             if (s == null || !(n > 0.0) || !LevyLive || !s.IsVillage || s.Village == null) return 0.0;
-            try { return FromVillage(s.Village, n, causeM); }
+            double got;
+            try { got = FromVillage(s.Village, n, causeM); }
             catch (Exception e) { OStumble("TakeLevyHere", e); return 0.0; }
+            if (causeM == MLevyVillage || causeM == MLevyA5)
+            {
+                try { if (region != null && region.StringId != null && got > Eps) Rg(region.StringId).VillOut += got; }
+                catch (Exception e) { OStumble("TakeLevyHere(licznik)", e); }
+                if (n - got > Eps) { _floorCalls++; _floorMen += n - got; }
+            }
+            return got;
+        }
+
+        /// <summary>m113-pobor TEST: pobor z wsi regionu od siewu (VillOut) - sonda autotestu; brak regionu albo wpisu - 0. Sam odczyt.</summary>
+        internal static double VillOutOf(Settlement region)
+        {
+            try { RegRef r; return region != null && region.StringId != null && _rg.TryGetValue(region.StringId, out r) && r != null ? r.VillOut : 0.0; }
+            catch { return 0.0; }
         }
 
         private static bool LevyVillageFromTownOn { get { var s = Settings.Current; return s != null && s.LevyVillageFromTown; } }

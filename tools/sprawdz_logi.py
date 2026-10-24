@@ -1864,6 +1864,12 @@ Uzycie (Python 3, tylko odczyt):
                     stanu; linia 'wyrownanie po wczytaniu' (nazwa sztuk na grzbiecie wedlug ksiegi) - bledy 0 (brak linii zuzycia - INFO). STAN-6 pomiar na bitwe: <= 5 ms + 0.002 ms x trafien TAK, <= 20 ms + 0.01 ms x trafien INFO, wiecej NIE. STAN-LC
                     cofniecie: z --baza-doby - ostatnia linia 'zapis' (pod flaga) bazy wobec pierwszej linii rynsztunku logu: arm_* i rl_* rowne, ERROR w logu 0;
                     log bez linii m110 (bieg na DLL 104) - ERROR 0 INFO, inaczej NIE; bez bazy - INFO.
+--grupa m113pobor : (24.10, w-toku/m113-rekrutacja - Jeff 24.10 "pula ma byc z tej konkretnej wioski ... ok. 10% ... odnawia sie tylko jak ludzie sie rodza";
+                    SideVillageVisit.Levy.cs, SideVillageVisit.LevyProbe.cs; klucz Side Village Recruit; zapis arm_sidelevy; plik testu CrashScribe/armoury-pobor.flag)
+                    python -I tools/sprawdz_logi.py --grupa m113pobor <Armoury-*.log>. POB-0 odcinek 'Pobor w wioskach (m113): klucz' w linii startu sesji WP.
+                    POB-1 potkniecia: ERROR 'SideVillageVisit.Levy.' 0 i 'potkniecia doby' linii doby 0. POB-2 linie werbunku: gracz -suma, kiesa wsi +suma
+                    (= cena x ludzi). POB-3 sonda (linie 'TEST'): BLAD 0 (brak sondy - INFO). POB-4 zapis -> wczytanie: wpisy i suma puli rowne (+-0.01; brak
+                    pary - INFO). POB-5 czas doby <= 1 ms na 100 wpisow (najmniej 1 ms). E4/3 i E4/7 KONTROLA oraz MoneyLedger swiata - grupy bazowe (osobno).
 --grupa m110anim  : (23.10, n35 m110-animacje + m110-modele - Jeff 23.10 20:19 "postac lezy w ekwipunku, rekawice bez obrazka - blad z dzisiaj"; HeroHp.Install,
                     ItemModels.cs; klucz Missing Model Fix) python -I tools/sprawdz_logi.py --grupa m110anim <Armoury-*.log>. ANIM-1 linia 'Animacje (m110):'
                     w kazdym logu: latka TAK (albo juz wpieta), act_inventory_idle_start i act_tableau_hand_armor_pose >= 0, OK (brak linii - NIE: latka HP
@@ -61166,6 +61172,8 @@ def main(argv):
         return m109lup_main(logp)   # m109lup (23.10, w-toku/m109-lup): konie, uprzaz i zbroja powalonych jezdzcow w lupie gracza - pomiar LootTally, Z1, Z2, hak testu
     if group == "m110stan":
         return m110stan_main(logp, bdp)   # m110stan (23.10, w-toku/m110-stan): cztery stany sprzetu (GearState) i stan lupu z obrazen (LootWear), --baza-doby = log z linia zapisu (STAN-LC)
+    if group == "m113pobor":
+        return m113pobor_main(logp)   # m113pobor (24.10, w-toku/m113-rekrutacja): pobor gracza z wiosek pobocznych - pule, zaplata rodzinom, sonda, zapis arm_sidelevy
     if group == "m110anim":
         return m110anim_main(logp)   # m110anim (23.10, n35 m110-animacje + m110-modele): indeksy akcji po wpieciu latki HP sprzetu (postac w ekwipunku, obrazek rekawic) i modele przedmiotow
     if group == "m110hp":
@@ -67601,6 +67609,69 @@ def m110anim_main(logp):
     rep.add("ANIM-3: 'Modele przedmiotow (m110)' przy wczytaniu, ERROR ItemModels./HeroHp.Install 0",
             "startow %d (klucz NIE %d), bez zamiennika do %d, ERROR %d" % (len(started), len(off), left, errs), "start jest, ERROR 0",
             None if (off and not started) else (bool(started) and errs == 0))
+    rep.show()
+    return 0
+
+
+def m113pobor_main(logp):
+    """m113pobor (24.10): POB-0..POB-5 - opis w --help."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("POB-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    pre = "Pobor w wioskach (m113): "
+    sess, errs, st_day, recs, rec_bad, tests_ok, tests_bad, tests, saves, pairs, pair_bad, slow, days = 0, 0, 0, 0, [], 0, 0, 0, [], 0, [], [], 0
+    rx_rec = re.compile(r"cena (\d+) x (\d+) = (\d+) \| gracz (-?\d+) -> (-?\d+), kiesa wsi okregu (-?\d+) -> (-?\d+)")
+    rx_save = re.compile(r"zapis arm_sidelevy - wpisy puli (\d+) \(suma ([\d.]+)\)")
+    rx_load = re.compile(r"wczytanie arm_sidelevy - wpisy puli (\d+)(?: \(suma ([\d.]+)\))?")
+    rx_day = re.compile(r"pule: wpisow (\d+).*czas doby ([\d.]+) ms \| potkniecia doby (\d+)")
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "ERROR" in line and "SideVillageVisit.Levy." in line:
+                errs += 1
+            if pre not in line:
+                continue
+            if pre + "klucz Side Village Recruit" in line:
+                sess += 1
+            if "TEST" in line:
+                tests += 1
+                tests_ok += len(re.findall(r" OK\b", line))
+                tests_bad += len(re.findall(r" BLAD\b", line))
+            m = rx_rec.search(line)
+            if m:
+                recs += 1
+                price, k, tot, g0, g1, p0, p1 = [int(x) for x in m.groups()]
+                if price * k != tot or g1 - g0 != -tot or p1 - p0 != tot:
+                    rec_bad.append(line.strip()[:200])
+            m = rx_save.search(line)
+            if m:
+                saves.append((int(m.group(1)), float(m.group(2))))
+            m = rx_load.search(line)
+            if m and saves:
+                pairs += 1
+                n, s = saves[-1]
+                ln, ls = int(m.group(1)), float(m.group(2) or 0.0)
+                if n != ln or abs(s - ls) > 0.01 + 1e-9:
+                    pair_bad.append("zapis %d/%.2f - wczytanie %d/%.2f" % (n, s, ln, ls))
+            m = rx_day.search(line)
+            if m:
+                days += 1
+                nrec, ms, sd = int(m.group(1)), float(m.group(2)), int(m.group(3))
+                st_day += sd
+                if ms > max(1.0, nrec / 100.0):
+                    slow.append("%d wpisow %.3f ms" % (nrec, ms))
+    rep.add("POB-0: odcinek 'Pobor w wioskach (m113): klucz' w starcie sesji", "startow %d" % sess, ">= 1", sess > 0)
+    rep.add("POB-1: potkniecia poboru (ERROR SideVillageVisit.Levy., potkniecia doby)", "ERROR %d, potkniecia doby %d (linii doby %d)" % (errs, st_day, days), "0 i 0",
+            errs == 0 and st_day == 0)
+    rep.add("POB-2: werbunki - cena x ludzi = suma, gracz -suma, kiesa wsi +suma", "werbunkow %d, zlych %d%s" % (recs, len(rec_bad), (" (" + rec_bad[0] + ")") if rec_bad else ""),
+            "zlych 0 (brak werbunku - INFO)", None if recs == 0 else not rec_bad)
+    rep.add("POB-3: sonda armoury-pobor.flag - kontrole OK/BLAD", "linii %d, OK %d, BLAD %d" % (tests, tests_ok, tests_bad), "BLAD 0 (brak sondy - INFO)",
+            None if tests == 0 else tests_bad == 0)
+    rep.add("POB-4: zapis -> wczytanie arm_sidelevy (wpisy, suma puli +-0.01)", "par %d, zlych %d%s" % (pairs, len(pair_bad), (" (" + pair_bad[0] + ")") if pair_bad else ""),
+            "zlych 0 (brak pary - INFO)", None if pairs == 0 else not pair_bad)
+    rep.add("POB-5: czas doby poboru <= 1 ms na 100 wpisow", "linii doby %d, wolnych %d%s" % (days, len(slow), (" (" + slow[0] + ")") if slow else ""), "wolnych 0 (brak linii - INFO)",
+            None if days == 0 else not slow)
     rep.show()
     return 0
 

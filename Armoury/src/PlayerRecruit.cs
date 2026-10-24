@@ -38,6 +38,8 @@ namespace Armoury
     {
         private const int Hooks = 4;
         private static MethodInfo _dteAdd;      // DTE ArmyArmory.AddItemToArmory(ItemObject, int)
+        private static MethodInfo _dteStart;    // m113-pobor: DTE RecruitmentPatch.AddStartingEquipmentToPlayerArmory(CharacterObject, int) - komplet tieru 1 rekruta z wioski pobocznej
+        private static long _sideMen;
         private static bool _dteWired;          // prefiks na DTE AddStartingEquipmentToPlayerArmory wpiety - bez niego sciezka nieczynna (inaczej komplet DTE + nasze rzeczy)
         private static int _wired, _stumbles;
         private static long _tMen, _tPcs;
@@ -224,6 +226,30 @@ namespace Armoury
             catch (Exception ex) { Stumble("AddToStores", ex); return false; }
         }
 
+        /// <summary>m113-pobor: rekruci z wioski pobocznej (SideVillageVisit.LevyDo - bez okna werbunku gry): tier 1 dostaje komplet DTE jak u AI (wlasny dobytek -
+        /// AddStartingEquipmentToPlayerArmory; poza naszym oknem DteKitPrefix go przepuszcza). Zwraca, ile sztuk przybylo zbrojowni druzyny; bez DTE / tier 2+ - 0. Nie rzuca.</summary>
+        internal static int SideVillageKit(CharacterObject t, int n)
+        {
+            if (t == null || n <= 0 || t.IsHero || t.Tier > 1 || _dteStart == null) return 0;
+            try
+            {
+                var arm = QuartermasterLaw.DteArmory();
+                long before = Pieces(arm);
+                _dteStart.Invoke(null, new object[] { t, n });
+                _sideMen += n;
+                return arm != null ? (int)Math.Max(0L, Pieces(arm) - before) : 0;
+            }
+            catch (Exception e) { Stumble("SideVillageKit", e); return 0; }
+        }
+
+        private static long Pieces(TaleWorlds.CampaignSystem.Roster.ItemRoster r)
+        {
+            if (r == null) return 0;
+            long n = 0;
+            for (int i = 0; i < r.Count; i++) n += Math.Max(0, r.GetElementNumber(i));
+            return n;
+        }
+
         // ------------------------------------------------------------ latki
         internal static void ApplyAll(Harmony h)
         {
@@ -235,6 +261,7 @@ namespace Armoury
                 _dteAdd = tArm != null ? AccessTools.Method(tArm, "AddItemToArmory", new[] { typeof(ItemObject), typeof(int) }) : null;
                 var tRec = AccessTools.TypeByName("DynamicTroopEquipmentReupload.Patches.RecruitmentPatch");
                 var m = tRec != null ? AccessTools.Method(tRec, "AddStartingEquipmentToPlayerArmory", new[] { typeof(CharacterObject), typeof(int) }) : null;
+                _dteStart = m;
                 if (m != null && _dteAdd != null)
                 {
                     h.Patch(m, prefix: new HarmonyMethod(typeof(PlayerRecruit), nameof(DteKitPrefix)));

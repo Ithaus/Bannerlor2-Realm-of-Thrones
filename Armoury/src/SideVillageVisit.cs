@@ -42,7 +42,10 @@ namespace Armoury
     ///     milicja wsi okregu (jak okup wsi), rabunek wsi gry przez gracza pali tylko jej osady (DistrictRaid.PlayerMainOnly), ochrona po okupie dziala tez w lancuchu
     ///     rabunku wsi gry (VillageBook) i pomniejsza okup wsi gry tej frakcji (RaidTribute.QuoteOf). Krok 2 (SideVillageVisit.Defenders.cs, klucz SideVillageDefenders): wioske
     ///     broni jej WLASNA ludnosc (1 na 10 w domu, pulap 60) - poddanie przy 4:1, inaczej zwykla bitwa z tymczasowa druzyna; AI slabsze niz obroncy pomija wioske w lancuchu.
-    /// Zapis arm_sidevil (SaveText): okupy, ostatnie rabunki gracza (10 dob), rabunek w toku. Brak klucza (stary zapis) = nic. AI bez zmian (poza ominieciem wiosek po okupie).
+    ///  V7 POBOR (SideVillageVisit.Levy.cs, klucz SideVillageRecruit, zapis arm_sidelevy - m113-pobor, Jeff 24.10): "Recruit men of the village" - wlasna pula mlodych TEJ wioski
+    ///     (10% jej ludzi), odnawiana tylko przez dorastanie; kazdy rekrut schodzi z ludzi wioski i z rak jej okregu.
+    /// Zapis arm_sidevil (SaveText): okupy, ostatnie rabunki gracza (10 dob), rabunek w toku. Brak klucza (stary zapis) = nic. AI nie wjezdza do wiosek pobocznych: wjazd, handel,
+    /// nocleg i pobor sa tylko dla gracza; AI omija wioski po okupie i slabsze od obroncow w lancuchu rabunku (Defenders) - pule obroncow liczy ta sama regula co pobor.
     /// Linie logu "Wioski poboczne (WP): ..." - start sesji, wjazd, handel, nocleg, oboz, prace, rabunek, okup, doba. Potkniecia liczone, nic nie gasimy globalnie.
     /// </summary>
     internal static partial class SideVillageVisit
@@ -83,6 +86,7 @@ namespace Armoury
             _st = _stDay = 0; lock (_err) _err.Clear();
             DayZero();
             RaidReset();
+            LevyReset();   // m113-pobor: pule wiosek, braki rak po poborze
         }
 
         private static void DayZero()
@@ -90,6 +94,7 @@ namespace Armoury
             _dEnter = _dClick = _dTrade = _dRest = _dRestFree = _dCamp = _dInvest = 0; _dBuy = _dSell = _dPcsOut = _dPcsIn = 0; _stDay = 0;
             _tickTicks = 0; _tickN = 0;
             RaidDayZero();
+            LevyDayZero();   // m113-pobor
         }
 
         private static void Stumble(string where, Exception e)
@@ -346,6 +351,8 @@ namespace Armoury
                         catch (Exception e) { Stumble("Camp", e); }
                     }, false, 1);
                 starter.AddGameMenuOption(Menu, "arm_sidevil_trade", "{=!}Trade", TradeCondition, TradeConsequence, false, 2);
+                // m113-pobor: indeks 2 - wstawione przed "Trade" (nocleg, oboz, pobor, handel, prace, wrogie akcje, wyjazd)
+                starter.AddGameMenuOption(Menu, LevyOption, "{=!}Recruit men of the village", LevyMenuCondition, LevyMenuConsequence, false, 2);
                 starter.AddGameMenuOption(Menu, "arm_sidevil_invest", "{=!}Invest in its works", InvestCondition,
                     delegate (MenuCallbackArgs a)
                     {
@@ -465,6 +472,8 @@ namespace Armoury
                 else if (me.Br + me.Bf > 0.5) sb.Append(" - raiders have emptied part of it.");
                 else sb.Append('.');
                 sb.Append('\n');
+                string lv = LevyLine(st, _uid, me);   // m113-pobor: pula mlodych, dorastanie, etap
+                if (lv != null) sb.Append(lv).Append('\n');
             }
             foreach (string l in DistrictWorks.PartLines(st, _uid, false)) sb.Append(l).Append('\n');
             if (st.Village.VillageState == Village.VillageStates.BeingRaided) sb.Append("Raiders are on the lands of ").Append(dn).Append(" - the village is barred and quiet.\n");
@@ -759,7 +768,7 @@ namespace Armoury
                 Log.Info(P + "start sesji | klucz Side Villages Enterable " + (On ? "TAK" : "WYLACZONY") + " | wiosek w ukladzie " + (l != null ? l.Count.ToString(Inv) : "- (ksiega nieczynna)")
                          + " | ukrycie partii: Roadside Inn Hide Party " + (s != null && s.RoadsideInns && s.RoadsideInnHideParty ? "tak" : "NIE") + ", nocleg za oplata: Town Inns "
                          + (TownInns.On ? "tak" : "NIE") + ", okup: Raid Tribute " + (RaidTribute.On ? "tak" : "NIE")
-                         + ", rabunek: ksiega " + (VillageBook.Active ? "tak" : "NIE") + " | " + RaidSessionText() + " | potkniecia " + _st + ".");
+                         + ", rabunek: ksiega " + (VillageBook.Active ? "tak" : "NIE") + " | " + RaidSessionText() + " | potkniecia " + _st + " | " + LevySessionText() + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
@@ -768,8 +777,9 @@ namespace Armoury
         {
             try
             {
+                int lvAct = LevyDaily();   // m113-pobor: linia "Pobor w wioskach (m113): dzien N" (tylko z ruchem), przyrost mlodych, wygasle braki rak
                 ProtSync();   // recenzja 20.10: wygasle ochrony po okupie z migawki ksiegi wiosek
-                bool any = _dEnter + _dClick + _dTrade + _dRest + _dCamp + _dInvest + _stDay > 0 || RaidDayAny();
+                bool any = _dEnter + _dClick + _dTrade + _dRest + _dCamp + _dInvest + _stDay > 0 || RaidDayAny() || lvAct > 0;
                 if (!any) return;
                 double ms = _tickN > 0 ? _tickTicks * 1000.0 / Stopwatch.Frequency / _tickN : 0.0;
                 Log.Info(P + "dzien " + (Today() - 1) + " | klucz " + (On ? "TAK" : "WYL") + " | wjazdy " + _dEnter + " (kliki " + _dClick + ") | handel " + _dTrade + ": gracz kupil za " + _dBuy

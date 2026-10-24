@@ -931,6 +931,10 @@ namespace Armoury
                         catch (Exception e) { Stumble("Leave", e); }
                     }, true, 9);
                 SideVillageHome.AddMenus(starter);   // r4-dom: "Trade", "Your house" (lozko, skrzynia), "Take a walk"
+                // m113-pobor: pobor z wlasnej wioski (zaufanie 6) - indeks 6 = tuz przed "Leave" (nocleg 0, prace 1, przeglad 2, handel 3, dom 4, spacer 5, wyjazd)
+                starter.AddGameMenuOption(Menu, "arm_side_fief_recruit", "{=!}Recruit men of your village",
+                    delegate (MenuCallbackArgs a) { return HasFief && SideVillageVisit.LevyCondition(a, Settlement.Find(_dist), _uid, true); },
+                    SideVillageVisit.LevyOpenFief, false, 6);
             }
             catch (Exception e) { Stumble("AddMenus", e); }
         }

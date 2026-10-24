@@ -310,7 +310,7 @@ namespace Armoury
             {
                 if (amount <= 0) return;
                 _rPlayer += amount; _rLed += amount;
-                AddRegion(_recruitedIn, Settlement.CurrentSettlement, amount);
+                AddRegion(_recruitedIn, Settlement.CurrentSettlement ?? SideVillageVisit.RecruitingAt, amount);   // m113-pobor: pobor z wioski pobocznej - gracz na mapie, osada wsi okregu
                 _gRecruited[GroupOf(Hero.MainHero != null ? Hero.MainHero.MapFaction : null, MobileParty.MainParty)] += amount;   // E4/0
             }
             catch { _stumbles++; }
