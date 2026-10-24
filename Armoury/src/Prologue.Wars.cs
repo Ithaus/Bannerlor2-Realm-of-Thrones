@@ -33,6 +33,8 @@ namespace Armoury
     ///     Klasyczna kampania: nic (Active = false; zreszta oba zegary sa rowne). Klucz wylaczony - wszystkie wojny czekaja na opowiesc, jak w 103.
     /// (2) REACH I DORNE Z KORONA (klucze CanonReachJoinsCrown, CanonDorneJoinsCrown) i (3) MLODE SMOKI DAENERYS (klucz DaenerysDragonsGrow) - Prologue.Crown /
     ///     Prologue.Dragons w tym samym pliku i w Prologue.Dragons.cs.
+    /// (4) m116-fabula: DORZECZE W WOJNIE Z KORONA OD KONCA PROLOGU i sojusz Polnoc+Dorzecze (klucze CanonRiverlandsWarAtPrologueEnd, CanonNorthRiverlandsAlliance) -
+    ///     Prologue.River.cs (postfiks Enforced wpinany tu, w InstallEssos; doba RiverDaily po CrownDaily; stan rw/ra w arm_m104).
     ///     ZAKRES (2) i (3) (recenzja R1, do decyzji Jeffa nr 5 w CHANGELOG): kampania z prologiem 298 (Active) albo nowa kampania utworzona z ta DLL (znacznik nw=1
     ///     w arm_m104, CampaignEvents.OnNewGameCreatedEvent). Zapis bez znacznika (biezaca kampania klasyczna Jeffa z 20.10) - jak klucze wylaczone: nic nie zakladamy
     ///     i nic nie zdejmujemy; linia startu i doby mowia "nie dotyczy". Wlaczenie w starych zapisach = CanonHere zwraca true (jedna linia), tylko na slowo Jeffa.
@@ -176,13 +178,17 @@ namespace Armoury
                 else
                 {
                     var h = new Harmony("com.jeff.armoury.prologue");
+                    // m116-fabula (4): postfiks Dorzecza w tym samym wpieciu (Jeff 24.10: "dorzecze jest w pokoju co to za bzdura to bylo pierwsze co zostalo zaatakowane")
                     var r = h.Patch(_mWEnforced, prefix: new HarmonyMethod(typeof(Prologue), nameof(EssosEnforcedPrefix)),
+                                    postfix: new HarmonyMethod(typeof(Prologue), nameof(RiverWarEnforcedPostfix)),
                                     finalizer: new HarmonyMethod(typeof(Prologue), nameof(EssosEnforcedFinalizer)));
                     _essosWire = r != null ? "TAK" : "BRAK";
+                    _rlWire = InstallRiverPopup(h);
                 }
             }
             catch (Exception e) { CwStumble("InstallEssos", e); _essosWire = "BLAD (" + e.GetType().Name + ")"; }
-            Log.Info(CwTag + "latka wojen essoskich (" + why + "): ROTStorylineWar.Enforced " + _essosWire + ".");
+            Log.Info(CwTag + "latka wojen essoskich (" + why + "): ROTStorylineWar.Enforced " + _essosWire + " (prefiks Essos, postfiks Dorzecza m116)"
+                     + " | okno ROT RiverlandsDeclareWarEvent (m116) " + _rlWire + ".");
         }
 
         /// <summary>Prefiks ROTStorylineWar.Enforced: wojna essoska w kampanii z prologiem i z kluczem - na czas wywolania odczyt startu w ROT = start kalendarza.</summary>
@@ -283,11 +289,12 @@ namespace Armoury
             _wNew = false;
             ResetCrown();
             ResetDragons();
+            ResetRiver();    // m116-fabula (4)
         }
 
         internal static string PackWars()
         {
-            return "v=1;nw=" + (_wNew ? "1" : "0") + ";" + PackCrown() + PackDragons();
+            return "v=1;nw=" + (_wNew ? "1" : "0") + ";" + PackCrown() + PackDragons() + PackRiver();
         }
 
         internal static void UnpackWars(string v)
@@ -304,6 +311,7 @@ namespace Armoury
             _wNew = map.TryGetValue("nw", out nw) && nw == "1";
             UnpackCrown(map);
             UnpackDragons(map);
+            UnpackRiver(map);   // m116-fabula (4): zapis bez "rw=" - stan od zera (wojna zastana zapisana w pierwszej dobie)
         }
 
         private static bool _warsEventDay;   // cos sie dzis wydarzylo (linia doby mimo rytmu 7 dob)
@@ -320,6 +328,7 @@ namespace Armoury
                      + " | zakres (2) i (3): " + ScopeText()
                      + " | (2) Reach i Dorne z korona: " + CrownStartText()
                      + " | (3) smoki Daenerys: " + DragonsText()
+                     + " | (4) Dorzecze: " + RiverStartText()
                      + " | potkniecia " + _cwStumbles + ".");
         }
 
@@ -328,6 +337,7 @@ namespace Armoury
         {
             try { EssosDaily(); } catch (Exception e) { CwStumble("EssosDaily", e); }
             try { CrownDaily(); } catch (Exception e) { CwStumble("CrownDaily", e); }
+            try { RiverDaily(); } catch (Exception e) { CwStumble("RiverDaily", e); }   // m116-fabula (4): wojna korona-Dorzecze i sojusz Polnoc+Dorzecze
             double sd = StoryDays();
             bool essosWindow = Active && EssosKey && sd < 1.0;
             int every = (int)Math.Floor(sd);
@@ -339,9 +349,10 @@ namespace Armoury
                                                          : "klucz NIE") : "nie dotyczy")
                          + " | (2) Reach: " + _reachState + " | Dorne: " + _dorneState
                          + " | (3) smoki Daenerys: " + DragonsText()
+                         + " | (4) Dorzecze: " + (Active ? RiverDayText() : "nie dotyczy")
                          + " | potkniecia dzis " + _cwStumblesDay + " (razem " + _cwStumbles + ").");
             }
-            _essosDeclaredDay = 0; _essosToday.Clear(); _cwStumblesDay = 0; _warsEventDay = false; _dChangesDay = 0;
+            _essosDeclaredDay = 0; _essosToday.Clear(); _cwStumblesDay = 0; _warsEventDay = false; _dChangesDay = 0; _rwForcedDay = 0;
         }
     }
 

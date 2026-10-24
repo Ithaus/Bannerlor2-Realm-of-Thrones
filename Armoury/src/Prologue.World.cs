@@ -38,6 +38,7 @@ namespace Armoury
         internal const string WTag = "Prolog E5 (m104): ";
         private const string TyrionTpl = "ROTwanderer8", JaimeTpl = "ROTwanderer1";
         private const string TyrionHoldRow = "p01", JaimeHoldRow = "p10";
+        private const string NedRow = "ned";   // m116-fabula: straz Neda (nie wiersz tabeli - Prologue.End NedHeld)
         private const int TyrionHoldLastDay = 140;    // dzien prologu - zapas po #p02 (132); straz Tyriona gasnie najpozniej wtedy
         // recenzja m104: straz Jaimego liczona z osi Fabuli (CrashScribe Fabula.cs: BlackwaterSiegeEvent 177 x FabulaTimeScale; #m02 = done:BlackwaterEvent po oblezeniu),
         // a nie stalym rokiem od #p10 (#p10 ok. 15. dnia opowiesci, oblezenie przy x4.33 ok. 766. dnia - rok gasl ok. 380 dni przed Catelyn). Zapas po bramie
@@ -50,6 +51,9 @@ namespace Armoury
         // ---------------------------------------------------------------- stan (zapis)
         // straz niewoli: od poczatku - ucieczki, okupy (dni bez okupu), pokoj, wypuszczenie przez porywacza, wykup; przepuszczone (gracz, smierc, po bitwie)
         private static int _hbEsc, _hbRan, _hbPeace, _hbChoice, _hbComp, _hbPass;
+        // m116-fabula: Ned w lochu Krolewskiej Przystani od konca prologu do egzekucji (Prologue.End NedHeld) - osobno od wierszy p01/p10 (zapis "wnb"):
+        // dni bez okupu (oferta i zaplata), zablokowane wyjscia (ucieczka, pokoj, wypuszczenie, wykup); doba - linia
+        private static int _nbRan, _nbOut, _nbDay;
         // sesja / doba
         private static int _hbDay, _hbPassDay, _wStumbles;
         private static readonly HashSet<string> _hbSaid = new HashSet<string>(StringComparer.Ordinal);
@@ -64,6 +68,7 @@ namespace Armoury
         {
             _hbEsc = _hbRan = _hbPeace = _hbChoice = _hbComp = _hbPass = 0;
             _hbDay = _hbPassDay = _wStumbles = 0; _hbSaid.Clear();
+            _nbRan = _nbOut = _nbDay = 0;   // m116-fabula
             _worldDirty = false; _wLegacy = false; _ordersDay = 0; _aiFreedDay = 0; _aiFreedSaid.Clear();
             _ctl.Clear(); _thawed = 0; _heroCacheDay = -1; _heroCache.Clear();
             ResetProgress();
@@ -78,6 +83,7 @@ namespace Armoury
         private static string PackWorld()
         {
             return "whb=" + string.Join(",", new[] { _hbEsc, _hbRan, _hbPeace, _hbChoice, _hbComp, _hbPass }.Select(x => x.ToString(Inv))) + ";"
+                   + "wnb=" + _nbRan.ToString(Inv) + "," + _nbOut.ToString(Inv) + ";"
                    + PackProgress() + PackTourney() + PackClans() + PackRaiders() + PackBeric();
         }
 
@@ -101,6 +107,12 @@ namespace Armoury
                 int[] r = new int[6];
                 for (int i = 0; i < 6 && i < a.Length; i++) int.TryParse(a[i], System.Globalization.NumberStyles.Integer, Inv, out r[i]);
                 _hbEsc = r[0]; _hbRan = r[1]; _hbPeace = r[2]; _hbChoice = r[3]; _hbComp = r[4]; _hbPass = r[5];
+            }
+            if (map.TryGetValue("wnb", out v))   // m116-fabula: Ned bez okupu (zapis bez klucza - od zera)
+            {
+                var a = v.Split(',');
+                if (a.Length > 0) int.TryParse(a[0], System.Globalization.NumberStyles.Integer, Inv, out _nbRan);
+                if (a.Length > 1) int.TryParse(a[1], System.Globalization.NumberStyles.Integer, Inv, out _nbOut);
             }
             _wLegacy = Active && !map.ContainsKey("whb");
             UnpackProgress(map);
@@ -251,26 +263,29 @@ namespace Armoury
             {
                 if (!Active || __0 == null || __0 == Hero.MainHero) return true;
                 string row = HeldByScene(__0);
+                // m116-fabula: Ned w lochu Krolewskiej Przystani (tylko tam - ArrestNed sam wyprowadza go z cudzej niewoli ucieczka) od konca prologu do egzekucji
+                if (row == null && NedHeld(__0) && InDungeon(__0, KingsLanding())) row = NedRow;
                 if (row == null) return true;
+                bool ned = row == NedRow;
                 string what;
                 bool pass = __1 == EndCaptivityDetail.Death || __1 == EndCaptivityDetail.ReleasedAfterBattle || CanonCompanions.Freeing(__0) || (__2 != null && __2 == Hero.MainHero);
                 if (pass)
                 {
                     if (CanonCompanions.Freeing(__0)) return true;   // nasze uwolnienie (#p02 / #m02) - linie pisze CanonCompanions
-                    _hbPass++; _hbPassDay++;
+                    if (!ned) { _hbPass++; _hbPassDay++; }
                     Log.Info(WTag + "straz niewoli: PRZEPUSZCZONE - " + WhoS(__0) + " (#" + row + ", " + WhereS(__0) + ") - " + __1 + (__2 == Hero.MainHero ? " (sprawca gracz)" : "")
                              + " (dzien prologu " + PrologueDay().ToString("0.0", Inv) + ").");
                     return true;
                 }
                 switch (__1)
                 {
-                    case EndCaptivityDetail.ReleasedAfterEscape: _hbEsc++; what = "ucieczka"; break;
-                    case EndCaptivityDetail.ReleasedAfterPeace: _hbPeace++; what = "zwolnienie przy pokoju"; break;
-                    case EndCaptivityDetail.Ransom: _hbRan++; what = "okup"; break;
-                    case EndCaptivityDetail.ReleasedByCompensation: _hbComp++; what = "wykup"; break;
-                    default: _hbChoice++; what = "wypuszczenie przez porywacza"; break;
+                    case EndCaptivityDetail.ReleasedAfterEscape: if (!ned) _hbEsc++; what = "ucieczka"; break;
+                    case EndCaptivityDetail.ReleasedAfterPeace: if (!ned) _hbPeace++; what = "zwolnienie przy pokoju"; break;
+                    case EndCaptivityDetail.Ransom: if (!ned) _hbRan++; what = "okup"; break;
+                    case EndCaptivityDetail.ReleasedByCompensation: if (!ned) _hbComp++; what = "wykup"; break;
+                    default: if (!ned) _hbChoice++; what = "wypuszczenie przez porywacza"; break;
                 }
-                _hbDay++;
+                if (ned) { _nbOut++; _nbDay++; } else _hbDay++;
                 string key = __0.StringId + "|" + what;
                 if (_hbSaid.Add(key))
                     Log.Info(WTag + "straz niewoli: ZABLOKOWANE - " + WhoS(__0) + " (#" + row + ", " + WhereS(__0) + ") - " + what + (__2 != null ? " (sprawca " + WhoS(__2) + ")" : "")
@@ -287,7 +302,16 @@ namespace Armoury
             try
             {
                 if (!Active || __0 == null || !__0.IsPrisoner) return true;
-                if (HeldByScene(__0) == null) return true;
+                if (HeldByScene(__0) == null)
+                {
+                    // m116-fabula: Ned od konca prologu do egzekucji - bez oferty i bez zaplaty okupu (DailyTickHero wola okup gry, Ransom178 i barter BK)
+                    if (!NedHeld(__0)) return true;
+                    _nbRan++; _nbDay++;
+                    if (_hbSaid.Add(NedRow + "|okup"))
+                        Log.Info(WTag + "Ned (m116): okup ZABLOKOWANY - " + WhoS(__0) + " (" + WhereS(__0) + ") w niewoli do egzekucji (dzien prologu " + PrologueDay().ToString("0.0", Inv)
+                                 + "; dni bez okupu od poczatku " + _nbRan + "; linia raz na dobe).");
+                    return false;
+                }
                 _hbRan++; _hbDay++;
                 return false;
             }
@@ -511,7 +535,7 @@ namespace Armoury
             if (day > PrologueDays + WorldLogAfterStory && !(holdOn && d % 10 == 0))
             {
                 try { if (_ctl.Count > 0) WorldStep(true); } catch (Exception e) { WStumble("WorldStep(po prologu)", e); }   // wszystko oddane najpozniej w dniu 188
-                _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0; _aiFreedDay = 0; return;
+                _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0; _aiFreedDay = 0; _nbDay = 0; return;
             }
             try { WorldStep(true); } catch (Exception e) { WStumble("WorldStep(doba)", e); }
             var sb = new StringBuilder(1200);
@@ -525,11 +549,12 @@ namespace Armoury
             sb.Append(" | Jaime: ").Append(HoldText(JaimeTpl, JaimeHoldRow, "m02"));
             sb.Append(" | straz niewoli: zablokowane dzis ").Append(_hbDay).Append(", od poczatku ucieczki ").Append(_hbEsc).Append(", dni bez okupu i okupy ").Append(_hbRan)
               .Append(", pokoj ").Append(_hbPeace).Append(", wypuszczenie ").Append(_hbChoice).Append(", wykup ").Append(_hbComp).Append(" | przepuszczone (gracz, smierc, po bitwie) dzis ")
-              .Append(_hbPassDay).Append(", od poczatku ").Append(_hbPass);
+              .Append(_hbPassDay).Append(", od poczatku ").Append(_hbPass)
+              .Append(" | Ned (m116): zablokowane dzis ").Append(_nbDay).Append(", od poczatku dni bez okupu ").Append(_nbRan).Append(", wyjscia ").Append(_nbOut);
             sb.Append(" | partie pod scena ").Append(_ctl.Count).Append(", rozkazy od wczoraj ").Append(_ordersDay).Append(", AI wlaczone (blokada innego moda) ").Append(_aiFreedDay);
             sb.Append(" | potkniecia E5 ").Append(_wStumbles).Append('.');
             Log.Info(sb.ToString());
-            _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0; _aiFreedDay = 0;
+            _hbDay = 0; _hbPassDay = 0; _hbSaid.Clear(); _ordersDay = 0; _aiFreedDay = 0; _nbDay = 0;
         }
 
         /// <summary>OnSessionLaunched: linia startu E5 (tylko kampania z prologiem).</summary>
@@ -545,7 +570,8 @@ namespace Armoury
                      + ", turniej " + yn(s != null && s.PrologueHandTourney)
                      + " | latki: " + _worldWire + " | zapis sprzed E5 " + yn(_wLegacy) + " | " + ProgressStart() + " | " + TourneyLine() + " | " + ClansLine() + " | " + RaidersLine() + " | " + BericLine()
                      + " | straz niewoli od poczatku: ucieczki " + _hbEsc + ", okup " + _hbRan + ", pokoj " + _hbPeace + ", wypuszczenie " + _hbChoice + ", wykup " + _hbComp
-                     + ", przepuszczone " + _hbPass + " | potkniecia " + _stumbles + ".");
+                     + ", przepuszczone " + _hbPass + " | Ned bez okupu (m116, klucz " + yn(s != null && s.PrologueNedNoRansom) + "): dni bez okupu " + _nbRan + ", wyjscia " + _nbOut
+                     + " | potkniecia " + _stumbles + ".");
         }
 
         /// <summary>HourlyTickEvent: po wczytaniu - partie scen odbudowane i zamrozone od nowa (flaga gry nie idzie do zapisu - WorldBeforeSave).</summary>

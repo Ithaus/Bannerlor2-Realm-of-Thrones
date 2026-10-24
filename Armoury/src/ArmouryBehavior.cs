@@ -885,6 +885,14 @@ namespace Armoury
                 if (dataStore.IsLoading) TownFolk.Import(townFolk);
             }
             catch (Exception e) { Log.Error("SyncData.TownFolk", e); }
+            // m116-fabula: osady na chlebie biedoty (TownFolk.Bread - dotad pamiec sesji) - wlasny try; brak klucza = jak dotad, starszy DLL klucz pomija
+            try
+            {
+                string bread = dataStore.IsSaving ? TownFolk.ExportBread() : null;
+                SaveText.Sync(dataStore, "arm_bread", ref bread);
+                if (dataStore.IsLoading) TownFolk.ImportBread(bread);
+            }
+            catch (Exception e) { Log.Error("SyncData.Bread", e); }
             // obieg2 (TownFolk.Guard.cs / TownFolk.Loans.cs): dlugi rodow u ludu (rod + osada), zakazy po niesplacie, mnoznik straznika obiegu i doplyw EMA - wlasny try
             // (zgubiony dlug = zloto u glow rodow bez roszczenia ludu; starszy DLL ignoruje klucz - cofniecie DLL w trakcie gry = dlugi przepadaja, CHANGELOG)
             try

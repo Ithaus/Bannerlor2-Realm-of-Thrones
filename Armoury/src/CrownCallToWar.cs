@@ -317,7 +317,8 @@ namespace Armoury
                             _dEnded += left; _dEndedN++;
                             bool peace = false;
                             Kingdom other;
-                            if (called.IsAtWarWith(against) && !beh.IsAtWarByCallToWarAgreement(called, against, out other))
+                            // m116-fabula: wojna fabularna ROT tej pary wymuszona (np. korona-Dorzecze od konca prologu) - bez pokoju (ROT wypowiedzialby ja nastepnej doby)
+                            if (called.IsAtWarWith(against) && !beh.IsAtWarByCallToWarAgreement(called, against, out other) && !Prologue.RotWarForced(called, against))
                             {
                                 // E7/0 (224): para znaczona na czas Apply - linia "Wojna i pokoj (E7/0)" podaje przyczyne "wezwanie 168 zerwane" zamiast Default
                                 try { WorldClock7.Mark168(called, against); MakePeaceAction.Apply(called, against); peace = true; _dPeaceN++; } catch (Exception e) { Stumble("MakePeace", e); }

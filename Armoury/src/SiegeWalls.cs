@@ -1154,6 +1154,7 @@ namespace Armoury
             {
                 if (ev == null) return;
                 var pz = PauseOf(ev, false);
+                SiegeWalls2.NoteSiegeEndForBan(ev, pz != null ? pz.Repels : 0);       // m116-fabula: krotkie oblezenie bez bitwy - zakaz powtorki (przed EndLine - ta sama chwila)
                 SiegeWalls2.EndLine(ev, pz != null ? pz.Repels : 0);                  // oblezenia 3 (KO): przyczyna konca oblezenia - PRZED czyszczeniem przerw OB2
                 _pauses.Remove(ev);
                 _prep.Remove(ev);

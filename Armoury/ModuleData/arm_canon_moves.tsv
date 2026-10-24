@@ -78,7 +78,8 @@ ROTwanderer68	D	Bedir Khan			made up by ROT, stays for hire (Jeff: D - ok)
 #   kr:NNN.w (Chronicle window resolved), kr:NNN.w=x (option x chosen), kr:NNN.w~R (m107: resolved by one of the rows R - 0 = main row, a-z = variant);
 #   kr: is false for ever when the Chronicle is off, and a kr: window resolved before the row first appeared in the save does not move it (no side change after the fact).
 # action: clan:<clan> lord of that house (may lead a party) | court:<clan> courtier of that house (no party) | lead (may lead a party from now on) |
-#   prisoner:<clan or settlement> captive of that house (held in its seat, else in its head's party) or in that keep | free:<clan> set free and back to that house |
+#   prisoner:<clan or settlement>[@<hero id>] captive of that house (held in its seat, else in its head's party) or in that keep; @hero (m116): first taken by that
+#   lord's party (else his house head's), then handed to the keep (MCM Canon Moves Captor Hero) | free:<clan> set free and back to that house |
 #   wander:<culture> leaves his house and wanders a town of that culture (for hire) | remove (gone from the world, no message) |
 #   hide[:<end term>] (m105 Chronicle K0: leaves his party and is disabled - alive, back with unhide or when the end term comes true) | unhide[:<settlement>] |
 #   die (dies, no message) | marry:<hero id> | wed:<hero id> (marries and joins the spouse's house).
@@ -86,7 +87,7 @@ ROTwanderer68	D	Bedir Khan			made up by ROT, stays for hire (Jeff: D - ok)
 # message: shown to the player only if he knows the character or his realm is one of the two sides; empty = log only.
 #move	id	who	name	trigger	action	mode	message	note
 m01	ROTwanderer1	Jaime Lannister	war:battania:vlandia+5	prisoner:clan_battania_1	classic		Whispering Wood - taken by Robb Stark's host (before Ned's execution in the book; in ROT the war of the North starts with NedEvent); classic start only - in Prologue 298 row p10 holds him at Riverrun
-p10	ROTwanderer1	Jaime Lannister	war:battania:vlandia+5	prisoner:town_V2	prolog		Whispering Wood - taken by Robb Stark's host and held at Riverrun until Catelyn frees him (m02); Jeff 21.10: Riverrun. MCM Prologue Jaime At Riverrun: no escape or ransom until then (m104-e5)
+p10	ROTwanderer1	Jaime Lannister	war:battania:vlandia+5	prisoner:town_V2@lord_5_1	prolog	Jaime Lannister has been taken at the Whispering Wood by Robb Stark's host and sent in chains to Riverrun.	Whispering Wood - taken by Robb Stark's host and held at Riverrun until Catelyn frees him (m02); Jeff 21.10: Riverrun. MCM Prologue Jaime At Riverrun: no escape or ransom until then (m104-e5)
 m02	ROTwanderer1	Jaime Lannister	done:BlackwaterEvent|kr:032.1=b|kr:032.1=c	free:clan_vlandia_1		Jaime Lannister has been set free and rides home to his house.	Catelyn frees him (end of A Clash of Kings)
 m35	ROTwanderer1	Jaime Lannister	kr:037.1	prisoner:ROT_town32		Jaime Lannister has been taken by the Brave Companions.	Chronicle 037.1 (A Storm of Swords): Vargo Hoat takes his sword hand; held at Harrenhal (no prologue guard - only p01/p10 are guarded)
 m36	ROTwanderer1	Jaime Lannister	kr:037.2|kr:037.1+45	free:clan_vlandia_1		Jaime Lannister has left Harrenhal and rides for King's Landing.	Chronicle 037.2: Roose Bolton lets him go and he goes back to his house; 45 days after 037.1 if 037.2 never comes

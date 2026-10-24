@@ -73,7 +73,7 @@ namespace Armoury
         private static readonly Dictionary<Settlement, double> _abortAt = new Dictionary<Settlement, double>();   // szturm AI bez zwyciezcy - chwila
         private sealed class Snap
         {
-            public double Hour = -1; public string Leader = "-", Fac = "-", Beh = "-", Tgt = "-"; public float Score = -1f, Siege = -1f; public bool Held; public int Men = -1, Food = -1;
+            public double Hour = -1; public string Leader = "-", Fac = "-", Beh = "-", Tgt = "-", Obj = "-"; public float Score = -1f, Siege = -1f, Food = -1f; public bool Held, Army; public int Men = -1;
         }
         private static readonly Dictionary<SiegeEvent, Snap> _snap = new Dictionary<SiegeEvent, Snap>();        // ostatnia mysl wodza obozu (LogOn)
         // poprawka po recenzji: regula F2 dla przerwanego szturmu AI ("tak" albo "nie (powod)") - z MapEventEnded, gdy bitwa jeszcze jest
@@ -215,18 +215,18 @@ namespace Armoury
                 var lp = camp != null ? camp.LeaderParty : null;
                 Snap sn; _snap.TryGetValue(ev, out sn);
                 if (k == ELeave) other = sn != null ? "zmiana celu - ostatnia mysl: " + sn.Beh + " " + sn.Tgt : "zmiana celu - bez mysli wodza w pamieci";
-                int men = 0, food = int.MaxValue; bool live = false;
+                int men = 0; float food = float.MaxValue; bool live = false;
                 if (camp != null)
                     foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
                     {
                         if (pb == null) continue;
                         live = true; men += pb.NumberOfHealthyMembers;
                         var mp = pb.MobileParty;
-                        if (mp != null) { int d = mp.GetNumDaysForFoodToLast(); if (d < food) food = d; }
+                        if (mp != null && mp.AttachedTo == null) { float d = FoodDays(mp); if (d >= 0f && d < food) food = d; }   // m116: Food / -FoodChange (armia - wodz liczy cala)
                     }
                 string campTxt;
-                if (live) campTxt = "ludzi " + men + ", jedzenie obozu " + (food == int.MaxValue ? "-" : food.ToString()) + " dob";
-                else if (sn != null) campTxt = "ludzi " + sn.Men + ", jedzenie obozu " + (sn.Food < 0 ? "-" : sn.Food.ToString()) + " dob (oboz zwiniety - z mysli wodza " + F(CampaignTime.Now.ToHours - sn.Hour, "0") + " h temu)";
+                if (live) campTxt = "ludzi " + men + ", jedzenie obozu " + (food == float.MaxValue ? "-" : F(food, "0.0")) + " dob";
+                else if (sn != null) campTxt = "ludzi " + sn.Men + ", jedzenie obozu " + (sn.Food < 0f ? "-" : F(sn.Food, "0.0")) + " dob (oboz zwiniety - z mysli wodza " + F(CampaignTime.Now.ToHours - sn.Hour, "0") + " h temu)";
                 else campTxt = "ludzi - (oboz zwiniety, bez mysli wodza w pamieci), jedzenie obozu - dob";
                 string fac = lp != null && lp.MapFaction != null ? lp.MapFaction.StringId : sn != null ? sn.Fac : "-";
                 string lead = lp != null ? Hn(lp) : sn != null ? sn.Leader : "-";
@@ -236,7 +236,8 @@ namespace Armoury
                 try { if (camp != null) Engines(camp, out ram, out tower, out tr, out tb); } catch (Exception e) { Stumble3("EndLine.Engines", e); }
                 bool player = (lp != null && lp.IsMainParty) || (MobileParty.MainParty != null && camp != null && MobileParty.MainParty.BesiegerCamp == camp);
                 string think = sn == null ? "-" : sn.Beh + " " + sn.Tgt + " (wynik " + F(sn.Score, "0.000") + ", oblezenie " + (sn.Siege < 0f ? "-" : F(sn.Siege, "0.000"))
-                                                   + (sn.Held ? ", szturm do konca" : "") + ", " + F(CampaignTime.Now.ToHours - sn.Hour, "0") + " h temu)";
+                                                   + (sn.Held ? ", trzymane (szturm do konca / swieze m116)" : "") + ", cel druzyny " + sn.Obj + ", armia " + (sn.Army ? "tak" : "nie")
+                                                   + ", jedzenie " + (sn.Food < 0f ? "-" : F(sn.Food, "0.0")) + " dob, " + F(CampaignTime.Now.ToHours - sn.Hour, "0") + " h temu)";
                 var sb = new StringBuilder(900);
                 sb.Append("Koniec oblezenia (KO): dzien ").Append(Today).Append(" | osada ").Append(st.StringId).Append(" (").Append(Nm(st)).Append(", ").Append(Cls(st)).Append(')')
                   .Append(" | oblegajacy ").Append(fac).Append(", wodz ").Append(lead).Append(", ").Append(campTxt)
@@ -272,7 +273,7 @@ namespace Armoury
         {
             if (party == null || partyThinkParams == null) return;
             var camp = party.BesiegerCamp;
-            if (camp == null) return;
+            if (camp == null) { if (_ban.Count > 0) ApplyBan(party, partyThinkParams); return; }   // m116: zakaz powtorki - druzyny poza obozem
             try
             {
                 var ev = camp.SiegeEvent;
@@ -281,7 +282,10 @@ namespace Armoury
                 bool lead = camp.LeaderParty == party;
                 var me = party.MapEvent;
                 bool assault = me != null && me.IsSiegeAssault && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party && me.MapEventSettlement == st;
-                if (!lead && !assault) return;
+                if (lead) NoteBesieger(ev, party);   // m116: frakcja oblegajaca (zakaz powtorki po zwinieciu obozu)
+                // m116-fabula: swieze oblezenie (Cape Wrath - oboz zwijany godzine po postawieniu)
+                bool fresh = !assault && FreshCandidate(party, camp, ev, st, partyThinkParams);
+                if (!lead && !assault && !fresh) return;
                 var scores = partyThinkParams.AIBehaviorScores;
                 if (scores == null) return;
                 int bi = -1, si = -1; float best = float.MinValue, sv = -1f;
@@ -316,6 +320,7 @@ namespace Armoury
                         }
                     }
                 }
+                if (fresh && !held) held = HoldFresh(party, ev, st, partyThinkParams, bi, bd, b0, si);   // m116
                 if (lead && LogOn) Remember(ev, camp, party, bi >= 0, bd, b0, sv, held);
             }
             catch (Exception e) { Stumble3("ThinkPost", e); }
@@ -327,15 +332,14 @@ namespace Armoury
             if (!_snap.TryGetValue(ev, out sn)) { sn = new Snap(); _snap[ev] = sn; }
             sn.Hour = CampaignTime.Now.ToHours; sn.Leader = Hn(lp); sn.Fac = lp.MapFaction != null ? lp.MapFaction.StringId : "-";
             sn.Beh = any ? bd.AiBehavior.ToString() : "-"; sn.Tgt = any ? Target(bd) : "-"; sn.Score = b0; sn.Siege = sv; sn.Held = held;
-            int men = 0, food = int.MaxValue;
+            sn.Obj = lp.Objective.ToString(); sn.Army = lp.Army != null;   // m116: diagnostyka petli oblezenia
+            int men = 0;
             foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
             {
                 if (pb == null) continue;
                 men += pb.NumberOfHealthyMembers;
-                var mp = pb.MobileParty;
-                if (mp != null) { int d = mp.GetNumDaysForFoodToLast(); if (d < food) food = d; }
             }
-            sn.Men = men; sn.Food = food == int.MaxValue ? -1 : food;
+            sn.Men = men; sn.Food = FoodDays(lp);   // m116: Food / -FoodChange wodza (z armia) zamiast GetNumDaysForFoodToLast
         }
 
         private static void SkLine(MobileParty party, Settlement st, SiegeEvent ev, MapEvent me, AIBehaviorData bd, float b0, float v)
@@ -467,7 +471,7 @@ namespace Armoury
                 if (dead != null) foreach (var ev in dead) _snap.Remove(ev);
                 _koDone.RemoveWhere(e => e == null || e.BesiegedSettlement == null || e.BesiegedSettlement.SiegeEvent != e);   // oblezenia skonczone - drugie zdarzenie przychodzi od razu
                 _skLogged.RemoveWhere(m => m == null || m.IsFinalized);
-                if (!LogOn) return;
+                if (!LogOn) { HoldDayText(); return; }   // m116: porzadek zakazow i frakcji takze bez logu
                 var sb = new StringBuilder(900);
                 sb.Append("Oblezenia 3 (doba): dzien ").Append(Today)
                   .Append(" | klucze: szturm do konca ").Append(RunsToEndOn ? "tak" : "nie").Append(", trebusze AI w mury ").Append(HitWallsOn ? "tak" : "nie")
@@ -484,6 +488,7 @@ namespace Armoury
                   .Append(", w machiny przy stojacym murze ").Append(_dTrebEngUp).Append(" (pociski sprzed wczytania ").Append(_dTrebEngPre)
                   .Append(", po rozbiciu murow ").Append(_dTrebEngDown).Append(')')
                   .Append(" | okup po odparciu odmowiony (przewaga >= ").Append(F(LadderRatio, "0.0")).Append(":1) ").Append(_dRepelWait)
+                  .Append(HoldDayText())
                   .Append(" | w pamieci: mysli wodzow ").Append(_snap.Count).Append(", szturmy z SK ").Append(_skLogged.Count)
                   .Append(" | potkniecia ").Append(_dStumbles3).Append(" (od wczytania ").Append(_stumbles3).Append(").");
                 Log.Info(sb.ToString());
@@ -499,6 +504,7 @@ namespace Armoury
             _dHoldH = _dHoldSaved = _dHoldLow = _dScaHeld = _dHoldOld = 0;
             _dAimed = _dAimIdx = _dTrebWall = _dTrebBroken = _dTrebEngUp = _dTrebEngDown = _dTrebEngPre = _dRepelWait = 0;
             _dStumbles3 = 0;
+            ZeroHoldDay();   // m116
         }
 
         /// <summary>Z SiegeWalls2.Reset (nowa kampania i kazde wczytanie).</summary>
@@ -506,6 +512,7 @@ namespace Armoury
         {
             _capAt.Clear(); _abortAt.Clear(); _abortRule.Clear(); _koDone.Clear(); _snap.Clear(); _skLogged.Clear();
             _loadH = -1.0;
+            ResetHold();   // m116
             ZeroDay3();
             _stumbles3 = 0; _err3.Clear();
         }

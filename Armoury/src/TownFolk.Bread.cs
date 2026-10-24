@@ -14,7 +14,8 @@ namespace Armoury
     ///  - WEJSCIE (jedna definicja glodu - zasada 0): osada z glodem z braku pieniedzy wedlug Hunger.Of / MoneyHungry (Afford jedzenia na jutro &lt; 0.95 przez 7 dob
     ///    z rzedu, kampania &gt;= 120 dob). Licznik dob glodu biegnie od startu kampanii (prog wieku jest tylko w MoneyHungry), wiec osada glodna od tygodnia wchodzi
     ///    juz w pierwszej kotwicy z wiekiem 120 (recenzja - nie "120 + 7"; ta sama chwila, w ktorej zaczyna sie kara zadowolenia E5/C2).
-    ///    WYJSCIE (histereza): 7 kotwic z rzedu, w ktorych lud sam ma na BreadDays dni jedzenia. Stan - pamiec sesji (bez pola zapisu).
+    ///    WYJSCIE (histereza): 7 kotwic z rzedu, w ktorych lud sam ma na BreadDays dni jedzenia. Stan - pamiec sesji (bez pola zapisu); od m116-fabula (klucz
+    ///    BreadForThePoorSaved) osady na chlebie, licznik wyjscia i tydzien komunikatu gracza w zapisie "arm_bread" (ExportBread / ImportBread; stary zapis - jak dotad).
     ///  - LUKA (w kotwicy doby, TownLive / CastleLiveDay po NoteHungerDay): miasto - klasy W/R/P: max(0, BreadDays x potrzeba dzienna klasy x udzial jedzenia - kiesa
     ///    klasy); podzamcze - max(0, BreadDays x potrzeba x udzial jedzenia - (kiesa + kredyt dworu)). BreadDays = 2: chleb wplywa w kroku korony PO kotwicy, wiec
     ///    trafia do kotwicy nastepnej doby - z celem 1 dnia osada skakalaby co drugi dzien (pelna / glodna); drugi dzien to zapas na to opoznienie (w rownowadze
@@ -65,6 +66,13 @@ namespace Armoury
         private static readonly HashSet<string> _brPlNames = new HashSet<string>();
 
         private static bool BreadKey { get { var s = Settings.Current; return s != null && s.BreadForThePoor; } }
+        private static bool BreadSaveKey { get { var s = Settings.Current; return s != null && s.BreadForThePoor && s.BreadForThePoorSaved; } }
+
+        // m116-fabula (Jeff 24.10, raport: "TownFolk.Bread.cs:17 pamiec sesji (bez pola zapisu)" - po wczytaniu glodne miasta czekaly od nowa tydzien glodu):
+        // osady na chlebie z zapisu (id osady -> BreadZero) czekaja na pierwsza kotwice osady (Folk powstaje po wczytaniu); reszta po kotwicy zostaje do zapisu
+        private static readonly Dictionary<string, int> _brPending = new Dictionary<string, int>(StringComparer.Ordinal);
+        private static int _brLoadN = -1, _brLoadBad, _brRestored;
+        private static bool _brSaveSaid;
 
         private static void ResetBread()
         {
@@ -74,6 +82,73 @@ namespace Armoury
             _brHoard = _brHoardLeft = _brHoardTook = 0; _brHoardN = _brHoardBelow = 0; _brHoardK.Clear();   // m105 G2
             LastBreadCrown = LastBreadLord = 0;
             _brPlWeek = -1; _brPlFief = _brPlFiefCrown = _brPlKingBread = _brPlKingRent = 0; _brPlNames.Clear();
+            _brPending.Clear(); _brLoadN = -1; _brLoadBad = 0; _brRestored = 0; _brSaveSaid = false;   // m116-fabula (ImportBread po konstruktorze)
+        }
+
+        /// <summary>m116-fabula: zapis "arm_bread" - "1|id,zero;id,zero|pw=..,pf=..,pfc=..,pkb=..,pkr=..,pn=nazwy". Klucz wylaczony - pusty (wczytanie jak dotad).</summary>
+        internal static string ExportBread()
+        {
+            if (!BreadSaveKey) return "";
+            var sb = new StringBuilder(512);
+            sb.Append("1|");
+            bool first = true;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var f in _f.Values)
+            {
+                if (f == null || f.Kind > 1 || !f.BreadOn || f.St == null || string.IsNullOrEmpty(f.St.StringId)) continue;
+                if (!seen.Add(f.St.StringId)) continue;
+                if (!first) sb.Append(';');
+                sb.Append(f.St.StringId).Append(',').Append(f.BreadZero.ToString(BrInv)); first = false;
+            }
+            foreach (var kv in _brPending)   // z zapisu, a osada jeszcze bez kotwicy - nie ginie
+            {
+                if (!seen.Add(kv.Key)) continue;
+                if (!first) sb.Append(';');
+                sb.Append(kv.Key).Append(',').Append(kv.Value.ToString(BrInv)); first = false;
+            }
+            var names = new List<string>();
+            foreach (var n in _brPlNames) names.Add(Uri.EscapeDataString(n ?? ""));
+            sb.Append("|pw=").Append(_brPlWeek.ToString(BrInv)).Append(",pf=").Append(_brPlFief.ToString(BrInv)).Append(",pfc=").Append(_brPlFiefCrown.ToString(BrInv))
+              .Append(",pkb=").Append(_brPlKingBread.ToString(BrInv)).Append(",pkr=").Append(_brPlKingRent.ToString(BrInv)).Append(",pn=").Append(string.Join(".", names.ToArray()));
+            return sb.ToString();
+        }
+
+        /// <summary>m116-fabula: wczytanie "arm_bread" (po ResetBread z konstruktora). Brak klucza / klucz wylaczony - jak dotad (stan od zera). Nie rzuca.</summary>
+        internal static void ImportBread(string data)
+        {
+            try
+            {
+                _brPending.Clear(); _brLoadN = -1; _brLoadBad = 0;
+                if (string.IsNullOrEmpty(data) || !BreadSaveKey) return;
+                var parts = data.Split('|');
+                if (parts.Length < 2 || parts[0] != "1") { _brLoadBad++; return; }
+                _brLoadN = 0;
+                foreach (var it in parts[1].Split(';'))
+                {
+                    if (it.Length == 0) continue;
+                    var a = it.Split(',');
+                    int z;
+                    if (a.Length != 2 || a[0].Length == 0 || !int.TryParse(a[1], NumberStyles.Integer, BrInv, out z)) { _brLoadBad++; continue; }
+                    _brPending[a[0]] = Math.Max(0, z);
+                    _brLoadN++;
+                }
+                if (parts.Length > 2)
+                    foreach (var kv in parts[2].Split(','))
+                    {
+                        int i = kv.IndexOf('=');
+                        if (i <= 0) continue;
+                        string k = kv.Substring(0, i), v = kv.Substring(i + 1);
+                        long x;
+                        if (k == "pn") { foreach (var n in v.Split('.')) if (n.Length > 0) _brPlNames.Add(Uri.UnescapeDataString(n)); continue; }
+                        if (!long.TryParse(v, NumberStyles.Integer, BrInv, out x)) { _brLoadBad++; continue; }
+                        if (k == "pw") _brPlWeek = (int)Math.Max(int.MinValue, Math.Min(int.MaxValue, x));
+                        else if (k == "pf") _brPlFief = x;
+                        else if (k == "pfc") _brPlFiefCrown = x;
+                        else if (k == "pkb") _brPlKingBread = x;
+                        else if (k == "pkr") _brPlKingRent = x;
+                    }
+            }
+            catch (Exception e) { _brLoadBad++; Stumble("ImportBread", e); }
         }
 
         /// <summary>Kotwica doby (TownLive / CastleLiveDay po NoteHungerDay): wejscie / wyjscie stanu "na chlebie" i luka na BreadDays dni jedzenia. Nie rzuca.</summary>
@@ -83,6 +158,16 @@ namespace Armoury
             {
                 f.BreadGap = 0; f.BreadPaid = 0; f.BreadCrown = 0; f.BreadLord = 0; f.BreadGapC[0] = f.BreadGapC[1] = f.BreadGapC[2] = 0;
                 if (!BreadKey || f.Kind > 1 || !f.FacOk) { if (f.BreadOn) { f.BreadOn = false; f.BreadZero = 0; } return; }
+                // m116-fabula: osada na chlebie z zapisu (arm_bread) - stan i licznik wyjscia wracaja przy pierwszej kotwicy po wczytaniu
+                if (_brPending.Count > 0 && f.St != null && f.St.StringId != null)
+                {
+                    int z;
+                    if (_brPending.TryGetValue(f.St.StringId, out z))
+                    {
+                        _brPending.Remove(f.St.StringId);
+                        if (!f.BreadOn) { f.BreadOn = true; f.BreadZero = z; _brRestored++; }
+                    }
+                }
                 if (!f.BreadOn && MoneyHungry(f.St)) { f.BreadOn = true; f.BreadZero = 0; _brIn++; }
                 if (!f.BreadOn) return;
                 var s = Settings.Current;
@@ -371,6 +456,14 @@ namespace Armoury
               .Append(", w pokoju ").Append(_brLordPeace).Append(" zl (do ").Append(BreadLordShare(s, false).ToString("0.00", BrInv)).Append(" tempa skrzyni)")
               .Append(" | top: ").Append(top.Count > 0 ? string.Join(", ", top.ToArray()) : "-")
               .Append(" | na krolestwo (korona/pan/nie stac nikogo): ").Append(rt.Count > 0 ? string.Join(", ", rt.ToArray()) : "-");
+            // m116-fabula: zapis osad na chlebie (raz na sesje)
+            if (!_brSaveSaid)
+            {
+                _brSaveSaid = true;
+                sb.Append(" | zapis (m116, Bread For The Poor Saved ").Append(s.BreadForThePoorSaved ? "tak" : "nie").Append("): ")
+                  .Append(_brLoadN < 0 ? "brak klucza arm_bread (nowa kampania albo stary zapis)" : "wczytano " + _brLoadN.ToString(BrInv)).Append(" (bledne ").Append(_brLoadBad).Append(")")
+                  .Append(", przywrocono ").Append(_brRestored).Append(", czeka na kotwice ").Append(_brPending.Count);
+            }
             // m105 G2: segment na koncu linii (regexy R2_M3 / R2_M3L bez zmian); klucz wylaczony - linia jak w WGRANIU 102
             if (s.CrownHoardFeedsHungry)
                 sb.Append(" | m105 skarbiec korony (Crown Hoard Feeds Hungry TAK): ze skarbca ").Append(_brHoard).Append(" zl (krolestw ").Append(_brHoardK.Count).Append(", osad ")

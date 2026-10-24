@@ -33,7 +33,7 @@ namespace Armoury
     ///   Pilnowane co dobe (brak sojuszu - od nowa, linia ODNOWIONY; wojna Reach-Dorne - pokoj od nowa) az do najazdu Daenerys.
     ///   Dorne gracza (recenzja R2): kroki 1 i 5 pominiete - jego wojny z Reach nie konczymy i paktu w jego imieniu nie zakladamy; sojusz korona-Reach jak dotad.
     /// DORNE (po zareczynach Myrcelli z Trystanem): w ksiazce Tyrion zareczyl Myrcelle na poczatku "Starcia kroli", ona odplywa przed smiercia Renly'ego. Na osi Fabuli
-    ///   (CrashScribe Fabula.Timeline, dzien ROT przed rozciagnieciem) Dorzecze wchodzi do wojny w dniu 25, Renly ginie w 120 - wybrany dzien 70 x skala osi
+    ///   (CrashScribe Fabula.Timeline, dzien ROT przed rozciagnieciem) okno ROT Dorzecza (RiverlandsDeclareWarEvent) w dniu 25 - od m116 to hold lordow rzecznych, wojna z korona trwa od konca prologu (Prologue.River) - Renly ginie w 120; wybrany dzien 70 x skala osi
     ///   (CrashScribe Config.FabulaTimeScale odbiciem, zapas rok/84), przy 4.33 ok. dzien opowiesci 303 (Kronika nr 19: dni 215-390). Warunek: Myrcella (lord_4_10)
     ///   zywa, Dorne rzadzone przez Martellow (clan_aserai_1), bez wladzy gracza. Wedlug kanonu Dorne formalnie stoi przy koronie, ale nie walczy: pokoj (gdy ROT nie
     ///   wymusza wojny) i PAKT O NIEAGRESJI Diplomacy korona-Dorne - nie sojusz (CanonAlliances nie ma Korona + Dorne na liscie - zerwalby go przy wczytaniu; StartAlliance
@@ -50,7 +50,7 @@ namespace Armoury
         private const string ReachId = "empire_w", DorneId = "aserai", DragonstoneId = "dragonstone";
         private const string TyrellClanId = "clan_empire_west_1", MartellClanId = "clan_aserai_1";
         private const string RenlyHeroId = "lord_1_9", MyrcellaHeroId = "lord_4_10";
-        private const float MyrcellaRotDay = 70f;        // dzien osi ROT (przed rozciagnieciem): miedzy wejsciem Dorzecza do wojny (25) a smiercia Renly'ego (120)
+        private const float MyrcellaRotDay = 70f;        // dzien osi ROT (przed rozciagnieciem): miedzy oknem ROT Dorzecza (25 - od m116 hold lordow, wojna od konca prologu) a smiercia Renly'ego (120)
         private const float DanyInvasionRotDay = 450f;   // CrashScribe Fabula.Timeline: DanyInvasionEvent
         private const float AllianceKeepDays = 364f, AllianceRenewBelow = 182f;
         private const float NapAfterInvasionDays = 250f, NapMinDays = 364f;

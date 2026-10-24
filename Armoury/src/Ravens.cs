@@ -63,6 +63,13 @@ namespace Armoury
         private const int QueueMax = 400, LogMax = 30;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.RavenNews; } }
+        // m116-fabula (Jeff 24.10, raport: "Cape Wrath has been besieged by Stormlands" kilkadziesiat razy; kruk o smierci krola Roberta bez tekstu)
+        private static bool SiegeOnceOn { get { var s = Settings.Current; return s != null && s.RavenSiegeOnce; } }
+        private static bool NeverEmptyOn { get { var s = Settings.Current; return s != null && s.RavenNeverEmpty; } }
+        private const double SiegeOnceHours = 72.0;   // ta sama osada i ta sama frakcja oblegajaca - wiesc najwyzej raz na 3 dni
+        private static readonly Dictionary<string, double> _siegeSeen = new Dictionary<string, double>(StringComparer.Ordinal);   // "siege:<osada>|<frakcja>" -> godzina
+        private static int _dSiegeDup, _sSiegeDup, _dEmptyFixed, _dEmptyDropped, _sEmptyFixed, _sEmptyDropped;
+        private static Hero _kingDead; private static string _kingDeadRealm;   // krol z BeforeHeroKilledEvent (wpis smierci przychodzi po zmianie glowy rodu)
 
         private const int KSiege = 1, KAssault = 2, KWar = 3, KPeace = 4, KAlly = 5, KCall = 6, KFall = 7, KDeath = 8, KCapture = 9, KFreed = 10, KArmy = 11, KAftermath = 12, KPact = 13, KWalker = 14, KN = 15;
         private static readonly string[] KName = { "-", "oblezenie", "napad/szturm", "wojna", "pokoj", "sojusz", "wezwanie do wojny", "upadek krolestwa",
@@ -102,6 +109,7 @@ namespace Armoury
             lock (Gate)
             {
                 _q.Clear(); _seq = 0; _forts = null; _checkFromH = -1;
+                _siegeSeen.Clear(); _sSiegeDup = _sEmptyFixed = _sEmptyDropped = 0; _kingDead = null; _kingDeadRealm = null;   // m116-fabula
                 _sDelayed = _sDelivered = 0; _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
                 ZeroDay();
             }
@@ -110,6 +118,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _dBkSeen = 0; _dDipSeen = 0; _dRotSeen = 0; _dFlushed = 0; _dRumHeld = 0;
+            _dSiegeDup = _dEmptyFixed = _dEmptyDropped = 0;   // m116-fabula
             _dSeen = _dWar = _dDelayed = _dNear = _dMine = _dNoPos = _dOff = _dDelivered = _dForced = _dBumped = _dLogSent = _dLogGot = _dStumbles = 0;
             _dDelaySum = _dDelayMax = _dLateSum = 0;
             Array.Clear(_dKind, 0, _dKind.Length);
@@ -131,6 +140,7 @@ namespace Armoury
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(b, delegate (CampaignGameStarter s) { try { SessionStart(); } catch (Exception e) { Log.Error("Ravens.SessionStart", e); } });
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(b, DayProfile.Hr("Ravens.Hourly", delegate { try { Hourly(); } catch (Exception e) { Log.Error("Ravens.Hourly", e); } }));
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(b, delegate { try { Daily(); } catch (Exception e) { Log.Error("Ravens.Daily", e); } });
+            CampaignEvents.BeforeHeroKilledEvent.AddNonSerializedListener(b, BeforeKilled);   // m116-fabula: krol przed zmiana glowy rodu (tekst zastepczy)
         }
 
         private static void SessionStart()
@@ -225,12 +235,80 @@ namespace Armoury
                         return true;
                     }
                     _dWar++;
-                    if (mine) { _dMine++; Flush(key); return true; }
-                    if (!havePos) { _dNoPos++; Flush(key); return true; }
-                    return !Send(kind, at, key, from, cn.GetNotificationText().ToString(), Campaign.Current.Models.DiplomacyModel.GetNotificationColor(cn.NotificationType));
+                    // m116-fabula: oblezenie tej samej osady przez te sama frakcje najwyzej raz na 3 dni (oboz zwijany i stawiany od nowa - petla Cape Wrath); twoje - zawsze
+                    if (kind == KSiege && !mine && SiegeOnceOn && SiegeDup(__0)) { _dSiegeDup++; _sSiegeDup++; return false; }
+                    uint color = Campaign.Current.Models.DiplomacyModel.GetNotificationColor(cn.NotificationType);
+                    // m116-fabula: wiesc bez tekstu (smierc "z ran" bez zabojcy - gra daje pusty tekst) - tekst zastepczy; bez zastepczego - nie idzie wcale
+                    string text = null; bool replaced = false;
+                    if (NeverEmptyOn)
+                    {
+                        var to = cn.GetNotificationText();
+                        string raw = to != null ? to.ToString() : null;
+                        if (string.IsNullOrWhiteSpace(raw))
+                        {
+                            text = Fallback(__0);
+                            if (text == null) { _dEmptyDropped++; _sEmptyDropped++; return false; }
+                            replaced = true; _dEmptyFixed++; _sEmptyFixed++;
+                            if (LogOn) Log.Info(P + "pusta wiesc gry (" + KName[kind] + ") - tekst zastepczy (m116) | " + Short(text));
+                        }
+                        else text = raw;
+                    }
+                    if (mine) { _dMine++; Flush(key); if (replaced) { Show(text, color); return false; } return true; }
+                    if (!havePos) { _dNoPos++; Flush(key); if (replaced) { Show(text, color); return false; } return true; }
+                    if (text == null) text = cn.GetNotificationText().ToString();
+                    bool sent = Send(kind, at, key, from, text, color);
+                    if (!sent && replaced) { Show(text, color); return false; }
+                    return !sent;
                 }
             }
             catch (Exception e) { lock (Gate) Stumble("ChatPrefix", e); return true; }
+        }
+
+        /// <summary>m116-fabula (pod Gate): wiesc o oblezeniu tej osady przez te frakcje byla w ostatnich SiegeOnceHours - true (pominac). Pierwsza - zapamietana
+        /// (okno stale od pierwszej wiesci, nie przesuwane powtorkami - po 3 dniach petli gracz dostaje nastepna).</summary>
+        private static bool SiegeDup(LogEntry log)
+        {
+            var bs = log as BesiegeSettlementLogEntry;
+            if (bs == null || bs.Settlement == null) return false;
+            var f = bs.BesiegerFaction ?? (bs.BesiegerHero != null ? bs.BesiegerHero.MapFaction : null);
+            string k = "siege:" + bs.Settlement.StringId + "|" + (f != null ? f.StringId : "?");
+            double t0, now = NowH;
+            if (_siegeSeen.TryGetValue(k, out t0) && now - t0 < SiegeOnceHours) return true;
+            _siegeSeen[k] = now;
+            return false;
+        }
+
+        /// <summary>m116-fabula: tekst zastepczy pustej wiesci gry: smierc - najpierw tekst prologu (krol Robert), potem krol z BeforeHeroKilledEvent, potem zwykly.
+        /// null - brak (wiesc nie idzie).</summary>
+        private static string Fallback(LogEntry log)
+        {
+            var ck = log as CharacterKilledLogEntry;
+            if (ck == null || ck.Victim == null) return null;
+            var v = ck.Victim;
+            string d = null;
+            try { d = Prologue.DeathNews(v); } catch (Exception e) { Stumble("Fallback.Prologue", e); }
+            if (!string.IsNullOrEmpty(d)) return d;
+            string name = v.Name != null ? v.Name.ToString() : v.StringId;
+            if (_kingDead == v && !string.IsNullOrEmpty(_kingDeadRealm)) return name + ", King of " + _kingDeadRealm + ", has died of " + (v.IsFemale ? "her" : "his") + " wounds.";
+            return name + " has died of " + (v.IsFemale ? "her" : "his") + " wounds.";
+        }
+
+        /// <summary>m116-fabula: BeforeHeroKilledEvent - wladca krolestwa zapamietany (wpis smierci przychodzi juz po zmianie glowy rodu i wladcy).</summary>
+        private static void BeforeKilled(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool notify)
+        {
+            try
+            {
+                var k = victim != null ? victim.MapFaction as Kingdom : null;
+                if (k != null && k.Leader == victim) { lock (Gate) { _kingDead = victim; _kingDeadRealm = k.Name != null ? k.Name.ToString() : k.StringId; } }
+            }
+            catch (Exception e) { lock (Gate) Stumble("BeforeKilled", e); }
+        }
+
+        /// <summary>m116-fabula: wiesc z tekstem zastepczym od razu na czat (gra pokazalaby pusty tekst).</summary>
+        private static void Show(string text, uint color)
+        {
+            try { InformationManager.DisplayMessage(new InformationMessage(text, Color.FromUint(color))); }
+            catch (Exception e) { Stumble("Show", e); }
         }
 
         /// <summary>Kruk w droge (pod Gate): false = wiesc idzie na czat od razu (gracz bez miejsca, blisko). Kolejnosc tej samej sprawy zachowana.</summary>
@@ -817,11 +895,25 @@ namespace Armoury
                                  + " | w drodze " + _q.Count + (_q.Count > 0 ? " (najblizszy za " + Math.Max(0.0, next - now).ToString("0", Inv) + " h)" : "")
                                  + " | inne wiesci (bez zmian): " + (os.Length > 0 ? os.ToString() : "-")
                                  + (hist >= 0 ? " | kontrola: widocznych wpisow w historii gry " + hist + ", przez latke " + _dSeen + (hist >= 5 && _dSeen == 0 ? " - LATKA NIE WIDZI WPISOW" : "") : "")
+                                 + " | m116: powtorki oblezen pominiete " + _dSiegeDup + " (sesja " + _sSiegeDup + ", w pamieci " + _siegeSeen.Count + "), puste wiesci z tekstem zastepczym "
+                                 + _dEmptyFixed + ", puste pominiete " + _dEmptyDropped + " (sesja " + _sEmptyFixed + "/" + _sEmptyDropped + ")"
                                  + " | sesja: wyslane " + _sDelayed + ", doreczone " + _sDelivered
                                  + (_stumbles > 0 ? " | potkniecia " + _stumbles + " (dzis " + _dStumbles + ")" : "") + ".");
                     }
                 }
                 catch (Exception e) { Stumble("Daily", e); }
+                try
+                {
+                    // m116-fabula: porzadek pamieci powtorek oblezen
+                    if (_siegeSeen.Count > 0 && Campaign.Current != null)
+                    {
+                        double now = NowH;
+                        List<string> old = null;
+                        foreach (var kv in _siegeSeen) if (now - kv.Value >= SiegeOnceHours) { if (old == null) old = new List<string>(); old.Add(kv.Key); }
+                        if (old != null) foreach (var k in old) _siegeSeen.Remove(k);
+                    }
+                }
+                catch (Exception e) { Stumble("Daily.SiegeSeen", e); }
                 ZeroDay();
             }
         }

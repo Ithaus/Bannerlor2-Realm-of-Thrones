@@ -471,6 +471,7 @@ namespace Armoury
                 if (ev == null || ev.BesiegedSettlement == null || ev.BesiegedSettlement.Town == null) return;
                 int h, w;
                 _gl[ev] = new Gl { Start = MenOf(ev.BesiegedSettlement, out h, out w) };
+                NoteBesieger(ev, ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null);   // m116: zakaz powtorki
             }
             catch (Exception e) { Stumble("OnSiegeStarted", e); }
         }

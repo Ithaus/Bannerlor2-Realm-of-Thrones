@@ -213,7 +213,7 @@ namespace Armoury
                     var h = WhoHero(l[last]);
                     if (h == null || !h.IsAlive || !h.IsPrisoner) continue;
                     _held[h] = l[last].Id;
-                    _heldArg[h] = l[last].Arg;
+                    _heldArg[h] = KeepOf(l[last].Arg);   // m116-fabula: "osada@bohater" - straz patrzy na loch (osade)
                     string dv; int dd;
                     _heldDay[h] = _done.TryGetValue(l[last].Id, out dv) && int.TryParse(dv.Split('|')[0], NumberStyles.Integer, Inv, out dd) ? dd : Day();
                 }
@@ -793,7 +793,8 @@ namespace Armoury
                 if (m.Action == "prisoner" && seenRef.Add("p:" + m.Arg))
                 {
                     refsWant++;
-                    if (Settlement.Find(m.Arg) != null || ClanKnown(m.Arg)) refsFound++; else missing.Add(m.Arg);
+                    string keep = KeepOf(m.Arg), by = ByOf(m.Arg);   // m116-fabula: prisoner:<osada|rod>[@<bohater>]
+                    if ((Settlement.Find(keep) != null || ClanKnown(keep)) && (by == null || FindHeroId(by) != null)) refsFound++; else missing.Add(m.Arg);
                 }
                 if ((m.Action == "marry" || m.Action == "wed") && seenRef.Add("h:" + m.Arg))
                 {
@@ -1477,8 +1478,46 @@ namespace Armoury
             catch { return false; }
         }
 
+        // m116-fabula (Jeff 24.10, raport: Jaime #p10 pojmany "przez Dorzecze" - loch Riverrun bez zdobywcy; kanon: hufiec Robba w Szepczacym Lesie): argument akcji
+        // prisoner:<osada|rod>@<bohater> - najpierw jeniec druzyny bohatera (wiesc gry: pojmany przez niego), potem przekazany do lochu (TransferPrisonerAction)
+        private static string KeepOf(string arg)
+        {
+            if (string.IsNullOrEmpty(arg)) return arg;
+            int i = arg.IndexOf('@');
+            return i < 0 ? arg : arg.Substring(0, i);
+        }
+
+        private static string ByOf(string arg)
+        {
+            if (string.IsNullOrEmpty(arg)) return null;
+            int i = arg.IndexOf('@');
+            return i < 0 || i + 1 >= arg.Length ? null : arg.Substring(i + 1);
+        }
+
+        private static bool CaptorHeroOn { get { var s = Settings.Current; return s != null && s.CanonMovesCaptorHero; } }
+
+        /// <summary>m116: druzyna bohatera z argumentu "@bohater" (czynna, prowadzi ja, poza bitwa i morzem, nie gracza); niedostepna - druzyna glowy jego rodu; null - jak dotad.</summary>
+        private static PartyBase CaptorHeroParty(string by)
+        {
+            if (string.IsNullOrEmpty(by) || !CaptorHeroOn) return null;
+            var hero = FindHeroId(by);
+            if (hero == null) return null;
+            var p = FieldParty(hero);
+            if (p == null && hero.Clan != null && hero.Clan != Clan.PlayerClan && hero.Clan.Leader != hero) p = FieldParty(hero.Clan.Leader);
+            return p;
+        }
+
+        private static PartyBase FieldParty(Hero hero)
+        {
+            if (hero == null || !hero.IsAlive || hero == Hero.MainHero || hero.Clan == Clan.PlayerClan) return null;
+            var mp = hero.PartyBelongedTo;
+            if (mp == null || mp == MobileParty.MainParty || mp.LeaderHero != hero || !mp.IsActive || mp.MapEvent != null || mp.IsCurrentlyAtSea) return null;
+            return mp.Party;
+        }
+
         private static PartyBase Captor(string arg)
         {
+            arg = KeepOf(arg);   // m116-fabula: "osada@bohater" - loch
             var st = Settlement.Find(arg);
             if (st != null) return st.OwnerClan == Clan.PlayerClan ? null : st.Party;
             var clan = FindClan(arg);
@@ -1572,11 +1611,28 @@ namespace Armoury
                         if (Busy(h)) { res = Res.Wait; why = "w bitwie albo oblezeniu"; break; }
                         var cap = Captor(arg);
                         if (cap == null) { res = Res.Wait; why = "brak miejsca niewoli (" + arg + ": siedziba / druzyna glowy rodu)"; break; }
+                        var byParty = CaptorHeroParty(ByOf(arg));   // m116-fabula: zdobywca z kanonu (Robb w Szepczacym Lesie), potem loch
+                        if (byParty == cap) byParty = null;
                         LeaveParty(h);
                         if (h.GovernorOf != null) ChangeGovernorAction.RemoveGovernorOf(h);
                         if (h.CurrentSettlement != null) LeaveSettlementAction.ApplyForCharacterOnly(h);
-                        TakePrisonerAction.Apply(cap, h);
-                        why = "jeniec " + cap.Name;
+                        if (byParty != null)
+                        {
+                            TakePrisonerAction.Apply(byParty, h);
+                            bool moved = false;
+                            if (h.IsPrisoner && h.PartyBelongedToAsPrisoner == byParty && cap.IsSettlement)
+                            {
+                                TransferPrisonerAction.Apply(h.CharacterObject, byParty, cap);
+                                moved = h.PartyBelongedToAsPrisoner == cap;
+                            }
+                            why = "jeniec " + byParty.Name + " (zdobywca " + (byParty.LeaderHero != null ? byParty.LeaderHero.Name.ToString() : "-") + ", m116)"
+                                  + (cap.IsSettlement ? (moved ? ", przekazany do lochu " + cap.Name : ", loch " + cap.Name + " NIE (zostaje w druzynie)") : "");
+                        }
+                        else
+                        {
+                            TakePrisonerAction.Apply(cap, h);
+                            why = "jeniec " + cap.Name + (ByOf(arg) != null ? " (zdobywca " + ByOf(arg) + " niedostepny albo klucz Canon Moves Captor Hero NIE)" : "");
+                        }
                         break;
                     }
                 case "free":

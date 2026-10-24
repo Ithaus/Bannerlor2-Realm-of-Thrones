@@ -33,9 +33,13 @@ namespace Armoury
         private static int _kingWaits, _nedArrests;
         private static string _pactsEndText = "";   // wynik EndPacts z dnia 186 (do linii KONCA PROLOGU, gdy krol umrze pozniej)
 
-        private static void ResetEnd() { _kingFallen = false; _nedDone = false; _endLogged = false; _kingWaits = 0; _nedArrests = 0; _pactsEndText = ""; _nedMarked = false; }
+        private static void ResetEnd() { _kingFallen = false; _nedDone = false; _endLogged = false; _kingWaits = 0; _nedArrests = 0; _pactsEndText = ""; _nedMarked = false; _nr = ""; }
 
-        private static string PackEnd() { return "kf=" + (_kingFallen ? "1" : "0") + ";nd=" + (_nedDone ? "1" : "0") + ";nm=" + (_nedMarked ? "1" : "0") + ";"; }
+        private static string PackEnd()
+        {
+            return "kf=" + (_kingFallen ? "1" : "0") + ";nd=" + (_nedDone ? "1" : "0") + ";nm=" + (_nedMarked ? "1" : "0") + ";"
+                   + (_nr.Length > 0 ? "nr=" + Clean(_nr) + ";" : "");   // m116-fabula: zwrot okupu Neda (raz)
+        }
 
         private static void UnpackEnd(Dictionary<string, string> map)
         {
@@ -44,7 +48,71 @@ namespace Armoury
             _kingFallen = map.TryGetValue("kf", out v) && v == "1";
             _nedDone = map.TryGetValue("nd", out v) && v == "1";
             _nedMarked = map.TryGetValue("nm", out v) && v == "1";
+            _nr = map.TryGetValue("nr", out v) ? Unesc(v) : "";
             _endLogged = _kingFallen;
+        }
+
+        // ---------------------------------------------------------------- m116-fabula: Ned bez okupu do egzekucji, zwrot okupu w zapisie Jeffa
+        // Jeff 24.10 (raport z gry): "[20:06:26] Okupy (178): AI-AI - Eddard Stark ... wolny za 292902 zl (placi skarbiec The North) -> skarbiec House Baratheon of King's
+        // Landing", potem KeepNedInDungeon wsadzil go z powrotem do lochu bez zwrotu zlota. Straz niewoli E5 (Prologue.World) obejmowala tylko wiersze p01/p10.
+        private const string NedRefundGameId = "KkUpHftX7ZIq";   // kampania Jeffa (IronmanKkUpHftX7ZIq.sav) - jedyna, w ktorej okup Neda zostal zaplacony
+        private const long NedRefundAmount = 292902;               // log 24.10 20:06:26 (gotowka 292902, dlug 0)
+        private static string _nr = "";                            // zapis arm_prologue "nr": "" = jeszcze nie sprawdzone, "done:<przeniesione>", "none:<powod>"
+
+        private static bool NedKey { get { var s = S; return s != null && s.PrologueNedNoRansom; } }
+
+        /// <summary>m116: Ned (ROTlord_512) jencem po koncu prologu, przed egzekucja (NedEvent), w czasie ochrony - ani okupu, ani wyjscia (poza smiercia, "po bitwie",
+        /// naszym aresztem i graczem jako sprawca - CaptivityPrefix).</summary>
+        internal static bool NedHeld(Hero h)
+        {
+            return Active && h != null && h.StringId == NedId && NedKey && h.IsAlive && h.IsPrisoner && _kingFallen && _kingsAlive && !_nedDone && NedProtected();
+        }
+
+        /// <summary>m116: jednorazowy zwrot okupu Neda w kampanii Jeffa - skarbiec korony (vlandia, dostala okup) -> skarbiec Polnocy (battania, zaplacila). Wzor
+        /// BookHoldings.RefundTreasury: najpierw platnik, potem odbiorca; migawka 165 i historia E1 przesuniete u obu stron. Raz (znacznik nr, takze "none"). Nie rzuca.</summary>
+        private static void TryNedRefund()
+        {
+            try
+            {
+                if (_nr.Length > 0) return;
+                var s = S;
+                if (s == null || !s.PrologueNedRansomRefund) return;
+                string gid = "";
+                try { gid = Campaign.Current != null ? Campaign.Current.UniqueGameId ?? "" : ""; } catch { gid = ""; }
+                if (gid != NedRefundGameId) { _nr = "none:inna-kampania"; return; }
+                var ned = H(NedId);
+                if (!_kingFallen || !(_nedDone || (ned != null && !ned.IsAlive))) return;   // czeka do egzekucji
+                var from = K(Crown); var to = K(NorthId);
+                if (from == null || to == null || from.IsEliminated || to.IsEliminated)
+                {
+                    _nr = "none:brak-krolestw";
+                    Log.Info(Tag + "zwrot okupu Neda: nie dotyczy (korona " + (from != null && !from.IsEliminated ? "jest" : "BRAK") + ", Polnoc " + (to != null && !to.IsEliminated ? "jest" : "BRAK") + ").");
+                    return;
+                }
+                long w0 = from.KingdomBudgetWallet, v0 = to.KingdomBudgetWallet;
+                long take = Math.Max(0, Math.Min(NedRefundAmount, w0));
+                take = Math.Min(take, Math.Max(0, (long)int.MaxValue - Math.Max(0, v0)));   // skarbiec odbiorcy to int
+                long moved = 0, got = 0;
+                string e1 = "";
+                if (take > 0)
+                {
+                    from.KingdomBudgetWallet -= (int)take;   // najpierw platnik, potem odbiorca: odbiorca dostaje dokladnie to, co zeszlo
+                    moved = w0 - from.KingdomBudgetWallet;
+                    to.KingdomBudgetWallet += (int)moved;
+                    got = (long)to.KingdomBudgetWallet - v0;
+                    CrownIncome.ShiftSnapshot(to, got);      // 165: zwrot skarbu, nie wplyw dnia
+                    CrownIncome.ShiftSnapshot(from, -moved); // 165: ubytek skarbu, nie "ujemny wplyw"
+                    e1 = " | historia skarbca E1 (CrashScribe): " + BookHoldings.E1Text(BookHoldings.E1Shift(to, got), to.Name.ToString())
+                         + ", " + BookHoldings.E1Text(BookHoldings.E1Shift(from, -moved), from.Name.ToString());
+                }
+                _nr = take > 0 ? "done:" + moved.ToString(Inv) : "none:pusty-skarbiec";
+                Log.Info(Tag + "zwrot okupu Neda (m116, raz) - z " + from.Name + " (" + from.StringId + ") " + w0 + " -> " + from.KingdomBudgetWallet + " do " + to.Name + " ("
+                         + to.StringId + ") " + v0 + " -> " + to.KingdomBudgetWallet + " | nalezne " + NedRefundAmount + ", zdjete " + moved + " - dopisane " + got + " = " + (moved - got)
+                         + (moved < NedRefundAmount ? " (skarbiec korony nie starczyl - oddane tyle, ile bylo)" : "") + ", migawka 165 przesunieta u obu stron" + e1 + " | znacznik nr=" + _nr + ".");
+                if (moved > 0)
+                    Log.Player("The crown returns the " + moved.ToString("N0", Inv) + " denars the North paid for Lord Eddard's freedom, a freedom King Joffrey never granted.");
+            }
+            catch (Exception e) { Stumble("TryNedRefund", e); }
         }
 
         private static string ApplyEnd(Harmony h)
@@ -73,6 +141,7 @@ namespace Armoury
             if (!_kingFallen && day >= KingFallsDay) TryKingFalls("doba " + ((int)day).ToString(Inv));
             if (_kingFallen && _kingsAlive && !_nedDone && NedProtected()) KeepNedInDungeon();
             if (_nedMarked) NedMarkFollowUp();
+            if (_nr.Length == 0) TryNedRefund();   // m116-fabula: raz, po egzekucji Neda, tylko kampania Jeffa
             return _kingFallen ? "koniec prologu TAK" + (_nedDone ? ", Ned stracony" : "") : "koniec prologu za " + Math.Max(0.0, KingFallsDay - day).ToString("0.0", Inv) + " dni";
         }
 
@@ -150,6 +219,15 @@ namespace Armoury
         }
 
         private static Settlement KingsLanding() { return Settlement.Find(KingsLandingId); }
+
+        /// <summary>m116-fabula (Jeff 24.10, raport: kruk o smierci Roberta bez tekstu - smierc WoundedInBattle bez zabojcy daje pusty tekst gry): tekst wiesci o smierci
+        /// postaci prologu (Ravens.Fallback). null - brak wlasnego tekstu.</summary>
+        internal static string DeathNews(Hero v)
+        {
+            if (!Active || v == null) return null;
+            if (v.StringId == RobertId) return "King Robert Baratheon is dead of the wounds a boar gave him on the hunt. Joffrey Baratheon sits the Iron Throne.";
+            return null;
+        }
 
         private static bool InDungeon(Hero ned, Settlement kl)
         {

@@ -1350,7 +1350,7 @@ namespace Armoury
         /// <summary>Po recenzji: CrashScribe PovertyPeace.ShiftHistory(Kingdom, long) - cala historia skarbca krolestwa w mierze biedy E1 przesunieta o delta
         /// (refleksja, jak inne wywolania CrashScribe z Armoury). Zwraca liczbe przesunietych dob; -1 - E1 bez stanu krolestwa (nastepny pomiar zacznie od skarbca
         /// po przelewie), -2 - brak metody (CrashScribe nie wczytany albo starsza DLL), -3 - wyjatek. Nie rzuca.</summary>
-        private static int E1Shift(Kingdom k, long delta)
+        internal static int E1Shift(Kingdom k, long delta)   // m116-fabula: tez zwrot okupu Neda (Prologue.End)
         {
             try
             {
@@ -1372,7 +1372,7 @@ namespace Armoury
             catch (Exception e) { Stumble("E1Shift", e); return -3; }
         }
 
-        private static string E1Text(int r, string who)
+        internal static string E1Text(int r, string who)
         {
             return who + (r >= 0 ? " przesunieta (dob " + r + ")" : r == -1 ? " bez stanu E1 (pomiar od skarbca po przelewie)"
                         : r == -2 ? " NIEPRZESUNIETA (brak CrashScribe PovertyPeace.ShiftHistory - stara DLL?)" : " NIEPRZESUNIETA (blad w logu wyzej)");

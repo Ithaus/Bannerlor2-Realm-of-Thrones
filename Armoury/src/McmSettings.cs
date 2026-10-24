@@ -1860,6 +1860,14 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SiegeAssaultRunsToEnd { get; set; } = true;
 
+        [SettingPropertyBool("Siege Ai Holds Fresh Siege", HintText = "an AI lord who has just laid siege (less than two days ago) stays at it instead of riding off to the next village an hour later, as long as his camp has food for a day and a half and no stronger relief army is coming; defending his own castles still comes first. Off = the game's choice every hour", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeAiHoldsFreshSiege { get; set; } = true;
+
+        [SettingPropertyBool("Siege Ai Retry Cooldown", HintText = "when an AI host gives up a siege within a day, without a battle, its realm does not besiege the same town or castle again for three days. Off = it may come back at once", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeAiRetryCooldown { get; set; } = true;
+
         [SettingPropertyBool("Siege Ai Trebuchets Hit Walls", HintText = "AI trebuchets aim at the walls while any stretch of wall still stands - the game rolled between the walls and the defenders' engines, and walls were almost never hit; other engines still choose as in the game. Your own camp is unchanged. Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeAiTrebuchetsHitWalls { get; set; } = true;
@@ -4764,6 +4772,10 @@ namespace Armoury
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool CrownGreatCaptives { get; set; } = true;
 
+        [SettingPropertyBool("Ransom No Reward To Own King", HintText = "with Crown Great Captives: a king who takes a royal captive himself gets no reward out of his own treasury. Off = he is paid like any other captor", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool RansomNoRewardToOwnKing { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Crown Great Captive Reward", 0.00f, 1.00f, "0.00", HintText = "the captor's reward for a king or heir handed to his crown, as a share of the ransom", RequireRestart = false)]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public float CrownGreatCaptiveReward { get; set; } = 0.1f;
@@ -5175,6 +5187,14 @@ namespace Armoury
         [SettingPropertyBool("Raven News", HintText = "news of far-off wars, battles and sieges reaches you as fast as a raven flies: wars declared and peace, alliances or non-aggression pacts made between other realms, sieges, raids and assaults, lords slain in battle or executed, taken captive, set free or risen as White Walkers come to you later the farther away they happened - about three days from King's Landing to Winterfell, four and a half from Pentos, a week from Qarth, never more than twelve days - with a note saying where the raven came from (e.g. 'A raven from Winterfell, 3 days on the wing: ...'). Tavern gossip about such news waits for the same raven. News about you, your clan, your close kin or your fiefs (on either side of a fight), wars, peace or alliances of your own realm, your realm's hosts gathering and deaths in its ruling house still come at once, and so does anything less than a day's ride away. Only your messages wait - the lords of the world know what they knew before. Ravens in flight are kept in the save. Off = all news at once, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool RavenNews { get; set; } = true;
+
+        [SettingPropertyBool("Raven Siege Once", HintText = "news that the same realm has besieged the same town or castle comes once in three days, not each time the siege camp is pitched again. Your own holdings and sieges are always told. Off = every time", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RavenSiegeOnce { get; set; } = true;
+
+        [SettingPropertyBool("Raven Never Empty", HintText = "a piece of news that the game leaves without words gets one (the death of a king, the death of a lord) instead of an empty line. Off = as the game writes it", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RavenNeverEmpty { get; set; } = true;
 
         [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -6579,6 +6599,10 @@ namespace Armoury
         [SettingPropertyBool("Bread For The Poor", HintText = "when the townsfolk or castle folk have been unable to afford their food for a week (the same hunger that hurts their contentment; it can start from day 120 of the campaign), the realm's crown tops up the purses of the poor to two days of food, out of the rest of its daily income after the wage refunds and before the rents; if the crown has nothing left, the lord of the place pays from his gold above his war reserve, but only from the part of his war chest that does not go to wages (at war this comes out of his equipment money), so in all he spends no faster than his war chest; a lord in debt never pays. The poor spend their purse as always - food first, then the rest of their basket - so in effect the bread covers what their earnings lack. Your own purse is never used. A place leaves the bread after a week of affording two days of food on its own. Off = the poor buy only what their purse allows, as before", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool BreadForThePoor { get; set; } = true;
+
+        [SettingPropertyBool("Bread For The Poor Saved", HintText = "with Bread For The Poor: the towns and castles fed by the crown stay fed after you save and load, instead of waiting a week of hunger again. Off = they start over after loading", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool BreadForThePoorSaved { get; set; } = true;
 
         [SettingPropertyBool("Town Folk Hunger Hurts", HintText = "when the townsfolk cannot afford their bread for a week, their contentment with food falls - not in the first 120 days of a campaign and only while there is food in the market; a town with no food at all is already punished by its empty granary, so its contentment is not cut twice. Off = as before: contentment with food follows what they could buy every day (needs Town Folk Satisfaction From Basket)", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -9312,6 +9336,10 @@ namespace Armoury
         [SettingPropertyGroup("Canon characters (21.10)")]
         public bool CanonCompanionsFollowStory { get; set; } = true;
 
+        [SettingPropertyBool("Canon Moves Captor Hero", HintText = "with Canon Companions Follow Story: a canon captive is taken by the lord who took him in the books (Jaime by Robb Stark at the Whispering Wood) and then held in the keep the story names. Off = he is simply put in that keep", RequireRestart = false)]
+        [SettingPropertyGroup("Canon characters (21.10)")]
+        public bool CanonMovesCaptorHero { get; set; } = true;
+
         [SettingPropertyBool("Town Menu Tidy", HintText = "the town menu is put in order: the inn and the local informants move into 'Go to the tavern district'; the game's smithy, your forge, the local blacksmith's repairs, the armory, the masters of Qohor and the cartwright and saddler into a new 'Go to the smithy'; day labour and the night watch into 'Look for paid work'; the town's books and dealings (People of this land, Realm ledger, Estates and livelihood, Living Economy, Banner Kings, buying a house, the town council's loan, proclaiming a tourney, kit for the garrison) into 'Town affairs'. Each place lists what it offers; every option works as before and shows under the same conditions. Takes effect when a save is loaded. Off = the town menu as before", RequireRestart = false)]
         [SettingPropertyGroup("The town menu")]
         public bool TownMenuTidy { get; set; } = true;
@@ -9524,6 +9552,14 @@ namespace Armoury
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueJaimeAtRiverrun { get; set; } = true;
 
+        [SettingPropertyBool("Prologue Ned No Ransom", HintText = "in a Prologue 298 campaign Lord Eddard Stark, seized for treason when King Robert dies, cannot be ransomed, freed at peace or escape from the black cells of King's Landing before his execution, as in the books. Off = he may be ransomed like any captive", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueNedNoRansom { get; set; } = true;
+
+        [SettingPropertyBool("Prologue Ned Ransom Refund", HintText = "once, in the campaign where it happened: the crown gives back to the North the 292,902 denars paid for Lord Eddard's freedom, a freedom King Joffrey never granted. Off = no refund", RequireRestart = false)]
+        [SettingPropertyGroup("Prologue 298 (new campaign)")]
+        public bool PrologueNedRansomRefund { get; set; } = true;
+
         [SettingPropertyBool("Prologue Hill Clans", HintText = "in a Prologue 298 campaign from day 118 the clans of the Mountains of the Moon (Painted Dogs, Burned Men, Milk Snakes, Black Ears) come down on the roads of the Vale: up to four bands of hill tribesmen around the Eyrie and the Bloody Gate, raised from the outlaws and the poor of the Vale (no one out of nothing), who prey on travellers like any band; after the prologue they stay as ordinary bands. Off = no clan bands", RequireRestart = false)]
         [SettingPropertyGroup("Prologue 298 (new campaign)")]
         public bool PrologueHillClans { get; set; } = true;
@@ -9547,6 +9583,14 @@ namespace Armoury
         [SettingPropertyBool("Canon Dorne Joins Crown", HintText = "after Myrcella is betrothed to Prince Trystane (about day 300 of the story) Dorne stands with the crown by a non-aggression pact (Diplomacy): Dorne keeps out of the war, as in the books, until Daenerys invades. Never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = no pact", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonDorneJoinsCrown { get; set; } = true;
+
+        [SettingPropertyBool("Canon Riverlands War At Prologue End", HintText = "in a Prologue 298 campaign the crown and House Lannister are at war with the Riverlands from King Robert's death, as in the books (Gregor's raids, the Golden Tooth, Riverrun). Off = Realm of Thrones' own date. Never if you rule either realm", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonRiverlandsWarAtPrologueEnd { get; set; } = true;
+
+        [SettingPropertyBool("Canon North Riverlands Alliance", HintText = "with the war above: the North and the Riverlands fight the crown as allies (Robb Stark, King in the North and the Trident) until the Red Wedding. Never if you rule either realm", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonNorthRiverlandsAlliance { get; set; } = true;
 
         [SettingPropertyBool("Daenerys Dragons Grow", HintText = "Daenerys' dragons grow up with the story: in the prologue they are still eggs, and while they grow none of them can carry her, so Daenerys rides a horse from her own train. Drogon first carries her when he is full-grown, as in the books (about the time of Daznak's Pit, before her invasion of Westeros). Only in Prologue 298 campaigns and in campaigns started after this update. Off = Drogon is full-grown from the first day, as in Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
@@ -10072,6 +10116,8 @@ namespace Armoury
             s.SiegeLadderMinRatio = SiegeLadderMinRatio;
             s.SiegeEnginesInProgressDontHold = SiegeEnginesInProgressDontHold;
             s.SiegeAssaultRunsToEnd = SiegeAssaultRunsToEnd;
+            s.SiegeAiHoldsFreshSiege = SiegeAiHoldsFreshSiege;
+            s.SiegeAiRetryCooldown = SiegeAiRetryCooldown;
             s.SiegeAiTrebuchetsHitWalls = SiegeAiTrebuchetsHitWalls;
             s.SiegeTrebuchetEarly = SiegeTrebuchetEarly;
             s.SiegeWallsLog = SiegeWallsLog;
@@ -10798,6 +10844,7 @@ namespace Armoury
             s.RansomDebtCapDays = RansomDebtCapDays;
             s.RansomKingFromTreasury = RansomKingFromTreasury;
             s.CrownGreatCaptives = CrownGreatCaptives;
+            s.RansomNoRewardToOwnKing = RansomNoRewardToOwnKing;
             s.CrownGreatCaptiveReward = CrownGreatCaptiveReward;
             s.CrownThirds = CrownThirds;
             s.CrownThirdsShare = CrownThirdsShare;
@@ -10901,6 +10948,8 @@ namespace Armoury
             s.HangoverSpeedPenaltyPercent = HangoverSpeedPenaltyPercent;
             s.HangoverMoralePenaltyPercent = HangoverMoralePenaltyPercent;
             s.RavenNews = RavenNews;
+            s.RavenSiegeOnce = RavenSiegeOnce;
+            s.RavenNeverEmpty = RavenNeverEmpty;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;
@@ -11252,6 +11301,7 @@ namespace Armoury
             s.TownFolkCastleCourtFeeds = TownFolkCastleCourtFeeds;
             s.TownFolkSatisfactionFromBasket = TownFolkSatisfactionFromBasket;
             s.BreadForThePoor = BreadForThePoor;
+            s.BreadForThePoorSaved = BreadForThePoorSaved;
             s.TownFolkHungerHurts = TownFolkHungerHurts;
             s.TownFolkStartReserves = TownFolkStartReserves;
             s.VillageLordScale = VillageLordScale;
@@ -11935,6 +11985,7 @@ namespace Armoury
             s.BookHoldingsFreeOwnPrisoners = BookHoldingsFreeOwnPrisoners;
             s.CanonCompanionsToClans = CanonCompanionsToClans;
             s.CanonCompanionsFollowStory = CanonCompanionsFollowStory;
+            s.CanonMovesCaptorHero = CanonMovesCaptorHero;
             s.TownMenuTidy = TownMenuTidy;
             s.CastleMenuTidy = CastleMenuTidy;
             s.VillageMenuTidy = VillageMenuTidy;
@@ -11988,12 +12039,16 @@ namespace Armoury
             s.PrologueHandTourney = PrologueHandTourney;
             s.PrologueTyrionHeld = PrologueTyrionHeld;
             s.PrologueJaimeAtRiverrun = PrologueJaimeAtRiverrun;
+            s.PrologueNedNoRansom = PrologueNedNoRansom;
+            s.PrologueNedRansomRefund = PrologueNedRansomRefund;
             s.PrologueHillClans = PrologueHillClans;
             s.PrologueMountainRaiders = PrologueMountainRaiders;
             s.PrologueBericHunt = PrologueBericHunt;
             s.PrologueEssosWarsCalendar = PrologueEssosWarsCalendar;
             s.CanonReachJoinsCrown = CanonReachJoinsCrown;
             s.CanonDorneJoinsCrown = CanonDorneJoinsCrown;
+            s.CanonRiverlandsWarAtPrologueEnd = CanonRiverlandsWarAtPrologueEnd;
+            s.CanonNorthRiverlandsAlliance = CanonNorthRiverlandsAlliance;
             s.DaenerysDragonsGrow = DaenerysDragonsGrow;
             s.StoryImagesForRotWindows = StoryImagesForRotWindows;
             s.LektorEnabled = LektorEnabled;

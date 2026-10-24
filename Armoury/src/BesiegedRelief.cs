@@ -594,6 +594,20 @@ namespace Armoury
         }
 
         /// <summary>KO / SK (oblezenia 3): zebrana odsiecz i wymagana dla tego oblezenia (ostatnie przeliczenie godziny OB5) albo "- (poza OB5)". Nie rzuca.</summary>
+        /// <summary>m116-fabula (SiegeWalls2.HoldFresh): odsiecz zebrana w drodze co najmniej rowna wymaganej (OB5) - oblegajacy nie jest trzymany pod murami.
+        /// Oblezenie poza OB5 - false. Tylko odczyt.</summary>
+        internal static bool ReliefReady(SiegeEvent ev)
+        {
+            try
+            {
+                Track t;
+                if (ev == null || !_tracks.TryGetValue(ev, out t)) return false;
+                float need = Math.Max(t.Need0, t.LastNeed);
+                return need > 0f && t.LastC >= need;
+            }
+            catch (Exception e) { Stumble("ReliefReady", e); return false; }
+        }
+
         internal static string ReliefOnWay(SiegeEvent ev)
         {
             try

@@ -65,7 +65,7 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         // liczniki doby (linia "Okupy (178)")
-        private static int _dAiN, _dCourierN, _dBrokerN, _dPlayerN, _dZeroN, _dBlockedN, _dCapN, _dKingN, _dGreatTakenN, _dDungeonN, _dBrokerShortN;
+        private static int _dAiN, _dCourierN, _dBrokerN, _dPlayerN, _dZeroN, _dBlockedN, _dCapN, _dKingN, _dGreatTakenN, _dDungeonN, _dBrokerShortN, _dRewardOwnKing;
         private static long _dPrice, _dCash, _dDebt, _dCapCut, _dKingCash, _dKingDebt, _dRewardQueued, _dRewardPaid, _dBaseThird, _dBaseLoot, _dBaseRansom, _dBasePurse,
                             _dBaseScreen, _dThirdsGot, _dThirdsPurse, _dThirdsCarry, _dToCrown, _dBrokerShort, _dBaseGold;
         private static string _dMax;
@@ -80,7 +80,7 @@ namespace Armoury
 
         private static void ZeroDay()
         {
-            _dAiN = _dCourierN = _dBrokerN = _dPlayerN = _dZeroN = _dBlockedN = _dCapN = _dKingN = _dGreatTakenN = _dDungeonN = _dBrokerShortN = 0;
+            _dAiN = _dCourierN = _dBrokerN = _dPlayerN = _dZeroN = _dBlockedN = _dCapN = _dKingN = _dGreatTakenN = _dDungeonN = _dBrokerShortN = _dRewardOwnKing = 0;
             _dPrice = _dCash = _dDebt = _dCapCut = _dKingCash = _dKingDebt = _dRewardQueued = _dRewardPaid = _dBaseThird = _dBaseLoot = _dBaseRansom = _dBasePurse = 0;
             _dBaseScreen = _dThirdsGot = _dThirdsPurse = _dThirdsCarry = _dToCrown = _dBrokerShort = _dBaseGold = 0;
             _dMax = null; _dMaxV = 0;
@@ -241,12 +241,15 @@ namespace Armoury
                 bool byCrown; double D;
                 long price = PriceOf(prisoner, out byCrown, out D);
                 long reward = (long)(Math.Max(0f, Math.Min(1f, Settings.Current.CrownGreatCaptiveReward)) * price);
+                // m116-fabula (Jeff 24.10, raport: Joffrey dostal 7322 zl nagrody ze skarbca wlasnej korony za Neda): zdobywca = krol korony zdobywcy - bez nagrody
+                bool ownKing = captor != null && captor == k.Leader && Settings.Current.RansomNoRewardToOwnKing;
+                if (ownKing) { _dRewardOwnKing++; reward = 0; }
                 if (captor != null && reward > 0) { _rewards.Add(new Reward { Hero = captor.StringId, Kingdom = k.StringId, Left = reward }); _dRewardQueued += reward; }
                 _dGreatTakenN++;
                 Log.Info("Okupy (178): wielki jeniec - " + Name(prisoner) + " (" + (prisoner.MapFaction != null && prisoner.MapFaction.Leader == prisoner ? "krol" : "nastepca tronu") + ", "
                          + prisoner.MapFaction.Name + ") pojmany przez " + Name(captor) + " - przechodzi na korone " + k.Name + "; okup ok. " + price + " zl do skarbca " + k.Name
-                         + ", nagroda dla zdobywcy " + reward + " zl ze skarbca.");
-                if (captor == Hero.MainHero)
+                         + (ownKing ? ", nagroda pominieta - zdobywca to krol korony (m116)." : ", nagroda dla zdobywcy " + reward + " zl ze skarbca."));
+                if (captor == Hero.MainHero && !ownKing)
                     Log.Player("You hand " + Name(prisoner) + " to your liege. The crown of " + k.Name + " will have the ransom, and pays you a reward of " + reward + " denars.");
             }
             catch (Exception e) { Stumble("OnPrisonerTaken", e); }
@@ -812,7 +815,7 @@ namespace Armoury
                   .Append(" | krol ze skarbca: ").Append(_dKingN).Append(" (gotowka ").Append(_dKingCash).Append(", nowy dlug korony ").Append(_dKingDebt).Append("; raty dlugu korony dzis ")
                   .Append(CrownIncome.LastKingRansomPaid).Append(", do splaty razem ").Append(CrownIncome.KingRansomDebtLeft()).Append(')')
                   .Append(" | wielcy jency: pojmani dzis ").Append(_dGreatTakenN).Append(", u koron zdobywcow ").Append(_crownCaptive.Count).Append(", okup do skarbcow zdobywcow ").Append(_dToCrown)
-                  .Append("; nagrody zdobywcow: nowe ").Append(_dRewardQueued).Append(", wyplacone ").Append(_dRewardPaid).Append(", czeka ").Append(pend)
+                  .Append("; nagrody zdobywcow: nowe ").Append(_dRewardQueued).Append(", wyplacone ").Append(_dRewardPaid).Append(", czeka ").Append(pend).Append(", pominiete - zdobywca krolem (m116) ").Append(_dRewardOwnKing)
                   .Append(" | prawo trzecich (1/9): podstawa - trzecie lordow ").Append(_dBaseThird).Append(" (korona 1/3), sprzedaz lupu lordow AI ").Append(_dBaseLoot)
                   .Append(", okupy otrzymane ").Append(_dBaseRansom).Append(", sakwy ludzi gracza ").Append(_dBasePurse).Append(", lup gracza z ekranu ").Append(_dBaseScreen).Append(", zloto z kies rozbitych i poddanych graczowi (3.2/112) ").Append(_dBaseGold)
                   .Append("; nalezne z dzisiejszej podstawy ").Append(Math.Round(due)).Append(" | sciagniete do skarbcow (rozliczenie dzis rano, podstawa wczoraj) ").Append(_dThirdsGot + _dThirdsPurse)
