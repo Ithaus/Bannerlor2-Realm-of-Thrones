@@ -741,6 +741,9 @@ namespace Armoury
                     string tmp;
                     if (!processed) cls[i] = AInne;                                                                       // DTE nie rozliczyl ciala
                     else if (!st.Naval && st.Temp != null && st.Temp.TryGetValue((EquipmentIndex)slot, out tmp) && tmp == it.StringId) cls[i] = AZast;
+                    // m117 (recenzja): zapas, gdy odczyt _temporaryItemIdBySlot sie nie zwiazal (st.Temp null) - wlasne ubranie cywilne agenta to sztuka
+                    // tymczasowa, nie kandydat Z1 "dodatkowo peknieta" (inaczej jedyny kandydat -> AddWreck = wrak z niczego); ten sam wzor co BattlefieldLaw.QueueWreck
+                    else if (!st.Naval && Civvies.IsWorn(affectedAgent, it)) cls[i] = AZast;
                     else if (pick != null && it.StringId == pick.StringId) cls[i] = ACios;
                     else if (!AiGear.DteTakes(it)) cls[i] = AOdrz;                                                        // czarna lista DTE
                     else if (!st.Naval && st.Tier >= 3 && slot >= (int)EquipmentIndex.Head && slot <= (int)EquipmentIndex.Cape

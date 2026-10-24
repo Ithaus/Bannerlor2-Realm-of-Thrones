@@ -70,8 +70,23 @@ nie ma sztuki, a DressCode tych ludzi celowo nie ubiera (ubranie ze wzorca bez o
   linia startu (wpiete), linia wyboru na kultury, dopisek m117 w linii "Bitwa gracza (sklad7b ...)" (tunika/buty > 0, wyjete z listy zbroi DTE > 0 przy poleglych ubranych,
   wrak zatrzymany (zapas) 0, potkniecia 0); zbrojownia DTE gracza i lorda bez tunik/butow cywilnych ponad stan sprzed bitwy, ekran lupu bez cywilnych wrakow, "sloty wzorca
   bez sztuki" bez spadku wobec bitwy o podobnym skladzie.
+- Recenzja m117 (2 uwagi, obie sprawdzone w kodzie i POPRAWIONE):
+  (1) LootTally.FelledPost - druga droga do wraku z ubrania (Z1 "dodatkowo peknieta", ExtraBrokenArmorWrecks): ubranie odsiewal tylko odczyt Assignment._temporaryItemIdBySlot
+  (_fTemp). Gdyby pole sie nie zwiazalo przy zwiazanych rekordach (RecordsOk), st.Temp = null, a ubranie (nie jest ani lupem, ani odrzutem) zostaloby jedynym kandydatem
+  u wroga tieru 3+ -> BattlefieldLaw.AddWreck = wrak z niczego. Przed m117 martwe (SpawnGuard zerowal tymczasowe sztuki zbroi), m117 to ozywia. Poprawka: zaraz po linii
+  st.Temp zapas `else if (!st.Naval && Civvies.IsWorn(affectedAgent, it)) cls[i] = AZast;` (wzor BattlefieldLaw.QueueWreck; przed kandydatami i przed ACios). Przy DTE 1.4.7
+  pole istnieje (Assignment._temporaryItemIdBySlot) - zapas nie zmienia wyniku, tylko zabezpiecza zmiane DTE. Na morzu kandydatow nie ma (warunek !st.Naval), jak dotad.
+  Druga propozycja recenzji (warunek _fTemp w Civvies.ArmorsHooked) - nie robiona: zapas IsWorn zamyka kanal bez wiazania ubierania z LootTally.
+  (2) CivilDress nie pomijal umarlych przy TroopsFightWithOwnKitOnly WYLACZONYM (ustawienie niedomyslne): zaloga Nocnego Krola przy GarrisonFightsWithArmoryOnly (BareOn)
+  idzie przez rozdzielacz jako rodzaj 2 (GarrisonDistributors: `if (OwnKitOn && Undead.Party(g)) continue` tylko przy OwnKitOn), a CivilDress sprawdzal tylko IsHero ->
+  wight z wzorcem z tulowiem/nogami dostalby ubranie z zapasu (c)/(d) (kultura Innych bez ubran - UniqueLaw.IsDead). Sprzeczne z tym wpisem ("bez umarlych") i opisem MCM.
+  Poprawka: SpawnInfo.Dead (zaloga z Undead.Party(g), liczone raz na zaloge; domyslny parametr - lordowie/gracz bez zmian, ich umarli i tak odpadaja w OwnAssignments)
+  i w CivilDress `si.Dead || Undead.Character(co)` -> bez ubrania; licznik "umarli pominieci (ludzi)" w dopisku m117 linii bitwy (przy domyslnych ustawieniach 0).
+  Kontrola: SpawnGuard/SaddleGuard/Missing/liczniki ludzi dla umarlych bez zmian (Dead czyta tylko CivilDress); IsWorn czyta rejestr _agents wypelniany przez RegisterPostfix
+  (ta sama sciezka co ArmorsPostfix i QueueWreck), czyszczony w DistributorsPostfix / EndMissionPostfix / Reset. Settings.cs bez zmian - gen_mcm niepotrzebny.
 **Status:** ZBUDOWANE - czeka na autotest i wgranie (gra Jeffa wlaczona). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne nowe; w zmienionych plikach tylko
-stare CS0169 BattlefieldLaw:34); Armoury.dll md5 f788045fed4df7305afce323114d2183.
+stare CS0169 BattlefieldLaw:34); Armoury.dll md5 f788045fed4df7305afce323114d2183; po recenzji (LootTally zapas IsWorn, CivilDress bez umarlych) md5
+306c634c3221aefa5937687ab950bc03.
 
 ## n36 cena ziemi wedlug stosunku 14-20 lat (galaz w-toku/m113-cena) - 24.10.2026
 

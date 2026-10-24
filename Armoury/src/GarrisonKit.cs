@@ -430,8 +430,9 @@ namespace Armoury
         private sealed class SpawnInfo
         {
             // Kind: 0 druzyna gracza, 1 lord AI, 2 zaloga; Clan - partia Twojego rodu (towarzysze, partie rodu; sklad7b-p - osobny licznik)
-            internal readonly object Asg; internal readonly int Kind; internal readonly MBGUID Party; internal readonly bool Clan;
-            internal SpawnInfo(object asg, int kind, MBGUID party, bool clan) { Asg = asg; Kind = kind; Party = party; Clan = clan; }
+            // Dead - zaloga umarlych (Nocny Krol; przy TroopsFightWithOwnKitOnly wylaczonym idzie przez rozdzielacz) - m117: bez ubrania cywilnego
+            internal readonly object Asg; internal readonly int Kind; internal readonly MBGUID Party; internal readonly bool Clan, Dead;
+            internal SpawnInfo(object asg, int kind, MBGUID party, bool clan, bool dead = false) { Asg = asg; Kind = kind; Party = party; Clan = clan; Dead = dead; }
         }
         private static readonly Dictionary<object, SpawnInfo> _spawn = new Dictionary<object, SpawnInfo>(RefEq.I);
         // sklad7b-p (uwaga 7): te same przydzialy po samym przydziale - licznik wystawionych przez DTE (RegisterSpawnedAgentAssignment) wobec strazy
@@ -462,7 +463,7 @@ namespace Armoury
             _bClanMen = _bClanMiss = _bFootP = _bFootL = _bFootG = _bNoLeader = _bOutside = _bOutsideTpl = _bDte = 0;
             _bSadP = _bSadL = _bSadG = 0;
             for (int i = 0; i < 3; i++) { _bCivBody[i] = 0; _bCivLeg[i] = 0; }   // m117: ubranie cywilne
-            _bCivNone = _bCivSkill = _bCivTpl = _bCivStumbles = 0; _bCivSample.Clear(); Civvies.ClearCounters();
+            _bCivNone = _bCivSkill = _bCivTpl = _bCivDead = _bCivStumbles = 0; _bCivSample.Clear(); Civvies.ClearCounters();
         }
 
         private static bool BattleTouched()
@@ -673,13 +674,14 @@ namespace Armoury
                         try { _run.Invoke(d, null); }
                         finally { _bareDist = null; }
                         var al = _fAssigns.GetValue(d) as IEnumerable;
+                        bool dead = bare && Undead.Party(g);   // m117 (recenzja): tu tylko przy TroopsFightWithOwnKitOnly wylaczonym (wlaczone - continue wyzej)
                         if (al != null)
                             foreach (var a in al)
                             {
                                 if (a == null) continue;
                                 _garAssign.Add(a);
                                 _asgParty[a] = g.Id;
-                                if (bare) { var eq = _fEq.GetValue(a); if (eq != null) { _spawn[eq] = new SpawnInfo(a, 2, g.Id, false); _spawnAsg.Add(a); } }
+                                if (bare) { var eq = _fEq.GetValue(a); if (eq != null) { _spawn[eq] = new SpawnInfo(a, 2, g.Id, false, dead); _spawnAsg.Add(a); } }
                             }
                         dists[g.Id] = d;
                         sides[g.Id] = pb.Side;
@@ -903,7 +905,7 @@ namespace Armoury
             foreach (var kv in _bCivSample) ex.Add(kv.Key + " " + (kv.Value[0] ?? "-") + "/" + (kv.Value[1] ?? "-"));
             return "; ubranie cywilne (m117, wlasne, poza zbrojownia) - tunika: gracz " + _bCivBody[0] + ", lordowie " + _bCivBody[1] + ", zalogi " + _bCivBody[2]
                    + "; buty: gracz " + _bCivLeg[0] + ", lordowie " + _bCivLeg[1] + ", zalogi " + _bCivLeg[2]
-                   + "; bez ubrania - wzorzec bez sztuki w slocie (projekt jednostki) " + _bCivTpl + ", brak sztuki dla kultury " + _bCivNone + ", ponad Atletyke " + _bCivSkill
+                   + "; bez ubrania - wzorzec bez sztuki w slocie (projekt jednostki) " + _bCivTpl + ", brak sztuki dla kultury " + _bCivNone + ", ponad Atletyke " + _bCivSkill + ", umarli pominieci (ludzi) " + _bCivDead
                    + "; " + Civvies.BattleNote() + ", potkniecia ubierania " + _bCivStumbles
                    + (ex.Count > 0 ? "; np. " + string.Join(", ", ex.ToArray()) : "");
         }
@@ -1148,7 +1150,7 @@ namespace Armoury
         // liczniki jednej bitwy: tunika / buty wedlug rodzaju (0 gracz, 1 lordowie AI, 2 zalogi); bez ubrania - wzorzec bez sztuki w slocie,
         // brak sztuki dla kultury, ponad Atletyke; przyklady kultura -> [tunika, buty] (najwyzej 8)
         private static readonly int[] _bCivBody = new int[3], _bCivLeg = new int[3];
-        private static int _bCivNone, _bCivSkill, _bCivTpl, _bCivStumbles;
+        private static int _bCivNone, _bCivSkill, _bCivTpl, _bCivDead, _bCivStumbles;   // _bCivDead - umarli pominieci (ludzie, nie sloty)
         private static readonly Dictionary<string, string[]> _bCivSample = new Dictionary<string, string[]>();
 
         private static void CivStumble(string where, Exception e) { if (++_bCivStumbles <= 3) Log.Error("GarrisonKit." + where, e); }
@@ -1166,7 +1168,9 @@ namespace Armoury
             CharacterObject co;
             try { co = _getChar.Invoke(si.Asg, null) as CharacterObject; }
             catch (Exception e) { CivStumble("CivilDress", e); return 0; }
-            if (co == null || co.IsHero) return 0;
+            // m117 (recenzja): bez bohaterow i bez umarlych (zaloga Nocnego Krola przy TroopsFightWithOwnKitOnly wylaczonym albo wight z kultury Innych) -
+            // umarli poza gospodarka; kultura Innych nie ma ubran (UniqueLaw.IsDead), wiec wybor szedlby do zapasow (c)/(d) - cudze ubranie na trupie
+            if (co == null || co.IsHero || si.Dead || Undead.Character(co)) { if (co != null && !co.IsHero) _bCivDead++; return 0; }
             ItemObject[] worn = null;
             int n = 0, kind = si.Kind < 0 || si.Kind > 2 ? 2 : si.Kind;
             for (int k = 0; k < CivSlots.Length; k++)
