@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -26,6 +27,8 @@ namespace Armoury
     ///    wioski, sprawdzenie pieniadza swiata, kiesy sprzedawcy i jednorazowych, wymuszony blad przeniesienia (zwrot co do grosza), odkup bez blokady 182 dob, zapis
     ///    tam i z powrotem trzech napisow, kupno wioski, ktora zostaje (T10, do zapisu); Lordship i zamek. Gdy oferty nie na kieszen gracza - dotacja testu
     ///    (linia "TEST dotacja testu ... (poza bilansem)"); krok, ktory nie mogl ruszyc, to NIEPOKRYTY, a linia wyniku konczy sie TAK / NIE / NIEPOKRYTY.
+    ///    Test n36: T11/T12 - bramy, ktore gracz zmieni w grze (stosunek ze sprzedawca, wasal krolestwa sprzedawcy), test spelnia sam (linie "TEST warunek testu ..."),
+    ///    potem kupno z kontrolami jak T3-T8; T12 "wyjatki przy zmianie pana" - ERROR in Armoury i wyjatki rzucone w czasie kupna (sluchacze innych modow).
     /// </summary>
     internal static partial class LandSale
     {
@@ -499,51 +502,208 @@ namespace Armoury
                     foreach (var n in new[] { "T3 kupno wioski", "T4 pieniadz swiata", "T5 kiesa sprzedawcy", "T6 jednorazowe sprzedawcy", "T7 blad przeniesienia - zwrot", "T8 zapis tam i z powrotem", "T9 odkup", "T10 kupno do zapisu (zostaje)" })
                         skip(n, w);
                 }
-                // T11 Lordship (B2) i T12 zamek (B3) - pierwsza oferta na kieszen gracza; test n36: gdy zadnej - najtansza z dotacja testu
+                // T11 Lordship (B2) i T12 zamek (B3) - test n36: oferty budowane z _testLift - bramy, ktore gracz zmieni w grze (stosunek ze sprzedawca, wasal
+                // krolestwa sprzedawcy; zloto - dotacja testu), nie zamykaja oferty; test je spelnia sam (linia "TEST warunek testu ..."), buduje oferte od nowa
+                // i kupuje z kontrolami jak T3-T8. Bramy, ktorych gracz nie zmieni (brak tytulu BK, jedyna siedziba, odstep, ustawienia) - NIEPOKRYTY z powodem.
+                var pc = Clan.PlayerClan;
+                string lw = null, cw = null;
+                List<Offer> lifted(bool castle)
+                {
+                    var l = new List<Offer>();
+                    string first = null, firstShown = null;
+                    _testLift = true;
+                    try
+                    {
+                        if (castle) { foreach (var st in Settlement.All) { if (st == null || !st.IsCastle) continue; var o = BuildCastle(st.StringId); if (o.Ok) l.Add(o); else { if (first == null) first = o.Why; if (firstShown == null && !o.Hide) firstShown = o.Why; } } }
+                        else foreach (var v in Village.All) { if (v == null || v.Settlement == null) continue; var o = BuildLord(v.Settlement.StringId); if (o.Ok) l.Add(o); else { if (first == null) first = o.Why; if (firstShown == null && !o.Hide) firstShown = o.Why; } }
+                    }
+                    finally { _testLift = false; }
+                    if (castle) cw = firstShown ?? first; else lw = firstShown ?? first;
+                    return l;
+                }
+                bool deepOf(Offer o) { return DeepDebt(o.Owed, o.D); }
+                bool noLift(Offer o) { return o.TestRel == int.MinValue && o.TestJoin == null; }
+                // zamek: sprzedawca w glebokim dlugu, potem bez zmiany krolestwa gracza, potem najtanszy
+                int castleCmp(Offer a, Offer b)
+                {
+                    int x = (deepOf(b) ? 1 : 0) - (deepOf(a) ? 1 : 0); if (x != 0) return x;
+                    x = (a.TestJoin != null ? 1 : 0) - (b.TestJoin != null ? 1 : 0); if (x != 0) return x;
+                    return a.Price.CompareTo(b.Price);
+                }
+                // zamek planowany przed T11: Lordship z warunkami testu bierze krolestwo sprzedawcy tego zamku - jedno wasalstwo na oba kroki
+                Kingdom planK = null;
+                if (Settings.Current.LandSalesCastles)
+                {
+                    var cp = lifted(true); cp.Sort(castleCmp);
+                    if (cp.Count > 0) planK = cp[0].TestJoin ?? (cp[0].Seller != null ? cp[0].Seller.Kingdom : null);
+                }
+                int joins = 0;
+                // warunki testu: wasal krolestwa sprzedawcy (ChangeKingdomAction.ApplyByJoinToKingdom - droga gry, konczy sluzbe najemnika, stosunki z wojnami
+                // krolestwa), potem stosunek ze sprzedawca dokladnie do progu (ChangeRelationAction; przyrost gry z mnoznikiem moze przeskoczyc - zmiana w dol bez
+                // mnoznika cofa do progu); na koniec te same bramy co oferta (CommonGate, VassalGate) - nie przeszly = NIE
+                bool lift(Offer o, string what, out string note)
+                {
+                    note = "";
+                    if (o.TestJoin != null && (pc.Kingdom != o.TestJoin || pc.IsUnderMercenaryService))
+                    {
+                        string was = pc.Kingdom != null ? Txt(pc.Kingdom.Name) + " (" + pc.Kingdom.StringId + (pc.IsUnderMercenaryService ? ", najemnik" : ", wasal") + ")" : "bez krolestwa";
+                        ChangeKingdomAction.ApplyByJoinToKingdom(pc, o.TestJoin, default(CampaignTime), false);
+                        joins++;
+                        string now = pc.Kingdom != null ? Txt(pc.Kingdom.Name) + " (" + pc.Kingdom.StringId + (pc.IsUnderMercenaryService ? ", najemnik" : ", wasal") + ")" : "bez krolestwa";
+                        Log.Info(P + "TEST warunek testu - " + what + ": rod gracza wasalem krolestwa " + Txt(o.TestJoin.Name) + " (" + o.TestJoin.StringId + ") przez ChangeKingdomAction.ApplyByJoinToKingdom"
+                                 + " - wczesniej " + was + ", teraz " + now + (pc.Kingdom == o.TestJoin && !pc.IsUnderMercenaryService ? "" : " - NIE WYSZLO") + " (tylko ten test).");
+                        note = "wasal " + o.TestJoin.StringId + " (wczesniej " + was + ")";
+                    }
+                    if (o.TestRel != int.MinValue && o.Head != null)
+                    {
+                        int r0 = (int)o.Head.GetRelationWithPlayer(), r = r0;
+                        for (int i = 0; i < 5 && r < o.TestRel; i++) { ChangeRelationAction.ApplyPlayerRelation(o.Head, o.TestRel - r, false, false); r = (int)o.Head.GetRelationWithPlayer(); }
+                        int up = r;
+                        if (r > o.TestRel) { ChangeRelationAction.ApplyPlayerRelation(o.Head, o.TestRel - r, false, false); r = (int)o.Head.GetRelationWithPlayer(); }
+                        Log.Info(P + "TEST warunek testu - " + what + ": stosunek gracza z " + NameOf(o.Head) + " " + r0 + " -> " + r + " (prog " + o.TestRel + ", ChangeRelationAction.ApplyPlayerRelation"
+                                 + (up != r ? ", przyrost gry do " + up + " cofniety do progu" : "") + ") (tylko ten test).");
+                        note += (note.Length > 0 ? ", " : "") + "stosunek " + r0 + " -> " + r + " (prog " + o.TestRel + ")";
+                    }
+                    int relMin = o.Kind == KLord ? Settings.Current.LandRelationLordship : Settings.Current.LandRelationCastle;
+                    string g = CommonGate(o.Head, relMin) ?? VassalGate(o.Seller, o.St != null ? o.St.MapFaction : null);
+                    if (g != null) { note = "warunek testu nie spelniony: " + g + (note.Length > 0 ? " (po zmianach: " + note + ")" : ""); return false; }
+                    if (note.Length > 0) note = "warunki testu: " + note;
+                    return true;
+                }
+                // kupno z kontrolami T4-T6 (pieniadz swiata, kiesa sprzedawcy, jednorazowe sprzedawcy) i T8 (arm_land113 tam i z powrotem, transakcja w zapisie);
+                // wyjatki w czasie kupna: ERROR in Armoury (Log.Errors), potkniecia ziemi i wyjatki rzucone na tym watku (FirstChanceException - takze zlapane
+                // dalej, np. w sluchaczach zmiany pana innych modow): typ, miejsce rzutu i pierwsza ramka spoza mscorlib/TaleWorlds/Armoury
+                bool buyChecked(Offer o, out string t, out string ex, out bool exOk)
+                {
+                    var head = o.Head; var seller = o.Seller;
+                    long w0 = WorldGold(), hg0 = head.Gold, pg0 = me.Gold, adv0 = DebtLadder.AdvNothingNow, owed0 = DebtLadder.OwedOf(seller);
+                    long once0, real0; ClanIncomeBook.OnceToday(seller, out once0, out real0);
+                    int deals0 = _deals.Count, err0 = Log.Errors, st0 = _stAll, fcN = 0;
+                    var fc = new List<string>(); bool inFc = false;
+                    int tid = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                    EventHandler<System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs> fh = (s, a) =>
+                    {
+                        if (inFc || System.Threading.Thread.CurrentThread.ManagedThreadId != tid) return;
+                        inFc = true;
+                        try
+                        {
+                            fcN++;
+                            if (fc.Count < 4)
+                            {
+                                var e = a.Exception; var m = e != null ? e.TargetSite : null;
+                                string at = m != null && m.DeclaringType != null ? m.DeclaringType.Assembly.GetName().Name + "!" + m.DeclaringType.Name + "." + m.Name : "?";
+                                string by = "";
+                                var fr = new StackTrace(1, false).GetFrames();
+                                if (fr != null)
+                                    foreach (var f in fr)
+                                    {
+                                        var fm = f != null ? f.GetMethod() : null;
+                                        var dt = fm != null ? fm.DeclaringType : null;
+                                        if (dt == null) continue;
+                                        string an = dt.Assembly.GetName().Name;
+                                        if (an == "mscorlib" || an.StartsWith("System", StringComparison.Ordinal) || an.StartsWith("TaleWorlds", StringComparison.Ordinal) || an == "Armoury" || an.StartsWith("0Harmony", StringComparison.Ordinal)) continue;
+                                        by = ", z " + an + "!" + dt.Name + "." + fm.Name; break;
+                                    }
+                                fc.Add((e != null ? e.GetType().Name : "?") + " w " + at + by);
+                            }
+                        }
+                        catch { }
+                        finally { inFc = false; }
+                    };
+                    AppDomain.CurrentDomain.FirstChanceException += fh;
+                    try { Execute(o); }
+                    finally { AppDomain.CurrentDomain.FirstChanceException -= fh; }
+                    long once1, real1; ClanIncomeBook.OnceToday(seller, out once1, out real1);
+                    long cred = owed0 - DebtLadder.OwedOf(seller), advN = DebtLadder.AdvNothingNow - adv0;
+                    bool okW = WorldGold() - w0 == -advN;
+                    bool okP = head.Gold - hg0 == o.Price - cred && pg0 - me.Gold == o.Price;
+                    bool okO = once1 == once0 && real1 == real0;
+                    string el = Export(), fl = RoundTrip(el);
+                    bool okS = el == fl && _deals.Count == Math.Min(200, deals0 + 1);
+                    t = "pieniadz swiata " + w0 + " -> " + WorldGold() + " (zaliczka w nicosc " + advN + ") " + (okW ? "ok" : "ZLE")
+                      + "; glowa sprzedawcy +" + (hg0 <= head.Gold ? "" : "-") + Math.Abs(head.Gold - hg0) + ", wierzycielom " + cred + ", gracz -" + (pg0 - me.Gold) + " " + (okP ? "ok" : "ZLE")
+                      + "; jednorazowe sprzedawcy " + once0 + " -> " + once1 + ", od platnikow " + real0 + " -> " + real1 + " " + (okO ? "ok" : "ZLE")
+                      + "; arm_land113 tam i z powrotem " + (el == fl ? "rowne" : "ROZNE") + ", transakcji " + deals0 + " -> " + _deals.Count + " " + (okS ? "ok" : "ZLE");
+                    int errN = Log.Errors - err0, stN = _stAll - st0;
+                    exOk = errN == 0 && stN == 0;
+                    ex = "ERROR in Armoury +" + errN + ", potkniecia ziemi +" + stN + ", wyjatki rzucone w czasie kupna " + fcN + (fc.Count > 0 ? " (" + string.Join("; ", fc.ToArray()) + ")" : "");
+                    return okW && okP && okO && okS;
+                }
                 if (!Settings.Current.LandSalesLordships) skip("T11 Lordship", "wylaczone w ustawieniach");
                 else if (!LandBk.Ready) skip("T11 Lordship", "ksiega tytulow BK nieczynna");
                 else
                 {
-                    Offer lo = null, lc = null; string lw = null;
-                    foreach (var v in Village.All)
+                    var ll = lifted(false);
+                    // Lordship: bez warunkow testu, potem w krolestwie planowanego zamku (albo bez zmiany krolestwa), potem najtansza
+                    ll.Sort((a, b) =>
                     {
-                        if (v == null || v.Settlement == null) continue;
-                        var o = BuildLord(v.Settlement.StringId);
-                        if (!o.Ok) { if (lw == null) lw = o.Why; continue; }
-                        if (o.Price <= me.Gold) { lo = o; break; }
-                        if (lc == null || o.Price < lc.Price) lc = o;
-                    }
-                    if (lo == null && lc != null) { grant(lc.Price, "T11 Lordship " + lc.Name + " (" + lc.Id + ")"); lo = lc; }
-                    if (lo != null)
+                        int x = (noLift(a) ? 0 : 1) - (noLift(b) ? 0 : 1); if (x != 0) return x;
+                        x = (a.TestJoin == null || a.TestJoin == planK ? 0 : 1) - (b.TestJoin == null || b.TestJoin == planK ? 0 : 1); if (x != 0) return x;
+                        return a.Price.CompareTo(b.Price);
+                    });
+                    if (ll.Count == 0) skip("T11 Lordship", "brak oferty (" + (lw ?? "-") + ")");
+                    else
                     {
-                        var seller = lo.Head; Execute(lo);
-                        bool mine = LandBk.DeJure(LandBk.Title(lo.St)) == me;
-                        add("T11 Lordship", mine && LandBk.DeJureCount(seller) >= 1, lo.Name + " za " + lo.Price + ", de iure gracza " + (mine ? "tak" : "NIE") + ", sprzedawcy zostaje tytulow " + LandBk.DeJureCount(seller));
+                        var p = ll[0]; string note;
+                        if (!lift(p, "T11 Lordship " + p.Name + " (" + p.Id + ")", out note)) add("T11 Lordship", false, p.Name + " (" + p.Id + "): " + note);
+                        else
+                        {
+                            var lo = BuildLord(p.Id);
+                            if (!lo.Ok) skip("T11 Lordship", "po warunkach testu brak oferty " + p.Name + " (" + lo.Why + ")" + (note.Length > 0 ? "; " + note : ""));
+                            else
+                            {
+                                grant(lo.Price, "T11 Lordship " + lo.Name + " (" + lo.Id + ")");
+                                var seller = lo.Head; string t, ex; bool exOk;
+                                bool okM = buyChecked(lo, out t, out ex, out exOk);
+                                bool mine = LandBk.DeJure(LandBk.Title(lo.St)) == me;
+                                int left = LandBk.DeJureCount(seller);
+                                add("T11 Lordship", mine && left >= 1 && okM, lo.Name + " (" + lo.Id + ") za " + lo.Price + " od " + NameOf(seller) + ", de iure gracza " + (mine ? "tak" : "NIE") + ", sprzedawcy zostaje tytulow " + left
+                                    + "; " + t + "; " + ex + (note.Length > 0 ? "; " + note : ""));
+                            }
+                        }
                     }
-                    else skip("T11 Lordship", "brak oferty (" + (lw ?? "-") + ")");
                 }
                 if (!Settings.Current.LandSalesCastles) skip("T12 zamek", "wylaczone w ustawieniach");
                 else
                 {
-                    Offer co = null, cc = null; string cw = null;
-                    foreach (var st in Settlement.All)
+                    var cl = lifted(true); cl.Sort(castleCmp);   // od nowa po T11 (wasalstwo z T11, zloto, odstepy)
+                    if (cl.Count == 0) skip("T12 zamek", "brak oferty (" + (cw ?? "-") + ")");
+                    else
                     {
-                        if (st == null || !st.IsCastle) continue;
-                        var o = BuildCastle(st.StringId);
-                        if (!o.Ok) { if (cw == null) cw = o.Why; continue; }
-                        if (o.Price <= me.Gold) { co = o; break; }
-                        if (cc == null || o.Price < cc.Price) cc = o;
+                        var p = cl[0]; string note; bool deep = deepOf(p);
+                        if (!lift(p, "T12 zamek " + p.Name + " (" + p.Id + ")", out note)) add("T12 zamek", false, p.Name + " (" + p.Id + "): " + note);
+                        else
+                        {
+                            var co = BuildCastle(p.Id);
+                            if (!co.Ok) skip("T12 zamek", "po warunkach testu brak oferty " + p.Name + " (" + co.Why + ")" + (note.Length > 0 ? "; " + note : ""));
+                            else
+                            {
+                                grant(co.Price, "T12 zamek " + co.Name + " (" + co.Id + ")");
+                                var st = co.St; var head = co.Head; var seller = co.Seller;
+                                var gp = st.Town.GarrisonParty; int g0 = gp != null && gp.MemberRoster != null ? gp.MemberRoster.TotalManCount : -1;
+                                // tytuly BK sprzedawcy: zamek i wsie zamku, ktorych de iure jest sprzedawca - wszystkie maja przejsc do gracza (Transfer: AddBarter albo InheritTitle)
+                                var tl = new List<object>();
+                                if (LandBk.Ready)
+                                {
+                                    var ct = LandBk.Title(st); if (ct != null && LandBk.DeJure(ct) == head) tl.Add(ct);
+                                    foreach (var bv in st.BoundVillages) { if (bv == null || bv.Settlement == null) continue; var vt = LandBk.Title(bv.Settlement); if (vt != null && LandBk.DeJure(vt) == head) tl.Add(vt); }
+                                }
+                                string home0 = seller.HomeSettlement != null ? seller.HomeSettlement.StringId : "-", ph0 = pc.HomeSettlement != null ? pc.HomeSettlement.StringId : "-";
+                                string t, ex; bool exOk;
+                                bool okM = buyChecked(co, out t, out ex, out exOk);
+                                gp = st.Town.GarrisonParty; int g1 = gp != null && gp.MemberRoster != null ? gp.MemberRoster.TotalManCount : -1;
+                                int tk = 0; foreach (var x in tl) if (LandBk.DeJure(x) == me) tk++;
+                                string home1 = seller.HomeSettlement != null ? seller.HomeSettlement.StringId : "-", ph1 = pc.HomeSettlement != null ? pc.HomeSettlement.StringId : "-";
+                                bool own = st.OwnerClan == pc, okT = own && g0 == g1 && tk == tl.Count && seller.HomeSettlement != st;
+                                add("T12 zamek", okT && okM, co.Name + " (" + co.Id + ") za " + co.Price + " od " + NameOf(head) + (deep ? " (gleboki dlug)" : " (bez glebokiego dlugu)") + ", pan " + (own ? "gracz" : "NIE gracz")
+                                    + ", zaloga " + g0 + " -> " + g1 + ", tytuly BK sprzedawcy u gracza " + tk + "/" + tl.Count + ", HomeSettlement sprzedawcy " + home0 + " -> " + home1 + (seller.HomeSettlement == st ? " ZLE" : "")
+                                    + ", gracza " + ph0 + " -> " + ph1 + "; " + t + (note.Length > 0 ? "; " + note : ""));
+                                add("T12 wyjatki przy zmianie pana", exOk, ex);
+                            }
+                        }
                     }
-                    if (co == null && cc != null) { grant(cc.Price, "T12 zamek " + cc.Name + " (" + cc.Id + ")"); co = cc; }
-                    if (co != null)
-                    {
-                        var gp = co.St.Town.GarrisonParty; int g0 = gp != null ? gp.MemberRoster.TotalManCount : -1;
-                        Execute(co);
-                        gp = co.St.Town.GarrisonParty; int g1 = gp != null ? gp.MemberRoster.TotalManCount : -1;
-                        add("T12 zamek", co.St.OwnerClan == Clan.PlayerClan && g0 == g1, co.Name + " za " + co.Price + ", zaloga " + g0 + " -> " + g1);
-                    }
-                    else skip("T12 zamek", "brak oferty (" + (cw ?? "-") + ")");
                 }
+                if (joins > 0) Log.Info(P + "TEST warunek testu: zmian krolestwa gracza " + joins + " - rod gracza zostaje w " + (pc.Kingdom != null ? Txt(pc.Kingdom.Name) + " (" + pc.Kingdom.StringId + ")" : "bez krolestwa") + " do konca biegu.");
             }
             catch (Exception e) { add("wyjatek", false, e.GetType().Name + ": " + e.Message); Stumble("Test", e); }
             finally { _forceNeed = false; _forceFail = false; _bypassResale = false; }

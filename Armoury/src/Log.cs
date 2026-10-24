@@ -579,8 +579,13 @@ namespace Armoury
             return null;
         }
 
+        private static int _errN;
+        /// <summary>Test n36: liczba wywolan Log.Error w sesji (autotest ziemi - wyjatki w czasie kupna).</summary>
+        internal static int Errors { get { return Volatile.Read(ref _errN); } }
+
         internal static void Error(string where, Exception e)
         {
+            Interlocked.Increment(ref _errN);
             if (_path == null) return;
             try { ErrorText("ERROR in " + where + ": " + e); }
             catch { }

@@ -102,7 +102,7 @@ namespace Armoury
         private static int _dryDay = -1000;
         private static bool _dryDone, _testDone;
         // autotest
-        private static bool _forceNeed, _forceFail, _bypassResale;
+        private static bool _forceNeed, _forceFail, _bypassResale, _testLift;   // test n36: _testLift - bramy, ktore gracz zmieni w grze, nie zamykaja oferty (LiftGates)
 
         internal static void Reset()
         {
@@ -110,7 +110,7 @@ namespace Armoury
             _st.Clear(); _stAll = _stDay = 0; _queued = null; InPay = false;
             _dBuilt = _dDeals = _dDropped = _dRefund = _dAsk = _dWindows = _dSellBack = 0;
             _dryDay = -1000; _dryDone = false; _testDone = false;
-            _forceNeed = _forceFail = _bypassResale = false;
+            _forceNeed = _forceFail = _bypassResale = _testLift = false;
             _distRecs = null; _distFrom = null;
             TalkReset();
         }
@@ -146,6 +146,7 @@ namespace Armoury
             public double OwnDues, DuesRate; // udzialy wiosek pobocznych gracza placone przez sprzedawce (dziennie) i stawka powinnosci korony od ziemi
             public string FixNote = "-";     // poprawka pory roku (log)
             public bool Hide;                // menu: powod, ktorego gracz nie zmieni (ustawienia, brak tytulu, BK, juz gracza) - opcja ukryta
+            public int TestRel = int.MinValue; public Kingdom TestJoin;   // test n36 (_testLift): prog stosunku do spelnienia i krolestwo sprzedawcy do wasalstwa
             public string Sig { get { return Kind + ":" + Id + ":" + Price; } }
         }
 
@@ -419,6 +420,24 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>Z3 Lordship i zamku: CommonGate, potem VassalGate. Test n36 (_testLift, tylko autotest ziemi): bramy, ktore gracz zmieni w grze - stosunek
+        /// ze sprzedawca (o.TestRel = prog) i wasal krolestwa sprzedawcy (o.TestJoin) - nie zamykaja oferty; test je spelnia i buduje oferte od nowa bez _testLift.
+        /// Zostaja: wojna, niewola, bitwa, ziemia poza krolestwem sprzedawcy, gracz wladca albo wasal innego krolestwa z lennami.</summary>
+        private static string LiftGates(Offer o, Hero head, int relMin, Clan seller, IFaction holding)
+        {
+            if (!_testLift) return CommonGate(head, relMin) ?? VassalGate(seller, holding);
+            string g = CommonGate(head, int.MinValue);
+            if (g != null) return g;
+            if ((int)head.GetRelationWithPlayer() < relMin) o.TestRel = relMin;
+            g = VassalGate(seller, holding);
+            if (g == null) return null;
+            var pc = Clan.PlayerClan; var k = seller != null ? seller.Kingdom : null;
+            if (pc == null || k == null || k.IsEliminated || holding != k) return g;
+            if (pc.Kingdom != null && pc.Kingdom != k && !pc.IsUnderMercenaryService && (pc.Kingdom.RulingClan == pc || pc.Settlements.Count > 0)) return g;
+            o.TestJoin = k;
+            return null;
+        }
+
         /// <summary>B2: oferta tytulu Lordship wsi gry stId (Z1-Z4). Nie rzuca.</summary>
         internal static Offer BuildLord(string stId)
         {
@@ -440,7 +459,7 @@ namespace Armoury
                 if (dj == Hero.MainHero || (dj != null && dj.Clan == Clan.PlayerClan)) { o.Why = "Its lordship is yours already."; o.Hide = true; return o; }
                 if (dj == null || !dj.IsAlive || dj.Clan == null || dj.Clan.Leader != dj) { o.Why = "Its lordship is held by " + NameOf(dj) + ", who cannot sell for " + His(dj) + " house."; return o; }
                 if (NeverSeller(dj.Clan, false)) { o.Why = HouseOf(dj.Clan) + " does not sell land."; return o; }
-                string g = CommonGate(dj, s.LandRelationLordship) ?? VassalGate(dj.Clan, st.MapFaction);
+                string g = LiftGates(o, dj, s.LandRelationLordship, dj.Clan, st.MapFaction);
                 if (g != null) { o.Why = g; return o; }
                 if (LandBk.DeJureCount(dj) < 2) { o.Why = NameOf(dj) + " holds no other title - " + He(dj) + " will not sell " + His(dj) + " last one."; return o; }
                 if (v.VillageState != Village.VillageStates.Normal) { o.Why = o.Name + " lies raided - nobody sells land now."; return o; }
@@ -483,7 +502,7 @@ namespace Armoury
                 if (Array.IndexOf(Twins, st.StringId) >= 0) { o.Why = "This castle is not for sale."; return o; }
                 // recenzja m113: twierdza trzymana tymczasowo (glosowanie krolestwa o panu po zdobyciu / wygasnieciu rodu) - zmiana pana skasowalaby decyzje krolestwa
                 if (st.Town.IsOwnerUnassigned) { o.Why = "The realm has not yet decided who holds this castle - it cannot be sold."; return o; }
-                string g = CommonGate(h, s.LandRelationCastle) ?? VassalGate(c, st.MapFaction);
+                string g = LiftGates(o, h, s.LandRelationCastle, c, st.MapFaction);
                 if (g != null) { o.Why = g; return o; }
                 int others = 0;
                 var fs = c.Fiefs;
