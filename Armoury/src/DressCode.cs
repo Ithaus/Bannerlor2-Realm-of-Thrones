@@ -28,6 +28,8 @@ namespace Armoury
     /// sklad7b-p: ludzi partii z ta regula, ktorych straz nie widziala (GarrisonKit.OutsideGuard),
     /// tez nie ubieramy - w strone braku, z licznikiem w linii bitwy.
     /// Zostaja: partie bez zbrojowni DTE (bandyci, karawany, milicja...) i umarli.
+    /// m117-ubranie: ludzie "tylko to, co ma" bez tulowia / nog ze zbrojowni dostaja w OwnKitSpawn wlasne ubranie cywilne
+    /// (sztuka tymczasowa DTE - GarrisonKit.CivilDress, Civvies), nie sztuke wzorca stad.
     /// </summary>
     internal static class DressCode
     {

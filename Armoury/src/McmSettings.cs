@@ -840,6 +840,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool TroopsFightWithOwnKitOnly { get; set; } = true;
 
+        [SettingPropertyBool("Bare Troops Wear Civilian Clothes", HintText = "in your battles a soldier who fights only with his party's stores (Troops Fight With Own Kit Only; garrisons with Garrison Fights With Armory Only) and gets no body armour or no boots from them wears the cheapest civilian tunic and shoes of his own culture instead of going bare - his own clothes from home, not armory gear: never taken from or returned to the stores, never looted, broken into scrap or sold. Only where his troop's template has a piece in that slot (troops bare-chested by design stay as they are) and only what his Athletics allows; head, hands, cape, weapons and horse are not affected, nor heroes and the dead (off = he fights bare, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool BareTroopsWearCivilianClothes { get; set; } = true;
+
         [SettingPropertyBool("Lord Battle Kit Is Lent", HintText = "only when Troops Fight With Own Kit Only is off: in your battles Dynamic Troop Equipment fills an AI lord's soldier's empty slots with his template kit out of thin air: that kit is only lent for the battle and no longer goes into the lord's stores afterwards (nor into your spoils from them); the men still fight with it (off: as before, it stays in the lord's stores)", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool LordBattleKitIsLent { get; set; } = false;
@@ -9861,6 +9865,7 @@ namespace Armoury
             s.GarrisonFightsWithArmoryOnly = GarrisonFightsWithArmoryOnly;
             s.GarrisonArmoryMinFillPercent = GarrisonArmoryMinFillPercent;
             s.TroopsFightWithOwnKitOnly = TroopsFightWithOwnKitOnly;
+            s.BareTroopsWearCivilianClothes = BareTroopsWearCivilianClothes;
             s.LordBattleKitIsLent = LordBattleKitIsLent;
             s.AiWearEnabled = AiWearEnabled;
             s.MineWagesStayInTown = MineWagesStayInTown;

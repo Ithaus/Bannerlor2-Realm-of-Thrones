@@ -1559,6 +1559,9 @@ namespace Armoury
         {
             try
             {
+                // m117 (zapas): wlasne ubranie cywilne agenta to nie sztuka zbrojowni - nie ma z niego wraka (latka Civvies.ArmorsPostfix i tak
+                // wyjmuje je z listy zbroi DTE; tu tylko, gdyby dla tego agenta nie zadzialala)
+                if (_lastPick != null && Civvies.IsWorn(affectedAgent, _lastPick)) { Civvies.NoteWreckStopped(); _lastPick = null; }
                 // Jeff 04.10 ("ma byc historycznie"): rozbita czesc WLASNEGO poleglego tez zostaje na polu jako wrak -
                 // kto utrzyma pole, ten ja zbiera (przegrana: DropShare czysci worek). Wczesniej znikala.
                 if (_lastPick != null && Settings.Current.WreckSalvageEnabled &&

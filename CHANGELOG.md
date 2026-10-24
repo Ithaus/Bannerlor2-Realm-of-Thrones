@@ -1,5 +1,78 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-24 111 (m117-ubranie, galaz w-toku/m117-ubranie od w-toku/m116-fabula 6cd80130) - wlasne ubranie cywilne golych zolnierzy: najtansza tunika i buty ich kultury
+
+**Problem:** Jeff 24.10 ok. 23:05, po zrzucie bitwy pod Riverrun (22:58-23:01) z polnagimi zolnierzami: "jak nie maja to wiadomo ze nikt nagi nie chdozi to niech
+dostana ubranie cywline najtansze buty tunike bty i tunike chociaz niech maja danej kultury przecie nie chodza w gaciach". Log sesji: CrashScribe przed bitwa "Mends: swieta
+zasada skilli w DTE [Sylwa Paege's Party, 273 slotow]: ... 93 slotow PUSTYCH - nic uzytecznego na polce (HandArmor 5, Cape 7, HeadArmor 22, Arrows 20, LegArmor 20,
+BodyArmor 19)"; Armoury na koniec misji "Bitwa gracza (sklad7b, nic z niczego; koniec misji): sloty wzorca bez sztuki (walcza bez) - gracz 7 (ludzi 11), lordowie AI 349
+(ludzi 283 ...)". 19 ludzi bez pancerza tulowia = gole torsy.
+**Przyczyna:** regula "tylko to, co ma" (sklad7b TroopsFightWithOwnKitOnly; zalogi - GarrisonFightsWithArmoryOnly, BareOn) zostawia slot pusty, gdy zbrojownia DTE partii
+nie ma sztuki, a DressCode tych ludzi celowo nie ubiera (ubranie ze wzorca bez oznaczenia jako tymczasowe bylo mennica przez zwrot DTE po bitwie - K1c/sklad7b).
+**Zmiana (tylko Armoury; CrashScribe bez zmian):**
+- GarrisonKit.CivilDress (z OwnKitSpawn, po SpawnGuard i SaddleGuard, po Missing - przed licznikami ludzi): przydzial z _spawn (druzyna gracza, lordowie AI z towarzyszami
+  i partiami rodu, zalogi przy BareOn - jedna regula; bez bohaterow, bez umarlych), slot Body albo Leg pusty po strazach, a wzorzec (Assignment.ReferenceEquipment - ten sam,
+  ktory widza Missing, FillPrefix, BattleNotice i DTE) ma w nim sztuke -> najtansze ubranie cywilne kultury czlowieka (CharacterObject.Culture). Najpierw
+  Assignment.MarkSlotAsTemporary, potem SetEquipment (wyjatek miedzy nimi = slot pusty, nigdy nietymczasowa sztuka z niczego). Wzorzec bez sztuki w slocie (Dothrakowie,
+  dzicy z gola klata) - bez zmian. Glowa, rece, plaszcz, bron, strzaly, kon - bez zmian. Potkniecia liczone na slot czlowieka, bez wylacznika.
+- Civvies.cs (nowy): wybor raz na kampanie (leniwie, Reset w GarrisonKit.Reset): BodyArmor / LegArmor z ochrona w slocie > 0, Value > 0, Recipes.Grade <= 3, !NotMerchandise,
+  bez ArmsPricing.IsUnique (unikaty ROT, BarredInBattle CrashScribe), UniqueGear, GiantGear, UniqueLaw.IsDead (private -> internal), bez ubran kobiecych (NotUsableByMale
+  albo id/nazwa: dress, female, lady, gown, woman, maiden, wench, bride). Kolejnosc: (a) kultura z flaga Civilian, (b) kultura bez flagi, (c) neutralne (bez kultury,
+  neutral_culture) z flaga, (d) dowolne z flaga; w kazdej Value, potem mniej ochrony, potem id. Przy wystawieniu pierwsza, ktora czlowiek udzwignie (ItemReq.Meets -
+  Atletyka; kobieta - bez NotUsableByFemale); zadna - slot pusty z licznikiem. Wedlug danych ROT (rozpoznanie, items-dump + XML): Polnoc burlap_waistcoat 7d /
+  first_men_boots 13d, Westerlands cloth_tunic / andal_noble_boots1, Dorzecze andal_noble_clothes18 / tully_shoes, Reach andal_noble_clothes13 / leather_shoes (c),
+  Dorne rhoynar_clothes4 / southern_moccasins, Zelazne Wyspy tundra_tunic / sturgia_boots_d, freefolk wilding_garb / wildling_boots, nightswatch nightswatch_garb /
+  nightswatch_boots2, wildlings i skagosi half_apron (c), zapas (d) tundra_tunic / nord_poor_boot.
+- Kanal lupu: postfiks na DTE AgentExtension.GetAgentArmors(Agent) (AccessTools.DeclaredMethod, Civvies.ArmorsPostfix) - jedyny odczyt sprzetu agenta w DTE bez filtra
+  tymczasowych (OnAgentRemoved: czesc rozbita ciosem hitArmor i "dodatkowo peknieta" wroga tieru 3+). Lista bez ubrania agenta: ubranie nie zabiera trafienia prawdziwej
+  sztuce i nie idzie do wrakow BattlefieldLaw (RecordStruckPiece + QueueWreck -> ekran lupu). Zapas w BattlefieldLaw.QueueWreck: _lastPick bedacy ubraniem tego agenta
+  (Civvies.IsWorn) - bez wraka, licznik. Bez latki (albo bez licznika RegisterSpawnedAgentAssignment) nikt nie jest ubierany (Civvies.ArmorsHooked).
+- Rejestr: przydzial -> ubranie (_civAsg, RefEq), GarrisonKit.RegisterPostfix teraz (Agent __0, object __1) przepisuje na agenta (Civvies.NoteAgent). Czyszczenie:
+  DistributorsPostfix (nowa misja), EndMissionPostfix (po FinalizeMission DTE), Reset.
+- Log: linia startu GarrisonKit "... ubranie cywilne golych (m117) wpiete (lista zbroi DTE bez ubrania)" / BRAK; raz na kampanie "Ubranie cywilne (m117): wybor raz na kampanie
+  ... - <kultura> <tunika> Nd a / <buty> Nd a, ...; w puli ...; odrzucone: kobiece, ponad tier 3, unikaty/olbrzymy/umarli"; dopisek na koncu linii "Bitwa gracza (sklad7b,
+  nic z niczego; ...)": "ubranie cywilne (m117, wlasne, poza zbrojownia) - tunika: gracz / lordowie / zalogi; buty: ...; bez ubrania - wzorzec bez sztuki w slocie (projekt
+  jednostki), brak sztuki dla kultury, ponad Atletyke; z listy zbroi DTE (rozbite ciosem) wyjete N, wrak z ubrania zatrzymany (zapas) N, potkniecia listy N, potkniecia
+  ubierania N; np. <kultura> <tunika>/<buty>" (najwyzej 8 kultur). Bez linii co klatke.
+- Ustawienie BareTroopsWearCivilianClothes (domyslnie TAK, grupa "The finished piece", na zywo) - "Bare Troops Wear Civilian Clothes"; gen_mcm: Armoury 2411 ustawien.
+  Klucz nowy - w Armoury.json Jeffa go nie ma, wiec domyslne TAK zadziala. DressCode - tylko komentarz.
+**Kontrola calosci (DTE v1.4.7 zdekompilowane, Armoury grep SpawnEquipment / IsTemporarySlot / GetAgentArmors):**
+- Spawn: CreateEquipmentForArmoryConsumption klonuje i czysci sloty tymczasowe -> Distributor.Spawn / ArmyArmory.AssignEquipment (i WearKeep) ubrania nie widza - nic
+  nie schodzi ze zbrojowni gracza ani AI.
+- Zwrot po bitwie (ReturnEquipmentFromAgents), lup z ciala w misji (AddItemToRecover, AddLootedItem, lup morski) i uciekajacy: ProcessAgentEquipmentRespectingTemporarySlots
+  pomija IsTemporarySlot (takze na morzu - ArmoryItemForSlot zmienia tylko amunicje); zapas ProcessAssignmentEquipmentFallback tez pomija tymczasowe i nie rusza, gdy
+  czlowiek ma na sobie cokolwiek. HandlePartyItems, dzialka gracza (LootTag, AfterDtePartyItems), ekran trofeow m114, Spoils of War (bez odczytu agenta) - zrodlem rekordy
+  DTE, wiec bez ubrania. Autorozstrzygniecie i kopia zbrojowni przegranego - bez spawnu ubrania nie ma. Sprzedaz - ubranie nie wchodzi do zadnego rostera ani zbrojowni.
+- LootTally FelledPost: ubranie dostaje klase "zastepcze" (AZast z _temporaryItemIdBySlot) przed kandydatami na wrak; kandydat "dodatkowo peknietej" i tak tylko poza
+  morzem - tozsamosc LUP-J2 (na cialach = lup + cios + pekniete + zastepcze + odrzut + inne) bez zmian.
+- Kara Underequipped (E8/P3) liczona w DoAssignAsync przed spawnem i tylko odczytana w postfiksie - ubranie jej NIE zmniejsza (R4 bez zmiany kodu). "Sloty wzorca bez
+  sztuki" (Missing) liczone przed ubraniem - ubranie liczy sie jak pusty slot; BattleNotice "no body armour" i MenUpgrade.NoteBareSlots liczone przed spawnem - bez zmian.
+- Przydzial DTE nie wraca do puli (IsAssigned nigdy nie jest zerowane) - ubranie w Assignment.Equipment nie przechodzi na drugiego czlowieka. Wszystkie petle po
+  Assignments rozdzielacza sa w DoAssignAsync (przed spawnem).
+- HeroHp i FieldCraft WearLedger - tylko bohaterowie; TroopWearLedger liczy trafienia wedlug czesci ciala niezaleznie od sztuki; AiWear - ze zbrojowni; AmmoRecovery -
+  amunicja; CrashScribe - 0 odczytow SpawnEquipment (zmiana niepotrzebna).
+**Ryzyko / co sprawdzic:**
+- Linia startu musi mowic "ubranie cywilne golych (m117) wpiete" - inaczej nikt nie jest ubierany (celowo: bez latki GetAgentArmors ubranie szloby do wrakow).
+- Ludzie poza straza (GarrisonKit.OutsideGuard: inny mod podmienil ekwipunek, brak przydzialu DTE) - bez ubrania, jak dotad (bez przydzialu DTE zwrot oddalby ubranie do
+  zbrojowni).
+- Dane ROT, decyzja Jeffa: *_garb (freefolk, nightswatch, ghiscari, lorathi, valyrian, sarnor, volantine, summer, myrish) ma body 33 przy 12d - "ubranie" chroni jak
+  przeszywanica; Andalowie (river, vale, reach, stormlands, crownlands, dragonstone) dostaja "Andal Noble Clothes" 8d (b14) - "noble" na szeregowcu. Ewentualny limit
+  ochrony albo wykluczenie "noble" - nie robione.
+- Filtr ubran kobiecych to heurystyka nazw (ROT nie ma NotUsableByMale) - sprawdzic linie "Ubranie cywilne (m117): wybor" w logu.
+- Odstepstwo od literalnego R3: zapas (b) "kultura bez flagi Civilian" i wszystkie poziomy tylko do tieru 3 (Recipes.Grade) - bez limitu skagosi_armor 915d, qarth_armor 246d.
+- Zapas (d) moze dac sztuke zza Waskiego Morza (GearFit kultury nie pytany) - tylko gdy neutralne (half_apron, leather_shoes) nie przechodza Atletyki.
+- Kara morale Underequipped zostaje mimo ubrania (jest liczona przed spawnem).
+- LootTally: licznik "zastepcze" u wroga urosnie (linie m109/m114); progi sprawdz_logi go nie dotycza (sprawdzone grep).
+- Ubranie zmienia mase i material pancerza agenta: HideoutAlarm (halas), FieldCraft, BattleGore/BattleWind - kosmetyka.
+- Agent zabity po OnEndMission (rejestr wyczyszczony) mialby liste DTE z ubraniem - w praktyce po koncu misji nikt nie ginie. Wywrotka DTE w postfiksie spawnu przed
+  RegisterSpawnedAgentAssignment (stary problem DTE: caly sprzet czlowieka bez rozliczenia) oddalaby takze ubranie.
+- Test w grze: bitwa z partia z brakami BodyArmor/LegArmor (np. Sylwa Paege) - na ekranie tuniki i buty zamiast golych torsow, Dothrakowie dalej z gola klata; Armoury.log:
+  linia startu (wpiete), linia wyboru na kultury, dopisek m117 w linii "Bitwa gracza (sklad7b ...)" (tunika/buty > 0, wyjete z listy zbroi DTE > 0 przy poleglych ubranych,
+  wrak zatrzymany (zapas) 0, potkniecia 0); zbrojownia DTE gracza i lorda bez tunik/butow cywilnych ponad stan sprzed bitwy, ekran lupu bez cywilnych wrakow, "sloty wzorca
+  bez sztuki" bez spadku wobec bitwy o podobnym skladzie.
+**Status:** ZBUDOWANE - czeka na autotest i wgranie (gra Jeffa wlaczona). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne nowe; w zmienionych plikach tylko
+stare CS0169 BattlefieldLaw:34); Armoury.dll md5 f788045fed4df7305afce323114d2183.
+
 ## n36 cena ziemi wedlug stosunku 14-20 lat (galaz w-toku/m113-cena) - 24.10.2026
 
 **Problem:** Jeff 24.10 (po uslyszeniu, ze cena = 14 lat dochodu netto pana, historycznie 10-20, typowo 20): "daj cene zalezna od relacji miedzy 14 a 20 lat, jesli

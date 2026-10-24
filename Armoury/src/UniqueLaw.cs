@@ -166,7 +166,7 @@ namespace Armoury
 
         // ---------------------------------------------------------------- zamiennik
 
-        private static bool IsDead(ItemObject it)
+        internal static bool IsDead(ItemObject it)   // m117: takze sito ubrania cywilnego (Civvies.Fits)
         {
             try
             {

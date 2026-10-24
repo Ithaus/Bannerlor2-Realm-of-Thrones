@@ -93,6 +93,7 @@ namespace Armoury
             _screen = null; _screenSt = null; _hintKey = null; _hint = null; _lastLogic = null; _garAssign.Clear(); _lordAssign.Clear(); _bareDist = null; _bareMission = false;
             _spawn.Clear(); _spawnAsg.Clear(); _asgParty.Clear(); _guardLog = 0; _outsideLog = 0; _ownAssign.Clear(); _simParty = null; _simMade.Clear(); _battleMission = null; _dteMissionRef = null;
             _clanFillDone = false; ClearBattle();
+            _civAsg.Clear(); Civvies.Reset();   // m117: ubranie cywilne - rejestr misji i listy wyboru (nowa kampania)
         }
 
         private static MobileParty GarrisonOf(Settlement st)
@@ -460,6 +461,8 @@ namespace Armoury
             _bPlayerMen = _bPlayerMiss = _bLordMen = _bLordMiss = _bGarMen = _bGarMiss = _bGuardP = _bGuardL = _bGuardG = _bNoEmergP = _bNoEmergL = _bNoEntry = _bUndead = 0;
             _bClanMen = _bClanMiss = _bFootP = _bFootL = _bFootG = _bNoLeader = _bOutside = _bOutsideTpl = _bDte = 0;
             _bSadP = _bSadL = _bSadG = 0;
+            for (int i = 0; i < 3; i++) { _bCivBody[i] = 0; _bCivLeg[i] = 0; }   // m117: ubranie cywilne
+            _bCivNone = _bCivSkill = _bCivTpl = _bCivStumbles = 0; _bCivSample.Clear(); Civvies.ClearCounters();
         }
 
         private static bool BattleTouched()
@@ -552,10 +555,26 @@ namespace Armoury
                     if (mReg != null) { h.Patch(mReg, postfix: new HarmonyMethod(typeof(GarrisonKit), nameof(RegisterPostfix))); reg = "wpiety"; _regHooked = true; }
                 }
                 catch (Exception e) { Log.Error("GarrisonKit.ApplyAll(reg)", e); }
+                string civ = "BRAK - nikt nie dostaje ubrania";
+                try
+                {
+                    // m117: lista zbroi agenta DTE (czesc rozbita ciosem i "dodatkowo peknieta") bez wlasnego ubrania cywilnego - jedyny odczyt sprzetu agenta
+                    // bez filtra tymczasowych; bez tej latki ubranie szloby do wrakow (BattlefieldLaw.QueueWreck), wiec nie ubieramy (Civvies.ArmorsHooked)
+                    var tExt = QuartermasterLaw.FindType("DynamicTroopEquipmentReupload.Extensions.AgentExtension");
+                    var mArm = tExt != null ? AccessTools.DeclaredMethod(tExt, "GetAgentArmors", new[] { typeof(Agent) }) : null;
+                    if (mArm != null && mArm.ReturnType == typeof(List<ItemObject>) && _getChar != null)
+                    {
+                        h.Patch(mArm, postfix: new HarmonyMethod(typeof(Civvies), nameof(Civvies.ArmorsPostfix)));
+                        Civvies.ArmorsHooked = _regHooked;   // agent poznajemy z RegisterSpawnedAgentAssignment - bez niej lista zostalaby z ubraniem
+                        civ = _regHooked ? "wpiete (lista zbroi DTE bez ubrania)" : "BRAK (bez licznika wystawionych DTE) - nikt nie dostaje ubrania";
+                    }
+                }
+                catch (Exception e) { Civvies.ArmorsHooked = false; Log.Error("GarrisonKit.ApplyAll(m117)", e); }
                 _battle = "wpieta, bez zestawu awaryjnego DTE " + _emerg + ", straz nic z niczego wpieta; sloty lordow AI z niczego tylko na bitwe (sklad7) wpiete"
                           + "; nic z niczego (sklad7b): rozdzielacz->partia " + (_fDistParty != null && _fDistMission != null ? "jest" : "BRAK (druzyna gracza i lordowie z zestawem awaryjnym)")
                           + ", kon tylko ze zbrojowni (sklad7b-p) " + (_canMount != null ? "wedlug przydzialu i misji" : "tylko wedlug misji") + ", lup autorozstrzygniecia " + sim
-                          + ", pusty wpis przegranych przed lupem (sklad7b-p) " + entry + ", licznik wystawionych przez DTE " + reg + ", linia bitwy " + end;
+                          + ", pusty wpis przegranych przed lupem (sklad7b-p) " + entry + ", licznik wystawionych przez DTE " + reg + ", linia bitwy " + end
+                          + ", ubranie cywilne golych (m117) " + civ;
             }
             catch (Exception e) { _battle = "BRAK (" + e.Message + ")"; Log.Error("GarrisonKit.ApplyAll", e); }
         }
@@ -579,6 +598,7 @@ namespace Armoury
                 if (!(bool)_fInit.GetValue(__instance)) return;
                 _lastLogic = new WeakReference(__instance);
                 _garAssign.Clear(); _spawn.Clear(); _spawnAsg.Clear(); _asgParty.Clear(); _lordAssign.Clear(); _ownAssign.Clear();   // nowa misja - przydzialy poprzedniej nieaktualne
+                _civAsg.Clear(); Civvies.ClearMission();   // m117: ubranie cywilne poprzedniej misji
                 var me = MapEvent.PlayerMapEvent;
                 var dists = _fDist.GetValue(__instance) as IDictionary;
                 var sides = _fSides.GetValue(__instance) as IDictionary;
@@ -869,7 +889,23 @@ namespace Armoury
                      + "; przez straz " + guarded + " z " + _bDte + " wystawionych przez DTE z przydzialem regul (" + check + ")"
                      + "; poza straza (partie z regula bez przydzialu, nie ubrani) " + _bOutside + ", w tym we wzorcu gry " + _bOutsideTpl
                      + "; bez zestawu awaryjnego DTE - druzyna gracza " + _bNoEmergP + ", partie lordow " + _bNoEmergL
-                     + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + ", bez wodza (rozdzielacz Armoury) " + _bNoLeader + "; umarli bez zmian " + _bUndead + ".");
+                     + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + ", bez wodza (rozdzielacz Armoury) " + _bNoLeader + "; umarli bez zmian " + _bUndead + CivNote() + ".");
+        }
+
+        /// <summary>m117: dopisek do linii bitwy - wlasne ubranie cywilne golych (tunika / buty wedlug rodzaju, sloty bez ubrania z przyczyna, przyklady
+        /// wedlug kultury, kanal listy zbroi DTE i potkniecia). "Sloty wzorca bez sztuki" wyzej licza ubranie jak pusty slot (to nie pancerz).</summary>
+        private static string CivNote()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.BareTroopsWearCivilianClothes) return "; ubranie cywilne (m117) wylaczone";
+            if (!Civvies.ArmorsHooked) return "; ubranie cywilne (m117) BRAK latki listy zbroi DTE - nikt nie ubrany";
+            var ex = new List<string>();
+            foreach (var kv in _bCivSample) ex.Add(kv.Key + " " + (kv.Value[0] ?? "-") + "/" + (kv.Value[1] ?? "-"));
+            return "; ubranie cywilne (m117, wlasne, poza zbrojownia) - tunika: gracz " + _bCivBody[0] + ", lordowie " + _bCivBody[1] + ", zalogi " + _bCivBody[2]
+                   + "; buty: gracz " + _bCivLeg[0] + ", lordowie " + _bCivLeg[1] + ", zalogi " + _bCivLeg[2]
+                   + "; bez ubrania - wzorzec bez sztuki w slocie (projekt jednostki) " + _bCivTpl + ", brak sztuki dla kultury " + _bCivNone + ", ponad Atletyke " + _bCivSkill
+                   + "; " + Civvies.BattleNote() + ", potkniecia ubierania " + _bCivStumbles
+                   + (ex.Count > 0 ? "; np. " + string.Join(", ", ex.ToArray()) : "");
         }
 
         /// <summary>sklad7b: po DTE DynamicTroopMissionLogic.OnEndMission (zwroty juz policzone) - linia bitwy i koniec przydzialow tej misji.</summary>
@@ -879,13 +915,21 @@ namespace Armoury
             catch (Exception e) { Log.Error("GarrisonKit.EndMission", e); }
             ClearBattle(); _battleMission = null;
             _spawn.Clear(); _spawnAsg.Clear(); _ownAssign.Clear(); _garAssign.Clear(); _lordAssign.Clear(); _asgParty.Clear();
+            _civAsg.Clear(); Civvies.ClearMission();   // m117: zwroty i lup DTE juz policzone (FinalizeMission przed tym postfiksem)
         }
 
         /// <summary>sklad7b-p (uwaga 7): postfiks DTE DynamicTroopMissionLogic.RegisterSpawnedAgentAssignment - czlowiek wystawiony z przydzialem
-        /// objetym regula (ten sam przydzial, ktory straz przy spawnie powinna byla zobaczyc).</summary>
-        public static void RegisterPostfix(object __1)
+        /// objetym regula (ten sam przydzial, ktory straz przy spawnie powinna byla zobaczyc). m117: przydzial z ubraniem cywilnym -> agent
+        /// (Civvies - lista zbroi DTE bez ubrania i zapas wrakow).</summary>
+        public static void RegisterPostfix(Agent __0, object __1)
         {
             try { if (__1 != null && _spawnAsg.Count > 0 && _spawnAsg.Contains(__1)) _bDte++; } catch { }
+            try
+            {
+                ItemObject[] worn;
+                if (__0 != null && __1 != null && _civAsg.Count > 0 && _civAsg.TryGetValue(__1, out worn)) Civvies.NoteAgent(__0, worn);
+            }
+            catch (Exception e) { CivStumble("RegisterPostfix", e); }
         }
 
         /// <summary>K1 (przeglad): DTE przy spawnie czlowieka partii innej niz gracza wola Assignment.FillEmptySlots - kazdy pusty slot dostaje
@@ -1067,7 +1111,9 @@ namespace Armoury
         /// <summary>sklad7b: wolane z DressCode.Prefix (Mission.SpawnAgent, Priority.Last - po prefiksie DTE, FillEmptySlots ze strazami CrashScribe
         /// i DragonUnmount). Ekwipunek przydzialu w trybie "tylko to, co ma" (druzyna gracza, lord AI, zaloga): ostatnia straz "nic z niczego"
         /// (SpawnGuard) i liczniki bitwy. true - DressCode go nie ubiera (kto nie ma sztuki, walczy bez niej).
-        /// sklad7b-p (uwaga 6): zaloga (rodzaj 2) - druga straz tylko przy TroopsFightWithOwnKitOnly (wylaczone = jak K1c).</summary>
+        /// sklad7b-p (uwaga 6): zaloga (rodzaj 2) - druga straz tylko przy TroopsFightWithOwnKitOnly (wylaczone = jak K1c).
+        /// m117: po wszystkich strazach pusty tulow / nogi (a wzorzec ma tam sztuke) - wlasne ubranie cywilne (CivilDress); Missing liczony PRZED
+        /// ubraniem, wiec ubranie liczy sie jak pusty slot (to nie pancerz).</summary>
         internal static bool OwnKitSpawn(Equipment eq)
         {
             SpawnInfo si;
@@ -1078,6 +1124,7 @@ namespace Armoury
                 bool noSad = (si.Kind != 2 || OwnKitOn) && SaddleGuard(si, eq);   // E8/H (271): po strazy "nic z niczego" - kon bez uprzezy schodzi (pieszo)
                 int miss = Missing(si.Asg, eq);
                 var rf = _getRef != null ? _getRef.Invoke(si.Asg, null) as Equipment : null;
+                CivilDress(si, eq, rf);   // m117: po strazach i po Missing - przed licznikami ludzi
                 int foot = !noSad && RiderOnFoot(si.Asg, eq, rf) ? 1 : 0;
                 if (noSad) { if (si.Kind == 0) _bSadP++; else if (si.Kind == 1) _bSadL++; else _bSadG++; }
                 if (si.Kind == 0) { _bPlayerMen++; _bPlayerMiss += miss; _bGuardP += g; _bFootP += foot; }
@@ -1090,6 +1137,65 @@ namespace Armoury
             }
             catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.OwnKitSpawn", e); }
             return true;
+        }
+
+        // ------------------------------------------------------------ m117-ubranie: wlasne ubranie cywilne golych
+        // Jeff 24.10 ok. 23:05 (pod Riverrun polnadzy): "jak nie maja to wiadomo ze nikt nagi nie chodzi to niech dostana ubranie cywilne najtansze
+        // buty tunike ... chociaz niech maja danej kultury przecie nie chodza w gaciach". Szczegoly i wybor sztuki - Civvies.
+        private static readonly EquipmentIndex[] CivSlots = { EquipmentIndex.Body, EquipmentIndex.Leg };
+        // przydzial -> ubranie [0] tulow, [1] nogi (null - bez ubrania w tym slocie); RegisterPostfix przepisuje na agenta (Civvies.NoteAgent)
+        private static readonly Dictionary<object, ItemObject[]> _civAsg = new Dictionary<object, ItemObject[]>(RefEq.I);
+        // liczniki jednej bitwy: tunika / buty wedlug rodzaju (0 gracz, 1 lordowie AI, 2 zalogi); bez ubrania - wzorzec bez sztuki w slocie,
+        // brak sztuki dla kultury, ponad Atletyke; przyklady kultura -> [tunika, buty] (najwyzej 8)
+        private static readonly int[] _bCivBody = new int[3], _bCivLeg = new int[3];
+        private static int _bCivNone, _bCivSkill, _bCivTpl, _bCivStumbles;
+        private static readonly Dictionary<string, string[]> _bCivSample = new Dictionary<string, string[]>();
+
+        private static void CivStumble(string where, Exception e) { if (++_bCivStumbles <= 3) Log.Error("GarrisonKit." + where, e); }
+
+        /// <summary>m117: tulow i nogi pustego po strazach przydzialu "tylko to, co ma" (druzyna gracza, lord AI, zaloga - jedna regula), gdy wzorzec
+        /// (Assignment.ReferenceEquipment - ten sam, ktory widza Missing, FillPrefix, BattleNotice i DTE) ma w tym slocie sztuke: najtansze ubranie
+        /// cywilne kultury czlowieka (Civvies.Pick). NAJPIERW oznaczenie tymczasowej (DTE: spawn jej nie zdejmuje, zwrot i lup jej nie oddaja),
+        /// potem slot - wyjatek miedzy nimi zostawia slot pusty (wpis tymczasowy pustego slotu nic nie robi), nigdy nietymczasowej sztuki z niczego.
+        /// Potkniecie liczone na slot czlowieka, bez wylacznika. Zwraca liczbe ubranych slotow.</summary>
+        private static int CivilDress(SpawnInfo si, Equipment eq, Equipment rf)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.BareTroopsWearCivilianClothes || !Civvies.ArmorsHooked || si == null || si.Asg == null || eq == null || rf == null
+                || _markTemp == null || _setEq == null || _getChar == null) return 0;
+            CharacterObject co;
+            try { co = _getChar.Invoke(si.Asg, null) as CharacterObject; }
+            catch (Exception e) { CivStumble("CivilDress", e); return 0; }
+            if (co == null || co.IsHero) return 0;
+            ItemObject[] worn = null;
+            int n = 0, kind = si.Kind < 0 || si.Kind > 2 ? 2 : si.Kind;
+            for (int k = 0; k < CivSlots.Length; k++)
+            {
+                var slot = CivSlots[k];
+                try
+                {
+                    var e = eq[slot];
+                    if (!e.IsEmpty && e.Item != null) continue;                    // ma sztuke ze zbrojowni
+                    var r = rf[slot];
+                    if (r.IsEmpty || r.Item == null) { _bCivTpl++; continue; }    // wzorzec bez sztuki (Dothrakowie, dzicy) - zostaje jak jest
+                    bool skill;
+                    var it = Civvies.Pick(co, slot, out skill);
+                    if (it == null) { if (skill) _bCivSkill++; else _bCivNone++; continue; }
+                    _markTemp.Invoke(si.Asg, new object[] { slot, it });
+                    _setEq.Invoke(si.Asg, new object[] { slot, new EquipmentElement(it) });
+                    if (worn == null) worn = new ItemObject[2];
+                    worn[k] = it;
+                    n++;
+                    if (k == 0) _bCivBody[kind]++; else _bCivLeg[kind]++;
+                    string c = co.Culture != null ? co.Culture.StringId ?? "?" : "?";
+                    string[] ex;
+                    if (!_bCivSample.TryGetValue(c, out ex) && _bCivSample.Count < 8) _bCivSample[c] = ex = new string[2];
+                    if (ex != null && ex[k] == null) ex[k] = it.StringId;
+                }
+                catch (Exception ex2) { CivStumble("CivilDress", ex2); }
+            }
+            if (worn != null) _civAsg[si.Asg] = worn;
+            return n;
         }
 
         private static WeakReference _dteMissionRef;
