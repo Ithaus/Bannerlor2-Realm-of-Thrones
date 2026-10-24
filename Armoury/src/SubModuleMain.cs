@@ -542,6 +542,7 @@ namespace Armoury
         private static void InvTestTick(float dt)
         {
             InventoryLookTest.AppTick(dt);
+            FiefsShotTest.AppTick(dt);   // m112-inwest: autotest zakladki Fiefs (tylko plik armoury-fiefs-test.flag)
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
