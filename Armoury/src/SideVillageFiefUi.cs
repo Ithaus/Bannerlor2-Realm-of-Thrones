@@ -22,6 +22,10 @@ namespace Armoury
     ///  - prawa czesc zakladki (NoFiefsText, gdy rod nie ma miast ani zamkow) - osobny postfiks Harmony bez UIExtenderEx (SideVillageFief.NoFiefsPostfix).
     /// Rejestracja w OnSubModuleLoad (wlasny UIExtender "Armoury.SideVillage" - niezalezny od przyciskow predkosci mapy, ktore u Jeffa sa nierejestrowane przez Better
     /// Time), metoda NoInlining w SubModuleMain - brak UIExtenderEx = linia w logu. Klucz SideVillageFiefClanTab czytany przy starcie gry z pliku MCM (jak MapSpeedButtons).
+    /// m112-inwest (24.10, Jeff: "i ma byc to poakzane w thiefts zeby wedizal gdzie mam majtek i inwestycje"): ta sama wstawka niesie jeszcze dwa bloki - "Village works (N)"
+    /// i "Estates (N)" (FiefInvestments, klucz InvestmentsInFiefs) - tez same TextWidgety bez zdarzen, kazde wypelnienie we wlasnym try (potkniecia liczone
+    /// w FiefInvestments). Rejestracja, gdy przy starcie gry wlaczony jest KTORYKOLWIEK z kluczy SideVillageFiefClanTab / InvestmentsInFiefs; blok wioski pobocznej
+    /// dalej tylko przy SideVillageFiefClanTab.
     /// </summary>
     internal static class SideVillageFiefUi
     {
@@ -32,10 +36,13 @@ namespace Armoury
         {
             if (_done) return;
             _done = true;
-            string src;
-            if (!KeyAtStart("SideVillageFiefClanTab", out src))
+            string src, src2;
+            bool side = KeyAtStart("SideVillageFiefClanTab", Settings.Current == null || Settings.Current.SideVillageFiefClanTab, out src);
+            bool inv = KeyAtStart("InvestmentsInFiefs", Settings.Current == null || Settings.Current.InvestmentsInFiefs, out src2);   // m112-inwest
+            src = "SideVillageFiefClanTab " + src + "; InvestmentsInFiefs " + src2;
+            if (!side && !inv)
             {
-                State = "NIE rejestrowane - SideVillageFiefClanTab wylaczone przy starcie gry (" + src + ")";
+                State = "NIE rejestrowane - SideVillageFiefClanTab i InvestmentsInFiefs wylaczone przy starcie gry (" + src + ")";
                 Log.Info("Wioska gracza (n20): zakladka Fiefs (UIExtenderEx) - " + State + ".");
                 return;
             }
@@ -47,9 +54,9 @@ namespace Armoury
         }
 
         /// <summary>Klucz przy starcie gry (MCM wchodzi do Settings dopiero w sesji): plik Armoury.json MCM, bez wpisu - Settings.Current / domyslne (TAK). Nie rzuca.</summary>
-        private static bool KeyAtStart(string key, out string src)
+        private static bool KeyAtStart(string key, bool dflt, out string src)
         {
-            bool on = Settings.Current == null || Settings.Current.SideVillageFiefClanTab;
+            bool on = dflt;
             src = "ustawienia modulu / domyslne: " + (on ? "TAK" : "NIE");
             try
             {
@@ -89,7 +96,22 @@ namespace Armoury
               + "</Children></ListPanel>";
             var doc = new XmlDocument();
             doc.LoadXml(xml);
-            _nodes = new List<XmlNode> { doc };
+            _nodes = new List<XmlNode> { doc, Block("ArmWorks"), Block("ArmEstates") };   // m112-inwest: prace i majatki gracza pod blokiem wioski pobocznej
+        }
+
+        /// <summary>m112-inwest: blok "Village works (N)" / "Estates (N)" - naglowek i jeden tekst wielowierszowy (linie z \n), ten sam wyglad co blok wioski pobocznej.</summary>
+        private static XmlNode Block(string id)
+        {
+            const string txt = "DoNotAcceptEvents=\"true\" WidthSizePolicy=\"StretchToParent\" HeightSizePolicy=\"CoverChildren\" ";
+            var xml =
+                "<ListPanel Id=\"" + id + "\" IsVisible=\"@" + id + "Shown\" DoNotAcceptEvents=\"true\" WidthSizePolicy=\"Fixed\" SuggestedWidth=\"!Clan.Management.Collapser.Width\" "
+              + "HeightSizePolicy=\"CoverChildren\" HorizontalAlignment=\"Right\" MarginTop=\"14\" MarginBottom=\"10\" StackLayout.LayoutMethod=\"VerticalTopToBottom\"><Children>"
+              + "<TextWidget " + txt + "MarginLeft=\"12\" Brush=\"Clan.Management.Collapser.Text\" Brush.TextHorizontalAlignment=\"Left\" Text=\"@" + id + "Header\" />"
+              + "<TextWidget " + txt + "MarginLeft=\"24\" MarginRight=\"10\" MarginTop=\"8\" Brush=\"Clan.Tuple.Name.Text\" Brush.TextHorizontalAlignment=\"Left\" Brush.FontSize=\"18\" Text=\"@" + id + "Body\" />"
+              + "</Children></ListPanel>";
+            var doc = new XmlDocument();
+            doc.LoadXml(xml);
+            return doc;
         }
     }
 
@@ -100,15 +122,45 @@ namespace Armoury
     {
         private bool _shown;
         private string _header = "", _line = "", _income = "";
+        private bool _wShown, _eShown;                                        // m112-inwest: prace i majatki gracza
+        private string _wHeader = "", _wBody = "", _eHeader = "", _eBody = "";
 
         public SideVillageFiefsMixin(ClanFiefsVM vm) : base(vm)
         {
             try { Fill(false); } catch (Exception e) { _shown = false; SideVillageFief.UiStumble("Mixin.ctor", e); }
+            try { FillWorks(false); } catch (Exception e) { _wShown = false; FiefInvestments.UiStumble("Mixin.ctor(prace)", e); }
+            try { FillEstates(false); } catch (Exception e) { _eShown = false; FiefInvestments.UiStumble("Mixin.ctor(majatki)", e); }
         }
 
         public override void OnRefresh()
         {
             try { Fill(true); } catch (Exception e) { _shown = false; SideVillageFief.UiStumble("Mixin.OnRefresh", e); }
+            try { FillWorks(true); } catch (Exception e) { _wShown = false; FiefInvestments.UiStumble("Mixin.OnRefresh(prace)", e); }
+            try { FillEstates(true); } catch (Exception e) { _eShown = false; FiefInvestments.UiStumble("Mixin.OnRefresh(majatki)", e); }
+        }
+
+        /// <summary>m112-inwest: blok "Village works (N)" (FiefInvestments.WorksTab - klucz InvestmentsInFiefs; brak prac - ukryty).</summary>
+        private void FillWorks(bool notify)
+        {
+            string h, b;
+            bool on = FiefInvestments.WorksTab(out h, out b);
+            _wShown = on; _wHeader = on ? h ?? "" : ""; _wBody = on ? b ?? "" : "";
+            if (!notify) return;
+            OnPropertyChangedWithValue(_wShown, nameof(ArmWorksShown));
+            OnPropertyChangedWithValue(_wHeader, nameof(ArmWorksHeader));
+            OnPropertyChangedWithValue(_wBody, nameof(ArmWorksBody));
+        }
+
+        /// <summary>m112-inwest: blok "Estates (N)" (FiefInvestments.EstatesTab - majatki BK rodu gracza; brak - ukryty).</summary>
+        private void FillEstates(bool notify)
+        {
+            string h, b;
+            bool on = FiefInvestments.EstatesTab(out h, out b);
+            _eShown = on; _eHeader = on ? h ?? "" : ""; _eBody = on ? b ?? "" : "";
+            if (!notify) return;
+            OnPropertyChangedWithValue(_eShown, nameof(ArmEstatesShown));
+            OnPropertyChangedWithValue(_eHeader, nameof(ArmEstatesHeader));
+            OnPropertyChangedWithValue(_eBody, nameof(ArmEstatesBody));
         }
 
         private void Fill(bool notify)
@@ -129,5 +181,11 @@ namespace Armoury
         [DataSourceProperty] public string ArmSideHeader => _header;
         [DataSourceProperty] public string ArmSideLine => _line;
         [DataSourceProperty] public string ArmSideIncome => _income;
+        [DataSourceProperty] public bool ArmWorksShown => _wShown;
+        [DataSourceProperty] public string ArmWorksHeader => _wHeader;
+        [DataSourceProperty] public string ArmWorksBody => _wBody;
+        [DataSourceProperty] public bool ArmEstatesShown => _eShown;
+        [DataSourceProperty] public string ArmEstatesHeader => _eHeader;
+        [DataSourceProperty] public string ArmEstatesBody => _eBody;
     }
 }

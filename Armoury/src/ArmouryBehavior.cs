@@ -736,7 +736,7 @@ namespace Armoury
         // inwest (noc 17/18.10): stan kampanii zajec wiosek, ikon i prac okregu od zera przy kazdym nowym zachowaniu (jak Reset w konstruktorze; osobna linia - bez zmiany
         // wspolnej linii konstruktora, ktora dopisuja inne paczki)
         private readonly bool _inwestReset = InwestReset();
-        private static bool InwestReset() { try { VillageCrafts.Reset(); DistrictIcon.Reset(); DistrictWorks.Reset(); } catch (Exception e) { Log.Error("InwestReset", e); } return true; }
+        private static bool InwestReset() { try { VillageCrafts.Reset(); DistrictIcon.Reset(); DistrictWorks.Reset(); FiefInvestments.Reset(); } catch (Exception e) { Log.Error("InwestReset", e); } return true; }
         // f5-bitwa (noc 17/18.10): zestaw bitwy autotestu - stan poprzedniej kampanii od zera (osobna linia, jak inwest)
         private readonly bool _f5BitwaReset = F5BitwaReset();
         private static bool F5BitwaReset() { try { AutotestBattleKit.Reset(); } catch (Exception e) { Log.Error("F5BitwaReset", e); } return true; }
@@ -2936,6 +2936,7 @@ namespace Armoury
             try { MoneyLedger.Probe169("DistrictIcon.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { DistrictWorks.Daily(); } catch (Exception e) { Log.Error("DistrictWorks.Daily", e); } DayProfile.Lap("DistrictWorks.Daily");
             try { SideVillageFief.Daily(); } catch (Exception e) { Log.Error("SideVillageFief.Daily", e); }
+            try { FiefInvestments.Daily(); } catch (Exception e) { Log.Error("FiefInvestments.Daily", e); }   // m112-inwest: komunikat wyplat prac i majatkow minionej doby, linia "Majatki i prace w Fiefs (m112)"
             try { SideVillageVisit.Daily(); } catch (Exception e) { Log.Error("SideVillageVisit.Daily", e); }   // m97-wioski: linia "Wioski poboczne (WP): dzien N" (tylko z ruchem)   // n20-wioska: linia "Wioska gracza (n20): dzien N" i srednia 7 dob udzialu
             try { MoneyLedger.Mark(MoneyLedger.MKs); } catch { }
             // p6-a7: roboty miast z rak okregu - PO KS i VillageCrafts (przebudowy A7 tej doby juz w kasach): miasto ponad pulapem 1/28 nadwyzki do kies wsi okregu; wlasna pozycja (MTownHire)

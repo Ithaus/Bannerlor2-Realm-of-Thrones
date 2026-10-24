@@ -8972,6 +8972,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefClanTab { get; set; } = true;
 
+        [SettingPropertyBool("Investments In Fiefs", HintText = "the clan screen's Fiefs tab lists your village works ('Village works': where, what kind, how much of the kit is in place and ready, what you put in, what they paid you in the last 28 days and in all, paused at war or burned) and your Banner Kings estates ('Estates': where, about how much a day, what they paid since the game was loaded); once a day a message tells you what your works and estates paid you that day (none on days they pay nothing). The Fiefs-tab list needs a game restart if this and Side Village Fief Clan Tab were both off when the game started. Off = no such lists and no daily message", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool InvestmentsInFiefs { get; set; } = true;
+
         [SettingPropertyBool("Side Village Fief Trade", HintText = "with Side Village Fief Menu: 'Trade' in your village - buy and sell at the market of its main village: its goods, its prices, and the coin goes to that village's purse (as 'Buy products' in a village). Off = no trade option", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefTrade { get; set; } = true;
@@ -11674,6 +11678,7 @@ namespace Armoury
             s.SideVillageFiefMenu = SideVillageFiefMenu;
             s.SideVillageFiefLodging = SideVillageFiefLodging;
             s.SideVillageFiefClanTab = SideVillageFiefClanTab;
+            s.InvestmentsInFiefs = InvestmentsInFiefs;
             s.SideVillageFiefTrade = SideVillageFiefTrade;
             s.SideVillageFiefHouse = SideVillageFiefHouse;
             s.SideVillageFiefWalk = SideVillageFiefWalk;

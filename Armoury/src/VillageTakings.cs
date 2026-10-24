@@ -487,6 +487,8 @@ namespace Armoury
                 if (a <= 0 || giver.Item1 != null || giver.Item2 != null || recipient.Item1 == null) return;
                 if (_openTime != CampaignTime.Now) return;
                 _openEstates += a;
+                var o = _open;
+                if (o != null) FiefInvestments.NoteEstatePaid(recipient.Item1, o.Home, o.Here, a);   // m112-inwest: udzial majatku rodu gracza - zakladka Fiefs i komunikat dnia (wlasny try)
             }
             catch (Exception e) { Stumble("VillageTakings.OnGoldTraded", e); }
         }

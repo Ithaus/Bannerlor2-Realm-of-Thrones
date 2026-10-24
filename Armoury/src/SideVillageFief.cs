@@ -257,14 +257,19 @@ namespace Armoury
         private static bool _startTxtWired, _noFiefsWired;
 
         /// <summary>r4-wioska: postfiks ClanFiefsVM.RefreshValues - przy wioskce gracza tekst prawej czesci zakladki Fiefs (widoczny tylko bez miast i zamkow) mowi o niej
-        /// zamiast "Clan Does Not Own Any Fiefs". Klucz SideVillageFiefClanTab. Tylko napis - przy bledzie zostaje tekst gry.</summary>
+        /// zamiast "Clan Does Not Own Any Fiefs". Klucz SideVillageFiefClanTab. Tylko napis - przy bledzie zostaje tekst gry.
+        /// m112-inwest (Jeff: "ma byc to poakzane w thiefts zeby wedizal gdzie mam majtek i inwestycje"): do tego krotkie podsumowanie prac i majatkow gracza
+        /// (FiefInvestments.NoFiefsText, klucz InvestmentsInFiefs) - takze bez wioski pobocznej.</summary>
         public static void NoFiefsPostfix(TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories.ClanFiefsVM __instance)
         {
             try
             {
                 var s = Settings.Current;
-                if (__instance == null || s == null || !s.SideVillageFiefClanTab || !HasFief) return;
-                string t = NoFiefsText();
+                if (__instance == null || s == null) return;
+                string t = s.SideVillageFiefClanTab && HasFief ? NoFiefsText() : null;
+                string inv = null;
+                try { inv = FiefInvestments.NoFiefsText(); } catch (Exception e) { FiefInvestments.UiStumble("NoFiefsPostfix", e); }
+                if (inv != null) t = (t ?? "Your clan holds no towns or castles.") + "\n\n" + inv;
                 if (t != null) __instance.NoFiefsText = t;
             }
             catch (Exception e) { Stumble("NoFiefsPostfix", e); }

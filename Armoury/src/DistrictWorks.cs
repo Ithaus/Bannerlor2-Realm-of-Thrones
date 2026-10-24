@@ -44,7 +44,8 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal const string P = "Prace okregu (PO): ";
-        private const string SaveVer = "w2";                 // recenzja: w2 = w1 + cena sprzetu czesci (Kit, wartosc straty przy ogniu po wczytaniu); w1 czytany
+        private const string SaveVer = "w3";                 // recenzja: w2 = w1 + cena sprzetu czesci (Kit, wartosc straty przy ogniu po wczytaniu); w1 czytany
+                                                             // m112-inwest: w3 = w2 + wyplaty gracza wedlug dob (28 dob, zakladka Fiefs i komunikat dnia); w1 i w2 czytane (bez dob)
         private const string MainPart = "#main", VillageClan = "#village";
         private const double DefaultH = 0.868;      // swiat: utarg oddany / wartosc produkcji okregow bez stadnin (projekt F10)
         private static readonly object Gate = new object();
@@ -103,6 +104,16 @@ namespace Armoury
             public double Paid7, Exp7;                            // wyplacone i oczekiwane od ostatniej linii 7 dob (CSV, komunikat)
             public bool War;                                      // wojna z krolestwem okregu przy ostatnim sprawdzeniu (komunikat raz)
             public double Kit;                                    // ostatnia znana cena pelnego sprzetu osady tej czesci (zakup, doba) - wartosc straty przy ogniu (czesc bez stojacych osad ma cene 0)
+            // m112-inwest (Jeff: "ma byc to poakzane w thiefts zeby wedizal gdzie mam majtek i inwestycje"): wyplaty wedlug dob (doba -> zloto, ostatnie 28 dob; zapis w3).
+            // Suma od poczatku to Out (w zapisie od w1).
+            public readonly Dictionary<int, double> PaidDays = new Dictionary<int, double>();
+            public void AddPaid(int day, double amt)
+            {
+                if (!(amt > 0) || double.IsInfinity(amt)) return;
+                double c; PaidDays.TryGetValue(day, out c); PaidDays[day] = c + amt;
+                if (PaidDays.Count > 32) { var old = new List<int>(); foreach (var k in PaidDays.Keys) if (k < day - 27) old.Add(k); foreach (var k in old) PaidDays.Remove(k); }
+            }
+            public double PaidSince(int fromDay) { double s = 0; foreach (var kv in PaidDays) if (kv.Key >= fromDay) s += kv.Value; return s; }
             // pamiec sesji
             public double Eff(int today)
             {
@@ -819,7 +830,7 @@ namespace Armoury
                     paid += got;
                     lock (Gate)
                         foreach (var x in er)
-                            if (x.Key.Clan == kv.Key) { double rp = got * x.Value / kv.Value; x.Key.Out += (long)Math.Round(rp); x.Key.Paid7 += rp; }
+                            if (x.Key.Clan == kv.Key) { double rp = got * x.Value / kv.Value; x.Key.Out += (long)Math.Round(rp); x.Key.Paid7 += rp; x.Key.AddPaid(today, rp); }   // m112-inwest: doba wyplaty (Fiefs, komunikat dnia)
                 }
                 lock (Gate)
                 {
@@ -1194,6 +1205,7 @@ namespace Armoury
         // w2|wiersz;wiersz;...|d:okreg=utarg:doba_relacji,...
         // wiersz: rod~okreg~czesc~zajecie~rodzaj~U~I~Z~loty(u:doba:gotowosc,...)~odbudowy(u:termin:przypomniane,...)~zwierze~zwierzat~wplacone~place~material~wyplacone~stracone~doba0~Br~Bf~cena_sprzetu
         // (w1 - bez ostatniego pola, czytany: cena sprzetu 0 do pierwszej wyceny)
+        // m112-inwest w3: + pole 22 wyplaty wedlug dob (doba:zloto,... - ostatnie 28 dob); w2 (21 pol) i w1 (20 pol) czytane bez dob
         internal static string Export()
         {
             try
@@ -1205,6 +1217,7 @@ namespace Armoury
                     var sb = new StringBuilder(_rows.Count * 120 + 64);
                     sb.Append(SaveVer).Append('|');
                     bool f = true;
+                    int today28 = Today() - 27;
                     foreach (var r in _rows)
                     {
                         if (!f) sb.Append(';'); f = false;
@@ -1214,7 +1227,14 @@ namespace Armoury
                         sb.Append('~');
                         for (int i = 0; i < r.Rebs.Count; i++) { if (i > 0) sb.Append(','); sb.Append(D(r.Rebs[i].Units)).Append(':').Append(r.Rebs[i].Deadline).Append(':').Append(r.Rebs[i].Reminded ? 1 : 0); }
                         sb.Append('~').Append(C(r.Animal ?? "-")).Append('~').Append(D(r.Animals)).Append('~').Append(r.In).Append('~').Append(r.InWage).Append('~').Append(r.InMat).Append('~').Append(r.Out)
-                          .Append('~').Append(r.LostG).Append('~').Append(r.Day0).Append('~').Append(D(r.SeenBr)).Append('~').Append(D(r.SeenBf)).Append('~').Append(D(r.Kit));
+                          .Append('~').Append(r.LostG).Append('~').Append(r.Day0).Append('~').Append(D(r.SeenBr)).Append('~').Append(D(r.SeenBf)).Append('~').Append(D(r.Kit)).Append('~');
+                        bool fd = true;                                            // m112-inwest (w3): wyplaty ostatnich 28 dob
+                        foreach (var kv in r.PaidDays)
+                        {
+                            if (kv.Key < today28 || !(kv.Value > 0)) continue;
+                            if (!fd) sb.Append(','); fd = false;
+                            sb.Append(kv.Key).Append(':').Append(D(Math.Round(kv.Value, 2)));
+                        }
                     }
                     sb.Append("|d:"); f = true;
                     foreach (var kv in _handed)
@@ -1249,8 +1269,9 @@ namespace Armoury
             {
                 var p = t.Split('|');
                 bool w1 = p.Length > 0 && p[0] == "w1";                          // recenzja: zapis sprzed ceny sprzetu (20 pol) - czytany
-                if (p.Length < 2 || (p[0] != SaveVer && !w1)) { _loadNote = "nieznany format arm_works (" + (p.Length > 0 ? p[0] : "?") + ") - bez prac"; _loadBad++; return; }
-                int fields = w1 ? 20 : 21;
+                bool w2 = p.Length > 0 && p[0] == "w2";                          // m112-inwest: zapis sprzed wyplat wedlug dob (21 pol) - czytany, doby puste (suma Out zostaje)
+                if (p.Length < 2 || (p[0] != SaveVer && !w1 && !w2)) { _loadNote = "nieznany format arm_works (" + (p.Length > 0 ? p[0] : "?") + ") - bez prac"; _loadBad++; return; }
+                int fields = w1 ? 20 : w2 ? 21 : 22;
                 if (p[1].Length > 0)
                     foreach (var e in p[1].Split(';'))
                     {
@@ -1268,6 +1289,14 @@ namespace Armoury
                             r.In = PL(q[12]); r.InWage = PL(q[13]); r.InMat = PL(q[14]); r.Out = PL(q[15]); r.LostG = PL(q[16]); r.Day0 = PI(q[17], -1);
                             r.SeenBr = PD(q[18]); r.SeenBf = PD(q[19]);
                             if (!w1) r.Kit = Math.Max(0, PD(q[20]));                // cena sprzetu czesci - strata przy ogniu zaraz po wczytaniu (recenzja)
+                            if (fields >= 22 && q[21].Length > 0)                  // m112-inwest (w3): wyplaty wedlug dob; zly wpis doby - pominiety (jak loty i odbudowy)
+                                foreach (var l in q[21].Split(','))
+                                {
+                                    var a = l.Split(':'); int dd;
+                                    if (a.Length != 2 || !int.TryParse(a[0], NumberStyles.Integer, Inv, out dd)) continue;
+                                    double x = PD(a[1]);
+                                    if (x > 0) { double c; r.PaidDays.TryGetValue(dd, out c); r.PaidDays[dd] = c + x; }
+                                }
                             _rows.Add(r);
                         }
                         catch { _loadBad++; }
