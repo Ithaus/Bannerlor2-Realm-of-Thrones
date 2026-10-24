@@ -7032,6 +7032,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int RiderHorseCarryKg { get; set; } = 20;
 
+        [SettingPropertyBool("Harness On Spare Horses", HintText = "every spare horse in your baggage wears one horse harness from it (heaviest first, pack saddles aside): that harness no longer weighs on the baggage, and a saddled spare horse carrying one of your men on the march takes saddlebags like a rider's horse (Rider Horse Carry Kg) - you and your clan's parties. Off = every harness in the baggage is cargo, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HarnessOnSpareHorses { get; set; } = true;
+
         [SettingPropertyInteger("Spare Horse Carry Kg", 20, 100, "0", HintText = "how many kilograms a spare horse carries when no footman or prisoner rides it (the game gives every spare horse 20; 20 = as in the game)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int SpareHorseCarryKg { get; set; } = 60;
@@ -11185,6 +11189,7 @@ namespace Armoury
             s.DteConvoyPacksStayWithConvoy = DteConvoyPacksStayWithConvoy;
             s.DteConvoyNoFreePacks = DteConvoyNoFreePacks;
             s.RiderHorseCarryKg = RiderHorseCarryKg;
+            s.HarnessOnSpareHorses = HarnessOnSpareHorses;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;
             s.BloomeryCartRange = BloomeryCartRange;

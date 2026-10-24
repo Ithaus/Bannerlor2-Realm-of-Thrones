@@ -57,6 +57,10 @@ namespace Armoury
 
         private static readonly TextObject _txtPack = new TextObject("{=!}Spare horses under packs");
         private static readonly TextObject _txtRider = new TextObject("{=!}Ridden horses (saddlebags)");
+        private static readonly TextObject _txtHarnessOwn = new TextObject("{=!}Harness worn by spare horses");
+        private static readonly TextObject _txtHarnessBags = new TextObject("{=!}Saddled spare horses (saddlebags)");
+        [ThreadStatic] private static List<KeyValuePair<float, int>> _hBuf;
+        private static readonly Comparison<KeyValuePair<float, int>> HeavyFirst = (a, b) => b.Key.CompareTo(a.Key);
 
         // co gra dodala nowej karawanie (InitializeCaravanOnCreation) - zdejmowane w postfiksie CreateCaravanParty tej samej partii.
         // Klucz po REFERENCJI (poprawka F2, test zbiorczy 5-8): InitializeCaravanOnCreation biegnie wewnatrz MobileParty.CreateParty PRZED nadaniem Id
@@ -366,6 +370,64 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>m111-uprzaz (Jeff 24.10 02:16, zrzut: udzwig 1235 / 430, 9 luzakow i 11 uprzezy w taborze - "uprzeze sa na koniach moich ludzi, ja ich nie
+        /// dzwigam; powinny dawac mi dodatkowo udzwig i ich konie"): gra liczy kazda uprzaz w taborze jako ladunek (Padded Bolton 80 kg), a luzak pod piechurem
+        /// daje tylko 20 kg. Zasada (klucz HarnessOnSpareHorses, gracz i jego rod - jak siodla transportowe): kazdy luzak taboru nosi jedna uprzaz bojowa z bagazu
+        /// (najciezsze najpierw, bez siodel transportowych - CampCart) - jej waga w udzwigu jako "Harness worn by spare horses" (nosi ja kon, nie tabor);
+        /// luzak z siodlem pod czlowiekiem (nie pod jukami - UnderPacks) niesie juki jak kon jezdzca (RiderHorseCarryKg). Tylko odczyt (watki tiku partii);
+        /// bufor watkowy bez alokacji poza pierwszym razem.</summary>
+        public static void HarnessPostfix(MobileParty __0, bool __1, bool __6, ref ExplainedNumber __result)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.HarnessOnSpareHorses || __0 == null || __1) return;
+                float own = 0f;
+                int bags = 0;
+                HarnessOne(__0, s, ref own, ref bags);
+                if (__6)
+                {
+                    var att = __0.AttachedParties;
+                    if (att != null) for (int i = 0; i < att.Count; i++) { var ap = att[i]; if (ap != null && ap != __0) HarnessOne(ap, s, ref own, ref bags); }
+                }
+                if (own > 0f) __result.Add(own, _txtHarnessOwn);
+                if (bags > 0 && s.RiderHorseCarryKg > 0) __result.Add((float)bags * s.RiderHorseCarryKg, _txtHarnessBags);
+            }
+            catch { }
+        }
+
+        private static void HarnessOne(MobileParty mp, Settings s, ref float own, ref int bags)
+        {
+            if (mp != MobileParty.MainParty && !(mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan)) return;
+            var pb = mp.Party;
+            var roster = mp.ItemRoster;
+            if (pb == null || roster == null) return;
+            int mounts = pb.NumberOfMounts;
+            if (mounts <= 0) return;
+            var buf = _hBuf ?? (_hBuf = new List<KeyValuePair<float, int>>());
+            buf.Clear();
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var el = roster.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (it == null || el.Amount <= 0 || it.ItemType != ItemObject.ItemTypeEnum.HorseHarness || CampCart.IsPackSaddle(it)) continue;
+                buf.Add(new KeyValuePair<float, int>(el.EquipmentElement.GetEquipmentElementWeight(), el.Amount));
+            }
+            if (buf.Count == 0) return;
+            buf.Sort(HeavyFirst);
+            int left = mounts, fitted = 0;
+            for (int i = 0; i < buf.Count && left > 0; i++)
+            {
+                int use = Math.Min(left, buf[i].Value);
+                own += use * buf[i].Key;
+                fitted += use;
+                left -= use;
+            }
+            int m2;
+            int under = UnderPacks(mp, s.SpareHorsesCarryFootmen, out m2);
+            bags += Math.Min(fitted, Math.Max(0, mounts - under));
+        }
+
         /// <summary>Jezdzcy partii: ludzie (z rannymi), ktorych ekwipunek bojowy ma konia (nie smoka).</summary>
         internal static int Riders(MobileParty mp)
         {
@@ -414,6 +476,7 @@ namespace Armoury
                 {
                     h.Patch(cap, postfix: new HarmonyMethod(typeof(PackMarket), nameof(CapPostfix))); parts.Add("udzwig luzaka wpiety");
                     h.Patch(cap, postfix: new HarmonyMethod(typeof(PackMarket), nameof(RiderPostfix))); parts.Add("udzwig konia pod jezdzcem wpiety (m108)");
+                    h.Patch(cap, postfix: new HarmonyMethod(typeof(PackMarket), nameof(HarnessPostfix))); parts.Add("uprzaz na luzaku wpieta (m111-uprzaz)");
                 }
             }
             catch (Exception e) { parts.Add("blad wpiecia udzwigu " + e.GetType().Name); Log.Error("PackMarket.ApplyAll(udzwig)", e); }
