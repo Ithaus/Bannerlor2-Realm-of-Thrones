@@ -73,7 +73,9 @@ namespace Armoury
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed;
-            public double[] WorksMkt; }   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
+            public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; }   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
+        // m114-prace (recenzja): WorksAll - caly dodatek po czynnikach (sztuki gry na dobe), WorksPart - kg dodatku czesci przed zima (klucz DistrictWorks.PartKey):
+        // udzial czesci w dodatku na targ (wycena okna i podzial puli miedzy posiadaczy wedlug dodatku NA TARG, nie wedlug calego E)
 
         /// <summary>Stawki wsi na jutro (sztuki gry na dobe wedlug towaru KS) i rynek wsi (0 Westeros, 1 Essos) - beta rampy na towar i rynek.</summary>
         private sealed class VRate { public float[] A; public int M; }
@@ -367,7 +369,8 @@ namespace Armoury
             var prod = res.Prod;
             KsDeliver.Produce(d, ld.B, prod);
             if (factors && !ld.TF) HerdKs(ld, prod, kgT);   // R3-06c (p5-stada, recenzja): stado wsi PRZED pracami okregu (stado prac pedzi DistrictWorks) - tylko gra; StartCalibration.Stada.cs
-            double[] wx = factors ? WorksKs(ld, prod) : null;   // inwest: dodatek prac okregu (b x kg zajecia czesci) przed zima i czynnikami rak - tylko gra (Plan nie)
+            Dictionary<string, double[]> wPart = null;
+            double[] wx = factors ? WorksKs(ld, prod, out wPart) : null;   // inwest: dodatek prac okregu (b x kg zajecia czesci) przed zima i czynnikami rak - tylko gra (Plan nie)
             double[] wSnap = wx != null ? (double[])prod.Clone() : null;   // m114-prace: produkcja z dodatkiem przed zima i czynnikami (dodatek po nich = wx x po / przed)
             double f = 1.0;
             if (factors)
@@ -407,8 +410,8 @@ namespace Armoury
             if (wx != null)
             {
                 // m114-prace: okreg zjada stala ilosc (Own = min(produkcja, potrzeba)), wiec dodatek na targ = min(dodatek, na targ) - targ z dodatkiem minus targ bez niego
-                res.WorksMkt = new double[ItemCount];
-                for (int i = 0; i < ItemCount; i++) if (wx[i] > 0) res.WorksMkt[i] = Math.Min(wx[i], res.MarketKg[i]) / (sigma * kgT[i]);
+                res.WorksMkt = new double[ItemCount]; res.WorksAll = new double[ItemCount]; res.WorksPart = wPart;
+                for (int i = 0; i < ItemCount; i++) if (wx[i] > 0) { res.WorksMkt[i] = Math.Min(wx[i], res.MarketKg[i]) / (sigma * kgT[i]); res.WorksAll[i] = wx[i] / (sigma * kgT[i]); }
             }
             return res;
         }

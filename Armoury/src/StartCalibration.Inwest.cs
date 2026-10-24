@@ -60,9 +60,16 @@ namespace Armoury
 
         /// <summary>m114-prace: wartosc dnia towaru okregu NA TARG (to, co wozy wioza) i dodatku prac, ktory idzie na targ - z ostatniego rachunku okregu (ld.Res, po zimie
         /// i czynnikach rak), w cenie miasta targowego (VillageCrafts.Price - jak ValDay). false - okreg poza KS, bez rachunku albo bez towaru na targ. Watek glowny, nie rzuca.</summary>
-        internal static bool WorksMarketOf(Village v, out double market, out double extra)
+        internal static bool WorksMarketOf(Village v, out double market, out double extra) { bool inc; return WorksMarketOf(v, out market, out extra, out inc, null, null); }
+
+        /// <summary>m114-prace (recenzja): jak wyzej, a takze inc - prace byly w ostatnim rachunku okregu (WorksKs; false - rachunek sprzed zakupu albo okreg bez prac)
+        /// i (gdy podane) wartosc dnia dodatku na targ (partMkt) i calego dodatku po czynnikach (partAll) wedlug czesci (klucz DistrictWorks.PartKey) - towar kazdej
+        /// pozycji dzielony miedzy czesci wedlug ich kg dodatku przed zima (zima i czynniki rak jednakowe dla towaru).</summary>
+        internal static bool WorksMarketOf(Village v, out double market, out double extra, out bool inc, Dictionary<string, double> partMkt, Dictionary<string, double> partAll)
         {
-            market = 0; extra = 0;
+            market = 0; extra = 0; inc = false;
+            if (partMkt != null) partMkt.Clear();
+            if (partAll != null) partAll.Clear();
             if (v == null || !KsDistrictLive(v)) return false;
             try
             {
@@ -77,11 +84,65 @@ namespace Armoury
                     double p = VillageCrafts.Price(town, it);
                     if (r.Market[i] > 0) market += r.Market[i] * p;
                     if (r.WorksMkt != null && r.WorksMkt[i] > 0) extra += r.WorksMkt[i] * p;
+                    if (r.WorksMkt != null && r.WorksAll != null && r.WorksPart != null && (partMkt != null || partAll != null) && r.WorksAll[i] > 0)
+                    {
+                        double tot = 0; foreach (var kv in r.WorksPart) if (kv.Value != null && kv.Value[i] > 0) tot += kv.Value[i];
+                        if (!(tot > 0)) continue;
+                        foreach (var kv in r.WorksPart)
+                        {
+                            if (kv.Value == null || !(kv.Value[i] > 0)) continue;
+                            double fr = kv.Value[i] / tot, a;
+                            if (partMkt != null) { partMkt.TryGetValue(kv.Key, out a); partMkt[kv.Key] = a + fr * r.WorksMkt[i] * p; }
+                            if (partAll != null) { partAll.TryGetValue(kv.Key, out a); partAll[kv.Key] = a + fr * r.WorksAll[i] * p; }
+                        }
+                    }
                 }
                 if (double.IsNaN(market) || double.IsInfinity(market) || double.IsNaN(extra) || double.IsInfinity(extra)) { market = extra = 0; return false; }
+                inc = r.WorksMkt != null;
                 return market > 0;
             }
-            catch { market = extra = 0; return false; }
+            catch { market = extra = 0; inc = false; if (partMkt != null) partMkt.Clear(); if (partAll != null) partAll.Clear(); return false; }
+        }
+
+        /// <summary>m114-prace (recenzja): czesc dodatku NOWYCH prac czesci uid (null - wies gry) przy zajeciu craft, ktora poszlaby na targ - wedlug towarow tego zajecia
+        /// w bloku (kg x cena): towar, ktorego okreg ma nadmiar na targ (MarketKg > 0 - produkcja ponad stol), idzie na targ caly; towar, ktorego okreg ma mniej niz zjada -
+        /// dodatek zjedzony w domu (0, ostroznie: brak liczby niedoboru). false - okreg poza KS, bez rachunku albo czesc bez towaru tego zajecia. Watek glowny, nie rzuca.</summary>
+        internal static bool WorksPartFrac(Village v, string uid, int craft, out double frac)
+        {
+            frac = 1.0;
+            if (v == null || craft < 0 || craft >= KsTab.NC || !KsDistrictLive(v)) return false;
+            try
+            {
+                LiveDist ld;
+                if (!_live.TryGetValue(v.Settlement.StringId, out ld) || ld == null || ld.Res == null || ld.B == null || ld.K == null || _items == null) return false;
+                Town town = v.TradeBound != null ? v.TradeBound.Town : (v.Bound != null ? v.Bound.Town : null);
+                string type = ld.K.Type;
+                var tmp = new double[ItemCount]; var kg = new double[ItemCount];
+                bool cattle = KsTab.Crafts[craft] == "cattle_farm";
+                foreach (var lb in ld.B)
+                {
+                    if (lb == null || lb.K == null || lb.C == null) continue;
+                    if (uid == null ? !lb.K.Main : (lb.K.Main || (lb.Uid ?? lb.K.Uid) != uid)) continue;
+                    for (int j = 0; j < lb.C.Length; j++)
+                    {
+                        if (lb.C[j] != craft && !(cattle && KsTab.Crafts[lb.C[j]] == "cattle_farm:maslo")) continue;   // jak WorksKs
+                        Array.Clear(tmp, 0, tmp.Length);
+                        BlockCraftKg(ld.K, lb, j, type, tmp);
+                        for (int i = 0; i < ItemCount; i++) if (tmp[i] > 0) kg[i] += tmp[i];
+                    }
+                }
+                double all = 0, mkt = 0;
+                for (int i = 0; i < ItemCount; i++)
+                {
+                    if (!(kg[i] > 0) || _items[i] == null) continue;
+                    double w = kg[i] * VillageCrafts.Price(town, _items[i]) / Math.Max(0.1, _itemKg != null ? _itemKg[i] : 10.0);
+                    all += w; if (ld.Res.MarketKg[i] > 1e-9) mkt += w;
+                }
+                if (!(all > 0) || double.IsNaN(all) || double.IsInfinity(all)) return false;
+                frac = Math.Max(0.0, Math.Min(1.0, mkt / all));
+                return true;
+            }
+            catch { frac = 1.0; return false; }
         }
 
         /// <summary>inwest: wiersze ziemi wiosek pobocznych okregu (plik ziemi KS po nakladce przysiolkow v6) - zajecia startowe i kandydaci drogi bez KS.
@@ -232,8 +293,9 @@ namespace Armoury
         /// <summary>ComputeDistrict (zaraz po KsDeliver.Produce, przed zima i czynnikami rak): dodatek prac okregu - dla czesci z pracami b x kg zajecia prac tej czesci
         /// (wies gry - 20 blokow, wioska poboczna - jej blok). Klucz District Works wylaczony albo okreg bez prac - nic. Dodatek zapamietany w pracach okregu
         /// (sztuki gry na dobe przed zima - udzial dodatku w utargu przy wozie).</summary>
-        private static double[] WorksKs(LiveDist ld, double[] prod)
+        private static double[] WorksKs(LiveDist ld, double[] prod, out Dictionary<string, double[]> parts)
         {
+            parts = null;
             if (ld == null || ld.TF || ld.V == null || ld.B == null || ld.K == null || prod == null) return null;
             if (!DistrictWorks.HasWorks(ld.V)) return null;
             try
@@ -246,13 +308,17 @@ namespace Armoury
                 {
                     if (lb == null || lb.K == null || lb.C == null) continue;
                     int craft; double b;
-                    if (!DistrictWorks.BonusOf(ld.V, lb.K.Main ? null : (lb.Uid ?? lb.K.Uid), out craft, out b) || !(b > 0) || craft < 0) continue;
+                    string puid = lb.K.Main ? null : (lb.Uid ?? lb.K.Uid);
+                    if (!DistrictWorks.BonusOf(ld.V, puid, out craft, out b) || !(b > 0) || craft < 0) continue;
+                    string pk = DistrictWorks.PartKey(puid);                 // m114-prace (recenzja): dodatek czesci - podzial puli wedlug dodatku na targ
+                    double[] pe; if (parts == null) parts = new Dictionary<string, double[]>(StringComparer.Ordinal);
+                    if (!parts.TryGetValue(pk, out pe)) { pe = new double[ItemCount]; parts[pk] = pe; }
                     for (int j = 0; j < lb.C.Length; j++)
                     {
                         if (lb.C[j] != craft && !(KsTab.Crafts[lb.C[j]] == "cattle_farm:maslo" && KsTab.Crafts[craft] == "cattle_farm")) continue;
                         Array.Clear(tmp, 0, tmp.Length);
                         BlockCraftKg(ld.K, lb, j, type, tmp);
-                        for (int i = 0; i < ItemCount; i++) if (tmp[i] > 0) extra[i] += b * tmp[i];
+                        for (int i = 0; i < ItemCount; i++) if (tmp[i] > 0) { extra[i] += b * tmp[i]; pe[i] += b * tmp[i]; }
                     }
                     _wkParts++;
                 }
@@ -266,9 +332,12 @@ namespace Armoury
                 }
                 _wkKg += kg;
                 DistrictWorks.NoteKsExtra(ld.V, _items, pcs);
-                return kg > 0 ? extra : null;                       // m114-prace: kg dodatku (przed zima) - ComputeDistrict liczy z niego dodatek na targ
+                // m114-prace: kg dodatku (przed zima) - ComputeDistrict liczy z niego dodatek na targ. Recenzja: takze przy 0 kg (prace w rachunku, dodatek 0 -
+                // wyplata 0, nie dawne E/V z utargu innych towarow); null tylko okreg bez prac albo blad
+                if (parts == null) parts = new Dictionary<string, double[]>(StringComparer.Ordinal);
+                return extra;
             }
-            catch (Exception e) { Stumble("WorksKs", e); return null; }
+            catch (Exception e) { Stumble("WorksKs", e); parts = null; return null; }
         }
 
         /// <summary>inwest: blok z pracami okregu nie zmienia zajecia (regula A7) - wioska z pracami (Uid) albo wies gry (Main), gdy prace sa w wsi gry.</summary>

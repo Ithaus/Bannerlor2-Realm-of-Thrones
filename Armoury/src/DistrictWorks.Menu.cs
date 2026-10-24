@@ -260,9 +260,19 @@ namespace Armoury
                   .Append(q.WKind == KHerd ? "% for animals bought at " : "% for timber, tools and other goods bought at ").Append(tname).Append(". Ready in ").Append(KReady[q.WKind]).Append(" days.\n");
                 sb.Append(q.Name).Append(" then makes more, and half of what the extra sells for is yours, paid whenever ").Append(Name(v)).Append("'s carts come back from market. The lord and the village share the other half as usual. The first coins earn the most.\n");
                 // m114-prace: wycena z tego samego wzoru co wyplata - towar okregu na targ i prawdziwy utarg wozow (bez 7 dob pomiaru - srednia swiata)
+                // recenzja: "caly dodatek na targ" tylko, gdy tak jest (Phi >= 0.9); inaczej ile dodatku okreg zje sam (wyplata liczy tylko czesc na targ - ta sama liczba w wycenie)
                 if (q.ByMkt && q.MkDay > 0)
-                    sb.Append(Name(v)).Append(" eats what it ate before - the extra all goes to market, where the district's goods for sale are worth about ").Append(Math.Round(q.MkDay).ToString("N0", Inv))
-                      .Append(" a day").Append(q.HdDay > 0 ? " and its carts have lately brought home about " + Math.Round(q.HdDay).ToString("N0", Inv) + " a day" : "").Append(".\n");
+                {
+                    string carts = q.HdDay > 0 ? " and its carts have lately brought home about " + Math.Round(q.HdDay).ToString("N0", Inv) + " a day" : "";
+                    if (q.Phi >= 0.9)
+                        sb.Append(Name(v)).Append(" eats what it ate before - the extra all goes to market, where the district's goods for sale are worth about ").Append(Math.Round(q.MkDay).ToString("N0", Inv))
+                          .Append(" a day").Append(carts).Append(".\n");
+                    else if (q.Phi > 0.005)
+                        sb.Append(Name(v)).Append(" grows less of these goods than it eats, so it eats part of the extra itself - only about ").Append(Math.Round(100 * q.Phi)).Append("% of it goes to market, and only that part earns you coins. The district's goods for sale are worth about ")
+                          .Append(Math.Round(q.MkDay).ToString("N0", Inv)).Append(" a day").Append(carts).Append(".\n");
+                    else
+                        sb.Append(Name(v)).Append(" grows less of these goods than it eats, so for now it eats all of the extra itself - nothing of it reaches market, and you are paid only once the district has more than it eats.\n");
+                }
                 sb.Append("If raiders empty homesteads of ").Append(q.Name).Append(", ").Append(q.WKind == KHerd ? "they drive off your animals there - that part is lost; when people return you can buy them again." : "your works there burn" + (KL[q.WKind] < 1 ? " in part" : "") + "; when people return you can rebuild them for " + Math.Round(100 * KR[q.WKind]) + "% of the price.")
                   .Append(" At war with ").Append(st.MapFaction != null && st.MapFaction.Name != null ? st.MapFaction.Name.ToString() : "this realm").Append(" you are paid nothing. Your gold: ").Append(gold.ToString("N0", Inv)).Append('.');
                 var amounts = new List<KeyValuePair<int, string>>
