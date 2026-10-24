@@ -9058,11 +9058,11 @@ namespace Armoury
 
         [SettingPropertyBool("Land Sales Lordships", HintText = "with Land Sales: the Banner Kings lordship title of a main village can be bought from the lord who holds it (only as a vassal of the same realm; the village stays bound to its castle, its rent and people stay with the castle lord - you get its tax). Off = no lordships for sale", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
-        public bool LandSalesLordships { get; set; } = true;
+        public bool LandSalesLordships { get; set; } = false;
 
         [SettingPropertyBool("Land Sales Castles", HintText = "with Land Sales: a castle can be bought - rarely, and dearly: only from a house deep in debt that keeps another seat, never a clan's only seat or a king's, with a large premium for a family seat. Off = no castles for sale", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
-        public bool LandSalesCastles { get; set; } = true;
+        public bool LandSalesCastles { get; set; } = false;
 
         [SettingPropertyBool("Land Sales Sell Back", HintText = "with Land Sales: a side village you bought can be offered back to the lord who takes its tax, at its real worth, once you have held it Land Resale Days and he can spare the coin. Off = bought villages cannot be sold back", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
