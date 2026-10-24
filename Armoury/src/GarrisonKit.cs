@@ -463,7 +463,7 @@ namespace Armoury
             _bClanMen = _bClanMiss = _bFootP = _bFootL = _bFootG = _bNoLeader = _bOutside = _bOutsideTpl = _bDte = 0;
             _bSadP = _bSadL = _bSadG = 0;
             for (int i = 0; i < 3; i++) { _bCivBody[i] = 0; _bCivLeg[i] = 0; }   // m117: ubranie cywilne
-            _bCivNone = _bCivSkill = _bCivTpl = _bCivDead = _bCivStumbles = 0; _bCivSample.Clear(); Civvies.ClearCounters();
+            _bCivNone = _bCivSkill = _bCivTpl = _bCivDead = _bCivStumbles = 0; _bCivSample.Clear(); _bCivKinds[0].Clear(); _bCivKinds[1].Clear(); Civvies.ClearCounters();
         }
 
         private static bool BattleTouched()
@@ -905,6 +905,7 @@ namespace Armoury
             foreach (var kv in _bCivSample) ex.Add(kv.Key + " " + (kv.Value[0] ?? "-") + "/" + (kv.Value[1] ?? "-"));
             return "; ubranie cywilne (m117, wlasne, poza zbrojownia) - tunika: gracz " + _bCivBody[0] + ", lordowie " + _bCivBody[1] + ", zalogi " + _bCivBody[2]
                    + "; buty: gracz " + _bCivLeg[0] + ", lordowie " + _bCivLeg[1] + ", zalogi " + _bCivLeg[2]
+                   + "; roznych sztuk: tulow " + _bCivKinds[0].Count + ", nogi " + _bCivKinds[1].Count
                    + "; bez ubrania - wzorzec bez sztuki w slocie (projekt jednostki) " + _bCivTpl + ", brak sztuki dla kultury " + _bCivNone + ", ponad Atletyke " + _bCivSkill + ", umarli pominieci (ludzi) " + _bCivDead
                    + "; " + Civvies.BattleNote() + ", potkniecia ubierania " + _bCivStumbles
                    + (ex.Count > 0 ? "; np. " + string.Join(", ", ex.ToArray()) : "");
@@ -1152,12 +1153,14 @@ namespace Armoury
         private static readonly int[] _bCivBody = new int[3], _bCivLeg = new int[3];
         private static int _bCivNone, _bCivSkill, _bCivTpl, _bCivDead, _bCivStumbles;   // _bCivDead - umarli pominieci (ludzie, nie sloty)
         private static readonly Dictionary<string, string[]> _bCivSample = new Dictionary<string, string[]>();
+        // m117 v2 (Jeff 25.10: "ubrania maja byc rozne"): rozne sztuki uzyte w bitwie - [0] tulow, [1] nogi
+        private static readonly HashSet<ItemObject>[] _bCivKinds = { new HashSet<ItemObject>(), new HashSet<ItemObject>() };
 
         private static void CivStumble(string where, Exception e) { if (++_bCivStumbles <= 3) Log.Error("GarrisonKit." + where, e); }
 
         /// <summary>m117: tulow i nogi pustego po strazach przydzialu "tylko to, co ma" (druzyna gracza, lord AI, zaloga - jedna regula), gdy wzorzec
-        /// (Assignment.ReferenceEquipment - ten sam, ktory widza Missing, FillPrefix, BattleNotice i DTE) ma w tym slocie sztuke: najtansze ubranie
-        /// cywilne kultury czlowieka (Civvies.Pick). NAJPIERW oznaczenie tymczasowej (DTE: spawn jej nie zdejmuje, zwrot i lup jej nie oddaja),
+        /// (Assignment.ReferenceEquipment - ten sam, ktory widza Missing, FillPrefix, BattleNotice i DTE) ma w tym slocie sztuke: ubranie cywilne
+        /// kultury czlowieka, losowo z puli (Civvies.Pick - m117 v2). NAJPIERW oznaczenie tymczasowej (DTE: spawn jej nie zdejmuje, zwrot i lup jej nie oddaja),
         /// potem slot - wyjatek miedzy nimi zostawia slot pusty (wpis tymczasowy pustego slotu nic nie robi), nigdy nietymczasowej sztuki z niczego.
         /// Potkniecie liczone na slot czlowieka, bez wylacznika. Zwraca liczbe ubranych slotow.</summary>
         private static int CivilDress(SpawnInfo si, Equipment eq, Equipment rf)
@@ -1190,6 +1193,7 @@ namespace Armoury
                     if (worn == null) worn = new ItemObject[2];
                     worn[k] = it;
                     n++;
+                    _bCivKinds[k].Add(it);
                     if (k == 0) _bCivBody[kind]++; else _bCivLeg[kind]++;
                     string c = co.Culture != null ? co.Culture.StringId ?? "?" : "?";
                     string[] ex;

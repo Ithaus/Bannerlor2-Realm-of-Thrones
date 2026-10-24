@@ -1,6 +1,61 @@
 # DZIENNIK ZMIAN
 
-## 2026-10-24 111 (m117-ubranie, galaz w-toku/m117-ubranie od w-toku/m116-fabula 6cd80130) - wlasne ubranie cywilne golych zolnierzy: najtansza tunika i buty ich kultury
+## 2026-10-24 111 (m117-ubranie, galaz w-toku/m117-ubranie od w-toku/m116-fabula 6cd80130) - wlasne ubranie cywilne golych zolnierzy: tunika i buty ich kultury (v2 25.10: losowo z ubran rekrutow tieru 1 i cywilow, bez zbroi)
+
+**v2 (25.10, ta sama niewgrana pozycja 111 - zmiana zasady wyboru):** Jeff 25.10 ok. 00:25: "ubrania maja byc rozne aby wszyscy nie wygladali tak samo i maja to byc
+ubrania cywline zadne zbroje za 33 pancerza no tier 1 jednostek jak laza recruit kazdej kultury". v1 (opis nizej) dawal kazdemu czlowiekowi danej kultury TE SAMA najtansza
+sztuke, a najtansza tunika wiekszosci kultur ROT to *_garb (12d, w grze body 33 po skalowaniu pancerzy - XML northern_garb body 15) - ochrona przeszywanicy.
+- Dane (rozpoznanie 25.10: XML postaci/kultur/zestawow/przedmiotow zlozone w kolejnosci modulow Jeffa + items-dump.csv 24.10; tier = DefaultCharacterStatsModel.GetTier, czyli
+  poziom 6-10): w 27 z 30 kultur glownych ROT rekruci tieru 1 maja na tulowiu tylko sztuki ponad granica (*_garb / pentoshi_tunic 33, Dothrakowie dothraki_armor8 55,
+  Qarth goly tors); cos w granicy maja tylko Braavos (tied_cloth_tunic 8, "Commoner Shirt" 7), Ghis (aserai_civil_d 7) i Ibben (highland_cloth 12). Literalne "jak chodza
+  rekruci" i "zadne zbroje za 33" nie dadza sie wiec spelnic naraz na tulowiu - tulow idzie prawie wszedzie od cywilow kultury, buty od rekrutow i cywilow.
+- Civvies (przepisany wybor; mechanizm v1 - CivilDress, MarkSlotAsTemporary, ArmorsPostfix, IsWorn, LootTally - bez zmian, Pick ta sama sygnatura):
+  GRANICA z danych gry, bez nowej stalej i bez MCM: dla slotu najwyzsza ochrona sztuki z flaga Civilian, ktora nosza Villager albo Townsman kultur glownych (bez umarlych)
+  i ktorej nie ma w BattleEquipments ZADEN zolnierz (Occupation.Soldier, nie bohater, nie szablon, dowolny tier) - najmocniejsze ubranie istniejace tylko jako odziez cywilna.
+  ROT: tulow 30 (andal_robe3/5 - szaty mieszczan Westeros), nogi 35 (wrapped_shoes); odcina *_garb 33, heavy_gambeson_armor 35 (zolnierze T3 Ibbenu), dragonstone_gambeson
+  61, brave_armor 81. Odrzucone warianty: maksimum u cywilow bez sita zolnierzy = 35 (przepuszcza garb - cywil Ibbenu nosi przeszywanice 35); granica osobno na kulture zeruje
+  nogi Polnocy (kazde jej obuwie nosza tez zolnierze); bandyci jako zolnierze - looter nosi wrapped_shoes, granica nog 17 odcielaby buty rekrutow (18).
+  PULA kultury (osobno tulow i nogi): sztuki z flaga Civilian w granicy, ktore nosza jej jednostki tieru 1 (Occupation Soldier albo Bandit, nie bohater, nie szablon,
+  CharacterObject.Tier == 1; zestawy Battle i Civilian; bez takich - Culture.BasicTroop) RAZEM z tym, co nosza jej Villager i Townsman, bez powtorzen. Sito v1 (Value > 0,
+  ochrona > 0, Recipes.Grade <= 3, bez unikatow/UniqueGear/olbrzymow/umarlych, bez ubran kobiecych) zostaje; NotMerchandise sprawdzane juz tylko w zapasach (c)/(d) - ubrania
+  z szablonow ludzi bywaja poza handlem (andal_civ_boots/2 Westerosu). Przy wystawieniu LOSOWO (MBRandom, rowno) jedna sztuka z puli sposrod tych, ktore czlowiek udzwignie
+  (ItemReq.Meets - Atletyka; kobieta bez NotUsableByFemale) - tunika i buty osobno; pula pusta albo nic w Atletyce -> (c) neutralne z flaga, losowo -> (d) dowolne z flaga,
+  najtansza (oba w granicy i w handlu); zadna - slot pusty z licznikiem jak w v1. Poziomy v1 (a) "kultura z flaga" / (b) "kultura bez flagi" (wedlug ItemObject.Culture) usuniete.
+  Build raz na kampanie (leniwie przy pierwszym ubraniu, Reset w GarrisonKit.Reset), jeden przebieg po postaciach + jeden po przedmiotach; kazda sztuka oceniana sitem raz.
+- Pule wedlug danych (symulacja reguly kodu na danych rozpoznania; tulow / nogi, liczba sztuk, najwyzsza ochrona): Westeros (vlandia, vale, river, dragonstone, stormlands,
+  reach, crownlands) 14 (andal_clothes1-8 19, andal_robe1-6 26-30) max 30 / 4 (andal_boots, first_men_boots 18, andal_civ_boots/2 15; crownlands 3) max 18; Polnoc i freefolk
+  11 (fm_clothes1-8, battania_civil_a/b, battania_woodland_outfit) max 20 / 6 max 30; Zelazne Wyspy i Skagos 7 max 16 / 7 max 35; Dorne 4 (rhoynar_clothes1-4) max 7 / 4 max
+  18; Ghis 5 max 7 / 3 max 30; Sarnor 4 max 7 / 2 max 18; Braavos 8 max 8 / 7 max 35; Norvos, Valyria, Volantis, Qohor, Lorath, Pentos, Myr, Lys, Tyrosh, Qarth 7 max 8 / 6
+  max 35; Dothrakowie i Yi Ti 5 max 12 / 4 max 30; Nocna Straz i Wyspy Letnie 7 max 11 / 4 max 35; Ibben 11 max 27 / 11 max 35; looters 2 / 1; kultury bandyckie ROT bez
+  tieru 1 - BasicTroop (tier 2): wildlings tulow 0 (wilding_garb 33 ponad) -> zapas c / nogi 2, hilltribesmen 1/1, kingswood_outlaw 1/2, robber_knights 1/1; yiti_bandits
+  bez puli. Zapasy w granicy: (c) neutralne tulow 5 (cloth_apron, half_apron, leather_apron, merchants_fur_coat, southern_pirate_armor) / nogi 4; (d) tulow 162 / nogi 94.
+- Log raz na kampanie: naglowek "Ubranie cywilne (m117 v2): ... granica ...: tulow N (sztuka), nogi N (sztuka); zapasy ...; odrzucone sztuki: ponad granica, ponad tier 3,
+  unikaty/olbrzymy/umarli, kobiece; kultur z pula N, bez puli (zapas c/d) ..." i linia na kulture "Ubranie cywilne (m117 v2) | <kultura>: tulow N (rekruci a, cywile b;
+  rekrutow ponad granica k: <id ochrona> ...) max P, np. ... | nogi ... | skad: rekruci T1 n (...) / bez tieru 1 - BasicTroop ... , cywile villager_x/townsman_x" (okolo 45
+  linii, nic co klatke). Linia bitwy (dopisek m117): "roznych sztuk: tulow X, nogi Y" (GarrisonKit._bCivKinds, czyszczone z licznikami bitwy).
+- Opis BareTroopsWearCivilianClothes (angielski) przepisany; gen_mcm: Armoury 2411 ustawien. Klucz bez zmian - Armoury.json Jeffa ruszac nie trzeba.
+- Kontrola v2: Civvies._civ/_plain czytal tylko Civvies (grep); Pick - jedyny wolajacy GarrisonKit.CivilDress, sygnatura bez zmian; wynik dalej sztuka tymczasowa DTE i wpis
+  _civAsg -> NoteAgent, wiec zwrot, lup, wraki (ArmorsPostfix, QueueWreck IsWorn, LootTally AZast) dzialaja tak samo dla kazdej wylosowanej sztuki. Losowanie przy kazdym
+  spawnie: ten sam czlowiek w nastepnej bitwie moze miec inne ubranie - bez skutku w gospodarce (ubranie poza zbrojownia). Build czyta tylko dane (MBObjectManager), niczego
+  nie zapisuje w szablonach postaci.
+**Ryzyko v2 / co sprawdzic:**
+- Jeff musi wiedziec: tulow NIE bedzie "jak u rekruta" (rekruci nosza garb 33 - wlasnie to, czego nie chce), tylko jak u chlopow i mieszczan tej kultury; od rekrutow sa buty.
+- Granica tulowia 30 opiera sie na andal_robe3/5, nog 35 na wrapped_shoes; jesli inny mod da te sztuki zolnierzowi, granica sama spadnie - naglowek logu podaje sztuke, ktora
+  ja wyznacza. Gdyby nogi spadly ponizej 18, wypadna buty rekrutow - sprawdzic w logu.
+- Przeciek przeszywanic w granicy: Ibben heavy_gambeson_armor_plain "Mariner Gambeson" (27, nosza go cywile Ibbenu i zolnierze T2), Zelazne Wyspy/Skagos/Ibben
+  northern_padded_gambeson (16, flaga Civilian, nosza cywile), neutral_culture BasicTroop guard empire_warrior_padded_armor_e (18, flaga Civilian). Wyciecie sztuk noszonych
+  przez zolnierzy usunieloby tez battania_woodland_outfit i "Villager Leather Tunic" - nie robione bez decyzji Jeffa.
+- Westeros: 6 z 14 sztuk na tulow to dlugie szaty mieszczan (andal_robe1-6) - wyglad "kupca" na szeregowcu; tylko Villager dalby 8 x andal_clothes max 19 - do decyzji.
+- Essos (Norvos ... Tyrosh, Qarth) ma w danych ROT Villager/Townsman z Braavos, Ghis i Sarnor - z Dorne, Skagos - z Zelaznych Wysp, Yi Ti - z Dothrakow: "ubranie danej
+  kultury" to ubranie przypisane przez ROT tej kulturze.
+- Kultury bandyckie ROT bez tieru 1 (BasicTroop tier 2): wildlings na tulowiu z zapasu (c) - fartuchy, merchants_fur_coat, southern_pirate_armor (losowo).
+- Odstepstwo od literalnego "cywile tylko, gdy rekruci nic nie maja": rekruci i cywile zawsze razem - na tulowiu wynik ten sam, w nogach wariant scisly dawalby 1-2 sztuki
+  w 20 kulturach ("wszyscy tak samo").
+- Liczby wyzej z XML + items-dump; ArmsPricing.IsUnique / UniqueGear poza gra nie do odtworzenia - faktyczne pule pokaze log (porownac z lista wyzej).
+- Test w grze (jak v1 nizej) plus: linie "Ubranie cywilne (m117 v2)" w Armoury.log (granica 30/35, pule jak wyzej), w bitwie z golymi "roznych sztuk" > 1 i na ekranie rozne
+  tuniki/buty u ludzi tej samej kultury, zadnego *_garb z ubrania.
+
+**v1 (24.10) - opis pierwotny; WYBOR SZTUKI ZASTAPIONY przez v2 wyzej (reszta - mechanizm, kanal lupu, rejestr, kontrola - obowiazuje):**
 
 **Problem:** Jeff 24.10 ok. 23:05, po zrzucie bitwy pod Riverrun (22:58-23:01) z polnagimi zolnierzami: "jak nie maja to wiadomo ze nikt nagi nie chdozi to niech
 dostana ubranie cywline najtansze buty tunike bty i tunike chociaz niech maja danej kultury przecie nie chodza w gaciach". Log sesji: CrashScribe przed bitwa "Mends: swieta
@@ -55,12 +110,10 @@ nie ma sztuki, a DressCode tych ludzi celowo nie ubiera (ubranie ze wzorca bez o
 - Linia startu musi mowic "ubranie cywilne golych (m117) wpiete" - inaczej nikt nie jest ubierany (celowo: bez latki GetAgentArmors ubranie szloby do wrakow).
 - Ludzie poza straza (GarrisonKit.OutsideGuard: inny mod podmienil ekwipunek, brak przydzialu DTE) - bez ubrania, jak dotad (bez przydzialu DTE zwrot oddalby ubranie do
   zbrojowni).
-- Dane ROT, decyzja Jeffa: *_garb (freefolk, nightswatch, ghiscari, lorathi, valyrian, sarnor, volantine, summer, myrish) ma body 33 przy 12d - "ubranie" chroni jak
-  przeszywanica; Andalowie (river, vale, reach, stormlands, crownlands, dragonstone) dostaja "Andal Noble Clothes" 8d (b14) - "noble" na szeregowcu. Ewentualny limit
-  ochrony albo wykluczenie "noble" - nie robione.
-- Filtr ubran kobiecych to heurystyka nazw (ROT nie ma NotUsableByMale) - sprawdzic linie "Ubranie cywilne (m117): wybor" w logu.
-- Odstepstwo od literalnego R3: zapas (b) "kultura bez flagi Civilian" i wszystkie poziomy tylko do tieru 3 (Recipes.Grade) - bez limitu skagosi_armor 915d, qarth_armor 246d.
-- Zapas (d) moze dac sztuke zza Waskiego Morza (GearFit kultury nie pytany) - tylko gdy neutralne (half_apron, leather_shoes) nie przechodza Atletyki.
+- (punkt v1 o *_garb 33 i "Andal Noble Clothes" - zamkniety przez v2: granica 30/35 odcina garb, a "Andal Noble Clothes" nie ma w szablonach rekrutow ani cywilow.)
+- Filtr ubran kobiecych to heurystyka nazw (ROT nie ma NotUsableByMale) - sprawdzic linie "Ubranie cywilne (m117 v2)" w logu.
+- Wszystkie poziomy tylko do tieru 3 (Recipes.Grade) - bez limitu zapas dawal skagosi_armor 915d, qarth_armor 246d (w v2 i tak ponad granica).
+- Zapas (d) moze dac sztuke zza Waskiego Morza (GearFit kultury nie pytany) - tylko gdy pula kultury i neutralne nie przechodza Atletyki.
 - Kara morale Underequipped zostaje mimo ubrania (jest liczona przed spawnem).
 - LootTally: licznik "zastepcze" u wroga urosnie (linie m109/m114); progi sprawdz_logi go nie dotycza (sprawdzone grep).
 - Ubranie zmienia mase i material pancerza agenta: HideoutAlarm (halas), FieldCraft, BattleGore/BattleWind - kosmetyka.
@@ -87,7 +140,8 @@ nie ma sztuki, a DressCode tych ludzi celowo nie ubiera (ubranie ze wzorca bez o
 **Status:** ZBUDOWANE - czeka na autotest i wgranie (gra Jeffa wlaczona). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne nowe; w zmienionych plikach tylko
 stare CS0169 BattlefieldLaw:34); Armoury.dll md5 f788045fed4df7305afce323114d2183; po recenzji (LootTally zapas IsWorn, CivilDress bez umarlych) md5
 306c634c3221aefa5937687ab950bc03 wedlug agenta poprawek - przebudowa z zatwierdzonego cb14b27d (dwa razy, czyste drzewo) daje 14e193c732225756fb271b57acae97dd
-i ta liczy sie przy wgraniu.
+(v1, NIEAKTUALNE). v2 (25.10): ZBUDOWANE, NIEWGRANE - czeka na autotest i wgranie; build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Civvies/GarrisonKit);
+Armoury.dll md5 4a4a8b5f49b8623bfdf6daba8fdaa6ee (drzewo zb\m117-ubranie - przy wgraniu przebudowac z commitu v2 i porownac).
 
 ## n36 cena ziemi wedlug stosunku 14-20 lat (galaz w-toku/m113-cena) - 24.10.2026
 
