@@ -33,6 +33,11 @@ namespace Armoury
     /// m111-walka faza 1 (24.10): ten sam postfiks niesie profil pojedynku (DuelAi, klucz DuelAiEnabled) - latka wpinana, gdy VeteransByTier
     /// albo DuelAiEnabled; w misji pojedynku (BattleSense.InDuel) przy DuelAiEnabled biegnie DuelAi.Apply i wyjscie, w bitwie kod weteranow bez
     /// zmian. Brama galezi RBM (RbmBranchOn) wspolna; czynnik zmeczenia RBM sFac = clamp(AIDecideOnAttackChance / 0.5, 0.85, 1) czytany na wejsciu.
+    /// m113-walka2 faza 2 (24.10, Jeff po fazie 1: walka w polu ma byc trudniejsza): w bitwie bohater AI (lord, towarzysz, przeciwnik-bohater) od
+    /// poziomu 0.40 dostaje profil DuelAi (DuelistsInBattles, DuelAi.ApplyField, runda 0), ponizej - regula weteranow z tierem co najmniej
+    /// z najlepszej umiejetnosci (HeroTierFromSkill, SkillTier); VeteranAggressionFix - AIDecideOnAttackChance (szansa porzucenia zamachu) bez
+    /// mnozenia w gore od T4 (robilo weterana bardziej biernym), T1-T3 dalej w dol jak w 106. Srednie AoD / DoA wedlug tieru do linii FieldDuel.
+    /// Po recenzji: bohater z profilem dostaje co najmniej prog tieru z reguly weteranow (DuelAi.ApplyField, TierMin).
     /// </summary>
     internal static class VeteranAi
     {
@@ -91,7 +96,7 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                if (c == null || (!c.VeteransByTier && !c.DuelAiEnabled)) { Log.Info("VeteranAi (NB2): weterani wedlug tieru i Duel AI wylaczeni przy starcie (VeteransByTier, DuelAiEnabled) - latka niewpieta."); return; }
+                if (c == null || (!c.VeteransByTier && !c.DuelAiEnabled && !c.DuelistsInBattles)) { Log.Info("VeteranAi (NB2): weterani wedlug tieru, Duel AI i bohaterowie-pojedynkowicze wylaczeni przy starcie (VeteransByTier, DuelAiEnabled, DuelistsInBattles) - latka niewpieta."); return; }
                 if (QuartermasterLaw.FindType("RBMAI.AgentAi") == null) { Log.Info("VeteranAi (NB2): RBM nieobecny - latka niewpieta (wspolczynniki gry bez zmian)."); return; }
                 _target = AccessTools.DeclaredMethod(typeof(AgentStatCalculateModel), "SetAiRelatedProperties");
                 if (_target == null) { Log.Info("VeteranAi (NB2): brak AgentStatCalculateModel.SetAiRelatedProperties - latka niewpieta."); return; }
@@ -100,7 +105,7 @@ namespace Armoury
                 Patched = r != null && Owned(_target, h.Id);
                 Log.Info("VeteranAi (NB2): weterani wedlug tieru - latka SetAiRelatedProperties " + (Patched ? "wpieta" : "NIEWPIETA")
                          + " (postfiks Priority.Last po com.rbmai; klucze VeteransByTier i DuelAiEnabled na zywo, przy starcie " + (c.VeteransByTier ? "TAK" : "NIE") + " / "
-                         + (c.DuelAiEnabled ? "TAK" : "NIE") + "; prog tieru 0.05 + 0.13 x (T-1), limity RBM wyzej od T5, agresja x0.80..x1.28; w pojedynku profil DuelAi).");
+                         + (c.DuelAiEnabled ? "TAK" : "NIE") + " / DuelistsInBattles " + (c.DuelistsInBattles ? "TAK" : "NIE") + "; prog tieru 0.05 + 0.13 x (T-1), limity RBM wyzej od T5, agresja x0.80..x1.28; w pojedynku profil DuelAi).");
             }
             catch (Exception e) { Log.Error("VeteranAi.ApplyAll", e); }
         }
@@ -243,6 +248,23 @@ namespace Armoury
             return u != null && u.IsShield;
         }
 
+        /// <summary>m113-walka2: najlepsza umiejetnosc broni bialej (OneHanded / TwoHanded / Polearm), skuteczna jak u RBM.</summary>
+        private static int BestMelee(Agent agent, AgentStatCalculateModel model)
+        {
+            int oh = model.GetEffectiveSkill(agent, DefaultSkills.OneHanded);
+            int th = model.GetEffectiveSkill(agent, DefaultSkills.TwoHanded);
+            int pa = model.GetEffectiveSkill(agent, DefaultSkills.Polearm);
+            return Math.Max(oh, Math.Max(th, pa));
+        }
+
+        /// <summary>m113-walka2 (HeroTierFromSkill): tier z najlepszej umiejetnosci broni bialej = clamp(1 + (best - 40) / 30, 1, 7) - 40 T1, 70 T2,
+        /// 100 T3, 130 T4, 160 T5, 190 T6, 220+ T7.</summary>
+        internal static int SkillTier(int best)
+        {
+            int t = best < 40 ? 1 : 1 + (best - 40) / 30;
+            return t > 7 ? 7 : t;
+        }
+
         public static void Postfix(Agent agent, AgentDrivenProperties agentDrivenProperties, WeaponComponentData equippedItem,
                                    WeaponComponentData secondaryItem, AgentStatCalculateModel __instance)
         {
@@ -263,13 +285,36 @@ namespace Armoury
                     catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelAi.Apply", e); }
                     return;
                 }
-                if (!c.VeteransByTier) return;
+                // m113-walka2 faza 2: w bitwie takze bohaterowie z profilem pojedynku (DuelistsInBattles) - weterani i bohaterowie za ta sama brama
+                bool vet = c.VeteransByTier, duelists = c.DuelistsInBattles;
+                if (!vet && !duelists) return;
                 if (!GateFor(m, out dm)) return;
                 if (!agent.IsHuman || agent.IsMainAgent || !agent.IsAIControlled) return;
                 var ch = agent.Character;
                 if (ch == null || Undead.Character(ch)) return;
 
+                bool hero = ch.IsHero;
+                int best = -1;
+                if (hero && duelists)
+                {
+                    // czynnik zmeczenia RBM z jego wyniku (przed nasza zmiana), jak w pojedynku
+                    float sFac = Clamp(agentDrivenProperties.AIDecideOnAttackChance / 0.5f, 0.85f, 1f);
+                    bool done = false;
+                    try { done = DuelAi.ApplyField(agent, agentDrivenProperties, equippedItem, secondaryItem, __instance, dm, sFac, c, out best); }
+                    catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVeteran, "DuelAi.ApplyField", e); }
+                    if (done) return;
+                }
+                if (!vet) return;
+
                 int tier = BattleWind.TierOf(ch);
+                // m113-walka2: bohater bez profilu pojedynku - tier co najmniej z najlepszej umiejetnosci broni bialej (40 = T1, co 30 punktow tier wiecej)
+                bool raised = false;
+                if (hero && c.HeroTierFromSkill)
+                {
+                    if (best < 0) best = BestMelee(agent, __instance);
+                    int ts = SkillTier(best);
+                    if (ts > tier) { tier = ts; raised = true; }
+                }
                 int skill = __instance.GetEffectiveSkill(agent, MeleeSkill(equippedItem, secondaryItem));
                 float numR = Clamp(skill / 250f * dm, 0f, 1f);                     // poziom RBM (Utilities.CalculateAILevel)
                 float lvl = Math.Max(numR, 0.05f + 0.13f * (tier - 1));
@@ -333,9 +378,12 @@ namespace Armoury
                     if (rawNew > rawOld + 1e-4f) { p.AIAttackOnParryChance *= rawNew / rawOld; above = true; }
                 }
 
-                // (3) agresja wedlug tieru (RBM: stale 0.5 x zmeczenie i 0.15 / 0.3 konno)
+                // (3) agresja wedlug tieru (RBM: stale 0.5 x zmeczenie i 0.15 / 0.3 konno). m113-walka2 (VeteranAggressionFix): AIDecideOnAttackChance
+                // to szansa porzucenia zamachu dla decyzji (profil DuelAi obniza ja z umiejetnoscia 0.50 -> 0.35, zryw otwarcia daje 0.10) - mnozenie przez
+                // agresje T6 x1.20 kazalo weteranowi czesciej rezygnowac z ataku; z kluczem odpada tylko mnozenie w gore (T4+ zostaje 0.50), T1-T3
+                // dalej x0.80 / x0.88 / x0.96 jak w 106 (po recenzji: bez tego rekrut porzucal zamach do 25% czesciej - walka latwiejsza, nie trudniejsza)
                 float agg = 0.8f + 0.08f * (tier - 1);
-                p.AIDecideOnAttackChance = Clamp(p.AIDecideOnAttackChance * agg, 0f, 1f);
+                if (!c.VeteranAggressionFix || agg < 1f) p.AIDecideOnAttackChance = Clamp(p.AIDecideOnAttackChance * agg, 0f, 1f);
                 p.AIAttackOnDecideChance = Clamp(p.AIAttackOnDecideChance * agg, 0.05f, 0.6f);
 
                 int id = agent.Index;
@@ -348,6 +396,7 @@ namespace Armoury
                     if (shield) _shield.Add(id);
                     if (cmd) _cmd.Add(id);
                     if (sample != null && _sample6 == null) _sample6 = sample;
+                    FieldDuel.NoteTierLocked(id, tier, p.AIAttackOnDecideChance, p.AIDecideOnAttackChance, hero, raised);
                 }
             }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVeteran, "VeteranAi.Postfix", e); }

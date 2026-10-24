@@ -648,7 +648,8 @@ namespace Armoury
                         || Settings.Current.SoldierPostureByTier || nb2b))
                     mission.AddMissionBehavior(new RoutKeeper());
                 // m111-walka (24.10): BattleSense niesie tez flage pojedynku (turniej, arena, pojedynek ROT) dla DuelAi / DuelCraft / DuelGuard / BattleWind
-                if (mission != null && (nb2b || DuelGuard.AnyKey(Settings.Current)))
+                // m113-walka2 (24.10): i dla rozszerzen bitwy fazy 2 (bohaterowie-pojedynkowicze, tier z umiejetnosci, roznica umiejetnosci gracza, zrywy)
+                if (mission != null && (nb2b || DuelGuard.AnyKey(Settings.Current) || FieldDuel.AnyKey(Settings.Current)))
                     mission.AddMissionBehavior(new BattleSense());
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
                     && (NightRest.PlayerCamped || CampScene.TestWanted()))   // m109-oboz: test autotestu (plik armoury-oboz-bitwa.flag) - kazda bitwa w polu jak w obozie

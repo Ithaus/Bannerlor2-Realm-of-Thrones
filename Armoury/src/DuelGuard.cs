@@ -122,7 +122,7 @@ namespace Armoury
         internal static void ApplyAll(Harmony h)
         {
             var c = Settings.Current;
-            if (!AnyKey(c)) { Log.Info("DuelGuard (m111-walka): wszystkie klucze pojedynku wylaczone przy starcie - haki niewpiete."); return; }
+            if (!AnyKey(c) && !FieldDuel.HooksWanted(c)) { Log.Info("DuelGuard (m111-walka): wszystkie klucze pojedynku i bitwy (m113-walka2) wylaczone przy starcie - haki niewpiete."); return; }
             // po recenzji: kazdy hak we wlasnym try - wyjatek jednego (przeciazenie po aktualizacji, h.Patch) nie wylacza pozostalych,
             // a linia stanu hakow pisze sie zawsze (finally)
             try
@@ -247,7 +247,8 @@ namespace Armoury
             finally
             {
                 Log.Info("DuelGuard (m111-walka): haki postury w pojedynku - " + HookState() + "; klucze czytane na zywo (DuelSkillGapWeight, DuelPerfectDefence, "
-                         + "DuelPressureBursts, DuelNoSlowMotion, DuelNoInjuredCollapse), poza turniejem / arena / pojedynkiem bez zmian.");
+                         + "DuelPressureBursts, DuelNoSlowMotion, DuelNoInjuredCollapse), poza turniejem / arena / pojedynkiem bez zmian; m113-walka2: w bitwie A i B tylko "
+                         + "kontakty gracza (DuelSkillGapInBattles) i obrona bohatera AI (DuelistBurstsInBattles), C i D nigdy.");
             }
         }
 
@@ -328,10 +329,46 @@ namespace Armoury
 
         // ------------------------------------------------------------ hak A
 
+        /// <summary>m113-walka2 (DuelSkillGapInBattles): bitwa w polu i kontakt z udzialem gracza (atakujacy albo obronca) - tylko roznica umiejetnosci,
+        /// bez DuelPerfectDefence. Inne kontakty bitwy wychodza po odczycie statykow BattleSense, klucza i MainAgent.</summary>
+        private static bool FieldGap(Mission m, Agent a, Agent b, Settings c)
+        {
+            if (!BattleSense.InBattle(m) || c == null || !c.DuelSkillGapInBattles) return false;
+            var main = m.MainAgent;
+            return main != null && (ReferenceEquals(a, main) || ReferenceEquals(b, main));
+        }
+
+        // po recenzji: w bitwie wezsze granice 0.75-1.25 zamiast 0.6-1.4, bo szeregowy ma juz pule postury wedlug tieru (SoldierPostureByTier, T6 x1.7):
+        // gracz 24 na T6 180 z tarcza przy 0.6 musial zablokowac ok. 2.6 raza wiecej ciosow niz w RBM, przy 0.75 ok. 2.3 raza.
+        // Recenzja chciala roznicy tylko przeciw graczowi (garda gracza >= x1, przeciwnika <= x1) - odrzucone 24.10: Jeff ("to cheatowanie", premia
+        // postury gracza z Endurance) chce jednej reguly dla gracza i AI, jak w szrankach; gracz slaby w broni (polearm "dopiero sie ucze") i tak
+        // dostaje trudniej, a wyuczona umiejetnosc ma sie liczyc w obie strony
+        internal const float FieldGapLo = 0.75f, FieldGapHi = 1.25f;
+
+        /// <summary>Mnoznik bitwy (ta sama regula dla gracza i przeciwnika, granice bitwy). mine - tylko do licznikow.</summary>
+        internal static float FieldGapMul(float raw, bool mine)
+        {
+            return Clamp(raw, FieldGapLo, FieldGapHi);
+        }
+
+        /// <summary>Brama hakow A: pojedynek albo kontakt gracza w bitwie. Po recenzji w try - wyjatek liczony, kontakt bez zmian.</summary>
+        private static bool GateA(Agent def, Agent att, out bool duel, string site)
+        {
+            duel = false;
+            try
+            {
+                var m = Mission.Current;
+                duel = BattleSense.InDuel(m);
+                return duel || FieldGap(m, def, att, Settings.Current);
+            }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, site, e); return false; }
+        }
+
         public static void DefDamagePostfix(Agent __0, Agent __1, ref AttackCollisionData __3, ref float __result)
         {
+            bool duel;
+            if (!GateA(__0, __1, out duel, "DuelGuard.DefDamage brama")) return;
             var m = Mission.Current;
-            if (!BattleSense.InDuel(m)) return;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -340,6 +377,13 @@ namespace Armoury
                 int ht = HitType(ref __3);
                 if (ht < 2) return;
                 float f = 1f, w = Weight(c);
+                if (!duel)
+                {
+                    // bitwa: __0 obronca - jego garda; gracz broni sie (mine) albo gracz atakuje przeciwnika
+                    bool mine = __0.IsMainAgent;
+                    if (w > 0f) f = FieldGapMul(1f - w * Gap(__0, __1, c, m.CurrentTime), mine);
+                    __result *= f; FieldDuel.NoteGap(mine, true, f); return;
+                }
                 if (w > 0f) f *= Clamp(1f - w * Gap(__0, __1, c, m.CurrentTime), 0.6f, 1.4f);
                 if (c.DuelPerfectDefence)
                 {
@@ -355,8 +399,9 @@ namespace Armoury
 
         public static void AttDamagePostfix(Agent __0, Agent __1, ref AttackCollisionData __3, ref float __result)
         {
+            bool duel;
+            if (!GateA(__0, __1, out duel, "DuelGuard.AttDamage brama")) return;
             var m = Mission.Current;
-            if (!BattleSense.InDuel(m)) return;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -365,6 +410,13 @@ namespace Armoury
                 int ht = HitType(ref __3);
                 if (ht < 2) return;
                 float f = 1f, w = Weight(c);
+                if (!duel)
+                {
+                    // bitwa: __1 atakujacy - koszt jego gardy; gracz atakuje (mine) albo przeciwnik atakuje gracza
+                    bool mine = __1.IsMainAgent;
+                    if (w > 0f) f = FieldGapMul(1f + w * Gap(__0, __1, c, m.CurrentTime), mine);
+                    __result *= f; FieldDuel.NoteGap(mine, false, f); return;
+                }
                 if (w > 0f) f *= Clamp(1f + w * Gap(__0, __1, c, m.CurrentTime), 0.6f, 1.4f);
                 if (c.DuelPerfectDefence && ht == 7) f *= 2f;      // chamber atakujacy (2.0)
                 __result *= f;
@@ -380,11 +432,35 @@ namespace Armoury
             return _rPosture(stance);
         }
 
-        public static void HandlePrefix(object __0, out float __state)
+        /// <summary>m113-walka2: kontakt bitwy, ktory sledzimy - gracz atakuje albo sie broni (dowolny klucz bitwy), albo broni sie bohater AI
+        /// (zrywy: DuelistsInBattles + DuelistBurstsInBattles). def = obronca (__1), att = atakujacy (__2) w obu metodach RBM.</summary>
+        private static bool FieldTrack(Mission m, Agent def, Agent att)
+        {
+            if (!BattleSense.InBattle(m) || def == null || att == null) return false;
+            var c = Settings.Current;
+            if (c == null) return false;
+            if (def.IsMainAgent || att.IsMainAgent) return FieldDuel.AnyKey(c);
+            // po recenzji: najpierw pole zarzadzane (Character.IsHero), potem IsAIControlled (odczyt wskaznika silnika) - najtanszy chybiony kontakt
+            return FieldDuel.BurstsOn(c) && IsHero(def) && def.IsAIControlled;
+        }
+
+        private static bool IsHero(Agent a)
+        {
+            var ch = a.Character;
+            return ch != null && ch.IsHero;
+        }
+
+        public static void HandlePrefix(object __0, Agent __1, Agent __2, out float __state)
         {
             __state = -1f;
-            if (__0 == null || !BattleSense.InDuel(Mission.Current)) return;
-            try { __state = PostureOf(__0); }
+            if (__0 == null) return;
+            // po recenzji: brama (FieldTrack czyta agentow) w try - wyjatek liczony, nigdy nie wychodzi z haka
+            try
+            {
+                var m = Mission.Current;
+                if (!BattleSense.InDuel(m) && !FieldTrack(m, __1, __2)) return;
+                __state = PostureOf(__0);
+            }
             catch (Exception e) { __state = -1f; RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.HandlePrefix", e); }
         }
 
@@ -405,6 +481,7 @@ namespace Armoury
                 float after = PostureOf(__0);
                 bool broke = after > __state || (after <= 0f && __state > 0f);
                 int ht = HitType(ref __3);
+                if (!BattleSense.InDuel(m)) { FieldDefender(m, c, __0, __1, __2, after, broke, ht); return; }
                 if (broke)
                     lock (RoutHold.Gate) { if (__1.IsMainAgent) _brDefPl++; else if (__1.IsAIControlled) _brDefAi++; }
                 if (ht < 2 || __1.IsMainAgent || !__1.IsAIControlled) return;
@@ -433,6 +510,7 @@ namespace Armoury
                 float after = PostureOf(__0);
                 bool broke = after > __state || (after <= 0f && __state > 0f);
                 if (!broke) return;
+                if (!BattleSense.InDuel(m)) { FieldAttacker(c, __1, __2, ref __3); return; }
                 lock (RoutHold.Gate) { if (__2.IsMainAgent) _brAttPl++; else if (__2.IsAIControlled) _brAttAi++; }
                 int ht = HitType(ref __3);
                 if (ht < 2) return;
@@ -456,6 +534,54 @@ namespace Armoury
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.AttackerPostfix", e); }
             finally { System.Threading.Interlocked.Add(ref _hookTicks, Stopwatch.GetTimestamp() - t0); }
         }
+
+        // ------------------------------------------------------------ hak B w bitwie (m113-walka2)
+
+        /// <summary>handleDefender w bitwie: zlamania w kontaktach gracza; obrona bohatera AI - pierscien obron i zryw NACISK (jak w pojedynku,
+        /// od poziomu 0.56). Tylko kontakty przepuszczone przez FieldTrack (gracz albo bohater AI w obronie).</summary>
+        private static void FieldDefender(Mission m, Settings c, object stance, Agent def, Agent att, float after, bool broke, int ht)
+        {
+            if (broke) FieldDuel.NoteBreak(def.IsMainAgent ? FieldDuel.BrPlayerDef : (att != null && att.IsMainAgent ? FieldDuel.BrAiDefVsPlayer : FieldDuel.BrHeroDef));
+            if (ht < 2 || def.IsMainAgent || !def.IsAIControlled || !FieldDuel.BurstsOn(c) || !IsHero(def)) return;
+            float now = m.CurrentTime;
+            bool three = DuelCraft.NoteDefence(def.Index, now);
+            FieldDuel.NoteBreak(FieldDuel.HeroDefence);
+            float max = _rMax(stance);
+            bool low = max > 1f && after / max < DuelCraft.PressedPostureFrac;
+            if ((three || low) && DuelAi.LevelOf(def, c) >= DuelAi.PressedFrom) DuelCraft.Request(def, DuelCraft.Pressed);
+        }
+
+        /// <summary>handleAttacker w bitwie (garda atakujacego pekla): licznik; obronca bohater AI od poziomu 0.40 - zryw OTWARCIE.</summary>
+        private static void FieldAttacker(Settings c, Agent def, Agent att, ref AttackCollisionData cd)
+        {
+            FieldDuel.NoteBreak(att.IsMainAgent ? FieldDuel.BrPlayerAtt : (def.IsMainAgent ? FieldDuel.BrAiAttVsPlayer : FieldDuel.BrOtherAtt));
+            if (HitType(ref cd) < 2) return;
+            if (FieldDuel.BurstsOn(c) && def.IsAIControlled && !def.IsMainAgent && IsHero(def) && DuelAi.LevelOf(def, c) >= DuelAi.Floor)
+                DuelCraft.Request(def, DuelCraft.Opening);
+        }
+
+        /// <summary>m113-walka2: poczatek bitwy (FieldDuel.Begin) - pamiec roznicy i czas hakow od zera.</summary>
+        internal static void BeginField()
+        {
+            _gDef = _gAtt = null; _gTime = -1f;
+            System.Threading.Interlocked.Exchange(ref _hookTicks, 0L);
+            lock (RoutHold.Gate) { _order = "?"; }
+        }
+
+        /// <summary>m113-walka2: koniec bitwy - bez silnych odwolan do agentow.</summary>
+        internal static void EndField()
+        {
+            _gDef = _gAtt = null; _gTime = -1f;
+        }
+
+        /// <summary>Czas spedzony w hakach A i B od poczatku misji (ms).</summary>
+        internal static float HookMs()
+        {
+            return (float)(System.Threading.Interlocked.Read(ref _hookTicks) * 1000.0 / Stopwatch.Frequency);
+        }
+
+        /// <summary>Stan hakow z AfterStart (CheckOrder) - czytany pod RoutHold.Gate.</summary>
+        internal static string OrderLocked() { return _order; }
 
         // ------------------------------------------------------------ hak C i D
 

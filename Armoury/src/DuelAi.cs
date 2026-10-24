@@ -175,9 +175,68 @@ namespace Armoury
                 return;
             }
 
+            int burst = c.DuelPressureBursts && m != null ? DuelCraft.BurstOf(id, m.CurrentTime) : DuelCraft.None;
+            Write(agent, p, lvl, sFac, burst);
+            Note(m, agent, equippedItem, held, best, s, round, lvl, p, burst);
+        }
+
+        /// <summary>m113-walka2 faza 2: bohater AI w bitwie w polu (klucz DuelistsInBattles, wolane z VeteranAi.Postfix po bramie bitwy i galezi RBM).
+        /// Ten sam profil co w pojedynku przy rundzie 0; ponizej poziomu 0.40 (umiejetnosc 100 na Realistic) false - bohater idzie regula weteranow
+        /// (tier z umiejetnosci: HeroTierFromSkill). best = najlepsza z trzech broni bialych (VeteranAi bierze ja do tieru bez ponownego liczenia).
+        /// Zryw tylko przy DuelistBurstsInBattles. Tylko odczyt statykow; liczniki pod RoutHold.Gate (FieldDuel).</summary>
+        internal static bool ApplyField(Agent agent, AgentDrivenProperties p, WeaponComponentData equippedItem, WeaponComponentData secondaryItem,
+                                        AgentStatCalculateModel model, float dm, float sFac, Settings c, out int best)
+        {
+            best = -1;
+            if (equippedItem == null) return false;        // bez broni w reku - regula weteranow (jak dotad)
+            int held;
+            int s = DuelSkill(agent, model, equippedItem, secondaryItem, c, out held, out best);
+            float lvl = Level(s, dm, 0, c);
+            if (lvl < Floor) return false;                 // brama profilu na poziomie z samej umiejetnosci (profil od 100 na Realistic)
+            // po recenzji: minimum z reguly weteranow zostaje (przy VeteransByTier) - prog tieru 0.05 + 0.13 x (T - 1), tier = wyzszy z poziomu
+            // i z umiejetnosci (HeroTierFromSkill); lord 35 (T6) z umiejetnoscia 120 mial 0.70, sam profil dawal 0.48 (losowy kierunek obrony 0.89
+            // zamiast 0.66); konny bohater - atak po decyzji co najmniej 0.30 x agresja tieru (T5-T7 0.336 / 0.36 / 0.384 jak u weteranow)
+            float lvlEff = lvl, aodMin = 0f;
+            if (c.VeteransByTier)
+            {
+                int tier = TierMin(agent.Character, best, c);
+                lvlEff = Math.Max(lvl, Math.Min(1f, 0.05f + 0.13f * (tier - 1)));
+                if (agent.HasMount) aodMin = 0.30f * (0.8f + 0.08f * (tier - 1));
+            }
+            var m = agent.Mission;
+            int burst = c.DuelistBurstsInBattles && m != null ? DuelCraft.BurstOf(agent.Index, m.CurrentTime) : DuelCraft.None;
+            float aod, doa;
+            Write(agent, p, lvlEff, sFac, burst, aodMin, out aod, out doa);
+            FieldDuel.NoteHero(m, agent.Index, s, lvlEff, aod, doa, burst);
+            return true;
+        }
+
+        /// <summary>m113-walka2 (po recenzji): tier bohatera jak w regule weteranow - z poziomu (BattleWind.TierOf), z HeroTierFromSkill co najmniej
+        /// z najlepszej umiejetnosci broni bialej (VeteranAi.SkillTier).</summary>
+        internal static int TierMin(BasicCharacterObject ch, int best, Settings c)
+        {
+            int tier = BattleWind.TierOf(ch);
+            if (c != null && c.HeroTierFromSkill && best >= 0)
+            {
+                int ts = VeteranAi.SkillTier(best);
+                if (ts > tier) tier = ts;
+            }
+            return tier;
+        }
+
+        private static void Write(Agent agent, AgentDrivenProperties p, float lvl, float sFac, int burst)
+        {
+            float aod, doa;
+            Write(agent, p, lvl, sFac, burst, 0f, out aod, out doa);
+        }
+
+        /// <summary>Profil Shape w polach RBM / gry i nakladka zrywu (wspolne dla pojedynku i bitwy). aod / doa - wartosci profilu przed zrywem.
+        /// aodMin - dolna granica ataku po decyzji przed zrywem (bitwa: konny bohater wedlug tieru; pojedynek 0).</summary>
+        private static void Write(Agent agent, AgentDrivenProperties p, float lvl, float sFac, int burst, float aodMin, out float aod, out float doa)
+        {
             bool shield = VeteranAi.HasShield(agent);
             var sh = ShapeOf(lvl, shield, agent.HasMount, sFac);
-            p.AIAttackOnDecideChance = sh.AoD;
+            p.AIAttackOnDecideChance = Math.Max(sh.AoD, aodMin);
             p.AIDecideOnAttackChance = sh.DoA;
             p.AIAttackOnParryChance = sh.AoP;
             p.AIParryOnDecideAbility = sh.Parry;
@@ -214,28 +273,24 @@ namespace Armoury
             p.AISetNoDefendTimerAfterParryingAbility = Lerp(0.15f, 1f, l2);
             p.AiParryDecisionChangeValue = 0.05f + 0.7f * lvl;
 
-            // zryw (DuelCraft) - tylko odczyt tablic statycznych
-            int burst = 0;
-            if (c.DuelPressureBursts && m != null)
+            // zryw (DuelCraft) - rodzaj odczytany przez wolajacego z tablic statycznych
+            aod = p.AIAttackOnDecideChance;
+            doa = p.AIDecideOnAttackChance;
+            if (burst == DuelCraft.Opening)
             {
-                burst = DuelCraft.BurstOf(id, m.CurrentTime);
-                if (burst == DuelCraft.Opening)
-                {
-                    p.AIAttackOnDecideChance = 0.90f;
-                    p.AIDecideOnAttackChance = 0.10f;
-                    if (melee) { p.AIHoldingReadyMaxDuration = 0f; p.AIHoldingReadyVariationPercentage = 0f; }
-                }
-                else if (burst == DuelCraft.Pressed)
-                {
-                    p.AIAttackOnDecideChance = Math.Max(p.AIAttackOnDecideChance, 0.60f);
-                    p.AIDecideOnAttackChance = p.AIDecideOnAttackChance * 0.6f;
-                    p.AIAttackOnParryChance = Math.Max(p.AIAttackOnParryChance, 0.80f);
-                    p.AiKick = Math.Max(p.AiKick, 0.45f);
-                    p.AiTryChamberAttackOnDecide = Math.Max(p.AiTryChamberAttackOnDecide, 0.20f);
-                    if (melee) p.AIHoldingReadyMaxDuration = 0.05f;
-                }
+                p.AIAttackOnDecideChance = 0.90f;
+                p.AIDecideOnAttackChance = 0.10f;
+                if (melee) { p.AIHoldingReadyMaxDuration = 0f; p.AIHoldingReadyVariationPercentage = 0f; }
             }
-            Note(m, agent, equippedItem, held, best, s, round, lvl, p, burst);
+            else if (burst == DuelCraft.Pressed)
+            {
+                p.AIAttackOnDecideChance = Math.Max(p.AIAttackOnDecideChance, 0.60f);
+                p.AIDecideOnAttackChance = p.AIDecideOnAttackChance * 0.6f;
+                p.AIAttackOnParryChance = Math.Max(p.AIAttackOnParryChance, 0.80f);
+                p.AiKick = Math.Max(p.AiKick, 0.45f);
+                p.AiTryChamberAttackOnDecide = Math.Max(p.AiTryChamberAttackOnDecide, 0.20f);
+                if (melee) p.AIHoldingReadyMaxDuration = 0.05f;
+            }
         }
 
         // ------------------------------------------------------------ linia DU (migawki, wypis w ticku BattleSense)

@@ -1520,6 +1520,26 @@ namespace Armoury
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelNoInjuredCollapse { get; set; } = true;
 
+        [SettingPropertyBool("Duelists In Battles", HintText = "in battles (the field, siege assaults and defences, sallies, raids) and hideouts lords, companions and other heroes fight like the duellists of the lists: from about skill 100 (on Realistic) a hero attacks on his own, ripostes after a parry, feints and kicks, and does not wait behind his guard - the higher his best weapon skill, the bolder, and with Veterans By Tier never weaker than a veteran of his tier; soldiers keep the veterans' rule. Needs RBM with posture. Off = heroes fight as soldiers of their tier (level, or skill with Hero Tier From Skill), as before", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool DuelistsInBattles { get; set; } = true;
+
+        [SettingPropertyBool("Hero Tier From Skill", HintText = "with Veterans By Tier: in battles and hideouts a hero counts as a soldier of the tier his best weapon skill earns when that is higher than his level's tier: best skill 40 = tier I, every 30 points a tier more (100 = III, 160 = V, 190 = VI, 220 and more = VII). It matters most with Duelists In Battles off; with it on, it covers heroes below the duellist profile (best skill under about 125 on Realistic, more on Hard and Easy) and the least a duellist hero keeps. Off = tier from level only, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool HeroTierFromSkill { get; set; } = true;
+
+        [SettingPropertyBool("Veteran Aggression Fix", HintText = "with Veterans By Tier: veterans (tier IV and up) no longer break their attacks off more often than plain RBM - before, their experience also made them give up attacks more readily, which made them more passive, not less. How readily a soldier starts an attack still follows his tier (recruits hesitate, veterans press on), and tiers I-III keep the old rule. Off = both chances scaled for every tier, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool VeteranAggressionFix { get; set; } = true;
+
+        [SettingPropertyBool("Duel Skill Gap In Battles", HintText = "in battles and hideouts the Duel Skill Gap Weight rule also counts in your own clashes (when you strike or are struck), the same rule both ways as in the lists: the better fighter's guard suffers less from blocked or parried blows and the weaker one's more (limits 0.75x-1.25x, as soldiers' guards already grow with their tier). Clashes between other fighters are untouched. Off = plain RBM in battles, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool DuelSkillGapInBattles { get; set; } = true;
+
+        [SettingPropertyBool("Duelist Bursts In Battles", HintText = "with Duelists In Battles: a skilled hero in a battle or hideout seizes his moment as in the lists - when an attacker's guard breaks on him he strikes back at once (about a second, then at least 2 seconds before the next), and when he is kept on the defence he answers with a flurry of his own (from skill 140, then at least 6 seconds' rest). Heroes only. Off = steady behaviour", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool DuelistBurstsInBattles { get; set; } = true;
+
         [SettingPropertyBool("Autotest Battle Kit", HintText = "test runs only (the CrashScribe automatic test, switched on by its autotest.json file) - no effect in your game: before a test battle the test company's men get the missing pieces of their own troop kit into the company stores, as recruits bring theirs, so the battle test fights armed; after the battle the same pieces are taken away again. Off = test men fight with whatever the stores hold, as before", RequireRestart = false)]
         [SettingPropertyGroup("Automatic test only")]
         public bool AutotestBattleKit { get; set; } = true;
@@ -9815,6 +9835,11 @@ namespace Armoury
             s.DuelPerfectDefence = DuelPerfectDefence;
             s.DuelNoSlowMotion = DuelNoSlowMotion;
             s.DuelNoInjuredCollapse = DuelNoInjuredCollapse;
+            s.DuelistsInBattles = DuelistsInBattles;
+            s.HeroTierFromSkill = HeroTierFromSkill;
+            s.VeteranAggressionFix = VeteranAggressionFix;
+            s.DuelSkillGapInBattles = DuelSkillGapInBattles;
+            s.DuelistBurstsInBattles = DuelistBurstsInBattles;
             s.AutotestBattleKit = AutotestBattleKit;
             s.CavalryNeedsMounts = CavalryNeedsMounts;
             s.WarHorseFromTier = WarHorseFromTier;
