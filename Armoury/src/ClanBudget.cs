@@ -695,16 +695,25 @@ namespace Armoury
             double d0 = ClanIncomeBook.StableIncome(c);
             if (!(d0 >= 0)) d0 = Math.Max(0, G / 60.0);
             double d; int days; double once;
+            double stableW = 0;   // n36 (M5): waga D stalego w D (tylko w nim jest lustro F6 wyplat wiosek pobocznych)
             if (s.ClanBudgetStableD && ClanIncomeBook.StableDWithDays(c, out d, out days, out once))
             {
                 if (Array.IndexOf(Raiders, c.Kingdom.StringId) >= 0) d += once;   // najezdzcy: lup w D (wyjatek lore W-1, jak AI)
                 days = Math.Max(0, Math.Min(Days28, days));
                 D = (days * d + (Days28 - days) * d0) / Days28;
+                stableW = (double)days / Days28;
             }
             else D = d0;
             D = Math.Max(0, D);
             // 168: rod w zajeciu - D bez dochodu wsi (jak AI; W5 i W6 i tak go pomijaja)
-            if (DebtLadder.On && DebtLadder.IsSeized(c)) D = Math.Max(0, D - Math.Min(D, ClanIncomeBook.VillageIncomeOf(c)));
+            if (DebtLadder.On && DebtLadder.IsSeized(c))
+            {
+                double vill = ClanIncomeBook.VillageIncomeOf(c);
+                // n36 (M5): wyplaty wiosek pobocznych (F4 w VillageIncomeOf) sa w D tylko przez lustro F6 w D stalym - odejmowac tylko te czesc, ktora D naprawde ma
+                double side = Math.Min(vill, SideVillageFief.PaidAvg28());
+                if (side > 0) vill -= side * (1.0 - (s.SideVillageDuesInLordD ? stableW : 0.0));
+                D = Math.Max(0, D - Math.Min(D, Math.Max(0, vill)));
+            }
             return D;
         }
 

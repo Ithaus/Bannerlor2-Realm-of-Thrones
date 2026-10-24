@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## n36 recenzja scalenia (galaz w-toku/n36-calosc) - 24.10.2026: poprawki styku poboru, zakupu ziemi i ceny
+
+- Pobor: wycena poboru (zaufanie 6 we wlasnej wiosce) uniewazniana przy zmianie wlasnosci (kupno / odkup / zamek) w tej samej godzinie - pole Own w LvQuote.
+- Menu wioski gracza po wczytaniu zapisu w srodku menu dodatkowej wioski: RecoverCur (wioska przy partii, wzor RecoverUid); pobor i odkup z menu wioski gracza
+  tylko na miejscu (TownInns.HostNearNow) - nigdy z dalekiej wioski.
+- arm_sidevil_buy na indeksie 6 (przed Leave - pobor wstawiony na 2 przesunal opcje); SetCurrent po kupnie oznacza wioske jako zapytana (bez pytania o postoj).
+- Cena wioski pobocznej i odkupu (M1): srednia roku - pomiar tylko przy pelnym roku w ksiedze (LandValue.SeasonFixFullYear: rok / ostatnie 7 dob), inaczej model
+  zimy ((1 - 0.25 x ciecie zimy wsi) / VillageCrafts.Now); zima liczona raz. Udzialy wiosek gracza w cenie Lordship / zamku na tej samej podstawie roku (M3).
+- Powinnosci korony w cenie wedlug KUPUJACEGO, raz w Price dla kazdego rodzaju (M4); wioska poboczna tylko z SideVillageDuesInLordD i podstawa "ziemia".
+- ClanBudget.PlayerD w zajeciu: wyplaty wiosek pobocznych odejmowane tylko w czesci, ktora D naprawde ma (lustro F6 w D stalym) (M5).
+- KS: brak rak wioski (pobor gracza, polegli obroncy) przesuwa udzial rak i potrzeby bloku tej wioski (VillageBook.KsLackShift, jak People/LackOf); ziemia z osad (A1).
+
 ## m113-pobor (galaz w-toku/m113-rekrutacja) - 24.10.2026: pobor z wioski pobocznej z jej wlasnej puli mlodych
 
 **Problem:** Jeff 24.10: "pula ma byc z tej konkretnej wioski ... 4000 ludzi to wioska z okolica, farmami i zagrodami. Z tej ludnosci maks ok. 10% ... potem pula odnawia sie
@@ -29,7 +41,7 @@ i zarabia ... nie za grosze ... mozna obnizyc, jak dlugi sa za duze, ale nie nad
 **Zmiana (B1+B2+B3 w jednym przebiegu; zasady Z1-Z9 w naglowku LandSale.cs):**
 - LandSale.cs / LandSale.Talk.cs: oferty (sprzedawca Z1, potrzeba Z2 przez ClanBudget.NeedOf, bramki Z3, cena Z4 = round100(NetDay x 364 x 14 lat [x0.85 w wojnie] x premia x (1 - upust <= 15%)),
   kolejka i wykonanie Z5 (GiveGoldAction gracz -> glowa, przeniesienie, zwrot przy bledzie "transakcja cofnieta", DebtLadder.LandProceeds), przeniesienie Z6, odkup Z7; rozmowa
-  "I hear your house needs coin. Would you sell me land?" (hero_main_options 105) z oknem wyboru i rachunku; menu arm_sidevil_buy (indeks 5), arm_land_lord (village, indeks 8),
+  "I hear your house needs coin. Would you sell me land?" (hero_main_options 105) z oknem wyboru i rachunku; menu arm_sidevil_buy (indeks 6, przed Leave), arm_land_lord (village, indeks 8),
   arm_side_fief_sellback; linia na sucho (raz na sesje i co 28 dob), linia doby, autotest (armoury-ziemia.flag); LandBk - odbicie BK (GetTitle, deJure, GetAllDeJure, InheritTitle, demesne).
 - LandValue.cs: ksiega wartosci ziemi - 4 sloty por roku (91 dob) z ostatniej doby pierscieni D stalego (ClanIncomeBook.LastDay), YearMean / Avg28; zapis arm_landval.
 - SideVillageFief.cs: wiele wiosek gracza (Own, pierwsza sf1 + dodatkowe arm_side_fief2), _cur menu, wybor przy dwoch w okregu, DueFor (czysta naleznosc, jeden PartsOf na okreg),

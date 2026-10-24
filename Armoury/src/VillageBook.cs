@@ -1935,6 +1935,40 @@ namespace Armoury
             catch (Exception e) { Stumble("VillageBook.LookOf", e); return false; }
         }
 
+        /// <summary>P8 / m97 (recenzja n36 A1): KS - udzialy rak osad okregu (z KsShares) z brakiem rak wiosek (SideVillageVisit.LackNow: pobor gracza, polegli obroncy)
+        /// przesunietym jak People (LackOf): wioska w traci f_w = brak / Dom, reszta okregu dostaje to samo pro rata (suma = 1). Ziemia zostaje z osad. Sam odczyt pod Gate,
+        /// nie rzuca.</summary>
+        internal static void KsLackShift(Village v, Dictionary<string, double> side, ref double main)
+        {
+            if (v == null || side == null || side.Count == 0 || !Active || !SideVillageVisit.LackAny) return;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d) || d == null || d.Uid == null) return;
+                    float k = PopulationLaw.KFor(d.St);
+                    double dom = k > 0f && !float.IsInfinity(k) ? (double)Math.Max(0f, d.V.Hearth) * k : 0.0;
+                    if (!(dom > Eps)) return;
+                    var f = new Dictionary<string, double>(StringComparer.Ordinal); double t = 0.0;
+                    foreach (var kv in side)
+                    {
+                        double s = kv.Value; if (!(s > Eps) || !(s < 1.0 - Eps)) continue;
+                        double lk = SideVillageVisit.LackNow(kv.Key); if (!(lk > Eps)) continue;
+                        double fw = Math.Min(s, lk / dom); f[kv.Key] = fw; t += fw / (1.0 - s);
+                    }
+                    if (!(t > 0.0)) return;
+                    foreach (var u in new List<string>(side.Keys))
+                    {
+                        double s = side[u], fw; f.TryGetValue(u, out fw);
+                        side[u] = Math.Max(0.0, s - fw + s * (t - (fw > 0.0 ? fw / (1.0 - s) : 0.0)));
+                    }
+                    main = Math.Max(0.0, main * (1.0 + t));
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.KsLackShift", e); }
+        }
+
         /// <summary>KS (kalibracja startu): udzialy osad okregu - wioski poboczne (uid -> osady wioski / osady okregu) i wies gry (main). Udzial z osad (Nw), nie z ludzi
         /// w domu: ubytek rak (uchodzcy) robi czynnik E4/5 w modelu produkcji. false - ksiega nieczynna, wies nieznana albo okreg bez n. Sam odczyt pod Gate, nie rzuca.</summary>
         internal static bool KsShares(Village v, Dictionary<string, double> side, out double main)

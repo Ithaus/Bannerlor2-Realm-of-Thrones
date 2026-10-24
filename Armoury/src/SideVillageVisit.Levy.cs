@@ -83,7 +83,7 @@ namespace Armoury
         private sealed class LvQuote
         {
             public string Uid; public int Hour = -1, Day = -1;
-            public bool Hide, Burned;
+            public bool Hide, Burned, Own;   // n36: wlasnosc wioski przy wycenie - zmiana (kupno / odkup / zamek) uniewaznia wycene w tej samej godzinie
             public double P, Home, Cap, Pool, Y;
             public int Callable, Muster, Ready, Stage = 1, Idx, Price, Today, Room;
             public CharacterObject Troop;
@@ -256,9 +256,10 @@ namespace Armoury
         private static LvQuote LvQuoteFor(Settlement st, string uid)
         {
             int hour = (int)CampaignTime.Now.ToHours;
+            bool own = SideVillageFief.IsMine(uid) || OwnLands(st);   // n36: zaufanie 6 zalezy od wlasnosci - kupno z menu wioski w tej samej godzinie nie moze trzymac starego indeksu
             var q = _lvQ;
-            if (q != null && q.Hour == hour && string.Equals(q.Uid, uid, StringComparison.Ordinal)) return q;
-            q = new LvQuote { Uid = uid, Hour = hour };   // recenzja: do pamieci (_lvQ) dopiero gotowa - wyjatek w srodku nie zostawia polowy wyceny na godzine
+            if (q != null && q.Hour == hour && q.Own == own && string.Equals(q.Uid, uid, StringComparison.Ordinal)) return q;
+            q = new LvQuote { Uid = uid, Hour = hour, Own = own };   // recenzja: do pamieci (_lvQ) dopiero gotowa - wyjatek w srodku nie zostawia polowy wyceny na godzine
             VillageBook.PartView me; double ha, na;
             if (st == null || uid == null || !PartOf(st, uid, out me, out ha, out na)) { q.Hide = true; _lvQ = q; return q; }
             int today = Today();
@@ -385,7 +386,13 @@ namespace Armoury
         /// <summary>Warunek opcji w menu wioski gracza (SideVillageFief): osada okregu szukana w try.</summary>
         internal static bool LevyConditionFief(MenuCallbackArgs a, string distId, string uid)
         {
-            try { return LevyCondition(a, Settlement.Find(distId ?? ""), uid, true); }
+            try
+            {
+                bool r = LevyCondition(a, Settlement.Find(distId ?? ""), uid, true);
+                // n36: partia u tej wioski (w wsi gry okregu albo przy obrazku) - pobor nigdy z dalekiej wioski, nawet gdy menu wskazuje zla
+                if (r && a.IsEnabled && !TownInns.HostNearNow(distId, uid)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You are not at the village."); NoteRefusal(uid, "miejsce"); }
+                return r;
+            }
             catch (Exception e) { LvStumble("ConditionFief", e); return false; }
         }
 
@@ -469,7 +476,12 @@ namespace Armoury
 
         internal static void LevyOpenFief(MenuCallbackArgs a)
         {
-            try { LevyOpen(Settlement.Find(SideVillageFief.MenuDistId ?? ""), SideVillageFief.MenuUid, true); }   // n36: wioska otwartego menu (m113-zakup - kilka wiosek gracza)
+            try
+            {
+                string d = SideVillageFief.MenuDistId, u = SideVillageFief.MenuUid;   // n36: wioska otwartego menu (m113-zakup - kilka wiosek gracza)
+                if (!TownInns.HostNearNow(d, u)) { Log.Player("You are not at the village.", true); return; }
+                LevyOpen(Settlement.Find(d ?? ""), u, true);
+            }
             catch (Exception e) { LvStumble("OpenFief", e); }
         }
 

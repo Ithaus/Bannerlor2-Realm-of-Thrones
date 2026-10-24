@@ -47,12 +47,13 @@ namespace Armoury
     ///  Z4 CENA = round100(NetDay x dni roku (364 przy kalendarzu Jeffa) x lata x premia x (1 - upust)). Lata 14, w wojnie krolestwa osady z wielkim krolestwem x0.85;
     ///     lata x (1 - upust) >= 10. Premia: wioska 1, Lordship 1, zamek 1.5, zamek-siedziba (HomeSettlement albo siedziba z ksiegi rodow kanonu) 2.0.
     ///     Upust = 0.15 x clamp((q - 0.5) / 1.5, 0, 1), q = dlug / max(1, G + 91 D).
-    ///     NetDay: wioska - SideVillageFief.DueFor (wartosc dnia x H x stawka pana) x poprawka pory roku (LandValue.SeasonFix: YearMean VT okregu / pelne 28 dob sesji
-    ///     albo biezaca pora z zapisu, clamp 0.5-2, inaczej 1); Lordship - YearMean VT wsi gry; zamek - YearMean renty zamku (zawor + cla) + renty wsi zamku + VT wsi,
+    ///     NetDay: wioska - SideVillageFief.DueFor (wartosc dnia x H x stawka pana) x poprawka na srednia roku (n36 SideYearFix: przy pelnym roku w ksiedze
+    ///     LandValue.SeasonFixFullYear - rok VT okregu / ostatnie 7 dob sesji; inaczej model: (1 - 0.25 x ciecie zimy wsi) / VillageCrafts.Now; clamp 0.25-4); Lordship - YearMean VT wsi gry; zamek - YearMean renty zamku (zawor + cla) + renty wsi zamku + VT wsi,
     ///     ktorych Lordship trzyma sprzedawca, minus straz (0.5 x norma zalogi zamku krolestwa x sredni zold czlowieka zalogi; zapas - zold rekruta tier 2 kultury).
     ///     Renta korony NIE wchodzi (to nie dochod ziemi). Recenzja: Lordship i zamek - co najmniej 28 dob pomiaru (kazda liczona wies tez); minus udzialy wiosek
-    ///     pobocznych GRACZA w tych okregach, ktore placi sprzedawca (po kupnie przestaja plynac - to czesc kupowanego podatku); minus powinnosci korony od ziemi
-    ///     (KingdomTreasury.DuesRateOf), gdy sprzedawca nie jest rodem panujacym.
+    ///     pobocznych GRACZA w tych okregach, ktore placi sprzedawca (po kupnie przestaja plynac - to czesc kupowanego podatku; n36: na podstawie roku jak cena wioski);
+    ///     minus powinnosci korony od ziemi (KingdomTreasury.DuesRateOf) wedlug KUPUJACEGO (n36: rod panujacy, najemnik, bez krolestwa - brak; wioska poboczna tylko
+    ///     z SideVillageDuesInLordD i podstawa "ziemia").
     ///  Z5 PIENIADZE: cala cena w kiesie gracza. Umowa w kolejce - wykonanie w nastepnym TickEvent bez rozmowy; wszystko (z cena) sprawdzane od nowa, roznica - umowa
     ///     przepada z komunikatem. (a) GiveGoldAction gracz -> glowa sprzedawcy (InPay tylko wokol tego przelewu); zaplacone = kiesa gracza mniejsza dokladnie o cene;
     ///     (b) przeniesienie (Z6) - o powodzeniu decyduje STAN po nim (Moved: wioska gracza / de iure gracza / zamek gracza), nie wyjatek ani wynik wywolania;
@@ -162,23 +163,47 @@ namespace Armoury
                 if (v == null || v.Settlement == null || payer == null || SideVillageFief.PayerOf(v) != payer) return 0;
                 foreach (var w in SideVillageFief.Owned())
                     if (w != null && string.Equals(w.Dist, v.Settlement.StringId, StringComparison.Ordinal)) { string y; own += Math.Max(0, SideVillageFief.DueFor(v, w.Uid, out y)); }
+                // recenzja n36 (M3): DueFor to dzien dzisiejszy (zima, spustoszenie) - na podstawe roku jak NetDay (YearMean), ta sama poprawka co cena wioski
+                if (own > 0) { string fn; own *= SideYearFix(v, v.Settlement, out fn); }
             }
             catch (Exception e) { Stumble("OwnDuesIn", e); }
             return own;
         }
 
-        /// <summary>Recenzja m113: powinnosci korony od ziemi (Lordship, zamek) - NetDay netto; rod panujacy nie placi. Nie rzuca.</summary>
-        private static void CrownDues(Offer o, Clan seller)
+        /// <summary>Recenzja m113 (n36 M4): powinnosci korony od ziemi wedlug KUPUJACEGO (po kupnie to on placi je z tego dochodu) - NetDay netto. Rod panujacy, najemnik
+        /// i rod bez krolestwa nie placa. Wioska poboczna tylko z kluczem SideVillageDuesInLordD i podstawa "ziemia" (CrownIncome.On i CrownDuesFromLand) - inaczej
+        /// jej wyplaty nie sa w podstawie powinnosci. Odkup: kupujacy = o.Seller. Raz w Price dla kazdego rodzaju. Nie rzuca.</summary>
+        private static void CrownDues(Offer o)
         {
             o.DuesRate = 0;
             try
             {
-                var k = seller != null ? seller.Kingdom : null;
-                if (k == null || k.RulingClan == seller || seller.IsUnderMercenaryService) return;
+                var s = Settings.Current;
+                Clan buyer = o.SellBack ? o.Seller : Clan.PlayerClan;
+                var k = buyer != null ? buyer.Kingdom : null;
+                if (s == null || k == null || k.RulingClan == buyer || buyer.IsUnderMercenaryService) return;
+                if (o.Kind == KSide && !(s.SideVillageDuesInLordD && CrownIncome.On && s.CrownDuesFromLand)) return;
                 o.DuesRate = Math.Max(0, Math.Min(0.5, KingdomTreasury.DuesRateOf(k)));
                 o.NetDay *= 1 - o.DuesRate;
             }
             catch (Exception e) { o.DuesRate = 0; Stumble("CrownDues", e); }
+        }
+
+        /// <summary>Recenzja n36 (M1): poprawka dzisiejszej naleznosci wioski pobocznej okregu v na srednia roku. Pelny rok w ksiedze (LandValue.SeasonFixFullYear) - pomiar;
+        /// inaczej model: rok (jedna pora z czterech to zima z cieciem tej wsi) / dzis (VillageCrafts.Now: zima x spustoszenie x rece wojny - to samo, co w DueFor).
+        /// Nigdy oba naraz (zima liczona raz). clamp 0.25-4. Nie rzuca.</summary>
+        private static double SideYearFix(Village v, Settlement st, out string note)
+        {
+            try
+            {
+                double f; if (LandValue.SeasonFixFullYear(st, out f, out note)) return f;
+                double now = Math.Max(0.05, VillageCrafts.Now(v));
+                double yy = 1.0 - 0.25 * WinterBite.VillageCutInWinter(v);
+                f = Math.Max(0.25, Math.Min(4.0, yy / now));
+                note = f.ToString("0.###", Inv) + " (model: rok " + yy.ToString("0.###", Inv) + " / dzis " + now.ToString("0.###", Inv) + "; " + note + ")";
+                return f;
+            }
+            catch (Exception e) { Stumble("SideYearFix", e); note = "1 (blad)"; return 1; }
         }
 
         // ------------------------------------------------------------ wioski ukladu wedlug okregu (raz na liste ksiegi)
@@ -290,6 +315,7 @@ namespace Armoury
         private static void Price(Offer o, Clan debtor, IFaction holdingFaction)
         {
             var s = Settings.Current;
+            CrownDues(o);   // n36 (M4): powinnosci korony wedlug kupujacego - raz, dla kazdego rodzaju
             double years = Math.Max(1, s.LandYearsOfPurchase);
             o.WarF = AtWarMajor(holdingFaction) ? Math.Max(0.1f, Math.Min(1f, s.LandYearsAtWar)) : 1.0;
             double ye = years * o.WarF;
@@ -357,7 +383,7 @@ namespace Armoury
                 if (state != VillageBook.SStanding && state != VillageBook.SDamaged) { o.Why = state < 0 ? "This village is not known to the books yet." : "This village lies burned or empty."; return o; }
                 string why;
                 double due = SideVillageFief.DueFor(v, uid, out why);
-                o.SeasonFix = LandValue.SeasonFix(st, out o.FixNote);
+                o.SeasonFix = SideYearFix(v, st, out o.FixNote);   // n36 (M1): srednia roku - pomiar przy pelnym roku, inaczej model zimy
                 o.Days = Math.Max(1, LandValue.SlotDays(st));
                 o.NetDay = due * o.SeasonFix;
                 if (!(o.NetDay > 0)) { o.Why = "It earns its lord nothing today - no price can be set."; return o; }
@@ -425,7 +451,6 @@ namespace Armoury
                 // recenzja m113: udzialy wiosek pobocznych gracza w tym okregu placi dzis sprzedawca z tego podatku - po kupnie przestaja plynac (F3), cena liczy tylko reszte
                 o.OwnDues = OwnDuesIn(v, dj);
                 o.NetDay = Math.Max(0, o.NetDay - o.OwnDues);
-                CrownDues(o, dj.Clan);
                 if (!(o.NetDay > 0)) { o.Why = "Its tax would bring you nothing beyond what your own villages there already pay you."; return o; }
                 if (!NeedFor(dj.Clan, KLord, o)) { o.Why = HouseOf(dj.Clan) + " is not in need - a house sells land only when it must."; return o; }
                 string cw = CooldownWhy(dj.Clan, KLord); if (cw != null) { o.Why = cw; return o; }
@@ -498,7 +523,6 @@ namespace Armoury
                 o.GuardMen = norm; o.GuardWage = wage;
                 o.Guard = Math.Max(0f, Math.Min(1f, s.LandCastleGuardShare)) * norm * wage;
                 o.NetDay = o.CastleLr + o.VilRent + o.VilVt - o.Guard - o.OwnDues;
-                if (o.NetDay > 0) CrownDues(o, c);
                 if (!(o.NetDay > 0)) { o.Why = "It earns nothing above the cost of its guard - no price can be set."; return o; }
                 if (!NeedFor(c, KCastle, o)) { o.Why = HouseOf(c) + " is not deep in debt - a house sells a castle only when it must."; return o; }
                 string cw = CooldownWhy(c, KCastle); if (cw != null) { o.Why = cw; return o; }
@@ -826,7 +850,7 @@ namespace Armoury
                 if (ReferenceEquals(w, FirstOwn()) && !SideVillageHome.ChestEmpty()) { o.Why = "Empty the chest of your house there first."; return o; }
                 string why;
                 double due = SideVillageFief.DueFor(v, uid, out why);
-                o.SeasonFix = LandValue.SeasonFix(st, out o.FixNote);
+                o.SeasonFix = SideYearFix(v, st, out o.FixNote);   // n36 (M1): jak BuildSide
                 o.Days = Math.Max(1, LandValue.SlotDays(st));
                 o.NetDay = due * o.SeasonFix;
                 if (!(o.NetDay > 0)) { o.Why = "It earns nothing today - no price can be set."; return o; }
@@ -944,7 +968,7 @@ namespace Armoury
                         string why;
                         double due = SideVillageFief.DueFor(v, r.Uid, out why);
                         if (!(due > 0)) continue;
-                        string fn; double fix = LandValue.SeasonFix(st, out fn);
+                        string fn; double fix = SideYearFix(v, st, out fn);
                         double ye = Math.Max(1, s.LandYearsOfPurchase) * (AtWarMajor(st.MapFaction) ? Math.Max(0.1f, Math.Min(1f, s.LandYearsAtWar)) : 1.0);
                         if (ye < Math.Max(1, s.LandYearsFloor)) ye = Math.Max(1, s.LandYearsFloor);
                         double net = due * fix, raw = net * dpy * ye;

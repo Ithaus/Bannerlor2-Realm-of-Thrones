@@ -202,6 +202,29 @@ namespace Armoury
             catch (Exception ex) { Stumble("SeasonFix", ex); note = "1 (blad)"; return 1; }
         }
 
+        /// <summary>Recenzja n36 (M1): poprawka pory roku z POMIARU tylko przy pelnym roku w ksiedze (4 pelne pory przed biezaca): srednia roku VT okregu / srednia
+        /// ostatnich (do 7) dob pierscienia sesji - ten sam horyzont co dzisiejsza naleznosc (DueFor), nie 28 dob ani biezaca pora. false - brak pelnego roku albo
+        /// pierscienia (po wczytaniu) - wolajacy bierze model zimy. clamp 0.25-4. Nie rzuca.</summary>
+        internal static bool SeasonFixFullYear(Settlement st, out double f, out string note)
+        {
+            f = 1; note = "bez pelnego roku w ksiedze";
+            try
+            {
+                E e; if (st == null || st.StringId == null || !_book.TryGetValue(st.StringId, out e)) return false;
+                int cur = CurAbs(), dis = _dis > 0 ? _dis : DaysInSeason(), full = 0; double sum = 0;
+                for (int a = cur - 4; a <= cur - 1; a++) { if (a < 0) break; int i = a % S; if (e.Abs[i] != a || e.N[i] < Math.Max(1, dis / 2)) break; sum += (double)e.Vt[i] / e.N[i]; full++; }
+                int k = Math.Min(7, e.RFilled);
+                if (full != 4 || k <= 0) { note = full != 4 ? "bez pelnego roku w ksiedze (" + full + " pelne pory)" : "pusty pierscien sesji"; return false; }
+                double r = 0; for (int j = 1; j <= k; j++) r += e.RVt[(e.RHead - j + 28) % 28]; r /= k;
+                double ym = sum / 4.0;
+                if (!(ym > 0) || !(r > 0)) { note = "rok albo ostatnie doby bez podatku"; return false; }
+                f = Math.Max(0.25, Math.Min(4.0, ym / r));
+                note = f.ToString("0.###", Inv) + " (rok " + ym.ToString("0.##", Inv) + " z 4 pelnych por / ostatnie " + k + " dob " + r.ToString("0.##", Inv) + ")";
+                return true;
+            }
+            catch (Exception ex) { Stumble("SeasonFixFullYear", ex); f = 1; return false; }
+        }
+
         private static double Avg28Of(E e, int part)
         {
             if (e.RFilled <= 0) return 0;

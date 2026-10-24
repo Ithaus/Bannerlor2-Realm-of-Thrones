@@ -324,8 +324,8 @@ namespace Armoury
             catch (Exception ex) { Stumble("RoundTrip2", ex); return "?"; }
         }
 
-        /// <summary>Recenzja m113: menu wioski gracza na wiosce uid (po kupnie z menu wioski obcej). false - nie gracza.</summary>
-        internal static bool SetCurrent(string uid) { var o = Find(uid); if (o == null) return false; _cur = o; return true; }
+        /// <summary>Recenzja m113: menu wioski gracza na wiosce uid (po kupnie z menu wioski obcej); wioska jak po kliku - bez pytania o postoj po wyjsciu (do odjechania dalej niz LeaveR). false - nie gracza.</summary>
+        internal static bool SetCurrent(string uid) { var o = Find(uid); if (o == null) return false; _cur = o; _askedUid = o.Uid; _pendingClick = null; return true; }
 
         /// <summary>Recenzja m113: wyjscie z menu wioski gracza jak opcja "Leave" (menu wsi gry, gdy partia w niej stoi; inaczej ostatnie). Nie rzuca.</summary>
         internal static void LeaveMenu()
@@ -1279,6 +1279,7 @@ namespace Armoury
                 starter.AddGameMenuOption("village", OptVillage, "{=!}{ARM_SIDE_FIEF_VISIT}", VisitCondition, VisitConsequence, false, 9);
                 starter.AddGameMenu(Menu, "{=!}{ARM_SIDE_FIEF_TEXT}", delegate (MenuCallbackArgs a)
                     {
+                        try { if (_cur == null && OwnedCount > 1) RecoverCur(); } catch (Exception e) { Stumble("MenuInit.Wioska", e); }   // n36: wczytanie zapisu w srodku menu dodatkowej wioski
                         try { MBTextManager.SetTextVariable("ARM_SIDE_FIEF_TEXT", MenuText()); } catch (Exception e) { Stumble("MenuInit", e); }
                         // recenzja (drobne): menu otwarte z mapy (nowy MenuContext) mialo tlo domyslne gry ("wait_guards_stop") - tlo wsi gry okregu jak sen w zajezdzie
                         try
@@ -1364,6 +1365,22 @@ namespace Armoury
                     SideVillageVisit.LevyOpenFief, false, 6);
             }
             catch (Exception e) { Stumble("AddMenus", e); }
+        }
+
+        /// <summary>n36: wejscie z zapisu w srodku menu arm_side_fief (_cur po Import = null) - wioska gracza przy partii: w wsi gry okregu wioski tego okregu, na mapie najblizsza do LeaveR. Wzor SideVillageVisit.RecoverUid.</summary>
+        private static void RecoverCur()
+        {
+            var mp = MobileParty.MainParty;
+            if (mp == null) return;
+            var here = mp.CurrentSettlement;
+            var l = here != null ? OwnedIn(here.StringId) : Owned();
+            if (l.Count == 0) return;
+            var pos = mp.GetPosition2D;
+            Own best = here != null ? l[0] : null; float bd = float.MaxValue;
+            foreach (var o in l) { float d = DistTo(o, pos); if (d < bd) { bd = d; best = o; } }
+            if (best == null || (here == null && bd > LeaveR)) return;
+            _cur = best; _askedUid = best.Uid;
+            Log.Info(P + "menu wioski gracza po wczytaniu - " + best.Name + " (" + best.Uid + ")" + (ReferenceEquals(best, _p) ? "" : " [dodatkowa]") + ", " + (bd < float.MaxValue ? bd.ToString("0.00", Inv) : "?") + " jedn. od partii.");
         }
 
         /// <summary>m113-zakup: wioski gracza w okregu wsi gry distId (czynne).</summary>

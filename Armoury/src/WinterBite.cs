@@ -109,6 +109,18 @@ namespace Armoury
             return MBMath.ClampFloat(cut, 0f, 0.95f);
         }
 
+        /// <summary>m113-zakup (cena ziemi, recenzja n36 M1): ciecie plonu wsi w zimie niezaleznie od dzisiejszej pory (0 bez klucza zimy). Nie rzuca.</summary>
+        internal static float VillageCutInWinter(Village village)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.WinterBiteEnabled || village == null || village.Settlement == null) return 0f;
+                return CutOf(s, village);
+            }
+            catch { return 0f; }
+        }
+
         /// <summary>E4/0 (pomiar, tylko odczyt): ciecie plonu wsi dzis - ten sam rachunek co VillageProdPostfix / VillageFoodPostfix (0 poza zima).
         /// Uwaga dla E4/4 (109 dodawal identyczna metode): NIE dublowac - od E4/1 z czynnikiem krainy (CutOf).</summary>
         internal static float VillageCut(Village village)

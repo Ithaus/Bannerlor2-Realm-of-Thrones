@@ -19,7 +19,7 @@ namespace Armoury
     ///    Bez potrzeby: "My lands are not for sale. A house sells land only when it must." Z potrzeba: potrzeba slowami, rozmowa sie konczy, a po niej (TickEvent,
     ///    bez rozmowy i bez innego okna) okno wyboru - wiersz na kazda ziemie (nazwa, rodzaj, dochod dnia, cena, lata zwrotu; niedostepne wyszarzone z powodem),
     ///    potem okno rachunku (dochod dnia, ile dob mierzony, lata, wojna, upust i dlaczego, cena, zwrot, dokad ida pieniadze) z "Buy" / "Not now".
-    ///  - Menu: arm_sidevil_buy w menu wioski pobocznej ("Offer to buy this village from {holder}", indeks 5, dodane po opcjach arm_sidevil), arm_land_lord w menu
+    ///  - Menu: arm_sidevil_buy w menu wioski pobocznej ("Offer to buy this village from {holder}", indeks 6 = tuz przed Leave po poborze z indeksem 2, dodane po opcjach arm_sidevil), arm_land_lord w menu
     ///    wsi gry ("Offer to buy the lordship of {village}", indeks 8, B2), arm_side_fief_sellback w menu wioski gracza ("Offer {village} back to {holder}", Z7) -
     ///    wylaczone z powodem w podpowiedzi. Wycena w warunku raz na godzine gry na osade (warunek menu nie liczy ksiegi co klatke).
     ///  - Autotest (DLL autotestu CrashScribe, LogGate.Mode 1/2, plik armoury-ziemia.flag): raz na sesje - linia na sucho, potrzeba wymuszona (linia), kupno najblizszej
@@ -167,7 +167,7 @@ namespace Armoury
                       .Append(". The crown's rent is not counted - it is not the land's.\n");
                 else if (o.Kind == KSide)
                     sb.Append("Income today: about ").Append(o.NetDay.ToString("N0", Inv)).Append(" a day (its share of the district's tax)")
-                      .Append(o.SeasonFix != 1 ? ", set to the year's mean from " + o.Days + " days of the district's tax (x" + o.SeasonFix.ToString("0.00", Inv) + ")" : "").Append(".\n");
+                      .Append(o.SeasonFix != 1 ? ", set to the year's mean (x" + o.SeasonFix.ToString("0.00", Inv) + ")" : "").Append(dues).Append(".\n");
                 else
                     sb.Append("Income: about ").Append(o.NetDay.ToString("N0", Inv)).Append(" a day (the tax of the village").Append(o.OwnDues > 0 ? ", less what it pays your own villages there" : "").Append(dues).Append(").\n");
                 if (o.Kind != KSide) sb.Append("Measured over ").Append(o.Days).Append(o.Days == 1 ? " day" : " days").Append(".\n");
@@ -208,15 +208,15 @@ namespace Armoury
         }
 
         // ============================================================ menu
-        /// <summary>OnAfterSessionLaunched: opcje menu (po opcjach gry i naszych - indeksy 5 i 8). Nie rzuca.</summary>
+        /// <summary>OnAfterSessionLaunched: opcje menu (po opcjach gry i naszych - indeksy 6, 8 i 6). Nie rzuca.</summary>
         internal static void AddMenus(CampaignGameStarter starter)
         {
             try
             {
-                starter.AddGameMenuOption(SideVillageVisit.Menu, OptSideBuy, "{=!}{ARM_LAND_BUY}", SideBuyCond, SideBuyCons, false, 5);
+                starter.AddGameMenuOption(SideVillageVisit.Menu, OptSideBuy, "{=!}{ARM_LAND_BUY}", SideBuyCond, SideBuyCons, false, 6);
                 starter.AddGameMenuOption("village", OptLord, "{=!}{ARM_LAND_LORD}", LordCond, LordCons, false, 8);
                 starter.AddGameMenuOption(SideVillageFief.Menu, OptSellBack, "{=!}{ARM_LAND_BACK}", BackCond, BackCons, false, 6);
-                Log.Info(P + "menu wpiete (" + SideVillageVisit.Menu + " indeks 5, village indeks 8, " + SideVillageFief.Menu + " indeks 6).");
+                Log.Info(P + "menu wpiete (" + SideVillageVisit.Menu + " indeks 6 (przed Leave), village indeks 8, " + SideVillageFief.Menu + " indeks 6).");
             }
             catch (Exception e) { Stumble("AddMenus", e); }
         }
@@ -289,7 +289,8 @@ namespace Armoury
                 if (uid == null) return false;
                 var o = Cached(_mBack, uid, () => BuildSellBack(uid));
                 MBTextManager.SetTextVariable("ARM_LAND_BACK", "Offer " + (SideVillageFief.MenuName ?? "this village") + " back to " + NameOf(o.Head));
-                if (!o.Ok) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + o.Why); }
+                if (!TownInns.HostNearNow(SideVillageFief.MenuDistId, uid)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You are not at the village."); }   // n36: odkup tylko na miejscu
+                else if (!o.Ok) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + o.Why); }
                 else a.Tooltip = new TextObject("{=!}" + NameOf(o.Head) + " would buy it back for " + o.Price.ToString("N0", Inv) + ".");
                 return true;
             }

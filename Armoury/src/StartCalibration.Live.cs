@@ -589,6 +589,24 @@ namespace Armoury
                         }
                         if (tot > 0) foreach (var b in kd.Blocks) b.Share /= tot;
                         foreach (var b in kd.Blocks) b.Area = kd.Area * b.Share;       // ziemia bloku (regula A7 - recenzja 16.10)
+                        // P8 / m97 (recenzja n36 A1): rece i potrzeba bloku z ludzi wioski - brak rak (pobor, polegli obroncy) zostaje w tej wiosce; ziemia (Area wyzej) z osad
+                        if (hs && SideVillageVisit.LackAny)
+                        {
+                            try
+                            {
+                                VillageBook.KsLackShift(ld.V, side, ref main);
+                                double totH = 0;
+                                for (int i = 0; i < ld.B.Length; i++)
+                                {
+                                    var lb = ld.B[i]; if (lb == null || lb.K == null) continue;
+                                    double sh = 0;
+                                    if (i < 20) sh = main / 20.0; else side.TryGetValue(lb.K.Uid, out sh);
+                                    lb.K.Share = sh > 0 ? sh : 0; totH += lb.K.Share;
+                                }
+                                if (totH > 0) foreach (var b in kd.Blocks) b.Share /= totH;
+                            }
+                            catch (Exception e) { Stumble("KsLackShift", e); }
+                        }
                     }
                     ld.Wf = kd.Wf;
                     kd.HomeWork = ld.TF ? 0.0 : ld.HomeWork;              // krok 8: praca domowa z Planu (KsDeliver.Produce)
