@@ -86,7 +86,8 @@ nie ma sztuki, a DressCode tych ludzi celowo nie ubiera (ubranie ze wzorca bez o
   (ta sama sciezka co ArmorsPostfix i QueueWreck), czyszczony w DistributorsPostfix / EndMissionPostfix / Reset. Settings.cs bez zmian - gen_mcm niepotrzebny.
 **Status:** ZBUDOWANE - czeka na autotest i wgranie (gra Jeffa wlaczona). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne nowe; w zmienionych plikach tylko
 stare CS0169 BattlefieldLaw:34); Armoury.dll md5 f788045fed4df7305afce323114d2183; po recenzji (LootTally zapas IsWorn, CivilDress bez umarlych) md5
-306c634c3221aefa5937687ab950bc03.
+306c634c3221aefa5937687ab950bc03 wedlug agenta poprawek - przebudowa z zatwierdzonego cb14b27d (dwa razy, czyste drzewo) daje 14e193c732225756fb271b57acae97dd
+i ta liczy sie przy wgraniu.
 
 ## n36 cena ziemi wedlug stosunku 14-20 lat (galaz w-toku/m113-cena) - 24.10.2026
 
