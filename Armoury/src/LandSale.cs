@@ -49,7 +49,7 @@ namespace Armoury
     ///  Z4 CENA = round100(NetDay x dni roku (364 przy kalendarzu Jeffa) x lata x premia x (1 - upust)). Lata wedlug stosunku glowy, ktora decyduje, do gracza (n36,
     ///     ta sama liczba co brama Z3; YearsFor): 20 (LandYearsWorst) przy progu rodzaju, liniowo do 14 (LandYearsOfPurchase - najlepsze) przy progu + 60
     ///     (LandYearsRelationSpan) i wyzej - wioska -10 -> 20 lat, +50 -> 14; Lordship 0 -> 20, 60 -> 14; zamek 10 -> 20, 70 -> 14; ponizej progu nikt nie sprzedaje.
-    ///     Odkup (Z7) odwrotnie - przyjaciel placi wiecej: 14 przy progu (i ponizej), 20 przy progu + 60. Potem w wojnie krolestwa osady z wielkim krolestwem x0.85;
+    ///     Odkup (Z7) odwrotnie - przyjaciel placi wiecej: 14 przy progu (i ponizej), 20 przy progu + 60, ale nie wiecej lat, niz gracz zaplacil za te wioske (PaidYears). Potem w wojnie krolestwa osady z wielkim krolestwem x0.85;
     ///     lata x (1 - upust) >= 10. Premia: wioska 1, Lordship 1, zamek 1.5, zamek-siedziba (HomeSettlement albo siedziba z ksiegi rodow kanonu) 2.0.
     ///     Upust = 0.15 x clamp((q - 0.5) / 1.5, 0, 1), q = dlug / max(1, G + 91 D).
     ///     NetDay: wioska - SideVillageFief.DueFor (wartosc dnia x H x stawka pana) x poprawka na srednia roku (n36 SideYearFix: przy pelnym roku w ksiedze
@@ -153,6 +153,7 @@ namespace Armoury
             public bool Hide;                // menu: powod, ktorego gracz nie zmieni (ustawienia, brak tytulu, BK, juz gracza) - opcja ukryta
             public int TestRel = int.MinValue; public Kingdom TestJoin;   // test n36 (_testLift): prog stosunku do spelnienia i krolestwo sprzedawcy do wasalstwa
             public int Rel, RelMin; public double YearsRel;              // n36 cena wedlug stosunku: stosunek glowy do gracza, prog rodzaju, lata z krzywej (przed wojna i upustem)
+            public double YearsPaid;                                     // recenzja n36: odkup - lata, ktore gracz zaplacil za te wioske (PaidYears; sufit lat odkupu)
             public string Sig { get { return Kind + ":" + Id + ":" + Price; } }
         }
 
@@ -329,7 +330,7 @@ namespace Armoury
         /// <summary>n36 cena wedlug stosunku (Jeff 24.10: "daj cene zalezna od relacji miedzy 14 a 20 lat, jesli relacja jest za niska nikt nie sprzeda, im wyzsza
         /// tym lepsza cena"). Lata przed wojna, upustem i premia. Kupno: LandYearsWorst (20) przy progu rodzaju, liniowo do LandYearsOfPurchase (14 - najlepsze)
         /// przy progu + LandYearsRelationSpan (60) i wyzej; ponizej progu oferty nie ma (brama), tu najgorsze. Odkup odwrotnie - przyjaciel placi wiecej:
-        /// 14 przy progu (i ponizej), 20 przy progu + 60 i wyzej (inaczej niski stosunek nagradzalby gracza). Nie rzuca.</summary>
+        /// 14 przy progu (i ponizej), 20 przy progu + 60 i wyzej (inaczej niski stosunek nagradzalby gracza); sufit odkupu (PaidYears) - w Price. Nie rzuca.</summary>
         internal static double YearsFor(int rel, int relMin, bool sellBack)
         {
             var s = Settings.Current;
@@ -346,6 +347,8 @@ namespace Armoury
             o.RelMin = RelMinOf(o.Kind);
             o.Rel = o.Head != null ? (int)o.Head.GetRelationWithPlayer() : o.RelMin;
             o.YearsRel = YearsFor(o.Rel, o.RelMin, o.SellBack);
+            // recenzja n36: odkup nie wiecej lat, niz gracz zaplacil za te wioske - inaczej kupno u przyjaciela za 14 lat i odkup przez tego samego za 20 = zysk co 182 doby
+            if (o.SellBack) { o.YearsPaid = PaidYears(o.Id); if (o.YearsRel > o.YearsPaid) o.YearsRel = o.YearsPaid; }
             double years = o.YearsRel;
             o.WarF = AtWarMajor(holdingFaction) ? Math.Max(0.1f, Math.Min(1f, s.LandYearsAtWar)) : 1.0;
             double ye = years * o.WarF;
@@ -371,7 +374,7 @@ namespace Armoury
             o.Price = Round100(raw);
             o.Pl = "NetDay " + o.NetDay.ToString("0.####", Inv) + (o.OwnDues > 0 ? " (po udzialach wiosek gracza " + o.OwnDues.ToString("0.##", Inv) + ")" : "")
                    + (o.DuesRate > 0 ? " (po powinnosciach korony " + (100 * o.DuesRate).ToString("0.#", Inv) + "%)" : "")
-                   + " x " + dpy + " x lata " + ye.ToString("0.####", Inv) + " (stosunek " + o.Rel + ", prog " + o.RelMin + (o.SellBack ? ", odkup: przyjaciel placi wiecej" : "")
+                   + " x " + dpy + " x lata " + ye.ToString("0.####", Inv) + " (stosunek " + o.Rel + ", prog " + o.RelMin + (o.SellBack ? ", odkup: przyjaciel placi wiecej, nie wiecej niz zaplacone " + o.YearsPaid.ToString("0.##", Inv) : "")
                    + " -> lata " + o.YearsRel.ToString("0.##", Inv) + ")" + (o.WarF < 1 ? " (wojna x" + o.WarF.ToString("0.##", Inv) + ")" : "")
                    + " x premia " + o.Premium.ToString("0.##", Inv) + " x (1 - upust " + o.Disc.ToString("0.####", Inv) + ", q " + o.Q.ToString("0.###", Inv) + ") = " + raw.ToString("0.##", Inv)
                    + " -> round100 " + o.Price;
@@ -870,6 +873,21 @@ namespace Armoury
         {
             _deals.Add(new Deal { Kind = o.SellBack ? -o.Kind : o.Kind, Id = o.Id, Day = t, Price = o.Price, Years100 = (int)Math.Round(o.Years * 100), Disc1000 = (int)Math.Round(o.Disc * 1000), Seller = o.Seller != null ? o.Seller.StringId : "" });
             while (_deals.Count > 200) _deals.RemoveAt(0);
+        }
+
+        /// <summary>recenzja n36: lata, ktore gracz zaplacil za wioske poboczna uid - ostatnie kupno w _deals (lata x (1 - upust); premia wioski 1), o ile po nim
+        /// nie bylo odkupu; brak zapisu (pierwsza wioska, zapis wypadl z 200 ostatnich) - LandYearsOfPurchase, jak odkup przed n36. Sufit lat odkupu. Nie rzuca.</summary>
+        internal static double PaidYears(string uid)
+        {
+            double flat = Math.Max(1, Settings.Current.LandYearsOfPurchase);
+            for (int i = _deals.Count - 1; i >= 0; i--)
+            {
+                var d = _deals[i];
+                if (d == null || d.Id != uid) continue;
+                if (d.Kind == -KSide) break;   // odkupiona po ostatnim kupnie - wioska wrocila do gracza inna droga
+                if (d.Kind == KSide && d.Years100 > 0) return Math.Max(0.01, d.Years100 / 100.0 * (1 - Math.Max(0, Math.Min(1000, d.Disc1000)) / 1000.0));
+            }
+            return flat;
         }
 
         // ============================================================ Z7: odkup

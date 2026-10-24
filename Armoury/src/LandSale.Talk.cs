@@ -21,7 +21,7 @@ namespace Armoury
     ///    bez rozmowy i bez innego okna) okno wyboru - wiersz na kazda ziemie (nazwa, rodzaj, dochod dnia, cena, lata zwrotu; niedostepne wyszarzone z powodem),
     ///    potem okno rachunku (dochod dnia, ile dob mierzony, lata, wojna, upust i dlaczego, cena, zwrot, dokad ida pieniadze) z "Buy" / "Not now".
     ///    n36 cena wedlug stosunku: odpowiedz w rozmowie, podpowiedz wiersza listy i okno rachunku mowia, ile lat dochodu chce sprzedawca przy stosunku gracza
-    ///    i do ilu zszedlby dla bliskiego przyjaciela (RelEn; odkup - ile placi i do ilu podniosl by przyjaciel).
+    ///    i do ilu zszedlby dla bliskiego przyjaciela (RelEn - stawka przed wojna, premia i upustem; odkup - ile placi i do ilu podniosl by przyjaciel, nie wiecej niz gracz zaplacil).
     ///  - Menu: arm_sidevil_buy w menu wioski pobocznej ("Offer to buy this village from {holder}", indeks 6 = tuz przed Leave po poborze z indeksem 2, dodane po opcjach arm_sidevil), arm_land_lord w menu
     ///    wsi gry ("Offer to buy the lordship of {village}", indeks 8, B2), arm_side_fief_sellback w menu wioski gracza ("Offer {village} back to {holder}", Z7) -
     ///    wylaczone z powodem w podpowiedzi. Wycena w warunku raz na godzine gry na osade (warunek menu nie liczy ksiegi co klatke).
@@ -93,14 +93,17 @@ namespace Armoury
                 else reply = first.NeedEn + " " + (ok > 0 ? "I may part with some land - at its true worth, not for a song. My steward will show you what I would sell."
                                                           : "Yet there is nothing I could sell you now - my steward will tell you why.");
                 // n36 cena wedlug stosunku (Jeff 24.10: "im wyzsza tym lepsza cena") - lata pierwszej oferty na sprzedaz slowami sprzedawcy
-                if (need && firstOk != null)
+                // recenzja n36: liczba tylko dla wioski pobocznej (zamek ma premie x1.5-2) i pelna - lata x wojna x (1 - upust), jak 'Years of purchase' w oknie
+                Offer sideOk = null; foreach (var o in l) if (o.Ok && o.Kind == KSide) { sideOk = o; break; }
+                if (need && sideOk != null)
                 {
                     var s = Settings.Current;
-                    string y = firstOk.YearsRel.ToString("0.#", Inv);
-                    reply += firstOk.YearsRel <= Math.Max(1, s.LandYearsOfPurchase) + 1e-6
-                        ? " You are a friend of my house - from you I ask only " + y + " years of its income."
-                        : " Land goes cheaper between friends - from you I would ask " + y + " years of its income; a closer friend would pay less.";
+                    string y = (sideOk.Years * sideOk.Premium * (1 - sideOk.Disc)).ToString("0.#", Inv);
+                    reply += sideOk.YearsRel <= Math.Max(1, s.LandYearsOfPurchase) + 1e-6
+                        ? " You are a friend of my house - for a side village I ask only " + y + " years of its income."
+                        : " Land goes cheaper between friends - for a side village I would ask you " + y + " years of its income; a closer friend would pay less.";
                 }
+                else if (need && firstOk != null) reply += " Land goes cheaper between friends - the closer you are to my house, the less I ask.";
                 MBTextManager.SetTextVariable("ARM_LAND_REPLY", reply);
                 Log.Info(P + "rozmowa - " + NameOf(h) + " (" + (h != null && h.Clan != null ? h.Clan.StringId : "-") + "): ziem policzonych " + l.Count + ", na sprzedaz " + ok
                          + ", potrzeba " + (need ? first.NeedPl : "brak") + ", stosunek " + (h != null ? ((int)h.GetRelationWithPlayer()).ToString(Inv) : "-")
@@ -128,19 +131,27 @@ namespace Armoury
         }
 
         // ============================================================ okna
-        /// <summary>n36 cena wedlug stosunku: lata ze stosunku slowami gracza - "He asks 17.5 years of its income (your relation 20; a closer friend would ask less,
-        /// down to 14)"; odkup - "He offers ... a closer friend would pay more, up to 20".</summary>
+        /// <summary>n36 cena wedlug stosunku: stawka ze stosunku slowami gracza - "His rate for you: 17.5 years of income at your relation 20 (a closer friend would ask less,
+        /// down to 14 at relation 50)"; odkup - "... a closer friend would pay more, up to 20" albo "no more than you paid for it" (recenzja n36: sufit PaidYears).</summary>
         internal static string RelEn(Offer o)
         {
+            // recenzja n36: to stawka ze stosunku (przed wojna, premia zamku, upustem i dolna granica) - pelne lata i cena sa w liniach 'Years of purchase' i 'Price'
             var s = Settings.Current;
             double best = Math.Max(1, s.LandYearsOfPurchase), worst = Math.Max(best, s.LandYearsWorst);
-            int full = o.RelMin + Math.Max(1, s.LandYearsRelationSpan);
-            string y = o.YearsRel.ToString("0.#", Inv), who = Cap(He(o.Head));
+            int sp = Math.Max(1, s.LandYearsRelationSpan), full = o.RelMin + sp;
+            string head = Cap(His(o.Head)) + " rate for you: " + o.YearsRel.ToString("0.#", Inv) + " years of income at your relation " + o.Rel + " (";
             if (o.SellBack)
-                return who + " offers " + y + " years of its income (your relation " + o.Rel
-                       + (o.YearsRel < worst - 1e-6 ? "; a closer friend would pay more, up to " + worst.ToString("0.#", Inv) + " at relation " + full + ")" : " - a close friend's price, the most " + He(o.Head) + " pays)");
-            return who + " asks " + y + " years of its income (your relation " + o.Rel
-                   + (o.YearsRel > best + 1e-6 ? "; a closer friend would ask less, down to " + best.ToString("0.#", Inv) + " at relation " + full + ")" : " - a close friend's price, the least " + He(o.Head) + " asks)");
+            {
+                double top = o.YearsPaid > 0 ? Math.Min(worst, o.YearsPaid) : worst;   // odkup nie wiecej, niz gracz zaplacil
+                bool paidCap = top < worst - 1e-6;
+                if (o.YearsRel < top - 1e-6)
+                {
+                    int rTop = o.RelMin + (int)Math.Ceiling(sp * (top - best) / Math.Max(1e-9, worst - best));
+                    return head + "a closer friend would pay more, up to " + top.ToString("0.#", Inv) + " at relation " + rTop + (paidCap ? " - no more than you paid for it)" : ")");
+                }
+                return head + (paidCap ? "no more than you paid for it)" : "a close friend's rate, the most " + He(o.Head) + " pays)");
+            }
+            return head + (o.YearsRel > best + 1e-6 ? "a closer friend would ask less, down to " + best.ToString("0.#", Inv) + " at relation " + full + ")" : "a close friend's rate, the least " + He(o.Head) + " asks)");
         }
 
         internal static string KindEn(Offer o)
@@ -521,7 +532,9 @@ namespace Armoury
                         long pgB = me.Gold, w1 = WorldGold(), advB = DebtLadder.AdvNothingNow, owB = DebtLadder.OwedOf(Clan.PlayerClan);
                         ExecuteSellBack(sbk);
                         long advN9 = DebtLadder.AdvNothingNow - advB, cred9 = owB - DebtLadder.OwedOf(Clan.PlayerClan);
-                        add("T9 odkup", !SideVillageFief.IsMine(best.Id) && me.Gold >= pgB && WorldGold() - w1 == -advN9, "cena " + sbk.Price + ", gracz " + pgB + " -> " + me.Gold + " (wierzycielom gracza " + cred9 + ")"
+                        // recenzja n36: lata odkupu nie wieksze niz zaplacone przy kupnie w T3 (tam i z powrotem bez zysku)
+                        add("T9 odkup", !SideVillageFief.IsMine(best.Id) && me.Gold >= pgB && WorldGold() - w1 == -advN9 && sbk.YearsRel <= sbk.YearsPaid + 1e-9, "cena " + sbk.Price + ", gracz " + pgB + " -> " + me.Gold + " (wierzycielom gracza " + cred9 + ")"
+                            + ", lata odkupu " + sbk.YearsRel.ToString("0.##", Inv) + " <= zaplacone " + sbk.YearsPaid.ToString("0.##", Inv)
                             + ", pieniadz swiata " + w1 + " -> " + WorldGold() + ", zaliczka w nicosc " + advN9);
                     }
                     else add("T9 odkup", false, sbk.Why);
