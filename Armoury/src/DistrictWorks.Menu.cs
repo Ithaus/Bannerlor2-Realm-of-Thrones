@@ -284,7 +284,7 @@ namespace Armoury
                 string rules = "Ready in " + KReady[q.WKind] + " days; paid when " + Name(v) + "'s carts come back. "
                                + (q.WKind == KHerd ? "Raiders drive off the animals" : "Raiders burn the works" + (KL[q.WKind] < 1 ? " in part" : "") + " (rebuild for " + Math.Round(100 * KR[q.WKind]) + "%)")
                                + "; at war with " + realm + " you are paid nothing.";
-                // krotki opis (m115-okno): co robi, pelny sprzet i ile stoi, dochod z reszty sprzetu (ten sam wzor co wiersz "full kit"), targ i wozy, zloto
+                // krotki opis (m115-okno): co robi, pelny sprzet i ile stoi, dochod z wiersza "full kit" (q.Room liczy tez puste zagrody, wiec nie "reszta" pelnego sprzetu), targ i wozy, zloto
                 var top = new StringBuilder(400);
                 top.Append("Makes ").Append(craft).Append(" worth about ").Append(Math.Round(q.V).ToString("N0", Inv)).Append(" a day (").Append(Math.Round(q.V * 364).ToString("N0", Inv)).Append(" a year).\n");
                 top.Append("Full kit for ").Append(Math.Round(q.S)).Append(" homesteads: ").Append(Math.Round(full).ToString("N0", Inv)).Append(". In place: ")
@@ -294,7 +294,7 @@ namespace Armoury
                 {
                     double uF = kFull / Math.Max(1e-6, q.KitPer);
                     double incF = IncomeDay(q, q.UMine + uF, q.UEff + uF) - IncomeDay(q, q.UMine, q.UEff);
-                    top.Append("The rest (").Append(kFull.ToString("N0", Inv)).Append(") pays you about ").Append(incF.ToString("0.0", Inv)).Append(" a day (").Append(Math.Round(incF * 364).ToString("N0", Inv)).Append(" a year).\n");
+                    top.Append("The full-kit row (").Append(kFull.ToString("N0", Inv)).Append(") adds about ").Append(incF.ToString("0.0", Inv)).Append(" a day (").Append(Math.Round(incF * 364).ToString("N0", Inv)).Append(" a year).\n");
                 }
                 else
                 {
