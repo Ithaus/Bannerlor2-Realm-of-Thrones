@@ -86,9 +86,10 @@ namespace Armoury
             }
             if (_stage == 2)
             {
+                FinanceCheck();   // m115: panel Finance i podpowiedz zlota - linia prac gracza (sam odczyt, nie rzuca)
                 string dir = Path.Combine(Dir(), "zdjecia");
                 Directory.CreateDirectory(dir);
-                string name = "fiefs-m112-" + DateTime.Now.ToString("HHmmss", Inv) + ".png";
+                string name = "fiefs-m115-" + DateTime.Now.ToString("HHmmss", Inv) + ".png";
                 TaleWorlds.Engine.Utilities.TakeScreenshot(Path.Combine(dir, name).Replace('\\', '/'));
                 Log.Info(P + "zdjecie zdjecia\\" + name + ".");
                 _stage = 3; _at = _clock + 1f;
@@ -97,6 +98,58 @@ namespace Armoury
             if (gsm != null && gsm.ActiveState is ClanState) gsm.PopState();
             Log.Info(P + "koniec.");
             _done = true;
+        }
+
+        private static int VmInt(object vm, string prop)
+        {
+            var pi = vm != null ? vm.GetType().GetProperty(prop) : null;
+            object v = pi != null ? pi.GetValue(vm, null) : null;
+            return v is int ? (int)v : int.MinValue;
+        }
+
+        /// <summary>m115 (Jeff 24.10: "skoro wioksa mi placi to ma byc na zielon w inocme i na drugim zdjeicuy"): panel Finance (ClanManagementVM po RefreshDailyValues
+        /// odbiciem - ta sama droga co gra), podpowiedz zlota (CalculateClanGoldChange(rod, true, false, false) - jak GetDenarTooltip) i przychod poza panelem
+        /// (bez flagi FinanceBox - bez linii prac). OK: Total Income - poza panelem = prace w widoku, Daily Change = |Income| - |Expenses|, linie "Village works"
+        /// podpowiedzi sumuja sie do prac w widoku. Linia "[FiefsShotTest] panel Finance: ...".</summary>
+        private static void FinanceCheck()
+        {
+            try
+            {
+                var scr = ScreenManager.TopScreen;
+                var pi = scr != null ? scr.GetType().GetProperty("_dataSource") : null;
+                var vm = pi != null ? pi.GetValue(scr, null) : null;
+                var rd = vm != null ? vm.GetType().GetMethod("RefreshDailyValues", Type.EmptyTypes) : null;
+                if (rd != null) rd.Invoke(vm, null);
+                int x = VmInt(vm, "TotalIncome"), y = VmInt(vm, "TotalExpenses"), z = VmInt(vm, "DailyChange"), ex = VmInt(vm, "ExpectedGold");
+                var s = Settings.Current;
+                bool on = s != null && s.WorksIncomeShown;
+                System.Collections.Generic.List<DistrictWorks.ViewLine> vl; int days;
+                int w = DistrictWorks.ViewWorks(out vl, out days);
+                int wExp = on ? w : 0;
+                var per = new System.Text.StringBuilder();
+                if (vl != null) foreach (var l in vl) per.Append(per.Length > 0 ? ", " : "").Append(l.Name).Append(' ').Append(l.Amt);
+                var fin = Campaign.Current.Models.ClanFinanceModel;
+                var tip = fin.CalculateClanGoldChange(Clan.PlayerClan, true, false, false);
+                var tl = new System.Text.StringBuilder();
+                long tipWorks = 0; int tipWorksN = 0;
+                foreach (var ln in tip.GetLines())
+                {
+                    string n = ln.name ?? "?";
+                    tl.Append(n).Append('=').Append(ln.number.ToString("0.##", Inv)).Append("; ");
+                    if (n.StartsWith("Village works", StringComparison.Ordinal)) { tipWorks += (long)Math.Round(ln.number); tipWorksN++; }
+                }
+                int o = (int)fin.CalculateClanIncome(Clan.PlayerClan, false, false, false).ResultNumber;
+                bool okBox = x != int.MinValue && x - o == wExp;
+                bool okDay = x != int.MinValue && y != int.MinValue && z == Math.Abs(x) - Math.Abs(y);
+                bool okTip = tipWorks == wExp && (wExp == 0 || tipWorksN > 0);
+                bool ok = rd != null && okBox && okDay && okTip;
+                Log.Info("[FiefsShotTest] panel Finance: Total Income " + x + ", Total Expenses " + y + ", Daily Change " + z + ", Expected " + ex
+                         + " | prace w widoku " + w + " (" + (per.Length > 0 ? per.ToString() : "brak") + "; dni " + days + "; klucz Works Income Shown " + (on ? "TAK" : "WYL") + ")"
+                         + " | podpowiedz zlota: " + tl + "razem " + tip.ResultNumber.ToString("0.##", Inv) + " (linie prac " + tipWorksN + " = " + tipWorks + ")"
+                         + " | przychod poza panelem " + o + " -> " + (ok ? "OK" : "BLAD (" + (rd == null ? "brak RefreshDailyValues; " : "") + (okBox ? "" : "panel - poza panelem != prace; ")
+                         + (okDay ? "" : "Daily Change != |Income| - |Expenses|; ") + (okTip ? "" : "podpowiedz != prace; ") + "panel Finance " + FinanceBox.State + ")"));
+            }
+            catch (Exception e) { Log.Error("FiefsShotTest.FinanceCheck", e); }
         }
     }
 }
