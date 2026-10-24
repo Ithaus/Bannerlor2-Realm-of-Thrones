@@ -178,7 +178,8 @@ namespace Armoury
         internal static void Write(Mission m, string kind)
         {
             var c = Settings.Current;
-            if (!AnyKey(c)) return;
+            // po recenzji: przy fladze testu bitwaOFF linia misji i tak (piec kluczy NIE) - dowod z kazdej bitwy, ze flaga dziala
+            if (c == null || (!AnyKey(c) && !TestOff)) return;
             var sb = new StringBuilder(1400);
             float dm = VeteranAi.DiffMulNow();
             float mins = m != null ? m.CurrentTime / 60f : 0f;

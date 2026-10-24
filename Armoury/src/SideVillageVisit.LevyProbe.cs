@@ -17,6 +17,8 @@ namespace Armoury
     /// (etapy, odmowa 'koniec dnia'), 0 &lt;= pula &lt;= pulap, przyrost mlodych wobec oczekiwanego, brak rak, obroncy &lt;= pula. Po wczytaniu z wpisami - tylko kontrole.
     /// Test n36: dopoki zaden werbunek sondy nie przeszedl kontroli - pelna druzyna albo za malo zlota nie zatrzymuja sondy (zdjeci ludzie / dotacja testu, linia w logu,
     /// poza bilansem); odmowa po werbunku - kazdy prawidlowy powod bramki to OK (z powodem), BLAD tylko werbunek ponad dzis albo wyjatek; linia doby konczy sie TAK / NIE / NIEPOKRYTY.
+    /// Po recenzji: przysiolek dostaje miejsce i dotacje kazdego dnia (inaczej pelna druzyna konczy werbunek przed limitem dnia), odmowa ponad dzis liczy sie
+    /// tylko po werbunku przysiolka tej doby i tylko z powodow, ktore moga stac za oproznionym przysiolkiem (druzyna, zloto - INFO); bez takiej odmowy - NIEPOKRYTY.
     /// </summary>
     internal static partial class SideVillageVisit
     {
@@ -27,8 +29,12 @@ namespace Armoury
         private static string _pbForce;   // wymuszona odmowa w LevyGate (tylko sonda)
         private static int _pbOk, _pbBad;
         private static int _pbRec;   // test n36: werbunki sondy z kontrolami (0 - sonda nic nie sprawdzila: NIEPOKRYTY)
-        // test n36: prawidlowe odmowy po werbunku - kody LevyGate i powody LevyDo (miejsce nie wystepuje: sonda wola bramke jak wioska gracza)
-        private static readonly string[] PbRefusals = { "koniec dnia", "pula", "zloto", "druzyna", "podloga", "rabunek", "wojna", "zaciag", "Straz", "spalona", "zaufanie", "nic do wziecia", "DOM na podlodze" };
+        private static int _pbOver;  // po recenzji: odmowy ponad dzis sprawdzone po werbunku przysiolka (0 - limit dnia nie sprawdzony: NIEPOKRYTY)
+        // test n36: prawidlowe odmowy po werbunku - kody LevyGate i powody LevyDo (miejsce nie wystepuje: sonda wola bramke jak wioska gracza).
+        // Po recenzji: tylko powody, ktore moga stac za oproznionym przysiolkiem (limit dnia, pula, podloga DOM) i bramki przed pula (wojna, rabunek, ...);
+        // druzyna, zloto i nic do wziecia przychodza tylko przy gotowych >= 1 - werbunek nie oproznil przysiolka, wiec limit nie byl sprawdzony (INFO).
+        private static readonly string[] PbRefusals = { "koniec dnia", "pula", "podloga", "DOM na podlodze", "rabunek", "wojna", "zaciag", "Straz", "spalona", "zaufanie" };
+        private static readonly string[] PbNotTested = { "druzyna", "zloto", "nic do wziecia" };
         private static readonly Dictionary<string, double> _pbPrev = new Dictionary<string, double>(StringComparer.Ordinal);
 
         private static bool ProbeFlag()
@@ -46,7 +52,7 @@ namespace Armoury
             return _pbFlag == 1;
         }
 
-        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbRec = 0; _pbPrev.Clear(); }
+        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbRec = 0; _pbOver = 0; _pbPrev.Clear(); }
 
         private static void PbCheck(StringBuilder sb, string what, bool ok, string val)
         {
@@ -123,7 +129,8 @@ namespace Armoury
             Log.Info(LP + "TEST wioski: najwieksza " + (_pbA ?? "-") + " (ludzi " + bestP.ToString("0", Inv) + "), przysiolek " + (_pbB ?? "-") + " (" + (minP < double.MaxValue ? minP.ToString("0", Inv) : "-")
                      + "), hamulec/obca " + (_pbC ?? "-") + " (rodzaj " + (cScore == 2 ? "hamulec" : cScore == 1 ? "obce krolestwo" : "-") + "), kandydatow " + near.Count + ".");
             ProbeRecruit("najwieksza", _pbA, 5);
-            ProbeRecruit("przysiolek", _pbB, int.MaxValue);
+            var rb = ProbeRecruit("przysiolek", _pbB, int.MaxValue);
+            ProbeOverToday(0, _pbB, rb);   // po recenzji: limit dnia sprawdzony juz w pierwszej dobie (przysiolek oprozniony do konca dnia)
             ProbeRecruit(cScore == 2 ? "hamulec" : "obca", _pbC, 3);
             // wymuszone odmowy
             if (_pbA != null)
@@ -140,11 +147,12 @@ namespace Armoury
                     Log.Info(s2.ToString());
                 }
             }
-            Log.Info(LP + "TEST start - werbunkow sondy z kontrolami " + _pbRec + (_pbRec == 0 ? " - NIEPOKRYTY (sprobuje w kolejnych dobach przysiolkiem)" : "") + ".");
+            Log.Info(LP + "TEST start - werbunkow sondy z kontrolami " + _pbRec + ", odmow ponad dzis po werbunku " + _pbOver
+                     + (_pbRec == 0 || _pbOver == 0 ? " - NIEPOKRYTY (sprobuje w kolejnych dobach przysiolkiem)" : "") + ".");
         }
 
         /// <summary>Test n36: miejsce w druzynie dla sondy - zdejmuje z druzyny gracza n zdrowych zwyklych ludzi (najnizszy tier, najliczniejszy rodzaj), linia w logu.
-        /// Tylko sonda, dopoki zaden werbunek nie przeszedl kontroli. Zwraca zdjetych.</summary>
+        /// Tylko sonda, dopoki zaden werbunek nie przeszedl kontroli, i werbunki przysiolka (kazda doba). Zwraca zdjetych.</summary>
         private static int PbFreeRoom(int n)
         {
             var mp = MobileParty.MainParty;
@@ -190,9 +198,10 @@ namespace Armoury
             var q0 = LvQuoteFor(st, uid);
             int k = Math.Min(want, q0 != null ? q0.Ready : 0);
             if (k < 1) { Log.Info(LP + "TEST " + label + " " + NameOf(Rec(uid)) + ": gotowych 0 (zaufanie " + (q0 != null ? q0.Idx : -1) + ") - INFO."); return null; }
-            if (_pbRec == 0)
+            if (_pbRec == 0 || label.StartsWith("przysiolek", StringComparison.Ordinal))
             {
-                // test n36: dopoki nie bylo werbunku z kontrolami - pelna druzyna albo pusta kiesa nie zatrzymuja sondy
+                // test n36: dopoki nie bylo werbunku z kontrolami - pelna druzyna albo pusta kiesa nie zatrzymuja sondy;
+                // po recenzji: przysiolek zawsze (kazda doba) - werbunek ma oproznic gotowych do konca dnia, zeby odmowa ponad dzis sprawdzala limit
                 var mp = MobileParty.MainParty;
                 int over = mp != null && mp.Party != null && mp.MemberRoster != null ? mp.MemberRoster.TotalManCount + k - mp.Party.PartySizeLimit : 0;
                 if (over > 0) PbFreeRoom(over);
@@ -265,21 +274,46 @@ namespace Armoury
                 Log.Info(sb.ToString());
                 if (!_pbAfterLoad && uid == _pbB && d <= 40)
                 {
-                    if (q.Ready > 0) ProbeRecruit("przysiolek doba " + d, uid, int.MaxValue);
-                    var res = LevyDo(st, uid, 1, "TEST sonda ponad dzis");
-                    var s2 = new StringBuilder(LP + "TEST doba " + d + " odmowa po werbunku: " + (res != null ? res.Why ?? "-" : "-"));
-                    // test n36: kazdy prawidlowy powod bramki (podloga, rabunek, wojna w trakcie biegu, ...) to OK z powodem; BLAD - werbunek ponad dzis, wyjatek, inny powod
-                    string rw = res != null ? res.Why : null;
-                    bool legit = rw != null && Array.IndexOf(PbRefusals, rw) >= 0;
-                    PbCheck(s2, "odmowa bramki (powod " + (rw ?? "-") + ")", res != null && res.Keep == 0 && legit,
-                            res == null ? "brak wyniku" : res.Keep > 0 ? "werbunek " + res.Keep + " ponad dzis" : legit ? "" : "nieoczekiwany powod");
-                    Log.Info(s2.ToString());
+                    LvDone dr = null;
+                    if (q.Ready > 0) dr = ProbeRecruit("przysiolek doba " + d, uid, int.MaxValue);
+                    ProbeOverToday(d, uid, dr);
                 }
                 var r = LvGet(uid);
                 _pbPrev[uid] = r != null ? r.Pool : q.Cap;
             }
-            Log.Info(LP + "TEST doba " + d + " - razem OK " + _pbOk + ", BLAD " + _pbBad + ", werbunkow sondy z kontrolami " + _pbRec
-                     + " = " + (_pbBad > 0 ? "NIE" : _pbRec == 0 && !_pbAfterLoad ? "NIEPOKRYTY" : "TAK") + (_pbAfterLoad ? " (po wczytaniu - tylko kontrole)" : "") + ".");
+            Log.Info(LP + "TEST doba " + d + " - razem OK " + _pbOk + ", BLAD " + _pbBad + ", werbunkow sondy z kontrolami " + _pbRec + ", odmow ponad dzis po werbunku " + _pbOver
+                     + " = " + (_pbBad > 0 ? "NIE" : (_pbRec == 0 || _pbOver == 0) && !_pbAfterLoad ? "NIEPOKRYTY" : "TAK") + (_pbAfterLoad ? " (po wczytaniu - tylko kontrole)" : "") + ".");
+        }
+
+        /// <summary>Po recenzji: odmowa ponad dzis (przysiolek). Liczy sie tylko po werbunku przysiolka tej doby (sonda dala miejsce i zloto na wszystkich gotowych,
+        /// wiec przysiolek jest oprozniony do konca dnia): wtedy werbunek 1 musi byc odmowiony powodem z PbRefusals (OK), werbunek = BLAD. Bez werbunku tej doby
+        /// (gotowych 0, odmowa werbunku) - INFO i bez proby (proba moglaby wziac czlowieka poza kontrolami). Druzyna / zloto / nic do wziecia - INFO.</summary>
+        private static void ProbeOverToday(int d, string uid, LvDone took)
+        {
+            if (uid == null) return;
+            var s2 = new StringBuilder(LP + "TEST doba " + d + " odmowa po werbunku: ");
+            if (took == null || took.Keep <= 0)
+            {
+                s2.Append("- | bez werbunku przysiolka tej doby (").Append(took != null ? took.Why ?? "-" : "gotowych 0").Append(") - limit dnia niesprawdzony INFO.");
+                Log.Info(s2.ToString());
+                return;
+            }
+            var st = DistOf(Rec(uid));
+            if (st == null) return;
+            var res = LevyDo(st, uid, 1, "TEST sonda ponad dzis");
+            string rw = res != null ? res.Why : null;
+            s2.Append(rw ?? "-");
+            if (res != null && res.Keep == 0 && rw != null && Array.IndexOf(PbNotTested, rw) >= 0)
+            {
+                s2.Append(" | odmowa bramki (powod ").Append(rw).Append(") - przysiolek nieoprozniony, limit dnia niesprawdzony INFO.");
+                Log.Info(s2.ToString());
+                return;
+            }
+            bool legit = rw != null && Array.IndexOf(PbRefusals, rw) >= 0;
+            _pbOver++;
+            PbCheck(s2, "odmowa bramki (powod " + (rw ?? "-") + ")", res != null && res.Keep == 0 && legit,
+                    res == null ? "brak wyniku" : res.Keep > 0 ? "werbunek " + res.Keep + " ponad dzis" : legit ? "" : "nieoczekiwany powod");
+            Log.Info(s2.ToString());
         }
     }
 }
