@@ -219,7 +219,9 @@ namespace Armoury
         internal static string Export()
         {
             if (!HasFief) return _pendKingdom != null ? PendVer + "|" + Clean(_pendKingdom) + "|" + _pendDay.ToString(Inv) : "";   // nadanie czeka (ksiega nieczynna) - przezyje zapis
-            return SaveVer + "|" + Clean(_p.Uid) + "|" + Clean(_p.Dist) + "|" + Clean(_p.Name) + "|" + _p.Day0.ToString(Inv) + "|" + _p.Paid.ToString(Inv) + "|" + _p.Avg.ToString("0.###", Inv);
+            // recenzja m113: + cena i rod sprzedawcy pierwszej wioski (kupiona albo dodatkowa awansowana po odkupie); starsza DLL czyta f[1..6] (f.Length < 7 - odrzut), nadmiar pomija
+            return SaveVer + "|" + Clean(_p.Uid) + "|" + Clean(_p.Dist) + "|" + Clean(_p.Name) + "|" + _p.Day0.ToString(Inv) + "|" + _p.Paid.ToString(Inv) + "|" + _p.Avg.ToString("0.###", Inv)
+                   + "|" + _p.Price.ToString(Inv) + "|" + Clean(_p.From);
         }
 
         private static string Clean(string s) { return (s ?? "").Replace("|", "/").Replace("~", "-"); }
@@ -243,6 +245,8 @@ namespace Armoury
                 long.TryParse(f[5], NumberStyles.Integer, Inv, out o.Paid);
                 double.TryParse(f[6], NumberStyles.Float, Inv, out o.Avg);
                 if (double.IsNaN(o.Avg) || o.Avg < 0) o.Avg = 0;
+                if (f.Length > 7) long.TryParse(f[7], NumberStyles.Integer, Inv, out o.Price);
+                if (f.Length > 8) o.From = f[8] ?? "";
                 _p = o;
             }
             catch (Exception e) { _p = null; Stumble("Import", e); }
@@ -250,12 +254,14 @@ namespace Armoury
         }
 
         /// <summary>m113-zakup: zapis arm_side_fief2 - dodatkowe wioski gracza (takze nieczynne - wracaja do zapisu bez zmian). Pusto - brak dodatkowych.</summary>
-        internal static string Export2()
+        internal static string Export2() { return Serialize2(_extra); }
+
+        private static string Serialize2(List<Own> extra)
         {
-            if (_extra.Count == 0) return "";
-            var sb = new StringBuilder(64 + 96 * _extra.Count);
+            if (extra.Count == 0) return "";
+            var sb = new StringBuilder(64 + 96 * extra.Count);
             sb.Append(SaveVer2);
-            foreach (var o in _extra)
+            foreach (var o in extra)
             {
                 if (o == null || o.Uid == null) continue;
                 sb.Append('~').Append(Clean(o.Uid)).Append('|').Append(Clean(o.Dist)).Append('|').Append(Clean(o.Name)).Append('|').Append(o.Day0.ToString(Inv))
@@ -275,26 +281,62 @@ namespace Armoury
             {
                 var e = data.Split('~');
                 if (e.Length == 0 || e[0] != SaveVer2) { Log.Info(P + "zapis arm_side_fief2 nieznany (" + data.Length + " znakow) - pominiety."); return; }
-                var seen = new HashSet<string>(StringComparer.Ordinal);
-                if (HasFief) seen.Add(_p.Uid);
-                for (int i = 1; i < e.Length; i++)
-                {
-                    var f = e[i].Split('|');
-                    if (f.Length < 6 || f[0].Length == 0 || f[1].Length == 0 || !seen.Add(f[0])) { bad++; continue; }
-                    var o = new Own { Uid = f[0], Dist = f[1], Name = f[2].Length > 0 ? f[2] : f[0] };
-                    int.TryParse(f[3], NumberStyles.Integer, Inv, out o.Day0);
-                    long.TryParse(f[4], NumberStyles.Integer, Inv, out o.Paid);
-                    double.TryParse(f[5], NumberStyles.Float, Inv, out o.Avg);
-                    if (double.IsNaN(o.Avg) || o.Avg < 0) o.Avg = 0;
-                    if (f.Length > 6) long.TryParse(f[6], NumberStyles.Integer, Inv, out o.Price);
-                    if (f.Length > 7) o.From = f[7];
-                    _extra.Add(o); ok++;
-                }
+                Parse2(e, HasFief ? _p.Uid : null, _extra, out ok, out bad);
                 if (!HasFief && _extra.Count > 0) { _p = _extra[0]; _extra.RemoveAt(0); Log.Info(P + "arm_side_fief2 bez pierwszej wioski - pierwsza jest " + _p.Name + " (" + _p.Uid + ")."); }
                 Log.Info(P + "zapis arm_side_fief2: dodatkowe wioski " + ok + (bad > 0 ? ", pominiete wpisy " + bad : "") + ".");
             }
             catch (Exception ex) { Stumble("Import2", ex); }
             finally { RebuildMine(); }
+        }
+
+        private static void Parse2(string[] e, string firstUid, List<Own> into, out int ok, out int bad)
+        {
+            ok = 0; bad = 0;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            if (firstUid != null) seen.Add(firstUid);
+            for (int i = 1; i < e.Length; i++)
+            {
+                var f = e[i].Split('|');
+                if (f.Length < 6 || f[0].Length == 0 || f[1].Length == 0 || !seen.Add(f[0])) { bad++; continue; }
+                var o = new Own { Uid = f[0], Dist = f[1], Name = f[2].Length > 0 ? f[2] : f[0] };
+                int.TryParse(f[3], NumberStyles.Integer, Inv, out o.Day0);
+                long.TryParse(f[4], NumberStyles.Integer, Inv, out o.Paid);
+                double.TryParse(f[5], NumberStyles.Float, Inv, out o.Avg);
+                if (double.IsNaN(o.Avg) || o.Avg < 0) o.Avg = 0;
+                if (f.Length > 6) long.TryParse(f[6], NumberStyles.Integer, Inv, out o.Price);
+                if (f.Length > 7) o.From = f[7];
+                into.Add(o); ok++;
+            }
+        }
+
+        /// <summary>Recenzja m113 (autotest T8): napis arm_side_fief2 -> lista na boku -> napis; zywe wioski (i ich stan sesji) nietkniete. Nie rzuca.</summary>
+        internal static string RoundTrip2(string data)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(data)) return "";
+                var e = data.Split('~');
+                if (e.Length == 0 || e[0] != SaveVer2) return "?";
+                var l = new List<Own>(); int ok, bad;
+                Parse2(e, HasFief ? _p.Uid : null, l, out ok, out bad);
+                return Serialize2(l);
+            }
+            catch (Exception ex) { Stumble("RoundTrip2", ex); return "?"; }
+        }
+
+        /// <summary>Recenzja m113: menu wioski gracza na wiosce uid (po kupnie z menu wioski obcej). false - nie gracza.</summary>
+        internal static bool SetCurrent(string uid) { var o = Find(uid); if (o == null) return false; _cur = o; return true; }
+
+        /// <summary>Recenzja m113: wyjscie z menu wioski gracza jak opcja "Leave" (menu wsi gry, gdy partia w niej stoi; inaczej ostatnie). Nie rzuca.</summary>
+        internal static void LeaveMenu()
+        {
+            try
+            {
+                var here = MobileParty.MainParty != null ? MobileParty.MainParty.CurrentSettlement : null;
+                if (here != null && here.IsVillage) GameMenu.SwitchToMenu("village");
+                else GameMenu.ExitToLast();
+            }
+            catch (Exception e) { Stumble("LeaveMenu", e); }
         }
 
         /// <summary>m113-zakup: dodatkowa wioska o uid spoza czynnego ukladu wiosek (inny uklad, mod mapy) - nieczynna (bez dochodu i menu), zostaje w zapisie. Raz, gdy
@@ -796,9 +838,16 @@ namespace Armoury
                     var payer = v != null ? PayerOf(v) : null;
                     VillageBook.VState vs;
                     if (v == null) { o.DueWhy = "Its district is not known."; o.DueWhyPl = "okreg nieznany"; }
-                    else if (lord == null || ReferenceEquals(lord, Clan.PlayerClan)) { o.DueCode = 1; o.DueWhy = "You hold the district yourself - its whole tax is yours already."; o.DueWhyPl = "gracz panem okregu"; }
-                    else if (payer != null && (ReferenceEquals(payer, Hero.MainHero) || ReferenceEquals(payer.Clan, Clan.PlayerClan)))
-                    { o.DueCode = 1; o.DueWhy = "You hold the lordship of " + Txt(st.Name) + " - its whole tax is yours already."; o.DueWhyPl = "gracz posiadaczem podatku okregu (F3)"; }
+                    // recenzja m113: przy F2 (platnik = posiadacz podatku) o naleznosci decyduje platnik, nie pan zamku - zamek gracza z wsia, ktorej Lordship trzyma
+                    // bohater innego rodu: podatek bierze on, wiec wioski gracza w tym okregu dalej dostaja od niego udzial
+                    else if (!(s.SideVillagePayerIsTaxHolder && payer != null) && (lord == null || ReferenceEquals(lord, Clan.PlayerClan))) { o.DueCode = 1; o.DueWhy = "You hold the district yourself - its whole tax is yours already."; o.DueWhyPl = "gracz panem okregu"; }
+                    else if (payer == null) { o.DueCode = 1; o.DueWhy = "No lord takes its tax."; o.DueWhyPl = "brak platnika (posiadacza podatku)"; }
+                    else if (ReferenceEquals(payer, Hero.MainHero) || ReferenceEquals(payer.Clan, Clan.PlayerClan))
+                    {
+                        o.DueCode = 1;
+                        if (lord == null || ReferenceEquals(lord, Clan.PlayerClan)) { o.DueWhy = "You hold the district yourself - its whole tax is yours already."; o.DueWhyPl = "gracz panem okregu i posiadaczem podatku"; }
+                        else { o.DueWhy = "You hold the lordship of " + Txt(st.Name) + " - its whole tax is yours already."; o.DueWhyPl = "gracz posiadaczem podatku okregu (F3)"; }
+                    }
                     else if (mf != null && df != null && !ReferenceEquals(mf, df) && FactionManager.IsAtWarAgainstFaction(mf, df)) { o.DueCode = 2; o.DueWhy = "Nothing while you are at war with its lord's realm."; o.DueWhyPl = "wojna z krolestwem okregu"; }
                     else if (v.VillageState == Village.VillageStates.BeingRaided || v.VillageState == Village.VillageStates.Looted) { o.DueWhy = "Nothing while " + Txt(st.Name) + " lies raided - the lord takes no tax from it either."; o.DueWhyPl = "wies gry okregu rabowana / spladrowana"; }
                     else if (VillageBook.StateOf(o.Uid, out vs) && (vs.State == VillageBook.SBurned || vs.State == VillageBook.SBurning || vs.State == VillageBook.SAbandoned)) { o.DueWhy = "Nothing while your village lies burned."; o.DueWhyPl = "wioska gracza spalona"; }
@@ -845,6 +894,12 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || !s.SideVillageIncomeSeizable) return 0;
+            try { return _paidRing.Avg(); } catch { return 0; }
+        }
+
+        /// <summary>Recenzja m113 (lustro F6): srednia 28 dob (sesja) wyplat wiosek gracza bez bramki SideVillageIncomeSeizable - ziemia D stalego rodu gracza. Nie rzuca.</summary>
+        internal static double PaidAvg28Raw()
+        {
             try { return _paidRing.Avg(); } catch { return 0; }
         }
 

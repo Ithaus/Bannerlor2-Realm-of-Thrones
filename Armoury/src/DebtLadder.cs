@@ -128,6 +128,10 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.DebtLadderEnabled && s.IronBankEnabled && s.ClanBudgetEnabled; } }
         internal static bool PlayerOnLadder { get { var s = Settings.Current; return On && s.PlayerSameLadder; } }
         private static bool InLadder(Clan c) { var s = Settings.Current; return c != null && (c != Clan.PlayerClan || (s != null && s.PlayerSameLadder)); }
+        /// <summary>Recenzja m113: czy wierzyciele wezma swoje z ceny ziemi rodu c (LandProceeds) - drabina wlaczona i rod w niej.</summary>
+        internal static bool TakesLandProceeds(Clan c) { return On && InLadder(c); }
+        /// <summary>Recenzja m113 (autotest LandSale T4): splata zaliczki gry w nicosc (OBIEG-1) od poczatku doby - licznik linii doby.</summary>
+        internal static long AdvNothingNow { get { return _dAdvNothing; } }
         internal static bool TakesCrownDebtFor(Clan c) { var s = Settings.Current; return On && s.WageDebtToMen && InLadder(c); }
         private static bool WalletsOn { get { var s = Settings.Current; return On && s.GameWalletsNoAdvance; } }
 
@@ -575,7 +579,7 @@ namespace Armoury
         {
             try
             {
-                if (c == null || price <= 0) return 0;
+                if (c == null || price <= 0 || !On || !InLadder(c)) return 0;   // recenzja m113: drabina wylaczona albo gracz poza nia - cena cala do sprzedawcy
                 var head = c.Leader;
                 if (head == null || !head.IsAlive) return 0;
                 long owed = OwedOf(c);

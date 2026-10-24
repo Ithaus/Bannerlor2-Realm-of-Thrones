@@ -205,6 +205,21 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>Recenzja m113: TodayLand zyje w pamieci, a Today jest w zapisie - LandSale.Export zapisuje go w arm_land113 ("t="), zeby cena ziemi sprzed zapisu
+        /// nie stala sie po wczytaniu jednorazowym wplywem (OnceToday, D169). Sam odczyt; nie rzuca.</summary>
+        internal static void ForEachTodayLand(Action<string, long> f)
+        {
+            try { foreach (var kv in _book) if (kv.Key != null && kv.Value != null && kv.Value.TodayLand > 0) f(kv.Key, kv.Value.TodayLand); }
+            catch (Exception e) { Stumble("ForEachTodayLand", e); }
+        }
+
+        /// <summary>Recenzja m113: LandSale.Import (arm_land113 po arm_clanincome) - TodayLand rodu clanId, nie wiecej niz wczytane Today. Nie rzuca.</summary>
+        internal static void RestoreLand(string clanId, long a)
+        {
+            try { Rec r; if (clanId != null && a > 0 && _book.TryGetValue(clanId, out r) && r != null) r.TodayLand = Math.Min(Math.Max(0L, r.Today), a); }
+            catch (Exception e) { Stumble("RestoreLand", e); }
+        }
+
         /// <summary>MoneyLedger.OnGoldTraded: zdarzenie gry do zywego czlonka rodu od platnika spoza rodu, poza rozliczeniem rodu i naszym tickiem.</summary>
         internal static void OnEvent(Hero gh, PartyBase gp, Hero rh, int a, bool gNone, bool inClan, bool inBlock, bool estate)
         {

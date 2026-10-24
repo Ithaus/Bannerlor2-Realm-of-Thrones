@@ -156,33 +156,45 @@ namespace Armoury
                 var sb = new StringBuilder(900);
                 if (o.SellBack) sb.Append(NameOf(o.Head)).Append(" of ").Append(HouseOf(o.Seller)).Append(" would buy ").Append(o.Name).Append(" back from you.\n\n");
                 else sb.Append(o.Name).Append(", ").Append(KindEn(o)).Append(" - sold by ").Append(NameOf(o.Head)).Append(" of ").Append(HouseOf(o.Seller)).Append(".\n\n");
-                if (!o.SellBack && o.NeedEn.Length > 0) sb.Append("Why he sells: ").Append(o.NeedEn).Append('\n');
+                if (o.Kind == KSide && o.Payer != null && o.Payer != o.Head && !o.SellBack) sb.Append("Its tax is taken by ").Append(NameOf(o.Payer)).Append(" of the same house; ").Append(NameOf(o.Head)).Append(" sells it for the house, and ").Append(NameOf(o.Payer)).Append(" pays you its share.\n");
+                if (!o.SellBack && o.NeedEn.Length > 0) sb.Append("Why ").Append(He(o.Head)).Append(" sells: ").Append(o.NeedEn).Append('\n');
+                string dues = o.DuesRate > 0 ? ", less the crown's dues of " + (100 * o.DuesRate).ToString("0.#", Inv) + "%" : "";
                 if (o.Kind == KCastle)
                     sb.Append("Income: about ").Append(o.NetDay.ToString("N0", Inv)).Append(" a day - the castle's own dues ").Append(o.CastleLr.ToString("N0", Inv))
                       .Append(", rents of its villages ").Append(o.VilRent.ToString("N0", Inv)).Append(", taxes of the villages its lord holds (").Append(o.VilSeller).Append(") ").Append(o.VilVt.ToString("N0", Inv))
                       .Append(", less the wages of its guard ").Append(o.Guard.ToString("N0", Inv)).Append(" (").Append((s.LandCastleGuardShare * o.GuardMen).ToString("0", Inv)).Append(" men at ")
-                      .Append(o.GuardWage.ToString("0.#", Inv)).Append("). The crown's rent is not counted - it is not the land's.\n");
-                else sb.Append("Income: about ").Append(o.NetDay.ToString("N0", Inv)).Append(" a day").Append(o.Kind == KSide ? " (its share of the district's tax)" : " (the tax of the village)").Append(".\n");
-                sb.Append("Measured over ").Append(o.Days).Append(o.Days == 1 ? " day" : " days").Append(o.SeasonFix != 1 ? " (set to the year's mean, x" + o.SeasonFix.ToString("0.00", Inv) + ")" : "").Append(".\n");
+                      .Append(o.GuardWage.ToString("0.#", Inv)).Append(")").Append(o.OwnDues > 0 ? ", less what it pays your own villages there " + o.OwnDues.ToString("N0", Inv) : "").Append(dues)
+                      .Append(". The crown's rent is not counted - it is not the land's.\n");
+                else if (o.Kind == KSide)
+                    sb.Append("Income today: about ").Append(o.NetDay.ToString("N0", Inv)).Append(" a day (its share of the district's tax)")
+                      .Append(o.SeasonFix != 1 ? ", set to the year's mean from " + o.Days + " days of the district's tax (x" + o.SeasonFix.ToString("0.00", Inv) + ")" : "").Append(".\n");
+                else
+                    sb.Append("Income: about ").Append(o.NetDay.ToString("N0", Inv)).Append(" a day (the tax of the village").Append(o.OwnDues > 0 ? ", less what it pays your own villages there" : "").Append(dues).Append(").\n");
+                if (o.Kind != KSide) sb.Append("Measured over ").Append(o.Days).Append(o.Days == 1 ? " day" : " days").Append(".\n");
+                if (o.Kind != KSide && o.OwnDues > 0 && !o.SellBack)
+                    sb.Append("Your side villages here (about ").Append(o.OwnDues.ToString("N0", Inv)).Append(" a day) stop paying you - their share is part of the tax you buy; the price counts only the rest.\n");
                 sb.Append("Years of purchase: ").Append(o.Years.ToString("0.##", Inv)).Append(o.WarF < 1 ? " (its realm is at war - land sells for less)" : "").Append('\n');
                 if (o.Premium > 1) sb.Append(o.Seat ? "Family seat: x" : "Castle: x").Append(o.Premium.ToString("0.##", Inv)).Append(" - lords hardly ever sell ").Append(o.Seat ? "the seat of their house" : "a fortress").Append(".\n");
                 sb.Append(o.Disc > 0 ? "Discount: " + (100 * o.Disc).ToString("0.#", Inv) + "% - " + o.DiscWhy + "." : "No discount - " + o.DiscWhy + ".").Append('\n');
-                sb.Append("Price: ").Append(o.Price.ToString("N0", Inv)).Append(". It pays itself back in about ").Append(Payback(o).ToString("0.0", Inv)).Append(" years.\n");
+                if (o.SellBack) sb.Append("Price: ").Append(o.Price.ToString("N0", Inv)).Append(". You give up about ").Append(o.NetDay.ToString("N0", Inv)).Append(" a day.\n");
+                else sb.Append("Price: ").Append(o.Price.ToString("N0", Inv)).Append(". It pays itself back in about ").Append(Payback(o).ToString("0.0", Inv)).Append(" years.\n");
                 if (o.SellBack)
                 {
-                    long ow = DebtLadder.OwedOf(Clan.PlayerClan);
+                    long ow = DebtLadder.TakesLandProceeds(Clan.PlayerClan) ? DebtLadder.OwedOf(Clan.PlayerClan) : 0;   // recenzja m113: tylko gdy drabina bierze z ceny
                     sb.Append("Where the money goes: to you").Append(ow > 0 ? "; your creditors take " + Math.Min(o.Price, ow).ToString("N0", Inv) + " of it first (you owe " + ow.ToString("N0", Inv) + ")" : "").Append(".\n");
                 }
                 else
                 {
-                    sb.Append("Where the money goes: to ").Append(NameOf(o.Head)).Append(o.Owed > 0 ? "; his creditors take " + Math.Min(o.Price, o.Owed).ToString("N0", Inv) + " of it first (his house owes " + o.Owed.ToString("N0", Inv) + ")" : "").Append(".\n");
+                    bool credTake = o.Owed > 0 && DebtLadder.TakesLandProceeds(o.Seller);
+                    sb.Append("Where the money goes: to ").Append(NameOf(o.Head)).Append(credTake ? "; " + His(o.Head) + " creditors take " + Math.Min(o.Price, o.Owed).ToString("N0", Inv) + " of it first (" + His(o.Head) + " house owes " + o.Owed.ToString("N0", Inv) + ")" : "").Append(".\n");
                     if (o.Kind == KSide) sb.Append("The village flies your banner and pays you its share of the tax every day, out of the district's tax and its lord's purse.\n");
                     if (o.Kind == KLord) sb.Append("The village stays bound to its castle: its rent and its people stay with the castle lord - you get its tax.\n");
                     if (o.Kind == KCastle)
                     {
                         float a, lim;
                         if (LandBk.DemesneAfter(Hero.MainHero, o.St, out a, out lim)) sb.Append("Your demesne after the purchase: ").Append(a.ToString("0.#", Inv)).Append(" of ").Append(lim.ToString("0.#", Inv)).Append(a > lim ? " - over your limit." : ".").Append('\n');
-                        sb.Append("Its garrison of ").Append(o.Garrison).Append(" men stays and is now yours to pay. If you leave the realm in peace, the castle goes back to the king.\n");
+                        sb.Append("Its garrison of ").Append(o.Garrison).Append(" men stays and is now yours to pay - the price counts only the ").Append((s.LandCastleGuardShare * o.GuardMen).ToString("0", Inv))
+                          .Append(" men the realm asks a castle to keep; more is your choice. If you leave the realm in peace, the castle goes back to the king.\n");
                     }
                 }
                 bool can = o.SellBack || (me != null && me.Gold >= o.Price);
@@ -226,6 +238,7 @@ namespace Armoury
                 string uid = SideVillageVisit.MenuUid;
                 if (uid == null || SideVillageFief.IsMine(uid)) return false;
                 var o = Cached(_mSide, uid, () => BuildSide(uid));
+                if (o.Hide) return false;   // recenzja m113: powod, ktorego gracz nie zmieni - bez martwej opcji
                 MBTextManager.SetTextVariable("ARM_LAND_BUY", "Offer to buy this village from " + NameOf(o.Head));
                 if (!o.Ok) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + o.Why); }
                 else a.Tooltip = new TextObject("{=!}" + o.Name + " earns about " + o.NetDay.ToString("N0", Inv) + " a day; " + NameOf(o.Head) + " would sell it for " + o.Price.ToString("N0", Inv) + ".");
@@ -250,7 +263,7 @@ namespace Armoury
                 var st = Settlement.CurrentSettlement;
                 if (st == null || !st.IsVillage) return false;
                 var o = Cached(_mLord, st.StringId, () => BuildLord(st.StringId));
-                if (o.Why == "Its lordship is yours already.") return false;
+                if (o.Hide) return false;   // recenzja m113: ustawienia, bez tytulu, bez BK, juz gracza - opcja ukryta (nie wyszarzona w kazdej wsi)
                 MBTextManager.SetTextVariable("ARM_LAND_LORD", "Offer to buy the lordship of " + Txt(st.Name));
                 if (!o.Ok) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + o.Why); }
                 else a.Tooltip = new TextObject("{=!}Its tax brings about " + o.NetDay.ToString("N0", Inv) + " a day; " + NameOf(o.Head) + " would sell the title for " + o.Price.ToString("N0", Inv) + ". The village stays bound to its castle.");
@@ -287,6 +300,43 @@ namespace Armoury
         {
             try { _mBack.Hour = -1; string uid = SideVillageFief.MenuUid; var o = uid != null ? BuildSellBack(uid) : null; if (o != null && o.Ok) { _dWindows++; ShowDeal(o); } }
             catch (Exception e) { Stumble("BackCons", e); }
+        }
+
+        // ------------------------------------------------------------ recenzja m113: menu po umowie
+        private static string CurMenuId()
+        {
+            try { var c = Campaign.Current != null ? Campaign.Current.CurrentMenuContext : null; return c != null && c.GameMenu != null ? c.GameMenu.StringId : null; }
+            catch { return null; }
+        }
+
+        /// <summary>Po udanej umowie: wyceny menu od nowa (stara oferta z ceny sprzed umowy nie wisi do konca godziny).</summary>
+        private static void DealDone() { _mSide.Hour = _mLord.Hour = _mBack.Hour = -1; _mSide.O = _mLord.O = _mBack.O = null; }
+
+        /// <summary>Kupno wioski z menu tej wioski (obcej) - menu przechodzi na menu wioski gracza tej wioski. Nie rzuca.</summary>
+        private static void AfterDealMenu(Offer o)
+        {
+            try
+            {
+                if (o == null || o.Kind != KSide) return;
+                if (CurMenuId() == SideVillageVisit.Menu && string.Equals(SideVillageVisit.MenuUid, o.Id, StringComparison.Ordinal) && SideVillageFief.SetCurrent(o.Id))
+                {
+                    GameMenu.SwitchToMenu(SideVillageFief.Menu);
+                    Log.Info(P + "menu po kupnie - " + o.Name + " (" + o.Id + "): menu wioski gracza.");
+                }
+            }
+            catch (Exception e) { Stumble("AfterDealMenu", e); }
+        }
+
+        /// <summary>Odkup z menu wioski gracza - wyjscie z niego (inaczej menu pokazaloby inna wioske gracza). Nie rzuca.</summary>
+        private static void AfterSellBackMenu(Offer o)
+        {
+            try
+            {
+                if (CurMenuId() != SideVillageFief.Menu) return;
+                SideVillageFief.LeaveMenu();
+                Log.Info(P + "menu po odkupie - " + (o != null ? o.Name : "?") + ": wyjscie z menu wioski gracza.");
+            }
+            catch (Exception e) { Stumble("AfterSellBackMenu", e); }
         }
 
         // ============================================================ autotest
@@ -341,7 +391,7 @@ namespace Armoury
                 add("T2 oferty wiosek (80 jedn.)", okN > 0, "policzone " + built + ", na sprzedaz " + okN + (firstWhy != null ? ", pierwszy powod: " + firstWhy : "") + ", zloto gracza " + me.Gold);
                 if (best != null)
                 {
-                    long w0 = WorldGold(), hg0 = best.Head.Gold, pg0 = me.Gold;
+                    long w0 = WorldGold(), hg0 = best.Head.Gold, pg0 = me.Gold, adv0 = DebtLadder.AdvNothingNow;
                     long owed0 = DebtLadder.OwedOf(best.Seller);
                     long once0, real0; ClanIncomeBook.OnceToday(best.Seller, out once0, out real0);
                     int n0 = SideVillageFief.OwnedCount;
@@ -349,7 +399,8 @@ namespace Armoury
                     long once1, real1; ClanIncomeBook.OnceToday(best.Seller, out once1, out real1);
                     long cred = owed0 - DebtLadder.OwedOf(best.Seller);
                     add("T3 kupno wioski", SideVillageFief.IsMine(best.Id) && SideVillageFief.OwnedCount == n0 + 1, best.Name + " za " + best.Price + ", wiosek " + n0 + " -> " + SideVillageFief.OwnedCount);
-                    add("T4 pieniadz swiata bez zmian", WorldGold() == w0, w0 + " -> " + WorldGold());
+                    long advN = DebtLadder.AdvNothingNow - adv0;   // recenzja m113: splata zaliczki gry w nicosc (OBIEG-1) z ceny - jedyna dozwolona roznica
+                    add("T4 pieniadz swiata bez zmian (poza zaliczka gry w nicosc)", WorldGold() - w0 == -advN, w0 + " -> " + WorldGold() + ", zaliczka w nicosc " + advN);
                     add("T5 kiesa sprzedawcy = cena - wierzyciele", best.Head.Gold - hg0 == best.Price - cred && pg0 - me.Gold == best.Price, "glowa +" + (best.Head.Gold - hg0) + ", wierzycielom " + cred + ", gracz -" + (pg0 - me.Gold));
                     add("T6 jednorazowe sprzedawcy bez ceny", real1 == real0 && once1 == once0, "jednorazowe " + once0 + " -> " + once1 + ", od platnikow " + real0 + " -> " + real1);
                     // T7 wymuszony blad przeniesienia - zwrot co do grosza
@@ -369,10 +420,9 @@ namespace Armoury
                     }
                     else add("T7 blad przeniesienia - zwrot", false, "brak drugiej oferty na kieszen gracza");
                     _forceFail = false;
-                    // T8 zapis tam i z powrotem (arm_side_fief2, arm_land113, arm_landval)
+                    // T8 zapis tam i z powrotem (arm_side_fief2, arm_land113, arm_landval) - recenzja m113: odczyt na boku, stan zywy (pierscienie sesji, wioski) nietkniety
                     string e2 = SideVillageFief.Export2(), el = Export(), ev = LandValue.Export();
-                    SideVillageFief.Import2(e2); Import(el); LandValue.Import(ev);
-                    string f2 = SideVillageFief.Export2(), fl = Export(), fv = LandValue.Export();
+                    string f2 = SideVillageFief.RoundTrip2(e2), fl = RoundTrip(el), fv = LandValue.RoundTrip(ev);
                     add("T8 zapis tam i z powrotem", e2 == f2 && el == fl && ev == fv, "sf2 " + e2.GetHashCode().ToString("x") + "/" + f2.GetHashCode().ToString("x") + ", ls1 " + el.GetHashCode().ToString("x") + "/" + fl.GetHashCode().ToString("x")
                         + ", lv1 " + ev.Length + " znakow " + (ev == fv ? "rowne" : "ROZNE"));
                     // T9 odkup bez blokady 182 dob

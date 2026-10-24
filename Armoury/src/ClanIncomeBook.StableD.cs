@@ -561,6 +561,8 @@ namespace Armoury
             // m113-zakup F6 (klucz SideVillageDuesInLordD): to, co pan placi graczowi za jego wioski poboczne z kiesy (srednia 28 dob sesji), pomniejsza jego ziemie i D
             double side113 = SideVillageFief.DrawnAvg28(c);
             if (side113 > 0) { side113 = Math.Min(side113, Math.Max(0, p.Land)); p.Land -= side113; }
+            // recenzja m113 (lustro F6, ten sam klucz): wyplaty wiosek pobocznych gracza to ziemia rodu GRACZA - ten dochod jest dokladnie w jednej ziemi (powinnosci korony, Bank)
+            if (c == Clan.PlayerClan && Settings.Current != null && Settings.Current.SideVillageDuesInLordD) { double pv = SideVillageFief.PaidAvg28Raw(); if (pv > 0) p.Land += pv; }
             p.Crown = pr.Avg(QCrown); p.Contract = pr.Avg(QContract); p.Assets = pr.Avg(QAssets);
             p.D = p.Land + p.Crown + p.Contract + p.Assets;
             p.Own = pr.Avg(QOwn); p.Once = pr.Avg(QOnce); p.Double = pr.Avg(QDouble); p.Other = pr.Avg(QOther); p.Family = pr.Avg(QFamily); p.Inflow = pr.Avg(QInflow);

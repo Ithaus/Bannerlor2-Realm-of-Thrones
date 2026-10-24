@@ -36,7 +36,8 @@ namespace Armoury
     ///     Lordship (B2): glowa rodu, ktora trzyma tytul de iure. Zamek (B3): glowa Town.OwnerClan, ktora trzyma de iure tytul BK zamku (przy BK).
     ///     Nigdy: rod gracza, wyeliminowany, bandyci, rody pomniejsze i w sluzbie najemnej, Straz i Wolni Ludzie (bez zoldu), rod panujacy (zamki). Rod w zajeciu (D3/D4) moze.
     ///  Z2 POTRZEBA (ClanBudget.NeedOf - G, R, D i seria dob ponad pulapem zoldu; nie wyklucza dluznikow ani zajetych): N1 dluznik 168, N2 dlug okupu, N3 G < R, N4 seria
-    ///     >= Budget Hysteresis Days. Wioska poboczna - ktorekolwiek; Lordship - N1, N2 albo G < 0.5 R; zamek - zaleglosc / zajecie / wyprzedaz albo N1 z dlugiem >= 91 D.
+    ///     >= Budget Hysteresis Days. Wioska poboczna - N1, N2, G < 0.5 R albo N4 (recenzja: samo G < R - rezerwa wojny - nie wystarcza); Lordship - N1, N2 albo
+    ///     G < 0.5 R; zamek - zajecie / wyprzedaz albo N1 z dlugiem >= 91 D przy D > 0 (recenzja: sama zaleglosc jednej raty i D = 0 to nie gleboki dlug).
     ///     Przerwa: jedna sprzedaz rodu na 28 dob, jeden zamek na 364 doby (arm_land113).
     ///  Z3 BRAMKI: gracz glowa rodu; bez wojny z krolestwem sprzedawcy; sprzedawca nie w bitwie i nie w niewoli; relacja >= -10 / 0 / 10. Wioska: stoi albo uszkodzona
     ///     (VillageBook), wies gry nie rabowana, nie gracza, gracz nie jest panem ani posiadaczem podatku okregu (przysiolki tak). Lordship: gracz wasalem (nie najemnikiem)
@@ -46,18 +47,25 @@ namespace Armoury
     ///  Z4 CENA = round100(NetDay x dni roku (364 przy kalendarzu Jeffa) x lata x premia x (1 - upust)). Lata 14, w wojnie krolestwa osady z wielkim krolestwem x0.85;
     ///     lata x (1 - upust) >= 10. Premia: wioska 1, Lordship 1, zamek 1.5, zamek-siedziba (HomeSettlement albo siedziba z ksiegi rodow kanonu) 2.0.
     ///     Upust = 0.15 x clamp((q - 0.5) / 1.5, 0, 1), q = dlug / max(1, G + 91 D).
-    ///     NetDay: wioska - SideVillageFief.DueFor (wartosc dnia x H x stawka pana) x poprawka pory roku (clamp(YearMean VT okregu / sr. 28 dob VT, 0.5, 2) od 91 dob ksiegi,
-    ///     inaczej 1); Lordship - YearMean VT wsi gry; zamek - YearMean renty zamku (zawor + cla) + renty wsi zamku + VT wsi, ktorych Lordship trzyma sprzedawca, minus
-    ///     straz (0.5 x norma zalogi zamku krolestwa x sredni zold czlowieka zalogi; zapas - zold rekruta tier 2 kultury). Renta korony NIE wchodzi (to nie dochod ziemi).
+    ///     NetDay: wioska - SideVillageFief.DueFor (wartosc dnia x H x stawka pana) x poprawka pory roku (LandValue.SeasonFix: YearMean VT okregu / pelne 28 dob sesji
+    ///     albo biezaca pora z zapisu, clamp 0.5-2, inaczej 1); Lordship - YearMean VT wsi gry; zamek - YearMean renty zamku (zawor + cla) + renty wsi zamku + VT wsi,
+    ///     ktorych Lordship trzyma sprzedawca, minus straz (0.5 x norma zalogi zamku krolestwa x sredni zold czlowieka zalogi; zapas - zold rekruta tier 2 kultury).
+    ///     Renta korony NIE wchodzi (to nie dochod ziemi). Recenzja: Lordship i zamek - co najmniej 28 dob pomiaru (kazda liczona wies tez); minus udzialy wiosek
+    ///     pobocznych GRACZA w tych okregach, ktore placi sprzedawca (po kupnie przestaja plynac - to czesc kupowanego podatku); minus powinnosci korony od ziemi
+    ///     (KingdomTreasury.DuesRateOf), gdy sprzedawca nie jest rodem panujacym.
     ///  Z5 PIENIADZE: cala cena w kiesie gracza. Umowa w kolejce - wykonanie w nastepnym TickEvent bez rozmowy; wszystko (z cena) sprawdzane od nowa, roznica - umowa
-    ///     przepada z komunikatem. (a) InPay, GiveGoldAction gracz -> glowa sprzedawcy; (b) przeniesienie (Z6) i sprawdzenie; (c) nieudane - zwrot glowa -> gracz (pod
-    ///     InPay), "transakcja cofnieta"; (d) DebtLadder.LandProceeds - wierzyciele biora swoje z ceny; (e) InPay = false (finally). Ksiega rodow: cena NIE jest
+    ///     przepada z komunikatem. (a) GiveGoldAction gracz -> glowa sprzedawcy (InPay tylko wokol tego przelewu); zaplacone = kiesa gracza mniejsza dokladnie o cene;
+    ///     (b) przeniesienie (Z6) - o powodzeniu decyduje STAN po nim (Moved: wioska gracza / de iure gracza / zamek gracza), nie wyjatek ani wynik wywolania;
+    ///     (c) nie przeszlo - zwrot glowa -> gracz (pod InPay, najwyzej tyle, ile glowa ma - bez zlota z niczego), "transakcja cofnieta"; (d) DebtLadder.LandProceeds -
+    ///     wierzyciele biora swoje z ceny (tylko przy wlaczonej drabinie i rodzie w niej). Ksiega rodow: cena NIE jest
     ///     wplywem (ClanIncomeBook TodayLand - poza jednorazowymi, D169 i D stalym; klucz LandPriceNotWindfall) - Bank i KW nie rosna od sprzedazy ziemi.
     ///  Z6 PRZENIESIENIE: wioska - SideVillageFief.AddOwned (pierwsza albo dodatkowa); Lordship - TitleManager.InheritTitle(sprzedawca, gracz, tytul) i sprawdzenie de iure
     ///     (nigdy GrantTitle); zamek - ChangeOwnerOfSettlementAction.ApplyByBarter (BK AddBarter przenosi Barony i Lordship wsi sprzedawcy; zapas InheritTitle),
     ///     ConsiderAndUpdateHomeSettlement obu rodow, liczba zalogi, siedziby i ostrzezenie Kroniki "own:".
-    ///  Z7 ODKUP (LandSalesSellBack): wioska gracza po 182 dobach do posiadacza podatku okregu, ta sama cena Z4 z upustem wedlug dlugow GRACZA; H placi, gdy TourneyPay.ClanSpare
-    ///     >= cena i nie jest dluznikiem; pierwsza wioska tylko z pusta skrzynia domu.
+    ///  Z7 ODKUP (LandSalesSellBack): wioska gracza po 182 dobach do posiadacza podatku okregu (platnik PayerOf - ta sama regula co sprzedawca; placi glowa jego rodu),
+    ///     ta sama cena Z4 z upustem wedlug dlugow GRACZA; rod placi, gdy TourneyPay.ClanSpare >= cena i nie jest dluznikiem; pierwsza wioska tylko z pusta skrzynia domu.
+    ///  Recenzja: sprzedawca wioski pobocznej = rod platnika (SideVillageFief.PayerOf - klucz SideVillagePayerIsTaxHolder przelacza sprzedawce i platnika razem);
+    ///     platnik rycerz BK (nie glowa rodu) - sprzedaje glowa jego rodu, podatek dalej bierze rycerz.
     ///  Z8 AI NIE KUPUJE ZIEMI w tej paczce: (1) AI nie ma jeszcze pojecia majatku poza lennami - wioska poboczna AI nie istnieje w modelu gry (nikt by jej nie widzial
     ///     ani nie liczyl), (2) budzet 166 nie ma pozycji "kapital na ziemie" - zakupy zjadalyby rezerwe wojny i pulap zoldu, (3) handel lennami miedzy AI zmienia mape
     ///     wplywow i BK (demesne, rycerze) bez kontroli gracza - to osobny projekt z testem dlugim.
@@ -132,7 +140,45 @@ namespace Armoury
             public object Title;             // tytul BK (Lordship)
             // odkup
             public bool SellBack;
+            // recenzja m113
+            public Hero Payer;               // wioska poboczna: posiadacz podatku okregu (platnik udzialu; rycerz BK - glowa rodu sprzedaje)
+            public double OwnDues, DuesRate; // udzialy wiosek pobocznych gracza placone przez sprzedawce (dziennie) i stawka powinnosci korony od ziemi
+            public string FixNote = "-";     // poprawka pory roku (log)
+            public bool Hide;                // menu: powod, ktorego gracz nie zmieni (ustawienia, brak tytulu, BK, juz gracza) - opcja ukryta
             public string Sig { get { return Kind + ":" + Id + ":" + Price; } }
+        }
+
+        internal static string He(Hero h) { return h != null && h.IsFemale ? "she" : "he"; }
+        internal static string His(Hero h) { return h != null && h.IsFemale ? "her" : "his"; }
+        internal static string Him(Hero h) { return h != null && h.IsFemale ? "herself" : "himself"; }
+
+        /// <summary>Recenzja m113: udzialy dnia wiosek pobocznych GRACZA w okregu v, ktore dzis placi payer (po przejsciu podatku okregu do gracza przestaja plynac - F3).
+        /// Nie rzuca.</summary>
+        private static double OwnDuesIn(Village v, Hero payer)
+        {
+            double own = 0;
+            try
+            {
+                if (v == null || v.Settlement == null || payer == null || SideVillageFief.PayerOf(v) != payer) return 0;
+                foreach (var w in SideVillageFief.Owned())
+                    if (w != null && string.Equals(w.Dist, v.Settlement.StringId, StringComparison.Ordinal)) { string y; own += Math.Max(0, SideVillageFief.DueFor(v, w.Uid, out y)); }
+            }
+            catch (Exception e) { Stumble("OwnDuesIn", e); }
+            return own;
+        }
+
+        /// <summary>Recenzja m113: powinnosci korony od ziemi (Lordship, zamek) - NetDay netto; rod panujacy nie placi. Nie rzuca.</summary>
+        private static void CrownDues(Offer o, Clan seller)
+        {
+            o.DuesRate = 0;
+            try
+            {
+                var k = seller != null ? seller.Kingdom : null;
+                if (k == null || k.RulingClan == seller || seller.IsUnderMercenaryService) return;
+                o.DuesRate = Math.Max(0, Math.Min(0.5, KingdomTreasury.DuesRateOf(k)));
+                o.NetDay *= 1 - o.DuesRate;
+            }
+            catch (Exception e) { o.DuesRate = 0; Stumble("CrownDues", e); }
         }
 
         // ------------------------------------------------------------ wioski ukladu wedlug okregu (raz na liste ksiegi)
@@ -184,26 +230,32 @@ namespace Armoury
             ClanBudget.NeedOf(c, out G, out R, out D, out streak);
             o.G = G; o.R = R; o.D = D; o.Streak = streak;
             o.Owed = DebtLadder.OwedOf(c);
-            bool n1 = DebtLadder.IsDebtor(c), n2 = DebtLadder.RansomDebtOf(c) > 0, n3 = G < R, n4 = streak >= Math.Max(1, s.BudgetHysteresisDays);
+            bool n1 = DebtLadder.IsDebtor(c), n2 = DebtLadder.RansomDebtOf(c) > 0, n3 = G < R, n3h = G < 0.5 * R, n4 = streak >= Math.Max(1, s.BudgetHysteresisDays);
             var en = new List<string>(); var pl = new List<string>();
             if (n1) { en.Add("my house owes " + o.Owed.ToString("N0", Inv) + " to the Iron Bank and others, and the creditors will not wait"); pl.Add("N1 dluznik (" + o.Owed + ")"); }
             if (n2) { en.Add("we still owe ransoms"); pl.Add("N2 okup"); }
             if (n3) { en.Add("our chest holds less than a house must keep for war"); pl.Add("N3 G " + G.ToString("0", Inv) + " < R " + R.ToString("0", Inv)); }
             if (n4) { en.Add("we pay more men than our income bears"); pl.Add("N4 seria " + streak); }
-            bool need;
-            if (kind == KSide) need = n1 || n2 || n3 || n4;
-            else if (kind == KLord) need = n1 || n2 || G < 0.5 * R;
-            else
-            {
-                string stage = DebtLadder.StageOf(c);
-                need = stage == "zaleglosc" || stage == "zajecie" || stage == "wyprzedaz" || (n1 && o.Owed >= Math.Max(1, s.LandDeepDebtDays) * Math.Max(0, D));
-                pl.Add("szczebel " + stage);
-            }
+            string stage = kind == KCastle ? DebtLadder.StageOf(c) : null;
+            bool deep = DeepDebt(o.Owed, D);
+            bool need = NeedKind(kind, n1, n2, n3h, n4, stage, deep);
+            if (kind == KCastle) pl.Add("szczebel " + stage + ", gleboki dlug " + (deep ? "tak" : "nie") + " (" + o.Owed + " >= " + Math.Max(1, s.LandDeepDebtDays) + " x D " + D.ToString("0.#", Inv) + ")");
             if (!need && _forceNeed) { need = true; pl.Add("POTRZEBA WYMUSZONA (autotest)"); }
             o.Need = need;
             o.NeedEn = en.Count > 0 ? Cap(string.Join("; ", en.ToArray())) + "." : "";
             o.NeedPl = pl.Count > 0 ? string.Join(", ", pl.ToArray()) : "bez potrzeby";
             return need;
+        }
+
+        /// <summary>Recenzja m113: gleboki dlug (zamek) - dochod znany (D > 0) i dlug co najmniej LandDeepDebtDays dob dochodu.</summary>
+        private static bool DeepDebt(long owed, double D) { var s = Settings.Current; return D > 0 && owed >= Math.Max(1, s != null ? s.LandDeepDebtDays : 91) * D; }
+
+        /// <summary>Z2: potrzeba wedlug rodzaju (recenzja: wioska - N1, N2, G < 0.5 R albo N4; Lordship - N1, N2, G < 0.5 R; zamek - zajecie, wyprzedaz albo N1 z glebokim dlugiem).</summary>
+        private static bool NeedKind(int kind, bool n1, bool n2, bool n3h, bool n4, string stage, bool deep)
+        {
+            if (kind == KSide) return n1 || n2 || n3h || n4;
+            if (kind == KLord) return n1 || n2 || n3h;
+            return stage == "zajecie" || stage == "wyprzedaz" || (n1 && deep);
         }
 
         private static string Cap(string s) { return string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s.Substring(1); }
@@ -226,7 +278,7 @@ namespace Armoury
             if (me == null || pc == null || pc.Leader != me) return "Only the head of your house can buy land.";
             if (head == null || !head.IsAlive) return "There is no one to sell it.";
             if (head.MapFaction != null && pc.MapFaction != null && FactionManager.IsAtWarAgainstFaction(head.MapFaction, pc.MapFaction)) return "You are at war with " + NameOf(head) + "'s realm.";
-            if (head.IsPrisoner) return NameOf(head) + " is a prisoner - he cannot sell land now.";
+            if (head.IsPrisoner) return NameOf(head) + " is a prisoner - " + He(head) + " cannot sell land now.";
             var mp = head.PartyBelongedTo;
             if (mp != null && mp.MapEvent != null) return NameOf(head) + " is in battle.";
             int rel = (int)head.GetRelationWithPlayer();
@@ -261,7 +313,9 @@ namespace Armoury
             int dpy = IronBank.DaysPerYearNow();
             double raw = o.NetDay * dpy * ye * o.Premium * (1 - o.Disc);
             o.Price = Round100(raw);
-            o.Pl = "NetDay " + o.NetDay.ToString("0.####", Inv) + " x " + dpy + " x lata " + ye.ToString("0.####", Inv) + (o.WarF < 1 ? " (wojna x" + o.WarF.ToString("0.##", Inv) + ")" : "")
+            o.Pl = "NetDay " + o.NetDay.ToString("0.####", Inv) + (o.OwnDues > 0 ? " (po udzialach wiosek gracza " + o.OwnDues.ToString("0.##", Inv) + ")" : "")
+                   + (o.DuesRate > 0 ? " (po powinnosciach korony " + (100 * o.DuesRate).ToString("0.#", Inv) + "%)" : "")
+                   + " x " + dpy + " x lata " + ye.ToString("0.####", Inv) + (o.WarF < 1 ? " (wojna x" + o.WarF.ToString("0.##", Inv) + ")" : "")
                    + " x premia " + o.Premium.ToString("0.##", Inv) + " x (1 - upust " + o.Disc.ToString("0.####", Inv) + ", q " + o.Q.ToString("0.###", Inv) + ") = " + raw.ToString("0.##", Inv)
                    + " -> round100 " + o.Price;
         }
@@ -278,38 +332,36 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (!On || !s.LandSalesSideVillages) { o.Why = "Side villages are not for sale (mod settings)."; return o; }
+                if (!On || !s.LandSalesSideVillages) { o.Why = "Side villages are not for sale (mod settings)."; o.Hide = true; return o; }
                 var rec = SideVillageVisit.Rec(uid);
                 var st = rec != null ? Settlement.Find(rec.VillageId) : null;
                 var v = st != null ? st.Village : null;
-                if (v == null) { o.Why = "This village is not known."; return o; }
+                if (v == null) { o.Why = "This village is not known."; o.Hide = true; return o; }
                 o.St = st; o.DistId = st.StringId; o.Name = string.IsNullOrEmpty(rec.Name) ? uid : rec.Name;
                 var lord = v.Bound != null ? v.Bound.OwnerClan : null;
-                Hero h = LandBk.ActualOwner(v) ?? (lord != null ? lord.Leader : null);
-                o.Head = h; o.Seller = h != null ? h.Clan : null;
-                if (SideVillageFief.IsMine(uid)) { o.Why = "This village is yours already."; return o; }
-                if (lord == Clan.PlayerClan || (h != null && (h == Hero.MainHero || h.Clan == Clan.PlayerClan))) { o.Why = "Its tax is yours already."; return o; }
-                if (h == null || !h.IsAlive || h.Clan == null || h.Clan.Leader != h) { o.Why = "Its tax goes to " + NameOf(h) + ", who cannot sell for his house."; return o; }
+                // recenzja m113: sprzedawca = rod platnika udzialu (PayerOf) - jedna regula dla sprzedazy i dla tego, kto potem placi
+                Hero h = SideVillageFief.PayerOf(v);
+                o.Payer = h;
+                if (SideVillageFief.IsMine(uid)) { o.Why = "This village is yours already."; o.Hide = true; return o; }
+                bool keyOn = s.SideVillagePayerIsTaxHolder;
+                if ((h != null && (h == Hero.MainHero || h.Clan == Clan.PlayerClan)) || ((!keyOn || h == null) && lord == Clan.PlayerClan)) { o.Why = "Its tax is yours already."; o.Hide = true; return o; }
+                if (h == null || !h.IsAlive || h.Clan == null) { o.Why = "No lord takes its tax - there is no one to sell it."; return o; }
+                Hero head = h.Clan.Leader;   // rycerz BK - sprzedaje glowa jego rodu (pieniadze, potrzeba i wierzyciele rodu), podatek dalej bierze rycerz
+                o.Head = head; o.Seller = h.Clan;
+                if (head == null || !head.IsAlive) { o.Why = "Its tax goes to " + NameOf(h) + ", whose house has no head to sell it."; return o; }
                 if (NeverSeller(h.Clan, false)) { o.Why = HouseOf(h.Clan) + " does not sell land."; return o; }
-                string g = CommonGate(h, s.LandRelationSideVillage);
+                string g = CommonGate(head, s.LandRelationSideVillage);
                 if (g != null) { o.Why = g; return o; }
                 if (v.VillageState == Village.VillageStates.BeingRaided || v.VillageState == Village.VillageStates.Looted) { o.Why = Txt(st.Name) + " lies raided - nobody sells land now."; return o; }
                 int state = PartState(v, uid);
                 if (state != VillageBook.SStanding && state != VillageBook.SDamaged) { o.Why = state < 0 ? "This village is not known to the books yet." : "This village lies burned or empty."; return o; }
                 string why;
                 double due = SideVillageFief.DueFor(v, uid, out why);
-                o.SeasonFix = 1;
-                int sd = LandValue.SlotDays(st);
-                if (sd >= LandValue.DaysInSeason())
-                {
-                    int d1, d2;
-                    double ym = LandValue.YearMean(st, LandValue.VT, out d1), a28 = LandValue.Avg28(st, LandValue.VT, out d2);
-                    if (ym > 0 && a28 > 0) o.SeasonFix = Math.Max(0.5, Math.Min(2.0, ym / a28));
-                }
-                o.Days = Math.Max(1, sd);
+                o.SeasonFix = LandValue.SeasonFix(st, out o.FixNote);
+                o.Days = Math.Max(1, LandValue.SlotDays(st));
                 o.NetDay = due * o.SeasonFix;
                 if (!(o.NetDay > 0)) { o.Why = "It earns its lord nothing today - no price can be set."; return o; }
-                if (!NeedFor(h.Clan, KSide, o)) { o.Why = "My lands are not for sale. A house sells land only when it must."; return o; }
+                if (!NeedFor(h.Clan, KSide, o)) { o.Why = HouseOf(h.Clan) + " is not in need - a house sells land only when it must."; return o; }
                 string cw = CooldownWhy(h.Clan, KSide); if (cw != null) { o.Why = cw; return o; }
                 o.Premium = 1;
                 Price(o, h.Clan, st.MapFaction);
@@ -349,27 +401,33 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (!On || !s.LandSalesLordships) { o.Why = "Lordships are not for sale (mod settings)."; return o; }
+                if (!On || !s.LandSalesLordships) { o.Why = "Lordships are not for sale (mod settings)."; o.Hide = true; return o; }
                 var st = Settlement.Find(stId);
                 var v = st != null ? st.Village : null;
-                if (v == null) { o.Why = "This village is not known."; return o; }
+                if (v == null) { o.Why = "This village is not known."; o.Hide = true; return o; }
                 o.St = st; o.DistId = st.StringId; o.Name = Txt(st.Name);
-                if (!LandBk.Ready) { o.Why = "Lordship titles need Banner Kings."; return o; }
+                if (!LandBk.Ready) { o.Why = "It holds no title that could pass by sale."; o.Hide = true; return o; }
                 var t = LandBk.Title(st);
                 var dj = LandBk.DeJure(t);
                 o.Title = t; o.Head = dj; o.Seller = dj != null ? dj.Clan : null;
-                if (t == null) { o.Why = "This village has no lordship title."; return o; }
-                if (dj == Hero.MainHero || (dj != null && dj.Clan == Clan.PlayerClan)) { o.Why = "Its lordship is yours already."; return o; }
-                if (dj == null || !dj.IsAlive || dj.Clan == null || dj.Clan.Leader != dj) { o.Why = "Its lordship is held by " + NameOf(dj) + ", who cannot sell for his house."; return o; }
+                if (t == null) { o.Why = "It holds no title that could pass by sale."; o.Hide = true; return o; }
+                if (dj == Hero.MainHero || (dj != null && dj.Clan == Clan.PlayerClan)) { o.Why = "Its lordship is yours already."; o.Hide = true; return o; }
+                if (dj == null || !dj.IsAlive || dj.Clan == null || dj.Clan.Leader != dj) { o.Why = "Its lordship is held by " + NameOf(dj) + ", who cannot sell for " + His(dj) + " house."; return o; }
                 if (NeverSeller(dj.Clan, false)) { o.Why = HouseOf(dj.Clan) + " does not sell land."; return o; }
                 string g = CommonGate(dj, s.LandRelationLordship) ?? VassalGate(dj.Clan, st.MapFaction);
                 if (g != null) { o.Why = g; return o; }
-                if (LandBk.DeJureCount(dj) < 2) { o.Why = NameOf(dj) + " holds no other title - he will not sell his last one."; return o; }
+                if (LandBk.DeJureCount(dj) < 2) { o.Why = NameOf(dj) + " holds no other title - " + He(dj) + " will not sell " + His(dj) + " last one."; return o; }
                 if (v.VillageState != Village.VillageStates.Normal) { o.Why = o.Name + " lies raided - nobody sells land now."; return o; }
                 int d;
                 o.NetDay = LandValue.YearMean(st, LandValue.VT, out d); o.Days = d;
+                if (d < 28) { o.Why = "Its tax has been watched only " + d + (d == 1 ? " day" : " days") + " - no fair price yet (ask again later)."; return o; }
                 if (!(o.NetDay > 0)) { o.Why = "Its tax is not known yet - no price can be set."; return o; }
-                if (!NeedFor(dj.Clan, KLord, o)) { o.Why = "My lands are not for sale. A house sells land only when it must."; return o; }
+                // recenzja m113: udzialy wiosek pobocznych gracza w tym okregu placi dzis sprzedawca z tego podatku - po kupnie przestaja plynac (F3), cena liczy tylko reszte
+                o.OwnDues = OwnDuesIn(v, dj);
+                o.NetDay = Math.Max(0, o.NetDay - o.OwnDues);
+                CrownDues(o, dj.Clan);
+                if (!(o.NetDay > 0)) { o.Why = "Its tax would bring you nothing beyond what your own villages there already pay you."; return o; }
+                if (!NeedFor(dj.Clan, KLord, o)) { o.Why = HouseOf(dj.Clan) + " is not in need - a house sells land only when it must."; return o; }
                 string cw = CooldownWhy(dj.Clan, KLord); if (cw != null) { o.Why = cw; return o; }
                 o.Premium = 1;
                 Price(o, dj.Clan, st.MapFaction);
@@ -398,6 +456,8 @@ namespace Armoury
                 if (h == null || !h.IsAlive) { o.Why = "There is no one to sell it."; return o; }
                 if (NeverSeller(c, true)) { o.Why = c != null && c.Kingdom != null && c.Kingdom.RulingClan == c ? "The crown does not sell its castles." : HouseOf(c) + " does not sell land."; return o; }
                 if (Array.IndexOf(Twins, st.StringId) >= 0) { o.Why = "This castle is not for sale."; return o; }
+                // recenzja m113: twierdza trzymana tymczasowo (glosowanie krolestwa o panu po zdobyciu / wygasnieciu rodu) - zmiana pana skasowalaby decyzje krolestwa
+                if (st.Town.IsOwnerUnassigned) { o.Why = "The realm has not yet decided who holds this castle - it cannot be sold."; return o; }
                 string g = CommonGate(h, s.LandRelationCastle) ?? VassalGate(c, st.MapFaction);
                 if (g != null) { o.Why = g; return o; }
                 int others = 0;
@@ -408,23 +468,26 @@ namespace Armoury
                 if (LandBk.Ready)
                 {
                     var t = LandBk.Title(st);
-                    if (t == null) { o.Why = "This castle has no Banner Kings title - it cannot change hands by sale."; return o; }
+                    if (t == null) { o.Why = "It holds no title that could pass by sale."; return o; }
                     if (LandBk.DeJure(t) != h) { o.Why = "Its title is held by " + NameOf(LandBk.DeJure(t)) + " - its lord cannot sell it."; return o; }
                     foreach (var bv in st.BoundVillages)
-                        if (bv != null && bv.Settlement != null && LandBk.Title(bv.Settlement) == null) { o.Why = Txt(bv.Settlement.Name) + " has no Banner Kings title - the castle cannot change hands by sale."; return o; }
+                        if (bv != null && bv.Settlement != null && LandBk.Title(bv.Settlement) == null) { o.Why = Txt(bv.Settlement.Name) + " holds no title that could pass by sale - the castle cannot change hands."; return o; }
                 }
-                // Z4 dochod netto zamku
+                // Z4 dochod netto zamku (recenzja m113: kazda liczona czesc z co najmniej 28 dob pomiaru)
                 int d;
                 o.CastleLr = LandValue.YearMean(st, LandValue.LR, out d); o.Days = d;
-                o.VilRent = 0; o.VilVt = 0; o.VilSeller = 0;
+                int dmin = d;
+                o.VilRent = 0; o.VilVt = 0; o.VilSeller = 0; o.OwnDues = 0;
                 foreach (var bv in st.BoundVillages)
                 {
                     if (bv == null || bv.Settlement == null) continue;
                     int dv;
-                    o.VilRent += LandValue.YearMean(bv.Settlement, LandValue.LR, out dv);
+                    o.VilRent += LandValue.YearMean(bv.Settlement, LandValue.LR, out dv); dmin = Math.Min(dmin, dv);
                     Hero vh = LandBk.Ready ? LandBk.DeJure(LandBk.Title(bv.Settlement)) : h;
-                    if (vh == h) { o.VilVt += LandValue.YearMean(bv.Settlement, LandValue.VT, out dv); o.VilSeller++; }
+                    if (vh == h) { o.VilVt += LandValue.YearMean(bv.Settlement, LandValue.VT, out dv); o.VilSeller++; dmin = Math.Min(dmin, dv); }
+                    o.OwnDues += OwnDuesIn(bv, h);   // udzialy wiosek gracza, ktore placi sprzedawca - po kupnie przestaja plynac
                 }
+                if (dmin < 28) { o.Why = "Its income has been watched only " + dmin + (dmin == 1 ? " day" : " days") + " - no fair price yet (ask again later)."; return o; }
                 var gp = st.Town.GarrisonParty;
                 o.Garrison = gp != null && gp.MemberRoster != null ? gp.MemberRoster.TotalManCount : 0;
                 double norm = CrownRents.CastleNormMen(st.MapFaction as Kingdom);
@@ -434,9 +497,10 @@ namespace Armoury
                 if (!(wage > 0)) wage = Tier2Wage(st.Culture);
                 o.GuardMen = norm; o.GuardWage = wage;
                 o.Guard = Math.Max(0f, Math.Min(1f, s.LandCastleGuardShare)) * norm * wage;
-                o.NetDay = o.CastleLr + o.VilRent + o.VilVt - o.Guard;
+                o.NetDay = o.CastleLr + o.VilRent + o.VilVt - o.Guard - o.OwnDues;
+                if (o.NetDay > 0) CrownDues(o, c);
                 if (!(o.NetDay > 0)) { o.Why = "It earns nothing above the cost of its guard - no price can be set."; return o; }
-                if (!NeedFor(c, KCastle, o)) { o.Why = "My lands are not for sale. A house sells a castle only when it must."; return o; }
+                if (!NeedFor(c, KCastle, o)) { o.Why = HouseOf(c) + " is not deep in debt - a house sells a castle only when it must."; return o; }
                 string cw = CooldownWhy(c, KCastle); if (cw != null) { o.Why = cw; return o; }
                 o.Seat = st == c.HomeSettlement || CanonSeat(c, st);
                 o.Premium = o.Seat ? Math.Max(1f, s.LandSeatPremium) : Math.Max(1f, s.LandCastlePremium);
@@ -482,9 +546,8 @@ namespace Armoury
                     foreach (var v in Village.All)
                     {
                         if (v == null || v.Settlement == null) continue;
-                        var lord = v.Bound != null ? v.Bound.OwnerClan : null;
-                        Hero ah = LandBk.ActualOwner(v) ?? (lord != null ? lord.Leader : null);
-                        if (ah != h) continue;
+                        Hero ah = SideVillageFief.PayerOf(v);   // recenzja m113: ta sama regula co BuildSide; rycerz rodu - sprzedaje glowa rodu
+                        if (ah == null || ah.Clan != c) continue;
                         var recs = RecsOf(v.Settlement.StringId);
                         if (recs == null) continue;
                         foreach (var r in recs) if (!SideVillageFief.IsMine(r.Uid)) l.Add(BuildSide(r.Uid));
@@ -557,27 +620,39 @@ namespace Armoury
             var head = o.Head; var seller = o.Seller;
             long w0 = WorldGold(), pg0 = me.Gold, hg0 = head.Gold;
             long owed0 = DebtLadder.OwedOf(seller);
-            long cred = 0; bool done = false; string tw = "";
+            long cred = 0; string tw = "";
+            // (a) recenzja m113: InPay tylko wokol przelewu ceny (sluchacze zdarzen innych modow przy przeniesieniu nie licza sie jako cena ziemi);
+            // zaplacone = kiesa gracza mniejsza dokladnie o cene (wyjatek sluchacza PO przelewie nie gubi zaplaty)
             InPay = true;
-            try
+            try { GiveGoldAction.ApplyBetweenCharacters(me, head, (int)o.Price, true); }
+            catch (Exception e) { Stumble("Execute(a)", e); }
+            finally { InPay = false; }
+            long paid = pg0 - me.Gold;
+            if (paid != o.Price)
             {
-                GiveGoldAction.ApplyBetweenCharacters(me, head, (int)o.Price, true);                 // (a)
-                bool ok = !_forceFail && Transfer(o, out tw);                                          // (b)
-                if (_forceFail) { tw = "wymuszony blad przeniesienia (autotest)"; _forceFail = false; }
-                if (!ok)                                                                               // (c)
-                {
-                    GiveGoldAction.ApplyBetweenCharacters(head, me, (int)o.Price, true);
-                    _dRefund++;
-                    Log.Info(P + "transakcja cofnieta - " + KindPl(o.Kind) + " " + o.Name + " (" + o.Id + "): " + tw + "; zwrot " + o.Price + " (gracz " + pg0 + " -> " + me.Gold + ", sprzedawca " + hg0 + " -> " + head.Gold + ").");
-                    Log.Player("The sale of " + o.Name + " could not be completed - your " + o.Price.ToString("N0", Inv) + " were given back.", true);
-                    return;
-                }
-                cred = DebtLadder.LandProceeds(seller, o.Price);                                       // (d)
-                done = true;
+                long back = paid > 0 ? Refund(head, me, paid, "Execute(zwrot a)") : 0;
+                _dRefund++;
+                Log.Info(P + "transakcja cofnieta przy platnosci - " + KindPl(o.Kind) + " " + o.Name + " (" + o.Id + "): zaplacono " + paid + " z " + o.Price + ", zwrot " + back
+                         + (paid > 0 && back < paid ? ", brak zwrotu " + (paid - back) : "") + " (gracz " + pg0 + " -> " + me.Gold + ", sprzedawca " + hg0 + " -> " + head.Gold + ").");
+                Log.Player("The sale of " + o.Name + " could not be completed.", true);
+                return;
             }
-            catch (Exception e) { Stumble("Execute", e); }
-            finally { InPay = false; }                                                                 // (e)
-            if (!done) return;
+            // (b) o powodzeniu decyduje stan po przeniesieniu (Transfer zwraca Moved)
+            bool moved;
+            if (_forceFail) { _forceFail = false; moved = false; tw = "wymuszony blad przeniesienia (autotest)"; }
+            else moved = Transfer(o, out tw);
+            if (!moved)                                                                                // (c)
+            {
+                long back = Refund(head, me, o.Price, "Execute(zwrot c)");
+                _dRefund++;
+                Log.Info(P + "transakcja cofnieta - " + KindPl(o.Kind) + " " + o.Name + " (" + o.Id + "): " + tw + "; zwrot " + back + " z " + o.Price + (back < o.Price ? ", brak zwrotu " + (o.Price - back) : "")
+                         + " (gracz " + pg0 + " -> " + me.Gold + ", sprzedawca " + hg0 + " -> " + head.Gold + ").");
+                Log.Player("The sale of " + o.Name + " could not be completed - " + (back >= o.Price ? "your " + o.Price.ToString("N0", Inv) + " were given back." : back.ToString("N0", Inv) + " of your " + o.Price.ToString("N0", Inv) + " were given back."), true);
+                return;
+            }
+            try { cred = DebtLadder.LandProceeds(seller, o.Price); }                                   // (d)
+            catch (Exception e) { Stumble("Execute(d)", e); }
+            DealDone();
             int t = Today();
             Cd cd; if (!_cd.TryGetValue(seller.StringId, out cd)) { cd = new Cd(); _cd[seller.StringId] = cd; }
             cd.LastSale = t; if (o.Kind == KCastle) cd.LastCastle = t;
@@ -586,14 +661,44 @@ namespace Armoury
             long w1 = WorldGold();
             long one, real; bool ib = ClanIncomeBook.OnceToday(seller, out one, out real);
             Log.Info(P + "KUPNO - " + KindPl(o.Kind) + " " + o.Name + " (" + o.Id + ", okreg " + o.DistId + ") od " + NameOf(head) + " (" + seller.StringId + ") za " + o.Price
-                     + " | " + o.Pl + " | dochod mierzony " + o.Days + " dob, poprawka pory roku " + o.SeasonFix.ToString("0.###", Inv) + " | potrzeba: " + o.NeedPl
+                     + " | " + o.Pl + " | dochod mierzony " + o.Days + " dob, poprawka pory roku " + (o.Kind == KSide ? o.FixNote : o.SeasonFix.ToString("0.###", Inv))
+                     + (o.Payer != null && o.Payer != head ? " | podatek bierze " + NameOf(o.Payer) + " (ten sam rod)" : "") + " | potrzeba: " + o.NeedPl
                      + " | gracz " + pg0 + " -> " + me.Gold + ", glowa sprzedawcy " + hg0 + " -> " + head.Gold + " (wierzycielom " + cred + ", dlug " + owed0 + " -> " + DebtLadder.OwedOf(seller) + ")"
                      + " | pieniadz swiata " + w0 + " -> " + w1 + " (roznica " + (w1 - w0) + ") | jednorazowe sprzedawcy dzis " + (ib ? one + " (od platnikow " + real + ")" : "brak ksiegi") + " - cena poza nimi" + (tw.Length > 0 ? " | " + tw : "") + ".");
-            string where = cred > 0 ? " His creditors took " + cred.ToString("N0", Inv) + " of it." : "";
+            string where = cred > 0 ? " " + Cap(His(head)) + " creditors took " + cred.ToString("N0", Inv) + " of it." : "";
             Log.Player("You bought " + o.Name + " from " + NameOf(head) + " for " + o.Price.ToString("N0", Inv) + "." + where);
+            AfterDealMenu(o);
         }
 
         private static long WorldGold() { try { return MoneyLedger.WorldNow(); } catch { return 0; } }
+
+        /// <summary>Recenzja m113: zwrot from -> to najwyzej tyle, ile from ma (Hero.Gold nie schodzi ponizej 0 - inaczej zwrot tworzylby zloto z niczego); pod InPay.
+        /// Zwraca, ile to dostal. Nie rzuca.</summary>
+        private static long Refund(Hero from, Hero to, long amount, string where)
+        {
+            if (from == null || to == null || amount <= 0) return 0;
+            long t0 = to.Gold;
+            int back = (int)Math.Max(0, Math.Min(amount, (long)from.Gold));
+            if (back <= 0) return 0;
+            InPay = true;
+            try { GiveGoldAction.ApplyBetweenCharacters(from, to, back, true); }
+            catch (Exception e) { Stumble(where, e); }
+            finally { InPay = false; }
+            return to.Gold - t0;
+        }
+
+        /// <summary>Recenzja m113: czy ziemia oferty jest juz gracza (stan po przeniesieniu - jedyna miara powodzenia). Nie rzuca.</summary>
+        private static bool Moved(Offer o)
+        {
+            try
+            {
+                if (o == null) return false;
+                if (o.Kind == KSide) return SideVillageFief.IsMine(o.Id);
+                if (o.Kind == KLord) return o.Title != null && LandBk.DeJure(o.Title) == Hero.MainHero;
+                return o.St != null && o.St.OwnerClan == Clan.PlayerClan;
+            }
+            catch { return false; }
+        }
 
         /// <summary>Z6: przeniesienie wlasnosci i sprawdzenie. false - nie powiodlo sie (why po polsku). Nie rzuca.</summary>
         private static bool Transfer(Offer o, out string why)
@@ -611,9 +716,9 @@ namespace Armoury
                 }
                 if (o.Kind == KLord)
                 {
-                    if (!LandBk.Inherit(o.Head, Hero.MainHero, o.Title)) { why = "InheritTitle nie przeszlo"; return false; }
-                    if (LandBk.DeJure(o.Title) != Hero.MainHero) { why = "tytul de iure nie jest gracza po InheritTitle"; return false; }
-                    why = "tytul de iure gracza, sprzedawcy zostaje tytulow " + LandBk.DeJureCount(o.Head);
+                    bool r = LandBk.Inherit(o.Head, Hero.MainHero, o.Title);   // wynik pominiety: BK moze rzucic PO zmianie de iure - decyduje stan
+                    if (LandBk.DeJure(o.Title) != Hero.MainHero) { why = "tytul de iure nie jest gracza po InheritTitle" + (r ? "" : " (wyjatek InheritTitle)"); return false; }
+                    why = "tytul de iure gracza" + (r ? "" : " (wyjatek InheritTitle PO przeniesieniu)") + ", sprzedawcy zostaje tytulow " + LandBk.DeJureCount(o.Head);
                     return true;
                 }
                 // zamek
@@ -621,37 +726,44 @@ namespace Armoury
                 var gp = st.Town.GarrisonParty;
                 int g0 = gp != null && gp.MemberRoster != null ? gp.MemberRoster.TotalManCount : -1;
                 string home0s = seller.HomeSettlement != null ? seller.HomeSettlement.StringId : "-", home0p = Clan.PlayerClan.HomeSettlement != null ? Clan.PlayerClan.HomeSettlement.StringId : "-";
-                ChangeOwnerOfSettlementAction.ApplyByBarter(Hero.MainHero, st);
-                if (st.OwnerClan != Clan.PlayerClan) { why = "ApplyByBarter - zamek nie jest gracza"; return false; }
-                int k = 0, m = 0, all = 0;
-                if (LandBk.Ready)
+                // recenzja m113: wyjatek sluchacza OnSettlementOwnerChanged (inne mody) leci PO ustawieniu pana - decyduje stan, reszta we wlasnym try
+                string bx = "";
+                try { ChangeOwnerOfSettlementAction.ApplyByBarter(Hero.MainHero, st); }
+                catch (Exception e) { Stumble("Transfer(ApplyByBarter)", e); bx = "wyjatek ApplyByBarter " + e.GetType().Name; }
+                if (st.OwnerClan != Clan.PlayerClan) { why = "ApplyByBarter - zamek nie jest gracza" + (bx.Length > 0 ? " (" + bx + ")" : ""); return false; }
+                try
                 {
-                    var ct = LandBk.Title(st);
-                    all++;
-                    if (LandBk.DeJure(ct) == Hero.MainHero) k++;
-                    else if (LandBk.DeJure(ct) == head && LandBk.Inherit(head, Hero.MainHero, ct)) m++;
-                    foreach (var bv in st.BoundVillages)
+                    int k = 0, m = 0, all = 0;
+                    if (LandBk.Ready)
                     {
-                        if (bv == null || bv.Settlement == null) continue;
-                        var t = LandBk.Title(bv.Settlement);
-                        var dj = LandBk.DeJure(t);
-                        if (dj == Hero.MainHero) { k++; all++; }
-                        else if (dj == head) { all++; if (LandBk.Inherit(head, Hero.MainHero, t)) m++; }
+                        var ct = LandBk.Title(st);
+                        all++;
+                        if (LandBk.DeJure(ct) == Hero.MainHero) k++;
+                        else if (LandBk.DeJure(ct) == head && LandBk.Inherit(head, Hero.MainHero, ct)) m++;
+                        foreach (var bv in st.BoundVillages)
+                        {
+                            if (bv == null || bv.Settlement == null) continue;
+                            var t = LandBk.Title(bv.Settlement);
+                            var dj = LandBk.DeJure(t);
+                            if (dj == Hero.MainHero) { k++; all++; }
+                            else if (dj == head) { all++; if (LandBk.Inherit(head, Hero.MainHero, t)) m++; }
+                        }
                     }
+                    try { seller.ConsiderAndUpdateHomeSettlement(); } catch (Exception e) { Stumble("Transfer(HomeSettlement sprzedawcy)", e); }
+                    try { Clan.PlayerClan.ConsiderAndUpdateHomeSettlement(); } catch (Exception e) { Stumble("Transfer(HomeSettlement gracza)", e); }
+                    gp = st.Town.GarrisonParty;
+                    int g1 = gp != null && gp.MemberRoster != null ? gp.MemberRoster.TotalManCount : -1;
+                    string home1s = seller.HomeSettlement != null ? seller.HomeSettlement.StringId : "-", home1p = Clan.PlayerClan.HomeSettlement != null ? Clan.PlayerClan.HomeSettlement.StringId : "-";
+                    string dem = LandBk.DemesneLine(Hero.MainHero);
+                    Log.Info(P + "zamek " + o.Name + " (" + st.StringId + ") gracza | tytuly BK: AddBarter " + k + ", zapas InheritTitle " + m + " (z " + all + ")"
+                             + " | zaloga " + g0 + " -> " + g1 + " | HomeSettlement sprzedawcy " + home0s + " -> " + home1s + ", gracza " + home0p + " -> " + home1p
+                             + " | demesne BK " + dem + (ChronicleOwnTarget(st.StringId) ? " | Kronika own: cel kanonu - pominie" : "") + ".");
+                    why = "zamek gracza, tytuly BK " + (k + m) + "/" + all + (bx.Length > 0 ? " (" + bx + " PO przeniesieniu)" : "");
                 }
-                try { seller.ConsiderAndUpdateHomeSettlement(); } catch (Exception e) { Stumble("Transfer(HomeSettlement sprzedawcy)", e); }
-                try { Clan.PlayerClan.ConsiderAndUpdateHomeSettlement(); } catch (Exception e) { Stumble("Transfer(HomeSettlement gracza)", e); }
-                gp = st.Town.GarrisonParty;
-                int g1 = gp != null && gp.MemberRoster != null ? gp.MemberRoster.TotalManCount : -1;
-                string home1s = seller.HomeSettlement != null ? seller.HomeSettlement.StringId : "-", home1p = Clan.PlayerClan.HomeSettlement != null ? Clan.PlayerClan.HomeSettlement.StringId : "-";
-                string dem = LandBk.DemesneLine(Hero.MainHero);
-                Log.Info(P + "zamek " + o.Name + " (" + st.StringId + ") gracza | tytuly BK: AddBarter " + k + ", zapas InheritTitle " + m + " (z " + all + ")"
-                         + " | zaloga " + g0 + " -> " + g1 + " | HomeSettlement sprzedawcy " + home0s + " -> " + home1s + ", gracza " + home0p + " -> " + home1p
-                         + " | demesne BK " + dem + (ChronicleOwnTarget(st.StringId) ? " | Kronika own: cel kanonu - pominie" : "") + ".");
-                why = "zamek gracza, tytuly BK " + (k + m) + "/" + all;
+                catch (Exception e) { Stumble("Transfer(po zamku)", e); why = "zamek gracza; wyjatek PO przeniesieniu " + e.GetType().Name; }
                 return true;
             }
-            catch (Exception e) { Stumble("Transfer", e); why = "wyjatek " + e.GetType().Name; return false; }
+            catch (Exception e) { Stumble("Transfer", e); bool mv = Moved(o); why = "wyjatek " + e.GetType().Name + (mv ? " PO przeniesieniu" : ""); return mv; }
         }
 
         /// <summary>Kronika: osada jest celem akcji own: w danych Kroniki (Chronicle.Data) - Kronika pominie osade gracza (Res.Skip). Tylko odczyt; nie rzuca.</summary>
@@ -703,20 +815,19 @@ namespace Armoury
                 o.St = st;
                 int held = Today() - w.Day0;
                 if (held < Math.Max(0, s.LandResaleDays) && !_bypassResale) { o.Why = "You have held it only " + held + " days - a lord buys back land only after " + s.LandResaleDays + "."; return o; }
-                var lord = v.Bound != null ? v.Bound.OwnerClan : null;
-                Hero h = LandBk.ActualOwner(v) ?? (lord != null ? lord.Leader : null);
-                o.Head = h; o.Seller = h != null ? h.Clan : null;   // tu: kupujacy
-                if (h == null || !h.IsAlive || h.Clan == null || h.Clan.Leader != h || h == Hero.MainHero || h.Clan == Clan.PlayerClan) { o.Why = "There is no lord to buy it back."; return o; }
+                // recenzja m113: kupujacy = rod platnika (PayerOf - po odkupie to on przestaje placic); placi glowa rodu (rycerz BK - glowa jego rodu)
+                Hero ph = SideVillageFief.PayerOf(v);
+                Hero h = ph != null && ph.Clan != null ? ph.Clan.Leader : null;
+                o.Payer = ph; o.Head = h; o.Seller = h != null ? h.Clan : null;   // tu: kupujacy
+                if (ph == null || h == null || !h.IsAlive || h.Clan == null || h == Hero.MainHero || h.Clan == Clan.PlayerClan) { o.Why = "There is no lord to buy it back."; return o; }
                 if (NeverSeller(h.Clan, false)) { o.Why = HouseOf(h.Clan) + " does not buy land."; return o; }
                 if (Clan.PlayerClan.MapFaction != null && h.MapFaction != null && FactionManager.IsAtWarAgainstFaction(h.MapFaction, Clan.PlayerClan.MapFaction)) { o.Why = "You are at war with " + NameOf(h) + "'s realm."; return o; }
-                if (DebtLadder.IsDebtor(h.Clan)) { o.Why = NameOf(h) + " is in debt himself and cannot buy land."; return o; }
+                if (DebtLadder.IsDebtor(h.Clan)) { o.Why = NameOf(h) + " is in debt " + Him(h) + " and cannot buy land."; return o; }
                 if (ReferenceEquals(w, FirstOwn()) && !SideVillageHome.ChestEmpty()) { o.Why = "Empty the chest of your house there first."; return o; }
                 string why;
                 double due = SideVillageFief.DueFor(v, uid, out why);
-                o.SeasonFix = 1;
-                int sd = LandValue.SlotDays(st);
-                if (sd >= LandValue.DaysInSeason()) { int d1, d2; double ym = LandValue.YearMean(st, LandValue.VT, out d1), a28 = LandValue.Avg28(st, LandValue.VT, out d2); if (ym > 0 && a28 > 0) o.SeasonFix = Math.Max(0.5, Math.Min(2.0, ym / a28)); }
-                o.Days = Math.Max(1, sd);
+                o.SeasonFix = LandValue.SeasonFix(st, out o.FixNote);
+                o.Days = Math.Max(1, LandValue.SlotDays(st));
                 o.NetDay = due * o.SeasonFix;
                 if (!(o.NetDay > 0)) { o.Why = "It earns nothing today - no price can be set."; return o; }
                 o.Premium = 1;
@@ -724,7 +835,7 @@ namespace Armoury
                 if (o.Price <= 0 || o.Price > int.MaxValue) { o.Why = "No price can be set."; return o; }
                 Hero hh; double R; bool old;
                 int spare = TourneyPay.ClanSpare(h.Clan, false, out hh, out R, out old);
-                if (spare < o.Price) { o.Why = NameOf(h) + " cannot spare " + o.Price.ToString("N0", Inv) + " (he can spare " + Math.Max(0, spare).ToString("N0", Inv) + ")."; return o; }
+                if (spare < o.Price) { o.Why = NameOf(h) + " cannot spare " + o.Price.ToString("N0", Inv) + " (" + He(h) + " can spare " + Math.Max(0, spare).ToString("N0", Inv) + ")."; return o; }
                 o.Ok = true;
             }
             catch (Exception e) { o.Ok = false; o.Why = "Not known today."; Stumble("BuildSellBack", e); }
@@ -741,30 +852,41 @@ namespace Armoury
             if (o.Price != q.Price || o.Head != q.Head) { Drop(q, "the price is now " + o.Price.ToString("N0", Inv) + " - ask again.", "odkup: cena albo kupujacy inne (" + q.Price + " -> " + o.Price + ")"); return; }
             var buyer = o.Head;
             long w0 = WorldGold(), pg0 = me.Gold, bg0 = buyer.Gold, cred = 0;
-            bool done = false; string why = "";
+            string why = "";
+            // recenzja m113 (lustro Execute): InPay tylko wokol przelewu; zaplacone - kiesa gracza wieksza dokladnie o cene; o wyniku decyduje stan (IsMine)
             InPay = true;
-            try
-            {
-                GiveGoldAction.ApplyBetweenCharacters(buyer, me, (int)o.Price, true);
-                if (!SideVillageFief.RemoveOwned(o.Id, out why))
-                {
-                    GiveGoldAction.ApplyBetweenCharacters(me, buyer, (int)o.Price, true);
-                    _dRefund++;
-                    Log.Info(P + "transakcja cofnieta - odkup " + o.Name + " (" + o.Id + "): " + why + "; zwrot " + o.Price + ".");
-                    Log.Player("The sale of " + o.Name + " could not be completed: " + why, true);
-                    return;
-                }
-                cred = DebtLadder.LandProceeds(Clan.PlayerClan, o.Price);
-                done = true;
-            }
-            catch (Exception e) { Stumble("ExecuteSellBack", e); }
+            try { GiveGoldAction.ApplyBetweenCharacters(buyer, me, (int)o.Price, true); }
+            catch (Exception e) { Stumble("ExecuteSellBack(a)", e); }
             finally { InPay = false; }
-            if (!done) return;
+            long got = me.Gold - pg0;
+            if (got != o.Price)
+            {
+                long back = got > 0 ? Refund(me, buyer, got, "ExecuteSellBack(zwrot a)") : 0;
+                _dRefund++;
+                Log.Info(P + "transakcja cofnieta przy platnosci - odkup " + o.Name + " (" + o.Id + "): zaplacono " + got + " z " + o.Price + ", zwrot " + back + ".");
+                Log.Player("The sale of " + o.Name + " could not be completed.", true);
+                return;
+            }
+            bool removed = false;
+            try { removed = SideVillageFief.RemoveOwned(o.Id, out why); }
+            catch (Exception e) { Stumble("ExecuteSellBack(b)", e); why = "wyjatek " + e.GetType().Name; }
+            if (!removed && SideVillageFief.IsMine(o.Id))
+            {
+                long back = Refund(me, buyer, o.Price, "ExecuteSellBack(zwrot c)");
+                _dRefund++;
+                Log.Info(P + "transakcja cofnieta - odkup " + o.Name + " (" + o.Id + "): " + why + "; zwrot " + back + " z " + o.Price + (back < o.Price ? ", brak zwrotu " + (o.Price - back) : "") + ".");
+                Log.Player("The sale of " + o.Name + " could not be completed: " + why, true);
+                return;
+            }
+            try { cred = DebtLadder.LandProceeds(Clan.PlayerClan, o.Price); }
+            catch (Exception e) { Stumble("ExecuteSellBack(d)", e); }
+            DealDone();
             AddDeal(o, Today());
             _dSellBack++;
             Log.Info(P + "ODKUP - " + o.Name + " (" + o.Id + ") wraca do " + NameOf(buyer) + " (" + (buyer.Clan != null ? buyer.Clan.StringId : "-") + ") za " + o.Price + " | " + o.Pl
                      + " | gracz " + pg0 + " -> " + me.Gold + " (wierzycielom " + cred + "), kupujacy " + bg0 + " -> " + buyer.Gold + " | pieniadz swiata " + w0 + " -> " + WorldGold() + ".");
             Log.Player(NameOf(buyer) + " bought " + o.Name + " back from you for " + o.Price.ToString("N0", Inv) + "." + (cred > 0 ? " Your creditors took " + cred.ToString("N0", Inv) + " of it." : ""));
+            AfterSellBackMenu(o);
         }
 
         // ============================================================ doba
@@ -822,8 +944,7 @@ namespace Armoury
                         string why;
                         double due = SideVillageFief.DueFor(v, r.Uid, out why);
                         if (!(due > 0)) continue;
-                        double fix = 1;
-                        if (LandValue.SlotDays(st) >= LandValue.DaysInSeason()) { int a, b; double ym = LandValue.YearMean(st, LandValue.VT, out a), a28 = LandValue.Avg28(st, LandValue.VT, out b); if (ym > 0 && a28 > 0) fix = Math.Max(0.5, Math.Min(2.0, ym / a28)); }
+                        string fn; double fix = LandValue.SeasonFix(st, out fn);
                         double ye = Math.Max(1, s.LandYearsOfPurchase) * (AtWarMajor(st.MapFaction) ? Math.Max(0.1f, Math.Min(1f, s.LandYearsAtWar)) : 1.0);
                         if (ye < Math.Max(1, s.LandYearsFloor)) ye = Math.Max(1, s.LandYearsFloor);
                         double net = due * fix, raw = net * dpy * ye;
@@ -853,11 +974,31 @@ namespace Armoury
                     catch (Exception e) { Stumble("DryRun(zamek)", e); }
                 }
                 lp.Sort(); cp.Sort();
+                // recenzja m113: ile rodow AI przechodzi kazda miare potrzeby (Z2) - czy ziemia jest na sprzedaz "za dlugi", a nie wszedzie
+                int nh = 0, c1 = 0, c2 = 0, c3 = 0, c3h = 0, c4 = 0, cs = 0, cl = 0, cc = 0;
+                foreach (var c in Clan.All)
+                {
+                    try
+                    {
+                        if (NeverSeller(c, false) || c.Leader == null || !c.Leader.IsAlive) continue;
+                        nh++;
+                        double G, R, D; int stk;
+                        ClanBudget.NeedOf(c, out G, out R, out D, out stk);
+                        bool n1 = DebtLadder.IsDebtor(c), n2 = DebtLadder.RansomDebtOf(c) > 0, n3 = G < R, n3h = G < 0.5 * R, n4 = stk >= Math.Max(1, s.BudgetHysteresisDays);
+                        if (n1) c1++; if (n2) c2++; if (n3) c3++; if (n3h) c3h++; if (n4) c4++;
+                        if (NeedKind(KSide, n1, n2, n3h, n4, null, false)) cs++;
+                        if (NeedKind(KLord, n1, n2, n3h, n4, null, false)) cl++;
+                        if (NeedKind(KCastle, n1, n2, n3h, n4, DebtLadder.StageOf(c), DeepDebt(DebtLadder.OwedOf(c), D))) cc++;
+                    }
+                    catch (Exception e) { Stumble("DryRun(potrzeba)", e); }
+                }
                 var sb = new StringBuilder(1500);
                 sb.Append(P).Append("na sucho (dzien ").Append(Today()).Append(", rok ").Append(dpy).Append(" dob, lata ").Append(s.LandYearsOfPurchase).Append(", ksiega wartosci ").Append(LandValue.DaysMeasured).Append(" dob)")
                   .Append(" | wioski poboczne z cena ").Append(prices.Count).Append(" z ").Append(recs.Count).Append(": ").Append(Dist(prices))
                   .Append(" | Lordship (sam VT x lata, bez upustu) ").Append(lp.Count).Append(": ").Append(Dist(lp))
                   .Append(" | zamki (renta + wsie, bez strazy, x premia ").Append(s.LandCastlePremium.ToString("0.##", Inv)).Append(") ").Append(cp.Count).Append(": ").Append(Dist(cp))
+                  .Append(" | potrzeba rodow AI (").Append(nh).Append("): N1 dluznik ").Append(c1).Append(", N2 okup ").Append(c2).Append(", N3 G<R ").Append(c3).Append(" (G<0.5R ").Append(c3h)
+                  .Append("), N4 seria ").Append(c4).Append(" -> wioski ").Append(cs).Append(", Lordship ").Append(cl).Append(", zamki ").Append(cc)
                   .Append(" | koszt: okregow PartsOf ").Append(SideVillageFief.DueForDistricts - d0);
                 if (lines.Count > 0)
                 {
@@ -882,26 +1023,43 @@ namespace Armoury
         // ============================================================ zapis (arm_land113)
         private static string Clean(string s) { return (s ?? "").Replace("|", "/").Replace(":", "/").Replace(",", "/").Replace("=", "/"); }
 
+        /// <summary>Zapis arm_land113. Recenzja m113: + "t=rod:kwota,..." - cena ziemi tej doby w ksiedze rodow (ClanIncomeBook.TodayLand zyje w pamieci, a Today jest
+        /// w zapisie; bez tego cena sprzed zapisu bylaby po wczytaniu jednorazowym wplywem). Starsza DLL pomija nieznana czesc.</summary>
         internal static string Export()
         {
             try
             {
-                if (_cd.Count == 0 && _deals.Count == 0) return "";
-                var sb = new StringBuilder(64 + 40 * _cd.Count + 60 * _deals.Count);
-                sb.Append(SaveVer).Append("|c=");
-                bool f = true;
-                foreach (var kv in _cd) { if (!f) sb.Append(','); f = false; sb.Append(Clean(kv.Key)).Append(':').Append(kv.Value.LastSale.ToString(Inv)).Append(':').Append(kv.Value.LastCastle.ToString(Inv)); }
-                sb.Append("|d=").Append(DealsText());
-                return sb.ToString();
+                var tl = new List<KeyValuePair<string, long>>();
+                ClanIncomeBook.ForEachTodayLand((id, a) => tl.Add(new KeyValuePair<string, long>(id, a)));
+                return Serialize(_cd, _deals, tl);
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
         }
 
-        internal static string DealsText()
+        private static string Serialize(Dictionary<string, Cd> cds, List<Deal> deals, List<KeyValuePair<string, long>> tl)
         {
-            var sb = new StringBuilder(60 * _deals.Count);
+            if (cds.Count == 0 && deals.Count == 0 && tl.Count == 0) return "";
+            var sb = new StringBuilder(64 + 40 * cds.Count + 60 * deals.Count + 30 * tl.Count);
+            sb.Append(SaveVer).Append("|c=");
             bool f = true;
-            foreach (var d in _deals)
+            foreach (var kv in cds) { if (!f) sb.Append(','); f = false; sb.Append(Clean(kv.Key)).Append(':').Append(kv.Value.LastSale.ToString(Inv)).Append(':').Append(kv.Value.LastCastle.ToString(Inv)); }
+            sb.Append("|d=").Append(DealsTextOf(deals));
+            if (tl.Count > 0)
+            {
+                sb.Append("|t=");
+                f = true;
+                foreach (var kv in tl) { if (!f) sb.Append(','); f = false; sb.Append(Clean(kv.Key)).Append(':').Append(kv.Value.ToString(Inv)); }
+            }
+            return sb.ToString();
+        }
+
+        internal static string DealsText() { return DealsTextOf(_deals); }
+
+        private static string DealsTextOf(List<Deal> deals)
+        {
+            var sb = new StringBuilder(60 * deals.Count);
+            bool f = true;
+            foreach (var d in deals)
             {
                 if (!f) sb.Append(','); f = false;
                 sb.Append(d.Kind.ToString(Inv)).Append(':').Append(Clean(d.Id)).Append(':').Append(d.Day.ToString(Inv)).Append(':').Append(d.Price.ToString(Inv)).Append(':')
@@ -910,41 +1068,74 @@ namespace Armoury
             return sb.ToString();
         }
 
+        /// <summary>Odczyt napisu arm_land113 do podanych zbiorow (bez stanu zywego). false - napis nieznany.</summary>
+        private static bool Parse(string data, Dictionary<string, Cd> cds, List<Deal> deals, List<KeyValuePair<string, long>> tl, out int bad)
+        {
+            bad = 0;
+            var f = data.Split('|');
+            if (f.Length == 0 || f[0] != SaveVer) return false;
+            for (int i = 1; i < f.Length; i++)
+            {
+                if (f[i].StartsWith("c=", StringComparison.Ordinal))
+                {
+                    foreach (var e in f[i].Substring(2).Split(','))
+                    {
+                        if (e.Length == 0) continue;
+                        var p = e.Split(':'); int a, b;
+                        if (p.Length < 3 || p[0].Length == 0 || !int.TryParse(p[1], NumberStyles.Integer, Inv, out a) || !int.TryParse(p[2], NumberStyles.Integer, Inv, out b)) { bad++; continue; }
+                        cds[p[0]] = new Cd { LastSale = a, LastCastle = b };
+                    }
+                }
+                else if (f[i].StartsWith("d=", StringComparison.Ordinal))
+                {
+                    foreach (var e in f[i].Substring(2).Split(','))
+                    {
+                        if (e.Length == 0) continue;
+                        var p = e.Split(':'); int k, day, y, dc; long pr;
+                        if (p.Length < 7 || !int.TryParse(p[0], NumberStyles.Integer, Inv, out k) || !int.TryParse(p[2], NumberStyles.Integer, Inv, out day) || !long.TryParse(p[3], NumberStyles.Integer, Inv, out pr)
+                            || !int.TryParse(p[4], NumberStyles.Integer, Inv, out y) || !int.TryParse(p[5], NumberStyles.Integer, Inv, out dc)) { bad++; continue; }
+                        deals.Add(new Deal { Kind = k, Id = p[1], Day = day, Price = pr, Years100 = y, Disc1000 = dc, Seller = p[6] });
+                    }
+                }
+                else if (f[i].StartsWith("t=", StringComparison.Ordinal))
+                {
+                    foreach (var e in f[i].Substring(2).Split(','))
+                    {
+                        if (e.Length == 0) continue;
+                        var p = e.Split(':'); long a;
+                        if (p.Length < 2 || p[0].Length == 0 || !long.TryParse(p[1], NumberStyles.Integer, Inv, out a) || a <= 0) { bad++; continue; }
+                        tl.Add(new KeyValuePair<string, long>(p[0], a));
+                    }
+                }
+                // inne czesci (nowsza DLL) - pominiete
+            }
+            return true;
+        }
+
+        /// <summary>Autotest (T8): napis -> zbiory na boku -> napis; stan zywy (i ksiega rodow) nietkniety. Nie rzuca.</summary>
+        internal static string RoundTrip(string data)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(data)) return "";
+                var cds = new Dictionary<string, Cd>(StringComparer.Ordinal); var deals = new List<Deal>(); var tl = new List<KeyValuePair<string, long>>(); int bad;
+                if (!Parse(data, cds, deals, tl, out bad)) return "?";
+                return Serialize(cds, deals, tl);
+            }
+            catch (Exception e) { Stumble("RoundTrip", e); return "?"; }
+        }
+
+        /// <summary>Odczyt arm_land113 (PO arm_clanincome - ksiega rodow juz wczytana: "t=" wraca do TodayLand).</summary>
         internal static void Import(string data)
         {
             _cd.Clear(); _deals.Clear();
             if (string.IsNullOrEmpty(data)) return;
             try
             {
-                var f = data.Split('|');
-                if (f.Length == 0 || f[0] != SaveVer) { Log.Info(P + "zapis arm_land113 nieznany (" + data.Length + " znakow) - pominiety."); return; }
-                int bad = 0;
-                for (int i = 1; i < f.Length; i++)
-                {
-                    if (f[i].StartsWith("c=", StringComparison.Ordinal))
-                    {
-                        foreach (var e in f[i].Substring(2).Split(','))
-                        {
-                            if (e.Length == 0) continue;
-                            var p = e.Split(':'); int a, b;
-                            if (p.Length < 3 || p[0].Length == 0 || !int.TryParse(p[1], NumberStyles.Integer, Inv, out a) || !int.TryParse(p[2], NumberStyles.Integer, Inv, out b)) { bad++; continue; }
-                            _cd[p[0]] = new Cd { LastSale = a, LastCastle = b };
-                        }
-                    }
-                    else if (f[i].StartsWith("d=", StringComparison.Ordinal))
-                    {
-                        foreach (var e in f[i].Substring(2).Split(','))
-                        {
-                            if (e.Length == 0) continue;
-                            var p = e.Split(':'); int k, day, y, dc; long pr;
-                            if (p.Length < 7 || !int.TryParse(p[0], NumberStyles.Integer, Inv, out k) || !int.TryParse(p[2], NumberStyles.Integer, Inv, out day) || !long.TryParse(p[3], NumberStyles.Integer, Inv, out pr)
-                                || !int.TryParse(p[4], NumberStyles.Integer, Inv, out y) || !int.TryParse(p[5], NumberStyles.Integer, Inv, out dc)) { bad++; continue; }
-                            _deals.Add(new Deal { Kind = k, Id = p[1], Day = day, Price = pr, Years100 = y, Disc1000 = dc, Seller = p[6] });
-                        }
-                    }
-                    // inne czesci (nowsza DLL) - pominiete
-                }
-                Log.Info(P + "zapis arm_land113 - rodow z przerwa " + _cd.Count + ", transakcji " + _deals.Count + (bad > 0 ? ", zle wpisy " + bad : "") + ".");
+                var tl = new List<KeyValuePair<string, long>>(); int bad;
+                if (!Parse(data, _cd, _deals, tl, out bad)) { _cd.Clear(); _deals.Clear(); Log.Info(P + "zapis arm_land113 nieznany (" + data.Length + " znakow) - pominiety."); return; }
+                foreach (var kv in tl) ClanIncomeBook.RestoreLand(kv.Key, kv.Value);
+                Log.Info(P + "zapis arm_land113 - rodow z przerwa " + _cd.Count + ", transakcji " + _deals.Count + ", cena ziemi tej doby w ksiedze rodow " + tl.Count + (bad > 0 ? ", zle wpisy " + bad : "") + ".");
             }
             catch (Exception e) { _cd.Clear(); _deals.Clear(); Stumble("Import", e); }
         }
