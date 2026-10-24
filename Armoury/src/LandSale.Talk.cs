@@ -32,6 +32,10 @@ namespace Armoury
     ///    Test n36: T11/T12 - bramy, ktore gracz zmieni w grze (stosunek ze sprzedawca, wasal krolestwa sprzedawcy), test spelnia sam (linie "TEST warunek testu ..."),
     ///    potem kupno z kontrolami jak T3-T8; T12 "wyjatki przy zmianie pana" - ERROR in Armoury i wyjatki rzucone w czasie kupna (sluchacze innych modow).
     ///    T13 (n36 cena wedlug stosunku, zaraz po T2): krzywa lat YearsFor (prog, polowa, prog + rozpietosc, wyzej; odkup odwrotnie) i lata oferty z T2.
+    ///    Test m114: T11/T12 osobno (TestLand, linia "test T11/T12 ... | wynik ..."), gdy ksiega wartosci ziemi ma 28 dob pomiaru (cena Lordship i zamku tego
+    ///    wymaga); do tego czasu "TEST T11/T12 ...: czekam na pomiar N/28 dob" raz na dobe (bieg ziemiaD, -Days 32). Klucze Lordship i zamki (domyslnie NIE od 107)
+    ///    traktowane jako TAK tylko w TestLand (_testKeys, linia "TEST klucze testu"); zamek tylko od sprzedawcy z inna siedziba (gleboki dlug, najmniej nowych
+    ///    wojen, najtanszy); brak oferty w calym swiecie - NIEPOKRYTY z liczba zamkow / wsi wedlug powodu (linie "TEST T11 powody bez oferty Lordship", "TEST T12 powody bez oferty zamku").
     /// </summary>
     internal static partial class LandSale
     {
@@ -306,7 +310,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (!On || s == null || !s.LandSalesLordships || !LandBk.Ready) return false;
+                if (!On || s == null || !LordshipsOn || !LandBk.Ready) return false;
                 var st = Settlement.CurrentSettlement;
                 if (st == null || !st.IsVillage) return false;
                 var o = Cached(_mLord, st.StringId, () => BuildLord(st.StringId));
@@ -388,9 +392,11 @@ namespace Armoury
         }
 
         // ============================================================ autotest
-        private static bool TestWanted()
+        private static bool TestWanted() { return !_testDone && FlagOn(); }
+
+        /// <summary>Plik armoury-ziemia.flag lezy (tylko LogGate.Mode 1/2 - DLL autotestu).</summary>
+        private static bool FlagOn()
         {
-            if (_testDone) return false;
             int m = LogGate.Mode;
             if (m != 1 && m != 2) return false;
             try
@@ -401,11 +407,33 @@ namespace Armoury
             catch { return false; }
         }
 
-        /// <summary>HourlyTick: autotest raz na sesje (flaga armoury-ziemia.flag), gdy ksiega wiosek czynna i ksiega wartosci ziemi ma co najmniej 1 dobe. Nie rzuca.</summary>
+        /// <summary>Test m114: doby pomiaru ksiegi wartosci ziemi, od ktorych BuildLord / BuildCastle licza cene (Z4: d &lt; 28 - "watched only").</summary>
+        private const int LandMinDays = 28;
+
+        /// <summary>HourlyTick: autotest raz na sesje (flaga armoury-ziemia.flag), gdy ksiega wiosek czynna i ksiega wartosci ziemi ma co najmniej 1 dobe.
+        /// Test m114: potem czesc T11/T12 (TestLand), gdy ksiega ma LandMinDays dob - do tego czasu linia "czekam na pomiar N/28 dob" raz na dobe gry. Nie rzuca.</summary>
         internal static void Hourly()
         {
-            try { if (!_testDone && TestWanted() && VillageBook.Active && LandValue.DaysMeasured >= 1) Test(); }
-            catch (Exception e) { _testDone = true; Stumble("Hourly", e); }
+            try
+            {
+                if (!_testDone && TestWanted() && VillageBook.Active && LandValue.DaysMeasured >= 1) Test();
+                if (_testDone && !_test2Done && FlagOn())
+                {
+                    int dm = LandValue.DaysMeasured;
+                    if (dm >= LandMinDays) TestLand();
+                    else
+                    {
+                        int t = Today();
+                        if (t != _waitDay)
+                        {
+                            _waitDay = t;
+                            Log.Info(P + "TEST T11/T12 (plik " + AutoFlagName + "): czekam na pomiar " + dm + "/" + LandMinDays + " dob (cena Lordship i zamku z ksiegi wartosci ziemi wymaga "
+                                     + LandMinDays + " dob; doba gry " + t + ", " + LandValue.LastNote + ").");
+                        }
+                    }
+                }
+            }
+            catch (Exception e) { _testDone = true; _test2Done = true; Stumble("Hourly", e); }
         }
 
         private static void Test()
@@ -570,23 +598,76 @@ namespace Armoury
                     foreach (var n in new[] { "T3 kupno wioski", "T4 pieniadz swiata", "T5 kiesa sprzedawcy", "T6 jednorazowe sprzedawcy", "T7 blad przeniesienia - zwrot", "T8 zapis tam i z powrotem", "T9 odkup", "T10 kupno do zapisu (zostaje)" })
                         skip(n, w);
                 }
+                // test m114: T11 Lordship i T12 zamek - osobna czesc TestLand (linia "test T11/T12"), gdy ksiega wartosci ziemi ma 28 dob pomiaru (cena Lordship
+                // i zamku tego wymaga, 113c: "watched only 1 day"); do tego czasu Hourly pisze raz na dobe "czekam na pomiar N/28 dob" (bieg ziemiaD, -Days 32)
+                sb.Append(" | T11/T12 osobna linia test T11/T12 - pomiar ").Append(LandValue.DaysMeasured).Append('/').Append(LandMinDays).Append(" dob").Append(LandValue.DaysMeasured >= LandMinDays ? ", zaraz po tej linii" : ", czeka na pomiar");
+            }
+            catch (Exception e) { add("wyjatek", false, e.GetType().Name + ": " + e.Message); Stumble("Test", e); }
+            finally { _forceNeed = false; _forceFail = false; _bypassResale = false; }
+            string verdict = fail > 0 ? "NIE" : unc > 0 ? "NIEPOKRYTY" : "TAK";
+            Log.Info(P + "test (autotest, plik " + AutoFlagName + ") | wynik TAK " + pass + ", NIE " + fail + ", NIEPOKRYTY " + unc + " = " + verdict
+                     + " | dotacja testu " + granted + " denarow (poza bilansem)" + sb.ToString() + ".");
+        }
+
+        /// <summary>Test m114: czesc T11/T12 autotestu ziemi (plik armoury-ziemia.flag) - z Hourly, gdy ksiega wartosci ziemi ma LandMinDays dob pomiaru.
+        /// Klucze Lordship i zamki traktowane jako TAK tylko tu (_testKeys, linia "TEST klucze testu"), potrzeba wymuszona; wlasna linia wyniku "test T11/T12".</summary>
+        private static void TestLand()
+        {
+            _test2Done = true;
+            var sb = new StringBuilder(2000);
+            int pass = 0, fail = 0, unc = 0;
+            long granted = 0;
+            void add(string n, bool ok, string t) { sb.Append(" | ").Append(n).Append(' ').Append(ok ? "TAK" : "NIE").Append(" (").Append(t).Append(')'); if (ok) pass++; else fail++; }
+            void skip(string n, string t) { sb.Append(" | ").Append(n).Append(" NIEPOKRYTY (").Append(t).Append(')'); unc++; }
+            var me = Hero.MainHero;
+            void grant(long price, string what)
+            {
+                long g = price + price / 10 + 1000 - me.Gold;
+                if (g <= 0) return;
+                g = Math.Min(g, (long)int.MaxValue - Math.Max(0, me.Gold));
+                if (g <= 0) return;
+                long before = me.Gold;
+                me.ChangeHeroGold((int)g);
+                granted += g;
+                Log.Info(P + "TEST dotacja testu " + g + " denarow (poza bilansem) - " + what + ": cena " + price + " + zapas, zloto gracza " + before + " -> " + me.Gold + ".");
+            }
+            int dm = LandValue.DaysMeasured;
+            var s0 = Settings.Current;
+            string k0 = "Lordship " + (s0 != null && s0.LandSalesLordships ? "TAK" : "NIE") + ", zamki " + (s0 != null && s0.LandSalesCastles ? "TAK" : "NIE");
+            _forceNeed = true; _testKeys = true;
+            Log.Info(P + "TEST klucze testu (tylko czesc T11/T12, plik " + AutoFlagName + "): Land Sales Lordships i Land Sales Castles traktowane jako TAK - w ustawieniach "
+                     + k0 + " (Armoury.json i domyslne bez zmian); ksiega wartosci ziemi " + dm + " dob; POTRZEBA WYMUSZONA dla wszystkich rodow (tylko ten test).");
+            try
+            {
                 // T11 Lordship (B2) i T12 zamek (B3) - test n36: oferty budowane z _testLift - bramy, ktore gracz zmieni w grze (stosunek ze sprzedawca, wasal
                 // krolestwa sprzedawcy; zloto - dotacja testu), nie zamykaja oferty; test je spelnia sam (linia "TEST warunek testu ..."), buduje oferte od nowa
                 // i kupuje z kontrolami jak T3-T8. Bramy, ktorych gracz nie zmieni (brak tytulu BK, jedyna siedziba, odstep, ustawienia) - NIEPOKRYTY z powodem.
                 var pc = Clan.PlayerClan;
                 string lw = null, cw = null;
+                // test m114: powody bez oferty wedlug rodzaju (WhyKey) - przy braku oferty w calym swiecie NIEPOKRYTY z liczba osad wedlug powodu
+                var lwhy = new Dictionary<string, int>(StringComparer.Ordinal); var cwhy = new Dictionary<string, int>(StringComparer.Ordinal);
+                int lAll = 0, cAll = 0, lOk = 0, cOk = 0;
                 List<Offer> lifted(bool castle)
                 {
                     var l = new List<Offer>();
                     string first = null, firstShown = null;
+                    var hist = castle ? cwhy : lwhy; hist.Clear(); int all = 0;
+                    void seen(Offer o)
+                    {
+                        all++;
+                        if (o.Ok) { l.Add(o); return; }
+                        string k = WhyKey(o.Why); int n; hist.TryGetValue(k, out n); hist[k] = n + 1;
+                        if (first == null) first = o.Why;
+                        if (firstShown == null && !o.Hide) firstShown = o.Why;
+                    }
                     _testLift = true;
                     try
                     {
-                        if (castle) { foreach (var st in Settlement.All) { if (st == null || !st.IsCastle) continue; var o = BuildCastle(st.StringId); if (o.Ok) l.Add(o); else { if (first == null) first = o.Why; if (firstShown == null && !o.Hide) firstShown = o.Why; } } }
-                        else foreach (var v in Village.All) { if (v == null || v.Settlement == null) continue; var o = BuildLord(v.Settlement.StringId); if (o.Ok) l.Add(o); else { if (first == null) first = o.Why; if (firstShown == null && !o.Hide) firstShown = o.Why; } }
+                        if (castle) { foreach (var st in Settlement.All) { if (st == null || !st.IsCastle) continue; seen(BuildCastle(st.StringId)); } }
+                        else foreach (var v in Village.All) { if (v == null || v.Settlement == null) continue; seen(BuildLord(v.Settlement.StringId)); }
                     }
                     finally { _testLift = false; }
-                    if (castle) cw = firstShown ?? first; else lw = firstShown ?? first;
+                    if (castle) { cw = firstShown ?? first; cAll = all; cOk = l.Count; } else { lw = firstShown ?? first; lAll = all; lOk = l.Count; }
                     return l;
                 }
                 bool deepOf(Offer o) { return DeepDebt(o.Owed, o.D); }
@@ -616,7 +697,7 @@ namespace Armoury
                 // zamek planowany przed T11: Lordship z warunkami testu bierze krolestwo sprzedawcy tego zamku - jedno wasalstwo na oba kroki;
                 // recenzja n36: Lordship od rodu sprzedawcy tego zamku na koncu - odstep sprzedawcy (LandSellerCooldownDays) zamknalby zamek w T12
                 Kingdom planK = null; Clan planSeller = null; string planId = null, planName = null;
-                if (Settings.Current.LandSalesCastles)
+                if (CastlesOn)
                 {
                     var cp = lifted(true); cp.Sort(castleCmp);
                     if (cp.Count > 0) { planK = cp[0].TestJoin ?? (cp[0].Seller != null ? cp[0].Seller.Kingdom : null); planSeller = cp[0].Seller; planId = cp[0].Id; planName = cp[0].Name; }
@@ -723,7 +804,7 @@ namespace Armoury
                     ex = "ERROR in Armoury +" + errN + ", potkniecia ziemi +" + stN + ", wyjatki rzucone w czasie kupna " + fcN + (fc.Count > 0 ? " (" + string.Join("; ", fc.ToArray()) + ")" : "");
                     return okW && okP && okO && okS;
                 }
-                if (!Settings.Current.LandSalesLordships) skip("T11 Lordship", "wylaczone w ustawieniach");
+                if (!LordshipsOn) skip("T11 Lordship", "wylaczone w ustawieniach");
                 else if (!LandBk.Ready) skip("T11 Lordship", "ksiega tytulow BK nieczynna");
                 else
                 {
@@ -738,7 +819,8 @@ namespace Armoury
                         x = newWars(a.TestJoin).CompareTo(newWars(b.TestJoin)); if (x != 0) return x;
                         return a.Price.CompareTo(b.Price);
                     });
-                    if (ll.Count == 0) skip("T11 Lordship", "brak oferty (" + (lw ?? "-") + ")");
+                    Log.Info(P + "TEST T11 powody bez oferty Lordship - " + HistPl(lwhy, lAll, lOk, "wsi") + " (pierwszy: " + (lw ?? "-") + ").");
+                    if (ll.Count == 0) skip("T11 Lordship", "brak oferty w calym swiecie mimo wymuszonej potrzeby - " + HistPl(lwhy, lAll, lOk, "wsi") + "; pierwszy: " + Bar(lw ?? "-"));
                     else
                     {
                         var p = ll[0]; string note;
@@ -760,10 +842,15 @@ namespace Armoury
                         }
                     }
                 }
-                if (!Settings.Current.LandSalesCastles) skip("T12 zamek", "wylaczone w ustawieniach");
+                if (!CastlesOn) skip("T12 zamek", "wylaczone w ustawieniach");
                 else
                 {
                     var cl = lifted(true); cl.Sort(castleCmp);   // od nowa po T11 (wasalstwo z T11, zloto, odstepy)
+                    // test m114: oferty zamku sa tylko od sprzedawcy, ktory zachowuje inna siedzibe (BuildCastle: jedyna siedziba - brama, ktorej gracz nie zmieni);
+                    // kolejnosc castleCmp: gleboki dlug, bez zmiany krolestwa, najmniej nowych wojen, najtanszy
+                    int cDeep = 0; foreach (var x in cl) if (deepOf(x)) cDeep++;
+                    string cPick = "wybor z " + cl.Count + " ofert zamku (gleboki dlug " + cDeep + ", sprzedawca zachowuje inna siedzibe)";
+                    Log.Info(P + "TEST T12 powody bez oferty zamku - " + HistPl(cwhy, cAll, cOk, "zamkow") + " (pierwszy: " + (cw ?? "-") + ").");
                     // recenzja n36: inny zamek niz planowany przed T11 - powod z oferty planowanego zbudowanej teraz (z warunkami testu)
                     string planNote(Offer got)
                     {
@@ -774,7 +861,7 @@ namespace Armoury
                         finally { _testLift = false; }
                         return "; planowany zamek " + planName + " (" + planId + ") nie kupiony: " + why;
                     }
-                    if (cl.Count == 0) skip("T12 zamek", "brak oferty (" + (cw ?? "-") + ")" + planNote(null));
+                    if (cl.Count == 0) skip("T12 zamek", "brak oferty w calym swiecie mimo wymuszonej potrzeby - " + HistPl(cwhy, cAll, cOk, "zamkow") + "; pierwszy: " + Bar(cw ?? "-") + planNote(null));
                     else
                     {
                         var p = cl[0]; string note; bool deep = deepOf(p);
@@ -804,7 +891,7 @@ namespace Armoury
                                 bool own = st.OwnerClan == pc, okT = own && g0 == g1 && tk == tl.Count && seller.HomeSettlement != st;
                                 add("T12 zamek", okT && okM, co.Name + " (" + co.Id + ") za " + co.Price + " od " + NameOf(head) + (deep ? " (gleboki dlug)" : " (bez glebokiego dlugu)") + ", pan " + (own ? "gracz" : "NIE gracz")
                                     + ", zaloga " + g0 + " -> " + g1 + ", tytuly BK sprzedawcy u gracza " + tk + "/" + tl.Count + ", HomeSettlement sprzedawcy " + home0 + " -> " + home1 + (seller.HomeSettlement == st ? " ZLE" : "")
-                                    + ", gracza " + ph0 + " -> " + ph1 + "; " + t + (note.Length > 0 ? "; " + note : "") + planNote(co));
+                                    + ", gracza " + ph0 + " -> " + ph1 + "; " + t + (note.Length > 0 ? "; " + note : "") + planNote(co) + "; " + cPick);
                                 // recenzja n36: bez zmiany pana (Execute wyszedl przed Transfer) wyjatki przy zmianie pana nie byly sprawdzone
                                 if (!own) skip("T12 wyjatki przy zmianie pana", "kupno nie doszlo do zmiany pana; " + ex);
                                 else add("T12 wyjatki przy zmianie pana", exOk, ex);
@@ -814,11 +901,73 @@ namespace Armoury
                 }
                 if (joins > 0) Log.Info(P + "TEST warunek testu: zmian krolestwa gracza " + joins + " - rod gracza zostaje w " + (pc.Kingdom != null ? Txt(pc.Kingdom.Name) + " (" + pc.Kingdom.StringId + ")" : "bez krolestwa") + " do konca biegu.");
             }
-            catch (Exception e) { add("wyjatek", false, e.GetType().Name + ": " + e.Message); Stumble("Test", e); }
-            finally { _forceNeed = false; _forceFail = false; _bypassResale = false; }
+            catch (Exception e) { add("wyjatek", false, e.GetType().Name + ": " + e.Message); Stumble("TestLand", e); }
+            finally { _forceNeed = false; _testKeys = false; _testLift = false; }
             string verdict = fail > 0 ? "NIE" : unc > 0 ? "NIEPOKRYTY" : "TAK";
-            Log.Info(P + "test (autotest, plik " + AutoFlagName + ") | wynik TAK " + pass + ", NIE " + fail + ", NIEPOKRYTY " + unc + " = " + verdict
+            Log.Info(P + "test T11/T12 (autotest, plik " + AutoFlagName + ", pomiar " + dm + " dob, klucze testu TAK) | wynik TAK " + pass + ", NIE " + fail + ", NIEPOKRYTY " + unc + " = " + verdict
                      + " | dotacja testu " + granted + " denarow (poza bilansem)" + sb.ToString() + ".");
         }
+
+        /// <summary>Test m114: powod braku oferty Lordship / zamku wedlug rodzaju (do liczenia osad wedlug powodu); nieznany - poczatek tekstu bez cyfr.</summary>
+        private static string WhyKey(string w)
+        {
+            if (string.IsNullOrEmpty(w)) return "bez powodu";
+            for (int i = 0; i + 1 < WhyMap.Length; i += 2) if (w.IndexOf(WhyMap[i], StringComparison.Ordinal) >= 0) return WhyMap[i + 1];
+            var sb = new StringBuilder(64);
+            foreach (char ch in w) { if (sb.Length >= 50) break; if (!char.IsDigit(ch) && ch != '|') sb.Append(ch); }
+            return "inne: " + sb.ToString().Trim();
+        }
+
+        // kolejnosc ma znaczenie (dluzszy wzorzec przed krotszym, ktory tez by pasowal)
+        private static readonly string[] WhyMap =
+        {
+            "mod settings", "wylaczone w ustawieniach",
+            "yours already", "juz gracza",
+            "There is no one to sell", "brak pana",
+            "crown does not sell", "korona nie sprzedaje zamkow",
+            "does not sell land", "rod nie sprzedaje (najemnik, mniejszy, Straz, wygasly)",
+            "This castle is not for sale", "Blizniaki - nie na sprzedaz",
+            "not yet decided", "pan nieprzydzielony (glosowanie)",
+            "Only the head of your house", "gracz nie glowa rodu",
+            "You are at war", "wojna z graczem",
+            "is a prisoner", "sprzedawca w niewoli",
+            "under siege or in battle", "oblezenie albo bitwa zamku",
+            "is in battle", "sprzedawca w bitwie",
+            "does not think well enough", "stosunek",
+            "vassal", "wasalstwo (gracz wladca albo z lennami innego krolestwa, ziemia poza krolestwem sprzedawcy)",
+            "last seat", "jedyna siedziba sprzedawcy",
+            "no other title", "ostatni tytul sprzedawcy",
+            "castle cannot change hands", "wies zamku bez tytulu BK",
+            "holds no title", "bez tytulu BK",
+            "Its title is held by", "tytul zamku u innego",
+            "who cannot sell for", "posiadacz tytulu nie glowa rodu",
+            "lies raided", "wies spladrowana",
+            "watched only", "pomiar ponizej 28 dob",
+            "not known yet", "dochod nieznany",
+            "above the cost of its guard", "dochod nie wyzszy niz straz",
+            "would bring you nothing", "dochod = udzialy wiosek gracza",
+            "not in need", "bez potrzeby",
+            "not deep in debt", "bez glebokiego dlugu",
+            "sold land only", "odstep sprzedawcy",
+            "parted with a castle", "odstep zamku",
+            "No price can be set", "brak ceny",
+            "Not known today", "potkniecie (Not known today)",
+            "is not known", "nieznana osada",
+        };
+
+        /// <summary>Test m114: "rodzaj N, z oferta K, bez oferty wedlug powodu: powod n, ..." (malejaco).</summary>
+        private static string HistPl(Dictionary<string, int> h, int all, int ok, string what)
+        {
+            var l = new List<KeyValuePair<string, int>>(h);
+            l.Sort((a, b) => a.Value != b.Value ? b.Value.CompareTo(a.Value) : string.CompareOrdinal(a.Key, b.Key));
+            var sb = new StringBuilder(256);
+            sb.Append(what).Append(' ').Append(all).Append(", z oferta ").Append(ok).Append(", bez oferty wedlug powodu: ");
+            for (int i = 0; i < l.Count; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].Key).Append(' ').Append(l[i].Value);
+            if (l.Count == 0) sb.Append('-');
+            return sb.ToString();
+        }
+
+        /// <summary>Tekst do linii wyniku bez znaku '|' (separator pozycji).</summary>
+        private static string Bar(string t) { return t == null ? "" : t.Replace('|', '/'); }
     }
 }

@@ -92,6 +92,10 @@ namespace Armoury
         internal static bool InPay;
         internal static bool NotWindfall { get { var s = Settings.Current; return s == null || s.LandPriceNotWindfall; } }
         internal static bool On { get { var s = Settings.Current; return s != null && s.LandSales; } }
+        // test m114: klucze Lordship / zamki - ustawienie albo _testKeys (tylko czesc T11/T12 autotestu ziemi, plik armoury-ziemia.flag, LogGate 1/2; linia "TEST klucze testu").
+        // _testKeys jest prawda tylko w synchronicznym kodzie TestLand (finally zeruje) - menu, rozmowy i swiat widza ustawienie (domyslnie NIE od 107).
+        internal static bool LordshipsOn { get { var s = Settings.Current; return s != null && (s.LandSalesLordships || _testKeys); } }
+        internal static bool CastlesOn { get { var s = Settings.Current; return s != null && (s.LandSalesCastles || _testKeys); } }
 
         // ------------------------------------------------------------ stan kampanii (arm_land113)
         private sealed class Cd { public int LastSale = -100000, LastCastle = -100000; }
@@ -106,6 +110,8 @@ namespace Armoury
         private static int _dBuilt, _dDeals, _dDropped, _dRefund, _dAsk, _dWindows, _dSellBack;
         private static int _dryDay = -1000;
         private static bool _dryDone, _testDone;
+        private static bool _test2Done, _testKeys;   // test m114: czesc T11/T12 autotestu (czeka na 28 dob pomiaru LandValue), klucze Lordship/zamki traktowane jako TAK tylko w niej
+        private static int _waitDay = -1;            // test m114: doba ostatniej linii "czekam na pomiar"
         // autotest
         private static bool _forceNeed, _forceFail, _bypassResale, _testLift;   // test n36: _testLift - bramy, ktore gracz zmieni w grze, nie zamykaja oferty (LiftGates)
 
@@ -114,7 +120,7 @@ namespace Armoury
             _cd.Clear(); _deals.Clear();
             _st.Clear(); _stAll = _stDay = 0; _queued = null; InPay = false;
             _dBuilt = _dDeals = _dDropped = _dRefund = _dAsk = _dWindows = _dSellBack = 0;
-            _dryDay = -1000; _dryDone = false; _testDone = false;
+            _dryDay = -1000; _dryDone = false; _testDone = false; _test2Done = false; _testKeys = false; _waitDay = -1;
             _forceNeed = _forceFail = _bypassResale = _testLift = false;
             _distRecs = null; _distFrom = null;
             TalkReset();
@@ -479,7 +485,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (!On || !s.LandSalesLordships) { o.Why = "Lordships are not for sale (mod settings)."; o.Hide = true; return o; }
+                if (!On || !LordshipsOn) { o.Why = "Lordships are not for sale (mod settings)."; o.Hide = true; return o; }
                 var st = Settlement.Find(stId);
                 var v = st != null ? st.Village : null;
                 if (v == null) { o.Why = "This village is not known."; o.Hide = true; return o; }
@@ -523,7 +529,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (!On || !s.LandSalesCastles) { o.Why = "Castles are not for sale (mod settings)."; return o; }
+                if (!On || !CastlesOn) { o.Why = "Castles are not for sale (mod settings)."; return o; }
                 var st = Settlement.Find(stId);
                 if (st == null || !st.IsCastle || st.Town == null) { o.Why = "This castle is not known."; return o; }
                 o.St = st; o.DistId = st.StringId; o.Name = Txt(st.Name);
@@ -628,13 +634,13 @@ namespace Armoury
                         if (recs == null) continue;
                         foreach (var r in recs) if (!SideVillageFief.IsMine(r.Uid)) l.Add(BuildSide(r.Uid));
                     }
-                if (s.LandSalesLordships && LandBk.Ready)
+                if (LordshipsOn && LandBk.Ready)
                     foreach (var t in LandBk.AllDeJure(h))
                     {
                         var f = LandBk.Fief(t);
                         if (f != null && f.IsVillage) l.Add(BuildLord(f.StringId));
                     }
-                if (s.LandSalesCastles && c.Fiefs != null)
+                if (CastlesOn && c.Fiefs != null)
                     for (int i = 0; i < c.Fiefs.Count; i++) { var f = c.Fiefs[i]; if (f != null && f.IsCastle && f.Settlement != null) l.Add(BuildCastle(f.Settlement.StringId)); }
             }
             catch (Exception e) { Stumble("OffersOf", e); }
