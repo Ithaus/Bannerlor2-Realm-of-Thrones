@@ -169,7 +169,7 @@ namespace Armoury
 
         /// <summary>Ile rod moze dac teraz (regula w naglowku). repay - splata dlugu: dodatkowo tempo jak chleb biedoty. R - rezerwa uzyta w regule,
         /// old - R z budzetu z zapisu (pierwsza doba po wczytaniu).</summary>
-        private static int ClanSpare(Clan c, bool repay, out Hero head, out double R, out bool old)
+        internal static int ClanSpare(Clan c, bool repay, out Hero head, out double R, out bool old)   // m113-zakup: internal - odkup wioski (LandSale Z7)
         {
             head = null; R = 0; old = false;
             try

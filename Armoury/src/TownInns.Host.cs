@@ -53,7 +53,7 @@ namespace Armoury
                 if (!SideVillageFief.IsMine(r.HostUid)) return SideVillageVisit.HostNear(r.HostUid, r.TownId, RoadSleepR);   // m97-wioski: wioska poboczna na ziemi rodu gracza
                 var st = mp.CurrentSettlement;
                 if (st != null) return st.StringId == r.TownId;
-                return SideVillageFief.PlayerDist() <= RoadSleepR;
+                return SideVillageFief.PlayerDist(r.HostUid) <= RoadSleepR;   // m113-zakup: ta wioska gracza (moze byc dodatkowa)
             }
             catch { return false; }
         }

@@ -469,7 +469,7 @@ namespace Armoury
 
         internal static void LevyOpenFief(MenuCallbackArgs a)
         {
-            try { LevyOpen(Settlement.Find(SideVillageFief.DistId ?? ""), SideVillageFief.Uid, true); }
+            try { LevyOpen(Settlement.Find(SideVillageFief.MenuDistId ?? ""), SideVillageFief.MenuUid, true); }   // n36: wioska otwartego menu (m113-zakup - kilka wiosek gracza)
             catch (Exception e) { LvStumble("OpenFief", e); }
         }
 

@@ -128,6 +128,10 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.DebtLadderEnabled && s.IronBankEnabled && s.ClanBudgetEnabled; } }
         internal static bool PlayerOnLadder { get { var s = Settings.Current; return On && s.PlayerSameLadder; } }
         private static bool InLadder(Clan c) { var s = Settings.Current; return c != null && (c != Clan.PlayerClan || (s != null && s.PlayerSameLadder)); }
+        /// <summary>Recenzja m113: czy wierzyciele wezma swoje z ceny ziemi rodu c (LandProceeds) - drabina wlaczona i rod w niej.</summary>
+        internal static bool TakesLandProceeds(Clan c) { return On && InLadder(c); }
+        /// <summary>Recenzja m113 (autotest LandSale T4): splata zaliczki gry w nicosc (OBIEG-1) od poczatku doby - licznik linii doby.</summary>
+        internal static long AdvNothingNow { get { return _dAdvNothing; } }
         internal static bool TakesCrownDebtFor(Clan c) { var s = Settings.Current; return On && s.WageDebtToMen && InLadder(c); }
         private static bool WalletsOn { get { var s = Settings.Current; return On && s.GameWalletsNoAdvance; } }
 
@@ -551,6 +555,49 @@ namespace Armoury
         {
             try { if (debtor != null && amount > 0) AddClaim(Of(debtor, true), great ? KGreat : KRansom, creditor, thirdsCrown, amount, (int)CampaignTime.Now.ToDays); }
             catch (Exception e) { Stumble("AddRansomDebt", e); }
+        }
+
+        /// <summary>m113-zakup: caly dlug rodu - kapital w Banku + roszczenia (zold, korona, okupy, pozyczka miejska). Miara potrzeby i upustu przy kupnie ziemi
+        /// (LandSale, Z2/Z4). Tylko odczyt; nie rzuca.</summary>
+        internal static long OwedOf(Clan c)
+        {
+            try
+            {
+                if (c == null) return 0;
+                var d = IronBank.DebtOf(c, false);
+                long bank = d != null && d.Principal >= 1 ? (long)Math.Ceiling(d.Principal) : 0;
+                return bank + ClaimsLeft(Of(c, false));
+            }
+            catch (Exception e) { Stumble("OwedOf", e); return 0; }
+        }
+
+        /// <summary>m113-zakup (Z5d): cena sprzedanej ziemi jest juz w kiesie glowy rodu (GiveGoldAction gracz -> glowa). Wierzyciele biora z niej swoje: x = min(cena,
+        /// dlug, kiesa glowy) - zdjete z glowy i rozdzielone jak zajete zloto (Distribute: Bank pierwszy, potem roszczenia wedlug kolejnosci; reszta wraca do glowy).
+        /// Dlug splacony w calosci przy zajeciu - zajecie konczy sie (EndSeizure). To NIE szczebel drabiny: sprzedaz jest dobrowolna. Zwraca oddane wierzycielom;
+        /// nie rzuca.</summary>
+        internal static long LandProceeds(Clan c, long price)
+        {
+            try
+            {
+                if (c == null || price <= 0 || !On || !InLadder(c)) return 0;   // recenzja m113: drabina wylaczona albo gracz poza nia - cena cala do sprzedawcy
+                var head = c.Leader;
+                if (head == null || !head.IsAlive) return 0;
+                long owed = OwedOf(c);
+                long x = Math.Min(price, Math.Min(owed, Math.Max(0, (long)head.Gold)));
+                if (x <= 0) return 0;
+                head.ChangeHeroGold(-(int)Math.Min(int.MaxValue, x));
+                CirculationWindows.NoteHeroGold(head, -x);
+                var l = Of(c, true);
+                var d = IronBank.DebtOf(c, false);
+                long left = Distribute(c, l, d, x);
+                if (left > 0) { head.ChangeHeroGold((int)Math.Min(int.MaxValue, left)); CirculationWindows.NoteHeroGold(head, left); x -= left; }
+                long after = OwedOf(c);
+                if (after <= 0 && l != null && l.Seized) EndSeizure(c, l, d, (int)CampaignTime.Now.ToDays);
+                Log.Info("Dlugi (168): " + c.Name + " - cena sprzedanej ziemi " + price + " zl, wierzycielom " + x + " zl (dlug " + owed + " -> " + after + ")"
+                         + (l != null && l.Seized ? ", rod dalej w zajeciu" : "") + "; sprzedaz dobrowolna, nie szczebel drabiny.");
+                return x;
+            }
+            catch (Exception e) { Stumble("LandProceeds", e); return 0; }
         }
 
         /// <summary>178: suma dlugow okupow rodu (pulap 364 D).</summary>

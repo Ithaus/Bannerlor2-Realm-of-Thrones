@@ -460,6 +460,8 @@ namespace Armoury
             ownC = Math.Max(0L, Math.Min(ownC, rentC));
             long own = ownT + ownC;
             long once = r.Today - r.TodayRefund - r.TodayCrown - r.TodayContract - r.TodayRent;   // trzecia + zdarzenia (+ reszta Today z zapisu); 185: bez kontraktu od korony; 180: bez renty korony
+            long land113 = Math.Max(0L, Math.Min(Math.Max(0L, once), r.TodayLand));   // m113-zakup: cena sprzedanej ziemi - poza jednorazowymi i wplywem doby
+            once -= land113;
             long other = a - (vd + wd + pol + sup + merc + shop + carpar);
             // f19-e3: gersuma f7-kasy pana tej doby (z renty miast, po "wlasnych") - z "ziemi" do "jednorazowych"; suma czesci bez zmian (0 bez klucza)
             long gersC; _gersByClan.TryGetValue(c, out gersC);
@@ -475,7 +477,7 @@ namespace Armoury
             _t[QOnce] = once + gersC + rentG;
             _t[QOther] = other;
             _t[QFamily] = family;
-            _t[QInflow] = a + rent + r.Today;
+            _t[QInflow] = a + rent + r.Today - land113;
             _t[QDouble] = Math.Min(Math.Max(0L, once), r.TodayEstates);
             _t[QReaver] = Math.Min(Math.Max(0L, once - _t[QDouble]), Math.Max(0L, r.TodayReaver));   // WW2 (wyspy-wolni): lup na zalogi w jednorazowych (nigdy wiecej niz one)
             _t[QGers] = gersC + rentG;   // f19-e3: "w tym" jednorazowych (QDouble i QReaver licza sie z jednorazowych zdarzen - bez gersumy); recenzja calosci: + renty z gersumy korony
@@ -556,6 +558,11 @@ namespace Armoury
             if (fiefs != null) for (int i = 0; i < fiefs.Count; i++) { var f = fiefs[i]; Ring r; if (f != null && f.Settlement != null && _rTown.TryGetValue(f.Settlement, out r)) p.LandTown += r.Avg(); }
             Ring rl; if (_rLoose.TryGetValue(c, out rl)) p.LandLoose = rl.Avg();
             p.Land = p.LandVTax + p.LandRent + p.LandTown + p.LandCastle + p.LandLoose;
+            // m113-zakup F6 (klucz SideVillageDuesInLordD): to, co pan placi graczowi za jego wioski poboczne z kiesy (srednia 28 dob sesji), pomniejsza jego ziemie i D
+            double side113 = SideVillageFief.DrawnAvg28(c);
+            if (side113 > 0) { side113 = Math.Min(side113, Math.Max(0, p.Land)); p.Land -= side113; }
+            // recenzja m113 (lustro F6, ten sam klucz): wyplaty wiosek pobocznych gracza to ziemia rodu GRACZA - ten dochod jest dokladnie w jednej ziemi (powinnosci korony, Bank)
+            if (c == Clan.PlayerClan && Settings.Current != null && Settings.Current.SideVillageDuesInLordD) { double pv = SideVillageFief.PaidAvg28Raw(); if (pv > 0) p.Land += pv; }
             p.Crown = pr.Avg(QCrown); p.Contract = pr.Avg(QContract); p.Assets = pr.Avg(QAssets);
             p.D = p.Land + p.Crown + p.Contract + p.Assets;
             p.Own = pr.Avg(QOwn); p.Once = pr.Avg(QOnce); p.Double = pr.Avg(QDouble); p.Other = pr.Avg(QOther); p.Family = pr.Avg(QFamily); p.Inflow = pr.Avg(QInflow);
@@ -722,12 +729,31 @@ namespace Armoury
                     if (_villagesOf.TryGetValue(c, out vs)) for (int i = 0; i < vs.Count; i++) { Ring r; if (vs[i] != null && _rVTax.TryGetValue(vs[i], out r)) v += r.Avg(); }
                     var sts = c.Settlements;
                     if (sts != null) for (int i = 0; i < sts.Count; i++) { var st = sts[i]; Ring r; if (st != null && st.IsVillage && _rRent.TryGetValue(st, out r)) v += r.Avg(); }
+                    if (c == Clan.PlayerClan) v += SideVillageFief.PaidAvg28();   // m113-zakup F4 (klucz SideVillageIncomeSeizable): wioski poboczne gracza to tez dochod wsi
                     return (long)Math.Max(0, v);
                 }
                 int rv; PopulationLaw.RentVillageToday.TryGetValue(c, out rv);
                 return Math.Max(0, rv);
             }
             catch { return 0; }
+        }
+
+        /// <summary>m113-zakup (LandValue): ostatnia doba pierscieni D stalego osady - vt: podatek wsi BK (wedlug posiadacza tytulu; tylko wies), lr: renta wsi / zawor miasta,
+        /// cla i podatek miasta / zamku, zawor zamku (to, co osada placi swojemu panu). false - D staly wylaczony albo osada bez pierscieni. Tylko odczyt; nie rzuca.</summary>
+        internal static bool LastDay(Settlement st, out long vt, out long lr)
+        {
+            vt = 0; lr = 0;
+            try
+            {
+                if (st == null || !StableDOn) return false;
+                bool any = false; Ring r;
+                if (_rVTax.TryGetValue(st, out r) && r.Filled > 0) { vt = r.V[(r.Head + Days - 1) % Days]; any = true; }
+                if (_rRent.TryGetValue(st, out r) && r.Filled > 0) { lr += r.V[(r.Head + Days - 1) % Days]; any = true; }
+                if (_rTown.TryGetValue(st, out r) && r.Filled > 0) { lr += r.V[(r.Head + Days - 1) % Days]; any = true; }
+                if (_rCastle.TryGetValue(st, out r) && r.Filled > 0) { lr += r.V[(r.Head + Days - 1) % Days]; any = true; }
+                return any;
+            }
+            catch { vt = 0; lr = 0; return false; }
         }
 
         /// <summary>f8-pozyczka: renta, ktora osada placi swojemu panu dziennie - srednia 28 dob z pierscieni D stalego tej osady: renta / zawor miasta (bez "wlasnych"),

@@ -86,7 +86,8 @@ namespace Armoury
 
         private static bool Menu { get { var s = Settings.Current; return s != null && s.SideVillageFiefMenu && SideVillageFief.HasFief; } }
 
-        private static Settlement District { get { var d = SideVillageFief.DistId; return d != null ? Settlement.Find(d) : null; } }
+        // m113-zakup: wies okregu wioski OTWARTEGO menu (dom, skrzynia i spacer tylko przy pierwszej wiosce - wtedy to ta sama wies)
+        private static Settlement District { get { var d = SideVillageFief.MenuDistId; return d != null ? Settlement.Find(d) : null; } }
 
         /// <summary>Partia stoi w wsi okregu (wejscie "Visit X" z menu wsi gry): spotkanie z ta osada gry - stan jak w menu "village".</summary>
         private static bool InDistrict(Settlement st)
@@ -100,7 +101,7 @@ namespace Armoury
         {
             var mp = MobileParty.MainParty;
             if (mp == null || mp.CurrentSettlement != null || mp.MapEvent != null || PlayerEncounter.Current != null || Settlement.CurrentSettlement != null) return false;
-            return TownInns.HostNearNow(SideVillageFief.DistId, SideVillageFief.Uid);
+            return TownInns.HostNearNow(SideVillageFief.MenuDistId, SideVillageFief.MenuUid);   // m113-zakup: wioska menu
         }
 
         /// <summary>Wojna gracza z krolestwem wsi okregu (jak dochod i nocleg: w wojnie wioska nie przyjmuje).</summary>
@@ -200,7 +201,7 @@ namespace Armoury
                 if (InDistrict(st))
                 {
                     _dTradeVil++;
-                    Log.Info(P + "handel w " + SideVillageFief.Name + " - z wsi okregu " + st.Name + " (" + st.StringId + "): droga gry (OpenScreenAsTrade), zloto wsi " + st.Village.Gold + ".");
+                    Log.Info(P + "handel w " + SideVillageFief.MenuName + " - z wsi okregu " + st.Name + " (" + st.StringId + "): droga gry (OpenScreenAsTrade), zloto wsi " + st.Village.Gold + ".");
                     InventoryScreenHelper.OpenScreenAsTrade(st.ItemRoster, st.Village);
                     return;
                 }
@@ -222,13 +223,13 @@ namespace Armoury
             var logic = new InventoryLogic(v.Owner);
             logic.Initialize(st.ItemRoster, PartyBase.MainParty.ItemRoster, PartyBase.MainParty.MemberRoster, true, true, CharacterObject.PlayerCharacter,
                              InventoryScreenHelper.InventoryCategoryType.None, v.MarketData, false, state.InventoryMode,
-                             new TextObject("{=!}" + SideVillageFief.Name + " - market of " + st.Name));
+                             new TextObject("{=!}" + SideVillageFief.MenuName + " - market of " + st.Name));
             logic.SetInventoryListener(listener);
             state.InventoryLogic = logic;
             int heroGold0 = Hero.MainHero.Gold, vilGold0 = v.Gold;
             state.DoneLogicExtrasDelegate = delegate { MapTradeDone(st, logic, listener, heroGold0, vilGold0); };
             _dTradeMap++;
-            Log.Info(P + "handel w " + SideVillageFief.Name + " - z mapy: towar i ceny targu wsi okregu " + st.Name + " (" + st.StringId + "), zloto wsi " + vilGold0 + ", gracza " + heroGold0 + ".");
+            Log.Info(P + "handel w " + SideVillageFief.MenuName + " - z mapy: towar i ceny targu wsi okregu " + st.Name + " (" + st.StringId + "), zloto wsi " + vilGold0 + ", gracza " + heroGold0 + ".");
             gsm.PushState(state);
         }
 
@@ -275,7 +276,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (!Menu || !s.SideVillageFiefHouse) return false;
+                if (!Menu || !s.SideVillageFiefHouse || !SideVillageFief.CurIsPrimary) return false;   // m113-zakup: dom tylko w pierwszej wiosce
                 var st = District;
                 if (st != null && AtWar(st)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}While you are at war with its lord's realm, you cannot stay in your house here."); return true; }
                 if (st != null && st.Village != null && st.Village.VillageState == Village.VillageStates.BeingRaided) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}Raiders are on these lands - not now."); return true; }
@@ -380,6 +381,9 @@ namespace Armoury
 
         private static int Count(ItemRoster r) { int k = 0; if (r != null) for (int i = 0; i < r.Count; i++) k += Math.Max(0, r.GetElementNumber(i)); return k; }
 
+        /// <summary>m113-zakup (odkup pierwszej wioski, LandSale Z7): skrzynia domu pusta - takze bez wpisow spoza gry z zapisu. Nie rzuca.</summary>
+        internal static bool ChestEmpty() { try { return (_chest == null || Count(_chest) == 0) && _chestRaw.Count == 0; } catch { return false; } }
+
         private static void ChestDone()
         {
             try
@@ -427,7 +431,7 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (!Menu || !s.SideVillageFiefWalk) return false;
+                if (!Menu || !s.SideVillageFiefWalk || !SideVillageFief.CurIsPrimary) return false;   // m113-zakup: spacer tylko z pierwszej wioski
                 var st = District;
                 if (st == null || st.Village == null) return false;
                 string dn = st.Name.ToString();

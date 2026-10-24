@@ -22,6 +22,30 @@ MLevyVillage = ludzie sondy); MoneyLedger swiata bez zmian; brak rak przy kluczu
 (takze ludzi, ktorzy nie przyszli - tylko licznik linii E4/7); tekst menu wioski odswieza sie przy wejsciu. Autotest NIE robiony (zakaz uruchamiania gry w tym kroku).
 **Status:** DO SPRAWDZENIA (build Armoury kod 0; gen_mcm Armoury 2363; bez autotestu, nie wgrane).
 
+## m113-zakup (galaz w-toku/m113-zakup, od 987e10eb) - 24.10.2026: kupno ziemi od rodow w potrzebie (wioska poboczna, Lordship, zamek)
+
+**Prosba:** Jeff: "kupno wioski za dlugi lordow ... zamek to beda ogromne sumy, bo malo kto chce sprzedac rodowa siedzibe, ale wioske tak"; 24.10: "kosztuje tyle, ile kosztuje
+i zarabia ... nie za grosze ... mozna obnizyc, jak dlugi sa za duze, ale nie nadmiernie".
+**Zmiana (B1+B2+B3 w jednym przebiegu; zasady Z1-Z9 w naglowku LandSale.cs):**
+- LandSale.cs / LandSale.Talk.cs: oferty (sprzedawca Z1, potrzeba Z2 przez ClanBudget.NeedOf, bramki Z3, cena Z4 = round100(NetDay x 364 x 14 lat [x0.85 w wojnie] x premia x (1 - upust <= 15%)),
+  kolejka i wykonanie Z5 (GiveGoldAction gracz -> glowa, przeniesienie, zwrot przy bledzie "transakcja cofnieta", DebtLadder.LandProceeds), przeniesienie Z6, odkup Z7; rozmowa
+  "I hear your house needs coin. Would you sell me land?" (hero_main_options 105) z oknem wyboru i rachunku; menu arm_sidevil_buy (indeks 5), arm_land_lord (village, indeks 8),
+  arm_side_fief_sellback; linia na sucho (raz na sesje i co 28 dob), linia doby, autotest (armoury-ziemia.flag); LandBk - odbicie BK (GetTitle, deJure, GetAllDeJure, InheritTitle, demesne).
+- LandValue.cs: ksiega wartosci ziemi - 4 sloty por roku (91 dob) z ostatniej doby pierscieni D stalego (ClanIncomeBook.LastDay), YearMean / Avg28; zapis arm_landval.
+- SideVillageFief.cs: wiele wiosek gracza (Own, pierwsza sf1 + dodatkowe arm_side_fief2), _cur menu, wybor przy dwoch w okregu, DueFor (czysta naleznosc, jeden PartsOf na okreg),
+  Pay/Expect z limitem na platnika, F2 platnik = posiadacz podatku (BK GetActualOwner), F3, F4 PaidAvg28, F6 DrawnAvg28; SideVillageHome (handel - wioska menu, dom/spacer - pierwsza).
+- ClanIncomeBook: TodayLand (cena ziemi poza jednorazowymi, D169 i D stalym), LastDay, F4 w VillageIncomeOf gracza, F6 w ziemi D stalego platnika. DebtLadder: OwedOf, LandProceeds.
+  ClanBudget.NeedOf; CrownRents.CastleNormMen; TourneyPay.ClanSpare internal; TownInns.Host i SideVillageVisit - wioska menu.
+- Klucze (grupa MCM "Land sales (m113)"): LandSales, LandSalesSideVillages, LandSalesLordships, LandSalesCastles, LandSalesSellBack, LandYearsOfPurchase 14, LandYearsAtWar 0.85,
+  LandYearsFloor 10, LandDebtDiscountMax 0.15, LandDebtRatioFrom 0.5, LandDebtRatioFull 2.0, LandCastlePremium 1.5, LandSeatPremium 2.0, LandCastleGuardShare 0.5, LandDeepDebtDays 91,
+  LandSellerCooldownDays 28, LandCastleCooldownDays 364, LandResaleDays 182, LandRelationSideVillage -10, LandRelationLordship 0, LandRelationCastle 10, LandPriceNotWindfall,
+  SideVillagePayerIsTaxHolder, SideVillageIncomeSeizable, SideVillageDuesInLordD. Opis DebtLadderEnabled: "No house ever loses a fief to its creditors; ... (Land Sales)".
+- Zapis: arm_side_fief bez zmian; nowe arm_side_fief2, arm_land113, arm_landval (brak klucza = pusto; starsza DLL: dodatkowe wioski przepadaja - linia "zapis - wioski gracza 1 + N" do recznego przywrocenia).
+**Ryzyko / co sprawdzic:** F2 zmienia platnika wioski startowej Jeffa (posiadacz Lordship wsi gry zamiast pana zamku) - sprawdzic linie doby "Wioska gracza (n20)"; F6 obniza D
+platnikow o to, co dali z kiesy (pierscien sesji - rampa 28 dob po wczytaniu); ApplyByBarter wola latki innych modow na zmiane wlasciciela (BK AddBarter, CrownRents, Kronika) - test zamku;
+odkup dopuszczony dla kazdej wioski gracza (takze startowej) po 182 dobach od Day0.
+**Status:** DO SPRAWDZENIA (build Armoury kod 0; bez autotestu i bez wgrania - gra nietknieta w tym kroku).
+
 ## m111-walka faza 1 (galaz w-toku/m111-walka) - 24.10.2026: grozni przeciwnicy w turnieju, na arenie i w pojedynku (bitwy bez zmian)
 
 **Problem:** Jeff (23.10): "jak atakuje caly czas, przeciwnik sie tylko broni; z drzewcem, ktorego sie dopiero ucze, bije duzo wyzsze poziomy; nie czulem,

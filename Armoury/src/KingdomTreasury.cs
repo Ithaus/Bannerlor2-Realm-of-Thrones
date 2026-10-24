@@ -61,6 +61,22 @@ namespace Armoury
         private static int _duesLand, _duesOld;   // 165: rody z podstawa "ziemia" D stalego / ze stara podstawa (brak pomiaru)
         private static int _duesSaved;            // f19-e3: rody z podstawa "ziemia" z zapisu (pierwsza doba po wczytaniu - pomiaru jeszcze nie ma)
 
+        /// <summary>Recenzja m113 (LandSale, cena ziemi netto): dzisiejsza stawka powinnosci wasala krolestwa k od ziemi - ta sama regula co Daily nizej (pokoj / wojna,
+        /// rampa DS); 0 - powinnosci wylaczone albo brak krolestwa. Wojna liczona stara droga (bez pamieci doby Optim - bez wplywu na jej liczniki). Nie rzuca.</summary>
+        internal static float DuesRateOf(TaleWorlds.CampaignSystem.Kingdom k)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.CrownDuesEnabled || k == null) return 0f;
+                bool war = WarOld(k);
+                float wOld = s.CrownDuesWarPercent, wNew = Math.Max(0f, Math.Min(33f, s.DsVassalAidWarPercent));
+                float pct = war ? (DsTowns.FarmsLive ? (float)(wOld + (wNew - wOld) * DsTowns.NewShare) : wOld) : s.CrownDuesPeacePercent;
+                return Math.Max(0f, Math.Min(100f, pct)) / 100f;
+            }
+            catch { return 0f; }
+        }
+
         internal static void Daily()
         {
             DuesToday.Clear();

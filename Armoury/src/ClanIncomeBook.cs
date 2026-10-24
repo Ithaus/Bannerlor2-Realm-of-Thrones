@@ -44,6 +44,7 @@ namespace Armoury
             public long TodayRentGers;                                 // recenzja calosci 18/19.10 (klucz Ks Farm Catch Up One Off): "w tym" TodayRent - czesc renty z gersumy korony tej doby (jednorazowa w D stalym); tylko pamiec
             public long TodayRansom;                                   // 178: okupy otrzymane (w Today; jednorazowe od prawdziwego platnika - 168 limit i splata kredytu)
             public long TodayShips;                                    // 3.1/3.3 (33) 181: wyplaty portow za statki (czesc TodayEvtSettl) - poza limitem KW (E2 R16 "limit bez statkow")
+            public long TodayLand;                                     // m113-zakup: cena sprzedanej ziemi (LandSale.InPay, czesc TodayEvtOther) - nie jest dochodem: poza jednorazowymi, D169 i D stalym
             public long TodayReaver;                                   // WW2 (wyspy-wolni): zelazna cena ponad s (czesc TodayEvtSettl), nabrzeze i dziesiecina korsarzy (KReaver) - kosz lupu na zalogi
             public long TodayNeedCut;                                  // recenzja calosci 18.10: zwrot f6 i renty f7 zatrzymane wedlug potrzeby (NIE w Today) - pierscien miary potrzeby; tylko pamiec
             public long WageAccLord, WageAccGar, WageAccCar;          // w biezacym rozliczeniu rodu
@@ -198,9 +199,25 @@ namespace Armoury
                 if (ReaverLaw.WindowClan(c)) all = Math.Max(0L, all - r.TodayReaver);   // WW2: lup na zalogi nie jest jednorazowym (kredyt wojenny 168 go nie widzi); recenzja - tylko rody z oknem
                 real = Math.Max(0L, Math.Min(all, r.TodayEvtSettl + r.TodayEvtOther + r.TodayThird + r.TodayRansom));
                 real = Math.Max(0L, real - r.TodayShips);   // 3.1/3.3 (33) 181: statki sprzedane portom (E3/10-E3/12) nie wchodza do limitu KW - jak dotad, gdy szly z niczego
+                if (r.TodayLand > 0) { all = Math.Max(0L, all - r.TodayLand); real = Math.Max(0L, Math.Min(all, real - r.TodayLand)); }   // m113-zakup: cena ziemi to nie wplyw (Bank, KW)
                 return true;
             }
             catch { return false; }
+        }
+
+        /// <summary>Recenzja m113: TodayLand zyje w pamieci, a Today jest w zapisie - LandSale.Export zapisuje go w arm_land113 ("t="), zeby cena ziemi sprzed zapisu
+        /// nie stala sie po wczytaniu jednorazowym wplywem (OnceToday, D169). Sam odczyt; nie rzuca.</summary>
+        internal static void ForEachTodayLand(Action<string, long> f)
+        {
+            try { foreach (var kv in _book) if (kv.Key != null && kv.Value != null && kv.Value.TodayLand > 0) f(kv.Key, kv.Value.TodayLand); }
+            catch (Exception e) { Stumble("ForEachTodayLand", e); }
+        }
+
+        /// <summary>Recenzja m113: LandSale.Import (arm_land113 po arm_clanincome) - TodayLand rodu clanId, nie wiecej niz wczytane Today. Nie rzuca.</summary>
+        internal static void RestoreLand(string clanId, long a)
+        {
+            try { Rec r; if (clanId != null && a > 0 && _book.TryGetValue(clanId, out r) && r != null) r.TodayLand = Math.Min(Math.Max(0L, r.Today), a); }
+            catch (Exception e) { Stumble("RestoreLand", e); }
         }
 
         /// <summary>MoneyLedger.OnGoldTraded: zdarzenie gry do zywego czlonka rodu od platnika spoza rodu, poza rozliczeniem rodu i naszym tickiem.</summary>
@@ -219,6 +236,7 @@ namespace Armoury
                 else if (gh == null && gp != null && gp.IsSettlement) { r.TodayEvtSettl += a; DayEvtSettl += a; }
                 else { r.TodayEvtOther += a; DayEvtOther += a; }
                 if (ShipsToPort181.InPortPay && gh == null && gp != null && gp.IsSettlement) r.TodayShips += a;   // 3.1/3.3 (33) 181: wyplata portu za statek (licznik do OnceToday)
+                if (LandSale.InPay && LandSale.NotWindfall) r.TodayLand += a;   // m113-zakup: cena ziemi (gracz -> glowa sprzedawcy, odkup, zwrot) - licznik do OnceToday i D
             }
             catch (Exception e) { Stumble("OnEvent", e); }
         }
@@ -390,7 +408,7 @@ namespace Armoury
                         }
                         IncomeToday[c] = a;
                         int b; PopulationLaw.RentToday.TryGetValue(c, out b);
-                        long inflow = (long)a + Math.Max(0, b) + r.Today;
+                        long inflow = (long)a + Math.Max(0, b) + r.Today - Math.Max(0L, Math.Min(r.Today, r.TodayLand));   // m113-zakup: bez ceny ziemi
                         r.Ring[r.Head] = Clamp(inflow);
                         r.Head = (r.Head + 1) % Days;
                         r.Filled = Math.Min(Days, r.Filled + 1);
@@ -401,6 +419,7 @@ namespace Armoury
                         r.TodayRentGers = 0;   // recenzja calosci 18/19.10 (razem z TodayRent)
                         r.TodayRansom = 0;   // 178
                         r.TodayShips = 0;   // 3.1/3.3 (33) 181
+                        r.TodayLand = 0;    // m113-zakup
                         r.TodayReaver = 0;  // WW2 (wyspy-wolni)
                         r.TodayNeedCut = 0; // recenzja calosci 18.10 (pierscien miary potrzeby - w StableClan wyzej)
                         r.D = DOf(r); r.G = g;
