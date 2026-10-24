@@ -18,7 +18,7 @@ namespace Armoury
             public string Village, District, Market, Kind; public bool Main;
             public double Units, Eff, Standing, Homesteads, Idle, Lost, Reb, RebCost;
             public int FullDay = -1, RebDay = -1, Today;
-            public long In, PaidAll; public double Paid28;
+            public long In, PaidAll; public double Paid28; public int PaidDaysN = 28;   // PaidDaysN - ile ostatnich dob obejmuje Paid28 (mniej po zapisie sprzed m112)
             public string WarWith, Paused;                           // wojna z krolestwem okregu (bez wyplat); wstrzymane z innego powodu (klucz, droga produkcji)
             internal string Dist, Part;
         }
@@ -32,11 +32,12 @@ namespace Armoury
                 string pid = PlayerClanId();
                 if (pid == null) return res;
                 int today = Today();
+                int hn = HistDays(today);                                    // m112-inwest po recenzji: zapis sprzed m112 - doby od wczytania
                 lock (Gate)
                     foreach (var r in _rows)
                     {
                         if (r.Clan != pid || (!(r.Held() > 1e-6) && r.In <= 0)) continue;
-                        var w = new MyWork { Dist = r.Dist, Part = r.Part, Main = r.Part == MainPart, Today = today, In = r.In, PaidAll = r.Out, Paid28 = r.PaidSince(today - 27) };
+                        var w = new MyWork { Dist = r.Dist, Part = r.Part, Main = r.Part == MainPart, Today = today, In = r.In, PaidAll = r.Out, Paid28 = r.PaidSince(today - 27), PaidDaysN = hn };
                         w.Kind = r.Kind >= 0 && r.Kind < Kinds ? KindName[r.Kind] : "works";
                         w.Units = r.U + r.Building(); w.Eff = r.Eff(today); w.Idle = r.I; w.Lost = r.Z; w.Reb = r.Rebuildable();
                         foreach (var l in r.Ramp) if (l.Units > 1e-9 && l.Day + l.Ready > w.FullDay) w.FullDay = l.Day + l.Ready;
@@ -58,6 +59,7 @@ namespace Armoury
                     if (v != null && VillageBook.PartsOf(v, book))
                         foreach (var p in book)
                             if (PartKey(p.Uid) == w.Part) { if (!w.Main && !string.IsNullOrEmpty(p.Name)) w.Village = p.Name; w.Homesteads = p.Nw; w.Standing = Math.Max(0, p.Nw - p.Br - p.Bf); break; }
+                    if (!w.Main && w.Village == w.Part) w.Village = "a side village of " + w.District;   // m112-inwest po recenzji: czesci nie ma w ksiedze wsi - bez surowego uid
                     IFaction mf = pc != null ? pc.MapFaction : null, df = st != null ? st.MapFaction : null;
                     if (mf != null && df != null && mf != df && FactionManager.IsAtWarAgainstFaction(mf, df)) w.WarWith = df.Name != null ? df.Name.ToString() : "them";
                     if (!On) w.Paused = "frozen - District Works is switched off in the mod settings";

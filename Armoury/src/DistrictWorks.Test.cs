@@ -113,9 +113,10 @@ namespace Armoury
                 var me = Hero.MainHero; var pc = Clan.PlayerClan;
                 // 0: stary zapis bez klucza - bez prac (piaskownica na napisie, stan przywrocony)
                 string keep = Export();
+                int hfKeep; lock (Gate) hfKeep = _histFrom;                        // m112-inwest: doba poczatku wyplat wedlug dob (piaskownica)
                 lock (Gate) { ImportNow(SaveVer + "||d:"); }
                 int zero = _rows.Count;
-                lock (Gate) { if (string.IsNullOrEmpty(keep)) { _rows.Clear(); _handed.Clear(); _handedDays.Clear(); _relDay.Clear(); } else ImportNow(keep); }
+                lock (Gate) { if (string.IsNullOrEmpty(keep)) { _rows.Clear(); _handed.Clear(); _handedDays.Clear(); _relDay.Clear(); _histFrom = hfKeep; } else ImportNow(keep); }
                 add("T0 zapis bez prac", zero == 0, "wierszy " + zero);
                 // 1: zakupy 30 000 w 4 czesci i 8 000 w inna - co do monety
                 var cand = new List<KeyValuePair<Village, List<Quote>>>();

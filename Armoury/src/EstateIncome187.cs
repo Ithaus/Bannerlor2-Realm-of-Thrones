@@ -157,6 +157,15 @@ namespace Armoury
             }
         }
 
+        /// <summary>m112-inwest po recenzji: srednia 28 dob wpisana do LastIncome przy ostatnim Average (zakladka Fiefs - LastIncome w ciagu doby rosnie o
+        /// dzisiejsze wyplaty AccumulateTradeTax). false - majatek jeszcze bez Average w tej sesji (wtedy LastIncome z zapisu).</summary>
+        internal static bool AverageOf(object estate, out int w)
+        {
+            w = 0; Avg a;
+            if (estate == null || !_avg.TryGetValue(estate, out a)) return false;
+            w = a.W; return true;
+        }
+
         // ------------------------------------------------------------ BK Estate.EstimatedDailyIncome (tylko UI i cheaty)
         /// <summary>Okno majatku: przy wylaczniku zamiast wzoru produkcji (dochodu, ktorego nie ma) srednia 28 dob z LastIncome; 0 zostaje 0.</summary>
         public static void EstimatedPostfix(object __instance, ref float __result)

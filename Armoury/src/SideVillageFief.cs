@@ -266,9 +266,11 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (__instance == null || s == null) return;
+                FiefInvestments.Opened(__instance);                    // m112-inwest po recenzji: nowy ekran - skan majatkow od nowa (nie rzuca)
                 string t = s.SideVillageFiefClanTab && HasFief ? NoFiefsText() : null;
                 string inv = null;
-                try { inv = FiefInvestments.NoFiefsText(); } catch (Exception e) { FiefInvestments.UiStumble("NoFiefsPostfix", e); }
+                if (!__instance.IsAnyValidFiefSelected)                // m112-inwest po recenzji: tekst i tak ukryty przy miastach/zamkach - bez przegladu prac i majatkow
+                    try { inv = FiefInvestments.NoFiefsText(); } catch (Exception e) { FiefInvestments.UiStumble("NoFiefsPostfix", e); }
                 if (inv != null) t = (t ?? "Your clan holds no towns or castles.") + "\n\n" + inv;
                 if (t != null) __instance.NoFiefsText = t;
             }

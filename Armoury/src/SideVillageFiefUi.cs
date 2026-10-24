@@ -127,6 +127,7 @@ namespace Armoury
 
         public SideVillageFiefsMixin(ClanFiefsVM vm) : base(vm)
         {
+            FiefInvestments.Opened(vm);                                         // m112-inwest po recenzji: nowy ekran - skan majatkow od nowa (nie rzuca)
             try { Fill(false); } catch (Exception e) { _shown = false; SideVillageFief.UiStumble("Mixin.ctor", e); }
             try { FillWorks(false); } catch (Exception e) { _wShown = false; FiefInvestments.UiStumble("Mixin.ctor(prace)", e); }
             try { FillEstates(false); } catch (Exception e) { _eShown = false; FiefInvestments.UiStumble("Mixin.ctor(majatki)", e); }
