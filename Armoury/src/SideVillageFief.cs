@@ -397,6 +397,8 @@ namespace Armoury
                     if (rv != null) { h.Patch(rv, postfix: new HarmonyMethod(typeof(SideVillageFief), nameof(NoFiefsPostfix))); _noFiefsWired = true; }
                 }
                 catch (Exception e) { _noFiefsWired = false; Stumble("EnsureHooks(Fiefs)", e); }
+                // m115: flaga panelu Finance ekranu rodu (ClanManagementVM.RefreshDailyValues) - linia prac gracza tylko tam, nie w naszych ksiegach
+                try { FinanceBox.Wire(h); } catch (Exception e) { Stumble("EnsureHooks(panel Finance)", e); }
             }
             var fin = Campaign.Current.Models != null ? Campaign.Current.Models.ClanFinanceModel : null;
             if (fin != null && !ReferenceEquals(fin, _finTriedFor))
@@ -442,13 +444,17 @@ namespace Armoury
         /// (ta sama co w podpowiedzi zlota). Tylko widok: pieniadze ida z Pay w OnDailyTick; dzienny przelew gry idzie przez CalculateClanGoldChange z pobraniem,
         /// nie przez ta metode, wiec nie ma podwojnej wyplaty. m113-zakup: linia na kazda wioske gracza (limit na platnika - ExpectEach).</summary>
         // m105-optym KtKnownPatches (KingdomTreasury.Optim105.cs): przy applyWithdrawals = false tylko odczyt, bez MBRandom; zmiana tresci = przeglad KtSkip
+        // m115 (24.10, Jeff: "skoro wioksa mi placi to ma byc na zielon w inocme i na drugim zdjeicuy"): takze linia prac gracza (DistrictWorks.AddView, klucz
+        // WorksIncomeShown) - TYLKO przy FinanceBox.In (panel Finance ekranu rodu); nasze ksiegi (ClanIncomeBook, KingdomTreasury, IronBank, BuildFunding) jej nie widza
         public static void IncomeViewPostfix(object __instance, Clan __0, bool __1, bool __2, ref ExplainedNumber __result)
         {
             try
             {
-                if (__2 || __0 == null || !HasFief || !ReferenceEquals(__0, Clan.PlayerClan)) return;
+                if (__2 || __0 == null || !ReferenceEquals(__0, Clan.PlayerClan)) return;
                 var s = Settings.Current;
-                if (s == null || !s.SideVillageFiefIncome || Campaign.Current == null || !ReferenceEquals(__instance, Campaign.Current.Models.ClanFinanceModel)) return;
+                if (s == null || Campaign.Current == null || !ReferenceEquals(__instance, Campaign.Current.Models.ClanFinanceModel)) return;
+                if (s.WorksIncomeShown && FinanceBox.In) DistrictWorks._dVwBox += DistrictWorks.AddView(ref __result, false);   // m115: tylko panel Finance (nasze ksiegi nie widza linii)
+                if (!HasFief || !s.SideVillageFiefIncome) return;
                 AddLines(ref __result);
             }
             catch (Exception e) { Stumble("IncomeViewPostfix", e); }
@@ -1095,13 +1101,16 @@ namespace Armoury
         /// <summary>Postfiks CalculateClanGoldChange czynnego modelu: rod gracza, z opisami i BEZ pobrania (podpowiedz zlota) - r4-wioska: naleznosc dnia (Due - wyplata
         /// w najblizszym OnDailyTick), nie srednia 7 dob (na starcie 0). Tylko widok: pieniadze ida z Pay, nie z modelu finansow (bez podwojnej wyplaty).
         /// m113-zakup: linia na kazda wioske gracza.</summary>
-        public static void GoldTipPostfix(object __instance, Clan __0, bool __1, bool __2, ref ExplainedNumber __result)
+        // m115: takze linia prac gracza (DistrictWorks.AddView, klucz WorksIncomeShown; __3 includeDetails - linia na wioske, bez niego najwyzej 3 linie)
+        public static void GoldTipPostfix(object __instance, Clan __0, bool __1, bool __2, bool __3, ref ExplainedNumber __result)
         {
             try
             {
-                if (!__1 || __2 || __0 == null || !HasFief || !ReferenceEquals(__0, Clan.PlayerClan)) return;
+                if (!__1 || __2 || __0 == null || !ReferenceEquals(__0, Clan.PlayerClan)) return;
                 var s = Settings.Current;
-                if (s == null || !s.SideVillageFiefIncome || Campaign.Current == null || !ReferenceEquals(__instance, Campaign.Current.Models.ClanFinanceModel)) return;
+                if (s == null || Campaign.Current == null || !ReferenceEquals(__instance, Campaign.Current.Models.ClanFinanceModel)) return;
+                if (s.WorksIncomeShown) DistrictWorks._dVwTip += DistrictWorks.AddView(ref __result, __3);   // m115: podpowiedz zlota (z opisami, bez pobrania)
+                if (!HasFief || !s.SideVillageFiefIncome) return;
                 _dTip += AddLines(ref __result);   // recenzja: obciete do tego, co platnik ma teraz (bez obietnicy +N, gdy nie ma z czego)
             }
             catch (Exception e) { Stumble("GoldTipPostfix", e); }
@@ -1696,6 +1705,7 @@ namespace Armoury
                   .Append(", nocleg pod dachem ").Append(s.SideVillageFiefLodging ? (TownInns.On ? "WL" : "WL (karczmy WYL)") : "WYL")
                   .Append(", platnik = posiadacz podatku ").Append(s.SideVillagePayerIsTaxHolder ? "WL" : "WYL")
                   .Append(" | latki: BK GiveLordshipOnKingdomJoin ").Append(_bkWired ? "wpieta" : "BRAK").Append(", podpowiedz zlota ").Append(_finWired ? "wpieta (" + (_finDecl != null ? _finDecl.Name : "?") + ")" : "BRAK")
+                  .Append(", przychod rodu (CalculateClanIncome) ").Append(_incWired ? "wpiety (" + (_incDecl != null ? _incDecl.Name : "?") + ")" : "BRAK").Append(", panel Finance (m115) ").Append(FinanceBox.State)
                   .Append(", opis startu BK (StartOptionVM.ShortDescription) ").Append(_startTxtWired ? "wpiety" : "BRAK")
                   .Append(", zakladka Fiefs: tekst ").Append(_noFiefsWired ? "wpiety" : "BRAK").Append(", lista - ").Append(SideVillageFiefUi.State)
                   .Append(", klucz ").Append(s.SideVillageFiefClanTab ? "WL" : "WYL");

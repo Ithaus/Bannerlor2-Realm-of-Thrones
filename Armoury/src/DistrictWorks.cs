@@ -171,6 +171,7 @@ namespace Armoury
                 _st = _stAll = 0; ZeroDay(); _err.Clear(); _dNotes.Clear(); _startLogged = false; _lastWeek = -1;
                 _preDay = int.MinValue; _preMs = 0;
             }
+            ViewDirty(); _dVwBox = _dVwTip = _vwStumble = 0;   // m115: widok finansow od nowa
             MenuReset();
             DistrictWorksAi.Reset();
         }
@@ -850,6 +851,7 @@ namespace Armoury
                             if (pid != null && rows[i].Clan == pid) rows[i].AddPaid(today, whole[i]);   // m112-inwest: doba wyplaty (Fiefs, komunikat dnia)
                         }
                     }
+                    if (pid != null && kv.Key == pid) ViewDirty();   // m115: widok finansow od nowa po wyplacie gracza
                 }
                 lock (Gate)
                 {
@@ -1186,6 +1188,7 @@ namespace Armoury
 
         private static void DayLine(int day, double ms)
         {
+            ViewDayLine();   // m115: linia widoku finansow (nie rzuca)
             try
             {
                 bool any;
@@ -1311,10 +1314,11 @@ namespace Armoury
             return Math.Max(1, Math.Min(28, today - from + 1));
         }
 
-        internal static void Import(string data) { lock (Gate) { _pending = string.IsNullOrEmpty(data) ? null : data; if (_pending == null) _loadNote = "zapis bez arm_works (brak prac)"; } }
+        internal static void Import(string data) { lock (Gate) { _pending = string.IsNullOrEmpty(data) ? null : data; if (_pending == null) _loadNote = "zapis bez arm_works (brak prac)"; } ViewDirty(); }   // m115: widok finansow od nowa
 
         private static void ImportNow(string t)
         {
+            ViewDirty();   // m115: widok finansow od nowa (wiersze z zapisu)
             _rows.Clear(); _handed.Clear(); _handedDays.Clear(); _relDay.Clear(); _loadBad = 0;
             try
             {

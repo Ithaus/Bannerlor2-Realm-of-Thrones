@@ -9004,6 +9004,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool InvestmentsInFiefs { get; set; } = true;
 
+        [SettingPropertyBool("Works Income Shown", HintText = "the clan screen's Finance box (Total Income, Daily Change, Expected) and your daily gold tooltip show what your village works really paid you as a green income line: the average a day over the last 28 days (at least 7 days counted), coin that comes when the district's carts return from market. No line at war with the district's realm, while the works are paused or burned. Display only - the coin still comes with the carts, never twice. Off = no such line", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool WorksIncomeShown { get; set; } = true;
+
         [SettingPropertyBool("Side Village Fief Trade", HintText = "with Side Village Fief Menu: 'Trade' in your village - buy and sell at the market of its main village: its goods, its prices, and the coin goes to that village's purse (as 'Buy products' in a village). Off = no trade option", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefTrade { get; set; } = true;
@@ -11850,6 +11854,7 @@ namespace Armoury
             s.SideVillageFiefLodging = SideVillageFiefLodging;
             s.SideVillageFiefClanTab = SideVillageFiefClanTab;
             s.InvestmentsInFiefs = InvestmentsInFiefs;
+            s.WorksIncomeShown = WorksIncomeShown;
             s.SideVillageFiefTrade = SideVillageFiefTrade;
             s.SideVillageFiefHouse = SideVillageFiefHouse;
             s.SideVillageFiefWalk = SideVillageFiefWalk;
