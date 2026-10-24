@@ -250,7 +250,7 @@ namespace Armoury
                     if (w.Paused != null) sb.Append('\n').Append(char.ToUpperInvariant(w.Paused[0])).Append(w.Paused.Substring(1));
                     if (w.Lost > 1e-3) sb.Append("\nLost to fire: ").Append(w.Lost.ToString("0.0", Inv)).Append(" units - the homesteads stand empty; you may rebuild when people come back");
                     if (w.Reb > 1e-3 && w.RebDay >= 0)
-                        sb.Append("\nLost to fire - rebuild until day ").Append(w.RebDay).Append(" (").Append(Math.Max(0, w.RebDay - w.Today)).Append(" days left, about ").Append(N0(w.RebCost)).Append(')');
+                        sb.Append("\nLost to fire - you can rebuild it for about ").Append(N0(w.RebCost)).Append(" within ").Append(Math.Max(0, w.RebDay - w.Today)).Append(" days");   // bez surowego numeru doby kampanii
                     if (w.Idle > 1e-3) sb.Append("\nIdle: ").Append(w.Idle.ToString("0.0", Inv)).Append(" units wait in empty homesteads");
                 }
                 body = sb.ToString();
