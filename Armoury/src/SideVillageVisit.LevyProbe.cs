@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -22,6 +23,10 @@ namespace Armoury
     /// poza bilansem); odmowa po werbunku - kazdy prawidlowy powod bramki to OK (z powodem), BLAD tylko werbunek ponad dzis albo wyjatek; linia doby konczy sie TAK / NIE / NIEPOKRYTY.
     /// Po recenzji: przysiolek dostaje miejsce i dotacje kazdego dnia (inaczej pelna druzyna konczy werbunek przed limitem dnia), odmowa ponad dzis liczy sie
     /// tylko po werbunku przysiolka tej doby i tylko z powodow, ktore moga stac za oproznionym przysiolkiem (druzyna, zloto - INFO); bez takiej odmowy - NIEPOKRYTY.
+    /// 113b (bieg 113b-pobor na zapisie Jeffa: kazda proba "gotowych 0 (zaufanie 0)" - obcy dla notabli okregu, VolunteerModel / BK CalculateMaximumRecruitmentIndex):
+    /// warunek testu - przy wyborze wiosek (i przysiolka w kolejnych dobach) sonda podnosi relacje gracza z notablami wsi okregu po +10 do zaufania &gt;= 3 albo
+    /// maksimum modelu (linia "TEST warunek testu: relacja z ..."); okreg z zaufaniem 0 mimo relacji 100 (prawo BK, kultura) - wioska pominieta z powodem, nastepna.
+    /// Linia doby TAK tylko przy co najmniej 1 werbunku z kontrolami, 1 odmowie ponad dzis, 1 kontroli odnowy doby i 1 kontroli przyrostu mlodych (doba rozliczenia).
     /// </summary>
     internal static partial class SideVillageVisit
     {
@@ -33,6 +38,10 @@ namespace Armoury
         private static int _pbOk, _pbBad;
         private static int _pbRec;   // test n36: werbunki sondy z kontrolami (0 - sonda nic nie sprawdzila: NIEPOKRYTY)
         private static int _pbOver;  // po recenzji: odmowy ponad dzis sprawdzone po werbunku przysiolka (0 - limit dnia nie sprawdzony: NIEPOKRYTY)
+        private static int _pbYouth;   // 113b: kontrole odnowy doby (ProbeYouth: dopisanie wobec RateOf tej wsi okregu) - 0: NIEPOKRYTY
+        private static int _pbSettle;  // 113b: kontrole przyrostu mlodych w dobie rozliczenia (co 28 dob) - 0: NIEPOKRYTY
+        private const int PbTrustWant = 3;   // 113b: zaufanie, do ktorego warunek testu podnosi relacje z notablami okregu (albo maksimum modelu)
+        private sealed class PbCand { public string Uid; public Settlement St; public double P; public int Sc, Ord; }
         // test n36: prawidlowe odmowy po werbunku - kody LevyGate i powody LevyDo (miejsce nie wystepuje: sonda wola bramke jak wioska gracza).
         // Po recenzji: tylko powody, ktore moga stac za oproznionym przysiolkiem (limit dnia, pula, podloga DOM) i bramki przed pula (wojna, rabunek, ...);
         // druzyna, zloto i nic do wziecia przychodza tylko przy gotowych >= 1 - werbunek nie oproznil przysiolka, wiec limit nie byl sprawdzony (INFO).
@@ -58,7 +67,7 @@ namespace Armoury
             return _pbFlag == 1;
         }
 
-        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbRec = 0; _pbOver = 0; _pbPrev.Clear(); _pbAcc.Clear(); }
+        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbRec = 0; _pbOver = 0; _pbYouth = _pbSettle = 0; _pbPrev.Clear(); _pbAcc.Clear(); }
 
         private static void PbCheck(StringBuilder sb, string what, bool ok, string val)
         {
@@ -116,24 +125,28 @@ namespace Armoury
             var near = new List<KeyValuePair<float, MapVillageRecord>>();
             foreach (var r in recs) if (r != null && r.Uid != null) { float d = p.Distance(new Vec2(r.X, r.Y)); if (d <= 150f) near.Add(new KeyValuePair<float, MapVillageRecord>(d, r)); }
             near.Sort((x, y) => x.Key.CompareTo(y.Key));
-            double bestP = -1, minP = double.MaxValue; int cScore = -1;
             var mf = Hero.MainHero.MapFaction;
+            var cand = new List<PbCand>();
             for (int i = 0; i < near.Count && i < 120; i++)
             {
                 var r = near[i].Value; var st = DistOf(r);
                 if (st == null || AtWar(st) || st.Village.VillageState != Village.VillageStates.Normal || WatchNow(st)) continue;
                 VillageBook.PartView me; double h, n;
                 if (!PartOf(st, r.Uid, out me, out h, out n) || Burned(me)) continue;
-                double P = me.Home + me.Away;
-                if (P > bestP) { bestP = P; _pbA = r.Uid; }
-                if (P >= 30 && P < minP) { minP = P; _pbB = r.Uid; }
                 int sc = BrakedSafe(st) ? 2 : (mf != null && st.MapFaction != null && !ReferenceEquals(mf, st.MapFaction) ? 1 : 0);
-                if (sc > cScore && sc > 0) { cScore = sc; _pbC = r.Uid; }
+                cand.Add(new PbCand { Uid = r.Uid, St = st, P = me.Home + me.Away, Sc = sc, Ord = cand.Count });
             }
-            if (_pbB == _pbA) _pbB = null;
-            if (_pbC == _pbA || _pbC == _pbB) _pbC = null;
-            Log.Info(LP + "TEST wioski: najwieksza " + (_pbA ?? "-") + " (ludzi " + bestP.ToString("0", Inv) + "), przysiolek " + (_pbB ?? "-") + " (" + (minP < double.MaxValue ? minP.ToString("0", Inv) : "-")
-                     + "), hamulec/obca " + (_pbC ?? "-") + " (rodzaj " + (cScore == 2 ? "hamulec" : cScore == 1 ? "obce krolestwo" : "-") + "), kandydatow " + near.Count + ".");
+            // 113b: kazda rola bierze pierwsza wioske ze swojej kolejnosci (najwieksza - najwiecej ludzi, przysiolek - najmniej od 30, hamulec / obce krolestwo - najblizsza),
+            // w ktorej warunek testu (PbLiftTrust - relacja z notablami okregu) daje zaufanie >= 1; okreg bez zaufania mimo relacji - jego wioski pominiete z powodem
+            var used = new HashSet<string>(StringComparer.Ordinal); var dead = new HashSet<Settlement>();
+            var la = new List<PbCand>(cand); la.Sort((x, y) => x.P != y.P ? y.P.CompareTo(x.P) : x.Ord.CompareTo(y.Ord));
+            var lb = cand.FindAll(x => x.P >= 30); lb.Sort((x, y) => x.P != y.P ? x.P.CompareTo(y.P) : x.Ord.CompareTo(y.Ord));
+            var lc = cand.FindAll(x => x.Sc > 0); lc.Sort((x, y) => x.Sc != y.Sc ? y.Sc.CompareTo(x.Sc) : x.Ord.CompareTo(y.Ord));
+            var ca = PbPick("najwieksza", la, used, dead); var cb = PbPick("przysiolek", lb, used, dead); var cc = PbPick("hamulec/obca", lc, used, dead);
+            _pbA = ca != null ? ca.Uid : null; _pbB = cb != null ? cb.Uid : null; _pbC = cc != null ? cc.Uid : null;
+            int cScore = cc != null ? cc.Sc : -1;
+            Log.Info(LP + "TEST wioski: najwieksza " + (_pbA ?? "-") + " (ludzi " + (ca != null ? ca.P.ToString("0", Inv) : "-") + "), przysiolek " + (_pbB ?? "-") + " (" + (cb != null ? cb.P.ToString("0", Inv) : "-")
+                     + "), hamulec/obca " + (_pbC ?? "-") + " (rodzaj " + (cScore == 2 ? "hamulec" : cScore == 1 ? "obce krolestwo" : "-") + "), kandydatow " + near.Count + ", po filtrach " + cand.Count + ".");
             ProbeRecruit("najwieksza", _pbA, 5);
             var rb = ProbeRecruit("przysiolek", _pbB, int.MaxValue);
             ProbeOverToday(0, _pbB, rb);   // po recenzji: limit dnia sprawdzony juz w pierwszej dobie (przysiolek oprozniony do konca dnia)
@@ -155,6 +168,81 @@ namespace Armoury
             }
             Log.Info(LP + "TEST start - werbunkow sondy z kontrolami " + _pbRec + ", odmow ponad dzis po werbunku " + _pbOver
                      + (_pbRec == 0 || _pbOver == 0 ? " - NIEPOKRYTY (sprobuje w kolejnych dobach przysiolkiem)" : "") + ".");
+        }
+
+        /// <summary>113b: pierwsza wioska z kolejnosci roli, w ktorej zaufanie po warunku testu (PbLiftTrust) &gt;= 1. Okreg z zaufaniem 0 mimo relacji - jego wioski
+        /// pomijane (te same notable, ten sam model). Najwyzej 6 okregow na role. null - brak wioski (werbunek pisze "brak wioski - INFO").</summary>
+        private static PbCand PbPick(string role, List<PbCand> order, HashSet<string> used, HashSet<Settlement> dead)
+        {
+            int tried = 0;
+            foreach (var c in order)
+            {
+                if (used.Contains(c.Uid) || dead.Contains(c.St)) continue;
+                if (tried++ >= 6) { Log.Info(LP + "TEST " + role + ": 6 okregow z zaufaniem 0 mimo warunku testu - dalsze wioski pominiete INFO."); break; }
+                int idx = PbLiftTrust(c.St, c.Uid, role);
+                if (idx >= 1) { used.Add(c.Uid); return c; }
+                dead.Add(c.St);
+                Log.Info(LP + "TEST " + role + " " + NameOf(Rec(c.Uid)) + " (" + c.Uid + ", okreg " + Txt(c.St.Name) + ") pominieta: zaufanie 0 po warunku testu - " + PbTrustWhy(c.St) + "; nastepna wioska.");
+            }
+            return null;
+        }
+
+        /// <summary>113b: warunek testu - zaufanie wioski uid (wies okregu st) co najmniej PbTrustWant: relacja gracza z notablami okregu (na miejscu, soltys pierwszy)
+        /// po +10 do 100 (ChangeRelationAction.ApplyPlayerRelation bez krewnych i okienka; mnoznik gry dal mniej niz krok - Hero.SetPersonalRelation na cel), po kazdym
+        /// kroku TrustIdx od nowa i linia "TEST warunek testu: relacja z ...". Tylko sonda (flaga + LogGate 1/2). Wycena (_lvQ) uniewazniona - nastepna liczy nowe
+        /// zaufanie. Zwraca zaufanie po zmianach (0 - relacja nic nie daje: prawo BK, kultura, wojna).</summary>
+        private static int PbLiftTrust(Settlement st, string uid, string role)
+        {
+            if (st == null || Hero.MainHero == null) return 0;
+            int idx = TrustIdx(st, uid);
+            if (idx >= PbTrustWant) return idx;
+            var me = Hero.MainHero;
+            var ns = new List<Hero>();
+            if (st.Notables != null) foreach (var n in st.Notables) if (n != null && n.IsAlive && n.CurrentSettlement == st) ns.Add(n);
+            ns.Sort((x, y) => (y.IsHeadman ? 1 : 0).CompareTo(x.IsHeadman ? 1 : 0));
+            int idx0 = idx, steps = 0;
+            foreach (var n in ns)
+            {
+                while (idx < PbTrustWant && steps < 40)
+                {
+                    int a = (int)n.GetRelationWithPlayer();
+                    if (a >= 100) break;
+                    int b = Math.Min(100, a + 10);
+                    string how = "ApplyPlayerRelation";
+                    try { ChangeRelationAction.ApplyPlayerRelation(n, b - a, false, false); } catch (Exception e) { LvStumble("ProbeTrust", e); }
+                    int r = (int)n.GetRelationWithPlayer();
+                    if (r < b)
+                    {
+                        // mnoznik gry (charyzma, cechy) dal mniej niz krok - wprost na cel
+                        try { me.SetPersonalRelation(n, b); how = "SetPersonalRelation, gra dala " + r; } catch (Exception e) { LvStumble("ProbeTrust.Set", e); }
+                        r = (int)n.GetRelationWithPlayer();
+                    }
+                    _lvQ = null;
+                    int i1 = TrustIdx(st, uid);
+                    steps++;
+                    Log.Info(LP + "TEST warunek testu: relacja z " + Txt(n.Name) + " (" + NameOf(Rec(uid)) + ") " + a + " -> " + r + ", zaufanie " + idx + " -> " + i1
+                             + " (" + how + ", rola " + role + ", okreg " + Txt(st.Name) + ", tylko ten test).");
+                    idx = i1;
+                    if (r <= a) break;   // relacja nie rosnie - nastepny notabl
+                }
+                if (idx >= PbTrustWant) break;
+            }
+            _lvQ = null;
+            if (idx >= 1 && idx < PbTrustWant)
+                Log.Info(LP + "TEST warunek testu: " + NameOf(Rec(uid)) + " zaufanie " + idx0 + " -> " + idx + " - ponizej " + PbTrustWant + ", maksimum modelu przy relacji z notablami okregu ("
+                         + PbTrustWhy(st) + "), werbunek mozliwy INFO.");
+            return idx;
+        }
+
+        private static string PbTrustWhy(Settlement st)
+        {
+            var c = Campaign.Current;
+            var m = c != null && c.Models != null ? c.Models.VolunteerModel : null;
+            string mn = m != null ? m.GetType().Name : "-";
+            int nn = 0;
+            if (st != null && st.Notables != null) foreach (var n in st.Notables) if (n != null && n.IsAlive && n.CurrentSettlement == st) nn++;
+            return "model " + mn + (mn.StartsWith("BK", StringComparison.Ordinal) ? " (Banner Kings: prawo poboru tytulu okregu - wasalstwo / hidage dla obcych, kultura, perki)" : "")
+                   + ", notabli na miejscu " + nn + (nn == 0 ? " (bez notabli zaufanie 2)" : "") + " - tego gracz relacja nie zmieni";
         }
 
         /// <summary>Test n36: miejsce w druzynie dla sondy - zdejmuje z druzyny gracza n zdrowych zwyklych ludzi (najnizszy tier, najliczniejszy rodzaj), linia w logu.
@@ -263,6 +351,7 @@ namespace Armoury
             try { ok = st != null && st.Village != null && PopulationLaw.RateOf(st.Village, out g0, out w0); } catch { ok = false; }
             double gExp = ok ? g0 : LvYouthPct;
             double addExp = Math.Max(0.0, rr.AccP) * Math.Max(0.0, gExp) / 100.0 / LvYearDays();
+            _pbYouth++;
             PbCheck(sb, "odnowa doby (" + (ok ? "przyrost wsi " + (w0 ?? "-") : "zapas") + ", g " + rr.LastG.ToString("0.####", Inv) + "/" + gExp.ToString("0.####", Inv) + ")",
                     rr.LastFb == !ok && Math.Abs(rr.LastG - gExp) <= 1e-4 && Math.Abs(rr.LastAdd - addExp) <= 1e-6 + 1e-4 * addExp,
                     "+" + rr.LastAdd.ToString("0.#####", Inv) + "/+" + addExp.ToString("0.#####", Inv));
@@ -291,6 +380,14 @@ namespace Armoury
                 _lvQ = null;
                 var q = LvQuoteFor(st, uid);
                 if (q == null || q.Hide) continue;
+                if (!_pbAfterLoad && uid == _pbB && q.Idx < 1)
+                {
+                    // 113b: przysiolek stracil zaufanie (relacja spadla, nowy notabl) - warunek testu jeszcze raz, wycena od nowa
+                    PbLiftTrust(st, uid, "przysiolek doba " + d);
+                    _lvQ = null;
+                    q = LvQuoteFor(st, uid);
+                    if (q == null || q.Hide) continue;
+                }
                 var sb = new StringBuilder(500);
                 sb.Append(LP).Append("TEST doba ").Append(d).Append(' ').Append(NameOf(Rec(uid))).Append(": pula ").Append(q.Pool.ToString("0.##", Inv)).Append(" z ").Append(q.Cap.ToString("0.##", Inv))
                   .Append(", etap ").Append(q.Stage).Append(", gotowych ").Append(q.Ready).Append(", dzis ").Append(q.Today).Append(", mozna ").Append(q.Callable)
@@ -302,10 +399,12 @@ namespace Armoury
                 double prev; var rq = LvGet(uid);
                 bool hp = _pbPrev.TryGetValue(uid, out prev);
                 // n36 (P3): pula rosnie tylko w dobie rozliczenia - o rozliczony przyrost w toku (z dobowej stopy wsi okregu), do pulapu. Recenzja n36: kontrola z doby
-                // rozliczenia, nie z samego wzrostu puli - rozliczenie policzone, a niedopisane do puli, to BLAD, nie cisza
-                if (hp && rq != null && rq.SettleDay == today && rq.LastSettle > 1e-9)
+                // rozliczenia, nie z samego wzrostu puli - rozliczenie policzone, a niedopisane do puli, to BLAD, nie cisza. 113b: takze rozliczenie 0 (wies okregu
+                // nie rosla) - pula nie moze wtedy wzrosnac
+                if (hp && rq != null && rq.SettleDay == today)
                 {
-                    double exp = Math.Min(q.Cap, prev + rq.LastSettle) - prev;
+                    double exp = Math.Min(q.Cap, prev + Math.Max(0.0, rq.LastSettle)) - prev;
+                    _pbSettle++;
                     PbCheck(sb, "przyrost mlodych", Math.Abs(q.Pool - prev - exp) <= Math.Max(0.05, 0.02 * Math.Abs(exp)), "+" + (q.Pool - prev).ToString("0.###", Inv) + "/+" + exp.ToString("0.###", Inv));
                 }
                 else if (hp && q.Pool > prev + 1e-9) sb.Append(" | pula +").Append((q.Pool - prev).ToString("0.###", Inv)).Append(" poza rozliczeniem (nowy wpis albo pulap wzrosl) INFO");
@@ -319,8 +418,10 @@ namespace Armoury
                 var r = LvGet(uid);
                 _pbPrev[uid] = r != null ? r.Pool : q.Cap;
             }
+            // 113b: TAK tylko, gdy byl werbunek z kontrolami, odmowa ponad dzis, kontrola odnowy doby i kontrola przyrostu mlodych (doba rozliczenia, 28 dob od wpisu)
             Log.Info(LP + "TEST doba " + d + " - razem OK " + _pbOk + ", BLAD " + _pbBad + ", werbunkow sondy z kontrolami " + _pbRec + ", odmow ponad dzis po werbunku " + _pbOver
-                     + " = " + (_pbBad > 0 ? "NIE" : (_pbRec == 0 || _pbOver == 0) && !_pbAfterLoad ? "NIEPOKRYTY" : "TAK") + (_pbAfterLoad ? " (po wczytaniu - tylko kontrole)" : "") + ".");
+                     + ", kontroli odnowy doby " + _pbYouth + ", kontroli rozliczenia " + _pbSettle
+                     + " = " + (_pbBad > 0 ? "NIE" : (_pbRec == 0 || _pbOver == 0 || _pbYouth == 0 || _pbSettle == 0) && !_pbAfterLoad ? "NIEPOKRYTY" : "TAK") + (_pbAfterLoad ? " (po wczytaniu - tylko kontrole)" : "") + ".");
         }
 
         /// <summary>Po recenzji: odmowa ponad dzis (przysiolek). Liczy sie tylko po werbunku przysiolka tej doby (sonda dala miejsce i zloto na wszystkich gotowych,
