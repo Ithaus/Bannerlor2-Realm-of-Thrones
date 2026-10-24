@@ -64,7 +64,7 @@ namespace CrashScribe
     /// "AUTOTEST BITWA BLAD GRY (...)" (u gracza ten sam klik wywrocilby gre), bieg dalej. Skrypt liczy kazda linie
     /// "AUTOTEST BITWA BLAD" jako blad testu bitew.
     /// </summary>
-    internal static class AutotestBattle
+    internal static partial class AutotestBattle
     {
         internal static int Battles;               // "battles" (0 = brak bitew)
         internal static int BattleSec = 150;       // "battle_s": sekundy rzeczywiste na jedna bitwe
@@ -80,7 +80,8 @@ namespace CrashScribe
         private const double ArenaGoLimitS = 90.0, ArenaLoadLimitS = 300.0, ArenaSec = 120.0;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        private enum Ph { Idle, ArenaGo, ArenaLoad, ArenaFight, ArenaEnd, Leave, Spawn, Meet, Attack, Load, Fight, Ending, After, Cleanup, Over }
+        // m113-turniej: fazy turnieju na koncu (zakresy ArenaGo..ArenaEnd i Leave..Load bez zmian)
+        private enum Ph { Idle, ArenaGo, ArenaLoad, ArenaFight, ArenaEnd, Leave, Spawn, Meet, Attack, Load, Fight, Ending, After, Cleanup, Over, TourGo, TourLoad, TourRun, TourEnd, TourAfter }
         private static Ph _ph = Ph.Idle;
         private static double _phAt, _actAt, _beginAt, _fightAt, _lastProgress;
         private static int _n;                     // biezaca bitwa 1..Battles
@@ -119,9 +120,11 @@ namespace CrashScribe
             Battles = Autotest.Int(json, "battles", 0, 0, 50);
             BattleSec = Autotest.Int(json, "battle_s", 150, 20, 3600);
             ArenaOn = Autotest.Int(json, "arena", 1, 0, 1) == 1 && !string.Equals(Autotest.Raw(json, "arena"), "false", StringComparison.OrdinalIgnoreCase);
+            ParseTour(json);   // m113-turniej: klucze "tournament" / "tournament_s"
         }
 
-        internal static bool Pending { get { return Battles > 0 && !_over; } }
+        // m113-turniej: etap istnieje takze przy samym turnieju (battles 0)
+        internal static bool Pending { get { return (Battles > 0 || TourOn) && !_over; } }
 
         private static Kind KindOf(int n) { return Plan[(Math.Max(1, n) - 1) % Plan.Length]; }
 
@@ -132,17 +135,20 @@ namespace CrashScribe
 
         internal static string Describe()
         {
-            if (Battles <= 0) return "";
+            if (Battles <= 0 && !TourOn) return "";
+            string tour = TourDescribe();   // m113-turniej: "" bez klucza "tournament"
+            if (Battles <= 0) return tour;
             var parts = new List<string>();
             for (int i = 1; i <= Math.Min(Battles, 6); i++) parts.Add(i + "=" + KindName(KindOf(i)) + "/" + EnemySizes[(i - 1) % EnemySizes.Length]);
-            return (ArenaOn ? "arena (walka cwiczebna, do " + (int)ArenaSec + " s) + " : "") + Battles + " x bitwa w polu z bandytami (do " + BattleSec + " s rzeczywistych kazda; plan/wrogowie "
+            return (tour.Length > 0 ? tour + " + " : "") + (ArenaOn ? "arena (walka cwiczebna, do " + (int)ArenaSec + " s) + " : "") + Battles + " x bitwa w polu z bandytami (do " + BattleSec + " s rzeczywistych kazda; plan/wrogowie "
                    + string.Join(", ", parts.ToArray()) + (Battles > 6 ? ", ..." : "") + ") po osadzeniu w miescie, przed pierwsza doba biegu";
         }
 
         internal static string Summary()
         {
-            if (Battles <= 0) return "";
-            return " | bitwy " + _played + "/" + Battles + " (wygrane " + _won + ", przegrane " + _lost + ", odwrot/limit " + _timeouts
+            if (Battles <= 0 && !TourOn) return "";
+            if (Battles <= 0) return TourSummary();   // m113-turniej: sam turniej
+            return TourSummary() + " | bitwy " + _played + "/" + Battles + " (wygrane " + _won + ", przegrane " + _lost + ", odwrot/limit " + _timeouts
                    + (_notStarted > 0 ? ", nie ruszyly " + _notStarted : "") + (_errors > 0 ? ", bledy bitwy " + _errors : "") + (_gameErrors > 0 ? " (w tym gry " + _gameErrors + ")" : "")
                    + (_modErrors > 0 ? ", wyjatki modow " + _modErrors : "") + (Leftover.Count > 0 ? ", druzyny wroga zostaly " + Leftover.Count : "") + ")"
                    + (ArenaOn ? " | arena " + (_arenaDone > 0 ? "KONIEC" : _arenaNot > 0 ? "NIE RUSZYLA" : "nie doszla") : "");
@@ -325,7 +331,8 @@ namespace CrashScribe
             _beginAt = t;
             ResetBattle();
             Note("AUTOTEST BITWA plan: " + Describe() + " | " + Autotest.Where(), true);
-            Go(ArenaOn ? Ph.ArenaGo : Ph.Leave, t);
+            // m113-turniej: najpierw turniej w miescie (potem arena i bitwy jak dotad; przy battles 0 tylko turniej)
+            Go(TourOn ? Ph.TourGo : ArenaOn ? Ph.ArenaGo : Ph.Leave, t);
         }
 
         /// <summary>Miekki limit biegu w trakcie bitew: biezaca bitwa konczy sie odwrotem, nastepnych nie ma.</summary>
@@ -338,7 +345,7 @@ namespace CrashScribe
             }
         }
 
-        private static bool InMissionPhase() { return _ph == Ph.ArenaLoad || _ph == Ph.ArenaFight || _ph == Ph.ArenaEnd || _ph == Ph.Load || _ph == Ph.Fight || _ph == Ph.Ending || _ph == Ph.After; }
+        private static bool InMissionPhase() { return _ph == Ph.ArenaLoad || _ph == Ph.ArenaFight || _ph == Ph.ArenaEnd || _ph == Ph.Load || _ph == Ph.Fight || _ph == Ph.Ending || _ph == Ph.After || TourMission(); }
 
         /// <summary>
         /// Koniec biegu (Autotest.Finish) w trakcie bitew: etap bitew zamkniety, misja dostaje tylko zadanie zamkniecia
@@ -357,7 +364,9 @@ namespace CrashScribe
                 if (m != null)
                 {
                     open = true;
-                    if (!m.MissionEnded && (ReferenceEquals(m, _mission) || InMissionPhase())) m.EndMission();
+                    // m113-turniej: turniej konczy sie jak "Leave" gracza (pominiecie reszty meczy + Mission.EndMission)
+                    if (!m.MissionEnded && TourMission()) TourQuit(m, "koniec biegu: " + why);
+                    else if (!m.MissionEnded && (ReferenceEquals(m, _mission) || InMissionPhase())) m.EndMission();
                 }
             }
             catch (Exception e) { Own("Abort", e); }
@@ -404,12 +413,15 @@ namespace CrashScribe
                 _mission = mission;
                 _log = new AutotestBattleLog();
                 mission.AddMissionBehavior(_log);
-                Note((IsArena() ? "AUTOTEST ARENA" : Tag()) + ": liczniki dolaczone do misji (OnMissionBehaviorInitialize, zachowan misji " + mission.MissionBehaviors.Count + ")", false);
+                Note(Pfx() + ": liczniki dolaczone do misji (OnMissionBehaviorInitialize, zachowan misji " + mission.MissionBehaviors.Count + ")", false);
             }
             catch (Exception e) { Own("OnMissionInit", e); }
         }
 
         private static bool IsArena() { return _ph >= Ph.ArenaGo && _ph <= Ph.ArenaEnd; }
+
+        /// <summary>m113-turniej: przedrostek linii wedlug fazy (turniej / arena / bitwa) - poza turniejem jak dotad.</summary>
+        private static string Pfx() { return IsTour() ? "AUTOTEST TURNIEJ" : IsArena() ? "AUTOTEST ARENA" : Tag(); }
 
         // ------------------------------------------------------------------ krok (Autotest.Tick, 4 razy na sekunde)
 
@@ -439,6 +451,11 @@ namespace CrashScribe
                     case Ph.Ending: StepEnding(t); break;
                     case Ph.After: StepAfter(c, t); break;
                     case Ph.Cleanup: StepCleanup(t); break;
+                    case Ph.TourGo: StepTourGo(c, t); break;       // m113-turniej
+                    case Ph.TourLoad: StepTourLoad(t); break;
+                    case Ph.TourRun: StepTourRun(c, t); break;
+                    case Ph.TourEnd: StepTourEnd(c, t); break;
+                    case Ph.TourAfter: StepTourAfter(c, t); break;
                     case Ph.Idle:
                     case Ph.Over:
                         if (!_over) Over(t);
@@ -449,7 +466,8 @@ namespace CrashScribe
             // powtarzajacy sie blad przed misja: arena pominieta / bitwy koncza sie (sprzatanie po bitwie), bieg dob idzie dalej
             if (_stopWhy != null && Errs.Values.Any(v => v >= 40))
             {
-                if (_ph == Ph.ArenaGo || _ph == Ph.ArenaLoad) ArenaNot(t, "powtarzajacy sie blad (" + _stopWhy + ")");
+                if (_ph == Ph.TourGo || _ph == Ph.TourLoad) TourNot(t, "powtarzajacy sie blad (" + _stopWhy + ")");   // m113-turniej
+                else if (_ph == Ph.ArenaGo || _ph == Ph.ArenaLoad) ArenaNot(t, "powtarzajacy sie blad (" + _stopWhy + ")");
                 else if (_ph >= Ph.Leave && _ph < Ph.Load) Go(Ph.After, t);
             }
         }
@@ -502,7 +520,7 @@ namespace CrashScribe
             if (hero == null || !hero.IsWounded) return false;
             int before = hero.HitPoints;
             hero.HitPoints = hero.MaxHitPoints;
-            Note((IsArena() ? "AUTOTEST ARENA" : Tag()) + ": bohater ranny (" + before + "/" + hero.MaxHitPoints + " HP) - leczenie na czas testu (" + why + ")", true);
+            Note(Pfx() + ": bohater ranny (" + before + "/" + hero.MaxHitPoints + " HP) - leczenie na czas testu (" + why + ")", true);
             return true;
         }
 
@@ -1579,7 +1597,7 @@ namespace CrashScribe
             try { Sweep("koniec bitew"); } catch (Exception e) { Own("Sweep", e); }
             Note("AUTOTEST BITWY koniec: rozegrane " + _played + "/" + Battles + " (wygrane " + _won + ", przegrane " + _lost + ", odwrot/limit " + _timeouts + ", nie ruszyly " + _notStarted
                  + "), bledy bitwy " + _errors + (_gameErrors > 0 ? " (gry " + _gameErrors + ")" : "") + (_modErrors > 0 ? ", wyjatki modow " + _modErrors : "")
-                 + (ArenaOn ? " | arena: " + (_arenaDone > 0 ? "KONIEC" : _arenaNot > 0 ? "NIE RUSZYLA" : "nie doszla") : "")
+                 + (ArenaOn && Battles > 0 ? " | arena: " + (_arenaDone > 0 ? "KONIEC" : _arenaNot > 0 ? "NIE RUSZYLA" : "nie doszla") : "") + TourSummary()
                  + (_stopWhy != null ? " | przerwane: " + _stopWhy : "") + " | " + (t - _beginAt).ToString("0", Inv) + " s | dalej zwykly bieg dob", true);
             Autotest.BattlesOver(t, "bitwy za nami");
         }

@@ -40,6 +40,13 @@
 # = BLAD, takze gdy w logu jest "KONIEC OK ... dotarl". Wyjatek moda w bitwie ("AUTOTEST BITWA BLAD (") i log stoi 60 s = BLAD.
 # Bez -Battles przelacznik jak dotad; po QuitGame wywrotka przy zamykaniu jak dotad (znany blad, nie wynik testu).
 #
+# m113-turniej - TURNIEJ (-Tournament [-TournamentSec S], z -Battles albo bez): przelacznik dostaje "tournament":true i
+# "tournament_s":S (domyslnie 900); CrashScribe z etapem turnieju (napis tournament_s w DLL, np. test\CrashScribe-at-n113.dll) przed
+# arena i bitwami dolacza do turnieju w miescie startu ("Join the tournament" -> "Join"), mecze gracza z bohaterem pod SI, inne mecze
+# ogladane do polowy limitu, potem "Skip", ekran konca -> "Leave"; linie "AUTOTEST TURNIEJ". Limit czasu i start do pierwszej doby
+# dostaja S/60 + 5 min. Kod 4 przy -Tournament: TURNIEJ NIE RUSZYL, brak linii TURNIEJ KONIEC, gracz nie walczyl, 0 ciosow w turnieju
+# (przy -Battles 0 takze linie AUTOTEST BITWA BLAD). Bez -Tournament wszystko jak dotad.
+#
 # Kody wyjscia: 0 = dotarl do N dob, przy -Battles takze misje sprawdzone, i wszystko przywrocone; 1 = test nie dotarl
 # do N dob albo wywrotka (przywrocone); 2 = STOP przed testem (nic nie ruszone albo przywrocone); 3 = PRZYWRACANIE
 # NIEUDANE - w grze moze zostac DLL probny (znacznik w-toku.json zostaje, -RestoreOnly); 4 = doby OK, ale misje NIE
@@ -80,6 +87,8 @@ param(
     [int]$Battles = 0,             # AT5: tyle bitew w polu przed pierwsza doba (0 = brak)
     [int]$BattleSec = 150,         # AT5: sekundy rzeczywiste na jedna bitwe
     [switch]$NoArena,              # AT5: bez walki cwiczebnej na arenie przed bitwami
+    [switch]$Tournament,           # m113-turniej: turniej w miescie startu przed arena i bitwami (dolaczenie i gra do odpadniecia / wygranej)
+    [int]$TournamentSec = 900,     # m113-turniej: twardy limit calego turnieju w grze (s rzeczywiste, 120-3600)
     [switch]$NoSave,
     [switch]$NoQuit,
     [switch]$RestoreOnly,
@@ -546,6 +555,14 @@ if ($Battles -gt 0) {
     if ($BattleSec -lt 20) { $BattleSec = 20 }
     Log ("Bitwy: " + $Battles + " x do " + $BattleSec + " s, plan mocna / odwrot / slaba" + $(if ($NoArena) { ", BEZ areny" } else { " + arena (walka cwiczebna) przed nimi" }) + " (przed pierwsza doba, linie AUTOTEST BITWA / ARENA w autotest log)")
 }
+# m113-turniej: turniej
+if ($Tournament) {
+    $csCheckT = $(if ($csTrial.Count -gt 0) { $csTrial[0].trial } else { $csInGame })
+    if (-not (Test-HasText $csCheckT 'tournament_s')) { Log ("STOP: " + $csCheckT + " nie ma etapu turnieju (m113-turniej, brak napisu tournament_s) - podaj -CrashScribeDll z turniejem (test\CrashScribe-at-n113.dll)"); exit 2 }
+    if ($TournamentSec -lt 120) { $TournamentSec = 120 }
+    if ($TournamentSec -gt 3600) { $TournamentSec = 3600 }
+    Log ("Turniej: dolaczenie w miescie startu, mecze gracza do odpadniecia albo wygranej (bohater pod SI), limit " + $TournamentSec + " s, przed arena i bitwami (linie AUTOTEST TURNIEJ w autotest log)")
+}
 
 # ------------------------------------------------------------------ lista modow z LauncherData.xml (tylko odczyt)
 
@@ -584,6 +601,7 @@ Log ("Polecenie: [" + $workDir + "] " + $exe + " " + $argLine)
 
 $photoMin = $(if ($script:photoItems.Count -gt 0) { [int][Math]::Ceiling(3 + 1.5 * $script:photoItems.Count) } else { 0 })
 $battleMin = $(if ($Battles -gt 0) { [int][Math]::Ceiling($Battles * ($BattleSec + 240) / 60.0) + $(if ($NoArena) { 0 } else { 5 }) } else { 0 })
+if ($Tournament) { $battleMin += [int][Math]::Ceiling($TournamentSec / 60.0) + 5 }   # m113-turniej: turniej tez przed pierwsza doba
 if ($TimeoutMin -le 0) { $TimeoutMin = [int][Math]::Ceiling($Days * 25 / 60.0) + 10 + $photoMin + $battleMin }
 if ($battleMin -gt 0) { $StartMin += $battleMin }   # AT5: bitwy sa przed pierwsza doba
 Log ("Limit czasu: " + $TimeoutMin + " min (" + $Days + " dob x 25 s + 10 min" + $(if ($photoMin -gt 0) { " + zdjecia " + $photoMin + " min" } else { "" }) + $(if ($battleMin -gt 0) { " + bitwy " + $battleMin + " min" } else { "" }) + "); start do pierwszej doby " + $StartMin + " min; postoj " + $StallMin + " min")
@@ -663,13 +681,14 @@ try {
     if (Test-Path -LiteralPath $switchPath) { Remove-Item -LiteralPath $switchPath -Force; Log "Usuniety stary przelacznik." }
     # miekki limit w grze liczy sie od startu procesu gry (CrashScribe AT5); przy bitwach margines 8 min: laska 90 s na odwrot,
     # do 60 s na zamkniecie misji, zapis i wyjscie - zanim twardy limit skryptu zabije gre w srodku misji
-    $limitS = [Math]::Max(0, $TimeoutMin * 60 - $(if ($Battles -gt 0) { 480 } else { 180 }))
+    $limitS = [Math]::Max(0, $TimeoutMin * 60 - $(if ($Battles -gt 0 -or $Tournament) { 480 } else { 180 }))
     $sw = '{"run":"' + $runId + '","days":' + $Days + ',"save":' + $(if ($NoSave) { 'false' } else { 'true' }) + ',"quit":' + $(if ($NoQuit) { 'false' } else { 'true' }) +
           ',"speed":' + $Speed.ToString([Globalization.CultureInfo]::InvariantCulture) + ',"limit_s":' + $limitS
     if ($LoadSave) { $sw += ',"load":"' + $LoadSave + '"' }
     if ($Census -gt 0) { $sw += ',"census":' + $Census }
     if ($Profile) { $sw += ',"profile":true' }
     if ($Battles -gt 0) { $sw += ',"battles":' + $Battles + ',"battle_s":' + $BattleSec + $(if ($NoArena) { ',"arena":false' } else { '' }) }
+    if ($Tournament) { $sw += ',"tournament":true,"tournament_s":' + $TournamentSec }   # m113-turniej
     if ($script:photoItems.Count -gt 0) {
         $sw += ',"photos":[' + ($script:photoItems -join ',') + ']'
         if ($photoShotsEff) { $sw += ',"photo_shots":"' + $photoShotsEff + '"' }
@@ -816,7 +835,7 @@ $photoEndM = [regex]::Matches($sec, '\] (ZDJECIA (koniec|przerwane)[^\r\n]*)')
 $photoEnd = $(if ($photoEndM.Count -gt 0) { $photoEndM[$photoEndM.Count - 1].Groups[1].Value } else { '' })
 $photoMiss = ([regex]::Matches($sec, '\] ZDJECIE BRAK ')).Count
 # AT5: linie bitew tego biegu
-$bitwyM = [regex]::Matches($sec, '\] (AUTOTEST (BITW[AY]|ARENA)[^\r\n]*)')
+$bitwyM = [regex]::Matches($sec, '\] (AUTOTEST (BITW[AY]|ARENA|TURNIEJ)[^\r\n]*)')   # m113-turniej: takze linie turnieju (bez -Tournament ich nie ma)
 $bitwyKoniec = ([regex]::Matches($sec, '\] AUTOTEST BITWA KONIEC ')).Count
 $bitwyNie = ([regex]::Matches($sec, '\] AUTOTEST BITWA NIE RUSZYLA')).Count
 $bitwyBlad = ([regex]::Matches($sec, '\] AUTOTEST BITWA BLAD')).Count
@@ -847,6 +866,22 @@ if ($Battles -gt 0) {
         elseif ($arenaCiosy -le 0) { $battleWhy += '0 ciosow wrecz na arenie' }
     }
 }
+# m113-turniej: turniej sprawdzony = linia TURNIEJ KONIEC, gracz walczyl w co najmniej 1 meczu, ciosy wrecz > 0, bez NIE RUSZYL
+$turniejK = [regex]::Match($sec, '\] (AUTOTEST TURNIEJ KONIEC[^\r\n]*)')
+$turniejNie = ([regex]::Matches($sec, '\] AUTOTEST TURNIEJ NIE RUSZYL')).Count
+$turniejCiosy = 0
+$turniejWalki = 0
+if ($turniejK.Success) {
+    $tm1 = [regex]::Match($turniejK.Value, 'ciosy wrecz (\d+)'); if ($tm1.Success) { $turniejCiosy = [int]$tm1.Groups[1].Value }
+    $tm2 = [regex]::Match($turniejK.Value, 'gracz walczyl (\d+)'); if ($tm2.Success) { $turniejWalki = [int]$tm2.Groups[1].Value }
+}
+if ($Tournament) {
+    if ($turniejNie -gt 0) { $battleWhy += 'TURNIEJ NIE RUSZYL' }
+    elseif (-not $turniejK.Success) { $battleWhy += 'turniej bez linii KONIEC' }
+    elseif ($turniejWalki -le 0) { $battleWhy += 'w turnieju gracz nie walczyl' }
+    elseif ($turniejCiosy -le 0) { $battleWhy += '0 ciosow wrecz w turnieju' }
+    if ($Battles -le 0 -and $bitwyBlad -gt 0) { $battleWhy += ('linie AUTOTEST BITWA BLAD: ' + $bitwyBlad) }
+}
 $battleOk = ($battleWhy.Count -eq 0)
 
 if (-not $restoredOk) { $script:exitCode = 3 } elseif ($ok -and $battleOk) { $script:exitCode = 0 } elseif ($ok) { $script:exitCode = 4 } else { $script:exitCode = 1 }
@@ -854,7 +889,7 @@ if (-not $restoredOk) { $script:exitCode = 3 } elseif ($ok -and $battleOk) { $sc
 $rep = @()
 $rep += '=============================== WYNIK AUTOTESTU ==============================='
 $rep += ('run          : ' + $runId + '   (' + $stamp + ')')
-$rep += ('wynik        : ' + $(if ($ok -and $battleOk) { 'OK - dotarl do ' + $reachedDay + '/' + $Days + ' dob' + $(if ($Battles -gt 0) { ', misje sprawdzone' } else { '' }) } elseif ($ok) { 'DOBY OK (' + $reachedDay + '/' + $Days + '), MISJE NIE SPRAWDZONE: ' + ($battleWhy -join '; ') } elseif ($crashFail -and ($sec -match '\] KONIEC OK')) { 'BLAD - dotarl do ' + $reachedDay + '/' + $Days + ' dob, ale WYWROTKA (' + $result + ')' } else { 'NIE DOTARL (' + $result + ') - doba ' + $reachedDay + '/' + $Days }))
+$rep += ('wynik        : ' + $(if ($ok -and $battleOk) { 'OK - dotarl do ' + $reachedDay + '/' + $Days + ' dob' + $(if ($Battles -gt 0 -or $Tournament) { ', misje sprawdzone' } else { '' }) } elseif ($ok) { 'DOBY OK (' + $reachedDay + '/' + $Days + '), MISJE NIE SPRAWDZONE: ' + ($battleWhy -join '; ') } elseif ($crashFail -and ($sec -match '\] KONIEC OK')) { 'BLAD - dotarl do ' + $reachedDay + '/' + $Days + ' dob, ale WYWROTKA (' + $result + ')' } else { 'NIE DOTARL (' + $result + ') - doba ' + $reachedDay + '/' + $Days }))
 $rep += ('koniec w logu: ' + $(if ($koniec) { $koniec } else { '(brak linii KONIEC)' }))
 $rep += ('czas         : ' + [int]$elapsed.TotalMinutes + ' min ' + $elapsed.Seconds + ' s od startu gry')
 $rep += ('okna zamkn.  : ' + $okna + ' | bledy CrashScribe: ' + $bledy)
@@ -867,6 +902,11 @@ if ($crashFail -or $script:crashNote) { $rep += ('wywrotka     : ' + $result + $
 if ($Battles -gt 0) {
     $rep += ('bitwy        : ' + $bitwyKoniec + '/' + $Battles + ' z linia KONIEC, ciosy wrecz ' + $bitwyCiosy + ', wygrane ' + $bitwyWygrane + $(if ($bitwyWygrane -lt 1) { ' (UWAGA: wygrana i lup NIE sprawdzone)' } else { '' }) + $(if ($bitwyNie -gt 0) { ' | NIE RUSZYLA: ' + $bitwyNie } else { '' }) + $(if ($bitwyBlad -gt 0) { ' | BLAD: ' + $bitwyBlad } else { '' }) + $(if ($battleOk) { ' | misje sprawdzone' } else { ' | MISJE NIE SPRAWDZONE: ' + ($battleWhy -join '; ') }))
     $rep += ('arena        : ' + $(if ($NoArena) { 'wylaczona (-NoArena)' } elseif ($arenaK.Success) { $arenaK.Groups[1].Value } elseif ($arenaNie -gt 0) { 'NIE RUSZYLA' } else { 'brak linii AUTOTEST ARENA KONIEC' }))
+}
+if ($Tournament) {   # m113-turniej
+    $rep += ('turniej      : ' + $(if ($turniejK.Success) { $turniejK.Groups[1].Value } elseif ($turniejNie -gt 0) { 'NIE RUSZYL' } else { 'brak linii AUTOTEST TURNIEJ KONIEC' }) + $(if ($Battles -le 0) { $(if ($battleOk) { ' | misje sprawdzone' } else { ' | MISJE NIE SPRAWDZONE: ' + ($battleWhy -join '; ') }) } else { '' }))
+}
+if ($Battles -gt 0 -or $Tournament) {
     foreach ($bm in $bitwyM) { $rep += ('  ' + $bm.Groups[1].Value) }
 }
 $rep += ('zapisy testu : ' + $(if ($newSaves.Count -gt 0) { ($newSaves | ForEach-Object { $_.Name }) -join ', ' } else { 'brak' }))

@@ -16,6 +16,8 @@ param(
     [int]$SwitchWaitSec = 0,                            # 16.10: dluzsze czekanie na przelacznik (bank BA 600 MB laduje sie ok. 4 min); 0 = domyslne skryptu (480 s)
     [string]$ExtraAdd = '',                                # 16.10: dodatkowe pliki 'wzgledna\sciezka=zrodlo' (np. sonda geografii - test only)
     [double]$Speed = 0,                                   # 19.10 (Jeff: testy jak najszybciej): wymuszony mnoznik czasu autotestu (0 = jak w grze; max 64)
+    [switch]$Tournament,                                  # m113-turniej: turniej w miescie startu przed arena i bitwami (CrashScribe-at-n113 albo nowszy)
+    [int]$TournamentSec = 900,                            # m113-turniej: twardy limit turnieju w grze (s rzeczywiste)
     [int]$ExitQuickSec = -1                               # m105-drobne (recenzja R1): przekazane do autotest-bitwa.ps1 -ExitQuickSec (0 = stare 90 s czekania po QuitGame - bieg sprawdzajacy 8a; -1 = domyslne skryptu)
 )
 # kod wyjscia jak autotest-bitwa.ps1: 0 OK (przy -Battles misje sprawdzone), 1 nie dotarl / wywrotka, 2 stop przed testem,
@@ -94,6 +96,7 @@ if ($Profile) { $a.Profile = $true }
 if ($PhotosFile) { $a.PhotosFile = $PhotosFile }
 if ($Photos.Count -gt 0) { $a.Photos = $Photos }
 if ($Battles -gt 0) { $a.Battles = $Battles; $a.BattleSec = $BattleSec; if ($NoArena) { $a.NoArena = $true } }
+if ($Tournament) { $a.Tournament = $true; $a.TournamentSec = $TournamentSec }   # m113-turniej
 if ($SwitchWaitSec -gt 0) { $a.SwitchWaitSec = $SwitchWaitSec }
 if ($Speed -gt 0) { $a.Speed = $Speed }
 if ($ExitQuickSec -ge 0) { $a.ExitQuickSec = $ExitQuickSec }   # m105-drobne (recenzja R1)
