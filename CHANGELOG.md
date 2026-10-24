@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## n36 cena ziemi wedlug stosunku 14-20 lat (galaz w-toku/m113-cena) - 24.10.2026
+
+**Problem:** Jeff 24.10 (po uslyszeniu, ze cena = 14 lat dochodu netto pana, historycznie 10-20, typowo 20): "daj cene zalezna od relacji miedzy 14 a 20 lat, jesli
+relacja jest za niska nikt nie sprzeda, im wyzsza tym lepsza cena".
+**Zmiana (LandSale.cs Z4, LandSale.YearsFor):** lata zakupu ze stosunku glowy, ktora decyduje (sprzedawca; przy odkupie kupujacy), do gracza - ta sama liczba co brama Z3.
+Kupno: 20 lat (LandYearsWorst) przy progu rodzaju, liniowo do 14 (LandYearsOfPurchase - teraz lata NAJLEPSZE, ta sama nazwa klucza) przy progu + 60 (LandYearsRelationSpan)
+i wyzej: wioska poboczna -10 -> 20 lat, +50 -> 14; Lordship 0 -> 20, 60 -> 14; zamek 10 -> 20, 70 -> 14. Ponizej progu - bez zmian, nikt nie sprzedaje. Na to jak dotad:
+wojna x0.85, upust za dlugi do 15%, premie zamku 1.5 / siedziby 2.0, dolna granica 10 lat. Odkup odwrotnie - przyjaciel placi wiecej: 14 lat przy progu wioski (i ponizej),
+20 przy progu + 60 (inaczej niski stosunek nagradzalby gracza).
+- Gracz: odpowiedz w rozmowie ("Land goes cheaper between friends - from you I would ask 17.5 years of its income; a closer friend would pay less" / przyjaciel - "only 14"),
+  podpowiedz wiersza listy i okno rachunku ("He asks 17.5 years of its income (your relation 20; a closer friend would ask less, down to 14 at relation 50)"; odkup - "He offers
+  ... a closer friend would pay more, up to 20"); tekst nad lista mowi o 20 -> 14 lat.
+- Log: rachunek ceny (KUPNO, ODKUP, umowa w kolejce) - "stosunek R, prog M -> lata Y"; rozmowa - stosunek i lata pierwszej oferty; na sucho - krzywa lat i progi, ceny
+  wiosek z latami ze stosunku glowy rodu platnika okregu (raz na okreg), Lordship (de iure) i zamki (pan) tez; liczba ponizej progu ("nie sprzeda") przy kazdym rodzaju;
+  5 cen do sprawdzenia z "stosunek R -> lata Y".
+- Sonda (armoury-ziemia.flag): T13 "lata wedlug stosunku" zaraz po T2 - krzywa (prog, polowa, prog + 60, wyzej; odkup odwrotnie) i oferta z T2 (stosunek = glowa dzis,
+  lata = YearsFor, lata ceny = max(10, lata x wojna)). T11/T12 ustawiaja stosunek dokladnie na prog - kupno w tescie po 20 latach (najdrozej).
+- Ustawienia: LandYearsWorst 20, LandYearsRelationSpan 60 (nowe), opisy LandYearsOfPurchase, LandSales i progow stosunku; gen_mcm: zakresy 1-40 i 1-200.
+**Ryzyko / co sprawdzic:** cena przy progu rosnie z 14 do 20 lat (+43%) - oferty przy niskim stosunku drozsze niz dotad; Armoury.json Jeffa z zapisanym
+LandYearsOfPurchase 14 zostaje przy nim (teraz jako lata najlepsze), nowe klucze z domyslnych. Umowa w kolejce przepada, gdy stosunek zmieni cene miedzy oknem a wykonaniem
+(jak kazda inna zmiana ceny). Autotest NIE robiony (zakaz uruchamiania gry w tym kroku).
+**Status:** DO SPRAWDZENIA (build Armoury kod 0, 0 bledow; bez autotestu, nie wgrane).
+
 ## n36 odnowa puli poboru z przyrostu naturalnego wsi + pulap przyrostu 1.3% (galaz w-toku/n36-calosc) - 24.10.2026
 
 **Problem:** Jeff 24.10 (po zobaczeniu, ze pula mlodych wioski pobocznej rosnie o stale 1% ludzi na rok): "przyrost bierze sie z realnego wzrostu tej wioski z jedzenia

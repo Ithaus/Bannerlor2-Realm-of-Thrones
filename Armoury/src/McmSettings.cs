@@ -9048,7 +9048,7 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public int SideRecruitResettleDays { get; set; } = 364;
 
-        [SettingPropertyBool("Land Sales", HintText = "houses in need may sell you land of their own will: ask a clan leader 'I hear your house needs coin. Would you sell me land?' (or use the offer option in a side village or main village menu). The price is the holding's real worth - what it truly earns its lord a year, net of its costs, times Land Years Of Purchase - never a token price; a house deep in debt may take somewhat less. The coin goes to the seller's head and his creditors take their due from it first. Off = no land is for sale", RequireRestart = false)]
+        [SettingPropertyBool("Land Sales", HintText = "houses in need may sell you land of their own will: ask a clan leader 'I hear your house needs coin. Would you sell me land?' (or use the offer option in a side village or main village menu). The price is the holding's real worth - what it truly earns its lord a year, net of its costs, times 14 to 20 years of it by how well the seller thinks of you (Land Years Of Purchase for a close friend, Land Years Worst when he only just will sell) - never a token price; a house deep in debt may take somewhat less. The coin goes to the seller's head and his creditors take their due from it first. Off = no land is for sale", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
         public bool LandSales { get; set; } = true;
 
@@ -9068,9 +9068,17 @@ namespace Armoury
         [SettingPropertyGroup("Land sales (m113)")]
         public bool LandSalesSellBack { get; set; } = true;
 
-        [SettingPropertyInteger("Land Years Of Purchase", 1, 40, "0", HintText = "with Land Sales: the price is this many years of the holding's net income (medieval land sold at about 10 to 20 years' purchase)", RequireRestart = false)]
+        [SettingPropertyInteger("Land Years Of Purchase", 1, 40, "0", HintText = "with Land Sales: the best price - the years of the holding's net income a lord asks of a close friend (your relation at least Land Years Relation Span above the least relation he needs to sell that kind of land). Medieval land sold at about 10 to 20 years' purchase", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
         public int LandYearsOfPurchase { get; set; } = 14;
+
+        [SettingPropertyInteger("Land Years Worst", 1, 40, "0", HintText = "with Land Sales: the years of income a lord asks when he only just thinks well enough of you to sell (your relation at the least relation for that kind of land; below it nobody sells). The price falls evenly to Land Years Of Purchase as your relation rises. Selling a village back works the other way: a lord who barely likes you pays Land Years Of Purchase, a close friend up to this", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandYearsWorst { get; set; } = 20;
+
+        [SettingPropertyInteger("Land Years Relation Span", 1, 200, "0", HintText = "with Land Sales: how many points of relation above the least relation bring the price from Land Years Worst down to Land Years Of Purchase (side village -10 to 50, lordship 0 to 60, castle 10 to 70)", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandYearsRelationSpan { get; set; } = 60;
 
         [SettingPropertyFloatingInteger("Land Years At War", 0.30f, 1.00f, "0.00", HintText = "with Land Sales: while the holding's realm is at war with a major kingdom, the years of purchase are multiplied by this (land at war is riskier and sells for less)", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
@@ -9120,15 +9128,15 @@ namespace Armoury
         [SettingPropertyGroup("Land sales (m113)")]
         public int LandResaleDays { get; set; } = 182;
 
-        [SettingPropertyInteger("Land Relation Side Village", -100, 100, "0", HintText = "with Land Sales: the least relation a lord must have with you to sell you a side village", RequireRestart = false)]
+        [SettingPropertyInteger("Land Relation Side Village", -100, 100, "0", HintText = "with Land Sales: the least relation a lord must have with you to sell you a side village; at it he asks Land Years Worst, and less the better he thinks of you", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
         public int LandRelationSideVillage { get; set; } = -10;
 
-        [SettingPropertyInteger("Land Relation Lordship", -100, 100, "0", HintText = "with Land Sales Lordships: the least relation to sell you a lordship", RequireRestart = false)]
+        [SettingPropertyInteger("Land Relation Lordship", -100, 100, "0", HintText = "with Land Sales Lordships: the least relation to sell you a lordship; at it he asks Land Years Worst, and less the better he thinks of you", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
         public int LandRelationLordship { get; set; } = 0;
 
-        [SettingPropertyInteger("Land Relation Castle", -100, 100, "0", HintText = "with Land Sales Castles: the least relation to sell you a castle", RequireRestart = false)]
+        [SettingPropertyInteger("Land Relation Castle", -100, 100, "0", HintText = "with Land Sales Castles: the least relation to sell you a castle; at it he asks Land Years Worst, and less the better he thinks of you", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
         public int LandRelationCastle { get; set; } = 10;
 
@@ -11851,6 +11859,8 @@ namespace Armoury
             s.LandSalesCastles = LandSalesCastles;
             s.LandSalesSellBack = LandSalesSellBack;
             s.LandYearsOfPurchase = LandYearsOfPurchase;
+            s.LandYearsWorst = LandYearsWorst;
+            s.LandYearsRelationSpan = LandYearsRelationSpan;
             s.LandYearsAtWar = LandYearsAtWar;
             s.LandYearsFloor = LandYearsFloor;
             s.LandDebtDiscountMax = LandDebtDiscountMax;
