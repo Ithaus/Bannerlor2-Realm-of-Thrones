@@ -379,12 +379,17 @@ namespace Armoury
                 // preset ma ON), wiec gasimy u zrodla: getter ustawienia
                 // odpowiada false, caly kod taboru Spoils spi.
                 var mcmType = Type.GetType("RealisticLoot.Settings.MCMSettings, RealisticLoot");
-                var gBag = mcmType != null ? AccessTools.PropertyGetter(mcmType, "EnableBaggageTrain") : null;
-                if (gBag != null)
+                // m114-lup (recenzja): kazda latka gettera Spoils we wlasnym try - wyjatek tutaj nie moze wylaczyc reszty prawa pola bitwy (dzialka DTE, E8/A, Z2, LootTally)
+                try
                 {
-                    h.Patch(gBag, postfix: new HarmonyMethod(typeof(BattlefieldLaw), "NoBaggageTrain"));
-                    Log.Info("BattlefieldLaw: tabor Spoils (Baggage Train) wyciety na stale - wozy dzieli vanilla wg wkladu.");
+                    var gBag = mcmType != null ? AccessTools.PropertyGetter(mcmType, "EnableBaggageTrain") : null;
+                    if (gBag != null)
+                    {
+                        h.Patch(gBag, postfix: new HarmonyMethod(typeof(BattlefieldLaw), "NoBaggageTrain"));
+                        Log.Info("BattlefieldLaw: tabor Spoils (Baggage Train) wyciety na stale - wozy dzieli vanilla wg wkladu.");
+                    }
                 }
+                catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (EnableBaggageTrain)", e); }
 
                 // m114-lup (Jeff 24.10 17:40: "dostaje tylko zbroje i zero broni... wszystkich zabijam sam, wiec wszystko powinno byc moje. Cos dzieli lup zle";
                 // 17:55: "bron byla potem w ekwipunku, ale nie na ekranie lupu - jakby przeniesiona przed ekranem"). Spoils dzieli liste trofeow DRUGI raz
@@ -392,14 +397,18 @@ namespace Armoury
                 // na ekran idzie 30% sztuk od najdrozszych (zbroje), reszta (tania bron bandytow) po cichu do sakw. Dzialke gracza liczy juz BattlefieldLaw
                 // wg powalonych, wiec getter odpowiada false - cala lista trofeow na ekran. Jedyny odczyt gettera to ten podzial (_isSoloParty nietkniete:
                 // kara rannych, czas szukania, komunikat solo). Klucz SpoilsSoldierSplitOff.
-                var gPrio = mcmType != null ? AccessTools.PropertyGetter(mcmType, "EnablePrioritySystem") : null;
-                if (gPrio != null)
+                try
                 {
-                    h.Patch(gPrio, postfix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(NoSoldierSplit)));
-                    SoldierSplitWired = true;
-                    Log.Info("BattlefieldLaw: drugi podzial Spoils (Priority: 30% na ekran, reszta po cichu do sakw) wylaczony - dzialke liczy BattlefieldLaw wg powalonych.");
+                    var gPrio = mcmType != null ? AccessTools.PropertyGetter(mcmType, "EnablePrioritySystem") : null;
+                    if (gPrio != null)
+                    {
+                        h.Patch(gPrio, postfix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(NoSoldierSplit)));
+                        SoldierSplitWired = true;
+                        Log.Info("BattlefieldLaw: drugi podzial Spoils (Priority: 30% na ekran, reszta po cichu do sakw) wylaczony - dzialke liczy BattlefieldLaw wg powalonych.");
+                    }
+                    else Log.Info("BattlefieldLaw: UWAGA brak EnablePrioritySystem w Spoils - drugi podzial NIE wylaczony.");
                 }
-                else Log.Info("BattlefieldLaw: UWAGA brak EnablePrioritySystem w Spoils - drugi podzial NIE wylaczony.");
+                catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (m114 EnablePrioritySystem)", e); }
 
                 if (dmgType != null) _applyDamage = AccessTools.Method(dmgType, "ApplyDamageToLoot");
                 // m109-lup: konie i uprzaz przetrzymane w AfterGenerateLoot wracaja na liste trofeow (prefiks; Spoils wola ApplyDamageToLoot tylko w :944)
