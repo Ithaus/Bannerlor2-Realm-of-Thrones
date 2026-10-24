@@ -143,8 +143,8 @@ namespace Armoury
         private sealed class TroopRoom { internal int Room, Room0, Men, Max, Cut; }
         private static readonly Dictionary<CharacterObject, TroopRoom> _room = new Dictionary<CharacterObject, TroopRoom>();
         // m114-musztra: powody uciecia XP (wiadomosc gracza i linia "Musztra (gracz)")
-        private const int CutTop = 0, CutReady = 1, CutItem = 2, CutGold = 3, CutPerk = 4, CutKinds = 5;
-        private static readonly string[] CutWhy = { "szczyt linii (bez awansu)", "gotowi do awansu", "brak przedmiotu do awansu", "brak zlota na awans", "brak perka do awansu" };
+        private const int CutTop = 0, CutReady = 1, CutItem = 2, CutGold = 3, CutPerk = 4, CutSaddle = 5, CutKinds = 6;
+        private static readonly string[] CutWhy = { "szczyt linii (bez awansu)", "gotowi do awansu", "brak przedmiotu do awansu", "brak zlota na awans", "brak perka do awansu", "brak wolnej uprzezy (brama siodla)" };
         private static long _xpBefore;
 
         // ekrany zapasu
@@ -164,7 +164,7 @@ namespace Armoury
         {
             internal Ctx C; internal int Day = -1;
             internal double B, P, Pre, Fin, ShN, N; internal long Computed, Accepted = -1, Cut;   // ShN, N - udzial uzbrojonych wazony liczba ludzi (A niezaleznie)
-            // m114-musztra: uciete XP i ludzie wedlug powodu (CutTop..CutPerk), nazwa brakujacego przedmiotu, opis oddzialow do logu
+            // m114-musztra: uciete XP i ludzie wedlug powodu (CutTop..CutSaddle), nazwa brakujacego przedmiotu, opis oddzialow do logu
             internal readonly long[] CutBy = new long[CutKinds]; internal readonly int[] MenBy = new int[CutKinds]; internal string ItemName, CutLog;
         }
         private static PlayerRec _pr, _prLast;
@@ -1035,30 +1035,40 @@ namespace Armoury
             catch (Exception e) { Stumble("DayMessage", e); }
         }
 
-        private static string MenAre(int n) { return n == 1 ? "1 man is" : n + " men are"; }
         private static string MenNeed(int n) { return n == 1 ? "1 man needs" : n + " men need"; }
 
         /// <summary>m114-musztra: XP uciete limitem awansu gry wedlug powodu. Szczyt linii (oddzial bez celu awansu - limit gry 0) traci XP na dobre;
-        /// pozostali stoja na limicie i czekaja na awans w ekranie druzyny - gotowi albo zatrzymani tym samym wymogiem, ktory sprawdza ekran
-        /// (PartyScreenLogic.ValidateCommand: zloto, przedmiot kategorii celu w sakwach; perk - DoesPartyHaveRequiredPerksForUpgrade).</summary>
+        /// pozostali stoja na limicie - XP ponad limit tez przepada (PartyBase.OnXpChanged przycina Xp do ludzie x koszt), czekaja tylko ludzie: gotowi albo
+        /// zatrzymani tym samym wymogiem, ktory sprawdza ekran (PartyScreenLogic.ValidateCommand: zloto, przedmiot kategorii celu w sakwach; perk -
+        /// DoesPartyHaveRequiredPerksForUpgrade; brama siodla Armoury - SaddleLaw.ValidatePostfix).</summary>
         private static void CutMessage(StringBuilder sb, PlayerRec r)
         {
             long known = 0;
             for (int k = 0; k < CutKinds; k++) known += r.CutBy[k];
             if (known <= 0) { sb.Append("; ").Append(r.Cut).Append(" XP did not fit - your men already have all the experience they can hold"); return; }
             if (r.CutBy[CutTop] > 0)
-                sb.Append("; ").Append(r.CutBy[CutTop]).Append(" XP wasted - ").Append(MenAre(r.MenBy[CutTop])).Append(" at the top of their line and learn nothing more from drill");
+            {
+                int n = r.MenBy[CutTop];
+                sb.Append("; ").Append(r.CutBy[CutTop]).Append(" XP wasted - ").Append(n == 1
+                    ? "1 man is at the top of his line and learns nothing more from drill"
+                    : n + " men are at the top of their line and learn nothing more from drill");
+            }
             if (r.CutBy[CutReady] > 0)
-                sb.Append("; ").Append(r.CutBy[CutReady]).Append(" XP waiting - ").Append(r.MenBy[CutReady] == 1 ? "1 man can" : r.MenBy[CutReady] + " men can").Append(" be upgraded in the party screen");
+                sb.Append("; ").Append(r.CutBy[CutReady]).Append(" XP lost - ").Append(r.MenBy[CutReady] == 1 ? "1 man is" : r.MenBy[CutReady] + " men are")
+                  .Append(" ready to upgrade in the party screen (upgrade them, or their drill keeps going to waste)");
             if (r.CutBy[CutItem] > 0)
-                sb.Append("; ").Append(r.CutBy[CutItem]).Append(" XP waiting - ").Append(MenNeed(r.MenBy[CutItem])).Append(' ').Append(r.ItemName ?? "a horse").Append(" in your baggage to be upgraded");
+                sb.Append("; ").Append(r.CutBy[CutItem]).Append(" XP lost - ").Append(MenNeed(r.MenBy[CutItem])).Append(' ').Append(r.ItemName ?? "a horse").Append(" in your baggage before they can be upgraded");
             if (r.CutBy[CutGold] > 0)
-                sb.Append("; ").Append(r.CutBy[CutGold]).Append(" XP waiting - ").Append(MenNeed(r.MenBy[CutGold])).Append(" more gold in your purse to be upgraded");
+                sb.Append("; ").Append(r.CutBy[CutGold]).Append(" XP lost - ").Append(MenNeed(r.MenBy[CutGold])).Append(" more gold in your purse before they can be upgraded");
             if (r.CutBy[CutPerk] > 0)
-                sb.Append("; ").Append(r.CutBy[CutPerk]).Append(" XP waiting - ").Append(MenNeed(r.MenBy[CutPerk])).Append(" a perk you do not have yet to be upgraded");
+                sb.Append("; ").Append(r.CutBy[CutPerk]).Append(" XP lost - ").Append(MenNeed(r.MenBy[CutPerk])).Append(" a perk you do not have yet before they can be upgraded");
+            if (r.CutBy[CutSaddle] > 0)
+                sb.Append("; ").Append(r.CutBy[CutSaddle]).Append(" XP lost - ").Append(MenNeed(r.MenBy[CutSaddle])).Append(" a spare saddle (horse harness) before they can be upgraded to riders");
         }
 
-        /// <summary>m114-musztra: po treningu gracza - uciete XP kazdego oddzialu z powodem (do wiadomosci i linii "Musztra (gracz)"). Nic nie zmienia w grze.</summary>
+        /// <summary>m114-musztra: po treningu gracza - uciete XP kazdego oddzialu z powodem (do wiadomosci i linii "Musztra (gracz)"). Nic nie zmienia w grze.
+        /// Gotowi = tylu ludzi, ilu ekran pozwoli awansowac (PartyCharacterVM: min(ludzie, zloto / koszt, sztuki kategorii w sakwach); brama siodla: wolna
+        /// uprzaz); reszta oddzialu pod powodem, ktory ja zatrzymuje - uciete XP oddzialu dzielone miedzy gotowych i zatrzymanych wedlug ludzi.</summary>
         private static void CutSplit(PlayerRec r, MobileParty mp)
         {
             try
@@ -1067,57 +1077,83 @@ namespace Armoury
                 var hero = mp.LeaderHero ?? Hero.MainHero;
                 int gold = hero != null ? hero.Gold : int.MaxValue;
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.PartyTroopUpgradeModel : null;
+                bool saddle = SaddleLaw.On && mp.IsMainParty;
+                int spare = -1;   // wolna uprzaz druzyny (liczona raz, gdy potrzebna)
                 var log = new StringBuilder();
                 foreach (var kv in _room)
                 {
                     var t = kv.Value;
                     if (t.Cut <= 0) continue;
                     var ch = kv.Key;
-                    int why = CutTop;
+                    int why = CutTop, can = 0;
                     string item = null;
                     var ups = ch.UpgradeTargets;
                     if (t.Max > 0 && ups != null && ups.Length > 0)
                     {
-                        // najlepszy cel: gotowy wygrywa; inaczej pierwszy brak w kolejnosci ekranu (zloto, przedmiot), potem perk
-                        int best = CutKinds;
+                        // najlepszy cel: najwiecej ludzi do awansu; przy rownej liczbie pierwszy powod w kolejnosci (gotowi, przedmiot, zloto, perk, siodlo)
+                        int bestCan = -1, bestLim = CutKinds;
+                        string bestItem = null;
                         for (int u = 0; u < ups.Length; u++)
                         {
                             var tg = ups[u];
                             if (tg == null) continue;
-                            int w = CutReady;
+                            int a = t.Men, lim = CutReady;
+                            string it = null;
                             int g = 0;
                             try { g = ch.GetUpgradeGoldCost(party, u); } catch { }
                             ItemCategory cat = null;
                             try { cat = tg.UpgradeRequiresItemFromCategory; } catch { }
-                            if (g > 0 && gold < g) w = CutGold;   // ekran: zloto wodza >= koszt x liczba - choc jednego nie stac
-                            else if (cat != null && !HasCategory(party, cat)) { w = CutItem; if (item == null) try { item = cat.GetName().ToString(); } catch { } }
-                            else if (model != null) { PerkObject pk; try { if (!model.DoesPartyHaveRequiredPerksForUpgrade(party, ch, tg, out pk)) w = CutPerk; } catch { } }
-                            if (w < best) best = w;
+                            if (g > 0) { long ag = gold / g; if (ag < a) { a = (int)ag; lim = CutGold; } }   // ekran: zloto wodza >= koszt x liczba
+                            if (cat != null)
+                            {
+                                int ai = CountCategory(party, cat);
+                                if (ai < a) { a = ai; lim = CutItem; }
+                                try { it = cat.GetName().ToString(); } catch { }
+                            }
+                            if (a > 0 && model != null) { PerkObject pk; try { if (!model.DoesPartyHaveRequiredPerksForUpgrade(party, ch, tg, out pk)) { a = 0; lim = CutPerk; } } catch { } }
+                            if (a > 0 && saddle && !ch.IsMounted && SaddleLaw.Needs(tg))   // brama siodla (SaddleLaw.ValidatePostfix): piechur na jezdzca tylko z wolna uprzeza
+                            {
+                                if (spare < 0) spare = SaddleLaw.PlayerSpare();
+                                if (spare < a) { a = spare; lim = CutSaddle; }
+                            }
+                            if (a > bestCan || (a == bestCan && lim < bestLim)) { bestCan = a; bestLim = lim; bestItem = it; }
                         }
-                        why = best >= CutKinds ? CutTop : best;
+                        if (bestCan >= t.Men) { why = CutReady; can = t.Men; }
+                        else if (bestLim < CutKinds) { why = bestLim; can = Math.Max(0, bestCan); }
+                        if (why == CutItem) item = bestItem;
                     }
-                    r.CutBy[why] += t.Cut; r.MenBy[why] += t.Men;
+                    long cutReady = 0;
+                    bool part = why != CutTop && why != CutReady && can > 0;
+                    if (part)
+                    {
+                        cutReady = (long)t.Cut * can / t.Men;   // uciete XP wedlug ludzi: gotowi - reszta zatrzymana
+                        r.CutBy[CutReady] += cutReady; r.MenBy[CutReady] += can;
+                        r.CutBy[why] += t.Cut - cutReady; r.MenBy[why] += t.Men - can;
+                    }
+                    else { r.CutBy[why] += t.Cut; r.MenBy[why] += t.Men; }
                     if (why == CutItem && r.ItemName == null && item != null) r.ItemName = item.Length > 0 && "aeiouAEIOU".IndexOf(item[0]) >= 0 ? "an " + item : "a " + item;
                     if (log.Length > 0) log.Append(" | ");
                     log.Append(ch.StringId).Append(" (").Append(ch.Name).Append(", t").Append(ch.Tier).Append(") ludzi ").Append(t.Men).Append(", miejsce ").Append(t.Room0)
                        .Append(" (limit ").Append(t.Men).Append(" x ").Append(t.Max).Append("), uciete ").Append(t.Cut).Append(", powod: ").Append(CutWhy[why]);
+                    if (part) log.Append(" (gotowych ").Append(can).Append(" z ").Append(t.Men).Append(", ich uciete ").Append(cutReady).Append(')');
                 }
                 r.CutLog = log.ToString();
             }
             catch (Exception e) { Stumble("CutSplit", e); }
         }
 
-        /// <summary>m114-musztra: przedmiot kategorii w sakwach partii - ta sama proba, co PartyScreenLogic.ValidateCommand (ItemRoster wlasciciela).</summary>
-        private static bool HasCategory(PartyBase party, ItemCategory cat)
+        /// <summary>m114-musztra: sztuki kategorii w sakwach partii - ta sama proba, co PartyScreenLogic.ValidateCommand i PartyCharacterVM (ItemRoster wlasciciela).</summary>
+        private static int CountCategory(PartyBase party, ItemCategory cat)
         {
             var ir = party != null ? party.ItemRoster : null;
-            if (ir == null) return true;
+            if (ir == null) return int.MaxValue;
+            int n = 0;
             for (int i = 0; i < ir.Count; i++)
             {
                 var it = ir[i].EquipmentElement.Item;
-                if (it != null && ir[i].Amount > 0 && it.ItemCategory == cat) return true;
+                if (it != null && ir[i].Amount > 0 && it.ItemCategory == cat) n += ir[i].Amount;
             }
-            return false;
+            return n;
         }
 
         public static Exception TickFinalizer(Exception __exception) { _tick = null; _room.Clear(); return __exception; }
@@ -1842,7 +1878,7 @@ namespace Armoury
                   .Append(" -> ").Append(r.Accepted == r.Computed - r.Cut ? "ZGODNE" : "NIEZGODNE (roznica " + (r.Computed - r.Cut - r.Accepted) + ")");
                 if (r.Cut > 0)   // m114-musztra: uciete wedlug oddzialow (typ, ludzie, miejsce przed treningiem, uciete, powod)
                     sb.Append(" [uciete: szczyt linii ").Append(r.CutBy[CutTop]).Append(", gotowi ").Append(r.CutBy[CutReady]).Append(", brak przedmiotu ").Append(r.CutBy[CutItem])
-                      .Append(", brak zlota ").Append(r.CutBy[CutGold]).Append(", brak perka ").Append(r.CutBy[CutPerk]).Append(string.IsNullOrEmpty(r.CutLog) ? "" : "; " + r.CutLog).Append(']');
+                      .Append(", brak zlota ").Append(r.CutBy[CutGold]).Append(", brak perka ").Append(r.CutBy[CutPerk]).Append(", brak uprzezy ").Append(r.CutBy[CutSaddle]).Append(string.IsNullOrEmpty(r.CutLog) ? "" : "; " + r.CutLog).Append(']');
                 sb.Append("; zapas: bron ").Append(c.StockW).Append('/').Append(c.Full).Append(" (od Ciebie ").Append(c.GivenW).Append(", nadwyzka ludzi ").Append(c.SurW)
                   .Append("), zbroje ").Append(c.StockA).Append('/').Append(c.Full).Append(" (od Ciebie ").Append(c.GivenA).Append(", nadwyzka ").Append(c.SurA)
                   .Append("), Giving Hands ").Append(c.PerkW ? "tak" : "nie").Append(", Paid in Promise ").Append(c.PerkA ? "tak" : "nie")

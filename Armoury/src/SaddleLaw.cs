@@ -527,6 +527,21 @@ namespace Armoury
             return Math.Max(0, total - mounted);
         }
 
+        /// <summary>m114-musztra: wolna uprzaz druzyny gracza poza ekranem druzyny - ta sama liczba co PlayerAvail bez sesji ekranu (zaplaconych koni 0):
+        /// zbrojownia i sakwy RAZEM ponad jezdzcow z koniem. Zbrojownia nieznana - int.MaxValue (brama nie blokuje).</summary>
+        internal static int PlayerSpare()
+        {
+            try
+            {
+                var arm = PlayerArm();
+                var main = MobileParty.MainParty;
+                if (arm == null || main == null) return int.MaxValue;
+                var p = Pairs(main.MemberRoster, arm);
+                return Math.Max(0, p.Harness + BagFit(PartyBase.MainParty.ItemRoster) - Math.Min(p.Riders, p.Horses));
+            }
+            catch (Exception e) { Stumble("PlayerSpare", e); return int.MaxValue; }
+        }
+
         /// <summary>
         /// Stables.BankPaidHorses (zatwierdzony ekran druzyny, konie juz w zbrojowni): uprzaz z sakw do zbrojowni dla nowych jezdzcow bez pary - najwyzej tyle
         /// sztuk, ile koni zaplacono w tej sesji ekranu (stare braki uprzezy gracz uzupelnia sam). Sztuka z sakw do zbrojowni tej samej druzyny.
