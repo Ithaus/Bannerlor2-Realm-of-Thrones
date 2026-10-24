@@ -71,8 +71,9 @@ nikt nie logowal) - przyczyna z dekompilacji, nowa linia logu ja potwierdzi albo
   gra prowadzi / stoja, potkniecia 0, postfiksu 0); na mapie armia AI na postoju (swit po 6 dobach marszu albo oboz nocy) - figury przy wodzu w ok. 1 s;
   po ruszeniu szyk bez maruderow; przelaczenie klucza w MCM na zywo (od razu szyk gry).
 
-**Status:** ZBUDOWANE - czeka na autotest i wgranie. Build Armoury 0 bledow (bez ostrzezen w zmienionych plikach). md5 Armoury.dll - w nastepnym commicie
-(DLL zawiera hash commitu - md5 zmienia sie z kazdym commitem; przy wgraniu liczy sie przebudowa z HEAD galezi).
+**Status:** ZBUDOWANE - czeka na autotest i wgranie. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w zmienionych plikach). Armoury.dll z pelnej
+przebudowy (--no-incremental, dwa razy to samo) na commicie kodu 11980fd6: md5 07382f5f12017003888e2a34ebadec7c (DLL zawiera hash commitu - md5 zmienia sie
+z kazdym commitem, takze samego CHANGELOG; przy wgraniu liczy sie przebudowa z HEAD galezi, porownana z plikiem wgrywanym).
 
 ## 2026-10-24 111 (m117-ubranie, galaz w-toku/m117-ubranie od w-toku/m116-fabula 6cd80130) - wlasne ubranie cywilne golych zolnierzy: tunika i buty ich kultury (v2 25.10: losowo z ubran rekrutow tieru 1 i cywilow, bez zbroi)
 
