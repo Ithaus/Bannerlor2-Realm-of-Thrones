@@ -338,11 +338,36 @@ namespace Armoury
             return main != null && (ReferenceEquals(a, main) || ReferenceEquals(b, main));
         }
 
+        // po recenzji: w bitwie roznica umiejetnosci tylko przeciw graczowi i w wezszych granicach - garda gracza nigdy mniej niz RBM, garda
+        // przeciwnika nigdy wiecej; 0.75-1.25 zamiast 0.6-1.4, bo w bitwie szeregowy ma juz pule postury wedlug tieru (SoldierPostureByTier, T6 x1.7):
+        // gracz 24 na T6 180 z tarcza przy 0.6 musial zablokowac ok. 2.6 raza wiecej ciosow niz w RBM, przy 0.75 ok. 2.3 raza
+        internal const float FieldGapLo = 0.75f, FieldGapHi = 1.25f;
+
+        /// <summary>Mnoznik bitwy: mine - strona tego haka to gracz (jego garda: co najmniej x1), inaczej przeciwnik gracza (najwyzej x1).</summary>
+        internal static float FieldGapMul(float raw, bool mine)
+        {
+            float f = Clamp(raw, FieldGapLo, FieldGapHi);
+            return mine ? (f < 1f ? 1f : f) : (f > 1f ? 1f : f);
+        }
+
+        /// <summary>Brama hakow A: pojedynek albo kontakt gracza w bitwie. Po recenzji w try - wyjatek liczony, kontakt bez zmian.</summary>
+        private static bool GateA(Agent def, Agent att, out bool duel, string site)
+        {
+            duel = false;
+            try
+            {
+                var m = Mission.Current;
+                duel = BattleSense.InDuel(m);
+                return duel || FieldGap(m, def, att, Settings.Current);
+            }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, site, e); return false; }
+        }
+
         public static void DefDamagePostfix(Agent __0, Agent __1, ref AttackCollisionData __3, ref float __result)
         {
+            bool duel;
+            if (!GateA(__0, __1, out duel, "DuelGuard.DefDamage brama")) return;
             var m = Mission.Current;
-            bool duel = BattleSense.InDuel(m);
-            if (!duel && !FieldGap(m, __0, __1, Settings.Current)) return;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -351,8 +376,14 @@ namespace Armoury
                 int ht = HitType(ref __3);
                 if (ht < 2) return;
                 float f = 1f, w = Weight(c);
+                if (!duel)
+                {
+                    // bitwa: __0 obronca - jego garda; gracz broni sie (mine) albo gracz atakuje przeciwnika
+                    bool mine = __0.IsMainAgent;
+                    if (w > 0f) f = FieldGapMul(1f - w * Gap(__0, __1, c, m.CurrentTime), mine);
+                    __result *= f; FieldDuel.NoteGap(mine, true, f); return;
+                }
                 if (w > 0f) f *= Clamp(1f - w * Gap(__0, __1, c, m.CurrentTime), 0.6f, 1.4f);
-                if (!duel) { __result *= f; FieldDuel.NoteGap(__0.IsMainAgent, true, f); return; }
                 if (c.DuelPerfectDefence)
                 {
                     if (ht == 3) f *= 0.5f;          // parowanie bronia (RBM przekazuje 0.5, nadpisuje 1)
@@ -367,9 +398,9 @@ namespace Armoury
 
         public static void AttDamagePostfix(Agent __0, Agent __1, ref AttackCollisionData __3, ref float __result)
         {
+            bool duel;
+            if (!GateA(__0, __1, out duel, "DuelGuard.AttDamage brama")) return;
             var m = Mission.Current;
-            bool duel = BattleSense.InDuel(m);
-            if (!duel && !FieldGap(m, __0, __1, Settings.Current)) return;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -378,8 +409,14 @@ namespace Armoury
                 int ht = HitType(ref __3);
                 if (ht < 2) return;
                 float f = 1f, w = Weight(c);
+                if (!duel)
+                {
+                    // bitwa: __1 atakujacy - koszt jego gardy; gracz atakuje (mine) albo przeciwnik atakuje gracza
+                    bool mine = __1.IsMainAgent;
+                    if (w > 0f) f = FieldGapMul(1f + w * Gap(__0, __1, c, m.CurrentTime), mine);
+                    __result *= f; FieldDuel.NoteGap(mine, false, f); return;
+                }
                 if (w > 0f) f *= Clamp(1f + w * Gap(__0, __1, c, m.CurrentTime), 0.6f, 1.4f);
-                if (!duel) { __result *= f; FieldDuel.NoteGap(__1.IsMainAgent, false, f); return; }
                 if (c.DuelPerfectDefence && ht == 7) f *= 2f;      // chamber atakujacy (2.0)
                 __result *= f;
             }
@@ -402,7 +439,8 @@ namespace Armoury
             var c = Settings.Current;
             if (c == null) return false;
             if (def.IsMainAgent || att.IsMainAgent) return FieldDuel.AnyKey(c);
-            return FieldDuel.BurstsOn(c) && def.IsAIControlled && IsHero(def);
+            // po recenzji: najpierw pole zarzadzane (Character.IsHero), potem IsAIControlled (odczyt wskaznika silnika) - najtanszy chybiony kontakt
+            return FieldDuel.BurstsOn(c) && IsHero(def) && def.IsAIControlled;
         }
 
         private static bool IsHero(Agent a)
@@ -415,9 +453,13 @@ namespace Armoury
         {
             __state = -1f;
             if (__0 == null) return;
-            var m = Mission.Current;
-            if (!BattleSense.InDuel(m) && !FieldTrack(m, __1, __2)) return;
-            try { __state = PostureOf(__0); }
+            // po recenzji: brama (FieldTrack czyta agentow) w try - wyjatek liczony, nigdy nie wychodzi z haka
+            try
+            {
+                var m = Mission.Current;
+                if (!BattleSense.InDuel(m) && !FieldTrack(m, __1, __2)) return;
+                __state = PostureOf(__0);
+            }
             catch (Exception e) { __state = -1f; RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.HandlePrefix", e); }
         }
 

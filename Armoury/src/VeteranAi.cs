@@ -35,8 +35,9 @@ namespace Armoury
     /// zmian. Brama galezi RBM (RbmBranchOn) wspolna; czynnik zmeczenia RBM sFac = clamp(AIDecideOnAttackChance / 0.5, 0.85, 1) czytany na wejsciu.
     /// m113-walka2 faza 2 (24.10, Jeff po fazie 1: walka w polu ma byc trudniejsza): w bitwie bohater AI (lord, towarzysz, przeciwnik-bohater) od
     /// poziomu 0.40 dostaje profil DuelAi (DuelistsInBattles, DuelAi.ApplyField, runda 0), ponizej - regula weteranow z tierem co najmniej
-    /// z najlepszej umiejetnosci (HeroTierFromSkill, SkillTier); VeteranAggressionFix - agresja tieru tylko w AIAttackOnDecideChance (mnozenie
-    /// AIDecideOnAttackChance, szansy porzucenia zamachu, robilo weterana bardziej biernym). Srednie AoD / DoA wedlug tieru do linii FieldDuel.
+    /// z najlepszej umiejetnosci (HeroTierFromSkill, SkillTier); VeteranAggressionFix - AIDecideOnAttackChance (szansa porzucenia zamachu) bez
+    /// mnozenia w gore od T4 (robilo weterana bardziej biernym), T1-T3 dalej w dol jak w 106. Srednie AoD / DoA wedlug tieru do linii FieldDuel.
+    /// Po recenzji: bohater z profilem dostaje co najmniej prog tieru z reguly weteranow (DuelAi.ApplyField, TierMin).
     /// </summary>
     internal static class VeteranAi
     {
@@ -379,9 +380,10 @@ namespace Armoury
 
                 // (3) agresja wedlug tieru (RBM: stale 0.5 x zmeczenie i 0.15 / 0.3 konno). m113-walka2 (VeteranAggressionFix): AIDecideOnAttackChance
                 // to szansa porzucenia zamachu dla decyzji (profil DuelAi obniza ja z umiejetnoscia 0.50 -> 0.35, zryw otwarcia daje 0.10) - mnozenie przez
-                // agresje T6 x1.20 kazalo weteranowi czesciej rezygnowac z ataku; z kluczem agresja idzie tylko w atak po decyzji
+                // agresje T6 x1.20 kazalo weteranowi czesciej rezygnowac z ataku; z kluczem odpada tylko mnozenie w gore (T4+ zostaje 0.50), T1-T3
+                // dalej x0.80 / x0.88 / x0.96 jak w 106 (po recenzji: bez tego rekrut porzucal zamach do 25% czesciej - walka latwiejsza, nie trudniejsza)
                 float agg = 0.8f + 0.08f * (tier - 1);
-                if (!c.VeteranAggressionFix) p.AIDecideOnAttackChance = Clamp(p.AIDecideOnAttackChance * agg, 0f, 1f);
+                if (!c.VeteranAggressionFix || agg < 1f) p.AIDecideOnAttackChance = Clamp(p.AIDecideOnAttackChance * agg, 0f, 1f);
                 p.AIAttackOnDecideChance = Clamp(p.AIAttackOnDecideChance * agg, 0.05f, 0.6f);
 
                 int id = agent.Index;

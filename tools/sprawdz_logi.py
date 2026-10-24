@@ -1869,6 +1869,13 @@ Uzycie (Python 3, tylko odczyt):
                     w kazdym logu: latka TAK (albo juz wpieta), act_inventory_idle_start i act_tableau_hand_armor_pose >= 0, OK (brak linii - NIE: latka HP
                     w PatchAll psula indeksy, 105.1-105.3). ANIM-2 linie testu 'Ekwipunek (test m110): start' (armoury-ekwipunek.flag): akcje >= 0 (brak - INFO).
                     ANIM-3 linia 'Modele przedmiotow (m110): start sesji' przy kazdym wczytaniu (klucz NIE - INFO), ERROR ItemModels. 0; bez zamiennika - INFO.
+--grupa m113walka : (24.10, w-toku/m113-walka2 faza 2 - trudniejsza walka w bitwach: FieldDuel.cs, DuelAi.ApplyField, VeteranAi, DuelGuard, DuelCraft)
+                    python -I tools/sprawdz_logi.py --grupa m113walka <Armoury-*.log>. M113-0 linia 'Bitwa (m113-walka2) tabela' przy starcie sesji, bez
+                    'UWAGA: lezy CrashScribe/armoury-pojedynek-test.flag' (flaga testu pojedynku robi z bitwy pojedynek - linii bitwy nie ma). M113-1 linie
+                    'Bitwa (m113-walka2): misja' - co najmniej jedna (bieg-bitwa.ps1 -Battles N: N linii, mniej - NIE). M113-2 w kazdej linii 'potkniecia
+                    weteran 0, pojedynek 0'. M113-3 'haki' nie '?' i A / B bez 'NIE', gdy tabela mowi 'haki bitwy potrzebne' (inaczej INFO). M113-4 udzial
+                    wywolan bohaterow w zrywie <= 25% (wiecej - NIE; brak bohaterow - INFO). Porownanie A/B (klucze TAK / NIE) - srednie AoD/DoA wedlug tieru
+                    z linii misji, recznie.
 --grupa m110hp    : (23.10, galaz w-toku/m110-stan krok 2 - Jeff 23.10 ok. 15:50 "tak": sprzet noszony przez gracza i towarzyszy chroni wedlug dokladnego HP;
                     Armoury/src/HeroHp.cs, HeroBook.cs, FieldCraft.cs, ArmouryBehavior.cs; klucze Worn Exact Hp Protection, Companion Gear Wear; plik testu
                     CrashScribe/armoury-hp.flag) python -I tools/sprawdz_logi.py --grupa m110hp [<Armoury-*.log>] [--baza-doby <log poprzedniego biegu z linia
@@ -61166,6 +61173,8 @@ def main(argv):
         return m109lup_main(logp)   # m109lup (23.10, w-toku/m109-lup): konie, uprzaz i zbroja powalonych jezdzcow w lupie gracza - pomiar LootTally, Z1, Z2, hak testu
     if group == "m110stan":
         return m110stan_main(logp, bdp)   # m110stan (23.10, w-toku/m110-stan): cztery stany sprzetu (GearState) i stan lupu z obrazen (LootWear), --baza-doby = log z linia zapisu (STAN-LC)
+    if group == "m113walka":
+        return m113walka_main(logp)   # m113walka (24.10, w-toku/m113-walka2): linie 'Bitwa (m113-walka2)' - tabela, linia na bitwe, potkniecia 0, haki, udzial zrywow
     if group == "m110anim":
         return m110anim_main(logp)   # m110anim (23.10, n35 m110-animacje + m110-modele): indeksy akcji po wpieciu latki HP sprzetu (postac w ekwipunku, obrazek rekawic) i modele przedmiotow
     if group == "m110hp":
@@ -67601,6 +67610,53 @@ def m110anim_main(logp):
     rep.add("ANIM-3: 'Modele przedmiotow (m110)' przy wczytaniu, ERROR ItemModels./HeroHp.Install 0",
             "startow %d (klucz NIE %d), bez zamiennika do %d, ERROR %d" % (len(started), len(off), left, errs), "start jest, ERROR 0",
             None if (off and not started) else (bool(started) and errs == 0))
+    rep.show()
+    return 0
+
+
+def m113walka_main(logp):
+    """m113walka (24.10): M113-0..M113-4 - opis w --help."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("M113-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    tables, lines = [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Bitwa (m113-walka2) tabela" in line:
+                tables.append(line.strip())
+            elif "Bitwa (m113-walka2): misja" in line:
+                lines.append(line.strip())
+    flag = [t for t in tables if "armoury-pojedynek-test.flag" in t]
+    rep.add("M113-0: tabela 'Bitwa (m113-walka2) tabela' bez flagi testu pojedynku", "tabel %d, z flaga %d" % (len(tables), len(flag)),
+            "tabela jest, z flaga 0", bool(tables) and not flag)
+    rep.add("M113-1: linie 'Bitwa (m113-walka2): misja' (jedna na bitwe)", "linii %d" % len(lines), ">= 1 (bieg -Battles N: N)", bool(lines))
+    bad = []
+    for l in lines:
+        m = re.search(r"potkniecia weteran (\d+), pojedynek (\d+)", l)
+        if not m or int(m.group(1)) != 0 or int(m.group(2)) != 0:
+            bad.append(m.group(0) if m else "brak licznika")
+    rep.add("M113-2: potkniecia weteran 0, pojedynek 0", "linii %d, zlych %d%s" % (len(lines), len(bad), (" (" + bad[0] + ")") if bad else ""),
+            "zlych 0", None if not lines else not bad)
+    need = any("haki bitwy potrzebne" in t for t in tables)
+    hb = []
+    for l in lines:
+        m = re.search(r"\| haki (.*?), czas hakow", l)
+        h = m.group(1) if m else "?"
+        h = h.split(", C ")[0]   # w bitwie tylko A i B (C i D nigdy)
+        if h.strip() == "?" or "NIE" in h:
+            hb.append(h)
+    rep.add("M113-3: haki postury w bitwie wpiete (gdy potrzebne)", "potrzebne %s, linii %d, zlych %d%s" % ("TAK" if need else "NIE", len(lines), len(hb),
+            (" (" + hb[0] + ")") if hb else ""), "zlych 0", None if (not need or not lines) else not hb)
+    calls = burst = 0
+    for l in lines:
+        m = re.search(r"wywolan (\d+), w zrywie (\d+)", l)
+        if m:
+            calls += int(m.group(1)); burst += int(m.group(2))
+    share = (100.0 * burst / calls) if calls else None
+    rep.add("M113-4: wywolania bohaterow w zrywie <= 25%", "wywolan %d, w zrywie %d (%s)" % (calls, burst, ("%.0f%%" % share) if share is not None else "-"),
+            "<= 25%", None if share is None else share <= 25.0)
     rep.show()
     return 0
 

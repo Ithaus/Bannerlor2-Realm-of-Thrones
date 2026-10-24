@@ -1520,23 +1520,23 @@ namespace Armoury
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelNoInjuredCollapse { get; set; } = true;
 
-        [SettingPropertyBool("Duelists In Battles", HintText = "in field battles lords, companions and other heroes fight like the duellists of the lists: from about skill 100 (on Realistic) a hero attacks on his own, ripostes after a parry, feints and kicks, and does not wait behind his guard - the higher his best weapon skill, the bolder; soldiers keep the veterans' rule. Needs RBM with posture. Off = heroes fight as soldiers of their level's tier, as before", RequireRestart = false)]
+        [SettingPropertyBool("Duelists In Battles", HintText = "in battles (the field, siege assaults and defences, sallies, raids) and hideouts lords, companions and other heroes fight like the duellists of the lists: from about skill 100 (on Realistic) a hero attacks on his own, ripostes after a parry, feints and kicks, and does not wait behind his guard - the higher his best weapon skill, the bolder, and with Veterans By Tier never weaker than a veteran of his tier; soldiers keep the veterans' rule. Needs RBM with posture. Off = heroes fight as soldiers of their tier (level, or skill with Hero Tier From Skill), as before", RequireRestart = false)]
         [SettingPropertyGroup("Field battle combat")]
         public bool DuelistsInBattles { get; set; } = true;
 
-        [SettingPropertyBool("Hero Tier From Skill", HintText = "with Veterans By Tier: in field battles a hero who is not fighting with the duellist profile (below skill 100, or Duelists In Battles off) counts as a soldier of the tier his best weapon skill earns when that is higher than his level's tier: best skill 40 = tier I, every 30 points a tier more (100 = III, 160 = V, 190 = VI, 220 and more = VII). Off = tier from level only, as before", RequireRestart = false)]
+        [SettingPropertyBool("Hero Tier From Skill", HintText = "with Veterans By Tier: in battles and hideouts a hero counts as a soldier of the tier his best weapon skill earns when that is higher than his level's tier: best skill 40 = tier I, every 30 points a tier more (100 = III, 160 = V, 190 = VI, 220 and more = VII). It matters most with Duelists In Battles off; with it on, it covers heroes below the duellist profile (best skill under about 125 on Realistic, more on Hard and Easy) and the least a duellist hero keeps. Off = tier from level only, as before", RequireRestart = false)]
         [SettingPropertyGroup("Field battle combat")]
         public bool HeroTierFromSkill { get; set; } = true;
 
-        [SettingPropertyBool("Veteran Aggression Fix", HintText = "with Veterans By Tier: a soldier's experience changes only how readily he starts an attack (recruits hesitate, veterans press on), no longer how readily he breaks an attack off - before, a veteran also gave up his attacks more often, which made him more passive, not less. Off = both chances scaled, as before", RequireRestart = false)]
+        [SettingPropertyBool("Veteran Aggression Fix", HintText = "with Veterans By Tier: veterans (tier IV and up) no longer break their attacks off more often than plain RBM - before, their experience also made them give up attacks more readily, which made them more passive, not less. How readily a soldier starts an attack still follows his tier (recruits hesitate, veterans press on), and tiers I-III keep the old rule. Off = both chances scaled for every tier, as before", RequireRestart = false)]
         [SettingPropertyGroup("Field battle combat")]
         public bool VeteranAggressionFix { get; set; } = true;
 
-        [SettingPropertyBool("Duel Skill Gap In Battles", HintText = "in field battles the Duel Skill Gap Weight rule also counts in your own clashes (when you strike or are struck): a better fighter's guard suffers less from your blocked or parried blows and yours more, as in the lists. Clashes between other fighters are untouched. Off = plain RBM in battles, as before", RequireRestart = false)]
+        [SettingPropertyBool("Duel Skill Gap In Battles", HintText = "in battles and hideouts the Duel Skill Gap Weight rule also counts in your own clashes (when you strike or are struck), but only against you: a better opponent's guard suffers less from your blocked or parried blows and yours more (limits 0.75x-1.25x, as soldiers' guards already grow with their tier); outskilling a weaker opponent gives you nothing over plain RBM. Clashes between other fighters are untouched. Off = plain RBM in battles, as before", RequireRestart = false)]
         [SettingPropertyGroup("Field battle combat")]
         public bool DuelSkillGapInBattles { get; set; } = true;
 
-        [SettingPropertyBool("Duelist Bursts In Battles", HintText = "with Duelists In Battles: a skilled hero in a field battle seizes his moment as in the lists - when an attacker's guard breaks on him he strikes back at once (about a second), and when he is kept on the defence he answers with a flurry of his own (from skill 140, then at least 3 seconds' rest). Heroes only. Off = steady behaviour", RequireRestart = false)]
+        [SettingPropertyBool("Duelist Bursts In Battles", HintText = "with Duelists In Battles: a skilled hero in a battle or hideout seizes his moment as in the lists - when an attacker's guard breaks on him he strikes back at once (about a second, then at least 2 seconds before the next), and when he is kept on the defence he answers with a flurry of his own (from skill 140, then at least 6 seconds' rest). Heroes only. Off = steady behaviour", RequireRestart = false)]
         [SettingPropertyGroup("Field battle combat")]
         public bool DuelistBurstsInBattles { get; set; } = true;
 

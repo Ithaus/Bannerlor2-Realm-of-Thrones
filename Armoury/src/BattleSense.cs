@@ -61,6 +61,18 @@ namespace Armoury
         private static int _duelTest = -1;
 
         /// <summary>m111-walka TEST: plik flagi autotestu (raz na proces); w zwyklej grze (LogGate 0) zawsze false.</summary>
+        /// <summary>m113-walka2 po recenzji: czy plik flagi testu pojedynku lezy w CrashScribe (bez pamieci na proces, bez LogGate) - ostrzezenie
+        /// w tabeli "Bitwa (m113-walka2)": w autotescie (LogGate 1/2) bitwy szlyby jako pojedynek i linii bitwy by nie bylo.</summary>
+        internal static bool DuelTestFlagFile()
+        {
+            try
+            {
+                var docs = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments);
+                return System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), "armoury-pojedynek-test.flag"));
+            }
+            catch { return false; }
+        }
+
         private static bool DuelTestFlag()
         {
             if (_duelTest >= 0) return _duelTest == 1;
@@ -161,7 +173,7 @@ namespace Armoury
             // m113-walka2: zrywy bohaterow w bitwie (zgloszenia z hakow B, UpdateAgentStats tylko tutaj, najwyzej 8 na klatke)
             else if (_battle && FieldDuel.BurstsOn(Settings.Current) && InBattle(Mission))
             {
-                try { DuelCraft.Tick(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelCraft.Tick bitwa", e); }
+                try { DuelCraft.Tick(Mission, true); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelCraft.Tick bitwa", e); }
             }
         }
 

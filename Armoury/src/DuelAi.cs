@@ -192,27 +192,51 @@ namespace Armoury
             int held;
             int s = DuelSkill(agent, model, equippedItem, secondaryItem, c, out held, out best);
             float lvl = Level(s, dm, 0, c);
-            if (lvl < Floor) return false;
+            if (lvl < Floor) return false;                 // brama profilu na poziomie z samej umiejetnosci (profil od 100 na Realistic)
+            // po recenzji: minimum z reguly weteranow zostaje (przy VeteransByTier) - prog tieru 0.05 + 0.13 x (T - 1), tier = wyzszy z poziomu
+            // i z umiejetnosci (HeroTierFromSkill); lord 35 (T6) z umiejetnoscia 120 mial 0.70, sam profil dawal 0.48 (losowy kierunek obrony 0.89
+            // zamiast 0.66); konny bohater - atak po decyzji co najmniej 0.30 x agresja tieru (T5-T7 0.336 / 0.36 / 0.384 jak u weteranow)
+            float lvlEff = lvl, aodMin = 0f;
+            if (c.VeteransByTier)
+            {
+                int tier = TierMin(agent.Character, best, c);
+                lvlEff = Math.Max(lvl, Math.Min(1f, 0.05f + 0.13f * (tier - 1)));
+                if (agent.HasMount) aodMin = 0.30f * (0.8f + 0.08f * (tier - 1));
+            }
             var m = agent.Mission;
             int burst = c.DuelistBurstsInBattles && m != null ? DuelCraft.BurstOf(agent.Index, m.CurrentTime) : DuelCraft.None;
             float aod, doa;
-            Write(agent, p, lvl, sFac, burst, out aod, out doa);
-            FieldDuel.NoteHero(m, agent.Index, s, lvl, aod, doa, burst);
+            Write(agent, p, lvlEff, sFac, burst, aodMin, out aod, out doa);
+            FieldDuel.NoteHero(m, agent.Index, s, lvlEff, aod, doa, burst);
             return true;
+        }
+
+        /// <summary>m113-walka2 (po recenzji): tier bohatera jak w regule weteranow - z poziomu (BattleWind.TierOf), z HeroTierFromSkill co najmniej
+        /// z najlepszej umiejetnosci broni bialej (VeteranAi.SkillTier).</summary>
+        internal static int TierMin(BasicCharacterObject ch, int best, Settings c)
+        {
+            int tier = BattleWind.TierOf(ch);
+            if (c != null && c.HeroTierFromSkill && best >= 0)
+            {
+                int ts = VeteranAi.SkillTier(best);
+                if (ts > tier) tier = ts;
+            }
+            return tier;
         }
 
         private static void Write(Agent agent, AgentDrivenProperties p, float lvl, float sFac, int burst)
         {
             float aod, doa;
-            Write(agent, p, lvl, sFac, burst, out aod, out doa);
+            Write(agent, p, lvl, sFac, burst, 0f, out aod, out doa);
         }
 
-        /// <summary>Profil Shape w polach RBM / gry i nakladka zrywu (wspolne dla pojedynku i bitwy). aod / doa - wartosci profilu przed zrywem.</summary>
-        private static void Write(Agent agent, AgentDrivenProperties p, float lvl, float sFac, int burst, out float aod, out float doa)
+        /// <summary>Profil Shape w polach RBM / gry i nakladka zrywu (wspolne dla pojedynku i bitwy). aod / doa - wartosci profilu przed zrywem.
+        /// aodMin - dolna granica ataku po decyzji przed zrywem (bitwa: konny bohater wedlug tieru; pojedynek 0).</summary>
+        private static void Write(Agent agent, AgentDrivenProperties p, float lvl, float sFac, int burst, float aodMin, out float aod, out float doa)
         {
             bool shield = VeteranAi.HasShield(agent);
             var sh = ShapeOf(lvl, shield, agent.HasMount, sFac);
-            p.AIAttackOnDecideChance = sh.AoD;
+            p.AIAttackOnDecideChance = Math.Max(sh.AoD, aodMin);
             p.AIDecideOnAttackChance = sh.DoA;
             p.AIAttackOnParryChance = sh.AoP;
             p.AIParryOnDecideAbility = sh.Parry;

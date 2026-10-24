@@ -13,14 +13,19 @@ namespace Armoury
     /// RBM-owy zolw (atak po decyzji 0.15, decyzja o ataku 0.5, trzymanie zamachu 1 s) jak szeregowy; VeteranAi mnozyl takze AIDecideOnAttackChance
     /// (szanse porzucenia zamachu - profil DuelAi obniza ja z umiejetnoscia) przez agresje tieru, wiec T6 x1.20 czesciej rezygnowal z ataku;
     /// zasady postury pojedynku (roznica umiejetnosci) dzialaly tylko w szrankach.
+    /// Zakres (po recenzji): BattleSense.InBattle - rodzaj "bitwa" (kazda misja przy bitwie gracza na mapie: pole, szturm i obrona murow, wypad,
+    /// najazd) i "kryjowka"; klucze dzialaja we wszystkich tych misjach, nie tylko w polu.
     ///
     /// Klucze (kazdy osobno, domyslnie TAK):
     ///  - DuelistsInBattles: bohater AI od poziomu 0.40 dostaje profil DuelAi (runda 0) - DuelAi.ApplyField z VeteranAi.Postfix; ponizej - weterani;
+    ///    po recenzji przy VeteransByTier poziom co najmniej prog tieru weteranow (DuelAi.TierMin), konny - atak po decyzji co najmniej 0.30 x agresja;
     ///  - HeroTierFromSkill: bohater bez profilu - tier = max(TierOf(poziom), clamp(1 + (najlepsza - 40) / 30, 1, 7)) (VeteranAi.SkillTier);
-    ///  - VeteranAggressionFix: agresja tieru tylko w AIAttackOnDecideChance;
+    ///  - VeteranAggressionFix: AIDecideOnAttackChance bez mnozenia w gore od T4 (T1-T3 jak w 106: x0.80 / x0.88 / x0.96);
     ///  - DuelSkillGapInBattles: hak A DuelGuard (roznica umiejetnosci, waga DuelSkillGapWeight) w kontaktach gracza - bez DuelPerfectDefence;
+    ///    po recenzji tylko przeciw graczowi (DuelGuard.FieldGapMul: garda gracza co najmniej x1, przeciwnika najwyzej x1, granice 0.75-1.25);
     ///  - DuelistBurstsInBattles: zrywy DuelCraft (otwarcie / nacisk) dla bohaterow AI - zgloszenia tylko z obrony bohatera (FieldTrack), tick
-    ///    DuelCraft z BattleSense.OnMissionTick, najwyzej 8 UpdateAgentStats na klatke (liczba ludzi ograniczona do bohaterow).
+    ///    DuelCraft z BattleSense.OnMissionTick, najwyzej 8 UpdateAgentStats na klatke (liczba ludzi ograniczona do bohaterow); po recenzji
+    ///    w bitwie przerwa nacisku 6 s, po otwarciu 2 s, otwarcie w trakcie otwarcia odrzucone (DuelCraft.Field*Cooldown).
     /// Linie: "Bitwa (m113-walka2) tabela" (start sesji) i "Bitwa (m113-walka2): misja ..." (koniec bitwy, BattleSense.Clean).
     /// Liczniki pod RoutHold.Gate (postfiks SetAiRelatedProperties bywa wolany z ticku asynchronicznego), zerowane w Begin (BattleSense.EarlyStart);
     /// bez alokacji poza HashSet roznych ludzi (jak VeteranAi).
@@ -96,7 +101,7 @@ namespace Armoury
             {
                 RoutHold.EnsureLocked(m);
                 _heroes.Add(id);
-                _heroBands[s < 100 ? 0 : (s < 180 ? 1 : 2)].Add(id);
+                _heroBands[s < 140 ? 0 : (s < 180 ? 1 : 2)].Add(id);   // po recenzji: profil wymaga s >= 100 / trudnosc - pasmo <100 bylo zawsze puste
                 _heroCalls++;
                 if (burst != DuelCraft.None) _heroBurstCalls++;
                 _hLvl += lvl; _hAoD += aod; _hDoA += doa;
@@ -151,8 +156,9 @@ namespace Armoury
             lock (RoutHold.Gate)
             {
                 RoutHold.EnsureLocked(m);
-                sb.Append(" | bohaterowie z profilem DuelAi ").Append(_heroes.Count).Append(" (umiejetnosc <100 ").Append(_heroBands[0].Count).Append(", 100-179 ")
-                  .Append(_heroBands[1].Count).Append(", 180+ ").Append(_heroBands[2].Count).Append("; wywolan ").Append(_heroCalls).Append(", w zrywie ").Append(_heroBurstCalls);
+                sb.Append(" | bohaterowie z profilem DuelAi ").Append(_heroes.Count).Append(" (umiejetnosc do 139 ").Append(_heroBands[0].Count).Append(", 140-179 ")
+                  .Append(_heroBands[1].Count).Append(", 180+ ").Append(_heroBands[2].Count).Append("; wywolan ").Append(_heroCalls).Append(", w zrywie ").Append(_heroBurstCalls)
+                  .Append(" (").Append(_heroCalls > 0 ? (100.0 * _heroBurstCalls / _heroCalls).ToString("0", Inv) : "-").Append("%, ponad 25% - zrywy za czesto)");
                 if (_heroCalls > 0)
                     sb.Append("; srednio poziom ").Append(F(_hLvl / _heroCalls)).Append(", AoD ").Append(F(_hAoD / _heroCalls)).Append(", DoA ").Append(F(_hDoA / _heroCalls));
                 sb.Append(") | bohaterowie regula weteranow ").Append(_vetHeroes.Count).Append(" (tier z umiejetnosci wyzszy ").Append(_raised.Count).Append(')')
@@ -200,6 +206,16 @@ namespace Armoury
                 sb.Append(' ').Append(F(a.AoD)).Append('/').Append(F(a.DoA)).Append('/').Append(F(a.AoP)).Append('/').Append(F(a.Parry)).Append('/').Append(F(a.Hold))
                   .Append(" | ").Append(F(b.AoD)).Append('/').Append(F(b.DoA)).Append('/').Append(F(b.AoP)).Append('/').Append(F(b.Parry)).Append('/').Append(F(b.Hold)).Append(';');
             }
+            // po recenzji: minimum z reguly weteranow - lord poziomu 35 (T6) z najlepsza umiejetnoscia 120
+            {
+                float l0 = DuelAi.Level(120, dm, 0, c);
+                int t35 = Math.Max((int)Math.Ceiling((35 - 5) / 5.0), c.HeroTierFromSkill ? VeteranAi.SkillTier(120) : 1);
+                float l1 = c.VeteransByTier ? Math.Max(l0, 0.05f + 0.13f * (t35 - 1)) : l0;
+                sb.Append(" | minimum tieru (Veterans By Tier ").Append(c.VeteransByTier ? "TAK" : "NIE").Append("): lord poziom 35 (T").Append(t35).Append("), umiejetnosc 120: L ")
+                  .Append(F(l0)).Append(l0 < DuelAi.Floor ? " (ponizej profilu - weterani)" : "").Append(" -> ").Append(F(l1)).Append(" (losowy kierunek obrony ")
+                  .Append(F(1f - l0 * l0 * l0)).Append(" -> ").Append(F(1f - l1 * l1 * l1)).Append(", parowanie w ataku ").Append(F(l0)).Append(" -> ").Append(F(l1))
+                  .Append("), konny T5/T6/T7 atak po decyzji co najmniej ").Append(F(0.30f * 1.12f)).Append('/').Append(F(0.30f * 1.20f)).Append('/').Append(F(0.30f * 1.28f));
+            }
             sb.Append(" | Hero Tier From Skill ").Append(c.HeroTierFromSkill ? "TAK" : "NIE").Append(": najlepsza");
             int[] best = { 39, 40, 70, 100, 130, 160, 190, 220, 300 };
             for (int i = 0; i < best.Length; i++) sb.Append(i > 0 ? "," : "").Append(' ').Append(best[i]).Append(" T").Append(VeteranAi.SkillTier(best[i]));
@@ -209,18 +225,27 @@ namespace Armoury
             {
                 float agg = 0.8f + 0.08f * (t - 1);
                 float aod = Math.Min(0.6f, Math.Max(0.05f, 0.15f * agg));
-                float doa = c.VeteranAggressionFix ? 0.5f : Math.Min(1f, 0.5f * agg);
+                float doa = c.VeteranAggressionFix && agg >= 1f ? 0.5f : Math.Min(1f, 0.5f * agg);   // po recenzji: T1-T3 jak w 106
                 sb.Append(t > 1 ? "," : "").Append(" T").Append(t).Append(' ').Append(F(aod)).Append('/').Append(F(doa));
             }
             float w = DuelGuard.Weight(c);
-            float g = (180f - 24f) / 250f;
+            // po recenzji: gracz 24 z tarcza na T6 180 z tarcza (pula postury T6 z SoldierPostureByTier) i gracz 220 z tarcza na rekrucie 50 z tarcza
+            float gA = (180f + 20f - 24f) / 250f, gD = (24f + 20f - 180f) / 250f, gR = (50f + 20f - 220f) / 250f, gP = (220f + 20f - 50f) / 250f;
+            float fFoe = DuelGuard.FieldGapMul(1f - w * gA, false), fOwnAtt = DuelGuard.FieldGapMul(1f + w * gA, true), fOwnDef = DuelGuard.FieldGapMul(1f - w * gD, true);
+            float pool = c.SoldierPostureByTier ? BattleWind.SoldierMul(6) : 1f;
             sb.Append(" | Duel Skill Gap In Battles ").Append(c.DuelSkillGapInBattles ? "TAK" : "NIE").Append(" (waga ").Append(F(w))
-              .Append(", tylko kontakty gracza, bez Perfect Defence; gracz 24 na rycerzu 180 bez tarczy: garda rycerza x").Append(F(Clamp(1f - w * g, 0.6f, 1.4f)))
-              .Append(", garda gracza x").Append(F(Clamp(1f + w * g, 0.6f, 1.4f))).Append(") | Duelist Bursts In Battles ").Append(c.DuelistBurstsInBattles ? "TAK" : "NIE")
+              .Append(", tylko przeciw graczowi, granice ").Append(F(DuelGuard.FieldGapLo)).Append('-').Append(F(DuelGuard.FieldGapHi))
+              .Append(", bez Perfect Defence; gracz 24 z tarcza na T6 180 z tarcza: garda T6 x").Append(F(fFoe)).Append(" przy puli postury T6 x").Append(F(pool))
+              .Append(" = ").Append(F(pool / fFoe)).Append(" raza wiecej ciosow niz RBM, koszt ciosu gracza x").Append(F(fOwnAtt)).Append(", garda gracza pod ciosem T6 x").Append(F(fOwnDef))
+              .Append("; gracz 220 na rekrucie 50: garda rekruta x").Append(F(DuelGuard.FieldGapMul(1f - w * gR, false))).Append(", garda gracza x")
+              .Append(F(DuelGuard.FieldGapMul(1f - w * gP, true))).Append(") | Duelist Bursts In Battles ").Append(c.DuelistBurstsInBattles ? "TAK" : "NIE")
               .Append(" (tylko bohaterowie AI z profilem: otwarcie ").Append(F(DuelCraft.OpeningSeconds)).Append(" s od L").Append(F(DuelAi.Floor)).Append(", nacisk ")
-              .Append(F(DuelCraft.PressedSeconds)).Append(" s od L").Append(F(DuelAi.PressedFrom)).Append(", przerwa ").Append(F(DuelCraft.Cooldown))
-              .Append(" s, najwyzej ").Append(DuelCraft.PerTick).Append(" odswiezen na klatke) | haki bitwy ").Append(HooksWanted(c) ? "potrzebne" : "niepotrzebne")
-              .Append(": ").Append(DuelGuard.HookState()).Append('.');
+              .Append(F(DuelCraft.PressedSeconds)).Append(" s od L").Append(F(DuelAi.PressedFrom)).Append(", przerwa nacisku w bitwie ").Append(F(DuelCraft.FieldPressedCooldown))
+              .Append(" s, po otwarciu ").Append(F(DuelCraft.FieldOpeningCooldown)).Append(" s, najwyzej ").Append(DuelCraft.PerTick).Append(" odswiezen na klatke) | zakres: bitwa (pole, mury, wypad, najazd) i kryjowka | haki bitwy ")
+              .Append(HooksWanted(c) ? "potrzebne" : "niepotrzebne").Append(": ").Append(DuelGuard.HookState());
+            if (BattleSense.DuelTestFlagFile())
+                sb.Append(" | UWAGA: lezy CrashScribe/armoury-pojedynek-test.flag - w autotescie bitwy ida jako pojedynek, linii 'Bitwa (m113-walka2): misja' nie bedzie");
+            sb.Append('.');
             Log.Info(sb.ToString());
         }
 
