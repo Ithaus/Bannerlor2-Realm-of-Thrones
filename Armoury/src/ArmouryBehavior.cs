@@ -1518,6 +1518,7 @@ namespace Armoury
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, Rumours.OnOwnerChanged);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, Rumours.OnMapEventEnded);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, SideVillageVisit.OnMapEventEnded);   // m97-wioski krok 2: wynik bitwy z obroncami wioski pobocznej (sam zapis zwyciezcy; tylko przy bitwie w toku)
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, FieldDuelHeroes.OnMapEventEnded);   // test n36: bohaterowie testu bitwy (armoury-walka-bohaterowie.flag) po bitwie gracza znowu zdrowi; bez flagi jedno porownanie
             CampaignEvents.ConversationEnded.AddNonSerializedListener(this, NoticeBoard.OnConversationEnded);   // m102-tablica E3: osoba z tablicy (licznik "z tablicy do zadania"), kapitan strazy (E2) - flaga rozmowy zdjeta
             CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, NoticeBoard.OnSettlementLeft);   // m102-tablica E3: wyjazd gracza z miasta - osoba z tablicy zapomniana
             // m102-tablica E2: listy gonczne - wyplata za rozbita bande i szkody band (karawany, wozy) w MapEventEnded (przed zniszczeniem partii), zlupione wsie, banda znikla
@@ -2303,6 +2304,7 @@ namespace Armoury
             try { RoutHold.SessionStart(); } catch (Exception e) { Log.Error("RoutHold.SessionStart", e); }   // NB2 (16.10): zlamani raz na bitwe i postura szeregowych wedlug tieru - linia "Bitwa (NB2): start sesji" (PO McmSettings.Apply), liczniki sesji od zera
             try { DuelAi.SessionStart(); } catch (Exception e) { Log.Error("DuelAi.SessionStart", e); }   // m111-walka (24.10): linia "DuelAi tabela" - profil AI w pojedynku przy umiejetnosci 60..250, klucze pojedynku, stan hakow (PO McmSettings.Apply)
             try { FieldDuel.SessionStart(); } catch (Exception e) { Log.Error("FieldDuel.SessionStart", e); }   // m113-walka2 (24.10): linia "Bitwa (m113-walka2) tabela" - profil bohatera w bitwie, tier z umiejetnosci, agresja weteranow, roznica umiejetnosci gracza, zrywy, haki (PO McmSettings.Apply)
+            try { FieldDuelHeroes.SessionStart(); } catch (Exception e) { Log.Error("FieldDuelHeroes.SessionStart", e); }   // test n36: plik CrashScribe/armoury-walka-bohaterowie.flag (tylko LogGate 1/2) - do 4 wolnych wedrowcow do rodu i druzyny gracza przed etapem bitew autotestu
             try { DayHeld.SessionStart(); } catch (Exception e) { Log.Error("DayHeld.SessionStart", e); }   // A14 / G20 (drobne2): doba po wczytaniu ze srodka doby - PO McmSettings.Apply (klucz z MCM), przed pierwszym tickiem osad
             try { VillageClimate.Apply(); } catch (Exception e) { Log.Error("VillageClimate.Apply", e); }   // T8: typ wsi wedlug klimatu (PO McmSettings.Apply; bez zapisu)
             try { GoodsRates.Apply(); } catch (Exception e) { Log.Error("GoodsRates.Apply", e); }   // GL-5 (P5): 16 wsi lnianych (tylko kampania zaczeta z kluczem, potem na stale) - PO VillageClimate.Apply, PRZED kalibracja plonu P1 (1. doba nowej kampanii)
