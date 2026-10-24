@@ -71,7 +71,7 @@ namespace Armoury
         private static readonly int[] _killed = new int[Kinds];
         private static readonly Dictionary<string, int> _killedIn = new Dictionary<string, int>(), _recruitedIn = new Dictionary<string, int>();
         private static int _fights, _wounded, _routed;
-        private static int _rNotableParty, _rNotableOther, _rTavern, _rNoPlace, _rPlayer, _rLed, _desLord, _desOther;
+        private static int _rNotableParty, _rNotableOther, _rTavern, _rNoPlace, _rPlayer, _rLed, _desLord, _desOther, _rSide;   // _rSide - m113-pobor: gracz z wiosek pobocznych (bez DeduceManpower)
         private static int _rRotEcho;              // 171 A1: echo werbunku ROT (ten sam czlowiek) - nie liczony jako nowy
         private static int _stumbles;              // potkniecia nasluchow - liczymy, nie gasimy
         // T4: odczyt dla WarLedger (pomiar przed/po, tylko czyta)
@@ -210,7 +210,7 @@ namespace Armoury
         {
             Array.Clear(_killed, 0, Kinds); _killedIn.Clear(); _recruitedIn.Clear();
             _fights = _wounded = _routed = 0;
-            _rNotableParty = _rNotableOther = _rTavern = _rNoPlace = _rPlayer = _rLed = _desLord = _desOther = 0;
+            _rNotableParty = _rNotableOther = _rTavern = _rNoPlace = _rPlayer = _rLed = _desLord = _desOther = _rSide = 0;
             _rRotEcho = 0;
             _stumbles = 0;
             ClearDay40();
@@ -310,6 +310,7 @@ namespace Armoury
             {
                 if (amount <= 0) return;
                 _rPlayer += amount; _rLed += amount;
+                if (SideVillageVisit.RecruitingAt != null) _rSide += amount;   // m113-pobor: bez DeduceManpower - T6 odejmuje (linia "w tym wioski poboczne")
                 AddRegion(_recruitedIn, Settlement.CurrentSettlement ?? SideVillageVisit.RecruitingAt, amount);   // m113-pobor: pobor z wioski pobocznej - gracz na mapie, osada wsi okregu
                 _gRecruited[GroupOf(Hero.MainHero != null ? Hero.MainHero.MapFaction : null, MobileParty.MainParty)] += amount;   // E4/0
             }
@@ -547,7 +548,7 @@ namespace Armoury
                 sb.Append("), ranni ").Append(_wounded).Append(", rozbici ").Append(_routed)
                   .Append("; zwerbowani ").Append(recruited).Append(" (od notabli do partii rodow ").Append(_rNotableParty)
                   .Append(", od notabli bez wodza - garnizony, karawany ").Append(_rNotableOther).Append(", z karczmy ").Append(_rTavern)
-                  .Append(", bez osady - jency albo ochotnicy z mapy ").Append(_rNoPlace).Append(", gracz ").Append(_rPlayer)
+                  .Append(", bez osady - jency albo ochotnicy z mapy ").Append(_rNoPlace).Append(", gracz ").Append(_rPlayer).Append(" (w tym wioski poboczne ").Append(_rSide).Append(")")
                   .Append(", duplikaty ROT (ten sam czlowiek, nie liczeni) ").Append(_rRotEcho)
                   .Append("); dezercja ").Append(_desLord + _desOther).Append(" (partie rodow ").Append(_desLord).Append(')');
                 if (_haveLast)

@@ -20,7 +20,7 @@ namespace Armoury
     {
         private static int _pbFlag = -1;
         private static int _pbDay0 = -1;
-        private static bool _pbAfterLoad;
+        private static bool _pbAfterLoad, _pbLoaded;   // _pbLoaded - wczytany zapis mial wpisy puli (LevyImport); wpisy z bitew przed pierwsza doba nie zmieniaja trybu
         private static string _pbA, _pbB, _pbC;
         private static string _pbForce;   // wymuszona odmowa w LevyGate (tylko sonda)
         private static int _pbOk, _pbBad;
@@ -41,7 +41,7 @@ namespace Armoury
             return _pbFlag == 1;
         }
 
-        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbPrev.Clear(); }
+        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbPrev.Clear(); }
 
         private static void PbCheck(StringBuilder sb, string what, bool ok, string val)
         {
@@ -55,7 +55,7 @@ namespace Armoury
             if (_pbDay0 < 0)
             {
                 _pbDay0 = today;
-                _pbAfterLoad = _lv.Count > 0;
+                _pbAfterLoad = _pbLoaded;
                 if (_pbAfterLoad)
                 {
                     int i = 0;

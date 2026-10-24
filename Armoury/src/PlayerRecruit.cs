@@ -39,7 +39,6 @@ namespace Armoury
         private const int Hooks = 4;
         private static MethodInfo _dteAdd;      // DTE ArmyArmory.AddItemToArmory(ItemObject, int)
         private static MethodInfo _dteStart;    // m113-pobor: DTE RecruitmentPatch.AddStartingEquipmentToPlayerArmory(CharacterObject, int) - komplet tieru 1 rekruta z wioski pobocznej
-        private static long _sideMen;
         private static bool _dteWired;          // prefiks na DTE AddStartingEquipmentToPlayerArmory wpiety - bez niego sciezka nieczynna (inaczej komplet DTE + nasze rzeczy)
         private static int _wired, _stumbles;
         private static long _tMen, _tPcs;
@@ -236,7 +235,6 @@ namespace Armoury
                 var arm = QuartermasterLaw.DteArmory();
                 long before = Pieces(arm);
                 _dteStart.Invoke(null, new object[] { t, n });
-                _sideMen += n;
                 return arm != null ? (int)Math.Max(0L, Pieces(arm) - before) : 0;
             }
             catch (Exception e) { Stumble("SideVillageKit", e); return 0; }

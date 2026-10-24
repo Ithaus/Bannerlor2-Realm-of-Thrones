@@ -1124,7 +1124,7 @@ namespace Armoury
             region = s != null ? OutlawLaw.RegionFor(s) : null;
             if (s == null || !(n > 0.0) || !LevyLive || !s.IsVillage || s.Village == null) return 0.0;
             double got;
-            try { got = FromVillage(s.Village, n, causeM); }
+            try { got = FromVillage(s.Village, n, causeM, false); }   // m113-pobor: wlasny pobor bierze k z wlasnej puli - bez rozkladu na pule okregu
             catch (Exception e) { OStumble("TakeLevyHere", e); return 0.0; }
             if (causeM == MLevyVillage || causeM == MLevyA5)
             {
@@ -1133,6 +1133,21 @@ namespace Armoury
                 if (n - got > Eps) { _floorCalls++; _floorMen += n - got; }
             }
             return got;
+        }
+
+        /// <summary>m113-pobor (recenzja): ilu ludzi DOM wsi s moze jeszcze dac ponad podloge 50 hearth (ta sama rachuba co FromVillage). Sam odczyt, nie rzuca;
+        /// ksiega nieczynna / bez przelicznika - 0.</summary>
+        internal static int LevyRoomHere(Settlement s)
+        {
+            try
+            {
+                if (s == null || !LevyLive || !s.IsVillage || s.Village == null) return 0;
+                bool unit;
+                float per = PeopleUnit.PerMan(s.Village, PeopleUnit.GamePerMan, out unit);
+                if (!unit || !(per > 0f)) return 0;
+                return (int)Math.Floor(Math.Max(0.0, (s.Village.Hearth - 50.0) / per) + 1e-9);
+            }
+            catch { return 0; }
         }
 
         /// <summary>m113-pobor TEST: pobor z wsi regionu od siewu (VillOut) - sonda autotestu; brak regionu albo wpisu - 0. Sam odczyt.</summary>
@@ -1195,7 +1210,9 @@ namespace Armoury
             return np;
         }
 
-        private static double FromVillage(Village v, double n, int causeM)
+        /// <summary>notePool (m113-pobor P7): pobor gry E4/7 (MLevyVillage, MLevyA5) z DOM wsi obniza pule mlodych wiosek pobocznych tego okregu wedlug ich udzialu
+        /// (SideVillageVisit.LevyNoteDistrictDraw); false - wlasny pobor wioski (TakeLevyHere).</summary>
+        private static double FromVillage(Village v, double n, int causeM, bool notePool = true)
         {
             if (v == null || !(n > 0.0)) return 0.0;
             bool unit;
@@ -1205,6 +1222,7 @@ namespace Armoury
             double t = Math.Min(can, n);
             if (t <= Eps) return 0.0;
             double h = Move(v, ADom, AService, t, causeM, PeopleUnit.GamePerMan);
+            if (h < 0.0 && notePool && (causeM == MLevyVillage || causeM == MLevyA5)) SideVillageVisit.LevyNoteDistrictDraw(v, t);   // nie rzuca
             return h < 0.0 ? t : 0.0;
         }
 

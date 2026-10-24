@@ -45,7 +45,8 @@ namespace Armoury
     ///  V7 POBOR (SideVillageVisit.Levy.cs, klucz SideVillageRecruit, zapis arm_sidelevy - m113-pobor, Jeff 24.10): "Recruit men of the village" - wlasna pula mlodych TEJ wioski
     ///     (10% jej ludzi), odnawiana tylko przez dorastanie; kazdy rekrut schodzi z ludzi wioski i z rak jej okregu.
     /// Zapis arm_sidevil (SaveText): okupy, ostatnie rabunki gracza (10 dob), rabunek w toku. Brak klucza (stary zapis) = nic. AI nie wjezdza do wiosek pobocznych: wjazd, handel,
-    /// nocleg i pobor sa tylko dla gracza; AI omija wioski po okupie i slabsze od obroncow w lancuchu rabunku (Defenders) - pule obroncow liczy ta sama regula co pobor.
+    /// nocleg i pobor sa tylko dla gracza; AI omija wioski po okupie i slabsze od obroncow w lancuchu rabunku (Defenders) - pule obroncow liczy ta sama regula co pobor
+    /// (lancuch AI nie obniza puli mlodych - nie zdejmuje ludzi z ksiegi; pule obniza tylko pobor gracza, bitwa z obroncami i pobor gry z okregu).
     /// Linie logu "Wioski poboczne (WP): ..." - start sesji, wjazd, handel, nocleg, oboz, prace, rabunek, okup, doba. Potkniecia liczone, nic nie gasimy globalnie.
     /// </summary>
     internal static partial class SideVillageVisit
@@ -351,8 +352,6 @@ namespace Armoury
                         catch (Exception e) { Stumble("Camp", e); }
                     }, false, 1);
                 starter.AddGameMenuOption(Menu, "arm_sidevil_trade", "{=!}Trade", TradeCondition, TradeConsequence, false, 2);
-                // m113-pobor: indeks 2 - wstawione przed "Trade" (nocleg, oboz, pobor, handel, prace, wrogie akcje, wyjazd)
-                starter.AddGameMenuOption(Menu, LevyOption, "{=!}Recruit men of the village", LevyMenuCondition, LevyMenuConsequence, false, 2);
                 starter.AddGameMenuOption(Menu, "arm_sidevil_invest", "{=!}Invest in its works", InvestCondition,
                     delegate (MenuCallbackArgs a)
                     {
@@ -368,6 +367,9 @@ namespace Armoury
                     }, false, 3);
                 starter.AddGameMenuOption(Menu, "arm_sidevil_hostile", "{=!}Take a hostile action", HostileCondition,
                     delegate (MenuCallbackArgs a) { try { GameMenu.SwitchToMenu(HostileMenu); } catch (Exception e) { Stumble("Hostile", e); } }, false, 4);
+                // m113-pobor: indeks 2 wstawia (GameMenu.AddOption - Insert) - dodane PO wszystkich opcjach z indeksem, inaczej przesuwa Trade za wrogie akcje
+                // (kolejnosc: nocleg, oboz, pobor, handel, prace, wrogie akcje, wyjazd)
+                starter.AddGameMenuOption(Menu, LevyOption, "{=!}Recruit men of the village", LevyMenuCondition, LevyMenuConsequence, false, 2);
                 starter.AddGameMenuOption(Menu, "arm_sidevil_leave", "{=!}Leave",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
                     delegate (MenuCallbackArgs a)

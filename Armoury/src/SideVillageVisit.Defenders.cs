@@ -214,7 +214,8 @@ namespace Armoury
                 if (d <= 0) return;
                 double lost = d * Math.Min(1.0, d / (double)men);
                 AddFallen(uid, lost);
-                LevyNoteLost(uid, lost, home);   // m113-pobor P9: polegli obroncy to mlodzi z puli wioski (wpis - ludzie w domu; nie rzuca)
+                // m113-pobor P9 (recenzja): BEZ LevyNoteLost - lancuch nie zdejmuje ludzi z ksiegi (BurnCore: tylko pamiec poleglych), wiec pula mlodych zostaje;
+                // obnizenie puli tylko przy faktycznym ubytku ludzi (FinishFight)
                 _dAiBurnNoted++; _dAiFallen += lost;
             }
             catch (Exception e) { Stumble("NoteChainBurn", e); }
@@ -232,6 +233,7 @@ namespace Armoury
             if (def <= 0) { sb.Append(" There is nobody left here to fight you.").Append(fit); return; }
             sb.Append(" About ").Append(def).Append(def == 1 ? " man" : " men").Append(" of its ").Append(Math.Round(home).ToString("N0", Inv)).Append(" people would take up flails, spears and bows to defend it");
             if (Fallen(_uid) >= 0.5) sb.Append(" (fewer than before - it has buried and nursed its men of late)");
+            else if (LevyCallableFor(_uid, home) < DefCapOf(home)) sb.Append(" (its young men have gone to war)");   // m113-pobor P9: pula oprozniona poborem
             sb.Append('.').Append(fit);
             if (men >= SurrenderRatio * def) sb.Append(" They are too few to stand against you - they would give in without a fight.");
             else sb.Append(" They will come out and fight you by the village.");
