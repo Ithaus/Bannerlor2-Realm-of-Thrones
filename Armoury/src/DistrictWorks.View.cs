@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 
@@ -31,15 +32,18 @@ namespace Armoury
         internal static int ViewWorks(out List<ViewLine> lines, out int days)
         {
             lines = _vw; days = _vwDays;
+            // po recenzji m115: godzina i znacznik przed try - blad tez zapamietany na godzine (podpowiedz zlota wola to kilka razy na sekunde na mapie)
+            int hour = int.MinValue, stamp = _vwStamp;
             try
             {
                 if (Campaign.Current == null) { lines = null; days = 0; return 0; }
-                int hour = (int)CampaignTime.Now.ToHours;
+                hour = (int)CampaignTime.Now.ToHours;
                 if (hour == _vwHour && _vwSeen == _vwStamp) return _vwTotal;
-                int stamp = _vwStamp;
+                stamp = _vwStamp;
                 var raw = new List<KeyValuePair<string, double>>();
+                var paid = new List<double>();                               // wyplacone w znanych dobach wedlug wioski (napis, jak w zakladce Fiefs)
                 var idx = new Dictionary<string, int>(StringComparer.Ordinal);
-                int d = 7;
+                int d = 7, h = 28;
                 foreach (var w in PlayerWorks())
                 {
                     if (w == null || w.WarWith != null || w.Paused != null || !(w.Eff > 1e-6)) continue;
@@ -47,10 +51,11 @@ namespace Armoury
                     d = Math.Max(d, dn);
                     double x = w.Paid28 / dn;
                     if (!(x > 0)) continue;
+                    h = Math.Min(h, Math.Max(1, w.PaidDaysN));
                     string n = w.Village ?? "?";
                     int i;
-                    if (idx.TryGetValue(n, out i)) raw[i] = new KeyValuePair<string, double>(n, raw[i].Value + x);
-                    else { idx[n] = raw.Count; raw.Add(new KeyValuePair<string, double>(n, x)); }
+                    if (idx.TryGetValue(n, out i)) { raw[i] = new KeyValuePair<string, double>(n, raw[i].Value + x); paid[i] += w.Paid28; }
+                    else { idx[n] = raw.Count; raw.Add(new KeyValuePair<string, double>(n, x)); paid.Add(w.Paid28); }
                 }
                 // suma zaokraglona raz, na wioski metoda najwiekszej reszty (jak OnCartReturn) - linie sumuja sie dokladnie do sumy
                 double sum = 0; foreach (var kv in raw) sum += kv.Value;
@@ -66,7 +71,12 @@ namespace Armoury
                 {
                     if (whole[i] <= 0) continue;
                     int a = (int)Math.Min(int.MaxValue, whole[i]);
-                    res.Add(new ViewLine { Name = raw[i].Key, Amt = a, Txt = new TextObject("{=!}Village works: " + raw[i].Key + " (average of the last " + d + " days, paid when the carts return)") });
+                    // po recenzji m115: historia krotsza niz 7 dob (zapis sprzed m112, kilka dob od wczytania) - napis uczciwy: ile wyplacono w ilu znanych dobach,
+                    // kwota rozlozona na 7 dob (doby przed wczytaniem = 0); zakladka Fiefs pokazuje te same doby
+                    string why = h < 7
+                        ? "paid " + Math.Round(paid[i]).ToString("N0", CultureInfo.InvariantCulture) + " in the last " + h + (h == 1 ? " day" : " days") + ", shown spread over 7 days"
+                        : "average of the last " + d + " days";
+                    res.Add(new ViewLine { Name = raw[i].Key, Amt = a, Txt = new TextObject("{=!}Village works: " + raw[i].Key + " (" + why + ", paid when the carts return)") });
                     sumOut += a;
                 }
                 _vwSumTxt = res.Count > 0 ? new TextObject("{=!}Village works (" + res.Count + " villages, average paid when the carts return)") : null;
@@ -74,8 +84,16 @@ namespace Armoury
                 lines = _vw; days = _vwDays;
                 return _vwTotal;
             }
-            catch (Exception e) { _vwStumble++; Stumble("ViewWorks", e); lines = null; days = 0; return 0; }
+            catch (Exception e)
+            {
+                _vwStumble++; Stumble("ViewWorks", e);
+                if (hour != int.MinValue) { _vw = new List<ViewLine>(); _vwTotal = 0; _vwSumTxt = null; _vwDays = 0; _vwHour = hour; _vwSeen = stamp; }
+                lines = null; days = 0; return 0;
+            }
         }
+
+        /// <summary>po recenzji m115 (autotest Fiefs): wiersze arm_works z zapisu jeszcze niewczytane (ImportNow dopiero w pierwszej dobie po wczytaniu).</summary>
+        internal static bool ImportPending { get { lock (Gate) return _pending != null; } }
 
         /// <summary>m115: linie prac gracza dopisane do wyniku modelu finansow (tylko widok). details albo najwyzej 3 wioski - linia na wioske, inaczej jedna linia.
         /// Zwraca liczbe dodanych linii.</summary>

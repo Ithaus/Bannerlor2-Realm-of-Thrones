@@ -109,8 +109,9 @@ namespace Armoury
 
         /// <summary>m115 (Jeff 24.10: "skoro wioksa mi placi to ma byc na zielon w inocme i na drugim zdjeicuy"): panel Finance (ClanManagementVM po RefreshDailyValues
         /// odbiciem - ta sama droga co gra), podpowiedz zlota (CalculateClanGoldChange(rod, true, false, false) - jak GetDenarTooltip) i przychod poza panelem
-        /// (bez flagi FinanceBox - bez linii prac). OK: Total Income - poza panelem = prace w widoku, Daily Change = |Income| - |Expenses|, linie "Village works"
-        /// podpowiedzi sumuja sie do prac w widoku. Linia "[FiefsShotTest] panel Finance: ...".</summary>
+        /// (bez flagi FinanceBox - bez linii prac). OK: Total Income - poza panelem = prace w widoku, linie "Village works"
+        /// podpowiedzi sumuja sie do prac w widoku, a przy wyplatach ksiegi w 28 dobach (liczonych osobno, nie przez widok) linia prac jest; bez potkniec widoku
+        /// i z wczytanymi arm_works. Linia "[FiefsShotTest] panel Finance: ...".</summary>
         private static void FinanceCheck()
         {
             try
@@ -123,9 +124,17 @@ namespace Armoury
                 int x = VmInt(vm, "TotalIncome"), y = VmInt(vm, "TotalExpenses"), z = VmInt(vm, "DailyChange"), ex = VmInt(vm, "ExpectedGold");
                 var s = Settings.Current;
                 bool on = s != null && s.WorksIncomeShown;
+                int st0 = DistrictWorks._vwStumble;
                 System.Collections.Generic.List<DistrictWorks.ViewLine> vl; int days;
                 int w = DistrictWorks.ViewWorks(out vl, out days);
                 int wExp = on ? w : 0;
+                // po recenzji m115: oczekiwanie NIE przez ViewWorks - przy w = 0 porownania wyzej to 0 == 0 (blad widoku, zgubione linie, niewczytane arm_works
+                // dawaly OK). Wyplaty ksiegi w 28 dobach / max(7, doby historii), suma zaokraglona raz (jak widok); > 0 przy kluczu - linia prac musi byc
+                double expRaw = 0;
+                foreach (var pw in DistrictWorks.PlayerWorks())
+                    if (pw != null && pw.WarWith == null && pw.Paused == null && pw.Eff > 1e-6 && pw.Paid28 > 0) expRaw += pw.Paid28 / Math.Max(7, pw.PaidDaysN);
+                long expLed = (long)Math.Round(expRaw);
+                bool pend = DistrictWorks.ImportPending;
                 var per = new System.Text.StringBuilder();
                 if (vl != null) foreach (var l in vl) per.Append(per.Length > 0 ? ", " : "").Append(l.Name).Append(' ').Append(l.Amt);
                 var fin = Campaign.Current.Models.ClanFinanceModel;
@@ -140,14 +149,19 @@ namespace Armoury
                 }
                 int o = (int)fin.CalculateClanIncome(Clan.PlayerClan, false, false, false).ResultNumber;
                 bool okBox = x != int.MinValue && x - o == wExp;
-                bool okDay = x != int.MinValue && y != int.MinValue && z == Math.Abs(x) - Math.Abs(y);
+                // po recenzji m115: bez sprawdzenia Daily Change = |Income| - |Expenses| - RefreshDailyValues liczy go wlasnie tak, zawsze prawda
                 bool okTip = tipWorks == wExp && (wExp == 0 || tipWorksN > 0);
-                bool ok = rd != null && okBox && okDay && okTip;
+                bool okLed = !on || expLed <= 0 || (w > 0 && x - o == w && tipWorksN > 0);
+                bool okSt = DistrictWorks._vwStumble == st0;
+                bool ok = rd != null && okBox && okTip && okLed && okSt && !pend;
                 Log.Info("[FiefsShotTest] panel Finance: Total Income " + x + ", Total Expenses " + y + ", Daily Change " + z + ", Expected " + ex
                          + " | prace w widoku " + w + " (" + (per.Length > 0 ? per.ToString() : "brak") + "; dni " + days + "; klucz Works Income Shown " + (on ? "TAK" : "WYL") + ")"
+                         + " | z ksiegi " + expLed + "/dobe"
                          + " | podpowiedz zlota: " + tl + "razem " + tip.ResultNumber.ToString("0.##", Inv) + " (linie prac " + tipWorksN + " = " + tipWorks + ")"
                          + " | przychod poza panelem " + o + " -> " + (ok ? "OK" : "BLAD (" + (rd == null ? "brak RefreshDailyValues; " : "") + (okBox ? "" : "panel - poza panelem != prace; ")
-                         + (okDay ? "" : "Daily Change != |Income| - |Expenses|; ") + (okTip ? "" : "podpowiedz != prace; ") + "panel Finance " + FinanceBox.State + ")"));
+                         + (okTip ? "" : "podpowiedz != prace; ") + (okLed ? "" : "brak linii prac przy wyplatach w 28 dobach; ")
+                         + (okSt ? "" : "potkniecie widoku w czasie sprawdzenia; ") + (pend ? "arm_works z zapisu jeszcze niewczytane - nic nie sprawdzone; " : "")
+                         + "panel Finance " + FinanceBox.State + ")"));
             }
             catch (Exception e) { Log.Error("FiefsShotTest.FinanceCheck", e); }
         }
