@@ -523,19 +523,35 @@ namespace Armoury
                 }
                 bool deepOf(Offer o) { return DeepDebt(o.Owed, o.D); }
                 bool noLift(Offer o) { return o.TestRel == int.MinValue && o.TestJoin == null; }
-                // zamek: sprzedawca w glebokim dlugu, potem bez zmiany krolestwa gracza, potem najtanszy
+                // recenzja n36: wasal krolestwa bierze jego wojny (MapFaction rodu = krolestwo) - krolestwa, z ktorymi k walczy, a strona gracza jeszcze nie
+                List<string> warsOf(IFaction f)
+                {
+                    var l = new List<string>();
+                    if (f != null) foreach (var kk in Kingdom.All) if (kk != null && kk != f && !kk.IsEliminated && f.IsAtWarWith(kk)) l.Add(kk.StringId);
+                    return l;
+                }
+                int newWars(Kingdom k)
+                {
+                    if (k == null) return 0;
+                    var mf = pc.MapFaction; int n = 0;
+                    foreach (var kk in Kingdom.All) if (kk != null && kk != k && !kk.IsEliminated && k.IsAtWarWith(kk) && !(mf != null && mf != kk && mf.IsAtWarWith(kk))) n++;
+                    return n;
+                }
+                // zamek: sprzedawca w glebokim dlugu, potem bez zmiany krolestwa gracza, potem najmniej nowych wojen z wasalstwa, potem najtanszy
                 int castleCmp(Offer a, Offer b)
                 {
                     int x = (deepOf(b) ? 1 : 0) - (deepOf(a) ? 1 : 0); if (x != 0) return x;
                     x = (a.TestJoin != null ? 1 : 0) - (b.TestJoin != null ? 1 : 0); if (x != 0) return x;
+                    x = newWars(a.TestJoin).CompareTo(newWars(b.TestJoin)); if (x != 0) return x;
                     return a.Price.CompareTo(b.Price);
                 }
-                // zamek planowany przed T11: Lordship z warunkami testu bierze krolestwo sprzedawcy tego zamku - jedno wasalstwo na oba kroki
-                Kingdom planK = null;
+                // zamek planowany przed T11: Lordship z warunkami testu bierze krolestwo sprzedawcy tego zamku - jedno wasalstwo na oba kroki;
+                // recenzja n36: Lordship od rodu sprzedawcy tego zamku na koncu - odstep sprzedawcy (LandSellerCooldownDays) zamknalby zamek w T12
+                Kingdom planK = null; Clan planSeller = null; string planId = null, planName = null;
                 if (Settings.Current.LandSalesCastles)
                 {
                     var cp = lifted(true); cp.Sort(castleCmp);
-                    if (cp.Count > 0) planK = cp[0].TestJoin ?? (cp[0].Seller != null ? cp[0].Seller.Kingdom : null);
+                    if (cp.Count > 0) { planK = cp[0].TestJoin ?? (cp[0].Seller != null ? cp[0].Seller.Kingdom : null); planSeller = cp[0].Seller; planId = cp[0].Id; planName = cp[0].Name; }
                 }
                 int joins = 0;
                 // warunki testu: wasal krolestwa sprzedawcy (ChangeKingdomAction.ApplyByJoinToKingdom - droga gry, konczy sluzbe najemnika, stosunki z wojnami
@@ -547,11 +563,21 @@ namespace Armoury
                     if (o.TestJoin != null && (pc.Kingdom != o.TestJoin || pc.IsUnderMercenaryService))
                     {
                         string was = pc.Kingdom != null ? Txt(pc.Kingdom.Name) + " (" + pc.Kingdom.StringId + (pc.IsUnderMercenaryService ? ", najemnik" : ", wasal") + ")" : "bez krolestwa";
-                        ChangeKingdomAction.ApplyByJoinToKingdom(pc, o.TestJoin, default(CampaignTime), false);
-                        joins++;
-                        string now = pc.Kingdom != null ? Txt(pc.Kingdom.Name) + " (" + pc.Kingdom.StringId + (pc.IsUnderMercenaryService ? ", najemnik" : ", wasal") + ")" : "bez krolestwa";
-                        Log.Info(P + "TEST warunek testu - " + what + ": rod gracza wasalem krolestwa " + Txt(o.TestJoin.Name) + " (" + o.TestJoin.StringId + ") przez ChangeKingdomAction.ApplyByJoinToKingdom"
-                                 + " - wczesniej " + was + ", teraz " + now + (pc.Kingdom == o.TestJoin && !pc.IsUnderMercenaryService ? "" : " - NIE WYSZLO") + " (tylko ten test).");
+                        var war0 = warsOf(pc.MapFaction);
+                        // recenzja n36: ApplyInternal ustawia krolestwo przed OnClanChangedKingdom - wyjatek sluchacza (BK, Diplomacy, inny mod) nie moze zgubic linii testu
+                        string jex = null;
+                        try { ChangeKingdomAction.ApplyByJoinToKingdom(pc, o.TestJoin, default(CampaignTime), false); }
+                        catch (Exception e) { jex = e.GetType().Name; Stumble("Test(ApplyByJoinToKingdom)", e); }
+                        finally
+                        {
+                            joins++;
+                            string now = pc.Kingdom != null ? Txt(pc.Kingdom.Name) + " (" + pc.Kingdom.StringId + (pc.IsUnderMercenaryService ? ", najemnik" : ", wasal") + ")" : "bez krolestwa";
+                            var war1 = warsOf(pc.MapFaction); var wn = new List<string>(); foreach (var x in war1) if (!war0.Contains(x)) wn.Add(x);
+                            Log.Info(P + "TEST warunek testu - " + what + ": rod gracza wasalem krolestwa " + Txt(o.TestJoin.Name) + " (" + o.TestJoin.StringId + ") przez ChangeKingdomAction.ApplyByJoinToKingdom"
+                                     + " - wczesniej " + was + ", teraz " + now + (jex == null && pc.Kingdom == o.TestJoin && !pc.IsUnderMercenaryService ? "" : " - NIE WYSZLO") + (jex != null ? " (wyjatek " + jex + ")" : "")
+                                     + "; wojny strony gracza [" + string.Join(",", war0.ToArray()) + "] -> [" + string.Join(",", war1.ToArray()) + "], nowe z wasalstwa " + (wn.Count > 0 ? string.Join(",", wn.ToArray()) : "brak") + " (tylko ten test).");
+                        }
+                        if (jex != null) { note = "wyjatek ApplyByJoinToKingdom " + jex + " (wczesniej " + was + ")"; return false; }
                         note = "wasal " + o.TestJoin.StringId + " (wczesniej " + was + ")";
                     }
                     if (o.TestRel != int.MinValue && o.Head != null)
@@ -634,11 +660,14 @@ namespace Armoury
                 else
                 {
                     var ll = lifted(false);
-                    // Lordship: bez warunkow testu, potem w krolestwie planowanego zamku (albo bez zmiany krolestwa), potem najtansza
+                    // Lordship: nie od rodu sprzedawcy planowanego zamku (odstep), bez warunkow testu, potem w krolestwie planowanego zamku (albo bez zmiany
+                    // krolestwa), potem najmniej nowych wojen z wasalstwa, potem najtansza
                     ll.Sort((a, b) =>
                     {
-                        int x = (noLift(a) ? 0 : 1) - (noLift(b) ? 0 : 1); if (x != 0) return x;
+                        int x = (planSeller != null && a.Seller == planSeller ? 1 : 0) - (planSeller != null && b.Seller == planSeller ? 1 : 0); if (x != 0) return x;
+                        x = (noLift(a) ? 0 : 1) - (noLift(b) ? 0 : 1); if (x != 0) return x;
                         x = (a.TestJoin == null || a.TestJoin == planK ? 0 : 1) - (b.TestJoin == null || b.TestJoin == planK ? 0 : 1); if (x != 0) return x;
+                        x = newWars(a.TestJoin).CompareTo(newWars(b.TestJoin)); if (x != 0) return x;
                         return a.Price.CompareTo(b.Price);
                     });
                     if (ll.Count == 0) skip("T11 Lordship", "brak oferty (" + (lw ?? "-") + ")");
@@ -667,7 +696,17 @@ namespace Armoury
                 else
                 {
                     var cl = lifted(true); cl.Sort(castleCmp);   // od nowa po T11 (wasalstwo z T11, zloto, odstepy)
-                    if (cl.Count == 0) skip("T12 zamek", "brak oferty (" + (cw ?? "-") + ")");
+                    // recenzja n36: inny zamek niz planowany przed T11 - powod z oferty planowanego zbudowanej teraz (z warunkami testu)
+                    string planNote(Offer got)
+                    {
+                        if (planId == null || (got != null && got.Id == planId)) return "";
+                        string why;
+                        _testLift = true;
+                        try { var po = BuildCastle(planId); why = po.Ok ? "oferta jest, ale nizej w kolejnosci" : po.Why; }
+                        finally { _testLift = false; }
+                        return "; planowany zamek " + planName + " (" + planId + ") nie kupiony: " + why;
+                    }
+                    if (cl.Count == 0) skip("T12 zamek", "brak oferty (" + (cw ?? "-") + ")" + planNote(null));
                     else
                     {
                         var p = cl[0]; string note; bool deep = deepOf(p);
@@ -697,8 +736,10 @@ namespace Armoury
                                 bool own = st.OwnerClan == pc, okT = own && g0 == g1 && tk == tl.Count && seller.HomeSettlement != st;
                                 add("T12 zamek", okT && okM, co.Name + " (" + co.Id + ") za " + co.Price + " od " + NameOf(head) + (deep ? " (gleboki dlug)" : " (bez glebokiego dlugu)") + ", pan " + (own ? "gracz" : "NIE gracz")
                                     + ", zaloga " + g0 + " -> " + g1 + ", tytuly BK sprzedawcy u gracza " + tk + "/" + tl.Count + ", HomeSettlement sprzedawcy " + home0 + " -> " + home1 + (seller.HomeSettlement == st ? " ZLE" : "")
-                                    + ", gracza " + ph0 + " -> " + ph1 + "; " + t + (note.Length > 0 ? "; " + note : ""));
-                                add("T12 wyjatki przy zmianie pana", exOk, ex);
+                                    + ", gracza " + ph0 + " -> " + ph1 + "; " + t + (note.Length > 0 ? "; " + note : "") + planNote(co));
+                                // recenzja n36: bez zmiany pana (Execute wyszedl przed Transfer) wyjatki przy zmianie pana nie byly sprawdzone
+                                if (!own) skip("T12 wyjatki przy zmianie pana", "kupno nie doszlo do zmiany pana; " + ex);
+                                else add("T12 wyjatki przy zmianie pana", exOk, ex);
                             }
                         }
                     }
