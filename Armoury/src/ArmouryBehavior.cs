@@ -1394,6 +1394,10 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_side_home", e); }
             try { string sv = dataStore.IsSaving ? SideVillageVisit.Export() : null; SaveText.Sync(dataStore, "arm_sidevil", ref sv); if (dataStore.IsLoading) SideVillageVisit.Import(sv); }   // m97-wioski: okupy wiosek pobocznych, rabunki gracza (10 dob), rabunek w toku; brak klucza = nic
             catch (Exception e) { Log.Error("SyncData.arm_sidevil", e); }
+            // m113-pobor (24.10): pule mlodych wiosek pobocznych po poborze gracza i braki rak ("sl1|p=...|k=..."); wlasny try; brak klucza (stary zapis) = pule pelne;
+            // starsza DLL klucz pomija (pule pelne, braki rak znikaja, ubytek DOM zostaje)
+            try { string sl = dataStore.IsSaving ? SideVillageVisit.LevyExport() : null; SaveText.Sync(dataStore, "arm_sidelevy", ref sl); if (dataStore.IsLoading) SideVillageVisit.LevyImport(sl); }
+            catch (Exception e) { Log.Error("SyncData.arm_sidelevy", e); }
             // R3-09f (regale gornicze): konta wozow wsi z kruszcem sprzedanym, a jeszcze nie w domu ("1|idWozu~kruszec~ladunek~doba"); brak klucza (stary zapis) = pusto; wlasny try
             try { string rg = dataStore.IsSaving ? MineRegale.Export() : null; if (!dataStore.IsSaving || rg != null) SaveText.Sync(dataStore, "arm_regale", ref rg); if (dataStore.IsLoading) MineRegale.Import(rg); }
             catch (Exception e) { Log.Error("SyncData.arm_regale", e); }

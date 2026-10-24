@@ -1116,13 +1116,45 @@ namespace Armoury
         }
 
         /// <summary>m97-wioski krok 2 (recenzja: obroncy maja byc ludzmi TEJ wioski): pobor tylko z DOM jednej wsi s (wies okregu wioski pobocznej - jej ludzie sa czescia
-        /// DOM tej wsi), bez innych wsi regionu i bez miasta. Ta sama droga i podloga 50 hearth co TakeLevy (FromVillage). Zwraca, ilu zdjeto; region - warownia regionu.</summary>
+        /// DOM tej wsi), bez innych wsi regionu i bez miasta. Ta sama droga i podloga 50 hearth co TakeLevy (FromVillage). Zwraca, ilu zdjeto; region - warownia regionu.
+        /// m113-pobor (pobor gracza z wioski pobocznej, MLevyVillage): pobor E4/7 (MLevyVillage, MLevyA5) liczy VillOut regionu i "pobor na podlodze" tak samo jak TakeLevy;
+        /// obroncy (MLevyMilitia, E4/8) bez zmian.</summary>
         internal static double TakeLevyHere(Settlement s, double n, int causeM, out Settlement region)
         {
             region = s != null ? OutlawLaw.RegionFor(s) : null;
             if (s == null || !(n > 0.0) || !LevyLive || !s.IsVillage || s.Village == null) return 0.0;
-            try { return FromVillage(s.Village, n, causeM); }
+            double got;
+            try { got = FromVillage(s.Village, n, causeM, false); }   // m113-pobor: wlasny pobor bierze k z wlasnej puli - bez rozkladu na pule okregu
             catch (Exception e) { OStumble("TakeLevyHere", e); return 0.0; }
+            if (causeM == MLevyVillage || causeM == MLevyA5)
+            {
+                try { if (region != null && region.StringId != null && got > Eps) Rg(region.StringId).VillOut += got; }
+                catch (Exception e) { OStumble("TakeLevyHere(licznik)", e); }
+                if (n - got > Eps) { _floorCalls++; _floorMen += n - got; }
+            }
+            return got;
+        }
+
+        /// <summary>m113-pobor (recenzja): ilu ludzi DOM wsi s moze jeszcze dac ponad podloge 50 hearth (ta sama rachuba co FromVillage). Sam odczyt, nie rzuca;
+        /// ksiega nieczynna / bez przelicznika - 0.</summary>
+        internal static int LevyRoomHere(Settlement s)
+        {
+            try
+            {
+                if (s == null || !LevyLive || !s.IsVillage || s.Village == null) return 0;
+                bool unit;
+                float per = PeopleUnit.PerMan(s.Village, PeopleUnit.GamePerMan, out unit);
+                if (!unit || !(per > 0f)) return 0;
+                return (int)Math.Floor(Math.Max(0.0, (s.Village.Hearth - 50.0) / per) + 1e-9);
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>m113-pobor TEST: pobor z wsi regionu od siewu (VillOut) - sonda autotestu; brak regionu albo wpisu - 0. Sam odczyt.</summary>
+        internal static double VillOutOf(Settlement region)
+        {
+            try { RegRef r; return region != null && region.StringId != null && _rg.TryGetValue(region.StringId, out r) && r != null ? r.VillOut : 0.0; }
+            catch { return 0.0; }
         }
 
         private static bool LevyVillageFromTownOn { get { var s = Settings.Current; return s != null && s.LevyVillageFromTown; } }
@@ -1178,7 +1210,9 @@ namespace Armoury
             return np;
         }
 
-        private static double FromVillage(Village v, double n, int causeM)
+        /// <summary>notePool (m113-pobor P7): pobor gry E4/7 (MLevyVillage, MLevyA5) z DOM wsi obniza pule mlodych wiosek pobocznych tego okregu wedlug ich udzialu
+        /// (SideVillageVisit.LevyNoteDistrictDraw); false - wlasny pobor wioski (TakeLevyHere).</summary>
+        private static double FromVillage(Village v, double n, int causeM, bool notePool = true)
         {
             if (v == null || !(n > 0.0)) return 0.0;
             bool unit;
@@ -1188,6 +1222,7 @@ namespace Armoury
             double t = Math.Min(can, n);
             if (t <= Eps) return 0.0;
             double h = Move(v, ADom, AService, t, causeM, PeopleUnit.GamePerMan);
+            if (h < 0.0 && notePool && (causeM == MLevyVillage || causeM == MLevyA5)) SideVillageVisit.LevyNoteDistrictDraw(v, t);   // nie rzuca
             return h < 0.0 ? t : 0.0;
         }
 

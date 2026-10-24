@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## m113-pobor (galaz w-toku/m113-rekrutacja) - 24.10.2026: pobor z wioski pobocznej z jej wlasnej puli mlodych
+
+**Problem:** Jeff 24.10: "pula ma byc z tej konkretnej wioski ... 4000 ludzi to wioska z okolica, farmami i zagrodami. Z tej ludnosci maks ok. 10% ... potem pula odnawia sie
+tylko jak ludzie sie rodza ... a gospodarka na tym cierpi". Dotad z wioski pobocznej nie dalo sie werbowac (tylko u notabli wsi gry). Dowod (log Armoury-2026-10-24_01-21-43,
+linia Przysiolki): wioski poboczne 10 302 472 ludzi w 1957 wioskach (srednio 5 264), wsie gry 23 979 944.
+**Zmiana (SideVillageVisit.Levy.cs, klucz SideVillageRecruit + 6 liczb):** opcja "Recruit men of the village" w menu kazdej wioski pobocznej (przed "Trade") i "Recruit men of
+your village" w menu wioski gracza (przed "Leave"). Pula TEJ wioski: pulap 10% jej ludzi (Home + Away z ksiegi wiosek), wpis dopiero po pierwszym werbunku / stracie obroncow;
+odnawia sie tylko co 28 dob o 1% ludzi na rok (dorastanie; rok 364 dni), nigdy ponad 10% obecnych ludzi. Dziennie najwyzej 3% pulapu x zaufanie/6 (indeks ochotnikow gry/BK
+u notabli wsi okregu; wlasna wioska i ziemia rodu 6) x 1 / 0.5 / 0.25 wedlug etapu (ochotnicy > 60% puli, pobor > 30%, pospolite ruszenie; kraina z hamulcem wolnych rak - co
+najmniej pobor); cena = koszt rekruta gry x 1 / 1.5 / 2.0. Rodzaj: ochotnik soltysa wsi okregu, bez tieru 2+ i bez konnych (inaczej BasicTroop kultury). Werbunek: DOM wsi okregu
+-k (PeopleBook.TakeLevyHere MLevyVillage, przed pieniedzmi), ludzie do druzyny, zdarzenie OnUnitRecruited (XP gry, PeopleLedger z osada wioski), komplet DTE tieru 1
+(PlayerRecruit.SideVillageKit), pochodzenie GiveNew FLevyPlayer; zaplata tylko za przybylych GiveGoldAction gracz -> kiesa wsi okregu. Brak rak wioski (jak po bitwie
+obroncow) przesuwa ubytek na te wioske i wraca przez 364 doby. Obroncy wioski: najwyzej tylu, ilu mlodych zostalo (DefendersFor = min(pulap obroncow, LevyCallableFor));
+polegli obroncy (bitwa gracza i lancuch AI) obnizaja pule. TakeLevyHere dla MLevyVillage/MLevyA5 liczy VillOut regionu i "pobor na podlodze" jak TakeLevy (obroncy bez zmian).
+Zapis arm_sidelevy ("sl1|p=...|k=..."). Sonda testu (SideVillageVisit.LevyProbe.cs, armoury-pobor.flag + LogGate 1/2). sprawdz_logi --grupa m113pobor (POB-0..5).
+**Bez podwojnego liczenia:** werbunek gry, pula BK, VolunteerTypes, RecruitKit, VolunteerKit, Levy/PeopleLevy bez zmian, bez DeduceManpower i bez OnTroopRecruited (DTE dalby
+komplet drugi raz). AI nie wjezdza do wiosek pobocznych - pobor tylko gracza.
+**Ryzyko / co sprawdzic:** linie "Pobor w wioskach (m113):" (start sesji w linii WP, werbunek, doba, zapis/wczytanie); E4/3 i E4/7 KONTROLA w granicach bazy (dodatkowy hearth
+MLevyVillage = ludzie sondy); MoneyLedger swiata bez zmian; brak rak przy kluczu wylaczonym = 0 (ksiega wraca do rozkladu okregu); "pobor na podlodze" liczy cala prosbe
+(takze ludzi, ktorzy nie przyszli - tylko licznik linii E4/7); tekst menu wioski odswieza sie przy wejsciu. Autotest NIE robiony (zakaz uruchamiania gry w tym kroku).
+**Status:** DO SPRAWDZENIA (build Armoury kod 0; gen_mcm Armoury 2363; bez autotestu, nie wgrane).
+
 ## m111-walka faza 1 (galaz w-toku/m111-walka) - 24.10.2026: grozni przeciwnicy w turnieju, na arenie i w pojedynku (bitwy bez zmian)
 
 **Problem:** Jeff (23.10): "jak atakuje caly czas, przeciwnik sie tylko broni; z drzewcem, ktorego sie dopiero ucze, bije duzo wyzsze poziomy; nie czulem,

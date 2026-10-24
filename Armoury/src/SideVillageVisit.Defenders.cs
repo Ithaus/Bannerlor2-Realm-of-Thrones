@@ -113,11 +113,20 @@ namespace Armoury
             _fallen[uid] = new[] { now, (double)Today0() };
         }
 
-        /// <summary>VillageBook.LackOf: jest jakis brak rak (bez bitew - zero kosztu w ksiedze).</summary>
-        internal static bool LackAny { get { return _lack.Count > 0; } }
+        /// <summary>VillageBook.LackOf: jest jakis brak rak (bez bitew i bez poboru - zero kosztu w ksiedze). m113-pobor: takze brak rak po poborze (LevyLackAny).</summary>
+        internal static bool LackAny { get { return _lack.Count > 0 || LevyLackAny; } }
 
-        /// <summary>Brak rak wioski uid teraz (ludzie; liniowo do 0 przez FallenDays dob). Wola VillageBook pod swoim Gate - sam odczyt, nie rzuca.</summary>
+        /// <summary>Brak rak wioski uid teraz: po bitwie z obroncami (DefLackNow) plus po poborze gracza (m113-pobor, LevyLackNow - wlasny try). Wola VillageBook pod swoim
+        /// Gate - sam odczyt, nie rzuca, bez PartsOf.</summary>
         internal static double LackNow(string uid)
+        {
+            double n = DefLackNow(uid);
+            try { n += LevyLackNow(uid); } catch { }
+            return n;
+        }
+
+        /// <summary>Brak rak wioski uid po bitwie z obroncami (ludzie; liniowo do 0 przez FallenDays dob). Sam odczyt, nie rzuca.</summary>
+        private static double DefLackNow(string uid)
         {
             try
             {
@@ -133,16 +142,16 @@ namespace Armoury
         private static void AddLack(string uid, double n)
         {
             if (uid == null || !(n > 0.0) || double.IsInfinity(n)) return;
-            _lack[uid] = new[] { LackNow(uid) + n, (double)Today0() };
+            _lack[uid] = new[] { DefLackNow(uid) + n, (double)Today0() };
         }
 
-        private static double LackSum() { double t = 0.0; foreach (var k in _lack.Keys) t += LackNow(k); return t; }
+        private static double LackSum() { double t = 0.0; foreach (var k in _lack.Keys) t += DefLackNow(k); return t; }
 
         /// <summary>Doba: wpisy pamieci poleglych i braku rak, ktore juz wrocily do zera, wylatuja (zapis i tak je pomija).</summary>
         private static void DefPrune()
         {
             List<string> gone = null;
-            foreach (var k in _lack.Keys) if (LackNow(k) < 0.01) (gone ?? (gone = new List<string>())).Add(k);
+            foreach (var k in _lack.Keys) if (DefLackNow(k) < 0.01) (gone ?? (gone = new List<string>())).Add(k);
             if (gone != null) foreach (var k in gone) _lack.Remove(k);
             gone = null;
             foreach (var k in _fallen.Keys) if (Fallen(k) < 0.01) (gone ?? (gone = new List<string>())).Add(k);
@@ -169,10 +178,11 @@ namespace Armoury
         /// <summary>Pulap ludnosci: 1 na 10 mieszkancow w domu, najwyzej 60.</summary>
         private static int DefCapOf(double home) { return Math.Max(0, Math.Min(DefCap, (int)Math.Floor(Math.Max(0.0, home) / DefPeoplePer))); }
 
-        /// <summary>Obroncy wioski uid przy home ludziach w domu: pulap ludnosci minus pamiec poleglych. Takze ksiega wiosek (lancuch AI) - sam odczyt, nie rzuca.</summary>
+        /// <summary>Obroncy wioski uid przy home ludziach w domu: pulap ludnosci minus pamiec poleglych, najwyzej tylu, ilu mlodych wioska jeszcze ma (m113-pobor P9 - jedna
+        /// regula z poborem: LevyCallableFor, bez wpisu bez limitu). Takze ksiega wiosek (lancuch AI) - sam odczyt, bez PartsOf, nie rzuca.</summary>
         internal static int DefendersFor(string uid, double home)
         {
-            try { return Math.Max(0, DefCapOf(home) - (int)Math.Round(Fallen(uid))); }
+            try { return Math.Max(0, Math.Min(DefCapOf(home) - (int)Math.Round(Fallen(uid)), LevyCallableFor(uid, home))); }
             catch { return 0; }
         }
 
@@ -204,6 +214,8 @@ namespace Armoury
                 if (d <= 0) return;
                 double lost = d * Math.Min(1.0, d / (double)men);
                 AddFallen(uid, lost);
+                // m113-pobor P9 (recenzja): BEZ LevyNoteLost - lancuch nie zdejmuje ludzi z ksiegi (BurnCore: tylko pamiec poleglych), wiec pula mlodych zostaje;
+                // obnizenie puli tylko przy faktycznym ubytku ludzi (FinishFight)
                 _dAiBurnNoted++; _dAiFallen += lost;
             }
             catch (Exception e) { Stumble("NoteChainBurn", e); }
@@ -221,6 +233,7 @@ namespace Armoury
             if (def <= 0) { sb.Append(" There is nobody left here to fight you.").Append(fit); return; }
             sb.Append(" About ").Append(def).Append(def == 1 ? " man" : " men").Append(" of its ").Append(Math.Round(home).ToString("N0", Inv)).Append(" people would take up flails, spears and bows to defend it");
             if (Fallen(_uid) >= 0.5) sb.Append(" (fewer than before - it has buried and nursed its men of late)");
+            else if (LevyCallableFor(_uid, home) < DefCapOf(home)) sb.Append(" (its young men have gone to war)");   // m113-pobor P9: pula oprozniona poborem
             sb.Append('.').Append(fit);
             if (men >= SurrenderRatio * def) sb.Append(" They are too few to stand against you - they would give in without a fight.");
             else sb.Append(" They will come out and fight you by the village.");
@@ -616,6 +629,7 @@ namespace Armoury
                 double sh = StandShareOf(Settlement.Find(f.Dist), f.Uid), lack = 0.0;
                 if (lost > 0 && f.Levy && sh >= 0.0) { lack = lost * (1.0 - sh); AddLack(f.Uid, lack); }
                 AddFallen(f.Uid, lost * FallenFighters);
+                if (lost > 0) LevyNoteLost(f.Uid, lost, LvPeopleOf(f.Dist, f.Uid));   // m113-pobor P9: polegli i pojmani schodza z puli mlodych wioski (nie rzuca)
                 _dFallen += lost; _dRouted += routed; _dLack += lack;
                 bool won = f.Won == 1;
                 if (won) _dWon++; else _dLostFights++;
@@ -714,7 +728,7 @@ namespace Armoury
             first = true;
             foreach (var kv in _lack)
             {
-                if (kv.Value == null || LackNow(kv.Key) < 0.05) continue;
+                if (kv.Value == null || DefLackNow(kv.Key) < 0.05) continue;
                 if (first) { sb.Append("|k="); first = false; } else sb.Append(';');
                 sb.Append(kv.Key).Append(',').Append(kv.Value[0].ToString("R", Inv)).Append(',').Append(((int)kv.Value[1]).ToString(Inv));
             }

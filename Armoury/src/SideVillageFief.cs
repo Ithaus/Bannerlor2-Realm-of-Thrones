@@ -931,6 +931,10 @@ namespace Armoury
                         catch (Exception e) { Stumble("Leave", e); }
                     }, true, 9);
                 SideVillageHome.AddMenus(starter);   // r4-dom: "Trade", "Your house" (lozko, skrzynia), "Take a walk"
+                // m113-pobor: pobor z wlasnej wioski (zaufanie 6) - indeks 6 = tuz przed "Leave" (nocleg 0, prace 1, przeglad 2, handel 3, dom 4, spacer 5, wyjazd)
+                starter.AddGameMenuOption(Menu, "arm_side_fief_recruit", "{=!}Recruit men of your village",
+                    delegate (MenuCallbackArgs a) { return HasFief && SideVillageVisit.LevyConditionFief(a, _dist, _uid); },   // osada szukana w try (recenzja)
+                    SideVillageVisit.LevyOpenFief, false, 6);
             }
             catch (Exception e) { Stumble("AddMenus", e); }
         }
@@ -1013,6 +1017,8 @@ namespace Armoury
             if (VillageBook.StateOf(_uid, out vs))
                 sb.Append(Math.Round(vs.Home + vs.Away).ToString("N0", Inv)).Append(" people in ").Append(Math.Max(1.0, Math.Round(vs.Settlements)).ToString("0", Inv)).Append(" homesteads")
                   .Append(vs.State == VillageBook.SStanding ? "." : vs.State == VillageBook.SBurned ? " - burned, people are slowly coming back." : " - raiders have emptied part of it.").Append('\n');
+            string lvl = st != null ? SideVillageVisit.LevyLineFor(st, _uid) : null;   // m113-pobor: pula mlodych wlasnej wioski (recenzja)
+            if (lvl != null) sb.Append(lvl).Append('\n');
             if (st != null) foreach (string l in DistrictWorks.PartLines(st, _uid, false)) sb.Append(l).Append('\n');
             string why; long due;
             long got = Expect(out why, out due);   // r4-wioska: dochod dnia (ten sam co w podpowiedzi zlota i w zakladce Fiefs; recenzja - obciety do tego, co pan ma)
