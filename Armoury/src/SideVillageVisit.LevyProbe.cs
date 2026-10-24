@@ -300,16 +300,15 @@ namespace Armoury
                 PbCheck(sb, "obroncy<=pula", def <= call, def + "/" + (call == int.MaxValue ? "bez wpisu" : call.ToString(Inv)));
                 ProbeYouth(sb, st, uid, today);
                 double prev; var rq = LvGet(uid);
-                if (_pbPrev.TryGetValue(uid, out prev) && q.Pool > prev + 1e-9)
+                bool hp = _pbPrev.TryGetValue(uid, out prev);
+                // n36 (P3): pula rosnie tylko w dobie rozliczenia - o rozliczony przyrost w toku (z dobowej stopy wsi okregu), do pulapu. Recenzja n36: kontrola z doby
+                // rozliczenia, nie z samego wzrostu puli - rozliczenie policzone, a niedopisane do puli, to BLAD, nie cisza
+                if (hp && rq != null && rq.SettleDay == today && rq.LastSettle > 1e-9)
                 {
-                    // n36 (P3): pula rosnie tylko w dobie rozliczenia - o rozliczony przyrost w toku (z dobowej stopy wsi okregu), do pulapu
-                    if (rq != null && rq.SettleDay == today)
-                    {
-                        double exp = Math.Min(q.Cap, prev + rq.LastSettle) - prev;
-                        PbCheck(sb, "przyrost mlodych", Math.Abs(q.Pool - prev - exp) <= Math.Max(0.05, 0.02 * exp), "+" + (q.Pool - prev).ToString("0.###", Inv) + "/+" + exp.ToString("0.###", Inv));
-                    }
-                    else sb.Append(" | pula +").Append((q.Pool - prev).ToString("0.###", Inv)).Append(" poza rozliczeniem (nowy wpis albo pulap wzrosl) INFO");
+                    double exp = Math.Min(q.Cap, prev + rq.LastSettle) - prev;
+                    PbCheck(sb, "przyrost mlodych", Math.Abs(q.Pool - prev - exp) <= Math.Max(0.05, 0.02 * Math.Abs(exp)), "+" + (q.Pool - prev).ToString("0.###", Inv) + "/+" + exp.ToString("0.###", Inv));
                 }
+                else if (hp && q.Pool > prev + 1e-9) sb.Append(" | pula +").Append((q.Pool - prev).ToString("0.###", Inv)).Append(" poza rozliczeniem (nowy wpis albo pulap wzrosl) INFO");
                 Log.Info(sb.ToString());
                 if (!_pbAfterLoad && uid == _pbB && d <= 40)
                 {

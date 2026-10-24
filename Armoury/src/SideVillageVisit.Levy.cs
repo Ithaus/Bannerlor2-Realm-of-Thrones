@@ -20,7 +20,7 @@ namespace Armoury
     /// tylko jak ludzie sie rodza (ile sie rodzi na miesiac itd.), a gospodarka na tym cierpi"). Klucz SideVillageRecruit; zapis arm_sidelevy.
     /// DOWOD (log Armoury-2026-10-24_01-21-43): wioski poboczne 10 302 472 ludzi w 1957 wioskach (srednio 5 264), wsie gry 23 979 944, wsie BK 986 949 w 571.
     /// Srednia wioska: pulap 10% = ok. 526 ludzi; od n36 pula wraca z przyrostu naturalnego jej wsi okregu - przy 0.5% rocznie ok. 2 chlopcow dorasta na miesiac
-    /// (pelna pula po ok. 20 latach), przy pulapie 1.3% ok. 5 (ok. 8 lat); glod, wojna, bieda, rabunek - nic.
+    /// (pelna pula po ok. 20 latach), przy pulapie 1.3% ok. 5 (ok. 8 lat); glod, wojna, bezprawie, bieda - wolniej; glod ponad prog, rabunek, spalenie, przymus wsi okregu - nic.
     /// REGULY (liczby Claude'a):
     ///  P1 LUDZIE: P = me.Home + me.Away z PartOf (VillageBook.PartsOf) - ludzie TEJ wioski w ksiedze wiosek. Pulap cap = SideRecruitPoolPercent (10) / 100 x P.
     ///  P2 WPIS LvRec {Uid, Pool, P, Grown, Day, Stage, Today, Total}; brak wpisu = pula pelna (Pool = cap). Wpis powstaje przy pierwszym werbunku albo pierwszej stracie
@@ -185,12 +185,13 @@ namespace Armoury
 
         /// <summary>P3 (n36): stopa odnowy puli g [% ludzi rocznie, ze znakiem] wioski pobocznej o wsi okregu st - przyrost naturalny tej wsi (PopulationLaw.RateOf,
         /// E4/4); przyrost wylaczony albo nieznany - zapas SideRecruitYouthPercent (fb, why "wyl" / "blad"). Raz na dobe na wies okregu (stopa z modelu). Nie rzuca.</summary>
-        private static double LvRate(Settlement st, out string why, out bool fb)
+        /// recenzja n36: fresh - z modelu teraz, z pominieciem pamieci doby (wycena menu: rabunek / przymus wsi okregu w tej dobie widac od razu; dopisanie doby i sonda bez zmian).
+        private static double LvRate(Settlement st, out string why, out bool fb, bool fresh = false)
         {
             int day = Today0();
             if (day != _lvGDay) { _lvGDay = day; _lvG.Clear(); }
             LvG x;
-            if (st != null && _lvG.TryGetValue(st, out x)) { why = x.Why; fb = x.Fb; return x.G; }
+            if (!fresh && st != null && _lvG.TryGetValue(st, out x)) { why = x.Why; fb = x.Fb; return x.G; }
             x = new LvG { G = LvYouthPct, Why = !PopulationLaw.GrowthOn ? "wyl" : (st == null ? "nieznana" : "blad"), Fb = true };   // nieznana - wioska bez wsi okregu w ukladzie
             try
             {
@@ -199,7 +200,7 @@ namespace Armoury
                 else if (w != null) x.Why = w;
             }
             catch (Exception e) { LvStumble("Rate", e); }
-            if (st != null && !x.Fb) _lvG[st] = x;   // zapas nie do pamieci doby - latka przyrostu wpieta pozniej w tej dobie (start sesji) liczy juz od nastepnego pytania
+            if (st != null && !x.Fb && !fresh) _lvG[st] = x;   // zapas nie do pamieci doby - latka przyrostu wpieta pozniej w tej dobie (start sesji) liczy juz od nastepnego pytania
             why = x.Why; fb = x.Fb;
             return x.G;
         }
@@ -335,7 +336,7 @@ namespace Armoury
             q.Room = PeopleBook.LevyRoomHere(st);   // podloga 50 hearth DOM wsi okregu - nikt z niczego, nikt "na podlodze"
             q.Ready = Math.Max(0, Math.Min(Math.Min(q.Callable, q.Room), q.Muster - q.Today));
             string gw; bool gfb;
-            q.G = LvRate(st, out gw, out gfb); q.GWhy = gw; q.GFb = gfb;
+            q.G = LvRate(st, out gw, out gfb, true); q.GWhy = gw; q.GFb = gfb;
             q.Y = q.P * Math.Max(0.0, q.G) / 100.0 * LvMonth / LvYearDays();   // P3 (n36): mlodzi na miesiac z przyrostu wsi okregu
             q.Troop = TroopFor(st, uid, today);
             if (q.Troop == null) { q.Hide = true; _lvQ = q; return q; }
@@ -379,12 +380,13 @@ namespace Armoury
             if (fb) return "no young men come of age here now";
             switch (q.GWhy)
             {
-                case "spalona": return "the village lies burned and is not growing";
-                case "lupiona": return "the village is not growing while raiders are about";
-                case "przymus": return "the village is not growing after it was squeezed by force";
-                case "glod": return "the village is not growing now, its people go hungry";
-                case "wojna": return "the village is not growing now, for war, raids and lawlessness";
-                case "bieda": return "the village is not growing now, its land is too poor";
+                // recenzja n36: spalona / lupiona / przymus - stan wsi okregu (wioska poboczna moze stac cala, linia menu nie patrzy na VillageState)
+                case "spalona": return "its district lies burned and is not growing";
+                case "lupiona": return "its district is not growing while raiders are about";
+                case "przymus": return "its district is not growing after it was squeezed by force";
+                case "glod": return "the village is not growing now because its people go hungry";
+                case "wojna": return "the village is not growing now because of war, raids and lawlessness";
+                case "bieda": return "the village is not growing now because its district is poorer than the rest of the land";
                 default: return "the village is not growing now (hunger, war or lawlessness)";
             }
         }
