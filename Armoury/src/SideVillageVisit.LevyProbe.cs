@@ -39,7 +39,7 @@ namespace Armoury
         private static int _pbRec;   // test n36: werbunki sondy z kontrolami (0 - sonda nic nie sprawdzila: NIEPOKRYTY)
         private static int _pbOver;  // po recenzji: odmowy ponad dzis sprawdzone po werbunku przysiolka (0 - limit dnia nie sprawdzony: NIEPOKRYTY)
         private static int _pbYouth;   // 113b: kontrole odnowy doby (ProbeYouth: dopisanie wobec RateOf tej wsi okregu) - 0: NIEPOKRYTY
-        private static int _pbSettle;  // 113b: kontrole przyrostu mlodych w dobie rozliczenia (co 28 dob) - 0: NIEPOKRYTY
+        private static int _pbSettle;  // 113b: kontrole przyrostu mlodych w dobie rozliczenia (co 28 dob) - 0: NIEPOKRYTY; recenzja 113b: tylko przyrost ponad tolerancje z kontrola odnowy miesiaca
         private const int PbTrustWant = 3;   // 113b: zaufanie, do ktorego warunek testu podnosi relacje z notablami okregu (albo maksimum modelu)
         private sealed class PbCand { public string Uid; public Settlement St; public double P; public int Sc, Ord; }
         // test n36: prawidlowe odmowy po werbunku - kody LevyGate i powody LevyDo (miejsce nie wystepuje: sonda wola bramke jak wioska gracza).
@@ -51,6 +51,8 @@ namespace Armoury
         // n36 (P3): suma dobowych dopisan policzona przez sonde od ostatniego rozliczenia wpisu (nowy wpis - od nowa)
         private sealed class PbAcc { public object R; public double Sum; public int Days; }
         private static readonly Dictionary<string, PbAcc> _pbAcc = new Dictionary<string, PbAcc>(StringComparer.Ordinal);
+        // recenzja 113b: pobor gry z puli wpisu od ostatniej linii sondy (LevyNoteDistrictDraw - rekruci notabli, LevyNoteLost - polegli obroncy) - { przed rozliczeniem, po nim }
+        private static readonly Dictionary<string, double[]> _pbDraw = new Dictionary<string, double[]>(StringComparer.Ordinal);
 
         private static bool ProbeFlag()
         {
@@ -67,7 +69,20 @@ namespace Armoury
             return _pbFlag == 1;
         }
 
-        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbRec = 0; _pbOver = 0; _pbYouth = _pbSettle = 0; _pbPrev.Clear(); _pbAcc.Clear(); }
+        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbRec = 0; _pbOver = 0; _pbYouth = _pbSettle = 0; _pbPrev.Clear(); _pbAcc.Clear(); _pbDraw.Clear(); }
+
+        /// <summary>Recenzja 113b: ubytek z puli wpisu r poza sonda (gone - ile naprawde zeszlo), osobno przed rozliczeniem tej doby i po nim. Tylko w czasie sondy. Nie rzuca.</summary>
+        private static void PbNoteDraw(LvRec r, double gone)
+        {
+            try
+            {
+                if (_pbDay0 < 0 || r == null || r.Uid == null || !(gone > 0.0)) return;
+                double[] a;
+                if (!_pbDraw.TryGetValue(r.Uid, out a)) _pbDraw[r.Uid] = a = new double[2];
+                a[r.SettleDay == Today0() ? 1 : 0] += gone;
+            }
+            catch { }
+        }
 
         private static void PbCheck(StringBuilder sb, string what, bool ok, string val)
         {
@@ -342,11 +357,13 @@ namespace Armoury
             return res;
         }
 
-        /// <summary>n36 (P3): odnowa wpisu uid w dobie today wobec RateOf tej samej wsi okregu (bez pamieci doby LvRate) i suma dob do rozliczenia miesiaca.</summary>
-        private static void ProbeYouth(StringBuilder sb, Settlement st, string uid, int today)
+        /// <summary>n36 (P3): odnowa wpisu uid w dobie today wobec RateOf tej samej wsi okregu (bez pamieci doby LvRate) i suma dob do rozliczenia miesiaca.
+        /// Recenzja 113b: true - w tej dobie byla kontrola odnowy miesiaca (sonda widziala wszystkie dopisania rozliczenia) - tylko wtedy przyrost mlodych liczy sie do pokrycia.</summary>
+        private static bool ProbeYouth(StringBuilder sb, Settlement st, string uid, int today)
         {
             var rr = LvGet(uid);
-            if (rr == null || rr.AccDay != today) return;   // brak wpisu (pula pelna) albo wpis z dzisiaj - doba go nie dopisywala
+            if (rr == null || rr.AccDay != today) return false;   // brak wpisu (pula pelna) albo wpis z dzisiaj - doba go nie dopisywala
+            bool month = false;
             float g0 = 0f; string w0 = null; bool ok = false;
             try { ok = st != null && st.Village != null && PopulationLaw.RateOf(st.Village, out g0, out w0); } catch { ok = false; }
             double gExp = ok ? g0 : LvYouthPct;
@@ -363,11 +380,15 @@ namespace Armoury
                 bool inSettle = rr.AccN == 0;
                 double sum = pa.Sum + (inSettle ? addExp : 0.0); int days = pa.Days + (inSettle ? 1 : 0);
                 if (days == LvMonth && rr.LastSettleN == LvMonth)
+                {
+                    month = true;
                     PbCheck(sb, "odnowa miesiaca (suma " + days + " dob)", Math.Abs(rr.LastSettle - sum) <= 1e-5 + 1e-4 * sum, "+" + rr.LastSettle.ToString("0.###", Inv) + "/+" + sum.ToString("0.###", Inv));
+                }
                 else sb.Append(" | odnowa miesiaca +").Append(rr.LastSettle.ToString("0.###", Inv)).Append(" (dob sondy ").Append(days).Append(", wpisu ").Append(rr.LastSettleN).Append(" z ").Append(LvMonth).Append(") INFO");
                 pa.Sum = inSettle ? 0.0 : addExp; pa.Days = inSettle ? 0 : 1;
             }
             else { pa.Sum += addExp; pa.Days++; }
+            return month;
         }
 
         private static void ProbeDay(int d, int today)
@@ -395,17 +416,27 @@ namespace Armoury
                 PbCheck(sb, "0<=pula<=pulap", q.Pool >= 0.0 && q.Pool <= q.Cap + 1e-6, "");
                 int def = DefendersFor(uid, q.Home), call = LevyCallableFor(uid, q.Home);
                 PbCheck(sb, "obroncy<=pula", def <= call, def + "/" + (call == int.MaxValue ? "bez wpisu" : call.ToString(Inv)));
-                ProbeYouth(sb, st, uid, today);
+                bool month = ProbeYouth(sb, st, uid, today);
                 double prev; var rq = LvGet(uid);
                 bool hp = _pbPrev.TryGetValue(uid, out prev);
+                double[] dw; _pbDraw.TryGetValue(uid, out dw);
+                double pre = dw != null ? dw[0] : 0.0, post = dw != null ? dw[1] : 0.0;
                 // n36 (P3): pula rosnie tylko w dobie rozliczenia - o rozliczony przyrost w toku (z dobowej stopy wsi okregu), do pulapu. Recenzja n36: kontrola z doby
                 // rozliczenia, nie z samego wzrostu puli - rozliczenie policzone, a niedopisane do puli, to BLAD, nie cisza. 113b: takze rozliczenie 0 (wies okregu
-                // nie rosla) - pula nie moze wtedy wzrosnac
+                // nie rosla) - pula nie moze wtedy wzrosnac. Recenzja 113b: pobor gry od wczorajszej linii (rekruci notabli okregu, polegli) odjety - przed rozliczeniem
+                // od puli wyjsciowej, po nim od wyniku (inaczej pobor dnia przed rozliczeniem = falszywy BLAD); do pokrycia (TAK) liczy sie tylko kontrola, ktora moze
+                // zawiesc: przyrost ponad tolerancje i w tej samej dobie kontrola odnowy miesiaca (suma dob sondy) - rozliczenie 0 / drobne zostaje kontrola bez pokrycia
                 if (hp && rq != null && rq.SettleDay == today)
                 {
-                    double exp = Math.Min(q.Cap, prev + Math.Max(0.0, rq.LastSettle)) - prev;
-                    _pbSettle++;
-                    PbCheck(sb, "przyrost mlodych", Math.Abs(q.Pool - prev - exp) <= Math.Max(0.05, 0.02 * Math.Abs(exp)), "+" + (q.Pool - prev).ToString("0.###", Inv) + "/+" + exp.ToString("0.###", Inv));
+                    double b0 = Math.Max(0.0, prev - pre);
+                    double exp = Math.Min(q.Cap, b0 + Math.Max(0.0, rq.LastSettle)) - b0;
+                    double tol = Math.Max(0.05, 0.02 * Math.Abs(exp));
+                    bool cover = month && exp > tol;
+                    if (cover) _pbSettle++;
+                    double seen = q.Pool + post - b0;
+                    PbCheck(sb, "przyrost mlodych" + (pre + post > 1e-9 ? " (pobor gry przed " + pre.ToString("0.###", Inv) + ", po " + post.ToString("0.###", Inv) + ")" : "")
+                                + (cover ? "" : " (bez pokrycia: " + (month ? "przyrost do " + tol.ToString("0.###", Inv) : "bez odnowy miesiaca") + ")"),
+                            Math.Abs(seen - exp) <= tol, "+" + seen.ToString("0.###", Inv) + "/+" + exp.ToString("0.###", Inv));
                 }
                 else if (hp && q.Pool > prev + 1e-9) sb.Append(" | pula +").Append((q.Pool - prev).ToString("0.###", Inv)).Append(" poza rozliczeniem (nowy wpis albo pulap wzrosl) INFO");
                 Log.Info(sb.ToString());
@@ -417,6 +448,7 @@ namespace Armoury
                 }
                 var r = LvGet(uid);
                 _pbPrev[uid] = r != null ? r.Pool : q.Cap;
+                _pbDraw.Remove(uid);   // recenzja 113b: pobor gry liczony od tej puli
             }
             // 113b: TAK tylko, gdy byl werbunek z kontrolami, odmowa ponad dzis, kontrola odnowy doby i kontrola przyrostu mlodych (doba rozliczenia, 28 dob od wpisu)
             Log.Info(LP + "TEST doba " + d + " - razem OK " + _pbOk + ", BLAD " + _pbBad + ", werbunkow sondy z kontrolami " + _pbRec + ", odmow ponad dzis po werbunku " + _pbOver

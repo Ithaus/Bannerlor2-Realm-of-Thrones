@@ -730,7 +730,9 @@ namespace Armoury
                     r = new LvRec { Uid = uid, P = pHint, Pool = LvPoolPct / 100.0 * pHint, Grown = today };
                     if (!LvPut(r)) return;
                 }
+                double was0 = r.Pool;
                 r.Pool = Math.Max(0.0, r.Pool - lost);
+                PbNoteDraw(r, was0 - r.Pool);   // recenzja 113b: sonda poboru - ubytek poza rozliczeniem (nie rzuca)
                 _ldLost += lost; _ldLostN++;
                 _lvQ = null;
             }
@@ -764,6 +766,7 @@ namespace Armoury
                     double was = r.Pool;
                     r.Pool = Math.Max(0.0, r.Pool - dd);
                     _ldVan += was - r.Pool;
+                    PbNoteDraw(r, was - r.Pool);   // recenzja 113b: sonda poboru - ubytek poza rozliczeniem (nie rzuca)
                 }
                 _lvQ = null;
             }
