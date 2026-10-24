@@ -56,6 +56,8 @@ namespace Armoury
         // startu LootTally ("Lup bitwy (m109): start")
         private static MethodInfo _lReg;
         internal static bool MountReturnWired, MountFinalWired, SpareHarnessWired;
+        // m114-lup: getter Spoils EnablePrioritySystem odpowiada false (NoSoldierSplit) - drugi podzial listy trofeow wylaczony
+        internal static bool SoldierSplitWired;
         internal static bool LuckyFound { get { return _lReg != null; } }
         /// <summary>m110-stan: latki lupu cialo po ciele wpiete (DTE OnAgentRemoved - zabojca i ofiara, PartyBattleRecord.AddLootedItem - sztuka) - linia startu stanow.</summary>
         internal static int LootWiredCount { get { return _lootWired; } }
@@ -384,6 +386,21 @@ namespace Armoury
                     Log.Info("BattlefieldLaw: tabor Spoils (Baggage Train) wyciety na stale - wozy dzieli vanilla wg wkladu.");
                 }
 
+                // m114-lup (Jeff 24.10 17:40: "dostaje tylko zbroje i zero broni... wszystkich zabijam sam, wiec wszystko powinno byc moje. Cos dzieli lup zle";
+                // 17:55: "bron byla potem w ekwipunku, ale nie na ekranie lupu - jakby przeniesiona przed ekranem"). Spoils dzieli liste trofeow DRUGI raz
+                // (LootCollectionBehavior.BuildLootScreenRoster, EnablePrioritySystem, bez MCM, kazdy preset ON): przy choc jednym zolnierzu w druzynie
+                // na ekran idzie 30% sztuk od najdrozszych (zbroje), reszta (tania bron bandytow) po cichu do sakw. Dzialke gracza liczy juz BattlefieldLaw
+                // wg powalonych, wiec getter odpowiada false - cala lista trofeow na ekran. Jedyny odczyt gettera to ten podzial (_isSoloParty nietkniete:
+                // kara rannych, czas szukania, komunikat solo). Klucz SpoilsSoldierSplitOff.
+                var gPrio = mcmType != null ? AccessTools.PropertyGetter(mcmType, "EnablePrioritySystem") : null;
+                if (gPrio != null)
+                {
+                    h.Patch(gPrio, postfix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(NoSoldierSplit)));
+                    SoldierSplitWired = true;
+                    Log.Info("BattlefieldLaw: drugi podzial Spoils (Priority: 30% na ekran, reszta po cichu do sakw) wylaczony - dzialke liczy BattlefieldLaw wg powalonych.");
+                }
+                else Log.Info("BattlefieldLaw: UWAGA brak EnablePrioritySystem w Spoils - drugi podzial NIE wylaczony.");
+
                 if (dmgType != null) _applyDamage = AccessTools.Method(dmgType, "ApplyDamageToLoot");
                 // m109-lup: konie i uprzaz przetrzymane w AfterGenerateLoot wracaja na liste trofeow (prefiks; Spoils wola ApplyDamageToLoot tylko w :944)
                 if (dmgType != null)
@@ -477,7 +494,8 @@ namespace Armoury
                         // placi za zabitych - bez DTE vanilla loteria zostaje
                         CasualtyLootCut = mCas != null;
                         Log.Info("BattlefieldLaw: dzialka gracza z lupow DTE trafia na ekran (solo 100%, z druzyna "
-                                 + Settings.Current.PlayerLootSharePercent + "%)."
+                                 + Settings.Current.PlayerLootSharePercent + "%) + drugi podzial Spoils: "
+                                 + (SoldierSplitWired && Settings.Current.SpoilsSoldierSplitOff ? "WYLACZONY" : "WLACZONY") + "."   // m114-lup
                                  + (CasualtyLootCut ? " Jency z bitew ida pod obszukanie (placa fizycznie za rannych)." : ""));
                         // E8/A (250, odpowiedz Jeffa 12.10 nr 1): lup cialo po ciele - kto powalil wlasciciela sztuki dopisywanej do lupu (latki wpiete zawsze,
                         // klucz OwnKillsLootWhole czytany w LootTag i AfterDtePartyItems; bez latek dzialka liczy sie srednia z puli jak dotad)
@@ -522,6 +540,7 @@ namespace Armoury
                 // m109-lup: pomiar lupu bitwy wedlug rodzaju i hak autotestu (LootTally) - latki wpiete zawsze, tylko czytaja
                 if (modelType != null) _lReg = AccessTools.Method(modelType, "RegisterLuckyElement");
                 LootTally.ApplyAll(h);
+                LootTally.ApplyScreen(h);   // m114-lup: pomiar ekranu trofeow Spoils (lista -> ekran -> sakwy)
             }
             catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll", e); }
         }
@@ -1422,6 +1441,13 @@ namespace Armoury
         public static void NoBaggageTrain(ref bool __result)
         {
             try { if (Settings.Current.BattlefieldLawEnabled) __result = false; } catch { }
+        }
+
+        /// <summary>m114-lup: drugi podzial Spoils (Priority) zawsze OFF przy prawie pola bitwy - cala lista trofeow na ekran, nic po cichu do sakw.
+        /// Bez ScreenIsRealLoot: LReset czysci ja przy wczytaniu, a zbieranie Spoils i BuildLootScreenRoster ida pozniej.</summary>
+        public static void NoSoldierSplit(ref bool __result)
+        {
+            try { if (Settings.Current.BattlefieldLawEnabled && Settings.Current.SpoilsSoldierSplitOff) __result = false; } catch { }
         }
 
         /// <summary>Symulacje: trup mial sprzet, to sprzet jest - bez zaszytego x0.10-0.58.</summary>

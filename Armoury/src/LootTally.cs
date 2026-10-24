@@ -342,7 +342,7 @@ namespace Armoury
                 }
                 // doba
                 _dBattles++;
-                if (how.StartsWith("lista trofeow")) _dList++;
+                if (how.StartsWith("lista trofeow")) { _dList++; _lastListN = b.N; _lastListW = b.C[Bron, CNa]; }   // m114-lup: do linii ekranu trofeow
                 else if (how.StartsWith("sakwy")) _dBag++;
                 else if (how.StartsWith("zwrot")) _dBack++;
                 else _dOther++;
@@ -856,8 +856,119 @@ namespace Armoury
         {
             try { Close("bez rozliczenia - nowa kampania albo wczytanie"); } catch { }
             _cur = null; _sifting = false;
+            _lastListN = 0; _lastListW = 0;   // m114-lup
             ClearDay();
             _testDone.Clear();
+        }
+
+        // ------------------------------------------------------------ m114-lup: ekran trofeow Spoils
+        // Jeff 24.10 17:40: "dostaje tylko zbroje i zero broni... wszystkich zabijam sam, wiec wszystko powinno byc moje"; 17:55: bron byla potem w ekwipunku,
+        // nie na ekranie lupu. Pomiar m109 konczy sie na liscie trofeow, a Spoils budowal ekran pozniej (BuildLootScreenRoster po zbieraniu) i drugi raz dzielil:
+        // 30% od najdrozszych na ekran, reszta do sakw. Linia 'Ekran trofeow (m114)' na kazde zbudowanie ekranu: lista -> ekran -> sakwy (podzial) -> niezebrane.
+        // Tylko czyta (prefiks liczy sakwy gracza, postfiks pola Spoils); wylacznik podzialu to BattlefieldLaw.NoSoldierSplit (klucz SpoilsSoldierSplitOff).
+        private const string PE = "Ekran trofeow (m114): ";
+        private static int _lastListN;         // bitwa, ktorej pomiar zamknela lista trofeow Spoils (do linii ekranu; 0 - nie wiadomo)
+        private static long _lastListW;        // bron na liscie wedlug m109 (blok C, na liscie)
+        private static FieldInfo _sGen, _sScr, _sPct, _sSolo;   // LootCollectionBehavior._generatedLoot / _lootScreenRoster / _collectedPercentage / _isSoloParty
+
+        internal static void ApplyScreen(Harmony h)
+        {
+            string wBuild = "BRAK";
+            try
+            {
+                var t = Type.GetType("RealisticLoot.Behaviors.LootCollectionBehavior, RealisticLoot");
+                if (t != null)
+                {
+                    _sGen = AccessTools.Field(t, "_generatedLoot");
+                    _sScr = AccessTools.Field(t, "_lootScreenRoster");
+                    _sPct = AccessTools.Field(t, "_collectedPercentage");
+                    _sSolo = AccessTools.Field(t, "_isSoloParty");
+                    var build = AccessTools.DeclaredMethod(t, "BuildLootScreenRoster");
+                    if (build != null && _sGen != null && _sScr != null)
+                    {
+                        h.Patch(build, prefix: new HarmonyMethod(typeof(LootTally), nameof(ScreenPre)), postfix: new HarmonyMethod(typeof(LootTally), nameof(ScreenBuilt)));
+                        wBuild = "TAK";
+                    }
+                }
+            }
+            catch (Exception e) { wBuild = "BLAD"; Log.Error("LootTally.ApplyScreen", e); }
+            try
+            {
+                var s = Settings.Current;
+                string wSplit = BattlefieldLaw.SoldierSplitWired ? "TAK" : "BRAK";
+                int ok = (wSplit == "TAK" ? 1 : 0) + (wBuild == "TAK" ? 1 : 0);
+                Log.Info(PE + "start | klucz SpoilsSoldierSplitOff " + YN(s != null && s.SpoilsSoldierSplitOff) + " (BattlefieldLawEnabled " + YN(s != null && s.BattlefieldLawEnabled)
+                         + ") | latki " + ok + "/2: Spoils EnablePrioritySystem (drugi podzial) " + wSplit + ", Spoils BuildLootScreenRoster (pomiar) " + wBuild
+                         + " | odczyt: zebrano " + YN(_sPct != null) + ", solo " + YN(_sSolo != null) + ".");
+            }
+            catch (Exception e) { Log.Error("LootTally.ApplyScreen(linia)", e); }
+        }
+
+        private static long[] KindsOf(ItemRoster r)
+        {
+            var k = new long[Kinds];
+            if (r == null) return k;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                if (el.EquipmentElement.Item != null && el.Amount > 0) k[KindOf(el.EquipmentElement.Item)] += el.Amount;
+            }
+            return k;
+        }
+
+        private static long Sum(long[] k) { long n = 0; foreach (var v in k) n += v; return n; }
+
+        /// <summary>Prefiks BuildLootScreenRoster: sakwy gracza przed budowa ekranu (podzial Spoils dokladal tam swoja czesc).</summary>
+        public static void ScreenPre(out long[] __state)
+        {
+            __state = null;
+            try { var mp = MobileParty.MainParty; if (mp != null) __state = KindsOf(mp.ItemRoster); }
+            catch (Exception e) { Stumble("ScreenPre", e); }
+        }
+
+        /// <summary>Postfiks BuildLootScreenRoster: lista trofeow -> ekran, sakwy (podzial Spoils), niezebrane (zbieranie przerwane).</summary>
+        public static void ScreenBuilt(object __instance, long[] __state)
+        {
+            try
+            {
+                if (__instance == null) return;
+                var gen = KindsOf(_sGen.GetValue(__instance) as ItemRoster);
+                var scr = KindsOf(_sScr.GetValue(__instance) as ItemRoster);
+                var bag = new long[Kinds];
+                var mp = MobileParty.MainParty;
+                if (__state != null && mp != null)
+                {
+                    var after = KindsOf(mp.ItemRoster);
+                    for (int i = 0; i < Kinds; i++) bag[i] = Math.Max(0, after[i] - __state[i]);
+                }
+                float pct = -1f;
+                try { if (_sPct != null) pct = (float)_sPct.GetValue(__instance); } catch { }
+                string solo = "?";
+                try { if (_sSolo != null) solo = YN((bool)_sSolo.GetValue(__instance)); } catch { }
+                var s = Settings.Current;
+                bool off = BattlefieldLaw.SoldierSplitWired && s != null && s.BattlefieldLawEnabled && s.SpoilsSoldierSplitOff;
+                long L = Sum(gen), E = Sum(scr), Y = Sum(bag), Z = Math.Max(0, L - E - Y);
+                var sb = new StringBuilder(PE);
+                sb.Append("bitwa ").Append(_lastListN).Append(" | lista ").Append(L).Append(" (bron ").Append(gen[Bron]).Append(") -> ekran ").Append(E)
+                  .Append(" (bron ").Append(scr[Bron]).Append(") | zebrano ").Append(pct < 0 ? "?" : Math.Round(pct * 100f).ToString(CultureInfo.InvariantCulture)).Append('%')
+                  .Append(" | solo ").Append(solo).Append(" | podzial Spoils ").Append(off ? "WYLACZONY" : "WLACZONY")
+                  .Append(" | poza ekranem ").Append(L - E).Append(" (podzial ").Append(Y).Append(", niezebrane ").Append(Z).Append(')')
+                  .Append(" | m109 bron na liscie ").Append(_lastListN > 0 ? _lastListW.ToString(CultureInfo.InvariantCulture) : "-")
+                  .Append(" | rodzaje [lista/ekran/podzial]: ");
+                bool any = false;
+                for (int i = 0; i < Kinds; i++)
+                {
+                    if (gen[i] == 0 && scr[i] == 0 && bag[i] == 0) continue;
+                    if (any) sb.Append(", ");
+                    sb.Append(KindName[i]).Append(' ').Append(gen[i]).Append('/').Append(scr[i]).Append('/').Append(bag[i]);
+                    any = true;
+                }
+                if (!any) sb.Append("brak");
+                sb.Append('.');
+                Log.Info(sb.ToString());
+                _lastListN = 0; _lastListW = 0;
+            }
+            catch (Exception e) { Stumble("ScreenBuilt", e); }
         }
 
         // ------------------------------------------------------------ autotest

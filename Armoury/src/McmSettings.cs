@@ -1008,6 +1008,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int PlayerLootSharePercent { get; set; } = 33;
 
+        [SettingPropertyBool("Spoils Soldier Split Off", HintText = "Spoils of War no longer splits your trophies a second time: with soldiers in your party it used to put only the costliest 30% of your loot on the trophy screen and slip the rest (mostly the weapons) silently into your bags - now everything that is yours by the law of the battlefield is shown on the trophy screen for you to take or leave (off = Spoils splits again as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsSoldierSplitOff { get; set; } = true;
+
         [SettingPropertyBool("Own Kills Loot Whole", HintText = "what you felled is yours: every piece stripped from a foe that you or a companion brought down goes to your loot whole, and from a foe felled by one of your men you take the captain's share (Player Loot Share Percent) - before, your cut was one average taken evenly from every kind of piece, so a single fine piece off your own kill could stay with the men", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool OwnKillsLootWhole { get; set; } = true;
@@ -9843,6 +9847,7 @@ namespace Armoury
             s.LootArrivesBattleWorn = LootArrivesBattleWorn;
             s.SimBattleFullDrop = SimBattleFullDrop;
             s.PlayerLootSharePercent = PlayerLootSharePercent;
+            s.SpoilsSoldierSplitOff = SpoilsSoldierSplitOff;
             s.OwnKillsLootWhole = OwnKillsLootWhole;
             s.LootIsTransfer = LootIsTransfer;
             s.SendTroopsOneLoot = SendTroopsOneLoot;
