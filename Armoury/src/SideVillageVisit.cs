@@ -171,11 +171,11 @@ namespace Armoury
         internal static RoadsideInns.Inn StayInn(string id)
         {
             if (id == Menu || id == HostileMenu) return InnFor(_uid);
-            var inn = InnFor(SideVillageFief.Uid);
+            var inn = InnFor(SideVillageFief.MenuUid);   // m113-zakup: wioska otwartego menu
             try
             {
                 var mp = MobileParty.MainParty;
-                if (inn != null && mp != null && mp.CurrentSettlement == null && SideVillageFief.PlayerDist() <= 2.2f) { var p = mp.GetPosition2D; inn.X = p.x; inn.Y = p.y; }
+                if (inn != null && mp != null && mp.CurrentSettlement == null && SideVillageFief.PlayerDist(SideVillageFief.MenuUid) <= 2.2f) { var p = mp.GetPosition2D; inn.X = p.x; inn.Y = p.y; }
             }
             catch { }
             return inn;
@@ -199,6 +199,9 @@ namespace Armoury
         }
 
         private static bool IsVillageUid(string uid) { return uid != null && Rec(uid) != null; }
+
+        /// <summary>m113-zakup (LandSale): wioska poboczna otwartego menu arm_sidevil (null - menu zamkniete).</summary>
+        internal static string MenuUid { get { return _uid; } }
 
         // ============================================================ V1 wjazd z mapy
         /// <summary>MapVillagesView: klik na te wioske prowadzi do niej (kursor raczki). Wioska gracza z wlasnym menu - SideVillageFief.</summary>

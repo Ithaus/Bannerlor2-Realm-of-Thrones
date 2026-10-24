@@ -275,6 +275,19 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>m113-zakup (Z4 zamek): stala norma zalogi zamku krolestwa k (srednia 28 dob, klucz "k/C"), zapas - swiat "*/C"; -1 - brak pomiaru. Tylko odczyt.</summary>
+        internal static double CastleNormMen(Kingdom k)
+        {
+            try
+            {
+                Norm n;
+                if (k != null && k.StringId != null && _norm.TryGetValue(k.StringId + "/C", out n) && n.Filled > 0) return n.Avg();
+                if (_norm.TryGetValue("*/C", out n) && n.Filled > 0) return n.Avg();
+                return -1;
+            }
+            catch { return -1; }
+        }
+
         private static Norm NormOf(string key)
         {
             Norm n;

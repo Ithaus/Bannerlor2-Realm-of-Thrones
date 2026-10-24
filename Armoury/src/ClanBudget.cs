@@ -373,6 +373,30 @@ namespace Armoury
             catch (Exception e) { Stumble("ChestOf", e); return false; }
         }
 
+        /// <summary>m113-zakup (Z2): miara potrzeby rodu dla kupna ziemi - G (kiesy rodziny), R (rezerwa wojny), D (dochod staly) i seria dob ponad pulapem zoldu z budzetu
+        /// 166. W przeciwienstwie do ChestOf NIE wyklucza dluznika ani rodu w zajeciu (to wlasnie rody w potrzebie). Bez budzetu (pierwsza doba sesji, 166 wylaczone,
+        /// rod bez budzetu): G = kiesy rodziny (ksiega rodow), R tym samym wzorem z Ceiling, D = DebtLadder.DebtD, seria 0. Tylko odczyt; nie rzuca.</summary>
+        internal static bool NeedOf(Clan c, out double G, out double R, out double D, out int streak)
+        {
+            G = 0; R = 0; D = 0; streak = 0;
+            try
+            {
+                if (c == null) return false;
+                var b = Of(c);
+                if (b != null && b.Today && !b.Zero)
+                {
+                    G = b.G; R = b.R; D = b.D; streak = b.Streak;
+                    return true;
+                }
+                G = ClanIncomeBook.FamilyGoldOf(c);
+                D = DebtLadder.DebtD(c);
+                double f, chest;
+                Ceiling(D, G, AtWar(c), AdultsOf(c), out R, out f, out chest);
+                return true;
+            }
+            catch (Exception e) { Stumble("NeedOf", e); G = R = D = 0; streak = 0; return false; }
+        }
+
         /// <summary>Recenzja calosci 18.10 (f6-zwrot + f7-renty): G, R i wojna jak ChestOf (te same wykluczenia), ale R = R MIARY POTRZEBY (b.RNeed): z D, w ktorym
         /// zwrot i renty zatrzymane wedlug potrzeby licza sie w pelni - ciecie nie obniza R i nastepnego f (sprzezenie D -> R -> f). Klucz Need Reserve Uncut
         /// wylaczony - R jak ChestOf. Tylko odczyt (KingdomTreasury.RbnOf).</summary>

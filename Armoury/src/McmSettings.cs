@@ -4616,7 +4616,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float CrownArrearsEnemyCredit { get; set; } = 1.5f;
 
-        [SettingPropertyBool("Debt Ladder Enabled", HintText = "with Iron Bank Enabled and Clan Budget Enabled: the Bank lends only to those who can repay, and instead of bankruptcy the creditor takes income. An AI house borrows only for war (War Credit). All instalments of a house come out of its steady income: the Bank at most Iron Bank Max Instalment Share of it a day, all debts together (Bank, unpaid wages, ransoms) at most All Instalments Max Share - the Bank first, then the rest by age. A missed instalment is an arrear (the house pays what it holds above three days of wages, its credit is stopped); after three arrears in a row the creditors seize the income of the house's villages and every coin above Seize Floor Gold in its head's purse, interest frozen, until the debt is paid; only when the seizure brings nothing for Sale After Zero Seize Days or would take longer than Sale Forecast Days are the surplus arms, caravans and workshops sold, once a week. No house ever loses a fief, and no debt is forgiven: the debt of a house that dies passes to the new lords of its villages. Debtors build nothing and keep half a court. Off = the Iron Bank as before (loans for wages, bankruptcy)", RequireRestart = false)]
+        [SettingPropertyBool("Debt Ladder Enabled", HintText = "with Iron Bank Enabled and Clan Budget Enabled: the Bank lends only to those who can repay, and instead of bankruptcy the creditor takes income. An AI house borrows only for war (War Credit). All instalments of a house come out of its steady income: the Bank at most Iron Bank Max Instalment Share of it a day, all debts together (Bank, unpaid wages, ransoms) at most All Instalments Max Share - the Bank first, then the rest by age. A missed instalment is an arrear (the house pays what it holds above three days of wages, its credit is stopped); after three arrears in a row the creditors seize the income of the house's villages and every coin above Seize Floor Gold in its head's purse, interest frozen, until the debt is paid; only when the seizure brings nothing for Sale After Zero Seize Days or would take longer than Sale Forecast Days are the surplus arms, caravans and workshops sold, once a week. No house ever loses a fief to its creditors; a house in need may still sell land of its own will (Land Sales). No debt is forgiven: the debt of a house that dies passes to the new lords of its villages. Debtors build nothing and keep half a court. Off = the Iron Bank as before (loans for wages, bankruptcy)", RequireRestart = false)]
         [SettingPropertyGroup("Debts and the war credit (stage 2)")]
         public bool DebtLadderEnabled { get; set; } = true;
 
@@ -9000,6 +9000,106 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageDefendersNoReinforcements { get; set; } = true;
 
+        [SettingPropertyBool("Land Sales", HintText = "houses in need may sell you land of their own will: ask a clan leader 'I hear your house needs coin. Would you sell me land?' (or use the offer option in a side village or main village menu). The price is the holding's real worth - what it truly earns its lord a year, net of its costs, times Land Years Of Purchase - never a token price; a house deep in debt may take somewhat less. The coin goes to the seller's head and his creditors take their due from it first. Off = no land is for sale", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool LandSales { get; set; } = true;
+
+        [SettingPropertyBool("Land Sales Side Villages", HintText = "with Land Sales: side villages can be bought from the lord who takes their tax. Bought villages fly your banner, pay you their share of the tax every day and can be ridden into like your first one. Off = no side villages for sale", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool LandSalesSideVillages { get; set; } = true;
+
+        [SettingPropertyBool("Land Sales Lordships", HintText = "with Land Sales: the Banner Kings lordship title of a main village can be bought from the lord who holds it (only as a vassal of the same realm; the village stays bound to its castle, its rent and people stay with the castle lord - you get its tax). Off = no lordships for sale", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool LandSalesLordships { get; set; } = true;
+
+        [SettingPropertyBool("Land Sales Castles", HintText = "with Land Sales: a castle can be bought - rarely, and dearly: only from a house deep in debt that keeps another seat, never a clan's only seat or a king's, with a large premium for a family seat. Off = no castles for sale", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool LandSalesCastles { get; set; } = true;
+
+        [SettingPropertyBool("Land Sales Sell Back", HintText = "with Land Sales: a side village you bought can be offered back to the lord who takes its tax, at its real worth, once you have held it Land Resale Days and he can spare the coin. Off = bought villages cannot be sold back", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool LandSalesSellBack { get; set; } = true;
+
+        [SettingPropertyInteger("Land Years Of Purchase", 1, 40, "0", HintText = "with Land Sales: the price is this many years of the holding's net income (medieval land sold at about 10 to 20 years' purchase)", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandYearsOfPurchase { get; set; } = 14;
+
+        [SettingPropertyFloatingInteger("Land Years At War", 0.30f, 1.00f, "0.00", HintText = "with Land Sales: while the holding's realm is at war with a major kingdom, the years of purchase are multiplied by this (land at war is riskier and sells for less)", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public float LandYearsAtWar { get; set; } = 0.85f;
+
+        [SettingPropertyInteger("Land Years Floor", 1, 40, "0", HintText = "with Land Sales: however deep the seller's debts and however long the war, the price never falls below this many years of the holding's income", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandYearsFloor { get; set; } = 10;
+
+        [SettingPropertyFloatingInteger("Land Debt Discount Max", 0.00f, 0.50f, "0.00", HintText = "with Land Sales: a seller deep in debt takes at most this share less than the real worth", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public float LandDebtDiscountMax { get; set; } = 0.15f;
+
+        [SettingPropertyFloatingInteger("Land Debt Ratio From", 0.00f, 2.00f, "0.00", HintText = "with Land Sales: the debt discount starts when what the seller owes reaches this share of his means (gold plus 91 days of income) ...", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public float LandDebtRatioFrom { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Land Debt Ratio Full", 0.00f, 8.00f, "0.00", HintText = "... and reaches Land Debt Discount Max when it reaches this many times his means", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public float LandDebtRatioFull { get; set; } = 2.0f;
+
+        [SettingPropertyFloatingInteger("Land Castle Premium", 0.00f, 6.00f, "0.00", HintText = "with Land Sales Castles: a castle costs its income times the years of purchase times this premium (lords hardly ever sell a fortress)", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public float LandCastlePremium { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Land Seat Premium", 0.00f, 8.00f, "0.00", HintText = "with Land Sales Castles: a castle that is the seat of its house (its home, or its seat in the books) costs this premium instead", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public float LandSeatPremium { get; set; } = 2.0f;
+
+        [SettingPropertyFloatingInteger("Land Castle Guard Share", 0.00f, 1.00f, "0.00", HintText = "with Land Sales Castles: the castle's net income counts the wages of this share of a normal garrison of the realm as its cost", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public float LandCastleGuardShare { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Land Deep Debt Days", 0, 364, "0", HintText = "with Land Sales Castles: a house sells a castle only when it is seized for debt, or owes at least this many days of its income", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandDeepDebtDays { get; set; } = 91;
+
+        [SettingPropertyInteger("Land Seller Cooldown Days", 0, 112, "0", HintText = "with Land Sales: a house sells at most one holding in this many days", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandSellerCooldownDays { get; set; } = 28;
+
+        [SettingPropertyInteger("Land Castle Cooldown Days", 0, 1456, "0", HintText = "with Land Sales Castles: a house sells at most one castle in this many days", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandCastleCooldownDays { get; set; } = 364;
+
+        [SettingPropertyInteger("Land Resale Days", 0, 728, "0", HintText = "with Land Sales Sell Back: days you must hold a bought side village before you can offer it back", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandResaleDays { get; set; } = 182;
+
+        [SettingPropertyInteger("Land Relation Side Village", -100, 100, "0", HintText = "with Land Sales: the least relation a lord must have with you to sell you a side village", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandRelationSideVillage { get; set; } = -10;
+
+        [SettingPropertyInteger("Land Relation Lordship", -100, 100, "0", HintText = "with Land Sales Lordships: the least relation to sell you a lordship", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandRelationLordship { get; set; } = 0;
+
+        [SettingPropertyInteger("Land Relation Castle", -100, 100, "0", HintText = "with Land Sales Castles: the least relation to sell you a castle", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public int LandRelationCastle { get; set; } = 10;
+
+        [SettingPropertyBool("Land Price Not Windfall", HintText = "with Land Sales: the price a house gets for its land is not counted as income - its steady income, its war credit limit and its Iron Bank limit do not grow from selling land. Off = the price counts like any other one-off income", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool LandPriceNotWindfall { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Payer Is Tax Holder", HintText = "with a side village of your own: its share of the tax is paid by the lord who takes the district's tax (Banner Kings lordship holder of the main village, else the castle lord) - first from the district's tax counter, then from his purse. Off = always the castle lord, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool SideVillagePayerIsTaxHolder { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Income Seizable", HintText = "with Player Same Ladder: if your house is ever seized for debt, the creditors take the income of your side villages too, like any village income. Off = side villages are not counted as village income", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool SideVillageIncomeSeizable { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Dues In Lord D", HintText = "with a side village of your own: what its lord pays you from his purse is taken off his steady income in the books (his budget, his credit and his dues see the smaller income). Off = his books do not see it", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool SideVillageDuesInLordD { get; set; } = true;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -11685,6 +11785,31 @@ namespace Armoury
             s.SideVillagesEnterable = SideVillagesEnterable;
             s.SideVillageDefenders = SideVillageDefenders;
             s.SideVillageDefendersNoReinforcements = SideVillageDefendersNoReinforcements;
+            s.LandSales = LandSales;
+            s.LandSalesSideVillages = LandSalesSideVillages;
+            s.LandSalesLordships = LandSalesLordships;
+            s.LandSalesCastles = LandSalesCastles;
+            s.LandSalesSellBack = LandSalesSellBack;
+            s.LandYearsOfPurchase = LandYearsOfPurchase;
+            s.LandYearsAtWar = LandYearsAtWar;
+            s.LandYearsFloor = LandYearsFloor;
+            s.LandDebtDiscountMax = LandDebtDiscountMax;
+            s.LandDebtRatioFrom = LandDebtRatioFrom;
+            s.LandDebtRatioFull = LandDebtRatioFull;
+            s.LandCastlePremium = LandCastlePremium;
+            s.LandSeatPremium = LandSeatPremium;
+            s.LandCastleGuardShare = LandCastleGuardShare;
+            s.LandDeepDebtDays = LandDeepDebtDays;
+            s.LandSellerCooldownDays = LandSellerCooldownDays;
+            s.LandCastleCooldownDays = LandCastleCooldownDays;
+            s.LandResaleDays = LandResaleDays;
+            s.LandRelationSideVillage = LandRelationSideVillage;
+            s.LandRelationLordship = LandRelationLordship;
+            s.LandRelationCastle = LandRelationCastle;
+            s.LandPriceNotWindfall = LandPriceNotWindfall;
+            s.SideVillagePayerIsTaxHolder = SideVillagePayerIsTaxHolder;
+            s.SideVillageIncomeSeizable = SideVillageIncomeSeizable;
+            s.SideVillageDuesInLordD = SideVillageDuesInLordD;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;
