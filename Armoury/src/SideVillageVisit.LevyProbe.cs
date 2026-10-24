@@ -15,6 +15,8 @@ namespace Armoury
     /// ta sama droga co okno (LevyDo) i kontrola OK/BLAD: druzyna +k, gracz -suma, kiesa wsi +suma, DOM -zdjeci (+-0.01), dom wioski -k (+-1), reszta okregu 0 (+-0.5),
     /// pula -k, cena wedlug etapu, sztuki DTE tieru 1, VillOut regionu +zdjeci; wymuszone odmowy (wojna, spalona, Straz). Kolejne doby: przysiolek oprozniany do konca
     /// (etapy, odmowa 'koniec dnia'), 0 &lt;= pula &lt;= pulap, przyrost mlodych wobec oczekiwanego, brak rak, obroncy &lt;= pula. Po wczytaniu z wpisami - tylko kontrole.
+    /// Test n36: dopoki zaden werbunek sondy nie przeszedl kontroli - pelna druzyna albo za malo zlota nie zatrzymuja sondy (zdjeci ludzie / dotacja testu, linia w logu,
+    /// poza bilansem); odmowa po werbunku - kazdy prawidlowy powod bramki to OK (z powodem), BLAD tylko werbunek ponad dzis albo wyjatek; linia doby konczy sie TAK / NIE / NIEPOKRYTY.
     /// </summary>
     internal static partial class SideVillageVisit
     {
@@ -24,6 +26,9 @@ namespace Armoury
         private static string _pbA, _pbB, _pbC;
         private static string _pbForce;   // wymuszona odmowa w LevyGate (tylko sonda)
         private static int _pbOk, _pbBad;
+        private static int _pbRec;   // test n36: werbunki sondy z kontrolami (0 - sonda nic nie sprawdzila: NIEPOKRYTY)
+        // test n36: prawidlowe odmowy po werbunku - kody LevyGate i powody LevyDo (miejsce nie wystepuje: sonda wola bramke jak wioska gracza)
+        private static readonly string[] PbRefusals = { "koniec dnia", "pula", "zloto", "druzyna", "podloga", "rabunek", "wojna", "zaciag", "Straz", "spalona", "zaufanie", "nic do wziecia", "DOM na podlodze" };
         private static readonly Dictionary<string, double> _pbPrev = new Dictionary<string, double>(StringComparer.Ordinal);
 
         private static bool ProbeFlag()
@@ -41,7 +46,7 @@ namespace Armoury
             return _pbFlag == 1;
         }
 
-        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbPrev.Clear(); }
+        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbRec = 0; _pbPrev.Clear(); }
 
         private static void PbCheck(StringBuilder sb, string what, bool ok, string val)
         {
@@ -135,6 +140,36 @@ namespace Armoury
                     Log.Info(s2.ToString());
                 }
             }
+            Log.Info(LP + "TEST start - werbunkow sondy z kontrolami " + _pbRec + (_pbRec == 0 ? " - NIEPOKRYTY (sprobuje w kolejnych dobach przysiolkiem)" : "") + ".");
+        }
+
+        /// <summary>Test n36: miejsce w druzynie dla sondy - zdejmuje z druzyny gracza n zdrowych zwyklych ludzi (najnizszy tier, najliczniejszy rodzaj), linia w logu.
+        /// Tylko sonda, dopoki zaden werbunek nie przeszedl kontroli. Zwraca zdjetych.</summary>
+        private static int PbFreeRoom(int n)
+        {
+            var mp = MobileParty.MainParty;
+            if (mp == null || mp.MemberRoster == null || n < 1) return 0;
+            var roster = mp.MemberRoster;
+            int freed = 0; var sb = new StringBuilder();
+            for (int guard = 0; freed < n && guard < 50; guard++)
+            {
+                CharacterObject pick = null; int healthy = 0;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    var ch = el.Character;
+                    int h = el.Number - el.WoundedNumber;
+                    if (ch == null || ch.IsHero || h <= 0) continue;
+                    if (pick == null || ch.Tier < pick.Tier || (ch.Tier == pick.Tier && h > healthy)) { pick = ch; healthy = h; }
+                }
+                if (pick == null) break;
+                int take = Math.Min(n - freed, healthy);
+                roster.AddToCounts(pick, -take);
+                freed += take;
+                sb.Append(sb.Length > 0 ? ", " : "").Append(pick.StringId).Append(" x").Append(take);
+            }
+            Log.Info(LP + "TEST miejsce w druzynie: zdjeci z druzyny gracza " + freed + " z " + n + " (" + (sb.Length > 0 ? sb.ToString() : "-") + ") - tylko sonda, poza bilansem ludzi.");
+            return freed;
         }
 
         private static double PbHomes(Settlement st, string uid, out double mine)
@@ -155,6 +190,20 @@ namespace Armoury
             var q0 = LvQuoteFor(st, uid);
             int k = Math.Min(want, q0 != null ? q0.Ready : 0);
             if (k < 1) { Log.Info(LP + "TEST " + label + " " + NameOf(Rec(uid)) + ": gotowych 0 (zaufanie " + (q0 != null ? q0.Idx : -1) + ") - INFO."); return null; }
+            if (_pbRec == 0)
+            {
+                // test n36: dopoki nie bylo werbunku z kontrolami - pelna druzyna albo pusta kiesa nie zatrzymuja sondy
+                var mp = MobileParty.MainParty;
+                int over = mp != null && mp.Party != null && mp.MemberRoster != null ? mp.MemberRoster.TotalManCount + k - mp.Party.PartySizeLimit : 0;
+                if (over > 0) PbFreeRoom(over);
+                long needG = (long)k * Math.Max(1, q0.Price) - Hero.MainHero.Gold;
+                if (needG > 0 && needG < int.MaxValue)
+                {
+                    int g0 = Hero.MainHero.Gold;
+                    Hero.MainHero.ChangeHeroGold((int)needG);
+                    Log.Info(LP + "TEST dotacja testu " + needG + " denarow (poza bilansem) - werbunek sondy " + label + ": " + k + " x " + q0.Price + ", zloto gracza " + g0 + " -> " + Hero.MainHero.Gold + ".");
+                }
+            }
             double mine0, mine1;
             double all0 = PbHomes(st, uid, out mine0);
             var region = OutlawLaw.RegionFor(st);
@@ -166,6 +215,7 @@ namespace Armoury
             sb.Append(LP).Append("TEST ").Append(label).Append(' ').Append(NameOf(Rec(uid))).Append(" (").Append(uid).Append("): prosba ").Append(k);
             if (res == null || res.Keep <= 0) { sb.Append(" - bez werbunku (").Append(res != null ? res.Why : "-").Append(") INFO."); Log.Info(sb.ToString()); return res; }
             int kk = res.Keep;
+            _pbRec++;
             PbCheck(sb, "druzyna", res.Men1 - res.Men0 == kk, "+" + (res.Men1 - res.Men0) + "/" + kk);
             PbCheck(sb, "gracz", res.HeroGold1 - res.HeroGold0 == -res.Total, (res.HeroGold1 - res.HeroGold0) + "/" + (-res.Total));
             PbCheck(sb, "kiesa wsi", res.Purse1 - res.Purse0 == res.Total, "+" + (res.Purse1 - res.Purse0) + "/" + res.Total);
@@ -218,13 +268,18 @@ namespace Armoury
                     if (q.Ready > 0) ProbeRecruit("przysiolek doba " + d, uid, int.MaxValue);
                     var res = LevyDo(st, uid, 1, "TEST sonda ponad dzis");
                     var s2 = new StringBuilder(LP + "TEST doba " + d + " odmowa po werbunku: " + (res != null ? res.Why ?? "-" : "-"));
-                    PbCheck(s2, "koniec dnia albo pula", res != null && res.Keep == 0 && (res.Why == "koniec dnia" || res.Why == "pula" || res.Why == "zloto" || res.Why == "druzyna"), "");
+                    // test n36: kazdy prawidlowy powod bramki (podloga, rabunek, wojna w trakcie biegu, ...) to OK z powodem; BLAD - werbunek ponad dzis, wyjatek, inny powod
+                    string rw = res != null ? res.Why : null;
+                    bool legit = rw != null && Array.IndexOf(PbRefusals, rw) >= 0;
+                    PbCheck(s2, "odmowa bramki (powod " + (rw ?? "-") + ")", res != null && res.Keep == 0 && legit,
+                            res == null ? "brak wyniku" : res.Keep > 0 ? "werbunek " + res.Keep + " ponad dzis" : legit ? "" : "nieoczekiwany powod");
                     Log.Info(s2.ToString());
                 }
                 var r = LvGet(uid);
                 _pbPrev[uid] = r != null ? r.Pool : q.Cap;
             }
-            Log.Info(LP + "TEST doba " + d + " - razem OK " + _pbOk + ", BLAD " + _pbBad + ".");
+            Log.Info(LP + "TEST doba " + d + " - razem OK " + _pbOk + ", BLAD " + _pbBad + ", werbunkow sondy z kontrolami " + _pbRec
+                     + " = " + (_pbBad > 0 ? "NIE" : _pbRec == 0 && !_pbAfterLoad ? "NIEPOKRYTY" : "TAK") + (_pbAfterLoad ? " (po wczytaniu - tylko kontrole)" : "") + ".");
         }
     }
 }

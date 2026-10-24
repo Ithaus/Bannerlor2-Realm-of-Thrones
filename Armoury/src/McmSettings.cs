@@ -11985,6 +11985,9 @@ namespace Armoury
         {
             try { var i = Instance; if (i != null) i.ApplyTo(Settings.Current); }
             catch (System.Exception e) { Log.Error("Mcm.Apply", e); }
+            // test n36: flaga armoury-walka-off.flag (tylko autotest) - piec kluczy walki m113 = false po kazdym ApplyTo (bieg bitwaOFF bez zmiany Armoury.json)
+            try { FieldDuel.ApplyTestOff(Settings.Current); }
+            catch (System.Exception e) { Log.Error("Mcm.Apply(walka-off)", e); }
         }
     }
 }

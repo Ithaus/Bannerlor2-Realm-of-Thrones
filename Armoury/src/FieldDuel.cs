@@ -38,6 +38,40 @@ namespace Armoury
         internal const int BrPlayerAtt = 0, BrPlayerDef = 1, BrAiAttVsPlayer = 2, BrAiDefVsPlayer = 3, BrHeroDef = 4, BrOtherAtt = 5, HeroDefence = 6;
         private const int Events = 7;
 
+        // test n36: plik CrashScribe/armoury-walka-off.flag (tylko DLL autotestu, LogGate.Mode 1/2) - piec kluczy walki m113 = false na sesje (bieg A/B bitwaOFF
+        // bez ruszania Armoury.json Jeffa). McmSettings.Apply nadpisuje je po kazdym ApplyTo (start, co godzine), wiec kazdy czytajacy Settings.Current widzi false.
+        internal const string OffFlagName = "armoury-walka-off.flag";
+        private static int _offFlag = -1;
+
+        /// <summary>Test n36: czy lezy flaga armoury-walka-off.flag (w zwyklej grze - LogGate 0 - zawsze false). Pamiec na proces dopiero w kampanii (jak LogGate.Mode).</summary>
+        internal static bool TestOff
+        {
+            get
+            {
+                if (_offFlag >= 0) return _offFlag == 1;
+                bool on = false;
+                try
+                {
+                    int mode = LogGate.Mode;
+                    if (mode == 1 || mode == 2)
+                    {
+                        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                        on = System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), OffFlagName));
+                    }
+                }
+                catch { on = false; }
+                if (TaleWorlds.CampaignSystem.Campaign.Current != null) _offFlag = on ? 1 : 0;
+                return on;
+            }
+        }
+
+        /// <summary>Test n36: z McmSettings.Apply po ApplyTo - przy fladze testu piec kluczy walki m113 = false. Nie rzuca.</summary>
+        internal static void ApplyTestOff(Settings s)
+        {
+            if (s == null || !TestOff) return;
+            s.DuelistsInBattles = false; s.HeroTierFromSkill = false; s.VeteranAggressionFix = false; s.DuelSkillGapInBattles = false; s.DuelistBurstsInBattles = false;
+        }
+
         internal static bool AnyKey(Settings c)
         {
             return c != null && (c.DuelistsInBattles || c.HeroTierFromSkill || c.VeteranAggressionFix || c.DuelSkillGapInBattles || c.DuelistBurstsInBattles);
@@ -243,6 +277,9 @@ namespace Armoury
               .Append(F(DuelCraft.PressedSeconds)).Append(" s od L").Append(F(DuelAi.PressedFrom)).Append(", przerwa nacisku w bitwie ").Append(F(DuelCraft.FieldPressedCooldown))
               .Append(" s, po otwarciu ").Append(F(DuelCraft.FieldOpeningCooldown)).Append(" s, najwyzej ").Append(DuelCraft.PerTick).Append(" odswiezen na klatke) | zakres: bitwa (pole, mury, wypad, najazd) i kryjowka | haki bitwy ")
               .Append(HooksWanted(c) ? "potrzebne" : "niepotrzebne").Append(": ").Append(DuelGuard.HookState());
+            if (TestOff)
+                sb.Append(" | klucze bitwy wylaczone flaga testu (CrashScribe/").Append(OffFlagName).Append("): Duelists In Battles, Hero Tier From Skill, Veteran Aggression Fix,")
+                  .Append(" Duel Skill Gap In Battles, Duelist Bursts In Battles = NIE na sesje, Armoury.json bez zmian");
             if (BattleSense.DuelTestFlagFile())
                 sb.Append(" | UWAGA: lezy CrashScribe/armoury-pojedynek-test.flag - w autotescie bitwy ida jako pojedynek, linii 'Bitwa (m113-walka2): misja' nie bedzie");
             sb.Append('.');

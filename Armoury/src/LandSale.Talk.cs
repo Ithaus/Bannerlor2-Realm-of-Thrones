@@ -24,7 +24,8 @@ namespace Armoury
     ///    wylaczone z powodem w podpowiedzi. Wycena w warunku raz na godzine gry na osade (warunek menu nie liczy ksiegi co klatke).
     ///  - Autotest (DLL autotestu CrashScribe, LogGate.Mode 1/2, plik armoury-ziemia.flag): raz na sesje - linia na sucho, potrzeba wymuszona (linia), kupno najblizszej
     ///    wioski, sprawdzenie pieniadza swiata, kiesy sprzedawcy i jednorazowych, wymuszony blad przeniesienia (zwrot co do grosza), odkup bez blokady 182 dob, zapis
-    ///    tam i z powrotem trzech napisow; Lordship i zamek - gdy jest oferta i zloto.
+    ///    tam i z powrotem trzech napisow, kupno wioski, ktora zostaje (T10, do zapisu); Lordship i zamek. Gdy oferty nie na kieszen gracza - dotacja testu
+    ///    (linia "TEST dotacja testu ... (poza bilansem)"); krok, ktory nie mogl ruszyc, to NIEPOKRYTY, a linia wyniku konczy sie TAK / NIE / NIEPOKRYTY.
     /// </summary>
     internal static partial class LandSale
     {
@@ -364,32 +365,66 @@ namespace Armoury
         private static void Test()
         {
             _testDone = true;
-            var sb = new StringBuilder(1500);
-            int pass = 0, fail = 0;
-            Action<string, bool, string> add = (n, ok, t) => { sb.Append(" | ").Append(n).Append(' ').Append(ok ? "TAK" : "NIE").Append(" (").Append(t).Append(')'); if (ok) pass++; else fail++; };
+            var sb = new StringBuilder(2000);
+            int pass = 0, fail = 0, unc = 0;
+            long granted = 0;
+            void add(string n, bool ok, string t) { sb.Append(" | ").Append(n).Append(' ').Append(ok ? "TAK" : "NIE").Append(" (").Append(t).Append(')'); if (ok) pass++; else fail++; }
+            // test n36: krok, ktory nie mogl ruszyc (brak oferty mimo dotacji, wylaczony w ustawieniach) - NIEPOKRYTY, nie TAK
+            void skip(string n, string t) { sb.Append(" | ").Append(n).Append(" NIEPOKRYTY (").Append(t).Append(')'); unc++; }
             var me = Hero.MainHero;
+            // test n36: dotacja testu - zloto gracza do ceny oferty + zapas (cena/10 + 1000), poza bilansem (zadna ksiega jej nie liczy, linia w logu);
+            // kazda kontrola pieniadza swiata bierze stan PO dotacji, wiec dotacja w zadnej roznicy nie siedzi
+            void grant(long price, string what)
+            {
+                long g = price + price / 10 + 1000 - me.Gold;
+                if (g <= 0) return;
+                g = Math.Min(g, (long)int.MaxValue - Math.Max(0, me.Gold));
+                if (g <= 0) return;
+                long before = me.Gold;
+                me.ChangeHeroGold((int)g);
+                granted += g;
+                Log.Info(P + "TEST dotacja testu " + g + " denarow (poza bilansem) - " + what + ": cena " + price + " + zapas, zloto gracza " + before + " -> " + me.Gold + ".");
+            }
             _forceNeed = true;
             try
             {
                 DryRun();
                 add("T1 linia na sucho", true, "wyzej");
                 Log.Info(P + "autotest: POTRZEBA WYMUSZONA dla wszystkich rodow (tylko ten test).");
-                // T2 najblizsza wioska na sprzedaz, na ktora gracza stac
+                // T2 wioski na sprzedaz w 80 jedn.
                 var recs = VillageBook.LayoutRecords();
                 var pos = MobileParty.MainParty.GetPosition2D;
-                Offer best = null; float bd = float.MaxValue; int built = 0, okN = 0; string firstWhy = null;
+                int built = 0, okN = 0; string firstWhy = null;
                 if (recs != null)
+                    foreach (var r in recs)
+                    {
+                        if (r == null || SideVillageFief.IsMine(r.Uid)) continue;
+                        if (pos.Distance(new Vec2(r.X, r.Y)) > 80f) continue;
+                        var o = BuildSide(r.Uid); built++;
+                        if (!o.Ok) { if (firstWhy == null) firstWhy = o.Why; continue; }
+                        okN++;
+                    }
+                add("T2 oferty wiosek (80 jedn.)", okN > 0, "policzone " + built + ", na sprzedaz " + okN + (firstWhy != null ? ", pierwszy powod: " + firstWhy : "") + ", zloto gracza " + me.Gold);
+                // test n36: najblizsza wioska na kieszen gracza; gdy zadnej - najtansza, a gracz dostaje dotacje testu (inaczej T3-T10 nie ruszaja)
+                Offer pickSide(string what)
+                {
+                    Offer near = null, cheap = null; float nd = float.MaxValue;
+                    if (recs == null) return null;
                     foreach (var r in recs)
                     {
                         if (r == null || SideVillageFief.IsMine(r.Uid)) continue;
                         float d = pos.Distance(new Vec2(r.X, r.Y));
                         if (d > 80f) continue;
-                        var o = BuildSide(r.Uid); built++;
-                        if (!o.Ok) { if (firstWhy == null) firstWhy = o.Why; continue; }
-                        okN++;
-                        if (o.Price <= me.Gold && d < bd) { bd = d; best = o; }
+                        var o = BuildSide(r.Uid);
+                        if (!o.Ok) continue;
+                        if (o.Price <= me.Gold && d < nd) { nd = d; near = o; }
+                        if (cheap == null || o.Price < cheap.Price) cheap = o;
                     }
-                add("T2 oferty wiosek (80 jedn.)", okN > 0, "policzone " + built + ", na sprzedaz " + okN + (firstWhy != null ? ", pierwszy powod: " + firstWhy : "") + ", zloto gracza " + me.Gold);
+                    if (near != null) return near;
+                    if (cheap != null) grant(cheap.Price, what + " " + cheap.Name + " (" + cheap.Id + ")");
+                    return cheap;
+                }
+                Offer best = okN > 0 ? pickSide("T3 kupno") : null;
                 if (best != null)
                 {
                     long w0 = WorldGold(), hg0 = best.Head.Gold, pg0 = me.Gold, adv0 = DebtLadder.AdvNothingNow;
@@ -404,14 +439,8 @@ namespace Armoury
                     add("T4 pieniadz swiata bez zmian (poza zaliczka gry w nicosc)", WorldGold() - w0 == -advN, w0 + " -> " + WorldGold() + ", zaliczka w nicosc " + advN);
                     add("T5 kiesa sprzedawcy = cena - wierzyciele", best.Head.Gold - hg0 == best.Price - cred && pg0 - me.Gold == best.Price, "glowa +" + (best.Head.Gold - hg0) + ", wierzycielom " + cred + ", gracz -" + (pg0 - me.Gold));
                     add("T6 jednorazowe sprzedawcy bez ceny", real1 == real0 && once1 == once0, "jednorazowe " + once0 + " -> " + once1 + ", od platnikow " + real0 + " -> " + real1);
-                    // T7 wymuszony blad przeniesienia - zwrot co do grosza
-                    Offer b2 = null;
-                    foreach (var r in recs)
-                    {
-                        if (r == null || SideVillageFief.IsMine(r.Uid) || pos.Distance(new Vec2(r.X, r.Y)) > 80f) continue;
-                        var o = BuildSide(r.Uid);
-                        if (o.Ok && o.Price <= me.Gold) { b2 = o; break; }
-                    }
+                    // T7 wymuszony blad przeniesienia - zwrot co do grosza (druga oferta; gdy nie na kieszen - dotacja testu)
+                    Offer b2 = pickSide("T7 druga oferta");
                     if (b2 != null)
                     {
                         long pgA = me.Gold, hgA = b2.Head.Gold; int nA = SideVillageFief.OwnedCount;
@@ -419,55 +448,108 @@ namespace Armoury
                         Execute(b2);
                         add("T7 blad przeniesienia - zwrot", me.Gold == pgA && b2.Head.Gold == hgA && SideVillageFief.OwnedCount == nA, "gracz " + pgA + " -> " + me.Gold + ", sprzedawca " + hgA + " -> " + b2.Head.Gold);
                     }
-                    else add("T7 blad przeniesienia - zwrot", false, "brak drugiej oferty na kieszen gracza");
+                    else skip("T7 blad przeniesienia - zwrot", "brak drugiej oferty wioski w 80 jedn.");
                     _forceFail = false;
                     // T8 zapis tam i z powrotem (arm_side_fief2, arm_land113, arm_landval) - recenzja m113: odczyt na boku, stan zywy (pierscienie sesji, wioski) nietkniety
                     string e2 = SideVillageFief.Export2(), el = Export(), ev = LandValue.Export();
                     string f2 = SideVillageFief.RoundTrip2(e2), fl = RoundTrip(el), fv = LandValue.RoundTrip(ev);
                     add("T8 zapis tam i z powrotem", e2 == f2 && el == fl && ev == fv, "sf2 " + e2.GetHashCode().ToString("x") + "/" + f2.GetHashCode().ToString("x") + ", ls1 " + el.GetHashCode().ToString("x") + "/" + fl.GetHashCode().ToString("x")
                         + ", lv1 " + ev.Length + " znakow " + (ev == fv ? "rowne" : "ROZNE"));
-                    // T9 odkup bez blokady 182 dob
+                    // T9 odkup bez blokady 182 dob; test n36: cena moze splacic wierzycieli gracza (DebtLadder.LandProceeds), a splata zaliczki gry idzie w nicosc - jak T4
                     _bypassResale = true;
                     var sbk = BuildSellBack(best.Id);
                     if (sbk.Ok)
                     {
-                        long pgB = me.Gold, w1 = WorldGold();
+                        long pgB = me.Gold, w1 = WorldGold(), advB = DebtLadder.AdvNothingNow, owB = DebtLadder.OwedOf(Clan.PlayerClan);
                         ExecuteSellBack(sbk);
-                        add("T9 odkup", !SideVillageFief.IsMine(best.Id) && me.Gold >= pgB && WorldGold() == w1, "cena " + sbk.Price + ", gracz " + pgB + " -> " + me.Gold);
+                        long advN9 = DebtLadder.AdvNothingNow - advB, cred9 = owB - DebtLadder.OwedOf(Clan.PlayerClan);
+                        add("T9 odkup", !SideVillageFief.IsMine(best.Id) && me.Gold >= pgB && WorldGold() - w1 == -advN9, "cena " + sbk.Price + ", gracz " + pgB + " -> " + me.Gold + " (wierzycielom gracza " + cred9 + ")"
+                            + ", pieniadz swiata " + w1 + " -> " + WorldGold() + ", zaliczka w nicosc " + advN9);
                     }
                     else add("T9 odkup", false, sbk.Why);
                     _bypassResale = false;
+                    // T10 (test n36): wioska kupiona w tescie ZOSTAJE u gracza - zapis koncowy niesie arm_side_fief2 i arm_land113 naprawde (wczyt w0 -> w1);
+                    // kupiona bez wioski gracza zostaje pierwsza (sf1), wiec najwyzej dwa kupna, az bedzie dodatkowa (sf2)
+                    string kept = "", why10 = null; bool ok10 = true; int buys = 0;
+                    for (int i = 0; i < 2 && SideVillageFief.OwnedCount - (SideVillageFief.HasFief ? 1 : 0) < 1; i++)
+                    {
+                        var k = pickSide("T10 kupno do zapisu");
+                        if (k == null) { why10 = "brak oferty wioski w 80 jedn."; break; }
+                        long wK = WorldGold(), advK = DebtLadder.AdvNothingNow; int nK = SideVillageFief.OwnedCount;
+                        Execute(k); buys++;
+                        long advNK = DebtLadder.AdvNothingNow - advK;
+                        bool okK = SideVillageFief.IsMine(k.Id) && SideVillageFief.OwnedCount == nK + 1 && WorldGold() - wK == -advNK;
+                        kept += (kept.Length > 0 ? ", " : "") + k.Name + " (" + k.Id + ") za " + k.Price
+                              + (okK ? "" : " ZLE: wiosek " + nK + " -> " + SideVillageFief.OwnedCount + ", pieniadz swiata " + wK + " -> " + WorldGold() + ", zaliczka w nicosc " + advNK);
+                        if (!okK) { ok10 = false; break; }
+                    }
+                    int extra = SideVillageFief.OwnedCount - (SideVillageFief.HasFief ? 1 : 0);
+                    string t10 = (kept.Length > 0 ? kept : "bez kupna - gracz ma juz dodatkowa wioske") + " | wiosek gracza " + SideVillageFief.OwnedCount + ", dodatkowych (sf2) " + extra + ", transakcji w zapisie " + _deals.Count;
+                    if (!ok10) add("T10 kupno do zapisu (zostaje)", false, t10);
+                    else if (extra < 1) skip("T10 kupno do zapisu (zostaje)", (why10 ?? "brak dodatkowej wioski") + " | " + t10);
+                    else
+                    {
+                        add("T10 kupno do zapisu (zostaje)", true, t10);
+                        Log.Info(P + "TEST T10: wioski kupione w tescie ZOSTAJA u gracza (zapis arm_side_fief2 i arm_land113 przy najblizszym zapisie) - " + t10 + ".");
+                    }
                 }
-                // T10 Lordship (B2) i T11 zamek (B3) - pierwsza oferta na kieszen gracza
-                if (LandBk.Ready && Settings.Current.LandSalesLordships)
+                else
                 {
-                    Offer lo = null; string lw = null;
-                    foreach (var v in Village.All) { if (v == null || v.Settlement == null) continue; var o = BuildLord(v.Settlement.StringId); if (o.Ok && o.Price <= me.Gold) { lo = o; break; } if (lw == null && !o.Ok) lw = o.Why; }
+                    string w = okN == 0 ? "brak oferty wioski w 80 jedn." : "brak oferty mimo dotacji testu";
+                    foreach (var n in new[] { "T3 kupno wioski", "T4 pieniadz swiata", "T5 kiesa sprzedawcy", "T6 jednorazowe sprzedawcy", "T7 blad przeniesienia - zwrot", "T8 zapis tam i z powrotem", "T9 odkup", "T10 kupno do zapisu (zostaje)" })
+                        skip(n, w);
+                }
+                // T11 Lordship (B2) i T12 zamek (B3) - pierwsza oferta na kieszen gracza; test n36: gdy zadnej - najtansza z dotacja testu
+                if (!Settings.Current.LandSalesLordships) skip("T11 Lordship", "wylaczone w ustawieniach");
+                else if (!LandBk.Ready) skip("T11 Lordship", "ksiega tytulow BK nieczynna");
+                else
+                {
+                    Offer lo = null, lc = null; string lw = null;
+                    foreach (var v in Village.All)
+                    {
+                        if (v == null || v.Settlement == null) continue;
+                        var o = BuildLord(v.Settlement.StringId);
+                        if (!o.Ok) { if (lw == null) lw = o.Why; continue; }
+                        if (o.Price <= me.Gold) { lo = o; break; }
+                        if (lc == null || o.Price < lc.Price) lc = o;
+                    }
+                    if (lo == null && lc != null) { grant(lc.Price, "T11 Lordship " + lc.Name + " (" + lc.Id + ")"); lo = lc; }
                     if (lo != null)
                     {
                         var seller = lo.Head; Execute(lo);
                         bool mine = LandBk.DeJure(LandBk.Title(lo.St)) == me;
-                        add("T10 Lordship", mine && LandBk.DeJureCount(seller) >= 1, lo.Name + " za " + lo.Price + ", de iure gracza " + (mine ? "tak" : "NIE") + ", sprzedawcy zostaje tytulow " + LandBk.DeJureCount(seller));
+                        add("T11 Lordship", mine && LandBk.DeJureCount(seller) >= 1, lo.Name + " za " + lo.Price + ", de iure gracza " + (mine ? "tak" : "NIE") + ", sprzedawcy zostaje tytulow " + LandBk.DeJureCount(seller));
                     }
-                    else add("T10 Lordship", true, "brak oferty na kieszen gracza (" + (lw ?? "-") + ") - pominiety");
+                    else skip("T11 Lordship", "brak oferty (" + (lw ?? "-") + ")");
                 }
-                if (Settings.Current.LandSalesCastles)
+                if (!Settings.Current.LandSalesCastles) skip("T12 zamek", "wylaczone w ustawieniach");
+                else
                 {
-                    Offer co = null; string cw = null;
-                    foreach (var st in Settlement.All) { if (st == null || !st.IsCastle) continue; var o = BuildCastle(st.StringId); if (o.Ok && o.Price <= me.Gold) { co = o; break; } if (cw == null && !o.Ok) cw = o.Why; }
+                    Offer co = null, cc = null; string cw = null;
+                    foreach (var st in Settlement.All)
+                    {
+                        if (st == null || !st.IsCastle) continue;
+                        var o = BuildCastle(st.StringId);
+                        if (!o.Ok) { if (cw == null) cw = o.Why; continue; }
+                        if (o.Price <= me.Gold) { co = o; break; }
+                        if (cc == null || o.Price < cc.Price) cc = o;
+                    }
+                    if (co == null && cc != null) { grant(cc.Price, "T12 zamek " + cc.Name + " (" + cc.Id + ")"); co = cc; }
                     if (co != null)
                     {
                         var gp = co.St.Town.GarrisonParty; int g0 = gp != null ? gp.MemberRoster.TotalManCount : -1;
                         Execute(co);
                         gp = co.St.Town.GarrisonParty; int g1 = gp != null ? gp.MemberRoster.TotalManCount : -1;
-                        add("T11 zamek", co.St.OwnerClan == Clan.PlayerClan && g0 == g1, co.Name + " za " + co.Price + ", zaloga " + g0 + " -> " + g1);
+                        add("T12 zamek", co.St.OwnerClan == Clan.PlayerClan && g0 == g1, co.Name + " za " + co.Price + ", zaloga " + g0 + " -> " + g1);
                     }
-                    else add("T11 zamek", true, "brak oferty na kieszen gracza (" + (cw ?? "-") + ") - pominiety");
+                    else skip("T12 zamek", "brak oferty (" + (cw ?? "-") + ")");
                 }
             }
             catch (Exception e) { add("wyjatek", false, e.GetType().Name + ": " + e.Message); Stumble("Test", e); }
             finally { _forceNeed = false; _forceFail = false; _bypassResale = false; }
-            Log.Info(P + "test (autotest, plik " + AutoFlagName + ") | wynik TAK " + pass + ", NIE " + fail + sb.ToString() + ".");
+            string verdict = fail > 0 ? "NIE" : unc > 0 ? "NIEPOKRYTY" : "TAK";
+            Log.Info(P + "test (autotest, plik " + AutoFlagName + ") | wynik TAK " + pass + ", NIE " + fail + ", NIEPOKRYTY " + unc + " = " + verdict
+                     + " | dotacja testu " + granted + " denarow (poza bilansem)" + sb.ToString() + ".");
         }
     }
 }

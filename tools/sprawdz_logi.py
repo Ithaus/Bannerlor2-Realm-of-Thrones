@@ -1868,7 +1868,7 @@ Uzycie (Python 3, tylko odczyt):
                     SideVillageVisit.Levy.cs, SideVillageVisit.LevyProbe.cs; klucz Side Village Recruit; zapis arm_sidelevy; plik testu CrashScribe/armoury-pobor.flag)
                     python -I tools/sprawdz_logi.py --grupa m113pobor <Armoury-*.log>. POB-0 odcinek 'Pobor w wioskach (m113): klucz' w linii startu sesji WP.
                     POB-1 potkniecia: ERROR 'SideVillageVisit.Levy.' 0 i 'potkniecia doby' linii doby 0. POB-2 linie werbunku: gracz -suma, kiesa wsi +suma
-                    (= cena x ludzi). POB-3 sonda (linie 'TEST'): BLAD 0 (brak sondy - INFO). POB-4 zapis -> wczytanie: wpisy i suma puli rowne (+-0.01; para = wczytanie tuz po zapisie, brak
+                    (= cena x ludzi). POB-3 sonda (linie 'TEST'): BLAD 0 bez podsumowan 'razem OK n, BLAD m' (brak sondy - INFO). POB-4 zapis -> wczytanie: wpisy i suma puli rowne (+-0.01; para = wczytanie tuz po zapisie, brak
                     pary - INFO). POB-5 czas doby <= 1 ms na 100 wpisow (najmniej 1 ms). E4/3 i E4/7 KONTROLA oraz MoneyLedger swiata - grupy bazowe (osobno).
 --grupa m110anim  : (23.10, n35 m110-animacje + m110-modele - Jeff 23.10 20:19 "postac lezy w ekwipunku, rekawice bez obrazka - blad z dzisiaj"; HeroHp.Install,
                     ItemModels.cs; klucz Missing Model Fix) python -I tools/sprawdz_logi.py --grupa m110anim <Armoury-*.log>. ANIM-1 linia 'Animacje (m110):'
@@ -67695,8 +67695,10 @@ def m113pobor_main(logp):
                 sess += 1
             if "TEST" in line:
                 tests += 1
-                tests_ok += len(re.findall(r" OK\b", line))
-                tests_bad += len(re.findall(r" BLAD\b", line))
+                # podsumowania sondy "razem OK n, BLAD m" (ProbeRecruit, ProbeDay) same zawieraja " OK" i " BLAD" - liczymy tylko kontrole
+                body = re.sub(r"razem OK \d+, BLAD \d+", "", line)
+                tests_ok += len(re.findall(r" OK\b", body))
+                tests_bad += len(re.findall(r" BLAD\b", body))
             m = rx_rec.search(line)
             if m:
                 recs += 1
