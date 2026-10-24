@@ -1008,6 +1008,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int PlayerLootSharePercent { get; set; } = 33;
 
+        [SettingPropertyBool("Spoils Soldier Split Off", HintText = "Spoils of War no longer splits your trophies a second time: with soldiers in your party it used to put only the costliest 30% of your loot on the trophy screen and slip the rest (mostly the weapons) silently into your bags - now everything that is yours by the law of the battlefield is shown on the trophy screen for you to take or leave (off = Spoils splits again as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsSoldierSplitOff { get; set; } = true;
+
         [SettingPropertyBool("Own Kills Loot Whole", HintText = "what you felled is yours: every piece stripped from a foe that you or a companion brought down goes to your loot whole, and from a foe felled by one of your men you take the captain's share (Player Loot Share Percent) - before, your cut was one average taken evenly from every kind of piece, so a single fine piece off your own kill could stay with the men", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool OwnKillsLootWhole { get; set; } = true;
@@ -1039,6 +1043,10 @@ namespace Armoury
         [SettingPropertyBool("Loot State From Wounds", HintText = "armour stripped from a foe your party brought down comes in the state the blows left it in: every hit of this battle wears the piece it struck exactly as your own armour wears, from the state it had before the battle (480 points off a 2000-point mail shirt leaves 76% - Damaged). The piece smashed by the killing blow and the piece Dynamic Troop Equipment counts as broken are judged the same way: only a true wreck comes to you whole; a better piece is shared like the rest of that foe's gear (yours whole if you or a companion felled him, the captain's share if your men did - the rest to the army armoury). Gear battered to Loot Min Condition Percent or less is destroyed. Needs Gear Four States. Off: as before", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool LootStateFromWounds { get; set; } = true;
+
+        [SettingPropertyBool("Loot Weapons Keep Condition", HintText = "weapons, shields and ammunition stripped from the foes come in the state they were in on the body: Spoils of War gave every one of them random battle wear (40-85%, never sound) - the blows strike the man and his armour, not the sword in his hand. Armour keeps its state from the blows (Loot State From Wounds). Off: Spoils wear as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool LootWeaponsKeepCondition { get; set; } = true;
 
         [SettingPropertyInteger("Loot Min Condition Percent", 0, 12, "0", HintText = "gear battered down to this percent of its worth or less is DESTROYED - it never reaches the loot screen (0 = off); with Loot State From Wounds on, armour stripped from a foe is destroyed when the blows left it this percent of its strength or less; with Gear Four States on, a Wrecked piece whose exact strength is not known (a wreck is anything under a tenth) is destroyed only at 10 or more", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -9843,6 +9851,7 @@ namespace Armoury
             s.LootArrivesBattleWorn = LootArrivesBattleWorn;
             s.SimBattleFullDrop = SimBattleFullDrop;
             s.PlayerLootSharePercent = PlayerLootSharePercent;
+            s.SpoilsSoldierSplitOff = SpoilsSoldierSplitOff;
             s.OwnKillsLootWhole = OwnKillsLootWhole;
             s.LootIsTransfer = LootIsTransfer;
             s.SendTroopsOneLoot = SendTroopsOneLoot;
@@ -9851,6 +9860,7 @@ namespace Armoury
             s.RiderBlowSparesHarness = RiderBlowSparesHarness;
             s.ExtraBrokenArmorWrecks = ExtraBrokenArmorWrecks;
             s.LootStateFromWounds = LootStateFromWounds;
+            s.LootWeaponsKeepCondition = LootWeaponsKeepCondition;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
             s.LegendarySweepLazy = LegendarySweepLazy;

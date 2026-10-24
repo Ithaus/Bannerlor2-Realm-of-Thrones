@@ -1841,6 +1841,17 @@ Uzycie (Python 3, tylko odczyt):
                     z dzialki na liste albo do sakw (lista + sakwy = wejscia - padle, zwrot/przepadlo/zostaje 0); flaga bez pokrycia - NIE, bez flagi - INFO.
                     LUP-J9 linie doby 'Lup bitew (m109)': Spoils wyjal kon/uprzaz 0 przy kluczu (brak linii - INFO). LUP-J10 pomiar na bitwe wobec liczby
                     wywolan (kazdy polegly czlowiek misji, takze wlasny): <= 20 ms + 0.05 ms x wywolan TAK, <= 50 ms + 0.2 ms x wywolan INFO, wiecej NIE.
+--grupa m114lup   : (24.10, galaz w-toku/m114-lup - Jeff 24.10 17:40 "dostaje tylko zbroje i zero broni... wszystkich zabijam sam, wiec wszystko powinno byc
+                    moje"; 17:55 bron byla potem w ekwipunku, ale nie na ekranie lupu; Armoury/src/BattlefieldLaw.cs NoSoldierSplit, LootTally.cs ApplyScreen/ScreenBuilt;
+                    klucz Spoils Soldier Split Off) python -I tools/sprawdz_logi.py --grupa m114lup [<Armoury-*.log>] (strumieniowo; log Spoils RealisticLoot_<data>.log
+                    szukany w <log>/../Spoils of War/Logs, katalogu logu i katalogu gry, okno czasu od nazwy logu do ostatniej linii). TROF-S self-test wyrazen i test
+                    syntetyczny (dobry; zly = bitwa Jeffa 24.10 17:38: lista 67 / bron 18 -> ekran 20 / bron 0 - TROF-2/3 NIE; log sprzed m114 - TROF-0 INFO, TROF-3b NIE).
+                    TROF-0 linia 'Ekran trofeow (m114): start' z kluczem TAK i latkami 2/2, linia 'drugi podzial Spoils (Priority ...) wylaczony' raz na start, init
+                    'drugi podzial Spoils: WYLACZONY' (log bez linii m114 - INFO 'log sprzed m114'). TROF-1 kazda bitwa m109 zamknieta lista trofeow ma linie
+                    'Ekran trofeow (m114): bitwa N' (ostatnia bitwa logu, pusta lista i 'Leave the battlefield' wg logu Spoils - bez NIE). TROF-2 (glowny) przy zebrano 100% ekran == lista i bron ekranu ==
+                    bron listy; solo NIE z bronia na liscie - bron na ekranie > 0; zebrano < 100% (Leave early, Spoils odcina najtansze) - INFO. TROF-2b bron listy Spoils == bron 'na liscie' m109 (roznica - INFO). TROF-3a podzial 0
+                    i WYLACZONY w kazdej linii ekranu; TROF-3b log Spoils bez '[Priority] Soldiers took their share' w oknie logu. TROF-4 bitwy z powaleniami zolnierzy:
+                    ekran == lista (brak takiej bitwy - INFO). TROF-5 ERROR LootTally.ApplyScreen/ScreenPre/ScreenBuilt 0, zly format linii m114 0.
 --grupa m110stan  : (23.10, galaz w-toku/m110-stan - Jeff 23.10 "zrobmy 4: rozbity/wrak ponizej 10% ... sprawny powyzej 80 do 100. I okreslajmy go nazwami,
                     nie procentami" i "zeszlo mu z pancerza np. 480 punktow z 2000"; Armoury/src/GearState.cs, LootWear.cs, BattlefieldLaw.cs, ArmouryBehavior.cs;
                     klucze Gear Four States, Loot State From Wounds; plik testu CrashScribe/armoury-stan.flag) python -I tools/sprawdz_logi.py --grupa m110stan
@@ -1858,7 +1869,8 @@ Uzycie (Python 3, tylko odczyt):
                     d <= prog zniszczenia z linii jej bitwy ('prog zniszczenia N%', +-0.06), nie zniszczona - d > prog; czesc bez linii bitwy - zniszczona przy
                     d <= 10 (brak linii - INFO). STAN-3 tozsamosci linii bitwy 'Stan lupu (m110): bitwa N': czesci z ksiega = lup do gracza + zostaje u wojska + cios + pekniete; drogi
                     ciosu i peknietych (do Ciebie, dzialka, zbrojownia, wraki, przepadly) = czesci bez zniszczonych; wraki nie mniej niz stan wrak (chyba ze
-                    przepadly); lucky k = k; trafien = trafien w pomiarze (brak - INFO). STAN-4 pokrycie pod flaga (linie 'test - ...'): w liniach czesci wszystkie
+                    przepadly); lucky k = k; odcinek 'bron bez loterii stanu (m114) k/n, z modyfikatorem m' (m114-lup, klucz Loot Weapons Keep Condition - bron, tarcze
+                    i amunicja z lucky Spoils albo sakwy bez loterii; brak odcinka - klucz NIE albo DLL sprzed m114): k = n, m <= n; trafien = trafien w pomiarze (brak - INFO). STAN-4 pokrycie pod flaga (linie 'test - ...'): w liniach czesci wszystkie
                     4 stany i zniszczona, >= 1 cios albo pekniete zolnierza rozdzielone (dzialka albo zbrojownia), >= 1 uprzaz; bez flagi - INFO. STAN-5 linie
                     'Zuzycie (m110)': liczony = ksiega - (100 - srodek stanu poczatku) (+-0.11), stan wedlug progow, stan gorszy niz byl, arm_* z przyrostkiem
                     stanu; linia 'wyrownanie po wczytaniu' (nazwa sztuk na grzbiecie wedlug ksiegi) - bledy 0 (brak linii zuzycia - INFO). STAN-6 pomiar na bitwe: <= 5 ms + 0.002 ms x trafien TAK, <= 20 ms + 0.01 ms x trafien INFO, wiecej NIE. STAN-LC
@@ -61184,6 +61196,8 @@ def main(argv):
         return m109kuz_main(logp)   # m109kuz (23.10, w-toku/m109-kuznia): kowalstwo wolniej (SmithingXpFactor) i rachunek kuzni na ekranie kucia (ForgeBill, ForgeView)
     if group == "m109lup":
         return m109lup_main(logp)   # m109lup (23.10, w-toku/m109-lup): konie, uprzaz i zbroja powalonych jezdzcow w lupie gracza - pomiar LootTally, Z1, Z2, hak testu
+    if group == "m114lup":
+        return m114lup_main(logp)   # m114lup (24.10, w-toku/m114-lup): cala lista trofeow (z bronia) na ekranie - drugi podzial Spoils wylaczony, linia Ekran trofeow (m114)
     if group == "m110stan":
         return m110stan_main(logp, bdp)   # m110stan (23.10, w-toku/m110-stan): cztery stany sprzetu (GearState) i stan lupu z obrazen (LootWear), --baza-doby = log z linia zapisu (STAN-LC)
     if group == "m113walka":
@@ -66380,6 +66394,287 @@ def m109lup_main(logp):
     return 0
 
 
+# ---------------- m114lup (24.10, galaz w-toku/m114-lup - Jeff 24.10 17:40: "po bitwie z bandytami sprawdz dzialke - dostaje tylko zbroje i zero broni...
+# wszystkich zabijam sam, wiec wszystko powinno byc moje. Cos dzieli lup zle"; 17:55: bron byla potem w ekwipunku, ale nie na ekranie lupu). Spoils dzielil liste
+# trofeow drugi raz (BuildLootScreenRoster, EnablePrioritySystem): przy zolnierzach w druzynie 30% od najdrozszych na ekran, reszta po cichu do sakw.
+# Armoury/src/BattlefieldLaw.cs (NoSoldierSplit, klucz SpoilsSoldierSplitOff), LootTally.cs (ApplyScreen / ScreenPre / ScreenBuilt - linia 'Ekran trofeow (m114)').
+# Stale z prefiksem M114LUP_, wiersze TROF-*. Log Spoils (RealisticLoot_<data>.log) szukany obok: <log>/../Spoils of War/Logs, katalog logu, katalog gry.
+M114LUP_P = "Ekran trofeow (m114): "
+M114LUP_WIRED = "BattlefieldLaw: drugi podzial Spoils (Priority: 30% na ekran, reszta po cichu do sakw) wylaczony"
+M114LUP_ERR = ("ERROR in LootTally.ApplyScreen", "ERROR in LootTally.ScreenPre", "ERROR in LootTally.ScreenBuilt")
+M114LUP_RX = {
+    "start": re.compile(r"^Ekran trofeow \(m114\): start \| klucz SpoilsSoldierSplitOff (TAK|NIE) \(BattlefieldLawEnabled (TAK|NIE)\) \| latki (\d+)/(\d+): "
+                        r"(.*?) \| odczyt: zebrano (TAK|NIE), solo (TAK|NIE)\.$"),
+    "init": re.compile(r"dzialka gracza z lupow DTE trafia na ekran \(solo 100%, z druzyna (\d+)%\) \+ drugi podzial Spoils: (WYLACZONY|WLACZONY)\."),
+    "screen": re.compile(r"^Ekran trofeow \(m114\): bitwa (\d+) \| lista (\d+) \(bron (\d+)\) -> ekran (\d+) \(bron (\d+)\) \| zebrano (\d+|\?)% \| solo (TAK|NIE|\?) "
+                         r"\| podzial Spoils (WYLACZONY|WLACZONY) \| poza ekranem (-?\d+) \(podzial (\d+), niezebrane (\d+)\) \| m109 bron na liscie (\d+|-) "
+                         r"\| rodzaje \[lista/ekran/podzial\]: (.*)\.$"),
+    "kinds": re.compile(r"^(\w+) (\d+)/(\d+)/(\d+)$"),
+    "prio": re.compile(r"^\[(\d\d:\d\d:\d\d)(?:\.\d+)?\] \[\w+\] \[Priority\] Soldiers took their share: (\d+) items"),
+    # 'Leave the battlefield' (rl_leave_no_loot): Spoils nie buduje ekranu (OnLeaveNoLootConsequence bez BuildLootScreenRoster) - bitwa bez linii ekranu to nie blad
+    "leave": re.compile(r"^\[(\d\d:\d\d:\d\d)(?:\.\d+)?\] \[\w+\] \[PostBattle\] Player left (?:the battlefield )?without"),
+    "rlts": re.compile(r"^\[(\d\d:\d\d:\d\d)"),
+    "name": re.compile(r"Armoury-(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)-(\d\d)"),
+}
+# linie kontrolne - napisy jak w kodzie C# (LootTally.ApplyScreen / ScreenBuilt, BattlefieldLaw.ApplyAll); "jeff" = bitwa Jeffa 24.10 17:38 (podzial WLACZONY)
+M114LUP_TEST = {
+    "start": "Ekran trofeow (m114): start | klucz SpoilsSoldierSplitOff TAK (BattlefieldLawEnabled TAK) | latki 2/2: Spoils EnablePrioritySystem (drugi podzial) TAK, "
+             "Spoils BuildLootScreenRoster (pomiar) TAK | odczyt: zebrano TAK, solo TAK.",
+    "wired": M114LUP_WIRED + " - dzialke liczy BattlefieldLaw wg powalonych.",
+    "init": "BattlefieldLaw: dzialka gracza z lupow DTE trafia na ekran (solo 100%, z druzyna 33%) + drugi podzial Spoils: WYLACZONY. Jency z bitew ida pod obszukanie "
+            "(placa fizycznie za rannych).",
+    "screen": "Ekran trofeow (m114): bitwa 3 | lista 33 (bron 18) -> ekran 33 (bron 18) | zebrano 100% | solo NIE | podzial Spoils WYLACZONY | poza ekranem 0 "
+              "(podzial 0, niezebrane 0) | m109 bron na liscie 18 | rodzaje [lista/ekran/podzial]: kon 1/1/0, uprzaz 2/2/0, tulow 12/12/0, bron 18/18/0.",
+    "jeff": "Ekran trofeow (m114): bitwa 3 | lista 67 (bron 18) -> ekran 20 (bron 0) | zebrano 100% | solo NIE | podzial Spoils WLACZONY | poza ekranem 47 "
+            "(podzial 47, niezebrane 0) | m109 bron na liscie 18 | rodzaje [lista/ekran/podzial]: tulow 12/12/0, glowa 12/8/4, rece 12/0/12, nogi 12/0/12, "
+            "bron 18/0/18, inne 1/0/1.",
+    "prio": "[17:38:31.676] [INFO] [Priority] Soldiers took their share: 47 items (~736 den.)",
+    "leave": "[16:38:18.298] [INFO] [PostBattle] Player left the battlefield without taking trophies.",
+    # 'Leave early' przy 30%: Spoils BuildAvailableLoot zostawia najdrozsze 30% sztuk - tania bron bandytow odpada, to nie podzial
+    "cut": "Ekran trofeow (m114): bitwa 3 | lista 33 (bron 18) -> ekran 10 (bron 0) | zebrano 30% | solo NIE | podzial Spoils WYLACZONY | poza ekranem 23 "
+           "(podzial 0, niezebrane 23) | m109 bron na liscie 18 | rodzaje [lista/ekran/podzial]: kon 1/1/0, uprzaz 2/2/0, tulow 12/7/0, bron 18/0/0.",
+}
+
+
+def m114lup_screen(s):
+    """Linia ekranu -> slownik; None - nie linia ekranu; {'bad': ...} - zly format albo sprzeczne liczby w linii."""
+    if not s.startswith(M114LUP_P + "bitwa "):
+        return None
+    m = M114LUP_RX["screen"].match(s)
+    if not m:
+        return {"bad": s[:160]}
+    g = m.groups()
+    d = {"n": int(g[0]), "L": int(g[1]), "Wl": int(g[2]), "E": int(g[3]), "We": int(g[4]), "pct": None if g[5] == "?" else int(g[5]), "solo": g[6],
+         "off": g[7] == "WYLACZONY", "out": int(g[8]), "Y": int(g[9]), "Z": int(g[10]), "w109": None if g[11] == "-" else int(g[11]), "kinds": {}}
+    if g[12] != "brak":
+        for part in g[12].split(", "):
+            k = M114LUP_RX["kinds"].match(part)
+            if not k or k.group(1) not in M109LUP_KINDS:
+                return {"bad": "bitwa %d: zly blok rodzajow" % d["n"]}
+            d["kinds"][k.group(1)] = (int(k.group(2)), int(k.group(3)), int(k.group(4)))
+    # spojnosc linii: suma rodzajow = lista/ekran/podzial, bron z bloku = bron z glowy, poza ekranem = lista - ekran
+    sums = [sum(v[i] for v in d["kinds"].values()) for i in range(3)]
+    bron = d["kinds"].get("bron", (0, 0, 0))
+    if sums[0] != d["L"] or sums[1] != d["E"] or sums[2] != d["Y"] or bron[0] != d["Wl"] or bron[1] != d["We"] or d["out"] != d["L"] - d["E"]:
+        return {"bad": "bitwa %d: liczby linii niespojne (rodzaje %s, lista %d, ekran %d, podzial %d)" % (d["n"], sums, d["L"], d["E"], d["Y"])}
+    return d
+
+
+def m114lup_scan(lines):
+    """m114lup: przebieg linii (strumieniowo) -> starty, linie wpiecia, linie init, ekrany, bitwy m109 (numer, koniec, zolnierze, bron na liscie), bledy."""
+    D = {"start": [], "wired": 0, "init": [], "screens": [], "bad": [], "m109": [], "err": 0, "err1": None, "last": None}
+    for ln in lines:
+        raw = ln.rstrip("\r\n")
+        m = TS.match(raw)
+        if m:
+            D["last"] = m.group(1)
+        s = m.group(2) if m else raw
+        if s.startswith("ERROR in "):
+            if any(s.startswith(e) for e in M114LUP_ERR):
+                D["err"] += 1
+                D["err1"] = D["err1"] or s[:200]
+            continue
+        if s.startswith(M114LUP_P):
+            if s.startswith(M114LUP_P + "start "):
+                mm = M114LUP_RX["start"].match(s)
+                D["start"].append(mm.groups() if mm else None)
+            else:
+                d = m114lup_screen(s)
+                if d is None or d.get("bad"):
+                    D["bad"].append(d["bad"] if d else s[:160])
+                else:
+                    D["screens"].append(d)
+            continue
+        if s.startswith(M114LUP_WIRED):
+            D["wired"] += 1
+            continue
+        if "drugi podzial Spoils: " in s:
+            mm = M114LUP_RX["init"].search(s)
+            D["init"].append(mm.group(2) if mm else "zly format")
+            continue
+        if s.startswith(M109LUP_P + "bitwa "):
+            b = m109lup_battle(s)
+            if b and not b.get("bad"):
+                C = b.get("C") or {}
+                D["m109"].append({"n": b["n"], "how": b["how"], "troop": b["troop"], "hero": b["hero"], "bron": C.get("bron", [0] * 8)[7],
+                                  "list": sum(v[7] for v in C.values()), "ts": D["last"]})
+    return D
+
+
+def m114lup_spoils(logp, last):
+    """Linie '[Priority] Soldiers took their share' logu Spoils w oknie czasu logu Armoury (od nazwy pliku do ostatniej linii).
+    -> (opis, [linie], [godziny 'Player left ... without' - Leave the battlefield]) albo (opis, None, []) - brak logu Spoils / nazwy logu."""
+    import datetime
+    mm = M114LUP_RX["name"].search(os.path.basename(logp))
+    if not mm:
+        return ("nazwa logu bez daty i godziny", None, [])
+    day = mm.group(1)
+    t0 = "%s:%s:%s" % (mm.group(2), mm.group(3), mm.group(4))
+    t1 = last or "23:59:59"
+    d = os.path.dirname(os.path.abspath(logp))
+    dirs = [os.path.join(d, "..", "Spoils of War", "Logs"), d,
+            os.path.join(r"C:" + chr(92), "Program Files (x86)", "Steam", "steamapps", "common", "Mount & Blade II Bannerlord", "Modules", "Spoils of War", "Logs")]
+    wrap = t1 < t0   # sesja przez polnoc - druga doba do t1
+    try:
+        day2 = (datetime.date.fromisoformat(day) + datetime.timedelta(days=1)).isoformat()
+    except ValueError:
+        return ("zla data w nazwie logu", None, [])
+    parts = [(day, t0, "23:59:59" if wrap else t1)] + ([(day2, "00:00:00", t1)] if wrap else [])
+    out, used, left = [], [], []
+    for dd, a, b in parts:
+        p = next((os.path.join(x, "RealisticLoot_%s.log" % dd) for x in dirs if os.path.isfile(os.path.join(x, "RealisticLoot_%s.log" % dd))), None)
+        if not p:
+            continue
+        used.append(os.path.normpath(p))
+        with open(p, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                r = M114LUP_RX["prio"].match(ln)
+                if r and a <= r.group(1) <= b:
+                    out.append(ln.rstrip("\r\n")[:120])
+                    continue
+                r = M114LUP_RX["leave"].match(ln)
+                if r and a <= r.group(1) <= b:
+                    left.append(r.group(1))
+    if not used:
+        return ("brak RealisticLoot_%s.log" % day, None, [])
+    return ("%s, okno %s-%s" % (" + ".join(used), t0, t1), out, left)
+
+
+def m114lup_rows(rep, D, spoils):
+    """m114lup: wiersze TROF-0..TROF-5 (spoils = (opis, linie Priority albo None[, godziny 'Leave the battlefield']))."""
+    spoils = tuple(spoils) if spoils else ("bez logu Spoils", None)
+    left = spoils[2] if len(spoils) > 2 else []
+    any114 = bool(D["start"] or D["screens"] or D["wired"] or D["init"])
+    # TROF-0 start: latki 2/2, klucz TAK, linia wpiecia dokladnie raz na start, linia init WYLACZONY
+    if not any114:
+        rep.add("TROF-0: start m114 (latki, linia 'drugi podzial Spoils ... wylaczony', init)", "log sprzed m114 (brak linii m114)", "linie m114 w logu", None)
+    else:
+        bad = [i for i, g in enumerate(D["start"]) if g is None or g[0] != "TAK" or g[2] != g[3] or g[2] != "2"]
+        ok = bool(D["start"]) and not bad and D["wired"] == len(D["start"]) and all(x == "WYLACZONY" for x in D["init"])
+        rep.add("TROF-0: start m114 (latki, linia 'drugi podzial Spoils ... wylaczony', init)",
+                "startow %d (zle %d), linii wpiecia %d, init %s" % (len(D["start"]), len(bad), D["wired"], ",".join(D["init"]) or "brak"),
+                "kazdy start: klucz TAK, latki 2/2; linia wpiecia raz na start; init 'drugi podzial Spoils: WYLACZONY'", ok)
+    # TROF-1 kazda bitwa zamknieta lista trofeow ma linie ekranu (ostatnia bitwa logu albo pusta lista - INFO: zbieranie moglo nie dobiec)
+    lists = [b for b in D["m109"] if b["how"].startswith("lista trofeow")]
+    seen = set(x["n"] for x in D["screens"])
+    miss = [b for b in lists if b["n"] not in seen]
+    # 'Leave the battlefield' (log Spoils '[PostBattle] Player left ... without') miedzy ta bitwa a nastepna - ekranu nie bylo (INFO, nie blad)
+    nxt = {id(b): (lists[i + 1]["ts"] if i + 1 < len(lists) else None) for i, b in enumerate(lists)}
+
+    def m114_left(b):
+        t0, t1 = b.get("ts"), nxt.get(id(b))
+        return t0 is not None and any(t0 <= t and (t1 is None or t < t1) for t in left)
+    gone = [b["n"] for b in miss if m114_left(b)]
+    hard = [b["n"] for b in miss if b["list"] > 0 and b is not lists[-1] and b["n"] not in gone]
+    if not lists:
+        rep.add("TROF-1: linia ekranu do kazdej listy trofeow m109", "brak bitew z lista trofeow", "bitwa z lista trofeow", None)
+    elif not any114:
+        rep.add("TROF-1: linia ekranu do kazdej listy trofeow m109", "list %d, ekranow 0 - log sprzed m114" % len(lists), "linia m114 na liste", None)
+    else:
+        rep.add("TROF-1: linia ekranu do kazdej listy trofeow m109", "list %d, ekranow %d, bez ekranu %s (w tym 'Leave the battlefield' %s)" % (len(lists),
+                len(D["screens"]), [b["n"] for b in miss] or "0", gone or "0"),
+                "kazda lista (poza ostatnia bitwa logu, pusta lista i 'Leave the battlefield' bez ekranu) ma linie ekranu", True if not hard else False)
+    # TROF-2 (glowny): przy zebrano 100% ekran == lista, bron ekranu == bron listy; solo NIE i bron na liscie > 0 -> bron na ekranie > 0.
+    # Zebrano < 100% ('Leave early'): Spoils BuildAvailableLoot zostawia najdrozsze sztuki, tania bron odpada pierwsza - bez werdyktu (INFO)
+    full = [x for x in D["screens"] if x["pct"] == 100]
+    cut = [x["n"] for x in D["screens"] if x["pct"] != 100]
+    b2 = [x["n"] for x in full if x["E"] != x["L"] or x["We"] != x["Wl"]] + [x["n"] for x in full if x["solo"] == "NIE" and x["Wl"] > 0 and x["We"] == 0]
+    if not D["screens"]:
+        rep.add("TROF-2: cala lista trofeow (z bronia) na ekranie", "brak linii ekranu" + ("" if any114 else " - log sprzed m114"), "linie ekranu", None)
+    else:
+        rep.add("TROF-2: cala lista trofeow (z bronia) na ekranie", "ekranow %d (zebrano 100%%: %d, przerwane %s - Spoils odcina najtansze), bron lista/ekran %d/%d, "
+                "zle bitwy %s" % (len(D["screens"]), len(full), cut or "0", sum(x["Wl"] for x in full), sum(x["We"] for x in full), sorted(set(b2)) or "0"),
+                "zebrano 100%: ekran == lista i bron ekranu == bron listy; solo NIE z bronia na liscie - bron na ekranie > 0 (brak bitwy ze 100% - INFO)",
+                (not b2) if full else None)
+        # TROF-2b bron listy Spoils wobec m109 'na liscie' (Spoils ApplyDamageToLoot moze cos zniszczyc - INFO przy roznicy)
+        diff = [(x["n"], x["w109"], x["Wl"]) for x in D["screens"] if x["w109"] is not None and x["w109"] != x["Wl"]]
+        rep.add("TROF-2b: bron listy Spoils == bron 'na liscie' m109", "rozne %s" % (diff or "0"), "rowne (roznica - INFO, do obejrzenia)", True if not diff else None)
+    # TROF-3 drugi podzial: podzial 0 i WYLACZONY w kazdej linii; log Spoils bez '[Priority] Soldiers took their share' w oknie logu
+    split = [x["n"] for x in D["screens"] if x["Y"] != 0 or not x["off"]]
+    if D["screens"]:
+        rep.add("TROF-3a: drugi podzial Spoils w liniach ekranu", "podzial > 0 albo WLACZONY w bitwach %s" % (split or "0"), "podzial 0 i WYLACZONY", not split)
+    desc, prio = spoils[0], spoils[1]
+    if prio is None:
+        rep.add("TROF-3b: log Spoils bez '[Priority] Soldiers took their share'", desc, "log Spoils z dnia logu", None)
+    else:
+        rep.add("TROF-3b: log Spoils bez '[Priority] Soldiers took their share'", "%d linii (%s)%s" % (len(prio), desc, (" - " + " / ".join(prio[:3])) if prio else ""),
+                "0 linii w oknie czasu logu", not prio)
+    # TROF-4 bitwy z powaleniami zolnierzy: ekran == lista (dzialka kapitana zostaje w zbrojowni, ale na ekranie cala lista)
+    sold = [b for b in lists if b["troop"] > 0]
+    scr = {x["n"]: x for x in D["screens"]}
+    s4 = [b["n"] for b in sold if b["n"] in scr and scr[b["n"]]["pct"] == 100 and scr[b["n"]]["E"] != scr[b["n"]]["L"]]
+    if not sold or not D["screens"]:
+        rep.add("TROF-4: bitwy, w ktorych powalaja zolnierze", "bitew %d z linia ekranu %d" % (len(sold), sum(1 for b in sold if b["n"] in scr)),
+                "bitwa z zolnierze > 0 (test: druzyna z zolnierzami)", None)
+    else:
+        rep.add("TROF-4: bitwy, w ktorych powalaja zolnierze", "bitew %d (z ekranem %d), ekran != lista %s" % (len(sold), sum(1 for b in sold if b["n"] in scr), s4 or "0"),
+                "ekran == lista (dzialka wojska zostaje w zbrojowni przed lista)", not s4)
+    # TROF-5 bledy i format
+    rep.add("TROF-5: ERROR LootTally.ApplyScreen/ScreenPre/ScreenBuilt, zly format linii m114", "ERROR %d%s, zly format %d%s" % (
+        D["err"], (" (" + D["err1"] + ")") if D["err1"] else "", len(D["bad"]), (" (" + D["bad"][0] + ")") if D["bad"] else ""), "0 i 0", D["err"] == 0 and not D["bad"])
+
+
+def m114lup_verdicts(D, spoils):
+    rep = Report()
+    m114lup_rows(rep, D, spoils)
+    return {r[0].split(":")[0]: r[3] for r in rep.rows}
+
+
+def m114lup_selftest():
+    """m114lup: wyrazenia wobec linii kontrolnych i test syntetyczny (dobry: TROF-2/3 TAK; zly = bitwa Jeffa 24.10 17:38: TROF-2/3 NIE). None = OK."""
+    T = M114LUP_TEST
+    if not M114LUP_RX["start"].match(T["start"]):
+        return "start: wyrazenie nie pasuje"
+    if not M114LUP_RX["init"].search(T["init"]):
+        return "init: wyrazenie nie pasuje"
+    for k in ("screen", "jeff"):
+        d = m114lup_screen(T[k])
+        if not d or d.get("bad"):
+            return "%s: %s" % (k, d.get("bad") if d else "nie linia ekranu")
+    if not M114LUP_RX["prio"].match(T["prio"]):
+        return "prio: wyrazenie nie pasuje"
+    head = ["[17:22:13] " + T["start"], "[17:22:13] " + T["wired"], "[17:22:13] " + T["init"], "[17:38:23] " + M109LUP_TEST["battle"]]
+    good = m114lup_verdicts(m114lup_scan(head + ["[17:38:31] " + T["screen"]]), ("synt", []))
+    bad = m114lup_verdicts(m114lup_scan(head + ["[17:38:31] " + T["jeff"]]), ("synt", [T["prio"]]))
+    old = m114lup_verdicts(m114lup_scan(["[17:38:23] " + M109LUP_TEST["battle"]]), ("synt", [T["prio"], T["prio"]]))
+    if not M114LUP_RX["leave"].match(T["leave"]):
+        return "leave: wyrazenie nie pasuje"
+    # 'Leave early' 30% (bron odcieta przez Spoils) - bez NIE; dwie bitwy: pierwsza 'Leave the battlefield' bez ekranu - TROF-1 TAK, bez linii Spoils - NIE
+    cut = m114lup_verdicts(m114lup_scan(head + ["[17:38:31] " + T["cut"]]), ("synt", []))
+    b4 = "[17:45:02] " + M109LUP_TEST["battle"].replace("bitwa 3 |", "bitwa 4 |", 1)
+    s4 = "[17:45:10] " + T["screen"].replace("bitwa 3 |", "bitwa 4 |", 1)
+    two = head + [b4, s4]
+    lv = m114lup_verdicts(m114lup_scan(two), ("synt", [], ["17:38:40"]))
+    nolv = m114lup_verdicts(m114lup_scan(two), ("synt", [], []))
+    exp = [(good, "TROF-0", "TAK"), (good, "TROF-1", "TAK"), (good, "TROF-2", "TAK"), (good, "TROF-3a", "TAK"), (good, "TROF-3b", "TAK"), (good, "TROF-5", "TAK"),
+           (bad, "TROF-2", "NIE"), (bad, "TROF-3a", "NIE"), (bad, "TROF-3b", "NIE"), (old, "TROF-0", "INFO"), (old, "TROF-3b", "NIE"),
+           (cut, "TROF-2", "INFO"), (cut, "TROF-3a", "TAK"), (lv, "TROF-1", "TAK"), (nolv, "TROF-1", "NIE")]
+    wrong = ["%s=%s (oczekiwane %s)" % (k, v.get(k), e) for v, k, e in exp if v.get(k) != e]
+    return ("werdykty: " + ", ".join(wrong)) if wrong else None
+
+
+def m114lup_main(logp):
+    """m114lup (24.10; m114-lup): TROF-S, TROF-0..TROF-5 - opis w --help. Strumieniowo; bez logu tylko self-test."""
+    rep = Report()
+    try:
+        s1 = m114lup_selftest()
+    except Exception as e:   # self-test nie moze zatrzymac grupy
+        s1 = "wyjatek %s: %s" % (type(e).__name__, e)
+    rep.add("TROF-S: self-test wyrazen i test syntetyczny (dobry, zly = bitwa Jeffa 24.10 17:38, log sprzed m114)", s1 or "OK", "werdykty zgodne", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("TROF-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        D = m114lup_scan(fh)
+    spoils = m114lup_spoils(logp, D["last"])
+    print("plik: %s | startow m114 %d, linii wpiecia %d, ekranow %d (zly format %d), bitew m109 %d, ERROR %d | Spoils: %s" % (
+        logp, len(D["start"]), D["wired"], len(D["screens"]), len(D["bad"]), len(D["m109"]), D["err"], spoils[0]))
+    m114lup_rows(rep, D, spoils)
+    rep.show()
+    return 0
+
+
 # ---------------- m110stan (23.10, galaz w-toku/m110-stan - Jeff 23.10 ok. 15:00: "zrobmy 4: rozbity/wrak ponizej 10% hp durability; zmasakrowany powyzej 10%,
 # ale ponizej 40%; uszkodzony powyzej 40%, ale do 80%; sprawny powyzej 80 do 100. I okreslajmy go nazwami, nie procentami"; ok. 14:45 "zeszlo mu z pancerza np.
 # 480 punktow z 2000"). Armoury/src/GearState.cs (cztery stany w modyfikatorach, linie startu / rynsztunku / zapisu), LootWear.cs (stan lupu z obrazen, linie
@@ -66392,7 +66687,8 @@ M110STAN_LP = "Stan lupu (m110): "
 M110STAN_ZP = "Zuzycie (m110): "
 M110STAN_ERR = ("ERROR in GearState.", "ERROR in LootWear.", "ERROR in AfterDtePartyItems", "ERROR in AfterGenerateLoot", "ERROR in FlushShareToBaggage",
                 "ERROR in DropShare", "ERROR in ApplyModifierForCondition", "ERROR in WearTheLoot", "ERROR in WearTheTroops", "ERROR in BattlefieldLaw.SplitWrecks",
-                "ERROR in BattlefieldLaw.ShareWithState", "ERROR in BattlefieldLaw.AfterGenerateLoot(lucky m110)", "ERROR in ResyncWornStates")
+                "ERROR in BattlefieldLaw.ShareWithState", "ERROR in BattlefieldLaw.AfterGenerateLoot(lucky m110)", "ERROR in ResyncWornStates",
+                "ERROR in BattlefieldLaw.AfterGenerateLoot(lucky m114)")
 _M110STAN_ST = r"(sprawny|uszkodzony|zmasakrowany|wrak)"
 _M110STAN_BLK = r"\[sprawny/uszkodzony/zmasakrowany/wrak/zniszczony\]: (\d+)/(\d+)/(\d+)/(\d+)/(\d+) -> do Ciebie (\d+), dzialka (\d+), zbrojownia (\d+), wraki (\d+), przepadly (\d+)"
 M110STAN_RX = {
@@ -66413,7 +66709,8 @@ M110STAN_RX = {
     "battle": re.compile(r"^Stan lupu \(m110\): bitwa (\d+) \| ksiega: wrogow (\d+) \(trafionych (\d+)\), trafien (\d+), przed nie-sprawnych (\d+), czesci z ksiega (\d+) \| "
                          r"lup z cial \[sprawny/uszkodzony/zmasakrowany/wrak/zniszczony\]: do gracza (\d+)/(\d+)/(\d+)/(\d+)/(\d+), zostaje u wojska (\d+) \| cios "
                          + _M110STAN_BLK + r" \| pekniete " + _M110STAN_BLK + r" \| bez ksiegi: lup (\d+), cios/pekniete (\d+) \| koniec: (.*) \(lucky (\d+)/(\d+)\) \| "
-                         r"prog zniszczenia (\d+)% \| pomiar (\d+(?:\.\d+)?) ms \(trafien (\d+)\) \| potkniecia (\d+)\.$"),
+                         r"prog zniszczenia (\d+)% \| pomiar (\d+(?:\.\d+)?) ms \(trafien (\d+)\) \| potkniecia (\d+)"
+                         r"(?: \| bron bez loterii stanu \(m114\) (\d+)/(\d+), z modyfikatorem (\d+))?\.$"),
     "test": re.compile(r"^Stan lupu \(m110\): test - bitwa (\d+): sztuczny stan przed bitwa dla (\d+) wrogow \(sprawny (\d+), uszkodzony (\d+), zmasakrowany (\d+), "
                        r"wrak (\d+)\)\.$"),
     "day": re.compile(r"\bdoba (\d+)\b"),
@@ -66478,7 +66775,10 @@ def m110stan_battle(s):
     d = {"n": g[0], "agents": g[1], "enemies": g[2], "hits": g[3], "before": g[4], "pieces": g[5], "lup": g[6:11], "zost": g[11],
          "cios": g[12:17], "rcios": g[17:22], "pek": g[22:27], "rpek": g[27:32], "nolup": g[32], "nowr": g[33], "how": m.group(35),
          "lok": int(m.group(36)), "lneed": int(m.group(37)), "min": int(m.group(38)), "ms": float(m.group(39)), "mhits": int(m.group(40)),
-         "stum": int(m.group(41))}
+         "stum": int(m.group(41)),
+         # m114-lup: odcinek broni (brak - None)
+         "wok": int(m.group(42)) if m.group(42) is not None else None, "wneed": int(m.group(43)) if m.group(43) is not None else None,
+         "wmod": int(m.group(44)) if m.group(44) is not None else None}
     return d
 
 
@@ -66495,6 +66795,11 @@ def m110stan_ids(b):
             e.append("bitwa %d %s: wrakow %d, a do wrakow poszlo %d" % (b["n"], nm, st[3], r[3]))
     if b["lok"] != b["lneed"]:
         e.append("bitwa %d: lucky %d/%d" % (b["n"], b["lok"], b["lneed"]))
+    if b.get("wok") is not None:   # m114-lup: bron bez loterii stanu - wszystkie oznaczone, z modyfikatorem nie wiecej niz oznaczonych
+        if b["wok"] != b["wneed"]:
+            e.append("bitwa %d: bron bez loterii stanu %d/%d" % (b["n"], b["wok"], b["wneed"]))
+        if b["wmod"] > b["wneed"]:
+            e.append("bitwa %d: bron z modyfikatorem %d > %d" % (b["n"], b["wmod"], b["wneed"]))
     if b["hits"] != b["mhits"]:
         e.append("bitwa %d: trafien %d != %d w pomiarze" % (b["n"], b["hits"], b["mhits"]))
     return e
@@ -66581,6 +66886,17 @@ def m110stan_selftest():
         return "bitwa: %s" % (b if b else "brak dopasowania")
     if m110stan_ids(b):
         return "bitwa: tozsamosci na linii kontrolnej %s" % m110stan_ids(b)
+    if b["wok"] is not None:
+        return "bitwa: odcinek broni (m114) w linii bez odcinka"
+    # m114-lup: odcinek broni - zgodny, niezgodny (k != n) i z modyfikatorem ponad oznaczone
+    W = " | bron bez loterii stanu (m114) %d/%d, z modyfikatorem %d."
+    bw = m110stan_battle(T["battle"][:-1] + W % (9, 9, 3))
+    if not bw or bw["wok"] != 9 or bw["wneed"] != 9 or bw["wmod"] != 3 or bw["stum"] != 0 or m110stan_ids(bw):
+        return "bitwa (bron m114): %s" % (bw if bw else "brak dopasowania")
+    for bad in ((8, 9, 3), (9, 9, 10)):
+        bx = m110stan_battle(T["battle"][:-1] + W % bad)
+        if not bx or not m110stan_ids(bx):
+            return "bitwa (bron m114): niezgodnosc %s nie wykryta" % (bad,)
     bb = m110stan_battle(T["battle"].replace("czesci z ksiega 21", "czesci z ksiega 22"))
     if not bb or not m110stan_ids(bb):
         return "bitwa: niezgodna suma czesci nie wykryta"
@@ -66749,9 +67065,10 @@ def m110stan_rows(rep, D, basep=None):
                 "brak linii bitwy", "100% bitew (brak - INFO)", None)
     else:
         rep.add("STAN-3: tozsamosci bitwy (czesci z ksiega = lup + zostaje + cios + pekniete; drogi ciosu i peknietych = czesci bez zniszczonych; lucky k = k)",
-                "bitew %d (czesci %d, lup do gracza %d, zostaje %d), niezgodnych %d%s" % (len(D["battles"]), sum(b["pieces"] for b in D["battles"]),
-                                                                                  sum(sum(b["lup"]) for b in D["battles"]), sum(b["zost"] for b in D["battles"]),
-                                                                                  len(berr), " (" + "; ".join(berr[:3]) + ")" if berr else ""), "100% bitew", not berr)
+                "bitew %d (czesci %d, lup do gracza %d, zostaje %d; bron bez loterii stanu (m114) %d/%d, z modyfikatorem %d, bitew z odcinkiem %d), niezgodnych %d%s" % (
+                    len(D["battles"]), sum(b["pieces"] for b in D["battles"]), sum(sum(b["lup"]) for b in D["battles"]), sum(b["zost"] for b in D["battles"]),
+                    sum(b.get("wok") or 0 for b in D["battles"]), sum(b.get("wneed") or 0 for b in D["battles"]), sum(b.get("wmod") or 0 for b in D["battles"]),
+                    sum(1 for b in D["battles"] if b.get("wok") is not None), len(berr), " (" + "; ".join(berr[:3]) + ")" if berr else ""), "100% bitew", not berr)
     # STAN-4 pokrycie pod flaga
     if not D["tests"]:
         rep.add("STAN-4: pokrycie testu (armoury-stan.flag): w lupie wszystkie 4 stany i zniszczona, cios/pekniete zolnierza rozdzielone, uprzaz",

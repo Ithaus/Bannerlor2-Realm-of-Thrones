@@ -56,6 +56,8 @@ namespace Armoury
         // startu LootTally ("Lup bitwy (m109): start")
         private static MethodInfo _lReg;
         internal static bool MountReturnWired, MountFinalWired, SpareHarnessWired;
+        // m114-lup: getter Spoils EnablePrioritySystem odpowiada false (NoSoldierSplit) - drugi podzial listy trofeow wylaczony
+        internal static bool SoldierSplitWired;
         internal static bool LuckyFound { get { return _lReg != null; } }
         /// <summary>m110-stan: latki lupu cialo po ciele wpiete (DTE OnAgentRemoved - zabojca i ofiara, PartyBattleRecord.AddLootedItem - sztuka) - linia startu stanow.</summary>
         internal static int LootWiredCount { get { return _lootWired; } }
@@ -123,6 +125,50 @@ namespace Armoury
             _bQueued.AddToCounts(ne, 1);
             if (orig.HasValue) _bOrig.AddToCounts(orig.Value, 1);
             if (mod == null) { int v; _bSound.TryGetValue(it, out v); _bSound[it] = v + 1; }
+        }
+
+        /// <summary>m114-lup (LootWeaponsKeepCondition, Jeff 24.10 "ja wszystkich sam zabijam, to wszystko powinno byc moje"): bron, tarcza, amunicja -
+        /// stan z ciala (modyfikator sztuki), bez loterii stanu Spoils i sakw; ciosy w cialo zuzywaja zbroje (ksiega m110), nie bron.</summary>
+        internal static bool KeepsBodyState(ItemObject it)
+        {
+            return it != null && it.HasWeaponComponent && !it.HasArmorComponent && !it.IsMountable && Settings.Current.LootWeaponsKeepCondition;
+        }
+
+        /// <summary>m114-lup: bron z kolejki lupu idacej na liste trofeow (element ze stanem -> sztuk), bez sztuk B (te oznacza petla m110 - bez dubli).</summary>
+        private static ItemRoster WeaponShare(ItemRoster queue)
+        {
+            var r = new ItemRoster();
+            for (int i = 0; i < queue.Count; i++)
+            {
+                var el = queue.GetElementCopyAtIndex(i);
+                if (el.Amount <= 0 || !KeepsBodyState(el.EquipmentElement.Item)) continue;
+                int bi = _bQueued.FindIndexOfElement(el.EquipmentElement);
+                int n = el.Amount - (bi >= 0 ? Math.Max(0, _bQueued.GetElementNumber(bi)) : 0);
+                if (n > 0) r.AddToCounts(el.EquipmentElement, n);
+            }
+            return r;
+        }
+
+        /// <summary>m114-lup: znacznik lucky Spoils (RegisterLuckyElement - ApplyDamageToLoot zostawia sztuke 1:1, jak zbroje z ksiega m110) dla broni z kolejki,
+        /// ktora zostala na liscie trofeow po przesianiu - tyle sztuk, ile lezy na liscie (bez znacznikow bez pokrycia). ok - oznaczone, need - do oznaczenia,
+        /// mod - z nich z modyfikatorem (stan inny niz sprawny, zachowany).</summary>
+        private static void RegisterWeaponsLucky(ItemRoster list, ItemRoster wq, ref int ok, ref int need, ref int mod)
+        {
+            for (int i = 0; i < wq.Count; i++)
+            {
+                var el = wq.GetElementCopyAtIndex(i);
+                int li = list.FindIndexOfElement(el.EquipmentElement);
+                int n = Math.Min(el.Amount, li >= 0 ? list.GetElementNumber(li) : 0);
+                if (n <= 0) continue;
+                need += n;
+                if (el.EquipmentElement.ItemModifier != null) mod += n;
+                if (_lReg == null) continue;
+                for (int k = 0; k < n; k++)
+                {
+                    try { _lReg.Invoke(null, new object[] { el.EquipmentElement }); ok++; }
+                    catch (Exception e) { MountStumble("AfterGenerateLoot(lucky m114)", e); break; }
+                }
+            }
         }
 
         /// <summary>m110-stan: sprawna sztuka B tego przedmiotu wysypywana do sakw - bez loterii stanu (true) i zapamietana dla WearTheLoot.</summary>
@@ -377,12 +423,36 @@ namespace Armoury
                 // preset ma ON), wiec gasimy u zrodla: getter ustawienia
                 // odpowiada false, caly kod taboru Spoils spi.
                 var mcmType = Type.GetType("RealisticLoot.Settings.MCMSettings, RealisticLoot");
-                var gBag = mcmType != null ? AccessTools.PropertyGetter(mcmType, "EnableBaggageTrain") : null;
-                if (gBag != null)
+                // m114-lup (recenzja): kazda latka gettera Spoils we wlasnym try - wyjatek tutaj nie moze wylaczyc reszty prawa pola bitwy (dzialka DTE, E8/A, Z2, LootTally)
+                try
                 {
-                    h.Patch(gBag, postfix: new HarmonyMethod(typeof(BattlefieldLaw), "NoBaggageTrain"));
-                    Log.Info("BattlefieldLaw: tabor Spoils (Baggage Train) wyciety na stale - wozy dzieli vanilla wg wkladu.");
+                    var gBag = mcmType != null ? AccessTools.PropertyGetter(mcmType, "EnableBaggageTrain") : null;
+                    if (gBag != null)
+                    {
+                        h.Patch(gBag, postfix: new HarmonyMethod(typeof(BattlefieldLaw), "NoBaggageTrain"));
+                        Log.Info("BattlefieldLaw: tabor Spoils (Baggage Train) wyciety na stale - wozy dzieli vanilla wg wkladu.");
+                    }
                 }
+                catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (EnableBaggageTrain)", e); }
+
+                // m114-lup (Jeff 24.10 17:40: "dostaje tylko zbroje i zero broni... wszystkich zabijam sam, wiec wszystko powinno byc moje. Cos dzieli lup zle";
+                // 17:55: "bron byla potem w ekwipunku, ale nie na ekranie lupu - jakby przeniesiona przed ekranem"). Spoils dzieli liste trofeow DRUGI raz
+                // (LootCollectionBehavior.BuildLootScreenRoster, EnablePrioritySystem, bez MCM, kazdy preset ON): przy choc jednym zolnierzu w druzynie
+                // na ekran idzie 30% sztuk od najdrozszych (zbroje), reszta (tania bron bandytow) po cichu do sakw. Dzialke gracza liczy juz BattlefieldLaw
+                // wg powalonych, wiec getter odpowiada false - cala lista trofeow na ekran. Jedyny odczyt gettera to ten podzial (_isSoloParty nietkniete:
+                // kara rannych, czas szukania, komunikat solo). Klucz SpoilsSoldierSplitOff.
+                try
+                {
+                    var gPrio = mcmType != null ? AccessTools.PropertyGetter(mcmType, "EnablePrioritySystem") : null;
+                    if (gPrio != null)
+                    {
+                        h.Patch(gPrio, postfix: new HarmonyMethod(typeof(BattlefieldLaw), nameof(NoSoldierSplit)));
+                        SoldierSplitWired = true;
+                        Log.Info("BattlefieldLaw: drugi podzial Spoils (Priority: 30% na ekran, reszta po cichu do sakw) wylaczony - dzialke liczy BattlefieldLaw wg powalonych.");
+                    }
+                    else Log.Info("BattlefieldLaw: UWAGA brak EnablePrioritySystem w Spoils - drugi podzial NIE wylaczony.");
+                }
+                catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (m114 EnablePrioritySystem)", e); }
 
                 if (dmgType != null) _applyDamage = AccessTools.Method(dmgType, "ApplyDamageToLoot");
                 // m109-lup: konie i uprzaz przetrzymane w AfterGenerateLoot wracaja na liste trofeow (prefiks; Spoils wola ApplyDamageToLoot tylko w :944)
@@ -477,7 +547,8 @@ namespace Armoury
                         // placi za zabitych - bez DTE vanilla loteria zostaje
                         CasualtyLootCut = mCas != null;
                         Log.Info("BattlefieldLaw: dzialka gracza z lupow DTE trafia na ekran (solo 100%, z druzyna "
-                                 + Settings.Current.PlayerLootSharePercent + "%)."
+                                 + Settings.Current.PlayerLootSharePercent + "%) + drugi podzial Spoils: "
+                                 + (SoldierSplitWired && Settings.Current.SpoilsSoldierSplitOff ? "WYLACZONY" : "WLACZONY") + "."   // m114-lup
                                  + (CasualtyLootCut ? " Jency z bitew ida pod obszukanie (placa fizycznie za rannych)." : ""));
                         // E8/A (250, odpowiedz Jeffa 12.10 nr 1): lup cialo po ciele - kto powalil wlasciciela sztuki dopisywanej do lupu (latki wpiete zawsze,
                         // klucz OwnKillsLootWhole czytany w LootTag i AfterDtePartyItems; bez latek dzialka liczy sie srednia z puli jak dotad)
@@ -522,6 +593,7 @@ namespace Armoury
                 // m109-lup: pomiar lupu bitwy wedlug rodzaju i hak autotestu (LootTally) - latki wpiete zawsze, tylko czytaja
                 if (modelType != null) _lReg = AccessTools.Method(modelType, "RegisterLuckyElement");
                 LootTally.ApplyAll(h);
+                LootTally.ApplyScreen(h);   // m114-lup: pomiar ekranu trofeow Spoils (lista -> ekran -> sakwy)
             }
             catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll", e); }
         }
@@ -566,7 +638,8 @@ namespace Armoury
                 // dzialke do sakw; loteria na wierzchu bylaby DRUGA nagroda)
                 __result.Clear();
                 ScreenIsRealLoot = true;    // E8/L (252): od teraz na liscie trofeow sa tylko prawdziwe sztuki z pola (albo nic)
-                if (ShareQueue.Count == 0 && Wrecks.Count == 0) { ClearB(); LootWear.Close("lista trofeow Spoils", 0, 0); ScreenDone(); return; }
+                int wOk = Settings.Current.LootWeaponsKeepCondition ? 0 : -1, wNeed = 0, wMod = 0;   // m114-lup: bron bez loterii stanu (linia m110)
+                if (ShareQueue.Count == 0 && Wrecks.Count == 0) { ClearB(); LootWear.Close("lista trofeow Spoils", 0, 0, wOk, 0, 0); ScreenDone(); return; }
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
                     var el = ShareQueue.GetElementCopyAtIndex(i);
@@ -588,6 +661,14 @@ namespace Armoury
                         catch (Exception e) { MountStumble("AfterGenerateLoot(lucky m110)", e); break; }
                     }
                 }
+                // m114-lup (LootWeaponsKeepCondition): bron, tarcze i amunicja z kolejki - ten sam znacznik lucky Spoils co zbroja wyzej (RegisterLuckyElement),
+                // nadany po przesianiu listy (RegisterWeaponsLucky nizej); ewidencja przed wyczyszczeniem _bQueued (sztuki B pominiete)
+                ItemRoster wq = null;
+                if (wOk >= 0)
+                {
+                    try { wq = WeaponShare(ShareQueue); }
+                    catch (Exception e) { MountStumble("AfterGenerateLoot(lucky m114)", e); }
+                }
                 _bQueued.Clear(); _bOrig.Clear();
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana na ekran
                 LootTally.WrecksIn(Wrecks);
@@ -595,6 +676,11 @@ namespace Armoury
                 CleanseDragons(__result);
                 CleanseTrash(__result);
                 LootTally.Sifted(__result);
+                if (wq != null)
+                {
+                    try { RegisterWeaponsLucky(__result, wq, ref wOk, ref wNeed, ref wMod); }
+                    catch (Exception e) { MountStumble("AfterGenerateLoot(lucky m114)", e); }
+                }
                 Log.Info("BattlefieldLaw: ekran Spoils podmieniony na " + __result.Count + " pozycji prawdziwego lupu"
                          + (wrecks > 0 ? " (w tym " + wrecks + " wrakow przed przesianiem)" : "") + ".");
                 // m109-lup (FallenRiderHorsesLooted): konie i uprzaz poza zasiegiem petli Spoils, ktora zabralaby je do zamknietego taboru - wracaja
@@ -617,7 +703,7 @@ namespace Armoury
                     _bSoundHeld = _bSound.Count > 0;
                 }
                 LootTally.OnList(__result, hold);
-                LootWear.Close("lista trofeow Spoils", bOk, bNeed);
+                LootWear.Close("lista trofeow Spoils", bOk, bNeed, wOk, wNeed, wMod);
                 ScreenDone();
             }
             catch (Exception e) { Log.Error("AfterGenerateLoot", e); }
@@ -1424,6 +1510,13 @@ namespace Armoury
             try { if (Settings.Current.BattlefieldLawEnabled) __result = false; } catch { }
         }
 
+        /// <summary>m114-lup: drugi podzial Spoils (Priority) zawsze OFF przy prawie pola bitwy - cala lista trofeow na ekran, nic po cichu do sakw.
+        /// Bez ScreenIsRealLoot: LReset czysci ja przy wczytaniu, a zbieranie Spoils i BuildLootScreenRoster ida pozniej.</summary>
+        public static void NoSoldierSplit(ref bool __result)
+        {
+            try { if (Settings.Current.BattlefieldLawEnabled && Settings.Current.SpoilsSoldierSplitOff) __result = false; } catch { }
+        }
+
         /// <summary>Symulacje: trup mial sprzet, to sprzet jest - bez zaszytego x0.10-0.58.</summary>
         public static void FullTierMultiplier(ref float __result)
         {
@@ -1606,11 +1699,13 @@ namespace Armoury
         internal static int FlushShareToBaggage(string why)
         {
             int moved = 0;
+            int wOk = -1, wMod = 0;   // m114-lup: bron bez loterii stanu (linia m110)
             try
             {
                 var bag = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
                 if (bag == null) return 0;
                 LootTally.QueueOut(ShareQueue, LootTally.Sakwy);   // m109-lup: pomiar
+                if (Settings.Current.LootWeaponsKeepCondition) wOk = 0;
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
                     var el = ShareQueue.GetElementCopyAtIndex(i);
@@ -1619,7 +1714,14 @@ namespace Armoury
                     for (int n = 0; n < el.Amount; n++)
                     {
                         var mod = el.EquipmentElement.ItemModifier;
-                        if (mod == null && !TakeBSound(item)) mod = ArmouryBehavior.PickWornModifier(item);   // m110-stan: sprawna sztuka B zostaje sprawna
+                        if (wOk >= 0 && KeepsBodyState(item))
+                        {
+                            // m114-lup: bron w stanie z ciala - bez PickWornModifier; sprawna zapamietana, zeby WearTheLoot (kryjowka) tez jej nie losowal
+                            wOk++;
+                            if (mod != null) wMod++;
+                            else { int f; _soundFlushed.TryGetValue(item, out f); _soundFlushed[item] = f + 1; }
+                        }
+                        else if (mod == null && !TakeBSound(item)) mod = ArmouryBehavior.PickWornModifier(item);   // m110-stan: sprawna sztuka B zostaje sprawna
                         bag.AddToCounts(new EquipmentElement(item, mod), 1);
                         moved++;
                     }
@@ -1636,7 +1738,7 @@ namespace Armoury
             catch (Exception e) { Log.Error("FlushShareToBaggage", e); }
             ClearB();   // m110-stan: kolejka oddana (sprawne B wysypane - _soundFlushed dla WearTheLoot)
             LootTally.Close("sakwy - " + why);   // m109-lup: pomiar bitwy zamkniety
-            LootWear.Close("sakwy - " + why, 0, 0);
+            LootWear.Close("sakwy - " + why, 0, 0, wOk, Math.Max(0, wOk), wMod);
             return moved;
         }
 
