@@ -289,7 +289,8 @@ namespace Armoury
             try { d = Prologue.DeathNews(v); } catch (Exception e) { Stumble("Fallback.Prologue", e); }
             if (!string.IsNullOrEmpty(d)) return d;
             string name = v.Name != null ? v.Name.ToString() : v.StringId;
-            if (_kingDead == v && !string.IsNullOrEmpty(_kingDeadRealm)) return name + ", King of " + _kingDeadRealm + ", has died of " + (v.IsFemale ? "her" : "his") + " wounds.";
+            // recenzja m116: bez tytulu "King of" (nazwy krolestw ROT to rody, Nocna Straz, Wolne Miasta; wladczyni) - neutralnie "who ruled"
+            if (_kingDead == v && !string.IsNullOrEmpty(_kingDeadRealm)) return name + ", who ruled " + _kingDeadRealm + ", has died of " + (v.IsFemale ? "her" : "his") + " wounds.";
             return name + " has died of " + (v.IsFemale ? "her" : "his") + " wounds.";
         }
 

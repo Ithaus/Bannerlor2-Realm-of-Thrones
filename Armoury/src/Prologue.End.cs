@@ -58,6 +58,9 @@ namespace Armoury
         private const string NedRefundGameId = "KkUpHftX7ZIq";   // kampania Jeffa (IronmanKkUpHftX7ZIq.sav) - jedyna, w ktorej okup Neda zostal zaplacony
         private const long NedRefundAmount = 292902;               // log 24.10 20:06:26 (gotowka 292902, dlug 0)
         private static string _nr = "";                            // zapis arm_prologue "nr": "" = jeszcze nie sprawdzone, "done:<przeniesione>", "none:<powod>"
+        // recenzja m116: termin niezalezny od znacznika - zapis pod starsza DLL (PackEnd 109.1 bez "nr") gubi znacznik, a ponowne wgranie oddaloby zloto drugi raz.
+        // Log Jeffa 24.10 20:59: dzien kampanii 108868 (Postacie kanonu m101); zapas ok. 120 dni gry na wgranie m116, potem "none:po-terminie".
+        private const int NedRefundLastDay = 108990;
 
         private static bool NedKey { get { var s = S; return s != null && s.PrologueNedNoRansom; } }
 
@@ -82,6 +85,14 @@ namespace Armoury
                 if (gid != NedRefundGameId) { _nr = "none:inna-kampania"; return; }
                 var ned = H(NedId);
                 if (!_kingFallen || !(_nedDone || (ned != null && !ned.IsAlive))) return;   // czeka do egzekucji
+                int today = (int)CampaignTime.Now.ToDays;
+                if (today > NedRefundLastDay)
+                {
+                    _nr = "none:po-terminie";
+                    Log.Info(Tag + "zwrot okupu Neda: po terminie (dzien kampanii " + today.ToString(Inv) + " > " + NedRefundLastDay.ToString(Inv) + ") - bez przelewu " + NedRefundAmount
+                             + " zl (ochrona przed drugim zwrotem po zapisie pod starsza DLL).");
+                    return;
+                }
                 var from = K(Crown); var to = K(NorthId);
                 if (from == null || to == null || from.IsEliminated || to.IsEliminated)
                 {
@@ -100,6 +111,7 @@ namespace Armoury
                     moved = w0 - from.KingdomBudgetWallet;
                     to.KingdomBudgetWallet += (int)moved;
                     got = (long)to.KingdomBudgetWallet - v0;
+                    _nr = "done:" + moved.ToString(Inv);    // recenzja m116: znacznik zaraz po przelewie - wyjatek nizej nie powtorzy go jutro
                     CrownIncome.ShiftSnapshot(to, got);      // 165: zwrot skarbu, nie wplyw dnia
                     CrownIncome.ShiftSnapshot(from, -moved); // 165: ubytek skarbu, nie "ujemny wplyw"
                     e1 = " | historia skarbca E1 (CrashScribe): " + BookHoldings.E1Text(BookHoldings.E1Shift(to, got), to.Name.ToString())
@@ -110,7 +122,7 @@ namespace Armoury
                          + to.StringId + ") " + v0 + " -> " + to.KingdomBudgetWallet + " | nalezne " + NedRefundAmount + ", zdjete " + moved + " - dopisane " + got + " = " + (moved - got)
                          + (moved < NedRefundAmount ? " (skarbiec korony nie starczyl - oddane tyle, ile bylo)" : "") + ", migawka 165 przesunieta u obu stron" + e1 + " | znacznik nr=" + _nr + ".");
                 if (moved > 0)
-                    Log.Player("The crown returns the " + moved.ToString("N0", Inv) + " denars the North paid for Lord Eddard's freedom, a freedom King Joffrey never granted.");
+                    Log.Player("The " + moved.ToString("N0", Inv) + " denars the North paid for Lord Eddard's release - a release that never came - are restored to the North's treasury.");   // recenzja m116: korekta, nie dar Joffreya
             }
             catch (Exception e) { Stumble("TryNedRefund", e); }
         }

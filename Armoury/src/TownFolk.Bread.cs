@@ -73,6 +73,8 @@ namespace Armoury
         private static readonly Dictionary<string, int> _brPending = new Dictionary<string, int>(StringComparer.Ordinal);
         private static int _brLoadN = -1, _brLoadBad, _brRestored;
         private static bool _brSaveSaid;
+        // recenzja m116: wpis bez kotwicy po pierwszej dobie z kotwicami (kiesa osady wylaczona, osada zniknela) - porzucony, nie wraca po miesiacach ze starym licznikiem
+        private static int _brAnchorDay = int.MinValue, _brDropped;
 
         private static void ResetBread()
         {
@@ -83,6 +85,7 @@ namespace Armoury
             LastBreadCrown = LastBreadLord = 0;
             _brPlWeek = -1; _brPlFief = _brPlFiefCrown = _brPlKingBread = _brPlKingRent = 0; _brPlNames.Clear();
             _brPending.Clear(); _brLoadN = -1; _brLoadBad = 0; _brRestored = 0; _brSaveSaid = false;   // m116-fabula (ImportBread po konstruktorze)
+            _brAnchorDay = int.MinValue; _brDropped = 0;
         }
 
         /// <summary>m116-fabula: zapis "arm_bread" - "1|id,zero;id,zero|pw=..,pf=..,pfc=..,pkb=..,pkr=..,pn=nazwy". Klucz wylaczony - pusty (wczytanie jak dotad).</summary>
@@ -157,7 +160,13 @@ namespace Armoury
             try
             {
                 f.BreadGap = 0; f.BreadPaid = 0; f.BreadCrown = 0; f.BreadLord = 0; f.BreadGapC[0] = f.BreadGapC[1] = f.BreadGapC[2] = 0;
-                if (!BreadKey || f.Kind > 1 || !f.FacOk) { if (f.BreadOn) { f.BreadOn = false; f.BreadZero = 0; } return; }
+                _brAnchorDay = _liveDay;   // recenzja m116: byla kotwica tej doby (BreadRest porzuca reszte wpisow z zapisu)
+                if (!BreadKey || f.Kind > 1 || !f.FacOk)
+                {
+                    if (f.BreadOn) { f.BreadOn = false; f.BreadZero = 0; }
+                    if (_brPending.Count > 0 && f.St != null && f.St.StringId != null && _brPending.Remove(f.St.StringId)) _brDropped++;   // recenzja m116: kiesa wylaczona - wpis z zapisu porzucony
+                    return;
+                }
                 // m116-fabula: osada na chlebie z zapisu (arm_bread) - stan i licznik wyjscia wracaja przy pierwszej kotwicy po wczytaniu
                 if (_brPending.Count > 0 && f.St != null && f.St.StringId != null)
                 {
@@ -383,6 +392,8 @@ namespace Armoury
                 }
                 _brLordN = _brLordToday.Count;
                 LastBreadCrown = _brCrown; LastBreadLord = _brLord;
+                // recenzja m116: po dobie z kotwicami wpisy z zapisu bez kotwicy (osada bez Folk / bez TownLive) - porzucone (linia "zapis (m116 ...)": porzucone N)
+                if (_brPending.Count > 0 && _brAnchorDay == _liveDay) { _brDropped += _brPending.Count; _brPending.Clear(); }
                 BreadPlayer(s);
                 if (s.LogEnabled) BreadLine(s, all);
             }
@@ -462,7 +473,7 @@ namespace Armoury
                 _brSaveSaid = true;
                 sb.Append(" | zapis (m116, Bread For The Poor Saved ").Append(s.BreadForThePoorSaved ? "tak" : "nie").Append("): ")
                   .Append(_brLoadN < 0 ? "brak klucza arm_bread (nowa kampania albo stary zapis)" : "wczytano " + _brLoadN.ToString(BrInv)).Append(" (bledne ").Append(_brLoadBad).Append(")")
-                  .Append(", przywrocono ").Append(_brRestored).Append(", czeka na kotwice ").Append(_brPending.Count);
+                  .Append(", przywrocono ").Append(_brRestored).Append(", czeka na kotwice ").Append(_brPending.Count).Append(", porzucone ").Append(_brDropped);
             }
             // m105 G2: segment na koncu linii (regexy R2_M3 / R2_M3L bez zmian); klucz wylaczony - linia jak w WGRANIU 102
             if (s.CrownHoardFeedsHungry)

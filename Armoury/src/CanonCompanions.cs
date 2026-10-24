@@ -1625,8 +1625,23 @@ namespace Armoury
                                 TransferPrisonerAction.Apply(h.CharacterObject, byParty, cap);
                                 moved = h.PartyBelongedToAsPrisoner == cap;
                             }
+                            // recenzja m116: loch nie wyszedl (przekazanie bez skutku albo TakePrisonerAction do druzyny Robba bez skutku) - jak przed m116 prosto do lochu,
+                            // inaczej jeniec w druzynie poza straza E5 (HeldArg town_V2) - okup AI-AI i ucieczka otwarte do m02
+                            string fb = "";
+                            if (!moved && cap.IsSettlement)
+                            {
+                                if (h.IsPrisoner && h.PartyBelongedToAsPrisoner == byParty)
+                                {
+                                    _freeing = h;   // nasze wyjecie z druzyny - straz niewoli prologu (Prologue.World) przepuszcza
+                                    try { EndCaptivityAction.ApplyByReleasedByChoice(h); }
+                                    finally { _freeing = null; }
+                                }
+                                if (!h.IsPrisoner && h.IsAlive) TakePrisonerAction.Apply(cap, h);
+                                moved = h.IsPrisoner && h.PartyBelongedToAsPrisoner == cap;
+                                fb = moved ? ", zapas: prosto do lochu " + cap.Name : ", zapas do lochu NIE (" + Where(h) + ")";
+                            }
                             why = "jeniec " + byParty.Name + " (zdobywca " + (byParty.LeaderHero != null ? byParty.LeaderHero.Name.ToString() : "-") + ", m116)"
-                                  + (cap.IsSettlement ? (moved ? ", przekazany do lochu " + cap.Name : ", loch " + cap.Name + " NIE (zostaje w druzynie)") : "");
+                                  + (cap.IsSettlement ? (fb.Length > 0 ? ", loch przez druzyne NIE" + fb : ", przekazany do lochu " + cap.Name) : "");
                         }
                         else
                         {

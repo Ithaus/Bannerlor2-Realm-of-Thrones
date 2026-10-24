@@ -178,12 +178,21 @@ namespace Armoury
                 if (!Active || !RiverWarKey || __instance == null) return;
                 var crown = K(Crown); var river = K(RiverId);
                 if (!Alive(crown) || !Alive(river) || !crown.IsAtWarWith(river)) return;
-                int n = SetPopup(_sTitle, __instance, "The River Lords Bend the Knee")
-                        + SetPopup(_sUpper, __instance, "Before Riverrun the river lords renew their oaths to Robb Stark.")
-                        + SetPopup(_sLower, __instance, "House Tully pledges fealty to the King in the North.");
+                // recenzja m116: hold dla Robba tylko, gdy Robb zyje, Polnoc stoi, w wojnie z korona, a sojusz Polnoc+Dorzecze nie zakonczony (Krwawe Gody,
+                // smierc Robba) - inaczej neutralny tekst wojny Dorzecza (bez przysiegi martwemu albo upadlemu krolowi)
+                var robb = HeroAny(RobbId); var north = K(NorthId);
+                bool oath = robb != null && robb.IsAlive && Alive(north) && north.IsAtWarWith(crown) && !_raEnded;
+                int n = oath
+                    ? SetPopup(_sTitle, __instance, "The River Lords Bend the Knee")
+                      + SetPopup(_sUpper, __instance, "Before Riverrun the river lords renew their oaths to Robb Stark.")
+                      + SetPopup(_sLower, __instance, "House Tully pledges fealty to the King in the North.")
+                    : SetPopup(_sTitle, __instance, "Riverrun Stands")
+                      + SetPopup(_sUpper, __instance, "The river lords hold the fords and keep Riverrun against the crown.")
+                      + SetPopup(_sLower, __instance, "House Tully fights on.");
                 _rlPopups++; _warsEventDay = true;
-                Log.Info(CwTag + "(4) Dorzecze - okno ROT RiverlandsDeclareWarEvent (dzien opowiesci " + StoryDays().ToString("0.0", Inv) + "): tekst holdu lordow rzecznych zamiast"
-                         + " wypowiedzenia wojny (wojna z korona trwa od dnia opowiesci " + (_rwDay != NoDay ? _rwDay.ToString(Inv) : "?") + "); ustawione " + n + "/3, relacje ROT bez zmian.");
+                Log.Info(CwTag + "(4) Dorzecze - okno ROT RiverlandsDeclareWarEvent (dzien opowiesci " + StoryDays().ToString("0.0", Inv) + "): " + (oath ? "tekst holdu lordow rzecznych" : "tekst wojny Dorzecza bez holdu (Robb "
+                         + (robb == null ? "brak" : robb.IsAlive ? "zyje" : "nie zyje") + ", Polnoc " + (Alive(north) ? "jest" : "BRAK") + ", sojusz " + (_raEnded ? "zakonczony" : "nie zakonczony") + ")")
+                         + " zamiast wypowiedzenia wojny (wojna z korona trwa od dnia opowiesci " + (_rwDay != NoDay ? _rwDay.ToString(Inv) : "?") + "); ustawione " + n + "/3, relacje ROT bez zmian.");
             }
             catch (Exception e) { CwStumble("RiverPopupPrefix", e); }
         }
@@ -192,7 +201,8 @@ namespace Armoury
 
         private const string RiverNewText = "King Robert is dead and the Lannisters press their quarrel with House Tully. Ser Gregor's riders burn the Red Fork, Ser Jaime's host breaks the river lords at the Golden Tooth, and Riverrun calls its banners. The Riverlands are at war with the crown.";
         private const string RiverCatchUpText = "The fires along the Red Fork were no outlaws' work. House Tully stands openly against King Joffrey: the Riverlands are at war with the crown, and their lords ride with Robb Stark.";
-        private const string RiverAllyText = "At Riverrun the lords of the Trident and the North hail Robb Stark King in the North. The Riverlands and the North fight the crown together.";
+        // recenzja m116: bez okrzykniecia Robba krolem - to robi Kronika 002.2 (Greatjon) i okno holdu ~108; sojusz wchodzi zaraz po smierci Roberta (przed 002.1)
+        private const string RiverAllyText = "Robb Stark and the river lords of House Tully join their banners against the crown. The North and the Riverlands now fight as allies.";
 
         private static void RiverDaily()
         {
