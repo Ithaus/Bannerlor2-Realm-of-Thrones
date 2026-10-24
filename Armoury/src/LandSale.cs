@@ -28,7 +28,9 @@ namespace Armoury
     ///    i po Czarnej Smierci - cena ziemi wzgledem czynszu (ok. 1300-1500), https://www.medievalists.net/2010/09/25/microbes-and-markets-was-the-black-death-an-economic-revolution/
     ///  - Sir John Fastolf (list do Howysa i Barkera, XV w.): kupno dobr liczone wedlug lat dochodu ("years' purchase") - ziemia kupowana za kilkanascie lat czynszu,
     ///    https://medievalfamilylife.amdigital.co.uk/Documents/Detail/sir-john-fastolf-to-sir-thomas-howys-and-william-barker/594796
-    ///  Stad 14 lat (LandYearsOfPurchase, srodek 10-20), dolna granica 10 lat (LandYearsFloor), w wojnie x0.85 (ryzyko - nizsza cena), upust za dlugi najwyzej 15%.
+    ///  Stad 14-20 lat wedlug stosunku (n36, ponizej), dolna granica 10 lat (LandYearsFloor), w wojnie x0.85 (ryzyko - nizsza cena), upust za dlugi najwyzej 15%.
+    ///  Jeff (24.10, po "cena = 14 lat dochodu, historycznie 10-20, typowo 20"): "daj cene zalezna od relacji miedzy 14 a 20 lat, jesli relacja jest za niska nikt nie
+    ///  sprzeda, im wyzsza tym lepsza cena".
     ///
     /// ZASADY:
     ///  Z1 SPRZEDAWCA. Wioska poboczna: posiadacz podatku okregu H = BK GetActualOwner(wies) (tytul de iure, gdy jego frakcja = frakcja wsi; inaczej glowa rodu pana zamku;
@@ -44,7 +46,10 @@ namespace Armoury
     ///     krolestwa sprzedawcy i wsi; sprzedawca zostaje z co najmniej jednym innym tytulem de iure (zostaje rycerzem BK); wies nie rabowana. Zamek: to samo krolestwo, gracz
     ///     wasalem; sprzedawca zostaje z innym miastem albo zamkiem; nie ROT_castle60 / ROT_castle61; bez oblezenia i bitwy; tytuly BK zamku i kazdej wsi (albo bez BK);
     ///     dochod netto > 0.
-    ///  Z4 CENA = round100(NetDay x dni roku (364 przy kalendarzu Jeffa) x lata x premia x (1 - upust)). Lata 14, w wojnie krolestwa osady z wielkim krolestwem x0.85;
+    ///  Z4 CENA = round100(NetDay x dni roku (364 przy kalendarzu Jeffa) x lata x premia x (1 - upust)). Lata wedlug stosunku glowy, ktora decyduje, do gracza (n36,
+    ///     ta sama liczba co brama Z3; YearsFor): 20 (LandYearsWorst) przy progu rodzaju, liniowo do 14 (LandYearsOfPurchase - najlepsze) przy progu + 60
+    ///     (LandYearsRelationSpan) i wyzej - wioska -10 -> 20 lat, +50 -> 14; Lordship 0 -> 20, 60 -> 14; zamek 10 -> 20, 70 -> 14; ponizej progu nikt nie sprzedaje.
+    ///     Odkup (Z7) odwrotnie - przyjaciel placi wiecej: 14 przy progu (i ponizej), 20 przy progu + 60, ale nie wiecej lat, niz gracz zaplacil za te wioske (PaidYears). Potem w wojnie krolestwa osady z wielkim krolestwem x0.85;
     ///     lata x (1 - upust) >= 10. Premia: wioska 1, Lordship 1, zamek 1.5, zamek-siedziba (HomeSettlement albo siedziba z ksiegi rodow kanonu) 2.0.
     ///     Upust = 0.15 x clamp((q - 0.5) / 1.5, 0, 1), q = dlug / max(1, G + 91 D).
     ///     NetDay: wioska - SideVillageFief.DueFor (wartosc dnia x H x stawka pana) x poprawka na srednia roku (n36 SideYearFix: przy pelnym roku w ksiedze
@@ -64,7 +69,7 @@ namespace Armoury
     ///     (nigdy GrantTitle); zamek - ChangeOwnerOfSettlementAction.ApplyByBarter (BK AddBarter przenosi Barony i Lordship wsi sprzedawcy; zapas InheritTitle),
     ///     ConsiderAndUpdateHomeSettlement obu rodow, liczba zalogi, siedziby i ostrzezenie Kroniki "own:".
     ///  Z7 ODKUP (LandSalesSellBack): wioska gracza po 182 dobach do posiadacza podatku okregu (platnik PayerOf - ta sama regula co sprzedawca; placi glowa jego rodu),
-    ///     ta sama cena Z4 z upustem wedlug dlugow GRACZA; rod placi, gdy TourneyPay.ClanSpare >= cena i nie jest dluznikiem; pierwsza wioska tylko z pusta skrzynia domu.
+    ///     ta sama cena Z4 z upustem wedlug dlugow GRACZA i latami odkupu ze stosunku kupujacego (przyjaciel placi wiecej); rod placi, gdy TourneyPay.ClanSpare >= cena i nie jest dluznikiem; pierwsza wioska tylko z pusta skrzynia domu.
     ///  Recenzja: sprzedawca wioski pobocznej = rod platnika (SideVillageFief.PayerOf - klucz SideVillagePayerIsTaxHolder przelacza sprzedawce i platnika razem);
     ///     platnik rycerz BK (nie glowa rodu) - sprzedaje glowa jego rodu, podatek dalej bierze rycerz.
     ///  Z8 AI NIE KUPUJE ZIEMI w tej paczce: (1) AI nie ma jeszcze pojecia majatku poza lennami - wioska poboczna AI nie istnieje w modelu gry (nikt by jej nie widzial
@@ -147,6 +152,8 @@ namespace Armoury
             public string FixNote = "-";     // poprawka pory roku (log)
             public bool Hide;                // menu: powod, ktorego gracz nie zmieni (ustawienia, brak tytulu, BK, juz gracza) - opcja ukryta
             public int TestRel = int.MinValue; public Kingdom TestJoin;   // test n36 (_testLift): prog stosunku do spelnienia i krolestwo sprzedawcy do wasalstwa
+            public int Rel, RelMin; public double YearsRel;              // n36 cena wedlug stosunku: stosunek glowy do gracza, prog rodzaju, lata z krzywej (przed wojna i upustem)
+            public double YearsPaid;                                     // recenzja n36: odkup - lata, ktore gracz zaplacil za te wioske (PaidYears; sufit lat odkupu)
             public string Sig { get { return Kind + ":" + Id + ":" + Price; } }
         }
 
@@ -313,11 +320,36 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ Z4
+        /// <summary>Z3/Z4: prog stosunku rodzaju (ponizej nikt nie sprzedaje - CommonGate) i poczatek krzywej lat.</summary>
+        internal static int RelMinOf(int kind)
+        {
+            var s = Settings.Current;
+            return kind == KCastle ? s.LandRelationCastle : kind == KLord ? s.LandRelationLordship : s.LandRelationSideVillage;
+        }
+
+        /// <summary>n36 cena wedlug stosunku (Jeff 24.10: "daj cene zalezna od relacji miedzy 14 a 20 lat, jesli relacja jest za niska nikt nie sprzeda, im wyzsza
+        /// tym lepsza cena"). Lata przed wojna, upustem i premia. Kupno: LandYearsWorst (20) przy progu rodzaju, liniowo do LandYearsOfPurchase (14 - najlepsze)
+        /// przy progu + LandYearsRelationSpan (60) i wyzej; ponizej progu oferty nie ma (brama), tu najgorsze. Odkup odwrotnie - przyjaciel placi wiecej:
+        /// 14 przy progu (i ponizej), 20 przy progu + 60 i wyzej (inaczej niski stosunek nagradzalby gracza); sufit odkupu (PaidYears) - w Price. Nie rzuca.</summary>
+        internal static double YearsFor(int rel, int relMin, bool sellBack)
+        {
+            var s = Settings.Current;
+            double best = Math.Max(1, s.LandYearsOfPurchase), worst = Math.Max(best, s.LandYearsWorst);
+            double k = Math.Max(0, Math.Min(1, (rel - (double)relMin) / Math.Max(1, s.LandYearsRelationSpan)));
+            return sellBack ? best + (worst - best) * k : worst - (worst - best) * k;
+        }
+
         private static void Price(Offer o, Clan debtor, IFaction holdingFaction)
         {
             var s = Settings.Current;
             CrownDues(o);   // n36 (M4): powinnosci korony wedlug kupujacego - raz, dla kazdego rodzaju
-            double years = Math.Max(1, s.LandYearsOfPurchase);
+            // n36: stosunek glowy, ktora decyduje (sprzedawca; przy odkupie - kupujacy), do gracza - ta sama liczba co brama CommonGate
+            o.RelMin = RelMinOf(o.Kind);
+            o.Rel = o.Head != null ? (int)o.Head.GetRelationWithPlayer() : o.RelMin;
+            o.YearsRel = YearsFor(o.Rel, o.RelMin, o.SellBack);
+            // recenzja n36: odkup nie wiecej lat, niz gracz zaplacil za te wioske - inaczej kupno u przyjaciela za 14 lat i odkup przez tego samego za 20 = zysk co 182 doby
+            if (o.SellBack) { o.YearsPaid = PaidYears(o.Id); if (o.YearsRel > o.YearsPaid) o.YearsRel = o.YearsPaid; }
+            double years = o.YearsRel;
             o.WarF = AtWarMajor(holdingFaction) ? Math.Max(0.1f, Math.Min(1f, s.LandYearsAtWar)) : 1.0;
             double ye = years * o.WarF;
             double floor = Math.Max(1, s.LandYearsFloor);
@@ -342,7 +374,8 @@ namespace Armoury
             o.Price = Round100(raw);
             o.Pl = "NetDay " + o.NetDay.ToString("0.####", Inv) + (o.OwnDues > 0 ? " (po udzialach wiosek gracza " + o.OwnDues.ToString("0.##", Inv) + ")" : "")
                    + (o.DuesRate > 0 ? " (po powinnosciach korony " + (100 * o.DuesRate).ToString("0.#", Inv) + "%)" : "")
-                   + " x " + dpy + " x lata " + ye.ToString("0.####", Inv) + (o.WarF < 1 ? " (wojna x" + o.WarF.ToString("0.##", Inv) + ")" : "")
+                   + " x " + dpy + " x lata " + ye.ToString("0.####", Inv) + " (stosunek " + o.Rel + ", prog " + o.RelMin + (o.SellBack ? ", odkup: przyjaciel placi wiecej, nie wiecej niz zaplacone " + o.YearsPaid.ToString("0.##", Inv) : "")
+                   + " -> lata " + o.YearsRel.ToString("0.##", Inv) + ")" + (o.WarF < 1 ? " (wojna x" + o.WarF.ToString("0.##", Inv) + ")" : "")
                    + " x premia " + o.Premium.ToString("0.##", Inv) + " x (1 - upust " + o.Disc.ToString("0.####", Inv) + ", q " + o.Q.ToString("0.###", Inv) + ") = " + raw.ToString("0.##", Inv)
                    + " -> round100 " + o.Price;
         }
@@ -625,7 +658,8 @@ namespace Armoury
         {
             if (o == null) return;
             _queued = o;
-            Log.Info(P + "umowa w kolejce - " + KindPl(o.Kind) + " " + o.Name + " (" + o.Id + "), sprzedawca " + NameOf(o.Head) + " (" + (o.Seller != null ? o.Seller.StringId : "-") + "), cena " + o.Price + (o.SellBack ? " (ODKUP przez posiadacza podatku)" : "") + ".");
+            Log.Info(P + "umowa w kolejce - " + KindPl(o.Kind) + " " + o.Name + " (" + o.Id + "), sprzedawca " + NameOf(o.Head) + " (" + (o.Seller != null ? o.Seller.StringId : "-") + "), cena " + o.Price + " (stosunek " + o.Rel + ", prog " + o.RelMin + ", lata " + o.YearsRel.ToString("0.##", Inv) + " -> " + o.Years.ToString("0.##", Inv) + ")"
+                     + (o.SellBack ? " (ODKUP przez posiadacza podatku)" : "") + ".");
         }
 
         private static string KindPl(int k) { return k == KSide ? "wioska poboczna" : k == KLord ? "Lordship" : "zamek"; }
@@ -841,6 +875,21 @@ namespace Armoury
             while (_deals.Count > 200) _deals.RemoveAt(0);
         }
 
+        /// <summary>recenzja n36: lata, ktore gracz zaplacil za wioske poboczna uid - ostatnie kupno w _deals (lata x (1 - upust); premia wioski 1), o ile po nim
+        /// nie bylo odkupu; brak zapisu (pierwsza wioska, zapis wypadl z 200 ostatnich) - LandYearsOfPurchase, jak odkup przed n36. Sufit lat odkupu. Nie rzuca.</summary>
+        internal static double PaidYears(string uid)
+        {
+            double flat = Math.Max(1, Settings.Current.LandYearsOfPurchase);
+            for (int i = _deals.Count - 1; i >= 0; i--)
+            {
+                var d = _deals[i];
+                if (d == null || d.Id != uid) continue;
+                if (d.Kind == -KSide) break;   // odkupiona po ostatnim kupnie - wioska wrocila do gracza inna droga
+                if (d.Kind == KSide && d.Years100 > 0) return Math.Max(0.01, d.Years100 / 100.0 * (1 - Math.Max(0, Math.Min(1000, d.Disc1000)) / 1000.0));
+            }
+            return flat;
+        }
+
         // ============================================================ Z7: odkup
         /// <summary>Odkup wioski gracza uid przez posiadacza podatku okregu (Z7). Oferta z Ok i powodem. Nie rzuca.</summary>
         internal static Offer BuildSellBack(string uid)
@@ -963,8 +1012,16 @@ namespace Armoury
             finally { _dBuilt = _dDeals = _dDropped = _dRefund = _dAsk = _dWindows = _dSellBack = 0; _stDay = 0; }
         }
 
+        /// <summary>n36: stosunek glowy rodu h do gracza; int.MinValue - brak glowy albo rod gracza. Nie rzuca.</summary>
+        private static int RelOf(Hero h)
+        {
+            try { return h != null && h.IsAlive && h != Hero.MainHero && h.Clan != Clan.PlayerClan ? (int)h.GetRelationWithPlayer() : int.MinValue; }
+            catch { return int.MinValue; }
+        }
+
         /// <summary>Linia na sucho: rozklad cen wszystkich wiosek pobocznych (bez bramek gracza i potrzeby - sama cena Z4 bez upustu: DueFor x poprawka pory roku x dni roku
-        /// x lata (z wojna) - jeden PartsOf na okreg), Lordship i zamki (mediana), 5 cen z rachunkiem do sprawdzenia recznie. Tylko log.</summary>
+        /// x lata (n36: z krzywej stosunku glowy rodu platnika do gracza, z wojna) - jeden PartsOf na okreg), Lordship i zamki (mediana; lata z krzywej stosunku de iure
+        /// / pana zamku), 5 cen z rachunkiem do sprawdzenia recznie. Ponizej progu - cena przy najgorszych latach z dopiskiem "nie sprzeda". Tylko log.</summary>
         internal static void DryRun()
         {
             try
@@ -976,6 +1033,10 @@ namespace Armoury
                 int dpy = IronBank.DaysPerYearNow();
                 var prices = new List<long>(); var samples = new List<string>();
                 var lines = new List<KeyValuePair<long, string>>();
+                // n36: stosunek glowy rodu platnika okregu - raz na okreg (PayerOf jak BuildSide); int.MinValue - bez sprzedawcy (lata najgorsze)
+                var relD = new Dictionary<string, int>(StringComparer.Ordinal);
+                int sMin = RelMinOf(KSide), lMin = RelMinOf(KLord), cMin = RelMinOf(KCastle), below = 0, belowL = 0, belowC = 0;
+                Func<int, int, string> relNote = (rel, min) => rel == int.MinValue ? "bez sprzedawcy" : "stosunek " + rel + (rel < min ? " < prog " + min + " - nie sprzeda" : "");
                 foreach (var r in recs)
                 {
                     try
@@ -988,13 +1049,18 @@ namespace Armoury
                         double due = SideVillageFief.DueFor(v, r.Uid, out why);
                         if (!(due > 0)) continue;
                         string fn; double fix = SideYearFix(v, st, out fn);
-                        double ye = Math.Max(1, s.LandYearsOfPurchase) * (AtWarMajor(st.MapFaction) ? Math.Max(0.1f, Math.Min(1f, s.LandYearsAtWar)) : 1.0);
+                        int rel;
+                        if (!relD.TryGetValue(r.VillageId, out rel)) { Hero ph = SideVillageFief.PayerOf(v); rel = RelOf(ph != null && ph.Clan != null ? ph.Clan.Leader : null); relD[r.VillageId] = rel; }
+                        if (rel != int.MinValue && rel < sMin) below++;
+                        double yr = YearsFor(rel == int.MinValue ? sMin : rel, sMin, false);
+                        double ye = yr * (AtWarMajor(st.MapFaction) ? Math.Max(0.1f, Math.Min(1f, s.LandYearsAtWar)) : 1.0);
                         if (ye < Math.Max(1, s.LandYearsFloor)) ye = Math.Max(1, s.LandYearsFloor);
                         double net = due * fix, raw = net * dpy * ye;
                         long p = Round100(raw);
                         prices.Add(p);
                         lines.Add(new KeyValuePair<long, string>(p, r.Uid + " (" + (string.IsNullOrEmpty(r.Name) ? "?" : r.Name) + ", " + r.VillageId + "): DueFor " + due.ToString("0.####", Inv) + " x pora roku " + fix.ToString("0.####", Inv)
-                                                                     + " = " + net.ToString("0.####", Inv) + " x " + dpy + " x " + ye.ToString("0.####", Inv) + " = " + raw.ToString("0.##", Inv) + " -> " + p));
+                                                                     + " = " + net.ToString("0.####", Inv) + " x " + dpy + " x " + ye.ToString("0.####", Inv) + " (" + relNote(rel, sMin) + " -> lata " + yr.ToString("0.##", Inv) + ")"
+                                                                     + " = " + raw.ToString("0.##", Inv) + " -> " + p));
                     }
                     catch (Exception e) { Stumble("DryRun(wioska)", e); }
                 }
@@ -1002,7 +1068,15 @@ namespace Armoury
                 var lp = new List<long>(); var cp = new List<long>();
                 foreach (var v in Village.All)
                 {
-                    try { if (v == null || v.Settlement == null) continue; int d; double vt = LandValue.YearMean(v.Settlement, LandValue.VT, out d); if (vt > 0) lp.Add(Round100(vt * dpy * Math.Max(1, s.LandYearsOfPurchase))); }
+                    try
+                    {
+                        if (v == null || v.Settlement == null) continue;
+                        int d; double vt = LandValue.YearMean(v.Settlement, LandValue.VT, out d);
+                        if (!(vt > 0)) continue;
+                        Hero lh = LandBk.Ready ? LandBk.DeJure(LandBk.Title(v.Settlement)) : (v.Bound != null && v.Bound.OwnerClan != null ? v.Bound.OwnerClan.Leader : null);
+                        int rel = RelOf(lh); if (rel != int.MinValue && rel < lMin) belowL++;
+                        lp.Add(Round100(vt * dpy * YearsFor(rel == int.MinValue ? lMin : rel, lMin, false)));
+                    }
                     catch (Exception e) { Stumble("DryRun(Lordship)", e); }
                 }
                 foreach (var st in Settlement.All)
@@ -1012,7 +1086,9 @@ namespace Armoury
                         if (st == null || !st.IsCastle) continue;
                         int d; double lr = LandValue.YearMean(st, LandValue.LR, out d);
                         foreach (var bv in st.BoundVillages) if (bv != null && bv.Settlement != null) { int dv; lr += LandValue.YearMean(bv.Settlement, LandValue.LR, out dv) + LandValue.YearMean(bv.Settlement, LandValue.VT, out dv); }
-                        if (lr > 0) cp.Add(Round100(lr * dpy * Math.Max(1, s.LandYearsOfPurchase) * Math.Max(1f, s.LandCastlePremium)));
+                        if (!(lr > 0)) continue;
+                        int rel = RelOf(st.Town != null && st.Town.OwnerClan != null ? st.Town.OwnerClan.Leader : null); if (rel != int.MinValue && rel < cMin) belowC++;
+                        cp.Add(Round100(lr * dpy * YearsFor(rel == int.MinValue ? cMin : rel, cMin, false) * Math.Max(1f, s.LandCastlePremium)));
                     }
                     catch (Exception e) { Stumble("DryRun(zamek)", e); }
                 }
@@ -1036,10 +1112,12 @@ namespace Armoury
                     catch (Exception e) { Stumble("DryRun(potrzeba)", e); }
                 }
                 var sb = new StringBuilder(1500);
-                sb.Append(P).Append("na sucho (dzien ").Append(Today()).Append(", rok ").Append(dpy).Append(" dob, lata ").Append(s.LandYearsOfPurchase).Append(", ksiega wartosci ").Append(LandValue.DaysMeasured).Append(" dob)")
-                  .Append(" | wioski poboczne z cena ").Append(prices.Count).Append(" z ").Append(recs.Count).Append(": ").Append(Dist(prices))
-                  .Append(" | Lordship (sam VT x lata, bez upustu) ").Append(lp.Count).Append(": ").Append(Dist(lp))
-                  .Append(" | zamki (renta + wsie, bez strazy, x premia ").Append(s.LandCastlePremium.ToString("0.##", Inv)).Append(") ").Append(cp.Count).Append(": ").Append(Dist(cp))
+                sb.Append(P).Append("na sucho (dzien ").Append(Today()).Append(", rok ").Append(dpy).Append(" dob, lata wedlug stosunku ").Append(YearsFor(0, 0, false).ToString("0.##", Inv)).Append(" przy progu -> ")
+                  .Append(YearsFor(int.MaxValue / 2, 0, false).ToString("0.##", Inv)).Append(" przy progu + ").Append(Math.Max(1, s.LandYearsRelationSpan)).Append(" (progi: wioska ").Append(sMin)
+                  .Append(", Lordship ").Append(lMin).Append(", zamek ").Append(cMin).Append("; odkup odwrotnie), ksiega wartosci ").Append(LandValue.DaysMeasured).Append(" dob)")
+                  .Append(" | wioski poboczne z cena ").Append(prices.Count).Append(" z ").Append(recs.Count).Append(" (stosunek ponizej progu - nie sprzeda: ").Append(below).Append("): ").Append(Dist(prices))
+                  .Append(" | Lordship (sam VT x lata ze stosunku de iure, bez upustu) ").Append(lp.Count).Append(" (ponizej progu ").Append(belowL).Append("): ").Append(Dist(lp))
+                  .Append(" | zamki (renta + wsie, bez strazy, lata ze stosunku pana, x premia ").Append(s.LandCastlePremium.ToString("0.##", Inv)).Append(") ").Append(cp.Count).Append(" (ponizej progu ").Append(belowC).Append("): ").Append(Dist(cp))
                   .Append(" | potrzeba rodow AI (").Append(nh).Append("): N1 dluznik ").Append(c1).Append(", N2 okup ").Append(c2).Append(", N3 G<R ").Append(c3).Append(" (G<0.5R ").Append(c3h)
                   .Append("), N4 seria ").Append(c4).Append(" -> wioski ").Append(cs).Append(", Lordship ").Append(cl).Append(", zamki ").Append(cc)
                   .Append(" | koszt: okregow PartsOf ").Append(SideVillageFief.DueForDistricts - d0);

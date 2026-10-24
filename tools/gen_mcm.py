@@ -9,6 +9,9 @@ RANGES = {
     'LandRelationLordship': (-100, 100, "0"),
     'LandRelationCastle': (-100, 100, "0"),
     'LandYearsOfPurchase': (1, 40, "0"),
+    'LandYearsWorst': (1, 40, "0"),
+    # n36 cena wedlug stosunku: punkty stosunku od progu do najlepszej ceny - kod bierze co najmniej 1 (LandSale.YearsFor)
+    'LandYearsRelationSpan': (1, 200, "0"),
     'LandYearsFloor': (1, 40, "0"),
     'LandYearsAtWar': (0.3, 1.0, "0.00"),
     'LandDebtDiscountMax': (0.0, 0.5, "0.00"),

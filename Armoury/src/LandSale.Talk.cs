@@ -20,6 +20,8 @@ namespace Armoury
     ///    Bez potrzeby: "My lands are not for sale. A house sells land only when it must." Z potrzeba: potrzeba slowami, rozmowa sie konczy, a po niej (TickEvent,
     ///    bez rozmowy i bez innego okna) okno wyboru - wiersz na kazda ziemie (nazwa, rodzaj, dochod dnia, cena, lata zwrotu; niedostepne wyszarzone z powodem),
     ///    potem okno rachunku (dochod dnia, ile dob mierzony, lata, wojna, upust i dlaczego, cena, zwrot, dokad ida pieniadze) z "Buy" / "Not now".
+    ///    n36 cena wedlug stosunku: odpowiedz w rozmowie, podpowiedz wiersza listy i okno rachunku mowia, ile lat dochodu chce sprzedawca przy stosunku gracza
+    ///    i do ilu zszedlby dla bliskiego przyjaciela (RelEn - stawka przed wojna, premia i upustem; odkup - ile placi i do ilu podniosl by przyjaciel, nie wiecej niz gracz zaplacil).
     ///  - Menu: arm_sidevil_buy w menu wioski pobocznej ("Offer to buy this village from {holder}", indeks 6 = tuz przed Leave po poborze z indeksem 2, dodane po opcjach arm_sidevil), arm_land_lord w menu
     ///    wsi gry ("Offer to buy the lordship of {village}", indeks 8, B2), arm_side_fief_sellback w menu wioski gracza ("Offer {village} back to {holder}", Z7) -
     ///    wylaczone z powodem w podpowiedzi. Wycena w warunku raz na godzine gry na osade (warunek menu nie liczy ksiegi co klatke).
@@ -29,6 +31,7 @@ namespace Armoury
     ///    (linia "TEST dotacja testu ... (poza bilansem)"); krok, ktory nie mogl ruszyc, to NIEPOKRYTY, a linia wyniku konczy sie TAK / NIE / NIEPOKRYTY.
     ///    Test n36: T11/T12 - bramy, ktore gracz zmieni w grze (stosunek ze sprzedawca, wasal krolestwa sprzedawcy), test spelnia sam (linie "TEST warunek testu ..."),
     ///    potem kupno z kontrolami jak T3-T8; T12 "wyjatki przy zmianie pana" - ERROR in Armoury i wyjatki rzucone w czasie kupna (sluchacze innych modow).
+    ///    T13 (n36 cena wedlug stosunku, zaraz po T2): krzywa lat YearsFor (prog, polowa, prog + rozpietosc, wyzej; odkup odwrotnie) i lata oferty z T2.
     /// </summary>
     internal static partial class LandSale
     {
@@ -84,14 +87,27 @@ namespace Armoury
                 bool need = h != null && h.Clan != null && NeedFor(h.Clan, KSide, first);
                 _winOffers = need ? l : null;
                 _winTitle = h != null && h.Clan != null ? "Land of " + HouseOf(h.Clan) : "Land for sale";
-                int ok = 0; foreach (var o in l) if (o.Ok) ok++;
+                int ok = 0; Offer firstOk = null; foreach (var o in l) if (o.Ok) { ok++; if (firstOk == null) firstOk = o; }
                 string reply;
                 if (!need) reply = "My lands are not for sale. A house sells land only when it must.";
                 else reply = first.NeedEn + " " + (ok > 0 ? "I may part with some land - at its true worth, not for a song. My steward will show you what I would sell."
                                                           : "Yet there is nothing I could sell you now - my steward will tell you why.");
+                // n36 cena wedlug stosunku (Jeff 24.10: "im wyzsza tym lepsza cena") - lata pierwszej oferty na sprzedaz slowami sprzedawcy
+                // recenzja n36: liczba tylko dla wioski pobocznej (zamek ma premie x1.5-2) i pelna - lata x wojna x (1 - upust), jak 'Years of purchase' w oknie
+                Offer sideOk = null; foreach (var o in l) if (o.Ok && o.Kind == KSide) { sideOk = o; break; }
+                if (need && sideOk != null)
+                {
+                    var s = Settings.Current;
+                    string y = (sideOk.Years * sideOk.Premium * (1 - sideOk.Disc)).ToString("0.#", Inv);
+                    reply += sideOk.YearsRel <= Math.Max(1, s.LandYearsOfPurchase) + 1e-6
+                        ? " You are a friend of my house - for a side village I ask only " + y + " years of its income."
+                        : " Land goes cheaper between friends - for a side village I would ask you " + y + " years of its income; a closer friend would pay less.";
+                }
+                else if (need && firstOk != null) reply += " Land goes cheaper between friends - the closer you are to my house, the less I ask.";
                 MBTextManager.SetTextVariable("ARM_LAND_REPLY", reply);
                 Log.Info(P + "rozmowa - " + NameOf(h) + " (" + (h != null && h.Clan != null ? h.Clan.StringId : "-") + "): ziem policzonych " + l.Count + ", na sprzedaz " + ok
-                         + ", potrzeba " + (need ? first.NeedPl : "brak") + ".");
+                         + ", potrzeba " + (need ? first.NeedPl : "brak") + ", stosunek " + (h != null ? ((int)h.GetRelationWithPlayer()).ToString(Inv) : "-")
+                         + (firstOk != null ? " (lata pierwszej oferty " + firstOk.YearsRel.ToString("0.##", Inv) + ")" : "") + ".");
             }
             catch (Exception e) { _winOffers = null; MBTextManager.SetTextVariable("ARM_LAND_REPLY", "My lands are not for sale."); Stumble("AskCons", e); }
         }
@@ -115,6 +131,29 @@ namespace Armoury
         }
 
         // ============================================================ okna
+        /// <summary>n36 cena wedlug stosunku: stawka ze stosunku slowami gracza - "His rate for you: 17.5 years of income at your relation 20 (a closer friend would ask less,
+        /// down to 14 at relation 50)"; odkup - "... a closer friend would pay more, up to 20" albo "no more than you paid for it" (recenzja n36: sufit PaidYears).</summary>
+        internal static string RelEn(Offer o)
+        {
+            // recenzja n36: to stawka ze stosunku (przed wojna, premia zamku, upustem i dolna granica) - pelne lata i cena sa w liniach 'Years of purchase' i 'Price'
+            var s = Settings.Current;
+            double best = Math.Max(1, s.LandYearsOfPurchase), worst = Math.Max(best, s.LandYearsWorst);
+            int sp = Math.Max(1, s.LandYearsRelationSpan), full = o.RelMin + sp;
+            string head = Cap(His(o.Head)) + " rate for you: " + o.YearsRel.ToString("0.#", Inv) + " years of income at your relation " + o.Rel + " (";
+            if (o.SellBack)
+            {
+                double top = o.YearsPaid > 0 ? Math.Min(worst, o.YearsPaid) : worst;   // odkup nie wiecej, niz gracz zaplacil
+                bool paidCap = top < worst - 1e-6;
+                if (o.YearsRel < top - 1e-6)
+                {
+                    int rTop = o.RelMin + (int)Math.Ceiling(sp * (top - best) / Math.Max(1e-9, worst - best));
+                    return head + "a closer friend would pay more, up to " + top.ToString("0.#", Inv) + " at relation " + rTop + (paidCap ? " - no more than you paid for it)" : ")");
+                }
+                return head + (paidCap ? "no more than you paid for it)" : "a close friend's rate, the most " + He(o.Head) + " pays)");
+            }
+            return head + (o.YearsRel > best + 1e-6 ? "a closer friend would ask less, down to " + best.ToString("0.#", Inv) + " at relation " + full + ")" : "a close friend's rate, the least " + He(o.Head) + " asks)");
+        }
+
         internal static string KindEn(Offer o)
         {
             if (o.Kind == KSide) return "side village of " + (o.St != null ? Txt(o.St.Name) : "?");
@@ -132,11 +171,14 @@ namespace Armoury
                 foreach (var o in l)
                 {
                     string lab = o.Name + " (" + KindEn(o) + ")" + (o.Ok ? " - " + o.NetDay.ToString("N0", Inv) + " a day - " + o.Price.ToString("N0", Inv) + " (" + Payback(o).ToString("0.0", Inv) + " years)" : "");
-                    string hint = o.Ok ? "Income about " + o.NetDay.ToString("N0", Inv) + " a day; price " + o.Price.ToString("N0", Inv) + "; pays itself back in about " + Payback(o).ToString("0.0", Inv) + " years." : o.Why;
+                    string hint = o.Ok ? "Income about " + o.NetDay.ToString("N0", Inv) + " a day; price " + o.Price.ToString("N0", Inv) + "; pays itself back in about " + Payback(o).ToString("0.0", Inv) + " years. " + RelEn(o) + "." : o.Why;
                     opts.Add(new InquiryElement(o, lab, null, o.Ok, hint));
                 }
                 if (opts.Count == 0) { InformationManager.ShowInquiry(new InquiryData(title, "There is no land to sell.", true, false, "Done", null, null, null), true); return; }
-                string body = "What the house would sell, at its true worth: what each holding earns its lord a year, net of its costs, times the years of purchase. Your gold: "
+                var s0 = Settings.Current;
+                double yb = Math.Max(1, s0.LandYearsOfPurchase), yw = Math.Max(yb, s0.LandYearsWorst);
+                string body = "What the house would sell, at its true worth: what each holding earns its lord a year, net of its costs, times the years of purchase - "
+                              + yw.ToString("0.#", Inv) + " years from a lord who only just thinks well enough of you to sell, down to " + yb.ToString("0.#", Inv) + " for a close friend. Your gold: "
                               + (Hero.MainHero != null ? Hero.MainHero.Gold.ToString("N0", Inv) : "0") + ".";
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(title, body, opts, true, 1, 1, "Look closer", "Not now",
                     delegate (List<InquiryElement> sel)
@@ -177,6 +219,7 @@ namespace Armoury
                 if (o.Kind != KSide) sb.Append("Measured over ").Append(o.Days).Append(o.Days == 1 ? " day" : " days").Append(".\n");
                 if (o.Kind != KSide && o.OwnDues > 0 && !o.SellBack)
                     sb.Append("Your side villages here (about ").Append(o.OwnDues.ToString("N0", Inv)).Append(" a day) stop paying you - their share is part of the tax you buy; the price counts only the rest.\n");
+                sb.Append(RelEn(o)).Append(".\n");
                 sb.Append("Years of purchase: ").Append(o.Years.ToString("0.##", Inv)).Append(o.WarF < 1 ? " (its realm is at war - land sells for less)" : "").Append('\n');
                 if (o.Premium > 1) sb.Append(o.Seat ? "Family seat: x" : "Castle: x").Append(o.Premium.ToString("0.##", Inv)).Append(" - lords hardly ever sell ").Append(o.Seat ? "the seat of their house" : "a fortress").Append(".\n");
                 sb.Append(o.Disc > 0 ? "Discount: " + (100 * o.Disc).ToString("0.#", Inv) + "% - " + o.DiscWhy + "." : "No discount - " + o.DiscWhy + ".").Append('\n');
@@ -397,7 +440,7 @@ namespace Armoury
                 // T2 wioski na sprzedaz w 80 jedn.
                 var recs = VillageBook.LayoutRecords();
                 var pos = MobileParty.MainParty.GetPosition2D;
-                int built = 0, okN = 0; string firstWhy = null;
+                int built = 0, okN = 0; string firstWhy = null; Offer okT2 = null;
                 if (recs != null)
                     foreach (var r in recs)
                     {
@@ -405,9 +448,32 @@ namespace Armoury
                         if (pos.Distance(new Vec2(r.X, r.Y)) > 80f) continue;
                         var o = BuildSide(r.Uid); built++;
                         if (!o.Ok) { if (firstWhy == null) firstWhy = o.Why; continue; }
-                        okN++;
+                        okN++; if (okT2 == null) okT2 = o;
                     }
                 add("T2 oferty wiosek (80 jedn.)", okN > 0, "policzone " + built + ", na sprzedaz " + okN + (firstWhy != null ? ", pierwszy powod: " + firstWhy : "") + ", zloto gracza " + me.Gold);
+                // T13 (n36 cena wedlug stosunku): krzywa lat - przy progu najgorsze, przy progu + rozpietosc i wyzej najlepsze, w polowie srodek, odkup odwrotnie;
+                // oferta z T2: stosunek = stosunek glowy dzis, lata oferty = YearsFor, lata ceny = max(dolna granica, lata x wojna) przed upustem
+                {
+                    var s = Settings.Current;
+                    double yb = Math.Max(1, s.LandYearsOfPurchase), yw = Math.Max(yb, s.LandYearsWorst);
+                    int g = s.LandRelationSideVillage, sp = Math.Max(1, s.LandYearsRelationSpan);
+                    bool eq(double a, double b) { return Math.Abs(a - b) < 1e-9; }
+                    double a0 = YearsFor(g, g, false), a1 = YearsFor(g + sp, g, false), a2 = YearsFor(g + sp + 50, g, false), ah = YearsFor(g + sp / 2, g, false), b0 = YearsFor(g, g, true), b1 = YearsFor(g + sp, g, true);
+                    bool okC = eq(a0, yw) && eq(a1, yb) && eq(a2, yb) && eq(ah, yw - (yw - yb) * (sp / 2) / (double)sp) && eq(b0, yb) && eq(b1, yw);
+                    string t13 = "kupno prog " + g + " -> " + a0.ToString("0.##", Inv) + ", +" + sp / 2 + " -> " + ah.ToString("0.##", Inv) + ", +" + sp + " -> " + a1.ToString("0.##", Inv) + ", +" + (sp + 50) + " -> " + a2.ToString("0.##", Inv)
+                               + "; odkup prog -> " + b0.ToString("0.##", Inv) + ", +" + sp + " -> " + b1.ToString("0.##", Inv);
+                    bool okO = true;
+                    if (okT2 != null)
+                    {
+                        int relNow = okT2.Head != null ? (int)okT2.Head.GetRelationWithPlayer() : int.MinValue;
+                        double yp = Math.Max(Math.Max(1, s.LandYearsFloor), okT2.YearsRel * okT2.WarF);
+                        okO = okT2.Rel == relNow && okT2.RelMin == g && okT2.Rel >= g && eq(okT2.YearsRel, YearsFor(okT2.Rel, g, false)) && eq(okT2.Years, yp);
+                        t13 += "; oferta " + okT2.Name + " (" + okT2.Id + "): stosunek " + okT2.Rel + " (glowa dzis " + relNow + "), lata " + okT2.YearsRel.ToString("0.##", Inv) + " x wojna " + okT2.WarF.ToString("0.##", Inv)
+                             + " = " + okT2.Years.ToString("0.##", Inv) + (okO ? " ok" : " ZLE (oczekiwane " + yp.ToString("0.##", Inv) + ")");
+                    }
+                    else t13 += "; bez oferty z T2";
+                    add("T13 lata wedlug stosunku", okC && okO, t13);
+                }
                 // test n36: najblizsza wioska na kieszen gracza; gdy zadnej - najtansza, a gracz dostaje dotacje testu (inaczej T3-T10 nie ruszaja)
                 Offer pickSide(string what)
                 {
@@ -466,7 +532,9 @@ namespace Armoury
                         long pgB = me.Gold, w1 = WorldGold(), advB = DebtLadder.AdvNothingNow, owB = DebtLadder.OwedOf(Clan.PlayerClan);
                         ExecuteSellBack(sbk);
                         long advN9 = DebtLadder.AdvNothingNow - advB, cred9 = owB - DebtLadder.OwedOf(Clan.PlayerClan);
-                        add("T9 odkup", !SideVillageFief.IsMine(best.Id) && me.Gold >= pgB && WorldGold() - w1 == -advN9, "cena " + sbk.Price + ", gracz " + pgB + " -> " + me.Gold + " (wierzycielom gracza " + cred9 + ")"
+                        // recenzja n36: lata odkupu nie wieksze niz zaplacone przy kupnie w T3 (tam i z powrotem bez zysku)
+                        add("T9 odkup", !SideVillageFief.IsMine(best.Id) && me.Gold >= pgB && WorldGold() - w1 == -advN9 && sbk.YearsRel <= sbk.YearsPaid + 1e-9, "cena " + sbk.Price + ", gracz " + pgB + " -> " + me.Gold + " (wierzycielom gracza " + cred9 + ")"
+                            + ", lata odkupu " + sbk.YearsRel.ToString("0.##", Inv) + " <= zaplacone " + sbk.YearsPaid.ToString("0.##", Inv)
                             + ", pieniadz swiata " + w1 + " -> " + WorldGold() + ", zaliczka w nicosc " + advN9);
                     }
                     else add("T9 odkup", false, sbk.Why);
