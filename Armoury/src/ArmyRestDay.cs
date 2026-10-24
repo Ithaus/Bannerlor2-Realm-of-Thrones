@@ -459,6 +459,13 @@ namespace Armoury
             _resting = n;
         }
 
+        /// <summary>m118 (ArmyCloseRanks): armia AI stoi teraz na dniu odpoczynku (sam odczyt).</summary>
+        internal static bool Resting(Army a)
+        {
+            Rec r;
+            return a != null && _recs.TryGetValue(a, out r) && r.Resting;
+        }
+
         // ------------------------------------------------------------ straznik co 0.1 h gry (ArmouryBehavior TickEvent)
         internal static void OnTick()
         {
@@ -614,6 +621,13 @@ namespace Armoury
         {
             if (mp == null) return false;
             return _bedPos.ContainsKey(mp) || _debtSleep.ContainsKey(mp) || _alarmed.ContainsKey(mp) || _townHold.Contains(mp) || _camping.Contains(mp);
+        }
+
+        /// <summary>m118 (ArmyCloseRanks): wodza trzyma oboz nocy w polu (legowisko, sen dlugu) - bez alarmu i osady (sam odczyt). _camping (lista) na koncu:
+        /// dodawana razem z _bedPos, wiec zwykle rozstrzyga slownik.</summary>
+        internal static bool FieldCampHolds(MobileParty mp)
+        {
+            return mp != null && (_bedPos.ContainsKey(mp) || _debtSleep.ContainsKey(mp) || _camping.Contains(mp));
         }
 
         /// <summary>R3-08a: wodz spi snem dlugu (T10) - to tez odpoczynek.</summary>

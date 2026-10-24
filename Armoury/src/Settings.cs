@@ -2265,6 +2265,10 @@ namespace Armoury
         public int ArmyRestDayAfterMarchDays = 6;          // days of marching in a row (4 or more hours on the move in a day) after which the next day is a day of rest (2 to 14)
         public float ArmyRestDayCohesion = 2f;             // cohesion an army gains for a day of rest after such a march (at the long year's slower loss about 2 days of what it loses at home, 1 deep in enemy land)
         public float ArmyRestDayMorale = 5f;               // morale every party in the army's camp gains for a day of rest after such a march (it fades by a tenth each day, like any lift from events)
+        // m118 (Jeff 25.10 "sciagaj figurki do wodza na postoju, bo to jest ta sama armia"; ArmyCloseRanks.cs): armia na naszym postoju (dzien odpoczynku AI,
+        // oboz nocy w polu, namiot gracza) - szyk gry sciesniony (k 0.5-1) i postawiony na wodzu (postfiks Army.GetRelativePositionForParty, tylko obraz);
+        // false = szyk gry wokol nastepnego punktu drogi wodza, jak dotad
+        public bool ArmyClosesRanksAtHalt = true;          // When an army halts for a rest day or a night camp, its parties' figures gather close around the commander instead of standing strung out along the road (display only). Off = they stand as the game spreads them, as before
         public bool Army175GoldenBows = true;              // Golden Company crossbowmen split into thirds as in the books - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. Their lords buy, keep and train with bows and arrows for two thirds of these men and crossbows and bolts for one third (only these three Golden Company crossbow troops; every other troop counts its first kit, as before). The kits are made by CrashScribe on the next load; the Armoury part acts at once. Off: one kit of crossbows for all of them
 
         // --- The Others and Valyrian steel (175c) ---

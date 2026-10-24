@@ -5908,6 +5908,10 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public float ArmyRestDayMorale { get; set; } = 5f;
 
+        [SettingPropertyBool("Army Closes Ranks At Halt", HintText = "When an army halts for a rest day or a night camp, its parties' figures gather close around the commander instead of standing strung out along the road (display only). Off = they stand as the game spreads them, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool ArmyClosesRanksAtHalt { get; set; } = true;
+
         [SettingPropertyBool("Army175 Golden Bows", HintText = "Golden Company crossbowmen split into thirds as in the books - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. Their lords buy, keep and train with bows and arrows for two thirds of these men and crossbows and bolts for one third (only these three Golden Company crossbow troops; every other troop counts its first kit, as before). The kits are made by CrashScribe on the next load; the Armoury part acts at once. Off: one kit of crossbows for all of them", RequireRestart = false)]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175GoldenBows { get; set; } = true;
@@ -11132,6 +11136,7 @@ namespace Armoury
             s.ArmyRestDayAfterMarchDays = ArmyRestDayAfterMarchDays;
             s.ArmyRestDayCohesion = ArmyRestDayCohesion;
             s.ArmyRestDayMorale = ArmyRestDayMorale;
+            s.ArmyClosesRanksAtHalt = ArmyClosesRanksAtHalt;
             s.Army175GoldenBows = Army175GoldenBows;
             s.OthersSteelRule = OthersSteelRule;
             s.OthersCastleSteelPercent = OthersCastleSteelPercent;

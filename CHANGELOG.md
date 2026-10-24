@@ -1,5 +1,79 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 112 (m118-postoj-armii, galaz w-toku/m117-ubranie po 111 d95802cc) - figurki armii na postoju sciagaja sie do wodza (tylko obraz)
+
+**Problem:** Jeff 25.10 ok. 00:25, po zrzucie armii Gregora Clegane'a (7 druzyn) na "Dniu odpoczynku armii" (R3-08a): wodz po prawej, figurki doczepionych
+o ok. 1.5-2 jedn. w lewo - "tak, sciagaj figurki do wodza na postoju, bo to jest ta sama armia a nie dochodzacy lordowie". Dowodu z logu nie ma (pozycji figurek
+nikt nie logowal) - przyczyna z dekompilacji, nowa linia logu ja potwierdzi albo obali.
+
+**Przyczyna (dekompilacja 1.4.8, TaleWorlds.CampaignSystem):**
+- Figurka doczepionej = Position + EventPositionAdder + ArmyPositionAdder (MobileParty.VisualPosition2DWithoutError:1184). Gdy druzyna jest "w ruchu", gra
+  co klatke prowadzi figurke do miejsca w szyku: wodz.NextTargetPosition + facing.TransformToParentUnitF(Army.GetRelativePositionForParty)
+  (MobileParty.DoUpdatePosition:3851-3866; facing = kierunek do NextTargetPosition, przy |..|^2 < 0.0025 - Bearing wodza).
+- AI doczepionej nie mysli (MobilePartyAi.TickInternal:444 pomija doczepione), wiec jej MoveTargetPoint zostaje z chwili doczepienia, a Position jedzie
+  z wodzem (TryToMove...:2936-2939). Po pierwszym marszu IsMoving (Position != MoveTargetPoint, MobileParty.cs:1200, porownanie dokladne) jest stale prawda,
+  takze gdy armia stoi - druzyna trafia co klatke na liste "moving" (CampaignTickCacheDataStore.ParallelArrangePartyIndices) i gra trzyma figurke w miejscu szyku.
+- ArmyRestDay i NightRest trzymaja wodza przez Ai.DisableForHours + SetMoveModeHold. SetMoveModeHold (MobileParty.cs:3906) NIE rusza NextTargetPosition,
+  a jedyne miejsce, ktore robi NextTargetPosition = Position (SetNavigationModeHold:4037), przychodzi z myslenia AI (UpdateBehavior) - u nas wylaczonego.
+  Szyk gry stoi wiec wokol NASTEPNEGO PUNKTU DROGI wodza (na kierunku marszu), a nie wokol wodza - pasuje do zrzutu (figury 1.5-2 jedn. w bok), niezmierzone.
+- Projekt z rozpoznania (zapis ArmyPositionAdder krokami przez prywatny setter) by nie zadzialal: gra w nastepnej klatce cofa figure do swojego miejsca
+  w szyku (druzyny "w ruchu"), a jego straznik "druzyna w ruchu - pomin" pominalby prawie wszystkie. Zatrzymanie druzyn (MoveTargetPoint = Position)
+  odrzucone: IsMoving doczepionych czytaja modele gry i BK (leczenie DefaultPartyHealingModel, doswiadczenie DefaultPartyTrainingModel / BKPartyTrainningModel,
+  widocznosc DefaultMapVisibilityModel) - to juz nie bylby sam obraz.
+
+**Zmiana:**
+- Nowy Armoury/src/ArmyCloseRanks.cs: postfiks Army.GetRelativePositionForParty (wola go tylko MobileParty.DoUpdatePosition i MobileParty.CalculateSpeed;
+  wlasna instancja Harmony com.jeff.armoury.armycloseranks, raz na proces, w kampanii przy pierwszym ticku mapy z kluczem; cel AccessTools.DeclaredMethod
+  na Army - metoda zadeklarowana w Army; sukces sprawdzony Harmony.GetPatchInfo, bo finalizer BKROTPatch polyka wyjatki Patch). Dla armii na naszym
+  postoju zwraca facing.TransformToLocalUnitF(Pozycja wodza - NextTargetPosition) + k x wynik gry, czyli miejsce = Pozycja wodza + facing.T(k x miejsce
+  gry): ten sam szyk gry (rzedy, staly rozrzut RandomValue druzyny, przyciecie szerokosci do navmesha) sciesniony k razy i postawiony na wodzu. Gra sama
+  prowadzi figurki (plynnie, swoja predkoscia 0.7-1.3 x wodza, z animacja marszu) i sama je tam trzyma. Przesuniecie bazy wchodzi do CalculateSpeed i obrotu
+  kierunku tak samo jak w grze (ta sama roznica "Pozycja wodza - NextTargetPosition", po drugiej stronie), wiec zbieznosc ruchu jak w grze.
+  NIC nie piszemy w stanie gry: ani addera, ani pozycji, ani MoveTargetPoint/NextTargetPosition, ani rozkazow; bez SetVisualAsDirty (przebudowa figurki).
+- Skala k = clamp(R0 / najdalsze miejsce szyku gry, 0.5, 1); R0 = EncounterModel.NeededMaximumLandDistanceForEncounteringMobileParty (0.5 - "w jednym miejscu",
+  z modelu w biegu), 0.5 = polowa odstepow gry (bok 0.5 -> 0.25, rzad 0.375 -> 0.19; ciasniej figurki w skali 0.3 wchodza na siebie). Najdalsza figura
+  (symulacja szyku gry z rozrzutem, scratchpad formation.py): 2 doczepione 0.56 -> 0.50, 4: 1.01 -> 0.50, 6: 1.26 -> 0.63, 10: 1.61 -> 0.80, 15: 2.00 -> 1.00, 30: 2.84 -> 1.42 jedn. - do 30
+  druzyn w promieniu zamku ROT (srodek -> brama: mediana 1.89, p25 1.50). Armia Clegane'a (6 doczepionych): z 1.5-2 do ok. 0.6.
+- POSTOJ (skan co 0.1 h gry, jak straznik ArmyRestDay): wodz czynny, nie doczepiony, bez bitwy, poza osada, bez oblezenia i obozu oblezenia, nie na morzu, bez
+  przejscia lad/morze, IsMoving false, z doczepionymi, nie Nieumarly; AI - ArmyRestDay.Resting albo NightRest.FieldCampHolds (legowisko, oboz nocy, sen dlugu;
+  alarm nocy i osada celowo nie); gracz - NightRest.PlayerCamped (namiot). k liczone RAZ na postoj (poczatek); ten sam postoj = wodz w miejscu +- Drill.RestStep
+  (0.35) i przerwa <= 1 h gry (swit: oboz nocy -> dzien odpoczynku, cudzy rozkaz cofniety przez straznika). Postfiks w kazdym wywolaniu sprawdza, czy wodz
+  nie ruszyl (IsMoving, bitwa, oboz oblezenia, morze, przejscie) - armia, ktora rusza, od razu wraca do szyku gry i gra sama prowadzi druzyny na zwykle miejsca.
+- Bez zmian: druzyna gracza doczepiona do armii AI (kamera), druzyny dochodzace (AttachedTo == null - gra nie liczy dla nich szyku), armie Nieumarlych.
+- ArmyRestDay.cs: dwa odczyty - ArmyRestDay.Resting(Army), NightRest.FieldCampHolds(MobileParty).
+- ArmouryBehavior.cs: ArmyCloseRanks.Reset() w konstruktorze; ArmyCloseRanks.OnTick(dt) w TickEvent po ArmyRestDay.OnTick.
+- Settings.cs: ArmyClosesRanksAtHalt = true ("Army Closes Ranks At Halt", grupa "Armies of the realms (175)"); gen_mcm: Armoury 2412 ustawien (inne mody bez
+  zmian). Klucz dziala na zywo (wylaczony - slownik pusty, od razu szyk gry); w Armoury.json Jeffa klucza nie ma, wchodzi domyslne true.
+- Log "Szyk na postoju (m118):": linia latki (wpieta / BRAK - funkcja wylaczona na sesje; jedyny wylacznik - brak API), do 3 przykladow poczatku postoju
+  na dobe (druzyn: gra prowadzi / stoja, k, najdalsze miejsce szyku gry, figura od wodza srednio i najdalej przed -> cel, baza szyku gry od wodza), do 3
+  pomiarow po 2 h, linia doby (armie wg rodzaju postoju, wznowione, druzyny, odleglosci przed / cel / po 2 h, baza szyku, potkniecia skanu i postfiksu).
+  Bez linii co klatke.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: stan gry tylko czytany. Zmieniony jest wynik funkcji czytanej przez DoUpdatePosition (cel figury) i CalculateSpeed (predkosc doczepionej: mnoznik
+  0.7-1.3 x wodza jak w grze, tylko wzgledem innego miejsca) - Speed doczepionej w czasie postoju moze czytac ktos inny (UI, cudze AI), wartosc w tym samym
+  przedziale co w grze. Grep: w Armoury nikt inny nie wola GetRelativePositionForParty ani nie pisze ArmyPositionAdder; w ~40 modach (grep dll) nikt tej
+  metody nie wola ani nie lata (BK lata inne metody Army - nazwa, gather/disperse; NavalDLC.View czyta ArmyPositionAdder tylko w obrazie na morzu, pomijanym).
+- Kolizje: ArmyRestDay / NightRest / NightMarch tylko czytane (rozkazy, AI, licznik bezczynnosci, pomiar marszu z pozycji wodza, namioty - dziecko figurki
+  wodza, wodza nie ruszamy - bez zmian). Bez zapisu (adder zapisuje gra jak zawsze - SaveableProperty 1005; po wczytaniu skan liczy postoj od nowa), bez ekonomii.
+- Watki: postfiks biegnie w watkach ruchu gry (TWParallel w CampaignTickCacheDataStore.RealTick); czyta pola wodza (wodzowie ruszaja w osobnej, wczesniejszej
+  fazie) i slownik publikowany kopia (volatile). Wyjatek - licznik Interlocked, wynik gry bez zmian, log pierwszego z watku glownego. Gdyby "postfiksu N" > 0 - zglosic.
+- Wydajnosc: postfiks na kazde wywolanie (ok. 3 na doczepiona druzyne "w ruchu" na klatke); bez postojow jedno sprawdzenie Count == 0.
+- NIEPOTWIERDZONE w grze (tylko kod): (1) ze doczepione stojacej armii sa "w ruchu" - przyklad "gra prowadzi N, stoja M": jesli stoja = wszystkie, figury
+  sie nie rusza (wtedy wrocic do zapisu addera); (2) ze szyk na naszym postoju stoi wokol starego NextTargetPosition - "baza szyku gry od wodza" w logu,
+  spodziewane > 0; (3) wyglad przy k = 0.5 (figury moga sie stykac) i plynnosc - zrzut Jeffa.
+- Lord doczepiony W CZASIE postoju AI ma MoveTargetPoint = pozycja stojacego wodza, wiec po pierwszym kroku nie jest "w ruchu" - gra go nie prowadzi, stoi tam,
+  gdzie sie doczepil (<= ok. 1.22 jedn., prog Army.Tick:387), jak w grze; licznik "stoja".
+- Po ruszeniu: figury stoja blizej wodza niz ich miejsce w szyku - gra prowadzi je na miejsca 0.7-1.3 x predkosci wodza; obejrzec pierwsze ruszenie po postoju.
+- Armia gracza tylko z namiotem (PlayerCamped) i gdy gracz czeka; sen w menu bez namiotu - nie (do decyzji Jeffa).
+- Jedna zmiana naraz: w tym samym DLL lezy niewgrane 111 (ubranie cywilne v2) - objawy rozdzielne (m118 nie dotyka sprzetu, DTE ani bitew).
+- Test: Armoury.log - "Szyk na postoju (m118): postfiks Army.GetRelativePositionForParty - wpieta.", przyklady i linia doby (k, przed -> cel -> po 2 h,
+  gra prowadzi / stoja, potkniecia 0, postfiksu 0); na mapie armia AI na postoju (swit po 6 dobach marszu albo oboz nocy) - figury przy wodzu w ok. 1 s;
+  po ruszeniu szyk bez maruderow; przelaczenie klucza w MCM na zywo (od razu szyk gry).
+
+**Status:** ZBUDOWANE - czeka na autotest i wgranie. Build Armoury 0 bledow (bez ostrzezen w zmienionych plikach). md5 Armoury.dll - w nastepnym commicie
+(DLL zawiera hash commitu - md5 zmienia sie z kazdym commitem; przy wgraniu liczy sie przebudowa z HEAD galezi).
+
 ## 2026-10-24 111 (m117-ubranie, galaz w-toku/m117-ubranie od w-toku/m116-fabula 6cd80130) - wlasne ubranie cywilne golych zolnierzy: tunika i buty ich kultury (v2 25.10: losowo z ubran rekrutow tieru 1 i cywilow, bez zbroi)
 
 **v2 (25.10, ta sama niewgrana pozycja 111 - zmiana zasady wyboru):** Jeff 25.10 ok. 00:25: "ubrania maja byc rozne aby wszyscy nie wygladali tak samo i maja to byc
