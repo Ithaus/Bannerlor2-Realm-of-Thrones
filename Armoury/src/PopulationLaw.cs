@@ -419,7 +419,8 @@ namespace Armoury
         // ------------------------------------------------------------ E4/4 (109n): przyrost naturalny wsi (R1, PLAN 4.2 + 4.3)
         // Gra dopisuje wsi stale +4 / +1.2 / +0.2 hearth dziennie (ponizej 300 / ponizej 600 / wyzej) bez wzgledu na to, ilu ludzi ta wies oznacza: w biegu 120 dob
         // (zbior 30, test A) tick wsi +834 hearth/d = ok. +165 tys. ludzi ksiegi dziennie (Ludnosc 52.2 -> 69.1 mln w 120 dob). Odtad hearth wsi zmienia sie o stope roczna g:
-        //   zmiana dobowa = hearth x g / 100 / dni roku,   g [% rocznie] = G0 + GW x W - GH x H - GU x U, obciete do [-1.3; +0.8]
+        //   zmiana dobowa = hearth x g / 100 / dni roku,   g [% rocznie] = G0 + GW x W - GH x H - GU x U, obciete do [-1.3; +1.3] (GrowthMaxDeclinePercent, GrowthMaxPercent;
+        //   pulap 0.8 -> 1.3 od n36, Jeff 24.10: "zwieksz wzrost do 1.3% max")
         //   W - dobrobyt warowni wsi wobec mediany warowni tego samego rodzaju (miasto albo zamek) w tej samej krainie (kultura z dnia kalibracji - U3), -0.5..+0.5;
         //       mediana krainy, nie srednia kroczaca: nie zalezy od wspolnego dryfu, nie potrzebuje stanu w zapisie, nie skacze w dniu wlaczenia ani po wczytaniu;
         //   H - glod okregu (E4/6, R1): brak jedzenia gospodarzy wsi w ostatniej dobie ze spichlerza okregu (Famine.HungerOf, 0..1; 0 bez glodu, 0.1 w przednowku);
@@ -427,7 +428,7 @@ namespace Armoury
         //   U - niebezpieczenstwo: 0.4 x (1 - bezpieczenstwo warowni / 100) + 0.3 x [region w wojnie - ta sama regula co powrot rozbitych E4/3: bez wiecznych
         //       wojen z Wolnymi Ludzmi i Innymi, OutlawLaw.WarWithoutEternal] + 0.3 x udzial spalonych i lupionych wsi regionu.
         // Premie hearth gry, BK i BKROT (perki, budynki, polityki, laski bogow, podatki, prawa) nie dopisuja hearth, tylko mnoza DODATNIE g:
-        // (1 + dodatki / 1.2) x (1 + czynniki), obciete do [0.5; 2]; pulap +0.8 dopiero PO mnozeniu. Rosnie tylko wies w stanie Normal (jak w grze, ktora baze pasma
+        // (1 + dodatki / 1.2) x (1 + czynniki), obciete do [0.5; 2]; pulap +GrowthMaxPercent (1.3) dopiero PO mnozeniu. Rosnie tylko wies w stanie Normal (jak w grze, ktora baze pasma
         // daje tylko jej); spalona, lupiona i pod przymusem: 0 (vanillowe -1 hearth w spalonej wsi znika). Powrot uchodzcow +0.5 hearth ponizej RefugeeFloorHearth
         // (ScorchedEarth.RefugeeReturn) - od E4/5 tylko wsie bez spustoszenia (objete: uchodzcy z konta w ksiedze, Devastation.Daily); w logu osobno. k osady sie skraca, wiec rachunek idzie wprost na hearth; ludzi (hearth x k_v) pokazuja dymek i log.
         // Ludzie z narodzin to jedyne (obok bilansu otwarcia) nazwane zrodlo ludzi ksiegi (R0): "przyrost naturalny" w linii "Ludzie: przyrost naturalny" i w "Hearth (E4/0)".
@@ -729,6 +730,59 @@ namespace Armoury
             if (ok) { refugees = _gLast.Refugees; natural = (float)(_gLast.Delta - _gLast.Refugees); }
             _gLast = default(Growth); _gLastVillage = null;
             return ok;
+        }
+
+        /// <summary>
+        /// n36 (Jeff 24.10: "przyrost bierze sie z realnego wzrostu tej wioski z jedzenia i gospodarki itd. - juz ustalilismy, jaki jest wzrost i jego zakresy"):
+        /// stopa przyrostu naturalnego wsi v, g [% rocznie] - TA SAMA, ktora dopisze jej dobowy tick (pytanie czynnego modelu gry, rachunek postfiksu GrowthPostfix:
+        /// dobrobyt, glod, niebezpieczenstwo, premie gry, korytarz). Pamiec postfiksu (_gLast, _gLastVillage) z chwili wejscia wraca po pytaniu - GrowthDaily,
+        /// Measure40 i FloorPrefix czytaja ja zaraz po wlasnym pytaniu, wiec nic im nie ginie; okno W1 (Measure40.InVillageTick) na czas pytania wylaczone jak
+        /// w FloorPrefix (blizna ScorchedEarth i pomiar nie licza tego pytania). why: "rosnie" (g &gt; 0); g = 0 w stanie innym niz Normal - "spalona" (Looted),
+        /// "lupiona" (BeingRaided), "przymus" (ForcedForVolunteers / ForcedForSupplies); g &lt;= 0 w stanie Normal - najwieksza strata: "glod" (takze glod ponad
+        /// prog), "wojna" (wojna, rabunki, bezprawie), "bieda" (dobrobyt ponizej mediany krainy), inaczej "stoi". false - g nieznane: przyrost wylaczony ("wyl")
+        /// albo postfiks tej odpowiedzi nie policzyl ("blad"); wolajacy liczy wtedy po staremu. Watek glowny, nie rzuca.
+        /// </summary>
+        internal static bool RateOf(Village v, out float gPercentYear, out string why)
+        {
+            gPercentYear = 0f; why = "wyl";
+            if (!GrowthOn) return false;
+            why = "blad";
+            var c = Campaign.Current;
+            if (v == null || c == null || c.Models == null || c.Models.SettlementProsperityModel == null) return false;
+            Growth saved = _gLast; Village savedV = _gLastVillage;
+            bool was = Measure40.InVillageTick;
+            Growth g = default(Growth);
+            try
+            {
+                Measure40.InVillageTick = false;
+                _gLast = default(Growth); _gLastVillage = null;
+                c.Models.SettlementProsperityModel.CalculateHearthChange(v, false);
+                if (ReferenceEquals(_gLastVillage, v)) g = _gLast;
+            }
+            catch (Exception e)
+            {
+                _gStumbles++;
+                if (!_errGrowth) { _errGrowth = true; Log.Error("PopulationLaw.RateOf", e); }
+                g = default(Growth);
+            }
+            finally { Measure40.InVillageTick = was; _gLast = saved; _gLastVillage = savedV; }
+            if (!g.Set) return false;
+            float r = g.G;
+            if (float.IsNaN(r) || float.IsInfinity(r)) r = 0f;
+            gPercentYear = r;
+            if (g.Blocked)
+            {
+                var vs = v.VillageState;
+                why = vs == Village.VillageStates.Looted ? "spalona" : (vs == Village.VillageStates.BeingRaided ? "lupiona" : "przymus");
+                return true;
+            }
+            if (r > 0f) { why = "rosnie"; return true; }
+            if (g.Starving) { why = "glod"; return true; }
+            float worst = 0f; why = "stoi";
+            if (g.Hunger < worst) { worst = g.Hunger; why = "glod"; }
+            if (g.Danger < worst) { worst = g.Danger; why = "wojna"; }
+            if (g.Prosper < worst) { worst = g.Prosper; why = "bieda"; }
+            return true;
         }
 
         // ------------------------------------------------------------ E4/4 (R17, U15d): podloga 10 hearth bez ludzi z niczego

@@ -14,7 +14,10 @@ namespace Armoury
     /// grze nic nie robi. Pierwsza doba: kolejnosc opcji menu, trzy wioski blisko gracza (najwieksza, przysiolek, kraina z hamulcem albo obce krolestwo bez wojny) - werbunek
     /// ta sama droga co okno (LevyDo) i kontrola OK/BLAD: druzyna +k, gracz -suma, kiesa wsi +suma, DOM -zdjeci (+-0.01), dom wioski -k (+-1), reszta okregu 0 (+-0.5),
     /// pula -k, cena wedlug etapu, sztuki DTE tieru 1, VillOut regionu +zdjeci; wymuszone odmowy (wojna, spalona, Straz). Kolejne doby: przysiolek oprozniany do konca
-    /// (etapy, odmowa 'koniec dnia'), 0 &lt;= pula &lt;= pulap, przyrost mlodych wobec oczekiwanego, brak rak, obroncy &lt;= pula. Po wczytaniu z wpisami - tylko kontrole.
+    /// (etapy, odmowa 'koniec dnia'), 0 &lt;= pula &lt;= pulap, brak rak, obroncy &lt;= pula. Po wczytaniu z wpisami - tylko kontrole.
+    /// n36 (P3, Jeff 24.10 "przyrost z realnego wzrostu tej wioski"): odnowa doby - dopisanie do Acc = P x max(0, g) / 100 / dni roku, g z PopulationLaw.RateOf TEJ
+    /// wsi okregu (sonda pyta model sama, bez pamieci doby LvRate; RateOf false - zapas SideRecruitYouthPercent); odnowa miesiaca - rozliczone Acc = suma dob sondy
+    /// (tylko pelny miesiac widziany przez sonde, inaczej INFO); przyrost mlodych w dobie rozliczenia = min(pulap, pula wczoraj + rozliczone Acc) - pula wczoraj.
     /// Test n36: dopoki zaden werbunek sondy nie przeszedl kontroli - pelna druzyna albo za malo zlota nie zatrzymuja sondy (zdjeci ludzie / dotacja testu, linia w logu,
     /// poza bilansem); odmowa po werbunku - kazdy prawidlowy powod bramki to OK (z powodem), BLAD tylko werbunek ponad dzis albo wyjatek; linia doby konczy sie TAK / NIE / NIEPOKRYTY.
     /// Po recenzji: przysiolek dostaje miejsce i dotacje kazdego dnia (inaczej pelna druzyna konczy werbunek przed limitem dnia), odmowa ponad dzis liczy sie
@@ -36,6 +39,9 @@ namespace Armoury
         private static readonly string[] PbRefusals = { "koniec dnia", "pula", "podloga", "DOM na podlodze", "rabunek", "wojna", "zaciag", "Straz", "spalona", "zaufanie" };
         private static readonly string[] PbNotTested = { "druzyna", "zloto", "nic do wziecia" };
         private static readonly Dictionary<string, double> _pbPrev = new Dictionary<string, double>(StringComparer.Ordinal);
+        // n36 (P3): suma dobowych dopisan policzona przez sonde od ostatniego rozliczenia wpisu (nowy wpis - od nowa)
+        private sealed class PbAcc { public object R; public double Sum; public int Days; }
+        private static readonly Dictionary<string, PbAcc> _pbAcc = new Dictionary<string, PbAcc>(StringComparer.Ordinal);
 
         private static bool ProbeFlag()
         {
@@ -52,7 +58,7 @@ namespace Armoury
             return _pbFlag == 1;
         }
 
-        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbRec = 0; _pbOver = 0; _pbPrev.Clear(); }
+        private static void LevyProbeReset() { _pbDay0 = -1; _pbAfterLoad = _pbLoaded = false; _pbA = _pbB = _pbC = null; _pbForce = null; _pbOk = _pbBad = 0; _pbRec = 0; _pbOver = 0; _pbPrev.Clear(); _pbAcc.Clear(); }
 
         private static void PbCheck(StringBuilder sb, string what, bool ok, string val)
         {
@@ -76,7 +82,7 @@ namespace Armoury
                 else ProbeStart();
                 return;
             }
-            ProbeDay(today - _pbDay0);
+            ProbeDay(today - _pbDay0, today);
         }
 
         private static string MenuOrder(string menu)
@@ -248,7 +254,34 @@ namespace Armoury
             return res;
         }
 
-        private static void ProbeDay(int d)
+        /// <summary>n36 (P3): odnowa wpisu uid w dobie today wobec RateOf tej samej wsi okregu (bez pamieci doby LvRate) i suma dob do rozliczenia miesiaca.</summary>
+        private static void ProbeYouth(StringBuilder sb, Settlement st, string uid, int today)
+        {
+            var rr = LvGet(uid);
+            if (rr == null || rr.AccDay != today) return;   // brak wpisu (pula pelna) albo wpis z dzisiaj - doba go nie dopisywala
+            float g0 = 0f; string w0 = null; bool ok = false;
+            try { ok = st != null && st.Village != null && PopulationLaw.RateOf(st.Village, out g0, out w0); } catch { ok = false; }
+            double gExp = ok ? g0 : LvYouthPct;
+            double addExp = Math.Max(0.0, rr.AccP) * Math.Max(0.0, gExp) / 100.0 / LvYearDays();
+            PbCheck(sb, "odnowa doby (" + (ok ? "przyrost wsi " + (w0 ?? "-") : "zapas") + ", g " + rr.LastG.ToString("0.####", Inv) + "/" + gExp.ToString("0.####", Inv) + ")",
+                    rr.LastFb == !ok && Math.Abs(rr.LastG - gExp) <= 1e-4 && Math.Abs(rr.LastAdd - addExp) <= 1e-6 + 1e-4 * addExp,
+                    "+" + rr.LastAdd.ToString("0.#####", Inv) + "/+" + addExp.ToString("0.#####", Inv));
+            PbAcc pa;
+            if (!_pbAcc.TryGetValue(uid, out pa) || !ReferenceEquals(pa.R, rr)) _pbAcc[uid] = pa = new PbAcc { R = rr };
+            if (rr.SettleDay == today)
+            {
+                // dzisiejsze dopisanie weszlo do rozliczenia, gdy doba dopisala przed rozliczeniem (AccN 0 po nim); rozliczenie z wyceny przed doba - dopisanie juz w nowym miesiacu
+                bool inSettle = rr.AccN == 0;
+                double sum = pa.Sum + (inSettle ? addExp : 0.0); int days = pa.Days + (inSettle ? 1 : 0);
+                if (days == LvMonth && rr.LastSettleN == LvMonth)
+                    PbCheck(sb, "odnowa miesiaca (suma " + days + " dob)", Math.Abs(rr.LastSettle - sum) <= 1e-5 + 1e-4 * sum, "+" + rr.LastSettle.ToString("0.###", Inv) + "/+" + sum.ToString("0.###", Inv));
+                else sb.Append(" | odnowa miesiaca +").Append(rr.LastSettle.ToString("0.###", Inv)).Append(" (dob sondy ").Append(days).Append(", wpisu ").Append(rr.LastSettleN).Append(" z ").Append(LvMonth).Append(") INFO");
+                pa.Sum = inSettle ? 0.0 : addExp; pa.Days = inSettle ? 0 : 1;
+            }
+            else { pa.Sum += addExp; pa.Days++; }
+        }
+
+        private static void ProbeDay(int d, int today)
         {
             foreach (var uid in new[] { _pbA, _pbB, _pbC })
             {
@@ -265,11 +298,17 @@ namespace Armoury
                 PbCheck(sb, "0<=pula<=pulap", q.Pool >= 0.0 && q.Pool <= q.Cap + 1e-6, "");
                 int def = DefendersFor(uid, q.Home), call = LevyCallableFor(uid, q.Home);
                 PbCheck(sb, "obroncy<=pula", def <= call, def + "/" + (call == int.MaxValue ? "bez wpisu" : call.ToString(Inv)));
-                double prev;
+                ProbeYouth(sb, st, uid, today);
+                double prev; var rq = LvGet(uid);
                 if (_pbPrev.TryGetValue(uid, out prev) && q.Pool > prev + 1e-9)
                 {
-                    double exp = Math.Min(q.Cap, prev + q.P * LvYouthPct / 100.0 * LvMonth / LvYearDays()) - prev;
-                    PbCheck(sb, "przyrost mlodych", Math.Abs(q.Pool - prev - exp) <= Math.Max(0.05, 0.02 * exp), "+" + (q.Pool - prev).ToString("0.###", Inv) + "/+" + exp.ToString("0.###", Inv));
+                    // n36 (P3): pula rosnie tylko w dobie rozliczenia - o rozliczony przyrost w toku (z dobowej stopy wsi okregu), do pulapu
+                    if (rq != null && rq.SettleDay == today)
+                    {
+                        double exp = Math.Min(q.Cap, prev + rq.LastSettle) - prev;
+                        PbCheck(sb, "przyrost mlodych", Math.Abs(q.Pool - prev - exp) <= Math.Max(0.05, 0.02 * exp), "+" + (q.Pool - prev).ToString("0.###", Inv) + "/+" + exp.ToString("0.###", Inv));
+                    }
+                    else sb.Append(" | pula +").Append((q.Pool - prev).ToString("0.###", Inv)).Append(" poza rozliczeniem (nowy wpis albo pulap wzrosl) INFO");
                 }
                 Log.Info(sb.ToString());
                 if (!_pbAfterLoad && uid == _pbB && d <= 40)

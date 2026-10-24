@@ -1869,7 +1869,12 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa m113pobor <Armoury-*.log>. POB-0 odcinek 'Pobor w wioskach (m113): klucz' w linii startu sesji WP.
                     POB-1 potkniecia: ERROR 'SideVillageVisit.Levy.' 0 i 'potkniecia doby' linii doby 0. POB-2 linie werbunku: gracz -suma, kiesa wsi +suma
                     (= cena x ludzi). POB-3 sonda (linie 'TEST'): BLAD 0 bez podsumowan 'razem OK n, BLAD m' (brak sondy - INFO). POB-4 zapis -> wczytanie: wpisy i suma puli rowne (+-0.01; para = wczytanie tuz po zapisie, brak
-                    pary - INFO). POB-5 czas doby <= 1 ms na 100 wpisow (najmniej 1 ms). E4/3 i E4/7 KONTROLA oraz MoneyLedger swiata - grupy bazowe (osobno).
+                    pary - INFO; n36: takze 'przyrost w toku' +-0.01, gdy obie linie go maja). POB-5 czas doby <= 1 ms na 100 wpisow (najmniej 1 ms).
+                    POB-6 (n36, Jeff 24.10 "przyrost z realnego wzrostu tej wioski", "zwieksz wzrost do 1.3% max"): odnowa puli z przyrostu naturalnego wsi okregu -
+                    odcinek 'odnowa:' linii doby: 'przyrost naturalny wsi E4/4: g srednio a% (min b, max c) w n wpisach, pulap +p%/rok' - b <= a <= c, c <= p;
+                    'nie policzyl wsi' (RateOf zawiodl przy czynnym przyroscie) - NIE; sam zapas SideRecruitYouthPercent (przyrost wylaczony) albo brak linii - INFO.
+                    Sonda (POB-3) od n36 sprawdza 'odnowa doby' (dopisanie = P x max(0, g) / 100 / dni roku, g z RateOf tej wsi) i 'odnowa miesiaca'.
+                    E4/3 i E4/7 KONTROLA oraz MoneyLedger swiata - grupy bazowe (osobno).
 --grupa m110anim  : (23.10, n35 m110-animacje + m110-modele - Jeff 23.10 20:19 "postac lezy w ekwipunku, rekawice bez obrazka - blad z dzisiaj"; HeroHp.Install,
                     ItemModels.cs; klucz Missing Model Fix) python -I tools/sprawdz_logi.py --grupa m110anim <Armoury-*.log>. ANIM-1 linia 'Animacje (m110):'
                     w kazdym logu: latka TAK (albo juz wpieta), act_inventory_idle_start i act_tableau_hand_armor_pose >= 0, OK (brak linii - NIE: latka HP
@@ -67682,8 +67687,11 @@ def m113pobor_main(logp):
     sess, errs, st_day, recs, rec_bad, tests_ok, tests_bad, tests, saves, pairs, pair_bad, slow, days = 0, 0, 0, 0, [], 0, 0, 0, [], 0, [], [], 0
     lone = 0   # wczytania bez zapisu tuz przed (inny zapis, stary zapis po autozapisie) - INFO
     rx_rec = re.compile(r"cena (\d+) x (\d+) = (\d+) \| gracz (-?\d+) -> (-?\d+), kiesa wsi okregu (-?\d+) -> (-?\d+)")
-    rx_save = re.compile(r"zapis arm_sidelevy - wpisy puli (\d+) \(suma ([\d.]+)\)")
-    rx_load = re.compile(r"wczytanie arm_sidelevy - wpisy puli (\d+)(?: \(suma ([\d.]+)\))?")
+    rx_save = re.compile(r"zapis arm_sidelevy - wpisy puli (\d+) \(suma ([\d.]+)\)(?:, przyrost w toku ([\d.]+))?")
+    rx_load = re.compile(r"wczytanie arm_sidelevy - wpisy puli (\d+)(?: \(suma ([\d.]+)\))?(?:, przyrost w toku ([\d.]+))?")
+    # n36 (POB-6): odcinek 'odnowa:' linii doby - zrodlo odnowy puli
+    rx_odn = re.compile(r"odnowa: przyrost naturalny wsi E4/4: g srednio (-?[\d.]+)% \(min (-?[\d.]+), max (-?[\d.]+)\) w (\d+) wpisach, pulap \+([\d.]+)%/rok")
+    odn, odn_bad, odn_fb, odn_err, odn_max = 0, [], 0, 0, None
     rx_day = re.compile(r"pule: wpisow (\d+).*czas doby ([\d.]+) ms \| potkniecia doby (\d+)")
     with open(logp, encoding="utf-8", errors="replace") as f:
         for line in f:
@@ -67707,16 +67715,17 @@ def m113pobor_main(logp):
                     rec_bad.append(line.strip()[:200])
             m = rx_save.search(line)
             if m:
-                saves.append((int(m.group(1)), float(m.group(2))))
+                saves.append((int(m.group(1)), float(m.group(2)), None if m.group(3) is None else float(m.group(3))))
             m = rx_load.search(line)
             if m:
                 # para tylko: wczytanie tuz po zapisie (bez innego wczytania miedzy nimi); wczytanie bez klucza ('brak klucza') pasuje tylko do pustego zapisu
                 ln, ls = int(m.group(1)), float(m.group(2) or 0.0)
+                la = None if m.group(3) is None else float(m.group(3))
                 if saves and (m.group(2) is not None or saves[-1][0] == 0):
                     pairs += 1
-                    n, s = saves[-1]
-                    if n != ln or abs(s - ls) > 0.01 + 1e-9:
-                        pair_bad.append("zapis %d/%.2f - wczytanie %d/%.2f" % (n, s, ln, ls))
+                    n, s, sa = saves[-1]
+                    if n != ln or abs(s - ls) > 0.01 + 1e-9 or (sa is not None and la is not None and abs(sa - la) > 0.01 + 1e-9):
+                        pair_bad.append("zapis %d/%.2f/w toku %s - wczytanie %d/%.2f/w toku %s" % (n, s, sa, ln, ls, la))
                 else:
                     lone += 1
                 saves = []
@@ -67725,6 +67734,17 @@ def m113pobor_main(logp):
                 days += 1
                 nrec, ms, sd = int(m.group(1)), float(m.group(2)), int(m.group(3))
                 st_day += sd
+                mo = rx_odn.search(line)
+                if mo:
+                    odn += 1
+                    a, b, c, n_, p = float(mo.group(1)), float(mo.group(2)), float(mo.group(3)), int(mo.group(4)), float(mo.group(5))
+                    odn_max = c if odn_max is None else max(odn_max, c)
+                    if not (b - 1e-3 <= a <= c + 1e-3) or c > p + 1e-3 or n_ <= 0:
+                        odn_bad.append("g %.3f (min %.3f, max %.3f), pulap %.2f" % (a, b, c, p))
+                if "odnowa: " in line and "zapas SideRecruitYouthPercent" in line:
+                    odn_fb += 1
+                if "przyrost naturalny nie policzyl wsi" in line:
+                    odn_err += 1
                 if ms > max(1.0, nrec / 100.0):
                     slow.append("%d wpisow %.3f ms" % (nrec, ms))
     rep.add("POB-0: odcinek 'Pobor w wioskach (m113): klucz' w starcie sesji", "startow %d" % sess, ">= 1", sess > 0)
@@ -67738,6 +67758,10 @@ def m113pobor_main(logp):
             "zlych 0 (brak pary - INFO)", None if pairs == 0 else not pair_bad)
     rep.add("POB-5: czas doby poboru <= 1 ms na 100 wpisow", "linii doby %d, wolnych %d%s" % (days, len(slow), (" (" + slow[0] + ")") if slow else ""), "wolnych 0 (brak linii - INFO)",
             None if days == 0 else not slow)
+    rep.add("POB-6: odnowa puli z przyrostu naturalnego wsi okregu (n36) - min <= srednia <= max <= pulap",
+            "linii z przyrostem wsi %d (najwieksze g %s), zlych %d%s, z zapasem %d, 'nie policzyl wsi' %d" % (odn, "-" if odn_max is None else "%.3f" % odn_max, len(odn_bad),
+            (" (" + odn_bad[0] + ")") if odn_bad else "", odn_fb, odn_err),
+            "zlych 0 i 'nie policzyl' 0 (sam zapas albo brak linii - INFO)", None if odn == 0 and odn_err == 0 else (not odn_bad and odn_err == 0))
     rep.show()
     return 0
 

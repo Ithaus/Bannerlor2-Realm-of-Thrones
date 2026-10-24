@@ -541,6 +541,8 @@ RANGES = {
     # m113-pobor (24.10): pobor z wiosek pobocznych (SideVillageVisit.Levy.cs)
     'SideRecruitPoolPercent': (1.0, 20.0, "0.0"),
     'SideRecruitYouthPercent': (0.0, 3.0, "0.00"),
+    # n36 (Jeff 24.10 "zwieksz wzrost do 1.3% max"): pulap przyrostu wsi - zakres jak przy 0.8 (do 3.2), nie 4 x domyslna
+    'GrowthMaxPercent': (0.0, 3.2, "0.00"),
     'SideRecruitDailyPercent': (0.5, 10.0, "0.0"),
     'SideRecruitLevyPrice': (1.0, 4.0, "0.00"),
     'SideRecruitGeneralLevyPrice': (1.0, 5.0, "0.00"),
@@ -784,6 +786,11 @@ def gen(module_dir, ns, display):
     out.append("        {")
     out.append("            try { var i = Instance; if (i != null) i.ApplyTo(Settings.Current); }")
     out.append("            catch (System.Exception e) { Log.Error(\"Mcm.Apply\", e); }")
+    if ns == 'Armoury':
+        # test n36 (fcdaca9c dopisal to recznie w McmSettings.cs - generator gubil): flaga armoury-walka-off.flag tylko w autotescie
+        out.append('            // test n36: flaga armoury-walka-off.flag (tylko autotest) - piec kluczy walki m113 = false po kazdym ApplyTo (bieg bitwaOFF bez zmiany Armoury.json)')
+        out.append('            try { FieldDuel.ApplyTestOff(Settings.Current); }')
+        out.append('            catch (System.Exception e) { Log.Error("Mcm.Apply(walka-off)", e); }')
     out.append("        }")
     out.append("    }")
     out.append("}")

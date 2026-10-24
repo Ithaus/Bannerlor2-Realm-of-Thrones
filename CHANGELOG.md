@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## n36 odnowa puli poboru z przyrostu naturalnego wsi + pulap przyrostu 1.3% (galaz w-toku/n36-calosc) - 24.10.2026
+
+**Problem:** Jeff 24.10 (po zobaczeniu, ze pula mlodych wioski pobocznej rosnie o stale 1% ludzi na rok): "przyrost bierze sie z realnego wzrostu tej wioski z jedzenia
+i gospodarki itd. - juz ustalilismy, jaki jest wzrost i jego zakresy", potem "zwieksz wzrost do 1.3% max".
+**Zmiana:**
+- PopulationLaw.RateOf(Village, out g, out why): stopa przyrostu naturalnego wsi [% rocznie] - ta sama, ktora dopisuje jej dobowy tick E4/4 (pytanie czynnego modelu gry,
+  rachunek postfiksu: dobrobyt, glod, niebezpieczenstwo, premie gry, korytarz). Pamiec postfiksu (_gLast) z chwili wejscia wraca po pytaniu (GrowthDaily, Measure40,
+  FloorPrefix bez zmian), okno W1 na czas pytania wylaczone. why: rosnie / spalona / lupiona / przymus / glod / wojna / bieda / stoi; false - przyrost wylaczony albo nieznany.
+- Pobor (SideVillageVisit.Levy.cs, P3): co dobe przyrost w toku wpisu += P x max(0, g) / 100 / dni roku z g wsi okregu (raz na dobe na wies okregu); co 28 dob
+  Pool = min(pulap z P dzis, Pool + przyrost w toku), przyrost w toku = 0. Ujemne g - bez odnowy (ksiega zmniejsza P, pulap spada). Przyrost naturalny wylaczony - zapas:
+  stara regula SideRecruitYouthPercent (log mowi "zapas"). Obroncy (LevyCallableFor) licza przyrost w toku po pelnym miesiacu.
+- Teksty gracza (dymek, linia menu, okno, odmowa "pula"): mlodzi na miesiac z tej samej stopy ("... come of age here each month as the village grows"); wies nie rosnie -
+  dlaczego (spalona, rabusie, przymus, glod, wojna i bezprawie, bieda).
+- Zapis arm_sidelevy: wpis ma 9. pole (przyrost w toku); sl1 sprzed n36 (8 pol) wczytuje sie z pustym przyrostem w toku; starsza DLL 9. pole pomija; inny naglowek - pominiety jak dotad.
+- Log: start sesji i linia doby poboru - odcinek "odnowa:" (przyrost naturalny wsi E4/4: g srednio / min / max w n wpisach, pulap; albo zapas), zapis i wczytanie - "przyrost w toku".
+- Ustawienia: GrowthMaxPercent 0.8 -> 1.3 (komentarz z cytatem Jeffa; opis: gorny skraj sredniowiecza - Anglia 1086-1300 ok. 0.5-0.7% rocznie, najlepsze dekady ok. 1%;
+  pulap tylko dla zamoznej wsi z premiami pana; miasta - ten sam pulap w TownRate); SideRecruitYouthPercent - tylko zapas przy wylaczonym przyroscie (nowy opis);
+  opis SideVillageRecruit (ok. 2 chlopcow na miesiac przy 0.5% rocznie, ok. 5 przy 1.3%). gen_mcm: zakres GrowthMaxPercent 0-3.2 jak dotad; blok FieldDuel.ApplyTestOff
+  (test n36, dopisany recznie w McmSettings.cs w fcdaca9c) generowany przez gen_mcm - nie ginie przy nastepnym uruchomieniu.
+- Sonda (LevyProbe): "odnowa doby" - dopisanie wobec RateOf tej samej wsi (bez pamieci doby), "odnowa miesiaca" - rozliczenie = suma dob sondy, "przyrost mlodych" - pula
+  wczoraj + rozliczony przyrost w toku. sprawdz_logi m113pobor: POB-4 takze przyrost w toku, nowe POB-6 (min <= srednia <= max <= pulap, "nie policzyl wsi" 0).
+**Ryzyko / co sprawdzic:** jedno pytanie modelu dobrobytu na wies okregu na dobe (wpisy puli + wyceny) - czas doby POB-5; wyzszy pulap 1.3 podnosi przyrost zamoznych wsi
+z premiami (i miast przez TownRate) - E4/4 linia "Ludzie: przyrost naturalny" (ile wsi obcina pulap). Armoury.json Jeffa z zapisana wartoscia GrowthMaxPercent zostaje przy niej
+(domyslna dziala tylko bez klucza w pliku). Autotest NIE robiony (zakaz uruchamiania gry w tym kroku).
+**Status:** DO SPRAWDZENIA (build Armoury kod 0; bez autotestu, nie wgrane).
+
 ## n36 recenzja scalenia (galaz w-toku/n36-calosc) - 24.10.2026: poprawki styku poboru, zakupu ziemi i ceny
 
 - Pobor: wycena poboru (zaufanie 6 we wlasnej wiosce) uniewazniana przy zmianie wlasnosci (kupno / odkup / zamek) w tej samej godzinie - pole Own w LvQuote.
