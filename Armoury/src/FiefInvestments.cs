@@ -308,10 +308,11 @@ namespace Armoury
                 var ws = DistrictWorks.PlayerWorks();
                 if (ws.Count > 0)
                 {
-                    double p28 = 0; long inAll = 0; var names = new List<string>();
-                    foreach (var w in ws) { p28 += w.Paid28; inAll += w.In; if (!names.Contains(w.Village)) names.Add(w.Village); }
+                    double p28 = 0; long inAll = 0; int dn = 28; var names = new List<string>();
+                    foreach (var w in ws) { p28 += w.Paid28; inAll += w.In; dn = Math.Min(dn, Math.Max(1, w.PaidDaysN)); if (!names.Contains(w.Village)) names.Add(w.Village); }
+                    // test 24.10 (zdjecie): lewa strona mowila "w ostatnich 4 dobach" (historia od wczytania zapisu sprzed m112), prawa "28" - to samo okno po obu stronach
                     sb.Append("Your village works: ").Append(string.Join(", ", names.ToArray())).Append(" - ").Append(inAll.ToString("N0", Inv)).Append(" put in, ")
-                      .Append(N0(p28)).Append(" paid to you in the last 28 days.");
+                      .Append(N0(p28)).Append(" paid to you in the last ").Append(dn).Append(dn == 1 ? " day." : " days.");
                 }
                 var es = Estates();
                 if (es.Count > 0)
