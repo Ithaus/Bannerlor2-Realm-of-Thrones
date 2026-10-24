@@ -243,7 +243,7 @@ namespace Armoury
                     if (w.Units > 1e-6)
                     {
                         sb.Append(", ready ").Append(Math.Round(100 * ready).ToString("0", Inv)).Append('%');
-                        if (w.FullDay > w.Today) sb.Append(" - full in ").Append(w.FullDay - w.Today).Append(w.FullDay - w.Today == 1 ? " day" : " days").Append(" (day ").Append(w.FullDay).Append(')');
+                        if (w.FullDay > w.Today) sb.Append(" - full in ").Append(w.FullDay - w.Today).Append(w.FullDay - w.Today == 1 ? " day" : " days");   // test 24.10: bez surowego numeru doby kampanii (108820 nic graczowi nie mowi)
                     }
                     sb.Append("\nPut in ").Append(w.In.ToString("N0", Inv)).Append(" - paid to you ").Append(N0(w.Paid28)).Append(" in the last ").Append(w.PaidDaysN).Append(w.PaidDaysN == 1 ? " day, " : " days, ").Append(w.PaidAll.ToString("N0", Inv)).Append(" in all");
                     if (w.WarWith != null) sb.Append("\nPaused - at war with ").Append(w.WarWith).Append(": pays nothing until peace");
