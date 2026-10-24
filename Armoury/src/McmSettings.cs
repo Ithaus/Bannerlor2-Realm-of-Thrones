@@ -1520,6 +1520,26 @@ namespace Armoury
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelNoInjuredCollapse { get; set; } = true;
 
+        [SettingPropertyBool("Duelists In Battles", HintText = "in field battles lords, companions and other heroes fight like the duellists of the lists: from about skill 100 (on Realistic) a hero attacks on his own, ripostes after a parry, feints and kicks, and does not wait behind his guard - the higher his best weapon skill, the bolder; soldiers keep the veterans' rule. Needs RBM with posture. Off = heroes fight as soldiers of their level's tier, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool DuelistsInBattles { get; set; } = true;
+
+        [SettingPropertyBool("Hero Tier From Skill", HintText = "with Veterans By Tier: in field battles a hero who is not fighting with the duellist profile (below skill 100, or Duelists In Battles off) counts as a soldier of the tier his best weapon skill earns when that is higher than his level's tier: best skill 40 = tier I, every 30 points a tier more (100 = III, 160 = V, 190 = VI, 220 and more = VII). Off = tier from level only, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool HeroTierFromSkill { get; set; } = true;
+
+        [SettingPropertyBool("Veteran Aggression Fix", HintText = "with Veterans By Tier: a soldier's experience changes only how readily he starts an attack (recruits hesitate, veterans press on), no longer how readily he breaks an attack off - before, a veteran also gave up his attacks more often, which made him more passive, not less. Off = both chances scaled, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool VeteranAggressionFix { get; set; } = true;
+
+        [SettingPropertyBool("Duel Skill Gap In Battles", HintText = "in field battles the Duel Skill Gap Weight rule also counts in your own clashes (when you strike or are struck): a better fighter's guard suffers less from your blocked or parried blows and yours more, as in the lists. Clashes between other fighters are untouched. Off = plain RBM in battles, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool DuelSkillGapInBattles { get; set; } = true;
+
+        [SettingPropertyBool("Duelist Bursts In Battles", HintText = "with Duelists In Battles: a skilled hero in a field battle seizes his moment as in the lists - when an attacker's guard breaks on him he strikes back at once (about a second), and when he is kept on the defence he answers with a flurry of his own (from skill 140, then at least 3 seconds' rest). Heroes only. Off = steady behaviour", RequireRestart = false)]
+        [SettingPropertyGroup("Field battle combat")]
+        public bool DuelistBurstsInBattles { get; set; } = true;
+
         [SettingPropertyBool("Autotest Battle Kit", HintText = "test runs only (the CrashScribe automatic test, switched on by its autotest.json file) - no effect in your game: before a test battle the test company's men get the missing pieces of their own troop kit into the company stores, as recruits bring theirs, so the battle test fights armed; after the battle the same pieces are taken away again. Off = test men fight with whatever the stores hold, as before", RequireRestart = false)]
         [SettingPropertyGroup("Automatic test only")]
         public bool AutotestBattleKit { get; set; } = true;
@@ -9815,6 +9835,11 @@ namespace Armoury
             s.DuelPerfectDefence = DuelPerfectDefence;
             s.DuelNoSlowMotion = DuelNoSlowMotion;
             s.DuelNoInjuredCollapse = DuelNoInjuredCollapse;
+            s.DuelistsInBattles = DuelistsInBattles;
+            s.HeroTierFromSkill = HeroTierFromSkill;
+            s.VeteranAggressionFix = VeteranAggressionFix;
+            s.DuelSkillGapInBattles = DuelSkillGapInBattles;
+            s.DuelistBurstsInBattles = DuelistBurstsInBattles;
             s.AutotestBattleKit = AutotestBattleKit;
             s.CavalryNeedsMounts = CavalryNeedsMounts;
             s.WarHorseFromTier = WarHorseFromTier;

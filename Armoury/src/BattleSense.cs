@@ -17,6 +17,8 @@ namespace Armoury
     /// Mission.cs:3809-3816; EarlyStart wszystkich zachowan idzie przed AfterStart kontrolera areny, w ktorym rodzi sie gracz) i jeszcze raz
     /// w AfterStart. Postfiks asynchroniczny czyta tylko statyki _duel / _m / Round (nigdy MissionTeams.Kind). Zasada pojedynku: rodzaj "turniej"
     /// albo "arena", albo bez bitwy gracza na mapie (rodzaj "inna") i zachowanie z "Duel" w nazwie typu - nazwa do logu raz na misje.
+    /// m113-walka2 faza 2 (24.10): w bitwie poczatek licznikow FieldDuel (EarlyStart), tick zrywow bohaterow (DuelCraft) i linia
+    /// "Bitwa (m113-walka2)" na koniec; rejestracja takze przy kluczach bitwy (FieldDuel.AnyKey).
     /// </summary>
     internal sealed class BattleSense : MissionBehavior
     {
@@ -30,6 +32,9 @@ namespace Armoury
         private static TournamentBehavior _tb;
         private static bool _duelDone;
         internal static int Round;
+        // m113-walka2: bitwa z rozszerzeniami fazy 2 (FieldDuel) - linia raz na bitwe
+        private static bool _battleDone;
+        private static string _battleKind = "-";
 
         /// <summary>Misja to bitwa na mapie, kryjowka albo bitwa wlasna (rodzaj z linii NM, liczony raz w AfterStart).</summary>
         internal static bool InBattle(Mission m)
@@ -74,6 +79,7 @@ namespace Armoury
         private static void Classify(Mission m, bool first)
         {
             string kind = MissionTeams.Kind(m);
+            bool wasBattle = InBattle(m);
             _battle = kind == "bitwa" || kind == "kryjowka";
             string via = null;
             bool duel = false;
@@ -115,6 +121,13 @@ namespace Armoury
                 }
             }
             else { _tb = null; Round = 0; }
+            // m113-walka2: poczatek bitwy - liczniki FieldDuel, zrywy i pamiec hakow od zera (raz na misje)
+            if (_battle && !duel && (first || !wasBattle))
+            {
+                _battleDone = false;
+                _battleKind = kind;
+                FieldDuel.Begin(m);
+            }
         }
 
         public override void EarlyStart()
@@ -133,7 +146,7 @@ namespace Armoury
             try { BattleCries.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.Begin", e); }
             try { BloodPools.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Begin", e); }
             try { if (_battle || _duel) VeteranAi.CheckOrder(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVeteran, "VeteranAi.CheckOrder", e); }
-            try { if (_duel) DuelGuard.CheckOrder(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.CheckOrder", e); }
+            try { if (_duel || (_battle && FieldDuel.HooksWanted(Settings.Current))) DuelGuard.CheckOrder(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.CheckOrder", e); }
             try { if (_battle) WarCouncil.Council(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteTactics, "WarCouncil.Council", e); }
             base.AfterStart();
         }
@@ -145,6 +158,11 @@ namespace Armoury
             try { BloodPools.Tick(Mission, dt); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Tick", e); }
             if (_duel && InDuel(Mission)) DuelTick(Mission, dt);
+            // m113-walka2: zrywy bohaterow w bitwie (zgloszenia z hakow B, UpdateAgentStats tylko tutaj, najwyzej 8 na klatke)
+            else if (_battle && FieldDuel.BurstsOn(Settings.Current) && InBattle(Mission))
+            {
+                try { DuelCraft.Tick(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelCraft.Tick bitwa", e); }
+            }
         }
 
         // m111-walka: tick pojedynku (glowny watek) - runda, zrywy (UpdateAgentStats tylko tutaj), probkowanie, lista meczu, linie DU
@@ -223,6 +241,13 @@ namespace Armoury
                 try { DuelAi.Flush(); } catch { }
                 try { DuelGuard.Write(Mission, _duelKind); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.Write", e); }
                 try { DuelGuard.End(); } catch { }   // po recenzji: statyki bez agentow i meczu (skonczona misja nie wisi w pamieci)
+            }
+            // m113-walka2: linia "Bitwa (m113-walka2)" raz na bitwe
+            if (_battle && !_duel && !_battleDone && InBattle(Mission))
+            {
+                _battleDone = true;
+                try { FieldDuel.Write(Mission, _battleKind); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVeteran, "FieldDuel.Write", e); }
+                try { FieldDuel.End(); } catch { }
             }
             var w = _m;
             if (w != null && ReferenceEquals(w.Target, Mission)) { _battle = false; _duel = false; _duelKind = "-"; _tb = null; Round = 0; _m = null; }
