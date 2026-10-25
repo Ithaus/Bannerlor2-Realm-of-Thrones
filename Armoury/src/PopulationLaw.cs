@@ -1227,9 +1227,12 @@ namespace Armoury
         private static object _wsModel, _popMgr; private static System.Reflection.MethodInfo _getBeh;
 
         /// <summary>121 (noc-p8): model kwot GetWorkshopTaxes - to samo zrodlo co Seal31B (NotableTaxLines / UnpaidOwnerTaxLines / D11-3): egzemplarz BK
-        /// z czynnego lancucha modelu finansow gry, zapas - konfiguracja BK; gdy nie pasuje do metody - jak dotad model z konfiguracji (_wsModel).</summary>
+        /// z czynnego lancucha modelu finansow gry, zapas - konfiguracja BK; gdy nie pasuje do metody - jak dotad model z konfiguracji (_wsModel).
+        /// Recenzja 121 (uwaga 3): przy BK Workshop Tax To Lord = WYL Seal31B linii warsztatow nie zdejmuje (UnpaidOwnerTaxLines / NotableTaxLines = 0),
+        /// wiec kwoty z lancucha dalyby panu miasta linie warsztatow lordow i gracza, ktorych nikt nie placi (z niczego) - wtedy jak przed 121 (_wsModel).</summary>
         private static object WsModel()
         {
+            if (!Seal31B.TaxOn) return _wsModel;
             var m = Seal31B.WsTaxModel();
             return m != null && _wsTax != null && _wsTax.DeclaringType.IsInstanceOfType(m) ? m : _wsModel;
         }
