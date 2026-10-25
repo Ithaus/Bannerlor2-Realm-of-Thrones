@@ -31,7 +31,9 @@ namespace Armoury
     ///    bez latek). Okno CZYTA zapis gry (takze to, co gracz ustawil w ostatniej bitwie), kopia robocza, zapis po "Save". Zapis pisze 8 wpisow (pole i armia;
     ///    oblezen nie ruszamy) - SandboxBattleSpawnModel.GetInitialSpawnAssignments rozstawia ludzi wedlug nich, gdy wszystkie 8 istnieje (dec sandbox :130-146),
     ///    SPOrderOfBattleVM.LoadConfiguration pokazuje je na ekranie Order of Battle (gracz dowodzi, >= 20 ludzi). Po rozstawieniu gra nadpisuje zapis tym, co
-    ///    gracz wystawil (SaveConfiguration) - okno zawsze czyta stan gry ("jedna prawda").
+    ///    gracz wystawil (SaveConfiguration - tylko gdy ekran byl pokazany) - okno zawsze czyta stan gry ("jedna prawda"). Bez ekranu dzialaja tylko wagi:
+    ///    kapitanow dobiera AssignBestCaptainsForTeam, HeroTroops i filtry nie sa czytane (recenzja 25.10). Zapis zostaje po wylaczeniu kluczy (spawn czyta go
+    ///    niezaleznie od nas) - dlatego "Return to the game's own order" jest czynne takze przy ArmyReviewWritesOrderOfBattle NIE.
     ///  - walidacja: kazdy rodzaj wojska obecny (zdrowi szeregowi partii, ktorymi gracz dowodzi) musi miec choragiew - inaczej OrderOfBattleVM.RefreshMissingFormations
     ///    blokuje start bitwy; brakujacy rodzaj dostaje "the rest" w wolnym indeksie, a gdy 8 zajetych - odmowa zapisu. Wagi kazdej klasy sumuja sie do 100
     ///    (pierwsza choragiew klasy bierze reszte, gdy zadna nie ma "the rest"); bohaterowie martwi, jency i spoza druzyny odfiltrowani, kazdy najwyzej raz.
@@ -49,6 +51,10 @@ namespace Armoury
         private const int CampIndex = 5, BkIndex = 2;
         private static readonly string[] Roman = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII" };
         private static readonly int[] MenSteps = { 10, 20, 25, 30, 40, 50, 60, 75, 100, 125, 150, 200, 250, 300, 400, 500, 750, 1000 };
+        // dowodcy i szeregi choragwi dzialaja tylko z ekranem Order of Battle (CanPlayerSideDeployWithOrderOfBattle: gracz prowadzi strone, >= 20 ludzi, nie wypad);
+        // bez ekranu GeneralsAndCaptainsAssignmentLogic.AssignBestCaptainsForTeam sam dobiera kapitanow, a HeroTroops czyta tylko SPOrderOfBattleVM.LoadConfiguration
+        private const string OobOnly = " (when you command 20 men or more and the Order of Battle screen shows before the fight; otherwise the game picks the captains"
+                                       + " and places your companions itself).";
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.ArmyReviewEnabled; } }
         private static bool Writes { get { var s = Settings.Current; return s != null && s.ArmyReviewEnabled && s.ArmyReviewWritesOrderOfBattle; } }
@@ -381,10 +387,11 @@ namespace Armoury
                                         null, b != null,
                                         b == null ? "The game's Order of Battle is not running in this campaign, so there is nothing to set."
                                                   : "Each banner is one of the game's 8 formations: its kind of troops, a share of them, a commander and the companions in its ranks."));
-            rows.Add(new InquiryElement("reset", "Return to the game's own order", null, b != null && entries > 0 && Writes,
-                                        !Writes ? "Army Review Writes Order Of Battle is off - the review only shows the game's order."
-                                                : entries > 0 ? "Forget the banners: the next battle sorts your men by kind into the game's own formations, as if no order had ever been set."
-                                                        : "No order is set - the game already sorts your men by kind."));
+            // powrot przywraca porzadek gry (nic nie zapisuje z okna) - czynny takze przy Writes NIE, bo zapisane choragwie dzialaja dalej po wylaczeniu klucza
+            rows.Add(new InquiryElement("reset", "Return to the game's own order", null, b != null && entries > 0,
+                                        entries <= 0 ? "No order is set - the game already sorts your men by kind."
+                                        : (!Writes ? "Army Review Writes Order Of Battle is off, but the banners saved before still set your next battle. " : "")
+                                          + "Forget the banners: the next battle sorts your men by kind into the game's own formations, as if no order had ever been set."));
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Review the army", desc, rows, true, 1, 1, "Look", "Close",
                 delegate (List<InquiryElement> picked)
                 {
@@ -964,6 +971,20 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>Pierwsza inna choragiew tego samego rodzaju (-1 - brak).</summary>
+        private static int FirstOtherOfClass(Slot[] w, int idx, int k)
+        {
+            for (int j = 0; j < Slots; j++) if (j != idx && w[j] != null && w[j].Cls == k) return j;
+            return -1;
+        }
+
+        /// <summary>Inna choragiew tego samego rodzaju ma ustawione "the rest".</summary>
+        private static bool RestElsewhere(Slot[] w, int idx, int k)
+        {
+            for (int j = 0; j < Slots; j++) if (j != idx && w[j] != null && w[j].Cls == k && w[j].Men == TheRest) return true;
+            return false;
+        }
+
         private static string Label(int i)
         {
             var s = _work[i];
@@ -1085,8 +1106,8 @@ namespace Armoury
                 new InquiryElement("filters", "Filled first with: " + (fl.Count > 0 ? string.Join(", ", fl.ToArray()) : "any man of its kind"), null, true,
                                    "Which men of its kind the Order of Battle puts here first (when you command 20 men or more and the screen sorts them)."),
                 new InquiryElement("captain", "Commander: " + (s.Captain == null ? "none" : HeroLine(s.Captain)), null, true,
-                                   "A hero of your party who leads this banner. Each hero leads one banner at most."),
-                new InquiryElement("ranks", "Companions in the ranks: " + s.Ranks.Count, null, true, "Heroes of your party who fight in this banner's ranks."),
+                                   "A hero of your party who leads this banner. Each hero leads one banner at most" + OobOnly),
+                new InquiryElement("ranks", "Companions in the ranks: " + s.Ranks.Count, null, true, "Heroes of your party who fight in this banner's ranks" + OobOnly),
                 new InquiryElement("name", "Name: " + (string.IsNullOrEmpty(s.Name) ? "none" : s.Name), null, true, "Your own name for the banner."),
                 new InquiryElement("strike", "Strike the banner", null, true, "Its men go to the other banners of their kind (or to one raised for them on saving)."),
             };
@@ -1158,13 +1179,30 @@ namespace Armoury
                 rows.Add(new InquiryElement(m, m + " men" + (h > 0 ? " (" + (int)Math.Round(100f * m / h) + "% of " + h + " fit now)" : "") + (s.Men == m ? " - now" : ""), null, true,
                                             "The banner keeps this share of your " + KindLower(s.Cls) + ": about " + m + " men while you have " + h + "."));
             }
-            MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(Label(i), "How many of your " + h + " fit " + KindLower(s.Cls) + " does this banner take?",
+            // recenzja 25.10: jedna choragiew rodzaju zawsze bierze reszte (Weights) - liczba dla tej, ktora bierze ja niejawnie, bylaby po cichu pominieta
+            int other = FirstOtherOfClass(_work, i, s.Cls);
+            string q = "How many of your " + h + " fit " + KindLower(s.Cls) + " does this banner take?";
+            if (other < 0) q += " It is your only banner of " + KindLower(s.Cls) + ", so it takes them all until you raise another.";
+            else if (TakesRest(_work, i) && !RestElsewhere(_work, i, s.Cls))
+                q += " It takes whatever the other banners leave; pick a number and banner " + Roman[other] + " takes the rest instead.";
+            MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(Label(i), q,
                 rows, true, 1, 1, "Choose", "Back",
                 delegate (List<InquiryElement> picked)
                 {
                     try
                     {
-                        if (picked != null && picked.Count > 0 && picked[0].Identifier is int) { s.Men = (int)picked[0].Identifier; _dirty = true; }
+                        if (picked != null && picked.Count > 0 && picked[0].Identifier is int)
+                        {
+                            s.Men = (int)picked[0].Identifier;
+                            _dirty = true;
+                            // liczba ludzi, a zadna inna choragiew rodzaju nie bierze reszty: reszte dostaje jawnie pierwsza inna (ta sama zasada co Weights)
+                            int j = s.Men >= 0 && !RestElsewhere(_work, i, s.Cls) ? FirstOtherOfClass(_work, i, s.Cls) : -1;
+                            if (j >= 0)
+                            {
+                                _work[j].Men = TheRest;
+                                Log.Player("Banner " + Roman[j] + " now takes the rest of your " + KindLower(s.Cls) + ".");
+                            }
+                        }
                         OpenBanner(i);
                     }
                     catch (Exception e) { Stumble("Men.Pick", e); }
@@ -1385,7 +1423,6 @@ namespace Armoury
 
         private static void AskReset()
         {
-            if (!Writes) { OpenMain(false); return; }
             InformationManager.ShowInquiry(new InquiryData("Return to the game's own order",
                 "Forget your banners? The next battle will sort your men by kind into the game's own formations, and the names of your banners are lost.",
                 true, true, "Forget them", "Back",
