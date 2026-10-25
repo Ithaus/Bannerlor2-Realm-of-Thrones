@@ -647,6 +647,10 @@ namespace Armoury
                 if (Campaign.Current != null && mission != null) DothrakiArms.OnMissionInit(mission);
                 if (Settings.Current.FieldCraftEnabled && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new FieldCraft());
+                // 136 (25.10): stamina koni - tylko bitwa gracza na mapie (turniej, arena, cwiczenia, spacer - nie; rodzaj misji i morze sprawdza HorseWind.AfterStart).
+                // Za FieldCraft i przed BattleSense: srednia S szykow z tego taktu czyta potem MarchToContact (odpoczynek konnicy AI)
+                if (Settings.Current.HorseStaminaEnabled && Campaign.Current != null && mission != null && HorseWind.Wanted(mission))
+                    mission.AddMissionBehavior(new HorseWind());
                 // m110-stan (LootStateFromWounds): ksiega obrazen czesci zbroi wrogow w bitwie - stan lupu z prawdziwych obrazen (bez latki, sama misja)
                 if (LootWear.On && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new LootWear.Logic());

@@ -1444,6 +1444,34 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float ChargeFullSpeed { get; set; } = 7f;
 
+        [SettingPropertyBool("Horse Stamina Enabled", HintText = "horses tire in battle like men do: a gallop spends a horse's wind and a blown horse slows down, while a walk or a trot gives the wind back. How long a horse lasts depends on the horse itself (speed, weight, breed), the load it carries (rider, armour, weapons, barding) and the rider's Riding skill - the same rule for you, your men and the enemy. Dragons, chariots, elephants, mammoths and the horses of the dead do not tire. Off = horses never tire, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Horse wind")]
+        public bool HorseStaminaEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Horse Gallop Drain Scale", 0.25f, 3.00f, "0.00", HintText = "how fast a gallop spends a horse's wind. At 1 an average horse with an average load (about a fifth of its own weight) gallops flat out for about a minute and a knight's horse in barding for about 40 seconds; a working canter lasts many minutes, a trot or a walk rests it. 2 = twice as fast, 0.5 = half as fast", RequireRestart = false)]
+        [SettingPropertyGroup("Horse wind")]
+        public float HorseGallopDrainScale { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Horse Recovery Seconds", 30.00f, 600.00f, "0", HintText = "how fast a horse gets its wind back: at a walk it regains about two thirds of what it lost in this many seconds (a 450 kg horse - heavier horses take a little longer); a trot rests it more slowly, a canter hardly at all", RequireRestart = false)]
+        [SettingPropertyGroup("Horse wind")]
+        public float HorseRecoverySeconds { get; set; } = 120f;
+
+        [SettingPropertyFloatingInteger("Horse Tired Floor", 0.40f, 0.90f, "0.00", HintText = "top speed of a blown horse as a share of its fresh top speed. Below 30% of its wind a horse slows down step by step, down to this (0.55 = little more than a working canter)", RequireRestart = false)]
+        [SettingPropertyGroup("Horse wind")]
+        public float HorseTiredFloor { get; set; } = 0.55f;
+
+        [SettingPropertyFloatingInteger("Horse Harness Heavy Scale", 0.10f, 1.00f, "0.00", HintText = "barding and saddles count in full up to 40 kg towards the load a horse carries; above that only this share of the extra weight counts (the barding weights in the game are about five times too heavy - 0.2 brings them back to real armour)", RequireRestart = false)]
+        [SettingPropertyGroup("Horse wind")]
+        public float HorseHarnessHeavyScale { get; set; } = 0.2f;
+
+        [SettingPropertyInteger("Horse AI Rest Below", 0, 80, "0", HintText = "AI cavalry (not horse archers) eases its horses to a trot when their wind falls below this on average, as long as no enemy is within 60 m, instead of riding them into the ground. Works with March To Contact. 0 = never", RequireRestart = false)]
+        [SettingPropertyGroup("Horse wind")]
+        public int HorseAiRestBelow { get; set; } = 35;
+
+        [SettingPropertyInteger("Horse AI Rest Until", 20, 100, "0", HintText = "AI cavalry resting its horses goes back to the gallop when their wind is back to this on average, or at once when the enemy comes within 60 m", RequireRestart = false)]
+        [SettingPropertyGroup("Horse wind")]
+        public int HorseAiRestUntil { get; set; } = 65;
+
         [SettingPropertyBool("Auto Parry Enabled", HintText = "hold block and your skill does the aiming: if your weapon skill beats the attacker's, the block turns to meet his blow", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool AutoParryEnabled { get; set; } = true;
@@ -10284,6 +10312,13 @@ namespace Armoury
             s.ChargeTemperEnabled = ChargeTemperEnabled;
             s.ChargeDamageFactor = ChargeDamageFactor;
             s.ChargeFullSpeed = ChargeFullSpeed;
+            s.HorseStaminaEnabled = HorseStaminaEnabled;
+            s.HorseGallopDrainScale = HorseGallopDrainScale;
+            s.HorseRecoverySeconds = HorseRecoverySeconds;
+            s.HorseTiredFloor = HorseTiredFloor;
+            s.HorseHarnessHeavyScale = HorseHarnessHeavyScale;
+            s.HorseAiRestBelow = HorseAiRestBelow;
+            s.HorseAiRestUntil = HorseAiRestUntil;
             s.AutoParryEnabled = AutoParryEnabled;
             s.WoundedFleeEnabled = WoundedFleeEnabled;
             s.WoundedFleePercent = WoundedFleePercent;

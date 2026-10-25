@@ -616,6 +616,13 @@ RANGES = {
     'AthleticsStaminaCurve': (1.0, 1.5, "0.00"),
     # 131 udzwig z Endurance 0..20 kg za punkt
     'EnduranceCarryKgPerPoint': (0.0, 20.0, "0.#"),
+    # 136 stamina koni (HorseWind.cs przycina do tych samych zakresow; progi odpoczynku AI w MarchToContact)
+    'HorseGallopDrainScale': (0.25, 3.0, "0.00"),
+    'HorseRecoverySeconds': (30.0, 600.0, "0"),
+    'HorseTiredFloor': (0.4, 0.9, "0.00"),
+    'HorseHarnessHeavyScale': (0.1, 1.0, "0.00"),
+    'HorseAiRestBelow': (0, 80, "0"),
+    'HorseAiRestUntil': (20, 100, "0"),
 }
 
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze
@@ -637,6 +644,9 @@ LABELS = {
     'AiArmsTripCooldownDays': 'AI Arms Trip Cooldown Days',
     'AiArmsWaitMaxDays': 'AI Arms Wait Max Days',
     'AiArmsBlockBanditAttacks': 'AI Arms Block Bandit Attacks',
+    # 136: stamina koni - progi odpoczynku konnicy AI
+    'HorseAiRestBelow': 'Horse AI Rest Below',
+    'HorseAiRestUntil': 'Horse AI Rest Until',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial

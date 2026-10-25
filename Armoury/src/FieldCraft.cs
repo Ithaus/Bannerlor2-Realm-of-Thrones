@@ -737,9 +737,12 @@ namespace Armoury
                     limit = Math.Min(limit, 1f - woundSlow);
                     if (limit < 0.4f) limit = 0.4f;
 
-                    // chod na zyczenie: gra na PC nie daje klawisza chodu (w silniku jest,
-                    // ale przypisany tylko padowi) - u nas trzymanie lewego Ctrl = idziesz,
-                    // stamina odpoczywa, wygladasz jak czlowiek, nie jak sprinter
+                    // chod na zyczenie: trzymanie lewego Ctrl = idziesz, stamina odpoczywa, wygladasz
+                    // jak czlowiek, nie jak sprinter. 136 (poprawka komentarza, bez zmiany zachowania):
+                    // gra na PC MA przelacznik chodu - GameKey 30 ToggleWalkMode = CapsLock
+                    // (CombatHotKeyCategory.cs:161; MissionMainAgentController.cs:811 wysyla Walk/Run
+                    // takze w siodle); Ctrl to nasz chod "na przytrzymanie". W siodle Ctrl ogranicza
+                    // tylko jezdzca (limit czlowieka), nie konia - czy kon go slucha, niesprawdzone
                     if (c.WalkKeyEnabled && agent.IsMainAgent)
                     {
                         try

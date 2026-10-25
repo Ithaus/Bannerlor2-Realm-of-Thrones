@@ -39,6 +39,8 @@ namespace Armoury
     ///    2.0 m/s (kolumna szybszym krokiem, ponizej progu biegu FieldCraft); pod ostrzalem (UnderRangedAttackRatio >= 0.33) tylko tempo szyku - prog RBM 0.6 (szybki krok) zostaje, celowo;
     ///  - lucznicy pieszo: marsz, dopoki najblizszy wrog dalej niz ArchersWalkUntil (powrot do marszu 20 m dalej); konni lucznicy - nigdy;
     ///  - konnica: klus = CavalryApproachPace x srednia predkosc maksymalna szyku do CavalryGallopDistance;
+    ///  - 136 odpoczynek konnicy AI (RestCav): srednia stamina koni szyku (HorseWind) ponizej HorseAiRestBelow i wrog dalej niz 70 m - ten sam klus,
+    ///    takze przy rozkazie szarzy i po zwolnieniu, az srednia wroci do HorseAiRestUntil albo wrog blizej niz 60 m; sygnal szarzy czeka (ChargeHeld);
     ///  - bieg: sygnal szarzy (BattleCries.ChargeStarted) albo rozkaz szarzy w ticku (gdy sygnal nie przyszedl - liczone osobno), zwarcie (wrog 25 m od
     ///    szyku), galop konnicy; szyk zwolniony zostaje wolny 30 s, potem wraca do marszu dopiero, gdy wrog odejdzie (piechota 50 m, lucznicy jak wyzej,
     ///    konnica dystans galopu + 100 m - nawroty RBMBehaviorCavalryCharge sa do 110 m);
@@ -81,6 +83,7 @@ namespace Armoury
         private static readonly float[] _chargeAt = new float[Slots];
         private static readonly bool[] _everMarched = new bool[Slots];
         private static readonly bool[] _chargeHeld = new bool[Slots];   // 128: szyk z rozkazem szarzy idzie jeszcze marszem (wrog dalej niz prog biegu)
+        private static readonly bool[] _rest = new bool[Slots];         // 136: konnica AI daje koniom odsapnac (klus) - srednia S koni szyku z HorseWind
 
         private static WeakReference _m;
         private static float _acc, _sampleAcc;
@@ -91,6 +94,10 @@ namespace Armoury
         // 128 (25.10, Jeff: "na poczatku powinni maszerowac a nie ciagle wszyscy biegaja w zbrojach"): szarza z daleka = marsz / klus do progu biegu
         private static bool _chargeFirst = true;
         private static float _runFrom = 60f;
+        // 136 (25.10, Jeff: "konie tez powinny miec stamine", "przeciwnik ... walczy o zycie"): konnica AI ze zmeczonymi konmi (srednia S szyku ponizej
+        // HorseAiRestBelow) idzie klusem, dopoki wrog dalej niz RestNear, az srednia wroci do HorseAiRestUntil; 0 = nigdy
+        internal const float RestNear = 60f, RestRearm = 10f;   // wejscie w odpoczynek dopiero ponad RestNear + RestRearm (bez migania klus / galop na granicy)
+        private static int _restBelow = 35, _restUntil = 65;
 
         // ---- latki
         private static bool _patchedSpeed, _patchedCache, _rbmPrefix, _triedPatch;
@@ -266,7 +273,7 @@ namespace Armoury
                 _capMove[i] = 0f; _capLimit[i] = 0f; _cav[i] = false; _who[i] = null;
                 _kind[i] = KNone; _freeUntil[i] = 0f; _released[i] = false; _archFree[i] = false; _walk[i] = 0f; _nextScan[i] = 0f;
                 _dragon[i] = false; _player[i] = false; _wasCharge[i] = false; _signal[i] = false; _chargeAt[i] = -1000f; _everMarched[i] = false;
-                _chargeHeld[i] = false;
+                _chargeHeld[i] = false; _rest[i] = false;
             }
             _any = false;
         }
@@ -301,6 +308,9 @@ namespace Armoury
             _playerMove = c.PlayerMoveOrderWalks;
             _chargeFirst = c.ChargeMarchesFirst;
             _runFrom = Clamp(c.ChargeRunsFrom, 20f, 200f);
+            _restBelow = c.HorseStaminaEnabled ? Math.Max(0, Math.Min(80, c.HorseAiRestBelow)) : 0;
+            _restUntil = Math.Max(20, Math.Min(100, c.HorseAiRestUntil));
+            if (_restUntil <= _restBelow) _restUntil = Math.Min(100, _restBelow + 5);
             _on = true;
             float now = m.CurrentTime;
             var teams = m.Teams;
@@ -393,7 +403,7 @@ namespace Armoury
                 _capMove[idx] = 0f; _capLimit[idx] = 0f; _cav[idx] = false;
                 _kind[idx] = KNone; _freeUntil[idx] = 0f; _released[idx] = false; _archFree[idx] = false; _walk[idx] = 0f; _nextScan[idx] = 0f;
                 _dragon[idx] = false; _wasCharge[idx] = false; _signal[idx] = false; _chargeAt[idx] = -1000f; _everMarched[idx] = false;
-                _chargeHeld[idx] = false;
+                _chargeHeld[idx] = false; _rest[idx] = false;
                 _who[idx] = f;
             }
             if (f.CountOfUnits <= 0) { Set(f, idx, 0f, 0f, false); return; }
@@ -426,10 +436,19 @@ namespace Armoury
             // 128: szarza z daleka idzie marszem (piechota, lucznicy pieszo) albo klusem (konnica) do progu biegu; sygnal szarzy (BattleCries.ChargeStarted:
             // okrzyk, rog, motto, zdjecie capu) przychodzi dopiero na progu - ChargeHeld mowi BattleCries, ze jeszcze nie. Gracz i AI tak samo.
             if (_released[idx] && now >= _freeUntil[idx] && gap > Rearm(kind)) _released[idx] = false;
+            // 136: stan odpoczynku konnicy AI liczony w kazdym takcie (takze przy szarzy marszem 128 - wtedy i tak klus)
+            bool rest = RestCav(f, idx, kind, player, charge, orderWalk, gap);
             if (charge && HoldCharge(idx, kind, gap, now))
             {
                 if (!_chargeHeld[idx]) { _chargeHeld[idx] = true; _tHeld++; }
                 MarchCap(f, idx, kind == KArch ? KInf : kind, gap, q);   // lucznicy w szarzy ida do progu biegu jak piechota
+                return;
+            }
+            if (rest)
+            {
+                // 136: konie odsapuja - klus jak przy podejsciu konnicy (MarchCap KCav); jak szarza marszem (128) bez ksiegowania przejsc szarzy:
+                // sygnal szarzy (okrzyk, rog, zdjecie capu) przyjdzie z BattleCries, gdy odpoczynek sie skonczy (ChargeHeld)
+                MarchCap(f, idx, KCav, gap, q);
                 return;
             }
             if (_chargeHeld[idx])
@@ -504,7 +523,32 @@ namespace Armoury
             return gap > (kind == KCav ? _gallop : _runFrom);
         }
 
-        /// <summary>128: dla BattleCries przed sygnalem szarzy (glowny watek): true = szyk idzie jeszcze marszem, sygnal (okrzyk, rog, bieg) pozniej.</summary>
+        /// <summary>136: odpoczynek szyku konnicy AI (nie konni lucznicy, nie gracz, nie smok; rozkaz szarzy albo marszu): wejscie, gdy srednia S koni szyku
+        /// (HorseWind.AvgStamina) spadnie ponizej HorseAiRestBelow, a wrog jest dalej niz RestNear; wyjscie, gdy srednia wroci do HorseAiRestUntil albo wrog
+        /// blizej niz RestNear (wtedy szarza / galop jak dotad - "walczy o zycie"); ponowne wejscie dopiero ponad RestNear + RestRearm. Brak danych (stamina koni wylaczona, szyk bez liczonych koni) = bez odpoczynku.</summary>
+        private static bool RestCav(Formation f, int idx, byte kind, bool player, bool charge, bool orderWalk, float gap)
+        {
+            if (kind != KCav || player || _dragon[idx] || (!charge && !orderWalk) || gap == float.MaxValue || _restBelow <= 0)
+            {
+                _rest[idx] = false;
+                return false;
+            }
+            float avg = HorseWind.AvgStamina(f);
+            if (avg < 0f) { _rest[idx] = false; return false; }
+            if (_rest[idx])
+            {
+                if (avg >= _restUntil || gap < RestNear) _rest[idx] = false;
+            }
+            else if (avg < _restBelow && gap > RestNear + RestRearm)
+            {
+                _rest[idx] = true;
+                HorseWind.NoteAiRest();
+            }
+            return _rest[idx];
+        }
+
+        /// <summary>128: dla BattleCries przed sygnalem szarzy (glowny watek): true = szyk idzie jeszcze marszem, sygnal (okrzyk, rog, bieg) pozniej.
+        /// 136: takze konnica AI, ktora daje koniom odsapnac (stan z ostatniego taktu Eval).</summary>
         internal static bool ChargeHeld(Formation f)
         {
             if (!_on || f == null) return false;
@@ -513,7 +557,7 @@ namespace Armoury
             int idx = Idx(f);
             if (idx < 0 || !ReferenceEquals(_who[idx], f)) return false;
             float gap = EnemyGap(f);
-            return HoldCharge(idx, _kind[idx], gap, m.CurrentTime);
+            return HoldCharge(idx, _kind[idx], gap, m.CurrentTime) || _rest[idx];
         }
 
         /// <summary>Tempo marszu szyku: konnica klus, lucznicy do ArchersWalkUntil, piechota krok (dalej niz 250 m szybszy krok); pod ostrzalem tylko tempo szyku.</summary>
