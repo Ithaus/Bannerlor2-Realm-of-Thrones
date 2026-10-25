@@ -23,6 +23,10 @@ namespace Armoury
         private static Harmony _h;
         private static bool _missionDone, _campaignDone;
 
+        /// <summary>140: instancja Harmony dla latek zakladanych w bitwie poza FirstBattle (ShieldsUp.EnsurePatched - raz na proces przy pierwszej
+        /// bitwie z kluczem, K9: klucz wylaczony w pierwszej bitwie nie blokuje latek do konca sesji).</summary>
+        internal static Harmony H { get { return _h; } }
+
         /// <summary>SubModuleMain.OnBeforeInitialModuleScreenSetAsRoot: tylko zapamietanie instancji Harmony (nic nie lata).</summary>
         internal static void SetHarmony(Harmony h)
         {

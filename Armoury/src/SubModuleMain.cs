@@ -671,7 +671,8 @@ namespace Armoury
                 // czesc 2: linia NB2 takze dla taktyki wedlug dowodcy, weteranow wedlug tieru, krwi przez pancerz i glosow (BattleSense ponizej)
                 bool nb2b = Settings.Current.CommanderTactics || Settings.Current.VeteransByTier || Settings.Current.BloodThroughArmour
                             || Settings.Current.BattleCriesAndMoans || Settings.Current.GroundBloodPools   // czesc 3 (16.10): kaluze krwi
-                            || BattleSense.NightKeys(Settings.Current);   // noc 25.10 P0 (K2): marsz i doktryny (P1), dzwiek (P2), choragwie (P3) - BattleSense i RoutKeeper (linia NB2, RoutHold.On)
+                            || BattleSense.NightKeys(Settings.Current)   // noc 25.10 P0 (K2): marsz i doktryny (P1), dzwiek (P2), choragwie (P3) - BattleSense i RoutKeeper (linia NB2, RoutHold.On)
+                            || Settings.Current.AiShieldsUpUnderFire;    // 140: tarcza pod ostrzalem (ShieldsUp) - wejscia tylko z BattleSense
                 if (mission != null && ((Settings.Current.BrokenMenNeverRally && (Settings.Current.WoundedFleeEnabled
                         || (Settings.Current.FieldCraftEnabled && Settings.Current.AiFleeWhenNearDeath && Campaign.Current != null)))
                         || Settings.Current.SoldierPostureByTier || nb2b

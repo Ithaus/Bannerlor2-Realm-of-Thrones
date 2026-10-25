@@ -1,5 +1,101 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 140 (galaz noc/139-ai-zycie, po 139 00472fc0) - AI walczy o zycie, krok 2: tarcza pod ostrzalem (ShieldsUp, projekt 135a z poprawkami krytyka K1-K13 i E)
+**Problem:** Jeff 25.10 ok. 13:25: "przeciwnik jak ma tarcze a widzi ze ktos w niego strzela to zaklada tarcze z plecow ... zamiast zalozyc tarcze to idzie w lucznika
+i ginie jak kretyn, zasada AI robi wszystko aby nie dac sie zabic!"; 13:30: "Jak widzi ze kolega padl od strzaly a ma tarcze to zalozy tarcze i sie za nia schowa i idzie na
+przeciwnika, dopiero ta zasada peka gdy jest panika". Dowod z logu (HitScribe, raport B rozpoznania 135): raiderzy (tarcza w kazdym zestawie) 33 trafienia pociskiem, 0 BLOK;
+konny chief 6 BLOK.
+**Przyczyna:** (1) RBMAI AgentAi.cs:243-257 (postfiks SetAiRelatedProperties, po rozstawieniu): wrog dalej niz 2.5 m -> AiWeaponFavorMultiplierPolearm = 35 (gra 1,
+ASCM.cs:226-228) - czlowiek z drzewcem dwurecznym idzie z nim, tarcza zostaje na plecach do 2.5 m; ostrzal nie ma znaczenia. (2) Zaden kod C# gry nie bierze tarczy
+w reakcji na pociski; AiUseShieldAgainstEnemyMissileProbability 0.95 (RBM AgentAi:142) dotyczy tarczy juz w rece. (3) Agent.UpdateFormationOrders (Agent.cs:3645-3650)
+co ok. 0.5 s daje EnforceShieldUsage(GetShieldDirectionOfUnit) = None poza ShieldWall / Circle / Square (ArrangementOrder.cs:163-198), a RBM wlacza ShieldWall tylko przy
+ponad 70% duzych tarcz w rece (Utilities:200-217). (4) LastRangedHitTime / UnderRangedAttackRatio licza tylko obrazenia (Agent.cs:5438-5442) - pudla i tarcze to nie
+"ostrzal" dla gry.
+**Zmiana:** ShieldsUp.cs (nowy), jedna regula dla wszystkich stron, tylko tryb ROZSADEK (przelacznik 139 SurvivalMode.InPanic + IsRetreating):
+(a) Wykrycie ostrzalu (prawdziwy strzal, bez wyprzedzania): S1 trafienie (OnMissileHit z ofiara - cialo, tarcza w rece, tarcza na plecach) - ofiara; S2 strzal AI z celem
+(GetTargetAgent na glownym watku) - cel; S3 (K6) strzal gracza albo AI bez celu - punkt upadku z balistyki (velocity.z, opad 1.6 m, bez oporu powietrza) i wrogowie
+strzelca w 8 m od niego, pudlo (OnMissileHit bez ofiary) - punkt zderzenia cd.CollisionGlobalPosition i wrogowie strzelca w 4.5 m (dziala na kazdym dystansie, nie ucina
+na 120 m); S4 szyk - jedno zdarzenie na pocisk na szyk (trafienie albo pudlo, pamiec indeksu pocisku 3 s), co najmniej ShieldsUpFormationShots w 5 s = caly szyk pod
+ostrzalem do ostatniego + ShieldsUpHoldSeconds. Znacznik czlowieka = teraz + ShieldsUpHoldSeconds, przedluzany kazdym zdarzeniem. Callbacki tylko kolejka pod lockiem
+(1024, nadmiar liczony), oproznianie co klatke na glownym watku, do 12 zapytan o sasiadow na klatke.
+(b) Kogo dotyczy: czlowiek AI (nie gracz), pieszy, z tarcza w ekwipunku; pomijani (kazdy powod osobno w linii): strzelcy z amunicja (K12: IsRangedCached - lucznik /
+kusznik ze strzalami strzela dalej, bez amunicji wchodzi; przy HoldYourFire szyku wchodzi - wybrana regula amunicji, nie IsShieldUsageEncouraged gry, ktora wyklucza
+lucznika takze bez strzal), konni, chorazy (sztandar w rece albo ExtraWeaponSlot), drabiny i machiny (IsUsingGameObject), odlaczeni od szyku, Inni (Undead), PANIKA
+i odwrot (139), ludzie gracza przy ShieldsUpYourMenToo NIE; bitwy morskie poza (Naval ma wlasna regule, ShipPlacementDetachment:678).
+(c) Zestaw po WSZYSTKICH uzyciach (K1, MissionWeapon.GetWeaponComponentDataForUsage), sprawdzany przy kazdym passie: tarcza (slot 0-3, HP > 0); bron jednoreczna z
+przedmiotow o samych uzyciach jednorecznych (miecz, topor, buzdygan/kilof, sztylet, jednoreczne drzewce), wlocznia z kilkoma uzyciami na koncu, bron rzucana wcale;
+"drzewce dwureczne" = uzycie drzewca z NotUsableWithOneHand (w 1.4.8 nie ma klasy Pike).
+(d) Przelozenie (K5): pass ludzi co 0.25 s tylko po liscie oznaczonych; w JEDNYM passie w kolejnosci gry (WieldInitialWeapons Agent.cs:4575-4584): tarcza do drugiej
+reki, potem jednoreczna, przez Mission.AddTickActionMT (TryToWieldWeaponInSlot, WithAnimation; wykonanie na poczatku nastepnego Mission.OnTick); jednoreczna juz w rece -
+sama tarcza; wlocznia z kilkoma uzyciami trzymana oburacz - sama tarcza; dwureczna bez jednorecznej - nic (licznik). Kontrola po 1.5 s od wykonania, proba co 4 s,
+3 proby na okres znacznika, 16 polecen na pass, 3000 na bitwe, NIGDY przy wrogu blizej niz 8 m; powrot do dwurecznej liczony (czas od przelozenia), po 3 powrotach
+"uparty" do konca okresu.
+(e) Preferencja (K3/K4): postfiks AgentStatCalculateModel.SetAiRelatedProperties (Priority.Last, after com.rbmai; cel AccessTools.DeclaredMethod na klasie deklarujacej)
+u oznaczonych z drzewcem dwurecznym i OSOBNA bronia jednoreczna: AiWeaponFavorMultiplierPolearm = 1, Melee co najmniej 35 (RBM przy wrogu w 2.5 m daje 55 - zostaje);
+kazda zmiana flagi od razu agent.UpdateAgentProperties (jak RBM StanceLogic:2040; do 32 na pass). Regula 8 m takze dla preferencji: w 8 m od wroga flaga idzie za tym,
+co czlowiek trzyma (decyzja Jeffa D2 - pikinier w zwarciu przy ostrzale zostaje z tarcza i mieczem; zwolnienie po ostrzale odlozone, az wrog odejdzie poza 8 m, chyba ze
+i tak trzyma dwureczna).
+(f) Uniesienie: postfiks Agent.UpdateFormationOrders (Priority.Last) - warunek oryginalu (K2: Formation != null, !IsRetreating, nie odlaczony) i bez paniki komponentu
+(IsPanicked / IsRetreating; RoutHold zna czlowieka - flaga gaszona w passie glownego watku), druga reka trzyma tarcze, szyk nie ShieldWall / Square / Circle (tam kierunek
+daje gra), wrog dalej niz 6 m (u rzucajacych bronia rzucana 35 m - K12, rzuty nie duszone): EnforceShieldUsage(pierwszy szereg DefendDown, reszta AttackEnd) - wzor gry
+w ShieldWall i Naval. K10: po wygasnieciu raz None, gdy w drugiej rece nie ma tarczy albo czlowiek nie ma szyku (z tarcza w rece kierunek co wywolanie ustawia gra albo
+prefiks RBM).
+(g) Konnica (K11, PikesKeptAgainstHorse): czlowiek z drzewcem dwurecznym nie zmienia broni i nie dostaje preferencji, gdy szyk wroga z IsCavalryFormation jest blizej niz
+90 m od jego szyku (przejscie po szykach wroga, nie ClosestSignificantlyLargeEnemyFormation; liczone przy pierwszym znaczniku szyku i co 1 s).
+(h) Watki i koszt: postfiksy tylko czytaja tablice po agent.Index (powieksza tylko glowny watek, _who podmieniane ostatnie, porownanie referencji agenta), liczniki
+postfiksow przez Interlocked i flaga int na czlowieka (K8), licznik wywolan postfiksow ogolem (lapka nie biegnie vs warunek). Latki raz na proces przy pierwszej bitwie
+z kluczem (EnsurePatched, K9 - klucz NIE w pierwszej bitwie nie blokuje ich do konca sesji; NightHooks.H), linia logu "Tarcze (140): latki ..." raz; kolejnosc po RBM
+sprawdzana w kazdym AfterStart (CheckOrder). Potkniecia: nowe miejsce "tarcze" w RoutHold (Sites 14 -> 15; NB2 "potkniecia: ..., los n, tarcze n" - regex NBW przyjmuje),
+w postfiksach pierwsze 3 do Stumble, reszta w liczniku; czlowiek z 5 potknieciami wypada z listy - funkcji nie gasimy.
+(i) Diagnostyka (K13): linia HIT (HitScribe) dostaje "| ofiara: reka=<klasa biezacego uzycia>#<CurrentUsageIndex>|pusta, lewa=tarcza|inna|pusta, tarcza w ekw.=TAK/NIE,
+plecy=TAK/NIE (CollidedWithShieldOnBack), 140=TAK/NIE; AI tarczy: opoznienie AiRaiseShieldDelayTimeBase, promien AiFlyingMissileCheckRadius, szansa
+AiUseShieldAgainstEnemyMissileProbability" (pola tylko przy tarczy w rece); zbiorczy histogram wszystkich ofiar (bez limitu 150 HitScribe) w linii bitwy - takze przy
+kluczu NIE, gdy HitScribeEnabled (punkt wyjscia testu A).
+(j) Linia raz na bitwe (BattleSense.Clean): "Bitwa (140 tarcze): misja bitwa, klucz TAK (trzymanie 8 s, szyk od 3 pociskow w 5 s, ludzie gracza TAK, piki przy konnicy
+TAK; latki: SetAi po RBM TAK, UpdateFormationOrders TAK (prefiks RBM TAK); wywolan postfiksu SetAi a (z preferencja b), UpdateFormationOrders c) | ostrzal: strzalow AI
+z celem d, AI bez celu e, gracza f (bez celu: punkt upadku z balistyki), pudel z punktem upadku g, trafien h (tarcza w rece i, tarcza na plecach j, cialo k), szykow pod
+ostrzalem l (m s), zapytan n (ponad limit klatki o), nadmiar kolejki p | ludzie: oznaczonych q (juz z tarcza w rece r) | przelozenia s, ludzi t (jednoreczna+tarcza u,
+tylko tarcza v; polecen w), bez jednorecznej x; pominieci: strzelcy z amunicja .., konni .., chorazy .., obiekt .., odlaczeni .., Inni .., panika .., ludzie gracza ..,
+konnica blisko .., wrog <8 m .., limit polecen .. | po 1.5 s tarcza w rece y/z, powtorki .., powroty do dwurecznej .. (srednio po .. s), uparci .. | preferencja
+(Polearm 1, Melee 35): wlaczona .. razy (ludzi ..), zwolniona .. (odlozona przez wroga <8 m ..), UpdateAgentProperties .. | EnforceShieldUsage .. wywolan, ludzi ..,
+None po wygasnieciu .. | zmiany szyku w oznaczonych szykach .. (na ShieldWall ..) | trafienia oznaczonych z tarcza w rece: BLOK ../.. (nieoznaczeni z tarcza w ekw.:
+../..) | rzuty broni rzucanej .. (oznaczonych ..) | ofiary pociskow (stan rak): lewa tarcza .. / tarcza nie w rece .. / bez tarczy ..; glowna dwureczna lub luk ..,
+jednoreczna .., pusta ..; z tarcza w rece sr. AiRaiseShieldDelayTimeBase .., AiFlyingMissileCheckRadius .., AiUseShieldAgainstEnemyMissileProbability .. | potkniecia
+tarcze n (w postfiksach m, wypadli z listy k); probka typow: <id> ok/oznaczonych x3." Linia startu sesji NB2 dostaje segment "AI Shields Up Under Fire TAK (...)".
+(k) Klucze MCM (nowa grupa "Shields under fire", opisy po angielsku, opis PikesKeptAgainstHorse wg K11): AiShieldsUpUnderFire = TAK, ShieldsUpHoldSeconds = 8 (2..30),
+ShieldsUpFormationShots = 3 (1..20), ShieldsUpYourMenToo = TAK (decyzja D1), PikesKeptAgainstHorse = TAK; RANGES w tools/gen_mcm.py, gen_mcm: Armoury 2498 ustawien,
+McmSettings.cs wygenerowany. Klucz dolaczony do nb2b w SubModuleMain (BattleSense i RoutKeeper w misji). Wpiecia w BattleSense: Begin w AfterStart (Night), Tick w bloku
+Night po BattleSound, OnAgentShootMissile / OnMissileHit - osobny try po dzwieku, End w Clean.
+Odstepstwa od projektu (swiadome): bron rzucana nigdy jako jednoreczna (E: "albo wcale"); preferencja tylko z OSOBNA bronia o samych uzyciach jednorecznych (u czlowieka
+z sama wlocznia o kilku uzyciach Polearm 1 nie ma czego wybrac, a moze ozywic rzuty - R6); S4 liczy przyloty (trafienie / pudlo), nie strzaly S2/S3 - jedno zdarzenie
+na pocisk na szyk bez podwojnego liczenia; K10 None tylko bez tarczy w drugiej rece; eksperymenty tylko DLL testu (flaga armoury-tarcze-test.flag - test B/B2,
+InvalidateAIWeaponSelections, WithAnimationUninterruptible) NIE zrobione; 135b (szyk pod ostrzalem) i 135c (ruch) - osobne kroki.
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - nowy kod dziala tylko w bitwie (Night) z kluczem; nikt inny w Armoury nie wola
+EnforceShieldUsage, TryToWield w bitwie ani AiWeaponFavor* (grep: tylko CampWalk.cs:551 - sztandar w obozie); VeteranAi / DuelAi pisza inne pola tego samego postfiksu
+SetAi (kolejnosc miedzy naszymi postfiksami bez znaczenia, pojedynek poza bramka Night); BattleSound / NB2 / 139 bez zmian logiki (dodane tylko wolania i miejsce
+"tarcze"); HitScribe tylko dopisek do linii. (b) kolizje - RBM: postfiks SetAi po RBM zmienia tylko Polearm/Melee u oznaczonych; prefiks RBM UpdateFormationOrders
+(ChargeWithTarget) nadpisujemy tylko poza 6 m; RBM UnpatchAll tylko z wlasnym id (RBMAiPatcher) - nasze latki zostaja, CheckOrder w linii; StanceLogic wytraca tarcze -
+zestaw co pass. DTE: TryToWield nie przestawia slotow (zwrot i lup nietkniete). Choragwie: chorazy pominieci (BannerKit czysci im sloty 1-3). 128 (szarza marszem do 60 m):
+dluzej pod strzalami = wiecej znacznikow; czy wymuszona tarcza w biegu spowalnia (Z4) - nie wiadomo. VeteranAi: tarcza w rece przelacza jego galaz T5+ "bez tarczy"
+(VeteranAi.cs:351-354) - pikinierzy T5+ traca podbicie parowania na rzecz profilu tarczy RBM (spojne, ale zmiana). Postura RBM: przeliczenie przy zmianie broni trzyma
+stosunek; licznik RoutHold.PostureNoWeapon moze urosnac (pusta reka w polowie animacji). (c) jedno zjawisko - druga i trzecia definicja ostrzalu zostaja bez zmian:
+MarchToContact underFire (UnderRangedAttackRatio >= 0.33, :545-547) i kolejka trafien BattleSound (_hitQ, okrzyk "shields", BattleSound.Orders.cs:407-430) - ujednolicenie
+to osobna decyzja; ekonomia bez zlota i przedmiotow; martwy kod nie ozywiony (nowa praca z limitami: 64 polecenia/s, 3000 na bitwe, 64 zapytania na pass, 12 na klatke).
+(d) cudzy kod sprawdzony w dekompilacji 1.4.8 (scratchpad shield/, surv/, s140/): Agent.cs (UpdateFormationOrders, EnforceShieldUsage, TryToWieldWeaponInSlot,
+IsRangedCached, HasShieldCached, IFormationUnit.FormationRankIndex), Mission.cs (AddTickActionMT pod lockiem, petla akcji na poczatku OnTick, GetNearbyEnemyAgents),
+MissionWeapon (CurrentUsageIndex, GetWeaponComponentDataForUsage, IsShield, IsBanner), WeaponComponentData/WeaponFlags (NotUsableWithOneHand 0x10, IsPolearm =
+MeleeWeapon|WideGrip), AttackCollisionData (AttackBlockedWithShield, CollidedWithShieldOnBack, CollisionGlobalPosition, AffectorWeaponSlotOrMissileIndex), RBMAI AgentAi
+i OverrideUpdateFormationOrders. Ryzyka: R1 pikinierzy porzucaja piki (zwolnienie przy konnicy w 90 m, nic w 8 m, po ostrzale wraca RBM x35); R3 migotanie broni (8 s,
+4 s, 3 proby, uparci); R4 natywne AI ignoruje preferencje (licznik powrotow; plan B InvalidateAIWeaponSelections, plan C OnAIInputSet); R5 wymuszona tarcza spowalnia
+marsz (Z4); R6 rzadsze rzuty (licznik rzutow, porownac z bitwa przy kluczu NIE); R7/K7 RBM czesciej ShieldWall (przy >70% duzych tarcz w rece) albo Loose -> Line
+(przelozenie halabardnikow zbija odsetek broni uderzeniowej) - gesciej pod strzalami, migotanie szyku: licznik zmian szyku; R8 watek - postfiksy tylko czytaja;
+R9 postfiks UpdateFormationOrders ok. 2000 wywolan/s konczy sie po jednym odczycie tablicy. Autotest nie sprawdzi S3 gracza (bohater pod SI) - sprawdzic w grze Jeffa.
+(e) Sprawdzic w logu po wgraniu: "Tarcze (140): latki ... wpieta" x2; w linii bitwy "SetAi po RBM TAK", "UpdateFormationOrders TAK", wywolan postfiksow > 0, potkniecia
+tarcze 0 (takze NB2 "tarcze 0"); przy ostrzale oznaczonych > 0, przelozenia > 0, po 1.5 s tarcza w rece >= 90% prob, powroty < 20%, EnforceShieldUsage > 0, BLOK
+oznaczonych z tarcza w rece wyraznie > 0 (orientacyjnie >= 30%) i wyzej niz nieoznaczonych, rzuty nie mniej niz polowa z bitwy przy kluczu NIE; HIT z "| ofiara: ..."
+(test A przy kluczu NIE rozstrzyga Z5: tarcza na plecach czy w rece u raiderow). W grze (Jeff): pikinierzy Westerlands (casterly_pikeman, bolton_veteran) pod ostrzalem
+z tarcza i mieczem, z pika przy konnicy; obroncy z tarcza na murach biora tarcze, drabiny dzialaja; strzelcy z amunicja strzelaja dalej; zadnych zmian broni w zwarciu.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; Armoury.dll md5 2e975b0a7cecb3a347a000e3d8d39bfa).
 ## 2026-10-25 139 (galaz noc/139-ai-zycie od noc/138-calosc d331082f) - AI walczy o zycie, krok 1: przelacznik trybu PANIKA / ROZSADEK (SurvivalMode) i pomiar losu zlamanych (linia "LOS ZLAMANYCH (139)"), zero zmian zachowania
 **Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze
 jego mozliwosci i skilli aby przetrwac, walczy o zycie! ... dopiero ta zasada peka gdy jest panika, w panice jest zasada uciekaj i brak rozsadku ... Wtedy ginie najwiecej

@@ -1560,6 +1560,26 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool AutoParryMirrorSides { get; set; } = true;
 
+        [SettingPropertyBool("Ai Shields Up Under Fire", HintText = "AI soldiers who carry a shield take it up when arrows, bolts or javelins come at them or their formation: a man with a pike or two-handed weapon and a shield on his back switches to his one-handed weapon and shield (never with an enemy within 8 m), holds the shield up while the shooting lasts and goes back to his own choice of weapon when it stops - in close combat he keeps sword and shield. Archers and crossbowmen with arrows or bolts left keep shooting; panicking men, horsemen, standard bearers and men on ladders or engines are left alone. All sides alike. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool AiShieldsUpUnderFire { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Shields Up Hold Seconds", 2.00f, 30.00f, "0.0", HintText = "with AI Shields Up Under Fire: how long after the last arrow the men keep their shields up, in seconds", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public float ShieldsUpHoldSeconds { get; set; } = 8f;
+
+        [SettingPropertyInteger("Shields Up Formation Shots", 1, 20, "0", HintText = "with AI Shields Up Under Fire: how many arrows, bolts or javelins landing on a formation within 5 seconds put the whole formation under fire (fewer = sooner); a man shot at himself takes his shield at once", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public int ShieldsUpFormationShots { get; set; } = 3;
+
+        [SettingPropertyBool("Shields Up Your Men Too", HintText = "with AI Shields Up Under Fire: your own soldiers follow the same rule (your orders to formations are never changed)", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool ShieldsUpYourMenToo { get; set; } = true;
+
+        [SettingPropertyBool("Pikes Kept Against Horse", HintText = "with AI Shields Up Under Fire: men with a pike or long spear keep it, and do not swap to the shield, while an enemy cavalry formation is within 90 m of theirs - with a shield on his arm a man cannot brace his pike, so its reach is all he has against a charge", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool PikesKeptAgainstHorse { get; set; } = true;
+
         [SettingPropertyBool("Duel Ai Enabled", HintText = "in tournaments, the arena and duels a skilled opponent fights like one: he attacks on his own, ripostes after a parry, feints and kicks, and does not stand behind his guard waiting for you - from about skill 100 up (on Realistic; a lower difficulty raises this, later tournament rounds lower it), the higher his skill the bolder he is; below that he fights as RBM sets him. A knight handed an unfamiliar weapon in the lists still fights with most of his best skill, and later rounds of a tournament field harder opponents. Needs RBM with posture; field battles are not touched. Off = plain RBM in duels, as before", RequireRestart = false)]
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelAiEnabled { get; set; } = true;
@@ -10373,6 +10393,11 @@ namespace Armoury
             s.AutoParryFullDiff = AutoParryFullDiff;
             s.AutoParryTwoHandedOnly = AutoParryTwoHandedOnly;
             s.AutoParryMirrorSides = AutoParryMirrorSides;
+            s.AiShieldsUpUnderFire = AiShieldsUpUnderFire;
+            s.ShieldsUpHoldSeconds = ShieldsUpHoldSeconds;
+            s.ShieldsUpFormationShots = ShieldsUpFormationShots;
+            s.ShieldsUpYourMenToo = ShieldsUpYourMenToo;
+            s.PikesKeptAgainstHorse = PikesKeptAgainstHorse;
             s.DuelAiEnabled = DuelAiEnabled;
             s.DuelAiBestSkillShare = DuelAiBestSkillShare;
             s.DuelAiTourneyRoundStep = DuelAiTourneyRoundStep;

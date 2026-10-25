@@ -631,6 +631,9 @@ RANGES = {
     # 137 recenzja: okno walki po strzale 0..5 s (0 = strzal nie otwiera okna)
     'BreathShotFightSeconds': (0.0, 5.0, "0.0"),
     'WindedExitBar': (0.10, 0.50, "0.00"),
+    # 140 tarcza pod ostrzalem (ShieldsUp.Begin przycina do tych samych zakresow): trzymanie 2..30 s, szyk pod ostrzalem od 1..20 pociskow w 5 s
+    'ShieldsUpHoldSeconds': (2.0, 30.0, "0.0"),
+    'ShieldsUpFormationShots': (1, 20, "0"),
 }
 
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze

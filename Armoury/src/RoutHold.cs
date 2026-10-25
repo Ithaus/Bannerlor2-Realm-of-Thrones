@@ -61,9 +61,11 @@ namespace Armoury
         internal const int SiteMarch = 9, SiteDoctrine = 10, SiteBanner = 11, SiteSound = 12;
         // 139 (25.10): pomiar losu zlamanych (BrokenFate) - wlasne miejsce, zeby potkniecia pomiaru nie zlewaly sie z panika
         internal const int SiteFate = 13;
-        private const int Sites = 14;
+        // 140 (25.10): tarcza pod ostrzalem (ShieldsUp) - wlasne miejsce (kolejka pociskow, pass ludzi i szykow, postfiksy SetAi / UpdateFormationOrders)
+        internal const int SiteShields = 14;
+        private const int Sites = 15;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
-                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los" };
+                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -367,6 +369,14 @@ namespace Armoury
               .Append(BrokenFate.SampleEvery.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" s, spis przelacznika co ")
               .Append(BrokenFate.CensusEvery.ToString("0", System.Globalization.CultureInfo.InvariantCulture))
               .Append(" s; panika = IsPanicked albo RoutHold albo odwrot komponentu, odwrot z rozkazu szyku = rozsadek)")
+              // 140: tarcza pod ostrzalem (linia 'Bitwa (140 tarcze)' po bitwie)
+              .Append(" | AI Shields Up Under Fire ").Append(c.AiShieldsUpUnderFire ? "TAK" : "NIE").Append(" (trzymanie ")
+              .Append(c.ShieldsUpHoldSeconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)).Append(" s, szyk od ").Append(c.ShieldsUpFormationShots)
+              .Append(" pociskow w 5 s, ludzie gracza ").Append(c.ShieldsUpYourMenToo ? "TAK" : "NIE").Append(", piki przy konnicy w ")
+              .Append(ShieldsUp.CavalryNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m ").Append(c.PikesKeptAgainstHorse ? "TAK" : "NIE")
+              .Append("; bez zmiany broni w ").Append(ShieldsUp.NoSwapNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m od wroga, tarcza w gore poza ")
+              .Append(ShieldsUp.RaiseNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m; latki ")
+              .Append(ShieldsUp.PatchedSetAi && ShieldsUp.PatchedUfo ? "wpiete" : "przy pierwszej bitwie z kluczem").Append(')')
               .Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }

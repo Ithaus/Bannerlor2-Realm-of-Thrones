@@ -77,12 +77,17 @@ namespace Armoury
                 }
                 catch { }
 
+                // 140 (K13 krytyka tarcz): stan rak ofiary - klasa biezacego uzycia broni w rece, druga reka, tarcza w ekwipunku, tarcza na plecach,
+                // znacznik ostrzalu 140, przy tarczy w rece trzy pola AI tarczy; zbiorczy histogram (bez limitu wpisow) w linii "Bitwa (140 tarcze)"
+                string vs = "";
+                try { vs = ShieldsUp.VictimState(affectedAgent, collisionData.CollidedWithShieldOnBack); } catch { }
+
                 _written++;
                 Log.Info("HIT " + arrow + " -> " + victim + " [" + part + "]"
                          + " dmg=" + ((int)damagedHp) + " wchloniete=" + ((int)armor)
                          + " surowe=" + ((int)(damagedHp + armor))
                          + " HPpo=" + ((int)affectedAgent.Health) + "/" + ((int)affectedAgent.HealthLimit)
-                         + (isBlocked ? " BLOK" : "") + " dyst=" + ((int)hitDistance) + shooter);
+                         + (isBlocked ? " BLOK" : "") + " dyst=" + ((int)hitDistance) + shooter + vs);
                 if (_written == MaxLines)
                     Log.Info("HitScribe: limit " + MaxLines + " wpisow tej misji osiagniety - reszta pominieta.");
             }

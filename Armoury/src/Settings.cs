@@ -584,6 +584,18 @@ namespace Armoury
         public bool AutoParryTwoHandedOnly = true;         // the master's parry works only with two-handed blades (off = any melee weapon)
         public bool AutoParryMirrorSides = true;           // side swings block mirror-wise (his left = your right) - flip if blocks feel wrong-sided
 
+        // --- Shields under fire ---
+        // 140 (25.10, fala 'AI walczy o zycie', Jeff 13:25 'przeciwnik jak ma tarcze a widzi ze ktos w niego strzela to zaklada tarcze z plecow ... zamiast
+        // zalozyc tarcze to idzie w lucznika i ginie jak kretyn'): ShieldsUp.cs - czlowiek AI z tarcza pod ostrzalem (trafienie, cel strzalu AI, punkt upadku
+        // pocisku, szyk pod ostrzalem) bierze tarcze i jednoreczna (nigdy w 8 m od wroga), postfiks SetAiRelatedProperties po RBM (Polearm 1, Melee 35 - cofa
+        // x35 drzewca z RBM AgentAi.cs:243-257), postfiks UpdateFormationOrders trzyma tarcze w gorze poza 6 m; panika (przelacznik 139) pominieta, strzelcy
+        // z amunicja strzelaja dalej, bitwy morskie poza. Zakresy w kodzie = RANGES w tools/gen_mcm.py. Linia 'Bitwa (140 tarcze)'
+        public bool AiShieldsUpUnderFire = true;           // AI soldiers who carry a shield take it up when arrows, bolts or javelins come at them or their formation: a man with a pike or two-handed weapon and a shield on his back switches to his one-handed weapon and shield (never with an enemy within 8 m), holds the shield up while the shooting lasts and goes back to his own choice of weapon when it stops - in close combat he keeps sword and shield. Archers and crossbowmen with arrows or bolts left keep shooting; panicking men, horsemen, standard bearers and men on ladders or engines are left alone. All sides alike. Off = as before
+        public float ShieldsUpHoldSeconds = 8f;            // with AI Shields Up Under Fire: how long after the last arrow the men keep their shields up, in seconds
+        public int ShieldsUpFormationShots = 3;            // with AI Shields Up Under Fire: how many arrows, bolts or javelins landing on a formation within 5 seconds put the whole formation under fire (fewer = sooner); a man shot at himself takes his shield at once
+        public bool ShieldsUpYourMenToo = true;            // with AI Shields Up Under Fire: your own soldiers follow the same rule (your orders to formations are never changed)
+        public bool PikesKeptAgainstHorse = true;          // with AI Shields Up Under Fire: men with a pike or long spear keep it, and do not swap to the shield, while an enemy cavalry formation is within 90 m of theirs - with a shield on his arm a man cannot brace his pike, so its reach is all he has against a charge
+
         // --- Duels and tournaments ---
         // m111-walka faza 1 (24.10, Jeff: "jak atakuje caly czas, przeciwnik sie tylko broni; z drzewcem, ktorego sie dopiero ucze, bije duzo wyzsze
         // poziomy; nie czulem, ze rycerz Gwardii Krolewskiej jest mocny"): tylko turniej, arena i pojedynek ROT (BattleSense.InDuel) - bitwy w polu bez zmian.

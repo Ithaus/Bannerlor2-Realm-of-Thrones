@@ -26,6 +26,8 @@ namespace Armoury
     /// BattleSound (K4: jeden detektor szarzy BattleCries.ChargeStarted, odbiorcy w tym samym takcie). Nowe override (OnDeploymentFinished, OnAgentShootMissile,
     /// OnMissileHit, OnAgentPanicked, OnAgentFleeing) tylko przekazuja do BattleSound - te z trafien moga przyjsc z ticku asynchronicznego (BattleSound: kolejka
     /// pod lockiem). Rejestracja takze przy kluczach nocy (NightKeys).
+    /// 140 (25.10): tarcza pod ostrzalem (ShieldsUp) - Begin w AfterStart (latki raz na proces przy pierwszej bitwie z kluczem, K9), Tick w bloku Night
+    /// (po BattleSound), strzal i trafienie pociskiem tylko do kolejki ShieldsUp (osobny try od dzwieku), End w Clean (linia "Bitwa (140 tarcze)").
     /// </summary>
     internal sealed class BattleSense : MissionBehavior
     {
@@ -184,6 +186,8 @@ namespace Armoury
             try { if (night) Doctrine.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Begin", e); }
             try { if (_battle) WarCouncil.Council(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteTactics, "WarCouncil.Council", e); }
             try { if (night) BattleSound.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Begin", e); }
+            // 140: tarcza pod ostrzalem - stan bitwy od zera, latki raz na proces (K9), kolejnosc po RBM (po przepieciu latek RBM w EarlyStart)
+            try { if (night) ShieldsUp.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.Begin", e); }
             base.AfterStart();
         }
 
@@ -197,6 +201,7 @@ namespace Armoury
                 try { MarchToContact.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "MarchToContact.Tick", e); }
                 try { Doctrine.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Tick", e); }
                 try { BattleSound.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Tick", e); }
+                try { ShieldsUp.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.Tick", e); }   // 140
             }
             try { BloodPools.Tick(Mission, dt); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Tick", e); }
@@ -276,6 +281,9 @@ namespace Armoury
             if (!Night) return;
             try { BattleSound.OnShoot(Mission, shooterAgent, weaponIndex); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnShoot", e); }
+            // 140: strzal - S2 (cel AI) / S3 (punkt upadku) i rzuty; tylko kolejka pod lockiem
+            try { ShieldsUp.OnShoot(Mission, shooterAgent, weaponIndex, position, velocity); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.OnShoot", e); }
         }
 
         // noc 25.10 P0 (K15): trafienie pociskiem - rozkaz "shields" (P2); czeste, jak wyzej
@@ -284,6 +292,9 @@ namespace Armoury
             if (!Night) return;
             try { BattleSound.OnMissileHit(Mission, attacker, victim, isCanceled); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnMissileHit", e); }
+            // 140: trafienie / pudlo - S1, punkt zderzenia (K6), S4 i histogram stanu rak ofiar (K13); tylko kolejka pod lockiem
+            try { ShieldsUp.OnMissileHit(Mission, attacker, victim, isCanceled, ref collisionData); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.OnMissileHit", e); }
         }
 
         // noc 25.10 P0 (K15): panika i ucieczka - licznik uciekajacych na formacje (P2, okrzyk przy zlamaniu wroga); tylko kolejka
@@ -331,6 +342,8 @@ namespace Armoury
             try { MarchToContact.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "MarchToContact.End", e); }
             try { Doctrine.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.End", e); }
             try { BattleSound.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.End", e); }
+            // 140: linia "Bitwa (140 tarcze)" raz na bitwe, flagi postfiksow zgaszone (End bezpieczne wielokrotnie i poza bitwa)
+            try { ShieldsUp.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.End", e); }
             // m111-walka: linia "Pojedynek (DU)" raz na misje pojedynku
             if (_duel && !_duelDone && InDuel(Mission))
             {
