@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 152 (galaz noc/138-calosc) - Atletyka ponad 300: mistrzowie - pula podwaja sie co 31 punktow (310 = ok. 3500, 330 = ok. 5500)
+**Problem:** Jeff 25.10 ok. 17:35: "kazdy punkt powyzej 300 to powinien byc wart znacznie wiecej, 307 a 300 to juz sa roznice na poziomie mistrzow ... jak na np. 300 atletyki mam 2800 kondycji to 301 mam np. 2825, a na 310 3500 ... kazdy punkt juz od 300 do 400 to jest ogromna roznica jak w prawdziwych mistrzostwach".
+**Przyczyna:** Krzywa 130 (A' = 300 x (A/300)^1.12) rosnie powyzej 300 prawie liniowo (pula 1000 x (1 + 3A'/500): 301 -> 2811, 310 -> 2918).
+**Zmiana:** BattleWind.CurvedAthletics: powyzej 300 pula RBM = 2800 x 2^((A - 300) / AthleticsMasteryDoubling) (nowy klucz, 31; 0..100, 0 = wylaczone), A' z odwrotnosci wzoru RBM; ciagle w 300, rosnace (max z krzywej 130). Ta sama A' idzie do oddechu (151: TauF/TauS - przy 310 juz na dolnych granicach 13/45 s, przy 320+ 8/45 s) i do biegu 127 (sufit sprawnosci podniesiony 1.6 -> 2.5: 310 - 215 s bez zbroi, 52 s w 46 kg; 330 - 300 s / 72 s). Pula: 301 2863, 305 3131, 310 3502, 320 4379, 330 5476, 350 8564.
+**Ryzyko / co sprawdzic:** Bohaterowie i elita z Atletyka ponad 300 (rzadko - limit nauki ok. 330) prawie sie nie mecza w walce (koszty RBM stale, ok. 35-45 pkt na cios). Linia 'BattleWind (130)' gracza (Atletyka liczona jak A') i 'Bieg (127)'. Zmiana sufitu fit dotyczy tylko A' > 340, czyli Atletyki ponad ok. 302 - ponizej bez zmian.
+**Status:** ZBUDOWANE - autotest i wgranie jako 117 razem z 151.
+
 ## 2026-10-25 151 (galaz noc/138-calosc) - regeneracja staminy wykladniczo od Atletyki: Atletyka 300 wraca do sil z 2% w ok. 3 min, Atletyka 10 w ponad 20 min
 **Problem:** Jeff 25.10 ok. 17:25: "regeneracja staminy powinna byc im mam wieksza atletyke tym szybciej sie regeneruje nawet jak mi stamina zejdzie do 2% to jak mam atletyke 300 to jest heroiczna kondycja to dosc szybko sie zregeneruje i to samo jak mam 10 atletyki to wysilek mnie naprawde meczy i dluzej dochodze do siebie".
 **Przyczyna:** Oddech dwufazowy 137 (WGRANE 116) skracal stale czasowe z Atletyka tylko liniowo i slabo: tau szybki 40 s / (1 + 0.75 A'/300), tau wolny 400 s / (1 + 0.30 A'/300) - od Atletyki 0 do 300 szybki x1.75, wolny tylko x1.3 (zgodnie z Chorley 2022, ktory nie znalazl zwiazku fazy wolnej z kondycja). Po zadyszce 90% wracalo po ok. 10-12 min niezaleznie od kondycji.

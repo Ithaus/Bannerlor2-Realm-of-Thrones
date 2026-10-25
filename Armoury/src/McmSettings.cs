@@ -1312,6 +1312,10 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool StaminaFromAthleticsOnly { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Athletics Mastery Doubling", 0.00f, 100.00f, "0", HintText = "above Athletics 300 every point is the gap between champions: stamina doubles with every this many points (at 31: Athletics 310 gives about 3500 instead of 2800, 330 about 5500, 350 about 8700), and breath and running grow with it. 0 = no extra above 300", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float AthleticsMasteryDoubling { get; set; } = 31f;
+
         [SettingPropertyFloatingInteger("Athletics Stamina Curve", 1.00f, 1.50f, "0.00", HintText = "how stamina and breath grow with Athletics: each further point counts a little more than the one before, as each costs more experience to learn. Athletics 300 gives what Realistic Battle Mod gives; at 1.12 Athletics 100 counts as 88, 200 as 191 and 400 as 414. 1.0 = a straight line, as in Realistic Battle Mod", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float AthleticsStaminaCurve { get; set; } = 1.12f;
@@ -10311,6 +10315,7 @@ namespace Armoury
             s.ArmourRunCostPerKgPercent = ArmourRunCostPerKgPercent;
             s.NoBreathWhileRunning = NoBreathWhileRunning;
             s.StaminaFromAthleticsOnly = StaminaFromAthleticsOnly;
+            s.AthleticsMasteryDoubling = AthleticsMasteryDoubling;
             s.AthleticsStaminaCurve = AthleticsStaminaCurve;
             s.BreathTwoPhase = BreathTwoPhase;
             s.BreathFastSeconds = BreathFastSeconds;

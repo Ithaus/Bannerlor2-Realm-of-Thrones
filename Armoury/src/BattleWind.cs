@@ -177,8 +177,19 @@ namespace Armoury
         {
             if (a <= 0f) return 0f;
             float p = CurveP(c);
-            if (p <= 1.0001f) return a;
-            return CurveRef * (float)Math.Pow(a / CurveRef, p);
+            float a2 = p <= 1.0001f ? a : CurveRef * (float)Math.Pow(a / CurveRef, p);
+            // 152 (25.10, Jeff: "kazdy punkt powyzej 300 to powinien byc wart znacznie wiecej ... 301 np. 2825, 310 3500 ... od 300 do 400 to ogromna roznica jak w
+            // prawdziwych mistrzostwach"): powyzej 300 pula RBM = 2800 x 2^((A - 300) / AthleticsMasteryDoubling) - A' z odwrotnosci wzoru RBM 1000 x (1 + 3A'/500);
+            // ciagle w 300 (2800), rosnace. Ta sama A' idzie do oddechu 137/151 i do biegu 127, wiec mistrz takze szybciej odpoczywa i dluzej biegnie.
+            float d = c != null ? c.AthleticsMasteryDoubling : 0f;
+            if (a > CurveRef && d > 0.5f)
+            {
+                d = Clamp(d, 10f, 100f);
+                double pool = 2800.0 * Math.Pow(2.0, (a - CurveRef) / d);
+                float ap = (float)((pool / 1000.0 - 1.0) * 500.0 / 3.0);
+                if (ap > a2) a2 = ap;
+            }
+            return a2;
         }
 
         /// <summary>130: pula i regeneracja RBM z Atletyki po krzywej - stosunek do linii RBM (zostaja inne mnozniki RBM: ciezki korpus x0.5, mnoznik gracza).</summary>

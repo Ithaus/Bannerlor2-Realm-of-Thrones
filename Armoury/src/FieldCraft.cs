@@ -95,7 +95,7 @@ namespace Armoury
         {
             float fit = 0.75f + BattleWind.CurvedAthletics(Math.Max(0f, athletics), c) / 400f;   // 130: Atletyka po tej samej krzywej co pula RBM
             if (fit < 0.6f) fit = 0.6f;
-            if (fit > 1.6f) fit = 1.6f;
+            if (fit > 2.5f) fit = 2.5f;   // 152: mistrzowie ponad 300 Atletyki (A' rosnie wykladniczo) biegna dluzej - dotad sufit 1.6 (A' 340)
             float m = 1f + Math.Max(0f, armourKg) * Math.Max(0f, c.ArmourRunCostPerKgPercent) / 100f;
             return Math.Max(5f, Math.Max(10f, c.RunSecondsUnarmoured) * fit / (m * m));
         }
