@@ -79,9 +79,11 @@ namespace Armoury
         internal const int SiteNoReturn = 15;
         // 143 (25.10): odwrot rannego z bronia (WoundedWithdraw, RoutHold.Withdraw.cs) - wlasne miejsce; nazwa jednym slowem (regex NB2)
         internal const int SiteWithdraw = 16;
-        private const int Sites = 17;
+        // 144 (25.10): AI oszczedza sily (AiBreath) i zadyszke widac / slychac (WindedShow) - wlasne miejsce; nazwa jednym slowem (regex NB2)
+        internal const int SiteBreath = 17;
+        private const int Sites = 18;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
-                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot" };
+                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot", "oddech" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -436,8 +438,9 @@ namespace Armoury
               .Append(ShieldsUp.CavalryNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m ").Append(c.PikesKeptAgainstHorse ? "TAK" : "NIE")
               .Append("; bez zmiany broni w ").Append(ShieldsUp.NoSwapNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m od wroga, tarcza w gore poza ")
               .Append(ShieldsUp.RaiseNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m; latki ")
-              .Append(ShieldsUp.PatchedSetAi && ShieldsUp.PatchedUfo ? "wpiete" : "przy pierwszej bitwie z kluczem").Append(')')
-              .Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
+              .Append(ShieldsUp.PatchedSetAi && ShieldsUp.PatchedUfo ? "wpiete" : "przy pierwszej bitwie z kluczem").Append(')');
+            AiBreath.Session(sb, c);   // 144: AI oszczedza sily, marsz krokiem, zadyszke widac / slychac
+            sb.Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }
     }

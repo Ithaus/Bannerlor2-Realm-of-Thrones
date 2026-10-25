@@ -52,6 +52,8 @@ namespace Armoury
             public bool SpeedApplied;       // noc 25.10 P1 (M0): nasz limit predkosci siedzi teraz w agencie (do jednorazowego zdjecia po karze)
             public bool EverWinded;         // 137: mial juz zadyszke w tej misji (linia "Oddech (137)": ludzi z zadyszka)
             public float WindedFor;         // 137: sekundy biezacej zadyszki
+            public float Ratio = 1f;        // 144: biezacy pasek staminy / max (przy oddechu 137 = pula - F - S) - budzet biegu AiBreath
+            public AiBreath.Man Ai;         // 144: stan zasady "AI oszczedza sily" (AiBreath.Step)
         }
 
         // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
@@ -243,6 +245,7 @@ namespace Armoury
         public override void OnRemoveBehavior()
         {
             if (ReferenceEquals(_live, this)) _live = null;   // 139
+            try { AiBreath.Abort(); } catch { }               // 144: latka nie czyta capu po usunieciu zachowania
             base.OnRemoveBehavior();
         }
         private readonly List<KeyValuePair<Agent, int>> _unstick = new List<KeyValuePair<Agent, int>>();
@@ -256,9 +259,23 @@ namespace Armoury
             {
                 State gone;
                 if (_states.TryGetValue(affectedAgent, out gone) && gone.RbmStance != null) _runningStances.Remove(gone.RbmStance);
+                if (gone != null && gone.Ai != null) AiBreath.CloseRun(gone.Ai);   // 144: bieg do licznikow, wpis tablicy capu zwolniony
+                AiBreath.Forget(affectedAgent);
+                WindedShow.Forget(affectedAgent);
                 _states.Remove(affectedAgent); _mountOwners.Remove(affectedAgent);
             }
             catch { }
+        }
+
+        // 144 (B1): panika i ucieczka - cap oddechu zdjety od razu (po Agent.OnFleeing czlowiek nie ma szyku, gra juz nie liczy mu limitu - cap zostalby na zawsze)
+        public override void OnAgentPanicked(Agent affectedAgent)
+        {
+            try { AiBreath.Drop(affectedAgent); } catch { }
+        }
+
+        public override void OnAgentFleeing(Agent affectedAgent)
+        {
+            try { AiBreath.Drop(affectedAgent); } catch { }
         }
 
         /// <summary>
@@ -374,6 +391,13 @@ namespace Armoury
                              + (_plKg >= 0f ? " | gracz: zbroja " + _plKg.ToString("0.0") + " kg, Atletyka " + _plAth.ToString("0") + " -> " + _plT.ToString("0") + " s" : " | gracz: -"));
             }
             catch { }
+            // 144: linia "Oddech AI (144)" raz na bitwe - biegi w toku zamkniete, capy zdjete
+            try
+            {
+                foreach (var kv in _states) if (kv.Value != null && kv.Value.Ai != null) AiBreath.CloseRun(kv.Value.Ai);
+                AiBreath.End(Mission);
+            }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "AiBreath.End", e); }
             ResetRunStats();
             try { BattleWind.BreathFlush(); } catch { }      // 137: linia "Oddech (137)" raz na misje
             try { MissionTeams.Flush(Mission); } catch { }   // NM: linia "Druzyny w misji (NM)" raz na misje
@@ -386,6 +410,7 @@ namespace Armoury
         {
             try { MissionTeams.Begin(Mission); } catch { }
             ResetRunStats();
+            try { AiBreath.Begin(Mission); } catch { }        // 144: liczniki i capy oddechu AI od zera
             _live = this;                                     // 139: odczyt zadyszki dla BrokenFate
             base.AfterStart();
         }
@@ -606,6 +631,14 @@ namespace Armoury
                 if (_accum < 0.2f) return;                    // reszta co 0.2 s wystarczy
                 float step = _accum; _accum = 0f;
 
+                // 144: AI oszczedza sily (AiBreath - decyzja co 0.6 s na czlowieka) i zadyszke widac / slychac (WindedShow) - bramki na takt
+                float now = Mission.CurrentTime;
+                bool aiLive = false, show = false;
+                try { aiLive = AiBreath.Gate(Mission, c, now); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "AiBreath.Gate", e); }
+                try { show = WindedShow.Gate(Mission, c); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "WindedShow.Gate", e); }
+                int aiTick = AiBreath.Tick;
+                long aiCost = 0;
+
                 // MIGAWKA LISTY (log 15.09: "Collection was modified" x25 w OnMissionTick):
                 // agent.Die() przy wykrwawieniu usuwa agenta z Mission.Agents W TRAKCIE
                 // tej petli - reszta ludzi nie dostawala tiku. Iterujemy po kopii.
@@ -631,6 +664,8 @@ namespace Armoury
                     }
 
                     float hpr = agent.HealthLimit > 0f ? agent.Health / agent.HealthLimit : 1f;
+                    bool sprintNow = false;      // 144: bieg w tym takcie (AiBreath: sekundy biegu wedlug sytuacji)
+                    float speedNow = -1f;        // 144: predkosc pieszego (-1 = konny albo nieliczona)
 
                     // --- zadyszka (tylko piechota, sprint) - MODEL PUNKTOWY:
                     // pula staminy w punktach (RBM: 1000 * bonus z Atletyki; my raz dokladamy
@@ -664,6 +699,8 @@ namespace Armoury
                             }
                             catch { }
                             sprinting = speed > runThr;
+                            sprintNow = sprinting;
+                            speedNow = speed;
                             if (sprinting && !_sprintLogged)
                             {
                                 _sprintLogged = true;
@@ -743,6 +780,7 @@ namespace Armoury
                                     _rbmStamina.SetValue(stance, stam);
                                 }
                                 bool wasWinded = st.Winded;
+                                st.Ratio = stam / maxStam;   // 144: pasek po drenazu biegu i zwrocie dlugu (oddech 137 - pasek RBM to pula - F - S)
                                 st.Pace = PaceFromRatio(st, stam / maxStam, breathOwns ? BattleWind.WindedExit(c) : 0.10f);
                                 // 137: liczniki zadyszek do linii "Oddech (137)" (stan zadyszki tylko tutaj - st.Winded)
                                 if (breathOwns && (st.Winded || wasWinded))
@@ -773,6 +811,7 @@ namespace Armoury
                             if (st.Pool < 0f) st.Pool = 0f;
                             if (st.Pool > st.PoolMax) st.Pool = st.PoolMax;
                             float ratio = st.PoolMax > 1f ? st.Pool / st.PoolMax : 1f;
+                            st.Ratio = ratio;   // 144
                             st.Pace = PaceFromRatio(st, ratio, 0.10f);
                         }
                     }
@@ -781,6 +820,17 @@ namespace Armoury
                         st.Pace = 1f; st.Winded = false;
                         if (st.RbmStance != null) _runningStances.Remove(st.RbmStance);
                     }
+
+                    // 144: AI oszczedza sily - decyzja co trzeci takt na czlowieka ((Index + takt) % 3), cap czyta latka AdjustSpeedLimit; true = zdjac cap od razu
+                    bool breathRelease = false;
+                    if (aiLive)
+                    {
+                        if (st.Ai == null) st.Ai = new AiBreath.Man();
+                        long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                        breathRelease = AiBreath.Step(agent, st.Ai, st.Ratio, st.RunSeconds, sprintNow, speedNow, st.Winded, step, now, ((agent.Index + aiTick) % 3) == 0);
+                        aiCost += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
+                    }
+                    if (show || WindedShow.Any) WindedShow.See(agent, st.Winded, speedNow, now);
 
                     // --- kara za rany (ruch liczony razem z zadyszka) ---
                     float woundSlow = 0f;
@@ -820,23 +870,43 @@ namespace Armoury
                     }
                     else if (limit < 0.999f)
                     {
-                        float cap = agent.MountAgent == null ? MarchToContact.CapFor(agent) : -1f;
+                        // 144 (punkt 4.3): gorny limit to cap marszu albo - bez niego - cap oddechu AiBreath (kara nie podnosi limitu ponad krok)
+                        bool capBreath = false;
+                        float cap = agent.MountAgent == null ? MarchToContact.CapFor(agent, out capBreath) : -1f;
                         float run = 0f;
                         if (cap > 0f) { try { run = agent.GetMaximumForwardUnlimitedSpeed(); } catch { run = 0f; } }
                         if (cap > 0f && run > 0.5f)
                         {
                             agent.SetMaximumSpeedLimit(Math.Min(limit * run, cap), false);
-                            _spdMarch++;
+                            if (!capBreath) _spdMarch++;
                         }
                         else agent.SetMaximumSpeedLimit(limit, true);
                         st.SpeedApplied = true;
                         _spdPenalty++;
+                        if (aiLive)
+                        {
+                            // przyczyna wiazaca: klawisz chodu, rany albo zadyszka / strefa 10% (najnizszy skladnik limitu)
+                            int cause = AiBreath.PenWind;
+                            float woundLim = 1f - woundSlow;
+                            if (agent.IsMainAgent && c.WalkKeyEnabled && limit <= Math.Max(0.2f, c.WalkSpeedShare) + 0.001f && limit < Math.Min(st.Pace, woundLim) - 0.001f) cause = AiBreath.PenKey;
+                            else if (woundLim < st.Pace) cause = AiBreath.PenWound;
+                            AiBreath.NotePenalty(cause, capBreath && cap > 0f && run > 0.5f);
+                        }
                     }
                     else if (st.SpeedApplied)
                     {
-                        agent.SetMaximumSpeedLimit(-1f, false);
+                        // 144 (punkt 4.4): zdjecie kary - zapis capu marszu albo oddechu zamiast -1 (inaczej ok. 0.5 s biegu bez limitu do najblizszego AdjustSpeedLimit)
+                        float rc = agent.MountAgent == null ? MarchToContact.CapFor(agent) : -1f;
+                        agent.SetMaximumSpeedLimit(rc > 0f ? rc : -1f, false);
+                        if (rc > 0f && aiLive) AiBreath.NotePenaltyReleaseCap();
                         st.SpeedApplied = false;
                         _spdRelease++;
+                    }
+                    else if (breathRelease)
+                    {
+                        // 144: cap oddechu zszedl (bieg na ostatnie metry, zwarcie, wyjatek) - limit zdjety od razu; gra przepisze swoj przy najblizszym AdjustSpeedLimit
+                        agent.SetMaximumSpeedLimit(-1f, false);
+                        AiBreath.NoteRelease();
                     }
 
                     // tempo CIOSOW: zadyszka i rany skladaja sie w jeden mnoznik
@@ -929,6 +999,9 @@ namespace Armoury
                         }
                     }
                 }
+                // 144: koniec taktu - szyki rozciagniete (D3), koszt zasady; pokaz zadyszki sprzata wpisy nie widziane w tym takcie
+                try { if (aiLive) AiBreath.EndTick(aiCost * 1000.0 / System.Diagnostics.Stopwatch.Frequency); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "AiBreath.EndTick", e); }
+                try { WindedShow.EndTick(now); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "WindedShow.EndTick", e); }
             }
             catch (Exception e) { Log.Error("FieldCraft.Tick", e); }
         }

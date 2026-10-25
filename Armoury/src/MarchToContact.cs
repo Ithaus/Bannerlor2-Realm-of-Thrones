@@ -24,6 +24,11 @@ namespace Armoury
     ///  - OnChargeStarted(f)      - JEDYNY sygnal szarzy (K4): BattleCries.ChargeStarted w chwili przejscia szyku na Charge / ChargeToTarget - tu zdjecie capu
     ///                              i od razu CacheMovementSpeedOfUnits (RBM w ChargeWithTarget liczy limit wlasnie z CachedMovementSpeed).
     ///  - ResetCounters / Activity / Append - segment 'marsz' linii "Bitwa (NB2)" (RoutHold.Ensure / Write pod RoutHold.Gate).
+    ///  - 144 (AI oszczedza sily, AiBreath): ChargeFresh(f) / ChargeAge(f) - swieza szarza szyku (od sygnalu do pierwszego zwarcia, najwyzej FreshFor = 20 s; B2),
+    ///    SpeedPatched; latka AdjustSpeedLimit niesie tez cap oddechu (AiBreath.CapOf) dla szyku bez capu marszu - za wszystkimi wyjsciami (B1: bez szyku,
+    ///    uciekajacy, odlaczeni, MissionPeer, konni, dogonienie w odwrocie - nic); CapFor zwraca cap marszu x 1.1, a bez niego cap oddechu (kara FieldCraft
+    ///    nie podnosi limitu ponad krok). 134c (MarchAtWalkingPace): tempo szyku pieszego najwyzej WalkPace (1.75 / 1.1 = ok. 1.6 m/s), limit czlowieka najwyzej
+    ///    WalkLineMax 1.75 m/s, dogonienie najwyzej WalkCatchUpMax 2.1 m/s (W3 - bez obnizenia tempa szyku ludzie zostawaliby z tylu i wpadali w dogonienie 2.88).
     ///
     /// DOWOD [K] (dekompilacja mbfull, RBMAI): silnik co 0.45-0.55 s na czlowieka AI w szyku (Agent.cs:4723 -> HumanAIComponent.ParallelUpdateFormationMovement)
     /// liczy limit predkosci z Formation.CachedMovementSpeed (GetDesiredSpeedInFormation: Hold = (0.7..1.1) x CachedMovementSpeed - utrzymanie linii, Charge =
@@ -62,6 +67,11 @@ namespace Armoury
         // kolumna nie traci sil na dalekim podejsciu (projekt liczyl 1.8 x 1.2 = 2.16 bez marginesu linii)
         internal const float FarPaceMax = 2.0f;
         internal const float ContactGap = 25f, FreeHold = 30f, InfRearm = 50f, ArcherHyst = 20f, CavRearm = 100f, ChargeSampleFor = 15f;
+        // 144 (134c, W3): prawdziwy krok - limit czlowieka ponizej progu animacji chodu (human walking_speed_limit 1.8, monsters.xml), tempo szyku tak, zeby
+        // utrzymanie linii (x1.1) miescilo sie w kroku, dogonienie ponizej progu biegu FieldCraft (2.2)
+        internal const float WalkLineMax = 1.75f, WalkPace = WalkLineMax / LineMul, WalkCatchUpMax = 2.1f;
+        // 144 (B2): swieza szarza - od sygnalu do pierwszego zwarcia (wrog 25 m od szyku), najwyzej tyle sekund; AiBreath jej nie zatrzymuje
+        internal const float FreshFor = 20f;
         private const byte KNone = 0, KInf = 1, KArch = 2, KCav = 3, KHorseArch = 4;
 
         // ---- stan czytany przez latki (watki robocze); zapis tylko z glownego watku
@@ -87,6 +97,7 @@ namespace Armoury
         private static readonly bool[] _chargeHeld = new bool[Slots];   // 128: szyk z rozkazem szarzy idzie jeszcze marszem (wrog dalej niz prog biegu)
         private static readonly bool[] _rest = new bool[Slots];         // 136: konnica AI daje koniom odsapnac (klus) - srednia S koni szyku z HorseWind
         private static readonly bool[] _capRest = new bool[Slots];      // 136 (recenzja): obecny cap to odpoczynek (wyjscie z niego w marsz liczy sie jako wejscie w marsz)
+        private static readonly float[] _freshUntil = new float[Slots];  // 144 (B2): swieza szarza do tej chwili (0 = nie; zerowane przy pierwszym zwarciu)
 
         private static WeakReference _m;
         private static float _acc, _sampleAcc;
@@ -101,6 +112,8 @@ namespace Armoury
         // HorseAiRestBelow) idzie klusem, dopoki wrog dalej niz RestNear, az srednia wroci do HorseAiRestUntil; 0 = nigdy
         internal const float RestNear = 60f, RestRearm = 10f;   // wejscie w odpoczynek dopiero ponad RestNear + RestRearm (bez migania klus / galop na granicy)
         private static int _restBelow = 35, _restUntil = 65;
+        // 144 (134c, klucz MarchAtWalkingPace): marsz prawdziwym krokiem; czytane tez przez latke (watki robocze) - kopia z Tick
+        private static volatile bool _trueWalk;
 
         // ---- latki
         private static bool _patchedSpeed, _patchedCache, _rbmPrefix, _triedPatch;
@@ -117,6 +130,7 @@ namespace Armoury
         private static float _sumMarchV, _sumChargeV;
         private static int _nMarchV, _nChargeV;
         private static int _hitLine, _hitCatch, _hitCache, _postErr, _postDragon;
+        private static int _hitWalk, _hitWalkCatch;   // 144 (134c): zapisy limitu przyciete do kroku / dogonienie przyciete do 2.1 m/s (Interlocked)
         private static readonly HashSet<int> _marched = new HashSet<int>();
 
         // ---- pomocnicze bez alokacji (glowny watek)
@@ -220,32 +234,55 @@ namespace Armoury
             catch { Interlocked.Increment(ref _postErr); }
         }
 
-        /// <summary>Latka 2 (watki robocze, co ok. 0.5 s na czlowieka AI w szyku): limit czlowieka i konia nie wyzej niz marsz. Bez alokacji i logu.</summary>
+        /// <summary>Latka 2 (watki robocze, co ok. 0.5 s na czlowieka AI w szyku): limit czlowieka i konia nie wyzej niz marsz. Bez alokacji i logu.
+        /// 144: szyk bez capu marszu - cap oddechu AiBreath (pieszy AI, ktory oszczedza sily), za wszystkimi wyjsciami (B1).</summary>
         private static void PostSpeed(Agent agent, float desiredSpeed, bool limitIsMultiplier)
         {
-            if (!_on || agent == null) return;
+            if ((!_on && !AiBreath.On) || agent == null) return;
             try
             {
                 var f = agent.Formation;
-                int idx = Idx(f);
-                if (idx < 0) return;
-                float cap = _capLimit[idx];
-                if (cap <= 0f || !ReferenceEquals(_who[idx], f)) return;
-                if (agent.IsRunningAway || agent.IsDetachedFromFormation || agent.MissionPeer != null) return;
-                var mount = agent.MountAgent;
-                if (mount != null && IsDragon(mount)) { Interlocked.Increment(ref _postDragon); return; }
-                bool catchUp = desiredSpeed < 0f;
-                if (catchUp && agent.IsRetreating()) return;          // OnRetreating tez wola AdjustSpeedLimit(-1)
-                float max = mount != null ? mount.GetMaximumForwardUnlimitedSpeed() : agent.GetMaximumForwardUnlimitedSpeed();
-                if (max <= 0.1f) return;
-                float cur = catchUp ? max : (limitIsMultiplier ? desiredSpeed * max : desiredSpeed);
-                float lim = cap * (catchUp ? CatchUpMul : LineMul);
-                if (cur < lim) lim = cur;
-                if (!_cav[idx] && lim >= cur - 0.01f) return;       // nic do obnizenia - zostaje wpis gry / RBM
-                if (lim < 0.3f) lim = 0.3f;
-                agent.SetMaximumSpeedLimit(lim, false);
-                if (mount != null) mount.SetMaximumSpeedLimit(lim, false);
-                if (catchUp) Interlocked.Increment(ref _hitCatch); else Interlocked.Increment(ref _hitLine);
+                if (f == null) return;                                // 144 (B1): bez szyku gra nie liczy limitu - nic nie zostawiamy na stale
+                int idx = _on ? Idx(f) : -1;
+                float cap = idx >= 0 && ReferenceEquals(_who[idx], f) ? _capLimit[idx] : 0f;
+                if (cap > 0f)
+                {
+                    // 128 / M1: cap marszu (bez zmian; 134c przycina do kroku tylko przy MarchAtWalkingPace)
+                    if (agent.IsRunningAway || agent.IsDetachedFromFormation || agent.MissionPeer != null) return;
+                    var mount = agent.MountAgent;
+                    if (mount != null && IsDragon(mount)) { Interlocked.Increment(ref _postDragon); return; }
+                    bool catchUp = desiredSpeed < 0f;
+                    if (catchUp && agent.IsRetreating()) return;          // OnRetreating tez wola AdjustSpeedLimit(-1)
+                    float max = mount != null ? mount.GetMaximumForwardUnlimitedSpeed() : agent.GetMaximumForwardUnlimitedSpeed();
+                    if (max <= 0.1f) return;
+                    float cur = catchUp ? max : (limitIsMultiplier ? desiredSpeed * max : desiredSpeed);
+                    float lim = cap * (catchUp ? CatchUpMul : LineMul);
+                    if (_trueWalk && mount == null && !_cav[idx])
+                    {
+                        float top = catchUp ? WalkCatchUpMax : WalkLineMax;
+                        if (lim > top && cur > top) { lim = top; if (catchUp) Interlocked.Increment(ref _hitWalkCatch); else Interlocked.Increment(ref _hitWalk); }
+                    }
+                    if (cur < lim) lim = cur;
+                    if (!_cav[idx] && lim >= cur - 0.01f) return;       // nic do obnizenia - zostaje wpis gry / RBM
+                    if (lim < 0.3f) lim = 0.3f;
+                    agent.SetMaximumSpeedLimit(lim, false);
+                    if (mount != null) mount.SetMaximumSpeedLimit(lim, false);
+                    if (catchUp) Interlocked.Increment(ref _hitCatch); else Interlocked.Increment(ref _hitLine);
+                    return;
+                }
+                // 144: oddech AI - tylko pieszy w szyku, nie uciekajacy, nie odlaczony, nie gracz sieci, nie w odwrocie (B1); zapis tylko przy obnizeniu
+                if (!AiBreath.On) return;
+                if (agent.IsRunningAway || agent.IsDetachedFromFormation || agent.MissionPeer != null || agent.MountAgent != null) return;
+                bool cu = desiredSpeed < 0f;
+                if (cu && agent.IsRetreating()) return;
+                float bc = AiBreath.CapOf(agent);
+                if (bc <= 0f) return;
+                float mx = agent.GetMaximumForwardUnlimitedSpeed();
+                if (mx <= 0.1f) return;
+                float now = cu ? mx : (limitIsMultiplier ? desiredSpeed * mx : desiredSpeed);
+                if (bc >= now - 0.01f) return;
+                agent.SetMaximumSpeedLimit(bc, false);
+                AiBreath.NotePost();
             }
             catch { Interlocked.Increment(ref _postErr); }
         }
@@ -255,6 +292,7 @@ namespace Armoury
         internal static void Begin(Mission m)
         {
             ClearState();
+            AiBreath.ClearCaps();   // 144: capy oddechu od zera (FieldCraft.AfterStart robi to samo - kolejnosc zachowan obojetna)
             _m = m != null ? new WeakReference(m) : null;
             _acc = 0f;
             _sampleAcc = 0f;
@@ -265,6 +303,7 @@ namespace Armoury
             // bez zerowania licznikow (linia NB2 pisze RoutKeeper.OnEndMission - moze po nas); tylko stan i wylacznik latek
             _on = false;
             ClearState();
+            AiBreath.ClearCaps();   // 144: latka nie czyta capu oddechu po koncu misji
             _m = null;
         }
 
@@ -276,7 +315,7 @@ namespace Armoury
                 _capMove[i] = 0f; _capLimit[i] = 0f; _cav[i] = false; _who[i] = null;
                 _kind[i] = KNone; _freeUntil[i] = 0f; _released[i] = false; _archFree[i] = false; _walk[i] = 0f; _nextScan[i] = 0f;
                 _dragon[i] = false; _player[i] = false; _wasCharge[i] = false; _signal[i] = false; _chargeAt[i] = -1000f; _everMarched[i] = false;
-                _chargeHeld[i] = false; _rest[i] = false; _capRest[i] = false;
+                _chargeHeld[i] = false; _rest[i] = false; _capRest[i] = false; _freshUntil[i] = 0f;
             }
             _any = false;
         }
@@ -314,6 +353,7 @@ namespace Armoury
             _restBelow = c.HorseStaminaEnabled ? Math.Max(0, Math.Min(80, c.HorseAiRestBelow)) : 0;
             _restUntil = Math.Max(20, Math.Min(100, c.HorseAiRestUntil));
             if (_restUntil <= _restBelow) _restUntil = Math.Min(100, _restBelow + 5);
+            _trueWalk = c.MarchAtWalkingPace;   // 144 (134c)
             _on = true;
             float now = m.CurrentTime;
             var teams = m.Teams;
@@ -406,7 +446,7 @@ namespace Armoury
                 _capMove[idx] = 0f; _capLimit[idx] = 0f; _cav[idx] = false;
                 _kind[idx] = KNone; _freeUntil[idx] = 0f; _released[idx] = false; _archFree[idx] = false; _walk[idx] = 0f; _nextScan[idx] = 0f;
                 _dragon[idx] = false; _wasCharge[idx] = false; _signal[idx] = false; _chargeAt[idx] = -1000f; _everMarched[idx] = false;
-                _chargeHeld[idx] = false; _rest[idx] = false; _capRest[idx] = false;
+                _chargeHeld[idx] = false; _rest[idx] = false; _capRest[idx] = false; _freshUntil[idx] = 0f;
                 _who[idx] = f;
             }
             if (f.CountOfUnits <= 0) { Set(f, idx, 0f, 0f, false); return; }
@@ -435,6 +475,7 @@ namespace Armoury
 
             bool marching = _capMove[idx] > 0f;
             float gap = EnemyGap(f);
+            if (gap <= ContactGap) _freshUntil[idx] = 0f;   // 144 (B2): pierwsze zwarcie konczy swieza szarze
 
             // 128: szarza z daleka idzie marszem (piechota, lucznicy pieszo) albo klusem (konnica) do progu biegu; sygnal szarzy (BattleCries.ChargeStarted:
             // okrzyk, rog, motto, zdjecie capu) przychodzi dopiero na progu - ChargeHeld mowi BattleCries, ze jeszcze nie. Gracz i AI tak samo.
@@ -466,6 +507,7 @@ namespace Armoury
             {
                 if (marching && !_signal[idx]) { _tNoSignal++; NoteChargeDistance(kind, gap); }
                 _chargeAt[idx] = now;
+                if (gap > ContactGap) _freshUntil[idx] = now + FreshFor;   // 144 (B2)
                 Release(idx, now);
             }
             _wasCharge[idx] = charge;
@@ -598,6 +640,7 @@ namespace Armoury
             pace *= _pace;
             if (gap > FarFrom) pace = Math.Max(pace, Math.Min(pace * FarMul, FarPaceMax));
             pace = Clamp(pace, 0.9f, 2.7f);
+            if (_trueWalk && pace > WalkPace) pace = WalkPace;   // 144 (134c, W3): szyk krokiem ok. 1.6 m/s - utrzymanie linii (x1.1) miesci sie w 1.75
             bool underFire = false;
             if (kind == KInf) { try { underFire = q.UnderRangedAttackRatio >= 0.33f; } catch { underFire = false; } }
             Set(f, idx, pace, underFire ? 0f : pace, false);
@@ -712,16 +755,71 @@ namespace Armoury
             return idx >= 0 && ReferenceEquals(_who[idx], f) && _capMove[idx] > 0f;
         }
 
-        /// <summary>Gorny limit marszu czlowieka AI w m/s (cap x 1.1, ten sam co w latce AdjustSpeedLimit); -1 = brak capu. Glowny watek (FieldCraft, M0).</summary>
+        /// <summary>Gorny limit marszu czlowieka AI w m/s (cap x 1.1, ten sam co w latce AdjustSpeedLimit); -1 = brak capu. Glowny watek (FieldCraft, M0).
+        /// 144: bez capu marszu - cap oddechu (AiBreath, krok 1.75 m/s), zeby kara FieldCraft nie podnosila limitu ponad krok (punkt 4.3); -1 takze bez szyku,
+        /// w odwrocie, u konnego i odlaczonego (B1). 134c: przy MarchAtWalkingPace cap marszu pieszego najwyzej WalkLineMax.</summary>
         internal static float CapFor(Agent a)
         {
-            if (!_on || a == null || !a.IsAIControlled || a.IsRunningAway) return -1f;
-            var f = a.Formation;
-            int idx = Idx(f);
-            if (idx < 0 || !ReferenceEquals(_who[idx], f)) return -1f;
-            float cap = _capLimit[idx];
-            return cap > 0f ? cap * LineMul : -1f;
+            bool breath;
+            return CapFor(a, out breath);
         }
+
+        internal static float CapFor(Agent a, out bool breath)
+        {
+            breath = false;
+            if (a == null || !a.IsAIControlled || a.IsRunningAway) return -1f;
+            var f = a.Formation;
+            if (_on)
+            {
+                int idx = Idx(f);
+                if (idx >= 0 && ReferenceEquals(_who[idx], f))
+                {
+                    float cap = _capLimit[idx];
+                    if (cap > 0f)
+                    {
+                        float lim = cap * LineMul;
+                        if (_trueWalk && !_cav[idx] && a.MountAgent == null && lim > WalkLineMax) lim = WalkLineMax;
+                        return lim;
+                    }
+                }
+            }
+            if (!AiBreath.On || f == null || a.MountAgent != null || a.IsDetachedFromFormation || a.MissionPeer != null) return -1f;
+            try { if (a.IsRetreating()) return -1f; } catch { return -1f; }
+            float bc = AiBreath.CapOf(a);
+            if (bc <= 0f) return -1f;
+            breath = true;
+            return bc;
+        }
+
+        /// <summary>144 (B2): szyk w swiezej szarzy - od sygnalu (OnChargeStarted albo rozkaz szarzy w ticku) do pierwszego zwarcia (wrog 25 m od szyku),
+        /// najwyzej FreshFor sekund; AiBreath nie trzyma wtedy nikogo krokiem (najciezsi szliby 2-3 s po rogu). Bez marszu (klucz NIE) - zawsze false. Glowny watek.</summary>
+        internal static bool ChargeFresh(Formation f)
+        {
+            if (!_on || f == null) return false;
+            var m = Mission.Current;
+            if (m == null) return false;
+            int idx = Idx(f);
+            if (idx < 0 || !ReferenceEquals(_who[idx], f)) return false;
+            return _wasCharge[idx] && m.CurrentTime < _freshUntil[idx];
+        }
+
+        /// <summary>144: sekundy od poczatku szarzy szyku (sygnal albo rozkaz w ticku); -1 = nie wiadomo (marsz nieczynny, szyk bez szarzy). Glowny watek.</summary>
+        internal static float ChargeAge(Formation f)
+        {
+            if (!_on || f == null) return -1f;
+            var m = Mission.Current;
+            if (m == null) return -1f;
+            int idx = Idx(f);
+            if (idx < 0 || !ReferenceEquals(_who[idx], f) || !_wasCharge[idx]) return -1f;
+            return m.CurrentTime - _chargeAt[idx];
+        }
+
+        /// <summary>144: latka AdjustSpeedLimit wpieta (cap oddechu dziala tylko przez nia).</summary>
+        internal static bool SpeedPatched { get { return _patchedSpeed; } }
+
+        /// <summary>144 (134c): zapisy limitu przyciete do kroku i dogonienia przyciete do 2.1 m/s w tej misji (do linii "Oddech AI (144)").</summary>
+        internal static int WalkHits { get { return Volatile.Read(ref _hitWalk); } }
+        internal static int WalkCatchHits { get { return Volatile.Read(ref _hitWalkCatch); } }
 
         /// <summary>Szyk przeszedl na szarze (sygnal z BattleCries.ChargeStarted, glowny watek, ten sam takt): cap zdjety i tempo przeliczone od razu.</summary>
         internal static void OnChargeStarted(Formation f)
@@ -737,8 +835,9 @@ namespace Armoury
             _chargeAt[idx] = now;
             bool marching = _capMove[idx] > 0f;
             Release(idx, now);
-            if (!marching) return;
             float gap = EnemyGap(f);
+            _freshUntil[idx] = gap > ContactGap ? now + FreshFor : 0f;   // 144 (B2): od sygnalu do pierwszego zwarcia, najwyzej 20 s
+            if (!marching) return;
             lock (RoutHold.Gate)
             {
                 RoutHold.EnsureLocked(m);
@@ -767,6 +866,8 @@ namespace Armoury
             Interlocked.Exchange(ref _hitCache, 0);
             Interlocked.Exchange(ref _postErr, 0);
             Interlocked.Exchange(ref _postDragon, 0);
+            Interlocked.Exchange(ref _hitWalk, 0);       // 144 (134c)
+            Interlocked.Exchange(ref _hitWalkCatch, 0);
             _marched.Clear();
             FieldCraft.ResetSpeedCounters();
         }

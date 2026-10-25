@@ -51,7 +51,8 @@ namespace Armoury
         {
             return c != null && (c.MarchToContactEnabled || c.CultureDoctrines || c.ShootBeforeAttacking || c.CavalrySeeksFlanks || c.ArchersFallBackBehindInfantry
                                  || c.BattleSoundsEnabled || c.BannerCompaniesEnabled
-                                 || c.DefendersAdvanceUnderFire);   // 141: S2 obronca pod ostrzalem (Doctrine.S2.cs) - wejscia tylko z BattleSense (Doctrine.Begin / Tick / End)
+                                 || c.DefendersAdvanceUnderFire     // 141: S2 obronca pod ostrzalem (Doctrine.S2.cs) - wejscia tylko z BattleSense (Doctrine.Begin / Tick / End)
+                                 || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 
         /// <summary>noc 25.10 P0: biezaca misja to bitwa (nie pojedynek) - bramka wolan paczek nocy; tylko odczyt statykow (takze z ticku asynchronicznego).</summary>

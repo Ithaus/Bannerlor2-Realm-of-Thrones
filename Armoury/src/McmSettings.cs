@@ -1344,6 +1344,18 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float WindedExitBar { get; set; } = 0.30f;
 
+        [SettingPropertyBool("Winded Shows It", HintText = "winded men near you show it (within 35 m): a tired face and, when they stand still with no enemy within 8 m and no arrows coming, a short weary pose of the upper body for a few seconds, repeated now and then while they get their wind back. At most 12 men at a time; men with a bow, crossbow or javelin in hand, on ladders or engines, in water or in panic are left alone. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool WindedShowsIt { get; set; } = true;
+
+        [SettingPropertyInteger("Winded Pose", 0, 3, "0", HintText = "with Winded Shows It: which pose a winded man takes: 0 none (only the tired face), 1 weary (from conversations), 2 weary (second), 3 bent over (the stoop Realistic Battle Mod plays for tiredness). Can be switched during a battle to compare them", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public int WindedPose { get; set; } = 1;
+
+        [SettingPropertyBool("Winded Breath Sound", HintText = "winded men within 25 m of you breathe hard - a laboured grunt of effort from the game's own voices, once when they run out of breath and then every 6 to 9 seconds while they stand; at most two a second on the whole field and never more often than the battle cries and moans allow. Off = silent", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool WindedBreathSound { get; set; } = true;
+
         [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant; the dead never tire. While Stamina From Athletics Only is on, heroes' stamina follows Athletics like everyone's and this switch keeps only the Endurance posture rule and the tireless dead. The Athletics curve and the two-phase breath work with it off too (read once at game start from ModuleData/Armoury.settings.xml - changing it here has no effect)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool BattleStaminaEnabled { get; set; } = true;
@@ -9828,6 +9840,30 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefendersAdvanceUnderFire { get; set; } = true;
 
+        [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool AiSavesBreath { get; set; } = true;
+
+        [SettingPropertyInteger("AI Arrive With Breath Percent", 20, 80, "0", HintText = "with AI Saves Breath: how much of his stamina an AI soldier wants left when he reaches the enemy. Lower = they start running from further away and arrive more tired. Under arrow fire they accept arriving with a quarter", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public int AiArriveWithBreathPercent { get; set; } = 50;
+
+        [SettingPropertyFloatingInteger("AI Runs Last Metres", 10.00f, 60.00f, "0", HintText = "with AI Saves Breath: within this distance of the enemy an AI soldier runs whatever his breath (the final rush). Does not apply when chasing a fleeing man", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public float AiRunsLastMetres { get; set; } = 25f;
+
+        [SettingPropertyBool("AI Saves Breath Your Troops", HintText = "with AI Saves Breath: your own soldiers pace themselves too, except a formation you order to follow you (Follow Me). Off = only allies and enemies", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool AiSavesBreathYourTroops { get; set; } = true;
+
+        [SettingPropertyBool("AI Saves Breath In Sieges", HintText = "with AI Saves Breath: also in sieges and sallies - AI soldiers on foot walk until they are within running distance of the enemy. Men already sent to a ladder, siege tower, ram or the gate are never held back and keep running, so the rest of their formation may come up behind them. Off = sieges as before (measured for the log only)", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool AiSavesBreathInSieges { get; set; } = false;
+
+        [SettingPropertyBool("March At Walking Pace", HintText = "with March To Contact: marching formations on foot keep to a true walk - the column steps at about 1.6 m/s and no man goes faster than 1.75 m/s (2.1 when catching up with his place in the line), below the speed at which the walking animation turns into a run, so the men keep their breath on the way. Off = up to 2.0-2.2 m/s far from the enemy and 2.9 when catching up, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool MarchAtWalkingPace { get; set; } = true;
+
         [SettingPropertyBool("Battle Sounds Enabled", HintText = "the mod's own battle sounds - drums, horns, commanders' voices and the sounds of the field below, each under its own switch. Field battles and sieges - not hideouts, sea battles, tournaments, the arena or training. Off = only the game's and other mods' battle sounds, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleSoundsEnabled { get; set; } = true;
@@ -10351,6 +10387,9 @@ namespace Armoury
             s.BreathFightShare = BreathFightShare;
             s.BreathShotFightSeconds = BreathShotFightSeconds;
             s.WindedExitBar = WindedExitBar;
+            s.WindedShowsIt = WindedShowsIt;
+            s.WindedPose = WindedPose;
+            s.WindedBreathSound = WindedBreathSound;
             s.BattleStaminaEnabled = BattleStaminaEnabled;
             s.BattleEndDoubleEvery = BattleEndDoubleEvery;
             s.BattleRegenAtEnd1 = BattleRegenAtEnd1;
@@ -12472,6 +12511,12 @@ namespace Armoury
             s.ArchersFallBackBehindInfantry = ArchersFallBackBehindInfantry;
             s.ArcherFallBackDistance = ArcherFallBackDistance;
             s.DefendersAdvanceUnderFire = DefendersAdvanceUnderFire;
+            s.AiSavesBreath = AiSavesBreath;
+            s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
+            s.AiRunsLastMetres = AiRunsLastMetres;
+            s.AiSavesBreathYourTroops = AiSavesBreathYourTroops;
+            s.AiSavesBreathInSieges = AiSavesBreathInSieges;
+            s.MarchAtWalkingPace = MarchAtWalkingPace;
             s.BattleSoundsEnabled = BattleSoundsEnabled;
             s.BattleHornsCulture = BattleHornsCulture;
             s.BattleDrumsMarch = BattleDrumsMarch;

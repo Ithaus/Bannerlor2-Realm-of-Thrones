@@ -142,6 +142,16 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>144 (134d): oddech zadyszki (WindedShow) - ten sam limiter co okrzyki i jeki: jeden glos na czlowieka na VoiceGap (4 s), najwyzej
+        /// MaxPerSecond glosow na sekunde w misji. true = miejsce wziete (glos zapisany na czlowieka). Glowny watek.</summary>
+        internal static bool TryBreathVoice(Agent a, float now)
+        {
+            if (!CanVoice(a, now, VoiceGap)) return false;
+            if (!TakeSlot(now)) return false;
+            _lastVoice[a] = now;
+            return true;
+        }
+
         private static bool CanVoice(Agent a, float now, float cooldown)
         {
             if (a == null || !a.IsActive() || !a.IsHuman || !a.IsAIControlled || a.IsMainAgent || a.IsRunningAway) return false;

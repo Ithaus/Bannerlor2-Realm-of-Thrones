@@ -1,5 +1,113 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 144 (galaz noc/139-ai-zycie, po 143 a1f2d41e) - AI walczy o zycie, krok 6: AI oszczedza sily (projekt 134a-134d, 134e jako klucz NIE; AiBreath.cs, WindedShow.cs, klucz AiSavesBreath i 8 pokrewnych)
+**Problem:** Jeff 25.10 ok. 13:20: "pamietaj aby w bitwach przeciwnik nie biegal caly czas bo beda padnieci i czy jest animacja chodu i zmeczenia??"; ok. 13:30:
+"generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze jego mozliwosci i skilli aby
+przetrwac". Objaw: AI idzie krokiem tylko w marszu szyku (127/128); po zwarciu, w pogoni, posilki DR z 100-400 m, lucznicy blizej 120 m i oblezenie - pelny bieg
+do zera puli. Dowod z logu (autotest 25.10 12:56:59, 4 bitwy z bandytami): bieg na czlowieka 14 / 8 / 27 / 39 s (pominiete regeneracje RBM 2590 / 1436 / 9512 / 6969),
+"pelny bieg do zera ... najkrocej 30 s", marsz 1.58-1.80 m/s, szarza 1.97-2.37 m/s. Animacji zadyszki w bitwie nie ma w grze ani w modach (projekt 134, punkt 1.9).
+**Przyczyna:** (dekompilacje scratchpad/ai_run, scratchpad/anim, scratchpad/surv) limit predkosci AI liczy silnik co 0.45-0.55 s tylko dla AI z szykiem
+(tw_Agent.cs:4723 -> HumanAIComponent.ParallelUpdateFormationMovement -> AdjustSpeedLimit); szarza = (0.7..1.1) x srednia predkosc maksymalna szyku (pelny bieg),
+odlaczeni, Retreat i daleko od miejsca w szyku - -1 (bez limitu); RBM w prefiksie daje progi 0.9 / 0.6, nigdy gornego limitu z oddechu. Nikt w grze ani w RBM nie
+pyta, czy czlowiekowi starczy tchu - jedyny gorny limit to nasz marsz 128 (szyk z capem). FieldCraft (127) i oddech dwufazowy (137) licza pule i odnowe, ale tylko
+karza zadyszke, nie zapobiegaja jej.
+**Zmiana:** AiBreath.cs (nowy), WindedShow.cs (nowy), FieldCraft.cs, MarchToContact.cs, BattleCries.cs (TryBreathVoice), BattleSense.cs (NightKeys), RoutHold.cs (miejsce
+potkniec NB2 "oddech" = 17, Sites 18; segment w linii startu sesji), Settings.cs, McmSettings.cs i tools/gen_mcm.py (RANGES, LABELS; Armoury 2501 -> 2510 ustawien).
+(a) 134b ZASADA (klucz AiSavesBreath TAK): pieszy czlowiek AI obu stron biegnie tylko na budzet tchu, decyzja co 0.6 s (FieldCraft co 0.2 s, rozlozenie (Index + takt) % 3,
+glowny watek): d = min(d_szyk: od czlowieka do mediany CachedClosestEnemyFormation jego szyku minus polowa glebokosci tamtego; d_cel: do GetTargetAgent(), gdy czynny
+wrog-czlowiek); budzet = max(0, pasek - zapas) x T x v - pasek = BIEZACA stamina / max (przy oddechu 137 to pula - F - S, wiec odnowa w kroku wedlug Breath jest juz
+w pasku, bez gumki RBM), T = FieldCraft RunSeconds (127, cala pula w T s pelnego biegu - drenaz liniowy, wiec wzor sie zgadza), v = zmierzone
+GetMaximumForwardUnlimitedSpeed (B2: nie zalozone 4.5 m/s); zapas AiArriveWithBreathPercent (50%), pod ostrzalem szyku (UnderRangedAttackRatio >= 0.33) najwyzej 25%.
+Krok, gdy d > budzet i d > AiRunsLastMetres (25 m); powrot do biegu, gdy d < budzet - 10 m albo d <= 25 m (histereza); pogon (cel ucieka i jest blizej niz szyk wroga) -
+bez strefy ostatnich metrow, sam budzet. Krok = min(WalkSpeedCached, 1.8) - 0.05 = 1.75 m/s - ponizej progu biegu FieldCraft (2.2), wiec oddech 137 wraca (mnoznik chodu
+WalkM), NoBreathWhileRunning go nie blokuje. Wyjatki (brak capu, kazdy liczony): gracz, MissionPeer, konni, umarli (FieldCraft ich pomija), PANIKA wedlug przelacznika 139
+albo IsRunningAway / IsRetreating(), ranny w odwrocie 143 (RoutKeeper.Withdrawing), bez szyku (Z1 - gra nie liczy mu limitu), odlaczeni (drabiny, wieze, taran, brama),
+ludzie gracza przy AiSavesBreathYourTroops NIE (decyzja: domyslnie TAK - ogolna zasada), szyk z rozkazem Follow (FollowMe), szyk z capem marszu (MarchToContact.IsMarching -
+marsz i szarza 128 bez zmian), swieza szarza (B2, MarchToContact.ChargeFresh), zwarcie (cios wrecz w 3 s albo cel nieuciekajacy w 25 m), d nieznane (W1 - caly szyk wroga
+ucieka i brak celu: bez capu zamiast kroku), v nieznane, indeks agenta >= 16384.
+(b) B2 swieza szarza: MarchToContact._freshUntil - od sygnalu szarzy (OnChargeStarted albo rozkaz szarzy w ticku, gdy wrog dalej niz 25 m) do pierwszego zwarcia (wrog 25 m
+od szyku) albo 20 s (FreshFor); kontrakty ChargeFresh(f) i ChargeAge(f). Bez marszu (MarchToContactEnabled NIE) ChargeFresh = false (szarza z dowolnej odleglosci - tam
+zasada ma dzialac). Licznik "decyzji krok wstrzymanych" pokazuje, ilu najciezszych szloby po rogu.
+(c) B1 straznicy: latka MarchToContact.PostSpeed - galaz oddechu tylko dla szyku bez capu marszu, ZA wszystkimi wyjsciami (bez szyku, IsRunningAway, odlaczony,
+MissionPeer, konny, dogonienie w odwrocie - nic), zapis tylko przy obnizeniu (SetMaximumSpeedLimit(cap, false)), bez alokacji, licznik Interlocked; galaz capu marszu
+bajt w bajt jak dotad (poza 134c). Brama latki: _on marszu ALBO AiBreath.On. Cap zdejmowany od razu przy OnAgentPanicked / OnAgentFleeing (FieldCraft), przy usunieciu
+agenta, na poczatku / koncu misji (FieldCraft, MarchToContact.Begin/End) i przy wylaczeniu zasady; po decyzji "bieg" (cap zszedl, szyk bez marszu) FieldCraft pisze -1 od razu
+(bez tego czlowiek po ucieczce / utracie szyku zostalby z 1.75 m/s na zawsze, a "bieg na ostatnie 25 m" czekalby do 0.5 s).
+(d) D1 tablice: float[16384] cap i Agent[16384] wlasciciel po Agent.Index; zapis tylko z glownego watku w kolejnosci Cap = 0 -> Owner -> Cap (Volatile.Write), odczyt
+Owner -> Cap -> Owner (Volatile.Read) - znosi ponowne uzycie indeksu i tick asynchroniczny.
+(e) Punkty 4.3 i 4.4: MarchToContact.CapFor zwraca cap marszu x 1.1, a bez niego cap oddechu (-1 takze bez szyku, w odwrocie, konny, odlaczony); kara FieldCraft
+(zadyszka, rany, klawisz chodu) pisze Min(limit x pelna predkosc, cap) - nie podnosi limitu ponad krok; zdjecie kary pisze CapFor zamiast -1 (marsz i oddech - inaczej
+ok. 0.5 s biegu bez limitu do najblizszego AdjustSpeedLimit). Licznik M0 "w marszu" (segment 'marsz' NB2) liczy tylko cap marszu, cap oddechu idzie do linii 144.
+(f) D2: zasada nieczynna przy SprintFatigueEnabled NIE (brak puli i czasu biegu), tylko na sucho przy SpeedCapOnlyWhenWinded NIE (FieldCraft pisalby limit co 0.2 s i kasowal
+krok) albo bez latki AdjustSpeedLimit - powod w linii. 134a: klucz NIE = ta sama decyzja na sucho (liczniki bez capu) - punkt wyjscia testu A.
+(g) 134c MarchAtWalkingPace (TAK, W3): tempo szyku pieszego w marszu najwyzej 1.75 / 1.1 = ok. 1.59 m/s (dotad 1.8, daleko 2.0), limit czlowieka najwyzej 1.75 m/s (dotad
+cap x 1.1 = 1.98 / 2.2), dogonienie najwyzej 2.1 m/s (dotad cap x 1.6 = 2.88 - ponad prog biegu, pelny drenaz) - ponizej progu animacji chodu (human
+walking_speed_limit 1.8, monsters.xml). Konnica, odpoczynek koni 136, lucznicy konni - bez zmian. NIE = jak dotad bajt w bajt.
+(h) 134d WindedShowsIt (TAK) / WindedPose (0-3, domyslnie 1) / WindedBreathSound (TAK) - tylko czlowiek AI z zadyszka (FieldCraft State.Winded) w 35 m od gracza,
+w bitwie po rozstawieniu (pole, oblezenie, kryjowka; bez morza i pojedynkow): twarz SetAgentFacialAnimation(Low, "idle_tired", petla), po zadyszce "idle_normal" (oba
+w Native voices.xml); poza na kanale 1 (wzor okrzyku gry, ignorePriority false) z kandydatow krytyki Z2: 1 act_conversation_weary_loop, 2 act_conversation_weary2_loop,
+3 act_pickup_down_begin_left_stance (to, co RBM gra jako "tired"); tylko na postoju < 0.6 m/s, bez wroga w 8 m (GetNearbyEnemyAgents, najwyzej 16 zapytan na takt),
+bez pocisku w 8 s, bez luku / kuszy / rzutu w reku, poza panika, drabina, machina i woda, kanal 0 i 1 wolne (act_none albo Idle), klip w zestawie czlowieka
+(CheckActionAnimationClipExists, pamiec na zestaw); 2.5-4 s, ponowienie co 8-14 s; przerwanie act_none z priorytetem min(GetCurrentActionPriority(1), 73) (wzor
+AgentVictoryLogic) przy ruchu, wrogu w 8 m, pocisku, panice, koncu zadyszki, wyjsciu poza 35 m; najwyzej 12 naraz, 3 starty na takt; odmowa SetActionChannel = licznik
+i bez ponawiania do konca zadyszki. Oddech: WYBOR wariantu (a) - zdarzenie FMOD gry voice/combat/(male 01, 04, 07, 08 | female 02, 04)/grunt_rowing (3.5 s, 80 m;
+Native sound_event_data.gen.xml) przez Mission.MakeSound w pozycji glowy (jednorazowy dzwiek silnika - bez uchwytu SoundEvent, nic do zwalniania; tak gra gra dzwieki
+niszczonych obiektow); (c) BattleSound odpada - wymaga wlasnych nagran, ktorych nie ma. Tylko w 25 m, raz na poczatku zadyszki, potem co 6-9 s na postoju; wspolny
+limiter z okrzykami i jekami (BattleCries.TryBreathVoice: glos na czlowieka co 4 s, 6 glosow na sekunde w misji), do tego najwyzej 2 oddechy na sekunde. Bez podmiany
+zestawow (Artem przywraca as_human_warrior zestawom z "injured", projekt 1.10). ActionIndexCache tworzone w misji (pulapka 105.4). Wszystko z taktu FieldCraft, nic
+co klatke.
+(i) 134e AiSavesBreathInSieges (NIE): oblezenie i wypad - ta sama zasada; bez klucza tylko na sucho. W4: opis MCM nie obiecuje "atakujacy ida do murow" - przydzieleni do
+drabiny / wiezy / tarana sa odlaczeni od chwili przydzialu i biegna dalej; licznik "odlaczeni w ruchu ponad 2.2 m/s".
+(j) Linia raz na bitwe (FieldCraft.OnEndMission, obok "Bieg (127)"): "Oddech AI (144): misja bitwa (pole|oblezenie|kryjowka), klucz TAK - czynne | na sucho: powod
+(czynne s, na sucho s) (zapas, pod ostrzalem, ostatnie m, krok, twoi, oblezenia, marsz krokiem, latka) | pieszych AI: strona gracza / wrog | zadyszka: n (%), s, ponizej
+10% puli k - na strone | bieg: % czasu na strone; sekundy biegu: ucieczka, zwarcie, pogon, posilki, szarza, marsz/dogonienie, oblezenie, inne; najdluzszy ciagly bieg
+sr. / najdluzej (sytuacja), ponad 20 s, ponad 30 s | pierwsze zwarcie (pasek do 0.2 s po pierwszym ciosie wrecz): sr. na strone (szarzujace osobno), rozklad <10 /
+10-30 / 30-60 / >60%, posilki (po rozstawieniu, ponad 60 m od szyku) i czas od pojawienia do zwarcia | kara FieldCraft (zapisy): rany, zadyszka i strefa 10%, klawisz
+chodu; z limitem z capu oddechu; zdjecia kary capem | zasada (naprawde / na sucho): decyzji, ludzi z capem, sekund kroku (po zwarciu - W5), przejsc krok->bieg, sr.
+budzet, sr. v_bieg (rozklad ludzi <3.5 / 3.5-4.0 / 4.0-4.5 / >=4.5 - B2), sr. T, decyzji pod ostrzalem; swieza szarza: decyzji krok wstrzymanych; wyjatki (15 pozycji);
+zapisow PostSpeed, zdjec od razu (-1); szyki bez marszu i szarzy z ponad 30% ludzi z capem (D3); oblezenie: odlaczeni w ruchu ponad 2.2 m/s | marsz krokiem (134c):
+limit krokiem, dogonienie przyciete | sonda (W2, co 2 s do 10 na grupe: marsz / krok z oddechu / inni w ruchu): predkosc <1.5 / 1.5-1.8 / 1.8-2.2 / >2.2 (z WalkMode),
+limit GetMaximumSpeedLimit surowy | zmeczenie widac (134d): ludzi w 35 m, twarz (powrot), startow pozy (naraz najwiecej), przerwan wedlug powodu, odmow SetActionChannel,
+bez klipu, kanal 0 / 1 zajety (probka nazwy akcji), oddechow (limit, bez zdarzenia) | potkniecia oddech n (wypadli w) | koszt sr. / najwiecej ms na takt 0.2 s."
+Linia kandydatow raz na bitwe (pierwszy takt bitwy): "Oddech AI (144) kandydaci zadyszki: poza WindedPose ... | as_human_warrior / as_human_female_warrior /
+as_giant_warrior: dla act_conversation_weary2_loop, act_conversation_weary_loop, act_pickup_down_begin_left_stance, act_npc_idle_injured_1 - #indeks, klip TAK/NIE,
+czas s, prio 0x.., cykl, enforce dol / caly | twarz | oddech grunt_rowing: zdarzen k/6 (id)". Linia startu sesji NB2 - segment "AI Saves Breath TAK (...)"; potkniecia
+NB2 - ", oddech n" (regex sprawdz_logi.py przyjmuje).
+(k) Klucze MCM (opisy po angielsku): "Marching and tactics": AiSavesBreath TAK, AiArriveWithBreathPercent 50 (20-80), AiRunsLastMetres 25 (10-60 m), AiSavesBreathYourTroops
+TAK, AiSavesBreathInSieges NIE, MarchAtWalkingPace TAK; "Flesh and wind": WindedShowsIt TAK, WindedPose 1 (0-3), WindedBreathSound TAK. W Armoury.json Jeffa zadnego
+z nich nie ma (grep 25.10) - dzialaja wartosci z kodu; SprintFatigueEnabled TAK w pliku, SpeedCapOnlyWhenWinded w pliku brak (domyslna TAK).
+Odstepstwa od projektu (swiadome): (1) pierwsze zwarcie czytane z pol C# Agent.LastMeleeHitTime / LastMeleeAttackTime w takcie FieldCraft (do 0.2 s po ciosie), nie
+z FieldCraft.OnAgentHit - te same trafienia (pola ustawia tylko trafienie), bez kolejki z wywolania zwrotnego silnika; (2) linia kandydatow przy pierwszym takcie bitwy,
+nie w AfterStart (ActionIndexCache w trwajacej misji); (3) sonda bez kubelka nazw akcji kanalu 0 (W2 - bezuzyteczny), WalkMode x predkosc x limit w trzech grupach;
+(4) zdjecie kary capem (4.4) takze przy capie marszu - koncowy stan bez zmian (gra i latka i tak daja <= cap x 1.1 w ciagu 0.5 s), znika 0.5 s biegu bez limitu;
+(5) poza tylko przy wolnym kanale 0 i 1 (act_none albo Idle) i bez luku w reku (lucznik z poza na kanale 1 moglby nie strzelac) - licznik "kanal zajety" z probka nazwy;
+(6) gracz bez oddechu i pozy (projekt 7: tylko ludzie AI w 35 / 25 m); bez gracza na polu (Agent.Main martwy) pokazu nie ma.
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - galaz capu marszu w PostSpeed i CapFor bez zmian przy MarchAtWalkingPace NIE (kolejnosc wyjsc ta sama,
+f == null i tak dawalo Idx -1); 128 (szarza marszem, sygnal, HoldCharge) nietkniete - szyk z capem marszu i swieza szarza sa wyjatkiem; FieldCraft: kara i zdjecie kary
+jak dotad poza gornym limitem z capu oddechu i zapisem capu zamiast -1; przy AiSavesBreath NIE zachowanie bez zmian (tylko liczniki), przy MarchAtWalkingPace NIE marsz
+bajt w bajt; segment 'marsz' NB2 - "w marszu" bez capu oddechu. (b) kolizje - jedno zrodlo limitu na czlowieka w danej chwili: cap marszu ALBO cap oddechu (oddech tylko
+bez capu marszu), kara FieldCraft = min z nimi; 136 konie - konni poza zasada, odpoczynek konnicy bez zmian; 137 oddech - krok 1.75 < 2.2, wiec postawa nie jest
+"w biegu" i oddech wraca (WalkM), budzet z paska; 139/142 panika - wyjatek (przelacznik); 143 ranny w odwrocie - wyjatek (natywny odwrot i tak omijany przez PostSpeed);
+140 tarcze i 141 S2 - brak wspolnego stanu; BattleCries - oddech zabiera ten sam limit glosow (czlowiek, ktory dyszal, nie krzyczy przez 4 s, a okrzyku szarzy przez
+20 s - ManCooldown); BattleSound.IsMarching bez zmian. (c) jedno zjawisko - "ile wolno biec" ma jedna regule (budzet z paska), krok jedna liczbe (1.75 m/s) w marszu
+134c i w zasadzie; stan czyszczony na poczatku / koncu misji i przy usunieciu zachowania. (d) cudzy kod - HumanAIComponent.AdjustSpeedLimit / ParallelUpdateFormationMovement,
+Agent.OnFleeing (zeruje Formation), CommonAIComponent, RBM AdjustSpeedLimitPatch (nasz postfiks po com.rbmai - minimum wygrywa z progami 0.9 / 0.6), RBMAI forceTiredAnimation,
+AgentVictoryLogic (przerwanie kanalu 1), MBActionSet, SoundEvent.GetEventIdFromString, Mission.MakeSound - sprawdzone w dekompilacji 1.4.8. NIE da sie sprawdzic w C#:
+czy silnik gra animacje chodu przy limicie 1.75 (sonda: WalkMode i predkosc w grupach), jak wyglada poza z kanalu 1 z bronia i tarcza w reku, czy grunt_rowing brzmi
+jak zadyszka (pokaz u Jeffa).
+Balans (D3, W5): szyk po zwarciu ma maly budzet - idzie do kolejnej grupy krokiem i biegnie ostatnie 25 m (przy oddechu 137 szybki dlug wraca w ok. 30-60 s kroku, wiec
+krocej niz wedlug gumki RBM z projektu); ludzie z rozna pula rozciagaja szyk Hold (licznik D3); posilki DR i fale m97 dochodza ok. 60-75 s pozniej (bitwy dluzsze);
+piechota odpuszcza pogon po kilkunastu sekundach (mniej zabitych w ucieczce od piechoty - jency, lup), konnica goni jak dotad; atakujacy dluzej ida pod lukami (zapas
+25% to lagodzi - straty od pociskow w liniach 140/141). D4: rozsypany szyk bandytow zaniza d_szyk (biegna wczesniej). Wydajnosc: jedno GetTargetAgent na czlowieka co 0.6 s
+- koszt w linii (oczekiwane sr. < 0.5 ms na takt 0.2 s przy kilkuset ludziach).
+Sprawdzic w logu po wgraniu: linia "Oddech AI (144)" w kazdej bitwie polowej, "czynne", potkniecia oddech 0; linia kandydatow - klipy TAK w as_human_warrior i
+as_giant_warrior, zdarzen grunt_rowing 6/6; "ponad 30 s" blisko 0 (poza ucieczka), mniejszy % zadyszki wroga niz w tescie z kluczem NIE, sr. pasek szarzujacych przy
+pierwszym zwarciu >= 50%, mniej sekund biegu w "pogon" i "posilki"; segment 'marsz' NB2: szarze zaczete marszem / doprowadzone jak dotad, predkosc w marszu ok. 1.5-1.6 m/s
+(dotad 1.58-1.80), dogonienie bliskie 0; "decyzji krok wstrzymanych" (B2) > 0 tylko u ciezkich; "d nieznane" po rozbiciu wroga; sonda: w grupie "marsz" i "krok z oddechu"
+predkosc ponizej 1.8 i udzial WalkMode (0% nie dowodzi truchtu - obraz u Jeffa). Autotest: przebieg A z AiSavesBreath NIE (na sucho) i B z TAK (YourTroops TAK - W6:
+ciezcy sa po stronie gracza), bez -Speed 16. W grze (Jeff): wrog nie biegnie przez cale pole, idzie i rusza biegiem na ostatnie metry; zmeczony na postoju pokazuje poze
+(WindedPose 1-3 do wyboru) i dyszy w 25 m.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 ffce8621f212992d95e4b4f85c0db236).
 ## 2026-10-25 143 (galaz noc/139-ai-zycie, po 142 4d3f7047) - AI walczy o zycie, krok 5: ranny ponizej 20% HP wycofuje sie z bronia, bez paniki (karta "141", decyzja D2, klucz WoundedWithdrawWithArms) - ZMIANA REGULY NB2 z 16.10
 **Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko
 w obszarze jego mozliwosci i skilli aby przetrwac, walczy o zycie! ... dopiero ta zasada peka gdy jest panika"; decyzja Jeffa ok. 15:00 (pytanie D2 syntezy): ranny
