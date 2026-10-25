@@ -464,8 +464,10 @@ namespace Armoury
         // ------------------------------------------------------------ paczka 132: proba zdjec okien (WindowPhotos - tylko autotest)
 
         /// <summary>Okno lupu z raportu PROBNEGO (WindowPhotos): ta sama tresc (Build), obrazek (Picture) i warstwa (ShowGauntlet) co po bitwie; bez zapasu,
-        /// bez zatrzymania czasu i bez raportu (_rep null - zamkniecie nie wola SpoilsReport.Finish, liczniki sesji bez zmian). null - otwarte; inaczej powod.</summary>
-        internal static string ShowPhoto(SpoilsReport.Rep r)
+        /// bez zatrzymania czasu i bez raportu (_rep null - zamkniecie nie wola SpoilsReport.Finish, liczniki sesji bez zmian). null - otwarte; inaczej powod.
+        /// paczka 150 (tylko proba obrazkow SpoilsAtlas): sprite - obrazek WYMUSZONY (nazwa z SpriteData) zamiast Picture, title - tytul okna zamiast TitleOf;
+        /// bez nich (WindowPhotos) wszystko jak dotad.</summary>
+        internal static string ShowPhoto(SpoilsReport.Rep r, string sprite = null, string title = null)
         {
             if (r == null) return "brak raportu probnego";
             if (_layer != null || _spec != null) return "okno lupu juz otwarte";
@@ -473,7 +475,16 @@ namespace Armoury
             string why = GauntletUnavailable();
             if (why != null) return "wlasne okno niedostepne: " + why;
             var content = Build(r);
-            string header = Picture(r, out _fileSprite);
+            if (title != null) content.Title = title;
+            string header;
+            if (sprite != null)
+            {
+                EnsureEventSprites();   // jak Picture: kategoria ui_event_category zaladowana przed LoadMovie
+                if (!HasSprite(sprite)) return "brak sprite'a " + sprite + " w SpriteData";
+                _fileSprite = null;     // sprite z arkusza - nic do zwolnienia po zamknieciu
+                header = sprite;
+            }
+            else header = Picture(r, out _fileSprite);
             bool ok = false;
             try { ok = ShowGauntlet(r, content, header); }
             catch (Exception e) { Stumble("ShowPhoto", e); RemoveLayer(); why = "wyjatek " + e.GetType().Name; }

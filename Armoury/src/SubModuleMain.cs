@@ -585,7 +585,16 @@ namespace Armoury
         {
             SpoilsWindow.AppTick();
             WindowPhotos.AppTick();   // paczka 132: proba zdjec nowych okien (tylko DLL autotestu i plik armoury-zdjecia-okien.flag; wlasny try, potem od razu wyjscie)
+            // paczka 150: proba obrazkow okna lupu (tylko DLL autotestu i plik armoury-zdjecia-obrazkow.flag; wlasny try w srodku) - tu tylko blad ladowania typu,
+            // liczony osobno (po 3 proba nie startuje), zeby nie gasil okna lupu (_spoilsFails)
+            if (_atlasFails < 3)
+            {
+                try { SpoilsAtlas.AppTick(); }
+                catch (Exception e) { _atlasFails++; Log.Error("SpoilsAtlas.AppTick: nie laduje sie (proba " + _atlasFails + "/3)", e); }
+            }
         }
+
+        private static int _atlasFails;   // paczka 150: blad ladowania typu proby obrazkow okna lupu (SpoilsAtlas.AppTick)
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void ChronicleTick()
