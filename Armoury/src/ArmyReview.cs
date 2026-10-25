@@ -235,7 +235,8 @@ namespace Armoury
             try { Log.Info(P + "start sesji | opcja \"Review the army\" w arm_camp_wait (" + (camp ? "TAK" : "NIE") + ", indeks " + CampIndex + ") i bk_camping_wait_menu ("
                            + (bk ? "TAK" : "NIE") + ", indeks " + BkIndex + "), takt doby " + (daily ? "TAK" : "NIE") + " | klucze Army Review Enabled " + Yes(On)
                            + ", Writes Order Of Battle " + Yes(Writes) + ", Pin Troop Types " + Yes(PinOn) + " | " + OobState() + " | zapis arm_army_review: " + _importNote
-                           + " | przypiecia " + PinSummary(_pins) + " | proba autotestu: " + TestState() + " | podglad sprzetu (133c): " + KitPreview.Wiring + "."); }
+                           + " | przypiecia " + PinSummary(_pins) + " | proba autotestu: " + TestState() + " | podglad sprzetu (133c): " + KitPreview.Wiring
+                           + " | strony marszu (133d): " + MarchWiring + "."); }
             catch (Exception e) { Stumble("AddMenus.Log", e); }
         }
 
@@ -286,7 +287,8 @@ namespace Armoury
                 string why;
                 if (!Can(out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
                 a.Tooltip = new TextObject("{=!}Your men by kind, what kit they lack for the next battle and why, what they went without in the last battle, the horses"
-                                           + " and harness in use and missing, why riders will go on foot and why the column walks, and your banners for the next battle.");
+                                           + " and harness in use, idle and to buy, why riders will go on foot, your speed on the map, the herd and why the column walks,"
+                                           + " and your banners for the next battle.");
                 return true;
             }
             catch (Exception e) { Stumble("Cond", e); return false; }
@@ -376,17 +378,26 @@ namespace Armoury
             MarchPace.Column col = null;
             try { col = MarchPace.Explain(mp); } catch (Exception e) { Stumble("Explain", e); }
             var pagesMen = Paginate(MenText(mp, fit, wnd, pairs));
-            var pagesHorses = Paginate(HorseText(mp, pairs));
-            var pagesMarch = Paginate(MarchText(mp, col, pairs));
             List<string> pagesLast = null;   // 133b: ostatnia bitwa (zapamietane liczby, bez liczenia na mapie)
             try { pagesLast = Paginate(LastBattleText()); } catch (Exception e) { Stumble("LastBattleText", e); }
             KitPreview.Result next = null;   // 133c: podglad nastepnej bitwy (ten sam rozdzielacz DTE i straze co bitwa; pamiec po wersjach i dniu)
             try { next = KitPreview.Get(false); } catch (Exception e) { Stumble("KitPreview", e); }
+            HorseView hv = null;             // 133d: konie i uprzaz z podgladu + czytnik rodzajow koni (bez podgladu - strona z SaddleLaw.Pairs)
+            try { hv = HorsesOf(mp, next, fit); } catch (Exception e) { Stumble("HorsesOf", e); }
+            List<string> pagesHorses;
+            try { pagesHorses = Paginate(HorsePageText(mp, pairs, hv, col)); }
+            catch (Exception e) { Stumble("HorsePageText", e); pagesHorses = Paginate(HorseText(mp, pairs)); hv = null; }
+            var pagesMarch = Paginate(ColumnText(mp, col, pairs, next));   // 133d: strona "Column" = MarchText bez zmian + regula jezdzca na mapie
+            MarchView mv = null;             // 133d: strony "Speed" i "Herd" (model predkosci gry wprost, stado gry)
+            try { mv = MarchOf(mp); } catch (Exception e) { Stumble("MarchOf", e); }
+            List<string> pagesSpeed = null, pagesHerd = null;
+            try { pagesSpeed = Paginate(SpeedText(mv)); pagesHerd = Paginate(HerdText(mv, col)); } catch (Exception e) { Stumble("MarchPages", e); mv = null; }
             if (logIt)
             {
                 List<string> pagesNext = null;
                 try { if (next != null && next.Ok) pagesNext = NextPages(next); } catch (Exception e) { Stumble("NextPages", e); }
-                try { Log.Info(ReportLine(mp, fit, wnd, pairs, col, pagesMen, pagesHorses, pagesMarch, pagesLast, next, pagesNext)); } catch (Exception e) { Stumble("ReportLine", e); }
+                try { Log.Info(ReportLine(mp, fit, wnd, pairs, col, pagesMen, pagesHorses, pagesMarch, pagesLast, next, pagesNext, hv, mv, pagesSpeed, pagesHerd)); }
+                catch (Exception e) { Stumble("ReportLine", e); }
                 try { if (next != null) Log.Info(KitPreview.LogLine(next)); } catch (Exception e) { Stumble("KitPreview.LogLine", e); }
             }
 
@@ -396,18 +407,14 @@ namespace Armoury
             string desc = (allFit + allWnd) + (allFit + allWnd == 1 ? " man" : " men") + " under your banner - " + allFit + " fit to fight, " + allWnd + " wounded"
                           + (prisoners > 0 ? "; " + prisoners + " prisoners in the column" : "") + ". Pick what to look at.";
 
-            int riders = pairs.Riders + pairs.Exempt;
-            int foot = FootInBattle(pairs);
             var rows = new List<InquiryElement>
             {
                 new InquiryElement("men", "Your men: " + fit[0] + " infantry, " + fit[1] + " archers, " + fit[2] + " cavalry, " + fit[3] + " horse archers", null, true,
                                    "Fit to fight by kind (the wounded are counted on the page). Kind follows each man's troop: the same sorting the Order of Battle uses."),
                 NextRowSafe(next),   // 133c
                 LastRowSafe(),   // 133b
-                new InquiryElement("horses", riders == 0 ? "Horses and harness: no riders in your party"
-                                                         : "Horses and harness: " + (riders - foot) + " of " + riders + " riders ready to ride", null, true,
-                                   foot > 0 ? foot + " riders will fight on foot - the page says why." : "Horses and harness in the troops' armoury and in your baggage."),
-                new InquiryElement("march", MarchRow(col), null, true, "Why your column walks or rides on the map, and what would change it."),
+                HorseRowSafe(pairs, hv),   // 133d: z podgladu (bez podgladu - z SaddleLaw.Pairs jak dotad)
+                MarchMainRow(col, mv),     // 133d: predkosc i co ja trzyma; strony Speed / Herd / Column
             };
             var b = Behavior();
             int raised = 0, entries = 0;
@@ -436,7 +443,7 @@ namespace Armoury
                         else if (id == "next") { _dReports++; OpenKitTypes(); }   // 133c
                         else if (id == "last") { _dReports++; ShowPages("Last battle", pagesLast, 0); }   // 133b
                         else if (id == "horses") { _dReports++; ShowPages("Horses and harness", pagesHorses, 0); }
-                        else if (id == "march") { _dReports++; ShowPages("On the march", pagesMarch, 0); }
+                        else if (id == "march") { _dReports++; OpenMarch(mv, col, pagesSpeed, pagesHerd, pagesMarch); }   // 133d
                         else if (id == "banners") { _dBanners++; OpenBanners(true); }
                         else if (id == "reset") AskReset();
                     }
@@ -613,7 +620,8 @@ namespace Armoury
 
         /// <summary>Linia logu raportu (na otwarcie okna i w tescie): te same liczby co strony okna.</summary>
         internal static string ReportLine(MobileParty mp, int[] fit, int[] wnd, SaddleLaw.PairState p, MarchPace.Column col, List<string> pm, List<string> ph, List<string> pmarch,
-                                          List<string> plast = null, KitPreview.Result next = null, List<string> pnext = null)
+                                          List<string> plast = null, KitPreview.Result next = null, List<string> pnext = null,
+                                          HorseView hv = null, MarchView mv = null, List<string> pspeed = null, List<string> pherd = null)
         {
             int exM = ExemptMounted(p);
             var bag = mp.ItemRoster;
@@ -633,10 +641,18 @@ namespace Armoury
               .Append(", bohaterowie ").Append(fit[4]).Append('/').Append(wnd[4]);
             sb.Append(" | ostatnia bitwa (133b): ").Append(LastBattleBrief());
             if (next != null) sb.Append(" | nastepna bitwa (133c): ").Append(KitPreview.Brief(next));
+            if (hv != null || mv != null)
+            {
+                // 133d: te same liczby co strony "Horses and harness", "Speed" i "Herd" (segmenty bez "marsz: ludzi" i "| strony N" - format AR-2 bez zmian)
+                sb.Append(" | konie (133d): ").Append(HorseBrief(hv, p));
+                sb.Append(" | predkosc (133d): ").Append(SpeedBrief(mv));
+                sb.Append(" | stado (133d): ").Append(HerdBrief(mv));
+            }
             sb.Append(" | strony ").Append(PagesInfo(pm)).Append(' ').Append(PagesInfo(ph)).Append(' ').Append(PagesInfo(pmarch)).Append(" (miesci sie ").Append(Rumours.PageLines).Append(')');
             // 133b: osobny segment - format "strony AxB CxD ExF (miesci sie N)" czyta tools/sprawdz_logi.py (AR-2)
             if (plast != null) sb.Append(" | strony ostatniej bitwy (133b) ").Append(PagesInfo(plast));
             if (pnext != null) sb.Append(" | strony podgladu (133c) ").Append(PagesInfo(pnext));
+            if (pspeed != null || pherd != null) sb.Append(" | strony marszu (133d) predkosc ").Append(PagesInfo(pspeed)).Append(", stado ").Append(PagesInfo(pherd));
             sb.Append(" | ").Append(OobState()).Append('.');
             return sb.ToString();
         }

@@ -81,6 +81,9 @@ namespace Armoury
                                                           Black = new Dictionary<ItemObject, int>(), Barred = new Dictionary<ItemObject, int>(), Spares = new Dictionary<ItemObject, int>();
             internal readonly int[] OffWhy = new int[6];   // zdjete przy wystawieniu wedlug kodu WouldStrip
             internal readonly int[] WhyCount = new int[RCodes];
+            // 133d: wierzchowce i uprzaz na nich PO strazach wystawienia (WouldStrip, SaddleGuard, RiderOnFoot) - "w uzyciu w bitwie" strony "Horses and harness"
+            internal readonly Dictionary<ItemObject, int> Rode = new Dictionary<ItemObject, int>(), Saddles = new Dictionary<ItemObject, int>();
+            internal Mounts MountsCache;                // 133d: potrzeby koni i uprzezy (MountsOf - leniwie, sakwy w kluczu pamieci)
             internal int BagPieces;
             internal List<Left> LeftList;               // resztka z przyczynami - leniwie (strona "Unused in the troops' armoury")
             internal Dictionary<string, List<Man>> PerMan;   // K15: wedlug typu, w kolejnosci przydzialow (tak wystawia DTE)
@@ -358,6 +361,14 @@ namespace Armoury
                 bool noSad = GarrisonKit.SaddleMissing(a, e2, canMount);
                 if (noSad) { e2[EquipmentIndex.Horse] = default(EquipmentElement); e2[EquipmentIndex.HorseHarness] = default(EquipmentElement); }
                 bool foot = !noSad && GarrisonKit.RiderOnFoot(a, e2, rf, canMount);
+                // 133d: kon i uprzaz, na ktorych czlowiek wyjedzie (po strazach; zestaw awaryjny DTE nie jest z polki) - tylko odczyt
+                var mh = e2[EquipmentIndex.Horse].Item;
+                if (canMount && mh != null && !Temp(a, 10, mh))
+                {
+                    Add(res.Rode, mh, 1);
+                    var mhr = e2[EquipmentIndex.HorseHarness].Item;
+                    if (mhr != null && !Temp(a, 11, mhr)) Add(res.Saddles, mhr, 1);
+                }
                 var g = KitGaps.Compare(rf, e2, true);
                 int miss = GarrisonKit.Missing(a, e2);
                 if (g.Missing != miss) res.Bad++;
@@ -701,6 +712,106 @@ namespace Armoury
                     t.Bag[cat] = Math.Min(n, t.Short[cat]);
                 }
             foreach (var v in useful.Values) res.BagPieces += v;
+        }
+
+        // ---------------------------------------------------------------- 133d: konie i uprzaz
+        /// <summary>133d (strona "Horses and harness"): czego brakuje jezdzcom podgladu, ktorzy pojda pieszo, i skad to wziac. Bez nowej reguly: braki to
+        /// NoHorse / NoSaddle podgladu (te same straze co bitwa), konie pokrywa resztka zbrojowni i sakwy tymi samymi predykatami co przydzial (Fail: Jazda,
+        /// kraj wierzchowca), uprzaz - rodzina konia (SaddleLaw.Fits) bez Jazdy (K5: w bitwie nikt jej nie sprawdza).</summary>
+        internal sealed class Mounts
+        {
+            internal int NeedHorse;      // jezdzcy bez konia w bitwie
+            internal int NeedHarness;    // kon bez uprzezy + bez konia, ktorych typ wymaga uprzezy (z koniem beda jej potrzebowac) - przy RiderNeedsHarness
+            internal int RemHorseFit;    // konie resztki zbrojowni, na ktorych ci jezdzcy moga jechac (przyciete do braku typu; kazdy kon raz)
+            internal int BagHorseFit;    // to samo z sakw (po resztce)
+            internal int RemHarness;     // uprzaz rodziny konia w resztce zbrojowni
+            internal int BagHarness;     // uprzaz rodziny konia w sakwach (SaddleLaw.BagFit)
+            internal int UseHarness, MoveHarness, BuyHarness, BuyHorse;
+            internal int HardTypes;      // typy, ktorym pierwsza przyczyna braku konia to umiejetnosc (Requires Riding)
+        }
+
+        /// <summary>Wierzchowiec pod jezdzca (jak licznik gry ItemRoster: juczne najpierw, bydlo osobno).</summary>
+        internal static bool RidingMount(ItemObject it)
+        {
+            var hc = it != null && it.ItemType == ItemObject.ItemTypeEnum.Horse ? it.HorseComponent : null;
+            return hc != null && !hc.IsPackAnimal && hc.IsMount;
+        }
+
+        /// <summary>Potrzeby koni i uprzezy podgladu (leniwie, raz na podglad - sakwy sa w kluczu pamieci).</summary>
+        internal static Mounts MountsOf(Result res, MobileParty mp)
+        {
+            if (res == null || !res.Ok) return new Mounts();
+            if (res.MountsCache != null) return res.MountsCache;
+            var m = new Mounts();
+            var needy = new List<TypeRow>();
+            foreach (var t in res.Rows)
+            {
+                if (t.NoHorse > 0)
+                {
+                    needy.Add(t);
+                    if (t.HorseWhy.Count > 0 && t.HorseWhy[0].Code == RSkill) m.HardTypes++;
+                }
+                m.NeedHorse += t.NoHorse;
+                m.NeedHarness += t.NoSaddle + (SaddleLaw.On && SaddleLaw.Needs(t.Troop) ? t.NoHorse : 0);
+            }
+            var rem = new List<KeyValuePair<ItemObject, int>>();
+            foreach (var kv in res.Rem)
+            {
+                if (kv.Value <= 0) continue;
+                if (RidingMount(kv.Key)) rem.Add(kv);
+                else if (kv.Key.ItemType == ItemObject.ItemTypeEnum.HorseHarness && SaddleLaw.Fits(kv.Key)) m.RemHarness += kv.Value;
+            }
+            var bag = new List<KeyValuePair<ItemObject, int>>();
+            var br = mp != null ? mp.ItemRoster : null;
+            if (br != null)
+            {
+                for (int i = 0; i < br.Count; i++)
+                {
+                    var el = br.GetElementCopyAtIndex(i);
+                    if (el.Amount > 0 && RidingMount(el.EquipmentElement.Item)) bag.Add(new KeyValuePair<ItemObject, int>(el.EquipmentElement.Item, el.Amount));
+                }
+                m.BagHarness = SaddleLaw.BagFit(br);
+            }
+            var left = new Dictionary<TypeRow, int>();
+            foreach (var t in needy) left[t] = t.NoHorse;
+            m.RemHorseFit = Cover(needy, left, rem);
+            m.BagHorseFit = Cover(needy, left, bag);
+            m.BuyHorse = Math.Max(0, m.NeedHorse - m.RemHorseFit - m.BagHorseFit);
+            m.UseHarness = Math.Min(m.NeedHarness, m.RemHarness);
+            m.MoveHarness = Math.Min(m.BagHarness, m.NeedHarness - m.UseHarness);
+            m.BuyHarness = m.NeedHarness - m.UseHarness - m.MoveHarness;
+            res.MountsCache = m;
+            return m;
+        }
+
+        /// <summary>Konie z zapasu dla typow z jezdzcami bez konia (po kolei jak lista okna, sztuki wedlug StringId): pierwszy predykat przydzialu (Fail) wobec
+        /// konia wzorca typu; kazdy kon raz. left - brak typu, pomniejszany. Wynik - ile pokryto.</summary>
+        private static int Cover(List<TypeRow> needy, Dictionary<TypeRow, int> left, List<KeyValuePair<ItemObject, int>> stock)
+        {
+            var have = new Dictionary<ItemObject, int>();
+            foreach (var kv in stock) Add(have, kv.Key, kv.Value);
+            var keys = new List<ItemObject>(have.Keys);
+            keys.Sort((a, b) => string.CompareOrdinal(a.StringId, b.StringId));
+            int got = 0;
+            foreach (var t in needy)
+            {
+                int need = left[t];
+                if (need <= 0) continue;
+                ItemObject R = null; int bn = -1;
+                foreach (var kv in t.Kit) if (kv.Key.ItemType == ItemObject.ItemTypeEnum.Horse && kv.Value > bn) { R = kv.Key; bn = kv.Value; }
+                foreach (var it in keys)
+                {
+                    if (need <= 0) break;
+                    int n = have[it];
+                    if (n <= 0) continue;
+                    string why;
+                    if (Fail(t.Troop, it, R, false, out why) != 0) continue;
+                    int take = Math.Min(n, need);
+                    have[it] = n - take; need -= take; got += take;
+                }
+                left[t] = need;
+            }
+            return got;
         }
 
         /// <summary>Resztka zbrojowni z przyczyna (leniwie - strona "Unused in the troops' armoury"): wobec typow, ktorych wzorzec ma ten rodzaj.</summary>

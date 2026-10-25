@@ -19,6 +19,8 @@ namespace Armoury
     /// linia startu sesji mowi, czy flaga jest widziana ("proba autotestu: flaga ... TAK/NIE (sciezka)"):
     ///  T1 raport: te same funkcje co okno (CountMen, SaddleLaw.Pairs, MarchPace.Explain, strony) - linia "raport" i strony najwyzej Rumours.PageLines linii;
     ///     tozsamosci par: jezdzcy + wyjatki = z para + kon bez uprzezy + wyjatki z koniem + bez konia; sufit kolumny wedlug wzoru Cap.
+    ///     133d: strony koni, Speed, Herd i Column w "najdluzszej"; konie z podgladu (gotowi + pieszo = jezdzcy, w bitwie <= w zbrojowni, braki rozlozone
+    ///     bez reszty); stado - procent linii "Herding" = GetHerdingModifier gry (K9); predkosc wobec gry - INFO.
     ///  T2 zapis choragwi testowych przez Write (ta sama droga co "Save" w oknie): 2 x piechota (60 ludzi / reszta, pierwsza z tarczami), lucznicy, konni
     ///     z kapitanem-towarzyszem, konni lucznicy - tylko rodzaje obecne; odczyt 8 x pole i armia zgodny, wagi kazdej klasy = 100, kazdy obecny rodzaj pokryty.
     ///  T3 nazwy: NameOf zgodne, Export -> Import -> Export bez zmian.
@@ -119,14 +121,19 @@ namespace Armoury
             var p = SaddleLaw.Pairs(mp);
             var col = MarchPace.Explain(mp);
             var pm = Paginate(MenText(mp, fit, wnd, p));
-            var ph = Paginate(HorseText(mp, p));
-            var pq = Paginate(MarchText(mp, col, p));
             var pl = Paginate(LastBattleText());   // 133b: strony "Last battle" (zapis ostatniej bitwy albo zdanie "nic jeszcze")
             var nx = KitPreview.Get(true);         // 133c: podglad nastepnej bitwy liczony od nowa (czas w ms do linii)
             var pn = NextPages(nx);
-            Log.Info(ReportLine(mp, fit, wnd, p, col, pm, ph, pq, pl, nx, pn));
+            var hv = HorsesOf(mp, nx, fit);        // 133d: te same funkcje co okno - konie z podgladu, Speed, Herd, Column
+            var ph = Paginate(HorsePageText(mp, p, hv, col));
+            var pq = Paginate(ColumnText(mp, col, p, nx));
+            var mv = MarchOf(mp);
+            var ps = Paginate(SpeedText(mv));
+            var pd = Paginate(HerdText(mv, col));
+            Log.Info(ReportLine(mp, fit, wnd, p, col, pm, ph, pq, pl, nx, pn, hv, mv, ps, pd));
             Log.Info(KitPreview.LogLine(nx));
-            int longest = Math.Max(Math.Max(Math.Max(LongestPage(pm), LongestPage(pl)), Math.Max(LongestPage(ph), LongestPage(pq))), LongestPage(pn));
+            int longest = Math.Max(Math.Max(Math.Max(LongestPage(pm), LongestPage(pl)), Math.Max(LongestPage(ph), LongestPage(pq))),
+                                   Math.Max(LongestPage(pn), Math.Max(LongestPage(ps), LongestPage(pd))));
             bool t1p = longest <= Rumours.PageLines;
             int exM = ExemptMounted(p);
             bool t1a = p.Riders + p.Exempt == p.Paired + p.NoSaddle + exM + p.NoHorse && p.Mounted == p.Paired + p.NoSaddle;
@@ -144,9 +151,23 @@ namespace Armoury
                 int sumShort = 0; foreach (var v in nx.Short) sumShort += v;
                 t1k = nx.Bad == 0 && sumShort - nx.Replaced == nx.Missing;
             }
+            // 133d: konie - gotowi + pieszo = jezdzcy podgladu, w bitwie <= w zbrojowni, braki koni i uprzezy rozlozone bez reszty (resztka + sakwy + kupic);
+            // stado - procent linii "Herding" = GetHerdingModifier gry z tych samych wejsc (K9, |roznica| <= 0.0005; bez linii - kara 0); predkosc wobec gry - INFO
+            bool t1m = true;
+            if (hv != null && hv.Ok)
+            {
+                var m = hv.M;
+                t1m = hv.Ready + hv.Foot == hv.Riders && (!hv.ArmRead || hv.Rode.Riding <= hv.Arm.Riding)
+                      && m.BuyHorse + m.RemHorseFit + m.BagHorseFit == m.NeedHorse && m.UseHarness + m.MoveHarness + m.BuyHarness == m.NeedHarness;
+            }
+            var herdOk = HerdAgrees(mv);
+            bool t1h = herdOk != false;
             pts.Add("T1 raport: strony <= " + Rumours.PageLines + " linii " + T(t1p) + " (najdluzsza " + longest + "), pary " + T(t1a) + ", kolumna " + (col == null ? "wylaczona" : T(t1c))
-                    + ", podglad sprzetu (133c) " + (nx.Ok ? T(t1k) + " (" + nx.Ms + " ms, stron " + pn.Count + ")" : "niedostepny (" + nx.Why + ")"));
-            ok &= t1p && t1a && t1c && t1k;
+                    + ", podglad sprzetu (133c) " + (nx.Ok ? T(t1k) + " (" + nx.Ms + " ms, stron " + pn.Count + ")" : "niedostepny (" + nx.Why + ")")
+                    + ", konie (133d) " + (hv != null && hv.Ok ? T(t1m) : "z SaddleLaw.Pairs (bez podgladu)")
+                    + ", stado (133d) " + (herdOk == null ? "bez porownania (" + (mv.Ok ? mv.HerdWhy : mv.Why) + ")" : T(t1h))
+                    + ", predkosc (133d) " + (mv.Ok ? "wobec gry " + (SpeedAgrees(mv) ? "zgodna" : "ROZJAZD") + " - INFO, Other " + S2(mv.Other) + ", " + mv.Ms + " ms" : "niedostepna (" + mv.Why + ")"));
+            ok &= t1p && t1a && t1c && t1k && t1m && t1h;
             if (!Writes)
             {
                 // klucz zapisu wylaczony = porzadek gry nietkniety (tak obiecuje opis klucza) - test tez go nie rusza

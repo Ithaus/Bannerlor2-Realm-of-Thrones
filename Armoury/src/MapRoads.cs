@@ -1285,6 +1285,23 @@ namespace Armoury
             finally { _noRecord = false; _suppress = false; }
         }
 
+        /// <summary>133d (okno "Review the army", strona Speed): rozpiska predkosci partii tak jak dymek gry (model wprost: CalculateFinalSpeed(CalculateBaseSpeed
+        /// z opisami)), ale bez zapisu predkosci do pamieci partii i bez zapisu stanu drogi i blota (_noRecord - jak ProbeFor). Wyjatek wychodzi do wolajacego.</summary>
+        internal static bool Explained(MobileParty mp, out ExplainedNumber en)
+        {
+            en = default(ExplainedNumber);
+            var model = Campaign.Current != null ? Campaign.Current.Models.PartySpeedCalculatingModel : null;
+            if (model == null || mp == null) return false;
+            bool was = _noRecord;
+            try
+            {
+                _noRecord = true;
+                en = model.CalculateFinalSpeed(mp, model.CalculateBaseSpeed(mp, true));
+                return true;
+            }
+            finally { _noRecord = was; }
+        }
+
         private static bool Probe(PartySpeedModel model, MobileParty mp, out float r0, out float r1, out float lim, out float lmin, out bool line, out bool lineS, out float cached)
         {
             r0 = r1 = lim = cached = 0f; lmin = float.MinValue; line = false; lineS = false;

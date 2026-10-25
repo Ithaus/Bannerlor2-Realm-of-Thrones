@@ -1,5 +1,57 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 133d (galaz noc/133-raport-armii) - Armoury: okno armii "Horses and harness" z podgladu bitwy (ile koni i uprzezy kupic, przeniesc, ile bezczynnych) i "On the march" -> Speed / Herd / Column
+**Problem:** Jeff 25.10 ok. 12:57: "... przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold, jakie konie jaka predkosc ile koni i ile
+zbroi potrzeba aby wojsko jechalo na koniach, ile brakuje ile za duzo koni i jest herding". Dotad strona "Horses and harness" liczyla SaddleLaw.Pairs (arytmetyka z rannymi,
+bez Jazdy i kraju wierzchowca - inna liczba niz bitwa), bez rodzajow koni, bez "co kupic" i "ile za duzo"; "On the march" pokazywala tylko sufit kolumny MarchPace - predkosci
+gry, jej linii ani herdingu w oknie nie bylo (rozpiska tylko w dymku gry i w linii "Audyt predkosci" raz na dobe; herding w logu gry Jeffa 02-11-22 nie wystapil, przyklad
+"Herding -1.49 | Shepherd +0.75" z autotestu 05-52-43).
+**Przyczyna:** brak strony koni liczonej ta sama droga co bitwa i brak stron predkosci/stada (projekt 2.3 i 2.4, krytyka K8, K9).
+**Zmiana:** (1) Nowy Armoury/src/ArmyReview.March.cs. HORSES AND HARNESS z podgladu nastepnej bitwy (KitPreview - ten sam rozdzielacz DTE i straze co bitwa): jezdzcy (zdrowi
+z koniem we wzorcu), gotowi, pieszo (bez konia / kon bez uprzezy), typy z jezdzcami pieszo z pierwsza przyczyna (ta sama co strona typu "Kit for the next battle", np.
+"Requires Riding 50 - this troop has 30."); nowy czytnik rodzajow (Herdbook) po zbrojowni DTE gracza i sakwach: wierzchowce zwykle / bojowe / szlachetne (Stables.IsPlainMount
++ Stables.Level), inne wierzchowce, juczne, bydlo (kolejnosc jak licznik gry ItemRoster), uprzaz rodziny konia (SaddleLaw.Fits) i inna; w bitwie (konie i uprzaz na czlowieku
+PO strazach wystawienia - nowe KitPreview.Result.Rode/Saddles), zostaje w zbrojowni, czeka na rannych, bezczynne; sakwy z licznikami gry (luzaki, juczne, bydlo). "Ile zbroi" =
+uprzaz konia (siodlo albo ladry, regula E8/H). Co kupic: nowe KitPreview.MountsOf - braki koni (NoHorse) i uprzezy (NoSaddle + bez konia, ktorych typ wymaga uprzezy, przy
+RiderNeedsHarness) pokryte najpierw resztka zbrojowni, potem sakwami - konie tymi samymi predykatami co przydzial (Fail: Jazda ItemReq, kraj wierzchowca GearFit.CultureCode;
+kazdy kon raz, typy po kolei), uprzaz bez Jazdy (K5); reszta = "buy N horses (their riders can ride) and M harness", z sakw = "already in your baggage - put them in the
+troops' armoury" (+ uwaga, ze kon z sakw przestaje niesc piechura w marszu). Bezczynne = zostaje - dla rannych - pasujace potrzebujacym ("more than every rider needs, the
+wounded included"). Na koncu dwie reguly jezdzca (decyzja (b) - tylko pokazac): na mapie jezdziec wedlug typu (premia Cavalry, kolumna), w bitwie tylko kon (i uprzaz) ze
+zbrojowni; ile luzakow brakuje, zeby nikt nie szedl. Bez podgladu (TroopsFightWithOwnKitOnly wylaczone, brak DTE, otwarta zbrojownia) - stara strona i wiersz z
+SaddleLaw.Pairs bez zmian. Wiersz glowny: "Horses and harness: 2 of 4 riders ready - buy 2 horses, 1 harness" (albo "- N horses idle"). (2) ON THE MARCH -> okno z trzema
+wierszami (Look/Back, strony wracaja do niego): SPEED - rozpiska modelu predkosci gry wprost jak dymek gry (CalculateFinalSpeed(CalculateBaseSpeed z opisami)) przez nowe
+MapRoads.Explained (bez zapisu predkosci do pamieci partii i bez zapisu stanu drogi i blota - _noRecord, jak ProbeFor); gracz doczepiony do armii - predkosc wodza i osobno
+mnoznik doganiania druzyny (K8: MobileParty.CalculateSpeed); linie mnoznikow w procentach (linia / BaseNumber - K9; rodzaj linii z ExplainedNumber._explainer refleksja,
+Declared*), linie dodatkow w jednostkach, linie < 0.005 pominiete, reszta jako "Other (no name given)" (czynniki bez opisu, np. BK/ROT), "= wynik"; porownanie z predkoscia
+gry (wodza) - rozjazd > 2% w linii logu. HERD - regula gry (DefaultPartySpeedCalculatingModel): stado = juczne + bydlo + luzaki ponad pieszych, sumowane po partii predkosci
+i doczepionych (K8), kara tylko ponad liczbe ludzi; procent z linii "Herding" (nazwa ze statycznego _textHerd gry, nie z napisu; linia scalona jako zwykla - bez procentu),
+Shepherd; "co gdyby" (bez wolnych luzakow) przez prywatne GetHerdingModifier gry na instancji Default z listy modeli kampanii (K9 - bez przepisywania wzoru); obok nasza
+regula taboru kolumny MarchPace z nazwa (decyzja (c) - tylko pokazac): jency na luzakach w kolumnie, a dla gry te konie to stado; woz w zaprzegu. COLUMN - MarchText bez zmian
+logiki + zdanie o regule jezdzca na mapie (ile takich jezdzcow maszeruje konno, a walczyloby pieszo). Wiersz glowny: "On the march: speed 3.23 - 22 afoot, the column walks;
+herd 27 too many". (3) Linia "raport" - nowe segmenty "konie (133d)" (te same liczby co strona + SaddleLaw.Pairs jako kontrola, tozsamosc), "predkosc (133d)" (kto, wynik,
+gra, zgodna/ROZJAZD, baza po dodatkach, linii, Other, rodzaje linii, ms), "stado (133d)" (wejscia, Herding z linii, GetHerdingModifier, zgodne/ROZJAZD, Shepherd, bez wolnych
+luzakow) i "strony marszu (133d)"; format AR-2 (pary, "marsz: ludzi", "strony AxB CxD ExF") bez zmian - trzecia para "strony" to teraz strona Column. Linia startu sesji -
+"strony marszu (133d): wpiecia 3/3". (4) Test T1 (armoury-przeglad.flag): strony koni, Speed, Herd i Column w "najdluzszej"; konie: gotowi + pieszo = jezdzcy, w bitwie <=
+w zbrojowni, braki koni i uprzezy rozlozone bez reszty (resztka + sakwy + kupic); stado: procent linii "Herding" = GetHerdingModifier gry z tych samych wejsc (|roznica|
+<= 0.0005, bez linii - kara 0; K9); predkosc wobec gry - INFO. Podpowiedz opcji menu: konie bezczynne i do kupienia, predkosc, stado. Bez nowych kluczy MCM (bez gen_mcm).
+**Ryzyko / co sprawdzic:** Kontrola calosci w kodzie: (1) Regresje - KitPreview: tylko nowe pola i odczyt slotow 10/11 po strazach (nic nie zmienia przydzialu ani dotychczasowych
+liczb, takze podgladu w misji K15); stara strona koni zostaje jako zapas (bez podgladu); kolejnosc w OpenMain: podglad liczony przed strona koni (Pairs i kolumna liczone
+wczesniej, podglad ich nie rusza - osobna pula). (2) Kolizje - rozpiska predkosci to to samo wywolanie modelu co dymek gry i TerrainEase.Probe/MapRoads.ProbeFor: nasze postfiksy
+(kolumna, drogi, bloto, woz, sen, teren) licza raz (SpeedDepth), drogi i bloto nie zapisuja stanu partii (_noRecord), sonda TerrainEase nieczynna; liczniki doby drog/blota
+(_speedCalls, _recSkipped) +1 na otwarcie okna; who.Speed / mp.Speed - wywolania gry jak dotad (MarchText juz je robil). GetHerdingModifier - prywatna, bez stanu, niewirtualna
+(gra 1.4.8, decB DefaultPartySpeed.cs:378-390). (3) Spojnosc - jedna regula na zjawisko: konie w bitwie z podgladu (te same straze co bitwa), stado gry i tabor kolumny
+pokazane OSOBNO z nazwami (decyzja (c)), regula jezdzca mapa/bitwa tylko opisana (decyzja (b)); "w uzyciu" po strazach wystawienia (kon bez uprzezy zostaje w zbrojowni).
+Przyblizenia: "co kupic" liczy zdrowych (ranni - osobno jako rezerwa bezczynnych), wierzchowce dla kupna jako "horses" ogolnie (wielblady jezdzcow pustyni tez), kon "za trudny"
+jako przyczyna typu (nie osobna liczba ludzi - SkillLawWard zdejmuje go w przydziale, bez sladu per czlowiek). (4) Cudzy kod - ExplainedNumber (gra 1.4.8): GetLines = baza +
+Lines (Add i Multiply w kolejnosci, Multiply jako BaseNumber x procent) + granice - mapowanie rodzaju linii po kolejnosci z kontrola liczby linii, inaczej bez procentow;
+DTE AssignHorseAndHarness rozdaje konie jezdzcom po kolei bez Jazdy (Jazde sprawdza SkillLawWard / DragonUnmount - stad predykaty Fail). (5) Koszt: jedno wywolanie modelu
+predkosci (ok. 6 us) i przejscie po rosterach na otwarcie okna; MountsOf raz na podglad (pamiec w wyniku). ODSTEPSTWO: "horse too hard to ride" z projektu 2.3 nie jest osobna
+liczba - jest przyczyna przy typie i zdanie "they need easier horses".
+Sprawdzic w grze: w obozie "Review the army" -> "Horses and harness" (gotowi/pieszo jak "Kit for the next battle", rodzaje koni, co kupic, bezczynne) i "On the march" ->
+Speed (wynik = "the game shows", linie w %), Herd (przy nadmiarze linia "Herding" z procentem), Column; linia "raport" z "konie (133d): ... tozsamosc zgodna", "predkosc (133d):
+... (zgodna)", "stado (133d): ... zgodne" albo "bez porownania"; linia startu "strony marszu (133d): wpiecia 3/3"; test T1 "konie (133d) TAK, stado (133d) TAK".
+**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+
 ## 2026-10-25 133c (galaz noc/133-raport-armii) - Armoury: okno armii "Kit for the next battle" - podglad nastepnej bitwy tym samym rozdzielaczem DTE i strazami co bitwa (KitPreview), przyczyny brakow, "Unused in the troops' armoury"; kwatermistrz jedna linia
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem ... jesli sprzet jest to komunikat czemu nie
 zalozy bo np. za maly skill, de facto przeniesmy logi do zakladki armii". To samo zjawisko licza dzis rozne reguly z roznymi liczbami (Armoury-2026-10-25_02-11-22): bitwa
