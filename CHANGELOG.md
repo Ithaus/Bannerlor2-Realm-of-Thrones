@@ -83,6 +83,8 @@ celowo zablokowany przez GarrisonKit.EmergencyPrefix ("nic z niczego").
   naprawde w zbrojowni).
 **Status:** ZBUDOWANE - czeka na autotest i wgranie razem z 111 i 112. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w HomeArms / GarrisonKit / GearFit /
 Settings); md5 Armoury.dll - z pelnej przebudowy (--no-incremental) HEAD galezi przy wgraniu (DLL zawiera hash commitu; wartosc dla commitu tego wpisu podaje raport agenta).
+Po recenzji (liczba pojedyncza w zdaniu przed bitwa): kod = commit c3487563; md5 z przebudowy commitu c3487563: 8fa83f54fd08cd7a1b5252e1f0f0e494 (--no-incremental dwa
+razy, czyste drzewo, oba buildy rowne; "c3487563" w pliku). Commit z tym zapisem zmienia md5 - wgrywany plik porownac z przebudowa HEAD galezi.
 
 ## 2026-10-25 112 (m118-postoj-armii, galaz w-toku/m117-ubranie po 111 d95802cc) - figurki armii na postoju sciagaja sie do wodza (tylko obraz; recenzja 25.10: druzyny stojace dociagane krokami)
 
