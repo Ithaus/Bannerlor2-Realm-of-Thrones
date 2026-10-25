@@ -57,6 +57,8 @@
     <Reference Include="TaleWorlds.Localization"><HintPath>$(GameLibs)/TaleWorlds.Localization.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.Core.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.Core.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
+    <!-- 155: pasek staminy konia w HUD bitwy (HorseWindBarUi.cs - mixin MissionAgentStatusVM); z bin\Win64_Shipping_Client gry, kopia w libs/ (patrz libs/README.md) -->
+    <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.InputSystem"><HintPath>$(GameLibs)/TaleWorlds.InputSystem.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.ObjectSystem"><HintPath>$(GameLibs)/TaleWorlds.ObjectSystem.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.DotNet"><HintPath>$(GameLibs)/TaleWorlds.DotNet.dll</HintPath><Private>false</Private></Reference>

@@ -15,6 +15,7 @@ Nie commituj ich — `.gitignore` je pomija (to wlasnosc TaleWorlds i autorow mo
     TaleWorlds.Library.dll
     TaleWorlds.Localization.dll
     TaleWorlds.MountAndBlade.dll
+    TaleWorlds.MountAndBlade.ViewModelCollection.dll   <- Armoury 155: pasek staminy konia (mixin MissionAgentStatusVM)
     TaleWorlds.ObjectSystem.dll
     TaleWorlds.SaveSystem.dll
     TaleWorlds.ScreenSystem.dll

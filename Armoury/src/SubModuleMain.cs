@@ -44,7 +44,13 @@ namespace Armoury
             try { SpeedUiRegister(); } catch (Exception e) { Log.Error("MapSpeedUi.Register (UIExtenderEx)", e); }
             // r4-wioska: wioska poboczna gracza w zakladce Fiefs ekranu rodu (UIExtenderEx: wstawka prefabu ClanFiefs + mixin ClanFiefsVM) - osobny UIExtender, wlasny try
             try { SideTabRegister(); } catch (Exception e) { Log.Error("SideVillageFiefUi.Register (UIExtenderEx)", e); }
+            // 155: pasek staminy konia gracza w HUD bitwy (UIExtenderEx: wstawka prefabu AgentStatus + pasywny mixin MissionAgentStatusVM) - osobny UIExtender,
+            // rejestracja zawsze (klucz HorseStaminaBar tylko chowa pasek), wlasny try
+            try { HorseBarRegister(); } catch (Exception e) { Log.Error("HorseWindBarUi.Register (UIExtenderEx)", e); }
         }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void HorseBarRegister() { HorseWindBarUi.Register(); }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void SpeedUiRegister() { MapSpeedUi.Register(); }

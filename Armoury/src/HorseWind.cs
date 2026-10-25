@@ -11,6 +11,23 @@ using TaleWorlds.MountAndBlade;
 
 namespace Armoury
 {
+    /// <summary>155: odbiorca paska staminy konia gracza w HUD (mixin MissionAgentStatusVM w HorseWindBarUi.cs). Zwykly interfejs - HorseWind nie dotyka typow
+    /// UIExtenderEx, wiec brak tego zestawu nie wywraca taktu (TypeLoadException).</summary>
+    internal interface IHorseWindBar
+    {
+        /// <summary>shown - pasek widoczny; frac 0..1 - stamina konia; low - ponizej progu zmeczenia (kon zwalnia). Glowny watek.</summary>
+        void Set(bool shown, float frac, bool low);
+    }
+
+    /// <summary>155: lacznik HorseWind - pasek HUD. Sink = biezacy mixin (konstruktor VM HUD ustawia, OnFinalize zdejmuje). Liczniki NARASTAJACE na caly proces
+    /// (recenzja 155, poprawka 1): oba rosna w EarlyStart misji (film HUD i VM), PRZED AfterStart, gdzie HorseWind zeruje liczniki misji - nie zerowac.</summary>
+    internal static class HorseWindBarLink
+    {
+        internal static volatile IHorseWindBar Sink;
+        internal static int Applied;     // nalozenia wstawki AgentStatus od startu gry (getter Nodes - wolany tylko po trafieniu xpath)
+        internal static int MixinMade;   // mixiny MissionAgentStatusVM utworzone od startu gry
+    }
+
     /// <summary>
     /// 136 (25.10, Jeff ok. 12:48: "i konie tez powinny miec stamine, ze nie moge ciagle biegac po polu walki, stamina powinna byc zalezna od cech konia";
     /// wczesniej "ogolna zasada" - gracz i AI tak samo, "wyjsc od sredniej"; ok. 13:30 "przeciwnik ... walczy o zycie"). STAMINA KONI W BITWIE.
@@ -50,6 +67,8 @@ namespace Armoury
     /// Tylko bitwa na mapie (MapEvent.PlayerMapEvent, rodzaj misji bitwa / kryjowka), nie turniej, arena ani morze.
     /// Gracz: komunikaty (zmeczenie, zajechany, odzyskal oddech; kazdy najwyzej co 10 s). AI: odpoczynek konnicy w MarchToContact (AvgStamina).
     /// Linie: "Konie (136): latka ..." raz na proces (pierwsza bitwa) i "Konie (136): ..." na koniec bitwy.
+    /// 155: pasek staminy konia gracza w HUD - PublishBar na koncu kazdego taktu (po sredniach szykow) wpisuje S konia gracza do IHorseWindBar (HorseWindBarLink.Sink);
+    /// tylko odczyt slownika w tym samym watku i takcie, S ani kary nie zmienia. Klucz HorseStaminaBar NIE = pasek ukryty.
     /// Wyjatek przy koniu = licznik potkniec (CLAUDE.md: licz, nie gas), funkcja zostaje wlaczona.
     /// </summary>
     internal sealed class HorseWind : MissionBehavior
@@ -134,9 +153,14 @@ namespace Armoury
         private static float _plMaxV, _plEng1, _plEngLow, _plEngLowM;
         private static int _p1N, _pLN, _pLOver;              // probki galopu: przy m = 1 / przy m <= T1MaxM; z tych drugich blizej 1/m niz 1
         private static float _p1Sum, _pLSum, _pLMSum, _pLVb;  // sumy: v/Vbase przy m = 1; v/(Vbase x m), m, v/Vbase przy m <= T1MaxM
+        // 155: pasek gracza w misji (liczniki narastajace na proces - HorseWindBarLink)
+        private static int _barNoSink, _barErr;
+        private static float _barTime, _barMin, _barLast;
 
         private static void ResetCounters()
         {
+            _barNoSink = _barErr = 0;
+            _barTime = 0f; _barMin = -1f; _barLast = -1f;
             _seen = _blownOurs = _blownFoe = _harnessScaled = _writes = _rejected = _stum = _aiRests = _plWrites = 0;
             _postN = _postPen = 0;
             Interlocked.Exchange(ref _postOff, 0);
@@ -206,6 +230,7 @@ namespace Armoury
         private void Finish()
         {
             try { if (_on && !_done) { _done = true; Write(); } } catch (Exception e) { Log.Error("HorseWind.Linia", e); }
+            HideBar();   // 155: pasek HUD gracza zgaszony (VM HUD juz zamkniety = Sink null, nic)
             if (ReferenceEquals(_live, this)) _live = null;
             _on = false;
             ClearAvg();
@@ -234,6 +259,7 @@ namespace Armoury
                 // klucz wylaczony w trakcie bitwy: kara zdjeta (z tym samym limitem zapisow), srednie szykow niedostepne
                 _avgOn = false;
                 RestoreAll();
+                HideBar();   // 155: bez staminy koni nie ma paska (powiadomienie tylko przy zmianie)
                 return;
             }
             float scale = Clamp(c.HorseGallopDrainScale, 0.25f, 3f);
@@ -293,6 +319,42 @@ namespace Armoury
                 else { _avg[i] = -1f; _restV[i] = -1f; _avgWho[i] = null; }
             }
             _avgOn = true;
+            PublishBar(mission, c, step);   // 155: pasek HUD gracza - po calym takcie (nowy kon gracza ma juz wpis z Setup)
+        }
+
+        /// <summary>155: pasek staminy konia gracza w HUD - S konia, na ktorym siedzi Agent.Main (mission.MainAgent), gdy kon jest liczony (nie smok, rydwan,
+        /// slon, mamut, kon umarlych, jezdziec umarly); inaczej ukryty. Ponizej TiredBelow (kon zwalnia, komunikat "Your horse is tiring") - czerwony.
+        /// Tylko odczyt slownika w takcie (glowny watek); wyjatek = licznik potkniec (licz, nie gas).</summary>
+        private void PublishBar(Mission mission, Settings c, float step)
+        {
+            var sink = HorseWindBarLink.Sink;
+            if (sink == null) { _barNoSink++; return; }
+            try
+            {
+                float s = -1f;
+                if (c.HorseStaminaBar)
+                {
+                    Agent main = mission.MainAgent;
+                    Agent mount = main != null ? main.MountAgent : null;
+                    Horse h;
+                    if (mount != null && _horses.TryGetValue(mount, out h) && h.Ex == ExNone) s = h.S;
+                }
+                bool shown = s >= 0f;
+                if (shown)
+                {
+                    _barTime += step;
+                    if (_barMin < 0f || s < _barMin) _barMin = s;
+                    _barLast = s;
+                }
+                sink.Set(shown, shown ? s / 100f : 0f, shown && s < TiredBelow);
+            }
+            catch (Exception e) { _barErr++; Stumble("HorseWind.Pasek", e); }
+        }
+
+        /// <summary>155: pasek HUD ukryty (klucz staminy wylaczony w trakcie bitwy, koniec misji). Nie rzuca.</summary>
+        private static void HideBar()
+        {
+            try { var k = HorseWindBarLink.Sink; if (k != null) k.Set(false, 0f, false); } catch { }
         }
 
         /// <summary>Pierwsze zetkniecie z koniem pod jezdzcem: Vbase (MountSpeed jeszcze bez naszej kary), wykluczenia, cechy konia.</summary>
@@ -727,6 +789,14 @@ namespace Armoury
                   .Append(", przy m ").Append(F(_plEngLowM, "0.00")).Append(' ').Append(_plEngLow >= 0f ? F(_plEngLow, "0.0") : "-");
             }
             else sb.Append(" | gracz: - (bez liczonego konia)");
+            // 155 (recenzja, poprawka 1): liczniki wstawki i mixinu narastajace od startu gry (rosna w EarlyStart, przed AfterStart) - nie "TAK/NIE" z Sink w Finish
+            sb.Append(" | pasek gracza (155): klucz HorseStaminaBar ").Append(c != null && c.HorseStaminaBar ? "TAK" : "NIE")
+              .Append(", wstawka AgentStatus nalozona ").Append(Volatile.Read(ref HorseWindBarLink.Applied)).Append(" razy od startu gry")
+              .Append(", mixin MissionAgentStatusVM utworzony ").Append(Volatile.Read(ref HorseWindBarLink.MixinMade)).Append(" razy od startu gry")
+              .Append(", taktow bez odbiorcy ").Append(_barNoSink)
+              .Append(", widoczny ").Append(F(_barTime, "0")).Append(" s, najnizsze S ").Append(_barMin >= 0f ? F(_barMin, "0") : "-")
+              .Append(", ostatnie S ").Append(_barLast >= 0f ? F(_barLast, "0") : "-")
+              .Append(" (czerwony ponizej ").Append(F(TiredBelow, "0")).Append("), bledy ").Append(_barErr);
             sb.Append(" | potkniecia ").Append(_stum).Append('.');
             Log.Info(sb.ToString());
         }

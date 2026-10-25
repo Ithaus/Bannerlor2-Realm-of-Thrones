@@ -1500,6 +1500,10 @@ namespace Armoury
         [SettingPropertyGroup("Horse wind")]
         public bool HorseStaminaEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Horse Stamina Bar", HintText = "Show a thin stamina bar under your horse's health bar in battle - orange, turning red once your horse is tired enough to slow down. Only while you ride a horse that tires (not dragons, chariots, elephants, mammoths or the horses of the dead) and with Horse Stamina Enabled on. A change here takes effect within an hour of game time on the map, not in the middle of a battle", RequireRestart = false)]
+        [SettingPropertyGroup("Horse wind")]
+        public bool HorseStaminaBar { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Horse Gallop Drain Scale", 0.25f, 3.00f, "0.00", HintText = "how fast a gallop spends a horse's wind. At 1 an average horse with an average load (about a fifth of its own weight) gallops flat out for about a minute and a knight's horse in barding for about 40 seconds; a working canter lasts many minutes (fewer under a heavy load), a walk or an easy trot rests it. 2 = twice as fast, 0.5 = half as fast", RequireRestart = false)]
         [SettingPropertyGroup("Horse wind")]
         public float HorseGallopDrainScale { get; set; } = 1f;
@@ -10454,6 +10458,7 @@ namespace Armoury
             s.ChargeDamageFactor = ChargeDamageFactor;
             s.ChargeFullSpeed = ChargeFullSpeed;
             s.HorseStaminaEnabled = HorseStaminaEnabled;
+            s.HorseStaminaBar = HorseStaminaBar;
             s.HorseGallopDrainScale = HorseGallopDrainScale;
             s.HorseRecoverySeconds = HorseRecoverySeconds;
             s.HorseTiredFloor = HorseTiredFloor;
