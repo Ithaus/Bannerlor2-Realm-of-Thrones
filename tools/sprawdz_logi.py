@@ -1899,6 +1899,15 @@ Uzycie (Python 3, tylko odczyt):
                     weteran 0, pojedynek 0'. M113-3 'haki' nie '?' i A / B bez 'NIE', gdy tabela mowi 'haki bitwy potrzebne' (inaczej INFO). M113-4 udzial
                     wywolan bohaterow w zrywie <= 25% (wiecej - NIE; brak bohaterow - INFO). Porownanie A/B (klucze TAK / NIE) - srednie AoD/DoA wedlug tieru
                     z linii misji, recznie.
+--grupa p4przeglad : (25.10, noc/p4-przeglad - Jeff 25.10 "w obozie powinna byc opcja przeglad armii ... stworzyc choragwie ... dodawac dowodcow ... ile koni
+                    jest uzywanych i ile uprzezy"; ArmyReview.cs, ArmyReview.Battle.cs, ArmyReview.Test.cs, MarchPace.Explain; plik testu CrashScribe/
+                    armoury-przeglad.flag) python -I tools/sprawdz_logi.py --grupa p4przeglad <Armoury-*.log>. AR-0 linia 'Przeglad armii (P4): start sesji'
+                    z opcja w arm_camp_wait i bk_camping_wait_menu (TAK) i taktem doby TAK. AR-1 ERROR ArmyReview. 0 i 'potkniecia doby' 0. AR-2 linie
+                    'raport': tozsamosci par (jezdzcy + wyjatki = z para + kon bez uprzezy + wyjatki z koniem + bez konia; w uzyciu = z para + kon bez
+                    uprzezy + wyjatki z koniem <= konie w zbrojowni; wolna uprzaz = uprzaz - (z para + kon bez uprzezy)), wzor kolumny MarchPace.Cap
+                    (na luzakach, idacych, rodzaj 0 <=> idacy > 0, n = idacych) i strony okna <= 'miesci sie' (brak raportu - INFO). AR-3 linia 'test'
+                    z 'wynik TAK' (brak - INFO). AR-4 linie zapisu: 'odczyt pole TAK, armia TAK' (brak - INFO). AR-5 linie 'bitwa': zgodnosc klas z
+                    zapisem TAK albo '-' (NIE - NIE; brak - INFO); kapitanowie i odmowy zapisu - INFO.
 --grupa m110hp    : (23.10, galaz w-toku/m110-stan krok 2 - Jeff 23.10 ok. 15:50 "tak": sprzet noszony przez gracza i towarzyszy chroni wedlug dokladnego HP;
                     Armoury/src/HeroHp.cs, HeroBook.cs, FieldCraft.cs, ArmouryBehavior.cs; klucze Worn Exact Hp Protection, Companion Gear Wear; plik testu
                     CrashScribe/armoury-hp.flag) python -I tools/sprawdz_logi.py --grupa m110hp [<Armoury-*.log>] [--baza-doby <log poprzedniego biegu z linia
@@ -61209,6 +61218,8 @@ def main(argv):
         return m113pobor_main(logp)   # m113pobor (24.10, w-toku/m113-rekrutacja): pobor gracza z wiosek pobocznych - pule, zaplata rodzinom, sonda, zapis arm_sidelevy
     if group == "choragwie":
         return choragwie_main(logp)   # noc 25.10 P3 (noc/p3-choragwie): kompanie, sztandary polowe, zwrot sprzetu chorazego (A: odlozone == oddane), potkniecia 0
+    if group == "p4przeglad":
+        return p4przeglad_main(logp)   # p4przeglad (25.10, noc/p4-przeglad): przeglad armii - opcja obozu, raport koni i marszu, zapis choragwi do Order of Battle, test, linia bitwy
     if group == "m110anim":
         return m110anim_main(logp)   # m110anim (23.10, n35 m110-animacje + m110-modele): indeksy akcji po wpieciu latki HP sprzetu (postac w ekwipunku, obrazek rekawic) i modele przedmiotow
     if group == "m110hp":
@@ -68300,6 +68311,99 @@ def choragwie_main(logp):
             bad5.append(m.group(0))
     rep.add("CH-5: 'Bitwa (NB2)' - potkniecia choragiew 0", "linii z miejscem choragiew %d, zlych %d%s" % (n5, len(bad5), (" (" + bad5[0] + ")") if bad5 else ""),
             "zlych 0 (brak linii - INFO)", None if n5 == 0 else not bad5)
+    rep.show()
+    return 0
+
+
+def p4przeglad_main(logp):
+    """p4przeglad (25.10, noc/p4-przeglad): AR-0..AR-5 - opis w --help."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("AR-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    pre = "Przeglad armii (P4): "
+    starts, reports, tests, battles, saves, refusals, days = [], [], [], [], [], [], []
+    errs = 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "ERROR" in line and "ArmyReview." in line:
+                errs += 1
+            if pre not in line:
+                continue
+            body = line.split(pre, 1)[1]
+            if " - zapis Order of Battle:" in body:
+                saves.append(line.strip())
+            elif " - odmowa zapisu" in body:
+                refusals.append(line.strip())
+            elif body.startswith("start sesji"):
+                starts.append(line.strip())
+            elif body.startswith("raport - "):
+                reports.append(line.strip())
+            elif body.startswith("test - "):
+                tests.append(line.strip())
+            elif body.startswith("bitwa ("):
+                battles.append(line.strip())
+            elif body.startswith("doba "):
+                days.append(line.strip())
+    ok0 = bool(starts) and all("arm_camp_wait (TAK" in x and "bk_camping_wait_menu (TAK" in x and "takt doby TAK" in x for x in starts)
+    rep.add("AR-0: linia 'Przeglad armii (P4): start sesji' - opcja w obu menu, takt doby", "startow %d" % len(starts), ">= 1, wszystkie TAK", ok0)
+    st = 0
+    for d in days:
+        m = re.search(r"potkniecia doby (\d+)", d)
+        if m:
+            st += int(m.group(1))
+    rep.add("AR-1: potkniecia (ERROR ArmyReview., potkniecia doby)", "ERROR %d, potkniecia doby %d (linii doby %d)" % (errs, st, len(days)), "0 i 0",
+            errs == 0 and st == 0)
+    rx = re.compile(r"jezdzcy (\d+) \(wyjatki (\d+), wyjatki z koniem (\d+)\), konie w zbrojowni (\d+) \(w uzyciu (\d+)\), uprzaz (\d+) \(inna rodzina (\d+)\), "
+                    r"z para (\d+), kon bez uprzezy (\d+), bez konia (\d+), wolna uprzaz (\d+)")
+    rxm = re.compile(r"marsz: ludzi (\d+), bez konia (\d+), jencow (\d+), luzakow (\d+), konie zbrojowni K0 (\d+) \(K0 (TAK|NIE)\), na luzakach (\d+), "
+                     r"idacych (\d+), sufit ([\d.]+) \(rodzaj (\d), n=(\d+)")
+    rxp = re.compile(r"\| strony (\d+)x(\d+) (\d+)x(\d+) (\d+)x(\d+) \(miesci sie (\d+)\)")
+    bad = []
+    for l in reports:
+        m = rx.search(l)
+        if not m:
+            bad.append("brak liczb par")
+            continue
+        R, E, X, H, U, Hr, O, Pa, S, B, F = [int(v) for v in m.groups()]
+        if R + E != Pa + S + X + B or U != Pa + S + X or U > H or F != max(0, Hr - (Pa + S)):
+            bad.append("pary: " + m.group(0)[:140])
+        mm = rxm.search(l)
+        if mm:
+            men, foot, pris, mounts, arm = [int(mm.group(i)) for i in range(1, 6)]
+            k0 = mm.group(6) == "TAK"
+            ride, walk, kind, n = int(mm.group(7)), int(mm.group(8)), int(mm.group(10)), int(mm.group(11))
+            horses = mounts + (arm if k0 else 0)
+            r2 = min(foot, horses)
+            w2 = (foot - r2) + max(0, pris - (horses - r2))
+            if r2 != ride or w2 != walk or ((kind == 0) != (w2 > 0)) or (kind == 0 and n != w2):
+                bad.append("marsz: " + mm.group(0)[:140])
+        mp_ = rxp.search(l)
+        if mp_ and max(int(mp_.group(2)), int(mp_.group(4)), int(mp_.group(6))) > int(mp_.group(7)):
+            bad.append("strona okna dluzsza niz miesci sie: " + mp_.group(0))
+    rep.add("AR-2: raport - tozsamosci par, wzor kolumny, strony okna", "raportow %d, zlych %d%s" % (len(reports), len(bad), (" (" + bad[0] + ")") if bad else ""),
+            "zlych 0 (brak raportu - INFO)", None if not reports else not bad)
+    tok = [t for t in tests if "wynik TAK" in t]
+    tno = [t for t in tests if "wynik NIE" in t]
+    rep.add("AR-3: test armoury-przeglad.flag - 'wynik TAK'", "linii %d, TAK %d, NIE %d%s" % (len(tests), len(tok), len(tno), (" (" + tno[0][-220:] + ")") if tno else ""),
+            "NIE 0 (brak - INFO)", None if not (tok or tno) else not tno)
+    sbad = [x for x in saves if "odczyt pole TAK, armia TAK" not in x]
+    rep.add("AR-4: zapis choragwi - odczyt kontrolny pola i armii", "zapisow %d, zlych %d, odmow %d (INFO)%s" % (len(saves), len(sbad), len(refusals),
+            (" (" + sbad[0][-200:] + ")") if sbad else ""), "zlych 0 (brak - INFO)", None if not saves else not sbad)
+    cl_no, cl_ok, cap_no = [], 0, 0
+    for b in battles:
+        m = re.search(r"zgodnosc z zapisem: klasy (TAK|NIE|-)", b)
+        if not m:
+            continue
+        if m.group(1) == "NIE":
+            cl_no.append(b[-220:])
+        else:
+            cl_ok += 1
+        if re.search(r"kapitanowie NIE", b):
+            cap_no += 1
+    rep.add("AR-5: bitwy - formacje gracza zgodne z zapisem (klasy)", "linii %d, z pelnym zapisem TAK/- %d, NIE %d, kapitanowie NIE %d (INFO)%s" % (len(battles), cl_ok, len(cl_no), cap_no,
+            (" (" + cl_no[0] + ")") if cl_no else ""), "NIE 0 (brak - INFO)", None if not (cl_ok or cl_no) else not cl_no)
     rep.show()
     return 0
 
