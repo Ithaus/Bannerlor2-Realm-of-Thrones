@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 126 (noc-p12 przeglad armii v2, galaz noc/p12-przeglad2 od noc/final; recenzja 58025164) - przypinanie konkretnych typow wojska do choragwi
+
+**Problem:** Jeff 25.10 00:36: przeglad armii ma pozwalac "przenosic wojsko" miedzy choragwiami; 116 (v1) umial tylko procent klasy i filtry Order of Battle, a przypinanie typow bylo odlozone do "v2". Jeff 06:35: "no ale miales to zrobic".
+**Przyczyna:** gra nie zna przydzialu wedlug typu jednostki - Order of Battle dzieli ludzi wagami klas i filtrami.
+**Zmiana (Armoury: ArmyReview.Pin.cs nowy, ArmyReview.cs, ArmyReview.Battle.cs, ArmyReview.Test.cs; klucz ArmyReviewPinTroopTypes, domyslnie TAK):** w oknie "Review the army" lista typow druzyny gracza (nazwa, tier, liczba, kon) -> wybor typu -> wybor choragwi; przeglad pokazuje przypiecia, mozna odpiac.
+W bitwie (gracz dowodzi swoimi) ludzie przypietego typu staja w przypietej formacji przy wystawieniu, takze posilki; kapitanowie z przegladu zostaja; bohaterowie bez zmian. Liczba klasy na ekranie OOB bez przypietych (chyba ze w formacji stoja sami przypieci - wtedy liczba gry);
+po bitwie naprawa wag zapisu pola/armii, gdy ekran zapisal smiec (NaN -> int.MinValue) albo 0 na choragwi przypiecia. Zapis przypiec w arm_army_review (zgodnie wstecz). Proba autotestu P4 w takcie godziny (dotad od 2. doby - nie odpalala) + T7/T7g przypiecia.
+Recenzja (4 uwagi, wszystkie poprawione): wagi 0/0 na ekranie OOB, flagi prob (skrypt), klucz Pin wylaczony a udzialy, plan budowany przed kluczem.
+**Ryzyko / co sprawdzic:** w logu "Przeglad armii (P4): test ... T7 przypiecia ... - wynik TAK" i w bitwie segment "przypiecia: czynne (typow N ...)"; koniec bitwy "naprawione wagi ...". Przypiecia dzialaja tylko, gdy gracz dowodzi swoimi ludzmi (ekran Order of Battle, 20+ ludzi) - w armii AI nie.
+**Status:** ZBUDOWANE - autotest i wgranie nizej.
+
+## 2026-10-25 125 (noc-p11 okno lupu po turnieju, galaz noc/p11-turniej od noc/final; recenzja dcff4c7d) - okno "The Tourney at X" po turnieju
+
+**Problem:** Jeff 25.10: "po bitwie i po oblezeniu i po turnieju, powinien wyskakiwac popup z dokladna iloscia lootu"; 117 mial tylko bitwe i oblezenie, turniej odlozony do "v1.1". Jeff 06:35: "no ale miales to zrobic".
+**Przyczyna:** brak ramki turnieju w SpoilsReport.
+**Zmiana (Armoury: SpoilsReport.Tourney.cs nowy, SpoilsReport.cs, SpoilsWindow.cs, PlayerFees8.cs, TourneyFolkPurse.cs; klucz SpoilsWindowAfterTourney TAK, opis MCM poprawiony):** ramka T od dolaczenia do turnieju do wyjscia ze szranek (tylko misja z TournamentBehavior); etykiety zlota z zakresow kiesy:
+nagroda (TXP i nasze PlayerFees8), zaklady (stawka, wygrana), sakiewka ludu, GrandTourney przez latki Armoury w kampanii (sakiewka mistrza, utarg szranek, okupy, wykup konia i zbroi - DLL GT bez zmian); przedmiot nagrody, oddany rynsztunek, walki/wygrane/runda odpadniecia; okno "The Tourney at X".
+Turniej, ktory sie nie odbyl - ramka porzucona bez okna (linia logu). Prog Min Worth dla turnieju liczy zyski i straty. Proba autotestu: flaga armoury-lup-turniej.flag (T0-T3).
+**Ryzyko / co sprawdzic:** "Okno lupu (125): latki GrandTourney N/N", po prawdziwym turnieju "Okno lupu (117): turniej N" z "TournamentFinished TAK, misja TAK" i mala reszta "Other"; "ramka T porzucona bez raportu" po prawdziwym turnieju = blad.
+**Status:** ZBUDOWANE - autotest i wgranie nizej.
+
 ## 2026-10-25 124 (noc-final, galaz noc/final = noc/calosc + noc/p10-szturm + noc/p9-gotowosc) - domyslne wlaczone (flanka, lucznicy za piechota, tlo dzwieku, szturm murow), friendly fire strzal przy oblezeniu 50%, nagrania ElevenLabs 379 klipow
 
 **Problem:** Jeff 25.10 ok. 04:55 dostal trzy pytania (nagrania ElevenLabs ok. 25 tys. kredytow; wlaczyc konnice na flanki i lucznikow za piechote - prosil o to, a paczka P1 zostawila je domyslnie wylaczone; friendly fire strzal przy oblezeniu 50%) z odpowiedzia domyslna "tak" do 05:15 - bez odpowiedzi. Tlo dzwieku (wiatr/deszcz, konie, szczek broni, ogien przy oblezeniu) i tlum przy szturmie murow Jeff zamowil wprost, a P2/P10 zostawily je "Trial - off".
