@@ -1,5 +1,18 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 25.10 ok. 18:30 CET - WGRANE 117 (151 + 152 + 150a + 150b + 117r); fala AI 139-149 nadal w toku
+- WGRANE 117 (18:23): Armoury 2c95388a (galaz noc/138-calosc, commit c55b2c58; statusy 746e87a2/7cc6ba66), CrashScribe bez zmian (bef9db58). Kopie: Armoury.dll.bak-2026-10-25-przed-wgranie117
+  obok DLL i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie117-przed.
+  - 151: odnowa oddechu wykladniczo od Atletyki (wolny 2x szybciej co 100 pkt od 100; 300 - po wyczerpaniu ok. 3 min, 10 - ponad 20 min).
+  - 152: ponad 300 pula RBM 2800 x 2^((A-300)/31) (310 ok. 3500, 330 ok. 5500); oddech i bieg razem z nia; sufit sprawnosci biegu 2.5.
+  - 150a: proba albumu obrazkow okna lupu (tylko z flaga armoury-zdjecia-obrazkow.flag). 150b: obrazek okna lupu wedlug miejsca (region kultury osady, Inni, dzicy,
+    morze, turniej - sala tronowa tylko w King's Landing, bez Joffreya). 117r: 6 poprawek po niezaleznej recenzji (Skagos to nie dzicy - kultura rodu; bez Ship1/Ship2;
+    osada obrazka od miejsca bitwy; osady Innych; krzywa 1.0 + mistrzostwo; opis suwaka).
+  - Autotesty 152a, 117a, 117b: kod 0, ERROR 0, 4/4 bitwy, zdjecia okien 22/22. Zdjecia okien lupu: docs/zdjecia-okien-2026-10-25/okna-132-[5-7]-*-117.jpg.
+- Znane, niepoprawione (nastepna paczka): tekst okna "Near X" bierze Hero.LastKnownClosestSettlement (rzadko odswiezane) - w autotescie bitwa pod Riverrun, tekst "Near Pendric";
+  obrazek juz liczy osade od miejsca bitwy (117r), tekst jeszcze nie.
+- W TOKU: workflow fali AI 139-149 (galaz noc/139-ai-zycie, worktree zb\n139) - po nim scalic noc/138-calosc (151/152/150/117r) do 139, test bitwaN, wgranie 118.
+
 ## DOPISEK 25.10 ok. 17:20 CET - WGRANE 116; w toku fala AI 139-149 i obrazki lupu 150
 - WGRANE 116 (17:15): Armoury 25f69127 + CrashScribe bef9db58 z galezi noc/138-calosc (worktree scratchpad\zb\n138): 132 proba zdjec okien, 133a-g okno Review the army
   (Kit for the next battle z podgladu DTE, Last battle, konie, Speed, Herd, Pay x3, Recent messages; 133a CrashScribe - cisza podgladu), 136 stamina koni (HorseWind), 137 oddech dwufazowy.
