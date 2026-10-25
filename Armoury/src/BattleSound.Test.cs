@@ -27,6 +27,7 @@ namespace Armoury
         private static readonly float[] TestDistM = { 5f, 150f };
         private static Clip _testDistClip;
         private static int _testDistStep;
+        private static double _testDistNextR;   // recenzja 154: odstep miedzy probkami odleglosci w czasie rzeczywistym (czas misji w autotescie biegnie ok. 10x szybciej)
 
         private static bool TestWanted()
         {
@@ -43,7 +44,7 @@ namespace Armoury
         private static void ResetTest()
         {
             _testOn = false; _testQ.Clear(); _testNext = -1f; _cTest = _cTestPlayed = 0;
-            _testDistClip = null; _testDistStep = 0;
+            _testDistClip = null; _testDistStep = 0; _testDistNextR = 0.0;
         }
 
         private static void TestBegin(Mission m)
@@ -78,22 +79,27 @@ namespace Armoury
             s.Test = true;
         }
 
-        /// <summary>154: probka odleglosci - ten sam klip w 5 m, a po jego koncu (dlugosc + 1,5 s) w 150 m od sluchacza; odleglosci rozkazu (4/200 m x glosnosc).</summary>
+        /// <summary>154: probka odleglosci - ten sam klip w 5 m, a po jego koncu (dlugosc + 1,5 s) w 150 m od sluchacza; odleglosci rozkazu (4/200 m x glosnosc).
+        /// Recenzja 154: odstep i koniec probki (Pool, TestNote) w czasie rzeczywistym - w czasie misji autotestu obie probki trwaly po ok. 0,3 s, jedna tuz po
+        /// drugiej, bez linii "w 5.0 m / w 150.0 m"; linia probki juz przy utworzeniu (nie zalezy od kontroli po 0,5 s).</summary>
         private static void TestDistTick(Mission m)
         {
             if (_testDistClip == null || _testDistStep >= TestDistM.Length || !m.IsDeploymentFinished) return;
             if (_testNext < 0f) { _testNext = _now + 2f; return; }
             if (_now < _testNext) return;
             for (int i = 0; i < _live.Count; i++) if (_live[i].Test) return;   // poprzednia probka jeszcze gra - odsluch bez nakladania
+            if (Real < _testDistNextR) return;
             var c = _testDistClip;
             float d = TestDistM[_testDistStep++];
-            _testNext = _now + c.Dur + 1.5f;
+            _testDistNextR = Real + c.Dur + ClipTail + 1.5;   // poprzednia konczy sie najwczesniej po dlugosc + 0,5 s czasu rzeczywistego (Pool) - potem 1,5 s ciszy
             string note = " w " + F1(d) + " m od sluchacza (min/max " + F1(OrderMin) + "/" + F1(OrderMax) + " m x glosnosc)";   // zdarzenie naprawde uzyte - w TestChecked
             var s = Play(m, c, GAmb, _lis + new Vec3(d, 0f, 0f), OrderMin, OrderMax, true, null, null, "probka odleglosci");
             _cTest++;
             if (s == null) { Log.Info(P + "probka " + c.Id + note + " (zdarzenie " + EvShort[EventFor(c, true)] + "): NIE utworzone (limit / daleko / silnik - licznik linii misji)."); return; }
             s.Test = true;
-            s.TestNote = note + " - ODSLUCH: w 5 m glosno, w 150 m wyraznie ciszej (tak samo glosno = brak 3D)";
+            s.TestNote = note;
+            Log.Info(P + "probka " + c.Id + " (" + c.Code + ", " + (s.Is3d ? "3D" : "2D") + ", zdarzenie " + EvShort[s.Kind] + ")" + note
+                     + ": utworzone - ODSLUCH: w 5 m glosno, w 150 m wyraznie ciszej (tak samo glosno = brak 3D).");
         }
 
         private static void TestChecked(Snd s, bool playing)
@@ -105,6 +111,14 @@ namespace Armoury
 
         private static void TestEnded(Snd s, float t)
         {
+            if (s.TestNote != null)
+            {
+                // recenzja 154: probka odleglosci konczy sie w czasie rzeczywistym (Pool) - czas misji przy przyspieszeniu autotestu bylby mylacy
+                double r = Real - s.R0;
+                Log.Info(P + "probka " + s.C.Id + s.TestNote + " - koniec po " + F1((float)r) + " s czasu rzeczywistego (z dlugosci " + F1(s.C.Dur) + " s"
+                         + (r > s.C.Dur + 1.5 ? ", silnik nie zglosil konca - limit czasu" : "") + ").");
+                return;
+            }
             Log.Info(P + "probka " + s.C.Id + " - koniec po " + F1(t) + " s (z dlugosci " + F1(s.C.Dur) + " s" + (t > s.C.Dur + 1.5f ? ", silnik nie zglosil konca - limit czasu" : "") + ").");
         }
 

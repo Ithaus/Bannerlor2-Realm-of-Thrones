@@ -37,12 +37,13 @@ namespace Armoury
     ///    dwoch probek ballista_break - prawdopodobnie dograliby sie do kazdego taktu bebna; bebny ida przez voice_shout;
     ///  - wiatr i deszcz - "event:/Extra/voiceover" 2D jak dotad (tlo calej sceny, jak Lektor).
     /// Zdarzenie 3D odrzucone przez silnik (id -1, Play false, wyjatek) - licznik i zapas: stara droga voiceover TYLKO dla tego klipu (cisza nie bez sladu - linia misji).
-    /// 3D: scena misji + SetPosition + SetEventMinMaxDistance(min, max, 0) (wzor ROTBA VoicePlayer) przed Play; zrodla za mowca / szykiem - pozycja i predkosc co klatke
-    /// (Track). Czy silnik stosuje nasze min / max (spatializer zdarzenia moze miec wlasny zakres) i jak glosno slychac - silnik NIE podaje; dowod tylko odsluchem
+    /// 3D: scena misji + SetPosition + SetEventMinMaxDistance(min, max, 0) (wzor ROTBA VoicePlayer) przed Play; zrodla za mowca / szykiem - pozycja co klatke
+    /// (Track; bez predkosci - recenzja 154). Czy silnik stosuje nasze min / max (spatializer zdarzenia moze miec wlasny zakres) i jak glosno slychac - silnik NIE podaje; dowod tylko odsluchem
     /// (probka odleglosci autotestu 5 m / 150 m). Glosnosci zdarzenia z pliku nie da sie ustawic - suwak BattleSoundsLoudness skaluje odleglosci min / max
     /// (1: x0.7, 2: x1.0, 3: x1.4), a dzwiekow dalej niz max + 50 m od sluchacza (kamera, SoundManager.GetListenerFrame) nie tworzymy wcale.
     ///
-    /// PULA: kazde zdarzenie w _live; koniec (silnik: !IsValid / IsStopped po 0,3 s, albo czas klipu + 2 s czasu misji, albo + 60 s czasu rzeczywistego) -> Release;
+    /// PULA: kazde zdarzenie w _live; koniec (silnik: !IsValid / IsStopped po 0,3 s, albo czas klipu + 2 s czasu misji, albo + 60 s czasu rzeczywistego; probka
+    /// odleglosci autotestu - tylko czas rzeczywisty, recenzja 154) -> Release;
     /// OnClearScene i End -> Release WSZYSTKICH. Nigdy zdarzenie z pustej sciezki / bez sceny dla 3D. Limity (stale): glosy 6, rogi 2, bebny 6, tlo 6 naraz; najwyzej
     /// 5 nowych zdarzen na sekunde czasu rzeczywistego; kazdy odstep liczony w czasie misji ORAZ w czasie rzeczywistym (co najmniej polowa odstepu) - przy
     /// przyspieszeniu czasu (autotest -Speed 20, Better Time) bez lawiny. Wszystko tylko w Tick (glowny watek): zdarzenia innych paczek i wywolania zwrotne
@@ -71,7 +72,6 @@ namespace Armoury
         private const float ShoutLen = 8f, VoiceLen = 4f, LenSlack = 0.05f;      // dlugosc osi zdarzenia (s) i luz na zaokraglenie dlugosci klipu w manifescie
         private const float LoopCutEarly = 0.05f;                                // ambient_3d_big: ciecie tyle przed koncem klipu (czas rzeczywisty) - bez zapetlenia
         private const float ClipTail = 0.5f;                                     // voice_shout / voice: koniec zdarzenia tyle po koncu klipu (zapas na wczytanie pliku)
-        private const float MaxSpeed = 40f;                                       // predkosc zrodla (m/s) - wiecej = przeskok (nowa pozycja), predkosc 0
         internal const int EvShout = 0, EvVoice = 1, EvAmb = 2, EvOver = 3, EvKinds = 4;
         private static readonly string[] EvName = { Ev3dShout, Ev3dVoice, Ev3dAmb, VoiceEvent };
         private static readonly string[] EvShort = { "voice_shout", "voice", "ambient_3d_big", "voiceover" };
@@ -109,9 +109,7 @@ namespace Armoury
             internal Clip Then;               // nastepny klip tego samego mowcy (przemowa regionu -> motto rodu)
             internal float ThenMin, ThenMax;
             internal int Kind;                // 154: zdarzenie (EvShout / EvVoice / EvAmb / EvOver)
-            internal Vec3 Last;               // 154: poprzednia pozycja sledzonego zrodla (predkosc)
-            internal bool HasLast;
-            internal string TestNote;         // 154: dopisek linii probki autotestu (odleglosc)
+            internal string TestNote;         // 154: dopisek linii probki autotestu (odleglosc); != null = probka odleglosci (koniec tylko w czasie rzeczywistym)
         }
 
         private static readonly List<Snd> _live = new List<Snd>();
@@ -218,7 +216,7 @@ namespace Armoury
                 return;
             }
             // 154: pozycja zrodel za mowca / szykiem i koniec klipu na zdarzeniu trwalym - co klatke (praca: najwyzej tyle, ile zywych zdarzen, limity grup razem 22)
-            if (_live.Count > 0) { try { Track(dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Sledzenie", e); } }
+            if (_live.Count > 0) { try { Track(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Sledzenie", e); } }
             // sygnaly szarzy - w tej samej klatce (okrzyk ludzi czeka 0,4 s na rozkaz)
             if (HasChargeQueue())
             {
@@ -464,11 +462,15 @@ namespace Armoury
 
         private static string F1(float v) { return v.ToString("0.0", Inv); }
 
-        /// <summary>154: co klatke misji (Tick) - pozycja i predkosc zrodel za mowca / szykiem (dotad co 0,25 s w Pool) oraz ciecie klipu na zdarzeniu trwalym
+        /// <summary>154: co klatke misji (Tick) - pozycja zrodel za mowca / szykiem (dotad co 0,25 s w Pool) oraz ciecie klipu na zdarzeniu trwalym
         /// ambient_3d_big na jego koncu (czas rzeczywisty = zegar dzwieku; inaczej zdarzenie bez konca zapetliloby klip, a LoopTick dolozyl nastepny).
-        /// Praca: jedno przejscie po _live (limity grup razem 22, w logu szczyt 6) - kilka wywolan silnika na zrodlo. Wyjatek - to zrodlo przestaje byc sledzone
-        /// (licznik potkniec), reszta dalej.</summary>
-        private static void Track(float dt)
+        /// Praca: jedno przejscie po _live (limity grup razem 22, w logu szczyt 6) - jedno wywolanie silnika na zrodlo. Wyjatek - to zrodlo przestaje byc sledzone
+        /// (licznik potkniec), reszta dalej.
+        /// Recenzja 154: BEZ SetVelocity. Predkosc liczona co klatke z roznicy pozycji byla zla dla szyku: Formation.CachedMedianPosition to pozycja JEDNEGO
+        /// agenta (mediana) odswiezana tylko co 0,075-0,125 s (Formation.Tick, _cachedPositionAndVelocityUpdateTimer - dekompilacja 1.4.8), wiec FMOD dostawal
+        /// 0 m/s w wiekszosci klatek i 10-36 m/s w klatce odswiezenia; po smierci mowcy / rozbiciu szyku zostawala ostatnia predkosc. Predkosc sluzy FMOD
+        /// tylko do efektu Dopplera - Jeff prosil o glosnosc wedlug odleglosci (pozycja), wiec predkosci nie ustawiamy wcale (zostaje zero zdarzenia).</summary>
+        private static void Track()
         {
             double rnow = Real;
             int tracked = 0;
@@ -499,15 +501,8 @@ namespace Armoury
                     }
                     else continue;
                     tracked++;
-                    Vec3 v = Vec3.Zero;
-                    if (s.HasLast && dt > 0.0001f)
-                    {
-                        v = (p - s.Last) * (1f / dt);
-                        if (v.LengthSquared > MaxSpeed * MaxSpeed) v = Vec3.Zero;   // przeskok (np. pierwszy odczyt szyku) - bez predkosci
-                    }
-                    s.Last = p; s.HasLast = true; s.Pos = p;
+                    s.Pos = p;
                     s.Ev.SetPosition(p);
-                    s.Ev.SetVelocity(v);
                 }
                 catch (Exception e) { s.Follow = null; s.FollowF = null; RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Sledzenie.Klip", e); }
             }
@@ -554,7 +549,11 @@ namespace Armoury
                     else if (er >= 0.3 && em >= 0.25f && s.Ev.IsStopped()) ended = true;
                     // 154: voice_shout / voice - os zdarzenia (8 / 4 s) dluzsza niz klip, silnik konczy zdarzenie dopiero na koncu osi; bez tego mowca bylby "zajety"
                     // (IsSpeaking), a motto po przemowie czekalo do konca osi. Klip skonczony (czas rzeczywisty = zegar dzwieku, misji - pauza nie tnie) -> koniec
-                    else if ((s.Kind == EvShout || s.Kind == EvVoice) && er >= s.C.Dur + ClipTail && em >= s.C.Dur) { ended = true; _clipEnd++; }
+                    else if ((s.Kind == EvShout || s.Kind == EvVoice) && er >= s.C.Dur + ClipTail && (em >= s.C.Dur || s.TestNote != null)) { ended = true; _clipEnd++; }
+                    // recenzja 154: probka odleglosci autotestu (TestNote) konczy sie TYLKO w czasie rzeczywistym (zegar dzwieku). Czas misji w autotescie biegnie
+                    // ok. 10x szybciej (log 25.10 23:54: klip 8 s "koniec po 10.1 s" po ok. 1 s), wiec limit "dlugosc + 2 s czasu misji" ucinal klip 1,4 s po ok.
+                    // 0,3 s, zanim Check (0,5 s czasu rzeczywistego) napisal linie "w 5.0 m / w 150.0 m" - odsluchu nie bylo z czego zrobic
+                    else if (s.TestNote != null) { if (er >= s.C.Dur + 2.0) { ended = true; _endCap++; } }
                     else if (em >= s.C.Dur + 2f) { ended = true; _endCap++; }
                     else if (er >= s.C.Dur + 60.0) { ended = true; _endCap++; }
                 }
