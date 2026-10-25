@@ -46,7 +46,8 @@ namespace Armoury
     /// Dodawane w SubModuleMain.OnMissionBehaviorInitialize przy ArmyReviewEnabled i kampanii; poza bitwa polowa gracza nic nie pisze.
     /// P12 (przypiecia typow, ArmyReview.Pin.cs): OnDeploymentFinished najpierw PinDeploy (przypieci przeniesieni przez ekran wracaja do swojej choragwi -
     /// to zachowanie dodane PO BannerCompaniesMission, wiec Mission.OnDeploymentFinished, ktore idzie od konca listy, wola je PRZED podzialem na kompanie
-    /// i przed widokiem Order of Battle), linia bitwy ma segment "przypiecia"; OnRemoveBehavior - linia posilkow i zwolnienie planu misji.
+    /// i przed widokiem Order of Battle), linia bitwy ma segment "przypiecia"; OnRemoveBehavior - naprawa wag zapisu wobec kopii sprzed bitwy (RepairWeights,
+    /// recenzja P12: druga waga _w2 w kopii), linia posilkow i zwolnienie planu misji.
     /// </summary>
     internal sealed class ArmyReviewCheck : MissionLogic
     {
@@ -56,6 +57,7 @@ namespace Armoury
         private int _entries;
         private readonly int[] _cls = new int[ArmyReview.Slots];
         private readonly int[] _w = new int[ArmyReview.Slots];
+        private readonly int[] _w2 = new int[ArmyReview.Slots];   // P12 recenzja: druga waga (formacje mieszane) do naprawy wag po bitwie
         private readonly Hero[] _cap = new Hero[ArmyReview.Slots];
 
         public override void OnBehaviorInitialize()
@@ -75,6 +77,7 @@ namespace Armoury
                     _entries++;
                     _cls[i] = (int)d.FormationClass;
                     _w[i] = d.PrimaryClassWeight;
+                    _w2[i] = d.SecondaryClassWeight;
                     _cap[i] = d.Captain;
                 }
             }
@@ -92,7 +95,8 @@ namespace Armoury
 
         public override void OnRemoveBehavior()
         {
-            try { ArmyReview.PinMissionEnd(Mission); } catch (Exception e) { ArmyReview.BattleStumble("PinEnd", e); }   // P12: posilki przypietych, plan zwolniony
+            // P12: naprawa wag zapisu wobec kopii sprzed bitwy (recenzja), posilki przypietych, plan zwolniony
+            try { ArmyReview.PinMissionEnd(Mission, _army, _entries, _cls, _w, _w2); } catch (Exception e) { ArmyReview.BattleStumble("PinEnd", e); }
             base.OnRemoveBehavior();
         }
 

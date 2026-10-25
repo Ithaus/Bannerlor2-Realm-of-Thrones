@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -25,6 +26,7 @@ namespace Armoury
     /// zwiniecie choragwi i "Return to the game's own order" zdejmuja przypiecia do niej / wszystkie.
     ///
     /// Udzialy (wagi) choragwi licza tylko NIEPRZYPIETYCH ludzi rodzaju (okno, Write, spawn i ekran Order of Battle - jedna zasada); przypieci stoja ponad udzialem.
+    /// Klucz ArmyReviewPinTroopTypes NIE: przypiecia zostaja zapisane, ale nic nie robia - udzialy licza wszystkich (ShareFit, Write), okno nie pokazuje "placed".
     ///
     /// Bitwa (plan na misje - PinPlan, budowany przy pierwszym spawnie): bitwa polowa kampanii gracza (IsFieldBattle - nie oblezenie, wypad, morze; nie
     /// kryjowka), gracz nie w cudzej armii, zapis Order of Battle gry ma 8 wpisow, a choragiew przypiecia jest w nim wystawiona (klasa i waga) - inaczej
@@ -35,7 +37,10 @@ namespace Armoury
     ///     w MissionBattleSideSpawnContext rzucilby na dublu).
     ///  S2 ekran Order of Battle (OrderOfBattleVM.Initialize -> DistributeAllTroops, zmiana wag i klas): postfiks OrderOfBattleUIHelper.GetExcludedAgentsForTransfer
     ///     dopisuje przypietych stojacych w swojej choragwi do wylaczonych z przenoszenia (jak kapitanow i chorazych gry), a postfiks
-    ///     GetTotalCountOfUnitsInClass odejmuje ich z liczby klasy (wagi ekranu = wagi spawnu, RefreshWeights i SaveConfiguration bez dryfu).
+    ///     GetTotalCountOfUnitsInClass odejmuje ich z liczby klasy (wagi ekranu = wagi spawnu, RefreshWeights i SaveConfiguration bez dryfu) - chyba ze w formacji
+    ///     stoja SAMI przypieci tej klasy (CountAfterPins, recenzja P12: zero w kazdej formacji klasy = waga 0/0).
+    ///  S4 koniec misji (PinMissionEnd, recenzja P12): RepairWeights przywraca wagi sprzed bitwy, ktore ekran zapisal jako smiec (0/0 - choragiew rodzaju pusta,
+    ///     bo wszyscy jego ludzie przypieci gdzie indziej) albo jako 0 na choragwi przypiecia; linia konca bitwy "naprawione wagi N".
     ///  S3 po rozstawieniu (ArmyReviewCheck.OnDeploymentFinished - PRZED BannerCompanies i widokami): przypieci, ktorych ekran przeniosl (zmiana klasy
     ///     choragwi), wracaja do swojej choragwi, jesli nie zostala pusta (gracz ja zwinal na ekranie - jego wybor); chorazych nie ruszamy.
     /// Druzyna AI gracza: RBM ManageFormationCounts i taktyki gry ruszaja tylko formacje IsAIControlled (gracz dowodzi - nie; "delegate command" - tak,
@@ -132,10 +137,12 @@ namespace Armoury
             return fit;
         }
 
-        /// <summary>Zdrowi szeregowi wedlug rodzaju do UDZIALOW choragwi: wszyscy, ktorymi gracz dowodzi, minus przypieci do wystawionych choragwi.</summary>
+        /// <summary>Zdrowi szeregowi wedlug rodzaju do UDZIALOW choragwi: wszyscy, ktorymi gracz dowodzi, minus przypieci do wystawionych choragwi.
+        /// Klucz ArmyReviewPinTroopTypes NIE - wszyscy (recenzja P12: w bitwie przypieci ida wtedy wedlug rodzaju, wiec udzialy licza tez ich).</summary>
         internal static int[] ShareFit(Slot[] slots, Dictionary<string, int> pins)
         {
             var fit = CommandedFit();
+            if (!PinOn) return fit;
             var p = PinnedFit(pins, slots, null);
             for (int k = 0; k < 4; k++) fit[k] = Math.Max(0, fit[k] - p[k]);
             return fit;
@@ -312,17 +319,19 @@ namespace Armoury
 
         private static string TypeName(string id) { var ch = Troop(id); return ch != null ? ch.Name.ToString() : id; }
 
-        /// <summary>" + N placed" za przyblizeniem choragwi (kopia robocza okna).</summary>
+        /// <summary>" + N placed" za przyblizeniem choragwi (kopia robocza okna); klucz przypiec NIE - nic (przypieci ida wtedy wedlug rodzaju).</summary>
         private static string PinnedTail(int i)
         {
+            if (!PinOn) return "";
             int n = PinnedIn(i);
             return n > 0 ? " + " + n + " placed" : "";
         }
 
-        /// <summary>Przypiecia do choragwi zwinietej w oknie odpadaja od razu (komunikat dla gracza).</summary>
+        /// <summary>Przypiecia do choragwi zwinietej w oknie odpadaja od razu (komunikat dla gracza). Klucz przypiec NIE - bez zmian: zapis ich wtedy
+        /// nie rusza (SaveWork podaje null, "the placements stay saved"), wiec i komunikat bylby nieprawdziwy.</summary>
         private static void DropPinsTo(int i)
         {
-            if (_workPins == null) return;
+            if (_workPins == null || !PinOn) return;
             var gone = new List<string>();
             foreach (var kv in _workPins) if (kv.Value == i) gone.Add(kv.Key);
             foreach (var id in gone) _workPins.Remove(id);
@@ -403,7 +412,7 @@ namespace Armoury
             public readonly Dictionary<string, int> Target = new Dictionary<string, int>(StringComparer.Ordinal);
             public readonly HashSet<string> Waiting = new HashSet<string>(StringComparer.Ordinal);
             public readonly int[] Spawn = new int[Slots], Reinf = new int[Slots], Deploy = new int[Slots];
-            public int SpawnCalls, ReinfCalls, WaitMen, Replaced, DeployEmpty, Excluded, Counted;
+            public int SpawnCalls, ReinfCalls, WaitMen, Replaced, DeployEmpty, Excluded, Counted, CountKept;
         }
 
         private static PinPlan _plan;
@@ -456,7 +465,9 @@ namespace Armoury
 
         private static PinPlan Live(BattleSideEnum side)
         {
-            if (Campaign.Current == null || _pins.Count == 0) return null;   // bez planu (i bez trzymania misji) poza kampania i bez przypiec
+            // bez planu (i bez trzymania misji) poza kampania, bez przypiec i przy kluczu NIE - recenzja P12: plan zwalnia ArmyReviewCheck (OnRemoveBehavior),
+            // dodawany tylko przy ArmyReviewEnabled; plan zbudowany przy wylaczonym przegladzie trzymalby zakonczona misje do nastepnej bitwy
+            if (!PinOn || Campaign.Current == null || _pins.Count == 0) return null;
             var p = PlanFor(Mission.Current);
             if (p == null || !p.Active) return null;
             if (p.Side != BattleSideEnum.None && side != p.Side) return null;
@@ -638,9 +649,19 @@ namespace Armoury
                 if (m == null || !ReferenceEquals(p.M, m)) return;
                 int idx = formation.Index, n = 0;
                 formation.ApplyActionOnEachUnit(delegate (Agent a) { if (PinnedHere(p, a, idx) && InClass(a, fc)) n++; });
-                if (n > 0) { __result = Math.Max(0, __result - n); p.Counted++; }
+                if (n <= 0) return;
+                int v = CountAfterPins(__result, n);
+                if (v != __result) { __result = v; p.Counted++; } else p.CountKept++;
             }
             catch (Exception e) { Stumble("Oob.Count", e); }
+        }
+
+        /// <summary>Liczba klasy w formacji dla ekranu Order of Battle: bez przypietych stojacych tu - chyba ze sa tu SAMI przypieci tej klasy (recenzja P12:
+        /// wtedy liczba zostaje, bo zero w kazdej formacji klasy daje w OrderOfBattleVM.RefreshWeights wage 0/0 = NaN -> int.MinValue, zapisywana
+        /// przez SaveConfiguration; choragiew samych przypietych ma tez nie dostac wagi 0 - gra zwinelaby ja w nastepnej bitwie).</summary>
+        internal static int CountAfterPins(int count, int pinnedHere)
+        {
+            return pinnedHere > 0 && pinnedHere < count ? count - pinnedHere : count;
         }
 
         /// <summary>Te same predykaty co OrderOfBattleUIHelper.IsAgentInFormationClass.</summary>
@@ -743,6 +764,7 @@ namespace Armoury
                 }
             sb.Append(" (typow ").Append(p.Target.Count).Append(", czeka ").Append(p.Waiting.Count).Append(") | spawn przypietych ").Append(PerBanner(p.Spawn))
               .Append(", ekran: wylaczeni z przenoszenia ").Append(p.Excluded).Append(", odjecia z liczby klasy ").Append(p.Counted)
+              .Append(" (liczba zostawiona - sami przypieci ").Append(p.CountKept).Append(')')
               .Append(", po rozstawieniu przeniesiono ").Append(PerBanner(p.Deploy)).Append(" (choragiew pusta - zostali ").Append(p.DeployEmpty).Append(')')
               .Append(" | na polu przypietych ").Append(pinMen).Append(" - w swojej choragwi ").Append(PerBanner(where)).Append(", poza nia ").Append(outside)
               .Append(" | typow bez przypiecia ").Append(free).Append(" (ludzi ").Append(freeMen).Append("), ludzi typow czekajacych ").Append(p.WaitMen);
@@ -750,16 +772,80 @@ namespace Armoury
             return sb.ToString();
         }
 
-        /// <summary>Koniec misji: linia posilkow (gdy plan czynny) i zwolnienie planu (bez trzymania misji w pamieci).</summary>
-        internal static void PinMissionEnd(Mission m)
+        /// <summary>Koniec misji: naprawa wag zapisu Order of Battle (gdy plan czynny), linia posilkow i zwolnienie planu (bez trzymania misji w pamieci).
+        /// army / entries / cls / w1 / w2 - kopia listy tej bitwy sprzed niej (ArmyReviewCheck.OnBehaviorInitialize).</summary>
+        internal static void PinMissionEnd(Mission m, bool army, int entries, int[] cls, int[] w1, int[] w2)
         {
             var p = _plan;
             if (p == null || !ReferenceEquals(p.M, m)) return;
             _plan = null;
             if (!p.Active) return;
+            string rep;
+            try
+            {
+                var note = new StringBuilder();
+                int n = RepairWeights(army, entries, cls, w1, w2, new HashSet<int>(p.Target.Values), note);
+                rep = n < 0 ? "naprawa wag: brak pelnej kopii zapisu sprzed bitwy" : "naprawione wagi zapisu " + (army ? "armii " : "pola ") + n + (note.Length > 0 ? " (" + note + ")" : "");
+            }
+            catch (Exception e) { rep = "naprawa wag: blad (" + e.GetType().Name + ")"; Stumble("Repair", e); }
             Log.Info(P + "przypiecia - koniec bitwy | spawn przypietych " + PerBanner(p.Spawn) + " (wywolan " + p.SpawnCalls + "), posilki przypietych " + PerBanner(p.Reinf)
                      + " (wywolan " + p.ReinfCalls + "), po rozstawieniu " + PerBanner(p.Deploy) + ", ludzi typow czekajacych " + p.WaitMen
-                     + (p.Replaced > 0 ? ", ZAMIANY " + p.Replaced : "") + ".");
+                     + (p.Replaced > 0 ? ", ZAMIANY " + p.Replaced : "") + " | ekran: odjecia z liczby klasy " + p.Counted + ", zostawione (sami przypieci) " + p.CountKept
+                     + " | " + rep + ".");
+        }
+
+        private static bool WOk(int w) { return w >= 1 && w <= 100; }
+
+        /// <summary>
+        /// Naprawa wag zapisu Order of Battle po bitwie z czynnym planem przypiec (recenzja P12). Ekran Order of Battle liczy wage klasy jako ludzi klasy
+        /// w formacji / ludzi klasy we wszystkich formacjach tej klasy (OrderOfBattleVM.RefreshWeights, MathF.Round = (int)Math.Round); gdy wszyscy ludzie
+        /// rodzaju sa przypieci do choragwi INNEGO rodzaju, choragiew rodzaju stoi pusta i wychodzi 0/0 = NaN -> int.MinValue, a SPOrderOfBattleVM.SaveConfiguration
+        /// (OnDeploymentFinalized) zapisuje to bez sprawdzenia. Nastepna bitwa: LoadConfiguration zwija choragiew (waga <= 0 -> ClearFormationItem), Build
+        /// uznaje ja za niewystawiona (przypiecie czeka), okno (ReadSlots) ja pomija, a CommitPins zrzuca przypiecia do niej.
+        /// Przywracamy wage sprzed bitwy tylko tam, gdzie klasa pod indeksem ta sama, a waga: spoza 0..100 (smiec - nigdy wybor gracza; brak poprawnej sprzed
+        /// bitwy -> 0, jak potraktowalaby go gra) albo choragiew PRZYPIECIA bez zadnej wagi (przypieci stoja w niej ponad udzialem - musi zostac wystawiona).
+        /// Zero zwyklej choragwi zostaje: to wybor gracza na ekranie albo zwykle zwiniecie przez gre (porzadek "po rozstawieniu" - jedna prawda).
+        /// Zwraca liczbe naprawionych wpisow (-1 - brak pelnej kopii sprzed bitwy albo zapisu).
+        /// </summary>
+        internal static int RepairWeights(bool army, int preEntries, int[] preCls, int[] preW1, int[] preW2, ICollection<int> targets, StringBuilder note)
+        {
+            var b = Behavior();
+            if (b == null || preEntries < Slots || preCls == null || preW1 == null || preW2 == null
+                || preCls.Length < Slots || preW1.Length < Slots || preW2.Length < Slots) return -1;
+            var cur = new List<OrderOfBattleCampaignBehavior.OrderOfBattleFormationData>();
+            for (int i = 0; i < 64; i++)
+            {
+                var d = b.GetFormationDataAtIndex(i, false, army);
+                if (d == null) break;
+                cur.Add(d);
+            }
+            if (cur.Count < Slots) return -1;
+            int n = 0;
+            for (int i = 0; i < Slots; i++)
+            {
+                var d = cur[i];
+                int cls = (int)d.FormationClass;
+                if (cls < 1 || cls > 6 || cls != preCls[i]) continue;   // klasa zmieniona na ekranie - wybor gracza
+                int w1 = d.PrimaryClassWeight, w2 = d.SecondaryClassWeight;
+                if (w1 < 0 || w1 > 100) w1 = WOk(preW1[i]) ? preW1[i] : 0;
+                if (w2 < 0 || w2 > 100) w2 = WOk(preW2[i]) ? preW2[i] : 0;
+                if (w1 <= 0 && w2 <= 0 && targets != null && targets.Contains(i) && (WOk(preW1[i]) || WOk(preW2[i])))
+                {
+                    w1 = WOk(preW1[i]) ? preW1[i] : 0;
+                    w2 = WOk(preW2[i]) ? preW2[i] : 0;
+                }
+                if (w1 == d.PrimaryClassWeight && w2 == d.SecondaryClassWeight) continue;
+                if (note != null)
+                {
+                    if (note.Length > 0) note.Append(", ");
+                    note.Append(Roman[i]).Append(' ').Append(d.PrimaryClassWeight).Append('/').Append(d.SecondaryClassWeight).Append("->").Append(w1).Append('/').Append(w2);
+                }
+                cur[i] = new OrderOfBattleCampaignBehavior.OrderOfBattleFormationData(d.Captain, d.HeroTroops, d.FormationClass, w1, w2,
+                                                                                      d.Filters ?? new Dictionary<FormationFilterType, bool>());
+                n++;
+            }
+            if (n > 0) b.SetFormationInfos(cur, false, army);
+            return n;
         }
     }
 }

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -26,6 +28,9 @@ namespace Armoury
     ///     zapis arm_army_review tam i z powrotem, podzial spawnu na prawdziwych PartyAgentOrigin (Split / Merge - przypieci z druzyny gracza do choragwi,
     ///     bohater i obcy tego typu bez zmian, kazdy raz; zamiana bez dubla), odpiecie, zwiniecie choragwi, ponowne przypiecie (stan koncowy - bitwa
     ///     autotestu z przypieciem: linia "bitwa" ma segment "przypiecia").
+    ///  T7g (recenzja P12, przed stanem koncowym T7): jedyny typ rodzaju przypiety do choragwi swojego rodzaju - zapis, liczba klasy ekranu (CountAfterPins)
+    ///     i naprawa wag po bitwie (RepairWeights) na zapisie popsutym jak przez ekran Order of Battle (int.MinValue z 0/0, zero); pominiety, gdy kazdy
+    ///     rodzaj ma kilka typow. Flaga biegu: tools/wgranie/bieg-autotest.ps1 -Flags armoury-przeglad (galaz noc/p12-flagi) - bez pliku proby nie ma.
     /// Linia "Przeglad armii (P4): test - ... - wynik TAK|NIE."
     /// </summary>
     internal static partial class ArmyReview
@@ -262,14 +267,103 @@ namespace Armoury
             slots2[target] = null;
             var r3 = Write(slots2, pins);
             bool e = r3.Ok && (r3.AsReset ? _pins.Count == 0 : (r3.Banners[target] == null ? _pins.Count == 0 && r3.PinDropped == 1 : _pins.Count == 1));
+            pts.Add("T7 przypiecia: typ " + id + " (" + KindName(kind) + ", zdrowych " + pick.Fit + ") -> choragiew " + Roman[target] + " (" + KindName(slots[target].Cls)
+                    + ") | zapis " + T(a) + ", wagi klasy 100 " + T(sums) + ", udzial bez przypietych " + T(share) + " (" + sf[kind - 1] + " z " + all[kind - 1] + ")"
+                    + " | arm_army_review tam i z powrotem " + T(b) + " | podzial spawnu " + T(c) + " (" + cInfo + ") | odpiecie " + T(d) + ", zwiniecie choragwi " + T(e));
+            // g) recenzja P12: jedyny typ rodzaju przypiety do choragwi swojego rodzaju, liczba klasy ekranu i naprawa wag po bitwie (przed stanem koncowym)
+            bool g;
+            try { g = TestPinsOwnKind(cnt, comp, pts); }
+            catch (Exception ex) { g = false; pts.Add("T7g BLAD " + ex.GetType().Name); Stumble("Test.T7g", ex); }
             // f) stan koncowy: choragwie testowe z przypieciem (bitwa autotestu)
             var r4 = Write(TestSlots(cnt, comp), pins);
             bool f = r4.Ok && !r4.AsReset && _pins.Count == 1 && r4.ReadField && r4.ReadArmy;
-            pts.Add("T7 przypiecia: typ " + id + " (" + KindName(kind) + ", zdrowych " + pick.Fit + ") -> choragiew " + Roman[target] + " (" + KindName(slots[target].Cls)
-                    + ") | zapis " + T(a) + ", wagi klasy 100 " + T(sums) + ", udzial bez przypietych " + T(share) + " (" + sf[kind - 1] + " z " + all[kind - 1] + ")"
-                    + " | arm_army_review tam i z powrotem " + T(b) + " | podzial spawnu " + T(c) + " (" + cInfo + ") | odpiecie " + T(d) + ", zwiniecie choragwi " + T(e)
-                    + ", stan koncowy z przypieciem " + T(f));
-            return a && sums && share && b && c && d && e && f;
+            pts.Add("T7 stan koncowy z przypieciem " + T(f) + " (" + id + " -> " + Roman[target] + ")");
+            return a && sums && share && b && c && d && e && g && f;
+        }
+
+        /// <summary>
+        /// T7g (recenzja P12): jedyny typ swojego rodzaju (cala liczba rodzaju partii, ktorymi gracz dowodzi) przypiety do choragwi SWOJEGO rodzaju -
+        /// zapis (waga choragwi 1..100 mimo udzialu 0), liczba klasy ekranu przy samych przypietych zostaje (CountAfterPins - bez 0/0), naprawa wag po bitwie
+        /// (RepairWeights - ta sama funkcja co koniec misji) na zapisie popsutym jak przez ekran: smiec (int.MinValue) i zero na choragwi przypiecia wracaja,
+        /// zero zwyklej choragwi zostaje; bez naprawy okno (ReadSlots) pomija choragiew - z naprawa ja widzi.
+        /// </summary>
+        private static bool TestPinsOwnKind(int[] cnt, Hero comp, List<string> pts)
+        {
+            var all = CommandedFit();
+            var types = PartyTypes();
+            TypeRow pick = null;
+            int kind = 0;
+            for (int k = 0; k < 4 && pick == null; k++)
+            {
+                TypeRow only = null;
+                int n = 0;
+                foreach (var t in types) if (KindOf(t.Ch) == k && t.Fit > 0) { only = t; n++; }
+                if (n == 1 && all[k] == only.Fit) { pick = only; kind = k + 1; }
+            }
+            if (pick == null) { pts.Add("T7g jedyny typ rodzaju - pominiety (kazdy rodzaj ma kilka typow albo ludzi innych partii)"); return true; }
+            var slots = TestSlots(cnt, comp);
+            int target = -1;
+            for (int i = 0; i < Slots && target < 0; i++) if (slots[i] != null && slots[i].Cls == kind) target = i;
+            if (target < 0) { pts.Add("T7g jedyny typ rodzaju - pominiety (brak choragwi rodzaju " + KindName(kind) + ")"); return true; }
+            string id = pick.Ch.StringId;
+            var r = Write(slots, new Dictionary<string, int>(StringComparer.Ordinal) { [id] = target });
+            Log.Info(WriteLine("test T7g", r));
+            int at;
+            bool a = r.Ok && !r.AsReset && r.PinTypes == 1 && _pins.TryGetValue(id, out at) && at == target && WOk(r.W1[target])
+                     && ShareFit(r.Banners, _pins)[kind - 1] == 0 && r.ReadField && r.ReadArmy;
+            // ekran: sami przypieci tej klasy w formacji - liczba zostaje (stara zasada dawala 0, a przy jednej choragwi rodzaju 0/0); obok wolnych - odjeci
+            bool scr = CountAfterPins(pick.Fit, pick.Fit) == pick.Fit && CountAfterPins(10, 4) == 6 && CountAfterPins(5, 0) == 5 && CountAfterPins(0, 0) == 0;
+            // naprawa wag: kopia "sprzed bitwy" z listy, ktorej uzylaby bitwa (pole albo armia), zapis popsuty jak przez SaveConfiguration
+            bool army = MobileParty.MainParty.Army != null;
+            var beh = Behavior();
+            var pc = new int[Slots]; var p1 = new int[Slots]; var p2 = new int[Slots];
+            int pe = 0;
+            for (int i = 0; i < Slots; i++)
+            {
+                var d = beh.GetFormationDataAtIndex(i, false, army);
+                if (d == null) continue;
+                pe++; pc[i] = (int)d.FormationClass; p1[i] = d.PrimaryClassWeight; p2[i] = d.SecondaryClassWeight;
+            }
+            int other = -1;
+            for (int i = 0; i < Slots && other < 0; i++) if (i != target && r.Banners != null && r.Banners[i] != null) other = i;
+            var targets = new HashSet<int> { target };
+            var note = new StringBuilder();
+            bool saved; int entries;
+            // 1) smiec na choragwi przypiecia, zero na zwyklej: bez naprawy okno pomija choragiew przypiecia; naprawa - wraca tylko ona
+            Spoil(beh, army, target, int.MinValue, other, 0);
+            var cur = ReadSlots(out saved, out entries);
+            bool skipped = cur != null && cur[target] == null;
+            int n1 = RepairWeights(army, pe, pc, p1, p2, targets, note);
+            cur = ReadSlots(out saved, out entries);
+            bool back = n1 == 1 && cur != null && cur[target] != null && cur[target].W1 == p1[target] && (other < 0 || cur[other] == null);
+            // 2) zero na choragwi przypiecia - wraca (przypieci stoja w niej ponad udzialem)
+            Spoil(beh, army, target, 0, -1, 0);
+            int n2 = RepairWeights(army, pe, pc, p1, p2, targets, note);
+            cur = ReadSlots(out saved, out entries);
+            bool zero = n2 == 1 && cur != null && cur[target] != null && cur[target].W1 == p1[target];
+            // 3) zapis bez zmian - nic do naprawy
+            int n3 = RepairWeights(army, pe, pc, p1, p2, targets, null);
+            bool none = n3 == 0;
+            pts.Add("T7g jedyny typ rodzaju: " + id + " (" + KindName(kind) + ", zdrowych " + pick.Fit + ") -> choragiew " + Roman[target] + " swojego rodzaju (waga " + r.W1[target]
+                    + ") | zapis " + T(a) + " | ekran: liczba klasy przy samych przypietych zostaje " + T(scr)
+                    + " | naprawa wag zapisu " + (army ? "armii" : "pola") + ": bez niej okno pomija choragiew " + T(skipped) + ", smiec wraca, zero zwyklej" + (other >= 0 ? " (" + Roman[other] + ")" : "")
+                    + " zostaje " + T(back) + ", zero choragwi przypiecia wraca " + T(zero) + ", zapis zdrowy bez zmian " + T(none) + " (" + note + ")");
+            return a && scr && skipped && back && zero && none;
+        }
+
+        /// <summary>Test: lista zapisu (pole albo armia) z podmienionymi wagami glownymi w dwoch indeksach (-1 - bez) - jak zapis ekranu z 0/0.</summary>
+        private static void Spoil(OrderOfBattleCampaignBehavior beh, bool army, int i1, int w1, int i2, int w2)
+        {
+            var l = new List<OrderOfBattleCampaignBehavior.OrderOfBattleFormationData>();
+            for (int i = 0; i < 64; i++)
+            {
+                var d = beh.GetFormationDataAtIndex(i, false, army);
+                if (d == null) break;
+                int w = i == i1 ? w1 : i == i2 ? w2 : d.PrimaryClassWeight;
+                l.Add(new OrderOfBattleCampaignBehavior.OrderOfBattleFormationData(d.Captain, d.HeroTroops, d.FormationClass, w, d.SecondaryClassWeight,
+                                                                                   d.Filters ?? new Dictionary<FormationFilterType, bool>()));
+            }
+            beh.SetFormationInfos(l, false, army);
         }
 
         /// <summary>Podzial spawnu (Split / Merge - te same funkcje co latka modelu) na prawdziwych PartyAgentOrigin bez misji: przypieci typu ch z druzyny gracza

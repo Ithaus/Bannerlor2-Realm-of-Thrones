@@ -811,9 +811,10 @@ namespace Armoury
                 res.Ok = true; res.AsReset = true; res.Banners = s; res.PinDropped = had; res.PinCommitted = true;
                 return res;
             }
-            // P12: udzialy z nieprzypietych - przypieci do wystawionych choragwi stoja ponad udzialem (walidacja rodzajow wyzej na wszystkich)
+            // P12: udzialy z nieprzypietych - przypieci do wystawionych choragwi stoja ponad udzialem (walidacja rodzajow wyzej na wszystkich);
+            // klucz przypiec NIE - wszyscy (recenzja P12: w bitwie przypieci ida wtedy wedlug rodzaju; PinnedFit z null = zera)
             var share = (int[])fit.Clone();
-            var pinnedFit = PinnedFit(pins ?? _pins, s, null);
+            var pinnedFit = PinnedFit(PinOn ? (pins ?? _pins) : null, s, null);
             for (int k = 0; k < 4; k++) share[k] = Math.Max(0, share[k] - pinnedFit[k]);
             Weights(s, share, res.W1, res.W2);
             // bohaterowie: dowodcy najpierw (wedlug indeksu), potem szeregi; kazdy najwyzej raz
@@ -949,7 +950,7 @@ namespace Armoury
             bool writes = Writes;
             int placed = 0;
             foreach (var kv in _workPins) if (kv.Value >= 0 && kv.Value < Slots && _work[kv.Value] != null) placed++;
-            rows.Add(new InquiryElement("pins", "Move troop types into banners" + (placed > 0 ? " (" + placed + (placed == 1 ? " type placed)" : " types placed)") : ""), null, PinEdit && raised > 0,
+            rows.Add(new InquiryElement("pins", "Move troop types into banners" + (placed > 0 && PinOn ? " (" + placed + (placed == 1 ? " type placed)" : " types placed)") : ""), null, PinEdit && raised > 0,
                                         !PinOn ? "Army Review Pin Troop Types is off - banners take men by kind, share and filters only."
                                         : !writes ? "Army Review Writes Order Of Battle is off - the review only shows the game's order."
                                         : raised == 0 ? "Raise a banner first."
@@ -1069,7 +1070,7 @@ namespace Armoury
                 foreach (var h in s.Ranks) n.Add(h.Name.ToString());
                 l.Add("In the ranks: " + string.Join(", ", n.ToArray()));
             }
-            var pn = PinNames(_workPins, i);
+            var pn = PinOn ? PinNames(_workPins, i) : new List<string>();   // klucz przypiec NIE - przypieci ida wedlug rodzaju
             if (pn.Count > 0) l.Add("Troop types placed here (" + PinnedIn(i) + " fit men, on top of the share): " + string.Join(", ", pn.ToArray()));
             if (s.Auto) l.Add("Raised for a kind of troop that had no banner.");
             return string.Join("\n", l.ToArray());
@@ -1155,7 +1156,7 @@ namespace Armoury
                 new InquiryElement("ranks", "Companions in the ranks: " + s.Ranks.Count, null, true, "Heroes of your party who fight in this banner's ranks" + OobOnly),
                 new InquiryElement("name", "Name: " + (string.IsNullOrEmpty(s.Name) ? "none" : s.Name), null, true, "Your own name for the banner."),
                 new InquiryElement("strike", "Strike the banner", null, true, "Its men go to the other banners of their kind (or to one raised for them on saving)"
-                                   + (PinNames(_workPins, i).Count > 0 ? "; the troop types placed in it go back to sorting by kind." : ".")),
+                                   + (PinOn && PinNames(_workPins, i).Count > 0 ? "; the troop types placed in it go back to sorting by kind." : ".")),
             };
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(Label(i), BannerHint(i, fit, w1, w2), rows, true, 1, 1, "Choose", "Back",
                 delegate (List<InquiryElement> picked)
