@@ -9716,7 +9716,7 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public float ArcherFallBackDistance { get; set; } = 45f;
 
-        [SettingPropertyBool("Battle Sounds Enabled", HintText = "the mod's own battle sounds - drums, horns, commanders' voices and the sounds of the field below, each under its own switch. Field battles, sieges and hideouts; never tournaments, the arena or training. Off = only the game's and other mods' battle sounds, as before", RequireRestart = false)]
+        [SettingPropertyBool("Battle Sounds Enabled", HintText = "the mod's own battle sounds - drums, horns, commanders' voices and the sounds of the field below, each under its own switch. Field battles and sieges - not hideouts, sea battles, tournaments, the arena or training. Off = only the game's and other mods' battle sounds, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleSoundsEnabled { get; set; } = true;
 
@@ -9728,7 +9728,7 @@ namespace Armoury
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleDrumsMarch { get; set; } = true;
 
-        [SettingPropertyBool("Battle Captain Orders", HintText = "with Battle Sounds: captains shout their orders in the voices of their lands - forward, hold the line, shields up when arrows fall, loose, charge, rally, fall back", RequireRestart = false)]
+        [SettingPropertyBool("Battle Captain Orders", HintText = "with Battle Sounds: captains shout their orders in the voices of their lands - forward, hold the line, shields up when arrows fall, loose, charge, rally, fall back - and cry out when a banner falls or a company breaks", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleCaptainOrders { get; set; } = true;
 
@@ -9740,7 +9740,7 @@ namespace Armoury
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleChargeMottos { get; set; } = true;
 
-        [SettingPropertyBool("Battle Wounded After", HintText = "with Battle Sounds: after a battle the wounded left on the field moan and call for help, in many different voices, until you leave", RequireRestart = false)]
+        [SettingPropertyBool("Battle Wounded After", HintText = "with Battle Sounds: after a battle the wounded left on the field moan and call for help in many different voices, for a few minutes", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleWoundedAfter { get; set; } = true;
 
@@ -9748,23 +9748,23 @@ namespace Armoury
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleRavensAfter { get; set; } = true;
 
-        [SettingPropertyBool("Battle Wind And Rain", HintText = "with Battle Sounds: wind over the field in battles in the open, and the patter of rain when it rains", RequireRestart = false)]
+        [SettingPropertyBool("Battle Wind And Rain", HintText = "with Battle Sounds: wind over the field in battles in the open, and the patter of rain when it rains. Battle Sounds Loudness does not change it. Trial - off by default until tested", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool BattleWindAndRain { get; set; } = true;
+        public bool BattleWindAndRain { get; set; } = false;
 
-        [SettingPropertyBool("Battle Horse Sounds", HintText = "with Battle Sounds: horses snort, whinny and stamp in the cavalry ranks while they wait and when they charge", RequireRestart = false)]
+        [SettingPropertyBool("Battle Horse Sounds", HintText = "with Battle Sounds: horses snort, whinny and stamp in the cavalry ranks while they wait and when they charge. Trial - off by default until tested", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool BattleHorseSounds { get; set; } = true;
+        public bool BattleHorseSounds { get; set; } = false;
 
-        [SettingPropertyBool("Battle Clash Of Arms", HintText = "with Battle Sounds: the din of steel on steel and on shields rolls over the field where the lines fight hand to hand", RequireRestart = false)]
+        [SettingPropertyBool("Battle Clash Of Arms", HintText = "with Battle Sounds: the din of steel on steel and on shields rolls over the field where the lines fight hand to hand. Trial - off by default until tested", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool BattleClashOfArms { get; set; } = true;
+        public bool BattleClashOfArms { get; set; } = false;
 
-        [SettingPropertyBool("Siege Fire Sounds", HintText = "with Battle Sounds: in sieges the fires of the burning camps and of the town crackle and roar", RequireRestart = false)]
+        [SettingPropertyBool("Siege Fire Sounds", HintText = "with Battle Sounds: in sieges the fires of the burning camps and of the town crackle and roar. Trial - off by default until tested", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool SiegeFireSounds { get; set; } = true;
+        public bool SiegeFireSounds { get; set; } = false;
 
-        [SettingPropertyInteger("Battle Sounds Loudness", 1, 3, "0", HintText = "how loud the mod's battle sounds are: 1 quiet, 2 normal, 3 loud. Heard from the next sound", RequireRestart = false)]
+        [SettingPropertyInteger("Battle Sounds Loudness", 1, 3, "0", HintText = "how loud the mod's battle sounds are: 1 quiet, 2 normal, 3 loud - how far they carry; wind and rain stay as they are. Heard from the next sound", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
         public int BattleSoundsLoudness { get; set; } = 2;
 

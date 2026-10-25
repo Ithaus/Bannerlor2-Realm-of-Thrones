@@ -29,6 +29,12 @@ namespace Armoury
     ///  - ludzi szyku zbieramy do wlasnej listy (ApplyActionOnEachUnit tylko dodaje do listy), natywne glosy dopiero po zakonczeniu iteracji gry;
     ///  - umarli, gracz, uciekajacy (IsRunningAway - zlamani maja swoj jeden okrzyk paniki), bez waznej druzyny - bez glosu;
     ///  - wyjatek liczony (RoutHold.Stumble, miejsce "glosy"), funkcja dalej dziala.
+    /// noc 25.10 P2 (krytyk K4): BattleCries jest JEDYNYM detektorem szarzy - przejscie KAZDEGO szyku (AI i gracza) na Charge / ChargeToTarget po rozstawieniu
+    /// wola ChargeStarted(f) (BattleCries.Events.cs: marsz P1 zdejmuje cap, dzwiek P2 gra rog / motto / rozkaz), takze przy BattleCriesAndMoans NIE (wtedy sam
+    /// sygnal, bez okrzyku i bez jekow) - detektor biegnie, gdy wlaczony okrzyk albo marsz (MarchToContactEnabled) albo dzwiek (BattleSoundsEnabled).
+    /// Okrzyk ludzi czeka na glos dowodcy: BattleSound.TakeYellLead(f) - 0.4 s po rozkazie "Charge!", do 2.5 s po motcie rodu (inaczej 0).
+    /// Cheer(team, pos) - wiwat zwyciezcow przy zlamaniu wrogiej kompanii (wola P3): najblizszy szyk tej druzyny do 60 m od miejsca, czesc ludzi natywnym Yell,
+    /// ten sam limit glosow na sekunde; najwyzej raz na druzyne na 8 s, najwyzej 12 glosow.
     /// </summary>
     internal static partial class BattleCries   // noc 25.10 P0: partial - sygnal szarzy ChargeStarted w BattleCries.Events.cs (plik integratora)
     {
@@ -106,6 +112,7 @@ namespace Armoury
             _buf.Clear();
             lock (_pend) { _pending.Clear(); }
             for (int i = 0; i < 8; i++) { _bucketSec[i] = -1; _bucketN[i] = 0; }
+            _cheerAt.Clear();   // noc 25.10 P2: bez obiektow Team po misji (liczniki wiwatow zeruje BattleSound.Begin)
             _acc = 0f;
             _m = null;
             _tCharges = _tYells = _tMoans = _tLimited = 0;
@@ -147,7 +154,10 @@ namespace Armoury
         internal static void Tick(Mission m, float dt)
         {
             var c = Settings.Current;
-            if (c == null || !c.BattleCriesAndMoans || m == null) return;
+            if (c == null || m == null) return;
+            // noc 25.10 P2 (K4): detektor szarzy biegnie takze dla marszu (P1) i dzwieku (P2); okrzyki i jeki tylko przy BattleCriesAndMoans
+            bool cries = c.BattleCriesAndMoans;
+            if (!cries && !c.MarchToContactEnabled && !c.BattleSoundsEnabled) return;
             _acc += dt;
             if (_acc < TickEvery) return;
             _acc = 0f;
@@ -155,10 +165,10 @@ namespace Armoury
             if (m.MissionEnded || m.IsNavalBattle || m.IsNavalRaidBattle || !BattleSense.InBattle(m)) return;   // takze wypad morski (recenzja 16.10)
             float now = m.CurrentTime;
 
-            // ranni z kolejki trafien
+            // ranni z kolejki trafien (OnHit zapisuje tylko przy BattleCriesAndMoans)
             lock (_pend)
             {
-                for (int i = 0; i < _pending.Count; i++)
+                for (int i = 0; cries && i < _pending.Count; i++)
                 {
                     var a = _pending[i];
                     if (a == null || _hurtSet.Contains(a)) continue;
@@ -172,11 +182,15 @@ namespace Armoury
 
             if (m.IsDeploymentFinished)
             {
-                try { Charges(m, now); }
+                try { Charges(m, now, cries); }
                 catch (Exception e) { _buf.Clear(); RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.Szarze", e); }
             }
-            try { Moans(m, now); }
-            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.Jeki", e); }
+            if (cries)
+            {
+                try { Moans(m, now); }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.Jeki", e); }
+            }
+            else if (_hurt.Count > 0) { _hurt.Clear(); _hurtSet.Clear(); }   // klucz wylaczony w bitwie - ranni z kolejki nie czekaja
 
             if (_tCharges + _tYells + _tMoans + _tLimited > 0)
             {
@@ -193,7 +207,7 @@ namespace Armoury
             }
         }
 
-        private static void Charges(Mission m, float now)
+        private static void Charges(Mission m, float now, bool cries)
         {
             var teams = m.Teams;
             int nt = teams != null ? teams.Count : 0;
@@ -214,11 +228,15 @@ namespace Armoury
                     if (charge && !st.Charge)
                     {
                         st.Charge = true;
+                        // noc 25.10 P2 (K4): jedyny sygnal szarzy - kazde przejscie, AI i gracza, takze bez okrzykow (dyspozytor w BattleCries.Events.cs)
+                        ChargeStarted(f);
+                        float lead = 0f;
+                        try { lead = BattleSound.TakeYellLead(f); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.TakeYellLead", e); }
                         int mode = f.IsAIControlled ? ForeignVoices.AiMode : ForeignVoices.PlayerMode;   // 16.10: obce glosy (ForeignVoices)
-                        if (mode != ForeignVoices.ModeNone && now - st.LastCry >= FormationCooldown && now - st.ChargeEnd >= ChargeGap)
+                        if (cries && mode != ForeignVoices.ModeNone && now - st.LastCry >= FormationCooldown && now - st.ChargeEnd >= ChargeGap)
                         {
                             st.LastCry = now;
-                            Cry(f, now, mode == ForeignVoices.ModeCaptain);
+                            Cry(f, now, mode == ForeignVoices.ModeCaptain, lead);
                         }
                     }
                     else if (!charge && st.Charge)
@@ -230,8 +248,11 @@ namespace Armoury
             }
         }
 
-        private static void Cry(Formation f, float now, bool captainOnly)
+        /// <summary>lead (noc 25.10 P2): sekundy na glos dowodcy przed okrzykiem (0 - jak dotad; najwyzej BattleSound.YellLeadMax).</summary>
+        private static void Cry(Formation f, float now, bool captainOnly, float lead)
         {
+            if (lead < 0f || float.IsNaN(lead)) lead = 0f;
+            if (lead > BattleSound.YellLeadMax) lead = BattleSound.YellLeadMax;
             _buf.Clear();
             f.ApplyActionOnEachUnit(_collect);                    // gra iteruje swoje listy - my tylko zbieramy
             Agent cap = f.Captain;
@@ -243,22 +264,26 @@ namespace Armoury
             }
             catch { lb = 0f; }
             _tCharges++;
-            if (cap != null && CanVoice(cap, now, ManCooldown)) Yell(cap, now, 0.1f + MBRandom.RandomFloat * 0.3f);
+            // noc 25.10 P2: kapitan, ktory wlasnie mowi motto / rozkaz (BattleSound), nie krzyczy natywnie na nim
+            bool capSpoke = lead > 0f && cap != null && BattleSound.Busy(cap);
+            if (cap != null && !capSpoke && CanVoice(cap, now, ManCooldown)) Yell(cap, now, lead + 0.1f + MBRandom.RandomFloat * 0.3f);
             for (int k = 0; !captainOnly && k < _buf.Count; k++)
             {
                 var a = _buf[k];
                 if (a == cap || !CanVoice(a, now, ManCooldown)) continue;
+                if (lead > 0f && BattleSound.Busy(a)) continue;   // noc 25.10 P2: mowca rozkazu (gdy nie kapitan) nie krzyczy na swoim glosie
                 int tier = BattleWind.TierOf(a.Character);
                 float mor = a.GetMorale();
                 float mf = mor < 0f ? 1f : Math.Max(0.25f, Math.Min(1.5f, mor / 50f));
                 float p = Math.Min(ShareMax, (BaseShare + PerTier * tier) * mf + lb);
                 if (MBRandom.RandomFloat >= p) continue;
-                Yell(a, now, DelayMin + MBRandom.RandomFloat * DelaySpan);
+                Yell(a, now, lead + DelayMin + MBRandom.RandomFloat * DelaySpan);
             }
             _buf.Clear();
         }
 
-        private static void Yell(Agent a, float now, float delay)
+        /// <summary>charge = okrzyk szarzy (liczniki NB2); false - wiwat (noc 25.10 P2: liczony osobno w linii dzwieku). true = glos zaplanowany.</summary>
+        private static bool Yell(Agent a, float now, float delay, bool charge = true)
         {
             float d = delay;
             bool ok = false;
@@ -267,15 +292,19 @@ namespace Armoury
                 if (TakeSlot(now + d)) { ok = true; break; }
                 d += 1f;
             }
-            if (!ok) { _tLimited++; return; }
+            if (!ok) { if (charge) _tLimited++; return false; }
             try
             {
                 a.YellAfterDelay(d);                              // natywne, jednorazowe (jak YellingBehaviour gry)
                 _lastVoice[a] = now + d;
-                _tYells++;
-                _tYellIds.Add(a.Index);
+                if (charge)
+                {
+                    _tYells++;
+                    _tYellIds.Add(a.Index);
+                }
+                return true;
             }
-            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.Okrzyk", e); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.Okrzyk", e); return false; }
         }
 
         private static void Moans(Mission m, float now)
@@ -324,7 +353,50 @@ namespace Armoury
 
         // noc 25.10 P0 (kontrakt K6, wlasciciel tresci P2): okrzyk zwyciezcow, gdy kompania wroga sie zalamie (wola P3 - BannerCompaniesMission).
         // team = druzyna, ktora wiwatuje; pos = srodek zlamanej kompanii (najblizsza formacja tej druzyny w 60 m, ta sama droga co Cry i ten sam limit glosow).
-        // Szkielet P0 - nic nie robi. Sygnal szarzy ChargeStarted(f) jest w BattleCries.Events.cs (plik integratora): P2 go WOLA z Charges.
-        internal static void Cheer(Team team, Vec3 pos) { }
+        // Sygnal szarzy ChargeStarted(f) jest w BattleCries.Events.cs (plik integratora): P2 go WOLA z Charges.
+        internal const float CheerRange = 60f, CheerTeamGap = 8f, CheerShare = 0.35f;
+        internal const int CheerMaxVoices = 12;
+        private static readonly Dictionary<Team, float> _cheerAt = new Dictionary<Team, float>();
+        // liczniki wiwatow (glowny watek) - do linii "Dzwiek bitwy" (BattleSound); zerowane w BattleSound.Begin (Clean misji wola Clear przed BattleSound.End)
+        internal static int CheerCalls, CheerYells, CheerNoFormation;
+
+        internal static void ResetCheer() { CheerCalls = CheerYells = CheerNoFormation = 0; _cheerAt.Clear(); }
+
+        /// <summary>noc 25.10 P2: wiwat druzyny team przy miejscu zlamania wrogiej kompanii (glowny watek, z logiki misji P3). Klucz decyduje P3 (BannerVictoryCheer);
+        /// tu tylko bitwa, ten sam limit glosow na sekunde co okrzyki, najwyzej raz na druzyne na 8 s i 12 glosow.</summary>
+        internal static void Cheer(Team team, Vec3 pos)
+        {
+            var m = Mission.Current;
+            if (m == null || team == null || !MissionTeams.Valid(team) || m.MissionEnded || m.IsNavalBattle || m.IsNavalRaidBattle || !BattleSense.InBattle(m)) return;
+            float now = m.CurrentTime;
+            float last;
+            if (_cheerAt.TryGetValue(team, out last) && now - last < CheerTeamGap) return;
+            CheerCalls++;
+            _cheerAt[team] = now;
+            Formation best = null;
+            float bd = CheerRange * CheerRange;
+            var fl = team.FormationsIncludingSpecialAndEmpty;
+            int nf = fl != null ? fl.Count : 0;
+            Vec2 p2 = pos.AsVec2;
+            for (int j = 0; j < nf; j++)
+            {
+                var f = fl[j];
+                if (f == null || f.CountOfUnits <= 0) continue;
+                float d = f.CachedAveragePosition.DistanceSquared(p2);
+                if (d <= bd) { bd = d; best = f; }
+            }
+            if (best == null) { CheerNoFormation++; return; }
+            _buf.Clear();
+            best.ApplyActionOnEachUnit(_collect);
+            int n = 0;
+            for (int k = 0; k < _buf.Count && n < CheerMaxVoices; k++)
+            {
+                var a = _buf[k];
+                if (!CanVoice(a, now, ManCooldown) || BattleSound.Busy(a)) continue;
+                if (MBRandom.RandomFloat >= CheerShare) continue;
+                if (Yell(a, now, DelayMin + MBRandom.RandomFloat * DelaySpan, false)) { n++; CheerYells++; }   // wiwat liczony osobno (linia dzwieku), nie w NB2
+            }
+            _buf.Clear();
+        }
     }
 }

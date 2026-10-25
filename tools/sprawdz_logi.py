@@ -68575,5 +68575,152 @@ def main(argv):   # p5lup: wlasne wejscie grupy (dopisana na koncu pliku - rozdz
     return _p5lup_prev_main(argv)
 
 
+
+# ------------------------------------------------------------ nocdzwiek (noc 25.10 P2b, galaz noc/p2b-dzwiek: dzwiek bitwy - Armoury/src/BattleSound*.cs,
+# ForeignVoices.cs, BattleCries.cs; linie "Dzwiek bitwy (noc-p2): katalog ..." raz na proces i "Dzwiek bitwy (noc-p2): misja ..." raz na bitwe)
+NOCDZ_TAG = "Dzwiek bitwy (noc-p2): "
+NOCDZ_CAT = re.compile(r"katalog - manifest (TAK|NIE)[^,]*, wierszy (\d+), klipow dobrych (\d+) \(([^)]*)\), zle pliki (\d+)(?: \(pierwszy .*?\))?, brak plikow (\d+)")
+NOCDZ_CREATED = re.compile(r"zdarzen utworzonych (\d+) ")
+NOCDZ_PLAYED = re.compile(r"grane po 0,5 s (\d+) \(nie grane (\d+)\)")
+NOCDZ_REL = re.compile(r"zwolnionych (\d+) \(przy koncu misji (\d+), w trakcie grania (\d+)\), najwiecej naraz (\d+), przerwane wczesnie (\d+)")
+NOCDZ_DRUMS = re.compile(r"\| bebny (TAK|NIE): start (\d+), takty (\d+), stop (\d+)")
+NOCDZ_STUMB = re.compile(r"\| potkniecia (-?\d+)\.$")
+NOCDZ_SKIP = re.compile(r"\) - pominieta \(([^)]*)\)")
+NOCDZ_SUMS = (("rogi", re.compile(r"\| rogi (?:TAK|NIE) (\d+)")), ("rozkazy", re.compile(r"\| rozkazy (?:TAK|NIE) (\d+)")),
+              ("motta", re.compile(r"\| motta przy szarzy (?:TAK|NIE) (\d+)")), ("przemowy", re.compile(r"\| przemowy (?:TAK|NIE) (\d+)")),
+              ("jeki", re.compile(r"jeki (?:TAK|NIE) (\d+)")), ("ptaki", re.compile(r"ptaki (?:TAK|NIE) (\d+)")),
+              ("wiatr", re.compile(r"wiatr (?:TAK|NIE) (\d+)")), ("szczek", re.compile(r"szczek (?:TAK|NIE) (\d+)")), ("ogien", re.compile(r"ogien (?:TAK|NIE) (\d+)")))
+
+
+def nocdzwiek_main(logp):
+    """nocdzwiek (noc 25.10 P2b - dzwiek bitwy): ND-0 linia katalogu, ND-1 ERROR BattleSound / ForeignVoices i potkniecia linii misji 0, ND-2 katalog: zle pliki 0
+    i brak plikow 0 (bez nagran P2a - INFO), ND-3 kazda bitwa: ksiegowosc puli utworzone == zwolnione (recenzja 25.10: rowne z konstrukcji, wycieku
+    instancji w silniku NIE wykrywa - ND-3b INFO: Release w trakcie grania i 'nie grane' w kolejnych bitwach), ND-4 grane po 0,5 s >= 90% utworzonych (od 5 zdarzen),
+    ND-5 bebny start == stop, ND-6 przerwane wczesnie (INFO - limit wystapien zdarzenia voiceover?), ND-7 probka autotestu (armoury-dzwiek-bitwy.flag) - wszystkie
+    utworzone i grane, ND-8 linia 'zdarzenie 3D' (INFO - odleglosci silnika), ND-9 bitwy pominiete (morska / kryjowka / klucz) i sumy funkcji (INFO)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("ND-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    cats, mis, skips, n_err, err_first, probe3d = [], [], [], 0, "", []
+    pr_made, pr_no, pr_play_yes, pr_play_no = 0, 0, 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in BattleSound") or s.startswith("ERROR in ForeignVoices") or (s.startswith("ERROR in ") and "BattleSound." in s[:80]):
+                n_err += 1
+                err_first = err_first or s[:200]
+                continue
+            if not s.startswith(NOCDZ_TAG):
+                continue
+            body = s[len(NOCDZ_TAG):]
+            if body.startswith("katalog - "):
+                cats.append(body)
+            elif body.startswith("zdarzenie 3D"):
+                probe3d.append(body)
+            elif body.startswith("misja "):
+                if NOCDZ_SKIP.search(body):
+                    skips.append(body)
+                else:
+                    mis.append(body)
+            elif body.startswith("probka ") and not body.startswith("probka autotestu"):
+                if "NIE utworzone" in body:
+                    pr_no += 1
+                elif "grane po 0,5 s tak" in body:
+                    pr_play_yes += 1
+                    pr_made += 1
+                elif "grane po 0,5 s NIE" in body:
+                    pr_play_no += 1
+                    pr_made += 1
+    print("plik: %s | katalog %d, bitew z dzwiekiem %d, pominietych %d, ERROR %d" % (logp, len(cats), len(mis), len(skips), n_err))
+    if not cats and not mis and not skips:
+        rep.add("ND-0: linie 'Dzwiek bitwy (noc-p2)'", "brak w logu", "INFO (log sprzed paczki albo bez bitwy)", None)
+        rep.show()
+        return 0
+    rep.add("ND-0: linia katalogu (raz na proces)", (cats[-1][:180] + "...") if cats else "brak", "jest", bool(cats))
+    stumb = []
+    for b in mis + skips:
+        ms = NOCDZ_STUMB.search(b)
+        if ms and int(ms.group(1)) != 0:
+            stumb.append(int(ms.group(1)))
+    rep.add("ND-1: ERROR dzwieku i potkniecia linii misji", "ERROR %d%s, linii z potknieciami %d" % (n_err, (" (" + err_first + ")") if err_first else "", len(stumb)),
+            "0 i 0", n_err == 0 and not stumb)
+    if cats:
+        mc = NOCDZ_CAT.search(cats[-1])
+        if mc:
+            good, bad, miss = int(mc.group(3)), int(mc.group(5)), int(mc.group(6))
+            rep.add("ND-2: katalog - zle pliki i brak plikow", "manifest %s, dobrych %d (%s), zle %d, brak %d" % (mc.group(1), good, mc.group(4)[:90], bad, miss),
+                    "zle 0 i brak 0 (0 dobrych - INFO: nagrania P2a nie wgrane)", None if good == 0 and bad == 0 else (bad == 0 and miss == 0))
+        else:
+            rep.add("ND-2: katalog - zle pliki i brak plikow", "linia katalogu nie rozpoznana: " + cats[-1][:120], "format", False)
+    bad_rel, bad_play, bad_drum, early, created_all, peak, rel_playing, trend = [], [], [], 0, 0, 0, 0, []
+    for b in mis:
+        c0 = NOCDZ_CREATED.search(b)
+        p0 = NOCDZ_PLAYED.search(b)
+        r0 = NOCDZ_REL.search(b)
+        d0 = NOCDZ_DRUMS.search(b)
+        if not (c0 and p0 and r0):
+            bad_rel.append("nie rozpoznana: " + b[:100])
+            continue
+        cr, pl, npl = int(c0.group(1)), int(p0.group(1)), int(p0.group(2))
+        rel, relp, pk, er = int(r0.group(1)), int(r0.group(3)), int(r0.group(4)), int(r0.group(5))
+        created_all += cr
+        early += er
+        peak = max(peak, pk)
+        rel_playing += relp
+        trend.append("%d%%" % (round(100.0 * npl / (pl + npl)) if pl + npl else 0))
+        if cr != rel:
+            bad_rel.append("utworzone %d, zwolnione %d" % (cr, rel))
+        if cr >= 5 and pl < 0.9 * (pl + npl):
+            bad_play.append("grane %d z %d" % (pl, pl + npl))
+        if d0 and int(d0.group(2)) != int(d0.group(4)):
+            bad_drum.append("start %s, stop %s" % (d0.group(2), d0.group(4)))
+    rep.add("ND-3: kazda bitwa - ksiegowosc puli utworzone == zwolnione", "bitew %d, zlych %d%s" % (len(mis), len(bad_rel), (" (" + bad_rel[0] + ")") if bad_rel else ""),
+            "zlych 0 (brak bitwy - INFO); wycieku w silniku NIE wykrywa - ND-3b", None if not mis else not bad_rel)
+    rep.add("ND-3b: Release w trakcie grania i nie grane w kolejnych bitwach (INFO)", "Release grajacych %d; nie grane po bitwach: %s" % (rel_playing, ", ".join(trend[:12]) or "-"),
+            "INFO: rosnace nie grane w kolejnych bitwach jednej sesji = instancje voiceover nie zwalniane (Stop -> ReleaseEvent(-1)?)", None)
+    rep.add("ND-4: grane po 0,5 s >= 90% (bitwy od 5 zdarzen)", "zdarzen %d, bitew ponizej progu %d%s" % (created_all, len(bad_play), (" (" + bad_play[0] + ")") if bad_play else ""),
+            "0 (0 zdarzen - INFO)", None if created_all == 0 else not bad_play)
+    rep.add("ND-5: bebny start == stop", "bitew zlych %d%s" % (len(bad_drum), (" (" + bad_drum[0] + ")") if bad_drum else ""), "0", None if not mis else not bad_drum)
+    rep.add("ND-6: przerwane wczesnie przez silnik (INFO)", "%d, najwiecej naraz %d" % (early, peak), "INFO: > 0 = limit wystapien zdarzenia voiceover?", None)
+    if pr_made or pr_no:
+        rep.add("ND-7: probka autotestu - utworzone i grane", "utworzone %d (nie %d), grane po 0,5 s %d, NIE %d" % (pr_made, pr_no, pr_play_yes, pr_play_no),
+                "nie utworzone 0 i grane NIE 0", pr_no == 0 and pr_play_no == 0)
+    else:
+        rep.add("ND-7: probka autotestu", "brak", "INFO (bez armoury-dzwiek-bitwy.flag albo bez klipow)", None)
+    rep.add("ND-8: zdarzenie 3D - odleglosci silnika (INFO)", probe3d[-1][:200] if probe3d else "brak (zadnego zdarzenia 3D)", "INFO", None)
+    sums = []
+    for name, rx in NOCDZ_SUMS:
+        t = 0
+        for b in mis:
+            mm = rx.search(b)
+            if mm:
+                t += int(mm.group(1))
+        sums.append("%s %d" % (name, t))
+    kinds = {}
+    for b in skips:
+        mk = NOCDZ_SKIP.search(b)
+        k = mk.group(1) if mk else "?"
+        kinds[k] = kinds.get(k, 0) + 1
+    rep.add("ND-9: sumy funkcji i bitwy pominiete (INFO)", ", ".join(sums) + "; pominiete: " + (", ".join("%s %d" % kv for kv in sorted(kinds.items())) or "0"), "INFO", None)
+    rep.show()
+    return 0
+
+
+_nocdzwiek_main_prev = main
+
+
+def main(argv):
+    # noc 25.10 P2b: grupa nocdzwiek - opakowanie main (grupy paczek nocy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "nocdzwiek":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return nocdzwiek_main(rest[0] if rest else None)
+    return _nocdzwiek_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

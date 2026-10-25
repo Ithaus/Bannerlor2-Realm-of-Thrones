@@ -4424,20 +4424,21 @@ namespace Armoury
         // P2 (Jeff: "powinny byc bebny, trabki, odglosy, okrzyki, wyzwiska ... glosy ElevenLabs meskie, brytyjski akcent ... przemowa przed bitwa dla kazdego rodu ... wodzowie
         // mowia swoje motta przy szarzy ... jeki rannych po bitwie, rozne glosy ... konie i szczek broni ... deszcz i wiatr ... ptaki i kruki po bitwie ... ogien i plonace obozy
         // przy oblezeniu"): BattleSound*.cs, pliki ModuleData/Lektor/Bitwa/<kategoria>/*.ogg (v1 bez project.mbproj i module_sounds.xml). Glowny wylacznik BattleSoundsEnabled,
-        // kazda czesc osobno. Linia 'Dzwiek bitwy' na misje
-        public bool BattleSoundsEnabled = true;            // the mod's own battle sounds - drums, horns, commanders' voices and the sounds of the field below, each under its own switch. Field battles, sieges and hideouts; never tournaments, the arena or training. Off = only the game's and other mods' battle sounds, as before
+        // kazda czesc osobno. Linia 'Dzwiek bitwy' na misje. Recenzja 25.10 (krytyk ZAKRES v1: tlo pola to v1.1 - 'najpierw sprawdzic, co gra juz daje'; otoczenie sceny
+        // i dzwieki koni gra silnik natywnie, poza C# - czy dublujemy, niesprawdzone): wiatr i deszcz, konie, szczek broni, ogien oblezenia - domyslnie NIE do pierwszego testu (jak S3/S4 P1)
+        public bool BattleSoundsEnabled = true;            // the mod's own battle sounds - drums, horns, commanders' voices and the sounds of the field below, each under its own switch. Field battles and sieges - not hideouts, sea battles, tournaments, the arena or training. Off = only the game's and other mods' battle sounds, as before
         public bool BattleHornsCulture = true;             // with Battle Sounds: horns and trumpets of each culture sound the advance, the charge and the retreat, heard from where they are blown - knightly trumpets in the South, deep war horns in the North, the Night's Watch horn, Ironborn sea horns, wildling horns, Essos brass. One horn per side every 10 seconds
         public bool BattleDrumsMarch = true;               // with Battle Sounds: drums beat the step while foot soldiers march towards the enemy and fall silent when they charge or the enemy is close. At most two drums per side
-        public bool BattleCaptainOrders = true;            // with Battle Sounds: captains shout their orders in the voices of their lands - forward, hold the line, shields up when arrows fall, loose, charge, rally, fall back
+        public bool BattleCaptainOrders = true;            // with Battle Sounds: captains shout their orders in the voices of their lands - forward, hold the line, shields up when arrows fall, loose, charge, rally, fall back - and cry out when a banner falls or a company breaks
         public bool BattleHouseSpeeches = true;            // with Battle Sounds: before the clash the commander of each side speaks a few words to his men in the voice of his land and ends with the words of his house (you hear the enemy's only when he is close)
         public bool BattleChargeMottos = true;             // with Battle Sounds: when a formation led by a lord or a companion charges, he roars the words of his house - once per lord per battle
-        public bool BattleWoundedAfter = true;             // with Battle Sounds: after a battle the wounded left on the field moan and call for help, in many different voices, until you leave
+        public bool BattleWoundedAfter = true;             // with Battle Sounds: after a battle the wounded left on the field moan and call for help in many different voices, for a few minutes
         public bool BattleRavensAfter = true;              // with Battle Sounds: after a battle crows and ravens gather over the dead and the birds come back to the field
-        public bool BattleWindAndRain = true;              // with Battle Sounds: wind over the field in battles in the open, and the patter of rain when it rains
-        public bool BattleHorseSounds = true;              // with Battle Sounds: horses snort, whinny and stamp in the cavalry ranks while they wait and when they charge
-        public bool BattleClashOfArms = true;              // with Battle Sounds: the din of steel on steel and on shields rolls over the field where the lines fight hand to hand
-        public bool SiegeFireSounds = true;                // with Battle Sounds: in sieges the fires of the burning camps and of the town crackle and roar
-        public int BattleSoundsLoudness = 2;               // how loud the mod's battle sounds are: 1 quiet, 2 normal, 3 loud. Heard from the next sound
+        public bool BattleWindAndRain = false;             // with Battle Sounds: wind over the field in battles in the open, and the patter of rain when it rains. Battle Sounds Loudness does not change it. Trial - off by default until tested
+        public bool BattleHorseSounds = false;             // with Battle Sounds: horses snort, whinny and stamp in the cavalry ranks while they wait and when they charge. Trial - off by default until tested
+        public bool BattleClashOfArms = false;             // with Battle Sounds: the din of steel on steel and on shields rolls over the field where the lines fight hand to hand. Trial - off by default until tested
+        public bool SiegeFireSounds = false;               // with Battle Sounds: in sieges the fires of the burning camps and of the town crackle and roar. Trial - off by default until tested
+        public int BattleSoundsLoudness = 2;               // how loud the mod's battle sounds are: 1 quiet, 2 normal, 3 loud - how far they carry; wind and rain stay as they are. Heard from the next sound
 
         // --- Banner companies ---
         // P3 (Jeff: "niech niosa sztandary ... choragwie po np. 50 ludzi i kazdy ma dowodce i sztandar i jak padnie sztandar lub dowodca to spada morale i choragiew moze sie
