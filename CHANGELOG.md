@@ -13,7 +13,11 @@ Agent nagran P2a nie nagral nic (zgoda tylko w tekscie skryptu) - nagrania zrobi
   linia "Dzwiek bitwy" pokazuje odrzucenia wedlug grup. Opis MCM Friendly Fire Ranged Percent mowi o oblezeniu; komentarze "domyslnie NIE" uzupelnione o 124.
 **Ryzyko / co sprawdzic:** S3/S4 i tlo dzwieku wlaczone bez osobnej proby w grze Jeffa - autotest nocny (bitwy polowe z flagami prob) pokaze tylko brak wywrotek i liczniki; SiegeAssaultCrowd moze dublowac Contextual Combat Shouts ROT Battle Atmosphere (u Jeffa wlaczone) - Jeff wylaczy jedno z nich, jesli slychac podwojnie;
 glosy z konta to glownie narratorzy (brytyjscy) - okrzyki moga brzmiec mniej "bojowo"; zamiana na glosy z biblioteki wymaga zwolnienia miejsc na koncie (decyzja Jeffa). Pliki poza DLL do wgrania: Armoury/ModuleData/Lektor/Bitwa/** i Armoury/GUI/Prefabs/ArmSpoilsWindow.xml.
-**Status:** DO SPRAWDZENIA (autotest i wgranie nizej).
+**Status:** WGRANE 113 (25.10 ok. 06:25 CET; Armoury.dll md5 6b4f188b z noc/final 1e7593e5; razem 114-124 (nocny pakiet, p7/p8 juz w 112, p9, p10); pliki poza DLL: Armoury/ModuleData/Lektor/Bitwa/** (379 ogg + manifest) i Armoury/GUI/Prefabs/ArmSpoilsWindow.xml; kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie113 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie113-przed).
+Autotesty na kopii zapisu Jeffa z 03:46: 124b i 124d (4 bitwy polowe kazdy, flagi armoury-dzwiek-bitwy/przeglad/przesluch) - KONIEC OK, ERROR 0, linie misji 4/4, Armoury.json nietkniety; kod wrappera 1 tylko przez zabicie gry wiszacej przy wyjsciu.
+Widziane w logu: FriendlyFire wpiete 1/1/2/1 (pole: wrecz 58, pociski 9; HP od swoich 707 -> 488), dzwiek: katalog 379 dobrych, zdarzenie 3D, wyciek 0; okno lupu latki 11/11; choragwie: 6 kompanii, 2 sztandary polowe, odlozone == oddane;
+marsz: szarza piechoty z ok. 55 m, galop konnicy z ok. 102-119 m; doktryny/S1/S3/S4 TAK (w bitwach z bandami bez zdarzen flanki/cofniec); gotowosc AI start TAK. NIE pokryte autotestem: oblezenie (szturm, ogien, tlum, bebny), okno lupu po oblezeniu,
+proba przegladu armii (P4 test) i T14/T15 przesluchania - linie prob nie pojawily sie w biegu 124c (4 doby z flagami; przyczyna nieustalona) - do sprawdzenia w grze Jeffa.
 
 ## 2026-10-25 122 (noc-p9 gotowosc AI, galaz noc/p9-gotowosc od a14c76d3 = WGRANIE 111; kod d036d233 + recenzja 155f3370 + druga recenzja - commit "noc-p9 (122) druga recenzja") - sila partii z uzbrojeniem (ocena AI i autobitwa) i "najpierw dozbroic" przed bitwa
 
