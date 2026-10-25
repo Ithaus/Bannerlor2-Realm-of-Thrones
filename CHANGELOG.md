@@ -107,11 +107,14 @@ nikt nie logowal) - przyczyna z dekompilacji, nowa linia logu ja potwierdzi albo
   (zapytanie navmesha) raz na stojaca druzyne na skan; L.Speed (ten sam getter, ktory MobilePartyVisual czyta co klatke).
 - Test dodatkowy: na postoju AI lord dochodzacy - figura po doczepieniu idzie do szyku przy wodzu; linia doby "stojace dociagane: krokow > 0, doszly > 0", potkniecia 0;
   po wczytaniu zapisu figury na miejscach; ruszenie armii po postoju bez skoku figur.
+- Wgranie: plik wgrywany porownac z przebudowa HEAD galezi; kod po recenzji = commit d7e8ee3b (razem z 111 v3), Armoury.dll md5 dcd46d71c27dd49057ee1c34f087d439
+  (DLL zawiera hash commitu - commit samego CHANGELOG daje inne md5). Jedna zmiana naraz: 111 v3 i 112 w jednym DLL - objawy rozdzielne (ubranie w bitwie / figurki na mapie).
 
 **Status:** ZBUDOWANE - czeka na autotest i wgranie. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w zmienionych plikach). Armoury.dll z pelnej
 przebudowy (--no-incremental, dwa razy to samo) na commicie kodu 11980fd6: md5 07382f5f12017003888e2a34ebadec7c (DLL zawiera hash commitu - md5 zmienia sie
 z kazdym commitem, takze samego CHANGELOG; przy wgraniu liczy sie przebudowa z HEAD galezi, porownana z plikiem wgrywanym). Po recenzji 25.10 (111 v3 + 112 B1/B2):
-md5 z przebudowy - wpis w nastepnym commicie CHANGELOG.
+ZBUDOWANE, NIEWGRANE - build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Civvies / ArmyCloseRanks); Armoury.dll z pelnej przebudowy (--no-incremental,
+dwa razy, czyste drzewo) na commicie kodu d7e8ee3b: md5 dcd46d71c27dd49057ee1c34f087d439 (oba buildy rowne; "d7e8ee3b" w pliku).
 
 ## 2026-10-24 111 (m117-ubranie, galaz w-toku/m117-ubranie od w-toku/m116-fabula 6cd80130) - wlasne ubranie cywilne golych zolnierzy: tunika i buty ich kultury (v2 25.10: losowo z ubran rekrutow tieru 1 i cywilow, bez zbroi; v3 25.10: ochrona calej sztuki, bez przeszywanic, granica "chlop / rekrut")
 
@@ -158,7 +161,10 @@ md5 z przebudowy - wpis w nastepnym commicie CHANGELOG.
 - Test w grze: naglowek "Ubranie cywilne (m117 v3)": tulow 31 (battania_civil_b; A 31 battania_civil_b, B 55 braavosi_garb), nogi 32 (leather_cavalier_boots; A 35
   wrapped_shoes, B 32 leather_cavalier_boots), "przeszywanice/zbroje z nazwy" > 0; linie kultur (Westeros tulow 8, nogi 4 z andal_civ_boots); w bitwie z golymi
   rozne tuniki i buty, zadnego *_garb, przeszywanicy ani szaty andal_robe z ubrania.
-**Status v3:** ZBUDOWANE, NIEWGRANE - czeka na autotest i wgranie. md5 z przebudowy - w Status nizej (wpis w nastepnym commicie CHANGELOG).
+- Wgranie: plik wgrywany porownac z przebudowa HEAD galezi; kod v3 = commit d7e8ee3b, Armoury.dll md5 dcd46d71c27dd49057ee1c34f087d439 (DLL zawiera hash commitu -
+  commit samego CHANGELOG daje inne md5).
+**Status v3:** ZBUDOWANE, NIEWGRANE - czeka na autotest i wgranie. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Civvies); Armoury.dll z pelnej
+przebudowy (--no-incremental, dwa razy, czyste drzewo) na commicie kodu d7e8ee3b (razem z poprawkami 112): md5 dcd46d71c27dd49057ee1c34f087d439 (oba buildy rowne).
 
 **v2 (25.10, ta sama niewgrana pozycja 111 - zmiana zasady wyboru):** Jeff 25.10 ok. 00:25: "ubrania maja byc rozne aby wszyscy nie wygladali tak samo i maja to byc
 ubrania cywline zadne zbroje za 33 pancerza no tier 1 jednostek jak laza recruit kazdej kultury". v1 (opis nizej) dawal kazdemu czlowiekowi danej kultury TE SAMA najtansza
