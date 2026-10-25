@@ -195,9 +195,11 @@ namespace Armoury
                         _gtOffers = AccessTools.Field(t, "_offers");
                         _gtPopup = AccessTools.Field(t, "_popupOpen");
                     }
-                    _gtKnown = _gtBouts != null && _gtOffers != null && _gtPopup != null ? 1 : -1;
+                    bool ok = _gtBouts != null && _gtOffers != null && _gtPopup != null;
+                    // brak - na stale dopiero w kampanii (linia startu pyta w menu glownym; zestaw GT mogl nie byc jeszcze zaladowany)
+                    _gtKnown = ok ? 1 : (Campaign.Current != null ? -1 : 0);
                 }
-                catch { _gtKnown = -1; }
+                catch { _gtKnown = Campaign.Current != null ? -1 : 0; }
             }
             return _gtKnown > 0;
         }
