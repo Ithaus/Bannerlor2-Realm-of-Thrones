@@ -9804,11 +9804,11 @@ namespace Armoury
         [SettingPropertyGroup("Banner companies")]
         public bool BannerCompanyMessages { get; set; } = true;
 
-        [SettingPropertyBool("Army Review Enabled", HintText = "'Review the army' in your camp menu: your men by kind, horses and harness in use and missing, why riders will fight on foot and why the column marches afoot, and your banners for the next battle. Off = no option", RequireRestart = false)]
+        [SettingPropertyBool("Army Review Enabled", HintText = "'Review the army' in your camp menu: your men by kind, horses and harness in use and missing, why riders will fight on foot and why the column marches afoot, and your banners for the next battle. Off = no option; banners saved before stay in the game's order - use Return to the game's own order before turning it off", RequireRestart = false)]
         [SettingPropertyGroup("Army review")]
         public bool ArmyReviewEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Army Review Writes Order Of Battle", HintText = "with Army Review: the banners you set become the game's Order of Battle for your field battles - which formation holds which troops, its commander and the companions in its ranks. They take the field when you command the battle with at least 20 men; after each battle the game keeps what you actually deployed. Off = the review only shows, the game's order is untouched", RequireRestart = false)]
+        [SettingPropertyBool("Army Review Writes Order Of Battle", HintText = "with Army Review: the banners you set become the game's Order of Battle for your field battles. The share of each kind takes the field in every field battle; commanders, companions in the ranks and filters only when you command 20 men or more and the Order of Battle screen shows (after such a battle the game keeps what you actually deployed). Off = the review only shows the game's order; banners saved before stay until you use Return to the game's own order", RequireRestart = false)]
         [SettingPropertyGroup("Army review")]
         public bool ArmyReviewWritesOrderOfBattle { get; set; } = true;
 
