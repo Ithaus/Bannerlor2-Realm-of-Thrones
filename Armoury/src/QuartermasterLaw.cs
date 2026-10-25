@@ -961,6 +961,7 @@ namespace Armoury
         /// 133c (decyzja Jeffa (a), krytyka K14): na ekranie JEDNA linia z podgladu nastepnej bitwy (KitPreview - ten sam rozdzielacz DTE i te same straze co
         /// bitwa), np. "QM: 7 kit slots empty for the next battle - see Review the army in camp."; papier (ShortageLines) dalej tylko w logu ("Kwatermistrz:
         /// papier ...") do porownania. Podglad niedostepny (bez DTE, TroopsFightWithOwnKitOnly wylaczone, otwarta zbrojownia, potkniecie) - jak dotad, z papieru.
+        /// 133f (K13): komunikaty kwatermistrza w tym pliku ida przez Log.Player / PlayerNews.Show - znacznik pliku z listy wojska, wpis w "Recent messages" i Armoury.log.
         /// </summary>
         internal static bool ShoutShortages(string headline)
         {
@@ -976,11 +977,11 @@ namespace Armoury
                     return any;
                 }
                 if (lines.Count == 0) return false;
-                InformationManager.DisplayMessage(new InformationMessage(headline, Colors.Red));
+                PlayerNews.Show(new InformationMessage(headline, Colors.Red));
                 for (int i = 0; i < lines.Count; i += 5)
                 {
                     int n = Math.Min(5, lines.Count - i);
-                    InformationManager.DisplayMessage(new InformationMessage(
+                    PlayerNews.Show(new InformationMessage(
                         "  " + string.Join(", ", lines.GetRange(i, n).ToArray()), Colors.Red));
                 }
                 return true;
@@ -1091,7 +1092,7 @@ namespace Armoury
                 if ((DateTime.Now - _lastShout).TotalMilliseconds > 700)
                 {
                     _lastShout = DateTime.Now;
-                    InformationManager.DisplayMessage(new InformationMessage(
+                    PlayerNews.Show(new InformationMessage(
                         "Quartermaster: the men still use these - " + need + " " + item.ItemType +
                         " must stay for " + troops + " soldiers (" + (surplus > 0 ? surplus + " spare to take" : "no spares") + ").",
                         Colors.Red));
@@ -1124,7 +1125,7 @@ namespace Armoury
                 {
                     _lastShout = DateTime.Now;
                     // m110-sam: bez zolnierzy (zapas po dawnym wojsku) - bez "the men", blokada i cena jak dotad
-                    InformationManager.DisplayMessage(new InformationMessage((PartyWords.NoTroops ? "Quartermaster: that kit is not yours - it costs " + owe + " denars on closing for what you took, and your purse holds "
+                    PlayerNews.Show(new InformationMessage((PartyWords.NoTroops ? "Quartermaster: that kit is not yours - it costs " + owe + " denars on closing for what you took, and your purse holds "
                                                                                                   : "Quartermaster: that is the men's kit - they want " + owe + " denars on closing for what you took, and your purse holds ")
                                                                              + Hero.MainHero.Gold + ".", Colors.Red));
                 }
@@ -1425,7 +1426,7 @@ namespace Armoury
                         }
                     }
                     if (wornPieces > 0)
-                        InformationManager.DisplayMessage(new InformationMessage(
+                        PlayerNews.Show(new InformationMessage(
                             "QM: " + wornPieces + " pcs battle-worn - the smith mends them (Work the forge)."
                             + (wreckPieces > 0 ? " " + wreckPieces + " of them are wrecks - scrap now, no smith restores them for coin." : ""),
                             Colors.Yellow));
@@ -1522,7 +1523,7 @@ namespace Armoury
                     // m110-sam: bez zolnierzy i bez zapasu po dawnym wojsku - tylko Twoje sztuki, bez zdania o ludziach (zapas jest - zdanie zostaje, bo zapas dalej jest ich)
                     bool noMen = PartyWords.NoTroops && visSpare <= 0;
                     if (visOwn + visSpare > 0)
-                        InformationManager.DisplayMessage(new InformationMessage(noMen
+                        PlayerNews.Show(new InformationMessage(noMen
                             ? "QM: listed - " + visOwn + " pcs, all yours and free to take" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "") + "."
                             : onlyYours
                             ? "QM: listed - " + visOwn + " pcs, all yours and free to take" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "")
@@ -1556,13 +1557,13 @@ namespace Armoury
                     }
                     catch { }
                     if (!swapMsg)
-                        InformationManager.DisplayMessage(new InformationMessage(
+                        PlayerNews.Show(new InformationMessage(
                             "QM: listed = what no man wears; the men's kit stays hidden.",
                             Colors.Yellow));
                 }
                 if (!anyShort && !PartyWords.NoTroops)   // m110-sam: bez zolnierzy (sam / sami towarzysze) nie ma kogo uzbrajac - kwatermistrz milczy
                 {
-                    InformationManager.DisplayMessage(new InformationMessage(
+                    PlayerNews.Show(new InformationMessage(
                         "QM: every man fully kitted.", Colors.Green));
                 }
             }

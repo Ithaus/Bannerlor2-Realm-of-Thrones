@@ -54,7 +54,7 @@ namespace Armoury
 
         private static void Msg(string t, Color c)
         {
-            try { InformationManager.DisplayMessage(new InformationMessage(t, c)); } catch { }
+            try { PlayerNews.Show(new InformationMessage(t, c)); } catch { }
         }
 
         internal static void Reset()

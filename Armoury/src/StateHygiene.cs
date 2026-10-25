@@ -17,6 +17,7 @@ namespace Armoury
     ///  2. Jedna wywrotka nie gasi funkcji do konca sesji (CLAUDE.md 7 "licz potkniecia, nie gas funkcji"): start klimatu (WesterosClimate.Ready -
     ///     ponowna proba w kolejnej dobie, najwyzej 3) i czekajace przeszukanie kryjowki (HideoutPurge.OnTick - najwyzej 3 proby).
     /// Do tego sen dlugu w osadzie zdejmuje martwy wpis obozu swiata (NightMarch.EnterDebt).
+    /// 133f: pierscien komunikatow o wojsku gracza (PlayerNews) zerowany tu ZAWSZE (niezaleznie od klucza, poza liczba klas), segment w linii startu.
     /// Tu tylko zerowanie przez metody tych klas, liczniki i dwie linie logu ("Porzadek stanu (E8/S)": start sesji i doba). Zadnego zlota ani sztuk.
     /// </summary>
     internal static class StateHygiene
@@ -32,6 +33,7 @@ namespace Armoury
         // liczniki doby (tylko log)
         private static int _dBuys, _dHold, _dFuture, _dHideStumbles, _dHideGivenUp, _dDeadOrders;
         private static int _stumbles;
+        private static int _news = -2;   // 133f: wpisy pierscienia PlayerNews przy zerowaniu (-1 potkniecie, -2 zerowanie nie bieglo)
 
         /// <summary>Nowa kampania i kazde wczytanie (WorldMeasure.Reset - konstruktor ArmouryBehavior, przed SyncData). Nie rzuca: wyjatek tutaj
         /// przerwalby konstruktor zachowania kampanii.</summary>
@@ -42,6 +44,10 @@ namespace Armoury
                 _zeroed = 0; _resetStumbles = 0; _left = ""; _stumbles = 0;
                 _dBuys = _dHold = _dFuture = _dHideStumbles = _dHideGivenUp = _dDeadOrders = 0;
                 _wasOn = On;
+                // 133f: pierscien komunikatow o wojsku gracza (PlayerNews - okno armii "Recent messages") to stan NOWEJ paczki - czyszczony ZAWSZE (jak pamiec E8/H
+                // przy wylaczonym kluczu), poza liczba klas (linia startu "wyzerowane 5 klas" bez zmian - sprawdz_logi S-2); ile bylo - osobny segment linii startu
+                _news = 0;
+                try { _news = PlayerNews.Reset(); } catch (Exception e) { _news = -1; _resetStumbles++; try { Log.Error("StateHygiene.Reset (komunikaty wojska 133f)", e); } catch { } }
                 // audyt 13.10 (drobne, [zapis]): pamiec paczki E8/H (SaddleLaw: spisy wzorcow i przedmiotow, doby sprzedazy uprzezy pod StringId partii,
                 // potkniecia) to stan NOWEJ paczki, nie "stan sprzed E8/S" - czyszczona zawsze, takze przy wylaczonym kluczu (dotad jedyna droga do
                 // SaddleLaw.Reset szla przez Stables.Reset pod kluczem). Przy wlaczonym kluczu bez zmian (Stables.Reset wola ja jak dotad).
@@ -88,8 +94,9 @@ namespace Armoury
                 head = "wyzerowane " + _zeroed + " klas";
             Log.Info("Porzadek stanu (E8/S): " + head + "; klimat potkniecia " + k
                      + (_zeroed >= 0 && _wasOn ? " | z " + Classes + " klas (HideoutPurge, NightRest, TerrainEase, Stables, CrossingLaw); w pamieci po poprzedniej kampanii bylo: " + (_left.Length > 0 ? _left : "-")
-                                                 + " | potkniecia zerowania " + _resetStumbles : ""));
-            _zeroed = -1;
+                                                 + " | potkniecia zerowania " + _resetStumbles : "")
+                     + " | komunikaty wojska (133f, zawsze): " + (_news >= 0 ? "w pierscieniu bylo " + _news : _news == -1 ? "POTKNIECIE zerowania" : "zerowanie nie bieglo"));
+            _zeroed = -1; _news = -2;
         }
 
         // ------------------------------------------------------------ liczniki (tylko log; wolane z jednego watku kampanii)

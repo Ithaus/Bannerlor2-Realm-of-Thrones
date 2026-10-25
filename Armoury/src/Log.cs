@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using TaleWorlds.Library;
@@ -598,14 +599,20 @@ namespace Armoury
             lock (Gate) { DrainLocked(false); Append(_path, text, null); }   // f13-doba: kolejka najpierw - blad w pliku od razu i po liniach sprzed niego
         }
 
-        internal static void Player(string text, bool bad = false)
+        /// <summary>Komunikat dla gracza na ekranie. 133f: src ([CallerFilePath] - wpisuje kompilator, wywolania bez zmian) - plik wolajacego z listy wojska
+        /// (PlayerNews.Sources) ustawia znacznik na czas wyslania; nasluch PlayerNews zapisuje komunikat do okna armii ("Recent messages") i do tego logu.</summary>
+        internal static void Player(string text, bool bad = false, [CallerFilePath] string src = "")
         {
+            string was = null;
+            bool marked = false;
+            try { was = PlayerNews.Enter(src); marked = true; } catch { }
             try
             {
                 InformationManager.DisplayMessage(new InformationMessage(text,
                     bad ? Colors.Red : new Color(0.9f, 0.8f, 0.4f)));
             }
             catch { }
+            finally { if (marked) { try { PlayerNews.Leave(was); } catch { } } }
         }
     }
 }

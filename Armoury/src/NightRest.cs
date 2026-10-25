@@ -1780,7 +1780,7 @@ namespace Armoury
 
         private static void Msg(string t, Color c)
         {
-            try { InformationManager.DisplayMessage(new InformationMessage(t, c)); } catch { }
+            try { PlayerNews.Show(new InformationMessage(t, c)); } catch { }
         }
 
         private static string F2(float v) { return v.ToString("0.00", CultureInfo.InvariantCulture); }

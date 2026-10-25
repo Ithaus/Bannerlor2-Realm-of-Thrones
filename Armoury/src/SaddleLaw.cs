@@ -499,7 +499,7 @@ namespace Armoury
                 if (avail >= n) return;
                 __result = false;
                 _dPlRefused += n;
-                MBInformationManager.AddQuickInformation(new TextObject(avail > 0
+                PlayerNews.Quick(new TextObject(avail > 0
                     ? "A rider needs a saddle as well as a horse - you have spare horse harness for only " + avail + " more."
                     : total > 0
                         ? "A rider needs a saddle as well as a horse - all the horse harness in your baggage and troop armoury is already needed by the riders you have."

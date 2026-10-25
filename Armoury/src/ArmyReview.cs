@@ -232,11 +232,12 @@ namespace Armoury
                 CampaignEvents.HourlyTickEvent.AddNonSerializedListener(owner ?? _owner, Hourly);
             }
             catch (Exception e) { Stumble("AddMenus.DailyTick", e); }
+            try { PlayerNews.Hook(); } catch (Exception e) { Stumble("AddMenus.News", e); }   // 133f: nasluch komunikatow o wojsku (co sesje, bez dubla)
             try { Log.Info(P + "start sesji | opcja \"Review the army\" w arm_camp_wait (" + (camp ? "TAK" : "NIE") + ", indeks " + CampIndex + ") i bk_camping_wait_menu ("
                            + (bk ? "TAK" : "NIE") + ", indeks " + BkIndex + "), takt doby " + (daily ? "TAK" : "NIE") + " | klucze Army Review Enabled " + Yes(On)
                            + ", Writes Order Of Battle " + Yes(Writes) + ", Pin Troop Types " + Yes(PinOn) + " | " + OobState() + " | zapis arm_army_review: " + _importNote
                            + " | przypiecia " + PinSummary(_pins) + " | proba autotestu: " + TestState() + " | podglad sprzetu (133c): " + KitPreview.Wiring
-                           + " | strony marszu (133d): " + MarchWiring + "."); }
+                           + " | strony marszu (133d): " + MarchWiring + " | komunikaty wojska (133f): " + PlayerNews.Wiring + "."); }
             catch (Exception e) { Stumble("AddMenus.Log", e); }
         }
 
@@ -288,7 +289,7 @@ namespace Armoury
                 if (!Can(out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
                 a.Tooltip = new TextObject("{=!}Your men by kind, what kit they lack for the next battle and why, what they went without in the last battle, the horses"
                                            + " and harness in use, idle and to buy, why riders will go on foot, your speed on the map, the herd and why the column walks,"
-                                           + " what you pay them, who gets it and where it goes, and your banners for the next battle.");
+                                           + " what you pay them, who gets it and where it goes, the last messages about them, and your banners for the next battle.");
                 return true;
             }
             catch (Exception e) { Stumble("Cond", e); return false; }
@@ -420,6 +421,7 @@ namespace Armoury
                 HorseRowSafe(pairs, hv),   // 133d: z podgladu (bez podgladu - z SaddleLaw.Pairs jak dotad)
                 MarchMainRow(col, mv),     // 133d: predkosc i co ja trzyma; strony Speed / Herd / Column
                 PayMainRow(pay),           // 133e: zold; strony Pay / Who gets what / Where it goes
+                NewsRowSafe(),             // 133f: komunikaty o wojsku (PlayerNews) - lista, najnowszy pierwszy
             };
             var b = Behavior();
             int raised = 0, entries = 0;
@@ -450,6 +452,7 @@ namespace Armoury
                         else if (id == "horses") { _dReports++; ShowPages("Horses and harness", pagesHorses, 0); }
                         else if (id == "march") { _dReports++; OpenMarch(mv, col, pagesSpeed, pagesHerd, pagesMarch); }   // 133d
                         else if (id == "pay") { _dReports++; OpenPay(pay, pagesPay, pagesWho, pagesWhere); }   // 133e
+                        else if (id == "news") { _dReports++; OpenNews(); }   // 133f
                         else if (id == "banners") { _dBanners++; OpenBanners(true); }
                         else if (id == "reset") AskReset();
                     }
@@ -657,6 +660,7 @@ namespace Armoury
             }
             // 133e: te same liczby co strony "Pay", "Who gets what" i "Where it goes" (segment bez "| strony N" - format AR-2 bez zmian)
             if (pv != null) sb.Append(" | zold (133e): ").Append(PayBrief(pv));
+            sb.Append(" | komunikaty (133f): ").Append(PlayerNews.Brief());   // 133f: pierscien wiersza "Recent messages" (format AR-2 bez zmian)
             sb.Append(" | strony ").Append(PagesInfo(pm)).Append(' ').Append(PagesInfo(ph)).Append(' ').Append(PagesInfo(pmarch)).Append(" (miesci sie ").Append(Rumours.PageLines).Append(')');
             // 133b: osobny segment - format "strony AxB CxD ExF (miesci sie N)" czyta tools/sprawdz_logi.py (AR-2)
             if (plast != null) sb.Append(" | strony ostatniej bitwy (133b) ").Append(PagesInfo(plast));

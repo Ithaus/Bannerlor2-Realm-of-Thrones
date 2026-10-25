@@ -1,5 +1,45 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 133f (galaz noc/133-raport-armii) - Armoury: okno armii "Recent messages (N)" - pierscien 60 komunikatow o wojsku gracza (sprzet, konie, zold, musztra, oboz, marsz, kwatermistrz), takze do Armoury.log
+**Problem:** Jeff 25.10 ok. 12:57: "... w tym logu tak szybko to leci ze ja nie wiem ... de facto przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne". Komunikaty
+o wojsku (Log.Player - ok. 525 wywolan w 158 plikach - i bezposrednie DisplayMessage kwatermistrza, obozu, marszu) migaja w czacie gry i nie trafiaja do ZADNEGO pliku (grep w logu
+Jeffa: 0); w oknie "Review the army" nie bylo ich wcale. Krytyka K13: sam hak w Log.Player nie zlapalby 8 bezposrednich DisplayMessage w QuartermasterLaw (w tym ShoutShortages),
+pomocniczych Msg w NightRest / ForcedMarch / ArmyRestDay ani szybkiej informacji SaddleLaw.
+**Przyczyna:** brak ksiegi komunikatow o wojsku (projekt 2.6, decyzja (e), K13).
+**Zmiana:** (1) Nowy Armoury/src/PlayerNews.cs - JEDNA zasada: komunikat jest "o wojsku", gdy na ekran wysyla go plik z listy Sources (30 plikow: QuartermasterLaw, MusterBook -
+Quartermaster; GarrisonKit, GarrisonArmory, GearFit, MenUpgrade, TroopSelfMend, ArmyClothing, CompanionGear, AiGear, CaptiveArmory - Kit; Stables, SaddleLaw - Horses; MenPurse,
+GentryService, UpgradePurse, VetPurse, CasualtyLoot, Leaks310 - Pay; Drill, CampDrill - Drill; NightRest, ArmyRestDay, CampFever, CampCart - Camp; ForcedMarch - March;
+DesertionLaw, StragglersRally, BattleMuster, ArmyReview - Army; pliki partial wedlug nazwy do pierwszej kropki). Log.Player dostal [CallerFilePath] (kompilator wpisuje plik
+wolajacego - zadne wywolanie sie nie zmienia); bezposrednie wywolania w plikach z listy ida przez PlayerNews.Show (8 x QuartermasterLaw, Msg w NightRest, ForcedMarch, ArmyRestDay)
+i PlayerNews.Quick (SaddleLaw - "A rider needs a saddle ..."). Plik z listy ustawia znacznik [ThreadStatic] na czas JEDNEGO wyslania (K13); JEDEN nasluch na publicznych
+zdarzeniach gry InformationManager.DisplayMessageInternal i MBInformationManager.FiringQuickInformation (bez latek Harmony; Hook -= i += na starcie kazdej sesji, w
+ArmyReview.AddMenus - zdarzenia czysci tylko Module.FinalizeModule) zapisuje to, co naprawde poszlo na ekran przy znaczniku. Pierscien 60 wpisow (najstarszy wypada), ta sama linia
+w ciagu godziny gry - jeden wpis z "(xN)"; kazdy komunikat (z powtorzeniami) takze do Armoury.log: "Wojsko (133f) [Temat(, red)]( (powtorzenie)): tekst". Bez kampanii nic.
+(2) Okno: wiersz "Recent messages (N)" (pusty - "Recent messages: none yet", wyszarzony z powodem) -> lista okna wyboru (przewijana, najnowszy pierwszy, tytul do 90 znakow
+ciety na spacji + "(xN)", podpowiedz: data gry, godzina, "today / N days ago", temat, "a warning" dla czerwonych, powtorzenia od kiedy, pelny tekst); "Look" - strona
+"Message - Temat" z pelnym tekstem, "Back" - do listy / przegladu (nowy ArmyReview.News.cs; przyciski bez skutku w probie zdjec 132 - Inert). Podpowiedz opcji menu: "the last
+messages about them". (3) Stan: PlayerNews.Reset w StateHygiene.ResetAll (konstruktor ArmouryBehavior - nowa kampania i kazde wczytanie, PRZED SyncData) ZAWSZE, niezaleznie od
+StateHygieneEnabled (jak pamiec E8/H), poza liczba klas - linia startu "Porzadek stanu (E8/S)" z nowym segmentem na koncu "komunikaty wojska (133f, zawsze): w pierscieniu bylo
+N" ("wyzerowane 5 klas" bez zmian - sprawdz_logi S-2). Nie w zapisie gry. (4) Log: linia startu "Przeglad armii (P4)" + "komunikaty wojska (133f): nasluch DisplayMessage TAK,
+szybkich informacji TAK (ok), plikow zrodel 30, pierscien 60"; linia "raport" + "komunikaty (133f): w pierscieniu N/60, zapisanych S (powtorzen scalonych M, wypadlo D), nasluch
+TAK, potkniecia K" (przed "| strony" - format AR-2 bez zmian). (5) Test T1: Log.Player z ArmyReview.Test.cs (plik z listy) -> licznik zapisanych +1 (koniec do konca przez
+nasluch gry), "komunikaty (133f) TAK". Bez nowych kluczy MCM (bez gen_mcm).
+**Ryzyko / co sprawdzic:** Kontrola calosci w kodzie: (1) Regresje - Log.Player: ten sam DisplayMessage w tym samym try/catch, znacznik w osobnym try (wyjatek PlayerNews nie
+zatrzyma komunikatu), finally przywraca poprzedni; Show/Quick: to samo wywolanie gry, wyjatek wychodzi do wolajacego jak przy wywolaniu wprost (Msg w NightRest/ForcedMarch/
+ArmyRestDay dalej z wlasnym catch, SaddleLaw w catch Stumble); zaden plik nie podaje Log.Player jako delegata (grep), zaden projekt narzedzi nie kompiluje zmienionych plikow.
+(2) Kolizje - nasluch na zdarzeniu gry dziala przy KAZDYM DisplayMessage w grze: odczyt [ThreadStatic] i powrot (znacznik tylko na czas wyslania z pliku z listy); nasluch nie wola
+DisplayMessage (zero rekurencji), caly w try/catch (wyjatek w nasluchu przerwalby wywolanie zdarzenia u wolajacego); nikt w repo nie lata DisplayMessage ani tych zdarzen (Ravens
+podmienia DisplayMessage transpilerem tylko w BK SiegeConsequences i Diplomacy - poza lista). Nowe linie logu "Wojsko (133f)" - prefiks spoza LogGate.DropMore i TopicOf
+(glowny plik), bez "ERROR". (3) Spojnosc - jedna regula (plik wysylajacy z listy) dla Log.Player, Show i Quick; jeden punkt zapisu (zdarzenia gry); stan czyszczony przy nowej
+kampanii i wczytaniu. Poza zakresem (K13): zolte CrashScribe "QM: N EMPTY in battle" (inny DLL, po 133a tylko w bitwie - pokazuje to "Last battle"), BannerCompanies (meldunki
+kompanii w bitwie), komunikaty samej gry (o niezaplaconym zoldzie gra nic nie pisze - DefaultClanFinanceModel ustawia tylko HasUnpaidWages); w czacie gry komunikaty zostaja jak
+byly (wylaczenie ich w czacie - decyzja Jeffa). (4) Cudzy kod - InformationManager.DisplayMessage = DisplayMessageInternal?.Invoke (synchronicznie), AddQuickInformation =
+FiringQuickInformation?.Invoke; Clear tylko w Module.FinalizeModule (dekompilacja). (5) Koszt: zero liczenia przy otwarciu okna (kopia pierscienia). [CallerFilePath] wpisuje do
+DLL sciezke budowania (napisy, ok. 158 roznych). Sprawdzic w grze: linia startu "komunikaty wojska (133f): nasluch DisplayMessage TAK, szybkich informacji TAK"; po komunikacie
+kwatermistrza / obozu / zoldu w Armoury.log linia "Wojsko (133f) [...]"; w obozie "Review the army" -> "Recent messages (N)" -> lista z data i pelnym tekstem w podpowiedzi;
+po wczytaniu zapisu lista pusta, a "Porzadek stanu (E8/S)" mowi, ile bylo; test T1 "komunikaty (133f) TAK".
+**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+
 ## 2026-10-25 133e (galaz noc/133-raport-armii) - Armoury: okno armii "Pay" -> Pay (linie gry z jednego wywolania, ostatnia wyplata) / Who gets what (rozdzial najwiekszych reszt, towarzysze, rycerze, Straz/WL) / Where it goes
 **Problem:** Jeff 25.10 ok. 12:57: "... przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold ...". Dotad zold druzyny gracza byl tylko w dymku
 zlota gry (suma) i w liniach doby logu ("Towarzysze (CW): dzien N ... zold druzyny gracza: przed (BK) 475 -> po 303", "Zold:", "Sakiewka ludzi:") - w oknie armii nic: ani linii

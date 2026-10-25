@@ -23,6 +23,7 @@ namespace Armoury
     ///     bez reszty); stado - procent linii "Herding" = GetHerdingModifier gry (K9); predkosc wobec gry - INFO.
     ///     133e: strony Pay / Who gets what / Where it goes w "najdluzszej"; zold - suma wierszy rozdzialu = wynik tego samego wywolania (K10); samosprawdzenie
     ///     wag wobec linii "Base" BK i TotalWage gry z osobnego wywolania - INFO.
+    ///     133f: Log.Player z tego pliku (lista wojska PlayerNews) - zapisany w pierscieniu "Recent messages" (licznik +1, koniec do konca przez nasluch gry).
     ///  T2 zapis choragwi testowych przez Write (ta sama droga co "Save" w oknie): 2 x piechota (60 ludzi / reszta, pierwsza z tarczami), lucznicy, konni
     ///     z kapitanem-towarzyszem, konni lucznicy - tylko rodzaje obecne; odczyt 8 x pole i armia zgodny, wagi kazdej klasy = 100, kazdy obecny rodzaj pokryty.
     ///  T3 nazwy: NameOf zgodne, Export -> Import -> Export bez zmian.
@@ -174,14 +175,20 @@ namespace Armoury
             bool t1w = !pv.Ok || pv.RowsSum == pv.Total;
             int gameWage = -1;
             try { gameWage = mp.TotalWage; } catch { gameWage = -1; }
+            // 133f: komunikat z pliku z listy wojska (ten plik - ArmyReview) przez Log.Player -> znacznik -> nasluch zdarzenia gry -> pierscien (koniec do konca;
+            // linia "Wojsko (133f) [Army]" idzie tez do tego logu)
+            long news0 = PlayerNews.Seen;
+            Log.Player("Army review test: this message should be listed under Recent messages.");
+            bool t1n = PlayerNews.Seen == news0 + 1;
             pts.Add("T1 raport: strony <= " + Rumours.PageLines + " linii " + T(t1p) + " (najdluzsza " + longest + "), pary " + T(t1a) + ", kolumna " + (col == null ? "wylaczona" : T(t1c))
                     + ", podglad sprzetu (133c) " + (nx.Ok ? T(t1k) + " (" + nx.Ms + " ms, stron " + pn.Count + ")" : "niedostepny (" + nx.Why + ")")
                     + ", konie (133d) " + (hv != null && hv.Ok ? T(t1m) : "z SaddleLaw.Pairs (bez podgladu)")
                     + ", stado (133d) " + (herdOk == null ? "bez porownania (" + (mv.Ok ? mv.HerdWhy : mv.Why) + ")" : T(t1h))
                     + ", predkosc (133d) " + (mv.Ok ? "wobec gry " + (SpeedAgrees(mv) ? "zgodna" : "ROZJAZD") + " - INFO, Other " + S2(mv.Other) + ", " + mv.Ms + " ms" : "niedostepna (" + mv.Why + ")")
                     + ", zold (133e) " + (pv.Ok ? T(t1w) + " (suma wierszy " + pv.RowsSum + " = wynik " + pv.Total + "; TotalWage gry osobno " + gameWage + " - INFO; podstawa "
-                                                  + PayBaseCheck(pv) + " - INFO; " + pv.Ms + " ms)" : "niedostepny (" + pv.Why + ")"));
-            ok &= t1p && t1a && t1c && t1k && t1m && t1h && t1w;
+                                                  + PayBaseCheck(pv) + " - INFO; " + pv.Ms + " ms)" : "niedostepny (" + pv.Why + ")")
+                    + ", komunikaty (133f) " + T(t1n) + " (" + PlayerNews.Brief() + ")");
+            ok &= t1p && t1a && t1c && t1k && t1m && t1h && t1w && t1n;
             if (!Writes)
             {
                 // klucz zapisu wylaczony = porzadek gry nietkniety (tak obiecuje opis klucza) - test tez go nie rusza
