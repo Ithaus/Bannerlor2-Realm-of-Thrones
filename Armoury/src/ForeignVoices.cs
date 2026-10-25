@@ -33,12 +33,14 @@ namespace Armoury
         private static int _stumbles;
         // noc 25.10 P2: rog szarzy IB (strona gracza / wrog, progi ludzi), dodatek rogow IB, ROTBA: rozkazy, slowa rodow, wiwat po bitwie
         private static bool _ibHorn, _ibHorn2, _ibAddon, _baOrders, _baWords, _baPostCheer, _hornFailed;
+        private static bool _baSiege;   // noc 25.10 P10: ROTBA EnableContextShouts (okrzyki oblezenia zolnierzy) - tylko informacja do linii dzwieku
         private static int _ibSmall = 1, _ibSmall2 = 1;
 
         private static bool _typesTried;
         private static Type _tBaCfg;
         private static PropertyInfo _pInst, _pEnabled, _pAiVoices, _pChorus;
         private static PropertyInfo _pOrderChance, _pHouseWords, _pPostCheer;   // noc 25.10 P2
+        private static PropertyInfo _pCtxShouts;                                 // noc 25.10 P10
         private static Type _tIbSet, _tIbLoader;                                  // noc 25.10 P2: Immersive_Battlefields.Settings1 / SettingsLoader1
         private static PropertyInfo _pIbInst, _pIbHorn, _pIbHorn2, _pIbSmall, _pIbSmall2;
         private static MemberInfo _mIbAddon;
@@ -62,6 +64,9 @@ namespace Armoury
         /// <summary>noc 25.10 P2: ROTBA krzyczy slowa rodow ustami zolnierzy (EnableHouseWords) - informacja do linii dzwieku.</summary>
         internal static bool BaHouseWords { get { return _ba && _baWords; } }
 
+        /// <summary>noc 25.10 P10: ROTBA krzyczy okrzyki oblezenia ustami zolnierzy (EnableContextShouts: taran, wylom, smola) - informacja do linii dzwieku.</summary>
+        internal static bool BaSiegeShouts { get { return _ba && _baSiege; } }
+
         internal static bool IbPresent { get { return _ibCore; } }
 
         internal static int AiMode { get; private set; } = ModeFull;
@@ -71,6 +76,7 @@ namespace Armoury
         {
             _ibCore = _ibShout = _ba = _baAiVolley = _baChorus = _ibPatch = _failed = false;
             _ibHorn = _ibHorn2 = _ibAddon = _baOrders = _baWords = _baPostCheer = _hornFailed = false;
+            _baSiege = false;
             _ibSmall = _ibSmall2 = 1;
             AiMode = ModeFull; PlayerMode = ModeNone;
             try
@@ -123,6 +129,7 @@ namespace Armoury
                 _pOrderChance = AccessTools.Property(_tBaCfg, "OrderVoiceChance");   // noc 25.10 P2
                 _pHouseWords = AccessTools.Property(_tBaCfg, "EnableHouseWords");
                 _pPostCheer = AccessTools.Property(_tBaCfg, "EnablePostBattleCheering");
+                _pCtxShouts = AccessTools.Property(_tBaCfg, "EnableContextShouts");   // noc 25.10 P10
             }
             // noc 25.10 P2: ustawienia IB (klasy publiczne; Settings1.Instance statyczne, wlasciwosci czytaja MCM albo XML IB)
             _tIbSet = AccessTools.TypeByName("Immersive_Battlefields.Settings1");
@@ -166,6 +173,7 @@ namespace Armoury
             ResolveTypes();
             _baAiVolley = _baChorus = true;
             _baOrders = _baWords = true; _baPostCheer = false;   // noc 25.10 P2: blad = BA mowi rozkazy (nasze co drugi raz)
+            _baSiege = false;
             try
             {
                 object cfg = _pInst != null ? _pInst.GetValue(null, null) : null;
@@ -177,8 +185,9 @@ namespace Armoury
                 _baOrders = on && (_pOrderChance == null || Convert.ToSingle(_pOrderChance.GetValue(cfg, null)) > 0f);
                 _baWords = on && (_pHouseWords == null || (bool)_pHouseWords.GetValue(cfg, null));
                 _baPostCheer = on && _pPostCheer != null && (bool)_pPostCheer.GetValue(cfg, null);
+                _baSiege = on && _pCtxShouts != null && (bool)_pCtxShouts.GetValue(cfg, null);   // noc 25.10 P10
             }
-            catch { _baAiVolley = _baChorus = true; _baOrders = _baWords = true; _baPostCheer = false; }
+            catch { _baAiVolley = _baChorus = true; _baOrders = _baWords = true; _baPostCheer = false; _baSiege = false; }
         }
 
         private static bool IbPatched()

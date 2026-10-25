@@ -9764,6 +9764,14 @@ namespace Armoury
         [SettingPropertyGroup("Battle sounds")]
         public bool SiegeFireSounds { get; set; } = false;
 
+        [SettingPropertyBool("Siege Assault Crowd", HintText = "with Battle Sounds: when a castle or a town is stormed, the attackers roar at the ladders, the siege towers and the ram, the defenders cry out from the walls in the voices of their lands - hold the walls, ladders, pour the oil, archers to the walls - and a great roar goes up when the gate or a breach gives way. Whether you storm or defend", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool SiegeAssaultCrowd { get; set; } = true;
+
+        [SettingPropertyBool("Siege Drums", HintText = "with Battle Sounds: the besiegers' war drums beat in the rhythm of their culture while their host closes on the walls, quicker once the assault begins, and fall silent while the fight is on the walls. In a siege they take the place of the marching drums", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool SiegeDrums { get; set; } = true;
+
         [SettingPropertyInteger("Battle Sounds Loudness", 1, 3, "0", HintText = "how loud the mod's battle sounds are: 1 quiet, 2 normal, 3 loud - how far they carry; wind and rain stay as they are. Heard from the next sound", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
         public int BattleSoundsLoudness { get; set; } = 2;
@@ -12284,6 +12292,8 @@ namespace Armoury
             s.BattleHorseSounds = BattleHorseSounds;
             s.BattleClashOfArms = BattleClashOfArms;
             s.SiegeFireSounds = SiegeFireSounds;
+            s.SiegeAssaultCrowd = SiegeAssaultCrowd;
+            s.SiegeDrums = SiegeDrums;
             s.BattleSoundsLoudness = BattleSoundsLoudness;
             s.StandardBearerKitSafe = StandardBearerKitSafe;
             s.BannerCompaniesEnabled = BannerCompaniesEnabled;

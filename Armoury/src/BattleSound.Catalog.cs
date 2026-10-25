@@ -13,7 +13,8 @@ namespace Armoury
     /// tools/lektor/nagraj_bitwa.py: wiersze '#' - naglowek; kolumny TAB albo ';': id, kategoria, kultura/rod, plik (wzgledem Bitwa), glos, dlugosc_s, tekst, rola, ...);
     /// bez manifestu - przeglad katalogow Bitwa/&lt;kategoria&gt;/*.ogg (dlugosc z naglowka Ogg). Klucz klipu z id (arm_bs_&lt;kod&gt;_&lt;reszta&gt;[_NN[b]]):
     /// sp przemowa, mo motto, or rozkaz (region_rozkaz), hr rog (styl_sygnal), dr beben (styl), br zlamanie, bd sztandar wroga, ob nasz sztandar, vi zwyciestwo,
-    /// tn wyzwisko, jk jek, ko kon, pt ptaki, wi wiatr, rn deszcz, fi ogien, sz szczek, cr tlum. Kontrola pliku jak Lektor (OggS, Vorbis, czestotliwosc,
+    /// tn wyzwisko, jk jek, ko kon, pt ptaki, wi wiatr, rn deszcz, fi ogien, sz szczek, cr tlum; P10 szturm murow: sa okrzyk atakujacych (region_rodzaj),
+    /// sd okrzyk obroncow (region_rodzaj), sc tlum oblezenia (assault_styl, defend_styl, roar_styl, breach), sg efekt oblezenia (ram, oil), ds beben oblezenia (styl_faza). Kontrola pliku jak Lektor (OggS, Vorbis, czestotliwosc,
     /// bloki zer na koncu i w srodku - dysk C Jeffa zeruje pliki); zly albo brakujacy plik = klip pominiety, licznik w linii katalogu (cisza zamiast bledu silnika).
     /// Wybor: losowy z listy klucza, bez powtorki ostatniego (jeki: bez glosu z trzech ostatnich).
     /// </summary>
@@ -206,9 +207,9 @@ namespace Armoury
             switch (code)
             {
                 case "sp": return 7f;
-                case "dr": return 8f;
+                case "dr": case "ds": return 8f;
                 case "wi": case "rn": case "fi": return 12f;
-                case "sz": case "pt": case "ko": case "cr": return 6f;
+                case "sz": case "pt": case "ko": case "cr": case "sc": case "sg": return 6f;
                 case "hr": return 4f;
                 default: return 2.5f;
             }

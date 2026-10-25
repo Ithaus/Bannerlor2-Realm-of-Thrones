@@ -17,7 +17,8 @@ namespace Armoury
     /// noc 25.10 P2 "dzwiek" (projekt dzwiek-glosy.json + krytyk K4/K7/K8; klucze BattleSoundsEnabled - glowny, BattleHornsCulture, BattleDrumsMarch, BattleCaptainOrders,
     /// BattleHouseSpeeches, BattleChargeMottos, BattleWoundedAfter, BattleRavensAfter, BattleWindAndRain, BattleHorseSounds, BattleClashOfArms, SiegeFireSounds,
     /// BattleSoundsLoudness - wszystkie czytane na zywo): bebny marszu, rogi i trabki kultur, rozkazy kapitanow, przemowy rodow, motta wodzow przy szarzy,
-    /// okrzyki choragwi, jeki rannych i kruki po bitwie, tlo pola (wiatr, deszcz, konie, szczek broni, ogien oblezenia).
+    /// okrzyki choragwi, jeki rannych i kruki po bitwie, tlo pola (wiatr, deszcz, konie, szczek broni, ogien oblezenia). P10 (klucze SiegeAssaultCrowd, SiegeDrums):
+    /// tlum i krzyki szturmu murow, bebny oblezenia - BattleSound.Siege.cs.
     ///
     /// ODTWARZANIE (v1 BEZ project.mbproj i module_sounds.xml - zly plik silnika = zly start gry): pliki Armoury/ModuleData/Lektor/Bitwa/&lt;kategoria&gt;/*.ogg
     /// (manifest.tsv P2a; bez manifestu - przeglad katalogow) przez SoundEvent.CreateEventFromExternalFile("event:/Extra/voiceover", plik, scena, is3d, false) - ta sama
@@ -242,6 +243,7 @@ namespace Armoury
         internal static void OnClearScene(Mission m)
         {
             if (_live.Count > 0) ReleaseAll("czyszczenie sceny");
+            try { SiegeSceneCleared(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Szturm.Scena", e); }   // P10: bez odwolan do obiektow starej sceny
         }
 
         /// <summary>Koniec misji (OnEndMission / OnRemoveBehavior - bezpieczne wielokrotnie): Release wszystkich, linia misji raz, stan od zera.</summary>

@@ -12,7 +12,8 @@ namespace Armoury
     /// przy MarchToContactEnabled w bitwie polowej - MarchToContact.IsMarching(f) (cap marszu P1; P1 dziala tylko w bitwie polowej - MarchToContact.Field),
     /// w oblezeniu, wypadzie i przy wylaczonym marszu - rozkaz Advance / Move (recenzja 25.10: w oblezeniu IsMarching zawsze false = bebny martwe); do tego szyk sie rusza
     /// (stoi dluzej niz 4 s - cisza), wrog dalej niz 45 m, bez szarzy. Styl wedlug kultury (DrumStyle; Dothrakowie, konnica, Inni, bandyci - bez bebna).
-    /// Najwyzej 2 bebny na druzyne - szyki najblizsze sluchacza do 300 m; oblezenie - tylko atakujacy. Takt = klip petli 8 s ponawiany po koncu poprzedniego
+    /// Najwyzej 2 bebny na druzyne - szyki najblizsze sluchacza do 300 m; oblezenie - tylko atakujacy, a przy SiegeDrums TAK wcale (P10: gra linia bebnow
+    /// oblezenia z BattleSound.Siege.cs - jedna zasada na jedno zjawisko; aktywne bebny marszu zatrzymane jak przy koncu warunku). Takt = klip petli 8 s ponawiany po koncu poprzedniego
     /// (czas misji ORAZ co najmniej 0,9 dlugosci w czasie rzeczywistym - bez lawiny przy przyspieszeniu); w jednym marszu ten sam klip (rowny rytm).
     /// Koniec warunku -> Release od razu (krytyk: bez wyciszania). Beben idzie za szykiem (srodek szyku co 0,25 s).
     /// </summary>
@@ -67,7 +68,7 @@ namespace Armoury
         private static void Drums(Mission m, Settings c)
         {
             _drumWant.Clear();
-            bool on = c.BattleDrumsMarch && m.IsDeploymentFinished && !m.MissionEnded;
+            bool on = c.BattleDrumsMarch && m.IsDeploymentFinished && !m.MissionEnded && !SiegeDrumsOwn(c);   // P10: w oblezeniu przy SiegeDrums gra beben oblezenia
             _drumP1 = DrumsFromP1(m, c);
             if (on)
             {

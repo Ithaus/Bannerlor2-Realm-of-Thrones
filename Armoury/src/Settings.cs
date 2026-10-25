@@ -4438,6 +4438,10 @@ namespace Armoury
         public bool BattleHorseSounds = false;             // with Battle Sounds: horses snort, whinny and stamp in the cavalry ranks while they wait and when they charge. Trial - off by default until tested
         public bool BattleClashOfArms = false;             // with Battle Sounds: the din of steel on steel and on shields rolls over the field where the lines fight hand to hand. Trial - off by default until tested
         public bool SiegeFireSounds = false;               // with Battle Sounds: in sieges the fires of the burning camps and of the town crackle and roar. Trial - off by default until tested
+        // P10 (Jeff 25.10 03:20-03:30: "dodaj odglosy tlumu i krzykow przy szturmie murow", "dodaj odglosy bebnow przy oblezeniu"): BattleSound.Siege.cs - tylko szturm
+        // (IsSiegeBattle, nie wypad); segmenty ' | szturm murow ' i ' | bebny oblezenia ' w linii 'Dzwiek bitwy'. Przy SiegeDrums bebny marszu w oblezeniu ustepuja
+        public bool SiegeAssaultCrowd = true;              // with Battle Sounds: when a castle or a town is stormed, the attackers roar at the ladders, the siege towers and the ram, the defenders cry out from the walls in the voices of their lands - hold the walls, ladders, pour the oil, archers to the walls - and a great roar goes up when the gate or a breach gives way. Whether you storm or defend
+        public bool SiegeDrums = true;                     // with Battle Sounds: the besiegers' war drums beat in the rhythm of their culture while their host closes on the walls, quicker once the assault begins, and fall silent while the fight is on the walls. In a siege they take the place of the marching drums
         public int BattleSoundsLoudness = 2;               // how loud the mod's battle sounds are: 1 quiet, 2 normal, 3 loud - how far they carry; wind and rain stay as they are. Heard from the next sound
 
         // --- Banner companies ---

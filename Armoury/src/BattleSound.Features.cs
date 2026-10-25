@@ -6,7 +6,7 @@ namespace Armoury
 {
     /// <summary>
     /// noc 25.10 P2: kolejnosc funkcji w takcie 0,25 s (po puli): kolejki (ciala, ostrzal, zdarzenia P1 / P3), zmiany rozkazow i rogi, przemowy, bebny, tlo,
-    /// po bitwie, probka autotestu. Kazda funkcja we wlasnym try z licznikiem potkniec (RoutHold, miejsce "dzwiek") - wywrotka jednej nie gasi reszty.
+    /// szturm murow i bebny oblezenia (P10), po bitwie, probka autotestu. Kazda funkcja we wlasnym try z licznikiem potkniec (RoutHold, miejsce "dzwiek") - wywrotka jednej nie gasi reszty.
     /// </summary>
     internal static partial class BattleSound
     {
@@ -16,6 +16,7 @@ namespace Armoury
             ResetDrums();
             ResetAfter();
             ResetField();
+            ResetSiege();
             ResetTest();
             _thenQ.Clear();
             _evQ.Clear();
@@ -41,6 +42,7 @@ namespace Armoury
             Step("Konie", () => Horses(m, c));
             Step("Szczek", () => Clash(m, c, TickEvery));
             Step("Ogien", () => Fires(m, c));
+            Step("Szturm", () => Siege(m, c));   // noc 25.10 P10: szturm murow i bebny oblezenia (BattleSound.Siege.cs)
             Step("Ptaki przed bitwa", () => BirdsBefore(m, c));
             Step("Po bitwie", () => After(m, c));
             Step("Probka", () => TestTick(m));
@@ -62,6 +64,7 @@ namespace Armoury
         private static void FinishFeatures()
         {
             foreach (var kv in _drums) if (kv.Value.Active) { kv.Value.Active = false; kv.Value.Cur = null; _cDrumStop++; }
+            SiegeFinish();
         }
 
         private static void ClearFeatures()
@@ -75,6 +78,7 @@ namespace Armoury
             AppendDrums(sb, c);
             AppendAfter(sb, c);
             AppendField(sb, c);
+            AppendSiege(sb, c);
             AppendTest(sb);
         }
     }
