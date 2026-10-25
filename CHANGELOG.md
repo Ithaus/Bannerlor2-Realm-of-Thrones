@@ -1,5 +1,274 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 NOC-CALOSC scalenie paczek nocy 114-119 (galaz noc/calosc od NOC-P0 5f590258) + WGRANE 112 (120, 121)
+
+**Problem:** Jeff 25.10 00:36-02:30 (plan przyjety slowem "start"): "Przygotuj to przez noc. Przetestuj aby bylo gotowe na jutro na godzine 12.00." Szesc paczek nocy (P1 marsz i doktryny, P3 choragwie, P4 przeglad armii, P5 okno lupu, P6 friendly fire, P2b dzwiek bitwy) lezalo na osobnych galeziach od NOC-P0.
+**Przyczyna:** praca rownolegla (krytyk.txt PODZIAL P0-P5); wspolne pliki rusza tylko integrator.
+**Zmiana:**
+- Scalenie --no-ff w kolejnosci noc/p1-marsz ad47fc0c -> noc/p3-choragwie eb0acf09 -> noc/p4-przeglad acd72c92 -> noc/p5-lup 5e65b3f8 -> noc/p6-ff 947b853b -> noc/p2b-dzwiek 50169166; po kazdym kroku build Armoury 0 bledow (6 starych ostrzezen).
+- Konflikty tylko w tools/sprawdz_logi.py (grupy dopisane na koncu pliku i wiersze rozdzielnika w main) - zachowane obie strony; grupy marsz, choragwie, p4przeglad, p5lup, nocdzwiek i stara m113pobor uruchamiaja sie (proba na pustym logu). Settings.cs / McmSettings.cs scalone same; kazda dodana linia paczek jest w wyniku, zadna usunieta nie zostala.
+- DECYZJA INTEGRATORA: scalone tez noc/wgranie112 d87fdc49 (WGRANE 112 = 120 przesluchanie + 121 podatek warsztatow, od a14c76d3). Paczki nocy wyszly od 111, wiec wgranie samej nocy cofneloby w grze 120 i 121. Konflikt tylko w CHANGELOG (oba wpisy na gorze, zachowane). Pliki 112 (CampInterrogation*.cs, PopulationLaw.cs, Seal31B.cs) identyczne z d87fdc49.
+- Prosba P4 dla integratora: opisy MCM Army Review Enabled i Army Review Writes Order Of Battle (tekst z bloku 116), potem gen_mcm (Armoury 2458 ustawien; RC i GT bez zmian).
+- Nagrania P2a: brak (0 znakow TTS, 0 SFX - zgoda Jeffa na kredyty ElevenLabs tylko w tekscie skryptu, nie w czacie). Katalogu noc/dzwiek/out nie ma, wiec Armoury/ModuleData/Lektor/Bitwa NIE powstal; dzwiek P2b milczy z licznikiem "brak klipu" (linia katalogu "klipow dobrych 0"). Narzedzia nagran (nagraj_bitwa.py, sfx_bitwa.py, klipy_bitwa.csv, glosy_bitwa.json) zostaja na galezi noc/p2a 20bac9ef - nie scalane (galaz od a14c76d3, poza lista scalenia).
+**Ryzyko / co sprawdzic (kontrola calosci w kodzie, zasada 0):**
+- Te same cele latek: AdjustSpeedLimit i CacheMovementSpeedOfUnits tylko MarchToContact (FieldCraft M0 tylko czyta CapFor); GetTacticWeight / Attack tylko Doctrine; MeleeHitCallback / MissileHitCallback / ChargeDamageCallback / CalculateDamage tylko FriendlyFire (ChargeTemperPatch lata ComputeBlowMagnitudeFromHorseCharge - inny cel); DTE ProcessAgentEquipmentRespectingTemporarySlots: BannerKit (P3) i HomeArms (m119) - obie postfiksy, P3 wylacza sloty tymczasowe m119 z "odlozonych"; DTE OnEndMission i RegisterSpawnedAgentAssignment - BannerKit obok GarrisonKit / HorseFate / Stage8World (tylko odczyt i wlasne listy); DoApplyMapEventResults - ramka A P5 obok BattlefieldLaw / LosersFlee, a 120 CampInterrogation bierze migawke ze zdarzenia OnPlayerBattleEndEvent (tylko odczyt).
+- Ten sam stan: NB2 - segmenty ' | marsz ', ' | doktryna ', ' | choragwie ' bez '|' w srodku (kontrakt P0, regex NBW_LINE). Zlamania P3 przez RoutHold.Break(a, MissionTeams.Flee); MarchToContact.CapFor pomija IsRunningAway, wiec zlamana kompania nie idzie stepem.
+- Kolejnosc w ticku (BattleSense): BattleCries.Tick (jedyny detektor szarzy, ChargeStarted takze przy BattleCriesAndMoans NIE) -> MarchToContact.Tick -> Doctrine.Tick -> BattleSound.Tick; AfterStart: NightHooks.FirstBattle -> MarchToContact.Begin -> Doctrine.Begin -> WarCouncil.Council -> BattleSound.Begin.
+- Dyspozytory: ChargeStarted -> marsz + dzwiek; Doctrine.ArchersFellBack / FlankRide (wolane z Doctrine.cs, S3/S4 domyslnie NIE) -> dzwiek; BannerCompanies.StandardFell / CommanderFell / CompanyBroke -> dzwiek; BattleCries.Cheer z P3.
+- Menu obozu: "Question the prisoners" (120, indeks 4) i "Review the army" (P4, indeks 5) - rozne id.
+- Okna w autotescie: SpoilsWindow zamyka sie sam po 1.5 s (LogGate.Mode 1/2) i nie zatrzymuje czasu; ArmyReview - proba na fladze, bez okien.
+- Otwarte (nie zmieniane, zasada 3): bebny P2 w bitwie polowej zaleza od MarchToContact.IsMarching - przy nieudanych latkach P1 bitwa polowa bez bebnow (linia "P1 dal marsz NIE"); kontrakt MarchToContact.Active nie dodany.
+- K16 (pliki poza DLL): do wgrania dochodzi tylko Armoury/GUI/Prefabs/ArmSpoilsWindow.xml (bez niego okno lupu idzie zapasem StoryWindow). Skrypty wgrania i wrapper testu sesji glownej nie sa w repo - sesja glowna dopisuje ten plik (kopia .bak i md5 jak DLL).
+- Gra NIE uruchamiana, w katalogu gry nic nie zapisane. md5 Armoury.dll scalenia - w raporcie integratora (pelna przebudowa --no-incremental dwa razy po ostatnim commicie; DLL zawiera hash commitu).
+**Status:** DO SPRAWDZENIA (autotest zbiorczy i wgranie - sesja glowna).
+
+## 2026-10-25 119 (noc-p2 dzwiek bitwy, galaz noc/p2b-dzwiek od NOC-P0 5f590258; 9e269b30 + 25754b45 + recenzja 2 50169166) - bebny marszu, rogi kultur, rozkazy kapitanow, przemowy rodow, motta przy szarzy, okrzyki choragwi, jeki i kruki po bitwie, tlo pola (v1.1 domyslnie NIE)
+
+**Problem:** Jeff 25.10 00:36-02:30 ("start"): "powinny byc bebny, trabki, odglosy, okrzyki ... glosy ElevenLabs meskie brytyjski akcent ... przemowa przed bitwa dla kazdego rodu
+... niech wodzowie mowia swoje motta przy szarzy ... jeki rannych po bitwie i niech beda to rozne glosy ... odglosy koni i szczek broni ... deszczu i wiatru ... ptakow i krukow
+po bitwie ... ognia i plonacych obozow przy oblezeniu". Nowa funkcja - brak logu; P0 dal puste szkielety BattleSound.
+**Przyczyna:** Armoury nie mialo wlasnych dzwiekow bitwy (tylko natywne okrzyki BattleCries; obce: ROTBA, Immersive Battlefields, rogi gry TacticComponent).
+**Zmiana (tylko Armoury; 13 kluczy P0 w grupie MCM "Battle sounds", czytane na zywo):**
+- BattleSound.cs: pula zdarzen SoundEvent.CreateEventFromExternalFile("event:/Extra/voiceover", plik .ogg) - 3D: scena misji + SetPosition + SetEventMinMaxDistance (pierwsze w procesie:
+  linia "zdarzenie 3D" z odleglosciami silnika); limity naraz glosy 6 / rogi 2 / bebny 6 / tlo 6, najwyzej 5 nowych na sekunde, odstepy w czasie misji ORAZ rzeczywistym
+  (przyspieszenie czasu bez lawiny); koniec -> Release, OnClearScene / End -> Release wszystkich; dalej niz max + 50 m od sluchacza - nie tworzymy. Suwak Loudness skaluje
+  odleglosci (0.7/1.0/1.4), nie glosnosc. Bitwy morskie i kryjowki pominiete. Linia "Dzwiek bitwy (noc-p2): misja ..." raz na misje, katalog raz na proces.
+- BattleSound.Catalog.cs: Armoury/ModuleData/Lektor/Bitwa/manifest.tsv (P2a) albo przeglad Bitwa/<kategoria>/*.ogg; kontrola Ogg (OggS, Vorbis, zera); zly plik = pominiety z licznikiem.
+- BattleSound.Orders.cs: rogi kultur (marsz i odwrot tylko szykom gracza - AI ma rogi gry, K8; szarza - ustepuje rogowi IB), rozkazy march/charge/hold/shields/loose/fallback/
+  archback/flank, motto bohatera-kapitana przy szarzy (raz na lorda na bitwe; okrzyk ludzi czeka TakeYellLead), przemowa przed bitwa (rod albo region + motto), okrzyki
+  choragwi z P3 (ob / rally, bd, br), rog Nocnej Strazy (2 na dzikich, 3 na Innych).
+- BattleSound.Drums.cs: bebny szykow pieszych od 20 ludzi w marszu (najwyzej 2 na strone, oblezenie - tylko atakujacy).
+- BattleSound.After.cs: jeki nieprzytomnych (rozne glosy, 300 s), kruki i ptaki po bitwie, ptaki przed bitwa, ranny kon. BattleSound.Field.cs: wiatr/deszcz, konie, szczek, ogien oblezenia.
+- BattleSound.Who.cs (mowcy, kultury ROT, rody), BattleSound.Test.cs (probka autotestu: LogGate 1/2 + CrashScribe/armoury-dzwiek-bitwy.flag - klip kazdego kodu).
+- BattleCries.cs: TakeYellLead / Busy (kapitan z mottem nie krzyczy natywnie), liczniki wiwatow P3. ForeignVoices.cs: rog szarzy IB (EnableHorn/2, SmallHorn/2, Custom_Addon_Mode),
+  ROTBA OrderVoiceChance / EnableHouseWords / EnablePostBattleCheering (rozkazy gracza co drugi raz przy BA).
+- tools/sprawdz_logi.py: grupa nocdzwiek (ND-0..ND-9, ND-3b).
+- Recenzja 2 (50169166): bebny - warunek P1 tylko w bitwie polowej (oblezenie / wypad - rozkaz Advance/Move), linia pokazuje zrodlo; klucze BattleWindAndRain, BattleHorseSounds,
+  BattleClashOfArms, SiegeFireSounds domyslnie NIE ("Trial - off by default until tested"); glos szarzy (motto / rozkaz, czekanie okrzyku) tylko z miejscem w limitach glosow
+  i na sekunde; jeki bez kobiet i Innych / umarlych; katalog: try na wiersz / plik, po wyjatku przy pustym katalogu ponowienie w kolejnej bitwie (do 3 prob); okrzyk naszego
+  sztandaru ob na zmiane z or_<region>_rally; linia: "w trakcie grania K" zamiast tautologii "aktywnych po koncu", ND-3b; opisy MCM zgodne z kodem (bez kryjowek, jeki "for
+  a few minutes", Loudness nie dotyczy wiatru i deszczu, rozkazy kapitanow obejmuja okrzyki choragwi). gen_mcm uruchomiony.
+- Nagrania P2a (integrator 25.10): NIE nagrane - 0 znakow TTS, 0 generacji SFX (zgoda Jeffa na kredyty ElevenLabs tylko w tekscie skryptu workflow, nie w czacie). Obsada 26 glosow,
+  scenariusz 385 klipow (280 v1), narzedzia z limitami i atrapa API - galaz noc/p2a 20bac9ef (tools/lektor/nagraj_bitwa.py, sfx_bitwa.py, bitwa/klipy_bitwa.csv, bitwa/glosy_bitwa.json);
+  szacunek v1 ok. 25 tys. kredytow z 88 262. Po "tak" Jeffa: najpierw --probka (776 znakow), potem v1; wynik out/** do Armoury/ModuleData/Lektor/Bitwa/ (z manifest.tsv).
+**Ryzyko / co sprawdzic (kontrola calosci w kodzie):**
+- Wynik recenzji 2: 10 uwag - 7 poprawionych, 1 czesciowo (bebny: przy NIEudanych latkach P1 bitwa polowa bez bebnow - kontrakt bez MarchToContact.Active; linia "P1 dal marsz NIE"),
+  1 inna droga (ND-3: GetTotalEventCount to liczba TYPOW zdarzen - GameNetwork.cs:1438 - nie instancji; wyciek widac jako rosnace "nie grane" w kolejnych bitwach, ND-3b),
+  1 odrzucona jako kod (ROTBA slowa rodow - decyzja Jeffa nizej).
+- Bez nagran P2a (czeka na zgode Jeffa na kredyty ElevenLabs) wszystko milczy z licznikiem "brak klipu" - linia katalogu "klipow dobrych 0". Klipy wgrywa sesja glowna z DLL.
+- NIESPRAWDZONE w grze: czy silnik tlumi voiceover z odlegloscia (linia "zdarzenie 3D" + odsluch Jeffa). Release na grajacym zdarzeniu = Stop -> ReleaseEvent(-1) - droga gry
+  (MissionAudienceHandler, MusicianGroup, MenuViewContext); obserwowac ND-3b / ND-4 w kolejnych bitwach jednej sesji.
+- Bebny zaleza od P1 (IsMarching) w bitwie polowej - po scaleniu z P1 (noc/calosc) sprawdzic w linii "P1 dal marsz TAK".
+- Kolizje: rogi marszu / odwrotu AI zostaja grze (K8); rog szarzy ustepuje IB; rozkazy szykow gracza co drugi raz przy BA. DECYZJA JEFFA: ROTBA EnableHouseWords (domyslnie tak)
+  krzyczy slowa rodow chorem przy szarzy AI i gracza (OrderVoiceController.cs:169, :462) - nakladaja sie na motto wodza; jesli przeszkadza: BA "House Words" albo nasze
+  "Battle Charge Mottos" NIE. Przemowa a BA pre-battle (szepty / modlitwy, BattleAtmosphereMissionLogic.cs:407) - rozna tresc, ten sam czas.
+- DECYZJA JEFFA: tlo pola (wiatr i deszcz, konie, szczek broni, ogien oblezenia) prosil wprost, ale domyslnie NIE do pierwszego testu (krytyk ZAKRES v1: v1.1; otoczenie sceny
+  i dzwieki koni gra silnik natywnie, poza C# - czy dublujemy, niesprawdzone). Wlaczyc w MCM po odsluchu. Probka autotestu i tak gra klip kazdego kodu (sciezka silnika).
+- Zmiana domyslnych: przed wgraniem grep '"BattleWindAndRain"\|"BattleHorseSounds"\|"BattleClashOfArms"\|"SiegeFireSounds"' w Configs/ModSettings/Global/Armoury/Armoury.json
+  (25.10 P0: kluczy nie bylo) - jesli sa z testu, poprawic w pliku (gra zamknieta, .bak).
+- Settings.cs / McmSettings.cs zmienione tylko w liniach "Battle sounds"; po scaleniu gen_mcm uruchomiony (noc/calosc).
+- build 0 bledow (6 ostrzezen jak dotad); md5 galezi a6639e8fd5f6c3c2c46ae6be128f664e (pelna przebudowa 50169166) - do wgrania md5 scalenia noc/calosc. Gra NIE uruchamiana.
+**Status:** DO SPRAWDZENIA (nie wgrane; scalone w noc/calosc; czeka na nagrania P2a i autotest sesji glownej).
+
+## 2026-10-25 118 (noc-p6 friendly fire, galaz noc/p6-ff od NOC-P0 5f590258; 8cd791b6 + recenzja 947b853b) - pociski, wrecz i szarza konia rania swoich, jedna regula dla gracza i AI
+
+**Problem:** Jeff 25.10: "i dodaj friendly fire po obu stronach", "cios wrecz nie tylko ostrzaly". Dzis w SP cios wrecz w swojego jest anulowany, a atakujacy dostaje ogluszenie 0.4 s. Pociski AI w swojego i w konia swojego sa anulowane, pociski gracza rania w pelni. Szarza konia w swojego wychodzi od razu.
+**Przyczyna:** kod gry (dekompilacja Mission.cs 1.4.8, md5 TaleWorlds.MountAndBlade.dll = libs):
+- wrecz: `CancelsDamageAndBlocksAttackBecauseOfNonEnemyCase` (6291), `!GameNetwork.IsSessionActive` w SP zawsze prawda;
+- pociski: `MissileHitCallback` porownuje `attacker.Controller == AI` w 2 miejscach (IL_0319 swoj, IL_0371 kon swojego);
+- szarza: `ChargeDamageCallback`, `IsFriendlyFireAllowedForChargeDamage` bez serwera MP = false;
+- klucz ROT "Friendly Fire" dotyczy tylko ognia smoka.
+**Zmiana (tylko Armoury):**
+- **FriendlyFire.cs, latki raz na proces** w SubModuleMain obok ChargeTemperPatch (przed JIT wolajacych), TYLKO gdy klucz FriendlyFireEnabled jest wlaczony przy starcie gry (plik MCM Armoury.json; bez wpisu Settings.Current):
+  - (1) postfiks `AgentApplyDamageModel.CalculateDamage` (DeclaredMethod na klasie bazowej): obrazenia swojego razy procent z klucza (pociski 100, wrecz 50, szarza 50);
+  - (2) prefiks i finalizer `MissileHitCallback`: [ThreadStatic] znacznik pocisku i pocisku machiny (MissionObjectToIgnore). Machiny i obszar (garnki ognia) zostaja przy zasadzie gry;
+  - (3) transpilery `MeleeHitCallback` (1/1), `MissileHitCallback` (get_Controller 2/2) i `ChargeDamageCallback` (1/1) z kontrola liczby dopasowan i ksztaltu IL. Zla liczba = galaz zdjeta tym samym MethodInfo. Kazda latka sprawdzona przez `Harmony.GetPatchInfo` (pulapka 15.10).
+- **Bramka misji** (`FriendlyFire.Logic.EarlyStart`): klucz, kampania, `MapEvent.PlayerMapEvent`, CombatType Combat, nie turniej / pojedynek, `!ForceNoFriendlyFire`. Przy kazdym trafieniu jeszcze raz sprawdzane `ForceNoFriendlyFire` i tryb.
+- **"Swoj"** = obie druzyny wazne, ta sama strona (nie None) i IsFriendOf. Neutralni jak w grze. Procent 0 = zasada gry dla wszystkich.
+- **Liczniki** przez Interlocked. Potkniecia liczone, bez globalnego wylacznika.
+- **Linie logu:** start `FriendlyFire: wpiete - obrazenia 1/1, machiny 1/1, wrecz 1/1, pociski 2/2, szarza 1/1 | ... | klucz Friendly Fire przy starcie: <zrodlo>` (albo `NIE wpiete - klucz Friendly Fire wylaczony przy starcie gry`). Raz na bitwe gracza linia `FF (pole|oblezenie|wypad|kryjowka|morze): ...` z trafieniami swoich (AI / gracz), HP przed i po skali, powalonymi przez swoich i udzialem FF w trafieniach ludzi.
+- **MCM** (grupa Friendly fire, P0): Friendly Fire Enabled (opis mowi o restarcie przy wylaczeniu i wlaczeniu), Ranged / Melee / Charge Percent 0-100. Wszystkie `RequireRestart = false`.
+
+**Ryzyko / co sprawdzic (kontrola calosci w kodzie + wynik recenzji):**
+- **Recenzja 1 (poprawiona):** do 8cd791b6 latki wchodzily bez wzgledu na klucz, a MCM zamykal tylko bramke. Teraz:
+  - klucz NIE przy starcie gry = zadna latka. Test offline: 0 latek, oryginalne metody;
+  - wylaczenie w trakcie gry zamyka bramke od nastepnej misji, ale zmieniony IL zostaje do restartu. **Przy CTD w bitwie: wylaczyc Friendly Fire Enabled w MCM i uruchomic gre ponownie.** Dopiero wtedy kod trafien gry jest caly;
+  - wlaczenie w trakcie gry po starcie z NIE nic nie robi do restartu. Linia FF podaje wtedy powod "klucz byl wylaczony przy starcie gry".
+- **Recenzja 2 (komentarz i Ryzyko, bez zmiany kodu):** kon swojego trafiony wrecz MOZE od teraz dostawac skale wrecz (domyslnie 50%) zamiast anulowania. Dzieje sie tak wtedy, gdy natywne `attacker.IsFriendOf(kon)` daje prawde (wierzchowiec nie dostaje SetTeam, wiec z C# nie wiadomo). Dotyczy to tez konia bohatera przy HorseDeathPermanent (FieldCraft.cs:186-215).
+  - W autotescie szukac linii `FieldCraft: kon bohatera ... zabity w walce` bez wroga w poblizu.
+  - Gdyby to bylo niepozadane: w `Melee()` przepuszczac tylko ofiare IsHuman.
+  - To samo dotyczy pociskow AI w konia swojego (miejsce 2, celowo otwarte).
+- **Recenzja 3:** md5 DLL zawiera hash commitu. Dla 947b853b pelna przebudowa daje `4b0cc09c7057f38e135b1913d44aee68`. Po scaleniu paczek md5 z pelnej przebudowy `--no-incremental` po commicie scalenia (noc/calosc). Wartosci 20dd40dd i feb026e2 nie przenosic.
+- **Regresje:**
+  - RBM i ROT nie maja transpilerow na tych metodach (projekt friendly-fire.txt);
+  - postfiks ROT MeleeHitCallback (MultiplePenetration) i postfiks szarzy RBM (blow 0 KnockBack) zostaja;
+  - obserwatorzy Armoury (BattleGore, HitScribe, LootWear itd.) nie zmieniaja wyniku;
+  - XP za swojego = 0 i brak kar relacji jak w grze;
+  - mnoznik trudnosci kampanii dotyczy tez FF.
+- **Kolizje z innymi zmianami:** jedyny wolajacy CalculateDamage to GetAttackCollisionResults. Machiny i obszar sa poza skala.
+- **NIEPOTWIERDZONE (tylko gra):**
+  - czy silnik podaje do callbackow trafienia AI w swoich;
+  - czy AI wstrzymuje strzal przy FriendInWay;
+  - czestosc FF w zwarciu (kryterium: udzial FF w trafieniach ludzi ponizej ok. 10%, potkniecia 0, przy NIE liczniki 0).
+- **Do decyzji Jeffa:** zabicie swojego daje dzis morale formacji zabojcy (blad gry, AgentMoraleInteractionLogic.cs:104-105) - etap 2.
+- **Build:** 0 bledow, 6 ostrzezen. Gry nie uruchamialem. Test zbiorczy i wgranie robi sesja glowna.
+
+**Status:** DO SPRAWDZENIA (galaz noc/p6-ff 947b853b, scalone w noc/calosc, czeka na autotest).
+
+## 2026-10-25 117 (noc-p5 okno lupu, galaz noc/p5-lup: 6737a4be + e5974a56 + 5e65b3f8 po recenzji, od 5f590258 = NOC-P0) - okno lupu po bitwie i oblezeniu: dokladne zloto, sprzet z wartoscia, jency, slawa i korona, w wygladzie okien wydarzen ROT; turniej - v1.1
+
+**Problem:** Jeff 25.10 (plan "start"): "po bitwie i po oblezeniu i po turnieju, powinien wyskakiwac popup z dokladna iloscia lootu, ile zlota, ile zlota w sprzecie ... w klimacie". Dotad lup byl rozsiany po komunikatach (You plundered X, kiesy band, skrzynia zalogi, czesc grabiezy, sakwy) i ekranach Spoils; nigdzie nie bylo jednej sumy.
+**Przyczyna:** kazda czesc lupu juz istnieje, ale w innym miejscu: BattlePlunder A6 (PlunderedGold), BeatenPurse 3.2, MenPurse, LootTally/BattlefieldLaw (lista trofeow, sakwy), CitySack L2/L7, SiegeRansom O3. Brakowalo zbioru danych o tym, co naprawde trafilo do gracza, i samego okna.
+**Zmiana (tylko Armoury; CrashScribe i GrandTourney bez zmian DLL, GT czytany odbiciem):**
+- SpoilsReport.cs (nowy): raport z RAMEK, czyli roznic stanu prawdziwych posiadaczy przed i po kroku, w ktorym czas kampanii stoi: kiesa gracza, MenPurse, sakwy (przedmiot i stan), loch, slawa i wplywy, podstawa korony Ransom178.PendingClaim. Tylko odczyt; zadna latka nie zmienia wyniku ani nie zwraca false. Ramki sie nie zagniezdzaja (licznik glebokosci). Etykiety zlota z istniejacych liczb, reszta "Other", suma czesci = roznica kiesy.
+  - A: DoApplyMapEventResults First -> DoEnd finalizer Last; etykieta CommitGoldChanges Last.
+  - S: ekrany Spoils, postfiks Last.
+  - L: OnCompleteLeaveConsequence First, przed SpoilsSeal.DrillLeavePrefix.
+  - F: BattlefieldLaw.FlushShareToBaggage / FlushMountsToBaggage.
+  - G: CampaignEventDispatcher.OnSiegeAftermathApplied First / finalizer Last.
+  - R: okup SiegeRansom O1/O3 jako osobny raport "The Ransom of X".
+  - Gotowosc: bitwa polowa po FinishCollection Spoils, szturm po ramce G (najwyzej 12 h), reszta po DoEnd. Przegrana, remis i odwrot bez okna (linia logu). Kolejna bitwa przed oknem dopisuje sie do tego samego raportu ("Spoils of 2 Battles").
+- SpoilsWindow.cs (nowy) + GUI/Prefabs/ArmSpoilsWindow.xml (nowy): wlasna warstwa Gauntlet 4500 na MapScreen (wzor CraftPopup), wyglad ROT (event-bg, Standard.ROTPanel, frame_9). Obrazek z pliku Images/Loot/loot_<battle|siege|sack>_<n>, inaczej sprite ROT tematu.
+  - Bramka: Prologue.SceneGate, zamkniete StoryWindow, Spoils bez fazy, zadne menu realistic_loot_*, brak misji, GT bez kolejki (odbicie TourneyRansom), MapScreen na wierzchu; wszystko to musi trwac 1.0 s.
+  - Na czas okna czas stoi (bez blokady). Zamyka Done, Esc lub Enter (w nastepnej klatce), zmiana ekranu albo OnGameEnd; w autotescie okno zamyka sie samo po 1.5 s.
+  - Zapas: StoryWindow, a za nim ShowInquiry.
+  - Sekcje okna (napisy po angielsku): Coin (etykiety, "To your purse", "Your men's purses", "The crown will claim at dawn"), Gear and goods (Armour, Weapons and shields, Ammunition, Horses, Horse harness, Goods and supplies, Left on the field), Prisoners (Taken, Lords, Ransom worth about), The cost, Renown, "Finest spoils" (do 5, sam tekst), "In all".
+- Wpiecia (po jednej linii): Prologue.SceneGate "okno lupu" (Kronika i sceny prologu czekaja na lup); StoryPictures.AppTick (zwolnienie tekstury wstrzymane przy otwartym oknie); CitySack.Coin NoteSack; CitySack.Capture NoteCoin LChest; SiegeRansom.Act / Besieger NoteRansom; BattlefieldLaw.ApplyAll -> SpoilsReport.Apply (przed wylacznikiem prawa pola bitwy).
+- Klucze z P0 (grupa MCM "The law of the battlefield"): SpoilsWindowAfterBattle, SpoilsWindowAfterSiege, SpoilsWindowAfterTourney (v1 bez okna), SpoilsWindowMinWorth 0-5000. Wszystkie domyslnie TAK / 0.
+- Poprawki po recenzji (5e65b3f8):
+  - (1) Raport bitwy czeka na sakwy, dopoki dzialka gracza lezy w kolejce BattlefieldLaw (bitwa bez ekranu Spoils: zaciezny ROT, Spoils wyszedl wczesniej). Zwalnia ramka F albo straznik: pusta kolejka albo 2.5 h kampanii (termin _lootFlushDue +1 h sprawdzany w HourlyTick, czyli najpozniej 2 h).
+  - (2) Korona w kazdej ramce z roznicy Ransom178.PendingClaim plus czesc lupu z kies z OnBattleWon (BeatenPurse.SplitPostfix -> NoteCrownEarly). Korona CitySack zostaje tylko kontrola w logu.
+  - (3) Reszta ramki A to "Other"; "Purses and chests of the beaten" tylko z liczb BeatenPurse pkt 3 i EnemyCaravans.
+  - (4) Ramki S licza sakwy razem z rynsztunkiem bohaterow druzyny (bojowy, cywilny, skrytu).
+  - (5) "Finest spoils" bez ikon (ikony w v1.1).
+  - (6) Podpowiedz MCM Spoils Window After Tourney: "not in this version yet - the tourney window comes later, and until then this setting does nothing...".
+- Log: linia startu "Okno lupu (117): start | klucze ... | latki 11/11: gra 4/4, Spoils 7/7 | pola Spoils 7/7 | prefab ArmSpoilsWindow TAK|BRAK | GT Busy ...". Jedna linia na raport "Okno lupu (117): bitwa|oblezenie|okup N (bitew k) <miejsce> | A ...: zloto X = czesci + reszta, czas stal, sakiewka ludzi, sztuk, jency, slawa, korona ... | S trofea ... sztuki zgodne TAK/NIE | L ... | F sakwy ... | czeka na sakwy / sakwy przyszly ... | razem ... | pokazane|pominiete (powod) | okno: wlasne|zapas ... | sesja: ... potkniecia N". Osobne linie: "bitwa bez okna" i "sakwy bez raportu".
+- tools/sprawdz_logi.py: grupa p5lup (`python -I tools/sprawdz_logi.py --grupa p5lup <Armoury-*.log>`), wiersze LUP-S i LUP-0..LUP-8.
+**Ryzyko / co sprawdzic (kontrola calosci w kodzie):**
+- Recenzja (6 uwag, 1 major + 5 minor): wszystkie poprawione. (2) i (3) zrobione inaczej niz proponowal recenzent, bo jego wzor liczylby czesc lupu od wodzow dwa razy i pominal czesc z kies sprzed ramki (OnBattleWon). Termin czekania na sakwy 2.5 h zamiast proponowanych 1.5 h (wysypka najpozniej po 2 h).
+- Regresje: wszystko tylko odczyt. Nowe wywolania w cudzych miejscach (BeatenPurse pkt 3 i SplitPostfix, EnemyCaravans) to NoteCoin / PendingClaim / NoteCrownEarly we wlasnym try, bez zmiany kwot. Ransom178.PendingClaim tylko czyta _acc. W zwyklej bitwie ze Spoils kolejka jest pusta juz przy DoEnd (AfterGenerateLoot w OnMapEventEnded), wiec czekanie na sakwy sie nie wlacza. Kryjowka i "Send troops" przy oblezeniu lub na morzu wysypuja w ramce A.
+- Kolizje: korona liczona raz (CitySack NoteThird -> Ransom178 -> roznica; liczba CitySack tylko w logu). SceneGate dostaje +1 warunek: Kronika, sceny prologu i okna ROT czekaja, gdy raport jest gotowy albo okno otwarte. Czekajacy raport (Spoils / oblezenie / sakwy) nie blokuje bramki. Po scaleniu z 112: 120 CampInterrogation bierze migawke lochu ze zdarzenia OnPlayerBattleEndEvent (tylko odczyt) - nie zmienia ramki A.
+- Cudzy kod (dekompilacja): Spoils OnMapEventEnded / OnLootScreenClosed (liczy tylko sakwy), InventoryLogic.PartyEquipment (3 zestawy), MapEvent.OnBattleWon -> CalculatePlunderedAndLostGoldAmounts przed DoApplyMapEventResults, ItemRoster.AddToCounts usuwa zera (SharePending po wysypce = false).
+- Do sprawdzenia w grze:
+  - czy okno Gauntlet rysuje sie na mapie z ROTPanel (inaczej zapas StoryWindow: LUP-5);
+  - LUP-2 (tozsamosc zlota) i LUP-8 ("sakwy bez raportu" 0);
+  - LUP-3 moze dac NIE, gdy gracz na ekranie trofeow zdejmie wlasny rynsztunek do sakw (Spoils liczy go jako trofeum, my nie - zamierzone);
+  - wiersz "The crown will claim at dawn" po bitwie, gdy gracz jest wasalem w wojnie;
+  - oblezenie (G/R) i zaciezny ROT nie sprawdzone w autotescie.
+- Przy zatrzymanym czasie raport czekajacy na sakwy pokaze sie dopiero, gdy czas ruszy. Jesli autotest trzyma czas po bitwie bez ekranu Spoils, raportu nie bedzie (sprawdzic LUP-1/LUP-8).
+- Wgranie: DLL plus Armoury/GUI/Prefabs/ArmSpoilsWindow.xml do Modules\Armoury\GUI\Prefabs. Bez prefabu okno idzie zapasem StoryWindow, co mowi linia startu. Kluczy nie ma w Armoury.json Jeffa, dzialaja domyslne z kodu.
+- Build 0 bledow (6 ostrzezen jak dotad); md5 galezi 711a9e0a32c826c98a0c15b34f9a5e36 (pelna przebudowa 5e65b3f8) - do wgrania md5 scalenia noc/calosc. Gra NIE uruchamiana - test zbiorczy po scaleniu paczek (sesja glowna).
+**Status:** DO SPRAWDZENIA (galaz noc/p5-lup, scalone w noc/calosc, czeka na test zbiorczy).
+
+## 2026-10-25 116 (noc-p4 przeglad armii, galaz noc/p4-przeglad od noc/p0 5f590258; recenzja acd72c92) - opcja obozu "Review the army": ludzie wedlug rodzaju, konie i uprzaz, marsz, choragwie = 8 formacji Order of Battle gry
+
+**Problem:** Jeff 25.10 (plan "start"): "w obozie powinien byc opcja przeglad armii ... popup gdzie mamy pokazane wojsko, gdzie mozna stworzyc choragwie i przenosic wojsko i dodawac dowodcow ... potem jak sie uruchamia bitwa to tak tez podzielona jest od razu armia, do tego pokazane jest ile koni jest uzywanych i ile uprzezy".
+**Przyczyna:** brak takiego okna. Order of Battle gry mozna ustawic tylko na ekranie przed bitwa, a stan koni, uprzezy i kolumny marszu widac tylko w rozbitych liniach logu.
+**Zmiana (tylko Armoury; klucze ArmyReviewEnabled i ArmyReviewWritesOrderOfBattle z P0):**
+- ArmyReview.cs:
+  - opcja w arm_camp_wait (indeks 5) i w bk_camping_wait_menu (indeks 2). To menu oczekiwania, wiec z opcji tylko okno inquiry, bez SwitchToMenu i ExitToLast;
+  - lancuch okien z pauza: ludzie wedlug rodzaju (zdrowi i ranni); konie i uprzaz (SaddleLaw.Pairs: w uzyciu, wolne, brakujace, ilu pojdzie pieszo i dlaczego); marsz (MarchPace.Explain);
+  - choragwie = 8 formacji OOB: odczyt GetFormationDataAtIndex, kopia robocza, Save -> SetFormationInfos pola i armii (8 wpisow, oblezen nie ruszamy), odczyt kontrolny;
+  - walidacja: brakujacy rodzaj dostaje "the rest", przy 8 zajetych formacjach zapis jest odrzucany; wagi kazdej klasy sumuja sie do 100; bohaterowie odfiltrowani;
+  - nazwy choragwi w zapisie arm_army_review (NameOf dla P3).
+- ArmyReview.Battle.cs: linia kontrolna bitwy (formacje wobec zapisu OOB, czy ekran OOB byl pokazany; tylko odczyt).
+- ArmyReview.Test.cs: proba autotestu z flaga armoury-przeglad.flag, bez okien (T1 raport, T2 zapis i odczyt, T3 nazwy, T4 odmowa, T5 powrot, T6 ponowny zapis).
+- MarchPace.cs: dopisane tylko Column i Explain (ten sam CountColumn i Cap; ColumnPostfix bez zmian).
+- tools/sprawdz_logi.py: grupa p4przeglad (AR-0..AR-5).
+- Poprawki tekstow 8c13e197.
+- Poprawki recenzji acd72c92:
+  - hinty Commander i Companions in the ranks z zastrzezeniem o ekranie OOB;
+  - "Return to the game's own order" czynne takze przy Writes = NIE;
+  - OpenMen: liczba ludzi nie jest juz po cichu pomijana, reszte dostaje jawnie pierwsza inna choragiew rodzaju (komunikat gracza).
+- Integrator (noc/calosc, Settings.cs + gen_mcm): opisy MCM wpisane wedlug prosby paczki:
+  - ArmyReviewWritesOrderOfBattle: "with Army Review: the banners you set become the game's Order of Battle for your field battles. The share of each kind takes the field in every field battle; commanders, companions in the ranks and filters only when you command 20 men or more and the Order of Battle screen shows (after such a battle the game keeps what you actually deployed). Off = the review only shows the game's order; banners saved before stay until you use Return to the game's own order"
+  - ArmyReviewEnabled, koncowka: "Off = no option; banners saved before stay in the game's order - use Return to the game's own order before turning it off".
+
+**Ryzyko / co sprawdzic (kontrola calosci w kodzie):**
+- Regresje: tylko publiczne API OrderOfBattleCampaignBehavior, bez latek. Zapis pisze 8 wpisow, ktore spawn gry czyta w kazdej bitwie polowej. Dotyczy to obu stron (SandboxBattleSpawnModel nie sprawdza strony), tak samo jak porzadek zapisany przez sama gre.
+- Wynik recenzji (4 uwagi, wszystkie potwierdzone dekompilacja):
+  - (1) dowodcy i szeregi dzialaja tylko z ekranem OOB (warunek ekranu: CanPlayerSideDeployWithOrderOfBattleAux - gracz prowadzi strone, co najmniej 20 ludzi, nie wypad). Bez ekranu AssignBestCaptainsForTeam sam dobiera kapitanow, a HeroTroops czyta tylko SPOrderOfBattleVM.LoadConfiguration. Gra nadpisuje zapis tylko z ekranem (SaveConfiguration). Teksty poprawione.
+  - (2) zapis zostaje po wylaczeniu kluczy. Powrot jest czynny takze przy Writes = NIE. Przy ArmyReviewEnabled = NIE menu znika, wiec opisane w kluczu (integrator). Bez automatycznego czyszczenia (zasada 3).
+  - (3) liczba ludzi pierwszej choragwi rodzaju byla ignorowana przez Weights. Poprawione w OpenMen, Weights bez zmian.
+  - (4) md5: 20dd40dd i c0aa08f6 nieaktualne.
+- Po scaleniu z 112: "Question the prisoners" (120) ma indeks 4 w arm_camp_wait, "Review the army" indeks 5 - rozne id opcji.
+- W bitwie sprawdzic linie "bitwa": "ekran OOB TAK/NIE" wobec kapitanow.
+- Build 0 bledow (6 ostrzezen jak dotad). md5 galezi 7efc8b0e4ab5b81905d68eae2d006db1 (pelna przebudowa acd72c92) - do wgrania md5 scalenia noc/calosc. Gra NIE uruchamiana.
+
+**Status:** DO SPRAWDZENIA (scalone w noc/calosc; test zbiorczy: sesja glowna, `--grupa p4przeglad`).
+
+## 2026-10-25 115 (noc-p3 choragwie, galaz noc/p3-choragwie od 5f590258 = NOC-P0; 742a3542 + recenzja eb0acf09) - chorazy bez dziury w zbrojowni (A), wielu chorazych i sztandar polowy (B), kompanie po ok. 50 z dowodca i chorazym, upadek sztandaru albo dowodcy -> wstrzas morale i rzut na zalamanie wedlug tieru (C)
+
+**Problem:** Jeff 25.10 (plan zaakceptowany slowem "start"): "niech niosa sztandary ... choragwie po np. 50 ludzi i kazdy ma dowodce i sztandar i jak padnie sztandar lub dowodca to spada morale i choragiew moze sie zalamac, im wyzszy tier sredni tym mniejsza szansa". W grze jest 1 chorazy na formacje i tylko wtedy, gdy kapitan-bohater ma sztandar (GeneralsAndCaptainsAssignmentLogic -> SetFormationBanner). Smierc kapitana dziala jak kazda smierc (AgentMoraleInteractionLogic: najwyzej 10 sasiadow w 4 m). Na formacje jako calosc nie dziala nic. Rozpoznanie (noc/projekty/choragwie.json, krytyk K5/K6/K9/K10): kazda podmiana sprzetu chorazego robi dziure w ekonomii DTE.
+**Przyczyna:** BannerBearerLogic.CreateBannerEquipmentForAgent (rozstawienie) i Mission.SpawnAgent (posilki, mbfull Mission.cs:4239-4256, na klonie ekwipunku) czyszcza sloty 1-3 i wkladaja w slot 0 bron zastepcza kultury (SandboxBattleBannerBearersModel.GetBannerBearerReplacementWeapon). DTE przy spawnie zdejmuje ze zbrojowni przydzial (SpawnAgentPatch: Assignment.CreateEquipmentForArmoryConsumption), a po bitwie albo przy zgonie oddaje to, co jest w agent.SpawnEquipment (ProcessAgentEquipmentRespectingTemporarySlots; pomija IsBannerItem i sloty tymczasowe). Bron ze slotow 0-3 ginie (zdjeta, nie oddana), a bron zastepcza powstaje z niczego (oddana, choc nikt jej nie zdjal).
+**Zmiana (tylko Armoury; CrashScribe, GT, RC bez zmian):**
+- A, BannerKit (klucz StandardBearerKitSafe). Latki zakladane w kampanii przez NightHooks.InCampaign, raz na proces, przez AccessTools.DeclaredMethod; wejscie sprawdzane Harmony.GetPatchInfo (pulapka 15.10).
+  - Chwila, gdy czlowiek zostaje chorazym: zdarzenie gry BannerBearerLogic.OnBannerBearerAgentUpdated(agent, true) w BannerCompaniesMission albo rejestracja DTE posilku ze sztandarem (GarrisonKit.RegisterPostfix -> BannerKit.OnRegistered).
+  - Wtedy liczona jest roznica. Nietymczasowe sztuki slotow 0-3 przydzialu, ktorych DTE nie odda, ida na liste "odlozone do taborow". Postfiks DTE ProcessAgentEquipmentRespectingTemporarySlots oddaje je tym samym delegatem, raz na czlowieka: zwrot, gdy przezyje; odzysk albo lup wedlug DTE, gdy padnie.
+  - Bron zastepcza gry dostaje MarkSlotAsTemporary w slocie 0 (DTE jej nie odda ani nie zlupi).
+  - Zdarzenie (agent, false), czyli gra cofa podmiane: lista znika, a znak slotu 0 wraca do poprzedniego (sztuka tymczasowa m117/m119/sklad7, inaczej "odznaczenie" sztandarem).
+  - Sloty tymczasowe przydzialu (ubranie m117, kij m119, sloty lorda z niczego sklad7) nie sa traktowane jako zdjete.
+  - Linia "Choragwie (CH) ekonomia" (postfiks DTE OnEndMission): odlozone == oddane, znaki potwierdzone przy rozliczeniu.
+- B (klucze BannerCompaniesEnabled i FieldStandards; tylko przy czynnym A, czyli BannerKit.MoreAllowed, i z DefaultBattleMissionAgentSpawnLogic):
+  - Postfiks SandboxBattleBannerBearersModel.GetDesiredNumberOfBannerBearersForFormation: w bitwie polowej 1 -> k = liczba kompanii, najwyzej 6. Recenzja: k liczone z szeregowych (BannerCompanies.SoldiersOf) jak przy podziale.
+  - BannerCompaniesMission.OnDeploymentFinished biegnie przed BannerBearerLogic (Mission.cs:6740-6754 iteruje od konca). Formacja 0-7 od 2 ludzi bez sztandaru dostaje sztandar polowy campaign_banner_small (herb pana, -10% kary morale od strat), z wyjatkiem bandytow i umarlych (wiekszosc formacji).
+  - Formacja, ktora ma mniej chorazych niz chce model, dostaje ponowne SetFormationBanner. Liczba jest przeliczana tylko w gore (zmniejszenie = KeyNotFound w grze dla chorazego posilkow).
+- C, BannerCompanies (klucze BannerCompaniesEnabled, BannerCompanySize 50, BannerShockStandardLost 12, BannerShockCommanderLost 12, BannerBreakChance 0.5, BannerVictoryCheer, BannerCompanyMessages):
+  - Podzial: kazda formacja 0-7 dzielona na k kompanii (ponizej 0.6 x Size jedna, inaczej round(n / Size), najwyzej 6) wedlug rzutu pozycji na wektor w prawo formacji. Kompanie sa rowne liczebnie, liczone od lewej.
+  - Chorazy: chorazy gry stojacy w przedziale kompanii; gdy kompania ma juz chorazego, idzie do najblizszej bez chorazego.
+  - Dowodca: kapitan formacji w swojej kompanii; inni bohaterowie do najblizszej kompanii bez bohatera; reszta dostaje sierzanta (najwyzszy tier szeregowego AI).
+  - Takt 0.5 s plus OnAgentRemoved. Zdarzenia: upadek sztandaru (S = BannerShockStandardLost; podniesienie +S/2), upadek dowodcy (x1.5 bohater, x2 wodz), pierwszy raz polowa skladu.
+  - Wstrzas przez BattleMoraleModel.CalculateMoraleChangeToCharacter.
+  - Rzut raz na zdarzenie przy srednim morale ponizej 50: p = clamp(szansa x F x M / (0.5 x tier + 1), 0, 0.9).
+  - Zalamanie w 4 falach co 0.5 s przez RoutHold.Break(a, MissionTeams.Flee); bez RoutKeeper SetMorale(0). Bohaterowie i gracz sie nie lamia.
+  - Okrzyk zwyciezcow BattleCries.Cheer (najblizsza wroga formacja w 60 m) i zdarzenia StandardFell / CommanderFell / CompanyBroke dla dzwieku P2.
+  - Co 3 s przeglad: posilki i ludzie przeniesieni do innej formacji trafiaja do kompanii z najmniejsza liczba w szeregu.
+  - Komunikaty po angielsku, najwyzej 1 na 2 s: strona gracza (sojusznicy z przedrostkiem "Allied ") - sztandar, dowodca, zalamanie; wrog - tylko zalamanie.
+  - Linie "Choragwie (CH) start" i "Choragwie (CH) koniec" oraz segment "choragwie" w linii "Bitwa (NB2)".
+- GarrisonKit:
+  - `_markTemp` / `_isTemp` zmienione na internal.
+  - Wolanie BannerKit.OnRegistered w RegisterPostfix.
+  - Recenzja: chorazy ze sztandarem od spawnu z kijem m119 jest liczony osobno, poza kontrola tymczasowych. Nowy fragment linii "Bitwa gracza (sklad7b, nic z niczego; ...)": "chorazowie ze sztandarem od spawnu (posilki) z kijem N".
+- tools/sprawdz_logi.py: grupa "choragwie" (CH-0..CH-5).
+**Ryzyko / co sprawdzic (kontrola calosci w kodzie):**
+- Ekonomia ("nic z niczego"): sztandar polowy nie trafia do zadnego rosteru (DTE pomija IsBannerItem). Odlozone sa oddawane tym samym delegatem DTE, raz na czlowieka (flaga Paid). Bron zastepcza jest tymczasowa. B dziala tylko przy czynnym A, bo inaczej dziura rosnie do 6x na formacje. W logu: "Choragwie (CH) ekonomia ... (zgodne)", nierozliczeni zywi 0.
+- Regresje i kolizje: znak slotu 0 nadpisuje kij m119 tylko u chorazego i wraca przy cofnieciu. RoutHold.Break dostaje miejsce z MissionTeams (kontrakt P0), a nie SiteBanner. Kod jest bez wylacznika: potkniecia liczone w RoutHold.SiteBanner ("choragiew" w NB2). BannerCompanies dziala bez Harmony i bez zmian wizerunkow; nic nie biegnie co klatke na agenta (tick tylko licznik czasu).
+- Koszt: przeglad co 3 s idzie po Mission.Agents. Postfiks liczby chorazych biegnie tez przy kazdym spawnie szeregowego posilku do formacji ze sztandarem (GetMissingBannerCount) i przechodzi wtedy po ludziach formacji; formacje ponizej 75 ludzi (przy 50) sa pomijane bez przegladu.
+- Recenzja 25.10 (4 uwagi minor), wszystkie poprawione w eb0acf09:
+  1. Falszywe "NIEZGODNE - u N agentow kij NIE jest sztuka tymczasowa" przy chorazych posilkow z kijem. Mission.SpawnAgent podmienia sprzet przed rejestracja DTE. Ekonomia byla w porzadku.
+  2. Liczba chorazych liczona z CountOfUnits (razem z bohaterami i umarlymi), a kompanie z szeregowych: 74 + 3 bohaterow dawalo 2 chorazych przy 1 kompanii. Teraz ta sama populacja. Uwaga do recenzji: model jest wolany przy kazdym spawnie posilku, a nie rzadko, dlatego jest tani prog.
+  3. Komunikaty sojusznikow brzmialy jak wlasne formacje gracza. Teraz maja "Allied ".
+  4. Dwa md5: 3ca6e670 to pelna przebudowa 742a3542 (sprawdzone), 20dd40dd nie pochodzi z tego commitu. md5 galezi eb0acf09: bd1d9a7fec96401420e83d0c5986c422.
+- Do sprawdzenia w autotescie: linia "Latki nocy (K3): kampania | choragwie: liczba chorazych TAK, zwrot DTE TAK ..., A czynne TAK". "Choragwie (CH) start" bez potkniec i bledow SetFormationBanner; "nadmiarowi chorazowie" ma byc 0 albo bliskie 0. W "Choragwie (CH) ekonomia" odlozone == oddane. Fragment m119 "zgodne" przy chorazych z kijem. `sprawdz_logi.py --grupa choragwie`.
+- P3 nie ma okien, wiec autotest nie stanie.
+- Build 0 bledow (6 ostrzezen jak dotad). DLL zawiera hash commitu - do wgrania md5 scalenia noc/calosc. Gra NIE uruchamiana.
+
+**Status:** DO SPRAWDZENIA (scalone w noc/calosc; test zbiorczy i wgranie robi sesja glowna).
+
+## 2026-10-25 114 (noc-p1 marsz i doktryny, galaz noc/p1-marsz: 414d4660, 6154f80d, recenzja ad47fc0c; baza noc/p0 5f590258 od a14c76d3 = WGRANE 111)
+
+**Problem:** Jeff 25.10 (plan przyjety slowem "start"): "armie nie biegly non stop tylko szly ... dopiero jak jest szarza to jest okrzyk i biegna na siebie, aby nie tracic sil", "taktyki sredniowiecznej bitwy ... pod wzgledem kultury np. Dothrakowie walcza inaczej niz Lannisterowie", "jesli jedna strona widzi, ze druga nie ma lucznikow, to najpierw wykorzystuje lucznikow", "kawaleria stara sie flankowac". W grze dzis: FieldCraft co 0.2 s nadpisuje limit predkosci kazdemu czlowiekowi, wiec szyki biegna od rozstawienia. Pod RBM o taktyce decyduje tylko kultura dowodcy, a ok. 28 kultur ROT ma wylacznie FullScaleAttack i linie obronna. RangedHarrass dostaje tylko khuzait.
+**Przyczyna:** brak marszu stepem (gra i RBM nie maja fazy podejscia). Brak doktryn kultur ROT (RBM Tactics.cs, EarlyStart). RBM zdejmuje konnicy BehaviorFlank.
+**Zmiana (tylko Armoury):**
+- M0 FieldCraft (klucz SpeedCapOnlyWhenWinded): limit predkosci tylko przy karze (zadyszka, rany, chod). Po karze jednorazowo -1. W marszu Min(limit x pelna, cap marszu). NIE = stary zapis co 0.2 s.
+- M1 MarchToContact (MarchToContactEnabled i suwaki): stan per szyk co 0.5 s, postfiksy CacheMovementSpeedOfUnits i AdjustSpeedLimit (po com.rbmai). Piechota stepem 1.8 m/s x MarchStepPace (daleko od wroga najwyzej 2.0 m/s). Lucznicy pieszo do ArchersWalkUntil, konnica klusem do CavalryGallopDistance. Szyki gracza na Advance/Move ida stepem. Bieg dopiero na sygnal BattleCries.ChargeStarted albo rozkaz szarzy, zwarcie 25 m, galop. Smoki ROT pominiete.
+- M2 Doctrine + WarCouncil (CultureDoctrines): 30 profili kultur ROT jako mnozniki wag 8 taktyk gry (Shock/Shot/Horse/Hold, postfiksy GetTacticWeight, Priority.Last po com.rbmai), od Tactics 30. +RangedHarrassmentOffensive w ataku i obronie: waga 0, gdy druzyna ma ponizej 10% strzelcow (prog w postfiksie, bo w AfterStart ludzi jeszcze nie ma; lista RBM khuzait bez zmian). +TacticCharge dla dzikich. Druzyna gracza bez doktryny. Rada wojenna biegnie takze przy CommanderTactics NIE. DR przez LateTeam.
+- S1 ShootBeforeAttacking / ShootFirstSeconds: nasze strzelectwo >= 15% przy slabym strzelectwie wroga daje Shot x2.5. Koniec po czasie (x ShootSec kultury), po stracie polowy strzelcow albo w zwarciu - wtedy x0.3.
+- S3 CavalrySeeksFlanks i S4 ArchersFallBackBehindInfantry / ArcherFallBackDistance: kod jest, klucze domyslnie NIE (v1.1 w ZAKRESIE krytyka, krytyk.txt:253). S3: postfiks Attack przywraca konnicy skrzydel BehaviorFlank z waga Flank doktryny; przy Flank >= 1.2 RBM ChargeInfantry = false. S4: lucznicy za glowna piechote (ScreenedSkirmish 2, reszta wag 0), kopia wag wedlug obiektu zachowania. Zdarzenia FlankRide / ArchersFellBack (Doctrine.Events.cs).
+- Segmenty ' | marsz ' i ' | doktryna ' w linii "Bitwa (NB2)" (doktryna z licznikiem "waga 0 ponizej 10% strzelcow"). tools/sprawdz_logi.py: grupa --grupa marsz (MRS-0..MRS-8).
+- Opis MCM Culture Doctrines tylko o tym, co v1 robi; gen_mcm (Armoury 2458 ustawien).
+**Ryzyko / co sprawdzic (CLAUDE.md 8.0):**
+- Recenzja (4 uwagi, wszystkie prawdziwe, poprawione):
+  (1) major S4: kopia wag wedlug pozycji, a FormationAI.FindBestBehavior (co 0.5 s) przenosi wybrane zachowanie na indeks 0 (FormationAI.cs:201-206) - powrot wpisywal wagi innym zachowaniom (lucznicy mogli szarzowac albo stac). Teraz pary (zachowanie, waga) i ReferenceEquals.
+  (2) S3/S4 poza v1 - teraz domyslnie NIE. Prog 10% RangedHarrass w postfiksie wagi; wariant z recenzji (RangedRatio w ApplyList) odrzucony, bo w AfterStart RangedRatio = 0 (BattleDeploymentMissionController.cs:30-44).
+  (3) opis MCM poprawiony.
+  (4) md5: 6154f80d = 897de46d (zmierzone osobna przebudowa), 20dd40dd bylo z innego stanu.
+- Autotest: MRS-0 'Latki nocy (K3)' marsz 2/2, GetTacticWeight 8/8, Attack 2/2. MRS-1 potkniecia marsz/doktryna 0. MRS-3 predkosc w marszu 1.2-2.4 m/s, w szarzy > 3.0. MRS-5 szarze z sygnalu > 0 (P2 scalone w noc/calosc - BattleCries wola ChargeStarted). MRS-6 druzyn z doktryna > 0. MRS-7 stare zapisy 0.2 s = 0. "waga 0 ponizej 10% strzelcow" > 0 tylko u stron z mala liczba strzelcow.
+- Kolizje: postfiksy GetTacticWeight / Attack / AdjustSpeedLimit po RBM (Priority.Last, after com.rbmai) - po scaleniu (noc/calosc) zadna inna paczka nie lata tych celow. WarCouncil.One woluje Doctrine.ApplyList na koncu (rada w osobnym try). FieldCraft M0 zmienia zachowanie przy kluczu TAK (NIE = stare). Zeby wlaczyc S3/S4 przed testem, wystarczy jedna linia w Settings.cs + gen_mcm (decyzja integratora/Jeffa).
+- Autotest NIE sprawdzi: wygladu marszu i chodu, realnego objazdu flanki (S3 wylaczone).
+- Build Armoury: 0 bledow, 6 starych ostrzezen. md5 galezi ad47fc0c = cd4749c778e6109a7677d7ad3e2de735 - do wgrania md5 scalenia noc/calosc. CrashScribe, GrandTourney, RealisticCaptivity, ForgeView bez zmian DLL. Nie testowane w grze.
+**Status:** DO SPRAWDZENIA (niewgrane; scalone w noc/calosc; autotest i wgranie - sesja glowna).
+
 ## 2026-10-25 NOC-P0 (baza nocy, galaz noc/p0 od a14c76d3 = WGRANE 111) - klucze, kontrakty i wolania szesciu paczek bitwy; funkcje puste (szkielety)
 
 **Problem:** Jeff 25.10 00:36-02:30 (plan zaakceptowany slowem "start"): "chce aby bitwa wygladala tak jak w sredniowieczu ... armie nie biegly non stop tylko szly ...
