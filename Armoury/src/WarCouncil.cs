@@ -31,6 +31,10 @@ namespace Armoury
     ///  - bez dubli typow; kazde dodanie we wlasnym try (potkniecie liczone, funkcja dalej dziala).
     /// Lista taktyk (TeamAIComponent._availableTactics) czytana tylko na glownym watku w AfterStart - gra iteruje ja w MakeDecision z ticku druzyn,
     /// ktory przy ticku asynchronicznym konczy sie przed OnPreMissionTick (Mission.cs:3532), wiec bez wyscigu.
+    /// noc 25.10 P1 (M2 doktryny kultur, Doctrine.cs): na koncu One - Doctrine.ApplyList (mnozniki wag i dodatki listy wedlug kultury strony; ta sama kultura
+    /// i ten sam Tactics co tutaj). Rada biegnie takze przy CommanderTactics NIE, gdy wlaczona doktryna albo manewry (Doctrine.AnyKey) - wtedy
+    /// lista wedlug dowodcy bez zmian (jak przy kluczu NIE), tylko doktryna. Druzyny DynamicReinforcements (powstaja w trakcie bitwy) - LateTeam z Doctrine.Tick,
+    /// z Tactics i kultura strony zapamietanymi w Council.
     /// </summary>
     internal static class WarCouncil
     {
@@ -46,6 +50,10 @@ namespace Armoury
         private static bool _fieldsDone;
         private static Type _tSplitAtt, _tSplitDef;
         private static bool _typesDone;
+        // noc 25.10 P1: Tactics i kultura stron z Council (dla poznych druzyn DR); misja, dla ktorej sa wazne
+        private static int _tacA, _tacD;
+        private static string _culA, _culD;
+        private static WeakReference _sideOf;
 
         internal static void ResetCounters()
         {
@@ -86,8 +94,9 @@ namespace Armoury
         internal static void Council(Mission m)
         {
             var c = Settings.Current;
-            if (c == null || !c.CommanderTactics || m == null) return;
-            if (!m.IsFieldBattle) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _notField++; } return; }
+            _sideOf = null;
+            if (c == null || m == null || (!c.CommanderTactics && !DoctrineWanted(c))) return;
+            if (!m.IsFieldBattle) { if (c.CommanderTactics) lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _notField++; } return; }
             Fields();
             Types();
             var logic = m.GetMissionBehavior<MissionCombatantsLogic>();
@@ -107,6 +116,8 @@ namespace Armoury
                 if (bc.Side == BattleSideEnum.Attacker) { if (t >= tacA) { tacA = t; if (cu != null) culA = cu; } }
                 else if (bc.Side == BattleSideEnum.Defender) { if (t >= tacD) { tacD = t; if (cu != null) culD = cu; } }
             }
+            _tacA = tacA; _tacD = tacD; _culA = culA; _culD = culD;
+            _sideOf = new WeakReference(m);
 
             var teams = m.Teams;
             int n = teams != null ? teams.Count : 0;
@@ -115,20 +126,35 @@ namespace Armoury
                 Team team = null;
                 try { team = teams[i]; } catch { team = null; }
                 if (team == null) continue;
-                try { One(m, team, team.Side == BattleSideEnum.Attacker ? tacA : tacD, team.Side == BattleSideEnum.Attacker ? culA : culD); }
+                try { One(m, team, team.Side == BattleSideEnum.Attacker ? tacA : tacD, team.Side == BattleSideEnum.Attacker ? culA : culD, false); }
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SiteTactics, "WarCouncil.Druzyna", e); }
             }
         }
 
-        private static void One(Mission m, Team team, int tac, string culture)
+        private static bool DoctrineWanted(Settings c) { return Doctrine.AnyKey(c); }
+
+        /// <summary>noc 25.10 P1: druzyna, ktora pojawila sie po AfterStart (DynamicReinforcements - TeamAIGeneral z kopia taktyk) - ta sama rada i doktryna,
+        /// Tactics i kultura jej strony z Council tej misji. Glowny watek (Doctrine.Tick). Brak danych Council (inna misja, klucze NIE) - nic.</summary>
+        internal static void LateTeam(Mission m, Team team)
+        {
+            var w = _sideOf;
+            if (m == null || team == null || w == null || !ReferenceEquals(w.Target, m) || _fTactics == null) return;
+            bool att = team.Side == BattleSideEnum.Attacker;
+            try { One(m, team, att ? _tacA : _tacD, att ? _culA : _culD, true); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteTactics, "WarCouncil.PoznaDruzyna", e); }
+        }
+
+        private static void One(Mission m, Team team, int tac, string culture, bool late)
         {
             if (!MissionTeams.Valid(team) || !team.HasTeamAi) return;
             if (team.Side != BattleSideEnum.Attacker && team.Side != BattleSideEnum.Defender) return;
             var ai = team.TeamAI;
             if (!(ai is TeamAIGeneral)) return;
-            if (team.IsPlayerTeam) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _player++; } return; }
+            var cs = Settings.Current;
+            bool council = cs != null && cs.CommanderTactics;
+            if (team.IsPlayerTeam) { if (council) lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _player++; } return; }
             var list = _fTactics.GetValue(ai) as List<TacticComponent>;
-            if (list == null) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _noData++; } return; }
+            if (list == null) { if (council) lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _noData++; } return; }
             var have = new List<Type>(list.Count + 4);
             var old = new List<TacticComponent>(list.Count);
             for (int i = 0; i < list.Count; i++) { var t = list[i]; if (t != null) { have.Add(t.GetType()); old.Add(t); } }
@@ -137,7 +163,8 @@ namespace Armoury
             int added = 0, dupes = 0, noType = 0;
             int kind;   // 0 bez zmian, 1 tlum, 2 konnica i obrona, 3 okrazenie
 
-            if (tac < HordeBelow)
+            if (!council) { kind = -1; }
+            else if (tac < HordeBelow)
             {
                 kind = 1;
                 bool wasCurrent = false;
@@ -187,7 +214,15 @@ namespace Armoury
             }
             else { kind = 0; note.Append("bez_zmian"); }
 
-            string sample = "T" + tac + "/" + (culture ?? "?") + "/" + note.ToString();
+            // noc 25.10 P1 (M2): doktryna kultury strony - mnozniki wag i dodatki listy (we wlasnym try - rada zostaje, gdy doktryna sie potknie)
+            if (DoctrineWanted(cs))
+            {
+                try { Doctrine.ApplyList(m, team, tac, culture, have, note, late); }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.ApplyList", e); }
+            }
+            if (!council) return;
+
+            string sample = "T" + tac + "/" + (culture ?? "?") + "/" + note.ToString() + (late ? "/DR" : "");
             lock (RoutHold.Gate)
             {
                 RoutHold.EnsureLocked(m);
@@ -208,6 +243,13 @@ namespace Armoury
         {
             for (int i = 0; i < have.Count; i++) if (have[i] == t) return true;
             return false;
+        }
+
+        /// <summary>noc 25.10 P1: dodanie taktyki dla doktryny (Doctrine.ApplyList) - ta sama droga co rada (bez dubli, wyjatek liczony).</summary>
+        internal static bool TryAdd(Team team, List<Type> have, Type t, StringBuilder note)
+        {
+            if (team == null || have == null || note == null || Has(have, t)) return false;
+            return Add(team, have, t, note);
         }
 
         /// <summary>Nowa taktyka typu t dla druzyny (publiczny konstruktor (Team) - jak gra i RBM); wyjatek liczony, reszta listy zostaje.</summary>

@@ -9692,7 +9692,7 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool PlayerMoveOrderWalks { get; set; } = true;
 
-        [SettingPropertyBool("Culture Doctrines", HintText = "AI armies fight by their culture's doctrine: Dothraki circle and shoot, the Vale and the Reach lead with heavy horse, the Unsullied march in lockstep, wildlings rush, the Riverlands hold the fords, the Lannisters weigh centre and wings. The commander's Tactics decides how much of it he can carry out. Your own team's AI is left as it is. Off = RBM's culture tactics and Commander Tactics only, as before", RequireRestart = false)]
+        [SettingPropertyBool("Culture Doctrines", HintText = "AI armies weigh their battle plans by their culture's doctrine: the Dothraki favour shooting and horse and seldom hold a line, the Vale and the Reach lead with heavy horse, the Iron Islanders and the Stormlands go straight in, wildlings prefer a headlong charge, the Riverlands, the Crownlands and the Night's Watch hold the line and shoot. Commanders below Tactics 30 lead a mob without a doctrine. Your own team's AI is left as it is. Off = RBM's culture tactics and Commander Tactics only, as before", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool CultureDoctrines { get; set; } = true;
 
@@ -9704,13 +9704,13 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public int ShootFirstSeconds { get; set; } = 90;
 
-        [SettingPropertyBool("Cavalry Seeks Flanks", HintText = "AI cavalry goes round a pinned enemy and strikes his archers and flanks instead of only charging the front", RequireRestart = false)]
+        [SettingPropertyBool("Cavalry Seeks Flanks", HintText = "AI cavalry goes round a pinned enemy and strikes his archers and flanks instead of only charging the front. Trial - off by default until tested", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
-        public bool CavalrySeeksFlanks { get; set; } = true;
+        public bool CavalrySeeksFlanks { get; set; } = false;
 
-        [SettingPropertyBool("Archers Fall Back Behind Infantry", HintText = "AI archers withdraw behind their infantry when enemy foot or horse comes within Archer Fall Back Distance, and step out again once it is pushed back", RequireRestart = false)]
+        [SettingPropertyBool("Archers Fall Back Behind Infantry", HintText = "AI archers withdraw behind their infantry when enemy foot or horse comes within Archer Fall Back Distance, and step out again once it is pushed back. Trial - off by default until tested", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
-        public bool ArchersFallBackBehindInfantry { get; set; } = true;
+        public bool ArchersFallBackBehindInfantry { get; set; } = false;
 
         [SettingPropertyFloatingInteger("Archer Fall Back Distance", 20.00f, 100.00f, "0", HintText = "with Archers Fall Back Behind Infantry: how close (metres) the enemy may come before the archers withdraw", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
