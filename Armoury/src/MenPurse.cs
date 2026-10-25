@@ -84,7 +84,7 @@ namespace Armoury
             }
         }
 
-        private static int SavedOf(MobileParty mp) { int v; var k = Key(mp); return k != null && _saved.TryGetValue(k, out v) ? v : 0; }
+        internal static int SavedOf(MobileParty mp) { int v; var k = Key(mp); return k != null && _saved.TryGetValue(k, out v) ? v : 0; }
         /// <summary>E5/A3 (163): oszczednosci K1, ktore markietani chronia dzis w sakiewce partii - ta sama regula co CampPlan (limit OnLeft: MenGearSaveDays
         /// x zold TERAZ minus zalegle naprawy). Tylko odczyt (linia markietanow: "w tym oszczednosci K1"). Bez wlasnego catch - wyjatek liczy Sutlers.</summary>
         internal static int KeptFor(MobileParty mp)

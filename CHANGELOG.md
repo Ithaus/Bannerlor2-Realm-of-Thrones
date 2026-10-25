@@ -1,5 +1,46 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 133e (galaz noc/133-raport-armii) - Armoury: okno armii "Pay" -> Pay (linie gry z jednego wywolania, ostatnia wyplata) / Who gets what (rozdzial najwiekszych reszt, towarzysze, rycerze, Straz/WL) / Where it goes
+**Problem:** Jeff 25.10 ok. 12:57: "... przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold ...". Dotad zold druzyny gracza byl tylko w dymku
+zlota gry (suma) i w liniach doby logu ("Towarzysze (CW): dzien N ... zold druzyny gracza: przed (BK) 475 -> po 303", "Zold:", "Sakiewka ludzi:") - w oknie armii nic: ani linii
+modelu, ani ile bierze typ / towarzysz / rycerz, ani czy wczoraj zaplacono, ani dokad zold idzie.
+**Przyczyna:** brak strony zoldu w oknie "Review the army" (projekt 2.5 z krytyka K10, K11, K12).
+**Zmiana:** (1) Nowy Armoury/src/ArmyReview.Pay.cs, wiersz "Pay: 303 denars a day (+ N to knights) (last paid in full / last pay short X%)" -> okno Pay / Who gets what / Where it
+goes (Look/Back, strony wracaja do niego). PAY: naglowek i linie z JEDNEGO wywolania PartyWageModel.GetTotalWage(druzyna, roster, true) (K10 - BK GetHeroWage losuje zaokraglenie
+bohaterow spoza CW, osobne TotalWage i TotalWageExplained moglyby sie roznic); wynik (int) = to, co gra pobiera; linie gry jak sa, mnozniki w procentach (rodzaj linii z
+ExplainedNumber._explainer - ta sama refleksja co Speed 133d), reszta bez nazwy jako "Other", "= wynik - the game takes whole denars"; zloto i na ile dni (zold + rycerze);
+ostatnia wyplata (K12): nowy zapis w SoldierPay.WagePostfix dla druzyny gracza (kiedy, ile gra wziela = min(zold, budzet), odsetek niezaplacony ustawiony przez gre w tym samym
+wywolaniu - HasUnpaidWages), bez zapisu w save - po wczytaniu stan gry (HasUnpaidWages); legenda Base (BaseWage BK) i zdanie o ujemnej linii towarzysza. WHO GETS WHAT:
+towarzysze z regula CW - wyplata z tabeli x czynniki partii (nowe CompanionWage.FactorOf/ShareOf - ta sama regula co PayFromWage przy pelnej wyplacie, czynnik z TEGO SAMEGO
+wywolania; PartyFactor i Pay woluja je teraz, liczby bez zmian), w kolejnosci rosteru, najwyzej wynik; RESZTA wyniku metoda najwiekszych reszt (calkowite) proporcjonalnie do wag
+z podstawy BK (K10): szeregowi (int)max(stawka w zoldzie partii x BaseWage BK, 1) x placeni (AidCorps - bez rannych; stawka przez nowe MountedWage.InParty - Straz/WL 0 i premia
+konnego wedlug partii, jak WagePostfix w kontekscie zoldu partii), bohaterowie bez CW - czesc (1) BK (poza glowami rodow) + ich linia z rozpiski; suma wierszy + nierozdzielone =
+wynik. Rycerze (K11): czesc zoldu z ich linii BK ("his Banner Kings line N") i osobno zold rycerza GentryService (nowe IsKnightIn/KnightWageOf - ta sama regula co Pay) - bez tezy
+"not part of the pay above". Typ: "Northern Spearman x12, tier 3, rider: 76 a day (6 a man; party screen 5)"; Straz/WL: "no coin by the Watch's rule, Banner Kings still counts
+1 a man" (BK bierze max(0 x 1.25, 1) - fakt, nie zmieniany); jezdziec "x1.5 by his troop, with or without a horse" (decyzja (b) - tylko pokazac). WHERE IT GOES: jak SoldierPay.Route
+- towarzysze CW do swoich kies, reszta (takze czesc rycerzy i innych bohaterow) do sakiewki ludzi albo nikomu (Soldier Pay To Purse / Men Purse Enabled / nieumarli / caly obieg
+wylaczony - nowe SoldierPay.RoutesWage), rycerze osobnym przelewem; sakiewka ludzi teraz, w tym odlozone na lepszy sprzet (MenPurse.SavedOf - teraz internal), zalegle naprawy
+(TroopSelfMend.OutstandingCost), jedzenie w jednostkach (FoodChange, dni) - bez wyceny w zlocie (gra jej nie ma). (2) Linia "raport": segment "zold (133e)" (wynik, linie, Other,
+rodzaje linii, czynnik, BaseWage, SAMOSPRAWDZENIE linii "Base" BK wobec wag szeregowych + czesci (1) wszystkich bohaterow - ZGODNA/ROZJAZD/bez porownania (Picked Shots), tylko log
+(K10); rozdzial: towarzysze, reszta na wagi, nierozdzielone, "suma wierszy = wynik TAK/NIE"; rycerze, Straz/WL, AidCorps, obieg, zloto, ostatnie pobranie, ms) i "strony zoldu
+(133e)"; format AR-2 bez zmian. (3) Test T1: strony Pay/Who/Where w "najdluzszej"; suma wierszy = wynik (TAK/NIE); samosprawdzenie Base i TotalWage gry z osobnego wywolania - INFO.
+Podpowiedz opcji menu: "what you pay them, who gets it and where it goes". Nowe akcesory (tylko odczyt): CompanionWage.BkPerMan/Part1/BaseWageNow (BkPart1 = Part1 z BaseWage
+sesji - ta sama formula). Bez nowych kluczy MCM (bez gen_mcm).
+**Ryzyko / co sprawdzic:** Kontrola calosci w kodzie: (1) Regresje - CompanionWage: BkPart1/PartyFactor/Pay przepisane na wspolne funkcje 1:1 (te same wyrazenia, ta sama
+kolejnosc dzialan double); SoldierPay.WagePostfix: jedna linia zapisu przed dotychczasowa logika (ReferenceEquals z MainParty, wlasny try) - rekordy, liczniki i przekazania bez
+zmian; MenPurse.SavedOf tylko widocznosc; MountedWage/GentryService - nowe funkcje, stare bez zmian. (2) Kolizje - okno woluje model zoldu gry (jak dymek zlota gry): nasze
+postfiksy GetTotalWage (CW wodz, MountedWage kontekst/WW-J) licza jak dla gry, bez stanu; licznik BkrotChains zoldu +1..N na otwarcie okna (linia doby "zold N"); BK GetHeroWage
+zuzywa MBRandom dla bohaterow spoza CW (rycerze) - powtarzalnosc autotestu. Straznik glebokosci BkrotChains (MaxDepth 4) - stawka jednostki w oknie i w zoldzie partii ta sama
+droga lancucha ROT. (3) Spojnosc - jedna regula na zjawisko: wynik i linie z jednego wywolania; towarzysze ta sama funkcja co ich wyplata; rycerz - ta sama regula co jego zold;
+reszta rozdzielona bez drugiej formuly (wagi z podstawy BK, kopia formuly BK tylko jako wagi + samosprawdzenie wobec linii "Base" w logu). Znane rozjazdy samosprawdzenia (log,
+nie blad okna): najemnicy kariery BK x3, Picked Shots (bez porownania), BaseWage ogniwa rozna od sesji. Mozliwe podwojne pobranie u rycerza (linia BK + 24) - fakt pokazany,
+sprawdzenie osobnym tematem (K11). (4) Cudzy kod - BK BKPartyWageModel (wageC): czesc (1) dla bohaterow poza glowa rodu, GetHeroWage dla bohaterow poza wodzem i graczem, linie
+z imieniem (scalane przy tym samym imieniu - liczone raz, "wspolne imiona" w logu), Culture null pominiete; gra DefaultClanFinanceModel.CalculatePartyWage/ApplyMoraleEffect
+(HasUnpaidWages = 1 - wziete/zold, ustawione przed powrotem - postfiks widzi wartosc tego wywolania). (5) Koszt: jedno wywolanie modelu zoldu + stawki typow przy otwarciu okna.
+Sprawdzic w grze: w obozie "Review the army" -> "Pay" -> trzy strony; linia "raport" z "zold (133e): ... podstawa ... ZGODNA ... suma wierszy N = wynik TAK"; po pierwszym takcie
+doby "Last pay day <data> (today): paid in full, N denars."; test T1 "zold (133e) TAK".
+**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+
 ## 2026-10-25 133d (galaz noc/133-raport-armii) - Armoury: okno armii "Horses and harness" z podgladu bitwy (ile koni i uprzezy kupic, przeniesc, ile bezczynnych) i "On the march" -> Speed / Herd / Column
 **Problem:** Jeff 25.10 ok. 12:57: "... przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold, jakie konie jaka predkosc ile koni i ile
 zbroi potrzeba aby wojsko jechalo na koniach, ile brakuje ile za duzo koni i jest herding". Dotad strona "Horses and harness" liczyla SaddleLaw.Pairs (arytmetyka z rannymi,

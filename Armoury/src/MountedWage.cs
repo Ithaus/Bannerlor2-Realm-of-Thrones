@@ -98,6 +98,20 @@ namespace Armoury
             catch { return 0; }
         }
 
+        /// <summary>133e (okno armii "Pay", tylko odczyt): stawka jednostki tak, jak widzi ja zold partii mp (GetTotalWage - kontekst _party/_total, WagePostfix):
+        /// Straz i Wolni Ludzie 0 (CrownGifts.IsUnpaidParty), inaczej premia konnego wedlug partii (Apply/PartyPays). Ta sama regula co WagePostfix.</summary>
+        internal static int InParty(CharacterObject c, MobileParty mp)
+        {
+            var m = Campaign.Current != null ? Campaign.Current.Models.PartyWageModel : null;
+            if (m == null || c == null) return 0;
+            int raw = Raw(m, c);
+            if (!c.IsHero && raw > 0 && mp != null && CrownGifts.IsUnpaidParty(mp)) return 0;
+            return Apply(raw, c, mp);
+        }
+
+        /// <summary>133e: czy stawka jednostki w zoldzie partii mp ma premie konnego (warunki Apply bez stawki).</summary>
+        internal static bool PremiumFor(CharacterObject c, MobileParty mp) { return On && c != null && !c.IsHero && c.IsMounted && PartyPays(mp); }
+
         // ------------------------------------------------------------ kontekst partii: GetTotalWage (zold partii) i CheckRecruiting (werbunek AI)
         public static void PartyPrefix(MobileParty __0, out TotalCtx __state) { __state = new TotalCtx { P = _party, T = _total }; _party = __0; _total = false; }   // werbunek AI: cena, nie zold partii
         public static Exception PartyFinalizer(Exception __exception, TotalCtx __state) { _party = __state.P; _total = __state.T; return __exception; }

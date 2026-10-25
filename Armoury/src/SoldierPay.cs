@@ -122,8 +122,31 @@ namespace Armoury
         private static object _netTriedFor, _regTriedFor;  // model tej kampanii, dla ktorego juz sprawdzalismy
         private static bool _regReady;
 
+        // 133e (K12, tylko odczyt okna armii "Pay"): ostatnie pobranie zoldu druzyny gracza przez gre (CalculatePartyWage z applyWithdrawals) - kiedy, ile gra
+        // wziela (min(zold, budzet)) i odsetek niezaplacony ustawiony przez gre w tym samym wywolaniu (ApplyMoraleEffect -> HasUnpaidWages). Bez zapisu; Reset.
+        internal static bool LastPlayerWageKnown;
+        internal static CampaignTime LastPlayerWageAt;
+        internal static int LastPlayerWagePaid;
+        internal static float LastPlayerWageUnpaid;
+
+        /// <summary>133e: czy zold w ogole idzie dalej (Route) - ktorakolwiek czesc mechanizmu wlaczona; inaczej zold schodzi z kiesy i nikt go nie dostaje.</summary>
+        internal static bool RoutesWage { get { return Watching; } }
+
+        private static void NotePlayerWage(MobileParty mp, int paid)
+        {
+            try
+            {
+                LastPlayerWageAt = CampaignTime.Now;
+                LastPlayerWagePaid = paid;
+                LastPlayerWageUnpaid = mp.HasUnpaidWages;
+                LastPlayerWageKnown = true;
+            }
+            catch { }
+        }
+
         internal static void Reset()
         {
+            LastPlayerWageKnown = false; LastPlayerWageAt = CampaignTime.Zero; LastPlayerWagePaid = 0; LastPlayerWageUnpaid = 0f;   // 133e (K12)
             _clan = null; _recs.Clear(); _haveNet = false; _netModel = null; _netDecl = null; _debtBefore = 0;
             _paidToday.Clear(); _castlePay.Clear(); _errLogged = false;
             _held.Clear(); _court.Clear(); _regModel = null; _regDecl = null; _dCourtIn = _dCourtKept = _dCourtOut = _dCourtTrim = _dCourtDel = 0;
@@ -260,6 +283,8 @@ namespace Armoury
             {
                 var clan = _clan;
                 if (!__2 || __0 == null) return;
+                // 133e (K12): druzyna gracza - kwota, ktora gra wlasnie wziela (takze zero i poza oknem rozliczenia rodu); tylko zapis do okna armii
+                if (ReferenceEquals(__0, MobileParty.MainParty)) NotePlayerWage(__0, __result);
                 if (__result <= 0)
                 {
                     // 169b (tylko log): naliczenie zerowe albo UJEMNE - gra (AddPartyExpense) daje partii z wodzem i kiesa < 500 budzet

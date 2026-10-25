@@ -119,11 +119,32 @@ namespace Armoury
         }
 
         /// <summary>Czesc (1) zoldu bohatera tak, jak liczy ja BK GetVanillaWage: (int)max(TroopWage x BaseWage, 1), z PaidInPromise wodza partii zaokraglone.</summary>
-        private static int BkPart1(int troopWage, MobileParty mp)
+        private static int BkPart1(int troopWage, MobileParty mp) { return Part1(troopWage, mp, _bw); }
+
+        /// <summary>133e (okno armii "Pay"): stawka na czlowieka w podstawie BK (GetVanillaWage: (int)max(TroopWage x BaseWage, 1)) - ta sama formula co czesc (1).</summary>
+        internal static int BkPerMan(int troopWage, float bw) { return (int)Math.Max(troopWage * bw, 1f); }
+
+        /// <summary>133e: czesc (1) zoldu bohatera przy podanej BaseWage (BkPart1 z BaseWage sesji - jedna formula).</summary>
+        internal static int Part1(int troopWage, MobileParty mp, float bw)
         {
-            int c1 = (int)Math.Max(troopWage * _bw, 1f);
+            int c1 = BkPerMan(troopWage, bw);
             float p = PromiseOfParty(mp);
             return p != 1f ? TaleWorlds.Library.MathF.Round(c1 * p) : c1;
+        }
+
+        /// <summary>133e: BaseWage BK teraz - pole baseWage zywego ogniwa BK, gdy juz czytane (> 0; BK czyta ustawienia leniwie), inaczej BaseWage tej sesji.</summary>
+        internal static float BaseWageNow()
+        {
+            try
+            {
+                if (_bkWage != null && _fBw != null)
+                {
+                    float live = Convert.ToSingle(_fBw.GetValue(_bkWage));
+                    if (live > 0f) return live;
+                }
+            }
+            catch { }
+            return _bw;
         }
 
         /// <summary>MenPurse (limity sakiewki ludzi): suma zoldu z tabeli bohaterow z regula w rosterze partii - ta czesc zoldu do sakiewki ludzi nie idzie.
@@ -219,7 +240,7 @@ namespace Armoury
                         f = PartyFactor(mp);
                     }
                     int due = DueOf(h);
-                    int pay = Math.Min(amt - given, (int)Math.Round(due * f * k));
+                    int pay = Math.Min(amt - given, ShareOf(due, f, k));
                     _dDue += due;
                     if (pay <= 0) continue;
                     h.ChangeHeroGold(pay);
@@ -236,15 +257,21 @@ namespace Armoury
         /// bez podstawy - 1. Udzial bohatera w zoldzie partii to jego podstawa x te czynniki - tyle dostaje przy pelnej wyplacie (jedna zasada z zoldem partii).</summary>
         private static double PartyFactor(MobileParty mp)
         {
-            try
-            {
-                var en = Campaign.Current.Models.PartyWageModel.GetTotalWage(mp, mp.MemberRoster, false);
-                if (!(en.BaseNumber > 0.5f)) return 1.0;
-                double f = en.ResultNumber / (double)en.BaseNumber;
-                return f < 0.0 ? 0.0 : f > 2.0 ? 2.0 : f;
-            }
+            try { return FactorOf(Campaign.Current.Models.PartyWageModel.GetTotalWage(mp, mp.MemberRoster, false)); }
             catch { return 1.0; }
         }
+
+        /// <summary>133e (okno armii "Pay"): czynniki zoldu partii z gotowej rozpiski (ta sama regula co PartyFactor - okno liczy ja z TEGO SAMEGO wywolania
+        /// modelu co naglowek, K10).</summary>
+        internal static double FactorOf(ExplainedNumber en)
+        {
+            if (!(en.BaseNumber > 0.5f)) return 1.0;
+            double f = en.ResultNumber / (double)en.BaseNumber;
+            return f < 0.0 ? 0.0 : f > 2.0 ? 2.0 : f;
+        }
+
+        /// <summary>Wyplata bohatera z regula: nalezny zold x czynniki partii x odsetek zaplaconego (Pay; 133e - okno armii przy pelnej wyplacie, k = 1).</summary>
+        internal static int ShareOf(int due, double f, double k) { return (int)Math.Round(due * f * k); }
 
         /// <summary>Proba autotestu (CompanionAutotest): zold rodu gracza nie poszedl od wczoraj (w zapisie autotestu partia gracza nie dostaje wyplaty) -
         /// pelna doba zoldu bohaterow druzyny gracza ta sama droga (Pay), zloto z kiesy gracza (przelew gracz -> bohater, bez ksiegi zoldu). Zwraca kwote.</summary>

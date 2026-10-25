@@ -172,6 +172,21 @@ namespace Armoury
             catch (Exception e) { Stumble("KnightWage", e); return 0; }
         }
 
+        /// <summary>133e (okno armii "Pay", tylko odczyt): rycerz w sluzbie w tej partii (pamiec rodow rycerzy z ostatniego odswiezenia).</summary>
+        internal static bool IsKnightIn(Hero h, MobileParty mp)
+        {
+            try { return On && IsServingKnight(h, mp); }
+            catch (Exception e) { Stumble("IsKnightIn", e); return false; }
+        }
+
+        /// <summary>133e: dzienny zold rycerza w sluzbie w tej partii - ta sama regula co Pay (GentryKnightWage; Straz i Wolni Ludzie bez zoldu); 0 - nie rycerz w sluzbie.</summary>
+        internal static int KnightWageOf(Hero h, MobileParty mp)
+        {
+            var s = Settings.Current;
+            if (s == null || !IsKnightIn(h, mp) || CrownGifts.IsUnpaidParty(mp)) return 0;
+            return Math.Max(0, s.GentryKnightWage);
+        }
+
         /// <summary>ClanBudget.SpawnPrefix: rod rycerza nie wystawia nowej partii (sprawdzenie bez pamieci doby - nowy rod BK tego samego dnia tez).</summary>
         internal static bool BlocksSpawn(Hero h)
         {

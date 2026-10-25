@@ -288,7 +288,7 @@ namespace Armoury
                 if (!Can(out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
                 a.Tooltip = new TextObject("{=!}Your men by kind, what kit they lack for the next battle and why, what they went without in the last battle, the horses"
                                            + " and harness in use, idle and to buy, why riders will go on foot, your speed on the map, the herd and why the column walks,"
-                                           + " and your banners for the next battle.");
+                                           + " what you pay them, who gets it and where it goes, and your banners for the next battle.");
                 return true;
             }
             catch (Exception e) { Stumble("Cond", e); return false; }
@@ -392,11 +392,15 @@ namespace Armoury
             try { mv = MarchOf(mp); } catch (Exception e) { Stumble("MarchOf", e); }
             List<string> pagesSpeed = null, pagesHerd = null;
             try { pagesSpeed = Paginate(SpeedText(mv)); pagesHerd = Paginate(HerdText(mv, col)); } catch (Exception e) { Stumble("MarchPages", e); mv = null; }
+            PayView pay = null;              // 133e: zold z jednego wywolania modelu zoldu gry (K10), Who gets what, Where it goes
+            List<string> pagesPay = null, pagesWho = null, pagesWhere = null;
+            try { pay = PayOf(mp); pagesPay = Paginate(PayText(pay)); pagesWho = Paginate(WhoText(pay)); pagesWhere = Paginate(WhereText(pay, mp)); }
+            catch (Exception e) { Stumble("Pay", e); pay = null; }
             if (logIt)
             {
                 List<string> pagesNext = null;
                 try { if (next != null && next.Ok) pagesNext = NextPages(next); } catch (Exception e) { Stumble("NextPages", e); }
-                try { Log.Info(ReportLine(mp, fit, wnd, pairs, col, pagesMen, pagesHorses, pagesMarch, pagesLast, next, pagesNext, hv, mv, pagesSpeed, pagesHerd)); }
+                try { Log.Info(ReportLine(mp, fit, wnd, pairs, col, pagesMen, pagesHorses, pagesMarch, pagesLast, next, pagesNext, hv, mv, pagesSpeed, pagesHerd, pay, pagesPay, pagesWho, pagesWhere)); }
                 catch (Exception e) { Stumble("ReportLine", e); }
                 try { if (next != null) Log.Info(KitPreview.LogLine(next)); } catch (Exception e) { Stumble("KitPreview.LogLine", e); }
             }
@@ -415,6 +419,7 @@ namespace Armoury
                 LastRowSafe(),   // 133b
                 HorseRowSafe(pairs, hv),   // 133d: z podgladu (bez podgladu - z SaddleLaw.Pairs jak dotad)
                 MarchMainRow(col, mv),     // 133d: predkosc i co ja trzyma; strony Speed / Herd / Column
+                PayMainRow(pay),           // 133e: zold; strony Pay / Who gets what / Where it goes
             };
             var b = Behavior();
             int raised = 0, entries = 0;
@@ -444,6 +449,7 @@ namespace Armoury
                         else if (id == "last") { _dReports++; ShowPages("Last battle", pagesLast, 0); }   // 133b
                         else if (id == "horses") { _dReports++; ShowPages("Horses and harness", pagesHorses, 0); }
                         else if (id == "march") { _dReports++; OpenMarch(mv, col, pagesSpeed, pagesHerd, pagesMarch); }   // 133d
+                        else if (id == "pay") { _dReports++; OpenPay(pay, pagesPay, pagesWho, pagesWhere); }   // 133e
                         else if (id == "banners") { _dBanners++; OpenBanners(true); }
                         else if (id == "reset") AskReset();
                     }
@@ -621,7 +627,8 @@ namespace Armoury
         /// <summary>Linia logu raportu (na otwarcie okna i w tescie): te same liczby co strony okna.</summary>
         internal static string ReportLine(MobileParty mp, int[] fit, int[] wnd, SaddleLaw.PairState p, MarchPace.Column col, List<string> pm, List<string> ph, List<string> pmarch,
                                           List<string> plast = null, KitPreview.Result next = null, List<string> pnext = null,
-                                          HorseView hv = null, MarchView mv = null, List<string> pspeed = null, List<string> pherd = null)
+                                          HorseView hv = null, MarchView mv = null, List<string> pspeed = null, List<string> pherd = null,
+                                          PayView pv = null, List<string> ppay = null, List<string> pwho = null, List<string> pwhere = null)
         {
             int exM = ExemptMounted(p);
             var bag = mp.ItemRoster;
@@ -648,11 +655,15 @@ namespace Armoury
                 sb.Append(" | predkosc (133d): ").Append(SpeedBrief(mv));
                 sb.Append(" | stado (133d): ").Append(HerdBrief(mv));
             }
+            // 133e: te same liczby co strony "Pay", "Who gets what" i "Where it goes" (segment bez "| strony N" - format AR-2 bez zmian)
+            if (pv != null) sb.Append(" | zold (133e): ").Append(PayBrief(pv));
             sb.Append(" | strony ").Append(PagesInfo(pm)).Append(' ').Append(PagesInfo(ph)).Append(' ').Append(PagesInfo(pmarch)).Append(" (miesci sie ").Append(Rumours.PageLines).Append(')');
             // 133b: osobny segment - format "strony AxB CxD ExF (miesci sie N)" czyta tools/sprawdz_logi.py (AR-2)
             if (plast != null) sb.Append(" | strony ostatniej bitwy (133b) ").Append(PagesInfo(plast));
             if (pnext != null) sb.Append(" | strony podgladu (133c) ").Append(PagesInfo(pnext));
             if (pspeed != null || pherd != null) sb.Append(" | strony marszu (133d) predkosc ").Append(PagesInfo(pspeed)).Append(", stado ").Append(PagesInfo(pherd));
+            if (ppay != null || pwho != null || pwhere != null)
+                sb.Append(" | strony zoldu (133e) pay ").Append(PagesInfo(ppay)).Append(", kto ").Append(PagesInfo(pwho)).Append(", dokad ").Append(PagesInfo(pwhere));
             sb.Append(" | ").Append(OobState()).Append('.');
             return sb.ToString();
         }

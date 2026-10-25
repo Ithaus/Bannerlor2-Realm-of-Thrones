@@ -21,6 +21,8 @@ namespace Armoury
     ///     tozsamosci par: jezdzcy + wyjatki = z para + kon bez uprzezy + wyjatki z koniem + bez konia; sufit kolumny wedlug wzoru Cap.
     ///     133d: strony koni, Speed, Herd i Column w "najdluzszej"; konie z podgladu (gotowi + pieszo = jezdzcy, w bitwie <= w zbrojowni, braki rozlozone
     ///     bez reszty); stado - procent linii "Herding" = GetHerdingModifier gry (K9); predkosc wobec gry - INFO.
+    ///     133e: strony Pay / Who gets what / Where it goes w "najdluzszej"; zold - suma wierszy rozdzialu = wynik tego samego wywolania (K10); samosprawdzenie
+    ///     wag wobec linii "Base" BK i TotalWage gry z osobnego wywolania - INFO.
     ///  T2 zapis choragwi testowych przez Write (ta sama droga co "Save" w oknie): 2 x piechota (60 ludzi / reszta, pierwsza z tarczami), lucznicy, konni
     ///     z kapitanem-towarzyszem, konni lucznicy - tylko rodzaje obecne; odczyt 8 x pole i armia zgodny, wagi kazdej klasy = 100, kazdy obecny rodzaj pokryty.
     ///  T3 nazwy: NameOf zgodne, Export -> Import -> Export bez zmian.
@@ -130,10 +132,15 @@ namespace Armoury
             var mv = MarchOf(mp);
             var ps = Paginate(SpeedText(mv));
             var pd = Paginate(HerdText(mv, col));
-            Log.Info(ReportLine(mp, fit, wnd, p, col, pm, ph, pq, pl, nx, pn, hv, mv, ps, pd));
+            var pv = PayOf(mp);                    // 133e: zold - te same funkcje co okno (jedno wywolanie modelu zoldu gry)
+            var pPay = Paginate(PayText(pv));
+            var pWho = Paginate(WhoText(pv));
+            var pWhere = Paginate(WhereText(pv, mp));
+            Log.Info(ReportLine(mp, fit, wnd, p, col, pm, ph, pq, pl, nx, pn, hv, mv, ps, pd, pv, pPay, pWho, pWhere));
             Log.Info(KitPreview.LogLine(nx));
             int longest = Math.Max(Math.Max(Math.Max(LongestPage(pm), LongestPage(pl)), Math.Max(LongestPage(ph), LongestPage(pq))),
                                    Math.Max(LongestPage(pn), Math.Max(LongestPage(ps), LongestPage(pd))));
+            longest = Math.Max(longest, Math.Max(LongestPage(pPay), Math.Max(LongestPage(pWho), LongestPage(pWhere))));
             bool t1p = longest <= Rumours.PageLines;
             int exM = ExemptMounted(p);
             bool t1a = p.Riders + p.Exempt == p.Paired + p.NoSaddle + exM + p.NoHorse && p.Mounted == p.Paired + p.NoSaddle;
@@ -162,12 +169,19 @@ namespace Armoury
             }
             var herdOk = HerdAgrees(mv);
             bool t1h = herdOk != false;
+            // 133e: zold - suma wierszy "Who gets what" (+ nierozdzielone) = wynik tego samego wywolania (K10); samosprawdzenie wag wobec linii "Base" BK i
+            // TotalWage gry z OSOBNEGO wywolania (BK losuje zaokraglenie bohaterow spoza CW) - INFO
+            bool t1w = !pv.Ok || pv.RowsSum == pv.Total;
+            int gameWage = -1;
+            try { gameWage = mp.TotalWage; } catch { gameWage = -1; }
             pts.Add("T1 raport: strony <= " + Rumours.PageLines + " linii " + T(t1p) + " (najdluzsza " + longest + "), pary " + T(t1a) + ", kolumna " + (col == null ? "wylaczona" : T(t1c))
                     + ", podglad sprzetu (133c) " + (nx.Ok ? T(t1k) + " (" + nx.Ms + " ms, stron " + pn.Count + ")" : "niedostepny (" + nx.Why + ")")
                     + ", konie (133d) " + (hv != null && hv.Ok ? T(t1m) : "z SaddleLaw.Pairs (bez podgladu)")
                     + ", stado (133d) " + (herdOk == null ? "bez porownania (" + (mv.Ok ? mv.HerdWhy : mv.Why) + ")" : T(t1h))
-                    + ", predkosc (133d) " + (mv.Ok ? "wobec gry " + (SpeedAgrees(mv) ? "zgodna" : "ROZJAZD") + " - INFO, Other " + S2(mv.Other) + ", " + mv.Ms + " ms" : "niedostepna (" + mv.Why + ")"));
-            ok &= t1p && t1a && t1c && t1k && t1m && t1h;
+                    + ", predkosc (133d) " + (mv.Ok ? "wobec gry " + (SpeedAgrees(mv) ? "zgodna" : "ROZJAZD") + " - INFO, Other " + S2(mv.Other) + ", " + mv.Ms + " ms" : "niedostepna (" + mv.Why + ")")
+                    + ", zold (133e) " + (pv.Ok ? T(t1w) + " (suma wierszy " + pv.RowsSum + " = wynik " + pv.Total + "; TotalWage gry osobno " + gameWage + " - INFO; podstawa "
+                                                  + PayBaseCheck(pv) + " - INFO; " + pv.Ms + " ms)" : "niedostepny (" + pv.Why + ")"));
+            ok &= t1p && t1a && t1c && t1k && t1m && t1h && t1w;
             if (!Writes)
             {
                 // klucz zapisu wylaczony = porzadek gry nietkniety (tak obiecuje opis klucza) - test tez go nie rusza
