@@ -674,7 +674,8 @@ namespace Armoury
                             || BattleSense.NightKeys(Settings.Current);   // noc 25.10 P0 (K2): marsz i doktryny (P1), dzwiek (P2), choragwie (P3) - BattleSense i RoutKeeper (linia NB2, RoutHold.On)
                 if (mission != null && ((Settings.Current.BrokenMenNeverRally && (Settings.Current.WoundedFleeEnabled
                         || (Settings.Current.FieldCraftEnabled && Settings.Current.AiFleeWhenNearDeath && Campaign.Current != null)))
-                        || Settings.Current.SoldierPostureByTier || nb2b))
+                        || Settings.Current.SoldierPostureByTier || nb2b
+                        || Settings.Current.FateOfTheBrokenLog))   // 139: pomiar losu zlamanych (BrokenFate) ma wejscia tylko w RoutKeeper
                     mission.AddMissionBehavior(new RoutKeeper());
                 // m111-walka (24.10): BattleSense niesie tez flage pojedynku (turniej, arena, pojedynek ROT) dla DuelAi / DuelCraft / DuelGuard / BattleWind
                 // m113-walka2 (24.10): i dla rozszerzen bitwy fazy 2 (bohaterowie-pojedynkowicze, tier z umiejetnosci, roznica umiejetnosci gracza, zrywy)

@@ -1536,6 +1536,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool FleeAwayFromEnemies { get; set; } = true;
 
+        [SettingPropertyBool("Fate Of The Broken Log", HintText = "battle log only, nothing changes on the field: after every battle the Armoury log gets a line on what became of the men who broke and ran - killed, knocked out, escaped or still on the field, who caught them (horseman, footman or missile), how far and how long they ran, how many ran out of breath or still held a weapon, how many the game's panic let back into the fight and how many victors stopped to cheer. Off = no line", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool FateOfTheBrokenLog { get; set; } = true;
+
         [SettingPropertyBool("Commander Tactics", HintText = "in field battles an AI army fights by its commander's Tactics skill, not only by its culture as RBM sets it: below 30 a mob that just charges, from 60 cavalry charges at the front and defenders may form a ring or hold a choke point, from 150 a side of 150 men or more also tries to outflank with its infantry. Your own team's AI is left as it is. Off = RBM's culture tactics only, as before", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool CommanderTactics { get; set; } = true;
@@ -10363,6 +10367,7 @@ namespace Armoury
             s.WoundedFleeBattlesOnly = WoundedFleeBattlesOnly;
             s.BrokenMenNeverRally = BrokenMenNeverRally;
             s.FleeAwayFromEnemies = FleeAwayFromEnemies;
+            s.FateOfTheBrokenLog = FateOfTheBrokenLog;
             s.CommanderTactics = CommanderTactics;
             s.VeteransByTier = VeteransByTier;
             s.AutoParryFullDiff = AutoParryFullDiff;

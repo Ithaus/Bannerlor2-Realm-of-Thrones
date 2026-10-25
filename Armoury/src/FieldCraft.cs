@@ -222,6 +222,29 @@ namespace Armoury
 
         private static bool _sprintLogged;
         private readonly Dictionary<Agent, State> _states = new Dictionary<Agent, State>();
+
+        // 139 (25.10): FieldCraft biezacej misji - odczyt zadyszki dla pomiaru losu zlamanych (BrokenFate, "z zadyszka"). Tylko odczyt, glowny watek
+        // (FieldCraft pisze st.Winded w OnMissionTick, BrokenFate czyta w ticku RoutKeeper). Ustawiane w AfterStart, zerowane na koniec misji.
+        private static FieldCraft _live;
+
+        internal static bool LiveIn(Mission m)
+        {
+            var f = _live;
+            return f != null && m != null && ReferenceEquals(f.Mission, m);
+        }
+
+        internal static bool WindedNow(Agent a)
+        {
+            var f = _live;
+            State st;
+            return f != null && a != null && f._states.TryGetValue(a, out st) && st.Winded;
+        }
+
+        public override void OnRemoveBehavior()
+        {
+            if (ReferenceEquals(_live, this)) _live = null;   // 139
+            base.OnRemoveBehavior();
+        }
         private readonly List<KeyValuePair<Agent, int>> _unstick = new List<KeyValuePair<Agent, int>>();
         // czyj to wierzchowiec: kon -> bohater z klanu gracza (spisujemy w locie)
         private readonly Dictionary<Agent, Hero> _mountOwners = new Dictionary<Agent, Hero>();
@@ -354,6 +377,7 @@ namespace Armoury
             ResetRunStats();
             try { BattleWind.BreathFlush(); } catch { }      // 137: linia "Oddech (137)" raz na misje
             try { MissionTeams.Flush(Mission); } catch { }   // NM: linia "Druzyny w misji (NM)" raz na misje
+            if (ReferenceEquals(_live, this)) _live = null;   // 139: bez odczytu zadyszki po koncu misji
             base.OnEndMission();
         }
 
@@ -362,6 +386,7 @@ namespace Armoury
         {
             try { MissionTeams.Begin(Mission); } catch { }
             ResetRunStats();
+            _live = this;                                     // 139: odczyt zadyszki dla BrokenFate
             base.AfterStart();
         }
 

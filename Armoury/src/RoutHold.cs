@@ -59,9 +59,11 @@ namespace Armoury
         // dzwiek (BattleSound, P2 - osobno od "glosy" BattleCries, zeby potkniecia sie nie zlewaly). UWAGA: RoutHold.Break(a, site) bierze miejsce MissionTeams
         // (Broken / Flee), NIE te stale - zlamanie choragwi idzie przez Break(a, MissionTeams.Flee) i liczy sie jako "ucieczka".
         internal const int SiteMarch = 9, SiteDoctrine = 10, SiteBanner = 11, SiteSound = 12;
-        private const int Sites = 13;
+        // 139 (25.10): pomiar losu zlamanych (BrokenFate) - wlasne miejsce, zeby potkniecia pomiaru nie zlewaly sie z panika
+        internal const int SiteFate = 13;
+        private const int Sites = 14;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
-                                                      "marsz", "doktryna", "choragiew", "dzwiek" };
+                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -238,6 +240,7 @@ namespace Armoury
             MarchToContact.ResetCounters();
             Doctrine.ResetCounters();
             BannerCompanies.ResetCounters();
+            BrokenFate.ResetCounters();     // 139: los zlamanych - liczniki i lista ludzi poprzedniej misji
         }
 
         /// <summary>Licznik misji dla RoutKeeper (glowny watek): misja zgodna z licznikami.</summary>
@@ -309,6 +312,8 @@ namespace Armoury
             for (int i = 0; i < Sites; i++) sb.Append(i > 0 ? ", " : "").Append(SiteName[i]).Append(' ').Append(Stum[i]);
             sb.Append(" (sesja ").Append(Sum(StumSession)).Append(", linia misji ").Append(_lines).Append(").");
             Log.Info(sb.ToString());
+            // 139: osobna linia "LOS ZLAMANYCH (139)" zaraz po NB2 (tylko bitwa / kryjowka z kluczem FateOfTheBrokenLog)
+            try { BrokenFate.Write(c); } catch { }
         }
 
         // ------------------------------------------------------------ start sesji
@@ -357,6 +362,11 @@ namespace Armoury
               .Append(BloodPools.SplatMinDamage).Append(" obrazen ciecia / klucia / strzaly ").Append(BloodPools.SplatsPerSecond).Append(" na s; ziemia, woda i pudlo sceny sprawdzane; najwyzej ")
               .Append(BloodPools.MaxPerMission).Append(" na misje, ").Append(BloodPools.PerSecond).Append(" na s, ").Append(BloodPools.PoolsPerCell)
               .Append(" kaluze na komorke ").Append(BloodPools.CellSize.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)).Append(" m)")
+              // 139: pomiar losu zlamanych (sam log) i przelacznik trybu PANIKA / ROZSADEK
+              .Append(" | Fate Of The Broken Log ").Append(c.FateOfTheBrokenLog ? "TAK" : "NIE").Append(" (linia LOS ZLAMANYCH (139) po bitwie; probka co ")
+              .Append(BrokenFate.SampleEvery.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" s, spis przelacznika co ")
+              .Append(BrokenFate.CensusEvery.ToString("0", System.Globalization.CultureInfo.InvariantCulture))
+              .Append(" s; panika = IsPanicked albo RoutHold albo odwrot komponentu, odwrot z rozkazu szyku = rozsadek)")
               .Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }
@@ -383,6 +393,7 @@ namespace Armoury
             public bool Resent;
             public bool EarlyDone;            // poprawka 16.10: wczesne ponowienie po zgaszeniu paniki przez innych juz bylo
             public bool Dead;
+            public bool ByPlayer;             // 139: przejety przez gracza - przelacznik trybu (Knows) go nie liczy
             public int Fails;                 // potkniecia na tym czlowieku
             public float Since;
             public float NextEval;
@@ -431,12 +442,15 @@ namespace Armoury
         public override void AfterStart()
         {
             try { RoutHold.Begin(Mission); } catch { }
+            BrokenFate.Begin(Mission);                // 139: pomiar losu zlamanych (sam wylapuje swoje wyjatki)
             base.AfterStart();
         }
 
         protected override void OnEndMission()
         {
-            try { if (Mission != null) FieldHere(Mission); RoutHold.Field = _field; RoutHold.Flush(Mission); } catch { }
+            // 139: Close (uciekajacy wciaz na polu, ostatni wiwat) przed linia; Release (bez referencji do ludzi) po niej
+            try { if (Mission != null) FieldHere(Mission); RoutHold.Field = _field; BrokenFate.Close(Mission); RoutHold.Flush(Mission); } catch { }
+            BrokenFate.Release();
             Clear();
             base.OnEndMission();
         }
@@ -444,8 +458,17 @@ namespace Armoury
         public override void OnRemoveBehavior()
         {
             Clear();
+            BrokenFate.Release();
             if (ReferenceEquals(RoutHold.Live, this)) RoutHold.Live = null;
             base.OnRemoveBehavior();
+        }
+
+        /// <summary>139: przelacznik trybu (SurvivalMode.InPanic) - czlowiek jest w zbiorze zlamanych tej bitwy (takze zabity i takze, gdy jego panike zgasil
+        /// ktos inny), poza przejetym przez gracza. Tylko odczyt, glowny watek; po koncu misji (Clear) zawsze false.</summary>
+        internal bool Knows(Agent a)
+        {
+            Entry e;
+            return a != null && _by.TryGetValue(a, out e) && !e.ByPlayer;
         }
 
         private void Clear()
@@ -462,12 +485,15 @@ namespace Armoury
         public override void OnAgentDeleted(Agent affectedAgent)
         {
             try { Entry e; if (affectedAgent != null && _by.TryGetValue(affectedAgent, out e)) Drop(e, false); } catch { }
+            BrokenFate.Deleted(affectedAgent);        // 139: usuniety bez losu - wypada z probek
         }
 
         public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
         {
             // zabity, powalony albo zniknal na granicy - zostaje klucz (raz na bitwe), wypada z ticku
             try { Entry e; if (affectedAgent != null && _by.TryGetValue(affectedAgent, out e)) Drop(e, true); } catch { }
+            // 139: los zlamanego (stan, cios konczacy, bron w rece - przed zrzutem broni z trupa, Mission.OnAgentRemoved:2997-3031); tylko liczniki
+            BrokenFate.Removed(Mission, affectedAgent, affectorAgent, agentState, in blow);
         }
 
         public override void OnAgentControllerSetToPlayer(Agent agent)
@@ -475,7 +501,7 @@ namespace Armoury
             try
             {
                 Entry e;
-                if (agent != null && _by.TryGetValue(agent, out e) && !e.Dead) { RoutHold.Player++; Drop(e, true); }
+                if (agent != null && _by.TryGetValue(agent, out e) && !e.Dead) { RoutHold.Player++; e.ByPlayer = true; Drop(e, true); }
             }
             catch { }
         }
@@ -485,11 +511,15 @@ namespace Armoury
             try
             {
                 Entry e;
-                if (affectedAgent == null || !_by.TryGetValue(affectedAgent, out e)) return;
-                if (e.PanicSeen) RoutHold.RePanic++;      // druga panika gry dla zlamanego (oczekiwane 0)
-                e.PanicSeen = true;
+                if (affectedAgent != null && _by.TryGetValue(affectedAgent, out e))
+                {
+                    if (e.PanicSeen) RoutHold.RePanic++;  // druga panika gry dla zlamanego (oczekiwane 0)
+                    e.PanicSeen = true;
+                }
             }
             catch { }
+            // 139: panika gry (czlowiek spoza zbioru zlamanych) albo ponowna panika po powrocie do walki - tylko liczniki
+            BrokenFate.Panicked(Mission, affectedAgent);
         }
 
         // ------------------------------------------------------------ zlamanie
@@ -518,6 +548,7 @@ namespace Armoury
             _list.Add(e);
             if (site == MissionTeams.Broken) RoutHold.Broken++; else RoutHold.Fled++;
             MissionTeams.Pushed(site, a);                                 // linia NM: odwrot wyslany - raz na czlowieka
+            BrokenFate.Broken(m, a, cai.IsPanicked);                      // 139: los zlamanych - wpis PRZED Panic (OnAgentPanicked widzi juz "nasz")
             if (cai.IsPanicked)
             {
                 // juz w panice (rozbicie szyku przez morale) - bez drugiego Panic, czyli bez drugiego okrzyku i bez drugiej animacji
@@ -537,6 +568,8 @@ namespace Armoury
 
         public override void OnMissionTick(float dt)
         {
+            // 139: probka losu zlamanych (co 1 s, takze bez naszych zlamanych i po koncu bitwy - wiwat zwyciezcow); sama lapie wyjatki
+            BrokenFate.Tick(Mission, dt);
             if (_list.Count == 0) return;
             try
             {
@@ -568,7 +601,7 @@ namespace Armoury
         {
             var a = e.A;
             if (a == null || !a.IsActive()) { Drop(e, true); return; }
-            if (!a.IsAIControlled) { RoutHold.Player++; Drop(e, true); return; }
+            if (!a.IsAIControlled) { RoutHold.Player++; e.ByPlayer = true; Drop(e, true); return; }
             var cai = a.CommonAIComponent;
             if (cai == null) { Drop(e, true); return; }
             // przeniesiony do Team.Invalid (widz pojedynku z hersztem kryjowki) - rece precz: GetClosestFleePositionForAgent i odwrot wywracaja

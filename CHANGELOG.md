@@ -1,5 +1,57 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 139 (galaz noc/139-ai-zycie od noc/138-calosc d331082f) - AI walczy o zycie, krok 1: przelacznik trybu PANIKA / ROZSADEK (SurvivalMode) i pomiar losu zlamanych (linia "LOS ZLAMANYCH (139)"), zero zmian zachowania
+**Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze
+jego mozliwosci i skilli aby przetrwac, walczy o zycie! ... dopiero ta zasada peka gdy jest panika, w panice jest zasada uciekaj i brak rozsadku ... Wtedy ginie najwiecej
+osob." (takze 13:20 "w bitwach przeciwnik nie biegal caly czas", 13:25 tarcza pod ostrzalem). Zanim cokolwiek skalibrujemy (decyzje Jeffa ok. 15:00: ranny ponizej 20% HP
+"Odwrot z bronia", panika z morale "Bez powrotu, zbiorka pozniej", lordowie "Ostrozni pozycyjnie", poscig "Tak, z limitem"), nie wiadomo, co sie dzieje ze zlamanymi. W logu
+jest tylko NB2 (13:01:32 zlamanych 52 = 29 BrokenMen + 18 z dwoch zalaman kompanii + 5 FieldCraft; 13:02:18 zlamani 12). Paniki z samego morale gry nikt nie liczy
+(BattleSense.OnAgentPanicked/OnAgentFleeing to tylko kolejka dzwieku), nie ma licznika, kto zabija uciekajacych, ilu uchodzi z pola, ilu wraca do walki (RBM) i ilu
+zwyciezcow wiwatuje zamiast gonic. Autotesty 25.10: przegrani traca 63-83% zdrowych (historycznie 15-40%) - poscig trzeba najpierw zmierzyc. Kolejne kroki fali potrzebuja
+jednej definicji "w panice".
+**Przyczyna:** brak pomiaru i brak wspolnej definicji trybu (nie blad). Dowody w kodzie: CommonAIComponent 1.4.8 - Panic ustawia IsPanicked przed Mission.OnAgentPanicked
+(OnAgentPanicked tylko przy !IsPanicked), Retreat ustawia IsRetreating i EnforceShieldUsage(None), StopRetreating zeruje oba; RBMAI AgentAi.cs:651-657 StopRetreating przy
+morale > 0 i 10 s bez ciosu wrecz; RBMAI AgentAi.cs:826-859 ofiara szarzy konnej (bitwa polowa) dostaje CommonAIComponent.Retreat bez paniki; odwrot z rozkazu szyku idzie
+natywnym Agent.Retreat (Agent.IsRunningAway bez komponentu); Mission.OnAgentRemoved:2997-3031 - zachowania misji widza czlowieka przed zrzutem broni z trupa, komponenty
+zostaja (Agent.OnRemove tylko je powiadamia); ArtemsLivelyAnimations.OnAgentPanicked zrzuca sloty 0-4 od razu (DropAllWeapons); AgentVictoryLogic._cheeringAgents
+(CheeringAgent.Agent / IsCheeringOnRetreat, sprawdzone w DLL 1.4.8) - przy ucieczce wroga ok. polowa zwyciezcow AI staje i wiwatuje.
+**Zmiana:** (1) SurvivalMode.cs (nowy) - SurvivalMode.InPanic(agent), jedna funkcja tylko do odczytu: PANIKA = cai.IsPanicked || RoutHold zna czlowieka
+(RoutKeeper.Knows: wpis w zbiorze zlamanych tej bitwy - takze gdy panike zgasil ktos inny - poza przejetym przez gracza, nowe pole Entry.ByPlayer) || cai.IsRetreating;
+reszta (takze odwrot z rozkazu szyku) = ROZSADEK. Na razie wola ja tylko pomiar; paczki rozsadku beda pomijac PANIKE, paczki paniki dzialac tylko na nia. Wolac z glownego
+watku. (2) BrokenFate.cs (nowy) - pomiar, wejscia tylko z RoutKeeper (wlasciciel linii NB2 i zbioru zlamanych): Break (wpis PRZED Panic), OnAgentPanicked, OnAgentRemoved,
+OnAgentDeleted, OnMissionTick (probka zlamanych co 1 s, spis przelacznika po Mission.Agents co 2 s do konca bitwy, wiwat co 1 s takze po koncu), OnEndMission (Close przed
+linia, Release po niej). Grupy (kazdy czlowiek raz): "nasi" = RoutHold.Break bez wczesniejszej paniki (BrokenMen ponizej 20% HP, FieldCraft ponizej 10%, zalamanie
+choragwi); "panika gry" = pierwsze OnAgentPanicked czlowieka spoza zbioru (morale gry, RBM CoordinatedRetreat; przy BrokenMenNeverRally NIE takze stare drogi
+BrokenMen/FieldCraft) - przejety potem przez RoutHold zostaje w tej grupie z licznikiem "przejeci". Liczone: los (zabici / nieprzytomni / uszli / na polu); kto dopadl
+uciekajacego (pocisk wedlug KillingBlow.IsMissile, konny = sprawca na koniu albo kon, pieszy, inne = wykrwawienie albo bez sprawcy); padli po powrocie do walki; sr. droga
+i czas ucieczki dopadnietych i uszlych (suma odcinkow probek co 1 s); z zadyszka w ucieczce (FieldCraft st.Winded - nowy odczyt FieldCraft.LiveIn / WindedNow, statyczne
+_live z AfterStart, zerowane w OnEndMission i nowym OnRemoveBehavior); bron i tarcza w slotach 0-3 (bez amunicji i sztandaru) przy losie albo na koniec misji; powroty
+RBM (PANIKA -> ROZSADEK u paniki gry przed koncem bitwy, bez broni; takze wykryte dopiero przy ponownej panice); wiwat zwyciezcow (ludzi, przy ucieczce wroga, naraz
+najwiecej); spis przelacznika (ludzi: RoutHold / panika gry / sam odwrot komponentu - RBM szarza - to PANIKA; odwrot z rozkazu szyku - ROZSADEK). (3) Linia zaraz po
+"Bitwa (NB2): misja" (tylko bitwa na mapie i kryjowka): "LOS ZLAMANYCH (139): misja bitwa | nasi N (zabici a / nieprzytomni b / uszli c / na polu d) | panika gry M
+(zabici .. / na polu ..; przejeci przez RoutHold t, ponowne paniki p) | dopadnieci w ucieczce K: konny x / pieszy y / pocisk z / inne o; padli po powrocie do walki f |
+sr. bieg: dopadnieci X m / Y s, uszli X m / Y s (droga z probek co 1 s) | z zadyszka k z N (FieldCraft TAK) | w ucieczce z bronia w, z tarcza s z F (przy losie albo
+na koniec; na koniec wciaz w ucieczce e) | powroty RBM r (ludzi h, bez broni q, wykryte dopiero przy ponownej panice u) | wiwat v (przy ucieczce wroga r, naraz najwiecej
+x) | przelacznik (spis co 2 s do konca bitwy, ludzi; ...): RoutHold a, panika gry b, sam odwrot komponentu (RBM szarza) c - to PANIKA; odwrot z rozkazu szyku d - to
+ROZSADEK | wypadli z probek n, potkniecia los n." Linia startu sesji NB2 dostaje segment "Fate Of The Broken Log TAK (...)". Potkniecia pomiaru w nowym miejscu "los"
+linii NB2 (RoutHold Sites 13 -> 14; regex NBW w tools/sprawdz_logi.py przyjmuje dodatkowe ", los N"). (4) Klucz MCM FateOfTheBrokenLog (TAK, grupa "The master's parry",
+czytany na poczatku misji); RoutKeeper rejestrowany takze przy nim (SubModuleMain). gen_mcm: Armoury 2493 ustawien, McmSettings.cs wygenerowany.
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) zachowanie bez zmian - BrokenFate i SurvivalMode tylko czytaja (zadnego SetMorale, Retreat, Panic, limitu
+predkosci, wlasciwosci agenta, Harmony); RoutKeeper.OnAgentPanicked przestawiony bez zmiany logiki RePanic; Entry.ByPlayer czyta tylko Knows; FieldCraft dostal tylko
+statyczny odczyt i OnRemoveBehavior z base. (b) Rejestracja RoutKeeper przy nowym kluczu nie otwiera nowych drog zlamanych: RoutHold.On(m) wolaja tylko BrokenMen
+(rejestrowany przy WoundedFleeEnabled - z BrokenMenNeverRally RoutKeeper juz byl), FieldCraft (AiFleeWhenNearDeath + kampania - jw.) i BannerCompanies (tick tylko przy
+BannerCompaniesEnabled, ktory jest w NightKeys -> RoutKeeper juz byl). U Jeffa (klucze nocy TAK) RoutKeeper i tak jest w kazdej misji. (c) Koszt: probka co 1 s tylko po
+liscie zlamanych (pozycja, przelacznik, lookup FieldCraft), spis co 2 s po Mission.Agents (kilka odczytow pol i jeden lookup na czlowieka), wiwat - refleksja po liscie
+wiwatujacych co 1 s; lock RoutHold.Gate jak inne liczniki NB2; bez alokacji w ticku poza nowymi wpisami. Przy rozbiciu calej armii (RBM CoordinatedRetreat) lista rosnie
+liniowo (setki) - mierzyc czas klatki. (d) Watek: wejscia z glownego watku; kon bez jezdzca (Panic z CommonAIComponent.OnHit) odrzucany przed lockiem i slownikiem.
+(e) Odstepstwo od karty "136 Pomiar": haki paniki nie w BattleSense (bramka Night zalezy od kluczy nocy), tylko w RoutKeeper - ten sam wlasciciel linii i zbioru
+zlamanych; OnAgentFleeing niepotrzebne (kazda panika przechodzi przez OnAgentPanicked). (f) Znane ograniczenia: powrot krotszy niz 1 s widac dopiero przy ponownej panice
+(bez stanu broni); droga to suma odcinkow co 1 s (zaniza krete ucieczki); "inne" obejmuje wykrwawienie FieldCraft (cios od siebie); przelacznik liczy ofiare szarzy
+RBM (Retreat bez paniki, do ok. 10 s) jako PANIKE - ile ich, pokaze "sam odwrot komponentu". (g) Sprawdzic w grze (po wgraniu): linia startu NB2 z "Fate Of The Broken Log
+TAK"; po bitwie polowej linia "LOS ZLAMANYCH (139)" zaraz po "Bitwa (NB2): misja", potkniecia los 0 (w obu liniach), nasi <= "Panic" z NB2 (rowne, gdy nikt z paniki gry
+nie wrocil i nie zostal potem zlamany od nowa), przejeci >= "juz w panice" z NB2, panika gry > 0 przy zalamaniu szyku przez morale; potem bitwa wyjsciowa z karty
+(obronca bez lucznikow przeciw stronie z lucznikami) jako stan "przed" dla kolejnych krokow fali.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie od noc/138-calosc d331082f; Armoury.dll md5 79d38d7fbe57aa9b316b02672ed4fa88).
 ## 2026-10-25 137 (galaz noc/137-oddech od noc/127-bitwa-cialo) - oddech dwufazowy: szybki i wolny dlug, odnowa szybsza z Atletyka, po zadyszce dlugi ogon
 **Problem:** Jeff 25.10 ok. 12:55: "a regeneracja bo powinna byc tak samo szybsza im wiecej mam atletyki oraz im mam mniej staminy a odpoczywam tym regeneracja
 postepuje inaczej jak jestem wyczerpany i dysze to wyjscie z zadyszki jak w prawdziwej fizjologii ludzi sprawdz jakie sa zasady"; wczesniej "ogolna zasada", "kazdy punkt
