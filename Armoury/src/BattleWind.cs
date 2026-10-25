@@ -195,7 +195,8 @@ namespace Armoury
         /// <summary>130: pula i regeneracja RBM z Atletyki po krzywej - stosunek do linii RBM (zostaja inne mnozniki RBM: ciezki korpus x0.5, mnoznik gracza).</summary>
         private static void ApplyAthleticsCurve(Agent agent, object stance, Settings c)
         {
-            if (CurveP(c) <= 1.0001f) return;
+            // 117 (recenzja 152): przy krzywej 1.0 i wlaczonym mistrzostwie (ponad 300) pula RBM tez - oddech i bieg dostaja je zawsze (CurvedAthletics)
+            if (CurveP(c) <= 1.0001f && !(c != null && c.AthleticsMasteryDoubling > 0.5f)) return;
             float a;
             try { a = MissionGameModels.Current.AgentStatCalculateModel.GetEffectiveSkill(agent, DefaultSkills.Athletics); }
             catch { return; }

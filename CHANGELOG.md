@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 117r (galaz noc/138-calosc) - poprawki po niezaleznej recenzji 150a/150b/151/152 (4 recenzentow + 2 weryfikatorow na zarzut, 9 zarzutow potwierdzonych, 6 roznych)
+**Problem:** Recenzja przed wgraniem 117 (workflow review-117, 16 agentow). 150a - bez zarzutow. Potwierdzone:
+(1) lordowie Skagos dostawali obrazek dzikich - krolestwo Skagos ma w ROT-Content/ROT_spkingdoms.xml kulture freefolk (rod ROTclan_107 - skagosi), a 150b bralo kulture frakcji lidera;
+(2) Ship1 (pion 803x1740) i Ship2 (pasek 2610x735 na przezroczystym tle) w pulach morza i Zelaznych Wysp - w ramce 640x360 okna pusty kamien z kawalkami zagli (zdjecie obrazek-150-39-Ship2.png);
+(3) bitwa w polu i na morzu: osada regionu z Hero.LastKnownClosestSettlement, ktore gra odswieza rzadko - na morzu region portu, z ktorego gracz wyplynal;
+(4) osady zajete przez Innych (ROT ChangeToOthersCulture - kultura Innych) szly do regionu "west";
+(5) 152: przy kluczu Athletics Stamina Curve = 1.00 ApplyAthleticsCurve wracal przed mistrzostwem - oddech i bieg dostawaly premie ponad 300, pula RBM nie (u Jeffa 1.12 - nie dotyczy);
+(6) suwak Athletics Mastery Doubling 1..9 dziala jak 10 bez slowa w opisie.
+**Zmiana:** (1) SpoilsReport.ApplyResultsPrefix: kultura wroga z rodu lidera (MobileParty.ActualClan), zapas - frakcja; (2) PicSea = StannisSetsSail, PicSeaCrown = blackwater/StannisSetsSail, PicSeaEssos = aegon/StannisSetsSail, PicIron = StannisSetsSail/messenger-2 (Ship1/Ship2 poza pulami); (3) Near = MapEventSettlement, a bez niej najblizsza osada nie-kryjowka od MapEvent.Position (nowe SpoilsWindow.NearestPlace, ta sama petla co dla kryjowki), zapas - jak dotad; tekst "Near X" okna bez zmian; (4) Undead.IsUndeadCulture (regula Undead.Character) - region "undead": pole PicUndead, szturm/okup SiegeUndead (wallfall, freefolk3); (5) warunek wyjscia: krzywa 1.0 I mistrzostwo wylaczone; (6) opis klucza "1 to 9 count as 10" (gen_mcm 2494).
+**Ryzyko / co sprawdzic:** Tylko wybor obrazka okna lupu i - przy kluczu krzywej 1.00 - pula RBM ponad 300 (domyslnie 1.12: bez zmiany). Petla po Settlement.All raz na bitwe gracza w polu (ok. 2000 osad, bez alokacji). W logu linie okna lupu "obrazek ... (temat, osada ...)" - osada blisko miejsca bitwy.
+**Status:** ZBUDOWANE (2c95388a) - autotest 117b, potem WGRANIE 117 (151 + 152 + 150a + 150b + 117r).
+
 ## 2026-10-25 150b (galaz noc/150-obrazki) - obrazek okna lupu dopasowany do miejsca: region osady, Inni, dzicy, morze; Joffrey nigdzie
 **Problem:** Jeff 25.10: "dopasuj obrazki w oknach lupu do miejsca". Dotad SpoilsWindow.Picture bral obrazek z jednej puli na rodzaj raportu (bitwa: RobbMarching3 / WildlingsFail / jon_stand / blackwater; oblezenie: harrenhal / wallfall / eastwatch / blackwater; turniej: kingslanding / joffrey) po numerze raportu - bitwa w Dorne dawala Czarny Nurt albo Mur, turniej gdziekolwiek - sale tronowa albo Joffreya.
 **Przyczyna:** Picture nie znal miejsca ani wroga (raport mial tylko nazwe osady jako tekst).

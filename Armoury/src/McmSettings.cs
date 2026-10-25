@@ -1312,7 +1312,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool StaminaFromAthleticsOnly { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Athletics Mastery Doubling", 0.00f, 100.00f, "0", HintText = "above Athletics 300 every point is the gap between champions: stamina doubles with every this many points (at 31: Athletics 310 gives about 3500 instead of 2800, 330 about 5500, 350 about 8700), and breath and running grow with it. 0 = no extra above 300", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Athletics Mastery Doubling", 0.00f, 100.00f, "0", HintText = "above Athletics 300 every point is the gap between champions: stamina doubles with every this many points (at 31: Athletics 310 gives about 3500 instead of 2800, 330 about 5500, 350 about 8700), and breath and running grow with it. 0 = no extra above 300; 1 to 9 count as 10", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float AthleticsMasteryDoubling { get; set; } = 31f;
 

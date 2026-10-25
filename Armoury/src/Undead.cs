@@ -32,6 +32,15 @@ namespace Armoury
             return _cultureId;
         }
 
+        /// <summary>117 (recenzja 150b): kultura Innych - ta sama regula co Character (kultura rodu ROTclan_126 albo id z walker / wight); osady zajete
+        /// przez Innych dostaja ja od ROT (ChangeToOthersCulture).</summary>
+        internal static bool IsUndeadCulture(string cu)
+        {
+            if (string.IsNullOrEmpty(cu)) return false;
+            var id = WwCultureId();
+            return (id != null && cu == id) || cu.Contains("walker") || cu.Contains("wight");
+        }
+
         internal static bool Character(BasicCharacterObject c)
         {
             try

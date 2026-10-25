@@ -512,14 +512,17 @@ namespace Armoury
                     var foe = me.GetMapEventSide(side == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
                     var lp = foe != null ? foe.LeaderParty : null;
                     s.Enemy = lp != null && lp.Name != null ? lp.Name.ToString() : "";
-                    // 150b: wrog i morze do obrazka okna (SpoilsWindow.Picture) - Inni przed dzikimi; kultura strony = kultura frakcji lidera
+                    // 150b: wrog i morze do obrazka okna (SpoilsWindow.Picture) - Inni przed dzikimi; kultura wroga = kultura RODU lidera strony (117, recenzja:
+                    // krolestwo Skagos ma w ROT_spkingdoms kulture freefolk, a jego rod ROTclan_107 - skagosi; z kultury krolestwa lordowie Skagos byli "dzikimi")
                     try
                     {
                         s.Sea = me.IsNavalMapEvent;
                         if (lp != null && lp.MobileParty != null && Undead.Party(lp.MobileParty)) s.Foe = "undead";
                         else
                         {
-                            string fc = lp != null && lp.MapFaction != null && lp.MapFaction.Culture != null ? lp.MapFaction.Culture.StringId : null;
+                            var cl = lp != null && lp.MobileParty != null ? lp.MobileParty.ActualClan : null;
+                            string fc = cl != null && cl.Culture != null ? cl.Culture.StringId
+                                        : lp != null && lp.MapFaction != null && lp.MapFaction.Culture != null ? lp.MapFaction.Culture.StringId : null;
                             if (fc == "freefolk" || fc == "wildlings") s.Foe = "wild";
                         }
                     }
@@ -537,7 +540,11 @@ namespace Armoury
                 {
                     var st = me.MapEventSettlement ?? (Hero.MainHero != null ? Hero.MainHero.LastKnownClosestSettlement : null);
                     s.Place = Nm(st);
-                    s.Near = st;
+                    // 117 (recenzja 150b): osada obrazka - osada bitwy albo najblizsza (nie kryjowka) od MIEJSCA bitwy; LastKnownClosestSettlement gry
+                    // odswieza sie rzadko (bitwa na morzu brala region portu, z ktorego gracz wyplynal)
+                    s.Near = me.MapEventSettlement;
+                    if (s.Near == null) { try { s.Near = SpoilsWindow.NearestPlace(me.Position.ToVec2()); } catch (Exception e) { Stumble("ApplyResultsPrefix.near", e); } }
+                    if (s.Near == null) s.Near = st;
                 }
                 catch { s.Place = "-"; }
             }

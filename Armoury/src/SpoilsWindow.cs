@@ -334,17 +334,19 @@ namespace Armoury
         // tylko widoki i sceny bitew, obozow i zamkow, bez portretow i scen fabuly; Joffrey nigdzie, sala tronowa tylko turniej w King's Landing.
         private static readonly string[] PicUndead = { "nightking", "freefolk3", "jon_death", "wallfall" };       // Inni: Nocny Krol, polegli na lodzie
         private static readonly string[] PicWild = { "freefolk1", "freefolk2", "fist", "WildlingsFail" };         // dzicy (Wolni Ludzie): snieg za Murem
-        private static readonly string[] PicSea = { "StannisSetsSail", "Ship2", "Ship1" };                        // bitwa na morzu
-        private static readonly string[] PicSeaCrown = { "blackwater", "StannisSetsSail", "Ship2" };              // morze przy Koronnych Ziemiach (Czarny Nurt)
-        private static readonly string[] PicSeaEssos = { "aegon", "StannisSetsSail", "Ship2" };                   // morze przy Essos (flota pod smokiem)
+        // 117 (recenzja): bez Ship1 (pion 803x1740) i Ship2 (pasek 2610x735 na przezroczystym tle) - w ramce 640x360 okna byl z nich pusty kamien
+        private static readonly string[] PicSea = { "StannisSetsSail" };                                          // bitwa na morzu
+        private static readonly string[] PicSeaCrown = { "blackwater", "StannisSetsSail" };                       // morze przy Koronnych Ziemiach (Czarny Nurt)
+        private static readonly string[] PicSeaEssos = { "aegon", "StannisSetsSail" };                            // morze przy Essos (flota pod smokiem)
         private static readonly string[] PicBeyond = { "freefolk1", "fist", "freefolk2" };                         // osada za Murem
         private static readonly string[] PicWall = { "eastwatch", "fist", "messenger-img" };                       // Mur (Nocna Straz)
         private static readonly string[] PicNorth = { "jon_stand", "messenger-img", "RobbMarching3" };            // Polnoc, Skagos
         private static readonly string[] PicRiver = { "riverlands", "messenger-1", "RobbMarching3" };             // Dorzecze
-        private static readonly string[] PicIron = { "StannisSetsSail", "Ship2", "messenger-2" };                 // Zelazne Wyspy
+        private static readonly string[] PicIron = { "StannisSetsSail", "messenger-2" };                          // Zelazne Wyspy
         private static readonly string[] PicEssos = { "dany_invasion", "aegon" };                                  // Essos
         private static readonly string[] PicField = { "jon_stand", "messenger-1", "messenger-2" };                // reszta Westeros: szarza, oboz po bitwie
         private static readonly string[] SiegeWall = { "eastwatch", "wallfall" };
+        private static readonly string[] SiegeUndead = { "wallfall", "freefolk3" };                                // 117: osada zajeta przez Innych
         private static readonly string[] SiegeBeyond = { "fist", "eastwatch" };
         private static readonly string[] SiegeNorth = { "traveling_merchant", "harrenhal" };                       // zamek pod osniezonymi gorami
         private static readonly string[] SiegeRiver = { "harrenhal", "riverlands" };
@@ -363,6 +365,7 @@ namespace Armoury
         /// <summary>150b: region obrazka z kultury osady (id kultur ROT - battania to Polnoc, aserai to Dorne, empire to Braavos, nord to Lorath).</summary>
         private static string PicRegion(string cul)
         {
+            if (Undead.IsUndeadCulture(cul)) return "undead";   // 117 (recenzja): osada zajeta przez Innych (ROT zmienia jej kulture)
             switch (cul ?? "")
             {
                 case "battania": case "skagosi": return "north";
@@ -385,15 +388,20 @@ namespace Armoury
             var st = r.Kind == SpoilsReport.KBattle ? (r.Near ?? r.Town) : (r.Town ?? r.Near);
             if (st == null && Hero.MainHero != null) st = Hero.MainHero.LastKnownClosestSettlement;
             if (st == null || !st.IsHideout) return st;
+            return NearestPlace(st.GetPosition2D) ?? st;
+        }
+
+        /// <summary>150b / 117: najblizsza osada (miasto, zamek, wies - bez kryjowek) od punktu mapy; null - brak.</summary>
+        internal static TaleWorlds.CampaignSystem.Settlements.Settlement NearestPlace(Vec2 p)
+        {
             TaleWorlds.CampaignSystem.Settlements.Settlement best = null; float bd = float.MaxValue;
-            var p = st.GetPosition2D;
             foreach (var t in TaleWorlds.CampaignSystem.Settlements.Settlement.All)
             {
                 if (t == null || t.IsHideout || !(t.IsTown || t.IsCastle || t.IsVillage)) continue;
                 float d = p.DistanceSquared(t.GetPosition2D);
                 if (d < bd) { bd = d; best = t; }
             }
-            return best ?? st;
+            return best;
         }
 
         /// <summary>150b: pula obrazkow ROT wedlug rodzaju raportu, wroga (Inni, dzicy), morza i regionu osady; theme - nazwa tematu do logu.</summary>
@@ -409,6 +417,7 @@ namespace Armoury
                 theme = "zamek " + region;
                 switch (region)
                 {
+                    case "undead": return SiegeUndead;
                     case "wall": return SiegeWall;
                     case "beyond": return SiegeBeyond;
                     case "north": return SiegeNorth;
@@ -430,6 +439,7 @@ namespace Armoury
             theme = "pole " + region;
             switch (region)
             {
+                case "undead": return PicUndead;
                 case "beyond": return PicBeyond;
                 case "wall": return PicWall;
                 case "north": return PicNorth;
