@@ -9,7 +9,11 @@ param(
     [switch]$Profile,
     [string]$PhotosFile = '',
     [string[]]$Photos = @(),
-    [string]$ArmouryDll = ''                            # inny Armoury niz w DllDir (np. z proba drog)
+    [string]$ArmouryDll = '',                           # inny Armoury niz w DllDir (np. z proba drog)
+    # pliki-przelaczniki prob autotestu w Documents\Mount and Blade II Bannerlord\CrashScribe (nazwa z '.flag' albo bez), np.
+    # -Flags armoury-przeglad,armoury-przesluch (P4 przeglad armii, m109 przesluchanie). Tworzone przed biegiem, a w finally ZAWSZE usuwane te,
+    # ktore utworzyl ten bieg (istniejace wczesniej zostaja). Bez pliku proby z flaga nie ruszaja (124c: P4 i przesluchanie milczaly).
+    [string[]]$Flags = @()
 )
 $AT = 'C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\3cf3e0ac-5529-4b68-a794-0edec69cfda7\scratchpad\dzien-6\autotest\repo\tools\autotest.ps1'
 $rel = @(
@@ -48,5 +52,32 @@ if ($LoadSave) { $a.LoadSave = $LoadSave }
 if ($Profile) { $a.Profile = $true }
 if ($PhotosFile) { $a.PhotosFile = $PhotosFile }
 if ($Photos.Count -gt 0) { $a.Photos = $Photos }
-& $AT @a *>&1 | Tee-Object -FilePath $Out
-exit $LASTEXITCODE
+$csDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Mount and Blade II Bannerlord\CrashScribe'
+$made = @()
+$kod = 1
+try {
+    foreach ($f in $Flags) {
+        foreach ($n in ($f -split ',')) {
+            $n = $n.Trim()
+            if (-not $n) { continue }
+            if ($n -notlike '*.flag') { $n = $n + '.flag' }
+            if ($n -match '[\\/:*?"<>|]') { throw "zla nazwa flagi $n" }
+            $p = Join-Path $csDir $n
+            if (Test-Path -LiteralPath $p) { Write-Host ('flaga ' + $n + ': juz byla (zostanie po biegu)'); continue }
+            if (-not (Test-Path -LiteralPath $csDir)) { New-Item -ItemType Directory -Path $csDir -Force | Out-Null }
+            Set-Content -LiteralPath $p -Value ('autotest ' + (Get-Date -Format 'yyyy-MM-dd HH:mm')) -Encoding ASCII
+            $made += $p
+            Write-Host ('flaga ' + $n + ': utworzona')
+        }
+    }
+    & $AT @a *>&1 | Tee-Object -FilePath $Out
+    $kod = $LASTEXITCODE
+}
+finally {
+    foreach ($p in $made) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force } }
+    if ($made.Count -gt 0) {
+        $left = @($made | Where-Object { Test-Path -LiteralPath $_ })
+        Write-Host ('flagi biegu usuniete: ' + $(if ($left.Count -eq 0) { 'TAK (' + $made.Count + ')' } else { 'NIE: ' + ($left -join ', ') }))
+    }
+}
+exit $kod
