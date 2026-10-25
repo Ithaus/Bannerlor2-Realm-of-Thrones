@@ -46,6 +46,12 @@ namespace Armoury
     ///    podejdzie na ArcherFallBackDistance, a nasza piechota glowna liczy co najmniej polowe lucznikow - BehaviorScreenedSkirmish 2, reszta wag 0 (zapisane);
     ///    powrot ponad dystans + 25 m (zapisane wagi wracaja, chyba ze taktyka przestawila je sama); co 1 s, glowny watek; taktyka, ktora przestawi wagi
     ///    (zmiana fazy) - przejmujemy od nowa, gdy dalej sie ostrzeliwuje, inaczej puszczamy.
+    ///    Recenzja 25.10: kopia wag WEDLUG OBIEKTU zachowania (para zachowanie - waga), nie wedlug pozycji - FormationAI.FindBestBehavior (co 0.5 s)
+    ///    przenosi wybrane zachowanie na indeks 0 listy _behaviors (Remove + Insert(0)), wiec po przejeciu kolejnosc listy jest inna niz przy zapisie.
+    ///  - S3 i S4 to v1.1 w ZAKRESIE krytyka (noc/projekty/krytyk.txt:253) - kod jest, klucze domyslnie NIE (wlacza Jeff albo integrator w MCM).
+    ///  - RangedHarrass dodany przez nas (nie lista RBM khuzait) liczy sie od 10% strzelcow druzyny (ZAKRES v1 "RangedHarrass na liscie od 10% strzelcow"):
+    ///    progu nie da sie sprawdzic w ApplyList (AfterStart - ludzi jeszcze nie ma, rozstawienie wystawia ich w OnSetupTeamsOfSide,
+    ///    BattleDeploymentMissionController.cs:30-44, TeamQuerySystem.RangedRatio = 0), wiec postfiks wagi daje 0, gdy strzelcow ponizej 10%.
     /// v1.1 (NIE w tej wersji): Rush (bieg dzikich z daleka / Nieskalani od 45 m), S2 (obronca pod deszczem strzal), specjalne taktyki RBM z doktryny
     /// (Embolon, SplitArchers od 100 - decyzja Jeffa).
     /// </summary>
@@ -153,11 +159,17 @@ namespace Armoury
         private static FieldInfo _fChargeInf;
         private static readonly Formation[] _sWho = new Formation[Slots];
         private static readonly bool[] _sBack = new bool[Slots];
-        private static readonly float[][] _sSnap = new float[Slots][];
+        private static readonly BehaviorComponent[][] _sSnapB = new BehaviorComponent[Slots][];   // kopia wag wedlug obiektu: zachowanie ...
+        private static readonly float[][] _sSnap = new float[Slots][];                            // ... i jego waga (ten sam indeks pary)
         private static readonly bool[] _sFlank = new bool[Slots];
         private static float _acc1;
         private static int _s3Set, _s3Hunt, _s3NoBehavior;                    // Interlocked (tick druzyn)
         private static int _s3Rides, _s4Back, _s4Return, _s4Lost, _s4NoScreen, _s4Other;   // pod Gate
+
+        // ---- prog RangedHarrass dodanego przez nas (postfiks wagi, tick druzyn czyta; zapis tylko z glownego watku w ApplyList / Clear)
+        internal const float RhMinRanged = 0.10f;
+        private static readonly bool[] _shotGate = new bool[MaxTeams];
+        private static int _rhGated;                                           // Interlocked (tick druzyn)
 
         // ---- liczniki misji (pod RoutHold.Gate; zerowane w RoutHold.Ensure)
         private static int _teams, _horde, _noProfile, _late, _addShot, _addCharge, _s1On, _s1Limit, _s1Loss, _s1Contact, _s1Back, _switches, _stum;
@@ -300,6 +312,12 @@ namespace Armoury
                 if (team == null) return;
                 int ti = team.TeamIndex;
                 if (ti < 0 || ti >= MaxTeams || !ReferenceEquals(_teamRef[ti], team)) return;
+                if (k == KShot && _shotGate[ti] && r > 0f)
+                {
+                    // RangedHarrass z naszej listy: od 10% strzelcow (ta sama miara co gra w tej wadze - QuerySystem druzyny, w tym samym wywolaniu)
+                    var q = team.QuerySystem;
+                    if (q != null && q.RangedRatio + q.RangedCavalryRatio < RhMinRanged) { r = 0f; Interlocked.Increment(ref _rhGated); return; }
+                }
                 float f = _mul[ti * K + k];
                 if (f == 1f || float.IsNaN(r) || float.IsInfinity(r)) return;
                 r *= f;
@@ -356,9 +374,9 @@ namespace Armoury
                 for (int k = 0; k < K; k++) _mul[i * K + k] = 1f;
                 _teamRef[i] = null; _seen[i] = null; _prof[i] = null; _doct[i] = false; _tacOf[i] = 0; _culOf[i] = null;
                 _s1[i] = 0; _s1Start[i] = 0f; _s1Clock[i] = -1f; _s1Ranged[i] = 0f; _cur[i] = null; _hist[i] = null;
-                _flankW[i] = 0f; _enemyRanged[i] = 0f;
+                _flankW[i] = 0f; _enemyRanged[i] = 0f; _shotGate[i] = false;
             }
-            for (int i = 0; i < Slots; i++) { _sWho[i] = null; _sBack[i] = false; _sSnap[i] = null; _sFlank[i] = false; }
+            for (int i = 0; i < Slots; i++) { _sWho[i] = null; _sBack[i] = false; Drop(i); _sFlank[i] = false; }
             _sampleTeamA = _sampleTeamD = -1;
             _acc1 = 0f;
         }
@@ -392,6 +410,8 @@ namespace Armoury
             // RangedHarrass (atak i obrona): bez strzelcow waga gry = 0 (TacticRangedHarrassmentOffensive.GetTacticWeight), wiec dodanie jest bezpieczne
             if ((c.CultureDoctrines || c.ShootBeforeAttacking) && WarCouncil.TryAdd(team, have, typeof(TacticRangedHarrassmentOffensive), note)) addShot++;
             if (c.CultureDoctrines && p.Charge && WarCouncil.TryAdd(team, have, typeof(TacticCharge), note)) addCharge++;
+            // prog 10% strzelcow tylko dla RangedHarrass dodanego tutaj (lista RBM khuzait bez zmian); zapis przed _teamRef - postfiks widzi calosc
+            _shotGate[ti] = addShot > 0;
             SetBase(ti, c);
             _teamRef[ti] = team;
             var s = new StringBuilder(160);
@@ -595,8 +615,8 @@ namespace Armoury
                     var f = fl[j];
                     if (f == null) continue;
                     int idx = ti * 10 + j;
-                    if (!ReferenceEquals(_sWho[idx], f)) { _sWho[idx] = f; _sBack[idx] = false; _sSnap[idx] = null; _sFlank[idx] = false; }
-                    if (f.CountOfUnits <= 0 || !f.IsAIControlled) { _sBack[idx] = false; _sSnap[idx] = null; continue; }
+                    if (!ReferenceEquals(_sWho[idx], f)) { _sWho[idx] = f; _sBack[idx] = false; Drop(idx); _sFlank[idx] = false; }
+                    if (f.CountOfUnits <= 0 || !f.IsAIControlled) { _sBack[idx] = false; Drop(idx); continue; }
                     try
                     {
                         var q = f.QuerySystem;
@@ -703,8 +723,11 @@ namespace Armoury
             }
             if (!screened) return 1;
             if (!skirmish) return 2;
+            // kopia wedlug obiektu (recenzja 25.10): FindBestBehavior gry przestawia kolejnosc listy (wybrane zachowanie na indeks 0)
+            var who = new BehaviorComponent[lst.Count];
             var snap = new float[lst.Count];
-            for (int i = 0; i < lst.Count; i++) snap[i] = lst[i] != null ? lst[i].WeightFactor : 0f;
+            for (int i = 0; i < lst.Count; i++) { who[i] = lst[i]; snap[i] = lst[i] != null ? lst[i].WeightFactor : 0f; }
+            _sSnapB[idx] = who;
             _sSnap[idx] = snap;
             for (int i = 0; i < lst.Count; i++)
             {
@@ -735,22 +758,42 @@ namespace Armoury
         {
             var lst = _fBehaviors(f.AI);
             if (lst == null) return;
-            if (Ours(lst) && _sSnap[idx] != null && _sSnap[idx].Length == lst.Count) return;
+            if (Ours(lst) && _sSnapB[idx] != null && _sSnap[idx] != null) return;
             if (Apply(lst, idx) == 0) return;
             _sBack[idx] = false;
-            _sSnap[idx] = null;
+            Drop(idx);
             lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Lost++; }
         }
 
         private static void Restore(Mission m, Formation f, int idx)
         {
             var lst = f.AI != null ? _fBehaviors(f.AI) : null;
-            var snap = _sSnap[idx];
-            if (lst != null && snap != null && snap.Length == lst.Count && Ours(lst))
-                for (int i = 0; i < lst.Count; i++) if (lst[i] != null) lst[i].WeightFactor = snap[i];
+            PutBack(lst, idx);
             _sBack[idx] = false;
-            _sSnap[idx] = null;
+            Drop(idx);
             lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Return++; }
+        }
+
+        /// <summary>Zapisane wagi wracaja do TYCH SAMYCH obiektow zachowan (ReferenceEquals), gdziekolwiek sa teraz na liscie; zachowania spoza kopii
+        /// bez zmian. Tylko gdy wagi to dalej nasze (taktyka ich nie przestawila).</summary>
+        private static void PutBack(List<BehaviorComponent> lst, int idx)
+        {
+            var who = _sSnapB[idx];
+            var snap = _sSnap[idx];
+            if (lst == null || who == null || snap == null || who.Length != snap.Length || !Ours(lst)) return;
+            for (int k = 0; k < who.Length; k++)
+            {
+                var b = who[k];
+                if (b == null) continue;
+                for (int i = 0; i < lst.Count; i++)
+                    if (ReferenceEquals(lst[i], b)) { b.WeightFactor = snap[k]; break; }
+            }
+        }
+
+        private static void Drop(int idx)
+        {
+            _sSnapB[idx] = null;
+            _sSnap[idx] = null;
         }
 
         /// <summary>Klucz S4 wylaczony w trakcie bitwy: zapisane wagi wracaja.</summary>
@@ -763,13 +806,11 @@ namespace Armoury
                 try
                 {
                     var lst = f != null && f.AI != null && _fBehaviors != null ? _fBehaviors(f.AI) : null;
-                    var snap = _sSnap[i];
-                    if (lst != null && snap != null && snap.Length == lst.Count && Ours(lst))
-                        for (int k = 0; k < lst.Count; k++) if (lst[k] != null) lst[k].WeightFactor = snap[k];
+                    PutBack(lst, i);
                 }
                 catch { }
                 _sBack[i] = false;
-                _sSnap[i] = null;
+                Drop(i);
             }
         }
 
@@ -782,6 +823,7 @@ namespace Armoury
             Interlocked.Exchange(ref _s3Set, 0);
             Interlocked.Exchange(ref _s3Hunt, 0);
             Interlocked.Exchange(ref _s3NoBehavior, 0);
+            Interlocked.Exchange(ref _rhGated, 0);
             _sampleA = _sampleD = _histA = _histD = null;
             Interlocked.Exchange(ref _calls, 0);
             Interlocked.Exchange(ref _postErr, 0);
@@ -795,7 +837,8 @@ namespace Armoury
         {
             sb.Append(" | doktryna ").Append(c != null && c.CultureDoctrines ? "TAK" : "NIE").Append(" (najpierw ostrzal ").Append(c != null && c.ShootBeforeAttacking ? "TAK" : "NIE")
               .Append("): druzyn ").Append(_teams).Append(" (tlum ").Append(_horde).Append(", bez profilu kultury ").Append(_noProfile).Append(", pozne DR ").Append(_late)
-              .Append("), lista +RangedHarrass ").Append(_addShot).Append(", +Charge ").Append(_addCharge)
+              .Append("), lista +RangedHarrass ").Append(_addShot).Append(" (waga 0 ponizej 10% strzelcow ").Append(Volatile.Read(ref _rhGated)).Append(')')
+              .Append(", +Charge ").Append(_addCharge)
               .Append("; najpierw ostrzal ").Append(_s1On).Append(" (koniec: limit czasu ").Append(_s1Limit).Append(", straty ").Append(_s1Loss)
               .Append(", zwarcie ").Append(_s1Contact).Append(", wrog jednak strzela ").Append(_s1Back).Append("); zmian taktyki ").Append(_switches)
               .Append("; flanka ").Append(c != null && c.CavalrySeeksFlanks ? "TAK" : "NIE").Append(": wagi Flank ").Append(Volatile.Read(ref _s3Set))
