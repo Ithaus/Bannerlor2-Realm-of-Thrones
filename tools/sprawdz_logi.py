@@ -68086,5 +68086,129 @@ def m113pobor_main(logp):
     return 0
 
 
+# ------------------------------------------------------------------ noc 25.10 P1 (grupa marsz) - wlasna grupa paczki na koncu pliku (krytyk P0: scalanie trywialne)
+# --grupa marsz : (noc 25.10 P1 marsz i doktryny - MarchToContact.cs, Doctrine.cs, FieldCraft.cs M0, WarCouncil.cs; klucze SpeedCapOnlyWhenWinded,
+#                 MarchToContactEnabled, CultureDoctrines, ShootBeforeAttacking, CavalrySeeksFlanks, ArchersFallBackBehindInfantry)
+#                 python -I tools/sprawdz_logi.py --grupa marsz <Armoury-*.log>
+#                 MRS-0 linia 'Latki nocy (K3)': marsz 2/2, doktryna GetTacticWeight 8/8 i Attack 2/2. MRS-1 ERROR z MarchToContact / Doctrine 0 i potkniecia
+#                 'marsz 0, doktryna 0' w liniach NB2. MRS-2 segment '| marsz' w bitwach polowych i szykow w marszu > 0 (klucz TAK). MRS-3 predkosc w marszu
+#                 1.2-2.4 m/s, w szarzy > 3.0 m/s (brak probki - INFO). MRS-4 bledy latek 0 (marsz i doktryna). MRS-5 przejscia do biegu: szarze z sygnalu
+#                 BattleCries (P2) > 0 - bez sygnalu tylko INFO (paczka dzwieku nie scalona). MRS-6 doktryna: druzyn > 0 tam, gdzie rada wojenna miala druzyny AI.
+#                 MRS-7 FieldCraft: 'stare zapisy co 0.2 s 0' przy kluczu TAK. MRS-8 najpierw ostrzal / flanka / lucznicy za piechote - liczniki (INFO).
+
+def marsz_main(logp):
+    """noc 25.10 P1 (marsz i doktryny): MRS-0..MRS-8 - opis w komentarzu grupy."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("MRS-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    hooks, nb2, errs = [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Latki nocy (K3): misja" in line:
+                hooks.append(line.strip())
+            elif "Bitwa (NB2): misja" in line:
+                nb2.append(line.strip())
+            if ("ERROR" in line or "Exception" in line) and ("MarchToContact" in line or "Doctrine" in line):
+                errs.append(line.strip()[:200])
+    h = hooks[-1] if hooks else ""
+    mm = re.search(r"marsz: (\d+)/(\d+)", h)
+    md = re.search(r"doktryna: GetTacticWeight (\d+)/(\d+)", h)
+    ma = re.search(r"Attack (\d+)/(\d+)", h)
+    ok0 = bool(mm and md and ma and mm.group(1) == mm.group(2) and md.group(1) == md.group(2) and ma.group(1) == ma.group(2))
+    rep.add("MRS-0: latki misji marszu i doktryny wpiete (linia 'Latki nocy (K3)')",
+            "linii %d%s" % (len(hooks), (" (" + h[h.find("marsz"):][:160] + ")") if h else ""), "marsz 2/2, GetTacticWeight 8/8, Attack 2/2", ok0 if hooks else None)
+    st_bad = []
+    for l in nb2:
+        m = re.search(r"marsz (\d+), doktryna (\d+)", l[l.find("| potkniecia:"):] if "| potkniecia:" in l else "")
+        if m and (int(m.group(1)) or int(m.group(2))):
+            st_bad.append(m.group(0))
+    rep.add("MRS-1: ERROR z MarchToContact / Doctrine i potkniecia marsz / doktryna w liniach NB2",
+            "ERROR %d, linii NB2 z potknieciami %d%s" % (len(errs), len(st_bad), (" (" + (errs[0] if errs else st_bad[0]) + ")") if (errs or st_bad) else ""),
+            "0 i 0", not errs and not st_bad)
+    field = [l for l in nb2 if "misja bitwa (pole bitwy TAK" in l]
+    seg = []
+    for l in field:
+        m = re.search(r"\| marsz (TAK|NIE): szykow w marszu (\d+)", l)
+        if m:
+            seg.append((m.group(1), int(m.group(2)), l))
+    on = [s for s in seg if s[0] == "TAK"]
+    rep.add("MRS-2: segment '| marsz' w bitwach polowych, szykow w marszu > 0 (klucz TAK)",
+            "bitew polowych %d, z segmentem %d, klucz TAK %d, szykow w marszu razem %d" % (len(field), len(seg), len(on), sum(s[1] for s in on)),
+            "segment w kazdej bitwie polowej i szykow > 0", None if not field else (len(seg) == len(field) and (not on or sum(s[1] for s in on) > 0)))
+    mv, cv = [], []
+    for s in on:
+        m = re.search(r"predkosc w marszu sr\. ([0-9.]+|-) m/s \((\d+)\), w szarzy ([0-9.]+|-) m/s \((\d+)\)", s[2])
+        if m:
+            if m.group(1) != "-":
+                mv.append(float(m.group(1)))
+            if m.group(3) != "-":
+                cv.append(float(m.group(3)))
+    ok3 = None if not mv else (all(1.2 <= v <= 2.4 for v in mv) and (not cv or all(v > 3.0 for v in cv)))
+    rep.add("MRS-3: predkosc w marszu 1.2-2.4 m/s, w szarzy > 3.0 m/s", "marsz %s, szarza %s" % (", ".join("%.2f" % v for v in mv) or "-", ", ".join("%.2f" % v for v in cv) or "-"),
+            "marsz 1.2-2.4, szarza > 3.0 (brak probki - INFO)", ok3)
+    pe = []
+    for l in field:
+        for m in re.finditer(r"bledy latek (\d+)", l):
+            if int(m.group(1)):
+                pe.append(m.group(0))
+    rep.add("MRS-4: bledy latek (marsz, doktryna)", "zlych %d%s" % (len(pe), (" (" + pe[0] + ")") if pe else ""), "0", None if not field else not pe)
+    sig = nos = cont = gal = 0
+    for s in on:
+        m = re.search(r"szarza z sygnalu (\d+), szarza bez sygnalu (\d+), zwarcie (\d+), galop (\d+)", s[2])
+        if m:
+            sig += int(m.group(1)); nos += int(m.group(2)); cont += int(m.group(3)); gal += int(m.group(4))
+    rep.add("MRS-5: przejscia do biegu - szarza z sygnalu BattleCries (jeden detektor, K4)",
+            "z sygnalu %d, bez sygnalu %d, zwarcie %d, galop %d" % (sig, nos, cont, gal), "z sygnalu > 0 (same bez sygnalu - INFO: P2 nie scalony)",
+            None if not on or sig + nos == 0 else (sig > 0 if sig > 0 else None))
+    dk_bad, dk_n = [], 0
+    for l in field:
+        mt = re.search(r"\| taktyka wg dowodcy (TAK|NIE): druzyn (\d+) \(tlum (\d+)", l)
+        md2 = re.search(r"\| doktryna (TAK|NIE) \(najpierw ostrzal (TAK|NIE)\): druzyn (\d+)", l)
+        if md2:
+            dk_n += 1
+        if mt and md2 and mt.group(1) == "TAK" and md2.group(1) == "TAK" and int(mt.group(2)) > 0 and int(md2.group(3)) == 0:
+            dk_bad.append(md2.group(0))
+    rep.add("MRS-6: doktryna - druzyn > 0 tam, gdzie rada wojenna miala druzyny AI", "linii z doktryna %d, zlych %d%s" % (dk_n, len(dk_bad), (" (" + dk_bad[0] + ")") if dk_bad else ""),
+            "zlych 0", None if not dk_n else not dk_bad)
+    old_bad = []
+    for l in nb2:
+        m = re.search(r"FieldCraft limit tylko przy karze (TAK|NIE): zapisy kary (\d+) \(w marszu (\d+)\), zdjecia (\d+), stare zapisy co 0\.2 s (\d+)", l)
+        if m and m.group(1) == "TAK" and int(m.group(5)):
+            old_bad.append(m.group(0))
+    rep.add("MRS-7: FieldCraft (M0) - bez starego zapisu limitu przy kluczu TAK", "zlych %d%s" % (len(old_bad), (" (" + old_bad[0] + ")") if old_bad else ""), "0",
+            None if not nb2 else not old_bad)
+    s1 = fl = s4 = 0
+    for l in field:
+        m = re.search(r"najpierw ostrzal (\d+) \(koniec", l)
+        if m:
+            s1 += int(m.group(1))
+        m = re.search(r"konnica w BehaviorFlank (\d+)", l)
+        if m:
+            fl += int(m.group(1))
+        m = re.search(r"cofniecia (\d+), powroty", l)
+        if m:
+            s4 += int(m.group(1))
+    rep.add("MRS-8: manewry (najpierw ostrzal, konnica w BehaviorFlank, lucznicy za piechote)", "ostrzal %d, flanka %d, cofniec lucznikow %d" % (s1, fl, s4),
+            "liczniki (ocena Jeffa)", None)
+    rep.show()
+    return 0
+
+
+_main_przed_marszem = main
+
+
+def main(argv):
+    # noc 25.10 P1: grupa 'marsz' bez zmiany dyspozytora grup w main (wlasna grupa paczki na koncu pliku)
+    a = argv[1:]
+    if "--grupa" in a:
+        k = a.index("--grupa")
+        if k + 1 < len(a) and a[k + 1] == "marsz":
+            rest = [x for j, x in enumerate(a) if j not in (k, k + 1) and not x.startswith("--")]
+            return marsz_main(rest[0] if rest else None)
+    return _main_przed_marszem(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

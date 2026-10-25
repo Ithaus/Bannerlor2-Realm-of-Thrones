@@ -32,7 +32,7 @@ namespace Armoury
     /// Lista taktyk (TeamAIComponent._availableTactics) czytana tylko na glownym watku w AfterStart - gra iteruje ja w MakeDecision z ticku druzyn,
     /// ktory przy ticku asynchronicznym konczy sie przed OnPreMissionTick (Mission.cs:3532), wiec bez wyscigu.
     /// noc 25.10 P1 (M2 doktryny kultur, Doctrine.cs): na koncu One - Doctrine.ApplyList (mnozniki wag i dodatki listy wedlug kultury strony; ta sama kultura
-    /// i ten sam Tactics co tutaj). Rada biegnie takze przy CommanderTactics NIE, gdy wlaczona doktryna (CultureDoctrines / ShootBeforeAttacking) - wtedy
+    /// i ten sam Tactics co tutaj). Rada biegnie takze przy CommanderTactics NIE, gdy wlaczona doktryna albo manewry (Doctrine.AnyKey) - wtedy
     /// lista wedlug dowodcy bez zmian (jak przy kluczu NIE), tylko doktryna. Druzyny DynamicReinforcements (powstaja w trakcie bitwy) - LateTeam z Doctrine.Tick,
     /// z Tactics i kultura strony zapamietanymi w Council.
     /// </summary>
@@ -131,7 +131,7 @@ namespace Armoury
             }
         }
 
-        private static bool DoctrineWanted(Settings c) { return c != null && (c.CultureDoctrines || c.ShootBeforeAttacking); }
+        private static bool DoctrineWanted(Settings c) { return Doctrine.AnyKey(c); }
 
         /// <summary>noc 25.10 P1: druzyna, ktora pojawila sie po AfterStart (DynamicReinforcements - TeamAIGeneral z kopia taktyk) - ta sama rada i doktryna,
         /// Tactics i kultura jej strony z Council tej misji. Glowny watek (Doctrine.Tick). Brak danych Council (inna misja, klucze NIE) - nic.</summary>

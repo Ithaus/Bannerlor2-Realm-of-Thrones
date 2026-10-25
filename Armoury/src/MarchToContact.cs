@@ -35,8 +35,8 @@ namespace Armoury
     ///  - tylko bitwa polowa (Mission.IsFieldBattle; morska, wypad morski, oblezenie, wypad, kryjowka - nie), po rozstawieniu, szyk z ludzmi, wazna druzyna;
     ///  - szyk AI: marsz przy rozkazie Move / Advance / FallBack (Charge, ChargeToTarget, Retreat, Stop, Follow - wolny);
     ///    szyk gracza (nie AI): Advance i Move (Move tylko przy PlayerMoveOrderWalks) = marsz, reszta wolna;
-    ///  - piechota: tempo = najwolniejszy chod ludzi szyku (WalkSpeedCached, 1.8 m/s z monsters.xml) x MarchStepPace; ponad 250 m od wroga x1.2 (kolumna
-    ///    szybszym krokiem); pod ostrzalem (UnderRangedAttackRatio >= 0.33) tylko tempo szyku - prog RBM 0.6 (szybki krok) zostaje, celowo;
+    ///  - piechota: tempo = najwolniejszy chod ludzi szyku (WalkSpeedCached, 1.8 m/s z monsters.xml) x MarchStepPace; ponad 250 m od wroga x1.2, najwyzej
+    ///    2.0 m/s (kolumna szybszym krokiem, ponizej progu biegu FieldCraft); pod ostrzalem (UnderRangedAttackRatio >= 0.33) tylko tempo szyku - prog RBM 0.6 (szybki krok) zostaje, celowo;
     ///  - lucznicy pieszo: marsz, dopoki najblizszy wrog dalej niz ArchersWalkUntil (powrot do marszu 20 m dalej); konni lucznicy - nigdy;
     ///  - konnica: klus = CavalryApproachPace x srednia predkosc maksymalna szyku do CavalryGallopDistance;
     ///  - bieg: sygnal szarzy (BattleCries.ChargeStarted) albo rozkaz szarzy w ticku (gdy sygnal nie przyszedl - liczone osobno), zwarcie (wrog 25 m od
@@ -54,6 +54,9 @@ namespace Armoury
         private const int MaxTeams = 16, Stride = 10, Slots = MaxTeams * Stride;
         internal const float TickEvery = 0.5f, ScanEvery = 5f, SampleEvery = 2f;
         internal const float FarFrom = 250f, FarMul = 1.2f, LineMul = 1.1f, CatchUpMul = 1.6f;
+        // szybszy krok kolumny daleko od wroga najwyzej 2.0 m/s: x1.1 utrzymania linii = 2.2 m/s, czyli ponizej dolnego progu biegu FieldCraft (2.2) -
+        // kolumna nie traci sil na dalekim podejsciu (projekt liczyl 1.8 x 1.2 = 2.16 bez marginesu linii)
+        internal const float FarPaceMax = 2.0f;
         internal const float ContactGap = 25f, FreeHold = 30f, InfRearm = 50f, ArcherHyst = 20f, CavRearm = 100f, ChargeSampleFor = 15f;
         private const byte KNone = 0, KInf = 1, KArch = 2, KCav = 3, KHorseArch = 4;
 
@@ -473,7 +476,7 @@ namespace Armoury
 
             float pace = _walk[idx] > 0f ? _walk[idx] : 1.8f;
             pace *= _pace;
-            if (gap > FarFrom) pace *= FarMul;
+            if (gap > FarFrom) pace = Math.Max(pace, Math.Min(pace * FarMul, FarPaceMax));
             pace = Clamp(pace, 0.9f, 2.7f);
             bool underFire = false;
             if (kind == KInf) { try { underFire = q.UnderRangedAttackRatio >= 0.33f; } catch { underFire = false; } }

@@ -37,8 +37,17 @@ namespace Armoury
     ///    ponad polowy strzelcow albo w zwarciu - wtedy Shot x0.3 do konca bitwy i MakeDecision przechodzi na glowny atak (histereza gry x1.5);
     ///  - druzyny DynamicReinforcements (powstaja w trakcie bitwy z kopia taktyk) - WarCouncil.One + doktryna przy pierwszym takcie, w ktorym je widac;
     ///  - postfiksy (tick druzyn) tylko czytaja tablice float pisana w OnMissionTick (glowny watek, nie biegnie rownolegle z tickiem druzyn).
-    /// v1.1 (NIE w tej wersji, klucze czekaja): S3 konnica na flanke (CavalrySeeksFlanks), S4 lucznicy za piechote (ArchersFallBackBehindInfantry),
-    /// Rush (bieg dzikich z daleka / Nieskalani od 45 m), S2 (obronca pod deszczem strzal), specjalne taktyki RBM z doktryny (Embolon, SplitArchers od 100).
+    ///  - S3 Cavalry Seeks Flanks (Jeff: "kawaleria stara sie flankowac"): postfiks Attack (FullScaleAttack, RangedHarrass; po RBM, ktory w swoim postfiksie
+    ///    zdejmuje konnicy BehaviorFlank gry) - lewa i prawa konnica dostaje z powrotem BehaviorFlank z waga Flank doktryny (bez doktryny 1.0, jak gra);
+    ///    BehaviorFlank gry dziala tylko, gdy wrog stoi frontem do kogos innego (zwiazany). Przy Flank >= 1.2 i lucznikach wroga >= 5%
+    ///    RBMBehaviorCavalryCharge.ChargeInfantry = false - najpierw lucznicy (bez nich RBM sam bierze najblizszy duzy szyk). Zdarzenie FlankRide, gdy
+    ///    konnica AI naprawde wchodzi w BehaviorFlank (glowny watek, raz na wejscie);
+    ///  - S4 Archers Fall Back Behind Infantry: szyk lucznikow AI, ktory sie ostrzeliwuje (aktywna waga ktoregos ze skirmish), gdy piechota albo konnica wroga
+    ///    podejdzie na ArcherFallBackDistance, a nasza piechota glowna liczy co najmniej polowe lucznikow - BehaviorScreenedSkirmish 2, reszta wag 0 (zapisane);
+    ///    powrot ponad dystans + 25 m (zapisane wagi wracaja, chyba ze taktyka przestawila je sama); co 1 s, glowny watek; taktyka, ktora przestawi wagi
+    ///    (zmiana fazy) - przejmujemy od nowa, gdy dalej sie ostrzeliwuje, inaczej puszczamy.
+    /// v1.1 (NIE w tej wersji): Rush (bieg dzikich z daleka / Nieskalani od 45 m), S2 (obronca pod deszczem strzal), specjalne taktyki RBM z doktryny
+    /// (Embolon, SplitArchers od 100 - decyzja Jeffa).
     /// </summary>
     internal static partial class Doctrine
     {
@@ -132,6 +141,24 @@ namespace Armoury
         private static int _patched, _wanted;
         private static AccessTools.FieldRef<TeamAIComponent, TacticComponent> _fCur;
 
+        // ---- S3 konnica na flanke (postfiks Attack, tick druzyn) i S4 lucznicy za piechote (glowny watek co 1 s)
+        internal const float S4Back = 25f, S4Every = 1f, S3ArchersMin = 0.05f, S3HuntFrom = 1.2f, S4Weight = 2f;
+        private const int Slots = MaxTeams * 10;
+        private static readonly float[] _flankW = new float[MaxTeams];       // 0 = S3 wylaczone dla druzyny
+        private static readonly float[] _enemyRanged = new float[MaxTeams];
+        private static int _patchedAttack, _wantedAttack;
+        private static AccessTools.FieldRef<TacticComponent, Formation> _fLeftCav, _fRightCav;
+        private static AccessTools.FieldRef<FormationAI, List<BehaviorComponent>> _fBehaviors;
+        private static Type _tRbmCavCharge, _tRbmArcher;
+        private static FieldInfo _fChargeInf;
+        private static readonly Formation[] _sWho = new Formation[Slots];
+        private static readonly bool[] _sBack = new bool[Slots];
+        private static readonly float[][] _sSnap = new float[Slots][];
+        private static readonly bool[] _sFlank = new bool[Slots];
+        private static float _acc1;
+        private static int _s3Set, _s3Hunt, _s3NoBehavior;                    // Interlocked (tick druzyn)
+        private static int _s3Rides, _s4Back, _s4Return, _s4Lost, _s4NoScreen, _s4Other;   // pod Gate
+
         // ---- liczniki misji (pod RoutHold.Gate; zerowane w RoutHold.Ensure)
         private static int _teams, _horde, _noProfile, _late, _addShot, _addCharge, _s1On, _s1Limit, _s1Loss, _s1Contact, _s1Back, _switches, _stum;
         private static string _sampleA, _sampleD, _histA, _histD;
@@ -154,8 +181,87 @@ namespace Armoury
             Patch(h, typeof(TacticDefensiveEngagement), nameof(PostHold), miss);
             Patch(h, typeof(TacticDefensiveRing), nameof(PostHold), miss);
             Patch(h, typeof(TacticHoldChokePoint), nameof(PostHold), miss);
+            // S3: konnica skrzydel z pol bazowych TacticComponent; typy RBM po nazwie (brak = pominiete i policzone)
+            try { _fLeftCav = AccessTools.FieldRefAccess<TacticComponent, Formation>("_leftCavalry"); _fRightCav = AccessTools.FieldRefAccess<TacticComponent, Formation>("_rightCavalry"); }
+            catch { _fLeftCav = _fRightCav = null; }
+            try { _fBehaviors = AccessTools.FieldRefAccess<FormationAI, List<BehaviorComponent>>("_behaviors"); } catch { _fBehaviors = null; }
+            try { _tRbmCavCharge = AccessTools.TypeByName("RBMAI.RBMBehaviorCavalryCharge") ?? AccessTools.TypeByName("RBMBehaviorCavalryCharge"); } catch { _tRbmCavCharge = null; }
+            try { _tRbmArcher = AccessTools.TypeByName("RBMAI.RBMBehaviorArcherSkirmish") ?? AccessTools.TypeByName("RBMBehaviorArcherSkirmish"); } catch { _tRbmArcher = null; }
+            if (_tRbmCavCharge != null && !typeof(BehaviorComponent).IsAssignableFrom(_tRbmCavCharge)) _tRbmCavCharge = null;
+            if (_tRbmArcher != null && !typeof(BehaviorComponent).IsAssignableFrom(_tRbmArcher)) _tRbmArcher = null;
+            try { _fChargeInf = _tRbmCavCharge != null ? AccessTools.Field(_tRbmCavCharge, "ChargeInfantry") : null; } catch { _fChargeInf = null; }
+            if (_fChargeInf != null && _fChargeInf.FieldType != typeof(bool)) _fChargeInf = null;
+            var missA = new StringBuilder(60);
+            if (_fLeftCav != null && _fRightCav != null)
+            {
+                PatchAttack(h, typeof(TacticFullScaleAttack), missA);
+                PatchAttack(h, typeof(TacticRangedHarrassmentOffensive), missA);
+            }
+            else missA.Append(" brak pol konnicy");
             return "GetTacticWeight " + _patched + "/" + _wanted + " (Priority.Last po com.rbmai" + (miss.Length > 0 ? "; NIE:" + miss.ToString() : "")
-                   + "), biezaca taktyka " + (_fCur != null ? "TAK" : "NIE");
+                   + "), Attack " + _patchedAttack + "/" + _wantedAttack + (missA.Length > 0 ? " (NIE:" + missA.ToString() + ")" : "")
+                   + ", biezaca taktyka " + (_fCur != null ? "TAK" : "NIE") + ", typy RBM: RBMBehaviorCavalryCharge " + (_fChargeInf != null ? "TAK" : "NIE")
+                   + ", RBMBehaviorArcherSkirmish " + (_tRbmArcher != null ? "TAK" : "NIE") + ", wagi zachowan " + (_fBehaviors != null ? "TAK" : "NIE");
+        }
+
+        private static void PatchAttack(Harmony h, Type t, StringBuilder miss)
+        {
+            _wantedAttack++;
+            try
+            {
+                var target = AccessTools.DeclaredMethod(t, "Attack");
+                if (target == null) { miss.Append(' ').Append(t.Name); return; }
+                h.Patch(target, postfix: new HarmonyMethod(typeof(Doctrine), nameof(PostAttack)) { priority = Priority.Last, after = new[] { "com.rbmai" } });
+                bool ok = false;
+                var info = Harmony.GetPatchInfo(target);
+                if (info != null) foreach (var p in info.Postfixes) if (p != null && p.owner == h.Id && p.PatchMethod != null && p.PatchMethod.DeclaringType == typeof(Doctrine)) ok = true;
+                if (ok) _patchedAttack++; else miss.Append(' ').Append(t.Name);
+            }
+            catch (Exception e)
+            {
+                miss.Append(' ').Append(t.Name).Append('(').Append(e.GetType().Name).Append(')');
+                RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.LatkaAttack " + t.Name, e);
+            }
+        }
+
+        /// <summary>S3 (tick druzyn, przy zmianie fazy taktyki na atak - po postfiksie RBM): konnica skrzydel z BehaviorFlank wedlug doktryny.</summary>
+        private static void PostAttack(object __instance)
+        {
+            if (!_on) return;
+            try
+            {
+                var tc = __instance as TacticComponent;
+                var team = tc != null ? tc.Team : null;
+                if (team == null) return;
+                int ti = team.TeamIndex;
+                if (ti < 0 || ti >= MaxTeams || !ReferenceEquals(_teamRef[ti], team)) return;
+                float w = _flankW[ti];
+                if (w <= 0f) return;
+                bool hunt = w >= S3HuntFrom && _enemyRanged[ti] >= S3ArchersMin;
+                var lf = _fLeftCav; var rf = _fRightCav;
+                if (lf != null) Flank(lf(tc), w, hunt);
+                if (rf != null) Flank(rf(tc), w, hunt);
+            }
+            catch { Interlocked.Increment(ref _postErr); }
+        }
+
+        private static void Flank(Formation f, float w, bool hunt)
+        {
+            if (f == null || f.CountOfUnits <= 0 || !f.IsAIControlled) return;
+            var ai = f.AI;
+            if (ai == null) return;
+            var b = ai.GetBehavior<BehaviorFlank>();
+            if (b == null) { Interlocked.Increment(ref _s3NoBehavior); return; }
+            b.WeightFactor = w;
+            Interlocked.Increment(ref _s3Set);
+            if (!hunt || _fChargeInf == null || _fBehaviors == null) return;
+            var lst = _fBehaviors(ai);
+            if (lst == null) return;
+            for (int i = 0; i < lst.Count; i++)
+            {
+                var x = lst[i];
+                if (x != null && x.GetType() == _tRbmCavCharge) { _fChargeInf.SetValue(x, false); Interlocked.Increment(ref _s3Hunt); }
+            }
         }
 
         private static void Patch(Harmony h, Type t, string post, StringBuilder miss)
@@ -224,7 +330,13 @@ namespace Armoury
             }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Begin druzyny", e); }
             var c = Settings.Current;
-            _on = c != null && (c.CultureDoctrines || c.ShootBeforeAttacking) && m != null && m.IsFieldBattle && _patched > 0;
+            _on = AnyKey(c) && m != null && m.IsFieldBattle && _patched + _patchedAttack > 0;
+        }
+
+        /// <summary>Ktorykolwiek klucz doktryny i manewrow (WarCouncil.Council biegnie takze przy CommanderTactics NIE, gdy ten jest TAK).</summary>
+        internal static bool AnyKey(Settings c)
+        {
+            return c != null && (c.CultureDoctrines || c.ShootBeforeAttacking || c.CavalrySeeksFlanks || c.ArchersFallBackBehindInfantry);
         }
 
         internal static void End(Mission m)
@@ -244,8 +356,11 @@ namespace Armoury
                 for (int k = 0; k < K; k++) _mul[i * K + k] = 1f;
                 _teamRef[i] = null; _seen[i] = null; _prof[i] = null; _doct[i] = false; _tacOf[i] = 0; _culOf[i] = null;
                 _s1[i] = 0; _s1Start[i] = 0f; _s1Clock[i] = -1f; _s1Ranged[i] = 0f; _cur[i] = null; _hist[i] = null;
+                _flankW[i] = 0f; _enemyRanged[i] = 0f;
             }
+            for (int i = 0; i < Slots; i++) { _sWho[i] = null; _sBack[i] = false; _sSnap[i] = null; _sFlank[i] = false; }
             _sampleTeamA = _sampleTeamD = -1;
+            _acc1 = 0f;
         }
 
         /// <summary>WarCouncil.One (glowny watek, AfterStart albo pozna druzyna DR): doktryna druzyny AI i dodatki do listy taktyk. have/note - lista typow
@@ -253,7 +368,10 @@ namespace Armoury
         internal static void ApplyList(Mission m, Team team, int tac, string culture, List<Type> have, StringBuilder note, bool late)
         {
             var c = Settings.Current;
-            if (c == null || team == null || (!c.CultureDoctrines && !c.ShootBeforeAttacking)) return;
+            if (c == null || team == null || !AnyKey(c)) return;
+            // tylko misja, dla ktorej biegl Begin (BattleSense: bitwa, nie pojedynek - takze nie flaga testu "bitwa jako pojedynek")
+            var w = _m;
+            if (w == null || !ReferenceEquals(w.Target, m)) return;
             int ti = team.TeamIndex;
             if (ti < 0 || ti >= MaxTeams) return;
             _seen[ti] = team;
@@ -272,7 +390,7 @@ namespace Armoury
             _hist[ti] = new StringBuilder(120);
             int addShot = 0, addCharge = 0;
             // RangedHarrass (atak i obrona): bez strzelcow waga gry = 0 (TacticRangedHarrassmentOffensive.GetTacticWeight), wiec dodanie jest bezpieczne
-            if (WarCouncil.TryAdd(team, have, typeof(TacticRangedHarrassmentOffensive), note)) addShot++;
+            if ((c.CultureDoctrines || c.ShootBeforeAttacking) && WarCouncil.TryAdd(team, have, typeof(TacticRangedHarrassmentOffensive), note)) addShot++;
             if (c.CultureDoctrines && p.Charge && WarCouncil.TryAdd(team, have, typeof(TacticCharge), note)) addCharge++;
             SetBase(ti, c);
             _teamRef[ti] = team;
@@ -294,7 +412,7 @@ namespace Armoury
                 if (att) { if (_sampleA == null) { _sampleA = s.ToString(); _sampleTeamA = ti; } }
                 else if (_sampleD == null) { _sampleD = s.ToString(); _sampleTeamD = ti; }
             }
-            if (m != null && m.IsFieldBattle && _patched > 0 && (c.CultureDoctrines || c.ShootBeforeAttacking)) _on = true;
+            if (m != null && m.IsFieldBattle && _patched + _patchedAttack > 0) _on = true;
         }
 
         private static string F(float v) { return v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture); }
@@ -307,20 +425,27 @@ namespace Armoury
             _mul[ti * K + KShot] = d ? p.Shot : 1f;
             _mul[ti * K + KHorse] = d ? p.Horse : 1f;
             _mul[ti * K + KHold] = d ? p.Hold : 1f;
+            _flankW[ti] = c.CavalrySeeksFlanks ? (d ? p.Flank : 1f) : 0f;
         }
 
         internal static void Tick(Mission m, float dt)
         {
             if (m == null) return;
             _acc += dt;
+            _acc1 += dt;
+            if (_acc1 >= S4Every)
+            {
+                _acc1 = 0f;
+                try { Manoeuvres(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Manewry", e); }
+            }
             if (_acc < TickEvery) return;
             _acc = 0f;
             var w = _m;
             if (w == null || !ReferenceEquals(w.Target, m)) return;   // Begin nie biegl dla tej misji - nic
             var c = Settings.Current;
             if (c == null || !m.IsFieldBattle || m.MissionEnded) return;
-            bool keys = c.CultureDoctrines || c.ShootBeforeAttacking;
-            _on = keys && _patched > 0;
+            bool keys = AnyKey(c);
+            _on = keys && _patched + _patchedAttack > 0;
             if (!keys) return;
             float now = m.CurrentTime;
             var teams = m.Teams;
@@ -355,6 +480,7 @@ namespace Armoury
             var p = _prof[ti] ?? Neutral;
             float baseShot = c.CultureDoctrines ? p.Shot : 1f;
             var q = t.QuerySystem;
+            if (q != null) { try { _enemyRanged[ti] = q.EnemyRangedRatio; } catch { _enemyRanged[ti] = 0f; } }
             if (q != null && c.ShootBeforeAttacking && m.IsDeploymentFinished)
             {
                 float ours = q.RangedRatio + q.RangedCavalryRatio;
@@ -442,17 +568,226 @@ namespace Armoury
             return best < 0f ? 0f : best;
         }
 
+        // ------------------------------------------------------------ S3 zdarzenie flanki, S4 lucznicy za piechote (glowny watek co 1 s)
+
+        private static void Manoeuvres(Mission m)
+        {
+            var w = _m;
+            if (w == null || !ReferenceEquals(w.Target, m)) return;
+            var c = Settings.Current;
+            if (c == null || !m.IsFieldBattle || m.MissionEnded || !m.IsDeploymentFinished) return;
+            bool s3 = c.CavalrySeeksFlanks, s4 = c.ArchersFallBackBehindInfantry && _fBehaviors != null;
+            if (!s3 && !s4) { ReleaseAllS4(); return; }
+            float dist = Math.Max(20f, Math.Min(100f, c.ArcherFallBackDistance));
+            var teams = m.Teams;
+            int n = teams != null ? teams.Count : 0;
+            for (int i = 0; i < n; i++)
+            {
+                Team t = null;
+                try { t = teams[i]; } catch { t = null; }
+                if (!MissionTeams.Valid(t)) continue;
+                int ti = t.TeamIndex;
+                if (ti < 0 || ti >= MaxTeams || !_doct[ti] || !ReferenceEquals(_teamRef[ti], t)) continue;
+                var fl = t.FormationsIncludingSpecialAndEmpty;
+                int nf = fl != null ? fl.Count : 0;
+                for (int j = 0; j < nf && j < 10; j++)
+                {
+                    var f = fl[j];
+                    if (f == null) continue;
+                    int idx = ti * 10 + j;
+                    if (!ReferenceEquals(_sWho[idx], f)) { _sWho[idx] = f; _sBack[idx] = false; _sSnap[idx] = null; _sFlank[idx] = false; }
+                    if (f.CountOfUnits <= 0 || !f.IsAIControlled) { _sBack[idx] = false; _sSnap[idx] = null; continue; }
+                    try
+                    {
+                        var q = f.QuerySystem;
+                        if (q == null) continue;
+                        if (q.IsCavalryFormation)
+                        {
+                            bool fr = s3 && f.AI != null && f.AI.ActiveBehavior is BehaviorFlank;
+                            if (fr && !_sFlank[idx])
+                            {
+                                lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s3Rides++; }
+                                FlankRide(f);
+                            }
+                            _sFlank[idx] = fr;
+                            continue;
+                        }
+                        // lucznicy jako glowny szyk druzyny (BehaviorScreenedSkirmish da im wtedy wage 0) - bez S4
+                        if (!q.IsRangedFormation || (f.AI != null && f.AI.IsMainFormation && !_sBack[idx])) continue;
+                        if (!s4) { if (_sBack[idx]) Restore(m, f, idx); continue; }
+                        float gap = MeleeGap(t, f);
+                        bool screen = Screen(t, f);
+                        if (!_sBack[idx])
+                        {
+                            if (gap <= dist && screen) TakeOver(m, f, idx);
+                        }
+                        else if (gap > dist + S4Back || !screen) Restore(m, f, idx);
+                        else Keep(m, f, idx);
+                    }
+                    catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Szyk", e); }
+                }
+            }
+        }
+
+        /// <summary>Najblizszy szyk wroga walczacy wrecz (piechota albo konnica, nie strzelcy) - mediana do mediany minus polowy glebokosci.</summary>
+        private static float MeleeGap(Team team, Formation f)
+        {
+            float best = float.MaxValue;
+            var my = f.CachedMedianPosition.AsVec2;
+            var teams = team.Mission != null ? team.Mission.Teams : null;
+            int n = teams != null ? teams.Count : 0;
+            for (int i = 0; i < n; i++)
+            {
+                var t = teams[i];
+                if (!MissionTeams.Enemies(team, t)) continue;
+                var fl = t.FormationsIncludingSpecialAndEmpty;
+                int nf = fl != null ? fl.Count : 0;
+                for (int j = 0; j < nf; j++)
+                {
+                    var e = fl[j];
+                    if (e == null || e.CountOfUnits <= 0) continue;
+                    var eq = e.QuerySystem;
+                    if (eq == null || eq.IsRangedFormation || eq.IsRangedCavalryFormation || !(eq.IsInfantryFormation || eq.IsCavalryFormation)) continue;
+                    float d = my.Distance(e.CachedMedianPosition.AsVec2) - 0.5f * (f.Depth + e.Depth);
+                    if (d < best) best = d;
+                }
+            }
+            return best < 0f ? 0f : best;
+        }
+
+        /// <summary>Zaslona: glowny szyk piechoty druzyny (IsMainFormation - tego szuka BehaviorScreenedSkirmish) z co najmniej polowa liczby lucznikow.</summary>
+        private static bool Screen(Team team, Formation archers)
+        {
+            var fl = team.FormationsIncludingSpecialAndEmpty;
+            int nf = fl != null ? fl.Count : 0;
+            for (int j = 0; j < nf; j++)
+            {
+                var g = fl[j];
+                if (g == null || ReferenceEquals(g, archers) || g.CountOfUnits <= 0 || g.AI == null || !g.AI.IsMainFormation) continue;
+                var gq = g.QuerySystem;
+                if (gq != null && gq.IsInfantryFormation && g.CountOfUnits * 2 >= archers.CountOfUnits) return true;
+            }
+            return false;
+        }
+
+        private static bool IsSkirmish(BehaviorComponent b)
+        {
+            return b is BehaviorSkirmish || b is BehaviorSkirmishLine || b is BehaviorScreenedSkirmish || b is BehaviorSkirmishBehindFormation
+                   || (_tRbmArcher != null && b.GetType() == _tRbmArcher);
+        }
+
+        /// <summary>Wagi to juz nasze (ScreenedSkirmish 2, reszta 0).</summary>
+        private static bool Ours(List<BehaviorComponent> lst)
+        {
+            for (int i = 0; i < lst.Count; i++)
+            {
+                var b = lst[i];
+                if (b == null) continue;
+                if (b is BehaviorScreenedSkirmish) { if (Math.Abs(b.WeightFactor - S4Weight) > 0.001f) return false; }
+                else if (b.WeightFactor > 1E-07f) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Przejecie: tylko szyk, ktory sie ostrzeliwuje (aktywna waga skirmish) i ma BehaviorScreenedSkirmish; wagi zapisane do powrotu.
+        /// 0 = przejety, 1 = brak BehaviorScreenedSkirmish, 2 = szyk sie nie ostrzeliwuje (inny rozkaz taktyki).</summary>
+        private static int Apply(List<BehaviorComponent> lst, int idx)
+        {
+            bool screened = false, skirmish = false;
+            for (int i = 0; i < lst.Count; i++)
+            {
+                var b = lst[i];
+                if (b == null) continue;
+                if (b is BehaviorScreenedSkirmish) screened = true;
+                if (b.WeightFactor > 1E-07f && IsSkirmish(b)) skirmish = true;
+            }
+            if (!screened) return 1;
+            if (!skirmish) return 2;
+            var snap = new float[lst.Count];
+            for (int i = 0; i < lst.Count; i++) snap[i] = lst[i] != null ? lst[i].WeightFactor : 0f;
+            _sSnap[idx] = snap;
+            for (int i = 0; i < lst.Count; i++)
+            {
+                var b = lst[i];
+                if (b == null) continue;
+                b.WeightFactor = b is BehaviorScreenedSkirmish ? S4Weight : 0f;
+            }
+            return 0;
+        }
+
+        private static void TakeOver(Mission m, Formation f, int idx)
+        {
+            var lst = _fBehaviors(f.AI);
+            if (lst == null) return;
+            int r = Apply(lst, idx);
+            lock (RoutHold.Gate)
+            {
+                RoutHold.EnsureLocked(m);
+                if (r == 0) _s4Back++; else if (r == 1) _s4NoScreen++; else _s4Other++;
+            }
+            if (r != 0) return;
+            _sBack[idx] = true;
+            ArchersFellBack(f);
+        }
+
+        /// <summary>Szyk dalej za piechota: taktyka przestawila wagi (zmiana fazy) - przejecie od nowa, gdy dalej sie ostrzeliwuje, inaczej puszczamy.</summary>
+        private static void Keep(Mission m, Formation f, int idx)
+        {
+            var lst = _fBehaviors(f.AI);
+            if (lst == null) return;
+            if (Ours(lst) && _sSnap[idx] != null && _sSnap[idx].Length == lst.Count) return;
+            if (Apply(lst, idx) == 0) return;
+            _sBack[idx] = false;
+            _sSnap[idx] = null;
+            lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Lost++; }
+        }
+
+        private static void Restore(Mission m, Formation f, int idx)
+        {
+            var lst = f.AI != null ? _fBehaviors(f.AI) : null;
+            var snap = _sSnap[idx];
+            if (lst != null && snap != null && snap.Length == lst.Count && Ours(lst))
+                for (int i = 0; i < lst.Count; i++) if (lst[i] != null) lst[i].WeightFactor = snap[i];
+            _sBack[idx] = false;
+            _sSnap[idx] = null;
+            lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Return++; }
+        }
+
+        /// <summary>Klucz S4 wylaczony w trakcie bitwy: zapisane wagi wracaja.</summary>
+        private static void ReleaseAllS4()
+        {
+            for (int i = 0; i < Slots; i++)
+            {
+                if (!_sBack[i]) continue;
+                var f = _sWho[i];
+                try
+                {
+                    var lst = f != null && f.AI != null && _fBehaviors != null ? _fBehaviors(f.AI) : null;
+                    var snap = _sSnap[i];
+                    if (lst != null && snap != null && snap.Length == lst.Count && Ours(lst))
+                        for (int k = 0; k < lst.Count; k++) if (lst[k] != null) lst[k].WeightFactor = snap[k];
+                }
+                catch { }
+                _sBack[i] = false;
+                _sSnap[i] = null;
+            }
+        }
+
         // ------------------------------------------------------------ linia misji
 
         internal static void ResetCounters()
         {
             _teams = _horde = _noProfile = _late = _addShot = _addCharge = _s1On = _s1Limit = _s1Loss = _s1Contact = _s1Back = _switches = _stum = 0;
+            _s3Rides = _s4Back = _s4Return = _s4Lost = _s4NoScreen = _s4Other = 0;
+            Interlocked.Exchange(ref _s3Set, 0);
+            Interlocked.Exchange(ref _s3Hunt, 0);
+            Interlocked.Exchange(ref _s3NoBehavior, 0);
             _sampleA = _sampleD = _histA = _histD = null;
             Interlocked.Exchange(ref _calls, 0);
             Interlocked.Exchange(ref _postErr, 0);
         }
 
-        internal static int Activity { get { return _teams + _s1On + _stum; } }
+        internal static int Activity { get { return _teams + _s1On + _stum + _s3Rides + _s4Back; } }
 
         /// <summary>Segment ' | doktryna ...' (bez znaku '|' w srodku). Wolajacy trzyma RoutHold.Gate. Historia taktyk probek czytana na koniec misji
         /// (glowny watek - Tick nie biegnie rownolegle).</summary>
@@ -463,6 +798,12 @@ namespace Armoury
               .Append("), lista +RangedHarrass ").Append(_addShot).Append(", +Charge ").Append(_addCharge)
               .Append("; najpierw ostrzal ").Append(_s1On).Append(" (koniec: limit czasu ").Append(_s1Limit).Append(", straty ").Append(_s1Loss)
               .Append(", zwarcie ").Append(_s1Contact).Append(", wrog jednak strzela ").Append(_s1Back).Append("); zmian taktyki ").Append(_switches)
+              .Append("; flanka ").Append(c != null && c.CavalrySeeksFlanks ? "TAK" : "NIE").Append(": wagi Flank ").Append(Volatile.Read(ref _s3Set))
+              .Append(" (najpierw lucznicy ").Append(Volatile.Read(ref _s3Hunt)).Append(", bez BehaviorFlank ").Append(Volatile.Read(ref _s3NoBehavior))
+              .Append("), konnica w BehaviorFlank ").Append(_s3Rides)
+              .Append("; lucznicy za piechote ").Append(c != null && c.ArchersFallBackBehindInfantry ? "TAK" : "NIE").Append(": cofniecia ").Append(_s4Back)
+              .Append(", powroty ").Append(_s4Return).Append(", puszczone po zmianie taktyki ").Append(_s4Lost).Append(", bez ScreenedSkirmish ").Append(_s4NoScreen)
+              .Append(", nie ostrzeliwal sie ").Append(_s4Other)
               .Append("; probka atak ").Append(_sampleA ?? "-").Append(_histA ?? Hist(_sampleTeamA)).Append(", obrona ").Append(_sampleD ?? "-").Append(_histD ?? Hist(_sampleTeamD))
               .Append("; latki ").Append(_patched).Append('/').Append(_wanted).Append(", wywolan z mnoznikiem ").Append(Volatile.Read(ref _calls))
               .Append(", bledy latek ").Append(Volatile.Read(ref _postErr)).Append(", potkniec ").Append(_stum);
