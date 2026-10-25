@@ -61,13 +61,16 @@ namespace Armoury
     ///    PlayerEncounter.RosterToReceiveLootPrisoners ze skladu pokonanych, MapEvent.CaptureDefeatedPartyMembers) przy wygranej gracza z banda: loch gracza
     ///    (zwykli wedlug StringId) i sklad kazdej pokonanej bandy. Ekran jencow (DoLootMembersAndPrisonersOfParty) zamyka sie PRZED MapEventEnded
     ///    (DoEnd -> Finish -> FinalizeBattle -> MapEvent.FinalizeEvent), wiec w OnMapEventEnded wzieci jency sa juz w lochu.
-    ///  - WPIS (zapis arm_interrogation, siodma czesc): przyrost rodzaju w lochu wobec migawki = jency z bandy, ktora miala najwiecej ludzi tego rodzaju (jedna
-    ///    pokonana partia - ona); rodzaj -> wpis bandy z pamieci (kultura bandy, kryjowka, miejsce, doba, banda) i liczba ludzi. Jeden wpis na rodzaj: nowa
-    ///    banda tego rodzaju - dane najnowszej, liczba sie sumuje. Liczba przycinana do stanu lochu (sprzedaz, ucieczka, okup, smierc), rodzaju juz nie ma - wpis
-    ///    odpada; najwyzej OriginMax wpisow (najstarsze odpadaja).
+    ///  - WPIS (zapis arm_interrogation, siodma czesc): przyrost rodzaju w lochu wobec migawki = jency z bandy, ktora miala najwiecej ludzi tego rodzaju;
+    ///    rodzaju, ktorego zadna pokonana banda nie miala w skladzie - bez wpisu ("bez bandy"; recenzja p7 R1: wedlug dekompilacji 1.4.8 jency bitwy pochodza
+    ///    tylko ze skladu pokonanych - CaptureDefeatedPartyMembers, a zwykli jency bandy ida do uwolnionych - LootDefeatedPartyPrisoners -> RosterToReceiveLootMembers;
+    ///    taki przyrost moze dac tylko cudza latka, wiec zadnego zgadywania, takze przy jednej pokonanej partii); rodzaj -> wpis bandy z pamieci (kultura bandy,
+    ///    kryjowka, miejsce, doba, banda) i liczba ludzi. Jeden wpis na rodzaj: nowa banda tego rodzaju - dane najnowszej, liczba sie sumuje. Liczba przycinana
+    ///    do stanu lochu (sprzedaz, ucieczka, okup, smierc), rodzaju juz nie ma - wpis odpada; najwyzej OriginMax wpisow (najstarsze odpadaja).
     ///  - GRUPA: zwykly zolnierz z wpisem (dezerter z bandy) - stos najwyzej liczby z wpisu, Culture = kultura bandy (kryjowki, limit doby), PersonCulture =
     ///    jego kultura; bandyta z wpisem - caly stos, kultura bandy (looter z bandy robber_knights wskaze kryjowke tej bandy). Bez wpisu - jak dotad.
-    ///    Kryjowka: (b) z wpisu (nie z pamieci kultury), (c) najblizsza kultury bandy od miejsca bitwy z wpisu.
+    ///    Kryjowka: (b) z wpisu (nie z pamieci kultury) - wpis najwyzej MemoryDays dob (recenzja p7 R2: ta sama regula wieku co pamiec band; starszy - pamiec
+    ///    kultury bandy jak u bandyty bez wpisu), (c) najblizsza kultury bandy od miejsca bitwy z wpisu (wpis po terminie - od miejsca z pamieci albo od gracza).
     ///  - OPCJA: jency w lochu, ale zaden z bandy - opcja SZARA z powodem (WhyNoOutlaws) zamiast ukrycia; pusty loch - ukryta jak dotad.
     ///  Jency wzieci przed ta wersja nie maja wpisu (nie zgadujemy ich bandy - "nic z niczego"). PrisonerLaw.Criminal bez zmian (dezerter z bandy nie idzie na Mur).
     /// </summary>
@@ -113,7 +116,6 @@ namespace Armoury
             public MapEvent Event;
             public Dictionary<string, int> Before;                          // StringId zwyklego jenca -> liczba w lochu gracza przed bitwa
             public Dictionary<string, Dictionary<string, int>> Bands;       // Clean(StringId bandy) -> StringId zwyklego -> liczba w skladzie
-            public int Losers;                                              // partii po stronie pokonanej
         }
         private static Snap _snap;
 
@@ -261,18 +263,17 @@ namespace Armoury
             var mp = MobileParty.MainParty;
             if (mp == null || mp.PrisonRoster == null) return;
             TrimOrigins(mp.PrisonRoster);   // stan lochu przed bitwa: sprzedani, zbiegli, wykupieni od ostatniej linii doby
-            _snap = new Snap { Event = me, Before = Troops(mp.PrisonRoster), Bands = bands, Losers = lose.Parties.Count };
+            _snap = new Snap { Event = me, Before = Troops(mp.PrisonRoster), Bands = bands };
         }
 
-        /// <summary>Przyrost lochu wobec migawki = jency tej bitwy; kazdy rodzaj do bandy, ktora miala go najwiecej w skladzie (jedna pokonana partia - ona).
-        /// Zwraca ludzi wpisanych (gra i test).</summary>
+        /// <summary>Przyrost lochu wobec migawki = jency tej bitwy; kazdy rodzaj do bandy, ktora miala go najwiecej w skladzie. Rodzaj, ktorego zadna pokonana
+        /// banda nie miala w migawce - "bez bandy", bez wpisu (recenzja p7 R1: takze przy jednej pokonanej partii - jency bitwy to tylko jej sklad, inny przyrost
+        /// to cudza latka, np. uwolnieni jency bandy wzieci jako jency). Zwraca ludzi wpisanych (gra i test).</summary>
         internal static int NoteOrigins(Snap sn, Dictionary<string, Band> made, int today)
         {
             var mp = MobileParty.MainParty;
             if (sn == null || made == null || made.Count == 0 || mp == null || mp.PrisonRoster == null) return 0;
             var now = Troops(mp.PrisonRoster);
-            Band only = null;
-            if (made.Count == 1 && sn.Losers == 1) foreach (var b in made.Values) only = b;
             int men = 0, skip = 0;
             var per = new Dictionary<Band, List<string>>();
             foreach (var kv in now)
@@ -288,7 +289,6 @@ namespace Armoury
                     if (!made.TryGetValue(bk.Key, out b) || !bk.Value.TryGetValue(kv.Key, out c) || c <= bn) continue;
                     bn = c; best = b;
                 }
-                if (best == null) best = only;
                 var ch = best != null ? MBObjectManager.Instance.GetObject<CharacterObject>(kv.Key) : null;
                 if (best == null || ch == null || PeopleBook.IsWight(ch)) { skip += d; continue; }
                 AddOrigin(kv.Key, best, d, kv.Value, today);
@@ -357,6 +357,12 @@ namespace Armoury
         {
             if (string.IsNullOrEmpty(id)) return null;
             try { return MBObjectManager.Instance.GetObject<CultureObject>(id); } catch { return null; }
+        }
+
+        /// <summary>Recenzja p7 R2: wpis pochodzenia w terminie pamieci band (najwyzej MemoryDays dob - jak Memory).</summary>
+        internal static bool OriginFresh(Origin o)
+        {
+            return o != null && Today - o.Day <= MemoryDays;
         }
 
         private static Band OriginBand(Origin o)
@@ -558,7 +564,10 @@ namespace Armoury
                 if (Open(born)) { source = "bohater"; mem = Memory(g.Culture, upTo); return born; }
             }
             var c = g.Culture;
-            mem = g.Origin != null ? OriginBand(g.Origin) : Memory(c, upTo);   // p7-pochodzenie: jeniec z wpisem zna SWOJA bande (wpis), nie najnowsza bande kultury
+            // p7-pochodzenie: jeniec z wpisem zna SWOJA bande (wpis), nie najnowsza bande kultury. Recenzja p7 R2: wpis najwyzej MemoryDays dob jak pamiec band
+            // (ta sama regula wieku; starszy - pamiec kultury bandy jak u bandyty bez wpisu). Warunku upTo (banda nie pozniejsza niz pierwsza doba stosu) wpis
+            // nie ma: powstaje z przyrostu lochu w bitwie z ta banda, wiec jej ludzie SA w stosie (jeden wpis na rodzaj - stos mieszany bierze najnowsza bande).
+            mem = g.Origin != null && OriginFresh(g.Origin) ? OriginBand(g.Origin) : Memory(c, upTo);
             if (mem != null && mem.Hideout.Length > 0)
             {
                 var st = Settlement.Find(mem.Hideout);
@@ -1173,9 +1182,16 @@ namespace Armoury
             {
                 try
                 {
-                    int og = 0, omen = 0, odes = 0;
-                    foreach (var g in Groups()) if (g.Origin != null) { og++; omen += g.Healthy + g.Wounded; if (g.Deserter) odes += g.Healthy + g.Wounded; }
-                    Log.Info(P + "pochodzenie - doba " + today + " | wpisow " + _origins.Count + " (grup w lochu " + og + ", ludzi " + omen + ", z tego dezerterow " + odes + ")"
+                    int og = 0, omen = 0, odes = 0, oold = 0;
+                    foreach (var g in Groups())
+                        if (g.Origin != null)
+                        {
+                            og++; omen += g.Healthy + g.Wounded;
+                            if (g.Deserter) odes += g.Healthy + g.Wounded;
+                            if (!OriginFresh(g.Origin)) oold++;   // recenzja p7 R2: kryjowka z pamieci kultury bandy, nie z wpisu
+                        }
+                    Log.Info(P + "pochodzenie - doba " + today + " | wpisow " + _origins.Count + " (grup w lochu " + og + ", ludzi " + omen + ", z tego dezerterow " + odes
+                             + ", grup z wpisem starszym niz " + MemoryDays + " dob " + oold + ")"
                              + " | dzis bitew z wpisem " + _dOBattles + ", ludzi wpisanych " + _dOMen + ", bez bandy " + _dOSkip + ", bez migawki " + _dONoSnap
                              + " | opcja szara (zaden z bandy) odswiezen " + _dOGrey + ".");
                 }

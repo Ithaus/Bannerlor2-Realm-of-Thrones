@@ -4,6 +4,8 @@ using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -37,7 +39,13 @@ namespace Armoury
     ///  OnPlayerBattleEndEvent (sklad bandy "test_dezerter" {D: 3}), 3 x D do lochu (1 ranny) jak ekran jencow, NoteOrigins jak OnMapEventEnded -> wpis {kultura C,
     ///  kryjowka = najblizsza otwarta (Open) albo brak, liczba 3}; grupa D: dezerter, kultura C, kultura rozmowcy = kultura D, 2/1, klucz limitu = A; Target -
     ///  kryjowka bandy "skad banda" (bez otwartej - "kultura" albo brak); rozmowa rzutem 0 (slot rodzaju zwolniony jak nowa doba) - MOWI z kryjowka bandy;
-    ///  przyciecie: -1 D -> grupa 2 i wpis 2, reszta D zdjeta -> grupy i wpisu brak; przyrost rodzaju, ktorego zadna z dwoch band nie miala - bez wpisu.
+    ///  wpis po terminie (recenzja p7 R2: doba wpisu = dzis - MemoryDays - 1 na chwile) - kryjowka nie "skad banda"; przyciecie: -1 D -> grupa 2 i wpis 2,
+    ///  reszta D zdjeta -> grupy i wpisu brak; przyrost rodzaju, ktorego zadna z dwoch band nie miala - bez wpisu; jedna pokonana banda bez D (recenzja p7 R1 -
+    ///  dawny zapas "jedna partia - ona") - bez wpisu. Liczniki doby pochodzenia (bitwy, wpisani, bez bandy, opcja szara) wrocone po T14 i T15 - linia doby to gra.
+    ///  T15 (recenzja p7 R3): warunek opcji obozu (Cond na atrapie MenuCallbackArgs) po sprzataniu - loch gracza bez jencow z bandy: +1 D (bez wpisu) -> opcja
+    ///  widoczna i SZARA z WhyNoOutlaws (a przy pustym lochu przed +1 D - ukryta); loch gracza z jencami z bandy - opcja widoczna, bez WhyNoOutlaws. Wpiecia zdarzen
+    ///  (OnPlayerBattleEndEvent -> MapEventEnded tej samej bitwy) test nie sprawdza - tylko prawdziwa wygrana z banda: linia "pochodzenie - banda" po "pamiec -
+    ///  banda" i w linii doby "bez migawki 0".
     ///  Wpisy pochodzenia rodzajow A, B, L, D gracza na czas proby odlozone (jak kajdany), potem wrocone. T9 - zapis z probnym wpisem pochodzenia tam i z powrotem.
     /// Linia "Przesluchanie (m109): test - ... - wynik TAK|NIE." (grupa m109przes PRZES-7, m110okol OKOL-8).
     /// </summary>
@@ -471,7 +479,8 @@ namespace Armoury
                     }
                     const string bid = "test_dezerter";
                     string dk = Clean(tdz.StringId);
-                    var sn = new Snap { Event = null, Before = Troops(r), Bands = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal), Losers = 1 };
+                    int oB0 = _dOBattles, oM0 = _dOMen, oS0 = _dOSkip, oG0 = _dOGrey;   // liczniki doby pochodzenia - wrocone na koncu T14 (proba to nie gra)
+                    var sn = new Snap { Event = null, Before = Troops(r), Bands = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal) };
                     sn.Bands[bid] = new Dictionary<string, int>(StringComparer.Ordinal) { { tdz.StringId, 3 } };
                     r.AddToCounts(tdz, 3, false, 1);   // jak ekran jencow: 3 wzietych, 1 ranny
                     var band = new Band { Day = today, Culture = Clean(c.StringId), Hideout = lair != null ? Clean(lair.StringId) : "", Party = bid, X = at.x, Y = at.y };
@@ -484,6 +493,16 @@ namespace Armoury
                     string src = null, w = null, wl = null; Band m = null;
                     var lt = g != null ? Target(g, out src, out m, out w, out wl) : null;
                     bool tgt = g != null && (lair != null ? lt == lair && src == "banda" : lt == null || src == "kultura");
+                    // recenzja p7 R2: wpis po terminie pamieci band - kryjowka nie z wpisu (pamiec band pusta od T4: "kultura" albo brak, nigdy "banda")
+                    bool fresh = OriginFresh(o), stale = false;
+                    string srcOld = null;
+                    if (o != null && g != null)
+                    {
+                        int day0 = o.Day;
+                        o.Day = today - MemoryDays - 1;
+                        try { string w2, wl2; Band m2; Target(g, out srcOld, out m2, out w2, out wl2); stale = !OriginFresh(o) && srcOld != "banda"; }
+                        finally { o.Day = day0; }
+                    }
                     var res = Act(g, false, 0f);
                     bool act = res.Refused ? lair == null && res.RefuseWhy != "limit" && res.RefuseWhy != "brak grupy"
                                            : res.Talked && (lair == null || (res.Lair == lair && res.Source == "banda"));
@@ -494,7 +513,7 @@ namespace Armoury
                     if (left.H + left.W > 0) r.AddToCounts(tdz, -(left.H + left.W), false, -left.W);   // ucieczka reszty
                     bool gone = Find(dk) == null && !_origins.ContainsKey(dk);
                     // przyrost rodzaju, ktorego zadna z dwoch pokonanych band nie miala w skladzie - bez wpisu (nie zgadujemy)
-                    var sn2 = new Snap { Event = null, Before = Troops(r), Bands = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal), Losers = 2 };
+                    var sn2 = new Snap { Event = null, Before = Troops(r), Bands = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal) };
                     sn2.Bands["test_a"] = new Dictionary<string, int>(StringComparer.Ordinal);
                     sn2.Bands["test_b"] = new Dictionary<string, int>(StringComparer.Ordinal);
                     r.AddToCounts(tdz, 1);
@@ -502,14 +521,23 @@ namespace Armoury
                     int got2 = NoteOrigins(sn2, new Dictionary<string, Band>(StringComparer.Ordinal) { { "test_a", band }, { "test_b", bandB } }, today);
                     bool skip = got2 == 0 && !_origins.ContainsKey(dk);
                     r.AddToCounts(tdz, -1);
+                    // recenzja p7 R1: jedna pokonana banda, w jej skladzie inny rodzaj (A), bez D - przyrost D bez wpisu (dawny zapas "jedna partia - ona" usuniety)
+                    var sn3 = new Snap { Event = null, Before = Troops(r), Bands = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal) };
+                    sn3.Bands["test_a"] = new Dictionary<string, int>(StringComparer.Ordinal) { { ta.StringId, 2 } };
+                    r.AddToCounts(tdz, 1);
+                    int got3 = NoteOrigins(sn3, new Dictionary<string, Band>(StringComparer.Ordinal) { { "test_a", band } }, today);
+                    bool skip1 = got3 == 0 && !_origins.ContainsKey(dk);
+                    r.AddToCounts(tdz, -1);
                     _origins.Remove(dk);
-                    bool t = rec && grp && tgt && act && cut && gone && skip;
+                    _dOBattles = oB0; _dOMen = oM0; _dOSkip = oS0; _dOGrey = oG0;
+                    bool t = rec && grp && tgt && fresh && stale && act && cut && gone && skip && skip1;
                     ok &= t;
                     pts.Add("T14 " + YN(t) + " (D " + tdz.StringId + ", kultura D " + (tdz.Culture != null ? tdz.Culture.StringId : "-") + ", kryjowka bandy " + (lair != null ? lair.StringId : "brak")
                             + ", wpis " + YN(rec) + " (wpisanych " + got + "), grupa " + YN(grp) + (g != null ? " (" + g.Healthy + "/" + g.Wounded + ", kultura " + (g.Culture != null ? g.Culture.StringId : "-")
                             + ", dezerter " + YN(g.Deserter) + ")" : " (brak)") + ", Target " + (lt != null ? lt.StringId + " skad " + src : "brak: " + (wl ?? "-")) + " " + YN(tgt)
+                            + ", wpis w terminie " + YN(fresh) + ", po terminie skad " + (srcOld ?? "-") + " " + YN(stale)
                             + ", rozmowa " + (res.Refused ? "odmowa " + res.RefuseWhy : res.Talked ? "MOWI skad " + res.Source : "MILCZY") + " " + YN(act)
-                            + ", przyciecie " + YN(cut) + ", wpis znika " + YN(gone) + ", obcy przyrost bez wpisu " + YN(skip) + ")");
+                            + ", przyciecie " + YN(cut) + ", wpis znika " + YN(gone) + ", obcy przyrost bez wpisu " + YN(skip) + ", jedna banda bez D - bez wpisu " + YN(skip1) + ")");
                 }
             }
             catch (Exception e) { ok = false; pts.Add("WYJATEK " + e.GetType().Name); Stumble("TestRun", e); }
@@ -553,6 +581,43 @@ namespace Armoury
             }
             catch (Exception e) { clean = false; HintStumble("HintTestClean", e); }
             ok &= clean;
+            // ---------------- T15 (p7-pochodzenie, recenzja p7 R3): warunek opcji obozu na atrapie MenuCallbackArgs - loch bez jencow z bandy: szara z WhyNoOutlaws
+            {
+                int grey0 = _dOGrey;   // licznik doby "opcja szara" - wrocony (proba to nie gra)
+                bool added = false;
+                try
+                {
+                    string dk15 = tdz != null ? Clean(tdz.StringId) : null;
+                    if (tdz == null) pts.Add("T15 POMINIETY (brak zwyklego zolnierza, ktorego gracz nie trzyma)");
+                    else if (_origins.ContainsKey(dk15)) pts.Add("T15 POMINIETY (wpis pochodzenia rodzaju D u gracza)");
+                    else
+                    {
+                        int g0 = Groups().Count;   // po sprzataniu: tylko jency gracza
+                        bool empty = r.TotalManCount <= 0, hid = true;
+                        if (empty) hid = !Cond(new MenuCallbackArgs((MenuContext)null, null));   // pusty loch - opcja ukryta (recenzja R1 m109)
+                        r.AddToCounts(tdz, 1); added = true;   // zwykly zolnierz bez wpisu - nie z bandy
+                        var a15 = new MenuCallbackArgs((MenuContext)null, null);
+                        bool vis = Cond(a15);
+                        string tip = a15.Tooltip != null ? a15.Tooltip.ToString() : "";
+                        int g1 = Groups().Count;
+                        r.AddToCounts(tdz, -1); added = false;
+                        var f15 = CountOf(tdz);
+                        bool back = f15.H == d0.H && f15.W == d0.W;
+                        bool t15 = g0 == 0 ? vis && !a15.IsEnabled && tip == WhyNoOutlaws && g1 == 0 && hid && back
+                                           : vis && tip != WhyNoOutlaws && g1 == g0 && back;   // loch gracza z jencami z bandy - opcja zwykla (galaz szara niesprawdzalna)
+                        ok &= t15;
+                        pts.Add("T15 " + YN(t15) + " (" + (g0 == 0 ? "loch bez jencow z bandy" + (empty ? " (pusty - ukryta " + YN(hid) + ")" : "") + " +1 D: widoczna " + YN(vis)
+                                + ", szara " + YN(!a15.IsEnabled) + ", podpowiedz \"" + tip + "\"" : "w lochu gracza grup z bandy " + g0 + " - galaz szara niesprawdzalna; opcja widoczna "
+                                + YN(vis) + ", bez WhyNoOutlaws " + YN(tip != WhyNoOutlaws)) + ", grup po +1 D " + g1 + ", D zdjety " + YN(back) + ")");
+                    }
+                }
+                catch (Exception e) { ok = false; pts.Add("T15 NIE (wyjatek " + e.GetType().Name + ")"); Stumble("TestT15", e); }
+                finally
+                {
+                    if (added) { try { r.AddToCounts(tdz, -1); } catch (Exception e) { ok = false; Stumble("TestT15clean", e); } }
+                    _dOGrey = grey0;
+                }
+            }
             // ---------------- T8: miara w karczmie najblizszego miasta
             try
             {
