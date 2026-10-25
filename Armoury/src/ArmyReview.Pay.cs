@@ -89,13 +89,13 @@ namespace Armoury
         {
             var v = new PayView();
             var c = Campaign.Current;
-            if (mp == null || c == null || c.Models == null || c.Models.PartyWageModel == null || mp.MemberRoster == null) { v.Why = "no campaign is running."; return v; }
+            if (mp == null || c == null || c.Models == null || c.Models.PartyWageModel == null || mp.MemberRoster == null) { v.Why = "No campaign is running."; return v; }
             SpeedWire();   // rodzaj linii rozpiski (ExplainedNumber._explainer) - ta sama refleksja co strona Speed (133d)
             var sw = Stopwatch.StartNew();
             // K10: naglowek i linie z JEDNEGO wywolania (BK GetHeroWage losuje zaokraglenie bohaterow spoza CW - osobne TotalWage daloby inna liczbe)
             var en = c.Models.PartyWageModel.GetTotalWage(mp, mp.MemberRoster, true);
             v.Result = en.ResultNumber;
-            if (float.IsNaN(v.Result) || float.IsInfinity(v.Result)) { v.Why = "the game's pay cannot be worked out now."; return v; }
+            if (float.IsNaN(v.Result) || float.IsInfinity(v.Result)) { v.Why = "The game's pay model gave no number for your party now."; return v; }   // recenzja 133: Why - sama przyczyna, pelne zdanie
             v.BaseNumber = en.BaseNumber;
             v.Total = (int)v.Result;
             v.Factor = CompanionWage.FactorOf(en);
@@ -272,7 +272,7 @@ namespace Armoury
         /// <summary>Strona "Pay": naglowek, ostatnia wyplata, linie gry, "Other", wynik.</summary>
         internal static string PayText(PayView v)
         {
-            if (v == null || !v.Ok) return "The pay cannot be worked out now" + (v != null && v.Why != null ? " - " + v.Why : ".");
+            if (v == null || !v.Ok) return v != null && v.Why != null ? v.Why : "The pay cannot be worked out now.";
             var sb = new StringBuilder();
             sb.Append("Your party's pay: ").Append(v.Total).Append(v.Total == 1 ? " denar" : " denars").Append(" a day, taken from your purse once a day");
             if (v.KnightPay > 0) sb.Append(", and ").Append(v.KnightPay).Append(" a day more to your knights (see Who gets what)");
@@ -338,7 +338,7 @@ namespace Armoury
         /// <summary>Strona "Who gets what": towarzysze, rycerze i inni bohaterowie, typy szeregowych (od najwiekszej czesci), legenda.</summary>
         internal static string WhoText(PayView v)
         {
-            if (v == null || !v.Ok) return "The pay cannot be worked out now" + (v != null && v.Why != null ? " - " + v.Why : ".");
+            if (v == null || !v.Ok) return v != null && v.Why != null ? v.Why : "The pay cannot be worked out now.";
             var sb = new StringBuilder();
             sb.Append("Who gets the ").Append(v.Total).Append(" a day");
             if (v.CompPaid > 0) sb.Append(": your companions take their pay by their level first (Companion Wage By Level); the rest falls");
@@ -382,7 +382,7 @@ namespace Armoury
         /// <summary>Strona "Where it goes": podzial jak SoldierPay.Route, rycerze, sakiewka ludzi teraz, zalegle naprawy, jedzenie.</summary>
         internal static string WhereText(PayView v, MobileParty mp)
         {
-            if (v == null || !v.Ok) return "The pay cannot be worked out now" + (v != null && v.Why != null ? " - " + v.Why : ".");
+            if (v == null || !v.Ok) return v != null && v.Why != null ? v.Why : "The pay cannot be worked out now.";
             var sb = new StringBuilder();
             if (!v.Routes) sb.Append("The pay leaves your purse and nobody gets it - Soldier Pay To Purse, Garrison Pay To Coffers and Crown Wage Refund Enabled are all off.");
             else
@@ -440,7 +440,7 @@ namespace Armoury
             try
             {
                 if (v == null || !v.Ok)
-                    return new InquiryElement("pay", "Pay (not available)", null, false, "The pay cannot be worked out now" + (v != null && v.Why != null ? " - " + v.Why : "."));
+                    return new InquiryElement("pay", "Pay (not available)", null, false, v != null && v.Why != null ? v.Why : "The pay cannot be worked out now.");
                 string t = "Pay: " + v.Total + " denars a day" + (v.KnightPay > 0 ? " + " + v.KnightPay + " to knights" : "") + " (" + LastPayShort(v) + ")";
                 return new InquiryElement("pay", t, null, true, "What your men cost a day: every line of the game's pay, the last pay day and how long your gold lasts; who gets what;"
                                                                + " where the pay goes.");

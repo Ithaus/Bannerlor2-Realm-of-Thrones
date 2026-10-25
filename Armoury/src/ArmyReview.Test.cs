@@ -170,13 +170,13 @@ namespace Armoury
             CountMen(mp, fit, wnd);
             var p = SaddleLaw.Pairs(mp);
             var col = MarchPace.Explain(mp);
-            var pm = Paginate(MenText(mp, fit, wnd, p));
-            var pl = Paginate(LastBattleText());   // 133b: strony "Last battle" (zapis ostatniej bitwy albo zdanie "nic jeszcze")
             var nx = KitPreview.Get(true);         // 133c: podglad nastepnej bitwy liczony od nowa (czas w ms do linii)
+            var pm = Paginate(MenText(mp, fit, wnd, p, nx));   // recenzja 133: jezdzcy pieszo z podgladu, jak okno
+            var pl = Paginate(LastBattleText());   // 133b: strony "Last battle" (zapis ostatniej bitwy albo zdanie "nic jeszcze")
             var pn = NextPages(nx);
             var hv = HorsesOf(mp, nx, fit);        // 133d: te same funkcje co okno - konie z podgladu, Speed, Herd, Column
             var ph = Paginate(HorsePageText(mp, p, hv, col));
-            var pq = Paginate(ColumnText(mp, col, p, nx));
+            var pq = Paginate(ColumnText(mp, col, p, nx, hv));
             var mv = MarchOf(mp);
             var ps = Paginate(SpeedText(mv));
             var pd = Paginate(HerdText(mv, col));

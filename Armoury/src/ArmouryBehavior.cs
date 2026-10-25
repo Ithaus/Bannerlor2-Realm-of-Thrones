@@ -3122,6 +3122,7 @@ namespace Armoury
                 QuartermasterLaw.ShoutShortages("QM morning: short (have/need):");
             }
             catch (Exception e) { Log.Error("MorningReport", e); }
+            DayProfile.Lap("MorningReport");   // recenzja 133: od 133c meldunek liczy podglad bitwy (KitPreview) - koszt we wlasnej linii profilu doby, nie w "reszta taktu"
         }
 
         internal bool HasProjectsHere(Settlement here)

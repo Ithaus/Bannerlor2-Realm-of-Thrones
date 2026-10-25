@@ -100,8 +100,9 @@ namespace Armoury
         private static int _stumbles;
         private static readonly Dictionary<string, int> _stumbleAt = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        /// <summary>Nowa kampania i kazde wczytanie (ArmyReview.Reset).</summary>
-        internal static void Reset() { _last = null; ClearMission(); _stumbles = 0; _stumbleAt.Clear(); }
+        /// <summary>Nowa kampania i kazde wczytanie (ArmyReview.Reset). Recenzja 133: takze pamieci klas broni (_wc, _same) - trzymaly ItemObject starej kampanii
+        /// do nastepnego Compute (LeftOf i Compute tworza je od nowa).</summary>
+        internal static void Reset() { _last = null; ClearMission(); _stumbles = 0; _stumbleAt.Clear(); _wc = null; _same = null; }
 
         /// <summary>Nowa bitwa i koniec misji (GarrisonKit.ClearBattle).</summary>
         internal static void ClearMission() { _mission = null; _missionNote = null; _mMen = _mDiffMen = _mDiffSlots = 0; }
@@ -165,13 +166,46 @@ namespace Armoury
                 _wired = miss.Count == 0;
                 _wiring = "wpiecia " + (need.Length - miss.Count) + "/" + need.Length + (miss.Count > 0 ? ", BRAK " + string.Join(", ", miss.ToArray()) : "")
                           + "; kara morale " + (_getPenalty != null ? "TAK" : "BRAK") + ", sloty tymczasowe " + (_isTemp != null ? "TAK" : "BRAK")
-                          + ", klasa broni DTE " + (_sameWc != null ? "TAK" : "BRAK (grupa typ + klasa)");
+                          + ", klasa broni DTE " + (_sameWc != null ? "TAK" : "BRAK (grupa typ + klasa)")
+                          + "; " + CsState();
                 return _wired;
             }
             catch (Exception e) { _wiring = "BRAK (" + e.GetType().Name + ")"; Stumble("Wire", e); return false; }
         }
 
         private static KeyValuePair<string, object> Kv(string k, object v) { return new KeyValuePair<string, object>(k, v); }
+
+        // recenzja 133: CrashScribe sprzed 133a (bez Mends.IsPreview) bierze nasz podglad za zwykla bitwe partii gracza - linie "PUSTE"/"swieta zasada", zolte
+        // "QM: N EMPTY" i liczniki strazy CS (w misji podwojnie). Wtedy bez podgladu z TAKTU (K15 w misji, poranny i pobitewny meldunek kwatermistrza - papier jak
+        // przed 133); okno armii (otwiera gracz) liczy dalej, jak pasek DTE. Bez CrashScribe - nie ma kto pisac, podglad wolno.
+        private static bool _csLooked, _csQuiet = true;
+        private static string _csState = "CrashScribe nie sprawdzany";
+
+        /// <summary>Czy CrashScribe nie pisze przy podgladzie (brak CS albo CS z 133a). Raz na proces.</summary>
+        internal static bool CsQuiet { get { CsState(); return _csQuiet; } }
+
+        private static string CsState()
+        {
+            if (_csLooked) return _csState;
+            _csLooked = true;
+            try
+            {
+                Type mends = null; bool cs = false;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (asm.GetName().Name != "CrashScribe") continue;
+                    cs = true;
+                    mends = asm.GetType("CrashScribe.Mends", false);
+                    break;
+                }
+                bool pv = mends != null && mends.GetMethod("IsPreview", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public, null, new[] { typeof(object) }, null) != null;
+                _csQuiet = !cs || pv;
+                _csState = !cs ? "CrashScribe BRAK (podglad bez szumu)" : pv ? "CrashScribe 133a TAK (podglad bez szumu)"
+                                                                       : "CrashScribe sprzed 133a - podglad pisze szum: K15 w misji i meldunek kwatermistrza z podgladu WYLACZONE (papier)";
+            }
+            catch (Exception e) { _csQuiet = true; _csState = "CrashScribe nieczytelny (" + e.GetType().Name + ")"; Stumble("CsState", e); }
+            return _csState;
+        }
 
         // ---------------------------------------------------------------- wejscia
         /// <summary>Podglad okna (pamiec po kluczu bez godziny - K7). force - liczyc od nowa. Nigdy null.</summary>
@@ -181,12 +215,15 @@ namespace Armoury
             string why = Gate(mp);
             if (why != null) return new Result { Why = why };
             string key = Key(mp);
-            if (!force && _last != null && _last.Key == key) return _last;
+            // recenzja 133: nieudany podglad pamietany z godzina gry w kluczu - bez powtarzania przy kazdym powrocie z podstron, ale jedno potkniecie (np. rano
+            // w takcie doby) nie wyszarza wiersza na cala dobe; udany - klucz bez godziny (K7: losowy pancerz wzorca)
+            string failKey = key + "|h" + (int)CampaignTime.Now.ToHours;
+            if (!force && _last != null && _last.Key == (_last.Ok ? key : failKey)) return _last;
             Result r;
             try { r = Compute(mp, null, true, true); r.Ok = r.Why == null; }
             catch (Exception e) { Stumble("Compute", e); r = new Result { Why = "The hand-out could not be worked out now - the log has the details." }; }
-            r.Key = key;
-            _last = r;   // takze nieudany - bez powtarzania przy kazdym powrocie z podstron
+            r.Key = r.Ok ? key : failKey;
+            _last = r;
             return r;
         }
 
@@ -354,6 +391,8 @@ namespace Armoury
                     bool cov = repl != null && Take(res.Rem, repl);
                     e2[(EquipmentIndex)s] = cov ? new EquipmentElement(repl) : default(EquipmentElement);
                     if (s == 10 && !cov) e2[EquipmentIndex.HorseHarness] = default(EquipmentElement);
+                    // recenzja 133 (K3): uprzaz musi pasowac do NOWEGO konia - ta sama funkcja co StripDragonMount przy wystawieniu
+                    else if (s == 10 && !DragonUnmount.HarnessFitsMount(repl, e2[EquipmentIndex.HorseHarness].Item)) e2[EquipmentIndex.HorseHarness] = default(EquipmentElement);
                     row.Stripped++;
                     if (code < row.StripWhy.Length) { row.StripWhy[code]++; res.OffWhy[code]++; }
                 }
@@ -880,30 +919,25 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------------- teksty okna (po angielsku)
-        /// <summary>Tytul wiersza glownego okna.</summary>
+        /// <summary>Tytul wiersza glownego okna (recenzja 133: wiersz bez portretu ma 2 linie, ok. 85 znakow - dwa rodzaje bez "and more"; jezdzcy pieszo tylko
+        /// przy braku pustych slotow - liczy ich wiersz "Horses and harness"). Liczby przy rodzajach tylko bez zastapien (Replaced 0) - wtedy rodzaje sumuja sie
+        /// do pustych slotow; z zastapieniem innym rodzajem same nazwy (rozpiska i "filled with another kind" na stronach typow).</summary>
         internal static string MainTitle(Result r)
         {
             if (r == null || !r.Ok) return "Kit for the next battle (not available)";
             if (r.Men <= 0) return "Kit for the next battle: no fit soldiers in your party";
             if (r.Missing <= 0 && r.Foot <= 0) return "Kit for the next battle: full kit (" + r.Men + (r.Men == 1 ? " man)" : " men)");
-            var parts = new List<string>();
-            if (r.Missing > 0)
-            {
-                string k = KitGaps.TopKinds(r.Short, 3, true);
-                parts.Add(r.Missing + (r.Missing == 1 ? " slot empty" : " slots empty") + (k.Length > 0 ? " - " + k : ""));
-            }
-            if (r.Foot > 0) parts.Add(r.Foot + (r.Foot == 1 ? " rider on foot" : " riders on foot"));
-            return "Kit for the next battle: " + string.Join("; ", parts.ToArray());
+            if (r.Missing <= 0) return "Kit for the next battle: no slot empty, " + r.Foot + (r.Foot == 1 ? " rider on foot" : " riders on foot");
+            string k = KitGaps.TopKinds(r.Short, 2, true, false, r.Replaced <= 0);
+            return "Kit for the next battle: " + r.Missing + (r.Missing == 1 ? " slot empty" : " slots empty") + (k.Length > 0 ? " - " + k : "");
         }
 
-        /// <summary>Podpowiedz wiersza glownego okna.</summary>
+        /// <summary>Podpowiedz wiersza glownego okna (recenzja 133: dymek gry ma ok. 33 znaki na linie - dwa zdania; losowy pancerz wzorca (K7) i pasek DTE (h)
+        /// na ostatnim akapicie strony typu - TypeText).</summary>
         internal static string MainHint(Result r)
         {
             if (r == null || !r.Ok) return r != null && r.Why != null ? r.Why : "Not available now.";
-            return "Worked out by the same hand-out as the battle: the troops' armoury, each man's skill, culture and saddle, and the checks as they take the field. "
-                   + r.Wounded + " wounded do not fight and are not counted. Shown for a battle in the field; armour of the kit is picked at random within the troop's"
-                   + " band, so single pieces can differ from one look to the next. The armoury readiness bar on the map counts the wounded too and leaves out spare kit,"
-                   + " so its numbers differ.";
+            return "Worked out as the battle hands kit out: armoury, skill, culture, saddle. " + r.Wounded + (r.Wounded == 1 ? " wounded man is" : " wounded are") + " not counted.";
         }
 
         /// <summary>Opis okna listy typow (najwyzej ok. 5 linii - lekcja 109.1).</summary>
@@ -916,28 +950,29 @@ namespace Armoury
                    + " Pick a kind of troop to see what they lack and why.";
         }
 
-        /// <summary>Wiersz typu na liscie.</summary>
+        /// <summary>Wiersz typu na liscie (recenzja 133: wiersz z portretem ma 2 linie, ok. 60 znakow - "Name xN: 6 empty - arrows 6", jeden rodzaj; jezdzcy
+        /// pieszo przy pustych slotach - w podpowiedzi; liczba przy rodzaju tylko bez zastapien, jak MainTitle).</summary>
         internal static string RowTitle(TypeRow t)
         {
             string head = t.Name + " x" + t.Men;
             if (t.Men <= 0) return head + " - all wounded";
             if (t.Missing <= 0 && t.Foot <= 0) return head + " - full kit";
-            var parts = new List<string>();
-            if (t.Missing > 0) { string k = KitGaps.TopKinds(t.Short, 2, true); parts.Add("short: " + (k.Length > 0 ? k : t.Missing + " slots")); }
-            if (t.Foot > 0) parts.Add(t.Foot + (t.Foot == 1 ? " rider on foot" : " riders on foot"));
-            return head + " - " + string.Join("; ", parts.ToArray());
+            if (t.Missing <= 0) return head + ": " + t.Foot + (t.Foot == 1 ? " rider on foot" : " riders on foot");
+            string k = KitGaps.TopKinds(t.Short, 1, true, false, t.Replaced <= 0);
+            return head + ": " + t.Missing + " empty" + (k.Length > 0 ? " - " + k : "");
         }
 
-        /// <summary>Podpowiedz wiersza typu: pierwsza przyczyna najwiekszego braku.</summary>
+        /// <summary>Podpowiedz wiersza typu: pierwsza przyczyna najwiekszego braku (przy pustych slotach i jezdzcach pieszo - najpierw ilu pieszo).</summary>
         internal static string RowHint(TypeRow t)
         {
             if (t.Men <= 0) return "All men of this kind are wounded - they do not fight.";
+            string foot = t.Missing > 0 && t.Foot > 0 ? "Also " + t.Foot + (t.Foot == 1 ? " rider on foot. " : " riders on foot. ") : "";
             int bc = -1;
             foreach (int c in KitGaps.Order) if (t.Short[c] > 0 && (bc < 0 || t.Short[c] > t.Short[bc])) bc = c;
-            if (bc >= 0 && t.Why[bc] != null && t.Why[bc].Count > 0) return Cap(KitGaps.NameEn(bc)) + ": " + t.Why[bc][0].Text;
-            if (t.NoHorse > 0 && t.HorseWhy.Count > 0) return "Horses: " + t.HorseWhy[0].Text;
-            if (t.NoSaddle > 0 && t.SaddleWhy.Count > 0) return "Harness: " + t.SaddleWhy[0].Text;
-            return t.Missing <= 0 && t.Foot <= 0 ? "Every man gets each piece of the kit his skill and rank call for." : "Look for the reasons.";
+            if (bc >= 0 && t.Why[bc] != null && t.Why[bc].Count > 0) return foot + Cap(KitGaps.NameEn(bc)) + ": " + t.Why[bc][0].Text;
+            if (t.NoHorse > 0 && t.HorseWhy.Count > 0) return foot + "Horses: " + t.HorseWhy[0].Text;
+            if (t.NoSaddle > 0 && t.SaddleWhy.Count > 0) return foot + "Harness: " + t.SaddleWhy[0].Text;
+            return t.Missing <= 0 && t.Foot <= 0 ? "Every man gets each piece of the kit his skill and rank call for." : foot + "Look for the reasons.";
         }
 
         internal static string UnusedTitle(Result r)
@@ -997,6 +1032,9 @@ namespace Armoury
                          + (t.MoraleMen == 1 ? " man whose kit is" : " men whose kit is") + " worse than the kit their skill and rank call for.");
             if (more.Count > 0) sb.Append("\n\n").Append(string.Join("\n", more.ToArray()));
             sb.Append("\n\nThe men handed out last get the gaps; in a siege or a hideout every rider fights on foot.");
+            // recenzja 133: zdania z podpowiedzi wiersza glownego (dymek za waski) - losowy pancerz wzorca (K7) i pasek DTE (decyzja (h)); osobny akapit (Paginate)
+            sb.Append("\n\nArmour of the kit is picked at random within the troop's band, so single pieces can differ from one look to the next."
+                      + " The armoury readiness bar on the map counts the wounded too and leaves out spare kit, so its numbers differ.");
             return sb.ToString();
         }
 
@@ -1134,10 +1172,13 @@ namespace Armoury
         internal static bool ShoutLine(string headline, int paperShort, out string line, out bool any)
         {
             line = null; any = false;
+            if (!CsQuiet) return false;   // recenzja 133: CrashScribe sprzed 133a pisalby szum przy kazdym meldunku - papier jak przed 133
             Result r;
+            var before = _last;
             try { r = Get(false); }
             catch (Exception e) { Stumble("ShoutLine", e); return false; }
             if (r == null || !r.Ok) return false;
+            bool fresh = !ReferenceEquals(r, before);
             any = r.Missing > 0 || r.Foot > 0;
             if (any)
             {
@@ -1150,7 +1191,9 @@ namespace Armoury
             {
                 Log.Info(P + "kwatermistrz (\"" + headline + "\") - na ekranie " + (any ? "jedna linia z podgladu: pustych " + r.Missing + " (" + KitGaps.KindsOf(r.Short, false) + "), pieszo " + r.Foot
                                                                                         : "nic do meldowania (podglad: komplet)")
-                         + "; papier (QM short) - typow z brakami " + paperShort + " (tylko log, linie 'Kwatermistrz: papier' wyzej); podglad " + r.Ms + " ms.");
+                         + "; papier (QM short) - typow z brakami " + paperShort + " (tylko log, linie 'Kwatermistrz: papier' wyzej); podglad "
+                         + (fresh ? "liczony teraz " + r.Ms + " ms" + (r.Ms > 50 ? " - PONAD 50 ms (do decyzji jak K15: meldunek z podgladu w takcie doby)" : "")
+                                  : "z pamieci (liczony " + r.Ms + " ms)") + ".");
             }
             catch { }
             return true;
@@ -1165,6 +1208,8 @@ namespace Armoury
             var main = MobileParty.MainParty;
             if (main == null || dists == null) return;
             if (!Wire()) { _missionNote = "BRAK wpiec (" + _wiring + ")"; return; }
+            // recenzja 133: CrashScribe sprzed 133a wzialby podglad za bitwe - drugi zolty "QM: N EMPTY" i podwojne liczniki strazy CS tej bitwy
+            if (!CsQuiet) { _missionNote = "pominiety - " + CsState(); return; }
             object bd = dists.Contains(main.Id) ? dists[main.Id] : null;
             var bl = bd != null ? _fAssigns.GetValue(bd) as IList : null;
             if (bl == null || bl.Count == 0) { _missionNote = "brak przydzialow druzyny gracza"; return; }
@@ -1199,6 +1244,20 @@ namespace Armoury
                          + (r.Ms > 50 ? " - PONAD 50 ms (do decyzji: klucz MCM)" : "") + ".");
             }
             catch { }
+        }
+
+        /// <summary>Recenzja 133 (decyzja (a), K14 - "i podobne o sprzecie gracza"): czerwona linia startu bitwy (GarrisonKit.BattleNotice) z podgladu tej misji
+        /// (K15 - ta sama zbrojownia, te same wzorce i straze wystawienia), jedna linia zamiast rozbicia wlasna regula. null - podgladu w tej misji nie ma
+        /// (oblezenie, kryjowka, morze, potkniecie, CrashScribe sprzed 133a); "" - nic pustego.</summary>
+        internal static string MissionNotice()
+        {
+            var r = _mission;
+            if (r == null) return null;
+            if (r.Missing <= 0 && r.Foot <= 0) return "";
+            var parts = new List<string>();
+            if (r.Missing > 0) parts.Add(r.Missing + (r.Missing == 1 ? " kit slot empty" : " kit slots empty"));
+            if (r.Foot > 0) parts.Add(r.Foot + (r.Foot == 1 ? " rider on foot" : " riders on foot"));
+            return "Your men's kit for this battle: " + string.Join(" and ", parts.ToArray()) + " - after the battle, see Last battle in Review the army.";
         }
 
         /// <summary>K15 (GarrisonKit.BattleLine, przed KitGaps.Close): podglad tej misji wobec tego, co zebral OwnKitSpawn - u wystawionych, pierwszych N

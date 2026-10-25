@@ -60,6 +60,50 @@ CrashScribe\zdjecia; "Przeglad armii (P4): test - T1 raport: ... podglad sprzetu
 + Other = wynik (133g) TAK, zold (133e) TAK (... wymagane (zold pewny) ...) ... - wynik TAK"; "Sprzet ludzi (133c): podglad - ... tozsamosc z Missing zgodna"; po bitwie w polu
 segment K15 "ZGODNE" z ms (ponad 50 ms - do decyzji klucz MCM). W grze Jeffa: obozowanie -> "Review the army" -> wszystkie wiersze; rano zamiast czerwonych "QM short" jedna
 linia "QM: N kit slots empty ... for the next battle - see Review the army in camp.".
+**Recenzja:** 20 uwag recenzentow paczki 133 sprawdzonych w kodzie (Armoury.dll md5 3b6186f2b8077738910f60e8e9ed5653, CrashScribe.dll md5 3a34b9064bfefea2e71cd68c2cdcdf2a;
+oba zbudowane bez bledow). POPRAWIONE: (1) strona "Your men" - jezdzcy pieszo z podgladu (next.Foot, ta sama liczba co "Horses and harness"), strona "Column" - wolne
+konie zbrojowni = "left in the armoury" z podgladu (HorseView.LeftHorse); SaddleLaw.Pairs tylko zapas bez podgladu i kontrola w linii logu (decyzja (a)). (2) proba
+zdjec: krok 10 "Last battle" bez zapisu bitwy od wczytania (zapis nie trafia do zapisu gry; bez -Battles bitwy przed etapem Run nie ma) = POMINIETY (nie dotyczy),
+poza mianownikiem: wynik TAK = TAK + pominiete = wszystkie kroki (linia koncowa "okna TAK N/22, pominiete (nie dotyczy) S, NIE B"). (3) tytuly "Kit for the next battle"
+(wiersz okna i typy): liczby przy rodzajach tylko bez zastapien innym rodzajem (wtedy rodzaje sumuja sie do pustych slotow), przy zastapieniach same nazwy rodzajow -
+rozbicie i "filled with another kind" na stronach (dopisek "(R filled ...)" nie miesci sie w 2 liniach wiersza). (4)+(15) decyzja (a) obejmuje tez bitwe ("czerwone/zolte
+komunikaty kwatermistrza ... i podobne o sprzecie gracza"): GarrisonKit.DistributorsPostfix liczy podglad K15 (KitPreview.InMission) PRZED BattleNotice (tylko odczyt -
+osobny rozdzielacz i pula, podloga GearFit bez licznikow misji, CS milczy przez 133a; dla bitwy kolejnosc bez skutku), a czerwona linia startu bitwy to JEDNA linia z jego
+liczb: "Your men's kit for this battle: N kit slots empty and M riders on foot - after the battle, see Last battle in Review the army." (KitPreview.MissionNotice; bez
+podgladu w misji - oblezenie, kryjowka, morze, potkniecie, CS sprzed 133a - zdanie bez liczb); rozbicie wlasna regula (bez broni / korpusu / konia / uprzezy) zostaje w
+linii logu "Bitwa gracza (sklad7b-p, start)"; zolte CS "QM: N EMPTY in battle (...)" (SkillLawWard - tylko pancerz i bron strzelecka) - na ekranie bez liczby: "QM: some
+kit slots stay EMPTY in this battle - nothing usable in the war-chest." (liczby zostaja w linii "swieta zasada" CS). (5) K3: DragonUnmount.HarnessFitsMount (uprzaz musi
+pasowac do konia-zamiennika) - jedna funkcja dla StripDragonMount (logika 1:1) i KitPreview (zamiennik z pokryciem). (8) KitPreview.CsQuiet: refleksja na
+CrashScribe.Mends.IsPreview(object), raz na proces (brak CrashScribe = cicho); CrashScribe sprzed 133a - K15 w misji pominiety (notka w segmencie bitwy), meldunek
+kwatermistrza z papieru jak przed 133, okno liczy dalej (jak pasek DTE); stan w linii startu (KitPreview.Wiring: "CrashScribe 133a TAK / sprzed 133a ..."). (9) Reset
+zeruje _wc i _same (ItemObject starej kampanii). (10) nieudany podglad pamietany z godzina gry w kluczu (ponowienie najwyzej raz na godzine gry, bez liczenia przy
+kazdym powrocie z podstron); udany jak dotad bez godziny (K7). (11) wiersz typu: "Name xN: 6 empty - arrows 6" (jeden rodzaj, bez "short:" i "and more"); jezdzcy
+pieszo przy pustych slotach - w podpowiedzi ("Also N riders on foot."). (12) wiersz glowny: dwa rodzaje bez "and more", jezdzcy pieszo tylko przy braku pustych slotow
+(liczy ich wiersz "Horses and harness"). (13) MainHint dwa zdania (ok. 105 znakow); zdania K7 (losowy pancerz wzorca) i (h) (pasek DTE liczy rannych, bez dodatkow) -
+ostatni akapit strony typu; "Last battle" ok. 95 znakow + data (K16 jednym zdaniem, pelne na stronie); "Recent messages" ok. 135. (14) podpowiedz opcji menu "Review the
+army" ok. 130 znakow. (16) proba zdjec: kroki 18-22 - okna wyboru "On the march" i "Pay", strony "Unused in the troops' armoury", "Column" i jednego komunikatu
+("Message - Temat"), te same funkcje co okno gracza (Steps 22, pliki okna-133-18..22). (17) PlayerNews.NotArmy (jawny plik zrodlowy "" w Log.Player - na ekran jak
+dotad, bez wpisu w "Recent messages"): zakup i sprzedaz zalogi (AiGear, GarrisonArmory), jednorazowy dorobek zalog, sojusznicy i wrog w BattleNotice, partie rodu
+(ClanFillOnce); ludzie przechodzacy z/do Twojej druzyny ze sztukami Twojej zbrojowni (GarrisonArmory 908-971) ZOSTAJA - to Twoje wojsko i Twoja zbrojownia. (18) podpowiedz
+"Horses and harness": bez "and the herd" ("the herd is under On the march"). (19) Why zoldu i predkosci to pelne zdanie z wielkiej litery ("The game's pay/speed model gave
+no number for your party now."), pokazywane samo - bez "The pay cannot be worked out now - the game's pay cannot ...". (20) strona "Column": "no horse or no harness"
+(przy regule uprzezy - r.Foot = bez konia + bez uprzezy) i "such riders march as horsemen". ODRZUCONE: (6) klucz MCM dla K15 "na zapas" - K15 kazal zmierzyc i dopiero
+przy > 50 ms dac klucz; bez bitwy w polu czasu nie ma, linia K15 pisze "PONAD 50 ms (do decyzji: klucz MCM)", a wpis wyzej ma to w "Sprawdzic" - klucz bez pomiaru
+to kod dopisany "na wszelki wypadek" (CLAUDE.md 8.3); (7) czesciowo: DayProfile.Lap("MorningReport") dopisany (koszt meldunku we wlasnej linii profilu doby, nie w
+"reszta taktu"), linia kwatermistrza mowi "liczony teraz N ms" / "z pamieci" i "PONAD 50 ms (do decyzji jak K15)"; odrzucone: powrot do papieru przy > 50 ms (znow dwie
+liczby tego samego zjawiska - wbrew decyzji (a)) i ShortageLines tylko w galezi papieru (papier liczony co rano takze przed 133 - zaden nowy koszt; jego linie
+"Kwatermistrz:" w logu to porownanie zaprojektowane w 133c).
+Kontrola calosci recenzji: (1) Regresje - MenText/MarchText/ColumnText: wszystkie wywolania (OpenMain, test T1, proba zdjec) z nowymi argumentami, bez podgladu zapas
+jak dotad; HarnessFitsMount - warunek identyczny z dotychczasowym (zdejmuje tylko przy uprzezy z ArmorComponent, koniu z Monster i innej rodzinie); TopKinds - nowe
+parametry z wartosciami domyslnymi jak dotad (wolaja go tylko oba tytuly); BattleNotice - linia logu bez zmian, na ekranie jedna linia zamiast rozbicia; czerwona
+linia startu bitwy pokaze sie teraz przy KAZDYM pustym slocie wzorca (helm, rekawice, bron boczna), nie tylko przy braku broni / korpusu / konia / uprzezy - to ta sama
+liczba co "Last battle" i poranny meldunek; tools/sprawdz_logi.py nie czyta zmienionych napisow ani linii profilu doby (sprawdzone grep). (2) Kolizje - InMission przed
+BattleNotice: oba tylko czytaja przydzialy bitwy (_spawn, dists); KitPreview._mission czyszczone przy nowej misji (BattleFor -> ClearBattle), wiec oblezenie po bitwie w
+polu nie dostanie cudzych liczb; NotArmy nie zmienia nic na ekranie. (3) Spojnosc - na ekranie (mapa i bitwa) liczby sprzetu gracza tylko z podgladu (KitPreview) albo
+zdania bez liczb; papier QM, Pairs i rozbicie BattleNotice tylko w logu. Sprawdzic dodatkowo: proba zdjec "okna TAK 22/22" (bez bitwy od wczytania: "TAK 21/22,
+pominiete (nie dotyczy) 1") i pliki okna-133-8..22; linia startu "Sprzet ludzi" z "CrashScribe 133a TAK" (w autotescie z testowym CrashScribe-at bez 133a: "sprzed
+133a" - wtedy K15 pominiety i meldunek z papieru, to nie blad); w bitwie w polu jedna czerwona linia "Your men's kit for this battle: ..." i zolte CS bez liczby; profil
+doby - linia "MorningReport" (ponad 50 ms - decyzja jak K15).
 **Status:** ZBUDOWANE - nie wgrane (Armoury.dll i CrashScribe.dll z galezi noc/133-raport-armii; wgranie zbiorcze po tescie, decyzja (g); 133a = osobny DLL CrashScribe.dll).
 
 ## 2026-10-25 133f (galaz noc/133-raport-armii) - Armoury: okno armii "Recent messages (N)" - pierscien 60 komunikatow o wojsku gracza (sprzet, konie, zold, musztra, oboz, marsz, kwatermistrz), takze do Armoury.log

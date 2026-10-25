@@ -34,6 +34,10 @@ namespace Armoury
     /// (pierwszy typ z brakami albo jezdzcami pieszo; bez brakow - pierwszy typ), 10 "Last battle", 11 "Horses and harness" (HorsePages - ta sama funkcja co
     /// OpenMain), 12 "Speed", 13 "Herd", 14-16 "Pay" / "Who gets what" / "Where it goes" (pierwsza strona kazdej), 17 lista "Recent messages" (pusty pierscien -
     /// jeden komunikat proby z ArmyReview.News.cs, ta sama droga co test T1). Strony (ShowPages) maja w probie przyciski bez skutku jak okna wyboru.
+    /// Recenzja 133: 18 okno wyboru "On the march" (OpenMarch), 19 okno wyboru "Pay" (OpenPay), 20 strona "Unused in the troops' armoury", 21 strona "Column",
+    /// 22 strona jednego komunikatu ("Message - Temat") - te same funkcje co okno gracza. Krok bez danych, ktorych od wczytania byc nie moze (10 "Last battle" bez
+    /// bitwy od wczytania - zapis nie trafia do zapisu gry) - POMINIETY (nie dotyczy): linia "POMINIETY", poza mianownikiem wyniku (wynik TAK = TAK + pominiete
+    /// = wszystkie kroki).
     /// ZDJECIE: TaleWorlds.Engine.Utilities.TakeScreenshot do CrashScribe\zdjecia\okna-132-N-nazwa-HHmmss.png (kroki 8-17: okna-133-N-...; silnik pisze BMP mimo rozszerzenia). Zapytania gry -
     /// zdjecie po 0.6 s czasu rzeczywistego (Stopwatch): autotest (AutotestUi.Handle co 0.25 s) zamyka zapytanie po >= 1.0 s od zobaczenia (odmowa / wyjscie), wiec
     /// 1.5 s sie nie da (0.4 s zapasu na zrzut silnika); prefab zapytania nie ma animacji wejscia (Native MultiSelectionQueryPopup.xml), rysuje sie w pierwszej klatce. Okno lupu (wlasna warstwa,
@@ -52,7 +56,7 @@ namespace Armoury
     {
         internal const string FlagName = "armoury-zdjecia-okien.flag";
         private const string P = "Zdjecia okien (132): ";
-        private const int Steps = 17;                     // 133g: 8-17 okna paczki 133 (zapytania jak 1-4)
+        private const int Steps = 22;                     // 133g: 8-17 okna paczki 133 (zapytania jak 1-4); recenzja 133: 18-22
         private const int LayerFirst = 5, LayerLast = 7;  // okna lupu (wlasna warstwa)
         private const double StartAfterSec = 30.0, CalmSec = 3.0, GiveUpSec = 3600.0;
         private const double InquiryShotSec = 0.6, LayerShotSec = 1.8, LayerShotMaxSec = 8.0, CloseAfterShotSec = 1.0;
@@ -60,7 +64,12 @@ namespace Armoury
         private const int MaxStumbles = 30;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly string[] Names = { "", "przeglad", "choragwie", "choragiew", "przypinanie", "lup-bitwa", "lup-oblezenie", "lup-turniej",
-                                                   "sprzet-lista", "sprzet-typ", "ostatnia-bitwa", "konie", "predkosc", "stado", "zold", "zold-kto", "zold-dokad", "komunikaty" };
+                                                   "sprzet-lista", "sprzet-typ", "ostatnia-bitwa", "konie", "predkosc", "stado", "zold", "zold-kto", "zold-dokad", "komunikaty",
+                                                   "marsz", "zold-okno", "nieuzyte", "kolumna", "komunikat" };
+
+        /// <summary>Recenzja 133: poczatek powodu z ArmyReview.PhotoOpen dla kroku "nie dotyczy" (okna nie da sie otworzyc z braku danych, ktorych od wczytania
+        /// byc nie moze) - krok POMINIETY, poza mianownikiem wyniku.</summary>
+        internal const string SkipMark = "nie dotyczy: ";
 
         private static bool _checked, _done, _active;
         private static Campaign _camp;
@@ -70,7 +79,7 @@ namespace Armoury
         private static object _myData;             // zapytanie gry tego kroku (GauntletQueryManager._activeQueryData)
         private static bool _dataKnown, _shotOpen;
         private static string _file, _note, _title, _shotErr;
-        private static int _ok, _bad, _stumbles;
+        private static int _ok, _bad, _skip, _stumbles;
         private static readonly List<string> _files = new List<string>();
 
         /// <summary>Proba w toku - akcje przyciskow okien przegladu bez skutku (ArmyReview.Inert).</summary>
@@ -249,7 +258,7 @@ namespace Armoury
                     else if (InformationManager.IsAnyInquiryActive()) InformationManager.HideInquiry();
                 }
                 catch (Exception e) { Stumble("Open.Close." + _step, e); }
-                Result(false, why);
+                if (why.StartsWith(SkipMark, StringComparison.Ordinal)) Skipped(why.Substring(SkipMark.Length)); else Result(false, why);
                 Next(now);
                 return;
             }
@@ -328,6 +337,14 @@ namespace Armoury
             catch (Exception e) { Stumble("Result", e); }
         }
 
+        /// <summary>Recenzja 133: krok "nie dotyczy" - linia POMINIETY, licznik _skip (poza mianownikiem wyniku).</summary>
+        private static void Skipped(string why)
+        {
+            _skip++;
+            try { Log.Info(P + _step + " " + Names[_step] + " - POMINIETY (nie dotyczy: " + why + ")."); }
+            catch (Exception e) { Stumble("Skipped", e); }
+        }
+
         private static void Next(long now)
         {
             if (_step == 4) { try { ArmyReview.PhotoRestore(); } catch (Exception e) { Stumble("PhotoRestore", e); } }   // okna przegladu za nami - kopia robocza sprzed proby
@@ -343,10 +360,10 @@ namespace Armoury
             int have = 0;
             var miss = new List<string>();
             foreach (var f in _files) { if (FileLen(f) > 0) have++; else miss.Add(Path.GetFileName(f)); }
-            Log.Info(P + "koniec | okna TAK " + _ok + "/" + Steps + ", NIE " + _bad + " | pliki na dysku " + have + "/" + _files.Count
+            Log.Info(P + "koniec | okna TAK " + _ok + "/" + Steps + ", pominiete (nie dotyczy) " + _skip + ", NIE " + _bad + " | pliki na dysku " + have + "/" + _files.Count
                      + " (Documents\\Mount and Blade II Bannerlord\\CrashScribe\\zdjecia)" + (miss.Count > 0 ? " - BRAK: " + string.Join(", ", miss.ToArray()) : "")
                      + " | kopia robocza okna choragwi przywrocona | potkniecia " + _stumbles + " | czas proby " + Sec(_beganAt, _endAt).ToString("0.0", Inv)
-                     + " s - wynik " + (_ok == Steps && have == _files.Count ? "TAK" : "NIE") + ".");
+                     + " s - wynik " + (_ok + _skip == Steps && have == _files.Count ? "TAK" : "NIE") + ".");
         }
 
         private static void Abort(string why)
@@ -372,7 +389,7 @@ namespace Armoury
             _active = false;
             try
             {
-                Log.Info(P + "przerwana (" + why + ") w kroku " + _step + " " + (_step >= 1 && _step <= Steps ? Names[_step] : "-") + " | okna TAK " + _ok + ", NIE " + _bad
+                Log.Info(P + "przerwana (" + why + ") w kroku " + _step + " " + (_step >= 1 && _step <= Steps ? Names[_step] : "-") + " | okna TAK " + _ok + ", pominiete " + _skip + ", NIE " + _bad
                          + " | potkniecia " + _stumbles + ".");
             }
             catch { }
@@ -707,7 +724,7 @@ namespace Armoury
                         return null;
                     }
             }
-            if (step >= 8 && step <= 17) return PhotoOpen133(step, out note);
+            if (step >= 8 && step <= 22) return PhotoOpen133(step, out note);
             return "nieznany krok " + step;
         }
 
@@ -745,7 +762,8 @@ namespace Armoury
                 case 10:
                     {
                         var b = KitGaps.Last;
-                        if (b == null || b.All == null) return "brak zapisu ostatniej bitwy - wiersz w przegladzie wyszarzony (" + LastBattleBrief() + ")";
+                        // recenzja 133: zapis zyje od wczytania (nie trafia do zapisu gry) - bez bitwy w tej sesji okna byc nie moze: krok POMINIETY, nie NIE
+                        if (b == null || b.All == null) return WindowPhotos.SkipMark + "brak zapisu ostatniej bitwy od wczytania - wiersz w przegladzie wyszarzony (" + LastBattleBrief() + ")";
                         var pages = Paginate(LastBattleText());
                         note = "zapis: " + LastBattleBrief() + ", stron " + PagesInfo(pages);
                         ShowPages("Last battle", pages, 0);
@@ -798,6 +816,63 @@ namespace Armoury
                         if (n <= 0) return "pierscien komunikatow pusty takze po komunikacie proby (" + PlayerNews.Brief() + ")";
                         note = "komunikatow " + n + (had == 0 ? " (pierscien byl pusty - dopisany komunikat proby)" : "") + " | " + PlayerNews.Brief();
                         OpenNews();
+                        return null;
+                    }
+                // recenzja 133: okna wyboru "On the march" i "Pay", strony "Unused in the troops' armoury", "Column" i jednego komunikatu - te same funkcje co gracz
+                case 18:
+                case 21:
+                    {
+                        var fit = new int[5];
+                        var wnd = new int[5];
+                        CountMen(mp, fit, wnd);
+                        var pairs = SaddleLaw.Pairs(mp);
+                        MarchPace.Column col = null;
+                        try { col = MarchPace.Explain(mp); } catch (Exception e) { Stumble("Photo.Explain", e); }
+                        KitPreview.Result next = null;
+                        try { next = KitPreview.Get(false); } catch (Exception e) { Stumble("Photo.KitPreview", e); }
+                        HorseView hv;
+                        HorsePages(mp, fit, pairs, col, next, out hv);   // jak OpenMain: hv dla strony "Column" (wolne konie z podgladu)
+                        var pCol = Paginate(ColumnText(mp, col, pairs, next, hv));
+                        if (step == 21)
+                        {
+                            note = "kolumna " + (col != null ? "rodzaj " + col.Kind + ", n=" + col.N : "wylaczona") + ", konie " + (hv != null ? "z podgladu" : "z SaddleLaw.Pairs") + ", stron " + PagesInfo(pCol);
+                            ShowPages("Column", pCol, 0);   // "Back" gracza wraca do "On the march" - w probie bez skutku, napis przycisku ten sam
+                            return null;
+                        }
+                        MarchView mv = null;
+                        try { mv = MarchOf(mp); } catch (Exception e) { Stumble("Photo.MarchOf", e); }
+                        List<string> pS = null, pH = null;
+                        try { pS = Paginate(SpeedText(mv)); pH = Paginate(HerdText(mv, col)); } catch (Exception e) { Stumble("Photo.MarchPages", e); mv = null; }
+                        note = (mv != null ? SpeedBrief(mv) : "predkosc niedostepna - wiersze Speed i Herd wyszarzone, jak u gracza");
+                        OpenMarch(mv, col, pS, pH, pCol);
+                        return null;
+                    }
+                case 19:
+                    {
+                        var pay = PayOf(mp);
+                        if (!pay.Ok) return "zold niedostepny (" + pay.Why + ")";   // wiersz "Pay" wyszarzony - gracz go nie otworzy
+                        note = "zold " + pay.Total + " (suma wierszy " + pay.RowsSum + ")";
+                        OpenPay(pay, Paginate(PayText(pay)), Paginate(WhoText(pay)), Paginate(WhereText(pay, mp)));
+                        return null;
+                    }
+                case 20:
+                    {
+                        var pv = KitPreview.Get(false);
+                        if (pv == null || !pv.Ok) return "podglad sprzetu niedostepny (" + (pv != null && pv.Why != null ? pv.Why : "-") + ")";
+                        var pages = Paginate(KitPreview.UnusedText(pv));
+                        note = KitPreview.UnusedTitle(pv) + ", stron " + PagesInfo(pages);
+                        ShowPages("Unused in the troops' armoury", pages, 0, OpenKitTypes);
+                        return null;
+                    }
+                case 22:
+                    {
+                        var l = PlayerNews.Newest();
+                        if (l.Count == 0) { PhotoNewsSeed(); l = PlayerNews.Newest(); }
+                        if (l.Count == 0) return "pierscien komunikatow pusty takze po komunikacie proby (" + PlayerNews.Brief() + ")";
+                        var it = l[0];
+                        var pages = Paginate(PlayerNews.PageText(it));
+                        note = "najnowszy komunikat [" + it.Topic + "], stron " + PagesInfo(pages);
+                        ShowPages("Message - " + it.Topic, pages, 0, OpenNews);
                         return null;
                     }
             }

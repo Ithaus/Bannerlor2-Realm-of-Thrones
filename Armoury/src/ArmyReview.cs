@@ -287,9 +287,9 @@ namespace Armoury
                 a.optionLeaveType = GameMenuOption.LeaveType.Manage;
                 string why;
                 if (!Can(out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
-                a.Tooltip = new TextObject("{=!}Your men by kind, what kit they lack for the next battle and why, what they went without in the last battle, the horses"
-                                           + " and harness in use, idle and to buy, why riders will go on foot, your speed on the map, the herd and why the column walks,"
-                                           + " what you pay them, who gets it and where it goes, the last messages about them, and your banners for the next battle.");
+                // recenzja 133: dymek gry ma ok. 33 znaki na linie - krotkie streszczenie (szczegoly w podpowiedziach wierszy okna)
+                a.Tooltip = new TextObject("{=!}Your men, their kit for the next and the last battle, horses, speed, pay and the latest messages - and your banners"
+                                           + " for the next battle.");
                 return true;
             }
             catch (Exception e) { Stumble("Cond", e); return false; }
@@ -378,14 +378,14 @@ namespace Armoury
             var pairs = SaddleLaw.Pairs(mp);
             MarchPace.Column col = null;
             try { col = MarchPace.Explain(mp); } catch (Exception e) { Stumble("Explain", e); }
-            var pagesMen = Paginate(MenText(mp, fit, wnd, pairs));
             List<string> pagesLast = null;   // 133b: ostatnia bitwa (zapamietane liczby, bez liczenia na mapie)
             try { pagesLast = Paginate(LastBattleText()); } catch (Exception e) { Stumble("LastBattleText", e); }
             KitPreview.Result next = null;   // 133c: podglad nastepnej bitwy (ten sam rozdzielacz DTE i straze co bitwa; pamiec po wersjach i dniu)
             try { next = KitPreview.Get(false); } catch (Exception e) { Stumble("KitPreview", e); }
+            var pagesMen = Paginate(MenText(mp, fit, wnd, pairs, next));   // recenzja 133: jezdzcy pieszo z podgladu (decyzja (a))
             HorseView hv;                    // 133d: konie i uprzaz z podgladu + czytnik rodzajow koni (bez podgladu - strona z SaddleLaw.Pairs)
             var pagesHorses = HorsePages(mp, fit, pairs, col, next, out hv);
-            var pagesMarch = Paginate(ColumnText(mp, col, pairs, next));   // 133d: strona "Column" = MarchText bez zmian + regula jezdzca na mapie
+            var pagesMarch = Paginate(ColumnText(mp, col, pairs, next, hv));   // 133d: strona "Column" = MarchText + regula jezdzca na mapie (recenzja 133: wolne konie z podgladu)
             MarchView mv = null;             // 133d: strony "Speed" i "Herd" (model predkosci gry wprost, stado gry)
             try { mv = MarchOf(mp); } catch (Exception e) { Stumble("MarchOf", e); }
             List<string> pagesSpeed = null, pagesHerd = null;
@@ -514,13 +514,15 @@ namespace Armoury
             return Math.Max(0, p.Exempt - (p.NoHorse - (p.Riders - p.Mounted)));
         }
 
-        private static string MenText(MobileParty mp, int[] fit, int[] wnd, SaddleLaw.PairState p)
+        /// <summary>Strona "Your men". Recenzja 133 (decyzja (a)): jezdzcy pieszo z podgladu nastepnej bitwy (te same co "Horses and harness"); bez podgladu -
+        /// zapas z SaddleLaw.Pairs (z rannymi, bez Jazdy), jak przed 133.</summary>
+        private static string MenText(MobileParty mp, int[] fit, int[] wnd, SaddleLaw.PairState p, KitPreview.Result next)
         {
             var sb = new StringBuilder();
             sb.Append("Fit to fight / wounded, by kind:");
             string[] names = { "Infantry", "Archers", "Cavalry", "Horse archers", "You and your companions" };
             for (int k = 0; k < 5; k++) sb.Append('\n').Append(names[k]).Append(": ").Append(fit[k]).Append(" / ").Append(wnd[k]);
-            int foot = FootInBattle(p);
+            int foot = next != null && next.Ok ? next.Foot : FootInBattle(p);
             if (foot > 0) sb.Append("\n\nOf your riders, ").Append(foot).Append(" will fight on foot - see Horses and harness.");
             int prisoners = mp.PrisonRoster != null ? mp.PrisonRoster.TotalManCount : 0;
             if (prisoners > 0) sb.Append("\n\nPrisoners in the column: ").Append(prisoners).Append('.');
@@ -585,7 +587,9 @@ namespace Armoury
             return "On the march: " + what + " (at most " + Num(col.Cap) + ")";
         }
 
-        private static string MarchText(MobileParty mp, MarchPace.Column col, SaddleLaw.PairState p)
+        /// <summary>Strona "Column" (bez dopisku reguly jezdzca). Recenzja 133 (decyzja (a)): wolne konie zbrojowni z podgladu ("left in the armoury" strony
+        /// "Horses and harness" - hv); bez podgladu - zapas z SaddleLaw.Pairs, jak przed 133.</summary>
+        private static string MarchText(MobileParty mp, MarchPace.Column col, SaddleLaw.PairState p, HorseView hv)
         {
             var c = Settings.Current;
             if (col == null || c == null)
@@ -630,8 +634,14 @@ namespace Armoury
             sb.Append("\n\nIt changes with every prisoner taken or freed, every recruit, every horse bought, sold or moved between the baggage and the troops' armoury - that is why the column walks one day and rides the next.");
             if (!col.K0)
                 sb.Append(" Free horses in the troops' armoury do not carry footmen (Spare Horses Carry Footmen is off).");
-            else if (p != null && p.Horses - (p.Mounted + ExemptMounted(p)) > 0)
-                sb.Append(" The ").Append(p.Horses - (p.Mounted + ExemptMounted(p))).Append(" free horses in your own troops' armoury do not carry your footmen on the march - only spare horses in your baggage do.");
+            else
+            {
+                bool pv = hv != null && hv.Ok && hv.ArmRead;
+                int free = pv ? hv.LeftHorse : p != null ? p.Horses - (p.Mounted + ExemptMounted(p)) : 0;
+                if (free > 0)
+                    sb.Append(" The ").Append(free).Append(pv ? (free == 1 ? " horse left" : " horses left") : (free == 1 ? " free horse" : " free horses"))
+                      .Append(" in your own troops' armoury ").Append(free == 1 ? "does" : "do").Append(" not carry your footmen on the march - only spare horses in your baggage do.");
+            }
             return sb.ToString();
         }
 

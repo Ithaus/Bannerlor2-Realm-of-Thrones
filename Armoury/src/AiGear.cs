@@ -1074,7 +1074,7 @@ namespace Armoury
                 try { ArmedStrength.MarkDirty(mp); } catch { }   // p9: zakup zmienia gotowosc zbrojowni - przeliczenie sily i progu w nastepnej godzinie
                 // poprawki sklad7: Twoja kiesa nie zmienia sie bez slowa - tylko gdy Twoja kiesa doplacila (GarrisonBuysGearPlayer); raz na dobe na zaloge (stempel _lastDay)
                 if (garrison && lord == Hero.MainHero && lordPart > 0)
-                    Log.Player("Your garrison of " + st.Name + " bought " + pieces + " pieces of kit for " + spent + " denars (their purse " + (spent - lordPart) + ", your coin " + lordPart + ").");
+                    Log.Player("Your garrison of " + st.Name + " bought " + pieces + " pieces of kit for " + spent + " denars (their purse " + (spent - lordPart) + ", your coin " + lordPart + ").", false, PlayerNews.NotArmy);   // recenzja 133 (e): zaloga - bez wpisu w "Recent messages"
                 _dayPieces += pieces; _dayGold += spent; _dayVisits++; if (garrison) { _dayGarrison++; _dayGarrisonGold += spent; }
                 if (_dayLogged < Math.Max(0, s.AiGearLogPerDay))
                 {

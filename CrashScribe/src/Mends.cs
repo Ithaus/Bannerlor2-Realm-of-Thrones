@@ -2097,12 +2097,13 @@ namespace CrashScribe
                 }
                 // GRACZ MA TO WIDZIEC NA EKRANIE (Jeff 14.09: "info mowi, ze wszystko
                 // okay, a stoja bez kolczanow") - krotko, tylko jego partia
+                // Recenzja 133 (decyzja Jeffa (a): zolte i czerwone komunikaty kwatermistrza o sprzecie gracza - jedna liczba z podgladu bitwy Armoury): ta straz
+                // liczy tylko luki pancerza i broni strzeleckiej, wiec jej liczba rozni sie od "Last battle" i od czerwonej linii startu bitwy Armoury (podglad K15).
+                // Na ekranie zdanie BEZ liczby; liczby i rodzaje zostaja w linii "swieta zasada" wyzej (log).
                 if (!pv && kept + keptAmmo > 0 && who != null && who == MobileParty.MainParty)   // 133a: na mapie (podglad) milczy
                 {
-                    string top = ""; int shown = 0;
-                    foreach (var kv in emptyByType) { if (shown++ >= 3) break; top += (top.Length > 0 ? ", " : "") + kv.Key + " " + kv.Value; }
                     InformationManager.DisplayMessage(new InformationMessage(
-                        "QM: " + (kept + keptAmmo) + " EMPTY in battle (" + top + ") - nothing usable in the war-chest.", Colors.Yellow));
+                        "QM: some kit slots stay EMPTY in this battle - nothing usable in the war-chest.", Colors.Yellow));
                 }
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.SkillLawWard", null); } catch { } }

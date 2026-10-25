@@ -20,11 +20,11 @@ namespace Armoury
                 int n = PlayerNews.Count;
                 if (n <= 0)
                     return new InquiryElement("news", "Recent messages: none yet", null, false,
-                                              "Messages about your men - kit, horses, pay, drill, camp, the march and the quartermaster - are kept here as they come, the last "
-                                              + PlayerNews.Keep + ". None since this campaign was loaded.");
+                                              "Messages about your men are kept here, the last " + PlayerNews.Keep + ". None since this campaign was loaded.");
+                // recenzja 133: dymek gry ma ok. 33 znaki na linie - krotko (tematy i "Look" opisuje okno listy)
                 return new InquiryElement("news", "Recent messages (" + n + ")", null, true,
-                                          "The last messages about your men - kit, horses, pay, drill, camp, the march and the quartermaster - newest first, each with its day and hour."
-                                          + " The last " + PlayerNews.Keep + " are kept until you load a game.");
+                                          "Messages about your men - kit, horses, pay, drill, camp, march, quartermaster - newest first. The last " + PlayerNews.Keep
+                                          + " are kept until you load a game.");
             }
             catch (Exception e) { Stumble("NewsRow", e); return new InquiryElement("news", "Recent messages (not available)", null, false, "The messages cannot be read now."); }
         }

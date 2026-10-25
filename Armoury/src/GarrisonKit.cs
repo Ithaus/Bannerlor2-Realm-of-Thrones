@@ -630,13 +630,17 @@ namespace Armoury
                 if (OwnKitOn) OwnAssignments(dists, sides, me, mission);   // PRZED rozdzielaczami zalog - te dochodza nizej
                 else if (s.LordBattleKitIsLent) LordAssignments(dists);
                 try { if (s.GarrisonArmoryInBattle) GarrisonDistributors(s, me, dists, sides, mission); }
-                finally { if (OwnKitOn) BattleNotice(sides); }   // sklad7b-p (uwaga 12): jedno zdanie w grze - czemu ludzie ida bez sprzetu
-                // 133c (K15): dowod jednej zasady - podglad okna armii na TEJ SAMEJ zbrojowni i tych samych wzorcach, przed pierwszym wystawieniem (bitwa w polu);
-                // na koniec misji BattleLine porownuje go z tym, co zebral OwnKitSpawn. Osobny przydzial DTE (podglad) - przydzial bitwy nietkniety.
-                if (OwnKitOn && _mountsOk)
+                finally
                 {
-                    try { KitPreview.InMission(dists, mission); }
-                    catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.DistributorsPostfix(133c)", e); }
+                    // 133c (K15): dowod jednej zasady - podglad okna armii na TEJ SAMEJ zbrojowni i tych samych wzorcach, przed pierwszym wystawieniem (bitwa w polu);
+                    // na koniec misji BattleLine porownuje go z tym, co zebral OwnKitSpawn. Osobny przydzial DTE (podglad) - przydzial bitwy nietkniety.
+                    // Recenzja 133: PRZED BattleNotice - czerwona linia startu bitwy bierze liczby z tego podgladu (decyzja (a)); tylko odczyt, kolejnosc bez skutku dla bitwy.
+                    if (OwnKitOn && _mountsOk)
+                    {
+                        try { KitPreview.InMission(dists, mission); }
+                        catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.DistributorsPostfix(133c)", e); }
+                    }
+                    if (OwnKitOn) BattleNotice(sides);   // sklad7b-p (uwaga 12): jedno zdanie w grze - czemu ludzie ida bez sprzetu
                 }
             }
             catch (Exception e) { Log.Error("GarrisonKit.DistributorsPostfix", e); }
@@ -771,10 +775,16 @@ namespace Armoury
                 if (noBody > 0) parts.Add(noBody + " no body armour");
                 if (onFoot > 0) parts.Add(onFoot + " riders no horse");
                 if (noSaddle > 0) parts.Add(noSaddle + " riders no saddle");
-                if (parts.Count > 0)
-                    Log.Player("Your stores are short for this battle - of your men, " + string.Join(", ", parts.ToArray()) + "; they fight with what they have.", true);
-                if (allyBare > 0) Log.Player("Your allies' men are short of arms too: " + BareText(allyBare, allyHome) + " - their stores hold no more.");
-                if (enemyBare > 0) Log.Player("The enemy's men are short of arms: " + BareText(enemyBare, enemyHome) + " - their stores hold no more.");
+                // recenzja 133 (decyzja (a), K14 - "i podobne o sprzecie gracza"): na ekranie JEDNA linia z liczbami podgladu tej misji (K15 - te same, ktore pokaze
+                // "Last battle"); rozbicie wlasna regula (przydzial przed strazami wystawienia, z pancerza tylko korpus) zostaje w linii logu wyzej. Bez podgladu
+                // w misji (oblezenie, kryjowka, morze, potkniecie, CrashScribe sprzed 133a) - jedno zdanie bez liczb z innej reguly.
+                string one = KitPreview.MissionNotice();
+                if (one != null) { if (one.Length > 0) Log.Player(one, true); }
+                else if (parts.Count > 0)
+                    Log.Player("Your stores are short for this battle - your men fight with what they have; after the battle, see Last battle in Review the army.", true);
+                // recenzja 133 (decyzja (e)): sojusznicy i wrog to nie wojsko gracza - na ekran jak dotad, bez wpisu w "Recent messages"
+                if (allyBare > 0) Log.Player("Your allies' men are short of arms too: " + BareText(allyBare, allyHome) + " - their stores hold no more.", false, PlayerNews.NotArmy);
+                if (enemyBare > 0) Log.Player("The enemy's men are short of arms: " + BareText(enemyBare, enemyHome) + " - their stores hold no more.", false, PlayerNews.NotArmy);
             }
             catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.BattleNotice", e); }
         }
@@ -1514,11 +1524,12 @@ namespace Armoury
                     catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.ClanFillOnce(partia)", e); }
                 }
                 Log.Info("Partie Twojego rodu (sklad7b-p, raz na sesje): wypelnienie zbrojowni wobec wzorca ludzi - " + (line.Count > 0 ? string.Join(", ", line.ToArray()) : "brak partii") + ".");
+                // recenzja 133 (decyzja (e)): partie rodu to nie wojsko gracza - na ekran jak dotad, bez wpisu w "Recent messages"
                 if (lowN == 1)
-                    Log.Player(lowName + " has kit for only " + lowFill + "% of its men - in battle they fight with what its stores hold until it buys more.", true);
+                    Log.Player(lowName + " has kit for only " + lowFill + "% of its men - in battle they fight with what its stores hold until it buys more.", true, PlayerNews.NotArmy);
                 else if (lowN > 1)
                     Log.Player(lowN + " parties of your clan have kit for few of their men: " + string.Join(", ", low.ToArray()) + (lowN > low.Count ? " and more" : "")
-                               + " - in battle they fight with what their stores hold until they buy more.", true);
+                               + " - in battle they fight with what their stores hold until they buy more.", true, PlayerNews.NotArmy);
             }
             catch (Exception e) { Log.Error("GarrisonKit.ClanFillOnce", e); }
         }

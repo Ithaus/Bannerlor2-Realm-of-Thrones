@@ -618,7 +618,7 @@ namespace Armoury
                     if (sold > 0) { _dSoldGarrisons++; _dSoldPcs += sold; _dSoldGold += gold; }
                     // poprawki sklad7: Twoja kiesa nie zmienia sie bez slowa (raz na tydzien na zaloge - kolejka C10)
                     if (sold > 0 && mine)
-                        Log.Player("Your garrison of " + st.Name + " sold " + sold + " spare pieces of kit for " + gold + " denars; your third: " + Math.Max(0, Hero.MainHero.Gold - before) + ".");
+                        Log.Player("Your garrison of " + st.Name + " sold " + sold + " spare pieces of kit for " + gold + " denars; your third: " + Math.Max(0, Hero.MainHero.Gold - before) + ".", false, PlayerNews.NotArmy);   // recenzja 133 (e): zaloga - bez wpisu w "Recent messages"
                     if (o1 != 0) NoteOne(st, Stopwatch.GetTimestamp() - o1);
                 }
                 // poprawki sklad7: jedno miejsce w logu na dobe (dotad osobno dla kazdej zalogi, a MenPurse.SellGarrisonSurplus logowal jeszcze raz sam) - reszta w liczniku potkniec
@@ -1256,7 +1256,7 @@ namespace Armoury
                      + ", " + pcs + " szt.; w tym zalogi gracza " + mine + ", " + minePcs + " szt. (sklad7: zaloga walczy tylko tym, co ma - bez dorobku bronilaby sie nago).");
             // poprawki sklad7: swiadome rozszerzenie decyzji 7 (dorobek startowy) na trwajaca kampanie - Jeff ma to zobaczyc w grze, nie tylko w logu
             if (mine > 0)
-                Log.Player("Your " + mine + " garrisons received the kit of their men once (" + minePcs + " pieces), like the stores of a new campaign - from now on a garrison fights only with what its stores hold.");
+                Log.Player("Your " + mine + " garrisons received the kit of their men once (" + minePcs + " pieces), like the stores of a new campaign - from now on a garrison fights only with what its stores hold.", false, PlayerNews.NotArmy);   // recenzja 133 (e)
         }
 
         /// <summary>sklad7: zapis z DLL probnej K1c (ten sam klucz, format "osada,przedmiot,ile;") - te zbrojownie odtwarzamy jak v1 (zastepujac to, co dal DTE).</summary>

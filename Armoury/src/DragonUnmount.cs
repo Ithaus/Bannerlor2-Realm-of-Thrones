@@ -119,6 +119,16 @@ namespace Armoury
             return Keeps;
         }
 
+        /// <summary>Recenzja 133 (K3): czy uprzaz zostaje na koniu-zamienniku (TopMount z WouldStrip) - rodzina uprzezy taka jak wierzchowca (Jeff 14.09, crash
+        /// 11:17:58: inna rodzina = natywny AccessViolation w AddMountMesh). Logika 1:1 jak dotad w StripDragonMount; wolana tez przez KitPreview (podglad).
+        /// Brak uprzezy, konia, ArmorComponent albo Monster - true (nic do zdjecia, jak dotad).</summary>
+        internal static bool HarnessFitsMount(ItemObject mount, ItemObject harness)
+        {
+            if (mount == null || harness == null || harness.ArmorComponent == null) return true;
+            var mc = mount.HorseComponent != null ? mount.HorseComponent.Monster : null;
+            return mc == null || harness.ArmorComponent.FamilyType == mc.FamilyType;
+        }
+
         public static void StripDragonMount(AgentBuildData agentBuildData)
         {
             try
@@ -205,10 +215,8 @@ namespace Armoury
                                 // UPRZAZ MUSI PASOWAC DO NOWEGO KONIA (Jeff 14.09, crash
                                 // 11:17:58): rodzina inna niz wierzchowca = natywny
                                 // AccessViolation w AddMountMesh - wtedy bez uprzezy
-                                var hr = eq[(EquipmentIndex)11].Item;
-                                var mc = topM.HorseComponent != null ? topM.HorseComponent.Monster : null;
-                                if (hr != null && hr.ArmorComponent != null && mc != null
-                                    && hr.ArmorComponent.FamilyType != mc.FamilyType)
+                                // (recenzja 133, K3: HarnessFitsMount - ta sama funkcja w podgladzie okna armii)
+                                if (!HarnessFitsMount(topM, eq[(EquipmentIndex)11].Item))
                                     eq[(EquipmentIndex)11] = new EquipmentElement(null);
                                 if (_floorLog++ < 20)
                                     Log.Info((geo ? "MountLaw: " : "ItemReq: ") + soldier.StringId

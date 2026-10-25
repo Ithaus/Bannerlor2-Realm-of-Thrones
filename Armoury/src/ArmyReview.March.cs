@@ -282,7 +282,7 @@ namespace Armoury
                 else if (v.Idle > 0) title += " - " + Pl(v.Idle, "horse", "horses") + " idle";
             }
             string hint = v.Foot > 0 ? Pl(v.Foot, "rider", "riders") + " would fight on foot - the page says why, what to buy and what is already in your baggage."
-                                     : "The horses and harness in the troops' armoury and in your baggage: what is ridden, what stands idle, and the herd.";
+                                     : "The horses and harness in the troops' armoury and in your baggage: what is ridden and what stands idle (the herd is under On the march).";
             return new InquiryElement("horses", title, null, true, hint);
         }
 
@@ -445,7 +445,7 @@ namespace Armoury
             }
             v.Who = who;
             ExplainedNumber en;
-            if (!MapRoads.Explained(who, out en)) { v.Why = "the game's speed cannot be worked out now."; return v; }
+            if (!MapRoads.Explained(who, out en)) { v.Why = "The game's speed model gave no number for your party now."; return v; }   // recenzja 133: Why - sama przyczyna, pelne zdanie
             v.Result = en.ResultNumber;
             v.BaseNumber = en.BaseNumber;
             var gl = en.GetLines();
@@ -528,7 +528,7 @@ namespace Armoury
         /// <summary>Strona "Speed".</summary>
         internal static string SpeedText(MarchView v)
         {
-            if (v == null || !v.Ok) return "The speed cannot be worked out now" + (v != null && v.Why != null ? " - " + v.Why : ".");
+            if (v == null || !v.Ok) return v != null && v.Why != null ? v.Why : "The speed cannot be worked out now.";
             var sb = new StringBuilder();
             sb.Append("Speed now: ").Append(F2(v.Result)).Append(" on the map");
             if (v.Game >= 0f) sb.Append(" (the game shows ").Append(F2(v.Game)).Append(')');
@@ -565,7 +565,7 @@ namespace Armoury
         /// <summary>Strona "Herd": regula stada gry i obok nasza regula taboru kolumny (decyzja (c) - tylko pokazac).</summary>
         internal static string HerdText(MarchView v, MarchPace.Column col)
         {
-            if (v == null || !v.Ok) return "The herd cannot be worked out now" + (v != null && v.Why != null ? " - " + v.Why : ".");
+            if (v == null || !v.Ok) return v != null && v.Why != null ? v.Why : "The herd cannot be worked out now.";
             var sb = new StringBuilder();
             sb.Append("The game's herd: pack animals, livestock and spare horses with no footman to ride them. It slows the party only when it outnumbers the men");
             if (v.Parties > 1) sb.Append(" - counted over the whole column: ").Append(v.Army ? "the army's leader's party with every party attached" : "your party with the parties of your army");
@@ -616,14 +616,15 @@ namespace Armoury
             return sb.ToString();
         }
 
-        /// <summary>Strona "Column": MarchText bez zmian logiki + regula jezdzca na mapie (decyzja (b) - tylko pokazac).</summary>
-        internal static string ColumnText(MobileParty mp, MarchPace.Column col, SaddleLaw.PairState p, KitPreview.Result r)
+        /// <summary>Strona "Column": MarchText + regula jezdzca na mapie (decyzja (b) - tylko pokazac). Recenzja 133: hv - wolne konie zbrojowni z podgladu;
+        /// zdanie o jezdzcach pieszo mowi o koniu ALBO uprzezy (r.Foot = bez konia + bez uprzezy).</summary>
+        internal static string ColumnText(MobileParty mp, MarchPace.Column col, SaddleLaw.PairState p, KitPreview.Result r, HorseView hv)
         {
-            var sb = new StringBuilder(MarchText(mp, col, p));
+            var sb = new StringBuilder(MarchText(mp, col, p, hv));
             if (GarrisonKit.OwnKitOn)
             {
-                sb.Append("\n\nA man rides on the march by his troop: a man of a mounted troop counts as a rider here even with no horse for him in the troops' armoury");
-                if (r != null && r.Ok && r.Foot > 0) sb.Append(" - now ").Append(Pl(r.Foot, "such rider marches", "such riders march")).Append(" as a horseman and would fight on foot (see Horses and harness).");
+                sb.Append("\n\nA man rides on the march by his troop: a man of a mounted troop counts as a rider here even with no horse").Append(SaddleLaw.On ? " or no harness" : "").Append(" for him in the troops' armoury");
+                if (r != null && r.Ok && r.Foot > 0) sb.Append(" - now ").Append(Pl(r.Foot, "such rider marches as a horseman", "such riders march as horsemen")).Append(" and would fight on foot (see Horses and harness).");
                 else sb.Append(" - in battle he would fight on foot (see Horses and harness).");
             }
             return sb.ToString();

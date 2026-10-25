@@ -27,14 +27,20 @@ namespace Armoury
     /// Ta sama linia w ciagu godziny gry (np. kwatermistrz przy kazdym otwarciu ekranu) - jeden wpis z licznikiem "(xN)"; do logu kazda.
     /// Pierscien Keep wpisow, tylko w pamieci (nie w zapisie gry); czyszczony przy nowej kampanii i kazdym wczytaniu - StateHygiene.ResetAll (konstruktor
     /// ArmouryBehavior, zawsze - takze przy wylaczonym StateHygieneEnabled, jak pamiec E8/H). Bez kampanii (menu glowne) nic nie zapisuje.
-    /// Poza zakresem (K13): zolte CrashScribe "QM: N EMPTY in battle" (inny DLL; po 133a tylko w bitwie - pokazuje to wiersz "Last battle") i komunikaty samej gry
-    /// (gra nie pisze nic o niezaplaconym zoldzie - DefaultClanFinanceModel ustawia tylko HasUnpaidWages).
+    /// Poza zakresem (K13): zolte CrashScribe "QM: ... EMPTY in battle" (inny DLL; po 133a tylko w bitwie, od recenzji 133 bez liczby z innej reguly - liczbe
+    /// daje czerwona linia startu bitwy z podgladu K15 i wiersz "Last battle") i komunikaty samej gry (gra nie pisze nic o niezaplaconym zoldzie -
+    /// DefaultClanFinanceModel ustawia tylko HasUnpaidWages). Komunikaty plikow z listy NIE o wojsku gracza - NotArmy (recenzja 133).
     /// Potkniecia liczone (pierwsze 3 i co 50 do Log.Error), nic sie nie wylacza. Napisy w grze po angielsku.
     /// </summary>
     internal static class PlayerNews
     {
         internal const int Keep = 60;            // pierscien: ostatnie 60 wpisow (decyzja (e))
         internal const int TitleChars = 90;      // tytul wiersza listy (wiersz okna ma 2 linie)
+
+        /// <summary>Recenzja 133 (decyzja (e) - "tylko komunikaty o wojsku gracza"): jawny plik zrodlowy "zaden" dla Log.Player z pliku z listy, gdy komunikat NIE
+        /// jest o wojsku gracza (zalogi, partie rodu, sojusznicy, wrog): Log.Player(tekst, bad, PlayerNews.NotArmy) - na ekran jak dotad, bez wpisu w pierscieniu.
+        /// Przejscia ludzi miedzy Twoja druzyna a zaloga / partia rodu (sztuki z Twojej zbrojowni) zostaja w pierscieniu - to Twoi ludzie i Twoja zbrojownia.</summary>
+        internal const string NotArmy = "";
         private const string LogHead = "Wojsko (133f) ";
 
         /// <summary>Wpis pierscienia (kopia dla okna - Newest).</summary>

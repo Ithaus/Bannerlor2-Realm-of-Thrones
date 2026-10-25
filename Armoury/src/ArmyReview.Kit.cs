@@ -109,8 +109,8 @@ namespace Armoury
                 if (foot > 0) parts.Add(foot + (foot == 1 ? " rider on foot" : " riders on foot"));
                 title = "Last battle: " + string.Join(", ", parts.ToArray()) + " (" + a.Men + (a.Men == 1 ? " man)" : " men)");
             }
-            string hint = BattleDate(b.When) + ": what your men went without when they took the field, counted after every check. The gaps gather in the men"
-                          + " handed out last - if not all your men fought, fewer show here than the hand-out had.";
+            // recenzja 133: dymek gry ma ok. 33 znaki na linie - krotko; K16 (kolejnosc przydzialow) jednym zdaniem, pelne wyjasnienie na ostatnim akapicie strony
+            string hint = BattleDate(b.When) + ": what your men went without as they took the field. Gaps gather in the men handed out last.";
             return new InquiryElement("last", title, null, true, hint);
         }
 

@@ -92,15 +92,22 @@ namespace Armoury
         /// <summary>133c (K15): kopia biezacej bitwy wedlug typu (porownanie z podgladem w misji - KitPreview.BattleSegment, przed Close).</summary>
         internal static List<Row> CurrentTypes() { return new List<Row>(_cur.Values); }
 
-        /// <summary>133c: najwieksze braki wiersza (najwyzej n rodzajow, wedlug liczby): "arrows 6, shield 1".</summary>
-        internal static string TopKinds(int[] shortBy, int n, bool en)
+        /// <summary>133c: najwieksze braki wiersza (najwyzej n rodzajow, wedlug liczby): "arrows 6, shield 1". Recenzja 133 (tytuly wierszy okna): andMore - dopisek
+        /// "and more" przy dalszych rodzajach; counts - liczby przy rodzajach (bez nich same nazwy - gdy czesc brakow zastapiono innym rodzajem, liczby rodzajow
+        /// nie sumuja sie do pustych slotow).</summary>
+        internal static string TopKinds(int[] shortBy, int n, bool en, bool andMore = true, bool counts = true)
         {
             var l = new List<int>();
             foreach (int c in Order) if (shortBy[c] > 0) l.Add(c);
             l.Sort((a, b) => { int x = shortBy[b].CompareTo(shortBy[a]); return x != 0 ? x : Array.IndexOf(Order, a).CompareTo(Array.IndexOf(Order, b)); });
             var sb = new StringBuilder();
-            for (int i = 0; i < l.Count && i < n; i++) { if (sb.Length > 0) sb.Append(", "); sb.Append(en ? En[l[i]] : Pl[l[i]]).Append(' ').Append(shortBy[l[i]]); }
-            if (l.Count > n) sb.Append(en ? " and more" : " i inne");
+            for (int i = 0; i < l.Count && i < n; i++)
+            {
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append(en ? En[l[i]] : Pl[l[i]]);
+                if (counts) sb.Append(' ').Append(shortBy[l[i]]);
+            }
+            if (andMore && l.Count > n) sb.Append(en ? " and more" : " i inne");
             return sb.ToString();
         }
 
