@@ -218,6 +218,7 @@ namespace Armoury
         {
             long men = pr != null ? pr.ToMen : 0, lead = pr != null ? pr.ToLead : 0;
             long crown = pr != null && pr.Lead != null ? CitySack.CrownPart(pr.Lead, lead) : 0;
+            SpoilsReport.NoteRansom(st, pool, men, lead, crown, true);   // noc 25.10 P5: okno lupu "The Ransom of X" z tych samych liczb (tylko odczyt)
             Log.Player("You took a ransom of " + N(pool) + " denars from " + Nm(st) + " and lifted the siege. " + CitySack.PartText(men, lead, crown)
                        + " You will not besiege " + Nm(st) + " again for " + TruceDays + " days.");
         }

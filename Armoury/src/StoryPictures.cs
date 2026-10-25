@@ -435,6 +435,7 @@ namespace Armoury
             try
             {
                 if (EventWindowOnStack()) return;
+                if (SpoilsWindow.IsOpen) return;   // noc 25.10 P5: okno lupu (wlasna warstwa) moze rysowac obrazek z pliku - zwolnienie po zamknieciu
                 long now = Stopwatch.GetTimestamp();
                 for (int i = _pending.Count - 1; i >= 0; i--)
                 {

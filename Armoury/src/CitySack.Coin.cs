@@ -240,6 +240,9 @@ namespace Armoury
             try
             {
                 var main = MobileParty.MainParty;
+                // noc 25.10 P5: okno lupu - czesc gracza (do kiesy) jako etykieta otwartej ramki nastepstw; tylko odczyt gotowych liczb, gdy gracz bierze udzial
+                if (main != null && kind != KMercy && (a == main || (contrib != null && contrib.ContainsKey(main))))
+                    SpoilsReport.NoteSack(res.PlayerLead, res.PlayerCrown);
                 string town = st.Name != null ? st.Name.ToString() : st.StringId;
                 bool castle = !st.IsTown;                   // poprawka po audycie (gracz 7, 8): zamek - skarbiec i ludzie podzamcza; pieniadz zawsze "denars"
                 if (a == main && main != null)

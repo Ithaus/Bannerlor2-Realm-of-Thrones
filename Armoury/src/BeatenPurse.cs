@@ -305,7 +305,9 @@ namespace Armoury
                     var h = w.Party != null ? w.Party.LeaderHero : null;
                     var mp = w.Party != null ? w.Party.MobileParty : null;
                     if (h == null || !h.IsAlive || (mp != null && Undead.Party(mp))) continue;
+                    long c0 = h == Hero.MainHero ? Ransom178.PendingClaim(h) : 0;   // noc 25.10 P5 (recenzja 2): tylko odczyt - korona z czesci lupu gracza z kies
                     Ransom178.NoteBeatenGold(h, (long)Math.Round(w.PlunderedGold * q));
+                    if (h == Hero.MainHero) SpoilsReport.NoteCrownEarly(__instance, Ransom178.PendingClaim(h) - c0);   // OnBattleWon - przed ramka A okna lupu
                 }
             }
             catch (Exception e) { Stumble("BeatenPurse.SplitPostfix", e); }
@@ -419,6 +421,7 @@ namespace Armoury
                         GiveGoldAction.ApplyForPartyToCharacter(party.Party, hero, g, true);
                         int moved = g - party.PartyTradeGold;
                         _dLords += moved; if (hero == Hero.MainHero) _dPlayer += moved;
+                        if (hero == Hero.MainHero) SpoilsReport.NoteCoin(SpoilsReport.LPurses, moved);   // noc 25.10 P5 (recenzja 3): etykieta okna lupu (tylko odczyt, bez ramki - nic)
                         _dWin[t] += moved;
                         Ransom178.NoteBeatenGold(hero, moved);   // 4: korona 1/9 od wodza-wasala
                     }

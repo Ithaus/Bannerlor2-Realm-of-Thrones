@@ -68408,5 +68408,172 @@ def p4przeglad_main(logp):
     return 0
 
 
+# ---------------- p5lup (noc 25.10, galaz noc/p5-lup - Jeff 25.10: "po bitwie i po oblezeniu i po turnieju, powinien wyskakiwac popup z dokladna iloscia lootu,
+# ile zlota, ile zlota w sprzecie ... w klimacie"). Armoury/src/SpoilsReport.cs (ramki A/S/L/F/G/R, linia startu i linia raportu "Okno lupu (117): "),
+# SpoilsWindow.cs (okno Gauntlet ArmSpoilsWindow, zapas StoryWindow/ShowInquiry). Grupa dopisana na koncu pliku: wlasne wejscie przez opakowanie main
+# (python -I tools/sprawdz_logi.py --grupa p5lup [<Armoury-*.log>]); bez logu - sam self-test wyrazen. Wiersze LUP-S, LUP-0..LUP-8 (LUP-8: recenzja P5 (1) - sakwy w raporcie).
+P5LUP_TAG = "Okno lupu (117): "
+P5LUP_RX_START = re.compile(r"Okno lupu \(117\): start \| .*?latki (\d+)/(\d+): gra (\d)/4, Spoils (\d)/7.*?\| prefab ArmSpoilsWindow (TAK|BRAK)")
+P5LUP_RX_GOLD = re.compile(r"zloto ([+-]\d+) = (.*?)(reszta ([+-]\d+)|reszta pominieta \(czas plynal\)), czas stal (TAK|NIE)")
+P5LUP_RX_PART = re.compile(r"^(.*) ([+-]\d+)$")
+P5LUP_RX_S = re.compile(r"\| S trofea: (\d+) szt\. za (\d+) \(Spoils razem (-?\d+)/(-?\d+) - sztuki zgodne (TAK|NIE)\)")
+P5LUP_RX_KIND = re.compile(r"Okno lupu \(117\): (bitwa|oblezenie|okup|turniej) (\d+) \(bitew (\d+)\)")
+P5LUP_RX_OUT = re.compile(r" \| (pokazane|pominiete)( \(([^)]*)\))?( \| okno: ([^|]*))?")
+P5LUP_RX_STUM = re.compile(r"potkniecia (\d+)\.\s*$")
+
+
+def p5lup_gold(seg):
+    """p5lup: tozsamosc ramki 'zloto X = czesc a + czesc b + reszta r' -> (X, suma czesci + reszta albo None, czas_stal) albo None (bez wzoru)."""
+    m = P5LUP_RX_GOLD.search(seg)
+    if not m:
+        return None
+    total = int(m.group(1))
+    parts = 0
+    for p in [x for x in m.group(2).split(" + ") if x.strip()]:
+        mp = P5LUP_RX_PART.match(p.strip())
+        if not mp:
+            return (total, None, m.group(5) == "TAK")
+        parts += int(mp.group(2))
+    rest = m.group(4)
+    if rest is None:
+        return (total, None, False)   # czas plynal - bez reszty (tozsamosci nie ma)
+    return (total, parts + int(rest), m.group(5) == "TAK")
+
+
+def p5lup_scan(lines):
+    """p5lup: przebieg linii (strumieniowo) -> starty, raporty (ramki zlota, ekrany trofeow, wynik okna, potkniecia), bitwy bez okna, bledy."""
+    D = {"start": [], "reports": [], "lost": 0, "err": 0, "bags": 0}
+    for line in lines:
+        if "ERROR" in line and ("SpoilsReport." in line or "SpoilsWindow." in line):
+            D["err"] += 1
+        if P5LUP_TAG not in line:
+            continue
+        s = line[line.index(P5LUP_TAG):].rstrip("\r\n")
+        m = P5LUP_RX_START.search(s)
+        if m:
+            D["start"].append(tuple(m.groups()))
+            continue
+        if "bitwa bez okna" in s:
+            D["lost"] += 1
+            continue
+        if "sakwy bez raportu" in s:
+            D["bags"] += 1
+            continue
+        mk = P5LUP_RX_KIND.search(s)
+        if not mk:
+            continue
+        segs = s.replace("; ", " | ").split(" | ")
+        golds = [g for g in (p5lup_gold(x) for x in segs) if g is not None]
+        mo = P5LUP_RX_OUT.search(s)
+        ms = P5LUP_RX_STUM.search(s)
+        D["reports"].append({"kind": mk.group(1), "id": int(mk.group(2)), "battles": int(mk.group(3)), "golds": golds,
+                             "s": P5LUP_RX_S.findall(s), "out": mo.group(1) if mo else "?", "why": (mo.group(3) or "") if mo else "",
+                             "win": (mo.group(5) or "").strip() if mo else "", "stum": int(ms.group(1)) if ms else -1,
+                             "timeflow": ", czas stal NIE" in s, "auto": "zamkniete: autotest" in s,
+                             "bagwait": "czeka na sakwy" in s, "bagcame": "sakwy przyszly" in s, "baglate": "sakwy nie przyszly" in s})
+    return D
+
+
+def p5lup_rows(rep, D):
+    st = D["start"]
+    ok0 = bool(st) and all(a == b and g == "4" and sp == "7" and pf == "TAK" for a, b, g, sp, pf in st)
+    rep.add("LUP-0: linia startu - latki 11/11 (gra 4/4, Spoils 7/7), prefab ArmSpoilsWindow TAK",
+            "startow %d%s" % (len(st), (" (ostatni: latki %s/%s, gra %s/4, Spoils %s/7, prefab %s)" % st[-1]) if st else ""), "wszystkie TAK", ok0)
+    R = D["reports"]
+    rep.add("LUP-1: linie raportu (bitwa / oblezenie / okup)", "raportow %d (bitwa %d, oblezenie %d, okup %d), pokazane %d, pominiete %d, bitew bez okna (przegrana) %d" % (
+        len(R), sum(1 for r in R if r["kind"] == "bitwa"), sum(1 for r in R if r["kind"] == "oblezenie"), sum(1 for r in R if r["kind"] == "okup"),
+        sum(1 for r in R if r["out"] == "pokazane"), sum(1 for r in R if r["out"] == "pominiete"), D["lost"]), ">= 1 (autotest: bitwa wygrana)", len(R) > 0)
+    bad = []
+    nid = 0
+    for r in R:
+        for total, summed, still in r["golds"]:
+            if summed is None:
+                continue
+            nid += 1
+            if total != summed:
+                bad.append("raport %d: zloto %+d, czesci %+d" % (r["id"], total, summed))
+    rep.add("LUP-2: tozsamosc zlota w kazdej ramce (czesci + reszta = roznica kiesy)", "ramek %d, zlych %d%s" % (nid, len(bad), (" (" + bad[0] + ")") if bad else ""),
+            "zlych 0", None if nid == 0 else not bad)
+    sl = [(r["id"], x) for r in R for x in r["s"]]
+    sbad = [i for i, x in sl if x[4] != "TAK"]
+    rep.add("LUP-3: ekran trofeow - nasze sztuki = _takenCount Spoils", "ekranow %d, niezgodnych %d%s" % (len(sl), len(sbad), (" (raport %d)" % sbad[0]) if sbad else ""),
+            "niezgodnych 0 (brak ekranu - INFO)", None if not sl else not sbad)
+    tf = [r["id"] for r in R if r["timeflow"]]
+    rep.add("LUP-4: czas kampanii stal w ramkach", "raportow z 'czas stal NIE' %d%s" % (len(tf), (" (raport %d)" % tf[0]) if tf else ""), "0", None if not R else not tf)
+    shown = [r for r in R if r["out"] == "pokazane"]
+    own = sum(1 for r in shown if r["win"].startswith("wlasne"))
+    fb = sum(1 for r in shown if r["win"].startswith("zapas"))
+    rep.add("LUP-5: okno - wlasna warstwa (zapas StoryWindow/ShowInquiry tylko przy braku ROT/prefabu)", "pokazanych %d: wlasne %d, zapas %d" % (len(shown), own, fb),
+            "zapas 0", None if not shown else fb == 0)
+    au = sum(1 for r in shown if r["auto"])
+    rep.add("LUP-6: autotest - okno zamyka sie samo (1.5 s)", "pokazanych %d, zamknietych przez autotest %d" % (len(shown), au), "wszystkie (gra Jeffa - INFO)",
+            None if not shown or au == 0 else au == len(shown))
+    stum = max([r["stum"] for r in R] + [0])
+    rep.add("LUP-7: potkniecia okna lupu i bledy SpoilsReport/SpoilsWindow", "potkniecia (najwiekszy licznik sesji) %d, ERROR %d" % (stum, D["err"]), "0 i 0",
+            stum == 0 and D["err"] == 0)
+    # recenzja P5 (1): bitwa bez ekranu Spoils (zaciezny ROT, Spoils wyszedl wczesniej) - raport czeka na sakwy z terminu godzinnego, zamiast pokazac sie bez nich
+    bw = sum(1 for r in R if r["bagwait"])
+    bc = sum(1 for r in R if r["bagcame"])
+    bl = sum(1 for r in R if r["baglate"])
+    rep.add("LUP-8: sakwy z kolejki BattlefieldLaw w raporcie (nie po oknie)", "raportow czekajacych na sakwy %d (przyszly %d, termin minal %d), linii 'sakwy bez raportu' %d" % (
+        bw, bc, bl, D["bags"]), "sakwy bez raportu 0, termin minal 0", None if bw == 0 and D["bags"] == 0 else (D["bags"] == 0 and bl == 0))
+
+
+def p5lup_selftest():
+    """p5lup: wyrazenia wobec linii syntetycznej dobrej i zlej. None = OK."""
+    good = ("[12:00:00] Okno lupu (117): bitwa 1 (bitew 1) Pyke | A (DoEnd): zloto +150 = lup pokonanych +100 + reszta +50, czas stal TAK, sakiewka ludzi +20,"
+            " sztuk 3 za 300, jency 2 (lordow 0), slawa +3 wplywy +0, polegli 1 ranni 2 | S trofea: 12 szt. za 900 (Spoils razem 12/880 - sztuki zgodne TAK);"
+            " zloto +0 = reszta +0, czas stal TAK, sakiewka ludzi +0, sztuk 12 za 900, jency 0 (lordow 0), slawa +0 wplywy +0 | L: zostawione na polu 4 szt. za 80;"
+            " zloto +0 = monety z pola +0 + reszta +0, czas stal TAK | gotowy po Leave | razem: zloto 150 | pokazane | okno: wlasne | pokazane po 1.2 s od gotowosci,"
+            " otwarte 1.5 s | zamkniete: autotest 1.5 s | sesja: pokazane 1, polaczone 0, pominiete 0, bez okna (przegrana) 0, zapas 0, potkniecia 0.")
+    bad = good.replace("lup pokonanych +100 + reszta +50", "lup pokonanych +100 + reszta +40").replace("sztuki zgodne TAK", "sztuki zgodne NIE")
+    D = p5lup_scan([good])
+    E = p5lup_scan([bad])
+    if len(D["reports"]) != 1 or len(D["reports"][0]["golds"]) != 3:
+        return "dobry: zly odczyt (%d raportow, ramek %d)" % (len(D["reports"]), len(D["reports"][0]["golds"]) if D["reports"] else -1)
+    if any(t != s for t, s, _ in D["reports"][0]["golds"]):
+        return "dobry: tozsamosc zlota NIE"
+    if not any(t != s for t, s, _ in E["reports"][0]["golds"] if s is not None):
+        return "zly: tozsamosc zlota nie wykryta"
+    if E["reports"][0]["s"][0][4] != "NIE":
+        return "zly: niezgodne sztuki nie wykryte"
+    if not D["reports"][0]["auto"] or D["reports"][0]["out"] != "pokazane" or not D["reports"][0]["win"].startswith("wlasne"):
+        return "dobry: wynik okna nie odczytany"
+    return None
+
+
+def p5lup_main(logp):
+    """p5lup (noc 25.10; noc/p5-lup): LUP-S, LUP-0..LUP-8. Strumieniowo; bez logu tylko self-test."""
+    rep = Report()
+    try:
+        s1 = p5lup_selftest()
+    except Exception as e:   # self-test nie moze zatrzymac grupy
+        s1 = "wyjatek %s: %s" % (type(e).__name__, e)
+    rep.add("LUP-S: self-test wyrazen (linia syntetyczna dobra i zla)", s1 or "OK", "werdykty zgodne", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("LUP-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        D = p5lup_scan(fh)
+    print("plik: %s | startow %d, raportow %d, bez okna %d, sakwy bez raportu %d, ERROR %d" % (logp, len(D["start"]), len(D["reports"]), D["lost"], D["bags"], D["err"]))
+    p5lup_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_p5lup_prev_main = main
+
+
+def main(argv):   # p5lup: wlasne wejscie grupy (dopisana na koncu pliku - rozdzielnik grup w main bez zmian)
+    a = list(argv[1:])
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "p5lup":
+            rest = [x for j, x in enumerate(a) if j not in (i, i + 1) and not x.startswith("--")]
+            return p5lup_main(rest[-1] if rest else None)
+    return _p5lup_prev_main(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

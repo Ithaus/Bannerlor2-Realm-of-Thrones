@@ -365,6 +365,9 @@ namespace Armoury
 
         internal static void ApplyAll(Harmony h)
         {
+            // noc 25.10 P5: okno lupu - latki ramek raportu (tylko odczyt: DoApplyMapEventResults, CommitGoldChanges, DoEnd, OnSiegeAftermathApplied, ekrany Spoils);
+            // PRZED wylacznikiem prawa pola bitwy (okno ma wlasne klucze Spoils Window After ...), wlasny try - wyjatek nie rusza reszty prawa pola bitwy
+            try { SpoilsReport.Apply(h); } catch (Exception e) { Log.Error("BattlefieldLaw.ApplyAll (okno lupu P5)", e); }
             if (!Settings.Current.BattlefieldLawEnabled) { Log.Info("BattlefieldLaw: wylaczone w ustawieniach."); return; }
             try
             {
@@ -789,6 +792,14 @@ namespace Armoury
 
         /// <summary>m109-lup: rezerwa - konie bez zmian, uprzaz ze stanem bojowym (jak FlushShareToBaggage) do sakw gracza. Zwraca liczbe sztuk.</summary>
         private static int FlushMountsToBaggage(string why)
+        {
+            // noc 25.10 P5: ramka F okna lupu (jw.; z FlushShareToBaggage zagniezdzona - liczy ramka zewnetrzna)
+            var spoilsF = SpoilsReport.OpenF();
+            try { return FlushMountsToBaggageCore(why); }
+            finally { SpoilsReport.CloseF(spoilsF, why); }
+        }
+
+        private static int FlushMountsToBaggageCore(string why)
         {
             int moved = 0;
             _mountArmed = false;   // przed wysypaniem - prefiks ReturnMounts nie dubluje
@@ -1700,6 +1711,14 @@ namespace Armoury
         /// po kazdej bitwie, ktorej ekran sie nie upomnial.
         /// </summary>
         internal static int FlushShareToBaggage(string why)
+        {
+            // noc 25.10 P5: ramka F okna lupu wokol calego przelewu (tylko odczyt sakw przed i po; w ramce bitwy/Spoils nic nie liczy - liczy ramka zewnetrzna)
+            var spoilsF = SpoilsReport.OpenF();
+            try { return FlushShareToBaggageCore(why); }
+            finally { SpoilsReport.CloseF(spoilsF, why); }
+        }
+
+        private static int FlushShareToBaggageCore(string why)
         {
             int moved = 0;
             int wOk = -1, wMod = 0;   // m114-lup: bron bez loterii stanu (linia m110)
