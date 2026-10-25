@@ -606,6 +606,7 @@ RANGES = {
     'FriendlyFireRangedPercent': (0, 100, "0"),
     'FriendlyFireMeleePercent': (0, 100, "0"),
     'FriendlyFireChargePercent': (0, 100, "0"),
+    'FriendlyFireSiegeRangedPercent': (0, 100, "0"),
 }
 
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze

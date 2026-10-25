@@ -510,7 +510,9 @@ namespace Armoury
             _active = false;
             Reset();
             var s = Settings.Current;
-            _rangedPct = s != null ? Clamp(s.FriendlyFireRangedPercent) : 100;
+            // noc-final: przy oblezeniu (szturm i obrona murow) osobny procent strzal - lucznicy strzelaja ponad wlasnym tlumem pod murem
+            bool siegeFf = false; try { siegeFf = m.IsSiegeBattle; } catch { }
+            _rangedPct = s != null ? Clamp(siegeFf ? s.FriendlyFireSiegeRangedPercent : s.FriendlyFireRangedPercent) : (siegeFf ? 50 : 100);
             _meleePct = s != null ? Clamp(s.FriendlyFireMeleePercent) : 50;
             _chargePct = s != null ? Clamp(s.FriendlyFireChargePercent) : 50;
             _mref = new WeakReference(m);

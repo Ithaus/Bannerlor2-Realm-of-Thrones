@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 124 (noc-final, galaz noc/final = noc/calosc + noc/p10-szturm + noc/p9-gotowosc) - domyslne wlaczone (flanka, lucznicy za piechota, tlo dzwieku, szturm murow), friendly fire strzal przy oblezeniu 50%, nagrania ElevenLabs 379 klipow
+
+**Problem:** Jeff 25.10 ok. 04:55 dostal trzy pytania (nagrania ElevenLabs ok. 25 tys. kredytow; wlaczyc konnice na flanki i lucznikow za piechote - prosil o to, a paczka P1 zostawila je domyslnie wylaczone; friendly fire strzal przy oblezeniu 50%) z odpowiedzia domyslna "tak" do 05:15 - bez odpowiedzi. Tlo dzwieku (wiatr/deszcz, konie, szczek broni, ogien przy oblezeniu) i tlum przy szturmie murow Jeff zamowil wprost, a P2/P10 zostawily je "Trial - off".
+Agent nagran P2a nie nagral nic (zgoda tylko w tekscie skryptu) - nagrania zrobila sesja glowna.
+**Zmiana:**
+- Settings.cs: CavalrySeeksFlanks, ArchersFallBackBehindInfantry, BattleWindAndRain, BattleHorseSounds, BattleClashOfArms, SiegeFireSounds, SiegeAssaultCrowd = true (opis MCM: "On by default (Jeff 25.10) - switch off if it misbehaves"); nowy FriendlyFireSiegeRangedPercent = 50 (gen_mcm 0-100), FriendlyFire.Begin: przy m.IsSiegeBattle procent strzal z tego klucza (pole bez zmian - 100). gen_mcm: Armoury 2471 ustawien.
+- Nagrania (tools/lektor na noc/p2a 19a871a5): obsada TYLKO z glosow juz na koncie Jeffa (16 glosow: konto 33 glosy przy limicie 30 dodanych - dodanie 23 z biblioteki nie miesci sie i zmienialoby konto; pierwotny wybor w glosy_bitwa.json jako voice_id_biblioteka).
+  TTS 218 + 80 (szturm/obrona murow) = 298 klipow (12 616 znakow), SFX 62 + 19 = 81 (538 s); 0 nieudanych; kredyty ElevenLabs 88 120 -> 76 203 (zuzyte ok. 11.9 tys.). Pliki: Armoury/ModuleData/Lektor/Bitwa/<kategoria>/*.ogg + manifest.tsv (379 wierszy, 15 MB); kopia D:\Backup-Bannerlord
+agrania-bitwa-2026-10-25.
+**Ryzyko / co sprawdzic:** S3/S4 i tlo dzwieku wlaczone bez osobnej proby w grze Jeffa - autotest nocny (bitwy polowe z flagami prob) pokaze tylko brak wywrotek i liczniki; SiegeAssaultCrowd moze dublowac Contextual Combat Shouts ROT Battle Atmosphere (u Jeffa wlaczone) - Jeff wylaczy jedno z nich, jesli slychac podwojnie;
+glosy z konta to glownie narratorzy (brytyjscy) - okrzyki moga brzmiec mniej "bojowo"; zamiana na glosy z biblioteki wymaga zwolnienia miejsc na koncie (decyzja Jeffa). Pliki poza DLL do wgrania: Armoury/ModuleData/Lektor/Bitwa/** i Armoury/GUI/Prefabs/ArmSpoilsWindow.xml.
+**Status:** ZBUDOWANE - czeka na autotest i wgranie.
+
 ## 2026-10-25 122 (noc-p9 gotowosc AI, galaz noc/p9-gotowosc od a14c76d3 = WGRANIE 111; kod d036d233 + recenzja 155f3370 + druga recenzja - commit "noc-p9 (122) druga recenzja") - sila partii z uzbrojeniem (ocena AI i autobitwa) i "najpierw dozbroic" przed bitwa
 
 **Problem:** Jeff 25.10 ok. 03:30, po bitwie: "sprawdz moj save i ostatnia bitwe wogole nie mili uzbrojenia? ... wszycy biegali w koszulakch i z palkami i kijami ... jesli tak

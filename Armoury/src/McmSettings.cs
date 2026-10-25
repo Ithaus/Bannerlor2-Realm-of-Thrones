@@ -9704,13 +9704,13 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public int ShootFirstSeconds { get; set; } = 90;
 
-        [SettingPropertyBool("Cavalry Seeks Flanks", HintText = "AI cavalry goes round a pinned enemy and strikes his archers and flanks instead of only charging the front. Trial - off by default until tested", RequireRestart = false)]
+        [SettingPropertyBool("Cavalry Seeks Flanks", HintText = "AI cavalry goes round a pinned enemy and strikes his archers and flanks instead of only charging the front. On by default (Jeff 25.10) - switch off if it misbehaves", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
-        public bool CavalrySeeksFlanks { get; set; } = false;
+        public bool CavalrySeeksFlanks { get; set; } = true;
 
-        [SettingPropertyBool("Archers Fall Back Behind Infantry", HintText = "AI archers withdraw behind their infantry when enemy foot or horse comes within Archer Fall Back Distance, and step out again once it is pushed back. Trial - off by default until tested", RequireRestart = false)]
+        [SettingPropertyBool("Archers Fall Back Behind Infantry", HintText = "AI archers withdraw behind their infantry when enemy foot or horse comes within Archer Fall Back Distance, and step out again once it is pushed back. On by default (Jeff 25.10) - switch off if it misbehaves", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
-        public bool ArchersFallBackBehindInfantry { get; set; } = false;
+        public bool ArchersFallBackBehindInfantry { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Archer Fall Back Distance", 20.00f, 100.00f, "0", HintText = "with Archers Fall Back Behind Infantry: how close (metres) the enemy may come before the archers withdraw", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
@@ -9748,25 +9748,25 @@ namespace Armoury
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleRavensAfter { get; set; } = true;
 
-        [SettingPropertyBool("Battle Wind And Rain", HintText = "with Battle Sounds: wind over the field in battles in the open, and the patter of rain when it rains. Battle Sounds Loudness does not change it. Trial - off by default until tested", RequireRestart = false)]
+        [SettingPropertyBool("Battle Wind And Rain", HintText = "with Battle Sounds: wind over the field in battles in the open, and the patter of rain when it rains. Battle Sounds Loudness does not change it. On by default (Jeff 25.10) - switch off if it misbehaves", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool BattleWindAndRain { get; set; } = false;
+        public bool BattleWindAndRain { get; set; } = true;
 
-        [SettingPropertyBool("Battle Horse Sounds", HintText = "with Battle Sounds: horses snort, whinny and stamp in the cavalry ranks while they wait and when they charge. Trial - off by default until tested", RequireRestart = false)]
+        [SettingPropertyBool("Battle Horse Sounds", HintText = "with Battle Sounds: horses snort, whinny and stamp in the cavalry ranks while they wait and when they charge. On by default (Jeff 25.10) - switch off if it misbehaves", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool BattleHorseSounds { get; set; } = false;
+        public bool BattleHorseSounds { get; set; } = true;
 
-        [SettingPropertyBool("Battle Clash Of Arms", HintText = "with Battle Sounds: the din of steel on steel and on shields rolls over the field where the lines fight hand to hand. Trial - off by default until tested", RequireRestart = false)]
+        [SettingPropertyBool("Battle Clash Of Arms", HintText = "with Battle Sounds: the din of steel on steel and on shields rolls over the field where the lines fight hand to hand. On by default (Jeff 25.10) - switch off if it misbehaves", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool BattleClashOfArms { get; set; } = false;
+        public bool BattleClashOfArms { get; set; } = true;
 
-        [SettingPropertyBool("Siege Fire Sounds", HintText = "with Battle Sounds: in sieges the fires of the burning camps and of the town crackle and roar. Trial - off by default until tested", RequireRestart = false)]
+        [SettingPropertyBool("Siege Fire Sounds", HintText = "with Battle Sounds: in sieges the fires of the burning camps and of the town crackle and roar. On by default (Jeff 25.10) - switch off if it misbehaves", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool SiegeFireSounds { get; set; } = false;
+        public bool SiegeFireSounds { get; set; } = true;
 
-        [SettingPropertyBool("Siege Assault Crowd", HintText = "with Battle Sounds: when a castle or a town is stormed, the attackers roar at the ladders, the siege towers and the ram, the defenders cry out from the walls in the voices of their lands - hold the walls, ladders, pour the oil, archers to the walls - and a great roar goes up when the gate or a breach gives way. Whether you storm or defend. ROT Battle Atmosphere's Contextual Combat Shouts also voice these moments - with both on you may hear them twice. Trial - off by default until tested", RequireRestart = false)]
+        [SettingPropertyBool("Siege Assault Crowd", HintText = "with Battle Sounds: when a castle or a town is stormed, the attackers roar at the ladders, the siege towers and the ram, the defenders cry out from the walls in the voices of their lands - hold the walls, ladders, pour the oil, archers to the walls - and a great roar goes up when the gate or a breach gives way. Whether you storm or defend. ROT Battle Atmosphere's Contextual Combat Shouts also voice these moments - with both on you may hear them twice. On by default (Jeff 25.10) - switch off if it misbehaves", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool SiegeAssaultCrowd { get; set; } = false;
+        public bool SiegeAssaultCrowd { get; set; } = true;
 
         [SettingPropertyBool("Siege Drums", HintText = "with Battle Sounds: the besiegers' war drums beat in the rhythm of their culture while their host closes on the walls, quicker once the assault begins, and fall silent while the fight is on the walls. In a siege they take the place of the marching drums", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
@@ -9851,6 +9851,10 @@ namespace Armoury
         [SettingPropertyInteger("Friendly Fire Charge Percent", 0, 100, "0", HintText = "with Friendly Fire: share of its damage (percent) a charging horse does to a man of its own side", RequireRestart = false)]
         [SettingPropertyGroup("Friendly fire")]
         public int FriendlyFireChargePercent { get; set; } = 50;
+
+        [SettingPropertyInteger("Friendly Fire Siege Ranged Percent", 0, 100, "0", HintText = "with Friendly Fire: share of its damage (percent) an arrow, bolt or javelin does to a man of its own side in a siege (storming or defending walls), where archers shoot over their own crowd; field battles use Friendly Fire Ranged Percent", RequireRestart = false)]
+        [SettingPropertyGroup("Friendly fire")]
+        public int FriendlyFireSiegeRangedPercent { get; set; } = 50;
 
         [SettingPropertyBool("AI Strength Counts Gear", HintText = "When lords weigh a fight - whether to attack, flee or join a battle, whether to lead or join an army, whether to march to a relief, how strong a realm is in war and peace - a party counts only as strong as the kit its stores hold for its men, measured like the garrison threshold. A party whose stores are empty counts as a band of peasants in tunics with clubs. The same rule for every lord's party, yours and your clan's, and for garrisons that fight only with their stores; bandits, caravans, villagers, militia and the dead count as before. Off = strength by troop tier only", RequireRestart = false)]
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
@@ -12354,6 +12358,7 @@ namespace Armoury
             s.FriendlyFireRangedPercent = FriendlyFireRangedPercent;
             s.FriendlyFireMeleePercent = FriendlyFireMeleePercent;
             s.FriendlyFireChargePercent = FriendlyFireChargePercent;
+            s.FriendlyFireSiegeRangedPercent = FriendlyFireSiegeRangedPercent;
             s.AiStrengthCountsGear = AiStrengthCountsGear;
             s.AiAutobattleCountsGear = AiAutobattleCountsGear;
             s.AiStrengthFullKitPercent = AiStrengthFullKitPercent;
