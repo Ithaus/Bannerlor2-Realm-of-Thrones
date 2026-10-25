@@ -92,7 +92,8 @@ namespace Armoury
                 try { LevelPoints.ApplyAll(_harmony); } catch (Exception e) { Log.Error("LevelPoints.ApplyAll", e); }
                 ChargeTemperPatch.ApplyAll(_harmony);
                 // noc 25.10 P6 (Jeff 25.10: "i dodaj friendly fire po obu stronach", "cios wrecz nie tylko ostrzaly"): transpilery Mission.MeleeHitCallback /
-                // MissileHitCallback / ChargeDamageCallback i postfiks CalculateDamage - TU, obok ChargeTemperPatch, zanim JIT skompiluje wolajacych; wlasny try
+                // MissileHitCallback / ChargeDamageCallback i postfiks CalculateDamage - TU, obok ChargeTemperPatch, zanim JIT skompiluje wolajacych; wlasny try.
+                // Recenzja P6: klucz Friendly Fire wylaczony przy starcie gry (plik MCM) = ApplyAll nic nie wpina (sprawdza sam)
                 try { FriendlyFire.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FriendlyFire.ApplyAll", e); }
                 TravellerGoods36.ApplyAll(_harmony);   // 3.6: wedrowcy BK bez towaru, rudy i drewna z niczego (postfiks po CastleSteel - Priority.Low)
                 CastleSteel.ApplyAll(_harmony);   // 177-1: wedrowcy BK bez sztab i wegla z niczego (dawny ValyrianSteel.DearRefine zdjety - stal zamkowa to zwykly stopien)

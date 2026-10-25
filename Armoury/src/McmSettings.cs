@@ -9828,7 +9828,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int SpoilsWindowMinWorth { get; set; } = 0;
 
-        [SettingPropertyBool("Friendly Fire Enabled", HintText = "arrows, bolts, javelins, blades and charging horses wound your own side too - the same rule for you and the AI, in field battles, sieges, hideouts and at sea. Tournaments and the arena are untouched. (Realm of Thrones' own Friendly Fire option is dragon fire only.)", RequireRestart = false)]
+        [SettingPropertyBool("Friendly Fire Enabled", HintText = "arrows, bolts, javelins, blades and charging horses wound your own side too - the same rule for you and the AI, in field battles, sieges, hideouts and at sea. Tournaments and the arena are untouched. (Realm of Thrones' own Friendly Fire option is dragon fire only.) Off = from the next battle your own side is spared again, as in the game; if battles crash, switch it off and restart the game - only then is the game's own combat code fully back. Switched on after starting the game with it off, it works after a restart.", RequireRestart = false)]
         [SettingPropertyGroup("Friendly fire")]
         public bool FriendlyFireEnabled { get; set; } = true;
 
