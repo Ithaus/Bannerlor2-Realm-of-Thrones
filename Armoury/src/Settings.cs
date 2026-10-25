@@ -4471,8 +4471,8 @@ namespace Armoury
         // --- Friendly fire ---
         // P6 (Jeff: "i dodaj friendly fire po obu stronach", "cios wrecz nie tylko ostrzaly"): FriendlyFire.cs - transpilery MeleeHitCallback / MissileHitCallback /
         // ChargeDamageCallback (wpiete przy starcie obok ChargeTemperPatch) i skala obrazen (postfiks CalculateDamage); jedna regula gracz/AI; pole, oblezenie, kryjowka,
-        // morze - nie turniej i arena. Linia 'FF' na misje
-        public bool FriendlyFireEnabled = true;            // arrows, bolts, javelins, blades and charging horses wound your own side too - the same rule for you and the AI, in field battles, sieges, hideouts and at sea. Tournaments and the arena are untouched. (Realm of Thrones' own Friendly Fire option is dragon fire only.)
+        // morze - nie turniej i arena. Linia 'FF' na misje. Recenzja P6: latki wpiete tylko przy FriendlyFireEnabled wlaczonym przy starcie gry (plik MCM)
+        public bool FriendlyFireEnabled = true;            // arrows, bolts, javelins, blades and charging horses wound your own side too - the same rule for you and the AI, in field battles, sieges, hideouts and at sea. Tournaments and the arena are untouched. (Realm of Thrones' own Friendly Fire option is dragon fire only.) Off = from the next battle your own side is spared again, as in the game; if battles crash, switch it off and restart the game - only then is the game's own combat code fully back. Switched on after starting the game with it off, it works after a restart.
         public int FriendlyFireRangedPercent = 100;        // with Friendly Fire: share of its damage (percent) an arrow, bolt or javelin does to a man of its own side (100 = full, 0 = none)
         public int FriendlyFireMeleePercent = 50;          // with Friendly Fire: share of its damage (percent) a sword, axe or spear blow does to a man of its own side (0 = blows pass harmlessly, as in the game)
         public int FriendlyFireChargePercent = 50;         // with Friendly Fire: share of its damage (percent) a charging horse does to a man of its own side

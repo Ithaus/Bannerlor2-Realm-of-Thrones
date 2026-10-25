@@ -21,10 +21,14 @@ namespace Armoury
     ///
     /// GRA DZIS (SP, dekompilacja Mission.cs 1.4.8, md5 TaleWorlds.MountAndBlade.dll = libs):
     ///  - wrecz: MeleeHitCallback -> CancelsDamageAndBlocksAttackBecauseOfNonEnemyCase (w SP zawsze prawda dla swojego) = cios anulowany, atakujacy ogluszony 0.4 s;
+    ///    kon swojego: anulowany tylko, gdy natywne attacker.IsFriendOf(kon) da prawde (galaz num && flag zwraca true bez IsHuman, Mission.cs:6297-6311) -
+    ///    czy silnik uznaje konia (bez SetTeam) za swojego, z C# nie wiadomo;
     ///  - pociski: MissileHitCallback - gracz rani swoich w pelni, AI w swojego i w konia swojego anulowane (porownanie attacker.Controller == AI, 2 miejsca);
     ///    pocisk z fizyka (MissileWithPhysics) i obszar (MissileAreaDamageCallback) razi zawsze;
     ///  - szarza: ChargeDamageCallback wychodzi przy celu nie-wrogu (IsFriendlyFireAllowedForChargeDamage bez serwera MP = false).
-    /// NASZE (latki wpiete raz na proces w SubModuleMain obok ChargeTemperPatch, przed JIT wolajacych):
+    /// NASZE (latki wpiete raz na proces w SubModuleMain obok ChargeTemperPatch, przed JIT wolajacych - tylko przy kluczu FriendlyFireEnabled wlaczonym
+    /// przy starcie gry (plik MCM Armoury.json, bez wpisu Settings.Current); wylaczony przy starcie = zadna latka, kod trafien gry nietkniety;
+    /// wylaczenie w sesji zamyka bramke od nastepnej misji, IL zostaje do ponownego uruchomienia gry):
     ///  (1) postfiks AgentApplyDamageModel.CalculateDamage (klasa bazowa, niewirtualna - jedyny wolajacy GetAttackCollisionResults): trafienie swojego
     ///      (IsFriendlyFire, a dla szarzy i pociskow tez ta sama strona przez jezdzca) x procent z klucza (wrecz / pociski / szarza);
     ///  (2) prefiks + finalizer MissileHitCallback: [ThreadStatic] znacznik "jestesmy w trafieniu pocisku" i "pocisk machiny" (Missile.MissionObjectToIgnore,
@@ -48,6 +52,7 @@ namespace Armoury
         private static bool _dmgOk, _preOk, _meleeOk, _missOk, _chargeOk;
         private static int _meleeMatch = -1, _missMatch = -1, _chargeMatch = -1;   // dopasowania celu w ostatnim przebiegu transpilera
         private static bool _meleeShape, _missShape, _chargeShape;                 // ksztalt IL zgodny z dekompilacja (ldarg przed get_Controller, brak etykiety za wstawka)
+        private static bool _offAtStart;                                           // klucz wylaczony przy starcie gry - nic nie wpiete (wlaczenie po restarcie)
 
         // ------------------------------------------------------------ bramka misji
         private static volatile bool _active;          // bramka otwarta w misji _mref
@@ -76,6 +81,16 @@ namespace Armoury
         internal static void ApplyAll(Harmony h)
         {
             if (h == null) { Log.Info("FriendlyFire: NIE wpiete - brak instancji Harmony."); return; }
+            // recenzja P6: klucz wylaczony przy starcie gry = zadna latka (transpilery, prefiks, finalizer, postfiks) - Jeff wylacza w MCM i po restarcie
+            // kod trafien gry jest caly; MCM wchodzi do Settings dopiero w sesji, wiec tu plik MCM (jak MapSpeedUi.ButtonsAtStart)
+            string src;
+            if (!EnabledAtStart(out src))
+            {
+                _offAtStart = true;
+                Log.Info("FriendlyFire: NIE wpiete - klucz Friendly Fire wylaczony przy starcie gry (" + src + "); kod trafien gry bez zmian,"
+                         + " wlaczenie w MCM dziala po ponownym uruchomieniu gry.");
+                return;
+            }
             int miss = 0;
             var parts = new StringBuilder(300);
 
@@ -128,9 +143,32 @@ namespace Armoury
             var s = Settings.Current;
             string head = miss == 0 ? "wpiete" : (_meleeOk || _missOk || _chargeOk) ? "CZESCIOWO wpiete" : "NIE wpiete";
             Log.Info("FriendlyFire: " + head + " - " + parts + " | latki, ktore nie weszly: " + miss
-                     + " | klucze: Friendly Fire " + (s != null && s.FriendlyFireEnabled ? "TAK" : "NIE")
-                     + ", pociski " + (s != null ? Clamp(s.FriendlyFireRangedPercent) : 100) + "%, wrecz " + (s != null ? Clamp(s.FriendlyFireMeleePercent) : 50)
+                     + " | klucz Friendly Fire przy starcie: " + src
+                     + " | procenty z modulu: pociski " + (s != null ? Clamp(s.FriendlyFireRangedPercent) : 100) + "%, wrecz " + (s != null ? Clamp(s.FriendlyFireMeleePercent) : 50)
                      + "%, szarza " + (s != null ? Clamp(s.FriendlyFireChargePercent) : 50) + "% (czytane na poczatku kazdej misji); machiny i obszar - zasada gry.");
+        }
+
+        /// <summary>Recenzja P6: FriendlyFireEnabled przy starcie gry (OnBeforeInitialModuleScreenSetAsRoot - MCM wchodzi do Settings dopiero w sesji,
+        /// McmSettings.Apply). Plik MCM (Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json, wpis "FriendlyFireEnabled" -
+        /// to on wygrywa w sesji), bez wpisu albo pliku - Settings.Current (Armoury.settings.xml albo domyslne z kodu: TAK). Tylko odczyt. Nie rzuca.</summary>
+        private static bool EnabledAtStart(out string src)
+        {
+            bool on = Settings.Current == null || Settings.Current.FriendlyFireEnabled;
+            src = "ustawienia modulu / domyslne: " + (on ? "TAK" : "NIE");
+            try
+            {
+                string doc = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                if (string.IsNullOrEmpty(doc)) return on;
+                string f = System.IO.Path.Combine(doc, "Mount and Blade II Bannerlord", "Configs", "ModSettings", "Global", "Armoury", "Armoury.json");
+                if (!System.IO.File.Exists(f)) return on;
+                var mm = System.Text.RegularExpressions.Regex.Match(System.IO.File.ReadAllText(f), "\"FriendlyFireEnabled\"\\s*:\\s*(true|false)",
+                                                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (!mm.Success) { src = "plik MCM bez wpisu, " + src; return on; }
+                on = string.Equals(mm.Groups[1].Value, "true", StringComparison.OrdinalIgnoreCase);
+                src = "plik MCM: " + (on ? "TAK" : "NIE");
+            }
+            catch (Exception e) { src = "plik MCM nieczytelny (" + e.GetType().Name + "), " + src; }
+            return on;
         }
 
         private static string State(bool ok, string skipped, int match, int want, bool shape)
@@ -397,8 +435,10 @@ namespace Armoury
                 bool charge = collisionData.IsHorseCharge;
                 bool missile = !charge && collisionData.IsMissile;
                 bool ff = attackInformation.IsFriendlyFire;
-                // szarza: atakujacy to kon (IsFriendOf konia nieznane); pocisk w konia swojego (miejsce 2) - liczy sie jezdziec. Wrecz w konia swojego - gra
-                // nie chroni go i dzis (pelne obrazenia), bez zmian.
+                // szarza: atakujacy to kon (IsFriendOf konia nieznane); pocisk w konia swojego (miejsce 2) - liczy sie jezdziec. Wrecz w konia swojego
+                // (recenzja P6): zalezy od natywnego IsFriendOf konia - gdy silnik uznaje go za swojego, gra dzis cios anuluje, a Melee() (OwnSide przez jezdzca)
+                // go przepuszcza i tu wchodzi skala wrecz (domyslnie 50%; takze kon bohatera - HorseDeathPermanent, FieldCraft.cs:186-215); gdy nie uznaje -
+                // gra rani go i dzis w pelni (ff false, bez zmian). Ta sama regula co pocisk w konia swojego; v1 bez zmiany kodu.
                 if (!ff && (charge || missile)) ff = OwnSide(a, v, true);
                 if (!ff) return;
                 var r = Rider(a);
@@ -479,6 +519,7 @@ namespace Armoury
             try { _inBattle = Campaign.Current != null && MapEvent.PlayerMapEvent != null; } catch { _inBattle = false; }
             string why = null;
             if (s == null || !s.FriendlyFireEnabled) why = "klucz Friendly Fire wylaczony";
+            else if (_offAtStart) why = "klucz byl wylaczony przy starcie gry - latki wejda po ponownym uruchomieniu gry";
             else if (!(_meleeOk || _missOk || _chargeOk)) why = "latki nie wpiete (linia FriendlyFire przy starcie)";
             else if (!_inBattle) why = "nie bitwa gracza na mapie";
             else if (m.CombatType != Mission.MissionCombatType.Combat) why = "walka cwiczebna";
