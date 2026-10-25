@@ -246,6 +246,7 @@ namespace Armoury
                     var r = TestRep(_step, out _note);
                     why = r == null ? "brak danych probnych (brak miasta)" : SpoilsWindow.ShowPhoto(r);
                     if (why == null) { try { _title = SpoilsWindow.TitleOf(r); } catch { _title = null; } }
+                    if (why == null && SpoilsWindow.LastPicture.Length > 0) _note = (_note != null ? _note + ", " : "") + SpoilsWindow.LastPicture;   // 150b
                 }
             }
             catch (Exception e) { Stumble("Open." + _step, e); why = "wyjatek " + e.GetType().Name; }
@@ -398,7 +399,7 @@ namespace Armoury
         // ------------------------------------------------------------ warunki
 
         /// <summary>null - spokojnie (wolno otworzyc okno); inaczej powod. start - takze etap autotestu (tylko bieg dob).</summary>
-        private static string Calm(bool start)
+        internal static string Calm(bool start)
         {
             var c = Campaign.Current;
             if (c == null || !c.GameStarted) return "brak kampanii";
@@ -429,12 +430,13 @@ namespace Armoury
             {
                 string sg = Stage();
                 if (sg != null && sg != "Run") return "etap autotestu " + sg;
+                if (SpoilsAtlas.Running) return "proba obrazkow lupu (150) w toku";   // paczka 150: obie proby uzywaja okna lupu (SpoilsWindow.ShowPhoto) - nie naraz
             }
             return null;
         }
 
         /// <summary>Przerwanie proby w toku: misja, bitwa gracza, etap autotestu inny niz bieg dob (zapis, wyjscie, bitwy, zdjecia mapy).</summary>
-        private static string StopWhy()
+        internal static string StopWhy()
         {
             if (TaleWorlds.MountAndBlade.Mission.Current != null) return "misja";
             var mp = MobileParty.MainParty;
@@ -448,7 +450,7 @@ namespace Armoury
         private static bool _stageTried, _queryTried;
 
         /// <summary>Etap autotestu CrashScribe (Autotest.Now - Menu, Creation, Settle, Run, Photos, Battle, Saving...) odbiciem jak LogGate.Detect; null - nie da sie.</summary>
-        private static string Stage()
+        internal static string Stage()
         {
             if (!_stageTried)
             {
@@ -530,7 +532,7 @@ namespace Armoury
         private static readonly int[] BattleCounts = { 7, 5, 3, 12, 6, 9, 3, 2, 15 };
         private static readonly int[] SiegeCounts = { 16, 11, 8, 28, 12, 40, 7, 5, 60 };
 
-        private static SpoilsReport.Rep TestRep(int step, out string note)
+        internal static SpoilsReport.Rep TestRep(int step, out string note)
         {
             note = null;
             var me = Hero.MainHero;
@@ -545,6 +547,7 @@ namespace Armoury
             {
                 r.Kind = SpoilsReport.KBattle; r.Battles = 1;
                 r.Place = near != null ? SpoilsReport.Nm(near) : "-";
+                r.Near = near;   // 150b: obrazek wedlug regionu jak po prawdziwej bitwie
                 r.Enemy = "Outlaws";
                 r.AddCoin(SpoilsReport.LPlunder, 1240); r.AddCoin(SpoilsReport.LPurses, 385); r.AddCoin(SpoilsReport.LField, 96); r.AddCoin(SpoilsReport.LOther, 14);
                 r.Men = 212; r.Crown = 245;

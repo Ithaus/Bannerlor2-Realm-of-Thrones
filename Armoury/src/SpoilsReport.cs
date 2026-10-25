@@ -87,6 +87,9 @@ namespace Armoury
             public string Place = "", Enemy = "", Date = "";
             public Settlement Town;               // osada szturmu / okupu
             public int SackKind = -1;             // CitySack.KMercy / KPillage / KDevastate (-1 - bez nastepstw)
+            public Settlement Near;               // 150b: osada miejsca bitwy (MapEventSettlement albo najblizsza) - region obrazka okna
+            public string Foe = "";               // 150b: "undead" / "wild" / "" - wrog pierwszej bitwy raportu (obrazek okna)
+            public bool Sea;                      // 150b: bitwa na morzu (MapEvent.IsNavalMapEvent) - obrazek okna
             public readonly List<string> CoinLabels = new List<string>();
             public readonly List<long> CoinAmounts = new List<long>();
             public long Men;                      // do sakiewek ludzi gracza (MenPurse)
@@ -188,6 +191,9 @@ namespace Armoury
             public Settlement Town;
             public int SackKind = -1;
             public string Place = "", Enemy = "", Date = "";
+            public Settlement Near;               // 150b: jak Rep.Near / Foe / Sea
+            public string Foe = "";
+            public bool Sea;
             public int Fallen, Wounded;
             public long OpenedTicks;
         }
@@ -506,6 +512,18 @@ namespace Armoury
                     var foe = me.GetMapEventSide(side == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
                     var lp = foe != null ? foe.LeaderParty : null;
                     s.Enemy = lp != null && lp.Name != null ? lp.Name.ToString() : "";
+                    // 150b: wrog i morze do obrazka okna (SpoilsWindow.Picture) - Inni przed dzikimi; kultura strony = kultura frakcji lidera
+                    try
+                    {
+                        s.Sea = me.IsNavalMapEvent;
+                        if (lp != null && lp.MobileParty != null && Undead.Party(lp.MobileParty)) s.Foe = "undead";
+                        else
+                        {
+                            string fc = lp != null && lp.MapFaction != null && lp.MapFaction.Culture != null ? lp.MapFaction.Culture.StringId : null;
+                            if (fc == "freefolk" || fc == "wildlings") s.Foe = "wild";
+                        }
+                    }
+                    catch (Exception e) { Stumble("ApplyResultsPrefix.foe", e); }
                     if (mine != null)
                         foreach (var p in mine.Parties)
                             if (p != null && p.Party == PartyBase.MainParty)
@@ -519,6 +537,7 @@ namespace Armoury
                 {
                     var st = me.MapEventSettlement ?? (Hero.MainHero != null ? Hero.MainHero.LastKnownClosestSettlement : null);
                     s.Place = Nm(st);
+                    s.Near = st;
                 }
                 catch { s.Place = "-"; }
             }
@@ -580,7 +599,7 @@ namespace Armoury
             if (r.Battles > 0) _sMerged++;
             r.Battles++;
             if (siegeKind && r.Kind == KBattle) r.Kind = KSiege;
-            if (string.IsNullOrEmpty(r.Place)) { r.Place = f.Place; r.Enemy = f.Enemy; r.Date = f.Date; }
+            if (string.IsNullOrEmpty(r.Place)) { r.Place = f.Place; r.Enemy = f.Enemy; r.Date = f.Date; r.Near = f.Near; r.Foe = f.Foe; r.Sea = f.Sea; }
             if (f.Town != null) r.Town = f.Town;
             if (f.SackKind >= 0) r.SackKind = f.SackKind;
             r.Fallen += f.Fallen; r.Wounded += f.Wounded;

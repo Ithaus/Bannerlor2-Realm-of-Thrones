@@ -1,5 +1,41 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 150b (galaz noc/150-obrazki) - obrazek okna lupu dopasowany do miejsca: region osady, Inni, dzicy, morze; Joffrey nigdzie
+**Problem:** Jeff 25.10: "dopasuj obrazki w oknach lupu do miejsca". Dotad SpoilsWindow.Picture bral obrazek z jednej puli na rodzaj raportu (bitwa: RobbMarching3 / WildlingsFail / jon_stand / blackwater; oblezenie: harrenhal / wallfall / eastwatch / blackwater; turniej: kingslanding / joffrey) po numerze raportu - bitwa w Dorne dawala Czarny Nurt albo Mur, turniej gdziekolwiek - sale tronowa albo Joffreya.
+**Przyczyna:** Picture nie znal miejsca ani wroga (raport mial tylko nazwe osady jako tekst).
+**Zmiana:** Ramka A (ApplyResultsPrefix) zapisuje do raportu osade miejsca (Near = MapEventSettlement albo LastKnownClosestSettlement), wroga (Foe: "undead" - Undead.Party lidera strony wroga, "wild" - kultura frakcji freefolk/wildlings) i morze (MapEvent.IsNavalMapEvent); raport bierze je z pierwszej bitwy (jak Place). Picture: region z kultury osady (PicRegion: battania/skagosi Polnoc, nightswatch Mur, freefolk/wildlings za Murem, river Dorzecze, vale/hilltribesmen Dolina, crownlands Ziemie Koronne, sturgia Zelazne Wyspy, kultury Essos - Essos, reszta Westeros); kryjowka - najblizsza osada nie-kryjowka. Pule (album 150a - tylko widoki, bitwy, obozy, zamki, bez portretow): Inni - nightking/freefolk3/jon_death/wallfall; morze - StannisSetsSail/Ship2/Ship1 (Ziemie Koronne: blackwater, Essos: aegon); dzicy - freefolk1/freefolk2/fist/WildlingsFail; pole wedlug regionu (Polnoc jon_stand/messenger-img/RobbMarching3, Dorzecze riverlands, Mur eastwatch/fist, Essos dany_invasion/aegon, reszta jon_stand/messenger-1/messenger-2); szturm i okup wedlug regionu (harrenhal, traveling_merchant, eastwatch/wallfall na Murze, riverlands, blackwater, Essos); turniej - kingslanding TYLKO w King's Landing (town_EW4), gdzie indziej traveling_merchant/harrenhal; joffrey usuniety. Pliki Images/Loot/loot_* nadal maja pierwszenstwo. Linia logu okna (okno: ...) i notka proby zdjec 132 dostaja "obrazek X (temat, osada Y / kultura)".
+**Ryzyko / co sprawdzic:** Tylko wybor nazwy sprite'a (ta sama kategoria ui_event_category, ten sam HasSprite, ten sam zapas messenger-img) - bez zmian w warstwie okna i w liczeniu lupu. Nowe pola raportu nie sa zapisywane w zapisie gry (raport zyje do pokazania okna). Petla po Settlement.All tylko przy bitwie przy kryjowce (raz na okno). W logu: linie okna lupu z "obrazek ..." - czy temat zgadza sie z miejscem; proba 132 (kroki 5-7) - obrazek w notce.
+**Status:** ZBUDOWANE - test z proba zdjec 132, potem wgranie.
+
+## 2026-10-25 150a (galaz noc/150-obrazki od noc/138-calosc d331082f) - proba autotestu: zdjecie okna lupu z kazdym obrazkiem wydarzen ROT (krok 1 dopasowania obrazkow)
+**Problem:** Jeff 25.10 ok. 17:00: "dopasuj obrazki w oknach lupu do miejsca". Okno lupu (SpoilsWindow.Picture) bierze sprite z pul na sztywno (bitwa: RobbMarching3,
+WildlingsFail, jon_stand, blackwater; oblezenie: harrenhal, wallfall, eastwatch, blackwater; turniej: kingslanding, joffrey) albo plik Images/Loot - bez zwiazku z miejscem,
+a miejsce na obrazek w prefabie ArmSpoilsWindow.xml to stale 640x360 (16:9), podczas gdy czesc obrazkow ROT ma inne proporcje (ROT-ContentSpriteData.xml: m.in.
+BlackwaterWarning 512x768, Ship1 803x1740, Davos i Stannis 1240x1024, harrenhal 986x669, Ship2 2610x735). Przed dopasowaniem trzeba obejrzec tresc i wyglad kazdego
+obrazka w oknie - z samej nazwy sprite'a nie wiadomo, co przedstawia.
+**Przyczyna:** brak sposobu, zeby zobaczyc wszystkie obrazki kategorii ui_event_category w oknie lupu bez czekania na bitwy (okno pokazuje jeden obrazek z puli wedlug Id raportu).
+**Zmiana:** (1) Nowy plik SpoilsAtlas.cs - proba tylko w autotescie: DLL autotestu CrashScribe (LogGate.Mode 1/2) i plik CrashScribe\armoury-zdjecia-obrazkow.flag (tylko
+czytany); w zwyklej grze jedno sprawdzenie trybu na sesje i wyjscie. Raz na proces, w warunkach spokoju proby 132 (WindowPhotos.Calm: mapa, bez misji, spotkania poza osada,
+zapytan, okna lupu i opowiesci, Prologue.SceneGate, etap autotestu Run; 30 s po wejsciu na mape, 3 s spokoju, najdluzej 60 min czekania). Lista sprite'ow z SpriteData W CZASIE
+GRY (SpriteGeneric, SpritePart.Category.Name == ui_event_category; bez event-bg i testevent), po nazwie bez wielkosci liter. Dla kazdego okno lupu probne (raport kroku 5 proby
+132 - WindowPhotos.TestRep, jeden na probe; bez SpoilsReport.Finish, bez zmiany stanu gry) z WYMUSZONYM tym sprite'em jako obrazkiem i tytulem okna "Sprite nn/N: nazwa
+(W x H)"; po 1.5 s (obce zapytanie nad oknem - czeka do 8 s) TakeScreenshot do CrashScribe\zdjecia\obrazek-150-nn-nazwa.png, zamkniecie 1 s po zdjeciu, nastepny po 0.3 s.
+Linie "Obrazki lupu (150): ..." - start (liczba, lista, ile obrazkow ma proporcje inne niz miejsce o ponad 5%), na kazdy obrazek "nn nazwa WxH (proporcje p, wobec miejsca
++-x%) - TAK plik ... / NIE (powod)", koniec (TAK/NIE, pliki zapisane po zdjeciu - plik starszy niz zdjecie liczony jako brak, potkniecia, czas, wynik). Przerwanie (misja,
+bitwa gracza, etap autotestu inny niz Run, inna kampania, 30 potkniec): okno zamkniete, linia "przerwana". (2) SpoilsWindow.ShowPhoto: parametry opcjonalne sprite i title
+(obrazek wymuszony zamiast Picture, kategoria ladowana EnsureEventSprites jak w Picture, brak sprite'a - powod NIE; tytul zamiast TitleOf); bez nich (WindowPhotos) - kod jak
+dotad. (3) WindowPhotos: Calm, StopWhy, Stage, TestRep z private na internal (bez zmiany tresci); Calm(true) czeka, dopoki SpoilsAtlas.Running - proby 132 i 150 nie ida naraz
+(150 czeka, dopoki WindowPhotos.Active). (4) SubModuleMain.SpoilsTick: SpoilsAtlas.AppTick po WindowPhotos.AppTick, w osobnym try z wlasnym licznikiem bledu ladowania typu
+(_atlasFails, po 3 koniec) - blad proby nie liczy sie do _spoilsFails okna lupu.
+**Ryzyko / co sprawdzic:** (1) Okno lupu poza proba bez zmian: Show() (prawdziwy raport) nie dotkniety, ShowPhoto bez nowych parametrow idzie ta sama droga (Picture);
+nowa galaz tylko przy sprite != null (wola ja tylko SpoilsAtlas). (2) Czas: ok. 3 s na obrazek, przy 46 obrazkach ok. 2.5 min biegu dob - autotest z dni=2 mial etap Run
+ok. 51 s (16:58:40-16:59:31) i proba zostalaby przerwana ("etap autotestu ..."); do tej proby dni co najmniej 8 (przy obu flagach 132 idzie pierwsza, ok. 45 s, potem 150).
+(3) Dysk: zrzut silnika ma ok. 24 MB na zdjecie (132: 24300 KB) - 46 zdjec to ok. 1.1 GB w Documents\...\CrashScribe\zdjecia; kolejna proba nadpisuje te same nazwy
+(jesli silnik nie nadpisze - linia koncowa: "stary plik sprzed zdjecia"). (4) Czas gry nie stoi (jak w 132 - autotest steruje czasem), okno lupu w autotescie i tak
+zamyka bezpiecznik 12 s. (5) Kategoria ui_event_category ladowana cala (jak przy kazdym oknie lupu i oknie wydarzenia ROT) - bez zmian pamieci wzgledem gry.
+(6) Sprawdzic w Armoury-*.log: "Obrazki lupu (150): start | obrazkow N" (spodziewane 46 z ROT-Content), linie TAK na kazdy, "koniec ... wynik TAK"; na zdjeciach tytul
+okna = nazwa sprite'a.
+**Status:** ZBUDOWANE - proba, nie wgrane (galaz noc/150-obrazki od noc/138-calosc d331082f; gra nie uruchamiana).
 ## 2026-10-25 152 (galaz noc/138-calosc) - Atletyka ponad 300: mistrzowie - pula podwaja sie co 31 punktow (310 = ok. 3500, 330 = ok. 5500)
 **Problem:** Jeff 25.10 ok. 17:35: "kazdy punkt powyzej 300 to powinien byc wart znacznie wiecej, 307 a 300 to juz sa roznice na poziomie mistrzow ... jak na np. 300 atletyki mam 2800 kondycji to 301 mam np. 2825, a na 310 3500 ... kazdy punkt juz od 300 do 400 to jest ogromna roznica jak w prawdziwych mistrzostwach".
 **Przyczyna:** Krzywa 130 (A' = 300 x (A/300)^1.12) rosnie powyzej 300 prawie liniowo (pula 1000 x (1 + 3A'/500): 301 -> 2811, 310 -> 2918).
