@@ -50,7 +50,8 @@ namespace Armoury
         internal static bool NightKeys(Settings c)
         {
             return c != null && (c.MarchToContactEnabled || c.CultureDoctrines || c.ShootBeforeAttacking || c.CavalrySeeksFlanks || c.ArchersFallBackBehindInfantry
-                                 || c.BattleSoundsEnabled || c.BannerCompaniesEnabled);
+                                 || c.BattleSoundsEnabled || c.BannerCompaniesEnabled
+                                 || c.DefendersAdvanceUnderFire);   // 141: S2 obronca pod ostrzalem (Doctrine.S2.cs) - wejscia tylko z BattleSense (Doctrine.Begin / Tick / End)
         }
 
         /// <summary>noc 25.10 P0: biezaca misja to bitwa (nie pojedynek) - bramka wolan paczek nocy; tylko odczyt statykow (takze z ticku asynchronicznego).</summary>

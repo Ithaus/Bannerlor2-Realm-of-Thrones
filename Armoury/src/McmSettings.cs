@@ -9816,6 +9816,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public float ArcherFallBackDistance { get; set; } = 45f;
 
+        [SettingPropertyBool("Defenders Advance Under Fire", HintText = "an AI army on the defence that is outshot - the enemy side has more than three times as many archers and crossbowmen as its own side - does not stand and die under the arrows: once its main infantry has been taking arrow wounds for about 20 seconds (a fifth of the men hit within 10 seconds) with enemy foot within 200 m, it gives up holding its line and goes forward to close with them. A ring or a choke point is kept; once in close combat it does not fall back to the line, before that it may hold again after 10 seconds without such fire. Field battles only; your own team's AI is left as it is. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool DefendersAdvanceUnderFire { get; set; } = true;
+
         [SettingPropertyBool("Battle Sounds Enabled", HintText = "the mod's own battle sounds - drums, horns, commanders' voices and the sounds of the field below, each under its own switch. Field battles and sieges - not hideouts, sea battles, tournaments, the arena or training. Off = only the game's and other mods' battle sounds, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleSoundsEnabled { get; set; } = true;
@@ -12457,6 +12461,7 @@ namespace Armoury
             s.CavalrySeeksFlanks = CavalrySeeksFlanks;
             s.ArchersFallBackBehindInfantry = ArchersFallBackBehindInfantry;
             s.ArcherFallBackDistance = ArcherFallBackDistance;
+            s.DefendersAdvanceUnderFire = DefendersAdvanceUnderFire;
             s.BattleSoundsEnabled = BattleSoundsEnabled;
             s.BattleHornsCulture = BattleHornsCulture;
             s.BattleDrumsMarch = BattleDrumsMarch;

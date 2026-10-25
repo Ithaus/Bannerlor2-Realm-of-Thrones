@@ -52,8 +52,8 @@ namespace Armoury
     ///  - RangedHarrass dodany przez nas (nie lista RBM khuzait) liczy sie od 10% strzelcow druzyny (ZAKRES v1 "RangedHarrass na liscie od 10% strzelcow"):
     ///    progu nie da sie sprawdzic w ApplyList (AfterStart - ludzi jeszcze nie ma, rozstawienie wystawia ich w OnSetupTeamsOfSide,
     ///    BattleDeploymentMissionController.cs:30-44, TeamQuerySystem.RangedRatio = 0), wiec postfiks wagi daje 0, gdy strzelcow ponizej 10%.
-    /// v1.1 (NIE w tej wersji): Rush (bieg dzikich z daleka / Nieskalani od 45 m), S2 (obronca pod deszczem strzal), specjalne taktyki RBM z doktryny
-    /// (Embolon, SplitArchers od 100 - decyzja Jeffa).
+    /// v1.1 (NIE w tej wersji): Rush (bieg dzikich z daleka / Nieskalani od 45 m), specjalne taktyki RBM z doktryny
+    /// (Embolon, SplitArchers od 100 - decyzja Jeffa). S2 (obronca pod deszczem strzal) - 141, Doctrine.S2.cs (klucz DefendersAdvanceUnderFire).
     /// </summary>
     internal static partial class Doctrine
     {
@@ -299,7 +299,7 @@ namespace Armoury
         private static void PostShock(object __instance, ref float __result) { Mul(__instance, KShock, ref __result); }
         private static void PostShot(object __instance, ref float __result) { Mul(__instance, KShot, ref __result); }
         private static void PostHorse(object __instance, ref float __result) { Mul(__instance, KHorse, ref __result); }
-        private static void PostHold(object __instance, ref float __result) { Mul(__instance, KHold, ref __result); }
+        private static void PostHold(object __instance, ref float __result) { Mul(__instance, KHold, ref __result); S2Mul(__instance, ref __result); }   // 141: S2 (Doctrine.S2.cs)
 
         /// <summary>Postfiks GetTacticWeight (tick druzyn): waga x mnoznik doktryny druzyny. Tylko odczyt tablicy, bez alokacji.</summary>
         private static void Mul(object inst, int k, ref float r)
@@ -331,6 +331,7 @@ namespace Armoury
         internal static void Begin(Mission m)
         {
             Clear();
+            S2ResetCounters(m);   // 141: liczniki linii "S2 (141)" od zera przed WarCouncil.Council (ApplyList liczy druzyny S2)
             _m = m != null ? new WeakReference(m) : null;
             _acc = 0f;
             // druzyny obecne przy AfterStart obsluguje WarCouncil.Council (zaraz po nas); pozniejsze (DR) - Tick
@@ -354,7 +355,8 @@ namespace Armoury
         /// <summary>Ktorykolwiek klucz doktryny i manewrow (WarCouncil.Council biegnie takze przy CommanderTactics NIE, gdy ten jest TAK).</summary>
         internal static bool AnyKey(Settings c)
         {
-            return c != null && (c.CultureDoctrines || c.ShootBeforeAttacking || c.CavalrySeeksFlanks || c.ArchersFallBackBehindInfantry);
+            return c != null && (c.CultureDoctrines || c.ShootBeforeAttacking || c.CavalrySeeksFlanks || c.ArchersFallBackBehindInfantry
+                                 || c.DefendersAdvanceUnderFire);   // 141: S2 sam tez potrzebuje rady wojennej (ApplyList) i ticku doktryny
         }
 
         internal static void End(Mission m)
@@ -362,6 +364,8 @@ namespace Armoury
             _on = false;
             // historia taktyk probek do linii NB2 (RoutKeeper moze ja pisac po nas) - potem stan bez druzyn (skonczona misja nie wisi w pamieci)
             try { lock (RoutHold.Gate) { if (_sampleTeamA >= 0) _histA = Hist(_sampleTeamA); if (_sampleTeamD >= 0) _histD = Hist(_sampleTeamD); } } catch { }
+            // 141: linia "S2 (141)" raz na misje (przed Clear - stan druzyn; _m zerowane nizej, drugie wywolanie End nic nie pisze)
+            try { S2End(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.S2End", e); }
             Clear();
             _m = null;
         }
@@ -375,6 +379,7 @@ namespace Armoury
                 _teamRef[i] = null; _seen[i] = null; _prof[i] = null; _doct[i] = false; _tacOf[i] = 0; _culOf[i] = null;
                 _s1[i] = 0; _s1Start[i] = 0f; _s1Clock[i] = -1f; _s1Ranged[i] = 0f; _cur[i] = null; _hist[i] = null;
                 _flankW[i] = 0f; _enemyRanged[i] = 0f; _shotGate[i] = false;
+                S2ClearTeam(i);   // 141
             }
             for (int i = 0; i < Slots; i++) { _sWho[i] = null; _sBack[i] = false; Drop(i); _sFlank[i] = false; }
             _sampleTeamA = _sampleTeamD = -1;
@@ -397,6 +402,7 @@ namespace Armoury
             _culOf[ti] = culture;
             if (tac < HordeBelow)
             {
+                S2Register(team, ti, have, late);   // 141: S2 to zasada przetrwania, nie doktryna - tlum tez (lista po radzie)
                 lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _teams++; _horde++; if (late) _late++; }
                 return;
             }
@@ -414,6 +420,7 @@ namespace Armoury
             _shotGate[ti] = addShot > 0;
             SetBase(ti, c);
             _teamRef[ti] = team;
+            S2Register(team, ti, have, late);   // 141: po dodatkach doktryny (+Charge dzikich) - lista taktyk ataku pelna
             var s = new StringBuilder(160);
             s.Append('T').Append(tac).Append('/').Append(culture ?? "?").Append(' ').Append(p.Name)
              .Append(" (Shock ").Append(F(p.Shock)).Append(", Shot ").Append(F(p.Shot)).Append(", Horse ").Append(F(p.Horse)).Append(", Hold ").Append(F(p.Hold)).Append(')');
@@ -488,6 +495,12 @@ namespace Armoury
                     if (_doct[ti] && ReferenceEquals(_teamRef[ti], t)) TeamTick(m, t, ti, c, now);
                 }
                 catch (Exception e) { _stumLocal++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Druzyna", e); }
+                // 141: S2 obronca pod ostrzalem - wlasny try (potkniecie doktryny nie gasi S2 i odwrotnie), po rozstawieniu
+                if (ReferenceEquals(_s2Ref[ti], t) && m.IsDeploymentFinished)
+                {
+                    try { S2Tick(m, t, ti, c, now); }
+                    catch (Exception e) { _s2Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.S2", e); }
+                }
             }
             if (_stumLocal > 0) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _stum += _stumLocal; } _stumLocal = 0; }
         }

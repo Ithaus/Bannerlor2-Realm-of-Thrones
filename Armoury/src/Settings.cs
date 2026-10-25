@@ -4478,6 +4478,12 @@ namespace Armoury
         public bool CavalrySeeksFlanks = true;            // AI cavalry goes round a pinned enemy and strikes his archers and flanks instead of only charging the front. On by default (Jeff 25.10) - switch off if it misbehaves
         public bool ArchersFallBackBehindInfantry = true; // AI archers withdraw behind their infantry when enemy foot or horse comes within Archer Fall Back Distance, and step out again once it is pushed back. On by default (Jeff 25.10) - switch off if it misbehaves
         public float ArcherFallBackDistance = 45f;         // with Archers Fall Back Behind Infantry: how close (metres) the enemy may come before the archers withdraw
+        // 141 (25.10, fala 'AI walczy o zycie', synteza '137 S2: obronca nie stoi pod strzalami'; Jeff 13:30 'Jak widzi ze kolega padl od strzaly a ma tarcze to
+        // zalozy tarcze i sie za nia schowa i idzie na przeciwnika', decyzja D1: naprzod do zwarcia): Doctrine.S2.cs - druzyna AI przestrzelana 3:1 (strzelcy strony
+        // razem) z glowna piechota pod ostrzalem (>= 20% ludzi w ROZSADKU trafionych pociskiem w 10 s) przez 20 s, pieszy wrog do 200 m: waga DefensiveLine
+        // i DefensiveEngagement x0.3 (Ring, ChokePoint, splity RBM bez zmian); wyjscie po 10 s bez ostrzalu, po zwarciu do konca bitwy; druzyna gracza i pozne
+        // DR poza; bez FullScaleAttack / Charge na liscie - nic (liczone). Wylaczone = ten sam pomiar bez mnoznika. Linia 'S2 (141)' na koniec bitwy
+        public bool DefendersAdvanceUnderFire = true;      // an AI army on the defence that is outshot - the enemy side has more than three times as many archers and crossbowmen as its own side - does not stand and die under the arrows: once its main infantry has been taking arrow wounds for about 20 seconds (a fifth of the men hit within 10 seconds) with enemy foot within 200 m, it gives up holding its line and goes forward to close with them. A ring or a choke point is kept; once in close combat it does not fall back to the line, before that it may hold again after 10 seconds without such fire. Field battles only; your own team's AI is left as it is. Off = as before
 
         // --- Battle sounds ---
         // P2 (Jeff: "powinny byc bebny, trabki, odglosy, okrzyki, wyzwiska ... glosy ElevenLabs meskie, brytyjski akcent ... przemowa przed bitwa dla kazdego rodu ... wodzowie

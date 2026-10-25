@@ -1,5 +1,68 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 141 (galaz noc/139-ai-zycie, po 140 b39c5cc2) - AI walczy o zycie, krok 3: obronca bez strzelcow nie stoi pod strzalami (S2, Doctrine.S2.cs, klucz DefendersAdvanceUnderFire)
+**Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze
+jego mozliwosci i skilli aby przetrwac ... Jak widzi ze kolega padl od strzaly a ma tarcze to zalozy tarcze i sie za nia schowa i idzie na przeciwnika"; decyzja D1 z syntezy
+(ai-przetrwanie.txt, karta "137 S2: obronca nie stoi pod strzalami"): naprzod do zwarcia. Dowodu z gry NIE ma: luka wskazana w kodzie (raport A punkt b - Doctrine.cs:55
+wprost odkladal S2 do v1.1); autotestu wyjsciowego "obronca bez lucznikow przeciw stronie z lucznikami" nie bylo - dlatego linia "S2 (141)" mierzy takze przy kluczu NIE.
+**Przyczyna:** (dekompilacja 1.4.8 scratchpad/dec/mbfull, RBMAI scratchpad/dec/rbmai) TeamAIComponent.MakeDecision (:254-335, co 5 s) bierze MaxBy(GetTacticWeight x 1.5
+dla biezacej) i zmienia taktyke tylko gdy nowa > 1.5 x biezaca; GetTacticWeight wola tylko MakeDecision. Obrona: TacticDefensiveEngagement (:173-192) = (piechota +
+strzelcy) x 1.1 x przewaga x wzgorze / sqrt(RemainingPowerRatio), TacticDefensiveLine (:204-219) x 1.2 x punktacja pozycji; atak TacticFullScaleAttack (:179-183) =
+piechota x sqrt(RemainingPowerRatio) - przy rownych silach obrona wygrywa nieznacznie i trwa. Ostrzal gra liczy w CheckIsDefenseApplicable (:215-247) przez
+TeamQuerySystem.MaxUnderRangedAttackRatio, ktory POMIJA ludzi z tarcza w ekwipunku (TeamQuerySystem.cs:545) - piechota z tarczami pod deszczem strzal dla gry nie jest pod
+ostrzalem, obrona zostaje do konca. RBM (Tactics.cs:253-337) daje obroncy DefensiveEngagement, DefensiveLine, FullScaleAttack, CoordinatedRetreat (+ splity wg kultury);
+TacticFullScaleAttackPatch.cs:92-104: obronca z piechota > 90% ma wage ataku 100 (taki i tak atakuje - problem dotyczy obroncy z konnica albo garstka strzelcow).
+**Zmiana:** Doctrine.S2.cs (nowy, partial Doctrine) + wpiecia w Doctrine.cs (PostHold, ApplyList, Tick, Begin, End, Clear, AnyKey), BattleSense.NightKeys, Settings.cs,
+McmSettings.cs (gen_mcm: Armoury 2499 ustawien).
+(a) Mnoznik: postfiks PostHold (istniejaca latka GetTacticWeight, Priority.Last po com.rbmai) po mnozniku kultury wola S2Mul - x0.3 TYLKO instancji TacticDefensiveLine
+i TacticDefensiveEngagement druzyny w stanie S2 przy kluczu TAK (DefensiveRing, HoldChokePoint, splity RBM bez zmian - synteza: nie rozbijac pierscienia i przesmyku).
+Przy wadze ataku Wa i obrony Wd przejscie na atak, gdy Wd / Wa < ok. 2.2 (0.3 x histereza 1.5) - obronca o sile od ok. polowy wroga idzie naprzod, duzo slabszy
+dalej stoi (waga gry, nie samobojcza szarza).
+(b) Kto: tylko druzyny rady wojennej (WarCouncil.One -> Doctrine.ApplyList: AI z TeamAIGeneral, bitwa polowa) - druzyna GRACZA poza (One jej nie bierze, synteza Z9),
+pozne druzyny DR poza (late, licznik). Tlum (Tactics < 30) TEZ - S2 to zasada przetrwania, nie doktryna (przy CommanderTactics TAK tlum i tak ma tylko Charge +
+FullScaleAttack). Klucz dolaczony do Doctrine.AnyKey (rada wojenna i tick doktryny biegna takze, gdy reszta kluczy doktryny NIE - wtedy rada bez zmian listy, doktryna
+neutralna x1) i do BattleSense.NightKeys (BattleSense / RoutKeeper w misji).
+(c) Warunek (Doctrine.Tick co 2 s, glowny watek, po rozstawieniu, wlasny try): strzelcy strony (sojusznicy razem: (AllyRangedRatio + AllyRangedCavalryRatio) x
+AllyUnitCount) x 3 < strzelcy wroga (to samo dla Enemy) - liczba ludzi, nie odsetek; glowna piechota = najwiekszy szyk piechoty druzyny (jak
+DefensiveEngagement._mainInfantry); jej czesc ludzi w trybie ROZSADEK (przelacznik 139 SurvivalMode.InPanic - panika pominieta, liczona) z Agent.LastRangedHitTime
+w ostatnich 10 s >= 0.2 (to definicja UnderRangedAttackRatio gry, FormationQuerySystem.cs:489-494, bez PANIKI); najblizszy PIESZY szyk wroga (piechota albo lucznicy,
+bez IsCavalryFormation / IsRangedCavalryFormation) <= 200 m od glownej piechoty (zasieg S1).
+(d) Histereza: wejscie po 20 s warunku bez przerwy, wyjscie po 10 s bez warunku; do tego histereza gry x1.5 w MakeDecision. Bez FullScaleAttack i Charge na liscie taktyk
+(po radzie i dodatkach doktryny) S2 NIE wchodzi - liczone "bez taktyki ataku".
+(e) Linia raz na bitwe polowa (Doctrine.End przed Clear, BattleSense.Clean): "S2 (141): misja bitwa, klucz TAK (zasada ...) | druzyn n (pozne DR pominiete p) |
+przestrzelane 3:1 druzyny a (bez piechoty b probek): maks. trafionych piechoty 0.xx, pod ostrzalem >= 0.2 x s, 0.1-0.2 y s (suma druzyn, wrog pieszy <= 200 m); w panice
+pominieto z probek ludzi | wejsc w S2 e (wyjsc po ciszy x, zwarc w S2 - do konca bitwy z, w S2 na koncu k); taktyka przy wejsciu: DefensiveLine a, DefensiveEngagement b,
+inna c [nazwy] | po wejsciu: na atak (FullScaleAttack / Charge) n (sr. po s s), na inna k [nazwy], bez zmiany taktyki u | bez taktyki ataku: k | wywolan z Hold x0.3 n |
+czas pod ostrzalem przed zwarciem: druzyn d, sr. s s, padli od pociskow do zwarcia q; pod ostrzalem bez zwarcia do konca: druzyn r (padli od pociskow v) | probka
+T<tactics>/<kultura> obrona: ostrzal 0.xx przez s s, strzelcy 0.x wroga (nasi/wroga) -> Hold x0.3; DefensiveLine -> FullScaleAttack po s s | potkniecia S2 n."
+Klucz NIE (gdy inny klucz doktryny TAK): ten sam stan i liczniki, bez mnoznika ("klucz NIE (tylko pomiar)"; linia tylko gdy ktos byl przestrzelany) - pomiar przed /
+po z karty: czas pod ostrzalem przed zwarciem i padli od pociskow do zwarcia (licznik gry TeamQuerySystem.DeathByRangedCount - Agent.Die z ciosem pocisku, Agent.cs:4644-4652).
+(f) Klucz MCM DefendersAdvanceUnderFire = TAK (grupa "Marching and tactics", opis po angielsku). Potkniecia: per druzyna w ticku (_s2Stum) i RoutHold.Stumble(SiteDoctrine)
+- funkcja dalej dziala; postfiks - wspolny licznik bledow latek doktryny.
+Odstepstwa od karty (swiadome): (1) po ZWARCIU w stanie S2 (glowna piechota <= 25 m od pieszego wroga, prog S1) S2 trzyma do konca bitwy, jak S1 "do konca bitwy" po
+zwarciu - inaczej po 10 s bez strzal (lucznicy wroga w zwarciu przestaja trafiac) waga linii wraca i druzyna moglaby w srodku walki odejsc na pozycje obronna (plecami
+do wroga); (2) "strzelectwo" = liczba strzelcow calej strony, nie odsetek druzyny (1000 ludzi z 10% lucznikow nie jest przestrzelane przez 100 z 40%); (3) "wrog
+w zasiegu" = pieszy szyk wroga w 200 m - sami konni lucznicy (Dothrakowie) nie wystarcza, piechota ich nie dogoni; (4) miara ostrzalu bez ludzi w PANICE (przelacznik 139);
+(5) bez taktyki ataku S2 nie wchodzi wcale (sam x0.3 przerzucilby druzyne na pierscien / przesmyk / split RBM); (6) tlum < 30 Tactics objety.
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - GetTacticWeight wola tylko MakeDecision (grep gry i RBM); jedyna nasza latka na DefensiveLine /
+Engagement to PostHold doktryny (grep: Doctrine.cs:192-193), S2Mul po Mul - mnozniki kultury bez zmian; AnyKey z nowym kluczem: przy pozostalych kluczach NIE rada nie
+zmienia listy (council NIE -> kind -1), ApplyList nie dodaje RangedHarrass ani Charge (wymagaja CultureDoctrines / ShootBeforeAttacking), SetBase daje x1, S1/S3/S4 maja
+wlasne klucze - zero zmian poza S2; NightKeys: przy kluczach domyslnych nb2b i tak TAK (CommanderTactics, FateOfTheBrokenLog). (b) kolizje - S1 dotyczy strony ze strzelcami (Shot), S2
+strony bez nich (Hold) - rozne druzyny i rozne mnozniki; 140 (tarcze w gore) i S2 razem daja przyklad Jeffa (tarcza i naprzod); 140 zmniejsza trafienia cialem
+(LastRangedHitTime tylko przy obrazeniach, Agent.cs:5438-5442) - S2 moze wchodzic rzadziej: kalibracja z linii (maks. trafionych, sekundy >= 0.2 i 0.1-0.2);
+MarchToContact pod ostrzalem (UnderRangedAttackRatio >= 0.33) zostawia szybszy krok RBM - po przejsciu na atak szyk idzie szybciej, dobrze; 128 (szarza marszem do 60 m)
+dziala na rozkaz ataku jak zawsze; splity RBM (DefendSplitInfantry: waga 5/10 przy piechocie > 0.5 - Iron Islands, Lorath, rada od 150) - S2 bez wplywu (liczone "inna").
+(c) jedno zjawisko - "pod ostrzalem" ma tu miare STRAT (trafieni w 10 s, jak gra i MarchToContact), a 140 miare LECACYCH pociskow (do podniesienia tarczy) - dwa rozne
+pytania, opisane w obu plikach; stan czyszczony w Begin i End; zadnej ekonomii. (d) cudzy kod: MakeDecision, wagi taktyk, CheckIsDefenseApplicable, TeamQuerySystem
+(Ally* / Enemy*, IsFriendOf wlacza siebie), FormationQuerySystem.UnderRangedAttackRatio, Formation.ApplyActionOnEachUnit (te same jednostki co GetCountOfUnitsWithCondition),
+RBM EarlyStart i TacticFullScaleAttackPatch - sprawdzone w dekompilacji.
+Ryzyka zachowania: zejscie ze wzgorza (swiadomie, decyzja D1); obronca, ktory wyszedl do ataku i dotarl do zwarcia, nie wraca na linie do konca bitwy; przed zwarciem
+po 10 s bez ostrzalu moze wrocic na pozycje (gdy waga linii > 1.5 x ataku) - widac w "wyjsc po ciszy" i probce taktyk NB2.
+Sprawdzic w logu po wgraniu: linia "S2 (141)" w bitwie polowej; przy obroncy bez lucznikow przeciw lucznikom: przestrzelane >= 1, wejsc >= 1, "na atak" >= 1 z czasem
+rzedu 0-10 s (MakeDecision co 5 s), wywolan z Hold x0.3 > 0, potkniecia S2 0, NB2 doktryna "bledy latek 0"; porownanie z bitwa przy kluczu NIE: "czas pod ostrzalem przed zwarciem" krotszy,
+"padli od pociskow do zwarcia" mniej. Jesli "maks. trafionych" ponizej 0.2 przy wyraznym ostrzale - prog do zmiany (decyzja po danych). "bez taktyki ataku" > 0 - lista
+taktyk tej druzyny do sprawdzenia (rada / RBM). W grze (Jeff): obronca bez lucznikow pod strzalami po ok. 20-30 s rusza na wroga z tarczami w gorze.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 44f1e57f692e6dd434c4a6e3dcbe885f).
 ## 2026-10-25 140 (galaz noc/139-ai-zycie, po 139 00472fc0) - AI walczy o zycie, krok 2: tarcza pod ostrzalem (ShieldsUp, projekt 135a z poprawkami krytyka K1-K13 i E)
 **Problem:** Jeff 25.10 ok. 13:25: "przeciwnik jak ma tarcze a widzi ze ktos w niego strzela to zaklada tarcze z plecow ... zamiast zalozyc tarcze to idzie w lucznika
 i ginie jak kretyn, zasada AI robi wszystko aby nie dac sie zabic!"; 13:30: "Jak widzi ze kolega padl od strzaly a ma tarcze to zalozy tarcze i sie za nia schowa i idzie na
