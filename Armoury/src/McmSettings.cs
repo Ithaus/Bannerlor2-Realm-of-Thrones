@@ -9840,7 +9840,7 @@ namespace Armoury
         [SettingPropertyGroup("Friendly fire")]
         public bool FriendlyFireEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Friendly Fire Ranged Percent", 0, 100, "0", HintText = "with Friendly Fire: share of its damage (percent) an arrow, bolt or javelin does to a man of its own side (100 = full, 0 = none)", RequireRestart = false)]
+        [SettingPropertyInteger("Friendly Fire Ranged Percent", 0, 100, "0", HintText = "with Friendly Fire: share of its damage (percent) an arrow, bolt or javelin does to a man of its own side (100 = full, 0 = none) in field battles, sally-outs, hideouts and at sea; sieges use Friendly Fire Siege Ranged Percent", RequireRestart = false)]
         [SettingPropertyGroup("Friendly fire")]
         public int FriendlyFireRangedPercent { get; set; } = 100;
 

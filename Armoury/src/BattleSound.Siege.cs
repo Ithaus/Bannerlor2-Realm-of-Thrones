@@ -145,7 +145,7 @@ namespace Armoury
                 if (!crowd || ended || _now - x.At > SgStale) { _cSgStale++; continue; }
                 var cl = Pick(x.Code, x.Key);
                 if (cl == null) { _cSgNoClip++; continue; }
-                if (Play(m, cl, GAmb, x.Pos, x.Min, x.Max, true, null, null, x.Tag) != null) _cSgOil++;
+                if (Play(m, cl, GSiegeFx, x.Pos, x.Min, x.Max, true, null, null, x.Tag) != null) _cSgOil++;
                 else _cSgRej++;
             }
             // petle tlumu i zalogi taranu - tylko w zasiegu sluchacza (jak ogien oblezenia; recenzja P10: bez tego Play co 0,25 s odrzucal "daleko")
@@ -459,7 +459,7 @@ namespace Armoury
             if (_sgAttSilent || !_sgRoarStamp.Ready(6f)) return;
             var cl = (_sgAttStyle != null ? Pick("sc", "roar_" + _sgAttStyle) : null) ?? Pick("sc", "roar_westeros");
             if (cl == null) { _cSgNoClip++; return; }
-            if (Play(m, cl, GAmb, Toward(pos, _sgCenA, 12f, 0f), RoarMin, RoarMax, true, null, null, "ryk szturmu") == null) { _cSgRej++; return; }
+            if (Play(m, cl, GSiegeFx, Toward(pos, _sgCenA, 12f, 0f), RoarMin, RoarMax, true, null, null, "ryk szturmu") == null) { _cSgRej++; return; }
             _sgRoarStamp.Hit();
             _cSgRoar++;
         }
@@ -470,7 +470,7 @@ namespace Armoury
             if (_sgAttSilent || !_sgBreachStamp.Ready(4f)) return;
             var cl = Pick("sc", "breach");
             if (cl == null) { _cSgNoClip++; return; }
-            if (Play(m, cl, GAmb, pos, BreachMin, BreachMax, true, null, null, "wylom") == null) { _cSgRej++; return; }
+            if (Play(m, cl, GSiegeFx, pos, BreachMin, BreachMax, true, null, null, "wylom") == null) { _cSgRej++; return; }
             _sgBreachStamp.Hit();
             _cSgBreach++;
         }

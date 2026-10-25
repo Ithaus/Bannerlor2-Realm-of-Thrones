@@ -59,9 +59,11 @@ namespace Armoury
         private const int QueueMax = 256;
 
         // grupy puli i limity naraz
-        internal const int GVoice = 0, GHorn = 1, GDrum = 2, GAmb = 3, Groups = 4;
-        private static readonly int[] GroupCap = { 6, 2, 6, 6 };
-        private static readonly string[] GroupName = { "glosy", "rogi", "bebny", "tlo" };
+        // noc-final (audyt): GSiegeFx - jednorazowe chwile szturmu (ryk przy drabinie/wiezy, wylom, smola) z wlasnym limitem - petle tla (ogien, tlum, taran,
+        // szczek, deszcz) zajmowaly caly GAmb i chwile, o ktore prosil Jeff, dostawaly cisze
+        internal const int GVoice = 0, GHorn = 1, GDrum = 2, GAmb = 3, GSiegeFx = 4, Groups = 5;
+        private static readonly int[] GroupCap = { 6, 2, 6, 6, 2 };
+        private static readonly string[] GroupName = { "glosy", "rogi", "bebny", "tlo", "chwile szturmu" };
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -523,11 +525,11 @@ namespace Armoury
             }
             sb.Append(", glosnosc ").Append(c != null ? c.BattleSoundsLoudness : 2).Append(", katalog klipow ").Append(_clips != null ? _clips.Count : 0).Append(')');
             sb.Append(" | zdarzen utworzonych ").Append(_created).Append(" (glosy ").Append(_byGroup[GVoice]).Append(", rogi ").Append(_byGroup[GHorn])
-              .Append(", bebny ").Append(_byGroup[GDrum]).Append(", tlo ").Append(_byGroup[GAmb]).Append("), grane po 0,5 s ").Append(_played05)
+              .Append(", bebny ").Append(_byGroup[GDrum]).Append(", tlo ").Append(_byGroup[GAmb]).Append(", chwile szturmu ").Append(_byGroup[GSiegeFx]).Append("), grane po 0,5 s ").Append(_played05)
               .Append(" (nie grane ").Append(_notPlayed).Append("), zwolnionych ").Append(_released).Append(" (przy koncu misji ").Append(activeEnd)
               .Append(", w trakcie grania ").Append(_relPlaying).Append(": zwolnione po id ").Append(_relById).Append(", zwolnil Stop ").Append(_relByStop)
               .Append(", wyciek ").Append(_relLeak).Append(_sndResolved == 2 ? " - BRAK ISoundEvent" : "").Append("), najwiecej naraz ").Append(_peak).Append(", przerwane wczesnie ").Append(_early).Append(", koniec po czasie ").Append(_endCap)
-              .Append("; odrzucone: limit ").Append(_rejLimit).Append(", na sekunde ").Append(_rejRate).Append(", daleko ").Append(_rejFar)
+              .Append("; odrzucone: limit ").Append(_rejLimit).Append(" (glosy ").Append(_rejGroup[GVoice]).Append(", rogi ").Append(_rejGroup[GHorn]).Append(", bebny ").Append(_rejGroup[GDrum]).Append(", tlo ").Append(_rejGroup[GAmb]).Append(", chwile szturmu ").Append(_rejGroup[GSiegeFx]).Append(')').Append(", na sekunde ").Append(_rejRate).Append(", daleko ").Append(_rejFar)
               .Append(", brak klipu ").Append(_rejNoClip).Append(", silnik ").Append(_rejEngine);
             AppendFeatures(sb, c);
             sb.Append(" | wiwaty P3: wywolan ").Append(BattleCries.CheerCalls).Append(", okrzykow ").Append(BattleCries.CheerYells).Append(", bez szyku ").Append(BattleCries.CheerNoFormation);

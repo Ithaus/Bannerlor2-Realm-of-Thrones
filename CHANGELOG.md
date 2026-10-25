@@ -7,11 +7,13 @@ Agent nagran P2a nie nagral nic (zgoda tylko w tekscie skryptu) - nagrania zrobi
 **Zmiana:**
 - Settings.cs: CavalrySeeksFlanks, ArchersFallBackBehindInfantry, BattleWindAndRain, BattleHorseSounds, BattleClashOfArms, SiegeFireSounds, SiegeAssaultCrowd = true (opis MCM: "On by default (Jeff 25.10) - switch off if it misbehaves"); nowy FriendlyFireSiegeRangedPercent = 50 (gen_mcm 0-100), FriendlyFire.Begin: przy m.IsSiegeBattle procent strzal z tego klucza (pole bez zmian - 100). gen_mcm: Armoury 2471 ustawien.
 - Nagrania (tools/lektor na noc/p2a 19a871a5): obsada TYLKO z glosow juz na koncie Jeffa (16 glosow: konto 33 glosy przy limicie 30 dodanych - dodanie 23 z biblioteki nie miesci sie i zmienialoby konto; pierwotny wybor w glosy_bitwa.json jako voice_id_biblioteka).
-  TTS 218 + 80 (szturm/obrona murow) = 298 klipow (12 616 znakow), SFX 62 + 19 = 81 (538 s); 0 nieudanych; kredyty ElevenLabs 88 120 -> 76 203 (zuzyte ok. 11.9 tys.). Pliki: Armoury/ModuleData/Lektor/Bitwa/<kategoria>/*.ogg + manifest.tsv (379 wierszy, 15 MB); kopia D:\Backup-Bannerlord
-agrania-bitwa-2026-10-25.
+  TTS 218 + 80 (szturm/obrona murow) = 298 klipow (12 616 znakow), SFX 62 + 19 = 81 (538 s); 0 nieudanych; kredyty ElevenLabs 88 120 -> 76 203 (zuzyte ok. 11.9 tys.). Pliki: Armoury/ModuleData/Lektor/Bitwa/<kategoria>/*.ogg + manifest.tsv (379 wierszy, 15 MB); kopia D:\Backup-Bannerlord\nagrania-bitwa-2026-10-25.
+**Przyczyna:** decyzje domyslne po braku odpowiedzi Jeffa do 05:15 i jego wprost zamowione funkcje dzwieku; agent nagran nie mial zgody w czacie.
+**Audyt koncowy (noc-final):** wspolny limit tla GAmb = 6 przy wlaczonych petlach (ogien, tlum, taran, szczek, deszcz) odrzucal jednorazowe chwile szturmu - nowa grupa GSiegeFx (limit 2) dla ryku przy drabinie/wiezy, wylomu i smoly;
+  linia "Dzwiek bitwy" pokazuje odrzucenia wedlug grup. Opis MCM Friendly Fire Ranged Percent mowi o oblezeniu; komentarze "domyslnie NIE" uzupelnione o 124.
 **Ryzyko / co sprawdzic:** S3/S4 i tlo dzwieku wlaczone bez osobnej proby w grze Jeffa - autotest nocny (bitwy polowe z flagami prob) pokaze tylko brak wywrotek i liczniki; SiegeAssaultCrowd moze dublowac Contextual Combat Shouts ROT Battle Atmosphere (u Jeffa wlaczone) - Jeff wylaczy jedno z nich, jesli slychac podwojnie;
 glosy z konta to glownie narratorzy (brytyjscy) - okrzyki moga brzmiec mniej "bojowo"; zamiana na glosy z biblioteki wymaga zwolnienia miejsc na koncie (decyzja Jeffa). Pliki poza DLL do wgrania: Armoury/ModuleData/Lektor/Bitwa/** i Armoury/GUI/Prefabs/ArmSpoilsWindow.xml.
-**Status:** ZBUDOWANE - czeka na autotest i wgranie.
+**Status:** DO SPRAWDZENIA (autotest i wgranie nizej).
 
 ## 2026-10-25 122 (noc-p9 gotowosc AI, galaz noc/p9-gotowosc od a14c76d3 = WGRANIE 111; kod d036d233 + recenzja 155f3370 + druga recenzja - commit "noc-p9 (122) druga recenzja") - sila partii z uzbrojeniem (ocena AI i autobitwa) i "najpierw dozbroic" przed bitwa
 
