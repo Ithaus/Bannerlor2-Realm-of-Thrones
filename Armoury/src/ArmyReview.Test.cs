@@ -121,8 +121,9 @@ namespace Armoury
             var pm = Paginate(MenText(mp, fit, wnd, p));
             var ph = Paginate(HorseText(mp, p));
             var pq = Paginate(MarchText(mp, col, p));
-            Log.Info(ReportLine(mp, fit, wnd, p, col, pm, ph, pq));
-            int longest = Math.Max(LongestPage(pm), Math.Max(LongestPage(ph), LongestPage(pq)));
+            var pl = Paginate(LastBattleText());   // 133b: strony "Last battle" (zapis ostatniej bitwy albo zdanie "nic jeszcze")
+            Log.Info(ReportLine(mp, fit, wnd, p, col, pm, ph, pq, pl));
+            int longest = Math.Max(Math.Max(LongestPage(pm), LongestPage(pl)), Math.Max(LongestPage(ph), LongestPage(pq)));
             bool t1p = longest <= Rumours.PageLines;
             int exM = ExemptMounted(p);
             bool t1a = p.Riders + p.Exempt == p.Paired + p.NoSaddle + exM + p.NoHorse && p.Mounted == p.Paired + p.NoSaddle;

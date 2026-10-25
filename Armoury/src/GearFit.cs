@@ -834,6 +834,13 @@ namespace Armoury
             return kept;
         }
 
+        /// <summary>133b (okno armii, "Last battle" - KitGaps.Close na koniec misji): liczniki podlogi broni biezacej misji dla druzyny gracza - te same co w FloorNote
+        /// (bez broni po strazach, z polki, z tego ponad umiejetnosc, nic w polce). Tylko odczyt.</summary>
+        internal static void FloorCounts(out int bare, out int got, out int over, out int none)
+        {
+            bare = _mBareP; got = _mB1P + _mB2P + _mB3P; over = _mB3P; none = _mNoneP;
+        }
+
         /// <summary>Dopisek NA KONCU linii "Bitwa gracza (sklad7b-p, start)" (GarrisonKit.BattleNotice) - liczniki biezacej misji; komunikat gracza przy ostatniej desce.</summary>
         internal static string FloorNote()
         {

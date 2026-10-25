@@ -129,6 +129,7 @@ namespace Armoury
             DayReset();
             TestReset();
             PinReset();   // P12: przypiecia typow i plan bitwy
+            KitReset();   // 133b: ostatnia bitwa druzyny gracza (KitGaps)
         }
 
         private static void DayReset() { _dWindows = _dReports = _dBanners = _dSaves = _dRefused = _dAuto = _dResets = _dStumbles = 0; _dPinSaves = 0; }
@@ -284,8 +285,8 @@ namespace Armoury
                 a.optionLeaveType = GameMenuOption.LeaveType.Manage;
                 string why;
                 if (!Can(out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
-                a.Tooltip = new TextObject("{=!}Your men by kind, the horses and harness in use and missing, why riders will go on foot and why the column walks,"
-                                           + " and your banners for the next battle.");
+                a.Tooltip = new TextObject("{=!}Your men by kind, what kit they went without in the last battle, the horses and harness in use and missing, why riders"
+                                           + " will go on foot and why the column walks, and your banners for the next battle.");
                 return true;
             }
             catch (Exception e) { Stumble("Cond", e); return false; }
@@ -377,7 +378,9 @@ namespace Armoury
             var pagesMen = Paginate(MenText(mp, fit, wnd, pairs));
             var pagesHorses = Paginate(HorseText(mp, pairs));
             var pagesMarch = Paginate(MarchText(mp, col, pairs));
-            if (logIt) { try { Log.Info(ReportLine(mp, fit, wnd, pairs, col, pagesMen, pagesHorses, pagesMarch)); } catch (Exception e) { Stumble("ReportLine", e); } }
+            List<string> pagesLast = null;   // 133b: ostatnia bitwa (zapamietane liczby, bez liczenia na mapie)
+            try { pagesLast = Paginate(LastBattleText()); } catch (Exception e) { Stumble("LastBattleText", e); }
+            if (logIt) { try { Log.Info(ReportLine(mp, fit, wnd, pairs, col, pagesMen, pagesHorses, pagesMarch, pagesLast)); } catch (Exception e) { Stumble("ReportLine", e); } }
 
             int allFit = fit[0] + fit[1] + fit[2] + fit[3] + fit[4];
             int allWnd = wnd[0] + wnd[1] + wnd[2] + wnd[3] + wnd[4];
@@ -391,6 +394,7 @@ namespace Armoury
             {
                 new InquiryElement("men", "Your men: " + fit[0] + " infantry, " + fit[1] + " archers, " + fit[2] + " cavalry, " + fit[3] + " horse archers", null, true,
                                    "Fit to fight by kind (the wounded are counted on the page). Kind follows each man's troop: the same sorting the Order of Battle uses."),
+                LastRowSafe(),   // 133b
                 new InquiryElement("horses", riders == 0 ? "Horses and harness: no riders in your party"
                                                          : "Horses and harness: " + (riders - foot) + " of " + riders + " riders ready to ride", null, true,
                                    foot > 0 ? foot + " riders will fight on foot - the page says why." : "Horses and harness in the troops' armoury and in your baggage."),
@@ -420,6 +424,7 @@ namespace Armoury
                     {
                         string id = picked != null && picked.Count > 0 ? picked[0].Identifier as string : null;
                         if (id == "men") { _dReports++; ShowPages("Your men", pagesMen, 0); }
+                        else if (id == "last") { _dReports++; ShowPages("Last battle", pagesLast, 0); }   // 133b
                         else if (id == "horses") { _dReports++; ShowPages("Horses and harness", pagesHorses, 0); }
                         else if (id == "march") { _dReports++; ShowPages("On the march", pagesMarch, 0); }
                         else if (id == "banners") { _dBanners++; OpenBanners(true); }
@@ -596,7 +601,8 @@ namespace Armoury
         }
 
         /// <summary>Linia logu raportu (na otwarcie okna i w tescie): te same liczby co strony okna.</summary>
-        internal static string ReportLine(MobileParty mp, int[] fit, int[] wnd, SaddleLaw.PairState p, MarchPace.Column col, List<string> pm, List<string> ph, List<string> pmarch)
+        internal static string ReportLine(MobileParty mp, int[] fit, int[] wnd, SaddleLaw.PairState p, MarchPace.Column col, List<string> pm, List<string> ph, List<string> pmarch,
+                                          List<string> plast = null)
         {
             int exM = ExemptMounted(p);
             var bag = mp.ItemRoster;
@@ -614,7 +620,10 @@ namespace Armoury
             sb.Append(" | zdrowi/ranni: piechota ").Append(fit[0]).Append('/').Append(wnd[0]).Append(", lucznicy ").Append(fit[1]).Append('/').Append(wnd[1])
               .Append(", konni ").Append(fit[2]).Append('/').Append(wnd[2]).Append(", konni lucznicy ").Append(fit[3]).Append('/').Append(wnd[3])
               .Append(", bohaterowie ").Append(fit[4]).Append('/').Append(wnd[4]);
+            sb.Append(" | ostatnia bitwa (133b): ").Append(LastBattleBrief());
             sb.Append(" | strony ").Append(PagesInfo(pm)).Append(' ').Append(PagesInfo(ph)).Append(' ').Append(PagesInfo(pmarch)).Append(" (miesci sie ").Append(Rumours.PageLines).Append(')');
+            // 133b: osobny segment - format "strony AxB CxD ExF (miesci sie N)" czyta tools/sprawdz_logi.py (AR-2)
+            if (plast != null) sb.Append(" | strony ostatniej bitwy (133b) ").Append(PagesInfo(plast));
             sb.Append(" | ").Append(OobState()).Append('.');
             return sb.ToString();
         }

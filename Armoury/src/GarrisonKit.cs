@@ -477,6 +477,7 @@ namespace Armoury
             for (int i = 0; i < 3; i++) _bHome[i] = 0;   // m119: kij z domu
             for (int i = 0; i < 4; i++) _bHomeLv[i] = 0;
             _bHomeTpl = _bHomeNone = _bHomeSlot = _bHomeDead = _bHomeRace = _bHomeStumbles = _bHomeReg = _bHomeTemp = _bHomeBanner = 0; _bHomeSample.Clear(); _bHomeKinds.Clear();
+            KitGaps.ClearBattle();   // 133b: braki wedlug rodzaju biezacej bitwy (ostatnia zamknieta bitwa zostaje - KitGaps.Last)
         }
 
         private static bool BattleTouched()
@@ -906,15 +907,18 @@ namespace Armoury
         {
             if (mission == null) return;
             if (_battleMission != null && ReferenceEquals(_battleMission.Target, mission)) return;
-            if (BattleTouched()) BattleLine("poprzednia misja bez konca");
+            if (BattleTouched()) BattleLine("poprzednia misja bez konca", false);
             ClearBattle();
             _battleMission = new WeakReference(mission);
         }
 
         /// <summary>sklad7b: linia jednej bitwy gracza (do autotestu: ile slotow wzorca zostalo pustych - gracz / lordowie AI / zalogi).
-        /// sklad7b-p: Twoj rod osobno (w lordach AI), jezdzcy pieszo, partie bez wodza, ludzie partii z regula poza straza i zgodnosc strazy z DTE.</summary>
-        private static void BattleLine(string why)
+        /// sklad7b-p: Twoj rod osobno (w lordach AI), jezdzcy pieszo, partie bez wodza, ludzie partii z regula poza straza i zgodnosc strazy z DTE.
+        /// 133b: na koncu segment "sprzet gracza wedlug rodzaju" (KitGaps.Close - te same sloty co "gracz N" z podzialem na rodzaje; zamyka "ostatnia bitwe" okna).
+        /// atEnd - koniec misji (nie "poprzednia misja bez konca": liczniki podlogi broni sa juz nastepnej misji).</summary>
+        private static void BattleLine(string why, bool atEnd)
         {
+            string kit = KitGaps.Close(_mountsOk, atEnd, _bPlayerMen, _bPlayerMiss);
             int guarded = _bPlayerMen + _bLordMen + _bGarMen;
             string check = !_regHooked ? "licznik DTE nie wpiety" : _bDte > guarded ? "NIEZGODNE - straz nie widziala " + (_bDte - guarded) + " ludzi (inny mod podmienil ekwipunek?)" : "zgodne";
             Log.Info("Bitwa gracza (sklad7b, nic z niczego; " + why + "): sloty wzorca bez sztuki (walcza bez) - gracz " + _bPlayerMiss + " (ludzi " + _bPlayerMen
@@ -925,7 +929,7 @@ namespace Armoury
                      + "; przez straz " + guarded + " z " + _bDte + " wystawionych przez DTE z przydzialem regul (" + check + ")"
                      + "; poza straza (partie z regula bez przydzialu, nie ubrani) " + _bOutside + ", w tym we wzorcu gry " + _bOutsideTpl
                      + "; bez zestawu awaryjnego DTE - druzyna gracza " + _bNoEmergP + ", partie lordow " + _bNoEmergL
-                     + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + ", bez wodza (rozdzielacz Armoury) " + _bNoLeader + "; umarli bez zmian " + _bUndead + CivNote() + HomeNote() + ".");
+                     + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + ", bez wodza (rozdzielacz Armoury) " + _bNoLeader + "; umarli bez zmian " + _bUndead + CivNote() + HomeNote() + kit + ".");
         }
 
         /// <summary>m119: dopisek do linii bitwy - kij z domu bezbronnych (gracz / lordowie / zalogi, poziom wyboru, bez kija z przyczyna, przyklady wedlug kultury)
@@ -973,7 +977,7 @@ namespace Armoury
         /// <summary>sklad7b: po DTE DynamicTroopMissionLogic.OnEndMission (zwroty juz policzone) - linia bitwy i koniec przydzialow tej misji.</summary>
         public static void EndMissionPostfix()
         {
-            try { if (BattleTouched()) BattleLine("koniec misji"); }
+            try { if (BattleTouched()) BattleLine("koniec misji", true); }
             catch (Exception e) { Log.Error("GarrisonKit.EndMission", e); }
             ClearBattle(); _battleMission = null;
             _spawn.Clear(); _spawnAsg.Clear(); _ownAssign.Clear(); _garAssign.Clear(); _lordAssign.Clear(); _asgParty.Clear();
@@ -1209,11 +1213,21 @@ namespace Armoury
                 bool noSad = (si.Kind != 2 || OwnKitOn) && SaddleGuard(si, eq);   // E8/H (271): po strazy "nic z niczego" - kon bez uprzezy schodzi (pieszo)
                 int miss = Missing(si.Asg, eq);
                 var rf = _getRef != null ? _getRef.Invoke(si.Asg, null) as Equipment : null;
-                CivilDress(si, eq, rf);   // m117: po strazach i po Missing - przed licznikami ludzi
-                HomeWeapon(si, eq, rf);   // m119: po strazach (takze uprzezy - jezdziec bez konia bierze kazdy kij), po Missing i po ubraniu
+                // 133b: braki wedlug rodzaju (ta sama chwila co Missing - przed ubraniem i kijem), tylko druzyna gracza; osobny try - potkniecie nie rusza licznikow bitwy
+                KitGaps.Gaps gaps = null;
+                bool bare = false;
+                if (si.Kind == 0) { try { gaps = KitGaps.Compare(rf, eq); bare = !GearFit.Armed(eq); } catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.OwnKitSpawn(133b)", e); } }
+                int civ = CivilDress(si, eq, rf);   // m117: po strazach i po Missing - przed licznikami ludzi
+                bool home = HomeWeapon(si, eq, rf);   // m119: po strazach (takze uprzezy - jezdziec bez konia bierze kazdy kij), po Missing i po ubraniu
                 int foot = !noSad && RiderOnFoot(si.Asg, eq, rf) ? 1 : 0;
                 if (noSad) { if (si.Kind == 0) _bSadP++; else if (si.Kind == 1) _bSadL++; else _bSadG++; }
-                if (si.Kind == 0) { _bPlayerMen++; _bPlayerMiss += miss; _bGuardP += g; _bFootP += foot; }
+                if (si.Kind == 0)
+                {
+                    _bPlayerMen++; _bPlayerMiss += miss; _bGuardP += g; _bFootP += foot;
+                    CharacterObject co = null;
+                    try { co = _getChar != null ? _getChar.Invoke(si.Asg, null) as CharacterObject : null; } catch { co = null; }
+                    KitGaps.Note(co, gaps, miss, noSad, foot > 0, bare, home, civ);   // 133b: ostatnia bitwa (okno "Review the army")
+                }
                 else if (si.Kind == 1)
                 {
                     _bLordMen++; _bLordMiss += miss; _bGuardL += g; _bFootL += foot;

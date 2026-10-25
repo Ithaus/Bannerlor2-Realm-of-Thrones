@@ -1,5 +1,46 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 133b (galaz noc/133-raport-armii) - Armoury: okno armii "Last battle" - braki sprzetu ostatniej bitwy wedlug rodzaju i typu (KitGaps), segment w linii bitwy
+**Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem, w tym logu tak szybko to leci ze ja nie wiem
+... przeniesmy logi do zakladki armii". Linia bitwy "Bitwa gracza (sklad7b ...): sloty wzorca bez sztuki (walcza bez) - gracz 19 (ludzi 43)" (Armoury-2026-10-25_02-11-22,
+03:42:06) nie mowi, KTORE sloty i u kogo; CS SkillLawWard w tej samej bitwie pisze "1 slotow PUSTYCH (Shield 1)" (03:36:56) - liczy luki tylko w broni strzeleckiej
+i pancerzu z wymogiem (krytyka K2), wiec Jeff widzi dwie rozne liczby i nie wie, czego brakuje. Po bitwie na mapie nic z tego nie zostaje.
+**Przyczyna:** GarrisonKit.Missing liczy sloty ilosciowo (pancerz 5-9 po slotach + max(0, bron wzorca - bron czlowieka)) bez rozbicia na rodzaje i typy; stanu ostatniej
+bitwy nikt nie zapamietywal.
+**Zmiana:** (1) Nowy Armoury/src/KitGaps.cs: Compare(wzorzec, ekwipunek) - czysta funkcja, rodzaje jak Missing: pancerz po slotach 5-9 (helm, zbroja, nogi, rece, plaszcz),
+bron 0-3 po grupach ItemType + klasa broni (jak CS Mends.WardGroup) - kazda sztuka wzorca po kolei (glowna pierwsza) szuka pary u czlowieka; bez pary = brak jej rodzaju:
+bron biala, osobno "side-arm (melee)" (K2: biala bron wzorca po pierwszej broni glownej - miecz wlocznika, lucznika, oszczepnika), tarcza, luk, kusza, strzaly, belty,
+rzucana, inna. Sztuki czlowieka bez pary = nadmiar; zastapione innym rodzajem = min(braki broni, nadmiar). TOZSAMOSC: pancerz + braki broni - zastapione = Missing
+(sprawdzana na kazdym czlowieku; rozjazd - linia "Sprzet wedlug rodzaju (133b): ROZJAZD z GarrisonKit.Missing", najwyzej 3 na bitwe). Missing bez zmian.
+(2) GarrisonKit.OwnKitSpawn, tylko druzyna gracza (Kind 0): Compare i "bez broni po strazach" (GearFit.Armed) w tej samej chwili co Missing (po wszystkich strazach, przed
+ubraniem cywilnym i kijem z domu), osobny try (potkniecie nie rusza licznikow bitwy); KitGaps.Note(typ, braki, Missing, bez uprzezy, bez konia, bez broni, kij, ubranie) przy
+_bPlayerMen++. Wartosci zwrotne CivilDress/HomeWeapon zapamietane (wywolania bez zmian). BattleLine(why, atEnd): na koncu linii bitwy segment "sprzet gracza wedlug rodzaju
+(133b): ludzi N, puste X = brakow Y (rodzaje) - bron zastapiona innym rodzajem Z; nadmiar broni ponad wzorzec; pieszo: bez konia, bez uprzezy; bez broni po strazach
+(kij z domu); ubranie cywilne; pole/oblezenie; tozsamosc z Missing zgodna|ROZJAZD, z linia zgodna|ROZJAZD | typy z brakami: id xN - puste (rodzaje) ..." (najwyzej 10 typow);
+KitGaps.Close zamyka "ostatnia bitwe" (tylko gdy wyszedl choc jeden Twoj czlowiek). ClearBattle -> KitGaps.ClearBattle. (3) GearFit.FloorCounts - odczyt licznikow podlogi
+broni misji druzyny gracza (te same co FloorNote), czytany tylko przy "koniec misji". (4) Nowy ArmyReview.Kit.cs: wiersz "Last battle: X kit slots empty, F riders on foot
+(N men)" / "full kit" / wyszarzony "nothing recorded yet" z powodem (podpowiedz: data gry i ile dni temu - K16 - oraz "luki skupiaja sie w ostatnio wydanych - gdy nie wszyscy
+wyszli, mniej luk niz w rozdaniu" - K16); strony: data i rodzaj bitwy, puste + "By kind" + zastapione + co to side-arm, typy z brakami (po 6 na akapit), typy w pelnym
+sprzecie, jezdzcy pieszo (bez konia / bez uprzezy), podloga broni przy rozdaniu i bez broni przy wystawieniu (kij z domu), ubranie cywilne, jak liczone. ArmyReview.Reset ->
+KitReset (KitGaps.Reset). Linia "Przeglad armii (P4): raport" ma segment "ostatnia bitwa (133b): ..." i osobny "strony ostatniej bitwy (133b) AxB" (format "strony AxB CxD ExF
+(miesci sie N)" czyta tools/sprawdz_logi.py AR-2 - zostaje bez zmian). Test T1 (armoury-przeglad.flag) liczy tez strony "Last battle". Podpowiedz opcji menu wspomina
+ostatnia bitwe. Bez nowych kluczy MCM.
+**Ryzyko / co sprawdzic:** (1) Kontrola w kodzie: Missing, straze (SpawnGuard, SaddleGuard), CivilDress, HomeWeapon, RiderOnFoot bez zmian; KitGaps tylko czyta ekwipunek
+(zadnej sztuki ani zlota); Note i Close lapia wyjatki (licznik potkniec, bez wylacznika). Lordowie AI i zalogi (Kind 1/2) bez zmian. (2) Linia bitwy dluzsza o segment na
+koncu - tools/sprawdz_logi.py parsuje tylko linie "sklad7b-p, start" i "straz nic z niczego" (grep), linii konca bitwy nie. (3) ODSTEPSTWO od projektu "Reset w ArmyReview.Reset
+i StateHygiene": StateHygiene NIE ruszany - nowy stan czyszczony zawsze w ArmyReview.Reset (NocReset w konstruktorze ArmouryBehavior, przed SyncData; ta sama chwila co
+StateHygiene.ResetAll), jak pamiec E8/H w SaddleLaw (audyt 13.10: stan paczek po E8/S czyszczony zawsze, nie pod kluczem StateHygieneEnabled); drugie zerowanie tego
+samego stanu bylby dwie zasady. (4) "Puste" w oknie = "gracz N" linii bitwy (ta sama suma Missing) - segment ma kontrole "z linia zgodna"; rozbicie na rodzaje sumuje sie
+do puste + zastapione. Grupa = ItemType + klasa broni: topor zamiast miecza wzorca to brak "melee weapon" + "zastapione innym rodzajem" (netto 0 pustych, jak Missing).
+(5) Ostatnia bitwa tylko przy TroopsFightWithOwnKitOnly (bez klucza druzyna gracza nie ma przydzialow "tylko to, co ma" - OwnKitSpawn jej nie widzi) - wiersz wyszarzony
+z powodem. Pamiec nie jest w zapisie: po wczytaniu "nothing recorded yet" do nastepnej bitwy. (6) Podloga broni na stronie tylko przy "koniec misji" (przy "poprzednia
+misja bez konca" liczniki GearFit moga byc juz nastepnej misji) i liczy wszystkich zdrowych druzyny przy rozdaniu (nie tylko wystawionych) - tak napisane na stronie.
+(7) Koszt: jedna lista 4 int i obiekt na wystawionego czlowieka druzyny gracza; okno bez liczenia na mapie (zapamietane liczby).
+Sprawdzic w grze: po bitwie w Armoury.log na koncu linii "Bitwa gracza (sklad7b ..." segment "sprzet gracza wedlug rodzaju (133b): ... tozsamosc z Missing zgodna, z linia
+zgodna | typy z brakami: ..." - "puste" = "gracz N" tej linii; brak linii "ROZJAZD z GarrisonKit.Missing"; w obozie "Review the army" -> wiersz "Last battle" i strony
+z tymi samymi liczbami (strony <= 17 linii - test T1); "Przeglad armii (P4): raport" z segmentem "ostatnia bitwa (133b)".
+**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+
 ## 2026-10-25 133a (galaz noc/133-raport-armii od noc/132-zdjecia 8a177bdb) - CrashScribe: podglad gotowosci partii gracza (pasek DTE, okno armii) bez linii, licznikow strazy i zoltego "QM: N EMPTY"
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom ... w tym logu tak szybko to leci ze ja nie wiem ... de facto przeniesmy
 logi do zakladki armii". Pierwszy krok paczki 133 (projekt + krytyka K1-K16: scratchpad raport-armii-133.txt). Okno "Review the army" (133c) ma liczyc sprzet "na nastepna bitwe"
