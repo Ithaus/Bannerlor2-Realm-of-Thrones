@@ -1,5 +1,89 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 146 (galaz noc/139-ai-zycie, po 145 bcd191c3) - AI walczy o zycie, krok 8: szyk pod ostrzalem (projekt 135b z design-weccrxf3h sekcja 5, karta syntezy "138", CloseRanks.cs, klucz AiFormationsUnderFire)
+**Problem:** Jeff 25.10 ok. 13:25: "przeciwnik jak ma tarcze a widzi ze ktos w niego strzela to zaklada tarcze z plecow ... zasada AI robi wszystko aby nie dac
+sie zabic!"; ok. 13:30: "Jak widzi ze kolega padl od strzaly a ma tarcze to zalozy tarcze i sie za nia schowa i idzie na przeciwnika". Objaw (synteza "AI walczy
+o zycie", luka 8): szyk AI idacy naprzod pod strzalami zostaje w gestej linii. Dowodu z logu nie ma (140 liczy tylko zmiany szyku w oznaczonych szykach, nie to,
+jaki szyk ma szyk pod ostrzalem - stad linia 146, takze przy kluczu NIE); dowod z kodu ponizej.
+**Przyczyna:** (dekompilacje scratchpad/surv, scratchpad/shield) RBM zastepuje BehaviorAdvance.TickOccasionally (OverrideBehaviorAdvance:353-418, zawsze false), a w
+BehaviorCharge.CalculateCurrentOrder (OverrideBehaviorCharge:296-303) - i tu, i tam przy szyku piechoty od 30 ludzi (w Advance: wrog w 150 m) co tick FormationAI
+(0.5 s, FormationAI:116/232) wola RBMAI.Utilities.DecideArrangementOrderForFormation (Utilities:200-217): ShieldWall tylko przy ponad 70% ludzi z DUZA tarcza
+(WeaponClass 29) w rece i najwyzej 1 sztuce innej broni, Loose przy ponad 50% broni uderzeniowej, inaczej gesta Line - bez wzgledu na ostrzal. Regula gry "ShieldWall
+pod ostrzalem" (BehaviorAdvance:135-166) przez to nie dziala.
+**Zmiana:** CloseRanks.cs (nowy), ShieldsUp.cs (On i FormFire - odczyt sygnalu S4; OffShield i CavNear internal - te same miary "tarcza w rece" i "konnica wroga
+w 90 m"; jedno wolanie CloseRanks.OnHit w Hit, z wlasnym try), Doctrine.S2.cs (FootGap internal - ta sama miara zwarcia co S1/S2), BattleSense.cs (Begin po
+ShieldsUp.Begin, Tick po ShieldsUp.Tick, End po ShieldsUp.End), RoutHold.cs (miejsce potkniec NB2 "szyk" = 19, Sites 20; segment "AI Formations Under Fire" w linii
+startu sesji), SubModuleMain.cs (klucz w nb2b - BattleSense w misji), Settings.cs, McmSettings.cs (gen_mcm: Armoury 2511 -> 2512 ustawien).
+(a) Regula (klucz AiFormationsUnderFire TAK, tylko bitwa polowa, tylko szyk AI piechoty - formation.IsAIControlled; szyk pod rozkazami gracza nigdy nie ruszany):
+szyk pod ostrzalem = sygnal S4 ze 140 (ShieldsUp.FormFire: co najmniej ShieldsUpFormationShots pociskow na szyk w 5 s, do ostatniego + ShieldsUpHoldSeconds) - jedna
+definicja ostrzalu szyku dla tarczy czlowieka (140) i szyku (146). Przed zwarciem (najblizszy pieszy szyk wroga dalej niz Doctrine.S1ContactGap 25 m - ta sama miara
+co S1/S2; wyjscie ze zwarcia dopiero powyzej 40 m): co najmniej 60% ludzi (bez PANIKI wedlug przelacznika 139) trzyma tarcze dowolnej klasy w rece -> ShieldWall
+(nasz ShieldWall zostaje do 50% - histereza); mniej -> Loose, ale NIE przy szyku konnym wroga w 90 m (luzny szyk pod szarza to rzez - wtedy decyduje RBM); gdy
+tarcze w ekwipunku ma co najmniej 60%, a w rece mniej, do 4 s od poczatku ostrzalu czekamy na przelozenie ze 140 (szyk bez zmiany). Po zwarciu, bez ostrzalu,
+szyk umarlych (Inni co najmniej polowa) - decyduje RBM. Zmiana szyku najwyzej raz na 10 s od ostatniej zmiany szyku formacji (nasza, RBM w tej metodzie i kazda inna
+sciezka - OverrideBehaviorAdvance:265 / OverrideBehaviorCharge:229,270, gra, gracz): OnApply wola UpdateAgentProperties i EnforceShieldUsage kazdemu czlowiekowi
+i przebudowuje linie (ArrangementOrder:126-150, Z8). Oddanie RBM (po zwarciu, po ostrzale, przy konnicy) tez dopiero po 10 s od naszej zmiany. Gdy RBM przestaje wolac
+decyzje (wrog dalej niz 150 m, ponizej 30 ludzi, inne zachowanie) przez 3 s, a nasz szyk nie jest juz potrzebny - przywracamy szyk sprzed naszej zmiany w passie
+(glowny watek).
+(b) Wpiecie: PREFIKS + postfiks (Priority.Last) na RBMAI.Utilities.DecideArrangementOrderForFormation(Formation) - cel przez AccessTools.TypeByName i DeclaredMethod
+(pulapka 15.10), latka raz na proces przy pierwszej bitwie z kluczem (wzor K9 ze 140). Prefiks pomija cialo RBM tylko, gdy decydujemy my (zmiana, "juz w szyku",
+czekanie na tarcze, zamrozenie do 10 s); w kazdym innym przypadku RBM decyduje jak dotad. Postfiks liczy zmiany szyku przez RBM (K7). Latka biegnie w ticku druzyn
+(Mission.TickAgentsAndTeamsImp - takze asynchronicznie, Mission:3599-3611 / 3766-3772), pass szykow co 0.5 s w OnMissionTick; nie nachodza na siebie (WaitTickCompletion
+Mission:3530), stan i tak pod jednym lockiem, SetArrangementOrder poza lockiem. Ryzyko inline JIT (krytyk C): metoda ma 84 bajty IL (zmierzone na RBMAI.dll Jeffa) -
+JIT moze ja wstawic w prefiks RBM i wtedy latka nie biegnie; linia porownuje liczbe wywolan latki z liczba "sytuacji decyzji RBM" z passu (szyk AI piechoty od 30
+ludzi w BehaviorAdvance / BehaviorCharge) i przy 0 wywolan pisze UWAGA.
+(c) Klucz NIE (albo latka nie weszla): ta sama ocena na sucho - szyko-sekundy pod ostrzalem w sytuacji decyzji RBM, co bysmy wybrali (ShieldWall / Loose / czekanie /
+RBM przez konnice / RBM przez zwarcie i reszte); szyk zostaje RBM - porownanie przed / po. Bez AI Shields Up Under Fire (brak S4) albo poza bitwa polowa - krotka linia
+"nieczynne"; bitwy morskie bez linii (jak 140).
+(d) Linia raz na bitwe (BattleSense.Clean, zaraz po "Bitwa (140 tarcze)"): "Szyk pod ostrzalem (146): misja bitwa, klucz TAK (ShieldWall od 60% ludzi z tarcza w rece
+(nasz zostaje do 50%), mniej - Loose, bez Loose przy konnicy wroga w 90 m; czekanie na tarcze do 4 s; zmiana najwyzej co 10 s; zwarcie = pieszy wrog w 25 m (wyjscie
+40 m) - wtedy RBM; sygnal S4 z 140; tylko szyki AI piechoty) | latka RBMAI.Utilities.DecideArrangementOrderForFormation TAK (prefiks + postfiks), RBM AI: BehaviorAdvance
+TAK, BehaviorCharge TAK; wywolan latki n (pod ostrzalem przed zwarciem a, bez stanu b), sytuacji decyzji RBM (szyk AI piechoty od 30, Advance / Charge) w passach co
+0.5 s: k (pod ostrzalem j)[; UWAGA: 0 wywolan przy sytuacjach RBM - latka nie biegnie (JIT wstawil metode do prefiksu RBM?)] | szyki pod ostrzalem: n (AI strony gracza
+s, pod rozkazami gracza - pominiete g), z decyzja RBM pod ostrzalem d | nasze zmiany: ShieldWall a (sr. tarcz w rece 0.xx), Loose b (sr. 0.xx), sr. od poczatku ostrzalu
+x s; decyzji: juz w szyku k, wstrzymane do 10 s q, czekanie na tarcze w, bez Loose przy konnicy c | oddane RBM: r (zwarcie z, po ostrzale o, konnica h, inne x), nasz
+szyk trzymany do 10 s t decyzji; przywrocone poza decyzja RBM v; nasz szyk zmieniony inna sciezka u, przejete przez gracza p | czas w naszym szyku: ShieldWall X s,
+Loose Y s (szyko-sekundy) | zmiany szyku RBM (K7): w tej metodzie n (Line a, Loose b, ShieldWall c; pod ostrzalem d; RBM wybral ShieldWall w e z f decyzji), poza ta
+metoda (inne sciezki RBM, gra, gracz) g | trafienia pociskami przed zwarciem w szykach pod ostrzalem (cialo/tarcza/plecy): nasz ShieldWall a/b/c, nasz Loose a/b/c, szyk
+bez naszej zmiany a/b/c | potkniecia szyk n (w latce m)." Przy kluczu NIE zamiast "nasze zmiany ... czas" - segment "na sucho". Linia startu sesji NB2 - segment
+"AI Formations Under Fire TAK (...)" (z dopiskiem "nieczynne", gdy AI Shields Up Under Fire NIE); potkniecia NB2 - ", szyk n" (regex sprawdz_logi.py przyjmuje
+kolejne miejsca "(?:, [a-z]+ \d+)*").
+(e) Klucz MCM: grupa "Shields under fire" - AiFormationsUnderFire TAK (opis po angielsku: "with AI Shields Up Under Fire: an AI infantry formation that comes under
+arrows ..."); w Armoury.json Jeffa go nie ma (grep 25.10; kluczy 140 tez nie ma) - dziala wartosc z kodu. Przelacznik - bez zakresu w RANGES; progi (60% / 50%, 4 s,
+10 s, 25 / 40 m, 90 m) w kodzie (CloseRanks), jeden klucz na krok.
+Odstepstwa od karty (swiadome): (1) PREFIKS + postfiks zamiast samego postfiksu: DecideArrangementOrderForFormation jest void i SAMA wola SetArrangementOrder -
+postfiks po RBM dawalby dwie zmiany szyku na decyzje (RBM, potem nasz), czyli dwa OnApply na kazdego czlowieka co 0.5 s (dokladnie migotanie, przed ktorym ostrzega
+projekt); prefiks pomija RBM tylko przy naszej decyzji. (2) Prog 60% liczy tarcze w rece (po przelozeniu 140), z 4 s czekania na przelozenie - inaczej pierwsza
+decyzja zapadalaby przed przelozeniem i blokowala ShieldWall na 10 s. (3) "Bez tarcz" = mniej niz 60% w rece -> Loose (synteza: "inaczej Loose"), z wyjatkiem konnicy
+wroga w 90 m (dodane: luzny szyk pod szarza; ta sama miara co PikesKeptAgainstHorse). (4) Zwarcie = miara S1/S2 (pieszy wrog w 25 m) z wyjsciem 40 m (synteza: "wrog
+dalej niz ~25 m"). (5) Tylko bitwa polowa (jak 141-143) - oblezenia, wypady, kryjowki poza (kryjowki i tak ponizej 30 ludzi). (6) Histereza: S4 trzyma ostrzal
+ShieldsUpHoldSeconds (8 s), do tego zmiana najwyzej raz na 10 s - zamiast osobnych 5 s z karty "138". (7) Szyki AI strony gracza (gdy gracz nie dowodzi albo oddal
+dowodzenie AI) objete jak wrog - to nie sa rozkazy gracza; liczone osobno w linii.
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - RBM: bez naszej decyzji cialo DecideArrangementOrderForFormation biegnie jak dotad (prefiks
+zwraca true); ShieldsUp: tylko widocznosc dwoch metod, odczyt S4 i jedno wolanie w Hit we wlasnym try (wyjatek 146 nie przerywa znacznika 140); Doctrine.FootGap -
+tylko widocznosc; nikt inny w Armoury nie wola SetArrangementOrder (grep). (b) kolizje - 140: postfiks UpdateFormationOrders pomija szyki ShieldWall / Square / Circle,
+bo tam kierunek tarczy daje gra albo prefiks RBM (OverrideUpdateFormationOrders: przy ChargeWithTarget i ShieldWall wola GetShieldDirectionOfUnit) - w naszym ShieldWall
+pierwszy szereg DefendDown, skraje Left / Right, reszta AttackEnd (ArrangementOrder:163-198); w Loose gra daje None, wiec tarcze oznaczonych unosi 140 - spojne. Licznik
+140 "zmiany szyku w oznaczonych szykach" obejmie teraz takze zmiany 146. RBM AdjustSpeedLimit (AdjustSpeedLimitPatch:66-79): w BehaviorCharge przy ShieldWall i
+UnderRangedAttackRatio gry ponizej 0.33 limit 0.5 - a tarcze w gorze zmniejszaja trafienia w cialo (ratio gry liczy tylko obrazenia), wiec nasz ShieldWall w szarzy
+bedzie sie wlokl; do tego ShieldWall ma w grze ograniczenie biegu 0.3 (Line 0.8, Loose 0.9 - ArrangementOrder ctor) - szyk tarcz idzie krokiem (ok. 1.6 m/s, mniej
+wiecej tempo 144), "ostatnie 25 m biegiem" ze 144 dziala dopiero po oddaniu szyku RBM (zwarcie + do 10 s). RBM Advance dobiera szerokosc do szyku (FormOrderCustom:
+Line /4.5, ShieldWall /7, Loose /2.75) - przebudowa przy kazdej naszej zmianie. Frontline RBM liczy ShieldWall +2 / Loose -1 w ocenie czlowieka - nasz szyk moze trwac
+do 10 s po zwarciu. 141 S2 (obronca pod ostrzalem idzie naprzod): idzie teraz w ShieldWall albo Loose - wolniej, ale zaslonieci. 128/144 limity marszu - niezalezne
+(wygrywa mniejszy). Doctrine S4 (lucznicy za piechote) - szyki strzelcow, decyzja RBM tylko dla piechoty - bez kolizji. AIInfluence (BattleOrderExecutor, zaciemniony -
+nie do zdekompilowania) tez wola SetArrangementOrder: jego zmiana liczy sie jako "poza ta metoda" i zamraza nasza decyzje na 10 s (RBM i tak nadpisywal ja co tick).
+(c) jedno zjawisko - ostrzal szyku = S4 ze 140, tarcza w rece = ShieldsUp.OffShield, konnica w 90 m = ShieldsUp.CavNear, zwarcie = Doctrine.FootGap / S1ContactGap,
+panika = przelacznik 139; stan czyszczony w Begin i End (BattleSense.Clean). (d) cudzy kod - RBM Utilities / OverrideBehaviorAdvance / OverrideBehaviorCharge /
+AdjustSpeedLimitPatch / OverrideUpdateFormationOrders, gra Formation.SetArrangementOrder, ArrangementOrder, FormationAI, Mission.TickAgentsAndTeamsImp - sprawdzone
+w dekompilacji 1.4.8. NIE da sie sprawdzic w C#: czy JIT wstawil metode RBM (licznik w linii) i jak szyk tarcz naprawde wyglada w ruchu.
+Wydajnosc: pass co 0.5 s po szykach (odleglosc do szykow wroga), spis ludzi tylko w szykach pod ostrzalem przed zwarciem; latka - jeden lock i kilka porownan na
+decyzje RBM (co 0.5 s na szyk).
+Sprawdzic w logu po wgraniu: linia "Szyk pod ostrzalem (146)" w kazdej bitwie polowej, latka TAK, RBM AI TAK / TAK, wywolan latki > 0 (przy sytuacjach RBM > 0 - inaczej
+UWAGA o JIT), "potkniecia szyk 0" (takze w NB2), nasze zmiany > 0 w bitwach z lucznikami, trafienia w cialo w naszym ShieldWall wyraznie mniejsze wzgledem tarczy niz
+w szyku bez naszej zmiany, zmiany szyku RBM w tej metodzie i "wstrzymane do 10 s" bez lawiny (migotanie), "przywrocone poza decyzja RBM" male. Porownanie z kluczem NIE:
+segment "na sucho" i czas bitwy. W grze (Jeff): wrogi szyk pod strzalami zwiera tarcze (albo rozluznia sie, gdy tarcz malo) i idzie dalej; po zwarciu walczy jak dotad.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 76002c711a6c76b2379a788f09187155).
+
 ## 2026-10-25 145 (galaz noc/139-ai-zycie, po 144 6ac81cbe) - AI walczy o zycie, krok 7: ranny walczy ostroznie (karta syntezy "140 Ranny walczy ostroznie", WoundedWary.cs, klucz WoundedFightWarily)
 **Problem:** Jeff 25.10 ok. 13:25: "zasada AI robi wszystko aby nie dac sie zabic!"; ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy
 zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze jego mozliwosci i skilli aby przetrwac, walczy o zycie! ... dopiero ta zasada peka gdy jest panika".

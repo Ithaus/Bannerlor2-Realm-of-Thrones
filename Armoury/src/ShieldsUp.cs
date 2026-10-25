@@ -166,6 +166,18 @@ namespace Armoury
 
         // ------------------------------------------------------------ odczyt dla innych (dowolny watek)
 
+        /// <summary>146: klucz TAK w tej bitwie (sygnal S4 liczony) - CloseRanks.Begin po ShieldsUp.Begin.</summary>
+        internal static bool On { get { return _on; } }
+
+        /// <summary>146: szyk pod ostrzalem wedlug S4 (co najmniej ShieldsUpFormationShots pociskow w 5 s, do ostatniego + trzymanie) - tylko glowny watek
+        /// (slownik szykow), po ShieldsUp.Tick tej klatki.</summary>
+        internal static bool FormFire(Formation f)
+        {
+            if (!_on || f == null) return false;
+            FState st;
+            return Forms.TryGetValue(f, out st) && st.Until > _now;
+        }
+
         /// <summary>Czlowiek ma znacznik ostrzalu w tej bitwie teraz (HitScribe, histogram) - tylko odczyt tablic.</summary>
         internal static bool IsMarked(Agent a)
         {
@@ -596,6 +608,7 @@ namespace Armoury
                 _hits++;
                 if (ev.F == 1) _hitShield++; else if (ev.F == 2) _hitBack++; else _hitBody++;
                 Histogram(v, ev.F == 1);
+                CloseRanks.OnHit(v, ev.F);   // 146: trafienia wedlug szyku pod ostrzalem (nasz ShieldWall / Loose / bez zmiany)
                 if (!act || !v.IsActive()) return;
                 TryMark(v, _now + _hold);   // S1
                 FEvent(v.Formation, ev.I);
@@ -805,7 +818,7 @@ namespace Armoury
             return (d.WeaponFlags & WeaponFlags.NotUsableWithOneHand) != 0 ? KTwo : KOne;
         }
 
-        private static bool OffShield(Agent a)
+        internal static bool OffShield(Agent a)   // 146: ta sama miara "tarcza w rece" dla szyku (CloseRanks)
         {
             var oi = a.GetOffhandWieldedItemIndex();
             if (oi < EquipmentIndex.WeaponItemBeginSlot || oi >= EquipmentIndex.NumAllWeaponSlots) return false;
@@ -862,7 +875,7 @@ namespace Armoury
         }
 
         /// <summary>K11: szyk konny wroga blizej niz 90 m od szyku (po szykach wroga z IsCavalryFormation, nie ClosestSignificantlyLargeEnemyFormation).</summary>
-        private static bool CavNear(Mission m, Formation f)
+        internal static bool CavNear(Mission m, Formation f)   // 146: bez Loose przy konnicy wroga (CloseRanks) - ta sama miara
         {
             if (m == null || f == null || f.Team == null) return false;
             var my = f.CachedAveragePosition;

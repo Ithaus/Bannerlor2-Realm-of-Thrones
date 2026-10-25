@@ -284,7 +284,7 @@ namespace Armoury
         }
 
         /// <summary>Najblizszy PIESZY szyk wroga (piechota albo lucznicy, bez konnicy i konnych lucznikow) - mediana do mediany minus polowy glebokosci.</summary>
-        private static float FootGap(Team team, Formation f)
+        internal static float FootGap(Team team, Formation f)   // 146: ta sama miara zwarcia dla szyku pod ostrzalem (CloseRanks)
         {
             float best = float.MaxValue;
             var my = f.CachedMedianPosition.AsVec2;

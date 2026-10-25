@@ -613,6 +613,11 @@ namespace Armoury
         public int ShieldsUpFormationShots = 3;            // with AI Shields Up Under Fire: how many arrows, bolts or javelins landing on a formation within 5 seconds put the whole formation under fire (fewer = sooner); a man shot at himself takes his shield at once
         public bool ShieldsUpYourMenToo = true;            // with AI Shields Up Under Fire: your own soldiers follow the same rule (your orders to formations are never changed)
         public bool PikesKeptAgainstHorse = true;          // with AI Shields Up Under Fire: men with a pike or long spear keep it, and do not swap to the shield, while an enemy cavalry formation is within 90 m of theirs - with a shield on his arm a man cannot brace his pike, so its reach is all he has against a charge
+        // 146 (25.10, fala 'AI walczy o zycie', krok 8 = projekt 135b z design-weccrxf3h sekcja 5 i karta syntezy '138'): CloseRanks.cs - szyk AI piechoty pod
+        // ostrzalem (sygnal S4 ze 140) przed zwarciem: >= 60% ludzi z tarcza w rece -> ShieldWall, mniej -> Loose (nie przy konnicy wroga w 90 m); po zwarciu
+        // (pieszy wrog w 25 m) i bez ostrzalu decyduje RBM; zmiana najwyzej raz na 10 s; prefiks + postfiks na RBMAI.Utilities.DecideArrangementOrderForFormation
+        // (cialo RBM pominiete tylko, gdy decydujemy my); tylko bitwa polowa; szyki pod rozkazami gracza nietkniete. Linia 'Szyk pod ostrzalem (146)'
+        public bool AiFormationsUnderFire = true;          // with AI Shields Up Under Fire: an AI infantry formation that comes under arrows, bolts or javelins before it closes with the enemy changes its order to live through it - a shield wall when at least six in ten of its men hold a shield, open order when fewer do (but not with enemy horse within 90 m) - and leaves the choice to RBM again once it is in close combat or the shooting stops; the order changes at most once in 10 seconds. Field battles only; formations under your command are never touched. Needs RBM. Off = RBM picks the order alone, as before
 
         // --- Duels and tournaments ---
         // m111-walka faza 1 (24.10, Jeff: "jak atakuje caly czas, przeciwnik sie tylko broni; z drzewcem, ktorego sie dopiero ucze, bije duzo wyzsze

@@ -83,9 +83,12 @@ namespace Armoury
         internal const int SiteBreath = 17;
         // 145: ranny walczy ostroznie (WoundedWary przez VeteranAi.Postfix) - wlasne miejsce; nazwa jednym slowem (regex NB2)
         internal const int SiteWary = 18;
-        private const int Sites = 19;
+        // 146: szyk pod ostrzalem (CloseRanks - pass szykow i latka na decyzji szyku RBM); nazwa jednym slowem (regex NB2)
+        internal const int SiteRanks = 19;
+        private const int Sites = 20;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
-                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot", "oddech", "ostroznosc" };
+                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot", "oddech", "ostroznosc",
+                                                      "szyk" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -487,6 +490,14 @@ namespace Armoury
               .Append("; bez zmiany broni w ").Append(ShieldsUp.NoSwapNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m od wroga, tarcza w gore poza ")
               .Append(ShieldsUp.RaiseNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m; latki ")
               .Append(ShieldsUp.PatchedSetAi && ShieldsUp.PatchedUfo ? "wpiete" : "przy pierwszej bitwie z kluczem").Append(')');
+            // 146: szyk pod ostrzalem (linia 'Szyk pod ostrzalem (146)' po linii 140)
+            sb.Append(" | AI Formations Under Fire ").Append(c.AiFormationsUnderFire ? "TAK" : "NIE")
+              .Append(c.AiFormationsUnderFire && !c.AiShieldsUpUnderFire ? " (nieczynne: AI Shields Up Under Fire NIE - brak sygnalu S4)" : "")
+              .Append(" (szyk AI piechoty pod ostrzalem przed zwarciem, bitwa polowa: ShieldWall od ")
+              .Append((CloseRanks.WallFrom * 100f).ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append("% ludzi z tarcza w rece, mniej - Loose (nie przy konnicy wroga w ")
+              .Append(ShieldsUp.CavalryNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m); po zwarciu i bez ostrzalu decyduje RBM; zmiana najwyzej co ")
+              .Append(CloseRanks.MinGap.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" s; szyki pod rozkazami gracza nietkniete; latka ")
+              .Append(CloseRanks.Patched ? "wpieta" : "przy pierwszej bitwie z kluczem").Append(')');
             AiBreath.Session(sb, c);   // 144: AI oszczedza sily, marsz krokiem, zadyszke widac / slychac
             // 145: ranny walczy ostroznie (VeteranAi.Postfix -> WoundedWary; linia 'ranni ostrozni (145)' po bitwie)
             sb.Append(" | Wounded Fight Warily ").Append(c.WoundedFightWarily ? "TAK" : "NIE").Append(" (ranny ponizej ").Append(c.WoundedBelowPercent)

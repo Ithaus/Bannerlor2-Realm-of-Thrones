@@ -1604,6 +1604,10 @@ namespace Armoury
         [SettingPropertyGroup("Shields under fire")]
         public bool PikesKeptAgainstHorse { get; set; } = true;
 
+        [SettingPropertyBool("Ai Formations Under Fire", HintText = "with AI Shields Up Under Fire: an AI infantry formation that comes under arrows, bolts or javelins before it closes with the enemy changes its order to live through it - a shield wall when at least six in ten of its men hold a shield, open order when fewer do (but not with enemy horse within 90 m) - and leaves the choice to RBM again once it is in close combat or the shooting stops; the order changes at most once in 10 seconds. Field battles only; formations under your command are never touched. Needs RBM. Off = RBM picks the order alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool AiFormationsUnderFire { get; set; } = true;
+
         [SettingPropertyBool("Duel Ai Enabled", HintText = "in tournaments, the arena and duels a skilled opponent fights like one: he attacks on his own, ripostes after a parry, feints and kicks, and does not stand behind his guard waiting for you - from about skill 100 up (on Realistic; a lower difficulty raises this, later tournament rounds lower it), the higher his skill the bolder he is; below that he fights as RBM sets him. A knight handed an unfamiliar weapon in the lists still fights with most of his best skill, and later rounds of a tournament field harder opponents. Needs RBM with posture; field battles are not touched. Off = plain RBM in duels, as before", RequireRestart = false)]
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelAiEnabled { get; set; } = true;
@@ -10456,6 +10460,7 @@ namespace Armoury
             s.ShieldsUpFormationShots = ShieldsUpFormationShots;
             s.ShieldsUpYourMenToo = ShieldsUpYourMenToo;
             s.PikesKeptAgainstHorse = PikesKeptAgainstHorse;
+            s.AiFormationsUnderFire = AiFormationsUnderFire;
             s.DuelAiEnabled = DuelAiEnabled;
             s.DuelAiBestSkillShare = DuelAiBestSkillShare;
             s.DuelAiTourneyRoundStep = DuelAiTourneyRoundStep;

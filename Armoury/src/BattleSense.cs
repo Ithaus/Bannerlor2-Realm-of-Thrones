@@ -28,6 +28,7 @@ namespace Armoury
     /// pod lockiem). Rejestracja takze przy kluczach nocy (NightKeys).
     /// 140 (25.10): tarcza pod ostrzalem (ShieldsUp) - Begin w AfterStart (latki raz na proces przy pierwszej bitwie z kluczem, K9), Tick w bloku Night
     /// (po BattleSound), strzal i trafienie pociskiem tylko do kolejki ShieldsUp (osobny try od dzwieku), End w Clean (linia "Bitwa (140 tarcze)").
+    /// 146 (25.10): szyk pod ostrzalem (CloseRanks) - Begin po ShieldsUp.Begin, Tick po ShieldsUp.Tick, End po ShieldsUp.End (linia "Szyk pod ostrzalem (146)").
     /// </summary>
     internal sealed class BattleSense : MissionBehavior
     {
@@ -190,6 +191,8 @@ namespace Armoury
             try { if (night) BattleSound.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Begin", e); }
             // 140: tarcza pod ostrzalem - stan bitwy od zera, latki raz na proces (K9), kolejnosc po RBM (po przepieciu latek RBM w EarlyStart)
             try { if (night) ShieldsUp.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.Begin", e); }
+            // 146: szyk pod ostrzalem - PO ShieldsUp.Begin (sygnal S4), latka raz na proces przy pierwszej bitwie z kluczem
+            try { if (night) CloseRanks.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.Begin", e); }
             base.AfterStart();
         }
 
@@ -204,6 +207,7 @@ namespace Armoury
                 try { Doctrine.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Tick", e); }
                 try { BattleSound.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Tick", e); }
                 try { ShieldsUp.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.Tick", e); }   // 140
+                try { CloseRanks.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.Tick", e); }   // 146 - po S4 tej klatki
             }
             try { BloodPools.Tick(Mission, dt); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Tick", e); }
@@ -346,6 +350,8 @@ namespace Armoury
             try { BattleSound.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.End", e); }
             // 140: linia "Bitwa (140 tarcze)" raz na bitwe, flagi postfiksow zgaszone (End bezpieczne wielokrotnie i poza bitwa)
             try { ShieldsUp.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.End", e); }
+            // 146: linia "Szyk pod ostrzalem (146)" raz na bitwe, po linii 140 (End bezpieczne wielokrotnie i poza bitwa)
+            try { CloseRanks.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.End", e); }
             // m111-walka: linia "Pojedynek (DU)" raz na misje pojedynku
             if (_duel && !_duelDone && InDuel(Mission))
             {
