@@ -415,7 +415,9 @@ namespace Armoury
         // czlowiek walczy tym jak dotad, ale po bitwie DTE nie dopisuje tych sztuk do zbrojowni lorda (dotad mennica - a z niej lup gracza)
         private static readonly HashSet<object> _lordAssign = new HashSet<object>();
         private static FieldInfo _fAssigns, _fEq;
-        private static MethodInfo _markTemp, _getRef, _setEq, _isTemp;
+        private static MethodInfo _getRef, _setEq;
+        // noc 25.10 P3 (choragwie): oznaczanie i odczyt slotow tymczasowych DTE takze dla BannerKit (bron zastepcza chorazego) - tylko odczyt referencji, bez zmiany dzialania
+        internal static MethodInfo _markTemp, _isTemp;
         private static int _stumbles, _guardLog;
         private static bool _tempErr;
         // K1 (Jeff 09.10, P2: "reszta walczy bez uzbrojenia po prostu"): GarrisonFightsWithArmoryOnly - rozdzielacz zalogi bez progu, bez
@@ -994,6 +996,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { HomeStumble("RegisterPostfix", e); }
+            try { BannerKit.OnRegistered(__0, __1); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBanner, "BannerKit.OnRegistered", e); }   // noc 25.10 P3: przydzial agenta i posilki ze sztandarem (zwrot sprzetu chorazego)
         }
 
         /// <summary>K1 (przeglad): DTE przy spawnie czlowieka partii innej niz gracza wola Assignment.FillEmptySlots - kazdy pusty slot dostaje

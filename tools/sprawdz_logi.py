@@ -61207,6 +61207,8 @@ def main(argv):
         return m113walka_main(logp)   # m113walka (24.10, w-toku/m113-walka2): linie 'Bitwa (m113-walka2)' - tabela, linia na bitwe, potkniecia 0, haki, udzial zrywow
     if group == "m113pobor":
         return m113pobor_main(logp)   # m113pobor (24.10, w-toku/m113-rekrutacja): pobor gracza z wiosek pobocznych - pule, zaplata rodzinom, sonda, zapis arm_sidelevy
+    if group == "choragwie":
+        return choragwie_main(logp)   # noc 25.10 P3 (noc/p3-choragwie): kompanie, sztandary polowe, zwrot sprzetu chorazego (A: odlozone == oddane), potkniecia 0
     if group == "m110anim":
         return m110anim_main(logp)   # m110anim (23.10, n35 m110-animacje + m110-modele): indeksy akcji po wpieciu latki HP sprzetu (postac w ekwipunku, obrazek rekawic) i modele przedmiotow
     if group == "m110hp":
@@ -68082,6 +68084,98 @@ def m113pobor_main(logp):
             "linii z przyrostem wsi %d (najwieksze g %s), zlych %d%s, z zapasem %d, 'nie policzyl wsi' %d" % (odn, "-" if odn_max is None else "%.3f" % odn_max, len(odn_bad),
             (" (" + odn_bad[0] + ")") if odn_bad else "", odn_fb, odn_err),
             "zlych 0 i 'nie policzyl' 0 (sam zapas albo brak linii - INFO)", None if odn == 0 and odn_err == 0 else (not odn_bad and odn_err == 0))
+    rep.show()
+    return 0
+
+
+def choragwie_main(logp):
+    """noc 25.10 P3 (choragwie): CH-0..CH-5 na logu Armoury-*.log.
+    CH-0 linia 'Latki nocy (K3): kampania | choragwie:' - liczba chorazych TAK, zwrot DTE TAK, A czynne TAK.
+    CH-1 linie 'Choragwie (CH) start' (bitwy polowe): potkniecia 0, bledy SetFormationBanner 0, A czynne TAK (brak bitwy polowej - INFO).
+    CH-2 przy 'kompanie TAK': kompanii > 0 i najwyzej 6 na formacje.
+    CH-3 linie 'Choragwie (CH) ekonomia' (koniec misji): odlozone == oddane, nierozliczeni zywi 0, znak przyjety == zastepcze tymczasowe, potkniecia 0.
+    CH-4 linie 'Choragwie (CH) koniec': potkniecia 0 (zalamania wedlug tieru - INFO).
+    CH-5 linie 'Bitwa (NB2)': potkniecia 'choragiew 0'."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("CH-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    k3, starts, ends, ecos, nb2 = [], [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Latki nocy (K3): kampania" in line:
+                k3.append(line.strip())
+            elif "Choragwie (CH) start:" in line:
+                starts.append(line.strip())
+            elif "Choragwie (CH) koniec:" in line:
+                ends.append(line.strip())
+            elif "Choragwie (CH) ekonomia:" in line:
+                ecos.append(line.strip())
+            elif "Bitwa (NB2): misja" in line:
+                nb2.append(line.strip())
+    ok0 = bool(k3) and all(("liczba chorazych TAK" in l and "zwrot DTE TAK" in l and "A czynne TAK" in l) for l in k3)
+    rep.add("CH-0: latki kampanii choragwi (liczba chorazych, zwrot DTE, A czynne)", "linii %d%s" % (len(k3), (" (" + k3[-1][-220:] + ")") if k3 else ""),
+            "TAK w kazdej linii", ok0)
+    bad1 = []
+    for l in starts:
+        m1 = re.search(r"\| potkniecia (\d+)\.$", l)
+        m2 = re.search(r"bledy SetFormationBanner (\d+)", l)
+        if not m1 or int(m1.group(1)) != 0 or not m2 or int(m2.group(1)) != 0 or "A czynne TAK" not in l:
+            bad1.append(l[:220])
+    rep.add("CH-1: 'Choragwie (CH) start' - potkniecia 0, bledy SetFormationBanner 0, A czynne TAK", "linii %d, zlych %d%s" % (len(starts), len(bad1),
+            (" (" + bad1[0] + ")") if bad1 else ""), "zlych 0 (brak bitwy polowej - INFO)", None if not starts else not bad1)
+    bad2, info2 = [], []
+    for l in starts:
+        if "klucze: kompanie TAK" not in l:
+            continue
+        m = re.search(r"formacji (\d+), kompanii (\d+) \(srednio ([0-9.\-]+) ludzi, (\d+)-(\d+)\)", l)
+        if not m:
+            bad2.append("brak licznikow: " + l[:160]); continue
+        fo, co = int(m.group(1)), int(m.group(2))
+        info2.append("%d/%d sr %s" % (co, fo, m.group(3)))
+        if co <= 0 or co > 6 * max(fo, 1):
+            bad2.append(m.group(0))
+    rep.add("CH-2: kompanie - wiecej niz 0, najwyzej 6 na formacje", "linii %d, zlych %d%s%s" % (len(info2) + len(bad2), len(bad2),
+            (" (" + bad2[0] + ")") if bad2 else "", (" | " + ", ".join(info2[:6])) if info2 else ""), "zlych 0 (klucz NIE albo brak bitwy - INFO)",
+            None if not info2 and not bad2 else not bad2)
+    bad3, tot = [], [0, 0, 0, 0]
+    for l in ecos:
+        if "(koniec misji)" not in l:
+            continue
+        m = re.search(r"odlozone do taborow (\d+) szt\., oddane przez DTE (\d+) szt\. \((zgodne|NIEZGODNE); nierozliczeni przez DTE: zywi (\d+) z (\d+) szt\.", l)
+        t = re.search(r"zastepcze tymczasowe (-?\d+) z (\d+) \(znak przyjety (-?\d+), potwierdzone przy rozliczeniu (\d+)", l)
+        st = re.search(r"\| potkniecia (\d+)\.$", l)
+        if not m or not t or not st:
+            bad3.append("format: " + l[:160]); continue
+        x, y, alive = int(m.group(1)), int(m.group(2)), int(m.group(4))
+        tt, ok_, conf = int(t.group(1)), int(t.group(3)), int(t.group(4))
+        tot[0] += x; tot[1] += y; tot[2] += tt; tot[3] += conf
+        if x != y or alive != 0 or ok_ != tt or conf > tt or int(st.group(1)) != 0:
+            bad3.append(l[:240])
+    rep.add("CH-3: ekonomia chorazych - odlozone == oddane, zywi rozliczeni, znak tymczasowy przyjety, potkniecia 0",
+            "linii %d (odlozone %d, oddane %d, zastepcze tymczasowe %d, potwierdzone %d), zlych %d%s" % (len(ecos), tot[0], tot[1], tot[2], tot[3], len(bad3),
+            (" (" + bad3[0] + ")") if bad3 else ""), "zlych 0 (brak chorazych - INFO)", None if not ecos else not bad3)
+    bad4, tiers = [], {}
+    for l in ends:
+        st = re.search(r"\| potkniecia (\d+)\.$", l)
+        if not st or int(st.group(1)) != 0:
+            bad4.append(l[:200])
+        for tm in re.finditer(r"T(\d) (\d+)/(\d+)", l):
+            a = tiers.setdefault(tm.group(1), [0, 0]); a[0] += int(tm.group(2)); a[1] += int(tm.group(3))
+    tinfo = ", ".join("T%s %d/%d" % (k, v[0], v[1]) for k, v in sorted(tiers.items()) if v[1] > 0)
+    rep.add("CH-4: 'Choragwie (CH) koniec' - potkniecia 0 (zalamania/rzuty wedlug tieru - INFO)", "linii %d, zlych %d%s | %s" % (len(ends), len(bad4),
+            (" (" + bad4[0] + ")") if bad4 else "", tinfo or "bez rzutow"), "zlych 0 (brak bitwy - INFO)", None if not ends else not bad4)
+    bad5, n5 = [], 0
+    for l in nb2:
+        m = re.search(r"choragiew (\d+)", l)
+        if not m:
+            continue
+        n5 += 1
+        if int(m.group(1)) != 0:
+            bad5.append(m.group(0))
+    rep.add("CH-5: 'Bitwa (NB2)' - potkniecia choragiew 0", "linii z miejscem choragiew %d, zlych %d%s" % (n5, len(bad5), (" (" + bad5[0] + ")") if bad5 else ""),
+            "zlych 0 (brak linii - INFO)", None if n5 == 0 else not bad5)
     rep.show()
     return 0
 
