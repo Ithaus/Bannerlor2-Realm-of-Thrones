@@ -1,5 +1,92 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 136 (galaz noc/136-konie od noc/127-bitwa-cialo) - stamina koni: galop meczy konia, step i klus daja odsapnac; zalezna od cech konia, obciazenia i jezdzca, gracz i AI tak samo
+**Problem:** Jeff 25.10 ok. 12:48: "i konie tez powinny miec stamine, ze nie moge ciagle biegac po polu walki, stamina powinna byc zalezna od cech konia"; wczesniej "ogolna zasada"
+(gracz i AI tak samo), "sprawdz jakie sa realne mozliwosci ... trzeba wyjsc od sredniej"; ok. 13:30 "przeciwnik zachowuje sie jak prawdziwy zywy czlowiek ... walczy o zycie".
+Dowod (rozpoznanie 25.10, skan 135 DLL modulow): gra ani zaden mod nie meczy koni - stamina RBM tylko ludzie (RBMAI StanceLogic.cs:39 IsHuman), FieldCraft celowo nie meczy
+konia (FieldCraft.cs:612-615); konnica AI w cyklu RBMBehaviorCavalryCharge krazy pelnym galopem bez przerwy (przejazd 110 m, nawrot, znow szarza).
+**Przyczyna:** Brak mechanizmu. MountSpeed konia liczy SandboxAgentStatCalculateModel.UpdateHorseStats + postfiks RBM (env x 0.22 x (1 + Speed + 1) x Riding, sufit 10 / 8 zmiekczony
+masa) przy budowie agenta; potem tylko BannerBearerLogic (chorazowie) i natywny callback - nikt go nie obniza za wysilek.
+**Zmiana:** (1) Nowy HorseWind.cs (MissionBehavior; tylko bitwa gracza na mapie - rodzaj bitwa / kryjowka, nie turniej, arena, morze; rejestracja w SubModuleMain za FieldCraft):
+pula S 0..100 na agencie KONIA (Dictionary<Agent, Horse>, czyszczona przy usunieciu agenta i na koniec misji; przesiadka na swiezego konia = pelna stamina). Co 0.25 s na konia
+z jezdzcem: v = droga pozioma / dt, u = v / Vbase (Vbase = MountSpeed z modelu bez naszej kary, NIGDY GetMaximumForwardUnlimitedSpeed - petla; probki v > 1.5 Vbase odrzucone),
+D(u) = 0.15 + 0.60u + 0.70u^2, r = (75 + zbroja + bron jezdzca + uprzaz_norm) / waga konia (uprzaz ponad 40 kg x HorseHarnessHeavyScale 0.2 - wagi uprzezy ROT ok. 5 razy
+za duze), f = (1+r)/1.2 x (1 + 1.5 x max(0, r-0.25)); W' = 44 x clamp(Speed/50, 0.85, 1.35), CP 0.75 (+0.05 rodziny wytrzymale: id albo kultura przedmiotu aserai, khuzait,
+eastern, sand, dothraki, steppe, wielblad; -0.05 kon od 500 kg), tau = HorseRecoverySeconds x sqrt(waga/450); jezdziec: drenaz x (1.15 - 0.30 x min(Riding,300)/300).
+D x f ponad CP drenuje (100 x (D x f - CP) / W' x dt x HorseGallopDrainScale), ponizej CP odpoczynek ((100 - S)/tau x g); luzak tylko odpoczywa. Ponizej S 30 predkosc
+m = HorseTiredFloor 0.55 + 0.45 x S/30. Przecietny kon (r 20%) pelnym galopem ok. 60 s, kon rycerza z bardem (r 35%) ok. 40 s, canter minuty, klus i step - odpoczynek
+(rozpoznanie "fizjologia" sekcja 7).
+(2) Kara przez AgentDrivenProperties.MountSpeed (ta sama droga, ktora gra zmienia predkosc konia w bitwie - BannerBearerLogic; kon jest zawsze agentem AI, takze pod graczem):
+postfiks SandboxAgentStatCalculateModel.UpdateAgentStats (AccessTools.DeclaredMethod, Priority.Last, raz na proces w pierwszej bitwie; biegnie po UpdateHorseStats i postfiksie
+RBM) - dla liczonego konia swieza Vbase i MountSpeed = Vbase x m (idempotentnie; przetrwa przeliczenia gry); tylko glowny watek (MBCallback isMultiThreadCallable = false;
+obcy watek liczony i pomijany), bez alokacji i logu. Tick: przy zmianie m o >= 0.03 (albo powrocie do 1) adp.MountSpeed = Vbase x m + UpdateCustomDrivenProperties,
+najwyzej 16 zapisow na takt (reszta w nastepnym od miejsca przerwania - bez glodzenia). Zadnego SetMaximumSpeedLimit na koniu. RBM AdjustSpeedLimitPatch sam przenosi nizszy
+MountSpeed na limit konnicy AI.
+(3) Wykluczenia (m = 1): smoki (takze dragonfly i forma latajaca), rydwany, slonie i mamuty, konie umarlych (wight_horse, kultura wights / walkers) i jezdziec umarly
+(Undead.Character); wielblady i muly liczone.
+(4) Gracz (Log.Player, kolor jak FieldCraft): "Your horse is tiring - ease it to a trot to let it breathe." (S ponizej 30, raz od odpoczynku), "Your horse is blown - it can only
+canter until it gets its wind back." (S = 0), "Your horse has its wind back." (powrot ponad 60) - kazdy najwyzej co 10 s.
+(5) MarchToContact.RestCav: szyk konnicy AI (KCav; nie konni lucznicy, nie szyk gracza, nie smok; rozkaz szarzy albo marszu) ze srednia S koni (HorseWind.AvgStamina - liczona
+w takcie HorseWind, tablice bez alokacji) ponizej HorseAiRestBelow 35 i wrogiem dalej niz 70 m idzie klusem (MarchCap konnicy: CavalryApproachPace x pelna), az srednia
+>= HorseAiRestUntil 65 albo wrog blizej niz 60 m (wtedy szarza jak dotad; 10 m histerezy odleglosci - bez migania klus / galop). Jak szarza marszem 128: powrot przed
+ksiegowaniem przejsc szarzy, ChargeHeld = true w odpoczynku (okrzyk i rog, gdy rusza galopem). Logika 127 i 128 bez zmian.
+(6) Klucze MCM (nowa grupa "Horse wind" za "Flesh and wind"): HorseStaminaEnabled TAK, HorseGallopDrainScale 1 (0.25..3), HorseRecoverySeconds 120 (30..600), HorseTiredFloor
+0.55 (0.4..0.9), HorseHarnessHeavyScale 0.2 (0.1..1), HorseAiRestBelow 35 (0..80, 0 = nigdy), HorseAiRestUntil 65 (20..100); RANGES i LABELS ("Horse AI Rest ...") w
+tools/gen_mcm.py, McmSettings.cs wygenerowany (RealisticCaptivity i GrandTourney bez zmian). Nowe klucze - Armoury.json Jeffa ich nie ma, wchodza domyslne z kodu.
+(7) Linie: start (raz na proces, pierwsza bitwa) "Konie (136): latka UpdateAgentStats wpieta TAK/NIE (postfiksy na celu: ...) | postfiks RBM na UpdateHorseStats (com.rbmcombat)
+TAK/NIE | czynny model statystyk: ..."; koniec bitwy "Konie (136): koni z jezdzcem N (wykluczonych M: smoki, rydwany, slonie i mamuty, umarli, inne) | stamina koni TAK/NIE |
+zajechanych do 0: strona gracza A, wrog B | sr. S na koniec | sr. obciazenie r (uprzaz przeliczona xK E razy), pelny galop do zera sr. | zapisow MountSpeed F, przeliczen modelu
+G (postfiks; z kara, obcy watek, bledy), odrzuconych probek | odpoczynkow konnicy AI H | gracz: kon id, waga, r, Vbase, pelny galop do zera, S na koniec, najwieksza zmierzona
+v, przy m<1: v/Vbase (przy m) i v/(Vbase x m), silnik GetMaximumForwardUnlimitedSpeed przy m=1 i przy najnizszym m | potkniecia".
+(8) FieldCraft: poprawiony komentarz klawisza chodu (gra na PC ma ToggleWalkMode = CapsLock - CombatHotKeyCategory.cs:161, MissionMainAgentController.cs:811) - bez zmiany zachowania.
+**Ryzyko / co sprawdzic:** (1) T1 - czy obnizony MountSpeed naprawde spowalnia konia GRACZA: tylko gra Jeffa (autotest steruje bohaterem przez AI). W linii "gracz: ... przy m<1:
+v/(Vbase x m)" ok. 1 = dziala; wyraznie ponad 1 (kon gracza dalej gna z Vbase) = silnik nie slucha MountSpeed konia gracza - wtedy osobna zmiana (np. limit konia gracza).
+Dowod posredni: gra sama zmienia MountSpeed w bitwie (BannerBearerLogic.cs:142-153), kon zawsze AI (Agent.cs:5172). Przy okazji: czy GetMaximumForwardUnlimitedSpeed idzie
+za MountSpeed (wpis w linii) i czy komunikaty przychodza we wlasciwych chwilach. (2) Jednostki: Vbase = MountSpeed traktowany jak m/s - przy m=1 "najwieksza zmierzona v"
+gracza powinna wyjsc ok. 0.9-1.1 Vbase; jesli wyraznie inaczej, u jest przesuniete i kalibracja do poprawki. (3) AI konnica i RBM: nizszy MountSpeed = nizszy limit RBM
+(AdjustSpeedLimitPatch), slabsza szarza (RBM i ChargeTemper liniowo w predkosci), ponizej 5 m/s czestsze stawanie deba (dno 0.55 x ok. 12 = ok. 6.6 m/s); RBMBehaviorCavalryCharge
+liczy progi z MovementSpeedMaximum - wolniejsza konnica zmienia wagi zachowan. Odpoczynek AI tylko z MarchToContactEnabled w bitwie polowej (MarchToContact.Field); konni lucznicy
+nie odpoczywaja (galopuja do zera i jada dalej canterem). Odpoczynek wedlug odleglosci szykow (mediany) - rozproszona po szarzy konnica moze miec pojedynczych jezdzcow w walce
+przy medianie ponad 70 m. (4) Wydajnosc: petla po Mission.Agents co 0.25 s (pole RiderAgent i slownik), Setup i obciazenie raz na pare kon-jezdziec, najwyzej 16 zapisow natywnych
+na takt; postfiks przy kazdym UpdateAgentStats (RBM co 3 s na czlowieka) - pole statyczne, watek i slownik. Do obejrzenia FPS w duzej bitwie. (5) Kolizje sprawdzone w kodzie:
+FieldCraft (tylko ludzie, limit jezdzca - nie konia; ten sam takt, inny obiekt), MarchToContact.PostSpeed (limit z desiredSpeed / GetMaximumForwardUnlimitedSpeed przy capie marszu -
+nieszkodliwe, jesli silnik trzyma sufit MountSpeed, inaczej osobna zmiana), CampWalk / CampScene (konie uwiazane bez jezdzca i bez flagi Mountable - nie trafiaja do slownika,
+zadnego -1 na limicie), BK BKAgentStatsTweakPatches (postfiks na tym samym celu, dla konia wychodzi - Character null), RBM UnpatchAll zdejmuje tylko wlasne id, DragonFeed / MountLaw
+(wykluczenia), HorseFate (bez zmian). Zadna inna nasza latka nie celuje w UpdateAgentStats (grep). (6) Kalibracja (W' 44, CP 0.75, tau 120 s, D(u)) z malych prob (Prince 2002:
+5+5 koni) - mnozniki w MCM; stan tylko na misje (bez zmeczenia przewleklego miedzy bitwami). (7) Linia misji osobna (nie w NB2) - tools/sprawdz_logi.py jej jeszcze nie zna.
+**Recenzja (7 uwag, 25.10 ok. 14:15; kazda sprawdzona w kodzie - wszystkie prawdziwe, 1=5, 2=6 i 4=7 to te same bledy):**
+(1)+(5) PRAWDA [wrong-behaviour] - odpoczynek konnicy AI tempem podejscia (MarchCap KCav: CavalryApproachPace 0.45 x pelna, limit konia x1.1 = u ok. 0.5) przy typowym
+obciazeniu ROT nie dawal odpoczynku: vlandia_horse 425 kg + rot_horse_saddle2 100 kg (liczone 52) + zbroja 19.6 + bron 10 -> r 0.37, f 1.34, D(0.45..0.50) x f = 0.75..0.83
+>= CP 0.75 (kon dalej tracil); t2_vlandia 475 kg g 0.10 (35 -> 65 ok. 12 min), t3 550 kg z bardem (CP 0.70) g 0 - srednia szyku nie wracala do 65, szyk klusowal az do 60 m
+od wroga z wstrzymanym sygnalem szarzy. Poprawka: wlasne tempo odpoczynku z modelu - HorseWind.RestPace: dla kazdego konia u_odp, przy ktorym D(u) x f = 0.23 + 0.5 x (CP - 0.23)
+(g = 0.5), u 0.12..0.35 (step - lekki klus); HorseWind.RestSpeed(szyk) = srednia u_odp x Vbase koni szyku (Vbase bez kary - zmeczenie go nie obniza); MarchToContact.RestCap:
+cap = RestSpeed / 1.1 (margines linii latki AdjustSpeedLimit), 1.5..9 m/s. Wyniki 35 -> 65 (tau 120 s): vlandia 425 u 0.27 ok. 2.4 min, t2 475 u 0.30 ok. 2.5 min, t3 550 z bardem
+u 0.31 ok. 2.7 min, khuzait 320 z 40 kg zbroi u 0.16 (step) ok. 2.1 min, lekki kon u 0.35 ok. 2.2 min. Galaz odpoczynku jest teraz PRZED szarza marszem 128 (zmeczony szyk
+idzie tempem odpoczynku takze przy dalekiej szarzy; bez zmeczenia 128 bez zmian). Bezpiecznika czasowego nie dodalem: g = 0.5 z konstrukcji dla przecietnego konia szyku
+(step drenowalby dopiero przy f ponad ok. 3). Klus podejscia 127/128 (CavalryApproachPace 0.45) zostaje - dla obciazonego konia ROT to canter, ktory powoli meczy (osobna decyzja).
+Poprawione: komentarz HorseWind (klus = prawdziwy klus, u ok. 0.3, 3.5-4 m/s) i opisy MCM HorseGallopDrainScale, HorseAiRestBelow ("a walk or an easy trot - as slow as their
+load needs"); McmSettings.cs wygenerowany (tylko te 2 opisy).
+(2)+(6) PRAWDA [minor] - (a) ChargeHeld bral _rest z poprzedniego Eval, a BattleCries.Tick biegnie w klatce przed MarchToContact.Tick (BattleSense.cs:192-197; oba co 0.5 s
+w tej samej klatce): w klatce konca odpoczynku sygnal byl wstrzymany, Eval konczyl odpoczynek, galaz rest wracala przed _wasCharge = charge -> szarza liczona jako "bez sygnalu"
+z dystansem ok. 60 m, okrzyk i rog takt pozniej (marching juz false, wiec bez "z sygnalu"). Poprawka: RestState - jedna regula bez skutkow ubocznych; RestCav (Eval) i ChargeHeld
+(na zywo: biezacy gap i srednia; takze wejscie w odpoczynek - swieza szarza zmeczonej konnicy nie daje okrzyku, po ktorym szyk zwalnia) licza to samo w tej samej klatce, wiec
+sygnal przychodzi w klatce konca odpoczynku jak w 128; w galezi rest przy rozkazie innym niz szarza _wasCharge / _signal = false (jak na dole Eval). (b) Wejscie w odpoczynek
+liczylo sie jako "wejscie w marsz: konnica" i do "szykow w marszu" (Set, old <= 0) - Set(count = false) dla capu odpoczynku; marsz zaraz po odpoczynku liczy sie jako wejscie
+(flaga _capRest). (c) NoteAiRest liczyl odpoczynek takze szykom klusujacym przez 128 - po przeniesieniu galezi rest przed 128 kazde wejscie naprawde jedzie tempem odpoczynku.
+(3) PRAWDA [minor] - kon gracza czekal w kolejce 16 zapisow MountSpeed na takt (64/s); przy kilkuset koniach ponizej S 30 (zapis co ok. 1.2 s na konia) kara gracza przychodzila
+z opoznieniem kilku s i skokami (komunikat "blown" przed zwolnieniem). Poprawka: kon gracza (rider.IsMainAgent) zapisywany zawsze, poza limitem (najwyzej 1 wolanie natywne
+na takt wiecej); licznik "kon gracza poza limitem" w linii. Dla AI opoznienie zostaje: przy N koniach do zapisu - zapis co ok. N/64 s (ryzyko w duzej bitwie: kara AI skokami).
+(4)+(7) PRAWDA [minor] - dowod T1 byl maksimum ze wszystkich probek (do 1.5 Vbase, takze tuz po obnizce, gdy kon jeszcze hamuje) - jedna odstajaca probka (stok, scisk,
+odrzut) dawala "silnik nie slucha". Poprawka: czas ostatniej zmiany mnoznika w silniku (Horse.MAt - zapis w takcie albo postfiks); liczone tylko probki galopu
+(v/(Vbase x m) ponad 0.8) przy m stojacym od >= 1 s: przy m = 1 sr. v/Vbase (jednostki - dobre ok. 0.85-1.05) i liczba probek; przy m <= 0.85 liczba probek, sr. m,
+sr. v/Vbase, sr. v/(Vbase x m) i udzial probek blizej 1/m niz 1 (prog (1 + 1/m) / 2). Najwieksza v zostaje jako surowa. NOWE KRYTERIUM T1 (zastepuje Ryzyko (1)-(2) wyzej):
+silnik slucha MountSpeed konia gracza = sr. v/(Vbase x m) ok. 1 i "blizej 1/m" ponizej 20%; nie slucha = sr. ok. 1/m i "blizej 1/m" ponad 50%. Probki T1 zbiera sie glownie,
+gdy kon gracza jest zajechany i gracz dalej go goni (m stoi na dnie) - przy spadku S mnoznik zmienia sie co ok. 1.2 s.
+Nowe pola linii "Konie (136)": "(tempo odpoczynku AI sr. u X)", "zapisow MountSpeed F (kon gracza poza limitem P)", "galop przy m=1: sr. v/Vbase A (probek N; ...)",
+"T1 przy m<=0.85 (m stale >= 1 s, probki galopu): probek N, sr. m, sr. v/Vbase, sr. v/(Vbase x m), blizej 1/m niz 1: Z%".
+Co sprawdzic dodatkowo: autotest - "odpoczynkow konnicy AI" i "sr. S na koniec" (odpoczywajace szyki wracaja ponad 65 i ruszaja), w NB2 "szarza bez sygnalu" nie rosnie
+od odpoczynku; konnica AI w odpoczynku jedzie ok. 3-4 m/s (dotad 5-6 m/s) - pod ostrzalem dluzej w zasiegu lukow; regresja 128: bez zmeczenia (S ponad 35) sciezka bez zmian.
+**Status:** ZBUDOWANE - nie wgrane (Armoury.dll md5 599ee56f po recenzji, przed recenzja 52120077; galaz noc/136-konie; gra nie uruchamiana).
 ## 2026-10-25 133 (galaz noc/133-raport-armii od noc/132-zdjecia) - przeglad armii: braki sprzetu i dlaczego, ostatnia bitwa, konie, predkosc, stado, zold, komunikaty
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem, w tym logu tak szybko to leci ze ja nie wiem,
 jesli sprzet jest to komunikat czemu nie zalozy bo np. za maly skill, de facto przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold, jakie

@@ -531,6 +531,19 @@ namespace Armoury
         public float ChargeDamageFactor = 0.6f;            // multiplier on mounted charge damage
         public float ChargeFullSpeed = 7f;                 // full charge damage only at this speed (m/s) and above - slower rides pay proportionally less
 
+        // --- Horse wind ---
+        // 136 (25.10, Jeff: "konie tez powinny miec stamine, ze nie moge ciagle biegac po polu walki, stamina powinna byc zalezna od cech konia", "ogolna zasada"):
+        // HorseWind.cs - pula na koniu (agent wierzchowca), drenaz z predkosci wzgledem Vbase (MountSpeed z modelu bez kary), obciazenia (jezdziec 75 kg, zbroja,
+        // bron, uprzaz ponad 40 kg x HorseHarnessHeavyScale) i cech konia (szybkosc, waga, rodzina); kara przez MountSpeed (postfiks SandboxAgentStatCalculateModel.
+        // UpdateAgentStats + zapis w ticku); konnica AI odpoczywa klusem (MarchToContact). Zakresy w kodzie = RANGES w tools/gen_mcm.py. Linia 'Konie (136)'
+        public bool HorseStaminaEnabled = true;            // horses tire in battle like men do: a gallop spends a horse's wind and a blown horse slows down, while a walk or a trot gives the wind back. How long a horse lasts depends on the horse itself (speed, weight, breed), the load it carries (rider, armour, weapons, barding) and the rider's Riding skill - the same rule for you, your men and the enemy. Dragons, chariots, elephants, mammoths and the horses of the dead do not tire. Off = horses never tire, as before
+        public float HorseGallopDrainScale = 1f;           // how fast a gallop spends a horse's wind. At 1 an average horse with an average load (about a fifth of its own weight) gallops flat out for about a minute and a knight's horse in barding for about 40 seconds; a working canter lasts many minutes (fewer under a heavy load), a walk or an easy trot rests it. 2 = twice as fast, 0.5 = half as fast
+        public float HorseRecoverySeconds = 120f;          // how fast a horse gets its wind back: at a walk it regains about two thirds of what it lost in this many seconds (a 450 kg horse - heavier horses take a little longer); a trot rests it more slowly, a canter hardly at all
+        public float HorseTiredFloor = 0.55f;              // top speed of a blown horse as a share of its fresh top speed. Below 30% of its wind a horse slows down step by step, down to this (0.55 = little more than a working canter)
+        public float HorseHarnessHeavyScale = 0.2f;        // barding and saddles count in full up to 40 kg towards the load a horse carries; above that only this share of the extra weight counts (the barding weights in the game are about five times too heavy - 0.2 brings them back to real armour)
+        public int HorseAiRestBelow = 35;                  // AI cavalry (not horse archers) eases its horses to a walk or an easy trot - as slow as their load needs - when their wind falls below this on average, as long as no enemy is within 60 m, instead of riding them into the ground. Works with March To Contact. 0 = never
+        public int HorseAiRestUntil = 65;                  // AI cavalry resting its horses goes back to the gallop when their wind is back to this on average, or at once when the enemy comes within 60 m
+
         // --- The master's parry ---
         public bool AutoParryEnabled = true;               // hold block and your skill does the aiming: if your weapon skill beats the attacker's, the block turns to meet his blow
         public bool WoundedFleeEnabled = true;             // a man too hurt to fight turns and runs instead of standing there screaming
