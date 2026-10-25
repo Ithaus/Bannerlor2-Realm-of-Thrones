@@ -123,6 +123,10 @@ namespace Armoury
         private static int _plPcs, _plMen, _plMenGold, _plNotGold, _plShelf;
         // ekwipunki z bronia ponad umiejetnosc z ostatniej deski podlogi (DragonUnmount jej nie podmienia) - maska slotow 0-3
         private static readonly Dictionary<Equipment, int> _floorKept = new Dictionary<Equipment, int>(RefEq.I);
+        // 133c (K16): przydzial bez misji (pasek DTE, autorozstrzygniecie, okno armii) NIE pisze do _floorKept - te ekwipunki nigdy nie wychodza w pole, a pamiec
+        // czyscila dopiero nastepna misja (wyciek przy kazdym podgladzie). Podglad okna (KitPreview) zbiera swoje znaczniki ostatniej deski tu, na czas jednego
+        // przebiegu (ten sam watek - DoAssignAsync jest synchroniczny), i podaje je DragonUnmount.WouldStrip - ta sama decyzja co przy wystawieniu.
+        [ThreadStatic] private static Dictionary<Equipment, int> _pvKept;
 
         private sealed class RefEq : IEqualityComparer<Equipment>
         {
@@ -195,24 +199,31 @@ namespace Armoury
         /// <summary>Kultura sztuki wobec kultury zolnierza. Przy GearFitCulture: ta sama, bez kultury, ta sama strona morza, styl krewny albo wlasny wzorzec;
         /// przy wylaczonym - tylko regula strony morza z wyjatkiem wlasnego wzorca (jak RealmWard przed GearFit). Kon - MountLaw.Allowed; rzad i proporzec
         /// zawsze. Wolane takze z CrashScribe (Mends.RealmWard) przez refleksje - sygnatury nie zmieniac.</summary>
-        internal static bool CultureOk(CharacterObject troop, ItemObject it)
+        internal static bool CultureOk(CharacterObject troop, ItemObject it) { return CultureCode(troop, it) == CultureFine; }
+
+        // 133c: kod odmowy kultury - ta sama regula co CultureOk (CultureOk = kod 0), do przyczyny w oknie armii (KitPreview)
+        internal const int CultureFine = 0, CultureDoth = 1, CultureSea = 2, CultureMount = 3;
+
+        /// <summary>133c: CultureOk z powodem odmowy: 0 wolno, 1 bron Dothrakow tylko dla Dothrakow, 2 zza Waskiego Morza (nie krewny styl, nie wlasny wzorzec),
+        /// 3 wierzchowiec nie u swoich (MountLaw). Logika i licznik doby odmow Dothrakow bez zmian (wydzielone z CultureOk).</summary>
+        internal static int CultureCode(CharacterObject troop, ItemObject it)
         {
-            if (troop == null || it == null) return true;
+            if (troop == null || it == null) return CultureFine;
             try
             {
                 var t = it.ItemType;
-                if (t == ItemObject.ItemTypeEnum.Horse) return MountLaw.Allowed(troop, it);
-                if (t == ItemObject.ItemTypeEnum.HorseHarness || t == ItemObject.ItemTypeEnum.Banner) return true;
+                if (t == ItemObject.ItemTypeEnum.Horse) return MountLaw.Allowed(troop, it) ? CultureFine : CultureMount;
+                if (t == ItemObject.ItemTypeEnum.HorseHarness || t == ItemObject.ItemTypeEnum.Banner) return CultureFine;
                 string ic = it.Culture != null ? it.Culture.StringId : null;
                 string tc = troop.Culture != null ? troop.Culture.StringId : null;
-                if (string.IsNullOrEmpty(ic) || string.IsNullOrEmpty(tc) || ic == "neutral_culture" || ic == tc) return true;
+                if (string.IsNullOrEmpty(ic) || string.IsNullOrEmpty(tc) || ic == "neutral_culture" || ic == tc) return CultureFine;
                 // n20-drobne: bron Dothrakow tylko u Dothrakow - PRZED regula strony morza (Braavos, Lys, Ghis tez nie); wlasny wzorzec i bohaterowie bez zmian
-                if (IsDoth(ic) && DothBar(troop, it)) { if (!Quiet) Interlocked.Increment(ref _dDothDeny); return false; }
-                if (IsEssos(ic) == IsEssos(tc)) return true;   // w obrebie jednej strony morza domy dziela sie lupem (Jeff 16.09)
-                if (CultureOn && KinOk(tc, ic, it)) return true;   // f29-arakh: przy GearFitKinItemLevel - sztuka po sztuce (wylaczony = sama para, jak dotad)
-                return TemplateHas(troop, it);
+                if (IsDoth(ic) && DothBar(troop, it)) { if (!Quiet) Interlocked.Increment(ref _dDothDeny); return CultureDoth; }
+                if (IsEssos(ic) == IsEssos(tc)) return CultureFine;   // w obrebie jednej strony morza domy dziela sie lupem (Jeff 16.09)
+                if (CultureOn && KinOk(tc, ic, it)) return CultureFine;   // f29-arakh: przy GearFitKinItemLevel - sztuka po sztuce (wylaczony = sama para, jak dotad)
+                return TemplateHas(troop, it) ? CultureFine : CultureSea;
             }
-            catch (Exception e) { Stumble("CultureOk", e); return true; }
+            catch (Exception e) { Stumble("CultureOk", e); return CultureFine; }
         }
 
         /// <summary>Czy ktos z tych oddzialow moze nosic sztuke tej kultury (zakupy ludzi gracza dla kilku oddzialow naraz); pusta lista - true.</summary>
@@ -735,7 +746,12 @@ namespace Armoury
             _setEq.Invoke(a, new object[] { (EquipmentIndex)slot, pick.El });
             _consume.Invoke(dist, new object[] { pick.El });
             pick.Left--;
-            if (pass == 3) Keep(eq, slot);
+            if (pass == 3)
+            {
+                // 133c (K16): pamiec dla DragonUnmount tylko w misji; podglad okna - na czas swojego przebiegu (PreviewKept), pasek DTE i autorozstrzygniecie - wcale
+                if (count) Keep(eq, slot);
+                else if (_pvKept != null) { int m; _pvKept.TryGetValue(eq, out m); _pvKept[eq] = m | (1 << slot); }
+            }
             if (!count) return;
             if (DothBar(co, pick.El.Item)) DothrakiArms.NoteFloorLastResort();   // n20-drobne: bron Dothrakow tylko, gdy w polce nie bylo innej
             _mGot++;
@@ -832,6 +848,19 @@ namespace Armoury
             lock (_lock) { int m; kept = _floorKept.Count > 0 && _floorKept.TryGetValue(eq, out m) && (m & (1 << slot)) != 0; }
             if (kept) _dKept++;
             return kept;
+        }
+
+        /// <summary>133c (K16): poczatek przebiegu podgladu okna (KitPreview) - znaczniki ostatniej deski tego przebiegu (ten watek); zwraca slownik do odczytu.</summary>
+        internal static Dictionary<Equipment, int> PreviewKeptBegin() { var d = new Dictionary<Equipment, int>(RefEq.I); _pvKept = d; return d; }
+
+        /// <summary>133c (K16): koniec przebiegu podgladu - dalsze przydzialy bez misji znow bez pamieci.</summary>
+        internal static void PreviewKeptEnd() { _pvKept = null; }
+
+        /// <summary>133c: czy podloga dala w tym slocie bron ponad umiejetnosc swiadomie (ostatnia deska) - slownik z PreviewKeptBegin; jak FloorKept, bez licznika.</summary>
+        internal static bool PreviewKept(Dictionary<Equipment, int> d, Equipment eq, int slot)
+        {
+            int m;
+            return d != null && eq != null && slot >= 0 && slot <= 3 && d.TryGetValue(eq, out m) && (m & (1 << slot)) != 0;
         }
 
         /// <summary>133b (okno armii, "Last battle" - KitGaps.Close na koniec misji): liczniki podlogi broni biezacej misji dla druzyny gracza - te same co w FloorNote

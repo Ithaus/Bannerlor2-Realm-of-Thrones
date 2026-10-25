@@ -39,39 +39,86 @@ namespace Armoury
         internal sealed class Gaps
         {
             internal readonly int[] Short = new int[Cats];   // braki wedlug rodzaju (bron - przed zastapieniem innym rodzajem)
+            internal readonly int[] Need = new int[Cats];    // 133c: sztuki wzorca wedlug rodzaju (ile ich wzorzec ma)
             internal int Armour, Weapons, Extra;             // pancerz 5-9 bez sztuki, sztuki broni wzorca bez pary, sztuki broni czlowieka bez pary
+            internal List<KeyValuePair<int, ItemObject>> Lost;   // 133c (detail): sztuki wzorca bez pary - rodzaj i sztuka wzorca (do przyczyn w oknie)
+            internal List<ItemObject> Spare;                     // 133c (detail): sztuki broni czlowieka bez pary (dodatki DTE, inny rodzaj)
             internal int Replaced { get { return Math.Min(Weapons, Extra); } }
             internal int Missing { get { return Armour + Weapons - Replaced; } }
         }
 
         /// <summary>Wzorzec (Assignment.ReferenceEquipment) wobec ekwipunku czlowieka - czysta funkcja, bez stanu.</summary>
-        internal static Gaps Compare(Equipment rf, Equipment eq)
+        internal static Gaps Compare(Equipment rf, Equipment eq) { return Compare(rf, eq, false); }
+
+        /// <summary>To samo; detail (133c, KitPreview) - takze listy sztuk bez pary (Lost, Spare). Liczby te same w obu trybach.</summary>
+        internal static Gaps Compare(Equipment rf, Equipment eq, bool detail)
         {
             var g = new Gaps();
             if (rf == null || eq == null) return g;
+            if (detail) { g.Lost = new List<KeyValuePair<int, ItemObject>>(); g.Spare = new List<ItemObject>(); }
             for (int i = 5; i <= 9; i++)
             {
                 var r = rf[(EquipmentIndex)i]; var e = eq[(EquipmentIndex)i];
-                if (!r.IsEmpty && r.Item != null && (e.IsEmpty || e.Item == null)) { g.Short[i - 5]++; g.Armour++; }
+                if (r.IsEmpty || r.Item == null) continue;
+                g.Need[i - 5]++;
+                if (e.IsEmpty || e.Item == null) { g.Short[i - 5]++; g.Armour++; if (detail) g.Lost.Add(new KeyValuePair<int, ItemObject>(i - 5, r.Item)); }
             }
             var held = new List<int>(4);
-            for (int i = 0; i < 4; i++) { var e = eq[(EquipmentIndex)i]; if (!e.IsEmpty && e.Item != null) held.Add(Group(e.Item)); }
+            var heldIt = detail ? new List<ItemObject>(4) : null;
+            for (int i = 0; i < 4; i++)
+            {
+                var e = eq[(EquipmentIndex)i];
+                if (e.IsEmpty || e.Item == null) continue;
+                held.Add(Group(e.Item));
+                if (detail) heldIt.Add(e.Item);
+            }
             bool primary = false;
             for (int i = 0; i < 4; i++)
             {
                 var r = rf[(EquipmentIndex)i]; var it = r.Item;
                 if (r.IsEmpty || it == null) continue;
                 int cat = WeaponCat(it, ref primary);
+                g.Need[cat]++;
                 int k = held.IndexOf(Group(it));
-                if (k >= 0) { held.RemoveAt(k); continue; }
+                if (k >= 0) { held.RemoveAt(k); if (detail) heldIt.RemoveAt(k); continue; }
                 g.Short[cat]++; g.Weapons++;
+                if (detail) g.Lost.Add(new KeyValuePair<int, ItemObject>(cat, it));
             }
             g.Extra = held.Count;
+            if (detail) g.Spare.AddRange(heldIt);
             return g;
         }
 
+        /// <summary>133c (K15): kopia biezacej bitwy wedlug typu (porownanie z podgladem w misji - KitPreview.BattleSegment, przed Close).</summary>
+        internal static List<Row> CurrentTypes() { return new List<Row>(_cur.Values); }
+
+        /// <summary>133c: najwieksze braki wiersza (najwyzej n rodzajow, wedlug liczby): "arrows 6, shield 1".</summary>
+        internal static string TopKinds(int[] shortBy, int n, bool en)
+        {
+            var l = new List<int>();
+            foreach (int c in Order) if (shortBy[c] > 0) l.Add(c);
+            l.Sort((a, b) => { int x = shortBy[b].CompareTo(shortBy[a]); return x != 0 ? x : Array.IndexOf(Order, a).CompareTo(Array.IndexOf(Order, b)); });
+            var sb = new StringBuilder();
+            for (int i = 0; i < l.Count && i < n; i++) { if (sb.Length > 0) sb.Append(", "); sb.Append(en ? En[l[i]] : Pl[l[i]]).Append(' ').Append(shortBy[l[i]]); }
+            if (l.Count > n) sb.Append(en ? " and more" : " i inne");
+            return sb.ToString();
+        }
+
+        /// <summary>133c: rodzaje brakow z tablicy (kolejnosc Order) - jak Kinds(Row).</summary>
+        internal static string KindsOf(int[] shortBy, bool en)
+        {
+            var sb = new StringBuilder();
+            foreach (int c in Order)
+            {
+                if (shortBy[c] <= 0) continue;
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append(en ? En[c] : Pl[c]).Append(' ').Append(shortBy[c]);
+            }
+            return sb.ToString();
+        }
+
         /// <summary>Grupa broni jak CrashScribe Mends.WardGroup: rodzaj przedmiotu i klasa broni.</summary>
-        private static int Group(ItemObject it)
+        internal static int Group(ItemObject it)
         {
             var wc = it.PrimaryWeapon != null ? it.PrimaryWeapon.WeaponClass : WeaponClass.Undefined;
             return (int)it.ItemType * 1000 + (int)wc;
@@ -223,17 +270,7 @@ namespace Armoury
         }
 
         /// <summary>Rodzaje brakow wiersza: "strzaly 6, tarcza 1" (pl) albo "arrows 6, shield 1" (en); pusty - brak brakow.</summary>
-        internal static string Kinds(Row r, bool en)
-        {
-            var sb = new StringBuilder();
-            foreach (int c in Order)
-            {
-                if (r.Short[c] <= 0) continue;
-                if (sb.Length > 0) sb.Append(", ");
-                sb.Append(en ? En[c] : Pl[c]).Append(' ').Append(r.Short[c]);
-            }
-            return sb.ToString();
-        }
+        internal static string Kinds(Row r, bool en) { return KindsOf(r.Short, en); }
 
         /// <summary>Suma brakow wedlug rodzaju (przed zastapieniem): pancerz + bron wzorca bez pary.</summary>
         internal static int ShortSum(Row r) { return r.Armour + r.Weapons; }

@@ -235,7 +235,7 @@ namespace Armoury
             try { Log.Info(P + "start sesji | opcja \"Review the army\" w arm_camp_wait (" + (camp ? "TAK" : "NIE") + ", indeks " + CampIndex + ") i bk_camping_wait_menu ("
                            + (bk ? "TAK" : "NIE") + ", indeks " + BkIndex + "), takt doby " + (daily ? "TAK" : "NIE") + " | klucze Army Review Enabled " + Yes(On)
                            + ", Writes Order Of Battle " + Yes(Writes) + ", Pin Troop Types " + Yes(PinOn) + " | " + OobState() + " | zapis arm_army_review: " + _importNote
-                           + " | przypiecia " + PinSummary(_pins) + " | proba autotestu: " + TestState() + "."); }
+                           + " | przypiecia " + PinSummary(_pins) + " | proba autotestu: " + TestState() + " | podglad sprzetu (133c): " + KitPreview.Wiring + "."); }
             catch (Exception e) { Stumble("AddMenus.Log", e); }
         }
 
@@ -285,8 +285,8 @@ namespace Armoury
                 a.optionLeaveType = GameMenuOption.LeaveType.Manage;
                 string why;
                 if (!Can(out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
-                a.Tooltip = new TextObject("{=!}Your men by kind, what kit they went without in the last battle, the horses and harness in use and missing, why riders"
-                                           + " will go on foot and why the column walks, and your banners for the next battle.");
+                a.Tooltip = new TextObject("{=!}Your men by kind, what kit they lack for the next battle and why, what they went without in the last battle, the horses"
+                                           + " and harness in use and missing, why riders will go on foot and why the column walks, and your banners for the next battle.");
                 return true;
             }
             catch (Exception e) { Stumble("Cond", e); return false; }
@@ -380,7 +380,15 @@ namespace Armoury
             var pagesMarch = Paginate(MarchText(mp, col, pairs));
             List<string> pagesLast = null;   // 133b: ostatnia bitwa (zapamietane liczby, bez liczenia na mapie)
             try { pagesLast = Paginate(LastBattleText()); } catch (Exception e) { Stumble("LastBattleText", e); }
-            if (logIt) { try { Log.Info(ReportLine(mp, fit, wnd, pairs, col, pagesMen, pagesHorses, pagesMarch, pagesLast)); } catch (Exception e) { Stumble("ReportLine", e); } }
+            KitPreview.Result next = null;   // 133c: podglad nastepnej bitwy (ten sam rozdzielacz DTE i straze co bitwa; pamiec po wersjach i dniu)
+            try { next = KitPreview.Get(false); } catch (Exception e) { Stumble("KitPreview", e); }
+            if (logIt)
+            {
+                List<string> pagesNext = null;
+                try { if (next != null && next.Ok) pagesNext = NextPages(next); } catch (Exception e) { Stumble("NextPages", e); }
+                try { Log.Info(ReportLine(mp, fit, wnd, pairs, col, pagesMen, pagesHorses, pagesMarch, pagesLast, next, pagesNext)); } catch (Exception e) { Stumble("ReportLine", e); }
+                try { if (next != null) Log.Info(KitPreview.LogLine(next)); } catch (Exception e) { Stumble("KitPreview.LogLine", e); }
+            }
 
             int allFit = fit[0] + fit[1] + fit[2] + fit[3] + fit[4];
             int allWnd = wnd[0] + wnd[1] + wnd[2] + wnd[3] + wnd[4];
@@ -394,6 +402,7 @@ namespace Armoury
             {
                 new InquiryElement("men", "Your men: " + fit[0] + " infantry, " + fit[1] + " archers, " + fit[2] + " cavalry, " + fit[3] + " horse archers", null, true,
                                    "Fit to fight by kind (the wounded are counted on the page). Kind follows each man's troop: the same sorting the Order of Battle uses."),
+                NextRowSafe(next),   // 133c
                 LastRowSafe(),   // 133b
                 new InquiryElement("horses", riders == 0 ? "Horses and harness: no riders in your party"
                                                          : "Horses and harness: " + (riders - foot) + " of " + riders + " riders ready to ride", null, true,
@@ -424,6 +433,7 @@ namespace Armoury
                     {
                         string id = picked != null && picked.Count > 0 ? picked[0].Identifier as string : null;
                         if (id == "men") { _dReports++; ShowPages("Your men", pagesMen, 0); }
+                        else if (id == "next") { _dReports++; OpenKitTypes(); }   // 133c
                         else if (id == "last") { _dReports++; ShowPages("Last battle", pagesLast, 0); }   // 133b
                         else if (id == "horses") { _dReports++; ShowPages("Horses and harness", pagesHorses, 0); }
                         else if (id == "march") { _dReports++; ShowPages("On the march", pagesMarch, 0); }
@@ -434,17 +444,18 @@ namespace Armoury
                 }, null), true);
         }
 
-        /// <summary>Strony tekstu z powrotem do przegladu ("More" / "Back", na ostatniej "Back" / "Close").</summary>
-        private static void ShowPages(string title, List<string> pages, int i)
+        /// <summary>Strony tekstu z powrotem do przegladu ("More" / "Back", na ostatniej "Back" / "Close"). back (133c) - dokad wraca "Back" (null - przeglad).</summary>
+        private static void ShowPages(string title, List<string> pages, int i, Action back = null)
         {
-            if (pages == null || pages.Count == 0) { OpenMain(false); return; }
+            Action ret = back ?? delegate { OpenMain(false); };
+            if (pages == null || pages.Count == 0) { ret(); return; }
             if (i < 0 || i >= pages.Count) i = 0;
             bool more = i < pages.Count - 1;
             int k = i + 1;
             string t = pages.Count > 1 ? title + " (" + (i + 1) + "/" + pages.Count + ")" : title;
             InformationManager.ShowInquiry(new InquiryData(t, pages[i], true, true, more ? "More" : "Back", more ? "Back" : "Close",
-                delegate { try { if (more) ShowPages(title, pages, k); else OpenMain(false); } catch (Exception e) { Stumble("Pages.Next", e); } },
-                delegate { try { if (more) OpenMain(false); } catch (Exception e) { Stumble("Pages.Back", e); } }), true);
+                delegate { try { if (more) ShowPages(title, pages, k, back); else ret(); } catch (Exception e) { Stumble("Pages.Next", e); } },
+                delegate { try { if (more) ret(); } catch (Exception e) { Stumble("Pages.Back", e); } }), true);
         }
 
         /// <summary>Tekst na strony okna (ramka okna nie przewija - Rumours.PageLines linii na strone, akapity rozdzielone pusta linia).</summary>
@@ -602,7 +613,7 @@ namespace Armoury
 
         /// <summary>Linia logu raportu (na otwarcie okna i w tescie): te same liczby co strony okna.</summary>
         internal static string ReportLine(MobileParty mp, int[] fit, int[] wnd, SaddleLaw.PairState p, MarchPace.Column col, List<string> pm, List<string> ph, List<string> pmarch,
-                                          List<string> plast = null)
+                                          List<string> plast = null, KitPreview.Result next = null, List<string> pnext = null)
         {
             int exM = ExemptMounted(p);
             var bag = mp.ItemRoster;
@@ -621,9 +632,11 @@ namespace Armoury
               .Append(", konni ").Append(fit[2]).Append('/').Append(wnd[2]).Append(", konni lucznicy ").Append(fit[3]).Append('/').Append(wnd[3])
               .Append(", bohaterowie ").Append(fit[4]).Append('/').Append(wnd[4]);
             sb.Append(" | ostatnia bitwa (133b): ").Append(LastBattleBrief());
+            if (next != null) sb.Append(" | nastepna bitwa (133c): ").Append(KitPreview.Brief(next));
             sb.Append(" | strony ").Append(PagesInfo(pm)).Append(' ').Append(PagesInfo(ph)).Append(' ').Append(PagesInfo(pmarch)).Append(" (miesci sie ").Append(Rumours.PageLines).Append(')');
             // 133b: osobny segment - format "strony AxB CxD ExF (miesci sie N)" czyta tools/sprawdz_logi.py (AR-2)
             if (plast != null) sb.Append(" | strony ostatniej bitwy (133b) ").Append(PagesInfo(plast));
+            if (pnext != null) sb.Append(" | strony podgladu (133c) ").Append(PagesInfo(pnext));
             sb.Append(" | ").Append(OobState()).Append('.');
             return sb.ToString();
         }

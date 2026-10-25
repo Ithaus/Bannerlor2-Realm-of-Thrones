@@ -478,6 +478,7 @@ namespace Armoury
             for (int i = 0; i < 4; i++) _bHomeLv[i] = 0;
             _bHomeTpl = _bHomeNone = _bHomeSlot = _bHomeDead = _bHomeRace = _bHomeStumbles = _bHomeReg = _bHomeTemp = _bHomeBanner = 0; _bHomeSample.Clear(); _bHomeKinds.Clear();
             KitGaps.ClearBattle();   // 133b: braki wedlug rodzaju biezacej bitwy (ostatnia zamknieta bitwa zostaje - KitGaps.Last)
+            KitPreview.ClearMission();   // 133c (K15): podglad na zbrojowni tej misji
         }
 
         private static bool BattleTouched()
@@ -630,6 +631,13 @@ namespace Armoury
                 else if (s.LordBattleKitIsLent) LordAssignments(dists);
                 try { if (s.GarrisonArmoryInBattle) GarrisonDistributors(s, me, dists, sides, mission); }
                 finally { if (OwnKitOn) BattleNotice(sides); }   // sklad7b-p (uwaga 12): jedno zdanie w grze - czemu ludzie ida bez sprzetu
+                // 133c (K15): dowod jednej zasady - podglad okna armii na TEJ SAMEJ zbrojowni i tych samych wzorcach, przed pierwszym wystawieniem (bitwa w polu);
+                // na koniec misji BattleLine porownuje go z tym, co zebral OwnKitSpawn. Osobny przydzial DTE (podglad) - przydzial bitwy nietkniety.
+                if (OwnKitOn && _mountsOk)
+                {
+                    try { KitPreview.InMission(dists, mission); }
+                    catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.DistributorsPostfix(133c)", e); }
+                }
             }
             catch (Exception e) { Log.Error("GarrisonKit.DistributorsPostfix", e); }
         }
@@ -782,9 +790,12 @@ namespace Armoury
         }
 
         /// <summary>sklad7b-p: jezdziec (wzorzec ma konia) bez konia w przydziale tam, gdzie DTE wpuszcza konie - idzie pieszo, bo zbrojownia nie ma konia.</summary>
-        private static bool RiderOnFoot(object asg, Equipment eq, Equipment rf)
+        private static bool RiderOnFoot(object asg, Equipment eq, Equipment rf) { return RiderOnFoot(asg, eq, rf, _mountsOk); }
+
+        /// <summary>133c: to samo z jawnym "konie wpuszczone" (KitPreview - podglad bitwy w polu na mapie; bez statycznego _mountsOk ostatniej misji).</summary>
+        internal static bool RiderOnFoot(object asg, Equipment eq, Equipment rf, bool mountsOk)
         {
-            if (!_mountsOk || eq == null || rf == null) return false;
+            if (!mountsOk || eq == null || rf == null) return false;
             var rh = rf[EquipmentIndex.Horse];
             if (rh.IsEmpty || rh.Item == null) return false;
             try { if (_canMount != null && !(bool)_canMount.Invoke(asg, null)) return false; } catch { return false; }
@@ -918,6 +929,7 @@ namespace Armoury
         /// atEnd - koniec misji (nie "poprzednia misja bez konca": liczniki podlogi broni sa juz nastepnej misji).</summary>
         private static void BattleLine(string why, bool atEnd)
         {
+            string pv = KitPreview.BattleSegment();   // 133c (K15): PRZED KitGaps.Close (Close czysci biezaca bitwe)
             string kit = KitGaps.Close(_mountsOk, atEnd, _bPlayerMen, _bPlayerMiss);
             int guarded = _bPlayerMen + _bLordMen + _bGarMen;
             string check = !_regHooked ? "licznik DTE nie wpiety" : _bDte > guarded ? "NIEZGODNE - straz nie widziala " + (_bDte - guarded) + " ludzi (inny mod podmienil ekwipunek?)" : "zgodne";
@@ -929,7 +941,7 @@ namespace Armoury
                      + "; przez straz " + guarded + " z " + _bDte + " wystawionych przez DTE z przydzialem regul (" + check + ")"
                      + "; poza straza (partie z regula bez przydzialu, nie ubrani) " + _bOutside + ", w tym we wzorcu gry " + _bOutsideTpl
                      + "; bez zestawu awaryjnego DTE - druzyna gracza " + _bNoEmergP + ", partie lordow " + _bNoEmergL
-                     + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + ", bez wodza (rozdzielacz Armoury) " + _bNoLeader + "; umarli bez zmian " + _bUndead + CivNote() + HomeNote() + kit + ".");
+                     + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + ", bez wodza (rozdzielacz Armoury) " + _bNoLeader + "; umarli bez zmian " + _bUndead + CivNote() + HomeNote() + kit + pv + ".");
         }
 
         /// <summary>m119: dopisek do linii bitwy - kij z domu bezbronnych (gracz / lordowie / zalogi, poziom wyboru, bez kija z przyczyna, przyklady wedlug kultury)
@@ -1587,9 +1599,12 @@ namespace Armoury
 
         /// <summary>E8/H (271): czlowiek objety regula "jezdziec = kon + uprzaz" (wzorzec jednostki ma zwyklego wierzchowca i uprzaz) ma w przydziale konia
         /// pod siodlo, a nie ma uprzezy rodziny tego konia. Tylko tam, gdzie DTE wpuszcza konie; kon tymczasowy (spoza zbrojowni) - poza regula. Sam odczyt.</summary>
-        private static bool SaddleMissing(object asg, Equipment eq)
+        private static bool SaddleMissing(object asg, Equipment eq) { return SaddleMissing(asg, eq, _mountsOk); }
+
+        /// <summary>133c: to samo z jawnym "konie wpuszczone" (KitPreview; projekt 133, ryzyko 6 - wynik nie moze zalezec od tego, czy ostatnia bitwa byla oblezeniem).</summary>
+        internal static bool SaddleMissing(object asg, Equipment eq, bool mountsOk)
         {
-            if (!_mountsOk || eq == null || asg == null || _getChar == null || !SaddleLaw.On) return false;
+            if (!mountsOk || eq == null || asg == null || _getChar == null || !SaddleLaw.On) return false;
             try
             {
                 var h = eq[EquipmentIndex.Horse];
@@ -1651,7 +1666,7 @@ namespace Armoury
 
         /// <summary>sklad7b (linia bitwy): ile sztuk wzorca czlowiek nie ma - pancerz po slotach (5-9), bron po liczbie (0-3: DTE uklada bron
         /// w innej kolejnosci niz wzorzec, a jego dodatki zajmuja wolne sloty).</summary>
-        private static int Missing(object asg, Equipment eq)
+        internal static int Missing(object asg, Equipment eq)
         {
             var rf = _getRef != null && asg != null ? _getRef.Invoke(asg, null) as Equipment : null;
             if (rf == null || eq == null) return 0;

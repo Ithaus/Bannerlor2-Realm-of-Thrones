@@ -10,14 +10,68 @@ namespace Armoury
     /// Paczka 133b (Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem, w tym logu tak szybko to
     /// leci ze ja nie wiem ... przeniesmy logi do zakladki armii"): wiersz "Last battle" okna "Review the army" i jego strony - FAKTYCZNY stan ostatniej bitwy
     /// druzyny gracza (KitGaps.Last: zebrany w GarrisonKit.OwnKitSpawn po wszystkich strazach, ta sama liczba co "gracz N" linii bitwy z podzialem na rodzaje).
-    /// Tylko odczyt zapamietanych liczb (zero liczenia na mapie). Wiersz "Kit for the next battle" (podglad DTE) - krok 133c.
+    /// Tylko odczyt zapamietanych liczb (zero liczenia na mapie).
+    /// 133c: wiersz "Kit for the next battle" (KitPreview - ten sam rozdzielacz DTE i te same straze co bitwa, z pamiecia po wersjach i dniu), lista typow
+    /// ("Look" / "Back"), strona typu z przyczynami brakow i strona "Unused in the troops' armoury". Okno nadal tylko z obozu (decyzja (d)).
     /// </summary>
     internal static partial class ArmyReview
     {
         private const int TypesPerPara = 6;
 
-        /// <summary>Stan okna "Last battle" - ArmyReview.Reset (nowa kampania i wczytanie).</summary>
-        private static void KitReset() { KitGaps.Reset(); }
+        /// <summary>Stan okna "Last battle" i podgladu nastepnej bitwy (133c) - ArmyReview.Reset (nowa kampania i wczytanie).</summary>
+        private static void KitReset() { KitGaps.Reset(); KitPreview.Reset(); }
+
+        // ------------------------------------------------------------ 133c: "Kit for the next battle"
+        /// <summary>Wiersz glownego okna z zapasem: niedostepny podglad - wiersz wyszarzony z powodem (reszta okna dziala).</summary>
+        private static InquiryElement NextRowSafe(KitPreview.Result pv)
+        {
+            try
+            {
+                bool ok = pv != null && pv.Ok && pv.Men > 0;
+                return new InquiryElement("next", KitPreview.MainTitle(pv), null, ok, KitPreview.MainHint(pv));
+            }
+            catch (Exception e) { Stumble("NextRow", e); return new InquiryElement("next", "Kit for the next battle (not available)", null, false, "The hand-out cannot be worked out now."); }
+        }
+
+        /// <summary>Okno listy typow: najpierw typy z brakami, na koncu "Unused in the troops' armoury". Strony typu i resztki wracaja tutaj.</summary>
+        private static void OpenKitTypes()
+        {
+            var pv = KitPreview.Get(false);
+            if (pv == null || !pv.Ok || pv.Rows.Count == 0) { OpenMain(false); return; }
+            var rows = new List<InquiryElement>();
+            foreach (var t in pv.Rows)
+                rows.Add(new InquiryElement(t.Id, KitPreview.RowTitle(t), TroopPortrait(t.Troop), t.Men > 0, KitPreview.RowHint(t)));
+            rows.Add(new InquiryElement("~unused", KitPreview.UnusedTitle(pv), null, true, "What is left in the troops' armoury after the hand-out, and why no man took it."));
+            bool photo = WindowPhotos.Active;   // paczka 132: okno proby zdjec - przyciski bez skutku
+            MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Kit for the next battle", KitPreview.ListDesc(pv), rows, true, 1, 1, "Look", "Back",
+                delegate (List<InquiryElement> picked)
+                {
+                    if (Inert(photo)) return;
+                    try
+                    {
+                        string id = picked != null && picked.Count > 0 ? picked[0].Identifier as string : null;
+                        var cur = KitPreview.Get(false);
+                        if (id == null || cur == null || !cur.Ok) { OpenKitTypes(); return; }
+                        _dReports++;
+                        if (id == "~unused") { ShowPages("Unused in the troops' armoury", Paginate(KitPreview.UnusedText(cur)), 0, OpenKitTypes); return; }
+                        var t = KitPreview.Find(cur, id);
+                        if (t == null) OpenKitTypes();
+                        else ShowPages(t.Name, Paginate(KitPreview.TypeText(cur, t)), 0, OpenKitTypes);
+                    }
+                    catch (Exception e) { Stumble("Kit.Pick", e); }
+                },
+                delegate (List<InquiryElement> _) { if (Inert(photo)) return; try { OpenMain(false); } catch (Exception e) { Stumble("Kit.Back", e); } }), true);
+        }
+
+        /// <summary>Wszystkie strony podgladu (typy i resztka) - linia raportu i test T1 (strony najwyzej Rumours.PageLines linii).</summary>
+        internal static List<string> NextPages(KitPreview.Result pv)
+        {
+            var l = new List<string>();
+            if (pv == null || !pv.Ok) return l;
+            foreach (var t in pv.Rows) l.AddRange(Paginate(KitPreview.TypeText(pv, t)));
+            l.AddRange(Paginate(KitPreview.UnusedText(pv)));
+            return l;
+        }
 
         /// <summary>Data bitwy: data gry i ile dni temu (K16 - bez surowego numeru doby).</summary>
         private static string BattleDate(CampaignTime t)

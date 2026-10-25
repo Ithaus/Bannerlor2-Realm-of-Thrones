@@ -57,6 +57,68 @@ namespace Armoury
             catch { return false; }
         }
 
+        // 133c (K3): kody decyzji WouldStrip - > 0 sztuka schodzi (repl - czym ja zastapic, null - pusty slot), 0 zostaje, StayHeavy - ponad umiejetnosc, ale
+        // lzejszej sztuki tego typu nie ma (zostaje przy swojej - PODLOGA SPRZETU, Jeff 31.08)
+        internal const int Keeps = 0, StayHeavy = -1, StripGiant = 1, StripLegend = 2, StripSkill = 3, StripMountLand = 4, StripMountSkill = 5;
+
+        /// <summary>133c (K3, krytyka 133): STRAZ PRZY WYSTAWIENIU SZEREGOWEGO jako czysta funkcja - wolana przez StripDragonMount (bitwa) i przez KitPreview
+        /// (okno armii, podglad nastepnej bitwy), wiec jedna decyzja dla bitwy i podgladu. Logika bez zmian wobec dotychczasowego StripDragonMount:
+        ///  - bron 0-3: SPRZET OLBRZYMOW NA CZLOWIEKU (Jeff 14.09) schodzi zawsze - zamiennik PatternFor wedlug umiejetnosci broni (RelevantSkill), bez niego
+        ///    goly slot; PRAWO LEGEND (prog 100k + lista person) - zamiennik LegendaryLaw.ReplacementFor, potem wzorzec klasy (PatternFor), dopiero nic;
+        ///    bron dana swiadomie przez podloge broni (floorKept - ostatnia deska GearFit) zostaje; ZASADA NADRZEDNA - ponad umiejetnosc (ItemReq) schodzi
+        ///    do najlepszej w ramach umiejetnosci (PatternFor), a gdy takiej nie ma - zostaje (StayHeavy);
+        ///  - pancerz 5-9: olbrzymi - TopArmor w ramach Atletyki (bez niego goly slot); ponad Atletyke - TopArmor, a gdy brak - zostaje (StayHeavy);
+        ///  - kon 10: GEOGRAFIA WIERZCHOWCOW (MountLaw - mamut, wielblad, rydwan, slon nie u swoich) albo ponad Jazde - TopMount (null - pieszo).
+        /// Bohater i pusty slot - Keeps. Zamienniki sa z niczego - przy wystawieniu straz "nic z niczego" (GarrisonKit.SpawnGuard) zostawia je tylko z pokryciem
+        /// w zbrojowni. TopArmor losuje sztuke z pasma (jedno wywolanie na slot - jak dotad).</summary>
+        internal static int WouldStrip(TaleWorlds.CampaignSystem.CharacterObject soldier, int slot, ItemObject it, bool floorKept, out ItemObject repl, out string whyNot)
+        {
+            repl = null; whyNot = null;
+            if (soldier == null || soldier.IsHero || it == null) return Keeps;
+            if (slot >= 0 && slot < 4)
+            {
+                if (GiantGear.Is(it) && !GiantGear.MayWear(soldier))
+                {
+                    int gs = it.RelevantSkill != null ? soldier.GetSkillValue(it.RelevantSkill) : 0;
+                    repl = SkillsDecide.PatternFor(it.ItemType, gs);
+                    return StripGiant;
+                }
+                if (LegendaryLaw.IsLegend(it))
+                {
+                    repl = LegendaryLaw.ReplacementFor(it);
+                    if (repl == null)
+                    {
+                        var rsk = ItemReq.SkillFor(it);
+                        int skl = rsk != null ? soldier.GetSkillValue(rsk) : 0;
+                        repl = SkillsDecide.PatternFor(it.ItemType, skl);
+                    }
+                    return StripLegend;
+                }
+                if (floorKept) return Keeps;
+                if (ItemReq.Meets(soldier, it, out whyNot)) return Keeps;
+                var rsk2 = ItemReq.SkillFor(it);
+                int sk = rsk2 != null ? soldier.GetSkillValue(rsk2) : 0;
+                repl = SkillsDecide.PatternFor(it.ItemType, sk);
+                return repl != null ? StripSkill : StayHeavy;
+            }
+            if (slot >= 5 && slot <= 9)
+            {
+                int ath = soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Athletics);
+                if (GiantGear.Is(it) && !GiantGear.MayWear(soldier)) { repl = SkillsDecide.TopArmor(it.ItemType, ath, soldier.Culture); return StripGiant; }
+                if (ItemReq.Meets(soldier, it, out whyNot)) return Keeps;
+                repl = SkillsDecide.TopArmor(it.ItemType, ath, soldier.Culture);
+                return repl != null ? StripSkill : StayHeavy;
+            }
+            if (slot == 10)
+            {
+                bool geo = !MountLaw.Allowed(soldier, it);
+                if (!geo && ItemReq.Meets(soldier, it, out whyNot)) return Keeps;
+                repl = SkillsDecide.TopMount(soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Riding));
+                return geo ? StripMountLand : StripMountSkill;
+            }
+            return Keeps;
+        }
+
         public static void StripDragonMount(AgentBuildData agentBuildData)
         {
             try
@@ -72,69 +134,41 @@ namespace Armoury
                     var soldier = agentBuildData.AgentData.AgentCharacter as TaleWorlds.CampaignSystem.CharacterObject;
                     if (soldier != null && !soldier.IsHero)
                     {
+                        // 133c (K3): decyzja "zostaje / schodzi i czym zastapic" w jednej funkcji WouldStrip (ta sama dla bitwy i podgladu okna armii - KitPreview);
+                        // tu tylko zapis slotu i linie logu - jak dotad
                         for (int slot = 0; slot < 4; slot++)
                         {
                             var w = eq[(EquipmentIndex)slot].Item;
-                            // SPRZET OLBRZYMOW NA CZLOWIEKU (Jeff 14.09): schodzi ZAWSZE,
-                            // w reke wchodzi zwykla bron w ramach skilla - a gdy nie ma
-                            // czym, lepiej goly slot niz mamut z maczuga w ludzkiej dloni
-                            if (GiantGear.Is(w) && !GiantGear.MayWear(soldier))
+                            if (w == null) continue;
+                            // GearFit (noc 15/16.10): bron ponad umiejetnosc dala swiadomie podloga broni (ostatnia deska) - FloorKept pytany jak dotad tylko
+                            // dla sztuk, ktore nie sa olbrzymie ani legendarne (licznik _dKept bez zmian)
+                            bool fk = !(GiantGear.Is(w) && !GiantGear.MayWear(soldier)) && !LegendaryLaw.IsLegend(w) && GearFit.FloorKept(eq, slot);
+                            ItemObject repl; string whyNot;
+                            int code = WouldStrip(soldier, slot, w, fk, out repl, out whyNot);
+                            if (code == StripGiant)
                             {
-                                int gs = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
-                                var gswap = SkillsDecide.PatternFor(w.ItemType, gs);
-                                eq[(EquipmentIndex)slot] = gswap != null ? new EquipmentElement(gswap) : new EquipmentElement(null);
+                                eq[(EquipmentIndex)slot] = repl != null ? new EquipmentElement(repl) : new EquipmentElement(null);
                                 if (_floorLog++ < 20)
                                     Log.Info("GiantGear: " + w.StringId + " zdjety z " + soldier.StringId
-                                             + " - dostaje " + (gswap != null ? gswap.StringId : "goly slot") + ".");
-                                continue;
+                                             + " - dostaje " + (repl != null ? repl.StringId : "goly slot") + ".");
                             }
-                            if (LegendaryLaw.IsLegend(w))   // prog 100k + lista person
+                            else if (code == StripLegend)
                             {
-                                // legenda schodzi ZAWSZE, ale zolnierz nie idzie z golym
-                                // slotem: zamiennik -> wzorzec klasy -> dopiero nic
-                                var repl = LegendaryLaw.ReplacementFor(w);
-                                if (repl == null)
-                                {
-                                    var rsk = ItemReq.SkillFor(w);
-                                    int skl = rsk != null ? soldier.GetSkillValue(rsk) : 0;
-                                    repl = SkillsDecide.PatternFor(w.ItemType, skl);
-                                }
                                 eq[(EquipmentIndex)slot] = repl != null
                                     ? new EquipmentElement(repl) : new EquipmentElement(null);
                                 Log.Info("LegendaryLaw: " + w.StringId + " zdjety przy spawnie z szeregowego ("
                                          + soldier.StringId + ") - dostaje "
                                          + (repl != null ? repl.StringId : "goly slot") + ".");
-                                continue;
                             }
-                            // GearFit (noc 15/16.10): bron ponad umiejetnosc dala swiadomie podloga broni (ostatnia deska, GearFitFloorOverSkill) ze zbrojowni
-                            // partii - bez podmiany na wzorzec z niczego (straz "nic z niczego" przy spawnie zdjelaby go i czlowiek szedlby z pustymi rekami)
-                            if (w != null && GearFit.FloorKept(eq, slot)) continue;
-                            // ZASADA NADRZEDNA na scenie: bron ponad skill schodzi,
-                            // ale zolnierz dostaje najlepsza W RAMACH swojego skilla
-                            // (nie wchodzi golym slotem) - i log mowi wprost CZEMU
-                            // (Jeff 29.08: "kwatermistrz nie przyjal lukow?!")
-                            if (w != null)
+                            else if (code == StripSkill)
                             {
-                                string whyNot;
-                                if (!ItemReq.Meets(soldier, w, out whyNot))
-                                {
-                                    var rsk2 = ItemReq.SkillFor(w);
-                                    int sk = rsk2 != null ? soldier.GetSkillValue(rsk2) : 0;
-                                    var swap = SkillsDecide.PatternFor(w.ItemType, sk);
-                                    // PODLOGA SPRZETU (Jeff 31.08): degradacja owszem,
-                                    // ale gdy NIE MA czym podmienic - zolnierz zostaje
-                                    // przy swoim. Bezbronny jest gorszy niz przepakowany.
-                                    if (swap != null)
-                                    {
-                                        eq[(EquipmentIndex)slot] = new EquipmentElement(swap);
-                                        Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + w.StringId
-                                                 + " (" + whyNot + ") - dostaje " + swap.StringId + ".");
-                                    }
-                                    else if (_floorLog++ < 20)
-                                        Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + w.StringId
-                                                 + " (" + whyNot + "), ale nie ma lzejszej broni - zostaje przy swojej.");
-                                }
+                                eq[(EquipmentIndex)slot] = new EquipmentElement(repl);
+                                Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + w.StringId
+                                         + " (" + whyNot + ") - dostaje " + repl.StringId + ".");
                             }
+                            else if (code == StayHeavy && _floorLog++ < 20)
+                                Log.Info("ItemReq: " + soldier.StringId + " nie udzwignie " + w.StringId
+                                         + " (" + whyNot + "), ale nie ma lzejszej broni - zostaje przy swojej.");
                         }
                         // pancerz ponad atletyke -> najlepszy dozwolony; kon ponad
                         // Riding -> najlepszy dozwolony (albo pieszo)
@@ -143,37 +177,26 @@ namespace Armoury
                         {
                             var a = eq[(EquipmentIndex)slot].Item;
                             if (a == null) continue;
-                            // PANCERZ OLBRZYMA NA CZLOWIEKU (Jeff 14.09): schodzi zawsze,
-                            // wchodzi najlepszy zwykly w ramach Atletyki
-                            if (GiantGear.Is(a) && !GiantGear.MayWear(soldier))
+                            ItemObject top; string whyA;
+                            int code = WouldStrip(soldier, slot, a, false, out top, out whyA);
+                            if (code == StripGiant)
                             {
-                                var gtop = SkillsDecide.TopArmor(a.ItemType, ath, soldier.Culture);
-                                eq[(EquipmentIndex)slot] = gtop != null ? new EquipmentElement(gtop) : new EquipmentElement(null);
+                                eq[(EquipmentIndex)slot] = top != null ? new EquipmentElement(top) : new EquipmentElement(null);
                                 if (_floorLog++ < 20)
                                     Log.Info("GiantGear: " + a.StringId + " zdjety z " + soldier.StringId
-                                             + " - dostaje " + (gtop != null ? gtop.StringId : "goly slot") + ".");
-                                continue;
+                                             + " - dostaje " + (top != null ? top.StringId : "goly slot") + ".");
                             }
-                            if (ItemReq.Meets(soldier, a)) continue;
-                            var top = SkillsDecide.TopArmor(a.ItemType, ath, soldier.Culture);
-                            // PODLOGA SPRZETU (Jeff 31.08: "tylko zeby nadzy nie
-                            // wyszli"): brak lzejszej sztuki = zolnierz zostaje
-                            // w swoim pancerzu. Zla statystyka jest mniejszym zlem
-                            // niz goly korpus - to JEDYNE miejsce w repo, ktore
-                            // potrafilo wpisac null do slotu pancerza.
-                            if (top != null) eq[(EquipmentIndex)slot] = new EquipmentElement(top);
-                            else if (_floorLog++ < 20)
+                            else if (code == StripSkill) eq[(EquipmentIndex)slot] = new EquipmentElement(top);
+                            else if (code == StayHeavy && _floorLog++ < 20)
                                 Log.Info("ItemReq: " + soldier.StringId + " - brak lzejszego pancerza ("
                                          + a.ItemType + ") w ramach Atletyki " + ath + "; zostaje w swoim.");
                         }
                         var mnt = eq[(EquipmentIndex)10].Item;
-                        // GEOGRAFIA WIERZCHOWCOW (Jeff 14.09): mamut/wielblad/rydwan/slon
-                        // nie u swoich schodzi tak samo jak kon ponad Riding
-                        bool geo = mnt != null && !MountLaw.Allowed(soldier, mnt);
-                        if (mnt != null && (geo || !ItemReq.Meets(soldier, mnt)))
+                        ItemObject topM = null; string whyM;
+                        int mcode = mnt != null ? WouldStrip(soldier, 10, mnt, false, out topM, out whyM) : Keeps;
+                        bool geo = mcode == StripMountLand;
+                        if (mcode == StripMountLand || mcode == StripMountSkill)
                         {
-                            var topM = SkillsDecide.TopMount(
-                                soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Riding));
                             eq[(EquipmentIndex)10] = topM != null
                                 ? new EquipmentElement(topM) : new EquipmentElement(null);
                             if (topM == null) eq[(EquipmentIndex)11] = new EquipmentElement(null);

@@ -122,8 +122,11 @@ namespace Armoury
             var ph = Paginate(HorseText(mp, p));
             var pq = Paginate(MarchText(mp, col, p));
             var pl = Paginate(LastBattleText());   // 133b: strony "Last battle" (zapis ostatniej bitwy albo zdanie "nic jeszcze")
-            Log.Info(ReportLine(mp, fit, wnd, p, col, pm, ph, pq, pl));
-            int longest = Math.Max(Math.Max(LongestPage(pm), LongestPage(pl)), Math.Max(LongestPage(ph), LongestPage(pq)));
+            var nx = KitPreview.Get(true);         // 133c: podglad nastepnej bitwy liczony od nowa (czas w ms do linii)
+            var pn = NextPages(nx);
+            Log.Info(ReportLine(mp, fit, wnd, p, col, pm, ph, pq, pl, nx, pn));
+            Log.Info(KitPreview.LogLine(nx));
+            int longest = Math.Max(Math.Max(Math.Max(LongestPage(pm), LongestPage(pl)), Math.Max(LongestPage(ph), LongestPage(pq))), LongestPage(pn));
             bool t1p = longest <= Rumours.PageLines;
             int exM = ExemptMounted(p);
             bool t1a = p.Riders + p.Exempt == p.Paired + p.NoSaddle + exM + p.NoHorse && p.Mounted == p.Paired + p.NoSaddle;
@@ -134,8 +137,16 @@ namespace Armoury
                 int walk = (col.Foot - ride) + Math.Max(0, col.Prisoners - (col.Horses - ride));
                 t1c = walk == col.Walkers && (col.Kind == 0) == (walk > 0) && (col.Kind != 0 || col.N == walk);
             }
-            pts.Add("T1 raport: strony <= " + Rumours.PageLines + " linii " + T(t1p) + " (najdluzsza " + longest + "), pary " + T(t1a) + ", kolumna " + (col == null ? "wylaczona" : T(t1c)));
-            ok &= t1p && t1a && t1c;
+            // 133c: tozsamosc podgladu - puste sloty = GarrisonKit.Missing u kazdego czlowieka (Bad 0); rozbicie: suma brakow - zastapione = puste
+            bool t1k = true;
+            if (nx.Ok)
+            {
+                int sumShort = 0; foreach (var v in nx.Short) sumShort += v;
+                t1k = nx.Bad == 0 && sumShort - nx.Replaced == nx.Missing;
+            }
+            pts.Add("T1 raport: strony <= " + Rumours.PageLines + " linii " + T(t1p) + " (najdluzsza " + longest + "), pary " + T(t1a) + ", kolumna " + (col == null ? "wylaczona" : T(t1c))
+                    + ", podglad sprzetu (133c) " + (nx.Ok ? T(t1k) + " (" + nx.Ms + " ms, stron " + pn.Count + ")" : "niedostepny (" + nx.Why + ")"));
+            ok &= t1p && t1a && t1c && t1k;
             if (!Writes)
             {
                 // klucz zapisu wylaczony = porzadek gry nietkniety (tak obiecuje opis klucza) - test tez go nie rusza

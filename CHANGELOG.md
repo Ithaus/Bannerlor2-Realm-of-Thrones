@@ -1,5 +1,75 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 133c (galaz noc/133-raport-armii) - Armoury: okno armii "Kit for the next battle" - podglad nastepnej bitwy tym samym rozdzielaczem DTE i strazami co bitwa (KitPreview), przyczyny brakow, "Unused in the troops' armoury"; kwatermistrz jedna linia
+**Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem ... jesli sprzet jest to komunikat czemu nie
+zalozy bo np. za maly skill, de facto przeniesmy logi do zakladki armii". To samo zjawisko licza dzis rozne reguly z roznymi liczbami (Armoury-2026-10-25_02-11-22): bitwa
+"sloty wzorca bez sztuki - gracz 19 (ludzi 43)" (03:42:06), papier kwatermistrza "Kwatermistrz: papier ... bez sztuki 0" dla wszystkich 16 typow (03:43:11) - wiec czerwone
+"QM short (have/need)" milczy albo mowi co innego niz bitwa; CS SkillLawWard "Shield 1"; pasek DTE z rannymi i bez dodatkow. Nigdzie nie ma odpowiedzi "czemu nie zalozy".
+**Przyczyna:** brak podgladu nastepnej bitwy liczonego ta sama droga co bitwa; komunikat kwatermistrza na ekranie z innej reguly (papier FitFor/SwapMath).
+**Zmiana:** (1) Nowy Armoury/src/KitPreview.cs - JEDNA ZASADA (decyzja (a)): ten sam DoAssignAsync DTE w trybie podgladu (prywatny konstruktor
+PartyEquipmentDistributor(MobileParty, ItemRoster, bool) - _isReadinessPreview, jak pasek DTE; CS milczy dzieki 133a) z flagami bitwy (dodatki tak, zestaw awaryjny
+= !TroopsFightWithOwnKitOnly, kara Underequipped tak, bez losowej broni bezbronnych), wszystkie nasze straze (UniqueWard, SuitableWard, SkillLawWard, RealmWard,
+CamelCulling, SkillsDecide, podloga GearFit) pod GearFit.Quiet; tylko zdrowi (jak RunAsync), wzorzec BattleEquipments[i % n] (jak pasek), kolejnosc Sort(y.CompareTo(x)).
+Potem to, co bitwa robi przy wystawieniu: DragonUnmount.WouldStrip (K3), straz uprzezy GarrisonKit.SaddleMissing i RiderOnFoot z jawnym mountsOk, puste sloty
+GarrisonKit.Missing i KitGaps.Compare (te same co linia bitwy i "Last battle"; tozsamosc sprawdzana na kazdym czlowieku). Trzy migawki puli (K4): A zbrojownia po
+normalizacji DTE, B pula po AddEquipmentToAssign (A-B: czarna lista DTE), C pula po przebiegu (bez klucza: UniqueWard); kon i uprzaz - B minus przydzielone (DTE nie
+zdejmuje ich z puli); ksiegowosc puli (B = C + przydzielone) tylko do logu. Przyczyny brakow (katalog projektu 2.1) tymi samymi predykatami co przydzial, w kolejnosci
+potoku: zakazane (BarredInBattle, smoki), legenda, olbrzymie, umiejetnosc (ItemReq - "Requires Bow 175 - this troop has 80."), siodlo (MenUpgrade.MountOk), tier (tylko
+bez SkillsDecide), kultura (GearFit.CultureCode - Dothrakowie / zza Waskiego Morza / wierzchowiec nie u swoich), klasa broni (DTE Global.HaveSameWeaponClass wobec
+sztuki wzorca - "Their kit carries a sword; the troops' armoury holds 5 of another kind (...)"), wszystkie wydane, dodatki u innych, brak; uprzaz bez wymogu Jazdy (K5:
+"brak wolnej / inna rodzina / nie sparowana"); porada z sakw tymi samymi predykatami, siodlo bez wyjatku wlasnego wzorca (K6); kara morale Underequipped z napisem
+"worse than the kit their skill and rank call for" (K7). Pamiec po wersjach zbrojowni, skladu, sakw, dniu i kluczach (bez godziny - K7). Potkniecia liczone per miejsce.
+(2) DragonUnmount.WouldStrip(zolnierz, slot, sztuka, floorKept, out zamiennik, out powod) - decyzja strazy przy wystawieniu szeregowego wydzielona z StripDragonMount bez
+zmiany logiki (olbrzymie, legendy, ponad umiejetnosc z "lzejszej brak - zostaje", podloga - ostatnia deska, pancerz, kon nie u swoich / ponad Jazde); StripDragonMount
+wola ja i pisze te same sloty i linie logu; FloorKept pytany jak dotad tylko poza olbrzymami i legendami (licznik _dKept bez zmian); jedno wywolanie TopArmor/PatternFor/
+TopMount na slot jak dotad. (3) GearFit: CultureCode (CultureOk = kod 0; sygnatura CultureOk bez zmian - CS RealmWard wiaze ja delegatem); K16 - podloga broni bez misji
+(pasek DTE, autorozstrzygniecie, okno) nie pisze juz do _floorKept (wyciek - te ekwipunki nie wychodza w pole); podglad zbiera swoje znaczniki ostatniej deski na czas
+przebiegu (PreviewKeptBegin/End/PreviewKept, [ThreadStatic]). (4) GarrisonKit: SaddleMissing(asg, eq, mountsOk) i RiderOnFoot(asg, eq, rf, mountsOk) - stare wolaja je
+z _mountsOk; Missing internal; K15 - w DistributorsPostfix (bitwa w polu, TroopsFightWithOwnKitOnly) KitPreview.InMission: podglad na TEJ SAMEJ zbrojowni z wzorcami
+(1:1) i kolejnoscia przydzialow bitwy, przed pierwszym wystawieniem - linia "Sprzet ludzi (133c): podglad w misji (K15) - ludzi N, przydzial podgladu rozny od bitwy:
+X slotow u Y ludzi ...; czas T ms (PONAD 50 ms - do decyzji: klucz MCM)"; BattleLine (przed KitGaps.Close) dopisuje segment "podglad w misji (133c, K15 ...): puste
+podglad A (rodzaje) wobec bitwy B (rodzaje), pieszo ... - ZGODNE|ROZNICA" u pierwszych N kazdego typu (tak DTE wystawia - FirstOrDefault(!IsAssigned)); ClearBattle ->
+KitPreview.ClearMission. (5) KitGaps.Compare(rf, eq, detail): Need (sztuki wzorca wedlug rodzaju), Lost/Spare (sztuki bez pary) - liczby jak dotad; TopKinds, KindsOf,
+CurrentTypes, Group internal. (6) ArmyReview: wiersz "Kit for the next battle: 7 slots empty - arrows 6, side-arm (melee) 3, shield 1; 2 riders on foot" (rodzaje jak
+Missing, K2) pod "Your men", wyszarzony z powodem (bez DTE, TroopsFightWithOwnKitOnly wylaczone, otwarta zbrojownia); podpowiedz: ta sama droga co bitwa, ranni nie
+licza sie, bitwa w polu, pancerz wzorca losowany (K7), pasek DTE liczy rannych i bez dodatkow (decyzja (h)). Lista typow (portret, "short: ..." / "full kit", podpowiedz -
+pierwsza przyczyna) + "Unused in the troops' armoury: N pieces"; strona typu: zdrowi/ranni, umiejetnosci, puste i zastapione, po akapicie na rodzaj "X: k of n missing"
+z najwyzej 3 przyczynami i porada z sakw, jezdzcy pieszo (bez konia / bez uprzezy) z przyczynami, zdjete przy wystawieniu, bez broni, kara morale, "luki dostaja wydani
+ostatni" (K16); strona resztki: kazda sztuka z przyczyna wobec typow z tym rodzajem we wzorcu ("too hard for all: Requires Bow 175 - the best of your men who carry this
+kind have 150", "no kind of your men carries this", "spare ..."), najwyzej 48 rodzajow, zakazane i czarna lista, zdjete przy wystawieniu. ShowPages(..., back) - strony
+wracaja do listy typow. Linia logu przy otwarciu "Sprzet ludzi (133c): podglad - typow, zdrowych (rannych), slotow wzorca, pustych (rodzaje; zastapione, dodatki),
+jezdzcy pieszo, zdjete, bez broni | przyczyny | nieuzyte, czarna lista, UniqueWard | sakwy | kara morale | tozsamosc z Missing, ksiegowosc puli | czas ms | typy";
+linia "raport" ma segmenty "nastepna bitwa (133c)" i "strony podgladu (133c) AxB" (format AR-2 sprawdz_logi bez zmian); linia startu sesji - "podglad sprzetu (133c):
+wpiecia N/N ...". Podpowiedz opcji menu wspomina sprzet nastepnej bitwy. (7) Decyzja (a) / K14: QuartermasterLaw.ShoutShortages (po bitwie, rano, przy otwarciu
+zbrojowni) - na ekranie JEDNA czerwona linia z podgladu "QM: 7 kit slots empty and 2 riders on foot for the next battle - see Review the army in camp." (nic, gdy podglad
+mowi komplet - wtedy przy zbrojowni zielone "QM: every man fully kitted." jak dotad); papier ShortageLines dalej liczony i pisany do logu ("Kwatermistrz: papier ...")
+plus linia porownania "Sprzet ludzi (133c): kwatermistrz (...) - na ekranie ... ; papier (QM short) - typow z brakami K". Podglad niedostepny - stare czerwone linie
+z papieru. (8) Test T1 (armoury-przeglad.flag): podglad liczony od nowa, strony podgladu w "najdluzszej", tozsamosc (Bad 0, suma brakow - zastapione = puste), ms.
+Bez nowych kluczy MCM (bez gen_mcm).
+**Ryzyko / co sprawdzic:** Kontrola calosci w kodzie: (1) Regresje - DragonUnmount: te same warunki, kolejnosc, zamienniki i linie logu (sprawdzone diffem; FloorKept
+tylko poza olbrzymami/legendami jak dotad); GearFit.CultureOk zwraca to samo (kod 0), licznik Dothrakow bez zmian; _floorKept czyta tylko DragonUnmount przy wystawieniu,
+a ekwipunki bez misji nigdy nie wychodza w pole - usuniecie zapisu nic nie zmienia w bitwie; SaddleMissing/RiderOnFoot/Missing - stare sciezki bez zmian;
+ShoutShortages - wartosc zwrotna (anyShort przy zbrojowni) teraz z podgladu. (2) Kolizje - podglad to osobny rozdzielacz i osobna pula: przydzial bitwy, zbrojownia
+DTE i liczniki doby nietkniete (GearFit.Quiet, FloorPostfix bez misji nie liczy, CS IsPreview z 133a); WYMAGA CrashScribe 133a - bez niego kazde otwarcie okna, poranny
+kwatermistrz i start bitwy w polu (K15) dalyby linie "Mends: PUSTE"/"swieta zasada" i zolte "QM: N EMPTY in battle" (wgranie zbiorcze 133). Konstruktor Assignment
+w podgladzie przechodzi przez SkillsDecide.RearmBySkill (losuje pancerz - MBRandom; nieszkodliwe, zmienia powtarzalnosc autotestu); w K15 wzorzec nadpisany 1:1 wzorcem
+bitwy. (3) Spojnosc - jedna regula na zjawisko: liczby okna = rozdzielacz bitwy + straze wystawienia (WouldStrip ta sama funkcja); przyblizenia nazwane w oknie i tu:
+wzorce BattleEquipments[i % n] zamiast losowego RandomBattleEquipment, bez losowej broni bezbronnych, zamiennik z niczego przy wystawieniu liczony jako pusty, chyba ze
+resztka zbrojowni ma te sztuke (SpawnGuard), tylko bitwa w polu (oblezenie/kryjowka - uwaga w oknie). Nadal inne liczby: pasek DTE (opisany w podpowiedzi - (h)),
+"Horses and harness" (SaddleLaw.Pairs - 133d), papier w logu i podpowiedzi kowala (OrderKitCondition) oraz "The Quartermaster's Muster" (decyzja (f)). (4) Cudzy kod
+(dekompilacja DTE v1.4.7): DoAssignAsync synchroniczny; AssignHorseAndHarness nie zdejmuje konia ani uprzezy z puli (stad B - przydzielone); AddEquipmentToAssign =
+normalizacja + ItemBlackList.Test; IsWeaponSuitable = HaveSameWeaponClass + IsSuitableForCharacter + siodlo; SpawnAgentPatch bierze pierwszy wolny przydzial typu;
+TryInitializeDistributors wolane w OnBehaviorInitialize (przed wystawieniem) - zbrojownia nietknieta. Refleksja przez Declared* (pulapka 15.10); brak elementu - "BRAK"
+w linii startu i wiersz wyszarzony, bez globalnego wylacznika. (5) Koszt: jeden przebieg DTE ze strazami na otwarcie okna (pamiec do zmiany zbrojowni/skladu/sakw/dnia),
+raz rano i po bitwie (kwatermistrz) i raz na start bitwy w polu (K15) - ms w liniach; projekt K15: ponad 50 ms -> klucz MCM (pomiar dopiero w grze, klucza nie dodano).
+(6) ODSTEPSTWA od projektu: porownanie w BattleLine z "ostatnim podgladem okna" zastapione mocniejszym K15 (ta sama zbrojownia w misji); osobnej linii startu
+KitPreview nie ma - stan wpiec w linii startu "Przeglad armii (P4)"; wiersz "Horses and harness" bez zmian (133d).
+Sprawdzic w grze: linia startu "podglad sprzetu (133c): wpiecia 10/10"; w obozie "Review the army" -> "Kit for the next battle" -> typy -> strony z przyczynami (strony
+<= 17 linii - T1), "Unused in the troops' armoury"; linia "Sprzet ludzi (133c): podglad - ..." z "tozsamosc z Missing zgodna"; po bitwie w polu segment "podglad w misji
+(133c, K15 ...) - ZGODNE" (ROZNICA - porownac rodzaje), czas podgladu w ms; rano/po bitwie zamiast czerwonych linii "QM short (have/need)" jedna linia "QM: N kit slots
+empty ... - see Review the army in camp."; w CS brak nowych "Mends: PUSTE"/"swieta zasada" na mapie.
+**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+
 ## 2026-10-25 133b (galaz noc/133-raport-armii) - Armoury: okno armii "Last battle" - braki sprzetu ostatniej bitwy wedlug rodzaju i typu (KitGaps), segment w linii bitwy
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem, w tym logu tak szybko to leci ze ja nie wiem
 ... przeniesmy logi do zakladki armii". Linia bitwy "Bitwa gracza (sklad7b ...): sloty wzorca bez sztuki (walcza bez) - gracz 19 (ludzi 43)" (Armoury-2026-10-25_02-11-22,

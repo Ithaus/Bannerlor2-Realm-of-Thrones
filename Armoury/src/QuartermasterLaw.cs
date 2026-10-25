@@ -958,6 +958,9 @@ namespace Armoury
         /// Kwatermistrz MELDUJE braki na glos - po bitwie i co rano, nie tylko
         /// w ekranie zbrojowni ("czemu ja o tym nie wiem!" - Jeff, 2026).
         /// Zwraca true, gdy bylo co meldowac.
+        /// 133c (decyzja Jeffa (a), krytyka K14): na ekranie JEDNA linia z podgladu nastepnej bitwy (KitPreview - ten sam rozdzielacz DTE i te same straze co
+        /// bitwa), np. "QM: 7 kit slots empty for the next battle - see Review the army in camp."; papier (ShortageLines) dalej tylko w logu ("Kwatermistrz:
+        /// papier ...") do porownania. Podglad niedostepny (bez DTE, TroopsFightWithOwnKitOnly wylaczone, otwarta zbrojownia, potkniecie) - jak dotad, z papieru.
         /// </summary>
         internal static bool ShoutShortages(string headline)
         {
@@ -966,6 +969,12 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.QuartermasterShouts) return false;
                 var lines = ShortageLines();
+                string one; bool any;
+                if (KitPreview.ShoutLine(headline, lines.Count, out one, out any))
+                {
+                    if (any) Log.Player(one, true);
+                    return any;
+                }
                 if (lines.Count == 0) return false;
                 InformationManager.DisplayMessage(new InformationMessage(headline, Colors.Red));
                 for (int i = 0; i < lines.Count; i += 5)
