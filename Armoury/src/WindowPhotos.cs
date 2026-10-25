@@ -22,7 +22,8 @@ namespace Armoury
     /// DLL autotestu CrashScribe (LogGate.Mode 1/2) i plik Documents\Mount and Blade II Bannerlord\CrashScribe\armoury-zdjecia-okien.flag (FlagName; plik tylko
     /// czytany). W zwyklej grze jedno sprawdzenie trybu na sesje (plik - tylko w autotescie), potem od razu wyjscie.
     /// KIEDY: raz na proces, w kampanii (najdluzej 60 min czekania), 30 s po wejsciu na mape i po 3 s spokoju: MapState na wierzchu i ekran mapy, bez misji, menu Esc, bitwy, oblezenia,
-    /// spotkania poza osada (miasto, w ktorym autotest czeka, wolno), rozmowy, zapytania, okna lupu i okna opowiesci; etap autotestu CrashScribe (Autotest.Now
+    /// spotkania poza osada (miasto, w ktorym autotest czeka, wolno), rozmowy, zapytania, okna lupu i okna opowiesci, do tego wspolna bramka okien Prologue.SceneGate
+    /// (recenzja 132: ekran wczytywania, MapScreen.IsReady, menu nad mapa, scena powiadomienia, pauza silnika, blokada czasu, okno BK, okno wydarzenia ROT); etap autotestu CrashScribe (Autotest.Now
     /// odbiciem, jak LogGate.Detect) "Run" - bieg dob, juz po bitwach autotestu (gdy etapu nie da sie odczytac - bez tego warunku). Inny etap, misja albo bitwa
     /// w trakcie proby - przerwanie: nasze okno zamkniete, linia "przerwana".
     /// OKNA (te same funkcje co gracz): 1 "Review the army" (ArmyReview.OpenMain), 2 "Banners for the next battle" (OpenBanners), 3 pierwsza wystawiona choragiew
@@ -33,11 +34,13 @@ namespace Armoury
     /// zdjecie po 0.6 s czasu rzeczywistego (Stopwatch): autotest (AutotestUi.Handle co 0.25 s) zamyka zapytanie po >= 1.0 s od zobaczenia (odmowa / wyjscie), wiec
     /// 1.5 s sie nie da (0.4 s zapasu na zrzut silnika); prefab zapytania nie ma animacji wejscia (Native MultiSelectionQueryPopup.xml), rysuje sie w pierwszej klatce. Okno lupu (wlasna warstwa,
     /// autotest jej nie widzi) - po 1.8 s (obce zapytanie nad nim - czeka, najwyzej 8 s). Zamkniecie: autotest albo my po 1 s od zdjecia
-    /// (InformationManager.HideInquiry -> GauntletQueryManager.CloseQuery: bez wywolania akcji okna; SpoilsWindow.ClosePhoto).
+    /// (InformationManager.HideInquiry -> GauntletQueryManager.CloseQuery: bez wywolania akcji okna; SpoilsWindow.ClosePhoto). recenzja 132: HideInquiry tylko na NASZYM
+    /// zapytaniu (MineOnScreen: faza >= 1 i _activeQueryData to dane kroku) - takze przy przerwaniu; obce okno (np. z kolejki po naszym) zostaje autotestowi.
     /// STAN GRY: na czas proby (Active) i dla kazdego okna otwartego w probie akcje przyciskow okien przegladu sa bez skutku (ArmyReview.Inert na poczatku callbackow),
     /// "Review the army" otwiera sie takze w osadzie (ArmyReview.Can -> InTownOk, tylko Active); kopia robocza okna choragwi (_work, _workPins, _dirty, _fromGame)
     /// wraca do stanu sprzed proby. Zadnego zapisu Order of Battle, przypiec, zlota, sakw ani zapisu gry. Nasze zapytanie rozpoznajemy po
-    /// GauntletQueryManager._activeQueryData (odbiciem, to samo pole czyta AutotestUi); bez pola - IsAnyInquiryActive.
+    /// GauntletQueryManager._activeQueryData (odbiciem, to samo pole czyta AutotestUi); bez pola - IsAnyInquiryActive tylko do odczytu (linia logu, czekanie),
+    /// nigdy do zamkniecia (bez pola nie zamykamy - autotest zamknie okno po 1-1.5 s, przyciski bez skutku).
     /// Linie: "Zdjecia okien (132): ..." - start, po jednej na okno ("TAK plik ..." / "NIE (powod)") i koniec (pliki na dysku 6 s po ostatnim zdjeciu).
     /// Potkniecia liczone (Stumble); zly krok - linia NIE i nastepny krok, bez wylacznika (po 30 potknieciach proba konczy sie linia "przerwana").
     /// </summary>
@@ -256,6 +259,16 @@ namespace Armoury
             return InformationManager.IsAnyInquiryActive();
         }
 
+        /// <summary>recenzja 132: na ekranie na pewno NASZE zapytanie (faza >= 1, pole _activeQueryData czytelne i to te same dane kroku). Tylko wtedy HideInquiry -
+        /// zapas StillOpen (IsAnyInquiryActive) bywa obcym oknem (faza 0 czeka wlasnie na obce zapytanie; CloseQuery wyciaga z kolejki okno stojace za naszym),
+        /// a CloseQuery zamyka okno bez wywolania jego akcji - obcy mod zostalby z niezamknietym stanem.</summary>
+        private static bool MineOnScreen()
+        {
+            if (Layer() || _phase < 1 || !_dataKnown || _myData == null) return false;
+            bool k; var d = ActiveQuery(out k);
+            return k && ReferenceEquals(d, _myData);
+        }
+
         private static void Shot(long now)
         {
             _shotErr = null; _file = null;
@@ -284,7 +297,9 @@ namespace Armoury
                     SpoilsWindow.ClosePhoto();
                     return "okno zamkniete przez probe";
                 }
-                if (StillOpen()) { InformationManager.HideInquiry(); return "okno zamkniete przez probe (HideInquiry)"; }
+                if (MineOnScreen()) { InformationManager.HideInquiry(); return "okno zamkniete przez probe (HideInquiry)"; }
+                if (!_dataKnown && InformationManager.IsAnyInquiryActive())
+                    return "zapytanie na ekranie, bez odczytu _activeQueryData nie wiadomo czy nasze - zostawione autotestowi (przyciski bez skutku)";
                 return "okno zamkniete przez autotest albo gracza (przycisk bez skutku)";
             }
             catch (Exception e) { Stumble("Close." + _step, e); return "blad zamkniecia " + e.GetType().Name; }
@@ -337,7 +352,7 @@ namespace Armoury
                 if (_step >= 1 && _step <= Steps)
                 {
                     if (Layer()) SpoilsWindow.ClosePhoto();
-                    else if (StillOpen()) InformationManager.HideInquiry();
+                    else if (MineOnScreen()) InformationManager.HideInquiry();   // recenzja 132: tylko nasze zapytanie (faza 0 - obce okno, na ktore krok czeka)
                 }
             }
             catch (Exception e) { Stumble("Abort.Close", e); }
@@ -382,6 +397,11 @@ namespace Armoury
             if (InformationManager.IsAnyInquiryActive()) return "zapytanie na ekranie";
             if (SpoilsWindow.Busy || SpoilsReport.AnyReady) return "okno lupu";
             if (StoryWindow.IsOpen) return "okno opowiesci";
+            // recenzja 132: wspolna bramka okien (ta sama co okno lupu i Kronika): ekran wczytywania, MapScreen.IsReady, menu nad mapa, scena powiadomienia, pauza silnika,
+            // blokada czasu (zdarzenie mapy), bitwa w spotkaniu, okno BK, okno wydarzenia ROT. Miasto autotestu (town_wait_menus, bieg) przepuszcza - Kronika pokazala
+            // tam okno 24.10 22:16:43 (Armoury-2026-10-24_22-13-58.log, autotest: "czekam w The Twins ... town_wait_menus").
+            string g = Prologue.SceneGate(c);
+            if (g != null) return g;
             if (start)
             {
                 string sg = Stage();

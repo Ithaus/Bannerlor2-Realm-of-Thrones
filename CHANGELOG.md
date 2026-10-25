@@ -25,6 +25,21 @@ pola - proba bez warunku etapu. (5) Regresje sprawdzone w kodzie: przy Active NI
 zeruje _photo; zadnego zapisu Order of Battle, przypiec, zlota, sakw ani zapisu gry; proba P4 (armoury-przeglad.flag) i proba turnieju P11 niezalezne (okno lupu probne
 = SpoilsWindow.Busy, proba turnieju czeka); obce zapytanie - krok czeka najwyzej 20 s, potem NIE i nastepny. (6) 7 plikow BMP 4K po ok. 24 MB. Sprawdzic w Armoury.log
 7 linii "TAK" i "koniec ... pliki na dysku 7/7 ... wynik TAK"; w autotest-*.log "OKNO wybor z listy "Review the army" ... -> NIE [Close]" (zamkniecie bez skutku).
+**Recenzja:** 3 uwagi, wszystkie sprawdzone w kodzie (WindowPhotos.cs, Prologue.SceneGate, dekompilacja GauntletQueryManager 1.4.8). (1)+(2) PRAWDA, jedna przyczyna -
+poprawione: Abort (i zapas w CloseMine) wolal HideInquiry, gdy StillOpen() = true, a w fazie 0 krokow 1-4 _dataKnown jest false (zerowane w Next/Open), wiec StillOpen
+spadal na IsAnyInquiryActive - takze na OBCE zapytanie, na ktore krok czeka (Calm: "zapytanie na ekranie", do 20 s; trafia tam np. okno z kolejki po naszym - CloseQuery
+wyciaga je z _inquiryQueue). Zmiana etapu autotestu (Saving po celu dob / miekkim limicie, Photos, Battle), misja albo bitwa gracza w tej chwili -> Abort -> HideInquiry ->
+CloseQuery zamyka cudze okno bez jego AffirmativeAction/NegativeAction (sprawdzone: tylko OnClearData). Teraz nowe MineOnScreen(): HideInquiry tylko przy fazie >= 1,
+czytelnym _activeQueryData (statyczne pole jest w 1.4.8) i ReferenceEquals z danymi kroku - w Abort i w CloseMine; bez pola nie zamykamy wcale (linia mowi "zostawione
+autotestowi", autotest zamknie po 1-1.5 s, przyciski i tak bez skutku). StillOpen z zapasem zostaje tylko do odczytu (faza 1/2, linia logu). Zamkniecie w Open() przy
+bledzie zostaje na IsAnyInquiryActive - Calm(false) w tej samej klatce sprawdzil, ze zadnego zapytania nie bylo, wiec to moze byc tylko okno z PhotoOpen. (3) PRAWDA
+(minor) - poprawione: Calm() mial tylko czesc warunkow okna lupu; na koncu Calm (przed warunkiem etapu) wspolna bramka Prologue.SceneGate(c) - ekran wczytywania,
+MapScreen.IsReady, rozmowa na mapie, menu nad mapa (ActiveStateDisabledByUser), scena powiadomienia, MBCommon.IsPaused, TimeControlModeLock, PlayerEncounter.Battle, okno
+BK (BannerKingsMapView), okno wydarzenia ROT na stosie, SpoilsWindow.IsOpen. Sprawdzone, ze nie zablokuje proby w miescie autotestu: Kronika (ta sama bramka) pokazala okno
+"The King in the North" 24.10 22:16:43 (Armoury-2026-10-24_22-13-58.log) przy autotescie "czekam w The Twins (menu town_wait_menus, czas UnstoppableFastForward)",
+okno gry bez fokusu - pauza silnika, blokada czasu i spotkanie z osada przepuszczone. Blokada czasu TownStay (armoury-postoj.flag, menu obozu w polu) zatrzyma probe
+do powrotu do miasta - to inna proba, bez kolizji. SceneGate bez skutkow ubocznych (sam odczyt), wolana tylko w fazie 0 i przed startem. Regresje: StillOpen, Shot,
+fazy 1/2 i proba w zwyklej grze bez zmian; okno lupu (ClosePhoto zamyka tylko _photo) bez zmian. Zbudowane 0 bledow.
 **Status:** ZBUDOWANE - nie wgrane (tylko autotest z plikiem armoury-zdjecia-okien.flag).
 
 ## 2026-10-25 131 (galaz noc/127-bitwa-cialo) - udzwig z Endurance: kazdy punkt Endurance bohatera w druzynie +5 kg
