@@ -494,7 +494,7 @@ namespace Armoury
             {
                 int noSaddle = SaddleLaw.On ? p.NoSaddle : 0;
                 int foot = p.NoHorse + noSaddle;
-                if (foot <= 0) sb.Append("Every rider has his horse").Append(SaddleLaw.On ? " and his harness" : "").Append(" - none will fight on foot.");
+                if (foot <= 0) sb.Append("Every rider has a horse").Append(SaddleLaw.On ? " and a harness" : "").Append(" - none will fight on foot.");
                 else
                 {
                     sb.Append(foot).Append(foot == 1 ? " rider will fight on foot: " : " riders will fight on foot: ");
@@ -562,8 +562,8 @@ namespace Armoury
             sb.Append("\n\nIt changes with every prisoner taken or freed, every recruit, every horse bought, sold or moved between the baggage and the troops' armoury - that is why the column walks one day and rides the next.");
             if (!col.K0)
                 sb.Append(" Free horses in the troops' armoury do not carry footmen (Spare Horses Carry Footmen is off).");
-            else if (p != null && p.Horses > 0)
-                sb.Append(" The free horses in your own troops' armoury do not carry your footmen on the march - only spare horses in your baggage do.");
+            else if (p != null && p.Horses - (p.Mounted + ExemptMounted(p)) > 0)
+                sb.Append(" The ").Append(p.Horses - (p.Mounted + ExemptMounted(p))).Append(" free horses in your own troops' armoury do not carry your footmen on the march - only spare horses in your baggage do.");
             return sb.ToString();
         }
 
@@ -920,7 +920,7 @@ namespace Armoury
                 for (int i = 0; i < Slots; i++) if (Covers(_work[i], k)) { cov = true; break; }
                 if (!cov) missing.Add(KindLower(k));
             }
-            var d = new StringBuilder("Each banner is one of the game's 8 formations; your men take their places in them when a battle opens, and when you command 20 men or more the Order of Battle screen shows them before the fight.");
+            var d = new StringBuilder("Each banner is one of the game's 8 formations; your men take their places in them when a field battle opens, and when you command 20 men or more the Order of Battle screen shows them before the fight.");
             d.Append(' ').Append(!writes ? "The review only shows the game's order (Army Review Writes Order Of Battle is off)."
                                : _fromGame && !_dirty ? "No order is set: this is how the game sorts your men by kind."
                                : _dirty ? "You have changes not yet saved." : "This is the order of your next battle.");
