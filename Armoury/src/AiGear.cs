@@ -40,7 +40,7 @@ namespace Armoury
     /// </summary>
     internal static class AiGear
     {
-        internal static void Reset() { _lastDay.Clear(); _dteRefused.Clear(); _dteOk.Clear(); AiBuyRules.Reset(); AmmoOrders.Reset(); }   // E8/Z (251): liczniki regul zakupow AI; tb: liczniki zamowien amunicji
+        internal static void Reset() { _lastDay.Clear(); _dteRefused.Clear(); _dteOk.Clear(); AiBuyRules.Reset(); AmmoOrders.Reset(); _avgPrice = 0; }   // E8/Z (251): liczniki regul zakupow AI; tb: liczniki zamowien amunicji
         private static Type _dte;
         private static FieldInfo _armories;
         private static MethodInfo _add;
@@ -894,7 +894,7 @@ namespace Armoury
                 var lord = payer;
                 int reserve = Math.Max(0, s.AiGearGoldReserve);
                 double p = Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100.0;
-                int budget = lordPays ? (int)((lord.Gold - reserve) * p) : 0;
+                int budget = lordPays ? GoldPart(lord, s) : 0;   // p9: ten sam wzor co BudgetPreview (GoldPart: (zloto pana - rezerwa) x procent)
                 int maxPieces = Math.Max(1, s.AiGearMaxPiecesPerVisit);
                 // 171 C6 (krytyka 4): zaloga zamku zamawia w miescie raz na D dob - zamowienie obejmuje wszystkie te doby: budzet 1-(1-p)^D kiesy
                 // ponad rezerwe (tyle, ile wydalyby D dziennych zakupow, nie wiecej) i limit sztuk x D; polka wlasnego zamku - codziennie jak dotad
@@ -1071,6 +1071,7 @@ namespace Armoury
                     AmmoOrders.NoteVisit(aw, ammoShort);
                 }
                 if (pieces <= 0) return;
+                try { ArmedStrength.MarkDirty(mp); } catch { }   // p9: zakup zmienia gotowosc zbrojowni - przeliczenie sily i progu w nastepnej godzinie
                 // poprawki sklad7: Twoja kiesa nie zmienia sie bez slowa - tylko gdy Twoja kiesa doplacila (GarrisonBuysGearPlayer); raz na dobe na zaloge (stempel _lastDay)
                 if (garrison && lord == Hero.MainHero && lordPart > 0)
                     Log.Player("Your garrison of " + st.Name + " bought " + pieces + " pieces of kit for " + spent + " denars (their purse " + (spent - lordPart) + ", your coin " + lordPart + ").");
@@ -1088,8 +1089,46 @@ namespace Armoury
 
         private static int _dayGarrison, _dayGarrisonGold;
 
+        // p9 (ArmsFirst): srednia cena sztuki zakupow AI wczoraj (zloto / sztuki z linii "ZakupyAI: dzien"); 0 = jeszcze nieznana w tej sesji
+        private static int _avgPrice;
+        internal static int AvgPiecePriceYesterday { get { return _avgPrice; } }
+
+        /// <summary>p9: czesc budzetu brakow z kiesy pana - (zloto - AiGearGoldReserve) x AiGearBudgetPercent, moze byc ujemna (TryBuyCore przycina ja dalej
+        /// przydzialem sprzetu rodu i zerem). Jedna funkcja dla TryBuyCore i BudgetPreview.</summary>
+        internal static int GoldPart(Hero lord, Settings s)
+        {
+            int reserve = Math.Max(0, s.AiGearGoldReserve);
+            double p = Math.Max(0f, Math.Min(100f, s.AiGearBudgetPercent)) / 100.0;
+            return (int)((lord.Gold - reserve) * p);
+        }
+
+        /// <summary>p9 (ArmsFirst - "stac go na sprzet?"): budzet zakupu brakow lorda AI tym samym wzorem co TryBuyCore dla partii lorda (nie zalogi): GoldPart,
+        /// przyciety niewydanym przydzialem sprzetu rodu (ClanBudget.GearCap), plus sakiewka ludzi minus rezerwa napraw. Rezerwa napraw bez miasta (sama robocizna;
+        /// TryBuyCore w miescie dolicza szacunek materialu z polki - podglad moze byc nieco wiekszy). Tylko odczyt; 0 - zakupy AI wylaczone albo partia poza regula.</summary>
+        internal static int BudgetPreview(MobileParty mp) { return BudgetPreview(mp, null); }
+
+        /// <summary>Recenzja p9 (uwaga 4): podglad dla wybranego MIASTA - rezerwa napraw jak TryBuyCore (AiWear.OutstandingCost(mp, st): robocizna i szacunek materialu
+        /// z polki tego miasta); st == null - sama robocizna jak dotad.</summary>
+        internal static int BudgetPreview(MobileParty mp, Settlement st)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (!On || s == null || mp == null || mp.IsMainParty || !mp.IsLordParty) return 0;
+                var lord = mp.LeaderHero;
+                if (lord == null || !lord.IsAlive) return 0;
+                int budget = GoldPart(lord, s);
+                int gearCap;
+                if (ClanBudget.GearCap(lord.Clan, out gearCap)) budget = Math.Min(budget, gearCap);
+                int purse = Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp, st));
+                return Math.Max(0, budget) + purse;
+            }
+            catch { return 0; }
+        }
+
         private static void FlushDay()
         {
+            if (_dayPieces > 0) _avgPrice = Math.Max(1, _dayGold / _dayPieces);   // p9: srednia cena sztuki tej doby - "wczoraj" dla ArmsFirst
             if (_dayStamp >= 0 && (_dayVisits > 0))
                 Log.Info("ZakupyAI: dzien " + _dayStamp + " - " + _dayVisits + " wizyt, " + _dayPieces + " szt. kupionych za " + _dayGold + " zlota; w tym garnizony " + _dayGarrison + " zakupow za " + _dayGarrisonGold
                          + "; zastepcze (174, pytanie 2): bron biala " + _daySubMelee + (SubstituteMeleeOn ? "" : " (wylaczone)") + ", zbroja na tulow " + _daySubBody + (SubstituteBodyOn ? "" : " (wylaczone)") + (_subStumbles > 0 ? "; potkniecia zastepczych " + _subStumbles : "") + ".");

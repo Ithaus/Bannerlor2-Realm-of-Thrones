@@ -121,9 +121,10 @@ namespace Armoury
         private static readonly List<Siege> _tmpGated = new List<Siege>();   // f12: osady, ktorym bramka zasiegu zamknela podbicie w tej mysli
         private static readonly HashSet<MobileParty> _dParties = new HashSet<MobileParty>();
         private static readonly HashSet<MobileParty> _dRelParties = new HashSet<MobileParty>();   // f12: druzyny zwolnione dzis bramka zasiegu (bez zadnej odsieczy od OB5)
+        private static readonly HashSet<MobileParty> _dUnreadyParties = new HashSet<MobileParty>();   // recenzja p9: niegotowe (ArmsFirst) w mysli OB5 dzis
         private static readonly List<MobileParty> _tmpGone = new List<MobileParty>();
         private static double _hour = -1.0;
-        private static int _dRaised, _dStarve, _dKingOffer, _dKingNoCall, _dArmies, _dStarted, _dEnded, _dCaptured, _undeadNow, _offClassNow, _stumbles, _dStumbles, _dOwnSiege, _dRel;
+        private static int _dRaised, _dStarve, _dKingOffer, _dKingNoCall, _dArmies, _dStarted, _dEnded, _dCaptured, _undeadNow, _offClassNow, _stumbles, _dStumbles, _dOwnSiege, _dRel, _dUnready;
         private static bool _patched; private static string _missing; private static MethodBase _target;
 
         private static Settings S { get { return Settings.Current; } }
@@ -133,8 +134,8 @@ namespace Armoury
         internal static void Reset()
         {
             _byK.Clear(); _tracks.Clear(); _armyFor.Clear(); _tmpIdx.Clear(); _tmpSg.Clear(); _dParties.Clear(); _hour = -1.0; _endedRelief.Clear();
-            _dRelParties.Clear(); _tmpGone.Clear(); _tmpGated.Clear();
-            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = _dRel = 0;
+            _dRelParties.Clear(); _tmpGone.Clear(); _tmpGated.Clear(); _dUnreadyParties.Clear();
+            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = _dRel = _dUnready = 0;
         }
 
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -401,6 +402,10 @@ namespace Armoury
 
                 float other = 0f, dMax = 0f;
                 _tmpIdx.Clear(); _tmpSg.Clear();
+                // recenzja p9 (uwaga 5): niegotowa partia (ArmsFirst - jedna regula z ArmsFirst.IsBattle) idzie tylko na odsiecz osady WLASNEGO rodu: odsiecz cudzej
+                // osady nie trafia do zasiegu krolestwa (EligAt / Eligible) ani do podbicia - ArmsFirst i tak dalby jej -1, a zasieg bylby zawyzony
+                bool unready = ArmsFirst.Unready(party);
+                var pc = unready ? party.ActualClan : null;
                 for (int i = 0; i < scores.Count; i++)
                 {
                     var e = scores[i];
@@ -409,6 +414,7 @@ namespace Armoury
                     {
                         var st = e.Item1.Party as Settlement;
                         if (st != null) for (int j = 0; j < list.Count; j++) if (ReferenceEquals(list[j].St, st)) { sg = list[j]; break; }
+                        if (sg != null && unready && !(pc != null && ReferenceEquals(st.OwnerClan, pc))) { _dUnready++; _dUnreadyParties.Add(party); continue; }   // ani odsiecz, ani "inna opcja"
                     }
                     if (sg != null) { _tmpIdx.Add(i); _tmpSg.Add(sg); if (e.Item2 > dMax) dMax = e.Item2; }
                     else if (e.Item2 > other) other = e.Item2;
@@ -696,6 +702,7 @@ namespace Armoury
                   .Append(" (odsiecz zamku pominieta przy wlasnym oblezeniu druzyny ").Append(_dOwnSiege).Append(")")
                   .Append(", odsiecz bez szans (zasieg krolestwa < min(wymagana, 1.2 x oboz)): zwolnione ").Append(_dRel).Append(" razy u ").Append(_dRelParties.Count).Append(" druzyn")
                   .Append(gateOn ? "" : " (Besieged Relief Only When Reachable NIE - bez zwalniania)")
+                  .Append(", niegotowe (p9 - bez sprzetu, tylko odsiecz osady wlasnego rodu): pominiete odsiecze cudzych osad ").Append(_dUnready).Append(" razy u ").Append(_dUnreadyParties.Count).Append(" druzyn")
                   .Append(" | trwajace oblezenia: podbite druzyny potem w odsieczy ").Append(redir)
                   .Append(" | ").Append(shown > 0 ? rows.ToString() : "-")
                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(").");
@@ -707,8 +714,8 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = _dRel = 0;
-            _dParties.Clear(); _endedRelief.Clear(); _dRelParties.Clear();
+            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = _dRel = _dUnready = 0;
+            _dParties.Clear(); _endedRelief.Clear(); _dRelParties.Clear(); _dUnreadyParties.Clear();
             foreach (var kv in _tracks) kv.Value.DayRel.Clear();
         }
     }

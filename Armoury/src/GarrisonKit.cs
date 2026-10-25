@@ -383,7 +383,14 @@ namespace Armoury
         /// bez nich miala najwyzej 5/7 = 71% i nigdy nie przechodzila progu 75%; battle=true - tylko zdrowi (DTE ubiera do bitwy tylko ich).</summary>
         internal static int FillPercent(MobileParty g, Dictionary<ItemObject, int> arm, List<string> shorts, bool battle)
         {
-            int need = 0, used = 0;
+            int need, used;
+            return FillPercent(g, arm, shorts, battle, out need, out used);
+        }
+
+        /// <summary>p9 recenzja (ArmsFirst - braki do progu): to samo z liczbami - sloty wzorca (need) i obsadzone ze zbrojowni (used).</summary>
+        internal static int FillPercent(MobileParty g, Dictionary<ItemObject, int> arm, List<string> shorts, bool battle, out int need, out int used)
+        {
+            need = 0; used = 0;
             try
             {
                 foreach (var type in QuartermasterLaw.KitTypes)

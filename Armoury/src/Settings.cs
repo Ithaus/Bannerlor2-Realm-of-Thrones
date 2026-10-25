@@ -4483,6 +4483,26 @@ namespace Armoury
         public int FriendlyFireRangedPercent = 100;        // with Friendly Fire: share of its damage (percent) an arrow, bolt or javelin does to a man of its own side (100 = full, 0 = none)
         public int FriendlyFireMeleePercent = 50;          // with Friendly Fire: share of its damage (percent) a sword, axe or spear blow does to a man of its own side (0 = blows pass harmlessly, as in the game)
         public int FriendlyFireChargePercent = 50;         // with Friendly Fire: share of its damage (percent) a charging horse does to a man of its own side
+        // --- AI readiness before battle (25.10) ---
+        // p9 (Jeff 25.10 po bitwie 108972: 55 ludzi Lady Darlessy Marbrand w tunikach z kijami - "AI najpierw przygotowac wojsko i dobrac pancerz, bo zolnierz
+        // taki nie nadaje sie do bitwy"): ArmedStrength.cs (sila partii w ocenach AI z gotowoscia zbrojowni) i ArmsFirst.cs (najpierw dozbroic). Nowe klucze -
+        // MCM Jeffa ich nie ma (domyslne z kodu). Progi: 75 = GarrisonArmoryMinFillPercent ("tyle kompletu i oddzial walczy jak pelny"), 60 = prog "chudych"
+        // partii rodu (GarrisonKit.ClanFillOnce), 50 = polowa slotow wzorca pusta.
+        public bool AiStrengthCountsGear = true;           // When lords weigh a fight - whether to attack, flee or join a battle, whether to lead or join an army, whether to march to a relief, how strong a realm is in war and peace - a party counts only as strong as the kit its stores hold for its men, measured like the garrison threshold. A party whose stores are empty counts as a band of peasants in tunics with clubs. The same rule for every lord's party, yours and your clan's, and for garrisons that fight only with their stores; bandits, caravans, villagers, militia and the dead count as before. Off = strength by troop tier only
+        // druga recenzja p9: wynik autobitew (SimulateHit) za osobnym kluczem - zmienia "wygrane ponad oczekiwane" B175 i kalibracje NorthHomeEdge, wiec proba A/B na
+        // tym samym zapisie. Domyslnie TAK: bez niego ocena AI (z uzbrojeniem) i wynik autobitwy (sam tier) sie rozjezdzaja - uzbrojeni atakuja liczna gola partie i przegrywaja.
+        public bool AiAutobattleCountsGear = true;         // Auto-resolved battles count kit the same way as AI Strength Counts Gear: a blow struck by an ill-armed man lands softer and a blow taken by him lands harder, so a fight ends the way it was judged. Works only with AI Strength Counts Gear. Off = auto-resolved blows by troop tier only, as before
+        public int AiStrengthFullKitPercent = 75;          // share of its men's template slots a party's stores must fill for it to count at full strength (the same 75% as the garrison threshold); below it the party's strength falls in a straight line towards that of unarmed men
+        public bool AiArmsBeforeBattle = true;             // A lord whose stores hold kit for fewer than AI Arms Below Percent of his men's slots arms them first: he rides to the nearest friendly town within AI Arms Trip Max Days and buys kit there with his own gold, as lords already do in towns. Until his stores reach AI Arms Ready Percent he attacks no lord, besieges and raids nothing, does not march to relieve another clan's fortress, neither leads nor joins an army, and refuses your summons. A lord who cannot arm his men within AI Arms Wait Max Days (no gold, no town in reach, or shelves that sell him nothing) goes back to war with what they carry - his strength is still judged by their kit - until he can pay for kit again. He still defends his own clan's fiefs and still flees. Your clan's parties follow the same rule. Off = lords go to war with whatever their men carry
+        public int AiArmsBelowPercent = 50;                // a lord's party counts as unarmed when its stores fill less than this share of its men's template slots
+        public int AiArmsReadyPercent = 60;                // an unarmed lord's party counts as armed again from this share of its men's template slots
+        public int AiArmsTripMaxDays = 3;                  // the farthest friendly town, in days of march, an unarmed lord rides to for kit
+        public int AiArmsTripCooldownDays = 3;             // a town where an unarmed lord found nothing that armed his men (empty shelves or no gold) is not chosen by him again for this many days
+        // recenzja p9 (uwaga 3) i druga recenzja: dwa wyjazdy na najdalszy zasieg - zasieg liczony 24 h marszu na dobe, a oboz nocny (CampStartHour 21 - CampEndHour 3)
+        // stoi 6 h: 3 doby drogi to ok. 4 doby kalendarza, z postojem 26 h - 2 x (4 + 1.1) = 10.2 doby; 12 = to i zapas na wolniejsza partie. Postoj w miescie wyjazdu
+        // i tak wstrzymuje zwolnienie (ArmsFirst.Progressing). Potem walczy tym, co ma (regula Jeffa 12.10 - nie bezczynnosc)
+        public int AiArmsWaitMaxDays = 12;                 // the most days an unarmed lord holds back from war while he tries to arm his men; after that he fights with what they carry until he can pay for kit again
+        public bool AiArmsBlockBanditAttacks = false;      // unarmed lords leave bandits alone as well. Off = they may still attack bandits when their strength, kit counted, is enough
 
         public static void Load(string moduleDataDir)
         {
