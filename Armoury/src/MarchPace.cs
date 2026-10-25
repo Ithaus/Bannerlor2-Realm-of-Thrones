@@ -80,6 +80,46 @@ namespace Armoury
             return cap;
         }
 
+        /// <summary>noc 25.10 P4 (przeglad armii): kolumna partii "na sucho" do okna "Review the army" - skad wpis predkosci "Marching column: N afoot".</summary>
+        internal sealed class Column
+        {
+            public int Men, Foot, Mounts, Train, Prisoners, Armory;   // jak CountColumn (z doczepionymi partiami armii); Armory - wolne konie zbrojowni (HorseState)
+            public int Horses;                                       // luzaki liczone pod piechote i jencow: Mounts (+ Armory przy SpareHorsesCarryFootmen)
+            public int RidingFoot, Walkers, Allowance;               // piechurzy na luzakach, idacy pieszo (piechota + jency), juczne wolne od kary taboru
+            public int Kind, N;                                      // jak Cap: 0 ktos idzie (N idacych), 1 sami jezdzcy, 2 piechota na luzakach (N), 3 tabor
+            public float CapRaw, Scale, Cap;                         // sufit przed tempem swiata, mnoznik WorldPacePercent, sufit na mapie
+            public bool K0, Alone, Applies;                          // klucz SpareHorsesCarryFootmen; sam bohater; sufit czynny (ColumnPostfix pomija sufit <= 0.25)
+        }
+
+        /// <summary>
+        /// noc 25.10 P4: wyjasnienie sufitu kolumny - TEN SAM CountColumn i Cap co ColumnPostfix (luzaki z kluczem SpareHorsesCarryFootmen, tempo swiata
+        /// WorldPacePercent), tylko odczyt: nic nie zapisuje i nie zmienia ColumnPostfix. null = klucz kolumny wylaczony albo partia poza regula
+        /// (morze, wies, karawana, zaloga, milicja, AI przy MarchPaceAiToo off) albo pusta.
+        /// </summary>
+        internal static Column Explain(MobileParty mp)
+        {
+            var c = Settings.Current;
+            if (c == null || !c.MarchPaceEnabled || mp == null || mp.MemberRoster == null) return null;
+            if (mp.IsCurrentlyAtSea || mp.IsVillager || mp.IsCaravan || mp.IsGarrison || mp.IsMilitia) return null;
+            if (!c.MarchPaceAiToo && mp != MobileParty.MainParty) return null;
+            var r = new Column();
+            CountColumn(mp, out r.Men, out r.Foot, out r.Mounts, out r.Train, out r.Prisoners, out r.Armory);
+            if (r.Men <= 0) return null;
+            r.K0 = c.SpareHorsesCarryFootmen;
+            r.Horses = r.K0 ? r.Mounts + r.Armory : r.Mounts;
+            r.CapRaw = Cap(c, r.Men, r.Foot, r.Horses, r.Train, r.Prisoners, out r.Kind, out r.N);
+            int pace = Math.Max(5, Math.Min(100, c.WorldPacePercent));
+            r.Scale = pace / 100f;
+            r.Cap = r.CapRaw * r.Scale;
+            r.Applies = r.Cap > 0.25f;
+            // te same kroki co w Cap (luzaki najpierw pod piechote, reszta pod jencow) - do zdania w oknie
+            r.RidingFoot = Math.Min(r.Foot, r.Horses);
+            r.Walkers = (r.Foot - r.RidingFoot) + Math.Max(0, r.Prisoners - (r.Horses - r.RidingFoot));
+            r.Allowance = (int)Math.Ceiling(r.Men * Math.Max(0f, c.MarchPackAllowance));
+            r.Alone = mp == MobileParty.MainParty && r.Men == 1 && r.Prisoners == 0;
+            return r;
+        }
+
         /// <summary>
         /// Postfix (Priority.Last) na KAZDY CalculateFinalSpeed w grze.
         /// Pozycyjne __0, bo nadpisania w modach zmieniaja nazwy parametrow.
