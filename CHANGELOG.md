@@ -125,7 +125,7 @@ brak wpisu CHANGELOG) PRAWDA - ten wpis; temat commita d036d233 bez pustej linii
 - Zapis: zegary czekania w zapisie (arm_p9_wait, druga recenzja); wyjazdy i serie wizyt bez postepu po wczytaniu od nowa; F = 1 do pierwszego przeliczenia (pelny przeglad
   w pierwszych godzinach, lordowie najpierw). Cofniecie DLL na wersje bez klucza - zegary przepadaja (nic wiecej).
 - Wydajnosc: SimPostfix - 2 odczyty slownika na cios (tylko partie z F < 1 albo niegotowe w publikacji), s w pamieci na postac; zegar czekania w przeliczeniu doby partii.
-- Build: Armoury 0 bledow (6 ostrzezen jak przed zmiana); md5 z pelnej przebudowy 155f3370: 18ac11e23d7707f67f28364204149cb2 (DLL zawiera hash commitu).
+- Build: Armoury 0 bledow (6 ostrzezen jak przed zmiana); md5 z pelnej przebudowy 155f3370: 18ac11e23d7707f67f28364204149cb2 (DLL zawiera hash commitu). Druga recenzja: pelna przebudowa a5ed328f - 0 bledow, 6 ostrzezen, md5 54ab895bffdf16171fb3c916e1a4c1c5.
 **Status:** DO SPRAWDZENIA (zbudowane w galezi noc/p9-gotowosc, NIE wgrane - test i wgranie robi sesja glowna).
 
 ## 2026-10-25 113 (m119-kij, galaz w-toku/m117-ubranie po 112 231dc8a5) - bezbronny po strazach bierze z domu najgorsza bron biala (palka, mlot, sierp, toporek) swojej kultury - sztuka tymczasowa DTE, poza zbrojownia
