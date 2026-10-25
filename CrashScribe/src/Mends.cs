@@ -1049,6 +1049,27 @@ namespace CrashScribe
             catch { }   // per-lup: cicho, zeby nie zasypac logu
         }
 
+        // ===== 133a: PODGLAD GOTOWOSCI BEZ SZUMU (Jeff 25.10: "przeniesmy logi do zakladki armii") =====
+        // Pasek DTE "Army Armory readiness" i (od 133c) okno "Review the army" licza przydzial partii gracza na mapie tym samym
+        // DoAssignAsync co bitwa - z naszymi strazami. Straze maja wtedy liczyc DOKLADNIE tak samo (jedna zasada), ale nie pisac:
+        // bez Scribe.Line, bez licznikow WardReport i bez zoltego "QM: N EMPTY in battle" przy kazdej zmianie zbrojowni na mapie.
+        // K1 (krytyka 133): sam _isReadinessPreview to za malo - ten sam prywatny konstruktor uzywa CreateMapEventAssignments
+        // (lup przegranych AI po autorozstrzygnieciu), wiec warunek to podglad I partia gracza. Gracz nigdy nie jest tam przegranym.
+        // Brak pola (inna wersja DTE) = false: straze pisza jak dotad (linia startu mowi JEST/BRAK).
+        private static System.Reflection.FieldInfo _fDistPreview, _fDistParty;
+
+        internal static bool IsPreview(object distributor)
+        {
+            try
+            {
+                if (distributor == null || _fDistPreview == null || _fDistParty == null) return false;
+                if (!(bool)_fDistPreview.GetValue(distributor)) return false;
+                var p = _fDistParty.GetValue(distributor) as MobileParty;
+                return p != null && p == MobileParty.MainParty;
+            }
+            catch { return false; }
+        }
+
         public static void CamelCulling(object __instance)
         {
             try
@@ -1085,7 +1106,7 @@ namespace CrashScribe
                     if (ic == null || ic == pc) continue;   // wlasna kultura (albo bezpanski) - wolno
                     list.RemoveAt(i);
                 }
-                if ((camelKept > 0 || camelCut > 0) && _camelLawSaid < 12)
+                if ((camelKept > 0 || camelCut > 0) && _camelLawSaid < 12 && !IsPreview(__instance))   // 133a: podglad gracza bez linii
                 {
                     _camelLawSaid++;
                     Scribe.Line("Mends: wielblady w przydziale DTE (r2-konie): " + party.Name + " (kultura " + pc + ") - zostaje " + camelKept
@@ -1594,6 +1615,7 @@ namespace CrashScribe
             {
                 var dic = Traverse.Create(__instance).Field("_equipmentToAssign").GetValue() as System.Collections.IDictionary;
                 if (dic == null || dic.Count == 0) return;
+                bool pv = IsPreview(__instance);   // 133a: podglad gracza - ta sama pula, bez licznika WardReport
                 var drop = new System.Collections.Generic.List<object>();
                 foreach (System.Collections.DictionaryEntry kv in dic)
                 {
@@ -1605,7 +1627,7 @@ namespace CrashScribe
                     // smoki nie dla szeregowych - NIGDY (Jeff: "smoki ma tylko Daenerys")
                     if (IsDragonMount(item)) { drop.Add(kv.Key); continue; }
                     if (IsUniqueGear(item) || IsLoreBlade(item))
-                    { drop.Add(kv.Key); WardBlades++; }
+                    { drop.Add(kv.Key); if (!pv) WardBlades++; }
                 }
                 for (int i = 0; i < drop.Count; i++) dic.Remove(drop[i]);
             }
@@ -1764,6 +1786,9 @@ namespace CrashScribe
                 var pool = tr.Field("_equipmentToAssign").GetValue() as System.Collections.IDictionary;
                 MobileParty who = null;
                 try { who = tr.Field("_party").GetValue() as MobileParty; } catch { }
+                // 133a: podglad gotowosci partii gracza (pasek DTE, okno armii) - dopasowanie IDENTYCZNE jak w bitwie, ale bez linii
+                // "PUSTE"/"swieta zasada", bez licznika WardSkillFoot i bez zoltego "QM: N EMPTY in battle"
+                bool pv = IsPreview(__instance);
                 // ZB-5b (noc 17/18.10, po recenzji; klucz Armoury GearFitSkillLawFootInHideoutSiege - brak klucza, stara Armoury: 0, jak dotad): w kryjowce, szturmie
                 // oblezenia i po stronie oblegajacych w wypadzie/odsieczy gra stawia ludzi bez koni - jezdziec ze wzorca (Assignment.IsMounted) dopasowany jak pieszy,
                 // czyli bez filtra MountOk slotow 0-3. Rodzaj misji i strona partii jak RealmWard (FootMission - raz na misje).
@@ -1788,7 +1813,7 @@ namespace CrashScribe
                     riders.Add(ta);
                     bool mounted = false;
                     try { mounted = ta.Property("IsMounted").GetValue<bool>(); } catch { }
-                    if (mounted && footW) { mounted = false; WardSkillFoot++; }   // ZB-5b: jezdziec ze wzorca pieszo (kryjowka / szturm / oblegajacy w wypadzie)
+                    if (mounted && footW) { mounted = false; if (!pv) WardSkillFoot++; }   // ZB-5b: jezdziec ze wzorca pieszo (kryjowka / szturm / oblegajacy w wypadzie)
                     Equipment tpl = null;
                     try { tpl = ta.Property("ReferenceEquipment").GetValue() as Equipment; } catch { }
                     if (_mIsTemp == null) { try { _mIsTemp = AccessTools.Method(a.GetType(), "IsTemporarySlot"); } catch { } }
@@ -1939,7 +1964,7 @@ namespace CrashScribe
                 // da sie porownac z raportem kwatermistrza, ktory liczy te same polki na papierze
                 var emptyWho = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, int>>();
                 var emptyGroupOf = new System.Collections.Generic.Dictionary<string, string>();
-                bool diagParty = who != null && who == MobileParty.MainParty;
+                bool diagParty = who != null && who == MobileParty.MainParty && !pv;   // 133a: diagnostyka "PUSTE" tylko w bitwie
                 foreach (var d in demands)
                 {
                     if (d.Pick < 0)
@@ -2061,7 +2086,7 @@ namespace CrashScribe
                     }
                     catch { }
                 }
-                if (moved > 0 || filled > 0 || kept > 0 || keptAmmo > 0 || extras > 0)
+                if (!pv && (moved > 0 || filled > 0 || kept > 0 || keptAmmo > 0 || extras > 0))
                 {
                     string types = "";
                     foreach (var kv in emptyByType) types += (types.Length > 0 ? ", " : "") + kv.Key + " " + kv.Value;
@@ -2072,7 +2097,7 @@ namespace CrashScribe
                 }
                 // GRACZ MA TO WIDZIEC NA EKRANIE (Jeff 14.09: "info mowi, ze wszystko
                 // okay, a stoja bez kolczanow") - krotko, tylko jego partia
-                if (kept + keptAmmo > 0 && who != null && who == MobileParty.MainParty)
+                if (!pv && kept + keptAmmo > 0 && who != null && who == MobileParty.MainParty)   // 133a: na mapie (podglad) milczy
                 {
                     string top = ""; int shown = 0;
                     foreach (var kv in emptyByType) { if (shown++ >= 3) break; top += (top.Length > 0 ? ", " : "") + kv.Key + " " + kv.Value; }
@@ -4152,6 +4177,21 @@ namespace CrashScribe
                     }
                     catch { }
                 }
+                // 133a (Jeff 25.10, okno "Review the army"): podglad gotowosci partii gracza (pasek DTE, potem okno armii) poznajemy po polach
+                // rozdzielacza - przed wpieciem strazy, zeby pierwsze wywolanie juz je widzialo
+                try
+                {
+                    _fDistPreview = tDist != null ? AccessTools.DeclaredField(tDist, "_isReadinessPreview") : null;
+                    _fDistParty = tDist != null ? AccessTools.DeclaredField(tDist, "_party") : null;
+                    if (_fDistPreview != null && _fDistPreview.FieldType != typeof(bool)) _fDistPreview = null;
+                }
+                catch { _fDistPreview = null; _fDistParty = null; }
+                if (tDist != null)
+                    Scribe.Line("Mends: podglad gotowosci DTE (133a) - pole _isReadinessPreview " + (_fDistPreview != null ? "JEST" : "BRAK")
+                                + ", _party " + (_fDistParty != null ? "JEST" : "BRAK")
+                                + (_fDistPreview != null && _fDistParty != null
+                                   ? " - podglad partii gracza (pasek DTE, okno armii) bez linii, licznikow strazy i zoltego 'QM: N EMPTY'; przydzial bez zmian."
+                                   : " - podgladu nie odroznie: straze pisza i licza jak dotad."));
                 var mGen = tDist != null ? AccessTools.Method(tDist, "GenerateHorseAndHarnessList") : null;
                 if (mGen != null)
                 {
@@ -6105,12 +6145,13 @@ namespace CrashScribe
         /// w slotach 0-3 z siodla (MountOk), bez unikatow, sprzetu umarlych i klingi lore; najwyzszy wymog, potem RangedKey (jak SkillLawWard).</summary>
         private static bool StoreSub(System.Collections.IDictionary pool, CharacterObject co, ItemObject it, int slot, bool mounted, Func<CharacterObject, ItemObject, bool> cultureOk, out EquipmentElement best)
         {
-            return StoreSub(pool, co, it, slot, mounted, cultureOk, null, out best);
+            return StoreSub(pool, co, it, slot, mounted, cultureOk, null, true, out best);
         }
 
         /// <summary>ZB-4 (klucz Armoury GearFitStoreSubNoLegends): to samo z filtrem - legendy (isLegend: Armoury LegendaryLaw.IsLegend) nigdy, sprzet olbrzymow tylko
-        /// dla oddzialu z giant_* we wlasnym wzorcu (jak Armoury GearFit.Best / GiantGear). isLegend == null - bez filtra (jak dotad).</summary>
-        private static bool StoreSub(System.Collections.IDictionary pool, CharacterObject co, ItemObject it, int slot, bool mounted, Func<CharacterObject, ItemObject, bool> cultureOk, Func<ItemObject, bool> isLegend, out EquipmentElement best)
+        /// dla oddzialu z giant_* we wlasnym wzorcu (jak Armoury GearFit.Best / GiantGear). isLegend == null - bez filtra (jak dotad).
+        /// count == false (133a: podglad gotowosci gracza) - ten sam wybor, bez licznikow WardSubLegend/WardSubGiant.</summary>
+        private static bool StoreSub(System.Collections.IDictionary pool, CharacterObject co, ItemObject it, int slot, bool mounted, Func<CharacterObject, ItemObject, bool> cultureOk, Func<ItemObject, bool> isLegend, bool count, out EquipmentElement best)
         {
             best = default(EquipmentElement);
             ItemObject bi = null;
@@ -6126,8 +6167,8 @@ namespace CrashScribe
                 if (isLegend != null)
                 {
                     bool leg = false; try { leg = isLegend(ci); } catch { leg = false; }
-                    if (leg) { WardSubLegend++; continue; }
-                    if (IsGiantGear(ci) && !GiantMayWear(co)) { WardSubGiant++; continue; }
+                    if (leg) { if (count) WardSubLegend++; continue; }
+                    if (IsGiantGear(ci) && !GiantMayWear(co)) { if (count) WardSubGiant++; continue; }
                 }
                 bool ok = cultureOk != null ? cultureOk(co, ci) : !(ForeignShore(ci, co) && !TemplateHas(co, ci));
                 if (!ok || !CanUse(co, ci)) continue;
@@ -6145,6 +6186,7 @@ namespace CrashScribe
                 var list = tr.Property("Assignments").GetValue() as System.Collections.IEnumerable;
                 if (list == null) list = tr.Field("Assignments").GetValue() as System.Collections.IEnumerable;
                 if (list == null) return;
+                bool pv = IsPreview(__instance);   // 133a: podglad gotowosci gracza - te same zamiany, bez licznikow WardReport
                 // GearFit: raz na wywolanie (nie na zolnierza) - goraca sciezka, podglad gotowosci zbrojowni na mapie tez wola DoAssignAsync
                 var cultureOk = GearFitCultureOk();
                 // poprawka po recenzji: brak klucza (stara Armoury bez GearFit, bez podlogi broni) = 0 - zamiennik ze wzorca jak przed zmiana; dotad domyslne 1
@@ -6176,7 +6218,7 @@ namespace CrashScribe
                     if (_mIsTemp == null) { try { _mIsTemp = AccessTools.Method(a.GetType(), "IsTemporarySlot"); } catch { } }
                     bool mounted = false;
                     if (pool != null) { try { var hs = eq[EquipmentIndex.Horse]; mounted = !hs.IsEmpty && hs.Item != null; } catch { } }
-                    if (mounted && foot) { mounted = false; WardFootRiders++; }   // ZB-5: kryjowka / oblezenie - jezdziec walczy pieszo (kon DTE nie decyduje o broni)
+                    if (mounted && foot) { mounted = false; if (!pv) WardFootRiders++; }   // ZB-5: kryjowka / oblezenie - jezdziec walczy pieszo (kon DTE nie decyduje o broni)
                     for (int s = 0; s <= 9; s++)
                     {
                         if (s == 4) continue;                                   // sztandar
@@ -6194,11 +6236,11 @@ namespace CrashScribe
                             try { tr.Method("AddEquipmentToAssign", el, 1).GetValue(); } catch { }
                             EquipmentElement got;
                             bool found = false;
-                            try { found = StoreSub(pool, co, it, s, mounted, cultureOk, subLegend, out got); } catch { got = default(EquipmentElement); found = false; }
+                            try { found = StoreSub(pool, co, it, s, mounted, cultureOk, subLegend, !pv, out got); } catch { got = default(EquipmentElement); found = false; }
                             try { ta.Method("SetEquipment", (EquipmentIndex)s, found ? got : default(EquipmentElement)).GetValue(); } catch { }
-                            if (found) { try { tr.Method("ConsumeEquipmentToAssign", got).GetValue(); } catch { } WardForeignSub++; }
-                            else WardForeignBare++;
-                            WardForeign++;
+                            if (found) { try { tr.Method("ConsumeEquipmentToAssign", got).GetValue(); } catch { } if (!pv) WardForeignSub++; }
+                            else if (!pv) WardForeignBare++;
+                            if (!pv) WardForeign++;
                             continue;
                         }
                         ItemObject sub = null;
@@ -6207,7 +6249,7 @@ namespace CrashScribe
                         if (sub != null && !CanUse(co, sub)) sub = null;
                         try { ta.Method("SetEquipment", (EquipmentIndex)s, sub != null ? new EquipmentElement(sub) : default(EquipmentElement)).GetValue(); } catch { }
                         try { tr.Method("AddEquipmentToAssign", el, 1).GetValue(); } catch { }   // sztuka wraca na polke
-                        WardForeign++; WardForeignTpl++;
+                        if (!pv) { WardForeign++; WardForeignTpl++; }
                     }
                 }
             }

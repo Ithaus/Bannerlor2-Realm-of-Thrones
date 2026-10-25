@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 133a (galaz noc/133-raport-armii od noc/132-zdjecia 8a177bdb) - CrashScribe: podglad gotowosci partii gracza (pasek DTE, okno armii) bez linii, licznikow strazy i zoltego "QM: N EMPTY"
+**Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom ... w tym logu tak szybko to leci ze ja nie wiem ... de facto przeniesmy
+logi do zakladki armii". Pierwszy krok paczki 133 (projekt + krytyka K1-K16: scratchpad raport-armii-133.txt). Okno "Review the army" (133c) ma liczyc sprzet "na nastepna bitwe"
+tym samym DoAssignAsync DTE co bitwa (prywatny konstruktor podgladu, _isReadinessPreview = true). Dzis kazde takie wywolanie - takze pasek DTE "Army Armory readiness" przy kazdej
+zmianie zbrojowni/skladu na mapie - przechodzi przez nasze straze, ktore pisza jak w bitwie: "Mends: PUSTE ..." i "swieta zasada skilli w DTE" w logu CS oraz zolte
+"QM: N EMPTY in battle" na ekranie (dowod: CS sesja 2026-10-25_02-11-21, wpisy 02:21:42, 02:22:15, 02:22:38 na mapie miedzy bitwami), a UniqueWard/RealmWard podbijaja liczniki
+WardReport (linia "Straz unikatow" po bitwie liczyla tez podglady z mapy).
+**Przyczyna:** Mends.SkillLawWard, RealmWard, UniqueWard i CamelCulling nie sprawdzaly, czy rozdzielacz to podglad.
+**Zmiana:** CrashScribe/src/Mends.cs: nowe Mends.IsPreview(rozdzielacz) = pole _isReadinessPreview I _party == MobileParty.MainParty (K1: ten sam prywatny konstruktor uzywa
+DTE CreateMapEventAssignments - lup przegranych AI po autorozstrzygnieciu; tam linie i liczniki zostaja jak dotad). Pola szukane raz przy wpieciu (AccessTools.DeclaredField
+na PartyEquipmentDistributor, przed latkami); brak pola = false, czyli straze pisza i licza jak dotad. Przy podgladzie gracza: SkillLawWard bez linii "PUSTE"/"swieta zasada",
+bez zoltego "QM: N EMPTY in battle", bez WardSkillFoot; RealmWard bez WardForeign/WardForeignSub/WardForeignBare/WardForeignTpl/WardFootRiders, a StoreSub (nowy parametr count)
+bez WardSubLegend/WardSubGiant; UniqueWard bez WardBlades; CamelCulling bez linii "wielblady w przydziale DTE" (i bez zuzywania limitu 12 linii). LOGIKA PRZYDZIALU BEZ ZMIAN -
+te same zdjecia, zamiany, zwroty na polke i pobrania; zmienione tylko warunki logowania i licznikow. Linia startu "Mends: podglad gotowosci DTE (133a) - pole _isReadinessPreview
+JEST/BRAK, _party JEST/BRAK ...".
+**Ryzyko / co sprawdzic:** (1) Po wgraniu linie "Straz unikatow" (WardReport) i "swieta zasada" beda rzadsze - dotad liczyly tez podglady paska DTE na mapie; to nie regresja.
+(2) Bez zmian celowo: Scribe.Report w catch SkillLawWard i WardStumbles w catch RealmWard (bledy maja byc widoczne takze z podgladu); jednorazowe linie wpiec (GearFitCultureOk,
+ArmouryIsLegend, ArmouryCamelLaw, ArmouryFloat PODPIETY/BRAK) - raz na proces. (3) Armoury GearFit.CultureOk wolane z RealmWard w podgladzie paska dalej liczy swoje odmowy
+(licznik Armoury, poza CS) - okno 133c ustawi GearFit.Quiet; pasek DTE to osobny temat. (4) Kontrola w kodzie: IsPreview w podgladzie nigdy nie ma misji (konstruktor podgladu
+ustawia _mission = null), wiec ZB-5/ZB-5b (FootMission) i tak tam nie dzialaly; ArmourWard (Assignment.FillEmptySlots) nie jest wolany przez pasek DTE, tylko przez
+CreateMapEventAssignments i spawn - bez zmian. StoreSub 7-arg przekazuje count = true (jak dotad). GearFit.cs Armoury czyta pole WardForeignSub odbiciem - pole bez zmian.
+Sprawdzic w CS: linia startu "JEST, _party JEST"; na mapie po zmianie zbrojowni/werbunku zadnych nowych "Mends: PUSTE"/"swieta zasada [Twoja partia" ani zoltego "QM: ... EMPTY";
+w bitwie te linie jak dotad.
+**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+
 ## 2026-10-25 132 (galaz noc/132-zdjecia od noc/127-bitwa-cialo 9bc0f627) - proba autotestu: zdjecia nowych okien (przeglad armii, choragwie, przypinanie, okno lupu po bitwie, oblezeniu i turnieju)
 **Problem:** Jeff 25.10 ok. 12:52: "daj mi zdjecia z gry jak wygladaja te nowe widoki popupy armii, lupow etc". Okna z nocy (P4/P12 przeglad armii, P5/P11 okno lupu) nie maja
 zadnego zdjecia - autotest ich nie otwiera (przeglad tylko z menu obozu, okno lupu tylko po prawdziwej bitwie z lupem), a proby P4/P11 sprawdzaja liczby, nie obraz.
