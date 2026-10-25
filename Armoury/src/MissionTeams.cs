@@ -38,6 +38,9 @@ namespace Armoury
     {
         // miejsca (indeksy licznikow)
         internal const int Alarm = 0, Broken = 1, Flee = 2, Parry = 3, Kill = 4;
+        // 142 (25.10): panika gry przejeta przez RoutHold (RoutKeeper, kolejka z OnAgentPanicked) - TYLKO znacznik dla RoutHold.Break / NoReturn,
+        // poza tablicami tej klasy (Held / Pushed / Skip ignoruja site >= Sites) - linia NM bez zmian, licznik w linii "PANIKA BEZ POWROTU (142)"
+        internal const int GamePanic = 5;
         private const int Sites = 5;
         private static readonly string[] SiteName = { "alarm", "rozbici", "ucieczka", "blok", "zabicia" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji, reszta tylko w liczniku

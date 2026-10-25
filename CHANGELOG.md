@@ -1,5 +1,65 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 142 (galaz noc/139-ai-zycie, po 141 ca231ec0) - AI walczy o zycie, krok 4: panika bez powrotu - kazda panika gry w bitwie polowej do RoutHold (karta "139a", klucz RoutedMenNeverRally)
+**Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek ... dopiero ta zasada peka gdy jest panika,
+w panice jest zasada uciekaj i brak rozsadku ... Wtedy ginie najwiecej osob."; decyzja Jeffa ok. 15:00 (pytanie D3 syntezy): panika z morale gry "Bez powrotu, zbiorka
+pozniej" (zbiorka przy sztandarze to osobny etap - NIE w tym kroku). Objaw: spanikowany przez morale gry po ok. 10 s wraca do walki bez broni ("bija piescia", Jeff 16.10).
+Dowodu z gry dla paniki gry NIE ma - linia "LOS ZLAMANYCH (139)" (powroty RBM) jeszcze nie byla w grze; luka wskazana w kodzie (raport B rozpoznania paniki, 2.2).
+**Przyczyna:** (dekompilacje 1.4.8 scratchpad/panB/CommonAI.cs, scratchpad/surv/RBMAI.AgentAi.cs, RBMAI.Tactics.cs, scratchpad/amil142.cs) (1) RBMAI AgentAi.cs:651-657 -
+postfiks HumanAIComponent.OnTick w KAZDEJ klatce: GetMorale > 0 i 10 s bez ciosu wrecz -> CommonAIComponent.StopRetreating (bez warunku IsPanicked); StopRetreating
+(gdy IsRetreating) zeruje IsRetreating i IsPanicked, daje morale max(0.02, m) i natywne Agent.StopRetreating. (2) AgentMoraleInteractionLogic.ApplyMoraleEffectOnAgentIncapacitated
+(smierc / nokaut w 4 m) dodaje morale do 10 sojusznikom zabojcy BEZ filtra paniki - spanikowany dostaje premie i spelnia warunek RBM. (3) Nasi zlamani (BrokenMen < 20% HP,
+FieldCraft < 10%, choragiew) maja od NB2 (16.10) morale przypiete na 0 w RoutKeeper, ale panika z morale gry (CommonAIComponent.OnTickParallel: morale < 0.01 ->
+_panicTriggered -> OnTick -> Panic -> Mission.OnAgentPanicked) i RBM CoordinatedRetreat (RBMAI Tactics.cs:385-442: RemainingPowerRatio < 0.1 i sama konnica - SetMorale(0)
+calej strony) do RoutHold nie trafiala - RoutKeeper.OnAgentPanicked liczyl tylko ponowne paniki naszych. (4) Panic ustawia IsPanicked PRZED Mission.OnAgentPanicked
+(CommonAI.cs Panic), Mission.OnAgentPanicked iteruje zachowania misji od konca (Mission:6704-6710), a MissionAgentPanicHandler.OnPreMissionTick daje Retreat w nastepnej
+klatce - stad kolejka i przejecie w nastepnym OnMissionTick (po handlerze: cel gry juz jest).
+**Zmiana:** RoutHold.cs (RoutKeeper), NoReturn.cs (nowy), MissionTeams.cs (znacznik GamePanic = 5 poza tablicami NM), BrokenFate.cs (3 odczyty do linii 142), Settings.cs,
+McmSettings.cs (gen_mcm: Armoury 2500 ustawien), SubModuleMain.cs (RoutKeeper takze przy BrokenMenNeverRally + RoutedMenNeverRally).
+(a) Wejscie: RoutKeeper.OnAgentPanicked (po liczniku RePanic i BrokenFate.Panicked) -> Enqueue: czlowiek (konie od ciosu odpadaja), AI, nie gracz, nie w zbiorze zlamanych
+(_by - nasz Break wpisuje PRZED Panic, wiec nasze paniki nie wracaja do kolejki), misja nie skonczona, bitwa polowa (NoReturnHere, raz na misje: IsFieldBattle bez kryjowki
+(FieldHere), bez IsNavalBattle / IsNavalRaidBattle, rodzaj "bitwa") -> pomiar (NoReturn.Candidate, takze przy kluczu NIE); przy RoutedMenNeverRally i BrokenMenNeverRally
+TAK wpis do kolejki (lock, HashSet bez duplikatow). W callbacku nic poza wpisem.
+(b) Przejecie: RoutKeeper.OnMissionTick -> TickList -> TakeQueued przed petla zlamanych: najwyzej TakePerFrame = 30 na klatke i tylko gdy zywych wpisow < MaxEntries = 800;
+tylko kto WCIAZ ma IsPanicked (zgaszona przed przejeciem - licznik, bez Panic); Break(a, MissionTeams.GamePanic) - w Break nowy warunek: panika gry tylko trwajaca, wiec
+zawsze sciezka "juz w panice": bez drugiego Panic, czyli bez drugiego okrzyku gry i drugiej animacji / zrzutu ArtemsLivelyAnimations; morale 0; dalej jak nasz zlamany
+(przypiecie 0 przy panice, 0.02 po zgaszeniu przez innych + ponowiony odwrot bez okrzyku, kierunek FleeAwayFromEnemies, wypada przy przejeciu przez gracza). Nowi ida od razu
+przez TickOne w tej samej klatce (Pending -> cel gry z handlera -> Decide). Czekajacy w kolejce (limit / ponad 30): morale 0, dopoki IsPanicked (RBM ich nie zawroci przed
+przejeciem). Koniec bitwy (MissionEnded) - kolejka przepada (gra sama gasi panike zwyciezcom, CommonAI.cs OnTickParallel), koniec misji - tak samo.
+(c) Liczniki: NB2 bez zmiany znaczenia "zlamani / rozbici / ucieczka / Panic / juz w panice" (GamePanic do NoReturn, nie do Broken / Fled / Already; linia NM bez Pushed);
+liczniki NB2 "morale przypiete", "zgaszone przez innych", "ponowienia", "kierunek", "przejeci przez gracza" i RePanic obejmuja teraz takze przejetych z paniki gry.
+Nowe miejsce potkniec NB2 "powrot" (SiteNoReturn = 15, Sites 16; regex sprawdz_logi przyjmuje kolejne "[a-z]+ \d+").
+(d) Linia raz na bitwe polowa, zaraz po "LOS ZLAMANYCH (139)" (RoutHold.Write -> NoReturn.Write pod Gate; przy kluczu NIE tylko gdy byla panika gry w polu):
+"PANIKA BEZ POWROTU (142): misja bitwa, klucz TAK (Broken Men Never Rally TAK; ...) | panika gry w polu: ludzi N (paniki P, pierwsza po x s misji) -> RoutHold T (bohaterow h;
+strona gracza p / wroga w; bez drugiego Panic, okrzyku i animacji) | nie przejeci: zgaszona przed przejeciem q, wzieta inna droga (BrokenMen / FieldCraft / choragiew) o,
+padli lub uszli w kolejce g, odmowy Break r, po koncu bitwy e | kolejka: najwiecej czekajacych k, czekanie sr. 0.00 s / najdluzej 0.00 s, klatek na limicie wpisow l,
+morale 0 czekajacym w razy | bez powrotu (przejeci z paniki gry): premia morale zdjeta u ludzi a, zgaszone mimo to (RBM po premii w tej samej klatce) z -> ponowiony odwrot bez
+okrzyku s, ponowne paniki gry r (wszyscy zlamani R) | powroty RBM poza RoutHold (linia 139): r (ludzi h) | wpisy RoutKeeper: najwiecej naraz n (limit 800), w bitwie razem m
+(nasi b + panika gry T) | czas bitwy: od rozstawienia do rozstrzygniecia t s, od pierwszej paniki gry u s (koniec misji v s) | tick RoutKeeper: sr. x ms (klatek z praca f),
+najwiecej y ms | potkniecia powrot n." Linia startu sesji NB2 - segment "Routed Men Never Rally TAK (...)".
+(e) Klucz MCM RoutedMenNeverRally = TAK (grupa "The master's parry", opis po angielsku); przy BrokenMenNeverRally NIE nieczynny (linia: "nieczynne ... tylko pomiar").
+Przelacznik 139: przejety jest w RoutHold (Knows), wiec SurvivalMode.InPanic mowi PANIKA do konca bitwy, takze po zgaszeniu przez innych - paczki rozsadku (140 tarcze,
+141 S2) go pomijaja. Warunek przejecia to sama panika (IsPanicked), nie caly przelacznik: "sam odwrot komponentu" (ofiara szarzy RBM) nie jest panika i nie ma OnAgentPanicked.
+Odstepstwa od karty (swiadome): (1) limit wpisow i przejec na klatke zamiast przejecia wszystkich w jednej klatce (CoordinatedRetreat = setki ludzi; koszt pierwszej oceny
+kierunku); czekajacy maja morale 0, wiec limit nie otwiera powrotu; (2) pomiar paniki gry w polu i czasu bitwy takze przy kluczu NIE (porownanie przed / po z karty);
+(3) bohaterowie paniki gry TEZ (model morale Sandbox pozwala im panikowac - SandboxBattleMoraleModel.CanPanicDueToMorale; "kazda panika"), liczeni osobno.
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - Break dla BrokenMen / FieldCraft / choragwi bez zmian (nowy warunek tylko dla GamePanic; Broken /
+Fled / Already / Pushed jak dotad); ich wywolania na czlowieka juz przejetego koncza sie na _by (true, jak dotad dla "raz na bitwe"); RoutKeeper.OnMissionTick: petla
+zlamanych ta sama, tylko w TickList (te same wczesne wyjscia: klucz NIE, brak misji, MissionEnded); BrokenFate: przejety z paniki gry = "przejety" (grupa gry, Taken -
+jego powrotow 139 nie liczy, bo jest w RoutHold), "powroty RBM" 139 licza teraz reszte (poza polem, przed przejeciem, klucz NIE). (b) kolizje - BannerCompanies.InRanks
+nie liczy IsPanicked: trwala panika gry szybciej daje "polowe skladu" (raz na kompanie - rzut) - mozliwa kaskada, patrz "zlamania kompanii" NB2 i czas bitwy;
+BattleEndLogic: trwale zlamani skracaja bitwe (zamierzone, karta) - "czas bitwy" przed / po; zarazanie paniki gry (AgentMoraleInteractionLogic.OnAgentFleeing) bez zmian
+(raz na panike, handler gry); ShieldsUp (140) i S2 (141) pomijaja przejetych (przelacznik); MarchToContact pomija IsRunningAway jak dotad; strona gracza objeta (synteza Z9 -
+jego ludzie tez nie wracaja; formacji gracza nie przejmujemy). (c) jedno zjawisko - jedna regula zlamanego (RoutHold) dla kazdej paniki w polu; stan kolejki czyszczony
+na koniec bitwy, misji i przy usunieciu zachowania; liczniki zeruje RoutHold.Ensure. (d) cudzy kod: CommonAIComponent (Panic / Retreat / StopRetreating / OnTickParallel),
+MissionAgentPanicHandler, Mission.OnAgentPanicked, AgentMoraleInteractionLogic, RBMAI AgentAi.cs:651-657 i Tactics.cs:385-442 - sprawdzone w dekompilacji.
+Wydajnosc: kolejka i przejecie O(1) na czlowieka; tick RoutKeeper liniowy w zywych wpisach (limit 800), ocena kierunku co 4 s na czlowieka, zapytania o droge dalej
+limit 20 na klatke - koszt ticku w linii (sr. / najwiecej ms).
+Sprawdzic w logu po wgraniu: linia "PANIKA BEZ POWROTU (142)" w bitwie polowej; "-> RoutHold" = "panika gry w polu: ludzi" minus nie przejeci (ok. 0 zgaszonych przed
+przejeciem); "ponowne paniki gry" 0; linia 139 "powroty RBM" ok. 0 (przy kluczu NIE bylo r) i "przejeci przez RoutHold" ~ "panika gry"; "zgaszone mimo to" male, kazde z
+ponowionym odwrotem; tick RoutKeeper sr. < 0.5 ms, najwiecej < 5 ms przy CoordinatedRetreat; potkniecia powrot 0; czas bitwy wobec bitwy przy kluczu NIE. W grze (Jeff):
+spanikowani biegna do granicy pola i nie wracaja z golymi piesciami; jeden okrzyk na czlowieka.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 ce0984f6711e43dadf4da5e3194d666a).
 ## 2026-10-25 141 (galaz noc/139-ai-zycie, po 140 b39c5cc2) - AI walczy o zycie, krok 3: obronca bez strzelcow nie stoi pod strzalami (S2, Doctrine.S2.cs, klucz DefendersAdvanceUnderFire)
 **Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze
 jego mozliwosci i skilli aby przetrwac ... Jak widzi ze kolega padl od strzaly a ma tarcze to zalozy tarcze i sie za nia schowa i idzie na przeciwnika"; decyzja D1 z syntezy

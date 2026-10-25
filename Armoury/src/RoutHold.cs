@@ -41,6 +41,12 @@ namespace Armoury
     ///    czlowieka - wypada ze zbioru.
     ///  - Wyjatek na czlowieka liczony (Stumble, pierwsze 3 na miejsce w sesji do logu) - funkcji nie gasimy (CLAUDE.md 7). Bez Harmony, wszystko
     ///    na glownym watku (OnMissionTick, przed tickiem agentow - Mission.cs:3743 / 3774). Iterujemy tylko wlasna liste, nie Mission.Agents.
+    /// 142 (25.10, fala "AI walczy o zycie", karta "139a Panika bez powrotu"; klucz RoutedMenNeverRally, dziala przy BrokenMenNeverRally): w bitwie
+    /// polowej KAZDA panika gry (morale gry ponizej 0.01, RBM CoordinatedRetreat = morale 0 calej strony) u czlowieka AI spoza zbioru trafia do zbioru
+    /// zlamanych - RoutKeeper.OnAgentPanicked tylko wpisuje do kolejki, przejecie w nastepnym OnMissionTick przez Break(a, MissionTeams.GamePanic)
+    /// sciezka "juz w panice" (bez drugiego Panic, okrzyku i animacji, morale 0, dalej jak nasz zlamany: przypiecie, ponowienia, kierunek). Najwyzej
+    /// TakePerFrame przejec na klatke i tylko do MaxEntries zywych wpisow; czekajacy maja morale 0. Bez zbiorki przy sztandarze (decyzja Jeffa: pozniej).
+    /// Liczniki i linia "PANIKA BEZ POWROTU (142)" - NoReturn.cs.
     /// Postura szeregowych wedlug tieru (BattleWind.PostureInitPostfix) pisze swoje liczniki tutaj - jedna linia "Bitwa (NB2)" po misji.
     /// Czesc 2 (16.10): ta sama linia niesie liczniki taktyki wedlug dowodcy (WarCouncil), weteranow wedlug tieru (VeteranAi), krwi przez pancerz
     /// (BattleGore) i glosow bitwy (BattleCries) - ich liczniki zeruje Ensure (zmiana misji), pisza je pod Gate przez EnsureLocked.
@@ -63,9 +69,11 @@ namespace Armoury
         internal const int SiteFate = 13;
         // 140 (25.10): tarcza pod ostrzalem (ShieldsUp) - wlasne miejsce (kolejka pociskow, pass ludzi i szykow, postfiksy SetAi / UpdateFormationOrders)
         internal const int SiteShields = 14;
-        private const int Sites = 15;
+        // 142 (25.10): panika bez powrotu (NoReturn) - kolejka paniki gry w RoutKeeper i przejecie do zbioru zlamanych; nazwa jednym slowem (regex NB2)
+        internal const int SiteNoReturn = 15;
+        private const int Sites = 16;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
-                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze" };
+                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -77,6 +85,11 @@ namespace Armoury
         internal const float LostCheckEvery = 0.5f; // miedzy ocenami: sprawdzenie "odwrot zgasl" najwyzej co 0,5 s na czlowieka (natywne IsRetreating / IsFadingOut)
         internal const float NearPlayer = 15f;    // gracz blizej - ucieczka tylko do 60 stopni od kierunku "od gracza" (Jeff 16.10)
         internal const float AwayCos = 0.5f;      // 60 stopni
+        // 142: panika gry -> RoutHold. Przejecie z kolejki najwyzej tyle na klatke (RBM CoordinatedRetreat = cala strona w jednej klatce: kazde
+        // przejecie to pierwsza ocena kierunku z zapytaniem natywnym o wrogow w 50 m) i tylko do limitu zywych wpisow (koszt ticku liniowy);
+        // reszta czeka w kolejce z morale przypietym na 0 (RBM jej nie zawroci), az zwolni sie miejsce.
+        internal const int TakePerFrame = 30;
+        internal const int MaxEntries = 800;
 
         // NB2 czesc 2: wspolna blokada licznikow linii misji - takze dla WarCouncil, VeteranAi, BattleGore, BattleCries (EnsureLocked)
         internal static readonly object Gate = new object();
@@ -243,6 +256,7 @@ namespace Armoury
             Doctrine.ResetCounters();
             BannerCompanies.ResetCounters();
             BrokenFate.ResetCounters();     // 139: los zlamanych - liczniki i lista ludzi poprzedniej misji
+            NoReturn.ResetCounters();       // 142: panika bez powrotu - liczniki misji
         }
 
         /// <summary>Licznik misji dla RoutKeeper (glowny watek): misja zgodna z licznikami.</summary>
@@ -316,6 +330,8 @@ namespace Armoury
             Log.Info(sb.ToString());
             // 139: osobna linia "LOS ZLAMANYCH (139)" zaraz po NB2 (tylko bitwa / kryjowka z kluczem FateOfTheBrokenLog)
             try { BrokenFate.Write(c); } catch { }
+            // 142: osobna linia "PANIKA BEZ POWROTU (142)" po linii 139 (tylko bitwa polowa)
+            try { NoReturn.Write(c); } catch { }
         }
 
         // ------------------------------------------------------------ start sesji
@@ -369,6 +385,11 @@ namespace Armoury
               .Append(BrokenFate.SampleEvery.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" s, spis przelacznika co ")
               .Append(BrokenFate.CensusEvery.ToString("0", System.Globalization.CultureInfo.InvariantCulture))
               .Append(" s; panika = IsPanicked albo RoutHold albo odwrot komponentu, odwrot z rozkazu szyku = rozsadek)")
+              // 142: kazda panika gry w bitwie polowej do RoutHold (bez powrotu)
+              .Append(" | Routed Men Never Rally ").Append(c.RoutedMenNeverRally ? "TAK" : "NIE")
+              .Append(c.RoutedMenNeverRally && !c.BrokenMenNeverRally ? " (nieczynne: Broken Men Never Rally NIE)" : "")
+              .Append(" (panika gry w bitwie polowej - morale gry, RBM CoordinatedRetreat - do RoutHold w nastepnym ticku sciezka 'juz w panice': bez drugiego Panic, okrzyku i animacji, morale 0; najwyzej ")
+              .Append(TakePerFrame).Append(" na klatke, limit zywych wpisow ").Append(MaxEntries).Append(", czekajacy z morale 0; zbiorki przy sztandarze brak)")
               // 140: tarcza pod ostrzalem (linia 'Bitwa (140 tarcze)' po bitwie)
               .Append(" | AI Shields Up Under Fire ").Append(c.AiShieldsUpUnderFire ? "TAK" : "NIE").Append(" (trzymanie ")
               .Append(c.ShieldsUpHoldSeconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)).Append(" s, szyk od ").Append(c.ShieldsUpFormationShots)
@@ -437,6 +458,17 @@ namespace Armoury
         private int _pathLeft;
         private int _field = -1;
 
+        // 142: kolejka paniki gry. Mission.OnAgentPanicked iteruje zachowania misji (Mission.cs:6704-6710) - w callbacku tylko wpis do kolejki,
+        // przejecie (Break, sciezka "juz w panice") w nastepnym OnMissionTick. Lock - na wypadek callbacku spoza glownego watku (konie od ciosu
+        // odpadaja wczesniej: !IsHuman).
+        private struct Pend { public Agent A; public float At; }
+        private readonly object _qLock = new object();
+        private readonly Queue<Pend> _queue = new Queue<Pend>();
+        private readonly HashSet<Agent> _queued = new HashSet<Agent>();
+        private readonly List<Pend> _take = new List<Pend>();
+        private int _noReturn = -1;               // -1 nie wiadomo, 0 poza bitwa polowa, 1 bitwa polowa (bez kryjowki i morza)
+        private bool _endSeen;                    // koniec bitwy (MissionEnded) juz zapisany do NoReturn
+
         public RoutKeeper()
         {
             // OnBehaviorInitialize nie biegnie dla zachowan dodanych w OnMissionBehaviorInitialize (Mission.cs:3809-3816) - zapis tutaj i w EarlyStart
@@ -453,12 +485,23 @@ namespace Armoury
         {
             try { RoutHold.Begin(Mission); } catch { }
             BrokenFate.Begin(Mission);                // 139: pomiar losu zlamanych (sam wylapuje swoje wyjatki)
+            // 142: bitwa polowa (liczona raz) i liczniki linii "PANIKA BEZ POWROTU (142)"
+            try { if (Mission != null) NoReturn.Begin(Mission, NoReturnHere(Mission)); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteNoReturn, "NoReturn.Begin", e); }
             base.AfterStart();
+        }
+
+        public override void OnDeploymentFinished()
+        {
+            try { if (Mission != null) NoReturn.Deployed(Mission.CurrentTime); } catch { }   // 142: czas bitwy od rozstawienia
+            base.OnDeploymentFinished();
         }
 
         protected override void OnEndMission()
         {
             // 139: Close (uciekajacy wciaz na polu, ostatni wiwat) przed linia; Release (bez referencji do ludzi) po niej
+            // 142: czekajacy w kolejce do licznika "po koncu bitwy", czas konca misji - przed linia
+            try { if (Mission != null) NoReturn.Close(Mission.CurrentTime, DropQueue()); } catch { }
             try { if (Mission != null) FieldHere(Mission); RoutHold.Field = _field; BrokenFate.Close(Mission); RoutHold.Flush(Mission); } catch { }
             BrokenFate.Release();
             Clear();
@@ -468,6 +511,7 @@ namespace Armoury
         public override void OnRemoveBehavior()
         {
             Clear();
+            DropQueue();                              // 142: bez referencji do ludzi skonczonej misji
             BrokenFate.Release();
             if (ReferenceEquals(RoutHold.Live, this)) RoutHold.Live = null;
             base.OnRemoveBehavior();
@@ -484,6 +528,120 @@ namespace Armoury
         private void Clear()
         {
             try { _by.Clear(); _list.Clear(); _near.Clear(); } catch { }
+        }
+
+        /// <summary>142: kolejka paniki gry pusta (koniec misji, koniec bitwy); zwraca, ilu czekalo.</summary>
+        private int DropQueue()
+        {
+            try
+            {
+                lock (_qLock)
+                {
+                    int n = _queue.Count;
+                    _queue.Clear();
+                    _queued.Clear();
+                    _take.Clear();
+                    return n;
+                }
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>142: bitwa polowa na mapie (albo wlasna) - IsFieldBattle bez kryjowki (FieldHere), bez bitwy morskiej, rodzaj misji "bitwa".
+        /// Oblezenie, wypad, kryjowka, morze, turniej, arena - panika gry jak dotad. Liczone raz na misje.</summary>
+        private bool NoReturnHere(Mission m)
+        {
+            if (_noReturn < 0)
+            {
+                bool f = false;
+                try
+                {
+                    bool naval = false;
+                    try { naval = m.IsNavalBattle || m.IsNavalRaidBattle; } catch { naval = false; }
+                    f = !naval && FieldHere(m) && MissionTeams.Kind(m) == "bitwa";
+                }
+                catch { f = false; }
+                _noReturn = f ? 1 : 0;
+            }
+            return _noReturn == 1;
+        }
+
+        /// <summary>142: panika gry (OnAgentPanicked) u czlowieka AI spoza zbioru zlamanych w bitwie polowej - pomiar zawsze, kolejka przy kluczach
+        /// RoutedMenNeverRally i BrokenMenNeverRally. Nic poza wpisem (callback w petli zachowan misji).</summary>
+        private void Enqueue(Agent a)
+        {
+            if (a == null || !a.IsHuman) return;                         // kon bez jezdzca panikuje od ciosu (CommonAIComponent.OnHit) - nie nasz
+            var m = Mission;
+            if (m == null || m.MissionEnded || !a.IsAIControlled || a.IsMainAgent) return;
+            if (_by.ContainsKey(a)) return;                               // nasz zlamany (Break wpisuje przed Panic) albo juz przejety
+            if (!NoReturnHere(m)) return;
+            float now = m.CurrentTime;
+            NoReturn.Candidate(a, now);
+            var c = Settings.Current;
+            if (c == null || !c.RoutedMenNeverRally || !c.BrokenMenNeverRally) return;
+            lock (_qLock)
+            {
+                if (_queued.Add(a)) _queue.Enqueue(new Pend { A = a, At = now });
+                NoReturn.QueueLen(_queue.Count);
+            }
+        }
+
+        /// <summary>142: przejecie z kolejki (glowny watek, OnMissionTick): najwyzej TakePerFrame ludzi i tylko do limitu zywych wpisow; tylko kto
+        /// WCIAZ jest w panice gry (IsPanicked) - Break idzie wtedy sciezka "juz w panice" (bez Panic, okrzyku i animacji; morale 0). Czekajacy:
+        /// morale przypiete na 0, dopoki panika trwa (RBM StopRetreating wymaga morale &gt; 0).</summary>
+        private void TakeQueued(Mission m, float now)
+        {
+            _take.Clear();
+            int room = RoutHold.MaxEntries - _list.Count;
+            lock (_qLock)
+            {
+                if (_queue.Count == 0) return;
+                if (room <= 0) NoReturn.LimitFrame();
+                int n = Math.Min(RoutHold.TakePerFrame, Math.Max(0, room));
+                while (n-- > 0 && _queue.Count > 0)
+                {
+                    var p = _queue.Dequeue();
+                    if (p.A != null) _queued.Remove(p.A);
+                    _take.Add(p);
+                }
+            }
+            for (int i = 0; i < _take.Count; i++)
+            {
+                var p = _take[i];
+                var a = p.A;
+                try
+                {
+                    if (a == null || !a.IsActive()) { NoReturn.Gone++; continue; }           // zginal, padl albo uszedl w kolejce - los liczy 139
+                    if (_by.ContainsKey(a)) { NoReturn.OtherWay++; continue; }             // BrokenMen / FieldCraft / choragiew wziely go pierwsze
+                    var cai = a.CommonAIComponent;
+                    if (cai == null || !cai.IsPanicked) { NoReturn.Quenched++; continue; } // panike zgasil ktos przed przejeciem - bez drugiego Panic
+                    if (Break(a, MissionTeams.GamePanic))
+                    {
+                        bool mine = false;
+                        try { var t = a.Team; mine = t != null && (t.IsPlayerTeam || t.IsPlayerAlly); } catch { }
+                        NoReturn.Took(now - p.At, a.IsHero, mine);
+                    }
+                    else NoReturn.Refused++;
+                }
+                catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteNoReturn, "RoutKeeper.TakeQueued", ex); }
+            }
+            _take.Clear();
+            // czekajacy (limit wpisow albo ponad TakePerFrame): panika gry trwa - morale 0, zeby RBM nie zawrocil ich do walki przed przejeciem
+            lock (_qLock)
+            {
+                if (_queue.Count == 0) return;
+                foreach (var p in _queue)
+                {
+                    var a = p.A;
+                    try
+                    {
+                        if (a == null || !a.IsActive()) continue;
+                        var cai = a.CommonAIComponent;
+                        if (cai != null && cai.IsPanicked && a.GetMorale() > 0f) { a.SetMorale(0f); NoReturn.WaitPins++; }
+                    }
+                    catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteNoReturn, "RoutKeeper.QueuePin", ex); }
+                }
+            }
         }
 
         private void Drop(Entry e, bool keepKey)
@@ -523,13 +681,20 @@ namespace Armoury
                 Entry e;
                 if (affectedAgent != null && _by.TryGetValue(affectedAgent, out e))
                 {
-                    if (e.PanicSeen) RoutHold.RePanic++;  // druga panika gry dla zlamanego (oczekiwane 0)
+                    if (e.PanicSeen)
+                    {
+                        RoutHold.RePanic++;               // druga panika gry dla zlamanego (oczekiwane 0)
+                        if (e.Site == MissionTeams.GamePanic) NoReturn.RePanicGame++;   // 142: wsrod przejetych z paniki gry
+                    }
                     e.PanicSeen = true;
                 }
             }
             catch { }
             // 139: panika gry (czlowiek spoza zbioru zlamanych) albo ponowna panika po powrocie do walki - tylko liczniki
             BrokenFate.Panicked(Mission, affectedAgent);
+            // 142: panika gry spoza zbioru zlamanych w bitwie polowej - tylko wpis do kolejki (przejecie w nastepnym ticku, nie z wnetrza callbacku)
+            try { Enqueue(affectedAgent); }
+            catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteNoReturn, "RoutKeeper.Enqueue", ex); }
         }
 
         // ------------------------------------------------------------ zlamanie
@@ -551,18 +716,21 @@ namespace Armoury
             if (cai == null) return false;
             // odwrot z rozkazu szyku (silnik: IsRunningAway, bez paniki i bez odwrotu komponentu) - nie nasz; sprobujemy, gdy sie skonczy
             if (a.IsRunningAway && !cai.IsRetreating && !cai.IsPanicked) { RoutHold.Ordered.Add(a.Index); return false; }
+            // 142: panika gry bierzemy tylko trwajaca - nigdy nie wolamy za nia Panic (drugi okrzyk i animacja)
+            if (site == MissionTeams.GamePanic && !cai.IsPanicked) return false;
 
             float now = m.CurrentTime;
             var e = new Entry { A = a, Site = site, Since = now, NextEval = now };
             _by[a] = e;
             _list.Add(e);
-            if (site == MissionTeams.Broken) RoutHold.Broken++; else RoutHold.Fled++;
-            MissionTeams.Pushed(site, a);                                 // linia NM: odwrot wyslany - raz na czlowieka
+            bool game = site == MissionTeams.GamePanic;                   // 142: panika gry z kolejki - licznik w NoReturn, NB2 bez zmian
+            if (site == MissionTeams.Broken) RoutHold.Broken++; else if (!game) RoutHold.Fled++;
+            if (!game) MissionTeams.Pushed(site, a);                      // linia NM: odwrot wyslany - raz na czlowieka (panika gry: odwrot dala gra)
             BrokenFate.Broken(m, a, cai.IsPanicked);                      // 139: los zlamanych - wpis PRZED Panic (OnAgentPanicked widzi juz "nasz")
             if (cai.IsPanicked)
             {
                 // juz w panice (rozbicie szyku przez morale) - bez drugiego Panic, czyli bez drugiego okrzyku i bez drugiej animacji
-                RoutHold.Already++;
+                if (!game) RoutHold.Already++;
                 e.PanicSeen = true;
             }
             else
@@ -580,7 +748,24 @@ namespace Armoury
         {
             // 139: probka losu zlamanych (co 1 s, takze bez naszych zlamanych i po koncu bitwy - wiwat zwyciezcow); sama lapie wyjatki
             BrokenFate.Tick(Mission, dt);
-            if (_list.Count == 0) return;
+            // 142: koniec bitwy (czas do linii) - raz; czekajacy w kolejce przepadaja (gra sama gasi panike zwyciezcom)
+            if (!_endSeen)
+            {
+                try
+                {
+                    var me = Mission;
+                    if (me != null && me.MissionEnded) { _endSeen = true; NoReturn.BattleEnded(me.CurrentTime, DropQueue()); }
+                }
+                catch { }
+            }
+            if (_list.Count == 0 && _queue.Count == 0) return;
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();       // 142: koszt ticku przy pracy (linia 142)
+            try { TickList(); }
+            finally { NoReturn.Cost(System.Diagnostics.Stopwatch.GetTimestamp() - t0, _list.Count); }
+        }
+
+        private void TickList()
+        {
             try
             {
                 var c = Settings.Current;
@@ -588,6 +773,13 @@ namespace Armoury
                 var m = Mission;
                 if (m == null || m.MissionEnded) return;                  // gra sama zatrzymuje odwrot zwyciezcom (CommonAIComponent.cs:109-116)
                 float now = m.CurrentTime;
+                // 142: kolejka paniki gry - przejecie poza callbackiem; nowi ida od razu przez TickOne ponizej (pierwszy cel po handlerze paniki)
+                if (_queue.Count > 0)
+                {
+                    try { TakeQueued(m, now); }
+                    catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteNoReturn, "RoutKeeper.TakeQueued", ex); }
+                }
+                if (_list.Count == 0) return;
                 _pathLeft = RoutHold.PathPerFrame;
                 bool dead = false;
                 for (int i = 0; i < _list.Count; i++)
@@ -627,11 +819,17 @@ namespace Armoury
                     a.SetMorale(0f);
                     RoutHold.Pins++;
                     RoutHold.PinPeople.Add(a.Index);
+                    if (e.Site == MissionTeams.GamePanic) NoReturn.PinGame.Add(a.Index);   // 142: premia morale u przejetego z paniki gry
                 }
             }
             else
             {
-                if (!e.Extinct) { e.Extinct = true; RoutHold.Extinct++; }
+                if (!e.Extinct)
+                {
+                    e.Extinct = true;
+                    RoutHold.Extinct++;
+                    if (e.Site == MissionTeams.GamePanic) NoReturn.ExtinctGame++;          // 142: tyle razy RBM / premia morale zgasily mimo przypiecia
+                }
                 if (a.GetMorale() < 0.02f) a.SetMorale(0.02f);
             }
 
@@ -741,6 +939,7 @@ namespace Armoury
                     RoutHold.Resends++;
                     RoutHold.ResendPeople.Add(a.Index);
                     e.Resent = true;
+                    if (e.Site == MissionTeams.GamePanic) NoReturn.ResendGame++;           // 142: ponowiony odwrot (bez okrzyku) przejetego z paniki gry
                 }
                 else RoutHold.Turns++;
             }

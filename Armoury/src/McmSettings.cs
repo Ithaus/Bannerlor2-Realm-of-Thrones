@@ -1540,6 +1540,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool FateOfTheBrokenLog { get; set; } = true;
 
+        [SettingPropertyBool("Routed Men Never Rally", HintText = "with Broken Men Never Rally on: in a field battle every man who panics - his morale broken by the fighting, or his whole side giving up a lost battle - runs for good, just like a broken wounded man: no turning back to fight bare-handed ten seconds later, no second scream or fright, and if his flight stalls he is sent off again quietly. Both sides alike, your men too. No rallying at the banner yet. Sieges, sorties, sea battles and hideouts are left as they were. Off = as before (the game lets a panicked man return to the fight)", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool RoutedMenNeverRally { get; set; } = true;
+
         [SettingPropertyBool("Commander Tactics", HintText = "in field battles an AI army fights by its commander's Tactics skill, not only by its culture as RBM sets it: below 30 a mob that just charges, from 60 cavalry charges at the front and defenders may form a ring or hold a choke point, from 150 a side of 150 men or more also tries to outflank with its infantry. Your own team's AI is left as it is. Off = RBM's culture tactics only, as before", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool CommanderTactics { get; set; } = true;
@@ -10392,6 +10396,7 @@ namespace Armoury
             s.BrokenMenNeverRally = BrokenMenNeverRally;
             s.FleeAwayFromEnemies = FleeAwayFromEnemies;
             s.FateOfTheBrokenLog = FateOfTheBrokenLog;
+            s.RoutedMenNeverRally = RoutedMenNeverRally;
             s.CommanderTactics = CommanderTactics;
             s.VeteransByTier = VeteransByTier;
             s.AutoParryFullDiff = AutoParryFullDiff;

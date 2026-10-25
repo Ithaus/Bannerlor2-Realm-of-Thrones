@@ -111,6 +111,11 @@ namespace Armoury
             SwOrdered.Clear();
         }
 
+        /// <summary>142: linia 139 tej misji jest (bitwa / kryjowka z kluczem) i jej powroty RBM (PANIKA -> ROZSADEK u paniki gry nieprzejetej) - wolajacy trzyma Gate.</summary>
+        internal static bool LineLocked { get { return _battle; } }
+        internal static int ReturnsLocked { get { return _returns; } }
+        internal static int ReturnPeopleLocked { get { return _returnPeople; } }
+
         private static bool Same(Mission m)
         {
             var w = _mission;
