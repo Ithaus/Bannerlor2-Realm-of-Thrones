@@ -36,9 +36,10 @@ namespace Armoury
     /// KONTRAKT (sygnatury P0): ApplyMissionPatches - v1 bez latek (krytyk K8: rogi gry zostaja); Begin (AfterStart, po ForeignVoices.Detect w BattleCries.Begin);
     /// Tick (po BattleCries -> MarchToContact -> Doctrine, K4); OnDeploymentFinished (przemowy +3 s); OnShoot / OnMissileHit / OnPanicked / OnFleeing / OnRemoved
     /// (kolejki); OnClearScene i End (Release wszystkich; End pisze linie misji raz). Zdarzenia: OnChargeStarted (jedyny sygnal szarzy z BattleCries, K4) - decyzja
-    /// motto / rozkaz od razu (TakeYellLead dla okrzyku ludzi), dzwiek w Tick tej samej klatki; OnStandardFell / OnCommanderFell / OnCompanyBroke (P3);
-    /// OnArchersFellBack / OnFlankRide (P1).
-    /// Gracz (MainAgent) nigdy nie mowi; kobiety nie mowia naszymi meskimi glosami; Inni (whitewalker) i bandyci - cisza (poza jekami i ptakami).
+    /// motto / rozkaz od razu, gdy jest miejsce w limitach (TakeYellLead dla okrzyku ludzi), dzwiek w Tick tej samej klatki; OnStandardFell / OnCommanderFell /
+    /// OnCompanyBroke (P3); OnArchersFellBack / OnFlankRide (P1).
+    /// Gracz (MainAgent) nigdy nie mowi; kobiety nie mowia naszymi meskimi glosami (takze bez jeku po bitwie); Inni (whitewalker) / umarli - cisza, takze bez jeku;
+    /// bandyci - cisza poza jekami; ptaki nad wszystkimi cialami.
     /// Bitwy morskie, wypady morskie, kryjowki - nic (linia misji "pominieta"). Turniej / arena / trening - BattleSense nie wola (pojedynek / nie bitwa).
     /// Wyjatki liczone (RoutHold.Stumble, miejsce "dzwiek"), bez wylacznika. Linia "Dzwiek bitwy (noc-p2): ..." raz na misje (wlasna, nie w NB2) i linia katalogu
     /// raz na proces; grupa progow nocdzwiek w tools/sprawdz_logi.py. Autotest (LogGate 1/2 + plik CrashScribe/armoury-dzwiek-bitwy.flag): probka po jednym klipie
@@ -95,7 +96,7 @@ namespace Armoury
         private static int _secCount;
 
         // ---- liczniki misji
-        private static int _created, _played05, _notPlayed, _released, _early, _endCap, _rejLimit, _rejFar, _rejNoClip, _rejEngine, _rejRate, _peak;
+        private static int _created, _played05, _notPlayed, _released, _relPlaying, _early, _endCap, _rejLimit, _rejFar, _rejNoClip, _rejEngine, _rejRate, _peak;
         private static readonly int[] _byGroup = new int[Groups];
         private static readonly int[] _rejGroup = new int[Groups];
 
@@ -159,7 +160,7 @@ namespace Armoury
             _on = false; _lineDone = false; _skip = null; _siege = _hideout = _naval = false;
             _acc = 0f; _now = 0f; _beganAt = 0f; _lisOk = false;
             _secStamp[0] = -1; _secCount = 0;
-            _created = _played05 = _notPlayed = _released = _early = _endCap = _rejLimit = _rejFar = _rejNoClip = _rejEngine = _rejRate = _peak = 0;
+            _created = _played05 = _notPlayed = _released = _relPlaying = _early = _endCap = _rejLimit = _rejFar = _rejNoClip = _rejEngine = _rejRate = _peak = 0;
             for (int i = 0; i < Groups; i++) { _byGroup[i] = 0; _rejGroup[i] = 0; }
             ResetFeatures();
         }
@@ -225,11 +226,16 @@ namespace Armoury
             if (!_on || affected == null) return;
             if (state != AgentState.Killed && state != AgentState.Unconscious) return;
             Vec3 p;
-            bool mount, human;
+            bool mount, human, mute = false;
             try { p = affected.Position; mount = affected.IsMount; human = affected.IsHuman; }
             catch { return; }
             if (!mount && !human) return;
-            lock (_q) { if (_bodyQ.Count < QueueMax) _bodyQ.Add(new Body { Pos = p, Unconscious = state == AgentState.Unconscious, Mount = mount, At = _now }); }
+            // recenzja 25.10: jeki sa meskie - kobieta i Inni / umarli bez jeku (jak CanSpeak); tylko nieprzytomni jecza, wiec sprawdzamy tylko ich
+            if (human && state == AgentState.Unconscious)
+            {
+                try { mute = affected.IsFemale || Undead.Character(affected.Character); } catch { mute = true; }
+            }
+            lock (_q) { if (_bodyQ.Count < QueueMax) _bodyQ.Add(new Body { Pos = p, Unconscious = state == AgentState.Unconscious, Mount = mount, Mute = mute, At = _now }); }
         }
 
         /// <summary>Przed zniszczeniem sceny (reset misji / koniec): Release wszystkich zdarzen; bez linii.</summary>
@@ -425,7 +431,9 @@ namespace Armoury
 
         private static void ReleaseOne(Snd s)
         {
-            try { if (s.Ev != null && s.Ev.IsValid) s.Ev.Release(); }
+            // recenzja 25.10: Release na grajacym zdarzeniu = Stop (StopEvent, _soundId -1) i ReleaseEvent(-1) - tak samo zwalnia gra (MissionAudienceHandler,
+            // MusicianGroup, MenuViewContext); czy silnik zwalnia instancje przy StopEvent - niesprawdzone, wiec licznik do linii (wyciek -> 'nie grane' w kolejnych bitwach)
+            try { if (s.Ev != null && s.Ev.IsValid) { if (s.Ev.IsPlaying()) _relPlaying++; s.Ev.Release(); } }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Release", e); }
             _released++;
         }
@@ -469,8 +477,8 @@ namespace Armoury
             sb.Append(", glosnosc ").Append(c != null ? c.BattleSoundsLoudness : 2).Append(", katalog klipow ").Append(_clips != null ? _clips.Count : 0).Append(')');
             sb.Append(" | zdarzen utworzonych ").Append(_created).Append(" (glosy ").Append(_byGroup[GVoice]).Append(", rogi ").Append(_byGroup[GHorn])
               .Append(", bebny ").Append(_byGroup[GDrum]).Append(", tlo ").Append(_byGroup[GAmb]).Append("), grane po 0,5 s ").Append(_played05)
-              .Append(" (nie grane ").Append(_notPlayed).Append("), zwolnionych ").Append(_released).Append(" (przy koncu misji ").Append(activeEnd).Append("), aktywnych po koncu ").Append(_live.Count)
-              .Append(", najwiecej naraz ").Append(_peak).Append(", przerwane wczesnie ").Append(_early).Append(", koniec po czasie ").Append(_endCap)
+              .Append(" (nie grane ").Append(_notPlayed).Append("), zwolnionych ").Append(_released).Append(" (przy koncu misji ").Append(activeEnd)
+              .Append(", w trakcie grania ").Append(_relPlaying).Append("), najwiecej naraz ").Append(_peak).Append(", przerwane wczesnie ").Append(_early).Append(", koniec po czasie ").Append(_endCap)
               .Append("; odrzucone: limit ").Append(_rejLimit).Append(", na sekunde ").Append(_rejRate).Append(", daleko ").Append(_rejFar)
               .Append(", brak klipu ").Append(_rejNoClip).Append(", silnik ").Append(_rejEngine);
             AppendFeatures(sb, c);

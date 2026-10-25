@@ -8,7 +8,8 @@ using IOPath = System.IO.Path;
 namespace Armoury
 {
     /// <summary>
-    /// noc 25.10 P2: KATALOG KLIPOW BITWY (raz na proces, przy pierwszej bitwie z dzwiekiem). Zrodlo: Armoury/ModuleData/Lektor/Bitwa/manifest.tsv (P2a,
+    /// noc 25.10 P2: KATALOG KLIPOW BITWY (raz na proces, przy pierwszej bitwie z dzwiekiem; wyjatek przy pustym katalogu - ponownie w kolejnej bitwie, najwyzej
+    /// 3 proby; wyjatek wiersza / pliku - tylko ten wiersz, licznik 'zle wiersze'). Zrodlo: Armoury/ModuleData/Lektor/Bitwa/manifest.tsv (P2a,
     /// tools/lektor/nagraj_bitwa.py: wiersze '#' - naglowek; kolumny TAB albo ';': id, kategoria, kultura/rod, plik (wzgledem Bitwa), glos, dlugosc_s, tekst, rola, ...);
     /// bez manifestu - przeglad katalogow Bitwa/&lt;kategoria&gt;/*.ogg (dlugosc z naglowka Ogg). Klucz klipu z id (arm_bs_&lt;kod&gt;_&lt;reszta&gt;[_NN[b]]):
     /// sp przemowa, mo motto, or rozkaz (region_rozkaz), hr rog (styl_sygnal), dr beben (styl), br zlamanie, bd sztandar wroga, ob nasz sztandar, vi zwyciestwo,
@@ -39,15 +40,40 @@ namespace Armoury
         private static string _dir;
         private static bool _manifest;
         private static int _catRows, _catBad, _catMissing, _catBadLines, _catDup, _catNoDur, _catStereo;
-        private static string _firstBad, _firstMissing;
+        private static string _firstBad, _firstMissing, _firstBadLine;
+        private const int CatTriesMax = 3;
+        private static int _catTries;
+        private static bool _catAgain;   // wyjatek przy pustym katalogu - nastepna bitwa laduje jeszcze raz (w tej bitwie pusta lista, cisza)
 
         private static void EnsureCatalog()
         {
-            if (_clips != null) return;
+            if (_clips != null && !_catAgain) return;
+            _catAgain = false;
+            _catTries++;
+            ResetCatalog();
             _clips = new List<Clip>();
+            bool failed = false;
             try { LoadCatalog(); }
-            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Katalog", e); }
-            try { CatalogLine(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.KatalogLinia", e); }
+            catch (Exception e) { failed = true; RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Katalog", e); }
+            // recenzja 25.10 (bez globalnego wylacznika): wyjatek przy pustym katalogu (np. manifest zablokowany w trakcie kopiowania) nie wycisza dzwieku
+            // do konca sesji - kolejna bitwa laduje jeszcze raz, najwyzej CatTriesMax razy na proces; zly wiersz liczy sie osobno (try na wiersz)
+            bool again = failed && _clips.Count == 0 && _catTries < CatTriesMax;
+            try { CatalogLine(failed, again); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.KatalogLinia", e); }
+            _catAgain = again;
+        }
+
+        private static void ResetCatalog()
+        {
+            _byKey.Clear();
+            _manifest = false;
+            _catRows = _catBad = _catMissing = _catBadLines = _catDup = _catNoDur = _catStereo = 0;
+            _firstBad = _firstMissing = _firstBadLine = null;
+        }
+
+        private static void BadRow(string where, Exception e)
+        {
+            _catBadLines++;
+            if (_firstBadLine == null) _firstBadLine = where + " " + e.GetType().Name;
         }
 
         private static void LoadCatalog()
@@ -59,35 +85,41 @@ namespace Armoury
             {
                 _manifest = true;
                 int iId = 0, iCat = 1, iFile = 3, iVoice = 4, iDur = 5, iRole = 7;
+                int nr = 0;
                 foreach (var raw in File.ReadAllLines(man, Encoding.UTF8))
                 {
+                    nr++;
                     if (string.IsNullOrWhiteSpace(raw)) continue;
-                    string line = raw.TrimEnd('\r', '\n');
-                    char sep = line.IndexOf('\t') >= 0 ? '\t' : ';';
-                    if (line.StartsWith("#", StringComparison.Ordinal))
+                    try
                     {
-                        // naglowek: kolumny po nazwie (P2a moze dopisac kolumny)
-                        var h = line.TrimStart('#', ' ').Split(sep);
-                        for (int i = 0; i < h.Length; i++)
+                        string line = raw.TrimEnd('\r', '\n');
+                        char sep = line.IndexOf('\t') >= 0 ? '\t' : ';';
+                        if (line.StartsWith("#", StringComparison.Ordinal))
                         {
-                            string n = h[i].Trim();
-                            if (n == "id") iId = i; else if (n == "kategoria") iCat = i; else if (n == "plik") iFile = i; else if (n == "glos") iVoice = i;
-                            else if (n == "dlugosc_s") iDur = i; else if (n == "rola") iRole = i;
+                            // naglowek: kolumny po nazwie (P2a moze dopisac kolumny)
+                            var h = line.TrimStart('#', ' ').Split(sep);
+                            for (int i = 0; i < h.Length; i++)
+                            {
+                                string n = h[i].Trim();
+                                if (n == "id") iId = i; else if (n == "kategoria") iCat = i; else if (n == "plik") iFile = i; else if (n == "glos") iVoice = i;
+                                else if (n == "dlugosc_s") iDur = i; else if (n == "rola") iRole = i;
+                            }
+                            continue;
                         }
-                        continue;
+                        var col = line.Split(sep);
+                        if (col.Length <= Math.Max(iId, Math.Max(iCat, iFile))) { _catBadLines++; continue; }
+                        _catRows++;
+                        string id = col[iId].Trim();
+                        if (id.Length == 0 || !seen.Add(id)) { _catDup++; continue; }
+                        string rel = col[iFile].Trim().Replace('/', IOPath.DirectorySeparatorChar);
+                        string path = IOPath.Combine(_dir, rel);   // niedozwolony znak w kolumnie 'plik' -> ArgumentException tylko tego wiersza
+                        float dur = 0f;
+                        if (iDur < col.Length) float.TryParse(col[iDur].Trim(), System.Globalization.NumberStyles.Float, Inv, out dur);
+                        string role = iRole < col.Length ? col[iRole].Trim() : null;
+                        if (string.IsNullOrEmpty(role) && iVoice < col.Length) role = col[iVoice].Trim();
+                        Add(id, col[iCat].Trim(), path, dur, role);
                     }
-                    var col = line.Split(sep);
-                    if (col.Length <= Math.Max(iId, Math.Max(iCat, iFile))) { _catBadLines++; continue; }
-                    _catRows++;
-                    string id = col[iId].Trim();
-                    if (id.Length == 0 || !seen.Add(id)) { _catDup++; continue; }
-                    string rel = col[iFile].Trim().Replace('/', IOPath.DirectorySeparatorChar);
-                    string path = IOPath.Combine(_dir, rel);
-                    float dur = 0f;
-                    if (iDur < col.Length) float.TryParse(col[iDur].Trim(), System.Globalization.NumberStyles.Float, Inv, out dur);
-                    string role = iRole < col.Length ? col[iRole].Trim() : null;
-                    if (string.IsNullOrEmpty(role) && iVoice < col.Length) role = col[iVoice].Trim();
-                    Add(id, col[iCat].Trim(), path, dur, role);
+                    catch (Exception e) { BadRow("wiersz " + nr.ToString(Inv), e); }
                 }
                 return;
             }
@@ -96,14 +128,20 @@ namespace Armoury
             foreach (var d in Directory.GetDirectories(_dir))
             {
                 string cat = IOPath.GetFileName(d);
-                var files = Directory.GetFiles(d, "arm_bs_*.ogg");
+                string[] files;
+                try { files = Directory.GetFiles(d, "arm_bs_*.ogg"); }
+                catch (Exception e) { BadRow("katalog " + cat, e); continue; }
                 Array.Sort(files, StringComparer.Ordinal);
                 foreach (var f in files)
                 {
-                    _catRows++;
-                    string id = IOPath.GetFileNameWithoutExtension(f);
-                    if (!seen.Add(id)) { _catDup++; continue; }
-                    Add(id, cat, f, 0f, null);
+                    try
+                    {
+                        _catRows++;
+                        string id = IOPath.GetFileNameWithoutExtension(f);
+                        if (!seen.Add(id)) { _catDup++; continue; }
+                        Add(id, cat, f, 0f, null);
+                    }
+                    catch (Exception e) { BadRow("plik " + IOPath.GetFileName(f), e); }
                 }
             }
         }
@@ -243,7 +281,7 @@ namespace Armoury
             return true;
         }
 
-        private static void CatalogLine()
+        private static void CatalogLine(bool failed, bool again)
         {
             var per = new SortedDictionary<string, int>(StringComparer.Ordinal);
             foreach (var c in _clips) { int n; per.TryGetValue(c.Code, out n); per[c.Code] = n + 1; }
@@ -255,9 +293,10 @@ namespace Armoury
             if (first) sb.Append("brak");
             sb.Append("), zle pliki ").Append(_catBad).Append(_firstBad != null ? " (pierwszy " + _firstBad + ")" : "")
               .Append(", brak plikow ").Append(_catMissing).Append(_firstMissing != null ? " (pierwszy " + _firstMissing + ")" : "")
-              .Append(", zle wiersze ").Append(_catBadLines).Append(", duble ").Append(_catDup).Append(", bez dlugosci ").Append(_catNoDur).Append(", stereo ").Append(_catStereo)
+              .Append(", zle wiersze ").Append(_catBadLines).Append(_firstBadLine != null ? " (pierwszy " + _firstBadLine + ")" : "").Append(", duble ").Append(_catDup).Append(", bez dlugosci ").Append(_catNoDur).Append(", stereo ").Append(_catStereo)
               .Append("; zdarzenie ").Append(VoiceEvent).Append(" (3D: scena misji + SetPosition), katalog ").Append(_dir ?? "?")
-              .Append(", probka autotestu ").Append(TestWanted() ? "TAK" : "NIE").Append('.');
+              .Append(", probka autotestu ").Append(TestWanted() ? "TAK" : "NIE").Append(", proba ").Append(_catTries).Append('/').Append(CatTriesMax)
+              .Append(failed ? (again ? " - WYJATEK przy ladowaniu, kolejna bitwa laduje jeszcze raz" : " - WYJATEK przy ladowaniu (bez kolejnej proby)") : "").Append('.');
             Log.Info(sb.ToString());
         }
 

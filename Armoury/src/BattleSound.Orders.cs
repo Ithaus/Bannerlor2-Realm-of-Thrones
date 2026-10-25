@@ -21,7 +21,7 @@ namespace Armoury
     ///  - Ostrzal: pierwszy pocisk w szyk piechoty po 30 s spokoju - "shields"; pierwszy strzal szyku strzelcow po 15 s ciszy - "loose" (zbiory z wywolan
     ///    zwrotnych pod lockiem, tu tylko odczyt).
     ///  - P1: lucznicy za piechote - "archback", konnica na skrzydlo - "flank"; P3: padl sztandar / dowodca kompanii - wlasna strona "ob" (Save the banner! Rally to me!)
-    ///    i rog zbiorki, najblizszy szyk wroga "bd" (Their banner is down!); zlamanie kompanii - najblizszy szyk wroga "br" (They break!). Raz na (szyk, kompanie).
+    ///    na zmiane z rozkazem "rally" (To the banner! Rally!) i rog zbiorki, najblizszy szyk wroga "bd" (Their banner is down!); zlamanie kompanii - najblizszy szyk wroga "br" (They break!). Raz na (szyk, kompanie).
     ///  - Odstepy (czas misji i rzeczywisty): rozkaz szyku: ten sam co 20 s (shields 30, loose 25), dowolny co 6 s; glos rozkazu druzyny co 2,5 s (gracza 1,5 s);
     ///    rog druzyny co 10 s, ten sam sygnal: marsz 40 s, szarza 15 s, odwrot i zbiorka 20 s. ROTBA mowi rozkazy gracza (OrderVoiceChance > 0) - nasze rozkazy
     ///    szykow gracza co drugi raz.
@@ -133,17 +133,22 @@ namespace Armoury
             bool silent = Silent(ch, cul);
             var cap = f.Captain;
             float k = LoudScale(c);
+            // recenzja 25.10: motto / rozkaz (i czekanie okrzyku ludzi, i cisza natywna kapitana) tylko, gdy Play w DrainCharges ma miejsce - limit glosow naraz
+            // i nowych zdarzen na sekunde liczone z kolejka szarzy tej klatki; inaczej okrzyk ludzi bez czekania, jak przed P2
+            bool room = _chargeQ.Count < 64 && ChargeVoiceRoom();
             // motto: bohater-kapitan, raz na bitwe (zaliczone dopiero, gdy zagra - DrainCharges); poza zasiegiem sluchacza - bez motta i bez czekania okrzyku
-            if (c.BattleChargeMottos && cap != null && cap.IsHero && CanSpeak(cap) && !_mottoDone.Contains(cap) && LisDist(HeadOf(cap)) <= MottoMax * k + FarExtra)
+            if (room && c.BattleChargeMottos && cap != null && cap.IsHero && CanSpeak(cap) && !_mottoDone.Contains(cap) && LisDist(HeadOf(cap)) <= MottoMax * k + FarExtra)
             {
                 string house = HouseOf(cap);
                 var mc = Pick("mo", house) ?? Pick("mo", MottoRegion(CulOf(cap.Character)));
                 if (mc != null) { ev.Motto = mc; ev.Spk = cap; }
             }
-            if (ev.Motto == null && c.BattleCaptainOrders && !silent && st.Kind[OCharge].Ready(OGap[OCharge]) && st.AnyOrder.Ready(OrderFormGap))
+            if (room && ev.Motto == null && c.BattleCaptainOrders && !silent && st.Kind[OCharge].Ready(OGap[OCharge]) && st.AnyOrder.Ready(OrderFormGap)
+                && TeamOrderReady(f))
             {
                 var spk = SpeakerOf(f);
-                if (spk != null && LisDist(HeadOf(spk)) <= OrderMax * k + FarExtra && PlayerVoiceOk(f))
+                // te same bramki co Say (mowca nie mowi juz) - PlayerVoiceOk na koncu (przelacznik co drugi raz zuzywa sie tylko przy rozkazie)
+                if (spk != null && !IsSpeaking(spk) && LisDist(HeadOf(spk)) <= OrderMax * k + FarExtra && PlayerVoiceOk(f))
                 {
                     var oc = OrderClip(cul, OCharge);
                     if (oc != null) { ev.Order = oc; ev.Spk = spk; }
@@ -154,6 +159,33 @@ namespace Armoury
             else if (ev.Order != null) { _leadF = f; _lead = OrderLead; }
             ChargeHorse(f, c);   // tetent konnicy (BattleSound.Field.cs)
             if (ev.Motto != null || ev.Order != null || ev.Horn) { if (_chargeQ.Count < 64) _chargeQ.Add(ev); }
+        }
+
+        /// <summary>Miejsce na glos szarzy w DrainCharges tej klatki: glosy naraz (GVoice) i nowe zdarzenia na sekunde, z glosami i rogami kolejki przed nim
+        /// (DrainCharges gra po kolei: glos, potem rog kazdego zdarzenia).</summary>
+        private static bool ChargeVoiceRoom()
+        {
+            int voices = 0, all = 0;
+            for (int i = 0; i < _chargeQ.Count; i++)
+            {
+                var e = _chargeQ[i];
+                if (e.Motto != null || e.Order != null) { voices++; all++; }
+                if (e.Horn) all++;
+            }
+            if (LiveIn(GVoice) + voices >= GroupCap[GVoice]) return false;
+            return RateOk() && _secCount + all < MaxNewPerSec;
+        }
+
+        /// <summary>Glos rozkazu druzyny gotowy (bramka Say: OrderTeamGap) i bez rozkazu tej druzyny w kolejce szarzy tej klatki (zagra pierwszy i zajmie odstep).</summary>
+        private static bool TeamOrderReady(Formation f)
+        {
+            if (!TS(f.Team).OrderVoice.Ready(f.IsAIControlled ? OrderTeamGapAi : OrderTeamGapPlayer)) return false;
+            for (int i = 0; i < _chargeQ.Count; i++)
+            {
+                var e = _chargeQ[i];
+                if (e.Order != null && e.F != null && ReferenceEquals(e.F.Team, f.Team)) return false;
+            }
+            return true;
         }
 
         /// <summary>BattleCries: ile sekund okrzyk ludzi ma czekac na glos dowodcy tego szyku (0 - nic nie mowi). Raz na sygnal.</summary>
@@ -278,6 +310,17 @@ namespace Armoury
         {
             string r = OrderRegion(cul);
             return r == "ghiscari" ? "essos" : r == "dothraki" ? null : r;
+        }
+
+        /// <summary>Nasz sztandar / dowodca padl: "ob" (Save the banner! Rally to me!) na zmiane z rozkazem or_&lt;region&gt;_rally (To the banner! Rally!) - recenzja 25.10:
+        /// klipy rally nie mialy zadnego wywolania; jedno z nich, gdy drugiego brak.</summary>
+        private static Clip OwnBannerCry(string cul)
+        {
+            var ob = Pick("ob", BannerRegion(cul));
+            var rally = OrderClip(cul, ORally);
+            if (ob == null) return rally;
+            if (rally == null) return ob;
+            return _rng.Next(2) == 0 ? ob : rally;
         }
 
         private static Clip OrderClip(string cul, int kind)
@@ -454,7 +497,7 @@ namespace Armoury
                 if (!Silent(ch, cul) && st.Kind[ORally].Ready(OGap[ORally]))
                 {
                     var spk = SpeakerOf(f);
-                    var cl = Pick("ob", BannerRegion(cul));
+                    var cl = OwnBannerCry(cul);
                     if (spk != null && cl != null && !IsSpeaking(spk) && Play(m, cl, GVoice, HeadOf(spk), OrderMin, OrderMax, true, spk, null, "sztandar") != null)
                     {
                         st.Kind[ORally].Hit(); _cOurBanner++; _cOrder[ORally]++;

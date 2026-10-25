@@ -14,7 +14,7 @@ namespace Armoury
     ///  - Ciala: OnRemoved (zgon / nokaut) - miejsce do kolejki (najwyzej 256 na takt, lista najwyzej 300 ostatnich).
     ///  - Po bitwie = Mission.MissionEnded przy trwajacej misji (gracz chodzi po polu). Jeki (BattleWoundedAfter): od 4 s po koncu, przy cialach NIEPRZYTOMNYCH
     ///    do 60 m od sluchacza, kazde cialo najwyzej 2 razy, glos (rola z manifestu) inny niz w trzech ostatnich jekach, najwyzej 2 naraz; odstep 3-6 s rosnie
-    ///    z czasem (x (1 + t/60)) - cichna; po 300 s koniec. Klipy jk (3D 5-60 m).
+    ///    z czasem (x (1 + t/60)) - cichna; po 300 s koniec. Klipy jk (3D 5-60 m) - meskie glosy: kobiety i Inni / umarli bez jeku (recenzja 25.10; Mute w OnRemoved).
     ///  - Ptaki (BattleRavensAfter): przed bitwa raz - ptaki wedlug terenu (las - ptaki lasu, brzeg - mewy, reszta - dalekie wrony) ok. 25 m od sluchacza;
     ///    po bitwie od 8 s - kruki zlatuja sie nad ciala blisko sluchacza (do 120 m; skrzydla / wrony, potem co 15-30 s kruk, wrony, klotnia), po 75 s raz
     ///    "ptaki wracaja" (las albo dalekie wrony); najwyzej 12 na misje. Klipy pt (3D 10-150 m).
@@ -22,7 +22,7 @@ namespace Armoury
     /// </summary>
     internal static partial class BattleSound
     {
-        private struct Body { internal Vec3 Pos; internal bool Unconscious, Mount; internal float At; internal int Moans; }
+        private struct Body { internal Vec3 Pos; internal bool Unconscious, Mount, Mute; internal float At; internal int Moans; }   // Mute: kobieta albo Inni / umarli - bez jeku
 
         private const int BodiesMax = 300, BirdsMax = 12;
         private const float MoanRange = 60f, MoanMin = 5f, MoanMax = 60f, MoanEndSec = 300f, BirdMin = 10f, BirdMax = 150f, BirdNear = 120f;
@@ -128,7 +128,7 @@ namespace Armoury
             for (int i = _bodies.Count - 1; i >= 0; i--)
             {
                 var b = _bodies[i];
-                if (!b.Unconscious || b.Moans >= 2 || LisDist(b.Pos) > MoanRange) continue;
+                if (!b.Unconscious || b.Mute || b.Moans >= 2 || LisDist(b.Pos) > MoanRange) continue;
                 seen++;
                 if (_rng.Next(seen) == 0) pick = i;
                 if (seen >= 6) break;
@@ -176,12 +176,12 @@ namespace Armoury
 
         private static void AppendAfter(StringBuilder sb, Settings c)
         {
-            int unc = 0, dead = 0;
-            for (int i = 0; i < _bodies.Count; i++) { if (_bodies[i].Unconscious) unc++; else dead++; }
+            int unc = 0, dead = 0, mute = 0;
+            for (int i = 0; i < _bodies.Count; i++) { if (_bodies[i].Unconscious) { unc++; if (_bodies[i].Mute) mute++; } else dead++; }
             sb.Append(" | po bitwie ").Append(_afterAt >= 0f ? (_now - _afterAt).ToString("0", Inv) + " s" : "-").Append(": jeki ").Append(c != null && c.BattleWoundedAfter ? "TAK" : "NIE")
               .Append(' ').Append(_cMoan).Append(" (glosow ").Append(_moanVoices.Count).Append("), ptaki ").Append(c != null && c.BattleRavensAfter ? "TAK" : "NIE").Append(' ')
               .Append(_cBird).Append(" (przed bitwa ").Append(_cBirdBefore).Append("), cial zapamietanych ").Append(_bodies.Count).Append(" (nieprzytomnych ").Append(unc)
-              .Append(", zabitych ").Append(dead).Append(')');
+              .Append(" - bez jeku, kobiety / Inni ").Append(mute).Append(", zabitych ").Append(dead).Append(')');
         }
     }
 }

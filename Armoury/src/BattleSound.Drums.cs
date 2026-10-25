@@ -9,7 +9,8 @@ namespace Armoury
 {
     /// <summary>
     /// noc 25.10 P2: BEBNY MARSZU (klucz BattleDrumsMarch; krytyk K7). Szyk piechoty albo strzelcow pieszych od 20 ludzi bije w beben, gdy idzie marszem:
-    /// przy MarchToContactEnabled - MarchToContact.IsMarching(f) (cap marszu P1), przy wylaczonym marszu - rozkaz Advance / Move; do tego szyk sie rusza
+    /// przy MarchToContactEnabled w bitwie polowej - MarchToContact.IsMarching(f) (cap marszu P1; P1 dziala tylko w bitwie polowej - MarchToContact.Field),
+    /// w oblezeniu, wypadzie i przy wylaczonym marszu - rozkaz Advance / Move (recenzja 25.10: w oblezeniu IsMarching zawsze false = bebny martwe); do tego szyk sie rusza
     /// (stoi dluzej niz 4 s - cisza), wrog dalej niz 45 m, bez szarzy. Styl wedlug kultury (DrumStyle; Dothrakowie, konnica, Inni, bandyci - bez bebna).
     /// Najwyzej 2 bebny na druzyne - szyki najblizsze sluchacza do 300 m; oblezenie - tylko atakujacy. Takt = klip petli 8 s ponawiany po koncu poprzedniego
     /// (czas misji ORAZ co najmniej 0,9 dlugosci w czasie rzeczywistym - bez lawiny przy przyspieszeniu); w jednym marszu ten sam klip (rowny rytm).
@@ -33,19 +34,33 @@ namespace Armoury
         private static readonly List<Formation> _drumPick = new List<Formation>();
         private static readonly List<float> _drumDist = new List<float>();
         private static readonly List<Formation> _drumWant = new List<Formation>();
-        private static int _cDrumStart, _cDrumBeat, _cDrumStop;
+        private static int _cDrumStart, _cDrumBeat, _cDrumStop, _cDrumBeatP1;
+        private static bool _drumP1, _drumP1Any;   // biezacy takt: warunek z marszu P1; P1 dal marsz choc raz w tej misji (linia - latki P1 nie weszly?)
 
         private static void ResetDrums()
         {
             _drums.Clear(); _drumPick.Clear(); _drumDist.Clear(); _drumWant.Clear();
-            _cDrumStart = _cDrumBeat = _cDrumStop = 0;
+            _cDrumStart = _cDrumBeat = _cDrumStop = _cDrumBeatP1 = 0;
+            _drumP1 = _drumP1Any = false;
+        }
+
+        /// <summary>Warunek marszu z P1 tylko tam, gdzie P1 dziala: klucz MarchToContactEnabled i bitwa polowa (MarchToContact.Field; morskie i kryjowki
+        /// BattleSound pomija). Oblezenie / wypad / klucz NIE - rozkaz Advance / Move.</summary>
+        private static bool DrumsFromP1(Mission m, Settings c)
+        {
+            return c.MarchToContactEnabled && m.IsFieldBattle && !_siege;
         }
 
         private static bool Marching(Formation f, Settings c)
         {
             var oe = f.GetReadonlyMovementOrderReference().OrderEnum;
             if (oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget) return false;
-            if (c.MarchToContactEnabled) return MarchToContact.IsMarching(f);
+            if (_drumP1)
+            {
+                bool mv = MarchToContact.IsMarching(f);
+                if (mv) _drumP1Any = true;
+                return mv;
+            }
             return oe == MovementOrder.MovementOrderEnum.Advance || oe == MovementOrder.MovementOrderEnum.Move;
         }
 
@@ -53,6 +68,7 @@ namespace Armoury
         {
             _drumWant.Clear();
             bool on = c.BattleDrumsMarch && m.IsDeploymentFinished && !m.MissionEnded;
+            _drumP1 = DrumsFromP1(m, c);
             if (on)
             {
                 var teams = m.Teams;
@@ -111,6 +127,7 @@ namespace Armoury
                 if (s == null) continue;
                 d.Cur = s;
                 _cDrumBeat++;
+                if (_drumP1) _cDrumBeatP1++;
                 if (!d.Active) { d.Active = true; _cDrumStart++; }
             }
         }
@@ -153,7 +170,8 @@ namespace Armoury
         private static void AppendDrums(StringBuilder sb, Settings c)
         {
             sb.Append(" | bebny ").Append(c != null && c.BattleDrumsMarch ? "TAK" : "NIE").Append(": start ").Append(_cDrumStart).Append(", takty ").Append(_cDrumBeat)
-              .Append(", stop ").Append(_cDrumStop).Append(" (marsz ").Append(c != null && c.MarchToContactEnabled ? "MarchToContact" : "rozkaz Advance/Move").Append(')');
+              .Append(", stop ").Append(_cDrumStop).Append(" (warunek marszu: P1 MarchToContact - taktow ").Append(_cDrumBeatP1).Append(", P1 dal marsz ")
+              .Append(_drumP1Any ? "TAK" : "NIE").Append("; rozkaz Advance/Move - taktow ").Append(_cDrumBeat - _cDrumBeatP1).Append(')');
         }
     }
 }

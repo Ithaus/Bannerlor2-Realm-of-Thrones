@@ -68093,7 +68093,7 @@ NOCDZ_TAG = "Dzwiek bitwy (noc-p2): "
 NOCDZ_CAT = re.compile(r"katalog - manifest (TAK|NIE)[^,]*, wierszy (\d+), klipow dobrych (\d+) \(([^)]*)\), zle pliki (\d+)(?: \(pierwszy .*?\))?, brak plikow (\d+)")
 NOCDZ_CREATED = re.compile(r"zdarzen utworzonych (\d+) ")
 NOCDZ_PLAYED = re.compile(r"grane po 0,5 s (\d+) \(nie grane (\d+)\)")
-NOCDZ_REL = re.compile(r"zwolnionych (\d+) \(przy koncu misji (\d+)\), aktywnych po koncu (\d+), najwiecej naraz (\d+), przerwane wczesnie (\d+)")
+NOCDZ_REL = re.compile(r"zwolnionych (\d+) \(przy koncu misji (\d+), w trakcie grania (\d+)\), najwiecej naraz (\d+), przerwane wczesnie (\d+)")
 NOCDZ_DRUMS = re.compile(r"\| bebny (TAK|NIE): start (\d+), takty (\d+), stop (\d+)")
 NOCDZ_STUMB = re.compile(r"\| potkniecia (-?\d+)\.$")
 NOCDZ_SKIP = re.compile(r"\) - pominieta \(([^)]*)\)")
@@ -68105,7 +68105,8 @@ NOCDZ_SUMS = (("rogi", re.compile(r"\| rogi (?:TAK|NIE) (\d+)")), ("rozkazy", re
 
 def nocdzwiek_main(logp):
     """nocdzwiek (noc 25.10 P2b - dzwiek bitwy): ND-0 linia katalogu, ND-1 ERROR BattleSound / ForeignVoices i potkniecia linii misji 0, ND-2 katalog: zle pliki 0
-    i brak plikow 0 (bez nagran P2a - INFO), ND-3 kazda bitwa: utworzone == zwolnione i aktywnych po koncu 0, ND-4 grane po 0,5 s >= 90% utworzonych (od 5 zdarzen),
+    i brak plikow 0 (bez nagran P2a - INFO), ND-3 kazda bitwa: ksiegowosc puli utworzone == zwolnione (recenzja 25.10: rowne z konstrukcji, wycieku
+    instancji w silniku NIE wykrywa - ND-3b INFO: Release w trakcie grania i 'nie grane' w kolejnych bitwach), ND-4 grane po 0,5 s >= 90% utworzonych (od 5 zdarzen),
     ND-5 bebny start == stop, ND-6 przerwane wczesnie (INFO - limit wystapien zdarzenia voiceover?), ND-7 probka autotestu (armoury-dzwiek-bitwy.flag) - wszystkie
     utworzone i grane, ND-8 linia 'zdarzenie 3D' (INFO - odleglosci silnika), ND-9 bitwy pominiete (morska / kryjowka / klucz) i sumy funkcji (INFO)."""
     rep = Report()
@@ -68165,7 +68166,7 @@ def nocdzwiek_main(logp):
                     "zle 0 i brak 0 (0 dobrych - INFO: nagrania P2a nie wgrane)", None if good == 0 and bad == 0 else (bad == 0 and miss == 0))
         else:
             rep.add("ND-2: katalog - zle pliki i brak plikow", "linia katalogu nie rozpoznana: " + cats[-1][:120], "format", False)
-    bad_rel, bad_play, bad_drum, early, created_all, peak = [], [], [], 0, 0, 0
+    bad_rel, bad_play, bad_drum, early, created_all, peak, rel_playing, trend = [], [], [], 0, 0, 0, 0, []
     for b in mis:
         c0 = NOCDZ_CREATED.search(b)
         p0 = NOCDZ_PLAYED.search(b)
@@ -68175,18 +68176,22 @@ def nocdzwiek_main(logp):
             bad_rel.append("nie rozpoznana: " + b[:100])
             continue
         cr, pl, npl = int(c0.group(1)), int(p0.group(1)), int(p0.group(2))
-        rel, after, pk, er = int(r0.group(1)), int(r0.group(3)), int(r0.group(4)), int(r0.group(5))
+        rel, relp, pk, er = int(r0.group(1)), int(r0.group(3)), int(r0.group(4)), int(r0.group(5))
         created_all += cr
         early += er
         peak = max(peak, pk)
-        if cr != rel or after != 0:
-            bad_rel.append("utworzone %d, zwolnione %d, po koncu %d" % (cr, rel, after))
+        rel_playing += relp
+        trend.append("%d%%" % (round(100.0 * npl / (pl + npl)) if pl + npl else 0))
+        if cr != rel:
+            bad_rel.append("utworzone %d, zwolnione %d" % (cr, rel))
         if cr >= 5 and pl < 0.9 * (pl + npl):
             bad_play.append("grane %d z %d" % (pl, pl + npl))
         if d0 and int(d0.group(2)) != int(d0.group(4)):
             bad_drum.append("start %s, stop %s" % (d0.group(2), d0.group(4)))
-    rep.add("ND-3: kazda bitwa - utworzone == zwolnione, aktywnych po koncu 0", "bitew %d, zlych %d%s" % (len(mis), len(bad_rel), (" (" + bad_rel[0] + ")") if bad_rel else ""),
-            "zlych 0 (brak bitwy - INFO)", None if not mis else not bad_rel)
+    rep.add("ND-3: kazda bitwa - ksiegowosc puli utworzone == zwolnione", "bitew %d, zlych %d%s" % (len(mis), len(bad_rel), (" (" + bad_rel[0] + ")") if bad_rel else ""),
+            "zlych 0 (brak bitwy - INFO); wycieku w silniku NIE wykrywa - ND-3b", None if not mis else not bad_rel)
+    rep.add("ND-3b: Release w trakcie grania i nie grane w kolejnych bitwach (INFO)", "Release grajacych %d; nie grane po bitwach: %s" % (rel_playing, ", ".join(trend[:12]) or "-"),
+            "INFO: rosnace nie grane w kolejnych bitwach jednej sesji = instancje voiceover nie zwalniane (Stop -> ReleaseEvent(-1)?)", None)
     rep.add("ND-4: grane po 0,5 s >= 90% (bitwy od 5 zdarzen)", "zdarzen %d, bitew ponizej progu %d%s" % (created_all, len(bad_play), (" (" + bad_play[0] + ")") if bad_play else ""),
             "0 (0 zdarzen - INFO)", None if created_all == 0 else not bad_play)
     rep.add("ND-5: bebny start == stop", "bitew zlych %d%s" % (len(bad_drum), (" (" + bad_drum[0] + ")") if bad_drum else ""), "0", None if not mis else not bad_drum)
