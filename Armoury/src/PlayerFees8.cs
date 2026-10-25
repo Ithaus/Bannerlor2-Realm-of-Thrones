@@ -437,8 +437,16 @@ namespace Armoury
 
         // ------------------------------------------------------------ zaklady (PlayerBetsCounterparty)
 
-        /// <summary>TournamentBehavior.PlaceABet: stawka gracza do kasy miasta (gra: w nicosc).</summary>
+        /// <summary>TournamentBehavior.PlaceABet: stawka gracza do kasy miasta (gra: w nicosc).
+        /// noc P11 (125): okno lupu turnieju - zakres roznicy kiesy gracza "Bets placed" (tylko odczyt; bez otwartej ramki turnieju - nic).</summary>
         public static void BetStake(Hero giver, Hero recipient, int amount, bool dn)
+        {
+            var sc = SpoilsReport.TBegin(SpoilsReport.LTBetStake);
+            try { BetStakeCore(giver, recipient, amount, dn); }
+            finally { SpoilsReport.TEnd(sc); }
+        }
+
+        private static void BetStakeCore(Hero giver, Hero recipient, int amount, bool dn)
         {
             bool mine = false, on = false; Settlement st = null;
             try { mine = OutDir(giver, recipient, amount); if (mine) { on = BetsOn; st = Here(); } }
@@ -477,14 +485,20 @@ namespace Armoury
             else if (amount - skip > 0) GiveGoldAction.ApplyForCharacterToSettlement(giver, settlement, amount - skip, dn);
         }
 
-        /// <summary>TournamentBehavior.OnPlayerWinTournament: wygrana z kasy miasta - stawka gracza wraca zawsze, zysk z nadwyzki.</summary>
+        /// <summary>TournamentBehavior.OnPlayerWinTournament: wygrana z kasy miasta - stawka gracza wraca zawsze, zysk z nadwyzki.
+        /// noc P11 (125): zakres kiesy "Bets won" (okno lupu turnieju, tylko odczyt).</summary>
         public static void BetWon(Hero giver, Hero recipient, int amount, bool dn)
         {
-            Settlement st = null; long held = 0; bool on = false;
-            try { on = BetsOn; st = _stakeTown ?? Here(); held = ReferenceEquals(_stakeTown, st) ? _stakeHeld : 0; }
-            catch (Exception e) { Stumble("BetWon(stan)", e); st = null; }
-            _stakeHeld = 0; _stakeTown = null;
-            TownPays(SBetWon, giver, recipient, amount, dn, on, st, held, TourneyPay.TBet);
+            var sc = SpoilsReport.TBegin(SpoilsReport.LTBetWon);
+            try
+            {
+                Settlement st = null; long held = 0; bool on = false;
+                try { on = BetsOn; st = _stakeTown ?? Here(); held = ReferenceEquals(_stakeTown, st) ? _stakeHeld : 0; }
+                catch (Exception e) { Stumble("BetWon(stan)", e); st = null; }
+                _stakeHeld = 0; _stakeTown = null;
+                TownPays(SBetWon, giver, recipient, amount, dn, on, st, held, TourneyPay.TBet);
+            }
+            finally { SpoilsReport.TEnd(sc); }
         }
 
         /// <summary>BoardGameCampaignBehavior.OnPlayerBoardGameOver (tylko gra z gospodarzem - nie-bohaterem): przegrana do kasy osady, wygrana z kasy osady.</summary>
@@ -511,8 +525,20 @@ namespace Armoury
 
         /// <summary>Zloto Tournaments XPanded (TXPManager.EndTournament - nagroda; TXPTournamentMissionController.ApplyMatchAchievements - premie meczu):
         /// z kasy miasta turnieju z nadwyzki (TP: dalej gospodarz, panujacy, dlug miasta). Dwa wrappery tylko dla tekstu komunikatu - liczniki wspolne (STxp).</summary>
-        public static void TxpGold(Hero giver, Hero recipient, int amount, bool dn) { TownPays(STxp, giver, recipient, amount, dn, PrizeOn, SafeHere("TxpGold"), 0, TourneyPay.TPrize); }
-        public static void TxpBonus(Hero giver, Hero recipient, int amount, bool dn) { TownPays(STxp, giver, recipient, amount, dn, PrizeOn, SafeHere("TxpBonus"), 0, TourneyPay.TBonus); }
+        // noc P11 (125): oba w zakresie roznicy kiesy gracza okna lupu turnieju ("Prize money" / "Match honours"; tylko odczyt, bez ramki turnieju - nic).
+        public static void TxpGold(Hero giver, Hero recipient, int amount, bool dn)
+        {
+            var sc = SpoilsReport.TBegin(SpoilsReport.LTPrize);
+            try { TownPays(STxp, giver, recipient, amount, dn, PrizeOn, SafeHere("TxpGold"), 0, TourneyPay.TPrize); }
+            finally { SpoilsReport.TEnd(sc); }
+        }
+
+        public static void TxpBonus(Hero giver, Hero recipient, int amount, bool dn)
+        {
+            var sc = SpoilsReport.TBegin(SpoilsReport.LTHonours);
+            try { TownPays(STxp, giver, recipient, amount, dn, PrizeOn, SafeHere("TxpBonus"), 0, TourneyPay.TBonus); }
+            finally { SpoilsReport.TEnd(sc); }
+        }
 
         /// <summary>RealPayer.TourneyPre (prefiks High na TournamentManager.GivePrizeToWinner - przed RBMTournament): migawka sakw gracza, gdy zwyciezca
         /// jest w jego druzynie. Bez migawki postfiks nic nie robi.</summary>
@@ -550,6 +576,14 @@ namespace Armoury
             var snap = _pzSnap;
             _pzSnap = null;
             if (snap == null) return;
+            // noc P11 (125): zakres kiesy "The prize, paid in coin" (nagrody nie bylo na polce - cena zamiast przedmiotu); przedmiot liczy ramka turnieju w sakwach
+            var sc = SpoilsReport.TBegin(SpoilsReport.LTPrizeCoin);
+            try { PrizeAfterCore(__0, snap); }
+            finally { SpoilsReport.TEnd(sc); }
+        }
+
+        private static void PrizeAfterCore(TournamentGame __0, Dictionary<EquipmentElement, int> snap)
+        {
             try
             {
                 var mp = MobileParty.MainParty;

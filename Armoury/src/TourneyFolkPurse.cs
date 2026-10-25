@@ -136,6 +136,7 @@ namespace Armoury
             try { CirculationWindows.NoteHeroGold(rec, got); } catch (Exception e) { Stumble("Run(NoteHeroGold)", e); }   // paczka 169b: glowa poza swiatem - zloto wyszlo ze swiata (licznik)
             _paidN++;
             if (ReferenceEquals(rec, me)) { _toPlayer += got; _playerN++; } else { _toHeads += got; _headsN++; }
+            if (ReferenceEquals(rec, me)) SpoilsReport.NoteTourney(SpoilsReport.LTFolk, got);   // noc P11 (125): okno lupu turnieju - ta sama kwota (tylko odczyt, bez ramki - nic)
             string tn = town.Name != null ? town.Name.ToString() : "?";
             if (x > _maxPurse) { _maxPurse = x; _maxTown = tn; }
             try

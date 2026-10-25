@@ -18,7 +18,8 @@ using TaleWorlds.ScreenSystem;
 namespace Armoury
 {
     /// <summary>
-    /// noc 25.10 P5 "okno-lupu": OKNO LUPU po bitwie i oblezeniu (raport SpoilsReport; projekt noc/projekty/okno-lupu.json "WYGLAD" i "KIEDY POKAZAC").
+    /// noc 25.10 P5 "okno-lupu": OKNO LUPU po bitwie i oblezeniu (raport SpoilsReport; projekt noc/projekty/okno-lupu.json "WYGLAD" i "KIEDY POKAZAC");
+    /// noc P11 (125): takze po turnieju (ramka T, BuildTourney - "The Tourney at X"; ta sama warstwa, prefab i bramka).
     /// Wlasna warstwa Gauntlet na MapScreen (wzor CraftPopup: kolejnosc 4500, InputRestrictions, focus) z prefabem Modules\Armoury\GUI\Prefabs\ArmSpoilsWindow.xml
     /// w wygladzie okien wydarzen ROT (ROT-Content EventXml: tlo event-bg, Standard.ROTPanel, ramka frame_9, pedzel UI.ROTSummaryScreen.Text). Sprite'y ROT
     /// (ui_event_category - event-bg i obrazki tematow) laduje sama, jak ROT.Screens.EventScreen (SpriteCategory.Load jest idempotentne, ROT tez nie zwalnia).
@@ -56,6 +57,9 @@ namespace Armoury
         private static readonly List<string> _blocks = new List<string>();
 
         internal static int Stumbles { get { return _stumbles; } }
+
+        /// <summary>noc P11: okno lupu (wlasna warstwa albo zapas) na ekranie - proba autotestu turnieju czeka.</summary>
+        internal static bool Busy { get { return _layer != null || _spec != null; } }
 
         private static void Stumble(string where, Exception e)
         {
@@ -116,6 +120,8 @@ namespace Armoury
             var c = Campaign.Current;
             if (c == null || !c.GameStarted) { _okSince = 0; return; }
             SpoilsReport.Watch();
+            SpoilsReport.EnsureGtWired();   // noc P11: latki GrandTourney (zakresy kiesy turnieju) - raz na proces, w kampanii; wlasny try
+            SpoilsReport.TestStep();        // noc P11: proba autotestu okna turnieju (LogGate.Mode 1/2 + plik flagi) - bez nich od razu wyjscie; wlasny try
             if (_spec != null) { WatchFallback(); return; }
             if (_layer != null) return;
             var r = SpoilsReport.NextReady();
@@ -144,7 +150,8 @@ namespace Armoury
             if (r.Kind == SpoilsReport.KBattle && !s.SpoilsWindowAfterBattle) return "klucz Spoils Window After Battle NIE";
             if ((r.Kind == SpoilsReport.KSiege || r.Kind == SpoilsReport.KRansom) && !s.SpoilsWindowAfterSiege) return "klucz Spoils Window After Siege NIE";
             if (r.Kind == SpoilsReport.KTourney && !s.SpoilsWindowAfterTourney) return "klucz Spoils Window After Tourney NIE";
-            if (!r.AnythingWon) return "nic nie zdobyto";
+            // noc P11: turniej - takze same straty (zaklady, wykup konia i zbroi), bo gracz chce wiedziec, co zostalo; widz bez zakladow - pominiety
+            if (r.Kind == SpoilsReport.KTourney ? !r.AnythingTourney : !r.AnythingWon) return "nic nie zdobyto";
             long worth = SpoilsReport.Worth(r);
             int min = Math.Max(0, Math.Min(5000, s.SpoilsWindowMinWorth));
             if (min > 0 && worth < min) return "wartosc " + worth.ToString(Inv) + " ponizej progu " + min.ToString(Inv) + " (Spoils Window Min Worth)";
@@ -202,6 +209,9 @@ namespace Armoury
             }
             return _gtKnown > 0;
         }
+
+        /// <summary>noc P11: ramka turnieju czeka, dopoki GrandTourney rozlicza wykup konia i zbroi (SpoilsReport.TWatch).</summary>
+        internal static bool GtBusyNow() { return GtBusy(); }
 
         private static bool GtBusy()
         {
@@ -318,6 +328,7 @@ namespace Armoury
 
         private static readonly string[] BattleSprites = { "RobbMarching3", "WildlingsFail", "jon_stand", "blackwater" };
         private static readonly string[] SiegeSprites = { "harrenhal", "wallfall", "eastwatch", "blackwater" };
+        private static readonly string[] TourneySprites = { "kingslanding", "joffrey" };   // noc P11: temat "dwor" tabeli Kroniki (dwor, turnieje)
 
         /// <summary>Obrazek okna: plik Images/Loot/loot_&lt;rodzaj&gt;_&lt;n&gt; (StoryPictures - walidacja bajtow), potem sprite ROT tematu (tabela Kroniki: bitwa / oblezenie),
         /// ostatecznie messenger-img. fileSprite - nazwa sprite'a z pliku (do zwolnienia po zamknieciu) albo null.</summary>
@@ -327,7 +338,8 @@ namespace Armoury
             try
             {
                 EnsureEventSprites();
-                string stem = r.Kind == SpoilsReport.KSiege ? (r.SackKind == CitySack.KMercy ? "siege" : "sack") : r.Kind == SpoilsReport.KRansom ? "siege" : "battle";
+                string stem = r.Kind == SpoilsReport.KSiege ? (r.SackKind == CitySack.KMercy ? "siege" : "sack") : r.Kind == SpoilsReport.KRansom ? "siege"
+                              : r.Kind == SpoilsReport.KTourney ? "tourney" : "battle";
                 int files = StoryPictures.CountFiles(DirLoot, "loot_" + stem + "_");
                 if (files > 0)
                 {
@@ -335,7 +347,7 @@ namespace Armoury
                     string s = StoryPictures.Acquire(DirLoot, "loot_" + stem + "_" + (1 + r.Id % files).ToString(Inv), out how);
                     if (s != null) { fileSprite = s; return s; }
                 }
-                var pool = r.Kind == SpoilsReport.KBattle ? BattleSprites : SiegeSprites;
+                var pool = r.Kind == SpoilsReport.KBattle ? BattleSprites : r.Kind == SpoilsReport.KTourney ? TourneySprites : SiegeSprites;
                 for (int i = 0; i < pool.Length; i++)
                 {
                     string n = pool[(r.Id + i) % pool.Length];
@@ -523,6 +535,7 @@ namespace Armoury
         internal static string TitleOf(SpoilsReport.Rep r)
         {
             string town = SpoilsReport.Nm(r.Town);
+            if (r.Kind == SpoilsReport.KTourney) return town != "-" ? "The Tourney at " + town : "Tourney Purse";   // noc P11
             if (r.Kind == SpoilsReport.KRansom) return "The Ransom of " + town;
             if (r.Kind == SpoilsReport.KSiege && r.Town != null)
             {
@@ -535,6 +548,7 @@ namespace Armoury
         /// <summary>Tresc okna z raportu (tylko liczby raportu - zadnego liczenia od nowa). Puste sekcje sie nie pokazuja; wierszy najwyzej tyle, ile miesci panel.</summary>
         internal static Content Build(SpoilsReport.Rep r)
         {
+            if (r.Kind == SpoilsReport.KTourney) return BuildTourney(r);   // noc P11: wlasne sekcje turnieju (szranki, nagroda, oddany rynsztunek)
             var c = new Content { Title = TitleOf(r) };
             try
             {
@@ -609,6 +623,123 @@ namespace Armoury
                 c.Total = "In all: " + N(Math.Max(0, purse) + Math.Max(0, r.Men)) + " denars in coin, " + N(r.GearWorth) + " in gear" + (r.RansomWorth > 0 ? ", " + N(r.RansomWorth) + " in ransoms" : "") + ".";
             }
             catch (Exception e) { Stumble("Build", e); }
+            return c;
+        }
+
+        private static string Pieces(long n) { return N(n) + (n == 1 ? " piece" : " pieces"); }
+
+        /// <summary>noc P11: etykieta wiersza najwyzej tyle znakow, ile miesci kolumna (ok. 360 px pedzlem 20) - dluzsza przycieta z "...".</summary>
+        private static string Cut(string s, int max = 40)
+        {
+            if (string.IsNullOrEmpty(s) || s.Length <= max) return s ?? "";
+            return s.Substring(0, max - 3).TrimEnd() + "...";
+        }
+
+        private static string ElName(EquipmentElement e)
+        {
+            try { var t = e.GetModifiedItemName(); return t != null ? t.ToString() : e.Item.Name.ToString(); }
+            catch { return e.Item != null ? e.Item.StringId : "-"; }
+        }
+
+        /// <summary>noc P11 (125): tresc okna turnieju z raportu ramki T (tylko liczby raportu). Sekcje: The lists (mistrz, walki gracza, runda odpadniecia,
+        /// final), Coin (etykiety zakresow kiesy + "Other", "To your purse" = roznica kiesy), The prize and the arms (nagroda turnieju, kon i zbroja oddane
+        /// graczowi), The cost (kon i zbroja oddane przez druzyne gracza), Renown. Puste sekcje sie nie pokazuja.</summary>
+        private static Content BuildTourney(SpoilsReport.Rep r)
+        {
+            var c = new Content { Title = TitleOf(r) };
+            try
+            {
+                var t = r.T ?? new SpoilsReport.TInfo();
+                string town = SpoilsReport.Nm(r.Town);
+                if (town == "-") town = r.Place;
+                c.Place = "The lists at " + town + ". " + r.Date + "." + (t.Rode ? " You rode in the lists." : " You watched from the stands.") + (r.Test ? " (autotest)" : "");
+
+                // THE LISTS
+                var ls = new Section { Title = "The lists" };
+                // wiersze z imionami przyciete do szerokosci kolumny (wiersz ma stala wysokosc - bez zawijania)
+                if (t.Champion.Length > 0)
+                    ls.Rows.Add(new Row { Label = Cut("Champion: " + (t.ChampionWho == 1 ? "you" : t.Champion + (t.ChampionWho == 2 ? " (of your company)" : ""))), Value = "" });
+                if (t.Rode && t.Bouts > 0) ls.Rows.Add(new Row { Label = "Your bouts", Value = N(t.BoutsWon) + " won of " + N(t.Bouts) });
+                if (t.ElimRound >= 0)
+                {
+                    ls.Rows.Add(new Row { Label = "You fell in round " + N(t.ElimRound + 1) + (t.Rounds > 0 ? " of " + N(t.Rounds) : ""), Value = "" });
+                    if (t.FellTo.Length > 0) ls.Rows.Add(new Row { Label = Cut("Bested by " + t.FellTo), Value = "" });
+                }
+                if (t.Final.Length > 0) ls.Rows.Add(new Row { Label = Cut("The final: " + t.Final), Value = "" });
+                // zaklady - te same liczby co wiersze Coin (zakresy kiesy wokol PlaceABet i OnPlayerWinTournament): postawione i wyplacone albo przegrane
+                long staked = 0, paidOut = 0;
+                for (int i = 0; i < r.CoinLabels.Count; i++)
+                {
+                    if (r.CoinLabels[i] == SpoilsReport.LTBetStake) staked -= r.CoinAmounts[i];
+                    else if (r.CoinLabels[i] == SpoilsReport.LTBetWon) paidOut += r.CoinAmounts[i];
+                }
+                if (staked > 0) ls.Rows.Add(new Row { Label = "Your wagers: " + N(staked) + " staked", Value = paidOut > 0 ? N(paidOut) + " paid out" : "lost" });
+                if (ls.Rows.Count > 0) c.Sections.Add(ls);
+
+                // COIN - kazda etykieta osobno (najwyzej 8 wierszy; nadmiar zlozony w jeden wiersz, zeby suma wierszy = "To your purse")
+                var coin = new Section { Title = "Coin" };
+                long folded = 0; int foldedN = 0;
+                for (int i = 0; i < r.CoinLabels.Count; i++)
+                {
+                    long v = r.CoinAmounts[i];
+                    if (v == 0) continue;
+                    if (coin.Rows.Count < 8) coin.Rows.Add(new Row { Label = r.CoinLabels[i], Value = Den(v) });
+                    else { folded += v; foldedN++; }
+                }
+                if (foldedN > 0) coin.Rows.Add(new Row { Label = "Other sums (" + N(foldedN) + ")", Value = Den(folded) });
+                if (coin.Rows.Count > 0) coin.Rows.Add(new Row { Label = r.CoinTotal >= 0 ? "To your purse" : "Out of your purse", Value = Den(r.CoinTotal) });
+                if (coin.Rows.Count > 0) c.Sections.Add(coin);
+
+                // THE PRIZE AND THE ARMS - nagroda turnieju (przedmiot TournamentGame.Prize w sakwach) i reszta przyrostu sakw (kon i zbroja oddane graczowi w GrandTourney)
+                var gear = new Section { Title = "The prize and the arms" };
+                var all = new List<SpoilsReport.Gain>(r.Gear.Values);
+                int otherN = 0; long otherW = 0; bool prizeShown = false;
+                foreach (var g in all)
+                {
+                    long w = (long)Math.Max(0, g.E.ItemValue) * g.N;
+                    if (!prizeShown && t.Prize != null && ReferenceEquals(g.E.Item, t.Prize))
+                    {
+                        gear.Rows.Add(new Row { Label = Cut("The prize: " + ElName(g.E) + (g.N > 1 ? " x" + N(g.N) : "")), Value = "worth " + N(w) });
+                        prizeShown = true;
+                        continue;
+                    }
+                    otherN += g.N; otherW += w;
+                }
+                if (otherN > 0) gear.Rows.Add(new Row { Label = (GtKnown() ? "Horse and armour won: " : "Other gear: ") + Pieces(otherN), Value = "worth " + N(otherW) });
+                if (gear.Rows.Count > 0) c.Sections.Add(gear);
+
+                // THE COST - kon i zbroja oddane przez gracza i jego druzyne (sloty puste po szrankach)
+                if (t.LostN > 0)
+                {
+                    var cost = new Section { Title = "The cost" };
+                    cost.Rows.Add(new Row { Label = "Horse and armour yielded: " + Pieces(t.LostN), Value = "worth " + N(t.LostW) });
+                    if (t.LostNames.Count > 0)
+                        cost.Rows.Add(new Row { Label = Cut(string.Join(", ", t.LostNames.ToArray()) + (t.LostN > t.LostNames.Count ? " and " + N(t.LostN - t.LostNames.Count) + " more" : "")), Value = "" });
+                    c.Sections.Add(cost);
+                }
+
+                // RENOWN
+                long ren = (long)Math.Round(r.Renown), inf = (long)Math.Round(r.Influence);
+                if (ren != 0 || inf != 0)
+                {
+                    var rn = new Section { Title = "Renown" };
+                    rn.Rows.Add(new Row { Label = (ren >= 0 ? "+" : "") + N(ren) + " renown" + (inf != 0 ? ", " + (inf >= 0 ? "+" : "") + N(inf) + " influence" : ""), Value = "" });
+                    c.Sections.Add(rn);
+                }
+
+                // FINEST SPOILS - do 5 sztuk wedlug wartosci sztuki (jak po bitwie)
+                all.Sort(delegate (SpoilsReport.Gain a, SpoilsReport.Gain b) { return b.E.ItemValue.CompareTo(a.E.ItemValue); });
+                for (int i = 0; i < all.Count && c.Finest.Count < 5; i++)
+                {
+                    var g = all[i];
+                    if (g.E.Item == null || g.E.ItemValue <= 0) continue;
+                    c.Finest.Add(new Fine { E = g.E, N = g.N, Text = ElName(g.E) + (g.N > 1 ? " x" + N(g.N) : "") + " - worth " + N(g.E.ItemValue) + (g.N > 1 ? " each" : "") });
+                }
+
+                c.Total = "In all: " + (r.CoinTotal >= 0 ? Den(r.CoinTotal) + " to your purse" : N(-r.CoinTotal) + " denars out of your purse")
+                          + (r.GearWorth > 0 ? ", " + N(r.GearWorth) + " in gear won" : "") + (t.LostW > 0 ? ", " + N(t.LostW) + " in gear yielded" : "") + ".";
+            }
+            catch (Exception e) { Stumble("BuildTourney", e); }
             return c;
         }
     }

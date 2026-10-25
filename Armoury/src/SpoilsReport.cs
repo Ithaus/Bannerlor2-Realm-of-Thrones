@@ -47,7 +47,8 @@ namespace Armoury
     ///  G oblezenie: prefiks First / finalizer Last CampaignEventDispatcher.OnSiegeAftermathApplied (wszystkie nasluchy: CitySack L2/L7, wyplata gry) - tylko,
     ///    gdy gracz atakuje, jest w partyContributions albo w armii atakujacego. Etykiety: CitySack.Messages (NoteSack), CitySack.Capture (skrzynia zalogi).
     ///  R okup oblezenia (SiegeRansom O1/O3): bez ramki - liczby SiegeRansom (ToLead, ToMen, korona) do osobnego raportu "The Ransom of X".
-    ///  T turniej - v1.1 (nasluchy z P0 zostaja puste; okno turnieju nie powstaje).
+    ///  T turniej (noc P11, 125 - SpoilsReport.Tourney.cs): od OnPlayerJoinedTournamentEvent do wyjscia z szranek (po misji, mapa, GrandTourney bez kolejki
+    ///    wykupu, bez zapytania); etykiety z zakresow roznicy kiesy wokol wrapperow PlayerFees8, sakiewki mieszczan i metod GrandTourney (odbicie, Harmony w kampanii).
     /// KIEDY GOTOWY: bitwa polowa - po FinishCollection Spoils (faza Spoils None), szturm wygrany - po ramce G tej osady (najwyzej 12 h kampanii), reszta po DoEnd;
     /// recenzja P5 (1): raport bitwy czeka tez, dopoki dzialka gracza lezy w kolejce BattlefieldLaw (SharePending - bitwa bez ekranu Spoils: zaciezny ROT,
     /// Spoils wyszedl z OnMapEventEnded wczesniej) - sakwy przychodza z terminu ArmouryBehavior._lootFlushDue (+1 h, sprawdzany w HourlyTick, wiec najpozniej
@@ -56,7 +57,7 @@ namespace Armoury
     /// (wczytanie zapisu w trakcie zbierania Spoils = brak raportu; Reset w konstruktorze ArmouryBehavior i OnGameEnd).
     /// GRACZ vs AI: tylko bitwy gracza (IsPlayerMapEvent), nastepstwa z jego udzialem; AI nic nie widzi i niczego nie traci.
     /// </summary>
-    internal static class SpoilsReport
+    internal static partial class SpoilsReport
     {
         internal const string Tag = "Okno lupu (117): ";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -106,6 +107,8 @@ namespace Armoury
             public int Given;                     // sztuki oddane z sakw w ramkach (ujemna roznica) - tylko log
             public int SN, SpN; public long SW, SpW;   // ekran trofeow: nasze sztuki i wartosc, Spoils _takenCount/_takenValue
             public readonly StringBuilder Lines = new StringBuilder();   // segmenty linii logu ramek
+            public TInfo T;                       // noc P11: turniej (szranki, mistrz, nagroda, oddany rynsztunek) - tylko KTourney
+            public bool Test;                     // noc P11: raport proby autotestu (linia wyniku przy Finish)
 
             internal long CoinTotal { get { long s = 0; foreach (var v in CoinAmounts) s += v; return s; } }
             internal long GearWorth
@@ -116,6 +119,15 @@ namespace Armoury
             internal int TroopCount { get { int s = 0; foreach (var v in Troops.Values) s += v; return s; } }
             internal long RansomWorth;            // policzone przy zamknieciu ramki jencow (wycena modelu / Ransom178)
             internal bool AnythingWon { get { return CoinTotal > 0 || Men > 0 || GearCount > 0 || TroopCount > 0 || Lords.Count > 0; } }
+            /// <summary>noc P11: turniej - okno takze przy samych stratach (zaklady, wykup konia i zbroi), bo gracz chce wiedziec, co zostalo.</summary>
+            internal bool AnythingTourney
+            {
+                get
+                {
+                    foreach (var v in CoinAmounts) if (v != 0) return true;
+                    return GearCount > 0 || Math.Abs(Renown) >= 0.5f || Math.Abs(Influence) >= 0.5f || (T != null && T.LostN > 0);
+                }
+            }
 
             internal void AddCoin(string label, long v)
             {
@@ -187,7 +199,7 @@ namespace Armoury
         {
             var s = new Snap { Name = name, OpenedTicks = System.Diagnostics.Stopwatch.GetTimestamp() };
             var me = Hero.MainHero; var mp = MobileParty.MainParty; var cl = Clan.PlayerClan;
-            s.Gold = me != null ? me.Gold : 0;
+            s.Gold = CurGold();   // noc P11: kiesa gracza (w probie autotestu turnieju - kiesa probna, bez ruszania prawdziwej)
             s.Men = mp != null ? MenPurse.Get(mp) : 0;
             s.Bag = BagOf(mp);
             if (WornCounts(name)) AddWorn(mp, s.Bag);   // recenzja P5 (4): tylko ekrany Spoils (w ramce A gra i zuzycie zmieniaja stan rynsztunku)
@@ -407,6 +419,17 @@ namespace Armoury
                 case LSack: return "czesc grabiezy";
                 case LChest: return "skrzynia zalogi";
                 case LRansom: return "czesc okupu";
+                // noc P11 (turniej)
+                case LTPrize: return "nagroda TXP";
+                case LTHonours: return "premie meczu";
+                case LTBetStake: return "zaklady postawione";
+                case LTBetWon: return "zaklady wygrane";
+                case LTPrizeCoin: return "nagroda w monecie";
+                case LTFolk: return "sakiewka mieszczan";
+                case LTChampion: return "sakiewka mistrza GT";
+                case LTTakings: return "utarg gospodarza GT";
+                case LTRansomIn: return "wykup od pokonanych GT";
+                case LTRansomOut: return "wykup gracza GT";
                 default: return label;
             }
         }
@@ -588,7 +611,8 @@ namespace Armoury
             var f = _frame;
             if (f == null) { _depth = 0; return; }
             if (f.Name == "A") { FinishA(f, why); return; }
-            if (f.Name.StartsWith("S", StringComparison.Ordinal)) { SClose(why); }
+            if (f.Name == "T") { TClose(why); }   // noc P11: turniej przerwany nowa bitwa albo nowym turniejem - raport z tego, co juz bylo
+            else if (f.Name.StartsWith("S", StringComparison.Ordinal)) { SClose(why); }
             else if (f.Name.StartsWith("L", StringComparison.Ordinal)) { LClose(why); }
             else if (f.Name == "G") { GClose(why); }
             if (_frame != null) { Log.Info(Tag + "ramka " + _frame.Name + " porzucona bez wplywu na raport (" + why + ")."); _frame = null; }
@@ -945,7 +969,8 @@ namespace Armoury
                 var mp = MobileParty.MainParty;
                 bool battle = mp != null && mp.MapEvent != null;
                 bool encounter = PlayerEncounter.Current != null;
-                if (_frame != null && _frame.Name == "A" && !battle && !encounter)
+                if (_frame != null && _frame.Name == "T") TWatch();   // noc P11: ramka turnieju - zamkniecie po wyjsciu z szranek
+                else if (_frame != null && _frame.Name == "A" && !battle && !encounter)
                     Abandon("straznik - ramka bez DoEnd (bez spotkania i bitwy)");
                 else if (_frame != null && _frame.Name.StartsWith("S", StringComparison.Ordinal))
                 {
@@ -1062,6 +1087,7 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Finish", e); }
+            if (r.Test) TestVerdict(r, outcome, why, window);   // noc P11: proba autotestu okna turnieju - linia wyniku
         }
 
         internal static string KindName(int k)
@@ -1092,14 +1118,10 @@ namespace Armoury
             _frame = null; _depth = 0;
             _sOpen = _lOpen = _gOpen = _gNested = false; _sFrame = _lFrame = _gFrame = null; _gTown = null;
             _earlyMe = null; _earlyCrown = 0;
+            TReset();   // noc P11: ramka turnieju, zakresy kiesy, proba autotestu (proba - raz na sesje gry, nie na kampanie)
         }
 
-        // turniej (ramka T) - v1.1: nasluchy P0 zostaja, okno turnieju nie powstaje (krytyk ZAKRES v1)
-        internal static void OnTourneyJoined(Town town, bool isParticipant) { }
-
-        internal static void OnTourneyFinished(CharacterObject winner, MBReadOnlyList<CharacterObject> participants, Town town, ItemObject prize) { }
-
-        internal static void OnTourneyEliminated(int round, Town town) { }
+        // turniej (ramka T) - noc P11 (125): SpoilsReport.Tourney.cs (OnTourneyJoined / OnTourneyFinished / OnTourneyEliminated)
 
         // ------------------------------------------------------------ latki (BattlefieldLaw.ApplyAll, start gry)
 
@@ -1160,6 +1182,7 @@ namespace Armoury
         {
             try
             {
+                _harmony = h;   // noc P11: latki GrandTourney (zakresy kiesy turnieju) wpinane dopiero w kampanii - EnsureGtWired
                 var pe = typeof(PlayerEncounter);
                 Wire(h, pe, "DoApplyMapEventResults", nameof(ApplyResultsPrefix), nameof(ApplyResultsPostfix), null, Priority.First, "DoApplyMapEventResults");
                 Wire(h, typeof(MapEventParty), "CommitGoldChanges", nameof(CommitGoldPrefix), null, null, Priority.Last, "CommitGoldChanges");
@@ -1191,7 +1214,7 @@ namespace Armoury
                 string foreign = Foreign(h, pe, "DoEnd") + "; DoApplyMapEventResults: " + Foreign(h, pe, "DoApplyMapEventResults");
                 var s = Settings.Current;
                 Log.Info(Tag + "start | klucze Battle " + YN(s.SpoilsWindowAfterBattle) + ", Siege " + YN(s.SpoilsWindowAfterSiege) + ", Tourney " + YN(s.SpoilsWindowAfterTourney)
-                         + " (turniej v1.1 - bez okna), MinWorth " + s.SpoilsWindowMinWorth + " | latki " + _wired + "/" + _wanted + ": gra " + game + "/4, Spoils " + sp + "/7 ("
+                         + " (turniej - ramka T, latki GrandTourney w kampanii: linia 'Okno lupu (125)'), MinWorth " + s.SpoilsWindowMinWorth + " | latki " + _wired + "/" + _wanted + ": gra " + game + "/4, Spoils " + sp + "/7 ("
                          + string.Join(", ", _wiredNames.ToArray()) + ")" + (_missing.Count > 0 ? " | BRAK: " + string.Join(", ", _missing.ToArray()) : "") + " | " + fields
                          + " | prefab ArmSpoilsWindow " + (SpoilsWindow.PrefabFileExists() ? "TAK" : "BRAK (okno przez zapas StoryWindow/ShowInquiry)")
                          + " | GT Busy " + (SpoilsWindow.GtKnown() ? "TAK" : "BRAK") + " | obce latki DoEnd: " + foreign + ".");

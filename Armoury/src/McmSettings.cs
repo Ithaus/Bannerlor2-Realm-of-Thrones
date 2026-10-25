@@ -9828,7 +9828,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsWindowAfterSiege { get; set; } = true;
 
-        [SettingPropertyBool("Spoils Window After Tourney", HintText = "not in this version yet - the tourney window comes later, and until then this setting does nothing. It will be the same window after a tourney you rode in or bet on: prize money, the prize, bets, ransoms of horse and armour, the townsfolk's purse and renown", RequireRestart = false)]
+        [SettingPropertyBool("Spoils Window After Tourney", HintText = "the same window after a tourney you rode in or watched, once you leave the lists and the ransoms of horse and armour are settled: the champion, your bouts and the round you fell in, prize money, the prize and its worth, bets placed and won, the townsfolk's and the champion's purse, ransoms of horse and armour paid and received, horse and armour won or yielded, and renown. Also shown when you only lost, so you see what is left", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsWindowAfterTourney { get; set; } = true;
 
