@@ -743,6 +743,9 @@ namespace Armoury
         // f9-predkosc: liczniki linii "Predkosc mapy (f9)" od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _f9Reset = F9Reset();
         private static bool F9Reset() { try { MapSpeedProfile.Reset(); } catch (Exception e) { Log.Error("F9Reset", e); } return true; }
+        // p9 (25.10): gotowosc zbrojowni partii i wyjazdy po sprzet od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
+        private readonly bool _p9Reset = P9Reset();
+        private static bool P9Reset() { try { ArmedStrength.Reset(); } catch (Exception e) { Log.Error("P9Reset", e); } return true; }
         // m110-stan krok 2: rejestry misji ochrony z dokladnego HP i ksiegi sprzetu towarzyszy od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _m110HpReset = M110HpReset();
         private static bool M110HpReset() { try { HeroHp.Reset(); HeroBook.Reset(); } catch (Exception e) { Log.Error("M110HpReset", e); } return true; }
@@ -1737,6 +1740,7 @@ namespace Armoury
             Measure169c.RegisterEvents(this);   // 169c: niewola lordow, dezercja, sluby AI, Bliznaki - same liczniki (tylko log)
             AiDowry.RegisterEvents(this);       // R3-01c: posag przy slubach AI z AI (BeforeHeroesMarried)
             ArmyCohesionYear.RegisterEvents(this);   // AC (Jeff 14.10): armie zalozone / rozwiazane - wiek armii i przyczyny do linii doby
+            ArmedStrength.RegisterEvents(this);   // p9 (Jeff 25.10): gotowosc zbrojowni partii - doba partii, godzina (brudne, publikacja; ArmsFirst), koniec bitwy, nowa / zniszczona partia
             PregnancyYear.RegisterEvents(this);   // CR (zasada Jeffa 14.10): poczecia i porody (OnChildConceived / OnGivenBirth) - same liczniki do linii doby
             FiefGrants.RegisterEvents(this);   // PROJEKT-LENNA (14.10): uczestnicy zwycieskiego szturmu (MapEventEnded), rodzaj zmiany pana twierdzy, decyzje "Owner of X" rozstrzygniete / anulowane
             // M6a: najkrotsza sluzba kompanii (pole gry przy najmie, pomiar konca sluzby), pamiec okupow (kazda droga okupu), rozstrzygniecie pokoju po 24 h
@@ -2309,6 +2313,7 @@ namespace Armoury
             try { ArmouryZb.SessionStart(); } catch (Exception e) { Log.Error("ArmouryZb.SessionStart", e); }   // ZB (noc 17/18.10, przeglad 16.10): linia "Zbrojownia gracza (ZB): start sesji" - klucze ZB-1..ZB-6 i samosprawdzenie ksiegi per modyfikator (PO McmSettings.Apply)
             try { GearFit.SessionStart(); } catch (Exception e) { Log.Error("GearFit.SessionStart", e); }   // GearFit (po recenzji): filtr kompletu t1 DTE dopiero od startu sesji (OnGameLoaded DTE biegnie przed prawami CrashScribe), pamiec wzorcow od nowa
             try { ArmyCohesionYear.SessionStart(); } catch (Exception e) { Log.Error("ArmyCohesionYear.SessionStart", e); }   // AC (Jeff 14.10): spojnosc armii x 84 / rok - postfiks na metode czynnego modelu armii (raz na proces), linia "Spojnosc armii (AC): start sesji"
+            try { ArmedStrength.SessionStart(); } catch (Exception e) { Log.Error("ArmedStrength.SessionStart", e); }   // p9 (Jeff 25.10): sila partii z uzbrojeniem i "najpierw dozbroic" - latki czynnych modeli (raz na proces, PO McmSettings.Apply), linia "Gotowosc do bitwy (p9): start sesji"
             try { MissionTeams.SessionStart(); } catch (Exception e) { Log.Error("MissionTeams.SessionStart", e); }   // NM (noc 15/16.10): straznik druzyn w misji i ucieczka rannych tylko w bitwie - linia "Druzyny w misji (NM): start sesji" (PO McmSettings.Apply), liczniki sesji od zera
             try { RoutHold.SessionStart(); } catch (Exception e) { Log.Error("RoutHold.SessionStart", e); }   // NB2 (16.10): zlamani raz na bitwe i postura szeregowych wedlug tieru - linia "Bitwa (NB2): start sesji" (PO McmSettings.Apply), liczniki sesji od zera
             try { DuelAi.SessionStart(); } catch (Exception e) { Log.Error("DuelAi.SessionStart", e); }   // m111-walka (24.10): linia "DuelAi tabela" - profil AI w pojedynku przy umiejetnosci 60..250, klucze pojedynku, stan hakow (PO McmSettings.Apply)
@@ -2703,6 +2708,7 @@ namespace Armoury
             try { RaceLaw.Daily(); } catch (Exception e) { Log.Error("RaceLaw.Daily", e); } DayProfile.Lap("RaceLaw.Daily");   // Jeff 10.10: linia "Rasy: dzien N" - tylko gdy cos zablokowano
             try { PregnancyYear.Daily(); } catch (Exception e) { Log.Error("PregnancyYear.Daily", e); } DayProfile.Lap("PregnancyYear.Daily");   // CR (zasada Jeffa 14.10): linia "Ciaza i plodnosc (CR): dzien N" - ciaze w toku, poczecia, porody, rzuty szansy (tylko log)
             try { ArmyCohesionYear.Daily(); } catch (Exception e) { Log.Error("ArmyCohesionYear.Daily", e); } DayProfile.Lap("ArmyCohesionYear.Daily");   // AC: linia "Spojnosc armii (AC): dzien N"
+            try { ArmedStrength.Daily(); } catch (Exception e) { Log.Error("ArmedStrength.Daily", e); } DayProfile.Lap("ArmedStrength.Daily");   // p9: linia "Gotowosc do bitwy (p9): dzien N"
             try { FiefGrants.Daily(); } catch (Exception e) { Log.Error("FiefGrants.Daily", e); } DayProfile.Lap("FiefGrants.Daily");   // PROJEKT-LENNA (14.10): linia "Nadania lenn (N) doba N" (gdy cos sie dzialo albo co 28 dob), pamiec szturmow i nadan 60 dob
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); } DayProfile.Lap("Orders.DailyTick");

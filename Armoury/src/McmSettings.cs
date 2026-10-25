@@ -9664,6 +9664,38 @@ namespace Armoury
         [SettingPropertyGroup("Chronicle of Westeros")]
         public bool ChronicleCanonDeaths { get; set; } = true;
 
+        [SettingPropertyBool("AI Strength Counts Gear", HintText = "When lords weigh a fight - whether to attack, flee or join a battle, whether to lead or join an army, whether to march to a relief, how strong a realm is in war and peace - a party counts only as strong as the kit its stores hold for its men, measured like the garrison threshold. A party whose stores are empty counts as a band of peasants in tunics with clubs. The same rule for every lord's party, yours and your clan's, and for garrisons that fight only with their stores; bandits, caravans, villagers, militia and the dead count as before. It changes how lords judge a fight, not how an auto-resolved battle between lords ends. Off = strength by troop tier only", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool AiStrengthCountsGear { get; set; } = true;
+
+        [SettingPropertyInteger("AI Strength Full Kit Percent", 1, 100, "0", HintText = "share of its men's template slots a party's stores must fill for it to count at full strength (the same 75% as the garrison threshold); below it the party's strength falls in a straight line towards that of unarmed men", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public int AiStrengthFullKitPercent { get; set; } = 75;
+
+        [SettingPropertyBool("AI Arms Before Battle", HintText = "A lord whose stores hold kit for fewer than AI Arms Below Percent of his men's slots arms them first: he rides to the nearest friendly town within AI Arms Trip Max Days and buys kit there with his own gold, as lords already do in towns. Until his stores reach AI Arms Ready Percent he attacks no lord, besieges and raids nothing, does not march to relieve another clan's fortress, neither leads nor joins an army, and refuses your summons. A lord who cannot pay waits for his clan's income. He still defends his own clan's fiefs and still flees. Your clan's parties follow the same rule. Off = lords go to war with whatever their men carry", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool AiArmsBeforeBattle { get; set; } = true;
+
+        [SettingPropertyInteger("AI Arms Below Percent", 0, 100, "0", HintText = "a lord's party counts as unarmed when its stores fill less than this share of its men's template slots", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public int AiArmsBelowPercent { get; set; } = 50;
+
+        [SettingPropertyInteger("AI Arms Ready Percent", 0, 100, "0", HintText = "an unarmed lord's party counts as armed again from this share of its men's template slots", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public int AiArmsReadyPercent { get; set; } = 60;
+
+        [SettingPropertyInteger("AI Arms Trip Max Days", 1, 14, "0", HintText = "the farthest friendly town, in days of march, an unarmed lord rides to for kit", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public int AiArmsTripMaxDays { get; set; } = 3;
+
+        [SettingPropertyInteger("AI Arms Trip Cooldown Days", 0, 30, "0", HintText = "a town where an unarmed lord found nothing that armed his men (empty shelves or no gold) is not chosen by him again for this many days", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public int AiArmsTripCooldownDays { get; set; } = 3;
+
+        [SettingPropertyBool("AI Arms Block Bandit Attacks", HintText = "unarmed lords leave bandits alone as well. Off = they may still attack bandits when their strength, kit counted, is enough", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool AiArmsBlockBanditAttacks { get; set; } = false;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -12079,6 +12111,14 @@ namespace Armoury
             s.ChronicleFullVersions = ChronicleFullVersions;
             s.ChroniclePlayerChoices = ChroniclePlayerChoices;
             s.ChronicleCanonDeaths = ChronicleCanonDeaths;
+            s.AiStrengthCountsGear = AiStrengthCountsGear;
+            s.AiStrengthFullKitPercent = AiStrengthFullKitPercent;
+            s.AiArmsBeforeBattle = AiArmsBeforeBattle;
+            s.AiArmsBelowPercent = AiArmsBelowPercent;
+            s.AiArmsReadyPercent = AiArmsReadyPercent;
+            s.AiArmsTripMaxDays = AiArmsTripMaxDays;
+            s.AiArmsTripCooldownDays = AiArmsTripCooldownDays;
+            s.AiArmsBlockBanditAttacks = AiArmsBlockBanditAttacks;
         }
 
         internal static void Apply()

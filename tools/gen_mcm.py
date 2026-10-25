@@ -49,6 +49,13 @@ RANGES = {
     # m102-tablica: listy gonczne - kod przycina do 0..5 na miasto i 1..60 dni (NoticeBoard.PerTown / DaysUp)
     'WatchBountiesPerTown': (0, 5, "0"),
     'WatchBountyDays': (1, 60, "0"),
+    # p9 (gotowosc AI przed bitwa): odsetki slotow wzorca 0..100 (prog pelnej sily 1..100 - kod dzieli przez niego), doby 1..14 i 0..30 - kod przycina tak samo
+    # (ArmedStrength.Knee / ArmsFirst.Below, Ready, TripDays, CoolDays)
+    'AiStrengthFullKitPercent': (1, 100, "0"),
+    'AiArmsBelowPercent': (0, 100, "0"),
+    'AiArmsReadyPercent': (0, 100, "0"),
+    'AiArmsTripMaxDays': (1, 14, "0"),
+    'AiArmsTripCooldownDays': (0, 30, "0"),
     'SutlerRowMinMen': (1, 5000, "0"),
     'SutlerRowMenPerStall': (10, 1000, "0"),
     'SutlerRowMaxStalls': (1, 50, "0"),
@@ -587,6 +594,15 @@ LABELS = {
     'LektorGossipLive': 'Narrator Gossip Live',
     'LektorGossipDailyChars': 'Narrator Gossip Daily Chars',
     'LektorGossipReserveChars': 'Narrator Gossip Reserve Chars',
+    # p9: "AI" wielkimi literami (regula ogolna dalaby "Ai Strength Counts Gear")
+    'AiStrengthCountsGear': 'AI Strength Counts Gear',
+    'AiStrengthFullKitPercent': 'AI Strength Full Kit Percent',
+    'AiArmsBeforeBattle': 'AI Arms Before Battle',
+    'AiArmsBelowPercent': 'AI Arms Below Percent',
+    'AiArmsReadyPercent': 'AI Arms Ready Percent',
+    'AiArmsTripMaxDays': 'AI Arms Trip Max Days',
+    'AiArmsTripCooldownDays': 'AI Arms Trip Cooldown Days',
+    'AiArmsBlockBanditAttacks': 'AI Arms Block Bandit Attacks',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial

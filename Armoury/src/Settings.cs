@@ -4397,6 +4397,20 @@ namespace Armoury
         // NIE (i Full Versions NIE) - wiersze smierc nie biora udzialu. World Changes NIE - tez nie (tekst nie twierdzi smierci, ktorej nie ma).
         public bool ChronicleCanonDeaths = true;          // characters die in Chronicle events as they die in the books and the show, but only when the world went the same way (the character is alive, where the story puts him and in the same role). When your world went another way they live. Off = only the full versions kill them
 
+        // --- AI readiness before battle (25.10) ---
+        // p9 (Jeff 25.10 po bitwie 108972: 55 ludzi Lady Darlessy Marbrand w tunikach z kijami - "AI najpierw przygotowac wojsko i dobrac pancerz, bo zolnierz
+        // taki nie nadaje sie do bitwy"): ArmedStrength.cs (sila partii w ocenach AI z gotowoscia zbrojowni) i ArmsFirst.cs (najpierw dozbroic). Nowe klucze -
+        // MCM Jeffa ich nie ma (domyslne z kodu). Progi: 75 = GarrisonArmoryMinFillPercent ("tyle kompletu i oddzial walczy jak pelny"), 60 = prog "chudych"
+        // partii rodu (GarrisonKit.ClanFillOnce), 50 = polowa slotow wzorca pusta.
+        public bool AiStrengthCountsGear = true;           // When lords weigh a fight - whether to attack, flee or join a battle, whether to lead or join an army, whether to march to a relief, how strong a realm is in war and peace - a party counts only as strong as the kit its stores hold for its men, measured like the garrison threshold. A party whose stores are empty counts as a band of peasants in tunics with clubs. The same rule for every lord's party, yours and your clan's, and for garrisons that fight only with their stores; bandits, caravans, villagers, militia and the dead count as before. It changes how lords judge a fight, not how an auto-resolved battle between lords ends. Off = strength by troop tier only
+        public int AiStrengthFullKitPercent = 75;          // share of its men's template slots a party's stores must fill for it to count at full strength (the same 75% as the garrison threshold); below it the party's strength falls in a straight line towards that of unarmed men
+        public bool AiArmsBeforeBattle = true;             // A lord whose stores hold kit for fewer than AI Arms Below Percent of his men's slots arms them first: he rides to the nearest friendly town within AI Arms Trip Max Days and buys kit there with his own gold, as lords already do in towns. Until his stores reach AI Arms Ready Percent he attacks no lord, besieges and raids nothing, does not march to relieve another clan's fortress, neither leads nor joins an army, and refuses your summons. A lord who cannot pay waits for his clan's income. He still defends his own clan's fiefs and still flees. Your clan's parties follow the same rule. Off = lords go to war with whatever their men carry
+        public int AiArmsBelowPercent = 50;                // a lord's party counts as unarmed when its stores fill less than this share of its men's template slots
+        public int AiArmsReadyPercent = 60;                // an unarmed lord's party counts as armed again from this share of its men's template slots
+        public int AiArmsTripMaxDays = 3;                  // the farthest friendly town, in days of march, an unarmed lord rides to for kit
+        public int AiArmsTripCooldownDays = 3;             // a town where an unarmed lord found nothing that armed his men (empty shelves or no gold) is not chosen by him again for this many days
+        public bool AiArmsBlockBanditAttacks = false;      // unarmed lords leave bandits alone as well. Off = they may still attack bandits when their strength, kit counted, is enough
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

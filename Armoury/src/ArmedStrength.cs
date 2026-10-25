@@ -1,0 +1,566 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.Reflection;
+using System.Text;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
+
+namespace Armoury
+{
+    /// <summary>
+    /// p9 - SILA Z UZBROJENIEM (Jeff 25.10, bitwa 108972: 55 ludzi Lady Darlessy Marbrand w tunikach z domu i z kijem zaatakowalo 46 ludzi gracza - zabici 24,
+    /// ranni 86, gracz 0; "zolnierz taki nie nadaje sie do bitwy, przeciez wiadomo, ze przegra"). Klucz AiStrengthCountsGear (MCM "AI Strength Counts Gear").
+    ///
+    /// DLACZEGO AI NIE WIDZI SPRZETU (dekompilacja 1.4.8, sprawdzone): kazda ocena sily na mapie idzie przez MilitaryPowerModel.GetPowerOfParty - PartyBase.
+    /// EstimatedStrength (pamiec wedlug MemberRoster.VersionNo), CalculateCurrentStrength, GetCustomStrength, MobileParty.GetTotalLandStrengthWithFollowers, Army.
+    /// EstimatedStrength - a ta liczy tylko tier ludzi: P(t) = (2+t)(10+t) x 0.02 (DefaultMilitaryPowerModel.GetDefaultTroopPower; ROT i NavalDLC przekazuja dalej).
+    /// StrategicCampaignAI145 (progi 35/80/260), BK (BKArmyManagementModel), ROT i nasze ArmyRestDay/BesiegedRelief/NightMarch czytaja te same liczby. Partia Darlessy
+    /// (nowa po okupie, bez wpisu w zbrojowniach DTE - 201 pustych slotow) miala w grze sile 142 wobec 66 gracza (2.16) i zaatakowala.
+    ///
+    /// REGULA (jedna dla gracza i AI): postfiks Priority.Last na GetPowerOfParty CZYNNEGO modelu (PatchTarget.OfActive - klasa deklarujaca, dzis ROTMilitaryPowerModel;
+    /// tylko najbardziej zewnetrzny model, wiec mnozenie jest raz), wpinany w kampanii (OnSessionLaunched; pola statyczne DefaultMilitaryPowerModel - pulapka
+    /// konstruktora statycznego). Wynik x F(partia), gdy kontekst Estimated albo partia poza bitwa (MapEvent == null). Rozliczen w toku bitwy (GetCustomStrength
+    /// z SimulationContext: slawa i wplywy, udzial, morale strony, poswiecenie ludzi) NIE ruszamy. Lup DTE AI-AI (EveryoneCampaignBehavior.OnMapEventEnded dzieli
+    /// sztuki wedlug EstimatedStrength) - bez mnoznika: prefiks/finalizer z flaga [ThreadStatic] i wyzerowana pamiecia sily uczestnikow (przed i po).
+    /// Partie w regule: lordowie (GarrisonKit.LordRule - takze towarzysze i partie Twojego rodu) i druzyna gracza (zbrojownia QuartermasterLaw.DteArmory, ten sam
+    /// algorytm) przy TroopsFightWithOwnKitOnly, zalogi przy GarrisonKit.BareOn (inaczej walcza we wzorcu - F = 1). Reszta F = 1: bandy, karawany, wozy, milicja,
+    /// umarli Nocnego Krola; bohaterowie bez kary (sprzet wlasny). Zbrojownie DTE nieczytelne - F = 1 (nie karzemy za blad odczytu), licznik w linii.
+    ///
+    /// GOTOWOSC R = GarrisonKit.FillPercent(partia, zbrojownia, battle: true) - % slotow wzorca (bez koni) obsadzonych ze zbrojowni, tylko zdrowi; ta sama miara
+    /// co progi 75 (GarrisonArmoryMinFillPercent) i 60 (ClanFillOnce). Brak wpisu DTE = 0.
+    /// MNOZNIK F: g = min(1, R / Knee), Knee = AiStrengthFullKitPercent (75). Zwykly zolnierz: g x P(t) + (1-g) x P0, P0 = 0.40 (tier 0 - wiesniak w tunice z kijem,
+    /// dokladnie to, co m117/m119 daja mu z domu). F = (Pstale + suma zwyklych z kara) / (Pstale + suma zwyklych), Pstale = bohaterowie (P x 1.5 z modelu) i dodatki
+    /// czynnego modelu ponad tier (ROT: smok +100). Przyklad Jeffa: sredni tier 2.3-2.5 -> F 0.36-0.38, sila AI 142 x 0.38 = 54 wobec 66 gracza - gra atakuje tylko
+    /// przy przewadze > 1 (DefaultMobilePartyAIModel.CalculateInitiativeScoresForEnemy), a avoidScore rosnie z 1/przewaga - ucieka.
+    ///
+    /// WYDAJNOSC: postfiks to odczyt z niezmiennego slownika MBGUID -> Info (publikacja co godzine, copy-on-write - bezpieczne przy watkach roboczych).
+    /// R i F liczone w DailyTickParty (gra rozklada na dobe, watek glowny) i co godzine dla "brudnych" (zakup AiGear, koniec bitwy, nowa partia, zmiana skladu
+    /// o >= max(3, 10%) zdrowych, zmiana zbrojowni gracza), najwyzej HourCap na godzine; po wczytaniu pelny przeglad kolejka (lordowie i gracz najpierw).
+    /// Przy zmianie F zerujemy pamiec gry PartyBase._lastEstimatedStrengthVersionNo (inaczej EstimatedStrength stare do zmiany skladu); brak pola - "BRAK".
+    /// Bez zapisu: po wczytaniu do pierwszego przeliczenia F = 1. Potkniecia liczone per partia - bez globalnych wylacznikow.
+    /// NIE ZMIENIA: wyniku autorozstrzygniecia AI-AI (DefaultCombatSimulationModel liczy GetTroopPower po zolnierzu) ani linii B175 "moc" (KingdomBalance).
+    /// </summary>
+    internal static class ArmedStrength
+    {
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+        internal const int KNone = 0, KLord = 1, KPlayer = 2, KGarrison = 3;
+        private const float P0 = 0.40f;          // (2+0)(10+0) x 0.02 - DefaultMilitaryPowerModel.GetDefaultTroopPower tieru 0
+        private const int DirtyCap = 200;        // brudne na godzine
+        private const int FullCap = 400;         // pelny przeglad po wczytaniu - na godzine
+
+        /// <summary>Opublikowany stan partii (niezmienny): mnoznik sily, gotowosc %, "niegotowa" (ArmsFirst, histereza), partia - do zerowania pamieci gry.</summary>
+        internal sealed class Info
+        {
+            internal readonly float F; internal readonly int R; internal readonly bool Low; internal readonly MobileParty P;
+            internal Info(float f, int r, bool low, MobileParty p) { F = f; R = r; Low = low; P = p; }
+        }
+
+        private sealed class Ent { internal MobileParty P; internal int Kind, R = 100, Ver, Healthy, ArmVer, Day; internal float F = 1f; internal bool Low, Known; }
+
+        private static readonly Dictionary<MBGUID, Ent> _ent = new Dictionary<MBGUID, Ent>();
+        private static readonly HashSet<MobileParty> _dirty = new HashSet<MobileParty>();
+        private static readonly Queue<MobileParty> _fullQ = new Queue<MobileParty>();
+        private static readonly Dictionary<MBGUID, Info> Empty = new Dictionary<MBGUID, Info>();
+        private static volatile Dictionary<MBGUID, Info> _pub = Empty;
+        private static volatile bool _strOn;
+        private static bool _pubDirty, _invAll, _needFull, _anyOn;
+        private static int _knee = -1;
+        [ThreadStatic] private static int _hold;
+
+        // latki (raz na proces)
+        private static Harmony _h;
+        private static readonly HashSet<MethodBase> _patched = new HashSet<MethodBase>();
+        private static string _hPower = "nie wpieta", _hDte = "nie wpieta", _hMem = "BRAK";
+        private static AccessTools.FieldRef<PartyBase, int> _verRef;
+        private static bool _verTried;
+
+        // liczniki
+        private static int _stumbles, _dComputed, _dUnknown, _dFull, _fullTotal, _dInvalid, _dPublish, _dHold;
+        private static long _dTicks;
+
+        private static void Stumble(string where, Exception e)
+        {
+            _stumbles++;
+            if (_stumbles <= 5 || _stumbles % 100 == 0) Log.Error("ArmedStrength." + where + " (potkniecie " + _stumbles + ")", e);
+        }
+
+        internal static void Reset()
+        {
+            _ent.Clear(); _dirty.Clear(); _fullQ.Clear(); _pub = Empty; _strOn = false; _pubDirty = _invAll = false; _needFull = true; _anyOn = false; _knee = -1;
+            _stumbles = 0; ClearDay(); _fullTotal = 0;
+            ArmsFirst.Reset();
+        }
+
+        private static void ClearDay() { _dComputed = _dUnknown = _dFull = _dInvalid = _dPublish = _dHold = 0; _dTicks = 0; }
+
+        // ------------------------------------------------------------ odczyt (dowolny watek)
+        /// <summary>Opublikowany stan partii albo null (poza regula, F = 1 i gotowa, albo jeszcze nie policzona).</summary>
+        internal static Info InfoOf(MobileParty mp)
+        {
+            if (mp == null) return null;
+            Info i;
+            return _pub.TryGetValue(mp.Id, out i) ? i : null;
+        }
+
+        /// <summary>ArmsFirst: partia lorda AI "niegotowa" (R ponizej AiArmsBelowPercent, histereza do AiArmsReadyPercent) wedlug ostatniej publikacji.</summary>
+        internal static bool IsLow(MobileParty mp) { var i = InfoOf(mp); return i != null && i.Low; }
+
+        /// <summary>Postfiks Priority.Last na GetPowerOfParty czynnego modelu: wynik x F, gdy kontekst Estimated albo partia poza bitwa. Tylko odczyt niezmiennego
+        /// slownika (watki robocze ruchu); zadnych zapisow. Flaga _hold (lup DTE) - bez mnoznika. Nie rzuca.</summary>
+        public static void PowerPostfix(PartyBase __0, MapEvent.PowerCalculationContext __2, ref float __result)
+        {
+            if (!_strOn || _hold > 0 || __0 == null) return;
+            try
+            {
+                var pub = _pub;
+                if (pub.Count == 0 || !__0.IsMobile) return;
+                if (__2 != MapEvent.PowerCalculationContext.Estimated && __0.MapEvent != null) return;
+                var mp = __0.MobileParty;
+                Info i;
+                if (mp != null && pub.TryGetValue(mp.Id, out i) && i.F < 1f) __result *= i.F;
+            }
+            catch { }
+        }
+
+        /// <summary>Prefiks First DTE EveryoneCampaignBehavior.OnMapEventEnded: podzial lupu AI-AI wedlug EstimatedStrength bez mnoznika (jak przed p9) - flaga
+        /// i wyzerowana pamiec sily uczestnikow (DTE policzy i zapamieta sile bez mnoznika).</summary>
+        public static void HoldPrefix(MapEvent __0)
+        {
+            _hold++;
+            if (_strOn) { _dHold++; InvalidateEvent(__0); }
+        }
+
+        /// <summary>Finalizer: koniec flagi i znowu wyzerowana pamiec uczestnikow - nastepny odczyt policzy sile z mnoznikiem. Wyjatek DTE idzie dalej bez zmian.</summary>
+        public static Exception HoldFinalizer(MapEvent __0, Exception __exception)
+        {
+            if (_hold > 0) _hold--;
+            if (_strOn) InvalidateEvent(__0);
+            return __exception;
+        }
+
+        private static void InvalidateEvent(MapEvent me)
+        {
+            try
+            {
+                if (me == null || _verRef == null) return;
+                foreach (var pb in me.InvolvedParties) if (pb != null && pb.IsMobile) _verRef(pb) = -1;
+            }
+            catch (Exception e) { Stumble("InvalidateEvent", e); }
+        }
+
+        private static void Invalidate(MobileParty mp)
+        {
+            try { if (_verRef != null && mp != null && mp.Party != null) { _verRef(mp.Party) = -1; _dInvalid++; } }
+            catch (Exception e) { Stumble("Invalidate", e); }
+        }
+
+        // ------------------------------------------------------------ regula partii
+        /// <summary>Rodzaj partii w regule: lord (LordRule) i gracz przy TroopsFightWithOwnKitOnly, zaloga przy BareOn (bez umarlych); reszta KNone (F = 1).</summary>
+        internal static int Kind(MobileParty mp)
+        {
+            if (mp == null || !mp.IsActive || mp.MemberRoster == null) return KNone;
+            if (mp.IsMainParty) return GarrisonKit.OwnKitOn ? KPlayer : KNone;
+            if (mp.IsGarrison) return GarrisonKit.BareOn && !Undead.Party(mp) ? KGarrison : KNone;
+            return GarrisonKit.OwnKitOn && GarrisonKit.LordRule(mp) ? KLord : KNone;
+        }
+
+        private static int Clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+        internal static int Below(Settings s) { return Clamp(s.AiArmsBelowPercent, 0, 100); }
+        internal static int Ready(Settings s) { return Math.Max(Below(s), Clamp(s.AiArmsReadyPercent, 0, 100)); }
+        private static int Knee(Settings s) { return Clamp(s.AiStrengthFullKitPercent, 1, 100); }
+
+        private static Dictionary<ItemObject, int> ToDict(ItemRoster pr)
+        {
+            var arm = new Dictionary<ItemObject, int>();
+            for (int i = 0; i < pr.Count; i++)
+            {
+                var e = pr.GetElementCopyAtIndex(i);
+                var it = e.EquipmentElement.Item;
+                if (it == null || e.Amount <= 0) continue;
+                int c0; arm.TryGetValue(it, out c0); arm[it] = c0 + e.Amount;
+            }
+            return arm;
+        }
+
+        /// <summary>Mnoznik sily partii z gotowosci R (opis klasy). Zdrowi jak w GetPowerOfParty; moc z czynnego modelu (kontekst Estimated, bez premii dowodcy -
+        /// ta mnozy wszystkich jednakowo).</summary>
+        private static float Factor(MobileParty mp, int r, Settings s)
+        {
+            double g = Math.Min(1.0, Math.Max(0, r) / (double)Knee(s));
+            if (g >= 1.0) return 1f;
+            var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.MilitaryPowerModel : null;
+            if (model == null) return 1f;
+            var roster = mp.MemberRoster;
+            double fix = 0, reg = 0, naked = 0;
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var el = roster.GetElementCopyAtIndex(i);
+                var ch = el.Character;
+                int n = el.Number - el.WoundedNumber;
+                if (ch == null || n <= 0) continue;
+                float full = model.GetTroopPower(ch, BattleSideEnum.Defender, MapEvent.PowerCalculationContext.Estimated, 0f);
+                if (ch.IsHero) { fix += n * (double)full; continue; }
+                float b = model.GetDefaultTroopPower(ch);
+                fix += n * (double)Math.Max(0f, full - b);
+                reg += n * (double)b;
+                naked += n * (double)Math.Min(P0, b);
+            }
+            double tot = fix + reg;
+            if (tot <= 0) return 1f;
+            double f = (fix + g * reg + (1.0 - g) * naked) / tot;
+            return (float)Math.Max(0.05, Math.Min(1.0, f));
+        }
+
+        /// <summary>Przeliczenie R, F i stanu "niegotowa" jednej partii (watek glowny). Zmiana opublikowanego stanu (F o >= 0.01 albo Low) - publikacja w godzinie.</summary>
+        private static void Compute(MobileParty mp, int kind, Settings s)
+        {
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                Ent e;
+                if (!_ent.TryGetValue(mp.Id, out e)) { e = new Ent(); _ent[mp.Id] = e; }
+                e.P = mp; e.Kind = kind;
+                var roster = mp.MemberRoster;
+                e.Ver = roster.VersionNo; e.Healthy = roster.TotalHealthyCount; e.Day = (int)CampaignTime.Now.ToDays;
+                Dictionary<ItemObject, int> arm = null;
+                bool known;
+                if (kind == KPlayer)
+                {
+                    var pr = QuartermasterLaw.DteArmory();
+                    known = pr != null;
+                    if (known) { e.ArmVer = pr.VersionNo; arm = ToDict(pr); }
+                }
+                else
+                {
+                    var all = AiGear.Armories();
+                    known = all != null;
+                    if (known) all.TryGetValue(mp.Id, out arm);
+                }
+                if (!known) { e.Known = false; e.R = -1; e.F = 1f; e.Low = false; _dUnknown++; }
+                else
+                {
+                    e.Known = true;
+                    int r = GarrisonKit.FillPercent(mp, arm, null, true);
+                    e.R = r;
+                    e.F = Factor(mp, r, s);
+                    e.Low = kind == KLord && (e.Low ? r < Ready(s) : r < Below(s));
+                }
+                _dComputed++;
+                var pi = InfoOf(mp);
+                float pf = pi != null ? pi.F : 1f;
+                bool pl = pi != null && pi.Low;
+                if (Math.Abs(pf - e.F) >= 0.01f || pl != e.Low) _pubDirty = true;
+            }
+            catch (Exception ex) { Stumble("Compute", ex); }
+            finally { _dTicks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        private static void Drop(MobileParty mp)
+        {
+            if (mp == null) return;
+            if (_ent.Remove(mp.Id) && InfoOf(mp) != null) _pubDirty = true;
+        }
+
+        // ------------------------------------------------------------ zdarzenia
+        internal static void RegisterEvents(CampaignBehaviorBase owner)
+        {
+            CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(owner, DayProfile.PartyDay("ArmedStrength.OnDailyTickParty", OnDailyTickParty));
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(owner, DayProfile.Hr("ArmedStrength.Hourly", Hourly));
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(owner, DayProfile.MapEnd("ArmedStrength.OnMapEventEnded", OnMapEventEnded));
+            CampaignEvents.MobilePartyCreated.AddNonSerializedListener(owner, MarkDirty);
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(owner, DayProfile.Destroyed("ArmedStrength.OnPartyDestroyed", OnPartyDestroyed));
+        }
+
+        /// <summary>Partia do przeliczenia w nastepnej godzinie (zakup AiGear, nowa partia, koniec bitwy). Watek glowny.</summary>
+        internal static void MarkDirty(MobileParty mp)
+        {
+            try { if (mp != null && _anyOn) _dirty.Add(mp); } catch { }
+        }
+
+        private static void OnMapEventEnded(MapEvent me)
+        {
+            try
+            {
+                if (me == null || !_anyOn) return;
+                foreach (var pb in me.InvolvedParties) if (pb != null && pb.MobileParty != null) _dirty.Add(pb.MobileParty);
+            }
+            catch (Exception e) { Stumble("OnMapEventEnded", e); }
+        }
+
+        private static void OnPartyDestroyed(MobileParty mp, PartyBase pb)
+        {
+            try { if (mp != null) { _dirty.Remove(mp); Drop(mp); ArmsFirst.Forget(mp); } } catch (Exception e) { Stumble("OnPartyDestroyed", e); }
+        }
+
+        /// <summary>DailyTickParty (watek glowny, gra rozklada partie na dobe): przeliczenie partii w regule; poza regula - wypada z pamieci.</summary>
+        internal static void OnDailyTickParty(MobileParty mp)
+        {
+            var s = Settings.Current;
+            if (s == null || mp == null || !(s.AiStrengthCountsGear || s.AiArmsBeforeBattle)) return;
+            try
+            {
+                int k = Kind(mp);
+                if (k == KNone) { Drop(mp); return; }
+                _dirty.Remove(mp);
+                Compute(mp, k, s);
+            }
+            catch (Exception e) { Stumble("OnDailyTickParty", e); }
+        }
+
+        /// <summary>Godzina: klucze z MCM, pelny przeglad po wczytaniu (kolejka), wersje skladow i zbrojowni gracza, brudne (limit), publikacja i pamiec gry.</summary>
+        internal static void Hourly()
+        {
+            var s = Settings.Current;
+            if (s == null || Campaign.Current == null) return;
+            try
+            {
+                bool str = s.AiStrengthCountsGear, any = str || s.AiArmsBeforeBattle;
+                if (!any)
+                {
+                    if (_anyOn || _pub.Count > 0)
+                    {
+                        var old = _pub; _pub = Empty; _strOn = false;
+                        foreach (var kv in old) if (kv.Value.F < 1f) Invalidate(kv.Value.P);
+                        _ent.Clear(); _dirty.Clear(); _fullQ.Clear(); _needFull = true;
+                    }
+                    _anyOn = false;
+                    return;
+                }
+                _anyOn = true;
+                if (str != _strOn) { _strOn = str; _invAll = true; _pubDirty = true; }
+                int knee = Knee(s);
+                if (knee != _knee) { if (_knee >= 0) foreach (var e in _ent.Values) if (e.P != null) _dirty.Add(e.P); _knee = knee; }
+                if (_needFull)
+                {
+                    _needFull = false; _fullQ.Clear();
+                    if (MobileParty.MainParty != null) _fullQ.Enqueue(MobileParty.MainParty);
+                    foreach (var mp in MobileParty.AllLordParties) if (mp != null && !mp.IsMainParty) _fullQ.Enqueue(mp);
+                    foreach (var mp in MobileParty.AllGarrisonParties) if (mp != null) _fullQ.Enqueue(mp);
+                    _fullTotal = _fullQ.Count;
+                }
+                // wersje: sklad (zdrowi o >= max(3, 10%)), zbrojownia gracza; nieczynne - z pamieci
+                List<MBGUID> gone = null;
+                ItemRoster pr = null; bool prRead = false;
+                foreach (var kv in _ent)
+                {
+                    var e = kv.Value; var mp = e.P;
+                    if (mp == null || !mp.IsActive || mp.MemberRoster == null) { if (gone == null) gone = new List<MBGUID>(); gone.Add(kv.Key); continue; }
+                    if (e.Kind == KPlayer)
+                    {
+                        if (!prRead) { pr = QuartermasterLaw.DteArmory(); prRead = true; }
+                        if (pr != null && pr.VersionNo != e.ArmVer) _dirty.Add(mp);
+                    }
+                    var ro = mp.MemberRoster;
+                    if (ro.VersionNo != e.Ver)
+                    {
+                        int h = ro.TotalHealthyCount;
+                        if (Math.Abs(h - e.Healthy) >= Math.Max(3, e.Healthy / 10)) _dirty.Add(mp);
+                    }
+                }
+                if (gone != null)
+                {
+                    var pub0 = _pub;
+                    foreach (var id in gone)
+                    {
+                        Ent e;
+                        if (_ent.TryGetValue(id, out e) && e.P != null) _dirty.Remove(e.P);
+                        _ent.Remove(id);
+                        if (pub0.ContainsKey(id)) _pubDirty = true;
+                    }
+                }
+                // brudne, potem pelny przeglad
+                int n = 0;
+                if (_dirty.Count > 0)
+                {
+                    var list = new List<MobileParty>(_dirty);
+                    foreach (var mp in list)
+                    {
+                        if (n >= DirtyCap) break;
+                        _dirty.Remove(mp);
+                        int k = Kind(mp);
+                        if (k == KNone) { Drop(mp); continue; }
+                        Compute(mp, k, s); n++;
+                    }
+                }
+                int f = 0;
+                while (_fullQ.Count > 0 && f < FullCap)
+                {
+                    var mp = _fullQ.Dequeue();
+                    int k = Kind(mp);
+                    if (k == KNone) continue;
+                    Ent e;
+                    if (_ent.TryGetValue(mp.Id, out e) && e.Day == (int)CampaignTime.Now.ToDays) continue;   // juz policzona dzis (doba albo brudna)
+                    Compute(mp, k, s); f++; _dFull++;
+                }
+                if (_pubDirty) Publish();
+            }
+            catch (Exception e) { Stumble("Hourly", e); }
+            try { ArmsFirst.Hourly(); } catch (Exception e) { Stumble("ArmsFirst.Hourly", e); }
+        }
+
+        /// <summary>Nowy niezmienny slownik (tylko partie z F &lt; 1 albo niegotowe) i wyzerowana pamiec EstimatedStrength kazdej partii, ktorej mnoznik sie zmienil
+        /// (albo wszystkich przy przelaczeniu klucza).</summary>
+        private static void Publish()
+        {
+            _pubDirty = false; _dPublish++;
+            var old = _pub;
+            var nu = new Dictionary<MBGUID, Info>(Math.Max(16, old.Count + 8));
+            foreach (var kv in _ent)
+            {
+                var e = kv.Value;
+                if (e.P == null) continue;
+                if (e.F < 0.9995f || e.Low) nu[kv.Key] = new Info(e.F, e.R, e.Low, e.P);
+            }
+            _pub = nu;
+            bool all = _invAll; _invAll = false;
+            foreach (var kv in nu)
+            {
+                Info o;
+                float of = old.TryGetValue(kv.Key, out o) ? o.F : 1f;
+                if (all ? (of < 1f || kv.Value.F < 1f) : of != kv.Value.F) Invalidate(kv.Value.P);
+            }
+            foreach (var kv in old)
+                if (!nu.ContainsKey(kv.Key) && kv.Value.F < 1f && kv.Value.P != null && kv.Value.P.IsActive) Invalidate(kv.Value.P);
+        }
+
+        // ------------------------------------------------------------ start sesji
+        /// <summary>OnSessionLaunched (po McmSettings.Apply): latki (raz na proces) - GetPowerOfParty czynnego modelu, lup DTE, pole pamieci sily; potem ArmsFirst;
+        /// linia startu. Pelny przeglad w pierwszych godzinach (kolejka).</summary>
+        internal static void SessionStart()
+        {
+            if (_h == null) _h = new Harmony("com.jeff.armoury.armedstrength");
+            _needFull = true;
+            try
+            {
+                var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.MilitaryPowerModel : null;
+                if (model == null) _hPower = "BRAK (model sily nieznany)";
+                else
+                {
+                    var m = PatchTarget.OfActive(model, "GetPowerOfParty", new[] { typeof(PartyBase), typeof(BattleSideEnum), typeof(MapEvent.PowerCalculationContext) }, "sila z uzbrojeniem (p9)");
+                    if (m == null) _hPower = "BRAK (" + model.GetType().FullName + ".GetPowerOfParty)";
+                    else if (_patched.Contains(m)) _hPower = "wpieta " + m.DeclaringType.FullName + ".GetPowerOfParty (juz wczesniej w tym procesie)";
+                    else
+                    {
+                        _h.Patch(m, postfix: new HarmonyMethod(typeof(ArmedStrength), nameof(PowerPostfix)) { priority = Priority.Last });
+                        _patched.Add(m);
+                        _hPower = "wpieta " + m.DeclaringType.FullName + ".GetPowerOfParty (model czynny " + model.GetType().FullName + ")";
+                    }
+                }
+            }
+            catch (Exception e) { _hPower = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Power", e); }
+            try
+            {
+                var t = AccessTools.TypeByName("DynamicTroopEquipmentReupload.EveryoneCampaignBehavior");
+                var m = t != null ? AccessTools.DeclaredMethod(t, "OnMapEventEnded", new[] { typeof(MapEvent) }) : null;
+                if (m == null) _hDte = "BRAK (DTE EveryoneCampaignBehavior.OnMapEventEnded)";
+                else if (_patched.Contains(m)) _hDte = "wpiety (juz wczesniej w tym procesie)";
+                else
+                {
+                    _h.Patch(m, prefix: new HarmonyMethod(typeof(ArmedStrength), nameof(HoldPrefix)) { priority = Priority.First },
+                             finalizer: new HarmonyMethod(typeof(ArmedStrength), nameof(HoldFinalizer)));
+                    _patched.Add(m);
+                    _hDte = "wpiety";
+                }
+            }
+            catch (Exception e) { _hDte = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Dte", e); }
+            if (!_verTried)
+            {
+                _verTried = true;
+                try { _verRef = AccessTools.FieldRefAccess<PartyBase, int>("_lastEstimatedStrengthVersionNo"); _hMem = _verRef != null ? "TAK" : "BRAK"; }
+                catch (Exception e) { _verRef = null; _hMem = "BRAK (" + e.GetType().Name + ")"; }
+            }
+            string af = "";
+            try { af = ArmsFirst.SessionStart(); } catch (Exception e) { af = "wyjatek " + e.GetType().Name; Stumble("SessionStart.ArmsFirst", e); }
+            try
+            {
+                var s = Settings.Current;
+                if (s == null) return;
+                Log.Info("Gotowosc do bitwy (p9): start sesji | klucze: AI Strength Counts Gear " + (s.AiStrengthCountsGear ? "TAK" : "NIE") + " (pelna sila od " + Knee(s)
+                         + "% slotow wzorca, ponizej liniowo do sily ludzi bez sprzetu P0 = 0.40), AI Arms Before Battle " + (s.AiArmsBeforeBattle ? "TAK" : "NIE")
+                         + " (niegotowa ponizej " + Below(s) + "%, gotowa od " + Ready(s) + "%, miasto najwyzej " + ArmsFirst.TripDays(s) + " dob drogi, wytchnienie miasta "
+                         + ArmsFirst.CoolDays(s) + " dob, bandy " + (s.AiArmsBlockBanditAttacks ? "tez zakazane" : "wolno") + ")"
+                         + " | regula: lordowie i druzyna gracza " + (GarrisonKit.OwnKitOn ? "TAK" : "NIE (TroopsFightWithOwnKitOnly wylaczone)") + ", zalogi " + (GarrisonKit.BareOn ? "TAK" : "NIE (walcza we wzorcu)")
+                         + " | latki: sila partii " + _hPower + "; pamiec sily gry (PartyBase._lastEstimatedStrengthVersionNo) " + _hMem + "; lup DTE AI-AI bez mnoznika " + _hDte
+                         + " | " + af + " | pelny przeglad partii w pierwszych godzinach (najwyzej " + FullCap + " na godzine, lordowie najpierw); do przeliczenia F = 1.");
+            }
+            catch (Exception e) { Stumble("SessionStart.Line", e); }
+        }
+
+        // ------------------------------------------------------------ linia doby
+        private static string F2(double v) { return v.ToString("0.00", Inv); }
+        private static string Nm(MobileParty mp) { try { return mp != null && mp.Name != null ? mp.Name.ToString() : "?"; } catch { return "?"; } }
+
+        internal static void Daily()
+        {
+            var s = Settings.Current;
+            if (s == null) return;
+            try
+            {
+                if (!(s.AiStrengthCountsGear || s.AiArmsBeforeBattle)) { ClearDay(); ArmsFirst.ClearDay(); return; }
+                int lords = 0, lordsKnown = 0, gars = 0, garsKnown = 0, garsLow = 0, low = 0, lowArmy = 0, poor = 0;
+                long rSum = 0, gSum = 0; double fSum = 0, fMin = 2; string fMinName = null;
+                var bucket = new int[4];
+                Ent pl = null;
+                var lows = new List<Ent>();
+                foreach (var e in _ent.Values)
+                {
+                    if (e.P == null) continue;
+                    if (e.Kind == KPlayer) { pl = e; continue; }
+                    if (e.Kind == KGarrison) { gars++; if (e.Known) { garsKnown++; gSum += e.R; if (e.F < 0.995f) garsLow++; } continue; }
+                    if (e.Kind != KLord) continue;
+                    lords++;
+                    if (!e.Known) continue;
+                    lordsKnown++; rSum += e.R; fSum += e.F;
+                    bucket[Math.Min(3, Math.Max(0, e.R) / 25)]++;
+                    if (e.F < fMin) { fMin = e.F; fMinName = Nm(e.P) + " (" + e.P.MemberRoster.TotalManCount + " ludzi, R " + e.R + "%)"; }
+                    if (e.Low)
+                    {
+                        if (e.P.Army != null) { lowArmy++; continue; }
+                        low++; lows.Add(e);
+                        int b, need;
+                        if (!ArmsFirst.CanAfford(e.P, out b, out need)) poor++;
+                    }
+                }
+                lows.Sort((a, b) => a.R != b.R ? a.R.CompareTo(b.R) : b.P.MemberRoster.TotalManCount.CompareTo(a.P.MemberRoster.TotalManCount));
+                var ex = new StringBuilder();
+                for (int i = 0; i < lows.Count && i < 3; i++)
+                {
+                    var e = lows[i];
+                    int b, need; bool can = ArmsFirst.CanAfford(e.P, out b, out need);
+                    if (ex.Length > 0) ex.Append("; ");
+                    ex.Append(Nm(e.P)).Append(" (").Append(e.P.MemberRoster.TotalManCount).Append(" ludzi, R ").Append(e.R).Append("%, F ").Append(F2(e.F))
+                      .Append(", budzet ").Append(b).Append(" z ").Append(need).Append(can ? "" : " - nie stac").Append(", cel ").Append(ArmsFirst.TargetName(e.P)).Append(')');
+                }
+                double ms = _dTicks * 1000.0 / Stopwatch.Frequency;
+                var sb = new StringBuilder(1600);
+                sb.Append("Gotowosc do bitwy (p9): dzien ").Append((int)CampaignTime.Now.ToDays)
+                  .Append(" | sila z uzbrojeniem ").Append(_strOn ? "TAK" : "NIE")
+                  .Append(" | partie lordow (bez gracza): ").Append(lords).Append(lordsKnown < lords ? " (zbrojownia nieczytelna " + (lords - lordsKnown) + ")" : "")
+                  .Append(", R srednio ").Append(lordsKnown > 0 ? (rSum / (double)lordsKnown).ToString("0", Inv) + "%" : "-")
+                  .Append(", R 0-25: ").Append(bucket[0]).Append(", 25-50: ").Append(bucket[1]).Append(", 50-75: ").Append(bucket[2]).Append(", 75-100: ").Append(bucket[3])
+                  .Append(", F srednio ").Append(lordsKnown > 0 ? F2(fSum / lordsKnown) : "-").Append(", najmniejsze ").Append(fMinName != null ? F2(fMin) + " " + fMinName : "-")
+                  .Append(" | gracz: ").Append(pl != null ? (pl.Known ? "R " + pl.R + "%, F " + F2(pl.F) : "zbrojownia nieczytelna") : "poza regula")
+                  .Append(" | zalogi: ").Append(gars).Append(garsKnown > 0 ? ", R srednio " + (gSum / (double)garsKnown).ToString("0", Inv) + "%, z F < 1: " + garsLow : "")
+                  .Append(" | niegotowe (R < ").Append(Below(s)).Append("%, do ").Append(Ready(s)).Append("%): poza armia ").Append(low).Append(", w tym bez pieniedzy ").Append(poor)
+                  .Append(", w armii ").Append(lowArmy)
+                  .Append(" | ").Append(ArmsFirst.DayText())
+                  .Append(" | przyklady: ").Append(ex.Length > 0 ? ex.ToString() : "brak")
+                  .Append(" | przeliczen ").Append(_dComputed).Append(" (pelny przeglad ").Append(_dFull).Append(" z ").Append(_fullTotal).Append(", w kolejce ").Append(_fullQ.Count)
+                  .Append(", brudnych czeka ").Append(_dirty.Count).Append("), koszt ").Append(ms.ToString("0.0", Inv)).Append(" ms")
+                  .Append(", publikacji ").Append(_dPublish).Append(", wyzerowan pamieci sily ").Append(_dInvalid).Append(", lup DTE bez mnoznika ").Append(_dHold)
+                  .Append(", zbrojownie nieczytelne ").Append(_dUnknown).Append(", potkniecia ").Append(_stumbles).Append('.');
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Stumble("Daily", e); }
+            ClearDay();
+            ArmsFirst.ClearDay();
+        }
+    }
+}
