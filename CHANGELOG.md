@@ -1,5 +1,84 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 113 (m119-kij, galaz w-toku/m117-ubranie po 112 231dc8a5) - bezbronny po strazach bierze z domu najgorsza bron biala (palka, mlot, sierp, toporek) swojej kultury - sztuka tymczasowa DTE, poza zbrojownia
+
+**Problem:** Jeff 25.10 ok. 01:00: "i jakas nagorsza bron dostja akijem moga walczyc sa kije?"; ok. 01:40: "wgraj wszystko razem z kijem". Log 24.10 (1 z 21 bitew, dopisek
+GearFit linii "Bitwa gracza (sklad7b-p, start)"): "wszystkie partie - bez broni po strazach 64, z polki 26, nic w polce 38" - 38 ludzi szlo na piesci.
+**Przyczyna:** regula "tylko to, co ma" (sklad7b TroopsFightWithOwnKitOnly; zalogi - BareOn): podloga broni GearFit.FloorPostfix / FloorOne daje tylko sztuke z polki zbrojowni
+partii (GearFit.Best); brak sztuki = licznik "nic w polce" i slot pusty. Zestaw awaryjny DTE (ApplyEmergencyLoadout - sprzet podstawowego zolnierza kultury z niczego)
+celowo zablokowany przez GarrisonKit.EmergencyPrefix ("nic z niczego").
+**Zmiana (tylko Armoury; CrashScribe bez zmian):**
+- GarrisonKit.HomeWeapon (z OwnKitSpawn zaraz po CivilDress - po SpawnGuard, SaddleGuard i Missing, wiec kij liczy sie w "slotach wzorca bez sztuki" jak brak broni):
+  przydzial z _spawn (druzyna gracza, lordowie AI z towarzyszami i partiami rodu, zalogi przy BareOn - jedna regula, jak ubranie), nie-bohater bez broni wedlug GearFit.Armed
+  (private -> internal; ten sam warunek co podloga broni: bron biala / miotana / proca / pistolet / muszkiet w 0-3 albo luk ze strzalami, kusza z beltami), wzorzec
+  (Assignment.ReferenceEquipment) ma bron w 0-3 (sztuka z WeaponComponent, nie tarcza) -> w pierwszy pusty slot 0-3 sztuka z HomeArms.Pick. NAJPIERW
+  MarkSlotAsTemporary, potem SetEquipment (jak CivilDress: wyjatek miedzy nimi = slot pusty, nigdy nietymczasowa sztuka z niczego). Bez umarlych (si.Dead /
+  Undead.Character), bez nie-ludzi (CharacterObject.Race inna niz FaceGen "human" - olbrzymy). Jezdziec (kon w przydziale po strazy uprzezy) - tylko MountOk (cala
+  pula ROT przechodzi). Potkniecia liczone na czlowieka, bez wylacznika. NIE w FloorPostfix: DoAssignAsync biegnie tez w autorozstrzygnieciu i podgladzie gotowosci.
+- HomeArms.cs (nowy): pula raz na kampanie (leniwie, Reset w GarrisonKit.Reset) - ItemType OneHandedWeapon, Recipes.Grade == 1 (pulapka Tier1 == 0), Difficulty 0 (ItemReq.Meets
+  przepuszcza zawsze), !NotMerchandise i Value > 0, bez crafted_item_*, tylko biala (zadne uzycie IsRangedWeapon / IsConsumable / IsAmmo / IsShield, pierwsze IsMeleeWeapon),
+  bez RotUniques / QuartermasterLaw.BarredInBattle / UniqueGear / GiantGear / UniqueLaw.IsDead / LegendaryLaw.IsLegend. Wedlug danych (items-dump 24.10) 15 sztuk 5-10 d:
+  peasant_hammer_1_t1, peasant_hammer_2_t1, peasant_sickle_1_t1, peasant_hatchet_1_t1, peasant_pickaxe_1_t1 (bez kultury), battania_mace_1_t2 / battania_mace_2_t2 (Polnoc),
+  empire_mace_1_t2 (Braavos), vlandia_mace_1_t2 (Westerlands), aserai_mace_1_t2 / aserai_mace_2_t2 (Dorne), khuzait_mace_1_t2 (Dothrakowie), nord_hatchett_2_t2 /
+  nord_hatchett_3_t1 / naval_one_handed_axe_t1 (Lorath). Odpadaja m.in. torch, horse_whip, wooden_sword_t1/t2, flail, shackle, dual_blades (poza handlem), crafted_item_*
+  (Grade 1 i 0 wymogu, ale wytwory), bo_staff i widly / kosa (nie OneHandedWeapon), Hoe (wymog 35).
+  Wybor przy wystawieniu: (a) kultura czlowieka, (b) inna kultura, ktora mu wolno (GearFit.CultureOk - ta sama strona Waskiego Morza, styl krewny, wlasny wzorzec;
+  bron Dothrakow tylko u Dothrakow - DothBar; pytane z GearFit.Quiet jak DothrakiArms.NobodyMay - wybor nie liczy sie w odmowach linii "Bron Dothrakow: dzien N"),
+  (c) bez kultury / neutral_culture; w pierwszym niepustym poziomie LOSOWO (MBRandom, rowno - jak ubrania) sposrod sztuk, ktorych czlowiek uzyje (jezdziec MenUpgrade.MountOk,
+  kobieta bez NotUsableByFemale, ItemReq.Meets); zadna - bez broni (licznik).
+- Kontrola szczelnosci (jedyny warunek z rozpoznania - agent zarejestrowany przez DTE RegisterSpawnedAgentAssignment, bez tego DTE czyta agenta bez filtra tymczasowych):
+  _homeAsg (przydzial -> slot, sztuka); GarrisonKit.RegisterPostfix liczy zarejestrowanych i tych, u ktorych IsTemporarySlot(slot, agent.SpawnEquipment[slot].Item) -
+  ten sam filtr co DTE ProcessAgentEquipmentRespectingTemporarySlots. Bez licznika rejestracji (_regHooked) albo refleksji Assignment (MarkSlotAsTemporary, SetEquipment,
+  IsTemporarySlot, Character) nikt nie dostaje kija (HomeHooked). Czyszczenie _homeAsg: DistributorsPostfix (nowa misja), EndMissionPostfix, Reset; liczniki w ClearBattle.
+- BattleNotice (zdanie w grze przed bitwa, przydzialy przed spawnem): przy kluczu "of your men, N have no weapon (they take clubs and farm tools from home)" albo
+  "(H of them take a club or farm tool from home)"; sojusznicy / wrog "N fight with clubs and farm tools from home[, R bare-handed] - their stores hold no more."
+  (HomeLikely - te same warunki co HomeWeapon bez losowania). Klucz wylaczony - zdania co do znaku jak dotad.
+- Log: linia startu GarrisonKit "... kij z domu dla bezbronnych (m119) wpiety (kontrola tymczasowych przy rejestracji agenta w DTE)" / "BRAK ... - nikt nie dostaje kija";
+  raz na kampanie "Kij z domu (m119): raz na kampanie; pula = ...: N szt. (po cenie: id Vd kultura, ...); odrzucone z M jednorecznych: crafted_item, ponad Grade 1,
+  z wymogiem, poza handlem, miotane/pociskowe/tarcze, unikaty/legendy/olbrzymy/umarli; rasa czlowieka nr R" i linia na kulture "Kij z domu (m119) | <kultura> (wedlug
+  <BasicTroop>, pieszo): <poziom> n (id, ...) | poziomy: wlasna a, dozwolona inna b, bez kultury c"; w linii "Bitwa gracza (sklad7b-p, start)" "; z tego wezmie kij z domu
+  (m119, przewidywane) - Twoi H, sojusznicy A, wrog E" (przed dopiskiem GearFit, ktory zostaje NA KONCU); dopisek linii "Bitwa gracza (sklad7b, nic z niczego; ...)":
+  "kij z domu (m119, wlasny, poza zbrojownia) - gracz / lordowie / zalogi (wlasna kultura, dozwolona inna, bez kultury; roznych sztuk); bez kija - wzorzec bez broni,
+  brak sztuki dla niego, bez wolnego slotu 0-3, umarli, nie-ludzie (olbrzymy); potwierdzone tymczasowe M z N zarejestrowanych przez DTE (wydanych K; zgodne / NIEZGODNE),
+  potkniecia; np. <kultura> <sztuka>" (najwyzej 8 kultur). Bez linii co klatke.
+- Ustawienie BareTroopsTakeHomeWeapon (domyslnie TAK, grupa "The finished piece", na zywo) - w MCM "Bare Troops Take Home Weapon" (nazwa z pola, jak "Bare Troops Wear
+  Civilian Clothes"); gen_mcm: Armoury 2413 ustawien (bylo 2412). Klucz NOWY - w Armoury.json Jeffa go nie ma (grep 0), domyslne TAK zadziala.
+**Kontrola calosci (DTE v1.4.7 zdekompilowane, Armoury i CrashScribe grep SpawnEquipment / agent.Equipment / IsTemporarySlot):**
+- Spawn: CreateEquipmentForArmoryConsumption klonuje i czysci WSZYSTKIE sloty z _temporaryItemIdBySlot -> Distributor.Spawn / ArmyArmory.AssignEquipment kija nie widza -
+  nic nie schodzi ze zbrojowni gracza ani AI.
+- Zwrot po bitwie, lup z ciala w misji, uciekajacy i lup morski: ProcessAgentEquipmentRespectingTemporarySlots pomija IsTemporarySlot (po StringId; ArmoryItemForSlot zmienia
+  tylko amunicje na morzu); zapas ProcessAssignmentEquipmentFallback rusza tylko, gdy czlowiek nie ma na sobie NIC (z kijem ma). GetAgentArmors - tylko HasArmorComponent
+  (kij nie idzie do wrakow ani do "rozbitej ciosem"). Podniesienie kija przez innego agenta - tylko MissionEquipment, SpawnEquipment bez zmian.
+- Armoury: LootTally.FelledPost - kij dostaje AZast (st.Temp) albo AInne; kandydat Z1 "dodatkowo peknieta" tylko sloty 5-9 z HasArmorComponent, ACios - sztuka z listy zbroi;
+  BattlefieldLaw.QueueWreck - z listy zbroi; HeroHp / FieldCraft WearLedger - bohaterowie; DothrakiArms.OnAgentBuild - sam pomiar (Dothrak z wlasna palka liczy sie jak
+  Dothrak z bronia Dothrakow; nie-Dothrak jej nie dostaje - DothBar); DressCode - OwnKitSpawn dalej zwraca true; OutsideGuard (ludzie bez przydzialu) - bez kija (bez
+  przydzialu DTE zwrot oddalby go do zbrojowni). GearFit: Armed - tylko dostep; FloorPostfix / FloorNote / Best bez zmian.
+- CrashScribe: 0 odczytow SpawnEquipment; OthersSteel czyta bron napastnika (stal valyrianska / szklo smocze) - kij nie jest zadna z nich. Spoils of War - z wzorcow.
+  Autorozstrzygniecie, podglad gotowosci, kopia zbrojowni przegranego - bez spawnu, kija nie ma.
+- Przydzial DTE nie wraca do puli (IsAssigned nie jest zerowane) - kij nie przechodzi na drugiego czlowieka; HomeArms wolane tylko z watku glownego (Mission.SpawnAgent,
+  BattleNotice z TryInitializeDistributors), bufor _lv bez blokady.
+**Ryzyko / co sprawdzic:**
+- KOLIZJA (znaleziona, NIE poprawiana - poza zakresem): TroopWearLedger (FieldCraft.cs ok. 392) liczy cios zolnierza druzyny gracza wedlug typu broni w reku
+  (affectorWeapon.Item.ItemType), bez sprawdzenia sztuki - cios kijem obija bron jednoreczna zbrojowni gracza (najwyzej tyle, ile jej noszonych - WornFor), choc kij nie jest
+  z zbrojowni. Dotad bezbronny bil piescia (bez wpisu). Skala: kilku ludzi na bitwe, tylko druzyna gracza. Poprawka wymagalaby rejestru agent -> kij w HomeArms i warunku
+  w FieldCraft - do decyzji Jeffa.
+- Nieszczelnosc DTE (z rozpoznania, nie nasza, NIE poprawiana): Global.ProcessAgentEquipment (Global.cs:268) dla slotow 0-3 z amunicja (strzaly, belty, miotane) decyduje
+  o zwrocie wedlug AKTUALNEJ broni agenta w tym slocie (MissionEquipment), nie wedlug sprzetu ze spawnu. Kija nie dotyczy (bron biala, bez amunicji).
+- Kara morale Underequipped DTE (druzyna gracza) liczona przed spawnem - kij jej nie zmniejsza. "Nic w polce" w dopisku GearFit liczone przed spawnem - bez zmian; kije
+  widac w dopisku m119.
+- Zdanie przed bitwa przewiduje kije z przydzialow PRZED spawnem; straze przy spawnie (SpawnGuard, SaddleGuard) moga rozbroic jeszcze kogos - ten tez dostanie kij, choc
+  zdanie go nie liczylo (i odwrotnie zdanie "bez broni" liczy tylko calkiem puste sloty 0-3, a kij dostaje kazdy bez broni wedlug Armed, np. sam luk bez strzal).
+- (b) to GearFit.CultureOk (strona morza + styl krewny + wlasny wzorzec), nie sama "ta sama strona morza" - jedna regula kultury dla calego sprzetu.
+- Jezdziec bez broni dostaje palke / toporek do walki z siodla (wszystkie sztuki puli przechodza MountOk).
+- Losowanie przy kazdym spawnie - ten sam czlowiek w nastepnej bitwie moze miec inny kij; bez skutku w gospodarce.
+- Test w grze: linia startu "kij z domu dla bezbronnych (m119) wpiety"; Armoury.log "Kij z domu (m119): ... 15 szt." (lista jak wyzej; inna liczba = straze/dane w grze inne
+  niz items-dump) i linie kultur (battania, empire, vlandia, aserai, khuzait, nord - wlasna; reszta - dozwolona inna albo bez kultury); w bitwie z "nic w polce" > 0: zdanie
+  "clubs and farm tools from home", dopisek m119 z kijami > 0 i "potwierdzone tymczasowe N z N ... zgodne", potkniecia 0; na ekranie bezbronni z palkami / narzedziami;
+  po bitwie zbrojownie DTE bez peasant_hammer / *_mace_1_t2 / nord_hatchett ponad stan sprzed bitwy, lup i ekran trofeow bez kijow z cial (poza tymi, ktore wrog mial
+  naprawde w zbrojowni).
+**Status:** ZBUDOWANE - czeka na autotest i wgranie razem z 111 i 112. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w HomeArms / GarrisonKit / GearFit /
+Settings); md5 Armoury.dll - z pelnej przebudowy (--no-incremental) HEAD galezi przy wgraniu (DLL zawiera hash commitu; wartosc dla commitu tego wpisu podaje raport agenta).
+
 ## 2026-10-25 112 (m118-postoj-armii, galaz w-toku/m117-ubranie po 111 d95802cc) - figurki armii na postoju sciagaja sie do wodza (tylko obraz; recenzja 25.10: druzyny stojace dociagane krokami)
 
 **Problem:** Jeff 25.10 ok. 00:25, po zrzucie armii Gregora Clegane'a (7 druzyn) na "Dniu odpoczynku armii" (R3-08a): wodz po prawej, figurki doczepionych

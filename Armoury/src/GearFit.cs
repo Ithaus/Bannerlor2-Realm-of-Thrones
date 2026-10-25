@@ -651,8 +651,9 @@ namespace Armoury
             return t == ItemObject.ItemTypeEnum.OneHandedWeapon || t == ItemObject.ItemTypeEnum.TwoHandedWeapon || t == ItemObject.ItemTypeEnum.Polearm;
         }
 
-        /// <summary>Czy czlowiek ma czym walczyc: bron biala, rzucana, luk ze strzalami albo kusza z beltami (proca, pistolet, muszkiet - tez) w slotach 0-3.</summary>
-        private static bool Armed(Equipment eq)
+        /// <summary>Czy czlowiek ma czym walczyc: bron biala, rzucana, luk ze strzalami albo kusza z beltami (proca, pistolet, muszkiet - tez) w slotach 0-3.
+        /// m119-kij: takze GarrisonKit.HomeWeapon (ten sam warunek "bez broni" co podloga broni).</summary>
+        internal static bool Armed(Equipment eq)
         {
             bool bow = false, xbow = false, arrows = false, bolts = false;
             for (int i = 0; i < 4; i++)

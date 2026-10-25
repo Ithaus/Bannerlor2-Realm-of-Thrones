@@ -94,6 +94,7 @@ namespace Armoury
             _spawn.Clear(); _spawnAsg.Clear(); _asgParty.Clear(); _guardLog = 0; _outsideLog = 0; _ownAssign.Clear(); _simParty = null; _simMade.Clear(); _battleMission = null; _dteMissionRef = null;
             _clanFillDone = false; ClearBattle();
             _civAsg.Clear(); Civvies.Reset();   // m117: ubranie cywilne - rejestr misji i listy wyboru (nowa kampania)
+            _homeAsg.Clear(); HomeArms.Reset();   // m119: kij z domu - rejestr misji i pula (nowa kampania)
         }
 
         private static MobileParty GarrisonOf(Settlement st)
@@ -464,6 +465,9 @@ namespace Armoury
             _bSadP = _bSadL = _bSadG = 0;
             for (int i = 0; i < 3; i++) { _bCivBody[i] = 0; _bCivLeg[i] = 0; }   // m117: ubranie cywilne
             _bCivNone = _bCivSkill = _bCivTpl = _bCivDead = _bCivStumbles = 0; _bCivSample.Clear(); _bCivKinds[0].Clear(); _bCivKinds[1].Clear(); Civvies.ClearCounters();
+            for (int i = 0; i < 3; i++) _bHome[i] = 0;   // m119: kij z domu
+            for (int i = 0; i < 4; i++) _bHomeLv[i] = 0;
+            _bHomeTpl = _bHomeNone = _bHomeSlot = _bHomeDead = _bHomeRace = _bHomeStumbles = _bHomeReg = _bHomeTemp = 0; _bHomeSample.Clear(); _bHomeKinds.Clear();
         }
 
         private static bool BattleTouched()
@@ -571,11 +575,13 @@ namespace Armoury
                     }
                 }
                 catch (Exception e) { Civvies.ArmorsHooked = false; Log.Error("GarrisonKit.ApplyAll(m117)", e); }
+                // m119: kij z domu tylko z kontrola przy rejestracji agenta w DTE (RegisterSpawnedAgentAssignment - bez wpisu DTE czyta agenta bez filtra tymczasowych)
+                string home = HomeHooked ? "wpiety (kontrola tymczasowych przy rejestracji agenta w DTE)" : "BRAK (bez licznika wystawionych DTE) - nikt nie dostaje kija";
                 _battle = "wpieta, bez zestawu awaryjnego DTE " + _emerg + ", straz nic z niczego wpieta; sloty lordow AI z niczego tylko na bitwe (sklad7) wpiete"
                           + "; nic z niczego (sklad7b): rozdzielacz->partia " + (_fDistParty != null && _fDistMission != null ? "jest" : "BRAK (druzyna gracza i lordowie z zestawem awaryjnym)")
                           + ", kon tylko ze zbrojowni (sklad7b-p) " + (_canMount != null ? "wedlug przydzialu i misji" : "tylko wedlug misji") + ", lup autorozstrzygniecia " + sim
                           + ", pusty wpis przegranych przed lupem (sklad7b-p) " + entry + ", licznik wystawionych przez DTE " + reg + ", linia bitwy " + end
-                          + ", ubranie cywilne golych (m117) " + civ;
+                          + ", ubranie cywilne golych (m117) " + civ + ", kij z domu dla bezbronnych (m119) " + home;
             }
             catch (Exception e) { _battle = "BRAK (" + e.Message + ")"; Log.Error("GarrisonKit.ApplyAll", e); }
         }
@@ -600,6 +606,7 @@ namespace Armoury
                 _lastLogic = new WeakReference(__instance);
                 _garAssign.Clear(); _spawn.Clear(); _spawnAsg.Clear(); _asgParty.Clear(); _lordAssign.Clear(); _ownAssign.Clear();   // nowa misja - przydzialy poprzedniej nieaktualne
                 _civAsg.Clear(); Civvies.ClearMission();   // m117: ubranie cywilne poprzedniej misji
+                _homeAsg.Clear();   // m119: kije z domu poprzedniej misji
                 var me = MapEvent.PlayerMapEvent;
                 var dists = _fDist.GetValue(__instance) as IDictionary;
                 var sides = _fSides.GetValue(__instance) as IDictionary;
@@ -706,6 +713,7 @@ namespace Armoury
                 var main = MobileParty.MainParty;
                 object mySide = main != null && sides != null && sides.Contains(main.Id) ? sides[main.Id] : null;
                 int noWeapon = 0, noBody = 0, onFoot = 0, men = 0, allyBare = 0, enemyBare = 0, noSaddle = 0;
+                int homeP = 0, allyHome = 0, enemyHome = 0;   // m119: z tego wezma kij z domu (przewidywane przed spawnem - HomeLikely)
                 foreach (var si in _spawn.Values)
                 {
                     if (si == null) continue;
@@ -714,10 +722,12 @@ namespace Armoury
                     if (eq == null) continue;
                     bool bare = true;
                     for (int i = 0; i < 4; i++) { var e = eq[(EquipmentIndex)i]; if (!e.IsEmpty && e.Item != null) { bare = false; break; } }
+                    bool home = bare && HomeLikely(si, eq, rf);
                     if (si.Kind == 0)
                     {
                         men++;
                         if (bare) noWeapon++;
+                        if (home) homeP++;
                         if (rf != null)
                         {
                             var rb = rf[EquipmentIndex.Body]; var eb = eq[EquipmentIndex.Body];
@@ -729,21 +739,33 @@ namespace Armoury
                     }
                     if (!bare) continue;
                     object side = sides != null && sides.Contains(si.Party) ? sides[si.Party] : null;
-                    if (side != null && mySide != null && side.Equals(mySide)) allyBare++; else enemyBare++;
+                    if (side != null && mySide != null && side.Equals(mySide)) { allyBare++; if (home) allyHome++; } else { enemyBare++; if (home) enemyHome++; }
                 }
                 Log.Info("Bitwa gracza (sklad7b-p, start): Twoich ludzi " + men + " - bez broni " + noWeapon + ", bez zbroi " + noBody + ", jezdzcy pieszo " + onFoot + ", jezdzcy z koniem bez uprzezy (E8/H) " + noSaddle
-                         + "; bez broni u sojusznikow " + allyBare + ", u wroga " + enemyBare + " (przydzialy DTE przed spawnem)." + GearFit.FloorNote());   // GearFit: dopisek NA KONCU
+                         + "; bez broni u sojusznikow " + allyBare + ", u wroga " + enemyBare + "; z tego wezmie kij z domu (m119, przewidywane) - Twoi " + homeP + ", sojusznicy " + allyHome
+                         + ", wrog " + enemyHome + " (przydzialy DTE przed spawnem)." + GearFit.FloorNote());   // GearFit: dopisek NA KONCU
                 var parts = new List<string>();
-                if (noWeapon > 0) parts.Add(noWeapon + " have no weapon");
+                // m119: kij z domu - zdanie mowi, ze wezma bron z domu (przewidywane przed spawnem; straze przy spawnie moga rozbroic jeszcze kogos)
+                if (noWeapon > 0) parts.Add(noWeapon + " have no weapon" + (homeP <= 0 ? "" : homeP >= noWeapon ? " (they take clubs and farm tools from home)"
+                                                                              : " (" + homeP + " of them take a club or farm tool from home)"));
                 if (noBody > 0) parts.Add(noBody + " no body armour");
                 if (onFoot > 0) parts.Add(onFoot + " riders no horse");
                 if (noSaddle > 0) parts.Add(noSaddle + " riders no saddle");
                 if (parts.Count > 0)
                     Log.Player("Your stores are short for this battle - of your men, " + string.Join(", ", parts.ToArray()) + "; they fight with what they have.", true);
-                if (allyBare > 0) Log.Player("Your allies' men are short of arms too: " + allyBare + " fight bare-handed - their stores hold no more.");
-                if (enemyBare > 0) Log.Player("The enemy's men are short of arms: " + enemyBare + " fight bare-handed - their stores hold no more.");
+                if (allyBare > 0) Log.Player("Your allies' men are short of arms too: " + BareText(allyBare, allyHome) + " - their stores hold no more.");
+                if (enemyBare > 0) Log.Player("The enemy's men are short of arms: " + BareText(enemyBare, enemyHome) + " - their stores hold no more.");
             }
             catch (Exception e) { if (++_stumbles <= 3) Log.Error("GarrisonKit.BattleNotice", e); }
+        }
+
+        /// <summary>m119: "N fight bare-handed" albo - gdy wezma kij z domu - "N fight with clubs and farm tools from home" (czesc: "H ..., R bare-handed").
+        /// Klucz wylaczony (home = 0) - zdanie jak dotad.</summary>
+        private static string BareText(int bare, int home)
+        {
+            if (home <= 0) return bare + " fight bare-handed";
+            if (home >= bare) return bare + " fight with clubs and farm tools from home";
+            return home + " fight with clubs and farm tools from home, " + (bare - home) + " bare-handed";
         }
 
         /// <summary>sklad7b-p: jezdziec (wzorzec ma konia) bez konia w przydziale tam, gdzie DTE wpuszcza konie - idzie pieszo, bo zbrojownia nie ma konia.</summary>
@@ -891,7 +913,29 @@ namespace Armoury
                      + "; przez straz " + guarded + " z " + _bDte + " wystawionych przez DTE z przydzialem regul (" + check + ")"
                      + "; poza straza (partie z regula bez przydzialu, nie ubrani) " + _bOutside + ", w tym we wzorcu gry " + _bOutsideTpl
                      + "; bez zestawu awaryjnego DTE - druzyna gracza " + _bNoEmergP + ", partie lordow " + _bNoEmergL
-                     + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + ", bez wodza (rozdzielacz Armoury) " + _bNoLeader + "; umarli bez zmian " + _bUndead + CivNote() + ".");
+                     + "; lordowie bez wpisu DTE (pusty wpis) " + _bNoEntry + ", bez wodza (rozdzielacz Armoury) " + _bNoLeader + "; umarli bez zmian " + _bUndead + CivNote() + HomeNote() + ".");
+        }
+
+        /// <summary>m119: dopisek do linii bitwy - kij z domu bezbronnych (gracz / lordowie / zalogi, poziom wyboru, bez kija z przyczyna, przyklady wedlug kultury)
+        /// i kontrola szczelnosci: ilu ludzi z kijem DTE zarejestrowal (RegisterSpawnedAgentAssignment) i u ilu z nich kij jest sztuka tymczasowa w sprzecie agenta
+        /// (IsTemporarySlot - ten sam filtr, ktorym DTE pomija sztuki przy zwrocie i lupie). "Sloty wzorca bez sztuki" wyzej licza kij jak brak broni.</summary>
+        private static string HomeNote()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.BareTroopsTakeHomeWeapon) return "; kij z domu (m119) wylaczony";
+            if (!HomeHooked) return "; kij z domu (m119) BRAK latki (licznik wystawionych DTE albo oznaczanie tymczasowych) - nikt nie dostal kija";
+            int given = _bHome[0] + _bHome[1] + _bHome[2];
+            string check = _bHomeReg < given ? "NIEZGODNE - DTE nie zarejestrowal " + (given - _bHomeReg) + " ludzi z kijem (bez wpisu zwrot i lup DTE czytaja agenta bez filtra tymczasowych)"
+                         : _bHomeTemp < _bHomeReg ? "NIEZGODNE - u " + (_bHomeReg - _bHomeTemp) + " agentow kij NIE jest sztuka tymczasowa (zwrot DTE oddalby go do zbrojowni)"
+                         : "zgodne";
+            var ex = new List<string>();
+            foreach (var kv in _bHomeSample) ex.Add(kv.Key + " " + kv.Value);
+            return "; kij z domu (m119, wlasny, poza zbrojownia) - gracz " + _bHome[0] + ", lordowie " + _bHome[1] + ", zalogi " + _bHome[2]
+                   + " (wlasna kultura " + _bHomeLv[1] + ", dozwolona inna " + _bHomeLv[2] + ", bez kultury " + _bHomeLv[3] + "; roznych sztuk " + _bHomeKinds.Count + ")"
+                   + "; bez kija - wzorzec bez broni " + _bHomeTpl + ", brak sztuki dla niego " + _bHomeNone + ", bez wolnego slotu 0-3 " + _bHomeSlot
+                   + ", umarli " + _bHomeDead + ", nie-ludzie (olbrzymy) " + _bHomeRace
+                   + "; potwierdzone tymczasowe " + _bHomeTemp + " z " + _bHomeReg + " zarejestrowanych przez DTE (wydanych " + given + "; " + check + "), potkniecia " + _bHomeStumbles
+                   + (ex.Count > 0 ? "; np. " + string.Join(", ", ex.ToArray()) : "");
         }
 
         /// <summary>m117: dopisek do linii bitwy - wlasne ubranie cywilne golych (tunika / buty wedlug rodzaju, sloty bez ubrania z przyczyna, przyklady
@@ -919,11 +963,13 @@ namespace Armoury
             ClearBattle(); _battleMission = null;
             _spawn.Clear(); _spawnAsg.Clear(); _ownAssign.Clear(); _garAssign.Clear(); _lordAssign.Clear(); _asgParty.Clear();
             _civAsg.Clear(); Civvies.ClearMission();   // m117: zwroty i lup DTE juz policzone (FinalizeMission przed tym postfiksem)
+            _homeAsg.Clear();   // m119: kije z domu tej misji
         }
 
         /// <summary>sklad7b-p (uwaga 7): postfiks DTE DynamicTroopMissionLogic.RegisterSpawnedAgentAssignment - czlowiek wystawiony z przydzialem
         /// objetym regula (ten sam przydzial, ktory straz przy spawnie powinna byla zobaczyc). m117: przydzial z ubraniem cywilnym -> agent
-        /// (Civvies - lista zbroi DTE bez ubrania i zapas wrakow).</summary>
+        /// (Civvies - lista zbroi DTE bez ubrania i zapas wrakow). m119: przydzial z kijem z domu - licznik kontrolny: DTE zarejestrowal agenta (od teraz
+        /// zwrot i lup czytaja go z filtrem tymczasowych) i kij w SpawnEquipment agenta jest dla tego przydzialu sztuka tymczasowa (IsTemporarySlot - jak DTE).</summary>
         public static void RegisterPostfix(Agent __0, object __1)
         {
             try { if (__1 != null && _spawnAsg.Count > 0 && _spawnAsg.Contains(__1)) _bDte++; } catch { }
@@ -933,6 +979,18 @@ namespace Armoury
                 if (__0 != null && __1 != null && _civAsg.Count > 0 && _civAsg.TryGetValue(__1, out worn)) Civvies.NoteAgent(__0, worn);
             }
             catch (Exception e) { CivStumble("RegisterPostfix", e); }
+            try
+            {
+                HomeRec hr;
+                if (__0 != null && __1 != null && _homeAsg.Count > 0 && _homeAsg.TryGetValue(__1, out hr) && hr != null)
+                {
+                    _bHomeReg++;
+                    var se = __0.SpawnEquipment;
+                    var it = se != null ? se[hr.Slot].Item : null;
+                    if (it != null && _isTemp != null && (bool)_isTemp.Invoke(__1, new object[] { hr.Slot, it })) _bHomeTemp++;
+                }
+            }
+            catch (Exception e) { HomeStumble("RegisterPostfix", e); }
         }
 
         /// <summary>K1 (przeglad): DTE przy spawnie czlowieka partii innej niz gracza wola Assignment.FillEmptySlots - kazdy pusty slot dostaje
@@ -1116,7 +1174,8 @@ namespace Armoury
         /// (SpawnGuard) i liczniki bitwy. true - DressCode go nie ubiera (kto nie ma sztuki, walczy bez niej).
         /// sklad7b-p (uwaga 6): zaloga (rodzaj 2) - druga straz tylko przy TroopsFightWithOwnKitOnly (wylaczone = jak K1c).
         /// m117: po wszystkich strazach pusty tulow / nogi (a wzorzec ma tam sztuke) - wlasne ubranie cywilne (CivilDress); Missing liczony PRZED
-        /// ubraniem, wiec ubranie liczy sie jak pusty slot (to nie pancerz).</summary>
+        /// ubraniem, wiec ubranie liczy sie jak pusty slot (to nie pancerz).
+        /// m119: zaraz po ubraniu - bezbronny po wszystkich strazach (GearFit.Armed) bierze kij z domu (HomeWeapon); tez po Missing, wiec kij liczy sie jak brak broni.</summary>
         internal static bool OwnKitSpawn(Equipment eq)
         {
             SpawnInfo si;
@@ -1128,6 +1187,7 @@ namespace Armoury
                 int miss = Missing(si.Asg, eq);
                 var rf = _getRef != null ? _getRef.Invoke(si.Asg, null) as Equipment : null;
                 CivilDress(si, eq, rf);   // m117: po strazach i po Missing - przed licznikami ludzi
+                HomeWeapon(si, eq, rf);   // m119: po strazach (takze uprzezy - jezdziec bez konia bierze kazdy kij), po Missing i po ubraniu
                 int foot = !noSad && RiderOnFoot(si.Asg, eq, rf) ? 1 : 0;
                 if (noSad) { if (si.Kind == 0) _bSadP++; else if (si.Kind == 1) _bSadL++; else _bSadG++; }
                 if (si.Kind == 0) { _bPlayerMen++; _bPlayerMiss += miss; _bGuardP += g; _bFootP += foot; }
@@ -1204,6 +1264,98 @@ namespace Armoury
             }
             if (worn != null) _civAsg[si.Asg] = worn;
             return n;
+        }
+
+        // ------------------------------------------------------------ m119-kij: najgorsza bron z domu dla bezbronnych
+        // Jeff 25.10 ok. 01:00: "i jakas nagorsza bron dostja akijem moga walczyc sa kije?"; ok. 01:40: "wgraj wszystko razem z kijem". Pula i wybor - HomeArms.
+        private sealed class HomeRec
+        {
+            internal readonly EquipmentIndex Slot; internal readonly ItemObject Item;
+            internal HomeRec(EquipmentIndex slot, ItemObject item) { Slot = slot; Item = item; }
+        }
+        // przydzial -> slot i sztuka kija z domu; RegisterPostfix sprawdza na agencie (licznik kontrolny), czyszczony jak _civAsg
+        private static readonly Dictionary<object, HomeRec> _homeAsg = new Dictionary<object, HomeRec>(RefEq.I);
+        // liczniki jednej bitwy: kij wedlug rodzaju (0 gracz, 1 lordowie AI, 2 zalogi) i poziomu wyboru (1 wlasna kultura, 2 dozwolona inna, 3 bez kultury);
+        // bez kija z przyczyna (ludzie); kontrola: zarejestrowani przez DTE i z kijem tymczasowym u agenta; przyklady kultura -> sztuka (najwyzej 8)
+        private static readonly int[] _bHome = new int[3], _bHomeLv = new int[4];
+        private static int _bHomeTpl, _bHomeNone, _bHomeSlot, _bHomeDead, _bHomeRace, _bHomeStumbles, _bHomeReg, _bHomeTemp;
+        private static readonly Dictionary<string, string> _bHomeSample = new Dictionary<string, string>();
+        private static readonly HashSet<ItemObject> _bHomeKinds = new HashSet<ItemObject>();
+
+        /// <summary>m119: latki potrzebne kijowi z domu - oznaczanie tymczasowych (MarkSlotAsTemporary, SetEquipment, IsTemporarySlot), wzorzec jednostki
+        /// (Assignment.Character) i licznik rejestracji agenta w DTE (RegisterSpawnedAgentAssignment). Bez ktorejkolwiek - nikt nie dostaje kija.</summary>
+        private static bool HomeHooked { get { return _regHooked && _markTemp != null && _setEq != null && _isTemp != null && _getChar != null; } }
+
+        private static bool HomeOn { get { var s = Settings.Current; return s != null && s.BareTroopsTakeHomeWeapon && HomeHooked; } }
+
+        private static void HomeStumble(string where, Exception e) { if (++_bHomeStumbles <= 3) Log.Error("GarrisonKit." + where, e); }
+
+        /// <summary>Wzorzec jednostki ma bron w slotach 0-3 (sztuka z WeaponComponent, nie tarcza) - jednostki bez broni z projektu zostaja jak sa.</summary>
+        private static bool TemplateArmed(Equipment rf)
+        {
+            if (rf == null) return false;
+            for (int i = 0; i < 4; i++)
+            {
+                var r = rf[(EquipmentIndex)i]; var it = r.Item;
+                if (r.IsEmpty || it == null || !it.HasWeaponComponent) continue;
+                if (it.ItemType == ItemObject.ItemTypeEnum.Shield || it.ItemType == ItemObject.ItemTypeEnum.Banner) continue;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>m119-kij: czlowiek przydzialu "tylko to, co ma" (druzyna gracza, lord AI, zaloga - jedna regula, jak CivilDress), ktory po wszystkich strazach
+        /// nie ma czym walczyc (GearFit.Armed - ten sam warunek co podloga broni), a jego wzorzec ma bron w slotach 0-3: w pierwszy pusty slot 0-3 najgorsza bron
+        /// biala z domu (HomeArms.Pick - wlasna kultura -> dozwolona inna -> bez kultury, losowo). NAJPIERW oznaczenie tymczasowej (DTE: spawn jej nie zdejmuje,
+        /// zwrot i lup jej nie oddaja), potem slot - wyjatek miedzy nimi zostawia slot pusty, nigdy nietymczasowej sztuki z niczego. Bez bohaterow, umarlych
+        /// i nie-ludzi (olbrzymy). Jezdziec (kon w przydziale po strazy uprzezy) - tylko bron do uzycia z siodla (cala pula ROT przechodzi). Potkniecie liczone
+        /// na czlowieka, bez wylacznika. true - dostal kij.</summary>
+        private static bool HomeWeapon(SpawnInfo si, Equipment eq, Equipment rf)
+        {
+            if (!HomeOn || si == null || si.Asg == null || eq == null) return false;
+            try
+            {
+                if (GearFit.Armed(eq)) return false;                                      // ma czym walczyc (zbrojownia albo podloga broni)
+                var co = _getChar.Invoke(si.Asg, null) as CharacterObject;
+                if (co == null || co.IsHero) return false;
+                if (si.Dead || Undead.Character(co)) { _bHomeDead++; return false; }      // umarli poza gospodarka (jak ubranie)
+                if (HomeArms.NonHuman(co)) { _bHomeRace++; return false; }
+                if (!TemplateArmed(rf)) { _bHomeTpl++; return false; }
+                int slot = -1;
+                for (int i = 0; i < 4; i++) { var e = eq[(EquipmentIndex)i]; if (e.IsEmpty || e.Item == null) { slot = i; break; } }
+                if (slot < 0) { _bHomeSlot++; return false; }                             // sloty zajete czyms innym (tarcze, kolczany bez luku)
+                var h = eq[EquipmentIndex.Horse];
+                int lv;
+                var it = HomeArms.Pick(co, !h.IsEmpty && h.Item != null, out lv);
+                if (it == null) { _bHomeNone++; return false; }
+                var idx = (EquipmentIndex)slot;
+                _markTemp.Invoke(si.Asg, new object[] { idx, it });
+                _setEq.Invoke(si.Asg, new object[] { idx, new EquipmentElement(it) });
+                _homeAsg[si.Asg] = new HomeRec(idx, it);
+                int kind = si.Kind < 0 || si.Kind > 2 ? 2 : si.Kind;
+                _bHome[kind]++;
+                if (lv >= 1 && lv <= 3) _bHomeLv[lv]++;
+                _bHomeKinds.Add(it);
+                string c = co.Culture != null ? co.Culture.StringId ?? "?" : "?";
+                if (!_bHomeSample.ContainsKey(c) && _bHomeSample.Count < 8) _bHomeSample[c] = it.StringId;
+                return true;
+            }
+            catch (Exception e) { HomeStumble("HomeWeapon", e); return false; }
+        }
+
+        /// <summary>m119: czy ten bezbronny (BattleNotice, przed spawnem) wezmie kij z domu - te same warunki co HomeWeapon bez losowania; straze przy spawnie
+        /// moga jeszcze rozbroic kogos innego (wtedy dostanie kij, choc zdanie go nie liczylo). Wyjatek - false (zdanie jak bez kija).</summary>
+        private static bool HomeLikely(SpawnInfo si, Equipment eq, Equipment rf)
+        {
+            if (!HomeOn || si == null || si.Asg == null || si.Dead || eq == null || !TemplateArmed(rf)) return false;
+            try
+            {
+                var co = _getChar.Invoke(si.Asg, null) as CharacterObject;
+                if (co == null || co.IsHero || Undead.Character(co) || HomeArms.NonHuman(co)) return false;
+                var h = eq[EquipmentIndex.Horse];
+                return HomeArms.Has(co, !h.IsEmpty && h.Item != null);
+            }
+            catch { return false; }
         }
 
         private static WeakReference _dteMissionRef;

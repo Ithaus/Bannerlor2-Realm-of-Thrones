@@ -844,6 +844,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool BareTroopsWearCivilianClothes { get; set; } = true;
 
+        [SettingPropertyBool("Bare Troops Take Home Weapon", HintText = "in your battles a soldier who fights only with his party's stores (Troops Fight With Own Kit Only; garrisons with Garrison Fights With Armory Only) and is left with no weapon he can fight with - the stores hold none he can use, not even through the weapon floor - takes the worst weapon from home instead of fighting bare-handed: a club, hammer, sickle or hatchet of his own culture, else of a people whose kit he may use, else a plain farm tool, picked at random for each man so they do not all carry the same. Only one-handed tier 1 weapons with no skill requirement that markets sell - never unique, legendary, giant's or the dead's gear. His own, not armory gear: never taken from or returned to the stores, never looted or sold. Only where his troop's template carries a weapon; heroes, the dead and giants are not affected (off = he fights bare-handed, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool BareTroopsTakeHomeWeapon { get; set; } = true;
+
         [SettingPropertyBool("Lord Battle Kit Is Lent", HintText = "only when Troops Fight With Own Kit Only is off: in your battles Dynamic Troop Equipment fills an AI lord's soldier's empty slots with his template kit out of thin air: that kit is only lent for the battle and no longer goes into the lord's stores afterwards (nor into your spoils from them); the men still fight with it (off: as before, it stays in the lord's stores)", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool LordBattleKitIsLent { get; set; } = false;
@@ -9870,6 +9874,7 @@ namespace Armoury
             s.GarrisonArmoryMinFillPercent = GarrisonArmoryMinFillPercent;
             s.TroopsFightWithOwnKitOnly = TroopsFightWithOwnKitOnly;
             s.BareTroopsWearCivilianClothes = BareTroopsWearCivilianClothes;
+            s.BareTroopsTakeHomeWeapon = BareTroopsTakeHomeWeapon;
             s.LordBattleKitIsLent = LordBattleKitIsLent;
             s.AiWearEnabled = AiWearEnabled;
             s.MineWagesStayInTown = MineWagesStayInTown;
