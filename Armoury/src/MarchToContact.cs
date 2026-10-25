@@ -80,6 +80,7 @@ namespace Armoury
         private static readonly bool[] _signal = new bool[Slots];
         private static readonly float[] _chargeAt = new float[Slots];
         private static readonly bool[] _everMarched = new bool[Slots];
+        private static readonly bool[] _chargeHeld = new bool[Slots];   // 128: szyk z rozkazem szarzy idzie jeszcze marszem (wrog dalej niz prog biegu)
 
         private static WeakReference _m;
         private static float _acc, _sampleAcc;
@@ -87,6 +88,9 @@ namespace Armoury
         // ustawienia skopiowane w Tick (latki ich nie czytaja - tylko tablice)
         private static float _pace = 1f, _cavPace = 0.45f, _gallop = 120f, _archUntil = 120f;
         private static bool _playerMove = true;
+        // 128 (25.10, Jeff: "na poczatku powinni maszerowac a nie ciagle wszyscy biegaja w zbrojach"): szarza z daleka = marsz / klus do progu biegu
+        private static bool _chargeFirst = true;
+        private static float _runFrom = 60f;
 
         // ---- latki
         private static bool _patchedSpeed, _patchedCache, _rbmPrefix, _triedPatch;
@@ -97,6 +101,7 @@ namespace Armoury
         // ---- liczniki misji (pod RoutHold.Gate; zerowane w RoutHold.Ensure przez ResetCounters); latki - Interlocked
         private static int _cInf, _cArch, _cCav, _cPlayer, _cSignal, _cNoSignal, _cContact, _cGallop, _cArchNear, _cOrder, _cRecache, _cDragon, _cStum;
         private static int _cSignals;
+        private static int _cHeld, _tHeld, _cHeldRun, _tHeldRun;   // 128: szarz zaczetych marszem / doprowadzonych marszem do progu biegu
         private static float _sumChargeD, _sumGallopD;
         private static int _nChargeD, _nGallopD;
         private static float _sumMarchV, _sumChargeV;
@@ -261,6 +266,7 @@ namespace Armoury
                 _capMove[i] = 0f; _capLimit[i] = 0f; _cav[i] = false; _who[i] = null;
                 _kind[i] = KNone; _freeUntil[i] = 0f; _released[i] = false; _archFree[i] = false; _walk[i] = 0f; _nextScan[i] = 0f;
                 _dragon[i] = false; _player[i] = false; _wasCharge[i] = false; _signal[i] = false; _chargeAt[i] = -1000f; _everMarched[i] = false;
+                _chargeHeld[i] = false;
             }
             _any = false;
         }
@@ -293,6 +299,8 @@ namespace Armoury
             _gallop = Clamp(c.CavalryGallopDistance, 40f, 250f);
             _archUntil = Clamp(c.ArchersWalkUntil, 40f, 250f);
             _playerMove = c.PlayerMoveOrderWalks;
+            _chargeFirst = c.ChargeMarchesFirst;
+            _runFrom = Clamp(c.ChargeRunsFrom, 20f, 200f);
             _on = true;
             float now = m.CurrentTime;
             var teams = m.Teams;
@@ -335,17 +343,19 @@ namespace Armoury
         private static void Flush(Mission m)
         {
             if (_tInf + _tArch + _tCav + _tPlayer + _tNoSignal + _tContact + _tGallop + _tArchNear + _tOrder + _tRecache + _tDragon + _tNChargeD + _tNGallopD
-                + _tNMarchV + _tNChargeV + _tMarched.Count + _cStumLocal == 0) return;
+                + _tNMarchV + _tNChargeV + _tMarched.Count + _cStumLocal + _tHeld + _tHeldRun == 0) return;
             lock (RoutHold.Gate)
             {
                 RoutHold.EnsureLocked(m);
                 _cInf += _tInf; _cArch += _tArch; _cCav += _tCav; _cPlayer += _tPlayer; _cNoSignal += _tNoSignal; _cContact += _tContact; _cGallop += _tGallop;
                 _cArchNear += _tArchNear; _cOrder += _tOrder; _cRecache += _tRecache; _cDragon += _tDragon; _cStum += _cStumLocal;
+                _cHeld += _tHeld; _cHeldRun += _tHeldRun;
                 _sumChargeD += _tSumChargeD; _nChargeD += _tNChargeD; _sumGallopD += _tSumGallopD; _nGallopD += _tNGallopD;
                 _sumMarchV += _tSumMarchV; _nMarchV += _tNMarchV; _sumChargeV += _tSumChargeV; _nChargeV += _tNChargeV;
                 for (int i = 0; i < _tMarched.Count; i++) _marched.Add(_tMarched[i]);
             }
             _tInf = _tArch = _tCav = _tPlayer = _tNoSignal = _tContact = _tGallop = _tArchNear = _tOrder = _tRecache = _tDragon = _cStumLocal = 0;
+            _tHeld = _tHeldRun = 0;
             _tSumChargeD = _tSumGallopD = _tSumMarchV = _tSumChargeV = 0f;
             _tNChargeD = _tNGallopD = _tNMarchV = _tNChargeV = 0;
             _tMarched.Clear();
@@ -383,6 +393,7 @@ namespace Armoury
                 _capMove[idx] = 0f; _capLimit[idx] = 0f; _cav[idx] = false;
                 _kind[idx] = KNone; _freeUntil[idx] = 0f; _released[idx] = false; _archFree[idx] = false; _walk[idx] = 0f; _nextScan[idx] = 0f;
                 _dragon[idx] = false; _wasCharge[idx] = false; _signal[idx] = false; _chargeAt[idx] = -1000f; _everMarched[idx] = false;
+                _chargeHeld[idx] = false;
                 _who[idx] = f;
             }
             if (f.CountOfUnits <= 0) { Set(f, idx, 0f, 0f, false); return; }
@@ -411,6 +422,22 @@ namespace Armoury
 
             bool marching = _capMove[idx] > 0f;
             float gap = EnemyGap(f);
+
+            // 128: szarza z daleka idzie marszem (piechota, lucznicy pieszo) albo klusem (konnica) do progu biegu; sygnal szarzy (BattleCries.ChargeStarted:
+            // okrzyk, rog, motto, zdjecie capu) przychodzi dopiero na progu - ChargeHeld mowi BattleCries, ze jeszcze nie. Gracz i AI tak samo.
+            if (_released[idx] && now >= _freeUntil[idx] && gap > Rearm(kind)) _released[idx] = false;
+            if (charge && HoldCharge(idx, kind, gap, now))
+            {
+                if (!_chargeHeld[idx]) { _chargeHeld[idx] = true; _tHeld++; }
+                MarchCap(f, idx, kind == KArch ? KInf : kind, gap, q);   // lucznicy w szarzy ida do progu biegu jak piechota
+                return;
+            }
+            if (_chargeHeld[idx])
+            {
+                // prog biegu osiagniety (albo rozkaz zmieniony): bez sygnalu tu - sygnal (i Release) daje BattleCries w tym samym takcie albo zwykla sciezka nizej
+                _chargeHeld[idx] = false;
+                if (charge) { _tHeldRun++; if (!_signal[idx]) Release(idx, now); }
+            }
 
             // szarza bez sygnalu BattleCries (np. paczka dzwieku nie scalona albo szyk szarzowal przed naszym taktem) - ta sama chwila w ciagu 0.5 s
             if (charge && !_wasCharge[idx])
@@ -444,8 +471,7 @@ namespace Armoury
             // po szarzy / zwarciu / galopie: 30 s wolny, potem marsz dopiero, gdy wrog odszedl
             if (_released[idx])
             {
-                float rearm = kind == KCav ? _gallop + CavRearm : (kind == KArch ? _archUntil + ArcherHyst : InfRearm);
-                if (now < _freeUntil[idx] || gap <= rearm) { Set(f, idx, 0f, 0f, false); return; }
+                if (now < _freeUntil[idx] || gap <= Rearm(kind)) { Set(f, idx, 0f, 0f, false); return; }
                 _released[idx] = false;
             }
 
@@ -458,6 +484,44 @@ namespace Armoury
                     Set(f, idx, 0f, 0f, false);
                     return;
                 }
+            }
+            MarchCap(f, idx, kind, gap, q);
+        }
+
+        private static float Rearm(byte kind)
+        {
+            return kind == KCav ? _gallop + CavRearm : (kind == KArch ? _archUntil + ArcherHyst : InfRearm);
+        }
+
+        /// <summary>128: czy szyk z rozkazem szarzy ma jeszcze isc marszem (klusem) - wrog dalej niz prog biegu (piechota i lucznicy ChargeRunsFrom,
+        /// konnica CavalryGallopDistance), szyk nie zwolniony po zwarciu. Konni lucznicy, smoki, szyki bez rodzaju - nigdy.</summary>
+        private static bool HoldCharge(int idx, byte kind, float gap, float now)
+        {
+            if (!_chargeFirst || gap == float.MaxValue) return false;
+            if (kind != KInf && kind != KArch && kind != KCav) return false;
+            if (_dragon[idx]) return false;
+            if (_released[idx] && (now < _freeUntil[idx] || gap <= Rearm(kind))) return false;
+            return gap > (kind == KCav ? _gallop : _runFrom);
+        }
+
+        /// <summary>128: dla BattleCries przed sygnalem szarzy (glowny watek): true = szyk idzie jeszcze marszem, sygnal (okrzyk, rog, bieg) pozniej.</summary>
+        internal static bool ChargeHeld(Formation f)
+        {
+            if (!_on || f == null) return false;
+            var m = Mission.Current;
+            if (m == null) return false;
+            int idx = Idx(f);
+            if (idx < 0 || !ReferenceEquals(_who[idx], f)) return false;
+            float gap = EnemyGap(f);
+            return HoldCharge(idx, _kind[idx], gap, m.CurrentTime);
+        }
+
+        /// <summary>Tempo marszu szyku: konnica klus, lucznicy do ArchersWalkUntil, piechota krok (dalej niz 250 m szybszy krok); pod ostrzalem tylko tempo szyku.</summary>
+        private static void MarchCap(Formation f, int idx, byte kind, float gap, FormationQuerySystem q)
+        {
+            bool marching = _capMove[idx] > 0f;
+            if (kind == KCav)
+            {
                 float full = 0f;
                 try { full = f.CachedFormationIntegrityData.AverageMaxUnlimitedSpeedExcludeFarAgents; } catch { full = 0f; }
                 if (full < 2f) { try { full = q.MovementSpeedMaximum; } catch { full = 0f; } }
@@ -636,6 +700,7 @@ namespace Armoury
         {
             _cInf = _cArch = _cCav = _cPlayer = _cSignal = _cNoSignal = _cContact = _cGallop = _cArchNear = _cOrder = _cRecache = _cDragon = _cStum = 0;
             _cSignals = 0;
+            _cHeld = _cHeldRun = 0;
             _sumChargeD = _sumGallopD = _sumMarchV = _sumChargeV = 0f;
             _nChargeD = _nGallopD = _nMarchV = _nChargeV = 0;
             Interlocked.Exchange(ref _hitLine, 0);
@@ -655,6 +720,9 @@ namespace Armoury
         internal static void Append(StringBuilder sb, Settings c)
         {
             sb.Append(" | marsz ").Append(c != null && c.MarchToContactEnabled ? "TAK" : "NIE")
+              .Append(" (szarza marszem ").Append(c != null && c.ChargeMarchesFirst ? "TAK" : "NIE").Append(", bieg od ")
+              .Append(c != null ? Clamp(c.ChargeRunsFrom, 20f, 200f).ToString("0") : "-").Append(" m: szarz zaczetych marszem ").Append(_cHeld)
+              .Append(", doprowadzonych do progu ").Append(_cHeldRun).Append(")")
               .Append(": szykow w marszu ").Append(_marched.Count)
               .Append(" (wejsc w marsz: piechota ").Append(_cInf).Append(", lucznicy ").Append(_cArch).Append(", konnica ").Append(_cCav).Append(", gracza ").Append(_cPlayer)
               .Append("), przejsc do biegu ").Append(_cSignal + _cNoSignal + _cContact + _cGallop + _cArchNear)

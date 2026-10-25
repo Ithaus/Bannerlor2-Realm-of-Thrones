@@ -346,6 +346,8 @@ namespace Armoury
         {
             try
             {
+                // 127: w biegu oddech nie wraca nikomu - bohaterom ani szeregowym (FieldCraft wpisuje biegnacych co 0.2 s)
+                if (FieldCraft.IsRunning(__instance)) { FieldCraft.NoteRegenSkipped(); return false; }
                 Profile p;
                 if (!Managed.TryGetValue(__instance, out p)) return true;   // NPC - oryginal
                 float cur = (float)_fStamina.GetValue(__instance);
@@ -388,8 +390,9 @@ namespace Armoury
                 // a linia "DuelAi tabela" mowila TAK; bitwy bez zmian (_baseOn = false -> postfiks poza pojedynkiem wychodzi od razu)
                 bool duelGuard = c != null && c.DuelFairGuard;
                 bool heroSkill = c != null && c.HeroPostureFromSkill;   // m111-postawa: postura bohaterow z umiejetnosci tez w bitwie - latka potrzebna poza pojedynkiem
+                bool noBreath = c != null && c.NoBreathWhileRunning;    // 127: latka tickStaminaRegen potrzebna takze bez oddechu bohaterow
                 _baseOn = wind || tiers || heroSkill;
-                if (!wind && !tiers && !duelGuard && !heroSkill) { Log.Info("BattleWind: wylaczone."); return; }
+                if (!wind && !tiers && !duelGuard && !heroSkill && !noBreath) { Log.Info("BattleWind: wylaczone."); return; }
                 var tStance = QuartermasterLaw.FindType("RBMAI.Stance");
                 if (tStance == null) { Log.Info("BattleWind: RBM nieobecny - nic do roboty."); return; }
 
@@ -411,7 +414,7 @@ namespace Armoury
                 var mIP = AccessTools.DeclaredMethod(tStance, "InitializePosture");
                 var mTS = AccessTools.DeclaredMethod(tStance, "tickStaminaRegen");
                 var mTP = AccessTools.DeclaredMethod(tStance, "tickPostureRegen");
-                if (mIP == null || (wind && (mIS == null || mTS == null || mTP == null)))
+                if (mIP == null || (wind && (mIS == null || mTS == null || mTP == null)) || (noBreath && mTS == null))
                 { Log.Info("BattleWind: metody RBMAI.Stance nie pasuja - odpuszczam."); return; }
 
                 h.Patch(mIP, postfix: new HarmonyMethod(typeof(BattleWind), "PostureInitPostfix"));
@@ -427,8 +430,13 @@ namespace Armoury
                              + (int)Settings.Current.BattleRegenAtEnd1 + "-" + (int)Settings.Current.BattleRegenAtEnd10
                              + " pkt/s, zadyszka " + Settings.Current.BattleWindedFloor.ToString("0.00") + ").");
                 }
-                else if (tiers) Log.Info("BattleWind: oddech bohaterow wylaczony (BattleStaminaEnabled) - wpieta tylko postura szeregowych wedlug tieru.");
-                else Log.Info("BattleWind: oddech bohaterow i postura szeregowych wylaczone - latka InitializePosture wpieta tylko dla postury w pojedynku (DuelFairGuard).");
+                else if (noBreath)
+                {
+                    h.Patch(mTS, prefix: new HarmonyMethod(typeof(BattleWind), "TickStaminaPrefix"));
+                    Log.Info("BattleWind (127): oddech bohaterow wylaczony (BattleStaminaEnabled) - latka tickStaminaRegen wpieta tylko dla zasady 'w biegu oddech nie wraca'.");
+                }
+                if (!wind && tiers) Log.Info("BattleWind: oddech bohaterow wylaczony (BattleStaminaEnabled) - wpieta postura szeregowych wedlug tieru.");
+                else if (!wind && !noBreath) Log.Info("BattleWind: oddech bohaterow i postura szeregowych wylaczone - latka InitializePosture wpieta tylko dla postury w pojedynku (DuelFairGuard).");
                 Log.Info("BattleWind (NB2): postura szeregowych wedlug tieru - latka InitializePosture wpieta (klucz SoldierPostureByTier na zywo"
                          + ", przy starcie " + (tiers ? "TAK" : "NIE") + "); bez broni glownej bez ponownego mnozenia; postura bohatera w pojedynku (DuelFairGuard) "
                          + (duelGuard ? "TAK" : "NIE") + (_baseOn ? "" : ", poza pojedynkiem latka nic nie robi") + ".");

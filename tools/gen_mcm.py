@@ -607,6 +607,11 @@ RANGES = {
     'FriendlyFireMeleePercent': (0, 100, "0"),
     'FriendlyFireChargePercent': (0, 100, "0"),
     'FriendlyFireSiegeRangedPercent': (0, 100, "0"),
+    # 127 bieg wedlug fizjologii: sekundy pelnego biegu bez zbroi 30..300, koszt zbroi 0..5 %/kg
+    'RunSecondsUnarmoured': (30.0, 300.0, "0"),
+    'ArmourRunCostPerKgPercent': (0.0, 5.0, "0.00"),
+    # 128 szarza marszem: prog biegu 20..200 m
+    'ChargeRunsFrom': (20.0, 200.0, "0"),
 }
 
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze

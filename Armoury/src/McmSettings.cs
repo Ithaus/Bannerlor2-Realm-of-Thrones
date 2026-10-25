@@ -1296,17 +1296,17 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool UseRbmStamina { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Sprint Drain Per Second", 0.00f, 16.00f, "0.00", HintText = "stamina points one second of flat-out sprint costs, before the armour is weighed", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Run Seconds Unarmoured", 30.00f, 300.00f, "0", HintText = "how long an average man (Athletics 100) keeps up a full run with no armour before he is spent, in seconds. One rule for everyone on the field - you, lords and soldiers: Athletics 0 runs a quarter shorter, Athletics 200 a quarter longer, and armour cuts it down by its weight", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
-        public float SprintDrainPerSecond { get; set; } = 4f;
+        public float RunSecondsUnarmoured { get; set; } = 120f;
 
-        [SettingPropertyFloatingInteger("Sprint Drain Per Kg", 0.00f, 4.00f, "0.00", HintText = "extra points per second for every kilogram of armour carried", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Armour Run Cost Per Kg Percent", 0.00f, 5.00f, "0.00", HintText = "every kilogram of armour makes running this much harder, and the time a man can run shrinks with the square of it - no armour 2 minutes, 10 kg about 80 s, 25 kg about 50 s, 46 kg about 30 s (a study of men running in real plate armour of 30 to 50 kg found it nearly doubles the effort, more than a backpack of the same weight, because the limbs are loaded and the breath is squeezed)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
-        public float SprintDrainPerKg { get; set; } = 1f;
+        public float ArmourRunCostPerKgPercent { get; set; } = 2.25f;
 
-        [SettingPropertyFloatingInteger("Fatigue Free Armor Kg", 0.00f, 1.00f, "0.00", HintText = "armour up to this weight costs no extra stamina", RequireRestart = false)]
+        [SettingPropertyBool("No Breath While Running", HintText = "nobody gets his breath back while running - stamina comes back only when walking, standing or trading blows. Off = RBM's regeneration keeps running during a sprint, as before (a hero with fast breath never lost any)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
-        public float FatigueFreeArmorKg { get; set; } = 0f;
+        public bool NoBreathWhileRunning { get; set; } = true;
 
         [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant (read once at game start from ModuleData/Armoury.settings.xml - changing it here has no effect)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
@@ -9668,7 +9668,7 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool SpeedCapOnlyWhenWinded { get; set; } = true;
 
-        [SettingPropertyBool("March To Contact Enabled", HintText = "formations walk in step towards the enemy and break into a run only when they charge: infantry at the charge (about 75 m), cavalry trots until the gallop distance, foot archers walk until the enemy is close. Your formations: Advance and Move walk, Charge runs. A man who ran 300 m arrives winded. Field battles only - not sieges, hideouts or sea battles. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("March To Contact Enabled", HintText = "formations walk in step towards the enemy and break into a run only when they charge: infantry at the charge (about 75 m), cavalry trots until the gallop distance, foot archers walk until the enemy is close. Your formations: Advance and Move walk, and a Charge marches until the last stretch (Charge Marches First). A man who ran 300 m arrives winded. Field battles only - not sieges, hideouts or sea battles. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool MarchToContactEnabled { get; set; } = true;
 
@@ -9688,9 +9688,17 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public float ArchersWalkUntil { get; set; } = 120f;
 
-        [SettingPropertyBool("Player Move Order Walks", HintText = "with March To Contact: your formations also walk on a Move order (Charge always runs)", RequireRestart = false)]
+        [SettingPropertyBool("Player Move Order Walks", HintText = "with March To Contact: your formations also walk on a Move order", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool PlayerMoveOrderWalks { get; set; } = true;
+
+        [SettingPropertyBool("Charge Marches First", HintText = "with March To Contact: a charge ordered from far away - by you or by the AI - is made at a steady march, horsemen at a trot; the men raise their battle cry and break into a run only for the last stretch, so they reach the enemy with breath left. Off = a charge order sends everyone running at once from any distance, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool ChargeMarchesFirst { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Charge Runs From", 20.00f, 200.00f, "0", HintText = "with Charge Marches First: how far from the enemy a charging line on foot breaks into a run, in metres (horsemen gallop from Cavalry Gallop Distance)", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public float ChargeRunsFrom { get; set; } = 60f;
 
         [SettingPropertyBool("Culture Doctrines", HintText = "AI armies weigh their battle plans by their culture's doctrine: the Dothraki favour shooting and horse and seldom hold a line, the Vale and the Reach lead with heavy horse, the Iron Islanders and the Stormlands go straight in, wildlings prefer a headlong charge, the Riverlands, the Crownlands and the Night's Watch hold the line and shoot. Commanders below Tactics 30 lead a mob without a doctrine. Your own team's AI is left as it is. Off = RBM's culture tactics and Commander Tactics only, as before", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
@@ -10223,9 +10231,9 @@ namespace Armoury
             s.FieldCraftEnabled = FieldCraftEnabled;
             s.SprintFatigueEnabled = SprintFatigueEnabled;
             s.UseRbmStamina = UseRbmStamina;
-            s.SprintDrainPerSecond = SprintDrainPerSecond;
-            s.SprintDrainPerKg = SprintDrainPerKg;
-            s.FatigueFreeArmorKg = FatigueFreeArmorKg;
+            s.RunSecondsUnarmoured = RunSecondsUnarmoured;
+            s.ArmourRunCostPerKgPercent = ArmourRunCostPerKgPercent;
+            s.NoBreathWhileRunning = NoBreathWhileRunning;
             s.BattleStaminaEnabled = BattleStaminaEnabled;
             s.BattleEndDoubleEvery = BattleEndDoubleEvery;
             s.BattleRegenAtEnd1 = BattleRegenAtEnd1;
@@ -12322,6 +12330,8 @@ namespace Armoury
             s.CavalryGallopDistance = CavalryGallopDistance;
             s.ArchersWalkUntil = ArchersWalkUntil;
             s.PlayerMoveOrderWalks = PlayerMoveOrderWalks;
+            s.ChargeMarchesFirst = ChargeMarchesFirst;
+            s.ChargeRunsFrom = ChargeRunsFrom;
             s.CultureDoctrines = CultureDoctrines;
             s.ShootBeforeAttacking = ShootBeforeAttacking;
             s.ShootFirstSeconds = ShootFirstSeconds;

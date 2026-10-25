@@ -225,7 +225,14 @@ namespace Armoury
                     bool charge = oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget;
                     Form st;
                     if (!_forms.TryGetValue(f, out st)) { st = new Form(); _forms[f] = st; }
+                    // 128: szarza z daleka idzie marszem - sygnal (okrzyk, rog, motto, bieg) dopiero na progu biegu (MarchToContact.ChargeHeld)
+                    bool held = false;
                     if (charge && !st.Charge)
+                    {
+                        try { held = MarchToContact.ChargeHeld(f); }
+                        catch (Exception e) { held = false; RoutHold.Stumble(RoutHold.SiteMarch, "MarchToContact.ChargeHeld", e); }
+                    }
+                    if (charge && !st.Charge && !held)
                     {
                         st.Charge = true;
                         // noc 25.10 P2 (K4): jedyny sygnal szarzy - kazde przejscie, AI i gracza, takze bez okrzykow (dyspozytor w BattleCries.Events.cs)

@@ -1,5 +1,49 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 128 (galaz noc/127-bitwa-cialo od noc/final df5ed020) - szarza z daleka idzie marszem, okrzyk i bieg dopiero na ostatnich ok. 60 m
+**Problem:** Jeff 25.10 ok. 12:15, po obejrzeniu autotestu 126a: "na poczatku powinni maszerowac a nie ciagle wszyscy biegaja w zbrojach". Log 126a (Armoury-2026-10-25_12-04-16.log,
+segment 'marsz' linii "Bitwa (NB2)"): szykow w marszu 1-2 na bitwe, "predkosc w marszu sr. - m/s (0)" - prawie nikt nie szedl. Autotest sam daje rozkaz SZARZA wszystkim szykom
+gracza na starcie (CrashScribe AutotestBattle.Drive, co 15 s), a bandyci walcza jak tlum (taktyka Charge) - szarza z 200-300 m.
+**Przyczyna:** MarchToContact (P1) trzymal marsz tylko przy rozkazach Move / Advance / FallBack; rozkaz Charge / ChargeToTarget od razu zdejmowal cap
+(OnChargeStarted i przejscie w Eval) - z kazdej odleglosci. Sygnal szarzy (BattleCries.ChargeStarted: okrzyk, rog, motto, zdjecie capu) szedl w chwili rozkazu.
+**Zmiana:** MarchToContact.HoldCharge / ChargeHeld: szyk z rozkazem szarzy (piechota, lucznicy pieszo, konnica; AI i gracz) idzie marszem (MarchCap - to samo tempo co
+przy Advance; konnica klus) az wrog jest blizej niz ChargeRunsFrom (60 m; konnica CavalryGallopDistance 120 m), o ile szyk nie jest zwolniony po zwarciu (30 s + rearm).
+BattleCries.Charges pyta ChargeHeld przed sygnalem - sygnal (okrzyk, rog, motto, bieg) przychodzi na progu, jeden detektor szarzy zostaje (K4). Gdy sygnal nie przyjdzie,
+Eval zwalnia szyk sam na progu. Konni lucznicy, smoki, szyki bez rodzaju, oblezenia, morze - bez zmian. Klucze ChargeMarchesFirst (TAK) i ChargeRunsFrom (60, 20..200);
+opisy MarchToContactEnabled i PlayerMoveOrderWalks poprawione ("Charge always runs" juz nieprawda). Segment 'marsz' linii NB2: "(szarza marszem TAK, bieg od 60 m:
+szarz zaczetych marszem N, doprowadzonych do progu M)". Refaktor bez zmiany zachowania: Rearm(kind) i MarchCap wyjete z Eval.
+**Ryzyko / co sprawdzic:** (1) Szarza z daleka trwa dluzej - szyk dluzej pod ostrzalem (zamierzone, sredniowiecze). (2) RBM ChargeWithTarget liczy limit z CachedMovementSpeed -
+nasz cap tnie go w PostCache / PostSpeed tak jak przy Advance (dowod [K] w naglowku MarchToContact). (3) Gracz: rozkaz F3 z daleka tez idzie marszem - nie ma "biegu od razu";
+klucz ChargeMarchesFirst NIE wraca do starego. (4) Kolejnosc tiku BattleCries -> MarchToContact (K4) bez zmian; ChargeHeld czyta stan z poprzedniego taktu (do 0.5 s).
+(5) BattleSound.IsMarching = true w czasie marszu szarzy - bebny graja do progu (zamierzone). Regresje: OnChargeStarted bez zmian; walking branch (Advance / Move) - ta sama
+logika (Rearm = stara formula). Sprawdzic w logu: szarz zaczetych marszem > 0, sr. dystans szarzy piechoty ok. 60 m (dotad 56-75 m tylko przy Advance).
+**Status:** ZBUDOWANE - autotest i wgranie razem z 127 i 129.
+
+## 2026-10-25 127 (galaz noc/127-bitwa-cialo od noc/final df5ed020) - bieg w zbroi wedlug fizjologii, jedna regula dla kazdego; w biegu oddech nie wraca
+**Problem:** Jeff 25.10 ok. 12:20: "bieganie w zbrojach powinno dwa razy mocniej kosztowac stamine w zaleznosci od tego ile mam na sobie", "nie tylko moja wage tez innych
+jednostek, ogolna zasada", "jak dzwigam na sobie np. 50 kg, to przebiegne duzo mniej niz jakbym mial na sobie 10 kg, sprawdz jakie sa realne mozliwosci dla ludzkiego ciala
+trzeba wyjsc od sredniej". Bohater Jeffa (Ithauser) nosi 46.3 kg zbroi (realm_knight_helmet 1.7, reach_heavy_armor 36, mallister_plated_boots2 3.3, mallister_gloves2 3.0,
+mallister_pauldrons 2.3 - wagi z ROT-Content/ROTassets.xml i item XML; sloty z linii "HP sprzetu (m110)"). Log Jeffa 03:36: "BattleWind: gracz END-mul 4.59, stamina 10908,
+regen 37 pkt/s".
+**Przyczyna:** FieldCraft: drenaz biegu 4 + 1 pkt/s za kg zbroi = 50 pkt/s u Jeffa, a w tym samym czasie regeneracja RBM (dla bohatera BattleWind 37 pkt/s, x3 po 10 s
+bez walki - RBMAI StanceLogic.IsAgentInQuickStaminaRegen, ponizej 70% puli) = do 111 pkt/s - bieg nic nie kosztowal. Szeregowi (regen ok. 2 pkt/s) meczyli sie
+po ok. 60-80 s. Pula bohatera x4.59 (Endurance) wydluzala bieg tak samo jak walke.
+**Zmiana:** (1) FieldCraft.RunSecondsFor: czas pelnego biegu do zera T = RunSecondsUnarmoured (120 s) x sprawnosc / (1 + k x kg)^2; sprawnosc = 0.75 + Atletyka/400
+(0.6..1.6); k = ArmourRunCostPerKgPercent 2.25%/kg z Askew, Formenti, Minetti 2012 (Proc. R. Soc. B 279:640-644: zbroja 30-50 kg = koszt biegu x1.9, chodu x2.1-2.3,
+wiecej niz plecak tej samej wagi - konczyny i oddech); kwadrat - drozszy krok i nizsze tempo, ktore cialo utrzyma (model predkosci krytycznej: srednia 120 s bez zbroi
+to oszacowanie, nie pomiar). Drenaz = cala pula / T - wielkosc puli (Endurance, Atletyka RBM) wydluza walke, nie bieg. Przyklady przy Atletyce 100: 0 kg 120 s, 10 kg 80 s,
+25 kg 49 s, 46.3 kg 29 s, 50 kg 27 s. (2) NoBreathWhileRunning: postawa RBM biegnacego czlowieka w HashSet FieldCraft (co 0.2 s), BattleWind.TickStaminaPrefix
+pomija wtedy regeneracje (takze NPC); latka tickStaminaRegen wpinana takze bez BattleStaminaEnabled. (3) Stare klucze SprintDrainPerSecond / SprintDrainPerKg /
+FatigueFreeArmorKg usuniete (w Armoury.json Jeffa zostaja jako martwe wpisy - MCM ich nie czyta). Nowe: RunSecondsUnarmoured (30..300), ArmourRunCostPerKgPercent (0..5),
+NoBreathWhileRunning. Linia na koniec misji "Bieg (127): ludzi zmierzonych N | zbroja sr. X kg | pelny bieg do zera sr. Y s | ... | gracz: zbroja K kg, Atletyka A -> T s".
+**Ryzyko / co sprawdzic:** (1) Lekka piechota i lucznicy bez zbroi mecza sie teraz po ok. 1.5-2 min biegu (dotad drenaz 4 pkt/s - prawie nigdy). (2) Ciezka piechota
+AI szarzujaca z daleka dobiegnie bez tchu (zadyszka -50% ruchu i walki) - dlatego 128 (szarza marszem) idzie w tej samej paczce. (3) Odpoczynek bez zmian: szeregowi
+oddaja dlug sprintu tempem biegacza (25/s x Atletyka), bohater z BattleWind swoja regeneracja (u Jeffa od zera do pelna ok. 2-3 min, do 10% ok. 30 s) - nierowne,
+do oceny w grze. (4) HashSet<object> postaw - RBM Stance bez Equals/GetHashCode (referencja); czyszczony w AfterStart, OnEndMission, OnAgentDeleted. (5) Prog biegu bez zmian
+(55% predkosci maks., 2.2..4.2 m/s); marsz MarchToContact <= 2.2 m/s nie jest biegiem. Regresje: DrainPerSec czytal tylko FieldCraft (grep), BattleWind.Active /
+Manages bez zmian; gracz jezdzi konno - bez drenazu jak dotad.
+**Status:** ZBUDOWANE - autotest i wgranie razem z 128 i 129.
+
 ## 2026-10-25 126 (noc-p12 przeglad armii v2, galaz noc/p12-przeglad2 od noc/final; recenzja 58025164) - przypinanie konkretnych typow wojska do choragwi
 
 **Problem:** Jeff 25.10 00:36: przeglad armii ma pozwalac "przenosic wojsko" miedzy choragwiami; 116 (v1) umial tylko procent klasy i filtry Order of Battle, a przypinanie typow bylo odlozone do "v2". Jeff 06:35: "no ale miales to zrobic".

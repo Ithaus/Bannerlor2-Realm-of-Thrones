@@ -37,7 +37,7 @@ namespace Armoury
             public bool SwingApplied;      // czy nasza kara siedzi teraz we wlasciwosciach agenta
             public bool Panicked;
             // policzone raz na agenta
-            public float DrainPerSec = -1f; // punkty/s sprintu (baza + obciazenie)
+            public float RunSeconds = -1f;  // 127: sekundy pelnego biegu do zera (fizjologia: Atletyka i waga zbroi) - drenaz = cala pula / RunSeconds
             public float EndBonus = 1f;     // mnoznik puli z Endurance (bohaterowie)
             public float TiredFloor;
             public float PoolMax;           // wlasna pula, gdy RBM nieobecny
@@ -64,6 +64,38 @@ namespace Armoury
             sb.Append("; FieldCraft limit tylko przy karze ").Append(c != null && c.SpeedCapOnlyWhenWinded ? "TAK" : "NIE")
               .Append(": zapisy kary ").Append(_spdPenalty).Append(" (w marszu ").Append(_spdMarch).Append("), zdjecia ").Append(_spdRelease)
               .Append(", stare zapisy co 0.2 s ").Append(_spdOld);
+        }
+
+        // ---- 127 (25.10, Jeff: "bieganie w zbrojach ... w zaleznosci od tego ile mam na sobie", "ogolna zasada", "wyjsc od sredniej"):
+        // postawy RBM ludzi, ktorzy TERAZ biegna - BattleWind.TickStaminaPrefix nie oddaje im oddechu (glowny watek: FieldCraft pisze co 0.2 s,
+        // RBM StanceLogic.OnMissionTick czyta). Liczniki linii "Bieg (127)" na koniec misji.
+        private static readonly HashSet<object> _runningStances = new HashSet<object>();
+        private static int _runN, _regenSkipped;
+        private static float _runKgSum, _runKgMax, _runTSum, _runTMin = float.MaxValue;
+        private static float _plKg = -1f, _plAth, _plT;
+
+        internal static bool IsRunning(object stance) { return stance != null && _runningStances.Count > 0 && _runningStances.Contains(stance); }
+
+        internal static void NoteRegenSkipped() { _regenSkipped++; }
+
+        private static void ResetRunStats()
+        {
+            _runningStances.Clear();
+            _runN = 0; _regenSkipped = 0;
+            _runKgSum = 0f; _runKgMax = 0f; _runTSum = 0f; _runTMin = float.MaxValue;
+            _plKg = -1f; _plAth = 0f; _plT = 0f;
+        }
+
+        /// <summary>127: sekundy pelnego biegu do zera, jedna regula dla kazdego czlowieka na polu:
+        /// T = RunSecondsUnarmoured x sprawnosc / (1 + k x kg)^2; sprawnosc = 0.75 + Atletyka/400 (0.6..1.6); k = ArmourRunCostPerKgPercent/100
+        /// (Askew, Formenti, Minetti 2012: zbroja 30-50 kg = koszt biegu x1.9 -> 2.25%/kg; kwadrat - drozszy krok i nizsze tempo, ktore cialo utrzyma).</summary>
+        internal static float RunSecondsFor(float athletics, float armourKg, Settings c)
+        {
+            float fit = 0.75f + Math.Max(0f, athletics) / 400f;
+            if (fit < 0.6f) fit = 0.6f;
+            if (fit > 1.6f) fit = 1.6f;
+            float m = 1f + Math.Max(0f, armourKg) * Math.Max(0f, c.ArmourRunCostPerKgPercent) / 100f;
+            return Math.Max(5f, Math.Max(10f, c.RunSecondsUnarmoured) * fit / (m * m));
         }
 
         // ---- most do staminy RBM: sprint pije z TEGO SAMEGO paska, ktory widac w walce ----
@@ -141,10 +173,9 @@ namespace Armoury
             return 1f;
         }
 
-        // Model punktowy: drenaz sprintu to STALE punkty na sekunde (baza + obciazenie).
-        // Atletyka nie zmniejsza drenazu - ona POWIEKSZA pule (w RBM robi to sam RBM:
-        // maxStamina = 1000 * (1 + 3*Atletyka/500)). Endurance bohaterow dokladamy sami
-        // jako mnoznik puli. Czas biegu wynika z puli / drenaz - sam z siebie.
+        // 127: czas pelnego biegu z fizjologii (RunSecondsFor), drenaz = cala pula / ten czas - wielkosc puli (Endurance bohaterow,
+        // Atletyka w RBM) wydluza WALKE, nie bieg. Dawniej staly drenaz 4 + 1 pkt/kg: bohater z regeneracja 37 pkt/s (x3 po 10 s bez walki)
+        // w 46 kg zbroi nie tracil nic. Endurance bohaterow dalej powieksza pule (raz, gdy BattleWind nieczynny).
         private static void MeasureWind(Agent agent, State st)
         {
             var c = Settings.Current;
@@ -168,8 +199,13 @@ namespace Armoury
             float w = 0f;
             try { w = agent.SpawnEquipment.GetTotalWeightOfArmor(true); } catch { }
 
-            st.DrainPerSec = Math.Max(1f, c.SprintDrainPerSecond)
-                           + Math.Max(0f, w - c.FatigueFreeArmorKg) * Math.Max(0f, c.SprintDrainPerKg);
+            st.RunSeconds = RunSecondsFor(ath, w, c);
+            _runN++;
+            _runKgSum += w;
+            if (w > _runKgMax) _runKgMax = w;
+            _runTSum += st.RunSeconds;
+            if (st.RunSeconds < _runTMin) _runTMin = st.RunSeconds;
+            if (agent.IsMainAgent) { _plKg = w; _plAth = ath; _plT = st.RunSeconds; }
             st.TiredFloor = Math.Min(0.92f, c.TiredSpeedFactor + ath / 1000f);
 
             // wlasna pula (gdy RBM nieobecny) - te same zasady co RBM: 1000 * bonus z Atletyki
@@ -189,7 +225,13 @@ namespace Armoury
 
         public override void OnAgentDeleted(Agent affectedAgent)
         {
-            try { _states.Remove(affectedAgent); _mountOwners.Remove(affectedAgent); } catch { }
+            try
+            {
+                State gone;
+                if (_states.TryGetValue(affectedAgent, out gone) && gone.RbmStance != null) _runningStances.Remove(gone.RbmStance);
+                _states.Remove(affectedAgent); _mountOwners.Remove(affectedAgent);
+            }
+            catch { }
         }
 
         /// <summary>
@@ -293,6 +335,19 @@ namespace Armoury
                 _skipHits = 0; _skipShots = 0;
             }
             catch { }
+            try
+            {
+                var c = Settings.Current;
+                if (_runN > 0 && c != null)
+                    Log.Info("Bieg (127): ludzi zmierzonych " + _runN + " | zbroja sr. " + (_runKgSum / _runN).ToString("0.0") + " kg (najwiecej "
+                             + _runKgMax.ToString("0.0") + ") | pelny bieg do zera sr. " + (_runTSum / _runN).ToString("0") + " s (najkrocej "
+                             + _runTMin.ToString("0") + ") | regula: " + c.RunSecondsUnarmoured.ToString("0") + " s bez zbroi przy Atletyce 100, "
+                             + c.ArmourRunCostPerKgPercent.ToString("0.##") + "%/kg do kwadratu | bez oddechu w biegu " + (c.NoBreathWhileRunning ? "TAK" : "NIE")
+                             + " (pominiete regeneracje RBM " + _regenSkipped + ")"
+                             + (_plKg >= 0f ? " | gracz: zbroja " + _plKg.ToString("0.0") + " kg, Atletyka " + _plAth.ToString("0") + " -> " + _plT.ToString("0") + " s" : " | gracz: -"));
+            }
+            catch { }
+            ResetRunStats();
             try { MissionTeams.Flush(Mission); } catch { }   // NM: linia "Druzyny w misji (NM)" raz na misje
             base.OnEndMission();
         }
@@ -301,6 +356,7 @@ namespace Armoury
         public override void AfterStart()
         {
             try { MissionTeams.Begin(Mission); } catch { }
+            ResetRunStats();
             base.AfterStart();
         }
 
@@ -552,7 +608,7 @@ namespace Armoury
                     // Ile sekund pobiegnie - wynika samo z puli i drenazu.
                     if (c.SprintFatigueEnabled)
                     {
-                        if (st.DrainPerSec < 0f) MeasureWind(agent, st);
+                        if (st.RunSeconds < 0f) MeasureWind(agent, st);
                         // sprint drenuje TYLKO piechura (konia nie meczy jezdziec),
                         // ale ODDECH czytamy kazdemu: jezdziec tez wymachuje i tez
                         // moze zejsc do zera pula RBM od ciosow
@@ -582,10 +638,16 @@ namespace Armoury
                             {
                                 _sprintLogged = true;
                                 Log.Info("FieldCraft: bieg wykryty (" + speed.ToString("0.0") + " m/s, prog "
-                                         + runThr.ToString("0.0") + "), drenaz " + st.DrainPerSec.ToString("0.0") + " pkt/s.");
+                                         + runThr.ToString("0.0") + "), pelny bieg do zera " + st.RunSeconds.ToString("0") + " s (127).");
                             }
                         }
                         var stance = c.UseRbmStamina ? RbmStanceOf(agent, st, step) : null;
+                        // 127: w biegu oddech nie wraca nikomu (BattleWind.TickStaminaPrefix pomija regeneracje RBM tej postawy)
+                        if (stance != null)
+                        {
+                            if (sprinting && c.NoBreathWhileRunning) _runningStances.Add(stance);
+                            else _runningStances.Remove(stance);
+                        }
                         if (stance != null)
                         {
                             try
@@ -622,7 +684,7 @@ namespace Armoury
 
                                 if (sprinting)
                                 {
-                                    float d = st.DrainPerSec * step;   // punkty, nie sekundy
+                                    float d = maxStam / st.RunSeconds * step;   // 127: cala pula w RunSeconds pelnego biegu
                                     stam -= d;
                                     st.SprintDebt += d;
                                     if (stam < 0f) stam = 0f;
@@ -650,7 +712,7 @@ namespace Armoury
                         {
                             // bez RBM: wlasna pula na tych samych zasadach
                             if (st.Pool < 0f) st.Pool = st.PoolMax;
-                            if (sprinting) st.Pool -= st.DrainPerSec * step;
+                            if (sprinting) st.Pool -= st.PoolMax / st.RunSeconds * step;
                             else st.Pool += st.RegenPerSec * step;
                             if (st.Pool < 0f) st.Pool = 0f;
                             if (st.Pool > st.PoolMax) st.Pool = st.PoolMax;
@@ -658,7 +720,11 @@ namespace Armoury
                             st.Pace = PaceFromRatio(st, ratio);
                         }
                     }
-                    else { st.Pace = 1f; st.Winded = false; }
+                    else
+                    {
+                        st.Pace = 1f; st.Winded = false;
+                        if (st.RbmStance != null) _runningStances.Remove(st.RbmStance);
+                    }
 
                     // --- kara za rany (ruch liczony razem z zadyszka) ---
                     float woundSlow = 0f;
