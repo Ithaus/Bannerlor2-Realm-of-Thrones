@@ -246,6 +246,7 @@ namespace Armoury
                     var r = TestRep(_step, out _note);
                     why = r == null ? "brak danych probnych (brak miasta)" : SpoilsWindow.ShowPhoto(r);
                     if (why == null) { try { _title = SpoilsWindow.TitleOf(r); } catch { _title = null; } }
+                    if (why == null && SpoilsWindow.LastPicture.Length > 0) _note = (_note != null ? _note + ", " : "") + SpoilsWindow.LastPicture;   // 150b
                 }
             }
             catch (Exception e) { Stumble("Open." + _step, e); why = "wyjatek " + e.GetType().Name; }
@@ -546,6 +547,7 @@ namespace Armoury
             {
                 r.Kind = SpoilsReport.KBattle; r.Battles = 1;
                 r.Place = near != null ? SpoilsReport.Nm(near) : "-";
+                r.Near = near;   // 150b: obrazek wedlug regionu jak po prawdziwej bitwie
                 r.Enemy = "Outlaws";
                 r.AddCoin(SpoilsReport.LPlunder, 1240); r.AddCoin(SpoilsReport.LPurses, 385); r.AddCoin(SpoilsReport.LField, 96); r.AddCoin(SpoilsReport.LOther, 14);
                 r.Men = 212; r.Crown = 245;

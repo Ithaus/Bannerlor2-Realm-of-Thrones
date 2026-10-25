@@ -330,15 +330,122 @@ namespace Armoury
                 cat.Load(UIResourceManager.ResourceContext, UIResourceManager.ResourceDepot);   // jak ROT.Screens.EventScreen (bez zwalniania - ROT tez nie zwalnia)
         }
 
-        private static readonly string[] BattleSprites = { "RobbMarching3", "WildlingsFail", "jon_stand", "blackwater" };
-        private static readonly string[] SiegeSprites = { "harrenhal", "wallfall", "eastwatch", "blackwater" };
-        private static readonly string[] TourneySprites = { "kingslanding", "joffrey" };   // noc P11: temat "dwor" tabeli Kroniki (dwor, turnieje)
+        // 150b (25.10, Jeff: "dopasuj obrazki w oknach lupu do miejsca"): obrazki ROT (ui_event_category) wedlug wroga, morza i regionu osady - przeglad albumu 150a:
+        // tylko widoki i sceny bitew, obozow i zamkow, bez portretow i scen fabuly; Joffrey nigdzie, sala tronowa tylko turniej w King's Landing.
+        private static readonly string[] PicUndead = { "nightking", "freefolk3", "jon_death", "wallfall" };       // Inni: Nocny Krol, polegli na lodzie
+        private static readonly string[] PicWild = { "freefolk1", "freefolk2", "fist", "WildlingsFail" };         // dzicy (Wolni Ludzie): snieg za Murem
+        private static readonly string[] PicSea = { "StannisSetsSail", "Ship2", "Ship1" };                        // bitwa na morzu
+        private static readonly string[] PicSeaCrown = { "blackwater", "StannisSetsSail", "Ship2" };              // morze przy Koronnych Ziemiach (Czarny Nurt)
+        private static readonly string[] PicSeaEssos = { "aegon", "StannisSetsSail", "Ship2" };                   // morze przy Essos (flota pod smokiem)
+        private static readonly string[] PicBeyond = { "freefolk1", "fist", "freefolk2" };                         // osada za Murem
+        private static readonly string[] PicWall = { "eastwatch", "fist", "messenger-img" };                       // Mur (Nocna Straz)
+        private static readonly string[] PicNorth = { "jon_stand", "messenger-img", "RobbMarching3" };            // Polnoc, Skagos
+        private static readonly string[] PicRiver = { "riverlands", "messenger-1", "RobbMarching3" };             // Dorzecze
+        private static readonly string[] PicIron = { "StannisSetsSail", "Ship2", "messenger-2" };                 // Zelazne Wyspy
+        private static readonly string[] PicEssos = { "dany_invasion", "aegon" };                                  // Essos
+        private static readonly string[] PicField = { "jon_stand", "messenger-1", "messenger-2" };                // reszta Westeros: szarza, oboz po bitwie
+        private static readonly string[] SiegeWall = { "eastwatch", "wallfall" };
+        private static readonly string[] SiegeBeyond = { "fist", "eastwatch" };
+        private static readonly string[] SiegeNorth = { "traveling_merchant", "harrenhal" };                       // zamek pod osniezonymi gorami
+        private static readonly string[] SiegeRiver = { "harrenhal", "riverlands" };
+        private static readonly string[] SiegeVale = { "traveling_merchant", "harrenhal" };
+        private static readonly string[] SiegeCrown = { "harrenhal", "blackwater" };
+        private static readonly string[] SiegeIron = { "harrenhal", "StannisSetsSail" };
+        private static readonly string[] SiegeEssos = { "dany_invasion", "aegon" };
+        private static readonly string[] SiegeAny = { "harrenhal", "traveling_merchant" };
+        private static readonly string[] TourneyKl = { "kingslanding" };
+        private static readonly string[] TourneyAny = { "traveling_merchant", "harrenhal" };                       // zamek z tlumem na moscie; Harrenhal - Wielki Turniej
+        private const string KingsLanding = "town_EW4";                                                            // ROT-Map settlements.xml
 
-        /// <summary>Obrazek okna: plik Images/Loot/loot_&lt;rodzaj&gt;_&lt;n&gt; (StoryPictures - walidacja bajtow), potem sprite ROT tematu (tabela Kroniki: bitwa / oblezenie),
+        /// <summary>150b: ostatni obrazek okna i jego temat ("obrazek X (temat, osada Y / kultura)") - do linii logu okna i proby zdjec 132.</summary>
+        internal static string LastPicture = "";
+
+        /// <summary>150b: region obrazka z kultury osady (id kultur ROT - battania to Polnoc, aserai to Dorne, empire to Braavos, nord to Lorath).</summary>
+        private static string PicRegion(string cul)
+        {
+            switch (cul ?? "")
+            {
+                case "battania": case "skagosi": return "north";
+                case "nightswatch": return "wall";
+                case "freefolk": case "wildlings": return "beyond";
+                case "river": return "river";
+                case "vale": case "hilltribesmen": return "vale";
+                case "crownlands": return "crown";
+                case "sturgia": return "iron";
+                case "empire": case "nord": case "khuzait": case "ghiscari": case "valyrian": case "ibbenese": case "lyseni": case "myrish": case "norvos":
+                case "pentoshi": case "qartheen": case "qohorik": case "sarnor": case "summer": case "tyroshi": case "volantine": case "yiti":
+                    return "essos";
+            }
+            return "west";   // Westerlands, Reach, Stormlands, Dragonstone, Dorne - i nieznane
+        }
+
+        /// <summary>150b: osada regionu obrazka - osada raportu (szturm, okup, turniej) albo miejsca bitwy; kryjowka (kultura bandytow) - najblizsza osada nie-kryjowka.</summary>
+        private static TaleWorlds.CampaignSystem.Settlements.Settlement PicSettlement(SpoilsReport.Rep r)
+        {
+            var st = r.Kind == SpoilsReport.KBattle ? (r.Near ?? r.Town) : (r.Town ?? r.Near);
+            if (st == null && Hero.MainHero != null) st = Hero.MainHero.LastKnownClosestSettlement;
+            if (st == null || !st.IsHideout) return st;
+            TaleWorlds.CampaignSystem.Settlements.Settlement best = null; float bd = float.MaxValue;
+            var p = st.GetPosition2D;
+            foreach (var t in TaleWorlds.CampaignSystem.Settlements.Settlement.All)
+            {
+                if (t == null || t.IsHideout || !(t.IsTown || t.IsCastle || t.IsVillage)) continue;
+                float d = p.DistanceSquared(t.GetPosition2D);
+                if (d < bd) { bd = d; best = t; }
+            }
+            return best ?? st;
+        }
+
+        /// <summary>150b: pula obrazkow ROT wedlug rodzaju raportu, wroga (Inni, dzicy), morza i regionu osady; theme - nazwa tematu do logu.</summary>
+        private static string[] PicPool(SpoilsReport.Rep r, string region, string townId, out string theme)
+        {
+            if (r.Kind == SpoilsReport.KTourney)
+            {
+                if (townId == KingsLanding) { theme = "turniej King's Landing"; return TourneyKl; }
+                theme = "turniej"; return TourneyAny;
+            }
+            if (r.Kind == SpoilsReport.KSiege || r.Kind == SpoilsReport.KRansom)
+            {
+                theme = "zamek " + region;
+                switch (region)
+                {
+                    case "wall": return SiegeWall;
+                    case "beyond": return SiegeBeyond;
+                    case "north": return SiegeNorth;
+                    case "river": return SiegeRiver;
+                    case "vale": return SiegeVale;
+                    case "crown": return SiegeCrown;
+                    case "iron": return SiegeIron;
+                    case "essos": return SiegeEssos;
+                }
+                return SiegeAny;
+            }
+            if (r.Foe == "undead") { theme = "Inni"; return PicUndead; }
+            if (r.Sea)
+            {
+                theme = "morze " + region;
+                return region == "crown" ? PicSeaCrown : region == "essos" ? PicSeaEssos : PicSea;
+            }
+            if (r.Foe == "wild") { theme = "dzicy"; return PicWild; }
+            theme = "pole " + region;
+            switch (region)
+            {
+                case "beyond": return PicBeyond;
+                case "wall": return PicWall;
+                case "north": return PicNorth;
+                case "river": return PicRiver;
+                case "iron": return PicIron;
+                case "essos": return PicEssos;
+            }
+            return PicField;
+        }
+
+        /// <summary>Obrazek okna: plik Images/Loot/loot_&lt;rodzaj&gt;_&lt;n&gt; (StoryPictures - walidacja bajtow), potem sprite ROT dopasowany do miejsca (150b: PicPool),
         /// ostatecznie messenger-img. fileSprite - nazwa sprite'a z pliku (do zwolnienia po zamknieciu) albo null.</summary>
         private static string Picture(SpoilsReport.Rep r, out string fileSprite)
         {
             fileSprite = null;
+            LastPicture = "";
             try
             {
                 EnsureEventSprites();
@@ -349,14 +456,24 @@ namespace Armoury
                 {
                     string how;
                     string s = StoryPictures.Acquire(DirLoot, "loot_" + stem + "_" + (1 + r.Id % files).ToString(Inv), out how);
-                    if (s != null) { fileSprite = s; return s; }
+                    if (s != null) { fileSprite = s; LastPicture = "obrazek z pliku " + s; return s; }
                 }
-                var pool = r.Kind == SpoilsReport.KBattle ? BattleSprites : r.Kind == SpoilsReport.KTourney ? TourneySprites : SiegeSprites;
+                TaleWorlds.CampaignSystem.Settlements.Settlement st = null;
+                try { st = PicSettlement(r); } catch (Exception e) { Stumble("Picture.osada", e); }
+                string cul = null, townId = null;
+                try { cul = st != null && st.Culture != null ? st.Culture.StringId : null; townId = st != null ? st.StringId : null; } catch { }
+                string region = PicRegion(cul), theme;
+                var pool = PicPool(r, region, townId, out theme);
                 for (int i = 0; i < pool.Length; i++)
                 {
                     string n = pool[(r.Id + i) % pool.Length];
-                    if (HasSprite(n)) return n;
+                    if (HasSprite(n))
+                    {
+                        LastPicture = "obrazek " + n + " (" + theme + ", osada " + (st != null ? SpoilsReport.Nm(st) : "-") + " / " + (cul ?? "-") + ")";
+                        return n;
+                    }
                 }
+                LastPicture = "brak obrazka tematu " + theme;
             }
             catch (Exception e) { Stumble("Picture", e); }
             return HasSprite("messenger-img") ? "messenger-img" : "";
@@ -515,7 +632,7 @@ namespace Armoury
             double waited = r.ReadyTicks != 0 ? (_openedAt - r.ReadyTicks) / (double)Stopwatch.Frequency : 0;
             string w = _mode + " | pokazane po " + waited.ToString("0.0", Inv) + " s od gotowosci"
                        + (_blocks.Count > 0 ? " (blokady: " + string.Join(", ", _blocks.ToArray()) + ")" : "")
-                       + ", otwarte " + Sec(_openedAt).ToString("0.0", Inv) + " s | " + how;
+                       + ", otwarte " + Sec(_openedAt).ToString("0.0", Inv) + " s | " + how + (LastPicture.Length > 0 ? " | " + LastPicture : "");
             _blocks.Clear();
             SpoilsReport.Finish(r, "pokazane", null, w);
         }
