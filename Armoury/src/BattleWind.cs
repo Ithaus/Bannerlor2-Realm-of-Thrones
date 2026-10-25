@@ -113,6 +113,40 @@ namespace Armoury
 
         private static float Clamp(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
+        // 130: krzywa Atletyki (klucz AthleticsStaminaCurve; 1.0 = linia RBM). A' = 300 x (A / 300)^p - przy 300 tyle co RBM, nizej troche mniej,
+        // wyzej wiecej; kazdy kolejny punkt daje nieco wiecej niz poprzedni (p 1.12: 10 -> 7, 100 -> 88, 200 -> 191, 230 -> 223, 300 -> 300, 400 -> 414).
+        private const float CurveRef = 300f;
+        private static float _lastAth, _lastAth2;
+        private static int _curveN;
+
+        internal static float CurveP(Settings c) { return Clamp(c != null ? c.AthleticsStaminaCurve : 1f, 1f, 1.5f); }
+
+        internal static float CurvedAthletics(float a, Settings c)
+        {
+            if (a <= 0f) return 0f;
+            float p = CurveP(c);
+            if (p <= 1.0001f) return a;
+            return CurveRef * (float)Math.Pow(a / CurveRef, p);
+        }
+
+        /// <summary>130: pula i regeneracja RBM z Atletyki po krzywej - stosunek do linii RBM (zostaja inne mnozniki RBM: ciezki korpus x0.5, mnoznik gracza).</summary>
+        private static void ApplyAthleticsCurve(Agent agent, object stance, Settings c)
+        {
+            if (CurveP(c) <= 1.0001f) return;
+            float a;
+            try { a = MissionGameModels.Current.AgentStatCalculateModel.GetEffectiveSkill(agent, DefaultSkills.Athletics); }
+            catch { return; }
+            float a2 = CurvedAthletics(a, c);
+            if (agent.IsPlayerControlled) { _lastAth = a; _lastAth2 = a2; }
+            if (Math.Abs(a2 - a) < 0.5f) return;
+            float kPool = (1f + 3f * a2 / 500f) / (1f + 3f * a / 500f);
+            float kRegen = (1f + 2f * a2 / 500f) / (1f + 2f * a / 500f);
+            _fMaxStamina.SetValue(stance, (float)_fMaxStamina.GetValue(stance) * kPool);
+            _fStamina.SetValue(stance, (float)_fStamina.GetValue(stance) * kPool);
+            _fStaminaRegen.SetValue(stance, (float)_fStaminaRegen.GetValue(stance) * kRegen);
+            _curveN++;
+        }
+
         private static float Winded(float current, float max)
         {
             float floor = Clamp(Settings.Current.BattleWindedFloor, 0.05f, 1f);
@@ -148,8 +182,25 @@ namespace Armoury
                     Profile drop; if (Managed.TryGetValue(stance, out drop)) Managed.Remove(stance);
                     return;
                 }
+                // 130 (Jeff 25.10: "to powinno isc wykladniczo ... kazdy kolejny punkt atletyki kosztuje wiecej XP zatem tez kazdy punkt daje nieco wiecej
+                // do staminy jak i jej regeneracji"): kazdy czlowiek (szeregowy i bohater) - pula i regeneracja RBM liczone z Atletyki po krzywej (CurvedAthletics)
+                var cs0 = Settings.Current;
+                if (cs0 != null) ApplyAthleticsCurve(agent, stance, cs0);
                 var hero = HeroOf(agent);
                 if (hero == null) return;
+                // 130 (25.10, Jeff: "rycerz tier 6 ma atletyka 200 i ja mam atletyka 200 powinnismy miec taka sama stamine", "to powinno byc zalezne od atletyki
+                // nie od tieru"): klucz StaminaFromAthleticsOnly - bohater (gracz, lordowie, towarzysze) ma pule i regeneracje RBM z Atletyki jak kazdy szeregowy;
+                // bez mnoznika Endurance i bez wlasnego Profile (tick idzie oryginalem RBM). Postura bez zmian (HeroPostureFromSkill / DuelFairGuard).
+                var cs = Settings.Current;
+                if (cs != null && cs.StaminaFromAthleticsOnly)
+                {
+                    Profile drop; if (Managed.TryGetValue(stance, out drop)) Managed.Remove(stance);
+                    if (agent.IsPlayerControlled)
+                        Log.Info("BattleWind (130): gracz - stamina z Atletyki jak kazdy (RBM po krzywej " + CurveP(cs).ToString("0.00") + "): Atletyka "
+                                 + _lastAth.ToString("0") + " liczona jak " + _lastAth2.ToString("0") + " | pula " + (int)(float)_fMaxStamina.GetValue(stance)
+                                 + ", regeneracja " + ((float)_fStaminaRegen.GetValue(stance) * RbmTickCount / RbmTickSeconds).ToString("0.0") + " pkt/s (bez mnoznika Endurance).");
+                    return;
+                }
                 float mul = EnduranceMul(hero);
                 float max = (float)_fMaxStamina.GetValue(stance) * mul;
                 _fMaxStamina.SetValue(stance, max);

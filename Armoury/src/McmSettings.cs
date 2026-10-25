@@ -1308,7 +1308,15 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool NoBreathWhileRunning { get; set; } = true;
 
-        [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant (read once at game start from ModuleData/Armoury.settings.xml - changing it here has no effect)", RequireRestart = false)]
+        [SettingPropertyBool("Stamina From Athletics Only", HintText = "one rule for every man's stamina in battle: the pool and the breath come from Athletics alone, as Realistic Battle Mod counts them - you, lords and companions the same as any soldier, so a tier 6 knight with Athletics 200 lasts as long as you with Athletics 200. Endurance no longer multiplies a hero's pool. Off = heroes' Endurance rule below, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool StaminaFromAthleticsOnly { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Athletics Stamina Curve", 1.00f, 1.50f, "0.00", HintText = "how stamina and breath grow with Athletics: each further point counts a little more than the one before, as each costs more experience to learn. Athletics 300 gives what Realistic Battle Mod gives; at 1.12 Athletics 100 counts as 88, 200 as 191 and 400 as 414. 1.0 = a straight line, as in Realistic Battle Mod", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float AthleticsStaminaCurve { get; set; } = 1.12f;
+
+        [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant (not used while Stamina From Athletics Only is on) (read once at game start from ModuleData/Armoury.settings.xml - changing it here has no effect)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool BattleStaminaEnabled { get; set; } = true;
 
@@ -9368,6 +9376,10 @@ namespace Armoury
         [SettingPropertyGroup("Payment messages")]
         public bool PlayerPaymentReasons { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Endurance Carry Kg Per Point", 0.00f, 20.00f, "0.#", HintText = "every point of Endurance of each hero in a party - you, your companions and every lord alike - adds this many kilograms to what the party can carry; it shows as its own Endurance line on the inventory weight. 0 = off", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public float EnduranceCarryKgPerPoint { get; set; } = 5f;
+
         [SettingPropertyBool("Camp Cart Enabled", HintText = "supply carts: a town carpenter builds one from market wood and tools; one pack animal pulls it and hauls Cart Load Kg instead of its own 100 kg, but the column moves slower (off = carts give nothing)", RequireRestart = false)]
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public bool CampCartEnabled { get; set; } = true;
@@ -9743,6 +9755,10 @@ namespace Armoury
         [SettingPropertyBool("Battle House Speeches", HintText = "with Battle Sounds: before the clash the commander of each side speaks a few words to his men in the voice of his land and ends with the words of his house (you hear the enemy's only when he is close)", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleHouseSpeeches { get; set; } = true;
+
+        [SettingPropertyBool("Own Kingdom War Cries", HintText = "with Battle Sounds: once you rule your own kingdom, its lords roar its words at the charge and a few men of every charging line join in - 'For Karda!', 'Justice is honour!' and fourteen more, in ten different voices, never the same shout twice in a row and each man only once a battle. Off = your lords and men shout as their own houses and lands do", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool OwnKingdomWarCries { get; set; } = true;
 
         [SettingPropertyBool("Battle Charge Mottos", HintText = "with Battle Sounds: when a formation led by a lord or a companion charges, he roars the words of his house - once per lord per battle", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
@@ -10234,6 +10250,8 @@ namespace Armoury
             s.RunSecondsUnarmoured = RunSecondsUnarmoured;
             s.ArmourRunCostPerKgPercent = ArmourRunCostPerKgPercent;
             s.NoBreathWhileRunning = NoBreathWhileRunning;
+            s.StaminaFromAthleticsOnly = StaminaFromAthleticsOnly;
+            s.AthleticsStaminaCurve = AthleticsStaminaCurve;
             s.BattleStaminaEnabled = BattleStaminaEnabled;
             s.BattleEndDoubleEvery = BattleEndDoubleEvery;
             s.BattleRegenAtEnd1 = BattleRegenAtEnd1;
@@ -12249,6 +12267,7 @@ namespace Armoury
             s.CastleMenuTidy = CastleMenuTidy;
             s.VillageMenuTidy = VillageMenuTidy;
             s.PlayerPaymentReasons = PlayerPaymentReasons;
+            s.EnduranceCarryKgPerPoint = EnduranceCarryKgPerPoint;
             s.CampCartEnabled = CampCartEnabled;
             s.CartLoadKg = CartLoadKg;
             s.CartSpeedPenaltyPercent = CartSpeedPenaltyPercent;
@@ -12343,6 +12362,7 @@ namespace Armoury
             s.BattleDrumsMarch = BattleDrumsMarch;
             s.BattleCaptainOrders = BattleCaptainOrders;
             s.BattleHouseSpeeches = BattleHouseSpeeches;
+            s.OwnKingdomWarCries = OwnKingdomWarCries;
             s.BattleChargeMottos = BattleChargeMottos;
             s.BattleWoundedAfter = BattleWoundedAfter;
             s.BattleRavensAfter = BattleRavensAfter;

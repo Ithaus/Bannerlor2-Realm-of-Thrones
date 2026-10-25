@@ -88,6 +88,19 @@ namespace Armoury
         private static int _cHornIb, _cHornNw, _cOrderBa, _cMotto, _cSpHouse, _cSpRegion, _cSpMotto, _cSpSkip, _cBreak, _cBannerDown, _cOurBanner;
         private static string _spSample;
 
+        // 129 (25.10, Jeff: "dodaj moje okrzyki mojej armii For Karda! Justice is honor! i takie tam wymysl zeby w kolko nie krzyczeli tego samego",
+        // "jak bede swoim krolestwem oczywiscie"): okrzyki krolestwa gracza - motto wodza (HouseOf -> "karda") i 1-3 szeregowych na szarze szyku,
+        // klipy mo_karda_01..16 (16 tekstow, 10 glosow), kazdy czlowiek raz na bitwe, bez powtorki ostatniego klipu (Pick)
+        private sealed class KardaEv { internal Agent A; internal Clip C; internal float At; }
+        internal const string KardaKey = "karda";
+        internal const string KardaFlagName = "armoury-karda.flag";
+        private const int KardaMaxPerCharge = 3;
+        private static readonly List<KardaEv> _kardaQ = new List<KardaEv>();
+        private static readonly HashSet<Agent> _kardaDone = new HashSet<Agent>();
+        private static readonly Dictionary<Formation, bool> _kardaForm = new Dictionary<Formation, bool>();
+        private static int _cKarda, _cKardaCap, _cKardaQ;
+        private static bool _kardaTest;
+
         private static FState FS(Formation f)
         {
             FState s;
@@ -113,6 +126,9 @@ namespace Armoury
             for (int i = 0; i < HKinds; i++) _cHorn[i] = 0;
             _cHornIb = _cHornNw = _cOrderBa = _cMotto = _cSpHouse = _cSpRegion = _cSpMotto = _cSpSkip = _cBreak = _cBannerDown = _cOurBanner = 0;
             _spSample = null;
+            _kardaQ.Clear(); _kardaDone.Clear(); _kardaForm.Clear();
+            _cKarda = _cKardaCap = _cKardaQ = 0;
+            _kardaTest = KardaTestWanted();
         }
 
         // ============================================================ szarza (K4: jedyny sygnal z BattleCries)
@@ -157,6 +173,8 @@ namespace Armoury
             ev.Horn = c.BattleHornsCulture && !silent && f.CountOfUnits >= MinMenHorn;
             if (ev.Motto != null) { _leadF = f; _lead = Math.Min(YellLeadMax, ev.Motto.Dur * 0.9f); }
             else if (ev.Order != null) { _leadF = f; _lead = OrderLead; }
+            if (ev.Motto != null && ev.Motto.Key == KardaKey) _cKardaCap++;
+            try { KardaShouts(f, c, ev); } catch (Exception e) { _units.Clear(); RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Karda", e); }
             ChargeHorse(f, c);   // tetent konnicy (BattleSound.Field.cs)
             if (ev.Motto != null || ev.Order != null || ev.Horn) { if (_chargeQ.Count < 64) _chargeQ.Add(ev); }
         }
@@ -625,6 +643,95 @@ namespace Armoury
             return s;
         }
 
+        // ============================================================ 129: okrzyki krolestwa gracza
+
+        /// <summary>Krolestwo gracza, gdy gracz nim wlada (Clan.PlayerClan.Kingdom.RulingClan == PlayerClan); null - inaczej.</summary>
+        private static TaleWorlds.CampaignSystem.Kingdom PlayerKingdom()
+        {
+            try
+            {
+                var pc = TaleWorlds.CampaignSystem.Clan.PlayerClan;
+                var k = pc != null ? pc.Kingdom : null;
+                return k != null && k.RulingClan == pc ? k : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Proba autotestu (LogGate 1/2 + plik CrashScribe/armoury-karda.flag): szyki druzyny gracza licza sie jak armia krolestwa gracza.</summary>
+        private static bool KardaTestWanted()
+        {
+            int mode = LogGate.Mode;
+            if (mode != 1 && mode != 2) return false;
+            try
+            {
+                var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                return System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), KardaFlagName));
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Czy szyk to armia krolestwa gracza (kapitan albo mowca szyku z partii tego krolestwa). Wynik w pamieci na bitwe, gdy byl kogo zapytac.</summary>
+        private static bool KardaForm(Formation f)
+        {
+            bool v;
+            if (_kardaForm.TryGetValue(f, out v)) return v;
+            var m = Mission.Current;
+            if (_kardaTest && m != null && f.Team != null && ReferenceEquals(f.Team, m.PlayerTeam)) { _kardaForm[f] = true; return true; }
+            var pk = PlayerKingdom();
+            if (pk == null) { _kardaForm[f] = false; return false; }
+            Agent a = f.Captain;
+            if (a == null || !a.IsActive()) a = SpeakerOf(f);
+            if (a == null) return false;
+            v = false;
+            try
+            {
+                var pb = a.Origin != null ? a.Origin.BattleCombatant as TaleWorlds.CampaignSystem.Party.PartyBase : null;
+                v = pb != null && pb.MapFaction == pk;
+            }
+            catch { v = false; }
+            _kardaForm[f] = v;
+            return v;
+        }
+
+        /// <summary>Szarza szyku krolestwa gracza: 1-3 szeregowych (1 + ludzi/25) krzyczy okrzyki Kardy po glosie wodza, co ok. 0,55 s, kazdy inny klip niz poprzedni.</summary>
+        private static void KardaShouts(Formation f, Settings c, ChargeEv ev)
+        {
+            if (c == null || !c.OwnKingdomWarCries || !Has("mo", KardaKey) || !KardaForm(f)) return;
+            _units.Clear();
+            f.ApplyActionOnEachUnit(_collectUnit);
+            int want = Math.Min(KardaMaxPerCharge, 1 + _units.Count / 25);
+            float t0 = _now + (ev.Motto != null ? Math.Min(YellLeadMax, ev.Motto.Dur * 0.9f) : (ev.Order != null ? OrderLead : 0.1f));
+            string lastId = ev.Motto != null ? ev.Motto.Id : null;
+            int n = 0, tries = 0;
+            while (n < want && tries < 12 && _units.Count > 0 && _kardaQ.Count < 12)
+            {
+                tries++;
+                var a = _units[_rng.Next(_units.Count)];
+                if (a == ev.Spk || _kardaDone.Contains(a) || !CanSpeak(a)) continue;
+                var clip = Pick("mo", KardaKey);
+                if (clip == null) break;
+                if (clip.Id == lastId) clip = Pick("mo", KardaKey);
+                _kardaDone.Add(a);
+                _kardaQ.Add(new KardaEv { A = a, C = clip, At = t0 + n * 0.55f + (float)_rng.NextDouble() * 0.3f });
+                lastId = clip.Id;
+                n++;
+                _cKardaQ++;
+            }
+            _units.Clear();
+        }
+
+        private static void Kardas(Mission m)
+        {
+            for (int i = _kardaQ.Count - 1; i >= 0; i--)
+            {
+                var k = _kardaQ[i];
+                if (_now < k.At) continue;
+                _kardaQ.RemoveAt(i);
+                if (k.A == null || !k.A.IsActive()) continue;
+                if (Play(m, k.C, GVoice, HeadOf(k.A), MottoMin, MottoMax, true, k.A, null, "okrzyk Kardy") != null) _cKarda++;
+            }
+        }
+
         private sealed class ThenEv { internal Clip C; internal Agent Spk; internal float At, Min, Max; }
         private static readonly List<ThenEv> _thenQ = new List<ThenEv>();
 
@@ -688,6 +795,8 @@ namespace Armoury
             for (int i = 0; i < OKinds; i++) sb.Append(i == 0 ? "" : ", ").Append(OName[i]).Append(' ').Append(_cOrder[i]);
             sb.Append("; ustapione BA ").Append(_cOrderBa).Append(')');
             sb.Append(" | motta przy szarzy ").Append(c != null && c.BattleChargeMottos ? "TAK" : "NIE").Append(' ').Append(_cMotto);
+            sb.Append(" | okrzyki krolestwa gracza (129) ").Append(c != null && c.OwnKingdomWarCries ? "TAK" : "NIE").Append(": ludzi ").Append(_cKarda).Append(" z ").Append(_cKardaQ)
+              .Append(" w kolejce, motto wodzow ").Append(_cKardaCap).Append(", wladca ").Append(PlayerKingdom() != null ? "TAK" : "NIE").Append(_kardaTest ? ", proba autotestu" : "");
             sb.Append(" | przemowy ").Append(c != null && c.BattleHouseSpeeches ? "TAK" : "NIE").Append(' ').Append(_cSpHouse + _cSpRegion).Append(" (rodu ").Append(_cSpHouse)
               .Append(", regionu ").Append(_cSpRegion).Append(" + motto ").Append(_cSpMotto).Append(", pominiete ").Append(_cSpSkip)
               .Append(_spSample != null ? "; probka " + _spSample : "").Append(')');

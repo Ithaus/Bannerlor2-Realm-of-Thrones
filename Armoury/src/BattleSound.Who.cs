@@ -157,6 +157,15 @@ namespace Armoury
                 var h = co != null ? co.HeroObject : null;
                 var clan = h != null ? h.Clan : null;
                 if (clan == null) return null;
+                // 129: rody krolestwa gracza (gracz wladca) krzycza okrzyki Kardy; proba autotestu - bohaterowie druzyny gracza
+                var cs = Settings.Current;
+                if (cs != null && cs.OwnKingdomWarCries && Has("mo", KardaKey))
+                {
+                    var pk = PlayerKingdom();
+                    if (pk != null && clan.Kingdom == pk) return KardaKey;
+                    var m = Mission.Current;
+                    if (_kardaTest && m != null && a.Team != null && ReferenceEquals(a.Team, m.PlayerTeam)) return KardaKey;
+                }
                 string t = ((clan.Name != null ? clan.Name.ToString() : "") + " " + (clan.StringId ?? "")).ToLowerInvariant();
                 if (t.Contains("golden company") || t.Contains("golden_company") || t.Contains("goldencompany")) return "goldencompany";
                 for (int i = 0; i < Houses.Length; i++) if (t.Contains(Houses[i])) return Houses[i];

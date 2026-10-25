@@ -91,7 +91,7 @@ namespace Armoury
         /// (Askew, Formenti, Minetti 2012: zbroja 30-50 kg = koszt biegu x1.9 -> 2.25%/kg; kwadrat - drozszy krok i nizsze tempo, ktore cialo utrzyma).</summary>
         internal static float RunSecondsFor(float athletics, float armourKg, Settings c)
         {
-            float fit = 0.75f + Math.Max(0f, athletics) / 400f;
+            float fit = 0.75f + BattleWind.CurvedAthletics(Math.Max(0f, athletics), c) / 400f;   // 130: Atletyka po tej samej krzywej co pula RBM
             if (fit < 0.6f) fit = 0.6f;
             if (fit > 1.6f) fit = 1.6f;
             float m = 1f + Math.Max(0f, armourKg) * Math.Max(0f, c.ArmourRunCostPerKgPercent) / 100f;
@@ -194,7 +194,7 @@ namespace Armoury
             // wykladniczy mnoznik Endurance - ta sama krzywa co BattleWind
             // (2^((END-2.5)/co_ile)); NPC bez bohatera zostaje na x1
             st.EndBonus = 1f;
-            try { if (hero != null) st.EndBonus = BattleWind.EnduranceMul(hero); }
+            try { if (hero != null && !c.StaminaFromAthleticsOnly) st.EndBonus = BattleWind.EnduranceMul(hero); }   // 130: bez Endurance - Atletyka jak u kazdego
             catch { }
             float w = 0f;
             try { w = agent.SpawnEquipment.GetTotalWeightOfArmor(true); } catch { }

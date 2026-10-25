@@ -37,6 +37,7 @@ namespace Armoury
             Step("Tetent", () => Gallops(m));
             Step("Przemowy", () => Speeches(m, c));
             Step("Motto po przemowie", () => Thens(m));
+            Step("Okrzyki Kardy", () => Kardas(m));
             Step("Bebny", () => Drums(m, c));
             Step("Pogoda", () => Weather(m, c));
             Step("Konie", () => Horses(m, c));

@@ -335,7 +335,7 @@ namespace Armoury
               .Append(" | postura szeregowych wg tieru ").Append(c.SoldierPostureByTier ? "TAK" : "NIE").Append(": ");
             for (int t = 1; t <= 7; t++) sb.Append(t > 1 ? ", " : "").Append('T').Append(t).Append(" x").Append(BattleWind.SoldierMul(t).ToString("0.00"));
             sb.Append(", regeneracja x pierwiastek | latka postury RBM wpieta ").Append(BattleWind.PosturePatched ? "TAK" : "NIE")
-              .Append(", oddech bohaterow ").Append(BattleWind.Active ? "TAK" : "NIE")
+              .Append(", oddech bohaterow ").Append(BattleWind.Active ? "TAK" : "NIE").Append(" (stamina tylko z Atletyki, 130: ").Append(c.StaminaFromAthleticsOnly ? "TAK" : "NIE").Append(')')
               // czesc 2 (16.10)
               .Append(" | Commander Tactics ").Append(c.CommanderTactics ? "TAK" : "NIE").Append(" (tlum ponizej ").Append(WarCouncil.HordeBelow)
               .Append(" Tactics, konnica i obrona od ").Append(WarCouncil.CavalryFrom).Append(", okrazenie RBM od ").Append(WarCouncil.EnvelopFrom)

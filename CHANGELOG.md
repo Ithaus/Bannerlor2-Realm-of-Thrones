@@ -1,5 +1,55 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 131 (galaz noc/127-bitwa-cialo) - udzwig z Endurance: kazdy punkt Endurance bohatera w druzynie +5 kg
+**Problem:** Jeff 25.10 ok. 12:41: "a kazdy punkt endurance daje +5 do udzwigu w menu inventory jako dodatkowe", potem "i companions tez".
+**Przyczyna:** Gra liczy udzwig partii tylko z ludzi (20 kg), luzakow (20 kg) i jucznych (100 kg) (DefaultInventoryCapacityModel.CalculateInventoryCapacity) - cechy
+bohaterow nic nie daja.
+**Zmiana:** Nowy EnduranceCarry.cs - postfiks DefaultInventoryCapacityModel.CalculateInventoryCapacity (ten sam cel co CampCart / PackMarket, osobny wpis; NavalDLC
+NavalDLCInventoryCapacityModel woła BaseModel - sprawdzone w dekompilacji): suma Endurance kazdego zywego bohatera w MemberRoster partii (gracz, towarzysze, lordowie
+i ich rodziny - kazda partia, ogolna zasada) x EnduranceCarryKgPerPoint (5, 0..20; 0 = wylaczone, na zywo); armia (includeFollowers) - takze doczepione partie;
+na ladzie i na morzu. Osobna linia "Endurance" w podpowiedzi udzwigu. Linia startu "Udzwig z Endurance (131): wpiete ...".
+**Ryzyko / co sprawdzic:** (1) AI lordowie tez dostaja (+25..50 kg na partie) - mniej przeciazenia, mikroskopijnie szybsze partie. (2) Petla po MemberRoster przy kazdym
+liczeniu udzwigu (predkosc partii) - kilkadziesiat wpisow, bez alokacji. (3) Kolejnosc postfiksow na tym samym celu bez znaczenia (kazdy tylko dodaje linie).
+Sprawdzic w grze: ekran ekwipunku - linia "Endurance" (u Jeffa END 8 = +40 kg plus towarzysze).
+**Status:** ZBUDOWANE - autotest i wgranie razem z 127-130.
+
+## 2026-10-25 130 (galaz noc/127-bitwa-cialo) - stamina tylko z Atletyki, ta sama dla gracza, lordow i szeregowych; krzywa Atletyki (kazdy punkt troche wiecej)
+**Problem:** Jeff 25.10 ok. 12:38: "czy ja znowu chetuje i mam wiecej staminy niz ktos na moim poziomie np. rycerz tier 6 ma atletyka 200 i ja mam atletyka 200
+powinnismy miec taka sama stamine albo zblizona", "to powinno byc zalezne od atletyki nie od tieru", "i to powinno isc wykladniczo ... kazdy kolejny punkt atletyki
+kosztuje wiecej XP zatem tez kazdy punkt daje nieco wiecej do staminy jak i jej regeneracji". Log Jeffa 03:36: "BattleWind: gracz END-mul 4.59, stamina 10908, regen 37".
+**Przyczyna:** BattleWind.StaminaInitPostfix (26.08, Jeff "po 10 machnieciach nie mam sily"): pula bohatera x 2^((END-2.5)/2.5) (END 8 = x4.59) i wlasna regeneracja
+5..100 pkt/s wedlug Endurance - Jeff ok. 10 900 pkt i 37 pkt/s (poza walka x3), rycerz T6 Atletyka 200: 2 200 pkt i 1.6 pkt/s (RBM: 1000 x (1 + 3A/500), 0.03 x (1 + 2A/500)
+na tick, ciezki korpus x0.5). RBM PlayerPostureMultiplier u Jeffa 0 = x1 (Configs/RBM/config.xml) - RBM gracza nie wyroznia.
+**Zmiana:** (1) Klucz StaminaFromAthleticsOnly (TAK; nowy klucz, bo BattleStaminaEnabled siedzi w Armoury.json Jeffa): bohater bez mnoznika Endurance i bez wlasnej
+regeneracji (Profile) - tick RBM jak u szeregowego; FieldCraft.MeasureWind bez EndBonus. (2) Krzywa Atletyki AthleticsStaminaCurve (1.12, 1.0..1.5; 1.0 = linia RBM)
+dla KAZDEGO czlowieka: A' = 300 x (A/300)^p, pula i regeneracja RBM przeliczone stosunkiem (1 + 3A'/500)/(1 + 3A/500) i (1 + 2A'/500)/(1 + 2A/500) - inne mnozniki RBM
+zostaja; p 1.12 z przykladu Jeffa (1 -> 1, 10 -> 12, 100 -> 180: kolejny punkt przy 100 daje ok. 1.8 razy wiecej niz pierwszy). Przyklady puli: A 100: 1 600 -> 1 525,
+200: 2 200 -> 2 143, 230: 2 380 -> 2 336, 300: 2 800, 400: 3 400 -> 3 484. Ta sama krzywa w sprawnosci biegu 127. Postura bez zmian (HeroPostureFromSkill TAK od m111).
+Linie: "BattleWind (130): gracz - stamina z Atletyki jak kazdy ...: Atletyka X liczona jak Y | pula ..., regeneracja ..." i w "Bitwa (NB2)" "(stamina tylko z Atletyki, 130: TAK)".
+**Ryzyko / co sprawdzic:** (1) Jeff w walce zmeczy sie jak rycerz o tej samej Atletyce - pula ok. 2 340 zamiast 10 900, oddech 1.3 pkt/s w ciezkiej zbroi (x3 i gumka RBM
+na postoju) - to wraca problem z 26.08 ("po 10 machnieciach"), swiadomie na zyczenie Jeffa. (2) Lordowie AI tez slabsi w dlugiej walce. (3) Latka StaminaInitPostfix wpinana
+tylko przy BattleStaminaEnabled TAK (u Jeffa TAK) - bez niej krzywa nie dziala (linia startu BattleWind mowi). (4) Trupy (Undead) bez zmian - galaz przed krzywa.
+Regresje: EnduranceMul uzywaja jeszcze tylko postura w pojedynku (DuelFairGuard) i stara galaz bohatera przy kluczu NIE.
+**Status:** ZBUDOWANE - autotest i wgranie razem z 127-129, 131.
+
+## 2026-10-25 129 (galaz noc/127-bitwa-cialo) - okrzyki krolestwa gracza: "For Karda!", "Justice is honour!" i 14 innych, wodz i szeregowi przy szarzy
+**Problem:** Jeff 25.10 ok. 12:25: "i dodaj moje okrzyki mojej armii - For Karda! Justice is honor! i takie tam wymysl zeby w kolko nie krzyczeli tego samego",
+"jak bede swoim krolestwem oczywiscie".
+**Przyczyna:** Brak - nowa rzecz. Motta przy szarzy szly tylko z rodow ROT (HouseOf po nazwie / id klanu) albo regionu; szeregowi tylko natywny okrzyk gry.
+**Zmiana:** Nagrania ElevenLabs 25.10 12:39 (tools/lektor/nagraj_bitwa.py z noc/p2a, --csv klipy_karda.csv, obsada glosy_bitwa.json - 10 glosow juz na koncie,
+bez dodawania; 16 klipow v3, 502 znaki, 0 nieudanych, -14 LUFS): arm_bs_mo_karda_01..16 w Armoury/ModuleData/Lektor/Bitwa/motto + 16 wierszy manifest.tsv.
+Kod (BattleSound.Orders.cs, Who.cs, Features.cs): (1) HouseOf -> "karda" dla bohatera z rodu krolestwa, ktorym wlada gracz (Clan.PlayerClan.Kingdom.RulingClan ==
+PlayerClan) - motto wodza przy szarzy (raz na bitwe, BattleChargeMottos), a po przemowie regionu motto Kardy; (2) KardaShouts: szarza szyku tego krolestwa (kapitan albo mowca
+z partii o MapFaction = krolestwo gracza) - 1-3 szeregowych (1 + ludzi/25, CanSpeak: mezczyzna AI, nie gracz) krzyczy po glosie wodza co ok. 0.55 s, kazdy czlowiek raz
+na bitwe, klip inny niz poprzedni; kolejka _kardaQ w TickFeatures (Step "Okrzyki Kardy"), grupa GVoice (limit 6 naraz). Klucz OwnKingdomWarCries (TAK).
+Proba autotestu: LogGate 1/2 + plik CrashScribe/armoury-karda.flag - szyki i bohaterowie druzyny gracza licza sie jak krolestwo gracza. Linia misji dzwieku:
+"okrzyki krolestwa gracza (129) TAK: ludzi N z M w kolejce, motto wodzow K, wladca TAK/NIE".
+**Ryzyko / co sprawdzic:** (1) Teksty stale "Karda" - gdy krolestwo Jeffa bedzie sie nazywac inaczej, krzycza "Karda" (klucz NIE wylacza). (2) Wasale krolestwa gracza
+(inne rody) tez krzycza Karde zamiast swoich slow - zamierzone ("moja armia"). (3) Przed zalozeniem krolestwa nic sie nie zmienia (wladca NIE). (4) Glosy GVoice wspolne
+z mottami i rozkazami - przy tloku czesc okrzykow odrzucona limitem (licznik w linii dzwieku). (5) 16 nowych plikow ogg trzeba wgrac z DLL (stary DLL ich nie uzywa:
+klucz mo:karda nikt nie pyta).
+**Status:** ZBUDOWANE - autotest (z flaga armoury-karda) i wgranie razem z 127, 128, 130, 131.
+
 ## 2026-10-25 128 (galaz noc/127-bitwa-cialo od noc/final df5ed020) - szarza z daleka idzie marszem, okrzyk i bieg dopiero na ostatnich ok. 60 m
 **Problem:** Jeff 25.10 ok. 12:15, po obejrzeniu autotestu 126a: "na poczatku powinni maszerowac a nie ciagle wszyscy biegaja w zbrojach". Log 126a (Armoury-2026-10-25_12-04-16.log,
 segment 'marsz' linii "Bitwa (NB2)"): szykow w marszu 1-2 na bitwe, "predkosc w marszu sr. - m/s (0)" - prawie nikt nie szedl. Autotest sam daje rozkaz SZARZA wszystkim szykom
