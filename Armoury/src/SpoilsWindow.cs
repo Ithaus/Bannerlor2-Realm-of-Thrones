@@ -10,7 +10,6 @@ using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.Core.ViewModelCollection.ImageIdentifiers;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
@@ -30,7 +29,7 @@ namespace Armoury
     /// i to wszystko trzyma sie 1.0 s (jak StableSec Kroniki). Kronika i sceny prologu czekaja: SceneGate dostaje warunek IsOpen (okno otwarte albo raport gotowy).
     /// Zadnego SwitchToMenu (CLAUDE.md 7). Na czas okna czas stoi (TimeControlMode = Stop, bez blokady).
     /// ZAMKNIECIE: przycisk Done, Esc, Enter (wejscie warstwy co klatke - jak EventScreen), zmiana ekranu (TopScreen to nie nasz ekran), OnGameEnd; w autotescie
-    /// (LogGate.Mode 1/2) samo po 1.5 s - inaczej test stanie. Zwolnienie: ReleaseMovie, RemoveLayer, OnFinalize VM (ikony przedmiotow), obrazek z pliku do kolejki
+    /// (LogGate.Mode 1/2) samo po 1.5 s - inaczej test stanie. Zwolnienie: ReleaseMovie, RemoveLayer, OnFinalize VM, obrazek z pliku do kolejki
     /// StoryPictures (zwolnienie tekstury wstrzymane przy IsOpen - StoryPictures.AppTick). Bledy: licznik potkniec, bez globalnego wylacznika.
     /// </summary>
     internal static class SpoilsWindow
@@ -674,25 +673,13 @@ namespace Armoury
         [DataSourceProperty] public string Value { get { return _value; } }
     }
 
+    // recenzja P5 (5): "Finest spoils" w v1 tylko tekstem (nazwa i wartosc) - ikony przedmiotow (ItemImageIdentifierVM) odlozone do v1.1 (krytyk ZAKRES v1)
     internal sealed class SpoilsItemVM : ViewModel
     {
         private readonly string _text;
-        private ItemImageIdentifierVM _image;
 
-        internal SpoilsItemVM(SpoilsWindow.Fine f)
-        {
-            _text = f.Text ?? "";
-            try { _image = f.E.Item != null ? new ItemImageIdentifierVM(f.E.Item, "") : null; } catch { _image = null; }
-        }
+        internal SpoilsItemVM(SpoilsWindow.Fine f) { _text = f.Text ?? ""; }
 
         [DataSourceProperty] public string Text { get { return _text; } }
-        [DataSourceProperty] public ItemImageIdentifierVM ImageIdentifier { get { return _image; } }
-
-        public override void OnFinalize()
-        {
-            base.OnFinalize();
-            try { if (_image != null) _image.OnFinalize(); } catch { }
-            _image = null;
-        }
     }
 }

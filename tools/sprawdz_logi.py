@@ -68089,7 +68089,7 @@ def m113pobor_main(logp):
 # ---------------- p5lup (noc 25.10, galaz noc/p5-lup - Jeff 25.10: "po bitwie i po oblezeniu i po turnieju, powinien wyskakiwac popup z dokladna iloscia lootu,
 # ile zlota, ile zlota w sprzecie ... w klimacie"). Armoury/src/SpoilsReport.cs (ramki A/S/L/F/G/R, linia startu i linia raportu "Okno lupu (117): "),
 # SpoilsWindow.cs (okno Gauntlet ArmSpoilsWindow, zapas StoryWindow/ShowInquiry). Grupa dopisana na koncu pliku: wlasne wejscie przez opakowanie main
-# (python -I tools/sprawdz_logi.py --grupa p5lup [<Armoury-*.log>]); bez logu - sam self-test wyrazen. Wiersze LUP-S, LUP-0..LUP-7.
+# (python -I tools/sprawdz_logi.py --grupa p5lup [<Armoury-*.log>]); bez logu - sam self-test wyrazen. Wiersze LUP-S, LUP-0..LUP-8 (LUP-8: recenzja P5 (1) - sakwy w raporcie).
 P5LUP_TAG = "Okno lupu (117): "
 P5LUP_RX_START = re.compile(r"Okno lupu \(117\): start \| .*?latki (\d+)/(\d+): gra (\d)/4, Spoils (\d)/7.*?\| prefab ArmSpoilsWindow (TAK|BRAK)")
 P5LUP_RX_GOLD = re.compile(r"zloto ([+-]\d+) = (.*?)(reszta ([+-]\d+)|reszta pominieta \(czas plynal\)), czas stal (TAK|NIE)")
@@ -68147,7 +68147,8 @@ def p5lup_scan(lines):
         D["reports"].append({"kind": mk.group(1), "id": int(mk.group(2)), "battles": int(mk.group(3)), "golds": golds,
                              "s": P5LUP_RX_S.findall(s), "out": mo.group(1) if mo else "?", "why": (mo.group(3) or "") if mo else "",
                              "win": (mo.group(5) or "").strip() if mo else "", "stum": int(ms.group(1)) if ms else -1,
-                             "timeflow": ", czas stal NIE" in s, "auto": "zamkniete: autotest" in s})
+                             "timeflow": ", czas stal NIE" in s, "auto": "zamkniete: autotest" in s,
+                             "bagwait": "czeka na sakwy" in s, "bagcame": "sakwy przyszly" in s, "baglate": "sakwy nie przyszly" in s})
     return D
 
 
@@ -68188,6 +68189,12 @@ def p5lup_rows(rep, D):
     stum = max([r["stum"] for r in R] + [0])
     rep.add("LUP-7: potkniecia okna lupu i bledy SpoilsReport/SpoilsWindow", "potkniecia (najwiekszy licznik sesji) %d, ERROR %d" % (stum, D["err"]), "0 i 0",
             stum == 0 and D["err"] == 0)
+    # recenzja P5 (1): bitwa bez ekranu Spoils (zaciezny ROT, Spoils wyszedl wczesniej) - raport czeka na sakwy z terminu godzinnego, zamiast pokazac sie bez nich
+    bw = sum(1 for r in R if r["bagwait"])
+    bc = sum(1 for r in R if r["bagcame"])
+    bl = sum(1 for r in R if r["baglate"])
+    rep.add("LUP-8: sakwy z kolejki BattlefieldLaw w raporcie (nie po oknie)", "raportow czekajacych na sakwy %d (przyszly %d, termin minal %d), linii 'sakwy bez raportu' %d" % (
+        bw, bc, bl, D["bags"]), "sakwy bez raportu 0, termin minal 0", None if bw == 0 and D["bags"] == 0 else (D["bags"] == 0 and bl == 0))
 
 
 def p5lup_selftest():
@@ -68214,7 +68221,7 @@ def p5lup_selftest():
 
 
 def p5lup_main(logp):
-    """p5lup (noc 25.10; noc/p5-lup): LUP-S, LUP-0..LUP-7. Strumieniowo; bez logu tylko self-test."""
+    """p5lup (noc 25.10; noc/p5-lup): LUP-S, LUP-0..LUP-8. Strumieniowo; bez logu tylko self-test."""
     rep = Report()
     try:
         s1 = p5lup_selftest()

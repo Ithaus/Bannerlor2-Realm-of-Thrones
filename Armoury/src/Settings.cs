@@ -4465,7 +4465,7 @@ namespace Armoury
         // (ramki stanu przed i po, tylko odczyt - nic z niczego), SpoilsWindow.cs + GUI/Prefabs/ArmSpoilsWindow.xml. Linia 'Okno lupu'
         public bool SpoilsWindowAfterBattle = true;        // after a battle you win, a window shows the whole haul once the loot screens are closed: coin to your purse and to your men's purses, every piece of gear and goods taken and what it is worth, horses, prisoners and their ransom, your losses and renown
         public bool SpoilsWindowAfterSiege = true;         // the same window after you storm a town or castle (with your part of the sack, or of the mercy) and when a besieged town buys you off with a ransom
-        public bool SpoilsWindowAfterTourney = true;       // the same window after a tourney you rode in or bet on: prize money, the prize, bets, ransoms of horse and armour, the townsfolk's purse and renown
+        public bool SpoilsWindowAfterTourney = true;       // not in this version yet - the tourney window comes later, and until then this setting does nothing. It will be the same window after a tourney you rode in or bet on: prize money, the prize, bets, ransoms of horse and armour, the townsfolk's purse and renown
         public int SpoilsWindowMinWorth = 0;               // the spoils window is skipped when coin, gear and ransoms together are worth less than this many denars (0 = always shown when anything was won)
 
         // --- Friendly fire ---

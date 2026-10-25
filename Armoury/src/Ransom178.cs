@@ -639,6 +639,22 @@ namespace Armoury
         /// <summary>Lup miast (CitySack, L2/L5): czy korona wezmie 1/9 od tego bohatera (ta sama regula co podstawa doby) - tylko odczyt do napisu.</summary>
         internal static bool WouldTax(Hero h) { try { return Taxed(h); } catch { return false; } }
 
+        /// <summary>noc 25.10 P5 (okno lupu, recenzja (2)): ile korona wezmie od tego bohatera o swicie z podstawy zebranej od ostatniego rozliczenia (bez zaleglosci
+        /// Carry) - ten sam wzor co ThirdsSettle: Third x sh x 3 + Ninth x sh, sakwa Purse x sh. Tylko odczyt; SpoilsReport bierze roznice przed i po ramce.</summary>
+        internal static long PendingClaim(Hero h)
+        {
+            try
+            {
+                Acc a;
+                if (h == null || h.StringId == null || !_acc.TryGetValue(h.StringId, out a)) return 0;
+                var s = Settings.Current;
+                if (s == null) return 0;
+                double sh = Math.Max(0f, Math.Min(1f, s.CrownThirdsShare));
+                return (long)(a.Third * sh * 3.0 + a.Ninth * sh) + (long)(a.Purse * sh);
+            }
+            catch { return 0; }
+        }
+
         /// <summary>ClanIncomeBook.NoteInflow(KThird): trzecia lorda AI (nadwyzki ludzi, sakwy) - korona bierze jej 1/3.</summary>
         internal static void NoteThird(Hero h, long x) { try { if (x > 0 && Taxed(h)) { AccOf(h).Third += x; _dBaseThird += x; } } catch (Exception e) { Stumble("NoteThird", e); } }
 

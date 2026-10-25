@@ -24,16 +24,23 @@ namespace Armoury
     /// Ramka = roznica stanu prawdziwych posiadaczy przed i po kroku, w ktorym czas kampanii stoi: kiesa gracza (Hero.MainHero.Gold), sakiewka ludzi gracza
     /// (MenPurse.Get), sakwy (MainParty.ItemRoster - sztuka wedlug przedmiotu i stanu), loch (MainParty.PrisonRoster), slawa i wplywy rodu gracza.
     /// Ramki sie NIE zagniezdzaja (licznik glebokosci: wewnetrzna ramka nic nie liczy, gdy zewnetrzna jest otwarta) - zadna sztuka ani zlotowka nie liczy sie dwa razy.
-    /// Etykiety zlota biora istniejace liczby (PlunderedGold - GoldLost gracza z MapEventParty, wyniki CitySack, skrzynia zalogi, okup SiegeRansom);
-    /// czego etykieta nie tlumaczy - wiersz reszty (w bitwie "Purses and chests of the beaten", gdzie indziej "Other"): suma czesci = roznica kiesy.
-    /// Gdy w ramce ruszyl sie czas kampanii (CampaignTime) - znacznik "czas plynal": zostaja tylko etykiety, bez reszty (linia logu mowi to wprost).
+    /// Etykiety zlota biora istniejace liczby (PlunderedGold - GoldLost gracza z MapEventParty, kiesy rozbitych BeatenPurse pkt 3 i karawan EnemyCaravans,
+    /// wyniki CitySack, skrzynia zalogi, okup SiegeRansom); czego etykieta nie tlumaczy - wiersz reszty "Other" (recenzja P5 (3): takze w bitwie - ramka A obejmuje
+    /// OnPlayerBattleEnd i wszystkie nasluchy MapEventEnded, wiec reszta to nie zawsze kiesy pokonanych): suma czesci = roznica kiesy.
+    /// Korona (recenzja P5 (2)): roznica podstawy prawa trzecich gracza w Ransom178 przed i po ramce (PendingClaim - ten sam wzor co ThirdsSettle o swicie);
+    /// obejmuje lup z kies wodzow (BattlePlunder), kiesy rozbitych (BeatenPurse pkt 3), sakwe do sakiewek ludzi (MenPurse), ekran lupu gry (ScreenLootPrefix),
+    /// skrzynie zalogi i czesc grabiezy (CitySack) - tylko odczyt. Czesc lupu z kies (BeatenPurse.SplitPostfix) gra liczy w MapEvent.OnBattleWon, PRZED ramka A -
+    /// jej przyrost podaje NoteCrownEarly, a ramka A tej samej bitwy go dolicza.
+    /// Gdy w ramce ruszyl sie czas kampanii (CampaignTime) - znacznik "czas plynal": zostaja tylko etykiety, bez reszty i bez korony (linia logu mowi to wprost).
     /// RAMKI v1:
     ///  A pole (bitwa i szturm): prefiks First PlayerEncounter.DoApplyMapEventResults -> finalizer Last PlayerEncounter.DoEnd (lup gry, jency, ekran jencow,
     ///    ekran lupu gry w oblezeniu/kryjowce/morzu, CommitGoldChanges, FinalizeEvent: BeatenPurse pkt 3, MenPurse.OnPartyDestroyed, nastepstwa oblezenia AI).
     ///    Etykieta: prefiks Last MapEventParty.CommitGoldChanges (po oknie ksiegi O14 First, BattlePlunder Normal, ShipsToPort181) - Party == MainParty.
     ///    Bez DoEnd (przegrana, niewola) - ramke zamyka nastepna bitwa albo straznik AppTick (bez spotkania i bitwy).
     ///  S ekrany Spoils: prefiks OpenLootSelectionScreen / OpenBaggageLootScreen -> postfiks Last OnLootScreenClosed / OnBaggageLootScreenClosed (po latkach SpoilsSeal);
-    ///    kontrola: suma sztuk wobec _takenCount Spoils (Spoils liczy po przedmiocie, my po przedmiocie i stanie - sztuki maja sie zgadzac).
+    ///    recenzja P5 (4): sakwy RAZEM z rynsztunkiem bohaterow druzyny (bojowy, cywilny, skrytu - jak InventoryLogic.PartyEquipment): sztuka zalozona na bohatera
+    ///    prosto z listy trofeow jest lupem, stara sztuka zdjeta do sakw - nie. Kontrola: suma sztuk wobec _takenCount Spoils (Spoils liczy tylko sakwy po przedmiocie,
+    ///    my po przedmiocie i stanie; sztuka zalozona z listy zgadza sie liczba, wlasny rynsztunek zdjety do sakw - "NIE": Spoils liczy go jako trofeum).
     ///  L Leave Spoils: prefiks First OnCompleteLeaveConsequence (PRZED SpoilsSeal.DrillLeavePrefix) - reszta _lootScreenRoster = "Left on the field" + ramka
     ///    przez cala metode (monety Spoils, dzis 0 przez SpoilsSeal) -> finalizer; OnBaggageDoneConsequence - ramka (zloto taboru, dzis 0).
     ///  F sakwy: BattlefieldLaw.FlushShareToBaggage / FlushMountsToBaggage - ramka tylko, gdy zadna inna nie jest otwarta (godzina bez ekranu, Send troops).
@@ -42,7 +49,9 @@ namespace Armoury
     ///  R okup oblezenia (SiegeRansom O1/O3): bez ramki - liczby SiegeRansom (ToLead, ToMen, korona) do osobnego raportu "The Ransom of X".
     ///  T turniej - v1.1 (nasluchy z P0 zostaja puste; okno turnieju nie powstaje).
     /// KIEDY GOTOWY: bitwa polowa - po FinishCollection Spoils (faza Spoils None), szturm wygrany - po ramce G tej osady (najwyzej 12 h kampanii), reszta po DoEnd;
-    /// przegrana, remis, odwrot - bez okna (linia logu). Nowa bitwa przed pokazaniem okna dopisuje sie do tego samego raportu ("Spoils of 2 Battles").
+    /// recenzja P5 (1): raport bitwy czeka tez, dopoki dzialka gracza lezy w kolejce BattlefieldLaw (SharePending - bitwa bez ekranu Spoils: zaciezny ROT,
+    /// Spoils wyszedl z OnMapEventEnded wczesniej) - sakwy przychodza z terminu ArmouryBehavior._lootFlushDue (+1 h, sprawdzany w HourlyTick, wiec najpozniej
+    /// 2 h po bitwie): ramka F zwalnia czekanie, straznik - pusta kolejka albo 2.5 h kampanii. Przegrana, remis, odwrot - bez okna (linia logu). Nowa bitwa przed pokazaniem okna dopisuje sie do tego samego raportu ("Spoils of 2 Battles").
     /// Okno pokazuje SpoilsWindow (bramka Prologue.SceneGate itd.). Wszystko watek glowny; potkniecia liczone, bez globalnego wylacznika. Raport w pamieci, bez zapisu
     /// (wczytanie zapisu w trakcie zbierania Spoils = brak raportu; Reset w konstruktorze ArmouryBehavior i OnGameEnd).
     /// GRACZ vs AI: tylko bitwy gracza (IsPlayerMapEvent), nastepstwa z jego udzialem; AI nic nie widzi i niczego nie traci.
@@ -80,7 +89,7 @@ namespace Armoury
             public readonly List<string> CoinLabels = new List<string>();
             public readonly List<long> CoinAmounts = new List<long>();
             public long Men;                      // do sakiewek ludzi gracza (MenPurse)
-            public long Crown;                    // korona upomni sie o (CitySack/SiegeRansom - przypis)
+            public long Crown;                    // korona upomni sie o (ramki: roznica Ransom178.PendingClaim; okup: liczby SiegeRansom - przypis)
             public readonly Dictionary<string, Gain> Gear = new Dictionary<string, Gain>(StringComparer.Ordinal);
             public int LeftN; public long LeftW;
             public readonly Dictionary<CharacterObject, int> Troops = new Dictionary<CharacterObject, int>();
@@ -88,8 +97,9 @@ namespace Armoury
             public int Fallen, Wounded;
             public float Renown, Influence;
             public bool TimeMoved;
-            public string WaitFor = "";           // "Spoils" / "oblezenie" / "" (gotowy, gdy brak ramki)
-            public double WaitUntil;              // dzien kampanii - koniec czekania na ramke G
+            public string WaitFor = "";           // "Spoils" / "oblezenie" / "sakwy" / "" (gotowy, gdy brak ramki)
+            public double WaitUntil;              // dzien kampanii - koniec czekania na ramke G albo na sakwy
+            public bool ShareWaitDone;            // czekanie na sakwy juz bylo dla tej bitwy (bez ponownego wejscia po terminie; nowa bitwa raportu - od nowa)
             public bool Ready, Shown, Done;
             public double ReadyDay;
             public long ReadyTicks;
@@ -157,7 +167,9 @@ namespace Armoury
             public double Day;
             public readonly List<string> Labels = new List<string>();
             public readonly List<long> Amounts = new List<long>();
-            public long Crown;
+            public long Crown0;                   // Ransom178.PendingClaim gracza przy otwarciu ramki (roznica = korona z tej ramki)
+            public long CrownEarly;               // ramka A: korona z czesci lupu z kies zapisana juz w MapEvent.OnBattleWon (BeatenPurse.SplitPostfix) - Crown0 o nia nizej
+            public long CrownSaid;                // korona wedlug CitySack (NoteSack) - tylko kontrola w linii logu
             // kontekst ramki A
             public MapEvent Me;
             public bool Won, Siege, SiegeApplied, Attacker;
@@ -178,13 +190,52 @@ namespace Armoury
             s.Gold = me != null ? me.Gold : 0;
             s.Men = mp != null ? MenPurse.Get(mp) : 0;
             s.Bag = BagOf(mp);
+            if (WornCounts(name)) AddWorn(mp, s.Bag);   // recenzja P5 (4): tylko ekrany Spoils (w ramce A gra i zuzycie zmieniaja stan rynsztunku)
             s.Pris = new Dictionary<CharacterObject, int>();
             s.PrisHeroes = new HashSet<Hero>();
             ReadPrison(mp, s.Pris, s.PrisHeroes);
             s.Renown = cl != null ? cl.Renown : 0f;
             s.Influence = cl != null ? cl.Influence : 0f;
+            s.Crown0 = Ransom178.PendingClaim(me);
             s.Day = CampaignTime.Now.ToDays;
             return s;
+        }
+
+        /// <summary>Ramki ekranow Spoils (S, S-tabor): rynsztunek bohaterow liczy sie razem z sakwami (gracz moze zalozyc trofeum prosto z listy).</summary>
+        private static bool WornCounts(string name) { return name == "S" || name == "S-tabor"; }
+
+        /// <summary>Recenzja P5 (4): rynsztunek bohaterow druzyny gracza - te same trzy zestawy, ktore ekran ekwipunku zmienia (InventoryLogic.PartyEquipment:
+        /// FirstBattleEquipment, FirstCivilianEquipment, FirstStealthEquipment). Zestaw wspolny (domyslny zestaw skrytu bez wlasnego) liczony raz.</summary>
+        private static void AddWorn(MobileParty mp, Dictionary<string, Gain> d)
+        {
+            var mr = mp != null ? mp.MemberRoster : null;
+            if (mr == null) return;
+            var seen = new List<Equipment>();
+            for (int i = 0; i < mr.Count; i++)
+            {
+                var ch = mr.GetCharacterAtIndex(i);
+                if (ch == null || !ch.IsHero || ch.HeroObject == null) continue;
+                AddSet(ch.FirstBattleEquipment, d, seen);
+                AddSet(ch.FirstCivilianEquipment, d, seen);
+                AddSet(ch.FirstStealthEquipment, d, seen);
+            }
+        }
+
+        private static void AddSet(Equipment eq, Dictionary<string, Gain> d, List<Equipment> seen)
+        {
+            if (eq == null) return;
+            for (int i = 0; i < seen.Count; i++) if (ReferenceEquals(seen[i], eq)) return;
+            seen.Add(eq);
+            for (int i = 0; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++)
+            {
+                var el = eq[i];
+                if (el.IsEmpty || el.Item == null) continue;
+                string k = KeyOf(el);
+                if (k == null) continue;
+                Gain g;
+                if (d.TryGetValue(k, out g)) g.N++;
+                else d[k] = new Gain { E = el, N = 1 };
+            }
         }
 
         private static string KeyOf(EquipmentElement e)
@@ -259,6 +310,7 @@ namespace Armoury
             public readonly List<Hero> Lords = new List<Hero>();
             public float Renown, Influence;
             public bool TimeMoved;
+            public long Crown;                    // przyrost podstawy korony gracza (Ransom178.PendingClaim); czas plynal - 0 (rozliczenie o swicie mogloby wejsc w srodek)
         }
 
         private static Delta DiffOf(Snap s)
@@ -284,6 +336,7 @@ namespace Armoury
             d.Renown = now.Renown - s.Renown;
             d.Influence = now.Influence - s.Influence;
             d.TimeMoved = now.Day - s.Day > 0.0005;   // ok. 43 s kampanii
+            d.Crown = d.TimeMoved ? 0 : Math.Max(0, now.Crown0 - s.Crown0);
             return d;
         }
 
@@ -311,7 +364,7 @@ namespace Armoury
             if (!d.TimeMoved && rest != 0) r.AddCoin(rest > 0 ? restLabel : LOther, rest);
             else if (d.TimeMoved) r.TimeMoved = true;
             r.Men += d.Men;
-            r.Crown += f.Crown;
+            r.Crown += d.Crown;
             int n = 0; long w = 0;
             foreach (var g in d.Gains)
             {
@@ -338,6 +391,9 @@ namespace Armoury
             sb.Append(", jency ").Append(t).Append(" (lordow ").Append(d.Lords.Count);
             if (d.Lords.Count > 0) { sb.Append(": "); for (int i = 0; i < d.Lords.Count; i++) { if (i > 0) sb.Append(", "); sb.Append(Nm(d.Lords[i])); } }
             sb.Append("), slawa ").Append(Sg((long)Math.Round(d.Renown))).Append(" wplywy ").Append(Sg((long)Math.Round(d.Influence)));
+            sb.Append(", korona ").Append(d.TimeMoved ? "pominieta (czas plynal)" : Sg(d.Crown));
+            if (f.CrownEarly > 0) sb.Append(" (z tego z kies przed ramka ").Append(f.CrownEarly.ToString(Inv)).Append(')');
+            if (f.CrownSaid > 0) sb.Append(" (wedlug CitySack ").Append(f.CrownSaid.ToString(Inv)).Append(')');
             return sb.ToString();
         }
 
@@ -385,6 +441,21 @@ namespace Armoury
         // ------------------------------------------------------------ ramka A (pole)
 
         private static FieldInfo _fPeMapEvent;
+        private static MapEvent _earlyMe;
+        private static long _earlyCrown;
+
+        /// <summary>Recenzja P5 (2): BeatenPurse.SplitPostfix (postfiks CalculatePlunderedAndLostGoldAmounts - MapEvent.OnBattleWon, PRZED ramka A) - przyrost
+        /// Ransom178.PendingClaim gracza z czesci jego lupu, ktora placa kiesy pokonanych. Ramka A tej samej bitwy dolicza go do korony (tylko odczyt).</summary>
+        internal static void NoteCrownEarly(MapEvent me, long crown)
+        {
+            try
+            {
+                if (me == null || crown <= 0) return;
+                if (!ReferenceEquals(_earlyMe, me)) { _earlyMe = me; _earlyCrown = 0; }
+                _earlyCrown += crown;
+            }
+            catch (Exception e) { Stumble("NoteCrownEarly", e); }
+        }
 
         /// <summary>Prefiks First PlayerEncounter.DoApplyMapEventResults - otwarcie ramki A (tylko odczyt).</summary>
         public static void ApplyResultsPrefix(PlayerEncounter __instance)
@@ -398,6 +469,9 @@ namespace Armoury
                 var s = Open("A");
                 if (s == null) return;
                 s.Me = me;
+                // recenzja P5 (2): czesc lupu gracza z kies pokonanych trafila do podstawy korony juz w OnBattleWon (przed ta ramka) - liczy sie do korony tej bitwy
+                if (ReferenceEquals(_earlyMe, me)) { s.CrownEarly = _earlyCrown; s.Crown0 -= _earlyCrown; }
+                _earlyMe = null; _earlyCrown = 0;
                 s.Siege = me.IsSiegeAssault || me.IsSallyOut;
                 s.Town = me.MapEventSettlement;
                 s.Date = CampaignTime.Now.ToString();
@@ -475,7 +549,7 @@ namespace Armoury
             if (!f.Won)
             {
                 _sLost++;
-                Log.Info(Tag + "bitwa bez okna (przegrana, remis albo odwrot) | " + how + " | " + Apply(new Rep(), d, LPurses) + " | " + Counters() + ".");
+                Log.Info(Tag + "bitwa bez okna (przegrana, remis albo odwrot) | " + how + " | " + Apply(new Rep(), d, LOther) + " | " + Counters() + ".");
                 return;
             }
             bool siegeKind = (f.Me != null && f.Me.IsSiegeAssault && f.Attacker) || f.SiegeApplied;   // obrona i wypad - okno bitwy (klucz Battle)
@@ -487,11 +561,14 @@ namespace Armoury
             if (f.Town != null) r.Town = f.Town;
             if (f.SackKind >= 0) r.SackKind = f.SackKind;
             r.Fallen += f.Fallen; r.Wounded += f.Wounded;
-            string a = Apply(r, d, LPurses);
+            r.ShareWaitDone = false;   // nowa bitwa raportu - jej dzialka moze jeszcze lezec w kolejce (TryReady)
+            // recenzja P5 (3): reszta "Other" - ramka A obejmuje OnPlayerBattleEnd i wszystkie nasluchy MapEventEnded (zadania, cudze mody); kiesy pokonanych maja wlasna etykiete
+            string a = Apply(r, d, LOther);
             r.Lines.Append(" | A").Append(r.Battles > 1 ? "#" + r.Battles : "").Append(" (").Append(how).Append("): ").Append(a)
              .Append(", polegli ").Append(f.Fallen).Append(" ranni ").Append(f.Wounded);
             r.Ready = false;
             // na co czekac: szturm wygrany przez atakujacego gracza - ramka G tej osady; bitwa polowa z Spoils w toku - FinishCollection; reszta - gotowy
+            // (dzialka gracza w kolejce BattlefieldLaw - TryReady dopisuje czekanie na sakwy, jedna regula dla kazdej drogi do gotowosci)
             if (f.Me != null && f.Me.IsSiegeAssault && !f.SiegeApplied && f.Attacker && f.Town != null)
             {
                 r.WaitFor = "oblezenie";
@@ -724,6 +801,7 @@ namespace Armoury
                 }
                 string a = Apply(r, d, LOther);
                 r.Lines.Append(" | F sakwy (").Append(why).Append("): ").Append(n).Append(" szt. za ").Append(w.ToString(Inv)).Append("; ").Append(a);
+                if (r.WaitFor == "sakwy") { r.WaitFor = ""; r.ShareWaitDone = true; r.Lines.Append(" | sakwy przyszly (koniec czekania)"); }   // recenzja P5 (1)
                 TryReady(r, "po sakwach");
             }
             catch (Exception e) { Stumble("CloseF", e); }
@@ -794,14 +872,16 @@ namespace Armoury
             catch (Exception e) { Stumble("GClose", e); }
         }
 
-        /// <summary>CitySack.Messages (tylko odczyt, gdy gracz bierze udzial): czesc gracza w lupie miasta jako etykieta; korona - przypis. Bez otwartej ramki - nic.</summary>
+        /// <summary>CitySack.Messages (tylko odczyt, gdy gracz bierze udzial): czesc gracza w lupie miasta jako etykieta; korona - kontrola w logu (liczy ja ramka). Bez otwartej ramki - nic.</summary>
         internal static void NoteSack(long playerLead, long playerCrown)
         {
             try
             {
                 if (_frame == null) return;
                 NoteCoin(LSack, playerLead);
-                if (playerCrown > 0) _frame.Crown += playerCrown;
+                // recenzja P5 (2): korone liczy roznica Ransom178.PendingClaim w ramce (czesc gracza idzie tam przez Ransom178.NoteThird - CitySack.Coin);
+                // liczba CitySack zostaje tylko kontrola w linii logu (bez drugiego doliczenia)
+                if (playerCrown > 0) _frame.CrownSaid += playerCrown;
             }
             catch (Exception e) { Stumble("NoteSack", e); }
         }
@@ -826,11 +906,27 @@ namespace Armoury
 
         // ------------------------------------------------------------ gotowosc i straznik
 
+        /// <summary>Recenzja P5 (1): termin czekania na sakwy - ArmouryBehavior._lootFlushDue = koniec bitwy + 1 h, sprawdzany w HourlyTick (CampaignTime.Now &gt; termin),
+        /// wiec wysypka przychodzi najpozniej 2 h kampanii po bitwie; 0.5 h zapasu.</summary>
+        private const double ShareWaitHours = 2.5;
+
+        private static bool ShareQueued() { try { return BattlefieldLaw.SharePending(); } catch { return false; } }
+
         private static void TryReady(Rep r, string how)
         {
             if (r == null || r.Ready || r.Done) return;
             if (_frame != null || _depth > 0) return;
             if (r.WaitFor == "Spoils" && !SpoilsBusy()) r.WaitFor = "";
+            // recenzja P5 (1): raport bitwy nie jest gotowy, dopoki dzialka gracza lezy w kolejce BattlefieldLaw (bitwa bez ekranu Spoils: zaciezny ROT -
+            // SoldierStandsDown, Spoils wyszedl z OnMapEventEnded wczesniej) - inaczej okno pokazaloby sie przed sakwami (Show zatrzymuje czas), a ramka F
+            // po oknie trafilaby w "sakwy bez raportu"; zwalnia CloseF albo straznik (pusta kolejka, ShareWaitHours)
+            if (r.WaitFor == "" && !r.ShareWaitDone && r.Battles > 0 && r.Kind != KRansom && ShareQueued())
+            {
+                r.WaitFor = "sakwy";
+                r.WaitUntil = CampaignTime.Now.ToDays + ShareWaitHours / 24.0;
+                r.Lines.Append(" | czeka na sakwy (dzialka w kolejce BattlefieldLaw, ").Append(how).Append(')');
+                return;
+            }
             if (r.WaitFor != "") return;
             r.Ready = true;
             r.ReadyDay = CampaignTime.Now.ToDays;
@@ -871,6 +967,17 @@ namespace Armoury
                         {
                             r.WaitFor = "";
                             r.Lines.Append(" | bez nastepstw oblezenia (").Append(day > r.WaitUntil ? "12 h kampanii" : "gracz poza osada").Append(')');
+                        }
+                        if (r.WaitFor == "sakwy")
+                        {
+                            // recenzja P5 (1): kolejka oprozniona bez ramki F (przegrana kolejna bitwa - DropShare) albo termin minal - okno bez sakw
+                            bool pend = ShareQueued();
+                            if (!pend || day > r.WaitUntil)
+                            {
+                                r.WaitFor = ""; r.ShareWaitDone = true;
+                                r.Lines.Append(pend ? " | sakwy nie przyszly w " + ShareWaitHours.ToString("0.0", Inv) + " h kampanii (straznik - okno bez nich)"
+                                                    : " | kolejka lupow pusta bez ramki F (straznik)");
+                            }
                         }
                         TryReady(r, "straznik");
                     }
@@ -984,6 +1091,7 @@ namespace Armoury
             _reps.Clear();
             _frame = null; _depth = 0;
             _sOpen = _lOpen = _gOpen = _gNested = false; _sFrame = _lFrame = _gFrame = null; _gTown = null;
+            _earlyMe = null; _earlyCrown = 0;
         }
 
         // turniej (ramka T) - v1.1: nasluchy P0 zostaja, okno turnieju nie powstaje (krytyk ZAKRES v1)

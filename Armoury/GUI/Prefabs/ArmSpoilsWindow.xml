@@ -6,7 +6,8 @@
   <Window>
     <!-- Armoury noc 25.10 P5 (okno lupu, SpoilsWindow.cs, VM SpoilsWindowVM): okno po bitwie i oblezeniu w wygladzie okien wydarzen ROT (ROT-Content EventXml.xml:
          tlo event-bg, Standard.ROTPanel z tytulem, obrazek w ramce frame_9, tekst pedzlem UI.ROTSummaryScreen.Text, przycisk Standard.DialogCloseButtons).
-         Lewa kolumna: obrazek 640x360 (sprite ROT tematu bitwa/oblezenie albo plik Images/Loot), zdanie o miejscu, "Finest spoils" (do 5 sztuk: ikona, nazwa, wartosc).
+         Lewa kolumna: obrazek 640x360 (sprite ROT tematu bitwa/oblezenie albo plik Images/Loot), zdanie o miejscu, "Finest spoils" (do 5 sztuk: nazwa i wartosc;
+         ikony przedmiotow - v1.1, recenzja P5 (5)).
          Prawa kolumna: sekcje (tytul + wiersze etykieta - liczba), na dole "In all". Wierszy jest najwyzej tyle, ile miesci panel (limit w SpoilsWindow.Build) - bez przewijania.
          Esc i Enter zamyka SpoilsWindow.AppTick (wejscie warstwy), przycisk Done - ExecuteDone. -->
     <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="@BackgroundImage">
@@ -38,13 +39,8 @@
 
                     <ListPanel DataSource="{Finest}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" VerticalAlignment="Top" PositionYOffset="516" MarginLeft="30" MarginRight="20" StackLayout.LayoutMethod="VerticalTopToBottom" IsVisible="@HasFinest">
                       <ItemTemplate>
-                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="34" StackLayout.LayoutMethod="HorizontalLeftToRight">
                           <Children>
-                            <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="96" SuggestedHeight="48" VerticalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#00000066">
-                              <Children>
-                                <ImageIdentifierWidget DataSource="{ImageIdentifier}" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="2" MarginRight="2" MarginTop="2" MarginBottom="2" ImageId="@Id" AdditionalArgs="@AdditionalArgs" TextureProviderName="@TextureProviderName" />
-                              </Children>
-                            </Widget>
                             <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="14" VerticalAlignment="Center" Brush="UI.ROTSummaryScreen.Text" Brush.FontSize="20" Brush.TextHorizontalAlignment="Left" Text="@Text" />
                           </Children>
                         </ListPanel>

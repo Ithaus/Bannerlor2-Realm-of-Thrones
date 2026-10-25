@@ -467,6 +467,7 @@ namespace Armoury
                             GiveGoldAction.ApplyForPartyToCharacter(c.Party, lead, g, true);
                             gotG = lead.Gold - h0;
                             Ransom178.NoteBeatenGold(lead, gotG);
+                            if (lead == Hero.MainHero && gotG > 0) SpoilsReport.NoteCoin(SpoilsReport.LPurses, gotG);   // noc 25.10 P5 (recenzja 3): etykieta okna lupu (tylko odczyt)
                         }
                         else if (cap.IsPartyTradeActive)
                         {
