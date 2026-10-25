@@ -44,6 +44,9 @@ namespace Armoury
     /// Order of Battle gry (8 wpisow: klasa, waga, kapitan) - zanim gra nadpisze go po rozstawieniu (SaveConfiguration); po rozstawieniu (OnDeploymentFinished,
     /// zapas: 10 s bitwy poza trybem rozstawienia) formacje 0..7 druzyny gracza: ludzi, rodzaje wedlug wzorca, z koniem, jezdzcy pieszo, kapitan - wobec kopii.
     /// Dodawane w SubModuleMain.OnMissionBehaviorInitialize przy ArmyReviewEnabled i kampanii; poza bitwa polowa gracza nic nie pisze.
+    /// P12 (przypiecia typow, ArmyReview.Pin.cs): OnDeploymentFinished najpierw PinDeploy (przypieci przeniesieni przez ekran wracaja do swojej choragwi -
+    /// to zachowanie dodane PO BannerCompaniesMission, wiec Mission.OnDeploymentFinished, ktore idzie od konca listy, wola je PRZED podzialem na kompanie
+    /// i przed widokiem Order of Battle), linia bitwy ma segment "przypiecia"; OnRemoveBehavior - linia posilkow i zwolnienie planu misji.
     /// </summary>
     internal sealed class ArmyReviewCheck : MissionLogic
     {
@@ -82,8 +85,15 @@ namespace Armoury
         {
             base.OnDeploymentFinished();
             if (_done) return;
+            try { ArmyReview.PinDeploy(Mission); } catch (Exception e) { ArmyReview.BattleStumble("PinDeploy", e); }   // P12: przed linia i przed kompaniami P3
             try { Check("po rozstawieniu"); }
             catch (Exception e) { _done = true; ArmyReview.BattleStumble("Deployment", e); }
+        }
+
+        public override void OnRemoveBehavior()
+        {
+            try { ArmyReview.PinMissionEnd(Mission); } catch (Exception e) { ArmyReview.BattleStumble("PinEnd", e); }   // P12: posilki przypietych, plan zwolniony
+            base.OnRemoveBehavior();
         }
 
         public override void OnMissionTick(float dt)
@@ -108,7 +118,7 @@ namespace Armoury
             var team = m.PlayerTeam;
             if (team == null) return;
             int n = ArmyReview.Slots;
-            var men = new int[n]; var mounted = new int[n]; var kind = new int[n, 4];
+            var men = new int[n]; var mounted = new int[n]; var kind = new int[n, 4]; var pinned = new int[n];
             int onFoot = 0, outside = 0;
             foreach (var a in team.ActiveAgents)
             {
@@ -120,7 +130,8 @@ namespace Armoury
                 men[i]++;
                 if (a.HasMount) mounted[i]++;
                 int k = ch.IsMounted ? (ch.IsRanged ? 3 : 2) : (ch.IsRanged ? 1 : 0);
-                kind[i, k]++;
+                if (ArmyReview.PinnedAgent(m, a)) pinned[i]++;   // P12: przypieci poza zgodnoscia klasy choragwi (stoja ponad jej udzialem)
+                else kind[i, k]++;
                 if (ch.IsMounted && !a.HasMount) onFoot++;
             }
             var sb = new StringBuilder(P);
@@ -139,7 +150,7 @@ namespace Armoury
                 int major = -1, best = -1;
                 for (int k = 0; k < 4; k++) if (kind[i, k] > best) { best = kind[i, k]; major = k; }
                 sb.Append(' ').Append(i).Append(' ').Append(men[i]).Append(" (p").Append(kind[i, 0]).Append(" l").Append(kind[i, 1]).Append(" k").Append(kind[i, 2])
-                  .Append(" kl").Append(kind[i, 3]).Append(", z koniem ").Append(mounted[i]).Append(')');
+                  .Append(" kl").Append(kind[i, 3]).Append(pinned[i] > 0 ? ", przypietych " + pinned[i] : "").Append(", z koniem ").Append(mounted[i]).Append(')');
                 if (capA != null && capA.Character != null) sb.Append(" kap. ").Append(capA.Character.Name);
                 string nm = ArmyReview.NameOf(i);
                 if (nm != null) sb.Append(" '").Append(nm).Append('\'');
@@ -148,7 +159,7 @@ namespace Armoury
                     sb.Append(" [zapis ").Append(ArmyReview.KindName(_cls[i])).Append(" w").Append(_w[i]);
                     if (_cap[i] != null) sb.Append(" kap. ").Append(_cap[i].Name);
                     sb.Append(']');
-                    if (men[i] > 0)
+                    if (men[i] - pinned[i] > 0)
                     {
                         classChecks++;
                         int want = major + 1;
@@ -171,6 +182,7 @@ namespace Armoury
                   .Append(", kapitanowie ").Append(capChecks == 0 ? "-" : capsOk ? "TAK" : "NIE").Append(" (").Append(capChecks).Append(')')
                   .Append(bad.Length > 0 ? " -" + bad : "");
             else sb.Append(" | zgodnosc z zapisem: - (brak pelnego zapisu)");
+            try { sb.Append(ArmyReview.PinBattleSegment(m, team)); } catch (Exception e) { ArmyReview.BattleStumble("PinSegment", e); }   // P12
             sb.Append('.');
             Log.Info(sb.ToString());
         }
