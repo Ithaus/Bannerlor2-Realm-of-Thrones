@@ -370,8 +370,9 @@ namespace Armoury
             return main != null && ReferenceEquals(f.PlayerOwner, main);
         }
 
-        /// <summary>Chorazy wedlug RBM (Utilities.IsBannerBearer:28-58): bron w rece klasy Banner albo uzycie "banner" - RBM sam steruje jego celem.</summary>
-        private static bool Banner(Agent a)
+        /// <summary>Chorazy wedlug RBM (Utilities.IsBannerBearer:28-58): bron w rece klasy Banner albo uzycie "banner" - RBM sam steruje jego celem.
+        /// 149: takze HeroCaution (chorazego nie przestawiamy w szyku) - jedna definicja "chorazy".</summary>
+        internal static bool Banner(Agent a)
         {
             return BannerWeapon(a.WieldedWeapon) || BannerWeapon(a.WieldedOffhandWeapon);
         }

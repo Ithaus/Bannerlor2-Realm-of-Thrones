@@ -31,6 +31,8 @@ namespace Armoury
     /// 146 (25.10): szyk pod ostrzalem (CloseRanks) - Begin po ShieldsUp.Begin, Tick po ShieldsUp.Tick, End po ShieldsUp.End (linia "Szyk pod ostrzalem (146)").
     /// 148 (25.10): poscig konnicy AI (HorsePursuit) - Begin po CloseRanks.Begin, Tick po CloseRanks.Tick (blok Night), trafienie i strata (blok Night) tylko
     /// liczniki, End po CloseRanks.End (linia "poscig (148)").
+    /// 149 (25.10): bohater walczy o zycie (HeroCaution) - Begin po HorsePursuit.Begin, Tick po HorsePursuit.Tick (blok Night), strata (blok Night) tylko liczniki,
+    /// End po HorsePursuit.End (linia "bohaterowie (149)").
     /// </summary>
     internal sealed class BattleSense : MissionBehavior
     {
@@ -197,6 +199,8 @@ namespace Armoury
             try { if (night) CloseRanks.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.Begin", e); }
             // 148: poscig konnicy AI - stan bitwy od zera (bitwa polowa, pora dnia); takze przy kluczu NIE (pomiar na sucho)
             try { if (night) HorsePursuit.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.Begin", e); }
+            // 149: bohater walczy o zycie - stan bitwy od zera (bitwa polowa); takze przy kluczu NIE (pomiar na sucho)
+            try { if (night) HeroCaution.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.Begin", e); }
             base.AfterStart();
         }
 
@@ -213,6 +217,7 @@ namespace Armoury
                 try { ShieldsUp.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.Tick", e); }   // 140
                 try { CloseRanks.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.Tick", e); }   // 146 - po S4 tej klatki
                 try { HorsePursuit.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.Tick", e); }   // 148 - po MarchToContact (odpoczynek koni) tej klatki
+                try { HeroCaution.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.Tick", e); }   // 149 - zachowania misji tykaja od konca listy (Mission.cs:3741-3744): BattleSense PRZED RoutKeeper i BrokenMen
             }
             try { BloodPools.Tick(Mission, dt); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Tick", e); }
@@ -281,6 +286,9 @@ namespace Armoury
                 // 148: straty stron, jezdziec w poscigu padl, uciekajacy dopadniety przez gonacego / uszedl
                 try { HorsePursuit.OnRemoved(Mission, affectedAgent, affectorAgent, agentState); }
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.OnRemoved", e); }
+                // 149: los bohatera (w wycofaniu czy nie) - tylko liczniki
+                try { HeroCaution.OnRemoved(Mission, affectedAgent, agentState); }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.OnRemoved", e); }
             }
         }
 
@@ -368,6 +376,8 @@ namespace Armoury
             try { CloseRanks.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.End", e); }
             // 148: jezdzcy oddani grze, linia "poscig (148)" raz na bitwe (End bezpieczne wielokrotnie i poza bitwa)
             try { HorsePursuit.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.End", e); }
+            // 149: pozycje bohaterow zdjete, linia "bohaterowie (149)" raz na bitwe (End bezpieczne wielokrotnie i poza bitwa)
+            try { HeroCaution.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.End", e); }
             // m111-walka: linia "Pojedynek (DU)" raz na misje pojedynku
             if (_duel && !_duelDone && InDuel(Mission))
             {

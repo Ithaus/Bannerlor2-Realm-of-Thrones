@@ -116,6 +116,9 @@ namespace Armoury
             // cudzy odwrot - szarza RBM / rozkaz odwrotu szyku (komponent), natywny odwrot szyku; BrokenMen sprobuje za 0.5 s
             if (cai.IsRetreating) { WoundedWithdraw.WaitComp.Add(a.Index); return; }
             if (a.IsRunningAway) { WoundedWithdraw.WaitOrder.Add(a.Index); return; }
+            // 149: bohater (WoundedFleeHeroes TAK) w wycofaniu HeroCaution - nasza pozycja skryptowa zdjeta, zanim odwrot rannego cokolwiek wysle; dalej droga 143
+            try { HeroCaution.BeforeWithdraw(a); }
+            catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.BeforeWithdraw", ex); }
 
             float now = m.CurrentTime;
             var w = new Wd { A = a, Since = now, NextEval = now };

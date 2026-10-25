@@ -675,7 +675,8 @@ namespace Armoury
                             || Settings.Current.AiShieldsUpUnderFire     // 140: tarcza pod ostrzalem (ShieldsUp) - wejscia tylko z BattleSense
                             || Settings.Current.WoundedFightWarily       // 145: ranny walczy ostroznie (VeteranAi -> WoundedWary) - brama BattleSense.InBattle, linia z RoutKeeper
                             || Settings.Current.AiFormationsUnderFire    // 146: szyk pod ostrzalem (CloseRanks) - wejscia tylko z BattleSense (po ShieldsUp)
-                            || Settings.Current.AiCavalryPursues;        // 148: poscig konnicy AI (HorsePursuit) - wejscia tylko z BattleSense (blok Night)
+                            || Settings.Current.AiCavalryPursues         // 148: poscig konnicy AI (HorsePursuit) - wejscia tylko z BattleSense (blok Night)
+                            || Settings.Current.HeroesKeepBehindTheirMen; // 149: bohater walczy o zycie (HeroCaution) - wejscia z BattleSense (blok Night) i RoutKeeper.Break
                 if (mission != null && ((Settings.Current.BrokenMenNeverRally && (Settings.Current.WoundedFleeEnabled
                         || (Settings.Current.FieldCraftEnabled && Settings.Current.AiFleeWhenNearDeath && Campaign.Current != null)))
                         || Settings.Current.SoldierPostureByTier || nb2b

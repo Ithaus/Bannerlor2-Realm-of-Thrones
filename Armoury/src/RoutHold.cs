@@ -89,10 +89,12 @@ namespace Armoury
         internal const int SiteRun = 20;
         // 148: poscig konnicy AI (HorsePursuit - pass szykow, cel jezdzcow, haki trafien i strat); nazwa jednym slowem (regex NB2)
         internal const int SitePursuit = 21;
-        private const int Sites = 22;
+        // 149: bohater walczy o zycie (HeroCaution - na tyl szyku, wycofanie rannego / samotnego bohatera); nazwa jednym slowem (regex NB2)
+        internal const int SiteHeroes = 22;
+        private const int Sites = 23;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
                                                       "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot", "oddech", "ostroznosc",
-                                                      "szyk", "bieg", "poscig" };
+                                                      "szyk", "bieg", "poscig", "bohaterowie" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -524,6 +526,16 @@ namespace Armoury
               .Append(HorsePursuit.PerVictim).Append(" jezdzcow na uciekajacego; cel na czlowieka (SetTargetAgent + pozycja skryptowa co ")
               .Append(HorsePursuit.TrackEvery.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))
               .Append(" s); formacje gracza, bohaterowie, chorazowie, smoki i umarli nie gonia; konie ponizej Horse AI Rest Below ").Append(c.HorseAiRestBelow).Append(" (136) nie gonia)");
+            // 149: bohater walczy o zycie (HeroCaution; linia 'bohaterowie (149)' po bitwie)
+            sb.Append(" | Heroes Keep Behind Their Men ").Append(c.HeroesKeepBehindTheirMen ? "TAK" : "NIE")
+              .Append(" (bitwa polowa, bohater AI obu stron, nie gracz: w szyku w ostatnich 2 szeregach (zamiana miejsc co ")
+              .Append(HeroCaution.RankEvery.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" s); ranny ponizej ")
+              .Append((HeroCaution.WoundedBelow * 100f).ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append("% HP albo samotny (0 swoich w ")
+              .Append(HeroCaution.AllyRadius.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m, co najmniej ").Append(HeroCaution.FoeMin)
+              .Append(" wrogow w ").Append(HeroCaution.FoeRadius.ToString("0", System.Globalization.CultureInfo.InvariantCulture))
+              .Append(" m) - za swoj szyk pozycja skryptowa, bez paniki i okrzyku; samotny wraca do walki po ")
+              .Append(HeroCaution.AloneHold.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" s, ranny stoi do konca bitwy; Duelists In Battles ")
+              .Append(c.DuelistsInBattles ? "TAK" : "NIE").Append(" bez zmian; formacja wodza RBM nieprzywrocona)");
             sb.Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }
@@ -859,6 +871,9 @@ namespace Armoury
             // 142: panika gry bierzemy tylko trwajaca - nigdy nie wolamy za nia Panic (drugi okrzyk i animacja)
             if (site == MissionTeams.GamePanic && !cai.IsPanicked) return false;
             if (wd) EndWithdrawForBreak(a, site);
+            // 149: bohater w wycofaniu (HeroCaution) - nasza pozycja skryptowa zdjeta PRZED Panic (jak postoj rannego 143 wyzej), powod do linii 149
+            try { HeroCaution.BeforeBreak(a, site); }
+            catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.BeforeBreak", ex); }
 
             float now = m.CurrentTime;
             var e = new Entry { A = a, Site = site, Since = now, NextEval = now };

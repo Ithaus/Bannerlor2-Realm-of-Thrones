@@ -1,5 +1,105 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 149 (galaz noc/139-ai-zycie, po 148 dccfecb9) - AI walczy o zycie, krok 11: bohater walczy o zycie (karta syntezy "142 Bohater walczy o zycie", D4 "Ostrozni pozycyjnie"; HeroCaution.cs, klucz HeroesKeepBehindTheirMen)
+**Problem:** Jeff 25.10 ok. 13:25: "zasada AI robi wszystko aby nie dac sie zabic!"; ok. 13:30: "przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie
+zabic i zrobi wszystko w obszarze jego mozliwosci i skilli aby przetrwac, walczy o zycie! ... dopiero ta zasada peka gdy jest panika". Decyzja D4 (ok. 15:00): lordowie AI
+= "Ostrozni pozycyjnie". Objaw (synteza "AI walczy o zycie", luka 10): lordowie szarzuja na czele i walcza do 10% HP. Dowodu z logu nie ma (zadna linia nie liczy
+pozycji ani wycofan bohaterow - stad linia 149, takze przy kluczu NIE); dowod z kodu ponizej.
+**Przyczyna:** (dekompilacje scratchpad/panB rbmai_all.txt, scratchpad/surv, scratchpad/dec/mbfull - 1.4.8) (1) RBM wylacza formacje wodza
+(RBMAI.CanTeamHaveGeneralsFormationPatch: __result = false, rbmai_all.txt:1280-1286) - lordowie stoja w zwyklych szykach (zwykle konnicy) i szarzuja z nimi; (2) gra stawia
+na tyl szyku tylko GRACZA (Formation.TryRelocatePlayerUnit:2691-2700 -> IFormationArrangement.SwitchUnitLocationsWithBackMostUnit), bohater AI stoi tam, gdzie go
+ustawil przydzial (takze w pierwszym szeregu, a SwitchFrontUnitTypesToFrontRows wypycha ludzi z tarcza do przodu); (3) od ran sie nie wycofuja - BrokenMen.cs:91
+pomija bohaterow (WoundedFleeHeroes = false), lamie ich dopiero bol ponizej AiFleeBelowPercent (FieldCraft.cs:979, bohaterowie nie wylaczeni); (4) DuelistsInBattles (m113)
+robi ich smielszymi w zwarciu; (5) nikt nie sprawdza, czy bohater zostal sam (kodu "samotny bohater" w bitwie nie bylo).
+**Zmiana:** HeroCaution.cs (nowy), BattleSense.cs (Begin po HorsePursuit.Begin, Tick w bloku Night po HorsePursuit.Tick, OnAgentRemoved w bloku Night - tylko liczniki,
+End po HorsePursuit.End), RoutHold.cs (RoutKeeper.Break: HeroCaution.BeforeBreak przed Panic; miejsce potkniec NB2 "bohaterowie" = 22, Sites 23; segment "Heroes Keep Behind
+Their Men" w linii startu sesji), RoutHold.Withdraw.cs (RoutKeeper.Withdraw: HeroCaution.BeforeWithdraw przed pierwszym ruchem 143), HorsePursuit.cs (Banner internal - jedna
+definicja chorazego), SubModuleMain.cs (klucz w nb2b - BattleSense i RoutKeeper w misji), Settings.cs, McmSettings.cs (gen_mcm: Armoury 2514 -> 2515 ustawien).
+(a) Kogo dotyczy (klucz HeroesKeepBehindTheirMen TAK): bohater AI (Agent.IsHero, IsAIControlled, nie gracz, nie umarly, nie na smoku - MarchToContact.IsDragon) obu stron,
+takze towarzysze gracza; tylko bitwa polowa (IsFieldBattle, rodzaj "bitwa", bez morza - jak 142/143/148); tylko w trybie ROZSADEK (przelacznik 139) i poza odwrotem rannego 143.
+(b) Na tyl szyku (co 3 s): bohater w szyku o ukladzie LineFormation (linia, ShieldWall, Loose, kolo, czworobok, klin, klucz; bez TransposedLineFormation i kolumny) ma stac
+w ostatnich dwoch szeregach (w dwuszeregowym - w drugim). Inaczej zamiana miejsc z najglebiej stojacym szeregowym (AI, nie chorazy wedlug HorsePursuit.Banner, ten sam szyk;
+najblizszy rzad - BannerCompanies dzieli kompanie wedlug pozycji w poprzek szyku) przez publiczne IFormationArrangement.SwitchUnitLocations - ta sama droga, ktora gra stawia
+gracza na tyl (LineFormation.SwitchUnitLocationsWithBackMostUnit:2169-2176 -> SwitchUnitLocations:2154-2167; RBM OverrideLineFormation tylko sprawdza, czy obaj sa czynni
+i maja szyk). SwitchUnitLocationsWithBackMostUnit NIE wprost - jego "ostatni" (prywatne GetLastUnit:420-437) bywa graczem albo innym bohaterem. Migawka indeksow z GetAllUnits
+PRZED zamianami (SwitchUnitLocations odbudowuje liste gry - ReconstructUnitsFromUnits2D), nieustawieni (indeks -1) pominieci. Szyk z graczem (IsPlayerTroopInFormation /
+HasPlayerControlledTroop) pominiety - gra sama stawia tam gracza na tyl. Gra przesuwa ludzi z tarcza do przodu (SwitchFrontUnitTypesToFrontRows w OnTickOccasionally) i zapelnia
+luki (RemoveUnit fillInTheGap) - nastepna zamiana liczona jako "ponowna", najwyzej 20 zamian na bohatera na bitwe (bez szarpania szykiem). Zamiana bez skutku (RBM / gra) -
+licznik "odmowy".
+(c) Samotny: 0 swoich (nie w PANICE) w 5 m i co najmniej 2 wrogow (nie uciekajacych, nie w PANICE) w 10 m przez 2 passy z rzedu po 0.5 s (bez reakcji na przejazd obok
+wroga) - wycofanie za swoj szyk, postoj 6 s, potem pozycja zdjeta i wraca do walki ze swoimi (z tylu szyku); nastepne samotne wycofanie najwczesniej po 10 s; bez bezpiecznego
+miejsca przez 4 s - porzucone (walczy dalej); w drodze ponad 25 s - koniec.
+(d) Ranny ponizej 45% HP (Health / HealthLimit - ta sama miara co FieldCraft i BrokenMen): wycofanie za swoj szyk do konca bitwy; co 4 s cel na nowo (szyk sie rusza -
+postoj idzie za nim, przesuniecie ponad 5 m); broni sie, gdy ktos do niego dojdzie (bez NoAttack); w drodze ponad 25 s - postoj tam, gdzie stoi. Samotny, ktory w drodze spadnie
+ponizej 45%, zostaje ranny (ten sam cel, bez zdejmowania pozycji).
+(e) Wycofanie = Agent.SetScriptedPosition(cel, bez NoAttack i DoNotRun) - bez Panic, okrzyku, zrzutu broni Artem i natywnego odwrotu (IsRunningAway zostaje false: gra nie
+wyprowadza go z pola - CanAgentRout; BannerCompanies, RBM i 148 widza go jak walczacego). Cel: tyl wlasnego szyku (CurrentPosition - Direction x (Depth/2 + 5 m, konno 10 m) -
+wzor 143), potem tyl glownej sily strony (najwiekszy szyk pieszy od 8 ludzi, inny niz wlasny), potem 3 m za najblizszym chorazym strony do 80 m (BannerBearerLogic); cel
+w granicach pola, 10 m od granicy, bez wroga (nie uciekajacego) w 10 m, z droga (Scene.GetPathDistanceBetweenPositions, najwyzej 6 zapytan na krok 0.25 s). Dotarl: blizej
+celu niz 5 m (konno 10 m). Pozycja zdjeta przez kogos (RBM StanceLogic przy zmianie szyku: DisableScriptedMovement) - przywrocona przy nastepnej ocenie.
+(f) Koniec trybu: PANIKA - RoutKeeper.Break wola HeroCaution.BeforeBreak PRZED Panic (pozycja zdjeta; bol ponizej AiFleeBelowPercent z FieldCraft, panika gry 142, inne);
+odwrot rannego 143 (tylko przy WoundedFleeHeroes TAK) - RoutKeeper.Withdraw wola HeroCaution.BeforeWithdraw przed pierwszym ruchem 143 (pozycja zdjeta), potem pass
+oddaje go bez dotykania (wzor HorsePursuit.Uncontrol: czlowieka w 143 dotykamy tylko, gdy ucieka); gracz przejal; koniec bitwy (MissionEnded - pozycje zdjete: zwyciezcy
+wiwatuja, przegrani odchodza droga gry).
+(g) Bez zmian: zrecznosc pojedynkowa (DuelistsInBattles, DuelAi.ApplyField, zrywy DuelCraft - pol AI nie dotykamy), formacja wodza RBM (NIE przywracamy - D4), regula paniki
+z bolu ponizej 10% (Jeff: "panika z bolu dopiero ponizej 10%"), WoundedFleeHeroes (u Jeffa NIE).
+(h) Klucz NIE: ta sama ocena na sucho (kto bylby przestawiony, wycofania rannych - raz na bohatera - i samotnych z przerwa 16 s) - bez zamian i bez pozycji skryptowej.
+(i) Linia raz na bitwe polowa (BattleSense.Clean, po "poscig (148)"): "bohaterowie (149): misja bitwa, klucz TAK (lord / bohater AI obu stron, nie gracz, bitwa polowa:
+ranny ponizej 45% HP albo samotny - 0 swoich w 5 m i co najmniej 2 wrogow w 10 m przez 2 passy po 0.5 s - wycofuje sie za swoj szyk pozycja skryptowa ...; Duelists In
+Battles TAK - zrecznosc pojedynkowa bez zmian; formacja wodza RBM nieprzywrocona; panika z bolu ponizej 10% HP jak dotad) | bohaterow AI n (strona gracza a / wroga b; konni k;
+wodzowie g, kapitanowie c; wykluczeni: smoki d, umarli u) | na tyl szyku: bohaterow p (zamian z, ponownych r - gra przesunela go do przodu; odmowy RBM / gry o, limit 20 na
+bohatera l; szyki jednoszeregowe s, bez partnera q; szyki z graczem pominiete g, kolumna i inne o) | wycofania n: ranni a (ludzi x, z samotnosci w rannego c, sr. HP przy
+wejsciu h%) / samotni b (ludzi y, ponowne q, sr. wrogow w 10 m w, sr. HP h%); strona gracza / wroga | cel: tyl wlasnego szyku t / glowna sila m / sztandar s, w miejscu po
+25 s i; ocen bez bezpiecznego miejsca u (wrog przy celu f, bez drogi d, limit zapytan l; zapytan o droge q) | dotarli za szyk d (sr. droga s s, najdluzej x s); cel przesuniety
+v, pozycja przywrocona r | samotni: wrocili do walki po postoju h, bez miejsca porzucone e, w drodze ponad 25 s l | przejeci: odwrot rannego 143 (Wounded Flee Heroes NIE) w,
+PANIKA: z bolu p / gry g / inna o, gracz j | na koniec bitwy: w drodze e, na postoju f | los bohaterow AI: zabici Z / nieprzytomni U / uszli R / inne I / na polu F; w wycofaniu
+(w drodze / na postoju): zabici a/b, nieprzytomni c/d; na polu z wycofanych w; kiedykolwiek ranni ponizej 45%: k (zabici x, nieprzytomni y) | potkniecia bohaterowie n
+(wypadli w)." Klucz NIE - zamiast segmentow przestawien i wycofan "na sucho: na tyl szyku bohaterow p (zamian z); wycofania: ranni a, samotni b (z przerwa 16 s)"; los
+bohaterow ten sam (porownanie przed / po). Poza bitwa polowa przy kluczu TAK krotka linia "nieczynne" (morze - bez linii). Linia startu sesji NB2 - segment "Heroes Keep Behind
+Their Men TAK (...)"; potkniecia NB2 - ", bohaterowie n" (regex sprawdz_logi.py przyjmuje kolejne miejsca "(?:, [a-z]+ \d+)*").
+(j) Klucz MCM: "The master's parry" - "Heroes Keep Behind Their Men" TAK (opis po angielsku: "lords, companions and other heroes fight for their lives: an AI hero no
+longer charges at the head of his men or fights on alone ..."). W Armoury.json Jeffa go nie ma - dziala wartosc z kodu. Przelacznik - bez zakresu w RANGES; progi w kodzie.
+Odstepstwa / decyzje: (1) prog rannego bohatera 45% (polecenie "ok. 45%", karta "~40-50%") - stala, NIE WoundedBelowPercent (50% - kara ciala i 145): tu skutkiem jest
+trwale zejscie z linii do konca bitwy, wiec prog nizszy; (2) "samotny" - wrogowie liczeni w 10 m (karta podawala tylko "co najmniej 2 wrogow"), 2 passy z rzedu, postoj 6 s
+i powrot do walki, przerwa 10 s - karta nie mowila, co dalej z samotnym, ktory doszedl do swoich; (3) na tyl szyku WSZYSCY bohaterowie AI w szyku, nie tylko wodz / kapitan
+(karta "wodz albo kapitan") - lordowie i towarzysze w jednym szyku to ta sama ostroznosc; (4) wlasna zamiana miejsc zamiast SwitchUnitLocationsWithBackMostUnit (pkt b);
+(5) wycofanie tylko pozycja skryptowa (karta: "SetScriptedPosition"; polecenie: "albo Retreat jak w 143") - bez natywnego odwrotu, wiec bez ryzyka zanikania na granicy
+i bez IsRunningAway; (6) towarzysze gracza objeci (polecenie "lord/bohater AI (nie gracz)"), szyk, w ktorym stoi gracz - bez zamian; (7) cel "glowna sila" miedzy szykiem
+a sztandarem - szyk konny w szarzy RBM czesto nie ma bezpiecznego tylu.
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - przy kluczu NIE zadnego wolania Agent / szyku poza odczytami; RoutKeeper.Break i Withdraw - tylko
+wolanie we wlasnym try (slownik bohaterow; dla szeregowych nic), kolejnosc i warunki odmow bez zmian; HorsePursuit.Banner - tylko zmiana dostepu; 143 bez zmian dla
+szeregowych (BeforeWithdraw dziala tylko na bohatera w naszym wycofaniu). (b) kolizje - SetScriptedPosition / DisableScriptedMovement w Armoury tylko 143, 148 i 149:
+148 nie bierze bohaterow (XHero), 143 bierze bohatera tylko przy WoundedFleeHeroes TAK (wtedy BeforeWithdraw oddaje go przed pierwszym ruchem 143, a pass go pomija -
+Withdrawing); SwitchUnitLocations w Armoury tylko tu (grep), gra - tylko gracz (TryRelocatePlayerUnit) i SwitchFrontUnitTypesToFrontRows; RBM OverrideLineFormation tylko
+straznik. 140 (tarcze) - bohater w wycofaniu jest w ROZSADKU i bez IsRunningAway, wiec podnosi tarcze pod ostrzalem jak kazdy; 144 - pieszy bohater w drodze podlega zasadzie
+(z wrogiem w 25 m / w zwarciu bez capu; ranny daleko od wroga idzie krokiem za szyk); 145 - bohaterowie poza (bez zmian); 146 - zmiana szerokosci / ukladu szyku moze
+przestawic ludzi w siatce - bohater wraca na tyl przy nastepnym przebiegu (licznik "ponownych"); 147 - bohater w wycofaniu nie w PANICE, bez drenazu paniki; 148 - bohaterowie
+nie gonia (spojne z D4). BannerCompanies: dowodca kompanii = bohater - "dowodca padl" tylko przy smierci / omdleniu (BannerCompanies.cs:760), wycofany dowodca dowodzi
+dalej, wiec wstrzasow "dowodca padl" bedzie mniej; podzial na kompanie przy rozstawieniu (Split - pozycja w poprzek szyku), zamiana z najblizszym rzedem nie przenosi go
+miedzy kompaniami; czlonkostwo w szyku bez zmian (zmiane szyku BannerCompanies liczy jako CmdMoved - my szyku nie zmieniamy). m113: DuelistsInBattles / DuelAi / DuelCraft
+bez zmian - mniej pojedynkow bohaterow w linii "Bitwa (m113-walka2)" (rzadziej w pierwszym szeregu), to skutek zamierzony (D4: "Ostrozni pozycyjnie"). (c) jedno zjawisko -
+PANIKA = przelacznik 139; "chorazy" = HorsePursuit.Banner (ten sam co 148); "tyl szyku" = wzor 143; "smok" = MarchToContact.IsDragon; stan czyszczony w Begin i End.
+(d) cudzy kod - Formation (TryRelocatePlayerUnit, Arrangement, Rearrange - nowy obiekt ukladu tylko przy zmianie TYPU), LineFormation (SwitchUnitLocations, GetLastUnit,
+GetAllUnits / _allUnits z nieustawionymi, SwitchFrontUnitTypesToFrontRows), RBM OverrideLineFormation, Mission.OnTick (zachowania tykaja od konca listy - Mission.cs:3741-3744:
+BattleSense przed RoutKeeper i BrokenMen; TickAgentsAndTeamsAsync dopiero po wszystkich OnMissionTick - zamiana miejsc nie biegnie rownolegle z tickiem agentow) - sprawdzone
+w dekompilacji 1.4.8.
+NIESPRAWDZONE (kod natywny, tylko gra pokaze): czy bohater z pozycja skryptowa przebija sie do tylu szyku przez wrogow, broni sie po drodze i na postoju (liczniki "dotarli",
+"zabici w drodze / na postoju"); czy szyk konny RBM w szarzy (ChargingPast / Reforming) trzyma bohatera w tylnych szeregach (obraz); jak czesto gra wypycha bohatera z tarcza
+do przodu ("ponownych").
+Kalibracja: przy czestych "samotnych" w szarzy konnej (bohater z przodu przejazdu) - prog 5 m albo 2 passy do zmiany po danych; "ocen bez bezpiecznego miejsca" duzo przy
+"dotarli" malo = cel za blisko wroga (konnica) - wtedy glowna sila jako pierwszy cel dla konnych. Porownac los bohaterow z kluczem NIE (na sucho): zabici / nieprzytomni
+bohaterowie AI powinni spasc. Wplyw na niewole: mniej bohaterow nieprzytomnych na polu = mniej jencow-lordow po bitwach (zamierzone, ale zmienia RealisticCaptivity).
+Wydajnosc: spis co 2 s (przejscie po Mission.Agents, tylko IsHero), pass co 0.5 s po bohaterach (jedno zapytanie natywne o sasiadow w 10 m na bohatera), szeregi co 3 s tylko
+w szykach z bohaterem, najwyzej 6 zapytan o droge na 0.25 s.
+Zaleznosci w fali 139-149 (przeglad przy 149): wejscie z przelacznika 139 (InPanic - PANIKA konczy tryb; swoi / wrogowie samotnego bez PANIKI); konczy go Break (142 panika
+gry, bol FieldCraft) przez BeforeBreak i 143 przez BeforeWithdraw / Withdrawing; 148 wyklucza bohaterow (komplementarnie); 146 i gra moga przesunac bohatera w siatce
+(ponowna zamiana); 140 podnosi mu tarcze; 144 moze go prowadzic krokiem daleko od wroga; 145 go pomija.
+Sprawdzic w logu po wgraniu: linia "bohaterowie (149)" w kazdej bitwie polowej; "potkniecia bohaterowie 0" (takze w NB2); w bitwach z lordami AI - "na tyl szyku" > 0,
+"odmowy" bliskie 0, "ponownych" niewiele wiecej niz zamian; wycofania ranni > 0 przy rannych lordach, "dotarli" bliskie liczbie wycofan, "przejeci: PANIKA z bolu" rzadziej
+niz dotad bolem (lordowie nie dochodza do 10% w linii); los bohaterow AI wobec klucza NIE. W grze (Jeff): lord AI nie jedzie pierwszy przed swoimi, ranny lord odjezdza za szyk
+i tam stoi, otoczony samotny lord wraca do swoich zamiast ginac; towarzysze gracza tak samo (gracza nikt nie przestawia).
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 8d96560abbf08a2a05f5bc256aeb2e3b).
+
 ## 2026-10-25 148 (galaz noc/139-ai-zycie, po 147 e997e333) - AI walczy o zycie, krok 10: poscig konnicy AI (karta syntezy "143 Poscig konnicy AI", D5; HorsePursuit.cs, klucz AiCavalryPursues)
 **Problem:** Jeff 25.10 ok. 13:30: "w panice jest zasada uciekaj i brak rozsadku ... Wtedy ginie najwiecej osob." Decyzja D5 (ok. 15:00): poscig "Tak, z limitem"
 (konnica AI, 60 s / 250 m, noca polowa, nie formacje gracza). Objaw (synteza "AI walczy o zycie", luka 6 / P3 / Z7): nikt nie goni uciekajacych - dobiegaja do skraju
@@ -80,6 +180,11 @@ jezdzcow na krok 0.25 s (round robin, licznik "limit kroku").
 Sprawdzic w logu po wgraniu: linia "poscig (148)" w kazdej bitwie polowej; "potkniecia poscig 0" (takze w NB2); w bitwie z rozbiciem wroga i konnica AI - wejsc > 0,
 jezdzcow > 0, zabici w poscigu > 0; FF na wlasnej jezdzie maly; zawroceni glownie "czas" / "250 m" / "brak uciekajacych"; straty przegranych w granicach celu. W grze
 (Jeff): po zlamaniu wroga konnica AI (wroga i sojusznikow) rusza za uciekajacymi, tnie ich i po minucie wraca; formacje gracza stoja jak dotad.
+Zaleznosci w fali 139-149 (przeglad przy 149): uciekajacy i "strona zlamala wroga" wedlug 139; 142 trzyma panike do konca bitwy, a 147 meczy uciekajacych - oba zwiekszaja
+liczbe dopadnietych (straty przegranych - porownac z kluczem NIE); progi koni z 136 (HorseAiRestBelow, MarchToContact.Resting); odwrot 143 i jego postoj nietkniete
+(Withdrawing); bohaterowie nie gonia - spojne z 149 (ostrozni pozycyjnie), chorazy wedlug tej samej HorsePursuit.Banner, ktorej uzywa 149; SetScriptedPosition /
+DisableScriptedMovement w Armoury tylko 143, 148 i 149 - rozlaczni ludzie (148 bez bohaterow, 149 tylko bohaterowie, 143 oddaje / przejmuje przez Withdrawing i BeforeWithdraw);
+MarchToContact.PostSpeed bez capu dla gonacych.
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 b3fc0e4e28ec7b3b90301dca4cd7b391).
 
 ## 2026-10-25 147 (galaz noc/139-ai-zycie, po 146 1040b277) - AI walczy o zycie, krok 9: bieg bez odsapki w panice (karta syntezy "139b Bieg bez odsapki", D6; PanicRun.cs, klucz PanicRunsUntilSpent)
@@ -140,6 +245,9 @@ Straty przegranych juz dzis 63-83% w malych bitwach gracza (synteza) - sprawdzic
 Sprawdzic w logu po wgraniu: linia "Bieg zlamanych (147)" w kazdej bitwie z panika, "odsapki w panice 0", udzial biegu na 50% wyraznie wiekszy niz przy kluczu NIE,
 sr. czas do wyczerpania mniej wiecej pasek przy wejsciu x pelny bieg 127, "potkniecia bieg 0" (takze w NB2), "sam odwrot komponentu" maly. W grze (Jeff): uciekajacy
 po kilkudziesieciu sekundach zwalniaja do truchtu i juz nie przyspieszaja; konnica ich dogania.
+Zaleznosci w fali 139-149 (przeglad przy 149): PANIKA wedlug 139 - przy 142 trwala do konca bitwy, wiec "bez odsapki" dziala na wszystkich przejetych z paniki gry;
+ten sam zbior biegnacych co 127 / 137 (zalezy od NoBreathWhileRunning); "sam odwrot komponentu" (szarza RBM) tez pije oddech (ok. 10 s); wyczerpani uciekajacy sa latwiejszym
+celem poscigu 148 (i "dopadnieci: konny" w 139 rosnie); ranny w odwrocie 143 i bohater w wycofaniu 149 sa w ROZSADKU - bez drenazu paniki; 144 pomija PANIKE w decyzji.
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 c1134463a180737dc0cfd033acba3a96).
 
 ## 2026-10-25 146 (galaz noc/139-ai-zycie, po 145 bcd191c3) - AI walczy o zycie, krok 8: szyk pod ostrzalem (projekt 135b z design-weccrxf3h sekcja 5, karta syntezy "138", CloseRanks.cs, klucz AiFormationsUnderFire)
@@ -224,6 +332,10 @@ Sprawdzic w logu po wgraniu: linia "Szyk pod ostrzalem (146)" w kazdej bitwie po
 UWAGA o JIT), "potkniecia szyk 0" (takze w NB2), nasze zmiany > 0 w bitwach z lucznikami, trafienia w cialo w naszym ShieldWall wyraznie mniejsze wzgledem tarczy niz
 w szyku bez naszej zmiany, zmiany szyku RBM w tej metodzie i "wstrzymane do 10 s" bez lawiny (migotanie), "przywrocone poza decyzja RBM" male. Porownanie z kluczem NIE:
 segment "na sucho" i czas bitwy. W grze (Jeff): wrogi szyk pod strzalami zwiera tarcze (albo rozluznia sie, gdy tarcz malo) i idzie dalej; po zwarciu walczy jak dotad.
+Zaleznosci w fali 139-149 (przeglad przy 149): wejscie z S4 / OffShield / CavNear (140) - bez 140 nieczynne; 60% tarcz liczone bez PANIKI (139 / 142); zwarcie =
+Doctrine.FootGap (141); ShieldWall zwalnia natarcie S2 (141) i odklada "ostatnie 25 m biegiem" (144) do oddania szyku RBM; zmiana ShieldWall / Loose zmienia odstepy
+i szerokosc szyku (ten sam typ LineFormation - Formation.Rearrange tworzy nowy uklad tylko przy zmianie typu), co moze przestawic ludzi w siatce - bohater 149 wraca
+na tyl przy nastepnym przebiegu (co 3 s, licznik "ponownych"); Frontline RBM ocenia nasz szyk do 10 s po zwarciu.
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 76002c711a6c76b2379a788f09187155).
 
 ## 2026-10-25 145 (galaz noc/139-ai-zycie, po 144 6ac81cbe) - AI walczy o zycie, krok 7: ranny walczy ostroznie (karta syntezy "140 Ranny walczy ostroznie", WoundedWary.cs, klucz WoundedFightWarily)
@@ -291,6 +403,10 @@ Sprawdzic w logu po wgraniu: linia "ranni ostrozni (145)" w kazdej bitwie z rann
 ok. 3 s i "dluzej niz 4 s" bliskie 0 (inaczej RBM nie odswieza i trzeba wlasnego UpdateAgentProperties przy progu), atak ranni po < przed, porzucenie po > przed, PANIKA
 pominieci > 0 w bitwach z ucieczka, bohaterowie liczeni osobno. Porownanie z kluczem NIE (na sucho - te same liczby bez zmiany pol): w liniach HIT ranni czesciej BLOK.
 W grze (Jeff): ranny wrog nie rzuca sie pierwszy, zaslania sie tarcza i oddaje cios, zamiast atakowac jak zdrowy.
+Zaleznosci w fali 139-149 (przeglad przy 149): bohaterowie poza (149 = ostroznosc pozycyjna - na tyl szyku i wycofanie; ich profil DuelAi / DuelCraft bez zmian); PANIKA
+przez PanicAnyThread (tablica RoutHold.KnownAnyThread pisana w Break / Drop / Clear) - przy 142 PANIKA trwa do konca bitwy, spanikowany ranny nie dostaje ostroznosci; ranny
+w odwrocie 143 dostaje f < 0.64; obrona tarcza x (2 - f) dziala na ludziach, ktorym 140 podnosi tarcze (inne pola); prog "ranny" = WoundedBelowPercent (50% u Jeffa, ten sam
+co kara FieldCraft), a 149 ma wlasny prog 45% dla bohatera (trwale zejscie z linii - swiadomie inna liczba, karta D4).
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 e3de50fec924c101634404a9bf461100).
 
 ## 2026-10-25 144 (galaz noc/139-ai-zycie, po 143 a1f2d41e) - AI walczy o zycie, krok 6: AI oszczedza sily (projekt 134a-134d, 134e jako klucz NIE; AiBreath.cs, WindedShow.cs, klucz AiSavesBreath i 8 pokrewnych)
@@ -400,6 +516,11 @@ pierwszym zwarciu >= 50%, mniej sekund biegu w "pogon" i "posilki"; segment 'mar
 predkosc ponizej 1.8 i udzial WalkMode (0% nie dowodzi truchtu - obraz u Jeffa). Autotest: przebieg A z AiSavesBreath NIE (na sucho) i B z TAK (YourTroops TAK - W6:
 ciezcy sa po stronie gracza), bez -Speed 16. W grze (Jeff): wrog nie biegnie przez cale pole, idzie i rusza biegiem na ostatnie metry; zmeczony na postoju pokazuje poze
 (WindedPose 1-3 do wyboru) i dyszy w 25 m.
+Zaleznosci w fali 139-149 (przeglad przy 149): wyjatki czytaja przelacznik 139 (razem z IsRunningAway), 143 (Withdrawing), MarchToContact.ChargeFresh (B2) i cap marszu
+128 / odpoczynek koni 136; zapas pod ostrzalem z UnderRangedAttackRatio gry - tarcze 140 obnizaja go; ShieldWall 146 (limit gry 0.3 / RBM 0.5) i cap oddechu skladaja sie
+(wolniejszy wygrywa) - "ostatnie 25 m biegiem" dopiero po oddaniu szyku RBM; 147 - decyzja pomija PANIKE (pomiar wedlug predkosci zostaje); 148 - jezdzcy poza (konni);
+149 - pieszy bohater w wycofaniu podlega zasadzie jak kazdy (z wrogiem w 25 m / w zwarciu bez capu; ranny daleko od wroga idzie krokiem za szyk); S2 (141) idzie naprzod
+krokiem poza budzetem tchu.
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 ffce8621f212992d95e4b4f85c0db236).
 ## 2026-10-25 143 (galaz noc/139-ai-zycie, po 142 4d3f7047) - AI walczy o zycie, krok 5: ranny ponizej 20% HP wycofuje sie z bronia, bez paniki (karta "141", decyzja D2, klucz WoundedWithdrawWithArms) - ZMIANA REGULY NB2 z 16.10
 **Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko
@@ -481,6 +602,11 @@ Sprawdzic w logu po wgraniu: linia "ODWROT RANNYCH (143)" w bitwie polowej; "odw
 "uszedl z pola" 0; "z bronia przy losie albo na koniec" 100%; "wrocil do walki" maly (duzy = postoj nie trzyma przy szarzy - wtedy latka na RBM Frontline jako osobny
 krok); "panika z bolu" > 0 tylko u schodzacych ponizej 10%; "szyk rozbity" przy rozbiciu strony; potkniecia odwrot 0; NB2 "polowa skladu" / "zalaman" wobec bitwy
 przed 143. W grze (Jeff): ranny ponizej 20% nie krzyczy i nie rzuca broni, cofa sie za swoj szyk z bronia i tarcza i tam stoi; krzyk i zrzut dopiero ponizej 10%.
+Zaleznosci w fali 139-149 (przeglad przy 149): RoutKeeper.Withdrawing czytaja 144 (wyjatek "odwrot rannego"), 148 (ranny nie goni, jego postoju nie zdejmujemy - Uncontrol),
+149 (bohater w 143 - tylko przy WoundedFleeHeroes TAK - wypada z wycofania 149; RoutKeeper.Withdraw wola HeroCaution.BeforeWithdraw przed pierwszym ruchem 143, wiec
+pozycja 149 nie miesza sie z natywnym odwrotem) i BrokenFate (spis: ROZSADEK); 145 daje rannemu ostroznosc f < 0.64 (wspiera "postoj tylko obrona"); 147 go nie drenuje
+(ROZSADEK); 140 pomija go w drodze (IsRunningAway - bez tarczy w gore w drodze); cel "tyl szyku" (srodek - kierunek x (glebokosc/2 + 5 m)) to ten sam wzor co 149; Break konczy
+odwrot przy panice gry 142, bolu FieldCraft i zalamaniu kompanii; "szyk rozbity" liczy PANIKE wedlug 139 (przy 142 wiecej spanikowanych w szyku - szybciej).
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 29d57bd0534af44b2264eebf98ad1c68).
 ## 2026-10-25 142 (galaz noc/139-ai-zycie, po 141 ca231ec0) - AI walczy o zycie, krok 4: panika bez powrotu - kazda panika gry w bitwie polowej do RoutHold (karta "139a", klucz RoutedMenNeverRally)
 **Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek ... dopiero ta zasada peka gdy jest panika,
@@ -541,6 +667,10 @@ Sprawdzic w logu po wgraniu: linia "PANIKA BEZ POWROTU (142)" w bitwie polowej; 
 przejeciem); "ponowne paniki gry" 0; linia 139 "powroty RBM" ok. 0 (przy kluczu NIE bylo r) i "przejeci przez RoutHold" ~ "panika gry"; "zgaszone mimo to" male, kazde z
 ponowionym odwrotem; tick RoutKeeper sr. < 0.5 ms, najwiecej < 5 ms przy CoordinatedRetreat; potkniecia powrot 0; czas bitwy wobec bitwy przy kluczu NIE. W grze (Jeff):
 spanikowani biegna do granicy pola i nie wracaja z golymi piesciami; jeden okrzyk na czlowieka.
+Zaleznosci w fali 139-149 (przeglad przy 149): trwala PANIKA (zbior RoutHold) to wejscie dla 147 (bieg bez odsapki do wyczerpania), 148 (uciekajacy zostaja celem poscigu
+do konca bitwy) i przelacznika 139 (paczki rozsadku 140 / 141 / 144 / 145 / 146 / 149 pomijaja przejetych); Break konczy odwrot rannego 143 (EndWithdrawForBreak) i - od 149 -
+wycofanie bohatera (HeroCaution.BeforeBreak przed Panic: pozycja skryptowa zdjeta, zanim handler paniki da odwrot); panika gry bohatera (morale) idzie ta sama kolejka
+(bohaterowie liczeni osobno); BannerCompanies InRanks liczy tylko !IsPanicked - kaskada zalaman kompanii szybsza; tablica KnownAnyThread (145) pisana w Break / Drop / Clear.
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 ce0984f6711e43dadf4da5e3194d666a).
 ## 2026-10-25 141 (galaz noc/139-ai-zycie, po 140 b39c5cc2) - AI walczy o zycie, krok 3: obronca bez strzelcow nie stoi pod strzalami (S2, Doctrine.S2.cs, klucz DefendersAdvanceUnderFire)
 **Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze
@@ -604,6 +734,10 @@ Sprawdzic w logu po wgraniu: linia "S2 (141)" w bitwie polowej; przy obroncy bez
 rzedu 0-10 s (MakeDecision co 5 s), wywolan z Hold x0.3 > 0, potkniecia S2 0, NB2 doktryna "bledy latek 0"; porownanie z bitwa przy kluczu NIE: "czas pod ostrzalem przed zwarciem" krotszy,
 "padli od pociskow do zwarcia" mniej. Jesli "maks. trafionych" ponizej 0.2 przy wyraznym ostrzale - prog do zmiany (decyzja po danych). "bez taktyki ataku" > 0 - lista
 taktyk tej druzyny do sprawdzenia (rada / RBM). W grze (Jeff): obronca bez lucznikow pod strzalami po ok. 20-30 s rusza na wroga z tarczami w gorze.
+Zaleznosci w fali 139-149 (przeglad przy 149): miara ostrzalu bez PANIKI (139) - przy trwalej panice 142 mniej ludzi w probce; tarcze 140 obnizaja odsetek trafionych
+w cialo (S2 wejdzie rzadziej - "maks. trafionych" w linii); po wejsciu w S2 linia idzie naprzod, ale ShieldWall 146 (bieg 0.3 gry / limit 0.5 RBM) i krok 144 poza budzetem
+tchu zwalniaja marsz pod strzalami (dluzej pod ostrzalem, mniej padnietych na dobiegu); "zwarcie" = Doctrine.FootGap (25 m / wyjscie 40 m) - ta sama miara w 146;
+142 / 143 / 145 / 147 / 148 / 149 nie dotykaja taktyk (S2 tylko mnoznik Hold).
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 44f1e57f692e6dd434c4a6e3dcbe885f).
 ## 2026-10-25 140 (galaz noc/139-ai-zycie, po 139 00472fc0) - AI walczy o zycie, krok 2: tarcza pod ostrzalem (ShieldsUp, projekt 135a z poprawkami krytyka K1-K13 i E)
 **Problem:** Jeff 25.10 ok. 13:25: "przeciwnik jak ma tarcze a widzi ze ktos w niego strzela to zaklada tarcze z plecow ... zamiast zalozyc tarcze to idzie w lucznika
@@ -700,6 +834,12 @@ tarcze 0 (takze NB2 "tarcze 0"); przy ostrzale oznaczonych > 0, przelozenia > 0,
 oznaczonych z tarcza w rece wyraznie > 0 (orientacyjnie >= 30%) i wyzej niz nieoznaczonych, rzuty nie mniej niz polowa z bitwy przy kluczu NIE; HIT z "| ofiara: ..."
 (test A przy kluczu NIE rozstrzyga Z5: tarcza na plecach czy w rece u raiderow). W grze (Jeff): pikinierzy Westerlands (casterly_pikeman, bolton_veteran) pod ostrzalem
 z tarcza i mieczem, z pika przy konnicy; obroncy z tarcza na murach biora tarcze, drabiny dzialaja; strzelcy z amunicja strzelaja dalej; zadnych zmian broni w zwarciu.
+Zaleznosci w fali 139-149 (przeglad przy 149): sygnal S4 (FormFire), OffShield i CavNear czyta 146 (ShieldWall / Loose) - zmiana progow 140 zmienia 146, bez 140 146
+jest nieczynne; tarcze w gorze zmniejszaja trafienia w cialo, z ktorych licza UnderRangedAttackRatio gry 141 (S2, prog 20% trafionych piechoty) i 144 (zapas 25% pod ostrzalem) -
+oba wejda rzadziej niz przed 140; PANIKA pominieta wedlug 139 (przy 142 do konca bitwy); ranny w drodze 143 (IsRunningAway) liczony jako "panika" - bez tarczy w gore w drodze,
+na postoju juz tak; 145 mnozy obrone tarcza x (2 - f) na tych samych ludziach (inne pola niz preferencja broni 140); bohater w wycofaniu 149 (ROZSADEK, bez IsRunningAway)
+podnosi tarcze jak kazdy; gra przesuwa ludzi z tarcza (HasShieldCached) do przodu szyku (SwitchFrontUnitTypesToFrontRows) - bohater 149 z tarcza moze wrocic do przodu i jest
+przestawiany znowu ("ponownych" w linii 149).
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; Armoury.dll md5 2e975b0a7cecb3a347a000e3d8d39bfa).
 ## 2026-10-25 139 (galaz noc/139-ai-zycie od noc/138-calosc d331082f) - AI walczy o zycie, krok 1: przelacznik trybu PANIKA / ROZSADEK (SurvivalMode) i pomiar losu zlamanych (linia "LOS ZLAMANYCH (139)"), zero zmian zachowania
 **Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze
@@ -752,6 +892,12 @@ RBM (Retreat bez paniki, do ok. 10 s) jako PANIKE - ile ich, pokaze "sam odwrot 
 TAK"; po bitwie polowej linia "LOS ZLAMANYCH (139)" zaraz po "Bitwa (NB2): misja", potkniecia los 0 (w obu liniach), nasi <= "Panic" z NB2 (rowne, gdy nikt z paniki gry
 nie wrocil i nie zostal potem zlamany od nowa), przejeci >= "juz w panice" z NB2, panika gry > 0 przy zalamaniu szyku przez morale; potem bitwa wyjsciowa z karty
 (obronca bez lucznikow przeciw stronie z lucznikami) jako stan "przed" dla kolejnych krokow fali.
+Zaleznosci w fali 139-149 (przeglad przy 149): przelacznik SurvivalMode.InPanic czytaja 140 (pass ludzi), 141 (ostrzal bez PANIKI), 143 (szyk rozbity = polowa w PANICE),
+144 (wyjatek, razem z IsRunningAway), 145 (PanicAnyThread - ta sama tresc przez RoutHold.KnownAnyThread), 146 (60% tarcz bez PANIKI), 147 (drenaz jak bieg), 148 (uciekajacy,
+"strona zlamala wroga") i 149 (bohater w PANICE wypada z wycofania; swoi / wrogowie samotnego bez PANIKI) - kazda zmiana definicji przesuwa je wszystkie naraz. "Sam odwrot
+komponentu" (ofiara szarzy RBM, ok. 10 s) jest PANIKA wszedzie: 147 pije jej oddech, 148 ja goni, 140 / 145 / 146 / 149 ja pomijaja, 143 liczy ja do "polowy w panice".
+142 trzyma PANIKE do konca bitwy (zbior RoutHold), wiec liczby tej linii zmieniaja kolejne kroki: "powroty RBM" -> ok. 0 (142), "z zadyszka" w gore (147), "dopadnieci:
+konny" w gore (148); odwrot rannego 143 i wycofanie bohatera 149 to ROZSADEK (spis: "odwrot rannego z bronia (143)"; 149 bez IsRunningAway - nie wchodzi w "rozkaz szyku").
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie od noc/138-calosc d331082f; Armoury.dll md5 79d38d7fbe57aa9b316b02672ed4fa88).
 ## 2026-10-25 137 (galaz noc/137-oddech od noc/127-bitwa-cialo) - oddech dwufazowy: szybki i wolny dlug, odnowa szybsza z Atletyka, po zadyszce dlugi ogon
 **Problem:** Jeff 25.10 ok. 12:55: "a regeneracja bo powinna byc tak samo szybsza im wiecej mam atletyki oraz im mam mniej staminy a odpoczywam tym regeneracja

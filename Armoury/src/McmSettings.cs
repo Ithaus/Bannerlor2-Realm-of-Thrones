@@ -1568,6 +1568,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool RoutedMenNeverRally { get; set; } = true;
 
+        [SettingPropertyBool("Heroes Keep Behind Their Men", HintText = "lords, companions and other heroes fight for their lives: an AI hero no longer charges at the head of his men or fights on alone. In his formation he keeps to the rear ranks; when he is cut off - none of his own men within 5 m and two or more enemies about him - he falls back behind his formation (or the main body, or the nearest banner of his side) without panic or scream, waits there a few seconds and goes back into the fight with his men; once wounded below 45% health he stays behind his formation for the rest of the battle and fights only whoever reaches him. His skill with weapons (Duelists In Battles) is unchanged, and he still breaks only from pain (AI Flee Below Percent) or panic. Both sides alike, your companions too; you yourself are never moved and a formation you stand in keeps its order. Field battles only. Off = heroes fight as before (still measured for the log)", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool HeroesKeepBehindTheirMen { get; set; } = true;
+
         [SettingPropertyBool("Commander Tactics", HintText = "in field battles an AI army fights by its commander's Tactics skill, not only by its culture as RBM sets it: below 30 a mob that just charges, from 60 cavalry charges at the front and defenders may form a ring or hold a choke point, from 150 a side of 150 men or more also tries to outflank with its infantry. Your own team's AI is left as it is. Off = RBM's culture tactics only, as before", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool CommanderTactics { get; set; } = true;
@@ -10459,6 +10463,7 @@ namespace Armoury
             s.WoundedWithdrawWithArms = WoundedWithdrawWithArms;
             s.WoundedFightWarily = WoundedFightWarily;
             s.RoutedMenNeverRally = RoutedMenNeverRally;
+            s.HeroesKeepBehindTheirMen = HeroesKeepBehindTheirMen;
             s.CommanderTactics = CommanderTactics;
             s.VeteransByTier = VeteransByTier;
             s.AutoParryFullDiff = AutoParryFullDiff;
