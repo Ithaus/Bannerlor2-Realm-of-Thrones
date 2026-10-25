@@ -1,0 +1,504 @@
+{
+ "_opis": "Obsada glosow bitwy (P2a, noc 25.10, wybor bez Jeffa - DO WYMIANY rano). Rola -> voice_id; zapas_voice_id = glos juz na koncie, gdy dodanie z biblioteki sie nie uda. Wymiana glosu: zmien voice_id roli (i dopisz glos w \"glosy\" z public_owner_id z biblioteki), potem nagraj_bitwa.py --nagraj --rola <ROLA> --nadpisz. Probki bez kosztu: pole probka_mp3 (podglad z biblioteki ElevenLabs). Wszystkie glosy meskie, akcent brytyjski/szkocki, stawka 1.0 (bez doplaty za znak). David (lektor) celowo NIE - bitwa nie ma brzmiec jak narrator.",
+ "role": {
+  "L_STARK": {
+   "voice_id": "q1h5HGdnfVxp4TXTJRNN",
+   "zapas_voice_id": "wyWA56cQNU2KqUW4eCsI",
+   "komu": "Stark, Karstark, Glover (rody Polnocy)",
+   "dlaczego": "polnocny, szorstki, spokojny autorytet"
+  },
+  "L_NORTH_OLD": {
+   "voice_id": "7rQX8r6PVq3gfJ8rZzyE",
+   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "komu": "Umber, Mormont, Manderly, region north (mniejsi lordowie Polnocy)",
+   "dlaczego": "starszy, gruby polnocnoangielski"
+  },
+  "L_WATCH": {
+   "voice_id": "M5E055lOUxMi0kJpGyE9",
+   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "komu": "Nocna Straz (nightswatch)",
+   "dlaczego": "stary, chropawy bas - Lord Dowodca"
+  },
+  "L_LANNISTER": {
+   "voice_id": "ib8aaABAPZQpTo6hx8Jr",
+   "zapas_voice_id": "onwK4e9ZLuTAKqWW03F9",
+   "komu": "Lannister, Crakehall, Marbrand, region west i crownlands",
+   "dlaczego": "wladczy, chlodny, RP"
+  },
+  "L_TYRELL": {
+   "voice_id": "7cOBG34AiHrAzs842Rdi",
+   "zapas_voice_id": "G17SuINrv2H9FC6nvetn",
+   "komu": "Tyrell, Hightower, region reach",
+   "dlaczego": "posh, ziemianin z Home Counties"
+  },
+  "L_ARRYN": {
+   "voice_id": "Veg2qijYoJAS8VPKOOmi",
+   "zapas_voice_id": "oaGwHLz3csUaSnc2NBD4",
+   "komu": "Arryn, Royce, Westerling, region vale",
+   "dlaczego": "mlody szlachcic, czysty RP"
+  },
+  "L_TULLY": {
+   "voice_id": "ktrGUw7rURIQyMrQZqCu",
+   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "komu": "Tully, Mallister, region river, Zlota Kompania",
+   "dlaczego": "aksamitny, wywazony, dowodczy"
+  },
+  "L_FREY": {
+   "voice_id": "HAvvFKatz0uu0Fv55Riy",
+   "zapas_voice_id": "HAvvFKatz0uu0Fv55Riy",
+   "komu": "Frey",
+   "dlaczego": "stary, jadowity (glos juz na koncie)"
+  },
+  "L_BARATHEON": {
+   "voice_id": "2ajXGJNYBR0iNHpS4VZb",
+   "zapas_voice_id": "wyWA56cQNU2KqUW4eCsI",
+   "komu": "Baratheon, Tarth, region storm",
+   "dlaczego": "twardy, chropawy wojak"
+  },
+  "L_STANNIS": {
+   "voice_id": "lKMAeQD7Brvj7QCWByqK",
+   "zapas_voice_id": "wyWA56cQNU2KqUW4eCsI",
+   "komu": "Smocza Skala (Stannis), Tarly",
+   "dlaczego": "gleboki, ostry, surowy"
+  },
+  "L_BOLTON": {
+   "voice_id": "yhf80q1381zd2JJQ4tM7",
+   "zapas_voice_id": "G17SuINrv2H9FC6nvetn",
+   "komu": "Bolton",
+   "dlaczego": "ponury, cichy, intensywny"
+  },
+  "L_MARTELL": {
+   "voice_id": "goT3UYdM9bhm0n2lmKQx",
+   "zapas_voice_id": "oaGwHLz3csUaSnc2NBD4",
+   "komu": "Martell, Dayne, Yronwood, region dorne (takze kapitanowie Dorne)",
+   "dlaczego": "niski, aksamitny, uwodzicielski"
+  },
+  "L_GREYJOY": {
+   "voice_id": "6VgigPFWF0sNZy1BthVg",
+   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "komu": "Greyjoy, Harlaw, region iron",
+   "dlaczego": "gleboki, zwirowy, morski"
+  },
+  "L_WILD": {
+   "voice_id": "YIn3yKpQSeXNJMF5CIuj",
+   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "komu": "Wolni Ludzie (freefolk, wildlings, hilltribesmen)",
+   "dlaczego": "szkocki, chrapliwy, szorstki"
+  },
+  "L_DOTHRAKI": {
+   "voice_id": "KHRvDizAHFVPzoSehNY6",
+   "zapas_voice_id": "wyWA56cQNU2KqUW4eCsI",
+   "komu": "Dothrakowie (khuzait)",
+   "dlaczego": "bardzo gleboki, basowy, chropawy"
+  },
+  "L_ESSOS": {
+   "voice_id": "1TE7ou3jyxHsyRehUuMB",
+   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "komu": "najemnicy i Wolne Miasta (essos; takze kapitanowie Essos)",
+   "dlaczego": "cockney, szorstki - jak Bronn"
+  },
+  "L_TARGARYEN": {
+   "voice_id": "qxePw1S1QmBgjlU3GIy5",
+   "zapas_voice_id": "qxePw1S1QmBgjlU3GIy5",
+   "komu": "Targaryen, Velaryon, region valyrian",
+   "dlaczego": "stary rycerz (glos juz na koncie)"
+  },
+  "L_UNSULLIED": {
+   "voice_id": "onwK4e9ZLuTAKqWW03F9",
+   "zapas_voice_id": "onwK4e9ZLuTAKqWW03F9",
+   "komu": "Nieskalani (ghiscari)",
+   "dlaczego": "plaski, zdyscyplinowany (premade)"
+  },
+  "C_NORTH": {
+   "voice_id": "AmY1pcgcEc15wyuIj50p",
+   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "komu": "kapitanowie Polnocy, Nocnej Strazy i Skagos; zolnierz (jeki, wyzwiska)",
+   "dlaczego": "polnocno-wschodnia Anglia (Durham)"
+  },
+  "C_WEST": {
+   "voice_id": "kTSNDDkx34wKsrujmdm1",
+   "zapas_voice_id": "onwK4e9ZLuTAKqWW03F9",
+   "komu": "kapitanowie Zachodu i Korony; zolnierz",
+   "dlaczego": "szorstki baryton, Estuary"
+  },
+  "C_RIVER": {
+   "voice_id": "poHOO1m3tBNm4Ywmzcaq",
+   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "komu": "kapitanowie Dorzecza i Doliny; Blackwood; zolnierz",
+   "dlaczego": "mlody, Yorkshire"
+  },
+  "C_STORM": {
+   "voice_id": "tczmcUWPAdiP3gKQPrv7",
+   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "komu": "kapitanowie Krainy Burz, Reach i Smoczej Skaly; Bracken; zolnierz",
+   "dlaczego": "mlody, zwykly angielski"
+  },
+  "C_IRON": {
+   "voice_id": "U4Y0Z2HmYcQYMkJB8hrg",
+   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "komu": "kapitanowie Zelaznych Wysp; zolnierz",
+   "dlaczego": "West Country, zwirowy pirat"
+  },
+  "C_WILD": {
+   "voice_id": "O4uxPTtvgxrA0QCLHI1J",
+   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "komu": "kapitanowie Wolnych Ludzi, Skagos; zolnierz",
+   "dlaczego": "stary Szkot, chrapliwy"
+  },
+  "S_TERRY": {
+   "voice_id": "wo6udizrrtpIxWGp2qJk",
+   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "komu": "szeregowy (wyzwiska, jeki)",
+   "dlaczego": "mlody, chrapliwy, polnoc Anglii"
+  },
+  "S_RICKY": {
+   "voice_id": "ytcsltLTtCHxNn1vC76H",
+   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "komu": "szeregowy (wyzwiska, jeki)",
+   "dlaczego": "wschodni Londyn, gleboki"
+  }
+ },
+ "glosy": {
+  "q1h5HGdnfVxp4TXTJRNN": {
+   "nazwa": "Gideon - Rugged, Gravelly & Northern",
+   "public_owner_id": "655db62473dfb65f630c66cab2df71a87da6f912f5ac05ca869b852e1b7f9489",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "serious",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://api.us.elevenlabs.io/v1/voices/q1h5HGdnfVxp4TXTJRNN/previews/audio?payload=eyJ2b2ljZV9zb3VyY2UiOiJjdXN0b20iLCJ3b3Jrc3BhY2VfaWQiOiI2NmQ0YjczODVmYjU0N2Q0YWM0YWM5YTc0ZTAwODhhMiIsImZpbGVuYW1lIjoiTVRObmczSnJpaDZVemIwVHp1cEYubXAzIiwidGltZXN0YW1wIjoxNzkyODkwMDAwMDAwMDAwfQ%3D%3D",
+   "na_koncie": false
+  },
+  "7rQX8r6PVq3gfJ8rZzyE": {
+   "nazwa": "John North - Northern Englishman",
+   "public_owner_id": "d396af315ee8681a2edbd4739b7c111101366f851614b6d67562a5f62a619e20",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "mature",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/workspace/bfad24883ac04636b8b51cc683f75efb/voices/7rQX8r6PVq3gfJ8rZzyE/snpYHCO31KXa2PqMNMXQ.mp3",
+   "na_koncie": false
+  },
+  "M5E055lOUxMi0kJpGyE9": {
+   "nazwa": "Gravel Midnight – Deep Grit Character Voice",
+   "public_owner_id": "72026985ddcf2e1b6cf05e05a8d5dc2e4d1b644e967553f8f6bf36210739d9a5",
+   "wiek": "old",
+   "akcent": "british",
+   "opis": "rough",
+   "kategoria": "professional",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/user_0401kepfzywfft9a5c4h5j3wnj3n/voices/M5E055lOUxMi0kJpGyE9/e3264828-f266-457d-94dd-29893cacb9a1.mp3",
+   "na_koncie": false
+  },
+  "ib8aaABAPZQpTo6hx8Jr": {
+   "nazwa": "Severin - Powerful & Commanding",
+   "public_owner_id": "bb2cf94b50b0c896a7379e353e0cbf14e27975948e820bb6e749f0013e238cc8",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "intense",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/workspace/f1affe425a5841d88b0c1f6aa4666fc0/voices/ib8aaABAPZQpTo6hx8Jr/byGFjo8l9l8IIGiY4vDg.mp3",
+   "na_koncie": false
+  },
+  "7cOBG34AiHrAzs842Rdi": {
+   "nazwa": "Tarquin - Posh & English RP",
+   "public_owner_id": "2485825829f9fa49abed561fe8e7e7cd78cbc8acdac91837122e6aba40a231a6",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "professional",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/SxKc9zakkgexS9VDBHJYgFlTi272/voices/7cOBG34AiHrAzs842Rdi/hO2k7QHEYyqbRfVr8ddt.mp3",
+   "na_koncie": false
+  },
+  "Veg2qijYoJAS8VPKOOmi": {
+   "nazwa": "Cassian - British Noble",
+   "public_owner_id": "70fa77ad315f86a084535ecf1154f55545ee91e923d9f4a0322756008d4c135d",
+   "wiek": "young",
+   "akcent": "british",
+   "opis": "confident",
+   "kategoria": "professional",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/OeNgvixn0hO26ZLPFAudWTqnsj23/voices/Veg2qijYoJAS8VPKOOmi/dhcGmwPKvj5g1al270E8.mp3",
+   "na_koncie": false
+  },
+  "ktrGUw7rURIQyMrQZqCu": {
+   "nazwa": "Cassius - Velvety, Measured, Commanding",
+   "public_owner_id": "bb2cf94b50b0c896a7379e353e0cbf14e27975948e820bb6e749f0013e238cc8",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "wise",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://api.us.elevenlabs.io/v1/voices/ktrGUw7rURIQyMrQZqCu/previews/audio?payload=eyJ2b2ljZV9zb3VyY2UiOiJjdXN0b20iLCJ3b3Jrc3BhY2VfaWQiOiJmMWFmZmU0MjVhNTg0MWQ4OGIwYzFmNmFhNDY2NmZjMCIsImZpbGVuYW1lIjoicDhRazM0eVN0aHlGTm9EbXkzWFYubXAzIiwidGltZXN0YW1wIjoxNzkyODkwMDAwMDAwMDAwfQ%3D%3D",
+   "na_koncie": false
+  },
+  "2ajXGJNYBR0iNHpS4VZb": {
+   "nazwa": "Rob - Tough & Calloused",
+   "public_owner_id": "465295810ef94f8627fad34ba88551a02745957d1c3b09877a3fc3de528d6f2f",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "rough",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/6ucepsMRFsSPtAkS3qJkLzIdtuw2/voices/2ajXGJNYBR0iNHpS4VZb/qei25Eeg71wvBuDXvBYN.mp3",
+   "na_koncie": false
+  },
+  "lKMAeQD7Brvj7QCWByqK": {
+   "nazwa": "Jason - British Badass",
+   "public_owner_id": "1ae46c1eedf72d9600c1628efc0c02b5cf29b0f5875a6d4f4dbe8f84252f9e30",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "serious",
+   "kategoria": "professional",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/2dTQLtC4bvSzpx50HDFhkOUXRKz1/voices/lKMAeQD7Brvj7QCWByqK/f1VmxZ2tAFIR7nBGHTPE.mp3",
+   "na_koncie": false
+  },
+  "yhf80q1381zd2JJQ4tM7": {
+   "nazwa": "Dominic - British, Brooding & Intense",
+   "public_owner_id": "51855fcd1e38c2297e848e9a2e80a05c830e502b0be1bb014c8e93289fe8b929",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "serious",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/5dVkyvf9hWQ7Nsxgwk1qbTBVxc63/voices/yhf80q1381zd2JJQ4tM7/27x8rzBE0wgw2eYVLLNA.mp3",
+   "na_koncie": false
+  },
+  "goT3UYdM9bhm0n2lmKQx": {
+   "nazwa": "Edward - British, Dark, Seductive, Low",
+   "public_owner_id": "c882580d1c31442030184de536c04f6849c66e1acaa082bf7c3f4479ca5d53a0",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "serious",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/5pJrHdqy3wdQOM1KGVsiuf2OJQ12/voices/goT3UYdM9bhm0n2lmKQx/8e1e53b7-9320-4bab-acf2-86d7e77d1b8b.mp3",
+   "na_koncie": false
+  },
+  "6VgigPFWF0sNZy1BthVg": {
+   "nazwa": "Captain Blackbeard - Gritty Pirate Voice",
+   "public_owner_id": "eeb9240f13725fad2718b050c00721c379d390388b1b9871a58ebd5f232d8803",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "husky",
+   "kategoria": "professional",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/Fi40ZnjuBsMXyI5Dlg184YJQBGZ2/voices/6VgigPFWF0sNZy1BthVg/Ibe8sxufPp0fTT6mx1xu.mp3",
+   "na_koncie": false
+  },
+  "YIn3yKpQSeXNJMF5CIuj": {
+   "nazwa": "Scottish Paisley",
+   "public_owner_id": "22147b29d048b598fb1a4df1018fc0f848b9da904796a51a37ffc3c87f25f6c4",
+   "wiek": "middle_aged",
+   "akcent": "scottish",
+   "opis": "raspy",
+   "kategoria": "professional",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/workspace/7b643c12d8a4464688b99f7cf8e83f2d/voices/YIn3yKpQSeXNJMF5CIuj/370f875c-b4e6-45ac-b3b2-3440d7f318b1.mp3",
+   "na_koncie": false
+  },
+  "KHRvDizAHFVPzoSehNY6": {
+   "nazwa": "Jayce - Grim",
+   "public_owner_id": "bb9155af3bec8240b8db699685a81097bc615809ef5b2becc1fa9d4da8bd0a1c",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "deep",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/workspace/e411ad79f9344e8c8b8f3beede37e82d/voices/KHRvDizAHFVPzoSehNY6/AL5u29sh78beaCC4UtYU.mp3",
+   "na_koncie": false
+  },
+  "1TE7ou3jyxHsyRehUuMB": {
+   "nazwa": "Eastend Steve",
+   "public_owner_id": "3d1fa6a5595e0a31fff8d7c1a2f2794b91ca87ddd200066dfbdfcef662a65a1b",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "rough",
+   "kategoria": "professional",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/custom/voices/1TE7ou3jyxHsyRehUuMB/EHjTRjsNYkFb7uHD2asA.mp3",
+   "na_koncie": false
+  },
+  "AmY1pcgcEc15wyuIj50p": {
+   "nazwa": "Chris -  Northern UK",
+   "public_owner_id": "0c66f442d93f83accc380e0341a1869bddb7ab7531ad7df9d6720c5c3af1c094",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "casual",
+   "kategoria": "professional",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/qSGzghlaXYOcVY8uha8qnNp88C73/voices/AmY1pcgcEc15wyuIj50p/S6JywTDGzgpvH7ANCv7b.mp3",
+   "na_koncie": false
+  },
+  "kTSNDDkx34wKsrujmdm1": {
+   "nazwa": "Jase - Rough Intense British Cinematic",
+   "public_owner_id": "88db64dbc62c0a75483d4055338f31540e451a9db5c46621f63ceb23bb3a296c",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "intense",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/workspace/66f9b58d5e8e4813973e29a2ab19ac58/voices/kTSNDDkx34wKsrujmdm1/krma6Ueg29qcqdmNQUPo.mp3",
+   "na_koncie": false
+  },
+  "poHOO1m3tBNm4Ywmzcaq": {
+   "nazwa": "Noah - Friendly, Natural and Yorkshire",
+   "public_owner_id": "890ab44dfb4d2e405d2b89da690ec2b513d4a52f10073fe001a7566bcedabf7e",
+   "wiek": "young",
+   "akcent": "british",
+   "opis": "confident",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://api.us.elevenlabs.io/v1/voices/poHOO1m3tBNm4Ywmzcaq/previews/audio?payload=eyJ2b2ljZV9zb3VyY2UiOiJjdXN0b20iLCJ1c2VyX2lkIjoiMFc1UVE5SlRKR2dOSkh2V29IQmpYUTVNbzFrMSIsImZpbGVuYW1lIjoiaXJLMElHWUpDSXVlUmlIT2Vsa3oubXAzIiwidGltZXN0YW1wIjoxNzkyODkwMDAwMDAwMDAwfQ%3D%3D",
+   "na_koncie": false
+  },
+  "tczmcUWPAdiP3gKQPrv7": {
+   "nazwa": "Bradley",
+   "public_owner_id": "0da5cab5d9e530fcd746fc04e21c2859bfc0b1da8b70adfe8c8490757d3ce5df",
+   "wiek": "young",
+   "akcent": "british",
+   "opis": "casual",
+   "kategoria": "professional",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/user/cE0udOy1zSVo3MgEyNwekkcUcrv1/voices/tczmcUWPAdiP3gKQPrv7/Vz3TDe2OYmmNeVJqwfT8.mp3",
+   "na_koncie": false
+  },
+  "U4Y0Z2HmYcQYMkJB8hrg": {
+   "nazwa": "Tom - Pirate Character",
+   "public_owner_id": "15539652f47661956f4ae409751b1d6817626d73ad465af181d766e7c72fcc73",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "rough",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://api.us.elevenlabs.io/v1/voices/U4Y0Z2HmYcQYMkJB8hrg/previews/audio?payload=eyJ2b2ljZV9zb3VyY2UiOiJjdXN0b20iLCJ3b3Jrc3BhY2VfaWQiOiIxMjA2YmUwNTBjM2I0ODM0YjdlODNhYjgwYTVlM2JjNSIsImZpbGVuYW1lIjoiNzVhMmJmYjktYjE2NC00ODNkLWFiODItNmQ3ZDVjZGY0MzQ1Lm1wMyIsInRpbWVzdGFtcCI6MTc5Mjg5MDAwMDAwMDAwMH0%3D",
+   "na_koncie": false
+  },
+  "O4uxPTtvgxrA0QCLHI1J": {
+   "nazwa": "Arkadius - Old Storyteller",
+   "public_owner_id": "e21da34db31d58704b7b2776dcf7db1c31b464e5bffd71727d5f1c4abafafa87",
+   "wiek": "old",
+   "akcent": "scottish",
+   "opis": "raspy",
+   "kategoria": "professional",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/database/workspace/631bf5a20c2d45ffacc1311eb5dec41f/voices/O4uxPTtvgxrA0QCLHI1J/LykZTYJiLElpfKXHjIUJ.mp3",
+   "na_koncie": false
+  },
+  "wo6udizrrtpIxWGp2qJk": {
+   "nazwa": "Northern Terry",
+   "public_owner_id": "3d1fa6a5595e0a31fff8d7c1a2f2794b91ca87ddd200066dfbdfcef662a65a1b",
+   "wiek": "young",
+   "akcent": "british",
+   "opis": "husky",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://storage.googleapis.com/eleven-public-prod/custom/voices/wo6udizrrtpIxWGp2qJk/hE6lDLlBQf56q6cg6FIP.mp3",
+   "na_koncie": false
+  },
+  "ytcsltLTtCHxNn1vC76H": {
+   "nazwa": "Ricky",
+   "public_owner_id": "7739b49ad92a218f2f643417333af017428de731d072c88c9b605147c05b417f",
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "casual",
+   "kategoria": "high_quality",
+   "stawka": 1.0,
+   "probka_mp3": "https://api.us.elevenlabs.io/v1/voices/ytcsltLTtCHxNn1vC76H/previews/audio?payload=eyJ2b2ljZV9zb3VyY2UiOiJjdXN0b20iLCJ1c2VyX2lkIjoiaXRoU25kdUxBaGFPY1NVZEprNjJQNkFHUkJPMiIsImZpbGVuYW1lIjoiSFBOZGdEeGwxeU1ITnNxaUxCQmQubXAzIiwidGltZXN0YW1wIjoxNzkyODkwMDAwMDAwMDAwfQ%3D%3D",
+   "na_koncie": false
+  },
+  "qxePw1S1QmBgjlU3GIy5": {
+   "nazwa": "Older Joe Narrator",
+   "public_owner_id": null,
+   "wiek": "old",
+   "akcent": "british",
+   "opis": "classy",
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "HAvvFKatz0uu0Fv55Riy": {
+   "nazwa": "Ancient Sage (Matthew Schmitz)",
+   "public_owner_id": null,
+   "wiek": "old",
+   "akcent": "british",
+   "opis": "raspy",
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "onwK4e9ZLuTAKqWW03F9": {
+   "nazwa": "Daniel - Steady Broadcaster (premade)",
+   "public_owner_id": null,
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "formal",
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "wyWA56cQNU2KqUW4eCsI": {
+   "nazwa": "Clyde Narrator",
+   "public_owner_id": null,
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "deep",
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "U5UjeJMsOvyhYhXfZdvZ": {
+   "nazwa": "Adam Scottish Storyteller",
+   "public_owner_id": null,
+   "wiek": "old",
+   "akcent": "scottish",
+   "opis": "crisp",
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "JBFqnCBsd6RMkjVDRZzb": {
+   "nazwa": "George (premade)",
+   "public_owner_id": null,
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "mature",
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "G17SuINrv2H9FC6nvetn": {
+   "nazwa": "Christopher Narrator",
+   "public_owner_id": null,
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "calm",
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "oaGwHLz3csUaSnc2NBD4": {
+   "nazwa": "Benedict Narrator",
+   "public_owner_id": null,
+   "wiek": "middle_aged",
+   "akcent": "british",
+   "opis": "calm",
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  }
+ }
+}
