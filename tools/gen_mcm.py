@@ -638,6 +638,10 @@ RANGES = {
     'AiArriveWithBreathPercent': (20, 80, "0"),
     'AiRunsLastMetres': (10.0, 60.0, "0"),
     'WindedPose': (0, 3, "0"),
+    # 151 regeneracja wykladniczo od Atletyki: punkty Atletyki na podwojenie 50..300
+    'BreathAthleticsDoubling': (50.0, 300.0, "0"),
+    # 152 mistrzowie ponad 300 Atletyki: punkty na podwojenie puli 0..100 (0 = wylaczone)
+    'AthleticsMasteryDoubling': (0.0, 100.0, "0"),
 }
 
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze

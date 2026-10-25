@@ -80,8 +80,11 @@ namespace Armoury
         private static bool _breathReady;        // latki InitializeStamina i tickStaminaRegen wpiete i pola znalezione
 
         // stale z komentarzem i zrodlem (projekt regen-model.txt, sekcja MODEL 3)
-        private const float AthFastK = 0.75f;    // Atletyka 300 skraca tau szybki x1.75 (Pesta 2013: niewytrenowani 41 s, wytrzymalosciowi 30 s; Chorley 2022 21.5 s)
-        private const float AthSlowK = 0.30f;    // Atletyka 300 skraca tau wolny tylko x1.3 (Chorley 2022: brak zwiazku tau wolnego z kondycja)
+        // 151 (25.10, Jeff: "im mam wieksza atletyke tym szybciej sie regeneruje nawet jak mi stamina zejdzie do 2% ... atletyka 300 to heroiczna kondycja ... dosc szybko
+        // sie zregeneruje ... 10 atletyki to wysilek mnie naprawde meczy i dluzej dochodze do siebie"): stale czasowe wykladniczo od Atletyki, kotwica = przecietny
+        // czlowiek (Atletyka 100) z badan (szybki 40 s, wolny 400 s): wolny 2x szybciej co BreathAthleticsDoubling (100) pkt, szybki co dwa razy tyle.
+        // Dotad (137): A0 -> A300 tylko x1.75 szybki i x1.3 wolny.
+        private const float AthAnchor = 100f;
         private const float KgFast = 0.002f;     // zbroja: tau szybki +0.2%/kg (46 kg x1.09; Haseler 1999: nawet niedotlenienie tylko +34%)
         private const float KgSlow = 0.005f;     // zbroja: tau wolny +0.5%/kg (46 kg x1.23; Askew 2012: utrudniony oddech w zbroi)
         private const float WalkBase = 0.85f, WalkPerKg = 0.0075f, WalkMin = 0.4f;   // chod: 0.85 - 0.0075 x kg, najmniej 0.4 (Askew 2012 chod w zbroi x2.1-2.3; Lievens 2021)
@@ -174,14 +177,26 @@ namespace Armoury
         {
             if (a <= 0f) return 0f;
             float p = CurveP(c);
-            if (p <= 1.0001f) return a;
-            return CurveRef * (float)Math.Pow(a / CurveRef, p);
+            float a2 = p <= 1.0001f ? a : CurveRef * (float)Math.Pow(a / CurveRef, p);
+            // 152 (25.10, Jeff: "kazdy punkt powyzej 300 to powinien byc wart znacznie wiecej ... 301 np. 2825, 310 3500 ... od 300 do 400 to ogromna roznica jak w
+            // prawdziwych mistrzostwach"): powyzej 300 pula RBM = 2800 x 2^((A - 300) / AthleticsMasteryDoubling) - A' z odwrotnosci wzoru RBM 1000 x (1 + 3A'/500);
+            // ciagle w 300 (2800), rosnace. Ta sama A' idzie do oddechu 137/151 i do biegu 127, wiec mistrz takze szybciej odpoczywa i dluzej biegnie.
+            float d = c != null ? c.AthleticsMasteryDoubling : 0f;
+            if (a > CurveRef && d > 0.5f)
+            {
+                d = Clamp(d, 10f, 100f);
+                double pool = 2800.0 * Math.Pow(2.0, (a - CurveRef) / d);
+                float ap = (float)((pool / 1000.0 - 1.0) * 500.0 / 3.0);
+                if (ap > a2) a2 = ap;
+            }
+            return a2;
         }
 
         /// <summary>130: pula i regeneracja RBM z Atletyki po krzywej - stosunek do linii RBM (zostaja inne mnozniki RBM: ciezki korpus x0.5, mnoznik gracza).</summary>
         private static void ApplyAthleticsCurve(Agent agent, object stance, Settings c)
         {
-            if (CurveP(c) <= 1.0001f) return;
+            // 117 (recenzja 152): przy krzywej 1.0 i wlaczonym mistrzostwie (ponad 300) pula RBM tez - oddech i bieg dostaja je zawsze (CurvedAthletics)
+            if (CurveP(c) <= 1.0001f && !(c != null && c.AthleticsMasteryDoubling > 0.5f)) return;
             float a;
             try { a = MissionGameModels.Current.AgentStatCalculateModel.GetEffectiveSkill(agent, DefaultSkills.Athletics); }
             catch { return; }
@@ -502,10 +517,11 @@ namespace Armoury
                 float max = _rMaxStamina(stance);
                 var b = new Breath();
                 b.Agent = agent;
-                // tau szybki: BreathFastSeconds (40 s przy Atletyce 0) / (1 + 0.75 A'/300) x (1 + 0.002 kg) - A0 40 s, A100 33 s, A200 27 s, A300 23 s
-                b.TauF = Clamp(c.BreathFastSeconds, 15f, 90f) / (1f + AthFastK * a2 / 300f) * (1f + KgFast * kg);
-                // tau wolny: BreathSlowSeconds (400 s przy Atletyce 0) / (1 + 0.30 A'/300) x (1 + 0.005 kg) - A0 400 s, A300 308 s
-                b.TauS = Clamp(c.BreathSlowSeconds, 120f, 1200f) / (1f + AthSlowK * a2 / 300f) * (1f + KgSlow * kg);
+                // 151: tau szybki = BreathFastSeconds (przy Atletyce 100) x 2^((100 - A') / (2 x D)) x (1 + 0.002 kg) - A0 57 s, A100 40 s, A200 28 s, A300 20 s
+                // tau wolny = BreathSlowSeconds (przy Atletyce 100) x 2^((100 - A') / D) x (1 + 0.005 kg) - A0 800 s, A100 400 s, A200 200 s, A300 100 s (D = 100)
+                float dbl = Clamp(c.BreathAthleticsDoubling, 50f, 300f);
+                b.TauF = Clamp(Clamp(c.BreathFastSeconds, 15f, 90f) * (float)Math.Pow(2.0, (AthAnchor - a2) / (2f * dbl)) * (1f + KgFast * kg), 8f, 180f);
+                b.TauS = Clamp(Clamp(c.BreathSlowSeconds, 120f, 1200f) * (float)Math.Pow(2.0, (AthAnchor - a2) / dbl) * (1f + KgSlow * kg), 45f, 3600f);
                 // spowolnienie wolnego po kolejnej zadyszce: 1 - 0.5 A'/300 (Chorley 2022: mniejsze przy wyzszym VO2max, r = -0.68)
                 b.G = Clamp(1f - 0.5f * a2 / 300f, 0f, 1f);
                 b.WalkM = Math.Max(WalkMin, WalkBase - WalkPerKg * kg);
@@ -739,7 +755,7 @@ namespace Armoury
                     sb.Append(" | potkniecia ").Append(_bStumbles);
                     if (c != null)
                         sb.Append(" | regula: szybki ").Append(Clamp(c.BreathFastSeconds, 15f, 90f).ToString("0", inv)).Append(" s, wolny ")
-                          .Append(Clamp(c.BreathSlowSeconds, 120f, 1200f).ToString("0", inv)).Append(" s, zbiornik ").Append(Clamp(c.BreathFastShare, 0.2f, 0.8f).ToString("0.00", inv))
+                          .Append(Clamp(c.BreathSlowSeconds, 120f, 1200f).ToString("0", inv)).Append(" s (Atletyka 100; 2x szybciej co ").Append(Clamp(c.BreathAthleticsDoubling, 50f, 300f).ToString("0", inv)).Append(" pkt - 151), zbiornik ").Append(Clamp(c.BreathFastShare, 0.2f, 0.8f).ToString("0.00", inv))
                           .Append(", walka x").Append(Clamp(c.BreathFightShare, 0f, 1f).ToString("0.00", inv))
                           .Append(" (po strzale ").Append(Clamp(c.BreathShotFightSeconds, 0f, FightWindow).ToString("0.#", inv)).Append(" s)")
                           .Append(", wyjscie ").Append((WindedExit(c) * 100f).ToString("0", inv))
@@ -860,7 +876,7 @@ namespace Armoury
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
                 Log.Info("BattleWind (137): oddech dwufazowy " + (_breathReady ? "gotowy" : "NIEGOTOWY (latki albo pola RBM)") + ", klucz BreathTwoPhase przy starcie "
                          + (breath ? "TAK" : "NIE") + " (na zywo) | szybki " + (c != null ? c.BreathFastSeconds.ToString("0", inv) : "-") + " s, wolny "
-                         + (c != null ? c.BreathSlowSeconds.ToString("0", inv) : "-") + " s, zbiornik " + (c != null ? c.BreathFastShare.ToString("0.00", inv) : "-")
+                         + (c != null ? c.BreathSlowSeconds.ToString("0", inv) : "-") + " s (przy Atletyce 100, 2x szybciej co " + (c != null ? c.BreathAthleticsDoubling.ToString("0", inv) : "-") + " pkt - 151), zbiornik " + (c != null ? c.BreathFastShare.ToString("0.00", inv) : "-")
                          + ", walka x" + (c != null ? c.BreathFightShare.ToString("0.00", inv) : "-") + " (po strzale " + (c != null ? c.BreathShotFightSeconds.ToString("0.#", inv) : "-")
                          + " s), wyjscie z zadyszki " + (c != null ? (WindedExit(c) * 100f).ToString("0", inv) : "-")
                          + "% | InitializeStamina " + (initS ? "TAK" : "NIE") + ", tickStaminaRegen " + (tickS ? "TAK" : "NIE")

@@ -1312,6 +1312,10 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool StaminaFromAthleticsOnly { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Athletics Mastery Doubling", 0.00f, 100.00f, "0", HintText = "above Athletics 300 every point is the gap between champions: stamina doubles with every this many points (at 31: Athletics 310 gives about 3500 instead of 2800, 330 about 5500, 350 about 8700), and breath and running grow with it. 0 = no extra above 300; 1 to 9 count as 10", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float AthleticsMasteryDoubling { get; set; } = 31f;
+
         [SettingPropertyFloatingInteger("Athletics Stamina Curve", 1.00f, 1.50f, "0.00", HintText = "how stamina and breath grow with Athletics: each further point counts a little more than the one before, as each costs more experience to learn. Athletics 300 gives what Realistic Battle Mod gives; at 1.12 Athletics 100 counts as 88, 200 as 191 and 400 as 414. 1.0 = a straight line, as in Realistic Battle Mod", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float AthleticsStaminaCurve { get; set; } = 1.12f;
@@ -1320,13 +1324,17 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool BreathTwoPhase { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Breath Fast Seconds", 15.00f, 90.00f, "0", HintText = "the quick part of the breath: seconds a man with Athletics 0 and no armour needs, standing, to win back about two thirds of it. Athletics 300 is almost twice as quick, heavy armour a little slower (measured in people: 30 to 41 s)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Breath Fast Seconds", 15.00f, 90.00f, "0", HintText = "the quick part of the breath: seconds an ordinary man (Athletics 100) with no armour needs, standing, to win back about two thirds of it. It grows twice as quick for every two steps of Breath Athletics Doubling (Athletics 300: about 20 s, Athletics 0: about 57 s); heavy armour a little slower (measured in people: 30 to 41 s)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float BreathFastSeconds { get; set; } = 40f;
 
-        [SettingPropertyFloatingInteger("Breath Slow Seconds", 120.00f, 1200.00f, "0", HintText = "the slow part of the breath, which only a hard effort uses up: seconds a man with Athletics 0 needs, standing, to win back about two thirds of it. Athletics shortens it a little, heavy armour lengthens it by up to a quarter. At 400 a man who was completely spent is back to 90% after about 10 minutes of rest; lower = men are fresh again sooner", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Breath Slow Seconds", 120.00f, 1200.00f, "0", HintText = "the slow part of the breath, which only a hard effort uses up: seconds an ordinary man (Athletics 100) needs, standing, to win back about two thirds of it - he is back to 90% about 10 minutes after being completely spent. It halves with every Breath Athletics Doubling points of Athletics: a man of heroic fitness (300) is fresh again in about 3 minutes, a weakling (10) needs over 20; heavy armour lengthens it by up to a quarter. Lower = everyone is fresh again sooner", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float BreathSlowSeconds { get; set; } = 400f;
+
+        [SettingPropertyFloatingInteger("Breath Athletics Doubling", 50.00f, 300.00f, "0", HintText = "how strongly Athletics speeds up getting your breath back: every this many points of Athletics above an ordinary man's 100 make the slow part of the breath twice as quick (and the quick part twice as quick for every twice as many); every this many below make it twice as slow. Lower = fitness counts for more", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BreathAthleticsDoubling { get; set; } = 100f;
 
         [SettingPropertyFloatingInteger("Breath Fast Share", 0.20f, 0.80f, "0.00", HintText = "how much of the pool the quick part holds: whatever a man spends beyond it goes into the slow part. 0.5 = after a full collapse half of the pool comes back quickly and half slowly", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
@@ -10399,10 +10407,12 @@ namespace Armoury
             s.ArmourRunCostPerKgPercent = ArmourRunCostPerKgPercent;
             s.NoBreathWhileRunning = NoBreathWhileRunning;
             s.StaminaFromAthleticsOnly = StaminaFromAthleticsOnly;
+            s.AthleticsMasteryDoubling = AthleticsMasteryDoubling;
             s.AthleticsStaminaCurve = AthleticsStaminaCurve;
             s.BreathTwoPhase = BreathTwoPhase;
             s.BreathFastSeconds = BreathFastSeconds;
             s.BreathSlowSeconds = BreathSlowSeconds;
+            s.BreathAthleticsDoubling = BreathAthleticsDoubling;
             s.BreathFastShare = BreathFastShare;
             s.BreathFightShare = BreathFightShare;
             s.BreathShotFightSeconds = BreathShotFightSeconds;

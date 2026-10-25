@@ -899,6 +899,83 @@ komponentu" (ofiara szarzy RBM, ok. 10 s) jest PANIKA wszedzie: 147 pije jej odd
 142 trzyma PANIKE do konca bitwy (zbior RoutHold), wiec liczby tej linii zmieniaja kolejne kroki: "powroty RBM" -> ok. 0 (142), "z zadyszka" w gore (147), "dopadnieci:
 konny" w gore (148); odwrot rannego 143 i wycofanie bohatera 149 to ROZSADEK (spis: "odwrot rannego z bronia (143)"; 149 bez IsRunningAway - nie wchodzi w "rozkaz szyku").
 **Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie od noc/138-calosc d331082f; Armoury.dll md5 79d38d7fbe57aa9b316b02672ed4fa88).
+## 2026-10-25 153 (galaz noc/138-calosc) - okno lupu: tekst "Near X" z tej samej osady co obrazek (najblizsza od miejsca bitwy)
+**Problem:** Autotest 117b: bitwy pod brama Riverrun (AUTOTEST "czekam w Riverrun [town_V2]"), okno lupu pisalo "Near Pendric", a obrazek (117r) mial juz osade Riverrun ("obrazek messenger-1 (pole river, osada Riverrun / river)").
+**Przyczyna:** SpoilsReport.ApplyResultsPrefix: s.Place = Nm(MapEventSettlement ?? Hero.MainHero.LastKnownClosestSettlement) - bitwa w polu nie ma MapEventSettlement, a LastKnownClosestSettlement gra odswieza rzadko.
+**Zmiana:** s.Place = Nm(s.Near) - ta sama osada co obrazek: MapEventSettlement (bitwa przy osadzie, takze kryjowka), bez niej najblizsza osada nie-kryjowka od MapEvent.Position (SpoilsWindow.NearestPlace), zapas - jak dotad.
+**Ryzyko / co sprawdzic:** Place czytaja tylko tekst okna ("Near X, against Y"), linie logu okna lupu i warunek pierwszej bitwy raportu (string.IsNullOrEmpty - Nm daje "-", nigdy pusty) - bez zmian w liczeniu lupu. Turniej, szturm i okup maja Place z wlasnej osady (bez zmian). W logu: "Okno lupu (117): bitwa N (bitew 1) <osada>" = osada z "obrazek ... osada <osada>".
+**Status:** ZBUDOWANE - do paczki 118 (razem z fala AI 139-149).
+
+## 2026-10-25 117r (galaz noc/138-calosc) - poprawki po niezaleznej recenzji 150a/150b/151/152 (4 recenzentow + 2 weryfikatorow na zarzut, 9 zarzutow potwierdzonych, 6 roznych)
+**Problem:** Recenzja przed wgraniem 117 (workflow review-117, 16 agentow). 150a - bez zarzutow. Potwierdzone:
+(1) lordowie Skagos dostawali obrazek dzikich - krolestwo Skagos ma w ROT-Content/ROT_spkingdoms.xml kulture freefolk (rod ROTclan_107 - skagosi), a 150b bralo kulture frakcji lidera;
+(2) Ship1 (pion 803x1740) i Ship2 (pasek 2610x735 na przezroczystym tle) w pulach morza i Zelaznych Wysp - w ramce 640x360 okna pusty kamien z kawalkami zagli (zdjecie obrazek-150-39-Ship2.png);
+(3) bitwa w polu i na morzu: osada regionu z Hero.LastKnownClosestSettlement, ktore gra odswieza rzadko - na morzu region portu, z ktorego gracz wyplynal;
+(4) osady zajete przez Innych (ROT ChangeToOthersCulture - kultura Innych) szly do regionu "west";
+(5) 152: przy kluczu Athletics Stamina Curve = 1.00 ApplyAthleticsCurve wracal przed mistrzostwem - oddech i bieg dostawaly premie ponad 300, pula RBM nie (u Jeffa 1.12 - nie dotyczy);
+(6) suwak Athletics Mastery Doubling 1..9 dziala jak 10 bez slowa w opisie.
+**Zmiana:** (1) SpoilsReport.ApplyResultsPrefix: kultura wroga z rodu lidera (MobileParty.ActualClan), zapas - frakcja; (2) PicSea = StannisSetsSail, PicSeaCrown = blackwater/StannisSetsSail, PicSeaEssos = aegon/StannisSetsSail, PicIron = StannisSetsSail/messenger-2 (Ship1/Ship2 poza pulami); (3) Near = MapEventSettlement, a bez niej najblizsza osada nie-kryjowka od MapEvent.Position (nowe SpoilsWindow.NearestPlace, ta sama petla co dla kryjowki), zapas - jak dotad; tekst "Near X" okna bez zmian; (4) Undead.IsUndeadCulture (regula Undead.Character) - region "undead": pole PicUndead, szturm/okup SiegeUndead (wallfall, freefolk3); (5) warunek wyjscia: krzywa 1.0 I mistrzostwo wylaczone; (6) opis klucza "1 to 9 count as 10" (gen_mcm 2494).
+**Ryzyko / co sprawdzic:** Tylko wybor obrazka okna lupu i - przy kluczu krzywej 1.00 - pula RBM ponad 300 (domyslnie 1.12: bez zmiany). Petla po Settlement.All raz na bitwe gracza w polu (ok. 2000 osad, bez alokacji). W logu linie okna lupu "obrazek ... (temat, osada ...)" - osada blisko miejsca bitwy.
+**Status:** WGRANE 117 (25.10 18:23 CET; Armoury.dll md5 2c95388a2b546d1c01b24cbb98d241be, build c55b2c58 galezi noc/138-calosc; CrashScribe bez zmian bef9db58; kopie: Armoury.dll.bak-2026-10-25-przed-wgranie117 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie117-przed). Autotesty: 152a (sam 151+152) kod 0, ERROR 0, 4/4 bitwy; 117a (151+152+150) kod 0, ERROR 0, zdjecia okien 22/22; 117b (po poprawkach 117r) kod 0, ERROR 0, zdjecia 22/22, okna lupu z obrazkiem wedlug miejsca ('obrazek messenger-1 (pole river, osada Riverrun / river)' - bitwy autotestu pod brama Riverrun; dawne LastKnownClosestSettlement mowilo Pendric).
+
+## 2026-10-25 150b (galaz noc/150-obrazki) - obrazek okna lupu dopasowany do miejsca: region osady, Inni, dzicy, morze; Joffrey nigdzie
+**Problem:** Jeff 25.10: "dopasuj obrazki w oknach lupu do miejsca". Dotad SpoilsWindow.Picture bral obrazek z jednej puli na rodzaj raportu (bitwa: RobbMarching3 / WildlingsFail / jon_stand / blackwater; oblezenie: harrenhal / wallfall / eastwatch / blackwater; turniej: kingslanding / joffrey) po numerze raportu - bitwa w Dorne dawala Czarny Nurt albo Mur, turniej gdziekolwiek - sale tronowa albo Joffreya.
+**Przyczyna:** Picture nie znal miejsca ani wroga (raport mial tylko nazwe osady jako tekst).
+**Zmiana:** Ramka A (ApplyResultsPrefix) zapisuje do raportu osade miejsca (Near = MapEventSettlement albo LastKnownClosestSettlement), wroga (Foe: "undead" - Undead.Party lidera strony wroga, "wild" - kultura frakcji freefolk/wildlings) i morze (MapEvent.IsNavalMapEvent); raport bierze je z pierwszej bitwy (jak Place). Picture: region z kultury osady (PicRegion: battania/skagosi Polnoc, nightswatch Mur, freefolk/wildlings za Murem, river Dorzecze, vale/hilltribesmen Dolina, crownlands Ziemie Koronne, sturgia Zelazne Wyspy, kultury Essos - Essos, reszta Westeros); kryjowka - najblizsza osada nie-kryjowka. Pule (album 150a - tylko widoki, bitwy, obozy, zamki, bez portretow): Inni - nightking/freefolk3/jon_death/wallfall; morze - StannisSetsSail/Ship2/Ship1 (Ziemie Koronne: blackwater, Essos: aegon); dzicy - freefolk1/freefolk2/fist/WildlingsFail; pole wedlug regionu (Polnoc jon_stand/messenger-img/RobbMarching3, Dorzecze riverlands, Mur eastwatch/fist, Essos dany_invasion/aegon, reszta jon_stand/messenger-1/messenger-2); szturm i okup wedlug regionu (harrenhal, traveling_merchant, eastwatch/wallfall na Murze, riverlands, blackwater, Essos); turniej - kingslanding TYLKO w King's Landing (town_EW4), gdzie indziej traveling_merchant/harrenhal; joffrey usuniety. Pliki Images/Loot/loot_* nadal maja pierwszenstwo. Linia logu okna (okno: ...) i notka proby zdjec 132 dostaja "obrazek X (temat, osada Y / kultura)".
+**Ryzyko / co sprawdzic:** Tylko wybor nazwy sprite'a (ta sama kategoria ui_event_category, ten sam HasSprite, ten sam zapas messenger-img) - bez zmian w warstwie okna i w liczeniu lupu. Nowe pola raportu nie sa zapisywane w zapisie gry (raport zyje do pokazania okna). Petla po Settlement.All tylko przy bitwie przy kryjowce (raz na okno). W logu: linie okna lupu z "obrazek ..." - czy temat zgadza sie z miejscem; proba 132 (kroki 5-7) - obrazek w notce.
+**Status:** WGRANE 117 (patrz wpis 117r).
+
+## 2026-10-25 150a (galaz noc/150-obrazki od noc/138-calosc d331082f) - proba autotestu: zdjecie okna lupu z kazdym obrazkiem wydarzen ROT (krok 1 dopasowania obrazkow)
+**Problem:** Jeff 25.10 ok. 17:00: "dopasuj obrazki w oknach lupu do miejsca". Okno lupu (SpoilsWindow.Picture) bierze sprite z pul na sztywno (bitwa: RobbMarching3,
+WildlingsFail, jon_stand, blackwater; oblezenie: harrenhal, wallfall, eastwatch, blackwater; turniej: kingslanding, joffrey) albo plik Images/Loot - bez zwiazku z miejscem,
+a miejsce na obrazek w prefabie ArmSpoilsWindow.xml to stale 640x360 (16:9), podczas gdy czesc obrazkow ROT ma inne proporcje (ROT-ContentSpriteData.xml: m.in.
+BlackwaterWarning 512x768, Ship1 803x1740, Davos i Stannis 1240x1024, harrenhal 986x669, Ship2 2610x735). Przed dopasowaniem trzeba obejrzec tresc i wyglad kazdego
+obrazka w oknie - z samej nazwy sprite'a nie wiadomo, co przedstawia.
+**Przyczyna:** brak sposobu, zeby zobaczyc wszystkie obrazki kategorii ui_event_category w oknie lupu bez czekania na bitwy (okno pokazuje jeden obrazek z puli wedlug Id raportu).
+**Zmiana:** (1) Nowy plik SpoilsAtlas.cs - proba tylko w autotescie: DLL autotestu CrashScribe (LogGate.Mode 1/2) i plik CrashScribe\armoury-zdjecia-obrazkow.flag (tylko
+czytany); w zwyklej grze jedno sprawdzenie trybu na sesje i wyjscie. Raz na proces, w warunkach spokoju proby 132 (WindowPhotos.Calm: mapa, bez misji, spotkania poza osada,
+zapytan, okna lupu i opowiesci, Prologue.SceneGate, etap autotestu Run; 30 s po wejsciu na mape, 3 s spokoju, najdluzej 60 min czekania). Lista sprite'ow z SpriteData W CZASIE
+GRY (SpriteGeneric, SpritePart.Category.Name == ui_event_category; bez event-bg i testevent), po nazwie bez wielkosci liter. Dla kazdego okno lupu probne (raport kroku 5 proby
+132 - WindowPhotos.TestRep, jeden na probe; bez SpoilsReport.Finish, bez zmiany stanu gry) z WYMUSZONYM tym sprite'em jako obrazkiem i tytulem okna "Sprite nn/N: nazwa
+(W x H)"; po 1.5 s (obce zapytanie nad oknem - czeka do 8 s) TakeScreenshot do CrashScribe\zdjecia\obrazek-150-nn-nazwa.png, zamkniecie 1 s po zdjeciu, nastepny po 0.3 s.
+Linie "Obrazki lupu (150): ..." - start (liczba, lista, ile obrazkow ma proporcje inne niz miejsce o ponad 5%), na kazdy obrazek "nn nazwa WxH (proporcje p, wobec miejsca
++-x%) - TAK plik ... / NIE (powod)", koniec (TAK/NIE, pliki zapisane po zdjeciu - plik starszy niz zdjecie liczony jako brak, potkniecia, czas, wynik). Przerwanie (misja,
+bitwa gracza, etap autotestu inny niz Run, inna kampania, 30 potkniec): okno zamkniete, linia "przerwana". (2) SpoilsWindow.ShowPhoto: parametry opcjonalne sprite i title
+(obrazek wymuszony zamiast Picture, kategoria ladowana EnsureEventSprites jak w Picture, brak sprite'a - powod NIE; tytul zamiast TitleOf); bez nich (WindowPhotos) - kod jak
+dotad. (3) WindowPhotos: Calm, StopWhy, Stage, TestRep z private na internal (bez zmiany tresci); Calm(true) czeka, dopoki SpoilsAtlas.Running - proby 132 i 150 nie ida naraz
+(150 czeka, dopoki WindowPhotos.Active). (4) SubModuleMain.SpoilsTick: SpoilsAtlas.AppTick po WindowPhotos.AppTick, w osobnym try z wlasnym licznikiem bledu ladowania typu
+(_atlasFails, po 3 koniec) - blad proby nie liczy sie do _spoilsFails okna lupu.
+**Ryzyko / co sprawdzic:** (1) Okno lupu poza proba bez zmian: Show() (prawdziwy raport) nie dotkniety, ShowPhoto bez nowych parametrow idzie ta sama droga (Picture);
+nowa galaz tylko przy sprite != null (wola ja tylko SpoilsAtlas). (2) Czas: ok. 3 s na obrazek, przy 46 obrazkach ok. 2.5 min biegu dob - autotest z dni=2 mial etap Run
+ok. 51 s (16:58:40-16:59:31) i proba zostalaby przerwana ("etap autotestu ..."); do tej proby dni co najmniej 8 (przy obu flagach 132 idzie pierwsza, ok. 45 s, potem 150).
+(3) Dysk: zrzut silnika ma ok. 24 MB na zdjecie (132: 24300 KB) - 46 zdjec to ok. 1.1 GB w Documents\...\CrashScribe\zdjecia; kolejna proba nadpisuje te same nazwy
+(jesli silnik nie nadpisze - linia koncowa: "stary plik sprzed zdjecia"). (4) Czas gry nie stoi (jak w 132 - autotest steruje czasem), okno lupu w autotescie i tak
+zamyka bezpiecznik 12 s. (5) Kategoria ui_event_category ladowana cala (jak przy kazdym oknie lupu i oknie wydarzenia ROT) - bez zmian pamieci wzgledem gry.
+(6) Sprawdzic w Armoury-*.log: "Obrazki lupu (150): start | obrazkow N" (spodziewane 46 z ROT-Content), linie TAK na kazdy, "koniec ... wynik TAK"; na zdjeciach tytul
+okna = nazwa sprite'a.
+**Status:** WGRANE 117 (patrz wpis 117r; proba dziala tylko z flaga armoury-zdjecia-obrazkow.flag); wczesniej: ZBUDOWANE - proba (galaz noc/150-obrazki od noc/138-calosc d331082f).
+## 2026-10-25 152 (galaz noc/138-calosc) - Atletyka ponad 300: mistrzowie - pula podwaja sie co 31 punktow (310 = ok. 3500, 330 = ok. 5500)
+**Problem:** Jeff 25.10 ok. 17:35: "kazdy punkt powyzej 300 to powinien byc wart znacznie wiecej, 307 a 300 to juz sa roznice na poziomie mistrzow ... jak na np. 300 atletyki mam 2800 kondycji to 301 mam np. 2825, a na 310 3500 ... kazdy punkt juz od 300 do 400 to jest ogromna roznica jak w prawdziwych mistrzostwach".
+**Przyczyna:** Krzywa 130 (A' = 300 x (A/300)^1.12) rosnie powyzej 300 prawie liniowo (pula 1000 x (1 + 3A'/500): 301 -> 2811, 310 -> 2918).
+**Zmiana:** BattleWind.CurvedAthletics: powyzej 300 pula RBM = 2800 x 2^((A - 300) / AthleticsMasteryDoubling) (nowy klucz, 31; 0..100, 0 = wylaczone), A' z odwrotnosci wzoru RBM; ciagle w 300, rosnace (max z krzywej 130). Ta sama A' idzie do oddechu (151: TauF/TauS - przy 310 juz na dolnych granicach 13/45 s, przy 320+ 8/45 s) i do biegu 127 (sufit sprawnosci podniesiony 1.6 -> 2.5: 310 - 215 s bez zbroi, 52 s w 46 kg; 330 - 300 s / 72 s). Pula: 301 2863, 305 3131, 310 3502, 320 4379, 330 5476, 350 8564.
+**Ryzyko / co sprawdzic:** Bohaterowie i elita z Atletyka ponad 300 (rzadko - limit nauki ok. 330) prawie sie nie mecza w walce (koszty RBM stale, ok. 35-45 pkt na cios). Linia 'BattleWind (130)' gracza (Atletyka liczona jak A') i 'Bieg (127)'. Zmiana sufitu fit dotyczy tylko A' > 340, czyli Atletyki ponad ok. 302 - ponizej bez zmian.
+**Status:** WGRANE 117 (patrz wpis 117r; autotest 152a: gracz Atletyka 232 -> A' 225, pula 2349, TauF 28.3 s, TauS 207 s w 46.3 kg - zgodnie ze wzorem).
+
+## 2026-10-25 151 (galaz noc/138-calosc) - regeneracja staminy wykladniczo od Atletyki: Atletyka 300 wraca do sil z 2% w ok. 3 min, Atletyka 10 w ponad 20 min
+**Problem:** Jeff 25.10 ok. 17:25: "regeneracja staminy powinna byc im mam wieksza atletyke tym szybciej sie regeneruje nawet jak mi stamina zejdzie do 2% to jak mam atletyke 300 to jest heroiczna kondycja to dosc szybko sie zregeneruje i to samo jak mam 10 atletyki to wysilek mnie naprawde meczy i dluzej dochodze do siebie".
+**Przyczyna:** Oddech dwufazowy 137 (WGRANE 116) skracal stale czasowe z Atletyka tylko liniowo i slabo: tau szybki 40 s / (1 + 0.75 A'/300), tau wolny 400 s / (1 + 0.30 A'/300) - od Atletyki 0 do 300 szybki x1.75, wolny tylko x1.3 (zgodnie z Chorley 2022, ktory nie znalazl zwiazku fazy wolnej z kondycja). Po zadyszce 90% wracalo po ok. 10-12 min niezaleznie od kondycji.
+**Zmiana:** BattleWind.MakeBreath: kotwica = przecietny czlowiek (Atletyka 100) z badan; tau wolny = BreathSlowSeconds x 2^((100 - A')/D), tau szybki = BreathFastSeconds x 2^((100 - A')/(2D)), D = nowy klucz BreathAthleticsDoubling (100; 50..300), x zbroja jak dotad, przyciete 45..3600 s i 8..180 s. A' = krzywa 130. Znaczenie BreathFastSeconds / BreathSlowSeconds: teraz przy Atletyce 100 (dotad przy 0) - w Armoury.json Jeffa tych kluczy jeszcze nie ma (sprawdzone), wiec dzialaja domyslne. Opisy MCM i linie logu ('regula ... (Atletyka 100; 2x szybciej co D pkt - 151)') poprawione. Na postoju od 2% (symulacja wzoru): A10 - 50% po 106 s, 90% po 20 min; A100 - 73 s, 11.6 min; A200 - 46 s, 5.7 min; A232 (Jeff) - 39 s, 4.5 min; A300 - 28 s, 2.7 min. W marszu, walce i biegu mnozniki 137 bez zmian.
+**Ryzyko / co sprawdzic:** Slabi zolnierze (Atletyka 20-60) po zadyszce dlugo nie wracaja do sil - bitwy z rekrutami szybciej sie rozstrzygaja; elita i bohaterowie wyraznie silniejsi w dlugiej walce. Linia 'Oddech (137)': sr. TauF/TauS i TauF/TauS gracza (A232: ok. 26 / 168 s). Fala AI 139-149 (osobna galaz od d331082f) dostanie te zmiane przy scaleniu - BattleWind.MakeBreath moze dac konflikt.
+**Status:** WGRANE 117 (patrz wpis 117r).
+
+## 2026-10-25 138 (galaz integracyjna noc/138-calosc = noc/133-raport-armii + noc/127-bitwa-cialo + noc/136-konie + noc/137-oddech) - scalenie 132, 133, 136, 137 do jednego wgrania
+**Problem:** Paczki 132 (proba zdjec okien), 133a-g (okno Review the army; 133a w CrashScribe), 136 (stamina koni) i 137 (oddech dwufazowy) powstaly rownolegle w osobnych galeziach od WGRANE 115 - jedno wgranie wymaga scalenia i kontroli calosci (CLAUDE.md 8.0).
+**Przyczyna:** Praca rownolegla (workflowy 25.10).
+**Zmiana:** Scalenie bez zmian kodu poza rozwiazaniem konfliktow: CHANGELOG.md (wpisy obu stron zachowane, kolejnosc 137, 136, 133.., liczba wpisow sprawdzona) i tools/gen_mcm.py (zakresy 136 i 137 razem); McmSettings.cs wygenerowany na nowo (gen_mcm). Build Armoury i CrashScribe bez bledow; Armoury.dll md5 25f69127 (scalenie d331082f), CrashScribe.dll md5 bef9db58.
+Kontrola calosci - trzy niezalezne recenzje (workflow integracja-138-przeglad): blokerow brak; wylaczone klucze nowych paczek = zachowanie 115; McmSettings = wynik gen_mcm; punkty styku FieldCraft (127/137, 136 tylko komentarz), MarchToContact (128 HoldCharge + 136 RestState/ChargeHeld), BattleCries kolejnosc ticku, PlayerNews/Log.Player (133f), KitPreview w misji (K15) - bez kolizji. Uwagi drobne (do poprawki w nastepnej paczce, bez wplywu na rozgrywke): liczniki 'marsz' NB2 przy koncu odpoczynku konnicy; linia 'BattleWind (130)' wypisuje martwa regeneracje RBM przy 137; RestoreAll HorseWind bez pierwszenstwa konia gracza; opisy MCM BattleStaminaEnabled / NoBreathWhileRunning / HorseAiRestUntil po 137 i 136; licznik E oddechu z drugiej histerezy; uspione: gracz startuje z dlugiem przy RBM PlayerPostureMultiplier > 0 (u Jeffa 0); czas biegu 127 z surowej Atletyki zamiast GetEffectiveSkill.
+**Ryzyko / co sprawdzic:** Autotest 138a: bitwaN kod 0, ERROR 0 (linie 'Konie (136)', 'Oddech (137)', 'BattleWind (137)'), probyN ze zdjeciami nowych stron okna armii. 133a wymaga CrashScribe.dll z tej galezi - wgrywac tylko po sprawdzeniu, ze produkcyjny CrashScribe jest z tej samej linii (m105 Watchdog.Closing); bez niego KitPreview pomija K15 w misji i meldunek kwatermistrza idzie z papieru (CsQuiet). T1 konia gracza sprawdzi tylko gra Jeffa.
+**Status:** WGRANE 116 (25.10 ok. 17:15 CET; Armoury.dll md5 25f69127 (build scalenia d331082f, autotest 138a), CrashScribe.dll md5 bef9db58 (produkcyjny 84205371 = linia m105 Watchdog.Closing sprawdzona dekompilacja, wiec nowy = produkcja + 133a); kopie: *.bak-2026-10-25-przed-wgranie116 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie116-przed). Autotest 138a: bitwaN kod 0, ERROR 0, 4/4 bitwy - 'BattleWind (137): oddech dwufazowy gotowy', 'Oddech (137)' (zadyszek 0-13 na bitwe, TauF/TauS gracza 28/402 s), 'Konie (136): latka UpdateAgentStats wpieta TAK, postfiks RBM TAK', zajechanych do 0: 0-2 koni gracza na bitwe, sr. S na koniec 52-63; probyN kod 0 - zdjecia okien 21/22 TAK (Last battle pominiety - brak bitwy po wczytaniu), predkosc zgodna z gra, suma zoldu = TotalWage, herding = GetHerdingModifier. 133a (CrashScribe) w autotescie NIE sprawdzony (autotest ma wlasny CrashScribe-at) - pierwsza gra Jeffa: linia 'Mends: podglad gotowosci DTE (133a) - pole _isReadinessPreview JEST'.
+
 ## 2026-10-25 137 (galaz noc/137-oddech od noc/127-bitwa-cialo) - oddech dwufazowy: szybki i wolny dlug, odnowa szybsza z Atletyka, po zadyszce dlugi ogon
 **Problem:** Jeff 25.10 ok. 12:55: "a regeneracja bo powinna byc tak samo szybsza im wiecej mam atletyki oraz im mam mniej staminy a odpoczywam tym regeneracja
 postepuje inaczej jak jestem wyczerpany i dysze to wyjscie z zadyszki jak w prawdziwej fizjologii ludzi sprawdz jakie sa zasady"; wczesniej "ogolna zasada", "kazdy punkt
@@ -985,7 +1062,7 @@ odczyt przy spawnie; pole nieznalezione = TAK jak dotad); bez Breath HasBreath =
 Kontrola calosci: NoteRunSpend tylko przy breathOwns (ten sam warunek co tick oddechu: klucz na zywo i Breath); RunPending bez alokacji (jeden lookup CWT na takt
 biegu); koszty RBM, krzywa 130, bieg 127, NoBreathWhileRunning (m = 0 w biegu), kon (136) bez zmian. Zbudowane bez bledow (ostrzezenia tylko stare, poza
 BattleWind/FieldCraft); gen_mcm: Armoury 2485 ustawien. Nic nie wgrane, gra nie uruchamiana.
-**Status:** ZBUDOWANE - nie wgrane (galaz noc/137-oddech od noc/127-bitwa-cialo 9cde264a; Armoury.dll md5 308fb1cf przed recenzja, po recenzji 5763ebe0f8283da684e9c6f25a38087b).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (galaz noc/137-oddech od noc/127-bitwa-cialo 9cde264a; Armoury.dll md5 308fb1cf przed recenzja, po recenzji 5763ebe0f8283da684e9c6f25a38087b).
 ## 2026-10-25 136 (galaz noc/136-konie od noc/127-bitwa-cialo) - stamina koni: galop meczy konia, step i klus daja odsapnac; zalezna od cech konia, obciazenia i jezdzca, gracz i AI tak samo
 **Problem:** Jeff 25.10 ok. 12:48: "i konie tez powinny miec stamine, ze nie moge ciagle biegac po polu walki, stamina powinna byc zalezna od cech konia"; wczesniej "ogolna zasada"
 (gracz i AI tak samo), "sprawdz jakie sa realne mozliwosci ... trzeba wyjsc od sredniej"; ok. 13:30 "przeciwnik zachowuje sie jak prawdziwy zywy czlowiek ... walczy o zycie".
@@ -1072,7 +1149,7 @@ Nowe pola linii "Konie (136)": "(tempo odpoczynku AI sr. u X)", "zapisow MountSp
 "T1 przy m<=0.85 (m stale >= 1 s, probki galopu): probek N, sr. m, sr. v/Vbase, sr. v/(Vbase x m), blizej 1/m niz 1: Z%".
 Co sprawdzic dodatkowo: autotest - "odpoczynkow konnicy AI" i "sr. S na koniec" (odpoczywajace szyki wracaja ponad 65 i ruszaja), w NB2 "szarza bez sygnalu" nie rosnie
 od odpoczynku; konnica AI w odpoczynku jedzie ok. 3-4 m/s (dotad 5-6 m/s) - pod ostrzalem dluzej w zasiegu lukow; regresja 128: bez zmeczenia (S ponad 35) sciezka bez zmian.
-**Status:** ZBUDOWANE - nie wgrane (Armoury.dll md5 599ee56f po recenzji, przed recenzja 52120077; galaz noc/136-konie; gra nie uruchamiana).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (Armoury.dll md5 599ee56f po recenzji, przed recenzja 52120077; galaz noc/136-konie; gra nie uruchamiana).
 ## 2026-10-25 133 (galaz noc/133-raport-armii od noc/132-zdjecia) - przeglad armii: braki sprzetu i dlaczego, ostatnia bitwa, konie, predkosc, stado, zold, komunikaty
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem, w tym logu tak szybko to leci ze ja nie wiem,
 jesli sprzet jest to komunikat czemu nie zalozy bo np. za maly skill, de facto przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold, jakie
@@ -1177,7 +1254,7 @@ zdania bez liczb; papier QM, Pairs i rozbicie BattleNotice tylko w logu. Sprawdz
 pominiete (nie dotyczy) 1") i pliki okna-133-8..22; linia startu "Sprzet ludzi" z "CrashScribe 133a TAK" (w autotescie z testowym CrashScribe-at bez 133a: "sprzed
 133a" - wtedy K15 pominiety i meldunek z papieru, to nie blad); w bitwie w polu jedna czerwona linia "Your men's kit for this battle: ..." i zolte CS bez liczby; profil
 doby - linia "MorningReport" (ponad 50 ms - decyzja jak K15).
-**Status:** ZBUDOWANE - nie wgrane (Armoury.dll i CrashScribe.dll z galezi noc/133-raport-armii; wgranie zbiorcze po tescie, decyzja (g); 133a = osobny DLL CrashScribe.dll).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (Armoury.dll i CrashScribe.dll z galezi noc/133-raport-armii; wgranie zbiorcze po tescie, decyzja (g); 133a = osobny DLL CrashScribe.dll).
 
 ## 2026-10-25 133f (galaz noc/133-raport-armii) - Armoury: okno armii "Recent messages (N)" - pierscien 60 komunikatow o wojsku gracza (sprzet, konie, zold, musztra, oboz, marsz, kwatermistrz), takze do Armoury.log
 **Problem:** Jeff 25.10 ok. 12:57: "... w tym logu tak szybko to leci ze ja nie wiem ... de facto przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne". Komunikaty
@@ -1217,7 +1294,7 @@ FiringQuickInformation?.Invoke; Clear tylko w Module.FinalizeModule (dekompilacj
 DLL sciezke budowania (napisy, ok. 158 roznych). Sprawdzic w grze: linia startu "komunikaty wojska (133f): nasluch DisplayMessage TAK, szybkich informacji TAK"; po komunikacie
 kwatermistrza / obozu / zoldu w Armoury.log linia "Wojsko (133f) [...]"; w obozie "Review the army" -> "Recent messages (N)" -> lista z data i pelnym tekstem w podpowiedzi;
 po wczytaniu zapisu lista pusta, a "Porzadek stanu (E8/S)" mowi, ile bylo; test T1 "komunikaty (133f) TAK".
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133e (galaz noc/133-raport-armii) - Armoury: okno armii "Pay" -> Pay (linie gry z jednego wywolania, ostatnia wyplata) / Who gets what (rozdzial najwiekszych reszt, towarzysze, rycerze, Straz/WL) / Where it goes
 **Problem:** Jeff 25.10 ok. 12:57: "... przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold ...". Dotad zold druzyny gracza byl tylko w dymku
@@ -1258,7 +1335,7 @@ z imieniem (scalane przy tym samym imieniu - liczone raz, "wspolne imiona" w log
 (HasUnpaidWages = 1 - wziete/zold, ustawione przed powrotem - postfiks widzi wartosc tego wywolania). (5) Koszt: jedno wywolanie modelu zoldu + stawki typow przy otwarciu okna.
 Sprawdzic w grze: w obozie "Review the army" -> "Pay" -> trzy strony; linia "raport" z "zold (133e): ... podstawa ... ZGODNA ... suma wierszy N = wynik TAK"; po pierwszym takcie
 doby "Last pay day <data> (today): paid in full, N denars."; test T1 "zold (133e) TAK".
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133d (galaz noc/133-raport-armii) - Armoury: okno armii "Horses and harness" z podgladu bitwy (ile koni i uprzezy kupic, przeniesc, ile bezczynnych) i "On the march" -> Speed / Herd / Column
 **Problem:** Jeff 25.10 ok. 12:57: "... przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold, jakie konie jaka predkosc ile koni i ile
@@ -1310,7 +1387,7 @@ liczba - jest przyczyna przy typie i zdanie "they need easier horses".
 Sprawdzic w grze: w obozie "Review the army" -> "Horses and harness" (gotowi/pieszo jak "Kit for the next battle", rodzaje koni, co kupic, bezczynne) i "On the march" ->
 Speed (wynik = "the game shows", linie w %), Herd (przy nadmiarze linia "Herding" z procentem), Column; linia "raport" z "konie (133d): ... tozsamosc zgodna", "predkosc (133d):
 ... (zgodna)", "stado (133d): ... zgodne" albo "bez porownania"; linia startu "strony marszu (133d): wpiecia 3/3"; test T1 "konie (133d) TAK, stado (133d) TAK".
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133c (galaz noc/133-raport-armii) - Armoury: okno armii "Kit for the next battle" - podglad nastepnej bitwy tym samym rozdzielaczem DTE i strazami co bitwa (KitPreview), przyczyny brakow, "Unused in the troops' armoury"; kwatermistrz jedna linia
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem ... jesli sprzet jest to komunikat czemu nie
@@ -1380,7 +1457,7 @@ Sprawdzic w grze: linia startu "podglad sprzetu (133c): wpiecia 10/10"; w obozie
 <= 17 linii - T1), "Unused in the troops' armoury"; linia "Sprzet ludzi (133c): podglad - ..." z "tozsamosc z Missing zgodna"; po bitwie w polu segment "podglad w misji
 (133c, K15 ...) - ZGODNE" (ROZNICA - porownac rodzaje), czas podgladu w ms; rano/po bitwie zamiast czerwonych linii "QM short (have/need)" jedna linia "QM: N kit slots
 empty ... - see Review the army in camp."; w CS brak nowych "Mends: PUSTE"/"swieta zasada" na mapie.
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133b (galaz noc/133-raport-armii) - Armoury: okno armii "Last battle" - braki sprzetu ostatniej bitwy wedlug rodzaju i typu (KitGaps), segment w linii bitwy
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem, w tym logu tak szybko to leci ze ja nie wiem
@@ -1421,7 +1498,7 @@ misja bez konca" liczniki GearFit moga byc juz nastepnej misji) i liczy wszystki
 Sprawdzic w grze: po bitwie w Armoury.log na koncu linii "Bitwa gracza (sklad7b ..." segment "sprzet gracza wedlug rodzaju (133b): ... tozsamosc z Missing zgodna, z linia
 zgodna | typy z brakami: ..." - "puste" = "gracz N" tej linii; brak linii "ROZJAZD z GarrisonKit.Missing"; w obozie "Review the army" -> wiersz "Last battle" i strony
 z tymi samymi liczbami (strony <= 17 linii - test T1); "Przeglad armii (P4): raport" z segmentem "ostatnia bitwa (133b)".
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133a (galaz noc/133-raport-armii od noc/132-zdjecia 8a177bdb) - CrashScribe: podglad gotowosci partii gracza (pasek DTE, okno armii) bez linii, licznikow strazy i zoltego "QM: N EMPTY"
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom ... w tym logu tak szybko to leci ze ja nie wiem ... de facto przeniesmy
@@ -1446,7 +1523,7 @@ ustawia _mission = null), wiec ZB-5/ZB-5b (FootMission) i tak tam nie dzialaly; 
 CreateMapEventAssignments i spawn - bez zmian. StoreSub 7-arg przekazuje count = true (jak dotad). GearFit.cs Armoury czyta pole WardForeignSub odbiciem - pole bez zmian.
 Sprawdzic w CS: linia startu "JEST, _party JEST"; na mapie po zmianie zbrojowni/werbunku zadnych nowych "Mends: PUSTE"/"swieta zasada [Twoja partia" ani zoltego "QM: ... EMPTY";
 w bitwie te linie jak dotad.
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 132 (galaz noc/132-zdjecia od noc/127-bitwa-cialo 9bc0f627) - proba autotestu: zdjecia nowych okien (przeglad armii, choragwie, przypinanie, okno lupu po bitwie, oblezeniu i turnieju)
 **Problem:** Jeff 25.10 ok. 12:52: "daj mi zdjecia z gry jak wygladaja te nowe widoki popupy armii, lupow etc". Okna z nocy (P4/P12 przeglad armii, P5/P11 okno lupu) nie maja
@@ -1488,7 +1565,7 @@ BK (BannerKingsMapView), okno wydarzenia ROT na stosie, SpoilsWindow.IsOpen. Spr
 okno gry bez fokusu - pauza silnika, blokada czasu i spotkanie z osada przepuszczone. Blokada czasu TownStay (armoury-postoj.flag, menu obozu w polu) zatrzyma probe
 do powrotu do miasta - to inna proba, bez kolizji. SceneGate bez skutkow ubocznych (sam odczyt), wolana tylko w fazie 0 i przed startem. Regresje: StillOpen, Shot,
 fazy 1/2 i proba w zwyklej grze bez zmian; okno lupu (ClosePhoto zamyka tylko _photo) bez zmian. Zbudowane 0 bledow.
-**Status:** ZBUDOWANE - nie wgrane (tylko autotest z plikiem armoury-zdjecia-okien.flag).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (tylko autotest z plikiem armoury-zdjecia-okien.flag).
 
 ## 2026-10-25 131 (galaz noc/127-bitwa-cialo) - udzwig z Endurance: kazdy punkt Endurance bohatera w druzynie +5 kg
 **Problem:** Jeff 25.10 ok. 12:41: "a kazdy punkt endurance daje +5 do udzwigu w menu inventory jako dodatkowe", potem "i companions tez".
