@@ -1,5 +1,67 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 133 (galaz noc/133-raport-armii od noc/132-zdjecia) - przeglad armii: braki sprzetu i dlaczego, ostatnia bitwa, konie, predkosc, stado, zold, komunikaty
+**Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem, w tym logu tak szybko to leci ze ja nie wiem,
+jesli sprzet jest to komunikat czemu nie zalozy bo np. za maly skill, de facto przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold, jakie
+konie jaka predkosc ile koni i ile zbroi potrzeba aby wojsko jechalo na koniach, ile brakuje ile za duzo koni i jest herding". Dowody z logu Jeffa
+(D:\Backup-Bannerlord\logi-jeffa\2026-10-25_03-50-po-grze: Armoury-2026-10-25_02-11-22.log, CrashScribe session-2026-10-25_02-11-21.log): bitwa 03:42:06 "sloty wzorca bez
+sztuki (walcza bez) - gracz 19 (ludzi 43)" - 19 slotow bez rozbicia (ktore sloty, u kogo, dlaczego); papier kwatermistrza 03:43:11 - wszystkie 16 typow "bez sztuki 0", czyli
+"komplet", wiec czerwone "QM short" milczalo przy 19 pustych slotach w bitwie; to samo zjawisko ("czego czlowiek nie ma w bitwie") liczylo 5 regul z roznymi liczbami: linia
+bitwy GarrisonKit (19), papier QM FitFor/SwapMath (0), CS SkillLawWard 03:36:56 ("1 slotow PUSTYCH (Shield 1)"), pasek DTE "Army Armory readiness" (z rannymi, bez dodatkow),
+"The Quartermaster's Muster" (sztuki bez umiejetnosci); do tego podloga broni 02:18:33 "bez broni po strazach 9, z polki 9" i zolte CS "QM: N EMPTY in battle" takze na mapie
+(02:21:42, 02:22:15, 02:22:38 - pasek DTE). Komunikaty o wojsku migaly w czacie gry i nie trafialy do zadnego pliku. W oknie "Review the army" nie bylo zoldu, predkosci gry,
+stada ani koni liczonych tak jak w bitwie.
+**Przyczyna:** brak widoku liczonego TA SAMA droga co bitwa (rozdzielacz DTE + nasze straze) - kazde miejsce liczylo sprzet po swojemu; okno armii mialo tylko ludzi, pary
+SaddleLaw (arytmetyka z rannymi, bez Jazdy) i sufit kolumny; straze CS nie odroznialy podgladu od bitwy; brak ksiegi komunikatow o wojsku (projekt i krytyka K1-K16:
+scratchpad raport-armii-133.txt).
+**Zmiana:** paczka krokami 133a-133g, jeden commit na krok (szczegoly i kontrola kazdego kroku - wpisy 133a-133f ponizej):
+- 133a (CrashScribe.dll): Mends.IsPreview = _isReadinessPreview I _party == MobileParty.MainParty (K1) - podglad gracza (pasek DTE, okno armii) bez linii "PUSTE"/"swieta
+  zasada", bez zoltego "QM: N EMPTY in battle" i bez licznikow strazy; przydzial bez zmian; autorozstrzygniecia AI (CreateMapEventAssignments) pisza i licza jak dotad.
+- 133b: wiersz "Last battle" - zapis faktyczny z GarrisonKit.OwnKitSpawn po wszystkich strazach (KitGaps.Compare: rodzaje liczone jak Missing, osobno "side-arm (melee)" -
+  K2; tozsamosc z Missing na kazdym czlowieku), data gry i "N days ago" (K16), typy z brakami, jezdzcy pieszo, podloga broni, kij z domu; segment w linii bitwy.
+- 133c: wiersz "Kit for the next battle" - KitPreview: ten sam DoAssignAsync DTE w trybie podgladu z flagami bitwy i wszystkimi naszymi strazami, potem straze wystawienia
+  (DragonUnmount.WouldStrip - K3, uprzaz, jezdziec bez konia); trzy migawki puli (K4); przyczyny brakow tymi samymi predykatami ("Requires Bow 175 - this troop has 80.";
+  uprzaz bez "Requires Riding" - K5; porada z sakw predykatami DTE - K6; morale "worse than the kit their skill and rank call for" - K7; pamiec bez godziny w kluczu); lista
+  typow -> strona typu, "Unused in the troops' armoury"; kwatermistrz na ekranie jedna linia z podgladu "QM: N kit slots empty ... for the next battle - see Review the army in
+  camp." (decyzja (a), K14); K15 - podglad w misji na tej samej zbrojowni i porownanie z bitwa (ms w logu); naprawa wycieku GearFit._floorKept (K16).
+- 133d: "Horses and harness" z podgladu (gotowi / pieszo i dlaczego, rodzaje koni, co kupic i co przeniesc z sakw, bezczynne; "ile zbroi" = uprzaz) i "On the march" ->
+  Speed (rozpiska modelu predkosci gry, mnozniki w procentach - K9; gracz w armii - predkosc wodza i mnoznik doganiania - K8) / Herd (regula stada gry, GetHerdingModifier
+  z instancji Default z listy modeli - K9; nasza regula taboru obok - decyzja (c)) / Column (MarchText + regula jezdzca mapa/bitwa - decyzja (b)).
+- 133e: "Pay" -> Pay (naglowek i linie z jednego GetTotalWage(...,true) - K10; ostatnia wyplata z SoldierPay.WagePostfix - K12) / Who gets what (towarzysze CW ta sama
+  regula co wyplata, reszta metoda najwiekszych reszt - K10; rycerze z linia BK i zoldem GentryService, bez tezy "not part of the pay above" - K11) / Where it goes.
+- 133f: "Recent messages (N)" - pierscien 60 komunikatow o wojsku gracza (plik wysylajacy z listy 30 plikow przez [CallerFilePath] w Log.Player / PlayerNews.Show / Quick,
+  znacznik [ThreadStatic], jeden nasluch na zdarzeniach gry - K13; decyzja (e)), kazdy takze do Armoury.log ("Wojsko (133f) [Temat]: tekst").
+- 133g (ten commit): (1) proba zdjec okien (WindowPhotos, tylko DLL autotestu i plik armoury-zdjecia-okien.flag) - 10 nowych krokow 8-17: lista typow "Kit for the next
+  battle", strona typu z brakami (pierwszy typ z brakami albo jezdzcami pieszo; bez brakow - pierwszy typ), "Last battle", "Horses and harness", "Speed", "Herd", "Pay",
+  "Who gets what", "Where it goes" (pierwsza strona kazdej), lista "Recent messages" (pusty pierscien - jeden komunikat proby z ArmyReview.News.cs, ta sama droga co test T1).
+  Te same funkcje i dane co okno gracza (ArmyReview.PhotoOpen133; strony koni przez nowe ArmyReview.HorsePages - wydzielone 1:1 z OpenMain, okno wola je tak samo); zdjecie
+  jak w 132 (zapytania po 0.6 s, zamkniecie: autotest albo proba po 1 s), pliki CrashScribe\zdjecia\okna-133-N-nazwa-HHmmss.png (kroki 1-7 dalej okna-132-...); okno, ktorego
+  gracz by nie otworzyl (wiersz wyszarzony: brak podgladu, brak zapisu bitwy, predkosc albo zold niedostepne) - krok "NIE (powod)". ShowPages (strony wszystkich okien
+  przegladu) - przyciski bez skutku w probie (Inert; dotad strony tej bramki nie mialy - odmowa autotestu na stronie wielostronicowej otwieralaby przeglad). (2) Test T1
+  (armoury-przeglad.flag) wedlug projektu "Wspolne": strony komunikatow ("Look") w "najdluzszej" (strony <= 17 linii); tozsamosc grup z Missing takze na KAZDYM typie podgladu
+  i na zapisie "Last battle" (calosc i typy: suma rodzajow = pancerz + bron wzorca bez pary, minus zastapione = puste; rozjazd ludzi 0); strona Speed odczytana z GOTOWEGO
+  tekstu - linie + "Other" = "= wynik" (tolerancja zaokraglenia strony 0.005 na liczbe; nieczytelna strona - "nie dotyczy"); zold - suma wierszy = wynik, a wynik = TotalWage
+  gry z osobnego wywolania, gdy zold jest pewny (bez bohatera spoza CW w druzynie - BK losuje jego zaokraglenie; inaczej INFO); stado - procent linii "Herding" =
+  GetHerdingModifier (133d, bez zmian); czas podgladu w ms (ponad 50 ms - INFO). Bez nowych kluczy MCM (bez gen_mcm).
+**Ryzyko / co sprawdzic:** Kontrola calosci w kodzie (133g): (1) Regresje - HorsePages: te same wywolania i ten sam zapas co dotad w OpenMain (potkniecie HorsesOf/HorsePageText
+- strona z SaddleLaw.Pairs, hv null); ShowPages: jedyna zmiana to bramka Inert (w zwyklej grze WindowPhotos.Active = false - bez skutku); WindowPhotos kroki 1-7 bez zmian
+(Layer() teraz 5-7 zamiast 5..Steps; kopia choragwi przywracana nadal po kroku 4; przerwanie w krokach 8-17 - PhotoForget, kopii juz nie ma); tools/sprawdz_logi.py
+(p4przeglad AR-3) czyta z linii testu tylko "wynik TAK/NIE" - nowe segmenty nic nie psuja; linii "Zdjecia okien" nie czyta. (2) Kolizje - kroki 8-17 licza jak otwarcie okna
+przez gracza: podglad z pamieci (ten sam klucz co krok 1), PayOf 3 razy (licznik zoldu BkrotChains +3 w linii doby; BK GetHeroWage zuzywa MBRandom dla bohaterow spoza CW),
+MarchOf 2 razy (liczniki drog i blota +1 na wywolanie), komunikat proby tylko przy pustym pierscieniu (na ekranie i w Armoury.log "Wojsko (133f) [Army]"). Test T1: wymog
+"wynik = TotalWage gry" przy zoldzie pewnym padnie, jesli latka CW na GetHeroWage nie weszla (linia startu "Towarzysze (CW)") - towarzysz ma wtedy losowe zaokraglenie BK,
+czyli okno naprawde rozni sie od gry. (3) Spojnosc - proba i test wolaja te same funkcje co okno (zero drugiej formuly). (4) CALA PACZKA: wgranie ZBIORCZE (decyzja (g))
+Armoury.dll i CrashScribe.dll RAZEM - Armoury 133 bez CrashScribe 133a: okno, poranny kwatermistrz i start bitwy w polu wypisalyby w CS "PUSTE" i zolte "QM: N EMPTY" przy
+kazdym podgladzie. UWAGA: 133a zmienia CrashScribe.dll (osobny DLL do wgrania); autotest uzywa testowego CrashScribe-at, wiec 133a sprawdzi dopiero gra Jeffa - linia startu
+CS "Mends: podglad gotowosci DTE (133a) - pole _isReadinessPreview JEST, _party JEST"; na mapie po zmianie zbrojowni albo werbunku brak nowych "PUSTE"/"swieta zasada" partii
+gracza i zoltego "QM: ... EMPTY"; w bitwie te linie jak dotad; liczniki doby strazy CS spadna (dotad liczyly tez podglady paska) - to nie regresja.
+Sprawdzic (autotest z flagami armoury-przeglad i armoury-zdjecia-okien): "Zdjecia okien (132): koniec | okna TAK 17/17 ... wynik TAK" i pliki okna-133-8..17 w
+CrashScribe\zdjecia; "Przeglad armii (P4): test - T1 raport: ... podglad sprzetu (133c) TAK (... typy z rozjazdem grup 0/N), ostatnia bitwa (133g) TAK, ... strona Speed linie
++ Other = wynik (133g) TAK, zold (133e) TAK (... wymagane (zold pewny) ...) ... - wynik TAK"; "Sprzet ludzi (133c): podglad - ... tozsamosc z Missing zgodna"; po bitwie w polu
+segment K15 "ZGODNE" z ms (ponad 50 ms - do decyzji klucz MCM). W grze Jeffa: obozowanie -> "Review the army" -> wszystkie wiersze; rano zamiast czerwonych "QM short" jedna
+linia "QM: N kit slots empty ... for the next battle - see Review the army in camp.".
+**Status:** ZBUDOWANE - nie wgrane (Armoury.dll i CrashScribe.dll z galezi noc/133-raport-armii; wgranie zbiorcze po tescie, decyzja (g); 133a = osobny DLL CrashScribe.dll).
+
 ## 2026-10-25 133f (galaz noc/133-raport-armii) - Armoury: okno armii "Recent messages (N)" - pierscien 60 komunikatow o wojsku gracza (sprzet, konie, zold, musztra, oboz, marsz, kwatermistrz), takze do Armoury.log
 **Problem:** Jeff 25.10 ok. 12:57: "... w tym logu tak szybko to leci ze ja nie wiem ... de facto przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne". Komunikaty
 o wojsku (Log.Player - ok. 525 wywolan w 158 plikach - i bezposrednie DisplayMessage kwatermistrza, obozu, marszu) migaja w czacie gry i nie trafiaja do ZADNEGO pliku (grep w logu

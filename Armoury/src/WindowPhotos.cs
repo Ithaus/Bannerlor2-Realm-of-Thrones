@@ -30,7 +30,11 @@ namespace Armoury
     /// (OpenBanner), 4 "Move troop types into banners" (OpenPins), 5-7 okno lupu po bitwie, po oblezeniu (grabiez) i po turnieju (SpoilsWindow.ShowPhoto - Build,
     /// Picture i warstwa jak po bitwie) z raportem PROBNYM: prawdziwe przedmioty (najcenniejsze z sakw gracza, brakujace rodzaje z listy przedmiotow gry), etykiety
     /// zlota, jency, straty, slawa - raport nie trafia do SpoilsReport (bez Finish, bez licznikow sesji) i niczego w grze nie zmienia.
-    /// ZDJECIE: TaleWorlds.Engine.Utilities.TakeScreenshot do CrashScribe\zdjecia\okna-132-N-nazwa-HHmmss.png (silnik pisze BMP mimo rozszerzenia). Zapytania gry -
+    /// 133g (okna paczki 133, te same funkcje co gracz - ArmyReview.PhotoOpen): 8 lista typow "Kit for the next battle" (OpenKitTypes), 9 strona typu z brakami
+    /// (pierwszy typ z brakami albo jezdzcami pieszo; bez brakow - pierwszy typ), 10 "Last battle", 11 "Horses and harness" (HorsePages - ta sama funkcja co
+    /// OpenMain), 12 "Speed", 13 "Herd", 14-16 "Pay" / "Who gets what" / "Where it goes" (pierwsza strona kazdej), 17 lista "Recent messages" (pusty pierscien -
+    /// jeden komunikat proby z ArmyReview.News.cs, ta sama droga co test T1). Strony (ShowPages) maja w probie przyciski bez skutku jak okna wyboru.
+    /// ZDJECIE: TaleWorlds.Engine.Utilities.TakeScreenshot do CrashScribe\zdjecia\okna-132-N-nazwa-HHmmss.png (kroki 8-17: okna-133-N-...; silnik pisze BMP mimo rozszerzenia). Zapytania gry -
     /// zdjecie po 0.6 s czasu rzeczywistego (Stopwatch): autotest (AutotestUi.Handle co 0.25 s) zamyka zapytanie po >= 1.0 s od zobaczenia (odmowa / wyjscie), wiec
     /// 1.5 s sie nie da (0.4 s zapasu na zrzut silnika); prefab zapytania nie ma animacji wejscia (Native MultiSelectionQueryPopup.xml), rysuje sie w pierwszej klatce. Okno lupu (wlasna warstwa,
     /// autotest jej nie widzi) - po 1.8 s (obce zapytanie nad nim - czeka, najwyzej 8 s). Zamkniecie: autotest albo my po 1 s od zdjecia
@@ -48,13 +52,15 @@ namespace Armoury
     {
         internal const string FlagName = "armoury-zdjecia-okien.flag";
         private const string P = "Zdjecia okien (132): ";
-        private const int Steps = 7;
+        private const int Steps = 17;                     // 133g: 8-17 okna paczki 133 (zapytania jak 1-4)
+        private const int LayerFirst = 5, LayerLast = 7;  // okna lupu (wlasna warstwa)
         private const double StartAfterSec = 30.0, CalmSec = 3.0, GiveUpSec = 3600.0;
         private const double InquiryShotSec = 0.6, LayerShotSec = 1.8, LayerShotMaxSec = 8.0, CloseAfterShotSec = 1.0;
         private const double GapSec = 0.3, StepWaitSec = 20.0, FileWaitSec = 6.0;
         private const int MaxStumbles = 30;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        private static readonly string[] Names = { "", "przeglad", "choragwie", "choragiew", "przypinanie", "lup-bitwa", "lup-oblezenie", "lup-turniej" };
+        private static readonly string[] Names = { "", "przeglad", "choragwie", "choragiew", "przypinanie", "lup-bitwa", "lup-oblezenie", "lup-turniej",
+                                                   "sprzet-lista", "sprzet-typ", "ostatnia-bitwa", "konie", "predkosc", "stado", "zold", "zold-kto", "zold-dokad", "komunikaty" };
 
         private static bool _checked, _done, _active;
         private static Campaign _camp;
@@ -84,7 +90,7 @@ namespace Armoury
 
         private static double Sec(long since, long now) { return since == 0 ? 0 : (now - since) / (double)Stopwatch.Frequency; }
 
-        private static bool Layer() { return _step >= 5 && _step <= Steps; }
+        private static bool Layer() { return _step >= LayerFirst && _step <= LayerLast; }
 
         // ------------------------------------------------------------ takt (SubModuleMain.SpoilsTick - co klatke)
 
@@ -277,7 +283,7 @@ namespace Armoury
             {
                 string dir = Path.Combine(CampWalk.CrashScribeDir(), "zdjecia");
                 Directory.CreateDirectory(dir);
-                string f = Path.Combine(dir, "okna-132-" + _step + "-" + Names[_step] + "-" + DateTime.Now.ToString("HHmmss", Inv) + ".png");
+                string f = Path.Combine(dir, "okna-" + (_step > LayerLast ? "133" : "132") + "-" + _step + "-" + Names[_step] + "-" + DateTime.Now.ToString("HHmmss", Inv) + ".png");
                 TaleWorlds.Engine.Utilities.TakeScreenshot(f.Replace('\\', '/'));
                 _file = f;
                 _files.Add(f);
@@ -698,6 +704,100 @@ namespace Armoury
                         note = t > 0 ? "typow wojska " + t + ", przypiec w kopii " + (_workPins != null ? _workPins.Count : 0) + ", klucz Pin Troop Types " + Yes(PinOn)
                                      : "druzyna bez wojska - okno informacji";
                         OpenPins();
+                        return null;
+                    }
+            }
+            if (step >= 8 && step <= 17) return PhotoOpen133(step, out note);
+            return "nieznany krok " + step;
+        }
+
+        /// <summary>133g: okna paczki 133 (kroki 8-17) - te same funkcje i te same dane co okno gracza (OpenMain i jego podokna); przyciski bez skutku (Inert,
+        /// ShowPages). null - otwarte; inaczej powod (okno, ktorego gracz by nie otworzyl - wiersz wyszarzony - nie jest pokazywane; wyjatek: pusty pierscien
+        /// "Recent messages" dostaje jeden komunikat proby, zeby lista miala co pokazac).</summary>
+        private static string PhotoOpen133(int step, out string note)
+        {
+            note = null;
+            var mp = MobileParty.MainParty;
+            switch (step)
+            {
+                case 8:
+                case 9:
+                    {
+                        var pv = KitPreview.Get(false);   // pamiec po wersjach i dniu - te same liczby co wiersz przegladu (krok 1)
+                        if (pv == null || !pv.Ok) return "podglad sprzetu niedostepny (" + (pv != null && pv.Why != null ? pv.Why : "-") + ")";
+                        if (pv.Rows.Count == 0) return "podglad bez typow (druzyna bez zdrowych szeregowych)";
+                        if (step == 8)
+                        {
+                            note = "typow " + pv.Rows.Count + " | " + KitPreview.Brief(pv);
+                            OpenKitTypes();
+                            return null;
+                        }
+                        KitPreview.TypeRow t = null;
+                        foreach (var x in pv.Rows) if (x.Men > 0 && (x.Missing > 0 || x.Foot > 0)) { t = x; break; }
+                        bool gaps = t != null;
+                        if (t == null) foreach (var x in pv.Rows) if (x.Men > 0) { t = x; break; }
+                        if (t == null) return "podglad bez zdrowych ludzi";
+                        var pages = Paginate(KitPreview.TypeText(pv, t));
+                        note = "typ " + t.Id + " x" + t.Men + ", puste " + t.Missing + ", pieszo " + t.Foot + (gaps ? "" : " (zaden typ z brakami - pierwszy typ)") + ", stron " + PagesInfo(pages);
+                        ShowPages(t.Name, pages, 0, OpenKitTypes);
+                        return null;
+                    }
+                case 10:
+                    {
+                        var b = KitGaps.Last;
+                        if (b == null || b.All == null) return "brak zapisu ostatniej bitwy - wiersz w przegladzie wyszarzony (" + LastBattleBrief() + ")";
+                        var pages = Paginate(LastBattleText());
+                        note = "zapis: " + LastBattleBrief() + ", stron " + PagesInfo(pages);
+                        ShowPages("Last battle", pages, 0);
+                        return null;
+                    }
+                case 11:
+                    {
+                        var fit = new int[5];
+                        var wnd = new int[5];
+                        CountMen(mp, fit, wnd);
+                        var pairs = SaddleLaw.Pairs(mp);
+                        MarchPace.Column col = null;
+                        try { col = MarchPace.Explain(mp); } catch (Exception e) { Stumble("Photo.Explain", e); }
+                        KitPreview.Result next = null;
+                        try { next = KitPreview.Get(false); } catch (Exception e) { Stumble("Photo.KitPreview", e); }
+                        HorseView hv;
+                        var pages = HorsePages(mp, fit, pairs, col, next, out hv);
+                        note = (hv != null ? "z podgladu" : "z SaddleLaw.Pairs (bez podgladu)") + ", stron " + PagesInfo(pages);
+                        ShowPages("Horses and harness", pages, 0);
+                        return null;
+                    }
+                case 12:
+                case 13:
+                    {
+                        var mv = MarchOf(mp);
+                        if (!mv.Ok) return "predkosc niedostepna (" + mv.Why + ")";   // wiersz "Speed" / "Herd" wyszarzony - gracz go nie otworzy
+                        MarchPace.Column col = null;
+                        if (step == 13) { try { col = MarchPace.Explain(mp); } catch (Exception e) { Stumble("Photo.Explain", e); } }
+                        var pages = Paginate(step == 12 ? SpeedText(mv) : HerdText(mv, col));
+                        note = (step == 12 ? SpeedBrief(mv) : HerdBrief(mv)) + ", stron " + PagesInfo(pages);
+                        ShowPages(step == 12 ? "Speed" : "Herd", pages, 0);   // "Back" gracza wraca do "On the march" - w probie bez skutku, napis przycisku ten sam
+                        return null;
+                    }
+                case 14:
+                case 15:
+                case 16:
+                    {
+                        var pay = PayOf(mp);
+                        if (!pay.Ok) return "zold niedostepny (" + pay.Why + ")";   // wiersz "Pay" wyszarzony - gracz go nie otworzy
+                        string title = step == 14 ? "Pay" : step == 15 ? "Who gets what" : "Where it goes";
+                        var pages = Paginate(step == 14 ? PayText(pay) : step == 15 ? WhoText(pay) : WhereText(pay, mp));
+                        note = "zold " + pay.Total + " (suma wierszy " + pay.RowsSum + "), stron " + PagesInfo(pages);
+                        ShowPages(title, pages, 0);   // "Back" gracza wraca do okna "Pay" - w probie bez skutku, napis przycisku ten sam
+                        return null;
+                    }
+                case 17:
+                    {
+                        int had = PlayerNews.Count;
+                        int n = PhotoNewsSeed();
+                        if (n <= 0) return "pierscien komunikatow pusty takze po komunikacie proby (" + PlayerNews.Brief() + ")";
+                        note = "komunikatow " + n + (had == 0 ? " (pierscien byl pusty - dopisany komunikat proby)" : "") + " | " + PlayerNews.Brief();
+                        OpenNews();
                         return null;
                     }
             }

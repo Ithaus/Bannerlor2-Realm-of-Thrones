@@ -57,5 +57,14 @@ namespace Armoury
                 },
                 delegate (List<InquiryElement> _) { if (Inert(photo)) return; try { OpenMain(false); } catch (Exception e) { Stumble("News.Back", e); } }), true);
         }
+
+        /// <summary>133g, proba zdjec okien (tylko autotest): pusty pierscien - jeden komunikat proby z TEGO pliku (lista wojska PlayerNews: ArmyReview -> "Army"),
+        /// ta sama droga co test T1 (Log.Player -> znacznik -> nasluch gry -> pierscien), zeby lista miala co pokazac. Zwraca liczbe wpisow po.</summary>
+        internal static int PhotoNewsSeed()
+        {
+            if (PlayerNews.Count > 0) return PlayerNews.Count;
+            Log.Player("Window photos test: no message about your men yet - this line shows how one is listed under Recent messages.");
+            return PlayerNews.Count;
+        }
     }
 }

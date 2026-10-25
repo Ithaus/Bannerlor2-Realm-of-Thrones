@@ -24,6 +24,10 @@ namespace Armoury
     ///     133e: strony Pay / Who gets what / Where it goes w "najdluzszej"; zold - suma wierszy rozdzialu = wynik tego samego wywolania (K10); samosprawdzenie
     ///     wag wobec linii "Base" BK i TotalWage gry z osobnego wywolania - INFO.
     ///     133f: Log.Player z tego pliku (lista wojska PlayerNews) - zapisany w pierscieniu "Recent messages" (licznik +1, koniec do konca przez nasluch gry).
+    ///     133g (projekt "Wspolne"): strony komunikatow w "najdluzszej"; tozsamosc grup z Missing takze na kazdym typie podgladu i na zapisie "Last battle"
+    ///     (calosc i typy, rozjazd ludzi 0); strona Speed odczytana z gotowego tekstu - linie + "Other" = "= wynik" (zaokraglenie strony); zold - suma wierszy
+    ///     = wynik, a wynik = TotalWage gry z osobnego wywolania, gdy zold pewny (bez bohatera spoza CW - BK losuje jego zaokraglenie; inaczej INFO); czas
+    ///     podgladu w ms (ponad 50 ms - INFO).
     ///  T2 zapis choragwi testowych przez Write (ta sama droga co "Save" w oknie): 2 x piechota (60 ludzi / reszta, pierwsza z tarczami), lucznicy, konni
     ///     z kapitanem-towarzyszem, konni lucznicy - tylko rodzaje obecne; odczyt 8 x pole i armia zgodny, wagi kazdej klasy = 100, kazdy obecny rodzaj pokryty.
     ///  T3 nazwy: NameOf zgodne, Export -> Import -> Export bez zmian.
@@ -112,6 +116,49 @@ namespace Armoury
 
         private static string T(bool b) { return b ? "TAK" : "NIE"; }
 
+        /// <summary>133g T1: tozsamosc grup wiersza (strony "Kit for the next battle" i "Last battle"): suma rodzajow = pancerz + bron wzorca bez pary,
+        /// braki - zastapione innym rodzajem = puste (Missing).</summary>
+        private static bool GapsAgree(int[] shortBy, int armour, int weapons, int replaced, int missing)
+        {
+            int s = 0;
+            if (shortBy != null) foreach (var x in shortBy) s += x;
+            return s == armour + weapons && armour + weapons - replaced == missing;
+        }
+
+        /// <summary>133g T1: strona Speed tak, jak ja widzi gracz - liczby linii (ostatnia liczba linii; mnoznik "x% (+0.45)" - liczba w nawiasie) i "Other" miedzy
+        /// pierwszym akapitem a linia "= wynik" sumuja sie do wyniku z dokladnoscia zaokraglenia strony (0.005 na liczbe). null - strony nie da sie odczytac.</summary>
+        private static bool? SpeedPageSums(string text, out string info)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var fl = System.Globalization.NumberStyles.Float;
+            info = "strona nieczytelna";
+            if (string.IsNullOrEmpty(text)) return null;
+            text = text.Replace("\r", "");
+            int head = text.IndexOf("\n\n", StringComparison.Ordinal);
+            int eq = text.IndexOf("\n= ", StringComparison.Ordinal);
+            if (head < 0 || eq < head) return null;
+            int eqEnd = text.IndexOf('\n', eq + 1);
+            string totalTok = (eqEnd < 0 ? text.Substring(eq + 3) : text.Substring(eq + 3, eqEnd - eq - 3)).Trim();
+            float total;
+            if (!float.TryParse(totalTok, fl, inv, out total)) { info = "nieczytelny wynik: " + totalTok; return null; }
+            float sum = 0f;
+            int n = 0;
+            foreach (var raw in text.Substring(head + 2, eq - head - 2).Split('\n'))
+            {
+                string line = raw.Trim();
+                if (line.Length == 0) continue;
+                int sp = line.LastIndexOf(' ');
+                string tok = (sp >= 0 ? line.Substring(sp + 1) : line).Trim('(', ')');
+                float x;
+                if (!float.TryParse(tok, fl, inv, out x)) { info = "nieczytelna linia: " + line; return null; }
+                sum += x;
+                n++;
+            }
+            float tol = 0.005f * (n + 1) + 0.001f;
+            info = "linii " + n + ", suma " + sum.ToString("0.00", inv) + " wobec " + total.ToString("0.00", inv) + " (tolerancja " + tol.ToString("0.000", inv) + ")";
+            return Math.Abs(sum - total) <= tol;
+        }
+
         private static void TestRun()
         {
             var mp = MobileParty.MainParty;
@@ -142,7 +189,6 @@ namespace Armoury
             int longest = Math.Max(Math.Max(Math.Max(LongestPage(pm), LongestPage(pl)), Math.Max(LongestPage(ph), LongestPage(pq))),
                                    Math.Max(LongestPage(pn), Math.Max(LongestPage(ps), LongestPage(pd))));
             longest = Math.Max(longest, Math.Max(LongestPage(pPay), Math.Max(LongestPage(pWho), LongestPage(pWhere))));
-            bool t1p = longest <= Rumours.PageLines;
             int exM = ExemptMounted(p);
             bool t1a = p.Riders + p.Exempt == p.Paired + p.NoSaddle + exM + p.NoHorse && p.Mounted == p.Paired + p.NoSaddle;
             bool t1c = true;
@@ -154,10 +200,28 @@ namespace Armoury
             }
             // 133c: tozsamosc podgladu - puste sloty = GarrisonKit.Missing u kazdego czlowieka (Bad 0); rozbicie: suma brakow - zastapione = puste
             bool t1k = true;
+            int kitTypesBad = 0;
             if (nx.Ok)
             {
                 int sumShort = 0; foreach (var v in nx.Short) sumShort += v;
                 t1k = nx.Bad == 0 && sumShort - nx.Replaced == nx.Missing;
+                // 133g: to samo na kazdym typie (strona typu: rodzaje braku = pancerz + bron wzorca bez pary; minus zastapione = "N empty" typu)
+                foreach (var t in nx.Rows) if (!GapsAgree(t.Short, t.Armour, t.Weapons, t.Replaced, t.Missing)) kitTypesBad++;
+                t1k &= kitTypesBad == 0;
+            }
+            // 133g: "Last battle" - tozsamosc grup z Missing na zapisie bitwy (Bad 0: rozbicie kazdego czlowieka = jego Missing; calosc i kazdy typ: rodzaje = braki,
+            // braki - zastapione = puste); bez zapisu - nie dotyczy
+            bool t1l = true;
+            string lastInfo;
+            var lb = KitGaps.Last;
+            if (lb == null || lb.All == null) lastInfo = "brak zapisu";
+            else
+            {
+                int bad = 0;
+                foreach (var kr in lb.Types) if (kr != null && !GapsAgree(kr.Short, kr.Armour, kr.Weapons, kr.Replaced, kr.Missing)) bad++;
+                bool all = GapsAgree(lb.All.Short, lb.All.Armour, lb.All.Weapons, lb.All.Replaced, lb.All.Missing);
+                t1l = lb.Bad == 0 && all && bad == 0;
+                lastInfo = "ludzi " + lb.All.Men + ", puste " + lb.All.Missing + ", rozjazd ludzi " + lb.Bad + ", calosc " + T(all) + ", typy z rozjazdem " + bad + "/" + lb.Types.Count;
             }
             // 133d: konie - gotowi + pieszo = jezdzcy podgladu, w bitwie <= w zbrojowni, braki koni i uprzezy rozlozone bez reszty (resztka + sakwy + kupic);
             // stado - procent linii "Herding" = GetHerdingModifier gry z tych samych wejsc (K9, |roznica| <= 0.0005; bez linii - kara 0); predkosc wobec gry - INFO
@@ -170,25 +234,43 @@ namespace Armoury
             }
             var herdOk = HerdAgrees(mv);
             bool t1h = herdOk != false;
-            // 133e: zold - suma wierszy "Who gets what" (+ nierozdzielone) = wynik tego samego wywolania (K10); samosprawdzenie wag wobec linii "Base" BK i
-            // TotalWage gry z OSOBNEGO wywolania (BK losuje zaokraglenie bohaterow spoza CW) - INFO
-            bool t1w = !pv.Ok || pv.RowsSum == pv.Total;
+            // 133g: strona Speed - liczby odczytane z GOTOWEJ strony (linie + "Other") sumuja sie do "= wynik" (w zaokragleniu strony do 0.01 na linie)
+            string speedInfo = "niedostepna";
+            bool? speedSum = null;
+            if (mv.Ok) speedSum = SpeedPageSums(SpeedText(mv), out speedInfo);
+            bool t1s = speedSum != false;
+            // 133e: zold - suma wierszy "Who gets what" (+ nierozdzielone) = wynik tego samego wywolania (K10); samosprawdzenie wag wobec linii "Base" BK - INFO.
+            // 133g: = TotalWage gry z OSOBNEGO wywolania (to, co gra pobiera) - wymagane, gdy zold jest pewny: bez bohatera spoza regul CW w druzynie (BK losuje
+            // jego zaokraglenie - GetHeroWage, RoundRandomized; towarzysze CW maja zold z tabeli); inaczej INFO
             int gameWage = -1;
             try { gameWage = mp.TotalWage; } catch { gameWage = -1; }
+            int randomHeroes = 0;
+            if (pv.Ok) foreach (var row in pv.Rows) if (row.Hero != null && !row.Comp) randomHeroes++;
+            bool wageSure = pv.Ok && randomHeroes == 0;
+            bool t1w = !pv.Ok || (pv.RowsSum == pv.Total && (!wageSure || gameWage == pv.Total));
             // 133f: komunikat z pliku z listy wojska (ten plik - ArmyReview) przez Log.Player -> znacznik -> nasluch zdarzenia gry -> pierscien (koniec do konca;
             // linia "Wojsko (133f) [Army]" idzie tez do tego logu)
             long news0 = PlayerNews.Seen;
             Log.Player("Army review test: this message should be listed under Recent messages.");
             bool t1n = PlayerNews.Seen == news0 + 1;
-            pts.Add("T1 raport: strony <= " + Rumours.PageLines + " linii " + T(t1p) + " (najdluzsza " + longest + "), pary " + T(t1a) + ", kolumna " + (col == null ? "wylaczona" : T(t1c))
-                    + ", podglad sprzetu (133c) " + (nx.Ok ? T(t1k) + " (" + nx.Ms + " ms, stron " + pn.Count + ")" : "niedostepny (" + nx.Why + ")")
+            // 133g: strony komunikatow ("Look") - po komunikacie testu, pierscien niepusty
+            var pNews = new List<string>();
+            foreach (var it in PlayerNews.Newest()) pNews.AddRange(Paginate(PlayerNews.PageText(it)));
+            longest = Math.Max(longest, LongestPage(pNews));
+            bool t1p = longest <= Rumours.PageLines;
+            pts.Add("T1 raport: strony <= " + Rumours.PageLines + " linii " + T(t1p) + " (najdluzsza " + longest + ", stron komunikatow " + pNews.Count + "), pary " + T(t1a) + ", kolumna " + (col == null ? "wylaczona" : T(t1c))
+                    + ", podglad sprzetu (133c) " + (nx.Ok ? T(t1k) + " (" + nx.Ms + " ms" + (nx.Ms > 50 ? " - PONAD 50 ms, INFO" : "") + ", stron " + pn.Count + ", typy z rozjazdem grup " + kitTypesBad + "/" + nx.Rows.Count + ")"
+                                                         : "niedostepny (" + nx.Why + ")")
+                    + ", ostatnia bitwa (133g) " + (lb == null || lb.All == null ? "nie dotyczy (" + lastInfo + ")" : T(t1l) + " (" + lastInfo + ")")
                     + ", konie (133d) " + (hv != null && hv.Ok ? T(t1m) : "z SaddleLaw.Pairs (bez podgladu)")
                     + ", stado (133d) " + (herdOk == null ? "bez porownania (" + (mv.Ok ? mv.HerdWhy : mv.Why) + ")" : T(t1h))
                     + ", predkosc (133d) " + (mv.Ok ? "wobec gry " + (SpeedAgrees(mv) ? "zgodna" : "ROZJAZD") + " - INFO, Other " + S2(mv.Other) + ", " + mv.Ms + " ms" : "niedostepna (" + mv.Why + ")")
-                    + ", zold (133e) " + (pv.Ok ? T(t1w) + " (suma wierszy " + pv.RowsSum + " = wynik " + pv.Total + "; TotalWage gry osobno " + gameWage + " - INFO; podstawa "
+                    + ", strona Speed linie + Other = wynik (133g) " + (speedSum == null ? "nie dotyczy (" + speedInfo + ")" : T(t1s) + " (" + speedInfo + ")")
+                    + ", zold (133e) " + (pv.Ok ? T(t1w) + " (suma wierszy " + pv.RowsSum + " = wynik " + pv.Total + "; TotalWage gry osobno " + gameWage
+                                                  + (wageSure ? " - wymagane (zold pewny)" : " - INFO (bohaterow z losowym zaokragleniem BK " + randomHeroes + ")") + "; podstawa "
                                                   + PayBaseCheck(pv) + " - INFO; " + pv.Ms + " ms)" : "niedostepny (" + pv.Why + ")")
                     + ", komunikaty (133f) " + T(t1n) + " (" + PlayerNews.Brief() + ")");
-            ok &= t1p && t1a && t1c && t1k && t1m && t1h && t1w && t1n;
+            ok &= t1p && t1a && t1c && t1k && t1l && t1m && t1h && t1s && t1w && t1n;
             if (!Writes)
             {
                 // klucz zapisu wylaczony = porzadek gry nietkniety (tak obiecuje opis klucza) - test tez go nie rusza

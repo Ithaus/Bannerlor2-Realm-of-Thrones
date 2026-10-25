@@ -383,11 +383,8 @@ namespace Armoury
             try { pagesLast = Paginate(LastBattleText()); } catch (Exception e) { Stumble("LastBattleText", e); }
             KitPreview.Result next = null;   // 133c: podglad nastepnej bitwy (ten sam rozdzielacz DTE i straze co bitwa; pamiec po wersjach i dniu)
             try { next = KitPreview.Get(false); } catch (Exception e) { Stumble("KitPreview", e); }
-            HorseView hv = null;             // 133d: konie i uprzaz z podgladu + czytnik rodzajow koni (bez podgladu - strona z SaddleLaw.Pairs)
-            try { hv = HorsesOf(mp, next, fit); } catch (Exception e) { Stumble("HorsesOf", e); }
-            List<string> pagesHorses;
-            try { pagesHorses = Paginate(HorsePageText(mp, pairs, hv, col)); }
-            catch (Exception e) { Stumble("HorsePageText", e); pagesHorses = Paginate(HorseText(mp, pairs)); hv = null; }
+            HorseView hv;                    // 133d: konie i uprzaz z podgladu + czytnik rodzajow koni (bez podgladu - strona z SaddleLaw.Pairs)
+            var pagesHorses = HorsePages(mp, fit, pairs, col, next, out hv);
             var pagesMarch = Paginate(ColumnText(mp, col, pairs, next));   // 133d: strona "Column" = MarchText bez zmian + regula jezdzca na mapie
             MarchView mv = null;             // 133d: strony "Speed" i "Herd" (model predkosci gry wprost, stado gry)
             try { mv = MarchOf(mp); } catch (Exception e) { Stumble("MarchOf", e); }
@@ -460,6 +457,16 @@ namespace Armoury
                 }, null), true);
         }
 
+        /// <summary>Strony "Horses and harness" (133d; 133g - wydzielone z OpenMain bez zmian, ta sama funkcja dla okna i proby zdjec): z podgladu i czytnika
+        /// rodzajow koni; potkniecie - strona z SaddleLaw.Pairs (hv null).</summary>
+        private static List<string> HorsePages(MobileParty mp, int[] fit, SaddleLaw.PairState pairs, MarchPace.Column col, KitPreview.Result next, out HorseView hv)
+        {
+            hv = null;
+            try { hv = HorsesOf(mp, next, fit); } catch (Exception e) { Stumble("HorsesOf", e); }
+            try { return Paginate(HorsePageText(mp, pairs, hv, col)); }
+            catch (Exception e) { Stumble("HorsePageText", e); hv = null; return Paginate(HorseText(mp, pairs)); }
+        }
+
         /// <summary>Strony tekstu z powrotem do przegladu ("More" / "Back", na ostatniej "Back" / "Close"). back (133c) - dokad wraca "Back" (null - przeglad).</summary>
         private static void ShowPages(string title, List<string> pages, int i, Action back = null)
         {
@@ -469,9 +476,10 @@ namespace Armoury
             bool more = i < pages.Count - 1;
             int k = i + 1;
             string t = pages.Count > 1 ? title + " (" + (i + 1) + "/" + pages.Count + ")" : title;
+            bool photo = WindowPhotos.Active;   // 133g: strony w probie zdjec - przyciski bez skutku (autotest zamyka zapytanie odmowa - bez powrotu do przegladu)
             InformationManager.ShowInquiry(new InquiryData(t, pages[i], true, true, more ? "More" : "Back", more ? "Back" : "Close",
-                delegate { try { if (more) ShowPages(title, pages, k, back); else ret(); } catch (Exception e) { Stumble("Pages.Next", e); } },
-                delegate { try { if (more) ret(); } catch (Exception e) { Stumble("Pages.Back", e); } }), true);
+                delegate { if (Inert(photo)) return; try { if (more) ShowPages(title, pages, k, back); else ret(); } catch (Exception e) { Stumble("Pages.Next", e); } },
+                delegate { if (Inert(photo)) return; try { if (more) ret(); } catch (Exception e) { Stumble("Pages.Back", e); } }), true);
         }
 
         /// <summary>Tekst na strony okna (ramka okna nie przewija - Rumours.PageLines linii na strone, akapity rozdzielone pusta linia).</summary>
