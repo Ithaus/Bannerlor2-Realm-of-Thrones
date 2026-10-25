@@ -1540,6 +1540,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool FateOfTheBrokenLog { get; set; } = true;
 
+        [SettingPropertyBool("Wounded Withdraw With Arms", HintText = "with Broken Men Never Rally on: in a field battle a man wounded below the Wounded Flee Percent no longer panics - no scream, no dropped weapons, no fright spreading to his mates. He keeps his weapon and shield, falls back behind his own line (or to the nearest banner of his side) and stands there, fighting only whoever reaches him. He breaks and runs only when the pain gets too much (below the AI Flee Below Percent), his company breaks, the fighting breaks his morale or his own formation falls apart. Both sides alike, your men too. Sieges, sorties, sea battles and hideouts keep the old rule. Off = the wounded man panics and runs, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool WoundedWithdrawWithArms { get; set; } = true;
+
         [SettingPropertyBool("Routed Men Never Rally", HintText = "with Broken Men Never Rally on: in a field battle every man who panics - his morale broken by the fighting, or his whole side giving up a lost battle - runs for good, just like a broken wounded man: no turning back to fight bare-handed ten seconds later, no second scream or fright, and if his flight stalls he is sent off again quietly. Both sides alike, your men too. No rallying at the banner yet. Sieges, sorties, sea battles and hideouts are left as they were. Off = as before (the game lets a panicked man return to the fight)", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool RoutedMenNeverRally { get; set; } = true;
@@ -10396,6 +10400,7 @@ namespace Armoury
             s.BrokenMenNeverRally = BrokenMenNeverRally;
             s.FleeAwayFromEnemies = FleeAwayFromEnemies;
             s.FateOfTheBrokenLog = FateOfTheBrokenLog;
+            s.WoundedWithdrawWithArms = WoundedWithdrawWithArms;
             s.RoutedMenNeverRally = RoutedMenNeverRally;
             s.CommanderTactics = CommanderTactics;
             s.VeteransByTier = VeteransByTier;

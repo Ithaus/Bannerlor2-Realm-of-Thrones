@@ -83,6 +83,7 @@ namespace Armoury
         private static readonly HashSet<int> SwRout = new HashSet<int>();
         private static readonly HashSet<int> SwRetreat = new HashSet<int>();
         private static readonly HashSet<int> SwOrdered = new HashSet<int>();
+        private static readonly HashSet<int> SwWithdraw = new HashSet<int>();   // 143: odwrot rannego z bronia (RoutKeeper.Withdrawing) - ROZSADEK
 
         /// <summary>Zmiana misji (RoutHold.Ensure, wolajacy trzyma Gate): wszystko od zera, wejscia nieczynne do Begin.</summary>
         internal static void ResetCounters()
@@ -109,6 +110,7 @@ namespace Armoury
             SwRout.Clear();
             SwRetreat.Clear();
             SwOrdered.Clear();
+            SwWithdraw.Clear();
         }
 
         /// <summary>142: linia 139 tej misji jest (bitwa / kryjowka z kluczem) i jej powroty RBM (PANIKA -> ROZSADEK u paniki gry nieprzejetej) - wolajacy trzyma Gate.</summary>
@@ -393,6 +395,7 @@ namespace Armoury
                     if (k != null && k.Knows(a)) SwRout.Add(a.Index);
                     else if (cai != null && cai.IsPanicked) SwPanic.Add(a.Index);
                     else if (cai != null && cai.IsRetreating) SwRetreat.Add(a.Index);
+                    else if (k != null && k.Withdrawing(a)) SwWithdraw.Add(a.Index);   // 143: ranny w odwrocie z bronia (natywny odwrot / postoj) - ROZSADEK
                     else if (a.IsRunningAway) SwOrdered.Add(a.Index);
                 }
             }
@@ -471,7 +474,7 @@ namespace Armoury
         }
 
         /// <summary>Bron (nie amunicja, nie sztandar) i tarcza w slotach 0-3 - te same sloty, ktore zrzuca ArtemsLivelyAnimations.DropAllWeapons.</summary>
-        private static void Arms(Agent a, out bool weapon, out bool shield)
+        internal static void Arms(Agent a, out bool weapon, out bool shield)
         {
             weapon = false;
             shield = false;
@@ -538,7 +541,8 @@ namespace Armoury
               .Append(_cheerList != null && _cheerAgent != null ? "" : ", lista wiwatu BRAK").Append(')')
               .Append(" | przelacznik (spis co ").Append(CensusEvery.ToString("0", Inv)).Append(" s do konca bitwy, ludzi; czlowiek moze trafic do kilku): RoutHold ")
               .Append(SwRout.Count).Append(", panika gry ").Append(SwPanic.Count).Append(", sam odwrot komponentu (RBM szarza) ").Append(SwRetreat.Count)
-              .Append(" - to PANIKA; odwrot z rozkazu szyku ").Append(SwOrdered.Count).Append(" - to ROZSADEK")
+              .Append(" - to PANIKA; odwrot z rozkazu szyku ").Append(SwOrdered.Count).Append(", odwrot rannego z bronia (143) ").Append(SwWithdraw.Count)
+              .Append(" - to ROZSADEK")
               .Append(" | wypadli z probek ").Append(_dropped).Append(", potkniecia los ").Append(RoutHold.StumblesLocked(RoutHold.SiteFate)).Append('.');
             Log.Info(sb.ToString());
         }

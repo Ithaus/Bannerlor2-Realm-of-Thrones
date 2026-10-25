@@ -18,6 +18,9 @@ namespace Armoury
     ///
     /// Bohaterowie domyslnie zostaja: dowodca, ktory ucieka pierwszy, to nie
     /// Westeros. Wlacza sie ich osobnym pokretlem.
+    ///
+    /// 143 (25.10): w bitwie polowej przy WoundedWithdrawWithArms ranny nie panikuje, tylko wycofuje sie z bronia za wlasny szyk (RoutKeeper.Withdraw,
+    /// RoutHold.Withdraw.cs) - panika z bolu zostaje ponizej AiFleeBelowPercent (FieldCraft).
     /// </summary>
     internal sealed class BrokenMen : MissionBehavior
     {
@@ -109,7 +112,16 @@ namespace Armoury
                         // morale zlamanego przypiete na 0 (RBM go nie zatrzyma), ponowienia odwrotu bez okrzyku w RoutKeeper. Takze ten, kto juz
                         // ucieka panika gry - zeby RBM nie zawrocil go do walki; odwrot z rozkazu szyku odrzuca sam Break. Ponowne wywolania
                         // dla zlamanego koncza sie na slowniku (raz na bitwe), wiec stare odstepy 3/6/9/20 s nie sa potrzebne.
-                        if (RoutHold.On(mission)) { RoutHold.Break(a, MissionTeams.Broken); continue; }
+                        // 143 (25.10, klucz WoundedWithdrawWithArms, decyzja Jeffa D2 "Odwrot z bronia"): ZMIANA REGULY NB2 z 16.10 - w bitwie polowej ranny
+                        // ponizej progu NIE panikuje (bez Panic: bez okrzyku, zrzutu broni Artem i zarazania), tylko cofa sie z bronia za wlasny szyk albo do
+                        // sztandaru i stoi za linia (RoutKeeper.Withdraw, raz na bitwe). Panika dopiero z bolu ponizej AiFleeBelowPercent (FieldCraft), przy
+                        // zalamaniu kompanii, panice gry albo rozbitym szyku - wtedy RoutHold.Break jak kazdy zlamany. Oblezenie, kryjowka, morze - jak dotad.
+                        if (RoutHold.On(mission))
+                        {
+                            if (RoutHold.WithdrawHere(mission)) RoutHold.Withdraw(a);
+                            else RoutHold.Break(a, MissionTeams.Broken);
+                            continue;
+                        }
                         // JUZ UCIEKA - jakakolwiek droga (nasz odwrot, vanillowa
                         // panika morale, masowa ucieczka po zlamaniu armii). Stary
                         // warunek patrzyl tylko na IsRetreating, wiec przy ROZBICIU

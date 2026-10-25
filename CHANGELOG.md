@@ -1,5 +1,86 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 143 (galaz noc/139-ai-zycie, po 142 4d3f7047) - AI walczy o zycie, krok 5: ranny ponizej 20% HP wycofuje sie z bronia, bez paniki (karta "141", decyzja D2, klucz WoundedWithdrawWithArms) - ZMIANA REGULY NB2 z 16.10
+**Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko
+w obszarze jego mozliwosci i skilli aby przetrwac, walczy o zycie! ... dopiero ta zasada peka gdy jest panika"; decyzja Jeffa ok. 15:00 (pytanie D2 syntezy): ranny
+ponizej 20% HP = "Odwrot z bronia" (panika z bolu dopiero ponizej 10%). Objaw: ranny ponizej WoundedFleePercent (20%) od razu PANIKUJE - krzyk Debacle, zrzut calej
+broni (ArtemsLivelyAnimations, u Jeffa DropAllWeapons=true), ucieczka do granicy pola. Dowod z gry: linia NB2 autotestu 25.10 13:01:32 - 52 zlamanych, z tego 29 rannych
+z BrokenMen (Panic z naszej reki). Linia 139 "LOS ZLAMANYCH" w grze jeszcze nie byla.
+**Przyczyna:** NB2 (16.10) - BrokenMen.cs (dawniej :99/112) wolal RoutHold.Break(a, Broken), a Break wola CommonAIComponent.Panic: Mission.OnAgentPanicked (Artem: animacja
+strachu i DropAllWeapons, artem.cs:259-313), MissionAgentPanicHandler -> CommonAIComponent.Retreat (EnforceShieldUsage(None)) -> Mission.OnAgentFleeing
+(AgentMoraleInteractionLogic: okrzyk Debacle 70%, spadek morale sasiadow w 4 m). To regula zlamanego dla rannego, ktory jeszcze mysli - sprzeczne z zasada Jeffa
+"racjonalny do chwili paniki". Sprawdzone w dekompilacji przed kodem (karta kazala): (1) RBM StopRetreating (RBMAI AgentAi.cs:651-657: morale > 0 i 10 s bez ciosu
+wrecz -> CommonAIComponent.StopRetreating) dziala TYLKO, gdy komponent ma IsRetreating (CommonAI.cs StopRetreating: "if (IsRetreating)") - natywny Agent.Retreat(pos)
+(SetRetreatMode) komponentu nie dotyka, wiec RBM takiego odwrotu nie gasi i nie trzeba trzymac morale 0; (2) natywny odwrot ustawia Agent.IsRunningAway (callback
+SetAgentAIPerformingRetreatBehavior, tw_Agent.cs:1611), a Mission.CanAgentRout (tw_Mission.cs:5269) jest prawdziwe dla IsRunningAway - CommonAIComponent.OnTickParallel
+co 0.5-0.6 s wola StartFadingOut, gdy czlowiek jest blizej celu odwrotu niz pierwiastek(0.55 x v^2 + 2r) (pieszy w biegu ok. 5.3 m, kon w galopie ok. 8.9 m) albo przy
+granicy pola - bez postoju przed celem ranny "uciekalby z pola" za wlasna linia; (3) pod morale 0.01 komponent bez IsRetreating sam wola Panic (OnTickParallel) - stad
+morale co najmniej 0.02; (4) BannerCompanies "polowa skladu" (InRanks) liczy czynnych bez IsPanicked - wycofany ranny NIE jest strata kompanii; fale zalamania i wstrzas
+(TickOne, Shock) pomijaja IsRunningAway (ranny w drodze), postoj juz nie; (5) RoutKeeper.Break odrzucal IsRunningAway bez flag komponentu jako "odwrot z rozkazu
+szyku" - bez wyjatku FieldCraft (< 10%) i choragiew nie moglyby zlamac rannego w drodze; (6) rozkaz odwrotu szyku (MovementOrder.RetreatAux -> CommonAIComponent.Retreat)
+i szarza RBM (AgentAi.cs:826-859) ustawiaja IsRetreating komponentu.
+**Zmiana:** RoutHold.Withdraw.cs (nowy, partial RoutKeeper - tryb "Wycofanie"), WoundedWithdraw.cs (nowy - stale, liczniki, linia), RoutHold.cs (RoutKeeper partial,
+WithdrawHere / Withdraw, wyjatek w Break, wpiecia w AfterStart / OnEndMission / Clear / OnAgentRemoved / OnAgentDeleted / OnAgentControllerSetToPlayer /
+OnMissionTick, miejsce potkniec NB2 "odwrot" = 16 (Sites 17), segment w linii startu sesji, ResetCounters i Write), BrokenMen.cs (galaz RoutHold.On), BrokenFate.cs
+(Arms internal; spis przelacznika: osobna pozycja "odwrot rannego z bronia (143)" - dotad wpadalby do "odwrot z rozkazu szyku"), Settings.cs, McmSettings.cs
+(gen_mcm: Armoury 2501 ustawien).
+(a) ZMIANA REGULY NB2 z 16.10: w bitwie polowej (zakres 142: IsFieldBattle bez kryjowki i morza, rodzaj "bitwa") przy WoundedWithdrawWithArms + BrokenMenNeverRally +
+WoundedFleeEnabled BrokenMen nie wola Break(a, Broken), tylko RoutKeeper.Withdraw - raz na czlowieka na bitwe: czlowiek AI w waznej druzynie, nie w zbiorze zlamanych;
+juz w panice gry - nic (142 wezmie go z kolejki; bez RoutedMenNeverRally - stara regula Break "takze ten, kto juz ucieka panika gry"); cudzy odwrot (komponent albo
+natywny) - czeka, BrokenMen sprobuje za 0.5 s. Oblezenia, wypady, kryjowki, morze - jak dotad (Break, panika).
+(b) Cel co RefreshEvery (4 s): tyl wlasnego szyku = Formation.CurrentPosition - Direction x (Depth/2 + 5 m) (karta), potem Depth/2 + 2 m, potem 3 m za najblizszym
+chorazym strony do 80 m (BannerBearerLogic.GetFormationBannerBearers). Cel: w granicach pola, co najmniej 15 m od granicy, bez wroga (nie uciekajacego) w 10 m, z droga
+od czlowieka (Scene.GetPathDistanceBetweenPositions, najwyzej 10 zapytan na klatke - osobny budzet od RoutHold). Brak bezpiecznego miejsca - nic nie wysylamy (w szyku
+walczy dalej), proba za 4 s.
+(c) Droga: natywny Agent.Retreat(cel) BEZ Panic i bez CommonAIComponent.Retreat - bez okrzyku, zrzutu broni Artem, zarazania i bez EnforceShieldUsage(None); nowy
+rozkaz, gdy cel przesunal sie o ponad 5 m; ponowienie co 4 s, gdy natywny odwrot zgasl. Co klatke: postoj juz od max(8 m, pierwiastek(0.8 x v^2 + 9)) od celu
+(zawsze przed promieniem zanikania gry); po 30 s drogi - postoj tam, gdzie stoi. Morale co najmniej 0.02.
+(d) Postoj za linia: Agent.StopRetreating + Agent.SetScriptedPosition(cel, bez NoAttack) - stoi za szykiem i broni sie, gdy ktos do niego dojdzie (DECYZJA: bez
+NoAttack, bo czlowiek, ktory nie moze oddac ciosu, ginie - "robi wszystko, aby przetrwac"); co 4 s cel na nowo (szyk sie rusza - postoj idzie za nim), postoj
+przywrocony, gdy ktos zdjal GoToPosition (RBM StanceLogic:2012 przy zmianie szyku - DisableScriptedMovement).
+(e) Panika rannego (jedna regula zlamanego - RoutHold.Break, jeden okrzyk): z bolu ponizej AiFleeBelowPercent (FieldCraft, Break(a, Flee) jak dotad), zalamanie kompanii
+(BannerCompanies, Break(a, Flee)), panika gry (142, Break(a, GamePanic)) albo szyk rozbity - nowy test co 4 s: bez szyku, sam w szyku albo co najmniej polowa reszty szyku
+w PANICE wedlug przelacznika 139 -> Break(a, Flee) ("ucieczka" NB2). Break: nowy wyjatek - ranny w odwrocie nie jest "odwrotem z rozkazu szyku"; odwrot konczony
+(postoj zdjety: DisableScriptedMovement), powod do licznika, dalej jak kazdy zlamany (Panic -> handler gry nadpisuje natywny cel).
+(f) Cudzy odwrot bez paniki W TRAKCIE naszego (rozkaz odwrotu szyku, szarza RBM): postoj zdjety, klucz zdjety - po StopRetreating RBM BrokenMen wycofa rannego od nowa
+(inaczej wrocilby do walki na zawsze). Gracz przejmuje czlowieka - wypada. Koniec bitwy: stan "na koniec" liczony w chwili rozstrzygniecia, postoj zdjety; idacy
+po stronie zwyciezcow - StopRetreating (ta sama regula co gra dla spanikowanych zwyciezcow), przegrani ida dalej; los po koncu bitwy nie jest liczony.
+(g) Linia raz na bitwe polowa, zaraz po "PANIKA BEZ POWROTU (142)" (RoutHold.Write -> WoundedWithdraw.Write pod Gate; przy kluczu NIE tylko, gdy BrokenMen zlamal kogos
+po staremu): "ODWROT RANNYCH (143): misja bitwa, klucz TAK (...) | odwrot rannych N (strona gracza a / wroga b; przy wejsciu z bronia x, z tarcza y; pominieci: juz
+w panice gry p, czekali na koniec cudzego odwrotu c / rozkazu szyku o; ponowne wejscia po cudzym odwrocie r) | za linia A (cel: tyl szyku t, sztandar s, w miejscu po
+30 s drogi m; sr. droga d s), na koniec: w drodze q, na postoju h | zginal w drodze b (zabici k / nieprzytomni u), padl na postoju f, uszedl z pola e (oczekiwane 0) |
+wrocil do walki c (na postoju znow w przedniej polowie szyku), bronil sie (cios wrecz po wejsciu) d | panika: z bolu (<10%) p, szyk rozbity k (bez szyku / sam / polowa
+w panice), zalamanie kompanii z, panika gry g, inna i, odmowy Break r; bez paniki: odwrot komponentu (rozkaz odwrotu szyku / szarza RBM) o, przejeci przez gracza x |
+z bronia przy losie albo na koniec w z n (100%), z tarcza s | rozkazy: odwrot, ponowien (zgasl), zmian celu, przesuniec postoju, postoj przywrocony, ocen bez
+bezpiecznego miejsca (wrog przy celu), sztandary TAK, zapytan o droge (limit) | morale do 0.02 n razy | rozbici BrokenMen w NB2 k (oczekiwane 0) | potkniecia odwrot n
+(wypadli w)." Linia startu sesji NB2 - segment "Wounded Withdraw With Arms TAK (...)"; linia 139 - w spisie przelacznika "odwrot rannego z bronia (143) w - to ROZSADEK".
+(h) Klucz MCM WoundedWithdrawWithArms = TAK (grupa "The master's parry", opis po angielsku); wylaczony = ranny panikuje jak dotad (stara regula NB2).
+Odstepstwa od karty (swiadome): (1) "po dojsciu tylko obrona (warunki z 140)" - karta syntezy "140 Ranny walczy ostroznie" (postfiks VeteranAi) nie jest zrobiona;
+"obrona" = postoj ScriptedPosition za linia bez NoAttack (nie idzie do walki, oddaje cios temu, kto do niego dojdzie); (2) zakres tylko bitwa polowa (jak 142) -
+oblezenia, wypady, kryjowki i morze bez zmian (cel "za szykiem" na murach / w kryjowce nie ma sensu); (3) szyk rozbity zdefiniowany: bez szyku, sam albo polowa reszty
+w PANICE (przelacznik 139) - karta nie podawala progu; (4) morale 0.02 (karta) oznacza, ze powolny spadek morale nie zlamie rannego w odwrocie - lamie go test "szyk
+rozbity", kompania albo panika gry w tej samej klatce co wstrzas; (5) cudzy odwrot bez paniki zdejmuje klucz (ponowne wejscie) zamiast "raz na bitwe" - inaczej
+ofiara szarzy RBM wracala do walki ranna na zawsze.
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - Break bez zmian dla wszystkich poza rannym w odwrocie (wyjatek tylko przy Withdrawing); FieldCraft
+(< 10%), BannerCompanies i 142 woluja Break jak dotad; przy kluczu NIE BrokenMen dokladnie jak NB2; oblezenia / kryjowki / morze - stara regula; NB2 "rozbici" w bitwie
+polowej teraz ok. 0 (to zamierzone), "ucieczka" obejmuje teraz takze rannych zlamanych z bolu / kompanii / rozbitego szyku; linia NM "odwroty wyslane rozbici" liczy
+wycofanych (raz na czlowieka). (b) kolizje - przelacznik 139: ranny w odwrocie to ROZSADEK (bez IsPanicked / IsRetreating komponentu, nie w zbiorze RoutHold) -
+140 tarcze (Skip: natywny IsRetreating -> "panika" w liczniku pominietych, idacy bez podnoszenia tarczy; na postoju normalnie), 141 S2 liczy go do ostrzalu piechoty,
+142 przejmuje go z kolejki przy panice gry; BannerCompanies: wycofany ranny zostaje "w szeregu" (dawniej spanikowany = strata) - MNIEJ rzutow "polowa skladu" niz
+przed 143 (kalibracja choragwi sie zmienia - porownac "polowa skladu" i "zalaman" w NB2 przed / po); RBM nie celuje w IsRunningAway (Utilities.NearestAgentFromMultipleFormations)
+- ranny w drodze rzadziej atakowany; BattleEndLogic liczy idacego jako uciekajacego (ostatni ranni w drodze moga zakonczyc bitwe - jak dotad przy panice); MarchToContact
+i BattleCries pomijaja IsRunningAway (idacy bez limitu marszu i bez okrzyku - jak dotad przy panice). (c) jedno zjawisko - ranny ponizej progu ma jedna regule
+(odwrot), panika ma jedna (RoutHold.Break); stan czyszczony na koniec misji (Clear) i przy usunieciu zachowania; liczniki zeruje RoutHold.Ensure. (d) cudzy kod -
+CommonAIComponent (Panic / Retreat / StopRetreating / OnTickParallel fade-out), Agent.Retreat / StopRetreating / SetScriptedPosition / IsRunningAway, Mission.CanAgentRout,
+MovementOrder.RetreatAux, BannerBearerLogic.GetFormationBannerBearers, RBMAI AgentAi.cs:651-657 i :826-859, RBMAI StanceLogic:2012 - sprawdzone w dekompilacji.
+NIE da sie sprawdzic w C# (kod natywny): czy ScriptedPosition trzyma czlowieka za linia przy szarzy szyku (RBM Frontline wola Agent.SetTargetPosition) i czy w trybie
+postoju broni sie / oddaje cios - pokaze "wrocil do walki", "bronil sie" i "postoj przywrocony". Wydajnosc: tick po liscie rannych (dziesiatki) - co klatke tylko
+odleglosc; co 4 s na czlowieka: przeglad szyku (raz na klatke na szyk), do 3 celow (granica, wrogowie w 10 m, droga - limit 10 zapytan na klatke).
+Sprawdzic w logu po wgraniu: linia "ODWROT RANNYCH (143)" w bitwie polowej; "odwrot rannych" ~ dawne "rozbici" NB2, a NB2 "rozbici" 0; "za linia" wiekszosc;
+"uszedl z pola" 0; "z bronia przy losie albo na koniec" 100%; "wrocil do walki" maly (duzy = postoj nie trzyma przy szarzy - wtedy latka na RBM Frontline jako osobny
+krok); "panika z bolu" > 0 tylko u schodzacych ponizej 10%; "szyk rozbity" przy rozbiciu strony; potkniecia odwrot 0; NB2 "polowa skladu" / "zalaman" wobec bitwy
+przed 143. W grze (Jeff): ranny ponizej 20% nie krzyczy i nie rzuca broni, cofa sie za swoj szyk z bronia i tarcza i tam stoi; krzyk i zrzut dopiero ponizej 10%.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 29d57bd0534af44b2264eebf98ad1c68).
 ## 2026-10-25 142 (galaz noc/139-ai-zycie, po 141 ca231ec0) - AI walczy o zycie, krok 4: panika bez powrotu - kazda panika gry w bitwie polowej do RoutHold (karta "139a", klucz RoutedMenNeverRally)
 **Problem:** Jeff 25.10 ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek ... dopiero ta zasada peka gdy jest panika,
 w panice jest zasada uciekaj i brak rozsadku ... Wtedy ginie najwiecej osob."; decyzja Jeffa ok. 15:00 (pytanie D3 syntezy): panika z morale gry "Bez powrotu, zbiorka

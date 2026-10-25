@@ -47,6 +47,12 @@ namespace Armoury
     /// sciezka "juz w panice" (bez drugiego Panic, okrzyku i animacji, morale 0, dalej jak nasz zlamany: przypiecie, ponowienia, kierunek). Najwyzej
     /// TakePerFrame przejec na klatke i tylko do MaxEntries zywych wpisow; czekajacy maja morale 0. Bez zbiorki przy sztandarze (decyzja Jeffa: pozniej).
     /// Liczniki i linia "PANIKA BEZ POWROTU (142)" - NoReturn.cs.
+    /// 143 (25.10, karta "141 Ranny ponizej 20% HP: odwrot z bronia", decyzja Jeffa D2 "Odwrot z bronia"; klucz WoundedWithdrawWithArms): w bitwie polowej
+    /// BrokenMen nie lamie juz rannego (Break -> Panic), tylko wola RoutKeeper.Withdraw - tryb "Wycofanie" (RoutHold.Withdraw.cs, liczniki WoundedWithdraw.cs):
+    /// natywny Agent.Retreat za tyl wlasnego szyku albo do sztandaru BEZ CommonAIComponent.Panic / Retreat (bez OnAgentPanicked: bez zrzutu broni Artem, okrzyku
+    /// Debacle i zarazania; komponent nie ma IsRetreating, wiec RBM StopRetreating - AgentAi.cs:651-657 - go nie dotyczy), postoj za linia (ScriptedPosition).
+    /// ZMIANA REGULY NB2 z 16.10: panika rannego dopiero z bolu ponizej AiFleeBelowPercent (FieldCraft), przy zalamaniu kompanii, panice gry albo rozbitym szyku -
+    /// wtedy Break konczy odwrot (wyjatek od "odwrotu z rozkazu szyku") i dalej jak kazdy zlamany.
     /// Postura szeregowych wedlug tieru (BattleWind.PostureInitPostfix) pisze swoje liczniki tutaj - jedna linia "Bitwa (NB2)" po misji.
     /// Czesc 2 (16.10): ta sama linia niesie liczniki taktyki wedlug dowodcy (WarCouncil), weteranow wedlug tieru (VeteranAi), krwi przez pancerz
     /// (BattleGore) i glosow bitwy (BattleCries) - ich liczniki zeruje Ensure (zmiana misji), pisza je pod Gate przez EnsureLocked.
@@ -71,9 +77,11 @@ namespace Armoury
         internal const int SiteShields = 14;
         // 142 (25.10): panika bez powrotu (NoReturn) - kolejka paniki gry w RoutKeeper i przejecie do zbioru zlamanych; nazwa jednym slowem (regex NB2)
         internal const int SiteNoReturn = 15;
-        private const int Sites = 16;
+        // 143 (25.10): odwrot rannego z bronia (WoundedWithdraw, RoutHold.Withdraw.cs) - wlasne miejsce; nazwa jednym slowem (regex NB2)
+        internal const int SiteWithdraw = 16;
+        private const int Sites = 17;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
-                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot" };
+                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -145,6 +153,26 @@ namespace Armoury
             if (k == null || a == null) return false;
             try { return k.Break(a, site); }
             catch (Exception e) { Stumble(SitePanic, "RoutHold.Break", e); return false; }
+        }
+
+        /// <summary>143: tryb "Wycofanie" czynny w tej misji - RoutHold czynny (On), klucz WoundedWithdrawWithArms i bitwa polowa (ten sam zakres co 142:
+        /// IsFieldBattle bez kryjowki i morza, rodzaj "bitwa"). Oblezenie, wypad, kryjowka, morze - stara regula NB2 (Break, panika).</summary>
+        internal static bool WithdrawHere(Mission m)
+        {
+            var c = Settings.Current;
+            if (c == null || !c.WoundedWithdrawWithArms || !On(m)) return false;
+            try { return Live.FieldForWithdraw(m); }
+            catch { return false; }
+        }
+
+        /// <summary>143: ranny ponizej WoundedFleePercent (BrokenMen) - odwrot z bronia za wlasny szyk albo do sztandaru, bez Panic (RoutKeeper.Withdraw).
+        /// Raz na czlowieka na bitwe; odmowa (cudzy odwrot, koniec bitwy) - BrokenMen sprobuje przy nastepnym takcie.</summary>
+        internal static void Withdraw(Agent a)
+        {
+            var k = Live;
+            if (k == null || a == null) return;
+            try { k.Withdraw(a); }
+            catch (Exception e) { Stumble(SiteWithdraw, "RoutHold.Withdraw", e); }
         }
 
         // ------------------------------------------------------------ postura (BattleWind.PostureInitPostfix)
@@ -257,6 +285,7 @@ namespace Armoury
             BannerCompanies.ResetCounters();
             BrokenFate.ResetCounters();     // 139: los zlamanych - liczniki i lista ludzi poprzedniej misji
             NoReturn.ResetCounters();       // 142: panika bez powrotu - liczniki misji
+            WoundedWithdraw.ResetCounters();   // 143: odwrot rannego z bronia - liczniki misji
         }
 
         /// <summary>Licznik misji dla RoutKeeper (glowny watek): misja zgodna z licznikami.</summary>
@@ -332,6 +361,8 @@ namespace Armoury
             try { BrokenFate.Write(c); } catch { }
             // 142: osobna linia "PANIKA BEZ POWROTU (142)" po linii 139 (tylko bitwa polowa)
             try { NoReturn.Write(c); } catch { }
+            // 143: osobna linia "ODWROT RANNYCH (143)" po linii 142 (tylko bitwa polowa)
+            try { WoundedWithdraw.Write(c); } catch { }
         }
 
         // ------------------------------------------------------------ start sesji
@@ -390,6 +421,14 @@ namespace Armoury
               .Append(c.RoutedMenNeverRally && !c.BrokenMenNeverRally ? " (nieczynne: Broken Men Never Rally NIE)" : "")
               .Append(" (panika gry w bitwie polowej - morale gry, RBM CoordinatedRetreat - do RoutHold w nastepnym ticku sciezka 'juz w panice': bez drugiego Panic, okrzyku i animacji, morale 0; najwyzej ")
               .Append(TakePerFrame).Append(" na klatke, limit zywych wpisow ").Append(MaxEntries).Append(", czekajacy z morale 0; zbiorki przy sztandarze brak)")
+              // 143: ranny ponizej WoundedFleePercent - odwrot z bronia za wlasny szyk, bez Panic (zmiana reguly NB2 z 16.10)
+              .Append(" | Wounded Withdraw With Arms ").Append(c.WoundedWithdrawWithArms ? "TAK" : "NIE")
+              .Append(c.WoundedWithdrawWithArms && !(c.BrokenMenNeverRally && c.WoundedFleeEnabled) ? " (nieczynne: Broken Men Never Rally albo Wounded Flee NIE)" : "")
+              .Append(" (bitwa polowa: ranny ponizej ").Append(c.WoundedFleePercent.ToString("0", System.Globalization.CultureInfo.InvariantCulture))
+              .Append("% HP bez Panic - natywny odwrot za tyl szyku (srodek - kierunek x (glebokosc/2 + 5 m)) albo do sztandaru, ponowienie co ")
+              .Append(RefreshEvery.ToString("0")).Append(" s, postoj za linia (ScriptedPosition) od ").Append(WoundedWithdraw.ArriveRadius.ToString("0", System.Globalization.CultureInfo.InvariantCulture))
+              .Append(" m od celu, morale co najmniej 0.02; panika dopiero z bolu ponizej ").Append(c.AiFleeBelowPercent)
+              .Append("% HP (FieldCraft), przy zalamaniu kompanii albo gdy szyk rozbity (bez szyku, sam, polowa w panice); oblezenia, kryjowki, morze - stara regula)")
               // 140: tarcza pod ostrzalem (linia 'Bitwa (140 tarcze)' po bitwie)
               .Append(" | AI Shields Up Under Fire ").Append(c.AiShieldsUpUnderFire ? "TAK" : "NIE").Append(" (trzymanie ")
               .Append(c.ShieldsUpHoldSeconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)).Append(" s, szyk od ").Append(c.ShieldsUpFormationShots)
@@ -409,7 +448,7 @@ namespace Armoury
     /// Czesc 2 (16.10): takze przy kluczach CommanderTactics, VeteransByTier, BloodThroughArmour, BattleCriesAndMoans - OnEndMission pisze linie NB2
     /// z ich licznikami (dodawane przed BattleSense, wiec jego AfterStart widzi juz RoutHold.Begin).
     /// </summary>
-    internal sealed class RoutKeeper : MissionBehavior
+    internal sealed partial class RoutKeeper : MissionBehavior
     {
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
@@ -488,6 +527,9 @@ namespace Armoury
             // 142: bitwa polowa (liczona raz) i liczniki linii "PANIKA BEZ POWROTU (142)"
             try { if (Mission != null) NoReturn.Begin(Mission, NoReturnHere(Mission)); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteNoReturn, "NoReturn.Begin", e); }
+            // 143: odwrot rannego z bronia - stan kluczy i bitwa polowa (ten sam zakres co 142)
+            try { if (Mission != null) WoundedWithdraw.Begin(Mission, NoReturnHere(Mission)); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteWithdraw, "WoundedWithdraw.Begin", e); }
             base.AfterStart();
         }
 
@@ -502,6 +544,7 @@ namespace Armoury
             // 139: Close (uciekajacy wciaz na polu, ostatni wiwat) przed linia; Release (bez referencji do ludzi) po niej
             // 142: czekajacy w kolejce do licznika "po koncu bitwy", czas konca misji - przed linia
             try { if (Mission != null) NoReturn.Close(Mission.CurrentTime, DropQueue()); } catch { }
+            try { CloseWithdraw(); } catch { }        // 143: kto na koniec w drodze / na postoju, bron - przed linia
             try { if (Mission != null) FieldHere(Mission); RoutHold.Field = _field; BrokenFate.Close(Mission); RoutHold.Flush(Mission); } catch { }
             BrokenFate.Release();
             Clear();
@@ -528,6 +571,7 @@ namespace Armoury
         private void Clear()
         {
             try { _by.Clear(); _list.Clear(); _near.Clear(); } catch { }
+            ClearWithdraw();                          // 143: wpisy odwrotu rannych (bez referencji do ludzi skonczonej misji)
         }
 
         /// <summary>142: kolejka paniki gry pusta (koniec misji, koniec bitwy); zwraca, ilu czekalo.</summary>
@@ -654,6 +698,7 @@ namespace Armoury
         {
             try { Entry e; if (affectedAgent != null && _by.TryGetValue(affectedAgent, out e)) Drop(e, false); } catch { }
             BrokenFate.Deleted(affectedAgent);        // 139: usuniety bez losu - wypada z probek
+            WithdrawDeleted(affectedAgent);           // 143: usuniety bez losu - wypada z ticku odwrotu
         }
 
         public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
@@ -662,6 +707,7 @@ namespace Armoury
             try { Entry e; if (affectedAgent != null && _by.TryGetValue(affectedAgent, out e)) Drop(e, true); } catch { }
             // 139: los zlamanego (stan, cios konczacy, bron w rece - przed zrzutem broni z trupa, Mission.OnAgentRemoved:2997-3031); tylko liczniki
             BrokenFate.Removed(Mission, affectedAgent, affectorAgent, agentState, in blow);
+            WithdrawRemoved(affectedAgent, agentState);   // 143: los rannego w odwrocie (w drodze / na postoju), bron przy losie
         }
 
         public override void OnAgentControllerSetToPlayer(Agent agent)
@@ -672,6 +718,7 @@ namespace Armoury
                 if (agent != null && _by.TryGetValue(agent, out e) && !e.Dead) { RoutHold.Player++; e.ByPlayer = true; Drop(e, true); }
             }
             catch { }
+            WithdrawToPlayer(agent);                  // 143: gracz przejmuje rannego w odwrocie - postoj zdjety, wypada z ticku
         }
 
         public override void OnAgentPanicked(Agent affectedAgent)
@@ -714,10 +761,14 @@ namespace Armoury
             if (!MissionTeams.Valid(a.Team)) { MissionTeams.Skip(a, site); RoutHold.NoTeam.Add(a.Index); return false; }
             var cai = a.CommonAIComponent;
             if (cai == null) return false;
+            // 143: ranny w odwrocie z bronia (nasz natywny Agent.Retreat - IsRunningAway bez odwrotu komponentu) to nie "rozkaz szyku": konczymy jego
+            // odwrot (postoj zdjety) i lamiemy go jak kazdego - z bolu (FieldCraft), przy zalamaniu kompanii, panice gry albo rozbitym szyku (tick odwrotu)
+            bool wd = Withdrawing(a);
             // odwrot z rozkazu szyku (silnik: IsRunningAway, bez paniki i bez odwrotu komponentu) - nie nasz; sprobujemy, gdy sie skonczy
-            if (a.IsRunningAway && !cai.IsRetreating && !cai.IsPanicked) { RoutHold.Ordered.Add(a.Index); return false; }
+            if (!wd && a.IsRunningAway && !cai.IsRetreating && !cai.IsPanicked) { RoutHold.Ordered.Add(a.Index); return false; }
             // 142: panika gry bierzemy tylko trwajaca - nigdy nie wolamy za nia Panic (drugi okrzyk i animacja)
             if (site == MissionTeams.GamePanic && !cai.IsPanicked) return false;
+            if (wd) EndWithdrawForBreak(a, site);
 
             float now = m.CurrentTime;
             var e = new Entry { A = a, Site = site, Since = now, NextEval = now };
@@ -758,10 +809,16 @@ namespace Armoury
                 }
                 catch { }
             }
-            if (_list.Count == 0 && _queue.Count == 0) return;
+            // 143: odwrot rannych z bronia - wlasna lista (po zbiorze zlamanych: przejecie paniki gry z kolejki konczy odwrot w Break)
+            if (_list.Count == 0 && _queue.Count == 0)
+            {
+                if (_wList.Count > 0) TickWithdraw();
+                return;
+            }
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();       // 142: koszt ticku przy pracy (linia 142)
             try { TickList(); }
             finally { NoReturn.Cost(System.Diagnostics.Stopwatch.GetTimestamp() - t0, _list.Count); }
+            if (_wList.Count > 0) TickWithdraw();
         }
 
         private void TickList()
