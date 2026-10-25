@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 25.10 ok. 22:20 CET - WGRANE 118 (fala "AI walczy o zycie" 139-149 + 153 + 117)
+- WGRANE 118 (22:13): Armoury 86195e02 z galezi noc/139-ai-zycie (worktree scratchpad\zb\n139, build 8995f2ab, wpis 86fc8054). Galaz zawiera scalone noc/138-calosc (117 + 153),
+  wiec to jest TERAZ linia glowna - nowe prace odgalezniac od noc/139-ai-zycie. CrashScribe bez zmian (bef9db58). Kopie: Armoury.dll.bak-2026-10-25-przed-wgranie118, D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie118-przed.
+- Autotest 118a: kod 0, ERROR 0, 4/4 bitwy; kontrola fali: python -I tools/sprawdz_logi.py --grupa ai139 <Armoury-*.log> (galaz n139) - 9/10 TAK.
+  NIE: tarcza pod ostrzalem po 1.5 s 24/36 (67%, prog 90%) - nastepna paczka: pomiar po 3 s i powod braku tarczy.
+- Po pierwszej grze Jeffa: --grupa ai139 na jego logu; 141/146/148/149 i oblezenia (145, 147) autotest nie sprawdza. Odlozone drobne: 146 falszywa UWAGA JIT przy bandytach,
+  Fall Back za mape = PANIKA. Pytania do Jeffa: odwrot rannego z bronia takze w oblezeniach/kryjowkach? poscig za armia AI w odwrocie na rozkaz wodza? (domyslnie NIE).
+
 ## DOPISEK 25.10 ok. 18:30 CET - WGRANE 117 (151 + 152 + 150a + 150b + 117r); fala AI 139-149 nadal w toku
 - WGRANE 117 (18:23): Armoury 2c95388a (galaz noc/138-calosc, commit c55b2c58; statusy 746e87a2/7cc6ba66), CrashScribe bez zmian (bef9db58). Kopie: Armoury.dll.bak-2026-10-25-przed-wgranie117
   obok DLL i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie117-przed.
