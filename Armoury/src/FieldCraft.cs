@@ -692,12 +692,15 @@ namespace Armoury
                                 if (sprinting)
                                 {
                                     float d = maxStam / st.RunSeconds * step;   // 127: cala pula w RunSeconds pelnego biegu
+                                    float stam0 = stam;
                                     stam -= d;
                                     // 137: przy oddechu dwufazowym bez wlasnego dlugu biegu - wydatek zostaje na pasku i uzgadnia go BattleWind (F/S)
                                     if (breathOwns) st.SprintDebt = 0f;
                                     else st.SprintDebt += d;
                                     if (stam < 0f) stam = 0f;
                                     _rbmStamina.SetValue(stance, stam);
+                                    // 137 (recenzja): zdjete punkty to bieg, nie walka - BattleWind nie otworzy za nie okna walki (BreathFightShare)
+                                    if (breathOwns) BattleWind.NoteRunSpend(stance, stam0 - stam);
                                 }
                                 else if (st.SprintDebt > 0.01f && stam < maxStam && !breathOwns && !BattleWind.Manages(stance))
                                 {

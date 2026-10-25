@@ -67,6 +67,7 @@ namespace Armoury
             public float F, S, E;          // dlug szybki, dlug wolny (pkt), licznik zadyszek 0..2
             public float LastT;            // MBCommon.GetTotalMissionTime ostatniego ticku
             public float LastSpendT;       // czas ostatniego wlasnego wydatku poza biegiem (okno walki)
+            public float RunPending;       // 137 (recenzja): wydatek biegu FieldCraft od ostatniego ticku - to bieg, nie walka (NoteRunSpend)
             public float TauF, TauS, G, WalkM, Fm;
             public bool AtZero;            // tylko do licznika E (stan zadyszki trzyma FieldCraft st.Winded)
             public bool IsPlayer;
@@ -87,8 +88,14 @@ namespace Armoury
         private const float MountedShare = 0.85f;  // na koniu: jak chod bez zbroi
         private const float ECap = 2f, EDecaySeconds = 900f;   // licznik zadyszek: sufit 2, zanik 1 na 15 min (Chorley 2022: druga zadyszka tau wolny 388 -> 716 s)
         private const float FightWindow = 5f;    // walka = wlasny wydatek w ostatnich 5 s
-        private const float ShotWindow = 2f;     // wydatek tuz po strzale (lucznik) - okno walki tylko 2 s
-        private const float ShotLag = 0.6f;      // "tuz po strzale": LastRangedAttackTime mlodszy niz 0.6 s (tick RBM co 0.5 s)
+        // 137 (recenzja): okno walki po strzale - klucz BreathShotFightSeconds (2 s; 0 = strzal nie otwiera okna). "Tuz po strzale" = strzal od poprzedniego
+        // ticku oddechu (LastRangedAttackTime >= LastT - 0.05 s) zamiast stalej 0.6 s - tick RBM przychodzi co 0.5 s + 1-2 klatki, przy 15-20 fps pozniej niz 0.6 s
+        private const float ShotSlack = 0.05f;
+
+        // 137 (recenzja): RBMConfig.staminaEnabled - przy wylaczonej staminie RBM tick oddechu nie przychodzi nigdy (StanceLogic.OnMissionTick: continue przed
+        // tickStaminaRegen), a InitializeStamina tak (przy postureEnabled); bez tej bramki Breath wyciszalby zwrot SprintDebt i pasek po biegu nie wracalby wcale
+        private static FieldInfo _fRbmStaminaOn;
+        private static int _bRbmOff;              // ludzie bez oddechu, bo stamina RBM wylaczona (linia "Oddech (137)")
 
         // liczniki misji - linia "Oddech (137)" raz na koniec misji (FieldCraft.OnEndMission; zapasowo przy pierwszym oddechu nastepnej misji)
         private static int _bN, _bStumbles, _bWindIn, _bWindPeople, _bExitN, _plWindN;
@@ -232,7 +239,16 @@ namespace Armoury
                 var cs0 = Settings.Current;
                 if (cs0 != null) ApplyAthleticsCurve(agent, stance, cs0);
                 // 137: oddech dwufazowy - kazdy czlowiek (po krzywej 130 i po galezi umarlych); pula zostaje, jak ja policzono wyzej
-                if (cs0 != null && cs0.BreathTwoPhase && _breathReady) MakeBreath(agent, stance, cs0);
+                // recenzja: tylko przy wlaczonej staminie RBM (inaczej tick oddechu nie przychodzi, a FieldCraft wycisza zwrot SprintDebt)
+                if (cs0 != null && cs0.BreathTwoPhase && _breathReady)
+                {
+                    if (RbmStaminaOn()) MakeBreath(agent, stance, cs0);
+                    else
+                    {
+                        Breath bo; if (Breaths.TryGetValue(stance, out bo)) Breaths.Remove(stance);
+                        _bRbmOff++;
+                    }
+                }
                 var hero = HeroOf(agent);
                 if (hero == null) return;
                 // 130 (25.10, Jeff: "rycerz tier 6 ma atletyka 200 i ja mam atletyka 200 powinnismy miec taka sama stamine", "to powinno byc zalezne od atletyki
@@ -518,8 +534,12 @@ namespace Armoury
                 if (max < 1f) return true;
                 float cur = _rStamina(stance);
                 float now = MBCommon.GetTotalMissionTime();
-                float raw = now - b.LastT;
+                float prevT = b.LastT;                     // poprzedni tick (albo spawn) - "strzal od poprzedniego ticku"
+                float raw = now - prevT;
                 b.LastT = now;
+                // recenzja: wydatek biegu zapisany przez FieldCraft od poprzedniego ticku - nie otwiera okna walki
+                float runSpend = b.RunPending;
+                b.RunPending = 0f;
                 if (raw < 0f) raw = 0f;
                 float dt = raw > 2f ? 2f : raw;            // F i S: przyciete (tick nie przychodzi przy pelnym pasku)
                 // licznik zadyszek zanika z PELNEGO czasu - takze z minut przy pelnym pasku, gdy RBM nie wola ticku
@@ -546,16 +566,24 @@ namespace Armoury
                     if (fn - b.F > spend) fn = b.F + spend;
                     b.S += spend - (fn - b.F);
                     b.F = fn;
-                    if (!running)
+                    // recenzja: walka = wydatek poza biegiem; wydatek biegu rozpoznany po zrodle (FieldCraft -> RunPending), nie po biezacym stanie biegu -
+                    // ostatni drenaz biegu uzgadnia zwykle tick juz po zdjeciu postawy z biegu (FieldCraft co 0.2 s, tick RBM co 0.5 s)
+                    float fight = spend - (runSpend < spend ? runSpend : spend);
+                    if (!running && fight > 0.01f)
                     {
                         // walka = WLASNY wydatek (cios, blok, trafienie); pola Agent.Last*Time nie widza blokow (RegisterBlow wychodzi przy 0 obrazen)
                         float shot = float.MinValue;
                         try { if (b.Agent != null) shot = b.Agent.LastRangedAttackTime; } catch { }
-                        if (now - shot < ShotLag)
+                        if (shot >= prevT - ShotSlack)
                         {
-                            // lucznik: wydatek tuz po strzale otwiera okno walki tylko na 2 s (inaczej strzal co 4-5 s trzyma go na stale w walce)
-                            float w = now - (FightWindow - ShotWindow);
-                            if (w > b.LastSpendT) b.LastSpendT = w;
+                            // lucznik: wydatek ze strzalu od poprzedniego ticku otwiera okno walki tylko na BreathShotFightSeconds (2 s; 0 = wcale) -
+                            // inaczej strzal co 4-5 s trzyma go na stale w walce
+                            float sw = Clamp(c.BreathShotFightSeconds, 0f, FightWindow);
+                            if (sw > 0f)
+                            {
+                                float w = now - (FightWindow - sw);
+                                if (w > b.LastSpendT) b.LastSpendT = w;
+                            }
                         }
                         else b.LastSpendT = now;
                     }
@@ -624,6 +652,28 @@ namespace Armoury
             return Breaths.TryGetValue(stance, out b);
         }
 
+        /// <summary>137 (recenzja): FieldCraft zdjal z paska wydatek biegu (rzeczywiscie zdjete punkty) - zapis przy oddechu, zeby uzgodnienie w BreathTick nie
+        /// wzielo go za walke. Jeden lookup CWT, bez alokacji.</summary>
+        internal static void NoteRunSpend(object stance, float d)
+        {
+            if (stance == null || d <= 0f) return;
+            Breath b;
+            if (Breaths.TryGetValue(stance, out b)) b.RunPending += d;
+        }
+
+        /// <summary>137 (recenzja): stamina RBM wlaczona (RBMConfig.staminaEnabled, czytane przy spawnie czlowieka). Pole nieznalezione = jak dotad (TAK).</summary>
+        private static bool RbmStaminaOn()
+        {
+            try
+            {
+                var f = _fRbmStaminaOn;
+                if (f == null) return true;
+                object v = f.GetValue(null);
+                return v is bool ? (bool)v : true;
+            }
+            catch { return true; }
+        }
+
         /// <summary>137: prog wyjscia z zadyszki przy oddechu dwufazowym (klucz WindedExitBar, przyciety jak suwak 0.10..0.50).</summary>
         internal static float WindedExit(Settings c)
         {
@@ -690,13 +740,19 @@ namespace Armoury
                     if (c != null)
                         sb.Append(" | regula: szybki ").Append(Clamp(c.BreathFastSeconds, 15f, 90f).ToString("0", inv)).Append(" s, wolny ")
                           .Append(Clamp(c.BreathSlowSeconds, 120f, 1200f).ToString("0", inv)).Append(" s, zbiornik ").Append(Clamp(c.BreathFastShare, 0.2f, 0.8f).ToString("0.00", inv))
-                          .Append(", walka x").Append(Clamp(c.BreathFightShare, 0f, 1f).ToString("0.00", inv)).Append(", wyjscie ").Append((WindedExit(c) * 100f).ToString("0", inv))
+                          .Append(", walka x").Append(Clamp(c.BreathFightShare, 0f, 1f).ToString("0.00", inv))
+                          .Append(" (po strzale ").Append(Clamp(c.BreathShotFightSeconds, 0f, FightWindow).ToString("0.#", inv)).Append(" s)")
+                          .Append(", wyjscie ").Append((WindedExit(c) * 100f).ToString("0", inv))
                           .Append("% | klucz BreathTwoPhase ").Append(c.BreathTwoPhase ? "TAK" : "NIE");
+                    if (_bRbmOff > 0) sb.Append(" | bez oddechu (stamina RBM wylaczona) ").Append(_bRbmOff);
                     Log.Info(sb.ToString());
                 }
+                else if (_bRbmOff > 0)
+                    Log.Info("Oddech (137): stamina RBM wylaczona (RBM config StaminaEnabled) - oddech dwufazowy nieczynny, ludzi bez oddechu " + _bRbmOff
+                             + " (zwrot dlugu biegu FieldCraft jak dotad).");
             }
             catch { }
-            _bN = 0; _bStumbles = 0; _bWindIn = 0; _bWindPeople = 0; _bExitN = 0; _plWindN = 0;
+            _bN = 0; _bStumbles = 0; _bWindIn = 0; _bWindPeople = 0; _bExitN = 0; _plWindN = 0; _bRbmOff = 0;
             _bTauFSum = 0f; _bTauSSum = 0f; _bWindSecs = 0f; _bExitSecs = 0f; _plWindSecs = 0f;
             _plA = -1f; _plA2 = 0f; _plKg = 0f; _plP = 0f; _plTauF = 0f; _plTauS = 0f;
             _bMission = null;
@@ -792,13 +848,23 @@ namespace Armoury
                         _breathReady = _rStamina != null && _rMaxStamina != null;
                     }
                     catch (Exception e) { _breathReady = false; Log.Error("BattleWind.ApplyAll (137 FieldRefAccess)", e); }
+                    // recenzja: flaga staminy RBM (wartosc czytana przy spawnie - config RBM mogl sie jeszcze nie wczytac)
+                    try
+                    {
+                        var tCfg = QuartermasterLaw.FindType("RBMConfig.RBMConfig");
+                        _fRbmStaminaOn = tCfg != null ? tCfg.GetField("staminaEnabled", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
+                        if (_fRbmStaminaOn != null && _fRbmStaminaOn.FieldType != typeof(bool)) _fRbmStaminaOn = null;
+                    }
+                    catch { _fRbmStaminaOn = null; }
                 }
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
                 Log.Info("BattleWind (137): oddech dwufazowy " + (_breathReady ? "gotowy" : "NIEGOTOWY (latki albo pola RBM)") + ", klucz BreathTwoPhase przy starcie "
                          + (breath ? "TAK" : "NIE") + " (na zywo) | szybki " + (c != null ? c.BreathFastSeconds.ToString("0", inv) : "-") + " s, wolny "
                          + (c != null ? c.BreathSlowSeconds.ToString("0", inv) : "-") + " s, zbiornik " + (c != null ? c.BreathFastShare.ToString("0.00", inv) : "-")
-                         + ", walka x" + (c != null ? c.BreathFightShare.ToString("0.00", inv) : "-") + ", wyjscie z zadyszki " + (c != null ? (WindedExit(c) * 100f).ToString("0", inv) : "-")
-                         + "% | InitializeStamina " + (initS ? "TAK" : "NIE") + ", tickStaminaRegen " + (tickS ? "TAK" : "NIE") + ".");
+                         + ", walka x" + (c != null ? c.BreathFightShare.ToString("0.00", inv) : "-") + " (po strzale " + (c != null ? c.BreathShotFightSeconds.ToString("0.#", inv) : "-")
+                         + " s), wyjscie z zadyszki " + (c != null ? (WindedExit(c) * 100f).ToString("0", inv) : "-")
+                         + "% | InitializeStamina " + (initS ? "TAK" : "NIE") + ", tickStaminaRegen " + (tickS ? "TAK" : "NIE")
+                         + ", flaga staminy RBM " + (_fRbmStaminaOn != null ? "znaleziona" : "BRAK (oddech zaklada TAK)") + ".");
                 if (!wind && tiers) Log.Info("BattleWind: oddech bohaterow wylaczony (BattleStaminaEnabled) - wpieta postura szeregowych wedlug tieru.");
                 else if (!wind && !tickS) Log.Info("BattleWind: oddech bohaterow i postura szeregowych wylaczone - latka InitializePosture wpieta tylko dla postury w pojedynku (DuelFairGuard).");
                 Log.Info("BattleWind (NB2): postura szeregowych wedlug tieru - latka InitializePosture wpieta (klucz SoldierPostureByTier na zywo"

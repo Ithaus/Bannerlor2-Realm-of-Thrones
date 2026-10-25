@@ -1316,7 +1316,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float AthleticsStaminaCurve { get; set; } = 1.12f;
 
-        [SettingPropertyBool("Breath Two Phase", HintText = "how breath comes back in battle, one rule for every man - you, lords and soldiers: a short effort comes back within about a minute, but a man who ran himself empty gets his first half back in a minute or two and the rest only over many minutes, as real lungs and muscles do. Each point of Athletics brings it back a little faster and makes the pool bigger, heavy armour slows it a little, walking slows it and fighting slows it a lot; a second collapse soon after the first is slower to recover from. Off = Realistic Battle Mod's own regeneration, as before. Turning it on works from the next battle", RequireRestart = false)]
+        [SettingPropertyBool("Breath Two Phase", HintText = "how breath comes back in battle, one rule for every man - you, lords and soldiers: a short effort comes back within about a minute, but a man who ran himself empty gets his first half back in a minute or two and the rest only over many minutes, as real lungs and muscles do. Each point of Athletics brings it back a little faster and makes the pool bigger, heavy armour slows it a little, walking slows it and fighting slows it a lot; a second collapse soon after the first is slower to recover from. Off = Realistic Battle Mod's own regeneration, as before. Turning it on works from the next battle - but if Battle Stamina Enabled was off too when the game started, it may need a game restart", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool BreathTwoPhase { get; set; } = true;
 
@@ -1332,9 +1332,13 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float BreathFastShare { get; set; } = 0.5f;
 
-        [SettingPropertyFloatingInteger("Breath Fight Share", 0.00f, 1.00f, "0.00", HintText = "how fast breath comes back while a man keeps fighting (he struck, blocked or was hit in the last 5 seconds), as a share of standing still: 0.3 = more than three times slower. A bow or crossbow shot counts as fighting for 2 seconds only", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Breath Fight Share", 0.00f, 1.00f, "0.00", HintText = "how fast breath comes back while a man keeps fighting (he struck, blocked or was hit in the last 5 seconds), as a share of standing still: 0.3 = more than three times slower. Running does not count as fighting; a bow or crossbow shot counts only for a short while (Breath Shot Fight Seconds)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float BreathFightShare { get; set; } = 0.3f;
+
+        [SettingPropertyFloatingInteger("Breath Shot Fight Seconds", 0.00f, 5.00f, "0.0", HintText = "how long a bow or crossbow shot counts as fighting for the breath (see Breath Fight Share). At 2 an archer who shoots without pause is winded after about 4 minutes at Athletics 50 and 7 at Athletics 100, and stays winded while he keeps shooting; at 0 he breathes between shots as if standing - winded after about 8 minutes at Athletics 50, never at Athletics 100", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BreathShotFightSeconds { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Winded Exit Bar", 0.10f, 0.50f, "0.00", HintText = "a winded man (empty bar: half speed and half strength) gets his wind back when his bar has refilled to this share of the pool. Used with the two-phase breath; without it 10%, as before", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
@@ -10281,6 +10285,7 @@ namespace Armoury
             s.BreathSlowSeconds = BreathSlowSeconds;
             s.BreathFastShare = BreathFastShare;
             s.BreathFightShare = BreathFightShare;
+            s.BreathShotFightSeconds = BreathShotFightSeconds;
             s.WindedExitBar = WindedExitBar;
             s.BattleStaminaEnabled = BattleStaminaEnabled;
             s.BattleEndDoubleEvery = BattleEndDoubleEvery;

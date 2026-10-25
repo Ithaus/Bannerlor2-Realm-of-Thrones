@@ -42,7 +42,7 @@ ok. 2x szybciej); RBM dawal 90% po 2-5 min, a po biegu po pol minuty. Leczenie R
 (2) AI dluzej w zadyszce: wyjscie 24-47 s postoju zamiast 7-16 s (-50% ruchu i walki). AI, ktore w zadyszce dalej macha (cios 40 pkt co 6 s): Atletyka 100 nie wychodzi
 wcale (w RBM tez nie), A200/20 kg po ok. 8 min, A300/10 kg po 2 min (RBM 17 s). Mnoznik walki 0.3 to glowne pokretlo tempa bitew - w autotescie mierzyc linie
 "Oddech (137)" (zadyszki, sekundy w zadyszce na czlowieka) i czas bitwy. (3) Lucznicy: strzal kosztuje 20-70 pkt (RBM max(20, 70 - 0.5 x (umiejetnosc - trudnosc)));
-strzelanie 55 pkt co 4.5 s bez przerwy przy okienku 2 s: A100/20 kg pada po ok. 7.4 min (okno 5 s: 3.1 min), A150 trzyma 11%; w RBM nigdy - sprawdzic zadyszki
+strzelanie 55 pkt co 4.5 s bez przerwy przy okienku 2 s: A100/20 kg pada po ok. 6.6 min i nie wychodzi, dopoki strzela (okno 5 s: 3.1 min; recenzja R1), A150 trzyma 3%; w RBM nigdy - sprawdzic zadyszki
 lucznikow w 2., 5. i 10. minucie. (4) Postura RBM: handleDefender mnozy obrazenia postury przez Lerp(1.25, 1, pasek) - dlugi ogon (55-75% przez minuty) = +6-11%
 obrazen postury do konca bitwy. (5) Trafienie oszczepem albo toporem do rzucania kosztuje 300 pkt (w glowe 600) = 10-30% puli, prawie cale do szybkiego dlugu.
 (6) Ciezkozbrojni: nowy model nie ma kary x0.5 z helmu, za to mala kare zbroi (46 kg: TauF +9%, TauS +23%) - przy lekkim zmeczeniu nosiciele helmow z listy RBM
@@ -56,7 +56,37 @@ gry = od razu tick RBM jak dotad i zwrot SprintDebt; TAK w trakcie = od nastepne
 co 0.5 s, Tanh/Log tylko przy nowym wydatku, GetCurrentVelocity tylko poza walka i bez konia; FieldCraft co 0.2 s HasBreath (lookup CWT); bez alokacji w ticku.
 (10) Sprawdzic w grze: linia startu "BattleWind (137): oddech dwufazowy gotowy", po bitwie linia "Oddech (137)" (potkniecia 0, sr. wyjscie ok. 25-45 s), pasek gracza
 po zadyszce: wyjscie przy 30%, potem szybki skok i dlugi ogon; linia "Bieg (127)" - pominiete regeneracje dalej liczone.
-**Status:** ZBUDOWANE - nie wgrane (galaz noc/137-oddech od noc/127-bitwa-cialo 9cde264a; Armoury.dll md5 308fb1cf96bcf9d03556d906f66531d4).
+**Recenzja (25.10, 9 uwag = 6 roznych; kazda sprawdzona w kodzie, dekompilacji RBM i symulacji: scratchpad rev137/sim.py przed, rev137fix/simfix.py + checks.py po):**
+(R1) Lucznik z oknem 2 s pada: strzal 55 pkt co 4.5 s bez przerwy, A100/20 kg - zadyszka po 6.6 min, potem 1404 s w zadyszce na 30 min (nie wychodzi, dopoki
+strzela); A50/10 kg 3.7 min; A150/20 kg nie pada (min 3%). PRAWDA, ale to wybor ze specyfikacji (CHECK E3 "decyzja Jeffa", spec 2 s) - domyslnie zostaje 2 s. Nowy klucz
+MCM BreathShotFightSeconds (2; 0..5; na zywo; 0 = strzal nie otwiera okna walki: A100 nie pada, min 21-25%, A50/10 kg pada po 7.7 min). Opis BreathFightShare poprawiony
+(bieg to nie walka, strzal - patrz nowy klucz). Dla Jeffa wprost: przy 2 s lucznik A100 strzelajacy bez przerwy pada po ok. 7 min (zwykle wczesniej konczy mu sie kolczan).
+(R2 = R5 = R7) Ostatni drenaz biegu brany za walke - PRAWDA: FieldCraft (co 0.2 s) zdejmuje postawe z _runningStances w pierwszym takcie bez biegu, a tick RBM
+(co 0.5 s) uzgadnia ostatni drenaz juz przy running = false -> LastSpendT = now, m = 0.3 przez 5 s. Symulacja: 10 z 15 faz timera RBM, wyjscie z zadyszki po biegu do zera
+29.4 zamiast 25.7 s; bieg/marsz 3 s / 3 s: 1349 z 4493 klatek poza biegiem z m = 0.3; przy NoBreathWhileRunning NIE caly bieg liczyl sie jak walka. Poprawka wedlug R2/R5
+(po zrodle wydatku): FieldCraft po drenazu biegu wola BattleWind.NoteRunSpend(stance, faktycznie zdjete punkty) -> Breath.RunPending; BreathTick: walka = wydatek -
+min(wydatek, RunPending), RunPending zerowany w kazdym ticku, LastSpendT tylko przy !running i walce > 0.01 pkt. Po poprawce: 0 klatek m = 0.3 po biegu we wszystkich
+15 fazach (wyjscie 25.2-25.9 s), bieg/marsz 0 z 4493, cios po biegu dalej rozpoznany, ciagla walka m = 0.3 bez zmian. Wariant R7 (WasRunning) odrzucony - nie lapie
+biegow krotszych niz tick i gubilby cios w ticku zaraz po biegu.
+(R3 = R8) Stala ShotLag 0.6 s za ciasna przy niskim fps - PRAWDA: StanceLogic.OnMissionTick (currentDt < 0.5 -> += dt i return; tick w nastepnej klatce, zerowanie
+po petli) = odstep 0.5 s + 1-2 klatki; symulacja 20 fps 43/200, 15 fps 44/200 strzalow z pelnym oknem 5 s (pada 5.0-6.1 min zamiast 6.6). Poprawka: "strzal od
+poprzedniego ticku" - LastRangedAttackTime >= poprzedni LastT - 0.05 s (stala ShotLag usunieta, ShotWindow -> klucz). Po poprawce 200/200 strzalow rozpoznanych przy
+10-60 fps. Zegar zgodny (Mission.OnAgentShootMissile stempluje MBCommon.GetTotalMissionTime; domyslnie float.MinValue). Znane: Agent.RegisterBlow stempluje
+LastRangedAttackTime takze przy trafieniu wlasnej strzaly z obrazeniami - wydatek wrecz w tym samym ticku liczony jak strzal (krotkie okno); rzadkie, jak przy ShotLag.
+(R4 = R9) Opis "Turning it on works from the next battle" nieprawdziwy, gdy przy starcie wylaczone BreathTwoPhase, BattleStaminaEnabled i (NoBreathWhileRunning albo
+krzywa > 1) - PRAWDA (latki i _breathReady tylko przy initS && tickS liczonych przy starcie); u Jeffa nie wystepuje (BattleStaminaEnabled TAK). Poprawiony opis angielski
+("... but if Battle Stamina Enabled was off too when the game started, it may need a game restart"); kod bez zmian - wpinanie latek zawsze zmieniloby stan "BattleWind:
+wylaczone" i linie startu.
+(R6) Uspiona regresja przy RBM StaminaEnabled = 0 - PRAWDA: dekompilacja RBM - EquipItemsFromSpawnEquipment wola Stance.InitializeStamina przy postureEnabled, a
+StanceLogic.OnMissionTick robi continue przed tickStaminaRegen przy !staminaEnabled (koszty RBM tez za ta flaga, ale bieg FieldCraft dalej zdejmuje pasek) -> Breath
+wyciszal zwrot SprintDebt, tick nie przychodzil, wieczna zadyszka po pierwszym biegu do zera. U Jeffa nieaktywne (Configs/RBM/config.xml: StaminaEnabled 1,
+PostureEnabled 1 - sprawdzone). Poprawka: StaminaInitPostfix tworzy Breath tylko przy RBMConfig.RBMConfig.staminaEnabled (pole statyczne, FieldInfo z ApplyAll,
+odczyt przy spawnie; pole nieznalezione = TAK jak dotad); bez Breath HasBreath = NIE, wiec zwrot SprintDebt i prog 10% jak przed 137. Linia "Oddech (137)" dopisuje
+"bez oddechu (stamina RBM wylaczona) N" (osobna linia, gdy nikt nie ma oddechu); linia startu "BattleWind (137)" - "(po strzale X s)" i "flaga staminy RBM znaleziona/BRAK".
+Kontrola calosci: NoteRunSpend tylko przy breathOwns (ten sam warunek co tick oddechu: klucz na zywo i Breath); RunPending bez alokacji (jeden lookup CWT na takt
+biegu); koszty RBM, krzywa 130, bieg 127, NoBreathWhileRunning (m = 0 w biegu), kon (136) bez zmian. Zbudowane bez bledow (ostrzezenia tylko stare, poza
+BattleWind/FieldCraft); gen_mcm: Armoury 2485 ustawien. Nic nie wgrane, gra nie uruchamiana.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/137-oddech od noc/127-bitwa-cialo 9cde264a; Armoury.dll md5 308fb1cf przed recenzja, po recenzji 5763ebe0f8283da684e9c6f25a38087b).
 
 ## 2026-10-25 131 (galaz noc/127-bitwa-cialo) - udzwig z Endurance: kazdy punkt Endurance bohatera w druzynie +5 kg
 **Problem:** Jeff 25.10 ok. 12:41: "a kazdy punkt endurance daje +5 do udzwigu w menu inventory jako dodatkowe", potem "i companions tez".

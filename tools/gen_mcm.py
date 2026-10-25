@@ -621,6 +621,8 @@ RANGES = {
     'BreathSlowSeconds': (120.0, 1200.0, "0"),
     'BreathFastShare': (0.2, 0.8, "0.00"),
     'BreathFightShare': (0.0, 1.0, "0.00"),
+    # 137 recenzja: okno walki po strzale 0..5 s (0 = strzal nie otwiera okna)
+    'BreathShotFightSeconds': (0.0, 5.0, "0.0"),
     'WindedExitBar': (0.10, 0.50, "0.00"),
 }
 
