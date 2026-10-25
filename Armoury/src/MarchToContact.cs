@@ -207,7 +207,7 @@ namespace Armoury
             return ti * Stride + fi;
         }
 
-        private static bool IsDragon(Agent mount)
+        internal static bool IsDragon(Agent mount)   // 148: takze HorsePursuit (smok nie goni i nie jest gonionym) - jedna regula "smok"
         {
             if (mount == null) return false;
             var mo = mount.Monster;
@@ -249,6 +249,9 @@ namespace Armoury
                 {
                     // 128 / M1: cap marszu (bez zmian; 134c przycina do kroku tylko przy MarchAtWalkingPace)
                     if (agent.IsRunningAway || agent.IsDetachedFromFormation || agent.MissionPeer != null) return;
+                    // 148: jezdziec w poscigu (HorsePursuit, cel na czlowieka) - bez capu marszu / odpoczynku koni szyku; szyk w odpoczynku poscigu nie zaczyna,
+                    // a zajechany kon jezdzca zawraca (ten sam prog HorseAiRestBelow)
+                    if (HorsePursuit.RidingAnyThread(agent)) { HorsePursuit.NoteCapSkip(); return; }
                     var mount = agent.MountAgent;
                     if (mount != null && IsDragon(mount)) { Interlocked.Increment(ref _postDragon); return; }
                     bool catchUp = desiredSpeed < 0f;
@@ -597,6 +600,14 @@ namespace Armoury
             if (v < 0.5f) v = 3.6f;   // brak danych w tym takcie (odpoczynek wymaga sredniej z tego samego taktu) - klus regulaminowy 3.6 m/s
             float cap = Clamp(v / LineMul, 1.5f, 9f);
             Set(f, idx, cap, cap, true, false);
+        }
+
+        /// <summary>148 (poscig konnicy AI): szyk konnicy AI daje teraz koniom odsapnac (136, RestCav) - poscig go nie zaczyna. Glowny watek.</summary>
+        internal static bool Resting(Formation f)
+        {
+            if (!_on || f == null) return false;
+            int idx = Idx(f);
+            return idx >= 0 && ReferenceEquals(_who[idx], f) && _rest[idx];
         }
 
         /// <summary>128: dla BattleCries przed sygnalem szarzy (glowny watek): true = szyk idzie jeszcze marszem, sygnal (okrzyk, rog, bieg) pozniej.

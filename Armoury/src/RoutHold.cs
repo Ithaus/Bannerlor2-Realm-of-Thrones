@@ -87,10 +87,12 @@ namespace Armoury
         internal const int SiteRanks = 19;
         // 147: bieg bez odsapki w panice (PanicRun - pomiar w FieldCraft); nazwa jednym slowem (regex NB2)
         internal const int SiteRun = 20;
-        private const int Sites = 21;
+        // 148: poscig konnicy AI (HorsePursuit - pass szykow, cel jezdzcow, haki trafien i strat); nazwa jednym slowem (regex NB2)
+        internal const int SitePursuit = 21;
+        private const int Sites = 22;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
                                                       "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot", "oddech", "ostroznosc",
-                                                      "szyk", "bieg" };
+                                                      "szyk", "bieg", "poscig" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -512,6 +514,16 @@ namespace Armoury
               .Append(c.PanicRunsUntilSpent && !(c.FieldCraftEnabled && c.SprintFatigueEnabled) ? " (nieczynne: Field Craft albo Sprint Fatigue NIE)" : "")
               .Append(" (pieszy w PANICE - przelacznik 139 - pije oddech jak w biegu 127 niezaleznie od predkosci, bez mnoznika strachu; w panice bez odnowy przy No Breath While Running ")
               .Append(c.NoBreathWhileRunning ? "TAK" : "NIE").Append(" - oddech 137 m = 0, regeneracja RBM pominieta; po wyczerpaniu 50% do granicy pola albo smierci; jezdziec bez zmian)");
+            // 148: poscig konnicy AI (HorsePursuit; linia 'poscig (148)' po bitwie)
+            sb.Append(" | AI Cavalry Pursues ").Append(c.AiCavalryPursues ? "TAK" : "NIE")
+              .Append(" (bitwa polowa: konnica i konni lucznicy AI strony, ktora zlamala wroga - uciekajacy (PANIKA 139) w ")
+              .Append(HorsePursuit.SeekRadius.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m, bez nietknietej formacji wroga w ")
+              .Append(HorsePursuit.IntactRadius.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m; limit ")
+              .Append(HorsePursuit.MaxSeconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" s / ")
+              .Append(HorsePursuit.MaxFromMain.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m od glownej sily, noca polowa; najwyzej ")
+              .Append(HorsePursuit.PerVictim).Append(" jezdzcow na uciekajacego; cel na czlowieka (SetTargetAgent + pozycja skryptowa co ")
+              .Append(HorsePursuit.TrackEvery.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))
+              .Append(" s); formacje gracza, bohaterowie, chorazowie, smoki i umarli nie gonia; konie ponizej Horse AI Rest Below ").Append(c.HorseAiRestBelow).Append(" (136) nie gonia)");
             sb.Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }

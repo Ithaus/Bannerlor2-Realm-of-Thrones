@@ -559,6 +559,17 @@ namespace Armoury
         /// <summary>MarchToContact: szyk konnicy AI zaczal odpoczywac (licznik linii).</summary>
         internal static void NoteAiRest() { _aiRests++; }
 
+        /// <summary>148 (poscig konnicy AI): stamina S (0..100) konia z ostatniego taktu; -1 = brak danych (klucz wylaczony, nie bitwa, kon wykluczony
+        /// - smok, rydwan, umarly - albo jeszcze nie liczony). Glowny watek (slownik pisze tylko OnMissionTick).</summary>
+        internal static float StaminaOf(Agent mount)
+        {
+            var hw = _live;
+            if (!_avgOn || hw == null || mount == null) return -1f;
+            Horse h;
+            if (!hw._horses.TryGetValue(mount, out h) || h.Ex != ExNone) return -1f;
+            return h.S;
+        }
+
         private static int Idx(Formation f)
         {
             if (f == null) return -1;

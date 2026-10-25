@@ -29,6 +29,8 @@ namespace Armoury
     /// 140 (25.10): tarcza pod ostrzalem (ShieldsUp) - Begin w AfterStart (latki raz na proces przy pierwszej bitwie z kluczem, K9), Tick w bloku Night
     /// (po BattleSound), strzal i trafienie pociskiem tylko do kolejki ShieldsUp (osobny try od dzwieku), End w Clean (linia "Bitwa (140 tarcze)").
     /// 146 (25.10): szyk pod ostrzalem (CloseRanks) - Begin po ShieldsUp.Begin, Tick po ShieldsUp.Tick, End po ShieldsUp.End (linia "Szyk pod ostrzalem (146)").
+    /// 148 (25.10): poscig konnicy AI (HorsePursuit) - Begin po CloseRanks.Begin, Tick po CloseRanks.Tick (blok Night), trafienie i strata (blok Night) tylko
+    /// liczniki, End po CloseRanks.End (linia "poscig (148)").
     /// </summary>
     internal sealed class BattleSense : MissionBehavior
     {
@@ -193,6 +195,8 @@ namespace Armoury
             try { if (night) ShieldsUp.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.Begin", e); }
             // 146: szyk pod ostrzalem - PO ShieldsUp.Begin (sygnal S4), latka raz na proces przy pierwszej bitwie z kluczem
             try { if (night) CloseRanks.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.Begin", e); }
+            // 148: poscig konnicy AI - stan bitwy od zera (bitwa polowa, pora dnia); takze przy kluczu NIE (pomiar na sucho)
+            try { if (night) HorsePursuit.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.Begin", e); }
             base.AfterStart();
         }
 
@@ -208,6 +212,7 @@ namespace Armoury
                 try { BattleSound.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Tick", e); }
                 try { ShieldsUp.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.Tick", e); }   // 140
                 try { CloseRanks.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.Tick", e); }   // 146 - po S4 tej klatki
+                try { HorsePursuit.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.Tick", e); }   // 148 - po MarchToContact (odpoczynek koni) tej klatki
             }
             try { BloodPools.Tick(Mission, dt); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Tick", e); }
@@ -255,6 +260,12 @@ namespace Armoury
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.OnHit", e); }
             try { BloodPools.OnHit(Mission, affectedAgent, in blow, in attackCollisionData); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.OnHit", e); }
+            // 148: trafienie jezdzca w poscigu przez wlasna strone (FF na wlasnej jezdzie) - tylko licznik
+            if (Night)
+            {
+                try { HorsePursuit.OnHit(affectedAgent, affectorAgent, in blow); }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.OnHit", e); }
+            }
         }
 
         // czesc 3 (16.10): zgon / nokaut - kaluze krwi (tylko kolejka; jestesmy w petli gry po zachowaniach misji, Mission.OnAgentRemoved)
@@ -267,6 +278,9 @@ namespace Armoury
             {
                 try { BattleSound.OnRemoved(Mission, affectedAgent, affectorAgent, agentState); }
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnRemoved", e); }
+                // 148: straty stron, jezdziec w poscigu padl, uciekajacy dopadniety przez gonacego / uszedl
+                try { HorsePursuit.OnRemoved(Mission, affectedAgent, affectorAgent, agentState); }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.OnRemoved", e); }
             }
         }
 
@@ -352,6 +366,8 @@ namespace Armoury
             try { ShieldsUp.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.End", e); }
             // 146: linia "Szyk pod ostrzalem (146)" raz na bitwe, po linii 140 (End bezpieczne wielokrotnie i poza bitwa)
             try { CloseRanks.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.End", e); }
+            // 148: jezdzcy oddani grze, linia "poscig (148)" raz na bitwe (End bezpieczne wielokrotnie i poza bitwa)
+            try { HorsePursuit.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.End", e); }
             // m111-walka: linia "Pojedynek (DU)" raz na misje pojedynku
             if (_duel && !_duelDone && InDuel(Mission))
             {

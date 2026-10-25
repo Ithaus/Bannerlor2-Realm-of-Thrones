@@ -674,7 +674,8 @@ namespace Armoury
                             || BattleSense.NightKeys(Settings.Current)   // noc 25.10 P0 (K2): marsz i doktryny (P1), dzwiek (P2), choragwie (P3) - BattleSense i RoutKeeper (linia NB2, RoutHold.On)
                             || Settings.Current.AiShieldsUpUnderFire     // 140: tarcza pod ostrzalem (ShieldsUp) - wejscia tylko z BattleSense
                             || Settings.Current.WoundedFightWarily       // 145: ranny walczy ostroznie (VeteranAi -> WoundedWary) - brama BattleSense.InBattle, linia z RoutKeeper
-                            || Settings.Current.AiFormationsUnderFire;   // 146: szyk pod ostrzalem (CloseRanks) - wejscia tylko z BattleSense (po ShieldsUp)
+                            || Settings.Current.AiFormationsUnderFire    // 146: szyk pod ostrzalem (CloseRanks) - wejscia tylko z BattleSense (po ShieldsUp)
+                            || Settings.Current.AiCavalryPursues;        // 148: poscig konnicy AI (HorsePursuit) - wejscia tylko z BattleSense (blok Night)
                 if (mission != null && ((Settings.Current.BrokenMenNeverRally && (Settings.Current.WoundedFleeEnabled
                         || (Settings.Current.FieldCraftEnabled && Settings.Current.AiFleeWhenNearDeath && Campaign.Current != null)))
                         || Settings.Current.SoldierPostureByTier || nb2b

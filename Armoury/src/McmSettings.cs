@@ -9876,6 +9876,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool MarchAtWalkingPace { get; set; } = true;
 
+        [SettingPropertyBool("AI Cavalry Pursues", HintText = "when an enemy breaks and runs, the AI cavalry and horse archers of the side that broke him ride the fleeing men down - in real battles most of the dead fell in the rout. They give chase only when fleeing enemies are within 150 m and no unbroken enemy formation stands within 80 m, at most two riders on one fleeing man, for at most 60 seconds and no further than 250 m from their own main body (half of that at night), then ride back to their formation and may chase again after 30 seconds. A formation whose horses are blown (below Horse AI Rest Below) does not chase, and a rider whose own horse is blown turns back. Lords, standard bearers, dragon riders and the dead do not chase. Allied AI armies chase too; your own formations are never touched. Field battles only. Off = no chase, as before (still measured for the log)", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool AiCavalryPursues { get; set; } = true;
+
         [SettingPropertyBool("Battle Sounds Enabled", HintText = "the mod's own battle sounds - drums, horns, commanders' voices and the sounds of the field below, each under its own switch. Field battles and sieges - not hideouts, sea battles, tournaments, the arena or training. Off = only the game's and other mods' battle sounds, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
         public bool BattleSoundsEnabled { get; set; } = true;
@@ -12532,6 +12536,7 @@ namespace Armoury
             s.AiSavesBreathYourTroops = AiSavesBreathYourTroops;
             s.AiSavesBreathInSieges = AiSavesBreathInSieges;
             s.MarchAtWalkingPace = MarchAtWalkingPace;
+            s.AiCavalryPursues = AiCavalryPursues;
             s.BattleSoundsEnabled = BattleSoundsEnabled;
             s.BattleHornsCulture = BattleHornsCulture;
             s.BattleDrumsMarch = BattleDrumsMarch;

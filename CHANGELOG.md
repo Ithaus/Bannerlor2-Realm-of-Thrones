@@ -1,5 +1,87 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 148 (galaz noc/139-ai-zycie, po 147 e997e333) - AI walczy o zycie, krok 10: poscig konnicy AI (karta syntezy "143 Poscig konnicy AI", D5; HorsePursuit.cs, klucz AiCavalryPursues)
+**Problem:** Jeff 25.10 ok. 13:30: "w panice jest zasada uciekaj i brak rozsadku ... Wtedy ginie najwiecej osob." Decyzja D5 (ok. 15:00): poscig "Tak, z limitem"
+(konnica AI, 60 s / 250 m, noca polowa, nie formacje gracza). Objaw (synteza "AI walczy o zycie", luka 6 / P3 / Z7): nikt nie goni uciekajacych - dobiegaja do skraju
+pola, znikaja i przezywaja. Dowodu z logu nie ma (139-147 nie wgrane; linia "LOS ZLAMANYCH (139)" ma juz pozycje "dopadnieci w ucieczce: konny" - bez danych);
+dowod z kodu ponizej.
+**Przyczyna:** (dekompilacje scratchpad/shield RBMAI_all.txt, ai_run, panB - 1.4.8) (1) RBMAI.Utilities.NearestAgentFromMultipleFormations (Utilities:492-555)
+pomija IsRunningAway, GetCorrectTarget (:408-464) szuka celu tylko w szykach wroga, a Frontline.PrefixGetOrderPositionOfUnit (:485-502) kieruje szyk konny AI
+z ChargeWithTarget na najblizszego NIE uciekajacego wroga, gdy jest dalej niz 60 m; (2) uciekajacy w ogole nie ma szyku - Mission.OnAgentFleeing -> Agent.OnFleeing
+(Agent.cs:5128-5136) robi Formation = null; (3) RBMBehaviorCavalryCharge (:300-420) po przejezdzie przez cel daje Move na punkt przegrupowania (ChargingPast /
+Reforming) - szyk jedzie na swoje miejsca. Naszego kodu poscigu nie bylo (grep pogon / pursu / chase - 0).
+**Zmiana:** HorsePursuit.cs (nowy), BattleSense.cs (Begin po CloseRanks.Begin, Tick w bloku Night po CloseRanks.Tick, OnAgentHit i OnAgentRemoved w bloku Night -
+tylko liczniki, End po CloseRanks.End), MarchToContact.cs (IsDragon internal; Resting(f) - odczyt odpoczynku koni 136; PostSpeed: jezdziec w poscigu bez capu
+marszu / odpoczynku), HorseWind.cs (StaminaOf(kon) - odczyt S jednego konia), RoutHold.cs (miejsce potkniec NB2 "poscig" = 21, Sites 22; segment "AI Cavalry
+Pursues" w linii startu sesji), SubModuleMain.cs (klucz w nb2b - BattleSense i RoutKeeper w misji), Settings.cs, McmSettings.cs, tools/gen_mcm.py (LABELS
+"AI Cavalry Pursues"; Armoury 2513 -> 2514 ustawien).
+(a) Sposob wskazania celu (rozstrzygniety w dekompilacji, karta dawala dwie drogi): postfiks na NearestAgentFromMultipleFormations ODPADA - przechodzi tylko po
+szykach, a spanikowanego w szyku nie ma (pkt 2 przyczyny). Ruch szyku na uciekajacych tez nie - zachowanie RBM nadpisuje rozkaz szyku co tick. Zostal cel na
+czlowieka: Agent.SetAutomaticTargetSelection(false) + SetTargetAgent(uciekajacy) (Agent.cs:2878-2886 - ten sam wzor RBM AgentAi:617-629 dla chorazych i NavalDLC)
+oraz ruch za celem Agent.SetScriptedPosition(cel.GetWorldPosition(), bez NoAttack i DoNotRun) odswiezany co 0.25 s - tak gra sama prowadzi czlowieka za innym
+(ScriptedMovementComponent.OnTick:58-59: SetScriptedPosition pozycji celu co klatke). Ta sama droga co postoj rannego 143. Zwolnienie: SetAutomaticTargetSelection(true)
++ InvalidateTargetAgent + DisableScriptedMovement (tylko gdy jest nasza GoToPosition i czlowiek nie stoi na postoju rannego 143).
+(b) Regula (klucz AiCavalryPursues TAK; decyzje co 1 s, cel co 0.25 s; tylko bitwa polowa - IsFieldBattle, rodzaj "bitwa", bez morza):
+ - szyk konnicy albo konnych lucznikow AI (QuerySystem.IsCavalryFormation / IsRangedCavalryFormation), NIE formacja gracza: rozkazy gracza (!IsAIControlled),
+   gracz w szyku, gracz wodzem druzyny, gracz sierzantem szyku (PlayerOwner); armie sojusznikow AI tak;
+ - strona zlamala wroga: u wroga co najmniej 3 ludzi w PANICE (przelacznik 139) i odsetek PANIKI wroga wiekszy niz wlasny;
+ - co najmniej 3 uciekajacych wroga w 150 m od szyku; zadnej nietknietej formacji wroga (szyk od 8 ludzi; odleglosc od mediany minus polowa szerokosci/glebokosci,
+   najwyzej 40 m) w 80 m; konie szyku nie zajechane (HorseWind.AvgStamina nie ponizej HorseAiRestBelow - ten sam prog co odpoczynek konnicy AI 136), szyk nie
+   w odpoczynku koni (MarchToContact.Resting); szyk do 250 m od glownej sily (najwiekszy pieszy szyk druzyny; bez piechoty - miejsce wejscia); bitwa nie
+   rozstrzygnieta (MissionEnded - nowy poscig nie zaczyna sie, trwajacy biegnie do limitow);
+ - jezdzcy: AI, konno, nie bohater (krok 149), nie chorazy (RBM sam steruje jego celem - IsBannerBearer), nie smok, nie umarly, nie odlaczony, nie w PANICE ani
+   w odwrocie rannego 143; najwyzej 2 na uciekajacego (reszta zostaje w szyku); najblizszy cel, uciekajacy konno liczony jak 2x dalej; cel tylko w 150 m od
+   jezdzca, nie blizej niz 80 m od nietknietej formacji wroga i najwyzej 240 m od glownej sily;
+ - jezdziec wraca do szyku: ponad 250 m od glownej sily, nietknieta formacja wroga w 80 m, jego kon zajechany (StaminaOf ponizej HorseAiRestBelow), panika /
+   odwrot, gra wybrala go do wiwatu (VictoryComponent - wiwat gry zostaje); cel padl, uszedl albo wyszedl z paniki - nowy cel od razu albo powrot;
+ - koniec poscigu szyku: 60 s, 3 s bez uciekajacych i bez gonacych, konie szyku, gracz przejal szyk, szyk pusty / przestal byc konny, koniec misji;
+   nastepny poscig szyku najwczesniej po 30 s; noca (Campaign.IsNight - czas kampanii stoi w misji, jak DrMarchArrival) 30 s i 125 m.
+(c) Klucz NIE: ta sama ocena szykow na sucho (wejscia, szyko-sekundy) - bez sterowania jezdzcami; reszta pomiaru (straty stron, dopadnieci przez konnych) ta sama.
+(d) Linia raz na bitwe polowa (BattleSense.Clean, po "Szyk pod ostrzalem (146)"):
+"poscig (148): misja bitwa, klucz TAK (konnica i konni lucznicy AI strony, ktora zlamala wroga: uciekajacy wroga (PANIKA 139) w 150 m od szyku, bez nietknietej
+formacji wroga (szyk od 8 ludzi) w 80 m; limit 60 s / 250 m od glownej sily (noc NIE); najwyzej 2 jezdzcow na uciekajacego; nastepny poscig szyku po 30 s; formacje
+gracza, bohaterowie, chorazowie, smoki i umarli nie gonia; konie ponizej Horse AI Rest Below 35 (136) nie gonia; Friendly Fire TAK, pociski 100%) | szyki n
+(strona gracza a / wroga b; konnica c, konni lucznicy d), wejsc k (sr. czas s s, najdluzej x s), jezdzcow w poscigu j (przydzialow celu p, nowy cel po utracie q),
+uciekajacych gonionych g | koniec poscigu szyku: czas, brak uciekajacych, konie szyku, gracz przejal, szyk pusty, koniec misji, klucz | jezdzcy zawroceni: 250 m od
+glownej sily, nietknieta formacja w 80 m, kon zajechany, panika / odwrot, wiwat, inne; najdalej od glownej sily m m | wykluczeni z poscigu (ludzi): bohaterowie,
+chorazowie, smoki, umarli, gracz | nie zaczeli (passy z uciekajacymi w 150 m): nietknieta formacja w 80 m, konie szyku, odpoczynek koni, poza 250 m od glownej sily,
+wrog nie zlamany, po rozstrzygnieciu, przerwa po poscigu; formacje gracza pominiete n | zabici w poscigu z (nieprzytomni u) przez gonacych; gonieni padli od innych o,
+gonieni uszli z pola r; uciekajacy dopadnieci przez konnych (jak 'konny' w 139) h; gonacy padli w poscigu l | FF na wlasnej jezdzie w poscigu f (pociski x, wrecz y,
+obrazen d) | cap marszu pominiety u gonacych n, odswiezen celu n (limit kroku n) | straty (z wystawionych): atakujacy zabici / nieprzytomni / uszli / na polu z N
+(zabici x%); obroncy ...; przegrani (strona) zabici x% - cel historyczny 15-40%, do 60-65% przy poscigu konnicy na pieszych; zwyciezca y% - cel 1-5% | potkniecia
+poscig n (wypadli w)." Klucz NIE - zamiast segmentow jezdzcow "na sucho: szykow, wejsc, szyko-sekund poscigu". Poza bitwa polowa przy kluczu TAK krotka linia
+"nieczynne" (morze - bez linii). Linia startu sesji NB2 - segment "AI Cavalry Pursues TAK (...)"; potkniecia NB2 - ", poscig n" (regex sprawdz_logi.py przyjmuje
+kolejne miejsca "(?:, [a-z]+ \d+)*").
+(e) Klucz MCM: grupa "Marching and tactics" - "AI Cavalry Pursues" TAK (opis po angielsku: "when an enemy breaks and runs, the AI cavalry and horse archers of the side
+that broke him ride the fleeing men down ..."). W Armoury.json Jeffa go nie ma - dziala wartosc z kodu. Przelacznik - bez zakresu w RANGES; progi w kodzie (karta).
+Odstepstwa od karty: (1) droga "postfiks na NearestAgentFromMultipleFormations" odrzucona dowodem (uciekajacy nie ma szyku) - cel na czlowieka; (2) "strona, ktora zlamala
+wroga" zdefiniowana: co najmniej 3 w PANICE u wroga i wiekszy odsetek PANIKI niz u siebie (karta nie podawala miary); (3) "nietknieta formacja" = szyk od 8 ludzi
+(uciekajacy nie maja szyku, wiec kazdy szyk to ludzie nie w ucieczce); (4) dodane: najwyzej 2 jezdzcow na uciekajacego, przerwa 30 s miedzy poscigami szyku, bez nowego
+poscigu po rozstrzygnieciu bitwy (wiwat gry zostaje - Z7), bohaterowie poza (krok 149 D4 "ostrozni pozycyjnie"), chorazowie poza (RBM przelacza im wybor celu co tick -
+AgentAi:606-630), zajechany kon pojedynczego jezdzca zawraca (nie tylko srednia szyku); (5) "max dystans" w linii = najdalej od glownej sily.
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - przy kluczu NIE zadnego wolania Agent poza odczytami; przy TAK sterujemy tylko jezdzcami AI szykow
+konnych w bitwie polowej; MarchToContact.PostSpeed dla innych bez zmian (wyjscie tylko dla jezdzca w poscigu); IsDragon tylko zmiana dostepu; HorseWind tylko odczyt.
+(b) kolizje - SetScriptedPosition / DisableScriptedMovement w Armoury tylko 143 (RoutHold.Withdraw.cs) i tu: jezdziec w odwrocie rannego / panice wypada z poscigu od razu
+(Track co 0.25 s), a zwolnienie nie zdejmuje postoju rannego (Withdrawing bez IsRunningAway); 143 i tak przywraca zdjety postoj ("Restored"). SetAutomaticTargetSelection /
+SetTargetAgent w Armoury tylko tu; RBM uzywa ich tylko dla chorazych (pominietych). RBM StanceLogic zdejmuje pozycje skryptowa przy zmianie szyku - Track kladzie ja
+z powrotem w 0.25 s. RBM AdjustSpeedLimitPatch wpisuje konnicy MountSpeed (pelny galop), nasz PostSpeed nie obniza go gonacym; HorseWind dalej spowalnia zmeczonego konia
+(MountSpeed) - poscig sam gasnie ze zmeczeniem koni; FieldCraft pisze limit jezdzca tylko przy ranach (konny: CapFor -1). AiBreath, WindedShow, ShieldsUp, CloseRanks
+pomijaja konnych / jezdzcow - bez zmian. AgentVictoryLogic (avl.cs:304-359) po rozstrzygnieciu zatrzymuje ok. polowe zwyciezcow do wiwatu (VictoryComponent + target frame)
+- takiego jezdzca zwalniamy od razu. FriendlyFire bez zmian - liczymy tylko trafienia wlasnej strony w gonacych (OnAgentHit; przy FF NIE gra kasuje pociski AI w swoich).
+(c) jedno zjawisko - uciekajacy = PANIKA wedlug przelacznika 139 (takze ofiara szarzy RBM przez ok. 10 s - wypada z celu po StopRetreating); "zajechany kon" = prog
+HorseAiRestBelow (jak odpoczynek 136); smok = MarchToContact.IsDragon; stan czyszczony w Begin i End. (d) cudzy kod - wszystkie wolania Agent sprawdzone w dekompilacji
+1.4.8 (Agent.cs, ScriptedMovementComponent, CommonAIComponent, AgentVictoryLogic, RBMAI Frontline / Utilities / AgentAi / RBMBehaviorCavalryCharge).
+NIESPRAWDZONE (kod natywny, tylko gra pokaze): czy jezdziec z SetTargetAgent + pozycja skryptowa na uciekajacym naprawde tnie go w przejezdzie (licznik "zabici w poscigu
+przez gonacych" vs "jezdzcow w poscigu"); czy pozycja skryptowa wygrywa z ruchem szyku konnego RBM (ChargingPast / Reforming = Move); czy konni lucznicy strzelaja w pogoni.
+Jesli "zabici w poscigu" = 0 przy jezdzcach > 0 - zmiana drogi (np. pozycja z wyprzedzeniem albo zdjecie z szyku) to osobny krok.
+Kalibracja: przegrani w malych bitwach gracza juz dzis 63-83% zabitych (synteza) - poscig moze to podniesc; linia pokazuje straty stron na tle celu 15-40% / 60-65%;
+porownac z kluczem NIE (na sucho). Wydajnosc: pass co 1 s - spis ludzi (PANIKA) raz, szyki konne, jezdzcy x uciekajacy (np. 100 x 300 odleglosci); cel najwyzej 96
+jezdzcow na krok 0.25 s (round robin, licznik "limit kroku").
+Sprawdzic w logu po wgraniu: linia "poscig (148)" w kazdej bitwie polowej; "potkniecia poscig 0" (takze w NB2); w bitwie z rozbiciem wroga i konnica AI - wejsc > 0,
+jezdzcow > 0, zabici w poscigu > 0; FF na wlasnej jezdzie maly; zawroceni glownie "czas" / "250 m" / "brak uciekajacych"; straty przegranych w granicach celu. W grze
+(Jeff): po zlamaniu wroga konnica AI (wroga i sojusznikow) rusza za uciekajacymi, tnie ich i po minucie wraca; formacje gracza stoja jak dotad.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 b3fc0e4e28ec7b3b90301dca4cd7b391).
+
 ## 2026-10-25 147 (galaz noc/139-ai-zycie, po 146 1040b277) - AI walczy o zycie, krok 9: bieg bez odsapki w panice (karta syntezy "139b Bieg bez odsapki", D6; PanicRun.cs, klucz PanicRunsUntilSpent)
 **Problem:** Jeff 25.10 ok. 13:30: "dopiero ta zasada peka gdy jest panika, w panice jest zasada uciekaj i brak rozsadku ... Wtedy ginie najwiecej osob"; ok. 13:20:
 "pamietaj aby w bitwach przeciwnik nie biegal caly czas bo beda padnieci". Objaw (synteza "AI walczy o zycie", luka 9 / P2c / Z5): spanikowany odsapuje w ucieczce -
