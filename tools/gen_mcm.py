@@ -631,6 +631,8 @@ RANGES = {
     # 137 recenzja: okno walki po strzale 0..5 s (0 = strzal nie otwiera okna)
     'BreathShotFightSeconds': (0.0, 5.0, "0.0"),
     'WindedExitBar': (0.10, 0.50, "0.00"),
+    # 151 regeneracja wykladniczo od Atletyki: punkty Atletyki na podwojenie 50..300
+    'BreathAthleticsDoubling': (50.0, 300.0, "0"),
 }
 
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze
