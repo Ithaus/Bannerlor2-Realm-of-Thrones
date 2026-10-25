@@ -38,8 +38,10 @@ namespace Armoury
     ///    blokuje start bitwy; brakujacy rodzaj dostaje "the rest" w wolnym indeksie, a gdy 8 zajetych - odmowa zapisu. Wagi kazdej klasy sumuja sie do 100
     ///    (pierwsza choragiew klasy bierze reszte, gdy zadna nie ma "the rest"); bohaterowie martwi, jency i spoza druzyny odfiltrowani, kazdy najwyzej raz.
     ///  - nazwy choragwi to NASZE metadane (zapis arm_army_review): wazne tylko, gdy klasa pod indeksem w zapisie gry jest ta sama (NameOf dla P3).
-    /// CZEGO v1 NIE UMIE: przypiecia konkretnych TYPOW jednostek do choragwi (gra dzieli ludzi wagami klas i filtrami - v2 z latka na OrderOfBattleVM.Initialize),
-    /// stalej liczby ludzi (waga to procent klasy), formacji mieszanych do edycji (formacje dwu rodzajow z zapisu gry zostaja jak sa), oblezen, bitew morskich.
+    /// v2 (noc 25.10 P12, ArmyReview.Pin.cs, klucz ArmyReviewPinTroopTypes): przypiecie konkretnych TYPOW wojska druzyny gracza do choragwi ("Move troop types
+    /// into banners") - spawn, posilki, ekran Order of Battle i po rozstawieniu; udzialy choragwi licza tylko nieprzypietych (ShareFit).
+    /// CZEGO NIE UMIE: stalej liczby ludzi (waga to procent klasy), formacji mieszanych do edycji (formacje dwu rodzajow z zapisu gry zostaja jak sa), oblezen,
+    /// bitew morskich, przypiec ludzi innych partii armii gracza.
     /// Potkniecia liczone per miejsce (bez globalnego wylacznika); linie logu: start sesji, raport (na otwarcie okna), zapis / odmowa / powrot, doba (tylko przy
     /// ruchu), bitwa (ArmyReview.Battle.cs), test (ArmyReview.Test.cs). Wszystkie napisy w grze po angielsku.
     /// </summary>
@@ -126,14 +128,16 @@ namespace Armoury
             _stumbles = 0; _stumbleAt.Clear(); _sessionDays = 0;
             DayReset();
             TestReset();
+            PinReset();   // P12: przypiecia typow i plan bitwy
         }
 
-        private static void DayReset() { _dWindows = _dReports = _dBanners = _dSaves = _dRefused = _dAuto = _dResets = _dStumbles = 0; }
+        private static void DayReset() { _dWindows = _dReports = _dBanners = _dSaves = _dRefused = _dAuto = _dResets = _dStumbles = 0; _dPinSaves = 0; }
 
-        /// <summary>Zapis arm_army_review: "ar1|indeks~klasa~nazwa|..." (nazwy bez '|' i '~'); null = brak nazw (klucz nie pisany).</summary>
+        /// <summary>Zapis arm_army_review: "ar1|indeks~klasa~nazwa|...|p~typ~indeks|..." (nazwy bez '|' i '~'; P12: przypiecia typow "p~StringId~indeks" -
+        /// naglowek dalej "ar1": stary kod liczy je jako zle wpisy i czyta nazwy); null = brak nazw i przypiec (klucz nie pisany).</summary>
         internal static string Export()
         {
-            if (_names.Count == 0) return null;
+            if (_names.Count == 0 && _pins.Count == 0) return null;
             var sb = new StringBuilder("ar1");
             for (int i = 0; i < Slots; i++)
             {
@@ -141,12 +145,16 @@ namespace Armoury
                 if (!_names.TryGetValue(i, out nm) || string.IsNullOrEmpty(nm.Value)) continue;
                 sb.Append('|').Append(i.ToString(CultureInfo.InvariantCulture)).Append('~').Append(nm.Key.ToString(CultureInfo.InvariantCulture)).Append('~').Append(Clean(nm.Value));
             }
+            foreach (var kv in Sorted(_pins))
+                if (PinIdOk(kv.Key) && kv.Value >= 0 && kv.Value < Slots)
+                    sb.Append("|p~").Append(kv.Key).Append('~').Append(kv.Value.ToString(CultureInfo.InvariantCulture));
             return sb.ToString();
         }
 
         internal static void Import(string s)
         {
             _names.Clear();
+            _pins.Clear();
             if (s == null) { _importNote = "brak klucza (stary zapis albo nowa kampania)"; return; }
             int bad = 0;
             try
@@ -157,6 +165,13 @@ namespace Armoury
                 {
                     var f = parts[k].Split('~');
                     int i, cls;
+                    if (f.Length == 3 && f[0] == "p")
+                    {
+                        // P12: przypiecie typu "p~StringId~indeks"
+                        if (PinIdOk(f[1]) && int.TryParse(f[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out i) && i >= 0 && i < Slots) _pins[f[1]] = i;
+                        else bad++;
+                        continue;
+                    }
                     if (f.Length != 3 || !int.TryParse(f[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out i)
                         || !int.TryParse(f[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out cls) || i < 0 || i >= Slots || cls < 1 || cls > 6)
                     { bad++; continue; }
@@ -164,9 +179,9 @@ namespace Armoury
                     if (n.Length == 0) { bad++; continue; }
                     _names[i] = new KeyValuePair<int, string>(cls, n);
                 }
-                _importNote = "nazw " + _names.Count + (bad > 0 ? ", zlych wpisow " + bad : "");
+                _importNote = "nazw " + _names.Count + ", przypiec typow " + _pins.Count + (bad > 0 ? ", zlych wpisow " + bad : "");
             }
-            catch (Exception e) { Stumble("Import", e); _names.Clear(); _importNote = "blad odczytu - nazwy pominiete"; }
+            catch (Exception e) { Stumble("Import", e); _names.Clear(); _pins.Clear(); _importNote = "blad odczytu - nazwy i przypiecia pominiete"; }
         }
 
         /// <summary>Nazwa choragwi gracza dla formacji 0..7 (P3 - komunikaty kompanii); null = brak nazwy albo klasa w zapisie gry inna niz przy nadaniu.</summary>
@@ -188,7 +203,7 @@ namespace Armoury
         // ------------------------------------------------------------ menu obozu
         internal static void AddMenus(CampaignGameStarter starter)
         {
-            _sessionDays = 0;
+            _sessionDays = 0; _sessionHours = 0;
             bool camp = false, bk = false, daily = false;
             if (starter != null)
             {
@@ -212,11 +227,14 @@ namespace Armoury
                 try { owner = Campaign.Current != null ? Campaign.Current.GetCampaignBehavior<ArmouryBehavior>() : null; } catch { owner = null; }
                 CampaignEvents.DailyTickEvent.AddNonSerializedListener(owner ?? _owner, Daily);
                 daily = true;
+                // P12: proba autotestu takze w takcie godziny (124c: proba czekala tylko na takt doby)
+                CampaignEvents.HourlyTickEvent.AddNonSerializedListener(owner ?? _owner, Hourly);
             }
             catch (Exception e) { Stumble("AddMenus.DailyTick", e); }
             try { Log.Info(P + "start sesji | opcja \"Review the army\" w arm_camp_wait (" + (camp ? "TAK" : "NIE") + ", indeks " + CampIndex + ") i bk_camping_wait_menu ("
                            + (bk ? "TAK" : "NIE") + ", indeks " + BkIndex + "), takt doby " + (daily ? "TAK" : "NIE") + " | klucze Army Review Enabled " + Yes(On)
-                           + ", Writes Order Of Battle " + Yes(Writes) + " | " + OobState() + " | nazwy choragwi: " + _importNote + "."); }
+                           + ", Writes Order Of Battle " + Yes(Writes) + ", Pin Troop Types " + Yes(PinOn) + " | " + OobState() + " | zapis arm_army_review: " + _importNote
+                           + " | przypiecia " + PinSummary(_pins) + " | proba autotestu: " + TestState() + "."); }
             catch (Exception e) { Stumble("AddMenus.Log", e); }
         }
 
@@ -744,7 +762,8 @@ namespace Armoury
         /// <summary>Wynik zapisu (do okna, logu i testu).</summary>
         internal sealed class WriteResult
         {
-            public bool Ok, AsReset;
+            public bool Ok, AsReset, PinCommitted;
+            public int PinTypes, PinMen, PinDropped;
             public string Error;
             public readonly List<int> Auto = new List<int>();
             public readonly int[] W1 = new int[Slots], W2 = new int[Slots];
@@ -757,7 +776,11 @@ namespace Armoury
         /// Zapis choragwi do Order of Battle gry: walidacja rodzajow (brakujacy -> "the rest" w wolnym indeksie, 8 zajetych -> odmowa), wagi, bohaterowie,
         /// 8 wpisow dla pola i dla armii (osobne obiekty), odczyt kontrolny, nazwy. Wszystkie choragwie puste = powrot do porzadku gry.
         /// </summary>
-        internal static WriteResult Write(Slot[] work)
+        internal static WriteResult Write(Slot[] work) { return Write(work, null); }
+
+        /// <summary>Zapis choragwi; pins != null - takze przypiecia typow (CommitPins: zapisane zastepuje kopia bez przypiec do zwinietych choragwi),
+        /// a udzialy licza tylko nieprzypietych (ShareFit). pins == null - przypiecia zapisane bez zmian.</summary>
+        internal static WriteResult Write(Slot[] work, Dictionary<string, int> pins)
         {
             var res = new WriteResult();
             var b = Behavior();
@@ -783,11 +806,17 @@ namespace Armoury
             }
             if (!Array.Exists(s, x => x != null))
             {
+                int had = pins != null ? pins.Count : _pins.Count;
                 ResetOrder();
-                res.Ok = true; res.AsReset = true; res.Banners = s;
+                res.Ok = true; res.AsReset = true; res.Banners = s; res.PinDropped = had; res.PinCommitted = true;
                 return res;
             }
-            Weights(s, fit, res.W1, res.W2);
+            // P12: udzialy z nieprzypietych - przypieci do wystawionych choragwi stoja ponad udzialem (walidacja rodzajow wyzej na wszystkich);
+            // klucz przypiec NIE - wszyscy (recenzja P12: w bitwie przypieci ida wtedy wedlug rodzaju; PinnedFit z null = zera)
+            var share = (int[])fit.Clone();
+            var pinnedFit = PinnedFit(PinOn ? (pins ?? _pins) : null, s, null);
+            for (int k = 0; k < 4; k++) share[k] = Math.Max(0, share[k] - pinnedFit[k]);
+            Weights(s, share, res.W1, res.W2);
             // bohaterowie: dowodcy najpierw (wedlug indeksu), potem szeregi; kazdy najwyzej raz
             var used = new HashSet<Hero>();
             var caps = new Hero[Slots];
@@ -833,6 +862,7 @@ namespace Armoury
             }
             res.Banners = s;
             res.Ok = true;
+            CommitPins(res, pins);
             return res;
         }
 
@@ -858,6 +888,7 @@ namespace Armoury
             b.SetFormationInfos(new List<OrderOfBattleCampaignBehavior.OrderOfBattleFormationData>(), false, false);
             b.SetFormationInfos(new List<OrderOfBattleCampaignBehavior.OrderOfBattleFormationData>(), false, true);
             _names.Clear();
+            _pins.Clear();   // P12: przypiecia potrzebuja choragwi
             for (int i = 0; i < Slots; i++)
                 if (b.GetFormationDataAtIndex(i, false, false) != null || b.GetFormationDataAtIndex(i, false, true) != null) return false;
             return true;
@@ -867,7 +898,7 @@ namespace Armoury
         internal static string WriteLine(string who, WriteResult r)
         {
             if (!r.Ok) return P + who + " - odmowa zapisu: " + r.Error;
-            if (r.AsReset) return P + who + " - wszystkie choragwie zwiniete: powrot do porzadku gry (listy pola i armii puste).";
+            if (r.AsReset) return P + who + " - wszystkie choragwie zwiniete: powrot do porzadku gry (listy pola i armii puste), przypiecia zdjete " + r.PinDropped + ".";
             var sb = new StringBuilder(P).Append(who).Append(" - zapis Order of Battle:");
             for (int i = 0; i < Slots; i++)
             {
@@ -883,7 +914,9 @@ namespace Armoury
             }
             sb.Append(" odczyt pole ").Append(Yes(r.ReadField)).Append(", armia ").Append(Yes(r.ReadArmy)).Append(" | dopisane ").Append(r.Auto.Count)
               .Append(" | bohaterowie: dowodcow ").Append(r.Captains).Append(", w szeregach ").Append(r.Ranks).Append(", odrzuconych ").Append(r.Dropped)
-              .Append(" | nazwy ").Append(_names.Count).Append('.');
+              .Append(" | nazwy ").Append(_names.Count)
+              .Append(" | przypiecia ").Append(r.PinCommitted ? "zapisane: typow " + r.PinTypes + ", zdrowych ludzi " + r.PinMen + ", odpadly (choragiew zwinieta) " + r.PinDropped
+                                                               : "bez zmian (" + _pins.Count + ")").Append('.');
             return sb.ToString();
         }
 
@@ -899,9 +932,11 @@ namespace Armoury
                 var cur = ReadSlots(out saved, out entries);
                 _fromGame = !saved;
                 _work = saved ? cur : DefaultSlots();
+                _workPins = new Dictionary<string, int>(_pins, StringComparer.Ordinal);
                 _dirty = false;
             }
-            var fit = CommandedFit();
+            if (_workPins == null) _workPins = new Dictionary<string, int>(_pins, StringComparer.Ordinal);
+            var fit = ShareFit(_work, _workPins);   // P12: udzialy z nieprzypietych
             var w1 = new int[Slots]; var w2 = new int[Slots];
             Weights(_work, fit, w1, w2);
             var rows = new List<InquiryElement>();
@@ -913,6 +948,13 @@ namespace Armoury
                 rows.Add(new InquiryElement(i, BannerTitle(i, fit, w1), null, true, BannerHint(i, fit, w1, w2)));
             }
             bool writes = Writes;
+            int placed = 0;
+            foreach (var kv in _workPins) if (kv.Value >= 0 && kv.Value < Slots && _work[kv.Value] != null) placed++;
+            rows.Add(new InquiryElement("pins", "Move troop types into banners" + (placed > 0 && PinOn ? " (" + placed + (placed == 1 ? " type placed)" : " types placed)") : ""), null, PinEdit && raised > 0,
+                                        !PinOn ? "Army Review Pin Troop Types is off - banners take men by kind, share and filters only."
+                                        : !writes ? "Army Review Writes Order Of Battle is off - the review only shows the game's order."
+                                        : raised == 0 ? "Raise a banner first."
+                                        : "Pick troop types of your own party and the banner they stand in: they open the battle there and their reinforcements join it."));
             rows.Add(new InquiryElement("raise", "Raise a new banner", null, writes && raised < Slots,
                                         !writes ? "Army Review Writes Order Of Battle is off - the review only shows the game's order."
                                                 : raised >= Slots ? "All 8 banners are raised - the game has no more formations." : "A new banner in the first free formation."));
@@ -920,9 +962,10 @@ namespace Armoury
                                         writes ? "Write the banners into the game's Order of Battle. A kind of troop with no banner gets one of its own (the rest)."
                                                : "Army Review Writes Order Of Battle is off - the review only shows the game's order."));
             var missing = new List<string>();
+            var all = CommandedFit();
             for (int k = 1; k <= 4; k++)
             {
-                if (fit[k - 1] <= 0) continue;
+                if (all[k - 1] <= 0) continue;
                 bool cov = false;
                 for (int i = 0; i < Slots; i++) if (Covers(_work[i], k)) { cov = true; break; }
                 if (!cov) missing.Add(KindLower(k));
@@ -939,6 +982,7 @@ namespace Armoury
                     {
                         object id = picked != null && picked.Count > 0 ? picked[0].Identifier : null;
                         if (id is int) OpenBanner((int)id);
+                        else if ((id as string) == "pins") OpenPins();
                         else if ((id as string) == "raise") Raise();
                         else if ((id as string) == "save") SaveWork();
                     }
@@ -995,7 +1039,7 @@ namespace Armoury
         private static string BannerTitle(int i, int[] fit, int[] w1)
         {
             var s = _work[i];
-            var sb = new StringBuilder(Label(i)).Append(' ').Append(Approx(i, fit, w1));
+            var sb = new StringBuilder(Label(i)).Append(' ').Append(Approx(i, fit, w1)).Append(PinnedTail(i));
             var fl = new List<string>();
             for (int f = 1; f <= 6; f++) if (s.Filt[f]) fl.Add(FilterNames[f]);
             if (fl.Count > 0) sb.Append(" (").Append(string.Join(", ", fl.ToArray())).Append(')');
@@ -1012,7 +1056,7 @@ namespace Armoury
             {
                 int h = fit[s.Cls - 1];
                 int men = (int)Math.Round(w1[i] * h / 100f);
-                l.Add("Men: about " + men + " now - " + w1[i] + "% of your " + h + " fit " + KindLower(s.Cls) + (TakesRest(_work, i) ? (s.Men == TheRest ? " (the rest of them)" : " (the first banner of its kind takes whatever the others leave)") : "")
+                l.Add("Men: about " + men + " now - " + w1[i] + "% of your " + h + " fit " + KindLower(s.Cls) + (PinOn && _workPins != null && _workPins.Count > 0 ? " not placed by type" : "") + (TakesRest(_work, i) ? (s.Men == TheRest ? " (the rest of them)" : " (the first banner of its kind takes whatever the others leave)") : "")
                       + ". A banner keeps its share, not a count: it grows and shrinks with your " + KindLower(s.Cls) + ".");
                 if (h == 0) l.Add("You have no fit " + KindLower(s.Cls) + " now.");
             }
@@ -1026,6 +1070,8 @@ namespace Armoury
                 foreach (var h in s.Ranks) n.Add(h.Name.ToString());
                 l.Add("In the ranks: " + string.Join(", ", n.ToArray()));
             }
+            var pn = PinOn ? PinNames(_workPins, i) : new List<string>();   // klucz przypiec NIE - przypieci ida wedlug rodzaju
+            if (pn.Count > 0) l.Add("Troop types placed here (" + PinnedIn(i) + " fit men, on top of the share): " + string.Join(", ", pn.ToArray()));
             if (s.Auto) l.Add("Raised for a kind of troop that had no banner.");
             return string.Join("\n", l.ToArray());
         }
@@ -1045,10 +1091,10 @@ namespace Armoury
             {
                 InformationManager.ShowInquiry(new InquiryData("Banners for the next battle", "Your changes to the banners are not saved yet.", true, true, "Save them", "Discard",
                     delegate { try { SaveWork(); } catch (Exception e) { Stumble("Leave.Save", e); } },
-                    delegate { try { _work = null; _dirty = false; OpenMain(false); } catch (Exception e) { Stumble("Leave.Discard", e); } }), true);
+                    delegate { try { _work = null; _workPins = null; _dirty = false; OpenMain(false); } catch (Exception e) { Stumble("Leave.Discard", e); } }), true);
                 return;
             }
-            _work = null; _dirty = false;
+            _work = null; _workPins = null; _dirty = false;
             OpenMain(false);
         }
 
@@ -1085,7 +1131,7 @@ namespace Armoury
         {
             if (_work == null || i < 0 || i >= Slots || _work[i] == null) { OpenBanners(false); return; }
             var s = _work[i];
-            var fit = CommandedFit();
+            var fit = ShareFit(_work, _workPins);   // P12
             var w1 = new int[Slots]; var w2 = new int[Slots];
             Weights(_work, fit, w1, w2);
             if (!Writes)
@@ -1109,7 +1155,8 @@ namespace Armoury
                                    "A hero of your party who leads this banner. Each hero leads one banner at most" + OobOnly),
                 new InquiryElement("ranks", "Companions in the ranks: " + s.Ranks.Count, null, true, "Heroes of your party who fight in this banner's ranks" + OobOnly),
                 new InquiryElement("name", "Name: " + (string.IsNullOrEmpty(s.Name) ? "none" : s.Name), null, true, "Your own name for the banner."),
-                new InquiryElement("strike", "Strike the banner", null, true, "Its men go to the other banners of their kind (or to one raised for them on saving)."),
+                new InquiryElement("strike", "Strike the banner", null, true, "Its men go to the other banners of their kind (or to one raised for them on saving)"
+                                   + (PinOn && PinNames(_workPins, i).Count > 0 ? "; the troop types placed in it go back to sorting by kind." : ".")),
             };
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(Label(i), BannerHint(i, fit, w1, w2), rows, true, 1, 1, "Choose", "Back",
                 delegate (List<InquiryElement> picked)
@@ -1123,7 +1170,7 @@ namespace Armoury
                         else if (id == "captain") OpenCommander(i);
                         else if (id == "ranks") OpenRanks(i);
                         else if (id == "name") AskName(i);
-                        else if (id == "strike") { _work[i] = null; _dirty = true; OpenBanners(false); }
+                        else if (id == "strike") { _work[i] = null; DropPinsTo(i); _dirty = true; OpenBanners(false); }
                         else OpenBanner(i);
                     }
                     catch (Exception e) { Stumble("Banner.Pick", e); }
@@ -1166,7 +1213,7 @@ namespace Armoury
         {
             var s = _work[i];
             if (s.Cls < 1 || s.Cls > 4) { OpenBanner(i); return; }
-            var fit = CommandedFit();
+            var fit = ShareFit(_work, _workPins);   // P12: liczby ludzi z nieprzypietych
             int h = fit[s.Cls - 1];
             var rows = new List<InquiryElement>
             {
@@ -1181,7 +1228,7 @@ namespace Armoury
             }
             // recenzja 25.10: jedna choragiew rodzaju zawsze bierze reszte (Weights) - liczba dla tej, ktora bierze ja niejawnie, bylaby po cichu pominieta
             int other = FirstOtherOfClass(_work, i, s.Cls);
-            string q = "How many of your " + h + " fit " + KindLower(s.Cls) + " does this banner take?";
+            string q = "How many of your " + h + " fit " + KindLower(s.Cls) + (CommandedFit()[s.Cls - 1] > h ? " (not counting those placed by type)" : "") + " does this banner take?";
             if (other < 0) q += " It is your only banner of " + KindLower(s.Cls) + ", so it takes them all until you raise another.";
             else if (TakesRest(_work, i) && !RestElsewhere(_work, i, s.Cls))
                 q += " It takes whatever the other banners leave; pick a number and banner " + Roman[other] + " takes the rest instead.";
@@ -1386,7 +1433,7 @@ namespace Armoury
         private static void SaveWork()
         {
             if (!Writes) { OpenBanners(false); return; }
-            var r = Write(_work);
+            var r = Write(_work, PinOn ? _workPins : null);   // P12: przypiecia razem z choragwiami (klucz wylaczony - zapisane bez zmian)
             try { Log.Info(WriteLine("okno", r)); } catch (Exception e) { Stumble("Save.Log", e); }
             if (!r.Ok)
             {
@@ -1397,6 +1444,7 @@ namespace Armoury
             }
             _dSaves++;
             _dAuto += r.Auto.Count;
+            if (r.PinCommitted) _dPinSaves++;
             if (r.AsReset)
             {
                 _dResets++;
@@ -1414,26 +1462,28 @@ namespace Armoury
                     msg += " Raised for kinds of troop that had none: " + string.Join(", ", l.ToArray()) + ".";
                 }
                 if (r.Dropped > 0) msg += " " + r.Dropped + (r.Dropped == 1 ? " hero was" : " heroes were") + " left out (dead, captive, away or placed twice).";
+                if (r.PinCommitted && r.PinTypes > 0) msg += " " + r.PinTypes + (r.PinTypes == 1 ? " troop type stands" : " troop types stand") + " in the banner you chose.";
                 if (!r.ReadField || !r.ReadArmy) msg += " The game did not take the order as written - see the log.";
                 Log.Player(msg, !r.ReadField || !r.ReadArmy);
             }
-            _work = null; _dirty = false;
+            _work = null; _workPins = null; _dirty = false;
             OpenBanners(true);
         }
 
         private static void AskReset()
         {
             InformationManager.ShowInquiry(new InquiryData("Return to the game's own order",
-                "Forget your banners? The next battle will sort your men by kind into the game's own formations, and the names of your banners are lost.",
+                "Forget your banners? The next battle will sort your men by kind into the game's own formations, and the names of your banners and the troop types placed in them are lost.",
                 true, true, "Forget them", "Back",
                 delegate
                 {
                     try
                     {
+                        int hadPins = _pins.Count;
                         bool ok = ResetOrder();
                         _dResets++;
-                        _work = null; _dirty = false;
-                        Log.Info(P + "okno - powrot do porzadku gry: listy pola i armii puste, odczyt null x 16 " + Yes(ok) + ", nazwy wyczyszczone.");
+                        _work = null; _workPins = null; _dirty = false;
+                        Log.Info(P + "okno - powrot do porzadku gry: listy pola i armii puste, odczyt null x 16 " + Yes(ok) + ", nazwy wyczyszczone, przypiecia zdjete " + hadPins + ".");
                         Log.Player(ok ? "Your banners are struck - the next battle follows the game's own order." : "The game did not clear its order - see the log.", !ok);
                         OpenMain(false);
                     }
@@ -1449,9 +1499,10 @@ namespace Armoury
             try { TestStep(); } catch (Exception e) { Stumble("Test", e); }
             try
             {
-                if (_dWindows + _dReports + _dBanners + _dSaves + _dRefused + _dResets + _dStumbles > 0)
+                if (_dWindows + _dReports + _dBanners + _dSaves + _dRefused + _dResets + _dStumbles + _dPinSaves > 0)
                     Log.Info(P + "doba " + (int)CampaignTime.Now.ToDays + " | okna " + _dWindows + " (strony raportu " + _dReports + ", choragwie " + _dBanners + "), zapisy " + _dSaves
-                             + " (odmowy " + _dRefused + ", dopisane rodzaje " + _dAuto + "), powrot do porzadku gry " + _dResets + " | potkniecia doby " + _dStumbles
+                             + " (odmowy " + _dRefused + ", dopisane rodzaje " + _dAuto + ", z przypieciami " + _dPinSaves + "), powrot do porzadku gry " + _dResets
+                             + " | przypiecia " + PinSummary(_pins) + " | potkniecia doby " + _dStumbles
                              + " (sesji " + _stumbles + ").");
             }
             catch (Exception e) { Stumble("Daily", e); }

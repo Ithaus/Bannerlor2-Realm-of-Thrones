@@ -55,6 +55,8 @@ namespace Armoury
             var sb = new StringBuilder(300);
             sb.Append("Latki nocy (K3): kampania | ");
             Part(sb, "choragwie", RoutHold.SiteBanner, () => BannerKit.ApplyInCampaign(_h));
+            sb.Append(" | ");
+            Part(sb, "przypiecia typow (P12)", RoutHold.SiteBanner, () => ArmyReview.ApplyPinHooks(_h));   // spawn i posilki czynnego BattleSpawnModel, ekran Order of Battle
             sb.Append('.');
             Log.Info(sb.ToString());
         }

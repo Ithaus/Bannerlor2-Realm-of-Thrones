@@ -9820,6 +9820,10 @@ namespace Armoury
         [SettingPropertyGroup("Army review")]
         public bool ArmyReviewWritesOrderOfBattle { get; set; } = true;
 
+        [SettingPropertyBool("Army Review Pin Troop Types", HintText = "with Army Review: troop types of your own party that you move into a banner ('Move troop types into banners') stand in that banner when a field battle opens, and their reinforcements join it; the banners' shares count only the men you have not placed. Works when the banner is raised in the game's order (saved from the review). Off = banners take men by kind, share and filters only; the placements stay saved", RequireRestart = false)]
+        [SettingPropertyGroup("Army review")]
+        public bool ArmyReviewPinTroopTypes { get; set; } = true;
+
         [SettingPropertyBool("Spoils Window After Battle", HintText = "after a battle you win, a window shows the whole haul once the loot screens are closed: coin to your purse and to your men's purses, every piece of gear and goods taken and what it is worth, horses, prisoners and their ransom, your losses and renown", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsWindowAfterBattle { get; set; } = true;
@@ -12350,6 +12354,7 @@ namespace Armoury
             s.BannerCompanyMessages = BannerCompanyMessages;
             s.ArmyReviewEnabled = ArmyReviewEnabled;
             s.ArmyReviewWritesOrderOfBattle = ArmyReviewWritesOrderOfBattle;
+            s.ArmyReviewPinTroopTypes = ArmyReviewPinTroopTypes;
             s.SpoilsWindowAfterBattle = SpoilsWindowAfterBattle;
             s.SpoilsWindowAfterSiege = SpoilsWindowAfterSiege;
             s.SpoilsWindowAfterTourney = SpoilsWindowAfterTourney;
