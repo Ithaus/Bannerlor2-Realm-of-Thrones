@@ -1,5 +1,65 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 147 (galaz noc/139-ai-zycie, po 146 1040b277) - AI walczy o zycie, krok 9: bieg bez odsapki w panice (karta syntezy "139b Bieg bez odsapki", D6; PanicRun.cs, klucz PanicRunsUntilSpent)
+**Problem:** Jeff 25.10 ok. 13:30: "dopiero ta zasada peka gdy jest panika, w panice jest zasada uciekaj i brak rozsadku ... Wtedy ginie najwiecej osob"; ok. 13:20:
+"pamietaj aby w bitwach przeciwnik nie biegal caly czas bo beda padnieci". Objaw (synteza "AI walczy o zycie", luka 9 / P2c / Z5): spanikowany odsapuje w ucieczce -
+zwalnia, lapie oddech i znow biegnie pelna para, wiec uciekajacy nie slabna i nie sa dogonieni. Dowodu z logu nie ma (139 nie wgrane - pozycja "z zadyszka" w linii
+"LOS ZLAMANYCH (139)" jeszcze bez danych; stad linia 147, takze przy kluczu NIE); dowod z kodu ponizej.
+**Przyczyna:** FieldCraft liczyl drenaz biegu tylko przy predkosci ponad prog: sprinting = speed > runThr (FieldCraft.cs:701 przed zmiana; runThr = 0.55 x pelna
+predkosc, 2.2..4.2 m/s, :695), drenaz `if (sprinting)` (:754, wlasna pula :809), zbior biegnacych `if (sprinting && NoBreathWhileRunning)` (:715). Spanikowany
+w strefie 10% puli (tempo 0.5 + 5 x pasek) albo w zadyszce (50%) schodzil ponizej progu - przestawal byc "w biegu": oddech 137 liczyl mu odnowe jak w chodzie (BattleWind.cs:613,
+m = WalkM 0.4-0.85 wedlug zbroi; m = 0 tylko dla biegnacych, :610), bez oddechu 137 wracala regeneracja RBM i dlug biegu (SprintDebt). Skutek (z kodu, nie pomiar):
+spanikowany krazyl przy ok. 1% paska i ok. 55% predkosci (bieg -> drenaz -> ponizej progu -> odnowa -> znow bieg); kto spadl do zera, po powrocie paska do WindedExitBar
+(30%) wychodzil z zadyszki (PaceFromRatio) i znow biegl pelna para (przy 25 kg i Atletyce ok. 100 po ok. 45 s truchtu - szacunek z tau 137); czlowiek stojacy w panice
+(zablokowany, na granicy) odzyskiwal oddech jak na postoju.
+**Zmiana:** PanicRun.cs (nowy - tylko liczniki i linia), FieldCraft.cs (regula, pomiar, linia w OnEndMission, Reset w ResetRunStats, pole State.Pr), RoutHold.cs (miejsce
+potkniec NB2 "bieg" = 20, Sites 21; segment "Panic Runs Until Spent" w linii startu sesji), Settings.cs, McmSettings.cs (gen_mcm: Armoury 2512 -> 2513 ustawien).
+(a) Regula (klucz PanicRunsUntilSpent TAK): pieszy czlowiek AI (nie gracz) w trybie PANIKA wedlug przelacznika 139 (SurvivalMode.InPanic: IsPanicked albo RoutHold albo
+odwrot komponentu) pije oddech jak w biegu 127 NIEZALEZNIE od predkosci: drains = sprinting || (pieszo && PANIKA && klucz) - ten sam drenaz (cala pula w RunSeconds
+z Atletyki i zbroi), ten sam zbior biegnacych (przy NoBreathWhileRunning: oddech 137 m = 0 - brak odnowy, regeneracja RBM pominieta, NoteRunSpend - wydatek biegu, nie
+walki, dlug SprintDebt nie wraca), wlasna pula bez RBM bez regeneracji. Bez mnoznika strachu - fizjologia 127 jedna. Po wyczerpaniu (pasek 0 -> zadyszka) pasek nie
+dochodzi do progu wyjscia, wiec zostaje 50% predkosci (istniejacy limit FieldCraft; rany dalej wolniej, jak dotad) do granicy pola albo do smierci. Bez animacji upadku.
+Jezdziec bez zmian (bieg pije tylko piechur; kon - HorseWind 136). Zakres: wszedzie, gdzie jest FieldCraft i przelacznik mowi PANIKA (pole, oblezenie, kryjowka; turniej
+i arena paniki nie maja). Ranny w odwrocie 143 to ROZSADEK (natywny Agent.Retreat bez komponentu) - regula go nie dotyczy.
+(b) Klucz NIE: drenaz jak dotad (tylko w biegu ponad prog), pomiar ten sam - porownanie przed / po.
+(c) Linia raz na misje (FieldCraft.OnEndMission, po "Bieg (127)" i "Oddech AI (144)"; w bitwie na mapie i w kryjowce zawsze, gdzie indziej tylko gdy ktos spanikowal):
+"Bieg zlamanych (147): misja bitwa, klucz TAK (pieszy w PANICE - przelacznik 139 - pije oddech jak w biegu 127 niezaleznie od predkosci, bez mnoznika strachu; po
+wyczerpaniu 50% do konca); bez oddechu w biegu TAK (oddech 137 m = 0 / regeneracja RBM pominieta), oddech dwufazowy 137 TAK, stamina RBM TAK | zlamani pieszo N (strona
+gracza a / wroga b; wejsc w panike s; w siodle pominieci m; sam odwrot komponentu - szarza RBM k ludzi, x s) | do wyczerpania: doszlo d z e wejsc ze swiezym oddechem,
+sr. czas do wyczerpania t s (najkrocej, najdluzej), pasek przy wejsciu sr. p%, pelny bieg 127 sr. R s; bez tchu juz przy wejsciu w; koniec paniki przed wyczerpaniem q |
+czas w panice pieszo X s: na 50% (zadyszka) Y s - udzial biegu na 50% h%, strefa 10% z s, ponizej progu biegu u s (drenaz tylko przez 147) | odsapki w panice (wyjscia
+z zadyszki) r (oczekiwane 0) | na koniec misji w panice na polu n, z nich na 50% k | potkniecia bieg f (wypadli z probek o)." Przy Sprint Fatigue NIE w bitwie - krotka
+linia "nieczynne". Linia startu sesji NB2 - segment "Panic Runs Until Spent TAK (...)" (z dopiskiem "nieczynne", gdy Field Craft albo Sprint Fatigue NIE); potkniecia NB2
+- ", bieg n" (regex sprawdz_logi.py przyjmuje kolejne miejsca "(?:, [a-z]+ \d+)*").
+(d) Klucz MCM: grupa "Flesh and wind" - PanicRunsUntilSpent TAK (opis po angielsku: "a man who panics and flees runs for his life: he spends his breath as in a full
+sprint whatever his pace ..."); w Armoury.json Jeffa go nie ma (grep 25.10; NoBreathWhileRunning i BreathTwoPhase tez nie ma - dzialaja domyslne TAK z kodu).
+Przelacznik - bez zakresu w RANGES.
+Decyzje: (1) brak odnowy w panice idzie przez TEN SAM zbior biegnacych co bieg 127, wiec zalezy od NoBreathWhileRunning (u Jeffa TAK z kodu) - jedna zasada "w biegu
+oddech nie wraca"; przy NoBreathWhileRunning NIE spanikowany oddycha jak kazdy biegacz (linia mowi to wprost). (2) Pomiar biegu AiBreath (sprintNow, sekundy biegu wedlug
+sytuacji) zostaje wedlug predkosci - 144 i tak pomija PANIKE (wyjatek "ucieczka/panika"). (3) Czas do wyczerpania liczony od wejscia w panike (takt wykrycia - 0.2 s) do
+pierwszej zadyszki w tej samej panice; kto juz byl bez tchu przy wejsciu, liczony osobno.
+Odstepstwa od karty: (1) ofiara szarzy konnej RBM (odwrot komponentu bez paniki, ok. 10 s) to PANIKA wedlug przelacznika 139, wiec przez te ok. 10 s pije oddech jak
+w biegu (ok. 20% puli przy 25 kg) - liczona osobno w linii ("sam odwrot komponentu"); jesli bedzie jej duzo, wyjatek to osobny krok. (2) "z zadyszka w 136" z karty - to
+pozycja "z zadyszka" w linii 139 (bez zmian kodu, wzrosnie sama).
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - dla czlowieka poza PANIKA drains == sprinting, wiec bieg, drenaz, zbior biegnacych, zwrot SprintDebt
+i oddech 137 bez zmian; gracz wylaczony (IsMainAgent); jezdziec bez zmian; AiBreath dostaje ten sam sprintNow co dotad; WindedShow (twarz, poza, oddech) pomija PANIKE
+(WindedShow.cs:246/274) - spanikowany z zadyszka nie dostaje pozy ani dzwieku. (b) kolizje - zbior biegnacych czytaja tylko BattleWind.TickStaminaPrefix (:475, bez oddechu
+137: regeneracja pominieta) i BreathTick (:547, m = 0) - o to chodzi; licznik "pominiete regeneracje RBM" w linii "Bieg (127)" obejmie teraz takze spanikowanych. RBM
+przy niskiej staminie daje do 1.25 x obrazen postury (StanceLogic:261-264) i nie leczy (+0.9 HP tylko przy pasku > 85%, :1993-1996) - jak u kazdego wyczerpanego. Limit
+predkosci 50% to istniejacy zapis FieldCraft (SetMaximumSpeedLimit wzgledny); spanikowany w odwrocie (IsRunningAway) nie ma capu marszu ani oddechu 144
+(MarchToContact.CapFor:770 daje -1, AiBreath.Drop przy panice - B1). 142 (panika bez powrotu) trzyma ludzi w RoutHold - przelacznik mowi PANIKA do konca bitwy, takze po zgaszeniu paniki przez RBM - spojne
+("bez powrotu" + "bez odsapki"). 143 (odwrot rannego) - ROZSADEK, bez zmian; 145 / 146 / 140 / 141 - pomijaja PANIKE, bez zmian. BrokenFate 139: "z zadyszka" i
+"sr. bieg" uciekajacych zmienia sie (zamierzone). (c) jedno zjawisko - panika = przelacznik 139, bieg = regula 127 (ten sam drenaz i zbior), zadyszka = st.Winded i
+WindedExitBar; liczniki zerowane w AfterStart i po linii (ResetRunStats). (d) cudzy kod - RBM StanceLogic (regeneracja, posture, leczenie) i CommonAIComponent (flagi
+paniki) sprawdzone w dekompilacji 1.4.8 (scratchpad/surv, panB); innych zrodel drenazu staminy w biegu brak (grep Armoury).
+Wydajnosc: jedno SurvivalMode.InPanic (dwie flagi + slownik) na czlowieka co 0.2 s; liczniki tylko dla spanikowanych.
+Oczekiwane skutki: spanikowani pieszo szybciej padaja z sil i dluzej sa na 50% - wiecej dopadnietych w ucieczce (linia 139 "dopadnieci"), krotsze odleglosci ucieczki.
+Straty przegranych juz dzis 63-83% w malych bitwach gracza (synteza) - sprawdzic, czy nie rosna ponad miare (porownanie z kluczem NIE).
+Sprawdzic w logu po wgraniu: linia "Bieg zlamanych (147)" w kazdej bitwie z panika, "odsapki w panice 0", udzial biegu na 50% wyraznie wiekszy niz przy kluczu NIE,
+sr. czas do wyczerpania mniej wiecej pasek przy wejsciu x pelny bieg 127, "potkniecia bieg 0" (takze w NB2), "sam odwrot komponentu" maly. W grze (Jeff): uciekajacy
+po kilkudziesieciu sekundach zwalniaja do truchtu i juz nie przyspieszaja; konnica ich dogania.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 c1134463a180737dc0cfd033acba3a96).
+
 ## 2026-10-25 146 (galaz noc/139-ai-zycie, po 145 bcd191c3) - AI walczy o zycie, krok 8: szyk pod ostrzalem (projekt 135b z design-weccrxf3h sekcja 5, karta syntezy "138", CloseRanks.cs, klucz AiFormationsUnderFire)
 **Problem:** Jeff 25.10 ok. 13:25: "przeciwnik jak ma tarcze a widzi ze ktos w niego strzela to zaklada tarcze z plecow ... zasada AI robi wszystko aby nie dac
 sie zabic!"; ok. 13:30: "Jak widzi ze kolega padl od strzaly a ma tarcze to zalozy tarcze i sie za nia schowa i idzie na przeciwnika". Objaw (synteza "AI walczy

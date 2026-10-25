@@ -1356,6 +1356,10 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool WindedBreathSound { get; set; } = true;
 
+        [SettingPropertyBool("Panic Runs Until Spent", HintText = "a man who panics and flees runs for his life: he spends his breath as in a full sprint whatever his pace and gets none of it back while the panic lasts, so he runs as long as his strength holds and then drags on at half speed to the edge of the field or to his death - no catching his breath on the way. The same body as any runner (how long he can run comes from his Athletics and armour), nothing added for fear. Men on foot only, both sides alike. Off = a fleeing man who slowed down got his breath back and ran again, as before (still measured for the log)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool PanicRunsUntilSpent { get; set; } = true;
+
         [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant; the dead never tire. While Stamina From Athletics Only is on, heroes' stamina follows Athletics like everyone's and this switch keeps only the Endurance posture rule and the tireless dead. The Athletics curve and the two-phase breath work with it off too (read once at game start from ModuleData/Armoury.settings.xml - changing it here has no effect)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool BattleStaminaEnabled { get; set; } = true;
@@ -10398,6 +10402,7 @@ namespace Armoury
             s.WindedShowsIt = WindedShowsIt;
             s.WindedPose = WindedPose;
             s.WindedBreathSound = WindedBreathSound;
+            s.PanicRunsUntilSpent = PanicRunsUntilSpent;
             s.BattleStaminaEnabled = BattleStaminaEnabled;
             s.BattleEndDoubleEvery = BattleEndDoubleEvery;
             s.BattleRegenAtEnd1 = BattleRegenAtEnd1;

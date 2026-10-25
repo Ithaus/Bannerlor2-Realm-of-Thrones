@@ -54,6 +54,7 @@ namespace Armoury
             public float WindedFor;         // 137: sekundy biezacej zadyszki
             public float Ratio = 1f;        // 144: biezacy pasek staminy / max (przy oddechu 137 = pula - F - S) - budzet biegu AiBreath
             public AiBreath.Man Ai;         // 144: stan zasady "AI oszczedza sily" (AiBreath.Step)
+            public PanicRun.Man Pr;         // 147: pomiar biegu w panice (linia "Bieg zlamanych (147)") - tworzony przy pierwszej panice
         }
 
         // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
@@ -88,6 +89,7 @@ namespace Armoury
             _runN = 0; _regenSkipped = 0;
             _runKgSum = 0f; _runKgMax = 0f; _runTSum = 0f; _runTMin = float.MaxValue;
             _plKg = -1f; _plAth = 0f; _plT = 0f;
+            PanicRun.Reset();                   // 147: liczniki linii "Bieg zlamanych (147)"
         }
 
         /// <summary>127: sekundy pelnego biegu do zera, jedna regula dla kazdego czlowieka na polu:
@@ -398,6 +400,13 @@ namespace Armoury
                 AiBreath.End(Mission);
             }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "AiBreath.End", e); }
+            // 147: linia "Bieg zlamanych (147)" raz na misje - kto jest jeszcze w panice na polu, potem liczniki
+            try
+            {
+                foreach (var kv in _states) if (kv.Value != null && kv.Value.Pr != null) PanicRun.AtEnd(kv.Key, kv.Value.Pr, kv.Value.Winded);
+                PanicRun.Line(Mission, Settings.Current);
+            }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRun, "PanicRun.Line", e); }
             ResetRunStats();
             try { BattleWind.BreathFlush(); } catch { }      // 137: linia "Oddech (137)" raz na misje
             try { MissionTeams.Flush(Mission); } catch { }   // NM: linia "Druzyny w misji (NM)" raz na misje
@@ -679,6 +688,8 @@ namespace Armoury
                         // moze zejsc do zera pula RBM od ciosow
                         bool onFoot = agent.MountAgent == null;
                         bool sprinting = false;
+                        bool windedBefore = st.Winded;   // 147: stan przed takciem (pomiar odsapek i wyczerpania w panice)
+                        float barBefore = st.Ratio;
                         if (onFoot)
                         {
                             float speed = agent.GetCurrentVelocity().Length;
@@ -708,11 +719,17 @@ namespace Armoury
                                          + runThr.ToString("0.0") + "), pelny bieg do zera " + st.RunSeconds.ToString("0") + " s (127).");
                             }
                         }
+                        // 147 (klucz PanicRunsUntilSpent, karta syntezy "139b Bieg bez odsapki"): pieszy AI w PANICE (przelacznik 139) pije oddech jak w biegu
+                        // NIEZALEZNIE od predkosci - ta sama regula co bieg 127 (cala pula w RunSeconds, w biegu bez oddechu: zbior biegnacych -> oddech 137 m = 0,
+                        // regeneracja RBM pominieta, dlug biegu nie wraca), bez mnoznika strachu. Po wyczerpaniu pasek nie dochodzi do progu wyjscia - 50% do konca.
+                        // Dotad zwolnienie ponizej progu biegu (strefa 10%, zadyszka) konczylo "bieg" i oddech wracal - odsapka w ucieczce. Jezdziec bez zmian.
+                        bool panicNow = !agent.IsMainAgent && SurvivalMode.InPanic(agent);
+                        bool drains = sprinting || (onFoot && panicNow && c.PanicRunsUntilSpent);
                         var stance = c.UseRbmStamina ? RbmStanceOf(agent, st, step) : null;
-                        // 127: w biegu oddech nie wraca nikomu (BattleWind.TickStaminaPrefix pomija regeneracje RBM tej postawy)
+                        // 127: w biegu oddech nie wraca nikomu (BattleWind.TickStaminaPrefix pomija regeneracje RBM tej postawy); 147: takze w panice
                         if (stance != null)
                         {
-                            if (sprinting && c.NoBreathWhileRunning) _runningStances.Add(stance);
+                            if (drains && c.NoBreathWhileRunning) _runningStances.Add(stance);
                             else _runningStances.Remove(stance);
                         }
                         if (stance != null)
@@ -751,9 +768,9 @@ namespace Armoury
                                     }
                                 }
 
-                                if (sprinting)
+                                if (drains)
                                 {
-                                    float d = maxStam / st.RunSeconds * step;   // 127: cala pula w RunSeconds pelnego biegu
+                                    float d = maxStam / st.RunSeconds * step;   // 127: cala pula w RunSeconds pelnego biegu (147: takze w panice)
                                     float stam0 = stam;
                                     stam -= d;
                                     // 137: przy oddechu dwufazowym bez wlasnego dlugu biegu - wydatek zostaje na pasku i uzgadnia go BattleWind (F/S)
@@ -806,13 +823,24 @@ namespace Armoury
                         {
                             // bez RBM: wlasna pula na tych samych zasadach
                             if (st.Pool < 0f) st.Pool = st.PoolMax;
-                            if (sprinting) st.Pool -= st.PoolMax / st.RunSeconds * step;
+                            if (drains) st.Pool -= st.PoolMax / st.RunSeconds * step;   // 147: takze w panice
                             else st.Pool += st.RegenPerSec * step;
                             if (st.Pool < 0f) st.Pool = 0f;
                             if (st.Pool > st.PoolMax) st.Pool = st.PoolMax;
                             float ratio = st.PoolMax > 1f ? st.Pool / st.PoolMax : 1f;
                             st.Ratio = ratio;   // 144
                             st.Pace = PaceFromRatio(st, ratio, 0.10f);
+                        }
+                        // 147: pomiar biegu w panice (takze przy kluczu NIE) - czas do wyczerpania, czas na 50%, odsapki; wyjatek liczony w PanicRun.Step
+                        if (onFoot && (panicNow || (st.Pr != null && st.Pr.In)))
+                        {
+                            if (st.Pr == null) st.Pr = new PanicRun.Man();
+                            PanicRun.Step(agent, st.Pr, panicNow, windedBefore, st.Winded, st.Pace, sprinting, barBefore, st.RunSeconds, step, now);
+                        }
+                        else if (panicNow && !onFoot)
+                        {
+                            if (st.Pr == null) st.Pr = new PanicRun.Man();
+                            PanicRun.Mounted(st.Pr);
                         }
                     }
                     else

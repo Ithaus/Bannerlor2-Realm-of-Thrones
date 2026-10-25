@@ -85,10 +85,12 @@ namespace Armoury
         internal const int SiteWary = 18;
         // 146: szyk pod ostrzalem (CloseRanks - pass szykow i latka na decyzji szyku RBM); nazwa jednym slowem (regex NB2)
         internal const int SiteRanks = 19;
-        private const int Sites = 20;
+        // 147: bieg bez odsapki w panice (PanicRun - pomiar w FieldCraft); nazwa jednym slowem (regex NB2)
+        internal const int SiteRun = 20;
+        private const int Sites = 21;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
                                                       "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot", "oddech", "ostroznosc",
-                                                      "szyk" };
+                                                      "szyk", "bieg" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -505,6 +507,11 @@ namespace Armoury
               .Append(WoundedWary.Floor.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)).Append(" + ")
               .Append((1f - WoundedWary.Floor).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))
               .Append(" x HP / prog; bez bohaterow (krok 149) i bez PANIKI (139); odswiezanie RBM co 3 s; latka VeteranAi ").Append(VeteranAi.Patched ? "TAK" : "NIE").Append(')');
+            // 147: bieg bez odsapki w panice (FieldCraft; linia 'Bieg zlamanych (147)' po misji)
+            sb.Append(" | Panic Runs Until Spent ").Append(c.PanicRunsUntilSpent ? "TAK" : "NIE")
+              .Append(c.PanicRunsUntilSpent && !(c.FieldCraftEnabled && c.SprintFatigueEnabled) ? " (nieczynne: Field Craft albo Sprint Fatigue NIE)" : "")
+              .Append(" (pieszy w PANICE - przelacznik 139 - pije oddech jak w biegu 127 niezaleznie od predkosci, bez mnoznika strachu; w panice bez odnowy przy No Breath While Running ")
+              .Append(c.NoBreathWhileRunning ? "TAK" : "NIE").Append(" - oddech 137 m = 0, regeneracja RBM pominieta; po wyczerpaniu 50% do granicy pola albo smierci; jezdziec bez zmian)");
             sb.Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }
