@@ -28,7 +28,9 @@ namespace Armoury
     ///     = caly szyk pod ostrzalem do ostatniego + ShieldsUpHoldSeconds (znacznik ludzi przez ApplyActionOnEachUnit co 1 s).
     /// Znacznik czlowieka = teraz + ShieldsUpHoldSeconds, przedluzany kazdym zdarzeniem.
     /// Kogo dotyczy: czlowiek AI (nie gracz), pieszy, z tarcza w ekwipunku, nie Inny (Undead), nie chorazy (sztandar w rece albo w ExtraWeaponSlot),
-    /// nie przy drabinie / machinie (IsUsingGameObject), nie odlaczony od szyku, nie w PANICE (SurvivalMode) ani w odwrocie (IsRetreating);
+    /// nie przy drabinie / machinie (IsUsingGameObject), nie odlaczony od szyku, nie w PANICE (SurvivalMode) ani w odwrocie (IsRetreating) - poza odwrotem
+    /// rannego 143 (recenzja: ROZSADEK - "cofa sie z tarcza i bronia": przelozenie tarczy do reki tak, uniesienie w drodze i tak blokuje warunek gry
+    /// !IsRetreating w Agent.UpdateFormationOrders, na postoju (StopRetreating) - jak kazdy);
     /// strzelec z amunicja (IsRangedCached) strzela dalej - wchodzi tylko przy HoldYourFire szyku (K12: lucznik bez strzal wchodzi, wybor regula
     /// amunicji, nie IsShieldUsageEncouraged gry); ludzie gracza przy ShieldsUpYourMenToo. Bitwy morskie poza (Naval ma wlasna regule tarcz).
     /// Co robi (glowny watek, pass ludzi co 0.25 s tylko po liscie oznaczonych):
@@ -140,7 +142,8 @@ namespace Armoury
         private static string _orderSetAi = "?", _orderUfo = "?";
 
         // ------------------------------------------------------------ liczniki misji (glowny watek, poza oznaczonymi Interlocked)
-        private static int _sAi, _sAiNoTarget, _sPlayer, _misses, _hits, _hitShield, _hitBack, _hitBody, _queries, _queriesOver, _qOverTotal;
+        private static int _sAi, _sAiNoTarget, _sPlayer, _sHeroAi, _misses, _hits, _hitShield, _hitBack, _hitBody, _queries, _queriesOver, _qOverTotal;
+        private static readonly HashSet<int> WithdrawMen = new HashSet<int>();   // recenzja 140/143: ranni w odwrocie 143 oznaczeni pod ostrzalem (nie pominieci)
         private static int _formUnderSec, _commands, _cmdBoth, _cmdShield, _checks, _checksOk, _retries, _reverts, _stubborn, _limitHits;
         private static float _revertTime;
         private static int _favorOn, _favorOff, _favorDefer, _uap, _arrChanges, _toShieldWall, _throws, _throwsMarked, _dropped;
@@ -527,7 +530,8 @@ namespace Armoury
                 _qn = 0; _qOver = 0;
             }
             _accMen = _accForm = 0f; _rot = 0;
-            _sAi = _sAiNoTarget = _sPlayer = _misses = _hits = _hitShield = _hitBack = _hitBody = _queries = _queriesOver = _qOverTotal = 0;
+            _sAi = _sAiNoTarget = _sPlayer = _sHeroAi = _misses = _hits = _hitShield = _hitBack = _hitBody = _queries = _queriesOver = _qOverTotal = 0;
+            WithdrawMen.Clear();
             _formUnderSec = _commands = _cmdBoth = _cmdShield = _checks = _checksOk = _retries = _reverts = _stubborn = _limitHits = 0;
             _revertTime = 0f;
             _favorOn = _favorOff = _favorDefer = _uap = _arrChanges = _toShieldWall = _throws = _throwsMarked = _dropped = 0;
@@ -586,6 +590,7 @@ namespace Armoury
                 }
                 _sAiNoTarget++;
             }
+            else if (s.IsAIControlled) _sHeroAi++;   // recenzja 140: bohater gracza pod SI (autotest) - ta sama sciezka S3, osobny licznik
             else _sPlayer++;
             // S3 (K6): punkt upadku z balistyki - opad LandDrop ponizej punktu wylotu, bez oporu powietrza
             var v = ev.Vel;
@@ -720,6 +725,10 @@ namespace Armoury
                 bool hold = f != null && f.FiringOrder.OrderEnum == FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire;
                 if (!hold) return WRanged;   // K12: lucznik / kusznik z amunicja strzela dalej
             }
+            // recenzja 140/143: ranny w odwrocie z bronia (natywny Agent.Retreat - natywne IsRetreating() prawdziwe w drodze) to ROZSADEK przelacznika - nie pomijamy:
+            // tarcza do reki dozwolona (przy wrogu w 8 m i tak nie), uniesienie w drodze blokuje warunek gry !IsRetreating (UpdateFormationOrders), na postoju jak kazdy
+            var k = RoutHold.Live;
+            if (k != null && k.Withdrawing(a)) { WithdrawMen.Add(a.Index); return -1; }
             if (a.IsRetreating() || SurvivalMode.InPanic(a)) return WPanic;   // przelacznik 139: PANIKA - bez rozsadku
             return -1;
         }
@@ -1163,6 +1172,7 @@ namespace Armoury
               .Append("; wywolan postfiksu SetAi ").Append(Volatile.Read(ref _setAiCalls)).Append(" (z preferencja ").Append(Volatile.Read(ref _setAiFavor))
               .Append("), UpdateFormationOrders ").Append(Volatile.Read(ref _ufoCalls)).Append(')')
               .Append(" | ostrzal: strzalow AI z celem ").Append(_sAi).Append(", AI bez celu ").Append(_sAiNoTarget).Append(", gracza ").Append(_sPlayer)
+              .Append(", bohatera gracza pod SI ").Append(_sHeroAi)
               .Append(" (bez celu: punkt upadku z balistyki), pudel z punktem upadku ").Append(_misses)
               .Append(", trafien ").Append(_hits).Append(" (tarcza w rece ").Append(_hitShield).Append(", tarcza na plecach ").Append(_hitBack).Append(", cialo ").Append(_hitBody)
               .Append("), szykow pod ostrzalem ").Append(FormUnder.Count).Append(" (").Append(_formUnderSec).Append(" s), zapytan ").Append(_queries)
@@ -1173,6 +1183,7 @@ namespace Armoury
               .Append("; pominieci: strzelcy z amunicja ").Append(SkipMen[WRanged].Count).Append(", konni ").Append(SkipMen[WMounted].Count)
               .Append(", chorazy ").Append(SkipMen[WBanner].Count).Append(", obiekt ").Append(SkipMen[WObject].Count).Append(", odlaczeni ").Append(SkipMen[WDetached].Count)
               .Append(", Inni ").Append(SkipMen[WUndead].Count).Append(", panika ").Append(SkipMen[WPanic].Count).Append(", ludzie gracza ").Append(SkipMen[WPlayer].Count)
+              .Append(" (ranni w odwrocie 143 NIE pominieci ").Append(WithdrawMen.Count).Append(')')
               .Append(", konnica blisko ").Append(SkipMen[WHorse].Count).Append(", wrog <").Append(NoSwapNear.ToString("0", Inv)).Append(" m ").Append(SkipMen[WNear].Count)
               .Append(", limit polecen ").Append(_limitHits)
               .Append(" | po 1.5 s tarcza w rece ").Append(_checksOk).Append('/').Append(_checks).Append(", powtorki ").Append(_retries)

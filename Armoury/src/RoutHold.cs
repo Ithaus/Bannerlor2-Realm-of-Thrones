@@ -825,6 +825,7 @@ namespace Armoury
 
         public override void OnAgentPanicked(Agent affectedAgent)
         {
+            try { CountFled(affectedAgent); } catch { }   // recenzja 143: zbiegli z szyku (szyk jeszcze ustawiony) - BrokenFormation odwrotu rannego
             try
             {
                 Entry e;

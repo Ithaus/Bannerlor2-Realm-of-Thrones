@@ -25,7 +25,7 @@ namespace Armoury
     ///    IFormationArrangement.SwitchUnitLocations - ta sama droga, ktora gra stawia gracza na tyl szyku (Formation.TryRelocatePlayerUnit ->
     ///    LineFormation.SwitchUnitLocationsWithBackMostUnit -> SwitchUnitLocations; RBM OverrideLineFormation tylko sprawdza, czy obaj sa czynni i w szyku).
     ///    SwitchUnitLocationsWithBackMostUnit NIE wprost: jego "ostatni" (prywatne GetLastUnit) bywa graczem albo innym bohaterem. Szyk z graczem pominiety (gra
-    ///    sama stawia tam gracza na tyl - nie przepychamy sie). Gra przesuwa ludzi z tarcza do przodu (LineFormation.SwitchFrontUnitTypesToFrontRows w
+    ///    sama stawia tam gracza na tyl - nie przepychamy sie); recenzja: takze szyk pod rozkazami gracza (HorsePursuit.PlayerForm - jedna definicja). Gra przesuwa ludzi z tarcza do przodu (LineFormation.SwitchFrontUnitTypesToFrontRows w
     ///    OnTickOccasionally) i zapelnia luki z tylu (RemoveUnit fillInTheGap) - kolejna zamiana liczona jako "ponowna", najwyzej SwapCap na bohatera na bitwe;
     ///  - SAMOTNY: 0 swoich (nie w PANICE) w 5 m i co najmniej 2 wrogow (nie uciekajacych) w 10 m przez 2 passy z rzedu (ok. 1 s) - wycofanie za swoj szyk,
     ///    postoj 6 s, potem wraca do walki (pozycja skryptowa zdjeta); nastepne samotne wycofanie najwczesniej po 10 s;
@@ -41,7 +41,8 @@ namespace Armoury
     ///    w 143 dotykamy tylko, gdy ucieka), gracz przejal, koniec bitwy (MissionEnded - pozycja zdjeta).
     ///  - kolejnosc w klatce: zachowania misji tykaja od konca listy (Mission.cs:3741-3744) - BattleSense (my) PRZED RoutKeeper (zlamani, 143) i BrokenMen.
     ///  - zrecznosc pojedynkowa (DuelistsInBattles, DuelAi, zrywy DuelCraft) bez zmian - nie dotykamy pol AI; formacji wodza RBM NIE przywracamy.
-    /// Klucz NIE: ta sama ocena na sucho (kto bylby przestawiony, wycofania rannych i samotnych) - bez zamian i bez pozycji skryptowej. Linia "bohaterowie (149)" raz na
+    /// Klucz NIE: ta sama ocena na sucho (kto bylby przestawiony, wycofania rannych i samotnych) - bez zamian i bez pozycji skryptowej; przelaczenie na NIE w trakcie
+    /// bitwy konczy trwajace wycofania (recenzja: pozycja zdjeta, powod "klucz NIE w trakcie"). Linia "bohaterowie (149)" raz na
     /// bitwe (BattleSense.Clean, po "poscig (148)"). Wyjatek na bohaterze = licznik (RoutHold.SiteHeroes); po FailsOut bohater wypada (pozycja zdjeta) - bez globalnego
     /// wylacznika. Nazwa klasy nie moze byc "Log", "Settings" ani "McmSettings".
     /// </summary>
@@ -82,8 +83,8 @@ namespace Armoury
         private const int StIdle = 0, StTravel = 1, StHold = 2;
         private const int KRear = 0, KMain = 1, KBanner = 2, KInPlace = 3, KKinds = 4, KindLimit = -2;
         private const int CheckOk = 0, CheckBad = 1, CheckLimit = 2;
-        // koniec trybu (przejeci)
-        private const int EPain = 0, EGame = 1, EPanicOther = 2, E143 = 3, EPlayer = 4, EKinds = 5;
+        // koniec trybu (przejeci); recenzja 149: EOrder - odwrot na rozkaz szyku (ROZSADEK przelacznika od recenzji 139), EKey - klucz NIE w trakcie bitwy
+        private const int EPain = 0, EGame = 1, EPanicOther = 2, E143 = 3, EPlayer = 4, EOrder = 5, EKey = 6, EKinds = 7;
 
         private sealed class Man
         {
@@ -384,7 +385,7 @@ namespace Armoury
                 try
                 {
                     if (full) PassOne(man, m, now);
-                    else if (man.Mode != ModeNone) StepOne(man, m, now);
+                    else if (man.Mode != ModeNone && _key) StepOne(man, m, now);   // recenzja 149: klucz NIE w trakcie - bez kroku (PassOne zdejmie pozycje)
                 }
                 catch (Exception e)
                 {
@@ -425,6 +426,14 @@ namespace Armoury
                 man.Hits = 0;
                 return;
             }
+            if (a.IsRunningAway || SurvivalMode.OrderedRetreat(a, a.CommonAIComponent))
+            {
+                // recenzja 139/149: odwrot na rozkaz szyku jest teraz ROZSADKIEM przelacznika (dotad PANIKA - ta sama galaz wyzej); bohater idzie za rozkazem
+                // wodza (natywny odwrot gry), naszej pozycji nie dokladamy - zachowanie jak przed recenzja, osobny powod w linii
+                if (man.Mode != ModeNone) { Release(man); EndMode(man, EOrder); }
+                man.Hits = 0;
+                return;
+            }
             man.Mounted = a.MountAgent != null;
             float max = a.HealthLimit;
             float hp = max > 0f ? a.Health / max : 1f;
@@ -433,6 +442,8 @@ namespace Armoury
 
             if (!_key)
             {
+                // recenzja 149: klucz przelaczony na NIE w trakcie bitwy - trwajace wycofanie konczy sie od razu (pozycja zdjeta), dalej tylko pomiar (wzor 148 EKey)
+                if (man.Mode != ModeNone) { Release(man); EndMode(man, EKey); }
                 // na sucho: kto bylby wycofany (ranny raz na bitwe; samotny z ta sama przerwa co przy TAK)
                 if (wounded) { if (!man.DryW) { man.DryW = true; _dryWounded++; } return; }
                 if (now < man.CoolUntil) return;
@@ -483,7 +494,8 @@ namespace Armoury
                     if (s < 0) continue;
                     if (s == side)
                     {
-                        if (x.Position.AsVec2.DistanceSquared(c) <= ar2 && !SurvivalMode.InPanic(x)) { allies++; break; }
+                        // recenzja 139: swoj w odwrocie na rozkaz szyku (od recenzji ROZSADEK) nie stoi przy nim - nie liczony, jak przed zmiana przelacznika
+                        if (x.Position.AsVec2.DistanceSquared(c) <= ar2 && !SurvivalMode.InPanic(x) && !SurvivalMode.OrderedRetreat(x, x.CommonAIComponent)) { allies++; break; }
                     }
                     else if (!x.IsRunningAway && !SurvivalMode.InPanic(x)) foes++;
                 }
@@ -827,7 +839,7 @@ namespace Armoury
             if (h == null || !h.IsHero || !h.IsAIControlled || h.IsMainAgent || !h.IsActive() || !ReferenceEquals(h.Formation, f)) return false;
             Man man;
             if (!Men.TryGetValue(h, out man) || man.Excl || man.Out || man.Mode != ModeNone) return false;
-            if (SurvivalMode.InPanic(h) || Withdrawing(h)) return false;
+            if (SurvivalMode.InPanic(h) || Withdrawing(h) || h.IsRunningAway) return false;   // recenzja 139: takze odwrot na rozkaz szyku (ROZSADEK)
             return !HorsePursuit.Banner(h);
         }
 
@@ -868,7 +880,9 @@ namespace Armoury
         private static void RankForm(Formation f)
         {
             if (f.CountOfUnits < 2) return;
-            if (f.IsPlayerTroopInFormation || f.HasPlayerControlledTroop) { PlayerForms.Add(f); return; }
+            // recenzja 149: takze szyk pod rozkazami gracza (!IsAIControlled, gracz wodzem / sierzantem) - jedna definicja formacji gracza z 148 (HorsePursuit.PlayerForm);
+            // D4 dotyczy lordow AI, Z9 syntezy: "jego formacji nie przejmujemy". Wycofanie rannego / samotnego towarzysza zostaje (osobista zasada jak 143).
+            if (f.HasPlayerControlledTroop || HorsePursuit.PlayerForm(f)) { PlayerForms.Add(f); return; }
             var arr = f.Arrangement;
             if (!(arr is LineFormation) || arr is TransposedLineFormation) { OtherForms.Add(f); return; }
             var all = arr.GetAllUnits();
@@ -952,7 +966,7 @@ namespace Armoury
               .Append(F0(RearFoot)).Append(" m, konno ").Append(F0(RearMounted)).Append(" m), potem glowna sila, potem sztandar do ").Append(F0(BannerRange))
               .Append(" m; samotny stoi ").Append(F0(AloneHold)).Append(" s i wraca do walki (nastepny raz po ").Append(F0(AloneCool))
               .Append(" s), ranny stoi za szykiem do konca bitwy i broni sie; w szyku na tyl - ostatnie 2 szeregi, zamiana miejsc co ").Append(F0(RankEvery))
-              .Append(" s, szyki z graczem pominiete; Duelists In Battles ").Append(_duelists ? "TAK" : "NIE")
+              .Append(" s, szyki gracza (gracz w szyku / jego rozkazy) pominiete; Duelists In Battles ").Append(_duelists ? "TAK" : "NIE")
               .Append(" - zrecznosc pojedynkowa bez zmian; formacja wodza RBM nieprzywrocona; panika z bolu ponizej ").Append(fleeBelow).Append("% HP jak dotad)");
             sb.Append(" | bohaterow AI ").Append(_heroes).Append(" (strona gracza ").Append(_heroesMine).Append(" / wroga ").Append(_heroesFoe)
               .Append("; konni ").Append(_heroesMounted).Append("; wodzowie ").Append(_generals).Append(", kapitanowie ").Append(_captains)
@@ -961,7 +975,7 @@ namespace Armoury
             {
                 sb.Append(" | na tyl szyku: bohaterow ").Append(SwappedHeroes.Count).Append(" (zamian ").Append(_swaps).Append(", ponownych ").Append(_reswaps)
                   .Append(" - gra przesunela go do przodu; odmowy RBM / gry ").Append(_swapRefused).Append(", limit ").Append(SwapCap).Append(" na bohatera ").Append(_swapCapHit)
-                  .Append("; szyki jednoszeregowe ").Append(OneRank.Count).Append(", bez partnera ").Append(_noPartner).Append("; szyki z graczem pominiete ").Append(PlayerForms.Count)
+                  .Append("; szyki jednoszeregowe ").Append(OneRank.Count).Append(", bez partnera ").Append(_noPartner).Append("; szyki gracza (gracz w szyku / jego rozkazy) pominiete ").Append(PlayerForms.Count)
                   .Append(", kolumna i inne ").Append(OtherForms.Count).Append(')');
                 float aloneN = Math.Max(1, _aStarts);
                 sb.Append(" | wycofania ").Append(_wStarts + _aStarts).Append(": ranni ").Append(_wStarts).Append(" (ludzi ").Append(WoundedPeople.Count)
@@ -980,7 +994,7 @@ namespace Armoury
                   .Append(", w drodze ponad ").Append(F0(TravelMax)).Append(" s ").Append(_aloneTimeout);
                 sb.Append(" | przejeci: odwrot rannego 143 (Wounded Flee Heroes ").Append(c != null && c.WoundedFleeHeroes ? "TAK" : "NIE").Append(") ").Append(EndWhy[E143])
                   .Append(", PANIKA: z bolu ").Append(EndWhy[EPain]).Append(" / gry ").Append(EndWhy[EGame]).Append(" / inna ").Append(EndWhy[EPanicOther])
-                  .Append(", gracz ").Append(EndWhy[EPlayer]).Append(" | na koniec bitwy: w drodze ").Append(_atEndTravel).Append(", na postoju ").Append(_atEndHold);
+                  .Append(", odwrot na rozkaz szyku ").Append(EndWhy[EOrder]).Append(", gracz ").Append(EndWhy[EPlayer]).Append(", klucz NIE w trakcie ").Append(EndWhy[EKey]).Append(" | na koniec bitwy: w drodze ").Append(_atEndTravel).Append(", na postoju ").Append(_atEndHold);
             }
             else
             {

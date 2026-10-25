@@ -36,7 +36,11 @@ namespace Armoury
     ///  - postoj: Agent.StopRetreating + SetScriptedPosition(cel) bez NoAttack (stoi za linia, broni sie, gdy ktos do niego dojdzie); co RefreshEvery cel na nowo
     ///    (szyk sie rusza - postoj idzie za nim), postoj przywrocony, gdy ktos zdjal GoToPosition (RBM StanceLogic przy zmianie szyku: DisableScriptedMovement);
     ///    "wrocil do walki" = na postoju znow w przedniej polowie wlasnego szyku (pomiar: czy postoj trzyma przy RBM Frontline / szarzy - kod natywny);
-    ///  - szyk rozbity (bez szyku, sam, co najmniej polowa reszty szyku w PANICE wedlug przelacznika 139) - RoutHold.Break(a, Flee): jedna regula zlamanego;
+    ///  - szyk rozbity (bez szyku, sam, co najmniej polowa reszty szyku zbiegla albo jest w panice) - RoutHold.Break(a, Flee): jedna regula zlamanego.
+    ///    Recenzja 143: spanikowany WYPADA z szyku w nastepnym OnPreMissionTick (MissionAgentPanicHandler -> Mission.OnAgentFleeing -> Agent.OnFleeing,
+    ///    Agent.cs:5128-5136: Formation = null) - liczba "w panice w szyku" byla prawie zawsze 0, a widziala tylko ofiary szarzy RBM (odwrot komponentu bez
+    ///    paniki, w szyku do StopRetreating). Teraz: zbiegli z szyku (OnAgentPanicked, szyk jeszcze ustawiony, raz na czlowieka) minus ci, ktorzy w nim znow sa,
+    ///    plus w szyku tylko IsPanicked albo zbior RoutHold - sam odwrot komponentu (szarza RBM, rozkaz Retreat szyku) szyku nie rozbija;
     ///  - koniec bitwy (MissionEnded): postoj zdjety; idacy po stronie zwyciezcow - StopRetreating (jak gra spanikowanym zwyciezcom), przegrani ida dalej.
     /// Wszystko na glownym watku (OnMissionTick RoutKeeper, callbacki misji). Wyjatek na czlowieka liczony (RoutHold.SiteWithdraw), po MaxFails wypada (postoj zdjety).
     /// </summary>
@@ -67,11 +71,15 @@ namespace Armoury
         private readonly List<Wd> _wList = new List<Wd>();
         private static readonly Predicate<Wd> WdDone = w => w.Done;
         // szyk rozbity: liczenie ludzi szyku raz na klatke na szyk (wielu rannych z jednego szyku)
-        private struct FCount { public int All, Panic; }
+        private struct FCount { public int All, Panic, Gone; }
         private readonly Dictionary<Formation, FCount> _fCount = new Dictionary<Formation, FCount>();
         private float _fStamp = -1f;
-        private int _cntAll, _cntPanic;
+        private int _cntAll, _cntPanic, _cntBack;
+        private Formation _cntF;
         private Action<Agent> _cnt;
+        // recenzja 143: zbiegli z szyku (OnAgentPanicked - szyk jeszcze ustawiony), raz na czlowieka na bitwe; glowny watek (konie odpadaja na wejsciu)
+        private readonly Dictionary<Formation, int> _fled = new Dictionary<Formation, int>();
+        private readonly Dictionary<Agent, Formation> _fledFrom = new Dictionary<Agent, Formation>();
         private int _wPathLeft;
         private bool _wEnded;
         private BannerBearerLogic _bbl;
@@ -119,6 +127,10 @@ namespace Armoury
             // 149: bohater (WoundedFleeHeroes TAK) w wycofaniu HeroCaution - nasza pozycja skryptowa zdjeta, zanim odwrot rannego cokolwiek wysle; dalej droga 143
             try { HeroCaution.BeforeWithdraw(a); }
             catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.BeforeWithdraw", ex); }
+            // recenzja 148: jezdziec w poscigu - cel automatyczny i pozycja skryptowa poscigu zdjete TERAZ (natywny odwrot 143 idzie dopiero w Evaluate, a
+            // HorsePursuit.Uncontrol nie zdejmowal pozycji czlowiekowi juz w Withdrawing - zostawala na nim pozycja uciekajacego)
+            try { HorsePursuit.BeforeWithdraw(a); }
+            catch (Exception ex) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.BeforeWithdraw", ex); }
 
             float now = m.CurrentTime;
             var w = new Wd { A = a, Since = now, NextEval = now };
@@ -198,7 +210,20 @@ namespace Armoury
 
         private void ClearWithdraw()
         {
-            try { _wd.Clear(); _wList.Clear(); _fCount.Clear(); _bbl = null; _bblInit = false; } catch { }
+            try { _wd.Clear(); _wList.Clear(); _fCount.Clear(); _fled.Clear(); _fledFrom.Clear(); _cntF = null; _bbl = null; _bblInit = false; } catch { }
+        }
+
+        /// <summary>Recenzja 143: RoutKeeper.OnAgentPanicked - czlowiek ucieka z szyku (szyk jeszcze ustawiony; handler paniki zdejmuje go w nastepnym
+        /// OnPreMissionTick). Raz na czlowieka na bitwe. Kon (Panic od ciosu - takze z ticku asynchronicznego) odpada przed slownikami.</summary>
+        private void CountFled(Agent a)
+        {
+            if (a == null || !a.IsHuman) return;
+            var f = a.Formation;
+            if (f == null || _fledFrom.ContainsKey(a)) return;
+            _fledFrom[a] = f;
+            int n;
+            _fled.TryGetValue(f, out n);
+            _fled[f] = n + 1;
         }
 
         /// <summary>RoutKeeper.OnEndMission przed linia: kto wciaz w odwrocie (w drodze / na postoju) i jego bron.</summary>
@@ -426,7 +451,9 @@ namespace Armoury
             w.LastSend = now;
         }
 
-        /// <summary>Szyk rozbity: 0 = trzyma sie; WhyNoFormation - bez szyku, WhyAlone - nikt poza nim, WhyHalf - co najmniej polowa reszty w PANICE (przelacznik 139).
+        /// <summary>Szyk rozbity: 0 = trzyma sie; WhyNoFormation - bez szyku, WhyAlone - nikt poza nim, WhyHalf - co najmniej polowa reszty szyku (obecni + zbiegli)
+        /// zbiegla albo jest w panice. Zbiegli = uciekli z tego szyku (CountFled) minus ci, ktorzy sa w nim znow (albo jeszcze - panika z tej klatki); w szyku
+        /// PANIKA tylko IsPanicked albo zbior RoutHold - sam odwrot komponentu (szarza RBM, rozkaz Retreat szyku) szyku nie rozbija (recenzja 143).
         /// Liczenie ludzi szyku raz na klatke (cache), bez alokacji (delegat w polu).</summary>
         private int BrokenFormation(Agent a, float now)
         {
@@ -441,16 +468,23 @@ namespace Armoury
                     {
                         if (x == null || !x.IsActive() || !x.IsHuman) return;
                         _cntAll++;
-                        if (SurvivalMode.InPanic(x)) _cntPanic++;
+                        var xc = x.CommonAIComponent;
+                        if ((xc != null && xc.IsPanicked) || Knows(x)) _cntPanic++;
+                        Formation ff;
+                        if (_fledFrom.TryGetValue(x, out ff) && ReferenceEquals(ff, _cntF)) _cntBack++;
                     };
-                _cntAll = _cntPanic = 0;
-                f.ApplyActionOnEachUnit(_cnt);
-                fc = new FCount { All = _cntAll, Panic = _cntPanic };
+                _cntAll = _cntPanic = _cntBack = 0;
+                _cntF = f;
+                try { f.ApplyActionOnEachUnit(_cnt); }
+                finally { _cntF = null; }
+                int fled;
+                _fled.TryGetValue(f, out fled);
+                fc = new FCount { All = _cntAll, Panic = _cntPanic, Gone = Math.Max(0, fled - _cntBack) };
                 _fCount[f] = fc;
             }
             int others = fc.All - 1;                                      // on sam jest w szyku i nie jest w panice (ROZSADEK)
             if (others <= 0) return WoundedWithdraw.WhyAlone;
-            if (fc.Panic >= WoundedWithdraw.BrokenShare * others) return WoundedWithdraw.WhyHalf;
+            if (fc.Panic + fc.Gone >= WoundedWithdraw.BrokenShare * (others + fc.Gone)) return WoundedWithdraw.WhyHalf;
             return 0;
         }
 

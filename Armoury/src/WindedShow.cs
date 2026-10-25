@@ -175,7 +175,9 @@ namespace Armoury
                 if (w != null)
                 {
                     w.Fails++;
-                    if (w.Fails >= MaxFails) { w.Refused = true; w.Posing = false; _out++; }
+                    // recenzja 144: poza przerwana i licznik _posing zmniejszony (dotad Posing = false bez _posing-- - po 12 takich ludziach MaxPosing blokowal
+                    // wszystkie pozy do konca bitwy, a poza na kanale 1 grala dalej)
+                    if (w.Fails >= MaxFails) { w.Refused = true; Abort(w); _out++; }
                 }
                 _fails++;
                 RoutHold.Stumble(RoutHold.SiteBreath, "WindedShow.See", e);
@@ -276,6 +278,23 @@ namespace Armoury
             if (why >= 0) EndPose(w, now, why);
         }
 
+        /// <summary>Recenzja 144: poza zdjeta po potknieciach (sciezka wyjatku) - licznik _posing zawsze zmniejszony, kanal 1 przerwany, jesli wciaz gra nasza akcje;
+        /// wywolania silnika we wlasnym try (ten sam wzor co EndPose).</summary>
+        private static void Abort(W w)
+        {
+            if (w == null || !w.Posing) return;
+            w.Posing = false;
+            _posing--;
+            _stopOther++;
+            try
+            {
+                var a = w.A;
+                if (a != null && a.IsActive() && a.GetCurrentAction(1).Index == w.Act)
+                    a.SetActionChannel(1, in ActionIndexCache.act_none, false, (AnimFlags)Math.Min(a.GetCurrentActionPriority(1), 73));
+            }
+            catch { }
+        }
+
         private static void EndPose(W w, float now, int why)
         {
             if (!w.Posing) return;
@@ -352,7 +371,15 @@ namespace Armoury
                 _tmp.Clear();
                 foreach (var kv in _w) kv.Value.Seen = false;
             }
-            catch (Exception e) { _fails++; _w.Clear(); _posing = 0; RoutHold.Stumble(RoutHold.SiteBreath, "WindedShow.EndTick", e); }
+            catch (Exception e)
+            {
+                _fails++;
+                // recenzja 144: trwajace pozy przerwane przed wyczyszczeniem (dotad _w.Clear() zostawial je na kanale 1)
+                try { foreach (var kv in _w) Abort(kv.Value); } catch { }
+                _w.Clear();
+                _posing = 0;
+                RoutHold.Stumble(RoutHold.SiteBreath, "WindedShow.EndTick", e);
+            }
         }
 
         /// <summary>Agent usuniety z misji (FieldCraft.OnAgentDeleted) - wpis zdjety bez wolan silnika.</summary>

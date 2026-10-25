@@ -33,7 +33,7 @@ namespace Armoury
         internal const float WalkMax = 30f;       // dluzej w drodze (zablokowany) - postoj tam, gdzie stoi
         internal const float MoveMin = 5f;        // cel przesuniety o wiecej - nowy rozkaz (odwrot albo postoj); mniej - bez wywolan natywnych
         internal const float MoraleFloor = 0.02f; // pod 0.01 gra sama wolalaby Panic (CommonAIComponent.OnTickParallel) - jak RoutHold po zgaszeniu
-        internal const float BrokenShare = 0.5f;  // szyk rozbity: co najmniej polowa reszty szyku w PANICE (przelacznik 139)
+        internal const float BrokenShare = 0.5f;  // szyk rozbity: co najmniej polowa reszty szyku (obecni + zbiegli) zbiegla albo w panice (recenzja 143)
         internal const int PathPerFrame = 10;     // zapytan o droge na klatke (osobny budzet od RoutHold)
 
         // powody konca odwrotu
@@ -201,7 +201,7 @@ namespace Armoury
               .Append(FoughtPeople.Count)
               .Append(" | panika: z bolu (<").Append(c != null ? c.AiFleeBelowPercent.ToString(Inv) : "?").Append("%) ").Append(Why[WhyPain])
               .Append(", szyk rozbity ").Append(Why[WhyNoFormation] + Why[WhyAlone] + Why[WhyHalf]).Append(" (bez szyku ").Append(Why[WhyNoFormation])
-              .Append(" / sam ").Append(Why[WhyAlone]).Append(" / polowa w panice ").Append(Why[WhyHalf]).Append("), zalamanie kompanii ").Append(Why[WhyCompany])
+              .Append(" / sam ").Append(Why[WhyAlone]).Append(" / polowa zbiegla lub w panice ").Append(Why[WhyHalf]).Append("), zalamanie kompanii ").Append(Why[WhyCompany])
               .Append(", panika gry ").Append(Why[WhyGame]).Append(", inna ").Append(Why[WhyOther]).Append(", odmowy Break ").Append(BreakRefused)
               .Append("; bez paniki: odwrot komponentu (rozkaz odwrotu szyku / szarza RBM) ").Append(Why[WhyComp]).Append(", przejeci przez gracza ").Append(Player)
               .Append(" | z bronia przy losie albo na koniec ").Append(_armed).Append(" z ").Append(_armDen).Append(" (").Append(Pct(_armed, _armDen))

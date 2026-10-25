@@ -51,6 +51,8 @@ namespace Armoury
         internal const float ContactOff = 40f;      // wyjscie ze zwarcia (wejscie: Doctrine.S1ContactGap)
         internal const float StaleCall = 3f;        // RBM nie wola decyzji od 3 s - nasz szyk wraca w passie
         internal const int MinMen = 30;             // prog RBM (OverrideBehaviorAdvance:401, OverrideBehaviorCharge:296)
+        internal const float SureAdvanceGap = 100f; // recenzja 146: "pewna" sytuacja RBM w Advance - pieszy wrog blizej niz 100 m (FootGap, od krawedzi szykow;
+                                                    // RBM: srodek szyku do mediany FindSignificantEnemy < 150 m - OverrideBehaviorAdvance:398-404)
         private const byte WNone = 0, WWall = 1, WLoose = 2, WHold = 3;
         private const byte YFire = 0, YContact = 1, YQuiet = 2, YHorse = 3, YUndead = 4, YPlayer = 5, YEmpty = 6, YKind = 7;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -85,7 +87,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki misji (pod Gate; _calls i _patchErr przez Interlocked)
         private static int _calls, _patchErr;
-        private static int _callsFire, _callsNoState, _sit, _sitFire;
+        private static int _callsFire, _callsNoState, _sit, _sitFire, _sitSure;
         private static int _toWall, _toLoose, _reactN, _keep, _hold10, _keep10, _waitShields, _horse;
         private static double _ratioWall, _ratioLoose, _react;
         private static int _backContact, _backQuiet, _backHorse, _backOther, _restored, _oursLost, _playerTook, _outside;
@@ -385,7 +387,7 @@ namespace Armoury
             {
                 Forms.Clear();
                 FireForms.Clear(); PlayerSideForms.Clear(); PlayerOrderForms.Clear(); DecidedForms.Clear();
-                _callsFire = _callsNoState = _sit = _sitFire = 0;
+                _callsFire = _callsNoState = _sit = _sitFire = _sitSure = 0;
                 _toWall = _toLoose = _reactN = _keep = _hold10 = _keep10 = _waitShields = _horse = 0;
                 _ratioWall = _ratioLoose = _react = 0;
                 _backContact = _backQuiet = _backHorse = _backOther = _restored = _oursLost = _playerTook = _outside = 0;
@@ -433,7 +435,7 @@ namespace Armoury
             bool fire = _s4 && ShieldsUp.FormFire(f);
             bool side = pt != null && (ReferenceEquals(t, pt) || t.Side == pt.Side);
             var cur = f.ArrangementOrder.OrderEnum;
-            bool sit = false;
+            bool sit = false, sure = false;
             float gap = float.MaxValue;
             if (ai && inf)
             {
@@ -441,6 +443,10 @@ namespace Armoury
                 var b = fai != null ? fai.ActiveBehavior : null;
                 sit = f.CountOfUnitsWithoutDetachedOnes >= MinMen && (b is BehaviorAdvance || b is BehaviorCharge);
                 gap = Doctrine.FootGap(t, f);
+                // recenzja 146: RBM wola decyzje z Advance tylko przy pieszym wrogu w 150 m (OverrideBehaviorAdvance:398-404), z Charge tylko z celem
+                // (FindSignificantEnemy != null, OverrideBehaviorCharge:296) - "pewna" sytuacja do UWAGI o inline JIT: Advance z pieszym wrogiem blizej niz
+                // SureAdvanceGap, Charge z jakimkolwiek pieszym szykiem wroga
+                sure = sit && (b is BehaviorCharge ? gap < float.MaxValue : gap < SureAdvanceGap);
             }
             bool contact = st.Contact ? gap <= ContactOff : gap <= Doctrine.S1ContactGap;
             // spis ludzi tylko pod ostrzalem przed zwarciem (szyk AI piechoty): w rece / w ekwipunku / umarli, bez PANIKI (przelacznik 139)
@@ -448,6 +454,7 @@ namespace Armoury
             bool horse = false;
             if (fire && ai && inf && !contact)
             {
+                var rk = RoutHold.Live;
                 Units.Clear();
                 f.ApplyActionOnEachUnit(Collect);   // gra iteruje swoje listy - my tylko zbieramy
                 for (int u = 0; u < Units.Count; u++)
@@ -455,6 +462,8 @@ namespace Armoury
                     var a = Units[u];
                     if (a == null || !a.IsActive() || !a.IsHuman) continue;
                     if (SurvivalMode.InPanic(a)) continue;
+                    // recenzja 146: ranny w odwrocie 143 (droga i postoj za szykiem) i odwrot na rozkaz szyku (natywny IsRunningAway) nie stoja w szyku pod ostrzalem
+                    if (a.IsRunningAway || (rk != null && rk.Withdrawing(a))) continue;
                     men++;
                     if (Undead.Character(a.Character)) dead++;
                     if (ShieldsUp.OffShield(a)) hand++;
@@ -488,6 +497,7 @@ namespace Armoury
                 st.Fire = fire && inf;
                 st.Contact = contact;
                 if (sit) { _sit++; if (fire) _sitFire++; }
+                if (sure) _sitSure++;
                 // decyzja
                 byte want = WNone, why = YFire;
                 if (!ai) why = YPlayer;
@@ -565,8 +575,10 @@ namespace Armoury
                   .Append(" | latka RBMAI.Utilities.DecideArrangementOrderForFormation ").Append(_target).Append(" (prefiks + postfiks), RBM AI: BehaviorAdvance ")
                   .Append(_rbmAdv).Append(", BehaviorCharge ").Append(_rbmCharge).Append("; wywolan latki ").Append(calls).Append(" (pod ostrzalem przed zwarciem ")
                   .Append(_callsFire).Append(", bez stanu ").Append(_callsNoState).Append("), sytuacji decyzji RBM (szyk AI piechoty od ").Append(MinMen)
-                  .Append(", Advance / Charge) w passach co ").Append(PassEvery.ToString("0.0", Inv)).Append(" s: ").Append(_sit).Append(" (pod ostrzalem ").Append(_sitFire).Append(')');
-                if (Patched && calls == 0 && _sit > 0 && (_rbmAdv == "TAK" || _rbmCharge == "TAK")) sb.Append("; UWAGA: 0 wywolan przy sytuacjach RBM - latka nie biegnie (JIT wstawil metode do prefiksu RBM?)");
+                  .Append(", Advance / Charge) w passach co ").Append(PassEvery.ToString("0.0", Inv)).Append(" s: ").Append(_sit).Append(" (pod ostrzalem ").Append(_sitFire).Append(", pewnych - Advance z pieszym wrogiem w ")
+                  .Append(SureAdvanceGap.ToString("0", Inv)).Append(" m / Charge z pieszym celem: ").Append(_sitSure).Append(')');
+                // recenzja 146: UWAGA tylko przy "pewnych" sytuacjach (RBM na pewno wolal decyzje) - bitwa bez podejscia piechoty na 150 m nie daje falszywej UWAGI
+                if (Patched && calls == 0 && _sitSure > 0 && (_rbmAdv == "TAK" || _rbmCharge == "TAK")) sb.Append("; UWAGA: 0 wywolan przy pewnych sytuacjach RBM - latka nie biegnie (JIT wstawil metode do prefiksu RBM?)");
                 sb.Append(" | szyki pod ostrzalem: ").Append(FireForms.Count).Append(" (AI strony gracza ").Append(PlayerSideForms.Count)
                   .Append(", pod rozkazami gracza - pominiete ").Append(PlayerOrderForms.Count).Append("), z decyzja RBM pod ostrzalem ").Append(DecidedForms.Count);
                 if (_key)

@@ -42,10 +42,12 @@ namespace Armoury
     ///  - noca (Campaign.IsNight - czas kampanii stoi w misji, jak DrMarchArrival) 30 s i 125 m.
     /// Zgodnosc: 136 - MarchToContact nie zaklada capu marszu / odpoczynku jezdzcowi w poscigu (PostSpeed: RidingAnyThread), a szyk w odpoczynku koni nie
     /// zaczyna; HorseWind dalej spowalnia zmeczonego konia (MountSpeed). FF - nie zmieniamy: liczymy trafienia wlasnej strony w jezdzcow w poscigu (pociski /
-    /// wrecz). 143 - zwolnienie nie zdejmuje pozycji skryptowej czlowiekowi na postoju rannego (Withdrawing bez IsRunningAway).
+    /// wrecz). 143 - zwolnienie nie zdejmuje pozycji skryptowej czlowiekowi na postoju rannego (Withdrawing bez IsRunningAway); recenzja: jezdziec w poscigu,
+    /// ktory wchodzi w odwrot rannego 143, jest oddawany grze juz w RoutKeeper.Withdraw (BeforeWithdraw - przed pierwszym ruchem 143, pozycja poscigu zdjeta).
     /// Klucz NIE: ta sama ocena na sucho (wejscia i szyko-sekundy), bez sterowania jezdzcami. Linia "poscig (148)" raz na bitwe (BattleSense.Clean).
-    /// Watki: wszystko na glownym watku (OnMissionTick, OnAgentRemoved, OnAgentHit - callbacki MBCallback glownego watku); latka PostSpeed (watki robocze)
-    /// czyta tylko tablice _riding wedlug Agent.Index (wzor RoutHold.KnownAnyThread). Wyjatek na jezdzcu = licznik; po 5 jezdziec wypada z poscigu (bez
+    /// Watki: glowny watek (OnMissionTick, OnAgentRemoved); OnAgentHit BYWA z ticku asynchronicznego (recenzja; tak zakladaja BattleCries, BattleGore,
+    /// BloodPools) - OnHit czyta tylko tablice _riding (bez slownika Riders), liczniki FF przez Interlocked; latka PostSpeed (watki robocze) tez czyta tylko
+    /// tablice _riding wedlug Agent.Index (wzor RoutHold.KnownAnyThread). Wyjatek na jezdzcu = licznik; po 5 jezdziec wypada z poscigu (bez
     /// globalnego wylacznika). Nazwa klasy nie moze byc "Log", "Settings" ani "McmSettings".
     /// </summary>
     internal static class HorsePursuit
@@ -128,7 +130,7 @@ namespace Armoury
         private static int _episodes, _assign, _retarget, _sets, _budgetHit, _ridersLost, _dropped;
         private static float _epSum, _epMax, _maxFar;
         private static int _killed, _ko, _escaped, _fellOthers, _byRiderAll;
-        private static int _ffMissile, _ffMelee;
+        private static int _ffMissile, _ffMelee;      // recenzja: Interlocked (OnHit bywa z ticku asynchronicznego)
         private static long _ffDmg;
         private static int _capSkip;
         private static int _dryEpisodes;
@@ -236,23 +238,42 @@ namespace Armoury
             }
         }
 
-        /// <summary>BattleSense.OnAgentHit (blok Night): trafienie jezdzca w poscigu (albo jego konia) przez wlasna strone - FF na wlasnej jezdzie.</summary>
+        /// <summary>BattleSense.OnAgentHit (blok Night): trafienie jezdzca w poscigu (albo jego konia) przez wlasna strone - FF na wlasnej jezdzie.
+        /// Recenzja: OnAgentHit bywa wolany z ticku asynchronicznego - tylko tablica _riding (jezdziec w poscigu = RChase, pisze glowny watek) i Interlocked,
+        /// bez slownika Riders.</summary>
         internal static void OnHit(Agent victim, Agent affector, in Blow blow)
         {
-            if (!_live || victim == null || affector == null || Riders.Count == 0) return;
+            if (!_live || victim == null || affector == null) return;
             try
             {
                 Agent rid = victim.IsMount ? victim.RiderAgent : victim;
-                Rider r;
-                if (rid == null || !Riders.TryGetValue(rid, out r) || r.St != RChase) return;
+                if (rid == null || !RidingAnyThread(rid)) return;
                 if (ReferenceEquals(affector, rid) || ReferenceEquals(affector, victim)) return;
                 var at = affector.Team;
                 var vt = rid.Team;
                 if (!MissionTeams.Valid(at) || !MissionTeams.Valid(vt) || at.Side != vt.Side) return;
-                if (blow.IsMissile) _ffMissile++; else _ffMelee++;
-                _ffDmg += blow.InflictedDamage;
+                if (blow.IsMissile) Interlocked.Increment(ref _ffMissile); else Interlocked.Increment(ref _ffMelee);
+                Interlocked.Add(ref _ffDmg, blow.InflictedDamage);
             }
             catch (Exception e) { Stumble("HorsePursuit.OnHit", e); }
+        }
+
+        /// <summary>Recenzja 148: RoutKeeper.Withdraw (143, glowny watek), PRZED pierwszym ruchem 143 - jezdziec w poscigu oddany grze: cel automatyczny, pozycja
+        /// skryptowa poscigu zdjeta (wzor HeroCaution.BeforeWithdraw). Dotad zdejmowal ja dopiero Uncontrol w nastepnej klatce, a ten przy Withdrawing bez
+        /// IsRunningAway (143 jeszcze nic nie wyslal) pozycji nie ruszal - jezdziec jechal do starego punktu uciekajacego (NoSpot / limit zapytan 143).</summary>
+        internal static void BeforeWithdraw(Agent a)
+        {
+            if (!_live || a == null) return;
+            Rider r;
+            if (!Riders.TryGetValue(a, out r) || r.St != RChase) return;
+            Dec(r.V);
+            r.V = null;
+            MarkRiding(a, false);
+            r.St = ROut;
+            OutWhy[OPanic]++;
+            if (!a.IsActive()) return;
+            try { a.SetAutomaticTargetSelection(true); a.InvalidateTargetAgent(); } catch { }
+            try { if ((a.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) != 0) a.DisableScriptedMovement(); } catch { }
         }
 
         /// <summary>BattleSense.OnAgentRemoved (blok Night): straty stron, jezdziec w poscigu padl, uciekajacy dopadniety (przez kogo) albo uszedl.</summary>
@@ -336,8 +357,9 @@ namespace Armoury
             _episodes = _assign = _retarget = _sets = _budgetHit = _ridersLost = _dropped = 0;
             _epSum = _epMax = _maxFar = 0f;
             _killed = _ko = _escaped = _fellOthers = _byRiderAll = 0;
-            _ffMissile = _ffMelee = 0;
-            _ffDmg = 0;
+            Interlocked.Exchange(ref _ffMissile, 0);
+            Interlocked.Exchange(ref _ffMelee, 0);
+            Interlocked.Exchange(ref _ffDmg, 0L);
             Interlocked.Exchange(ref _capSkip, 0);
             _dryEpisodes = 0;
             _drySec = 0f;
@@ -360,8 +382,9 @@ namespace Armoury
             return -1;
         }
 
-        /// <summary>Formacja gracza (nie ruszamy - D5): rozkazy gracza, gracz w szyku, gracz wodzem druzyny, gracz sierzantem szyku.</summary>
-        private static bool PlayerForm(Formation f)
+        /// <summary>Formacja gracza (nie ruszamy - D5): rozkazy gracza, gracz w szyku, gracz wodzem druzyny, gracz sierzantem szyku.
+        /// Recenzja 149: takze HeroCaution.RankForm - jedna definicja formacji gracza.</summary>
+        internal static bool PlayerForm(Formation f)
         {
             if (!f.IsAIControlled || f.IsPlayerTroopInFormation) return true;
             var t = f.Team;
@@ -973,8 +996,8 @@ namespace Armoury
               .Append(" | zabici w poscigu ").Append(_killed).Append(" (nieprzytomni ").Append(_ko).Append(") przez gonacych; gonieni padli od innych ").Append(_fellOthers)
               .Append(", gonieni uszli z pola ").Append(_escaped).Append("; uciekajacy dopadnieci przez konnych (jak 'konny' w 139) ").Append(_byRiderAll)
               .Append("; gonacy padli w poscigu ").Append(_ridersLost)
-              .Append(" | FF na wlasnej jezdzie w poscigu ").Append(_ffMissile + _ffMelee).Append(" (pociski ").Append(_ffMissile).Append(", wrecz ").Append(_ffMelee)
-              .Append(", obrazen ").Append(_ffDmg).Append(')')
+              .Append(" | FF na wlasnej jezdzie w poscigu ").Append(Volatile.Read(ref _ffMissile) + Volatile.Read(ref _ffMelee)).Append(" (pociski ").Append(Volatile.Read(ref _ffMissile))
+              .Append(", wrecz ").Append(Volatile.Read(ref _ffMelee)).Append(", obrazen ").Append(Interlocked.Read(ref _ffDmg)).Append(')')
               .Append(" | cap marszu pominiety u gonacych ").Append(Volatile.Read(ref _capSkip)).Append(", odswiezen celu ").Append(_sets).Append(" (limit kroku ")
               .Append(_budgetHit).Append(')');
             // straty stron i udzial zabitych przegranych na tle celu historycznego

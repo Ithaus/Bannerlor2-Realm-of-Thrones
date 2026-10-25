@@ -68722,5 +68722,200 @@ def main(argv):
             return nocdzwiek_main(rest[0] if rest else None)
     return _nocdzwiek_main_prev(argv)
 
+
+# ------------------------------------------------------------ ai139 (fala 25.10 "AI walczy o zycie", galaz noc/139-ai-zycie: kroki 139-149 - SurvivalMode,
+# BrokenFate, ShieldsUp, Doctrine.S2, NoReturn, RoutHold.Withdraw / WoundedWithdraw, AiBreath / WindedShow, WoundedWary, CloseRanks, PanicRun, HorsePursuit,
+# HeroCaution). Recenzja fali: autotest nie dawal dla 139-149 zadnego automatycznego TAK/NIE - nowe miejsca potkniec NB2 (los, tarcze, powrot, odwrot, oddech,
+# ostroznosc, szyk, bieg, poscig, bohaterowie) lapala grupa bez przechwytu, NBW_ERR nie znal nowych klas, a fala nie dodala wlasnej grupy.
+#   python -I tools/sprawdz_logi.py --grupa ai139 <Armoury-*.log>
+# Wiersze: AI-0 bitwy polowe (linia NB2 "misja bitwa (pole bitwy TAK"), AI-1 obecnosc 11 linii fali w bitwach polowych, AI-2 potkniecia (11 linii + ogon
+# NB2 dla miejsc fali) = 0, AI-3 'ERROR in <klasy fali>' = 0, AI-4 latki (Tarcze 140 wpiete, 146 TAK, 145 po RBM TAK, bez UWAGI 146), AI-5 140 po 1.5 s tarcza
+# w rece >= 90% (od 10 kontroli), AI-6 142 ponowne paniki gry 0, AI-7 143 uszedl z pola 0 i rozbici BrokenMen w NB2 0 (gdy linia mowi "oczekiwane 0"),
+# AI-8 147 odsapki w panice 0 (przy kluczu TAK), AI-9 co ta bitwa w ogole sprawdzila (INFO - autotest: bandyci, szyki gracza pod jego rozkazami).
+AI139_FIELD = re.compile(r"^Bitwa \(NB2\): misja bitwa \(pole bitwy TAK")
+AI139_NB2_STUM = re.compile(r"^Bitwa \(NB2\): misja .*\| potkniecia: (.*?) \(sesja \d+, linia misji \d+\)\.$")
+AI139_SITES = ("los", "tarcze", "powrot", "odwrot", "oddech", "ostroznosc", "szyk", "bieg", "poscig", "bohaterowie")
+AI139_LINES = (
+    ("139", "LOS ZLAMANYCH (139): misja ", re.compile(r"potkniecia los (\d+)")),
+    ("140", "Bitwa (140 tarcze): misja ", re.compile(r"\| potkniecia tarcze (\d+)")),
+    ("141", "S2 (141): misja ", re.compile(r"\| potkniecia S2 (\d+)")),
+    ("142", "PANIKA BEZ POWROTU (142): misja ", re.compile(r"\| potkniecia powrot (\d+)")),
+    ("143", "ODWROT RANNYCH (143): misja ", re.compile(r"\| potkniecia odwrot (\d+)")),
+    ("144", "Oddech AI (144): misja ", re.compile(r"\| potkniecia oddech (\d+)")),
+    ("145", "ranni ostrozni (145): misja ", re.compile(r"\| potkniecia ostroznosc (\d+)")),
+    ("146", "Szyk pod ostrzalem (146): misja ", re.compile(r"\| potkniecia szyk (\d+)")),
+    ("147", "Bieg zlamanych (147): misja ", re.compile(r"\| potkniecia bieg (\d+)")),
+    ("148", "poscig (148): misja ", re.compile(r"\| potkniecia poscig (\d+)")),
+    ("149", "bohaterowie (149): misja ", re.compile(r"\| potkniecia bohaterowie (\d+)")),
+)
+AI139_ERR = re.compile(r"^ERROR in (?:ShieldsUp|CloseRanks|HorsePursuit|HeroCaution|BrokenFate|AiBreath|WindedShow|NoReturn|WoundedWithdraw|WoundedWary|PanicRun"
+                       r"|SurvivalMode|Doctrine\.S2|RoutKeeper\.(?:Enqueue|QueuePin|TakeQueued|CloseWithdraw|EndOfBattle|TickWithdraw|WithdrawRemoved))\b")
+AI139_P140 = re.compile(r"^Tarcze \(140\): latki raz na proces .*SetAiRelatedProperties (wpieta|NIEWPIETA|BRAK CELU).*Agent\.UpdateFormationOrders (wpieta|NIEWPIETA|BRAK CELU)")
+AI139_P146 = re.compile(r"^Szyk pod ostrzalem \(146\): latka raz na proces .*DecideArrangementOrderForFormation (.+?) \(prefiks")
+AI139_P145 = re.compile(r"\| latka VeteranAi (TAK|NIE), po RBM (.+?) \|")
+AI139_CHK140 = re.compile(r"\| po 1\.5 s tarcza w rece (\d+)/(\d+)")
+AI139_REP142 = re.compile(r"ponowne paniki gry (\d+) \(wszyscy zlamani")
+AI139_ESC143 = re.compile(r"uszedl z pola (\d+) \(oczekiwane 0\)")
+AI139_NB2_143 = re.compile(r"rozbici BrokenMen w NB2 (\d+) \(oczekiwane 0\)")
+AI139_REC147 = re.compile(r"odsapki w panice \(wyjscia z zadyszki\) (\d+) \(oczekiwane 0\)")
+AI139_INFO = (("140 strzaly bohatera gracza pod SI", "140", re.compile(r"bohatera gracza pod SI (\d+)")),
+              ("141 wejsc w S2", "141", re.compile(r"\| wejsc w S2 (\d+)")),
+              ("143 odwrot rannych", "143", re.compile(r"\| odwrot rannych (\d+)")),
+              ("143 szyk rozbity - polowa zbiegla", "143", re.compile(r"polowa zbiegla lub w panice (\d+)")),
+              ("146 szyki pod ostrzalem", "146", re.compile(r"\| szyki pod ostrzalem: (\d+)")),
+              ("146 szyki gracza pominiete", "146", re.compile(r"pod rozkazami gracza - pominiete (\d+)")),
+              ("148 jezdzcow w poscigu", "148", re.compile(r"jezdzcow w poscigu (\d+)")),
+              ("148 formacje gracza pominiete", "148", re.compile(r"formacje gracza pominiete (\d+)")),
+              ("149 bohaterow AI", "149", re.compile(r"\| bohaterow AI (\d+)")),
+              ("149 wycofania", "149", re.compile(r"\| wycofania (\d+)")))
+
+
+def ai139_main(logp):
+    """ai139 (fala 139-149 "AI walczy o zycie"): AI-0..AI-9 - opis w komentarzu nad stalymi AI139_*. Tylko odczyt logu."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("AI-0: log Armoury", "brak pliku %s" % logp, "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    field, lines, nb2_tail, errs, p140, p146, uwaga146 = 0, {k: [] for k, _, _ in AI139_LINES}, [], [], [], [], 0
+    field_kind = {k: 0 for k, _, _ in AI139_LINES}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if AI139_FIELD.match(s):
+                field += 1
+            mt = AI139_NB2_STUM.match(s)
+            if mt:
+                nb2_tail.append(mt.group(1))
+            if s.startswith("ERROR in ") and AI139_ERR.match(s):
+                errs.append(s[:200])
+                continue
+            mp = AI139_P140.match(s)
+            if mp:
+                p140.append((mp.group(1), mp.group(2)))
+            mq = AI139_P146.match(s)
+            if mq:
+                p146.append(mq.group(1))
+            for k, tag, _ in AI139_LINES:
+                if s.startswith(tag):
+                    lines[k].append(s)
+                    if s.startswith(tag + "bitwa"):
+                        field_kind[k] += 1
+                    if k == "146" and "UWAGA: 0 wywolan" in s:
+                        uwaga146 += 1
+                    break
+    total = sum(len(v) for v in lines.values())
+    print("plik: %s | bitew polowych (NB2) %d, linii fali %d, ERROR fali %d" % (logp, field, total, len(errs)))
+    rep.add("AI-0: bitwy polowe (linia NB2 'misja bitwa (pole bitwy TAK')", str(field), "INFO (0 = log bez bitwy polowej - reszta wierszy INFO)", None)
+    # AI-1: obecnosc linii w bitwach polowych
+    miss = [k for k in field_kind if field_kind[k] == 0]
+    short = [k for k in field_kind if 0 < field_kind[k] < field]
+    pres = ", ".join("%s %d" % (k, field_kind[k]) for k, _, _ in AI139_LINES)
+    if field == 0:
+        ok1 = None
+    elif miss:
+        ok1 = False
+    elif short:
+        ok1 = None
+    else:
+        ok1 = True
+    rep.add("AI-1: linie 139-149 w bitwach polowych (liczba linii 'misja bitwa')", pres + (" | brak: " + ", ".join(miss) if miss else "") + (" | mniej niz bitew: " + ", ".join(short) if short else ""),
+            "kazda >= liczba bitew polowych (mniej - INFO: klucz NIE albo bitwa bez zdarzen, np. 140 bez pociskow)", ok1)
+    # AI-2: potkniecia
+    st_lines, st_list = 0, []
+    for k, _, rx in AI139_LINES:
+        for s in lines[k]:
+            mm = rx.search(s)
+            if mm and int(mm.group(1)) != 0:
+                st_lines += int(mm.group(1))
+                st_list.append("%s %s" % (k, mm.group(1)))
+    st_nb2 = {}
+    for tail in nb2_tail:
+        for name, n in re.findall(r"([a-z]+) (\d+)", tail):
+            if name in AI139_SITES and int(n) != 0:
+                st_nb2[name] = st_nb2.get(name, 0) + int(n)
+    rep.add("AI-2: potkniecia fali (11 linii + ogon NB2 miejsc fali)", "w liniach %d%s; NB2 %s" % (st_lines, (" (" + ", ".join(st_list[:8]) + ")") if st_list else "",
+            ", ".join("%s %d" % kv for kv in sorted(st_nb2.items())) or "0"), "0 i 0", None if total == 0 and not nb2_tail else (st_lines == 0 and not st_nb2))
+    # AI-3: ERROR w klasach fali
+    rep.add("AI-3: 'ERROR in <klasy fali 139-149>'", "%d%s" % (len(errs), (" (" + errs[0] + ")") if errs else ""), "0", not errs)
+    # AI-4: latki
+    bad4, info4 = [], []
+    if p140:
+        a, b = p140[-1]
+        info4.append("140 SetAi %s, UFO %s" % (a, b))
+        if a != "wpieta" or b != "wpieta":
+            bad4.append("140")
+    else:
+        info4.append("140 brak linii latek")
+    if p146:
+        info4.append("146 %s" % p146[-1])
+        if p146[-1] != "TAK":
+            bad4.append("146")
+    else:
+        info4.append("146 brak linii latki")
+    o145 = [AI139_P145.search(s) for s in lines["145"]]
+    o145 = [mm.groups() for mm in o145 if mm]
+    if o145:
+        badv = [g for g in o145 if g[0] != "TAK" or g[1] != "TAK"]
+        info4.append("145 latka/po RBM: %s" % ("TAK/TAK" if not badv else "%s/%s w %d z %d linii" % (badv[0][0], badv[0][1], len(badv), len(o145))))
+        if badv:
+            bad4.append("145")
+    else:
+        info4.append("145 brak linii")
+    if uwaga146:
+        bad4.append("146 UWAGA x%d" % uwaga146)
+    known = bool(p140 or p146 or o145)
+    rep.add("AI-4: latki fali (140 wpiete, 146 TAK, 145 po RBM TAK, 146 bez UWAGI o JIT)", "; ".join(info4) + ("; ZLE: " + ", ".join(bad4) if bad4 else ""),
+            "wszystkie wpiete, po RBM, bez UWAGI (brak linii - INFO)", None if not known else not bad4)
+    # AI-5: 140 kontrola po 1.5 s
+    ok5, tot5 = 0, 0
+    for s in lines["140"]:
+        mm = AI139_CHK140.search(s)
+        if mm:
+            ok5 += int(mm.group(1))
+            tot5 += int(mm.group(2))
+    rep.add("AI-5: 140 tarcza w rece po 1.5 s", "%d/%d%s" % (ok5, tot5, (" (%.0f%%)" % (100.0 * ok5 / tot5)) if tot5 else ""), ">= 90% (od 10 kontroli; mniej - INFO)",
+            None if tot5 < 10 else ok5 >= 0.9 * tot5)
+    # AI-6: 142 ponowne paniki gry
+    rp = [int(mm.group(1)) for mm in (AI139_REP142.search(s) for s in lines["142"]) if mm]
+    rep.add("AI-6: 142 ponowne paniki gry (przejeci z paniki gry)", "%d (linii %d)" % (sum(rp), len(rp)), "0", None if not rp else sum(rp) == 0)
+    # AI-7: 143 uszedl z pola i rozbici BrokenMen w NB2
+    esc = [int(mm.group(1)) for mm in (AI139_ESC143.search(s) for s in lines["143"]) if mm]
+    rb = [int(mm.group(1)) for mm in (AI139_NB2_143.search(s) for s in lines["143"]) if mm]
+    rep.add("AI-7: 143 uszedl z pola / rozbici BrokenMen w NB2", "uszedl %d, rozbici %d (linii %d / %d z 'oczekiwane 0')" % (sum(esc), sum(rb), len(esc), len(rb)),
+            "0 i 0", None if not esc and not rb else (sum(esc) == 0 and sum(rb) == 0))
+    # AI-8: 147 odsapki w panice
+    rc = [int(mm.group(1)) for mm in (AI139_REC147.search(s) for s in lines["147"]) if mm]
+    rep.add("AI-8: 147 odsapki w panice (klucz TAK)", "%d (linii %d)" % (sum(rc), len(rc)), "0 (klucz NIE - INFO)", None if not rc else sum(rc) == 0)
+    # AI-9: co bitwy sprawdzily
+    parts = []
+    for name, k, rx in AI139_INFO:
+        t, n = 0, 0
+        for s in lines[k]:
+            mm = rx.search(s)
+            if mm:
+                t += int(mm.group(1))
+                n += 1
+        parts.append("%s %d" % (name, t) if n else "%s -" % name)
+    rep.add("AI-9: co bitwy w ogole sprawdzily (INFO)", "; ".join(parts),
+            "INFO: autotest (bandyci, szyki gracza pod jego rozkazami) - 146 / 148 / 149 / S2 zwykle 0; sprawdzenie w grze Jeffa (lordowie, konnica AI, oblezenie)", None)
+    rep.show()
+    return 0
+
+
+_ai139_main_prev = main
+
+
+def main(argv):
+    # fala 139-149 (recenzja 25.10): grupa ai139 - opakowanie main jak nocdzwiek (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "ai139":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return ai139_main(rest[0] if rest else None)
+    return _ai139_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

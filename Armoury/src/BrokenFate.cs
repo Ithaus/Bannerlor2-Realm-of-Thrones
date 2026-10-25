@@ -23,7 +23,8 @@ namespace Armoury
     /// bron i tarcza w rece przy losie albo na koniec misji (ArtemsLivelyAnimations zrzuca bron przy OnAgentPanicked), powroty z paniki do walki (przejscie
     /// PANIKA -> ROZSADEK przelacznika SurvivalMode u paniki gry przed koncem bitwy - RBM StopRetreating, AgentAi.cs:651-657; takze wykryte dopiero przy
     /// ponownej panice, bo OnAgentPanicked przychodzi tylko przy !IsPanicked), wiwatujacych zwyciezcow (AgentVictoryLogic._cheeringAgents, probka co 1 s)
-    /// i spis przelacznika co 2 s (ludzie: panika gry / RoutHold / sam odwrot komponentu / odwrot z rozkazu szyku).
+    /// i spis przelacznika co 2 s (ludzie: panika gry / RoutHold / sam odwrot komponentu bez rozkazu (szarza RBM) / odwrot komponentu na rozkaz Retreat szyku
+    /// (recenzja 139 - ROZSADEK) / inny natywny odwrot / odwrot rannego 143).
     /// Wejscia tylko z RoutKeeper (wlasciciel linii NB2, zarejestrowany w kazdej bitwie z kluczem): Break, OnAgentPanicked, OnAgentRemoved, OnAgentDeleted,
     /// OnMissionTick (probka co 1 s - tylko lista zlamanych, bez alokacji; spis co 2 s po Mission.Agents), OnEndMission (Close przed linia, Release po niej).
     /// Wszystko pod RoutHold.Gate; wyjatek liczony w miejscu "los" linii NB2 (pierwsze 3 w sesji do logu), czlowiek z 5 potknieciami wypada z probek -
@@ -83,6 +84,7 @@ namespace Armoury
         private static readonly HashSet<int> SwRout = new HashSet<int>();
         private static readonly HashSet<int> SwRetreat = new HashSet<int>();
         private static readonly HashSet<int> SwOrdered = new HashSet<int>();
+        private static readonly HashSet<int> SwOrderRetreat = new HashSet<int>();   // recenzja 139: odwrot komponentu na rozkaz Retreat szyku (SurvivalMode.OrderedRetreat)
         private static readonly HashSet<int> SwWithdraw = new HashSet<int>();   // 143: odwrot rannego z bronia (RoutKeeper.Withdrawing) - ROZSADEK
 
         /// <summary>Zmiana misji (RoutHold.Ensure, wolajacy trzyma Gate): wszystko od zera, wejscia nieczynne do Begin.</summary>
@@ -110,6 +112,7 @@ namespace Armoury
             SwRout.Clear();
             SwRetreat.Clear();
             SwOrdered.Clear();
+            SwOrderRetreat.Clear();
             SwWithdraw.Clear();
         }
 
@@ -378,7 +381,7 @@ namespace Armoury
             t.Last = pos;
         }
 
-        /// <summary>Spis przelacznika (co 2 s, bez alokacji poza nowymi numerami w zbiorach): kto jest w PANICE i z jakiego powodu; odwrot z rozkazu szyku to ROZSADEK.</summary>
+        /// <summary>Spis przelacznika (co 2 s, bez alokacji poza nowymi numerami w zbiorach): kto jest w PANICE i z jakiego powodu; odwrot na rozkaz szyku (OrderedRetreat) i odwrot rannego 143 to ROZSADEK.</summary>
         private static void Census(Mission m)
         {
             try
@@ -391,9 +394,11 @@ namespace Armoury
                     var a = ags[i];
                     if (a == null || !a.IsHuman || !a.IsActive()) continue;
                     var cai = a.CommonAIComponent;
-                    // kolejnosc zrodel: nasz zbior zlamanych (Break wola Panic, wiec tez IsPanicked), panika gry, sam odwrot komponentu (RBM szarza), rozkaz szyku
+                    // kolejnosc zrodel: nasz zbior zlamanych (Break wola Panic, wiec tez IsPanicked), panika gry, odwrot komponentu na rozkaz Retreat szyku
+                    // (recenzja 139: MovementOrder.RetreatAux -> CommonAIComponent.Retreat - ROZSADEK), sam odwrot komponentu bez rozkazu (RBM szarza), inny natywny odwrot
                     if (k != null && k.Knows(a)) SwRout.Add(a.Index);
                     else if (cai != null && cai.IsPanicked) SwPanic.Add(a.Index);
+                    else if (SurvivalMode.OrderedRetreat(a, cai)) SwOrderRetreat.Add(a.Index);
                     else if (cai != null && cai.IsRetreating) SwRetreat.Add(a.Index);
                     else if (k != null && k.Withdrawing(a)) SwWithdraw.Add(a.Index);   // 143: ranny w odwrocie z bronia (natywny odwrot / postoj) - ROZSADEK
                     else if (a.IsRunningAway) SwOrdered.Add(a.Index);
@@ -540,8 +545,9 @@ namespace Armoury
               .Append(" | wiwat ").Append(Cheer.Count).Append(" (przy ucieczce wroga ").Append(CheerRetreat.Count).Append(", naraz najwiecej ").Append(_cheerMax)
               .Append(_cheerList != null && _cheerAgent != null ? "" : ", lista wiwatu BRAK").Append(')')
               .Append(" | przelacznik (spis co ").Append(CensusEvery.ToString("0", Inv)).Append(" s do konca bitwy, ludzi; czlowiek moze trafic do kilku): RoutHold ")
-              .Append(SwRout.Count).Append(", panika gry ").Append(SwPanic.Count).Append(", sam odwrot komponentu (RBM szarza) ").Append(SwRetreat.Count)
-              .Append(" - to PANIKA; odwrot z rozkazu szyku ").Append(SwOrdered.Count).Append(", odwrot rannego z bronia (143) ").Append(SwWithdraw.Count)
+              .Append(SwRout.Count).Append(", panika gry ").Append(SwPanic.Count).Append(", sam odwrot komponentu bez rozkazu szyku (RBM szarza) ").Append(SwRetreat.Count)
+              .Append(" - to PANIKA; odwrot na rozkaz Retreat szyku (komponent) ").Append(SwOrderRetreat.Count).Append(", inny natywny odwrot bez komponentu ")
+              .Append(SwOrdered.Count).Append(", odwrot rannego z bronia (143) ").Append(SwWithdraw.Count)
               .Append(" - to ROZSADEK")
               .Append(" | wypadli z probek ").Append(_dropped).Append(", potkniecia los ").Append(RoutHold.StumblesLocked(RoutHold.SiteFate)).Append('.');
             Log.Info(sb.ToString());
