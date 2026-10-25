@@ -32,16 +32,23 @@ namespace Armoury
     ///      DoNotMakeNewDecisions idzie do zapisu gry - dlatego waga w ocenie celow, jak BesiegedRelief i WatchLaw. Glod - najpierw jedzenie (bez zmian).
     ///      - opcje bitwy (oblezenie, szturm, rabunek, obrona cudzej osady, poscig GoAroundParty/EngageParty za partia nie-banda) dostaja -1 (SetBehaviorScore, jak WatchLaw);
     ///      - obrona osady WLASNEGO rodu zostaje (wyjatek) - i wtedy bez wyjazdu po sprzet;
-    ///      - stac go (AiGear.BudgetPreview - ten sam wzor co TryBuyCore - >= 10 sztuk po wczorajszej sredniej cenie zakupow AI, najmniej 300): najblizsze przyjazne
+    ///      - stac go (AiGear.BudgetPreview - ten sam wzor co TryBuyCore - >= min(braki do progu gotowosci, 10) sztuk po wczorajszej sredniej cenie zakupow AI, najmniej
+    ///        300; recenzja p9: braki z FillPercent, a przy wybranym miescie podglad z rezerwa napraw z materialem tego miasta, jak TryBuyCore): najblizsze przyjazne
     ///        MIASTO droga ladowa najwyzej AiArmsTripMaxDays dob marszu (nie w wojnie, bez oblezenia, po tej samej stronie Muru, poza wytchnieniem) - GoToSettlement
     ///        z ocena max(0.5, 1.2 x najlepszej innej) + 0.01 (wzor BesiegedRelief: 0.5 to prog zmiany celu gry). Na miejscu kupuje dotychczasowa droga (wejscie:
     ///        MenPurse.OnEntered -> AiGear.TryBuy; doba postoju: AiGear.OnDailyTickParty) - nic nowego w ekonomii ("nic z niczego": placi pan i sakiewka ludzi,
-    ///        zloto do kasy miasta). Po dobie w miescie bez osiagniecia progu (pusta polka albo brak zlota) - wytchnienie AiArmsTripCooldownDays dla tego miasta
-    ///        i nastepne miasto w zasiegu (bez petli "jade - nic nie ma - jade"); za dlugo w drodze (2 x zasieg + 12 h) - tak samo;
-    ///      - nie stac go albo brak miasta: tylko -1 opcjom bitwy - patrol i dojazd do wlasnych osad z gry zostaja; czeka, az dochod rodu da budzet
-    ///        (DECYZJA Jeffa, czy pozyczka na sprzet albo zwolnienie ludzi - nie w tym kroku).
+    ///        zloto do kasy miasta). Po dobie w miescie: postep (R wzroslo) i dalej stac go - zostaje kolejna dobe (recenzja p9: AiGear kupuje raz na dobe, polka
+    ///        mogla miec wiecej); bez postepu (pusta polka albo brak zlota) - wytchnienie AiArmsTripCooldownDays dla tego miasta i nastepne miasto w zasiegu; za dlugo
+    ///        w drodze (2 x zasieg + 12 h) - tak samo; NoGainMax wizyt z rzedu bez postepu - jak "nie stac" (bez dalszych wyjazdow; petla "jade - nic nie ma - jade");
+    ///      - nie stac go albo brak miasta: tylko -1 opcjom bitwy - patrol i dojazd do wlasnych osad z gry zostaja. Recenzja p9 (uwaga 3, regula Jeffa 12.10: "jak ich
+    ///        nie stac na wojne, to pozyczka albo mniejsze wojsko" - nie bezczynnosc): najwyzej AiArmsWaitMaxDays dob w stanie niegotowej (ArmedStrength.Wait), potem
+    ///        ZWOLNIONA - walczy tym, co ma (sila dalej z uzbrojeniem), do gotowosci albo do pieniedzy na sprzet (wtedy nowa proba). Pozyczka Banku na sprzet albo
+    ///        zwolnienie ludzi bez kompletu - DECYZJA Jeffa (nie w tym kroku).
     ///  (c) ARMIE: postfiksy DefaultArmyManagementCalculationModel.CanLordCreateArmy (baza dla StrategicCampaignAI145 i BK) i BKArmyManagementModel.CanLordCreateArmy
-    ///      (BK dokleja partie rodu PO bazie i patrzy tylko na liczbe >= 2): niegotowy wodz - false i pusta lista, niegotowi kandydaci wypadaja; BK MobilePartyExtensions.
+    ///      (BK dokleja partie rodu PO bazie i patrzy tylko na liczbe >= 2): niegotowy wodz - false i pusta lista, niegotowi kandydaci wypadaja. Recenzja p9 (uwaga 2):
+    ///      w bazie gry niegotowi wypadaja PRZED rankingiem, cieciem do 70% partii krolestwa i progiem sily 1000 (Siege) - prefiks/finalizer bazy ustawiaja flage watku,
+    ///      a postfiks DisbandPartyCampaignBehavior.IsPartyWaitingForDisband (predykat petli kandydatow, wolany przez interfejs) zwraca dla niegotowej true tylko
+    ///      przy tej fladze; zapas: gdy postfiks bazy cos usunie (brak haka), prog 1000 liczony od nowa wzorem gry. BK MobilePartyExtensions.
     ///      IsAvailableForArmies - false (wezwania BK gracza i AI); czynny CheckPartyEligibility (SCA) - false z napisem po angielsku (okno armii gracza). Czlonek juz
     ///      w armii zostaje.
     /// Stan wyjazdow bez zapisu - po wczytaniu liczony od nowa. Liczniki do linii "Gotowosc do bitwy (p9): dzien" (ArmedStrength.Daily). Potkniecia per wywolanie.
@@ -53,26 +60,34 @@ namespace Armoury
         private const float FloorScore = 0.5f;   // najnizsza ocena wyjazdu - prog zmiany celu gry (jak BesiegedRelief.FloorBase)
         private const float Edge = 1.2f;         // ponad najlepsza inna opcje
         private const int MinNeed = 300;         // najmniejszy budzet "stac go"
+        private const int PiecesUnit = 10;       // recenzja p9: "stac go" = min(braki do progu, 10) sztuk po sredniej cenie (zakup rozlozony na doby postoju)
+        private const int NoGainMax = 2;         // recenzja p9: tyle wizyt z rzedu bez postepu - jak "nie stac" (koniec wyjazdow do gotowosci albo zwolnienia)
+        private const float ArmyFloor = 1000f;   // DefaultArmyManagementCalculationModel.CanLordCreateArmy: num5 < 1000f -> false (Siege, krolestwo z osadami)
         private static readonly TextObject NotArmedText = new TextObject("{=!}Its men lack arms and armour - it must arm them before joining an army.");
 
-        private sealed class Trip { internal MobileParty P; internal Settlement Town; internal double StartH, ArriveH = -1; internal int R0; }
+        private sealed class Trip { internal MobileParty P; internal Settlement Town; internal double StartH, ArriveH = -1; internal int R0, Ext; }
         private static readonly Dictionary<MBGUID, Trip> _trip = new Dictionary<MBGUID, Trip>();
+        private sealed class Streak { internal MobileParty P; internal int N; }
+        private static readonly Dictionary<MBGUID, Streak> _noGain = new Dictionary<MBGUID, Streak>();   // recenzja p9: wizyty z rzedu bez postepu
+        [ThreadStatic] private static int _inCreate;   // recenzja p9 (uwaga 2): w toku bazowego CanLordCreateArmy (filtr kandydatow przed progiem)
         private static readonly Dictionary<string, double> _cool = new Dictionary<string, double>(StringComparer.Ordinal);   // partia|miasto -> godzina konca wytchnienia
 
         // latki (raz na proces)
         private static Harmony _h;
         private static readonly HashSet<MethodBase> _patched = new HashSet<MethodBase>();
-        private static string _hThink = "nie wpieta", _hAttack = "nie wpieta", _hArmy = "nie wpieta", _hArmyBk = "nie wpieta", _hAvail = "nie wpieta", _hElig = "nie wpieta";
+        private static string _hThink = "nie wpieta", _hAttack = "nie wpieta", _hArmy = "nie wpieta", _hArmyBk = "nie wpieta", _hAvail = "nie wpieta", _hElig = "nie wpieta",
+                              _hPre = "nie wpieta";
         private static MethodBase _thinkM;
         private static Func<Vec2, bool> _beyond;
         private static bool _beyondTried;
 
         // liczniki doby (mysl i armie - watek glowny; atak - dowolny watek, pod zamkiem)
         private static readonly object Gate = new object();
-        private static int _dTrips, _dArrived, _dArmed, _dPart, _dNoGain, _dTimeout, _dOff, _dOwnDef, _dStarve, _stumbles;
-        private static int _vAttackCalls;
+        private static int _dTrips, _dArrived, _dArmed, _dPart, _dNoGain, _dTimeout, _dOff, _dOwnDef, _dStarve, _stumbles, _dExt, _dFreedTrip;
+        private static int _vAttackCalls, _vThresh;
         private static readonly HashSet<MBGUID> _vAttack = new HashSet<MBGUID>(), _vLead = new HashSet<MBGUID>(), _vMember = new HashSet<MBGUID>(),
-                                                _vAvail = new HashSet<MBGUID>(), _vElig = new HashSet<MBGUID>(), _dPoor = new HashSet<MBGUID>(), _dNoTown = new HashSet<MBGUID>();
+                                                _vAvail = new HashSet<MBGUID>(), _vElig = new HashSet<MBGUID>(), _dPoor = new HashSet<MBGUID>(), _dNoTown = new HashSet<MBGUID>(),
+                                                _vPre = new HashSet<MBGUID>(), _dNoBuy = new HashSet<MBGUID>(), _dNoBudgetTown = new HashSet<MBGUID>();
 
         private static void Stumble(string where, Exception e)
         {
@@ -80,20 +95,31 @@ namespace Armoury
             try { if (n <= 5 || n % 100 == 0) Log.Error("ArmsFirst." + where + " (potkniecie " + n + ")", e); } catch { }
         }
 
-        internal static void Reset() { _trip.Clear(); _cool.Clear(); ClearDay(); _stumbles = 0; }
+        internal static void Reset() { _trip.Clear(); _cool.Clear(); _noGain.Clear(); ClearDay(); _stumbles = 0; }
 
         internal static void ClearDay()
         {
-            _dTrips = _dArrived = _dArmed = _dPart = _dNoGain = _dTimeout = _dOff = _dOwnDef = _dStarve = 0;
-            lock (Gate) { _vAttackCalls = 0; _vAttack.Clear(); _vLead.Clear(); _vMember.Clear(); _vAvail.Clear(); _vElig.Clear(); }
-            _dPoor.Clear(); _dNoTown.Clear();
+            _dTrips = _dArrived = _dArmed = _dPart = _dNoGain = _dTimeout = _dOff = _dOwnDef = _dStarve = _dExt = _dFreedTrip = 0;
+            lock (Gate) { _vAttackCalls = 0; _vThresh = 0; _vAttack.Clear(); _vLead.Clear(); _vMember.Clear(); _vAvail.Clear(); _vElig.Clear(); _vPre.Clear(); }
+            _dPoor.Clear(); _dNoTown.Clear(); _dNoBuy.Clear(); _dNoBudgetTown.Clear();
         }
 
-        internal static void Forget(MobileParty mp) { if (mp != null) _trip.Remove(mp.Id); }
+        /// <summary>Koniec wyjazdu i serii wizyt bez postepu (zniszczona partia, zwolnienie z czekania, obrona wlasnej osady, brak pieniedzy). Watek glowny.</summary>
+        internal static void Forget(MobileParty mp) { if (mp != null) { _trip.Remove(mp.Id); _noGain.Remove(mp.Id); } }
+
+        private static int NoGainOf(MobileParty mp) { Streak k; return mp != null && _noGain.TryGetValue(mp.Id, out k) ? k.N : 0; }
+
+        /// <summary>Recenzja p9: partia w miescie wyjazdu z przedluzonym postojem (postep w poprzedniej dobie i dalej ja stac) - ArmedStrength.Wait jej nie zwalnia.</summary>
+        internal static bool Progressing(MobileParty mp)
+        {
+            Trip t;
+            return mp != null && _trip.TryGetValue(mp.Id, out t) && t.Ext > 0 && t.ArriveH >= 0 && mp.CurrentSettlement == t.Town;
+        }
 
         private static int Clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
         internal static int TripDays(Settings s) { return Clamp(s.AiArmsTripMaxDays, 1, 14); }
         internal static int CoolDays(Settings s) { return Clamp(s.AiArmsTripCooldownDays, 0, 30); }
+        internal static int WaitDays(Settings s) { return Clamp(s.AiArmsWaitMaxDays, 1, 60); }
 
         private static void Note(HashSet<MBGUID> set, MobileParty mp) { if (mp == null) return; lock (Gate) set.Add(mp.Id); }
 
@@ -107,15 +133,19 @@ namespace Armoury
             return ArmedStrength.IsLow(mp);
         }
 
-        /// <summary>Stac go na sprzet: podglad budzetu zakupow brakow (AiGear.BudgetPreview - wzor TryBuyCore) >= 10 sztuk po wczorajszej sredniej cenie zakupow AI
-        /// (najmniej MinNeed). Zakupy AI wylaczone - nie stac (nikt nie kupuje).</summary>
-        internal static bool CanAfford(MobileParty mp, out int budget, out int need)
+        /// <summary>Stac go na sprzet: podglad budzetu zakupow brakow (AiGear.BudgetPreview - wzor TryBuyCore; z miastem - rezerwa napraw z materialem tego miasta,
+        /// jak TryBuyCore) >= min(braki do progu gotowosci, PiecesUnit) sztuk po wczorajszej sredniej cenie zakupow AI (najmniej MinNeed). Recenzja p9 (uwaga 4): nie
+        /// pelne braki naraz - AiGear kupuje raz na dobe AiGearBudgetPercent kiesy, a partia z postepem zostaje w miescie kolejne doby; prog "jedna wizyta pokrywa
+        /// min(braki, AiGearMaxPiecesPerVisit)" (Darlessa: min(121, 60) = 60 szt. x 36 d = ok. 2.2 tys. na wizyte, przy 25% kiesy ponad rezerwe 2000 - kiesa ok.
+        /// 10.6 tys.) zostawilby bez wyjazdu lordow, ktorzy dozbroja sie w kilka dob. Zakupy AI wylaczone - nie stac (nikt nie kupuje).</summary>
+        internal static bool CanAfford(MobileParty mp, int shortPieces, Settlement town, out int budget, out int need)
         {
             budget = 0; need = MinNeed;
             try
             {
-                need = Math.Max(MinNeed, 10 * Math.Max(0, AiGear.AvgPiecePriceYesterday));
-                budget = AiGear.BudgetPreview(mp);
+                int pcs = Math.Max(1, Math.Min(PiecesUnit, shortPieces));
+                need = Math.Max(MinNeed, pcs * Math.Max(0, AiGear.AvgPiecePriceYesterday));
+                budget = town != null ? AiGear.BudgetPreview(mp, town) : AiGear.BudgetPreview(mp);
                 return AiGear.On && budget >= need;
             }
             catch (Exception e) { Stumble("CanAfford", e); return false; }
@@ -203,7 +233,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.AiArmsBeforeBattle || !party.IsLordParty || party.IsMainParty) return;
                 var info = ArmedStrength.InfoOf(party);
-                if (info == null || !info.Low) return;
+                if (info == null || !info.Low || info.Free) return;   // recenzja p9: zwolniona z czekania - zwykle decyzje
                 if (party.Army != null || party.MapEvent != null || party.BesiegedSettlement != null) return;
                 if (party.CurrentSettlement != null && party.CurrentSettlement.SiegeEvent != null) return;
                 if (partyThinkParams.DoNotChangeBehavior) return;
@@ -223,7 +253,8 @@ namespace Armoury
                 else
                 {
                     int b, need;
-                    if (CanAfford(party, out b, out need)) town = TripTown(party, info, CampaignTime.Now.ToHours, s);
+                    if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); _trip.Remove(party.Id); }   // recenzja p9: seria wizyt bez postepu - jak "nie stac"
+                    else if (CanAfford(party, info.Short, null, out b, out need)) town = TripTown(party, info, CampaignTime.Now.ToHours, s);
                     else { _dPoor.Add(party.Id); Forget(party); }
                 }
                 // opcje bitwy -1 (kopia listy - SetBehaviorScore zmienia elementy)
@@ -287,14 +318,32 @@ namespace Armoury
                     bool done = t.ArriveH >= 0 && (!inTown || now - t.ArriveH >= StayHours);
                     bool late = t.ArriveH < 0 && now - t.StartH > TripDays(s) * 48.0 + 12.0;
                     if (!done && !late) return t.Town;
+                    bool gain = !late && info.R > t.R0;
+                    // recenzja p9 (uwaga 4): postep w tej wizycie i dalej go stac (podglad z rezerwa napraw tego miasta) - zostaje kolejna dobe (AiGear kupuje raz na dobe)
+                    int b2, need2;
+                    if (gain && inTown && CanAfford(party, info.Short, t.Town, out b2, out need2))
+                    {
+                        t.ArriveH = now; t.R0 = info.R; t.Ext++; _dExt++; _noGain.Remove(party.Id);
+                        return t.Town;
+                    }
                     // wizyta skonczona, a partia dalej niegotowa (albo za dlugo w drodze) - wytchnienie tego miasta i nastepne w zasiegu
-                    if (late) _dTimeout++; else if (info.R > t.R0) _dPart++; else _dNoGain++;
+                    if (late) _dTimeout++; else if (gain) _dPart++; else _dNoGain++;
+                    if (gain) _noGain.Remove(party.Id);
+                    else
+                    {
+                        Streak k;
+                        if (!_noGain.TryGetValue(party.Id, out k)) { k = new Streak { P = party }; _noGain[party.Id] = k; }
+                        k.N++;
+                    }
                     Cool(party, t.Town, now, s);
                     _trip.Remove(party.Id);
+                    if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); return null; }   // recenzja p9: bez kolejnych wyjazdow
                 }
             }
             var town = Nearest(party, now, s);
             if (town == null) { _dNoTown.Add(party.Id); return null; }
+            int b, need;
+            if (!CanAfford(party, info.Short, town, out b, out need)) { _dNoBudgetTown.Add(party.Id); return null; }   // recenzja p9: rezerwa napraw z materialem tego miasta
             _trip[party.Id] = new Trip { P = party, Town = town, StartH = now, R0 = info.R };
             _dTrips++;
             return town;
@@ -351,10 +400,26 @@ namespace Armoury
                 {
                     var t = kv.Value; var p = t.P;
                     bool end = p == null || !p.IsActive || p.Army != null;
-                    if (!end && !ArmedStrength.IsLow(p)) { _dArmed++; end = true; }
+                    if (!end)
+                    {
+                        var i = ArmedStrength.InfoOf(p);
+                        if (i == null || !i.Low) { _dArmed++; end = true; }
+                        else if (i.Free) { _dFreedTrip++; end = true; }   // recenzja p9: zwolniona z czekania w drodze
+                    }
                     if (end) { if (rm == null) rm = new List<MBGUID>(); rm.Add(kv.Key); }
                 }
                 if (rm != null) foreach (var k in rm) _trip.Remove(k);
+            }
+            if (_noGain.Count > 0)
+            {
+                // recenzja p9: seria wizyt bez postepu tylko dla partii dalej niegotowych (gotowa, zwolniona, w armii albo nieczynna - od nowa)
+                List<MBGUID> rm = null;
+                foreach (var kv in _noGain)
+                {
+                    var p = kv.Value.P;
+                    if (p == null || !p.IsActive || p.Army != null || !ArmedStrength.IsLow(p)) { if (rm == null) rm = new List<MBGUID>(); rm.Add(kv.Key); }
+                }
+                if (rm != null) foreach (var k in rm) _noGain.Remove(k);
             }
             if (_cool.Count > 0)
             {
@@ -367,7 +432,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ (c) armie
         /// <summary>Postfiks CanLordCreateArmy (Default - baza SCA i BK; BK - po doklejeniu partii rodu): niegotowy wodz - false i pusta lista; niegotowi kandydaci wypadaja.</summary>
-        public static void CreatePostfix(MobileParty __0, ref MBList<MobileParty> __1, ref bool __result)
+        public static void CreatePostfix(MobileParty __0, ref MBList<MobileParty> __1, ref bool __result, MethodBase __originalMethod)
         {
             try
             {
@@ -381,14 +446,41 @@ namespace Armoury
                     return;
                 }
                 if (__1 == null || __1.Count == 0) return;
+                int removed = 0;
                 for (int i = __1.Count - 1; i >= 0; i--)
                 {
                     var m = __1[i];
-                    if (m != null && Unready(m)) { __1.RemoveAt(i); Note(_vMember, m); }
+                    if (m != null && Unready(m)) { __1.RemoveAt(i); Note(_vMember, m); removed++; }
                 }
                 if (__result && __1.Count == 0) __result = false;
+                // recenzja p9 (uwaga 2), zapas na brak haka przed progiem: baza gry sprawdzila prog sily z niegotowymi - liczymy go od nowa tym samym wzorem
+                // (DefaultArmyManagementCalculationModel.cs:176-189: krolestwo z osadami, GetCustomStrength(Attacker, Siege) wodza i kandydatow, < 1000 -> pusta lista i false)
+                if (__result && removed > 0 && __originalMethod != null && __originalMethod.DeclaringType == typeof(DefaultArmyManagementCalculationModel))
+                {
+                    var k = __0.MapFaction as Kingdom;
+                    if (k != null && k.Settlements.Count > 0)
+                    {
+                        float sum = __0.Party.GetCustomStrength(TaleWorlds.Core.BattleSideEnum.Attacker, TaleWorlds.CampaignSystem.MapEvents.MapEvent.PowerCalculationContext.Siege);
+                        foreach (var m in __1) if (m != null) sum += m.Party.GetCustomStrength(TaleWorlds.Core.BattleSideEnum.Attacker, TaleWorlds.CampaignSystem.MapEvents.MapEvent.PowerCalculationContext.Siege);
+                        if (sum < ArmyFloor) { __1.Clear(); __result = false; lock (Gate) _vThresh++; }
+                    }
+                }
             }
             catch (Exception e) { Stumble("CreatePostfix", e); }
+        }
+
+        /// <summary>Recenzja p9 (uwaga 2): prefiks bazowego CanLordCreateArmy - flaga watku "w toku petli kandydatow" (filtr niegotowych przed progiem).</summary>
+        public static void CreatePrefix() { _inCreate++; }
+
+        /// <summary>Finalizer bazowego CanLordCreateArmy: koniec flagi; wyjatek gry idzie dalej bez zmian.</summary>
+        public static Exception CreateFinalizer(Exception __exception) { if (_inCreate > 0) _inCreate--; return __exception; }
+
+        /// <summary>Recenzja p9 (uwaga 2): postfiks DisbandPartyCampaignBehavior.IsPartyWaitingForDisband - TYLKO w toku bazowego CanLordCreateArmy (flaga watku)
+        /// niegotowa partia "czeka na rozwiazanie", wiec petla kandydatow gry ja pomija (przed rankingiem, cieciem num4 i progiem 1000). Poza flaga - bez zmian.</summary>
+        public static void DisbandPostfix(MobileParty __0, ref bool __result)
+        {
+            if (_inCreate <= 0 || __result || __0 == null) return;
+            try { if (Unready(__0)) { __result = true; Note(_vPre, __0); } } catch (Exception e) { Stumble("DisbandPostfix", e); }
         }
 
         /// <summary>Postfiks BK MobilePartyExtensions.IsAvailableForArmies: niegotowa partia nie idzie na wezwanie (BK CallBannersGoal gracza i AI, partie rodu BK).</summary>
@@ -450,9 +542,29 @@ namespace Armoury
             try
             {
                 var m = AccessTools.DeclaredMethod(typeof(DefaultArmyManagementCalculationModel), "CanLordCreateArmy", armyArgs);
-                _hArmy = Patch(m, "DefaultArmyManagementCalculationModel.CanLordCreateArmy", me, nameof(CreatePostfix), Priority.Last);
+                if (m == null) _hArmy = "BRAK (DefaultArmyManagementCalculationModel.CanLordCreateArmy)";
+                else if (_patched.Contains(m)) _hArmy = "TAK (juz wczesniej w tym procesie)";
+                else
+                {
+                    // recenzja p9 (uwaga 2): prefiks i finalizer - flaga watku dla filtra kandydatow przed progiem; postfiks jak dotad (wodz, zapas z progiem 1000)
+                    _h.Patch(m, prefix: new HarmonyMethod(me, nameof(CreatePrefix)) { priority = Priority.First },
+                             postfix: new HarmonyMethod(me, nameof(CreatePostfix)) { priority = Priority.Last },
+                             finalizer: new HarmonyMethod(me, nameof(CreateFinalizer)));
+                    _patched.Add(m);
+                    _hArmy = "TAK (z filtrem kandydatow przed progiem)";
+                }
             }
             catch (Exception e) { _hArmy = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Army", e); }
+            try
+            {
+                // recenzja p9 (uwaga 2): predykat petli kandydatow bazowej armii - czynna klasa zachowania (gra: DisbandPartyCampaignBehavior), metoda deklarowana
+                var beh = Campaign.Current != null ? Campaign.Current.GetCampaignBehavior<TaleWorlds.CampaignSystem.CampaignBehaviors.IDisbandPartyCampaignBehavior>() : null;
+                var bt = beh != null ? beh.GetType() : null;
+                var m = bt != null ? AccessTools.DeclaredMethod(bt, "IsPartyWaitingForDisband", new[] { typeof(MobileParty) }) : null;
+                _hPre = beh == null ? "BRAK (zachowanie IDisbandPartyCampaignBehavior nieobecne - zostaje zapas z progiem 1000)"
+                      : Patch(m, bt.FullName + ".IsPartyWaitingForDisband", me, nameof(DisbandPostfix), Priority.Last) + " (" + bt.Name + ")";
+            }
+            catch (Exception e) { _hPre = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Pre", e); }
             try
             {
                 var t = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKArmyManagementModel");
@@ -477,7 +589,8 @@ namespace Armoury
             catch (Exception e) { _hElig = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Elig", e); }
             return "najpierw dozbroic: mysl AI (CampaignEventDispatcher.AiHourlyTick, postfiks VeryLow) " + _hThink + ", wlasciciele latek celu: " + Owners(_thinkM)
                    + "; atak (DefaultMobilePartyAIModel.ShouldConsiderAttacking) " + _hAttack
-                   + "; armia gry (DefaultArmyManagementCalculationModel.CanLordCreateArmy) " + _hArmy + "; armia BK (BKArmyManagementModel.CanLordCreateArmy) " + _hArmyBk
+                   + "; armia gry (DefaultArmyManagementCalculationModel.CanLordCreateArmy) " + _hArmy + ", filtr kandydatow przed progiem 1000 (IsPartyWaitingForDisband) " + _hPre
+                   + "; armia BK (BKArmyManagementModel.CanLordCreateArmy) " + _hArmyBk
                    + "; wezwania BK (MobilePartyExtensions.IsAvailableForArmies) " + _hAvail + "; okno armii gracza (CheckPartyEligibility) " + _hElig
                    + "; Mur (ROT IsBeyondTheWall) " + (Beyond() != null ? "TAK" : "BRAK");
         }
@@ -485,16 +598,21 @@ namespace Armoury
         /// <summary>Czesc linii doby "Gotowosc do bitwy (p9)" (ArmedStrength.Daily).</summary>
         internal static string DayText()
         {
-            int a, aCalls, lead, mem, avail, elig;
-            lock (Gate) { a = _vAttack.Count; aCalls = _vAttackCalls; lead = _vLead.Count; mem = _vMember.Count; avail = _vAvail.Count; elig = _vElig.Count; }
+            int a, aCalls, lead, mem, avail, elig, pre, thr;
+            lock (Gate) { a = _vAttack.Count; aCalls = _vAttackCalls; lead = _vLead.Count; mem = _vMember.Count; avail = _vAvail.Count; elig = _vElig.Count; pre = _vPre.Count; thr = _vThresh; }
+            int streak = 0;
+            foreach (var kv in _noGain) if (kv.Value.N >= NoGainMax) streak++;
             int onWay = 0, there = 0;
             foreach (var t in _trip.Values) { if (t.ArriveH >= 0) there++; else onWay++; }
             return "jada po sprzet: nowe wyjazdy " + _dTrips + ", teraz w drodze " + onWay + " i na miejscu " + there + ", dojechaly " + _dArrived + ", dozbrojone " + _dArmed
-                   + ", po wizycie czesciowo " + _dPart + " i bez poprawy " + _dNoGain + ", za dlugo w drodze " + _dTimeout + ", bez miasta w zasiegu " + _dNoTown.Count
-                   + " partii, w wytchnieniu " + _cool.Count + " par partia-miasto"
+                   + ", postoj przedluzony (postep i dalej stac) " + _dExt + ", po wizycie czesciowo " + _dPart + " i bez poprawy " + _dNoGain + ", za dlugo w drodze " + _dTimeout
+                   + ", bez miasta w zasiegu " + _dNoTown.Count + " partii, w miescie nie stac (rezerwa napraw z materialem) " + _dNoBudgetTown.Count
+                   + ", po " + NoGainMax + " wizytach bez postepu bez wyjazdow " + streak + " partii (mysli " + _dNoBuy.Count + "), wyjazd przerwany zwolnieniem z czekania " + _dFreedTrip
+                   + ", w wytchnieniu " + _cool.Count + " par partia-miasto"
                    + " | odmowy: atak " + a + " partii (" + aCalls + " razy), opcje bitwy zgaszone " + _dOff + " (mysli bez pieniedzy " + _dPoor.Count + " partii)"
                    + ", obrona wlasnej osady zostawiona " + _dOwnDef + ", glod (bez zmian) " + _dStarve
-                   + ", tworzenie armii " + lead + " partii, kandydaci armii " + mem + ", wezwania BK " + avail + ", okno armii gracza " + elig
+                   + ", tworzenie armii " + lead + " partii, kandydaci armii przed progiem gry " + pre + " i po nim " + mem + " (armia ponizej progu 1000 po odjeciu " + thr + ")"
+                   + ", wezwania BK " + avail + ", okno armii gracza " + elig
                    + " | potkniecia ArmsFirst " + _stumbles;
         }
     }

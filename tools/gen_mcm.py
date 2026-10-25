@@ -56,6 +56,7 @@ RANGES = {
     'AiArmsReadyPercent': (0, 100, "0"),
     'AiArmsTripMaxDays': (1, 14, "0"),
     'AiArmsTripCooldownDays': (0, 30, "0"),
+    'AiArmsWaitMaxDays': (1, 60, "0"),   # recenzja p9: ArmsFirst.WaitDays przycina 1..60
     'SutlerRowMinMen': (1, 5000, "0"),
     'SutlerRowMenPerStall': (10, 1000, "0"),
     'SutlerRowMaxStalls': (1, 50, "0"),
@@ -602,6 +603,7 @@ LABELS = {
     'AiArmsReadyPercent': 'AI Arms Ready Percent',
     'AiArmsTripMaxDays': 'AI Arms Trip Max Days',
     'AiArmsTripCooldownDays': 'AI Arms Trip Cooldown Days',
+    'AiArmsWaitMaxDays': 'AI Arms Wait Max Days',
     'AiArmsBlockBanditAttacks': 'AI Arms Block Bandit Attacks',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -45,7 +46,14 @@ namespace Armoury
     /// o >= max(3, 10%) zdrowych, zmiana zbrojowni gracza), najwyzej HourCap na godzine; po wczytaniu pelny przeglad kolejka (lordowie i gracz najpierw).
     /// Przy zmianie F zerujemy pamiec gry PartyBase._lastEstimatedStrengthVersionNo (inaczej EstimatedStrength stare do zmiany skladu); brak pola - "BRAK".
     /// Bez zapisu: po wczytaniu do pierwszego przeliczenia F = 1. Potkniecia liczone per partia - bez globalnych wylacznikow.
-    /// NIE ZMIENIA: wyniku autorozstrzygniecia AI-AI (DefaultCombatSimulationModel liczy GetTroopPower po zolnierzu) ani linii B175 "moc" (KingdomBalance).
+    ///
+    /// AUTOBITWA - TA SAMA REGULA (recenzja p9, uwaga 1): wynik autorozstrzygniecia liczy cios po cios DefaultCombatSimulationModel.SimulateHit = 40 x (moc bijacego /
+    /// moc trafianego)^0.7 z GetTroopPower (sam tier; ROT dokleja smoki, BK perki) - bez mnoznika ocena i wynik by sie rozjechaly (uzbrojeni widza gola, liczna partie
+    /// jako slaba, atakuja i przegrywaja symulacje po tierze). Postfiks Priority.VeryLow na bazowym SimulateHit (po NorthHomeEdge Low i BK Normal, przed CS
+    /// ValyrianWardSim Last; ROT-owy model deleguje do bazowego, smok i tak nadpisany przez ROT): moc zwyklego zolnierza partii w regule x k = 1 - (1-g) x s, s = (P - min(P0,P))
+    /// / (P + dodatek modelu) - DOKLADNIE ten sam wzor na czlowieka co F (g z publikacji partii, bez nowego liczenia), wiec cios x (k bijacego / k trafianego)^0.7.
+    /// Bohaterowie k = 1. Dotyczy kazdej autobitwy (AI-AI, szturm AI, "wyslij wojsko" gracza - jedna regula), tylko przy kluczu AiStrengthCountsGear.
+    /// NIE ZMIENIA: linii B175 "moc" (KingdomBalance).
     /// </summary>
     internal static class ArmedStrength
     {
@@ -55,14 +63,20 @@ namespace Armoury
         private const int DirtyCap = 200;        // brudne na godzine
         private const int FullCap = 400;         // pelny przeglad po wczytaniu - na godzine
 
-        /// <summary>Opublikowany stan partii (niezmienny): mnoznik sily, gotowosc %, "niegotowa" (ArmsFirst, histereza), partia - do zerowania pamieci gry.</summary>
+        /// <summary>Opublikowany stan partii (niezmienny): mnoznik sily, gotowosc %, "niegotowa" (ArmsFirst, histereza), partia - do zerowania pamieci gry.
+        /// Recenzja p9: G - udzial pelnej sily zwyklego zolnierza (min(1, R / Knee) - autobitwa), Free - niegotowa zwolniona z czekania po AiArmsWaitMaxDays dobach
+        /// (walczy tym, co ma; ArmsFirst jej nie wstrzymuje), Short - sztuk brakujacych do progu gotowosci (AiArmsReadyPercent).</summary>
         internal sealed class Info
         {
-            internal readonly float F; internal readonly int R; internal readonly bool Low; internal readonly MobileParty P;
-            internal Info(float f, int r, bool low, MobileParty p) { F = f; R = r; Low = low; P = p; }
+            internal readonly float F, G; internal readonly int R, Short; internal readonly bool Low, Free; internal readonly MobileParty P;
+            internal Info(float f, float g, int r, int sh, bool low, bool free, MobileParty p) { F = f; G = g; R = r; Short = sh; Low = low; Free = free; P = p; }
         }
 
-        private sealed class Ent { internal MobileParty P; internal int Kind, R = 100, Ver, Healthy, ArmVer, Day; internal float F = 1f; internal bool Low, Known; }
+        private sealed class Ent
+        {
+            internal MobileParty P; internal int Kind, R = 100, Ver, Healthy, ArmVer, Day, Short; internal float F = 1f, G = 1f; internal bool Low, Known, Free;
+            internal double LowSinceH = -1, FreeFromH = -1;   // recenzja p9 (uwaga 3): od kiedy niegotowa (zegar czekania), od kiedy zwolniona
+        }
 
         private static readonly Dictionary<MBGUID, Ent> _ent = new Dictionary<MBGUID, Ent>();
         private static readonly HashSet<MobileParty> _dirty = new HashSet<MobileParty>();
@@ -77,13 +91,15 @@ namespace Armoury
         // latki (raz na proces)
         private static Harmony _h;
         private static readonly HashSet<MethodBase> _patched = new HashSet<MethodBase>();
-        private static string _hPower = "nie wpieta", _hDte = "nie wpieta", _hMem = "BRAK";
+        private static string _hPower = "nie wpieta", _hDte = "nie wpieta", _hMem = "BRAK", _hSim = "nie wpieta";
         private static AccessTools.FieldRef<PartyBase, int> _verRef;
         private static bool _verTried;
+        // recenzja p9 (uwaga 1): udzial "nagiej" mocy zwyklego zolnierza s = (P - min(P0,P)) / (P + dodatek modelu) - stale na kampanie (tier i wzorce), pamiec na postac
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<CharacterObject, float> _share = new System.Collections.Concurrent.ConcurrentDictionary<CharacterObject, float>();
 
         // liczniki
-        private static int _stumbles, _dComputed, _dUnknown, _dFull, _fullTotal, _dInvalid, _dPublish, _dHold;
-        private static long _dTicks;
+        private static int _stumbles, _dComputed, _dUnknown, _dFull, _fullTotal, _dInvalid, _dPublish, _dHold, _dFreed, _dUnfree, _simStumbles;
+        private static long _dTicks, _dSimHits, _dSimOut, _dSimIn, _dSimMilli;   // autobitwa: ciosy z poprawka, zadane / otrzymane przez slabo uzbrojonych, suma mnoznikow x 1000
 
         private static void Stumble(string where, Exception e)
         {
@@ -94,11 +110,15 @@ namespace Armoury
         internal static void Reset()
         {
             _ent.Clear(); _dirty.Clear(); _fullQ.Clear(); _pub = Empty; _strOn = false; _pubDirty = _invAll = false; _needFull = true; _anyOn = false; _knee = -1;
-            _stumbles = 0; ClearDay(); _fullTotal = 0;
+            _stumbles = 0; _simStumbles = 0; ClearDay(); _fullTotal = 0; _share.Clear();
             ArmsFirst.Reset();
         }
 
-        private static void ClearDay() { _dComputed = _dUnknown = _dFull = _dInvalid = _dPublish = _dHold = 0; _dTicks = 0; }
+        private static void ClearDay()
+        {
+            _dComputed = _dUnknown = _dFull = _dInvalid = _dPublish = _dHold = _dFreed = _dUnfree = 0; _dTicks = 0;
+            Interlocked.Exchange(ref _dSimHits, 0); Interlocked.Exchange(ref _dSimOut, 0); Interlocked.Exchange(ref _dSimIn, 0); Interlocked.Exchange(ref _dSimMilli, 0);
+        }
 
         // ------------------------------------------------------------ odczyt (dowolny watek)
         /// <summary>Opublikowany stan partii albo null (poza regula, F = 1 i gotowa, albo jeszcze nie policzona).</summary>
@@ -109,8 +129,9 @@ namespace Armoury
             return _pub.TryGetValue(mp.Id, out i) ? i : null;
         }
 
-        /// <summary>ArmsFirst: partia lorda AI "niegotowa" (R ponizej AiArmsBelowPercent, histereza do AiArmsReadyPercent) wedlug ostatniej publikacji.</summary>
-        internal static bool IsLow(MobileParty mp) { var i = InfoOf(mp); return i != null && i.Low; }
+        /// <summary>ArmsFirst: partia lorda AI "niegotowa" (R ponizej AiArmsBelowPercent, histereza do AiArmsReadyPercent) i NIE zwolniona z czekania (recenzja p9,
+        /// uwaga 3: po AiArmsWaitMaxDays dobach walczy tym, co ma) wedlug ostatniej publikacji.</summary>
+        internal static bool IsLow(MobileParty mp) { var i = InfoOf(mp); return i != null && i.Low && !i.Free; }
 
         /// <summary>Postfiks Priority.Last na GetPowerOfParty czynnego modelu: wynik x F, gdy kontekst Estimated albo partia poza bitwa. Tylko odczyt niezmiennego
         /// slownika (watki robocze ruchu); zadnych zapisow. Flaga _hold (lup DTE) - bez mnoznika. Nie rzuca.</summary>
@@ -127,6 +148,58 @@ namespace Armoury
                 if (mp != null && pub.TryGetValue(mp.Id, out i) && i.F < 1f) __result *= i.F;
             }
             catch { }
+        }
+
+        /// <summary>Recenzja p9 (uwaga 1): udzial mocy zwyklego zolnierza, ktory znika bez sprzetu - s = (P - min(P0,P)) / (P + dodatek modelu ponad tier), jak w Factor.
+        /// Bohater 0 (sprzet wlasny). Pamiec na postac (tier i wzorce stale w kampanii).</summary>
+        private static float ShareOf(CharacterObject ch)
+        {
+            if (ch == null || ch.IsHero) return 0f;
+            float v;
+            if (_share.TryGetValue(ch, out v)) return v;
+            var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.MilitaryPowerModel : null;
+            if (model == null) return 0f;
+            float full = model.GetTroopPower(ch, BattleSideEnum.Defender, MapEvent.PowerCalculationContext.Estimated, 0f);
+            float b = model.GetDefaultTroopPower(ch);
+            float tot = b + Math.Max(0f, full - b);
+            v = tot > 0f ? Math.Max(0f, Math.Min(1f, (b - Math.Min(P0, b)) / tot)) : 0f;
+            _share[ch] = v;
+            return v;
+        }
+
+        /// <summary>k zwyklego zolnierza partii w autobitwie: 1 - (1 - g) x s (g z publikacji partii; poza regula albo pelna sila - 1).</summary>
+        private static float SimK(CharacterObject ch, PartyBase pb, Dictionary<MBGUID, Info> pub)
+        {
+            if (pb == null || !pb.IsMobile || ch == null || ch.IsHero) return 1f;
+            var mp = pb.MobileParty;
+            Info i;
+            if (mp == null || !pub.TryGetValue(mp.Id, out i) || !(i.G < 1f)) return 1f;
+            float k = 1f - (1f - Math.Max(0f, i.G)) * ShareOf(ch);
+            return Math.Max(0.05f, Math.Min(1f, k));
+        }
+
+        /// <summary>Recenzja p9 (uwaga 1): postfiks VeryLow bazowego DefaultCombatSimulationModel.SimulateHit (cios w autobitwie) - moc bijacego i trafianego
+        /// z gotowoscia zbrojowni ich partii, ten sam wzor co F w ocenie sily: cios x (k bijacego / k trafianego)^0.7 (wzor gry 40 x (moc / moc)^0.7). Tylko odczyt
+        /// niezmiennej publikacji. Nie rzuca.</summary>
+        public static void SimPostfix(CharacterObject __0, CharacterObject __1, PartyBase __2, PartyBase __3, ref ExplainedNumber __result)
+        {
+            if (!_strOn) return;
+            try
+            {
+                var pub = _pub;
+                if (pub.Count == 0) return;
+                float pre = __result.ResultNumber;
+                if (!(pre > 0f)) return;
+                float ka = SimK(__0, __2, pub), kd = SimK(__1, __3, pub);
+                if (ka >= 1f && kd >= 1f) return;
+                double m = Math.Pow(ka / (double)kd, 0.7);
+                __result = new ExplainedNumber((float)(pre * m));
+                Interlocked.Increment(ref _dSimHits);
+                if (ka < 1f) Interlocked.Increment(ref _dSimOut);
+                if (kd < 1f) Interlocked.Increment(ref _dSimIn);
+                Interlocked.Add(ref _dSimMilli, (long)(m * 1000.0));
+            }
+            catch { Interlocked.Increment(ref _simStumbles); }
         }
 
         /// <summary>Prefiks First DTE EveryoneCampaignBehavior.OnMapEventEnded: podzial lupu AI-AI wedlug EstimatedStrength bez mnoznika (jak przed p9) - flaga
@@ -243,23 +316,51 @@ namespace Armoury
                     known = all != null;
                     if (known) all.TryGetValue(mp.Id, out arm);
                 }
-                if (!known) { e.Known = false; e.R = -1; e.F = 1f; e.Low = false; _dUnknown++; }
+                if (!known) { e.Known = false; e.R = -1; e.F = 1f; e.G = 1f; e.Short = 0; e.Low = false; e.Free = false; e.LowSinceH = -1; _dUnknown++; }
                 else
                 {
                     e.Known = true;
-                    int r = GarrisonKit.FillPercent(mp, arm, null, true);
+                    int slots, filled;
+                    int r = GarrisonKit.FillPercent(mp, arm, null, true, out slots, out filled);
                     e.R = r;
                     e.F = Factor(mp, r, s);
+                    e.G = (float)Math.Min(1.0, Math.Max(0, r) / (double)Knee(s));
+                    e.Short = Math.Max(0, (int)Math.Ceiling(Ready(s) * (double)slots / 100.0) - filled);   // sztuk do progu gotowosci (ArmsFirst.CanAfford)
                     e.Low = kind == KLord && (e.Low ? r < Ready(s) : r < Below(s));
+                    Wait(e, mp, s);
                 }
                 _dComputed++;
                 var pi = InfoOf(mp);
                 float pf = pi != null ? pi.F : 1f;
-                bool pl = pi != null && pi.Low;
-                if (Math.Abs(pf - e.F) >= 0.01f || pl != e.Low) _pubDirty = true;
+                bool pl = pi != null && pi.Low, pfr = pi != null && pi.Free;
+                int psh = pi != null ? pi.Short : 0;
+                if (Math.Abs(pf - e.F) >= 0.01f || pl != e.Low || pfr != e.Free || (e.Low && psh != e.Short)) _pubDirty = true;
             }
             catch (Exception ex) { Stumble("Compute", ex); }
             finally { _dTicks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>Recenzja p9 (uwaga 3 - regula Jeffa 12.10 "jak ich nie stac na wojne, to pozyczka albo mniejsze wojsko", nie bezczynnosc): zegar czekania niegotowej
+        /// partii. Po AiArmsWaitMaxDays dobach bez dozbrojenia (brak zlota, brak miasta, puste polki) - ZWOLNIONA: ArmsFirst jej nie wstrzymuje, walczy tym, co ma
+        /// (sila dalej z uzbrojeniem - nie zaczepi silniejszych). Koniec zwolnienia: gotowa (R >= progu) albo najwczesniej po tylu samych dobach, gdy stac ja znowu
+        /// na sprzet (CanAfford) - nowa proba dozbrojenia, zegar od nowa. Partia, ktora w miescie dalej dokupuje z postepem (ArmsFirst.Progressing), nie jest zwalniana
+        /// (postep wymaga pieniedzy, R ma sufit - to sie konczy). Watek glowny (doba partii albo brudna w godzinie).</summary>
+        private static void Wait(Ent e, MobileParty mp, Settings s)
+        {
+            if (!e.Low) { e.LowSinceH = -1; e.FreeFromH = -1; e.Free = false; return; }
+            double now = CampaignTime.Now.ToHours, wait = ArmsFirst.WaitDays(s) * 24.0;
+            if (e.LowSinceH < 0) e.LowSinceH = now;
+            if (mp.Army != null && !e.Free) { e.LowSinceH = now; return; }   // w armii nie jest wstrzymywana (Unready - false) - zegar liczy od wyjscia z armii
+            if (e.Free)
+            {
+                int b, need;
+                if (now - e.FreeFromH >= wait && ArmsFirst.CanAfford(mp, e.Short, null, out b, out need)) { e.Free = false; e.FreeFromH = -1; e.LowSinceH = now; _dUnfree++; }
+            }
+            else if (now - e.LowSinceH >= wait && !ArmsFirst.Progressing(mp))   // w miescie z postepem (postoj przedluzony) - dokupuje dalej, zwolnienie pozniej
+            {
+                e.Free = true; e.FreeFromH = now; _dFreed++;
+                ArmsFirst.Forget(mp);   // wyjazd i seria wizyt bez zakupu - koniec
+            }
         }
 
         private static void Drop(MobileParty mp)
@@ -416,7 +517,7 @@ namespace Armoury
             {
                 var e = kv.Value;
                 if (e.P == null) continue;
-                if (e.F < 0.9995f || e.Low) nu[kv.Key] = new Info(e.F, e.R, e.Low, e.P);
+                if (e.F < 0.9995f || e.Low) nu[kv.Key] = new Info(e.F, e.G, e.R, e.Short, e.Low, e.Free, e.P);
             }
             _pub = nu;
             bool all = _invAll; _invAll = false;
@@ -470,6 +571,22 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _hDte = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Dte", e); }
+            // recenzja p9 (uwaga 1): autobitwa - bazowy SimulateHit zolnierza (DeclaredMethod; ROT-owy i morski model deleguja do bazowego - latanie obu cieloby podwojnie)
+            try
+            {
+                var tDef = typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultCombatSimulationModel);
+                var m = AccessTools.DeclaredMethod(tDef, "SimulateHit", new[] { typeof(CharacterObject), typeof(CharacterObject), typeof(PartyBase), typeof(PartyBase),
+                                                                               typeof(float), typeof(MapEvent), typeof(float), typeof(float) });
+                if (m == null) _hSim = "BRAK (DefaultCombatSimulationModel.SimulateHit)";
+                else if (_patched.Contains(m)) _hSim = "wpieta (juz wczesniej w tym procesie)";
+                else
+                {
+                    _h.Patch(m, postfix: new HarmonyMethod(typeof(ArmedStrength), nameof(SimPostfix)) { priority = Priority.VeryLow });
+                    _patched.Add(m);
+                    _hSim = "wpieta DefaultCombatSimulationModel.SimulateHit (VeryLow; czynny model " + TypeName(Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.CombatSimulationModel : null) + ")";
+                }
+            }
+            catch (Exception e) { _hSim = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Sim", e); }
             if (!_verTried)
             {
                 _verTried = true;
@@ -485,9 +602,11 @@ namespace Armoury
                 Log.Info("Gotowosc do bitwy (p9): start sesji | klucze: AI Strength Counts Gear " + (s.AiStrengthCountsGear ? "TAK" : "NIE") + " (pelna sila od " + Knee(s)
                          + "% slotow wzorca, ponizej liniowo do sily ludzi bez sprzetu P0 = 0.40), AI Arms Before Battle " + (s.AiArmsBeforeBattle ? "TAK" : "NIE")
                          + " (niegotowa ponizej " + Below(s) + "%, gotowa od " + Ready(s) + "%, miasto najwyzej " + ArmsFirst.TripDays(s) + " dob drogi, wytchnienie miasta "
-                         + ArmsFirst.CoolDays(s) + " dob, bandy " + (s.AiArmsBlockBanditAttacks ? "tez zakazane" : "wolno") + ")"
+                         + ArmsFirst.CoolDays(s) + " dob, bandy " + (s.AiArmsBlockBanditAttacks ? "tez zakazane" : "wolno") + ", czekanie najwyzej " + ArmsFirst.WaitDays(s)
+                         + " dob - potem walczy tym, co ma, do gotowosci albo pieniedzy na sprzet)"
                          + " | regula: lordowie i druzyna gracza " + (GarrisonKit.OwnKitOn ? "TAK" : "NIE (TroopsFightWithOwnKitOnly wylaczone)") + ", zalogi " + (GarrisonKit.BareOn ? "TAK" : "NIE (walcza we wzorcu)")
-                         + " | latki: sila partii " + _hPower + "; pamiec sily gry (PartyBase._lastEstimatedStrengthVersionNo) " + _hMem + "; lup DTE AI-AI bez mnoznika " + _hDte
+                         + " | latki: sila partii " + _hPower + "; autobitwa (ta sama regula na cios) " + _hSim + "; pamiec sily gry (PartyBase._lastEstimatedStrengthVersionNo) " + _hMem
+                         + "; lup DTE AI-AI bez mnoznika " + _hDte
                          + " | " + af + " | pelny przeglad partii w pierwszych godzinach (najwyzej " + FullCap + " na godzine, lordowie najpierw); do przeliczenia F = 1.");
             }
             catch (Exception e) { Stumble("SessionStart.Line", e); }
@@ -495,6 +614,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ linia doby
         private static string F2(double v) { return v.ToString("0.00", Inv); }
+        private static string TypeName(object o) { return o != null ? o.GetType().FullName : "?"; }
         private static string Nm(MobileParty mp) { try { return mp != null && mp.Name != null ? mp.Name.ToString() : "?"; } catch { return "?"; } }
 
         internal static void Daily()
@@ -504,7 +624,7 @@ namespace Armoury
             try
             {
                 if (!(s.AiStrengthCountsGear || s.AiArmsBeforeBattle)) { ClearDay(); ArmsFirst.ClearDay(); return; }
-                int lords = 0, lordsKnown = 0, gars = 0, garsKnown = 0, garsLow = 0, low = 0, lowArmy = 0, poor = 0;
+                int lords = 0, lordsKnown = 0, gars = 0, garsKnown = 0, garsLow = 0, low = 0, lowArmy = 0, poor = 0, freed = 0;
                 long rSum = 0, gSum = 0; double fSum = 0, fMin = 2; string fMinName = null;
                 var bucket = new int[4];
                 Ent pl = null;
@@ -523,9 +643,10 @@ namespace Armoury
                     if (e.Low)
                     {
                         if (e.P.Army != null) { lowArmy++; continue; }
+                        if (e.Free) { freed++; continue; }   // recenzja p9 (uwaga 3): zwolniona z czekania - walczy tym, co ma
                         low++; lows.Add(e);
                         int b, need;
-                        if (!ArmsFirst.CanAfford(e.P, out b, out need)) poor++;
+                        if (!ArmsFirst.CanAfford(e.P, e.Short, null, out b, out need)) poor++;
                     }
                 }
                 lows.Sort((a, b) => a.R != b.R ? a.R.CompareTo(b.R) : b.P.MemberRoster.TotalManCount.CompareTo(a.P.MemberRoster.TotalManCount));
@@ -533,9 +654,11 @@ namespace Armoury
                 for (int i = 0; i < lows.Count && i < 3; i++)
                 {
                     var e = lows[i];
-                    int b, need; bool can = ArmsFirst.CanAfford(e.P, out b, out need);
+                    int b, need; bool can = ArmsFirst.CanAfford(e.P, e.Short, null, out b, out need);
+                    double waited = e.LowSinceH >= 0 ? (CampaignTime.Now.ToHours - e.LowSinceH) / 24.0 : 0;
                     if (ex.Length > 0) ex.Append("; ");
                     ex.Append(Nm(e.P)).Append(" (").Append(e.P.MemberRoster.TotalManCount).Append(" ludzi, R ").Append(e.R).Append("%, F ").Append(F2(e.F))
+                      .Append(", brak do progu ").Append(e.Short).Append(" szt., czeka ").Append(waited.ToString("0.0", Inv)).Append(" dob")
                       .Append(", budzet ").Append(b).Append(" z ").Append(need).Append(can ? "" : " - nie stac").Append(", cel ").Append(ArmsFirst.TargetName(e.P)).Append(')');
                 }
                 double ms = _dTicks * 1000.0 / Stopwatch.Frequency;
@@ -550,6 +673,12 @@ namespace Armoury
                   .Append(" | zalogi: ").Append(gars).Append(garsKnown > 0 ? ", R srednio " + (gSum / (double)garsKnown).ToString("0", Inv) + "%, z F < 1: " + garsLow : "")
                   .Append(" | niegotowe (R < ").Append(Below(s)).Append("%, do ").Append(Ready(s)).Append("%): poza armia ").Append(low).Append(", w tym bez pieniedzy ").Append(poor)
                   .Append(", w armii ").Append(lowArmy)
+                  .Append(", zwolnione z czekania (po ").Append(ArmsFirst.WaitDays(s)).Append(" dobach walcza tym, co maja) ").Append(freed)
+                  .Append(" (dzis nowe ").Append(_dFreed).Append(", powrot do dozbrajania - stac na sprzet ").Append(_dUnfree).Append(')')
+                  .Append(" | autobitwa (ta sama regula): ciosy z poprawka ").Append(Interlocked.Read(ref _dSimHits))
+                  .Append(" (zadane przez slabo uzbrojonych ").Append(Interlocked.Read(ref _dSimOut)).Append(", otrzymane ").Append(Interlocked.Read(ref _dSimIn))
+                  .Append(", sredni mnoznik ciosu ").Append(Interlocked.Read(ref _dSimHits) > 0 ? (Interlocked.Read(ref _dSimMilli) / 1000.0 / Interlocked.Read(ref _dSimHits)).ToString("0.00", Inv) : "-")
+                  .Append(", potkniecia ").Append(_simStumbles).Append(')')
                   .Append(" | ").Append(ArmsFirst.DayText())
                   .Append(" | przyklady: ").Append(ex.Length > 0 ? ex.ToString() : "brak")
                   .Append(" | przeliczen ").Append(_dComputed).Append(" (pelny przeglad ").Append(_dFull).Append(" z ").Append(_fullTotal).Append(", w kolejce ").Append(_fullQ.Count)

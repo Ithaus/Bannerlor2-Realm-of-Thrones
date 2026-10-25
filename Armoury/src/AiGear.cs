@@ -1105,7 +1105,11 @@ namespace Armoury
         /// <summary>p9 (ArmsFirst - "stac go na sprzet?"): budzet zakupu brakow lorda AI tym samym wzorem co TryBuyCore dla partii lorda (nie zalogi): GoldPart,
         /// przyciety niewydanym przydzialem sprzetu rodu (ClanBudget.GearCap), plus sakiewka ludzi minus rezerwa napraw. Rezerwa napraw bez miasta (sama robocizna;
         /// TryBuyCore w miescie dolicza szacunek materialu z polki - podglad moze byc nieco wiekszy). Tylko odczyt; 0 - zakupy AI wylaczone albo partia poza regula.</summary>
-        internal static int BudgetPreview(MobileParty mp)
+        internal static int BudgetPreview(MobileParty mp) { return BudgetPreview(mp, null); }
+
+        /// <summary>Recenzja p9 (uwaga 4): podglad dla wybranego MIASTA - rezerwa napraw jak TryBuyCore (AiWear.OutstandingCost(mp, st): robocizna i szacunek materialu
+        /// z polki tego miasta); st == null - sama robocizna jak dotad.</summary>
+        internal static int BudgetPreview(MobileParty mp, Settlement st)
         {
             try
             {
@@ -1116,7 +1120,7 @@ namespace Armoury
                 int budget = GoldPart(lord, s);
                 int gearCap;
                 if (ClanBudget.GearCap(lord.Clan, out gearCap)) budget = Math.Min(budget, gearCap);
-                int purse = Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp));
+                int purse = Math.Max(0, MenPurse.Get(mp) - AiWear.OutstandingCost(mp, st));
                 return Math.Max(0, budget) + purse;
             }
             catch { return 0; }
