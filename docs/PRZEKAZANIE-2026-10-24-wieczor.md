@@ -1,5 +1,18 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 25.10 ok. 13:15 CET - WGRANE 114 i 115; w toku: konie, regeneracja, zdjecia okien, raport armii
+- WGRANE 114 (12:31): Armoury 3cab5bea z noc/final (125 okno lupu po turnieju, 126 przypinanie typow wojska). Crash 126a w bitwie 4/4 = AccessViolation w natywnym Agent.MakeVoice
+  z Immersive_Battlefields.PlayOrderGesturesPatch.Prefix (IB i gra wolaja Owner.MakeVoice bez IsActive; autotest ponawia rozkaz szarzy co 15 s) - powtorka 126b czysta.
+- WGRANE 115 (13:10): Armoury 70246086 z galezi noc/127-bitwa-cialo (worktree scratchpad\zb\n127; CHANGELOG 127-131) + 16 klipow mo_karda w Lektor/Bitwa/motto i manifest.
+  127 bieg wedlug fizjologii (jedna regula, w biegu bez oddechu), 128 szarza z daleka marszem (bieg od 60 m), 129 okrzyki krolestwa gracza "Karda" (gdy Jeff wlada krolestwem),
+  130 stamina tylko z Atletyki (bez Endurance bohaterow) + krzywa 1.12, 131 udzwig +5 kg za punkt Endurance kazdego bohatera w partii.
+- BLAD WRAPPERA (naprawiony 13:00): testy-noc.ps1 '-ExtraFlags a,b' przez powershell -File = JEDNA flaga 'a,b' - dlatego w nocy proby P4/T14/T15 nie ruszaly. Teraz rozbicie po przecinku.
+  Proby P4 (przeglad armii), T14/T15 (przesluchanie), test okna turnieju - DO PUSZCZENIA jeszcze raz (biegi probyN / turniejN).
+- W TOKU (workflowy tej sesji): rozpoznanie staminy koni (Jeff: "konie tez powinny miec stamine ... zalezna od cech konia"), regeneracja wedlug fizjologii (Jeff: "wyjscie z zadyszki
+  jak w prawdziwej fizjologii"), paczka 132 proba zdjec nowych okien (worktree zb\n132, galaz noc/132-zdjecia - flaga armoury-zdjecia-okien.flag), rozpoznanie 133
+  raportu w przegladzie armii (Jeff: braki sprzetu i dlaczego nie zaklada, zold, konie, predkosc, herding).
+- Jeff wie: stamina koni, regeneracja i 133 beda osobnymi paczkami; zdjecia okien wysle po biegu 132.
+
 ## DOPISEK 25.10 ok. 06:30 CET - WGRANE 113 (nocny pakiet gotowy przed 12:00)
 - W grze: Armoury 6b4f188b = galaz noc/final 1e7593e5 (CHANGELOG 203ac63a): 114 marsz i doktryny kultur (+S1 ostrzal, S3 flanka, S4 lucznicy za piechota), 115 choragwie, 116 przeglad armii w obozie, 117 okno lupu (bitwa, oblezenie),
   118 friendly fire (strzaly 100% / oblezenie 50%, wrecz 50%, szarza 50%), 119 dzwiek bitwy, 120 przesluchanie (juz w 112), 121 podatek warsztatow (juz w 112), 122 gotowosc AI (sila z uzbrojeniem, dozbrajanie), 123 szturm murow i bebny oblezenia, 124 domyslne + nagrania.
