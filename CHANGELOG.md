@@ -31,7 +31,8 @@ celowo zablokowany przez GarrisonKit.EmergencyPrefix ("nic z niczego").
   ten sam filtr co DTE ProcessAgentEquipmentRespectingTemporarySlots. Bez licznika rejestracji (_regHooked) albo refleksji Assignment (MarkSlotAsTemporary, SetEquipment,
   IsTemporarySlot, Character) nikt nie dostaje kija (HomeHooked). Czyszczenie _homeAsg: DistributorsPostfix (nowa misja), EndMissionPostfix, Reset; liczniki w ClearBattle.
 - BattleNotice (zdanie w grze przed bitwa, przydzialy przed spawnem): przy kluczu "of your men, N have no weapon (they take clubs and farm tools from home)" albo
-  "(H of them take a club or farm tool from home)"; sojusznicy / wrog "N fight with clubs and farm tools from home[, R bare-handed] - their stores hold no more."
+  "(H of them take clubs and farm tools from home)" (H = 1: "(1 of them takes a club or farm tool from home)"); sojusznicy / wrog "N fight with clubs and farm tools
+  from home[, R bare-handed] - their stores hold no more." (czesc z H = 1: "1 fights with a club or farm tool from home, R bare-handed")
   (HomeLikely - te same warunki co HomeWeapon bez losowania). Klucz wylaczony - zdania co do znaku jak dotad.
 - Log: linia startu GarrisonKit "... kij z domu dla bezbronnych (m119) wpiety (kontrola tymczasowych przy rejestracji agenta w DTE)" / "BRAK ... - nikt nie dostaje kija";
   raz na kampanie "Kij z domu (m119): raz na kampanie; pula = ...: N szt. (po cenie: id Vd kultura, ...); odrzucone z M jednorecznych: crafted_item, ponad Grade 1,
@@ -71,6 +72,10 @@ celowo zablokowany przez GarrisonKit.EmergencyPrefix ("nic z niczego").
 - (b) to GearFit.CultureOk (strona morza + styl krewny + wlasny wzorzec), nie sama "ta sama strona morza" - jedna regula kultury dla calego sprzetu.
 - Jezdziec bez broni dostaje palke / toporek do walki z siodla (wszystkie sztuki puli przechodza MountOk).
 - Losowanie przy kazdym spawnie - ten sam czlowiek w nastepnej bitwie moze miec inny kij; bez skutku w gospodarce.
+- Recenzja m119 (poprawka): czesc zdania przed bitwa z dokladnie jednym kijem miala zla liczbe czasownika ("1 of them take ...") - teraz "1 of them takes a club or farm
+  tool from home" (Twoi) i "1 fights with a club or farm tool from home, R bare-handed" (sojusznicy / wrog). Tylko napisy w BattleNotice / BareText (zmiana warunku
+  homeP == 1 / home == 1 w galezi "czesc"; liczby, logi i HomeWeapon bez zmian). Stare zdania ("1 have no weapon", "1 fight bare-handed", "1 have no weapon (they take
+  ...)") zostaja jak byly - klucz wylaczony daje zdania co do znaku jak dotad.
 - Test w grze: linia startu "kij z domu dla bezbronnych (m119) wpiety"; Armoury.log "Kij z domu (m119): ... 15 szt." (lista jak wyzej; inna liczba = straze/dane w grze inne
   niz items-dump) i linie kultur (battania, empire, vlandia, aserai, khuzait, nord - wlasna; reszta - dozwolona inna albo bez kultury); w bitwie z "nic w polce" > 0: zdanie
   "clubs and farm tools from home", dopisek m119 z kijami > 0 i "potwierdzone tymczasowe N z N ... zgodne", potkniecia 0; na ekranie bezbronni z palkami / narzedziami;

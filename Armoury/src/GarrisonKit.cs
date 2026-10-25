@@ -745,9 +745,11 @@ namespace Armoury
                          + "; bez broni u sojusznikow " + allyBare + ", u wroga " + enemyBare + "; z tego wezmie kij z domu (m119, przewidywane) - Twoi " + homeP + ", sojusznicy " + allyHome
                          + ", wrog " + enemyHome + " (przydzialy DTE przed spawnem)." + GearFit.FloorNote());   // GearFit: dopisek NA KONCU
                 var parts = new List<string>();
-                // m119: kij z domu - zdanie mowi, ze wezma bron z domu (przewidywane przed spawnem; straze przy spawnie moga rozbroic jeszcze kogos)
+                // m119: kij z domu - zdanie mowi, ze wezma bron z domu (przewidywane przed spawnem; straze przy spawnie moga rozbroic jeszcze kogos);
+                // czesc: jeden - "takes a club", kilku - "take clubs" (recenzja m119)
                 if (noWeapon > 0) parts.Add(noWeapon + " have no weapon" + (homeP <= 0 ? "" : homeP >= noWeapon ? " (they take clubs and farm tools from home)"
-                                                                              : " (" + homeP + " of them take a club or farm tool from home)"));
+                                                                              : homeP == 1 ? " (1 of them takes a club or farm tool from home)"
+                                                                              : " (" + homeP + " of them take clubs and farm tools from home)"));
                 if (noBody > 0) parts.Add(noBody + " no body armour");
                 if (onFoot > 0) parts.Add(onFoot + " riders no horse");
                 if (noSaddle > 0) parts.Add(noSaddle + " riders no saddle");
@@ -765,6 +767,7 @@ namespace Armoury
         {
             if (home <= 0) return bare + " fight bare-handed";
             if (home >= bare) return bare + " fight with clubs and farm tools from home";
+            if (home == 1) return "1 fights with a club or farm tool from home, " + (bare - home) + " bare-handed";   // recenzja m119: jeden - liczba pojedyncza
             return home + " fight with clubs and farm tools from home, " + (bare - home) + " bare-handed";
         }
 
