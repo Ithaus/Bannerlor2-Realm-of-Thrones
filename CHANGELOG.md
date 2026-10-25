@@ -9,7 +9,7 @@ W bitwie (gracz dowodzi swoimi) ludzie przypietego typu staja w przypietej forma
 po bitwie naprawa wag zapisu pola/armii, gdy ekran zapisal smiec (NaN -> int.MinValue) albo 0 na choragwi przypiecia. Zapis przypiec w arm_army_review (zgodnie wstecz). Proba autotestu P4 w takcie godziny (dotad od 2. doby - nie odpalala) + T7/T7g przypiecia.
 Recenzja (4 uwagi, wszystkie poprawione): wagi 0/0 na ekranie OOB, flagi prob (skrypt), klucz Pin wylaczony a udzialy, plan budowany przed kluczem.
 **Ryzyko / co sprawdzic:** w logu "Przeglad armii (P4): test ... T7 przypiecia ... - wynik TAK" i w bitwie segment "przypiecia: czynne (typow N ...)"; koniec bitwy "naprawione wagi ...". Przypiecia dzialaja tylko, gdy gracz dowodzi swoimi ludzmi (ekran Order of Battle, 20+ ludzi) - w armii AI nie.
-**Status:** ZBUDOWANE - autotest i wgranie nizej.
+**Status:** WGRANE 114 (25.10 ok. 12:31 CET; Armoury.dll md5 3cab5bea z noc/final df5ed020, razem z 125; kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie114 i D:\Backup-Bannerlord\wgrane6-10-25-wgranie114-przed). Autotest 126a: 3/4 bitwy, w 4/4 AccessViolationException w natywnym Agent.MakeVoice z Immersive_Battlefields.PlayOrderGesturesPatch.Prefix (IB woła owner.MakeVoice bez IsActive - jak gra; rozkaz szarzy testu ponawiany co 15 s, prawdopodobnie na martwym bohaterze - log urwany, niepotwierdzone; naszego kodu w stosie brak). Powtorka 126b: 4/4 bitwy, ERROR 0, bez wywrotki (kod 1 tylko od zawieszenia gry po KONIEC OK). Proby P4 / T14 / T15 / test turnieju w biegu bitew nie odpalily - przypiecia i okno turnieju sprawdzi gra Jeffa.
 
 ## 2026-10-25 125 (noc-p11 okno lupu po turnieju, galaz noc/p11-turniej od noc/final; recenzja dcff4c7d) - okno "The Tourney at X" po turnieju
 
@@ -19,7 +19,7 @@ Recenzja (4 uwagi, wszystkie poprawione): wagi 0/0 na ekranie OOB, flagi prob (s
 nagroda (TXP i nasze PlayerFees8), zaklady (stawka, wygrana), sakiewka ludu, GrandTourney przez latki Armoury w kampanii (sakiewka mistrza, utarg szranek, okupy, wykup konia i zbroi - DLL GT bez zmian); przedmiot nagrody, oddany rynsztunek, walki/wygrane/runda odpadniecia; okno "The Tourney at X".
 Turniej, ktory sie nie odbyl - ramka porzucona bez okna (linia logu). Prog Min Worth dla turnieju liczy zyski i straty. Proba autotestu: flaga armoury-lup-turniej.flag (T0-T3).
 **Ryzyko / co sprawdzic:** "Okno lupu (125): latki GrandTourney N/N", po prawdziwym turnieju "Okno lupu (117): turniej N" z "TournamentFinished TAK, misja TAK" i mala reszta "Other"; "ramka T porzucona bez raportu" po prawdziwym turnieju = blad.
-**Status:** ZBUDOWANE - autotest i wgranie nizej.
+**Status:** WGRANE 114 razem z 126 (patrz wyzej). Okno turnieju nie sprawdzone autotestem (bieg turniejN nie puszczony) - sprawdzi pierwszy turniej Jeffa (linia 'Okno lupu (125)' i ramka T).
 
 ## 2026-10-25 124 (noc-final, galaz noc/final = noc/calosc + noc/p10-szturm + noc/p9-gotowosc) - domyslne wlaczone (flanka, lucznicy za piechota, tlo dzwieku, szturm murow), friendly fire strzal przy oblezeniu 50%, nagrania ElevenLabs 379 klipow
 
