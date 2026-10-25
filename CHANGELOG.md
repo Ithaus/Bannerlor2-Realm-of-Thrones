@@ -1,5 +1,101 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 122 (noc-p9 gotowosc AI, galaz noc/p9-gotowosc od a14c76d3 = WGRANIE 111; kod d036d233 + recenzja 155f3370) - sila partii z uzbrojeniem (ocena AI i autobitwa) i "najpierw dozbroic" przed bitwa
+
+**Problem:** Jeff 25.10 ok. 03:30, po bitwie: "sprawdz moj save i ostatnia bitwe wogole nie mili uzbrojenia? ... wszycy biegali w koszulakch i z palkami i kijami ... jesli tak
+jest to powinna zanim podzjie do bitwy AI najpeirw przygotwac wojsko i dobrac pancerz bo zolnierz taki nie nadaje sie do bitwy, przeciez wiadomo ze przegra." Dowod
+(Armoury-2026-10-25_02-11-22.log, CrashScribe session-2026-10-25_02-11-21.log, Logs\2026-10-25_02-11-22\bitwy.log): [03:02:16] "Okupy (178): AI-AI - Darlessa Marbrand
+(lord, Marbrand) wolny za 21000 zl (D 2719): gotowka 11044, dlug 9956"; [03:21:17] "Bitwa gracza: Lady Darlessa Marbrand's Party - bez wpisu w zbrojowniach DTE (dotad pelny
+wzorzec z niczego) - pusty wpis, walcza tym, co maja."; CrashScribe [03:21:17] "201 slotow PUSTYCH - nic uzytecznego na polce"; bitwy.log [03:26:35] B175: A vlandia lord
+110 ludzi moc 142.3 wobec O riverlands (gracz) 46 ludzi moc 66.0 - stosunek 2.16, AI zaatakowala i przegrala: zabici 24, ranni 86, gracz 0. Wszyscy w tunikach z domu
+(m117) i z kijem (m119).
+**Przyczyna:** (1) kazda ocena sily na mapie idzie przez MilitaryPowerModel.GetPowerOfParty (PartyBase.EstimatedStrength, CalculateCurrentStrength, GetCustomStrength,
+Army.EstimatedStrength), a ta liczy tylko tier: P(t) = (2+t)(10+t) x 0.02 (DefaultMilitaryPowerModel.GetDefaultTroopPower; ROT dokleja smoki, NavalDLC przekazuje dalej) -
+StrategicCampaignAI145, BK, ROT i nasze ArmyRestDay/BesiegedRelief/NightMarch czytaja te same liczby; (2) nowa partia po okupie nie ma wpisu w zbrojowniach DTE (koniec
+darmowego kompletu - sklad7b / LevyGold, "nic z niczego"), a nic nie kazalo lordowi najpierw kupic sprzetu; (3) autobitwa (DefaultCombatSimulationModel.SimulateHit =
+40 x (moc bijacego / moc trafianego)^0.7 z GetTroopPower) tez liczy sam tier - sprzet nie zmienial wyniku walk AI-AI.
+**Zmiana (tylko Armoury):**
+- A. ArmedStrength.cs (MCM "AI Strength Counts Gear", domyslnie TAK): postfiks Priority.Last na GetPowerOfParty CZYNNEGO modelu (PatchTarget.OfActive - klasa deklarujaca,
+  dzis ROTMilitaryPowerModel; wpinany w OnSessionLaunched): sila x F, gdy kontekst Estimated albo partia poza bitwa (rozliczen w toku bitwy nie ruszamy). Gotowosc R =
+  GarrisonKit.FillPercent(partia, zbrojownia, battle: true) - ta sama miara co progi 75 (GarrisonArmoryMinFillPercent) i 60 (ClanFillOnce); brak wpisu DTE = 0.
+  g = min(1, R / 75); zwykly zolnierz g x P(t) + (1-g) x P0, P0 = 0.40 (tier 0 - wiesniak w tunice z kijem); bohaterowie i dodatki modelu ponad tier bez kary.
+  Partie w regule: lordowie (GarrisonKit.LordRule - takze towarzysze i partie Twojego rodu) i druzyna gracza przy TroopsFightWithOwnKitOnly, zalogi przy BareOn; reszta F = 1.
+  Lup DTE AI-AI (EveryoneCampaignBehavior.OnMapEventEnded, podzial wedlug EstimatedStrength) bez mnoznika (prefiks/finalizer z flaga [ThreadStatic]).
+  R/F liczone w DailyTickParty i co godzine dla "brudnych" (zakup AiGear, koniec bitwy, nowa partia, zmiana skladu o >= max(3, 10%) zdrowych), publikacja copy-on-write
+  (postfiks tylko czyta niezmienny slownik - bezpieczne przy watkach AI), przy zmianie F zerowana pamiec gry PartyBase._lastEstimatedStrengthVersionNo.
+  RECENZJA 1: AUTOBITWA - TA SAMA REGULA. Postfiks Priority.VeryLow na bazowym DefaultCombatSimulationModel.SimulateHit (zolnierz; po BK Normal i NorthHomeEdge Low,
+  przed CS ValyrianWardSim Last; ROT i NavalDLC deleguja do bazowego - latanie obu cieloby podwojnie): cios x (k bijacego / k trafianego)^0.7, k = 1 - (1-g) x s,
+  s = (P - min(P0,P)) / (P + dodatek modelu) - dokladnie ten sam wzor na czlowieka co F (g z publikacji partii, bez nowego liczenia; s w pamieci na postac). Bohaterowie k = 1.
+  Dotyczy kazdej autobitwy: AI-AI, szturm AI, "wyslij wojsko" gracza (jedna regula), tylko przy kluczu AI Strength Counts Gear.
+- B. ArmsFirst.cs (MCM "AI Arms Before Battle", domyslnie TAK): NIEGOTOWA = partia lorda w regule poza armia, bitwa i oblezeniem z R < 50 (histereza do 60; 60 = prog
+  "chudych" partii rodu ClanFillOnce, 50 = polowa slotow wzorca pusta). (a) nie zaczepia partii poza bandami (postfiks DefaultMobilePartyAIModel.ShouldConsiderAttacking -
+  DeclaredMethod, czynny NavalDLCMobilePartyAIModel przekazuje do bazy); wyjatek: cel oblega osade rodu partii albo bitwa toczy sie o nia; ucieczka bez zmian. (b) postfiks
+  VeryLow CampaignEventDispatcher.AiHourlyTick: opcje bitwy (oblezenie, szturm, rabunek, obrona cudzej osady, poscig za partia nie-banda) -1; obrona ZAGROZONEJ osady
+  wlasnego rodu zostaje; stac go - wyjazd do najblizszego przyjaznego miasta (droga ladowa, najwyzej 3 doby marszu, nie w wojnie, bez oblezenia, ta sama strona Muru,
+  poza wytchnieniem 3 dob) z ocena max(0.5, 1.2 x najlepszej innej) + 0.01; na miejscu kupuje dotychczasowa droga AiGear (wejscie i doba postoju) - nic nowego w
+  ekonomii (placi pan i sakiewka ludzi, zloto do kasy miasta). (c) armie: niegotowy wodz - CanLordCreateArmy false i pusta lista (gra i BK); BK IsAvailableForArmies false
+  (wezwania); czynny CheckPartyEligibility (SCA) false z napisem "Its men lack arms and armour - it must arm them before joining an army."; czlonek armii zostaje.
+  RECENZJA 2: niegotowi kandydaci wypadaja PRZED rankingiem, cieciem do 70% partii krolestwa (num4) i progiem sily 1000 (Siege) bazowego CanLordCreateArmy - prefiks
+  (First) i finalizer bazy ustawiaja flage watku [ThreadStatic], a postfiks czynnego zachowania IDisbandPartyCampaignBehavior (gra: DisbandPartyCampaignBehavior).
+  IsPartyWaitingForDisband zwraca dla niegotowej true TYLKO przy tej fladze (jedyny predykat petli kandydatow wolany przez interfejs, DefaultArmyManagementCalculationModel.cs:136);
+  zapas (brak haka): gdy postfiks bazy cos usunie, prog 1000 liczony od nowa wzorem gry (:176-189) - ponizej: pusta lista i false.
+  RECENZJA 3 (regula Jeffa 12.10 "jak ich nie stac na wojne, to zaciagaja pozyczke albo wystawiaja mniejsze zaciagi wojska" - czekanie bez konca bylo z nia SPRZECZNE):
+  ArmedStrength.Wait - najwyzej AiArmsWaitMaxDays (10 = dwa wyjazdy na najdalszy zasieg 2 x (3 + 1) dob i zapas) dob niegotowej, potem ZWOLNIONA: ArmsFirst jej nie
+  wstrzymuje (atak, cele, armie, wezwania, okno armii gracza, odsiecz), walczy tym, co ma - sila dalej z uzbrojeniem, wiec nie zaczepi silniejszych. Koniec zwolnienia:
+  gotowa (R >= 60) albo najwczesniej po tylu samych dobach, gdy stac ja znowu na sprzet - nowa proba, zegar od nowa. W armii zegar stoi (liczy od wyjscia);
+  partia, ktora w miescie dokupuje z postepem (postoj przedluzony), nie jest zwalniana.
+  RECENZJA 4: po dobie w miescie z postepem (R wzroslo) i dalej "stac go" - zostaje kolejna dobe (AiGear kupuje raz na dobe); "stac go" = min(braki do progu gotowosci,
+  10) sztuk po wczorajszej sredniej cenie zakupow AI (najmniej 300; braki z nowego GarrisonKit.FillPercent z licznikami slotow); przy wybranym miescie podglad budzetu
+  z rezerwa napraw z materialem tego miasta (AiGear.BudgetPreview(mp, miasto) = AiWear.OutstandingCost(mp, st) jak TryBuyCore); 2 wizyty z rzedu bez postepu - jak
+  "nie stac" (bez dalszych wyjazdow do gotowosci albo zwolnienia). Prog "jedna wizyta pokrywa min(braki, AiGearMaxPiecesPerVisit 60)" ODRZUCONY: Darlessa 60 szt. x 36 d
+  = ok. 2.2 tys. na wizyte, przy 25% kiesy ponad rezerwe 2000 - kiesa ok. 10.6 tys.; lordowie, ktorzy dozbroja sie w kilka dob postoju, nie wyjechaliby wcale.
+- C. BesiegedRelief.cs (RECENZJA 5): niegotowa partia (ArmsFirst.Unready) idzie w OB5 tylko na odsiecz osady WLASNEGO rodu - odsiecz cudzej osady nie trafia do zasiegu
+  krolestwa (EligAt / Eligible, bramka f12 "odsiecz bez szans") ani do podbicia; jedna regula z ArmsFirst.IsBattle (DefendSettlement cudzego rodu -1).
+- D. AiGear.cs: GoldPart (wspolny wzor TryBuyCore i BudgetPreview: (zloto pana - rezerwa) x procent), AvgPiecePriceYesterday (z FlushDay), BudgetPreview(mp[, miasto]),
+  ArmedStrength.MarkDirty po zakupie. GarrisonKit.cs: FillPercent z licznikami (need, used) - stare sygnatury bez zmian.
+- E. Ustawienia (grupa "AI readiness before battle (25.10)", na zywo): AI Strength Counts Gear TAK, AI Strength Full Kit Percent 75, AI Arms Before Battle TAK, AI Arms Below
+  Percent 50, AI Arms Ready Percent 60, AI Arms Trip Max Days 3, AI Arms Trip Cooldown Days 3, AI Arms Wait Max Days 10, AI Arms Block Bandit Attacks NIE. gen_mcm: Armoury
+  2422 ustawien (bylo 2413). Klucze NOWE - w Armoury.json Jeffa ich nie ma (grep "AiArms" / "AiStrength" 0), domyslne z kodu zadzialaja.
+- F. Log: "Gotowosc do bitwy (p9): start sesji | klucze ... | regula ... | latki: sila partii ...; autobitwa (ta sama regula na cios) ...; pamiec sily gry ...; lup DTE ...
+  | najpierw dozbroic: mysl AI ...; atak ...; armia gry ... , filtr kandydatow przed progiem 1000 (IsPartyWaitingForDisband) ...; armia BK ...; wezwania BK ...; okno armii
+  gracza ...; Mur ..." i linia doby "Gotowosc do bitwy (p9): dzien N | partie lordow: R srednio, R 0-25/25-50/50-75/75-100, F srednio, najmniejsze | gracz | zalogi |
+  niegotowe: poza armia, w tym bez pieniedzy, w armii, zwolnione z czekania (dzis nowe, powrot do dozbrajania) | autobitwa: ciosy z poprawka (zadane / otrzymane przez slabo
+  uzbrojonych), sredni mnoznik ciosu | jada po sprzet: wyjazdy, w drodze, na miejscu, dojechaly, dozbrojone, postoj przedluzony, czesciowo, bez poprawy, za dlugo, bez
+  miasta, w miescie nie stac, po 2 wizytach bez postepu bez wyjazdow, wyjazd przerwany zwolnieniem, wytchnienie | odmowy: atak, opcje bitwy, obrona wlasnej osady, glod,
+  tworzenie armii, kandydaci armii przed progiem gry i po nim (armia ponizej progu 1000 po odjeciu), wezwania BK, okno armii gracza | przyklady (3 najgorsze: ludzie, R,
+  F, brak do progu, czeka dob, budzet, cel) | przeliczen, koszt ms, publikacji, potkniecia"; linia "Odsiecz (OB5): dzien N" + "niegotowe (p9 ...): pominiete odsiecze
+  cudzych osad N razy u M druzyn".
+**Recenzja p9 (6 uwag) - wynik:** 1 (major, autobitwa po tierze) PRAWDA - poprawiona (SimPostfix, wyzej). 2 (major, filtr armii po progu 1000) PRAWDA - poprawiona (filtr
+przed progiem + zapas z progiem; czynny model armii u Jeffa: StrategicCampaignAI145.StrategicArmyManagementModel, dziedziczy po grze - BK model nieczynny). 3 (major,
+niegotowa bez wyjscia) PRAWDA - poprawiona limitem czekania (pozyczka / zwolnienie ludzi - decyzja Jeffa). 4 (minor, wyjazdy marnuja doby) PRAWDA w (1) i (3) - poprawione;
+(2) CZESCIOWO - prog wedlug brakow do progu, ale min(braki, 10), nie min(braki, 60) (uzasadnienie wyzej). 5 (minor, OB5 liczy niegotowe) PRAWDA - poprawiona. 6 (minor,
+brak wpisu CHANGELOG) PRAWDA - ten wpis; temat commita d036d233 bez pustej linii po pierwszym wierszu - zostaje (bez przepisywania historii / force-push).
+**Kontrola calosci (dekompilacja 1.4.8, ROT, NavalDLC, BK, SCA145; grep Armoury i CrashScribe):**
+- SimulateHit zolnierza: lancuch czynny ROT.Models.ROTCombatSimulationModel (linia SiegeWalls "modele: symulacja ...") -> _previousModel (NavalDLC base.BaseModel /
+  Default) -> bazowy DefaultCombatSimulationModel.SimulateHit - jedna latka na bazowym, mnozy raz; ROT nadpisuje cios smoka PO nas (DragonDamageScaling - smok bez zmian);
+  BK SimulateHitPostfix (perki, strzemiona) i NorthHomeEdge (x(1+P)^0.7) i CS ValyrianWardSim (do 15%) - mnozniki, kolejnosc bez znaczenia. Zaden nasz kod nie wola
+  SimulateHit (SiegeRansom / SiegeWalls czytaja tylko GetSettlementAdvantage i GetSimulationTicksForBattleRound). Ocena w toku bitwy (SimulationContext) bez F - mnoznik nie
+  liczy sie dwa razy (cios bierze GetTroopPower, nie GetPowerOfParty).
+- IsPartyWaitingForDisband wolaja tez DisbandPartyAction, TeleportationCampaignBehavior, AiEngageParty/AiMilitary/AiPatrolling/AiVisitSettlement, CheckPartyEligibility
+  (:446) i BK BKAIVisitSettlementBehavior - poza flaga watku wynik bez zmian. Flaga tylko w bazowym CanLordCreateArmy (SCA i BK wolaja baze).
+- CreatePostfix zapas: GetCustomStrength(Attacker, Siege) poza bitwa - z F, tak jak policzyla gra; prog tylko dla wariantu bazowego (__originalMethod), BK bez zmian.
+- Zwolnienie: Unready / IsLow licza Free z publikacji (niezmiennej) - atak (watki AI), armie, wezwania BK, okno armii, OB5 i mysl ArmsFirst maja jeden predykat.
+- Ekonomia: nic z niczego - wyjazd tylko kieruje partie do miasta; zakup, cena, zaplata i dostawa to dotychczasowy AiGear.TryBuyCore; podglad budzetu tylko czyta.
+**Ryzyko / co sprawdzic:**
+- AUTOBITWA ZMIENIA WYNIKI walk AI-AI wedlug kompletu: pokrycie zbrojowni AI (linia 171, dzien 108970) - partie rodow AI korpus 66%, helm 52%, tarcza 54%, rece 55%,
+  zalogi AI korpus 90%, helm 85% - wiekszosc partii lordow ma g < 1 (k ok. 0.85-0.95 dla t2-t3), zalogi zwykle F = k = 1: szturmy AI troche trudniejsze, bandy troche
+  grozniejsze dla slabo uzbrojonych lordow, walki lord-lord prawie bez zmian (obie strony podobnie). Pilnowac B175 / KingdomBalance (zdobycze twierdz na dobe) i
+  "autobitwa: sredni mnoznik ciosu" w linii p9. "Wyslij wojsko" gracza tez wedlug jego zbrojowni (TroopsFightWithOwnKitOnly TAK u Jeffa).
+- Rozklad R nieznany - pierwsza linia doby p9 pokaze R 0-25 / 25-50 / ...; przy wielu partiach < 50 ArmsFirst wstrzyma wielu lordow najwyzej 10 dob (linia: "zwolnione
+  z czekania"); jesli wojny staja - AI Arms Wait Max Days w dol albo AI Arms Before Battle NIE (sama sila z uzbrojeniem zostaje).
+- Filtr armii: "kandydaci armii przed progiem gry N i po nim M" - M powinno byc ok. 0 (zapas), "armia ponizej progu 1000 po odjeciu" ok. 0; "filtr kandydatow ... TAK
+  (DisbandPartyCampaignBehavior)" w linii startu - BRAK znaczy, ze dziala tylko zapas.
+- DECYZJA JEFFA (otwarta): pozyczka Banku Zelaznego na sprzet albo zwolnienie ludzi bez kompletu do progu ("mniejsze wojsko") zamiast samego limitu czekania.
+- Stan bez zapisu: po wczytaniu zegary czekania, wyjazdy i serie od nowa; F = 1 do pierwszego przeliczenia (pelny przeglad w pierwszych godzinach, lordowie najpierw).
+- Wydajnosc: SimPostfix - 2 odczyty slownika na cios (tylko partie z F < 1 albo niegotowe w publikacji), s w pamieci na postac; zegar czekania w przeliczeniu doby partii.
+- Build: Armoury 0 bledow (6 ostrzezen jak przed zmiana); md5 z pelnej przebudowy 155f3370: 18ac11e23d7707f67f28364204149cb2 (DLL zawiera hash commitu).
+**Status:** DO SPRAWDZENIA (zbudowane w galezi noc/p9-gotowosc, NIE wgrane - test i wgranie robi sesja glowna).
+
 ## 2026-10-25 113 (m119-kij, galaz w-toku/m117-ubranie po 112 231dc8a5) - bezbronny po strazach bierze z domu najgorsza bron biala (palka, mlot, sierp, toporek) swojej kultury - sztuka tymczasowa DTE, poza zbrojownia
 
 **Problem:** Jeff 25.10 ok. 01:00: "i jakas nagorsza bron dostja akijem moga walczyc sa kije?"; ok. 01:40: "wgraj wszystko razem z kijem". Log 24.10 (1 z 21 bitew, dopisek
