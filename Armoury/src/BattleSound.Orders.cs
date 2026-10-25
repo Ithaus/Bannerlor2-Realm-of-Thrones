@@ -20,8 +20,9 @@ namespace Armoury
     ///    Stop po ruchu przy wrogu do 200 m - "hold". Szarza tylko z sygnalu BattleCries (K4 - bez drugiego detektora).
     ///  - Ostrzal: pierwszy pocisk w szyk piechoty po 30 s spokoju - "shields"; pierwszy strzal szyku strzelcow po 15 s ciszy - "loose" (zbiory z wywolan
     ///    zwrotnych pod lockiem, tu tylko odczyt).
-    ///  - P1: lucznicy za piechote - "archback", konnica na skrzydlo - "flank"; P3: padl sztandar / dowodca kompanii - wlasna strona "ob" (Save the banner! Rally to me!)
-    ///    na zmiane z rozkazem "rally" (To the banner! Rally!) i rog zbiorki, najblizszy szyk wroga "bd" (Their banner is down!); zlamanie kompanii - najblizszy szyk wroga "br" (They break!). Raz na (szyk, kompanie).
+    ///  - P1: lucznicy za piechote - "archback", konnica na skrzydlo - "flank"; P3: padl sztandar - wlasna strona "ob" (Save the banner! Rally to me!)
+    ///    na zmiane z rozkazem "rally" (To the banner! Rally!) i rog zbiorki, najblizszy szyk wroga "bd" (Their banner is down!); padl dowodca kompanii (154) - sam
+    ///    rozkaz "rally" i rog zbiorki, bez "ob" (sztandar stoi); zlamanie kompanii - najblizszy szyk wroga "br" (They break!). Raz na (szyk, kompanie).
     ///  - Odstepy (czas misji i rzeczywisty): rozkaz szyku: ten sam co 20 s (shields 30, loose 25), dowolny co 6 s; glos rozkazu druzyny co 2,5 s (gracza 1,5 s);
     ///    rog druzyny co 10 s, ten sam sygnal: marsz 40 s, szarza 15 s, odwrot i zbiorka 20 s. ROTBA mowi rozkazy gracza (OrderVoiceChance > 0) - nasze rozkazy
     ///    szykow gracza co drugi raz.
@@ -40,8 +41,10 @@ namespace Armoury
         private static readonly float[] HGap = { 40f, 15f, 20f, 20f };
         private const float HornTeamGap = 10f, OrderFormGap = 6f, OrderTeamGapAi = 2.5f, OrderTeamGapPlayer = 1.5f;
         private const int MinMenAi = 20, MinMenPlayer = 8, MinMenHorn = 20, MinMenSpeech = 40;
-        // odleglosci 3D (min-max m, x glosnosc)
-        private const float OrderMin = 30f, OrderMax = 250f, MottoMin = 35f, MottoMax = 450f, SpeechMin = 40f, SpeechMax = 300f, HornMin = 50f, HornMax = 700f;
+        // odleglosci 3D (min-max m, x glosnosc). 154 (Jeff 25.10: pelna glosnosc tylko przy zrodle, ciszej z odlegloscia): dotad min 30-50 m (rozkaz 30/250,
+        // motto 35/450, przemowa 40/300, rog 50/700) - w promieniu kilkudziesieciu metrow wszystko jak przy uchu. Teraz: rozkaz, motto, okrzyk choragwi 4/200,
+        // przemowa 6/150, rog 15/600
+        private const float OrderMin = 4f, OrderMax = 200f, MottoMin = 4f, MottoMax = 200f, SpeechMin = 6f, SpeechMax = 150f, HornMin = 15f, HornMax = 600f;
         private const float SpeechEnemyListener = 250f, SpeechEnemyFar = 150f;
 
         private sealed class FState
@@ -86,6 +89,7 @@ namespace Armoury
         private static readonly int[] _cOrder = new int[OKinds];
         private static readonly int[] _cHorn = new int[HKinds];
         private static int _cHornIb, _cHornNw, _cOrderBa, _cMotto, _cSpHouse, _cSpRegion, _cSpMotto, _cSpSkip, _cBreak, _cBannerDown, _cOurBanner;
+        private static int _cOurBannerOb, _cStdFell, _cCmdFell, _cCmdRally;   // 154: okrzyk "ob" tylko przy upadku sztandaru; smierc dowodcy - sam rozkaz zbiorki
         private static string _spSample;
 
         // 129 (25.10, Jeff: "dodaj moje okrzyki mojej armii For Karda! Justice is honor! i takie tam wymysl zeby w kolko nie krzyczeli tego samego",
@@ -125,6 +129,7 @@ namespace Armoury
             for (int i = 0; i < OKinds; i++) _cOrder[i] = 0;
             for (int i = 0; i < HKinds; i++) _cHorn[i] = 0;
             _cHornIb = _cHornNw = _cOrderBa = _cMotto = _cSpHouse = _cSpRegion = _cSpMotto = _cSpSkip = _cBreak = _cBannerDown = _cOurBanner = 0;
+            _cOurBannerOb = _cStdFell = _cCmdFell = _cCmdRally = 0;
             _spSample = null;
             _kardaQ.Clear(); _kardaDone.Clear(); _kardaForm.Clear();
             _cKarda = _cKardaCap = _cKardaQ = 0;
@@ -505,20 +510,30 @@ namespace Armoury
             var f = e.F;
             long key = ((long)f.GetHashCode() << 8) ^ ((long)e.Company << 3) ^ e.Kind;
             if (!_bannerDone.Add(key)) return;
+            if (e.Kind == ECommander) _cCmdFell++;
+            else if (e.Kind == EStandard) _cStdFell++;
             Vec3 pos = e.Pos.x == 0f && e.Pos.y == 0f ? FormPos(f) : e.Pos;
             if (e.Kind != EBroke && f.CountOfUnits > 0)
             {
-                // wlasna strona: "Save the banner! Rally to me!" + rog zbiorki
+                // wlasna strona: okrzyk + rog zbiorki.
+                // 154 (Jeff 25.10: "ktos krzyczy lapcie baner ale baner stoi pusty"): "ob" (Save the banner! Rally to me!) TYLKO gdy sztandar naprawde padl - EStandard:
+                // BannerCompaniesMission.StandardLost wola StandardFell tylko dla kompanii ze sztandarem w gorze (co.StandardUp, chorazy zabity / omdlaly / upuscil;
+                // przeniesiony do innego szyku i kompania juz zlamana - bez zdarzenia). Smierc dowodcy / sierzanta (ECommander) - sam rozkaz zbiorki
+                // (or_<region>_rally - w manifescie brak takich klipow, wiec dzis cisza glosu) i rog zbiorki, nigdy "ob"
                 BasicCharacterObject ch;
                 string cul = FormCul(f, out ch);
                 var st = FS(f);
                 if (!Silent(ch, cul) && st.Kind[ORally].Ready(OGap[ORally]))
                 {
                     var spk = SpeakerOf(f);
-                    var cl = OwnBannerCry(cul);
-                    if (spk != null && cl != null && !IsSpeaking(spk) && Play(m, cl, GVoice, HeadOf(spk), OrderMin, OrderMax, true, spk, null, "sztandar") != null)
+                    bool std = e.Kind == EStandard;
+                    var cl = std ? OwnBannerCry(cul) : OrderClip(cul, ORally);
+                    if (spk != null && cl != null && !IsSpeaking(spk) && Play(m, cl, GVoice, HeadOf(spk), OrderMin, OrderMax, true, spk, null, std ? "sztandar" : "zbiorka po dowodcy") != null)
                     {
-                        st.Kind[ORally].Hit(); _cOurBanner++; _cOrder[ORally]++;
+                        st.Kind[ORally].Hit(); _cOrder[ORally]++;
+                        if (!std) _cCmdRally++;
+                        else if (cl.Code == "ob") { _cOurBanner++; _cOurBannerOb++; }
+                        else _cOurBanner++;
                     }
                     if (c.BattleHornsCulture) Horn(m, f, HRally, false);
                 }
@@ -801,6 +816,9 @@ namespace Armoury
               .Append(", regionu ").Append(_cSpRegion).Append(" + motto ").Append(_cSpMotto).Append(", pominiete ").Append(_cSpSkip)
               .Append(_spSample != null ? "; probka " + _spSample : "").Append(')');
             sb.Append(" | okrzyki choragwi: zlamanie ").Append(_cBreak).Append(", sztandar wroga ").Append(_cBannerDown).Append(", nasz sztandar ").Append(_cOurBanner);
+            // 154: "ob" (Save the banner!) tylko przy upadku sztandaru; smierc dowodcy - rozkaz zbiorki (klipow or_*_rally brak) i rog, bez "ob"
+            sb.Append(" (zdarzen upadku ").Append(_cStdFell).Append(", w tym ob ").Append(_cOurBannerOb).Append("; dowodca padl ").Append(_cCmdFell)
+              .Append(" - rozkaz zbiorki ").Append(_cCmdRally).Append(", ob nigdy)");
         }
     }
 }

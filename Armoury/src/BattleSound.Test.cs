@@ -13,6 +13,8 @@ namespace Armoury
     /// armoury-muzyka-bitwy.flag): raz na proces, w pierwszej bitwie z dzwiekiem, 2 s po rozstawieniu - po jednym klipie kazdego kodu katalogu (sp, mo, or, hr, dr,
     /// br, bd, ob, jk, ko, pt, wi, rn, fi, sz, cr...) co 1,5 s, 3D 6 m przed sluchaczem (tlo 2D), linia na klip: "probka &lt;id&gt; (kod, dlugosc): grane po 0,5 s
     /// tak/nie, koniec po X s (z dlugosci Y)". Nic nie czeka na gracza - autotest nie stanie. W grze Jeffa (LogGate 0) nic.
+    /// 154: na koniec probka odleglosci - ten sam klip (rozkaz "or" na voice_shout, odleglosci rozkazu 4/200 m) raz ok. 5 m i raz ok. 150 m od sluchacza,
+    /// z linia na kazdy ("probka &lt;id&gt; ... w 5 m / w 150 m ...") - do odsluchu przez Jeffa (silnik nie podaje glosnosci: w 150 m ma byc wyraznie ciszej).
     /// </summary>
     internal static partial class BattleSound
     {
@@ -21,6 +23,10 @@ namespace Armoury
         private static readonly List<Clip> _testQ = new List<Clip>();
         private static float _testNext;
         private static int _cTest, _cTestPlayed;
+        // 154: probka odleglosci (ten sam klip w 5 m i 150 m)
+        private static readonly float[] TestDistM = { 5f, 150f };
+        private static Clip _testDistClip;
+        private static int _testDistStep;
 
         private static bool TestWanted()
         {
@@ -37,6 +43,7 @@ namespace Armoury
         private static void ResetTest()
         {
             _testOn = false; _testQ.Clear(); _testNext = -1f; _cTest = _cTestPlayed = 0;
+            _testDistClip = null; _testDistStep = 0;
         }
 
         private static void TestBegin(Mission m)
@@ -46,12 +53,17 @@ namespace Armoury
             _testOn = true;
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var c in _clips) if (seen.Add(c.Code)) _testQ.Add(c);
-            Log.Info(P + "probka autotestu - " + _testQ.Count + " klipow (po jednym z kodu), start 2 s po rozstawieniu.");
+            // 154: klip probki odleglosci - pierwszy rozkaz (voice_shout); bez rozkazow - pierwszy klip 3D (nie wiatr / deszcz)
+            foreach (var c in _clips) if (c.Code == "or") { _testDistClip = c; break; }
+            if (_testDistClip == null) foreach (var c in _clips) if (c.Code != "wi" && c.Code != "rn") { _testDistClip = c; break; }
+            Log.Info(P + "probka autotestu - " + _testQ.Count + " klipow (po jednym z kodu), start 2 s po rozstawieniu"
+                     + (_testDistClip != null ? "; potem probka odleglosci " + _testDistClip.Id + " (zdarzenie " + EvName[EventFor(_testDistClip, true)] + ") w 5 m i w 150 m od sluchacza." : "; probki odleglosci brak (brak klipu 3D)."));
         }
 
         private static void TestTick(Mission m)
         {
-            if (!_testOn || _testQ.Count == 0) return;
+            if (!_testOn) return;
+            if (_testQ.Count == 0) { TestDistTick(m); return; }
             if (!m.IsDeploymentFinished) return;
             if (_testNext < 0f) { _testNext = _now + 2f; return; }
             if (_now < _testNext) return;
@@ -66,10 +78,29 @@ namespace Armoury
             s.Test = true;
         }
 
+        /// <summary>154: probka odleglosci - ten sam klip w 5 m, a po jego koncu (dlugosc + 1,5 s) w 150 m od sluchacza; odleglosci rozkazu (4/200 m x glosnosc).</summary>
+        private static void TestDistTick(Mission m)
+        {
+            if (_testDistClip == null || _testDistStep >= TestDistM.Length || !m.IsDeploymentFinished) return;
+            if (_testNext < 0f) { _testNext = _now + 2f; return; }
+            if (_now < _testNext) return;
+            for (int i = 0; i < _live.Count; i++) if (_live[i].Test) return;   // poprzednia probka jeszcze gra - odsluch bez nakladania
+            var c = _testDistClip;
+            float d = TestDistM[_testDistStep++];
+            _testNext = _now + c.Dur + 1.5f;
+            string note = " w " + F1(d) + " m od sluchacza (min/max " + F1(OrderMin) + "/" + F1(OrderMax) + " m x glosnosc)";   // zdarzenie naprawde uzyte - w TestChecked
+            var s = Play(m, c, GAmb, _lis + new Vec3(d, 0f, 0f), OrderMin, OrderMax, true, null, null, "probka odleglosci");
+            _cTest++;
+            if (s == null) { Log.Info(P + "probka " + c.Id + note + " (zdarzenie " + EvShort[EventFor(c, true)] + "): NIE utworzone (limit / daleko / silnik - licznik linii misji)."); return; }
+            s.Test = true;
+            s.TestNote = note + " - ODSLUCH: w 5 m glosno, w 150 m wyraznie ciszej (tak samo glosno = brak 3D)";
+        }
+
         private static void TestChecked(Snd s, bool playing)
         {
             if (playing) _cTestPlayed++;
-            Log.Info(P + "probka " + s.C.Id + " (" + s.C.Code + ", " + (s.Is3d ? "3D" : "2D") + "): grane po 0,5 s " + (playing ? "tak" : "NIE") + ".");
+            Log.Info(P + "probka " + s.C.Id + " (" + s.C.Code + ", " + (s.Is3d ? "3D" : "2D") + ", zdarzenie " + EvShort[s.Kind] + ")" + (s.TestNote ?? "")
+                     + ": grane po 0,5 s " + (playing ? "tak" : "NIE") + ".");
         }
 
         private static void TestEnded(Snd s, float t)

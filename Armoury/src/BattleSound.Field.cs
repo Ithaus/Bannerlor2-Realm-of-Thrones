@@ -21,11 +21,14 @@ namespace Armoury
     ///  - Szczek broni (BattleClashOfArms): szyki wrecz od 15 ludzi w zwarciu (najblizszy wrog do 20 m) - petla zgielku (sz_melee) w polowie miedzy szykami,
     ///    najwyzej 2 miejsca naraz, najblizsze sluchacza do 150 m, miejsca blizej niz 30 m - jedno.
     ///  - Ogien (SiegeFireSounds): oblezenie - po rozstawieniu petla ognia obozu oblegajacych (za ich szykami, 60 m od obroncow) i plonacego miasta (przy
-    ///    obroncach); gra, gdy sluchacz jest w zasiegu (do 250 m).
+    ///    obroncach); gra, gdy sluchacz jest w zasiegu (do 200 m - 154, dotad 250).
     /// </summary>
     internal static partial class BattleSound
     {
-        private const float HorseRange = 120f, HorseTeamGap = 8f, ClashNear = 20f, ClashRange = 150f, FireMin = 15f, FireMax = 250f;
+        private const float HorseRange = 120f, HorseTeamGap = 8f, ClashNear = 20f, ClashRange = 150f;
+        // 154 (odleglosci 3D min/max m, x glosnosc; pelna glosnosc tylko przy zrodle): konie (parskanie, rzenie, ranny kon) 4/120 (dotad 10/300 i 10/120),
+        // tetent 8/250 (dotad 10/300), szczek 10/150 (bez zmian), ogien 10/200 (dotad 15/250)
+        private const float HorseMin = 4f, HorseMax = 120f, GallopMin = 8f, GallopMax = 250f, ClashMin = 10f, FireMin = 10f, FireMax = 200f;
 
         private sealed class Loop
         {
@@ -146,7 +149,7 @@ namespace Armoury
                     if (LisDist(p) > HorseRange) continue;
                     var hc = _rng.Next(2) == 0 ? Pick("ko", "snort") : Pick("ko", "neigh");
                     if (hc == null) hc = Pick("ko", "snort") ?? Pick("ko", "neigh");
-                    if (hc != null && Play(m, hc, GAmb, p, 10f, 300f, true, null, f, "konie") != null) { _cHorse++; tl.Hit(); _horseTeam[t] = tl; break; }
+                    if (hc != null && Play(m, hc, GAmb, p, HorseMin, HorseMax, true, null, f, "konie") != null) { _cHorse++; tl.Hit(); _horseTeam[t] = tl; break; }
                 }
             }
         }
@@ -178,7 +181,7 @@ namespace Armoury
                 var f = _gallopQ[i];
                 if (f == null || f.CountOfUnits <= 0) continue;
                 var hc = Pick("ko", "charge");
-                if (hc != null && Play(m, hc, GAmb, FormPos(f), 10f, 300f, true, null, f, "tetent") != null) _cGallop++;
+                if (hc != null && Play(m, hc, GAmb, FormPos(f), GallopMin, GallopMax, true, null, f, "tetent") != null) _cGallop++;
             }
             _gallopQ.Clear();
         }
@@ -226,7 +229,7 @@ namespace Armoury
                 bool want = s < _clashPts.Count;
                 if (want)
                 {
-                    if (_clash[s] == null) _clash[s] = new Loop { Code = "sz", Key = "melee", Tag = "szczek", Is3d = true, Min = 10f, Max = ClashRange };
+                    if (_clash[s] == null) _clash[s] = new Loop { Code = "sz", Key = "melee", Tag = "szczek", Is3d = true, Min = ClashMin, Max = ClashRange };
                     _clash[s].Pos = _clashPts[s];
                     if (_clash[s].Cur != null && _live.Contains(_clash[s].Cur)) { _clash[s].Cur.Pos = _clashPts[s]; try { _clash[s].Cur.Ev.SetPosition(_clashPts[s]); } catch { } }
                 }

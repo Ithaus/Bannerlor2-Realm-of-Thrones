@@ -68582,7 +68582,10 @@ NOCDZ_TAG = "Dzwiek bitwy (noc-p2): "
 NOCDZ_CAT = re.compile(r"katalog - manifest (TAK|NIE)[^,]*, wierszy (\d+), klipow dobrych (\d+) \(([^)]*)\), zle pliki (\d+)(?: \(pierwszy .*?\))?, brak plikow (\d+)")
 NOCDZ_CREATED = re.compile(r"zdarzen utworzonych (\d+) ")
 NOCDZ_PLAYED = re.compile(r"grane po 0,5 s (\d+) \(nie grane (\d+)\)")
-NOCDZ_REL = re.compile(r"zwolnionych (\d+) \(przy koncu misji (\d+), w trakcie grania (\d+)\), najwiecej naraz (\d+), przerwane wczesnie (\d+)")
+NOCDZ_REL = re.compile(r"zwolnionych (\d+) \(przy koncu misji (\d+), w trakcie grania (\d+)[^)]*\), najwiecej naraz (\d+), przerwane wczesnie (\d+)")   # 154: [^)]* - audyt 25.10 dopisal ": zwolnione po id ..."
+# 154 (dzwiek 3D przy zrodle): odmowy zdarzenia 3D (zapas voiceover) i ktore zdarzenia gry niosly klipy
+NOCDZ_154 = re.compile(r"\(\+ zdarzenie 3D odrzucone (\d+) -> zapas voiceover (\d+)(?:; pierwsze: ([^)]*))?\)")
+NOCDZ_154EV = re.compile(r"\| zdarzenia \(154\): voice_shout (\d+), voice (\d+), ambient_3d_big (\d+) \(ciete na koncu klipu (\d+)\), voiceover (\d+)")
 NOCDZ_DRUMS = re.compile(r"\| bebny (TAK|NIE): start (\d+), takty (\d+), stop (\d+)")
 NOCDZ_STUMB = re.compile(r"\| potkniecia (-?\d+)\.$")
 NOCDZ_SKIP = re.compile(r"\) - pominieta \(([^)]*)\)")
@@ -68691,6 +68694,20 @@ def nocdzwiek_main(logp):
     else:
         rep.add("ND-7: probka autotestu", "brak", "INFO (bez armoury-dzwiek-bitwy.flag albo bez klipow)", None)
     rep.add("ND-8: zdarzenie 3D - odleglosci silnika (INFO)", probe3d[-1][:200] if probe3d else "brak (zadnego zdarzenia 3D)", "INFO", None)
+    # 154: zdarzenie 3D z banku gry odrzucone przez silnik = klip zagral 2D przy uchu (zapas voiceover) albo wcale - ma byc 0
+    f3d, fb, why1, ev = 0, 0, "", [0, 0, 0, 0, 0]
+    for b in mis:
+        m4 = NOCDZ_154.search(b)
+        if m4:
+            f3d += int(m4.group(1))
+            fb += int(m4.group(2))
+            why1 = why1 or (m4.group(3) or "")
+        m5 = NOCDZ_154EV.search(b)
+        if m5:
+            ev = [ev[i] + int(m5.group(i + 1)) for i in range(5)]
+    rep.add("ND-10: zdarzenia 3D (154) - odrzucone przez silnik 0", "odrzucone %d (zapas voiceover %d%s); voice_shout %d, voice %d, ambient_3d_big %d (ciete %d), voiceover %d"
+            % (f3d, fb, (", pierwsze: " + why1[:90]) if why1 else "", ev[0], ev[1], ev[2], ev[3], ev[4]),
+            "0 (linii bez segmentu 154 - INFO)", None if not any(NOCDZ_154.search(b) for b in mis) else f3d == 0)
     sums = []
     for name, rx in NOCDZ_SUMS:
         t = 0

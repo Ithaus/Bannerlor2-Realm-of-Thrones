@@ -295,7 +295,9 @@ namespace Armoury
             sb.Append("), zle pliki ").Append(_catBad).Append(_firstBad != null ? " (pierwszy " + _firstBad + ")" : "")
               .Append(", brak plikow ").Append(_catMissing).Append(_firstMissing != null ? " (pierwszy " + _firstMissing + ")" : "")
               .Append(", zle wiersze ").Append(_catBadLines).Append(_firstBadLine != null ? " (pierwszy " + _firstBadLine + ")" : "").Append(", duble ").Append(_catDup).Append(", bez dlugosci ").Append(_catNoDur).Append(", stereo ").Append(_catStereo)
-              .Append("; zdarzenie ").Append(VoiceEvent).Append(" (3D: scena misji + SetPosition), katalog ").Append(_dir ?? "?")
+              .Append("; zdarzenia (154): 3D przy zrodle - glosy, rogi, konie, bebny, ryk i wylom ").Append(Ev3dShout).Append(" (klip do 8 s), jeki do 4 s ").Append(Ev3dVoice)
+              .Append(", petle (szczek, ogien, tlum, taran), ptaki i klipy dluzsze niz os ").Append(Ev3dAmb).Append(" (ciete na koncu klipu); 2D - wiatr i deszcz ").Append(VoiceEvent)
+              .Append("; odmowa zdarzenia 3D - zapas ").Append(VoiceEvent).Append(" dla tego klipu; katalog ").Append(_dir ?? "?")
               .Append(", probka autotestu ").Append(TestWanted() ? "TAK" : "NIE").Append(", proba ").Append(_catTries).Append('/').Append(CatTriesMax)
               .Append(failed ? (again ? " - WYJATEK przy ladowaniu, kolejna bitwa laduje jeszcze raz" : " - WYJATEK przy ladowaniu (bez kolejnej proby)") : "").Append('.');
             Log.Info(sb.ToString());

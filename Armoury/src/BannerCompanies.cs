@@ -164,6 +164,9 @@ namespace Armoury
         private Action<Agent> _collect;
         private Action<Agent, bool> _onBearer;
         private string _deployNote = "-";
+        // 154 (Jeff 25.10: "baner stoi pusty"): linia na kazde zdarzenie sztandaru (padl / odszedl z chorazym / podniesiony) - najwyzej StdLinesMax na misje
+        private const int StdLinesMax = 60;
+        private int _stdLines, _stdLinesCut;
 
         // ------------------------------------------------------------ start / koniec
 
@@ -681,6 +684,7 @@ namespace Armoury
                         for (int j = 0; j < list.Count && best == null; j++)
                             if (!list[j].HadStandard && !list[j].Broken) best = list[j];
                     if (best == null) break;
+                    bool again = best.HadStandard, afterFall = best.LastFall;   // 154: linia tylko dla kompanii, ktora sztandar juz miala
                     Put(b, best);
                     SetBearer(best, b);
                     if (best.BonusDue && best.LastFall)
@@ -689,6 +693,7 @@ namespace Armoury
                         BannerCompanies.StdRaised++;
                         Shock(best, +0.5f * c.BannerShockStandardLost);
                     }
+                    if (again) StdLine(best, afterFall ? "PODNIESIONY po upadku" : "znowu w gorze (poprzedni chorazy odszedl do innego szyku)", b, b.Position);
                 }
             }
         }
@@ -766,9 +771,11 @@ namespace Armoury
         private void StandardLost(Company co, Vec3 pos, bool moved, float now, Settings c)
         {
             co.StandardUp = false;
+            var bearer = co.Bearer;
             if (co.Bearer != null) _bearerOf.Remove(co.Bearer);
             co.Bearer = null;
             co.FallPos = pos;
+            StdLine(co, moved ? "odszedl z chorazym do innego szyku (bez okrzyku)" : co.Broken ? "PADL (kompania juz zlamana - bez okrzyku)" : "PADL", bearer, pos);
             if (moved) { co.LastFall = false; BannerCompanies.StdMoved++; return; }
             co.LastFall = true;
             co.BonusDue = true;
@@ -798,6 +805,26 @@ namespace Armoury
             }
             BannerCompanies.CommanderFell(co.F, co.Index, pos);
             Roll(co, co.CmdGeneral ? 2f : (co.CmdHero ? 1.5f : 1f), c, now);
+        }
+
+        /// <summary>154: linia zdarzenia sztandaru (kto, strona, co) - dowod do testu okrzyku "Save the banner!" i podnoszenia; najwyzej StdLinesMax na misje
+        /// (reszta liczona w linii konca). Tylko log - stan kompanii bez zmian.</summary>
+        private void StdLine(Company co, string what, Agent bearer, Vec3 pos)
+        {
+            if (_stdLines >= StdLinesMax) { _stdLinesCut++; return; }
+            _stdLines++;
+            try
+            {
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                string side = co.T != null && co.T.IsPlayerTeam ? "druzyna gracza" : PlayerSide(co) ? "sojusznik gracza" : "wrog";
+                string who = "-";
+                try { if (bearer != null) who = bearer.Name ?? "?"; } catch { who = "?"; }
+                float t = Mission != null ? Mission.CurrentTime - _deployedAt : 0f;
+                Log.Info("Choragwie (154): sztandar " + what + " | " + NameOf(co) + " (szyk " + ((int)co.F.FormationIndex + 1).ToString(inv) + ", kompania " + (co.Index + 1).ToString(inv)
+                         + ") | strona " + side + " | chorazy " + who + " | miejsce " + pos.x.ToString("0", inv) + "," + pos.y.ToString("0", inv)
+                         + " | " + (_deployed ? t.ToString("0", inv) + " s po rozstawieniu" : "przed rozstawieniem") + ".");
+            }
+            catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.StdLine", e); }
         }
 
         /// <summary>Wstrzas morale kompanii przez model gry (CalculateMoraleChangeToCharacter - odpornosc wedlug tieru, bohater x1.5).</summary>
@@ -1026,6 +1053,7 @@ namespace Armoury
               .Append(BannerCompanies.CheersNoEnemy).Append("), komunikatow ").Append(BannerCompanies.Msgs).Append(" (pominiete limitem ").Append(BannerCompanies.MsgsLimited).Append(')')
               .Append(" | posilkow dolaczonych ").Append(BannerCompanies.Joined).Append(", przeniesionych ").Append(BannerCompanies.Moved)
               .Append(", formacji podzielonych pozniej ").Append(BannerCompanies.Lazy)
+              .Append(" | linie sztandaru (154) ").Append(_stdLines).Append(" (ponad limit ").Append(_stdLinesCut).Append(')')
               .Append(" | potkniecia ").Append(BannerCompanies.Stumbles).Append('.');
             Log.Info(sb.ToString());
         }

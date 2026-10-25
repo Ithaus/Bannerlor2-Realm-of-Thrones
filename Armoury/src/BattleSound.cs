@@ -21,12 +21,26 @@ namespace Armoury
     /// tlum i krzyki szturmu murow, bebny oblezenia - BattleSound.Siege.cs.
     ///
     /// ODTWARZANIE (v1 BEZ project.mbproj i module_sounds.xml - zly plik silnika = zly start gry): pliki Armoury/ModuleData/Lektor/Bitwa/&lt;kategoria&gt;/*.ogg
-    /// (manifest.tsv P2a; bez manifestu - przeglad katalogow) przez SoundEvent.CreateEventFromExternalFile("event:/Extra/voiceover", plik, scena, is3d, false) - ta sama
-    /// droga co Lektor (2D, scena null) i gra w misji (SandBox EavesdroppingMissionLogic: scena misji, is3d true; CampaignMissionComponent: SetPosition przed Play).
-    /// 3D: scena misji + SetPosition + SetEventMinMaxDistance(min, max, 0) (wzor ROTBA VoicePlayer) przed Play. Czy silnik tlumi zdarzenie voiceover z odlegloscia -
-    /// NIESPRAWDZONE w grze (dowod: linia "zdarzenie 3D" raz na proces z GetEventMinMaxDistance przed / po ustawieniu i odsluch Jeffa). Glosnosci zdarzenia z pliku
-    /// nie da sie ustawic - suwak BattleSoundsLoudness skaluje odleglosci min / max (1: x0.7, 2: x1.0, 3: x1.4), a dzwiekow dalej niz max + 50 m od sluchacza
-    /// (kamera, SoundManager.GetListenerFrame) nie tworzymy wcale. Tlo (wiatr, deszcz) - 2D jak Lektor.
+    /// (manifest.tsv P2a; bez manifestu - przeglad katalogow) przez SoundEvent.CreateEventFromExternalFile(zdarzenie programisty, plik, scena, is3d, false).
+    /// 154 (Jeff 25.10 22:45: "zrodlo jest glosniejsze jak jestem blisko a ciszej jak jestem dalej"): do P2 KAZDY klip szedl przez "event:/Extra/voiceover" - w banku gry
+    /// zdarzenie 2D (voice.bank: na sciezce glownej brak spatializera FMOD - DSP typu 27 PAN; sound_event_data.gen.xml max_distance 100000), wiec SetPosition
+    /// i SetEventMinMaxDistance nic nie dawaly - wszystko gralo przy uchu. Teraz 3D (EventFor wedlug kodu klipu) - zdarzenia szablonow module_sounds z Native mod.bank,
+    /// kazde z instrumentem programisty (PRIB) i spatializerem na sciezce glownej (sprawdzone w banku 1.4.8):
+    ///  - event:/mod/mission/voice_shout (max_distance 450, os 8 s): rozkazy, motta, przemowy, okrzyki choragwi i murow, rogi, konie, bebny marszu i oblezenia, ryk i wylom;
+    ///  - event:/mod/mission/voice (80, os 4 s): jeki po bitwie do 4 s (dluzsze - voice_shout);
+    ///  - event:/mod/mission/ambient_3d_big (100, zdarzenie trwale - dlugosc -1, instrument programisty w multi-instrumencie podpietym w naglowku zdarzenia, nie na osi): petle szczeku, ognia, tlumu szturmu
+    ///    i zalogi taranu oraz ptaki; zdarzenie samo sie nie konczy (moze zapetlic klip), wiec Track tnie je na koncu klipu (czas rzeczywisty);
+    ///  - klip dluzszy niz os zdarzenia -> ambient_3d_big: os instrumentu programisty mod/* jest zapisana inaczej niz w Extra/voiceover i Extra/external (te graja
+    ///    klipy dluzsze niz os - Lektor 20-43 s na osi 5 s; mod/* - prawdopodobnie bez "async"), a opis kategorii w Native module_sounds.xml mowi "max 8 sec." /
+    ///    "max 4 sec." - dluzszy klip bylby zapewne uciety na koncu osi (wniosek z banku, NIESPRAWDZONE w grze);
+    ///  - event:/mod/mission/siege_loud NIE (choc ma instrument programisty i spatializer): ma drugi arkusz (parametr "Distance Siege 500", 0-500) z multi-instrumentem
+    ///    dwoch probek ballista_break - prawdopodobnie dograliby sie do kazdego taktu bebna; bebny ida przez voice_shout;
+    ///  - wiatr i deszcz - "event:/Extra/voiceover" 2D jak dotad (tlo calej sceny, jak Lektor).
+    /// Zdarzenie 3D odrzucone przez silnik (id -1, Play false, wyjatek) - licznik i zapas: stara droga voiceover TYLKO dla tego klipu (cisza nie bez sladu - linia misji).
+    /// 3D: scena misji + SetPosition + SetEventMinMaxDistance(min, max, 0) (wzor ROTBA VoicePlayer) przed Play; zrodla za mowca / szykiem - pozycja i predkosc co klatke
+    /// (Track). Czy silnik stosuje nasze min / max (spatializer zdarzenia moze miec wlasny zakres) i jak glosno slychac - silnik NIE podaje; dowod tylko odsluchem
+    /// (probka odleglosci autotestu 5 m / 150 m). Glosnosci zdarzenia z pliku nie da sie ustawic - suwak BattleSoundsLoudness skaluje odleglosci min / max
+    /// (1: x0.7, 2: x1.0, 3: x1.4), a dzwiekow dalej niz max + 50 m od sluchacza (kamera, SoundManager.GetListenerFrame) nie tworzymy wcale.
     ///
     /// PULA: kazde zdarzenie w _live; koniec (silnik: !IsValid / IsStopped po 0,3 s, albo czas klipu + 2 s czasu misji, albo + 60 s czasu rzeczywistego) -> Release;
     /// OnClearScene i End -> Release WSZYSTKICH. Nigdy zdarzenie z pustej sciezki / bez sceny dla 3D. Limity (stale): glosy 6, rogi 2, bebny 6, tlo 6 naraz; najwyzej
@@ -49,7 +63,19 @@ namespace Armoury
     internal static partial class BattleSound
     {
         internal const string P = "Dzwiek bitwy (noc-p2): ";
-        internal const string VoiceEvent = "event:/Extra/voiceover";
+        internal const string VoiceEvent = "event:/Extra/voiceover";   // 2D (wiatr, deszcz) i zapas po odmowie zdarzenia 3D
+        // 154: zdarzenia 3D z banku gry (Native mod.bank / sound_event_data.gen.xml 1.4.8) - instrument programisty + spatializer na sciezce glownej
+        internal const string Ev3dShout = "event:/mod/mission/voice_shout";      // max_distance 450 m, os 8 s
+        internal const string Ev3dVoice = "event:/mod/mission/voice";            // max_distance 80 m, os 4 s
+        internal const string Ev3dAmb = "event:/mod/mission/ambient_3d_big";     // max_distance 100 m, zdarzenie trwale (bez konca)
+        private const float ShoutLen = 8f, VoiceLen = 4f, LenSlack = 0.05f;      // dlugosc osi zdarzenia (s) i luz na zaokraglenie dlugosci klipu w manifescie
+        private const float LoopCutEarly = 0.05f;                                // ambient_3d_big: ciecie tyle przed koncem klipu (czas rzeczywisty) - bez zapetlenia
+        private const float ClipTail = 0.5f;                                     // voice_shout / voice: koniec zdarzenia tyle po koncu klipu (zapas na wczytanie pliku)
+        private const float MaxSpeed = 40f;                                       // predkosc zrodla (m/s) - wiecej = przeskok (nowa pozycja), predkosc 0
+        internal const int EvShout = 0, EvVoice = 1, EvAmb = 2, EvOver = 3, EvKinds = 4;
+        private static readonly string[] EvName = { Ev3dShout, Ev3dVoice, Ev3dAmb, VoiceEvent };
+        private static readonly string[] EvShort = { "voice_shout", "voice", "ambient_3d_big", "voiceover" };
+        private static readonly string[] EvBankMax = { "450", "80", "100", "100000 (2D)" };
         internal const float YellLeadMax = 2.5f;          // najdluzsze czekanie okrzyku ludzi na glos dowodcy (BattleCries)
         internal const float OrderLead = 0.4f;            // okrzyk ludzi 0,4 s po "Charge!" kapitana (krytyk K4)
         private const float TickEvery = 0.25f;
@@ -82,6 +108,10 @@ namespace Armoury
             internal Vec3 Pos;
             internal Clip Then;               // nastepny klip tego samego mowcy (przemowa regionu -> motto rodu)
             internal float ThenMin, ThenMax;
+            internal int Kind;                // 154: zdarzenie (EvShout / EvVoice / EvAmb / EvOver)
+            internal Vec3 Last;               // 154: poprzednia pozycja sledzonego zrodla (predkosc)
+            internal bool HasLast;
+            internal string TestNote;         // 154: dopisek linii probki autotestu (odleglosc)
         }
 
         private static readonly List<Snd> _live = new List<Snd>();
@@ -102,6 +132,10 @@ namespace Armoury
         private static int _created, _played05, _notPlayed, _released, _relPlaying, _relById, _relByStop, _relLeak, _early, _endCap, _rejLimit, _rejFar, _rejNoClip, _rejEngine, _rejRate, _peak;
         private static readonly int[] _byGroup = new int[Groups];
         private static readonly int[] _rejGroup = new int[Groups];
+        // 154: zdarzenia wedlug rodzaju, odmowy zdarzenia 3D (zapas voiceover), ciecia petli na koncu klipu, sledzenie co klatke
+        private static readonly int[] _cEv = new int[EvKinds];
+        private static int _fail3d, _fallback, _loopCut, _trackPeak, _clipEnd;
+        private static string _fail3dWhy;
 
         // ---- czas
         private static double Real { get { return Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency; } }
@@ -165,6 +199,9 @@ namespace Armoury
             _secStamp[0] = -1; _secCount = 0;
             _created = _played05 = _notPlayed = _released = _relPlaying = _relById = _relByStop = _relLeak = _early = _endCap = _rejLimit = _rejFar = _rejNoClip = _rejEngine = _rejRate = _peak = 0;
             for (int i = 0; i < Groups; i++) { _byGroup[i] = 0; _rejGroup[i] = 0; }
+            for (int i = 0; i < EvKinds; i++) _cEv[i] = 0;
+            _fail3d = _fallback = _loopCut = _trackPeak = _clipEnd = 0;
+            _fail3dWhy = null;
             ResetFeatures();
         }
 
@@ -180,6 +217,8 @@ namespace Armoury
                 if (_live.Count > 0) ReleaseAll("klucz NIE w bitwie");
                 return;
             }
+            // 154: pozycja zrodel za mowca / szykiem i koniec klipu na zdarzeniu trwalym - co klatke (praca: najwyzej tyle, ile zywych zdarzen, limity grup razem 22)
+            if (_live.Count > 0) { try { Track(dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Sledzenie", e); } }
             // sygnaly szarzy - w tej samej klatce (okrzyk ludzi czeka 0,4 s na rozkaz)
             if (HasChargeQueue())
             {
@@ -309,7 +348,28 @@ namespace Armoury
             return _secCount < MaxNewPerSec;
         }
 
-        /// <summary>Nowe zdarzenie: limity, odleglosc od sluchacza, CreateEventFromExternalFile, pozycja i odleglosci 3D, Play. null = cisza (licznik).</summary>
+        /// <summary>154: zdarzenie wedlug kodu klipu (opis klasy). 2D - zawsze voiceover. Klip dluzszy niz os zdarzenia - dluzsze zdarzenie (bez uciecia konca).</summary>
+        private static int EventFor(Clip c, bool threeD)
+        {
+            if (!threeD) return EvOver;
+            switch (c.Code)
+            {
+                case "sz": case "fi": case "pt": return EvAmb;                       // petle szczeku i ognia, ptaki
+                case "sc":
+                    if (c.Key != null && (c.Key.StartsWith("assault", StringComparison.Ordinal) || c.Key.StartsWith("defend", StringComparison.Ordinal))) return EvAmb;   // petle tlumu szturmu
+                    break;
+                case "sg":
+                    if (c.Key == "ram") return EvAmb;                                // petla zalogi taranu
+                    break;
+                case "jk":
+                    if (c.Dur <= VoiceLen + LenSlack) return EvVoice;                  // jek - krotki zasieg w banku (80 m)
+                    break;
+            }
+            return c.Dur <= ShoutLen + LenSlack ? EvShout : EvAmb;
+        }
+
+        /// <summary>Nowe zdarzenie: limity, odleglosc od sluchacza, zdarzenie wedlug klipu (EventFor), pozycja i odleglosci 3D, Play; odmowa zdarzenia 3D - zapas
+        /// voiceover dla tego klipu. null = cisza (licznik).</summary>
         private static Snd Play(Mission m, Clip clip, int group, Vec3 pos, float min, float max, bool threeD, Agent follow, Formation ff, string tag)
         {
             if (clip == null) { _rejNoClip++; return null; }
@@ -325,35 +385,31 @@ namespace Armoury
                 scene = m != null ? m.Scene : null;
                 if (scene == null) { _rejEngine++; return null; }
             }
+            int kind = EventFor(clip, threeD);
             SoundEvent ev = null;
-            try { ev = SoundEvent.CreateEventFromExternalFile(VoiceEvent, clip.Path, scene, threeD, false); }
-            catch (Exception e) { _rejEngine++; RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Create", e); return null; }
-            bool ok = false;
-            try
+            string why;
+            bool tried3d = kind != EvOver;
+            if (tried3d)
             {
-                if (ev != null && ev.IsValid)
+                ev = Start(EvName[kind], clip, scene, true, pos, min, max, out why);
+                if (ev == null)
                 {
-                    if (threeD)
-                    {
-                        Vec3 before = Vec3.Zero;
-                        bool probe = !_probed;
-                        if (probe) { try { before = ev.GetEventMinMaxDistance(); } catch { } }
-                        ev.SetPosition(pos);
-                        ev.SetEventMinMaxDistance(new Vec3(min, max, 0f));
-                        if (probe) Probe3D(before, ev, min, max);
-                    }
-                    ok = ev.Play();
+                    // silnik nie przyjal zdarzenia 3D - licznik ("silnik" w linii misji) i stara droga voiceover TYLKO dla tego klipu
+                    _fail3d++;
+                    if (_fail3dWhy == null) _fail3dWhy = EvShort[kind] + " " + (why ?? "?") + " (" + clip.Id + ")";
+                    kind = EvOver;
                 }
             }
-            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Play", e); ok = false; }
-            if (!ok)
+            if (ev == null)
             {
-                _rejEngine++;
-                try { if (ev != null && ev.IsValid) ev.Release(); } catch { }
-                return null;
+                ev = Start(VoiceEvent, clip, scene, threeD, pos, min, max, out why);
+                if (ev == null) { _rejEngine++; return null; }
+                if (tried3d) _fallback++;
             }
             _secCount++;
-            var s = new Snd { Ev = ev, C = clip, Group = group, Tag = tag, T0 = _now, R0 = Real, Is3d = threeD, Follow = follow, FollowF = ff, Pos = pos };
+            _cEv[kind]++;
+            if (kind != EvOver) EventFirst(kind, ev, clip, min, max, tag);
+            var s = new Snd { Ev = ev, C = clip, Group = group, Tag = tag, T0 = _now, R0 = Real, Is3d = threeD, Follow = follow, FollowF = ff, Pos = pos, Kind = kind };
             _live.Add(s);
             _created++;
             _byGroup[group]++;
@@ -361,22 +417,127 @@ namespace Armoury
             return s;
         }
 
-        // pierwsze zdarzenie 3D w procesie: odleglosci silnika przed i po ustawieniu (dowod, ze zdarzenie ma przestrzen 3D)
-        private static bool _probed;
-
-        private static void Probe3D(Vec3 before, SoundEvent ev, float min, float max)
+        /// <summary>CreateEventFromExternalFile, dla 3D pozycja i odleglosci, Play. null = silnik odmowil (why: id -1 / Play false / wyjatek - wyjatek liczony
+        /// jako potkniecie); zdarzenie po nieudanym Play zwolnione.</summary>
+        private static SoundEvent Start(string evName, Clip clip, Scene scene, bool threeD, Vec3 pos, float min, float max, out string why)
         {
-            _probed = true;
-            Vec3 after = Vec3.Zero;
-            try { after = ev.GetEventMinMaxDistance(); } catch { }
-            Log.Info(P + "zdarzenie 3D (pierwsze w procesie, " + VoiceEvent + ", scena misji, is3d tak): GetEventMinMaxDistance przed ustawieniem "
-                     + F1(before.x) + "/" + F1(before.y) + ", po SetEventMinMaxDistance(" + F1(min) + ", " + F1(max) + ") " + F1(after.x) + "/" + F1(after.y)
-                     + " - czy silnik tlumi z odlegloscia: odsluch (0/0 przed = zdarzenie bez przestrzeni w banku?).");
+            why = null;
+            SoundEvent ev;
+            try { ev = SoundEvent.CreateEventFromExternalFile(evName, clip.Path, scene, threeD, false); }
+            catch (Exception e) { why = "wyjatek " + e.GetType().Name; RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Create", e); return null; }
+            if (ev == null || !ev.IsValid) { why = "nie utworzone (id " + (ev != null ? ev.GetSoundId() : -1).ToString(Inv) + ")"; return null; }
+            bool ok = false;
+            try
+            {
+                if (threeD)
+                {
+                    ev.SetPosition(pos);
+                    ev.SetEventMinMaxDistance(new Vec3(min, max, 0f));
+                }
+                ok = ev.Play();
+                if (!ok) why = "Play false";
+            }
+            catch (Exception e) { why = "wyjatek " + e.GetType().Name; RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Play", e); ok = false; }
+            if (!ok)
+            {
+                try { if (ev.IsValid) ev.Release(); } catch { }
+                return null;
+            }
+            return ev;
+        }
+
+        // 154: pierwsze zdarzenie kazdego rodzaju 3D w procesie - uczciwa linia (zastepuje probke "zdarzenie 3D" z P2: odczyt -1/-1 przed i 10/150 po niczego
+        // nie dowodzil - to tylko nadpisanie wlasnosci zdarzenia, -1 = nieustawione)
+        private static readonly bool[] _evFirst = new bool[EvKinds];
+
+        private static void EventFirst(int kind, SoundEvent ev, Clip clip, float min, float max, string tag)
+        {
+            if (kind < 0 || kind >= EvKinds || _evFirst[kind]) return;
+            _evFirst[kind] = true;
+            Vec3 got = Vec3.Zero;
+            try { got = ev.GetEventMinMaxDistance(); } catch { }
+            Log.Info(P + "zdarzenie 3D " + EvName[kind] + " - pierwsze w procesie (" + tag + ", " + clip.Id + ", " + F1(clip.Dur) + " s): utworzone, Play tak, ustawione min/max "
+                     + F1(min) + "/" + F1(max) + " m (odczyt GetEventMinMaxDistance " + F1(got.x) + "/" + F1(got.y) + " = tylko zapisana wlasnosc zdarzenia, -1 = nieustawiona; "
+                     + "max_distance w banku gry " + EvBankMax[kind] + " m). Silnik NIE podaje, czy nasze min/max dzialaja ani jak glosno klip slychac - dowod 3D tylko odsluchem "
+                     + "(probka odleglosci autotestu: ten sam klip 5 m i 150 m od sluchacza).");
         }
 
         private static string F1(float v) { return v.ToString("0.0", Inv); }
 
-        /// <summary>Takt puli (0,25 s): pozycja za mowca / szykiem, kontrola "grane po 0,5 s", koniec -> Release, nastepny klip mowcy.</summary>
+        /// <summary>154: co klatke misji (Tick) - pozycja i predkosc zrodel za mowca / szykiem (dotad co 0,25 s w Pool) oraz ciecie klipu na zdarzeniu trwalym
+        /// ambient_3d_big na jego koncu (czas rzeczywisty = zegar dzwieku; inaczej zdarzenie bez konca zapetliloby klip, a LoopTick dolozyl nastepny).
+        /// Praca: jedno przejscie po _live (limity grup razem 22, w logu szczyt 6) - kilka wywolan silnika na zrodlo. Wyjatek - to zrodlo przestaje byc sledzone
+        /// (licznik potkniec), reszta dalej.</summary>
+        private static void Track(float dt)
+        {
+            double rnow = Real;
+            int tracked = 0;
+            for (int i = _live.Count - 1; i >= 0; i--)
+            {
+                var s = _live[i];
+                try
+                {
+                    if (s.Kind == EvAmb && rnow - s.R0 >= s.C.Dur - LoopCutEarly)
+                    {
+                        Check(s, rnow - s.R0, _now - s.T0);
+                        _live.RemoveAt(i);
+                        _loopCut++;
+                        Finish(s, _now - s.T0);
+                        continue;
+                    }
+                    if (!s.Is3d) continue;
+                    Vec3 p;
+                    if (s.Follow != null)
+                    {
+                        if (!s.Follow.IsActive()) { s.Follow = null; continue; }   // zginal w trakcie - glos gra do konca w miejscu
+                        p = s.Follow.Position + new Vec3(0f, 0f, 1.6f);
+                    }
+                    else if (s.FollowF != null)
+                    {
+                        if (s.FollowF.CountOfUnits <= 0) { s.FollowF = null; continue; }
+                        p = s.FollowF.CachedMedianPosition.GetNavMeshVec3() + new Vec3(0f, 0f, 1.5f);
+                    }
+                    else continue;
+                    tracked++;
+                    Vec3 v = Vec3.Zero;
+                    if (s.HasLast && dt > 0.0001f)
+                    {
+                        v = (p - s.Last) * (1f / dt);
+                        if (v.LengthSquared > MaxSpeed * MaxSpeed) v = Vec3.Zero;   // przeskok (np. pierwszy odczyt szyku) - bez predkosci
+                    }
+                    s.Last = p; s.HasLast = true; s.Pos = p;
+                    s.Ev.SetPosition(p);
+                    s.Ev.SetVelocity(v);
+                }
+                catch (Exception e) { s.Follow = null; s.FollowF = null; RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Sledzenie.Klip", e); }
+            }
+            if (tracked > _trackPeak) _trackPeak = tracked;
+        }
+
+        /// <summary>Kontrola "grane po 0,5 s" (raz na zdarzenie): Pool po 0,5 s; Track przed cieciem krotkiego klipu petli.</summary>
+        private static void Check(Snd s, double er, float em)
+        {
+            if (s.Checked || er < 0.5 || em < 0.3f) return;
+            s.Checked = true;
+            bool playing = s.Ev.IsValid && s.Ev.IsPlaying();
+            if (playing) _played05++; else _notPlayed++;
+            if (s.Test) TestChecked(s, playing);
+        }
+
+        /// <summary>Koniec zdarzenia (juz poza _live): Release, linia probki, nastepny klip mowcy, beben. Wlasny try - wywrotka nie zostawia zdarzenia bez Release.</summary>
+        private static void Finish(Snd s, float em)
+        {
+            ReleaseOne(s);
+            try
+            {
+                if (s.Test) TestEnded(s, em);
+                if (s.Then != null && s.Follow != null) QueueThen(s);
+                OnSndEnded(s);
+            }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Koniec", e); }
+        }
+
+        /// <summary>Takt puli (0,25 s): kontrola "grane po 0,5 s", koniec -> Release, nastepny klip mowcy (pozycja za mowca / szykiem - co klatke w Track, 154).</summary>
         private static void Pool(Mission m)
         {
             double rnow = Real;
@@ -388,28 +549,12 @@ namespace Armoury
                 double er = rnow - s.R0;
                 try
                 {
-                    if (s.Is3d)
-                    {
-                        if (s.Follow != null)
-                        {
-                            if (s.Follow.IsActive()) { s.Pos = s.Follow.Position + new Vec3(0f, 0f, 1.6f); s.Ev.SetPosition(s.Pos); }
-                            else s.Follow = null;   // zginal w trakcie - glos gra do konca w miejscu
-                        }
-                        else if (s.FollowF != null)
-                        {
-                            if (s.FollowF.CountOfUnits > 0) { s.Pos = s.FollowF.CachedMedianPosition.GetNavMeshVec3() + new Vec3(0f, 0f, 1.5f); s.Ev.SetPosition(s.Pos); }
-                            else s.FollowF = null;
-                        }
-                    }
-                    if (!s.Checked && er >= 0.5 && em >= 0.3f)
-                    {
-                        s.Checked = true;
-                        bool playing = s.Ev.IsValid && s.Ev.IsPlaying();
-                        if (playing) _played05++; else _notPlayed++;
-                        if (s.Test) TestChecked(s, playing);
-                    }
+                    Check(s, er, em);
                     if (!s.Ev.IsValid) ended = true;
                     else if (er >= 0.3 && em >= 0.25f && s.Ev.IsStopped()) ended = true;
+                    // 154: voice_shout / voice - os zdarzenia (8 / 4 s) dluzsza niz klip, silnik konczy zdarzenie dopiero na koncu osi; bez tego mowca bylby "zajety"
+                    // (IsSpeaking), a motto po przemowie czekalo do konca osi. Klip skonczony (czas rzeczywisty = zegar dzwieku, misji - pauza nie tnie) -> koniec
+                    else if ((s.Kind == EvShout || s.Kind == EvVoice) && er >= s.C.Dur + ClipTail && em >= s.C.Dur) { ended = true; _clipEnd++; }
                     else if (em >= s.C.Dur + 2f) { ended = true; _endCap++; }
                     else if (er >= s.C.Dur + 60.0) { ended = true; _endCap++; }
                 }
@@ -425,10 +570,7 @@ namespace Armoury
             {
                 var s = _ended[i];
                 _live.Remove(s);
-                ReleaseOne(s);
-                if (s.Test) TestEnded(s, _now - s.T0);
-                if (s.Then != null && s.Follow != null) QueueThen(s);
-                OnSndEnded(s);
+                Finish(s, _now - s.T0);
             }
             _ended.Clear();
         }
@@ -530,7 +672,12 @@ namespace Armoury
               .Append(", w trakcie grania ").Append(_relPlaying).Append(": zwolnione po id ").Append(_relById).Append(", zwolnil Stop ").Append(_relByStop)
               .Append(", wyciek ").Append(_relLeak).Append(_sndResolved == 2 ? " - BRAK ISoundEvent" : "").Append("), najwiecej naraz ").Append(_peak).Append(", przerwane wczesnie ").Append(_early).Append(", koniec po czasie ").Append(_endCap)
               .Append("; odrzucone: limit ").Append(_rejLimit).Append(" (glosy ").Append(_rejGroup[GVoice]).Append(", rogi ").Append(_rejGroup[GHorn]).Append(", bebny ").Append(_rejGroup[GDrum]).Append(", tlo ").Append(_rejGroup[GAmb]).Append(", chwile szturmu ").Append(_rejGroup[GSiegeFx]).Append(')').Append(", na sekunde ").Append(_rejRate).Append(", daleko ").Append(_rejFar)
-              .Append(", brak klipu ").Append(_rejNoClip).Append(", silnik ").Append(_rejEngine);
+              .Append(", brak klipu ").Append(_rejNoClip).Append(", silnik ").Append(_rejEngine)
+              .Append(" (+ zdarzenie 3D odrzucone ").Append(_fail3d).Append(" -> zapas voiceover ").Append(_fallback).Append(_fail3dWhy != null ? "; pierwsze: " + _fail3dWhy : "").Append(')');
+            // 154: ktore zdarzenia gry niosly klipy (3D przy zrodle / 2D tlo) i praca sledzenia co klatke
+            sb.Append(" | zdarzenia (154): voice_shout ").Append(_cEv[EvShout]).Append(", voice ").Append(_cEv[EvVoice]).Append(", ambient_3d_big ").Append(_cEv[EvAmb])
+              .Append(" (ciete na koncu klipu ").Append(_loopCut).Append("), voiceover ").Append(_cEv[EvOver])
+              .Append(" (2D tlo + zapas); koniec klipu przed koncem osi zdarzenia ").Append(_clipEnd).Append(", sledzone co klatke najwiecej naraz ").Append(_trackPeak);
             AppendFeatures(sb, c);
             sb.Append(" | wiwaty P3: wywolan ").Append(BattleCries.CheerCalls).Append(", okrzykow ").Append(BattleCries.CheerYells).Append(", bez szyku ").Append(BattleCries.CheerNoFormation);
             sb.Append(" | obce: ");
