@@ -57,8 +57,9 @@ D11-3 jest jedynym poborca od lordow i gracza - podatek nie dubluje sie.
   (kwota BK z wyplaty rodu): CZYNNE", "kwoty podatku warsztatow (GetWorkshopTaxes): egzemplarz BK z lancucha modelu gry"; linia doby D11-3: warsztatow > 0, podatek > 0,
   "podatek / wyplata" blisko 2 x stawka, gracz zaplacil > 0, gdy jego warsztat w cudzym miescie ma zysk (w zapisie z diagnozy silversmithy gracza w Seagard: kapital 1986
   przy poczatkowym 2000 - zysku 0, wiec podatek 0 jest tam poprawny); komunikat "Workshop tax: you paid ...".
-**Status:** ZBUDOWANE, NIEWGRANE (galaz noc/p8-podatek). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Seal31B / PopulationLaw). Gra Jeffa dzialala -
-nic nie wgrane, bez autotestu.
+**Status:** WGRANE 112 (25.10 ok. 04:05 CET razem z 120; Armoury.dll md5 68f74d0f - patrz 120). Autotest 112a: ERROR 0; linia startu "kwoty podatku warsztatow (GetWorkshopTaxes): egzemplarz BK z lancucha modelu gry", D11-3 CZYNNE;
+w 2 dobach testu 0 wyplat z warsztatow lordow i gracza w cudzych miastach (pobrane 0) - pobor do sprawdzenia w grze Jeffa (komunikat "Workshop tax: you paid ...", linia D11-3 "w tym gracz zaplacil X").
+Wczesniej: ZBUDOWANE (galaz noc/p8-podatek). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Seal31B / PopulationLaw).
 
 ## 2026-10-25 120 (noc-p7 przesluchanie, galaz noc/p7-przesluchanie od a14c76d3 = WGRANIE 111; commity 17479881 + recenzja 443b13f5) - przesluchanie jencow z band dezerterow: pochodzenie jenca z bandy, opcja szara zamiast ukrytej
 
@@ -75,7 +76,8 @@ nic nie wgrane, bez autotestu.
 **Ryzyko / co sprawdzic:** wpiecie zdarzen sprawdzi tylko prawdziwa wygrana z banda (T14 wola NoteOrigins wprost) - po wgraniu: po "pamiec - banda X" linia "pochodzenie - banda X ... jency z bandy", w linii doby "bez migawki 0", w obozie grupy "(..., rode with outlaws)".
 Jency wzieci przed ta wersja nie maja wpisu - opcja szara do nastepnej wygranej z banda. Stos mieszany bierze dane najnowszej bandy. PrisonerLaw.Criminal (definicja przestepcy, Mur) bez zmian - dezerterzy z band dalej nie ida na Mur.
 Recenzja 443b13f5: R1 bez zapasu "jedna pokonana partia - ona", R2 OriginFresh 60 dob, R3 autotest T14/T15 rozszerzony.
-**Status:** ZBUDOWANE (scalone z 121 na noc/wgranie112).
+**Status:** WGRANE 112 (25.10 ok. 04:05 CET razem z 121; Armoury.dll md5 68f74d0f z noc/wgranie112 07864a62; kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie112 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie112-przed).
+Autotest 112a (4 bitwy na kopii zapisu Jeffa z 03:46): KONIEC OK, ERROR 0, linie misji 4/4, Armoury.json nietkniety; kod wrappera 1 tylko przez zabicie gry wiszacej przy wyjsciu. Linia startu przesluchania OK; T14/T15 (flaga) i prawdziwa wygrana z banda - do sprawdzenia w grze Jeffa.
 
 ## 2026-10-25 113 (m119-kij, galaz w-toku/m117-ubranie po 112 231dc8a5) - bezbronny po strazach bierze z domu najgorsza bron biala (palka, mlot, sierp, toporek) swojej kultury - sztuka tymczasowa DTE, poza zbrojownia
 
