@@ -539,12 +539,13 @@ namespace Armoury
                 try
                 {
                     var st = me.MapEventSettlement ?? (Hero.MainHero != null ? Hero.MainHero.LastKnownClosestSettlement : null);
-                    s.Place = Nm(st);
                     // 117 (recenzja 150b): osada obrazka - osada bitwy albo najblizsza (nie kryjowka) od MIEJSCA bitwy; LastKnownClosestSettlement gry
                     // odswieza sie rzadko (bitwa na morzu brala region portu, z ktorego gracz wyplynal)
                     s.Near = me.MapEventSettlement;
                     if (s.Near == null) { try { s.Near = SpoilsWindow.NearestPlace(me.Position.ToVec2()); } catch (Exception e) { Stumble("ApplyResultsPrefix.near", e); } }
                     if (s.Near == null) s.Near = st;
+                    // 153 (25.10): tekst okna "Near X" z tej samej osady co obrazek (autotest 117b: bitwa pod brama Riverrun, tekst "Near Pendric" z LastKnownClosestSettlement)
+                    s.Place = Nm(s.Near);
                 }
                 catch { s.Place = "-"; }
             }

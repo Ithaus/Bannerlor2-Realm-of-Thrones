@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 153 (galaz noc/138-calosc) - okno lupu: tekst "Near X" z tej samej osady co obrazek (najblizsza od miejsca bitwy)
+**Problem:** Autotest 117b: bitwy pod brama Riverrun (AUTOTEST "czekam w Riverrun [town_V2]"), okno lupu pisalo "Near Pendric", a obrazek (117r) mial juz osade Riverrun ("obrazek messenger-1 (pole river, osada Riverrun / river)").
+**Przyczyna:** SpoilsReport.ApplyResultsPrefix: s.Place = Nm(MapEventSettlement ?? Hero.MainHero.LastKnownClosestSettlement) - bitwa w polu nie ma MapEventSettlement, a LastKnownClosestSettlement gra odswieza rzadko.
+**Zmiana:** s.Place = Nm(s.Near) - ta sama osada co obrazek: MapEventSettlement (bitwa przy osadzie, takze kryjowka), bez niej najblizsza osada nie-kryjowka od MapEvent.Position (SpoilsWindow.NearestPlace), zapas - jak dotad.
+**Ryzyko / co sprawdzic:** Place czytaja tylko tekst okna ("Near X, against Y"), linie logu okna lupu i warunek pierwszej bitwy raportu (string.IsNullOrEmpty - Nm daje "-", nigdy pusty) - bez zmian w liczeniu lupu. Turniej, szturm i okup maja Place z wlasnej osady (bez zmian). W logu: "Okno lupu (117): bitwa N (bitew 1) <osada>" = osada z "obrazek ... osada <osada>".
+**Status:** ZBUDOWANE - do paczki 118 (razem z fala AI 139-149).
+
 ## 2026-10-25 117r (galaz noc/138-calosc) - poprawki po niezaleznej recenzji 150a/150b/151/152 (4 recenzentow + 2 weryfikatorow na zarzut, 9 zarzutow potwierdzonych, 6 roznych)
 **Problem:** Recenzja przed wgraniem 117 (workflow review-117, 16 agentow). 150a - bez zarzutow. Potwierdzone:
 (1) lordowie Skagos dostawali obrazek dzikich - krolestwo Skagos ma w ROT-Content/ROT_spkingdoms.xml kulture freefolk (rod ROTclan_107 - skagosi), a 150b bralo kulture frakcji lidera;
