@@ -1,5 +1,72 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 145 (galaz noc/139-ai-zycie, po 144 6ac81cbe) - AI walczy o zycie, krok 7: ranny walczy ostroznie (karta syntezy "140 Ranny walczy ostroznie", WoundedWary.cs, klucz WoundedFightWarily)
+**Problem:** Jeff 25.10 ok. 13:25: "zasada AI robi wszystko aby nie dac sie zabic!"; ok. 13:30: "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy
+zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze jego mozliwosci i skilli aby przetrwac, walczy o zycie! ... dopiero ta zasada peka gdy jest panika".
+Objaw (synteza "AI walczy o zycie", luka 7): ranny 20-50% HP atakuje jak zdrowy - rzuca sie pierwszy, nie zaslania sie. Dowodu z logu nie ma (zadna linia nie liczy
+decyzji rannych - stad linia 145, takze przy kluczu NIE); dowod z kodu ponizej.
+**Przyczyna:** (dekompilacje scratchpad/surv, scratchpad/dec/mbfull, scratchpad/ai_run) RBM (RBMAI AgentAi.cs:95-131, galaz "postura, bez vanillaCombatAi") przypisuje
+decyzje walki bez wzgledu na zdrowie: AIAttackOnDecideChance 0.15 (z tarcza clamp(0.3n, 0.1, 0.15), konno 0.3), AIDecideOnAttackChance 0.5 x zmeczenie, AIBlockOnDecideAbility
+clamp(2n, 0.3, 1), AiDefendWithShieldDecisionChanceValue 1; gra (AgentStatCalculateModel.SetAiRelatedProperties:165-229) tez nie czyta Health; nasz VeteranAi mnozy tylko
+przez tier. Cialo rannego zwalnia (FieldCraft, od WoundedBelowPercent 50%), wola zostaje jak u zdrowego.
+**Zmiana:** WoundedWary.cs (nowy), VeteranAi.cs (wpiecie w istniejacy postfiks SetAiRelatedProperties, Priority.Last po com.rbmai; warunek latki przy starcie + klucz;
+OrderLocked), SurvivalMode.cs (PanicAnyThread), RoutHold.cs (tablica zbioru zlamanych dla postfiksow KnownAnyThread / MarkKnown / ClearKnown; miejsce potkniec NB2
+"ostroznosc" = 18, Sites 19; reset licznikow w Ensure; linia po 143; segment w linii startu sesji), SubModuleMain.cs (klucz w nb2b - BattleSense i RoutKeeper w misji),
+Settings.cs, McmSettings.cs (gen_mcm: Armoury 2510 -> 2511 ustawien).
+(a) Zasada (klucz WoundedFightWarily TAK): szeregowy czlowiek AI obu stron (takze ludzie gracza; nie gracz, nie umarly, nie bohater) w bitwie (BattleSense.InBattle - pole,
+szturm, wypad, kryjowka) przy galezi RBM z postura, w trybie ROZSADEK; hp = Health / HealthLimit (ta sama miara co FieldCraft i BrokenMen), prog rannego =
+WoundedBelowPercent (u Jeffa 50 - ten sam prog co kara ran FieldCraft: jedna granica "ranny" dla ciala i woli); f = 0.4 + 0.6 x hp / prog (50% -> 1.0, 35% -> 0.82,
+20% -> 0.64, 10% -> 0.52); atak po decyzji x f (clamp weteranow 0.05-0.6, nigdy w gore), porzucenie zamachu x (2 - f) (clamp 0-1, nigdy w dol), blok blok + (1 - blok) x (1 - f)
+(clamp RBM 0.3-1; od poziomu RBM 0.5 blok jest juz 1.0 - licznik w linii), obrona tarcza x (2 - f) (clamp gry 2, nigdy w dol). Wpiecie NA KONCU postfiksu, po regule weteranow
+i po FieldDuel.NoteTierLocked - srednie AoD / DoA wedlug tieru w linii m113 zostaja bez rannych. Bez weteranow (VeteransByTier NIE) - wprost na wyniku RBM.
+(b) Odswiezanie (sprawdzone, karta kazala): RBM StanceLogic.OnMissionTick (StanceLogic.cs:1916-1933) co 3 s wola Agent.UpdateAgentStats() kazdemu czynnemu czlowiekowi
+(postureEnabled i AllowAiTicking) -> UpdateAgentProperties (Agent.cs:1834-1840, 3658-3664) -> Artem -> SandboxAgentStatCalculateModel.UpdateHumanStats:1107 ->
+SetAiRelatedProperties -> RBM -> VeteranAi.Postfix. Nasza brama (RbmBranchOn) wymaga tej samej postury, wiec spadek HP dochodzi najpozniej po 3 s - wlasnego
+UpdateAgentProperties przy progu HP NIE ma (niepotrzebne). RBM i gra przypisuja te pola przy kazdym wywolaniu - mnozenie sie nie kumuluje. Linia mierzy odstep wywolan
+u rannego (sr., najdluzej, dluzej niz 4 s).
+(c) PANIKA pominieta (przelacznik 139): postfiks bywa wolany z ticku asynchronicznego, a SurvivalMode.InPanic czyta slownik RoutKeeper (tylko glowny watek) - nowy
+SurvivalMode.PanicAnyThread: flagi komponentu IsPanicked / IsRetreating wprost i zbior RoutHold z tablicy wedlug Agent.Index (RoutHold.KnownAnyThread), pisanej tylko
+na glownym watku w RoutKeeper.Break (wpis), Drop (usuniety albo przejety przez gracza - zdjecie) i Clear (koniec misji, tylko wlasna tablica); ta sama tresc co Knows.
+Ranny w odwrocie 143 (natywny Retreat, bez odwrotu komponentu, poza zbiorem) jest w ROZSADKU i dostaje ostroznosc z f ponizej 0.64 - wspiera "postoj tylko obrona".
+(d) Bohaterowie poza zasada (decyzja Jeffa D4 "Ostrozni pozycyjnie" -> krok 149: wodz i lordowie cofaja sie za szyk; ich profil pojedynku DuelistsInBattles i zrywy
+DuelCraft zostaja) - tylko licznik rannych bohaterow w linii.
+(e) Klucz NIE: ta sama ocena na sucho (wartosci przed i to, co dalby klucz TAK), pola bez zmian - porownanie przed / po.
+(f) Linia raz na bitwe (RoutHold.Write, zaraz po "ODWROT RANNYCH (143)"): "ranni ostrozni (145): misja bitwa, klucz TAK (ponizej 50% HP - prog kary FieldCraft: ...; f = 0.4
++ 0.6 x HP / 0.50; bez bohaterow (krok 149) i bez PANIKI (139); odswiezanie RBM co 3 s) | latka VeteranAi TAK, po RBM TAK | rannych ostroznych N (strona gracza a / wroga b;
+konnych k, z tarcza w rece s; ponizej progu Wounded Flee 20% d - odwrot 143 / postoj albo bez celu odwrotu) | wywolan z ostroznoscia n: sr. HP x%, sr. f 0.xx (najmniej
+0.xx); odstep wywolan u rannego sr. x s (n odstepow), najdluzej y s, dluzej niz 4 s z | atak po decyzji (AIAttackOnDecideChance): ranni 0.xxx -> 0.xxx, zdrowi 0.xxx |
+porzucenie zamachu (AIDecideOnAttackChance): ranni 0.xx -> 0.xx, zdrowi 0.xx | blok (AIBlockOnDecideAbility): ranni 0.xx -> 0.xx (juz 1.0 w k wywolaniach), zdrowi 0.xx |
+obrona tarcza (AiDefendWithShieldDecisionChanceValue, tarcza w rece): ranni 0.xx -> 0.xx (n wywolan), zdrowi 0.xx (n) | wywolan zdrowych n | pominieci ranni: bohaterowie h
+(krok 149 ...), PANIKA p (IsPanicked / IsRetreating q, zbior RoutHold r) | probka: HP .., f ..: atak a->b, porzucenie, blok, tarcza | potkniecia ostroznosc n."
+Bez wywolan w bitwie przy kluczu TAK - linia z powodem ("latka niewpieta" albo "RBM bez postury"). Linia startu sesji NB2 - segment "Wounded Fight Warily TAK (...)";
+potkniecia NB2 - ", ostroznosc n" (regex sprawdz_logi.py przyjmuje kolejne miejsca "(?:, [a-z]+ \d+)*").
+(g) Klucz MCM: "The master's parry" - WoundedFightWarily TAK (opis po angielsku: "a wounded man fights for his life ..."); w Armoury.json Jeffa go nie ma (grep 25.10) -
+dziala wartosc z kodu; WoundedBelowPercent 50 i WoundedFleePercent 20 w pliku. Latka wpinana przy starcie gry, gdy ktorykolwiek z VeteransByTier / DuelAiEnabled /
+DuelistsInBattles / WoundedFightWarily - u Jeffa VeteransByTier TAK, wiec klucz dziala na zywo.
+Odstepstwa od karty (swiadome): (1) AIDecideOnAttackChance W GORE (x (2 - f)), nie "x f": we wzorach gry ta szansa rosnie z obrona (0.5 x Defensiveness; szarza D = 0,
+stanie w murze tarcz D = 2 - MovementOrder:422, ArrangementOrder:474), a AIAttackOnDecideChance maleje (0.1 x max x (3 - D)) - to "szansa porzucenia zamachu na rzecz obrony"
+(to samo ustalil m113 VeteranAggressionFix); mnozenie w dol zrobiloby rannego mniej ostroznym. (2) Prog 50% z WoundedBelowPercent (kara FieldCraft) zamiast stalej -
+jedna granica "ranny". (3) Ponizej 20% (Wounded Flee) wzor dalej w dol, nie stop na 0.64 - ranny w odwrocie 143 i ten bez celu odwrotu sa w ROZSADKU i maja sie tylko
+bronic. (4) Bohaterowie wylaczeni (D4 = ostroznosc pozycyjna w kroku 149, nie profil walki). (5) Zakres jak weterani (InBattle: takze szturm i kryjowka), nie tylko pole -
+zasada przetrwania, nie taktyka. (6) Parowanie bez zmian (karta go nie wymienia). (7) Bez wlasnego UpdateAgentProperties (RBM odswieza co 3 s - punkt (b)).
+**Ryzyko / co sprawdzic:** Kontrola calosci (w kodzie): (a) regresje - VeteranAi.Postfix: kolejnosc i wartosci weteranow, profilu pojedynku bohaterow (DuelAi.ApplyField)
+i liczniki FieldDuel bez zmian (145 po nich, bohater poza); nowy warunek wejscia (!vet && !duelists && !wary) puszcza do bramy tylko przy samym WoundedFightWarily (wtedy
+tylko 145); pojedynki (InDuel) - galaz przed nami, bez zmian; RoutKeeper - MarkKnown tylko dopisuje tablice, slownik _by i Knows bez zmian. (b) kolizje - 4 pola pisza
+tylko RBM (przed nami), weterani (przed nami), DuelAi / DuelCraft (tylko bohaterowie - pominieci); ShieldsUp (140) pisze tylko preferencje broni (AiWeaponFavor*) - rozlaczne;
+Artem (model) tych pol nie dotyka (grep); FieldCraft - tylko odczyt progu (cialo osobno, nie liczymy tego samego dwa razy); 143 - wspiera postoj; 144 i 141 - brak wspolnego
+stanu. (c) jedno zjawisko - "ranny" = WoundedBelowPercent dla kary ciala i woli; "panika" = jedna definicja 139 (PanicAnyThread to ten sam warunek dla innego watku); liczniki
+zerowane w RoutHold.Ensure, tablica czyszczona w RoutKeeper.Clear. (d) cudzy kod - RBM AgentAi / StanceLogic, gra AgentStatCalculateModel, Agent.UpdateAgentStats,
+SandboxAgentStatCalculateModel, Artem - sprawdzone w dekompilacji 1.4.8. NIE da sie sprawdzic w C#: jak silnik naprawde uzywa tych czterech liczb (kod natywny) - tylko
+po obrazie i po liniach HIT (blok rannych).
+Balans: ranni bija rzadziej i czesciej sie zaslaniaja - walka w zwarciu moze trwac dluzej, a przy posturze RBM czestszy blok to wiecej utraty postury obroncy (mozliwe
+wiecej przelaman gardy u rannych zamiast ciosow w cialo); ludzie gracza tak samo. Wydajnosc: jedno wywolanie na czlowieka co 3 s, dwie blokady Gate na wywolanie (weterani +
+145), bez LINQ.
+Sprawdzic w logu po wgraniu: linia "ranni ostrozni (145)" w kazdej bitwie z rannymi, "potkniecia ostroznosc 0" (takze w NB2), "po RBM TAK", odstep wywolan u rannego sr.
+ok. 3 s i "dluzej niz 4 s" bliskie 0 (inaczej RBM nie odswieza i trzeba wlasnego UpdateAgentProperties przy progu), atak ranni po < przed, porzucenie po > przed, PANIKA
+pominieci > 0 w bitwach z ucieczka, bohaterowie liczeni osobno. Porownanie z kluczem NIE (na sucho - te same liczby bez zmiany pol): w liniach HIT ranni czesciej BLOK.
+W grze (Jeff): ranny wrog nie rzuca sie pierwszy, zaslania sie tarcza i oddaje cios, zamiast atakowac jak zdrowy.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/139-ai-zycie; gry nie uruchamialem; Armoury.dll md5 e3de50fec924c101634404a9bf461100).
+
 ## 2026-10-25 144 (galaz noc/139-ai-zycie, po 143 a1f2d41e) - AI walczy o zycie, krok 6: AI oszczedza sily (projekt 134a-134d, 134e jako klucz NIE; AiBreath.cs, WindedShow.cs, klucz AiSavesBreath i 8 pokrewnych)
 **Problem:** Jeff 25.10 ok. 13:20: "pamietaj aby w bitwach przeciwnik nie biegal caly czas bo beda padnieci i czy jest animacja chodu i zmeczenia??"; ok. 13:30:
 "generalnie wprowadz zasade ze przeciwnik zachowuje sie jak prawdziwy zywy czlowiek, nie chce dac sie zabic i zrobi wszystko w obszarze jego mozliwosci i skilli aby

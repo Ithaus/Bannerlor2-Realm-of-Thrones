@@ -38,6 +38,9 @@ namespace Armoury
     /// z najlepszej umiejetnosci (HeroTierFromSkill, SkillTier); VeteranAggressionFix - AIDecideOnAttackChance (szansa porzucenia zamachu) bez
     /// mnozenia w gore od T4 (robilo weterana bardziej biernym), T1-T3 dalej w dol jak w 106. Srednie AoD / DoA wedlug tieru do linii FieldDuel.
     /// Po recenzji: bohater z profilem dostaje co najmniej prog tieru z reguly weteranow (DuelAi.ApplyField, TierMin).
+    /// 145 (25.10, fala "AI walczy o zycie"): ten sam postfiks niesie "ranny walczy ostroznie" (WoundedWary, klucz WoundedFightWarily) - szeregowy AI ponizej
+    /// WoundedBelowPercent HP w trybie ROZSADEK: atak po decyzji x f, porzucenie zamachu i obrona tarcza x (2 - f), blok blizej 1 (f = 0.4 + 0.6 x HP / prog);
+    /// na koncu postfiksu, po licznikach weteranow; bohaterowie poza zasada (krok 149). Latka wpinana takze przy samym WoundedFightWarily.
     /// </summary>
     internal static class VeteranAi
     {
@@ -75,6 +78,9 @@ namespace Armoury
             _order = "?";
         }
 
+        /// <summary>145: kolejnosc latki wobec RBM (CheckOrder) do linii "ranni ostrozni (145)" - wolajacy trzyma Gate.</summary>
+        internal static string OrderLocked { get { return _order; } }
+
         internal static int Activity
         {
             get { int s = 0; for (int i = 1; i < _tiers.Length; i++) s += _tiers[i].Count; return s; }
@@ -96,7 +102,8 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                if (c == null || (!c.VeteransByTier && !c.DuelAiEnabled && !c.DuelistsInBattles)) { Log.Info("VeteranAi (NB2): weterani wedlug tieru, Duel AI i bohaterowie-pojedynkowicze wylaczeni przy starcie (VeteransByTier, DuelAiEnabled, DuelistsInBattles) - latka niewpieta."); return; }
+                // 145: takze przy WoundedFightWarily (ranny walczy ostroznie - ten sam postfiks)
+                if (c == null || (!c.VeteransByTier && !c.DuelAiEnabled && !c.DuelistsInBattles && !c.WoundedFightWarily)) { Log.Info("VeteranAi (NB2): weterani wedlug tieru, Duel AI, bohaterowie-pojedynkowicze i ranni ostrozni wylaczeni przy starcie (VeteransByTier, DuelAiEnabled, DuelistsInBattles, WoundedFightWarily) - latka niewpieta."); return; }
                 if (QuartermasterLaw.FindType("RBMAI.AgentAi") == null) { Log.Info("VeteranAi (NB2): RBM nieobecny - latka niewpieta (wspolczynniki gry bez zmian)."); return; }
                 _target = AccessTools.DeclaredMethod(typeof(AgentStatCalculateModel), "SetAiRelatedProperties");
                 if (_target == null) { Log.Info("VeteranAi (NB2): brak AgentStatCalculateModel.SetAiRelatedProperties - latka niewpieta."); return; }
@@ -105,7 +112,7 @@ namespace Armoury
                 Patched = r != null && Owned(_target, h.Id);
                 Log.Info("VeteranAi (NB2): weterani wedlug tieru - latka SetAiRelatedProperties " + (Patched ? "wpieta" : "NIEWPIETA")
                          + " (postfiks Priority.Last po com.rbmai; klucze VeteransByTier i DuelAiEnabled na zywo, przy starcie " + (c.VeteransByTier ? "TAK" : "NIE") + " / "
-                         + (c.DuelAiEnabled ? "TAK" : "NIE") + " / DuelistsInBattles " + (c.DuelistsInBattles ? "TAK" : "NIE") + "; prog tieru 0.05 + 0.13 x (T-1), limity RBM wyzej od T5, agresja x0.80..x1.28; w pojedynku profil DuelAi).");
+                         + (c.DuelAiEnabled ? "TAK" : "NIE") + " / DuelistsInBattles " + (c.DuelistsInBattles ? "TAK" : "NIE") + " / WoundedFightWarily " + (c.WoundedFightWarily ? "TAK" : "NIE") + "; prog tieru 0.05 + 0.13 x (T-1), limity RBM wyzej od T5, agresja x0.80..x1.28; w pojedynku profil DuelAi).");
             }
             catch (Exception e) { Log.Error("VeteranAi.ApplyAll", e); }
         }
@@ -286,14 +293,16 @@ namespace Armoury
                     return;
                 }
                 // m113-walka2 faza 2: w bitwie takze bohaterowie z profilem pojedynku (DuelistsInBattles) - weterani i bohaterowie za ta sama brama
-                bool vet = c.VeteransByTier, duelists = c.DuelistsInBattles;
-                if (!vet && !duelists) return;
+                // 145: ranny walczy ostroznie (WoundedWary) za ta sama brama - takze bez weteranow; przy kluczu NIE pomiar na sucho (gdy latka jest)
+                bool vet = c.VeteransByTier, duelists = c.DuelistsInBattles, wary = c.WoundedFightWarily;
+                if (!vet && !duelists && !wary) return;
                 if (!GateFor(m, out dm)) return;
                 if (!agent.IsHuman || agent.IsMainAgent || !agent.IsAIControlled) return;
                 var ch = agent.Character;
                 if (ch == null || Undead.Character(ch)) return;
 
                 bool hero = ch.IsHero;
+                if (hero) WoundedWary.Hero(agent, m, c);       // 145: bohater poza zasada (krok 149, decyzja D4) - tylko licznik rannych bohaterow
                 int best = -1;
                 if (hero && duelists)
                 {
@@ -304,7 +313,11 @@ namespace Armoury
                     catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVeteran, "DuelAi.ApplyField", e); }
                     if (done) return;
                 }
-                if (!vet) return;
+                if (!vet)
+                {
+                    if (!hero) WoundedWary.Apply(agent, agentDrivenProperties, m, c);   // 145: bez weteranow - wprost na wyniku RBM
+                    return;
+                }
 
                 int tier = BattleWind.TierOf(ch);
                 // m113-walka2: bohater bez profilu pojedynku - tier co najmniej z najlepszej umiejetnosci broni bialej (40 = T1, co 30 punktow tier wiecej)
@@ -398,6 +411,8 @@ namespace Armoury
                     if (sample != null && _sample6 == null) _sample6 = sample;
                     FieldDuel.NoteTierLocked(id, tier, p.AIAttackOnDecideChance, p.AIDecideOnAttackChance, hero, raised);
                 }
+                // 145: ranny walczy ostroznie - PO licznikach weteranow (srednie tierow m113 bez rannych); bohater poza zasada (krok 149)
+                if (!hero) WoundedWary.Apply(agent, p, m, c);
             }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVeteran, "VeteranAi.Postfix", e); }
         }

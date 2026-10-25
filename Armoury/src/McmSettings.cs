@@ -1556,6 +1556,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool WoundedWithdrawWithArms { get; set; } = true;
 
+        [SettingPropertyBool("Wounded Fight Warily", HintText = "a wounded man fights for his life: once his health drops below the Wounded Below Percent (where his wounds start to slow him) an AI soldier stops throwing himself at the enemy - he attacks less readily, breaks off a swing to defend more often, blocks more and keeps behind his shield, the more so the worse he is hurt. Both sides alike, your men too; lords and companions keep their own fighting style. A panicking man is beyond such sense. Needs RBM; takes effect from the next game start when switched on. Off = the wounded fight as boldly as the healthy, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool WoundedFightWarily { get; set; } = true;
+
         [SettingPropertyBool("Routed Men Never Rally", HintText = "with Broken Men Never Rally on: in a field battle every man who panics - his morale broken by the fighting, or his whole side giving up a lost battle - runs for good, just like a broken wounded man: no turning back to fight bare-handed ten seconds later, no second scream or fright, and if his flight stalls he is sent off again quietly. Both sides alike, your men too. No rallying at the banner yet. Sieges, sorties, sea battles and hideouts are left as they were. Off = as before (the game lets a panicked man return to the fight)", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool RoutedMenNeverRally { get; set; } = true;
@@ -10440,6 +10444,7 @@ namespace Armoury
             s.FleeAwayFromEnemies = FleeAwayFromEnemies;
             s.FateOfTheBrokenLog = FateOfTheBrokenLog;
             s.WoundedWithdrawWithArms = WoundedWithdrawWithArms;
+            s.WoundedFightWarily = WoundedFightWarily;
             s.RoutedMenNeverRally = RoutedMenNeverRally;
             s.CommanderTactics = CommanderTactics;
             s.VeteransByTier = VeteransByTier;

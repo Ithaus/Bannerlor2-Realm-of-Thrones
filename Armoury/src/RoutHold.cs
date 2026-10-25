@@ -81,9 +81,11 @@ namespace Armoury
         internal const int SiteWithdraw = 16;
         // 144 (25.10): AI oszczedza sily (AiBreath) i zadyszke widac / slychac (WindedShow) - wlasne miejsce; nazwa jednym slowem (regex NB2)
         internal const int SiteBreath = 17;
-        private const int Sites = 18;
+        // 145: ranny walczy ostroznie (WoundedWary przez VeteranAi.Postfix) - wlasne miejsce; nazwa jednym slowem (regex NB2)
+        internal const int SiteWary = 18;
+        private const int Sites = 19;
         private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
-                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot", "oddech" };
+                                                      "marsz", "doktryna", "choragiew", "dzwiek", "los", "tarcze", "powrot", "odwrot", "oddech", "ostroznosc" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -107,6 +109,11 @@ namespace Armoury
         private static bool _any, _flushed;
         private static string _kind = "?";
         internal static RoutKeeper Live;          // zachowanie biezacej misji (null albo inna misja = nowa droga nieczynna)
+        // 145: zbior zlamanych dla postfiksow z dowolnego watku (SurvivalMode.PanicAnyThread <- WoundedWary <- VeteranAi.Postfix): czlowiek wedlug
+        // Agent.Index, pisane TYLKO na glownym watku (RoutKeeper.Break, Drop, przejecie przez gracza, Clear); czytane bez blokady - odczyt referencji
+        // z tablicy jest atomowy, nowa (wieksza) tablica publikowana po skopiowaniu. Ta sama tresc co RoutKeeper.Knows (bez przejetych przez gracza).
+        private static Agent[] _known;
+        private const int KnownMaxIndex = 65536;
 
         // ---- liczniki misji: panika
         internal static int Broken, Fled, Panics, Already, RePanic, Pins, Extinct, Resends, Turns, NoHandler, Player;
@@ -155,6 +162,44 @@ namespace Armoury
             if (k == null || a == null) return false;
             try { return k.Break(a, site); }
             catch (Exception e) { Stumble(SitePanic, "RoutHold.Break", e); return false; }
+        }
+
+        /// <summary>145: czlowiek jest w zbiorze zlamanych tej bitwy (jak RoutKeeper.Knows) - odczyt z dowolnego watku, bez blokady.</summary>
+        internal static bool KnownAnyThread(Agent a)
+        {
+            if (a == null) return false;
+            var k = System.Threading.Volatile.Read(ref _known);
+            if (k == null) return false;
+            int i = a.Index;
+            return i >= 0 && i < k.Length && ReferenceEquals(k[i], a);
+        }
+
+        /// <summary>145: wpis / zdjecie w tablicy zbioru zlamanych - TYLKO glowny watek (RoutKeeper). Wieksza tablica: kopia, wpis, potem publikacja.</summary>
+        internal static void MarkKnown(Agent a, bool on)
+        {
+            if (a == null) return;
+            int i = a.Index;
+            if (i < 0 || i >= KnownMaxIndex) return;
+            var k = _known;
+            if (k == null || i >= k.Length)
+            {
+                if (!on) return;
+                int n = k == null ? 1024 : k.Length;
+                while (n <= i) n *= 2;
+                var nk = new Agent[n];
+                if (k != null) Array.Copy(k, nk, k.Length);
+                nk[i] = a;
+                System.Threading.Volatile.Write(ref _known, nk);
+                return;
+            }
+            if (on) k[i] = a;
+            else if (ReferenceEquals(k[i], a)) k[i] = null;
+        }
+
+        /// <summary>145: koniec misji (RoutKeeper.Clear) - bez referencji do ludzi skonczonej misji.</summary>
+        internal static void ClearKnown()
+        {
+            System.Threading.Volatile.Write(ref _known, null);
         }
 
         /// <summary>143: tryb "Wycofanie" czynny w tej misji - RoutHold czynny (On), klucz WoundedWithdrawWithArms i bitwa polowa (ten sam zakres co 142:
@@ -288,6 +333,7 @@ namespace Armoury
             BrokenFate.ResetCounters();     // 139: los zlamanych - liczniki i lista ludzi poprzedniej misji
             NoReturn.ResetCounters();       // 142: panika bez powrotu - liczniki misji
             WoundedWithdraw.ResetCounters();   // 143: odwrot rannego z bronia - liczniki misji
+            WoundedWary.ResetCounters();       // 145: ranny walczy ostroznie - liczniki misji
         }
 
         /// <summary>Licznik misji dla RoutKeeper (glowny watek): misja zgodna z licznikami.</summary>
@@ -365,6 +411,8 @@ namespace Armoury
             try { NoReturn.Write(c); } catch { }
             // 143: osobna linia "ODWROT RANNYCH (143)" po linii 142 (tylko bitwa polowa)
             try { WoundedWithdraw.Write(c); } catch { }
+            // 145: osobna linia "ranni ostrozni (145)" po linii 143 (bitwa z wywolaniami postfiksu VeteranAi albo klucz TAK w bitwie / kryjowce)
+            try { WoundedWary.Write(c, _kind); } catch { }
         }
 
         // ------------------------------------------------------------ start sesji
@@ -440,6 +488,12 @@ namespace Armoury
               .Append(ShieldsUp.RaiseNear.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append(" m; latki ")
               .Append(ShieldsUp.PatchedSetAi && ShieldsUp.PatchedUfo ? "wpiete" : "przy pierwszej bitwie z kluczem").Append(')');
             AiBreath.Session(sb, c);   // 144: AI oszczedza sily, marsz krokiem, zadyszke widac / slychac
+            // 145: ranny walczy ostroznie (VeteranAi.Postfix -> WoundedWary; linia 'ranni ostrozni (145)' po bitwie)
+            sb.Append(" | Wounded Fight Warily ").Append(c.WoundedFightWarily ? "TAK" : "NIE").Append(" (ranny ponizej ").Append(c.WoundedBelowPercent)
+              .Append("% HP - prog kary FieldCraft: atak po decyzji x f, porzucenie zamachu i obrona tarcza x (2 - f), blok blizej 1, f = ")
+              .Append(WoundedWary.Floor.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)).Append(" + ")
+              .Append((1f - WoundedWary.Floor).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))
+              .Append(" x HP / prog; bez bohaterow (krok 149) i bez PANIKI (139); odswiezanie RBM co 3 s; latka VeteranAi ").Append(VeteranAi.Patched ? "TAK" : "NIE").Append(')');
             sb.Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }
@@ -574,6 +628,8 @@ namespace Armoury
         private void Clear()
         {
             try { _by.Clear(); _list.Clear(); _near.Clear(); } catch { }
+            // 145: tablica zbioru dla postfiksow (bez referencji do ludzi skonczonej misji) - nie ruszamy tablicy nowszego RoutKeeper (nastepna misja)
+            if (RoutHold.Live == null || ReferenceEquals(RoutHold.Live, this)) RoutHold.ClearKnown();
             ClearWithdraw();                          // 143: wpisy odwrotu rannych (bez referencji do ludzi skonczonej misji)
         }
 
@@ -695,6 +751,7 @@ namespace Armoury
         {
             e.Dead = true;
             if (!keepKey && e.A != null) _by.Remove(e.A);
+            if ((!keepKey || e.ByPlayer) && e.A != null) RoutHold.MarkKnown(e.A, false);   // 145: Knows = false (usuniety albo przejety przez gracza)
         }
 
         public override void OnAgentDeleted(Agent affectedAgent)
@@ -776,6 +833,7 @@ namespace Armoury
             float now = m.CurrentTime;
             var e = new Entry { A = a, Site = site, Since = now, NextEval = now };
             _by[a] = e;
+            RoutHold.MarkKnown(a, true);                                  // 145: ten sam zbior dla postfiksow z dowolnego watku (SurvivalMode.PanicAnyThread)
             _list.Add(e);
             bool game = site == MissionTeams.GamePanic;                   // 142: panika gry z kolejki - licznik w NoReturn, NB2 bez zmian
             if (site == MissionTeams.Broken) RoutHold.Broken++; else if (!game) RoutHold.Fled++;

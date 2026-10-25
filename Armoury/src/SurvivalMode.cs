@@ -18,6 +18,7 @@ namespace Armoury
     /// Znane (RBMAI AgentAi.cs:826-859): ofiara szarzy konnej RBM (przewrocona albo odrzucona, bitwa polowa) dostaje CommonAIComponent.Retreat BEZ paniki -
     /// do StopRetreating RBM (ok. 10 s) przelacznik mowi PANIKA. Ilu ich jest, pokazuje spis w linii "LOS ZLAMANYCH (139)" ("sam odwrot komponentu").
     /// Wolac z glownego watku (slownik RoutKeeper). Bez zapisu stanu, bez Harmony; wyjatek = ROZSADEK (nic sie nie zmienia).
+    /// 145: PanicAnyThread - ta sama definicja dla postfiksow z ticku asynchronicznego (zbior RoutHold z tablicy wedlug Agent.Index).
     /// </summary>
     internal static class SurvivalMode
     {
@@ -33,6 +34,21 @@ namespace Armoury
                 return k != null && k.Knows(a);
             }
             catch { return false; }
+        }
+
+        /// <summary>145: ta sama PANIKA dla postfiksow wolanych z dowolnego watku (VeteranAi -> WoundedWary): flagi komponentu wprost, zbior RoutHold przez
+        /// tablice RoutHold.KnownAnyThread (pisana tylko na glownym watku, ta sama tresc co RoutKeeper.Knows). 0 = ROZSADEK, 1 = IsPanicked / IsRetreating,
+        /// 2 = RoutHold zna czlowieka. Wyjatek = 0 (nic sie nie zmienia).</summary>
+        internal static int PanicAnyThread(Agent a)
+        {
+            if (a == null) return 0;
+            try
+            {
+                var cai = a.CommonAIComponent;
+                if (cai != null && (cai.IsPanicked || cai.IsRetreating)) return 1;
+                return RoutHold.KnownAnyThread(a) ? 2 : 0;
+            }
+            catch { return 0; }
         }
     }
 }
