@@ -50,6 +50,8 @@ namespace Armoury
             public float SprintDebt;        // ile MY zabralismy z puli RBM sprintem - tyle oddajemy szybko
             public float BleedDebt;         // uzbierany ulamek krwawienia - silnik przyjmuje tylko pelne punkty
             public bool SpeedApplied;       // noc 25.10 P1 (M0): nasz limit predkosci siedzi teraz w agencie (do jednorazowego zdjecia po karze)
+            public bool EverWinded;         // 137: mial juz zadyszke w tej misji (linia "Oddech (137)": ludzi z zadyszka)
+            public float WindedFor;         // 137: sekundy biezacej zadyszki
         }
 
         // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
@@ -164,10 +166,12 @@ namespace Armoury
         /// dlugo, az oddech wroci do 10% puli. Dotyczy KAZDEGO czlowieka
         /// na polu - gracza, jego ludzi i wroga.
         /// </summary>
-        private static float PaceFromRatio(State st, float ratio)
+        private static float PaceFromRatio(State st, float ratio, float exitBar)
         {
+            // 137: przy oddechu dwufazowym wyjscie z zadyszki dopiero przy pasku >= WindedExitBar (30%) - w 10% puli wraca po 6-9 s, a moc
+            // wraca z fosfokreatyna (Bogdanis 1995; szybka faza tlenu 33-35 s, Ozyener 2001); bez oddechu dwufazowego jak dotad 10%
             if (ratio <= 0.005f) st.Winded = true;
-            else if (st.Winded && ratio >= 0.10f) st.Winded = false;
+            else if (st.Winded && ratio >= exitBar) st.Winded = false;
             if (st.Winded) return 0.5f;
             if (ratio < 0.10f) return 0.5f + 0.5f * (ratio / 0.10f);
             return 1f;
@@ -348,6 +352,7 @@ namespace Armoury
             }
             catch { }
             ResetRunStats();
+            try { BattleWind.BreathFlush(); } catch { }      // 137: linia "Oddech (137)" raz na misje
             try { MissionTeams.Flush(Mission); } catch { }   // NM: linia "Druzyny w misji (NM)" raz na misje
             base.OnEndMission();
         }
@@ -652,6 +657,8 @@ namespace Armoury
                         {
                             try
                             {
+                                // 137: oddech dwufazowy tej postawy (klucz BreathTwoPhase na zywo) - dlug biegu oddaje on, prog wyjscia z zadyszki WindedExitBar
+                                bool breathOwns = BattleWind.HasBreath(stance);
                                 float stam = (float)_rbmStamina.GetValue(stance);
                                 float maxStam = _rbmMaxStamina != null ? (float)_rbmMaxStamina.GetValue(stance) : 1000f;
                                 if (maxStam < 1f) maxStam = 1000f;
@@ -685,13 +692,19 @@ namespace Armoury
                                 if (sprinting)
                                 {
                                     float d = maxStam / st.RunSeconds * step;   // 127: cala pula w RunSeconds pelnego biegu
+                                    float stam0 = stam;
                                     stam -= d;
-                                    st.SprintDebt += d;
+                                    // 137: przy oddechu dwufazowym bez wlasnego dlugu biegu - wydatek zostaje na pasku i uzgadnia go BattleWind (F/S)
+                                    if (breathOwns) st.SprintDebt = 0f;
+                                    else st.SprintDebt += d;
                                     if (stam < 0f) stam = 0f;
                                     _rbmStamina.SetValue(stance, stam);
+                                    // 137 (recenzja): zdjete punkty to bieg, nie walka - BattleWind nie otworzy za nie okna walki (BreathFightShare)
+                                    if (breathOwns) BattleWind.NoteRunSpend(stance, stam0 - stam);
                                 }
-                                else if (st.SprintDebt > 0.01f && stam < maxStam && !BattleWind.Manages(stance))
+                                else if (st.SprintDebt > 0.01f && stam < maxStam && !breathOwns && !BattleWind.Manages(stance))
                                 {
+                                    // 137: milczy przy oddechu dwufazowym - inaczej dlug biegu wracalby podwojnie (35 pkt/s przy Atletyce 100 plus oddech)
                                     // ODDECH SPRINTERA: to, co zabral bieg, wraca tempem
                                     // biegacza (25/s x Atletyka x Endurance) - ale TYLKO
                                     // dlug sprintu. Koszty ciosow RBM oddaja sie dalej po
@@ -704,7 +717,25 @@ namespace Armoury
                                     st.SprintDebt -= back;
                                     _rbmStamina.SetValue(stance, stam);
                                 }
-                                st.Pace = PaceFromRatio(st, stam / maxStam);
+                                bool wasWinded = st.Winded;
+                                st.Pace = PaceFromRatio(st, stam / maxStam, breathOwns ? BattleWind.WindedExit(c) : 0.10f);
+                                // 137: liczniki zadyszek do linii "Oddech (137)" (stan zadyszki tylko tutaj - st.Winded)
+                                if (breathOwns && (st.Winded || wasWinded))
+                                {
+                                    bool main = agent.IsMainAgent;
+                                    if (!wasWinded)
+                                    {
+                                        st.WindedFor = 0f;
+                                        BattleWind.NoteWindIn(main, !st.EverWinded);
+                                        st.EverWinded = true;
+                                    }
+                                    else
+                                    {
+                                        st.WindedFor += step;
+                                        BattleWind.NoteWindTime(step, main);
+                                        if (!st.Winded) BattleWind.NoteWindOut(st.WindedFor);
+                                    }
+                                }
                             }
                             catch { st.Pace = 1f; st.Winded = false; }
                         }
@@ -717,7 +748,7 @@ namespace Armoury
                             if (st.Pool < 0f) st.Pool = 0f;
                             if (st.Pool > st.PoolMax) st.Pool = st.PoolMax;
                             float ratio = st.PoolMax > 1f ? st.Pool / st.PoolMax : 1f;
-                            st.Pace = PaceFromRatio(st, ratio);
+                            st.Pace = PaceFromRatio(st, ratio, 0.10f);
                         }
                     }
                     else

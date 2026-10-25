@@ -1316,7 +1316,35 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float AthleticsStaminaCurve { get; set; } = 1.12f;
 
-        [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant (not used while Stamina From Athletics Only is on) (read once at game start from ModuleData/Armoury.settings.xml - changing it here has no effect)", RequireRestart = false)]
+        [SettingPropertyBool("Breath Two Phase", HintText = "how breath comes back in battle, one rule for every man - you, lords and soldiers: a short effort comes back within about a minute, but a man who ran himself empty gets his first half back in a minute or two and the rest only over many minutes, as real lungs and muscles do. Each point of Athletics brings it back a little faster and makes the pool bigger, heavy armour slows it a little, walking slows it and fighting slows it a lot; a second collapse soon after the first is slower to recover from. Off = Realistic Battle Mod's own regeneration, as before. Turning it on works from the next battle - but if Battle Stamina Enabled was off too when the game started, it may need a game restart", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool BreathTwoPhase { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Breath Fast Seconds", 15.00f, 90.00f, "0", HintText = "the quick part of the breath: seconds a man with Athletics 0 and no armour needs, standing, to win back about two thirds of it. Athletics 300 is almost twice as quick, heavy armour a little slower (measured in people: 30 to 41 s)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BreathFastSeconds { get; set; } = 40f;
+
+        [SettingPropertyFloatingInteger("Breath Slow Seconds", 120.00f, 1200.00f, "0", HintText = "the slow part of the breath, which only a hard effort uses up: seconds a man with Athletics 0 needs, standing, to win back about two thirds of it. Athletics shortens it a little, heavy armour lengthens it by up to a quarter. At 400 a man who was completely spent is back to 90% after about 10 minutes of rest; lower = men are fresh again sooner", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BreathSlowSeconds { get; set; } = 400f;
+
+        [SettingPropertyFloatingInteger("Breath Fast Share", 0.20f, 0.80f, "0.00", HintText = "how much of the pool the quick part holds: whatever a man spends beyond it goes into the slow part. 0.5 = after a full collapse half of the pool comes back quickly and half slowly", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BreathFastShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Breath Fight Share", 0.00f, 1.00f, "0.00", HintText = "how fast breath comes back while a man keeps fighting (he struck, blocked or was hit in the last 5 seconds), as a share of standing still: 0.3 = more than three times slower. Running does not count as fighting; a bow or crossbow shot counts only for a short while (Breath Shot Fight Seconds)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BreathFightShare { get; set; } = 0.3f;
+
+        [SettingPropertyFloatingInteger("Breath Shot Fight Seconds", 0.00f, 5.00f, "0.0", HintText = "how long a bow or crossbow shot counts as fighting for the breath (see Breath Fight Share). At 2 an archer who shoots without pause is winded after about 4 minutes at Athletics 50 and 7 at Athletics 100, and stays winded while he keeps shooting; at 0 he breathes between shots as if standing - winded after about 8 minutes at Athletics 50, never at Athletics 100", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BreathShotFightSeconds { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Winded Exit Bar", 0.10f, 0.50f, "0.00", HintText = "a winded man (empty bar: half speed and half strength) gets his wind back when his bar has refilled to this share of the pool. Used with the two-phase breath; without it 10%, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float WindedExitBar { get; set; } = 0.30f;
+
+        [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant; the dead never tire. While Stamina From Athletics Only is on, heroes' stamina follows Athletics like everyone's and this switch keeps only the Endurance posture rule and the tireless dead. The Athletics curve and the two-phase breath work with it off too (read once at game start from ModuleData/Armoury.settings.xml - changing it here has no effect)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool BattleStaminaEnabled { get; set; } = true;
 
@@ -10280,6 +10308,13 @@ namespace Armoury
             s.NoBreathWhileRunning = NoBreathWhileRunning;
             s.StaminaFromAthleticsOnly = StaminaFromAthleticsOnly;
             s.AthleticsStaminaCurve = AthleticsStaminaCurve;
+            s.BreathTwoPhase = BreathTwoPhase;
+            s.BreathFastSeconds = BreathFastSeconds;
+            s.BreathSlowSeconds = BreathSlowSeconds;
+            s.BreathFastShare = BreathFastShare;
+            s.BreathFightShare = BreathFightShare;
+            s.BreathShotFightSeconds = BreathShotFightSeconds;
+            s.WindedExitBar = WindedExitBar;
             s.BattleStaminaEnabled = BattleStaminaEnabled;
             s.BattleEndDoubleEvery = BattleEndDoubleEvery;
             s.BattleRegenAtEnd1 = BattleRegenAtEnd1;
