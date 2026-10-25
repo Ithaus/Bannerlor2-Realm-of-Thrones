@@ -24,17 +24,25 @@ namespace Armoury
     /// WYBOR v2 (Jeff 25.10 ok. 00:25: "ubrania maja byc rozne aby wszyscy nie wygladali tak samo i maja to byc ubrania cywilne zadne zbroje za 33
     /// pancerza no tier 1 jednostek jak laza recruit kazdej kultury"). v1 dawal kazdemu tej kultury te sama najtansza sztuke, a najtansze tuniki
     /// kultur ROT to *_garb (12d, w grze body 33 po skalowaniu pancerzy - ochrona przeszywanicy). Leniwie, raz na kampanie (Reset):
-    /// - GRANICA z danych gry, bez nowej stalej: dla slotu najwyzsza ochrona sztuki z flaga Civilian, ktora nosza Villager albo Townsman kultur glownych
-    ///   (bez umarlych) i ktorej NIE ma w BattleEquipments zaden zolnierz (Occupation.Soldier, nie bohater, nie szablon, dowolny tier) - najmocniejsze
-    ///   ubranie, ktore istnieje tylko jako odziez cywilna. ROT 8.1.8 (rozpoznanie 25.10): tulow 30 (andal_robe3/5 - szaty mieszczan Westeros), nogi 35
-    ///   (wrapped_shoes); odcina *_garb 33, heavy_gambeson_armor 35, dragonstone_gambeson 61. Bandyci sie tu nie licza (looter nosi wrapped_shoes -
-    ///   granica nog spadlaby do 17 i odcielaby buty rekrutow 18). Granica 0 = slot bez ubrania (nigdy bez granicy).
+    /// - OCHRONA SZTUKI (v3, recenzja 25.10) = glowa + tulow + rece + nogi tej sztuki (Total), nie sam slot: v2 liczyl tylko ochrone slotu i przepuszczal
+    ///   sztuki, ktore lacznie chronia bardziej niz odrzucony garb (33/11/11 = 55), np. "Mariner Gambeson" 27/30/27 = 84, "Woodland Garments" 20/14/22 = 56.
+    /// - SITO Fits: przeszywanice i zbroje z nazwy (ArmourWords w id albo nazwie: gambeson, padded, armor, mail... - heurystyka jak ubrania kobiece) odpadaja
+    ///   (Jeff: "zadne zbroje"); unikaty tylko wedlug spisu (RotUniques) i strazy CrashScribe - bez NotMerchandise (ubrania z szablonow ludzi bywaja poza
+    ///   handlem: andal_civ_boots/2 Westerosu); NotMerchandise sprawdzaja tylko zapasy (c)/(d).
+    /// - GRANICA z danych gry, bez nowej stalej, dla slotu MNIEJSZA z dwoch (Jeff: "ubrania cywilne" i "jak laza recruit"):
+    ///   (A) "nie mocniej niz chlop" - najwyzsza ochrona sztuki z flaga Civilian, ktora nosi Villager kultur glownych (bez umarlych), przez sito, i ktorej
+    ///       NIE ma w BattleEquipments zaden zolnierz (Occupation.Soldier, nie bohater, nie szablon, dowolny tier). Bez Townsman (v3): szaty mieszczan
+    ///       Westerosu andal_robe1-6 (26-30 na tulowiu, 42-46 lacznie, 3 kg) dawaly granice tuz pod garbem; pobor idzie ze wsi.
+    ///   (B) "nie mocniej niz rekrut" - najwyzsza ochrona sztuki, ktora w tym slocie nosza w bitwie rekruci tieru 1 kultur glownych (Occupation.Soldier),
+    ///       przez sito. Bez rekrutow w danych - sama (A).
+    ///   ROT 8.1.8 (symulacja 25.10 na XML + items-dump): tulow A 31 (battania_civil_b "Villager Leather Tunic" 13/9/9), B 55 (garb) -> 31; nogi A 35
+    ///   (wrapped_shoes), B 32 (leather_cavalier_boots rekrutow Braavos) -> 32. Odcina garby 55, szaty andal_robe 42-46, przeszywanice, wrapped_shoes i
+    ///   battania_fur_boots 35. Bandyci sie tu nie licza (looter nosi wrapped_shoes - granica nog spadlaby do 17 i odcielaby buty rekrutow 18).
+    ///   Granica 0 = slot bez ubrania (nigdy bez granicy).
     /// - PULA kultury, osobno tulow i nogi: to, co nosza jej jednostki TIERU 1 (Occupation Soldier albo Bandit, nie bohater, nie szablon, CharacterObject.Tier
     ///   == 1; zestawy Battle i Civilian; bez takich - Culture.BasicTroop), RAZEM z tym, co nosza jej Villager i Townsman (ROT czesci kultur daje cywilow
     ///   innej: Essos - Braavos, Ghis i Sarnor - Dorne, Skagos - Zelazne Wyspy, Yi Ti - Dothrakowie). Tylko sztuki z flaga Civilian, w granicy, przez
-    ///   sito Fits (unikaty, olbrzymy, umarli, ubrania kobiece, tier ponad 3 odpadaja; NotMerchandise tylko w zapasach - ubrania z szablonow ludzi bywaja
-    ///   poza handlem: andal_civ_boots). W 27 z 30 kultur glownych ROT rekruci maja na tulowiu tylko sztuki ponad granica (*_garb 33),
-    ///   wiec tulow idzie zwykle od cywilow.
+    ///   sito Fits. W 27 z 30 kultur glownych ROT rekruci maja na tulowiu tylko sztuki ponad granica (*_garb), wiec tulow idzie zwykle od cywilow.
     /// - Przy wystawieniu: LOSOWO jedna z puli (tunika i buty osobno) sposrod tych, ktore czlowiek udzwignie (ItemReq.Meets - Atletyka; kobieta - bez
     ///   NotUsableByFemale). Pula pusta albo nic w Atletyce: (c) neutralne z flaga, losowo; (d) dowolne z flaga, najtansza - oba w granicy i w handlu;
     ///   zadna - slot pusty (licznik linii bitwy).
@@ -58,10 +66,13 @@ namespace Armoury
         private static readonly ItemObject[][] _neutral = { None, None }, _any = { None, None };
         private static readonly int[] _cap = new int[2];
         private static readonly string[] _capBy = new string[2];
+        // skladniki granicy (v3): (A) chlopi - Villager, (B) rekruci tieru 1 - do logu
+        private static readonly int[] _capV = new int[2], _capR = new int[2];
+        private static readonly string[] _capVBy = new string[2], _capRBy = new string[2];
         // werdykt sita na sztuke i slot - kazda sztuka oceniana (i liczona w odrzuconych) raz; tylko na czas Build
         private static readonly Dictionary<ItemObject, bool>[] _judged = { new Dictionary<ItemObject, bool>(), new Dictionary<ItemObject, bool>() };
         private static bool _built;
-        private static int _cutFemale, _cutTier, _cutBarred;
+        private static int _cutFemale, _cutTier, _cutBarred, _cutArmour;
         private static readonly int[] _cutCap = new int[2];
 
         // agent -> ubranie [0] tulow, [1] nogi (null - slot bez ubrania); wpis z GarrisonKit.RegisterPostfix, czyszczony na koniec misji
@@ -74,8 +85,12 @@ namespace Armoury
         internal static void Reset()
         {
             _pool.Clear(); _order.Clear();
-            for (int s = 0; s < 2; s++) { _neutral[s] = None; _any[s] = None; _cap[s] = 0; _capBy[s] = null; _cutCap[s] = 0; _judged[s].Clear(); }
-            _built = false; _cutFemale = _cutTier = _cutBarred = 0;
+            for (int s = 0; s < 2; s++)
+            {
+                _neutral[s] = None; _any[s] = None; _cap[s] = 0; _capBy[s] = null; _cutCap[s] = 0; _judged[s].Clear();
+                _capV[s] = _capR[s] = 0; _capVBy[s] = _capRBy[s] = null;
+            }
+            _built = false; _cutFemale = _cutTier = _cutBarred = _cutArmour = 0;
             ClearMission(); ClearCounters();
         }
 
@@ -87,10 +102,18 @@ namespace Armoury
 
         private static int SlotIx(EquipmentIndex slot) { return slot == EquipmentIndex.Body ? 0 : slot == EquipmentIndex.Leg ? 1 : -1; }
 
+        /// <summary>Ochrona w samym slocie (czy sztuka naprawde okrywa tulow / nogi).</summary>
         private static int Prot(ItemObject it, int s)
         {
             var ac = it != null ? it.ArmorComponent : null;
             return ac == null ? 0 : s == 0 ? ac.BodyArmor : ac.LegArmor;
+        }
+
+        /// <summary>Ochrona calej sztuki: glowa + tulow + rece + nogi (v3) - tym liczy sie granica, pula, kolejnosc i log.</summary>
+        private static int Total(ItemObject it)
+        {
+            var ac = it != null ? it.ArmorComponent : null;
+            return ac == null ? 0 : ac.HeadArmor + ac.BodyArmor + ac.ArmArmor + ac.LegArmor;
         }
 
         private static bool TypeFits(ItemObject it, int s)
@@ -110,15 +133,31 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>Przeszywanica albo zbroja z nazwy (v3, Jeff: "zadne zbroje") - heurystyka nazw jak Female: ROT daje cywilom Zelaznych Wysp, Ibbenu
+        /// i straznikom neutral_culture przeszywanice z flaga Civilian ("Short Gambeson over Tunic", "Infantryman Long Gambeson", "Corsair Cloth Armor").</summary>
+        private static readonly string[] ArmourWords = { "gambeson", "padded", "quilted", "armor", "armour", "mail", "plate", "lamellar", "scale", "brigandine", "cuirass", "hauberk" };
+
+        private static bool Armour(ItemObject it)
+        {
+            string id = (it.StringId ?? "").ToLowerInvariant();
+            string nm = it.Name != null ? it.Name.ToString().ToLowerInvariant() : "";
+            foreach (var w in ArmourWords) if (id.Contains(w) || nm.Contains(w)) return true;
+            return false;
+        }
+
         /// <summary>Czy sztuka nadaje sie na ubranie dla slotu s (0 tulow, 1 nogi) - wspolne sito wszystkich poziomow wyboru (bez granicy, flagi
-        /// Civilian i handlu - te sprawdza Build wedlug zrodla). Liczy odrzucone - wolac tylko przez Ok (raz na sztuke).</summary>
+        /// Civilian i handlu - te sprawdza Build wedlug zrodla). Liczy odrzucone - wolac tylko przez Ok (raz na sztuke).
+        /// Unikaty: spis ROT (RotUniques) i straz bitewna CrashScribe (QuartermasterLaw.BarredInBattle) - to samo co ArmsPricing.IsUnique BEZ NotMerchandise
+        /// (v3: IsUnique liczy NotMerchandise jako unikat, a ubrania z szablonow ludzi bywaja poza handlem - andal_civ_boots/2).</summary>
         private static bool Fits(ItemObject it, int s)
         {
             if (it == null || it.StringId == null || it.Value <= 0 || !TypeFits(it, s)) return false;
             if (Prot(it, s) <= 0) return false;                                  // slot naprawde okrywa (baggy_trunks: b0)
             if (Recipes.Grade(it) > 3) { _cutTier++; return false; }               // ubranie, nie zbroja (pulapka Tier1 == 0 - Grade)
-            if (ArmsPricing.IsUnique(it) || UniqueGear.Is(it) || GiantGear.Is(it) || UniqueLaw.IsDead(it)) { _cutBarred++; return false; }
+            if (RotUniques.Ids.Contains(it.StringId) || QuartermasterLaw.BarredInBattle(it) || UniqueGear.Is(it) || GiantGear.Is(it) || UniqueLaw.IsDead(it))
+            { _cutBarred++; return false; }
             if (Female(it)) { _cutFemale++; return false; }
+            if (Armour(it)) { _cutArmour++; return false; }
             return true;
         }
 
@@ -138,7 +177,7 @@ namespace Armoury
             {
                 int c = a.Value.CompareTo(b.Value);
                 if (c != 0) return c;
-                c = Prot(a, s).CompareTo(Prot(b, s));
+                c = Total(a).CompareTo(Total(b));
                 return c != 0 ? c : string.CompareOrdinal(a.StringId, b.StringId);
             });
             return l.ToArray();
@@ -185,6 +224,19 @@ namespace Armoury
                                 for (int s = 0; s < 2; s++) { var it = eq[Slots[s]].Item; if (it != null) soldierWorn[s].Add(it); }
                             }
                         if (co.Tier != 1) continue;
+                        // (B) granicy: najmocniejsza sztuka, ktora w bitwie nosza rekruci tieru 1 kultur glownych (przez sito)
+                        if (occ == Occupation.Soldier && co.Culture.IsMainCulture)
+                            foreach (var eq in co.BattleEquipments)
+                            {
+                                if (eq == null) continue;
+                                for (int s = 0; s < 2; s++)
+                                {
+                                    var it = eq[Slots[s]].Item;
+                                    if (it == null || !Ok(it, s)) continue;
+                                    int p = Total(it);
+                                    if (p > _capR[s] || (p == _capR[s] && _capRBy[s] != null && string.CompareOrdinal(it.StringId, _capRBy[s]) < 0)) { _capR[s] = p; _capRBy[s] = it.StringId; }
+                                }
+                            }
                         List<CharacterObject> l;
                         if (!t1.TryGetValue(co.Culture.StringId, out l)) t1[co.Culture.StringId] = l = new List<CharacterObject>();
                         l.Add(co);
@@ -197,26 +249,30 @@ namespace Armoury
                     try { if (cu != null && cu.StringId != null && !DeadCulture(cu)) cultures.Add(cu); }
                     catch { bad++; }
                 }
-                // (2) granica: najmocniejsze ubranie cywilow kultur glownych, ktorego nie nosi zaden zolnierz
+                // (2) granica: (A) najmocniejsze ubranie chlopow (Villager) kultur glownych, ktorego nie nosi zaden zolnierz; granica = mniejsza z (A) i (B)
                 foreach (var cu in cultures)
                 {
                     try
                     {
                         if (!cu.IsMainCulture) continue;
-                        foreach (var man in new[] { cu.Villager, cu.Townsman })
-                        {
-                            if (man == null || Undead.Character(man)) continue;
-                            foreach (var eq in Sets(man))
-                                for (int s = 0; s < 2; s++)
-                                {
-                                    var it = eq[Slots[s]].Item;
-                                    if (it == null || !it.IsCivilian || soldierWorn[s].Contains(it) || !Ok(it, s)) continue;
-                                    int p = Prot(it, s);
-                                    if (p > _cap[s] || (p == _cap[s] && _capBy[s] != null && string.CompareOrdinal(it.StringId, _capBy[s]) < 0)) { _cap[s] = p; _capBy[s] = it.StringId; }
-                                }
-                        }
+                        var man = cu.Villager;
+                        if (man == null || Undead.Character(man)) continue;
+                        foreach (var eq in Sets(man))
+                            for (int s = 0; s < 2; s++)
+                            {
+                                var it = eq[Slots[s]].Item;
+                                if (it == null || !it.IsCivilian || soldierWorn[s].Contains(it) || !Ok(it, s)) continue;
+                                int p = Total(it);
+                                if (p > _capV[s] || (p == _capV[s] && _capVBy[s] != null && string.CompareOrdinal(it.StringId, _capVBy[s]) < 0)) { _capV[s] = p; _capVBy[s] = it.StringId; }
+                            }
                     }
                     catch { bad++; }
+                }
+                for (int s = 0; s < 2; s++)
+                {
+                    bool byRecruit = _capR[s] > 0 && _capR[s] < _capV[s];   // bez rekrutow w danych - sama (A)
+                    _cap[s] = byRecruit ? _capR[s] : _capV[s];
+                    _capBy[s] = byRecruit ? _capRBy[s] : _capVBy[s];
                 }
                 // (3) pule kultur: rekruci tieru 1 (albo BasicTroop) razem z Villager i Townsman, w granicy
                 foreach (var cu in cultures)
@@ -270,7 +326,7 @@ namespace Armoury
                         if (it == null) continue;
                         int s = it.ItemType == ItemObject.ItemTypeEnum.BodyArmor ? 0 : it.ItemType == ItemObject.ItemTypeEnum.LegArmor ? 1 : -1;
                         if (s < 0 || !it.IsCivilian || it.NotMerchandise || !Ok(it, s)) continue;
-                        if (Prot(it, s) > _cap[s]) { _cutCap[s]++; continue; }
+                        if (Total(it) > _cap[s]) { _cutCap[s]++; continue; }
                         string c = it.Culture != null ? it.Culture.StringId ?? "" : "";
                         if (c.Length == 0 || c == "neutral_culture") neu[s].Add(it);
                         any[s].Add(it);
@@ -293,7 +349,7 @@ namespace Armoury
                 {
                     var it = eq[Slots[s]].Item;
                     if (it == null || !seen[s].Add(it)) continue;
-                    int pr = Prot(it, s);
+                    int pr = Total(it);
                     if (pr > _cap[s]) { if (recruit && TypeFits(it, s)) p.Over[s].Add(it.StringId + " " + pr); continue; }
                     if (!it.IsCivilian || !Ok(it, s)) { if (recruit) p.RecOut[s]++; continue; }
                     l[s].Add(it);
@@ -356,14 +412,18 @@ namespace Armoury
                 if (p.Items[0].Length == 0 && p.Items[1].Length == 0) empty.Add(c); else withPool++;
             }
             var sb = new StringBuilder(1000);
-            sb.Append("Ubranie cywilne (m117 v2): raz na kampanie; pula kultury = sztuki z flaga Civilian, ktore na tulowiu / nogach nosza jej jednostki tieru 1")
+            sb.Append("Ubranie cywilne (m117 v3): raz na kampanie; pula kultury = sztuki z flaga Civilian, ktore na tulowiu / nogach nosza jej jednostki tieru 1")
               .Append(" (bez nich Culture.BasicTroop) i jej Villager / Townsman, w granicy; przy wystawieniu losowo z puli to, co czlowiek udzwignie (Atletyka)")
-              .Append("; granica z danych (najmocniejsze ubranie cywilow kultur glownych, ktorego nie nosi zaden zolnierz): tulow ").Append(_cap[0])
-              .Append(" (").Append(_capBy[0] ?? "BRAK - tulow bez ubrania").Append("), nogi ").Append(_cap[1]).Append(" (").Append(_capBy[1] ?? "BRAK - nogi bez ubrania")
+              .Append("; ochrona sztuki = glowa+tulow+rece+nogi; granica = mniejsza z (A) najmocniejsze ubranie chlopow (Villager) kultur glownych, ktorego nie nosi")
+              .Append(" zaden zolnierz, i (B) najmocniejsza sztuka rekrutow tieru 1 kultur glownych: tulow ").Append(_cap[0])
+              .Append(" (").Append(_capBy[0] ?? "BRAK - tulow bez ubrania").Append("; A ").Append(_capV[0]).Append(' ').Append(_capVBy[0] ?? "-")
+              .Append(", B ").Append(_capR[0]).Append(' ').Append(_capRBy[0] ?? "-").Append("), nogi ").Append(_cap[1]).Append(" (").Append(_capBy[1] ?? "BRAK - nogi bez ubrania")
+              .Append("; A ").Append(_capV[1]).Append(' ').Append(_capVBy[1] ?? "-").Append(", B ").Append(_capR[1]).Append(' ').Append(_capRBy[1] ?? "-")
               .Append("); zapasy w granicy: (c) neutralne tulow ").Append(_neutral[0].Length).Append(" / nogi ").Append(_neutral[1].Length)
               .Append(" (losowo), (d) dowolne tulow ").Append(_any[0].Length).Append(" / nogi ").Append(_any[1].Length).Append(" (najtansza)")
               .Append("; odrzucone sztuki: ponad granica (z flaga, w handlu) tulow ").Append(_cutCap[0]).Append(" / nogi ").Append(_cutCap[1])
               .Append(", ponad tier 3 ").Append(_cutTier).Append(", unikaty/olbrzymy/umarli ").Append(_cutBarred).Append(", kobiece ").Append(_cutFemale)
+              .Append(", przeszywanice/zbroje z nazwy ").Append(_cutArmour)
               .Append(bad > 0 ? ", bledy odczytu " + bad : "").Append("; kultur z pula ").Append(withPool);
             if (empty.Count > 0) sb.Append(", bez puli (zapas c/d) ").Append(empty.Count).Append(": ").Append(string.Join(", ", empty.ToArray()));
             Log.Info(sb.Append('.').ToString());
@@ -371,7 +431,7 @@ namespace Armoury
             {
                 Pool p;
                 if (!_pool.TryGetValue(c, out p) || (p.Items[0].Length == 0 && p.Items[1].Length == 0)) continue;
-                Log.Info("Ubranie cywilne (m117 v2) | " + c + ": tulow " + SlotText(p, 0) + " | nogi " + SlotText(p, 1) + " | skad: " + p.Src);
+                Log.Info("Ubranie cywilne (m117 v3) | " + c + ": tulow " + SlotText(p, 0) + " | nogi " + SlotText(p, 1) + " | skad: " + p.Src);
             }
         }
 
@@ -389,8 +449,8 @@ namespace Armoury
             if (p.RecOut[s] > 0) sb.Append("; rekrutow bez flagi Civilian / przez sito ").Append(p.RecOut[s]);
             sb.Append(')');
             if (l.Length == 0) return sb.Append(" - zapas c/d").ToString();
-            sb.Append(" max ").Append(p.Max[s]).Append(", np. ");
-            for (int i = 0; i < l.Length && i < 5; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].StringId).Append(' ').Append(Prot(l[i], s));
+            sb.Append(" max ").Append(p.Max[s]).Append(", np. (ochrona sztuki / w slocie) ");
+            for (int i = 0; i < l.Length && i < 5; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].StringId).Append(' ').Append(Total(l[i])).Append('/').Append(Prot(l[i], s));
             if (l.Length > 5) sb.Append(", ... (+").Append(l.Length - 5).Append(')');
             return sb.ToString();
         }

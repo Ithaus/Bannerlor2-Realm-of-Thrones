@@ -1,6 +1,6 @@
 # DZIENNIK ZMIAN
 
-## 2026-10-25 112 (m118-postoj-armii, galaz w-toku/m117-ubranie po 111 d95802cc) - figurki armii na postoju sciagaja sie do wodza (tylko obraz)
+## 2026-10-25 112 (m118-postoj-armii, galaz w-toku/m117-ubranie po 111 d95802cc) - figurki armii na postoju sciagaja sie do wodza (tylko obraz; recenzja 25.10: druzyny stojace dociagane krokami)
 
 **Problem:** Jeff 25.10 ok. 00:25, po zrzucie armii Gregora Clegane'a (7 druzyn) na "Dniu odpoczynku armii" (R3-08a): wodz po prawej, figurki doczepionych
 o ok. 1.5-2 jedn. w lewo - "tak, sciagaj figurki do wodza na postoju, bo to jest ta sama armia a nie dochodzacy lordowie". Dowodu z logu nie ma (pozycji figurek
@@ -30,6 +30,7 @@ nikt nie logowal) - przyczyna z dekompilacji, nowa linia logu ja potwierdzi albo
   prowadzi figurki (plynnie, swoja predkoscia 0.7-1.3 x wodza, z animacja marszu) i sama je tam trzyma. Przesuniecie bazy wchodzi do CalculateSpeed i obrotu
   kierunku tak samo jak w grze (ta sama roznica "Pozycja wodza - NextTargetPosition", po drugiej stronie), wiec zbieznosc ruchu jak w grze.
   NIC nie piszemy w stanie gry: ani addera, ani pozycji, ani MoveTargetPoint/NextTargetPosition, ani rozkazow; bez SetVisualAsDirty (przebudowa figurki).
+  (Recenzja 25.10 - wyjatek: ArmyPositionAdder druzyn STOJACYCH, ktorych gra nie prowadzi - opis w bloku "Recenzja" nizej.)
 - Skala k = clamp(R0 / najdalsze miejsce szyku gry, 0.5, 1); R0 = EncounterModel.NeededMaximumLandDistanceForEncounteringMobileParty (0.5 - "w jednym miejscu",
   z modelu w biegu), 0.5 = polowa odstepow gry (bok 0.5 -> 0.25, rzad 0.375 -> 0.19; ciasniej figurki w skali 0.3 wchodza na siebie). Najdalsza figura
   (symulacja szyku gry z rozrzutem, scratchpad formation.py): 2 doczepione 0.56 -> 0.50, 4: 1.01 -> 0.50, 6: 1.26 -> 0.63, 10: 1.61 -> 0.80, 15: 2.00 -> 1.00, 30: 2.84 -> 1.42 jedn. - do 30
@@ -63,7 +64,7 @@ nikt nie logowal) - przyczyna z dekompilacji, nowa linia logu ja potwierdzi albo
   sie nie rusza (wtedy wrocic do zapisu addera); (2) ze szyk na naszym postoju stoi wokol starego NextTargetPosition - "baza szyku gry od wodza" w logu,
   spodziewane > 0; (3) wyglad przy k = 0.5 (figury moga sie stykac) i plynnosc - zrzut Jeffa.
 - Lord doczepiony W CZASIE postoju AI ma MoveTargetPoint = pozycja stojacego wodza, wiec po pierwszym kroku nie jest "w ruchu" - gra go nie prowadzi, stoi tam,
-  gdzie sie doczepil (<= ok. 1.22 jedn., prog Army.Tick:387), jak w grze; licznik "stoja".
+  gdzie sie doczepil (<= ok. 1.22 jedn., prog Army.Tick:387), jak w grze; licznik "stoja". (Recenzja 25.10: teraz dociagany krokami addera - blok nizej.)
 - Po ruszeniu: figury stoja blizej wodza niz ich miejsce w szyku - gra prowadzi je na miejsca 0.7-1.3 x predkosci wodza; obejrzec pierwsze ruszenie po postoju.
 - Armia gracza tylko z namiotem (PlayerCamped) i gdy gracz czeka; sen w menu bez namiotu - nie (do decyzji Jeffa).
 - Jedna zmiana naraz: w tym samym DLL lezy niewgrane 111 (ubranie cywilne v2) - objawy rozdzielne (m118 nie dotyka sprzetu, DTE ani bitew).
@@ -71,11 +72,93 @@ nikt nie logowal) - przyczyna z dekompilacji, nowa linia logu ja potwierdzi albo
   gra prowadzi / stoja, potkniecia 0, postfiksu 0); na mapie armia AI na postoju (swit po 6 dobach marszu albo oboz nocy) - figury przy wodzu w ok. 1 s;
   po ruszeniu szyk bez maruderow; przelaczenie klucza w MCM na zywo (od razu szyk gry).
 
+**Recenzja 25.10 (ta sama niewgrana pozycja 112; uwagi "B-armia"):**
+- (B1, minor - PRAWDA, poprawione) Druzyny doczepione W CZASIE postoju (i armia zebrana na stojaco, ktora zaraz rozbila oboz nocy) nie podchodzily do wodza -
+  stalyby do ok. 1.22 jedn. (Army.Tick:387-388: odleglosc^2 < MaximumAllowedLandDistanceForEncounteringMobilePartyInArmy 1.5), gdy reszta stoi w 0.5-0.6.
+  Sprawdzone w dekompilacji: EscortParty/JoinParty -> MoveTargetPoint = Position celu (MobileParty.cs:2141); po pierwszym kroku TryToMove (2936-2939) Position =
+  pozycja wodza = MoveTargetPoint, wiec IsMoving (1200) false, a przy stojacym wodzu variables.IsMoving (2776) false -> lista stacjonarnych:
+  TickForStationaryMobileParty (2685) wola tylko DoUpdatePosition, bez TryToMove - postfiks zmienial cel, ktorego nikt nie realizowal. Jeff: "to jest ta sama
+  armia a nie dochodzacy lordowie" - doczepiony to juz armia.
+  Zmiana: ArmyCloseRanks.Pull - co skan (0.1 h gry), po publikacji k, dla armii na postoju i TYLKO dla doczepionych z IsMoving false (wodz stoi; bez druzyny gracza,
+  bitwy, osady, oblezenia, morza, przejscia): krok ArmyPositionAdder w strone TEGO SAMEGO miejsca, ktore gra liczy druzynom "w ruchu" (wodz.NextTargetPosition +
+  facing.T(GetRelativePositionForParty) - z postfiksem wodz + facing.T(k x miejsce gry)); dlugosc kroku = Speed wodza x dt gry od ostatniego skanu (suma dt
+  z TickEvent - ten sam _dt co ruch w Campaign.RealTick; gra prowadzi doczepione 0.7-1.3 x wodza), nie dalej niz cel. Setter: AccessTools.PropertySetter(MobileParty,
+  "ArmyPositionAdder"), zadeklarowany w MobileParty, delegat raz na sesje przy latce; brak - linia logu, stojace zostaja jak dotad (postfiks dziala dalej).
+  Spojnosc z gra: tych druzyn gra nie rusza, dopoki wodz stoi (nie ma ich na liscie ruchu - zapis nie jest cofany); gdy wodz ruszy, variables.IsMoving = prawda
+  i TryToMove liczy od figurki (Position := wodz, adder += NextPosition - Position, NextPosition = krok od figurki) - bez skoku. Adder zapisuje gra (SaveableProperty 1005).
+- (B2, minor - PRAWDA co do pochodzenia liczby; kod bez zmian, opis poprawiony) KMin = 0.5 jest dobrany na oko, nie z modelu gry: R0 z EncounterModel decyduje
+  tylko przy 2-3 doczepionych, od 4 druzyn k = 0.5 zawsze ("polowa szyku gry"). Wyprowadzenie z danych (promien zamku, rozmiar figurki PartyScale 0.3) wymagaloby
+  nowych liczb (wymiary czlowieka i konia) - nie lepsze. W ArmyCloseRanks i tutaj zapisane wprost: KMin to jedyna liczba bez zrodla, DO DECYZJI JEFFA na zrzucie
+  (zmiana jednej stalej). Recenzja: "Kodu nie trzeba zmieniac przed testem".
+- Log: linia latki z dopiskiem "setter ArmyPositionAdder - jest / BRAK"; przyklad poczatku "stoja M - dociagane krokami"; linia doby "stojace dociagane (setter jest):
+  krokow N, doszly na miejsce M". Bez linii co klatke.
+**Ryzyko recenzji / co sprawdzic (kontrola calosci):**
+- Zastrzezenie do "NIC nie piszemy w stanie gry" wyzej: od recenzji piszemy ArmyPositionAdder stojacych doczepionych w czasie postoju (tylko przesuniecie figurki;
+  Position, MoveTargetPoint, NextTargetPosition, rozkazy - bez zmian; IsMoving bez zmian, wiec modele leczenia/doswiadczenia/widocznosci czytaja to samo).
+  Kto czyta adder (dekompilacja): VisualPosition2DWithoutError (figurka, DoUpdatePosition, CalculateSpeed), MapEvent:699 (ustawienie stron bitwy od figurki - jak
+  dla kazdej figurki w szyku), MapScreen:2460, MobilePartyVisual (przejscie lad/morze - pomijane), NavalDLC.View (morze - pomijane). Skan DLL zainstalowanych
+  modulow: "ArmyPositionAdder" tylko w SandBox.View i NavalDLC.View; w naszych 5 modach poza ArmyCloseRanks - 0 odczytow. Gra zeruje adder przy wejsciu do twierdzy,
+  koncu przejscia, odlaczeniu (OnAttachedToRemoved) - jak dotad. ArmyRestDay / NightRest / NightMarch / CampWalk czytaja doczepione tylko dla morale, jedzenia, snu
+  i listy obozu - pozycji nie.
+- Plynnosc: krok co skan (0.1 h gry = ok. 0.08 s przy x1, czesciej w czasie rzeczywistym przy przyspieszeniu) - ruch moze byc mniej plynny niz u druzyn prowadzonych
+  przez gre; obejrzec lorda dochodzacego w czasie dnia odpoczynku.
+- Wylaczenie klucza w czasie postoju: dociagniete figurki zostaja przy wodzu (nic nie cofamy), przy nastepnym marszu gra prowadzi je na miejsca szyku.
+- Wydajnosc: na skan petla po doczepionych armii na postoju; zapis tylko, gdy figura > 0.001 od miejsca (po dojsciu - zero zapisow); GetRelativePositionForParty
+  (zapytanie navmesha) raz na stojaca druzyne na skan; L.Speed (ten sam getter, ktory MobilePartyVisual czyta co klatke).
+- Test dodatkowy: na postoju AI lord dochodzacy - figura po doczepieniu idzie do szyku przy wodzu; linia doby "stojace dociagane: krokow > 0, doszly > 0", potkniecia 0;
+  po wczytaniu zapisu figury na miejscach; ruszenie armii po postoju bez skoku figur.
+
 **Status:** ZBUDOWANE - czeka na autotest i wgranie. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w zmienionych plikach). Armoury.dll z pelnej
 przebudowy (--no-incremental, dwa razy to samo) na commicie kodu 11980fd6: md5 07382f5f12017003888e2a34ebadec7c (DLL zawiera hash commitu - md5 zmienia sie
-z kazdym commitem, takze samego CHANGELOG; przy wgraniu liczy sie przebudowa z HEAD galezi, porownana z plikiem wgrywanym).
+z kazdym commitem, takze samego CHANGELOG; przy wgraniu liczy sie przebudowa z HEAD galezi, porownana z plikiem wgrywanym). Po recenzji 25.10 (111 v3 + 112 B1/B2):
+md5 z przebudowy - wpis w nastepnym commicie CHANGELOG.
 
-## 2026-10-24 111 (m117-ubranie, galaz w-toku/m117-ubranie od w-toku/m116-fabula 6cd80130) - wlasne ubranie cywilne golych zolnierzy: tunika i buty ich kultury (v2 25.10: losowo z ubran rekrutow tieru 1 i cywilow, bez zbroi)
+## 2026-10-24 111 (m117-ubranie, galaz w-toku/m117-ubranie od w-toku/m116-fabula 6cd80130) - wlasne ubranie cywilne golych zolnierzy: tunika i buty ich kultury (v2 25.10: losowo z ubran rekrutow tieru 1 i cywilow, bez zbroi; v3 25.10: ochrona calej sztuki, bez przeszywanic, granica "chlop / rekrut")
+
+**v3 (recenzja 25.10, ta sama niewgrana pozycja 111 - uwagi "A-ubrania"; zastepuje GRANICE i liczby PUL z v2 nizej, mechanizm bez zmian):**
+- (A1, major - PRAWDA) Granica sprawdzala tylko ochrone slotu (Prot = BodyArmor sztuki tulowia), bez rak i nog tej samej sztuki - przechodzily sztuki, ktore lacznie
+  chronia bardziej niz odrzucony garb (riverlands/northern/nightswatch_garb 33/11/11 = 55): heavy_gambeson_armor_plain "Mariner Gambeson" 27/30/27 = 84 (Ibben),
+  battania_woodland_outfit "Woodland Garments" 20/14/22 = 56, northern_padded_gambeson "Short Gambeson over Tunic" 16/13/16, nordic_padded_cloth "Reinforced Thick Tunic",
+  empire_warrior_padded_armor_e "Infantryman Long Gambeson", studded_fur_armor, zapas (c) southern_pirate_armor "Corsair Cloth Armor". Poprawka: (1) ochrona sztuki =
+  glowa + tulow + rece + nogi (Civvies.Total) w granicy, puli, kolejnosci i logu (Prot zostaje tylko jako "sztuka okrywa slot"); (2) sito Fits odrzuca przeszywanice
+  i zbroje z nazwy (ArmourWords w id albo nazwie: gambeson, padded, quilted, armor, armour, mail, plate, lamellar, scale, brigandine, cuirass, hauberk - heurystyka jak
+  ubrania kobiece), licznik "przeszywanice/zbroje z nazwy" w naglowku logu. Wariant "suma + nazwa" (oba z propozycji recenzji): sama suma przy granicy z Villager dalaby
+  45 (northern_padded_gambeson nosza chlopi Zelaznych Wysp) i przepuscila przeszywanice.
+- (A2, major - PRAWDA) Sito Fits wolalo ArmsPricing.IsUnique, ktora liczy NotMerchandise jako unikat (ArmsPricing.cs:95) - andal_civ_boots/2 (merchandise 0) wypadaly
+  mimo opisu. Poprawka: Fits pyta RotUniques.Ids i QuartermasterLaw.BarredInBattle (to samo co IsUnique bez NotMerchandise) oraz UniqueGear / GiantGear /
+  UniqueLaw.IsDead jak dotad; NotMerchandise sprawdzaja tylko zapasy (c)/(d). ArmsPricing.IsUnique bez zmian (inni wolajacy - wycena, warsztaty - nietknieci).
+- (A3, major - PRAWDA) Granica tulowia z jednej sztuki mieszczan (andal_robe3/5 = 30 na tulowiu) - Westeros mial cala pule 19-30, srednio 22.6 (68% garbu).
+  Poprawka: skladnik (A) granicy liczony z Villager (bez Townsman) - "nie mocniej niz chlop" (pobor idzie ze wsi; szata mieszczanina 3 kg, 46 d to nie ubranie z domu
+  poborowego). Townsman zostaje w PULI (rozmaitosc), ale tylko w granicy - andal_robe1-6 (42-46 lacznie) odpadaja.
+- (A4, minor - PRAWDA) Granica nog 35 (wrapped_shoes) - liczbowo ponad 33 i prawie 2x buty rekrutow (18). Poprawka: granica = MNIEJSZA z (A) "chlop" i (B) "nie mocniej
+  niz rekrut" - najmocniejsza sztuka, ktora w slocie nosza w bitwie rekruci tieru 1 kultur glownych (Occupation.Soldier, przez sito; bez rekrutow w danych - sama A).
+  Jedna regula na oba sloty (Jeff: "ubrania cywilne" + "jak laza recruit"). ROT: nogi A 35 / B 32 (leather_cavalier_boots - buty rekrutow tieru 1 Braavos) -> 32 < 33;
+  tulow A 31 / B 55 (braavosi_garb) -> 31. leather_cavalier_boots zostaje (nosza je rekruci tieru 1); odpadaja wrapped_shoes i battania_fur_boots 35.
+- Dane v3 (symulacja reguly kodu: scratchpad py3/sim4.py na XML rozpoznania + items-dump.csv; ochrona lacznie/w slocie): granica tulow 31 (battania_civil_b "Villager
+  Leather Tunic" 13/9/9), nogi 32. Pule (tulow / nogi: sztuk, max lacznie/w slocie): Westeros (vlandia, vale, river, dragonstone, stormlands, reach, crownlands)
+  8 (andal_clothes1-8, 29/19) / 4 (andal_boots, first_men_boots 18, andal_civ_boots/2 15; crownlands 3); Polnoc i freefolk 10 max 31/13 / 6 max 30; Zelazne Wyspy
+  i Skagos 5 max 31/13 / 5 max 32; Dorne 4 max 13/7 / 4 max 18; Ghis 5 max 20/7 / 3 max 30; Sarnor 4 max 13/7 / 2 max 18; Braavos 8 max 22/8 / 6 max 32; Norvos,
+  Valyria, Volantis, Qohor, Lorath, Pentos, Myr, Lys, Tyrosh, Qarth 7 max 22/8 / 5 max 30; Dothrakowie i Yi Ti 4 max 30/12 / 4 max 30; Nocna Straz i Wyspy Letnie
+  7 max 29/11 / 3 max 30; Ibben 7 max 31/13 / 9 max 32. Kultury bandyckie (ich ludzie w druzynach lordow rzadko): tulow zwykle z zapasu (c) - wildlings tulow (c) /
+  nogi 2, looters (c) / (c). Zapasy: (c) neutralne tulow 4 (cloth_apron, half_apron 14, leather_apron 27, merchants_fur_coat 30) / nogi 4 (leather_shoes 19,
+  strapped_shoes 22, bandit_shoes 25, ragged_boots 26); (d) tulow 109 / nogi 84. Liczby v2 nizej ("Pule wedlug danych", granica 30/35) - NIEAKTUALNE.
+- Opis BareTroopsWearCivilianClothes (angielski) poprawiony ("no gambesons or pieces named armour ... 31 for a tunic, 32 for boots"); gen_mcm: Armoury 2412 ustawien
+  (liczba bez zmian - klucz 112 juz byl). Klucz bez zmian - Armoury.json Jeffa ruszac nie trzeba.
+**Ryzyko v3 / co sprawdzic (kontrola calosci):**
+- Zmienione tylko Civvies (Fits, Build, Gather, Sorted, log) i opis MCM; Pick, GarrisonKit.CivilDress, MarkSlotAsTemporary, ArmorsPostfix, IsWorn, LootTally - bez
+  zmian, wiec zwrot, lup i wraki jak w v2 (grep "Civvies." - jedyni wolajacy: GarrisonKit, BattlefieldLaw). Ok() ocenia teraz takze sztuki rekrutow tieru 1 w bitwie
+  (skladnik B) - liczniki odrzuconych w naglowku licza i je (raz na sztuke). W pulach symulacji 0 sztuk ze spisow UniqueGear / RotUniques / CrashScribe.
+- Heurystyka nazw zbroi odcina tez steppe_armor "Striped Coat" (id z "armor"; Dothrakowie i Yi Ti 5 -> 4) i torn_bandit_clothes "Torn Padded Garments"; jesli Jeff
+  woli - tylko nazwa zamiast id + nazwa (jedna linia).
+- Westeros: tylko andal_clothes1-8 (bez szat mieszczan) - 8 wariantow wygladu, tulow najwyzej 19 (garb 33).
+- Nogi do 32 (leather_cavalier_boots, battania_leather_boots "Highborn Leather Boots" 32 od cywilow Zelaznych Wysp / Skagos / Ibbenu) - ponizej 33, ale ok. 2x buty
+  rekrutow Westerosu (18); nizsza granica wymagalaby nowej liczby - do oceny Jeffa.
+- Wildlings i kultury bandyckie na tulowiu z zapasu (c): fartuchy i merchants_fur_coat (jak w v2, juz bez Corsair Cloth Armor).
+- Liczby z XML + items-dump; straz CrashScribe (BarredInBattle) i UniqueGear w grze moga odciac cos jeszcze - faktyczne pule pokaze log.
+- Test w grze: naglowek "Ubranie cywilne (m117 v3)": tulow 31 (battania_civil_b; A 31 battania_civil_b, B 55 braavosi_garb), nogi 32 (leather_cavalier_boots; A 35
+  wrapped_shoes, B 32 leather_cavalier_boots), "przeszywanice/zbroje z nazwy" > 0; linie kultur (Westeros tulow 8, nogi 4 z andal_civ_boots); w bitwie z golymi
+  rozne tuniki i buty, zadnego *_garb, przeszywanicy ani szaty andal_robe z ubrania.
+**Status v3:** ZBUDOWANE, NIEWGRANE - czeka na autotest i wgranie. md5 z przebudowy - w Status nizej (wpis w nastepnym commicie CHANGELOG).
 
 **v2 (25.10, ta sama niewgrana pozycja 111 - zmiana zasady wyboru):** Jeff 25.10 ok. 00:25: "ubrania maja byc rozne aby wszyscy nie wygladali tak samo i maja to byc
 ubrania cywline zadne zbroje za 33 pancerza no tier 1 jednostek jak laza recruit kazdej kultury". v1 (opis nizej) dawal kazdemu czlowiekowi danej kultury TE SAMA najtansza
