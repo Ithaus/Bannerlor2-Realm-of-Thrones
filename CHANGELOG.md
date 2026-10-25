@@ -60,6 +60,23 @@ D11-3 jest jedynym poborca od lordow i gracza - podatek nie dubluje sie.
 **Status:** ZBUDOWANE, NIEWGRANE (galaz noc/p8-podatek). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Seal31B / PopulationLaw). Gra Jeffa dzialala -
 nic nie wgrane, bez autotestu.
 
+## 2026-10-25 120 (noc-p7 przesluchanie, galaz noc/p7-przesluchanie od a14c76d3 = WGRANIE 111; commity 17479881 + recenzja 443b13f5) - przesluchanie jencow z band dezerterow: pochodzenie jenca z bandy, opcja szara zamiast ukrytej
+
+**Problem:** Jeff 25.10 ok. 02:50: "nie dziala przelsuchanie jencow". Opcji obozu "Question the prisoners" nie bylo. Log Armoury-2026-10-25_02-11-22.log: bitwy z Robber Knights o 02:41 i 02:48 (w bandach robber_knights: lannister_footman, river_man_at_arms, goldcloak_master_archer, western_mercenary);
+[02:48:06] pamiec bandy robber_knights_2145345368, kryjowka hideout_robber_11; [02:50:43] "Przesluchanie (m109): ... jency-bandyci grup 0, ludzi 0".
+**Przyczyna:** za bandyte uchodzil tylko jeniec z Occupation == Bandit albo Culture.IsBandit (CampInterrogation.BanditTroop); Groups() pomijalo reszte, a Cond przy gs.Count == 0 ukrywalo opcje bez sladu w logu. Bandy w swiecie Jeffa to dezerterzy i zolnierze z puli wyrzutkow
+(OutlawLaw.RosterPostfix / Draw, OutlawLawEnabled TAK). Wtornie: prosci w bandzie to "looter" (kultura bez kryjowek w ROT-Map) - szara "Outlaws of this kind keep no lair", bo pamiec band jest kluczowana kultura. Dawny autotest wkladal bandytow z szablonu klanu.
+**Zmiana (tylko Armoury: CampInterrogation.cs, CampInterrogation.Test.cs; bez nowego klucza MCM):**
+- Migawka lochu gracza i skladu pokonanych band w CampaignEvents.OnPlayerBattleEndEvent (PlayerEncounter.DoApplyMapEventResults, przed CalculateAndCommitMapEventResults); w OnMapEventEnded przyrost lochu przypisany bandzie, ktora miala najwiecej ludzi tego rodzaju (rodzaj spoza migawki - "bez bandy", bez wpisu).
+- Wpis pochodzenia rodzaj -> kultura bandy, kryjowka, miejsce, doba, banda, liczba (najwyzej 60) w siodmej czesci arm_interrogation (DLL 111 ja pomija); liczba przycinana do stanu lochu, smierc w przesluchaniu -1, wpis znika bez rodzaju w lochu.
+- Groups(): dezerter z wpisem (najwyzej liczba z wpisu) i bandyta z wpisem (caly stos) dostaja kulture bandy (PersonCulture zostaje); Target bierze kryjowke z wpisu, gdy wpis ma najwyzej 60 dob (OriginFresh, jak pamiec band), inaczej pamiec kultury bandy.
+- Cond: jency w lochu, ale zaden z bandy - opcja SZARA "None of the men you hold rode with outlaws." (pusty loch - ukryta jak dotad). Teksty dezertera po angielsku.
+- Log "Przesluchanie (m109): pochodzenie - banda ... | jency z bandy: ... | bez bandy N", linia doby "pochodzenie - doba ... bez migawki N", "opcja szara". Autotest: T14 (dezerter z bandy), T15 (Cond na atrapie), T9 (zapis siodmej czesci).
+**Ryzyko / co sprawdzic:** wpiecie zdarzen sprawdzi tylko prawdziwa wygrana z banda (T14 wola NoteOrigins wprost) - po wgraniu: po "pamiec - banda X" linia "pochodzenie - banda X ... jency z bandy", w linii doby "bez migawki 0", w obozie grupy "(..., rode with outlaws)".
+Jency wzieci przed ta wersja nie maja wpisu - opcja szara do nastepnej wygranej z banda. Stos mieszany bierze dane najnowszej bandy. PrisonerLaw.Criminal (definicja przestepcy, Mur) bez zmian - dezerterzy z band dalej nie ida na Mur.
+Recenzja 443b13f5: R1 bez zapasu "jedna pokonana partia - ona", R2 OriginFresh 60 dob, R3 autotest T14/T15 rozszerzony.
+**Status:** ZBUDOWANE (scalone z 121 na noc/wgranie112).
+
 ## 2026-10-25 113 (m119-kij, galaz w-toku/m117-ubranie po 112 231dc8a5) - bezbronny po strazach bierze z domu najgorsza bron biala (palka, mlot, sierp, toporek) swojej kultury - sztuka tymczasowa DTE, poza zbrojownia
 
 **Problem:** Jeff 25.10 ok. 01:00: "i jakas nagorsza bron dostja akijem moga walczyc sa kije?"; ok. 01:40: "wgraj wszystko razem z kijem". Log 24.10 (1 z 21 bitew, dopisek
