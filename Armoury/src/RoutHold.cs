@@ -55,8 +55,13 @@ namespace Armoury
         internal const int SitePools = 7;
         // m111-walka (24.10): pojedynki - DuelAi, DuelCraft, DuelGuard (turniej, arena, pojedynek ROT)
         internal const int SiteDuel = 8;
-        private const int Sites = 9;
-        private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek" };
+        // noc 25.10 P0 (krytyk K1 - indeksy nadaje integrator): marsz (MarchToContact, P1), doktryna (Doctrine, P1), choragiew (BannerCompanies / BannerKit, P3),
+        // dzwiek (BattleSound, P2 - osobno od "glosy" BattleCries, zeby potkniecia sie nie zlewaly). UWAGA: RoutHold.Break(a, site) bierze miejsce MissionTeams
+        // (Broken / Flee), NIE te stale - zlamanie choragwi idzie przez Break(a, MissionTeams.Flee) i liczy sie jako "ucieczka".
+        internal const int SiteMarch = 9, SiteDoctrine = 10, SiteBanner = 11, SiteSound = 12;
+        private const int Sites = 13;
+        private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze", "pojedynek",
+                                                      "marsz", "doktryna", "choragiew", "dzwiek" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -229,6 +234,10 @@ namespace Armoury
             BattleGore.ResetCounters();
             BattleCries.ResetCounters();
             BloodPools.ResetCounters();
+            // noc 25.10 P0: segmenty nocy w tej samej linii (jeden wlasciciel linii - K1); kazda klasa zeruje tylko swoje liczniki
+            MarchToContact.ResetCounters();
+            Doctrine.ResetCounters();
+            BannerCompanies.ResetCounters();
         }
 
         /// <summary>Licznik misji dla RoutKeeper (glowny watek): misja zgodna z licznikami.</summary>
@@ -262,7 +271,8 @@ namespace Armoury
             for (int i = 1; i < Tiers.Length; i++) soldiers += Tiers[i].Count;
             int broken = Broken + Fled, stum = Sum(Stum);
             int extra = WarCouncil.Activity + VeteranAi.Activity + BattleGore.Activity + BattleCries.Activity   // czesc 2 - tylko w bitwach
-                        + BloodPools.Activity;                                                                // czesc 3 - kaluze krwi
+                        + BloodPools.Activity                                                                 // czesc 3 - kaluze krwi
+                        + MarchToContact.Activity + Doctrine.Activity + BannerCompanies.Activity;              // noc 25.10 (P1, P3)
             // spacer po miescie / wsi / zamku ("inna") bez zlamanych i potkniec - bez linii (straz miasta tez dostaje postury RBM)
             if (_kind == "inna" && broken + stum + extra == 0) return;
             if (_kind == "?" && broken + stum + soldiers + Heroes.Count + extra == 0) return;
@@ -291,6 +301,10 @@ namespace Armoury
             BattleGore.Append(sb, c);
             BattleCries.Append(sb, c);
             BloodPools.Append(sb, c);   // czesc 3 (16.10): kaluze krwi na ziemi - po 'obce glosy'
+            // noc 25.10 P0: segmenty marsz / doktryna (P1) i choragwie (P3) - wolane pod Gate (Append nie moze brac innej blokady)
+            MarchToContact.Append(sb, c);
+            Doctrine.Append(sb, c);
+            BannerCompanies.Append(sb, c);
             sb.Append(" | potkniecia: ");
             for (int i = 0; i < Sites; i++) sb.Append(i > 0 ? ", " : "").Append(SiteName[i]).Append(' ').Append(Stum[i]);
             sb.Append(" (sesja ").Append(Sum(StumSession)).Append(", linia misji ").Append(_lines).Append(").");

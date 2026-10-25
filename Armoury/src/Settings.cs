@@ -4397,6 +4397,86 @@ namespace Armoury
         // NIE (i Full Versions NIE) - wiersze smierc nie biora udzialu. World Changes NIE - tez nie (tekst nie twierdzi smierci, ktorej nie ma).
         public bool ChronicleCanonDeaths = true;          // characters die in Chronicle events as they die in the books and the show, but only when the world went the same way (the character is alive, where the story puts him and in the same role). When your world went another way they live. Off = only the full versions kill them
 
+        // ===== noc 25.10 (P0 baza nocy): klucze szesciu paczek bitwy - nazwy i domyslne ustala integrator (krytyk K13), paczki ich nie dopisuja.
+        // Polecenie Jeffa 25.10 00:36-02:30 ("chce aby bitwa wygladala tak jak w sredniowieczu ... Przygotuj to przez noc"). Kazda funkcja za wlasnym kluczem,
+        // domyslnie TAK, czytane na zywo; nowe klucze - w Armoury.json Jeffa ich nie ma (sprawdzone grepem 25.10), dzialaja wartosci z kodu.
+
+        // --- Marching and tactics ---
+        // P1 (Jeff: "armie nie biegly non stop tylko szly ... dopiero jak jest szarza to jest okrzyk i biegna na siebie, aby nie tracic sil"; "taktyki sredniowiecznej
+        // bitwy wedlug kultury"; "jesli jedna strona widzi, ze druga nie ma lucznikow, to najpierw wykorzystuje lucznikow"; "kawaleria stara sie flankowac"):
+        // M0 FieldCraft.cs (limit predkosci tylko przy karze), M1 MarchToContact.cs (marsz stepem do szarzy), M2 Doctrine.cs + WarCouncil.cs (doktryny kultur ROT),
+        // S1 najpierw ostrzal, S3 konnica na flanke, S4 lucznicy za piechote (Doctrine.cs). Segmenty 'marsz' i 'doktryna' w linii 'Bitwa (NB2)'
+        public bool SpeedCapOnlyWhenWinded = true;         // Field Craft holds a man back only while he is winded or wounded; the rest of the time his formation sets his pace (the game and RBM keep the line and walk at the pace of the slowest man). Off = as before: Field Craft rewrites every man's speed limit five times a second
+        public bool MarchToContactEnabled = true;          // formations walk in step towards the enemy and break into a run only when they charge: infantry at the charge (about 75 m), cavalry trots until the gallop distance, foot archers walk until the enemy is close. Your formations: Advance and Move walk, Charge runs. A man who ran 300 m arrives winded. Field battles only - not sieges, hideouts or sea battles. Off = as before
+        public float MarchStepPace = 1f;                   // with March To Contact: marching pace as a share of the walking speed (1.8 m/s); more than 250 m from the enemy the column steps out a fifth faster
+        public float CavalryApproachPace = 0.45f;          // with March To Contact: cavalry approach speed as a share of a full gallop, until the gallop distance
+        public float CavalryGallopDistance = 120f;         // with March To Contact: distance to the enemy (metres) at which cavalry breaks into a gallop
+        public float ArchersWalkUntil = 120f;              // with March To Contact: foot archers march until the nearest enemy is this close (metres), then move freely
+        public bool PlayerMoveOrderWalks = true;           // with March To Contact: your formations also walk on a Move order (Charge always runs)
+        public bool CultureDoctrines = true;               // AI armies fight by their culture's doctrine: Dothraki circle and shoot, the Vale and the Reach lead with heavy horse, the Unsullied march in lockstep, wildlings rush, the Riverlands hold the fords, the Lannisters weigh centre and wings. The commander's Tactics decides how much of it he can carry out. Your own team's AI is left as it is. Off = RBM's culture tactics and Commander Tactics only, as before
+        public bool ShootBeforeAttacking = true;           // an AI side with archers facing an enemy with few or none first shoots - its infantry advances slowly as a screen - before the main attack, for at most Shoot First Seconds
+        public int ShootFirstSeconds = 90;                 // with Shoot Before Attacking: the longest the archers shoot before the main attack, in seconds (some cultures shoot longer by their doctrine)
+        public bool CavalrySeeksFlanks = true;             // AI cavalry goes round a pinned enemy and strikes his archers and flanks instead of only charging the front
+        public bool ArchersFallBackBehindInfantry = true;  // AI archers withdraw behind their infantry when enemy foot or horse comes within Archer Fall Back Distance, and step out again once it is pushed back
+        public float ArcherFallBackDistance = 45f;         // with Archers Fall Back Behind Infantry: how close (metres) the enemy may come before the archers withdraw
+
+        // --- Battle sounds ---
+        // P2 (Jeff: "powinny byc bebny, trabki, odglosy, okrzyki, wyzwiska ... glosy ElevenLabs meskie, brytyjski akcent ... przemowa przed bitwa dla kazdego rodu ... wodzowie
+        // mowia swoje motta przy szarzy ... jeki rannych po bitwie, rozne glosy ... konie i szczek broni ... deszcz i wiatr ... ptaki i kruki po bitwie ... ogien i plonace obozy
+        // przy oblezeniu"): BattleSound*.cs, pliki ModuleData/Lektor/Bitwa/<kategoria>/*.ogg (v1 bez project.mbproj i module_sounds.xml). Glowny wylacznik BattleSoundsEnabled,
+        // kazda czesc osobno. Linia 'Dzwiek bitwy' na misje
+        public bool BattleSoundsEnabled = true;            // the mod's own battle sounds - drums, horns, commanders' voices and the sounds of the field below, each under its own switch. Field battles, sieges and hideouts; never tournaments, the arena or training. Off = only the game's and other mods' battle sounds, as before
+        public bool BattleHornsCulture = true;             // with Battle Sounds: horns and trumpets of each culture sound the advance, the charge and the retreat, heard from where they are blown - knightly trumpets in the South, deep war horns in the North, the Night's Watch horn, Ironborn sea horns, wildling horns, Essos brass. One horn per side every 10 seconds
+        public bool BattleDrumsMarch = true;               // with Battle Sounds: drums beat the step while foot soldiers march towards the enemy and fall silent when they charge or the enemy is close. At most two drums per side
+        public bool BattleCaptainOrders = true;            // with Battle Sounds: captains shout their orders in the voices of their lands - forward, hold the line, shields up when arrows fall, loose, charge, rally, fall back
+        public bool BattleHouseSpeeches = true;            // with Battle Sounds: before the clash the commander of each side speaks a few words to his men in the voice of his land and ends with the words of his house (you hear the enemy's only when he is close)
+        public bool BattleChargeMottos = true;             // with Battle Sounds: when a formation led by a lord or a companion charges, he roars the words of his house - once per lord per battle
+        public bool BattleWoundedAfter = true;             // with Battle Sounds: after a battle the wounded left on the field moan and call for help, in many different voices, until you leave
+        public bool BattleRavensAfter = true;              // with Battle Sounds: after a battle crows and ravens gather over the dead and the birds come back to the field
+        public bool BattleWindAndRain = true;              // with Battle Sounds: wind over the field in battles in the open, and the patter of rain when it rains
+        public bool BattleHorseSounds = true;              // with Battle Sounds: horses snort, whinny and stamp in the cavalry ranks while they wait and when they charge
+        public bool BattleClashOfArms = true;              // with Battle Sounds: the din of steel on steel and on shields rolls over the field where the lines fight hand to hand
+        public bool SiegeFireSounds = true;                // with Battle Sounds: in sieges the fires of the burning camps and of the town crackle and roar
+        public int BattleSoundsLoudness = 2;               // how loud the mod's battle sounds are: 1 quiet, 2 normal, 3 loud. Heard from the next sound
+
+        // --- Banner companies ---
+        // P3 (Jeff: "niech niosa sztandary ... choragwie po np. 50 ludzi i kazdy ma dowodce i sztandar i jak padnie sztandar lub dowodca to spada morale i choragiew moze sie
+        // zalamac, im wyzszy tier sredni tym mniejsza szansa"): BannerCompanies.cs (choragwie w bitwie), BannerKit.cs (latki w kampanii: liczba chorazych, rozstaw, zwrot sprzetu
+        // chorazego przez DTE). A = StandardBearerKitSafe (naprawa dziury DTE przy chorazych), B = FieldStandards i wielu chorazych, C = BannerCompaniesEnabled. Linia 'Choragwie (CH)'
+        public bool StandardBearerKitSafe = true;          // standard bearers keep the armoury honest: the weapons a standard bearer sets aside go back to his party's armoury like the rest of his kit, and the spare weapon the game hands him is never added to it. Off = as the game does
+        public bool BannerCompaniesEnabled = true;         // every formation in a field battle splits into companies of about Banner Company Size men, each under a commander (a hero, or its best veteran) and, where possible, a standard bearer. Losing the standard or the commander shakes the company and may break it; veterans hold far better than levies. Off = one standard bearer per formation, as in the game
+        public int BannerCompanySize = 50;                 // with Banner Companies: men per company, at most 6 companies per formation
+        public bool FieldStandards = true;                 // formations whose captain carries no banner, or that have no hero captain, still march under a plain campaign banner bearing their lord's coat of arms (10% less morale shock from casualties while it stands). Bandits carry none. Nothing is taken from any armoury
+        public float BannerShockStandardLost = 12f;        // with Banner Companies: morale shock to a company whose standard falls (veterans feel it less)
+        public float BannerShockCommanderLost = 12f;       // with Banner Companies: morale shock to a company whose commander falls (x1.5 for a hero, x2 for the army's commander)
+        public float BannerBreakChance = 0.5f;             // with Banner Companies: base chance that a shaken company breaks, divided by the morale resistance of its average tier (tier 1 x0.67, tier 3 x0.4, tier 6 x0.25)
+        public bool BannerVictoryCheer = true;             // with Banner Companies: the nearest enemy formation cheers when a company breaks
+        public bool BannerCompanyMessages = true;          // with Banner Companies: messages when a standard or a commander falls and when a company breaks (at most one every 2 seconds)
+
+        // --- Army review ---
+        // P4 (Jeff: "w obozie powinna byc opcja przeglad armii ... popup, gdzie mamy pokazane wojsko, gdzie mozna stworzyc choragwie i przenosic wojsko i dodawac dowodcow ...
+        // potem jak sie uruchamia bitwa to tak tez podzielona jest od razu armia, do tego pokazane jest ile koni jest uzywanych i ile uprzezy"): ArmyReview*.cs, zapis
+        // arm_army_review (nazwy choragwi), choragwie = 8 formacji Order of Battle gry (SetFormationInfos). Linia 'Przeglad armii'
+        public bool ArmyReviewEnabled = true;              // 'Review the army' in your camp menu: your men by kind, horses and harness in use and missing, why riders will fight on foot and why the column marches afoot, and your banners for the next battle. Off = no option
+        public bool ArmyReviewWritesOrderOfBattle = true;  // with Army Review: the banners you set become the game's Order of Battle for your field battles - which formation holds which troops, its commander and the companions in its ranks. They take the field when you command the battle with at least 20 men; after each battle the game keeps what you actually deployed. Off = the review only shows, the game's order is untouched
+
+        // --- The law of the battlefield ---
+        // P5 (Jeff: "po bitwie i po oblezeniu i po turnieju powinien wyskakiwac popup z dokladna iloscia lootu, ile zlota, ile zlota w sprzecie ... w klimacie"): SpoilsReport.cs
+        // (ramki stanu przed i po, tylko odczyt - nic z niczego), SpoilsWindow.cs + GUI/Prefabs/ArmSpoilsWindow.xml. Linia 'Okno lupu'
+        public bool SpoilsWindowAfterBattle = true;        // after a battle you win, a window shows the whole haul once the loot screens are closed: coin to your purse and to your men's purses, every piece of gear and goods taken and what it is worth, horses, prisoners and their ransom, your losses and renown
+        public bool SpoilsWindowAfterSiege = true;         // the same window after you storm a town or castle (with your part of the sack, or of the mercy) and when a besieged town buys you off with a ransom
+        public bool SpoilsWindowAfterTourney = true;       // the same window after a tourney you rode in or bet on: prize money, the prize, bets, ransoms of horse and armour, the townsfolk's purse and renown
+        public int SpoilsWindowMinWorth = 0;               // the spoils window is skipped when coin, gear and ransoms together are worth less than this many denars (0 = always shown when anything was won)
+
+        // --- Friendly fire ---
+        // P6 (Jeff: "i dodaj friendly fire po obu stronach", "cios wrecz nie tylko ostrzaly"): FriendlyFire.cs - transpilery MeleeHitCallback / MissileHitCallback /
+        // ChargeDamageCallback (wpiete przy starcie obok ChargeTemperPatch) i skala obrazen (postfiks CalculateDamage); jedna regula gracz/AI; pole, oblezenie, kryjowka,
+        // morze - nie turniej i arena. Linia 'FF' na misje
+        public bool FriendlyFireEnabled = true;            // arrows, bolts, javelins, blades and charging horses wound your own side too - the same rule for you and the AI, in field battles, sieges, hideouts and at sea. Tournaments and the arena are untouched. (Realm of Thrones' own Friendly Fire option is dragon fire only.)
+        public int FriendlyFireRangedPercent = 100;        // with Friendly Fire: share of its damage (percent) an arrow, bolt or javelin does to a man of its own side (100 = full, 0 = none)
+        public int FriendlyFireMeleePercent = 50;          // with Friendly Fire: share of its damage (percent) a sword, axe or spear blow does to a man of its own side (0 = blows pass harmlessly, as in the game)
+        public int FriendlyFireChargePercent = 50;         // with Friendly Fire: share of its damage (percent) a charging horse does to a man of its own side
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

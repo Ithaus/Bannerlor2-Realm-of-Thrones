@@ -35331,7 +35331,10 @@ NBW_LINE = re.compile(
     r"ludzi (\d+), nieprzytomnych (\d+), koni (\d+); nieumarli (\d+), w wodzie (\d+), po zamknieciu misji (\d+)\), pominiete decale: "
     r"limit misji (\d+), kolejka (\d+), zageszczenie (\d+), bez ziemi (\d+), w wodzie (\d+), poza polem (\d+), zle wspolrzedne (\d+), "
     r"bez renderera (\d+), przy zamknieciu misji (\d+); materialy (\d+)/(\d+), renderer decali (TAK|NIE), MoreBlood (TAK|NIE) )?"
-    r"\| potkniecia: panika (\d+), kierunek (\d+), postura (\d+)(?:, taktyka (\d+), weteran (\d+), krew (\d+), glosy (\d+))?(?:, kaluze (\d+))? "
+    # noc 25.10 P0: segmenty nocy (P1 'marsz', 'doktryna', P3 'choragwie') - bez znaku '|' w srodku, grupa nieprzechwytujaca (NBW_KEYS bez zmian)
+    r"(?:\| (?:marsz|doktryna|choragwie)[^|]* )*"
+    # noc 25.10 P0: dalsze miejsca potkniec (m111 'pojedynek' - od 24.10 linia przez to NIE byla rozpoznana; noc: marsz, doktryna, choragiew, dzwiek) - bez przechwytu
+    r"\| potkniecia: panika (\d+), kierunek (\d+), postura (\d+)(?:, taktyka (\d+), weteran (\d+), krew (\d+), glosy (\d+))?(?:, kaluze (\d+))?(?:, [a-z]+ \d+)* "
     r"\(sesja (\d+), linia misji (\d+)\)\.$")
 NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic", "juz", "repanic", "po_koncu", "bez_druzyny", "rozkaz",
             "pin", "pin_ludzi", "zgaszone", "ponowienia", "ponowienia_ludzi", "zwroty", "bez_handlera", "gracz",

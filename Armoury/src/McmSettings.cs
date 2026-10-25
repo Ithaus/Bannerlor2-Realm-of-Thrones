@@ -9664,6 +9664,186 @@ namespace Armoury
         [SettingPropertyGroup("Chronicle of Westeros")]
         public bool ChronicleCanonDeaths { get; set; } = true;
 
+        [SettingPropertyBool("Speed Cap Only When Winded", HintText = "Field Craft holds a man back only while he is winded or wounded; the rest of the time his formation sets his pace (the game and RBM keep the line and walk at the pace of the slowest man). Off = as before: Field Craft rewrites every man's speed limit five times a second", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool SpeedCapOnlyWhenWinded { get; set; } = true;
+
+        [SettingPropertyBool("March To Contact Enabled", HintText = "formations walk in step towards the enemy and break into a run only when they charge: infantry at the charge (about 75 m), cavalry trots until the gallop distance, foot archers walk until the enemy is close. Your formations: Advance and Move walk, Charge runs. A man who ran 300 m arrives winded. Field battles only - not sieges, hideouts or sea battles. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool MarchToContactEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("March Step Pace", 0.50f, 1.20f, "0.00", HintText = "with March To Contact: marching pace as a share of the walking speed (1.8 m/s); more than 250 m from the enemy the column steps out a fifth faster", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public float MarchStepPace { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Cavalry Approach Pace", 0.20f, 1.00f, "0.00", HintText = "with March To Contact: cavalry approach speed as a share of a full gallop, until the gallop distance", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public float CavalryApproachPace { get; set; } = 0.45f;
+
+        [SettingPropertyFloatingInteger("Cavalry Gallop Distance", 40.00f, 250.00f, "0", HintText = "with March To Contact: distance to the enemy (metres) at which cavalry breaks into a gallop", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public float CavalryGallopDistance { get; set; } = 120f;
+
+        [SettingPropertyFloatingInteger("Archers Walk Until", 40.00f, 250.00f, "0", HintText = "with March To Contact: foot archers march until the nearest enemy is this close (metres), then move freely", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public float ArchersWalkUntil { get; set; } = 120f;
+
+        [SettingPropertyBool("Player Move Order Walks", HintText = "with March To Contact: your formations also walk on a Move order (Charge always runs)", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool PlayerMoveOrderWalks { get; set; } = true;
+
+        [SettingPropertyBool("Culture Doctrines", HintText = "AI armies fight by their culture's doctrine: Dothraki circle and shoot, the Vale and the Reach lead with heavy horse, the Unsullied march in lockstep, wildlings rush, the Riverlands hold the fords, the Lannisters weigh centre and wings. The commander's Tactics decides how much of it he can carry out. Your own team's AI is left as it is. Off = RBM's culture tactics and Commander Tactics only, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CultureDoctrines { get; set; } = true;
+
+        [SettingPropertyBool("Shoot Before Attacking", HintText = "an AI side with archers facing an enemy with few or none first shoots - its infantry advances slowly as a screen - before the main attack, for at most Shoot First Seconds", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool ShootBeforeAttacking { get; set; } = true;
+
+        [SettingPropertyInteger("Shoot First Seconds", 0, 300, "0", HintText = "with Shoot Before Attacking: the longest the archers shoot before the main attack, in seconds (some cultures shoot longer by their doctrine)", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public int ShootFirstSeconds { get; set; } = 90;
+
+        [SettingPropertyBool("Cavalry Seeks Flanks", HintText = "AI cavalry goes round a pinned enemy and strikes his archers and flanks instead of only charging the front", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CavalrySeeksFlanks { get; set; } = true;
+
+        [SettingPropertyBool("Archers Fall Back Behind Infantry", HintText = "AI archers withdraw behind their infantry when enemy foot or horse comes within Archer Fall Back Distance, and step out again once it is pushed back", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool ArchersFallBackBehindInfantry { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Archer Fall Back Distance", 20.00f, 100.00f, "0", HintText = "with Archers Fall Back Behind Infantry: how close (metres) the enemy may come before the archers withdraw", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public float ArcherFallBackDistance { get; set; } = 45f;
+
+        [SettingPropertyBool("Battle Sounds Enabled", HintText = "the mod's own battle sounds - drums, horns, commanders' voices and the sounds of the field below, each under its own switch. Field battles, sieges and hideouts; never tournaments, the arena or training. Off = only the game's and other mods' battle sounds, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleSoundsEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Battle Horns Culture", HintText = "with Battle Sounds: horns and trumpets of each culture sound the advance, the charge and the retreat, heard from where they are blown - knightly trumpets in the South, deep war horns in the North, the Night's Watch horn, Ironborn sea horns, wildling horns, Essos brass. One horn per side every 10 seconds", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleHornsCulture { get; set; } = true;
+
+        [SettingPropertyBool("Battle Drums March", HintText = "with Battle Sounds: drums beat the step while foot soldiers march towards the enemy and fall silent when they charge or the enemy is close. At most two drums per side", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleDrumsMarch { get; set; } = true;
+
+        [SettingPropertyBool("Battle Captain Orders", HintText = "with Battle Sounds: captains shout their orders in the voices of their lands - forward, hold the line, shields up when arrows fall, loose, charge, rally, fall back", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleCaptainOrders { get; set; } = true;
+
+        [SettingPropertyBool("Battle House Speeches", HintText = "with Battle Sounds: before the clash the commander of each side speaks a few words to his men in the voice of his land and ends with the words of his house (you hear the enemy's only when he is close)", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleHouseSpeeches { get; set; } = true;
+
+        [SettingPropertyBool("Battle Charge Mottos", HintText = "with Battle Sounds: when a formation led by a lord or a companion charges, he roars the words of his house - once per lord per battle", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleChargeMottos { get; set; } = true;
+
+        [SettingPropertyBool("Battle Wounded After", HintText = "with Battle Sounds: after a battle the wounded left on the field moan and call for help, in many different voices, until you leave", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleWoundedAfter { get; set; } = true;
+
+        [SettingPropertyBool("Battle Ravens After", HintText = "with Battle Sounds: after a battle crows and ravens gather over the dead and the birds come back to the field", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleRavensAfter { get; set; } = true;
+
+        [SettingPropertyBool("Battle Wind And Rain", HintText = "with Battle Sounds: wind over the field in battles in the open, and the patter of rain when it rains", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleWindAndRain { get; set; } = true;
+
+        [SettingPropertyBool("Battle Horse Sounds", HintText = "with Battle Sounds: horses snort, whinny and stamp in the cavalry ranks while they wait and when they charge", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleHorseSounds { get; set; } = true;
+
+        [SettingPropertyBool("Battle Clash Of Arms", HintText = "with Battle Sounds: the din of steel on steel and on shields rolls over the field where the lines fight hand to hand", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool BattleClashOfArms { get; set; } = true;
+
+        [SettingPropertyBool("Siege Fire Sounds", HintText = "with Battle Sounds: in sieges the fires of the burning camps and of the town crackle and roar", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public bool SiegeFireSounds { get; set; } = true;
+
+        [SettingPropertyInteger("Battle Sounds Loudness", 1, 3, "0", HintText = "how loud the mod's battle sounds are: 1 quiet, 2 normal, 3 loud. Heard from the next sound", RequireRestart = false)]
+        [SettingPropertyGroup("Battle sounds")]
+        public int BattleSoundsLoudness { get; set; } = 2;
+
+        [SettingPropertyBool("Standard Bearer Kit Safe", HintText = "standard bearers keep the armoury honest: the weapons a standard bearer sets aside go back to his party's armoury like the rest of his kit, and the spare weapon the game hands him is never added to it. Off = as the game does", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public bool StandardBearerKitSafe { get; set; } = true;
+
+        [SettingPropertyBool("Banner Companies Enabled", HintText = "every formation in a field battle splits into companies of about Banner Company Size men, each under a commander (a hero, or its best veteran) and, where possible, a standard bearer. Losing the standard or the commander shakes the company and may break it; veterans hold far better than levies. Off = one standard bearer per formation, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public bool BannerCompaniesEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Banner Company Size", 20, 150, "0", HintText = "with Banner Companies: men per company, at most 6 companies per formation", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public int BannerCompanySize { get; set; } = 50;
+
+        [SettingPropertyBool("Field Standards", HintText = "formations whose captain carries no banner, or that have no hero captain, still march under a plain campaign banner bearing their lord's coat of arms (10% less morale shock from casualties while it stands). Bandits carry none. Nothing is taken from any armoury", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public bool FieldStandards { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Banner Shock Standard Lost", 0.00f, 40.00f, "0.0", HintText = "with Banner Companies: morale shock to a company whose standard falls (veterans feel it less)", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public float BannerShockStandardLost { get; set; } = 12f;
+
+        [SettingPropertyFloatingInteger("Banner Shock Commander Lost", 0.00f, 40.00f, "0.0", HintText = "with Banner Companies: morale shock to a company whose commander falls (x1.5 for a hero, x2 for the army's commander)", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public float BannerShockCommanderLost { get; set; } = 12f;
+
+        [SettingPropertyFloatingInteger("Banner Break Chance", 0.00f, 1.00f, "0.00", HintText = "with Banner Companies: base chance that a shaken company breaks, divided by the morale resistance of its average tier (tier 1 x0.67, tier 3 x0.4, tier 6 x0.25)", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public float BannerBreakChance { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Banner Victory Cheer", HintText = "with Banner Companies: the nearest enemy formation cheers when a company breaks", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public bool BannerVictoryCheer { get; set; } = true;
+
+        [SettingPropertyBool("Banner Company Messages", HintText = "with Banner Companies: messages when a standard or a commander falls and when a company breaks (at most one every 2 seconds)", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public bool BannerCompanyMessages { get; set; } = true;
+
+        [SettingPropertyBool("Army Review Enabled", HintText = "'Review the army' in your camp menu: your men by kind, horses and harness in use and missing, why riders will fight on foot and why the column marches afoot, and your banners for the next battle. Off = no option", RequireRestart = false)]
+        [SettingPropertyGroup("Army review")]
+        public bool ArmyReviewEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Army Review Writes Order Of Battle", HintText = "with Army Review: the banners you set become the game's Order of Battle for your field battles - which formation holds which troops, its commander and the companions in its ranks. They take the field when you command the battle with at least 20 men; after each battle the game keeps what you actually deployed. Off = the review only shows, the game's order is untouched", RequireRestart = false)]
+        [SettingPropertyGroup("Army review")]
+        public bool ArmyReviewWritesOrderOfBattle { get; set; } = true;
+
+        [SettingPropertyBool("Spoils Window After Battle", HintText = "after a battle you win, a window shows the whole haul once the loot screens are closed: coin to your purse and to your men's purses, every piece of gear and goods taken and what it is worth, horses, prisoners and their ransom, your losses and renown", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsWindowAfterBattle { get; set; } = true;
+
+        [SettingPropertyBool("Spoils Window After Siege", HintText = "the same window after you storm a town or castle (with your part of the sack, or of the mercy) and when a besieged town buys you off with a ransom", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsWindowAfterSiege { get; set; } = true;
+
+        [SettingPropertyBool("Spoils Window After Tourney", HintText = "the same window after a tourney you rode in or bet on: prize money, the prize, bets, ransoms of horse and armour, the townsfolk's purse and renown", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool SpoilsWindowAfterTourney { get; set; } = true;
+
+        [SettingPropertyInteger("Spoils Window Min Worth", 0, 5000, "0", HintText = "the spoils window is skipped when coin, gear and ransoms together are worth less than this many denars (0 = always shown when anything was won)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public int SpoilsWindowMinWorth { get; set; } = 0;
+
+        [SettingPropertyBool("Friendly Fire Enabled", HintText = "arrows, bolts, javelins, blades and charging horses wound your own side too - the same rule for you and the AI, in field battles, sieges, hideouts and at sea. Tournaments and the arena are untouched. (Realm of Thrones' own Friendly Fire option is dragon fire only.)", RequireRestart = false)]
+        [SettingPropertyGroup("Friendly fire")]
+        public bool FriendlyFireEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Friendly Fire Ranged Percent", 0, 100, "0", HintText = "with Friendly Fire: share of its damage (percent) an arrow, bolt or javelin does to a man of its own side (100 = full, 0 = none)", RequireRestart = false)]
+        [SettingPropertyGroup("Friendly fire")]
+        public int FriendlyFireRangedPercent { get; set; } = 100;
+
+        [SettingPropertyInteger("Friendly Fire Melee Percent", 0, 100, "0", HintText = "with Friendly Fire: share of its damage (percent) a sword, axe or spear blow does to a man of its own side (0 = blows pass harmlessly, as in the game)", RequireRestart = false)]
+        [SettingPropertyGroup("Friendly fire")]
+        public int FriendlyFireMeleePercent { get; set; } = 50;
+
+        [SettingPropertyInteger("Friendly Fire Charge Percent", 0, 100, "0", HintText = "with Friendly Fire: share of its damage (percent) a charging horse does to a man of its own side", RequireRestart = false)]
+        [SettingPropertyGroup("Friendly fire")]
+        public int FriendlyFireChargePercent { get; set; } = 50;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -12079,6 +12259,51 @@ namespace Armoury
             s.ChronicleFullVersions = ChronicleFullVersions;
             s.ChroniclePlayerChoices = ChroniclePlayerChoices;
             s.ChronicleCanonDeaths = ChronicleCanonDeaths;
+            s.SpeedCapOnlyWhenWinded = SpeedCapOnlyWhenWinded;
+            s.MarchToContactEnabled = MarchToContactEnabled;
+            s.MarchStepPace = MarchStepPace;
+            s.CavalryApproachPace = CavalryApproachPace;
+            s.CavalryGallopDistance = CavalryGallopDistance;
+            s.ArchersWalkUntil = ArchersWalkUntil;
+            s.PlayerMoveOrderWalks = PlayerMoveOrderWalks;
+            s.CultureDoctrines = CultureDoctrines;
+            s.ShootBeforeAttacking = ShootBeforeAttacking;
+            s.ShootFirstSeconds = ShootFirstSeconds;
+            s.CavalrySeeksFlanks = CavalrySeeksFlanks;
+            s.ArchersFallBackBehindInfantry = ArchersFallBackBehindInfantry;
+            s.ArcherFallBackDistance = ArcherFallBackDistance;
+            s.BattleSoundsEnabled = BattleSoundsEnabled;
+            s.BattleHornsCulture = BattleHornsCulture;
+            s.BattleDrumsMarch = BattleDrumsMarch;
+            s.BattleCaptainOrders = BattleCaptainOrders;
+            s.BattleHouseSpeeches = BattleHouseSpeeches;
+            s.BattleChargeMottos = BattleChargeMottos;
+            s.BattleWoundedAfter = BattleWoundedAfter;
+            s.BattleRavensAfter = BattleRavensAfter;
+            s.BattleWindAndRain = BattleWindAndRain;
+            s.BattleHorseSounds = BattleHorseSounds;
+            s.BattleClashOfArms = BattleClashOfArms;
+            s.SiegeFireSounds = SiegeFireSounds;
+            s.BattleSoundsLoudness = BattleSoundsLoudness;
+            s.StandardBearerKitSafe = StandardBearerKitSafe;
+            s.BannerCompaniesEnabled = BannerCompaniesEnabled;
+            s.BannerCompanySize = BannerCompanySize;
+            s.FieldStandards = FieldStandards;
+            s.BannerShockStandardLost = BannerShockStandardLost;
+            s.BannerShockCommanderLost = BannerShockCommanderLost;
+            s.BannerBreakChance = BannerBreakChance;
+            s.BannerVictoryCheer = BannerVictoryCheer;
+            s.BannerCompanyMessages = BannerCompanyMessages;
+            s.ArmyReviewEnabled = ArmyReviewEnabled;
+            s.ArmyReviewWritesOrderOfBattle = ArmyReviewWritesOrderOfBattle;
+            s.SpoilsWindowAfterBattle = SpoilsWindowAfterBattle;
+            s.SpoilsWindowAfterSiege = SpoilsWindowAfterSiege;
+            s.SpoilsWindowAfterTourney = SpoilsWindowAfterTourney;
+            s.SpoilsWindowMinWorth = SpoilsWindowMinWorth;
+            s.FriendlyFireEnabled = FriendlyFireEnabled;
+            s.FriendlyFireRangedPercent = FriendlyFireRangedPercent;
+            s.FriendlyFireMeleePercent = FriendlyFireMeleePercent;
+            s.FriendlyFireChargePercent = FriendlyFireChargePercent;
         }
 
         internal static void Apply()

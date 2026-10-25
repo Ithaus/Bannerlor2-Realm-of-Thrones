@@ -1,6 +1,7 @@
 using System;
 using SandBox.Tournaments.MissionLogics;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Armoury
@@ -19,6 +20,12 @@ namespace Armoury
     /// albo "arena", albo bez bitwy gracza na mapie (rodzaj "inna") i zachowanie z "Duel" w nazwie typu - nazwa do logu raz na misje.
     /// m113-walka2 faza 2 (24.10): w bitwie poczatek licznikow FieldDuel (EarlyStart), tick zrywow bohaterow (DuelCraft) i linia
     /// "Bitwa (m113-walka2)" na koniec; rejestracja takze przy kluczach bitwy (FieldDuel.AnyKey).
+    /// noc 25.10 P0 (baza nocy, krytyk K2-K4, K15): wszystkie wolania paczek nocy - marsz i doktryny (P1: MarchToContact, Doctrine), dzwiek (P2: BattleSound) -
+    /// kazde we wlasnym try z miejscem potkniec RoutHold (SiteMarch / SiteDoctrine / SiteSound), tylko w bitwie (_battle i nie pojedynek). Latki misji P1/P2
+    /// zakladane raz, przy pierwszym AfterStart bitwy (NightHooks.FirstBattle, K3). Kolejnosc w OnMissionTick: BattleCries -> MarchToContact -> Doctrine ->
+    /// BattleSound (K4: jeden detektor szarzy BattleCries.ChargeStarted, odbiorcy w tym samym takcie). Nowe override (OnDeploymentFinished, OnAgentShootMissile,
+    /// OnMissileHit, OnAgentPanicked, OnAgentFleeing) tylko przekazuja do BattleSound - te z trafien moga przyjsc z ticku asynchronicznego (BattleSound: kolejka
+    /// pod lockiem). Rejestracja takze przy kluczach nocy (NightKeys).
     /// </summary>
     internal sealed class BattleSense : MissionBehavior
     {
@@ -35,6 +42,17 @@ namespace Armoury
         // m113-walka2: bitwa z rozszerzeniami fazy 2 (FieldDuel) - linia raz na bitwe
         private static bool _battleDone;
         private static string _battleKind = "-";
+
+        /// <summary>noc 25.10 P0 (K2): klucze nocy, przy ktorych BattleSense (i RoutKeeper - linia NB2, RoutHold.On dla zlaman choragwi) musi byc w misji:
+        /// marsz i doktryny (P1), dzwiek (P2), choragwie (P3). Czytane w SubModuleMain.OnMissionBehaviorInitialize.</summary>
+        internal static bool NightKeys(Settings c)
+        {
+            return c != null && (c.MarchToContactEnabled || c.CultureDoctrines || c.ShootBeforeAttacking || c.CavalrySeeksFlanks || c.ArchersFallBackBehindInfantry
+                                 || c.BattleSoundsEnabled || c.BannerCompaniesEnabled);
+        }
+
+        /// <summary>noc 25.10 P0: biezaca misja to bitwa (nie pojedynek) - bramka wolan paczek nocy; tylko odczyt statykow (takze z ticku asynchronicznego).</summary>
+        private bool Night { get { return _battle && !_duel && InBattle(Mission); } }
 
         /// <summary>Misja to bitwa na mapie, kryjowka albo bitwa wlasna (rodzaj z linii NM, liczony raz w AfterStart).</summary>
         internal static bool InBattle(Mission m)
@@ -159,7 +177,13 @@ namespace Armoury
             try { BloodPools.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Begin", e); }
             try { if (_battle || _duel) VeteranAi.CheckOrder(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVeteran, "VeteranAi.CheckOrder", e); }
             try { if (_duel || (_battle && FieldDuel.HooksWanted(Settings.Current))) DuelGuard.CheckOrder(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.CheckOrder", e); }
+            // noc 25.10 P0 (K3): latki misji P1/P2 raz, przy pierwszej bitwie; potem Begin paczek - Doctrine PRZED WarCouncil (WarCouncil.One wola Doctrine.ApplyList)
+            bool night = Night;
+            try { if (night) NightHooks.FirstBattle(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "NightHooks.FirstBattle", e); }
+            try { if (night) MarchToContact.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "MarchToContact.Begin", e); }
+            try { if (night) Doctrine.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Begin", e); }
             try { if (_battle) WarCouncil.Council(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteTactics, "WarCouncil.Council", e); }
+            try { if (night) BattleSound.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Begin", e); }
             base.AfterStart();
         }
 
@@ -167,6 +191,13 @@ namespace Armoury
         {
             try { BattleCries.Tick(Mission, dt); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.Tick", e); }
+            // noc 25.10 P0 (K4): po BattleCries (jedyny detektor szarzy) - marsz, doktryna, dzwiek; kazde we wlasnym try
+            if (Night)
+            {
+                try { MarchToContact.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "MarchToContact.Tick", e); }
+                try { Doctrine.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Tick", e); }
+                try { BattleSound.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Tick", e); }
+            }
             try { BloodPools.Tick(Mission, dt); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Tick", e); }
             if (_duel && InDuel(Mission)) DuelTick(Mission, dt);
@@ -220,12 +251,62 @@ namespace Armoury
         {
             try { BloodPools.OnRemoved(Mission, affectedAgent, affectorAgent, agentState, in blow); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.OnRemoved", e); }
+            // noc 25.10 P0: dzwiek (jeki po bitwie, kruki przy cialach) - tylko kolejka
+            if (Night)
+            {
+                try { BattleSound.OnRemoved(Mission, affectedAgent, affectorAgent, agentState); }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnRemoved", e); }
+            }
+        }
+
+        // noc 25.10 P0 (K15): koniec rozstawienia - przemowy dowodcow (P2). Mission.OnDeploymentFinished idzie PRZED odpauzowaniem AI (DeploymentMissionController.cs:41-79)
+        public override void OnDeploymentFinished()
+        {
+            if (Night)
+            {
+                try { BattleSound.OnDeploymentFinished(Mission); }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnDeploymentFinished", e); }
+            }
+            base.OnDeploymentFinished();
+        }
+
+        // noc 25.10 P0 (K15): strzal - rozkaz "loose" (P2); bardzo czeste, moze przyjsc z ticku asynchronicznego - BattleSound tylko O(1) pod lockiem
+        public override void OnAgentShootMissile(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
+        {
+            if (!Night) return;
+            try { BattleSound.OnShoot(Mission, shooterAgent, weaponIndex); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnShoot", e); }
+        }
+
+        // noc 25.10 P0 (K15): trafienie pociskiem - rozkaz "shields" (P2); czeste, jak wyzej
+        public override void OnMissileHit(Agent attacker, Agent victim, bool isCanceled, AttackCollisionData collisionData)
+        {
+            if (!Night) return;
+            try { BattleSound.OnMissileHit(Mission, attacker, victim, isCanceled); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnMissileHit", e); }
+        }
+
+        // noc 25.10 P0 (K15): panika i ucieczka - licznik uciekajacych na formacje (P2, okrzyk przy zlamaniu wroga); tylko kolejka
+        public override void OnAgentPanicked(Agent affectedAgent)
+        {
+            if (!Night) return;
+            try { BattleSound.OnPanicked(Mission, affectedAgent); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnPanicked", e); }
+        }
+
+        public override void OnAgentFleeing(Agent affectedAgent)
+        {
+            if (!Night) return;
+            try { BattleSound.OnFleeing(Mission, affectedAgent); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnFleeing", e); }
         }
 
         // czesc 3: Mission.ResetMission czysci decale sceny sam (ClearRuntimeDecals) - kaluze tylko zapominaja kolejke
         public override void OnClearScene()
         {
             try { BloodPools.Cleared(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Cleared", e); }
+            // noc 25.10 P0: dzwiek zwalnia WSZYSTKIE swoje zdarzenia przed zniszczeniem sceny (bez bramki Night - sprzatanie zawsze)
+            try { BattleSound.OnClearScene(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnClearScene", e); }
             base.OnClearScene();
         }
 
@@ -246,6 +327,10 @@ namespace Armoury
             try { BattleCries.Clear(); } catch { }
             try { BattleGore.Clear(); } catch { }
             try { BloodPools.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.End", e); }
+            // noc 25.10 P0: koniec misji paczek nocy - bez bramki (End bezpieczne wielokrotnie i poza bitwa; dzwiek: Release wszystkich, linia misji)
+            try { MarchToContact.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "MarchToContact.End", e); }
+            try { Doctrine.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.End", e); }
+            try { BattleSound.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.End", e); }
             // m111-walka: linia "Pojedynek (DU)" raz na misje pojedynku
             if (_duel && !_duelDone && InDuel(Mission))
             {

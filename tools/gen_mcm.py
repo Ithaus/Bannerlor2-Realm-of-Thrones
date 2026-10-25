@@ -577,6 +577,27 @@ RANGES = {
     # m109-czas (23.10): mnoznik czasu kuzni - kod przycina do >= 0.1 (ForgeClock.TimeMult)
     'ForgeTimeMult': (0.10, 5.0, "0.00"),
     'LektorGossipReserveChars': (0, 30000, "0"),
+    # noc 25.10 P0 (baza nocy): suwaki szesciu paczek bitwy - paczka MUSI przycinac w kodzie do tych samych zakresow
+    # P1 marsz i doktryny: ulamek chodu 0.5..1.2 (ponad 1.2 x 1.8 m/s to juz bieg FieldCraft), klus konnicy 0.2..1, odleglosci w m, sekundy ostrzalu
+    'MarchStepPace': (0.5, 1.2, "0.00"),
+    'CavalryApproachPace': (0.2, 1.0, "0.00"),
+    'CavalryGallopDistance': (40.0, 250.0, "0"),
+    'ArchersWalkUntil': (40.0, 250.0, "0"),
+    'ShootFirstSeconds': (0, 300, "0"),
+    'ArcherFallBackDistance': (20.0, 100.0, "0"),
+    # P2 dzwiek: glosnosc 1..3
+    'BattleSoundsLoudness': (1, 3, "0"),
+    # P3 choragwie: wielkosc kompanii 20..150, wstrzasy 0..40, szansa zalamania 0..1
+    'BannerCompanySize': (20, 150, "0"),
+    'BannerShockStandardLost': (0.0, 40.0, "0.0"),
+    'BannerShockCommanderLost': (0.0, 40.0, "0.0"),
+    'BannerBreakChance': (0.0, 1.0, "0.00"),
+    # P5 okno lupu: prog wartosci 0..5000 denarow
+    'SpoilsWindowMinWorth': (0, 5000, "0"),
+    # P6 friendly fire: procent obrazen 0..100
+    'FriendlyFireRangedPercent': (0, 100, "0"),
+    'FriendlyFireMeleePercent': (0, 100, "0"),
+    'FriendlyFireChargePercent': (0, 100, "0"),
 }
 
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze

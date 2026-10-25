@@ -30,7 +30,7 @@ namespace Armoury
     ///  - umarli, gracz, uciekajacy (IsRunningAway - zlamani maja swoj jeden okrzyk paniki), bez waznej druzyny - bez glosu;
     ///  - wyjatek liczony (RoutHold.Stumble, miejsce "glosy"), funkcja dalej dziala.
     /// </summary>
-    internal static class BattleCries
+    internal static partial class BattleCries   // noc 25.10 P0: partial - sygnal szarzy ChargeStarted w BattleCries.Events.cs (plik integratora)
     {
         internal const float TickEvery = 0.5f;
         internal const float FormationCooldown = 40f, ChargeGap = 8f, ManCooldown = 20f, VoiceGap = 4f;
@@ -321,5 +321,10 @@ namespace Armoury
                 _hurt.RemoveAll(x => x.Dead);
             }
         }
+
+        // noc 25.10 P0 (kontrakt K6, wlasciciel tresci P2): okrzyk zwyciezcow, gdy kompania wroga sie zalamie (wola P3 - BannerCompaniesMission).
+        // team = druzyna, ktora wiwatuje; pos = srodek zlamanej kompanii (najblizsza formacja tej druzyny w 60 m, ta sama droga co Cry i ten sam limit glosow).
+        // Szkielet P0 - nic nie robi. Sygnal szarzy ChargeStarted(f) jest w BattleCries.Events.cs (plik integratora): P2 go WOLA z Charges.
+        internal static void Cheer(Team team, Vec3 pos) { }
     }
 }

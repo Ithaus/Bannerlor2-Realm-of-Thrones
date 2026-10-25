@@ -789,6 +789,15 @@ namespace Armoury
         private readonly bool _m103LektorReset = M103LektorReset();
         private static bool M103LektorReset() { try { Lektor.Reset(); } catch (Exception e) { Log.Error("M103LektorReset", e); } return true; }
 
+        // noc 25.10 P0: stan kampanii paczek nocy od zera - przeglad armii (P4: nazwy choragwi, potem Import z arm_army_review) i raport lupu (P5)
+        private readonly bool _nocReset = NocReset();
+        private static bool NocReset()
+        {
+            try { ArmyReview.Reset(); } catch (Exception e) { Log.Error("NocReset (ArmyReview)", e); }
+            try { SpoilsReport.Reset(); } catch (Exception e) { Log.Error("NocReset (SpoilsReport)", e); }
+            return true;
+        }
+
         public override void SyncData(IDataStore dataStore)
         {
             // zapas startowy rudy i drewna przeliczony na ladunki raz na kampanie (StartStock); brak klucza = stary zapis.
@@ -1449,6 +1458,10 @@ namespace Armoury
             // oddawany bez zmian (nowa kampania bez napisu - klucz nie pisany); brak klucza (stary zapis) = pamiec pusta; starsza DLL klucz pomija. Reset w konstruktorze
             try { string cr = dataStore.IsSaving ? CartRisk.Export() : null; if (!dataStore.IsSaving || cr != null) SaveText.Sync(dataStore, "arm_cart_risk", ref cr); if (dataStore.IsLoading) CartRisk.Import(cr); }
             catch (Exception e) { Log.Error("SyncData.arm_cart_risk", e); }
+            // noc 25.10 P4: przeglad armii - nazwy choragwi gracza ("ar1|..."; podzial i dowodcy sa w Order of Battle gry, nie tutaj); pisany tylko z danymi; wlasny try;
+            // brak klucza (stary zapis, kampania Jeffa) = choragwie bez nazw; starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> NocReset)
+            try { string ar = dataStore.IsSaving ? ArmyReview.Export() : null; if (!dataStore.IsSaving || ar != null) SaveText.Sync(dataStore, "arm_army_review", ref ar); if (dataStore.IsLoading) ArmyReview.Import(ar); }
+            catch (Exception e) { Log.Error("SyncData.arm_army_review", e); }
         }
 
         public override void RegisterEvents()
@@ -1489,6 +1502,10 @@ namespace Armoury
             CampaignEvents.MakePeace.AddNonSerializedListener(this, WorldClock7.OnMakePeace);
             CampaignEvents.KingdomDestroyedEvent.AddNonSerializedListener(this, WorldClock7.OnKingdomDestroyed);
             CampaignEvents.TournamentStarted.AddNonSerializedListener(this, WorldClock7.OnTournamentStarted);
+            // noc 25.10 P5: raport lupu turnieju (ramka T) - TournamentFinished dopisany PRZED sakiewka mieszczan, wiec biegnie PO niej i widzi ja w kiesie gracza
+            CampaignEvents.TournamentFinished.AddNonSerializedListener(this, (w, ps, t, prize) => { try { SpoilsReport.OnTourneyFinished(w, ps, t, prize); } catch (Exception e) { Log.Error("SpoilsReport.OnTourneyFinished", e); } });
+            CampaignEvents.OnPlayerJoinedTournamentEvent.AddNonSerializedListener(this, (t, b) => { try { SpoilsReport.OnTourneyJoined(t, b); } catch (Exception e) { Log.Error("SpoilsReport.OnTourneyJoined", e); } });
+            CampaignEvents.PlayerEliminatedFromTournament.AddNonSerializedListener(this, (r, t) => { try { SpoilsReport.OnTourneyEliminated(r, t); } catch (Exception e) { Log.Error("SpoilsReport.OnTourneyEliminated", e); } });
             CampaignEvents.TournamentFinished.AddNonSerializedListener(this, TourneyFolkPurse.OnTournamentFinished);   // f8-sakiewka (18.10): sakiewka mieszczan miasta-gospodarza dla zwyciezcy (klucz TourneyFolkPurse; po GivePrizeToWinner - poza RealPayer i oknem O11)
             // CG (19.10, recenzja: MbEvent - dopisany pozniej = wolany wczesniej): bohaterowie rodu w druzynie gracza kupuja sprzet za swoje PO sprzedazy nadwyzek
             // i zakupach ludzi (MenPurse.OnEntered) - rejestracja PRZED nimi
@@ -2418,6 +2435,8 @@ namespace Armoury
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
             try { CleanseAmmo(); } catch (Exception e) { Log.Error("CleanseAmmo", e); }
             try { NightRest.AddMenus(starter); } catch (Exception e) { Log.Error("NightRest.AddMenus", e); }
+            try { ArmyReview.AddMenus(starter); } catch (Exception e) { Log.Error("ArmyReview.AddMenus", e); }   // noc 25.10 P4: "Review the army" w menu obozu (PO NightRest - arm_camp_wait juz stoi)
+            try { NightHooks.InCampaign(); } catch (Exception e) { Log.Error("NightHooks.InCampaign", e); }       // noc 25.10 P0 (K3): latki kampanii choragwi P3 (BannerKit) - raz na proces
             try { TownInns.AddMenus(starter); } catch (Exception e) { Log.Error("TownInns.AddMenus", e); }   // KA (16.10): "Take lodgings at an inn" w menu miasta (sen - arm_sleep_wait z NightRest)
             try { RoadsideInns.AddMenus(starter); } catch (Exception e) { Log.Error("RoadsideInns.AddMenus", e); }   // sw-zajazdy: menu zajazdu przy szlaku (nocleg, plotki, dalej w droge)
             try { if (!LoreSeedFix.On) RangedLore.ReportLedger(false); } catch (Exception e) { Log.Error("RangedLore.ReportLedger", e); }   // m96-wzory: przy kluczu - po zmianach statystyk (LoreSeedFix)

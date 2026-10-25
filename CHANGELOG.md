@@ -1,5 +1,43 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 NOC-P0 (baza nocy, galaz noc/p0 od a14c76d3 = WGRANE 111) - klucze, kontrakty i wolania szesciu paczek bitwy; funkcje puste (szkielety)
+
+**Problem:** Jeff 25.10 00:36-02:30 (plan zaakceptowany slowem "start"): "chce aby bitwa wygladala tak jak w sredniowieczu ... armie nie biegly non stop tylko szly ...
+bebny, trabki ... choragwie po np. 50 ludzi ... w obozie opcja przeglad armii ... po bitwie i po oblezeniu i po turnieju popup z dokladna iloscia lootu ... Przygotuj to przez noc"
+oraz dopiski (friendly fire po obu stronach, cios wrecz, przemowa rodu, motta przy szarzy, jeki po bitwie, konie, szczek broni, deszcz i wiatr, kruki, ogien oblezenia).
+Szesc paczek (P1 marsz/doktryny, P2 dzwiek, P3 choragwie, P4 przeglad armii, P5 okno lupu, P6 friendly fire) pisze rownolegle w tych samych wspolnych plikach -
+krytyk noc/projekty/krytyk.txt K1-K3, K6, K13-K15: te same indeksy potkniec, warunki rejestracji zachowan, latki taktyk przy starcie (konstruktor statyczny TacticComponent),
+niezgodne API miedzy paczkami.
+**Przyczyna:** brak wspolnej bazy - kazda paczka dopisywalaby klucze, wolania i indeksy po swojemu (kolizje przy scalaniu).
+**Zmiana (tylko Armoury; zadna funkcja jeszcze nic nie robi - same szkielety):**
+- Settings.cs: 45 nowych kluczy (domyslnie TAK / wartosci z projektow), grupy MCM Marching and tactics (13), Battle sounds (13), Banner companies (9), Army review (2),
+  The law of the battlefield (4 - okno lupu), Friendly fire (4); gen_mcm.py: zakresy suwakow (RANGES) - paczki musza przycinac w kodzie do tych samych; McmSettings
+  wygenerowany (2413 -> 2458). Zadnego z kluczy nie ma w Armoury.json Jeffa ani w Armoury.settings.xml modulu (grep 25.10) - dzialaja domyslne z kodu.
+- RoutHold.cs (K1): miejsca potkniec SiteMarch 9, SiteDoctrine 10, SiteBanner 11, SiteSound 12, Sites 13; segmenty linii "Bitwa (NB2)" marsz / doktryna / choragwie
+  (ResetCounters / Activity / Append w klasach paczek, wolane pod Gate).
+- BattleSense.cs (K3, K4, K15): NightKeys (warunek rejestracji), bramka Night (bitwa, nie pojedynek); AfterStart: NightHooks.FirstBattle -> MarchToContact.Begin ->
+  Doctrine.Begin -> WarCouncil.Council -> BattleSound.Begin; OnMissionTick: BattleCries -> MarchToContact -> Doctrine -> BattleSound; nowe override OnDeploymentFinished,
+  OnAgentShootMissile, OnMissileHit, OnAgentPanicked, OnAgentFleeing (tylko przekazanie do BattleSound), OnAgentRemoved / OnClearScene / koniec misji - dzwiek i End paczek.
+  Kazde wolanie we wlasnym try z licznikiem potkniec (bez wylacznika).
+- SubModuleMain.cs (K2): nb2b takze przy NightKeys (BattleSense + RoutKeeper); nowe zachowania BannerCompaniesMission (P3), ArmyReviewCheck (P4), FriendlyFire.Logic (P6);
+  FriendlyFire.ApplyAll zaraz po ChargeTemperPatch (przed JIT); NightHooks.SetHarmony; OnApplicationTick -> SpoilsWindow.AppTick (NoInlining, licznik bledow ladowania);
+  OnGameEnd -> SpoilsWindow.Close + SpoilsReport.Reset.
+- ArmouryBehavior.cs (K14): Reset ArmyReview / SpoilsReport w konstruktorze, SyncData arm_army_review (pisany tylko z danymi), nasluchy turnieju dla SpoilsReport
+  (TournamentFinished dopisany PRZED TourneyFolkPurse - biegnie po nim), ArmyReview.AddMenus po NightRest.AddMenus, NightHooks.InCampaign (latki P3 raz na proces).
+- Nowe pliki: NightHooks.cs, BattleCries.Events.cs, Doctrine.Events.cs, BannerCompanies.Events.cs (pliki integratora - dyspozytory zdarzen miedzy paczkami: ChargeStarted,
+  ArchersFellBack, FlankRide, StandardFell, CommanderFell, CompanyBroke); szkielety MarchToContact.cs, Doctrine.cs (P1), BattleSound.cs (P2), BannerCompanies.cs, BannerKit.cs (P3),
+  ArmyReview.cs, ArmyReview.Battle.cs (P4), SpoilsReport.cs, SpoilsWindow.cs (P5), FriendlyFire.cs (P6). BattleCries: partial + pusty Cheer(Team, Vec3) dla P3.
+- tools/sprawdz_logi.py: wzor linii NB2 (NBW_LINE) przyjmuje dalsze miejsca potkniec i segmenty nocy (grupy nieprzechwytujace) - od m111 (24.10, miejsce "pojedynek")
+  linia NB2 nie byla rozpoznawana wcale (log 25.10 02:11 i 02:55: 0 z 3 i 0 z 4; po zmianie 3/3 i 4/4).
+**Ryzyko / co sprawdzic (kontrola calosci w kodzie):**
+- regresje: przy kluczach domyslnych Jeffa BattleSense i RoutKeeper byly juz w kazdej misji (CommanderTactics itd.) - NightKeys nic nie doklada; nowe override BattleSense
+  wychodza od razu poza bitwa (Night = statyki); trzy puste zachowania w kazdej misji kampanii (koszt pomijalny); linia NB2 ma 4 nowe liczniki potkniec (0).
+- RoutHold.Break(a, site) bierze miejsce MissionTeams (Broken / Flee), NIE stale RoutHold - projekt choragwi mial Break(a, SiteBanner): indeks wypadlby poza tablice
+  MissionTeams (zlamanie bez licznika). Kontrakt P3: Break(a, MissionTeams.Flee).
+- kolejnosc nasluchow TournamentFinished: SpoilsReport po TourneyFolkPurse (B-1); Prologue ma osobny nasluch w swoim zachowaniu (bez zmian).
+- build 0 bledow (6 ostrzezen jak dotad). Gra NIE uruchamiana - test zbiorczy po scaleniu paczek (sesja glowna).
+**Status:** DO SPRAWDZENIA (baza dla paczek P1-P6; samo w sobie nie do wgrania - funkcje puste).
+
 ## 2026-10-25 113 (m119-kij, galaz w-toku/m117-ubranie po 112 231dc8a5) - bezbronny po strazach bierze z domu najgorsza bron biala (palka, mlot, sierp, toporek) swojej kultury - sztuka tymczasowa DTE, poza zbrojownia
 
 **Problem:** Jeff 25.10 ok. 01:00: "i jakas nagorsza bron dostja akijem moga walczyc sa kije?"; ok. 01:40: "wgraj wszystko razem z kijem". Log 24.10 (1 z 21 bitew, dopisek

@@ -91,6 +91,9 @@ namespace Armoury
                 // HeroDeveloper.OnGainLevel i SetupDefaultPoints (prywatne - TU, w menu glownym, zanim JIT skompiluje wolajacych); klucze na zywo; wlasny try
                 try { LevelPoints.ApplyAll(_harmony); } catch (Exception e) { Log.Error("LevelPoints.ApplyAll", e); }
                 ChargeTemperPatch.ApplyAll(_harmony);
+                // noc 25.10 P6 (Jeff 25.10: "i dodaj friendly fire po obu stronach", "cios wrecz nie tylko ostrzaly"): transpilery Mission.MeleeHitCallback /
+                // MissileHitCallback / ChargeDamageCallback i postfiks CalculateDamage - TU, obok ChargeTemperPatch, zanim JIT skompiluje wolajacych; wlasny try
+                try { FriendlyFire.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FriendlyFire.ApplyAll", e); }
                 TravellerGoods36.ApplyAll(_harmony);   // 3.6: wedrowcy BK bez towaru, rudy i drewna z niczego (postfiks po CastleSteel - Priority.Low)
                 CastleSteel.ApplyAll(_harmony);   // 177-1: wedrowcy BK bez sztab i wegla z niczego (dawny ValyrianSteel.DearRefine zdjety - stal zamkowa to zwykly stopien)
                 TravellerTrade36b.ApplyAll(_harmony);   // 36b: wedrowcy BK z prawdziwym towarem - zywnosc drogi z polki pochodzenia, bez jucznych z niczego, towar w komis miasto -> miasto
@@ -350,6 +353,7 @@ namespace Armoury
                 try { CraftOrders8.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CraftOrders8.ApplyAll", e); }   // E8/K (255): zlecenia kowalskie gry (nagroda, platnik, bron, szablon) i kupno u ksiegarza BK
                 try { CraftOrdersPurse.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CraftOrdersPurse.ApplyAll", e); }   // NZ (16.10): postfiks CreateTownOrder - zlecenie tylko od zleceniodawcy z kiesa na sume swoich zlecen; PO CraftOrders8 (ta sama metoda ma jego transpiler)
                 Measure169c.SetHarmony(_harmony);
+                NightHooks.SetHarmony(_harmony);   // noc 25.10 P0 (K3): tylko zapamietanie - latki misji P1/P2 przy pierwszej bitwie (BattleSense.AfterStart), latki P3 w kampanii
                 ClanBudget.SetHarmony(_harmony);    // 166: tylko zapamietanie - latki gry wpina EnsureHooks w kampanii
                 OverflowHome.SetHarmony(_harmony);  // W4c: tylko zapamietanie - okno dezercji gry wpina EnsureHooks w kampanii
                 GentryService.SetHarmony(_harmony); // 179: tylko zapamietanie - latki BK (wezwanie rycerza, partia rycerza, majatki) w kampanii
@@ -502,6 +506,13 @@ namespace Armoury
                 try { InvTestTick(dt); }
                 catch (Exception e) { _invTestFails++; Log.Error("InventoryLookTest.AppTick: nie laduje sie (proba " + _invTestFails + "/3)", e); }
             }
+            // noc 25.10 P5: okno lupu po bitwie, oblezeniu i turnieju (SpoilsWindow.AppTick - bramka SceneGate, warstwa Gauntlet; wlasny try w srodku) - tu tylko blad
+            // ladowania typu, liczony (po 3 okno lupu nie startuje do konca sesji, gra bez zmian). PRZED returnem wiosek - klucz Map Villages = off nie wylacza okna.
+            if (_spoilsFails < 3)
+            {
+                try { SpoilsTick(); }
+                catch (Exception e) { _spoilsFails++; Log.Error("SpoilsWindow.AppTick: nie laduje sie (proba " + _spoilsFails + "/3)", e); }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -564,6 +575,13 @@ namespace Armoury
         }
 
         private static int _chronicleTickFails;   // m105-kronika: blad ladowania typu straznika Kroniki (Chronicle.AppTick)
+        private static int _spoilsFails;          // noc 25.10 P5: blad ladowania typu okna lupu (SpoilsWindow.AppTick)
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void SpoilsTick()
+        {
+            SpoilsWindow.AppTick();
+        }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void ChronicleTick()
@@ -580,6 +598,8 @@ namespace Armoury
             try { MapChatLog.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (dziennik m105)", e); }
             try { EventMusic.RestoreNow("wyjscie z kampanii"); } catch (Exception e) { Log.Error("OnGameEnd (muzyka m108)", e); }   // m108-muzyka: muzyka gry z powrotem   // m105-dziennik: linia kampanii i test od nowa
             try { Chronicle.GameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (Kronika Westeros)", e); }   // m105-kronika: stan kampanii Kroniki od zera
+            try { SpoilsWindow.Close("wyjscie z kampanii"); } catch (Exception e) { Log.Error("OnGameEnd (okno lupu)", e); }   // noc 25.10 P5: warstwa zdjeta, obrazek zwolniony
+            try { SpoilsReport.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (raport lupu)", e); }                     // noc 25.10 P5: raport w pamieci od zera
         }
         private static int _lektorFails;    // m103-lektor: blad ladowania typu lektora (Lektor.AppTick)
 
@@ -642,7 +662,8 @@ namespace Armoury
                 // NB2 (16.10): zlamani raz na bitwe (BrokenMen + FieldCraft przez RoutHold.Break) i linia "Bitwa (NB2)" z postura wedlug tieru
                 // czesc 2: linia NB2 takze dla taktyki wedlug dowodcy, weteranow wedlug tieru, krwi przez pancerz i glosow (BattleSense ponizej)
                 bool nb2b = Settings.Current.CommanderTactics || Settings.Current.VeteransByTier || Settings.Current.BloodThroughArmour
-                            || Settings.Current.BattleCriesAndMoans || Settings.Current.GroundBloodPools;   // czesc 3 (16.10): kaluze krwi
+                            || Settings.Current.BattleCriesAndMoans || Settings.Current.GroundBloodPools   // czesc 3 (16.10): kaluze krwi
+                            || BattleSense.NightKeys(Settings.Current);   // noc 25.10 P0 (K2): marsz i doktryny (P1), dzwiek (P2), choragwie (P3) - BattleSense i RoutKeeper (linia NB2, RoutHold.On)
                 if (mission != null && ((Settings.Current.BrokenMenNeverRally && (Settings.Current.WoundedFleeEnabled
                         || (Settings.Current.FieldCraftEnabled && Settings.Current.AiFleeWhenNearDeath && Campaign.Current != null)))
                         || Settings.Current.SoldierPostureByTier || nb2b))
@@ -652,6 +673,16 @@ namespace Armoury
                 // po recenzji: takze przy fladze testu bitwaOFF (FieldDuel.TestOff, tylko DLL autotestu) - linia misji z kluczami NIE
                 if (mission != null && (nb2b || DuelGuard.AnyKey(Settings.Current) || FieldDuel.AnyKey(Settings.Current) || FieldDuel.TestOff))
                     mission.AddMissionBehavior(new BattleSense());
+                // noc 25.10 P3 (krytyk K2): choragwie - kompanie, wielu chorazych, sztandar polowy, zwrot sprzetu chorazego; samo sprawdza bitwe polowa i logike sztandarow
+                if ((Settings.Current.BannerCompaniesEnabled || Settings.Current.StandardBearerKitSafe || Settings.Current.FieldStandards)
+                    && Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new BannerCompaniesMission());
+                // noc 25.10 P4: linia kontrolna przegladu armii (formacje gracza wobec Order of Battle; tylko odczyt) - samo sprawdza bitwe polowa gracza
+                if (Settings.Current.ArmyReviewEnabled && Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new ArmyReviewCheck());
+                // noc 25.10 P6: bramka friendly fire (pole, oblezenie, kryjowka, morze - liczona raz w EarlyStart; turniej i arena poza)
+                if (Settings.Current.FriendlyFireEnabled && Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new FriendlyFire.Logic());
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
                     && (NightRest.PlayerCamped || CampScene.TestWanted()))   // m109-oboz: test autotestu (plik armoury-oboz-bitwa.flag) - kazda bitwa w polu jak w obozie
                     mission.AddMissionBehavior(new CampScene());
