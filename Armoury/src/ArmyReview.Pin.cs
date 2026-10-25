@@ -220,10 +220,11 @@ namespace Armoury
                 rows.Add(new InquiryElement(kv.Key, (ch != null ? ch.Name.ToString() : kv.Key) + " - none in your party now - " + Where(kv.Key), ch != null ? TroopPortrait(ch) : null, true,
                                             "The pin waits for men of this type. Pick it to move it or to send the type back to sorting by kind."));
             }
+            bool photo = WindowPhotos.Active;   // paczka 132: okno proby zdjec - przyciski bez skutku
             if (rows.Count == 0)
             {
                 InformationManager.ShowInquiry(new InquiryData("Move troop types into banners", "You have no troops in your party to place - only companions, who lead banners or stand in their ranks.",
-                    true, false, "Back", null, delegate { try { OpenBanners(false); } catch (Exception e) { Stumble("Pins.Empty", e); } }, null), true);
+                    true, false, "Back", null, delegate { if (Inert(photo)) return; try { OpenBanners(false); } catch (Exception e) { Stumble("Pins.Empty", e); } }, null), true);
                 return;
             }
             int placed = 0;
@@ -235,6 +236,7 @@ namespace Armoury
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Move troop types into banners", d, rows, true, 1, rows.Count, "Choose the banner", "Back",
                 delegate (List<InquiryElement> picked)
                 {
+                    if (Inert(photo)) return;
                     try
                     {
                         var ids = new List<string>();
@@ -244,7 +246,7 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Pins.Pick", e); }
                 },
-                delegate (List<InquiryElement> _) { try { OpenBanners(false); } catch (Exception e) { Stumble("Pins.Back", e); } }), true);
+                delegate (List<InquiryElement> _) { if (Inert(photo)) return; try { OpenBanners(false); } catch (Exception e) { Stumble("Pins.Back", e); } }), true);
         }
 
         private static ImageIdentifier TroopPortrait(CharacterObject ch)

@@ -584,6 +584,7 @@ namespace Armoury
         private static void SpoilsTick()
         {
             SpoilsWindow.AppTick();
+            WindowPhotos.AppTick();   // paczka 132: proba zdjec nowych okien (tylko DLL autotestu i plik armoury-zdjecia-okien.flag; wlasny try, potem od razu wyjscie)
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]

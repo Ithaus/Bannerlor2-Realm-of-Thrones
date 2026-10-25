@@ -39,6 +39,7 @@ namespace Armoury
         private const string DirLoot = "Loot";
         private const double StableSec = 1.0;
         private const double AutotestCloseSec = 1.5;
+        private const double PhotoCloseSec = 12.0;   // paczka 132: okno proby zdjec zamyka WindowPhotos po zdjeciu - to tylko bezpiecznik
         private static readonly long CheckTicks = Stopwatch.Frequency / 4;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -54,6 +55,7 @@ namespace Armoury
         private static bool _selfGate;
         private static string _closeKey;            // Esc/Enter - zamkniecie w nastepnej klatce
         private static int _stumbles;
+        private static bool _photo;                 // paczka 132: okno proby zdjec (ShowPhoto) - raport probny, bez SpoilsReport.Finish
         private static readonly List<string> _blocks = new List<string>();
 
         internal static int Stumbles { get { return _stumbles; } }
@@ -108,7 +110,8 @@ namespace Armoury
                 if (inp.IsKeyReleased(InputKey.Escape)) { _closeKey = "Esc"; return; }
                 if (inp.IsKeyReleased(InputKey.Enter) || inp.IsKeyReleased(InputKey.NumpadEnter)) { _closeKey = "Enter"; return; }
             }
-            if (Autotest() && Sec(_openedAt) >= AutotestCloseSec) Close("autotest " + AutotestCloseSec.ToString("0.0", Inv) + " s");
+            double lim = _photo ? PhotoCloseSec : AutotestCloseSec;   // paczka 132: okno proby zdjec zamyka WindowPhotos (zdjecie po 1.8 s)
+            if (Autotest() && Sec(_openedAt) >= lim) Close("autotest " + lim.ToString("0.0", Inv) + " s");
         }
 
         private static double Sec(long since) { return since == 0 ? 0 : (Stopwatch.GetTimestamp() - since) / (double)Stopwatch.Frequency; }
@@ -381,6 +384,7 @@ namespace Armoury
         {
             var l = _layer; var scr = _screen;
             _layer = null; _screen = null;
+            _photo = false;
             try
             {
                 if (l != null)
@@ -456,6 +460,40 @@ namespace Armoury
                 _rep = null; _okSince = 0; _blocks.Clear();
             }
         }
+
+        // ------------------------------------------------------------ paczka 132: proba zdjec okien (WindowPhotos - tylko autotest)
+
+        /// <summary>Okno lupu z raportu PROBNEGO (WindowPhotos): ta sama tresc (Build), obrazek (Picture) i warstwa (ShowGauntlet) co po bitwie; bez zapasu,
+        /// bez zatrzymania czasu i bez raportu (_rep null - zamkniecie nie wola SpoilsReport.Finish, liczniki sesji bez zmian). null - otwarte; inaczej powod.</summary>
+        internal static string ShowPhoto(SpoilsReport.Rep r)
+        {
+            if (r == null) return "brak raportu probnego";
+            if (_layer != null || _spec != null) return "okno lupu juz otwarte";
+            if (_rep != null && !_rep.Done) return "prawdziwy raport lupu czeka na okno";
+            string why = GauntletUnavailable();
+            if (why != null) return "wlasne okno niedostepne: " + why;
+            var content = Build(r);
+            string header = Picture(r, out _fileSprite);
+            bool ok = false;
+            try { ok = ShowGauntlet(r, content, header); }
+            catch (Exception e) { Stumble("ShowPhoto", e); RemoveLayer(); why = "wyjatek " + e.GetType().Name; }
+            if (!ok)
+            {
+                if (_fileSprite != null) { try { StoryPictures.Drop(_fileSprite); } catch { } _fileSprite = null; }
+                return why ?? "warstwa nie weszla";
+            }
+            _photo = true;
+            _rep = null;
+            _mode = "zdjecie (132)";
+            _openedAt = Stopwatch.GetTimestamp();
+            return null;
+        }
+
+        /// <summary>paczka 132: okno proby zdjec na ekranie.</summary>
+        internal static bool PhotoOpen { get { return _photo && _layer != null; } }
+
+        /// <summary>paczka 132: zamkniecie okna proby zdjec (nic, gdy zamkniete juz inaczej - Done, Esc, Enter, zmiana ekranu).</summary>
+        internal static void ClosePhoto() { if (PhotoOpen) Close("proba zdjec (132)"); }
 
         private static void FinishShown(string how)
         {

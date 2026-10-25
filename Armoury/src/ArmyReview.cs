@@ -269,7 +269,8 @@ namespace Armoury
             why = null;
             var mp = MobileParty.MainParty;
             if (Campaign.Current == null || mp == null || Hero.MainHero == null) why = "No campaign is running.";
-            else if (mp.MapEvent != null || mp.SiegeEvent != null || PlayerEncounter.Current != null) why = "Not while in a battle or siege.";
+            // paczka 132: proba zdjec okien (tylko autotest, WindowPhotos.Active) - takze w osadzie, w ktorej czeka autotest; bitwa i oblezenie dalej nie
+            else if (mp.MapEvent != null || mp.SiegeEvent != null || (PlayerEncounter.Current != null && !WindowPhotos.InTownOk())) why = "Not while in a battle or siege.";
             else if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress) why = "Only on land.";
             else if (!Hero.MainHero.IsAlive || Hero.MainHero.IsPrisoner) why = "Not now.";
             return why == null;
@@ -410,9 +411,11 @@ namespace Armoury
                                         entries <= 0 ? "No order is set - the game already sorts your men by kind."
                                         : (!Writes ? "Army Review Writes Order Of Battle is off, but the banners saved before still set your next battle. " : "")
                                           + "Forget the banners: the next battle sorts your men by kind into the game's own formations, as if no order had ever been set."));
+            bool photo = WindowPhotos.Active;   // paczka 132: okno proby zdjec - przyciski bez skutku
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Review the army", desc, rows, true, 1, 1, "Look", "Close",
                 delegate (List<InquiryElement> picked)
                 {
+                    if (Inert(photo)) return;
                     try
                     {
                         string id = picked != null && picked.Count > 0 ? picked[0].Identifier as string : null;
@@ -975,9 +978,11 @@ namespace Armoury
                                : _fromGame && !_dirty ? "No order is set: this is how the game sorts your men by kind."
                                : _dirty ? "You have changes not yet saved." : "This is the order of your next battle.");
             if (missing.Count > 0) d.Append(" Your ").Append(string.Join(", ", missing.ToArray())).Append(missing.Count == 1 ? " has" : " have").Append(" no banner yet - one will be raised on saving.");
+            bool photo = WindowPhotos.Active;   // paczka 132: okno proby zdjec - przyciski bez skutku (takze "Save" i "Back")
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Banners for the next battle", d.ToString(), rows, true, 1, 1, "Choose", "Back",
                 delegate (List<InquiryElement> picked)
                 {
+                    if (Inert(photo)) return;
                     try
                     {
                         object id = picked != null && picked.Count > 0 ? picked[0].Identifier : null;
@@ -988,7 +993,7 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Banners.Pick", e); }
                 },
-                delegate (List<InquiryElement> _) { try { LeaveBanners(); } catch (Exception e) { Stumble("Banners.Back", e); } }), true);
+                delegate (List<InquiryElement> _) { if (Inert(photo)) return; try { LeaveBanners(); } catch (Exception e) { Stumble("Banners.Back", e); } }), true);
         }
 
         private static string Approx(int i, int[] fit, int[] w1)
@@ -1134,10 +1139,11 @@ namespace Armoury
             var fit = ShareFit(_work, _workPins);   // P12
             var w1 = new int[Slots]; var w2 = new int[Slots];
             Weights(_work, fit, w1, w2);
+            bool photo = WindowPhotos.Active;   // paczka 132: okno proby zdjec - przyciski bez skutku
             if (!Writes)
             {
                 InformationManager.ShowInquiry(new InquiryData(Label(i), BannerHint(i, fit, w1, w2), true, false, "Back", null,
-                    delegate { try { OpenBanners(false); } catch (Exception e) { Stumble("Banner.ReadOnly", e); } }, null), true);
+                    delegate { if (Inert(photo)) return; try { OpenBanners(false); } catch (Exception e) { Stumble("Banner.ReadOnly", e); } }, null), true);
                 return;
             }
             bool basic = s.Cls >= 1 && s.Cls <= 4;
@@ -1161,6 +1167,7 @@ namespace Armoury
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(Label(i), BannerHint(i, fit, w1, w2), rows, true, 1, 1, "Choose", "Back",
                 delegate (List<InquiryElement> picked)
                 {
+                    if (Inert(photo)) return;
                     try
                     {
                         string id = picked != null && picked.Count > 0 ? picked[0].Identifier as string : null;
@@ -1175,7 +1182,7 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Banner.Pick", e); }
                 },
-                delegate (List<InquiryElement> _) { try { OpenBanners(false); } catch (Exception e) { Stumble("Banner.Back", e); } }), true);
+                delegate (List<InquiryElement> _) { if (Inert(photo)) return; try { OpenBanners(false); } catch (Exception e) { Stumble("Banner.Back", e); } }), true);
         }
 
         private static void OpenKind(int i)

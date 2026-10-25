@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 132 (galaz noc/132-zdjecia od noc/127-bitwa-cialo 9bc0f627) - proba autotestu: zdjecia nowych okien (przeglad armii, choragwie, przypinanie, okno lupu po bitwie, oblezeniu i turnieju)
+**Problem:** Jeff 25.10 ok. 12:52: "daj mi zdjecia z gry jak wygladaja te nowe widoki popupy armii, lupow etc". Okna z nocy (P4/P12 przeglad armii, P5/P11 okno lupu) nie maja
+zadnego zdjecia - autotest ich nie otwiera (przeglad tylko z menu obozu, okno lupu tylko po prawdziwej bitwie z lupem), a proby P4/P11 sprawdzaja liczby, nie obraz.
+**Przyczyna:** Brak - nowa proba (tylko autotest).
+**Zmiana:** Nowy WindowPhotos.cs (wlacznik: LogGate.Mode 1/2 + plik CrashScribe/armoury-zdjecia-okien.flag; w zwyklej grze jedno sprawdzenie trybu na sesje, pliku nie czyta).
+Raz na proces, 30 s po wejsciu na mape i po 3 s spokoju (MapState i ekran mapy, bez misji, menu Esc, bitwy, oblezenia, spotkania poza osada, rozmowy, zapytania, okna lupu
+i okna opowiesci; etap autotestu CrashScribe "Run" - Autotest.Now odbiciem; najdluzej 60 min czekania): 7 okien tymi samymi funkcjami co gracz - 1 "Review the army"
+(OpenMain), 2 "Banners for the next battle" (OpenBanners), 3 pierwsza wystawiona choragiew (OpenBanner), 4 "Move troop types into banners" (OpenPins), 5-7 okno lupu po bitwie,
+po oblezeniu (grabiez) i po turnieju (nowe SpoilsWindow.ShowPhoto: Build, Picture i ShowGauntlet jak po bitwie; raport PROBNY - prawdziwe przedmioty z sakw gracza albo z listy
+gry, etykiety zlota, jency, straty, slawa; bez SpoilsReport.Finish i licznikow sesji). Zdjecie TakeScreenshot do CrashScribe/zdjecia/okna-132-N-nazwa-HHmmss.png: zapytania
+po 0.6 s (autotest AutotestUi zamyka zapytanie po >= 1.0 s od zobaczenia - 1.5 s sie nie da; prefab zapytania bez animacji wejscia), okno lupu po 1.8 s (wlasna warstwa,
+autotest jej nie widzi). Zamkniecie: autotest albo proba po 1 s (InformationManager.HideInquiry -> GauntletQueryManager.CloseQuery bez wywolania akcji okna - sprawdzone
+w dekompilacji; SpoilsWindow.ClosePhoto). Nasze zapytanie rozpoznane po GauntletQueryManager._activeQueryData (odbicie, to samo pole czyta AutotestUi).
+Bezpieczenstwo stanu: okna przegladu otwarte w probie maja przyciski bez skutku (bool photo przy otwarciu + ArmyReview.Inert na poczatku 9 callbackow OpenMain / OpenBanners /
+OpenBanner / OpenPins - takze "Save", "Back" i "Return to the game's own order"); ArmyReview.Can wpuszcza w osadzie tylko przy WindowPhotos.Active (autotest czeka w miescie -
+PlayerEncounter z osada; bitwa i oblezenie dalej nie); kopia robocza okna choragwi (_work, _workPins, _dirty, _fromGame) wraca do stanu sprzed proby; okno lupu probne (_photo)
+ma bezpiecznik zamkniecia 12 s zamiast 1.5 s autotestu. Linie "Zdjecia okien (132): ..." - start, po jednej na okno ("TAK plik zdjecia\..." / "NIE (powod)") i koniec
+(pliki na dysku 6 s po ostatnim zdjeciu, wynik); inny etap autotestu, misja albo bitwa w trakcie - "przerwana" (nasze okno zamkniete, stan okna przywrocony).
+**Ryzyko / co sprawdzic:** (1) Zrzut silnika zlecany 0.6 s po otwarciu zapytania, autotest zamyka je od 1.0 s - gdyby silnik robil zrzut pozniej niz 0.4 s (bardzo niski FPS),
+zdjecie pokaze tlo bez okna; obejrzec obrazy. (2) Zapytania wstrzymuja gre (MBCommon.PauseGameEngine) - zrzutu przy tej pauzie dotad nie robilismy. (3) Przeglad armii
+w miescie (w grze tylko z menu obozu) - tlem zdjec 1-4 jest menu miasta; liczby te same. (4) Etap autotestu odbiciem (CrashScribe.Autotest.Now ze zrodla 1ef2130b); DLL bez
+pola - proba bez warunku etapu. (5) Regresje sprawdzone w kodzie: przy Active NIE Can, callbacki i FrameTick dzialaja jak dotad (Inert(false) = false, lim = 1.5 s), RemoveLayer
+zeruje _photo; zadnego zapisu Order of Battle, przypiec, zlota, sakw ani zapisu gry; proba P4 (armoury-przeglad.flag) i proba turnieju P11 niezalezne (okno lupu probne
+= SpoilsWindow.Busy, proba turnieju czeka); obce zapytanie - krok czeka najwyzej 20 s, potem NIE i nastepny. (6) 7 plikow BMP 4K po ok. 24 MB. Sprawdzic w Armoury.log
+7 linii "TAK" i "koniec ... pliki na dysku 7/7 ... wynik TAK"; w autotest-*.log "OKNO wybor z listy "Review the army" ... -> NIE [Close]" (zamkniecie bez skutku).
+**Status:** ZBUDOWANE - nie wgrane (tylko autotest z plikiem armoury-zdjecia-okien.flag).
+
 ## 2026-10-25 131 (galaz noc/127-bitwa-cialo) - udzwig z Endurance: kazdy punkt Endurance bohatera w druzynie +5 kg
 **Problem:** Jeff 25.10 ok. 12:41: "a kazdy punkt endurance daje +5 do udzwigu w menu inventory jako dodatkowe", potem "i companions tez".
 **Przyczyna:** Gra liczy udzwig partii tylko z ludzi (20 kg), luzakow (20 kg) i jucznych (100 kg) (DefaultInventoryCapacityModel.CalculateInventoryCapacity) - cechy
