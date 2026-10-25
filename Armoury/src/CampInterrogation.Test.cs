@@ -33,6 +33,12 @@ namespace Armoury
     ///  ogloszony grze drugi raz (kafelek trackera, recenzja R1); T13 - znacznik H2 zdjety jak przy flagach wylaczonych, przeglad godzinny stawia go (R4); T10 - H1 IsSpotted na chwile -> HintsHour "znaleziona", znacznik zdjety, suma +1;
     ///  T11 - probna wskazowka H1 po terminie -> "po terminie"; T4 - MOWI => wskazowka czynna i niewypatrzona; T9 - zapis tam i z powrotem z wskazowkami.
     ///  Sprzatanie: probne wskazowki zdjete, wskazowki prob (H2 z T1, ewentualne z T4/T5) i wiedza H1/H2 zostaja jako slad biegu (jak w 104 wypatrzona H2 z flaga).
+    /// p7-pochodzenie (CHANGELOG 120): T14 - zolnierz-dezerter wziety z bandy: D (zwykly zolnierz, nie bandyta, ktorego gracz nie trzyma); migawka lochu jak
+    ///  OnPlayerBattleEndEvent (sklad bandy "test_dezerter" {D: 3}), 3 x D do lochu (1 ranny) jak ekran jencow, NoteOrigins jak OnMapEventEnded -> wpis {kultura C,
+    ///  kryjowka = najblizsza otwarta (Open) albo brak, liczba 3}; grupa D: dezerter, kultura C, kultura rozmowcy = kultura D, 2/1, klucz limitu = A; Target -
+    ///  kryjowka bandy "skad banda" (bez otwartej - "kultura" albo brak); rozmowa rzutem 0 (slot rodzaju zwolniony jak nowa doba) - MOWI z kryjowka bandy;
+    ///  przyciecie: -1 D -> grupa 2 i wpis 2, reszta D zdjeta -> grupy i wpisu brak; przyrost rodzaju, ktorego zadna z dwoch band nie miala - bez wpisu.
+    ///  Wpisy pochodzenia rodzajow A, B, L, D gracza na czas proby odlozone (jak kajdany), potem wrocone. T9 - zapis z probnym wpisem pochodzenia tam i z powrotem.
     /// Linia "Przesluchanie (m109): test - ... - wynik TAK|NIE." (grupa m109przes PRZES-7, m110okol OKOL-8).
     /// </summary>
     internal static partial class CampInterrogation
@@ -96,6 +102,25 @@ namespace Armoury
             return t.Culture != null && !string.IsNullOrEmpty(t.Culture.StringId) ? "c:" + Clean(t.Culture.StringId) : Clean(t.StringId);
         }
 
+        /// <summary>p7-pochodzenie: zwykly zolnierz (Soldier, nie bandyta, nie wight, kultura nie bandycka), ktorego gracz nie trzyma w lochu - najpierw
+        /// podstawowy i elitarny kultury gracza, potem pierwszy z CharacterObject.All; null - brak.</summary>
+        private static CharacterObject TestDeserter()
+        {
+            var me = Hero.MainHero;
+            var cands = new List<CharacterObject>();
+            if (me != null && me.Culture != null) { cands.Add(me.Culture.BasicTroop); cands.Add(me.Culture.EliteBasicTroop); }
+            foreach (var co in cands) if (TestSoldier(co)) return co;
+            foreach (var co in CharacterObject.All) if (TestSoldier(co)) return co;
+            return null;
+        }
+
+        private static bool TestSoldier(CharacterObject co)
+        {
+            if (co == null || co.IsHero || co.StringId == null || co.Occupation != Occupation.Soldier || BanditTroop(co) || PeopleBook.IsWight(co) || co.Culture == null || co.Culture.IsBandit) return false;
+            var n = CountOf(co);
+            return n.H + n.W == 0;
+        }
+
         private static bool NoLairCulture(CultureObject c)
         {
             if (c == null) return false;
@@ -150,7 +175,8 @@ namespace Armoury
                 foreach (var ps in k.DefaultPartyTemplate.Stacks)
                     if (BanditTroop(ps.Character) && NoLairCulture(ps.Character.Culture)) { tl = ps.Character; break; }
             }
-            Cnt a0 = CountOf(ta), bb0 = CountOf(tb), l0 = CountOf(tl);
+            CharacterObject tdz = TestDeserter();   // p7-pochodzenie: zwykly zolnierz, ktorego gracz nie trzyma (null - T14 pominiety)
+            Cnt a0 = CountOf(ta), bb0 = CountOf(tb), l0 = CountOf(tl), d0 = CountOf(tdz);
             int mercy0 = MercyXp();
             var stash = new List<Band>(_bands);
             string kA = TestLimitKey(ta);   // A i B - ten sam rodzaj bandy (kultura kryjowki H1)
@@ -162,14 +188,18 @@ namespace Armoury
             var seenKeys = new List<string> { Clean(ta.StringId) };
             if (tb != null) seenKeys.Add(Clean(tb.StringId));
             if (tl != null) seenKeys.Add(Clean(tl.StringId));
+            if (tdz != null) seenKeys.Add(Clean(tdz.StringId));
             var seenStash = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (var k in seenKeys) { int d; if (_seen.TryGetValue(k, out d)) { seenStash[k] = d; _seen.Remove(k); } }
+            var originStash = new Dictionary<string, Origin>(StringComparer.Ordinal);   // p7-pochodzenie: jency testowi bez wpisow gracza (A, B, L - sciezka bez pochodzenia)
+            foreach (var k in seenKeys) { Origin o; if (_origins.TryGetValue(k, out o)) { originStash[k] = o; _origins.Remove(k); } }
             Hero hero = null;
             bool area = AreaOn;   // m110-okolica: tryb okolicy (klucz Interrogation Area Only)
             bool flagWant = s != null && s.HideoutFlagEnabled && s.HideoutFlagDays > 0;
             var vt = Campaign.Current.VisualTrackerManager;
             pts.Add("T0 TAK (H1 " + h1.StringId + ", H2 " + h2.StringId + (h2 == h1 ? " = H1" : "") + ", kultura " + c.StringId + ", klan " + clan.StringId + ", A " + ta.StringId
-                    + ", B " + (tb != null ? tb.StringId : "-") + ", L " + (tl != null ? tl.StringId : "-") + ", od obozu " + best.ToString("0.0", Inv) + " jedn.)");
+                    + ", B " + (tb != null ? tb.StringId : "-") + ", L " + (tl != null ? tl.StringId : "-") + ", D " + (tdz != null ? tdz.StringId : "-")
+                    + ", od obozu " + best.ToString("0.0", Inv) + " jedn.)");
             try
             {
                 _bands.Clear();
@@ -427,16 +457,70 @@ namespace Armoury
                     ok &= t;
                     pts.Add("T6 " + (t ? "TAK" : "NIE") + " (grupa " + (g != null ? "TAK" : "NIE") + ", kryjowka " + (lair != null ? lair.StringId : "-") + ")");
                 }
+                // ---------------- T14 (p7-pochodzenie): zolnierz-dezerter wziety z bandy - migawka, wpis, grupa z kultura bandy, kryjowka bandy, rozmowa, przyciecie
+                if (tdz == null) pts.Add("T14 POMINIETY (brak zwyklego zolnierza, ktorego gracz nie trzyma)"); else
+                {
+                    _used.Remove(kA);   // slot rodzaju bandy wolny (jak nowa doba) - dezerter z bandy kultury C ma klucz limitu A
+                    Settlement lair = null; float ld = float.MaxValue;
+                    foreach (var h in Hideout.All)
+                    {
+                        var st = h != null ? h.Settlement : null;
+                        if (!Open(st)) continue;
+                        float d = st.GetPosition2D.Distance(at);
+                        if (d < ld) { ld = d; lair = st; }
+                    }
+                    const string bid = "test_dezerter";
+                    string dk = Clean(tdz.StringId);
+                    var sn = new Snap { Event = null, Before = Troops(r), Bands = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal), Losers = 1 };
+                    sn.Bands[bid] = new Dictionary<string, int>(StringComparer.Ordinal) { { tdz.StringId, 3 } };
+                    r.AddToCounts(tdz, 3, false, 1);   // jak ekran jencow: 3 wzietych, 1 ranny
+                    var band = new Band { Day = today, Culture = Clean(c.StringId), Hideout = lair != null ? Clean(lair.StringId) : "", Party = bid, X = at.x, Y = at.y };
+                    int got = NoteOrigins(sn, new Dictionary<string, Band>(StringComparer.Ordinal) { { bid, band } }, today);
+                    Origin o;
+                    _origins.TryGetValue(dk, out o);
+                    var g = Find(dk);
+                    bool rec = got == 3 && o != null && o.Count == 3 && o.Party == bid && o.Culture == band.Culture && o.Hideout == band.Hideout;
+                    bool grp = g != null && g.Origin == o && g.Deserter && g.Culture == c && g.PersonCulture == tdz.Culture && g.Healthy == 2 && g.Wounded == 1 && LimitKey(g) == kA;
+                    string src = null, w = null, wl = null; Band m = null;
+                    var lt = g != null ? Target(g, out src, out m, out w, out wl) : null;
+                    bool tgt = g != null && (lair != null ? lt == lair && src == "banda" : lt == null || src == "kultura");
+                    var res = Act(g, false, 0f);
+                    bool act = res.Refused ? lair == null && res.RefuseWhy != "limit" && res.RefuseWhy != "brak grupy"
+                                           : res.Talked && (lair == null || (res.Lair == lair && res.Source == "banda"));
+                    r.AddToCounts(tdz, -1);   // sprzedaz jednego zdrowego
+                    var g2 = Find(dk);
+                    bool cut = g2 != null && g2.Healthy + g2.Wounded == 2 && o != null && o.Count == 2;
+                    var left = CountOf(tdz);
+                    if (left.H + left.W > 0) r.AddToCounts(tdz, -(left.H + left.W), false, -left.W);   // ucieczka reszty
+                    bool gone = Find(dk) == null && !_origins.ContainsKey(dk);
+                    // przyrost rodzaju, ktorego zadna z dwoch pokonanych band nie miala w skladzie - bez wpisu (nie zgadujemy)
+                    var sn2 = new Snap { Event = null, Before = Troops(r), Bands = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal), Losers = 2 };
+                    sn2.Bands["test_a"] = new Dictionary<string, int>(StringComparer.Ordinal);
+                    sn2.Bands["test_b"] = new Dictionary<string, int>(StringComparer.Ordinal);
+                    r.AddToCounts(tdz, 1);
+                    var bandB = new Band { Day = today, Culture = band.Culture, Hideout = band.Hideout, Party = "test_b", X = band.X, Y = band.Y };
+                    int got2 = NoteOrigins(sn2, new Dictionary<string, Band>(StringComparer.Ordinal) { { "test_a", band }, { "test_b", bandB } }, today);
+                    bool skip = got2 == 0 && !_origins.ContainsKey(dk);
+                    r.AddToCounts(tdz, -1);
+                    _origins.Remove(dk);
+                    bool t = rec && grp && tgt && act && cut && gone && skip;
+                    ok &= t;
+                    pts.Add("T14 " + YN(t) + " (D " + tdz.StringId + ", kultura D " + (tdz.Culture != null ? tdz.Culture.StringId : "-") + ", kryjowka bandy " + (lair != null ? lair.StringId : "brak")
+                            + ", wpis " + YN(rec) + " (wpisanych " + got + "), grupa " + YN(grp) + (g != null ? " (" + g.Healthy + "/" + g.Wounded + ", kultura " + (g.Culture != null ? g.Culture.StringId : "-")
+                            + ", dezerter " + YN(g.Deserter) + ")" : " (brak)") + ", Target " + (lt != null ? lt.StringId + " skad " + src : "brak: " + (wl ?? "-")) + " " + YN(tgt)
+                            + ", rozmowa " + (res.Refused ? "odmowa " + res.RefuseWhy : res.Talked ? "MOWI skad " + res.Source : "MILCZY") + " " + YN(act)
+                            + ", przyciecie " + YN(cut) + ", wpis znika " + YN(gone) + ", obcy przyrost bez wpisu " + YN(skip) + ")");
+                }
             }
             catch (Exception e) { ok = false; pts.Add("WYJATEK " + e.GetType().Name); Stumble("TestRun", e); }
             // ---------------- sprzatanie
             bool clean = true;
             try
             {
-                foreach (var t in new[] { ta, tb, tl })
+                foreach (var t in new[] { ta, tb, tl, tdz })
                 {
                     if (t == null) continue;
-                    Cnt was = t == ta ? a0 : t == tb ? bb0 : l0, now = CountOf(t);
+                    Cnt was = t == ta ? a0 : t == tb ? bb0 : t == tl ? l0 : d0, now = CountOf(t);
                     int dh = Math.Max(0, now.H - was.H), dw = Math.Max(0, now.W - was.W);
                     if (dh + dw > 0) r.AddToCounts(t, -(dh + dw), false, -dw);
                     var fin = CountOf(t);
@@ -455,6 +539,8 @@ namespace Armoury
             foreach (var kv in usedStash) _used[kv.Key] = kv.Value;
             foreach (var k in seenKeys) _seen.Remove(k);
             foreach (var kv in seenStash) _seen[kv.Key] = kv.Value;
+            foreach (var k in seenKeys) _origins.Remove(k);   // p7-pochodzenie: wpisy gracza wrocone
+            foreach (var kv in originStash) _origins[kv.Key] = kv.Value;
             // m110-okolica: probne wskazowki zdjete; wskazowki prob (H2 z T1, ewentualne z T4/T5) zostaja jako slad biegu (jak w 104 wypatrzona H2 z flaga)
             int probes = 0;
             var keepHints = new List<string>();
@@ -483,11 +569,16 @@ namespace Armoury
             // ---------------- T9: zapis tam i z powrotem
             try
             {
-                string ex = Write(_bands, _used, _sum, _seen, _hints);
-                var bands = new List<Band>(); var used = new Dictionary<string, int[]>(StringComparer.Ordinal); var sum = new int[_sum.Length]; int bad, badH; bool hp;
+                // p7-pochodzenie: wpisy gracza + probny (siodma czesc)
+                var oo = new Dictionary<string, Origin>(_origins, StringComparer.Ordinal);
+                if (!oo.ContainsKey("test_probe") && oo.Count < OriginMax)
+                    oo["test_probe"] = new Origin { Troop = "test_probe", Day = today - 2, Culture = Clean(c.StringId), Hideout = Clean(h1.StringId), X = 12.5f, Y = -3.5f, Party = "test_band_1", Count = 4 };
+                string ex = Write(_bands, _used, _sum, _seen, _hints, oo);
+                var bands = new List<Band>(); var used = new Dictionary<string, int[]>(StringComparer.Ordinal); var sum = new int[_sum.Length]; int bad, badH, badO; bool hp, op;
                 var seen = new Dictionary<string, int>(StringComparer.Ordinal);
                 var hints = new Dictionary<string, Hint>(StringComparer.Ordinal);
-                bool parsed = Parse(ex, bands, used, sum, seen, hints, out bad, out badH, out hp);
+                var origins = new Dictionary<string, Origin>(StringComparer.Ordinal);
+                bool parsed = Parse(ex, bands, used, sum, seen, hints, out bad, out badH, out hp, origins, out badO, out op);
                 bool same = parsed && bad == 0 && bands.Count == _bands.Count && used.Count == _used.Count && seen.Count == _seen.Count;
                 for (int i = 0; same && i < sum.Length; i++) same = sum[i] == _sum[i];
                 foreach (var kv in _seen) { int d; if (!seen.TryGetValue(kv.Key, out d) || d != kv.Value) same = false; }
@@ -500,10 +591,19 @@ namespace Armoury
                     if (!hints.TryGetValue(kv.Key, out q) || q.Ref != h.Ref || q.Src != h.Src || Math.Abs(q.Due - h.Due) > 1e-3 || Math.Abs(q.Start - h.Start) > 1e-3
                         || Math.Abs(q.X - h.X) > 1e-3f || Math.Abs(q.Y - h.Y) > 1e-3f || q.Pinned != PinNow(h)) hs = false;
                 }
-                same &= hs && sum.Length == 8;
+                bool os = op && badO == 0 && origins.Count == oo.Count;   // p7-pochodzenie: rodzaj, doba, kultura, kryjowka, banda, liczba, punkt +-0.06 (zapis 0.0)
+                foreach (var kv in oo)
+                {
+                    Origin q;
+                    var x = kv.Value;
+                    if (!origins.TryGetValue(kv.Key, out q) || q.Day != x.Day || q.Culture != x.Culture || q.Hideout != x.Hideout || q.Party != x.Party || q.Count != x.Count
+                        || Math.Abs(q.X - x.X) > 0.06f || Math.Abs(q.Y - x.Y) > 0.06f) os = false;
+                }
+                same &= hs && os && sum.Length == 8;
                 ok &= same;
                 pts.Add("T9 " + (same ? "TAK" : "NIE") + " (" + ex.Length + " znakow, pamiec " + bands.Count + "/" + _bands.Count + ", uzycia " + used.Count + "/" + _used.Count
-                        + ", kajdany " + seen.Count + "/" + _seen.Count + ", wskazowki " + hints.Count + "/" + _hints.Count + " (zgodne " + YN(hs) + "), sum " + sum.Length + ", zlych " + (bad + badH) + ")");
+                        + ", kajdany " + seen.Count + "/" + _seen.Count + ", wskazowki " + hints.Count + "/" + _hints.Count + " (zgodne " + YN(hs) + "), pochodzenie " + origins.Count + "/" + oo.Count
+                        + " (zgodne " + YN(os) + "), sum " + sum.Length + ", zlych " + (bad + badH + badO) + ")");
             }
             catch (Exception e) { ok = false; pts.Add("T9 NIE (wyjatek " + e.GetType().Name + ")"); Stumble("TestT9", e); }
             pts.Add("sprzatanie " + (clean ? "TAK" : "NIE") + " (Mercy xp przed proba " + mercy0 + ", teraz " + MercyXp() + ")"

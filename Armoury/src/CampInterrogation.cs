@@ -9,11 +9,13 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Core.ImageIdentifiers;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 
 namespace Armoury
 {
@@ -53,6 +55,21 @@ namespace Armoury
     ///    oddaje sakiewke graczowi (gra przy smierci daje ja glowie klanu, a bez glowy GiveGoldAction z odbiorca null - zloto przepadloby); log "sakiewka N -> gracz".
     /// Log "Przesluchanie (m109): " - start sesji, pamiec (pierwsze DetailMax na sesje), kazda proba i odmowa, linia doby; tools/sprawdz_logi.py --grupa m109przes.
     /// Bledy liczone per miejsce (pierwsze 3 i co 50. do Log.Error), nic nie gasimy. Autotest (flaga armoury-przesluch.flag) - CampInterrogation.Test.cs.
+    /// p7-pochodzenie (Jeff 25.10 ok. 02:50 "nie dziala przesluchanie jencow", CHANGELOG 120): bandy swiata Jeffa to dezerterzy i zolnierze z puli wyrzutkow
+    /// (OutlawLaw.Draw), a prosci w bandzie to "looter" (kultura bez kryjowek) - zaden jeniec nie byl "bandyta", opcja byla ukryta. Teraz POCHODZENIE JENCA:
+    ///  - MIGAWKA: CampaignEvents.OnPlayerBattleEndEvent (PlayerEncounter.DoApplyMapEventResults, PRZED CalculateAndCommitMapEventResults - jency bitwy ida do
+    ///    PlayerEncounter.RosterToReceiveLootPrisoners ze skladu pokonanych, MapEvent.CaptureDefeatedPartyMembers) przy wygranej gracza z banda: loch gracza
+    ///    (zwykli wedlug StringId) i sklad kazdej pokonanej bandy. Ekran jencow (DoLootMembersAndPrisonersOfParty) zamyka sie PRZED MapEventEnded
+    ///    (DoEnd -> Finish -> FinalizeBattle -> MapEvent.FinalizeEvent), wiec w OnMapEventEnded wzieci jency sa juz w lochu.
+    ///  - WPIS (zapis arm_interrogation, siodma czesc): przyrost rodzaju w lochu wobec migawki = jency z bandy, ktora miala najwiecej ludzi tego rodzaju (jedna
+    ///    pokonana partia - ona); rodzaj -> wpis bandy z pamieci (kultura bandy, kryjowka, miejsce, doba, banda) i liczba ludzi. Jeden wpis na rodzaj: nowa
+    ///    banda tego rodzaju - dane najnowszej, liczba sie sumuje. Liczba przycinana do stanu lochu (sprzedaz, ucieczka, okup, smierc), rodzaju juz nie ma - wpis
+    ///    odpada; najwyzej OriginMax wpisow (najstarsze odpadaja).
+    ///  - GRUPA: zwykly zolnierz z wpisem (dezerter z bandy) - stos najwyzej liczby z wpisu, Culture = kultura bandy (kryjowki, limit doby), PersonCulture =
+    ///    jego kultura; bandyta z wpisem - caly stos, kultura bandy (looter z bandy robber_knights wskaze kryjowke tej bandy). Bez wpisu - jak dotad.
+    ///    Kryjowka: (b) z wpisu (nie z pamieci kultury), (c) najblizsza kultury bandy od miejsca bitwy z wpisu.
+    ///  - OPCJA: jency w lochu, ale zaden z bandy - opcja SZARA z powodem (WhyNoOutlaws) zamiast ukrycia; pusty loch - ukryta jak dotad.
+    ///  Jency wzieci przed ta wersja nie maja wpisu (nie zgadujemy ich bandy - "nic z niczego"). PrisonerLaw.Criminal bez zmian (dezerter z bandy nie idzie na Mur).
     /// </summary>
     internal static partial class CampInterrogation
     {
@@ -69,7 +86,9 @@ namespace Armoury
         internal const int MercyTorture = -20, MercyDeath = -40, RelationDeath = -2;
         internal const float LairRange = 160f;
         internal const int MemoryMax = 30, MemoryDays = 60, DetailMax = 10, SeenMax = 200;
+        internal const int OriginMax = 60, OriginDetailMax = 30;   // p7-pochodzenie: wpisow pochodzenia (rodzajow), linii "pochodzenie - banda" na sesje
 
+        internal const string WhyNoOutlaws = "None of the men you hold rode with outlaws.";   // p7-pochodzenie: opcja szara - jency sa, zaden z bandy
         internal const string WhyNoKind = "Outlaws of this kind keep no lair - they live off the road.";
         internal const string WhyAllKnown = "Every lair of his people that he could know of is already known to you.";
         internal const string WhyNoneNear = "He knows of no lair of his people anywhere near.";
@@ -85,9 +104,23 @@ namespace Armoury
         private static readonly int[] _sum = new int[8];
         private static string _importNote = "brak klucza (stary zapis albo nowa kampania)";
 
+        // p7-pochodzenie: rodzaj jenca (Clean(StringId)) -> banda, z ktorej go wzieto (zapis arm_interrogation, siodma czesc)
+        internal sealed class Origin { public string Troop = "", Culture = "", Hideout = "", Party = ""; public int Day, Count; public float X, Y; }
+        private static readonly Dictionary<string, Origin> _origins = new Dictionary<string, Origin>(StringComparer.Ordinal);
+        // migawka z OnPlayerBattleEndEvent (bez zapisu - czas stoi do MapEventEnded tej samej bitwy): loch gracza i sklad pokonanych band
+        internal sealed class Snap
+        {
+            public MapEvent Event;
+            public Dictionary<string, int> Before;                          // StringId zwyklego jenca -> liczba w lochu gracza przed bitwa
+            public Dictionary<string, Dictionary<string, int>> Bands;       // Clean(StringId bandy) -> StringId zwyklego -> liczba w skladzie
+            public int Losers;                                              // partii po stronie pokonanej
+        }
+        private static Snap _snap;
+
         // liczniki doby i sesji
         private static int _dTalk, _dTalkYes, _dTort, _dTortYes, _dDeadMen, _dDeadHero, _dBlocked, _dRevHero, _dRevBand, _dRevKin, _dMemNew, _dRefused, _dStumbles;
-        private static int _stumbles, _detail, _sessionDays;
+        private static int _dOBattles, _dOMen, _dOSkip, _dONoSnap, _dOGrey;   // p7-pochodzenie: bitwy z wpisami, ludzi wpisanych, bez bandy, bez migawki, opcja szara
+        private static int _stumbles, _detail, _sessionDays, _oDetail;
         private static readonly Dictionary<string, int> _stumbleAt = new Dictionary<string, int>(StringComparer.Ordinal);
 
         private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
@@ -104,6 +137,7 @@ namespace Armoury
         internal static void Reset()
         {
             _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length);
+            _origins.Clear(); _snap = null;   // p7-pochodzenie
             _importNote = "brak klucza (stary zapis albo nowa kampania)";
             HintsClear(); _hintNote = "brak klucza (stary zapis albo nowa kampania)";   // m110-okolica
             TestReset();
@@ -113,6 +147,7 @@ namespace Armoury
         private static void DayReset()
         {
             _dTalk = _dTalkYes = _dTort = _dTortYes = _dDeadMen = _dDeadHero = _dBlocked = _dRevHero = _dRevBand = _dRevKin = _dMemNew = _dRefused = _dStumbles = 0;
+            _dOBattles = _dOMen = _dOSkip = _dONoSnap = _dOGrey = 0;   // p7-pochodzenie
             HintDayReset();   // m110-okolica
         }
 
@@ -122,11 +157,13 @@ namespace Armoury
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(b, delegate { try { Reset(); } catch (Exception e) { Stumble("Reset", e); } });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(b, delegate (CampaignGameStarter s)
             {
-                try { _stumbles = 0; _stumbleAt.Clear(); _detail = 0; _sessionDays = 0; _hStumbles = 0; DayReset(); if (s != null) AddMenus(s); SessionStart(); }
+                try { _stumbles = 0; _stumbleAt.Clear(); _detail = 0; _oDetail = 0; _sessionDays = 0; _hStumbles = 0; DayReset(); if (s != null) AddMenus(s); SessionStart(); }
                 catch (Exception e) { Stumble("SessionStart", e); }
                 try { HintsSessionStart(); } catch (Exception e) { HintStumble("HintStart", e); }   // m110-okolica: znaczniki wskazowek z zapisu, linia startu m110 (po linii m109)
             });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(b, delegate { try { Daily(); } catch (Exception e) { Stumble("Daily", e); } });
+            // p7-pochodzenie: migawka lochu i skladu pokonanych band przed rozdzialem jencow bitwy gracza (para z OnMapEventEnded tej samej bitwy)
+            CampaignEvents.OnPlayerBattleEndEvent.AddNonSerializedListener(b, delegate (MapEvent me) { try { OnPlayerBattleEnd(me); } catch (Exception e) { _snap = null; Stumble("PlayerBattleEnd", e); } });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(b, DayProfile.MapEnd("CampInterrogation.OnMapEventEnded", OnMapEventEnded));
             // m110-okolica: koniec wskazowek (przeglad godzinny i zdarzenie wypatrzenia gry), znaczniki obszaru poza zapisem gry (zdjete przed zapisem, oddane po nim)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(b, DayProfile.Hr("CampInterrogation.Hints", delegate { try { HintsHour(); } catch (Exception e) { HintStumble("HintHour", e); } }));
@@ -164,22 +201,174 @@ namespace Armoury
                 if (lose == null || lose.Parties == null) return;
                 Vec2 pos = me.Position.ToVec2();
                 int today = Today;
+                var made = new Dictionary<string, Band>(StringComparer.Ordinal);   // p7-pochodzenie: Clean(StringId bandy) -> jej nowy wpis pamieci
                 foreach (var mep in lose.Parties)
                 {
                     var m = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
                     if (m == null || !m.IsBandit) continue;
-                    try { Remember(m, pos, today); }
+                    try { var b = Remember(m, pos, today); if (b != null && b.Party.Length > 0) made[b.Party] = b; }
                     catch (Exception e) { Stumble("Remember", e); }
+                }
+                // p7-pochodzenie: jency tej bitwy (ekran jencow juz zamkniety - PlayerEncounter.DoEnd -> FinalizeEvent) wobec migawki z OnPlayerBattleEndEvent
+                var sn = _snap;
+                _snap = null;
+                if (made.Count > 0)
+                {
+                    if (sn != null && sn.Event == me) { try { NoteOrigins(sn, made, today); } catch (Exception e) { Stumble("Origins", e); } }
+                    else _dONoSnap++;
                 }
             }
             catch (Exception e) { Stumble("OnMapEventEnded", e); }
         }
 
-        private static void Remember(MobileParty m, Vec2 pos, int today)
+        // ------------------------------------------------------------ p7-pochodzenie: z jakiej bandy jest jeniec
+        /// <summary>Zwykli (bez bohaterow) roster wedlug StringId -> liczba.</summary>
+        internal static Dictionary<string, int> Troops(TroopRoster r)
+        {
+            var d = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (r == null) return d;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                var ch = el.Character;
+                if (ch == null || ch.IsHero || el.Number <= 0 || ch.StringId == null) continue;
+                int n;
+                d.TryGetValue(ch.StringId, out n);
+                d[ch.StringId] = n + el.Number;
+            }
+            return d;
+        }
+
+        /// <summary>OnPlayerBattleEndEvent (przed rozdzialem jencow): przy wygranej gracza z banda migawka lochu gracza i skladu pokonanych band; inaczej brak migawki.</summary>
+        private static void OnPlayerBattleEnd(MapEvent me)
+        {
+            _snap = null;
+            if (!On || me == null) return;
+            var ps = PlayerSideOf(me);
+            if (ps == BattleSideEnum.None) return;
+            var win = me.WinningSide;
+            if (win == BattleSideEnum.None || ps != win) return;
+            var lose = win == BattleSideEnum.Attacker ? me.DefenderSide : me.AttackerSide;
+            if (lose == null || lose.Parties == null) return;
+            var bands = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
+            foreach (var mep in lose.Parties)
+            {
+                var m = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
+                if (m == null || !m.IsBandit) continue;
+                bands[Clean(m.StringId ?? "")] = Troops(m.MemberRoster);   // MapEvent.CaptureDefeatedPartyMembers bierze jencow wlasnie z MemberRoster
+            }
+            if (bands.Count == 0) return;
+            var mp = MobileParty.MainParty;
+            if (mp == null || mp.PrisonRoster == null) return;
+            TrimOrigins(mp.PrisonRoster);   // stan lochu przed bitwa: sprzedani, zbiegli, wykupieni od ostatniej linii doby
+            _snap = new Snap { Event = me, Before = Troops(mp.PrisonRoster), Bands = bands, Losers = lose.Parties.Count };
+        }
+
+        /// <summary>Przyrost lochu wobec migawki = jency tej bitwy; kazdy rodzaj do bandy, ktora miala go najwiecej w skladzie (jedna pokonana partia - ona).
+        /// Zwraca ludzi wpisanych (gra i test).</summary>
+        internal static int NoteOrigins(Snap sn, Dictionary<string, Band> made, int today)
+        {
+            var mp = MobileParty.MainParty;
+            if (sn == null || made == null || made.Count == 0 || mp == null || mp.PrisonRoster == null) return 0;
+            var now = Troops(mp.PrisonRoster);
+            Band only = null;
+            if (made.Count == 1 && sn.Losers == 1) foreach (var b in made.Values) only = b;
+            int men = 0, skip = 0;
+            var per = new Dictionary<Band, List<string>>();
+            foreach (var kv in now)
+            {
+                int before;
+                sn.Before.TryGetValue(kv.Key, out before);
+                int d = kv.Value - before;
+                if (d <= 0) continue;
+                Band best = null; int bn = 0;
+                foreach (var bk in sn.Bands)
+                {
+                    Band b; int c;
+                    if (!made.TryGetValue(bk.Key, out b) || !bk.Value.TryGetValue(kv.Key, out c) || c <= bn) continue;
+                    bn = c; best = b;
+                }
+                if (best == null) best = only;
+                var ch = best != null ? MBObjectManager.Instance.GetObject<CharacterObject>(kv.Key) : null;
+                if (best == null || ch == null || PeopleBook.IsWight(ch)) { skip += d; continue; }
+                AddOrigin(kv.Key, best, d, kv.Value, today);
+                men += d;
+                List<string> l;
+                if (!per.TryGetValue(best, out l)) { l = new List<string>(); per[best] = l; }
+                if (l.Count < 12) l.Add(Clean(kv.Key) + " " + d + (BanditTroop(ch) ? " (bandyta)" : ""));
+            }
+            _dOMen += men; _dOSkip += skip;
+            if (men > 0) _dOBattles++;
+            foreach (var kv in per)
+            {
+                if (_oDetail >= OriginDetailMax) break;
+                _oDetail++;
+                var b = kv.Key;
+                Log.Info(P + "pochodzenie - banda " + b.Party + " (kultura " + b.Culture + ", kryjowka " + (b.Hideout.Length > 0 ? b.Hideout : "brak") + ") | doba " + today
+                         + " | jency z bandy: " + string.Join(", ", kv.Value.ToArray()) + " | bez bandy " + skip + " | wpisow " + _origins.Count + ".");
+            }
+            if (men == 0 && skip > 0 && _oDetail < OriginDetailMax)
+            {
+                _oDetail++;
+                Log.Info(P + "pochodzenie - bitwa z banda, jencow " + skip + " bez bandy (zadna pokonana banda nie miala tego rodzaju) | doba " + today + " | wpisow " + _origins.Count + ".");
+            }
+            return men;
+        }
+
+        /// <summary>Wpis pochodzenia rodzaju: dane bandy (najnowszej), liczba += d, najwyzej stan lochu (inLoch).</summary>
+        private static void AddOrigin(string troopId, Band b, int d, int inLoch, int today)
+        {
+            string k = Clean(troopId);
+            Origin o;
+            if (!_origins.TryGetValue(k, out o))
+            {
+                while (_origins.Count >= OriginMax)
+                {
+                    string old = null; int od = int.MaxValue;
+                    foreach (var kv in _origins) if (kv.Value.Day < od) { od = kv.Value.Day; old = kv.Key; }
+                    if (old == null) break;
+                    _origins.Remove(old);
+                }
+                o = new Origin { Troop = k };
+                _origins[k] = o;
+            }
+            o.Day = today; o.Culture = b.Culture; o.Hideout = b.Hideout; o.Party = b.Party; o.X = b.X; o.Y = b.Y;
+            o.Count = Math.Max(0, Math.Min(inLoch, o.Count + d));
+        }
+
+        /// <summary>Liczba wpisow najwyzej stan lochu gracza (sprzedaz, ucieczka, okup, smierc); rodzaju juz nie ma - wpis odpada.</summary>
+        private static void TrimOrigins(TroopRoster r)
+        {
+            if (_origins.Count == 0) return;
+            var now = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var kv in Troops(r)) { int n; now.TryGetValue(Clean(kv.Key), out n); now[Clean(kv.Key)] = n + kv.Value; }
+            List<string> gone = null;
+            foreach (var kv in _origins)
+            {
+                int n;
+                now.TryGetValue(kv.Key, out n);
+                if (n <= 0 || kv.Value.Count <= 0) { if (gone == null) gone = new List<string>(); gone.Add(kv.Key); }
+                else if (kv.Value.Count > n) kv.Value.Count = n;
+            }
+            if (gone != null) foreach (var k in gone) _origins.Remove(k);
+        }
+
+        private static CultureObject CultureOf(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            try { return MBObjectManager.Instance.GetObject<CultureObject>(id); } catch { return null; }
+        }
+
+        private static Band OriginBand(Origin o)
+        {
+            return new Band { Day = o.Day, Culture = o.Culture, Hideout = o.Hideout, Party = o.Party, X = o.X, Y = o.Y };
+        }
+
+        private static Band Remember(MobileParty m, Vec2 pos, int today)
         {
             var clan = m.ActualClan;
             var cul = BandCulture(clan) ?? (m.Party != null ? m.Party.Culture : null);
-            if (cul == null || string.IsNullOrEmpty(cul.StringId)) return;
+            if (cul == null || string.IsNullOrEmpty(cul.StringId)) return null;
             var hc = m.BanditPartyComponent;
             var hs = hc != null && hc.Hideout != null ? hc.Hideout.Settlement : null;
             string id = m.StringId ?? "";
@@ -196,6 +385,7 @@ namespace Armoury
                          + " (zajeta " + (hs != null && hs.Hideout != null && hs.Hideout.IsInfested ? "TAK" : "NIE") + ") | miejsce " + pos.x.ToString("0.0", Inv) + "," + pos.y.ToString("0.0", Inv)
                          + " | doba " + today + " | pamiec " + _bands.Count + ".");
             }
+            return b;
         }
 
         private static string Clean(string s)
@@ -240,6 +430,8 @@ namespace Armoury
             public int Healthy, Wounded, Tier;
             public CultureObject Culture;         // kultura kryjowek (bohater: kultura klanu bandytow)
             public CultureObject PersonCulture;   // kultura rozmowcy (premia przywodcy w mierze perswazji)
+            public Origin Origin;                 // p7-pochodzenie: wpis bandy, z ktorej go wzieto (null - bez wpisu)
+            public bool Deserter;                 // p7-pochodzenie: zwykly zolnierz (nie bandyta) wziety z bandy
         }
 
         internal static bool BanditTroop(CharacterObject ch)
@@ -261,13 +453,15 @@ namespace Armoury
             return Math.Max(1, Math.Min(TierMax, t));
         }
 
-        /// <summary>Grupy jencow-bandytow w lochu partii gracza (stos rodzaju albo bohater).</summary>
+        /// <summary>Grupy jencow-bandytow w lochu partii gracza (stos rodzaju albo bohater). p7-pochodzenie: takze zwykly zolnierz z wpisem pochodzenia (dezerter
+        /// z bandy - najwyzej liczba z wpisu) i bandyta z wpisem (caly stos) - kultura bandy z wpisu.</summary>
         internal static List<Group> Groups()
         {
             var res = new List<Group>();
             var mp = MobileParty.MainParty;
             var r = mp != null ? mp.PrisonRoster : null;
             if (r == null) return res;
+            try { TrimOrigins(r); } catch (Exception e) { Stumble("TrimOrigins", e); }
             for (int i = 0; i < r.Count; i++)
             {
                 var el = r.GetElementCopyAtIndex(i);
@@ -285,10 +479,17 @@ namespace Armoury
                     }
                     else
                     {
-                        if (!BanditTroop(ch)) continue;
-                        int wn = Math.Max(0, Math.Min(el.Number, el.WoundedNumber));
-                        res.Add(new Group { Key = Clean(ch.StringId), Name = ch.Name.ToString(), Troop = ch, Healthy = el.Number - wn, Wounded = wn, Tier = TierOf(ch),
-                                            Culture = ch.Culture, PersonCulture = ch.Culture });
+                        bool bandit = BanditTroop(ch);
+                        Origin o = null;
+                        CultureObject oc = null;
+                        if (_origins.Count > 0 && _origins.TryGetValue(Clean(ch.StringId), out o) && o.Count > 0 && !PeopleBook.IsWight(ch)) oc = CultureOf(o.Culture);
+                        if (oc == null) o = null;
+                        if (!bandit && o == null) continue;
+                        int num = bandit ? el.Number : Math.Min(el.Number, o.Count);   // dezerter: tylko ludzie z bandy (reszta stosu - z innych bitew)
+                        if (num <= 0) continue;
+                        int wn = Math.Max(0, Math.Min(num, el.WoundedNumber));
+                        res.Add(new Group { Key = Clean(ch.StringId), Name = ch.Name.ToString(), Troop = ch, Healthy = num - wn, Wounded = wn, Tier = TierOf(ch),
+                                            Culture = oc ?? ch.Culture, PersonCulture = ch.Culture, Origin = o, Deserter = !bandit });
                     }
                 }
                 catch (Exception e) { Stumble("Groups", e); }
@@ -357,7 +558,7 @@ namespace Armoury
                 if (Open(born)) { source = "bohater"; mem = Memory(g.Culture, upTo); return born; }
             }
             var c = g.Culture;
-            mem = Memory(c, upTo);
+            mem = g.Origin != null ? OriginBand(g.Origin) : Memory(c, upTo);   // p7-pochodzenie: jeniec z wpisem zna SWOJA bande (wpis), nie najnowsza bande kultury
             if (mem != null && mem.Hideout.Length > 0)
             {
                 var st = Settlement.Find(mem.Hideout);
@@ -613,7 +814,9 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Xp", e); }
 
-            Log.Info(P + "proba " + kind + " | doba " + today + " | grupa " + g.Key + " (" + g.Name + ", kultura " + (g.Culture != null ? g.Culture.StringId : "-") + ", tier " + g.Tier
+            // p7-pochodzenie: pochodzenie w polu nazwy (PRZES-2 czyta je jako (.*?) - format linii bez zmian)
+            string who = g.Origin != null ? g.Name + " - z bandy " + g.Origin.Party + (g.Deserter ? " (dezerter)" : "") : g.Name;
+            Log.Info(P + "proba " + kind + " | doba " + today + " | grupa " + g.Key + " (" + who + ", kultura " + (g.Culture != null ? g.Culture.StringId : "-") + ", tier " + g.Tier
                      + ", bohater " + (g.Hero != null ? "TAK" : "NIE") + ", wybrany " + (o.PickWounded ? "ranny" : "zdrowy") + ", w niewoli " + o.ChainsDays + " dob, przed " + h0 + "/" + w0 + ")"
                      + " | miara " + pp.Total + " (" + Persuasion.LogText(pp) + ") | " + OddsLog(o) + " | rzut " + F4(res.Roll) + " -> " + (res.Talked ? "MOWI" : "MILCZY")
                      + " | " + lairLog + " | " + deathLog + " | po " + h1 + "/" + w1 + " | " + mercyLog + " | " + relLog + " | plotka " + rumourLog
@@ -640,6 +843,7 @@ namespace Armoury
                 {
                     var r = mp.PrisonRoster;
                     r.AddToCounts(g.Troop, -1, false, wounded ? -1 : 0);
+                    if (g.Origin != null && g.Origin.Count > 0) g.Origin.Count--;   // p7-pochodzenie: zmarl czlowiek z bandy (przyciecie do lochu by tego nie wiedzialo)
                     PeopleBook.DieShares(PeopleBook.Take(r, 1, PeopleBook.FDieExec), PeopleBook.FDieExec);
                     res.Died = true; _dDeadMen++; _sum[4]++;
                     return "TAK (zwykly, ksiega ludzi straceni 1)";
@@ -696,13 +900,15 @@ namespace Armoury
         /// <summary>Tekst okna wyniku (EN).</summary>
         private static string Story(Group g, bool torture, Result r, Band mem)
         {
-            if (r.Talked && r.Area) return AreaStory(torture, r, mem);   // m110-okolica
+            if (r.Talked && r.Area) return AreaStory(torture, r, mem, g.Deserter);   // m110-okolica
             string mark = r.Flag ? " It is marked on your map." : " It now shows on your map.";
             string lair = "";
             if (r.Talked)
             {
                 if (r.Source == "bohater") lair = "their lair lies " + r.Where + " - the den his band holds.";
                 else if (r.Source == "banda") lair = "their lair lies " + r.Where + " - his own band's den.";
+                else if (g.Deserter && mem != null && mem.Hideout.Length == 0) lair = "the band he rode with had no lair of its own, but he names one of its kind's: " + r.Where + ".";   // p7-pochodzenie
+                else if (g.Deserter) lair = "he names a lair of the outlaws he rode with: " + r.Where + ".";
                 else if (mem != null && mem.Hideout.Length == 0) lair = "his band had no lair of its own, but he names one of his people's: " + r.Where + ".";
                 else lair = "he names a lair of his people: " + r.Where + ".";
             }
@@ -712,13 +918,15 @@ namespace Armoury
         }
 
         /// <summary>m110-okolica: tekst okna wyniku, gdy jeniec podal okolice (EN).</summary>
-        private static string AreaStory(bool torture, Result r, Band mem)
+        private static string AreaStory(bool torture, Result r, Band mem, bool deserter)
         {
             string where = r.Where ?? AreaSomewhere;
             string head = !torture ? "The man talks. " : r.Died ? "Under the irons he screams it out before he dies. " : "Under the irons he breaks. ";
             string mid;
             if (r.Source == "bohater") mid = "He gives up the den his band holds: " + where + ".";
             else if (r.Source == "banda") mid = "He gives up his own band's den: " + where + ".";
+            else if (deserter && mem != null && mem.Hideout.Length == 0) mid = "The band he rode with had no lair of its own, but he has heard of one of its kind's: " + where + ".";   // p7-pochodzenie
+            else if (deserter) mid = "He has heard of a lair of the outlaws he rode with: " + where + ".";
             else if (mem != null && mem.Hideout.Length == 0) mid = "His band had no lair of its own, but he has heard of one of his people's: " + where + ".";
             else mid = "He has heard of a lair of his people: " + where + ".";
             return head + mid + (r.Marker ? " You will have to find it yourself - the area is marked on your map." : " You will have to find it yourself.");
@@ -756,7 +964,19 @@ namespace Armoury
             {
                 if (!On) return false;
                 var gs = Groups();
-                if (gs.Count == 0) return false;   // recenzja R1: opcja tylko przy jencach-bandytach
+                if (gs.Count == 0)
+                {
+                    // p7-pochodzenie: pusty loch - ukryta (recenzja R1); jency sa, ale zaden z bandy - szara z powodem (dotad ukryta bez sladu)
+                    var mp = MobileParty.MainParty;
+                    if (mp == null || mp.PrisonRoster == null || mp.PrisonRoster.TotalManCount <= 0) return false;
+                    a.optionLeaveType = GameMenuOption.LeaveType.Conversation;
+                    a.IsEnabled = false;
+                    a.Tooltip = new TextObject("{=!}" + WhyNoOutlaws);
+                    if (_dOGrey++ == 0)
+                        Log.Info(P + "pochodzenie - opcja szara: w lochu " + mp.PrisonRoster.TotalManCount + " (zwyklych " + mp.PrisonRoster.TotalRegulars + "), zaden z bandy | wpisow "
+                                 + _origins.Count + " | doba " + Today + ".");
+                    return true;
+                }
                 a.optionLeaveType = GameMenuOption.LeaveType.Conversation;
                 string why;
                 if (!Can(out why)) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
@@ -795,11 +1015,23 @@ namespace Armoury
         {
             if (g.Hero != null) return g.Name + (g.Wounded > 0 ? " (outlaw chief, wounded)" : " (outlaw chief)");
             int n = g.Healthy + g.Wounded;
-            return g.Name + " (" + n + (g.Wounded > 0 ? ", " + g.Wounded + " wounded" : "") + ")";
+            return g.Name + " (" + n + (g.Wounded > 0 ? ", " + g.Wounded + " wounded" : "") + (g.Deserter ? ", rode with outlaws" : "") + ")";   // p7-pochodzenie
         }
 
-        private static string LairHint(string source, Band mem)
+        private static string LairHint(string source, Band mem, bool deserter)
         {
+            if (deserter)   // p7-pochodzenie: zwykly zolnierz wziety z bandy
+            {
+                if (AreaOn)
+                {
+                    if (source == "banda") return "He rode with outlaws and can tell you which way and how far to their den.";
+                    if (mem != null && mem.Hideout.Length == 0) return "The band he rode with had no lair of its own, but he may have heard where one of its kind's lies.";
+                    return "He rode with outlaws and may have heard where a lair of their kind lies.";
+                }
+                if (source == "banda") return "He rode with outlaws and knows their den.";
+                if (mem != null && mem.Hideout.Length == 0) return "The band he rode with had no lair of its own, but he knows one of its kind's.";
+                return "He rode with outlaws and may know a lair of their kind.";
+            }
             if (AreaOn)   // m110-okolica: jeniec zna tylko okolice
             {
                 if (source == "bohater") return "He can tell you which way and how far to the lair his band holds.";
@@ -837,7 +1069,7 @@ namespace Armoury
                 if (lair == null) hint.Add(w);
                 else
                 {
-                    hint.Add(LairHint(src, mem));
+                    hint.Add(LairHint(src, mem, g.Deserter));
                     hint.Add(tu ? (g.Hero != null ? "Questioned today." : "Outlaws of his kind were questioned today.") : "Talk him round: " + Pct(ot.Chance) + ".");
                     hint.Add(ru ? (g.Hero != null ? "Put to the question today." : "Outlaws of his kind were put to the question today.")
                                 : "Put him to the question: " + Pct(oo.Chance) + ", he may die (" + Pct(dc) + ").");
@@ -886,7 +1118,7 @@ namespace Armoury
                 new InquiryElement("talk", (tu ? "Talk him round (done today)" : "Talk him round (" + Pct(ot.Chance) + ")"), null, !tu, talkHint),
                 new InquiryElement("torture", (ru ? "Put him to the question (done today)" : "Put him to the question (" + Pct(oo.Chance) + ", may die " + Pct(dc) + ")"), null, !ru, tortHint)
             };
-            MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Question the prisoners: " + g.Name, LairHint(src, mem), rows, true, 1, 1, "Proceed", "Back",
+            MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Question the prisoners: " + g.Name, LairHint(src, mem, g.Deserter), rows, true, 1, 1, "Proceed", "Back",
                 delegate (List<InquiryElement> picked)
                 {
                     try
@@ -936,6 +1168,19 @@ namespace Armoury
                          + " | pamiec band " + _bands.Count + " (nowe dzis " + _dMemNew + ") | jency-bandyci grup " + gr + ", ludzi " + men + ", bohaterow " + he + ", kajdany " + _seen.Count
                          + " | potkniecia dzis " + _dStumbles + ".");
             }
+            // p7-pochodzenie: osobna linia doby (linia doby m109 bez zmian formatu - PRZES-1/PRZES-8)
+            if (_origins.Count > 0 || _dOBattles + _dOSkip + _dONoSnap + _dOGrey > 0)
+            {
+                try
+                {
+                    int og = 0, omen = 0, odes = 0;
+                    foreach (var g in Groups()) if (g.Origin != null) { og++; omen += g.Healthy + g.Wounded; if (g.Deserter) odes += g.Healthy + g.Wounded; }
+                    Log.Info(P + "pochodzenie - doba " + today + " | wpisow " + _origins.Count + " (grup w lochu " + og + ", ludzi " + omen + ", z tego dezerterow " + odes + ")"
+                             + " | dzis bitew z wpisem " + _dOBattles + ", ludzi wpisanych " + _dOMen + ", bez bandy " + _dOSkip + ", bez migawki " + _dONoSnap
+                             + " | opcja szara (zaden z bandy) odswiezen " + _dOGrey + ".");
+                }
+                catch (Exception e) { Stumble("OriginsDaily", e); }
+            }
             try { HintsDaily(today); } catch (Exception e) { HintStumble("HintDaily", e); }   // m110-okolica: linia doby wskazowek
             DayReset();
         }
@@ -974,18 +1219,21 @@ namespace Armoury
         /// <summary>"1|doba,kultura,kryjowka,x,y,banda;...|klucz,dobaR,dobaT;...|rozmowy,mowili,tortury,mowili,zmarli,ujawnione|stos,doba;..." (ponizej 4 KB
         /// pamieci i uzyc + kajdany najwyzej SeenMax wpisow, ok. 8 KB; limit napisu 32 KB); piata czesc (kajdany) opcjonalna przy odczycie. Klucz wylaczony i stan pusty - "".
         /// m110-okolica: sumy + wskazane, znalezione (8 liczb) i szosta czesc - wskazowki "kryjowka,odniesienie,termin,x,y,skad,wskazanie,przypiety;..." (najwyzej po
-        /// jednej na kryjowke, kilka dob - ponizej kilku KB); DLL 104 czyta czesci 1-5 i pierwsze 6 sum, szosta pomija.</summary>
+        /// jednej na kryjowke, kilka dob - ponizej kilku KB); DLL 104 czyta czesci 1-5 i pierwsze 6 sum, szosta pomija.
+        /// p7-pochodzenie: siodma czesc - pochodzenie jencow "rodzaj,doba,kultura,kryjowka,x,y,banda,liczba;..." (najwyzej OriginMax = 60 wpisow, ok. 6 KB);
+        /// DLL 111 (wgrane) czyta czesci 1-6 i siodma pomija (Parse: parts.Length > 5), zapis sprzed p7 - bez siodmej czesci, wpisow 0.</summary>
         internal static string Export()
         {
             try
             {
-                if (!On && _bands.Count == 0 && _used.Count == 0 && _seen.Count == 0 && _hints.Count == 0) return "";
-                return Write(_bands, _used, _sum, _seen, _hints);
+                if (!On && _bands.Count == 0 && _used.Count == 0 && _seen.Count == 0 && _hints.Count == 0 && _origins.Count == 0) return "";
+                return Write(_bands, _used, _sum, _seen, _hints, _origins);
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
         }
 
-        private static string Write(List<Band> bands, Dictionary<string, int[]> used, int[] sum, Dictionary<string, int> seen, Dictionary<string, Hint> hints)
+        private static string Write(List<Band> bands, Dictionary<string, int[]> used, int[] sum, Dictionary<string, int> seen, Dictionary<string, Hint> hints,
+                                    Dictionary<string, Origin> origins)
         {
             var sb = new StringBuilder("1|");
             for (int i = 0; i < bands.Count; i++)
@@ -1013,15 +1261,24 @@ namespace Armoury
             }
             sb.Append('|');
             WriteHints(sb, hints);   // m110-okolica: szosta czesc
+            sb.Append('|');
+            n = 0;
+            if (origins != null)   // p7-pochodzenie: siodma czesc
+                foreach (var o in origins.Values)
+                {
+                    if (n++ > 0) sb.Append(';');
+                    sb.Append(Clean(o.Troop)).Append(',').Append(o.Day.ToString(Inv)).Append(',').Append(Clean(o.Culture)).Append(',').Append(Clean(o.Hideout)).Append(',')
+                      .Append(o.X.ToString("0.0", Inv)).Append(',').Append(o.Y.ToString("0.0", Inv)).Append(',').Append(Clean(o.Party)).Append(',').Append(o.Count.ToString(Inv));
+                }
             return sb.ToString();
         }
 
         /// <summary>Odczyt napisu zapisu do podanych kontenerow (Import i proba testu). Zle wpisy pominiete i policzone; false - nieznany format.
         /// m110-okolica: szosta czesc (wskazowki) - hintsPart false = zapis sprzed m110, badHints - zle wpisy wskazowek (osobno od bad).</summary>
         private static bool Parse(string data, List<Band> bands, Dictionary<string, int[]> used, int[] sum, Dictionary<string, int> seen, Dictionary<string, Hint> hints,
-                                  out int bad, out int badHints, out bool hintsPart)
+                                  out int bad, out int badHints, out bool hintsPart, Dictionary<string, Origin> origins, out int badOrigins, out bool originsPart)
         {
-            bad = 0; badHints = 0; hintsPart = false;
+            bad = 0; badHints = 0; hintsPart = false; badOrigins = 0; originsPart = false;
             var parts = data.Split('|');
             if (parts.Length < 4 || parts[0] != "1") return false;
             foreach (var e in parts[1].Split(';'))
@@ -1055,29 +1312,48 @@ namespace Armoury
                 }
             }
             if (parts.Length > 5 && hints != null) { hintsPart = true; badHints = ParseHints(parts[5], hints); }   // m110-okolica: wskazowki (zapis sprzed m110 - brak czesci)
+            if (parts.Length > 6 && origins != null) { originsPart = true; badOrigins = ParseOrigins(parts[6], origins); }   // p7-pochodzenie (zapis sprzed p7 - brak czesci)
             return true;
+        }
+
+        /// <summary>p7-pochodzenie: odczyt siodmej czesci; zle wpisy (i ponad OriginMax) pominiete i policzone.</summary>
+        private static int ParseOrigins(string part, Dictionary<string, Origin> origins)
+        {
+            int bad = 0;
+            foreach (var e in part.Split(';'))
+            {
+                if (e.Length == 0) continue;
+                var a = e.Split(',');
+                int day, cnt; float x, y;
+                if (a.Length < 8 || a[0].Length == 0 || a[2].Length == 0 || !int.TryParse(a[1], NumberStyles.Integer, Inv, out day) || !float.TryParse(a[4], NumberStyles.Float, Inv, out x)
+                    || !float.TryParse(a[5], NumberStyles.Float, Inv, out y) || !int.TryParse(a[7], NumberStyles.Integer, Inv, out cnt) || cnt <= 0 || origins.Count >= OriginMax) { bad++; continue; }
+                origins[a[0]] = new Origin { Troop = a[0], Day = day, Culture = a[2], Hideout = a[3], X = x, Y = y, Party = a[6], Count = cnt };
+            }
+            return bad;
         }
 
         internal static void Import(string data)
         {
             _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length);
+            _origins.Clear(); _snap = null;   // p7-pochodzenie
             HintsClear();   // m110-okolica
             TestReset();
             if (string.IsNullOrEmpty(data)) { _importNote = "brak klucza (stary zapis albo nowa kampania)"; _hintNote = _importNote; return; }
             try
             {
-                int bad, badH; bool hp;
-                if (!Parse(data, _bands, _used, _sum, _seen, _hints, out bad, out badH, out hp))
+                int bad, badH, badO; bool hp, op;
+                if (!Parse(data, _bands, _used, _sum, _seen, _hints, out bad, out badH, out hp, _origins, out badO, out op))
                 {
-                    _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); HintsClear(); _importNote = "nieznany format - pominiety"; _hintNote = _importNote; return;
+                    _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); HintsClear(); _origins.Clear(); _importNote = "nieznany format - pominiety"; _hintNote = _importNote; return;
                 }
                 _importNote = "pamiec " + _bands.Count + ", uzycia " + _used.Count + ", kajdany " + _seen.Count + ", sumy kampanii: rozmowy " + _sum[0] + " (mowili " + _sum[1] + "), tortury " + _sum[2]
-                              + " (mowili " + _sum[3] + "), zmarli " + _sum[4] + ", ujawnione " + _sum[5] + ", wskazane " + _sum[6] + ", znalezione " + _sum[7] + (bad > 0 ? ", zlych wpisow " + bad : "");
+                              + " (mowili " + _sum[3] + "), zmarli " + _sum[4] + ", ujawnione " + _sum[5] + ", wskazane " + _sum[6] + ", znalezione " + _sum[7] + (bad > 0 ? ", zlych wpisow " + bad : "")
+                              + (op ? ", pochodzenie " + _origins.Count + (badO > 0 ? " (zlych " + badO + ")" : "") : ", brak czesci pochodzenia (zapis sprzed p7)");   // p7-pochodzenie
                 _hintNote = hp ? "wskazowek " + _hints.Count + " (zlych " + badH + ")" : "brak czesci wskazowek (zapis sprzed m110)";
             }
             catch (Exception e)
             {
-                _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); HintsClear(); _importNote = "blad odczytu - pominiety"; _hintNote = _importNote; Stumble("Import", e);
+                _bands.Clear(); _used.Clear(); _seen.Clear(); Array.Clear(_sum, 0, _sum.Length); HintsClear(); _origins.Clear(); _importNote = "blad odczytu - pominiety"; _hintNote = _importNote; Stumble("Import", e);
             }
         }
     }
