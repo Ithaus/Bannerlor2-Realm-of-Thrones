@@ -616,6 +616,12 @@ RANGES = {
     'AthleticsStaminaCurve': (1.0, 1.5, "0.00"),
     # 131 udzwig z Endurance 0..20 kg za punkt
     'EnduranceCarryKgPerPoint': (0.0, 20.0, "0.#"),
+    # 137 oddech dwufazowy: tau szybki 15..90 s, tau wolny 120..1200 s, zbiornik szybki 0.2..0.8 puli, mnoznik walki 0..1, wyjscie z zadyszki 0.10..0.50
+    'BreathFastSeconds': (15.0, 90.0, "0"),
+    'BreathSlowSeconds': (120.0, 1200.0, "0"),
+    'BreathFastShare': (0.2, 0.8, "0.00"),
+    'BreathFightShare': (0.0, 1.0, "0.00"),
+    'WindedExitBar': (0.10, 0.50, "0.00"),
 }
 
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze
@@ -718,7 +724,9 @@ PRICE_SUFFIX = " (prices of items already in the world are recalculated after lo
 STARTUP_KEYS = {
     'Armoury': {
         # BattleWind.ApplyAll: latki staminy i tickow RBMAI.Stance oraz BattleWind.Active tylko przy kluczu; Active czyta FieldCraft (stary liniowy bonus
-        # Endurance przy !Active) - odczyt na zywo wymagalby zmian w BattleWind i FieldCraft naraz (podwojny bonus), wiec bez zmiany kodu
+        # Endurance przy !Active) - odczyt na zywo wymagalby zmian w BattleWind i FieldCraft naraz (podwojny bonus), wiec bez zmiany kodu.
+        # 137: InitializeStamina i tickStaminaRegen wpinane takze przy BreathTwoPhase / krzywej 130 (NoBreathWhileRunning) - klucz bramkuje juz tylko
+        # tickPostureRegen, Active (Endurance bohaterow, umarli bez zmeczenia); BreathTwoPhase czytany na zywo (spawn i tick), nie tu
         'BattleStaminaEnabled',
     },
 }

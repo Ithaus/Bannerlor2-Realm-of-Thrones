@@ -1,5 +1,63 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-25 137 (galaz noc/137-oddech od noc/127-bitwa-cialo) - oddech dwufazowy: szybki i wolny dlug, odnowa szybsza z Atletyka, po zadyszce dlugi ogon
+**Problem:** Jeff 25.10 ok. 12:55: "a regeneracja bo powinna byc tak samo szybsza im wiecej mam atletyki oraz im mam mniej staminy a odpoczywam tym regeneracja
+postepuje inaczej jak jestem wyczerpany i dysze to wyjscie z zadyszki jak w prawdziwej fizjologii ludzi sprawdz jakie sa zasady"; wczesniej "ogolna zasada", "kazdy punkt
+atletyki ... daje nieco wiecej do staminy jak i jej regeneracji", "trzeba wyjsc od sredniej". Kontrola (dekompilacja RBMAI.dll, symulacja breath_model.py): RBM po zadyszce
+oddaje 90% puli po 2-5 min (gumka (1 + brak/pula)^2.5 - im pusciej, tym szybciej, odwrotnie niz fizjologia), a po biegu do zera 90% wraca w 26-34 s przez zwrot SprintDebt
+FieldCraft (25 x (1 + 2A/500) pkt/s, przy Atletyce 100 35 pkt/s; od 130 takze bohaterowie). Atletyka spowalnia odnowe liczona w %: pula rosnie jak 1 + 3A/500,
+regeneracja tylko jak 1 + 2A/500. Kara x0.5 RBM "ciezki korpus" czyta HELM (Stance.InitializeStamina: SpawnEquipment[NumAllWeaponSlots] = 5 = Head), nie tulow - u Jeffa
+log 13:01 "regeneracja 1.7 pkt/s" przy Atletyce 232 (225) = x0.5 z helmu. Wyjscie z zadyszki przy 10% paska trwa 7-16 s.
+**Przyczyna:** RBMAI.Stance.tickStaminaRegen (co 0.5 s z StanceLogic.OnMissionTick, tylko przy stamina < max): przyrost staminaRegenPerTick x 30 x gumka, x3 po 10 s bez
+ataku i trafienia ponizej 70% puli - jedna krzywa bez pamieci o tym, jak gleboko czlowiek sie wyczerpal; FieldCraft oddawal dlug biegu osobnym, szybkim kanalem.
+**Zmiana:** (1) BattleWind: obiekt Breath na czlowieka (ConditionalWeakTable po RBMAI.Stance, wzor Managed; tworzony w StaminaInitPostfix po krzywej 130 i po galezi
+umarlych; umarli bez Breath = oryginal RBM, regeneracja 0): pasek = pula - F - S (F dlug szybki: fosfokreatyna, szybka faza tlenu; S dlug wolny: kwasica, wolna faza).
+(2) Tick w TickStaminaPrefix (return false dla czlowieka z Breath - koniec gumki, x3 i x0.5 z helmu): uzgodnienie D = max - stamina z T = F + S; nowy wydatek c (cios,
+blok, trafienie, strzal, bieg) dzielony tanh: F' = Fm x tanh(atanh(F/Fm) + c/Fm), Fm = BreathFastShare (0.5) x pula, reszta do S (25% puli: 92% do szybkiego; pelne
+wyczerpanie 48/52 - Chorley 2022: 50.67/49.33%); D < T: F i S x D/T. Odnowa F -= F x min(1, m dt/TauF), S -= S x min(1, m dt/(TauS x (1 + G x max(0, E-1)))), dt
+z MBCommon.GetTotalMissionTime przyciete do 0..2 s; F + S < 0.5 pkt - pasek pelny od razu. Zapis przez AccessTools.FieldRefAccess (bez boxingu i bez alokacji w ticku).
+(3) Stale (liczone raz przy wejsciu czlowieka do bitwy, A' = CurvedAthletics(Atletyka efektywna), kg = GetTotalWeightOfArmor(true) jak w biegu 127 i kosztach RBM):
+TauF = BreathFastSeconds 40 / (1 + 0.75 A'/300) x (1 + 0.002 kg) - Atletyka 0/100/200/300: 40/33/27/23 s (Pesta 2013: niewytrenowani 41 s, wytrzymalosciowi 30 s;
+Ozyener 2001 szybka faza 33-35 s); TauS = BreathSlowSeconds 400 / (1 + 0.30 A'/300) x (1 + 0.005 kg) - 400/368/338/308 s (Chorley 2022: 388 s, osobno 377 +-100;
+Ozyener 2001: 460-539 s; Ferguson 2010: 37/65/86% po 2/6/15 min); G = 1 - 0.5 A'/300 (Chorley 2022: druga zadyszka tau wolny 388 -> 716 s, mniej przy wyzszym VO2max);
+E +1 przy pasku <= 0.5% puli raz na zadyszke, sufit 2, zanik 1 na 900 s z pelnego (nieprzycietego) czasu. (4) Mnoznik aktywnosci m: bieg 0 (127, NoBreathWhileRunning);
+walka = WLASNY wydatek poza biegiem w ostatnich 5 s (nie pola Agent.Last*Time - Agent.RegisterBlow wychodzi przy 0 obrazen, wiec nie widza blokow) -> BreathFightShare
+0.3; wydatek tuz po strzale (LastRangedAttackTime mlodszy niz 0.6 s) otwiera okno walki tylko na 2 s (lucznicy); na koniu 0.85; chod (> 0.5 m/s) max(0.4, 0.85 - 0.0075 kg)
+(Askew 2012: chod w zbroi 30-50 kg x2.1-2.3); postoj 1. (5) FieldCraft: zadyszka ma jedno zrodlo stanu (st.Winded); wyjscie przy pasku >= WindedExitBar 30% (przy oddechu
+dwufazowym; bez niego 10% jak dotad); zwrot SprintDebt ("ODDECH SPRINTERA") milczy przy oddechu dwufazowym (dlug nie narasta) - inaczej bieg wracalby podwojnie;
+wydatek biegu dalej schodzi z paska (127), uzgadnia go Breath. (6) BattleWind.ApplyAll: InitializeStamina wpinana takze przy BreathTwoPhase albo krzywej 130 > 1 (dotad
+tylko przy BattleStaminaEnabled - jego wylaczenie po cichu gasilo krzywa 130), tickStaminaRegen takze przy BreathTwoPhase; przy wylaczonym BattleStaminaEnabled postfiks
+nie mnozy puli bohatera przez Endurance (robi to FieldCraft jak dotad) i umarli zostaja na czystym RBM jak dotad. Opis BattleStaminaEnabled poprawiony (nie jest
+"nieuzywany" - bramkuje tickPostureRegen, Endurance bohaterow i umarlych). Linia startu "BattleWind (137): oddech dwufazowy gotowy ...". (7) Klucze MCM (Flesh and wind,
+czytane na zywo): BreathTwoPhase TAK, BreathFastSeconds 40 (15..90), BreathSlowSeconds 400 (120..1200), BreathFastShare 0.5 (0.2..0.8), BreathFightShare 0.3 (0..1),
+WindedExitBar 0.30 (0.10..0.50); zakresy w tools/gen_mcm.py RANGES, McmSettings.cs wygenerowany. (8) Linia na koniec misji (FieldCraft.OnEndMission; zapasowo przy pierwszym
+oddechu nastepnej misji): "Oddech (137): ludzi N | zadyszek M (ludzi K) | sr. czas w zadyszce X s | sr. wyjscie z zadyszki Y s (wyjsc n) | sr. TauF/TauS | gracz: Atletyka
+A (A'), zbroja kg, pula P, TauF, TauS, zadyszek k, sekund w zadyszce s | potkniecia Z | regula ...". Wyjatek per czlowiek liczony (pierwsze 3 w logu), ten jeden tick idzie
+wtedy oryginalem RBM - funkcja sie nie wylacza. Symulacja wiernej kopii kodu (scratchpad scripts/breath137_check.py, tick 0.5 s, wyczerpanie walka ok. 75 s, potem
+postoj): A0/10 kg wyjscie z zadyszki 38 s, 50% po 1.5 min, 70% 4.4 min, 90% 12.1 min; A100/10 kg 34 s, 1.4/4.2/11.2 min; A100/46 kg 36 s, 1.5/4.8/13.1 min; A200/46 kg
+32 s, 1.4/4.5/12.1 min; A300/10 kg 26 s, 1.2/3.7/9.6 min. Po biegu do zera (A100, 0 kg, 116 s): wyjscie 26 s, 50% po 64 s, 90% po 10.1 min. Lekkie zmeczenie 100 -> 75%:
+90% po 26-43 s, 95% po 46-78 s (A300-A0) - szybciej niz RBM. Druga zadyszka po 2 min przerwy (A100/10 kg): wyjscie 41 s, 50% 2.3 min, 90% 14.6 min.
+**Ryzyko / co sprawdzic:** (1) Wolny ogon: kto raz padnie, nie jest swiezy do konca bitwy - po zadyszce 90% po ok. 10-13 min postoju przy BreathSlowSeconds 400 (250 =
+ok. 2x szybciej); RBM dawal 90% po 2-5 min, a po biegu po pol minuty. Leczenie RBM (+0.9 HP co 10 s przy stamina > 85%) przychodzi po zadyszce dopiero po ok. 7.5-10 min.
+(2) AI dluzej w zadyszce: wyjscie 24-47 s postoju zamiast 7-16 s (-50% ruchu i walki). AI, ktore w zadyszce dalej macha (cios 40 pkt co 6 s): Atletyka 100 nie wychodzi
+wcale (w RBM tez nie), A200/20 kg po ok. 8 min, A300/10 kg po 2 min (RBM 17 s). Mnoznik walki 0.3 to glowne pokretlo tempa bitew - w autotescie mierzyc linie
+"Oddech (137)" (zadyszki, sekundy w zadyszce na czlowieka) i czas bitwy. (3) Lucznicy: strzal kosztuje 20-70 pkt (RBM max(20, 70 - 0.5 x (umiejetnosc - trudnosc)));
+strzelanie 55 pkt co 4.5 s bez przerwy przy okienku 2 s: A100/20 kg pada po ok. 7.4 min (okno 5 s: 3.1 min), A150 trzyma 11%; w RBM nigdy - sprawdzic zadyszki
+lucznikow w 2., 5. i 10. minucie. (4) Postura RBM: handleDefender mnozy obrazenia postury przez Lerp(1.25, 1, pasek) - dlugi ogon (55-75% przez minuty) = +6-11%
+obrazen postury do konca bitwy. (5) Trafienie oszczepem albo toporem do rzucania kosztuje 300 pkt (w glowe 600) = 10-30% puli, prawie cale do szybkiego dlugu.
+(6) Ciezkozbrojni: nowy model nie ma kary x0.5 z helmu, za to mala kare zbroi (46 kg: TauF +9%, TauS +23%) - przy lekkim zmeczeniu nosiciele helmow z listy RBM
+odpoczywaja szybciej niz dotad, po wyczerpaniu wolniej. (7) Wytrzymalosc w ciaglej walce spada 2-3.5x wzgledem RBM (CHECK C3, TauS 500: najwyzszy staly koszt bez
+zadyszki przy 20 kg, A0/100/200/300: 2.9/4.9/7.8/11.4 pkt/s wobec 10.1/13.7/17.8/22.3) - znika "Atletyka 300 nigdy sie nie meczy". (8) Kolizje sprawdzone w kodzie:
+zwrot SprintDebt milczy przy Breath; FieldCraft EndBonus (tylko BattleStaminaEnabled NIE i StaminaFromAthleticsOnly NIE) mnozy pasek po spawnie - uzgodnienie bierze
+to za wydatek albo odplate (Fm liczone w ticku z biezacej puli); Managed (bohaterowie wg Endurance przy StaminaFromAthleticsOnly NIE) - stamina idzie Breath, postura dalej
+Profile; ApplyAthleticsCurve dalej skaluje staminaRegenPerTick (martwe przy Breath); koszty RBM, krzywa 130 puli, bieg 127 (czas pelnego biegu), NoBreathWhileRunning,
+kon (136: HorseWind, MarchToContact) bez zmian; leczenie RBM siedzi w OnMissionTick, nie w ticku staminy - return false go nie wylacza. BreathTwoPhase NIE w trakcie
+gry = od razu tick RBM jak dotad i zwrot SprintDebt; TAK w trakcie = od nastepnej bitwy (Breath przy spawnie). (9) Koszt: lookup CWT i kilkanascie mnozen na czlowieka
+co 0.5 s, Tanh/Log tylko przy nowym wydatku, GetCurrentVelocity tylko poza walka i bez konia; FieldCraft co 0.2 s HasBreath (lookup CWT); bez alokacji w ticku.
+(10) Sprawdzic w grze: linia startu "BattleWind (137): oddech dwufazowy gotowy", po bitwie linia "Oddech (137)" (potkniecia 0, sr. wyjscie ok. 25-45 s), pasek gracza
+po zadyszce: wyjscie przy 30%, potem szybki skok i dlugi ogon; linia "Bieg (127)" - pominiete regeneracje dalej liczone.
+**Status:** ZBUDOWANE - nie wgrane (galaz noc/137-oddech od noc/127-bitwa-cialo 9cde264a; Armoury.dll md5 308fb1cf96bcf9d03556d906f66531d4).
+
 ## 2026-10-25 131 (galaz noc/127-bitwa-cialo) - udzwig z Endurance: kazdy punkt Endurance bohatera w druzynie +5 kg
 **Problem:** Jeff 25.10 ok. 12:41: "a kazdy punkt endurance daje +5 do udzwigu w menu inventory jako dodatkowe", potem "i companions tez".
 **Przyczyna:** Gra liczy udzwig partii tylko z ludzi (20 kg), luzakow (20 kg) i jucznych (100 kg) (DefaultInventoryCapacityModel.CalculateInventoryCapacity) - cechy
