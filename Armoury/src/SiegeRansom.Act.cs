@@ -341,6 +341,7 @@ namespace Armoury
                 {
                     long mine = pr != null ? pr.ToMen + pr.ToLead : 0;
                     long crown = pr != null && pr.Lead != null ? CitySack.CrownPart(pr.Lead, pr.ToLead) : 0;
+                    if (pr != null && pr.Lead == Hero.MainHero) SpoilsReport.NoteRansom(st, pool, pr.ToMen, pr.ToLead, crown, false);   // noc 25.10 P5: okno lupu (te same liczby)
                     Log.Player(lead + " took a ransom of " + N(pool) + " denars from " + town + " and lifted the siege."
                                + (mine > 0 ? " Your party's part: " + N(mine) + " denars" + (pr.ToMen > 0 ? " (your men " + N(pr.ToMen) + ", you " + N(pr.ToLead) + ")" : "")
                                              + (crown > 0 ? "; the crown will claim " + N(crown) + " of your part" : "") + "." : ""));

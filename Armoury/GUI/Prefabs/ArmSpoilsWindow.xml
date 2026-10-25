@@ -1,0 +1,97 @@
+<Prefab>
+  <Constants>
+  </Constants>
+  <VisualDefinitions>
+  </VisualDefinitions>
+  <Window>
+    <!-- Armoury noc 25.10 P5 (okno lupu, SpoilsWindow.cs, VM SpoilsWindowVM): okno po bitwie i oblezeniu w wygladzie okien wydarzen ROT (ROT-Content EventXml.xml:
+         tlo event-bg, Standard.ROTPanel z tytulem, obrazek w ramce frame_9, tekst pedzlem UI.ROTSummaryScreen.Text, przycisk Standard.DialogCloseButtons).
+         Lewa kolumna: obrazek 640x360 (sprite ROT tematu bitwa/oblezenie albo plik Images/Loot), zdanie o miejscu, "Finest spoils" (do 5 sztuk: ikona, nazwa, wartosc).
+         Prawa kolumna: sekcje (tytul + wiersze etykieta - liczba), na dole "In all". Wierszy jest najwyzej tyle, ile miesci panel (limit w SpoilsWindow.Build) - bez przewijania.
+         Esc i Enter zamyka SpoilsWindow.AppTick (wejscie warstwy), przycisk Done - ExecuteDone. -->
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="@BackgroundImage">
+      <Children>
+        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#00000000" DoNotAcceptEvents="true">
+          <Children>
+
+            <Standard.ROTPanel WidthSizePolicy="Fixed" SuggestedWidth="1300" HorizontalAlignment="Center" HeightSizePolicy="Fixed" SuggestedHeight="920" VerticalAlignment="Center" Parameter.Brush="ROTPanelBrush" Parameter.Title="@Title">
+              <Children>
+
+                <!-- lewa kolumna -->
+                <Widget WidthSizePolicy="Fixed" SuggestedWidth="680" HeightSizePolicy="StretchToParent" HorizontalAlignment="Left" MarginLeft="20" MarginTop="10" MarginBottom="20">
+                  <Children>
+
+                    <Widget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" Sprite="frame_9" HorizontalAlignment="Center" VerticalAlignment="Top" ExtendTop="1" ExtendBottom="1" ExtendLeft="1" ExtendRight="1" ValueFactor="-100">
+                      <Children>
+                        <Widget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" Sprite="frame_9" HorizontalAlignment="Center" VerticalAlignment="Top">
+                          <Children>
+                            <BrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="640" SuggestedHeight="360" Sprite="@HeaderImage" VerticalAlignment="Top" MarginTop="12" MarginBottom="12" MarginLeft="12" MarginRight="12" />
+                            <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="664" SuggestedHeight="384" Sprite="frame_9" ValueFactor="-40" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                          </Children>
+                        </Widget>
+                      </Children>
+                    </Widget>
+
+                    <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="70" VerticalAlignment="Top" PositionYOffset="398" MarginLeft="20" MarginRight="20" Brush="UI.ROTSummaryScreen.Text" Brush.FontSize="22" Text="@PlaceText" />
+
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="34" VerticalAlignment="Top" PositionYOffset="476" Brush="Recruitment.Popup.Title.Text.ROT" Brush.FontSize="28" Text="@FinestTitle" IsVisible="@HasFinest" />
+
+                    <ListPanel DataSource="{Finest}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" VerticalAlignment="Top" PositionYOffset="516" MarginLeft="30" MarginRight="20" StackLayout.LayoutMethod="VerticalTopToBottom" IsVisible="@HasFinest">
+                      <ItemTemplate>
+                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                          <Children>
+                            <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="96" SuggestedHeight="48" VerticalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#00000066">
+                              <Children>
+                                <ImageIdentifierWidget DataSource="{ImageIdentifier}" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="2" MarginRight="2" MarginTop="2" MarginBottom="2" ImageId="@Id" AdditionalArgs="@AdditionalArgs" TextureProviderName="@TextureProviderName" />
+                              </Children>
+                            </Widget>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="14" VerticalAlignment="Center" Brush="UI.ROTSummaryScreen.Text" Brush.FontSize="20" Brush.TextHorizontalAlignment="Left" Text="@Text" />
+                          </Children>
+                        </ListPanel>
+                      </ItemTemplate>
+                    </ListPanel>
+
+                  </Children>
+                </Widget>
+
+                <!-- prawa kolumna: sekcje -->
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="730" MarginRight="40" MarginTop="10" MarginBottom="20">
+                  <Children>
+
+                    <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" VerticalAlignment="Top" StackLayout.LayoutMethod="VerticalTopToBottom">
+                      <ItemTemplate>
+                        <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginBottom="10" StackLayout.LayoutMethod="VerticalTopToBottom">
+                          <Children>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="34" Brush="Recruitment.Popup.Title.Text.ROT" Brush.FontSize="26" Brush.TextHorizontalAlignment="Left" Text="@Title" />
+                            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="2" Sprite="BlankWhiteSquare_9" Color="#C6AC8D66" MarginBottom="4" />
+                            <ListPanel DataSource="{Rows}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
+                              <ItemTemplate>
+                                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="27">
+                                  <Children>
+                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginRight="170" Brush="UI.ROTSummaryScreen.Text" Brush.FontSize="20" Brush.TextHorizontalAlignment="Left" Text="@Label" />
+                                    <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="170" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" Brush="UI.ROTSummaryScreen.Text" Brush.FontSize="20" Brush.TextHorizontalAlignment="Right" Text="@Value" />
+                                  </Children>
+                                </Widget>
+                              </ItemTemplate>
+                            </ListPanel>
+                          </Children>
+                        </ListPanel>
+                      </ItemTemplate>
+                    </ListPanel>
+
+                    <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="56" VerticalAlignment="Bottom" Brush="UI.ROTSummaryScreen.Text" Brush.FontSize="22" Text="@TotalText" />
+
+                  </Children>
+                </Widget>
+
+              </Children>
+            </Standard.ROTPanel>
+
+            <Standard.DialogCloseButtons Parameter.DoneButtonAction="ExecuteDone" Parameter.DoneButtonText="@DoneText" Parameter.ShowCancel="false" Parameter.IsDoneEnabled="true" HorizontalAlignment="Center" MarginBottom="-5" />
+
+          </Children>
+        </Widget>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

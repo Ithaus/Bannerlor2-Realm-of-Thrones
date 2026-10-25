@@ -186,6 +186,7 @@ namespace Armoury
             var top = ScreenManager.TopScreen;
             if (top != null && top.FindLayer<ScreenLayer>("BannerKingsMapView") != null) return "okno Banner Kings";
             if (StoryPictures.EventWindowOnStack()) return "okno wydarzenia ROT";
+            if (SpoilsWindow.IsOpen) return "okno lupu";   // noc 25.10 P5: okno lupu otwarte albo gotowy raport czeka - lup pierwszy (w bramce samego okna lupu - falsz)
             return null;
         }
 
