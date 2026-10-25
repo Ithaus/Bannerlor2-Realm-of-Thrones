@@ -428,7 +428,7 @@ na ladzie i na morzu. Osobna linia "Endurance" w podpowiedzi udzwigu. Linia star
 **Ryzyko / co sprawdzic:** (1) AI lordowie tez dostaja (+25..50 kg na partie) - mniej przeciazenia, mikroskopijnie szybsze partie. (2) Petla po MemberRoster przy kazdym
 liczeniu udzwigu (predkosc partii) - kilkadziesiat wpisow, bez alokacji. (3) Kolejnosc postfiksow na tym samym celu bez znaczenia (kazdy tylko dodaje linie).
 Sprawdzic w grze: ekran ekwipunku - linia "Endurance" (u Jeffa END 8 = +40 kg plus towarzysze).
-**Status:** ZBUDOWANE - autotest i wgranie razem z 127-130.
+**Status:** WGRANE 115 (25.10 ok. 13:10 CET; Armoury.dll md5 70246086 z noc/127-bitwa-cialo 9bc0f627, razem 127-131; pliki poza DLL: 16 x Armoury/ModuleData/Lektor/Bitwa/motto/arm_bs_mo_karda_NN.ogg + manifest.tsv (md5 1f89f1d9; wgrane 12:45 przed testem - stary DLL ich nie czytal); kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie115 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie115-przed). Autotest 131a (bitwaN): 4/4 bitwy, ERROR 0 - 'Bieg (127)' (gracz 46.3 kg, Atletyka 232 -> 38 s; sr. 54-59 s), 'BattleWind (130)' (pula 2349, regen 1.7), marsz 128 (szarz zaczetych marszem 5-7, sr. dystans szarzy piechoty 52-60 m, predkosc w marszu 1.56-1.70 m/s; dotad '-'), 131 wpiete; proba 129 nie ruszyla (blad wrappera: '-ExtraFlags a,b' przez -File = jedna flaga). 131b (wrapper poprawiony): kod 0, 4/4, ERROR 0, 'okrzyki krolestwa gracza (129) TAK: ludzi 1-2 z 4-5 w kolejce (reszta - limit na sekunde), motto wodzow 0-1, proba autotestu'.
 
 ## 2026-10-25 130 (galaz noc/127-bitwa-cialo) - stamina tylko z Atletyki, ta sama dla gracza, lordow i szeregowych; krzywa Atletyki (kazdy punkt troche wiecej)
 **Problem:** Jeff 25.10 ok. 12:38: "czy ja znowu chetuje i mam wiecej staminy niz ktos na moim poziomie np. rycerz tier 6 ma atletyka 200 i ja mam atletyka 200
@@ -447,7 +447,7 @@ Linie: "BattleWind (130): gracz - stamina z Atletyki jak kazdy ...: Atletyka X l
 na postoju) - to wraca problem z 26.08 ("po 10 machnieciach"), swiadomie na zyczenie Jeffa. (2) Lordowie AI tez slabsi w dlugiej walce. (3) Latka StaminaInitPostfix wpinana
 tylko przy BattleStaminaEnabled TAK (u Jeffa TAK) - bez niej krzywa nie dziala (linia startu BattleWind mowi). (4) Trupy (Undead) bez zmian - galaz przed krzywa.
 Regresje: EnduranceMul uzywaja jeszcze tylko postura w pojedynku (DuelFairGuard) i stara galaz bohatera przy kluczu NIE.
-**Status:** ZBUDOWANE - autotest i wgranie razem z 127-129, 131.
+**Status:** WGRANE 115 (25.10 ok. 13:10 CET; Armoury.dll md5 70246086 z noc/127-bitwa-cialo 9bc0f627, razem 127-131; pliki poza DLL: 16 x Armoury/ModuleData/Lektor/Bitwa/motto/arm_bs_mo_karda_NN.ogg + manifest.tsv (md5 1f89f1d9; wgrane 12:45 przed testem - stary DLL ich nie czytal); kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie115 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie115-przed). Autotest 131a (bitwaN): 4/4 bitwy, ERROR 0 - 'Bieg (127)' (gracz 46.3 kg, Atletyka 232 -> 38 s; sr. 54-59 s), 'BattleWind (130)' (pula 2349, regen 1.7), marsz 128 (szarz zaczetych marszem 5-7, sr. dystans szarzy piechoty 52-60 m, predkosc w marszu 1.56-1.70 m/s; dotad '-'), 131 wpiete; proba 129 nie ruszyla (blad wrappera: '-ExtraFlags a,b' przez -File = jedna flaga). 131b (wrapper poprawiony): kod 0, 4/4, ERROR 0, 'okrzyki krolestwa gracza (129) TAK: ludzi 1-2 z 4-5 w kolejce (reszta - limit na sekunde), motto wodzow 0-1, proba autotestu'.
 
 ## 2026-10-25 129 (galaz noc/127-bitwa-cialo) - okrzyki krolestwa gracza: "For Karda!", "Justice is honour!" i 14 innych, wodz i szeregowi przy szarzy
 **Problem:** Jeff 25.10 ok. 12:25: "i dodaj moje okrzyki mojej armii - For Karda! Justice is honor! i takie tam wymysl zeby w kolko nie krzyczeli tego samego",
@@ -465,7 +465,7 @@ Proba autotestu: LogGate 1/2 + plik CrashScribe/armoury-karda.flag - szyki i boh
 (inne rody) tez krzycza Karde zamiast swoich slow - zamierzone ("moja armia"). (3) Przed zalozeniem krolestwa nic sie nie zmienia (wladca NIE). (4) Glosy GVoice wspolne
 z mottami i rozkazami - przy tloku czesc okrzykow odrzucona limitem (licznik w linii dzwieku). (5) 16 nowych plikow ogg trzeba wgrac z DLL (stary DLL ich nie uzywa:
 klucz mo:karda nikt nie pyta).
-**Status:** ZBUDOWANE - autotest (z flaga armoury-karda) i wgranie razem z 127, 128, 130, 131.
+**Status:** WGRANE 115 (25.10 ok. 13:10 CET; Armoury.dll md5 70246086 z noc/127-bitwa-cialo 9bc0f627, razem 127-131; pliki poza DLL: 16 x Armoury/ModuleData/Lektor/Bitwa/motto/arm_bs_mo_karda_NN.ogg + manifest.tsv (md5 1f89f1d9; wgrane 12:45 przed testem - stary DLL ich nie czytal); kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie115 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie115-przed). Autotest 131a (bitwaN): 4/4 bitwy, ERROR 0 - 'Bieg (127)' (gracz 46.3 kg, Atletyka 232 -> 38 s; sr. 54-59 s), 'BattleWind (130)' (pula 2349, regen 1.7), marsz 128 (szarz zaczetych marszem 5-7, sr. dystans szarzy piechoty 52-60 m, predkosc w marszu 1.56-1.70 m/s; dotad '-'), 131 wpiete; proba 129 nie ruszyla (blad wrappera: '-ExtraFlags a,b' przez -File = jedna flaga). 131b (wrapper poprawiony): kod 0, 4/4, ERROR 0, 'okrzyki krolestwa gracza (129) TAK: ludzi 1-2 z 4-5 w kolejce (reszta - limit na sekunde), motto wodzow 0-1, proba autotestu'.
 
 ## 2026-10-25 128 (galaz noc/127-bitwa-cialo od noc/final df5ed020) - szarza z daleka idzie marszem, okrzyk i bieg dopiero na ostatnich ok. 60 m
 **Problem:** Jeff 25.10 ok. 12:15, po obejrzeniu autotestu 126a: "na poczatku powinni maszerowac a nie ciagle wszyscy biegaja w zbrojach". Log 126a (Armoury-2026-10-25_12-04-16.log,
@@ -484,7 +484,7 @@ nasz cap tnie go w PostCache / PostSpeed tak jak przy Advance (dowod [K] w naglo
 klucz ChargeMarchesFirst NIE wraca do starego. (4) Kolejnosc tiku BattleCries -> MarchToContact (K4) bez zmian; ChargeHeld czyta stan z poprzedniego taktu (do 0.5 s).
 (5) BattleSound.IsMarching = true w czasie marszu szarzy - bebny graja do progu (zamierzone). Regresje: OnChargeStarted bez zmian; walking branch (Advance / Move) - ta sama
 logika (Rearm = stara formula). Sprawdzic w logu: szarz zaczetych marszem > 0, sr. dystans szarzy piechoty ok. 60 m (dotad 56-75 m tylko przy Advance).
-**Status:** ZBUDOWANE - autotest i wgranie razem z 127 i 129.
+**Status:** WGRANE 115 (25.10 ok. 13:10 CET; Armoury.dll md5 70246086 z noc/127-bitwa-cialo 9bc0f627, razem 127-131; pliki poza DLL: 16 x Armoury/ModuleData/Lektor/Bitwa/motto/arm_bs_mo_karda_NN.ogg + manifest.tsv (md5 1f89f1d9; wgrane 12:45 przed testem - stary DLL ich nie czytal); kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie115 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie115-przed). Autotest 131a (bitwaN): 4/4 bitwy, ERROR 0 - 'Bieg (127)' (gracz 46.3 kg, Atletyka 232 -> 38 s; sr. 54-59 s), 'BattleWind (130)' (pula 2349, regen 1.7), marsz 128 (szarz zaczetych marszem 5-7, sr. dystans szarzy piechoty 52-60 m, predkosc w marszu 1.56-1.70 m/s; dotad '-'), 131 wpiete; proba 129 nie ruszyla (blad wrappera: '-ExtraFlags a,b' przez -File = jedna flaga). 131b (wrapper poprawiony): kod 0, 4/4, ERROR 0, 'okrzyki krolestwa gracza (129) TAK: ludzi 1-2 z 4-5 w kolejce (reszta - limit na sekunde), motto wodzow 0-1, proba autotestu'.
 
 ## 2026-10-25 127 (galaz noc/127-bitwa-cialo od noc/final df5ed020) - bieg w zbroi wedlug fizjologii, jedna regula dla kazdego; w biegu oddech nie wraca
 **Problem:** Jeff 25.10 ok. 12:20: "bieganie w zbrojach powinno dwa razy mocniej kosztowac stamine w zaleznosci od tego ile mam na sobie", "nie tylko moja wage tez innych
@@ -509,7 +509,7 @@ oddaja dlug sprintu tempem biegacza (25/s x Atletyka), bohater z BattleWind swoj
 do oceny w grze. (4) HashSet<object> postaw - RBM Stance bez Equals/GetHashCode (referencja); czyszczony w AfterStart, OnEndMission, OnAgentDeleted. (5) Prog biegu bez zmian
 (55% predkosci maks., 2.2..4.2 m/s); marsz MarchToContact <= 2.2 m/s nie jest biegiem. Regresje: DrainPerSec czytal tylko FieldCraft (grep), BattleWind.Active /
 Manages bez zmian; gracz jezdzi konno - bez drenazu jak dotad.
-**Status:** ZBUDOWANE - autotest i wgranie razem z 128 i 129.
+**Status:** WGRANE 115 (25.10 ok. 13:10 CET; Armoury.dll md5 70246086 z noc/127-bitwa-cialo 9bc0f627, razem 127-131; pliki poza DLL: 16 x Armoury/ModuleData/Lektor/Bitwa/motto/arm_bs_mo_karda_NN.ogg + manifest.tsv (md5 1f89f1d9; wgrane 12:45 przed testem - stary DLL ich nie czytal); kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie115 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie115-przed). Autotest 131a (bitwaN): 4/4 bitwy, ERROR 0 - 'Bieg (127)' (gracz 46.3 kg, Atletyka 232 -> 38 s; sr. 54-59 s), 'BattleWind (130)' (pula 2349, regen 1.7), marsz 128 (szarz zaczetych marszem 5-7, sr. dystans szarzy piechoty 52-60 m, predkosc w marszu 1.56-1.70 m/s; dotad '-'), 131 wpiete; proba 129 nie ruszyla (blad wrappera: '-ExtraFlags a,b' przez -File = jedna flaga). 131b (wrapper poprawiony): kod 0, 4/4, ERROR 0, 'okrzyki krolestwa gracza (129) TAK: ludzi 1-2 z 4-5 w kolejce (reszta - limit na sekunde), motto wodzow 0-1, proba autotestu'.
 
 ## 2026-10-25 126 (noc-p12 przeglad armii v2, galaz noc/p12-przeglad2 od noc/final; recenzja 58025164) - przypinanie konkretnych typow wojska do choragwi
 
@@ -520,7 +520,7 @@ W bitwie (gracz dowodzi swoimi) ludzie przypietego typu staja w przypietej forma
 po bitwie naprawa wag zapisu pola/armii, gdy ekran zapisal smiec (NaN -> int.MinValue) albo 0 na choragwi przypiecia. Zapis przypiec w arm_army_review (zgodnie wstecz). Proba autotestu P4 w takcie godziny (dotad od 2. doby - nie odpalala) + T7/T7g przypiecia.
 Recenzja (4 uwagi, wszystkie poprawione): wagi 0/0 na ekranie OOB, flagi prob (skrypt), klucz Pin wylaczony a udzialy, plan budowany przed kluczem.
 **Ryzyko / co sprawdzic:** w logu "Przeglad armii (P4): test ... T7 przypiecia ... - wynik TAK" i w bitwie segment "przypiecia: czynne (typow N ...)"; koniec bitwy "naprawione wagi ...". Przypiecia dzialaja tylko, gdy gracz dowodzi swoimi ludzmi (ekran Order of Battle, 20+ ludzi) - w armii AI nie.
-**Status:** ZBUDOWANE - autotest i wgranie nizej.
+**Status:** WGRANE 114 (25.10 ok. 12:31 CET; Armoury.dll md5 3cab5bea z noc/final df5ed020, razem z 125; kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie114 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie114-przed). Autotest 126a: 3/4 bitwy, w 4/4 AccessViolationException w natywnym Agent.MakeVoice z Immersive_Battlefields.PlayOrderGesturesPatch.Prefix (IB woła owner.MakeVoice bez IsActive - jak gra; rozkaz szarzy testu ponawiany co 15 s, prawdopodobnie na martwym bohaterze - log urwany, niepotwierdzone; naszego kodu w stosie brak). Powtorka 126b: 4/4 bitwy, ERROR 0, bez wywrotki (kod 1 tylko od zawieszenia gry po KONIEC OK). Proby P4 / T14 / T15 / test turnieju w biegu bitew nie odpalily - przypiecia i okno turnieju sprawdzi gra Jeffa.
 
 ## 2026-10-25 125 (noc-p11 okno lupu po turnieju, galaz noc/p11-turniej od noc/final; recenzja dcff4c7d) - okno "The Tourney at X" po turnieju
 
@@ -530,7 +530,7 @@ Recenzja (4 uwagi, wszystkie poprawione): wagi 0/0 na ekranie OOB, flagi prob (s
 nagroda (TXP i nasze PlayerFees8), zaklady (stawka, wygrana), sakiewka ludu, GrandTourney przez latki Armoury w kampanii (sakiewka mistrza, utarg szranek, okupy, wykup konia i zbroi - DLL GT bez zmian); przedmiot nagrody, oddany rynsztunek, walki/wygrane/runda odpadniecia; okno "The Tourney at X".
 Turniej, ktory sie nie odbyl - ramka porzucona bez okna (linia logu). Prog Min Worth dla turnieju liczy zyski i straty. Proba autotestu: flaga armoury-lup-turniej.flag (T0-T3).
 **Ryzyko / co sprawdzic:** "Okno lupu (125): latki GrandTourney N/N", po prawdziwym turnieju "Okno lupu (117): turniej N" z "TournamentFinished TAK, misja TAK" i mala reszta "Other"; "ramka T porzucona bez raportu" po prawdziwym turnieju = blad.
-**Status:** ZBUDOWANE - autotest i wgranie nizej.
+**Status:** WGRANE 114 razem z 126 (patrz wyzej). Okno turnieju nie sprawdzone autotestem (bieg turniejN nie puszczony) - sprawdzi pierwszy turniej Jeffa (linia 'Okno lupu (125)' i ramka T).
 
 ## 2026-10-25 124 (noc-final, galaz noc/final = noc/calosc + noc/p10-szturm + noc/p9-gotowosc) - domyslne wlaczone (flanka, lucznicy za piechota, tlo dzwieku, szturm murow), friendly fire strzal przy oblezeniu 50%, nagrania ElevenLabs 379 klipow
 
