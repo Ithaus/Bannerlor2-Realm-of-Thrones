@@ -15,7 +15,6 @@ Nie commituj ich — `.gitignore` je pomija (to wlasnosc TaleWorlds i autorow mo
     TaleWorlds.Library.dll
     TaleWorlds.Localization.dll
     TaleWorlds.MountAndBlade.dll
-    TaleWorlds.MountAndBlade.ViewModelCollection.dll   <- Armoury 155: pasek staminy konia (mixin MissionAgentStatusVM)
     TaleWorlds.ObjectSystem.dll
     TaleWorlds.SaveSystem.dll
     TaleWorlds.ScreenSystem.dll
@@ -52,6 +51,14 @@ Gdy ich tu nie ma, `Armoury.csproj` bierze je wprost z katalogow gry (wlasciwosc
 domyslnie `C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/bin/Win64_Shipping_Client`). Kopii w libs/
 lepiej nie robic - dysk C zeruje pliki. Armoury dziedziczy po `ROT.Events.EventBase` (okno w wygladzie wydarzen ROT), wiec po aktualizacji
 ROT trzeba przebudowac Armoury i sprawdzic okno (typ ROT uzywany tylko w metodach NoInlining, zapas: zwykle okno gry z tym samym tekstem).
+
+## Z `bin\Win64_Shipping_Client\` (Armoury 155: pasek staminy konia w HUD bitwy, mixin MissionAgentStatusVM)
+
+    TaleWorlds.MountAndBlade.ViewModelCollection.dll
+
+Gdy jej tu nie ma, `Armoury.csproj` bierze ja wprost z katalogu bin gry (wlasciwosc `MbVmLibs`, domyslnie
+`C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/bin/Win64_Shipping_Client`, jak `TwoDimLibs`). Kopii w libs/
+lepiej nie robic - dysk C zeruje pliki.
 
 ## Szybciej
 

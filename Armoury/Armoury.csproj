@@ -27,6 +27,10 @@
     <RotLibs Condition="'$(RotLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/Modules/ROT-Core/bin/Win64_Shipping_Client</RotLibs>
     <TwoDimLibs Condition="'$(TwoDimLibs)' == '' And Exists('$(GameLibs)/TaleWorlds.TwoDimension.dll')">$(GameLibs)</TwoDimLibs>
     <TwoDimLibs Condition="'$(TwoDimLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/bin/Win64_Shipping_Client</TwoDimLibs>
+    <!-- 155: pasek staminy konia w HUD bitwy (HorseWindBarUi.cs - mixin MissionAgentStatusVM): TaleWorlds.MountAndBlade.ViewModelCollection.dll z bin gry.
+         Z libs/, a gdy jej tam nie ma - wprost z katalogu bin gry (jak TwoDimLibs wyzej; recenzja 155: libs/*.dll poza repo, inne worktree jej nie maja). -->
+    <MbVmLibs Condition="'$(MbVmLibs)' == '' And Exists('$(GameLibs)/TaleWorlds.MountAndBlade.ViewModelCollection.dll')">$(GameLibs)</MbVmLibs>
+    <MbVmLibs Condition="'$(MbVmLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/bin/Win64_Shipping_Client</MbVmLibs>
   </PropertyGroup>
   <PropertyGroup Condition="'$(T10Dry)' == 'true'">
     <!-- T10 (uwaga krytyki 6): DLL "na sucho" do pierwszego autotestu - ksiega snu AI i powody nocnego marszu tylko w logu,
@@ -57,8 +61,8 @@
     <Reference Include="TaleWorlds.Localization"><HintPath>$(GameLibs)/TaleWorlds.Localization.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.Core.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.Core.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
-    <!-- 155: pasek staminy konia w HUD bitwy (HorseWindBarUi.cs - mixin MissionAgentStatusVM); z bin\Win64_Shipping_Client gry, kopia w libs/ (patrz libs/README.md) -->
-    <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
+    <!-- 155: pasek staminy konia w HUD bitwy (HorseWindBarUi.cs - mixin MissionAgentStatusVM) - patrz MbVmLibs wyzej i libs/README.md -->
+    <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection"><HintPath>$(MbVmLibs)/TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.InputSystem"><HintPath>$(GameLibs)/TaleWorlds.InputSystem.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.ObjectSystem"><HintPath>$(GameLibs)/TaleWorlds.ObjectSystem.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.DotNet"><HintPath>$(GameLibs)/TaleWorlds.DotNet.dll</HintPath><Private>false</Private></Reference>
