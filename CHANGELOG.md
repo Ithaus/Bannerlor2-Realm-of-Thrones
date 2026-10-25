@@ -81,7 +81,9 @@ celowo zablokowany przez GarrisonKit.EmergencyPrefix ("nic z niczego").
   "clubs and farm tools from home", dopisek m119 z kijami > 0 i "potwierdzone tymczasowe N z N ... zgodne", potkniecia 0; na ekranie bezbronni z palkami / narzedziami;
   po bitwie zbrojownie DTE bez peasant_hammer / *_mace_1_t2 / nord_hatchett ponad stan sprzed bitwy, lup i ekran trofeow bez kijow z cial (poza tymi, ktore wrog mial
   naprawde w zbrojowni).
-**Status:** ZBUDOWANE - czeka na autotest i wgranie razem z 111 i 112. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w HomeArms / GarrisonKit / GearFit /
+**Status:** WGRANE 111 (25.10 ok. 02:10 CET razem z 111 i 112; Armoury.dll md5 9e301ed6 z HEAD b74049c9; kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie111 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie111-przed).
+Autotest 117a (4 bitwy na kopii zapisu Jeffa z 00:59): KONIEC OK, 4/4 bitwy, ERROR w logu Armoury 0 (kod wrappera 1 tylko przez zmiane czasu 03:00 -> 02:00 - wrapper nie znalazl logu - i zabicie gry
+wiszacej przy wyjsciu); kije u lordow AI 30 / 14 / 14, potwierdzone tymczasowe 30 z 30, 14 z 14, 14 z 14, roznych sztuk 6. Wczesniej: ZBUDOWANE. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w HomeArms / GarrisonKit / GearFit /
 Settings); md5 Armoury.dll - z pelnej przebudowy (--no-incremental) HEAD galezi przy wgraniu (DLL zawiera hash commitu; wartosc dla commitu tego wpisu podaje raport agenta).
 Po recenzji (liczba pojedyncza w zdaniu przed bitwa): kod = commit c3487563; md5 z przebudowy commitu c3487563: 8fa83f54fd08cd7a1b5252e1f0f0e494 (--no-incremental dwa
 razy, czyste drzewo, oba buildy rowne; "c3487563" w pliku). Commit z tym zapisem zmienia md5 - wgrywany plik porownac z przebudowa HEAD galezi.
@@ -196,7 +198,8 @@ nikt nie logowal) - przyczyna z dekompilacji, nowa linia logu ja potwierdzi albo
 - Wgranie: plik wgrywany porownac z przebudowa HEAD galezi; kod po recenzji = commit d7e8ee3b (razem z 111 v3), Armoury.dll md5 dcd46d71c27dd49057ee1c34f087d439
   (DLL zawiera hash commitu - commit samego CHANGELOG daje inne md5). Jedna zmiana naraz: 111 v3 i 112 w jednym DLL - objawy rozdzielne (ubranie w bitwie / figurki na mapie).
 
-**Status:** ZBUDOWANE - czeka na autotest i wgranie. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w zmienionych plikach). Armoury.dll z pelnej
+**Status:** WGRANE 111 (25.10 ok. 02:10 CET, Armoury.dll md5 9e301ed6 - patrz 113). Autotest 117a: postfiks i setter wpiete, armie sciagniete na obozie nocy i dniu odpoczynku
+(np. dzien 108951: 11 armii, 72 druzyny, figura od wodza srednio 4.05 -> cel 0.50; po 2 h srednio 0.42-0.50), ERROR 0. Wyglad do oceny Jeffa. Wczesniej: ZBUDOWANE. Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w zmienionych plikach). Armoury.dll z pelnej
 przebudowy (--no-incremental, dwa razy to samo) na commicie kodu 11980fd6: md5 07382f5f12017003888e2a34ebadec7c (DLL zawiera hash commitu - md5 zmienia sie
 z kazdym commitem, takze samego CHANGELOG; przy wgraniu liczy sie przebudowa z HEAD galezi, porownana z plikiem wgrywanym). Po recenzji 25.10 (111 v3 + 112 B1/B2):
 ZBUDOWANE, NIEWGRANE - build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Civvies / ArmyCloseRanks); Armoury.dll z pelnej przebudowy (--no-incremental,
@@ -387,7 +390,8 @@ nie ma sztuki, a DressCode tych ludzi celowo nie ubiera (ubranie ze wzorca bez o
   i w CivilDress `si.Dead || Undead.Character(co)` -> bez ubrania; licznik "umarli pominieci (ludzi)" w dopisku m117 linii bitwy (przy domyslnych ustawieniach 0).
   Kontrola: SpawnGuard/SaddleGuard/Missing/liczniki ludzi dla umarlych bez zmian (Dead czyta tylko CivilDress); IsWorn czyta rejestr _agents wypelniany przez RegisterPostfix
   (ta sama sciezka co ArmorsPostfix i QueueWreck), czyszczony w DistributorsPostfix / EndMissionPostfix / Reset. Settings.cs bez zmian - gen_mcm niepotrzebny.
-**Status:** ZBUDOWANE - czeka na autotest i wgranie (gra Jeffa wlaczona). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne nowe; w zmienionych plikach tylko
+**Status:** WGRANE 111 (25.10 ok. 02:10 CET, Armoury.dll md5 9e301ed6 - patrz 113). Autotest 117a: w 4 bitwach nikt nie mial pustego tulowia ani nog (ubranych 0, linia wyboru nie
+powstala) - w grze Jeffa do sprawdzenia: linia "Ubranie cywilne (m117): wybor" i dopisek bitwy z tunikami > 0; mechanizm sztuki tymczasowej ten sam co m119 (potwierdzony 58 z 58). Wczesniej: ZBUDOWANE (gra Jeffa wlaczona). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne nowe; w zmienionych plikach tylko
 stare CS0169 BattlefieldLaw:34); Armoury.dll md5 f788045fed4df7305afce323114d2183; po recenzji (LootTally zapas IsWorn, CivilDress bez umarlych) md5
 306c634c3221aefa5937687ab950bc03 wedlug agenta poprawek - przebudowa z zatwierdzonego cb14b27d (dwa razy, czyste drzewo) daje 14e193c732225756fb271b57acae97dd
 (v1, NIEAKTUALNE). v2 (25.10): ZBUDOWANE, NIEWGRANE - czeka na autotest i wgranie; build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Civvies/GarrisonKit);
