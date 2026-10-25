@@ -148,13 +148,16 @@ namespace Armoury
                 if (Play(m, cl, GAmb, x.Pos, x.Min, x.Max, true, null, null, x.Tag) != null) _cSgOil++;
                 else _cSgRej++;
             }
-            // petle tlumu i zalogi taranu
+            // petle tlumu i zalogi taranu - tylko w zasiegu sluchacza (jak ogien oblezenia; recenzja P10: bez tego Play co 0,25 s odrzucal "daleko")
             bool assault = crowd && _sgPhase >= 2 && !ended && _sgHotOk;
-            if (LoopTick(m, _sgCrowdA, assault && !_sgAttSilent && _sgMenA >= 10)) _cSgLoopA++;
-            if (LoopTick(m, _sgCrowdD, assault && !_sgDefSilent && _sgMenD >= 5)) _cSgLoopD++;
-            if (LoopTick(m, _sgRamLoop, crowd && !ended && !_sgAttSilent && _now - _sgRamHitAt < RamHitHold)) _cSgLoopRam++;
+            if (LoopTick(m, _sgCrowdA, assault && !_sgAttSilent && _sgMenA >= 10 && SgNear(_sgCrowdA, c))) _cSgLoopA++;
+            if (LoopTick(m, _sgCrowdD, assault && !_sgDefSilent && _sgMenD >= 5 && SgNear(_sgCrowdD, c))) _cSgLoopD++;
+            if (LoopTick(m, _sgRamLoop, crowd && !ended && !_sgAttSilent && _now - _sgRamHitAt < RamHitHold && SgNear(_sgRamLoop, c))) _cSgLoopRam++;
             SiegeDrumTick(m, c);
         }
+
+        /// <summary>Petla w zasiegu sluchacza: ta sama miara co Play (max x glosnosc + FarExtra) i ogien oblezenia (BattleSound.Field.cs Fires).</summary>
+        private static bool SgNear(Loop l, Settings c) { return l != null && LisDist(l.Pos) <= l.Max * LoudScale(c) + FarExtra; }
 
         // ============================================================ przeglad obiektow (raz po rozstawieniu)
 
@@ -649,6 +652,7 @@ namespace Armoury
                 _sdClip = cl;
             }
             if (_sdClip == null) return;
+            if (LisDist(_sdPos) > SdMax * LoudScale(c) + FarExtra) return;   // poza zasiegiem sluchacza - bez Play (jak bebny marszu, Drums.cs)
             var s = Play(m, _sdClip, GDrum, _sdPos, SdMin, SdMax, true, null, null, "beben oblezenia");
             if (s == null) return;
             _sdCur = s;

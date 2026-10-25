@@ -9764,9 +9764,9 @@ namespace Armoury
         [SettingPropertyGroup("Battle sounds")]
         public bool SiegeFireSounds { get; set; } = false;
 
-        [SettingPropertyBool("Siege Assault Crowd", HintText = "with Battle Sounds: when a castle or a town is stormed, the attackers roar at the ladders, the siege towers and the ram, the defenders cry out from the walls in the voices of their lands - hold the walls, ladders, pour the oil, archers to the walls - and a great roar goes up when the gate or a breach gives way. Whether you storm or defend", RequireRestart = false)]
+        [SettingPropertyBool("Siege Assault Crowd", HintText = "with Battle Sounds: when a castle or a town is stormed, the attackers roar at the ladders, the siege towers and the ram, the defenders cry out from the walls in the voices of their lands - hold the walls, ladders, pour the oil, archers to the walls - and a great roar goes up when the gate or a breach gives way. Whether you storm or defend. ROT Battle Atmosphere's Contextual Combat Shouts also voice these moments - with both on you may hear them twice. Trial - off by default until tested", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
-        public bool SiegeAssaultCrowd { get; set; } = true;
+        public bool SiegeAssaultCrowd { get; set; } = false;
 
         [SettingPropertyBool("Siege Drums", HintText = "with Battle Sounds: the besiegers' war drums beat in the rhythm of their culture while their host closes on the walls, quicker once the assault begins, and fall silent while the fight is on the walls. In a siege they take the place of the marching drums", RequireRestart = false)]
         [SettingPropertyGroup("Battle sounds")]
