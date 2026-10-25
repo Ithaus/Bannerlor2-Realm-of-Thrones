@@ -54,7 +54,39 @@ nieszkodliwe, jesli silnik trzyma sufit MountSpeed, inaczej osobna zmiana), Camp
 zadnego -1 na limicie), BK BKAgentStatsTweakPatches (postfiks na tym samym celu, dla konia wychodzi - Character null), RBM UnpatchAll zdejmuje tylko wlasne id, DragonFeed / MountLaw
 (wykluczenia), HorseFate (bez zmian). Zadna inna nasza latka nie celuje w UpdateAgentStats (grep). (6) Kalibracja (W' 44, CP 0.75, tau 120 s, D(u)) z malych prob (Prince 2002:
 5+5 koni) - mnozniki w MCM; stan tylko na misje (bez zmeczenia przewleklego miedzy bitwami). (7) Linia misji osobna (nie w NB2) - tools/sprawdz_logi.py jej jeszcze nie zna.
-**Status:** ZBUDOWANE - nie wgrane (Armoury.dll md5 52120077, galaz noc/136-konie; gra nie uruchamiana).
+**Recenzja (7 uwag, 25.10 ok. 14:15; kazda sprawdzona w kodzie - wszystkie prawdziwe, 1=5, 2=6 i 4=7 to te same bledy):**
+(1)+(5) PRAWDA [wrong-behaviour] - odpoczynek konnicy AI tempem podejscia (MarchCap KCav: CavalryApproachPace 0.45 x pelna, limit konia x1.1 = u ok. 0.5) przy typowym
+obciazeniu ROT nie dawal odpoczynku: vlandia_horse 425 kg + rot_horse_saddle2 100 kg (liczone 52) + zbroja 19.6 + bron 10 -> r 0.37, f 1.34, D(0.45..0.50) x f = 0.75..0.83
+>= CP 0.75 (kon dalej tracil); t2_vlandia 475 kg g 0.10 (35 -> 65 ok. 12 min), t3 550 kg z bardem (CP 0.70) g 0 - srednia szyku nie wracala do 65, szyk klusowal az do 60 m
+od wroga z wstrzymanym sygnalem szarzy. Poprawka: wlasne tempo odpoczynku z modelu - HorseWind.RestPace: dla kazdego konia u_odp, przy ktorym D(u) x f = 0.23 + 0.5 x (CP - 0.23)
+(g = 0.5), u 0.12..0.35 (step - lekki klus); HorseWind.RestSpeed(szyk) = srednia u_odp x Vbase koni szyku (Vbase bez kary - zmeczenie go nie obniza); MarchToContact.RestCap:
+cap = RestSpeed / 1.1 (margines linii latki AdjustSpeedLimit), 1.5..9 m/s. Wyniki 35 -> 65 (tau 120 s): vlandia 425 u 0.27 ok. 2.4 min, t2 475 u 0.30 ok. 2.5 min, t3 550 z bardem
+u 0.31 ok. 2.7 min, khuzait 320 z 40 kg zbroi u 0.16 (step) ok. 2.1 min, lekki kon u 0.35 ok. 2.2 min. Galaz odpoczynku jest teraz PRZED szarza marszem 128 (zmeczony szyk
+idzie tempem odpoczynku takze przy dalekiej szarzy; bez zmeczenia 128 bez zmian). Bezpiecznika czasowego nie dodalem: g = 0.5 z konstrukcji dla przecietnego konia szyku
+(step drenowalby dopiero przy f ponad ok. 3). Klus podejscia 127/128 (CavalryApproachPace 0.45) zostaje - dla obciazonego konia ROT to canter, ktory powoli meczy (osobna decyzja).
+Poprawione: komentarz HorseWind (klus = prawdziwy klus, u ok. 0.3, 3.5-4 m/s) i opisy MCM HorseGallopDrainScale, HorseAiRestBelow ("a walk or an easy trot - as slow as their
+load needs"); McmSettings.cs wygenerowany (tylko te 2 opisy).
+(2)+(6) PRAWDA [minor] - (a) ChargeHeld bral _rest z poprzedniego Eval, a BattleCries.Tick biegnie w klatce przed MarchToContact.Tick (BattleSense.cs:192-197; oba co 0.5 s
+w tej samej klatce): w klatce konca odpoczynku sygnal byl wstrzymany, Eval konczyl odpoczynek, galaz rest wracala przed _wasCharge = charge -> szarza liczona jako "bez sygnalu"
+z dystansem ok. 60 m, okrzyk i rog takt pozniej (marching juz false, wiec bez "z sygnalu"). Poprawka: RestState - jedna regula bez skutkow ubocznych; RestCav (Eval) i ChargeHeld
+(na zywo: biezacy gap i srednia; takze wejscie w odpoczynek - swieza szarza zmeczonej konnicy nie daje okrzyku, po ktorym szyk zwalnia) licza to samo w tej samej klatce, wiec
+sygnal przychodzi w klatce konca odpoczynku jak w 128; w galezi rest przy rozkazie innym niz szarza _wasCharge / _signal = false (jak na dole Eval). (b) Wejscie w odpoczynek
+liczylo sie jako "wejscie w marsz: konnica" i do "szykow w marszu" (Set, old <= 0) - Set(count = false) dla capu odpoczynku; marsz zaraz po odpoczynku liczy sie jako wejscie
+(flaga _capRest). (c) NoteAiRest liczyl odpoczynek takze szykom klusujacym przez 128 - po przeniesieniu galezi rest przed 128 kazde wejscie naprawde jedzie tempem odpoczynku.
+(3) PRAWDA [minor] - kon gracza czekal w kolejce 16 zapisow MountSpeed na takt (64/s); przy kilkuset koniach ponizej S 30 (zapis co ok. 1.2 s na konia) kara gracza przychodzila
+z opoznieniem kilku s i skokami (komunikat "blown" przed zwolnieniem). Poprawka: kon gracza (rider.IsMainAgent) zapisywany zawsze, poza limitem (najwyzej 1 wolanie natywne
+na takt wiecej); licznik "kon gracza poza limitem" w linii. Dla AI opoznienie zostaje: przy N koniach do zapisu - zapis co ok. N/64 s (ryzyko w duzej bitwie: kara AI skokami).
+(4)+(7) PRAWDA [minor] - dowod T1 byl maksimum ze wszystkich probek (do 1.5 Vbase, takze tuz po obnizce, gdy kon jeszcze hamuje) - jedna odstajaca probka (stok, scisk,
+odrzut) dawala "silnik nie slucha". Poprawka: czas ostatniej zmiany mnoznika w silniku (Horse.MAt - zapis w takcie albo postfiks); liczone tylko probki galopu
+(v/(Vbase x m) ponad 0.8) przy m stojacym od >= 1 s: przy m = 1 sr. v/Vbase (jednostki - dobre ok. 0.85-1.05) i liczba probek; przy m <= 0.85 liczba probek, sr. m,
+sr. v/Vbase, sr. v/(Vbase x m) i udzial probek blizej 1/m niz 1 (prog (1 + 1/m) / 2). Najwieksza v zostaje jako surowa. NOWE KRYTERIUM T1 (zastepuje Ryzyko (1)-(2) wyzej):
+silnik slucha MountSpeed konia gracza = sr. v/(Vbase x m) ok. 1 i "blizej 1/m" ponizej 20%; nie slucha = sr. ok. 1/m i "blizej 1/m" ponad 50%. Probki T1 zbiera sie glownie,
+gdy kon gracza jest zajechany i gracz dalej go goni (m stoi na dnie) - przy spadku S mnoznik zmienia sie co ok. 1.2 s.
+Nowe pola linii "Konie (136)": "(tempo odpoczynku AI sr. u X)", "zapisow MountSpeed F (kon gracza poza limitem P)", "galop przy m=1: sr. v/Vbase A (probek N; ...)",
+"T1 przy m<=0.85 (m stale >= 1 s, probki galopu): probek N, sr. m, sr. v/Vbase, sr. v/(Vbase x m), blizej 1/m niz 1: Z%".
+Co sprawdzic dodatkowo: autotest - "odpoczynkow konnicy AI" i "sr. S na koniec" (odpoczywajace szyki wracaja ponad 65 i ruszaja), w NB2 "szarza bez sygnalu" nie rosnie
+od odpoczynku; konnica AI w odpoczynku jedzie ok. 3-4 m/s (dotad 5-6 m/s) - pod ostrzalem dluzej w zasiegu lukow; regresja 128: bez zmeczenia (S ponad 35) sciezka bez zmian.
+**Status:** ZBUDOWANE - nie wgrane (Armoury.dll md5 599ee56f po recenzji, przed recenzja 52120077; galaz noc/136-konie; gra nie uruchamiana).
 
 ## 2026-10-25 131 (galaz noc/127-bitwa-cialo) - udzwig z Endurance: kazdy punkt Endurance bohatera w druzynie +5 kg
 **Problem:** Jeff 25.10 ok. 12:41: "a kazdy punkt endurance daje +5 do udzwigu w menu inventory jako dodatkowe", potem "i companions tez".

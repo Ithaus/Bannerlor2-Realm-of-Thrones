@@ -29,7 +29,10 @@ namespace Armoury
     ///  - D x f ponad CP: S -= 100 x (D x f - CP) / W' x dt x HorseGallopDrainScale x jezdziec; D x f ponizej CP: S += (100 - S) / tau x g x dt,
     ///    g = clamp((CP - D x f) / (CP - 0.23), 0, 1); kon bez jezdzca tylko odpoczywa (jak stepem);
     ///  - mnoznik predkosci m = S &lt; 30 ? HorseTiredFloor + (1 - HorseTiredFloor) x S/30 : 1.
-    /// Przecietny kon (r 20%) pelnym galopem do zera ok. 60 s, rycerz z bardem (r 35%) ok. 40 s; klus i step to odpoczynek.
+    /// Przecietny kon (r 20%) pelnym galopem do zera ok. 60 s, rycerz z bardem (r 35%) ok. 40 s; step i prawdziwy klus (u ok. 0.3, ok. 3.5-4 m/s) to odpoczynek.
+    /// Recenzja 136: "klus" podejscia konnicy w MarchToContact (CavalryApproachPace 0.45 x pelna, z marginesem linii u ok. 0.5) to w modelu canter - typowy kon ROT
+    /// (vlandia_horse 425 kg, "siodlo" 100 kg, r ok. 0.37, f ok. 1.34) traci na nim powoli (D x f ok. 0.76-0.83 &gt; CP 0.75). Dlatego odpoczynek konnicy AI ma wlasne tempo:
+    /// RestSpeed(szyk) = srednia z koni szyku u_odp x Vbase, gdzie u_odp daje g = 0.5 przy obciazeniu konia (D(u) x f = 0.23 + 0.5 x (CP - 0.23); u 0.12..0.35).
     ///
     /// Jak kara trafia do silnika (dowod w rozpoznaniu, krytyk pkt 1): przez AgentDrivenProperties.MountSpeed konia - ta sama droga, ktora gra sama
     /// zmienia predkosc konia w bitwie (BannerBearerLogic: mount.UpdateAgentProperties przy chorazych), a RBM AdjustSpeedLimitPatch wpisuje konnicy AI
@@ -63,6 +66,9 @@ namespace Armoury
         private const float RiderKg = 75f;           // jezdziec bez rynsztunku (fizjologia: 70-75 kg)
         private const float HarnessFreeKg = 40f;     // uprzaz do tej wagi liczona w calosci
         private const float FullGallopD = 1.45f;     // D(1) - pelny galop
+        private const float RestG = 0.5f, RestUMin = 0.12f, RestUMax = 0.35f;   // tempo odpoczynku konnicy AI: g = 0.5, od stepu do klusa
+        private const float StableFor = 1f;          // dowod T1: probka liczona, gdy mnoznik w silniku stoi od tylu sekund (kon zdazyl zwolnic)
+        private const float T1MaxM = 0.85f;          // dowod T1: tylko przy m do tyle (1/m wyraznie ponad 1)
         private const int MaxTeams = 16, Stride = 10, Slots = MaxTeams * Stride;
 
         // rodzaje wykluczen (indeksy licznikow linii)
@@ -77,7 +83,9 @@ namespace Armoury
             public float S = 100f;       // pula 0..100
             public float M = 1f;         // biezacy mnoznik predkosci (czyta postfiks)
             public float MWritten = 1f;  // mnoznik, ktory siedzi teraz w MountSpeed silnika
+            public float MAt = -1000f;   // czas misji ostatniej zmiany MWritten (zapis w takcie albo postfiks)
             public float Vbase = -1f;    // MountSpeed z modelu bez naszej kary (m/s wedlug gry)
+            public float RestU = 0.3f;   // tempo odpoczynku (u) przy obciazeniu tego konia - dla konnicy AI (RestSpeed)
             public string Id = "?";
             public float Kg = 450f, HarnessRaw, Harness;
             public float Wprim = 44f, CP = 0.75f, Tau = 120f;
@@ -99,12 +107,15 @@ namespace Armoury
         // ---- czytane przez postfiks (glowny watek - sprawdzane) i przez MarchToContact
         private static volatile HorseWind _live;
         private static int _mainTid = -1;
+        private static float _clock;     // czas misji biezacego taktu (postfiks zapisuje nim MAt)
 
-        // ---- srednia S koni szyku (dla odpoczynku konnicy AI w MarchToContact) - liczona w takcie, bez alokacji
+        // ---- srednia S i tempo odpoczynku koni szyku (dla odpoczynku konnicy AI w MarchToContact) - liczone w takcie, bez alokacji
         private static readonly float[] _fSum = new float[Slots];
+        private static readonly float[] _fRestV = new float[Slots];
         private static readonly int[] _fN = new int[Slots];
         private static readonly Formation[] _fWho = new Formation[Slots];
         private static readonly float[] _avg = new float[Slots];
+        private static readonly float[] _restV = new float[Slots];
         private static readonly Formation[] _avgWho = new Formation[Slots];
         private static bool _avgOn;
 
@@ -112,25 +123,30 @@ namespace Armoury
         private static bool _patchTried, _patched;
 
         // ---- liczniki misji
-        private static int _seen, _blownOurs, _blownFoe, _harnessScaled, _writes, _rejected, _stum, _stumSession, _aiRests;
+        private static int _seen, _blownOurs, _blownFoe, _harnessScaled, _writes, _rejected, _stum, _stumSession, _aiRests, _plWrites;
         private static int _postN, _postPen, _postOff, _postErr;
         private static readonly int[] _ex = new int[ExKinds];
-        private static float _rSum, _tSum;
+        private static float _rSum, _tSum, _restUSum;
         private static int _rN, _tN;
-        // gracz (dowod T1: czy MountSpeed spowalnia konia gracza)
+        // gracz (dowod T1: czy MountSpeed spowalnia konia gracza). Recenzja 136: zamiast maksimum (jedna odstajaca probka do 1.5 Vbase albo probka
+        // tuz po obnizce, gdy kon jeszcze hamuje, dawala "silnik nie slucha") - liczba i srednia probek galopu przy mnozniku stojacym od StableFor s.
         private static Horse _pl;
-        private static float _plMaxV, _plRatio, _plRatioM, _plRatio2, _plEng1, _plEngLow, _plEngLowM;
+        private static float _plMaxV, _plEng1, _plEngLow, _plEngLowM;
+        private static int _p1N, _pLN, _pLOver;              // probki galopu: przy m = 1 / przy m <= T1MaxM; z tych drugich blizej 1/m niz 1
+        private static float _p1Sum, _pLSum, _pLMSum, _pLVb;  // sumy: v/Vbase przy m = 1; v/(Vbase x m), m, v/Vbase przy m <= T1MaxM
 
         private static void ResetCounters()
         {
-            _seen = _blownOurs = _blownFoe = _harnessScaled = _writes = _rejected = _stum = _aiRests = 0;
+            _seen = _blownOurs = _blownFoe = _harnessScaled = _writes = _rejected = _stum = _aiRests = _plWrites = 0;
             _postN = _postPen = 0;
             Interlocked.Exchange(ref _postOff, 0);
             Interlocked.Exchange(ref _postErr, 0);
             for (int i = 0; i < ExKinds; i++) _ex[i] = 0;
-            _rSum = _tSum = 0f; _rN = _tN = 0;
+            _rSum = _tSum = _restUSum = 0f; _rN = _tN = 0;
             _pl = null;
-            _plMaxV = 0f; _plRatio = 0f; _plRatioM = 1f; _plRatio2 = 0f; _plEng1 = -1f; _plEngLow = -1f; _plEngLowM = 1f;
+            _plMaxV = 0f; _plEng1 = -1f; _plEngLow = -1f; _plEngLowM = 1f;
+            _p1N = _pLN = _pLOver = 0;
+            _p1Sum = _pLSum = _pLMSum = _pLVb = 0f;
         }
 
         // ------------------------------------------------------------ rejestracja i misja
@@ -200,7 +216,7 @@ namespace Armoury
         private static void ClearAvg()
         {
             _avgOn = false;
-            for (int i = 0; i < Slots; i++) { _fSum[i] = 0f; _fN[i] = 0; _fWho[i] = null; _avg[i] = -1f; _avgWho[i] = null; }
+            for (int i = 0; i < Slots; i++) { _fSum[i] = 0f; _fRestV[i] = 0f; _fN[i] = 0; _fWho[i] = null; _avg[i] = -1f; _restV[i] = -1f; _avgWho[i] = null; }
         }
 
         // ------------------------------------------------------------ takt
@@ -224,7 +240,8 @@ namespace Armoury
             float floor = Clamp(c.HorseTiredFloor, 0.4f, 0.9f);
             var mission = Mission;
             float now = mission.CurrentTime;
-            for (int i = 0; i < Slots; i++) { _fSum[i] = 0f; _fN[i] = 0; _fWho[i] = null; }
+            _clock = now;
+            for (int i = 0; i < Slots; i++) { _fSum[i] = 0f; _fRestV[i] = 0f; _fN[i] = 0; _fWho[i] = null; }
 
             var agents = mission.Agents;
             int n = agents != null ? agents.Count : 0;
@@ -259,7 +276,10 @@ namespace Armoury
                     float d = m - h.MWritten;
                     if (d >= MinStep || d <= -MinStep || (m >= 0.999f && h.MWritten < 0.999f))
                     {
-                        if (budget > 0) { budget--; Push(a, h, m); }
+                        // recenzja 136: kon gracza poza limitem zapisow (jedno wolanie natywne na takt najwyzej) - w duzej bitwie kolejka kilkuset meczacych sie koni
+                        // opozniala jego kare o kilka sekund i dawala duze skoki (komunikat "blown" przed zwolnieniem)
+                        if (rider != null && rider.IsMainAgent) { Push(a, h, m); _plWrites++; }
+                        else if (budget > 0) { budget--; Push(a, h, m); }
                         else if (resume < 0) resume = i;
                     }
                 }
@@ -269,8 +289,8 @@ namespace Armoury
 
             for (int i = 0; i < Slots; i++)
             {
-                if (_fN[i] > 0) { _avg[i] = _fSum[i] / _fN[i]; _avgWho[i] = _fWho[i]; }
-                else { _avg[i] = -1f; _avgWho[i] = null; }
+                if (_fN[i] > 0) { _avg[i] = _fSum[i] / _fN[i]; _restV[i] = _fRestV[i] / _fN[i]; _avgWho[i] = _fWho[i]; }
+                else { _avg[i] = -1f; _restV[i] = -1f; _avgWho[i] = null; }
             }
             _avgOn = true;
         }
@@ -337,8 +357,9 @@ namespace Armoury
             int riding = 0;
             try { if (ch != null) riding = ch.GetSkillValue(DefaultSkills.Riding); } catch { }
             h.RideMul = 1.15f - 0.30f * Math.Min(Math.Max(riding, 0), 300) / 300f;
+            h.RestU = RestPace(h.F, h.CP);
             if (!h.Counted) { h.Counted = true; _seen++; }
-            _rSum += h.R; _rN++;
+            _rSum += h.R; _restUSum += h.RestU; _rN++;
             float t = GallopToZero(h, scale);
             if (t > 0f && t < 100000f) { _tSum += t; _tN++; }
         }
@@ -350,6 +371,17 @@ namespace Armoury
             if (over <= 0f) return float.MaxValue;
             float perSec = 100f * over / h.Wprim * scale * h.RideMul;
             return perSec > 0f ? 100f / perSec : float.MaxValue;
+        }
+
+        /// <summary>Recenzja 136: tempo odpoczynku (u) przy obciazeniu konia - D(u) x f = 0.23 + RestG x (CP - 0.23), czyli g = 0.5 (powrot z 35 do 65
+        /// w ok. 2.5 min przy tau 120 s); od stepu do klusa (RestUMin..RestUMax). Typowy kon ROT (f 1.34, CP 0.75): u ok. 0.27, ok. 3.3 m/s przy Vbase 12.</summary>
+        private static float RestPace(float f, float cp)
+        {
+            float target = 0.23f + RestG * (cp - 0.23f);
+            float c = 0.15f - target / Math.Max(0.5f, f);       // 0.70u^2 + 0.60u + c = 0
+            if (c >= 0f) return RestUMin;
+            float u = (-0.60f + (float)Math.Sqrt(0.36f - 2.8f * c)) / 1.4f;
+            return Clamp(u, RestUMin, RestUMax);
         }
 
         /// <summary>Kon pod jezdzcem (liczony): pomiar drogi, model, srednia szyku, zajechani, komunikaty gracza.</summary>
@@ -364,7 +396,7 @@ namespace Armoury
                 else
                 {
                     Model(h, v / h.Vbase, step, scale);
-                    if (rider.IsMainAgent) NotePlayer(a, h, v);
+                    if (rider.IsMainAgent) NotePlayer(a, h, v, now);
                 }
             }
             h.PX = p.x; h.PY = p.y; h.HasPos = true;
@@ -376,7 +408,7 @@ namespace Armoury
             if (idx >= 0)
             {
                 if (_fWho[idx] == null) _fWho[idx] = f;
-                if (ReferenceEquals(_fWho[idx], f)) { _fSum[idx] += h.S; _fN[idx]++; }
+                if (ReferenceEquals(_fWho[idx], f)) { _fSum[idx] += h.S; _fRestV[idx] += h.RestU * h.Vbase; _fN[idx]++; }
             }
 
             if (h.S <= 0f && !h.Blown)
@@ -422,6 +454,7 @@ namespace Armoury
             adp.MountSpeed = h.Vbase * m;
             a.UpdateCustomDrivenProperties();
             h.MWritten = m;
+            h.MAt = _clock;
             _writes++;
         }
 
@@ -443,21 +476,39 @@ namespace Armoury
 
         // ------------------------------------------------------------ gracz
 
-        private static void NotePlayer(Agent a, Horse h, float v)
+        /// <summary>Probka konia gracza (dowod T1 i jednostek). Liczone tylko probki galopu (v ponad 0.8 obecnego sufitu) przy mnozniku, ktory stoi w silniku
+        /// od StableFor s - po obnizce kon jeszcze hamuje. Przy m &lt;= T1MaxM: silnik slucha MountSpeed = v/(Vbase x m) ok. 1; nie slucha = ok. 1/m;
+        /// probka blizej 1/m niz 1 (prog (1 + 1/m) / 2) liczona osobno - pojedyncze odstajace (zjazd, scisk, odrzut) nie wywracaja wyniku.</summary>
+        private static void NotePlayer(Agent a, Horse h, float v, float now)
         {
             _pl = h;
             if (v > _plMaxV) _plMaxV = v;
             float eng = -1f;
             try { eng = a.GetMaximumForwardUnlimitedSpeed(); } catch { }
-            if (h.MWritten < 0.999f)
+            float m = h.MWritten;
+            bool stable = now - h.MAt >= StableFor;
+            if (m < 0.999f)
             {
-                float ratio = v / h.Vbase;
-                if (ratio > _plRatio) { _plRatio = ratio; _plRatioM = h.MWritten; }
-                float r2 = v / (h.Vbase * h.MWritten);
-                if (r2 > _plRatio2) _plRatio2 = r2;
-                if (h.MWritten <= _plEngLowM) { _plEngLowM = h.MWritten; _plEngLow = eng; }
+                if (m <= _plEngLowM) { _plEngLowM = m; _plEngLow = eng; }
+                if (stable && m <= T1MaxM && m > 0.05f)
+                {
+                    float r2 = v / (h.Vbase * m);
+                    if (r2 > 0.8f)
+                    {
+                        _pLN++; _pLSum += r2; _pLMSum += m; _pLVb += v / h.Vbase;
+                        if (r2 > 0.5f * (1f + 1f / m)) _pLOver++;
+                    }
+                }
             }
-            else _plEng1 = eng;
+            else
+            {
+                _plEng1 = eng;
+                if (stable)
+                {
+                    float r1 = v / h.Vbase;
+                    if (r1 > 0.8f) { _p1N++; _p1Sum += r1; }
+                }
+            }
         }
 
         private void PlayerMessages(Horse h, float now)
@@ -493,6 +544,16 @@ namespace Armoury
             int idx = Idx(f);
             if (idx < 0 || !ReferenceEquals(_avgWho[idx], f)) return -1f;
             return _avg[idx];
+        }
+
+        /// <summary>Recenzja 136: tempo odpoczynku koni szyku w m/s (srednia RestU x Vbase z ostatniego taktu - Vbase bez kary, wiec zmeczenie go nie obniza);
+        /// -1 = brak danych (jak AvgStamina). MarchToContact dzieli przez margines linii, zeby limit konia wyszedl na to tempo.</summary>
+        internal static float RestSpeed(Formation f)
+        {
+            if (!_avgOn || f == null) return -1f;
+            int idx = Idx(f);
+            if (idx < 0 || !ReferenceEquals(_avgWho[idx], f)) return -1f;
+            return _restV[idx];
         }
 
         /// <summary>MarchToContact: szyk konnicy AI zaczal odpoczywac (licznik linii).</summary>
@@ -591,10 +652,11 @@ namespace Armoury
                 if (!hw._horses.TryGetValue(agent, out h) || h.Ex != ExNone) return;
                 _postN++;
                 float fresh = agentDrivenProperties.MountSpeed;
-                if (fresh <= 0.5f) { h.MWritten = 1f; return; }
+                if (fresh <= 0.5f) { if (h.MWritten < 0.999f) h.MAt = _clock; h.MWritten = 1f; return; }
                 h.Vbase = fresh;
                 float m = h.M;
                 if (m < 0.999f) { agentDrivenProperties.MountSpeed = fresh * m; _postPen++; }
+                if (m - h.MWritten > 0.001f || h.MWritten - m > 0.001f) h.MAt = _clock;
                 h.MWritten = m;
             }
             catch { Interlocked.Increment(ref _postErr); }
@@ -624,9 +686,11 @@ namespace Armoury
               .Append(" | zajechanych do 0: strona gracza ").Append(_blownOurs).Append(", wrog ").Append(_blownFoe)
               .Append(" | sr. S na koniec ").Append(sN > 0 ? F(sSum / sN, "0") : "-").Append(" (koni ").Append(sN).Append(')')
               .Append(" | sr. obciazenie r ").Append(_rN > 0 ? F(100f * _rSum / _rN, "0") + "%" : "-")
+              .Append(" (tempo odpoczynku AI sr. u ").Append(_rN > 0 ? F(_restUSum / _rN, "0.00") : "-").Append(')')
               .Append(" (uprzaz przeliczona x").Append(F(c != null ? Clamp(c.HorseHarnessHeavyScale, 0.1f, 1f) : 0.2f, "0.##")).Append(' ').Append(_harnessScaled).Append(" razy)")
               .Append(", pelny galop do zera sr. ").Append(_tN > 0 ? F(_tSum / _tN, "0") + " s" : "-")
-              .Append(" | zapisow MountSpeed ").Append(_writes).Append(", przeliczen modelu ").Append(_postN).Append(" (postfiks; z kara ").Append(_postPen)
+              .Append(" | zapisow MountSpeed ").Append(_writes).Append(" (kon gracza poza limitem ").Append(_plWrites).Append(")")
+              .Append(", przeliczen modelu ").Append(_postN).Append(" (postfiks; z kara ").Append(_postPen)
               .Append(", obcy watek ").Append(Volatile.Read(ref _postOff)).Append(", bledy ").Append(Volatile.Read(ref _postErr)).Append(')')
               .Append(", odrzuconych probek (skok > 1.5 Vbase) ").Append(_rejected)
               .Append(" | odpoczynkow konnicy AI ").Append(_aiRests)
@@ -639,9 +703,15 @@ namespace Armoury
                 sb.Append(" | gracz: kon ").Append(p.Id).Append(' ').Append(F(p.Kg, "0")).Append(" kg, r ").Append(F(100f * p.R, "0")).Append("%, Vbase ")
                   .Append(F(p.Vbase, "0.0")).Append(" m/s, pelny galop do zera ").Append(t < 100000f ? F(t, "0") + " s" : "nigdy")
                   .Append(", S na koniec ").Append(F(p.S, "0"))
-                  .Append(", najwieksza zmierzona v ").Append(F(_plMaxV, "0.0")).Append(" m/s, przy m<1: v/Vbase ")
-                  .Append(_plRatio > 0f ? F(_plRatio, "0.00") + " (przy m " + F(_plRatioM, "0.00") + "), v/(Vbase x m) " + F(_plRatio2, "0.00") : "- (kon gracza nie zwolnil)")
-                  .Append(" (dowod, ze MountSpeed spowalnia: v/(Vbase x m) do ok. 1)")
+                  .Append(", najwieksza zmierzona v ").Append(F(_plMaxV, "0.0")).Append(" m/s (surowa, z odstajacymi)")
+                  .Append(", galop przy m=1: sr. v/Vbase ").Append(_p1N > 0 ? F(_p1Sum / _p1N, "0.00") : "-").Append(" (probek ").Append(_p1N)
+                  .Append("; jednostki dobre, gdy ok. 0.85-1.05)")
+                  .Append(", T1 przy m<=").Append(F(T1MaxM, "0.00")).Append(" (m stale >= 1 s, probki galopu): ");
+                if (_pLN > 0)
+                    sb.Append("probek ").Append(_pLN).Append(", sr. m ").Append(F(_pLMSum / _pLN, "0.00")).Append(", sr. v/Vbase ").Append(F(_pLVb / _pLN, "0.00"))
+                      .Append(", sr. v/(Vbase x m) ").Append(F(_pLSum / _pLN, "0.00")).Append(", blizej 1/m niz 1: ").Append(F(100f * _pLOver / _pLN, "0")).Append('%');
+                else sb.Append("- (kon gracza nie zwolnil do tego m albo nie galopowal)");
+                sb.Append(" (silnik slucha MountSpeed: v/(Vbase x m) ok. 1 i blizej 1/m ponizej 20%; nie slucha: ok. 1/m i ponad 50%)")
                   .Append(", silnik GetMaximumForwardUnlimitedSpeed przy m=1 ").Append(_plEng1 >= 0f ? F(_plEng1, "0.0") : "-")
                   .Append(", przy m ").Append(F(_plEngLowM, "0.00")).Append(' ').Append(_plEngLow >= 0f ? F(_plEngLow, "0.0") : "-");
             }

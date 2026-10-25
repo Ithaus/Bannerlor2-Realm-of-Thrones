@@ -1448,7 +1448,7 @@ namespace Armoury
         [SettingPropertyGroup("Horse wind")]
         public bool HorseStaminaEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Horse Gallop Drain Scale", 0.25f, 3.00f, "0.00", HintText = "how fast a gallop spends a horse's wind. At 1 an average horse with an average load (about a fifth of its own weight) gallops flat out for about a minute and a knight's horse in barding for about 40 seconds; a working canter lasts many minutes, a trot or a walk rests it. 2 = twice as fast, 0.5 = half as fast", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Horse Gallop Drain Scale", 0.25f, 3.00f, "0.00", HintText = "how fast a gallop spends a horse's wind. At 1 an average horse with an average load (about a fifth of its own weight) gallops flat out for about a minute and a knight's horse in barding for about 40 seconds; a working canter lasts many minutes (fewer under a heavy load), a walk or an easy trot rests it. 2 = twice as fast, 0.5 = half as fast", RequireRestart = false)]
         [SettingPropertyGroup("Horse wind")]
         public float HorseGallopDrainScale { get; set; } = 1f;
 
@@ -1464,7 +1464,7 @@ namespace Armoury
         [SettingPropertyGroup("Horse wind")]
         public float HorseHarnessHeavyScale { get; set; } = 0.2f;
 
-        [SettingPropertyInteger("Horse AI Rest Below", 0, 80, "0", HintText = "AI cavalry (not horse archers) eases its horses to a trot when their wind falls below this on average, as long as no enemy is within 60 m, instead of riding them into the ground. Works with March To Contact. 0 = never", RequireRestart = false)]
+        [SettingPropertyInteger("Horse AI Rest Below", 0, 80, "0", HintText = "AI cavalry (not horse archers) eases its horses to a walk or an easy trot - as slow as their load needs - when their wind falls below this on average, as long as no enemy is within 60 m, instead of riding them into the ground. Works with March To Contact. 0 = never", RequireRestart = false)]
         [SettingPropertyGroup("Horse wind")]
         public int HorseAiRestBelow { get; set; } = 35;
 
