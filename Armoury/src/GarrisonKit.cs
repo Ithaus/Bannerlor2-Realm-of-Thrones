@@ -469,7 +469,7 @@ namespace Armoury
             _bCivNone = _bCivSkill = _bCivTpl = _bCivDead = _bCivStumbles = 0; _bCivSample.Clear(); _bCivKinds[0].Clear(); _bCivKinds[1].Clear(); Civvies.ClearCounters();
             for (int i = 0; i < 3; i++) _bHome[i] = 0;   // m119: kij z domu
             for (int i = 0; i < 4; i++) _bHomeLv[i] = 0;
-            _bHomeTpl = _bHomeNone = _bHomeSlot = _bHomeDead = _bHomeRace = _bHomeStumbles = _bHomeReg = _bHomeTemp = 0; _bHomeSample.Clear(); _bHomeKinds.Clear();
+            _bHomeTpl = _bHomeNone = _bHomeSlot = _bHomeDead = _bHomeRace = _bHomeStumbles = _bHomeReg = _bHomeTemp = _bHomeBanner = 0; _bHomeSample.Clear(); _bHomeKinds.Clear();
         }
 
         private static bool BattleTouched()
@@ -930,7 +930,8 @@ namespace Armoury
             if (s == null || !s.BareTroopsTakeHomeWeapon) return "; kij z domu (m119) wylaczony";
             if (!HomeHooked) return "; kij z domu (m119) BRAK latki (licznik wystawionych DTE albo oznaczanie tymczasowych) - nikt nie dostal kija";
             int given = _bHome[0] + _bHome[1] + _bHome[2];
-            string check = _bHomeReg < given ? "NIEZGODNE - DTE nie zarejestrowal " + (given - _bHomeReg) + " ludzi z kijem (bez wpisu zwrot i lup DTE czytaja agenta bez filtra tymczasowych)"
+            int reg = _bHomeReg + _bHomeBanner;   // noc 25.10 P3 (recenzja): chorazowie posilkow z kijem tez zarejestrowani, ale poza kontrola tymczasowych
+            string check = reg < given ? "NIEZGODNE - DTE nie zarejestrowal " + (given - reg) + " ludzi z kijem (bez wpisu zwrot i lup DTE czytaja agenta bez filtra tymczasowych)"
                          : _bHomeTemp < _bHomeReg ? "NIEZGODNE - u " + (_bHomeReg - _bHomeTemp) + " agentow kij NIE jest sztuka tymczasowa (zwrot DTE oddalby go do zbrojowni)"
                          : "zgodne";
             var ex = new List<string>();
@@ -939,7 +940,9 @@ namespace Armoury
                    + " (wlasna kultura " + _bHomeLv[1] + ", dozwolona inna " + _bHomeLv[2] + ", bez kultury " + _bHomeLv[3] + "; roznych sztuk " + _bHomeKinds.Count + ")"
                    + "; bez kija - wzorzec bez broni " + _bHomeTpl + ", brak sztuki dla niego " + _bHomeNone + ", bez wolnego slotu 0-3 " + _bHomeSlot
                    + ", umarli " + _bHomeDead + ", nie-ludzie (olbrzymy) " + _bHomeRace
-                   + "; potwierdzone tymczasowe " + _bHomeTemp + " z " + _bHomeReg + " zarejestrowanych przez DTE (wydanych " + given + "; " + check + "), potkniecia " + _bHomeStumbles
+                   + "; potwierdzone tymczasowe " + _bHomeTemp + " z " + _bHomeReg + " zarejestrowanych przez DTE (wydanych " + given + "; " + check + ")"
+                   + "; chorazowie ze sztandarem od spawnu (posilki) z kijem " + _bHomeBanner
+                   + " (gra podmienila sprzet przed rejestracja - kija nie niosa, bron zastepcza - BannerKit przy czynnym A; poza kontrola), potkniecia " + _bHomeStumbles
                    + (ex.Count > 0 ? "; np. " + string.Join(", ", ex.ToArray()) : "");
         }
 
@@ -989,10 +992,17 @@ namespace Armoury
                 HomeRec hr;
                 if (__0 != null && __1 != null && _homeAsg.Count > 0 && _homeAsg.TryGetValue(__1, out hr) && hr != null)
                 {
-                    _bHomeReg++;
-                    var se = __0.SpawnEquipment;
-                    var it = se != null ? se[hr.Slot].Item : null;
-                    if (it != null && _isTemp != null && (bool)_isTemp.Invoke(__1, new object[] { hr.Slot, it })) _bHomeTemp++;
+                    // noc 25.10 P3 (recenzja): chorazy posilkow (MissionBattleSideSpawnContext -> SpawnBannerBearer; Mission.SpawnAgent juz przed ta rejestracja
+                    // wyczyscil na klonie sloty 1-3 i wlozyl w slot 0 bron zastepcza gry) - kija w SpawnEquipment nie ma: spawn go nie zdjal (slot tymczasowy),
+                    // zwrot go nie odda; bron zastepcza oznacza BannerKit.OnRegistered nizej. Liczony osobno - poza kontrola, inaczej falszywe NIEZGODNE
+                    if (__0.Banner != null) _bHomeBanner++;
+                    else
+                    {
+                        _bHomeReg++;
+                        var se = __0.SpawnEquipment;
+                        var it = se != null ? se[hr.Slot].Item : null;
+                        if (it != null && _isTemp != null && (bool)_isTemp.Invoke(__1, new object[] { hr.Slot, it })) _bHomeTemp++;
+                    }
                 }
             }
             catch (Exception e) { HomeStumble("RegisterPostfix", e); }
@@ -1285,6 +1295,8 @@ namespace Armoury
         // bez kija z przyczyna (ludzie); kontrola: zarejestrowani przez DTE i z kijem tymczasowym u agenta; przyklady kultura -> sztuka (najwyzej 8)
         private static readonly int[] _bHome = new int[3], _bHomeLv = new int[4];
         private static int _bHomeTpl, _bHomeNone, _bHomeSlot, _bHomeDead, _bHomeRace, _bHomeStumbles, _bHomeReg, _bHomeTemp;
+        // noc 25.10 P3 (recenzja): zarejestrowani przez DTE chorazowie posilkow z kijem - gra podmienila sprzet przed rejestracja, kija w SpawnEquipment juz nie ma
+        private static int _bHomeBanner;
         private static readonly Dictionary<string, string> _bHomeSample = new Dictionary<string, string>();
         private static readonly HashSet<ItemObject> _bHomeKinds = new HashSet<ItemObject>();
 

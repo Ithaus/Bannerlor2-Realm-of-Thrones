@@ -385,7 +385,11 @@ namespace Armoury
                 if (m == null || c == null || !c.BannerCompaniesEnabled || !MoreAllowed(c)) return;
                 var t = __0.Team;
                 if (t == null || !ReferenceEquals(t.Mission, m) || (int)__0.FormationIndex >= 8) return;
-                int k = BannerCompanies.CompaniesFor(__0.CountOfUnits, c.BannerCompanySize);
+                // recenzja: ta sama populacja co podzial na kompanie (BannerCompaniesMission.Split - czynni ludzie bez bohaterow i umarlych); CountOfUnits liczy
+                // takze bohaterow i umarlych (74 szeregowych + 3 bohaterow = 2 chorazych przy 1 kompanii). Najpierw tani prog: szeregowych nie wiecej niz
+                // CountOfUnits, a CompaniesFor nie maleje - gdy wszyscy daja 1 kompanie, szeregowi tez (bez przegladu formacji; wolane tez przy kazdym spawnie posilkow)
+                if (BannerCompanies.CompaniesFor(__0.CountOfUnits, c.BannerCompanySize) <= 1) return;
+                int k = BannerCompanies.CompaniesFor(BannerCompanies.SoldiersOf(__0), c.BannerCompanySize);
                 if (k > 1) { __result = k; _raised.Add(__0); }
             }
             catch (Exception e) { Stumble("BannerKit.DesiredPostfix", e); }

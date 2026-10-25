@@ -76,6 +76,23 @@ namespace Armoury
             return k;
         }
 
+        // recenzja: licznik szeregowych dla BannerKit.DesiredPostfix (glowny watek, bez alokacji na wolanie)
+        private static int _soldiers;
+        private static readonly Action<Agent> _countSoldier = a =>
+        {
+            if (a == null || !a.IsActive() || !a.IsHuman || a.IsHero || Undead.Character(a.Character)) return;
+            _soldiers++;
+        };
+
+        /// <summary>Szeregowi formacji liczeni jak w podziale (BannerCompaniesMission.Split): czynni ludzie bez bohaterow i bez umarlych.</summary>
+        internal static int SoldiersOf(Formation f)
+        {
+            _soldiers = 0;
+            if (f == null) return 0;
+            f.ApplyActionOnEachUnit(_countSoldier);
+            return _soldiers;
+        }
+
         // ---- liczniki misji (glowny watek; czytane w Append pod RoutHold.Gate, zerowane w RoutHold.Ensure i w BannerCompaniesMission.AfterStart)
         internal static int Formations, Companies, Members, MinSize, MaxSize, BearersSet, NoBearer, ExtraBearers, CmdHero, CmdSergeant, CmdPlayer;
         internal static int StdHero, StdField, StdSkipped, StdNoItem, StdRecount, StdCallFails, CapTotal, CapBanner;
@@ -908,7 +925,8 @@ namespace Armoury
 
         private static readonly string[] ClassNames = { "Infantry", "Archers", "Cavalry", "Horse Archers", "Skirmishers", "Heavy Infantry", "Light Cavalry", "Heavy Cavalry" };
 
-        /// <summary>{BANNER} - company N: nazwa choragwi z przegladu armii (ArmyReview.NameOf - tylko druzyna gracza) albo klasa formacji i numer.</summary>
+        /// <summary>{BANNER} - company N: nazwa choragwi z przegladu armii (ArmyReview.NameOf - tylko druzyna gracza) albo klasa formacji i numer;
+        /// sojusznicy z przedrostkiem "Allied ".</summary>
         private static string NameOf(Company co)
         {
             int ix = (int)co.F.FormationIndex;
@@ -920,6 +938,8 @@ namespace Armoury
                 if (cls < 0 || cls >= ClassNames.Length) cls = ix >= 0 && ix < ClassNames.Length ? ix : 0;
                 banner = ClassNames[cls] + " (" + (ix + 1) + ")";
             }
+            // recenzja: sojusznik (ta sama strona, nie druzyna gracza) - inaczej "Infantry (1) - company 2" brzmi jak wlasna formacja gracza
+            if (co.T != null && !co.T.IsPlayerTeam) banner = "Allied " + banner;
             return co.Count > 1 ? banner + " - company " + (co.Index + 1) : banner;
         }
 
