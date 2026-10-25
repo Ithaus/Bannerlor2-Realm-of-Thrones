@@ -1,161 +1,213 @@
 {
- "_opis": "Obsada glosow bitwy (P2a, noc 25.10, wybor bez Jeffa - DO WYMIANY rano). Rola -> voice_id; zapas_voice_id = glos juz na koncie, gdy dodanie z biblioteki sie nie uda. Wymiana glosu: zmien voice_id roli (i dopisz glos w \"glosy\" z public_owner_id z biblioteki), potem nagraj_bitwa.py --nagraj --rola <ROLA> --nadpisz. Probki bez kosztu: pole probka_mp3 (podglad z biblioteki ElevenLabs). Wszystkie glosy meskie, akcent brytyjski/szkocki, stawka 1.0 (bez doplaty za znak). David (lektor) celowo NIE - bitwa nie ma brzmiec jak narrator.",
+ "_opis": "Obsada glosow bitwy (P2a, noc 25.10, wybor bez Jeffa - DO WYMIANY rano). Rola -> voice_id; zapas_voice_id = glos juz na koncie, gdy dodanie z biblioteki sie nie uda. Wymiana glosu: zmien voice_id roli (i dopisz glos w \"glosy\" z public_owner_id z biblioteki), potem nagraj_bitwa.py --nagraj --rola <ROLA> --nadpisz. Probki bez kosztu: pole probka_mp3 (podglad z biblioteki ElevenLabs). Wszystkie glosy meskie, akcent brytyjski/szkocki, stawka 1.0 (bez doplaty za znak). David (lektor) celowo NIE - bitwa nie ma brzmiec jak narrator. | 25.10 05:30 sesja glowna: obsada TYLKO z glosow juz na koncie Jeffa (konto: 33 glosy przy limicie 30 dodanych - dodanie 23 z biblioteki nie miesci sie i zmienialoby konto); voice_id_biblioteka = pierwotny wybor do ewentualnej zamiany przez Jeffa.",
  "role": {
   "L_STARK": {
-   "voice_id": "q1h5HGdnfVxp4TXTJRNN",
+   "voice_id": "wyWA56cQNU2KqUW4eCsI",
    "zapas_voice_id": "wyWA56cQNU2KqUW4eCsI",
    "komu": "Stark, Karstark, Glover (rody Polnocy)",
-   "dlaczego": "polnocny, szorstki, spokojny autorytet"
+   "dlaczego": "polnocny, szorstki, spokojny autorytet",
+   "voice_id_biblioteka": "q1h5HGdnfVxp4TXTJRNN",
+   "glos_konta": "Clyde Narrator"
   },
   "L_NORTH_OLD": {
-   "voice_id": "7rQX8r6PVq3gfJ8rZzyE",
+   "voice_id": "U5UjeJMsOvyhYhXfZdvZ",
    "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
    "komu": "Umber, Mormont, Manderly, region north (mniejsi lordowie Polnocy)",
-   "dlaczego": "starszy, gruby polnocnoangielski"
+   "dlaczego": "starszy, gruby polnocnoangielski",
+   "voice_id_biblioteka": "7rQX8r6PVq3gfJ8rZzyE",
+   "glos_konta": "Adam Scottish Storyteller"
   },
   "L_WATCH": {
-   "voice_id": "M5E055lOUxMi0kJpGyE9",
-   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "voice_id": "JoYo65swyP8hH6fVMeTO",
+   "zapas_voice_id": "JoYo65swyP8hH6fVMeTO",
    "komu": "Nocna Straz (nightswatch)",
-   "dlaczego": "stary, chropawy bas - Lord Dowodca"
+   "dlaczego": "stary, chropawy bas - Lord Dowodca",
+   "voice_id_biblioteka": "M5E055lOUxMi0kJpGyE9",
+   "glos_konta": "Old Wizard Storyteller"
   },
   "L_LANNISTER": {
-   "voice_id": "ib8aaABAPZQpTo6hx8Jr",
+   "voice_id": "onwK4e9ZLuTAKqWW03F9",
    "zapas_voice_id": "onwK4e9ZLuTAKqWW03F9",
    "komu": "Lannister, Crakehall, Marbrand, region west i crownlands",
-   "dlaczego": "wladczy, chlodny, RP"
+   "dlaczego": "wladczy, chlodny, RP",
+   "voice_id_biblioteka": "ib8aaABAPZQpTo6hx8Jr",
+   "glos_konta": "Daniel - Steady Broadcaster"
   },
   "L_TYRELL": {
-   "voice_id": "7cOBG34AiHrAzs842Rdi",
-   "zapas_voice_id": "G17SuINrv2H9FC6nvetn",
+   "voice_id": "oaGwHLz3csUaSnc2NBD4",
+   "zapas_voice_id": "oaGwHLz3csUaSnc2NBD4",
    "komu": "Tyrell, Hightower, region reach",
-   "dlaczego": "posh, ziemianin z Home Counties"
+   "dlaczego": "posh, ziemianin z Home Counties",
+   "voice_id_biblioteka": "7cOBG34AiHrAzs842Rdi",
+   "glos_konta": "Benedict Narrator"
   },
   "L_ARRYN": {
-   "voice_id": "Veg2qijYoJAS8VPKOOmi",
-   "zapas_voice_id": "oaGwHLz3csUaSnc2NBD4",
+   "voice_id": "G17SuINrv2H9FC6nvetn",
+   "zapas_voice_id": "G17SuINrv2H9FC6nvetn",
    "komu": "Arryn, Royce, Westerling, region vale",
-   "dlaczego": "mlody szlachcic, czysty RP"
+   "dlaczego": "mlody szlachcic, czysty RP",
+   "voice_id_biblioteka": "Veg2qijYoJAS8VPKOOmi",
+   "glos_konta": "Christopher Narrator"
   },
   "L_TULLY": {
-   "voice_id": "ktrGUw7rURIQyMrQZqCu",
+   "voice_id": "JBFqnCBsd6RMkjVDRZzb",
    "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
    "komu": "Tully, Mallister, region river, Zlota Kompania",
-   "dlaczego": "aksamitny, wywazony, dowodczy"
+   "dlaczego": "aksamitny, wywazony, dowodczy",
+   "voice_id_biblioteka": "ktrGUw7rURIQyMrQZqCu",
+   "glos_konta": "George - Warm, Captivating Storyteller"
   },
   "L_FREY": {
    "voice_id": "HAvvFKatz0uu0Fv55Riy",
    "zapas_voice_id": "HAvvFKatz0uu0Fv55Riy",
    "komu": "Frey",
-   "dlaczego": "stary, jadowity (glos juz na koncie)"
+   "dlaczego": "stary, jadowity (glos juz na koncie)",
+   "voice_id_biblioteka": "HAvvFKatz0uu0Fv55Riy",
+   "glos_konta": "Ancient Sage"
   },
   "L_BARATHEON": {
-   "voice_id": "2ajXGJNYBR0iNHpS4VZb",
-   "zapas_voice_id": "wyWA56cQNU2KqUW4eCsI",
+   "voice_id": "BNgbHR0DNeZixGQVzloa",
+   "zapas_voice_id": "BNgbHR0DNeZixGQVzloa",
    "komu": "Baratheon, Tarth, region storm",
-   "dlaczego": "twardy, chropawy wojak"
+   "dlaczego": "twardy, chropawy wojak",
+   "voice_id_biblioteka": "2ajXGJNYBR0iNHpS4VZb",
+   "glos_konta": "David Deep Storyteller"
   },
   "L_STANNIS": {
-   "voice_id": "lKMAeQD7Brvj7QCWByqK",
+   "voice_id": "wyWA56cQNU2KqUW4eCsI",
    "zapas_voice_id": "wyWA56cQNU2KqUW4eCsI",
    "komu": "Smocza Skala (Stannis), Tarly",
-   "dlaczego": "gleboki, ostry, surowy"
+   "dlaczego": "gleboki, ostry, surowy",
+   "voice_id_biblioteka": "lKMAeQD7Brvj7QCWByqK",
+   "glos_konta": "Clyde Narrator"
   },
   "L_BOLTON": {
-   "voice_id": "yhf80q1381zd2JJQ4tM7",
-   "zapas_voice_id": "G17SuINrv2H9FC6nvetn",
+   "voice_id": "qxePw1S1QmBgjlU3GIy5",
+   "zapas_voice_id": "qxePw1S1QmBgjlU3GIy5",
    "komu": "Bolton",
-   "dlaczego": "ponury, cichy, intensywny"
+   "dlaczego": "ponury, cichy, intensywny",
+   "voice_id_biblioteka": "yhf80q1381zd2JJQ4tM7",
+   "glos_konta": "Older Joe Narrator"
   },
   "L_MARTELL": {
-   "voice_id": "goT3UYdM9bhm0n2lmKQx",
-   "zapas_voice_id": "oaGwHLz3csUaSnc2NBD4",
+   "voice_id": "cjVigY5qzO86Huf0OWal",
+   "zapas_voice_id": "cjVigY5qzO86Huf0OWal",
    "komu": "Martell, Dayne, Yronwood, region dorne (takze kapitanowie Dorne)",
-   "dlaczego": "niski, aksamitny, uwodzicielski"
+   "dlaczego": "niski, aksamitny, uwodzicielski",
+   "voice_id_biblioteka": "goT3UYdM9bhm0n2lmKQx",
+   "glos_konta": "Eric - Smooth, Trustworthy"
   },
   "L_GREYJOY": {
-   "voice_id": "6VgigPFWF0sNZy1BthVg",
-   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "voice_id": "N2lVS1w4EtoT3dr4eOWO",
+   "zapas_voice_id": "N2lVS1w4EtoT3dr4eOWO",
    "komu": "Greyjoy, Harlaw, region iron",
-   "dlaczego": "gleboki, zwirowy, morski"
+   "dlaczego": "gleboki, zwirowy, morski",
+   "voice_id_biblioteka": "6VgigPFWF0sNZy1BthVg",
+   "glos_konta": "Callum - Husky Trickster"
   },
   "L_WILD": {
-   "voice_id": "YIn3yKpQSeXNJMF5CIuj",
+   "voice_id": "U5UjeJMsOvyhYhXfZdvZ",
    "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
    "komu": "Wolni Ludzie (freefolk, wildlings, hilltribesmen)",
-   "dlaczego": "szkocki, chrapliwy, szorstki"
+   "dlaczego": "szkocki, chrapliwy, szorstki",
+   "voice_id_biblioteka": "YIn3yKpQSeXNJMF5CIuj",
+   "glos_konta": "Adam Scottish Storyteller"
   },
   "L_DOTHRAKI": {
-   "voice_id": "KHRvDizAHFVPzoSehNY6",
-   "zapas_voice_id": "wyWA56cQNU2KqUW4eCsI",
+   "voice_id": "SOYHLrjzK2X1ezoPC6cr",
+   "zapas_voice_id": "SOYHLrjzK2X1ezoPC6cr",
    "komu": "Dothrakowie (khuzait)",
-   "dlaczego": "bardzo gleboki, basowy, chropawy"
+   "dlaczego": "bardzo gleboki, basowy, chropawy",
+   "voice_id_biblioteka": "KHRvDizAHFVPzoSehNY6",
+   "glos_konta": "Harry - Fierce Warrior"
   },
   "L_ESSOS": {
-   "voice_id": "1TE7ou3jyxHsyRehUuMB",
-   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "voice_id": "IKne3meq5aSn9XLyUdCD",
+   "zapas_voice_id": "IKne3meq5aSn9XLyUdCD",
    "komu": "najemnicy i Wolne Miasta (essos; takze kapitanowie Essos)",
-   "dlaczego": "cockney, szorstki - jak Bronn"
+   "dlaczego": "cockney, szorstki - jak Bronn",
+   "voice_id_biblioteka": "1TE7ou3jyxHsyRehUuMB",
+   "glos_konta": "Charlie - Deep, Confident, Energetic"
   },
   "L_TARGARYEN": {
    "voice_id": "qxePw1S1QmBgjlU3GIy5",
    "zapas_voice_id": "qxePw1S1QmBgjlU3GIy5",
    "komu": "Targaryen, Velaryon, region valyrian",
-   "dlaczego": "stary rycerz (glos juz na koncie)"
+   "dlaczego": "stary rycerz (glos juz na koncie)",
+   "voice_id_biblioteka": "qxePw1S1QmBgjlU3GIy5",
+   "glos_konta": "Older Joe Narrator"
   },
   "L_UNSULLIED": {
-   "voice_id": "onwK4e9ZLuTAKqWW03F9",
-   "zapas_voice_id": "onwK4e9ZLuTAKqWW03F9",
+   "voice_id": "pNInz6obpgDQGcFmaJgB",
+   "zapas_voice_id": "pNInz6obpgDQGcFmaJgB",
    "komu": "Nieskalani (ghiscari)",
-   "dlaczego": "plaski, zdyscyplinowany (premade)"
+   "dlaczego": "plaski, zdyscyplinowany (premade)",
+   "voice_id_biblioteka": "onwK4e9ZLuTAKqWW03F9",
+   "glos_konta": "Adam - Dominant, Firm"
   },
   "C_NORTH": {
-   "voice_id": "AmY1pcgcEc15wyuIj50p",
+   "voice_id": "U5UjeJMsOvyhYhXfZdvZ",
    "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
    "komu": "kapitanowie Polnocy, Nocnej Strazy i Skagos; zolnierz (jeki, wyzwiska)",
-   "dlaczego": "polnocno-wschodnia Anglia (Durham)"
+   "dlaczego": "polnocno-wschodnia Anglia (Durham)",
+   "voice_id_biblioteka": "AmY1pcgcEc15wyuIj50p",
+   "glos_konta": "Adam Scottish Storyteller"
   },
   "C_WEST": {
-   "voice_id": "kTSNDDkx34wKsrujmdm1",
+   "voice_id": "onwK4e9ZLuTAKqWW03F9",
    "zapas_voice_id": "onwK4e9ZLuTAKqWW03F9",
    "komu": "kapitanowie Zachodu i Korony; zolnierz",
-   "dlaczego": "szorstki baryton, Estuary"
+   "dlaczego": "szorstki baryton, Estuary",
+   "voice_id_biblioteka": "kTSNDDkx34wKsrujmdm1",
+   "glos_konta": "Daniel - Steady Broadcaster"
   },
   "C_RIVER": {
-   "voice_id": "poHOO1m3tBNm4Ywmzcaq",
+   "voice_id": "JBFqnCBsd6RMkjVDRZzb",
    "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
    "komu": "kapitanowie Dorzecza i Doliny; Blackwood; zolnierz",
-   "dlaczego": "mlody, Yorkshire"
+   "dlaczego": "mlody, Yorkshire",
+   "voice_id_biblioteka": "poHOO1m3tBNm4Ywmzcaq",
+   "glos_konta": "George - Warm, Captivating Storyteller"
   },
   "C_STORM": {
-   "voice_id": "tczmcUWPAdiP3gKQPrv7",
-   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "voice_id": "G17SuINrv2H9FC6nvetn",
+   "zapas_voice_id": "G17SuINrv2H9FC6nvetn",
    "komu": "kapitanowie Krainy Burz, Reach i Smoczej Skaly; Bracken; zolnierz",
-   "dlaczego": "mlody, zwykly angielski"
+   "dlaczego": "mlody, zwykly angielski",
+   "voice_id_biblioteka": "tczmcUWPAdiP3gKQPrv7",
+   "glos_konta": "Christopher Narrator"
   },
   "C_IRON": {
-   "voice_id": "U4Y0Z2HmYcQYMkJB8hrg",
-   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "voice_id": "N2lVS1w4EtoT3dr4eOWO",
+   "zapas_voice_id": "N2lVS1w4EtoT3dr4eOWO",
    "komu": "kapitanowie Zelaznych Wysp; zolnierz",
-   "dlaczego": "West Country, zwirowy pirat"
+   "dlaczego": "West Country, zwirowy pirat",
+   "voice_id_biblioteka": "U4Y0Z2HmYcQYMkJB8hrg",
+   "glos_konta": "Callum - Husky Trickster"
   },
   "C_WILD": {
-   "voice_id": "O4uxPTtvgxrA0QCLHI1J",
-   "zapas_voice_id": "U5UjeJMsOvyhYhXfZdvZ",
+   "voice_id": "pqHfZKP75CvOlQylNhV4",
+   "zapas_voice_id": "pqHfZKP75CvOlQylNhV4",
    "komu": "kapitanowie Wolnych Ludzi, Skagos; zolnierz",
-   "dlaczego": "stary Szkot, chrapliwy"
+   "dlaczego": "stary Szkot, chrapliwy",
+   "voice_id_biblioteka": "O4uxPTtvgxrA0QCLHI1J",
+   "glos_konta": "Bill - Wise, Mature, Balanced"
   },
   "S_TERRY": {
-   "voice_id": "wo6udizrrtpIxWGp2qJk",
-   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "voice_id": "SOYHLrjzK2X1ezoPC6cr",
+   "zapas_voice_id": "SOYHLrjzK2X1ezoPC6cr",
    "komu": "szeregowy (wyzwiska, jeki)",
-   "dlaczego": "mlody, chrapliwy, polnoc Anglii"
+   "dlaczego": "mlody, chrapliwy, polnoc Anglii",
+   "voice_id_biblioteka": "wo6udizrrtpIxWGp2qJk",
+   "glos_konta": "Harry - Fierce Warrior"
   },
   "S_RICKY": {
-   "voice_id": "ytcsltLTtCHxNn1vC76H",
-   "zapas_voice_id": "JBFqnCBsd6RMkjVDRZzb",
+   "voice_id": "IKne3meq5aSn9XLyUdCD",
+   "zapas_voice_id": "IKne3meq5aSn9XLyUdCD",
    "komu": "szeregowy (wyzwiska, jeki)",
-   "dlaczego": "wschodni Londyn, gleboki"
+   "dlaczego": "wschodni Londyn, gleboki",
+   "voice_id_biblioteka": "ytcsltLTtCHxNn1vC76H",
+   "glos_konta": "Charlie - Deep, Confident, Energetic"
   }
  },
  "glosy": {
@@ -495,6 +547,70 @@
    "wiek": "middle_aged",
    "akcent": "british",
    "opis": "calm",
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "JoYo65swyP8hH6fVMeTO": {
+   "nazwa": "Old Wizard Storyteller",
+   "public_owner_id": null,
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "BNgbHR0DNeZixGQVzloa": {
+   "nazwa": "David Deep Storyteller",
+   "public_owner_id": null,
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "cjVigY5qzO86Huf0OWal": {
+   "nazwa": "Eric - Smooth, Trustworthy",
+   "public_owner_id": null,
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "N2lVS1w4EtoT3dr4eOWO": {
+   "nazwa": "Callum - Husky Trickster",
+   "public_owner_id": null,
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "SOYHLrjzK2X1ezoPC6cr": {
+   "nazwa": "Harry - Fierce Warrior",
+   "public_owner_id": null,
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "IKne3meq5aSn9XLyUdCD": {
+   "nazwa": "Charlie - Deep, Confident, Energetic",
+   "public_owner_id": null,
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "pNInz6obpgDQGcFmaJgB": {
+   "nazwa": "Adam - Dominant, Firm",
+   "public_owner_id": null,
+   "kategoria": "konto",
+   "stawka": 1.0,
+   "probka_mp3": null,
+   "na_koncie": true
+  },
+  "pqHfZKP75CvOlQylNhV4": {
+   "nazwa": "Bill - Wise, Mature, Balanced",
+   "public_owner_id": null,
    "kategoria": "konto",
    "stawka": 1.0,
    "probka_mp3": null,
