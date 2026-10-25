@@ -57,6 +57,14 @@ namespace Armoury
     ///    zostaje zdjeta (UnpaidOwnerTaxLines) - pan dostaje przelew, nie linie z niczego. Gracz ta sama regula (komunikat przy pierwszym poborze w sesji).
     ///    Warsztat czlonka rodu pana miasta - nie cudze miasto: linia zdjeta, bez przelewu (jak dotad). Nie dubluje podatku: gra (DefaultClanFinanceModel) nie ma
     ///    podatku warsztatow, BK pobiera 'Workshop taxes' tylko przy czynnym BKWorkshopModel (te warsztaty pomijamy - bkCharges), notabli - E3/8a.
+    ///    121 (noc-p8, 25.10): kwoty GetWorkshopTaxes z egzemplarza BK w CZYNNYM lancuchu modelu finansow gry (TaxFin), nie z BannerKingsConfig - BKROTPatch
+    ///    podmienia tam model na nowy egzemplarz, ktorego slownik nikt nie wypelnia (D11-3 pobieral 0). Placi tylko glowa rodu (gracz tez) - tylko jej warsztatom
+    ///    gra wyplaca dochod, a BK przy tej wyplacie zapisuje kwote. To samo zrodlo czytaja linie warsztatow w podatku miasta (KeptTownLines, NotableTaxLines,
+    ///    UnpaidOwnerTaxLines) - przy rencie znosza sie do zera. Poprawki po recenzji 121: (1) bez egzemplarza BK w lancuchu (albo bez latki DailyTickClan)
+    ///    D11-3 nieczynne i cena warsztatu lorda / gracza bez podatku (zapas z konfiguracji BK zostaje tylko dla linii podatku miast); (2) kwota z prawdziwej
+    ///    wyplaty rodu - migawka slownika BK w postfiksie DailyTickClan (ClanPayPost: stawka x zysk przed wyplata = 2 x stawka x wyplata, jak w cenie),
+    ///    pobierana raz w OwnerTaxDaily od tego, kto dostal wyplate; (3) przy BK Workshop Tax To Lord = WYL KeptTownLines czyta jak przed 121 (konfiguracja
+    ///    BK) - inaczej linie warsztatow lordow i gracza dochodzilyby panu miasta z niczego.
     /// E3/8b (BkLordFeesHaveRecipients) - OPLATY LORDOW BK MAJA ODBIORCE (W11): tytuly (roszczenie, nadanie, odebranie, uzurpacja) i dylematy -> skarbiec
     ///    krolestwa platnika (bez krolestwa - kasa najblizszego miasta), zmiana wydatkow dworu (CourtGrace.AddExpense) -> kasa siedziby rodu (ClanBudget.Seat),
     ///    przeniesienie dworu -> kasa nowej siedziby, pasowanie (wiano do 50 000 przy zalozeniu rodu rycerza) -> glowa nowego rodu. Kwota = to, co naprawde
@@ -114,9 +122,13 @@ namespace Armoury
         private static readonly Dictionary<Clan, int> _rentPend = new Dictionary<Clan, int>();
         private static long _rentMerged;
         // D11-3: podatek warsztatow lordow i gracza w cudzych miastach placi wlasciciel
-        private static long _otDue, _otToLords, _otToTowns, _otNoLord, _otShort, _otPlayer;
-        private static int _otN, _otOwners, _otShortN;
+        private static long _otDue, _otToLords, _otToTowns, _otNoLord, _otShort, _otPlayer, _otPayout, _otDrop;
+        private static int _otN, _otOwners, _otShortN, _otPlayerN, _otDropN;
         private static bool _otTold;                        // komunikat dla gracza przy pierwszym poborze w sesji
+        // 121 (recenzja uwaga 2): podatek z prawdziwej wyplaty rodu - migawka kwoty BK w postfiksie DailyTickClan, pobierana raz w OwnerTaxDaily
+        private sealed class OtPay { public Workshop W; public Hero Owner; public int Tax, Payout; }
+        private static readonly List<OtPay> _otPay = new List<OtPay>();
+        private static bool _wPay;                          // postfiks DailyTickClan (migawka) wpiety - bez niego D11-3 nieczynne
         // E3/8b - wedlug rodzaju
         private const int FClaim = 0, FCreate = 1, FRevoke = 2, FUsurp = 3, FDilemma = 4, FCourt = 5, FMove = 6, FKnight = 7, Fees = 8;
         private static readonly string[] FeeName = { "roszczenia", "nadania", "odebrania", "uzurpacje", "dylematy", "dwor", "przeniesienie dworu", "pasowanie" };
@@ -136,7 +148,7 @@ namespace Armoury
             System.Threading.Interlocked.Exchange(ref _taxLinesCut, 0);
             System.Threading.Interlocked.Exchange(ref _unpaidCut, 0); System.Threading.Interlocked.Exchange(ref _unpaidN, 0);
             _rentMerged = 0;
-            _otDue = _otToLords = _otToTowns = _otNoLord = _otShort = _otPlayer = 0; _otN = _otOwners = _otShortN = 0;
+            _otDue = _otToLords = _otToTowns = _otNoLord = _otShort = _otPlayer = _otPayout = _otDrop = 0; _otN = _otOwners = _otShortN = _otPlayerN = _otDropN = 0;
             Array.Clear(_feePaid, 0, Fees); Array.Clear(_feeToWallet, 0, Fees); Array.Clear(_feeToTown, 0, Fees); Array.Clear(_feeToHero, 0, Fees); Array.Clear(_feeKept, 0, Fees);
             Array.Clear(_feeN, 0, Fees);
             _deadNotable = _deadWanderer = _deadHead = _deadOther = _deadLost = 0; _deadNotableN = _deadWandererN = _deadHeadN = _deadOtherN = 0;
@@ -154,6 +166,7 @@ namespace Armoury
         internal static void EnsureHooks()
         {
             ZeroDay(); _rentPend.Clear(); _pend = null; _tickHero = null; _otTold = false;   // nowa sesja / kampania - liczniki i stan od zera (latki zostaja w procesie)
+            _otPay.Clear();   // 121: migawki wyplat poprzedniej kampanii (cudze obiekty Workshop) nie przechodza do nowej
             if (_harmony == null || Campaign.Current == null) return;
             if (!_hooksTried)
             {
@@ -164,15 +177,25 @@ namespace Armoury
                 _hookNote = (wired.Count > 0 ? string.Join(", ", wired.ToArray()) : "-") + "; BRAK: " + (missing.Count > 0 ? string.Join(", ", missing.ToArray()) : "-");
             }
             // E3/8a: czy odejmowanie podatku BK naprawde dziala w tej kampanii (lancuch czynnego modelu finansow) - co sesje
-            try { _taxLive = _wTax && _wTick && BkInChain(out _taxChain); }
-            catch (Exception e) { _taxLive = false; _taxChain = "blad: " + e.Message; Stumble("BkInChain", e); }
+            // 121 (noc-p8): lancuch czytany zawsze (nie tylko przy latkach E3/8a) - egzemplarz BK z lancucha to zrodlo kwot podatku warsztatow (TaxFin)
+            _fin = null;
+            try
+            {
+                object bkObj; bool inChain = BkInChain(out _taxChain, out bkObj);
+                _taxLive = _wTax && _wTick && inChain;
+                var ms = Campaign.Current.Models;
+                if (bkObj != null && _mGetWsTax != null && _mGetWsTax.DeclaringType.IsInstanceOfType(bkObj) && ms != null && ms.ClanFinanceModel != null)
+                    _fin = new FinRef { Head = ms.ClanFinanceModel, Bk = bkObj };
+            }
+            catch (Exception e) { _taxLive = false; _fin = null; _taxChain = "blad: " + e.Message; Stumble("BkInChain", e); }
             try { _linesHooked = TownTaxHooked(out _linesNote); }
             catch (Exception e) { _linesHooked = false; _linesNote = "blad: " + e.Message; Stumble("TownTaxHooked", e); }
             string wsModel = "-";
             try { var wm = Campaign.Current.Models != null ? Campaign.Current.Models.WorkshopModel : null; wsModel = wm != null ? wm.GetType().Name : "brak"; } catch { }
             Log.Info("Szczelnosc (164a/31b): latki - " + _hookNote + " | podatek warsztatow BK: lancuch modelu " + _taxChain + ", podatek miast " + _linesNote + " -> " + (_taxLive && _linesHooked ? "CZYNNE (przy Population Rent Enabled i Rent Replaces Town Tax)" : "NIECZYNNE (linia 'Taxes from' zostaje, podatek znika jak dotad)")
                      + "; warsztaty lordow i gracza: czynny model warsztatow gry " + wsModel + " - BK pobiera od glow rodow 'Workshop taxes': " + (BkWorkshopModelActive() ? "TAK (linie glow rodow w miastach innych rodow zostaja, reszta zdjeta)" : "NIE (linie 'Taxes from' warsztatow nie-notabli zdjete z podatku miast - nikt ich nie placi)")
-                     + "; D11-3 wlasciciel warsztatu (lord, gracz) w cudzym miescie placi ten podatek panu miasta: " + (OwnerTaxLive ? "CZYNNE" : (OwnerTaxOn ? "NIECZYNNE - wymaga BK Workshop Tax To Lord, rent miast (Population Rent Enabled, Rent Replaces Town Tax) i latki renty na podatku miast" : "wylaczone"))
+                     + "; D11-3 wlasciciel warsztatu (glowa rodu, gracz) w cudzym miescie placi ten podatek panu miasta (kwota BK z wyplaty rodu): " + OwnerTaxState()
+                     + "; kwoty podatku warsztatow (GetWorkshopTaxes): " + FinSourceNote()
                      + " | wylaczniki: Caravan Wage To Purse " + Onoff(WageOn) + ", BK Workshop Tax To Lord " + Onoff(TaxOn) + ", Workshop Owner Pays Town Tax " + Onoff(OwnerTaxOn) + ", BK Lord Fees Have Recipients " + Onoff(FeesOn)
                      + ", Dead Hero Gold Stays " + Onoff(DeadOn) + ", Caravan Profit In Realm Town " + Onoff(ProfitOn) + " | E3/8d (Inni bez zoldu) - odlozone.");
         }
@@ -280,6 +303,11 @@ namespace Armoury
             _pRealCar = setT != null ? AccessTools.Property(setT, "RealisticCaravanIncome") : null;
             if (_pBkSet == null || _pRealCar == null) mProf = null;
             _wProfit = Patch(mProf, "zysk karawany pana (BKPartyBehavior.AddRealisticIncome)", nameof(ProfitPre), nameof(ProfitPost), null, Priority.Normal, Priority.Normal, wired, missing);
+
+            // 121 (recenzja uwaga 2): D11-3 - kwota podatku warsztatu z prawdziwej wyplaty rodu (gra), nie z ostatniego przeliczenia BK. Tylko odczyt;
+            // Priority.First - zaraz po ciele gry, przed innymi postfiksami rozliczenia rodu (zaden z nich nie przelicza dochodu z warsztatow)
+            var mClanTick = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickClan", new[] { typeof(Clan) });
+            _wPay = Patch(mClanTick, "podatek warsztatow z wyplaty rodu (ClanVariablesCampaignBehavior.DailyTickClan)", null, nameof(ClanPayPost), null, Priority.First, Priority.Normal, wired, missing);
         }
 
         /// <summary>E3/8a: obie nogi naraz - przelew notabl -> pan (TaxPre) i zdjecie linii "Taxes from" z podatku miasta (NotableTaxLines, wolane
@@ -314,9 +342,9 @@ namespace Armoury
 
         /// <summary>E3/8a: czy w lancuchu czynnego modelu finansow rodu jest BKClanFinanceModel z wlasnym CalculateNotableDailyGoldChange
         /// (BaseModel albo pole poprzedniego modelu, np. ROT _previousModel) - tylko wtedy BK odejmuje podatek, a my go oddajemy.</summary>
-        private static bool BkInChain(out string chain)
+        private static bool BkInChain(out string chain, out object bkObj)
         {
-            chain = "-";
+            chain = "-"; bkObj = null;
             var bk = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKClanFinanceModel");
             object m = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.ClanFinanceModel : null;
             var names = new List<string>();
@@ -327,6 +355,7 @@ namespace Armoury
                 names.Add(t.Name);
                 if (bk != null && bk.IsInstanceOfType(m))
                 {
+                    bkObj = m;   // 121: ten egzemplarz gra wola (CalculateOwnerIncomeFromWorkshop) - tylko jego workshopTaxes sa wypelniane
                     var mm = t.GetMethod("CalculateNotableDailyGoldChange", BindingFlags.Instance | BindingFlags.Public, null, new[] { typeof(Hero), typeof(bool) }, null);
                     found = mm != null && mm.DeclaringType == bk;
                     break;
@@ -666,6 +695,46 @@ namespace Armoury
             return g != null ? g(cfg) : _pCfgFin.GetValue(cfg, null);
         }
 
+        // ------------------------------------------------------------ 121 (noc-p8): zrodlo kwot podatku warsztatow BK
+        // BKROTPatch (OnGameStart) podmienia BannerKingsConfig.ClanFinanceModel na nowy BKROTClanFinanceModel PO tym, jak BK (Main.cs:207) dodal do gry swoj
+        // egzemplarz - w lancuchu gry siedzi egzemplarz BK, a konfiguracja wskazuje drugi, ktorego CalculateOwnerIncomeFromWorkshop nikt nie wola (gra wola
+        // Campaign.Current.Models.ClanFinanceModel). Slownik workshopTaxes egzemplarza z konfiguracji byl wiec zawsze pusty (D11-3: 0 warsztatow od 24.10).
+        // Kwoty czytamy z egzemplarza w lancuchu (ten sam, ktory BK wypelnia przy wyplacie z warsztatu); zapas - konfiguracja BK (jak dotad).
+        private sealed class FinRef { public object Head, Bk; }
+        private static volatile FinRef _fin;               // egzemplarz BK z lancucha + glowa lancucha, przy ktorej go znaleziono (EnsureHooks, co sesje)
+
+        /// <summary>Egzemplarz BKClanFinanceModel z czynnego lancucha modelu finansow gry, gdy glowa lancucha ta sama co przy odczycie; inaczej null.</summary>
+        private static object ChainFin()
+        {
+            var f = _fin;
+            if (f == null) return null;
+            var c = Campaign.Current;
+            var ms = c != null ? c.Models : null;
+            return ms != null && ReferenceEquals(ms.ClanFinanceModel, f.Head) ? f.Bk : null;
+        }
+
+        /// <summary>Model, z ktorego czytamy GetWorkshopTaxes: egzemplarz BK z lancucha gry, zapas - BannerKingsConfig.ClanFinanceModel (jak dotad).</summary>
+        private static object TaxFin(object cfg, bool fast)
+        {
+            var b = ChainFin();
+            if (b != null) return b;
+            return _pCfgFin != null ? FinOf(cfg, fast) : null;
+        }
+
+        /// <summary>121: model kwot podatku warsztatow dla PopulationLaw.KeptTownLines (to samo zrodlo co NotableTaxLines / UnpaidOwnerTaxLines / D11-3 -
+        /// linie warsztatow w podatku miasta przy rencie znosza sie do zera tylko przy jednym zrodle). null - BK niedostepny (KeptTownLines bierze swoj zapas).</summary>
+        internal static object WsTaxModel()
+        {
+            try { var b = ChainFin(); if (b != null) return b; return _pCfgFin != null ? FinOf(BkCfgFast(), true) : null; }
+            catch { return null; }
+        }
+
+        private static string FinSourceNote()
+        {
+            if (ChainFin() != null) return "egzemplarz BK z lancucha modelu gry (ten, ktory BK wypelnia przy wyplacie z warsztatu)";
+            return "ZAPAS BannerKingsConfig.ClanFinanceModel tylko dla linii podatku miast (egzemplarza BK w lancuchu nie znaleziono - kwoty moga byc 0; D11-3 i podatek w cenie warsztatu lorda / gracza nieczynne)";
+        }
+
         /// <summary>perf-d2d3: podatek BK warsztatu (GetWorkshopTaxes) jako float - delegat albo odbicie (Convert.ToSingle, jak dotad).</summary>
         private static float WsTax(object fin, Workshop w, Func<object, Workshop, int> tax)
         {
@@ -711,7 +780,7 @@ namespace Armoury
         private static float NotableCore(Town town, bool fast)
         {
             var cfg = fast ? BkCfgFast() : BkCfg();
-            var fin = FinOf(cfg, fast);
+            var fin = TaxFin(cfg, fast);   // 121: egzemplarz BK z lancucha gry (zapas - konfiguracja BK)
             if (fin == null) return 0f;
             var tax = fast ? PerfFast.M1<Workshop, int>(_mGetWsTax) : null;
             var leader = town.OwnerClan != null ? town.OwnerClan.Leader : null;
@@ -772,7 +841,7 @@ namespace Armoury
         {
             paid = 0f; n = 0;
             var cfg = fast ? BkCfgFast() : BkCfg();
-            var fin = FinOf(cfg, fast);
+            var fin = TaxFin(cfg, fast);   // 121: egzemplarz BK z lancucha gry (zapas - konfiguracja BK)
             if (fin == null || !_mGetWsTax.DeclaringType.IsInstanceOfType(fin)) return 0f;
             var tax = fast ? PerfFast.M1<Workshop, int>(_mGetWsTax) : null;
             var townClan = town.OwnerClan;
@@ -808,15 +877,29 @@ namespace Armoury
 
         // ================================================================= D11-3: podatek warsztatow lordow i gracza w cudzych miastach placi wlasciciel
         /// <summary>D11-3 czynne: wylacznik, E3/8 i druga noga - linia 'Taxes from' naprawde zdjeta z podatku miasta (UnpaidOwnerTaxLines w PopulationLaw.TownTaxPostfix,
-        /// czynne tylko przy rentach miast i latce renty na czynnym modelu podatku). Bez ktorejkolwiek - linia zostaje, przelew bylby drugi raz.</summary>
+        /// czynne tylko przy rentach miast i latce renty na czynnym modelu podatku). Bez ktorejkolwiek - linia zostaje, przelew bylby drugi raz.
+        /// 121 (recenzja uwaga 1): tez egzemplarz BK w czynnym lancuchu modelu finansow (ChainFin) i migawka wyplaty (postfiks DailyTickClan) - bez nich
+        /// kwot podatku nie ma skad wziac (slownik z konfiguracji BK pusty), wiec D11-3 nieczynne, a cena warsztatu (TaxShare przez OwnerPaysTax) podatku nie wlicza.</summary>
         private static bool OwnerTaxLive
         {
             get
             {
                 var s = S;
                 return s != null && s.WorkshopOwnerPaysTownTax && s.BkWorkshopTaxToLord && _linesHooked && s.PopulationRentEnabled && s.RentReplacesTownTax
-                       && _mGetWsTax != null && _pCfgFin != null;
+                       && _mGetWsTax != null && _pCfgFin != null && _wPay && ChainFin() != null;
             }
+        }
+
+        /// <summary>121: stan D11-3 slowami (linia startu i doby) - przy nieczynnym powod.</summary>
+        private static string OwnerTaxState()
+        {
+            if (OwnerTaxLive) return "CZYNNE";
+            var s = S;
+            if (s == null || !s.WorkshopOwnerPaysTownTax) return "wylaczone";
+            if (!(s.BkWorkshopTaxToLord && _linesHooked && s.PopulationRentEnabled && s.RentReplacesTownTax && _mGetWsTax != null && _pCfgFin != null))
+                return "NIECZYNNE - wymaga BK Workshop Tax To Lord, rent miast (Population Rent Enabled, Rent Replaces Town Tax) i latki renty na podatku miast";
+            if (!_wPay) return "NIECZYNNE - brak latki DailyTickClan (migawka wyplaty rodu; cena warsztatu bez podatku)";
+            return "NIECZYNNE - brak egzemplarza BK w lancuchu modelu finansow gry (cena warsztatu bez podatku)";
         }
 
         /// <summary>D11-3: czy wlasciciel `o` (nie notabl, nie pan miasta) placi podatek warsztatu w miescie rodu `townClan` - ten sam zbior co UnpaidOwnerTaxLines
@@ -825,6 +908,9 @@ namespace Armoury
         {
             if (o == null || o == leader || o.IsNotable) return false;
             var oc = o.Clan;
+            // 121: tylko glowa rodu (gracz - glowa swojego) - kwota BK powstaje przy wyplacie z warsztatu, a gra wyplaca tylko glowie (DefaultClanFinanceModel
+            // CalculateHeroIncomeFromWorkshops(clan.Leader)); warsztat innego czlonka rodu ma w slowniku BK kwote stara (poprzedniego wlasciciela) albo zadna
+            if (oc == null || oc.Leader != o) return false;
             if (oc != null && townClan != null && oc == townClan) return false;                  // czlonek rodu pana - nie cudze miasto
             if (bkCharges && oc != null && oc.Leader == o && townClan != oc) return false;       // BK pobiera 'Workshop taxes'
             return true;
@@ -843,69 +929,105 @@ namespace Armoury
         }
 
         /// <summary>
+        /// 121 (recenzja uwaga 2), postfiks ClanVariablesCampaignBehavior.DailyTickClan (Priority.First - zaraz po ciele gry, tylko odczyt): gra wlasnie
+        /// wyplacila glowie rodu dochod z warsztatow (DefaultClanFinanceModel.CalculateHeroIncomeFromWorkshops(clan.Leader), applyWithdrawals), a BK
+        /// (BKClanFinanceModel.CalculateOwnerIncomeFromWorkshop) zapisal przy tym workshopTaxes[w] = TaxExpenses od zysku PRZED wyplata - stawka x zysk,
+        /// czyli 2 x stawka x wyplata (wyplata = polowa zysku). Tyle samo pobralby BK przy BKWorkshopModel (AddExpenses w tym samym rozliczeniu) i tyle
+        /// zaklada cena warsztatu (WorkshopTrade.TaxShare = 2 x stawka). Zapamietujemy (warsztat, wlasciciel, kwota, wyplata) - OwnerTaxDaily pobiera
+        /// dokladnie te kwote, raz na wyplate. Slownika nie czytamy w dobie: kazde pozniejsze przeliczenie (podpowiedzi, AI, KingdomTreasury, IronBank)
+        /// nadpisuje go stanem po wyplacie (1-2 x stawka), a po zmianie wlasciciela trzyma kwote poprzedniego.
+        /// </summary>
+        public static void ClanPayPost(Clan __0)
+        {
+            try
+            {
+                if (__0 == null || __0.IsBanditFaction || !OwnerTaxLive || !Live) return;   // bandy: gra nie rozlicza (DailyTickClan)
+                var o = __0.Leader;
+                if (o == null || o.IsNotable) return;
+                var ws = o.OwnedWorkshops;
+                if (ws == null || ws.Count == 0) return;
+                var fin = ChainFin();
+                if (fin == null) return;
+                bool bkCharges = BkWorkshopModelActive();
+                foreach (var w in ws)
+                {
+                    try
+                    {
+                        var st = w != null ? w.Settlement : null;
+                        var town = st != null ? st.Town : null;
+                        if (town == null) continue;
+                        var tc = town.OwnerClan;
+                        if (!OwnerPays(o, tc, tc != null ? tc.Leader : null, bkCharges)) continue;
+                        int t = Convert.ToInt32(_mGetWsTax.Invoke(fin, new object[] { w }));
+                        if (t <= 0) continue;
+                        // wyplata (tylko do kontroli w linii doby): gra zdjela z kapitalu floor(zysk/2), zostalo ceil(zysk/2) - ProfitMade teraz = wyplata (+1)
+                        _otPay.Add(new OtPay { W = w, Owner = o, Tax = t, Payout = Math.Max(0, w.ProfitMade) });
+                    }
+                    catch (Exception e) { Stumble("ClanPayPost(warsztat)", e); }
+                }
+            }
+            catch (Exception e) { Stumble("ClanPayPost", e); }
+        }
+
+        /// <summary>
         /// D11-3, ArmouryBehavior raz na dobe po PopulationLaw.Daily, przed RentMerge (w bloku ksiegi - zmiane kas miast lapie migawka rent): kazdy warsztat
         /// lorda albo gracza w cudzym miescie placi podatek BK (GetWorkshopTaxes - kwota linii 'Taxes from') - czesc autonomii do kasy miasta (zdarzenie gry),
         /// reszta panu miasta (renta przez _rentPend -> RentMerge, jak E3/8a); najwyzej z kiesy wlasciciela, reszta przepada (zaleglosc nie rosnie).
+        /// 121 (recenzja uwaga 2): kwota z migawek wyplat od ostatniej doby (ClanPayPost) - placi ten, kto dostal wyplate, raz za kazda wyplate;
+        /// regula (OwnerPays) sprawdzana jeszcze raz na dzis (miasto moglo przejsc na rod wlasciciela, wlasciciel zmarl) - wtedy migawka przepada (licznik).
         /// </summary>
         internal static void OwnerTaxDaily()
         {
             try
             {
                 if (!OwnerTaxLive || !Live) return;
-                var cfg = BkCfg();
-                var fin = cfg != null ? _pCfgFin.GetValue(cfg, null) : null;
-                if (fin == null || !_mGetWsTax.DeclaringType.IsInstanceOfType(fin)) return;
                 bool bkCharges = BkWorkshopModelActive();
                 var owners = new HashSet<Hero>();
+                var auts = new Dictionary<Settlement, float>();
                 long plPaid = 0;
-                foreach (var town in Town.AllTowns)
+                foreach (var p in _otPay)
                 {
-                    if (town == null || town.Workshops == null) continue;
-                    var st = town.Settlement;
-                    if (st == null || st.SettlementComponent == null) continue;
-                    var townClan = town.OwnerClan;
-                    var lord = townClan != null ? townClan.Leader : null;
-                    float aut = -1f;
-                    foreach (var w in town.Workshops)
+                    try
                     {
-                        try
+                        var w = p.W; var o = p.Owner; int t = p.Tax;
+                        var st = w != null ? w.Settlement : null;
+                        var town = st != null ? st.Town : null;
+                        if (town == null || st.SettlementComponent == null || o == null || t <= 0) { _otDrop += Math.Max(0, t); _otDropN++; continue; }
+                        var townClan = town.OwnerClan;
+                        var lord = townClan != null ? townClan.Leader : null;
+                        if (!OwnerPays(o, townClan, lord, bkCharges) || !o.IsAlive || CW.OutOfWorld(o)) { _otDrop += t; _otDropN++; continue; }
+                        float aut;
+                        if (!auts.TryGetValue(st, out aut)) { aut = Autonomy(st); auts[st] = aut; }
+                        _otN++; _otDue += t; _otPayout += p.Payout; owners.Add(o);
+                        bool lordOk = lord != null && lord.IsAlive && !CW.OutOfWorld(lord) && !ReferenceEquals(lord, o);
+                        long toTown = lordOk ? (long)Math.Round(t * Math.Min(1.0, 0.6 * aut)) : t;
+                        long toLord = t - toTown;
+                        long paid = 0;
+                        if (toTown > 0)
                         {
-                            var o = w != null ? w.Owner : null;
-                            if (!OwnerPays(o, townClan, lord, bkCharges) || !o.IsAlive || CW.OutOfWorld(o)) continue;
-                            int t = Convert.ToInt32(_mGetWsTax.Invoke(fin, new object[] { w }));
-                            if (t <= 0) continue;
-                            if (aut < 0f) aut = Autonomy(st);
-                            _otN++; _otDue += t; owners.Add(o);
-                            bool lordOk = lord != null && lord.IsAlive && !CW.OutOfWorld(lord) && !ReferenceEquals(lord, o);
-                            long toTown = lordOk ? (long)Math.Round(t * Math.Min(1.0, 0.6 * aut)) : t;
-                            long toLord = t - toTown;
-                            long paid = 0;
-                            if (toTown > 0)
-                            {
-                                int before = o.Gold;
-                                if (before > 0) GiveGoldAction.ApplyForCharacterToSettlement(o, st, (int)Math.Min(toTown, before), true);   // zdarzenie gry: wlasciciel -> kasa miasta
-                                long moved = Math.Max(0, before - o.Gold);
-                                if (lordOk) _otToTowns += moved; else _otNoLord += moved;
-                                paid += moved;
-                            }
-                            if (toLord > 0)
-                            {
-                                int got = (int)Math.Min(toLord, Math.Max(0, o.Gold));
-                                if (got > 0)
-                                {
-                                    // bez zdarzenia gry: wplata liczy sie jak renta miasta (RentMerge), nie jak wplyw jednorazowy - jak E3/8a
-                                    o.ChangeHeroGold(-got);
-                                    lord.ChangeHeroGold(got);
-                                    var c = lord.Clan;
-                                    if (c != null) { int r0; _rentPend.TryGetValue(c, out r0); _rentPend[c] = r0 + got; }
-                                    _otToLords += got; paid += got;
-                                }
-                            }
-                            if (paid < t) { _otShort += t - paid; _otShortN++; }
-                            if (o == Hero.MainHero) plPaid += paid;
+                            int before = o.Gold;
+                            if (before > 0) GiveGoldAction.ApplyForCharacterToSettlement(o, st, (int)Math.Min(toTown, before), true);   // zdarzenie gry: wlasciciel -> kasa miasta
+                            long moved = Math.Max(0, before - o.Gold);
+                            if (lordOk) _otToTowns += moved; else _otNoLord += moved;
+                            paid += moved;
                         }
-                        catch (Exception e) { Stumble("OwnerTaxDaily(warsztat)", e); }
+                        if (toLord > 0)
+                        {
+                            int got = (int)Math.Min(toLord, Math.Max(0, o.Gold));
+                            if (got > 0)
+                            {
+                                // bez zdarzenia gry: wplata liczy sie jak renta miasta (RentMerge), nie jak wplyw jednorazowy - jak E3/8a
+                                o.ChangeHeroGold(-got);
+                                lord.ChangeHeroGold(got);
+                                var c = lord.Clan;
+                                if (c != null) { int r0; _rentPend.TryGetValue(c, out r0); _rentPend[c] = r0 + got; }
+                                _otToLords += got; paid += got;
+                            }
+                        }
+                        if (paid < t) { _otShort += t - paid; _otShortN++; }
+                        if (o == Hero.MainHero) { plPaid += paid; _otPlayerN++; }
                     }
+                    catch (Exception e) { Stumble("OwnerTaxDaily(warsztat)", e); }
                 }
                 _otOwners += owners.Count;
                 _otPlayer += plPaid;
@@ -916,6 +1038,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("OwnerTaxDaily", e); }
+            finally { _otPay.Clear(); }   // kazda migawka raz: pobrana, przepadla albo (D11-3 nieczynne) porzucona
         }
 
         /// <summary>ArmouryBehavior, zaraz po PopulationLaw.Daily (ktore czysci RentToday): przelewy podatku od ostatniej doby jako renta miasta panow
@@ -1275,10 +1398,13 @@ namespace Armoury
                   .Append("; linie 'Taxes from' warsztatow, ktorych wlasciciel nie placi (lordowie, gracz - BK nie pobiera), zdjete z podatku miast (suma wywolan modelu, bez przelewu) ")
                   .Append(System.Threading.Interlocked.Read(ref _unpaidCut)).Append(" (").Append(System.Threading.Volatile.Read(ref _unpaidN)).Append(" linii)");
                 // D11-3
-                sb.Append(" | podatek warsztatow lordow i gracza w cudzych miastach (D11-3 ").Append(Onoff(OwnerTaxOn)).Append(OwnerTaxLive || !OwnerTaxOn ? "" : ", NIECZYNNE - wymaga E3/8, rent miast i latki renty")
-                  .Append("): placi wlasciciel - warsztatow ").Append(_otN).Append(" (wlascicieli ").Append(_otOwners).Append("), podatek BK (kwota linii 'Taxes from') ").Append(_otDue)
+                sb.Append(" | podatek warsztatow lordow i gracza w cudzych miastach (D11-3 ").Append(Onoff(OwnerTaxOn)).Append(OwnerTaxLive || !OwnerTaxOn ? "" : ", " + OwnerTaxState())
+                  .Append("): placi wlasciciel - warsztatow ").Append(_otN).Append(" (wlascicieli ").Append(_otOwners).Append("), podatek BK z wyplat rodow (kwota BK w chwili wyplaty) ").Append(_otDue)
                   .Append(" -> do panow miast (renta) ").Append(_otToLords).Append(", do kas miast (autonomia) ").Append(_otToTowns).Append(", do kas miast bez pana ").Append(_otNoLord)
-                  .Append(", nie zaplacone - brak w kiesie wlasciciela (zaleglosc nie rosnie) ").Append(_otShort).Append(" (").Append(_otShortN).Append(" warsztatow); w tym gracz zaplacil ").Append(_otPlayer);
+                  .Append(", nie zaplacone - brak w kiesie wlasciciela (zaleglosc nie rosnie) ").Append(_otShort).Append(" (").Append(_otShortN).Append(" warsztatow); w tym gracz zaplacil ").Append(_otPlayer)
+                  .Append(" (warsztatow gracza ").Append(_otPlayerN).Append("); kontrola: wyplaty z tych warsztatow ok. ").Append(_otPayout).Append(", podatek / wyplata ")
+                  .Append(_otPayout > 0 ? (100.0 * _otDue / _otPayout).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%" : "-")
+                  .Append(" (cena warsztatu zaklada 2 x stawka BK); migawki przepadle (wlasciciel zmarl albo miasto juz nie cudze) ").Append(_otDropN).Append(" (").Append(_otDrop).Append(")");
                 // E3/8b
                 sb.Append(" | oplaty lordow BK (E3/8b ").Append(Onoff(FeesOn)).Append(", latek ").Append(_wFees).Append("/8):");
                 long feeAll = 0;

@@ -1226,15 +1226,29 @@ namespace Armoury
         }
         private static object _wsModel, _popMgr; private static System.Reflection.MethodInfo _getBeh;
 
+        /// <summary>121 (noc-p8): model kwot GetWorkshopTaxes - to samo zrodlo co Seal31B (NotableTaxLines / UnpaidOwnerTaxLines / D11-3): egzemplarz BK
+        /// z czynnego lancucha modelu finansow gry, zapas - konfiguracja BK; gdy nie pasuje do metody - jak dotad model z konfiguracji (_wsModel).
+        /// Recenzja 121 (uwaga 3): przy BK Workshop Tax To Lord = WYL Seal31B linii warsztatow nie zdejmuje (UnpaidOwnerTaxLines / NotableTaxLines = 0),
+        /// wiec kwoty z lancucha dalyby panu miasta linie warsztatow lordow i gracza, ktorych nikt nie placi (z niczego) - wtedy jak przed 121 (_wsModel).</summary>
+        private static object WsModel()
+        {
+            if (!Seal31B.TaxOn) return _wsModel;
+            var m = Seal31B.WsTaxModel();
+            return m != null && _wsTax != null && _wsTax.DeclaringType.IsInstanceOfType(m) ? m : _wsModel;
+        }
+
         /// <summary>KeptTownLines - stara droga (odbicie), cialo sprzed perf-d2d3 bez zmian.</summary>
         private static float KeptTownLinesSlow(Town town)
         {
                 float sum = 0f;
                 var leader = town.OwnerClan != null ? town.OwnerClan.Leader : null;
                 if (_wsTax != null)
+                {
+                    var wm = WsModel();   // 121: egzemplarz BK z lancucha gry (jak Seal31B) - z konfiguracji BK slownik pusty
                     foreach (var w in town.Workshops)
                         if (w != null && w.Owner != null && w.Owner != leader)
-                            sum += Convert.ToSingle(_wsTax.Invoke(_wsModel, new object[] { w }));
+                            sum += Convert.ToSingle(_wsTax.Invoke(wm, new object[] { w }));
+                }
                 if (_bldT != null && Campaign.Current != null)
                 {
                     if (_getBeh == null) _getBeh = typeof(Campaign).GetMethod("GetCampaignBehavior").MakeGenericMethod(_bldT);
@@ -1263,9 +1277,10 @@ namespace Armoury
             if (_wsTax != null)
             {
                 var tax = PerfFast.M1<TaleWorlds.CampaignSystem.Settlements.Workshops.Workshop, int>(_wsTax);
+                var wm = WsModel();   // 121: egzemplarz BK z lancucha gry (jak Seal31B) - z konfiguracji BK slownik pusty
                 foreach (var w in town.Workshops)
                     if (w != null && w.Owner != null && w.Owner != leader)
-                        sum += tax != null ? (float)tax(_wsModel, w) : Convert.ToSingle(_wsTax.Invoke(_wsModel, new object[] { w }));
+                        sum += tax != null ? (float)tax(wm, w) : Convert.ToSingle(_wsTax.Invoke(wm, new object[] { w }));
             }
             if (_bldT != null && Campaign.Current != null)
             {

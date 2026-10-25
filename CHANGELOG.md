@@ -38,6 +38,85 @@ niezgodne API miedzy paczkami.
 - build 0 bledow (6 ostrzezen jak dotad). Gra NIE uruchamiana - test zbiorczy po scaleniu paczek (sesja glowna).
 **Status:** DO SPRAWDZENIA (baza dla paczek P1-P6; samo w sobie nie do wgrania - funkcje puste).
 
+## 2026-10-25 121 (noc-p8-podatek, galaz noc/p8-podatek od a14c76d3 = WGRANE 111) - podatek warsztatow lordow i gracza w cudzych miastach (D11-3) naprawde pobierany: kwota BK z egzemplarza w czynnym lancuchu modelu finansow, z prawdziwej wyplaty rodu
+
+**Problem:** Jeff 25.10 ok. 03:05, po diagnozie warsztatu (opcje: 1 = pobierac podatek, 2 = bez podatku i drozsze warsztaty): "pobierac podatek". Cena warsztatu
+(WorkshopTrade.TaxShare przez Seal31B.OwnerPaysTax) wlicza podatek BK (Seagard 57.8% zysku), a we wszystkich sesjach od 24.10 17:21 linia doby "Szczelnosc (164a/31b)"
+mowi "D11-3 ... warsztatow 0 ... w tym gracz zaplacil 0" - podatku nie placil nikt (gracz ani lordowie).
+**Przyczyna:** Seal31B (NotableTaxLines / UnpaidOwnerTaxLines / OwnerTaxDaily) i PopulationLaw.KeptTownLines czytaly GetWorkshopTaxes z BannerKingsConfig.Instance.ClanFinanceModel.
+BK (Main.cs:207) dodaje do gry ten egzemplarz, ale BKROTPatch (BKROTPatch.cs:201, OnGameStart, laduje sie po BK) podmienia pole konfiguracji na nowy BKROTClanFinanceModel.
+Gra wola Campaign.Current.Models.ClanFinanceModel (lancuch ROTClanFinanceModel -> BKClanFinanceModel), wiec slownik workshopTaxes wypelnia tylko egzemplarz z lancucha
+(BKClanFinanceModel.CalculateOwnerIncomeFromWorkshop: workshopTaxes[w] = TaxExpenses przy KAZDYM wolaniu); slownik egzemplarza z konfiguracji byl zawsze pusty.
+Kontrola podwojnego podatku (dekompilacja BK, ROT, gry): BK CalculateOwnerIncomeFromWorkshop niczego nie odejmuje (wyplata = ProfitMade / 2); BKClanFinanceModel.AddExpenses
+pobiera "Workshop taxes" od glowy rodu tylko przy czynnym BKWorkshopModel (u Jeffa NavalDLCWorkshopModel; te warsztaty i tak pomija bkCharges); ROTClanFinanceModel tylko
+przekazuje dalej (_previousModel); DefaultClanFinanceModel podatku warsztatow nie ma. Notable placa przez BK CalculateNotableDailyGoldChange (E3/8a, bez zmian).
+D11-3 jest jedynym poborca od lordow i gracza - podatek nie dubluje sie.
+**Zmiana (tylko Armoury):**
+- (commit 06ec0f99) Seal31B.EnsureHooks: BkInChain oddaje egzemplarz BK z lancucha, zapamietany razem z glowa lancucha (_fin; ChainFin = null, gdy glowa sie zmienila).
+  TaxFin / WsTaxModel: zrodlo kwot GetWorkshopTaxes = ten egzemplarz, zapas - BannerKingsConfig. Czytaja go NotableCore, UnpaidCore, D11-3 i PopulationLaw.KeptTownLines
+  (Slow i Fast przez WsModel()) - linie warsztatow w podatku miasta przy rencie dalej z jednego zrodla (znosza sie). OwnerPays: placi tylko glowa rodu (gracz - glowa
+  swojego), bo tylko jej warsztatom gra wyplaca dochod (CalculateHeroIncomeFromWorkshops(clan.Leader)). Linia startu: "kwoty podatku warsztatow (GetWorkshopTaxes): ...",
+  linia doby: liczba warsztatow gracza.
+- Poprawki po recenzji (ten wpis):
+  1. OwnerTaxLive wymaga tez ChainFin() != null i wpietej latki DailyTickClan (_wPay). Bez egzemplarza BK w lancuchu D11-3 jest nieczynne, a cena warsztatu (TaxShare ->
+     OwnerPaysTax) nie wlicza podatku lordowi / graczowi (notablom - jak dotad); zapas z konfiguracji BK zostaje tylko dla linii podatku miast. Linie startu i doby podaja
+     powod (OwnerTaxState): "NIECZYNNE - brak egzemplarza BK w lancuchu modelu finansow gry (cena warsztatu bez podatku)" albo "NIECZYNNE - brak latki DailyTickClan ...".
+  2. Kwota z prawdziwej wyplaty: nowy postfiks Seal31B.ClanPayPost na ClanVariablesCampaignBehavior.DailyTickClan (Priority.First, tylko odczyt). Gra wyplaca tam glowie rodu
+     dochod z warsztatow (applyWithdrawals), a BK zapisuje workshopTaxes[w] = stawka x zysk PRZED wyplata = 2 x stawka x wyplata - tyle zaklada cena (TaxShare = 2 x stawka)
+     i tyle pobralby BK przy BKWorkshopModel. Migawka (warsztat, wlasciciel, kwota, wyplata) dla warsztatow, ktore placa (OwnerPays); OwnerTaxDaily pobiera dokladnie te kwoty,
+     raz (finally czysci liste), od tego, kto dostal wyplate; regula sprawdzana jeszcze raz na dzis (miasto przeszlo na rod wlasciciela, wlasciciel zmarl - migawka przepada,
+     licznik). Dotad OwnerTaxDaily czytal slownik w dobie, czyli stan z ostatniego przeliczenia: podpowiedzi, AI, KingdomTreasury.Daily (:108 i :577), IronBank.Limit (:195)
+     nadpisuja go stanem po wyplacie (1-2 x stawka, zaleznie od kolejnosci), a po zakupie warsztatu (Workshop.ChangeOwnerOfWorkshop: Capital = capital) trzymal kwote
+     poprzedniego wlasciciela. Migawki czyszczone tez przy starcie sesji (EnsureHooks). Linia doby: "podatek BK z wyplat rodow (kwota BK w chwili wyplaty)", kontrolka
+     "wyplaty z tych warsztatow ok. W, podatek / wyplata X% (cena warsztatu zaklada 2 x stawka BK)" i "migawki przepadle N (kwota)".
+  3. PopulationLaw.WsModel: przy BK Workshop Tax To Lord = WYL czyta jak przed 121 (konfiguracja BK). Seal31B tych linii wtedy nie zdejmuje (UnpaidOwnerTaxLines /
+     NotableTaxLines = 0), wiec z lancucha pan miasta dostawalby linie warsztatow lordow i gracza z niczego (martwy kod robil sie zywy - zasada 4). U Jeffa WL - bez zmian.
+  Odrzucone z recenzji: (c) "ciecie ceny 0.9 przy LimitMax 0.5 (2 x stawka do 1.0)" - stawka BK (BKWorkshopModel.CalculateWorkshopTax) wynosi najwyzej 0.3 x 1.2 = 0.36
+  (atut wlasciciela miasta +20%, Mercantilism 0..1 tylko obniza), wiec 2 x stawka <= 0.72 i ciecie 0.9 nigdy nie dziala; ceny nie zmieniamy (polecenie). Skrocenie kwoty do
+  TaxExpenses liczonego teraz (propozycja recenzji) niepotrzebne - migawka bierze kwote z chwili wyplaty, a skrocenie zanizaloby pobor ponizej ceny.
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Nic z niczego: D11-3 przenosi zloto wlasciciel -> kasa miasta (czesc autonomii, GiveGoldAction) i wlasciciel -> pan miasta (renta: _rentPend -> RentMerge), najwyzej
+  z kiesy wlasciciela (reszta przepada, zaleglosc nie rosnie); linia 'Taxes from' tych warsztatow zdjeta z podatku miasta (UnpaidOwnerTaxLines) - pan dostaje przelew, nie
+  linie. Przelewy w tym samym miejscu doby co dotad (po PopulationLaw.Daily, przed RentMerge, w bloku ksiegi). Gracz i lordowie - jedna regula.
+- Podwojny podatek: brak (wyzej). Przy czynnym BKWorkshopModel BK pobiera sam - OwnerPays (bkCharges) pomija te warsztaty w migawce i w poborze.
+- Latka DailyTickClan: kolejna na tej metodzie (Measure31 First, SoldierPay prefiks First / postfiks Last, GarrisonRecruitFee i CouncilWages35 Normal, MoneyLedger, BK
+  TraceDailyTickClan). Nasz postfiks tylko czyta (slownik BK, ProfitMade) - nie zmienia zlota ani pomiarow ksiegi. Cialo gry po wyplacie (wplyw, gubernatorzy, limity) i
+  postfiksy przed nami nie przeliczaja dochodu z warsztatow (sprawdzone). Rody rozliczane sa po kawalku przez dobe (PeriodicTicker); migawki zbierane do dziennego poboru -
+  rod z 0 albo 2 wyplatami miedzy naszymi dobami placi za kazda wyplate.
+- Kontrolka "podatek / wyplata": z konstrukcji ok. 2 x stawka (np. Seagard ok. 57.8%); wyplata liczona z ProfitMade po wyplacie (ceil(zysk/2) - o 1 wiecej przy nieparzystym
+  zysku), tylko do kontroli.
+- Podstawa pensji rady (CouncilWages35.TownBase, ownerPaid z UnpaidCore) dalej szacowana ze slownika w chwili liczenia podatku miasta (1-2 x stawka), nie z migawki - tylko
+  wielkosc podstawy, bez przeplywu zlota.
+- E3/8a nieczynne (latki notabli nie weszly) przy WL: linie warsztatow notabli w podatku miasta maja teraz kwote z lancucha (para przez nicosc jak przed E3/8a, opisane jako
+  "linia zostaje"); przed 121 bylo 0 (pusty slownik konfiguracji). U Jeffa E3/8a czynne.
+- Inny mod podmieni glowe lancucha modelu finansow w trakcie sesji -> ChainFin = null -> D11-3 i podatek w cenie wylaczone do nastepnej sesji (linia doby: NIECZYNNE z powodem).
+- Pierwsza doba po wczytaniu: pobor tylko za wyplaty od startu sesji (migawki sprzed zapisu nie przechodza).
+- Co sprawdzic w logu: linia startu "Szczelnosc (164a/31b)" - w wpietych "podatek warsztatow z wyplaty rodu (ClanVariablesCampaignBehavior.DailyTickClan)", "D11-3 ...
+  (kwota BK z wyplaty rodu): CZYNNE", "kwoty podatku warsztatow (GetWorkshopTaxes): egzemplarz BK z lancucha modelu gry"; linia doby D11-3: warsztatow > 0, podatek > 0,
+  "podatek / wyplata" blisko 2 x stawka, gracz zaplacil > 0, gdy jego warsztat w cudzym miescie ma zysk (w zapisie z diagnozy silversmithy gracza w Seagard: kapital 1986
+  przy poczatkowym 2000 - zysku 0, wiec podatek 0 jest tam poprawny); komunikat "Workshop tax: you paid ...".
+**Status:** WGRANE 112 (25.10 ok. 04:05 CET razem z 120; Armoury.dll md5 68f74d0f - patrz 120). Autotest 112a: ERROR 0; linia startu "kwoty podatku warsztatow (GetWorkshopTaxes): egzemplarz BK z lancucha modelu gry", D11-3 CZYNNE;
+w 2 dobach testu 0 wyplat z warsztatow lordow i gracza w cudzych miastach (pobrane 0) - pobor do sprawdzenia w grze Jeffa (komunikat "Workshop tax: you paid ...", linia D11-3 "w tym gracz zaplacil X").
+Wczesniej: ZBUDOWANE (galaz noc/p8-podatek). Build Armoury 0 bledow, 6 ostrzezen jak przed zmiana (zadne w Seal31B / PopulationLaw).
+
+## 2026-10-25 120 (noc-p7 przesluchanie, galaz noc/p7-przesluchanie od a14c76d3 = WGRANIE 111; commity 17479881 + recenzja 443b13f5) - przesluchanie jencow z band dezerterow: pochodzenie jenca z bandy, opcja szara zamiast ukrytej
+
+**Problem:** Jeff 25.10 ok. 02:50: "nie dziala przelsuchanie jencow". Opcji obozu "Question the prisoners" nie bylo. Log Armoury-2026-10-25_02-11-22.log: bitwy z Robber Knights o 02:41 i 02:48 (w bandach robber_knights: lannister_footman, river_man_at_arms, goldcloak_master_archer, western_mercenary);
+[02:48:06] pamiec bandy robber_knights_2145345368, kryjowka hideout_robber_11; [02:50:43] "Przesluchanie (m109): ... jency-bandyci grup 0, ludzi 0".
+**Przyczyna:** za bandyte uchodzil tylko jeniec z Occupation == Bandit albo Culture.IsBandit (CampInterrogation.BanditTroop); Groups() pomijalo reszte, a Cond przy gs.Count == 0 ukrywalo opcje bez sladu w logu. Bandy w swiecie Jeffa to dezerterzy i zolnierze z puli wyrzutkow
+(OutlawLaw.RosterPostfix / Draw, OutlawLawEnabled TAK). Wtornie: prosci w bandzie to "looter" (kultura bez kryjowek w ROT-Map) - szara "Outlaws of this kind keep no lair", bo pamiec band jest kluczowana kultura. Dawny autotest wkladal bandytow z szablonu klanu.
+**Zmiana (tylko Armoury: CampInterrogation.cs, CampInterrogation.Test.cs; bez nowego klucza MCM):**
+- Migawka lochu gracza i skladu pokonanych band w CampaignEvents.OnPlayerBattleEndEvent (PlayerEncounter.DoApplyMapEventResults, przed CalculateAndCommitMapEventResults); w OnMapEventEnded przyrost lochu przypisany bandzie, ktora miala najwiecej ludzi tego rodzaju (rodzaj spoza migawki - "bez bandy", bez wpisu).
+- Wpis pochodzenia rodzaj -> kultura bandy, kryjowka, miejsce, doba, banda, liczba (najwyzej 60) w siodmej czesci arm_interrogation (DLL 111 ja pomija); liczba przycinana do stanu lochu, smierc w przesluchaniu -1, wpis znika bez rodzaju w lochu.
+- Groups(): dezerter z wpisem (najwyzej liczba z wpisu) i bandyta z wpisem (caly stos) dostaja kulture bandy (PersonCulture zostaje); Target bierze kryjowke z wpisu, gdy wpis ma najwyzej 60 dob (OriginFresh, jak pamiec band), inaczej pamiec kultury bandy.
+- Cond: jency w lochu, ale zaden z bandy - opcja SZARA "None of the men you hold rode with outlaws." (pusty loch - ukryta jak dotad). Teksty dezertera po angielsku.
+- Log "Przesluchanie (m109): pochodzenie - banda ... | jency z bandy: ... | bez bandy N", linia doby "pochodzenie - doba ... bez migawki N", "opcja szara". Autotest: T14 (dezerter z bandy), T15 (Cond na atrapie), T9 (zapis siodmej czesci).
+**Ryzyko / co sprawdzic:** wpiecie zdarzen sprawdzi tylko prawdziwa wygrana z banda (T14 wola NoteOrigins wprost) - po wgraniu: po "pamiec - banda X" linia "pochodzenie - banda X ... jency z bandy", w linii doby "bez migawki 0", w obozie grupy "(..., rode with outlaws)".
+Jency wzieci przed ta wersja nie maja wpisu - opcja szara do nastepnej wygranej z banda. Stos mieszany bierze dane najnowszej bandy. PrisonerLaw.Criminal (definicja przestepcy, Mur) bez zmian - dezerterzy z band dalej nie ida na Mur.
+Recenzja 443b13f5: R1 bez zapasu "jedna pokonana partia - ona", R2 OriginFresh 60 dob, R3 autotest T14/T15 rozszerzony.
+**Status:** WGRANE 112 (25.10 ok. 04:05 CET razem z 121; Armoury.dll md5 68f74d0f z noc/wgranie112 07864a62; kopia przed: Armoury.dll.bak-2026-10-25-przed-wgranie112 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie112-przed).
+Autotest 112a (4 bitwy na kopii zapisu Jeffa z 03:46): KONIEC OK, ERROR 0, linie misji 4/4, Armoury.json nietkniety; kod wrappera 1 tylko przez zabicie gry wiszacej przy wyjsciu. Linia startu przesluchania OK; T14/T15 (flaga) i prawdziwa wygrana z banda - do sprawdzenia w grze Jeffa.
+
 ## 2026-10-25 113 (m119-kij, galaz w-toku/m117-ubranie po 112 231dc8a5) - bezbronny po strazach bierze z domu najgorsza bron biala (palka, mlot, sierp, toporek) swojej kultury - sztuka tymczasowa DTE, poza zbrojownia
 
 **Problem:** Jeff 25.10 ok. 01:00: "i jakas nagorsza bron dostja akijem moga walczyc sa kije?"; ok. 01:40: "wgraj wszystko razem z kijem". Log 24.10 (1 z 21 bitew, dopisek
