@@ -51,6 +51,10 @@ namespace Armoury
     ///      przy tej fladze; zapas: gdy postfiks bazy cos usunie (brak haka), prog 1000 liczony od nowa wzorem gry. BK MobilePartyExtensions.
     ///      IsAvailableForArmies - false (wezwania BK gracza i AI); czynny CheckPartyEligibility (SCA) - false z napisem po angielsku (okno armii gracza). Czlonek juz
     ///      w armii zostaje.
+    ///  (d) CUDZE BLOKADY (druga recenzja p9, uwaga "kod" major; zasada 8.0 - nie nadpisujemy wyniku innej latki): postfiks VeryLow biegnie PO CrossingLaw.AimPostfix
+    ///      (Normal; -1 kazdemu zachowaniu z osada zablokowana po dwoch zawroceniach od przeprawy), ROT AIThinkPatch.Patch1 (Normal), WatchLaw/BesiegedRelief/ReaverLaw/
+    ///      RaidTribute (Low). Miasto, ktore w liscie ocen ma JAKIEKOLWIEK zachowanie z wynikiem <= -1 (odczyt PRZED naszymi -1 opcjom bitwy), jest dla wyjazdu
+    ///      zablokowane: Nearest je pomija, a biezacy wyjazd do niego konczy sie wytchnieniem miasta (Cool) i wyborem nastepnego. Nigdy nie podnosimy wyniku <= -1.
     /// Stan wyjazdow bez zapisu - po wczytaniu liczony od nowa. Liczniki do linii "Gotowosc do bitwy (p9): dzien" (ArmedStrength.Daily). Potkniecia per wywolanie.
     /// </summary>
     internal static class ArmsFirst
@@ -83,7 +87,7 @@ namespace Armoury
 
         // liczniki doby (mysl i armie - watek glowny; atak - dowolny watek, pod zamkiem)
         private static readonly object Gate = new object();
-        private static int _dTrips, _dArrived, _dArmed, _dPart, _dNoGain, _dTimeout, _dOff, _dOwnDef, _dStarve, _stumbles, _dExt, _dFreedTrip;
+        private static int _dTrips, _dArrived, _dArmed, _dPart, _dNoGain, _dTimeout, _dOff, _dOwnDef, _dStarve, _stumbles, _dExt, _dFreedTrip, _dBlocked;
         private static int _vAttackCalls, _vThresh;
         private static readonly HashSet<MBGUID> _vAttack = new HashSet<MBGUID>(), _vLead = new HashSet<MBGUID>(), _vMember = new HashSet<MBGUID>(),
                                                 _vAvail = new HashSet<MBGUID>(), _vElig = new HashSet<MBGUID>(), _dPoor = new HashSet<MBGUID>(), _dNoTown = new HashSet<MBGUID>(),
@@ -99,7 +103,7 @@ namespace Armoury
 
         internal static void ClearDay()
         {
-            _dTrips = _dArrived = _dArmed = _dPart = _dNoGain = _dTimeout = _dOff = _dOwnDef = _dStarve = _dExt = _dFreedTrip = 0;
+            _dTrips = _dArrived = _dArmed = _dPart = _dNoGain = _dTimeout = _dOff = _dOwnDef = _dStarve = _dExt = _dFreedTrip = _dBlocked = 0;
             lock (Gate) { _vAttackCalls = 0; _vThresh = 0; _vAttack.Clear(); _vLead.Clear(); _vMember.Clear(); _vAvail.Clear(); _vElig.Clear(); _vPre.Clear(); }
             _dPoor.Clear(); _dNoTown.Clear(); _dNoBuy.Clear(); _dNoBudgetTown.Clear();
         }
@@ -109,11 +113,13 @@ namespace Armoury
 
         private static int NoGainOf(MobileParty mp) { Streak k; return mp != null && _noGain.TryGetValue(mp.Id, out k) ? k.N : 0; }
 
-        /// <summary>Recenzja p9: partia w miescie wyjazdu z przedluzonym postojem (postep w poprzedniej dobie i dalej ja stac) - ArmedStrength.Wait jej nie zwalnia.</summary>
+        /// <summary>Recenzja p9: partia na postoju w miescie wyjazdu - ArmedStrength.Wait jej nie zwalnia. Druga recenzja p9 (uwaga "kod", limit czekania): kazdy postoj,
+        /// nie tylko przedluzony (dotad t.Ext > 0) - lord, ktorego zegar mija pierwszej doby drugiego postoju, nie wyjezdza bez zakupu. Ograniczone: postoj StayHours,
+        /// przedluzenie tylko z postepem R (sufit 100%).</summary>
         internal static bool Progressing(MobileParty mp)
         {
             Trip t;
-            return mp != null && _trip.TryGetValue(mp.Id, out t) && t.Ext > 0 && t.ArriveH >= 0 && mp.CurrentSettlement == t.Town;
+            return mp != null && _trip.TryGetValue(mp.Id, out t) && t.ArriveH >= 0 && mp.CurrentSettlement == t.Town;
         }
 
         private static int Clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -248,13 +254,24 @@ namespace Armoury
                     if (IsOwnDefend(e.Item1, clan)) { if (e.Item2 > own) own = e.Item2; }
                     else if (e.Item2 > other) other = e.Item2;
                 }
+                // druga recenzja p9 (uwaga major): osady zablokowane przez latki przed nami (wynik <= -1, np. CrossingLaw.AimPostfix) - odczyt PRZED naszymi -1
+                HashSet<Settlement> blocked = null;
+                for (int i = 0; i < scores.Count; i++)
+                {
+                    var e = scores[i];
+                    if (e.Item2 > -1f) continue;
+                    var bs = e.Item1.Party as Settlement;
+                    if (bs == null || !bs.IsTown) continue;
+                    if (blocked == null) blocked = new HashSet<Settlement>();
+                    blocked.Add(bs);
+                }
                 Settlement town = null;
                 if (own >= 0f) { _dOwnDef++; Forget(party); }   // obrona zagrozonej osady wlasnego rodu - wyjatek, bez wyjazdu (ta opcja zostaje, IsBattle jej nie gasi)
                 else
                 {
                     int b, need;
                     if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); _trip.Remove(party.Id); }   // recenzja p9: seria wizyt bez postepu - jak "nie stac"
-                    else if (CanAfford(party, info.Short, null, out b, out need)) town = TripTown(party, info, CampaignTime.Now.ToHours, s);
+                    else if (CanAfford(party, info.Short, null, out b, out need)) town = TripTown(party, info, CampaignTime.Now.ToHours, s, blocked);
                     else { _dPoor.Add(party.Id); Forget(party); }
                 }
                 // opcje bitwy -1 (kopia listy - SetBehaviorScore zmienia elementy)
@@ -275,7 +292,7 @@ namespace Armoury
                 {
                     var d = scores[i].Item1;
                     if (d.AiBehavior != AiBehavior.GoToSettlement || d.WillGatherArmy || d.NavigationType != MobileParty.NavigationType.Default || !ReferenceEquals(d.Party, town)) continue;   // droga ladowa (Nearest)
-                    if (scores[i].Item2 < nv) partyThinkParams.SetBehaviorScore(in d, nv);
+                    if (scores[i].Item2 > -1f && scores[i].Item2 < nv) partyThinkParams.SetBehaviorScore(in d, nv);   // wyniku <= -1 (cudza blokada) nie podnosimy
                     set = true;
                     break;
                 }
@@ -305,12 +322,13 @@ namespace Armoury
         }
 
         /// <summary>Cel wyjazdu po sprzet: biezacy (do konca wizyty) albo najblizsze wazne miasto w zasiegu; null - brak.</summary>
-        private static Settlement TripTown(MobileParty party, ArmedStrength.Info info, double now, Settings s)
+        private static Settlement TripTown(MobileParty party, ArmedStrength.Info info, double now, Settings s, HashSet<Settlement> blocked)
         {
             Trip t;
             if (_trip.TryGetValue(party.Id, out t))
             {
-                if (!Valid(party, t.Town, now)) _trip.Remove(party.Id);
+                if (blocked != null && blocked.Contains(t.Town)) { _dBlocked++; Cool(party, t.Town, now, s); _trip.Remove(party.Id); }   // druga recenzja p9: cudza blokada celu
+                else if (!Valid(party, t.Town, now)) _trip.Remove(party.Id);
                 else
                 {
                     bool inTown = party.CurrentSettlement == t.Town;
@@ -340,7 +358,7 @@ namespace Armoury
                     if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); return null; }   // recenzja p9: bez kolejnych wyjazdow
                 }
             }
-            var town = Nearest(party, now, s);
+            var town = Nearest(party, now, s, blocked);
             if (town == null) { _dNoTown.Add(party.Id); return null; }
             int b, need;
             if (!CanAfford(party, info.Short, town, out b, out need)) { _dNoBudgetTown.Add(party.Id); return null; }   // recenzja p9: rezerwa napraw z materialem tego miasta
@@ -350,7 +368,7 @@ namespace Armoury
         }
 
         /// <summary>Najblizsze droga ladowa wazne miasto w zasiegu AiArmsTripMaxDays dob marszu (EstimatedAverageLordPartySpeed x 24 h), po tej samej stronie Muru.</summary>
-        private static Settlement Nearest(MobileParty party, double now, Settings s)
+        private static Settlement Nearest(MobileParty party, double now, Settings s, HashSet<Settlement> blocked)
         {
             if (party.IsCurrentlyAtSea) return null;
             var c = Campaign.Current;
@@ -367,6 +385,7 @@ namespace Armoury
             {
                 var st = tw != null ? tw.Settlement : null;
                 if (st == null || !Valid(party, st, now)) continue;
+                if (blocked != null && blocked.Contains(st)) continue;   // druga recenzja p9: zablokowane przez latke przed nami (CrossingLaw i inne)
                 if (pos.Distance(st.GetPosition2D) > range) continue;   // w linii prostej dalej niz zasieg - droga tym bardziej
                 float d;
                 if (at == st) d = 0f;
@@ -608,6 +627,7 @@ namespace Armoury
                    + ", postoj przedluzony (postep i dalej stac) " + _dExt + ", po wizycie czesciowo " + _dPart + " i bez poprawy " + _dNoGain + ", za dlugo w drodze " + _dTimeout
                    + ", bez miasta w zasiegu " + _dNoTown.Count + " partii, w miescie nie stac (rezerwa napraw z materialem) " + _dNoBudgetTown.Count
                    + ", po " + NoGainMax + " wizytach bez postepu bez wyjazdow " + streak + " partii (mysli " + _dNoBuy.Count + "), wyjazd przerwany zwolnieniem z czekania " + _dFreedTrip
+                   + ", cel zablokowany cudza latka (wynik <= -1, wytchnienie i nastepne miasto) " + _dBlocked
                    + ", w wytchnieniu " + _cool.Count + " par partia-miasto"
                    + " | odmowy: atak " + a + " partii (" + aCalls + " razy), opcje bitwy zgaszone " + _dOff + " (mysli bez pieniedzy " + _dPoor.Count + " partii)"
                    + ", obrona wlasnej osady zostawiona " + _dOwnDef + ", glod (bez zmian) " + _dStarve

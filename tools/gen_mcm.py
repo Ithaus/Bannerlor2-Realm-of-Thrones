@@ -597,6 +597,7 @@ LABELS = {
     'LektorGossipReserveChars': 'Narrator Gossip Reserve Chars',
     # p9: "AI" wielkimi literami (regula ogolna dalaby "Ai Strength Counts Gear")
     'AiStrengthCountsGear': 'AI Strength Counts Gear',
+    'AiAutobattleCountsGear': 'AI Autobattle Counts Gear',
     'AiStrengthFullKitPercent': 'AI Strength Full Kit Percent',
     'AiArmsBeforeBattle': 'AI Arms Before Battle',
     'AiArmsBelowPercent': 'AI Arms Below Percent',

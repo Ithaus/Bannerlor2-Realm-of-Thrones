@@ -9664,9 +9664,13 @@ namespace Armoury
         [SettingPropertyGroup("Chronicle of Westeros")]
         public bool ChronicleCanonDeaths { get; set; } = true;
 
-        [SettingPropertyBool("AI Strength Counts Gear", HintText = "When lords weigh a fight - whether to attack, flee or join a battle, whether to lead or join an army, whether to march to a relief, how strong a realm is in war and peace - a party counts only as strong as the kit its stores hold for its men, measured like the garrison threshold. A party whose stores are empty counts as a band of peasants in tunics with clubs. The same rule for every lord's party, yours and your clan's, and for garrisons that fight only with their stores; bandits, caravans, villagers, militia and the dead count as before. The same measure decides auto-resolved battles: a blow struck by an ill-armed man lands softer and a blow taken by him lands harder, so a fight ends the way it was judged. Off = strength by troop tier only", RequireRestart = false)]
+        [SettingPropertyBool("AI Strength Counts Gear", HintText = "When lords weigh a fight - whether to attack, flee or join a battle, whether to lead or join an army, whether to march to a relief, how strong a realm is in war and peace - a party counts only as strong as the kit its stores hold for its men, measured like the garrison threshold. A party whose stores are empty counts as a band of peasants in tunics with clubs. The same rule for every lord's party, yours and your clan's, and for garrisons that fight only with their stores; bandits, caravans, villagers, militia and the dead count as before. Off = strength by troop tier only", RequireRestart = false)]
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool AiStrengthCountsGear { get; set; } = true;
+
+        [SettingPropertyBool("AI Autobattle Counts Gear", HintText = "Auto-resolved battles count kit the same way as AI Strength Counts Gear: a blow struck by an ill-armed man lands softer and a blow taken by him lands harder, so a fight ends the way it was judged. Works only with AI Strength Counts Gear. Off = auto-resolved blows by troop tier only, as before", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool AiAutobattleCountsGear { get; set; } = true;
 
         [SettingPropertyInteger("AI Strength Full Kit Percent", 1, 100, "0", HintText = "share of its men's template slots a party's stores must fill for it to count at full strength (the same 75% as the garrison threshold); below it the party's strength falls in a straight line towards that of unarmed men", RequireRestart = false)]
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
@@ -9694,7 +9698,7 @@ namespace Armoury
 
         [SettingPropertyInteger("AI Arms Wait Max Days", 1, 60, "0", HintText = "the most days an unarmed lord holds back from war while he tries to arm his men; after that he fights with what they carry until he can pay for kit again", RequireRestart = false)]
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
-        public int AiArmsWaitMaxDays { get; set; } = 10;
+        public int AiArmsWaitMaxDays { get; set; } = 12;
 
         [SettingPropertyBool("AI Arms Block Bandit Attacks", HintText = "unarmed lords leave bandits alone as well. Off = they may still attack bandits when their strength, kit counted, is enough", RequireRestart = false)]
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
@@ -12116,6 +12120,7 @@ namespace Armoury
             s.ChroniclePlayerChoices = ChroniclePlayerChoices;
             s.ChronicleCanonDeaths = ChronicleCanonDeaths;
             s.AiStrengthCountsGear = AiStrengthCountsGear;
+            s.AiAutobattleCountsGear = AiAutobattleCountsGear;
             s.AiStrengthFullKitPercent = AiStrengthFullKitPercent;
             s.AiArmsBeforeBattle = AiArmsBeforeBattle;
             s.AiArmsBelowPercent = AiArmsBelowPercent;

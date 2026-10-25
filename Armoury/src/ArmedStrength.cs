@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -52,8 +53,18 @@ namespace Armoury
     /// jako slaba, atakuja i przegrywaja symulacje po tierze). Postfiks Priority.VeryLow na bazowym SimulateHit (po NorthHomeEdge Low i BK Normal, przed CS
     /// ValyrianWardSim Last; ROT-owy model deleguje do bazowego, smok i tak nadpisany przez ROT): moc zwyklego zolnierza partii w regule x k = 1 - (1-g) x s, s = (P - min(P0,P))
     /// / (P + dodatek modelu) - DOKLADNIE ten sam wzor na czlowieka co F (g z publikacji partii, bez nowego liczenia), wiec cios x (k bijacego / k trafianego)^0.7.
-    /// Bohaterowie k = 1. Dotyczy kazdej autobitwy (AI-AI, szturm AI, "wyslij wojsko" gracza - jedna regula), tylko przy kluczu AiStrengthCountsGear.
-    /// NIE ZMIENIA: linii B175 "moc" (KingdomBalance).
+    /// Bohaterowie k = 1. Dotyczy kazdej autobitwy (AI-AI, szturm AI, "wyslij wojsko" gracza - jedna regula), przy kluczu AiStrengthCountsGear I osobnym
+    /// AiAutobattleCountsGear (druga recenzja p9: wynik autobitew zmienia WPO balansu krolestw i kalibracje NorthHomeEdge - osobny klucz do proby A/B na tym samym zapisie).
+    /// NIE ZMIENIA: linii B175 "moc" (KingdomBalance) - ale jej "wygrane ponad oczekiwane" i "wyrownane" licza oczekiwany wynik z samego tieru, a autobitwa (z kluczem)
+    /// rozstrzyga sie takze wedlug zbrojowni: po p9 WPO nie jest porownywalne z baza sprzed p9 (CHANGELOG 122).
+    ///
+    /// ZALOGI - DECYZJE "ILU ZOSTAWIC / ILU WZIAC" (druga recenzja p9): BKGarrisonModel.FindNumberOfTroopsToLeaveToGarrison porownuje EstimatedStrength zalogi
+    /// z idealem, gra FindNumberOfTroopsToTakeFromGarrison - CalculateCurrentStrength; z F < 1 (zaloga przy BareOn) niedozbrojona zaloga wygladalaby na slaba,
+    /// lord zostawialby wiecej ludzi -> wiecej pustych slotow -> nizsze R i F -> petla wzrostu zalog i zoldu. Prefiks/finalizer czynnego modelu zalog (ten sam
+    /// wzor co lup DTE: flaga [ThreadStatic] i wyzerowana pamiec sily zalogi i lorda przed i po) - te dwie decyzje licza ludzi bez mnoznika, jak przed p9.
+    ///
+    /// ZAPIS (druga recenzja p9): zegar czekania (od kiedy niegotowa, od kiedy zwolniona, zwolniona) partii niegotowych idzie do zapisu (klucz arm_p9_wait,
+    /// StringId partii) - inaczej kazde wczytanie zaczynaloby AiArmsWaitMaxDays od nowa i lord bez pieniedzy przy krotkich sesjach nie bylby nigdy zwolniony.
     /// </summary>
     internal static class ArmedStrength
     {
@@ -83,7 +94,7 @@ namespace Armoury
         private static readonly Queue<MobileParty> _fullQ = new Queue<MobileParty>();
         private static readonly Dictionary<MBGUID, Info> Empty = new Dictionary<MBGUID, Info>();
         private static volatile Dictionary<MBGUID, Info> _pub = Empty;
-        private static volatile bool _strOn;
+        private static volatile bool _strOn, _simOn;   // _simOn - autobitwa (AiStrengthCountsGear i AiAutobattleCountsGear)
         private static bool _pubDirty, _invAll, _needFull, _anyOn;
         private static int _knee = -1;
         [ThreadStatic] private static int _hold;
@@ -91,7 +102,11 @@ namespace Armoury
         // latki (raz na proces)
         private static Harmony _h;
         private static readonly HashSet<MethodBase> _patched = new HashSet<MethodBase>();
-        private static string _hPower = "nie wpieta", _hDte = "nie wpieta", _hMem = "BRAK", _hSim = "nie wpieta";
+        private static string _hPower = "nie wpieta", _hDte = "nie wpieta", _hMem = "BRAK", _hSim = "nie wpieta", _hGar = "nie wpieta";
+        // druga recenzja p9: zegary czekania z zapisu (StringId -> stan), zuzywane przy pierwszym czytelnym przeliczeniu partii
+        private struct SavedWait { internal double LowH, FreeH; internal bool Free; }
+        private static readonly Dictionary<string, SavedWait> _savedWait = new Dictionary<string, SavedWait>(StringComparer.Ordinal);
+        private static int _waitLoaded, _dRestored, _dGarHold;
         private static AccessTools.FieldRef<PartyBase, int> _verRef;
         private static bool _verTried;
         // recenzja p9 (uwaga 1): udzial "nagiej" mocy zwyklego zolnierza s = (P - min(P0,P)) / (P + dodatek modelu) - stale na kampanie (tier i wzorce), pamiec na postac
@@ -109,14 +124,14 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _ent.Clear(); _dirty.Clear(); _fullQ.Clear(); _pub = Empty; _strOn = false; _pubDirty = _invAll = false; _needFull = true; _anyOn = false; _knee = -1;
+            _ent.Clear(); _dirty.Clear(); _fullQ.Clear(); _pub = Empty; _strOn = false; _simOn = false; _savedWait.Clear(); _waitLoaded = 0; _pubDirty = _invAll = false; _needFull = true; _anyOn = false; _knee = -1;
             _stumbles = 0; _simStumbles = 0; ClearDay(); _fullTotal = 0; _share.Clear();
             ArmsFirst.Reset();
         }
 
         private static void ClearDay()
         {
-            _dComputed = _dUnknown = _dFull = _dInvalid = _dPublish = _dHold = _dFreed = _dUnfree = 0; _dTicks = 0;
+            _dComputed = _dUnknown = _dFull = _dInvalid = _dPublish = _dHold = _dFreed = _dUnfree = _dRestored = _dGarHold = 0; _dTicks = 0;
             Interlocked.Exchange(ref _dSimHits, 0); Interlocked.Exchange(ref _dSimOut, 0); Interlocked.Exchange(ref _dSimIn, 0); Interlocked.Exchange(ref _dSimMilli, 0);
         }
 
@@ -183,7 +198,7 @@ namespace Armoury
         /// niezmiennej publikacji. Nie rzuca.</summary>
         public static void SimPostfix(CharacterObject __0, CharacterObject __1, PartyBase __2, PartyBase __3, ref ExplainedNumber __result)
         {
-            if (!_strOn) return;
+            if (!_simOn) return;
             try
             {
                 var pub = _pub;
@@ -216,6 +231,79 @@ namespace Armoury
             if (_hold > 0) _hold--;
             if (_strOn) InvalidateEvent(__0);
             return __exception;
+        }
+
+        /// <summary>Druga recenzja p9: prefiks First czynnego modelu zalog (FindNumberOfTroopsToLeaveToGarrison / FindNumberOfTroopsToTakeFromGarrison) - ile ludzi
+        /// zostawic albo wziac liczone bez mnoznika (jak przed p9): flaga i wyzerowana pamiec sily zalogi i lorda. Nie rzuca.</summary>
+        public static void GarPrefix(MobileParty __0, Settlement __1)
+        {
+            _hold++;
+            if (!_strOn) return;
+            _dGarHold++;
+            InvalidateGar(__0, __1);
+        }
+
+        /// <summary>Finalizer: koniec flagi i znowu wyzerowana pamiec - nastepny odczyt policzy sile z mnoznikiem. Wyjatek gry idzie dalej bez zmian.</summary>
+        public static Exception GarFinalizer(MobileParty __0, Settlement __1, Exception __exception)
+        {
+            if (_hold > 0) _hold--;
+            if (_strOn) InvalidateGar(__0, __1);
+            return __exception;
+        }
+
+        private static void InvalidateGar(MobileParty mp, Settlement st)
+        {
+            try
+            {
+                if (_verRef == null) return;
+                if (mp != null && mp.Party != null) _verRef(mp.Party) = -1;
+                var g = st != null && st.Town != null ? st.Town.GarrisonParty : null;
+                if (g != null && g.Party != null) _verRef(g.Party) = -1;
+            }
+            catch (Exception e) { Stumble("InvalidateGar", e); }
+        }
+
+        // ------------------------------------------------------------ zapis zegarow czekania (druga recenzja p9)
+        private static readonly char[] IdBad = { ',', ';', '|' };
+
+        private static void AppendWait(StringBuilder sb, ref bool first, string id, double lowH, double freeH, bool free)
+        {
+            if (!first) sb.Append(';');
+            first = false;
+            sb.Append(id).Append(',').Append(lowH.ToString("0.##", Inv)).Append(',').Append(freeH.ToString("0.##", Inv)).Append(',').Append(free ? '1' : '0');
+        }
+
+        /// <summary>"1|StringId,odH,zwolnionaOdH,0/1;..." - partie lordow niegotowe (z zegarem) plus wpisy z zapisu, ktorych jeszcze nie przeliczono po wczytaniu.</summary>
+        internal static string ExportWait()
+        {
+            var sb = new StringBuilder("1|");
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            bool first = true;
+            foreach (var e in _ent.Values)
+            {
+                if (e.P == null || e.Kind != KLord || !e.Low || e.LowSinceH < 0) continue;
+                string id = e.P.StringId;
+                if (string.IsNullOrEmpty(id) || id.IndexOfAny(IdBad) >= 0 || !seen.Add(id)) continue;
+                AppendWait(sb, ref first, id, e.LowSinceH, e.FreeFromH, e.Free);
+            }
+            foreach (var kv in _savedWait)
+                if (seen.Add(kv.Key)) AppendWait(sb, ref first, kv.Key, kv.Value.LowH, kv.Value.FreeH, kv.Value.Free);
+            return sb.ToString();
+        }
+
+        /// <summary>Wczytanie (po Reset z konstruktora zachowania): brak klucza albo zly format - pusto (zegary od nowa, jak przed poprawka).</summary>
+        internal static void ImportWait(string v)
+        {
+            _savedWait.Clear(); _waitLoaded = 0;
+            if (string.IsNullOrEmpty(v) || !v.StartsWith("1|", StringComparison.Ordinal)) return;
+            foreach (var row in v.Substring(2).Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var c = row.Split(',');
+                double lo, fr;
+                if (c.Length < 4 || c[0].Length == 0 || !double.TryParse(c[1], NumberStyles.Float, Inv, out lo) || !double.TryParse(c[2], NumberStyles.Float, Inv, out fr) || lo < 0) continue;
+                _savedWait[c[0]] = new SavedWait { LowH = lo, FreeH = fr, Free = c[3] == "1" && fr >= 0 };
+                _waitLoaded++;
+            }
         }
 
         private static void InvalidateEvent(MapEvent me)
@@ -326,7 +414,16 @@ namespace Armoury
                     e.F = Factor(mp, r, s);
                     e.G = (float)Math.Min(1.0, Math.Max(0, r) / (double)Knee(s));
                     e.Short = Math.Max(0, (int)Math.Ceiling(Ready(s) * (double)slots / 100.0) - filled);   // sztuk do progu gotowosci (ArmsFirst.CanAfford)
+                    // druga recenzja p9: stan z zapisu (niegotowa - histereza - i zegar czekania), raz, przy pierwszym czytelnym przeliczeniu po wczytaniu
+                    SavedWait sw;
+                    bool restored = false;
+                    if (_savedWait.Count > 0 && mp.StringId != null && _savedWait.TryGetValue(mp.StringId, out sw))
+                    {
+                        _savedWait.Remove(mp.StringId);
+                        if (kind == KLord) { e.Low = true; e.LowSinceH = sw.LowH; e.FreeFromH = sw.FreeH; e.Free = sw.Free; restored = true; }
+                    }
                     e.Low = kind == KLord && (e.Low ? r < Ready(s) : r < Below(s));
+                    if (restored && e.Low) _dRestored++;
                     Wait(e, mp, s);
                 }
                 _dComputed++;
@@ -427,7 +524,7 @@ namespace Armoury
                 {
                     if (_anyOn || _pub.Count > 0)
                     {
-                        var old = _pub; _pub = Empty; _strOn = false;
+                        var old = _pub; _pub = Empty; _strOn = false; _simOn = false;
                         foreach (var kv in old) if (kv.Value.F < 1f) Invalidate(kv.Value.P);
                         _ent.Clear(); _dirty.Clear(); _fullQ.Clear(); _needFull = true;
                     }
@@ -436,6 +533,7 @@ namespace Armoury
                 }
                 _anyOn = true;
                 if (str != _strOn) { _strOn = str; _invAll = true; _pubDirty = true; }
+                _simOn = str && s.AiAutobattleCountsGear;
                 int knee = Knee(s);
                 if (knee != _knee) { if (_knee >= 0) foreach (var e in _ent.Values) if (e.P != null) _dirty.Add(e.P); _knee = knee; }
                 if (_needFull)
@@ -587,6 +685,35 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _hSim = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Sim", e); }
+            // druga recenzja p9: czynny model zalog - ile ludzi zostawic / wziac bez mnoznika (prefiks First i finalizer; PatchTarget.OfActive - klasa deklarujaca,
+            // dzis ROTSettlementGarrisonModel -> NavalDLC -> BKGarrisonModel; latamy najbardziej zewnetrzny, wiec flaga obejmuje caly lancuch)
+            try
+            {
+                var gm = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SettlementGarrisonModel : null;
+                if (gm == null) _hGar = "BRAK (model zalog nieznany)";
+                else
+                {
+                    var mL = PatchTarget.OfActive(gm, "FindNumberOfTroopsToLeaveToGarrison", new[] { typeof(MobileParty), typeof(Settlement) }, "zalogi: ilu zostawic bez mnoznika (p9)");
+                    var mT = PatchTarget.OfActive(gm, "FindNumberOfTroopsToTakeFromGarrison", new[] { typeof(MobileParty), typeof(Settlement), typeof(float) }, "zalogi: ilu wziac bez mnoznika (p9)");
+                    var parts = new List<string>(2);
+                    var names = new[] { "zostaw", "wez" };
+                    var ms = new[] { mL, mT };
+                    for (int i = 0; i < 2; i++)
+                    {
+                        var m = ms[i];
+                        if (m == null) { parts.Add(names[i] + " BRAK"); continue; }
+                        if (!_patched.Contains(m))
+                        {
+                            _h.Patch(m, prefix: new HarmonyMethod(typeof(ArmedStrength), nameof(GarPrefix)) { priority = Priority.First },
+                                     finalizer: new HarmonyMethod(typeof(ArmedStrength), nameof(GarFinalizer)));
+                            _patched.Add(m);
+                        }
+                        parts.Add(names[i] + " " + m.DeclaringType.Name);
+                    }
+                    _hGar = "wpiete (" + string.Join(", ", parts.ToArray()) + "; model czynny " + gm.GetType().Name + ")";
+                }
+            }
+            catch (Exception e) { _hGar = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Gar", e); }
             if (!_verTried)
             {
                 _verTried = true;
@@ -605,8 +732,10 @@ namespace Armoury
                          + ArmsFirst.CoolDays(s) + " dob, bandy " + (s.AiArmsBlockBanditAttacks ? "tez zakazane" : "wolno") + ", czekanie najwyzej " + ArmsFirst.WaitDays(s)
                          + " dob - potem walczy tym, co ma, do gotowosci albo pieniedzy na sprzet)"
                          + " | regula: lordowie i druzyna gracza " + (GarrisonKit.OwnKitOn ? "TAK" : "NIE (TroopsFightWithOwnKitOnly wylaczone)") + ", zalogi " + (GarrisonKit.BareOn ? "TAK" : "NIE (walcza we wzorcu)")
+                         + " | AI Autobattle Counts Gear " + (s.AiAutobattleCountsGear ? "TAK" : "NIE") + (s.AiAutobattleCountsGear && !s.AiStrengthCountsGear ? " (bez skutku - AI Strength Counts Gear NIE)" : "")
                          + " | latki: sila partii " + _hPower + "; autobitwa (ta sama regula na cios) " + _hSim + "; pamiec sily gry (PartyBase._lastEstimatedStrengthVersionNo) " + _hMem
-                         + "; lup DTE AI-AI bez mnoznika " + _hDte
+                         + "; lup DTE AI-AI bez mnoznika " + _hDte + "; zalogi ilu zostawic / wziac bez mnoznika " + _hGar
+                         + " | zegary czekania z zapisu (arm_p9_wait): " + _waitLoaded + " partii"
                          + " | " + af + " | pelny przeglad partii w pierwszych godzinach (najwyzej " + FullCap + " na godzine, lordowie najpierw); do przeliczenia F = 1.");
             }
             catch (Exception e) { Stumble("SessionStart.Line", e); }
@@ -616,6 +745,18 @@ namespace Armoury
         private static string F2(double v) { return v.ToString("0.00", Inv); }
         private static string TypeName(object o) { return o != null ? o.GetType().FullName : "?"; }
         private static string Nm(MobileParty mp) { try { return mp != null && mp.Name != null ? mp.Name.ToString() : "?"; } catch { return "?"; } }
+
+        private static string KingdomR(SortedDictionary<string, long[]> byK)
+        {
+            if (byK.Count == 0) return "-";
+            var sb = new StringBuilder();
+            foreach (var kv in byK)
+            {
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append(kv.Key).Append(' ').Append(kv.Value[1] > 0 ? (kv.Value[0] / (double)kv.Value[1]).ToString("0", Inv) : "-").Append("% (").Append(kv.Value[1]).Append(", ").Append(kv.Value[2]).Append(')');
+            }
+            return sb.ToString();
+        }
 
         internal static void Daily()
         {
@@ -627,6 +768,7 @@ namespace Armoury
                 int lords = 0, lordsKnown = 0, gars = 0, garsKnown = 0, garsLow = 0, low = 0, lowArmy = 0, poor = 0, freed = 0;
                 long rSum = 0, gSum = 0; double fSum = 0, fMin = 2; string fMinName = null;
                 var bucket = new int[4];
+                var byK = new SortedDictionary<string, long[]>(StringComparer.Ordinal);   // druga recenzja p9: R lordow wedlug krolestw (HorseCensus.KeyOfParty) - [suma R, partii, niegotowych]
                 Ent pl = null;
                 var lows = new List<Ent>();
                 foreach (var e in _ent.Values)
@@ -638,6 +780,10 @@ namespace Armoury
                     lords++;
                     if (!e.Known) continue;
                     lordsKnown++; rSum += e.R; fSum += e.F;
+                    string kk = HorseCensus.KeyOfParty(e.P.Party) ?? "?";
+                    long[] kr;
+                    if (!byK.TryGetValue(kk, out kr)) { kr = new long[3]; byK[kk] = kr; }
+                    kr[0] += e.R; kr[1]++; if (e.Low && !e.Free) kr[2]++;
                     bucket[Math.Min(3, Math.Max(0, e.R) / 25)]++;
                     if (e.F < fMin) { fMin = e.F; fMinName = Nm(e.P) + " (" + e.P.MemberRoster.TotalManCount + " ludzi, R " + e.R + "%)"; }
                     if (e.Low)
@@ -669,13 +815,14 @@ namespace Armoury
                   .Append(", R srednio ").Append(lordsKnown > 0 ? (rSum / (double)lordsKnown).ToString("0", Inv) + "%" : "-")
                   .Append(", R 0-25: ").Append(bucket[0]).Append(", 25-50: ").Append(bucket[1]).Append(", 50-75: ").Append(bucket[2]).Append(", 75-100: ").Append(bucket[3])
                   .Append(", F srednio ").Append(lordsKnown > 0 ? F2(fSum / lordsKnown) : "-").Append(", najmniejsze ").Append(fMinName != null ? F2(fMin) + " " + fMinName : "-")
+                  .Append(" | R lordow wedlug krolestw (srednio, partii, niegotowych): ").Append(KingdomR(byK))
                   .Append(" | gracz: ").Append(pl != null ? (pl.Known ? "R " + pl.R + "%, F " + F2(pl.F) : "zbrojownia nieczytelna") : "poza regula")
                   .Append(" | zalogi: ").Append(gars).Append(garsKnown > 0 ? ", R srednio " + (gSum / (double)garsKnown).ToString("0", Inv) + "%, z F < 1: " + garsLow : "")
                   .Append(" | niegotowe (R < ").Append(Below(s)).Append("%, do ").Append(Ready(s)).Append("%): poza armia ").Append(low).Append(", w tym bez pieniedzy ").Append(poor)
                   .Append(", w armii ").Append(lowArmy)
                   .Append(", zwolnione z czekania (po ").Append(ArmsFirst.WaitDays(s)).Append(" dobach walcza tym, co maja) ").Append(freed)
                   .Append(" (dzis nowe ").Append(_dFreed).Append(", powrot do dozbrajania - stac na sprzet ").Append(_dUnfree).Append(')')
-                  .Append(" | autobitwa (ta sama regula): ciosy z poprawka ").Append(Interlocked.Read(ref _dSimHits))
+                  .Append(" | autobitwa (ta sama regula, AI Autobattle Counts Gear ").Append(_simOn ? "TAK" : "NIE").Append("): ciosy z poprawka ").Append(Interlocked.Read(ref _dSimHits))
                   .Append(" (zadane przez slabo uzbrojonych ").Append(Interlocked.Read(ref _dSimOut)).Append(", otrzymane ").Append(Interlocked.Read(ref _dSimIn))
                   .Append(", sredni mnoznik ciosu ").Append(Interlocked.Read(ref _dSimHits) > 0 ? (Interlocked.Read(ref _dSimMilli) / 1000.0 / Interlocked.Read(ref _dSimHits)).ToString("0.00", Inv) : "-")
                   .Append(", potkniecia ").Append(_simStumbles).Append(')')
@@ -684,7 +831,10 @@ namespace Armoury
                   .Append(" | przeliczen ").Append(_dComputed).Append(" (pelny przeglad ").Append(_dFull).Append(" z ").Append(_fullTotal).Append(", w kolejce ").Append(_fullQ.Count)
                   .Append(", brudnych czeka ").Append(_dirty.Count).Append("), koszt ").Append(ms.ToString("0.0", Inv)).Append(" ms")
                   .Append(", publikacji ").Append(_dPublish).Append(", wyzerowan pamieci sily ").Append(_dInvalid).Append(", lup DTE bez mnoznika ").Append(_dHold)
-                  .Append(", zbrojownie nieczytelne ").Append(_dUnknown).Append(", potkniecia ").Append(_stumbles).Append('.');
+                  .Append(", zbrojownie nieczytelne ").Append(_dUnknown)
+                  .Append(", zalogi ilu zostawic / wziac bez mnoznika ").Append(_dGarHold)
+                  .Append(", zegary czekania z zapisu przywrocone dzis ").Append(_dRestored).Append(" (czeka na przeliczenie ").Append(_savedWait.Count).Append(')')
+                  .Append(", potkniecia ").Append(_stumbles).Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }

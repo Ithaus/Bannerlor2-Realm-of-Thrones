@@ -1,6 +1,6 @@
 # DZIENNIK ZMIAN
 
-## 2026-10-25 122 (noc-p9 gotowosc AI, galaz noc/p9-gotowosc od a14c76d3 = WGRANIE 111; kod d036d233 + recenzja 155f3370) - sila partii z uzbrojeniem (ocena AI i autobitwa) i "najpierw dozbroic" przed bitwa
+## 2026-10-25 122 (noc-p9 gotowosc AI, galaz noc/p9-gotowosc od a14c76d3 = WGRANIE 111; kod d036d233 + recenzja 155f3370 + druga recenzja - commit "noc-p9 (122) druga recenzja") - sila partii z uzbrojeniem (ocena AI i autobitwa) i "najpierw dozbroic" przed bitwa
 
 **Problem:** Jeff 25.10 ok. 03:30, po bitwie: "sprawdz moj save i ostatnia bitwe wogole nie mili uzbrojenia? ... wszycy biegali w koszulakch i z palkami i kijami ... jesli tak
 jest to powinna zanim podzjie do bitwy AI najpeirw przygotwac wojsko i dobrac pancerz bo zolnierz taki nie nadaje sie do bitwy, przeciez wiadomo ze przegra." Dowod
@@ -26,7 +26,7 @@ darmowego kompletu - sklad7b / LevyGold, "nic z niczego"), a nic nie kazalo lord
   RECENZJA 1: AUTOBITWA - TA SAMA REGULA. Postfiks Priority.VeryLow na bazowym DefaultCombatSimulationModel.SimulateHit (zolnierz; po BK Normal i NorthHomeEdge Low,
   przed CS ValyrianWardSim Last; ROT i NavalDLC deleguja do bazowego - latanie obu cieloby podwojnie): cios x (k bijacego / k trafianego)^0.7, k = 1 - (1-g) x s,
   s = (P - min(P0,P)) / (P + dodatek modelu) - dokladnie ten sam wzor na czlowieka co F (g z publikacji partii, bez nowego liczenia; s w pamieci na postac). Bohaterowie k = 1.
-  Dotyczy kazdej autobitwy: AI-AI, szturm AI, "wyslij wojsko" gracza (jedna regula), tylko przy kluczu AI Strength Counts Gear.
+  Dotyczy kazdej autobitwy: AI-AI, szturm AI, "wyslij wojsko" gracza (jedna regula), przy kluczu AI Strength Counts Gear I (druga recenzja) osobnym AI Autobattle Counts Gear.
 - B. ArmsFirst.cs (MCM "AI Arms Before Battle", domyslnie TAK): NIEGOTOWA = partia lorda w regule poza armia, bitwa i oblezeniem z R < 50 (histereza do 60; 60 = prog
   "chudych" partii rodu ClanFillOnce, 50 = polowa slotow wzorca pusta). (a) nie zaczepia partii poza bandami (postfiks DefaultMobilePartyAIModel.ShouldConsiderAttacking -
   DeclaredMethod, czynny NavalDLCMobilePartyAIModel przekazuje do bazy); wyjatek: cel oblega osade rodu partii albo bitwa toczy sie o nia; ucieczka bez zmian. (b) postfiks
@@ -40,10 +40,10 @@ darmowego kompletu - sklad7b / LevyGold, "nic z niczego"), a nic nie kazalo lord
   IsPartyWaitingForDisband zwraca dla niegotowej true TYLKO przy tej fladze (jedyny predykat petli kandydatow wolany przez interfejs, DefaultArmyManagementCalculationModel.cs:136);
   zapas (brak haka): gdy postfiks bazy cos usunie, prog 1000 liczony od nowa wzorem gry (:176-189) - ponizej: pusta lista i false.
   RECENZJA 3 (regula Jeffa 12.10 "jak ich nie stac na wojne, to zaciagaja pozyczke albo wystawiaja mniejsze zaciagi wojska" - czekanie bez konca bylo z nia SPRZECZNE):
-  ArmedStrength.Wait - najwyzej AiArmsWaitMaxDays (10 = dwa wyjazdy na najdalszy zasieg 2 x (3 + 1) dob i zapas) dob niegotowej, potem ZWOLNIONA: ArmsFirst jej nie
+  ArmedStrength.Wait - najwyzej AiArmsWaitMaxDays (druga recenzja: 12 - dwa wyjazdy na najdalszy zasieg z obozem nocnym 2 x (4 + 1.1) = 10.2 doby i zapas) dob niegotowej, potem ZWOLNIONA: ArmsFirst jej nie
   wstrzymuje (atak, cele, armie, wezwania, okno armii gracza, odsiecz), walczy tym, co ma - sila dalej z uzbrojeniem, wiec nie zaczepi silniejszych. Koniec zwolnienia:
   gotowa (R >= 60) albo najwczesniej po tylu samych dobach, gdy stac ja znowu na sprzet - nowa proba, zegar od nowa. W armii zegar stoi (liczy od wyjscia);
-  partia, ktora w miescie dokupuje z postepem (postoj przedluzony), nie jest zwalniana.
+  partia na postoju w miescie wyjazdu (druga recenzja: kazdy postoj, nie tylko przedluzony) nie jest zwalniana.
   RECENZJA 4: po dobie w miescie z postepem (R wzroslo) i dalej "stac go" - zostaje kolejna dobe (AiGear kupuje raz na dobe); "stac go" = min(braki do progu gotowosci,
   10) sztuk po wczorajszej sredniej cenie zakupow AI (najmniej 300; braki z nowego GarrisonKit.FillPercent z licznikami slotow); przy wybranym miescie podglad budzetu
   z rezerwa napraw z materialem tego miasta (AiGear.BudgetPreview(mp, miasto) = AiWear.OutstandingCost(mp, st) jak TryBuyCore); 2 wizyty z rzedu bez postepu - jak
@@ -53,9 +53,10 @@ darmowego kompletu - sklad7b / LevyGold, "nic z niczego"), a nic nie kazalo lord
   krolestwa (EligAt / Eligible, bramka f12 "odsiecz bez szans") ani do podbicia; jedna regula z ArmsFirst.IsBattle (DefendSettlement cudzego rodu -1).
 - D. AiGear.cs: GoldPart (wspolny wzor TryBuyCore i BudgetPreview: (zloto pana - rezerwa) x procent), AvgPiecePriceYesterday (z FlushDay), BudgetPreview(mp[, miasto]),
   ArmedStrength.MarkDirty po zakupie. GarrisonKit.cs: FillPercent z licznikami (need, used) - stare sygnatury bez zmian.
-- E. Ustawienia (grupa "AI readiness before battle (25.10)", na zywo): AI Strength Counts Gear TAK, AI Strength Full Kit Percent 75, AI Arms Before Battle TAK, AI Arms Below
-  Percent 50, AI Arms Ready Percent 60, AI Arms Trip Max Days 3, AI Arms Trip Cooldown Days 3, AI Arms Wait Max Days 10, AI Arms Block Bandit Attacks NIE. gen_mcm: Armoury
-  2422 ustawien (bylo 2413). Klucze NOWE - w Armoury.json Jeffa ich nie ma (grep "AiArms" / "AiStrength" 0), domyslne z kodu zadzialaja.
+- E. Ustawienia (grupa "AI readiness before battle (25.10)", na zywo): AI Strength Counts Gear TAK, AI Autobattle Counts Gear TAK (druga recenzja), AI Strength Full Kit
+  Percent 75, AI Arms Before Battle TAK, AI Arms Below Percent 50, AI Arms Ready Percent 60, AI Arms Trip Max Days 3, AI Arms Trip Cooldown Days 3, AI Arms Wait Max Days 12
+  (druga recenzja; bylo 10), AI Arms Block Bandit Attacks NIE. gen_mcm: Armoury 2423 ustawien (bylo 2413). Klucze NOWE - w Armoury.json Jeffa ich nie ma (grep "AiArms" /
+  "AiStrength" / "AiAutobattle" 0), domyslne z kodu zadzialaja.
 - F. Log: "Gotowosc do bitwy (p9): start sesji | klucze ... | regula ... | latki: sila partii ...; autobitwa (ta sama regula na cios) ...; pamiec sily gry ...; lup DTE ...
   | najpierw dozbroic: mysl AI ...; atak ...; armia gry ... , filtr kandydatow przed progiem 1000 (IsPartyWaitingForDisband) ...; armia BK ...; wezwania BK ...; okno armii
   gracza ...; Mur ..." i linia doby "Gotowosc do bitwy (p9): dzien N | partie lordow: R srednio, R 0-25/25-50/50-75/75-100, F srednio, najmniejsze | gracz | zalogi |
@@ -70,6 +71,28 @@ przed progiem + zapas z progiem; czynny model armii u Jeffa: StrategicCampaignAI
 niegotowa bez wyjscia) PRAWDA - poprawiona limitem czekania (pozyczka / zwolnienie ludzi - decyzja Jeffa). 4 (minor, wyjazdy marnuja doby) PRAWDA w (1) i (3) - poprawione;
 (2) CZESCIOWO - prog wedlug brakow do progu, ale min(braki, 10), nie min(braki, 60) (uzasadnienie wyzej). 5 (minor, OB5 liczy niegotowe) PRAWDA - poprawiona. 6 (minor,
 brak wpisu CHANGELOG) PRAWDA - ten wpis; temat commita d036d233 bez pustej linii po pierwszym wierszu - zostaje (bez przepisywania historii / force-push).
+**Druga recenzja p9 (5 uwag) - wynik:**
+- (major, kod) ArmsFirst.ThinkPostfix nadpisywal -1 CrossingLaw.AimPostfix (blokada celu za przeprawa po dwoch zawroceniach) - PRAWDA, poprawiona. Kolejnosc sprawdzona:
+  CrossingLaw Normal (400) przed ArmsFirst VeryLow (100), wiec lord niegotowy jechal po sprzet do zablokowanego miasta i znow byl zawracany. Teraz: miasto z JAKIMKOLWIEK
+  zachowaniem o wyniku <= -1 w liscie ocen (odczyt przed naszymi -1 opcjom bitwy - ROT Patch1, CrossingLaw, WatchLaw/BesiegedRelief/ReaverLaw/RaidTribute) jest dla
+  wyjazdu zablokowane: Nearest je pomija, biezacy wyjazd do niego - wytchnienie miasta i nastepne; wyniku <= -1 nigdy nie podnosimy. Linia doby: "cel zablokowany cudza latka".
+- (minor, kod) zegar czekania bez zapisu - kazde wczytanie zaczynalo AiArmsWaitMaxDays od nowa - PRAWDA, poprawiona: klucz zapisu arm_p9_wait ("1|StringId,odH,
+  zwolnionaOdH,0/1;..."), ArmedStrength.ExportWait/ImportWait, stan (niegotowa - histereza, zegar, zwolnienie) przywracany przy pierwszym czytelnym przeliczeniu partii po
+  wczytaniu; wpisy jeszcze nieprzeliczone ida do nastepnego zapisu. Brak klucza (stary zapis) = zegary od nowa; starszy DLL klucz pomija. Wyjazdy i serie wizyt bez postepu
+  dalej bez zapisu (ograniczone zegarem). Linia startu "zegary czekania z zapisu (arm_p9_wait): N partii", linia doby "przywrocone dzis N (czeka na przeliczenie M)".
+- (minor, kod) zalogi: F < 1 obniza EstimatedStrength zalogi, a BKGarrisonModel.FindNumberOfTroopsToLeaveToGarrison (:58) i gra FindNumberOfTroopsToTakeFromGarrison
+  (CalculateCurrentStrength) licza z niej, ilu ludzi zostawic / wziac - petla wzrostu zalog i zoldu - PRAWDA, poprawiona: prefiks First i finalizer na CZYNNYM modelu
+  zalog (PatchTarget.OfActive - dzis ROTSettlementGarrisonModel, najbardziej zewnetrzny, flaga obejmuje caly lancuch ROT -> NavalDLC -> BK -> Default), ten sam wzor co lup
+  DTE: flaga [ThreadStatic] i wyzerowana pamiec sily zalogi i lorda przed i po - te dwie decyzje licza ludzi bez mnoznika, jak przed p9. ZOSTAJE z F: ocena odwiedzin
+  BKAIVisitSettlementBehavior (:589 - lord czesciej zajrzy do niedozbrojonej zalogi, ale zostawi tyle co przed p9), sila frakcji w DefaultDiplomacyModel (wojna/pokoj -
+  zamierzone: sila z uzbrojeniem), bunt BK CheckRebellionEvent (milicja >= 1.4 x zaloga - niedozbrojona zaloga przy niskiej lojalnosci latwiej przegra bunt; patrzec).
+- (minor, kod) limit 10 dob nie liczyl obozu nocnego (NightRest 21-3, 6 h bez ruchu) - PRAWDA, poprawiona: AiArmsWaitMaxDays 12 (komentarz w Settings.cs z rachunkiem)
+  i ArmsFirst.Progressing = kazdy postoj w miescie wyjazdu (dotad tylko przedluzony, t.Ext > 0) - zwolnienie nie wyrywa lorda z miasta pierwszej doby postoju.
+  Zasieg wyjazdu (24 h marszu na dobe) bez zmian - krotszy zasieg odcialby miasta.
+- (minor, swiat) B175 / balans-krolestw: WPO i "wyrownane" licza oczekiwany wynik z mocy bez sprzetu, a autobitwa rozstrzyga sie teraz takze wedlug zbrojowni - PRAWDA.
+  Regula bez zmian; zrobione: (1) wynik autobitwy za OSOBNYM kluczem MCM "AI Autobattle Counts Gear" (domyslnie TAK; dziala tylko z AI Strength Counts Gear) - proba A/B
+  na tym samym zapisie bez wylaczania oceny sily; (2) linia doby p9: "R lordow wedlug krolestw (srednio, partii, niegotowych)" (HorseCensus.KeyOfParty); (3) ryzyko nizej.
+  Kolumna "moc z uzbrojeniem" w migawce B175 (Power x k) - OSOBNY wpis po tescie p9 (jedna zmiana naraz), nie w tym kroku.
 **Kontrola calosci (dekompilacja 1.4.8, ROT, NavalDLC, BK, SCA145; grep Armoury i CrashScribe):**
 - SimulateHit zolnierza: lancuch czynny ROT.Models.ROTCombatSimulationModel (linia SiegeWalls "modele: symulacja ...") -> _previousModel (NavalDLC base.BaseModel /
   Default) -> bazowy DefaultCombatSimulationModel.SimulateHit - jedna latka na bazowym, mnozy raz; ROT nadpisuje cios smoka PO nas (DragonDamageScaling - smok bez zmian);
@@ -81,17 +104,26 @@ brak wpisu CHANGELOG) PRAWDA - ten wpis; temat commita d036d233 bez pustej linii
 - CreatePostfix zapas: GetCustomStrength(Attacker, Siege) poza bitwa - z F, tak jak policzyla gra; prog tylko dla wariantu bazowego (__originalMethod), BK bez zmian.
 - Zwolnienie: Unready / IsLow licza Free z publikacji (niezmiennej) - atak (watki AI), armie, wezwania BK, okno armii, OB5 i mysl ArmsFirst maja jeden predykat.
 - Ekonomia: nic z niczego - wyjazd tylko kieruje partie do miasta; zakup, cena, zaplata i dostawa to dotychczasowy AiGear.TryBuyCore; podglad budzetu tylko czyta.
+- Druga recenzja: flaga _hold wspolna dla lupu DTE i zalog (licznik, zagniezdzenie bezpieczne); w repo nikt inny nie lata FindNumberOfTroops* (grep); SetBehaviorScore w
+  ArmsFirst tylko dla wyniku > -1; zapis arm_p9_wait we wlasnym try (wzor arm_interrogation), Reset z konstruktora zachowania przed SyncData - kolejnosc jak przy innych kluczach.
 **Ryzyko / co sprawdzic:**
 - AUTOBITWA ZMIENIA WYNIKI walk AI-AI wedlug kompletu: pokrycie zbrojowni AI (linia 171, dzien 108970) - partie rodow AI korpus 66%, helm 52%, tarcza 54%, rece 55%,
   zalogi AI korpus 90%, helm 85% - wiekszosc partii lordow ma g < 1 (k ok. 0.85-0.95 dla t2-t3), zalogi zwykle F = k = 1: szturmy AI troche trudniejsze, bandy troche
   grozniejsze dla slabo uzbrojonych lordow, walki lord-lord prawie bez zmian (obie strony podobnie). Pilnowac B175 / KingdomBalance (zdobycze twierdz na dobe) i
   "autobitwa: sredni mnoznik ciosu" w linii p9. "Wyslij wojsko" gracza tez wedlug jego zbrojowni (TroopsFightWithOwnKitOnly TAK u Jeffa).
-- Rozklad R nieznany - pierwsza linia doby p9 pokaze R 0-25 / 25-50 / ...; przy wielu partiach < 50 ArmsFirst wstrzyma wielu lordow najwyzej 10 dob (linia: "zwolnione
+- (druga recenzja) WPO i "wyrownane" B175 / balans-krolestw.csv po p9 NIE sa porownywalne z baza kopiaT9-120 (K = 12.6 skalibrowane przed p9): WPO kazdego krolestwa
+  zawiera ukryty skutek uzbrojenia (spis T2, balans.log 02:13:38: puste sloty Polnoc 11.5%, riverlands 7.0%, khuzait 7.4% wobec Westerlands 23.4%, empire_w 27.7%,
+  qarth 26.8%, empire_s 23.8%) - dodatkowe wygrane Polnocy NIE ida tylko na konto NorthHomeEdge. Kalibracje NorthHomeEdgePercent sprawdzac A/B: AI Autobattle Counts Gear
+  TAK/NIE (albo AI Strength Counts Gear TAK/NIE) na tym samym zapisie; linia p9 "R lordow wedlug krolestw" pokazuje, ktore krolestwa regula oslabia.
+- (druga recenzja) zalogi: obserwowac rozmiar zalog twierdz z R < 75 ("zalogi ... z F < 1" w linii p9) i "zalogi ilu zostawic / wziac bez mnoznika N" (licznik wywolan) -
+  rozmiary nie powinny rosnac szybciej niz przed p9; latka zalog w linii startu "zalogi ilu zostawic / wziac bez mnoznika wpiete (zostaw ROTSettlementGarrisonModel, wez ...)".
+- Rozklad R nieznany - pierwsza linia doby p9 pokaze R 0-25 / 25-50 / ...; przy wielu partiach < 50 ArmsFirst wstrzyma wielu lordow najwyzej 12 dob (linia: "zwolnione
   z czekania"); jesli wojny staja - AI Arms Wait Max Days w dol albo AI Arms Before Battle NIE (sama sila z uzbrojeniem zostaje).
 - Filtr armii: "kandydaci armii przed progiem gry N i po nim M" - M powinno byc ok. 0 (zapas), "armia ponizej progu 1000 po odjeciu" ok. 0; "filtr kandydatow ... TAK
   (DisbandPartyCampaignBehavior)" w linii startu - BRAK znaczy, ze dziala tylko zapas.
 - DECYZJA JEFFA (otwarta): pozyczka Banku Zelaznego na sprzet albo zwolnienie ludzi bez kompletu do progu ("mniejsze wojsko") zamiast samego limitu czekania.
-- Stan bez zapisu: po wczytaniu zegary czekania, wyjazdy i serie od nowa; F = 1 do pierwszego przeliczenia (pelny przeglad w pierwszych godzinach, lordowie najpierw).
+- Zapis: zegary czekania w zapisie (arm_p9_wait, druga recenzja); wyjazdy i serie wizyt bez postepu po wczytaniu od nowa; F = 1 do pierwszego przeliczenia (pelny przeglad
+  w pierwszych godzinach, lordowie najpierw). Cofniecie DLL na wersje bez klucza - zegary przepadaja (nic wiecej).
 - Wydajnosc: SimPostfix - 2 odczyty slownika na cios (tylko partie z F < 1 albo niegotowe w publikacji), s w pamieci na postac; zegar czekania w przeliczeniu doby partii.
 - Build: Armoury 0 bledow (6 ostrzezen jak przed zmiana); md5 z pelnej przebudowy 155f3370: 18ac11e23d7707f67f28364204149cb2 (DLL zawiera hash commitu).
 **Status:** DO SPRAWDZENIA (zbudowane w galezi noc/p9-gotowosc, NIE wgrane - test i wgranie robi sesja glowna).

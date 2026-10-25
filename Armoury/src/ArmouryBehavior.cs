@@ -844,6 +844,14 @@ namespace Armoury
                 if (dataStore.IsLoading) CampInterrogation.Import(interrogation);
             }
             catch (Exception e) { Log.Error("SyncData.arm_interrogation", e); }
+            // p9 druga recenzja: zegary czekania niegotowych partii lordow "1|StringId,odH,zwolnionaOdH,0/1;..." - brak klucza = stary zapis (zegary od nowa); osobny try
+            try
+            {
+                string p9Wait = dataStore.IsSaving ? ArmedStrength.ExportWait() : null;
+                SaveText.Sync(dataStore, "arm_p9_wait", ref p9Wait);
+                if (dataStore.IsLoading) ArmedStrength.ImportWait(p9Wait);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_p9_wait", e); }
             // R3-05e: rok urodzaju (doba losowania, siatka i wezly pola pogody) - brak klucza = stary zapis (x1 do nastepnego okna zniw); osobny try
             try
             {
