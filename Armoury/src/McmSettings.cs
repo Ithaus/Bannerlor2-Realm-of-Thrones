@@ -9832,7 +9832,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsWindowAfterTourney { get; set; } = true;
 
-        [SettingPropertyInteger("Spoils Window Min Worth", 0, 5000, "0", HintText = "the spoils window is skipped when coin, gear and ransoms together are worth less than this many denars (0 = always shown when anything was won)", RequireRestart = false)]
+        [SettingPropertyInteger("Spoils Window Min Worth", 0, 5000, "0", HintText = "the spoils window is skipped when coin, gear and ransoms together are worth less than this many denars (0 = always shown when anything was won). After a tourney, coin and gear you lost count too", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public int SpoilsWindowMinWorth { get; set; } = 0;
 

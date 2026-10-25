@@ -152,7 +152,8 @@ namespace Armoury
             if (r.Kind == SpoilsReport.KTourney && !s.SpoilsWindowAfterTourney) return "klucz Spoils Window After Tourney NIE";
             // noc P11: turniej - takze same straty (zaklady, wykup konia i zbroi), bo gracz chce wiedziec, co zostalo; widz bez zakladow - pominiety
             if (r.Kind == SpoilsReport.KTourney ? !r.AnythingTourney : !r.AnythingWon) return "nic nie zdobyto";
-            long worth = SpoilsReport.Worth(r);
+            // recenzja P11 (2): turniej - prog liczy zyski i straty (TourneyStake); Worth liczy tylko zyski, wiec raport z samymi stratami zawsze bylby ponizej progu
+            long worth = r.Kind == SpoilsReport.KTourney ? SpoilsReport.TourneyStake(r) : SpoilsReport.Worth(r);
             int min = Math.Max(0, Math.Min(5000, s.SpoilsWindowMinWorth));
             if (min > 0 && worth < min) return "wartosc " + worth.ToString(Inv) + " ponizej progu " + min.ToString(Inv) + " (Spoils Window Min Worth)";
             return null;

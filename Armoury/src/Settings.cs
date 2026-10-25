@@ -4474,7 +4474,7 @@ namespace Armoury
         public bool SpoilsWindowAfterSiege = true;         // the same window after you storm a town or castle (with your part of the sack, or of the mercy) and when a besieged town buys you off with a ransom
         // noc P11 (125): ramka T (SpoilsReport.Tourney.cs) - okno po wyjsciu z szranek, takze przy samych stratach (zaklady, wykup konia i zbroi)
         public bool SpoilsWindowAfterTourney = true;       // the same window after a tourney you rode in or watched, once you leave the lists and the ransoms of horse and armour are settled: the champion, your bouts and the round you fell in, prize money, the prize and its worth, bets placed and won, the townsfolk's and the champion's purse, ransoms of horse and armour paid and received, horse and armour won or yielded, and renown. Also shown when you only lost, so you see what is left
-        public int SpoilsWindowMinWorth = 0;               // the spoils window is skipped when coin, gear and ransoms together are worth less than this many denars (0 = always shown when anything was won)
+        public int SpoilsWindowMinWorth = 0;               // the spoils window is skipped when coin, gear and ransoms together are worth less than this many denars (0 = always shown when anything was won). After a tourney, coin and gear you lost count too
 
         // --- Friendly fire ---
         // P6 (Jeff: "i dodaj friendly fire po obu stronach", "cios wrecz nie tylko ostrzaly"): FriendlyFire.cs - transpilery MeleeHitCallback / MissileHitCallback /

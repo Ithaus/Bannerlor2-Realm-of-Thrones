@@ -25,7 +25,8 @@ namespace Armoury
     /// Zamkniecie (TWatch z SpoilsWindow.AppTick, 4 razy na sekunde): po misji szranek, na mapie (menu miasta), GrandTourney bez kolejki (TourneyRansom
     /// _missionBouts/_offers/_popupOpen - wykup konia i zbroi rozliczany PO misji i okna "Pay N / Yield"), bez zapytania, dwa sprawdzenia z rzedu (0,5 s).
     /// Bitwa przy otwartej ramce (MapEvent gracza, nowa bitwa w ApplyResultsPrefix) albo nowy turniej - zamkniecie z tego, co bylo. Turniej, ktory nie ruszyl
-    /// (bez misji i bez TournamentFinished) - zamkniecie po godzinie kampanii albo gdy gracz jest poza miastem; po szrankach straznik 12 h kampanii.
+    /// (bez misji szranek - misja z TournamentBehavior - i bez TournamentFinished) - zamkniecie po godzinie kampanii albo gdy gracz jest poza miastem, i to
+    /// BEZ raportu (recenzja P11 (1): w ramce bylby tylko targ, kon, werbunek) - linia "ramka T porzucona bez raportu"; po szrankach straznik 12 h kampanii.
     /// ETYKIETY ZLOTA (suma czesci = roznica kiesy; czego zaden zakres nie tlumaczy - "Other"): ZAKRESY roznicy kiesy gracza (TBegin/TEnd, stos - zakres
     /// wewnetrzny liczy sie tylko w sobie):
     ///  - PlayerFees8 (wrappery wywolan GiveGoldAction w grze i w Tournaments XPanded): TxpGold "Prize money", TxpBonus "Match honours", BetStake "Bets placed",
@@ -80,6 +81,7 @@ namespace Armoury
         private static TInfo _t;                  // turniej otwartej ramki T
         private static Rep _tLast;                // ostatni raport turnieju (proba autotestu)
         private static int _tClear;
+        private static int _tDropped;             // recenzja P11 (1): ramki T porzucone bez raportu (turniej sie nie odbyl) - licznik sesji gry, tylko log
         private static long _testGold = -1;       // proba autotestu: kiesa probna zamiast prawdziwej (tylko w jednym synchronicznym wywolaniu TestRun)
         private static Harmony _harmony;
 
@@ -274,6 +276,14 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteTourney", e); }
         }
 
+        /// <summary>Recenzja P11 (2): wartosc raportu turnieju dla progu Spoils Window Min Worth (SpoilsWindow.SkipWhy) - zyski I straty: kiesa w wartosci
+        /// bezwzglednej, sprzet zdobyty, rynsztunek oddany. Okno turnieju pokazuje takze same straty, wiec prog nie moze ich zerowac (Worth liczy tylko zyski).</summary>
+        internal static long TourneyStake(Rep r)
+        {
+            if (r == null) return 0;
+            return Math.Abs(r.CoinTotal) + Math.Max(0, r.Men) + r.GearWorth + r.RansomWorth + (r.T != null ? Math.Max(0, r.T.LostW) : 0);
+        }
+
         // ------------------------------------------------------------ zamkniecie ramki T
 
         private static List<Worn> WornOf(MobileParty mp)
@@ -309,14 +319,20 @@ namespace Armoury
             var t = _t;
             var mp = MobileParty.MainParty;
             if (mp != null && mp.MapEvent != null) { TClose("bitwa przy otwartej ramce turnieju"); return; }
-            if (TaleWorlds.MountAndBlade.Mission.Current != null) { if (t != null) t.SawMission = true; _tClear = 0; return; }
+            var ms = TaleWorlds.MountAndBlade.Mission.Current;
+            if (ms != null)
+            {
+                // recenzja P11 (1): misja szranek = misja z TournamentBehavior (spacer po miescie albo arena to nie turniej); kazda misja wstrzymuje zamkniecie
+                if (t != null && !t.SawMission && ms.GetMissionBehavior<TournamentBehavior>() != null) t.SawMission = true;
+                _tClear = 0; return;
+            }
             double day = CampaignTime.Now.ToDays;
             bool fought = t != null && (t.SawMission || t.Finished);
             if (!fought)
             {
-                // szranki jeszcze nie ruszyly (scena w drodze - czas kampanii stoi) albo nie rusza wcale
+                // szranki jeszcze nie ruszyly (scena w drodze - czas kampanii stoi) albo nie rusza wcale - TClose porzuca wtedy ramke bez raportu
                 bool away = mp != null && f.Town != null && !ReferenceEquals(mp.CurrentSettlement, f.Town) && PlayerEncounter.Current == null;
-                if (day - f.Day > 1.0 / 24.0 || away) TClose("turniej sie nie odbyl (bez misji szranek" + (away ? ", gracz poza miastem" : ", godzina kampanii") + ")");
+                if (day - f.Day > 1.0 / 24.0 || away) TClose("bez misji szranek" + (away ? ", gracz poza miastem" : ", godzina kampanii"));
                 return;
             }
             var gsm = GameStateManager.Current;
@@ -347,6 +363,16 @@ namespace Armoury
             if (d == null) return;
             try
             {
+                // recenzja P11 (1): turniej sie nie odbyl (bez misji szranek i bez TournamentFinished) - ramka porzucona BEZ raportu i bez okna: w czasie
+                // otwartej ramki gracz mogl handlowac na targu, kupic konia albo werbowac, a to nie jest lup turnieju (jedna regula dla straznika, nowej bitwy
+                // i nowego turnieju - Abandon)
+                if (!t.SawMission && !t.Finished)
+                {
+                    _tDropped++;
+                    Log.Info(TagT + "ramka T porzucona bez raportu - turniej sie nie odbyl | " + f.Place + " (" + how + "): " + Apply(new Rep(), d, LOther)
+                             + " | porzucone w sesji " + _tDropped + (t.Test ? " (proba autotestu)" : "") + ".");
+                    return;
+                }
                 // oddany rynsztunek (GrandTourney Yield zdejmuje sztuke z ekwipunku bojowego przegranego) - slot pelny przy otwarciu, pusty teraz
                 if (worn != null)
                     foreach (var w in worn)
@@ -503,6 +529,22 @@ namespace Armoury
             _testGold = 10000;
             try
             {
+                // T0 (recenzja P11 (1)): turniej, ktory sie nie odbyl - ramka porzucona bez raportu (zakup na targu przy otwartej ramce nie trafia do okna)
+                int reps0 = _reps.Count, drop0 = _tDropped;
+                var last0 = _tLast;
+                OpenT(town, true, true);
+                bool open0 = _frame != null && _frame.Name == "T";
+                _testGold -= 500;
+                TClose("proba autotestu - bez misji szranek");
+                bool t0 = open0 && _reps.Count == reps0 && _tDropped == drop0 + 1 && ReferenceEquals(_tLast, last0)
+                          && _frame == null && _depth == 0 && _t == null && _tTop == null;
+                // T0 (recenzja P11 (2)): prog wartosci przy samych stratach (zaklad przegrany, rynsztunek oddany) - Worth 0, stawka turnieju 150 + 2000
+                var lr = new Rep { Kind = KTourney, T = new TInfo { LostN = 1, LostW = 2000 } };
+                lr.AddCoin(LTBetStake, -150);
+                bool stake = Worth(lr) == 0 && TourneyStake(lr) == 2150;
+                pts.Add("T0 turniej bez szranek - bez raportu " + YN(t0) + ", prog przy samych stratach " + YN(stake) + " (" + TourneyStake(lr) + ")");
+                ok &= t0 && stake;
+                _testGold = 10000;
                 OpenT(town, true, true);
                 bool opened = _frame != null && _frame.Name == "T";
                 if (opened)
