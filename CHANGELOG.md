@@ -6,7 +6,7 @@
 **Zmiana:** Scalenie bez zmian kodu poza rozwiazaniem konfliktow: CHANGELOG.md (wpisy obu stron zachowane, kolejnosc 137, 136, 133.., liczba wpisow sprawdzona) i tools/gen_mcm.py (zakresy 136 i 137 razem); McmSettings.cs wygenerowany na nowo (gen_mcm). Build Armoury i CrashScribe bez bledow; Armoury.dll md5 25f69127 (scalenie d331082f), CrashScribe.dll md5 bef9db58.
 Kontrola calosci - trzy niezalezne recenzje (workflow integracja-138-przeglad): blokerow brak; wylaczone klucze nowych paczek = zachowanie 115; McmSettings = wynik gen_mcm; punkty styku FieldCraft (127/137, 136 tylko komentarz), MarchToContact (128 HoldCharge + 136 RestState/ChargeHeld), BattleCries kolejnosc ticku, PlayerNews/Log.Player (133f), KitPreview w misji (K15) - bez kolizji. Uwagi drobne (do poprawki w nastepnej paczce, bez wplywu na rozgrywke): liczniki 'marsz' NB2 przy koncu odpoczynku konnicy; linia 'BattleWind (130)' wypisuje martwa regeneracje RBM przy 137; RestoreAll HorseWind bez pierwszenstwa konia gracza; opisy MCM BattleStaminaEnabled / NoBreathWhileRunning / HorseAiRestUntil po 137 i 136; licznik E oddechu z drugiej histerezy; uspione: gracz startuje z dlugiem przy RBM PlayerPostureMultiplier > 0 (u Jeffa 0); czas biegu 127 z surowej Atletyki zamiast GetEffectiveSkill.
 **Ryzyko / co sprawdzic:** Autotest 138a: bitwaN kod 0, ERROR 0 (linie 'Konie (136)', 'Oddech (137)', 'BattleWind (137)'), probyN ze zdjeciami nowych stron okna armii. 133a wymaga CrashScribe.dll z tej galezi - wgrywac tylko po sprawdzeniu, ze produkcyjny CrashScribe jest z tej samej linii (m105 Watchdog.Closing); bez niego KitPreview pomija K15 w misji i meldunek kwatermistrza idzie z papieru (CsQuiet). T1 konia gracza sprawdzi tylko gra Jeffa.
-**Status:** ZBUDOWANE - autotest 138a w toku; wgranie jako 116.
+**Status:** WGRANE 116 (25.10 ok. 17:15 CET; Armoury.dll md5 25f69127 (build scalenia d331082f, autotest 138a), CrashScribe.dll md5 bef9db58 (produkcyjny 84205371 = linia m105 Watchdog.Closing sprawdzona dekompilacja, wiec nowy = produkcja + 133a); kopie: *.bak-2026-10-25-przed-wgranie116 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie116-przed). Autotest 138a: bitwaN kod 0, ERROR 0, 4/4 bitwy - 'BattleWind (137): oddech dwufazowy gotowy', 'Oddech (137)' (zadyszek 0-13 na bitwe, TauF/TauS gracza 28/402 s), 'Konie (136): latka UpdateAgentStats wpieta TAK, postfiks RBM TAK', zajechanych do 0: 0-2 koni gracza na bitwe, sr. S na koniec 52-63; probyN kod 0 - zdjecia okien 21/22 TAK (Last battle pominiety - brak bitwy po wczytaniu), predkosc zgodna z gra, suma zoldu = TotalWage, herding = GetHerdingModifier. 133a (CrashScribe) w autotescie NIE sprawdzony (autotest ma wlasny CrashScribe-at) - pierwsza gra Jeffa: linia 'Mends: podglad gotowosci DTE (133a) - pole _isReadinessPreview JEST'.
 
 ## 2026-10-25 137 (galaz noc/137-oddech od noc/127-bitwa-cialo) - oddech dwufazowy: szybki i wolny dlug, odnowa szybsza z Atletyka, po zadyszce dlugi ogon
 **Problem:** Jeff 25.10 ok. 12:55: "a regeneracja bo powinna byc tak samo szybsza im wiecej mam atletyki oraz im mam mniej staminy a odpoczywam tym regeneracja
@@ -94,7 +94,7 @@ odczyt przy spawnie; pole nieznalezione = TAK jak dotad); bez Breath HasBreath =
 Kontrola calosci: NoteRunSpend tylko przy breathOwns (ten sam warunek co tick oddechu: klucz na zywo i Breath); RunPending bez alokacji (jeden lookup CWT na takt
 biegu); koszty RBM, krzywa 130, bieg 127, NoBreathWhileRunning (m = 0 w biegu), kon (136) bez zmian. Zbudowane bez bledow (ostrzezenia tylko stare, poza
 BattleWind/FieldCraft); gen_mcm: Armoury 2485 ustawien. Nic nie wgrane, gra nie uruchamiana.
-**Status:** ZBUDOWANE - nie wgrane (galaz noc/137-oddech od noc/127-bitwa-cialo 9cde264a; Armoury.dll md5 308fb1cf przed recenzja, po recenzji 5763ebe0f8283da684e9c6f25a38087b).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (galaz noc/137-oddech od noc/127-bitwa-cialo 9cde264a; Armoury.dll md5 308fb1cf przed recenzja, po recenzji 5763ebe0f8283da684e9c6f25a38087b).
 ## 2026-10-25 136 (galaz noc/136-konie od noc/127-bitwa-cialo) - stamina koni: galop meczy konia, step i klus daja odsapnac; zalezna od cech konia, obciazenia i jezdzca, gracz i AI tak samo
 **Problem:** Jeff 25.10 ok. 12:48: "i konie tez powinny miec stamine, ze nie moge ciagle biegac po polu walki, stamina powinna byc zalezna od cech konia"; wczesniej "ogolna zasada"
 (gracz i AI tak samo), "sprawdz jakie sa realne mozliwosci ... trzeba wyjsc od sredniej"; ok. 13:30 "przeciwnik zachowuje sie jak prawdziwy zywy czlowiek ... walczy o zycie".
@@ -181,7 +181,7 @@ Nowe pola linii "Konie (136)": "(tempo odpoczynku AI sr. u X)", "zapisow MountSp
 "T1 przy m<=0.85 (m stale >= 1 s, probki galopu): probek N, sr. m, sr. v/Vbase, sr. v/(Vbase x m), blizej 1/m niz 1: Z%".
 Co sprawdzic dodatkowo: autotest - "odpoczynkow konnicy AI" i "sr. S na koniec" (odpoczywajace szyki wracaja ponad 65 i ruszaja), w NB2 "szarza bez sygnalu" nie rosnie
 od odpoczynku; konnica AI w odpoczynku jedzie ok. 3-4 m/s (dotad 5-6 m/s) - pod ostrzalem dluzej w zasiegu lukow; regresja 128: bez zmeczenia (S ponad 35) sciezka bez zmian.
-**Status:** ZBUDOWANE - nie wgrane (Armoury.dll md5 599ee56f po recenzji, przed recenzja 52120077; galaz noc/136-konie; gra nie uruchamiana).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (Armoury.dll md5 599ee56f po recenzji, przed recenzja 52120077; galaz noc/136-konie; gra nie uruchamiana).
 ## 2026-10-25 133 (galaz noc/133-raport-armii od noc/132-zdjecia) - przeglad armii: braki sprzetu i dlaczego, ostatnia bitwa, konie, predkosc, stado, zold, komunikaty
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem, w tym logu tak szybko to leci ze ja nie wiem,
 jesli sprzet jest to komunikat czemu nie zalozy bo np. za maly skill, de facto przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold, jakie
@@ -286,7 +286,7 @@ zdania bez liczb; papier QM, Pairs i rozbicie BattleNotice tylko w logu. Sprawdz
 pominiete (nie dotyczy) 1") i pliki okna-133-8..22; linia startu "Sprzet ludzi" z "CrashScribe 133a TAK" (w autotescie z testowym CrashScribe-at bez 133a: "sprzed
 133a" - wtedy K15 pominiety i meldunek z papieru, to nie blad); w bitwie w polu jedna czerwona linia "Your men's kit for this battle: ..." i zolte CS bez liczby; profil
 doby - linia "MorningReport" (ponad 50 ms - decyzja jak K15).
-**Status:** ZBUDOWANE - nie wgrane (Armoury.dll i CrashScribe.dll z galezi noc/133-raport-armii; wgranie zbiorcze po tescie, decyzja (g); 133a = osobny DLL CrashScribe.dll).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (Armoury.dll i CrashScribe.dll z galezi noc/133-raport-armii; wgranie zbiorcze po tescie, decyzja (g); 133a = osobny DLL CrashScribe.dll).
 
 ## 2026-10-25 133f (galaz noc/133-raport-armii) - Armoury: okno armii "Recent messages (N)" - pierscien 60 komunikatow o wojsku gracza (sprzet, konie, zold, musztra, oboz, marsz, kwatermistrz), takze do Armoury.log
 **Problem:** Jeff 25.10 ok. 12:57: "... w tym logu tak szybko to leci ze ja nie wiem ... de facto przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne". Komunikaty
@@ -326,7 +326,7 @@ FiringQuickInformation?.Invoke; Clear tylko w Module.FinalizeModule (dekompilacj
 DLL sciezke budowania (napisy, ok. 158 roznych). Sprawdzic w grze: linia startu "komunikaty wojska (133f): nasluch DisplayMessage TAK, szybkich informacji TAK"; po komunikacie
 kwatermistrza / obozu / zoldu w Armoury.log linia "Wojsko (133f) [...]"; w obozie "Review the army" -> "Recent messages (N)" -> lista z data i pelnym tekstem w podpowiedzi;
 po wczytaniu zapisu lista pusta, a "Porzadek stanu (E8/S)" mowi, ile bylo; test T1 "komunikaty (133f) TAK".
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133e (galaz noc/133-raport-armii) - Armoury: okno armii "Pay" -> Pay (linie gry z jednego wywolania, ostatnia wyplata) / Who gets what (rozdzial najwiekszych reszt, towarzysze, rycerze, Straz/WL) / Where it goes
 **Problem:** Jeff 25.10 ok. 12:57: "... przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold ...". Dotad zold druzyny gracza byl tylko w dymku
@@ -367,7 +367,7 @@ z imieniem (scalane przy tym samym imieniu - liczone raz, "wspolne imiona" w log
 (HasUnpaidWages = 1 - wziete/zold, ustawione przed powrotem - postfiks widzi wartosc tego wywolania). (5) Koszt: jedno wywolanie modelu zoldu + stawki typow przy otwarciu okna.
 Sprawdzic w grze: w obozie "Review the army" -> "Pay" -> trzy strony; linia "raport" z "zold (133e): ... podstawa ... ZGODNA ... suma wierszy N = wynik TAK"; po pierwszym takcie
 doby "Last pay day <data> (today): paid in full, N denars."; test T1 "zold (133e) TAK".
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133d (galaz noc/133-raport-armii) - Armoury: okno armii "Horses and harness" z podgladu bitwy (ile koni i uprzezy kupic, przeniesc, ile bezczynnych) i "On the march" -> Speed / Herd / Column
 **Problem:** Jeff 25.10 ok. 12:57: "... przeniesmy logi do zakladki armii, aby tam wszystko bylo czytelne ile im place jaki zold, jakie konie jaka predkosc ile koni i ile
@@ -419,7 +419,7 @@ liczba - jest przyczyna przy typie i zdanie "they need easier horses".
 Sprawdzic w grze: w obozie "Review the army" -> "Horses and harness" (gotowi/pieszo jak "Kit for the next battle", rodzaje koni, co kupic, bezczynne) i "On the march" ->
 Speed (wynik = "the game shows", linie w %), Herd (przy nadmiarze linia "Herding" z procentem), Column; linia "raport" z "konie (133d): ... tozsamosc zgodna", "predkosc (133d):
 ... (zgodna)", "stado (133d): ... zgodne" albo "bez porownania"; linia startu "strony marszu (133d): wpiecia 3/3"; test T1 "konie (133d) TAK, stado (133d) TAK".
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133c (galaz noc/133-raport-armii) - Armoury: okno armii "Kit for the next battle" - podglad nastepnej bitwy tym samym rozdzielaczem DTE i strazami co bitwa (KitPreview), przyczyny brakow, "Unused in the troops' armoury"; kwatermistrz jedna linia
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem ... jesli sprzet jest to komunikat czemu nie
@@ -489,7 +489,7 @@ Sprawdzic w grze: linia startu "podglad sprzetu (133c): wpiecia 10/10"; w obozie
 <= 17 linii - T1), "Unused in the troops' armoury"; linia "Sprzet ludzi (133c): podglad - ..." z "tozsamosc z Missing zgodna"; po bitwie w polu segment "podglad w misji
 (133c, K15 ...) - ZGODNE" (ROZNICA - porownac rodzaje), czas podgladu w ms; rano/po bitwie zamiast czerwonych linii "QM short (have/need)" jedna linia "QM: N kit slots
 empty ... - see Review the army in camp."; w CS brak nowych "Mends: PUSTE"/"swieta zasada" na mapie.
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133b (galaz noc/133-raport-armii) - Armoury: okno armii "Last battle" - braki sprzetu ostatniej bitwy wedlug rodzaju i typu (KitGaps), segment w linii bitwy
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom, bo teraz ja nie wiem, w tym logu tak szybko to leci ze ja nie wiem
@@ -530,7 +530,7 @@ misja bez konca" liczniki GearFit moga byc juz nastepnej misji) i liczy wszystki
 Sprawdzic w grze: po bitwie w Armoury.log na koncu linii "Bitwa gracza (sklad7b ..." segment "sprzet gracza wedlug rodzaju (133b): ... tozsamosc z Missing zgodna, z linia
 zgodna | typy z brakami: ..." - "puste" = "gracz N" tej linii; brak linii "ROZJAZD z GarrisonKit.Missing"; w obozie "Review the army" -> wiersz "Last battle" i strony
 z tymi samymi liczbami (strony <= 17 linii - test T1); "Przeglad armii (P4): raport" z segmentem "ostatnia bitwa (133b)".
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 133a (galaz noc/133-raport-armii od noc/132-zdjecia 8a177bdb) - CrashScribe: podglad gotowosci partii gracza (pasek DTE, okno armii) bez linii, licznikow strazy i zoltego "QM: N EMPTY"
 **Problem:** Jeff 25.10 ok. 12:57: "w widoku armii tez ma pokazywac: jakiego sprzetu brakuje zolnierzom ... w tym logu tak szybko to leci ze ja nie wiem ... de facto przeniesmy
@@ -555,7 +555,7 @@ ustawia _mission = null), wiec ZB-5/ZB-5b (FootMission) i tak tam nie dzialaly; 
 CreateMapEventAssignments i spawn - bez zmian. StoreSub 7-arg przekazuje count = true (jak dotad). GearFit.cs Armoury czyta pole WardForeignSub odbiciem - pole bez zmian.
 Sprawdzic w CS: linia startu "JEST, _party JEST"; na mapie po zmianie zbrojowni/werbunku zadnych nowych "Mends: PUSTE"/"swieta zasada [Twoja partia" ani zoltego "QM: ... EMPTY";
 w bitwie te linie jak dotad.
-**Status:** ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (wgranie zbiorcze 133 po tescie, decyzja (g)).
 
 ## 2026-10-25 132 (galaz noc/132-zdjecia od noc/127-bitwa-cialo 9bc0f627) - proba autotestu: zdjecia nowych okien (przeglad armii, choragwie, przypinanie, okno lupu po bitwie, oblezeniu i turnieju)
 **Problem:** Jeff 25.10 ok. 12:52: "daj mi zdjecia z gry jak wygladaja te nowe widoki popupy armii, lupow etc". Okna z nocy (P4/P12 przeglad armii, P5/P11 okno lupu) nie maja
@@ -597,7 +597,7 @@ BK (BannerKingsMapView), okno wydarzenia ROT na stosie, SpoilsWindow.IsOpen. Spr
 okno gry bez fokusu - pauza silnika, blokada czasu i spotkanie z osada przepuszczone. Blokada czasu TownStay (armoury-postoj.flag, menu obozu w polu) zatrzyma probe
 do powrotu do miasta - to inna proba, bez kolizji. SceneGate bez skutkow ubocznych (sam odczyt), wolana tylko w fazie 0 i przed startem. Regresje: StillOpen, Shot,
 fazy 1/2 i proba w zwyklej grze bez zmian; okno lupu (ClosePhoto zamyka tylko _photo) bez zmian. Zbudowane 0 bledow.
-**Status:** ZBUDOWANE - nie wgrane (tylko autotest z plikiem armoury-zdjecia-okien.flag).
+**Status:** WGRANE 116 razem z 138 (patrz wpis 138); wczesniej: ZBUDOWANE - nie wgrane (tylko autotest z plikiem armoury-zdjecia-okien.flag).
 
 ## 2026-10-25 131 (galaz noc/127-bitwa-cialo) - udzwig z Endurance: kazdy punkt Endurance bohatera w druzynie +5 kg
 **Problem:** Jeff 25.10 ok. 12:41: "a kazdy punkt endurance daje +5 do udzwigu w menu inventory jako dodatkowe", potem "i companions tez".
