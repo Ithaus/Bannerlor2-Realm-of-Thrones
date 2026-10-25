@@ -96,7 +96,7 @@ namespace Armoury
         private static int _secCount;
 
         // ---- liczniki misji
-        private static int _created, _played05, _notPlayed, _released, _relPlaying, _early, _endCap, _rejLimit, _rejFar, _rejNoClip, _rejEngine, _rejRate, _peak;
+        private static int _created, _played05, _notPlayed, _released, _relPlaying, _relById, _relByStop, _relLeak, _early, _endCap, _rejLimit, _rejFar, _rejNoClip, _rejEngine, _rejRate, _peak;
         private static readonly int[] _byGroup = new int[Groups];
         private static readonly int[] _rejGroup = new int[Groups];
 
@@ -160,7 +160,7 @@ namespace Armoury
             _on = false; _lineDone = false; _skip = null; _siege = _hideout = _naval = false;
             _acc = 0f; _now = 0f; _beganAt = 0f; _lisOk = false;
             _secStamp[0] = -1; _secCount = 0;
-            _created = _played05 = _notPlayed = _released = _relPlaying = _early = _endCap = _rejLimit = _rejFar = _rejNoClip = _rejEngine = _rejRate = _peak = 0;
+            _created = _played05 = _notPlayed = _released = _relPlaying = _relById = _relByStop = _relLeak = _early = _endCap = _rejLimit = _rejFar = _rejNoClip = _rejEngine = _rejRate = _peak = 0;
             for (int i = 0; i < Groups; i++) { _byGroup[i] = 0; _rejGroup[i] = 0; }
             ResetFeatures();
         }
@@ -431,11 +431,56 @@ namespace Armoury
 
         private static void ReleaseOne(Snd s)
         {
-            // recenzja 25.10: Release na grajacym zdarzeniu = Stop (StopEvent, _soundId -1) i ReleaseEvent(-1) - tak samo zwalnia gra (MissionAudienceHandler,
-            // MusicianGroup, MenuViewContext); czy silnik zwalnia instancje przy StopEvent - niesprawdzone, wiec licznik do linii (wyciek -> 'nie grane' w kolejnych bitwach)
-            try { if (s.Ev != null && s.Ev.IsValid) { if (s.Ev.IsPlaying()) _relPlaying++; s.Ev.Release(); } }
+            // recenzja 25.10: Release na grajacym zdarzeniu = Stop (StopEvent, _soundId -1) i ReleaseEvent(-1) - instancja silnika zostaje (wyciek).
+            // Audyt 25.10: dla grajacego zapamietaj id, Stop, a potem ReleaseEvent(id) przez ISoundEvent silnika - tylko gdy id wciaz wazne
+            // (jesli StopEvent sam zwolnil instancje, nie ruszamy go drugi raz). Brak odbicia -> stara droga gry, licznik 'wyciek'.
+            try
+            {
+                if (s.Ev != null && s.Ev.IsValid)
+                {
+                    if (s.Ev.IsPlaying())
+                    {
+                        _relPlaying++;
+                        int id = s.Ev.GetSoundId();
+                        if (EngineSnd())
+                        {
+                            s.Ev.Stop();
+                            if ((bool)_mSndValid.Invoke(_iSnd, new object[] { id })) { _mSndRelease.Invoke(_iSnd, new object[] { id }); _relById++; }
+                            else _relByStop++;
+                        }
+                        else { s.Ev.Release(); _relLeak++; }
+                    }
+                    else s.Ev.Release();
+                }
+            }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Release", e); }
             _released++;
+        }
+
+        // ISoundEvent silnika (internal) - raz na proces; null = brak (wtedy stara droga Release)
+        private static object _iSnd;
+        private static System.Reflection.MethodInfo _mSndRelease, _mSndValid;
+        private static int _sndResolved;   // 0 nie szukano, 1 jest, 2 brak
+
+        private static bool EngineSnd()
+        {
+            if (_sndResolved == 0)
+            {
+                _sndResolved = 2;
+                try
+                {
+                    var asm = typeof(SoundEvent).Assembly;
+                    var tEai = asm.GetType("TaleWorlds.Engine.EngineApplicationInterface");
+                    var tIf = asm.GetType("TaleWorlds.Engine.ISoundEvent");
+                    var f = tEai != null ? AccessTools.Field(tEai, "ISoundEvent") : null;
+                    _iSnd = f != null ? f.GetValue(null) : null;
+                    _mSndRelease = tIf != null ? AccessTools.Method(tIf, "ReleaseEvent", new[] { typeof(int) }) : null;
+                    _mSndValid = tIf != null ? AccessTools.Method(tIf, "IsValid", new[] { typeof(int) }) : null;
+                    if (_iSnd != null && _mSndRelease != null && _mSndValid != null) _sndResolved = 1;
+                }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.EngineSnd", e); }
+            }
+            return _sndResolved == 1;
         }
 
         /// <summary>Zatrzymanie jednego zdarzenia (beben przy szarzy) - Release jak w grze.</summary>
@@ -478,7 +523,8 @@ namespace Armoury
             sb.Append(" | zdarzen utworzonych ").Append(_created).Append(" (glosy ").Append(_byGroup[GVoice]).Append(", rogi ").Append(_byGroup[GHorn])
               .Append(", bebny ").Append(_byGroup[GDrum]).Append(", tlo ").Append(_byGroup[GAmb]).Append("), grane po 0,5 s ").Append(_played05)
               .Append(" (nie grane ").Append(_notPlayed).Append("), zwolnionych ").Append(_released).Append(" (przy koncu misji ").Append(activeEnd)
-              .Append(", w trakcie grania ").Append(_relPlaying).Append("), najwiecej naraz ").Append(_peak).Append(", przerwane wczesnie ").Append(_early).Append(", koniec po czasie ").Append(_endCap)
+              .Append(", w trakcie grania ").Append(_relPlaying).Append(": zwolnione po id ").Append(_relById).Append(", zwolnil Stop ").Append(_relByStop)
+              .Append(", wyciek ").Append(_relLeak).Append(_sndResolved == 2 ? " - BRAK ISoundEvent" : "").Append("), najwiecej naraz ").Append(_peak).Append(", przerwane wczesnie ").Append(_early).Append(", koniec po czasie ").Append(_endCap)
               .Append("; odrzucone: limit ").Append(_rejLimit).Append(", na sekunde ").Append(_rejRate).Append(", daleko ").Append(_rejFar)
               .Append(", brak klipu ").Append(_rejNoClip).Append(", silnik ").Append(_rejEngine);
             AppendFeatures(sb, c);

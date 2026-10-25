@@ -1119,10 +1119,40 @@ namespace Armoury
                 HarmonyMethod post = postfix != null ? new HarmonyMethod(typeof(SpoilsReport), postfix) { priority = prio } : null;
                 HarmonyMethod fin = finalizer != null ? new HarmonyMethod(typeof(SpoilsReport), finalizer) { priority = Priority.Last } : null;
                 h.Patch(m, prefix: pre, postfix: post, finalizer: fin);
-                _wired++;
-                _wiredNames.Add(label);
+                // pulapka 15.10: finalizer BKROTPatch polyka bledy Harmony - liczymy tylko to, co GetPatchInfo naprawde pokazuje na celu
+                bool okPre = prefix == null || Has(m, h.Id, prefix, 'p');
+                bool okPost = postfix == null || Has(m, h.Id, postfix, 'o');
+                bool okFin = finalizer == null || Has(m, h.Id, finalizer, 'f');
+                if (okPre && okPost && okFin)
+                {
+                    _wired++;
+                    _wiredNames.Add(label);
+                    return;
+                }
+                // czesciowo wpieta para (np. prefiks bez finalizera) zostawilaby otwarta ramke - zdejmij to, co weszlo
+                foreach (var n in new[] { prefix, postfix, finalizer })
+                {
+                    if (n == null) continue;
+                    var pm = AccessTools.DeclaredMethod(typeof(SpoilsReport), n);
+                    if (pm == null) continue;
+                    try { h.Unpatch(m, pm); } catch { }
+                }
+                _missing.Add(label + " (latka nie weszla" + (okPre ? "" : " - prefiks") + (okPost ? "" : " - postfiks") + (okFin ? "" : " - finalizer")
+                             + " - slad w BKROTPatch/BKROTLog.txt)");
             }
             catch (Exception e) { _missing.Add(label + " (wyjatek " + e.GetType().Name + ")"); Log.Error("SpoilsReport.Wire " + label, e); }
+        }
+
+        /// <summary>Harmony.GetPatchInfo: nasza latka danego rodzaju (p/o/f) naprawde na celu.</summary>
+        private static bool Has(MethodBase target, string owner, string patchName, char kind)
+        {
+            var pi = Harmony.GetPatchInfo(target);
+            if (pi == null) return false;
+            IEnumerable<Patch> list = kind == 'p' ? pi.Prefixes : kind == 'o' ? pi.Postfixes : pi.Finalizers;
+            if (list == null) return false;
+            foreach (var p in list)
+                if (p != null && p.owner == owner && p.PatchMethod != null && p.PatchMethod.DeclaringType == typeof(SpoilsReport) && p.PatchMethod.Name == patchName) return true;
+            return false;
         }
 
         /// <summary>Latki ramek (tylko odczyt) - z BattlefieldLaw.ApplyAll (start gry, obok LootTally); kazda osobno, brak = BRAK w linii startu.</summary>

@@ -213,6 +213,7 @@ namespace Armoury
         {
             Unsub();
             try { BannerKit.EndMission(Mission); } catch { }
+            try { BannerKit.Finalized(Mission); } catch { }
             Clear();
             base.OnRemoveBehavior();
         }

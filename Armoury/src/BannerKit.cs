@@ -198,6 +198,17 @@ namespace Armoury
             if (ReferenceEquals(_field, m)) _field = null;
         }
 
+        /// <summary>BannerCompaniesMission.OnRemoveBehavior (Mission.OnMissionStateFinalize - zawsze PO OnEndMission wszystkich logik, wiec po DTE
+        /// FinalizeMission i naszym EndPostfix): audyt 25.10 - jesli postfiks konca DTE nie wyczyscil stanu (latka nie weszla albo DTE nie zakonczyl misji),
+        /// linia ekonomii i czyszczenie tu, zeby agenci (a przez nich misja i scena) nie wisieli w slownikach do nastepnej bitwy.</summary>
+        internal static void Finalized(Mission m)
+        {
+            if (m == null || _m == null || !ReferenceEquals(_m.Target, m)) return;
+            try { if (Any()) Write(EndHooked ? "koniec misji bez DTE" : "koniec misji bez DTE - latka konca NIE"); }
+            catch (Exception e) { Stumble("BannerKit.Finalized", e); }
+            Clear();
+        }
+
         internal static int RaisedFormations { get { return _raised.Count; } }
 
         private static void Stumble(string where, Exception e)
