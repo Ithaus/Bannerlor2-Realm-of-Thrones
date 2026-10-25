@@ -1,5 +1,18 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 25.10 ok. 17:20 CET - WGRANE 116; w toku fala AI 139-149 i obrazki lupu 150
+- WGRANE 116 (17:15): Armoury 25f69127 + CrashScribe bef9db58 z galezi noc/138-calosc (worktree scratchpad\zb\n138): 132 proba zdjec okien, 133a-g okno Review the army
+  (Kit for the next battle z podgladu DTE, Last battle, konie, Speed, Herd, Pay x3, Recent messages; 133a CrashScribe - cisza podgladu), 136 stamina koni (HorseWind), 137 oddech dwufazowy.
+  Autotest 138a kod 0, ERROR 0; zdjecia okien w docs/zdjecia-okien-2026-10-25. 133a NIE sprawdzony autotestem (testowy CrashScribe-at) - w logu CS Jeffa linia
+  'Mends: podglad gotowosci DTE (133a) - pole _isReadinessPreview JEST'. T1 konia gracza (czy MountSpeed spowalnia) - tylko gra Jeffa: linia 'Konie (136)' v/(Vbase x m) ok. 1.
+- Drobne uwagi z przegladu 138 (do poprawy w nastepnej paczce, wpis 138 w CHANGELOG): liczniki NB2 przy koncu odpoczynku konnicy, linia 'BattleWind (130)' z martwa regeneracja,
+  opisy MCM po 136/137, licznik E oddechu, Atletyka biegu 127 surowa.
+- W TOKU: workflow fali "AI walczy o zycie" (galaz noc/139-ai-zycie od 138, worktree zb\n139; kroki 139 pomiar i przelacznik paniki, 140 tarcza pod ostrzalem, 141 obronca naprzod,
+  142 panika bez powrotu, 143 ranny <20% odwrot z bronia, 144 AI oszczedza sily + animacje/glos zadyszki, 145 ranny ostrozny, 146 szyk pod ostrzalem, 147 panika do wyczerpania,
+  148 poscig konnicy AI, 149 bohaterowie ostrozni). Decyzje Jeffa 25.10: ranny <20% odwrot z bronia; panika bez powrotu (zbiorka pozniej); lordowie ostrozni; poscig z limitem.
+- W TOKU: 150 obrazki okien lupu wedlug miejsca - krok 1 album 48 sprite'ow ROT (galaz noc/150-obrazki, flaga armoury-zdjecia-obrazkow.flag), potem dobor (region, przeciwnik, rodzaj).
+- Wrapper testow: m113\testy-noc.ps1 rozbija -ExtraFlags po przecinku (od 13:00).
+
 ## DOPISEK 25.10 ok. 13:15 CET - WGRANE 114 i 115; w toku: konie, regeneracja, zdjecia okien, raport armii
 - WGRANE 114 (12:31): Armoury 3cab5bea z noc/final (125 okno lupu po turnieju, 126 przypinanie typow wojska). Crash 126a w bitwie 4/4 = AccessViolation w natywnym Agent.MakeVoice
   z Immersive_Battlefields.PlayOrderGesturesPatch.Prefix (IB i gra wolaja Owner.MakeVoice bez IsActive; autotest ponawia rozkaz szarzy co 15 s) - powtorka 126b czysta.
