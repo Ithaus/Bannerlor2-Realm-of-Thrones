@@ -119,7 +119,7 @@ namespace Armoury
                 return;
             }
             double sec;
-            string why = CheckClip(path, out sec);
+            string why = CheckClip(path, dur <= 0f, out sec);   // dlugosc z naglowka tylko bez dlugosci w manifescie (64 KB odczytu na plik)
             if (why != null)
             {
                 _catBad++;
@@ -177,7 +177,7 @@ namespace Armoury
         }
 
         /// <summary>null = plik dobry. Jak Lektor.CheckOgg, ale bez progu dlugosci 8 KB (krotkie rozkazy) - bloki zer tylko w plikach od 3 x 4 KB.</summary>
-        private static string CheckClip(string path, out double sec)
+        private static string CheckClip(string path, bool needDur, out double sec)
         {
             sec = 0;
             try
@@ -205,7 +205,7 @@ namespace Armoury
                         if (Zeros(fs, n - ZeroBlock)) return "koniec pliku z zer";
                         if (Zeros(fs, (n / 2) & ~1L)) return "srodek pliku z zer";
                     }
-                    sec = OggSec(fs, n, rate);
+                    if (needDur) sec = OggSec(fs, n, rate);
                 }
                 return null;
             }

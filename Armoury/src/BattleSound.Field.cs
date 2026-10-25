@@ -42,7 +42,7 @@ namespace Armoury
         private static readonly Loop[] _clash = new Loop[2];
         private static readonly Dictionary<Formation, float> _horseNext = new Dictionary<Formation, float>();
         private static readonly Dictionary<Formation, Stamp> _gallop = new Dictionary<Formation, Stamp>();
-        private static readonly Dictionary<Team, float> _horseTeam = new Dictionary<Team, float>();
+        private static readonly Dictionary<Team, Stamp> _horseTeam = new Dictionary<Team, Stamp>();
         private static readonly List<Vec3> _clashPts = new List<Vec3>();
         private static readonly List<float> _clashD = new List<float>();
         private static bool _windTried, _firesTried;
@@ -129,8 +129,8 @@ namespace Armoury
             {
                 var t = teams[i];
                 if (!MissionTeams.Valid(t)) continue;
-                float tl;
-                if (_horseTeam.TryGetValue(t, out tl) && _now - tl < HorseTeamGap) continue;
+                Stamp tl;
+                if (_horseTeam.TryGetValue(t, out tl) && !tl.Ready(HorseTeamGap)) continue;
                 var fl = t.FormationsIncludingSpecialAndEmpty;
                 for (int j = 0; fl != null && j < fl.Count; j++)
                 {
@@ -146,7 +146,7 @@ namespace Armoury
                     if (LisDist(p) > HorseRange) continue;
                     var hc = _rng.Next(2) == 0 ? Pick("ko", "snort") : Pick("ko", "neigh");
                     if (hc == null) hc = Pick("ko", "snort") ?? Pick("ko", "neigh");
-                    if (hc != null && Play(m, hc, GAmb, p, 10f, 300f, true, null, f, "konie") != null) { _cHorse++; _horseTeam[t] = _now; break; }
+                    if (hc != null && Play(m, hc, GAmb, p, 10f, 300f, true, null, f, "konie") != null) { _cHorse++; tl.Hit(); _horseTeam[t] = tl; break; }
                 }
             }
         }

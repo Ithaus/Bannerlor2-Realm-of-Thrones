@@ -273,6 +273,13 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>Okrzyki choragwi (ob, br, bd): region rozkazow, Nieskalani jak Essos, Dothrakowie bez okrzyku (brak klipow).</summary>
+        private static string BannerRegion(string cul)
+        {
+            string r = OrderRegion(cul);
+            return r == "ghiscari" ? "essos" : r == "dothraki" ? null : r;
+        }
+
         private static Clip OrderClip(string cul, int kind)
         {
             string reg = OrderRegion(cul);
@@ -447,7 +454,7 @@ namespace Armoury
                 if (!Silent(ch, cul) && st.Kind[ORally].Ready(OGap[ORally]))
                 {
                     var spk = SpeakerOf(f);
-                    var cl = Pick("ob", OrderRegion(cul));
+                    var cl = Pick("ob", BannerRegion(cul));
                     if (spk != null && cl != null && !IsSpeaking(spk) && Play(m, cl, GVoice, HeadOf(spk), OrderMin, OrderMax, true, spk, null, "sztandar") != null)
                     {
                         st.Kind[ORally].Hit(); _cOurBanner++; _cOrder[ORally]++;
@@ -478,7 +485,7 @@ namespace Armoury
             string cul2 = FormCul(best, out ch2);
             if (Silent(ch2, cul2)) return;
             var spk2 = SpeakerOf(best);
-            var cl2 = Pick(e.Kind == EBroke ? "br" : "bd", OrderRegion(cul2));
+            var cl2 = Pick(e.Kind == EBroke ? "br" : "bd", BannerRegion(cul2));
             if (spk2 == null || cl2 == null || IsSpeaking(spk2)) return;
             if (Play(m, cl2, GVoice, HeadOf(spk2), OrderMin, OrderMax, true, spk2, null, e.Kind == EBroke ? "zlamanie" : "sztandar wroga") == null) return;
             if (e.Kind == EBroke) _cBreak++; else _cBannerDown++;

@@ -30,7 +30,8 @@ namespace Armoury
         private static readonly List<Body> _bodyQ = new List<Body>();
         private static readonly List<Body> _bodies = new List<Body>();
         private static readonly List<string> _moanRoles = new List<string>();
-        private static float _afterAt = -1f, _nextMoan = -1f, _nextBird = -1f, _lastHorseHurt = -1000f;
+        private static float _afterAt = -1f, _nextMoan = -1f, _nextBird = -1f;
+        private static Stamp _horseHurt, _moanReal, _birdReal;   // odstepy takze w czasie rzeczywistym (przyspieszenie czasu - bez lawiny)
         private static bool _birdsBefore, _birdsBack;
         private static int _birdStep;
         private static int _cMoan, _cBird, _cBirdBefore, _cHorseHurt;
@@ -40,7 +41,7 @@ namespace Armoury
         {
             lock (_q) { _bodyQ.Clear(); }
             _bodies.Clear(); _moanRoles.Clear(); _moanVoices.Clear();
-            _afterAt = _nextMoan = _nextBird = -1f; _lastHorseHurt = -1000f;
+            _afterAt = _nextMoan = _nextBird = -1f; _horseHurt = default(Stamp); _moanReal = default(Stamp); _birdReal = default(Stamp);
             _birdsBefore = _birdsBack = false; _birdStep = 0;
             _cMoan = _cBird = _cBirdBefore = _cHorseHurt = 0;
         }
@@ -59,10 +60,10 @@ namespace Armoury
                 if (b.Mount)
                 {
                     // ranny / zabity kon w bitwie blisko sluchacza
-                    if (c.BattleHorseSounds && !m.MissionEnded && _now - _lastHorseHurt >= 12f && LisDist(b.Pos) <= 60f)
+                    if (c.BattleHorseSounds && !m.MissionEnded && _horseHurt.Ready(12f) && LisDist(b.Pos) <= 60f)
                     {
                         var hc = Pick("ko", "wounded");
-                        if (hc != null && Play(m, hc, GAmb, b.Pos + new Vec3(0f, 0f, 1f), 10f, 120f, true, null, null, "ranny kon") != null) { _lastHorseHurt = _now; _cHorseHurt++; }
+                        if (hc != null && Play(m, hc, GAmb, b.Pos + new Vec3(0f, 0f, 1f), 10f, 120f, true, null, null, "ranny kon") != null) { _horseHurt.Hit(); _cHorseHurt++; }
                     }
                     continue;
                 }
@@ -111,13 +112,14 @@ namespace Armoury
                 _nextBird = _now + 8f;
             }
             float t = _now - _afterAt;
-            if (c.BattleWoundedAfter && t <= MoanEndSec && _now >= _nextMoan) Moan(m, t);
-            if (c.BattleRavensAfter && _now >= _nextBird && _cBird < BirdsMax) Ravens(m, t);
+            if (c.BattleWoundedAfter && t <= MoanEndSec && _now >= _nextMoan && _moanReal.Ready(3f)) Moan(m, t);
+            if (c.BattleRavensAfter && _now >= _nextBird && _cBird < BirdsMax && _birdReal.Ready(15f)) Ravens(m, t);
         }
 
         private static void Moan(Mission m, float t)
         {
             _nextMoan = _now + (3f + (float)_rng.NextDouble() * 3f) * (1f + t / 60f);
+            _moanReal.Hit();
             int live = 0;
             for (int i = 0; i < _live.Count; i++) if (_live[i].Tag == "jek") live++;
             if (live >= 2) return;
@@ -147,6 +149,7 @@ namespace Armoury
         private static void Ravens(Mission m, float t)
         {
             _nextBird = _now + 15f + (float)_rng.NextDouble() * 15f;
+            _birdReal.Hit();
             // miejsce: cialo blisko sluchacza (do 120 m), inaczej 40 m od sluchacza
             Vec3 pos = Around(40f);
             for (int i = _bodies.Count - 1; i >= 0; i--)
