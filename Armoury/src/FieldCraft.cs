@@ -49,6 +49,21 @@ namespace Armoury
             public float RbmRecheck;        // RBM zaklada stance PO spawnie - ponawiamy szukanie
             public float SprintDebt;        // ile MY zabralismy z puli RBM sprintem - tyle oddajemy szybko
             public float BleedDebt;         // uzbierany ulamek krwawienia - silnik przyjmuje tylko pelne punkty
+            public bool SpeedApplied;       // noc 25.10 P1 (M0): nasz limit predkosci siedzi teraz w agencie (do jednorazowego zdjecia po karze)
+        }
+
+        // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
+        // zerowane w RoutHold.Ensure przez MarchToContact.ResetCounters)
+        private static int _spdPenalty, _spdMarch, _spdRelease, _spdOld;
+
+        internal static void ResetSpeedCounters() { _spdPenalty = _spdMarch = _spdRelease = _spdOld = 0; }
+
+        /// <summary>Koncowka segmentu 'marsz' (bez znaku '|'): zapisy limitu FieldCraft w tej misji. Wolajacy trzyma RoutHold.Gate.</summary>
+        internal static void AppendSpeed(System.Text.StringBuilder sb, Settings c)
+        {
+            sb.Append("; FieldCraft limit tylko przy karze ").Append(c != null && c.SpeedCapOnlyWhenWinded ? "TAK" : "NIE")
+              .Append(": zapisy kary ").Append(_spdPenalty).Append(" (w marszu ").Append(_spdMarch).Append("), zdjecia ").Append(_spdRelease)
+              .Append(", stare zapisy co 0.2 s ").Append(_spdOld);
         }
 
         // ---- most do staminy RBM: sprint pije z TEGO SAMEGO paska, ktory widac w walce ----
@@ -668,7 +683,36 @@ namespace Armoury
                         }
                         catch { }
                     }
-                    agent.SetMaximumSpeedLimit(limit, true);
+                    // noc 25.10 P1 (M0, Jeff: "armie nie biegly non stop tylko szly"): dawniej limit 1.0 co 0.2 s KAZDEMU kasowal limit szyku, ktory
+                    // silnik liczy co 0.5 s (HumanAIComponent.AdjustSpeedLimit - linia i tempo szyku, progi RBM). Teraz zapis tylko przy karze
+                    // (zadyszka, rany, klawisz chodu: limit < 0.999), a po jej zejsciu raz (-1, bez mnoznika) - silnik przywraca swoj limit w ciagu 0.5 s.
+                    // Kara spotyka marsz (MarchToContact): Min(limit x pelna predkosc, gorny limit marszu), wartosc bezwzgledna. Klucz NIE = jak dawniej.
+                    if (!c.SpeedCapOnlyWhenWinded)
+                    {
+                        agent.SetMaximumSpeedLimit(limit, true);
+                        st.SpeedApplied = true;
+                        _spdOld++;
+                    }
+                    else if (limit < 0.999f)
+                    {
+                        float cap = agent.MountAgent == null ? MarchToContact.CapFor(agent) : -1f;
+                        float run = 0f;
+                        if (cap > 0f) { try { run = agent.GetMaximumForwardUnlimitedSpeed(); } catch { run = 0f; } }
+                        if (cap > 0f && run > 0.5f)
+                        {
+                            agent.SetMaximumSpeedLimit(Math.Min(limit * run, cap), false);
+                            _spdMarch++;
+                        }
+                        else agent.SetMaximumSpeedLimit(limit, true);
+                        st.SpeedApplied = true;
+                        _spdPenalty++;
+                    }
+                    else if (st.SpeedApplied)
+                    {
+                        agent.SetMaximumSpeedLimit(-1f, false);
+                        st.SpeedApplied = false;
+                        _spdRelease++;
+                    }
 
                     // tempo CIOSOW: zadyszka i rany skladaja sie w jeden mnoznik
                     // zamachu i pchniecia. Wolniejszy zamach = mniejsza energia
