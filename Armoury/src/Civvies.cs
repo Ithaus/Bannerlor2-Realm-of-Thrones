@@ -549,7 +549,7 @@ namespace Armoury
             {
                 Pool p;
                 if (!_pool.TryGetValue(c, out p)) continue;
-                if (p.Items[0].Length == 0 && p.Items[1].Length == 0) empty.Add(c); else withPool++;
+                if (p.Items[1].Length == 0) empty.Add(c); else withPool++;   // m160 recenzja: tulow ma zawsze tabele - liczy sie tylko pula nog
             }
             var sb = new StringBuilder(1600);
             sb.Append("Ubranie cywilne (m117 v4, m160 barwy ziemi): raz na kampanie; TULOW tylko z tabeli barw ziemi wedlug kultury (sztuki sprawdzone na teksturach")
@@ -569,7 +569,7 @@ namespace Armoury
               .Append(", przeszywanice/zbroje z nazwy ").Append(_cutArmour)
               .Append("; odrzucone kolorowe / z barwami rodu (m160; ubrania cywilne w granicy, pule nog, tabele): tulow ").Append(_cutDyed[0]).Append(" / ").Append(_cutTeam[0])
               .Append(", nogi ").Append(_cutDyed[1]).Append(" / ").Append(_cutTeam[1])
-              .Append(bad > 0 ? ", bledy odczytu " + bad : "").Append("; kultur z pula ").Append(withPool);
+              .Append(bad > 0 ? ", bledy odczytu " + bad : "").Append("; kultur z pula nog ").Append(withPool);
             if (empty.Count > 0) sb.Append(", bez puli (nogi: zapas c/d) ").Append(empty.Count).Append(": ").Append(string.Join(", ", empty.ToArray()));
             Log.Info(sb.Append('.').ToString());
             foreach (var c in _order)
