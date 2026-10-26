@@ -135,6 +135,7 @@ namespace Armoury
                     _starts++;
                     DuckStart();
                     Log.Info(P + (win ? "okno \"" + _moodTag + "\"" : "plotki") + " - nastroj " + MoodText(asked, mood) + ", muzyka gry cichnie (psai " + (_psaiOk ? "glosnosc " + _saved.ToString("0.00", Inv) : "BRAK") + ").");
+                    EventThemeSeen();   // m164 recenzja: motyw wydarzenia ROT na warstwie psai przy otwarciu okna - linia, para do EventThemeStop
                 }
                 int seq = Lektor.WindowSeq;
                 if (_mus == null || _musMood != mood || (win && seq != _winSeqSeen)) { _winSeqSeen = seq; if (_mus == null || _musMood != mood) StartTrack(mood); }

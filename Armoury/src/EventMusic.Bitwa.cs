@@ -61,6 +61,8 @@ namespace Armoury
         // m164: rodzaj bitwy, utwory zagrane w tej bitwie (kolo bez powtorek), zwyciestwo gracza
         private static bool _batSiege, _batWon, _batVicDone;
         private static string _batVicText = "NIE";
+        // m164 recenzja: misja, w ktorej zwyciestwo (08) juz obsluzone - okno wydarzenia w tej misji nie zaczyna 08 od nowa (slaba referencja - obiekt Mission nie zostaje)
+        private static WeakReference _batVicMis;
         private static readonly HashSet<string> _batPlayed = new HashSet<string>(StringComparer.Ordinal);
         private static readonly StringBuilder _batSeq = new StringBuilder();
         // biezacy utwor
@@ -259,6 +261,11 @@ namespace Armoury
             _batBeganAt = Now; _batGap = 0; _batPrevText = null; _batPrevBattle = _batLastFile; _batCur = null; _batCurWhy = "";
             _bN = _bEndEngine = _bEndCap = _bEndTest = _bNotPlayed = _bNo1s = _bRepeats = _bForced = _bErrors = _bDetail = 0;
             _batPlayed.Clear(); _batSeq.Length = 0; _batWon = false; _batVicDone = false; _batVicText = "NIE"; _stopState = "-";
+            if (_batVicMis != null && ReferenceEquals(_batVicMis.Target, _batMission))
+            {   // m164 recenzja: ta sama misja po oknie wydarzenia, zwyciestwo juz bylo - cisza do konca misji (bez 08 od nowa i bez falszywej powtorki z rzedu)
+                _batWon = true; _batVicDone = true; _batVicText = "08-przed-oknem";
+            }
+            else _batVicMis = null;
             _volLogged = false; _paused = false;   // linia m108 "muzyka gry wyciszona" w kazdej bitwie (takze gdy wyciszenie trwa po oknie)
             string map = "brak", kind = "-", scene = "?";
             try
@@ -413,6 +420,7 @@ namespace Armoury
                 cut = "przerwany " + cur.File + " po " + t.ToString("0.0", Inv) + " s (zdarzenie " + st + ")";
             }
             _batVicDone = true;   // po 08 (albo po odrzuceniu 08) cisza do konca misji
+            _batVicMis = new WeakReference(_batOnMission);
             bool ok = BattlePlay(v, got, "zwyciestwo gracza 08", false);
             _batVicText = ok ? "08" : "08-odrzucony";
             Log.Info(PB + "zwyciestwo gracza (wynik misji, misja trwa) - " + cut + ", " + (ok ? "gra " + v.File : "silnik nie przyjal " + v.File) + ", po nim cisza do konca misji.");

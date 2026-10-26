@@ -1129,7 +1129,9 @@ Uzycie (Python 3, tylko odczyt):
                     '- bitwa dalej' / 'przywrocona od razu') przed nastepnym, linii z SetPaused 0 (poza
                     linia 'psai TAK (GetVolume/SetVolume/SetPaused)'; bez okien - INFO); MUZ-7 (m164) kolejnosc rol z listy 'grane' linii konca: pierwszy z otwarcia (pole 01/02,
                     oblezenie i wypad 09), dalej 03-07 (+10 w oblezeniu), bez tego samego dwa razy z rzedu, 08 tylko ostatni po 'zwyciestwo 08' (zestaw niepelny - INFO);
-                    MUZ-8 (m164) mapa: zaden utwor okna m108 muz_wojna / bit_*, linia 'mapa - okna z nastrojem wojna graja muz_korona.ogg', zatrzymane motywy ROT - liczba (INFO).
+                    MUZ-8 (m164) mapa: zaden utwor okna m108 muz_wojna / bit_*, linia 'mapa - okna z nastrojem wojna graja muz_korona.ogg' (przy kluczu StopEventThemesOnMap
+                    TAK - 'psai motywy TAK'), kazda linia 'motyw wydarzenia ROT .. gra w oknie' rozliczona przed nastepnym oknem: 'zatrzymany po oknie', 'nie gra po oknie'
+                    albo okno w bitwie ('koniec wydarzenia - bitwa dalej', 'przywrocona od razu'); ostatnie otwarte na koncu logu - INFO; liczba zatrzymanych - INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -40648,7 +40650,9 @@ M109MUZ_RX = {
     "gra": re.compile(r"^gra (\S+\.ogg) \(nastroj (\S+)\)\.$"),
     "mapa": re.compile(r"^mapa - okna z nastrojem wojna graja (muz_\w+\.ogg) \(muzyka wojenna tylko w bitwie\), klucz StopEventThemesOnMap (TAK|NIE) .*, psai motywy (TAK|NIE), "
                        r"klucz EventMusicEnabled (TAK|NIE)\.$"),
-    "theme": re.compile(r"^motyw wydarzenia ROT (\d+) \(odcinek (-?\d+)\) zatrzymany po oknie - StopMusic (\d+) s, wynik (\S+);"),
+    "theme": re.compile(r"^motyw wydarzenia ROT (\d+) \(odcinek (-?\d+)\) zatrzymany po oknie - wyciszenie warstwy psai \(glos (\d+)\) (\d+) s;"),
+    "thseen": re.compile(r"^motyw wydarzenia ROT (\d+) \(odcinek (-?\d+)\) gra w oknie \(warstwa psai, glos (\d+)\)\.$"),
+    "thgone": re.compile(r"^motyw wydarzenia ROT (\d+) \(odcinek (-?\d+)\) nie gra po oknie - bez zatrzymania\.$"),
     "cs": re.compile(r"AUTOTEST BITWA (\d+)/(\d+) \[[^\]]*\]: misja ruszyla"),
 }
 M109MUZ_SET = "01_zbiorka 120.1 s, 02_marsz 150.0 s, 03_mur_tarcz 150.1 s, 04_szarza 150.0 s, 05_stal_i_bloto 150.0 s, 06_choragwie 152.1 s, 07_ostatni_szyk 149.0 s, " \
@@ -40689,9 +40693,11 @@ M109MUZ_TEST = {
     "gave2": "rezygnacja w tej misji po 1 bledach (RestoreNow) - muzyka gry wraca, nastepna bitwa od nowa.",
     "trkerr": "utwor 2 - bit_04_szarza.ogg (lufs17, 150.0 s, wybor starcie 03-07 - losowo z 5), grany po 1 s TAK; poprzedni bit_01_zbiorka.ogg skonczony po 0.5 s (blad).",
     "psai": "psai TAK (GetVolume/SetVolume/SetPaused).",
-    "mapa": "mapa - okna z nastrojem wojna graja muz_korona.ogg (muzyka wojenna tylko w bitwie), klucz StopEventThemesOnMap TAK (motywy wydarzen ROT 402-415 zatrzymywane "
-            "3 s po oknie), psai motywy TAK, klucz EventMusicEnabled TAK.",
-    "theme": "motyw wydarzenia ROT 405 (odcinek 421) zatrzymany po oknie - StopMusic 3 s, wynik OK; muzyka mapy wraca po przerwie gry (zatrzyman w sesji 1).",
+    "mapa": "mapa - okna z nastrojem wojna graja muz_korona.ogg (muzyka wojenna tylko w bitwie), klucz StopEventThemesOnMap TAK (motywy wydarzen ROT 402-415 na warstwie "
+            "psai wyciszane 3 s po oknie), psai motywy TAK, klucz EventMusicEnabled TAK.",
+    "theme": "motyw wydarzenia ROT 405 (odcinek 421) zatrzymany po oknie - wyciszenie warstwy psai (glos 7) 3 s; muzyka mapy wraca po przerwie gry (zatrzyman w sesji 1).",
+    "thseen": "motyw wydarzenia ROT 405 (odcinek 421) gra w oknie (warstwa psai, glos 7).",
+    "thgone": "motyw wydarzenia ROT 405 (odcinek 421) nie gra po oknie - bez zatrzymania.",
     "cs": "[06:25:18] AUTOTEST: AUTOTEST BITWA 1/4 [mocna]: misja ruszyla po 3 s ladowania (scena battle_terrain_biome_040, Mission)",
 }
 
@@ -40788,8 +40794,14 @@ def m109muz_selftest():
     if not m or m.groups() != ("muz_korona.ogg", "TAK", "TAK", "TAK"):
         return f"mapa: {m.groups() if m else 'brak dopasowania'}"
     m = RX["theme"].match(T["theme"])
-    if not m or m.groups() != ("405", "421", "3", "OK"):
+    if not m or m.groups() != ("405", "421", "7", "3"):
         return f"theme: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["thseen"].match(T["thseen"])
+    if not m or m.groups() != ("405", "421", "7") or RX["theme"].match(T["thseen"]) or RX["thgone"].match(T["thseen"]):
+        return f"thseen: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["thgone"].match(T["thgone"])
+    if not m or m.groups() != ("405", "421") or RX["theme"].match(T["thgone"]):
+        return f"thgone: {m.groups() if m else 'brak dopasowania'}"
     m = RX["cs"].search(T["cs"])
     if not m or m.groups() != ("1", "4"):
         return "cs (AUTOTEST BITWA misja ruszyla)"
@@ -40810,9 +40822,10 @@ def m109muz_collect(logp, csp=None):
     utwory okien i zatrzymane motywy ROT (m164); z csp - bitwy autotestu."""
     RX = M109MUZ_RX
     D = {"starts": [], "battles": [], "skips": [], "gave": 0, "rej": 0, "notp": 0, "nores": 0, "err": 0, "err1": "", "setpaused": 0, "sp1": "", "wins": 0, "win_bad": 0,
-         "orphan": 0, "lines": 0, "cs_n": None, "mapa": [], "win_gra": [], "themes": [], "winwar": 0}
+         "orphan": 0, "lines": 0, "cs_n": None, "mapa": [], "win_gra": [], "themes": [], "winwar": 0, "thseen": 0, "thgone": 0, "thmiss": 0, "thmiss1": ""}
     cur = pend = None
     win_open = False
+    th_pend = None                                  # m164 recenzja: 'gra w oknie' czeka na 'zatrzymany po oknie' / 'nie gra po oknie' / okno w bitwie
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -40837,16 +40850,32 @@ def m109muz_collect(logp, csp=None):
                     if win_open:
                         D["win_bad"] += 1
                     win_open = True
+                    if th_pend is not None:
+                        D["thmiss"] += 1
+                        D["thmiss1"] = D["thmiss1"] or th_pend
+                        th_pend = None
                 elif RX["winend"].match(b):
                     win_open = False
                     if pend is not None and RX["windalej"].match(b):
                         pend["dalej"] = True       # okno w bitwie zamkniete, misja bitwy trwa
+                    if not b.startswith("koniec wydarzenia - muzyka gry wraca"):
+                        th_pend = None             # okno w bitwie / wyjscie z kampanii - bez zatrzymania motywu (EventThemeStop tylko na mapie)
+                elif RX["thseen"].match(b):
+                    D["thseen"] += 1
+                    if th_pend is not None:
+                        D["thmiss"] += 1
+                        D["thmiss1"] = D["thmiss1"] or th_pend
+                    th_pend = b[:120]
+                elif RX["thgone"].match(b):
+                    D["thgone"] += 1
+                    th_pend = None
                 elif RX["gra"].match(b):
                     D["win_gra"].append(RX["gra"].match(b).group(1))
                 elif RX["mapa"].match(b):
                     D["mapa"].append(RX["mapa"].match(b).groups())
                 elif RX["theme"].match(b):
                     D["themes"].append(RX["theme"].match(b).groups())
+                    th_pend = None
                 continue
             if not s.startswith(M109MUZ_TAG):
                 continue
@@ -41020,7 +41049,7 @@ def m109muz_rows(rep, D):
         flagged = [b for b in bats if b["test"]]
         for b in flagged:
             sec = b["end"]["sec"] if b["end"] else None
-            if sec is not None and sec >= M109MUZ_MIN_BATTLE_SEC and len(b["trk"]) < M109MUZ_MIN_TRACKS_TEST:
+            if sec is not None and sec >= M109MUZ_MIN_BATTLE_SEC and len(b["trk"]) < M109MUZ_MIN_TRACKS_TEST and b["end"]["vic"] != "08-przed-oknem":
                 probs.append(f"bitwa {b['name']} {sec} s: utworow z linia {len(b['trk'])}")
             badend = [t["why"] for t in b["trk"] if t["why"] is not None and t["why"] not in ("test 4 s", "zwyciestwo - przerwany")]
             if badend:
@@ -41129,11 +41158,17 @@ def m109muz_rows(rep, D):
         probs.append(f"utwory okien wojenne {len(war)} ({war[0]})")
     if mapa and mapa[-1][0] != "muz_korona.ogg":
         probs.append(f"linia mapy: {mapa[-1][0]}")
+    if mapa and mapa[-1][1] == "TAK" and mapa[-1][2] != "TAK":
+        probs.append("klucz StopEventThemesOnMap TAK, psai motywy NIE (odbicie na Logik / PlaybackChannel nieudane)")
+    if D["thmiss"]:
+        probs.append(f"motyw ROT w oknie bez zatrzymania po oknie {D['thmiss']} ({D['thmiss1'][:80]})")
     rep.add("MUZ-8: mapa bez muzyki wojennej (okna wojna -> korona, motywy ROT po oknie)",
             f"linii mapy {len(mapa)}" + (f" (klucz StopEventThemesOnMap {mapa[-1][1]}, psai motywy {mapa[-1][2]})" if mapa else "")
-            + f", utworow okien {len(D['win_gra'])}, okien 'zamiast wojna' {D['winwar']}, zatrzymanych motywow ROT {len(D['themes'])}"
+            + f", utworow okien {len(D['win_gra'])}, okien 'zamiast wojna' {D['winwar']}, motywow ROT w oknie {D['thseen']} (zatrzymanych {len(D['themes'])}, "
+            f"skonczonych w oknie {D['thgone']}, bez rozliczenia {D['thmiss']})"
             + (f" ({', '.join(sorted({t[0] for t in D['themes']}))})" if D["themes"] else "") + (" | " + "; ".join(probs) if probs else ""),
-            "zaden utwor okna muz_wojna / bit_*; linia mapy z muz_korona (bez linii mapy i okien - INFO; liczba zatrzymanych motywow - INFO)",
+            "zaden utwor okna muz_wojna / bit_*; linia mapy z muz_korona (klucz TAK - psai motywy TAK); kazdy motyw ROT w oknie zatrzymany / skonczony przed nastepnym "
+            "oknem (bez linii mapy i okien - INFO; liczba zatrzymanych motywow - INFO)",
             False if probs else (True if (mapa or D["win_gra"]) else None))
 
 
@@ -41202,15 +41237,19 @@ def m109muz_synth():
         try:
             logp, csp = os.path.join(tmp, "Armoury-test.log"), os.path.join(tmp, "session-test.log")
             L = [P8 + T["psai"]]
-            if kind in ("good", "bad", "cut", "winbat", "winbad"):
+            if kind in ("good", "bad", "cut", "winbat", "winbad", "thmiss"):
                 L.append(P8 + (T["mapa"] if kind != "bad" else T["mapa"].replace("graja muz_korona.ogg", "graja muz_wojna.ogg")))
                 L.append(P + (T["start"] if kind != "bad" else T["start"].replace("lufs26 10", "lufs26 9")))
             elif kind == "keyno":
                 L.append(P + T["startno"])
-            L += [P8 + T["winwar"], P8 + (T["gra"] if kind != "bad" else "gra muz_wojna.ogg (nastroj wojna)."), P8 + T["duck"], P8 + T["winend"]]
+            L += [P8 + T["winwar"], P8 + T["thseen"], P8 + (T["gra"] if kind != "bad" else "gra muz_wojna.ogg (nastroj wojna)."), P8 + T["duck"], P8 + T["winend"]]
             if kind in ("good", "cut", "winbat", "winbad"):
                 L.append(P8 + T["theme"])
-            if kind in ("good", "bad", "cut", "winbat", "winbad"):
+            if kind == "good":                              # drugie okno: motyw skonczyl sie w oknie
+                L += [P8 + T["win"], P8 + T["thseen"], P8 + T["winend"], P8 + T["thgone"]]
+            if kind == "thmiss":                            # nastepne okno bez rozliczenia motywu z pierwszego
+                L += [P8 + T["win"], P8 + T["winend"]]
+            if kind in ("good", "bad", "cut", "winbat", "winbad", "thmiss"):
                 L.append(P + T["skip"])
                 for i in range(4):
                     battle(L, i, kind == "bad", cut=(kind == "cut" and i == 3), win=kind[3:] if kind.startswith("win") else None)
@@ -41233,6 +41272,7 @@ def m109muz_synth():
         "cut": {"MUZ-0": "TAK", "MUZ-1": "TAK", "MUZ-2": "TAK", "MUZ-3": "TAK", "MUZ-4": "TAK", "MUZ-5": "TAK", "MUZ-6": "TAK", "MUZ-7": "TAK", "MUZ-8": "TAK"},
         "winbat": {"MUZ-0": "TAK", "MUZ-1": "TAK", "MUZ-2": "TAK", "MUZ-3": "TAK", "MUZ-4": "TAK", "MUZ-5": "TAK", "MUZ-6": "TAK", "MUZ-7": "TAK", "MUZ-8": "TAK"},
         "winbad": {"MUZ-0": "TAK", "MUZ-1": "NIE", "MUZ-2": "TAK", "MUZ-3": "NIE", "MUZ-4": "TAK", "MUZ-5": "TAK", "MUZ-6": "NIE", "MUZ-7": "TAK", "MUZ-8": "TAK"},
+        "thmiss": {"MUZ-0": "TAK", "MUZ-1": "TAK", "MUZ-2": "TAK", "MUZ-3": "TAK", "MUZ-4": "TAK", "MUZ-5": "TAK", "MUZ-6": "TAK", "MUZ-7": "TAK", "MUZ-8": "NIE"},
     }
     diff = []
     for kind, e in exp.items():
