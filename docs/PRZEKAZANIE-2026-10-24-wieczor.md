@@ -1,5 +1,28 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 13:45 CET - STAN NA WYPADEK URWANIA (Jeff: "zapisz stan, zaraz moze urwac sie tokeny")
+**W GRZE (zatwierdzone):** WGRANE 124 = Armoury 05503a8c (commit 87aaa764 galezi noc/161-integracja), CrashScribe bef9db58, glosy 123 (dane).
+Gra posprzatana po URWANYM tescie 163a (13:04): przywrocone z C:\Users\GAME\autotest-kopie\2026-10-26_13-04-00 (Armoury, CrashScribe, arm_canon_moves.tsv,
+BannerlordConfig.txt LatestSaveGameName, engine_config.txt safely_exited), flaga usunieta. Procedura: pamiec przerwany-autotest-sprzatanie.md.
+**UWAGA:** HEAD noc/161-integracja (worktree zb\n161) ma JUZ scalone 159 (merge, build 9650e63d) - NIE wgrane. Wgrane 124 = 87aaa764.
+**W TOKU (jesli urwie sie - co zrobic):**
+1. Autotest 163b (159 na 124; bitwaN + probyN 6 dob): m113\seria-163b.out.txt. Jesli urwany: SPRAWDZ GRE (md5 Armoury 05503a8c, CS bef9db58, flagi, Configs)
+   wedlug pamieci przerwany-autotest-sprzatanie.md, potem powtorz: testy-noc.ps1 -Dll mfinal163c -NowyArmoury zb\n161\Armoury\bin\Release\Armoury.dll
+   -Prefix 163c -Runs bitwaN,probyN -ProbyDays 6 -CsAt test\CrashScribe-at-n103.dll -ExtraFlags armoury-dzwiek-bitwy.flag (run_in_background).
+   Kryteria: kod 0, ERROR 0 (bledy 27 first-chance = latki BKROTPatch/BK, tak samo w kazdym tescie); w logu linia dobowa "Nowe druzyny i sprzet (159)".
+2. Recenzja 159b fix2 (workflow wf_e0014686-1ec): wznowic Workflow(scriptPath=...\workflows\scripts\recenzja-159b-fix2-wf_e0014686-1ec.js, resumeFromRunId).
+   Gdy recenzja i test OK -> WGRANIE 125 (159+159b): kopia .bak + D:, md5, statusy w CHANGELOG n161, push.
+3. Muzyka: 9 utworow ElevenLabs Music (scratchpad\muzyka_bitwy\probka\bit_NN_*.mp3; petla w muzyka_9.log pomija gotowe - mozna uruchomic jeszcze raz:
+   probka_muzyki.py <nazwa> dla brakujacych). Jeff o probce bit_04_szarza: "tak swietny klimat". Kredyty: ok. 44k przed 9 utworami (~2.1k/utwor).
+4. Paczka 164 (muzyka tylko w bitwie, motywy wojenne off z mapy) - workflow wf_57fa2a26-aee w zb\n164 (galaz noc/164-muzyka-bitwy od 87aaa764).
+   Po nim: tools/muzyka/bitwa_v2.py na 10 mp3 -> ogg w 4 zestawach lufs -> wgrac pliki + DLL 164 (scalony z 159 jesli 125 wgrane) po autotescie.
+**DECYZJE JEFFA 26.10:** nadzy lordowie "Pozyczka + mniejsze" + max 10% bez broni (brak pancerza OK); ubrania chlopow barwy ziemi bez szlacheckich;
+glosy dziko (v4, bloki, RRRAAAH rzadko); muzyka 10 utworow tylko w bitwie, rozdzielic od mapy; wybor glosow zostawil Claude.
+**OTWARTE / POZNIEJ:** pytanie do Jeffa "spotkate koszule" = kolory (zrobione) czy dlugosc?; 200 nowych kwestii glosu (ranni hp/pn/dy, sztandar bl/bg/bt/eb, chor ou -
+scratchpad\glosy_v4\klipy_v4_nowe.csv, blok_v4.py) nagrac razem z paczka runtime (ranni krzycza z miejsca 50%, max 4 naraz); sztandar B (przejecie, odbijanie)
+i C (piesn zwyciezcow); muzykant w szyku (rog/bodhran, raport w transkrypcie: cornu + bodhran z grajkow karczmy, 2 linie action_sets); drobne: sprawdz_logi ND-7
+(13 probek zamiast 6), 146 falszywa UWAGA JIT, Fall Back za mape = PANIKA, phantom wpis DTE w SpawnPost (sprzed 159).
+
 ## DOPISEK 26.10 ok. 12:35 CET - WGRANE 121-124 (ubrania, jezdziec, glosy v4, sztandar); w toku 159b, muzyka
 - LINIA GLOWNA: noc/161-integracja (worktree scratchpad\zb\n161) = 120 + 160 + 157 + 158 (+ wpis 123). Kolejne paczki scalac tu.
 - WGRANE 121 (11:45): Armoury 72b07d42 = 160 ubrania chlopow w barwach ziemi (bez barw rodu - UseTeamColor, bez farbowanych ROT; tekstury sprawdzone).
