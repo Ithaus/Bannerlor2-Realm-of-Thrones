@@ -69827,7 +69827,7 @@ def main(argv):
 # ============================================================ odbicie222 (26.10, paczka 222 noc/222-odbicie-lorda; Armoury/src/RescueHunt.cs, RescueHunt.Test.cs, Ransom178.ConsiderPrefix)
 # Jeff 26.10 ok. 22:15 (Tywin w niewoli): rod jenca dowiaduje sie po jezdzcu i kruku, potem tropi gracza. Stale z prefiksem ODB_, wiersze ODB-.
 ODB_TAG = "Odbicie (222): "
-ODB_HOUR_TOL = 1.05            # ODB-1: przeglad co godzine - wiesc najpozniej godzine po planie (+ zaokraglenie do 0.1)
+ODB_HOUR_TOL = 1.2             # ODB-1: przeglad co godzine - wiesc najpozniej godzine po planie (+ przeskok zegara gry ok. 0.05 h + 2 x zaokraglenie do 0.1; recenzja 222)
 ODB_PLAN_TOL = 0.11            # ODB-1: plan z linii pojmania = plan z linii wiesci (dwa zaokraglenia do 0.1)
 ODB_ERR = ("ERROR in RescueHunt",)
 ODB_SEL_MODES = ("poscig", "szuka", "oblezenie lochu", "widza - za slabi blisko")
@@ -69848,8 +69848,8 @@ ODB_TEST = {
     "start": "[22:00:00] Odbicie (222): start sesji | klucze Rescue Hunt tak, Rescue Hunt Realm tak, Rescue Hunt Tell Player tak | latka AiHourlyTick 150 TAK (wlasciciele a/b) | kurier 178 TAK | lowy z zapisu 2 (bledne 0) | jezdziec 2.5 jedn./h, od razu do 40 jedn., potrzeba 1.5 x sila celu, trop zimny po 72 h, zasieg 8.02/4.01 dob marszu.",
     "start0": "[22:00:00] Odbicie (222): start sesji | klucze Rescue Hunt tak, Rescue Hunt Realm tak, Rescue Hunt Tell Player tak | latka AiHourlyTick 150 TAK (wlasciciele a/b) | kurier 178 TAK | lowy z zapisu 0 (brak klucza arm_odbicie - nowa kampania albo stary zapis) | jezdziec 2.5 jedn./h.",
     "poj": "[22:00:10] Odbicie (222): pojmanie | dzien 4500 godz 13 | Tywin Lannister (T2 glowa rodu) rodu House Lannister krolestwa Westerlands przez gracz | przy Hillfork | twierdza Deep Den 14.7 jedn. (konno 0.0 h) | kruk do Casterly Rock 133.0 jedn. (24.3 h) | dotrze za 24.3 h (godzina gry 108013.3).",
-    "wie": "[22:10:00] Odbicie (222): wiesc doszla | dzien 4501 godz 14 | rod House Lannister wie o Tywin Lannister po 25.0 h (godzina gry 108014.0, plan 108013.3) | wybrani 3 sila 450 / potrzeba 300 (1.5 x 200) | lowcow 5 sila 700 (jeszcze nie wiedza 2, zimny trop 0, za daleko 1, pominieci 0) | zasieg 8.02/4.01 dob | ostatnio widziany Hillfork 25 h temu (pojmanie).",
-    "mode": "[22:10:00] Odbicie (222): szuka | dzien 4501 godz 14 | Tywin Lannister | wybrani 3 sila 450 / potrzeba 300 | lowcow 5 sila 700 | cel Jeff's Party (sila 200) | rozkazy: poscig 0, szukanie 3, oblezenie 0 | nie wiedza 2, zimny trop 0, za daleko 1.",
+    "wie": "[22:10:00] Odbicie (222): wiesc doszla | dzien 4501 godz 14 | rod House Lannister wie o Tywin Lannister po 25.0 h (godzina gry 108014.0, plan 108013.3) | wybrani 3 sila 450 / potrzeba 300 (1.5 x 200) | lowcow 5 sila 700 (jeszcze nie wiedza 2, zimny trop 0, za daleko 1, pominieci 0 w tym wyjazd po bron 0) | zasieg 8.02/4.01 dob | ostatnio widziany Hillfork 25 h temu (pojmanie).",
+    "mode": "[22:10:00] Odbicie (222): szuka | dzien 4501 godz 14 | Tywin Lannister | wybrani 3 sila 450 / potrzeba 300 | lowcow 5 sila 700 | cel Jeff's Party (sila 200) | rozkazy: poscig 0, szukanie 3, oblezenie 0 | nie wiedza 2, zimny trop 0, za daleko 1, pominieci 0 (wyjazd po bron 0).",
     "kur": "[22:05:00] Odbicie (222): kurier wstrzymany | dzien 4501 godz 0 | Tywin Lannister (rod jeszcze nie wie, wiesc za 13.3 h).",
     "kon": "[22:20:00] Odbicie (222): koniec | dzien 4503 godz 2 | Tywin Lannister - po bitwie | dob 2.5 | wiesc doszla | bitwy lowcow z graczem 1 (wygrane 0) | armie 0 | najwieksza sila 450.",
     "day": "[22:30:00] Odbicie (222): dzien 4502 | CZYNNE | lowy czynne 1 (przed wiescia 0, poscig 0, szuka 1, armia 0, za slabi 0, oblezenie lochu 0, inne 0) | dzis: nowe 1, skonczone 0 | slady 3 | kurier 178 TAK | potkniecia 0 (sesja 0).",

@@ -66,7 +66,9 @@ namespace Armoury
         private const double PeaceEndHours = 24.0;            // PeaceHold M6a-3 - wojna wypowiadana od nowa tego samego dnia nie konczy lowow
         private const double MarkMsgHours = 12.0;             // komunikat "marked your column" najwyzej co pol doby na lowy
         private const double SightLogHours = 6.0;             // linia "widziany" najwyzej co 6 h na lowy (tylko log)
-        private const int MaxSights = 8;
+        // recenzja 222: slady trzymane wedlug wieku (ColdHours), nie liczby - kruk/jezdziec do dalekich lowcow idzie do kilkudziesieciu godzin;
+        // najwyzej jeden slad na godzine (Look co godzine) -> do 73 sladow; MaxSights to tylko bezpiecznik (trzy doby + doba zapasu na loch)
+        private const int MaxSights = (int)ColdHours + 24;
         private const double ReachOwnDays = 8.02, ReachHelpDays = 4.01;   // AiMilitaryBehavior.GetDistanceScoreForDefending (oblezona twierdza / zwykle)
         private const float FloorBase = 0.5f;                 // OB5: najnizsza podstawa B
         private const float POwn = 1.2f, PHelp = 1.1f, PRealm = 1.3f;   // ArmsFirst.Edge; OB5 zamek i miasto
@@ -123,11 +125,12 @@ namespace Armoury
         private static readonly List<string[]> _pendingS = new List<string[]>();
         private static int _importN = -1, _importBad;
         private static double _lastHour = -1.0;
+        private static double _hourNowH = -1.0, _hourPrevH = -1.0;   // NowH tego i poprzedniego przegladu (T4: wiesc przy pierwszym przegladzie po planie)
         private static int _sessionDays;
         private static bool _adopted;   // Adopt raz na sesje
 
         // liczniki doby (watek kampanii) i mysli AI (Interlocked)
-        private static int _dNew, _dEnded, _dSkipped, _dCourier, _dRethink, _dSight, _dMarkMsg, _dStumbles, _stumbles;
+        private static int _dNew, _dEnded, _dSkipped, _dCourier, _dRethink, _dSight, _dSightCap, _dMarkMsg, _dStumbles, _stumbles, _dSkipTrip;
         private static int _dRaise, _dAdd, _dPatrol, _dArmyOffer, _dArmyNoCall, _dArmyShort, _dSiege, _dRaid, _dSkipRelief, _dSkipOwn, _dSkipDnc, _dArmies;
         private static readonly Dictionary<string, int> _dSkipWhy = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly HashSet<string> _err = new HashSet<string>(StringComparer.Ordinal);
@@ -173,7 +176,7 @@ namespace Armoury
         internal static void Reset()
         {
             _hunts.Clear(); Volatile.Write(ref _snap, Empty); _pendingH.Clear(); _pendingS.Clear();
-            _importN = -1; _importBad = 0; _lastHour = -1.0; _sessionDays = 0; _stumbles = 0; _adopted = false;
+            _importN = -1; _importBad = 0; _lastHour = -1.0; _hourNowH = _hourPrevH = -1.0; _sessionDays = 0; _stumbles = 0; _adopted = false;
             lock (_err) _err.Clear();
             ClearDay();
             TestReset();
@@ -181,7 +184,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _dNew = _dEnded = _dSkipped = _dCourier = _dRethink = _dSight = _dMarkMsg = _dStumbles = 0;
+            _dNew = _dEnded = _dSkipped = _dCourier = _dRethink = _dSight = _dSightCap = _dMarkMsg = _dStumbles = _dSkipTrip = 0;
             Interlocked.Exchange(ref _dRaise, 0); Interlocked.Exchange(ref _dAdd, 0); Interlocked.Exchange(ref _dPatrol, 0);
             Interlocked.Exchange(ref _dArmyOffer, 0); Interlocked.Exchange(ref _dArmyNoCall, 0); Interlocked.Exchange(ref _dArmyShort, 0);
             Interlocked.Exchange(ref _dSiege, 0); Interlocked.Exchange(ref _dRaid, 0); Interlocked.Exchange(ref _dSkipRelief, 0);
@@ -628,9 +631,13 @@ namespace Armoury
         private static void AddSight(Hunt t, Sight s)
         {
             var l = t.Sights;
-            if (l.Count > 0 && Math.Floor(l[l.Count - 1].H) == Math.Floor(s.H) && l[l.Count - 1].Kind != SCapture) l[l.Count - 1] = s;
+            var last = l.Count > 0 ? l[l.Count - 1] : null;
+            // ta sama godzina: nowszy slad zastepuje poprzedni, ale nigdy pojmania ani lochu
+            if (last != null && Math.Floor(last.H) == Math.Floor(s.H) && last.Kind != SCapture && last.Kind != SDungeon) l[l.Count - 1] = s;
             else l.Add(s);
-            while (l.Count > MaxSights) l.RemoveAt(0);
+            // recenzja 222: usuwane tylko slady starsze niz ColdHours (Hunters i tak ich nie bierze) - dalecy lowcy dostaja slad, gdy dojdzie kruk/jezdziec
+            l.RemoveAll(x => s.H - x.H > ColdHours);
+            while (l.Count > MaxSights) { _dSightCap++; l.RemoveAt(0); }
         }
 
         /// <summary>Kiedy druzyna w q dowie sie o sladzie s.</summary>
@@ -720,6 +727,7 @@ namespace Armoury
             double now = Math.Floor(NowH);
             if (now == _lastHour) return;
             _lastHour = now;
+            _hourPrevH = _hourNowH; _hourNowH = NowH;
             Resolve();
             if (On && !_adopted) { _adopted = true; try { Adopt(); } catch (Exception e) { Stumble("Adopt", e); } }
             var old = Volatile.Read(ref _snap);
@@ -857,7 +865,7 @@ namespace Armoury
             bool tVisible = tp != null && tp.CurrentSettlement == null && !tp.IsCurrentlyAtSea;
             float max = Campaign.Current.Models.MapVisibilityModel.MaximumSeeingRange();
             IFaction tf = x != null ? x.MapFaction : tp != null ? tp.MapFaction : null;
-            int notYet = 0, cold = 0, far = 0, skip = 0;
+            int notYet = 0, cold = 0, far = 0, skip = 0, trip = 0;
             var wpcs = t.K.WarPartyComponents;
             for (int i = 0; i < wpcs.Count; i++)
             {
@@ -872,6 +880,8 @@ namespace Armoury
                 if (mp.MapEvent != null || (mp.CurrentSettlement != null && mp.CurrentSettlement.SiegeEvent != null)) { skip++; continue; }
                 if (mp.BesiegedSettlement != null && mp.BesiegedSettlement != x) { skip++; continue; }
                 if (Undead.Party(mp) || Prologue.Scripted(mp) || mp.Party.IsStarving || ArmsFirst.Unready(mp)) { skip++; continue; }
+                // recenzja 222: wyjazd po pierwsza bron 159c (CapThink po tym postfiksie zawsze go przebija) - nie wybierac i nie liczyc sily, idzie nastepny
+                if (ArmsFirst.CapTripActive(mp)) { skip++; trip++; _dSkipTrip++; continue; }
                 var q = mp.GetPosition2D;
                 if (now < NewsAt(t, q)) { notYet++; continue; }
                 Vec2 kp; double age = 0;
@@ -957,7 +967,7 @@ namespace Armoury
                 if (t.Sights.Count > 0) { var ls = t.Sights[t.Sights.Count - 1]; last = NearName(ls.Pos) + " " + F0(now - ls.H) + " h temu (" + SightName[ls.Kind] + ")"; }
                 Log.Info(P + "wiesc doszla | " + When() + " | rod " + Nm(t.Clan) + " wie o " + Nm(t.Captive) + " po " + F1(now - t.StartH) + " h (godzina gry " + F1(now) + ", plan " + F1(t.SeatH) + ")"
                          + " | wybrani " + nSel + " sila " + F0(sel) + " / potrzeba " + F0(need) + " (1.5 x " + F0(tStr) + ") | lowcow " + _cands.Count + " sila " + F0(total)
-                         + " (jeszcze nie wiedza " + notYet + ", zimny trop " + cold + ", za daleko " + far + ", pominieci " + skip + ") | zasieg " + F2(ReachOwnDays) + "/" + F2(ReachHelpDays)
+                         + " (jeszcze nie wiedza " + notYet + ", zimny trop " + cold + ", za daleko " + far + ", pominieci " + skip + " w tym wyjazd po bron " + trip + ") | zasieg " + F2(ReachOwnDays) + "/" + F2(ReachHelpDays)
                          + " dob | ostatnio widziany " + last + ".");
             }
             if (mode != t.Mode)
@@ -965,7 +975,7 @@ namespace Armoury
                 t.Mode = mode;
                 Log.Info(P + mode + " | " + When() + " | " + Nm(t.Captive) + " | wybrani " + nSel + " sila " + F0(sel) + " / potrzeba " + F0(need) + " | lowcow " + _cands.Count + " sila " + F0(total)
                          + " | cel " + (x != null ? "loch " + Nm(x) : Nm(tp)) + " (sila " + F0(tStr) + ") | rozkazy: poscig " + nChase + ", szukanie " + nPatrol + ", oblezenie " + nSiege
-                         + (mode == "armia" ? ", armia 1" : "") + " | nie wiedza " + notYet + ", zimny trop " + cold + ", za daleko " + far + ".");
+                         + (mode == "armia" ? ", armia 1" : "") + " | nie wiedza " + notYet + ", zimny trop " + cold + ", za daleko " + far + ", pominieci " + skip + " (wyjazd po bron " + trip + ").");
             }
             _cands.Clear();
         }
@@ -1121,8 +1131,8 @@ namespace Armoury
                          + " | dzis: nowe " + _dNew + ", skonczone " + _dEnded + ", pojmania bez lowow " + _dSkipped + (sk.Length > 0 ? " (" + sk + ")" : "")
                          + " | rozkazy w mysli AI: poscig podbity " + _dRaise + ", poscig dodany " + _dAdd + ", szukanie " + _dPatrol + ", armia " + _dArmyOffer + " (bez druzyn do wezwania "
                          + _dArmyNoCall + ", za slabi z wezwanymi " + _dArmyShort + ", zalozone " + _dArmies + "), oblezenie lochu " + _dSiege + ", najazd wsi lochu " + _dRaid
-                         + " | pominiete: odsiecz OB5 " + _dSkipRelief + ", obrona osady wlasnego rodu " + _dSkipOwn + ", zbiorka armii " + _dSkipDnc
-                         + " | slady " + _dSight + ", komunikaty 'marked your column' " + _dMarkMsg + ", wstrzymani kurierzy " + _dCourier + ", przemyslenia " + _dRethink
+                         + " | pominiete: odsiecz OB5 " + _dSkipRelief + ", obrona osady wlasnego rodu " + _dSkipOwn + ", zbiorka armii " + _dSkipDnc + ", wyjazd po bron (druzynogodziny) " + _dSkipTrip
+                         + " | slady " + _dSight + " (bezpiecznik " + _dSightCap + ")" + ", komunikaty 'marked your column' " + _dMarkMsg + ", wstrzymani kurierzy " + _dCourier + ", przemyslenia " + _dRethink
                          + " | kurier 178 " + CourierWired() + " | potkniecia " + _dStumbles + " (sesja " + _stumbles + ").");
             }
             catch (Exception e) { Stumble("Daily.Line", e); }
@@ -1163,7 +1173,8 @@ namespace Armoury
 
         internal static void Import(string data)
         {
-            _hunts.Clear(); _pendingH.Clear(); _pendingS.Clear(); _importN = 0; _importBad = 0;
+            // recenzja 222: brak klucza (stary zapis) = null -> _importN zostaje -1 ("brak klucza"); zapis 222 bez lowow ma "" -> 0
+            _hunts.Clear(); _pendingH.Clear(); _pendingS.Clear(); _importN = data == null ? -1 : 0; _importBad = 0;
             Volatile.Write(ref _snap, Empty);
             try
             {

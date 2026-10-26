@@ -17,11 +17,13 @@ namespace Armoury
     ///  T1 TakePrisonerAction.Apply(druzyna gracza, glowa rodu) - lowy otwarte, plan wiesci = wzor liczony tu niezaleznie (jazda do twierdzy, kruk do siedziby);
     ///  T2 bramka kuriera zamknieta przed wiescia (plan 0 h - POMINIETY);
     ///  T3 zapis tam i z powrotem (Export -> Import -> Export) identyczny;
-    ///  T4 (godzinny przeglad) linia "wiesc doszla" najwyzej 1 h po planie;
+    ///  T4 (godzinny przeglad) "wiesc doszla" przy pierwszym przegladzie po planie (poprzedni przeglad przed planem - przeskok zegara gry nie myli);
     ///  T5 syntetyczna mysl wybranego lowcy (nowe PartyThinkParams z jedna opcja gry 0.4): rozkaz z migawki daje opcje lowow (poscig / szukanie / armia) o ocenie
     ///     &gt;= P x 0.5; brak lowcow - POMINIETY;
     ///  T6 loch: gracz z twierdza - jeniec przeniesiony do lochu, przeglad - cel lochu, potem z powrotem do druzyny; bez twierdzy - POMINIETY;
-    ///  T7 EndCaptivityAction.ApplyByReleasedByChoice - "koniec ... wypuszczony", bramka kuriera otwarta.
+    ///  T7 EndCaptivityAction.ApplyByReleasedByChoice - "koniec ... wypuszczony", bramka kuriera otwarta;
+    ///  T8 (recenzja 222, bez obiektow gry) slady wedlug wieku: pojmanie + 48 sladow co godzine przy twierdzy - lowca 130 jedn. od niej ma znany slad,
+    ///     pojmanie trzymane do ColdHours, po 80 h zaden slad starszy niz ColdHours.
     /// Linie "Odbicie (222): test - Tn ... - wynik TAK|NIE|POMINIETY" (grupa odbicie222, ODB-6).
     /// </summary>
     internal static partial class RescueHunt
@@ -100,6 +102,7 @@ namespace Armoury
 
         private static void TestRun()
         {
+            try { TestSights(); } catch (Exception e) { Stumble("TestSights", e); TLine("T8", "wyjatek " + e.GetType().Name, "NIE"); }
             try
             {
                 var h = TestPick();
@@ -158,11 +161,32 @@ namespace Armoury
                 return;
             }
             _tHero = null;
-            bool ok4 = now - _tPlan <= 1.0 + 1e-6 && now >= _tPlan - 1e-6;
-            TLine("T4", "wiesc doszla po " + F1(now - _tStart) + " h, plan " + F1(_tPlan - _tStart) + " h", ok4 ? "TAK" : "NIE");
+            // recenzja 222: przeglad godzinny trafia troche po pelnej godzinie - wiesc ma dojsc przy pierwszym przegladzie po planie, nie "w 1.0 h"
+            bool ok4 = now >= _tPlan - 1e-6 && _hourPrevH < _tPlan;
+            TLine("T4", "wiesc doszla po " + F1(now - _tStart) + " h, plan " + F1(_tPlan - _tStart) + " h, poprzedni przeglad " + F2(_hourPrevH - _tStart) + " h", ok4 ? "TAK" : "NIE");
             TestThink(t);
             TestDungeon(t);
             TestRelease(h);
+        }
+
+        /// <summary>T8: slady wedlug wieku (AddSight/KnownAt na sztucznych lowach - bez obiektow gry). Przed recenzja (8 sladow) dalecy lowcy nie mieli zadnego.</summary>
+        private static void TestSights()
+        {
+            var t = new Hunt();
+            var fort = new Vec2(0f, 0f);
+            const double h0 = 1000.0;
+            t.Sights.Add(new Sight { H = h0, X = 0f, Y = 0f, Kind = SCapture, FH = h0, FX = fort.X, FY = fort.Y });
+            for (int i = 1; i <= 48; i++) AddSight(t, new Sight { H = h0 + i, X = 1f, Y = 1f, Kind = SSettlement, FH = h0 + i, FX = fort.X, FY = fort.Y });
+            var q = new Vec2(130f, 0f);
+            double now = h0 + 48.0;
+            int known = 0;
+            foreach (var s in t.Sights) if (now - s.H <= ColdHours && KnownAt(s, null, q) <= now) known++;
+            bool capKept = t.Sights.Count > 0 && t.Sights[0].Kind == SCapture;
+            for (int i = 49; i <= 80; i++) AddSight(t, new Sight { H = h0 + i, X = 1f, Y = 1f, Kind = SSettlement, FH = h0 + i, FX = fort.X, FY = fort.Y });
+            double oldest = t.Sights.Count > 0 ? h0 + 80.0 - t.Sights[0].H : -1.0;
+            bool ok = known > 0 && capKept && oldest <= ColdHours && t.Sights.Count <= (int)ColdHours + 1;
+            TLine("T8", "slady wedlug wieku: lowca 130 jedn. od twierdzy po 48 h zna " + known + " sladow (kruk " + F1(KnownAt(t.Sights[t.Sights.Count - 1], null, q) - (h0 + 80.0)) + " h), pojmanie po 48 h "
+                  + (capKept ? "jest" : "BRAK") + ", po 80 h sladow " + t.Sights.Count + " najstarszy " + F0(oldest) + " h", ok ? "TAK" : "NIE");
         }
 
         private static void TestThink(Hunt t)
