@@ -127,6 +127,7 @@ namespace Armoury
             _ent.Clear(); _dirty.Clear(); _fullQ.Clear(); _pub = Empty; _strOn = false; _simOn = false; _savedWait.Clear(); _waitLoaded = 0; _pubDirty = _invAll = false; _needFull = true; _anyOn = false; _knee = -1;
             _stumbles = 0; _simStumbles = 0; ClearDay(); _fullTotal = 0; _share.Clear();
             ArmsFirst.Reset();
+            NewLordKit.Reset();   // 159: plany nowych druzyn, zegary "nie moze sie dozbroic", liczniki - od zera przy nowej kampanii / przed wczytaniem
         }
 
         private static void ClearDay()
@@ -147,6 +148,17 @@ namespace Armoury
         /// <summary>ArmsFirst: partia lorda AI "niegotowa" (R ponizej AiArmsBelowPercent, histereza do AiArmsReadyPercent) i NIE zwolniona z czekania (recenzja p9,
         /// uwaga 3: po AiArmsWaitMaxDays dobach walczy tym, co ma) wedlug ostatniej publikacji.</summary>
         internal static bool IsLow(MobileParty mp) { var i = InfoOf(mp); return i != null && i.Low && !i.Free; }
+
+        /// <summary>159: czy partia byla juz przeliczona w tej sesji (po wczytaniu pelny przeglad idzie kolejka) - brak publikacji przy policzonej = gotowa.</summary>
+        internal static bool Computed(MobileParty mp) { return mp != null && _ent.ContainsKey(mp.Id); }
+
+        /// <summary>159 P0: ile dob partia czeka jako niegotowa (zegar ArmedStrength.Wait; -1 - nie czeka albo nie policzona). Watek glowny, tylko odczyt.</summary>
+        internal static double WaitDaysOf(MobileParty mp)
+        {
+            Ent e;
+            if (mp == null || !_ent.TryGetValue(mp.Id, out e) || e.LowSinceH < 0) return -1;
+            return (CampaignTime.Now.ToHours - e.LowSinceH) / 24.0;
+        }
 
         /// <summary>Postfiks Priority.Last na GetPowerOfParty czynnego modelu: wynik x F, gdy kontekst Estimated albo partia poza bitwa. Tylko odczyt niezmiennego
         /// slownika (watki robocze ruchu); zadnych zapisow. Flaga _hold (lup DTE) - bez mnoznika. Nie rzuca.</summary>
@@ -474,6 +486,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(owner, DayProfile.MapEnd("ArmedStrength.OnMapEventEnded", OnMapEventEnded));
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(owner, MarkDirty);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(owner, DayProfile.Destroyed("ArmedStrength.OnPartyDestroyed", OnPartyDestroyed));
+            NewLordKit.RegisterEvents(owner);   // 159: doba powstania partii, koniec planu przy zniszczeniu, P0 przy bitwie gracza
         }
 
         /// <summary>Partia do przeliczenia w nastepnej godzinie (zakup AiGear, nowa partia, koniec bitwy). Watek glowny.</summary>

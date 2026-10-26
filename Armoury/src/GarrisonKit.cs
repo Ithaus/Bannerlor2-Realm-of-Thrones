@@ -626,6 +626,7 @@ namespace Armoury
                 if (me == null || dists == null || sides == null || mission == null) return;
                 BattleFor(mission);
                 _mountsOk = MountsOk(mission);
+                NewLordKit.BattleLine(me, "misja");   // 159 P0: stan partii lordow AI tej bitwy PRZED pustymi wpisami OwnAssignments (tylko log, raz na bitwe - pelny sklad z dolaczajacymi, nie rzuca)
                 // sklad7b: jedna regula dla druzyny gracza i lordow AI (OwnKitOn); "tylko pozyczone" (LordBattleKitIsLent) tylko bez niej
                 if (OwnKitOn) OwnAssignments(dists, sides, me, mission);   // PRZED rozdzielaczami zalog - te dochodza nizej
                 else if (s.LordBattleKitIsLent) LordAssignments(dists);

@@ -318,6 +318,21 @@ namespace Armoury
             return h != null ? h.StringId : null;
         }
 
+        /// <summary>159 (NewLordKit.Plan): czy LateLord da tej nowej partii lorda dorobek stuleci w oknie nowej gry - te same warunki co LateLord, bez skutkow
+        /// (bez wpisu wodza i bez licznikow). true - plan 159 tej partii nie dotyczy (sklad zostaje, dorobek przyjdzie w PartyCreatedPrefix). Nie rzuca.</summary>
+        internal static bool LateWindowFor(MobileParty mp)
+        {
+            try
+            {
+                if (mp == null || !LateOn || !_ran || !_done) return false;
+                if (Hunger.CampaignAge() > LateDays) return false;
+                if (mp.ActualClan == Clan.PlayerClan || Undead.Party(mp)) return false;
+                var key = LeaderKey(mp);
+                return !string.IsNullOrEmpty(key) && !_lateLeaders.Contains(key);
+            }
+            catch { return false; }
+        }
+
         private static void NoteLateLeader(MobileParty mp)
         {
             try { var k = LeaderKey(mp); if (!string.IsNullOrEmpty(k)) _lateLeaders.Add(k); } catch { }

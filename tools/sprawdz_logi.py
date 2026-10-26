@@ -3339,6 +3339,8 @@ def etap4_main(logp, start_arg, until=120, csp=None, bdp=None):
     h3 = e4_series(lines, "Przegrani (H3): dzien", 1)
     i1 = e4_series(lines, "Prawo jenca (I1): dzien", 1)
     bud = e4_series(lines, "Budzet rodow (166): dzien", 1)
+    # 159 (recenzja, uwaga 6): odeslani bez sprzetu (NewLordKit.SendHome) - ta sama droga co zwolnieni 166, ale poza "zwolnieni: do wsi" linii 166; dzien gry jak 166 (shift 1)
+    n159 = e4_series(lines, "Nowe druzyny i sprzet (159): dzien", 1)
     # N7 (recenzja O1): rozbici czekajacy w osadach zbiorki - stan T7 (ten sam tick co "Ludzie"; dzien gry jak Wyrzutki - shift 1); log bez paczki - 0
     n7w = e4_series(lines, "Rozbici wracaja (N7): dzien", 1)
     start = start_arg
@@ -3555,6 +3557,9 @@ def etap4_main(logp, start_arg, until=120, csp=None, bdp=None):
             "E4/10: do karczmy (H3 rozbici + uwolnieni, I1)": L(d, r", do karczmy \(E4/10\) (\d+) \(rozbici", h3) + L(d, r", do karczmy \(E4/10\) (\d+) \(w tym", i1),
             "dezercja poza pula": max(0.0, L(d, r"dezercja (\d+) \(partie rodow", lud) - L(d, r"naplyw: dezercja (\d+)", wyr)),
             "zwolnieni 166 (do wsi i zniklo)": L(d, r"zwolnieni: do wsi (\d+) ludzi", bud) + L(d, r"zwolnieni: do wsi \d+ ludzi \([^)]*\), zniklo (\d+)", bud),
+            # 159 (recenzja, uwaga 6): ludzie bez sprzetu do domu (do wsi i do karczmy E4/10 - razem); log bez 159 - 0
+            # 159b (regula Jeffa 10%): etykieta "(ludzie bez broni ponad X% partii)"; stary log - "(ludzie bez zbroi albo broni)"
+            "159 do domu (ludzie bez broni ponad %)": L(d, r"\(2\) DO DOMU \(ludzie bez (?:zbroi albo broni|broni ponad [\d.]+% partii)\): partii \d+, ludzi (\d+)", n159),
             "partie rozwiazane i usuniete (sklad, jency)": L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi (\d+)", par) + L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi \d+, ranni (\d+)", par)
                                                           + L(d, r"ranni \d+, jency (\d+) - znikaja", par) + L(d, r"usuniete bez zniszczenia \d+ \(ostatni stan (\d+)", par),
             "jency bez odbiorcy (gra) i skasowani przez ROT": L(d, r"bez odbiorcy \(gra usuwa[^)]*\) (\d+)", jen) + L(d, r"jency Innych skasowani przez ROT (\d+)", inn),
@@ -4461,13 +4466,15 @@ def etap4_e410(rep, lines, start, win, lud, until):
     h3t = ssum("Przegrani (H3): dzien", r", do karczmy \(E4/10\) (\d+) \(rozbici", 1)
     i1t = ssum("Prawo jenca (I1): dzien", r", do karczmy \(E4/10\) (\d+) \(w tym", 1)
     b6t = ssum("Budzet rodow (166): dzien", r"z tego do karczmy \(E4/10\) (\d+)", 1)
+    # 159 (recenzja, uwaga 6): odeslani bez sprzetu wchodza do puli jako "zwolnieni 166" (V166), ich karczma - w linii 159
+    b6t += ssum("Nowe druzyny i sprzet (159): dzien", r"\(rannych \d+, z tego do karczmy \(E4/10\) (\d+)\)", 1)
     def vsum(name):
         return sum(num(re.escape(name) + r" (\d+)", vet[d], int, 0) or 0 for d in live)
     vh3 = vsum("rozbici H3") + vsum("uwolnieni jency")
     vi1 = vsum("prawo jenca I1") + vsum("zostawieni po bitwie gracza")
     v166 = vsum("zwolnieni 166")
     ok = all(abs(a - b) <= max(5, 0.01 * max(a, b)) for a, b in ((h3t, vh3), (i1t, vi1), (b6t, v166)))
-    rep.add("E4/10: do karczmy w liniach H3 / I1 / 166 wobec wejsc linii Weterani (sumy okna)", f"H3 {h3t} vs {vh3}, I1 {i1t} vs {vi1}, 166 {b6t} vs {v166}",
+    rep.add("E4/10: do karczmy w liniach H3 / I1 / 166 (+159) wobec wejsc linii Weterani (sumy okna)", f"H3 {h3t} vs {vh3}, I1 {i1t} vs {vi1}, 166+159 {b6t} vs {v166}",
             "|roznica| <= max(5, 1%) (krawedzie okna)", ok)
     # wejscia wedlug strumienia (INFO)
     names = ["zwolnieni 166", "przepelnienie W4c", "rycerze 179", "rozbici H3", "uwolnieni jency", "prawo jenca I1", "zostawieni po bitwie gracza", "rozwiazane partie"]

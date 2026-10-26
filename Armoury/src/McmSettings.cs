@@ -10104,6 +10104,30 @@ namespace Armoury
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool AiArmsBlockBanditAttacks { get; set; } = false;
 
+        [SettingPropertyBool("New Lord Party Armed Men Only", HintText = "When a lord takes the field again with a new party (after captivity, ransom or a lost battle) and his clan's warband would come from the free hands of his villages, he calls up only the men he can arm: their kit is priced at the nearest friendly town within AI Arms Trip Max Days and paid from his gold above his reserve (and, with New Lord Party Kit Loan, by an Iron Bank loan up to his house's credit limit) - first one weapon for every man, then the rest of the kit as far as the money goes. Every man who gets a weapon comes; men who would get no weapon come only up to Unarmed Men Allowed (%) of the party, the rest stay at home in their villages. He rides to that town and buys the kit off the shelf as lords already do, weapons first. Your clan, the Night's Watch and the dead are untouched. Off = he takes the full warband even with no kit for them", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool NewLordPartyArmedMenOnly { get; set; } = true;
+
+        [SettingPropertyBool("New Lord Party Kit Loan", HintText = "With New Lord Party Armed Men Only: when the lord's own gold is short, he borrows the rest of the price of his new men's kit from the Iron Bank when he reaches the town - a real loan with the Bank's interest and fee, repaid under the debt ladder like any other, and only up to the limit the Bank gives his house (nothing while his house is behind on instalments or seized, its crown owes the Bank, or the Bank's vaults are low). Off = he arms, and calls up, only as many men as his own gold pays for", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool NewLordPartyKitLoan { get; set; } = true;
+
+        [SettingPropertyBool("Unarmed Men Sent Home", HintText = "A lord's party still counted as unarmed (AI Arms Below Percent) that cannot arm its men - no gold for kit, no friendly town within reach, or shelves that sold it nothing - for Unarmed Men Sent Home Days sends home men who have no weapon at all - only as many as are above Unarmed Men Allowed (%) of the party (with Unarmed Cap All Lord Parties also any other lord's party above that share that cannot pay for their weapons). A man counts as armed when the party's stores hold a weapon he can use; a man without armour but with a weapon stays. They go back to the villages they came from: nobody vanishes and nobody appears. Parties in an army, a battle or a siege, at sea, of your clan, of the Night's Watch and of the dead keep their men. Off = such lords keep marching with men in tunics and clubs", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool UnarmedMenSentHome { get; set; } = true;
+
+        [SettingPropertyInteger("Unarmed Men Sent Home Days", 1, 30, "0", HintText = "days an unarmed lord who cannot arm his men keeps them before he sends home the men without a weapon above Unarmed Men Allowed (%)", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public int UnarmedMenSentHomeDays { get; set; } = 3;
+
+        [SettingPropertyFloatingInteger("Unarmed Men Allowed (%)", 0.00f, 50.00f, "0", HintText = "A lord may keep men without any weapon up to this share of his party; men lacking armour but carrying a weapon are not counted as unarmed", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public float UnarmedMenAllowedPercent { get; set; } = 10f;
+
+        [SettingPropertyBool("Unarmed Cap All Lord Parties", HintText = "Unarmed Men Allowed (%) holds for every AI lord's party, not only for parties counted as unarmed (AI Arms Below Percent): a well-armoured party whose men without any weapon exceed that share buys a first weapon for the excess before armour at its next town, and if it cannot pay for those weapons for Unarmed Men Sent Home Days, sends the excess home (with Unarmed Men Sent Home). Parties in an army, of your clan, of the Night's Watch and of the dead are untouched. Off = only parties counted as unarmed that cannot arm their men send anyone home", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool UnarmedCapAllLordParties { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -12629,6 +12653,12 @@ namespace Armoury
             s.AiArmsTripCooldownDays = AiArmsTripCooldownDays;
             s.AiArmsWaitMaxDays = AiArmsWaitMaxDays;
             s.AiArmsBlockBanditAttacks = AiArmsBlockBanditAttacks;
+            s.NewLordPartyArmedMenOnly = NewLordPartyArmedMenOnly;
+            s.NewLordPartyKitLoan = NewLordPartyKitLoan;
+            s.UnarmedMenSentHome = UnarmedMenSentHome;
+            s.UnarmedMenSentHomeDays = UnarmedMenSentHomeDays;
+            s.UnarmedMenAllowedPercent = UnarmedMenAllowedPercent;
+            s.UnarmedCapAllLordParties = UnarmedCapAllLordParties;
         }
 
         internal static void Apply()

@@ -57,6 +57,10 @@ RANGES = {
     'AiArmsTripMaxDays': (1, 14, "0"),
     'AiArmsTripCooldownDays': (0, 30, "0"),
     'AiArmsWaitMaxDays': (1, 60, "0"),   # recenzja p9: ArmsFirst.WaitDays przycina 1..60
+    # 159: doby niegotowej partii bez mozliwosci dozbrojenia przed odeslaniem ludzi bez zbroi albo broni - kod przycina 1..30 (NewLordKit.HomeDays)
+    'UnarmedMenSentHomeDays': (1, 30, "0"),
+    # 159b (Jeff 26.10 "max 10% armii"): odsetek ludzi bez broni w partii lorda - kod przycina 0..50 (NewLordKit.AllowedPct)
+    'UnarmedMenAllowedPercent': (0.0, 50.0, "0"),
     'SutlerRowMinMen': (1, 5000, "0"),
     'SutlerRowMenPerStall': (10, 1000, "0"),
     'SutlerRowMaxStalls': (1, 50, "0"),
@@ -676,6 +680,8 @@ LABELS = {
     'AiSavesBreathInSieges': 'AI Saves Breath In Sieges',
     # 148: poscig konnicy AI
     'AiCavalryPursues': 'AI Cavalry Pursues',
+    # 159b: nazwa z procentem (regula ogolna dalaby "Unarmed Men Allowed Percent")
+    'UnarmedMenAllowedPercent': 'Unarmed Men Allowed (%)',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial
