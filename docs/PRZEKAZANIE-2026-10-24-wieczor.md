@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 23:40 CET - 202, 203 gotowe i scalone do n161 (f3413043, NIE wgrane); 204 dokonczenie; 222/223 w toku
+- n161 HEAD f3413043 = 126 + 202 (426fe0ba) + 203 (8f48dbcb); build kod 0, Armoury 06c8ab82 (do testu; NIE wgrane - w grze dalej 126).
+  203 usunal z repo stare Bitwa\lufs17-26\bit_*.ogg, nowe zestawy Bitwa\lufs21.4/24.4/27.4/30.4 (40 ogg) - przy wgraniu dodac te katalogi (stare moga zostac).
+- 204 (zb\n204): 6c561288 + 6f04a755 + recenzja bafb4574 (7 uwag potwierdzonych; poprawiajacy dostal ucieta liste). Dokonczenie: wf_0055b61c-6fc
+  (pozostale uwagi: koszt przebiegu, lamiaca sie strona; recheck; testowy CrashScribe-at-n204.dll z konnymi lucznikami "harasser": 3 - tylko do testu).
+- 222/223: wf_63b46d86-20c w toku (UWAGA: ten sam skrypt ucina liste uwag do 20000 znakow - sprawdzic po wyniku).
+- Konflikty przy scalaniu typu "obie paczki dopisaly w tym samym miejscu" (CHANGELOG, sprawdz_logi): scratchpad 1e1c276a...\scratchpad\rozwiaz_oba.py (zostawia oba).
+
 ## DOPISEK 26.10 ok. 22:30 CET - uwagi Jeffa z bitwy na 126; paczki 202-223 w toku (Jeff gra)
 - Rycerz Lannisterow z jencow z "full kit" (sledztwo wf_ba8fb83f-df5): NIE blad - kon, uprzaz i zbroja z JEGO zbrojowni (wolny kon bojowy + uprzaz, potem jego
   Chain Mail Horse Armor); ekran druzyny pokazuje wzorzec. Jeff wybral "B" = paczka 202 (prawdziwy sprzet na ekranie druzyny + linie logu werbunku jencow).
