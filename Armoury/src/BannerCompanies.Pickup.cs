@@ -280,7 +280,7 @@ namespace Armoury
                         // recenzja 158: RBM (AgentAi OnTick, chorazy bez wroga w 5 m) wylacza automatyczny wybor celu i celuje w pierwszego z szyku, a wlacza
                         // go z powrotem tylko u chorazego z wrogiem blisko; po upuszczeniu RBM go juz nie rusza (IsBannerBearer = sztandar w rece), gra tez nie
                         // (SetAutomaticTargetSelection wola tylko RBM i nasz 148). Wzor HorsePursuit przy zwolnieniu jezdzca; jezdziec w poscigu 148 - cel jego.
-                        if (a.IsAIControlled && !HorsePursuit.RidingAnyThread(a))
+                        if (a.IsAIControlled && !HorsePursuit.RidingAnyThread(a) && !HorsePursuit.HuntAnyThread(a))   // 204: cel czlowieka 204 - jego
                         {
                             try { a.SetAutomaticTargetSelection(true); a.InvalidateTargetAgent(); _rTargetBack++; }
                             catch (Exception e) { _rStumbles++; BannerCompanies.Stumble("BannerCompaniesMission.CelPoUpuszczeniu", e); }
@@ -390,7 +390,7 @@ namespace Armoury
             if (_runners.ContainsKey(a) || fl.Tried.Contains(a) || _noRun.Contains(a)) return false;
             if (a.HumanAIComponent == null || !a.CanBeAssignedForScriptedMovement()) return false;
             if (model != null && !model.CanAgentPickUpAnyBanner(a)) return false;   // gra: bez sztandaru, bez IsPanicked, nie w waznej akcji walki
-            if (SurvivalMode.InPanic(a) || Withdrawing(a) || HorsePursuit.RidingAnyThread(a) || WindedShow.Posing(a)) return false;
+            if (SurvivalMode.InPanic(a) || Withdrawing(a) || HorsePursuit.RidingAnyThread(a) || HorsePursuit.HuntAnyThread(a) || WindedShow.Posing(a)) return false;   // 204: pod sterowaniem 204
             if (Undead.Character(a.Character) || a.IsInWater()) return false;
             return a.CanUseObject(fl.Sie);   // IsInteractableFormationBanner: szyk sztandaru albo kapitan
         }
@@ -436,7 +436,7 @@ namespace Armoury
             // DisableScriptedMovement i zdjalby postoj 143 (Arrive), wiec tylko MoveToClear (claim i UseObjectMoving)
             if (Withdrawing(a)) { GiveUp(fl, GWound, now, false); return; }
             if (SurvivalMode.InPanic(a) || a.IsRunningAway) { GiveUp(fl, GPanic, now, true); return; }
-            if (HorsePursuit.RidingAnyThread(a)) { GiveUp(fl, GPursuit, now, false); return; }
+            if (HorsePursuit.RidingAnyThread(a) || HorsePursuit.HuntAnyThread(a)) { GiveUp(fl, GPursuit, now, false); return; }   // 204: jak poscig 148
             if (!ReferenceEquals(a.Formation, fl.F)) { GiveUp(fl, GForm, now, true); return; }
             // claim i stan AI (flagi GoToPosition NIE sprawdzamy - czy silnik zdejmuje ja po dojsciu, nie wiadomo z kodu zarzadzanego; ruch zdjety cudza reka
             // bez zmiany szyku konczy brak postepu 2 s)

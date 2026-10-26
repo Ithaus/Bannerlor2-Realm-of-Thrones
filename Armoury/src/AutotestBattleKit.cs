@@ -153,6 +153,13 @@ namespace Armoury
             catch { return "?"; }
         }
 
+        /// <summary>204 (HorsePursuit.HuntTest): plan biezacej bitwy autotestu (Strong / Retreat / Weak) albo null poza etapem bitew autotestu CrashScribe.</summary>
+        internal static string TestPlan()
+        {
+            if (!AutotestBattleStage()) return null;
+            return Plan();
+        }
+
         private static string PlanName(string k)
         {
             return k == "Strong" ? "mocna" : k == "Retreat" ? "odwrot" : k == "Weak" ? "slaba" : "?";

@@ -49,7 +49,7 @@ namespace Armoury
         private static int _rCmdShield, _rCmdTwo, _rChecks, _rChecksOk, _rReverts, _rStubborn, _rRetries, _rChargeRelease;
 
         // ------------------------------------------------------------ P1 stan (glowny watek)
-        private static bool _cavLog, _cavField, _counterKey;
+        private static bool _cavLog, _cavField, _counterKey, _huntKey;   // 204: _huntKey - kolejka do HorsePursuit.OnFire (bitwa polowa)
         private static float _cfAcc;
         private sealed class CfSt
         {
@@ -86,6 +86,7 @@ namespace Armoury
             try { _cavField = m.IsFieldBattle && _kind == "bitwa" && !m.IsNavalBattle && !m.IsNavalRaidBattle; } catch { _cavField = false; }
             _cavLog = _cavField && (c == null || c.CavalryUnderFireLog);
             _counterKey = _cavField;
+            _huntKey = _cavField;   // 204: wykrycie konnego strzelca w kazdej bitwie polowej (klucz RidersRunDownShooters czyta HorsePursuit - przy NIE same wykrycia)
         }
 
         /// <summary>Clear: liczniki konnych (P2) i pomiar konnicy (P1) od zera; klucze zgaszone (Begin ustawia je po Clear).</summary>
@@ -93,7 +94,7 @@ namespace Armoury
         {
             RiderMen.Clear(); RiderShieldMen.Clear(); RiderTwoMen.Clear(); RiderNoOne.Clear(); RiderInCharge.Clear(); RiderNear.Clear(); RiderFavorMen.Clear();
             _rCmdShield = _rCmdTwo = _rChecks = _rChecksOk = _rReverts = _rStubborn = _rRetries = _rChargeRelease = 0;
-            _cavLog = false; _cavField = false; _counterKey = false;
+            _cavLog = false; _cavField = false; _counterKey = false; _huntKey = false;
             _cfAcc = 0f;
             CavForms.Clear(); CavOrder.Clear(); CfSamples.Clear(); CfOther.Clear(); CfRidersNoCharge.Clear();
             Array.Clear(CfB, 0, CfB.Length); Array.Clear(CfO, 0, CfO.Length); Array.Clear(CfC, 0, CfC.Length); Array.Clear(CfD, 0, CfD.Length);
@@ -180,7 +181,7 @@ namespace Armoury
                     }
                 }
             }
-            if (_counterKey) HorsePursuit.OnRiderShot(m, rider, at, horse, charging);
+            if (_counterKey) HorsePursuit.OnRiderShot(m, rider, at, horse, charging);   // 204: juz tylko licznik "przejete przez 204" (wykrycie - OnFire)
         }
 
         private static CfSt GetCf(Formation f)
