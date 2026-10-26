@@ -23,6 +23,8 @@ namespace Armoury
     ///    pod glos; tools/muzyka). Odtwarzanie jak lektor: SoundEvent.CreateEventFromExternalFile("event:/Extra/external", ...) - zdarzenie z instrumentem
     ///    programisty (MasterBank.strings: Extra/external obok Extra/voiceover; voiceover NIE - jeden glos naraz, uciszylby lektora). Po koncu utworu - od nowa.
     ///    Nastroj z tytulu, klucza i tekstu okna (slowa: smierc -> zaloba, wojna, Polnoc, korona i smoki, reszta intryga); plotki - plotka.
+    ///    m164: nastroj "wojna" gra muz_korona.ogg (MapMood, EventMusic.Mapa.cs) - muzyka wojenna tylko w bitwie; po oknie motyw wydarzenia ROT w psai zatrzymany
+    ///    (EventThemeStop, klucz StopEventThemesOnMap); stop utworu przez StopRelease (Stop przed Release, gdy zdarzenie nie gra).
     ///  - Linie "Muzyka (m108): ..." (start okna z nastrojem i glosnoscia psai, koniec, bledy pierwsze 3). Potkniecia liczone, bez wylacznika.
     /// </summary>
     internal static partial class EventMusic
@@ -125,13 +127,14 @@ namespace Armoury
                 if (battle) { BattleStep(dt); FadeDown(dt); return; }   // m109-muzyka: nasze utwory bitewne, psai trzymane na 0
                 if (_batActive) BattleEnd("okno wydarzenia", false);    // m109-muzyka: okno wydarzenia przejmuje (wyciszenie zostaje)
                 _idle = 0f;
-                string mood = win ? _mood : "plotka";
+                string asked = win ? _mood : "plotka";
+                string mood = MapMood(asked);   // m164: "wojna" -> "korona" (muzyka wojenna tylko w bitwie)
                 if (!_active)
                 {
                     _active = true;
                     _starts++;
                     DuckStart();
-                    Log.Info(P + (win ? "okno \"" + _moodTag + "\"" : "plotki") + " - nastroj " + mood + ", muzyka gry cichnie (psai " + (_psaiOk ? "glosnosc " + _saved.ToString("0.00", Inv) : "BRAK") + ").");
+                    Log.Info(P + (win ? "okno \"" + _moodTag + "\"" : "plotki") + " - nastroj " + MoodText(asked, mood) + ", muzyka gry cichnie (psai " + (_psaiOk ? "glosnosc " + _saved.ToString("0.00", Inv) : "BRAK") + ").");
                 }
                 int seq = Lektor.WindowSeq;
                 if (_mus == null || _musMood != mood || (win && seq != _winSeqSeen)) { _winSeqSeen = seq; if (_mus == null || _musMood != mood) StartTrack(mood); }
@@ -149,6 +152,7 @@ namespace Armoury
                 {
                     StopTrack("koniec wydarzenia");
                     Log.Info(P + "koniec wydarzenia - muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s).");
+                    EventThemeStop();   // m164: motyw wydarzenia ROT nie gra dalej na mapie (psai jeszcze wyciszone - FadeUp od nastepnej klatki)
                 }
                 _paused = false;
             }
@@ -302,7 +306,7 @@ namespace Armoury
             if (ev == null) return;
             bool end = false;
             try { end = !ev.IsValid || ev.IsStopped(); } catch (Exception e) { Stumble("Loop", e); end = true; }
-            if (end) { string m = _musMood; _mus = null; try { if (ev.IsValid) ev.Release(); } catch { } StartTrack(m); }
+            if (end) { string m = _musMood; _mus = null; StopRelease(ev, false); StartTrack(m); }
         }
 
         private static void StopTrack(string why)
@@ -310,7 +314,7 @@ namespace Armoury
             var ev = _mus;
             if (ev == null) return;
             _mus = null;
-            try { ev.Release(); } catch (Exception e) { Stumble("StopTrack", e); }
+            _stopState = StopRelease(ev, _musMood == BattleMood);   // m164: Stop przed Release, gdy zdarzenie nie gra (pauza / start); stan do linii konca bitwy
             if (why != null) Log.Info(P + "stop " + _musFile + " (" + why + ").");
         }
 

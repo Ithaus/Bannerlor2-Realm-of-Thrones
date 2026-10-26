@@ -9780,17 +9780,21 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public int LektorGossipDailyChars { get; set; } = 1000;
 
-        [SettingPropertyBool("Event Music Enabled", HintText = "Event Music: while a story window is open (Realm of Thrones events, the Chronicle, the prologue scenes) and while the narrator reads the gossip of an inn, the game's music fades away and a quiet piece of the mod's own plays under the narrator - mourning, war, the North, crowns and dragons, intrigue or tavern talk, by what the window tells; the game's music comes back when the window closes", RequireRestart = false)]
+        [SettingPropertyBool("Event Music Enabled", HintText = "Event Music: while a story window is open (Realm of Thrones events, the Chronicle, the prologue scenes) and while the narrator reads the gossip of an inn, the game's music fades away and a quiet piece of the mod's own plays under the narrator - mourning, the North, crowns and dragons (news of war get the crowns piece too - war music plays only in battle), intrigue or tavern talk, by what the window tells; the game's music comes back when the window closes", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public bool EventMusicEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Battle Music Ours", HintText = "in field battles, fights with bandits, battles at your camp, raids on villages and their defence, sieges, sallies and battles at sea, the game's own battle music fades away and the mod's six pieces play instead - one after another in random order, never the same piece twice in a row; when you leave the battle the game's music comes back. Tournaments, the arena, hideouts and walks through towns, villages and your camp keep the game's music. Off = the game's battle music, as before", RequireRestart = false)]
+        [SettingPropertyBool("Battle Music Ours", HintText = "in field battles, fights with bandits, battles at your camp, raids on villages and their defence, sieges, sallies and battles at sea, the game's own battle music fades away and the mod's ten battle pieces play instead: a gathering or a march while the armies close in (a siege opens under the walls), then shield walls, charges, the grind of the melee, the banners and the last stand in random order without repeats (sieges add the storming of the breach), and a victory piece when your side wins the field. When you leave the battle the game's music comes back; the war pieces never play on the campaign map. Tournaments, the arena, hideouts and walks through towns, villages and your camp keep the game's music. Off = the game's battle music, as before", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public bool BattleMusicOurs { get; set; } = true;
 
         [SettingPropertyInteger("Battle Music Loudness", 1, 4, "0", HintText = "how loud the mod's music plays in battle, 1 to 4: 4 is loud enough to carry over the clash of a big battle, each step down is a notch quieter (about a fifth to the ear), and 1 is almost as soft as the music under the narrator. A new setting is heard from the next piece", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public int BattleMusicLoudness { get; set; } = 3;
+
+        [SettingPropertyBool("Stop Event Themes On Map", HintText = "when a Realm of Thrones story window closes, the event's own theme (the Blackwater, the weddings and the rest, some of them nearly seven minutes long) fades out over three seconds instead of playing on over the campaign map, and the map's own music returns after its usual pause. Works together with Event Music Enabled. Off = the event's theme plays on, as in Realm of Thrones", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool StopEventThemesOnMap { get; set; } = true;
 
         [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
@@ -12551,6 +12555,7 @@ namespace Armoury
             s.EventMusicEnabled = EventMusicEnabled;
             s.BattleMusicOurs = BattleMusicOurs;
             s.BattleMusicLoudness = BattleMusicLoudness;
+            s.StopEventThemesOnMap = StopEventThemesOnMap;
             s.LektorGossipReserveChars = LektorGossipReserveChars;
             s.ChronicleOfWesteros = ChronicleOfWesteros;
             s.ChronicleWorldChanges = ChronicleWorldChanges;

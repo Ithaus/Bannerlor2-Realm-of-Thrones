@@ -1,0 +1,41 @@
+poziom	plik	wzmocnienie_dB	I_LUFS	TP_dBTP	LRA_LU	dlugosc_s	wejscie	wyjscie	zrodlo	zrodlo_md5	md5
+17	lufs17/bit_01_zbiorka.ogg	-3.20	-17.1	-4.5	10.9	120.08	jest	jest	bit_01_zbiorka.mp3	dc5ae72ae25eacb36570485f3ce1328b	01d68257ba23b81196d934a8abd2543a
+20	lufs20/bit_01_zbiorka.ogg	-6.20	-20.1	-7.7	10.9	120.08	jest	jest	bit_01_zbiorka.mp3	dc5ae72ae25eacb36570485f3ce1328b	6ce0ce94667ceea5119eb30fd88ed54c
+23	lufs23/bit_01_zbiorka.ogg	-9.20	-23.1	-10.4	10.9	120.08	jest	jest	bit_01_zbiorka.mp3	dc5ae72ae25eacb36570485f3ce1328b	2a2513aa4b986007a6ddbfdfa2a67624
+26	lufs26/bit_01_zbiorka.ogg	-12.20	-26.1	-13.5	10.9	120.08	jest	jest	bit_01_zbiorka.mp3	dc5ae72ae25eacb36570485f3ce1328b	09f0c1a095d243b50d4056b28e8c1110
+17	lufs17/bit_02_marsz.ogg	-5.20	-17.1	-4.8	7.7	150.05	jest	jest	bit_02_marsz.mp3	54f4bcfaeff39c79b3ee6c66a375497b	7622ca54cd9d5a3f1bb1530bda6656fa
+20	lufs20/bit_02_marsz.ogg	-8.20	-20.1	-7.8	7.7	150.05	jest	jest	bit_02_marsz.mp3	54f4bcfaeff39c79b3ee6c66a375497b	c4459e58e7b3414c4180aad81c93f259
+23	lufs23/bit_02_marsz.ogg	-11.20	-23.1	-10.8	7.7	150.05	jest	jest	bit_02_marsz.mp3	54f4bcfaeff39c79b3ee6c66a375497b	447e09315e59463b1caa188b3782247e
+26	lufs26/bit_02_marsz.ogg	-14.20	-26.1	-13.9	7.7	150.05	jest	jest	bit_02_marsz.mp3	54f4bcfaeff39c79b3ee6c66a375497b	ca3164db832a37174f8556c138bb90be
+17	lufs17/bit_03_mur_tarcz.ogg	-4.10	-17.1	-4.2	8.7	150.07	wypalone 2 s	jest	bit_03_mur_tarcz.mp3	2385b5f5759d23bd5f89d8a2a392a250	bdf80e312b20299b9c51972877e9492a
+20	lufs20/bit_03_mur_tarcz.ogg	-7.10	-20.1	-7.2	8.7	150.07	wypalone 2 s	jest	bit_03_mur_tarcz.mp3	2385b5f5759d23bd5f89d8a2a392a250	71789d0220651a1bc020e796286df440
+23	lufs23/bit_03_mur_tarcz.ogg	-10.10	-23.1	-10.3	8.7	150.07	wypalone 2 s	jest	bit_03_mur_tarcz.mp3	2385b5f5759d23bd5f89d8a2a392a250	a3bada67c8c3d749d94f8d5643a71ed3
+26	lufs26/bit_03_mur_tarcz.ogg	-13.10	-26.1	-13.1	8.7	150.07	wypalone 2 s	jest	bit_03_mur_tarcz.mp3	2385b5f5759d23bd5f89d8a2a392a250	a3fc430136b8513ae2a80de38d3d58d8
+17	lufs17/bit_04_szarza.ogg	-6.30	-17.0	-6.7	3.1	150.05	jest	jest	bit_04_szarza.mp3	b970426684a09303cf7fd0be5dc08a0e	cc1bbe31a9e62a0db5e2490d86ccd4e5
+20	lufs20/bit_04_szarza.ogg	-9.30	-20.0	-9.6	3.2	150.05	jest	jest	bit_04_szarza.mp3	b970426684a09303cf7fd0be5dc08a0e	c502d3b60bccb9e6b008c3fb33be67fe
+23	lufs23/bit_04_szarza.ogg	-12.30	-23.0	-12.5	3.1	150.05	jest	jest	bit_04_szarza.mp3	b970426684a09303cf7fd0be5dc08a0e	4a6103c97a2f29e6ea1f513f15efd7a2
+26	lufs26/bit_04_szarza.ogg	-15.30	-26.1	-15.6	3.1	150.05	jest	jest	bit_04_szarza.mp3	b970426684a09303cf7fd0be5dc08a0e	2bf43da8c10cef228f422a909ca3a74d
+17	lufs17/bit_05_stal_i_bloto.ogg	-5.70	-17.1	-5.7	2.3	150.05	jest	jest	bit_05_stal_i_bloto.mp3	f6d65fb7bc4d6ce292b8f64312951e79	616a70e365f9b3ca0e61d7146a2db3a0
+20	lufs20/bit_05_stal_i_bloto.ogg	-8.70	-20.1	-8.7	2.3	150.05	jest	jest	bit_05_stal_i_bloto.mp3	f6d65fb7bc4d6ce292b8f64312951e79	5ac0d0b82f3e4e092325d1dea1c8011c
+23	lufs23/bit_05_stal_i_bloto.ogg	-11.70	-23.1	-11.7	2.3	150.05	jest	jest	bit_05_stal_i_bloto.mp3	f6d65fb7bc4d6ce292b8f64312951e79	1eaa19687da90df57343074d61883d24
+26	lufs26/bit_05_stal_i_bloto.ogg	-14.70	-26.1	-14.7	2.3	150.05	jest	jest	bit_05_stal_i_bloto.mp3	f6d65fb7bc4d6ce292b8f64312951e79	9bb7328b7eebfb63ae83f022ea512e92
+17	lufs17/bit_06_choragwie.ogg	-5.10	-17.1	-4.7	11.2	152.08	jest	jest	bit_06_choragwie.mp3	48bc4ec9557e529b3c0c9928445cfffe	6195939dad70e4d56b95f41c0238a0d1
+20	lufs20/bit_06_choragwie.ogg	-8.10	-20.1	-7.8	11.2	152.08	jest	jest	bit_06_choragwie.mp3	48bc4ec9557e529b3c0c9928445cfffe	d3ecb71de64cb6c77105748e947cdc37
+23	lufs23/bit_06_choragwie.ogg	-11.10	-23.1	-11.0	11.2	152.08	jest	jest	bit_06_choragwie.mp3	48bc4ec9557e529b3c0c9928445cfffe	8408d99ddf86723cebe82e51a0b41567
+26	lufs26/bit_06_choragwie.ogg	-14.10	-26.1	-13.5	11.2	152.08	jest	jest	bit_06_choragwie.mp3	48bc4ec9557e529b3c0c9928445cfffe	78b21e5335ffb95832f76a46728efe90
+17	lufs17/bit_07_ostatni_szyk.ogg	-2.60	-17.0	-4.0	8.8	149.05	wypalone 2 s	jest	bit_07_ostatni_szyk.mp3	c00ace99de21d8e72bfc795f8f15b9cb	022afe8035fa2c500b76a94bcfce1435
+20	lufs20/bit_07_ostatni_szyk.ogg	-5.60	-20.1	-6.6	8.8	149.05	wypalone 2 s	jest	bit_07_ostatni_szyk.mp3	c00ace99de21d8e72bfc795f8f15b9cb	b7538aa6aa1025b693ea40331d5e6bfb
+23	lufs23/bit_07_ostatni_szyk.ogg	-8.60	-23.1	-10.0	8.8	149.05	wypalone 2 s	jest	bit_07_ostatni_szyk.mp3	c00ace99de21d8e72bfc795f8f15b9cb	d34c00fc44bc4ba02e7c869b7e30404c
+26	lufs26/bit_07_ostatni_szyk.ogg	-11.60	-26.1	-12.7	8.8	149.05	wypalone 2 s	jest	bit_07_ostatni_szyk.mp3	c00ace99de21d8e72bfc795f8f15b9cb	fb4e3ae25ffa56fa06f83a4350ee64a2
+17	lufs17/bit_08_pole_nasze.ogg	-5.70	-17.0	-6.2	5.4	138.16	jest	jest	bit_08_pole_nasze.mp3	6135194eed4e761ee9323269f2fe32d9	bb24d2e3a7c7537154e7d5b8da7c0398
+20	lufs20/bit_08_pole_nasze.ogg	-8.70	-20.0	-9.1	5.4	138.16	jest	jest	bit_08_pole_nasze.mp3	6135194eed4e761ee9323269f2fe32d9	22d7e7e469952ddac4e447c7167ba88b
+23	lufs23/bit_08_pole_nasze.ogg	-11.70	-23.0	-12.1	5.4	138.16	jest	jest	bit_08_pole_nasze.mp3	6135194eed4e761ee9323269f2fe32d9	b7581c08090be0c11a22b82cd050a92f
+26	lufs26/bit_08_pole_nasze.ogg	-14.70	-26.0	-15.2	5.4	138.16	jest	jest	bit_08_pole_nasze.mp3	6135194eed4e761ee9323269f2fe32d9	673721c769ecaf967f2d2619124cab71
+17	lufs17/bit_09_pod_murami.ogg	-5.00	-17.1	-5.7	4.8	150.00	jest	jest	bit_09_pod_murami.mp3	0ee0260ba65c03889ff0bc2792a39d2f	558a2a1010d67fb8d124cf20c96a3aaf
+20	lufs20/bit_09_pod_murami.ogg	-8.00	-20.1	-8.5	4.8	150.00	jest	jest	bit_09_pod_murami.mp3	0ee0260ba65c03889ff0bc2792a39d2f	10c3a2cd083233e93a27010410ddcd72
+23	lufs23/bit_09_pod_murami.ogg	-11.00	-23.1	-11.4	4.8	150.00	jest	jest	bit_09_pod_murami.mp3	0ee0260ba65c03889ff0bc2792a39d2f	223633ae35308deec606d842ef90aecb
+26	lufs26/bit_09_pod_murami.ogg	-14.00	-26.1	-14.5	4.8	150.00	jest	jest	bit_09_pod_murami.mp3	0ee0260ba65c03889ff0bc2792a39d2f	9cb22a4b6cd1f79a3d134199cf3c3f6e
+17	lufs17/bit_10_szturm.ogg	-5.80	-17.1	-5.3	9.6	150.13	jest	jest	bit_10_szturm.mp3	744f7638e227cfea14de01b76f7bf5bc	63ab84efcdc4c6707ca2a410ecc57190
+20	lufs20/bit_10_szturm.ogg	-8.80	-20.1	-8.6	9.6	150.13	jest	jest	bit_10_szturm.mp3	744f7638e227cfea14de01b76f7bf5bc	a0e91b347e0d1dd4a4c05c6c67ea4f88
+23	lufs23/bit_10_szturm.ogg	-11.80	-23.1	-11.9	9.6	150.13	jest	jest	bit_10_szturm.mp3	744f7638e227cfea14de01b76f7bf5bc	3c5e9c27a8dae1d00dea267e21602a98
+26	lufs26/bit_10_szturm.ogg	-14.80	-26.1	-14.7	9.6	150.13	jest	jest	bit_10_szturm.mp3	744f7638e227cfea14de01b76f7bf5bc	95590242fa567f0bda089ec8b8b2bd41
