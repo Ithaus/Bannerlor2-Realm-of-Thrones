@@ -1175,6 +1175,12 @@ Uzycie (Python 3, tylko odczyt):
                     J204-8 (recenzja 204 (2)): segment 'koszt passu' - sr. <= 2 ms i max <= 16.7 ms (jedna klatka 60 fps), ludzi przejrzanych na pass <= limit (512);
                     w wierszu takze ciecia przegladu, strzelcy naraz, passy z odlozonymi strzelcami, obnizenia poziomu (strona lamana / strzelec w szyku),
                     'FF poza kolejka' (recenzja 204 (3): sprawdzenia swoich przy strzelcu poza jego ThreatPass; stary log bez segmentu - 0).
+--grupa odbicie222 : (26.10, paczka 222 noc/222-odbicie-lorda - Jeff 26.10 "zlapalem ... Tywina Lannistera ... po jakims czasie zaczna mnie tropic"; Armoury/src/RescueHunt.cs,
+                    RescueHunt.Test.cs, Ransom178.ConsiderPrefix) python -I tools/sprawdz_logi.py --grupa odbicie222 <Armoury-*.log> (strumieniowo). Linie 'Odbicie (222): '.
+                    ODB-S self-test wyrazen, ODB-S2 test syntetyczny. ODB-0 start sesji; ODB-1 'wiesc doszla' najpozniej 1 h po planie (plan = 'godzina gry' z linii pojmania);
+                    ODB-2 zadna linia trybu (poscig/szuka/armia/...) jenca przed jego 'wiesc doszla'; ODB-3 'lowy czynne' w linii doby = z zapisu + pojmania - konce;
+                    ODB-4 tryb z wyborem: sila wybranych >= potrzeby, tryb slabych: sila lowcow < potrzeby; ODB-5 'kurier wstrzymany' tylko przed wiescia;
+                    ODB-6 proba autotestu (flaga armoury-odbicie.flag) bez NIE; ODB-7 potkniecia 0 i bez ERROR RescueHunt. Brak linii - INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -70596,6 +70602,237 @@ def m204jazda_synth():
             open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(L)) + "\n")
             rep = Report()
             m204jazda_rows(rep, m204jazda_collect(logp))
+# ============================================================ odbicie222 (26.10, paczka 222 noc/222-odbicie-lorda; Armoury/src/RescueHunt.cs, RescueHunt.Test.cs, Ransom178.ConsiderPrefix)
+# Jeff 26.10 ok. 22:15 (Tywin w niewoli): rod jenca dowiaduje sie po jezdzcu i kruku, potem tropi gracza. Stale z prefiksem ODB_, wiersze ODB-.
+ODB_TAG = "Odbicie (222): "
+ODB_HOUR_TOL = 1.2             # ODB-1: przeglad co godzine - wiesc najpozniej godzine po planie (+ przeskok zegara gry ok. 0.05 h + 2 x zaokraglenie do 0.1; recenzja 222)
+ODB_PLAN_TOL = 0.11            # ODB-1: plan z linii pojmania = plan z linii wiesci (dwa zaokraglenia do 0.1)
+ODB_ERR = ("ERROR in RescueHunt",)
+ODB_SEL_MODES = ("poscig", "szuka", "oblezenie lochu", "widza - za slabi blisko")
+ODB_WEAK_MODES = ("armia", "za slabi - czekaja", "loch - za slabi", "trop zimny", "brak lowcow")
+ODB_MODES = ODB_SEL_MODES + ODB_WEAK_MODES + ("brak celu",)   # brak celu: gracz w niewoli albo jeniec w lochu, o ktorym rod nie wie (bez lowcow - ODB-4 m == 0)
+ODB_RE_START = re.compile(r"Odbicie \(222\): start sesji \| .*\| lowy z zapisu (\d+) \((?:bledne (\d+)|brak klucza)")
+ODB_RE_POJ = re.compile(r"Odbicie \(222\): pojmanie \| dzien (\d+) godz (\d+) \| (.+?) \((T\d) [^)]*\) rodu (.+?) krolestwa (.+?) przez (.+?) \| przy (.+?) \| twierdza (.+?) "
+                        r"([\d.]+) jedn\. \(konno ([\d.]+) h\) \| kruk do (.+?) ([\d.]+) jedn\. \(([\d.]+) h\) \| dotrze za ([\d.]+) h \(godzina gry ([\d.]+)\)\.")
+ODB_RE_WIE = re.compile(r"Odbicie \(222\): wiesc doszla \| dzien \d+ godz \d+ \| rod (.+?) wie o (.+?) po ([\d.]+) h \(godzina gry ([\d.]+), plan ([\d.]+)\)(.*)$")
+ODB_RE_SEL = re.compile(r"\| wybrani (\d+) sila (\d+) / potrzeba (\d+)(?: \(1\.5 x \d+\))? \| lowcow (\d+) sila (\d+)")
+ODB_RE_MODE = re.compile(r"Odbicie \(222\): (" + "|".join(re.escape(m) for m in ODB_MODES) + r") \| dzien \d+ godz \d+ \| (.+?) \| wybrani")
+ODB_RE_KUR = re.compile(r"Odbicie \(222\): kurier wstrzymany \| dzien \d+ godz \d+ \| (.+?) \(rod jeszcze nie wie, wiesc za ([\d.]+) h\)\.")
+ODB_RE_KON = re.compile(r"Odbicie \(222\): koniec \| dzien \d+ godz \d+ \| (.+?) - (.+?) \| dob ")
+ODB_RE_DAY = re.compile(r"Odbicie \(222\): dzien (\d+) \| (CZYNNE|WYLACZONE[^|]*) \| lowy czynne (\d+) .*\| potkniecia (\d+) \(sesja (\d+)\)\.\s*$")
+ODB_RE_TEST = re.compile(r"Odbicie \(222\): test - (T\d) (.*) - wynik (TAK|NIE|POMINIETY)\.\s*$")
+# linie kontrolne (napisy jak w kodzie C# RescueHunt.cs)
+ODB_TEST = {
+    "start": "[22:00:00] Odbicie (222): start sesji | klucze Rescue Hunt tak, Rescue Hunt Realm tak, Rescue Hunt Tell Player tak | latka AiHourlyTick 150 TAK (wlasciciele a/b) | kurier 178 TAK | lowy z zapisu 2 (bledne 0) | jezdziec 2.5 jedn./h, od razu do 40 jedn., potrzeba 1.5 x sila celu, trop zimny po 72 h, zasieg 8.02/4.01 dob marszu.",
+    "start0": "[22:00:00] Odbicie (222): start sesji | klucze Rescue Hunt tak, Rescue Hunt Realm tak, Rescue Hunt Tell Player tak | latka AiHourlyTick 150 TAK (wlasciciele a/b) | kurier 178 TAK | lowy z zapisu 0 (brak klucza arm_odbicie - nowa kampania albo stary zapis) | jezdziec 2.5 jedn./h.",
+    "poj": "[22:00:10] Odbicie (222): pojmanie | dzien 4500 godz 13 | Tywin Lannister (T2 glowa rodu) rodu House Lannister krolestwa Westerlands przez gracz | przy Hillfork | twierdza Deep Den 14.7 jedn. (konno 0.0 h) | kruk do Casterly Rock 133.0 jedn. (24.3 h) | dotrze za 24.3 h (godzina gry 108013.3).",
+    "wie": "[22:10:00] Odbicie (222): wiesc doszla | dzien 4501 godz 14 | rod House Lannister wie o Tywin Lannister po 25.0 h (godzina gry 108014.0, plan 108013.3) | wybrani 3 sila 450 / potrzeba 300 (1.5 x 200) | lowcow 5 sila 700 (jeszcze nie wiedza 2, zimny trop 0, za daleko 1, pominieci 0 w tym wyjazd po bron 0) | zasieg 8.02/4.01 dob | ostatnio widziany Hillfork 25 h temu (pojmanie).",
+    "mode": "[22:10:00] Odbicie (222): szuka | dzien 4501 godz 14 | Tywin Lannister | wybrani 3 sila 450 / potrzeba 300 | lowcow 5 sila 700 | cel Jeff's Party (sila 200) | rozkazy: poscig 0, szukanie 3, oblezenie 0 | nie wiedza 2, zimny trop 0, za daleko 1, pominieci 0 (wyjazd po bron 0).",
+    "kur": "[22:05:00] Odbicie (222): kurier wstrzymany | dzien 4501 godz 0 | Tywin Lannister (rod jeszcze nie wie, wiesc za 13.3 h).",
+    "kon": "[22:20:00] Odbicie (222): koniec | dzien 4503 godz 2 | Tywin Lannister - po bitwie | dob 2.5 | wiesc doszla | bitwy lowcow z graczem 1 (wygrane 0) | armie 0 | najwieksza sila 450.",
+    "day": "[22:30:00] Odbicie (222): dzien 4502 | CZYNNE | lowy czynne 1 (przed wiescia 0, poscig 0, szuka 1, armia 0, za slabi 0, oblezenie lochu 0, inne 0) | dzis: nowe 1, skonczone 0 | slady 3 | kurier 178 TAK | potkniecia 0 (sesja 0).",
+    "test": "[22:40:00] Odbicie (222): test - T1 pojmanie X: plan lowow 24.30 h, wzor niezalezny 24.30 h (jazda 0.00, kruk 24.30) - wynik TAK.",
+}
+
+
+def odbicie222_selftest():
+    """odbicie222: wyrazenia wobec linii kontrolnych ODB_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    T = ODB_TEST
+    m = ODB_RE_START.search(T["start"])
+    if not m or m.group(1) != "2" or m.group(2) != "0":
+        return "start sesji"
+    m = ODB_RE_START.search(T["start0"])
+    if not m or m.group(1) != "0" or m.group(2) is not None:
+        return "start sesji bez klucza"
+    m = ODB_RE_POJ.search(T["poj"])
+    if not m or m.group(3) != "Tywin Lannister" or m.group(4) != "T2" or float(m.group(15)) != 24.3 or float(m.group(16)) != 108013.3:
+        return "pojmanie"
+    m = ODB_RE_WIE.search(T["wie"])
+    if not m or m.group(2) != "Tywin Lannister" or float(m.group(4)) != 108014.0 or float(m.group(5)) != 108013.3:
+        return "wiesc doszla"
+    s = ODB_RE_SEL.search(m.group(6))
+    if not s or [int(x) for x in s.groups()] != [3, 450, 300, 5, 700]:
+        return "wybrani (wiesc)"
+    m = ODB_RE_MODE.search(T["mode"])
+    if not m or m.group(1) != "szuka" or m.group(2) != "Tywin Lannister" or not ODB_RE_SEL.search(T["mode"]):
+        return "tryb"
+    m = ODB_RE_KUR.search(T["kur"])
+    if not m or m.group(1) != "Tywin Lannister":
+        return "kurier"
+    m = ODB_RE_KON.search(T["kon"])
+    if not m or m.group(1) != "Tywin Lannister" or m.group(2) != "po bitwie":
+        return "koniec"
+    m = ODB_RE_DAY.search(T["day"])
+    if not m or m.group(3) != "1" or m.group(4) != "0":
+        return "dzien"
+    m = ODB_RE_TEST.search(T["test"])
+    if not m or m.group(1) != "T1" or m.group(3) != "TAK":
+        return "test"
+    return None
+
+
+def odbicie222_collect(logp):
+    """odbicie222: przebieg logu (strumieniowo) -> zdarzenia w kolejnosci (rodzaj, dane) i liczniki."""
+    D = {"ev": [], "lines": 0, "err": 0, "tests": [], "days": [], "starts": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if any(e in ln for e in ODB_ERR):
+                D["err"] += 1
+            if ODB_TAG not in ln:
+                continue
+            D["lines"] += 1
+            m = ODB_RE_START.search(ln)
+            if m:
+                D["starts"] += 1
+                D["ev"].append(("start", int(m.group(1)), int(m.group(2) or 0)))
+                continue
+            m = ODB_RE_POJ.search(ln)
+            if m:
+                D["ev"].append(("poj", m.group(3), float(m.group(16)), float(m.group(15))))
+                continue
+            m = ODB_RE_WIE.search(ln)
+            if m:
+                s = ODB_RE_SEL.search(m.group(6))
+                D["ev"].append(("wie", m.group(2), float(m.group(4)), float(m.group(5)), [int(x) for x in s.groups()] if s else None))
+                continue
+            m = ODB_RE_MODE.search(ln)
+            if m:
+                s = ODB_RE_SEL.search(ln)
+                D["ev"].append(("mode", m.group(2), m.group(1), [int(x) for x in s.groups()] if s else None))
+                continue
+            m = ODB_RE_KUR.search(ln)
+            if m:
+                D["ev"].append(("kur", m.group(1)))
+                continue
+            m = ODB_RE_KON.search(ln)
+            if m:
+                D["ev"].append(("kon", m.group(1), m.group(2)))
+                continue
+            m = ODB_RE_DAY.search(ln)
+            if m:
+                D["ev"].append(("day", int(m.group(3)), int(m.group(4))))
+                D["days"].append(int(m.group(4)))
+                continue
+            m = ODB_RE_TEST.search(ln)
+            if m:
+                D["tests"].append((m.group(1), m.group(3), m.group(2)))
+    return D
+
+
+def odbicie222_rows(rep, D):
+    """odbicie222: wiersze ODB-0..ODB-7 z zebranych zdarzen (opis w --help). Log bez linii 222 - INFO."""
+    ev = D["ev"]
+    rep.add("ODB-0: linie paczki 222 (start sesji)", f"linii {D['lines']}, startow {D['starts']}", ">= 1 start sesji", True if D["starts"] > 0 else None)
+    # ODB-1: wiesc o planie (+- 1 h), plan z linii pojmania
+    plan = {}
+    bad1, n1 = [], 0
+    for e in ev:
+        if e[0] == "poj":
+            plan[e[1]] = e[2]
+        elif e[0] == "wie":
+            n1 += 1
+            got, pl = e[2], e[3]
+            if not (pl - 1e-6 <= got <= pl + ODB_HOUR_TOL):
+                bad1.append(f"{e[1]} godz {got} plan {pl}")
+            elif e[1] in plan and abs(plan[e[1]] - pl) > ODB_PLAN_TOL:
+                bad1.append(f"{e[1]} plan pojmania {plan[e[1]]} != {pl}")
+    rep.add("ODB-1: wiesc doszla w godzinie planu (jezdziec + kruk z linii pojmania)", f"wiesci {n1}, zle {len(bad1)}" + (f" ({'; '.join(bad1[:3])})" if bad1 else ""),
+            "0 zlych (brak wiesci - INFO)", None if n1 == 0 else not bad1)
+    # ODB-2 i ODB-5: tryb lowow i kurier wstrzymany wzgledem wiesci (od ostatniego pojmania tego jenca; po starcie sesji jency z zapisu - stan nieznany)
+    told = {}
+    bad2, n2, bad5, n5 = [], 0, [], 0
+    for e in ev:
+        if e[0] == "start":
+            told = {}
+        elif e[0] == "poj":
+            told[e[1]] = False
+        elif e[0] == "wie":
+            told[e[1]] = True
+        elif e[0] == "kon":
+            told.pop(e[1], None)
+        elif e[0] == "mode":
+            n2 += 1
+            if told.get(e[1]) is False:
+                bad2.append(f"{e[2]} {e[1]}")
+        elif e[0] == "kur":
+            n5 += 1
+            if told.get(e[1]) is True:
+                bad5.append(e[1])
+    rep.add("ODB-2: zaden poscig / szukanie / armia przed wiescia do rodu", f"linii trybu {n2}, przed wiescia {len(bad2)}" + (f" ({'; '.join(bad2[:3])})" if bad2 else ""),
+            "0 (brak linii trybu - INFO)", None if n2 == 0 else not bad2)
+    # ODB-3: lowy czynne w linii doby = z zapisu + pojmania - konce (w obrebie startu sesji; nierozpoznane z zapisu odejmowane)
+    bad3, n3 = [], 0
+    base = bad_imp = new = ended = 0
+    seg = False
+    for e in ev:
+        if e[0] == "start":
+            base, bad_imp, new, ended, seg = e[1], e[2], 0, 0, True
+        elif e[0] == "poj":
+            new += 1
+        elif e[0] == "kon":
+            ended += 1
+        elif e[0] == "day" and seg:
+            n3 += 1
+            hi = base + new - ended
+            lo = hi - bad_imp
+            if not (lo <= e[1] <= hi):
+                bad3.append(f"czynne {e[1]} wobec {lo}..{hi}")
+    rep.add("ODB-3: kazde pojmanie konczy sie linia 'koniec' albo jest w 'lowy czynne' linii doby", f"linii doby {n3}, niezgodnych {len(bad3)}" + (f" ({'; '.join(bad3[:3])})" if bad3 else ""),
+            "0 niezgodnych (brak linii doby - INFO)", None if n3 == 0 else not bad3)
+    # ODB-4: tryb z wyborem - sila wybranych >= potrzeby; tryb slabych - sila wszystkich lowcow < potrzeby
+    bad4, n4 = [], 0
+    for e in ev:
+        if e[0] == "mode" and e[3]:
+            n4 += 1
+            k, s, need, m, t = e[3]
+            ok = (s >= need) if e[2] in ODB_SEL_MODES else (t <= need or m == 0)   # sila w linii zaokraglona do 1 - "mniej" moze wyjsc rowne
+            if not ok:
+                bad4.append(f"{e[2]} {e[1]} {s}/{need} (lowcow {t})")
+        elif e[0] == "wie" and e[4]:
+            n4 += 1
+            k, s, need, m, t = e[4]
+            if not (s >= need or t <= need):
+                bad4.append(f"wiesc {e[1]} {s}/{need} (lowcow {t})")
+    rep.add("ODB-4: sila wybranych >= 1.5 x cel albo wszyscy lowcy za slabi", f"linii {n4}, zlych {len(bad4)}" + (f" ({'; '.join(bad4[:3])})" if bad4 else ""),
+            "0 zlych (brak linii - INFO)", None if n4 == 0 else not bad4)
+    rep.add("ODB-5: 'kurier wstrzymany' tylko przed wiescia", f"linii {n5}, po wiesci {len(bad5)}" + (f" ({'; '.join(bad5[:3])})" if bad5 else ""),
+            "0 po wiesci (brak linii - INFO)", None if n5 == 0 else not bad5)
+    nt = [t for t in D["tests"] if t[1] == "NIE"]
+    rep.add("ODB-6: proba autotestu (linie 'test - Tn ... - wynik')", f"linii {len(D['tests'])}, NIE {len(nt)}" + (f" ({'; '.join(t[0] + ' ' + t[2][:60] for t in nt[:3])})" if nt else "")
+            + (f", TAK {sum(1 for t in D['tests'] if t[1] == 'TAK')}, POMINIETY {sum(1 for t in D['tests'] if t[1] == 'POMINIETY')}" if D["tests"] else ""),
+            "0 NIE (brak proby - INFO)", None if not D["tests"] else not nt)
+    st = sum(D["days"])
+    rep.add("ODB-7: potkniecia 222 (linie doby) i ERROR RescueHunt", f"potkniecia {st}, ERROR {D['err']}", "0 i 0", None if D["lines"] == 0 else (st == 0 and D["err"] == 0))
+
+
+def odbicie222_synth():
+    """odbicie222 - test syntetyczny: dobry i zly bieg przez odbicie222_collect / odbicie222_rows. None = werdykty zgodne, inaczej opis roznicy."""
+    import tempfile, shutil
+    T = ODB_TEST
+    good = [T["start0"], T["poj"], T["kur"], T["wie"], T["mode"], T["day"], T["test"], T["kon"],
+            T["day"].replace("lowy czynne 1", "lowy czynne 0")]
+    bad = [T["start0"],
+           T["poj"],
+           T["mode"],                                                                   # ODB-2: tryb przed wiescia
+           T["wie"].replace("godzina gry 108014.0", "godzina gry 108020.0"),            # ODB-1: 6.7 h po planie
+           T["kur"],                                                                    # ODB-5: kurier po wiesci
+           T["mode"].replace("wybrani 3 sila 450", "wybrani 1 sila 100"),               # ODB-4: 100 < 300
+           T["day"].replace("lowy czynne 1", "lowy czynne 3").replace("potkniecia 0 (sesja 0)", "potkniecia 2 (sesja 2)"),   # ODB-3, ODB-7
+           T["test"].replace("wynik TAK", "wynik NIE")]                                 # ODB-6
+    exp = {
+        "good": {"ODB-0": "TAK", "ODB-1": "TAK", "ODB-2": "TAK", "ODB-3": "TAK", "ODB-4": "TAK", "ODB-5": "TAK", "ODB-6": "TAK", "ODB-7": "TAK"},
+        "bad": {"ODB-0": "TAK", "ODB-1": "NIE", "ODB-2": "NIE", "ODB-3": "NIE", "ODB-4": "NIE", "ODB-5": "NIE", "ODB-6": "NIE", "ODB-7": "NIE"},
+        "none": {"ODB-0": "INFO", "ODB-1": "INFO", "ODB-2": "INFO", "ODB-3": "INFO", "ODB-4": "INFO", "ODB-5": "INFO", "ODB-6": "INFO", "ODB-7": "INFO"},
+    }
+    runs = {"good": good, "bad": bad, "none": ["[10:00:00] Armoury: inna linia"]}
+    diff = []
+    tmp = tempfile.mkdtemp(prefix="odb222_")
+    try:
+        for kind, L in runs.items():
+            logp = os.path.join(tmp, kind + ".log")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            odbicie222_rows(rep, odbicie222_collect(logp))
             got = {r[0].split(":")[0]: r[3] for r in rep.rows}
             diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
     finally:
@@ -70622,6 +70859,23 @@ def m204jazda_main(logp):
     print(f"plik: {logp} | bitew polowych {D['field']}, linii bitwy 204 {len(D['lines'])}, epizodow (linie startu) {len(D['starts'])}, nekajacych {len(D['tstarts'])}, "
           f"ERROR {len(D['err'])}")
     m204jazda_rows(rep, D)
+def odbicie222_main(logp):
+    """odbicie222 (26.10, paczka 222): ODB-S, ODB-S2, ODB-0..ODB-7 - opis w --help. Strumieniowo."""
+    rep = Report()
+    s1 = odbicie222_selftest()
+    rep.add("ODB-S: self-test wyrazen (linie kontrolne jak w kodzie C#: RescueHunt.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = odbicie222_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("ODB-S2: test syntetyczny (dobry, zly, bez linii 222)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("ODB-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = odbicie222_collect(logp)
+    print(f"plik: {logp} | linii 222 {D['lines']}, startow {D['starts']}, zdarzen {len(D['ev'])}, testow {len(D['tests'])}, ERROR {D['err']}")
+    odbicie222_rows(rep, D)
     rep.show()
     return 0
 
@@ -70663,6 +70917,20 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return m204jazda_main(rest[0] if rest else None)
     return _m204jazda_main_prev(argv)
+
+_odbicie222_main_prev = main
+
+
+def main(argv):
+    # paczka 222: grupa odbicie222 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "odbicie222":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return odbicie222_main(rest[0] if rest else None)
+    return _odbicie222_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

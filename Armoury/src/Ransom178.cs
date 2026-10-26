@@ -401,6 +401,7 @@ namespace Armoury
         {
             try
             {
+                if (RescueHunt.HoldCourier(__0)) return false;   // 222: kurier nie przychodzi, zanim rod jenca nie wie o pojmaniu (takze przy 178 wylaczonym)
                 if (!On || __0 == null || !Lord(__0)) return true;
                 var hero = __0;
                 var captorClan = GetCaptorClan(__instance, hero);
