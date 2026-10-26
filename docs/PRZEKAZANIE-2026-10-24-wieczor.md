@@ -1,5 +1,12 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 20:25 CET - 126 WSTRZYMANE: Jeff slyszal dwie muzyki naraz na mapie (okno autotestu 126a)
+- Autotest 126a: bitwaN + probyN kod 0, ERROR 0, gra przywrocona 20:22 (w grze 125: Armoury 8e488bd6, CS bef9db58; po tescie zostaly puste foldery Lektor\Muzyka\Mapa\lufsNN - bez znaczenia).
+- Jeff ok. 20:10 patrzyl na okno autotestu (myslal, ze to jego gra): "muzyki na mapie kampanii na siebie nachodza, leci nasza muzyka a w tle muzyka z gry", "i leca dwie naraz".
+  Log twierdzi, ze psai = 0.00 i gra jeden nasz utwor (20:07-20:12 map_07, map_08, map_03) - druga muzyka spoza naszej kontroli albo psai podnoszone przez gre/mod.
+- Workflow wf_9cd7649b-016 (naprawa-165-dwie-muzyki): 3 sledztwa (silnik/psai, inne mody, nasz kod) -> diagnoza -> poprawka 165b w zb\n165 + linia kontrolna co 30 s
+  + test sprawdz_logi (jedno zrodlo) -> recenzja -> fix. Potem: scalic n165 do n161, autotest, odsluch Jeffa (jego ucho rozstrzyga), dopiero wtedy WGRANIE 126.
+
 ## DOPISEK 26.10 ok. 20:05 CET - 164 + 165 scalone do n161; AUTOTEST 126a W TOKU (muzyka bitwy i mapy)
 - 10 utworow mapy nagrane (zostalo ok. 9 tys. kredytow realnie; licznik z opoznieniem 13.5 tys.), wyslane Jeffowi. Przerobione bitwa_v2.py --prefiks map -> 40 ogg OK.
 - 164 recheck 7fe8c6d0 (motyw ROT stop 50 ms), 165 e96eb615..bc0010c1 + pliki 16f37999. Scalone do n161: 604cb213 (CHANGELOG: wpisy 165, 164 nad 159).
