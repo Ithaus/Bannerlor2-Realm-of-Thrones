@@ -48,6 +48,9 @@ namespace Armoury
     ///  - pomiar DropOnWeaponChange (sztandar ma flage - SandBoxCore horses_and_others.xml, HeldInOffHand, slot ExtraWeaponSlot): nowy chorazy (podniosl w misji),
     ///    ktory upuscil sztandar zywy i nie w panice = "upuszczony ponownie przy zmianie broni" (linia z bronia w rekach). Gra czysci sloty 1-3 tylko chorazym
     ///    z rozstawienia (CreateBannerEquipmentForAgent) - tego NIE powtarzamy (decyzja Jeffa po pomiarze).
+    /// Recenzja 158: biegacz w odwrot rannego 143 zdjety juz w RoutKeeper.Withdraw (BeforeWithdraw); po pierwszym takim ponownym upuszczeniu szyk sztandaru
+    /// do konca misji bez biegaczy (limit na szyk, nie na czlowieka), a ex-chorazy dostaje z powrotem automatyczny wybor celu (RBM go nie przywraca);
+    /// "podniosl inny", gdy ktos zaczal podnosic w trakcie biegu; srednia predkosc osobno dla podniesionych i porzuconych po 8 s.
     /// Bez Harmony. Linie: "Choragwie (154)" (wspolny limit, role biegacz / podniosl / upuscil) i "Sztandar (158)" raz na misje. Wyjatek na upadek liczony,
     /// po RunMaxFails upadek wypada - bez globalnego wylacznika.
     /// </summary>
@@ -64,6 +67,20 @@ namespace Armoury
             if (f == null) return;
             try { BattleSound.OnBannerRunner(f, company, pos); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnBannerRunner", e); }
         }
+
+        /// <summary>Recenzja 158: biezaca misja biegaczy (glowny watek; ustawiana w RunStart, zdejmowana w RunUnsub) - tylko dla BeforeWithdraw.</summary>
+        internal static BannerCompaniesMission RunLive;
+
+        /// <summary>Recenzja 158: RoutKeeper.Withdraw (143, glowny watek), PRZED pierwszym ruchem 143 - biegacz po sztandar zdjety TERAZ (claim, UseObjectMoving
+        /// i nasza pozycja NoAttack: StopUsingGameObject(false)); wzor HeroCaution / HorsePursuit.BeforeWithdraw. Dotad zdejmowal go dopiero Step (co 0.25 s)
+        /// tym samym StopUsingGameObject, a Agent.StopUsingGameObjectAux (dekompilacja 1.4.8) wola DisableScriptedMovement bezwarunkowo - kasowal postoj 143
+        /// postawiony w Arrive (143 przywracal go dopiero po RefreshEvery 4 s), a przy natywnym odwrocie nasza pozycja NoAttack trzymala rannego do 0.25 s.</summary>
+        internal static void BeforeWithdraw(Agent a)
+        {
+            var k = RunLive;
+            if (k == null || a == null || !ReferenceEquals(k.Mission, a.Mission)) return;
+            k.RunnerWithdraw(a);
+        }
     }
 
     internal sealed partial class BannerCompaniesMission
@@ -78,7 +95,7 @@ namespace Armoury
             public Vec3 Pos;
             public float At, RunAt, LastBetter, Best, StartDist, Dist;
             public int Sent, Uses, Fails, LastWhy = -1;
-            public bool Cried, GameSeen, Closed;
+            public bool Cried, GameSeen, Closed, UserCut;   // UserCut (recenzja 158): ostatni bieg przerwal ktos inny, ktory zaczal podnosic (gracz / gra)
             public readonly HashSet<Agent> Tried = new HashSet<Agent>();
         }
 
@@ -91,15 +108,19 @@ namespace Armoury
             "rozkaz odwrotu", "kompania zlamana", "wrogowie przy sztandarze", "ruch zdjety cudza reka", "podnoszenie przerwane", "sztandar zniknal",
             "podniosl inny", "padl / omdlal", "koniec misji", "potkniecia" };
         // dlaczego upadek skonczyl sie bez biegacza (ostatni powod)
-        private const int SNotYet = 0, SOff = 1, SPlayer = 2, SBroken = 3, SRetreat = 4, SGame = 5, SCrowd = 6, SNoOne = 7, SLimit = 8, SEmpty = 9, SFail = 10, NS = 11;
+        private const int SNotYet = 0, SOff = 1, SPlayer = 2, SBroken = 3, SRetreat = 4, SGame = 5, SCrowd = 6, SNoOne = 7, SLimit = 8, SEmpty = 9, SFail = 10,
+                          SRedrop = 11, NS = 12;
         private static readonly string[] SNames = { "zanim szukano (ponizej 1 s / przed rozstawieniem)", "klucz zasieg 0", "szyk gracza (klucz NIE)", "kompania zlamana",
-            "rozkaz odwrotu", "gra juz biegnie / ktos podnosi", "wrogowie przy sztandarze", "nikogo w zasiegu", "limit prob", "szyk pusty", "potkniecia" };
+            "rozkaz odwrotu", "gra juz biegnie / ktos podnosi", "wrogowie przy sztandarze", "nikogo w zasiegu", "limit prob", "szyk pusty", "potkniecia",
+            "po ponownym upuszczeniu w szyku" };
 
         private readonly List<Fallen> _fallen = new List<Fallen>();
         private readonly Dictionary<Agent, Fallen> _runners = new Dictionary<Agent, Fallen>();
         private readonly Dictionary<Agent, float> _picked = new Dictionary<Agent, float>();   // podniosl sztandar szyku w tej misji (czas) - pomiar ponownego upuszczenia
         private readonly HashSet<Agent> _pickedByRunner = new HashSet<Agent>();
         private readonly HashSet<Agent> _noRun = new HashSet<Agent>();         // upuscil podniesiony sztandar zywy (zmiana broni) - nie biega juz w tej misji (bez petli)
+        // recenzja 158: szyk, w ktorym nowy chorazy upuscil sztandar zywy - bez biegaczy do konca misji (_noRun nie ograniczal lancucha roznych ludzi)
+        private readonly HashSet<Formation> _noRunForm = new HashSet<Formation>();
         private readonly object _runQLock = new object();
         private readonly List<ItemEv> _runQ = new List<ItemEv>();      // pod _runQLock (dowolny watek)
         private readonly List<ItemEv> _runQ2 = new List<ItemEv>();     // glowny watek
@@ -111,7 +132,8 @@ namespace Armoury
         // liczniki misji (linia "Sztandar (158)"); _rEvFail - watki zdarzen (Interlocked), _rQueueCut - pod _runQLock
         private int _rDrops, _rNoForm, _rSent, _rFallsRun, _rCries, _rRaised, _rGame, _rGamePlayer, _rGameRun, _rGameSeen, _rVanished, _rLeft;
         private int _rRedrop, _rRedropRunner, _rRedropPanic, _rPickOther, _rStumbles, _rSpeedN, _rQueueCut, _rEvFail;
-        private float _rRaisedFall, _rRaisedRun, _rSpeedSum;
+        private int _rSpeedTN, _rTargetBack;
+        private float _rRaisedFall, _rRaisedRun, _rSpeedSum, _rSpeedTSum;   // predkosc: _rSpeed* - podniesieni, _rSpeedT* - porzuceni po 8 s (recenzja 158)
         private readonly int[] _rGiveUp = new int[NG], _rNoRunner = new int[NS];
 
         // ------------------------------------------------------------ zdarzenia (dowolny watek - tylko kolejka)
@@ -124,10 +146,12 @@ namespace Armoury
             m.OnItemDrop += _onDrop;
             m.OnItemPickUp += _onPick;
             _runSub = true;
+            BannerCompanies.RunLive = this;   // recenzja 158: BeforeWithdraw (143)
         }
 
         private void RunUnsub()
         {
+            if (ReferenceEquals(BannerCompanies.RunLive, this)) BannerCompanies.RunLive = null;
             if (!_runSub) return;
             _runSub = false;
             try
@@ -250,6 +274,17 @@ namespace Armoury
                         _rRedrop++;
                         if (runner) _rRedropRunner++;
                         _noRun.Add(a);   // ten sam czlowiek stoi najblizej - bez tego podnosilby i upuszczal w kolko (kazdy upadek to wstrzas i rzut 154)
+                        // recenzja 158: limit na szyk, nie na czlowieka - nastepny biegacz z tym samym ekwipunkiem podnioslby i upuscil znowu, a kazde
+                        // upuszczenie to w P3 nowy upadek (wstrzas -S, rzut, komunikat) z nowym limitem RunMaxTries; od teraz do tego szyku nikt nie biega
+                        if (f != null) _noRunForm.Add(f);
+                        // recenzja 158: RBM (AgentAi OnTick, chorazy bez wroga w 5 m) wylacza automatyczny wybor celu i celuje w pierwszego z szyku, a wlacza
+                        // go z powrotem tylko u chorazego z wrogiem blisko; po upuszczeniu RBM go juz nie rusza (IsBannerBearer = sztandar w rece), gra tez nie
+                        // (SetAutomaticTargetSelection wola tylko RBM i nasz 148). Wzor HorsePursuit przy zwolnieniu jezdzca; jezdziec w poscigu 148 - cel jego.
+                        if (a.IsAIControlled && !HorsePursuit.RidingAnyThread(a))
+                        {
+                            try { a.SetAutomaticTargetSelection(true); a.InvalidateTargetAgent(); _rTargetBack++; }
+                            catch (Exception e) { _rStumbles++; BannerCompanies.Stumble("BannerCompaniesMission.CelPoUpuszczeniu", e); }
+                        }
                         Company rc;
                         if (!_mem.TryGetValue(a, out rc) || (f != null && !ReferenceEquals(rc.F, f))) rc = null;
                         StdLine(rc, "UPUSZCZONY PONOWNIE (158: zywy, nie w panice - zmiana broni?) po " + (now - pickedAt).ToString("0.0", CultureInfo.InvariantCulture)
@@ -282,7 +317,7 @@ namespace Armoury
                 _rRaisedFall += now - fl.At;
                 _rRaisedRun += now - fl.RunAt;
                 _pickedByRunner.Add(a);
-                NoteSpeed(fl, a, now);
+                NoteSpeed(fl, a, now, false);
                 _runners.Remove(a);
                 fl.Runner = null;
                 Line(fl, "podniesiony przez biegacza (158) po " + (now - fl.At).ToString("0.0", inv) + " s od upadku (" + (now - fl.RunAt).ToString("0.0", inv) + " s biegu, proba "
@@ -293,7 +328,9 @@ namespace Armoury
             _rGame++;
             bool player = a != null && a.IsMainAgent;
             if (player) _rGamePlayer++;
-            if (fl.Runner != null) { _rGameRun++; GiveUp(fl, GOther, now, true); }
+            // UserCut (recenzja 158): Step zobaczyl cudzego podnoszacego wczesniej niz to zdarzenie (OnUse zdejmuje claim od razu, animacja trwa dluzej)
+            if (fl.Runner != null || fl.UserCut) _rGameRun++;
+            if (fl.Runner != null) GiveUp(fl, GOther, now, true);
             Line(fl, "podniesiony przez " + (player ? "gracza" : "gre") + " (158: nie nasz biegacz) po " + (now - fl.At).ToString("0.0", inv) + " s od upadku", a, "podniosl");
             Close(fl);
         }
@@ -323,6 +360,7 @@ namespace Armoury
                 if (c == null || !c.BannerPickupYourFormations) { fl.LastWhy = SPlayer; return; }
                 if (range > BannerCompanies.RunPlayerRange) range = BannerCompanies.RunPlayerRange;
             }
+            if (_noRunForm.Contains(f)) { fl.LastWhy = SRedrop; return; }   // recenzja 158: nowy chorazy tego szyku upuscil juz sztandar zywy
             if (fl.Sent >= BannerCompanies.RunMaxTries) { fl.LastWhy = SLimit; return; }
             try { fl.Pos = sie.GameEntity.GlobalPosition; } catch { }
             if (Crowded(fl.Pos, f.Team, m)) { fl.LastWhy = SCrowd; return; }
@@ -367,6 +405,7 @@ namespace Armoury
             fl.StartDist = d;
             fl.Dist = d;
             fl.Uses = 0;
+            fl.UserCut = false;
             fl.Sent++;
             fl.Tried.Add(a);
             _runners[a] = fl;
@@ -392,13 +431,18 @@ namespace Armoury
             if (a.IsUsingGameObject && ReferenceEquals(a.CurrentlyUsedGameObject, sie)) return;   // animacja podnoszenia - koniec da OnItemPickUp albo przerwanie
             // juz trzyma sztandar (przy wyslaniu Banner == null): podniesienie skonczylo sie w tej klatce na watku roboczym, a zdarzenie czeka w kolejce
             if (a.Banner != null) return;
-            // odwrot rannego 143 przed panika: jego natywny Agent.Retreat tez ustawia IsRunningAway - powod "rana", nie "panika"
-            if (Withdrawing(a)) { GiveUp(fl, GWound, now, true); return; }
+            // odwrot rannego 143 przed panika: jego natywny Agent.Retreat tez ustawia IsRunningAway - powod "rana", nie "panika". Recenzja 158: zwykle zdjety juz
+            // w RoutKeeper.Withdraw (BeforeWithdraw, przed pierwszym ruchem 143); tu tylko zapas po wyjatku - bez stop: StopUsingGameObject wola
+            // DisableScriptedMovement i zdjalby postoj 143 (Arrive), wiec tylko MoveToClear (claim i UseObjectMoving)
+            if (Withdrawing(a)) { GiveUp(fl, GWound, now, false); return; }
             if (SurvivalMode.InPanic(a) || a.IsRunningAway) { GiveUp(fl, GPanic, now, true); return; }
             if (HorsePursuit.RidingAnyThread(a)) { GiveUp(fl, GPursuit, now, false); return; }
             if (!ReferenceEquals(a.Formation, fl.F)) { GiveUp(fl, GForm, now, true); return; }
             // claim i stan AI (flagi GoToPosition NIE sprawdzamy - czy silnik zdejmuje ja po dojsciu, nie wiadomo z kodu zarzadzanego; ruch zdjety cudza reka
             // bez zmiany szyku konczy brak postepu 2 s)
+            // recenzja 158: ktos inny zaczal podnosic (gracz albo gra) - UsableMissionObject.OnUse zdjal nam claim (StopUsingGameObject ruchomego) od razu,
+            // a animacja trwa dluzej niz takt; to "podniosl inny", nie "ruch zdjety cudza reka" (ruchu i pozycji juz nie ma - bez stop)
+            if (sie.HasUser && !ReferenceEquals(sie.UserAgent, a)) { fl.UserCut = true; GiveUp(fl, GOther, now, false); return; }
             bool mine = ReferenceEquals(sie.MovingAgent, a) && Moving(a, sie);
             if (!mine) { GiveUp(fl, fl.Uses > 0 ? GUseFail : GLost, now, true); return; }
             if (Retreating(fl.F)) { GiveUp(fl, GRetreat, now, true); return; }
@@ -439,7 +483,7 @@ namespace Armoury
             fl.Runner = null;
             if (a != null) _runners.Remove(a);
             _rGiveUp[why]++;
-            NoteSpeed(fl, a, now);
+            if (why == GTime) NoteSpeed(fl, a, now, true);   // recenzja 158: tempo biegu mowia tylko podniesienia i limit 8 s (inne powody - tlok, przeszkoda)
             if (a != null && a.IsActive())
             {
                 try
@@ -466,6 +510,17 @@ namespace Armoury
                 try { GiveUp(fl, why, now, true); }
                 catch (Exception e) { fl.Runner = null; _rStumbles++; BannerCompanies.Stumble("BannerCompaniesMission.BiegaczKoniec", e); }
             }
+        }
+
+        /// <summary>Recenzja 158 (BannerCompanies.BeforeWithdraw, RoutKeeper.Withdraw, glowny watek): biegacz wchodzi w odwrot rannego 143 - rezygnacja "rana (143)"
+        /// ze StopUsingGameObject(false) TERAZ, zanim 143 cokolwiek wysle (natywny Retreat albo postoj). Juz trzyma sztandar - jak Step: zdarzenie w kolejce.</summary>
+        internal void RunnerWithdraw(Agent a)
+        {
+            Fallen fl;
+            if (!_runners.TryGetValue(a, out fl) || fl == null || fl.Closed || !ReferenceEquals(fl.Runner, a)) return;
+            if (a.Banner != null) return;
+            var m = Mission;
+            GiveUp(fl, GWound, m != null ? m.CurrentTime : 0f, true);
         }
 
         private void Close(Fallen fl)
@@ -537,7 +592,8 @@ namespace Armoury
             catch { return "?"; }
         }
 
-        private void NoteSpeed(Fallen fl, Agent a, float now)
+        /// <summary>Srednia predkosc biegu (pokonany dystans / czas): timeout NIE - podniesieni, TAK - porzuceni po limicie 8 s (osobno, recenzja 158).</summary>
+        private void NoteSpeed(Fallen fl, Agent a, float now, bool timeout)
         {
             float t = now - fl.RunAt;
             if (a == null || t < 0.5f) return;
@@ -545,8 +601,8 @@ namespace Armoury
             try { if (a.IsActive()) d = a.Position.AsVec2.Distance(fl.Pos.AsVec2); } catch { }
             float cov = fl.StartDist - d;
             if (cov < 0f) cov = 0f;
-            _rSpeedSum += cov / t;
-            _rSpeedN++;
+            if (timeout) { _rSpeedTSum += cov / t; _rSpeedTN++; }
+            else { _rSpeedSum += cov / t; _rSpeedN++; }
         }
 
         private void Line(Fallen fl, string what, Agent who, string role)
@@ -575,7 +631,7 @@ namespace Armoury
 
         private void RunClear()
         {
-            _fallen.Clear(); _runners.Clear(); _picked.Clear(); _pickedByRunner.Clear(); _noRun.Clear(); _near.Clear(); _near2.Clear(); _runQ2.Clear();
+            _fallen.Clear(); _runners.Clear(); _picked.Clear(); _pickedByRunner.Clear(); _noRun.Clear(); _noRunForm.Clear(); _near.Clear(); _near2.Clear(); _runQ2.Clear();
             lock (_runQLock) _runQ.Clear();
         }
 
@@ -608,13 +664,15 @@ namespace Armoury
               .Append(" | biegaczy wyslanych ").Append(_rSent).Append(" (do upadkow ").Append(_rFallsRun).Append(", okrzyk przy wyslaniu ").Append(_rCries).Append(')')
               .Append(" | podniesionych ").Append(_rRaised).Append(" (sr. czas ").Append(_rRaised > 0 ? (_rRaisedFall / _rRaised).ToString("0.0", inv) : "-")
               .Append(" s od upadku, ").Append(_rRaised > 0 ? (_rRaisedRun / _rRaised).ToString("0.0", inv) : "-").Append(" s biegu; sr. predkosc biegu ")
-              .Append(_rSpeedN > 0 ? (_rSpeedSum / _rSpeedN).ToString("0.00", inv) : "-").Append(" m/s z ").Append(_rSpeedN).Append(')')
+              .Append(_rSpeedN > 0 ? (_rSpeedSum / _rSpeedN).ToString("0.00", inv) : "-").Append(" m/s z ").Append(_rSpeedN)
+              .Append(", porzuconych po 8 s ").Append(_rSpeedTN > 0 ? (_rSpeedTSum / _rSpeedTN).ToString("0.00", inv) : "-").Append(" m/s z ").Append(_rSpeedTN).Append(')')
               .Append(" | porzuconych ").Append(gave).Append(" (").Append(Reasons(_rGiveUp, GNames)).Append(')')
               .Append(" | przejetych przez gre ").Append(_rGame).Append(" (gracz ").Append(_rGamePlayer).Append(", w trakcie naszego biegu ").Append(_rGameRun)
               .Append("; gra biegla przed nami ").Append(_rGameSeen).Append(')')
               .Append(" | bez biegacza ").Append(none).Append(" (").Append(Reasons(_rNoRunner, SNames)).Append(')')
               .Append(" | upuszczonych ponownie przy zmianie broni ").Append(_rRedrop).Append(" (zywy, nie w panice; z tego po biegu ").Append(_rRedropRunner)
-              .Append("; nowy chorazy w panice ").Append(_rRedropPanic).Append(')')
+              .Append("; nowy chorazy w panice ").Append(_rRedropPanic).Append("; szykow odtad bez biegaczy ").Append(_noRunForm.Count)
+              .Append("; cel automatyczny przywrocony (RBM) ").Append(_rTargetBack).Append(')')
               .Append(" | podniesienia spoza listy ").Append(_rPickOther)
               .Append(" | kolejka: pominiete ").Append(_rQueueCut).Append(", bledy zdarzen ").Append(Volatile.Read(ref _rEvFail))
               .Append(" | potkniecia ").Append(_rStumbles).Append('.');
