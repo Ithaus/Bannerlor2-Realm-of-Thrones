@@ -1,0 +1,41 @@
+poziom	plik	wzmocnienie_dB	I_LUFS	TP_dBTP	LRA_LU	dlugosc_s	wejscie	wyjscie	zrodlo	zrodlo_md5	md5
+17	lufs17/map_01_krolewski_trakt.ogg	-3.20	-17.0	-4.1	11.5	125.05	jest	jest	map_01_krolewski_trakt.mp3	f0c93a637ccdd638226f171923839dfd	898a230b98cd6ff2900d52a4d97fda01
+20	lufs20/map_01_krolewski_trakt.ogg	-6.20	-20.0	-7.0	11.6	125.05	jest	jest	map_01_krolewski_trakt.mp3	f0c93a637ccdd638226f171923839dfd	585d2e7d255cc080ccdbf7dfe360dcbd
+23	lufs23/map_01_krolewski_trakt.ogg	-9.20	-23.0	-10.0	11.5	125.05	jest	jest	map_01_krolewski_trakt.mp3	f0c93a637ccdd638226f171923839dfd	f3120de6f21f592b8583a6b9561b126d
+26	lufs26/map_01_krolewski_trakt.ogg	-12.20	-26.0	-13.0	11.5	125.05	jest	jest	map_01_krolewski_trakt.mp3	f0c93a637ccdd638226f171923839dfd	50801253f8d5c002feb6237d4598e41a
+17	lufs17/map_02_polnoc.ogg	-2.80	-17.0	-3.9	9.2	125.05	jest	jest	map_02_polnoc.mp3	1bfbf9edcf56c6999a602744ced8f865	05a4188eed9ba9fde25262c82a5ee987
+20	lufs20/map_02_polnoc.ogg	-5.80	-20.0	-6.8	9.2	125.05	jest	jest	map_02_polnoc.mp3	1bfbf9edcf56c6999a602744ced8f865	19ecd6648e2c835e50cd1ec1060c11b0
+23	lufs23/map_02_polnoc.ogg	-8.80	-23.0	-9.9	9.2	125.05	jest	jest	map_02_polnoc.mp3	1bfbf9edcf56c6999a602744ced8f865	45bb1b8bdfc3852044b6f290462baaed
+26	lufs26/map_02_polnoc.ogg	-11.80	-26.0	-12.8	9.2	125.05	jest	jest	map_02_polnoc.mp3	1bfbf9edcf56c6999a602744ced8f865	b358668cc6ee6f2e92fc9fd307077705
+17	lufs17/map_03_dorzecze.ogg	5.30	-17.0	-1.6	8.6	125.00	jest	jest	map_03_dorzecze.mp3	efefb247047abd78cbe817e938cfaca4	8d76f999005a7069588e8e392132c523
+20	lufs20/map_03_dorzecze.ogg	2.30	-20.0	-4.6	8.6	125.00	jest	jest	map_03_dorzecze.mp3	efefb247047abd78cbe817e938cfaca4	3e61c41b3b5790597c252c32e148907b
+23	lufs23/map_03_dorzecze.ogg	-0.70	-23.0	-7.7	8.6	125.00	jest	jest	map_03_dorzecze.mp3	efefb247047abd78cbe817e938cfaca4	09caa65c1d6508ac1ce2caf97c92e364
+26	lufs26/map_03_dorzecze.ogg	-3.70	-26.0	-10.6	8.6	125.00	jest	jest	map_03_dorzecze.mp3	efefb247047abd78cbe817e938cfaca4	d53db4e8d8ab90b265c9c32374e01c5e
+17	lufs17/map_04_dwor.ogg	2.60	-17.0	-5.5	2.5	125.05	jest	jest	map_04_dwor.mp3	ebc01b24bc2d37dc8713b9cc474b8a33	4a338f0412b7d5c1e9569a981d160edd
+20	lufs20/map_04_dwor.ogg	-0.40	-20.0	-8.7	2.5	125.05	jest	jest	map_04_dwor.mp3	ebc01b24bc2d37dc8713b9cc474b8a33	695fca51b275f9d0f34cf484e7996624
+23	lufs23/map_04_dwor.ogg	-3.40	-23.0	-11.6	2.5	125.05	jest	jest	map_04_dwor.mp3	ebc01b24bc2d37dc8713b9cc474b8a33	e3266348777517beb9ff729d61d3286e
+26	lufs26/map_04_dwor.ogg	-6.40	-26.0	-14.6	2.5	125.05	jest	jest	map_04_dwor.mp3	ebc01b24bc2d37dc8713b9cc474b8a33	c9c161fb7c62a55d0c295ff4cc8bec31
+17	lufs17/map_05_ognisko.ogg	-2.90	-17.0	-4.2	2.4	125.05	jest	jest	map_05_ognisko.mp3	c167af727d4fa28787ba2b073613570d	77fa809d46ab22ecb664e92ec3f5303b
+20	lufs20/map_05_ognisko.ogg	-5.90	-20.0	-7.2	2.4	125.05	jest	jest	map_05_ognisko.mp3	c167af727d4fa28787ba2b073613570d	b07b01821ff9e84996168c07cec4e793
+23	lufs23/map_05_ognisko.ogg	-8.90	-23.0	-10.1	2.4	125.05	jest	jest	map_05_ognisko.mp3	c167af727d4fa28787ba2b073613570d	2f759af9ed39b7618a1111d565f5132e
+26	lufs26/map_05_ognisko.ogg	-11.90	-26.0	-13.0	2.4	125.05	jest	jest	map_05_ognisko.mp3	c167af727d4fa28787ba2b073613570d	36d8043d46774fd7b2ad133d2e4ab075
+17	lufs17/map_06_starzy_bogowie.ogg	-2.50	-17.0	-3.8	7.5	125.05	jest	jest	map_06_starzy_bogowie.mp3	d9355c81d0efb1afbe2b088d2c8f838d	00485e195acd94ba9235af448890e431
+20	lufs20/map_06_starzy_bogowie.ogg	-5.50	-20.0	-7.0	7.5	125.05	jest	jest	map_06_starzy_bogowie.mp3	d9355c81d0efb1afbe2b088d2c8f838d	1eaa0018c2c1757026696711248c98fe
+23	lufs23/map_06_starzy_bogowie.ogg	-8.50	-23.0	-9.9	7.5	125.05	jest	jest	map_06_starzy_bogowie.mp3	d9355c81d0efb1afbe2b088d2c8f838d	6b1c44d9e4668484832e77448764babd
+26	lufs26/map_06_starzy_bogowie.ogg	-11.50	-26.0	-13.0	7.5	125.05	jest	jest	map_06_starzy_bogowie.mp3	d9355c81d0efb1afbe2b088d2c8f838d	d12aa84fe2f3da3dd1c746207fe292b1
+17	lufs17/map_07_waskie_morze.ogg	-3.10	-17.0	-4.4	4.2	125.05	wypalone 4 s	jest	map_07_waskie_morze.mp3	9df9cfd2d9018e014b7b2122a4b3f59d	e0799ac0589a9459afefe9ec88a76886
+20	lufs20/map_07_waskie_morze.ogg	-6.10	-20.0	-7.3	4.2	125.05	wypalone 4 s	jest	map_07_waskie_morze.mp3	9df9cfd2d9018e014b7b2122a4b3f59d	d70f36f20d176c3d31bf4eb317382a2d
+23	lufs23/map_07_waskie_morze.ogg	-9.10	-23.0	-10.3	4.2	125.05	wypalone 4 s	jest	map_07_waskie_morze.mp3	9df9cfd2d9018e014b7b2122a4b3f59d	82a8d3e05a36e0bd0f6bd542772a8e30
+26	lufs26/map_07_waskie_morze.ogg	-12.10	-26.0	-13.4	4.2	125.05	wypalone 4 s	jest	map_07_waskie_morze.mp3	9df9cfd2d9018e014b7b2122a4b3f59d	9646db474fc4eac95f6c0a1721b77e9f
+17	lufs17/map_08_poludniowe_ziemie.ogg	-5.00	-17.0	-5.9	11.7	119.98	jest	jest	map_08_poludniowe_ziemie.mp3	fb4d2f870ced0c659dec0466c12fdfa2	209edd0b34935ab52a31c25f0008d9bf
+20	lufs20/map_08_poludniowe_ziemie.ogg	-8.00	-20.0	-8.9	11.7	119.98	jest	jest	map_08_poludniowe_ziemie.mp3	fb4d2f870ced0c659dec0466c12fdfa2	854232a45c414b943fa226e17171dad5
+23	lufs23/map_08_poludniowe_ziemie.ogg	-11.00	-22.9	-11.9	11.7	119.98	jest	jest	map_08_poludniowe_ziemie.mp3	fb4d2f870ced0c659dec0466c12fdfa2	20416245195a0fea52bf13eb81f2a080
+26	lufs26/map_08_poludniowe_ziemie.ogg	-14.00	-25.9	-14.9	11.7	119.98	jest	jest	map_08_poludniowe_ziemie.mp3	fb4d2f870ced0c659dec0466c12fdfa2	3fddf59ee855e7a81bb6e74c0e6f1742
+17	lufs17/map_09_dluga_zima.ogg	-3.00	-17.0	-4.3	5.7	125.05	jest	jest	map_09_dluga_zima.mp3	17dc4d28f45da3857b5c35dfde3a4732	b9e50f994a71090c38016cac6eaa7d73
+20	lufs20/map_09_dluga_zima.ogg	-6.00	-20.0	-7.3	5.7	125.05	jest	jest	map_09_dluga_zima.mp3	17dc4d28f45da3857b5c35dfde3a4732	562278e1475b2befb7c955e58674c8db
+23	lufs23/map_09_dluga_zima.ogg	-9.00	-23.0	-10.4	5.7	125.05	jest	jest	map_09_dluga_zima.mp3	17dc4d28f45da3857b5c35dfde3a4732	d4fb8784375a51cb299e7b3a9a03166b
+26	lufs26/map_09_dluga_zima.ogg	-12.00	-26.0	-13.3	5.8	125.05	jest	jest	map_09_dluga_zima.mp3	17dc4d28f45da3857b5c35dfde3a4732	4230c94b9674fb8552b987ff55c2b150
+17	lufs17/map_10_wsie_i_pola.ogg	-3.70	-16.9	-5.1	8.0	125.05	jest	jest	map_10_wsie_i_pola.mp3	f15015651c2ad0a9896fe7adac087dd3	d663bd5a4c0d4b146800b50d9dc40d06
+20	lufs20/map_10_wsie_i_pola.ogg	-6.70	-19.9	-8.1	8.0	125.05	jest	jest	map_10_wsie_i_pola.mp3	f15015651c2ad0a9896fe7adac087dd3	4bb3f1fbc2a512038e47a70d29ac8d7d
+23	lufs23/map_10_wsie_i_pola.ogg	-9.70	-22.9	-11.1	8.0	125.05	jest	jest	map_10_wsie_i_pola.mp3	f15015651c2ad0a9896fe7adac087dd3	fe04492ace5f5ee26200a14e01639548
+26	lufs26/map_10_wsie_i_pola.ogg	-12.70	-25.9	-14.1	8.0	125.05	jest	jest	map_10_wsie_i_pola.mp3	f15015651c2ad0a9896fe7adac087dd3	b8979161ce8b7d902d273717bf8a9f93
