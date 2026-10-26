@@ -36,8 +36,10 @@ namespace Armoury
     internal static partial class BattleSound
     {
         private const float SgEvalEvery = 1f, SgNearWall = 30f, SgFightNear = 15f, SgFightWall = 40f, SgFightHold = 20f, SgSpkRange = 150f, SgStale = 4f;
-        private const float ShoutMin = 30f, ShoutMax = 280f, RoarMin = 25f, RoarMax = 400f, BreachMin = 30f, BreachMax = 500f, CrowdMin = 20f, CrowdMax = 300f;
-        private const float RamMin = 15f, RamMax = 200f, OilMin = 15f, OilMax = 200f, SdMin = 25f, SdMax = 450f, SdBack = 30f, RamHitHold = 3f;
+        // 154: okrzyk murow 4/200 m (dotad 30/280), beben oblezenia 10/250 m (dotad 25/450); ryk, wylom, tlum, taran i smola - bez zmian (zrodlo = tlum
+        // albo machina, do strojenia z Jeffem po odsluchu)
+        private const float ShoutMin = 4f, ShoutMax = 200f, RoarMin = 25f, RoarMax = 400f, BreachMin = 30f, BreachMax = 500f, CrowdMin = 20f, CrowdMax = 300f;
+        private const float RamMin = 15f, RamMax = 200f, OilMin = 15f, OilMax = 200f, SdMin = 10f, SdMax = 250f, SdBack = 30f, RamHitHold = 3f;
         private const int MinMenSdrum = 20, MinMenSgFight = 5, SgQMax = 16, SgFxMax = 8;
 
         // obiekty

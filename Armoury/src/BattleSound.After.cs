@@ -13,11 +13,12 @@ namespace Armoury
     /// noc 25.10 P2: PO BITWIE (Jeff 01:05-01:06: "jeki rannych po bitwie i niech beda to rozne glosy", "odglosy ptakow i krukow po bitwie").
     ///  - Ciala: OnRemoved (zgon / nokaut) - miejsce do kolejki (najwyzej 256 na takt, lista najwyzej 300 ostatnich).
     ///  - Po bitwie = Mission.MissionEnded przy trwajacej misji (gracz chodzi po polu). Jeki (BattleWoundedAfter): od 4 s po koncu, przy cialach NIEPRZYTOMNYCH
-    ///    do 60 m od sluchacza, kazde cialo najwyzej 2 razy, glos (rola z manifestu) inny niz w trzech ostatnich jekach, najwyzej 2 naraz; odstep 3-6 s rosnie
-    ///    z czasem (x (1 + t/60)) - cichna; po 300 s koniec. Klipy jk (3D 5-60 m) - meskie glosy: kobiety i Inni / umarli bez jeku (recenzja 25.10; Mute w OnRemoved).
+    ///    do 40 m x glosnosc od sluchacza (154; dotad 60 m), kazde cialo najwyzej 2 razy, glos (rola z manifestu) inny niz w trzech ostatnich jekach, najwyzej 2 naraz;
+    ///    odstep 3-6 s rosnie z czasem (x (1 + t/60)) - cichna; po 300 s koniec. Klipy jk (3D 2-40 m, 154; dotad 5-60) - meskie glosy: kobiety i Inni / umarli bez jeku
+    ///    (recenzja 25.10; Mute w OnRemoved).
     ///  - Ptaki (BattleRavensAfter): przed bitwa raz - ptaki wedlug terenu (las - ptaki lasu, brzeg - mewy, reszta - dalekie wrony) ok. 25 m od sluchacza;
     ///    po bitwie od 8 s - kruki zlatuja sie nad ciala blisko sluchacza (do 120 m; skrzydla / wrony, potem co 15-30 s kruk, wrony, klotnia), po 75 s raz
-    ///    "ptaki wracaja" (las albo dalekie wrony); najwyzej 12 na misje. Klipy pt (3D 10-150 m).
+    ///    "ptaki wracaja" (las albo dalekie wrony); najwyzej 12 na misje. Klipy pt (3D 8-120 m, 154; dotad 10-150).
     ///  - Ranny kon (BattleHorseSounds): kon pada w bitwie do 60 m od sluchacza - kwik (ko_wounded), najwyzej raz na 12 s.
     /// </summary>
     internal static partial class BattleSound
@@ -25,7 +26,9 @@ namespace Armoury
         private struct Body { internal Vec3 Pos; internal bool Unconscious, Mount, Mute; internal float At; internal int Moans; }   // Mute: kobieta albo Inni / umarli - bez jeku
 
         private const int BodiesMax = 300, BirdsMax = 12;
-        private const float MoanRange = 60f, MoanMin = 5f, MoanMax = 60f, MoanEndSec = 300f, BirdMin = 10f, BirdMax = 150f, BirdNear = 120f;
+        // 154 (Jeff 25.10: "odjechalem dalej nikogo nie ma i slysze rannego"): jek 2/40 m (dotad 5/60) i tylko przy ciele do MoanMax x glosnosc od sluchacza
+        // (dotad 60 m stale - przy max 40 jek z 40-60 m bylby nieslyszalny albo, gdy silnik nie przyjmie naszego max, slyszany z daleka); ptaki 8/120 (dotad 10/150)
+        private const float MoanMin = 2f, MoanMax = 40f, MoanEndSec = 300f, BirdMin = 8f, BirdMax = 120f, BirdNear = 120f;
 
         private static readonly List<Body> _bodyQ = new List<Body>();
         private static readonly List<Body> _bodies = new List<Body>();
@@ -63,7 +66,7 @@ namespace Armoury
                     if (c.BattleHorseSounds && !m.MissionEnded && _horseHurt.Ready(12f) && LisDist(b.Pos) <= 60f)
                     {
                         var hc = Pick("ko", "wounded");
-                        if (hc != null && Play(m, hc, GAmb, b.Pos + new Vec3(0f, 0f, 1f), 10f, 120f, true, null, null, "ranny kon") != null) { _horseHurt.Hit(); _cHorseHurt++; }
+                        if (hc != null && Play(m, hc, GAmb, b.Pos + new Vec3(0f, 0f, 1f), HorseMin, HorseMax, true, null, null, "ranny kon") != null) { _horseHurt.Hit(); _cHorseHurt++; }
                     }
                     continue;
                 }
@@ -123,12 +126,13 @@ namespace Armoury
             int live = 0;
             for (int i = 0; i < _live.Count; i++) if (_live[i].Tag == "jek") live++;
             if (live >= 2) return;
-            // cialo nieprzytomne blisko sluchacza, losowe z najwyzej 6 najblizszych
+            // cialo nieprzytomne blisko sluchacza (do zasiegu jeku - 154), losowe z najwyzej 6 najblizszych
+            float range = MoanMax * LoudScale(Settings.Current);
             int pick = -1, seen = 0;
             for (int i = _bodies.Count - 1; i >= 0; i--)
             {
                 var b = _bodies[i];
-                if (!b.Unconscious || b.Mute || b.Moans >= 2 || LisDist(b.Pos) > MoanRange) continue;
+                if (!b.Unconscious || b.Mute || b.Moans >= 2 || LisDist(b.Pos) > range) continue;
                 seen++;
                 if (_rng.Next(seen) == 0) pick = i;
                 if (seen >= 6) break;
