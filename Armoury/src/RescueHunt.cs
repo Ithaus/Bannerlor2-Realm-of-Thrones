@@ -884,6 +884,8 @@ namespace Armoury
                 if (ArmsFirst.CapTripActive(mp)) { skip++; trip++; _dSkipTrip++; continue; }
                 var q = mp.GetPosition2D;
                 if (now < NewsAt(t, q)) { notYet++; continue; }
+                // recenzja 222: o lochu kazdy dowiaduje sie wiescia z siedziby (DungeonH + kruk), nie razem z siedziba - kto jeszcze nie wie, nie oblega
+                if (x != null && now < t.DungeonH + FromSeat(t.Seat, q)) { notYet++; continue; }
                 Vec2 kp; double age = 0;
                 if (x != null) kp = x.GetPosition2D;
                 else
@@ -1011,7 +1013,8 @@ namespace Armoury
                         {
                             bool threat = st.SiegeEvent != null || (st.Party != null && st.Party.MapEvent != null);
                             if (threat && clan != null && st.OwnerClan == clan) ownThreat = true;
-                            relief = !d.WillGatherArmy && st.SiegeEvent != null && st.MapFaction == f;
+                            // recenzja 222: armia odsieczy wladcy OB5 (DefendSettlement + WillGatherArmy, KingArmyEdge) tez jest odsiecza - gra sama takiej opcji nie daje
+                            relief = st.SiegeEvent != null && st.MapFaction == f;
                         }
                     }
                     if (v > top) { top = v; topRelief = relief; }

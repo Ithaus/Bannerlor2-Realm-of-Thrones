@@ -162,7 +162,8 @@ namespace Armoury
             }
             _tHero = null;
             // recenzja 222: przeglad godzinny trafia troche po pelnej godzinie - wiesc ma dojsc przy pierwszym przegladzie po planie, nie "w 1.0 h"
-            bool ok4 = now >= _tPlan - 1e-6 && _hourPrevH < _tPlan;
+            // plan 0 h: przeglad godzinny tej samej chwili szedl przed dzienna proba (pojmanie po nim) - pierwszy przeglad po pojmaniu jest pierwszym po planie
+            bool ok4 = now >= _tPlan - 1e-6 && (_hourPrevH < _tPlan || _hourPrevH <= _tStart + 1e-6);
             TLine("T4", "wiesc doszla po " + F1(now - _tStart) + " h, plan " + F1(_tPlan - _tStart) + " h, poprzedni przeglad " + F2(_hourPrevH - _tStart) + " h", ok4 ? "TAK" : "NIE");
             TestThink(t);
             TestDungeon(t);
