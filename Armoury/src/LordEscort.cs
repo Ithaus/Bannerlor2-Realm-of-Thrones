@@ -29,10 +29,13 @@ namespace Armoury
     ///  - prog = ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy (gra 0.6 - ponizej gra i BK nie wolaja partii do armii);
     ///  - sila S = Party.EstimatedStrength (z mnoznikiem uzbrojenia p9), zagrozenie T = najsilniejsza wroga grupa (partia lorda, cala armia od wodza, banda, gracz)
     ///    w zasiegu CivilWorksFrontRange (60, "doba drogi"); zalogi, milicja, wiesniacy, karawany, partie w bitwie i w osadach pominiete.
-    /// NARAZONA: R1/R2 z wypelnieniem ponizej progu albo dowolna ranga z S &lt; T. Co robi (mysl AI co 6 h, postfiks Priority.Last po p9, OB5, WatchLaw, CrossingLaw):
+    /// NARAZONA: R1/R2 z wypelnieniem ponizej progu albo dowolna ranga z S + sojusznicy w zasiegu &lt; T bez oblegajacych (recenzja 223: przewaga lokalna jak gra
+    /// GetBestInitiativeBehavior; oblegajacy stoja przy oblezeniu). Co robi (mysl AI co 6 h, postfiks Priority.Last po p9, OB5, WatchLaw, CrossingLaw):
     ///  1. armia wlasnego krolestwa w zasiegu (wodz poza bitwa, nie armia gracza, jedzenie >= MinimumNeededFoodInDaysToCallToArmy, wplyw wodza na koszt wezwania; wladca
     ///     nie idzie do cudzej armii - regula gry) - dolaczenie w nastepnej godzinie (mp.Army = armia, jak gra przy wezwaniu; warunki od nowa);
-    ///  2. przy zagrozeniu (T > 0): silniejsza przyjazna partia lorda (S >= T, sama nie narazona) w zasiegu - EscortParty gry;
+    ///  1b. partia nie ponizej progu, gdy zebranie armii gry (BesiegeSettlement z WillGatherArmy) jest najlepsze - zostawione, zbiera armie (recenzja 223);
+    ///  2. przy wrogim lordzie / armii / graczu w zasiegu (bandy nie - sa prawie zawsze), nie z wlasnej twierdzy: silniejsza przyjazna partia lorda (>= T i > S,
+    ///     sama nie narazona) w zasiegu - EscortParty gry;
     ///  3. bezpieczna twierdza: najpierw miasto/zamek wlasnego rodu, potem najblizsza przyjazna - bez oblezenia, bez wrogiego lorda w zasiegu, po tej samej stronie Muru,
     ///     droga ladowa najwyzej AiArmsTripMaxDays dob - GoToSettlement z ocena p9 (max(0.5, 1.2 x najlepsza inna) + 0.01; wyniku &lt;= -1 nie podnosimy);
     ///  4. w twierdzy wlasnego rodu: eskorta z zalogi - prawdziwi ludzie przez prywatna metode gry GarrisonTroopsCampaignBehavior.TakeTroopsFromGarrison (171 sprzet z
@@ -41,8 +44,9 @@ namespace Armoury
     ///  5. postoj do odbudowy (wypelnienie >= progu i S >= T), najwyzej AiArmsWaitMaxDays dob - potem zwolniony na AiArmsTripCooldownDays dob (regula Jeffa 12.10:
     ///     nie bezczynnosc);
     ///  6. w stanie narazenia opcje bitwy (oblezenie, szturm, rabunek, obrona cudzej osady, poscig za partia nie-banda) -1; obrona osady wlasnego rodu zostaje; obrona
-    ///     osady krolestwa zostaje, gdy jest najlepsza (OB5); R1/R2 nie zaczepia partii poza bandami (postfiks ShouldConsiderAttacking, jak p9), poza obrona wlasnej osady.
-    /// Stan (od kiedy narazona, zwolniona do) w zapisie (arm_esc223). Linie "Eskorta lordow (223): ...".
+    ///     osady krolestwa zostaje, gdy jest najlepsza (OB5); zebranie armii zostaje dla partii nie ponizej progu; R1/R2 ponizej progu nie zaczepia partii poza bandami
+    ///     (postfiks ShouldConsiderAttacking, jak p9), poza obrona wlasnej osady.
+    /// Stan (od kiedy narazona, zwolniona do) w zapisie (arm_esc223); wpis wazny tylko w pierwszej mysli partii po wczytaniu, reszta usuwana po dobie (recenzja 223). Linie "Eskorta lordow (223): ...".
     /// </summary>
     internal static partial class LordEscort
     {
@@ -60,7 +64,10 @@ namespace Armoury
         private static readonly Dictionary<string, Saved> _saved = new Dictionary<string, Saved>(StringComparer.Ordinal);
         private static int _savedLoaded;
 
-        private sealed class Thr { internal double H; internal float T; internal MobileParty Who; }
+        // T - najsilniejsza wroga grupa (z oblegajacymi; FortUnsafe), Free - bez oblegajacych (stoja przy oblezeniu - nie gonia; test "slabsza"), Lords - jak Free bez band
+        // (krok "za silniejszym" - recenzja 223), Friends - sila przyjaznych partii lordow w zasiegu (przewaga lokalna jak gra GetBestInitiativeBehavior)
+        private sealed class Thr { internal double H; internal float T, Free, Lords, Friends; internal MobileParty Who; }
+        private static double _savedH0 = -1;   // godzina pierwszej godziny sesji z wpisami z zapisu (po dobie reszta usuwana)
         private static readonly Dictionary<MBGUID, Thr> _thr = new Dictionary<MBGUID, Thr>();
         private static readonly Dictionary<Settlement, Thr> _fortThr = new Dictionary<Settlement, Thr>();
 
@@ -82,7 +89,7 @@ namespace Armoury
         private static readonly HashSet<MBGUID> _vAtk = new HashSet<MBGUID>();
         private static readonly HashSet<MBGUID> _dLords = new HashSet<MBGUID>(), _dWeak = new HashSet<MBGUID>(), _dGreat = new HashSet<MBGUID>(), _dLow = new HashSet<MBGUID>(),
                                                 _dWeaker = new HashSet<MBGUID>(), _dToFort = new HashSet<MBGUID>(), _dStay = new HashSet<MBGUID>(), _dFollow = new HashSet<MBGUID>(),
-                                                _dNoFort = new HashSet<MBGUID>(), _dOwnDef = new HashSet<MBGUID>(), _dKin = new HashSet<MBGUID>();
+                                                _dNoFort = new HashSet<MBGUID>(), _dOwnDef = new HashSet<MBGUID>(), _dKin = new HashSet<MBGUID>(), _dGather = new HashSet<MBGUID>();
         private static readonly HashSet<Settlement> _dEscForts = new HashSet<Settlement>();
         private static int _dArrived, _dJoined, _dJoinDrop, _dEsc, _dEscMen, _dEscBelow, _dEscHeld, _dEscNoRoom, _dRebuilt, _dFreed, _dStarve, _dExamples;
 
@@ -96,14 +103,14 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _st.Clear(); _saved.Clear(); _savedLoaded = 0; _thr.Clear(); _fortThr.Clear(); _noAtk = new HashSet<MBGUID>(); _joinQ.Clear(); _escQ.Clear(); _seen.Clear();
+            _st.Clear(); _saved.Clear(); _savedLoaded = 0; _savedH0 = -1; _thr.Clear(); _fortThr.Clear(); _noAtk = new HashSet<MBGUID>(); _joinQ.Clear(); _escQ.Clear(); _seen.Clear();
             ClearDay(); _stumbles = 0;
         }
 
         private static void ClearDay()
         {
             lock (Gate) { _vAtkCalls = 0; _vAtk.Clear(); }
-            _dLords.Clear(); _dWeak.Clear(); _dGreat.Clear(); _dLow.Clear(); _dWeaker.Clear(); _dToFort.Clear(); _dStay.Clear(); _dFollow.Clear(); _dNoFort.Clear(); _dOwnDef.Clear(); _dKin.Clear();
+            _dLords.Clear(); _dWeak.Clear(); _dGreat.Clear(); _dLow.Clear(); _dWeaker.Clear(); _dToFort.Clear(); _dStay.Clear(); _dFollow.Clear(); _dNoFort.Clear(); _dOwnDef.Clear(); _dKin.Clear(); _dGather.Clear();
             _dEscForts.Clear();
             _dArrived = _dJoined = _dJoinDrop = _dEsc = _dEscMen = _dEscBelow = _dEscHeld = _dEscNoRoom = _dRebuilt = _dFreed = _dStarve = _dExamples = 0;
             ClearDayProbe();
@@ -181,11 +188,12 @@ namespace Armoury
             return f != null && ft != null && ft != f && ft.IsAtWarWith(f);
         }
 
-        /// <summary>Najsilniejsza wroga grupa w zasiegu punktu: partia lorda (armia liczona raz, od wodza), banda (gdy lordsOnly false), gracz. Watek glowny.</summary>
-        private static float ThreatAt(Vec2 pos, IFaction f, bool atSea, MobileParty self, bool lordsOnly, out MobileParty who)
+        /// <summary>Wrogie grupy w zasiegu punktu: partia lorda (armia liczona raz, od wodza), banda (gdy lordsOnly false), gracz. Wynik: T najsilniejsza (z oblegajacymi),
+        /// Free bez oblegajacych (Who), Lords jak Free bez band; Friends - suma sil przyjaznych partii lordow (armia raz, od wodza; nie gracz, nie self). Watek glowny.</summary>
+        private static Thr ThreatAt(Vec2 pos, IFaction f, bool atSea, MobileParty self, bool lordsOnly, double now)
         {
-            who = null;
-            float best = 0f, r = Range;
+            var res = new Thr { H = now };
+            float r = Range;
             HashSet<Army> armies = null;
             var data = MobileParty.StartFindingLocatablesAroundPosition(pos, r);
             for (var t = MobileParty.FindNextLocatable(ref data); t != null; t = MobileParty.FindNextLocatable(ref data))
@@ -195,46 +203,66 @@ namespace Armoury
                     if (t == self || !t.IsActive || t.IsCurrentlyAtSea != atSea) continue;
                     if (t.CurrentSettlement != null || t.MapEvent != null) continue;
                     if (t.IsGarrison || t.IsMilitia || t.IsVillager || t.IsCaravan) continue;
+                    bool hostile = Hostile(f, t);
+                    if (!hostile)
+                    {
+                        // przyjaciel: partia lorda AI tego samego krolestwa (przewaga lokalna - gra GetBestInitiativeBehavior dolicza sojusznikow w poblizu)
+                        if (self == null || !t.IsLordParty || t.IsMainParty || t.MapFaction != f) continue;
+                        if (pos.Distance(t.GetPosition2D) > r) continue;
+                        var fa = t.Army;
+                        var fl = fa != null && fa.LeaderParty != null ? fa.LeaderParty : t;
+                        if (fl.BesiegedSettlement != null) continue;   // przy oblezeniu - nie pomoze w drodze
+                        if (fa != null)
+                        {
+                            if (armies == null) armies = new HashSet<Army>();
+                            if (!armies.Add(fa)) continue;
+                            res.Friends += fa.EstimatedStrength;
+                        }
+                        else res.Friends += t.Party != null ? t.Party.EstimatedStrength : 0f;
+                        continue;
+                    }
                     if (!(t.IsLordParty || t.IsMainParty || (!lordsOnly && t.IsBandit))) continue;
-                    if (!Hostile(f, t)) continue;
                     if (pos.Distance(t.GetPosition2D) > r) continue;
                     float st;
                     var a = t.Army;
+                    MobileParty w = t;
                     if (a != null)
                     {
                         if (armies == null) armies = new HashSet<Army>();
                         if (!armies.Add(a)) continue;
                         st = a.EstimatedStrength;
-                        if (a.LeaderParty != null) { if (st > best) { best = st; who = a.LeaderParty; } continue; }
+                        if (a.LeaderParty != null) w = a.LeaderParty;
                     }
                     else st = t.Party != null ? t.Party.EstimatedStrength : 0f;
-                    if (st > best) { best = st; who = t; }
+                    if (st > res.T) res.T = st;
+                    if (w.BesiegedSettlement != null) continue;   // oblegajacy stoja przy oblezeniu - nie gonia partii w drodze (liczeni tylko w T dla twierdz)
+                    if (st > res.Free) { res.Free = st; res.Who = w; }
+                    if (!t.IsBandit && st > res.Lords) res.Lords = st;
                 }
                 catch (Exception e) { Stumble("ThreatAt", e); }
             }
-            return best;
+            return res;
         }
 
         /// <summary>Zagrozenie partii (pamiec na godzine).</summary>
-        private static float ThreatOf(MobileParty mp, double now, out MobileParty who)
+        private static Thr ThreatOf(MobileParty mp, double now)
         {
             Thr c;
-            if (_thr.TryGetValue(mp.Id, out c) && c.H == now) { who = c.Who; return c.T; }
-            float t = ThreatAt(mp.GetPosition2D, mp.MapFaction, mp.IsCurrentlyAtSea, mp, false, out who);
-            _thr[mp.Id] = new Thr { H = now, T = t, Who = who };
-            return t;
+            if (_thr.TryGetValue(mp.Id, out c) && c.H == now) return c;
+            c = ThreatAt(mp.GetPosition2D, mp.MapFaction, mp.IsCurrentlyAtSea, mp, false, now);
+            _thr[mp.Id] = c;
+            return c;
         }
 
-        /// <summary>Twierdza niebezpieczna: oblezona albo wrogi lord / armia / gracz w zasiegu (bandy nie biora twierdz). Pamiec na godzine.</summary>
+        /// <summary>Twierdza niebezpieczna: oblezona albo wrogi lord / armia / gracz w zasiegu (bandy nie biora twierdz; oblegajacy sie licza). Pamiec na godzine.</summary>
         private static bool FortUnsafe(Settlement st, IFaction f, double now)
         {
             if (st.IsUnderSiege || st.SiegeEvent != null) return true;
             Thr c;
             if (_fortThr.TryGetValue(st, out c) && c.H == now) return c.T > 0f;
-            MobileParty who;
-            float t = ThreatAt(st.GetPosition2D, f, false, null, true, out who);
-            _fortThr[st] = new Thr { H = now, T = t, Who = who };
-            return t > 0f;
+            c = ThreatAt(st.GetPosition2D, f, false, null, true, now);
+            _fortThr[st] = c;
+            return c.T > 0f;
         }
 
         private static string Nm(MobileParty mp) { try { return mp != null && mp.Name != null ? mp.Name.ToString() : "?"; } catch { return "?"; } }
@@ -256,6 +284,13 @@ namespace Armoury
             var nu = new HashSet<MBGUID>(cur);
             if (on) nu.Add(mp.Id); else nu.Remove(mp.Id);
             _noAtk = nu;
+        }
+
+        /// <summary>Wpis z zapisu tej partii usuniety (partia przeliczona w tej sesji albo zniszczona - nowa partia lorda dostaje ten sam StringId "_party_1").</summary>
+        private static void ForgetSaved(MobileParty mp)
+        {
+            if (_saved.Count == 0 || mp == null || mp.StringId == null) return;
+            _saved.Remove(mp.StringId);
         }
 
         private static void Drop(MobileParty mp)
@@ -285,11 +320,14 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ mysl
-        private static bool IsBattle(in AIBehaviorData d, Clan clan, bool keepKin, MobileParty party)
+        private static bool IsBattle(in AIBehaviorData d, Clan clan, bool keepKin, MobileParty party, bool low)
         {
             switch (d.AiBehavior)
             {
                 case AiBehavior.BesiegeSettlement:
+                    // zebranie armii (WillGatherArmy - jedyna droga gry do Kingdom.CreateArmy z mysli; CanLordCreateArmy wymaga wypelnienia > progu) zostaje dla partii
+                    // nie ponizej progu - armia to najlepsza ochrona (recenzja 223)
+                    return !d.WillGatherArmy || low;
                 case AiBehavior.AssaultSettlement:
                 case AiBehavior.RaidSettlement:
                     return true;
@@ -314,11 +352,13 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.LordsAvoidDanger) return;
+                if (s == null) return;
                 double now = Math.Floor(CampaignTime.Now.ToHours);
-                Snap(party, now);   // obraz glowy rodu do linii pojmania (sonda)
-                if (!Covered(party)) { if (_st.Count > 0) Drop(party); return; }
-                if (party.Army != null) { if (_st.Count > 0) Drop(party); return; }   // w armii bezpieczny - koniec stanu
+                Snap(party, now);   // obraz glowy rodu do linii pojmania (sonda; takze przy kluczu NIE - porownanie A/B, recenzja 223)
+                if (!s.LordsAvoidDanger) return;
+                // wpis z zapisu: wazny tylko w pierwszej mysli po wczytaniu - partia poza regula albo w armii zuzywa go od razu (recenzja 223: stary SinceH zwalnial na miejscu)
+                if (!Covered(party)) { ForgetSaved(party); if (_st.Count > 0) Drop(party); return; }
+                if (party.Army != null) { ForgetSaved(party); if (_st.Count > 0) Drop(party); return; }   // w armii bezpieczny - koniec stanu
                 if (party.MapEvent != null || party.BesiegedSettlement != null || party.IsCurrentlyAtSea) return;
                 if (party.CurrentSettlement != null && party.CurrentSettlement.SiegeEvent != null) return;
                 if (ArmsFirst.Unready(party) || ArmsFirst.CapTripActive(party)) { SetNoAtk(party, false); return; }   // p9/159c najpierw
@@ -331,13 +371,17 @@ namespace Armoury
                 var clan = party.ActualClan;
                 int rank = RankOf(h, clan);
                 float ratio = Ratio(), fill = Fill(party), S = Str(party);
-                MobileParty who;
-                float T = ThreatOf(party, now, out who);
-                bool low = rank <= 2 && fill < ratio, weaker = T > 0f && S < T;
+                var thr = ThreatOf(party, now);
+                MobileParty who = thr.Who;
+                // slabsza = wlasna sila z przyjaznymi partiami lordow w zasiegu ponizej najsilniejszej wrogiej grupy, ktora moze gonic (bez oblegajacych) - przewaga
+                // lokalna jak gra (GetBestInitiativeBehavior), nie sama partia przeciw calej armii (recenzja 223)
+                float T = thr.Free;
+                bool low = rank <= 2 && fill < ratio, weaker = T > 0f && S + thr.Friends < T;
                 var st = StateOf(party);
                 if (st != null && st.FreeUntilH > now) { SetNoAtk(party, false); return; }   // zwolniony - walczy tym, co ma
                 if (!low && !weaker)
                 {
+                    ForgetSaved(party);
                     if (st != null) { if (st.SinceH >= 0) _dRebuilt++; Drop(party); }
                     return;
                 }
@@ -361,7 +405,7 @@ namespace Armoury
                 {
                     // regula Jeffa 12.10 (nie bezczynnosc): po AiArmsWaitMaxDays zwolniony na AiArmsTripCooldownDays - walczy tym, co ma
                     _dFreed++;
-                    Example(party, h, rank, fill, ratio, S, T, who, "zwolniony po " + wait + " dobach - walczy tym, co ma (" + ArmsFirst.CoolDays(s) + " dob bez stanu)");
+                    Example(party, h, rank, fill, ratio, S, T, thr.Friends, who, "zwolniony po " + wait + " dobach - walczy tym, co ma (" + ArmsFirst.CoolDays(s) + " dob bez stanu)");
                     st.SinceH = -1; st.FreeUntilH = now + Math.Max(1, ArmsFirst.CoolDays(s)) * 24.0; st.Fort = null; st.ArriveH = -1; st.Act = "";
                     SetNoAtk(party, false); _joinQ.Remove(party); _escQ.Remove(party);
                     return;
@@ -373,9 +417,11 @@ namespace Armoury
                     if (low) _dLow.Add(party.Id);
                     if (weaker) _dWeaker.Add(party.Id);
                 }
-                SetNoAtk(party, rank <= 2);
+                // zakaz zaczepiania tylko dla R1/R2 ponizej progu (Tywin: ocena sily gry liczy tier, nie umiejetnosci); pelna partia slabsza od wrogiej armii obok
+                // nadal bierze male cele - gra i tak nie atakuje silniejszych (recenzja 223)
+                SetNoAtk(party, rank <= 2 && low);
 
-                float other = 0f, own = -1f, kin = -1f;
+                float other = 0f, own = -1f, kin = -1f, gather = -1f;
                 HashSet<Settlement> blocked = null;
                 for (int i = 0; i < scores.Count; i++)
                 {
@@ -389,15 +435,26 @@ namespace Armoury
                     if (ArmsFirst.IsOwnDefend(in e.Item1, clan)) { if (e.Item2 > own) own = e.Item2; }
                     else if (ArmsFirst.IsKinDefend(in e.Item1, party)) { if (e.Item2 > kin) kin = e.Item2; }
                     else if (e.Item2 > other) other = e.Item2;
+                    if (e.Item1.AiBehavior == AiBehavior.BesiegeSettlement && e.Item1.WillGatherArmy && e.Item2 > gather) gather = e.Item2;
                 }
                 bool keepKin = own < 0f && kin >= 0f && kin >= other;
                 string act = null;
                 if (own >= 0f) { _dOwnDef.Add(party.Id); act = "broni osady wlasnego rodu"; }
                 else if (keepKin) { _dKin.Add(party.Id); act = "odsiecz osady krolestwa (OB5)"; }
+                else if (!low && gather >= 0f && gather >= other)
+                {
+                    // zebranie armii najlepsze (gra pozwolila: CanLordCreateArmy) - nie blokujemy, armia chroni lepiej niz twierdza (recenzja 223)
+                    _dGather.Add(party.Id);
+                    act = "zbiera armie (gra)";
+                }
                 else
                 {
                     Army army = s.LordsJoinNearArmy ? NearArmy(party, h) : null;
-                    MobileParty esc = army == null && T > 0f ? Escort(party, T, S) : null;
+                    // za silniejszym tylko przy prawdziwym zagrozeniu - wrogi lord, armia albo gracz w zasiegu (bandy sa prawie zawsze; jazda za kims nie odbudowuje
+                    // partii) i nie z wlasnej twierdzy (tam werbunek i eskorta z zalogi) - recenzja 223
+                    var cs = party.CurrentSettlement;
+                    bool inOwnFort = cs != null && cs.IsFortification && cs.OwnerClan == clan;
+                    MobileParty esc = army == null && !inOwnFort && thr.Lords > 0f ? Escort(party, T, S) : null;
                     if (army != null)
                     {
                         _joinQ[party] = army;
@@ -435,19 +492,19 @@ namespace Armoury
                 {
                     if (!(it.Item2 > -1f)) continue;
                     var d = it.Item1;
-                    if (!IsBattle(in d, clan, keepKin, party)) continue;
+                    if (!IsBattle(in d, clan, keepKin, party, low)) continue;
                     partyThinkParams.SetBehaviorScore(in d, -1f);
                 }
                 if (act != null && act != st.Act)
                 {
                     st.Act = act;
-                    Example(party, h, rank, fill, ratio, S, T, who, act);
+                    Example(party, h, rank, fill, ratio, S, T, thr.Friends, who, act);
                 }
             }
             catch (Exception e) { Stumble("ThinkPostfix", e); }
         }
 
-        private static void Example(MobileParty party, Hero h, int rank, float fill, float ratio, float S, float T, MobileParty who, string act)
+        private static void Example(MobileParty party, Hero h, int rank, float fill, float ratio, float S, float T, float friends, MobileParty who, string act)
         {
             if (_dExamples >= MaxExamples) return;
             _dExamples++;
@@ -456,7 +513,7 @@ namespace Armoury
                 var r = party.MemberRoster;
                 Log.Info("Eskorta lordow (223): " + Hn(h) + " (" + RankName(rank) + ") ludzi " + (r != null ? r.TotalManCount : 0) + ", zdrowych " + (r != null ? r.TotalHealthyCount : 0)
                          + ", wypelnienie " + F2(fill) + "/" + F2(ratio) + ", sila " + F0(S) + " / zagrozenie " + F0(T)
-                         + (who != null ? " (" + Nm(who) + ", " + (who.Army != null ? "armia" : (who.MemberRoster != null ? who.MemberRoster.TotalManCount + " ludzi" : "?")) + ")" : "")
+                         + (who != null ? " (" + Nm(who) + ", " + (who.Army != null ? "armia" : (who.MemberRoster != null ? who.MemberRoster.TotalManCount + " ludzi" : "?")) + ", sojusznicy w zasiegu " + F0(friends) + ")" : "")
                          + " -> " + act + ".");
             }
             catch (Exception e) { Stumble("Example", e); }
@@ -602,6 +659,17 @@ namespace Armoury
         {
             try
             {
+                // reszta wpisow z zapisu po pierwszej dobie sesji (partii juz nie ma albo cala dobe w bitwie / p9) - usunieta, nie wraca do zapisu (wzor NewLordKit)
+                if (_saved.Count > 0)
+                {
+                    double h0 = Math.Floor(CampaignTime.Now.ToHours);
+                    if (_savedH0 < 0) _savedH0 = h0;
+                    else if (h0 - _savedH0 >= 24.0)
+                    {
+                        Log.Info("Eskorta lordow (223): stan z zapisu - po dobie usunieto " + _saved.Count + " nieuzytych wpisow (z " + _savedLoaded + ").");
+                        _saved.Clear();
+                    }
+                }
                 var s = Settings.Current;
                 if (s == null || !s.LordsAvoidDanger)
                 {
@@ -724,9 +792,9 @@ namespace Armoury
             if (s == null) return;
             try
             {
-                if (!s.LordsAvoidDanger) { ClearDay(); return; }
+                // klucz NIE: ta sama linia doby (dzialania 0, pojmania z sondy) - porownanie A/B (recenzja 223)
                 // doba postoju w twierdzy wlasnego rodu - eskorta z zalogi (zaloga mogla urosnac werbunkiem gry)
-                if (s.LordEscortFromGarrison && _st.Count > 0)
+                if (s.LordsAvoidDanger && s.LordEscortFromGarrison && _st.Count > 0)
                 {
                     foreach (var st in _st.Values.ToList())
                     {
@@ -765,7 +833,8 @@ namespace Armoury
                   .Append(" | ").Append(ProbeText())
                   .Append(" | teraz w stanie ").Append(exposedNow).Append(", zwolnionych ").Append(freeNow)
                   .Append(" | najdluzej w stanie ").Append(F1(longest)).Append(" dob (").Append(longName).Append(')')
-                  .Append(" | potkniecia ").Append(_stumbles).Append('.');
+                  .Append(" | potkniecia ").Append(_stumbles)
+                  .Append(" | zbiera armie (gra) ").Append(_dGather.Count).Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -805,7 +874,7 @@ namespace Armoury
         /// <summary>Wczytanie (po Reset z konstruktora zachowania): brak klucza albo zly format - pusto (stan od nowa).</summary>
         internal static void Import(string v)
         {
-            _saved.Clear(); _savedLoaded = 0;
+            _saved.Clear(); _savedLoaded = 0; _savedH0 = -1;
             if (string.IsNullOrEmpty(v) || !v.StartsWith("1|", StringComparison.Ordinal)) return;
             foreach (var row in v.Substring(2).Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
             {
@@ -823,7 +892,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(owner, DayProfile.Hr("LordEscort.Hourly", Hourly));
             CampaignEvents.SettlementEntered.AddNonSerializedListener(owner, DayProfile.Settle("LordEscort.OnEntered", OnEntered));
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(owner, OnPrisonerTaken);
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(owner, (mp, pb) => { try { Drop(mp); } catch { } });
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(owner, (mp, pb) => { try { ForgetSaved(mp); Drop(mp); } catch { } });
             _events = true;
         }
 

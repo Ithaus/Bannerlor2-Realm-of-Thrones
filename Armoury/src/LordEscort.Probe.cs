@@ -52,7 +52,7 @@ namespace Armoury
         {
             try
             {
-                if (!On || prisoner == null || !prisoner.IsLord) return;
+                if (prisoner == null || !prisoner.IsLord) return;   // takze przy kluczu NIE - porownanie A/B (recenzja 223)
                 var clan = prisoner.Clan;
                 if (clan == null || clan == Clan.PlayerClan || clan.IsBanditFaction) return;
                 _cLords++;

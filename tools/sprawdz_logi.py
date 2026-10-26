@@ -69843,7 +69843,8 @@ E223_RX = {
                       r"\(ludzi (\d+), twierdz (\d+), zaloga ponizej podlogi (\d+), wstrzymana - wrog przy twierdzy (\d+), bez miejsca lub zoldu (\d+)\), odbudowani (\d+), "
                       r"zwolnieni po (\d+) dobach (\d+), bez twierdzy w zasiegu (\d+), obrona wlasnej osady (\d+), odsiecz krolestwa (\d+), glod (\d+) \| atak wstrzymany (\d+) "
                       r"partii \((\d+) razy\) \| pojmania dzis: glowy rodow (\d+) \(sam slaby (\d+), sam silny (\d+), w armii (\d+), w osadzie (\d+), bez obrazu (\d+)\), "
-                      r"lordowie (\d+) \| teraz w stanie (\d+), zwolnionych (\d+) \| najdluzej w stanie ([\d.]+) dob \((.*)\) \| potkniecia (\d+)\.$"),
+                      r"lordowie (\d+) \| teraz w stanie (\d+), zwolnionych (\d+) \| najdluzej w stanie ([\d.]+) dob \((.*)\) \| potkniecia (\d+)"
+                      r"(?: \| zbiera armie \(gra\) (\d+))?\.$"),   # ogon od recenzji 223 (grupa 41; starsze logi bez niego)
     "esc": re.compile(r"^eskorta z zalogi \((wejscie|doba)\): (.+?) w (.+) wzial (\d+) \(zaloga (\d+) -> (\d+), podloga (\d+), zgodnosc (TAK|NIE)\), "
                       r"wypelnienie ([\d.]+) -> ([\d.]+)/([\d.]+)\.$"),
     "join": re.compile(r"^do armii - (.+) dolaczyl do armii (.+) \((\d+) partii, sila (\d+)\)\.$"),
@@ -69862,7 +69863,7 @@ E223_TEST = {
            "do armii 1 (odpadlo 0), za silniejszym 1, eskorta z zalog {e} razy (ludzi {m}, twierdz 1, zaloga ponizej podlogi {b}, wstrzymana - wrog przy twierdzy 0, bez miejsca "
            "lub zoldu 0), odbudowani 2, zwolnieni po 12 dobach 0, bez twierdzy w zasiegu 1, obrona wlasnej osady 0, odsiecz krolestwa 0, glod 0 | atak wstrzymany 2 partii (5 razy) "
            "| pojmania dzis: glowy rodow 1 (sam slaby 0, sam silny 1, w armii 0, w osadzie 0, bez obrazu 0), lordowie 3 | teraz w stanie 6, zwolnionych 0 | najdluzej w stanie "
-           "{k} dob (Tywin Lannister) | potkniecia {p}.",
+           "{k} dob (Tywin Lannister) | potkniecia {p} | zbiera armie (gra) 2.",
     "esc": "eskorta z zalogi (wejscie): Tywin Lannister w Casterly Rock wzial {n} (zaloga 420 -> {a}, podloga 125, zgodnosc {z}), wypelnienie 0.31 -> 0.60/0.60.",
     "join": "do armii - Kevan Lannister dolaczyl do armii Tywin Lannister, Lord Paramount of Casterly Rock's Party (4 partii, sila 812).",
     "cap": "POJMANY Tywin Lannister (glowa rodu) przez Ithauser's Party | sam silny | Tywin Lannister's Party ludzi 95, zdrowych 75, wypelnienie 0.31/0.60, stan 223 -, w armii NIE, "
@@ -69880,14 +69881,19 @@ def e223_selftest():
         if not E223_RX[name].match(line):
             probs.append(name)
     m = E223_RX["day"].match(day)
-    if m and (m.group(1) != "108990" or m.group(15) != "85" or m.group(40) != "0"):
+    if m and (m.group(1) != "108990" or m.group(15) != "85" or m.group(40) != "0" or m.group(41) != "2"):
         probs.append("day grupy")
+    old = day.replace(" | zbiera armie (gra) 2.", ".")   # linia sprzed recenzji 223 (bez ogona)
+    mo = E223_RX["day"].match(old)
+    if not mo or mo.group(40) != "0" or mo.group(41) is not None:
+        probs.append("day bez ogona")
     return ("nie pasuje: " + ", ".join(probs)) if probs else None
 
 
 def e223_collect(logp):
     RX = E223_RX
-    D = {"starts": [], "days": [], "esc": [], "esc_bad": [], "sum_mis": [], "joins": 0, "caps": [], "ex": 0, "err": 0, "err1": "", "p9": set(), "z169": 0, "has169": False}
+    D = {"starts": [], "days": [], "esc": [], "esc_bad": [], "sum_mis": [], "joins": 0, "caps": [], "ex": 0, "err": 0, "err1": "", "p9": set(), "z169": 0, "has169": False,
+         "saved_drop": 0}
     acc = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -69938,6 +69944,9 @@ def e223_collect(logp):
                     D["esc_bad"].append(f"{me.group(3)}: zaloga {g1} ponizej podlogi {fl}")
             elif r.startswith("do armii - "):
                 D["joins"] += 1
+            elif r.startswith("stan z zapisu - po dobie usunieto "):
+                mz = re.match(r"stan z zapisu - po dobie usunieto (\d+) ", r)
+                D["saved_drop"] += int(mz.group(1)) if mz else 0
             elif r.startswith("POJMANY "):
                 mc = RX["cap"].match(r)
                 D["caps"].append(mc.group(3) if mc else "?")
@@ -69979,7 +69988,8 @@ def e223_rows(rep, D):
         rep.add("E223-2: slabe partie i dzialania", f"partii lordow AI (suma dob) {lords}", "INFO (brak wojny albo linii)", None)
     else:
         rep.add("E223-2: slabe partie i dzialania", f"partii lordow AI (suma dob) {lords}, slabe {weak}, dzialan (twierdza, postoj, armia, za silniejszym, eskorta, zwolnieni) "
-                f"{acts}, dolaczen do armii (linie) {D['joins']}, przykladow {D['ex']}", "slabe > 0 i dzialan > 0", weak > 0 and acts > 0)
+                f"{acts}, zbiera armie (gra) {sum(int(m.group(41) or 0) for m in days)}, dolaczen do armii (linie) {D['joins']}, przykladow {D['ex']}, wpisow z zapisu "
+                f"usunietych po dobie {D['saved_drop']}", "slabe > 0 i dzialan > 0", weak > 0 and acts > 0)
     below = sum(int(m.group(17)) for m in days)
     men = sum(int(m.group(15)) for m in days)
     probs = list(D["esc_bad"]) + list(D["sum_mis"])
@@ -70021,7 +70031,13 @@ def e223_synth():
         try:
             logp = os.path.join(tmp, "Armoury-test.log")
             L = []
-            if kind != "none":
+            if kind == "off":
+                # klucz NIE (recenzja 223): linia doby dalej co dobe, dzialania 0 - A/B
+                L.append(P + T["start"].replace("Lords Avoid Danger TAK", "Lords Avoid Danger NIE"))
+                for d in range(108990, 108996):
+                    L.append("[10:00:00] Gotowosc do bitwy (p9): dzien %d | reszta" % d)
+                    L.append(P + T["day"].format(d=d, w=0, g=0, e=0, m=0, b=0, k="0.0", p=0).replace("partii lordow AI 120", "partii lordow AI 0"))
+            elif kind != "none":
                 L.append(P + T["start"] if kind == "good" else P + T["start"].replace("atak TAK", "atak BRAK"))
                 for i, d in enumerate(range(108990, 108996)):
                     L.append("[10:00:00] Gotowosc do bitwy (p9): dzien %d | reszta" % d)
@@ -70050,6 +70066,7 @@ def e223_synth():
         "good": {"E223-0": "TAK", "E223-1": "TAK", "E223-2": "TAK", "E223-3": "TAK", "E223-4": "TAK", "E223-5": "TAK", "E223-6": "INFO"},
         "bad": {"E223-0": "NIE", "E223-1": "NIE", "E223-3": "NIE", "E223-4": "NIE", "E223-5": "NIE"},
         "none": {"E223-0": "INFO", "E223-1": "INFO", "E223-2": "INFO", "E223-3": "INFO", "E223-4": "TAK", "E223-5": "INFO"},
+        "off": {"E223-0": "INFO", "E223-1": "TAK", "E223-2": "INFO", "E223-3": "INFO", "E223-4": "TAK", "E223-5": "TAK"},
     }
     diff = []
     for kind, e in exp.items():
