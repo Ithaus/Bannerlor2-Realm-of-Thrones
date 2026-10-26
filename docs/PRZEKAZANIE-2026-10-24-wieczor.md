@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 19:35 CET - WGRANE 125 (159 + 159b + 159c); muzyka mapy nagrywana; 165 w toku
+- WGRANE 125 (19:27): Armoury 8e488bd6 = build scalenia f5048698 noc/161-integracja (status 6674fb98, wypchniete; noc/159-nadzy-lordowie tez wypchniete).
+  Kopie: Armoury.dll.bak-2026-10-26-przed-wgranie125 i D:\Backup-Bannerlord\wgrane\2026-10-26-wgranie125-przed (05503a8c = 124). CrashScribe bef9db58, flag brak.
+  Autotest 163c: bitwaN + probyN 6 dob kod 0, ERROR 0, potkniecia 0; (2b) 32 -> 18-20 gotowych ponad % po wyjazdach, do domu 161 ludzi w 5 partiach (163b: 120).
+- Muzyka mapy: Jeff 19:15 "to zrob pozostale 9" - generuj.py --wszystkie (muzyka_mapy\probka, log generuj.log). Kredyty przed: 26 302.
+- W toku: wf_d370822d-ca4 (recheck 164 -> paczka 165 w zb\n165). Potem: bitwa_v2/mapa na 10 mp3 -> scalic 164+165 do n161 -> autotest -> WGRANIE 126
+  (DLL + Lektor\Muzyka\Bitwa\lufsNN\bit_*.ogg + Lektor\Muzyka\Mapa\lufsNN\map_*.ogg). Zapis testowy autotest-przekierowany-* w Game Saves przeniesc na D: po serii 126.
+
 ## DOPISEK 26.10 ok. 19:07 CET - 159c ZBUDOWANE i scalone; AUTOTEST 163c W TOKU
 - 159c (zb\n159): c7c00ae2 + 20aacfb7 (recenzja 2), ed31a2c2 + 8c65f8bb (recenzja 3: 4 potwierdzone + drobne poprawione). Recheck: tylko 1 drobna (po wczytaniu
   zapisu partia z zegarem po terminie dostaje raz wyjazd po bron zamiast odsylki, takze gdy przed zapisem nie byla w drodze) - zostawiona, do pozniejszej poprawki.
