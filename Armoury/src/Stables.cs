@@ -47,17 +47,21 @@ namespace Armoury
         public static void GrabPaidHorses(PartyScreenLogic __instance, ref object __state)
         {
             __state = null;
-            try
-            {
-                var c = Settings.Current;
-                if (c == null || !c.CavalryNeedsMounts) return;
-                if (__instance == null || __instance.CurrentData == null) return;
-                var hist = __instance.CurrentData.UsedUpgradeHorsesHistory;
-                if (hist == null || hist.Count == 0) return;
-                // kopia, nie referencja - oryginal zaraz zostanie podmieniony na pusty
-                __state = new System.Collections.Generic.List<Tuple<EquipmentElement, int>>(hist);
-            }
+            try { __state = PaidOnScreen(__instance); }
             catch { __state = null; }
+        }
+
+        /// <summary>Konie zaplacone przy awansach w tej sesji ekranu druzyny (UsedUpgradeHorsesHistory) - kopia, nie referencja (DoneLogic podmienia
+        /// oryginal na pusty). null - brak albo regula koni wylaczona (CavalryNeedsMounts). Jedna brama dla ksiegowania (GrabPaidHorses) i, od recenzji 202,
+        /// dla podgladu ekranu druzyny (KitPreview.ForScreen: te konie dojda do zbrojowni przy zatwierdzeniu).</summary>
+        internal static System.Collections.Generic.List<Tuple<EquipmentElement, int>> PaidOnScreen(PartyScreenLogic logic)
+        {
+            var c = Settings.Current;
+            if (c == null || !c.CavalryNeedsMounts) return null;
+            if (logic == null || logic.CurrentData == null) return null;
+            var hist = logic.CurrentData.UsedUpgradeHorsesHistory;
+            if (hist == null || hist.Count == 0) return null;
+            return new System.Collections.Generic.List<Tuple<EquipmentElement, int>>(hist);
         }
 
         /// <summary>Po ZATWIERDZONYM ekranie druzyny gracza: zaplacone konie ida na polke zbrojowni.</summary>

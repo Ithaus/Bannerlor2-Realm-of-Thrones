@@ -1152,7 +1152,9 @@ Uzycie (Python 3, tylko odczyt):
                     KitPreview.cs ForScreen / NoteMounts, klucz PartyScreenRealKit) python -I tools/sprawdz_logi.py --grupa p202 <Armoury-*.log> (strumieniowo).
                     P202-S self-test wyrazen; P202-0 linia startu; P202-1 linie paczki bez dopasowania 0; P202-2 ERROR 0; P202-3 podglad ekranu <= 50 ms;
                     P202-4 model: kon tylko, gdy typ jedzie, uprzaz tylko z koniem, puste <= wzorzec; P202-5/6 INFO (wzorzec zostal, werbunek jencow);
-                    P202-7 linie koni z zapasu ludzi spojne (jezdzcow typu przybylo, koni / uprzezy w zbrojowni nie).
+                    P202-7 linie koni z zapasu ludzi spojne (jezdzcow typu przybylo, koni / uprzezy w zbrojowni nie; recenzja 202: razem we wszystkich
+                    typach przybylo ponad wyleczonych, typy w "ubylo" stracily); P202-8 sztuki z awansow sesji ekranu w podgladzie (uprzaz <= konie);
+                    P202-9 przejscia ludzi z zaloga / partia - wzorzec do zatwierdzenia (INFO, liczby > 0).
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -69835,8 +69837,13 @@ P202_RX = {
     "keep": re.compile(r"^Ekran druzyny \(202\): (\S+) - wzorzec zostaje: (.*)\.$"),
     "skip": re.compile(r"^Ekran druzyny \(202\): wzorzec zostaje - podglad niedostepny: \"(.*)\"\.$"),
     "recruit": re.compile(r"^Werbunek jencow gracza \(202\): (\S+) x(\d+), dzien (\d+)\.$"),
+    # recenzja 202: sumy wszystkich typow (z wyleczonymi) i czesc "ubylo" (typy, ktorym konia / uprzazy ubylo - zamiana miedzy typami wedlug szczebla)
     "horse": re.compile(r"^Konie z zapasu ludzi \(202\): typ druzyny gracza bierze konia / uprzaz z zapasu ludzi w zbrojowni \(jezdzcow przybylo, koni w zbrojowni nie\) - dzien (\d+) "
-                        r"\| konie w zbrojowni (-?\d+) -> (\d+), uprzeze (-?\d+) -> (\d+) \| typy: (.*)\.$"),
+                        r"\| konie w zbrojowni (-?\d+) -> (\d+), uprzeze (-?\d+) -> (\d+) \| razem na koniu (\d+) -> (\d+) \(wyleczeni (\d+)\), z uprzeza (\d+) -> (\d+) "
+                        r"\(wyleczeni (\d+)\) \| typy: (.*?)(?: \| ubylo: (.*))?\.$"),
+    "paid": re.compile(r"^Ekran druzyny \(202\): w podgladzie sztuki z awansow tej sesji ekranu - konie (\d+), uprzaz (\d+) \(do zbrojowni dojda przy zatwierdzeniu: Stajnia i uprzaz E8/H\)\.$"),
+    "cross": re.compile(r"^Ekran druzyny \(202\): ludzie przeszli miedzy Twoja druzyna a: (.+) \(do druzyny (\d+), z druzyny (\d+)\) - ich komplety przejda przy zatwierdzeniu, "
+                        r"wzorzec zostaje do zatwierdzenia\.$"),
     "htype": re.compile(r"(\S+) \(.*?\) - (?:na koniu (\d+) -> (\d+))?(?:, )?(?:z uprzeza (\d+) -> (\d+))? z (\d+) zdrowych"),
     "err": re.compile(r"^ERROR in (PartyScreenKit|KitPreview\.(ForScreen|NoteMounts))"),
 }
@@ -69847,7 +69854,9 @@ P202_TEST = {
     "keep": "Ekran druzyny (202): lannister_footman - wzorzec zostaje: wszyscy ranni (4) - nie wyjda do nastepnej bitwy.",
     "skip": "Ekran druzyny (202): wzorzec zostaje - podglad niedostepny: \"Troops Fight With Own Kit Only is off - your men fight in their troop's full kit, so no slot goes empty.\".",
     "recruit": "Werbunek jencow gracza (202): lannister_knight x6, dzien 412.",
-    "horse": "Konie z zapasu ludzi (202): typ druzyny gracza bierze konia / uprzaz z zapasu ludzi w zbrojowni (jezdzcow przybylo, koni w zbrojowni nie) - dzien 413 | konie w zbrojowni 14 -> 14, uprzeze 5 -> 5 | typy: lannister_knight (Lannister Knight) - na koniu 0 -> 4, z uprzeza 0 -> 2 z 6 zdrowych; north_rider (Rider) - z uprzeza 1 -> 3 z 8 zdrowych.",
+    "horse": "Konie z zapasu ludzi (202): typ druzyny gracza bierze konia / uprzaz z zapasu ludzi w zbrojowni (jezdzcow przybylo, koni w zbrojowni nie) - dzien 413 | konie w zbrojowni 14 -> 14, uprzeze 5 -> 5 | razem na koniu 8 -> 10 (wyleczeni 0), z uprzeza 3 -> 7 (wyleczeni 0) | typy: lannister_knight (Lannister Knight) - na koniu 0 -> 4, z uprzeza 0 -> 2 z 6 zdrowych; north_rider (Rider) - z uprzeza 1 -> 3 z 8 zdrowych | ubylo: west_rider (Westerlands Rider) - na koniu 4 -> 2 z 4 zdrowych.",
+    "paid": "Ekran druzyny (202): w podgladzie sztuki z awansow tej sesji ekranu - konie 3, uprzaz 2 (do zbrojowni dojda przy zatwierdzeniu: Stajnia i uprzaz E8/H).",
+    "cross": "Ekran druzyny (202): ludzie przeszli miedzy Twoja druzyna a: zaloga castle_wl1 (do druzyny 10, z druzyny 0) - ich komplety przejda przy zatwierdzeniu, wzorzec zostaje do zatwierdzenia.",
     "err": "ERROR in PartyScreenKit (potkniecie 1, wzorzec zostaje): NullReferenceException",
 }
 
@@ -69874,15 +69883,27 @@ def p202_selftest():
     if not m or m.groups() != ("lannister_knight", "6", "412"):
         return f"recruit: {m.groups() if m else 'brak'}"
     m = RX["horse"].match(T["horse"])
-    if not m or m.groups()[:5] != ("413", "14", "14", "5", "5"):
+    if not m or m.groups()[:11] != ("413", "14", "14", "5", "5", "8", "10", "0", "3", "7", "0"):
         return f"horse: {m.groups() if m else 'brak'}"
-    ts = RX["htype"].findall(m.group(6))
+    ts = RX["htype"].findall(m.group(12))
     if ts != [("lannister_knight", "0", "4", "0", "2", "6"), ("north_rider", "", "", "1", "3", "8")]:
         return f"htype: {ts}"
+    ds = RX["htype"].findall(m.group(13) or "")
+    if ds != [("west_rider", "4", "2", "", "", "4")]:
+        return f"htype ubylo: {ds}"
+    m2 = RX["horse"].match(T["horse"].replace(" | ubylo: west_rider (Westerlands Rider) - na koniu 4 -> 2 z 4 zdrowych", ""))
+    if not m2 or m2.group(13) is not None or len(RX["htype"].findall(m2.group(12))) != 2:
+        return "horse bez ubylo"
+    m = RX["paid"].match(T["paid"])
+    if not m or m.groups() != ("3", "2"):
+        return f"paid: {m.groups() if m else 'brak'}"
+    m = RX["cross"].match(T["cross"])
+    if not m or m.groups() != ("zaloga castle_wl1", "10", "0"):
+        return f"cross: {m.groups() if m else 'brak'}"
     if not RX["err"].match(T["err"]):
         return "err"
     # linie spoza paczki nie moga pasowac
-    for k in ("start", "calc", "model", "keep", "skip", "recruit", "horse"):
+    for k in ("start", "calc", "model", "keep", "skip", "recruit", "horse", "paid", "cross"):
         if RX[k].match("Sprzet ludzi (133c): podglad - typow 7, zdrowych 52"):
             return f"falszywe dopasowanie {k}"
     return None
@@ -69890,7 +69911,7 @@ def p202_selftest():
 
 def p202_collect(logp):
     """p202: przebieg logu (strumieniowo)."""
-    D = {"start": [], "calc": [], "model": [], "keep": [], "skip": [], "recruit": [], "horse": [], "err": [], "bad": []}
+    D = {"start": [], "calc": [], "model": [], "keep": [], "skip": [], "recruit": [], "horse": [], "paid": [], "cross": [], "err": [], "bad": []}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -69901,7 +69922,7 @@ def p202_collect(logp):
                 continue
             if not (s.startswith("Ekran druzyny (202): ") or s.startswith("Werbunek jencow gracza (202): ") or s.startswith("Konie z zapasu ludzi (202): ")):
                 continue
-            for k in ("start", "calc", "model", "keep", "skip", "recruit", "horse"):
+            for k in ("start", "calc", "model", "keep", "skip", "recruit", "horse", "paid", "cross"):
                 mm = P202_RX[k].match(s)
                 if mm:
                     D[k].append(mm.groups())
@@ -69939,11 +69960,28 @@ def p202_rows(rep, D):
         # ani koni, ani uprzezy w zbrojowni nie moglo przybyc (oba punkty odniesienia znane i oba wzrosly - sprzecznosc)
         if int(h[1]) >= 0 and int(h[2]) > int(h[1]) and int(h[3]) >= 0 and int(h[4]) > int(h[3]):
             hbad.append(h[0])
-        for t in P202_RX["htype"].findall(h[5]):
+        # recenzja 202: razem we wszystkich typach przybylo ponad wyleczonych (zamiana koni miedzy typami to nie zapas)
+        hup = int(h[6]) - int(h[5]) - int(h[7]) > 0 and int(h[2]) <= int(h[1])
+        sup = int(h[9]) - int(h[8]) - int(h[10]) > 0 and int(h[4]) <= int(h[3])
+        if not (hup or sup):
+            hbad.append(h[0] + ":razem")
+        for t in P202_RX["htype"].findall(h[11]):
             if not ((t[1] and int(t[2]) > int(t[1])) or (t[3] and int(t[4]) > int(t[3]))):
                 hbad.append(h[0] + ":" + t[0])
-    rep.add("P202-7: konie z zapasu ludzi (jezdzcow typu przybylo, koni w zbrojowni nie)", f"{len(hs)} linii, sprzecznych {len(hbad)}" + (f" ({hbad[:3]})" if hbad else ""),
+        for t in P202_RX["htype"].findall(h[12] or ""):
+            if not ((t[1] and int(t[2]) < int(t[1])) or (t[3] and int(t[4]) < int(t[3]))):
+                hbad.append(h[0] + ":ubylo " + t[0])
+    rep.add("P202-7: konie z zapasu ludzi (jezdzcow razem przybylo ponad wyleczonych, koni w zbrojowni nie)", f"{len(hs)} linii, sprzecznych {len(hbad)}" + (f" ({hbad[:3]})" if hbad else ""),
             "sprzecznych 0 (brak linii - INFO)", (len(hbad) == 0) if hs else None)
+    pd = D["paid"]
+    pbad = [x for x in pd if int(x[1]) > int(x[0]) or int(x[0]) <= 0]
+    rep.add("P202-8: sztuki z awansow tej sesji ekranu w podgladzie (konie i uprzaz, ktore dojda przy zatwierdzeniu)",
+            f"{len(pd)} linii, koni {sum(int(x[0]) for x in pd)}, uprzezy {sum(int(x[1]) for x in pd)}, sprzecznych {len(pbad)}" + (f" (np. {pbad[0]})" if pbad else ""),
+            "uprzaz <= konie, konie > 0 (brak linii - INFO: bez awansu na jezdnego)", (len(pbad) == 0) if pd else None)
+    cr = D["cross"]
+    cbad = [x for x in cr if int(x[1]) + int(x[2]) <= 0]
+    rep.add("P202-9: ludzie przeszli z / do zalogi lub partii - wzorzec do zatwierdzenia", f"{len(cr)} linii, sprzecznych {len(cbad)}" + (f" (np. {cr[-1][0]} do {cr[-1][1]}, z {cr[-1][2]})" if cr else ""),
+            "INFO (liczby > 0)", (len(cbad) == 0) if cr else None)
 
 
 def p202_main(logp):

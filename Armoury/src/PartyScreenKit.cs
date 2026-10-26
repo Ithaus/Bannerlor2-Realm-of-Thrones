@@ -27,7 +27,7 @@ namespace Armoury
         private const string P = "Ekran druzyny (202): ";
         private static object _loggedFor;                                   // podglad, dla ktorego pisane sa linie typow (nowy podglad - od nowa)
         private static readonly HashSet<string> _logged = new HashSet<string>(StringComparer.Ordinal);
-        private static string _lastSkip;
+        private static string _lastSkip, _lastCross;
         private static int _stumbles;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.PartyScreenRealKit; } }
@@ -48,14 +48,54 @@ namespace Armoury
                 var rosters = logic.MemberRosters;
                 var roster = rosters != null && rosters.Length > (int)PartyScreenLogic.PartyRosterSide.Right ? rosters[(int)PartyScreenLogic.PartyRosterSide.Right] : null;
 
+                // recenzja 202 (2): ludzie przeszli miedzy Twoja druzyna a zaloga / partia lorda / nowa partia rodu - ich komplety przechodza dopiero przy
+                // zatwierdzeniu (GarrisonArmory.ScreenDonePostfix, KitMovesWithMen), wiec zbrojownia sprzed zatwierdzenia dalaby mylacy obraz: wzorzec do zatwierdzenia
+                int toMain, toLeft;
+                string who = GarrisonArmory.ScreenKitsPending(logic, out toMain, out toLeft);
+                if (who != null)
+                {
+                    string sig = who + "|" + toMain + "|" + toLeft;
+                    if (sig != _lastCross)
+                    {
+                        _lastCross = sig;
+                        Log.Info(P + "ludzie przeszli miedzy Twoja druzyna a: " + who + " (do druzyny " + toMain + ", z druzyny " + toLeft
+                                 + ") - ich komplety przejda przy zatwierdzeniu, wzorzec zostaje do zatwierdzenia.");
+                    }
+                    return;
+                }
+                _lastCross = null;
+
+                // recenzja 202 (1): konie zaplacone przy awansach w tej sesji ekranu (tabor stracil je od razu, zbrojownia dostaje je w DoneLogic - Stajnia)
+                // i uprzaz, ktora pojdzie z nimi z sakw (SaddleLaw.PlanBank - ten sam plan co PlayerBank) - do migawki podgladu, bo nowi jezdzcy juz sa w skladzie
+                var pending = new List<Tuple<EquipmentElement, int>>();
+                int pH = 0, pS = 0;
+                var paid = Stables.PaidOnScreen(logic);
+                if (paid != null)
+                {
+                    var arm = SaddleLaw.PlayerArmCopy();
+                    foreach (var t in paid)
+                    {
+                        if (t == null || t.Item2 <= 0 || t.Item1.Item == null) continue;
+                        pending.Add(t); pH += t.Item2;
+                        if (arm != null) { int n; arm.TryGetValue(t.Item1.Item, out n); arm[t.Item1.Item] = n + t.Item2; }
+                    }
+                    if (arm != null && pH > 0)
+                        foreach (var t in SaddleLaw.PlanBank(pH, roster, arm, main.ItemRoster)) { pending.Add(t); pS += t.Item2; }
+                }
+
                 bool fresh;
-                var r = KitPreview.ForScreen(roster, out fresh);
+                var r = KitPreview.ForScreen(roster, pending, "h" + pH + "s" + pS, out fresh);
                 if (fresh)
                 {
                     _loggedFor = r; _logged.Clear();
                     if (r.Ok)
+                    {
                         Log.Info(P + "podglad nastepnej bitwy dla skladu z ekranu - typow " + r.Rows.Count + ", zdrowych " + r.Men + " (rannych " + r.Wounded + "), pustych slotow "
                                  + r.Missing + ", pieszo " + r.Foot + ", zdjete przy wystawieniu " + r.Stripped + "; czas " + r.Ms + " ms" + (r.Ms > 50 ? " (PONAD 50 ms)" : "") + ".");
+                        if (pH > 0)
+                            Log.Info(P + "w podgladzie sztuki z awansow tej sesji ekranu - konie " + pH + ", uprzaz " + pS
+                                     + " (do zbrojowni dojda przy zatwierdzeniu: Stajnia i uprzaz E8/H).");
+                    }
                 }
                 if (!r.Ok)
                 {
@@ -126,7 +166,7 @@ namespace Armoury
             catch (Exception e) { Log.Error("PartyScreenKit.OnPrisonerRecruited", e); }
         }
 
-        internal static void Reset() { _loggedFor = null; _logged.Clear(); _lastSkip = null; _stumbles = 0; }
+        internal static void Reset() { _loggedFor = null; _logged.Clear(); _lastSkip = null; _lastCross = null; _stumbles = 0; }
 
         internal static void ApplyAll(Harmony h)
         {

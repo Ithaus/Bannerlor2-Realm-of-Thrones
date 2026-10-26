@@ -863,18 +863,8 @@ namespace Armoury
             {
                 if (__instance == null || _fInitial == null || !KitMoves) return;
                 if (MobileParty.MainParty == null || __instance.RightOwnerParty != PartyBase.MainParty) return;
-                var left = __instance.LeftOwnerParty;
-                MobileParty g = null; bool live = false;
-                var lm = left != null && left.IsMobile ? left.MobileParty : null;
-                if (lm != null && (lm.IsGarrison || PartyTakesKit(lm))) { g = lm; live = true; }
-                else if (left == null)
-                {
-                    var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
-                    var ps = gsm != null ? gsm.ActiveState as TaleWorlds.CampaignSystem.GameState.PartyState : null;
-                    var cur = Settlement.CurrentSettlement;
-                    if (ps != null && ps.IsDonating && ps.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.TroopsManage && cur != null && cur.Town != null)
-                        g = cur.Town.GarrisonParty;
-                }
+                bool live;
+                var g = KitPartner(__instance, out live);
                 if (g == null || g.MemberRoster == null) return;
                 var init = _fInitial.GetValue(__instance) as PartyScreenData;
                 if (init == null || init.RightMemberRoster == null || (live && init.LeftMemberRoster == null)) return;
@@ -884,6 +874,66 @@ namespace Armoury
                 __state = new ScreenState { G = g, St = st, Garrison = gar, Name = name, GBefore = Snapshot(live ? init.LeftMemberRoster : g.MemberRoster), MainBefore = Snapshot(init.RightMemberRoster) };
             }
             catch (Exception e) { __state = null; Stumble("ScreenDonePrefix", e); }
+        }
+
+        /// <summary>Partia, z ktora ludzie ekranu druzyny wymieniaja komplety przy zatwierdzeniu (ScreenDonePrefix): zaloga albo partia lorda po lewej
+        /// (live - lewa strona to jej zywy roster), albo zaloga osady przy "Donate troops" (lewa strona pusta). null - ekran bez wymiany kompletow.</summary>
+        private static MobileParty KitPartner(PartyScreenLogic logic, out bool live)
+        {
+            live = false;
+            var left = logic.LeftOwnerParty;
+            var lm = left != null && left.IsMobile ? left.MobileParty : null;
+            if (lm != null && (lm.IsGarrison || PartyTakesKit(lm))) { live = true; return lm; }
+            if (left != null) return null;
+            var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
+            var ps = gsm != null ? gsm.ActiveState as TaleWorlds.CampaignSystem.GameState.PartyState : null;
+            var cur = Settlement.CurrentSettlement;
+            if (ps != null && ps.IsDonating && ps.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.TroopsManage && cur != null && cur.Town != null)
+                return cur.Town.GarrisonParty;
+            return null;
+        }
+
+        /// <summary>
+        /// Recenzja 202 (podglad ekranu druzyny, KitPreview.ForScreen): czy ludzie przeszli w tej sesji ekranu miedzy Twoja druzyna a partia, z ktora
+        /// wymieniaja komplety przy zatwierdzeniu (KitPartner jak ScreenDonePrefix; takze nowa partia rodu - Create new party: lewa strona bez wlasciciela
+        /// z bohaterem Twojego rodu). Ich komplety przechodza dopiero w DoneLogic (KitsToMain / KitsToGarrison), wiec podglad ze zbrojowni sprzed
+        /// zatwierdzenia bylby mylacy. Zwraca nazwe partii (null - brak przejsc albo regula KitMovesWithMen wylaczona); toMain / toLeft - ilu ludzi.
+        /// Tylko odczyt.
+        /// </summary>
+        internal static string ScreenKitsPending(PartyScreenLogic logic, out int toMain, out int toLeft)
+        {
+            toMain = 0; toLeft = 0;
+            try
+            {
+                if (logic == null || _fInitial == null || !KitMoves) return null;
+                if (MobileParty.MainParty == null || logic.RightOwnerParty != PartyBase.MainParty) return null;
+                bool live;
+                var g = KitPartner(logic, out live);
+                string name = null;
+                if (g != null)
+                {
+                    var st = g.IsGarrison ? (g.CurrentSettlement ?? g.HomeSettlement) : null;
+                    name = g.IsGarrison ? "zaloga " + (st != null ? st.StringId : "?") : "partia " + (g.StringId ?? "?");
+                }
+                else if (logic.LeftOwnerParty == null && logic.MemberRosters != null && logic.MemberRosters.Length > 0 && logic.MemberRosters[0] != null)
+                {
+                    var lr = logic.MemberRosters[0];
+                    for (int i = 0; i < lr.Count; i++)
+                    {
+                        var ch = lr.GetCharacterAtIndex(i);
+                        if (ch != null && ch.IsHero && ch.HeroObject != null && ch.HeroObject != Hero.MainHero && ch.HeroObject.Clan == Clan.PlayerClan) { name = "nowa partia rodu"; break; }
+                    }
+                }
+                if (name == null) return null;
+                var init = _fInitial.GetValue(logic) as PartyScreenData;
+                if (init == null || logic.MemberRosters == null || logic.MemberRosters.Length < 2) return null;
+                var lB = Snapshot(init.LeftMemberRoster); var lN = Snapshot(logic.MemberRosters[0]);
+                var rB = Snapshot(init.RightMemberRoster); var rN = Snapshot(logic.MemberRosters[1]);
+                foreach (var v in Crossed(lB, lN, rB, rN).Values) toMain += v;
+                foreach (var v in Crossed(rB, rN, lB, lN).Values) toLeft += v;
+                return toMain + toLeft > 0 ? name : null;
+            }
+            catch (Exception e) { Stumble("ScreenKitsPending", e); return null; }
         }
 
         /// <summary>Postfiks DoneLogic (tylko zatwierdzony ekran): komplety ida z ludzmi w obie strony.</summary>

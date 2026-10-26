@@ -554,27 +554,14 @@ namespace Armoury
                 var armory = QuartermasterLaw.DteArmory();
                 var main = MobileParty.MainParty;
                 if (armory == null || main == null || main.ItemRoster == null) return;
-                var p = Pairs(main.MemberRoster, PlayerArm());
-                int want = Math.Min(paidHorses, p.Mounted - p.Harness);
-                int moved = 0;
                 var bag = main.ItemRoster;
-                while (want > 0)
+                int moved = 0;
+                // recenzja 202: plan w jednej funkcji (PlanBank) - ten sam plan liczy podglad ekranu druzyny przed zatwierdzeniem (KitPreview.ForScreen)
+                foreach (var t in PlanBank(paidHorses, main.MemberRoster, PlayerArm(), bag))
                 {
-                    int best = -1, bestVal = int.MaxValue;
-                    for (int i = 0; i < bag.Count; i++)
-                    {
-                        var el = bag[i];
-                        if (el.Amount <= 0 || ItemKind(el.EquipmentElement.Item) != 2) continue;
-                        int v = el.EquipmentElement.ItemValue;
-                        if (v < bestVal) { bestVal = v; best = i; }
-                    }
-                    if (best < 0) break;
-                    var e = bag[best];
-                    int take = Math.Min(want, e.Amount);
-                    var ee = e.EquipmentElement;
-                    armory.AddToCounts(ee, take);
-                    bag.AddToCounts(ee, -take);
-                    want -= take; moved += take;
+                    armory.AddToCounts(t.Item1, t.Item2);
+                    bag.AddToCounts(t.Item1, -t.Item2);
+                    moved += t.Item2;
                 }
                 if (moved <= 0) return;
                 _dPlSeat += moved;
@@ -583,6 +570,42 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("PlayerBank", e); }
         }
+
+        /// <summary>
+        /// Recenzja 202: plan PlayerBank bez zapisu - ktora uprzaz z sakw (najtansza rodziny konia, po kolei) idzie do zbrojowni dla nowych jezdzcow: najwyzej
+        /// tyle, ile koni zaplacono, i tyle, ile jezdzcow z koniem nie ma pary (Pairs(roster, arm)). PlayerBank stosuje plan po zatwierdzeniu (roster i arm
+        /// po DoneLogic, konie juz w zbrojowni); podglad ekranu druzyny liczy go wczesniej (sklad z ekranu, zbrojownia + konie zaplacone w tej sesji).
+        /// Sakwy tylko czytane. Pusta lista - nic nie idzie.
+        /// </summary>
+        internal static List<Tuple<EquipmentElement, int>> PlanBank(int paidHorses, TroopRoster roster, Dictionary<ItemObject, int> arm, ItemRoster bag)
+        {
+            var plan = new List<Tuple<EquipmentElement, int>>();
+            if (paidHorses <= 0 || !On || bag == null) return plan;
+            var p = Pairs(roster, arm);
+            int want = Math.Min(paidHorses, p.Mounted - p.Harness);
+            if (want <= 0) return plan;
+            var left = new int[bag.Count];
+            for (int i = 0; i < bag.Count; i++) left[i] = bag[i].Amount;
+            while (want > 0)
+            {
+                int best = -1, bestVal = int.MaxValue;
+                for (int i = 0; i < bag.Count; i++)
+                {
+                    var el = bag[i];
+                    if (left[i] <= 0 || ItemKind(el.EquipmentElement.Item) != 2) continue;
+                    int v = el.EquipmentElement.ItemValue;
+                    if (v < bestVal) { bestVal = v; best = i; }
+                }
+                if (best < 0) break;
+                int take = Math.Min(want, left[best]);
+                plan.Add(Tuple.Create(bag[best].EquipmentElement, take));
+                left[best] -= take; want -= take;
+            }
+            return plan;
+        }
+
+        /// <summary>Recenzja 202: kopia slownika koni i uprzezy zbrojowni druzyny gracza (PlayerArm) dla planu podgladu; null - zbrojownia nieznana.</summary>
+        internal static Dictionary<ItemObject, int> PlayerArmCopy() { return PlayerArm(); }
 
         // ------------------------------------------------------------ (2) bitwa gracza
         /// <summary>GarrisonKit.SaddleGuard: jezdziec zszedl z konia z braku uprzezy (0 druzyna gracza, 1 lord AI, 2 zaloga).</summary>

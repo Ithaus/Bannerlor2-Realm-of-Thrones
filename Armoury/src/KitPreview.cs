@@ -108,7 +108,7 @@ namespace Armoury
         internal static void Reset()
         {
             _last = null; ClearMission(); _stumbles = 0; _stumbleAt.Clear(); _wc = null; _same = null;
-            _screen = null; _screenRoster = null; _prevMount = null; _prevArmH = _prevArmS = -1; PartyScreenKit.Reset();   // 202
+            _screen = null; _screenRoster = null; _prevMount = null; _prevName = null; _prevArmH = _prevArmS = -1; PartyScreenKit.Reset();   // 202
         }
 
         /// <summary>Nowa bitwa i koniec misji (GarrisonKit.ClearBattle).</summary>
@@ -239,13 +239,17 @@ namespace Armoury
         private const string P202 = "Konie z zapasu ludzi (202): ";
         private static Result _screen;                    // podglad ekranu druzyny (sklad z ekranu) - osobno od _last, okno armii i bitwa bez zmian
         private static TroopRoster _screenRoster;
-        private static Dictionary<string, int[]> _prevMount;   // typ -> {na koniu, z uprzeza} z poprzedniego podgladu skladu partii
+        private static Dictionary<string, int[]> _prevMount;   // typ -> {na koniu, z uprzeza, ranni} z poprzedniego podgladu skladu partii
+        private static Dictionary<string, string> _prevName;   // typ -> nazwa (typ, ktorego juz nie ma - linia "ubylo")
         private static int _prevArmH = -1, _prevArmS = -1;
 
         /// <summary>202 (Jeff 26.10 ok. 22:15 "B"): podglad nastepnej bitwy dla skladu z ekranu druzyny (prawa strona, z wcielonymi jencami przed zatwierdzeniem).
         /// Ten sam Compute co okno armii (te same straze i liczby), bez przyczyn i sakw; pamiec po wersji zbrojowni, skladzie ekranu (obiekt i VersionNo), dniu
-        /// i przelacznikach - liczony tylko, gdy cos z tego sie zmienilo (klik w kolejny wiersz - z pamieci). fresh - liczony teraz. Nigdy null.</summary>
-        internal static Result ForScreen(TroopRoster roster, out bool fresh)
+        /// i przelacznikach - liczony tylko, gdy cos z tego sie zmienilo (klik w kolejny wiersz - z pamieci). fresh - liczony teraz. Nigdy null.
+        /// Recenzja 202: pending - sztuki, ktore dojda do zbrojowni przy zatwierdzeniu ekranu (konie zaplacone przy awansach w tej sesji i uprzaz z planu
+        /// SaddleLaw.PlanBank) - dodane do migawki podgladu, bo sklad ekranu jest zywy (nowi jezdzcy juz w nim), a zbrojownia dostaje je dopiero w DoneLogic.
+        /// pendingSig - podpis tych sztuk do klucza pamieci.</summary>
+        internal static Result ForScreen(TroopRoster roster, List<Tuple<EquipmentElement, int>> pending, string pendingSig, out bool fresh)
         {
             fresh = false;
             var mp = MobileParty.MainParty;
@@ -254,10 +258,11 @@ namespace Armoury
             if (roster == null) return new Result { Why = "no roster" };
             var arm = QuartermasterLaw.DteArmory();
             string key = (arm != null ? arm.VersionNo : -1) + "|" + roster.VersionNo + "|" + (int)CampaignTime.Now.ToDays
-                         + "|" + (SaddleLaw.On ? 1 : 0) + (GearFit.CultureOn ? 1 : 0) + (GearFit.FloorOn ? 1 : 0) + (GearFit.FloorOverSkillOn ? 1 : 0) + (GearFit.FloorForeignOn ? 1 : 0);
+                         + "|" + (SaddleLaw.On ? 1 : 0) + (GearFit.CultureOn ? 1 : 0) + (GearFit.FloorOn ? 1 : 0) + (GearFit.FloorOverSkillOn ? 1 : 0) + (GearFit.FloorForeignOn ? 1 : 0)
+                         + "|" + (pendingSig ?? "");
             if (_screen != null && ReferenceEquals(_screenRoster, roster) && _screen.Key == key) return _screen;
             Result r;
-            try { r = Compute(mp, null, true, false, roster); r.Ok = r.Why == null; }
+            try { r = Compute(mp, null, true, false, roster, pending); r.Ok = r.Why == null; }
             catch (Exception e) { Stumble("ForScreen", e); r = new Result { Why = "The hand-out could not be worked out now - the log has the details." }; }
             r.Key = key;
             _screen = r; _screenRoster = roster; fresh = true;
@@ -266,7 +271,10 @@ namespace Armoury
 
         /// <summary>202: typ druzyny gracza zaczal jezdzic na koniu (albo z uprzeza) z zapasu ludzi w zbrojowni - jezdzcow typu przybylo, a koni (uprzezy)
         /// w zbrojowni nie przybylo. Porownanie z poprzednim udanym podgladem skladu partii (okno armii, meldunek kwatermistrza rano / po bitwie / przy zbrojowni);
-        /// pierwszy podglad po wczytaniu - tylko punkt odniesienia. Tylko log, liczby z gotowego podgladu (bez dodatkowego przebiegu).</summary>
+        /// pierwszy podglad po wczytaniu - tylko punkt odniesienia. Tylko log, liczby z gotowego podgladu (bez dodatkowego przebiegu).
+        /// Recenzja 202: linia tylko, gdy jezdzcow na koniu (z uprzeza) przybylo RAZEM we wszystkich typach - DTE rozdaje konie wedlug szczebla, wiec nowy typ
+        /// wyzszego szczebla zabiera konia nizszemu (zamiana miedzy typami to nie zapas); bez wzrostu, ktory tylko wraca do wyleczonych (ranni typu ubyli,
+        /// ich kon czekal w zbrojowni). Typy, ktorym ubylo, ida w czesci "ubylo".</summary>
         private static void NoteMounts(Result r)
         {
             try
@@ -278,25 +286,58 @@ namespace Armoury
                     else if (kv.Key != null && kv.Key.ItemType == ItemObject.ItemTypeEnum.HorseHarness) s += kv.Value;
                 }
                 var now = new Dictionary<string, int[]>(StringComparer.Ordinal);
-                foreach (var t in r.Rows) now[t.Id] = new[] { t.Rode, t.Harnessed };
+                var names = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var t in r.Rows) { now[t.Id] = new[] { t.Rode, t.Harnessed, t.Wounded }; names[t.Id] = t.Name; }
                 if (_prevMount != null)
                 {
-                    var parts = new List<string>();
+                    // sumy: przed (wszystkie typy poprzedniego podgladu, takze tych, ktorych juz nie ma) i teraz; wyleczeni - wzrost do liczby rannych, ktorzy ubyli
+                    int pH = 0, pS = 0, nH = 0, nS = 0, healH = 0, healS = 0;
+                    foreach (var v in _prevMount.Values) { pH += v[0]; pS += v[1]; }
                     foreach (var t in r.Rows)
                     {
+                        nH += t.Rode; nS += t.Harnessed;
                         int[] p; _prevMount.TryGetValue(t.Id, out p);
-                        int pr = p != null ? p[0] : 0, ps = p != null ? p[1] : 0;
-                        bool hUp = t.Rode > pr && h <= _prevArmH, sUp = t.Harnessed > ps && s <= _prevArmS;
-                        if (!hUp && !sUp) continue;
-                        parts.Add(t.Id + " (" + t.Name + ") - " + (hUp ? "na koniu " + pr + " -> " + t.Rode : "")
-                                  + (hUp && sUp ? ", " : "") + (sUp ? "z uprzeza " + ps + " -> " + t.Harnessed : "") + " z " + t.Men + " zdrowych");
+                        int pr = p != null ? p[0] : 0, ps = p != null ? p[1] : 0, pw = p != null ? p[2] : 0;
+                        int healed = Math.Max(0, pw - t.Wounded);
+                        healH += Math.Min(Math.Max(0, t.Rode - pr), healed);
+                        healS += Math.Min(Math.Max(0, t.Harnessed - ps), healed);
                     }
-                    if (parts.Count > 0)
-                        Log.Info(P202 + "typ druzyny gracza bierze konia / uprzaz z zapasu ludzi w zbrojowni (jezdzcow przybylo, koni w zbrojowni nie) - dzien "
-                                 + (int)CampaignTime.Now.ToDays + " | konie w zbrojowni " + _prevArmH + " -> " + h + ", uprzeze " + _prevArmS + " -> " + s
-                                 + " | typy: " + string.Join("; ", parts.ToArray()) + ".");
+                    bool hUpAll = nH - pH - healH > 0 && h <= _prevArmH, sUpAll = nS - pS - healS > 0 && s <= _prevArmS;
+                    if (hUpAll || sUpAll)
+                    {
+                        var parts = new List<string>();
+                        var down = new List<string>();
+                        foreach (var t in r.Rows)
+                        {
+                            int[] p; _prevMount.TryGetValue(t.Id, out p);
+                            int pr = p != null ? p[0] : 0, ps = p != null ? p[1] : 0;
+                            bool hUp = hUpAll && t.Rode > pr, sUp = sUpAll && t.Harnessed > ps;
+                            if (hUp || sUp)
+                                parts.Add(t.Id + " (" + t.Name + ") - " + (hUp ? "na koniu " + pr + " -> " + t.Rode : "")
+                                          + (hUp && sUp ? ", " : "") + (sUp ? "z uprzeza " + ps + " -> " + t.Harnessed : "") + " z " + t.Men + " zdrowych");
+                            bool hDn = hUpAll && t.Rode < pr, sDn = sUpAll && t.Harnessed < ps;
+                            if (hDn || sDn)
+                                down.Add(t.Id + " (" + t.Name + ") - " + (hDn ? "na koniu " + pr + " -> " + t.Rode : "")
+                                         + (hDn && sDn ? ", " : "") + (sDn ? "z uprzeza " + ps + " -> " + t.Harnessed : "") + " z " + t.Men + " zdrowych");
+                        }
+                        foreach (var kv in _prevMount)
+                        {
+                            if (now.ContainsKey(kv.Key)) continue;
+                            bool hDn = hUpAll && kv.Value[0] > 0, sDn = sUpAll && kv.Value[1] > 0;
+                            if (!hDn && !sDn) continue;
+                            string nm; if (_prevName == null || !_prevName.TryGetValue(kv.Key, out nm)) nm = "?";
+                            down.Add(kv.Key + " (" + nm + ") - " + (hDn ? "na koniu " + kv.Value[0] + " -> 0" : "")
+                                     + (hDn && sDn ? ", " : "") + (sDn ? "z uprzeza " + kv.Value[1] + " -> 0" : "") + " z 0 zdrowych");
+                        }
+                        if (parts.Count > 0)
+                            Log.Info(P202 + "typ druzyny gracza bierze konia / uprzaz z zapasu ludzi w zbrojowni (jezdzcow przybylo, koni w zbrojowni nie) - dzien "
+                                     + (int)CampaignTime.Now.ToDays + " | konie w zbrojowni " + _prevArmH + " -> " + h + ", uprzeze " + _prevArmS + " -> " + s
+                                     + " | razem na koniu " + pH + " -> " + nH + " (wyleczeni " + healH + "), z uprzeza " + pS + " -> " + nS + " (wyleczeni " + healS + ")"
+                                     + " | typy: " + string.Join("; ", parts.ToArray())
+                                     + (down.Count > 0 ? " | ubylo: " + string.Join("; ", down.ToArray()) : "") + ".");
+                    }
                 }
-                _prevMount = now; _prevArmH = h; _prevArmS = s;
+                _prevMount = now; _prevName = names; _prevArmH = h; _prevArmS = s;
             }
             catch (Exception e) { Stumble("NoteMounts", e); }
         }
@@ -334,7 +375,7 @@ namespace Armoury
 
         /// <summary>Jeden przebieg rozdzielacza DTE w trybie podgladu. mirror == null - mapa (sklad partii, wzorce BattleEquipments, sortowanie jak w bitwie);
         /// mirror - przydzialy bitwy tej misji (K15: te same wzorce i ta sama kolejnosc). Wyjatek wychodzi do wolajacego (licznik potkniec tam).</summary>
-        private static Result Compute(MobileParty mp, IList mirror, bool canMount, bool bag, TroopRoster screen = null)
+        private static Result Compute(MobileParty mp, IList mirror, bool canMount, bool bag, TroopRoster screen = null, List<Tuple<EquipmentElement, int>> pending = null)
         {
             var res = new Result { InMission = mirror != null };
             var sw = Stopwatch.StartNew();
@@ -344,18 +385,24 @@ namespace Armoury
             if (arm == null) { res.Why = "The troops' armoury (Dynamic Troop Equipment) cannot be read now."; return res; }
             // migawka A: zbrojownia po normalizacji DTE (jak pasek DTE MeasureMainPartyArmoryReadiness i RunAsync bitwy)
             var snap = new ItemRoster();
+            var src = new List<Tuple<EquipmentElement, int>>();
             for (int i = 0; i < arm.Count; i++)
             {
                 var el = arm.GetElementCopyAtIndex(i);
-                if (el.Amount <= 0 || el.EquipmentElement.Item == null) continue;
-                var args = new object[] { el.EquipmentElement, null };
+                src.Add(Tuple.Create(el.EquipmentElement, el.Amount));
+            }
+            if (pending != null) src.AddRange(pending);   // recenzja 202: sztuki ekranu druzyny, ktore dojda przy zatwierdzeniu (tylko ForScreen)
+            foreach (var t in src)
+            {
+                if (t == null || t.Item2 <= 0 || t.Item1.Item == null) continue;
+                var args = new object[] { t.Item1, null };
                 bool ok;
                 try { ok = (bool)_norm.Invoke(null, args); } catch { ok = false; }
                 if (!ok || !(args[1] is EquipmentElement)) continue;
                 var ne = (EquipmentElement)args[1];
                 if (ne.Item == null) continue;
-                snap.AddToCounts(ne, el.Amount);
-                Add(res.A, ne.Item, el.Amount);
+                snap.AddToCounts(ne, t.Item2);
+                Add(res.A, ne.Item, t.Item2);
             }
             var dist = _ctorDist.Invoke(new object[] { mp, snap, canMount });
             var list = _fAssigns.GetValue(dist) as IList;
