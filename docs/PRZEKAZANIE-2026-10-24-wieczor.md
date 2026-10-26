@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 21:05 CET - 165b (dwie muzyki) zbudowane; AUTOTEST 126b + recheck bezpieczenstwa w toku
+- Diagnoza (wf_9cd7649b-016): nasz MapHold pisal psai 0 tylko raz (odczyt przed zapisem); psai co 30-120 s startuje nowy odcinek mapy na innym glosie
+  i natywny kanal najpewniej nie zachowuje 0 -> muzyka gry pod naszym utworem; odczyt "psai 0.00" to tylko pole managed (nie mikser). Inne mody wykluczone.
+- 165b (zb\n165): 981f17c5 + a86cc5d1, recenzja 5ad02d06 + 40c923ac: psai 0 co klatke, ForceStopThemeWithFadeOut motywu mapy gry co >= 5 s, trzymanie 0 przy
+  ladowaniu misji (20 s), linia "kontrola" co 30 s, sprawdz_logi MAP-7 (jedno zrodlo), StopFree (Stop + zwolnienie po id - TEZ dla dzwiekow bitwy!).
+- Scalone do n161: 8574a3ad, build kod 0, Armoury f67326e2. 21:03 AUTOTEST 126b (m113\seria-126b.out.txt) + workflow wf_96b60ce9-683 (recheck: bezpieczenstwo
+  natywne StopFree/ReleaseById, koszt, ForceStop). Po obu: sprawdz_logi --grupa m165mapa i m109muz na logach 126b, potem odsluch Jeffa -> WGRANIE 126.
+
 ## DOPISEK 26.10 ok. 20:25 CET - 126 WSTRZYMANE: Jeff slyszal dwie muzyki naraz na mapie (okno autotestu 126a)
 - Autotest 126a: bitwaN + probyN kod 0, ERROR 0, gra przywrocona 20:22 (w grze 125: Armoury 8e488bd6, CS bef9db58; po tescie zostaly puste foldery Lektor\Muzyka\Mapa\lufsNN - bez znaczenia).
 - Jeff ok. 20:10 patrzyl na okno autotestu (myslal, ze to jego gra): "muzyki na mapie kampanii na siebie nachodza, leci nasza muzyka a w tle muzyka z gry", "i leca dwie naraz".
