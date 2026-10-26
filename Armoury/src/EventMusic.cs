@@ -160,7 +160,8 @@ namespace Armoury
             // paczka 165: ekran ladowania w kampanii przy wyciszonym psai (np. powrot z bitwy na mape) - psai trzymane, bez FadeUp; po ladowaniu mapa albo misja
             bool loadHold = _mapOffWhy == "ekran ladowania" && _ducked;
             if (_mapOn && !loadHold) MapOff(_mapOffWhy, "muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s)");   // paczka 165: misja, klucz NIE, inny stan
-            if (_active && _idle >= ReleaseDelay)
+            if (_active && _idle >= ReleaseDelay && loadHold && _mapOn) MapRelease();   // recenzja 165: ladowanie nad wlaczona mapa - koniec jak w MapStep (psai trzymane, bez "wraca")
+            else if (_active && _idle >= ReleaseDelay)
             {
                 _active = false;
                 if (_batActive) BattleEnd(_batWhy, false);   // m109-muzyka: koniec bitwy (powod z BattleWanted) - linia bitwy zamiast linii wydarzenia

@@ -32,7 +32,9 @@ namespace Armoury
     ///  - Kolejnosc: worek - kazdy utwor zestawu raz, potem nowy worek; nigdy ten sam dwa razy z rzedu (takze na granicy workow i po wczytaniu w tej samej sesji),
     ///    chyba ze zestaw ma jeden utwor ("jedyny - powtorka"). Po utworze cisza 20-40 s (losowo). Koniec utworu: silnik (!IsValid / IsStopped) albo czas pliku + 5 s.
     ///  - Przekazania: okno wydarzenia / plotki - utwor mapy stop od razu (SoundEvent nie ma glosnosci - dekompilacja TaleWorlds.Engine.SoundEvent: Play, Stop,
-    ///    Pause, SetParameter, bez SetVolume; zanik 2 s niemozliwy), nastepny utwor ok. 3 s po zamknieciu okna (0,6 s zapasu m108 wliczone); misja - stop od razu,
+    ///    Pause, SetParameter, bez SetVolume; zanik 2 s niemozliwy na tej drodze odtwarzania; recenzja 165: kanaly TaleWorlds.Engine.Music - GetFreeMusicChannelIndex,
+    ///    LoadClip, PlayMusic, SetVolume(int, float) - maja glosnosc (tak gra psai), ale to inna droga odtwarzania, niesprawdzona w grze (wolny kanal obok 9 kanalow
+    ///    psai, stop kanalow przy zmianie stanu gry) - decyzja Jeffa), nastepny utwor ok. 3 s po zamknieciu okna (0,6 s zapasu m108 wliczone); misja - stop od razu,
     ///    psai wraca (FadeUp 2 s; w bitwie przejmuje m109), po powrocie na mape cisza 5-10 s i nastepny; klucz NIE / inny stan - stop, psai wraca. Ekran
     ///    ladowania bez misji (np. powrot z bitwy na mape) - psai trzymane bez FadeUp, mapa ani utwor sie nie zmieniaja (EventMusic.Step loadHold); decyzja po ladowaniu.
     ///    Nowa kampania (takze wczytanie zapisu) - stan od zera, pierwszy utwor po 5 s mapy. Nic nie jest zapisywane w zapisie gry.
@@ -187,15 +189,13 @@ namespace Armoury
             _idle += dt;
             if (_active && _idle >= ReleaseDelay)
             {   // okno / plotki / bitwa skonczone, jestesmy na mapie: wyciszenie psai przejmuje mapa (bez FadeUp)
-                _active = false;
-                _paused = false;
-                if (_batActive) { BattleEnd(_batWhy, false, true); _duckBattle = false; }   // linia konca bitwy "muzyka gry dalej wyciszona (muzyka mapy)"
-                else
-                {
-                    StopTrack("koniec wydarzenia - mapa dalej");
-                    Log.Info(P + "koniec wydarzenia - mapa dalej, muzyka gry dalej wyciszona (nasza muzyka mapy).");
-                    EventThemeStop();   // m164: motyw wydarzenia ROT na warstwie psai stop (psai i tak trzymane na 0)
-                }
+                MapRelease();
+            }
+            if (_duckBattle && !_batActive)
+            {   // recenzja 165: bitwa skonczona poza mapa (ekran ladowania, FadeUp nie skonczyl) - wyciszenie przejmuje mapa: linia m109 zamiast "wrocila" (sprawdz_logi
+                // m109muz MUZ-3); co klatke mapy, nie tylko przy wlaczeniu (mapa mogla wlaczyc sie klatke przed ekranem ladowania, jeszcze przy aktywnej bitwie)
+                _duckBattle = false;
+                Log.Info(PB + "muzyka gry dalej wyciszona - przejmuje muzyka mapy.");
             }
             if (!_mapOn) MapOn();
             if (_mus != null && _musMood != MapMoodTag && !_active) StopTrack(null);   // obcy utwor po przejeciu (nie powinien zostac) - nigdy dwa naraz
@@ -220,19 +220,28 @@ namespace Armoury
             }
         }
 
+        /// <summary>Koniec okna / plotek / bitwy przy wlaczonej mapie (MapStep albo ekran ladowania nad mapa - EventMusic.Step loadHold): wyciszenie psai przejmuje
+        /// mapa bez FadeUp; linia konca bitwy "muzyka gry dalej wyciszona (muzyka mapy)" albo "koniec wydarzenia - mapa dalej".</summary>
+        private static void MapRelease()
+        {
+            _active = false;
+            _paused = false;
+            if (_batActive) { BattleEnd(_batWhy, false, true); _duckBattle = false; }
+            else
+            {
+                StopTrack("koniec wydarzenia - mapa dalej");
+                Log.Info(P + "koniec wydarzenia - mapa dalej, muzyka gry dalej wyciszona (nasza muzyka mapy).");
+                EventThemeStop();   // m164: motyw wydarzenia ROT na warstwie psai stop (psai i tak trzymane na 0)
+            }
+        }
+
         /// <summary>Wlaczenie mapy: wyciszenie psai (jak okna), linia z zestawem i czasem do pierwszego utworu.</summary>
         private static void MapOn()
         {
             bool was = _ducked;
             _mapOn = true; _mapDuckLogged = false; _mapAcc = 0; _mapHoldAcc = 0;
             DuckStart();
-            _duckMap = true;
-            if (_duckBattle && !_batActive)
-            {   // bitwa skonczona poza mapa (ekran ladowania, FadeUp nie skonczyl) - wyciszenie przejmuje mapa: linia m109 zamiast "wrocila" (sprawdz_logi m109muz MUZ-3);
-                // bitwa jeszcze aktywna - konczy ja MapStep (BattleEnd z mapa = true, linia konca z "muzyka mapy")
-                _duckBattle = false;
-                Log.Info(PB + "muzyka gry dalej wyciszona - przejmuje muzyka mapy.");
-            }
+            _duckMap = true;   // przejecie wyciszenia po bitwie - MapStep (recenzja 165)
             int got;
             var set = PickMapSet(out got);
             Log.Info(PM + "mapa - nasza muzyka, muzyka gry " + (was ? "dalej wyciszona" : "cichnie") + " (psai " + (_psaiOk && _ducked ? "glosnosc zapamietana "

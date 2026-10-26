@@ -69352,9 +69352,9 @@ def m165mapa_collect(logp):
             mm = RX["on"].match(b)
             if mm:
                 D["ons"] += 1
-                if off_pend is not None:
+                if off_pend is not None and mm.group(1) != "dalej wyciszona":   # recenzja 165: mapa wlaczona przed koncem FadeUp - psai nie wrocilo, mapa przejela
                     D["unres"].append(off_pend)
-                    off_pend = None
+                off_pend = None
                 on, seg_trk, seg_duck = True, False, False
                 D["on_gaps"].append((mm.group(6), int(mm.group(5))))
                 continue
@@ -69547,7 +69547,8 @@ def m165mapa_synth():
                     L += [trk(2, "map_02_polnoc.ogg", "po przerwie", 2), P + T["cutwin"], P8 + T9["win"], P8 + T9["winmap"],
                           trk(3, "map_03_dorzecze.ogg", "po oknie", 3), P + T["cutmis"], P + T["off"], P + T["back"],
                           P9 + T9["bat"], P9 + T9["endmap"], P + T["onbat"], P + T["duck"], trk(4, "map_04_dwor.ogg", "po misji", 4),
-                          P + T["end"].replace("map_01_krolewski_trakt", "map_04_dwor")]
+                          P + T["end"].replace("map_01_krolewski_trakt", "map_04_dwor"),
+                          P + T["offst"], P + T["on"].replace("cichnie", "dalej wyciszona")]   # recenzja 165: powrot na mape w trakcie FadeUp - bez 'wrocila'
                 else:
                     L += [trk(2, "map_01_krolewski_trakt.ogg", "po przerwie", 2),                    # powtorka z rzedu i dubel w worku (MAP-4)
                           P + T["end"].replace("nastepny za 27 s", "nastepny za 55 s").replace("grany po 1 s TAK", "grany po 1 s NIE"),   # MAP-5, MAP-1
