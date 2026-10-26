@@ -70035,6 +70035,24 @@ def p202_main(logp):
     print(f"plik: {logp} | linii 202: start {len(D['start'])}, podgladow {len(D['calc'])}, modeli {len(D['model'])}, werbunkow {len(D['recruit'])}, "
           f"koni {len(D['horse'])}, ERROR {len(D['err'])}")
     p202_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_p202_main_prev = main
+
+
+def main(argv):
+    # paczka 202: grupa p202 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "p202":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return p202_main(rest[0] if rest else None)
+    return _p202_main_prev(argv)
+
+
 # ------------------------------------------------------------ p203 (26.10, paczka 203 noc/203-bitwa-glosnosc-stamina: Jeff 26.10 ok. 22:15 "muzyka w bitwie jest za glosna,
 # nie slychac bebnow etc. scisz ja o 40%", "stamina, bieganie w zbroi za szybko meczy obniz o polowe wzor na meczenie sie w zbroi w stosunku do kg", "kon za szybko sie
 # meczy, wydluz x2 ilosc staminy lub zmniejsz o 50% zuzycie staminy konia w galopie"; Armoury/src/EventMusic.Bitwa.cs, FieldCraft.cs, HorseWind.cs)
@@ -70302,6 +70320,24 @@ def p203_main(logp):
     print(f"plik: {logp} | startow muzyki bitwy {len(D['bst'])}, utworow bitwy {len(D['btrk'])}, startow mapy {len(D['mst'])}, linii biegu {len(D['run'])}, "
           f"linii koni start/koniec {len(D['hst'])}/{len(D['hend'])}")
     p203_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_p203_main_prev = main
+
+
+def main(argv):
+    # paczka 203: grupa p203 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "p203":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return p203_main(rest[0] if rest else None)
+    return _p203_main_prev(argv)
+
+
 # ------------------------------------------------------------ m204jazda (26.10, paczka 204 noc/204-jazda-na-strzelca: konnica AI przegania konnego strzelca - Jeff 26.10
 # ok. 22:15 "w bitwie strzelam do jezdzca nawet jak nie trafie a jezdzcy widza ze do nich strzelam to nie stoja jak kretyni tylko jada w moim kierunku";
 # Armoury/src/HorsePursuit.Hunt.cs, HorsePursuit.HuntTest.cs, klucze RidersRunDownShooters i HuntHarasserInAutotest)
@@ -70635,31 +70671,6 @@ def m204jazda_main(logp):
     rep.show()
     return 0
 
-
-_p202_main_prev = main
-
-
-def main(argv):
-    # paczka 202: grupa p202 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
-    a = argv[1:]
-    if "--grupa" in a:
-        i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "p202":
-            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return p202_main(rest[0] if rest else None)
-    return _p202_main_prev(argv)
-_p203_main_prev = main
-
-
-def main(argv):
-    # paczka 203: grupa p203 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
-    a = argv[1:]
-    if "--grupa" in a:
-        i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "p203":
-            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return p203_main(rest[0] if rest else None)
-    return _p203_main_prev(argv)
 
 _m204jazda_main_prev = main
 
