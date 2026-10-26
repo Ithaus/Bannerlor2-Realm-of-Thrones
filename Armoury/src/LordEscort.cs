@@ -41,6 +41,8 @@ namespace Armoury
     ///     sama nie narazona) w zasiegu - EscortParty gry;
     ///  3. bezpieczna twierdza: najpierw miasto/zamek wlasnego rodu, potem najblizsza przyjazna - bez oblezenia, bez wrogiego lorda w zasiegu, po tej samej stronie Muru,
     ///     droga ladowa najwyzej AiArmsTripMaxDays dob - GoToSettlement z ocena p9 (max(0.5, 1.2 x najlepsza inna) + 0.01; wyniku &lt;= -1 nie podnosimy);
+    ///     recenzja 223b: sam brak ludzi (nie slabsza) - cudza twierdza tylko miasto (werbunek gry co godzine; w cudzym zamku ani eskorty, ani werbunku), a bez
+    ///     takiej twierdzy bez celu - werbunek gry (opcje bitwy -1 i zakaz zaczepiania zostaja);
     ///  4. w twierdzy wlasnego rodu: eskorta z zalogi - prawdziwi ludzie przez prywatna metode gry GarrisonTroopsCampaignBehavior.TakeTroopsFromGarrison (171 sprzet z
     ///     ludzmi, ksiega ludzi, 169c), do progu wypelnienia, nie ponad PartySizeLimit, zaloga najmniej 75 (zamek) / 125 (miasto) - te same liczby co gra; bez eskorty
     ///     przy oblezeniu i wrogim lordzie w zasiegu twierdzy; nie przy przekroczonym limicie zoldu partii (jak gra);
@@ -64,6 +66,8 @@ namespace Armoury
         private sealed class St
         {
             internal MobileParty P; internal int Rank, Kind; internal double SinceH = -1, FreeUntilH = -1, ArriveH = -1; internal Settlement Fort; internal string Act = "";
+            // recenzja 223b: stan byl (choc raz) ponizej progu - wyjscie "odbudowany" i wahadlo tylko wtedy; sam "slabszy" bez braku ludzi to "zagrozenie minelo"
+            internal bool Low;
         }
         private static readonly Dictionary<MBGUID, St> _st = new Dictionary<MBGUID, St>();
         private struct Saved { internal double Since, Free; }
@@ -109,6 +113,10 @@ namespace Armoury
         private static HashSet<string> _greatClans = new HashSet<string>(StringComparer.Ordinal);
         private static string _greatNote = "-";
         private static int _dArrived, _dJoined, _dJoinDrop, _dEsc, _dEscMen, _dEscBelow, _dEscHeld, _dEscNoRoom, _dRebuilt, _dFreed, _dStarve, _dExamples;
+        // recenzja 223b: wyjscia "zagrozenie minelo" (stan bez braku ludzi), ponizej progu bez wlasnej twierdzy i miasta - werbunek gry (bez celu twierdzy),
+        // postoj w cudzym zamku (slabszy od zagrozenia - bez eskorty i bez werbunku gry co godzine)
+        private static int _dThreatGone;
+        private static readonly HashSet<MBGUID> _dLowFree = new HashSet<MBGUID>(), _dStayForeign = new HashSet<MBGUID>();
 
         private static void Stumble(string where, Exception e)
         {
@@ -132,6 +140,7 @@ namespace Armoury
             _dEscForts.Clear();
             _dFamous.Clear(); _dFamLow.Clear(); _dFamWeaker.Clear(); _dFamLandless.Clear(); _dFamGreat.Clear(); _dFamCanon.Clear(); _dShuttleP.Clear(); _dShuttle = 0;
             _dArrived = _dJoined = _dJoinDrop = _dEsc = _dEscMen = _dEscBelow = _dEscHeld = _dEscNoRoom = _dRebuilt = _dFreed = _dStarve = _dExamples = 0;
+            _dThreatGone = 0; _dLowFree.Clear(); _dStayForeign.Clear();
             ClearDayProbe();
         }
 
@@ -309,6 +318,10 @@ namespace Armoury
         /// <summary>Partia narazona teraz (stan od kiedy, nie zwolniona). Watek glowny.</summary>
         internal static bool Exposed(MobileParty mp) { var s = StateOf(mp); return s != null && s.SinceH >= 0; }
 
+        /// <summary>Recenzja 223b (dla scalenia z 222): partia lorda wstrzymana przez 223 (klucz TAK i stan narazenia) - nie zaczepia, opcje bitwy -1, jedzie do armii,
+        /// za silniejszym albo do twierdzy. Wybor lowcow (RescueHunt.Hunters) ma ja pomijac jak ArmsFirst.Unready - nie liczyc w sile grupy. Watek glowny.</summary>
+        internal static bool HeldBack(MobileParty mp) { return On && Exposed(mp); }
+
         private static void SetNoAtk(MobileParty mp, bool on)
         {
             var cur = _noAtk;
@@ -354,6 +367,9 @@ namespace Armoury
         // ------------------------------------------------------------ mysl
         private static bool IsBattle(in AIBehaviorData d, Clan clan, bool keepKin, MobileParty party, bool low)
         {
+            // zebranie armii dowolnego rodzaju (gra 1.4.8: tylko BesiegeSettlement; 222 - PatrolAroundPoint z WillGatherArmy) zostaje dla partii nie ponizej progu
+            // (recenzja 223b); ponizej progu - reguly ponizej jak dotad (oblezenie -1, obrona wlasnej osady zostaje)
+            if (d.WillGatherArmy && !low) return false;
             switch (d.AiBehavior)
             {
                 case AiBehavior.BesiegeSettlement:
@@ -418,7 +434,8 @@ namespace Armoury
                     ForgetSaved(party);
                     if (st != null)
                     {
-                        if (st.SinceH >= 0) { _dRebuilt++; _rebuiltH[party.Id] = now; }   // 223b: godzina wyjscia "odbudowany" - licznik wahadla
+                        // 223b: godzina wyjscia "odbudowany" - licznik wahadla; recenzja 223b: tylko stan ponizej progu (sam "slabszy" - zagrozenie minelo, osobny licznik)
+                        if (st.SinceH >= 0) { if (st.Low) { _dRebuilt++; _rebuiltH[party.Id] = now; } else _dThreatGone++; }
                         Drop(party);
                     }
                     return;
@@ -438,15 +455,17 @@ namespace Armoury
                     _st[party.Id] = st;
                     // 223b wahadlo (recenzja D1): powrot do stanu w AiArmsTripCooldownDays dob po wyjsciu "odbudowany" (166 podnosi limit zoldu po eskorcie,
                     // jeden ranny po potyczce) - tylko licznik, bez zmiany progu (brak liczby z istniejacego modelu na prog wyjscia)
+                    // recenzja 223b: tylko powrot ponizej progu (wejscie przez samo zagrozenie to nie wahadlo wypelnienia; wpis zostaje do konca okna)
                     double rb;
-                    if (!fromSave && _rebuiltH.TryGetValue(party.Id, out rb))
+                    if (!fromSave && low && _rebuiltH.TryGetValue(party.Id, out rb))
                     {
                         _rebuiltH.Remove(party.Id);
                         if (now - rb <= Math.Max(1, ArmsFirst.CoolDays(s)) * 24.0) { _dShuttle++; _dShuttleP.Add(party.Id); }
                     }
                 }
-                else if (st.SinceH < 0) { st.SinceH = now; st.FreeUntilH = -1; }
+                else if (st.SinceH < 0) { st.SinceH = now; st.FreeUntilH = -1; st.Low = false; }
                 st.Rank = rank; st.Kind = kind;
+                if (low) st.Low = true;
                 int wait = ArmsFirst.WaitDays(s);
                 if (now - st.SinceH > wait * 24.0)
                 {
@@ -489,7 +508,8 @@ namespace Armoury
                     if (ArmsFirst.IsOwnDefend(in e.Item1, clan)) { if (e.Item2 > own) own = e.Item2; }
                     else if (ArmsFirst.IsKinDefend(in e.Item1, party)) { if (e.Item2 > kin) kin = e.Item2; }
                     else if (e.Item2 > other) other = e.Item2;
-                    if (e.Item1.AiBehavior == AiBehavior.BesiegeSettlement && e.Item1.WillGatherArmy && e.Item2 > gather) gather = e.Item2;
+                    // zebranie armii - kazdy wpis z WillGatherArmy (gra 1.4.8 tylko oblezenie; 222 PatrolAroundPoint "wezwij armie") - recenzja 223b
+                    if (e.Item1.WillGatherArmy && e.Item2 > gather) gather = e.Item2;
                 }
                 bool keepKin = own < 0f && kin >= 0f && kin >= other;
                 string act = null;
@@ -522,7 +542,9 @@ namespace Armoury
                     }
                     else
                     {
-                        var fort = Fort(party, now, s, blocked);
+                        // recenzja 223b: sam brak ludzi (bez silniejszego wroga w zasiegu) - cudza twierdza tylko miasto (gra werbuje tam co godzine); w cudzym zamku
+                        // nie ma eskorty (zaloga tylko dla rodu wlasciciela) ani werbunku gry co godzine - postoj do 12 dob bez odbudowy
+                        var fort = Fort(party, now, s, blocked, !weaker);
                         if (fort != null)
                         {
                             Aim(partyThinkParams, scores, fort, other);
@@ -532,9 +554,17 @@ namespace Armoury
                             {
                                 if (st.ArriveH < 0) { st.ArriveH = now; _dArrived++; }
                                 _dStay.Add(party.Id);
+                                if (fort.OwnerClan != clan && !fort.IsTown) _dStayForeign.Add(party.Id);
                                 act = "postoj w " + Sn(fort);
                             }
                             else { _dToFort.Add(party.Id); act = "do twierdzy " + Sn(fort) + (fort.OwnerClan == clan ? " (wlasna)" : " (krolestwa)"); }
+                        }
+                        else if (!weaker)
+                        {
+                            // bez twierdzy wlasnego rodu i miasta krolestwa w zasiegu - bez celu twierdzy: werbunek gry (wizyty w wsiach i miastach), opcje bitwy -1
+                            // i zakaz zaczepiania jak dotad
+                            st.Fort = null; st.ArriveH = -1;
+                            _dLowFree.Add(party.Id); act = "werbunek gry (bez twierdzy wlasnego rodu i miasta krolestwa w zasiegu)";
                         }
                         else { _dNoFort.Add(party.Id); act = "brak bezpiecznej twierdzy w zasiegu"; }
                     }
@@ -661,8 +691,9 @@ namespace Armoury
         }
 
         /// <summary>Bezpieczna twierdza: najblizsza droga ladowa wlasnego rodu, potem najblizsza przyjazna (to samo krolestwo) w zasiegu AiArmsTripMaxDays dob marszu
-        /// (wzor ArmsFirst.Nearest), bez oblezenia, bez wrogiego lorda w zasiegu, po tej samej stronie Muru, nie zablokowana cudza latka (wynik &lt;= -1).</summary>
-        private static Settlement Fort(MobileParty party, double now, Settings s, HashSet<Settlement> blocked)
+        /// (wzor ArmsFirst.Nearest), bez oblezenia, bez wrogiego lorda w zasiegu, po tej samej stronie Muru, nie zablokowana cudza latka (wynik &lt;= -1).
+        /// foreignTownsOnly (recenzja 223b - sam brak ludzi, bez silniejszego wroga): cudza twierdza tylko miasto (werbunek gry co godzine), cudzy zamek nie.</summary>
+        private static Settlement Fort(MobileParty party, double now, Settings s, HashSet<Settlement> blocked, bool foreignTownsOnly)
         {
             var c = Campaign.Current;
             var model = c != null && c.Models != null ? c.Models.MapDistanceModel : null;
@@ -683,6 +714,7 @@ namespace Armoury
                 var st = tw != null ? tw.Settlement : null;
                 if (st == null || st.MapFaction != f || st.IsUnderSiege) continue;
                 if (blocked != null && blocked.Contains(st)) continue;
+                if (foreignTownsOnly && st.OwnerClan != clan && !st.IsTown) continue;
                 if (pos.Distance(st.GetPosition2D) > range) continue;
                 float d;
                 if (at == st) d = 0f;
@@ -904,7 +936,10 @@ namespace Armoury
                   .Append(", postacie ksiag ").Append(_dFamCanon.Count).Append(')')
                   .Append(" | ").Append(ProbeFamousText())
                   .Append(" | wahadlo - powrot do stanu w ").Append(Math.Max(1, ArmsFirst.CoolDays(s))).Append(" dob po odbudowie ").Append(_dShuttle)
-                  .Append(" razy (").Append(_dShuttleP.Count).Append(" partii)").Append('.');
+                  .Append(" razy (").Append(_dShuttleP.Count).Append(" partii)")
+                  // recenzja 223b - ogon linii (starsze logi bez niego): wyjscia bez braku ludzi, werbunek gry bez celu twierdzy, postoj w cudzym zamku
+                  .Append(" | zagrozenie minelo ").Append(_dThreatGone).Append(", werbunek gry bez twierdzy ").Append(_dLowFree.Count)
+                  .Append(", postoj w cudzym zamku ").Append(_dStayForeign.Count).Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }

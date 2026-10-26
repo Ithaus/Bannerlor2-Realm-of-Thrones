@@ -69849,7 +69849,8 @@ E223_RX = {
                       r"(?: \| zbiera armie \(gra\) (\d+))?"   # ogon od recenzji 223 (grupa 41; starsze logi bez niego)
                       r"(?: \| znani lordowie (\d+) \(ponizej progu (\d+), slabsze od zagrozenia (\d+); glowy rodow bez lenna (\d+), rody wielkie lub panujace (\d+), "
                       r"postacie ksiag (\d+)\) \| pojmania znanych lordow (\d+) \(sam slaby (\d+), sam silny (\d+), w armii (\d+), w osadzie (\d+), bez obrazu (\d+)\) "
-                      r"\| wahadlo - powrot do stanu w (\d+) dob po odbudowie (\d+) razy \((\d+) partii\))?\.$"),   # ogon 223b (grupy 42-56; starsze logi bez niego)
+                      r"\| wahadlo - powrot do stanu w (\d+) dob po odbudowie (\d+) razy \((\d+) partii\))?"   # ogon 223b (grupy 42-56; starsze logi bez niego)
+                      r"(?: \| zagrozenie minelo (\d+), werbunek gry bez twierdzy (\d+), postoj w cudzym zamku (\d+))?\.$"),   # ogon recenzji 223b (grupy 57-59)
     "esc": re.compile(r"^eskorta z zalogi \((wejscie|doba)\): (.+?) w (.+) wzial (\d+) \(zaloga (\d+) -> (\d+), podloga (\d+), zgodnosc (TAK|NIE)\), "
                       r"wypelnienie ([\d.]+) -> ([\d.]+)/([\d.]+)\.$"),
     "join": re.compile(r"^do armii - (.+) dolaczyl do armii (.+) \((\d+) partii, sila (\d+)\)\.$"),
@@ -69870,7 +69871,7 @@ E223_TEST = {
            "| pojmania dzis: glowy rodow 1 (sam slaby 0, sam silny 1, w armii 0, w osadzie 0, bez obrazu 0), lordowie 3 | teraz w stanie 6, zwolnionych 0 | najdluzej w stanie "
            "{k} dob (Tywin Lannister) | potkniecia {p} | zbiera armie (gra) 2 | znani lordowie 11 (ponizej progu 4, slabsze od zagrozenia 2; glowy rodow bez lenna 3, "
            "rody wielkie lub panujace 6, postacie ksiag 2) | pojmania znanych lordow 1 (sam slaby 0, sam silny 1, w armii 0, w osadzie 0, bez obrazu 0) "
-           "| wahadlo - powrot do stanu w 3 dob po odbudowie {h} razy (2 partii).",
+           "| wahadlo - powrot do stanu w 3 dob po odbudowie {h} razy (2 partii) | zagrozenie minelo 4, werbunek gry bez twierdzy 3, postoj w cudzym zamku 1.",
     "esc": "eskorta z zalogi (wejscie): Tywin Lannister w Casterly Rock wzial {n} (zaloga 420 -> {a}, podloga 125, zgodnosc {z}), wypelnienie 0.31 -> 0.60/0.60.",
     "join": "do armii - Kevan Lannister dolaczyl do armii Tywin Lannister, Lord Paramount of Casterly Rock's Party (4 partii, sila 812).",
     "cap": "POJMANY Tywin Lannister (glowa rodu) przez Ithauser's Party | sam silny | Tywin Lannister's Party ludzi 95, zdrowych 75, wypelnienie 0.31/0.60, stan 223 -, w armii NIE, "
@@ -69895,6 +69896,11 @@ def e223_selftest():
         probs.append("day grupy")
     if m and (m.group(42) != "11" or m.group(46) != "6" or m.group(48) != "1" or m.group(50) != "1" or m.group(54) != "3" or m.group(55) != "5" or m.group(56) != "2"):
         probs.append("day grupy 223b")
+    if m and (m.group(57) != "4" or m.group(58) != "3" or m.group(59) != "1"):
+        probs.append("day grupy recenzji 223b")
+    mr = E223_RX["day"].match(day[:day.index(" | zagrozenie minelo")] + ".")   # linia 223b sprzed recenzji 223b (bez ostatniego ogona)
+    if not mr or mr.group(55) != "5" or mr.group(57) is not None:
+        probs.append("day bez ogona recenzji 223b")
     mb = E223_RX["day"].match(day[:day.index(" | znani lordowie")] + ".")   # linia sprzed 223b (ogon recenzji, bez ogona 223b)
     if not mb or mb.group(41) != "2" or mb.group(42) is not None:
         probs.append("day bez ogona 223b")
@@ -70049,7 +70055,9 @@ def e223_rows(rep, D):
         rep.add("E223-7: znani lordowie (223b) slabe, pojmania znanych lordow, wahadlo",
                 f"doba {f.group(1)}: {f.group(42)} (ponizej progu {f.group(43)}, slabsze {f.group(44)}; bez lenna {f.group(45)}, rody wielkie lub panujace {f.group(46)}, "
                 f"postacie ksiag {f.group(47)}); doba {l.group(1)}: {l.group(42)} (ponizej progu {l.group(43)}) | pojmania znanych lordow (suma dob) "
-                f"{sum(int(m.group(48)) for m in tail)}, linie {len(D['fcaps'])} {fc} | wahadlo (powrot w {l.group(54)} dob po odbudowie) {sh} razy, najwiecej partii w dobie {shp}",
+                f"{sum(int(m.group(48)) for m in tail)}, linie {len(D['fcaps'])} {fc} | wahadlo (powrot w {l.group(54)} dob po odbudowie) {sh} razy, najwiecej partii w dobie {shp}"
+                + (f" | zagrozenie minelo (suma dob) {sum(int(m.group(57) or 0) for m in tail)}, werbunek gry bez twierdzy (suma dob) {sum(int(m.group(58) or 0) for m in tail)}, "
+                   f"postoj w cudzym zamku (suma dob) {sum(int(m.group(59) or 0) for m in tail)}" if any(m.group(57) is not None for m in tail) else ""),
                 "INFO (wahadlo czeste - histereza do decyzji, recenzja D1)", None)
     else:
         rep.add("E223-7: znani lordowie (223b) slabe, pojmania znanych lordow, wahadlo", "brak ogona 223b w liniach doby", "INFO (log sprzed 223b)", None)
