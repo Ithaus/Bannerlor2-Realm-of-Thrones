@@ -40650,7 +40650,7 @@ M109MUZ_RX = {
     "gra": re.compile(r"^gra (\S+\.ogg) \(nastroj (\S+)\)\.$"),
     "mapa": re.compile(r"^mapa - okna z nastrojem wojna graja (muz_\w+\.ogg) \(muzyka wojenna tylko w bitwie\), klucz StopEventThemesOnMap (TAK|NIE) .*, psai motywy (TAK|NIE), "
                        r"klucz EventMusicEnabled (TAK|NIE)\.$"),
-    "theme": re.compile(r"^motyw wydarzenia ROT (\d+) \(odcinek (-?\d+)\) zatrzymany po oknie - wyciszenie warstwy psai \(glos (\d+)\) (\d+) s;"),
+    "theme": re.compile(r"^motyw wydarzenia ROT (\d+) \(odcinek (-?\d+)\) zatrzymany po oknie - wyciszenie warstwy psai \(glos (\d+)\) (\d+) ms;"),
     "thseen": re.compile(r"^motyw wydarzenia ROT (\d+) \(odcinek (-?\d+)\) gra w oknie \(warstwa psai, glos (\d+)\)\.$"),
     "thgone": re.compile(r"^motyw wydarzenia ROT (\d+) \(odcinek (-?\d+)\) nie gra po oknie - bez zatrzymania\.$"),
     "cs": re.compile(r"AUTOTEST BITWA (\d+)/(\d+) \[[^\]]*\]: misja ruszyla"),
@@ -40694,8 +40694,8 @@ M109MUZ_TEST = {
     "trkerr": "utwor 2 - bit_04_szarza.ogg (lufs17, 150.0 s, wybor starcie 03-07 - losowo z 5), grany po 1 s TAK; poprzedni bit_01_zbiorka.ogg skonczony po 0.5 s (blad).",
     "psai": "psai TAK (GetVolume/SetVolume/SetPaused).",
     "mapa": "mapa - okna z nastrojem wojna graja muz_korona.ogg (muzyka wojenna tylko w bitwie), klucz StopEventThemesOnMap TAK (motywy wydarzen ROT 402-415 na warstwie "
-            "psai wyciszane 3 s po oknie), psai motywy TAK, klucz EventMusicEnabled TAK.",
-    "theme": "motyw wydarzenia ROT 405 (odcinek 421) zatrzymany po oknie - wyciszenie warstwy psai (glos 7) 3 s; muzyka mapy wraca po przerwie gry (zatrzyman w sesji 1).",
+            "psai wyciszane 50 ms po oknie), psai motywy TAK, klucz EventMusicEnabled TAK.",
+    "theme": "motyw wydarzenia ROT 405 (odcinek 421) zatrzymany po oknie - wyciszenie warstwy psai (glos 7) 50 ms; muzyka mapy wraca po przerwie gry (zatrzyman w sesji 1).",
     "thseen": "motyw wydarzenia ROT 405 (odcinek 421) gra w oknie (warstwa psai, glos 7).",
     "thgone": "motyw wydarzenia ROT 405 (odcinek 421) nie gra po oknie - bez zatrzymania.",
     "cs": "[06:25:18] AUTOTEST: AUTOTEST BITWA 1/4 [mocna]: misja ruszyla po 3 s ladowania (scena battle_terrain_biome_040, Mission)",
@@ -40794,7 +40794,7 @@ def m109muz_selftest():
     if not m or m.groups() != ("muz_korona.ogg", "TAK", "TAK", "TAK"):
         return f"mapa: {m.groups() if m else 'brak dopasowania'}"
     m = RX["theme"].match(T["theme"])
-    if not m or m.groups() != ("405", "421", "7", "3"):
+    if not m or m.groups() != ("405", "421", "7", "50"):
         return f"theme: {m.groups() if m else 'brak dopasowania'}"
     m = RX["thseen"].match(T["thseen"])
     if not m or m.groups() != ("405", "421", "7") or RX["theme"].match(T["thseen"]) or RX["thgone"].match(T["thseen"]):

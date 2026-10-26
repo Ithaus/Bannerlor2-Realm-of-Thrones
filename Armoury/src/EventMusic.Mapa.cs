@@ -12,25 +12,26 @@ namespace Armoury
     ///  - Motywy wydarzen ROT: ROT przy oknie wydarzenia wola PsaiCore.StopMusic(true) + PlaySegment(418-431) (dekompilacja ROT.Events/*Event.cs, np.
     ///    HarrenhalSiegeEvent: segment 421 Blackwater 410 s), a przy zamknieciu okna muzyki nie zatrzymuje; CampaignMusicHandler.TickCampaignMusic nie przerywa
     ///    grajacego psai - motyw (np. Blackwater) gral dalej na mapie. Klucz StopEventThemesOnMap (TAK): przy koncu okna m108 (0,6 s po zamknieciu, poza bitwa),
-    ///    gdy na warstwie psai gra motyw wydarzenia ROT - wyciszenie tej warstwy w 3 s, zanim glosnosc psai wroci (FadeUp 2 s); mapa wraca do swoich motywow
+    ///    gdy na warstwie psai gra motyw wydarzenia ROT - wyciszenie tej warstwy w jednym kroku psai (50 ms), poki glosnosc psai jest jeszcze ~0 (FadeUp 2 s rusza
+    ///    w tej samej klatce; recheck 164: zanik 3 s zachodzil na FadeUp i motyw wracal slyszalnie na 3-6 s); mapa wraca do swoich motywow
     ///    po przerwie gry (30-120 s; ROT przy otwarciu okna dal StopMusic - tryb ciszy). Dziala tylko z oknami sledzonymi przez m108 (klucz EventMusicEnabled TAK).
     ///    Recenzja 164 (dekompilacja TaleWorlds.PSAI 1.4.8): PsaiCore.PlaySegment -> Logik.PlaySegmentLayeredAndImmediately gra odcinek na glosie warstwy 7/8
     ///    (getNextVoiceNumber(forHighlight), glosy 0-6 to zwykle motywy) i NIE ustawia m_effectiveTheme - GetCurrentThemeId nigdy nie daje 402-415, a StopMusic
     ///    wycisza tylko glos glowny (startFade(m_currentVoiceNumber)). Dlatego odbicie na pola prywatne: PsaiCore.m_logik -> Logik.m_playbackChannels[7..8],
     ///    kanal IsPlaying() i Segment (ThemeId 402-415 = ThemeTypeInt 7 w ROT-Content/music/soundtrack.xml, odcinki 418-431), stop przez prywatne
-    ///    Logik.startFade(glos, 3000, 0) - updateFades zbija FadeOutVolume i przy 0 StopChannel + ReleaseSegment (droga gry); glos glowny mapy nietkniety.
+    ///    Logik.startFade(glos, 50, 0) - krok = cala glosnosc, pierwszy updateFades (~50 ms, raz na klatke) daje 0 -> StopChannel + ReleaseSegment (droga gry)
+    ///    i usuwa FadeData glosu (bez starego zaniku czekajacego na nowy PlaySegment na tym glosie); glos glowny mapy nietkniety.
     ///    Watek: Logik.Update (updateFades) wola MBMusicManager.Update w glownym watku, nasz AppTick tez - bez wyscigu na m_fadeVoices.
     ///  - Stop naszych utworow (okna i bitwa): StopRelease - SoundEvent.Release wola Stop tylko dla IsPlaying (dekompilacja SoundEvent.Release), zdarzenie
     ///    spauzowane / startujace dostaloby samo ReleaseEvent (ryzyko H-stop z raportu: moglo przezyc wyjscie z misji); tu najpierw Stop, potem Release jak w grze.
     ///  - Linie "Muzyka (m108): mapa - ..." (start kampanii), "motyw wydarzenia ROT N (odcinek S) gra w oknie (warstwa psai, glos V)." (przy otwarciu okna,
-    ///    klucz TAK), "motyw wydarzenia ROT ... zatrzymany po oknie - wyciszenie warstwy psai (glos V) 3 s; ..." (kazde zatrzymanie) albo, gdy motyw widziany
+    ///    klucz TAK), "motyw wydarzenia ROT ... zatrzymany po oknie - wyciszenie warstwy psai (glos V) 50 ms; ..." (kazde zatrzymanie) albo, gdy motyw widziany
     ///    w oknie juz nie gra, "motyw wydarzenia ROT ... nie gra po oknie - bez zatrzymania." - tools/sprawdz_logi.py m109muz MUZ-8 paruje te linie.
     /// </summary>
     internal static partial class EventMusic
     {
         private const int RotEventThemeMin = 402, RotEventThemeMax = 415;
-        private const float RotThemeFadeSec = 3f;
-        private const int RotThemeFadeMs = 3000;
+        private const int RotThemeFadeMs = 50;   // recheck 164: jeden krok updateFades (Logik: delta = glosnosc / (ms / 50)) - stop, zanim FadeUp podniesie psai
         private const int PsaiFirstLayerVoice = 7;   // Logik: glosy 0-6 zwykle motywy, 7-8 warstwa (PlaySegment / highlight)
         private const string MapWarMood = "wojna", MapWarInstead = "korona";
 
@@ -79,7 +80,7 @@ namespace Armoury
             ThemeResolve();
             Log.Info(P + "mapa - okna z nastrojem " + MapWarMood + " graja muz_" + MapWarInstead + ".ogg (muzyka wojenna tylko w bitwie), klucz StopEventThemesOnMap "
                      + (ThemeKeyOn ? "TAK" : "NIE") + " (motywy wydarzen ROT " + RotEventThemeMin + "-" + RotEventThemeMax + " na warstwie psai wyciszane "
-                     + RotThemeFadeSec.ToString("0", Inv) + " s po oknie), psai motywy " + (_thOk ? "TAK" : "NIE") + ", klucz EventMusicEnabled " + (KeyOn ? "TAK" : "NIE") + ".");
+                     + RotThemeFadeMs + " ms po oknie), psai motywy " + (_thOk ? "TAK" : "NIE") + ", klucz EventMusicEnabled " + (KeyOn ? "TAK" : "NIE") + ".");
         }
 
         private static void ThemeResolve()
@@ -149,7 +150,7 @@ namespace Armoury
             catch (Exception e) { Stumble("EventThemeSeen", e); }
         }
 
-        /// <summary>Koniec okna wydarzenia / plotek poza bitwa (Step): motyw wydarzenia ROT na warstwie psai - wyciszenie 3 s (Logik.startFade). Nie rzuca.</summary>
+        /// <summary>Koniec okna wydarzenia / plotek poza bitwa (Step): motyw wydarzenia ROT na warstwie psai - wyciszenie w jednym kroku psai, 50 ms (Logik.startFade). Nie rzuca.</summary>
         private static void EventThemeStop()
         {
             int seenTheme = _thSeenTheme, seenSeg = _thSeenSeg;
@@ -164,7 +165,7 @@ namespace Armoury
                     _mStartFade.Invoke(lg, new object[] { f[0], RotThemeFadeMs, 0 });
                     _thStops++;
                     Log.Info(P + "motyw wydarzenia ROT " + f[1] + " (odcinek " + f[2] + ") zatrzymany po oknie - wyciszenie warstwy psai (glos " + f[0] + ") "
-                             + RotThemeFadeSec.ToString("0", Inv) + " s; muzyka mapy wraca po przerwie gry (zatrzyman w sesji " + _thStops + ").");
+                             + RotThemeFadeMs + " ms; muzyka mapy wraca po przerwie gry (zatrzyman w sesji " + _thStops + ").");
                 }
                 if (found.Count == 0 && seenTheme >= 0)
                     Log.Info(P + "motyw wydarzenia ROT " + seenTheme + " (odcinek " + seenSeg + ") nie gra po oknie - bez zatrzymania.");

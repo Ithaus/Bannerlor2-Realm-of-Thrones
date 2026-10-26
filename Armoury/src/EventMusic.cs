@@ -153,7 +153,7 @@ namespace Armoury
                 {
                     StopTrack("koniec wydarzenia");
                     Log.Info(P + "koniec wydarzenia - muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s).");
-                    EventThemeStop();   // m164: motyw wydarzenia ROT nie gra dalej na mapie (psai jeszcze wyciszone - FadeUp od nastepnej klatki)
+                    EventThemeStop();   // m164: motyw wydarzenia ROT nie gra dalej na mapie (psai jeszcze ~0 - FadeUp rusza w tej samej klatce, warstwa stoi po 1 kroku psai, 50 ms)
                 }
                 _paused = false;
             }

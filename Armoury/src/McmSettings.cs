@@ -9792,7 +9792,7 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public int BattleMusicLoudness { get; set; } = 3;
 
-        [SettingPropertyBool("Stop Event Themes On Map", HintText = "when a Realm of Thrones story window closes, the event's own theme (the Blackwater, the weddings and the rest, some of them nearly seven minutes long) fades out over three seconds instead of playing on over the campaign map, and the map's own music returns after its usual pause. Works together with Event Music Enabled. Off = the event's theme plays on, as in Realm of Thrones", RequireRestart = false)]
+        [SettingPropertyBool("Stop Event Themes On Map", HintText = "when a Realm of Thrones story window closes, the event's own theme (the Blackwater, the weddings and the rest, some of them nearly seven minutes long) is silenced at once instead of playing on over the campaign map, and the map's own music returns after its usual pause. Works together with Event Music Enabled. Off = the event's theme plays on, as in Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public bool StopEventThemesOnMap { get; set; } = true;
 
