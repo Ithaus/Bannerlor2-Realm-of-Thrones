@@ -69173,7 +69173,7 @@ def main(argv):
 # Armoury/ModuleData/Lektor/Muzyka/Mapa/lufs{17,20,23,26}/map_NN_nazwa.ogg z tools/muzyka/bitwa_v2.py --prefiks map)
 M165MAPA_TAG = "Muzyka mapy (m165): "
 M165MAPA_LEVELS = (17, 20, 23, 26)
-M165MAPA_DUR = (120.0, 180.0)
+M165MAPA_DUR = (115.0, 180.0)   # 26.10: map_08_poludniowe_ziemie ma 119.98 s (zrodlo ElevenLabs 120 s) - tolerancja ponizej 2 min
 M165MAPA_GAP = (20, 40)
 M165MAPA_AFTER = {"start": (5, 5), "po misji": (5, 10), "po oknie": (0, 3), "po przerwie": (0, 40)}   # liczba w linii 'mapa - ...' (ToString("0"))
 M165MAPA_RETRY = 5
