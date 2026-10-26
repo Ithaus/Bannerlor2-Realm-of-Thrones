@@ -767,6 +767,9 @@ namespace Armoury
         // p5-kruki (R3-05c): kruki w drodze od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
         private readonly bool _p5RavensReset = P5RavensReset();
         private static bool P5RavensReset() { try { Ravens.Reset(); } catch (Exception e) { Log.Error("P5RavensReset", e); } return true; }
+        // 222 (odbicie lorda): lowy od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5-kruki)
+        private readonly bool _p222OdbicieReset = P222OdbicieReset();
+        private static bool P222OdbicieReset() { try { RescueHunt.Reset(); } catch (Exception e) { Log.Error("P222OdbicieReset", e); } return true; }
         // p6-szubienice (R3-07a): szubienice przy rozstajach od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5-handel)
         private readonly bool _p6SzubieniceReset = P6SzubieniceReset();
         private static bool P6SzubieniceReset() { try { Gallows.Reset(); } catch (Exception e) { Log.Error("P6SzubieniceReset", e); } return true; }
@@ -1396,6 +1399,9 @@ namespace Armoury
             // p5-kruki (R3-05c): kruki w drodze (wiesci wojenne z opoznieniem) - wlasny klucz, starsza DLL go pomija; brak klucza = brak krukow w drodze
             try { string rv = dataStore.IsSaving ? Ravens.Export() : null; SaveText.Sync(dataStore, "arm_ravens", ref rv); if (dataStore.IsLoading) Ravens.Import(rv); }
             catch (Exception e) { Log.Error("SyncData.arm_ravens", e); }
+            // 222 (odbicie lorda): lowy na pojmanego lorda (wiesc, slady) - wlasny klucz, starsza DLL go pomija; brak klucza = brak lowow
+            try { string ob = dataStore.IsSaving ? RescueHunt.Export() : null; SaveText.Sync(dataStore, "arm_odbicie", ref ob); if (dataStore.IsLoading) RescueHunt.Import(ob); }
+            catch (Exception e) { Log.Error("SyncData.arm_odbicie", e); }
             // KS r4 (r4-ceny): stan cen i sterowania rynku (doba restartu srednich cen, czynnik popytu targu do 1.25, brak miast C1) - osobny klucz, starsza DLL go pomija;
             // brak klucza (stary zapis) = stan od zera (po D+14 srednie cen uznane za juz zerowane)
             try { string k4 = dataStore.IsSaving ? StartCalibration.ExportR4c() : null; SaveText.Sync(dataStore, "arm_ks_r4c", ref k4); if (dataStore.IsLoading) StartCalibration.ImportR4c(k4); }
@@ -1579,6 +1585,7 @@ namespace Armoury
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, delegate (MapEvent me, PartyBase a, PartyBase d) { try { NoticeBoard.OnMapEventStartedTest(me, a, d); } catch (Exception e) { Log.Error("NoticeBoard.OnMapEventStartedTest", e); } });
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, Rumours.OnSiegeStarted);
             Ravens.RegisterEvents(this);   // p5-kruki (R3-05c): latka czatu w starcie sesji, doreczenie krukow co godzine, linia doby
+            RescueHunt.RegisterEvents(this);   // 222 (odbicie lorda): pojmanie/uwolnienie/smierc, przeglad godzinny lowow i migawka rozkazow, linia doby "Odbicie (222)"
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("AiGear.OnDailyTickParty", AiGear.OnDailyTickParty));
             // CG (19.10, recenzja - kolejnosc odwrotna): doba postoju druzyny gracza w miescie - bohaterowie rodu za swoje PO ludziach (rejestracja PRZED MenPurse)
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("CompanionGear.OnDailyTickParty", CompanionGear.OnDailyTickParty));

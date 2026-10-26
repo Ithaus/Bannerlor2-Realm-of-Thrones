@@ -7948,6 +7948,18 @@ namespace Armoury
         [SettingPropertyGroup("Relief of besieged towns")]
         public bool BesiegedReliefOnlyWhenReachable { get; set; } = true;
 
+        [SettingPropertyBool("Rescue Hunt", HintText = "when you take a lord of a realm captive (in your party, a party of your clan or the dungeon of your fief), his house learns of it only when the news reaches them - a rider to their nearest stronghold and a raven to their seat, about a day across a realm - and no ransom courier comes before that. Then the lords of his house ride out to free him: they search where you were last seen (a trail older than three days goes cold), gather enough strength first (half again your own; if they are too few, the head of the house calls a host) and only then close in, and besiege the fief whose dungeon holds him. The hunt ends when he is freed, ransomed, escapes or dies, or when there is peace. Off = nobody comes after you and the courier may come on the first day, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Rescue of captured lords")]
+        public bool RescueHunt { get; set; } = true;
+
+        [SettingPropertyBool("Rescue Hunt Realm", HintText = "with Rescue Hunt: when you hold the head of a house or his close kin, the lords of the realm who are his friends or friends of his house ride with them; when you hold a ruler or the ruler's close kin, the whole realm rides (only the nearest lords that are enough). Off = only the captive's own house", RequireRestart = false)]
+        [SettingPropertyGroup("Rescue of captured lords")]
+        public bool RescueHuntRealm { get; set; } = true;
+
+        [SettingPropertyBool("Rescue Hunt Tell Player", HintText = "with Rescue Hunt: you are told when the captive's house learns that you hold him, when their riders have marked your column (at most twice a day) and when they learn which dungeon holds him. Off = the hunt goes on unannounced", RequireRestart = false)]
+        [SettingPropertyGroup("Rescue of captured lords")]
+        public bool RescueHuntTellPlayer { get; set; } = true;
+
         [SettingPropertyBool("Siege Phantom Lift", HintText = "A siege camp in which fewer than Siege Phantom Min Men men are able to fight (all its parties together, the wounded not counted), or whose parties together have a strength below 1 in the game's own reckoning, for Siege Phantom Lift Days days in a row breaks up: its parties leave the siege, as when peace is made, and choose a new aim. Not a camp with the player's own party, the player's army or a party of the player's clan, not a siege with the player inside the walls, not the sieges of the Realm of Thrones story, not the Others, never during a battle. The count of days is not saved - after loading a game it starts again. Off = such a camp stays until something else ends the siege", RequireRestart = false)]
         [SettingPropertyGroup("Siege camps without fighting men")]
         public bool SiegePhantomLift { get; set; } = true;
@@ -12122,6 +12134,9 @@ namespace Armoury
             s.BesiegedReliefCastleForce = BesiegedReliefCastleForce;
             s.BesiegedReliefKingsArmy = BesiegedReliefKingsArmy;
             s.BesiegedReliefOnlyWhenReachable = BesiegedReliefOnlyWhenReachable;
+            s.RescueHunt = RescueHunt;
+            s.RescueHuntRealm = RescueHuntRealm;
+            s.RescueHuntTellPlayer = RescueHuntTellPlayer;
             s.SiegePhantomLift = SiegePhantomLift;
             s.SiegePhantomLiftDays = SiegePhantomLiftDays;
             s.SiegePhantomMinMen = SiegePhantomMinMen;
