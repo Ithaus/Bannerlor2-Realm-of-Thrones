@@ -12,8 +12,8 @@ BannerlordConfig.txt LatestSaveGameName, engine_config.txt safely_exited), flaga
    Kryteria: kod 0, ERROR 0 (bledy 27 first-chance = latki BKROTPatch/BK, tak samo w kazdym tescie); w logu linia dobowa "Nowe druzyny i sprzet (159)".
 2. Recenzja 159b fix2 (workflow wf_e0014686-1ec): wznowic Workflow(scriptPath=...\workflows\scripts\recenzja-159b-fix2-wf_e0014686-1ec.js, resumeFromRunId).
    Gdy recenzja i test OK -> WGRANIE 125 (159+159b): kopia .bak + D:, md5, statusy w CHANGELOG n161, push.
-3. Muzyka: 9 utworow ElevenLabs Music (scratchpad\muzyka_bitwy\probka\bit_NN_*.mp3; petla w muzyka_9.log pomija gotowe - mozna uruchomic jeszcze raz:
-   probka_muzyki.py <nazwa> dla brakujacych). Jeff o probce bit_04_szarza: "tak swietny klimat". Kredyty: ok. 44k przed 9 utworami (~2.1k/utwor).
+3. Muzyka: GOTOWE wszystkie 10 utworow (13:50) w scratchpad\muzyka_bitwy\probka\bit_01..10_*.mp3 (01 = 120 s, reszta 150 s). Jeff o probce bit_04:
+   "tak swietny klimat". Kredyty ElevenLabs po muzyce: ok. 26.3k (licznik aktualizuje sie z opoznieniem).
 4. Paczka 164 (muzyka tylko w bitwie, motywy wojenne off z mapy) - workflow wf_57fa2a26-aee w zb\n164 (galaz noc/164-muzyka-bitwy od 87aaa764).
    Po nim: tools/muzyka/bitwa_v2.py na 10 mp3 -> ogg w 4 zestawach lufs -> wgrac pliki + DLL 164 (scalony z 159 jesli 125 wgrane) po autotescie.
 **DECYZJE JEFFA 26.10:** nadzy lordowie "Pozyczka + mniejsze" + max 10% bez broni (brak pancerza OK); ubrania chlopow barwy ziemi bez szlacheckich;
