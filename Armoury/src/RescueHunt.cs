@@ -30,7 +30,9 @@ namespace Armoury
     ///  - Ranga: T3 wladca krolestwa albo jego bliscy (malzonek, dzieci, rodzice, rodzenstwo) z rodu panujacego; T2 glowa rodu albo jej bliscy; T1 inny lord.
     ///  - Wiesc (bez wszechwiedzy): z miejsca pojmania jezdziec do najblizszej twierdzy krolestwa jenca (dalej niz 40 jedn. - Ravens.NearRange; 2.5 jedn./h =
     ///    kruk Ravens.SpeedPerHour / 2.5 - "kruk = ok. 2.5 x dzien jazdy"), stamtad kruk do siedziby rodu (T3: siedziby wladcy) - Ravens.EtaHours (3 h + d / 6.25,
-    ///    najwyzej 12 dob). Kazda druzyna wie w chwili: wiesc w siedzibie + EtaHours(siedziba -> druzyna) (do 40 jedn. od siedziby - od razu, jak Ravens).
+    ///    najwyzej 12 dob). 222c: albo - gdy szybciej - jezdziec do najblizszej NIEOBLEGANEJ twierdzy (zamek albo miasto) DOWOLNEJ frakcji, ktorej maester
+    ///    wysyla kruka do siedziby (te same liczby); tez dla lochu; lowy z zapisu dostaja min(stary plan, nowy plan) (Recalc w Resolve).
+    ///    Kazda druzyna wie w chwili: wiesc w siedzibie + EtaHours(siedziba -> druzyna) (do 40 jedn. od siedziby - od razu, jak Ravens).
     ///    Kurier z okupem (RansomOfferCampaignBehavior / Ransom178.ConsiderPrefix) nie przychodzi, zanim rod nie wie (HoldCourier).
     ///  - Slady (ostatnie znane miejsce, najwyzej 8): druzyna lorda krolestwa jenca widzi cel (odleglosc &lt;= jej SeeingRange; sama wie od razu, inni - jezdziec
     ///    2.5 jedn./h); osada krolestwa widzi cel (w niej albo w 12 jedn. dniem / 6 noca - podstawa widzenia gry; wiesc wzorem wiesci o pojmaniu); loch osady.
@@ -176,7 +178,7 @@ namespace Armoury
         internal static void Reset()
         {
             _hunts.Clear(); Volatile.Write(ref _snap, Empty); _pendingH.Clear(); _pendingS.Clear();
-            _importN = -1; _importBad = 0; _lastHour = -1.0; _hourNowH = _hourPrevH = -1.0; _sessionDays = 0; _stumbles = 0; _adopted = false;
+            _importN = -1; _importBad = 0; _lastHour = -1.0; _hourNowH = _hourPrevH = -1.0; _sessionDays = 0; _stumbles = 0; _adopted = false; _forts = null;
             lock (_err) _err.Clear();
             ClearDay();
             TestReset();
@@ -349,6 +351,65 @@ namespace Armoury
             return d <= NearRange ? 0.0 : Ravens.EtaHours(d);
         }
 
+        // 222c (autotest 127a: Tywin wziety na Skagos, najblizsza twierdza jego krolestwa Duskendale 665 jedn. - wiesc po 13 dobach): maester jest w kazdym
+        // zamku i miescie, a porywacz sam wysyla kruka z zadaniem okupu - wiesc idzie tez przez najblizsza twierdze DOWOLNEJ frakcji, ktora nie jest oblegana
+        // (z oblezonej kruk nie wyleci). Te same liczby co droga przez twierdze krolestwa: jezdziec RiderPerHour powyzej NearRange, kruk Ravens.EtaHours.
+        // Kruki R3-05c nie wysylaja kruka do siedziby jenca (ich kolejka to tylko czat gracza; pojmanie przez gracza idzie na czat od razu) - wspolne sa liczby.
+        private static List<Settlement> _forts;
+
+        private static Settlement NearestOpenFort(Vec2 p)
+        {
+            if (_forts == null)
+            {
+                var l = new List<Settlement>();
+                foreach (var s in Settlement.All) if (s != null && s.IsFortification) l.Add(s);
+                _forts = l;
+            }
+            Settlement best = null; float bd = float.MaxValue;
+            for (int i = 0; i < _forts.Count; i++)
+            {
+                var st = _forts[i];
+                if (st.SiegeEvent != null) continue;
+                float d = st.GetPosition2D.Distance(p);
+                if (d < bd) { bd = d; best = st; }
+            }
+            return best;
+        }
+
+        /// <summary>222c: wiesc z miejsca p do siedziby q - szybsza z dwoch drog: (a) jezdziec do najblizszej nieoblezonej twierdzy dowolnej frakcji i kruk jej
+        /// maestra, (b) NewsPlan (twierdza krolestwa jenca - jak dotad). Remis - (b). any = wybrana (a); alt - opis drugiej drogi do linii logu.</summary>
+        private static double SeatNews(Vec2 p, Kingdom k, Vec2 q, out Settlement f, out float d1, out double h1, out float d2, out double h2, out bool any, out string alt)
+        {
+            Settlement fb; float b1, b2; double g1, g2;
+            double etaB = NewsPlan(p, k, q, out fb, out b1, out g1, out b2, out g2);
+            var fa = NearestOpenFort(p);
+            double etaA = double.MaxValue, e1 = 0.0, e2 = 0.0; float a1 = 0f, a2 = 0f;
+            if (fa != null)
+            {
+                var fp = fa.GetPosition2D;
+                a1 = p.Distance(fp); e1 = a1 <= NearRange ? 0.0 : a1 / RiderPerHour;
+                a2 = fp.Distance(q); e2 = a2 <= NearRange ? 0.0 : Ravens.EtaHours(a2);
+                etaA = e1 + e2;
+            }
+            any = fa != null && etaA < etaB;
+            if (any)
+            {
+                f = fa; d1 = a1; h1 = e1; d2 = a2; h2 = e2;
+                alt = "przez twierdze krolestwa jenca " + (fb != null ? Nm(fb) : "brak") + " bylaby za " + F1(etaB) + " h";
+                return etaA;
+            }
+            f = fb; d1 = b1; h1 = g1; d2 = b2; h2 = g2;
+            alt = fa != null ? "najblizsza wolna twierdza " + Nm(fa) + " (frakcja " + Nm(fa.MapFaction) + ") bylaby za " + F1(etaA) + " h" : "brak wolnej twierdzy";
+            return etaB;
+        }
+
+        private static string Route(Settlement f, bool any, string alt)
+        {
+            string s = any ? "kruk z najblizszej twierdzy " + Nm(f) + " (frakcja " + Nm(f != null ? f.MapFaction : null) + ")"
+                           : f != null ? "twierdza krolestwa jenca " + Nm(f) : "kruk z miejsca (krolestwo bez twierdz)";
+            return s + ", " + alt;
+        }
+
         private static double NewsAt(Hunt t, Vec2 q) { return t.SeatH + FromSeat(t.Seat, q); }
 
         private static bool SeatOf(Hunt t, Vec2 fallback, out Vec2 pos, out string name)
@@ -448,8 +509,8 @@ namespace Armoury
             Vec2 seat; string seatName;
             SeatOf(t, at, out seat, out seatName);
             t.SX = seat.X; t.SY = seat.Y; t.SeatName = Clean(seatName);
-            Settlement f; float d1, d2; double h1, h2;
-            double eta = NewsPlan(at, k, seat, out f, out d1, out h1, out d2, out h2);
+            Settlement f; float d1, d2; double h1, h2; bool any; string alt;
+            double eta = SeatNews(at, k, seat, out f, out d1, out h1, out d2, out h2, out any, out alt);
             t.SeatH = Math.Max(t.StartH + eta, now);
             if (captor.IsSettlement) { t.DungeonId = captor.Settlement.StringId; t.DungeonH = t.SeatH; }
             // slad pojmania - znany z wiescia (twierdza = siedziba, godzina = wiesc w siedzibie); przejety jeniec - miejsce z tej chwili
@@ -460,7 +521,8 @@ namespace Armoury
             if (adopted) by += " (przejete: w niewoli od " + F1(now - t.StartH) + " h)";
             Log.Info(P + "pojmanie | " + When() + " | " + Nm(h) + " (" + TierName[t.Tier] + ") rodu " + Nm(c) + " krolestwa " + Nm(k) + " przez " + by
                      + " | przy " + NearName(at) + " | twierdza " + (f != null ? Nm(f) : "brak") + " " + F1(d1) + " jedn. (konno " + F1(h1) + " h)"
-                     + " | kruk do " + t.SeatName + " " + F1(d2) + " jedn. (" + F1(h2) + " h) | dotrze za " + F1(t.SeatH - now) + " h (godzina gry " + F1(t.SeatH) + ").");
+                     + " | kruk do " + t.SeatName + " " + F1(d2) + " jedn. (" + F1(h2) + " h) | dotrze za " + F1(t.SeatH - now) + " h (godzina gry " + F1(t.SeatH) + ")"
+                     + " | droga wiesci: " + Route(f, any, alt) + ".");
             return t;
         }
 
@@ -803,12 +865,14 @@ namespace Armoury
             // loch
             if (x != null && t.DungeonId != x.StringId)
             {
-                Settlement f; float d1, d2; double h1, h2;
-                double eta = NewsPlan(x.GetPosition2D, t.K, t.Seat, out f, out d1, out h1, out d2, out h2);
+                // 222c: o lochu tez szybsza z dwoch drog (zwykle kruk maestra samej twierdzy lochu, gdy nie jest oblegana)
+                Settlement f; float d1, d2; double h1, h2; bool any; string alt;
+                double eta = SeatNews(x.GetPosition2D, t.K, t.Seat, out f, out d1, out h1, out d2, out h2, out any, out alt);
                 t.DungeonId = x.StringId; t.DungeonH = Math.Max(now + eta, t.SeatH); t.DungeonTold = false;
                 var xp = x.GetPosition2D;
                 AddSight(t, new Sight { H = now, X = xp.X, Y = xp.Y, Kind = SDungeon, FH = t.DungeonH, FX = t.SX, FY = t.SY });
-                Log.Info(P + "loch | " + When() + " | " + Nm(h) + " w lochu " + Nm(x) + " | wiesc do " + t.SeatName + " za " + F1(t.DungeonH - now) + " h (godzina gry " + F1(t.DungeonH) + ").");
+                Log.Info(P + "loch | " + When() + " | " + Nm(h) + " w lochu " + Nm(x) + " | wiesc do " + t.SeatName + " za " + F1(t.DungeonH - now) + " h (godzina gry " + F1(t.DungeonH) + ")"
+                         + " | droga wiesci: " + Route(f, any, alt) + ".");
             }
             else if (x == null && t.DungeonId.Length > 0)
             {
@@ -1239,6 +1303,29 @@ namespace Armoury
                 catch { _importBad++; }
             }
             _pendingH.Clear(); _pendingS.Clear();
+            // 222c: lowy z zapisu 222/222b dostaja wczesniejszy plan wiesci (najblizsza twierdza dowolnej frakcji) - min(stary plan, nowy plan)
+            foreach (var t in map.Values)
+            {
+                try { Recalc(t); } catch (Exception e) { Stumble("Recalc", e); }
+            }
+        }
+
+        /// <summary>222c: plan wiesci lowow z zapisu liczony od nowa z miejsca pojmania (X, Y), siedziby i poczatku niewoli - tylko gdy wiesc jeszcze nie doszla
+        /// i nowy plan wczesniejszy; najwczesniej teraz (jak Open). Slad pojmania i loch z tym samym planem przesuwane razem. Ten sam plan - bez zmian
+        /// (zapis tam i z powrotem T3 identyczny).</summary>
+        private static void Recalc(Hunt t)
+        {
+            if (t == null || t.Told || t.K == null) return;
+            Settlement f; float d1, d2; double h1, h2; bool any; string alt;
+            double eta = SeatNews(new Vec2(t.X, t.Y), t.K, t.Seat, out f, out d1, out h1, out d2, out h2, out any, out alt);
+            double now = NowH, old = t.SeatH;
+            double nh = Math.Max(t.StartH + eta, now);
+            if (nh >= old - 0.01) return;
+            t.SeatH = nh;
+            foreach (var s in t.Sights) if ((s.Kind == SCapture || s.Kind == SDungeon) && Math.Abs(s.FH - old) < 1e-6) s.FH = nh;
+            if (t.DungeonH >= 0.0 && Math.Abs(t.DungeonH - old) < 1e-6) t.DungeonH = nh;
+            Log.Info(P + "wiesc przeliczona (222c) | " + When() + " | " + Nm(t.Captive) + " | dotrze za " + F1(nh - now) + " h (godzina gry " + F1(nh) + ", poprzednio " + F1(old) + ")"
+                     + " | droga wiesci: " + Route(f, any, alt) + ".");
         }
     }
 }

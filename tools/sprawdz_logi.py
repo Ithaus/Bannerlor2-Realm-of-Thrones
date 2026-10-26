@@ -70696,7 +70696,10 @@ ODB_WEAK_MODES = ("armia", "za slabi - czekaja", "loch - za slabi", "trop zimny"
 ODB_MODES = ODB_SEL_MODES + ODB_WEAK_MODES + ("brak celu",)   # brak celu: gracz w niewoli albo jeniec w lochu, o ktorym rod nie wie (bez lowcow - ODB-4 m == 0)
 ODB_RE_START = re.compile(r"Odbicie \(222\): start sesji \| .*\| lowy z zapisu (\d+) \((?:bledne (\d+)|brak klucza)")
 ODB_RE_POJ = re.compile(r"Odbicie \(222\): pojmanie \| dzien (\d+) godz (\d+) \| (.+?) \((T\d) [^)]*\) rodu (.+?) krolestwa (.+?) przez (.+?) \| przy (.+?) \| twierdza (.+?) "
-                        r"([\d.]+) jedn\. \(konno ([\d.]+) h\) \| kruk do (.+?) ([\d.]+) jedn\. \(([\d.]+) h\) \| dotrze za ([\d.]+) h \(godzina gry ([\d.]+)\)\.")
+                        r"([\d.]+) jedn\. \(konno ([\d.]+) h\) \| kruk do (.+?) ([\d.]+) jedn\. \(([\d.]+) h\) \| dotrze za ([\d.]+) h \(godzina gry ([\d.]+)\)"
+                        r"(?: \| droga wiesci: (.+?))?\.\s*$")   # 222c: ogon "droga wiesci" (grupa 17; stare linie bez niego)
+# 222c: lowy z zapisu z wczesniejszym planem wiesci (Recalc w Resolve) - nowy plan jenca dla ODB-1
+ODB_RE_PRZ = re.compile(r"Odbicie \(222\): wiesc przeliczona \(222c\) \| dzien \d+ godz \d+ \| (.+?) \| dotrze za ([\d.]+) h \(godzina gry ([\d.]+), poprzednio ([\d.]+)\)")
 ODB_RE_WIE = re.compile(r"Odbicie \(222\): wiesc doszla \| dzien \d+ godz \d+ \| rod (.+?) wie o (.+?) po ([\d.]+) h \(godzina gry ([\d.]+), plan ([\d.]+)\)(.*)$")
 ODB_RE_SEL = re.compile(r"\| wybrani (\d+) sila (\d+) / potrzeba (\d+)(?: \(1\.5 x \d+\))? \| lowcow (\d+) sila (\d+)")
 ODB_RE_MODE = re.compile(r"Odbicie \(222\): (" + "|".join(re.escape(m) for m in ODB_MODES) + r") \| dzien \d+ godz \d+ \| (.+?) \| wybrani")
@@ -70709,6 +70712,8 @@ ODB_TEST = {
     "start": "[22:00:00] Odbicie (222): start sesji | klucze Rescue Hunt tak, Rescue Hunt Realm tak, Rescue Hunt Tell Player tak | latka AiHourlyTick 150 TAK (wlasciciele a/b) | kurier 178 TAK | lowy z zapisu 2 (bledne 0) | jezdziec 2.5 jedn./h, od razu do 40 jedn., potrzeba 1.5 x sila celu, trop zimny po 72 h, zasieg 8.02/4.01 dob marszu.",
     "start0": "[22:00:00] Odbicie (222): start sesji | klucze Rescue Hunt tak, Rescue Hunt Realm tak, Rescue Hunt Tell Player tak | latka AiHourlyTick 150 TAK (wlasciciele a/b) | kurier 178 TAK | lowy z zapisu 0 (brak klucza arm_odbicie - nowa kampania albo stary zapis) | jezdziec 2.5 jedn./h.",
     "poj": "[22:00:10] Odbicie (222): pojmanie | dzien 4500 godz 13 | Tywin Lannister (T2 glowa rodu) rodu House Lannister krolestwa Westerlands przez gracz | przy Hillfork | twierdza Deep Den 14.7 jedn. (konno 0.0 h) | kruk do Casterly Rock 133.0 jedn. (24.3 h) | dotrze za 24.3 h (godzina gry 108013.3).",
+    "poj2": "[22:00:10] Odbicie (222): pojmanie | dzien 108987 godz 3 | Tywin Lannister (T2 glowa rodu) rodu Lannister krolestwa House Baratheon of King's Landing przez gracz (przejete: w niewoli od 13.2 h) | przy Driftwood Hall | twierdza Driftwood Hall 1.2 jedn. (konno 0.0 h) | kruk do Lannisport 851.8 jedn. (139.3 h) | dotrze za 126.1 h (godzina gry 2615817.9) | droga wiesci: kruk z najblizszej twierdzy Driftwood Hall (frakcja House Stane), przez twierdze krolestwa jenca Duskendale bylaby za 334.8 h.",
+    "prz": "[22:00:00] Odbicie (222): wiesc przeliczona (222c) | dzien 108990 godz 0 | Tywin Lannister | dotrze za 50.1 h (godzina gry 2615817.9, poprzednio 2616013.4) | droga wiesci: kruk z najblizszej twierdzy Driftwood Hall (frakcja House Stane), przez twierdze krolestwa jenca Duskendale bylaby za 334.8 h.",
     "wie": "[22:10:00] Odbicie (222): wiesc doszla | dzien 4501 godz 14 | rod House Lannister wie o Tywin Lannister po 25.0 h (godzina gry 108014.0, plan 108013.3) | wybrani 3 sila 450 / potrzeba 300 (1.5 x 200) | lowcow 5 sila 700 (jeszcze nie wiedza 2, zimny trop 0, za daleko 1, pominieci 0 w tym wyjazd po bron 0) | zasieg 8.02/4.01 dob | ostatnio widziany Hillfork 25 h temu (pojmanie).",
     "mode": "[22:10:00] Odbicie (222): szuka | dzien 4501 godz 14 | Tywin Lannister | wybrani 3 sila 450 / potrzeba 300 | lowcow 5 sila 700 | cel Jeff's Party (sila 200) | rozkazy: poscig 0, szukanie 3, oblezenie 0 | nie wiedza 2, zimny trop 0, za daleko 1, pominieci 0 (wyjazd po bron 0).",
     "kur": "[22:05:00] Odbicie (222): kurier wstrzymany | dzien 4501 godz 0 | Tywin Lannister (rod jeszcze nie wie, wiesc za 13.3 h).",
@@ -70730,6 +70735,14 @@ def odbicie222_selftest():
     m = ODB_RE_POJ.search(T["poj"])
     if not m or m.group(3) != "Tywin Lannister" or m.group(4) != "T2" or float(m.group(15)) != 24.3 or float(m.group(16)) != 108013.3:
         return "pojmanie"
+    if m.group(17) is not None:
+        return "pojmanie bez drogi wiesci (linia sprzed 222c)"
+    m = ODB_RE_POJ.search(T["poj2"])
+    if not m or m.group(3) != "Tywin Lannister" or m.group(9) != "Driftwood Hall" or float(m.group(15)) != 126.1 or float(m.group(16)) != 2615817.9             or not (m.group(17) or "").startswith("kruk z najblizszej twierdzy Driftwood Hall (frakcja House Stane)"):
+        return "pojmanie z droga wiesci (222c)"
+    m = ODB_RE_PRZ.search(T["prz"])
+    if not m or m.group(1) != "Tywin Lannister" or float(m.group(3)) != 2615817.9 or float(m.group(4)) != 2616013.4:
+        return "wiesc przeliczona (222c)"
     m = ODB_RE_WIE.search(T["wie"])
     if not m or m.group(2) != "Tywin Lannister" or float(m.group(4)) != 108014.0 or float(m.group(5)) != 108013.3:
         return "wiesc doszla"
@@ -70773,6 +70786,10 @@ def odbicie222_collect(logp):
             if m:
                 D["ev"].append(("poj", m.group(3), float(m.group(16)), float(m.group(15))))
                 continue
+            m = ODB_RE_PRZ.search(ln)
+            if m:
+                D["ev"].append(("prz", m.group(1), float(m.group(3))))
+                continue
             m = ODB_RE_WIE.search(ln)
             if m:
                 s = ODB_RE_SEL.search(m.group(6))
@@ -70810,7 +70827,7 @@ def odbicie222_rows(rep, D):
     plan = {}
     bad1, n1 = [], 0
     for e in ev:
-        if e[0] == "poj":
+        if e[0] in ("poj", "prz"):   # 222c: 'wiesc przeliczona' - nowy plan lowow z zapisu
             plan[e[1]] = e[2]
         elif e[0] == "wie":
             n1 += 1

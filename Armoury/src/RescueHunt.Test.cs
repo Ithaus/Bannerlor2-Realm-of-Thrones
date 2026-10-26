@@ -14,7 +14,7 @@ namespace Armoury
     /// plik tylko czytany; w zwyklej grze nic nie robi). Raz na sesje, od 2. do 10. doby sesji, gdy gracz nie jest w bitwie ani spotkaniu:
     ///  T0 wybor: wolna glowa rodu krolestwa w wojnie z graczem (nie jeniec sceny prologu, nie druzyna sceny, nie Inni), najblizsza graczowi; bez wojny - POMINIETY
     ///     (wojny proba nie wypowiada);
-    ///  T1 TakePrisonerAction.Apply(druzyna gracza, glowa rodu) - lowy otwarte, plan wiesci = wzor liczony tu niezaleznie (jazda do twierdzy, kruk do siedziby);
+    ///  T1 TakePrisonerAction.Apply(druzyna gracza, glowa rodu) - lowy otwarte, plan wiesci = wzor liczony tu niezaleznie (jazda do twierdzy, kruk do siedziby; 222c - szybsza z: twierdza krolestwa jenca, najblizsza nieoblegana twierdza dowolnej frakcji);
     ///  T2 bramka kuriera zamknieta przed wiescia (plan 0 h - POMINIETY);
     ///  T3 zapis tam i z powrotem (Export -> Import -> Export) identyczny;
     ///  T4 (godzinny przeglad) "wiesc doszla" przy pierwszym przegladzie po planie (poprzedni przeglad przed planem - przeskok zegara gry nie myli);
@@ -123,6 +123,16 @@ namespace Armoury
                 double ride = best != null && bd > 40f ? bd / 2.5 : 0.0;
                 float d2 = from.Distance(seat);
                 double raven = d2 > 40f ? Math.Min(288.0, 3.0 + d2 / 6.25) : 0.0;
+                // 222c: druga droga - najblizsza nieoblegana twierdza dowolnej frakcji; wybrana szybsza (remis - twierdza krolestwa)
+                Settlement anyF = null; float ad = float.MaxValue;
+                foreach (var st in Settlement.All) { if (st == null || !st.IsFortification || st.SiegeEvent != null) continue; float d = st.GetPosition2D.Distance(at); if (d < ad) { ad = d; anyF = st; } }
+                if (anyF != null)
+                {
+                    double ride2 = ad > 40f ? ad / 2.5 : 0.0;
+                    float d3 = anyF.GetPosition2D.Distance(seat);
+                    double raven2 = d3 > 40f ? Math.Min(288.0, 3.0 + d3 / 6.25) : 0.0;
+                    if (ride2 + raven2 < ride + raven) { ride = ride2; raven = raven2; }
+                }
                 double plan = start + ride + raven;
                 _tPlan = t.SeatH;
                 bool ok1 = Math.Abs(plan - t.SeatH) < 0.01;
