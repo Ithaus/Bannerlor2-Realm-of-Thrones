@@ -1143,9 +1143,9 @@ Uzycie (Python 3, tylko odczyt):
                     rezygnacje, brak psai / utworow - 0. Paczka 165 zmienia tez m109muz: koniec okna '- mapa dalej', koniec bitwy '(muzyka mapy)' i 'przejmuje muzyka mapy'
                     zamiast 'wrocila' (MUZ-3, MUZ-6, MUZ-8). 165b (Jeff 26.10 ok. 20:10 "i leca dwie naraz"): MAP-7 jedno zrodlo muzyki na mapie - linie 'kontrola (...)'
                     (co 30 s mapy, po 1 s i po koncu utworu): NIE, gdy nasze zdarzenia grajace > 1 albo 0 przy utworze mapy, psai master > 0.01, zapisow 0 < 0.9 x klatek
-                    (brak trzymania co klatke - np. ARMOURY_MAPHOLD_STARE=1), 2 kolejne linie z glosem psai 0-6 grajacym natywnie poza trybem menu (zatrzymanie motywu
-                    nie dziala), mapa wlaczona >= 90 s zegara (poza oknami) bez linii kontroli (log sprzed 165b z mapa >= 90 s - NIE); MAP-7b INFO: glosy psai pod
-                    nasza mapa w trybie menu i na warstwie 7-8 (tylko trzymane na 0), nowe odcinki psai, zatrzymania motywu gry, 'misja bez bitwy' / 'trzymanie misji (po 20 s)'
+                    (brak trzymania co klatke - np. ARMOURY_MAPHOLD_STARE=1), 2 kolejne linie z glosem psai 0-6 grajacym natywnie (fade > 0.01, stan psai playing) poza trybem menu
+                    (zatrzymanie motywu nie dziala; glos z fade <= 0.01 nie liczony - nieslyszalny; glos przy stanie psai silence / rest - resztka odcinka, MAP-7b), mapa wlaczona >= 90 s zegara (poza oknami) bez linii kontroli (log sprzed 165b z mapa >= 90 s - NIE); MAP-7b INFO: glosy psai pod
+                    nasza mapa w trybie menu, na warstwie 7-8 i resztki odcinkow poza motywem (tylko trzymane na 0), nowe odcinki psai, zatrzymania motywu gry, 'misja bez bitwy' / 'trzymanie misji (po 20 s)'
                     (165b recenzja; koniec okna przy trzymaniu 'koniec wydarzenia - muzyka gry trzymana na 0 (...)' w m109muz jak koniec okna). MAP-3 przyjmuje
                     stop mapy 'muzyka gry trzymana na 0 do startu misji' (165b: bez FadeUp do startu misji) i linie 'misja bez bitwy (...) - muzyka gry wraca'.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
@@ -69541,16 +69541,28 @@ def m165mapa_collect(logp):
                 if fr > 0 and wr < M165MAPA_WRITE_MIN * fr:
                     D["ctl_bad"].append(f"{tag}: zapisow 0 {wr}/{fr} klatek - brak trzymania co klatke")
                 main = layer = False
+                left = []       # 165b recenzja 2: glos 0-6 grajacy natywnie, ktorego psai nie prowadzi (stan nie playing) - resztka odcinka
+                pstate = mm.group(5)
                 for v in RX["voice"].findall(mm.group(9)):
                     if v[5] != "TAK":
                         continue
+                    # fade 0.00 - glos nieslyszalny przy kazdym master (glosnosc kanalu = master x fade); psai nie wola StopChannel, gdy jego zegar odcinka
+                    # juz minal (Logik.updateFades), wiec IsMusicPlaying zostaje TAK minutami po bitwie
+                    if v[3] != "?" and float(v[3]) <= M165MAPA_TOL:
+                        continue
                     if int(v[0]) >= M165MAPA_LAYER:
                         layer = True
-                    else:
+                    elif pstate in ("playing", "?"):
                         main = True
+                    else:
+                        left.append(f"v{v[0]}:m{v[1]}/o{v[2]} fade {v[3]}")
+                if left:
+                    D["ctl_warn"].append(f"{tag}: glos psai 0-6 poza motywem (stan psai {pstate}, resztka odcinka - nasz kod go nie zatrzymuje) gra natywnie, "
+                                         f"trzymany na 0: {', '.join(left)}")
                 cur_main = main and menu == "NIE"
                 if cur_main and prev_main:
-                    D["ctl_bad"].append(f"{tag}: glos psai 0-6 gra natywnie w 2 kolejnych kontrolach poza trybem menu ({mm.group(9)[:80]})")
+                    D["ctl_bad"].append(f"{tag}: glos psai 0-6 (fade > {M165MAPA_TOL}, stan psai playing) gra natywnie w 2 kolejnych kontrolach poza trybem menu "
+                                        f"- zatrzymanie motywu nie dziala ({mm.group(9)[:80]})")
                 prev_main = cur_main
                 if main and menu == "TAK":
                     D["ctl_warn"].append(f"{tag}: tryb menu - glos psai gra natywnie (trzymany na 0)")
@@ -69679,13 +69691,13 @@ def m165mapa_rows(rep, D):
         + (f", ostatnia: psai master {last[1]}, zapisow 0 {last[2]}/{last[3]}, stan psai {last[4]}, glosy psai {last[7]}, nasze zdarzenia {last[11]}" if last else "") \
         + (" | " + "; ".join(probs[:3]) + (f" (+{len(probs) - 3})" if len(probs) > 3 else "") if probs else "")
     rep.add("MAP-7: jedno zrodlo muzyki na mapie (kontrola 165b)", val,
-            "w kazdej kontroli: nasze zdarzenia grajace <= 1 (0 tylko w przerwie), psai master <= 0.01, zapisow 0 >= 0.9 x klatek; glos psai 0-6 grajacy natywnie poza "
-            f"trybem menu najwyzej w 1 kontroli z rzedu; mapa (poza oknami) bez kontroli < {M165MAPA_CTL_GAP} s zegara (bez mapy - INFO)",
+            "w kazdej kontroli: nasze zdarzenia grajace <= 1 (0 tylko w przerwie), psai master <= 0.01, zapisow 0 >= 0.9 x klatek; glos psai 0-6 grajacy natywnie "
+            f"(fade > {M165MAPA_TOL}, stan psai playing) poza trybem menu najwyzej w 1 kontroli z rzedu; mapa (poza oknami) bez kontroli < {M165MAPA_CTL_GAP} s zegara (bez mapy - INFO)",
             (not probs) if (D["ctl"] or D["ons"] or probs) else None)
-    rep.add("MAP-7b: glosy psai pod nasza mapa (tryb menu / warstwa), nowe odcinki, zatrzymania motywu", f"ostrzezen {len(D['ctl_warn'])}"
+    rep.add("MAP-7b: glosy psai pod nasza mapa (tryb menu / warstwa / resztki odcinkow), nowe odcinki, zatrzymania motywu", f"ostrzezen {len(D['ctl_warn'])}"
             + (f" ({D['ctl_warn'][0]})" if D["ctl_warn"] else "") + f", linii nowych odcinkow {D['segs']}, linii zatrzyman motywu {D['thstops']}, misja bez bitwy "
             f"{D['nobat']}, kontrola psai {D['diag'] or '-'}" + (f", w ostatniej kontroli nowych odcinkow {D['ctl_last'][9]}, zatrzyman {D['ctl_last'][10]}" if D["ctl_last"] else ""),
-            "INFO (tryb menu i warstwa 7-8 - psai tylko trzymane na 0; sluchem sprawdza Jeff)", None)
+            "INFO (tryb menu, warstwa 7-8 i resztki odcinkow poza motywem - psai tylko trzymane na 0; sluchem sprawdza Jeff)", None)
 
 
 def m165mapa_synth():
@@ -69726,7 +69738,7 @@ def m165mapa_synth():
                           "[10:00:00] ERROR in EventMusic.MapaTlo.Next (potkniecie 1; kolejne tylko liczone): System.Exception: test"]
             elif kind == "keyno":
                 L.append(P + T["startno"])
-            elif kind in ("gap", "voice", "stare", "old"):   # 165b: pojedyncze reguly MAP-7
+            elif kind in ("gap", "voice", "stare", "old", "left"):   # 165b: pojedyncze reguly MAP-7 (left: resztki odcinkow - recenzja 2)
                 L += [P + T["start"], P + T["on"], P + (T["duck3"] if kind == "stare" else T["duck2"]), trk(1, "map_01_krolewski_trakt.ogg", "start", 1)]
                 if kind == "gap":
                     L += [P + T["ctl1"], "[10:01:40] Armoury: inna linia"]
@@ -69734,6 +69746,11 @@ def m165mapa_synth():
                     L += [P + T["ctl1"], P + T["ctl1"].replace("po 1 s utworu", "co 30 s")]
                 elif kind == "stare":
                     L += [P + T["ctl1"].replace("zapisow 0 240/240", "zapisow 0 1/240")]
+                elif kind == "left":    # bieg 21:04:28: v2 fade 0.00 i v0 fade 1.00 przy stanie silence przez kilka kontroli
+                    c0 = T["ctl1"].replace("fade 0.40", "fade 0.00")
+                    c1 = c0.replace("stan psai playing, motyw 12", "stan psai silence, motyw -1").replace(
+                        "[v2:m12/o340 fade 0.00 master 0.00 natywnie TAK]", "[v0:m10/o167 fade 1.00 master 0.00 natywnie TAK; v2:m26/o260 fade 0.00 master 0.00 natywnie TAK]")
+                    L += [P + c0, P + c0.replace("po 1 s utworu", "co 30 s"), P + c1.replace("po 1 s utworu", "co 30 s"), P + c1.replace("po 1 s utworu", "co 30 s")]
                 else:
                     L += ["[10:02:00] Armoury: inna linia"]
             L.append("[10:00:00] Armoury: inna linia" if kind not in ("gap", "old") else "[10:02:00] Armoury: inna linia")
@@ -69749,7 +69766,7 @@ def m165mapa_synth():
         "nostart": {"MAP-0": "INFO", "MAP-1": "INFO", "MAP-2": "INFO", "MAP-3": "INFO", "MAP-4": "INFO", "MAP-5": "INFO", "MAP-6": "TAK", "MAP-7": "INFO"},
         "keyno": {"MAP-0": "INFO", "MAP-1": "INFO", "MAP-2": "INFO", "MAP-3": "INFO", "MAP-4": "INFO", "MAP-5": "INFO", "MAP-6": "TAK", "MAP-7": "INFO"},
         # 165b MAP-7 - kazda regula osobno (gap: 100 s mapy bez kontroli; voice: glos 0-6 natywnie w 2 kontrolach; stare: zapisy 0 bez trzymania; old: log sprzed 165b)
-        "gap": {"MAP-7": "NIE"}, "voice": {"MAP-7": "NIE"}, "stare": {"MAP-7": "NIE"}, "old": {"MAP-7": "NIE"},
+        "gap": {"MAP-7": "NIE"}, "voice": {"MAP-7": "NIE"}, "stare": {"MAP-7": "NIE"}, "old": {"MAP-7": "NIE"}, "left": {"MAP-7": "TAK", "MAP-7b": "INFO"},
     }
     diff = []
     for kind, e in exp.items():
@@ -69767,7 +69784,7 @@ def m165mapa_main(logp):
         s2 = m165mapa_synth()
     except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
         s2 = f"wyjatek {type(e).__name__}: {e}"
-    rep.add("MAP-S2: test syntetyczny (dobry, zly, bez linii m165, klucz NIE; 165b MAP-7: przerwa kontroli, glos psai, stare trzymanie, log sprzed 165b)", s2 or "OK", "OK",
+    rep.add("MAP-S2: test syntetyczny (dobry, zly, bez linii m165, klucz NIE; 165b MAP-7: przerwa kontroli, glos psai, stare trzymanie, log sprzed 165b, resztki odcinkow)", s2 or "OK", "OK",
             s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("MAP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
