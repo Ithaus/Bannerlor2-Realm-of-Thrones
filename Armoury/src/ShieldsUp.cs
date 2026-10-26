@@ -60,6 +60,9 @@ namespace Armoury
     /// RidersShieldsUpUnderFire) zamiast stalego pominiecia WMounted - regula konnych w One (jednoreczna: tylko tarcza do lewej reki; dwureczna: tarcza
     /// + jednoreczna boczna albo ta sama bron jednorecznie, nie w szarzy szyku ani w kontrze P3; prog zmiany broni 4 m; bez EnforceShieldUsage);
     /// pomiar konnicy AI pod ostrzalem (P1) i wejscie kontry na strzelca (P3, HorsePursuit.Counter.cs) - plik ShieldsUp.Riders.cs.
+    /// 204 (26.10): Drain podaje KAZDE zdarzenie kolejki (strzal, trafienie, pudlo) do HorsePursuit.OnFire PRZED bramkami 140 (Shot / Hit wracaja przy kluczu
+    /// 140 NIE) - wykrycie konnego strzelca dziala takze bez tarcz; kolejka zywa w kazdej bitwie polowej (_huntKey = _cavField). Punkt upadku - Land (jedna
+    /// balistyka dla S3 140 i 204).
     /// </summary>
     internal static partial class ShieldsUp
     {
@@ -67,11 +70,13 @@ namespace Armoury
         internal const float PassEvery = 0.25f;     // pass ludzi
         internal const float FormEvery = 1f;        // pass szykow (S4, konnica, zmiany szyku)
         internal const float Window = 5f;           // okno strzalow na szyk
-        private const int CmdPerPass = 16, CmdPerBattle = 3000, UapPerPass = 32, QueriesPerPass = 64, QueriesPerFrame = 12;
+        private const int CmdPerPass = 16, CmdPerBattle = 3000, UapPerPass = 32;
+        internal const int QueriesPerPass = 64, QueriesPerFrame = 12;   // 204: te same limity zapytan (HorsePursuit.Hunt)
         private const int MaxTries = 3, StubbornAfter = 3, MaxFails = 5, QueueCap = 1024, DedupeN = 128;
         private const float RetryEvery = 4f, CheckAfter = 1.6f;           // kontrola 1.5 s od wykonania (polecenie idzie w nastepnej klatce)
         internal const float NoSwapNear = 8f, RaiseNear = 6f, ThrowerRaiseNear = 35f, CavalryNear = 90f;
-        private const float MissRadius = 4.5f, LandRadius = 8f, LandDrop = 1.6f, Gravity = 9.81f, MaxFlight = 6f, DedupeFor = 3f;
+        internal const float MissRadius = 4.5f, LandRadius = 8f, LandDrop = 1.6f, Gravity = 9.81f, MaxFlight = 6f;   // 204: te same promienie i balistyka
+        private const float DedupeFor = 3f;
         internal const float FavorPolearm = 1f, FavorMelee = 35f;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -438,7 +443,7 @@ namespace Armoury
             // 157: histogram i linia 140 jak dotad (klucz albo HitScribe); kolejka zdarzen takze dla pomiaru konnicy (P1) i kontry na strzelca (P3)
             _hist = _key || (c != null && c.HitScribeEnabled);
             CavBegin(m, c);
-            _live = _hist || _cavLog || _counterKey;
+            _live = _hist || _cavLog || _counterKey || _huntKey;
             _on = _key;
         }
 
@@ -582,9 +587,13 @@ namespace Armoury
             _qOverTotal += over;
             bool act = _on;
             bool deployed = false;
-            if (n > 0 && (act || _cavLog || _counterKey)) { try { deployed = m.IsDeploymentFinished; } catch { } }
+            if (n > 0 && (act || _cavLog || _counterKey || _huntKey)) { try { deployed = m.IsDeploymentFinished; } catch { } }
+            bool hunt = _huntKey && deployed;
+            if (hunt) HorsePursuit.FireFrame();
             for (int i = 0; i < n; i++)
             {
+                // 204: wykrycie konnego strzelca - przed bramkami 140 (wlasny try w OnFire)
+                if (hunt) HorsePursuit.OnFire(m, q[i].K, q[i].A, q[i].V, q[i].P, q[i].Vel);
                 try
                 {
                     if (q[i].K == 1) Shot(m, ref q[i], act && deployed);
@@ -616,13 +625,22 @@ namespace Armoury
             else if (s.IsAIControlled) _sHeroAi++;   // recenzja 140: bohater gracza pod SI (autotest) - ta sama sciezka S3, osobny licznik
             else _sPlayer++;
             // S3 (K6): punkt upadku z balistyki - opad LandDrop ponizej punktu wylotu, bez oporu powietrza
-            var v = ev.Vel;
+            Vec2 land;
+            if (!Land(ev.P, ev.Vel, out land)) return;
+            MarkNear(m, land, LandRadius, s.Team, -1);
+        }
+
+        /// <summary>S3 (K6) i 204: punkt upadku pocisku z balistyki - opad LandDrop ponizej punktu wylotu p, predkosc v, bez oporu powietrza, lot najwyzej
+        /// MaxFlight s; false = pocisk prawie pionowy (predkosc pozioma ponizej 1 m/s).</summary>
+        internal static bool Land(Vec3 p, Vec3 v, out Vec2 land)
+        {
+            land = Vec2.Invalid;
             float vh2 = v.x * v.x + v.y * v.y;
-            if (vh2 < 1f) return;
+            if (vh2 < 1f) return false;
             float t2 = (v.z + (float)Math.Sqrt(v.z * v.z + 2f * Gravity * LandDrop)) / Gravity;
             if (t2 > MaxFlight) t2 = MaxFlight;
-            var land = new Vec2(ev.P.x + v.x * t2, ev.P.y + v.y * t2);
-            MarkNear(m, land, LandRadius, s.Team, -1);
+            land = new Vec2(p.x + v.x * t2, p.y + v.y * t2);
+            return true;
         }
 
         private static void Hit(Mission m, ref Ev ev, bool act, bool deployed)

@@ -1148,6 +1148,13 @@ Uzycie (Python 3, tylko odczyt):
                     nasza mapa w trybie menu, na warstwie 7-8 i resztki odcinkow poza motywem (tylko trzymane na 0), nowe odcinki psai, zatrzymania motywu gry, 'misja bez bitwy' / 'trzymanie misji (po 20 s)'
                     (165b recenzja; koniec okna przy trzymaniu 'koniec wydarzenia - muzyka gry trzymana na 0 (...)' w m109muz jak koniec okna). MAP-3 przyjmuje
                     stop mapy 'muzyka gry trzymana na 0 do startu misji' (165b: bez FadeUp do startu misji) i linie 'misja bez bitwy (...) - muzyka gry wraca'.
+--grupa m204jazda : (26.10, paczka 204 noc/204-jazda-na-strzelca - Jeff 26.10 ok. 22:15 "jezdzcy widza ze do nich strzelam to nie stoja jak kretyni tylko jada w moim
+                    kierunku"; Armoury/src/HorsePursuit.Hunt.cs, HorsePursuit.HuntTest.cs, klucze RidersRunDownShooters, HuntHarasserInAutotest)
+                    python -I tools/sprawdz_logi.py --grupa m204jazda <Armoury-*.log> (strumieniowo). J204-S self-test wyrazen, J204-S2 test syntetyczny. J204-0 linia
+                    'Jazda na strzelca (204): misja' w kazdej bitwie polowej (NB2), klucz TAK, linie 204 rozpoznane; J204-1 nekajacy testu (>= 3 strzaly, wrog z wolna jazda):
+                    >= 1 wykrycie, w tym pudlo albo przelot; J204-2 >= 1 epizod i jezdzcow >= min(2, wolnej jazdy); J204-3 kontakt albo epizod 'padl od jezdzcow' /
+                    'odpedzony'; J204-4 z szyku gracza 0; J204-5 pod sterowaniem 204 na koniec 0, potkniecia jazda 0, 'ERROR in HorsePursuit' 0; J204-6 INFO (gra Jeffa:
+                    epizody na gracza). Bez nekajacego (DLL autotestu bez klucza harasser, plan bitwy inny niz mocna) J204-1..3 = NIE SPRAWDZONE (INFO), nie TAK.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -69014,6 +69021,7 @@ AI139_LINES = (
     ("147", "Bieg zlamanych (147): misja ", re.compile(r"\| potkniecia bieg (\d+)")),
     ("148", "poscig (148): misja ", re.compile(r"\| potkniecia poscig (\d+)")),
     ("149", "bohaterowie (149): misja ", re.compile(r"\| potkniecia bohaterowie (\d+)")),
+    ("204", "Jazda na strzelca (204): misja ", re.compile(r"\| potkniecia jazda (\d+)")),   # 204 (26.10): konnica na konnego strzelca - linia w kazdej bitwie polowej
 )
 AI139_ERR = re.compile(r"^ERROR in (?:ShieldsUp|CloseRanks|HorsePursuit|HeroCaution|BrokenFate|AiBreath|WindedShow|NoReturn|WoundedWithdraw|WoundedWary|PanicRun"
                        r"|SurvivalMode|Doctrine\.S2|RoutKeeper\.(?:Enqueue|QueuePin|TakeQueued|CloseWithdraw|EndOfBattle|TickWithdraw|WithdrawRemoved))\b")
@@ -69817,6 +69825,302 @@ def main(argv):
             return m165mapa_main(rest[0] if rest else None)
     return _m165mapa_main_prev(argv)
 
+
+# ------------------------------------------------------------ m204jazda (26.10, paczka 204 noc/204-jazda-na-strzelca: konnica AI przegania konnego strzelca - Jeff 26.10
+# ok. 22:15 "w bitwie strzelam do jezdzca nawet jak nie trafie a jezdzcy widza ze do nich strzelam to nie stoja jak kretyni tylko jada w moim kierunku";
+# Armoury/src/HorsePursuit.Hunt.cs, HorsePursuit.HuntTest.cs, klucze RidersRunDownShooters i HuntHarasserInAutotest)
+#   python -I tools/sprawdz_logi.py --grupa m204jazda <Armoury-*.log>
+M204_FIELD = re.compile(r"^Bitwa \(NB2\): misja bitwa \(pole bitwy TAK")
+M204_RX = {
+    "line": re.compile(r"^Jazda na strzelca \(204\): misja (\S+), klucz (TAK|NIE)"),
+    "det": re.compile(r"\| wykrycia (\d+) \(trafienia (\d+), pudla przy ludziach (\d+), przelot obok szyku (\d+), cel AI (\d+); strzelcow (\d+), w tym gracz (\d+);"),
+    "ep": re.compile(r"\| epizody (\d+) \(L1 (\d+) / L2 (\d+) / L3 (\d+);"),
+    "riders": re.compile(r"\| jezdzcy wyslani (\d+) \(szykow (\d+), z szyku w szarzy (\d+), konni lucznicy na cel (\d+), lucznicy pieszo na cel (\d+), strzaly w strzelca (\d+),"),
+    "contact": re.compile(r"\| kontakt (\d+) \(sr\. (\S+) / min (\S+) / max (\S+) s; ciosy w strzelca (\d+)\)"),
+    "out": re.compile(r"\| wyniki (.*?) \| nie wyslani:"),
+    "outkv": re.compile(r"([a-z][a-z ]*?) (\d+)(?:, |$)"),
+    "player": re.compile(r"\| z szyku gracza (\d+) \(oczekiwane 0\)"),
+    "left": re.compile(r"\| pod sterowaniem 204 na koniec (\d+) \(oczekiwane 0\)"),
+    "stum": re.compile(r"\| potkniecia jazda (\d+) \(wypadli (\d+)\)\.$"),
+    "start": re.compile(r"^Jazda na strzelca \(204\) start: strzelec (\S+) \((gracz|AI), konno, (\S+)\) \| strona (atak|obrona) \| wykrycie (trafienie|pudlo|przelot|cel AI), "
+                        r"pociskow w 5 s (\d+), padlo od niego (\d+) \| poziom (oddzial|szyk|cala jazda).*? \| jezdzcow (\d+) \(z szyku w szarzy (\d+)\), "
+                        r"lucznikow na cel (\d+) \| odleglosc od szyku (\d+) m$"),
+    "contact1": re.compile(r"^Jazda na strzelca \(204\) kontakt: po ([\d.]+) s, jezdziec (\S+), ([\d.]+) m \| strzelec (\S+)$"),
+    "end1": re.compile(r"^Jazda na strzelca \(204\) koniec: (padl od jezdzcow|padl od innych|odpedzony|uszedl poza smycz|konie|odwrot wodza|koniec bitwy|inne) "
+                       r"po ([\d.]+) s \| strzelec (\S+) \| jezdzcy padli (\d+), ciosy w strzelca (\d+), kontakt (-|[\d.]+ s), najdalej od szyku (\d+) m$"),
+    "tstart": re.compile(r"^Jazda na strzelca \(204\) TEST: nekajacy (\S+) \(konno, (\S+), amunicja TAK\) \| cel .*\| wolnej jazdy wroga (\d+) \(szykow (\d+)\) \| faza podjazd$"),
+    "tnone": re.compile(r"^Jazda na strzelca \(204\) TEST: brak nekajacego - (.*)$"),
+    "tend": re.compile(r"^Jazda na strzelca \(204\) TEST koniec: strzalow (\d+), wykryc (\d+) \(w tym pudla/przelot (\d+)\), epizodow (\d+), jezdzcow (\d+), "
+                       r"kontakt (-|[\d.]+ s), wynik (.+?) po ([\d.]+) s \| wolnej jazdy wroga (\d+) \(szykow (\d+)\)$"),
+}
+M204_ERR = re.compile(r"^ERROR in HorsePursuit\b")
+# linie kontrolne - napisy jak w kodzie C# (HorsePursuit.Hunt.cs HuntWrite / StartEp / Contact / EndEp, HorsePursuit.HuntTest.cs TestPick / TestEnd / HuntTestStep)
+M204_TEST = {
+    "line": ("Jazda na strzelca (204): misja bitwa, klucz TAK (konny strzelec wroga zauwazony po trafieniu, pudle w 4.5 m od ludzi, upadku / przelocie w 8 m, celu AI; "
+             "L1 oddzial 2 + padlo od niego z szyku bez szarzy, L2 szyk (110 m od konnicy, 3 pociskow w 5 s albo ktos padl), L3 cala jazda w 250 m (noc NIE); cisza 8 s; "
+             "zaslona 30 m przy piechocie strzelca w 15 m; kon ponizej 35; przerwa 30 s; szyki gracza, bohaterowie, chorazowie, smoki, umarli nigdy) | wykrycia 14 "
+             "(trafienia 6, pudla przy ludziach 5, przelot obok szyku 1, cel AI 2; strzelcow 1, w tym gracz 0; strzalow konnych 12; ponad limit klatki 0) | epizody 2 "
+             "(L1 0 / L2 2 / L3 0; podniesien poziomu 0, sekund zaslony 0) | jezdzcy wyslani 7 (szykow 2, z szyku w szarzy 3, konni lucznicy na cel 0, lucznicy pieszo "
+             "na cel 4, strzaly w strzelca 2, cel zdjety - swoi przy strzelcu 0, limit lucznikow 0) | kontakt 2 (sr. 6.5 / min 5.0 / max 8.0 s; ciosy w strzelca 3) | "
+             "wyniki padl od jezdzcow 1, padl od innych 0, odpedzony 1, uszedl poza smycz 0, konie 0, odwrot wodza 0, koniec bitwy 0, inne 0 | nie wyslani: w zwarciu 3, "
+             "panika/odwrot 0, poscig 148 0, bohater 1, chorazy 0, kon 0, daleko 0, szyk gracza 0, strona przegrywa 0, zajety 0, przerwa 0, limit zapytan 0, "
+             "smok/umarly 0 | powroty: padl 1, panika 0, kon 0, smycz 0, odwrot wodza 0, gracz przejal 0, klucz 0, koniec bitwy 0, koniec strzelca 6, poza zasiegiem 0, "
+             "swoi przy strzelcu 0, inne 0; najdalej od szyku 80 m; jezdzcy padli 1 | z szyku gracza 0 (oczekiwane 0) | pod sterowaniem 204 na koniec 0 "
+             "(oczekiwane 0) | FF w jezdzcow 0 (pociski 0, wrecz 0) | cap marszu pominiety 5, odswiezen celu 120 | test: nekajacy strzalow 12, wykryc 14, epizodow 2, "
+             "jezdzcow 7, wynik padl | potkniecia jazda 0 (wypadli 0)."),
+    "lineno": ("Jazda na strzelca (204): misja bitwa, klucz NIE (tylko wykrycia, bez sterowania) (konny strzelec ...) | wykrycia 0 (trafienia 0, pudla przy ludziach 0, "
+               "przelot obok szyku 0, cel AI 0; strzelcow 0, w tym gracz 0; strzalow konnych 0; ponad limit klatki 0) | epizody 0 (L1 0 / L2 0 / L3 0; podniesien "
+               "poziomu 0, sekund zaslony 0) | z szyku gracza 0 (oczekiwane 0) | pod sterowaniem 204 na koniec 0 (oczekiwane 0) | test: bez nekajacego (klucz NIE) | "
+               "potkniecia jazda 0 (wypadli 0)."),
+    "start": ("Jazda na strzelca (204) start: strzelec vlandian_horse_archer#211 (AI, konno, Bow) | strona obrona | wykrycie cel AI, pociskow w 5 s 2, padlo od niego 0 "
+              "| poziom szyk | szyki [Cavalry 5/5] | jezdzcow 5 (z szyku w szarzy 0), lucznikow na cel 4 | odleglosc od szyku 12 m"),
+    "startpl": ("Jazda na strzelca (204) start: strzelec gracz (gracz, konno, Bow) | strona atak | wykrycie pudlo, pociskow w 5 s 1, padlo od niego 0 | poziom oddzial "
+                "(zaslona - strzelec przy swojej piechocie) | szyki [Cavalry 2/9] | jezdzcow 2 (z szyku w szarzy 0), lucznikow na cel 0 | odleglosc od szyku 140 m"),
+    "contact1": "Jazda na strzelca (204) kontakt: po 6.5 s, jezdziec sea_raiders_raider#77, 5.2 m | strzelec vlandian_horse_archer#211",
+    "end1": ("Jazda na strzelca (204) koniec: padl od jezdzcow po 9.0 s | strzelec vlandian_horse_archer#211 | jezdzcy padli 0, ciosy w strzelca 3, kontakt 6.5 s, "
+             "najdalej od szyku 80 m"),
+    "end2": ("Jazda na strzelca (204) koniec: odpedzony po 22.0 s | strzelec gracz | jezdzcy padli 1, ciosy w strzelca 0, kontakt -, najdalej od szyku 140 m"),
+    "tstart": ("Jazda na strzelca (204) TEST: nekajacy vlandian_horse_archer#211 (konno, Bow, amunicja TAK) | cel sea_raiders_bandit#90 szyku Infantry (20 ludzi), "
+               "odleglosc 80 m | podjazd na 10 m od krawedzi szyku | wolnej jazdy wroga 6 (szykow 1) | faza podjazd"),
+    "tnone": ("Jazda na strzelca (204) TEST: brak nekajacego - brak konnego strzelca AI w druzynie gracza (30 s po rozstawieniu; DLL autotestu bez klucza harasser?)"),
+    "tend": ("Jazda na strzelca (204) TEST koniec: strzalow 12, wykryc 14 (w tym pudla/przelot 5), epizodow 2, jezdzcow 7, kontakt 6.5 s, wynik 2 epizody po 61.0 s "
+             "| wolnej jazdy wroga 6 (szykow 1)"),
+    "tend0": ("Jazda na strzelca (204) TEST koniec: strzalow 0, wykryc 0 (w tym pudla/przelot 0), epizodow 0, jezdzcow 0, kontakt -, wynik padl po 3.0 s "
+              "| wolnej jazdy wroga 0 (szykow 0)"),
+}
+
+
+def m204jazda_selftest():
+    """m204jazda: wyrazenia wobec linii kontrolnych M204_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    RX, T = M204_RX, M204_TEST
+    s = T["line"]
+    m = RX["line"].match(s)
+    if not m or m.groups() != ("bitwa", "TAK"):
+        return "line"
+    if RX["det"].search(s).groups() != ("14", "6", "5", "1", "2", "1", "0"):
+        return "det"
+    if RX["ep"].search(s).groups() != ("2", "0", "2", "0"):
+        return "ep"
+    if RX["riders"].search(s).groups() != ("7", "2", "3", "0", "4", "2"):
+        return "riders"
+    if RX["contact"].search(s).groups() != ("2", "6.5", "5.0", "8.0", "3"):
+        return "contact"
+    out = dict((k.strip(), int(v)) for k, v in RX["outkv"].findall(RX["out"].search(s).group(1)))
+    if out.get("padl od jezdzcow") != 1 or out.get("odpedzony") != 1 or out.get("inne") != 0 or len(out) != 8:
+        return f"wyniki {out}"
+    if RX["player"].search(s).group(1) != "0" or RX["left"].search(s).group(1) != "0" or RX["stum"].search(s).groups() != ("0", "0"):
+        return "player/left/stum"
+    s = T["lineno"]
+    m = RX["line"].match(s)
+    if not m or m.group(2) != "NIE" or RX["stum"].search(s).group(1) != "0":
+        return "lineno"
+    m = RX["start"].match(T["start"])
+    if not m or m.groups() != ("vlandian_horse_archer#211", "AI", "Bow", "obrona", "cel AI", "2", "0", "szyk", "5", "0", "4", "12"):
+        return f"start: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["start"].match(T["startpl"])
+    if not m or m.group(1) != "gracz" or m.group(5) != "pudlo" or m.group(8) != "oddzial" or m.group(12) != "140":
+        return f"startpl: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["contact1"].match(T["contact1"])
+    if not m or m.groups() != ("6.5", "sea_raiders_raider#77", "5.2", "vlandian_horse_archer#211"):
+        return "contact1"
+    m = RX["end1"].match(T["end1"])
+    if not m or m.groups() != ("padl od jezdzcow", "9.0", "vlandian_horse_archer#211", "0", "3", "6.5 s", "80"):
+        return f"end1: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["end1"].match(T["end2"])
+    if not m or m.group(1) != "odpedzony" or m.group(3) != "gracz" or m.group(6) != "-":
+        return "end2"
+    m = RX["tstart"].match(T["tstart"])
+    if not m or m.groups() != ("vlandian_horse_archer#211", "Bow", "6", "1"):
+        return "tstart"
+    m = RX["tnone"].match(T["tnone"])
+    if not m or not m.group(1).startswith("brak konnego strzelca"):
+        return "tnone"
+    m = RX["tend"].match(T["tend"])
+    if not m or m.groups() != ("12", "14", "5", "2", "7", "6.5 s", "2 epizody", "61.0", "6", "1"):
+        return f"tend: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["tend"].match(T["tend0"])
+    if not m or m.group(6) != "-" or m.group(7) != "padl":
+        return "tend0"
+    return None
+
+
+def m204jazda_collect(logp):
+    """Strumieniowo: bitwy polowe NB2, linie 204 (bitwa, epizody, test), ERROR in HorsePursuit."""
+    D = {"field": 0, "lines": [], "starts": [], "contacts": [], "ends": [], "tstarts": [], "tnone": [], "tends": [], "err": [], "bad": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            mt = TS.match(ln.rstrip("\n"))
+            s = mt.group(2) if mt else ln.rstrip("\n")
+            if M204_FIELD.match(s):
+                D["field"] += 1
+                continue
+            if s.startswith("ERROR in ") and M204_ERR.match(s):
+                D["err"].append(s[:200])
+                continue
+            if not s.startswith("Jazda na strzelca (204)"):
+                continue
+            for key, dst in (("line", "lines"), ("start", "starts"), ("contact1", "contacts"), ("end1", "ends"), ("tstart", "tstarts"), ("tnone", "tnone"), ("tend", "tends")):
+                m = M204_RX[key].match(s)
+                if m:
+                    D[dst].append((s, m) if key != "line" else s)
+                    break
+            else:
+                if not s.startswith("Jazda na strzelca (204) poziom: ") and not s.startswith("Jazda na strzelca (204) TEST: nekajacy "):
+                    D["bad"].append(s[:160])
+    return D
+
+
+def m204jazda_rows(rep, D):
+    RX = M204_RX
+    lines = D["lines"]
+    keys = [RX["line"].match(s).groups() for s in lines]
+    nfield = sum(1 for k in keys if k[0] == "bitwa")
+    # J204-0: linia bitwy w kazdej bitwie polowej, klucz TAK
+    if D["field"] == 0 and not lines:
+        ok0 = None
+    else:
+        ok0 = nfield >= D["field"] and all(k[1] == "TAK" for k in keys) and not D["bad"]
+    rep.add("J204-0: linia 'Jazda na strzelca (204): misja' w kazdej bitwie polowej, klucz TAK, linie 204 rozpoznane",
+            f"bitew polowych {D['field']}, linii {len(lines)} (bitwa {nfield}), klucz NIE {sum(1 for k in keys if k[1] != 'TAK')}, nierozpoznanych {len(D['bad'])}"
+            + (f" ({D['bad'][0]})" if D["bad"] else ""), "linii >= bitew, klucz TAK, nierozpoznanych 0 (brak bitew - INFO)", ok0)
+    # test nekajacego
+    ts, tn, te = D["tstarts"], D["tnone"], D["tends"]
+    har = [m.group(1) for _, m in ts]
+    if not ts:
+        why = (tn[-1][1].group(1) if tn else "brak linii TEST (klucz HuntHarasserInAutotest NIE, gra Jeffa albo plan bitwy inny niz mocna)")
+        for row in ("J204-1: wykrycie strzalow nekajacego (takze pudla / przelot)", "J204-2: odpowiedz jazdy (epizod, jezdzcy)", "J204-3: kontakt albo wynik padl / odpedzony"):
+            rep.add(row, "NIE SPRAWDZONE - " + why, "nekajacy w bitwie autotestu (DLL autotestu z kluczem harasser)", None)
+    else:
+        sh = sum(int(m.group(1)) for _, m in te)
+        det = sum(int(m.group(2)) for _, m in te)
+        mp = sum(int(m.group(3)) for _, m in te)
+        ep = sum(int(m.group(4)) for _, m in te)
+        rid = sum(int(m.group(5)) for _, m in te)
+        free = max([int(m.group(3)) for _, m in ts] + [0])
+        cont = [m.group(6) for _, m in te if m.group(6) != "-"]
+        ok_end = [m.group(1) for _, m in D["ends"] if m.group(3) in har and m.group(1) in ("padl od jezdzcow", "odpedzony")]
+        cont_lines = [m for _, m in D["contacts"] if m.group(4) in har]
+        base = f"nekajacych {len(ts)} ({', '.join(har[:3])}), linii konca testu {len(te)}, strzalow {sh}, wolnej jazdy wroga {free}"
+        if not te:
+            ok1 = ok2 = ok3 = False
+            base += " - BRAK linii 'TEST koniec'"
+        elif sh < 3 or free <= 0:
+            ok1 = ok2 = ok3 = None
+            base += " - NIE SPRAWDZONE (strzalow < 3 albo wrog bez wolnej jazdy)"
+        else:
+            ok1 = det >= 1 and mp >= 1
+            ok2 = ep >= 1 and rid >= min(2, free)
+            ok3 = bool(cont) or bool(ok_end) or bool(cont_lines)
+        rep.add("J204-1: wykrycie strzalow nekajacego (takze pudla / przelot)", f"{base}; wykryc {det}, w tym pudla/przelot {mp}",
+                ">= 1 wykrycie, w tym >= 1 pudlo albo przelot (przy >= 3 strzalach i wolnej jezdzie wroga)", ok1)
+        rep.add("J204-2: odpowiedz jazdy (epizod, jezdzcy)", f"epizodow {ep}, jezdzcow {rid}", f">= 1 epizod i jezdzcow >= min(2, wolnej jazdy {free})", ok2)
+        rep.add("J204-3: kontakt albo wynik padl / odpedzony", f"kontakt {', '.join(cont) or '-'}; koncow padl od jezdzcow / odpedzony {len(ok_end)}; linii kontaktu {len(cont_lines)}",
+                "kontakt albo epizod zakonczony 'padl od jezdzcow' / 'odpedzony'", ok3)
+    # J204-4: szyki gracza nigdy
+    pl = [int(RX["player"].search(s).group(1)) for s in lines if RX["player"].search(s)]
+    rep.add("J204-4: jezdzcy / lucznicy z szyku gracza", f"{sum(pl)} (linii {len(pl)})", "0", None if not pl else sum(pl) == 0)
+    # J204-5: pod sterowaniem na koniec, potkniecia, ERROR
+    left = [int(RX["left"].search(s).group(1)) for s in lines if RX["left"].search(s)]
+    st = [int(RX["stum"].search(s).group(1)) for s in lines if RX["stum"].search(s)]
+    known5 = bool(left or st or D["err"])
+    rep.add("J204-5: pod sterowaniem 204 na koniec bitwy / potkniecia jazda / 'ERROR in HorsePursuit'",
+            f"{sum(left)} / {sum(st)} / {len(D['err'])}" + (f" ({D['err'][0]})" if D["err"] else ""), "0 / 0 / 0", None if not known5 else (sum(left) == 0 and sum(st) == 0 and not D["err"]))
+    # J204-6: INFO - co bitwy pokazaly (gra Jeffa: epizody na gracza)
+    det = [RX["det"].search(s) for s in lines]
+    det = [m for m in det if m]
+    eps = [RX["ep"].search(s) for s in lines]
+    eps = [m for m in eps if m]
+    rid = [RX["riders"].search(s) for s in lines]
+    rid = [m for m in rid if m]
+    outs = {}
+    for s in lines:
+        mo = RX["out"].search(s)
+        if mo:
+            for k, v in RX["outkv"].findall(mo.group(1)):
+                outs[k.strip()] = outs.get(k.strip(), 0) + int(v)
+    onpl = [m for _, m in D["starts"] if m.group(2) == "gracz"]
+    rep.add("J204-6: bitwy (INFO)",
+            f"wykrycia {sum(int(m.group(1)) for m in det)} (trafienia {sum(int(m.group(2)) for m in det)}, pudla {sum(int(m.group(3)) for m in det)}, przelot "
+            f"{sum(int(m.group(4)) for m in det)}, cel AI {sum(int(m.group(5)) for m in det)}; strzelec gracz w {sum(int(m.group(7)) for m in det)} bitwach); epizody "
+            f"{sum(int(m.group(1)) for m in eps)} (L1 {sum(int(m.group(2)) for m in eps)} / L2 {sum(int(m.group(3)) for m in eps)} / L3 {sum(int(m.group(4)) for m in eps)}; "
+            f"na gracza {len(onpl)} z linii startu); jezdzcy {sum(int(m.group(1)) for m in rid)}, lucznicy na cel {sum(int(m.group(4)) + int(m.group(5)) for m in rid)}, "
+            f"strzaly w strzelca {sum(int(m.group(6)) for m in rid)}; wyniki " + (", ".join(f"{k} {v}" for k, v in outs.items() if v) or "-"),
+            "INFO: gra Jeffa - epizody na gracza (konny lucznik); autotest - nekajacy", None)
+
+
+def m204jazda_synth():
+    """Test syntetyczny: dobry bieg, zly bieg, bez nekajacego, bez bitwy. None = OK, inaczej opis roznic."""
+    import tempfile
+    import shutil
+    T = M204_TEST
+    nb2 = "Bitwa (NB2): misja bitwa (pole bitwy TAK, ...)"
+    bad_line = (T["line"].replace("| z szyku gracza 0 (oczekiwane 0)", "| z szyku gracza 2 (oczekiwane 0)")
+                .replace("| pod sterowaniem 204 na koniec 0 (oczekiwane 0)", "| pod sterowaniem 204 na koniec 1 (oczekiwane 0)")
+                .replace("| potkniecia jazda 0 (wypadli 0).", "| potkniecia jazda 3 (wypadli 1)."))
+    bad_tend = ("Jazda na strzelca (204) TEST koniec: strzalow 9, wykryc 2 (w tym pudla/przelot 0), epizodow 0, jezdzcow 0, kontakt -, wynik zwolniony po 120 s "
+                "po 120.0 s | wolnej jazdy wroga 6 (szykow 1)")
+    runs = {
+        "good": [nb2, T["tstart"], T["start"], T["contact1"], T["end1"], T["tend"], T["line"]],
+        "bad": [nb2, T["tstart"], bad_tend, bad_line, "ERROR in HorsePursuit.JazdaCel: NullReferenceException"],
+        "nohar": [nb2, T["tnone"], T["line"]],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"J204-0": "TAK", "J204-1": "TAK", "J204-2": "TAK", "J204-3": "TAK", "J204-4": "TAK", "J204-5": "TAK", "J204-6": "INFO"},
+        "bad": {"J204-1": "NIE", "J204-2": "NIE", "J204-3": "NIE", "J204-4": "NIE", "J204-5": "NIE"},
+        "nohar": {"J204-0": "TAK", "J204-1": "INFO", "J204-2": "INFO", "J204-3": "INFO", "J204-5": "TAK"},
+        "empty": {"J204-0": "INFO", "J204-1": "INFO", "J204-4": "INFO", "J204-5": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="m204_")
+    diff = []
+    try:
+        for kind, L in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(L)) + "\n")
+            rep = Report()
+            m204jazda_rows(rep, m204jazda_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def m204jazda_main(logp):
+    """m204jazda (26.10, paczka 204): J204-S, J204-S2, J204-0..J204-6 - opis w --help. Strumieniowo."""
+    rep = Report()
+    s1 = m204jazda_selftest()
+    rep.add("J204-S: self-test wyrazen (linie kontrolne jak w kodzie C#: HorsePursuit.Hunt.cs, HorsePursuit.HuntTest.cs)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = m204jazda_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("J204-S2: test syntetyczny (dobry, zly, bez nekajacego, bez bitwy)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("J204-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = m204jazda_collect(logp)
+    print(f"plik: {logp} | bitew polowych {D['field']}, linii bitwy 204 {len(D['lines'])}, epizodow (linie startu) {len(D['starts'])}, nekajacych {len(D['tstarts'])}, "
+          f"ERROR {len(D['err'])}")
+    m204jazda_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_m204jazda_main_prev = main
+
+
+def main(argv):
+    # paczka 204: grupa m204jazda - opakowanie main jak ai139 / m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "m204jazda":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return m204jazda_main(rest[0] if rest else None)
+    return _m204jazda_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

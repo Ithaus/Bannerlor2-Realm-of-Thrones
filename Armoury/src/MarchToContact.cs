@@ -252,7 +252,8 @@ namespace Armoury
                     // 148: jezdziec w poscigu (HorsePursuit, cel na czlowieka) - bez capu marszu / odpoczynku koni szyku; szyk w odpoczynku poscigu nie zaczyna,
                     // a zajechany kon jezdzca zawraca (ten sam prog HorseAiRestBelow)
                     if (HorsePursuit.RidingAnyThread(agent)) { HorsePursuit.NoteCapSkip(); return; }
-                    // 157 (P3): jezdziec w kontrze na strzelca (cel na czlowieku, najwyzej 20 s) - tez bez capu marszu / odpoczynku szyku; kon zajechany wraca
+                    // 204 (dawniej 157 P3): jezdziec w poscigu za konnym strzelcem (cel na czlowieku, pozycja skryptowa) - tez bez capu marszu / odpoczynku szyku;
+                    // kon zajechany (HorseAiRestBelow) konczy poscig w HorsePursuit.Hunt; lucznicy z celem 204 (bez pozycji skryptowej) zostaja pod capem szyku
                     if (HorsePursuit.CounterAnyThread(agent)) { HorsePursuit.NoteCounterCapSkip(); return; }
                     var mount = agent.MountAgent;
                     if (mount != null && IsDragon(mount)) { Interlocked.Increment(ref _postDragon); return; }
