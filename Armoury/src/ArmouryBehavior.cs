@@ -746,6 +746,9 @@ namespace Armoury
         // p9 (25.10): gotowosc zbrojowni partii i wyjazdy po sprzet od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _p9Reset = P9Reset();
         private static bool P9Reset() { try { ArmedStrength.Reset(); } catch (Exception e) { Log.Error("P9Reset", e); } return true; }
+        // 223 (26.10): stan "eskorta lordow" (narazone partie lordow, kolejki, sonda pojman) od zera przy nowej kampanii / wczytaniu (osobna linia, jak p9)
+        private readonly bool _e223Reset = E223Reset();
+        private static bool E223Reset() { try { LordEscort.Reset(); } catch (Exception e) { Log.Error("E223Reset", e); } return true; }
         // m110-stan krok 2: rejestry misji ochrony z dokladnego HP i ksiegi sprzetu towarzyszy od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _m110HpReset = M110HpReset();
         private static bool M110HpReset() { try { HeroHp.Reset(); HeroBook.Reset(); } catch (Exception e) { Log.Error("M110HpReset", e); } return true; }
@@ -869,6 +872,15 @@ namespace Armoury
                 if (dataStore.IsLoading) NewLordKit.Import(kit159);
             }
             catch (Exception e) { Log.Error("SyncData.arm_159_kit", e); }
+            // 223: narazone partie lordow "1|StringId,odH,zwolnionyDoH;..." (zegar AiArmsWaitMaxDays nie startuje od nowa po wczytaniu) - brak klucza = stary zapis
+            // (stan od nowa); starsza DLL ignoruje klucz; osobny try
+            try
+            {
+                string esc223 = dataStore.IsSaving ? LordEscort.Export() : null;
+                SaveText.Sync(dataStore, "arm_esc223", ref esc223);
+                if (dataStore.IsLoading) LordEscort.Import(esc223);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_esc223", e); }
             // R3-05e: rok urodzaju (doba losowania, siatka i wezly pola pogody) - brak klucza = stary zapis (x1 do nastepnego okna zniw); osobny try
             try
             {
@@ -1774,6 +1786,7 @@ namespace Armoury
             AiDowry.RegisterEvents(this);       // R3-01c: posag przy slubach AI z AI (BeforeHeroesMarried)
             ArmyCohesionYear.RegisterEvents(this);   // AC (Jeff 14.10): armie zalozone / rozwiazane - wiek armii i przyczyny do linii doby
             ArmedStrength.RegisterEvents(this);   // p9 (Jeff 25.10): gotowosc zbrojowni partii - doba partii, godzina (brudne, publikacja; ArmsFirst), koniec bitwy, nowa / zniszczona partia
+            LordEscort.RegisterEvents(this);   // 223 (Jeff 26.10): eskorta lordow - godzina (dolaczenie do armii, eskorta z zalogi po wejsciu), wejscie do osady, pojmanie, zniszczona partia
             PregnancyYear.RegisterEvents(this);   // CR (zasada Jeffa 14.10): poczecia i porody (OnChildConceived / OnGivenBirth) - same liczniki do linii doby
             FiefGrants.RegisterEvents(this);   // PROJEKT-LENNA (14.10): uczestnicy zwycieskiego szturmu (MapEventEnded), rodzaj zmiany pana twierdzy, decyzje "Owner of X" rozstrzygniete / anulowane
             // M6a: najkrotsza sluzba kompanii (pole gry przy najmie, pomiar konca sluzby), pamiec okupow (kazda droga okupu), rozstrzygniecie pokoju po 24 h
@@ -2347,6 +2360,7 @@ namespace Armoury
             try { GearFit.SessionStart(); } catch (Exception e) { Log.Error("GearFit.SessionStart", e); }   // GearFit (po recenzji): filtr kompletu t1 DTE dopiero od startu sesji (OnGameLoaded DTE biegnie przed prawami CrashScribe), pamiec wzorcow od nowa
             try { ArmyCohesionYear.SessionStart(); } catch (Exception e) { Log.Error("ArmyCohesionYear.SessionStart", e); }   // AC (Jeff 14.10): spojnosc armii x 84 / rok - postfiks na metode czynnego modelu armii (raz na proces), linia "Spojnosc armii (AC): start sesji"
             try { ArmedStrength.SessionStart(); } catch (Exception e) { Log.Error("ArmedStrength.SessionStart", e); }   // p9 (Jeff 25.10): sila partii z uzbrojeniem i "najpierw dozbroic" - latki czynnych modeli (raz na proces, PO McmSettings.Apply), linia "Gotowosc do bitwy (p9): start sesji"
+            try { LordEscort.SessionStart(); } catch (Exception e) { Log.Error("LordEscort.SessionStart", e); }   // 223: mysl AI (Priority.Last, po p9), atak, linia "Eskorta lordow (223): start sesji"
             try { MissionTeams.SessionStart(); } catch (Exception e) { Log.Error("MissionTeams.SessionStart", e); }   // NM (noc 15/16.10): straznik druzyn w misji i ucieczka rannych tylko w bitwie - linia "Druzyny w misji (NM): start sesji" (PO McmSettings.Apply), liczniki sesji od zera
             try { RoutHold.SessionStart(); } catch (Exception e) { Log.Error("RoutHold.SessionStart", e); }   // NB2 (16.10): zlamani raz na bitwe i postura szeregowych wedlug tieru - linia "Bitwa (NB2): start sesji" (PO McmSettings.Apply), liczniki sesji od zera
             try { DuelAi.SessionStart(); } catch (Exception e) { Log.Error("DuelAi.SessionStart", e); }   // m111-walka (24.10): linia "DuelAi tabela" - profil AI w pojedynku przy umiejetnosci 60..250, klucze pojedynku, stan hakow (PO McmSettings.Apply)
@@ -2745,6 +2759,7 @@ namespace Armoury
             try { ArmyCohesionYear.Daily(); } catch (Exception e) { Log.Error("ArmyCohesionYear.Daily", e); } DayProfile.Lap("ArmyCohesionYear.Daily");   // AC: linia "Spojnosc armii (AC): dzien N"
             try { ArmedStrength.Daily(); } catch (Exception e) { Log.Error("ArmedStrength.Daily", e); } DayProfile.Lap("ArmedStrength.Daily");   // p9: linia "Gotowosc do bitwy (p9): dzien N"
             try { NewLordKit.Daily(); } catch (Exception e) { Log.Error("NewLordKit.Daily", e); } DayProfile.Lap("NewLordKit.Daily");   // 159: ludzie bez broni ponad UnarmedMenAllowedPercent do domu (UnarmedMenSentHome, 159b), wygasle plany, linia "Nowe druzyny i sprzet (159): dzien N"
+            try { LordEscort.Daily(); } catch (Exception e) { Log.Error("LordEscort.Daily", e); } DayProfile.Lap("LordEscort.Daily");   // 223: eskorta z zalogi na postoju, linia "Eskorta lordow (223): dzien N"
             try { FiefGrants.Daily(); } catch (Exception e) { Log.Error("FiefGrants.Daily", e); } DayProfile.Lap("FiefGrants.Daily");   // PROJEKT-LENNA (14.10): linia "Nadania lenn (N) doba N" (gdy cos sie dzialo albo co 28 dob), pamiec szturmow i nadan 60 dob
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); } DayProfile.Lap("Orders.DailyTick");

@@ -10136,6 +10136,18 @@ namespace Armoury
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool UnarmedCapAllLordParties { get; set; } = true;
 
+        [SettingPropertyBool("Lords Avoid Danger", HintText = "An AI lord's party that is too weak for the enemies around it - an enemy lord, army, bandit band or your party within about a day's ride is stronger - stops seeking battle: it attacks no one but bandits, besieges and raids nothing, and does not chase other parties. A ruler, an heir or the head of a house that holds a fief also counts as too weak while his healthy men fill less of his party than the share the game asks of a lord called to an army (60%); such men should ride inside an army or with an escort. The weak lord joins a nearby army of his realm (with Lords Join Near Army), rides with a stronger friendly lord, or goes to the nearest safe fortress of his house or realm within AI Arms Trip Max Days and waits there behind the walls until his party is strong again (with Lord Escort From Garrison he takes men from his own garrison). He still defends his own house's fiefs and still helps relieve his realm's besieged fortresses. After AI Arms Wait Max Days he goes back to war with what he has. Your clan, the Night's Watch, mercenaries and the dead are untouched. Off = lords ride wherever the game sends them, whatever their strength", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool LordsAvoidDanger { get; set; } = true;
+
+        [SettingPropertyBool("Lord Escort From Garrison", HintText = "With Lords Avoid Danger: a weak lord inside a town or castle of his own house takes men from its garrison until his healthy men fill 60% of his party - real men with their own kit, the garrison never drops below the game's own minimum (75 in a castle, 125 in a town), and nothing is taken while the fortress is besieged or an enemy lord is near. Off = he waits for recruits instead", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool LordEscortFromGarrison { get; set; } = true;
+
+        [SettingPropertyBool("Lords Join Near Army", HintText = "With Lords Avoid Danger: a weak lord joins an army of his own realm whose leader is within about a day's ride, if he has food for the march and the army's leader has the influence the game charges for calling him; a ruler never joins another lord's army. Off = he rides with a stronger lord or goes to a fortress instead", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool LordsJoinNearArmy { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -12669,6 +12681,9 @@ namespace Armoury
             s.UnarmedMenSentHomeDays = UnarmedMenSentHomeDays;
             s.UnarmedMenAllowedPercent = UnarmedMenAllowedPercent;
             s.UnarmedCapAllLordParties = UnarmedCapAllLordParties;
+            s.LordsAvoidDanger = LordsAvoidDanger;
+            s.LordEscortFromGarrison = LordEscortFromGarrison;
+            s.LordsJoinNearArmy = LordsJoinNearArmy;
         }
 
         internal static void Apply()

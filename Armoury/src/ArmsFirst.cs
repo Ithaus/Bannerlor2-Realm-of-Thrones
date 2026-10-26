@@ -73,8 +73,8 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const double StayHours = 26.0;   // zakup przy wjezdzie i jedna doba postoju (AiGear kupuje raz na dobe)
-        private const float FloorScore = 0.5f;   // najnizsza ocena wyjazdu - prog zmiany celu gry (jak BesiegedRelief.FloorBase)
-        private const float Edge = 1.2f;         // ponad najlepsza inna opcje
+        internal const float FloorScore = 0.5f;   // najnizsza ocena wyjazdu - prog zmiany celu gry (jak BesiegedRelief.FloorBase)
+        internal const float Edge = 1.2f;         // ponad najlepsza inna opcje
         private const int MinNeed = 300;         // najmniejszy budzet "stac go"
         private const int PiecesUnit = 10;       // recenzja p9: "stac go" = min(braki do progu, 10) sztuk po sredniej cenie (zakup rozlozony na doby postoju)
         private const int NoGainMax = 2;         // recenzja p9: tyle wizyt z rzedu bez postepu - jak "nie stac" (koniec wyjazdow do gotowosci albo zwolnienia)
@@ -182,7 +182,7 @@ namespace Armoury
 
         /// <summary>Obrona ZAGROZONEJ osady wlasnego rodu (oblezenie albo bitwa o nia - rabunek wsi, szturm). Gra dodaje DefendSettlement takze dla osad bez
         /// zagrozenia (patrol przy swoich) - te nie sa wyjatkiem i nie wstrzymuja wyjazdu po sprzet.</summary>
-        private static bool IsOwnDefend(in AIBehaviorData d, Clan clan)
+        internal static bool IsOwnDefend(in AIBehaviorData d, Clan clan)
         {
             if (d.AiBehavior != AiBehavior.DefendSettlement) return false;
             var st = d.Party as Settlement;
@@ -190,7 +190,7 @@ namespace Armoury
         }
 
         /// <summary>159c recenzja 3: obrona ZAGROZONEJ osady krolestwa partii (MapFaction - te same osady co OB5 BesiegedRelief), takze cudzego rodu.</summary>
-        private static bool IsKinDefend(in AIBehaviorData d, MobileParty party)
+        internal static bool IsKinDefend(in AIBehaviorData d, MobileParty party)
         {
             if (d.AiBehavior != AiBehavior.DefendSettlement) return false;
             var st = d.Party as Settlement;
@@ -219,7 +219,7 @@ namespace Armoury
         }
 
         /// <summary>Cel przy osadzie rodu partii: oblega ja albo jego bitwa toczy sie o nia (rabunek wsi rodu, szturm) - obrona wlasnej osady.</summary>
-        private static bool DefendsOwn(MobileParty party, MobileParty target)
+        internal static bool DefendsOwn(MobileParty party, MobileParty target)
         {
             var clan = party.ActualClan;
             if (clan == null) return false;
@@ -228,7 +228,7 @@ namespace Armoury
             return me != null && OwnClanSettlement(me.MapEventSettlement, clan);
         }
 
-        private static Func<Vec2, bool> Beyond()
+        internal static Func<Vec2, bool> Beyond()
         {
             if (_beyondTried) return _beyond;
             _beyondTried = true;

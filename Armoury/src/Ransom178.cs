@@ -213,6 +213,9 @@ namespace Armoury
             return h.Clan != null && h.Clan == k.RulingClan && HeirOf(k) == h;
         }
 
+        /// <summary>223 (eskorta lordow): krol albo nastepca tronu bez wzgledu na klucz wielkich jencow - ta sama regula rangi. Watek glowny (pamiec nastepcy).</summary>
+        internal static bool IsRulerOrHeir(Hero h) { try { return h != null && IsGreat(h); } catch { return false; } }
+
         /// <summary>Recenzja D (harness 2.14/178): krol albo nastepca tronu przy czynnych wielkich jencach.</summary>
         internal static bool IsGreatCaptive(Hero h) { try { return GreatOn && h != null && IsGreat(h); } catch { return false; } }
 
