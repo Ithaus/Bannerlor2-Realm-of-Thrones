@@ -1,5 +1,15 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 18:55 CET - 164 ZBUDOWANE po recenzji; 165 muzyka mapy (Jeff 18:30); 159c w toku
+- 164 (zb\n164, noc/164-muzyka-bitwy): 3d1d6b18 + cc9d4cda + recenzja 5171df53 (Armoury md5 8ebc3f2f). Recenzja: "Stop Event Themes On Map" nie dzialal (ROT gra motywy
+  402-415 przez PlaySegment na glosach 7/8 warstwy psai) - teraz refleksja psai m_logik/m_playbackChannels + startFade. Pliki bit_* (40 ogg + 10 mp3) w repo galezi.
+- Jeff 18:30: "zrob mi jeszcze 10 utworow na mape kampanii w stylu gry o tron lub sredniowiecza minimum 2 minuty ... nie zbyt intensywna, nie rozprasza, dobry podklad".
+  Zadania: scratchpad 1e1c276a...\scratchpad\muzyka_mapy (zrob_zadania.py, zadania\map_01..10_*.json po 125 s, generuj.py - pomija gotowe, STOP < 2500 kredytow).
+  Probka map_01_krolewski_trakt.mp3 (2:05) wyslana Jeffowi do odsluchu; reszta 9: po jego OK albo (bez odpowiedzi) po WGRANIU 125. Kredyty przed: 26 302.
+- Workflow wf_d370822d-ca4: recheck poprawki 164 -> paczka 165 muzyka mapy w zb\n165 (galaz noc/165-muzyka-mapy od 5171df53): nasze utwory map_* tylko na mapie
+  kampanii (psai wyciszone), losowo bez powtorek, przerwa 20-40 s, okna wydarzen / misje przejmuja, klucz MCM "Our Map Music".
+- Kolejnosc wgran: 125 (159+159b+159c, po autotescie 163c) -> 126 (164 + 165, pliki bit_* i map_* do Lektor\Muzyka\Bitwa|Mapa\lufsNN, po autotescie).
+
 ## DOPISEK 26.10 ok. 18:20 CET - NOWE KONTO (poprzednie: limit tygodnia o 15:17); 159c i 164 w toku
 - Test 163b (159 + 159b-fix, build 9650e63d = merge 9263c755 w n161): bitwaN + probyN kod 0, ERROR 0, gra przywrocona 15:22 (Armoury w grze 05503a8c = 124).
 - Druga recenzja 159b (wf_e0014686-1ec): 2 prawdziwe usterki -> paczka 159c. Wynik recenzji: scratchpad sesji 1e1c276a...\scratchpad\recenzja-159b-fix2-wynik.json.
