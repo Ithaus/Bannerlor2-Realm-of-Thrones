@@ -1,5 +1,16 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 22:30 CET - uwagi Jeffa z bitwy na 126; paczki 202-223 w toku (Jeff gra)
+- Rycerz Lannisterow z jencow z "full kit" (sledztwo wf_ba8fb83f-df5): NIE blad - kon, uprzaz i zbroja z JEGO zbrojowni (wolny kon bojowy + uprzaz, potem jego
+  Chain Mail Horse Armor); ekran druzyny pokazuje wzorzec. Jeff wybral "B" = paczka 202 (prawdziwy sprzet na ekranie druzyny + linie logu werbunku jencow).
+- Uwagi Jeffa 22:15 (dokladne slowa w promptach workflow): muzyka bitwy -40%; zbroja meczy o polowe mniej na kg; kon w galopie x2 dluzej; jazda AI ma przeganiac
+  konnego strzelca (gracza); po pojmaniu Tywina Lannisterowie po wiesci (kruki) maja go scigac; glowy rodow nie jezdza z garstka biedoty.
+- Galezie od eac436b3 (126), drzewa scratchpad fffc991e...\zb\n202, n203, n204, n222, n223:
+  202 ekran-druzyny-sprzet, 203 bitwa-glosnosc-stamina (muzyka, zbroja, kon), 204 jazda-na-strzelca, 222 odbicie-lorda, 223 eskorta-lordow.
+- Workflowy: wf_0d787158-815 (202+203), wf_a555d7f1-449 (204), wf_63b46d86-20c (222+223); skrypt workflows\scripts\paczki-jeff-26-10-wieczor-wf_03ae36fd-43a.js
+  (args = lista paczek). Pierwsze uruchomienie 202+203 (wf_03ae36fd-43a) padlo na bledzie skryptu (null z etapu) - poprawione.
+- Po nich: scalic do n161, build, autotest (bitwaN + probyN), dopiero po zamknieciu gry przez Jeffa -> WGRANIE 127.
+
 ## DOPISEK 26.10 ok. 21:30 CET - WGRANE 126 (muzyka bitwy 164 + muzyka mapy 165/165b); Jeff sprawdza uchem
 - WGRANE 126 (21:25): Armoury f67326e2 (build scalenia 8574a3ad; kod C# = 11d6fcfa) + 80 ogg z drzewa n161 (Lektor\Muzyka\Bitwa\lufsNN\bit_*, Lektor\Muzyka\Mapa\lufsNN\map_*).
   Kopie: Armoury.dll.bak-2026-10-26-przed-wgranie126 i D:\Backup-Bannerlord\wgrane\2026-10-26-wgranie126-przed (8e488bd6 = 125, lista nowych plikow nowe-pliki-126.txt).
