@@ -31,7 +31,8 @@ namespace Armoury
     ///  - Wiesc (bez wszechwiedzy): z miejsca pojmania jezdziec do najblizszej twierdzy krolestwa jenca (dalej niz 40 jedn. - Ravens.NearRange; 2.5 jedn./h =
     ///    kruk Ravens.SpeedPerHour / 2.5 - "kruk = ok. 2.5 x dzien jazdy"), stamtad kruk do siedziby rodu (T3: siedziby wladcy) - Ravens.EtaHours (3 h + d / 6.25,
     ///    najwyzej 12 dob). 222c: albo - gdy szybciej - jezdziec do najblizszej NIEOBLEGANEJ twierdzy (zamek albo miasto) DOWOLNEJ frakcji, ktorej maester
-    ///    wysyla kruka do siedziby (te same liczby); tez dla lochu; lowy z zapisu dostaja min(stary plan, nowy plan) (Recalc w Resolve).
+    ///    wysyla kruka do siedziby (te same liczby); tez dla lochu; lowy z zapisu sprzed 222c dostaja raz min(stary plan, nowy plan) (Recalc w Resolve;
+    ///    wiersz 'h' z polem 22 = "c" - plan juz liczony droga 222c, kolejne wczytania go nie ruszaja).
     ///    Kazda druzyna wie w chwili: wiesc w siedzibie + EtaHours(siedziba -> druzyna) (do 40 jedn. od siedziby - od razu, jak Ravens).
     ///    Kurier z okupem (RansomOfferCampaignBehavior / Ransom178.ConsiderPrefix) nie przychodzi, zanim rod nie wie (HoldCourier).
     ///  - Slady (ostatnie znane miejsce, najwyzej 8): druzyna lorda krolestwa jenca widzi cel (odleglosc &lt;= jej SeeingRange; sama wie od razu, inni - jezdziec
@@ -104,6 +105,7 @@ namespace Armoury
             public bool Told;
             public string DungeonId = ""; public double DungeonH = -1.0; public bool DungeonTold;
             public int Armies, Battles, Wins; public float TopStr;
+            public bool Planned;                            // recenzja 222c: plan wiesci liczony droga 222c (SeatNews) - zapis pole 22 "c", Recalc tylko bez niego
             public readonly List<Sight> Sights = new List<Sight>();
             // sesja
             public double PeaceH = -1.0, MarkH = -1000.0, SightLogH = -1000.0;
@@ -501,7 +503,7 @@ namespace Armoury
             {
                 try { double cs = h.CaptivityStartTime.ToHours; if (cs > 0.0 && cs <= now) start = cs; } catch { }
             }
-            var t = new Hunt { Captive = h, Clan = c, K = k, Tier = TierOf(h, k), StartH = start };
+            var t = new Hunt { Captive = h, Clan = c, K = k, Tier = TierOf(h, k), StartH = start, Planned = true };
             t.CaptorKind = captor == PartyBase.MainParty ? CMain : captor.IsSettlement ? CDungeon : CParty;
             t.CaptorId = captor.IsSettlement ? (captor.Settlement != null ? captor.Settlement.StringId : "") : (captor.MobileParty != null ? captor.MobileParty.StringId : "");
             Vec2 at = captor.IsSettlement ? captor.Settlement.GetPosition2D : captor.MobileParty.GetPosition2D;
@@ -1225,7 +1227,8 @@ namespace Armoury
                       .Append('\t').Append(t.StartH.ToString("R", Inv)).Append('\t').Append(t.X.ToString("R", Inv)).Append('\t').Append(t.Y.ToString("R", Inv))
                       .Append('\t').Append(Clean(t.SeatName)).Append('\t').Append(t.SX.ToString("R", Inv)).Append('\t').Append(t.SY.ToString("R", Inv)).Append('\t').Append(t.SeatH.ToString("R", Inv))
                       .Append('\t').Append(t.Told ? "1" : "0").Append('\t').Append(Clean(t.DungeonId)).Append('\t').Append(t.DungeonH.ToString("R", Inv)).Append('\t').Append(t.DungeonTold ? "1" : "0")
-                      .Append('\t').Append(t.Armies.ToString(Inv)).Append('\t').Append(t.Battles.ToString(Inv)).Append('\t').Append(t.Wins.ToString(Inv)).Append('\t').Append(t.TopStr.ToString("R", Inv));
+                      .Append('\t').Append(t.Armies.ToString(Inv)).Append('\t').Append(t.Battles.ToString(Inv)).Append('\t').Append(t.Wins.ToString(Inv)).Append('\t').Append(t.TopStr.ToString("R", Inv))
+                      .Append('\t').Append(t.Planned ? "c" : "-");   // recenzja 222c: pole 22 - stary build (f.Length >= 22) je pomija
                     foreach (var s in t.Sights)
                     {
                         sb.Append("\ns\t").Append(t.Captive.StringId).Append('\t').Append(s.H.ToString("R", Inv)).Append('\t').Append(s.X.ToString("R", Inv)).Append('\t').Append(s.Y.ToString("R", Inv))
@@ -1285,7 +1288,7 @@ namespace Armoury
                     {
                         Captive = h, Clan = c, K = k ?? c.Kingdom, Tier = I(f[4]), CaptorKind = I(f[5]), CaptorId = f[6], StartH = D(f[7]), X = Fl(f[8]), Y = Fl(f[9]),
                         SeatName = f[10], SX = Fl(f[11]), SY = Fl(f[12]), SeatH = D(f[13]), Told = f[14] == "1", DungeonId = f[15], DungeonH = D(f[16]), DungeonTold = f[17] == "1",
-                        Armies = I(f[18]), Battles = I(f[19]), Wins = I(f[20]), TopStr = Fl(f[21])
+                        Armies = I(f[18]), Battles = I(f[19]), Wins = I(f[20]), TopStr = Fl(f[21]), Planned = f.Length > 22 && f[22] == "c"
                     };
                     if (t.K == null) { _importBad++; continue; }
                     _hunts[h] = t; map[f[1]] = t;
@@ -1303,16 +1306,20 @@ namespace Armoury
                 catch { _importBad++; }
             }
             _pendingH.Clear(); _pendingS.Clear();
-            // 222c: lowy z zapisu 222/222b dostaja wczesniejszy plan wiesci (najblizsza twierdza dowolnej frakcji) - min(stary plan, nowy plan)
+            // 222c: lowy z zapisu 222/222b dostaja wczesniejszy plan wiesci (najblizsza twierdza dowolnej frakcji) - min(stary plan, nowy plan).
+            // Recenzja 222c: tylko RAZ (wiersz bez pola 22 "c") - Recalc czyta swiat z chwili wczytania (oblezenia, lenna krolestwa, t.K po zmianie
+            // krolestwa), wiec przy kazdym wczytaniu przesuwalby wiesc wstecz zaleznie od tego, czy gracz wczytal gre; plan z Open/Recalc zostaje na stale.
             foreach (var t in map.Values)
             {
+                if (t.Planned) continue;
                 try { Recalc(t); } catch (Exception e) { Stumble("Recalc", e); }
+                t.Planned = true;
             }
         }
 
-        /// <summary>222c: plan wiesci lowow z zapisu liczony od nowa z miejsca pojmania (X, Y), siedziby i poczatku niewoli - tylko gdy wiesc jeszcze nie doszla
-        /// i nowy plan wczesniejszy; najwczesniej teraz (jak Open). Slad pojmania i loch z tym samym planem przesuwane razem. Ten sam plan - bez zmian
-        /// (zapis tam i z powrotem T3 identyczny).</summary>
+        /// <summary>222c: plan wiesci lowow z zapisu sprzed 222c (raz - Resolve) liczony od nowa z miejsca pojmania (X, Y), siedziby i poczatku niewoli - tylko
+        /// gdy wiesc jeszcze nie doszla i nowy plan wczesniejszy; najwczesniej teraz (jak Open). Slad pojmania z tym samym planem przesuwany razem; loch,
+        /// ktorego wiesc byla rowna planowi siedziby (Max w galezi lochu), liczony od nowa z jego wlasnego sladu (wejscie do lochu + SeatNews z lochu).</summary>
         private static void Recalc(Hunt t)
         {
             if (t == null || t.Told || t.K == null) return;
@@ -1322,10 +1329,37 @@ namespace Armoury
             double nh = Math.Max(t.StartH + eta, now);
             if (nh >= old - 0.01) return;
             t.SeatH = nh;
-            foreach (var s in t.Sights) if ((s.Kind == SCapture || s.Kind == SDungeon) && Math.Abs(s.FH - old) < 1e-6) s.FH = nh;
-            if (t.DungeonH >= 0.0 && Math.Abs(t.DungeonH - old) < 1e-6) t.DungeonH = nh;
+            foreach (var s in t.Sights) if (s.Kind == SCapture && Math.Abs(s.FH - old) < 1e-6) s.FH = nh;
+            string dn = "";
+            // recenzja 222c: loch nie dostaje nowego planu siedziby wprost - wiesc z lochu nie moze przyjsc, zanim kruk z lochu doleci
+            if (t.DungeonH >= 0.0 && !t.DungeonTold && Math.Abs(t.DungeonH - old) < 1e-6)
+            {
+                double od = t.DungeonH, dh = od;
+                Sight ds = DungeonSight(t);
+                if (ds != null)
+                {
+                    Settlement f2; float e1, e2; double g1, g2; bool any2; string alt2;
+                    double de = SeatNews(ds.Pos, t.K, t.Seat, out f2, out e1, out g1, out e2, out g2, out any2, out alt2);
+                    dh = Math.Min(od, Math.Max(ds.H + de, nh));
+                    if (Math.Abs(ds.FH - od) < 1e-6) ds.FH = dh;
+                }
+                else if (t.CaptorKind == CDungeon && t.DungeonId == t.CaptorId && t.Sights.Exists(s => s.Kind == SCapture) && !t.Sights.Exists(s => s.Kind == SDungeon))
+                    dh = nh;                                                               // loch = miejsce pojmania, nigdy z niego nie wyszedl (Open: DungeonH = SeatH)
+                t.DungeonH = dh;                                                           // slad lochu usuniety (ColdHours / MaxSights) - stary plan
+                dn = " | loch: godzina gry " + F1(dh) + " (poprzednio " + F1(od) + ")";
+            }
             Log.Info(P + "wiesc przeliczona (222c) | " + When() + " | " + Nm(t.Captive) + " | dotrze za " + F1(nh - now) + " h (godzina gry " + F1(nh) + ", poprzednio " + F1(old) + ")"
-                     + " | droga wiesci: " + Route(f, any, alt) + ".");
+                     + dn + " | droga wiesci: " + Route(f, any, alt) + ".");
+        }
+
+        /// <summary>Recenzja 222c: slad wejscia do obecnego lochu - ostatni slad lochu, gdy lezy przy osadzie DungeonId (inaczej null).</summary>
+        private static Sight DungeonSight(Hunt t)
+        {
+            Sight ds = null;
+            for (int i = t.Sights.Count - 1; i >= 0; i--) if (t.Sights[i].Kind == SDungeon) { ds = t.Sights[i]; break; }
+            if (ds == null) return null;
+            var x = Settlement.Find(t.DungeonId);
+            return x != null && x.GetPosition2D.Distance(ds.Pos) < 1f ? ds : null;
         }
     }
 }
