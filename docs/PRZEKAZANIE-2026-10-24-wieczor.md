@@ -1,5 +1,15 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 20:05 CET - 164 + 165 scalone do n161; AUTOTEST 126a W TOKU (muzyka bitwy i mapy)
+- 10 utworow mapy nagrane (zostalo ok. 9 tys. kredytow realnie; licznik z opoznieniem 13.5 tys.), wyslane Jeffowi. Przerobione bitwa_v2.py --prefiks map -> 40 ogg OK.
+- 164 recheck 7fe8c6d0 (motyw ROT stop 50 ms), 165 e96eb615..bc0010c1 + pliki 16f37999. Scalone do n161: 604cb213 (CHANGELOG: wpisy 165, 164 nad 159).
+  Build n161 kod 0, Armoury md5 cda4a309 (build z 604cb213). gen_mcm bez zmian, selftesty m109muz i m165mapa OK.
+- WAZNE: n161 mial STARE glosy bitwy (WGRANE 123 bylo ze scratchpad, nie z repo) - 315 plikow Lektor\Bitwa innych niz w grze. Naprawione: 4c63bc38 = glosy 123
+  z gry do repo (md5 zgodne z manifestem 395/395). Teraz drzewo n161 = gra (832 takie same, 0 roznych) + 80 nowych (bit_*, map_*). NIE wgrywac wgraj-v5 z drzew
+  sprzed 4c63bc38 (cofnelyby glosy 123).
+- 20:01 AUTOTEST 126a (m113\seria-126a.out.txt; -Dll mfinal126a -Tree n161, bitwaN + probyN 6 dob). Po TAK -> WGRANIE 126 = DLL cda4a309 + 80 ogg
+  (Lektor\Muzyka\Bitwa|Mapa\lufs17-26) z drzewa n161; potem statusy 164/165 w CHANGELOG, push n161/n164/n165; zapis autotest-przekierowany-* na D:.
+
 ## DOPISEK 26.10 ok. 19:35 CET - WGRANE 125 (159 + 159b + 159c); muzyka mapy nagrywana; 165 w toku
 - WGRANE 125 (19:27): Armoury 8e488bd6 = build scalenia f5048698 noc/161-integracja (status 6674fb98, wypchniete; noc/159-nadzy-lordowie tez wypchniete).
   Kopie: Armoury.dll.bak-2026-10-26-przed-wgranie125 i D:\Backup-Bannerlord\wgrane\2026-10-26-wgranie125-przed (05503a8c = 124). CrashScribe bef9db58, flag brak.
