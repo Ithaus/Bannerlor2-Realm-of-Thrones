@@ -1300,7 +1300,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float RunSecondsUnarmoured { get; set; } = 120f;
 
-        [SettingPropertyFloatingInteger("Armour Run Cost Per Kg Percent", 0.000f, 5.000f, "0.000", HintText = "every kilogram of armour makes running this much harder, and the time a man can run shrinks with the square of it - at Athletics 100: no armour 2 minutes, 10 kg about 95 s, 25 kg about 75 s, 46 kg about 50 s. The default is half the cost measured on men running in real plate armour of 30 to 50 kg (it nearly doubled their effort; at that full cost, 2.25, a man in 46 kg of plate is spent after about 30 s)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Armour Run Cost Per Kg Percent", 0.000f, 5.000f, "0.000", HintText = "every kilogram of armour makes running this much harder, and the time a man can run shrinks with the square of it - at Athletics 100: no armour just under 2 minutes, 10 kg about 95 s, 25 kg about 70 s, 46 kg about 50 s. The default is half the cost measured on men running in real plate armour of 30 to 50 kg (it nearly doubled their effort; at that full cost, 2.25, a man in 46 kg of plate is spent after about 30 s)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float ArmourRunCostPerKgPercent { get; set; } = 1.125f;
 

@@ -69864,7 +69864,7 @@ P203_TEST = {
            "lufs26 10 (01_krolewski_trakt 125.0 s), brak numerow -, odrzucone 0, psai TAK, przerwa 20-40 s, po oknie 3 s, po misji 5-10 s, pierwszy po 5 s.",
     "run": "[22:50:00] Bieg (127): ludzi zmierzonych 125 | zbroja sr. 12.4 kg (najwiecej 49.8) | pelny bieg do zera sr. 95 s (najkrocej 50) | regula: 120 s bez zbroi "
            "przy Atletyce 100, 1.125%/kg do kwadratu (203: domyslnie 1.125 = polowa 2.25 z 127) | bez oddechu w biegu TAK (pominiete regeneracje RBM 6438) | gracz: "
-           "zbroja 46.3 kg, Atletyka 241 -> 69 s (sprawnosc 1.320, przy 2.25%/kg z 127 bylo 38 s)",
+           "zbroja 46.3 kg, Atletyka 241 -> 69 s (sprawnosc 1.337, przy 2.25%/kg z 127 bylo 38 s)",
     "runold": "[21:57:40] Bieg (127): ludzi zmierzonych 125 | zbroja sr. 12.4 kg (najwiecej 49.8) | pelny bieg do zera sr. 71 s (najkrocej 28) | regula: 120 s bez zbroi "
               "przy Atletyce 100, 2.25%/kg do kwadratu | bez oddechu w biegu TAK (pominiete regeneracje RBM 6438) | gracz: zbroja 46.3 kg, Atletyka 241 -> 38 s",
     "hst": "[22:40:30] Konie (136): latka UpdateAgentStats wpieta TAK (postfiksy na celu: BannerKings, com.jeff.armoury.horsewind) | postfiks RBM na UpdateHorseStats "
@@ -69899,13 +69899,13 @@ def p203_selftest():
     if not m or m.groups() != ("3", "23", "23"):
         return f"mst: {m.groups() if m else 'brak dopasowania'}"
     m = RX["run"].search(T["run"])
-    if not m or m.group(2, 3, 4, 5, 6, 7, 8, 9, 10, 11) != ("120", "1.125", "1.125", "2.25", "46.3", "241", "69", "1.320", "2.25", "38"):
+    if not m or m.group(2, 3, 4, 5, 6, 7, 8, 9, 10, 11) != ("120", "1.125", "1.125", "2.25", "46.3", "241", "69", "1.337", "2.25", "38"):
         return f"run: {m.groups() if m else 'brak dopasowania'}"
     m = RX["run"].search(T["runold"])
     if not m or m.group(3) != "2.25" or m.group(4) is not None or m.group(8) != "38" or m.group(9) is not None:
         return f"runold: {m.groups() if m else 'brak dopasowania'}"
-    if round(p203_run_t(120, 1.32, 1.125, 46.3)) != 68 or round(p203_run_t(120, 1.32, 2.25, 46.3)) != 38:
-        return f"wzor biegu: {p203_run_t(120, 1.32, 1.125, 46.3):.2f} / {p203_run_t(120, 1.32, 2.25, 46.3):.2f}"
+    if round(p203_run_t(120, 1.337, 1.125, 46.3)) != 69 or round(p203_run_t(120, 1.337, 2.25, 46.3)) != 38:
+        return f"wzor biegu: {p203_run_t(120, 1.337, 1.125, 46.3):.2f} / {p203_run_t(120, 1.337, 2.25, 46.3):.2f}"
     m = RX["hst"].search(T["hst"])
     if not m or m.groups() != ("0.50", "120"):
         return f"hst: {m.groups() if m else 'brak dopasowania'}"
