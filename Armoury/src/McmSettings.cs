@@ -9996,6 +9996,14 @@ namespace Armoury
         [SettingPropertyGroup("Banner companies")]
         public bool BannerCompanyMessages { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Banner Pickup Range", 0.00f, 40.00f, "0", HintText = "when a standard falls in a field battle, the nearest man of its own formation within this many metres runs to it and raises it again - unless the enemy holds the spot (more foes than friends plus one within 6 m), his formation is falling back or his company has broken. He gives up after 8 seconds, when he stops getting closer, panics or is badly wounded, and the next man tries. Only then does the commander call to save the banner. 0 = off: as in the game, a standard is picked up only by a man who happens to stand right next to it", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public float BannerPickupRange { get; set; } = 20f;
+
+        [SettingPropertyBool("Banner Pickup Your Formations", HintText = "with Banner Pickup Range: formations under your orders also send a man for their fallen standard, but only from within 12 m. Off = your formations leave their fallen standard to you", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public bool BannerPickupYourFormations { get; set; } = true;
+
         [SettingPropertyBool("Army Review Enabled", HintText = "'Review the army' in your camp menu: your men by kind, horses and harness in use and missing, why riders will fight on foot and why the column marches afoot, and your banners for the next battle. Off = no option; banners saved before stay in the game's order - use Return to the game's own order before turning it off", RequireRestart = false)]
         [SettingPropertyGroup("Army review")]
         public bool ArmyReviewEnabled { get; set; } = true;
@@ -12582,6 +12590,8 @@ namespace Armoury
             s.BannerBreakChance = BannerBreakChance;
             s.BannerVictoryCheer = BannerVictoryCheer;
             s.BannerCompanyMessages = BannerCompanyMessages;
+            s.BannerPickupRange = BannerPickupRange;
+            s.BannerPickupYourFormations = BannerPickupYourFormations;
             s.ArmyReviewEnabled = ArmyReviewEnabled;
             s.ArmyReviewWritesOrderOfBattle = ArmyReviewWritesOrderOfBattle;
             s.ArmyReviewPinTroopTypes = ArmyReviewPinTroopTypes;

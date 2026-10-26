@@ -704,7 +704,8 @@ namespace Armoury
                 if (mission != null && (nb2b || DuelGuard.AnyKey(Settings.Current) || FieldDuel.AnyKey(Settings.Current) || FieldDuel.TestOff))
                     mission.AddMissionBehavior(new BattleSense());
                 // noc 25.10 P3 (krytyk K2): choragwie - kompanie, wielu chorazych, sztandar polowy, zwrot sprzetu chorazego; samo sprawdza bitwe polowa i logike sztandarow
-                if ((Settings.Current.BannerCompaniesEnabled || Settings.Current.StandardBearerKitSafe || Settings.Current.FieldStandards)
+                // 158: takze sam biegacz po sztandar (BannerPickupRange > 0)
+                if ((Settings.Current.BannerCompaniesEnabled || Settings.Current.StandardBearerKitSafe || Settings.Current.FieldStandards || Settings.Current.BannerPickupRange > 0f)
                     && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new BannerCompaniesMission());
                 // noc 25.10 P4: linia kontrolna przegladu armii (formacje gracza wobec Order of Battle; tylko odczyt) - samo sprawdza bitwe polowa gracza

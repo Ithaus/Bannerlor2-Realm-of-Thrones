@@ -39,8 +39,8 @@ namespace Armoury
     ///    (nie chorazy; remis: zdrowie, potem Index) - "sierzant".
     ///  Zdarzenia (takt 0.5 s; smierc dowodcy i chorazego od razu w OnAgentRemoved):
     ///    1. sztandar padl (chorazy zabity / omdlaly / zbiegl albo upuscil sztandar - Banner null): wstrzas S = BannerShockStandardLost, rzut F = 1;
-    ///       sztandar podniesiony (szukajacy gry w 9 m co 3 s, posilki ze sztandarem) - chorazy przypisany do kompanii bez sztandaru najblizej miejsca upadku,
-    ///       +S/2 raz na upadek; chorazy odszedl z formacja (RBM split, rozkaz) - bez wstrzasu, liczony osobno;
+    ///       sztandar podniesiony (szukajacy gry w 9 m co 3 s, posilki ze sztandarem, od 158 takze biegacz - BannerCompanies.Pickup.cs) - chorazy przypisany
+    ///       do kompanii bez sztandaru najblizej miejsca upadku, +S/2 raz na upadek; chorazy odszedl z formacja (RBM split, rozkaz) - bez wstrzasu, liczony osobno;
     ///    2. dowodca padl (zabity albo omdlaly): S = BannerShockCommanderLost x1.5 bohater x2 wodz strony; F = 2 wodz / 1.5 bohater / 1;
     ///    3. pierwszy raz zostala polowa skladu (w szeregu wobec stanu po rozstawieniu i posilkach): sam rzut, F = 1.
     ///  Wstrzas: kazdy czlonek AI (nie gracz, nie uciekajacy) ChangeMorale(-BattleMoraleModel.CalculateMoraleChangeToCharacter(agent, S)) - ten sam model co gra.
@@ -52,7 +52,8 @@ namespace Armoury
     ///  Czlonkostwo zamrozone; co 3 s przeglad Mission.Agents: posilki i przeniesieni do innej formacji - do kompanii swojej formacji z najmniejsza liczba
     ///    w szeregu (formacja bez kompanii - podzial od razu).
     ///  Komunikaty (BannerCompanyMessages, najwyzej 1 na 2 s): strona gracza - upadek sztandaru, dowodcy, zalamanie; wrog - tylko zalamanie.
-    /// Bez Harmony, bez zmian wizerunkow, nic co klatke na agenta (OnMissionTick tylko licznik czasu). Wyjatki liczone (RoutHold.Stumble, miejsce
+    /// Bez Harmony, bez zmian wizerunkow, nic co klatke na agenta (OnMissionTick tylko licznik czasu; 158: co klatke tylko oproznienie kolejki zdarzen
+    /// sztandarow, biegacze co 0.25 s). Wyjatki liczone (RoutHold.Stumble, miejsce
     /// "choragiew") - bez globalnego wylacznika. Linie: "Choragwie (CH) start" po rozstawieniu, "Choragwie (CH) koniec" po misji, segment 'choragwie' w NB2.
     ///
     /// KONTRAKT P0: ResetCounters / Activity / Append - segment ' | choragwie ...' linii "Bitwa (NB2)" (bez znaku '|' w srodku), wolane pod RoutHold.Gate.
@@ -126,8 +127,9 @@ namespace Armoury
         }
     }
 
-    /// <summary>noc 25.10 P3: zachowanie misji choragwi (patrz BannerCompanies). Rejestrowane w SubModuleMain.OnMissionBehaviorInitialize (kampania, klucze P3).</summary>
-    internal sealed class BannerCompaniesMission : MissionLogic
+    /// <summary>noc 25.10 P3: zachowanie misji choragwi (patrz BannerCompanies). Rejestrowane w SubModuleMain.OnMissionBehaviorInitialize (kampania, klucze P3).
+    /// 158: czesc "biegacz po wlasny sztandar" w BannerCompanies.Pickup.cs (partial).</summary>
+    internal sealed partial class BannerCompaniesMission : MissionLogic
     {
         private sealed class Company
         {
@@ -165,7 +167,8 @@ namespace Armoury
         private Action<Agent, bool> _onBearer;
         private string _deployNote = "-";
         // 154 (Jeff 25.10: "baner stoi pusty"): linia na kazde zdarzenie sztandaru (padl / odszedl z chorazym / podniesiony) - najwyzej StdLinesMax na misje
-        private const int StdLinesMax = 60;
+        // 158: ta sama linia dla biegacza (wyslany / porzucil / podniosl) i ponownego upuszczenia - do 4 linii wiecej na upadek, wiec limit 60 -> 120
+        private const int StdLinesMax = 120;
         private int _stdLines, _stdLinesCut;
 
         // ------------------------------------------------------------ start / koniec
@@ -194,18 +197,25 @@ namespace Armoury
                 }
             }
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.AfterStart", e); }
+            // 158: zdarzenia upuszczenia / podniesienia przedmiotu (tylko kolejka) - bitwa polowa, takze przy kluczu BannerPickupRange 0 (sam pomiar)
+            try { RunStart(m); }
+            catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.RunStart", e); }
         }
 
         private void Unsub()
         {
             try { if (_sub && _bbl != null && _onBearer != null) _bbl.OnBannerBearerAgentUpdated -= _onBearer; } catch { }
             _sub = false;
+            RunUnsub();
         }
 
         protected override void OnEndMission()
         {
             try { if (!_lineDone) { _lineDone = true; if (_field) WriteEnd(); } }
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.OnEndMission", e); }
+            // 158: biegacze zdjeci, linia "Sztandar (158)" (raz na misje)
+            try { RunEnd(); }
+            catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.RunEnd", e); }
             Unsub();
             try { BannerKit.EndMission(Mission); } catch { }
             Clear();
@@ -224,6 +234,7 @@ namespace Armoury
         private void Clear()
         {
             _forms.Clear(); _all.Clear(); _mem.Clear(); _bearerOf.Clear(); _skip.Clear(); _buf.Clear(); _unpause.Clear(); _lazy.Clear(); _capCult.Clear();
+            RunClear();   // 158
         }
 
         private void OnBearer(Agent a, bool bearer)
@@ -553,6 +564,12 @@ namespace Armoury
 
         public override void OnMissionTick(float dt)
         {
+            // 158: kolejka zdarzen sztandarow co klatke (tani odczyt), biegacze co 0.25 s / wybor co 0.5 s - takze bez kompanii (klucz BannerCompaniesEnabled NIE)
+            if (_runSub)
+            {
+                try { RunTick(dt); }
+                catch (Exception e) { _rStumbles++; BannerCompanies.Stumble("BannerCompaniesMission.RunTick", e); }
+            }
             if (!_deployed || (_all.Count == 0 && _unpause.Count == 0)) return;
             var m = Mission;
             if (m == null) return;
@@ -808,20 +825,27 @@ namespace Armoury
         }
 
         /// <summary>154: linia zdarzenia sztandaru (kto, strona, co) - dowod do testu okrzyku "Save the banner!" i podnoszenia; najwyzej StdLinesMax na misje
-        /// (reszta liczona w linii konca). Tylko log - stan kompanii bez zmian.</summary>
-        private void StdLine(Company co, string what, Agent bearer, Vec3 pos)
+        /// (reszta liczona w linii konca). Tylko log - stan kompanii bez zmian.
+        /// 158: ta sama linia dla biegacza (role "biegacz" / "podniosl" / "upuscil"); szyk bez kompanii (co == null) - nazwa z klasy szyku f, kompania "-".</summary>
+        private void StdLine(Company co, string what, Agent bearer, Vec3 pos, string role = "chorazy", Formation f = null)
         {
             if (_stdLines >= StdLinesMax) { _stdLinesCut++; return; }
             _stdLines++;
             try
             {
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
+                bool real = co != null;
+                if (!real)
+                {
+                    if (f == null) return;
+                    co = new Company { F = f, T = f.Team, Index = 0, Count = 1 };   // tylko do nazwy i strony - nie trafia do _all
+                }
                 string side = co.T != null && co.T.IsPlayerTeam ? "druzyna gracza" : PlayerSide(co) ? "sojusznik gracza" : "wrog";
                 string who = "-";
                 try { if (bearer != null) who = bearer.Name ?? "?"; } catch { who = "?"; }
                 float t = Mission != null ? Mission.CurrentTime - _deployedAt : 0f;
-                Log.Info("Choragwie (154): sztandar " + what + " | " + NameOf(co) + " (szyk " + ((int)co.F.FormationIndex + 1).ToString(inv) + ", kompania " + (co.Index + 1).ToString(inv)
-                         + ") | strona " + side + " | chorazy " + who + " | miejsce " + pos.x.ToString("0", inv) + "," + pos.y.ToString("0", inv)
+                Log.Info("Choragwie (154): sztandar " + what + " | " + NameOf(co) + " (szyk " + ((int)co.F.FormationIndex + 1).ToString(inv) + ", kompania " + (real ? (co.Index + 1).ToString(inv) : "-")
+                         + ") | strona " + side + " | " + role + " " + who + " | miejsce " + pos.x.ToString("0", inv) + "," + pos.y.ToString("0", inv)
                          + " | " + (_deployed ? t.ToString("0", inv) + " s po rozstawieniu" : "przed rozstawieniem") + ".");
             }
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.StdLine", e); }

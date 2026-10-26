@@ -90,6 +90,7 @@ namespace Armoury
         private static readonly int[] _cHorn = new int[HKinds];
         private static int _cHornIb, _cHornNw, _cOrderBa, _cMotto, _cSpHouse, _cSpRegion, _cSpMotto, _cSpSkip, _cBreak, _cBannerDown, _cOurBanner;
         private static int _cOurBannerOb, _cStdFell, _cCmdFell, _cCmdRally;   // 154: okrzyk "ob" tylko przy upadku sztandaru; smierc dowodcy - sam rozkaz zbiorki
+        private static int _cRunner, _cRunnerQuiet;                           // 158: okrzyk "ob" dopiero przy wyslaniu biegacza (zdarzenia / bez glosu)
         private static string _spSample;
 
         // 129 (25.10, Jeff: "dodaj moje okrzyki mojej armii For Karda! Justice is honor! i takie tam wymysl zeby w kolko nie krzyczeli tego samego",
@@ -130,6 +131,7 @@ namespace Armoury
             for (int i = 0; i < HKinds; i++) _cHorn[i] = 0;
             _cHornIb = _cHornNw = _cOrderBa = _cMotto = _cSpHouse = _cSpRegion = _cSpMotto = _cSpSkip = _cBreak = _cBannerDown = _cOurBanner = 0;
             _cOurBannerOb = _cStdFell = _cCmdFell = _cCmdRally = 0;
+            _cRunner = _cRunnerQuiet = 0;
             _spSample = null;
             _kardaQ.Clear(); _kardaDone.Clear(); _kardaForm.Clear();
             _cKarda = _cKardaCap = _cKardaQ = 0;
@@ -336,7 +338,7 @@ namespace Armoury
         }
 
         /// <summary>Nasz sztandar / dowodca padl: "ob" (Save the banner! Rally to me!) na zmiane z rozkazem or_&lt;region&gt;_rally (To the banner! Rally!) - recenzja 25.10:
-        /// klipy rally nie mialy zadnego wywolania; jedno z nich, gdy drugiego brak.</summary>
+        /// klipy rally nie mialy zadnego wywolania; jedno z nich, gdy drugiego brak. 158: wolane tylko z RunnerCry (ktos biegnie po sztandar).</summary>
         private static Clip OwnBannerCry(string cul)
         {
             var ob = Pick("ob", BannerRegion(cul));
@@ -460,12 +462,14 @@ namespace Armoury
         // ============================================================ zdarzenia P1 (doktryna) i P3 (choragwie)
 
         private sealed class TagEv { internal int Kind; internal Formation F; internal int Company; internal Vec3 Pos; }
-        private const int EArchback = 0, EFlank = 1, EStandard = 2, ECommander = 3, EBroke = 4;
+        private const int EArchback = 0, EFlank = 1, EStandard = 2, ECommander = 3, EBroke = 4, ERunner = 5;
         private static readonly List<TagEv> _evQ = new List<TagEv>();
 
         internal static void OnArchersFellBack(Formation f) { Enq(EArchback, f, 0, Vec3.Zero); }
         internal static void OnFlankRide(Formation f) { Enq(EFlank, f, 0, Vec3.Zero); }
         internal static void OnStandardFell(Formation f, int company, Vec3 pos) { Enq(EStandard, f, company, pos); }
+        /// <summary>158: wyslany pierwszy biegacz po upadly sztandar (BannerCompanies.RunnerSent, raz na upadek).</summary>
+        internal static void OnBannerRunner(Formation f, int company, Vec3 pos) { Enq(ERunner, f, company, pos); }
         internal static void OnCommanderFell(Formation f, int company, Vec3 pos) { Enq(ECommander, f, company, pos); }
         internal static void OnCompanyBroke(Formation f, int company, Vec3 pos) { Enq(EBroke, f, company, pos); }
 
@@ -499,6 +503,9 @@ namespace Armoury
                     case EBroke:
                         Banner(m, e, c);
                         break;
+                    case ERunner:
+                        RunnerCry(m, e);
+                        break;
                 }
             }
             _evQ.Clear();
@@ -520,20 +527,22 @@ namespace Armoury
                 // BannerCompaniesMission.StandardLost wola StandardFell tylko dla kompanii ze sztandarem w gorze (co.StandardUp, chorazy zabity / omdlaly / upuscil;
                 // przeniesiony do innego szyku i kompania juz zlamana - bez zdarzenia). Smierc dowodcy / sierzanta (ECommander) - sam rozkaz zbiorki
                 // (or_<region>_rally - w manifescie brak takich klipow, wiec dzis cisza glosu) i rog zbiorki, nigdy "ob"
+                // 158 (Jeff: "ktos powinien podbiec i zlapac baner"): przy upadku (EStandard) juz BEZ glosu - zostaje rog zbiorki; "ob" dopiero, gdy ktos naprawde
+                // biegnie po sztandar (ERunner - RunnerCry). Bez biegacza w zasiegu - bez okrzyku.
                 BasicCharacterObject ch;
                 string cul = FormCul(f, out ch);
                 var st = FS(f);
                 if (!Silent(ch, cul) && st.Kind[ORally].Ready(OGap[ORally]))
                 {
-                    var spk = SpeakerOf(f);
-                    bool std = e.Kind == EStandard;
-                    var cl = std ? OwnBannerCry(cul) : OrderClip(cul, ORally);
-                    if (spk != null && cl != null && !IsSpeaking(spk) && Play(m, cl, GVoice, HeadOf(spk), OrderMin, OrderMax, true, spk, null, std ? "sztandar" : "zbiorka po dowodcy") != null)
+                    if (e.Kind == ECommander)
                     {
-                        st.Kind[ORally].Hit(); _cOrder[ORally]++;
-                        if (!std) _cCmdRally++;
-                        else if (cl.Code == "ob") { _cOurBanner++; _cOurBannerOb++; }
-                        else _cOurBanner++;
+                        var spk = SpeakerOf(f);
+                        var cl = OrderClip(cul, ORally);
+                        if (spk != null && cl != null && !IsSpeaking(spk) && Play(m, cl, GVoice, HeadOf(spk), OrderMin, OrderMax, true, spk, null, "zbiorka po dowodcy") != null)
+                        {
+                            st.Kind[ORally].Hit(); _cOrder[ORally]++;
+                            _cCmdRally++;
+                        }
                     }
                     if (c.BattleHornsCulture) Horn(m, f, HRally, false);
                 }
@@ -565,6 +574,27 @@ namespace Armoury
             if (spk2 == null || cl2 == null || IsSpeaking(spk2)) return;
             if (Play(m, cl2, GVoice, HeadOf(spk2), OrderMin, OrderMax, true, spk2, null, e.Kind == EBroke ? "zlamanie" : "sztandar wroga") == null) return;
             if (e.Kind == EBroke) _cBreak++; else _cBannerDown++;
+        }
+
+        /// <summary>158: ktos biegnie po upadly sztandar (BannerCompaniesMission.Send - pierwszy biegacz upadku, raz na upadek pilnuje on sam): "ob" (Save the banner!
+        /// Rally to me!) na zmiane z rozkazem zbiorki (OwnBannerCry), glos kapitana / sierzanta szyku w 3D jak dotad; bez rogu (rog zbiorki gra przy upadku) i bez
+        /// okrzyku wroga ("bd" przy upadku). Odstep - ORally szyku (ten sam co przy upadku w 154).</summary>
+        private static void RunnerCry(Mission m, TagEv e)
+        {
+            var f = e.F;
+            _cRunner++;
+            if (f.CountOfUnits <= 0) { _cRunnerQuiet++; return; }
+            BasicCharacterObject ch;
+            string cul = FormCul(f, out ch);
+            var st = FS(f);
+            if (Silent(ch, cul) || !st.Kind[ORally].Ready(OGap[ORally])) { _cRunnerQuiet++; return; }
+            var spk = SpeakerOf(f);
+            var cl = OwnBannerCry(cul);
+            if (spk == null || cl == null || IsSpeaking(spk)
+                || Play(m, cl, GVoice, HeadOf(spk), OrderMin, OrderMax, true, spk, null, "sztandar - biegacz (158)") == null) { _cRunnerQuiet++; return; }
+            st.Kind[ORally].Hit(); _cOrder[ORally]++;
+            _cOurBanner++;
+            if (cl.Code == "ob") _cOurBannerOb++;
         }
 
         // ============================================================ przemowy przed bitwa
@@ -817,7 +847,9 @@ namespace Armoury
               .Append(_spSample != null ? "; probka " + _spSample : "").Append(')');
             sb.Append(" | okrzyki choragwi: zlamanie ").Append(_cBreak).Append(", sztandar wroga ").Append(_cBannerDown).Append(", nasz sztandar ").Append(_cOurBanner);
             // 154: "ob" (Save the banner!) tylko przy upadku sztandaru; smierc dowodcy - rozkaz zbiorki (klipow or_*_rally brak) i rog, bez "ob"
-            sb.Append(" (zdarzen upadku ").Append(_cStdFell).Append(", w tym ob ").Append(_cOurBannerOb).Append("; dowodca padl ").Append(_cCmdFell)
+            // 158: przy upadku juz tylko rog zbiorki; "ob" przy wyslaniu biegacza (zdarzenia biegacza - z glosem / bez glosu: odstep, mowca zajety, cisza kultury)
+            sb.Append(" (zdarzen upadku ").Append(_cStdFell).Append(" - rog zbiorki, bez glosu; biegaczy (158) ").Append(_cRunner).Append(" - glos ").Append(_cRunner - _cRunnerQuiet)
+              .Append(", bez glosu ").Append(_cRunnerQuiet).Append(", w tym ob ").Append(_cOurBannerOb).Append("; dowodca padl ").Append(_cCmdFell)
               .Append(" - rozkaz zbiorki ").Append(_cCmdRally).Append(", ob nigdy)");
         }
     }

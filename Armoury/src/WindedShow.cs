@@ -74,6 +74,13 @@ namespace Armoury
 
         internal static bool Any { get { return _w.Count > 0; } }
 
+        /// <summary>158: czlowiek stoi teraz w pozie zadyszki (tylko odczyt, glowny watek) - biegacz po sztandar (BannerCompanies.Pickup) go nie bierze.</summary>
+        internal static bool Posing(Agent a)
+        {
+            W w;
+            return a != null && _w.TryGetValue(a, out w) && w.Posing;
+        }
+
         internal static void Reset()
         {
             _w.Clear();
