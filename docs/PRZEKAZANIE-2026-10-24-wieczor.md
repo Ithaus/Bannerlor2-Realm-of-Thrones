@@ -1,5 +1,16 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 21:30 CET - WGRANE 126 (muzyka bitwy 164 + muzyka mapy 165/165b); Jeff sprawdza uchem
+- WGRANE 126 (21:25): Armoury f67326e2 (build scalenia 8574a3ad; kod C# = 11d6fcfa) + 80 ogg z drzewa n161 (Lektor\Muzyka\Bitwa\lufsNN\bit_*, Lektor\Muzyka\Mapa\lufsNN\map_*).
+  Kopie: Armoury.dll.bak-2026-10-26-przed-wgranie126 i D:\Backup-Bannerlord\wgrane\2026-10-26-wgranie126-przed (8e488bd6 = 125, lista nowych plikow nowe-pliki-126.txt).
+  Wycofanie: przywrocic DLL 125 i usunac pliki z listy (stara wersja ich nie czyta, wiec mozna je zostawic).
+- Autotest 126b: kod 0, ERROR 0; sprawdz_logi m109muz + m165mapa 0 NIE (MAP-7: psai 0 co klatke, motyw mapy gry zatrzymywany, 1 nasze zdarzenie). Recheck bezpieczenstwa
+  (wf_96b60ce9-683): StopFree/ReleaseById bez zastrzezen; poprawiony tylko MAP-7 w sprawdz_logi (resztki odcinkow bitwy, 20788b14).
+- Statusy 164/165 w CHANGELOG n161 eac436b3; push n161/n164/n165 (ok. 100 MB muzyki i glosow). Zapis testowy przeniesiony na D:\Backup-Bannerlord\zapisy-testowe-archiwum.
+- DO SPRAWDZENIA u Jeffa: czy na mapie gra jedna muzyka (126a: "leca dwie naraz"), glosnosc mapy -23 LUFS, muzyka bitwy. Wylacznik MCM "Our Map Music" / "BattleMusicOurs".
+- ZNANE DROBNE: 159c - po wczytaniu zapisu partia z zegarem po terminie dostaje raz wyjazd po bron zamiast odsylki; leftover glos psai po bitwie (fade 1.00) slyszalny
+  dopiero, gdy oddamy muzyke grze (jak w czystej grze). Kredyty ElevenLabs ok. 9 tys. (200 nowych kwestii glosu czeka).
+
 ## DOPISEK 26.10 ok. 21:05 CET - 165b (dwie muzyki) zbudowane; AUTOTEST 126b + recheck bezpieczenstwa w toku
 - Diagnoza (wf_9cd7649b-016): nasz MapHold pisal psai 0 tylko raz (odczyt przed zapisem); psai co 30-120 s startuje nowy odcinek mapy na innym glosie
   i natywny kanal najpewniej nie zachowuje 0 -> muzyka gry pod naszym utworem; odczyt "psai 0.00" to tylko pole managed (nie mikser). Inne mody wykluczone.
