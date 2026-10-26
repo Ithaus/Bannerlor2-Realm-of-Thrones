@@ -335,22 +335,23 @@ namespace Armoury
             try
             {
                 var m = Mission.Current;
-                if (m != null && m.CurrentState == Mission.State.Continuing) { MissionHoldEnd("misja trwa"); return false; }
+                if (m != null && m.CurrentState == Mission.State.Continuing) { MissionHoldEnd("misja trwa", false); return false; }
             }
             catch (Exception e) { MapStumble("MissionHold", e); return false; }
             if (!MapReady()) return false;
             double now = Now;
             if (_misHoldT0 < 0) _misHoldT0 = now;
-            if (now - _misHoldT0 >= MissionHoldSec) { MissionHoldEnd("po " + MissionHoldSec.ToString("0", Inv) + " s"); return false; }
+            if (now - _misHoldT0 >= MissionHoldSec) { MissionHoldEnd("po " + MissionHoldSec.ToString("0", Inv) + " s", true); return false; }
             _misHeld = true;
             return true;
         }
 
-        private static void MissionHoldEnd(string why)
+        private static void MissionHoldEnd(string why, bool timeout)
         {
             if (!_misHeld) return;
             _misHeld = false;
-            Log.Info(PM + "misja bez bitwy (" + why + ") - muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s).");
+            // 165b recenzja: po 20 s to moze byc dlugo ladowana bitwa albo dlugi koniec bitwy - bez "misja bez bitwy"
+            Log.Info(PM + (timeout ? "trzymanie misji" : "misja bez bitwy") + " (" + why + ") - muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s).");
         }
 
         /// <summary>Okno, bitwa albo mapa (galaz want) - trzymanie misji od zera.</summary>
@@ -461,6 +462,15 @@ namespace Armoury
                 _liveEv.Add(ev); _liveName.Add(name);
             }
             catch (Exception e) { MapStumble("LiveAdd", e); }
+        }
+
+        /// <summary>165b recenzja: zdarzenie skonczone przez nas (niewazne / stop przy stopie, odrzucone) - z kontroli od razu: SoundEvent trzyma stare id,
+        /// silnik moze je dac innemu dzwiekowi (otoczenie mapy, Lektor), a kontrola liczylaby go jako nasze grajace (falszywe MAP-7 NIE).</summary>
+        private static void LiveDrop(SoundEvent ev)
+        {
+            if (ev == null) return;
+            for (int i = _liveEv.Count - 1; i >= 0; i--)
+                if (ReferenceEquals(_liveEv[i], ev)) { _liveEv.RemoveAt(i); _liveName.RemoveAt(i); }
         }
 
         /// <summary>Odrzut niewaznych i zatrzymanych; zwraca opis grajacych (albo spauzowanych) - rozne id silnika - i ich liczbe.</summary>
@@ -574,7 +584,7 @@ namespace Armoury
             if (!ok)
             {
                 _mapRejects++;
-                try { if (ev != null && ev.IsValid) { ev.Stop(); if (ev.IsValid) ev.Release(); } } catch { }   // 165b: Stop przed Release - zdarzenie jeszcze ladowane nie ruszy bez nas
+                FreeRejected(ev);   // 165b recenzja: Stop i ReleaseEvent(id) - zdarzenie jeszcze ladowane nie ruszy bez nas i nie zostaje w silniku
                 if (_mapRejects <= MapRejectLog) Log.Info(PM + "silnik nie przyjal " + pick.File + " (zdarzenie " + MusicEvent + ") - proba za " + MapRetrySec.ToString("0", Inv) + " s.");
                 _mapGap = MapRetrySec;
                 MapFail("Next");

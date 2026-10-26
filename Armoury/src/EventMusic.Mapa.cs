@@ -23,7 +23,8 @@ namespace Armoury
     ///    i usuwa FadeData glosu (bez starego zaniku czekajacego na nowy PlaySegment na tym glosie); glos glowny mapy nietkniety.
     ///    Watek: Logik.Update (updateFades) wola MBMusicManager.Update w glownym watku, nasz AppTick tez - bez wyscigu na m_fadeVoices.
     ///  - Stop naszych utworow (okna i bitwa): StopRelease - SoundEvent.Release wola Stop tylko dla IsPlaying (dekompilacja SoundEvent.Release), zdarzenie
-    ///    spauzowane / startujace dostaloby samo ReleaseEvent (ryzyko H-stop z raportu: moglo przezyc wyjscie z misji); tu najpierw Stop, potem Release jak w grze.
+    ///    spauzowane / startujace dostaloby samo ReleaseEvent (ryzyko H-stop z raportu: moglo przezyc wyjscie z misji); tu najpierw Stop, potem ReleaseEvent(id) przez ISoundEvent silnika
+    ///    (165b recenzja: Stop zeruje id w SoundEvent - Release po Stop nic nie zwalnial; BattleSound.ReleaseById). Stan stop - sam Release gry.
     ///  - Linie "Muzyka (m108): mapa - ..." (start kampanii), "motyw wydarzenia ROT N (odcinek S) gra w oknie (warstwa psai, glos V)." (przy otwarciu okna,
     ///    klucz TAK), "motyw wydarzenia ROT ... zatrzymany po oknie - wyciszenie warstwy psai (glos V) 50 ms; ..." (kazde zatrzymanie) albo, gdy motyw widziany
     ///    w oknie juz nie gra, "motyw wydarzenia ROT ... nie gra po oknie - bez zatrzymania." - tools/sprawdz_logi.py m109muz MUZ-8 paruje te linie.
@@ -61,10 +62,10 @@ namespace Armoury
             string st = "?";
             try
             {
-                if (!ev.IsValid) return "niewazne";
+                if (!ev.IsValid) { LiveDrop(ev); return "niewazne"; }   // 165b recenzja: koniec sam - id w SoundEvent zostaje, silnik moze je dac innemu dzwiekowi
                 st = ev.IsPaused() ? "pauza" : ev.IsPlaying() ? "gra" : ev.IsStopped() ? "stop" : "inne";
-                if (st == "pauza" || st == "inne") ev.Stop();   // Release gry zatrzymuje tylko IsPlaying; Stop zeruje id (IsValid NIE) - dalej jak Release gry po Stop
-                if (ev.IsValid) ev.Release();
+                if (st == "stop") { ev.Release(); LiveDrop(ev); }   // Release gry na niegrajacym = sam ReleaseEvent(id); id zostaje - z kontroli
+                else StopFree(ev);   // gra / pauza / inne: Stop, potem ReleaseEvent(id) (Release gry po Stop = ReleaseEvent(-1), wyciek); wpis zostaje - Stop daje id -1
             }
             catch (Exception e)
             {
@@ -72,6 +73,24 @@ namespace Armoury
                 st = "blad";
             }
             return st;
+        }
+
+        /// <summary>165b recenzja: Stop i ReleaseEvent(id) jak BattleSound.ReleaseOne - SoundEvent.Stop zeruje swoje id (IsValid NIE), wiec Release po Stop
+        /// nie zwalnial instancji silnika (strumien ogg do konca sesji). Zwraca 1 zwolnione po id, 0 zwolnil Stop, -1 brak odbicia (sam Stop - stara droga). Rzuca.</summary>
+        private static int StopFree(SoundEvent ev)
+        {
+            if (ev == null || !ev.IsValid) return 0;
+            int id = ev.GetSoundId();
+            ev.Stop();
+            return BattleSound.ReleaseById(id);
+        }
+
+        /// <summary>165b recenzja: zdarzenie, ktorego silnik nie przyjal (Play false albo wyjatek) - Stop i ReleaseEvent(id); bez odbicia Release gry (niegrajace =
+        /// sam ReleaseEvent(id), jak przed 165b). Wpis z kontroli mapy. Nie rzuca.</summary>
+        private static void FreeRejected(SoundEvent ev)
+        {
+            try { if (ev != null && ev.IsValid) { if (BattleSound.CanReleaseById()) StopFree(ev); else ev.Release(); } } catch { }
+            LiveDrop(ev);
         }
 
         // ------------------------------------------------------------ start kampanii (BattleStartCheck - raz na obiekt Campaign)

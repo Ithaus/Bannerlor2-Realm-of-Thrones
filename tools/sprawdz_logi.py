@@ -1145,7 +1145,8 @@ Uzycie (Python 3, tylko odczyt):
                     (co 30 s mapy, po 1 s i po koncu utworu): NIE, gdy nasze zdarzenia grajace > 1 albo 0 przy utworze mapy, psai master > 0.01, zapisow 0 < 0.9 x klatek
                     (brak trzymania co klatke - np. ARMOURY_MAPHOLD_STARE=1), 2 kolejne linie z glosem psai 0-6 grajacym natywnie poza trybem menu (zatrzymanie motywu
                     nie dziala), mapa wlaczona >= 90 s zegara (poza oknami) bez linii kontroli (log sprzed 165b z mapa >= 90 s - NIE); MAP-7b INFO: glosy psai pod
-                    nasza mapa w trybie menu i na warstwie 7-8 (tylko trzymane na 0), nowe odcinki psai, zatrzymania motywu gry, 'misja bez bitwy'. MAP-3 przyjmuje
+                    nasza mapa w trybie menu i na warstwie 7-8 (tylko trzymane na 0), nowe odcinki psai, zatrzymania motywu gry, 'misja bez bitwy' / 'trzymanie misji (po 20 s)'
+                    (165b recenzja; koniec okna przy trzymaniu 'koniec wydarzenia - muzyka gry trzymana na 0 (...)' w m109muz jak koniec okna). MAP-3 przyjmuje
                     stop mapy 'muzyka gry trzymana na 0 do startu misji' (165b: bez FadeUp do startu misji) i linie 'misja bez bitwy (...) - muzyka gry wraca'.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
@@ -40660,7 +40661,7 @@ M109MUZ_RX = {
     "gave": re.compile(r"^rezygnacja w tej misji po (\d+) bledach \(([^)]*)\)"),
     "nores": re.compile(r"^(?:brak utworow bitewnych w .* - bitwy z muzyka gry|psai NIE - bitwy z muzyka gry)\.$"),
     "win": re.compile(r"^(?:okno \".*\"|plotki) - nastroj \S+(?: \(zamiast \S+\))?, muzyka gry cichnie"),
-    "winend": re.compile(r"^(?:koniec wydarzenia - (?:muzyka gry wraca|bitwa dalej|mapa dalej)|muzyka gry przywrocona od razu)"),   # paczka 165: '- mapa dalej'
+    "winend": re.compile(r"^(?:koniec wydarzenia - (?:muzyka gry wraca|muzyka gry trzymana na 0|bitwa dalej|mapa dalej)|muzyka gry przywrocona od razu)"),   # paczka 165: '- mapa dalej'; 165b recenzja: 'trzymana na 0'
     "mapko": re.compile(r"^muzyka gry dalej wyciszona - przejmuje muzyka mapy\.$"),   # paczka 165: po bitwie wyciszenie przejmuje muzyka mapy (bez 'wrocila')
     "windalej": re.compile(r"^koniec wydarzenia - bitwa dalej\b"),
     "gra": re.compile(r"^gra (\S+\.ogg) \(nastroj (\S+)\)\.$"),
@@ -40797,6 +40798,9 @@ def m109muz_selftest():
     if not RX["win"].match(T["win"]) or not RX["win"].match(T["winwar"]) or not RX["win"].match("plotki - nastroj plotka, muzyka gry cichnie (psai glosnosc 1.00).") \
             or not RX["winend"].match(T["winend"]) or not RX["winend"].match("muzyka gry przywrocona od razu (wyjscie z kampanii)."):
         return "win / winend (linie m108)"
+    if not RX["winend"].match("koniec wydarzenia - muzyka gry trzymana na 0 (ladowanie misji).") \
+            or RX["windalej"].match("koniec wydarzenia - muzyka gry trzymana na 0 (ekran ladowania)."):
+        return "winend przy trzymaniu (165b recenzja)"
     if not RX["winend"].match(T["winbat"]) or not RX["windalej"].match(T["winbat"]) or RX["windalej"].match(T["winend"]):
         return "winbat (linia m108 koniec okna - bitwa dalej)"
     m = RX["end"].match(T["endwin"])
@@ -40886,7 +40890,8 @@ def m109muz_collect(logp, csp=None):
                     win_open = False
                     if pend is not None and RX["windalej"].match(b):
                         pend["dalej"] = True       # okno w bitwie zamkniete, misja bitwy trwa
-                    if not (b.startswith("koniec wydarzenia - muzyka gry wraca") or b.startswith("koniec wydarzenia - mapa dalej")):
+                    if not (b.startswith("koniec wydarzenia - muzyka gry wraca") or b.startswith("koniec wydarzenia - mapa dalej")
+                            or b.startswith("koniec wydarzenia - muzyka gry trzymana na 0")):   # 165b recenzja: koniec okna przy trzymaniu - EventThemeStop tez
                         th_pend = None             # okno w bitwie / wyjscie z kampanii - bez zatrzymania motywu (EventThemeStop tylko na mapie; paczka 165: 'mapa dalej' tez)
                 elif RX["thseen"].match(b):
                     D["thseen"] += 1
@@ -69214,7 +69219,7 @@ M165MAPA_RX = {
     "voice": re.compile(r"v(\d+):m(-?\d+)/o(-?\d+) fade (\S+) master (\S+) natywnie (TAK|NIE|\?)"),
     "seg": re.compile(r"^psai nowy odcinek pod nasza mapa - v(\d+):"),
     "thstop": re.compile(r"^motyw mapy gry (-?\d+) zatrzymany pod nasza mapa \(ForceStopThemeWithFadeOut"),
-    "nobat": re.compile(r"^misja bez bitwy \(([^)]*)\) - muzyka gry wraca"),
+    "nobat": re.compile(r"^(?:misja bez bitwy|trzymanie misji) \(([^)]*)\) - muzyka gry wraca"),   # 165b recenzja: po 20 s 'trzymanie misji'
     "diag": re.compile(r"^kontrola psai (TAK|NIE) \("),
 }
 M165MAPA_SET = "01_krolewski_trakt 125.0 s, 02_polnoc 125.0 s, 03_dorzecze 125.0 s, 04_dwor 125.0 s, 05_ognisko 125.0 s, 06_starzy_bogowie 125.0 s, " \
@@ -69313,6 +69318,7 @@ def m165mapa_selftest():
     if not m or m.group(2) != "?" or m.group(8) != "?":
         return f"ctlno: {m.groups() if m else 'brak dopasowania'}"
     if not RX["seg"].match(T["seg"]) or RX["thstop"].match(T["thstop"]).group(1) != "12" or RX["nobat"].match(T["nobat"]).group(1) != "misja trwa" \
+            or RX["nobat"].match("trzymanie misji (po 20 s) - muzyka gry wraca (2.0 s).").group(1) != "po 20 s" \
             or not RX["diag"].match(T["diag"]):
         return "seg / thstop / nobat / diag"
     m = RX["off"].match(T["offhold"])

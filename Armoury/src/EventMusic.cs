@@ -30,7 +30,8 @@ namespace Armoury
     ///    gniazdo utworu (_mus, nastroj "mapa"); pierwszenstwo okno / plotki > bitwa > mapa. Okno przy mapie: utwor mapy stop, po oknie wyciszenie zostaje
     ///    (linia "koniec wydarzenia - mapa dalej"); ekran ladowania - psai trzymane bez FadeUp (decyzja po ladowaniu: mapa albo misja).
     ///  - 165b (Jeff 26.10 "i leca dwie naraz"): ekran ladowania, misja ladowana nad mapa (przed Continuing) i koniec bitwy przy zamykaniu misji - zapis 0 co klatke
-    ///    (HoldDown), bez FadeUp (misja: najwyzej 20 s, potem albo przy spacerze "misja bez bitwy - muzyka gry wraca"); nieprzyjete zdarzenie - Stop przed Release;
+    ///    (HoldDown), bez FadeUp (misja: najwyzej 20 s, potem "trzymanie misji (po 20 s)", przy spacerze "misja bez bitwy - muzyka gry wraca"; koniec okna przy trzymaniu: "muzyka gry trzymana na 0");
+    ///    nieprzyjete zdarzenie i stop utworu - Stop, potem ReleaseEvent(id) (StopFree; Release po Stop nic nie zwalnial);
     ///    kazde nasze zdarzenie w spisie kontroli mapy (LiveAdd). Szczegoly w EventMusic.MapaTlo.cs.
     /// </summary>
     internal static partial class EventMusic
@@ -175,7 +176,8 @@ namespace Armoury
                 else
                 {
                     StopTrack("koniec wydarzenia");
-                    Log.Info(P + "koniec wydarzenia - muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s).");
+                    Log.Info(P + "koniec wydarzenia - " + (hold ? "muzyka gry trzymana na 0 (" + (loadHold ? "ekran ladowania" : "ladowanie misji") + ")."   // 165b recenzja: przy trzymaniu bez FadeUp
+                                                             : "muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s)."));
                     EventThemeStop();   // m164: motyw wydarzenia ROT nie gra dalej na mapie (psai jeszcze ~0 - FadeUp rusza w tej samej klatce, warstwa stoi po 1 kroku psai, 50 ms)
                 }
                 _paused = false;
@@ -321,7 +323,7 @@ namespace Armoury
             if (!ok)
             {
                 _createFails++;
-                try { if (ev != null && ev.IsValid) { ev.Stop(); if (ev.IsValid) ev.Release(); } } catch { }   // 165b: Stop przed Release
+                FreeRejected(ev);   // 165b recenzja: Stop i ReleaseEvent(id) (Release po Stop nic nie zwalnial), wpis z kontroli
                 if (_createFails <= 3) Log.Info(P + "silnik nie przyjal utworu " + Path.GetFileName(path) + " (zdarzenie " + MusicEvent + ") - bez naszej muzyki, muzyka gry dalej wyciszona.");
                 return;
             }

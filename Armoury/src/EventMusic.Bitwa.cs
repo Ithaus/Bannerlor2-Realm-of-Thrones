@@ -370,7 +370,7 @@ namespace Armoury
             if (!ok)
             {
                 _batRejects++;
-                try { if (ev != null && ev.IsValid) { ev.Stop(); if (ev.IsValid) ev.Release(); } } catch { }   // 165b: Stop przed Release
+                FreeRejected(ev);   // 165b recenzja: Stop i ReleaseEvent(id) (Release po Stop nic nie zwalnial), wpis z kontroli
                 if (_batRejects <= 3) Log.Info(PB + "silnik nie przyjal " + pick.File + " (zdarzenie " + MusicEvent + ") - nastepny za " + GapOf().ToString("0", Inv) + " s.");
                 if (!threw) MisFail("Next");
                 return false;
