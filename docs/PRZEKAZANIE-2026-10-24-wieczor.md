@@ -1,5 +1,12 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 19:07 CET - 159c ZBUDOWANE i scalone; AUTOTEST 163c W TOKU
+- 159c (zb\n159): c7c00ae2 + 20aacfb7 (recenzja 2), ed31a2c2 + 8c65f8bb (recenzja 3: 4 potwierdzone + drobne poprawione). Recheck: tylko 1 drobna (po wczytaniu
+  zapisu partia z zegarem po terminie dostaje raz wyjazd po bron zamiast odsylki, takze gdy przed zapisem nie byla w drodze) - zostawiona, do pozniejszej poprawki.
+- Scalone do n161: f5048698 (konflikt CHANGELOG rozwiazany skryptem). Build n161 kod 0, Armoury md5 8e488bd6.
+- 19:05 AUTOTEST 163c (m113\seria-163c.out.txt; -Dll mfinal163c, bitwaN + probyN 6 dob). Jesli urwany: gra wedlug pamieci przerwany-autotest-sprzatanie
+  (w grze ma byc Armoury 05503a8c), potem powtorzyc tym samym poleceniem z -Prefix 163d. Po TAK -> WGRANIE 125 = DLL 8e488bd6 (kopia .bak + D:, md5, statusy, push).
+
 ## DOPISEK 26.10 ok. 18:55 CET - 164 ZBUDOWANE po recenzji; 165 muzyka mapy (Jeff 18:30); 159c w toku
 - 164 (zb\n164, noc/164-muzyka-bitwy): 3d1d6b18 + cc9d4cda + recenzja 5171df53 (Armoury md5 8ebc3f2f). Recenzja: "Stop Event Themes On Map" nie dzialal (ROT gra motywy
   402-415 przez PlaySegment na glosach 7/8 warstwy psai) - teraz refleksja psai m_logik/m_playbackChannels + startFade. Pliki bit_* (40 ogg + 10 mp3) w repo galezi.
