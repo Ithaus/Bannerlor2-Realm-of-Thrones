@@ -1181,6 +1181,10 @@ Uzycie (Python 3, tylko odczyt):
                     ODB-2 zadna linia trybu (poscig/szuka/armia/...) jenca przed jego 'wiesc doszla'; ODB-3 'lowy czynne' w linii doby = z zapisu + pojmania - konce;
                     ODB-4 tryb z wyborem: sila wybranych >= potrzeby, tryb slabych: sila lowcow < potrzeby; ODB-5 'kurier wstrzymany' tylko przed wiescia;
                     ODB-6 proba autotestu (flaga armoury-odbicie.flag) bez NIE; ODB-7 potkniecia 0 i bez ERROR RescueHunt. Brak linii - INFO.
+--grupa e223      : (26.10, paczka 223 noc/223-eskorta-lordow - Jeff 26.10 "znani lordowie a juz glowy rodu nie moga ... czekac az ktos ich schwyta"; Armoury/src/
+                    LordEscort.cs, LordEscort.Probe.cs) python -I tools/sprawdz_logi.py --grupa e223 <Armoury-*.log> (strumieniowo). Linie 'Eskorta lordow (223): '.
+                    E223-S self-test, E223-S2 test syntetyczny; E223-0 latki TAK; E223-1 linia doby co dobe; E223-2 slabe i dzialania; E223-3 eskorta z zalog: wzial ==
+                    spadek zalogi, podloga, suma doby == zdarzenia, <= 169c; E223-4 potkniecia 0; E223-5 najdluzej w stanie <= postoj + 1; E223-6 INFO pojmania.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -70941,6 +70945,339 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return odbicie222_main(rest[0] if rest else None)
     return _odbicie222_main_prev(argv)
+
+
+# ------------------------------------------------------------ e223 (26.10, paczka 223 noc/223-eskorta-lordow: znani lordowie nie jezdza sami z garstka ludzi - Jeff 26.10
+# ok. 22:15 "jakim sposobem Tywin szedl z garstka ludzi i biedota w armii, kurwa znani lordowie a juz glowy rodu nie moga kurwa jezdzic i byc doslownie i czekac az ktos
+# ich schwyta"; Armoury/src/LordEscort.cs, LordEscort.Probe.cs; klucze LordsAvoidDanger, LordEscortFromGarrison, LordsJoinNearArmy)
+#   python -I tools/sprawdz_logi.py --grupa e223 <Armoury-*.log>
+# E223-S self-test wyrazen (linie kontrolne jak w kodzie C#), E223-S2 test syntetyczny (dobry, zly, bez linii 223). E223-0 linia startu: latki mysl AI, atak, wejscie do
+# osady, pojmanie - TAK (klucz NIE - INFO); E223-1 linia doby co dobe (wobec linii "Gotowosc do bitwy (p9): dzien" - najwyzej 1 brak, najmniej min(5, dob biegu));
+# E223-2 slabe partie znalezione i >= 1 dzialanie w biegu (partii lordow AI 0 - INFO); E223-3 zamknieta ekonomia eskorty: w kazdej linii 'eskorta z zalogi'
+# wzial == spadek zalogi (zgodnosc TAK), zaloga po >= podloga, suma ludzi w linii doby == suma 'wzial' z linii zdarzen od poprzedniej linii doby, zaloga ponizej podlogi
+# 0, suma eskort <= suma "z zalogi do partii" 169c (gdy linie 169c sa); E223-4 potkniecia 0 i 0 linii "ERROR in LordEscort"; E223-5 najdluzej w stanie <= postoj
+# najwyzej + 1 doba (z linii startu); E223-6 INFO: wladcy i glowy rodow slabe pierwszej i ostatniej doby, pojmania glow rodow wedlug klasy.
+# 223b (znani lordowie): E223-7 INFO - znani lordowie (R3: glowy rodow bez lenna, rody wielkie lub panujace, postacie ksiag) slabe, pojmania znanych lordow,
+# wahadlo (powrot do stanu w AiArmsTripCooldownDays dob po odbudowie - recenzja D1); ogon linii doby opcjonalny (starsze logi bez niego - INFO).
+E223_TAG = "Eskorta lordow (223): "
+E223_RX = {
+    "start": re.compile(r"^start sesji \| klucze: Lords Avoid Danger (TAK|NIE), Lord Escort From Garrison (TAK|NIE), Lords Join Near Army (TAK|NIE) \| prog wypelnienia ([\d.]+) "
+                        r"\(.*?\) \| zasieg (\d+) \(CivilWorksFrontRange\) \| twierdza najwyzej (\d+) dob drogi \| postoj najwyzej (\d+) dob, potem zwolniony na (\d+) dob "
+                        r"\| podloga zalogi (\d+)/(\d+) \| latki: mysl AI (\S+).*?, atak (\S+).*?, wejscie do osady (\S+), pojmanie (\S+), zaloga -> partia \(metoda gry\) (\S+)"
+                        r".*? \| stan z zapisu \(arm_esc223\): (\d+) partii\.$"),
+    "day": re.compile(r"^dzien (\d+) \| partii lordow AI (\d+), slabe (\d+) \(wladcy i glowy rodow (\d+): ponizej ([\d.]+) (\d+), slabsze od zagrozenia (\d+)\) "
+                      r"\| dzialania: do twierdzy (\d+) \(dojechalo (\d+)\), postoj (\d+), do armii (\d+) \(odpadlo (\d+)\), za silniejszym (\d+), eskorta z zalog (\d+) razy "
+                      r"\(ludzi (\d+), twierdz (\d+), zaloga ponizej podlogi (\d+), wstrzymana - wrog przy twierdzy (\d+), bez miejsca lub zoldu (\d+)\), odbudowani (\d+), "
+                      r"zwolnieni po (\d+) dobach (\d+), bez twierdzy w zasiegu (\d+), obrona wlasnej osady (\d+), odsiecz krolestwa (\d+), glod (\d+) \| atak wstrzymany (\d+) "
+                      r"partii \((\d+) razy\) \| pojmania dzis: glowy rodow (\d+) \(sam slaby (\d+), sam silny (\d+), w armii (\d+), w osadzie (\d+), bez obrazu (\d+)\), "
+                      r"lordowie (\d+) \| teraz w stanie (\d+), zwolnionych (\d+) \| najdluzej w stanie ([\d.]+) dob \((.*)\) \| potkniecia (\d+)"
+                      r"(?: \| zbiera armie \(gra\) (\d+))?"   # ogon od recenzji 223 (grupa 41; starsze logi bez niego)
+                      r"(?: \| znani lordowie (\d+) \(ponizej progu (\d+), slabsze od zagrozenia (\d+); glowy rodow bez lenna (\d+), rody wielkie lub panujace (\d+), "
+                      r"postacie ksiag (\d+)\) \| pojmania znanych lordow (\d+) \(sam slaby (\d+), sam silny (\d+), w armii (\d+), w osadzie (\d+), bez obrazu (\d+)\) "
+                      r"\| wahadlo - powrot do stanu w (\d+) dob po odbudowie (\d+) razy \((\d+) partii\))?"   # ogon 223b (grupy 42-56; starsze logi bez niego)
+                      r"(?: \| zagrozenie minelo (\d+), werbunek gry bez twierdzy (\d+), postoj w cudzym zamku (\d+))?\.$"),   # ogon recenzji 223b (grupy 57-59)
+    "esc": re.compile(r"^eskorta z zalogi \((wejscie|doba)\): (.+?) w (.+) wzial (\d+) \(zaloga (\d+) -> (\d+), podloga (\d+), zgodnosc (TAK|NIE)\), "
+                      r"wypelnienie ([\d.]+) -> ([\d.]+)/([\d.]+)\.$"),
+    "join": re.compile(r"^do armii - (.+) dolaczyl do armii (.+) \((\d+) partii, sila (\d+)\)\.$"),
+    "cap": re.compile(r"^POJMANY (.+?) \((?:glowa rodu(?:, wladca/nastepca)?|wladca/nastepca|znany lord - [^)]+)\) przez (.+?) \| (w osadzie|bez obrazu partii|w armii|sam slaby|sam silny)(?: \| .*)?\.$"),
+    "ex": re.compile(r"^(.+) \((wladca/nastepca|glowa rodu|znany lord - [^)]+|lord)\) ludzi (\d+), zdrowych (\d+), wypelnienie ([\d.]+)/([\d.]+), sila (\d+) / zagrozenie (\d+)(?: \(.*\))? -> (.+)\.$"),
+}
+E223_P9 = re.compile(r"Gotowosc do bitwy \(p9\): dzien (\d+)")
+E223_169C = re.compile(r"Zalogi: przyrost bez werbunku \(169c\): dzien (\d+) .*?, z zalogi do partii ([+-]?\d+)")
+# linie kontrolne - jak w kodzie C# (LordEscort.cs, LordEscort.Probe.cs)
+E223_TEST = {
+    "start": "start sesji | klucze: Lords Avoid Danger TAK, Lord Escort From Garrison TAK, Lords Join Near Army TAK | prog wypelnienia 0.60 (gra AIMobilePartySizeRatioToCallToArmy, "
+             "BK IsAvailableForArmies) | zasieg 60 (CivilWorksFrontRange) | twierdza najwyzej 3 dob drogi | postoj najwyzej 12 dob, potem zwolniony na 3 dob | podloga zalogi 75/125 "
+             "| latki: mysl AI TAK (inne postfiksy Last: com.jeff.armoury.siegewalls2/SiegeWalls2, x/Y), atak TAK, wejscie do osady TAK, pojmanie TAK, zaloga -> partia (metoda gry) TAK "
+             "| stan z zapisu (arm_esc223): 0 partii.",
+    "day": "dzien {d} | partii lordow AI 120, slabe {w} (wladcy i glowy rodow {g}: ponizej 0.60 7, slabsze od zagrozenia 3) | dzialania: do twierdzy 5 (dojechalo 2), postoj 4, "
+           "do armii 1 (odpadlo 0), za silniejszym 1, eskorta z zalog {e} razy (ludzi {m}, twierdz 1, zaloga ponizej podlogi {b}, wstrzymana - wrog przy twierdzy 0, bez miejsca "
+           "lub zoldu 0), odbudowani 2, zwolnieni po 12 dobach 0, bez twierdzy w zasiegu 1, obrona wlasnej osady 0, odsiecz krolestwa 0, glod 0 | atak wstrzymany 2 partii (5 razy) "
+           "| pojmania dzis: glowy rodow 1 (sam slaby 0, sam silny 1, w armii 0, w osadzie 0, bez obrazu 0), lordowie 3 | teraz w stanie 6, zwolnionych 0 | najdluzej w stanie "
+           "{k} dob (Tywin Lannister) | potkniecia {p} | zbiera armie (gra) 2 | znani lordowie 11 (ponizej progu 4, slabsze od zagrozenia 2; glowy rodow bez lenna 3, "
+           "rody wielkie lub panujace 6, postacie ksiag 2) | pojmania znanych lordow 1 (sam slaby 0, sam silny 1, w armii 0, w osadzie 0, bez obrazu 0) "
+           "| wahadlo - powrot do stanu w 3 dob po odbudowie {h} razy (2 partii) | zagrozenie minelo 4, werbunek gry bez twierdzy 3, postoj w cudzym zamku 1.",
+    "esc": "eskorta z zalogi (wejscie): Tywin Lannister w Casterly Rock wzial {n} (zaloga 420 -> {a}, podloga 125, zgodnosc {z}), wypelnienie 0.31 -> 0.60/0.60.",
+    "join": "do armii - Kevan Lannister dolaczyl do armii Tywin Lannister, Lord Paramount of Casterly Rock's Party (4 partii, sila 812).",
+    "cap": "POJMANY Tywin Lannister (glowa rodu) przez Ithauser's Party | sam silny | Tywin Lannister's Party ludzi 95, zdrowych 75, wypelnienie 0.31/0.60, stan 223 -, w armii NIE, "
+           "ostatni rozkaz Hold/EngageParty (Hold od 5 h), obraz sprzed 2 h.",
+    "capf": "POJMANY Jaime Lannister (znany lord - rod wielki lub panujacy) przez Ithauser's Party | sam slaby | Jaime Lannister's Party ludzi 60, zdrowych 41, "
+            "wypelnienie 0.35/0.60, stan 223 narazony, w armii NIE, ostatni rozkaz GoToSettlement/GoToSettlement, obraz sprzed 1 h.",
+    "ex": "Tywin Lannister (glowa rodu) ludzi 95, zdrowych 75, wypelnienie 0.31/0.60, sila 210 / zagrozenie 340 (Ithauser's Party, 47 ludzi) -> do twierdzy Casterly Rock (wlasna).",
+    "exf": "Jaime Lannister (znany lord - postac ksiag) ludzi 60, zdrowych 41, wypelnienie 0.35/0.60, sila 150 / zagrozenie 0 -> do twierdzy Casterly Rock (wlasna).",
+}
+
+
+def e223_selftest():
+    T = E223_TEST
+    probs = []
+    day = T["day"].format(d=108990, w=9, g=7, e=1, m=85, b=0, k="3.5", p=0, h=5)
+    esc = T["esc"].format(n=85, a=335, z="TAK")
+    for name, line in (("start", T["start"]), ("day", day), ("esc", esc), ("join", T["join"]), ("cap", T["cap"]), ("ex", T["ex"]), ("cap", T["capf"]), ("ex", T["exf"])):
+        if not E223_RX[name].match(line):
+            probs.append(name)
+    m = E223_RX["day"].match(day)
+    if m and (m.group(1) != "108990" or m.group(15) != "85" or m.group(40) != "0" or m.group(41) != "2"):
+        probs.append("day grupy")
+    if m and (m.group(42) != "11" or m.group(46) != "6" or m.group(48) != "1" or m.group(50) != "1" or m.group(54) != "3" or m.group(55) != "5" or m.group(56) != "2"):
+        probs.append("day grupy 223b")
+    if m and (m.group(57) != "4" or m.group(58) != "3" or m.group(59) != "1"):
+        probs.append("day grupy recenzji 223b")
+    mr = E223_RX["day"].match(day[:day.index(" | zagrozenie minelo")] + ".")   # linia 223b sprzed recenzji 223b (bez ostatniego ogona)
+    if not mr or mr.group(55) != "5" or mr.group(57) is not None:
+        probs.append("day bez ogona recenzji 223b")
+    mb = E223_RX["day"].match(day[:day.index(" | znani lordowie")] + ".")   # linia sprzed 223b (ogon recenzji, bez ogona 223b)
+    if not mb or mb.group(41) != "2" or mb.group(42) is not None:
+        probs.append("day bez ogona 223b")
+    st = T["start"].replace(" | stan z zapisu", " | znani lordowie (223b): glowy rodow bez lenna, rody wielkie ksiag 12 klanow (w grze 11: House Stark, House Lannister), "
+                                         "postacie ksiag w rodach TAK, czlonkowie rodow panujacych | stan z zapisu")
+    if not E223_RX["start"].match(st):
+        probs.append("start 223b")
+    old = day[:day.index(" | zbiera armie (gra) 2")] + "."   # linia sprzed recenzji 223 (bez ogona)
+    mo = E223_RX["day"].match(old)
+    if not mo or mo.group(40) != "0" or mo.group(41) is not None:
+        probs.append("day bez ogona")
+    return ("nie pasuje: " + ", ".join(probs)) if probs else None
+
+
+def e223_collect(logp):
+    RX = E223_RX
+    D = {"starts": [], "days": [], "esc": [], "esc_bad": [], "sum_mis": [], "joins": 0, "caps": [], "ex": 0, "err": 0, "err1": "", "p9": set(), "z169": 0, "has169": False,
+         "saved_drop": 0, "fcaps": []}
+    acc = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            if "ERROR in LordEscort" in s:
+                D["err"] += 1
+                if not D["err1"]:
+                    D["err1"] = s[:160]
+                continue
+            mp = E223_P9.search(s)
+            if mp and s.startswith("Gotowosc do bitwy (p9): dzien"):
+                D["p9"].add(int(mp.group(1)))
+                continue
+            if s.startswith("Zalogi: przyrost bez werbunku (169c)"):
+                mz = E223_169C.search(s)
+                if mz:
+                    D["has169"] = True
+                    D["z169"] += abs(int(mz.group(2)))
+                continue
+            if not s.startswith(E223_TAG):
+                continue
+            r = s[len(E223_TAG):]
+            if r.startswith("start sesji"):
+                D["starts"].append((RX["start"].match(r), r))
+                acc = 0
+            elif r.startswith("dzien "):
+                md = RX["day"].match(r)
+                if not md:
+                    D["esc_bad"].append("zly format linii doby: " + r[:80])
+                    continue
+                D["days"].append(md)
+                if int(md.group(15)) != acc:
+                    D["sum_mis"].append(f"doba {md.group(1)}: ludzi {md.group(15)}, linie zdarzen {acc}")
+                acc = 0
+            elif r.startswith("eskorta z zalogi"):
+                me = RX["esc"].match(r)
+                if not me:
+                    D["esc_bad"].append("zly format: " + r[:80])
+                    continue
+                n, g0, g1, fl = int(me.group(4)), int(me.group(5)), int(me.group(6)), int(me.group(7))
+                D["esc"].append(me)
+                acc += n
+                if me.group(8) != "TAK" or g0 - g1 != n:
+                    D["esc_bad"].append(f"{me.group(2)} w {me.group(3)}: wzial {n}, zaloga {g0} -> {g1}")
+                if g1 < fl:
+                    D["esc_bad"].append(f"{me.group(3)}: zaloga {g1} ponizej podlogi {fl}")
+            elif r.startswith("do armii - "):
+                D["joins"] += 1
+            elif r.startswith("stan z zapisu - po dobie usunieto "):
+                mz = re.match(r"stan z zapisu - po dobie usunieto (\d+) ", r)
+                D["saved_drop"] += int(mz.group(1)) if mz else 0
+            elif r.startswith("POJMANY "):
+                mc = RX["cap"].match(r)
+                # 223b: znani lordowie i nastepcy spoza glow rodow - osobno (E223-7); E223-6 tylko glowy rodow
+                (D["caps"] if r.find(" (glowa rodu") >= 0 else D["fcaps"]).append(mc.group(3) if mc else "?")
+            else:
+                D["ex"] += 1
+    return D
+
+
+def e223_rows(rep, D):
+    starts = D["starts"]
+    ok_starts = [m for m, _ in starts if m]
+    wait = 12
+    if not starts:
+        rep.add("E223-0: linia startu (latki mysl AI, atak, wejscie do osady, pojmanie)", "brak linii 223 (log sprzed paczki 223)", "INFO", None)
+    elif not ok_starts:
+        rep.add("E223-0: linia startu (latki mysl AI, atak, wejscie do osady, pojmanie)", "zly format: " + starts[-1][1][:100], "format jak w kodzie", False)
+    else:
+        m = ok_starts[-1]
+        wait = int(m.group(7))
+        hooks = [m.group(11), m.group(12), m.group(13), m.group(14)]
+        if m.group(1) != "TAK":
+            rep.add("E223-0: linia startu (latki mysl AI, atak, wejscie do osady, pojmanie)", "klucz Lords Avoid Danger NIE", "INFO", None)
+        else:
+            rep.add("E223-0: linia startu (latki mysl AI, atak, wejscie do osady, pojmanie)", f"startow {len(starts)}, latki {hooks}, zaloga -> partia {m.group(15)}, "
+                    f"prog {m.group(4)}, zasieg {m.group(5)}, postoj {wait} dob, stan z zapisu {m.group(16)}", "4 x TAK", all(h == "TAK" for h in hooks))
+    days = D["days"]
+    dset = {int(m.group(1)) for m in days}
+    ref = D["p9"] or dset
+    miss = sorted(ref - dset)
+    if not days and not starts:
+        rep.add("E223-1: linia doby co dobe", "0 linii doby", "INFO (log sprzed 223)", None)
+    else:
+        rep.add("E223-1: linia doby co dobe", f"dob z linia {len(dset)}, dob biegu (p9) {len(ref)}, braki {miss[:5]}", "najwyzej 1 brak, najmniej min(5, dob biegu)",
+                len(miss) <= 1 and len(dset) >= min(5, len(ref)))
+    lords = sum(int(m.group(2)) for m in days)
+    weak = sum(int(m.group(3)) for m in days)
+    acts = sum(int(m.group(i)) for m in days for i in (8, 10, 11, 13, 14, 22))
+    if not days or lords == 0:
+        rep.add("E223-2: slabe partie i dzialania", f"partii lordow AI (suma dob) {lords}", "INFO (brak wojny albo linii)", None)
+    else:
+        rep.add("E223-2: slabe partie i dzialania", f"partii lordow AI (suma dob) {lords}, slabe {weak}, dzialan (twierdza, postoj, armia, za silniejszym, eskorta, zwolnieni) "
+                f"{acts}, zbiera armie (gra) {sum(int(m.group(41) or 0) for m in days)}, dolaczen do armii (linie) {D['joins']}, przykladow {D['ex']}, wpisow z zapisu "
+                f"usunietych po dobie {D['saved_drop']}", "slabe > 0 i dzialan > 0", weak > 0 and acts > 0)
+    below = sum(int(m.group(17)) for m in days)
+    men = sum(int(m.group(15)) for m in days)
+    probs = list(D["esc_bad"]) + list(D["sum_mis"])
+    if below:
+        probs.append(f"zaloga ponizej podlogi {below}")
+    ev = sum(int(m.group(4)) for m in D["esc"])
+    if D["has169"] and ev > D["z169"]:
+        probs.append(f"eskorty {ev} > z zalogi do partii 169c {D['z169']}")
+    rep.add("E223-3: zamknieta ekonomia eskorty z zalog", f"eskort {len(D['esc'])} (ludzi w liniach zdarzen {ev}, w liniach doby {men}), 169c z zalogi do partii "
+            + (str(D["z169"]) if D["has169"] else "-") + (" | " + "; ".join(probs[:3]) if probs else ""),
+            "wzial == spadek zalogi, zaloga >= podloga, suma doby == suma zdarzen, eskorty <= 169c (bez eskort - INFO)", (not probs) if (D["esc"] or probs) else None)
+    st = sum(int(m.group(40)) for m in days)
+    rep.add("E223-4: potkniecia", f"potkniecia w liniach doby {st}, ERROR in LordEscort {D['err']}" + (f" ({D['err1']})" if D["err1"] else ""), "0 i 0",
+            st == 0 and D["err"] == 0)
+    if days:
+        mx = max(float(m.group(38)) for m in days)
+        rep.add("E223-5: najdluzej w stanie", f"{mx:.1f} dob", f"<= {wait + 1} (postoj najwyzej {wait} dob + 1)", mx <= wait + 1)
+    else:
+        rep.add("E223-5: najdluzej w stanie", "brak linii doby", "INFO", None)
+    if days:
+        f, l = days[0], days[-1]
+        caps = {}
+        for c in D["caps"]:
+            caps[c] = caps.get(c, 0) + 1
+        rep.add("E223-6: wladcy i glowy rodow slabe (pierwsza / ostatnia doba), pojmania glow rodow",
+                f"doba {f.group(1)}: {f.group(4)} (ponizej progu {f.group(6)}, slabsze od zagrozenia {f.group(7)}); doba {l.group(1)}: {l.group(4)} (ponizej progu {l.group(6)}, "
+                f"slabsze od zagrozenia {l.group(7)}) | pojmania glow rodow {len(D['caps'])} {caps}, lordow (suma dob) {sum(int(m.group(35)) for m in days)}",
+                "INFO (porownanie A/B: ten sam zapis z kluczem NIE i TAK)", None)
+    tail = [m for m in days if m.group(42) is not None]
+    if tail:
+        f, l = tail[0], tail[-1]
+        fc = {}
+        for c in D["fcaps"]:
+            fc[c] = fc.get(c, 0) + 1
+        sh = sum(int(m.group(55)) for m in tail)
+        shp = max(int(m.group(56)) for m in tail)
+        rep.add("E223-7: znani lordowie (223b) slabe, pojmania znanych lordow, wahadlo",
+                f"doba {f.group(1)}: {f.group(42)} (ponizej progu {f.group(43)}, slabsze {f.group(44)}; bez lenna {f.group(45)}, rody wielkie lub panujace {f.group(46)}, "
+                f"postacie ksiag {f.group(47)}); doba {l.group(1)}: {l.group(42)} (ponizej progu {l.group(43)}) | pojmania znanych lordow (suma dob) "
+                f"{sum(int(m.group(48)) for m in tail)}, linie {len(D['fcaps'])} {fc} | wahadlo (powrot w {l.group(54)} dob po odbudowie) {sh} razy, najwiecej partii w dobie {shp}"
+                + (f" | zagrozenie minelo (suma dob) {sum(int(m.group(57) or 0) for m in tail)}, werbunek gry bez twierdzy (suma dob) {sum(int(m.group(58) or 0) for m in tail)}, "
+                   f"postoj w cudzym zamku (suma dob) {sum(int(m.group(59) or 0) for m in tail)}" if any(m.group(57) is not None for m in tail) else ""),
+                "INFO (wahadlo czeste - histereza do decyzji, recenzja D1)", None)
+    else:
+        rep.add("E223-7: znani lordowie (223b) slabe, pojmania znanych lordow, wahadlo", "brak ogona 223b w liniach doby", "INFO (log sprzed 223b)", None)
+
+
+def e223_synth():
+    import tempfile
+    import shutil
+    T = E223_TEST
+    P = "[10:00:00] " + E223_TAG
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="e223_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind == "off":
+                # klucz NIE (recenzja 223): linia doby dalej co dobe, dzialania 0 - A/B
+                L.append(P + T["start"].replace("Lords Avoid Danger TAK", "Lords Avoid Danger NIE"))
+                for d in range(108990, 108996):
+                    L.append("[10:00:00] Gotowosc do bitwy (p9): dzien %d | reszta" % d)
+                    L.append(P + T["day"].format(d=d, w=0, g=0, e=0, m=0, b=0, k="0.0", p=0, h=0).replace("partii lordow AI 120", "partii lordow AI 0"))
+            elif kind != "none":
+                L.append(P + T["start"] if kind == "good" else P + T["start"].replace("atak TAK", "atak BRAK"))
+                for i, d in enumerate(range(108990, 108996)):
+                    L.append("[10:00:00] Gotowosc do bitwy (p9): dzien %d | reszta" % d)
+                    if kind == "good":
+                        L += [P + T["ex"], P + T["exf"], P + T["join"], P + T["esc"].format(n=40, a=380, z="TAK"), P + T["cap"], P + T["capf"]]
+                        L.append(P + T["day"].format(d=d, w=9, g=7, e=1, m=40, b=0, k="3.5", p=0, h=1))
+                        L.append("[10:00:00] Zalogi: przyrost bez werbunku (169c): dzien %d | zalogi 9000 ludzi (w miastach 6000, w zamkach 3000), zmiana od wczoraj -40 "
+                                 "| werbunek gry od notabli +0 | przyrost z modelu zalogi gry (bez werbunku i bez zlota) +0 | z partii do zalogi +0, z zalogi do partii -60 | patrole BK" % d)
+                    else:
+                        if i == 3:
+                            continue   # brak dwoch dob (E223-1)
+                        if i == 4:
+                            continue
+                        L += [P + T["esc"].format(n=40, a=300, z="NIE")]
+                        L.append(P + T["day"].format(d=d, w=9, g=7, e=1, m=45, b=1, k="20.0", p=2, h=0))
+                L.append("[10:00:00] ERROR in LordEscort.ThinkPostfix (potkniecie 1): x" if kind == "bad" else "[10:00:00] Armoury: inna linia")
+            else:
+                L.append("[10:00:00] Armoury: inna linia")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            e223_rows(rep, e223_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"E223-0": "TAK", "E223-1": "TAK", "E223-2": "TAK", "E223-3": "TAK", "E223-4": "TAK", "E223-5": "TAK", "E223-6": "INFO", "E223-7": "INFO"},
+        "bad": {"E223-0": "NIE", "E223-1": "NIE", "E223-3": "NIE", "E223-4": "NIE", "E223-5": "NIE"},
+        "none": {"E223-0": "INFO", "E223-1": "INFO", "E223-2": "INFO", "E223-3": "INFO", "E223-4": "TAK", "E223-5": "INFO"},
+        "off": {"E223-0": "INFO", "E223-1": "TAK", "E223-2": "INFO", "E223-3": "INFO", "E223-4": "TAK", "E223-5": "TAK"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def e223_main(logp):
+    """e223 (26.10, paczka 223): E223-S, E223-S2, E223-0..E223-6 - opis w komentarzu nad stalymi E223_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = e223_selftest()
+    rep.add("E223-S: self-test wyrazen (linie kontrolne jak w kodzie C#: LordEscort.cs, LordEscort.Probe.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)",
+            s1 is None)
+    try:
+        s2 = e223_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("E223-S2: test syntetyczny (dobry, zly, bez linii 223)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("E223-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = e223_collect(logp)
+    print(f"plik: {logp} | startow 223 {len(D['starts'])}, dob {len(D['days'])}, eskort {len(D['esc'])}, dolaczen do armii {D['joins']}, pojman glow rodow {len(D['caps'])}, "
+          f"przykladow {D['ex']}, ERROR {D['err']}")
+    e223_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_e223_main_prev = main
+
+
+def main(argv):
+    # paczka 223: grupa e223 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "e223":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return e223_main(rest[0] if rest else None)
+    return _e223_main_prev(argv)
 
 
 if __name__ == "__main__":
