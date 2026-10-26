@@ -1,5 +1,16 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 18:20 CET - NOWE KONTO (poprzednie: limit tygodnia o 15:17); 159c i 164 w toku
+- Test 163b (159 + 159b-fix, build 9650e63d = merge 9263c755 w n161): bitwaN + probyN kod 0, ERROR 0, gra przywrocona 15:22 (Armoury w grze 05503a8c = 124).
+- Druga recenzja 159b (wf_e0014686-1ec): 2 prawdziwe usterki -> paczka 159c. Wynik recenzji: scratchpad sesji 1e1c276a...\scratchpad\recenzja-159b-fix2-wynik.json.
+- Workflowy z 15:17 (159c wf_0e9e7939-ff8, 164 wf_57fa2a26-aee) padly na limicie - 159c nie ruszyl; 164 zostawil NIEZACOMMITOWANE zmiany w zb\n164
+  (EventMusic.Bitwa.cs, tools/muzyka/bitwa_v2.py); ogg 10 utworow x 4 lufs gotowe w scratchpad fffc991e...\muzyka_bitwy\out.
+- 18:15 nowe konto: workflow 159c wf_f37a28aa-e17 (zb\n159: poprawka, 3 recenzje + obalanie, fix2, recheck) i 164 wf_3f58b257-583 (zb\n164: dokonczenie, recenzja, fix).
+  Skrypty: C:\Users\GAME\.claude\projects\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\1e1c276a-7a4b-41a8-acfd-5b40353b59ab\workflows\scripts\
+  Po 159c: merge noc/159-nadzy-lordowie -> noc/161-integracja (zb\n161), build, autotest 163c (bitwaN,probyN 6 dob), dopiero po TAK -> WGRANIE 125 (159+159b+159c).
+  Po 164: merge do n161 po 125, autotest, WGRANIE 126 (DLL + bit_*.ogg do Modules\Armoury\ModuleData\Lektor\Muzyka\Bitwa\lufsNN).
+- Wrapper testow: scratchpad 6570af7b...\scratchpad\m113\testy-m114.ps1 (163b: -Dll test\mfinal163b -NowyArmoury ... -Prefix 163b -Runs bitwaN,probyN).
+
 ## DOPISEK 26.10 ok. 13:45 CET - STAN NA WYPADEK URWANIA (Jeff: "zapisz stan, zaraz moze urwac sie tokeny")
 **W GRZE (zatwierdzone):** WGRANE 124 = Armoury 05503a8c (commit 87aaa764 galezi noc/161-integracja), CrashScribe bef9db58, glosy 123 (dane).
 Gra posprzatana po URWANYM tescie 163a (13:04): przywrocone z C:\Users\GAME\autotest-kopie\2026-10-26_13-04-00 (Armoury, CrashScribe, arm_canon_moves.tsv,
