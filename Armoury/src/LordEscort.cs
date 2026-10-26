@@ -23,13 +23,16 @@ namespace Armoury
     ///
     /// Kogo: partie lordow AI rodow AI w krolestwie w wojnie (nie gracz i jego rod, nie Straz, nie umarli, nie partie prologu Prologue.Scripted, nie najemnicy),
     /// poza armia, bitwa, oblezeniem i morzem. Partie niegotowe p9 (ArmsFirst.Unready) i w wyjezdzie po pierwsza bron 159c (ArmsFirst.CapTripActive) prowadzi p9.
-    /// Rangi: R1 wladca albo nastepca (Ransom178 - ta sama regula co wielcy jency), R2 glowa rodu z lennem, R3 reszta.
+    /// Rangi: R1 wladca albo nastepca (Ransom178 - ta sama regula co wielcy jency), R2 glowa rodu z lennem, R3 znany lord (223b, Jeff "znani lordowie a juz glowy
+    /// rodu"): glowa rodu bez lenna, czlonek rodu wielkiego ksiag (CanonHouses.GreatClanIds - status awoiaf great / suwerenny) albo rodu panujacego swojego krolestwa
+    /// (Kingdom.RulingClan), postac ksiag przeniesiona do rodu (CanonCompanions.IsOriginal - Jaime, Tyrion, Bronn...); R4 reszta. R1-R3 maja regule wypelnienia
+    /// i zakaz zaczepiania ponizej progu; eskorta z zalogi jak dotad tylko z twierdzy wlasnego rodu (R3 bez lenna jej nie ma - armia, za silniejszym, twierdza krolestwa).
     /// Miary (z istniejacych modeli, bez nowych stalych):
     ///  - wypelnienie = zdrowi / normalny rozmiar partii (PartyBaseHelper.FindPartySizeNormalLimit x PartySizeLimit - z limitem zoldu rodu 166);
     ///  - prog = ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy (gra 0.6 - ponizej gra i BK nie wolaja partii do armii);
     ///  - sila S = Party.EstimatedStrength (z mnoznikiem uzbrojenia p9), zagrozenie T = najsilniejsza wroga grupa (partia lorda, cala armia od wodza, banda, gracz)
     ///    w zasiegu CivilWorksFrontRange (60, "doba drogi"); zalogi, milicja, wiesniacy, karawany, partie w bitwie i w osadach pominiete.
-    /// NARAZONA: R1/R2 z wypelnieniem ponizej progu albo dowolna ranga z S + sojusznicy w zasiegu &lt; T bez oblegajacych (recenzja 223: przewaga lokalna jak gra
+    /// NARAZONA: R1-R3 z wypelnieniem ponizej progu albo dowolna ranga z S + sojusznicy w zasiegu &lt; T bez oblegajacych (recenzja 223: przewaga lokalna jak gra
     /// GetBestInitiativeBehavior; oblegajacy stoja przy oblezeniu). Co robi (mysl AI co 6 h, postfiks Priority.Last po p9, OB5, WatchLaw, CrossingLaw):
     ///  1. armia wlasnego krolestwa w zasiegu (wodz poza bitwa, nie armia gracza, jedzenie >= MinimumNeededFoodInDaysToCallToArmy, wplyw wodza na koszt wezwania; wladca
     ///     nie idzie do cudzej armii - regula gry) - dolaczenie w nastepnej godzinie (mp.Army = armia, jak gra przy wezwaniu; warunki od nowa);
@@ -44,9 +47,12 @@ namespace Armoury
     ///  5. postoj do odbudowy (wypelnienie >= progu i S >= T), najwyzej AiArmsWaitMaxDays dob - potem zwolniony na AiArmsTripCooldownDays dob (regula Jeffa 12.10:
     ///     nie bezczynnosc);
     ///  6. w stanie narazenia opcje bitwy (oblezenie, szturm, rabunek, obrona cudzej osady, poscig za partia nie-banda) -1; obrona osady wlasnego rodu zostaje; obrona
-    ///     osady krolestwa zostaje, gdy jest najlepsza (OB5); zebranie armii zostaje dla partii nie ponizej progu; R1/R2 ponizej progu nie zaczepia partii poza bandami
+    ///     osady krolestwa zostaje, gdy jest najlepsza (OB5); zebranie armii zostaje dla partii nie ponizej progu; R1-R3 ponizej progu nie zaczepia partii poza bandami
     ///     (postfiks ShouldConsiderAttacking, jak p9), poza obrona wlasnej osady.
     /// Stan (od kiedy narazona, zwolniona do) w zapisie (arm_esc223); wpis wazny tylko w pierwszej mysli partii po wczytaniu, reszta usuwana po dobie (recenzja 223). Linie "Eskorta lordow (223): ...".
+    /// 223b: histereza wyjscia (recenzja D1) bez zmian - brak liczby z istniejacego modelu na prog wyjscia (gra werbuje do 1.0 normalnego rozmiaru, CanLordCreateArmy
+    /// i wezwanie do armii - ten sam prog 0.6, AiArmsBelow/ReadyPercent p9 to gotowosc uzbrojenia); zamiast tego licznik "wahadlo" (powrot do stanu w
+    /// AiArmsTripCooldownDays dob po wyjsciu "odbudowany") w linii doby.
     /// </summary>
     internal static partial class LordEscort
     {
@@ -57,7 +63,7 @@ namespace Armoury
 
         private sealed class St
         {
-            internal MobileParty P; internal int Rank; internal double SinceH = -1, FreeUntilH = -1, ArriveH = -1; internal Settlement Fort; internal string Act = "";
+            internal MobileParty P; internal int Rank, Kind; internal double SinceH = -1, FreeUntilH = -1, ArriveH = -1; internal Settlement Fort; internal string Act = "";
         }
         private static readonly Dictionary<MBGUID, St> _st = new Dictionary<MBGUID, St>();
         private struct Saved { internal double Since, Free; }
@@ -91,6 +97,17 @@ namespace Armoury
                                                 _dWeaker = new HashSet<MBGUID>(), _dToFort = new HashSet<MBGUID>(), _dStay = new HashSet<MBGUID>(), _dFollow = new HashSet<MBGUID>(),
                                                 _dNoFort = new HashSet<MBGUID>(), _dOwnDef = new HashSet<MBGUID>(), _dKin = new HashSet<MBGUID>(), _dGather = new HashSet<MBGUID>();
         private static readonly HashSet<Settlement> _dEscForts = new HashSet<Settlement>();
+        // 223b znani lordowie (R3): partie doby, ponizej progu, slabsze od zagrozenia, wedlug rodzaju (1 glowa rodu bez lenna, 2 rod wielki lub panujacy, 3 postac ksiag)
+        private static readonly HashSet<MBGUID> _dFamous = new HashSet<MBGUID>(), _dFamLow = new HashSet<MBGUID>(), _dFamWeaker = new HashSet<MBGUID>(),
+                                                _dFamLandless = new HashSet<MBGUID>(), _dFamGreat = new HashSet<MBGUID>(), _dFamCanon = new HashSet<MBGUID>();
+        // 223b wahadlo (recenzja D1, histereza nie poprawiona - brak liczby z istniejacego modelu na prog wyjscia): godzina wyjscia "odbudowany"; powrot do stanu
+        // w AiArmsTripCooldownDays dob po niej = wahadlo (licznik doby)
+        private static readonly Dictionary<MBGUID, double> _rebuiltH = new Dictionary<MBGUID, double>();
+        private static readonly HashSet<MBGUID> _dShuttleP = new HashSet<MBGUID>();
+        private static int _dShuttle;
+        // 223b rody wielkie ksiag (id klanow ROT z CanonHouses, sesja)
+        private static HashSet<string> _greatClans = new HashSet<string>(StringComparer.Ordinal);
+        private static string _greatNote = "-";
         private static int _dArrived, _dJoined, _dJoinDrop, _dEsc, _dEscMen, _dEscBelow, _dEscHeld, _dEscNoRoom, _dRebuilt, _dFreed, _dStarve, _dExamples;
 
         private static void Stumble(string where, Exception e)
@@ -104,6 +121,7 @@ namespace Armoury
         internal static void Reset()
         {
             _st.Clear(); _saved.Clear(); _savedLoaded = 0; _savedH0 = -1; _thr.Clear(); _fortThr.Clear(); _noAtk = new HashSet<MBGUID>(); _joinQ.Clear(); _escQ.Clear(); _seen.Clear();
+            _rebuiltH.Clear();
             ClearDay(); _stumbles = 0;
         }
 
@@ -112,6 +130,7 @@ namespace Armoury
             lock (Gate) { _vAtkCalls = 0; _vAtk.Clear(); }
             _dLords.Clear(); _dWeak.Clear(); _dGreat.Clear(); _dLow.Clear(); _dWeaker.Clear(); _dToFort.Clear(); _dStay.Clear(); _dFollow.Clear(); _dNoFort.Clear(); _dOwnDef.Clear(); _dKin.Clear(); _dGather.Clear();
             _dEscForts.Clear();
+            _dFamous.Clear(); _dFamLow.Clear(); _dFamWeaker.Clear(); _dFamLandless.Clear(); _dFamGreat.Clear(); _dFamCanon.Clear(); _dShuttleP.Clear(); _dShuttle = 0;
             _dArrived = _dJoined = _dJoinDrop = _dEsc = _dEscMen = _dEscBelow = _dEscHeld = _dEscNoRoom = _dRebuilt = _dFreed = _dStarve = _dExamples = 0;
             ClearDayProbe();
         }
@@ -150,16 +169,29 @@ namespace Armoury
             catch { return 0f; }
         }
 
-        /// <summary>Ranga: 1 wladca albo nastepca (Ransom178), 2 glowa rodu z lennem, 3 reszta.</summary>
-        private static int RankOf(Hero h, Clan clan)
+        /// <summary>Ranga: 1 wladca albo nastepca (Ransom178), 2 glowa rodu z lennem, 3 znany lord (223b; kind 1 glowa rodu bez lenna, 2 czlonek rodu wielkiego ksiag
+        /// albo rodu panujacego swojego krolestwa, 3 postac ksiag przeniesiona do rodu - CanonCompanions), 4 reszta. Watek glowny.</summary>
+        private static int RankOf(Hero h, Clan clan, out int kind)
         {
-            if (h == null) return 3;
+            kind = 0;
+            if (h == null) return 4;
             if (Ransom178.IsRulerOrHeir(h)) return 1;
-            if (clan != null && clan.Leader == h && clan.Fiefs != null && clan.Fiefs.Count > 0) return 2;
-            return 3;
+            if (clan != null && clan.Leader == h)
+            {
+                if (clan.Fiefs != null && clan.Fiefs.Count > 0) return 2;
+                kind = 1; return 3;
+            }
+            if (clan != null && ((clan.StringId != null && _greatClans.Contains(clan.StringId)) || (clan.Kingdom != null && clan.Kingdom.RulingClan == clan))) { kind = 2; return 3; }
+            if (CanonCompanions.Active && CanonCompanions.IsOriginal(h)) { kind = 3; return 3; }
+            return 4;
         }
 
-        private static string RankName(int r) { return r == 1 ? "wladca/nastepca" : (r == 2 ? "glowa rodu" : "lord"); }
+        private static string KindName(int k) { return k == 1 ? "glowa rodu bez lenna" : (k == 2 ? "rod wielki lub panujacy" : (k == 3 ? "postac ksiag" : "?")); }
+
+        private static string RankName(int r, int kind)
+        {
+            return r == 1 ? "wladca/nastepca" : (r == 2 ? "glowa rodu" : (r == 3 ? "znany lord - " + KindName(kind) : "lord"));
+        }
 
         private static bool AtWar(Kingdom k)
         {
@@ -369,43 +401,58 @@ namespace Armoury
                 _dLords.Add(party.Id);
                 var h = party.LeaderHero;
                 var clan = party.ActualClan;
-                int rank = RankOf(h, clan);
+                int kind;
+                int rank = RankOf(h, clan, out kind);
                 float ratio = Ratio(), fill = Fill(party), S = Str(party);
                 var thr = ThreatOf(party, now);
                 MobileParty who = thr.Who;
                 // slabsza = wlasna sila z przyjaznymi partiami lordow w zasiegu ponizej najsilniejszej wrogiej grupy, ktora moze gonic (bez oblegajacych) - przewaga
                 // lokalna jak gra (GetBestInitiativeBehavior), nie sama partia przeciw calej armii (recenzja 223)
                 float T = thr.Free;
-                bool low = rank <= 2 && fill < ratio, weaker = T > 0f && S + thr.Friends < T;
+                // regula wypelnienia: R1, R2 i od 223b R3 (znani lordowie - Jeff "znani lordowie a juz glowy rodu")
+                bool low = rank <= 3 && fill < ratio, weaker = T > 0f && S + thr.Friends < T;
                 var st = StateOf(party);
                 if (st != null && st.FreeUntilH > now) { SetNoAtk(party, false); return; }   // zwolniony - walczy tym, co ma
                 if (!low && !weaker)
                 {
                     ForgetSaved(party);
-                    if (st != null) { if (st.SinceH >= 0) _dRebuilt++; Drop(party); }
+                    if (st != null)
+                    {
+                        if (st.SinceH >= 0) { _dRebuilt++; _rebuiltH[party.Id] = now; }   // 223b: godzina wyjscia "odbudowany" - licznik wahadla
+                        Drop(party);
+                    }
                     return;
                 }
                 if (st == null)
                 {
                     st = new St { P = party };
                     Saved sv;
+                    bool fromSave = false;
                     if (party.StringId != null && _saved.TryGetValue(party.StringId, out sv))
                     {
                         _saved.Remove(party.StringId);
                         if (sv.Free > now) { st.FreeUntilH = sv.Free; _st[party.Id] = st; return; }
-                        if (sv.Since >= 0 && sv.Since <= now) st.SinceH = sv.Since;
+                        if (sv.Since >= 0 && sv.Since <= now) { st.SinceH = sv.Since; fromSave = true; }
                     }
                     if (st.SinceH < 0) st.SinceH = now;
                     _st[party.Id] = st;
+                    // 223b wahadlo (recenzja D1): powrot do stanu w AiArmsTripCooldownDays dob po wyjsciu "odbudowany" (166 podnosi limit zoldu po eskorcie,
+                    // jeden ranny po potyczce) - tylko licznik, bez zmiany progu (brak liczby z istniejacego modelu na prog wyjscia)
+                    double rb;
+                    if (!fromSave && _rebuiltH.TryGetValue(party.Id, out rb))
+                    {
+                        _rebuiltH.Remove(party.Id);
+                        if (now - rb <= Math.Max(1, ArmsFirst.CoolDays(s)) * 24.0) { _dShuttle++; _dShuttleP.Add(party.Id); }
+                    }
                 }
                 else if (st.SinceH < 0) { st.SinceH = now; st.FreeUntilH = -1; }
-                st.Rank = rank;
+                st.Rank = rank; st.Kind = kind;
                 int wait = ArmsFirst.WaitDays(s);
                 if (now - st.SinceH > wait * 24.0)
                 {
                     // regula Jeffa 12.10 (nie bezczynnosc): po AiArmsWaitMaxDays zwolniony na AiArmsTripCooldownDays - walczy tym, co ma
                     _dFreed++;
-                    Example(party, h, rank, fill, ratio, S, T, thr.Friends, who, "zwolniony po " + wait + " dobach - walczy tym, co ma (" + ArmsFirst.CoolDays(s) + " dob bez stanu)");
+                    Example(party, h, rank, kind, fill, ratio, S, T, thr.Friends, who, "zwolniony po " + wait + " dobach - walczy tym, co ma (" + ArmsFirst.CoolDays(s) + " dob bez stanu)");
                     st.SinceH = -1; st.FreeUntilH = now + Math.Max(1, ArmsFirst.CoolDays(s)) * 24.0; st.Fort = null; st.ArriveH = -1; st.Act = "";
                     SetNoAtk(party, false); _joinQ.Remove(party); _escQ.Remove(party);
                     return;
@@ -417,9 +464,16 @@ namespace Armoury
                     if (low) _dLow.Add(party.Id);
                     if (weaker) _dWeaker.Add(party.Id);
                 }
-                // zakaz zaczepiania tylko dla R1/R2 ponizej progu (Tywin: ocena sily gry liczy tier, nie umiejetnosci); pelna partia slabsza od wrogiej armii obok
+                else if (rank == 3)
+                {
+                    _dFamous.Add(party.Id);
+                    if (low) _dFamLow.Add(party.Id);
+                    if (weaker) _dFamWeaker.Add(party.Id);
+                    (kind == 1 ? _dFamLandless : (kind == 2 ? _dFamGreat : _dFamCanon)).Add(party.Id);
+                }
+                // zakaz zaczepiania tylko dla R1-R3 ponizej progu (Tywin: ocena sily gry liczy tier, nie umiejetnosci); pelna partia slabsza od wrogiej armii obok
                 // nadal bierze male cele - gra i tak nie atakuje silniejszych (recenzja 223)
-                SetNoAtk(party, rank <= 2 && low);
+                SetNoAtk(party, rank <= 3 && low);
 
                 float other = 0f, own = -1f, kin = -1f, gather = -1f;
                 HashSet<Settlement> blocked = null;
@@ -498,20 +552,20 @@ namespace Armoury
                 if (act != null && act != st.Act)
                 {
                     st.Act = act;
-                    Example(party, h, rank, fill, ratio, S, T, thr.Friends, who, act);
+                    Example(party, h, rank, kind, fill, ratio, S, T, thr.Friends, who, act);
                 }
             }
             catch (Exception e) { Stumble("ThinkPostfix", e); }
         }
 
-        private static void Example(MobileParty party, Hero h, int rank, float fill, float ratio, float S, float T, float friends, MobileParty who, string act)
+        private static void Example(MobileParty party, Hero h, int rank, int kind, float fill, float ratio, float S, float T, float friends, MobileParty who, string act)
         {
             if (_dExamples >= MaxExamples) return;
             _dExamples++;
             try
             {
                 var r = party.MemberRoster;
-                Log.Info("Eskorta lordow (223): " + Hn(h) + " (" + RankName(rank) + ") ludzi " + (r != null ? r.TotalManCount : 0) + ", zdrowych " + (r != null ? r.TotalHealthyCount : 0)
+                Log.Info("Eskorta lordow (223): " + Hn(h) + " (" + RankName(rank, kind) + ") ludzi " + (r != null ? r.TotalManCount : 0) + ", zdrowych " + (r != null ? r.TotalHealthyCount : 0)
                          + ", wypelnienie " + F2(fill) + "/" + F2(ratio) + ", sila " + F0(S) + " / zagrozenie " + F0(T)
                          + (who != null ? " (" + Nm(who) + ", " + (who.Army != null ? "armia" : (who.MemberRoster != null ? who.MemberRoster.TotalManCount + " ludzi" : "?")) + ", sojusznicy w zasiegu " + F0(friends) + ")" : "")
                          + " -> " + act + ".");
@@ -674,7 +728,16 @@ namespace Armoury
                 if (s == null || !s.LordsAvoidDanger)
                 {
                     if (_st.Count > 0 || _noAtk.Count > 0 || _joinQ.Count > 0 || _escQ.Count > 0) { _st.Clear(); _noAtk = new HashSet<MBGUID>(); _joinQ.Clear(); _escQ.Clear(); }
+                    _rebuiltH.Clear();
                     return;
+                }
+                // 223b wahadlo: wyjscia "odbudowany" starsze niz okno (AiArmsTripCooldownDays dob) - usuniete
+                if (_rebuiltH.Count > 0 && Math.Floor(CampaignTime.Now.ToHours) % 24.0 == 0.0)
+                {
+                    double now0 = Math.Floor(CampaignTime.Now.ToHours), win = Math.Max(1, ArmsFirst.CoolDays(s)) * 24.0;
+                    List<MBGUID> old = null;
+                    foreach (var kv in _rebuiltH) if (now0 - kv.Value > win) { if (old == null) old = new List<MBGUID>(); old.Add(kv.Key); }
+                    if (old != null) foreach (var k in old) _rebuiltH.Remove(k);
                 }
                 if (_joinQ.Count > 0)
                 {
@@ -834,7 +897,14 @@ namespace Armoury
                   .Append(" | teraz w stanie ").Append(exposedNow).Append(", zwolnionych ").Append(freeNow)
                   .Append(" | najdluzej w stanie ").Append(F1(longest)).Append(" dob (").Append(longName).Append(')')
                   .Append(" | potkniecia ").Append(_stumbles)
-                  .Append(" | zbiera armie (gra) ").Append(_dGather.Count).Append('.');
+                  .Append(" | zbiera armie (gra) ").Append(_dGather.Count)
+                  // 223b: znani lordowie (R3) i wahadlo (recenzja D1) - ogon linii (starsze logi bez niego)
+                  .Append(" | znani lordowie ").Append(_dFamous.Count).Append(" (ponizej progu ").Append(_dFamLow.Count).Append(", slabsze od zagrozenia ").Append(_dFamWeaker.Count)
+                  .Append("; glowy rodow bez lenna ").Append(_dFamLandless.Count).Append(", rody wielkie lub panujace ").Append(_dFamGreat.Count)
+                  .Append(", postacie ksiag ").Append(_dFamCanon.Count).Append(')')
+                  .Append(" | ").Append(ProbeFamousText())
+                  .Append(" | wahadlo - powrot do stanu w ").Append(Math.Max(1, ArmsFirst.CoolDays(s))).Append(" dob po odbudowie ").Append(_dShuttle)
+                  .Append(" razy (").Append(_dShuttleP.Count).Append(" partii)").Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -892,7 +962,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(owner, DayProfile.Hr("LordEscort.Hourly", Hourly));
             CampaignEvents.SettlementEntered.AddNonSerializedListener(owner, DayProfile.Settle("LordEscort.OnEntered", OnEntered));
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(owner, OnPrisonerTaken);
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(owner, (mp, pb) => { try { ForgetSaved(mp); Drop(mp); } catch { } });
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(owner, (mp, pb) => { try { ForgetSaved(mp); Drop(mp); if (mp != null) _rebuiltH.Remove(mp.Id); } catch { } });
             _events = true;
         }
 
@@ -942,6 +1012,24 @@ namespace Armoury
                 _hTake = _take == null ? "BRAK (GarrisonTroopsCampaignBehavior.TakeTroopsFromGarrison)" : (beh == null ? "BRAK (zachowanie zalog gry nieobecne)" : "TAK");
             }
             catch (Exception e) { _take = null; _hTake = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Take", e); }
+            // 223b: rody wielkie ksiag z pliku rodow kanonu (raz na sesje; plik wczytany raz na proces) - takze przy kluczu NIE (sonda pojman, A/B)
+            try
+            {
+                var ids = CanonHouses.GreatClanIds();
+                var set = new HashSet<string>(ids, StringComparer.Ordinal);
+                int live = 0;
+                var names = new List<string>();
+                foreach (var c in Clan.All)
+                {
+                    if (c == null || c.StringId == null || !set.Contains(c.StringId) || c.IsEliminated) continue;
+                    live++;
+                    if (names.Count < 12) { try { names.Add(c.Name != null ? c.Name.ToString() : c.StringId); } catch { names.Add(c.StringId); } }
+                }
+                _greatClans = set;
+                _greatNote = "rody wielkie ksiag " + set.Count + " klanow (w grze " + live + (names.Count > 0 ? ": " + string.Join(", ", names.ToArray()) : "")
+                             + (CanonHouses.Loaded ? "" : "; plik rodow: " + CanonHouses.Note) + "), postacie ksiag w rodach " + (CanonCompanions.Active ? "TAK" : "NIE");
+            }
+            catch (Exception e) { _greatClans = new HashSet<string>(StringComparer.Ordinal); _greatNote = "wyjatek " + e.GetType().Name; Stumble("SessionStart.Great", e); }
             try
             {
                 var s = Settings.Current;
@@ -953,6 +1041,7 @@ namespace Armoury
                          + " | podloga zalogi " + FloorCastle + "/" + FloorTown
                          + " | latki: mysl AI " + _hThink + ", atak " + _hAttack + ", wejscie do osady " + (_events ? "TAK" : "NIE") + ", pojmanie " + (_events ? "TAK" : "NIE")
                          + ", zaloga -> partia (metoda gry) " + _hTake
+                         + " | znani lordowie (223b): glowy rodow bez lenna, " + _greatNote + ", czlonkowie rodow panujacych"
                          + " | stan z zapisu (arm_esc223): " + _savedLoaded + " partii.");
             }
             catch (Exception e) { Stumble("SessionStart.Line", e); }

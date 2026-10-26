@@ -285,6 +285,22 @@ namespace Armoury
             return c != null && c.StringId != null && _byClan.TryGetValue(c.StringId, out h) ? h : null;
         }
 
+        /// <summary>223b (eskorta lordow, "znani lordowie"): id klanow ROT rodow wielkich ksiag (status z awoiaf "great", "great (P)", "adwd:great") i rodow
+        /// suwerennych nie wymarlych (liege "none (sovereign)", status bez "extinct") - Arryn, Baratheon (oba), Greyjoy, Lannister, Martell, Stark, Targaryen, Tully,
+        /// Tyrell. Z pliku, bez nowej listy. Watek glowny (wczytuje plik przy pierwszym wolaniu).</summary>
+        internal static List<string> GreatClanIds()
+        {
+            EnsureLoaded();
+            var l = new List<string>();
+            foreach (var h in _all)
+            {
+                bool great = h.Status.IndexOf("great", StringComparison.Ordinal) >= 0;
+                bool sov = h.Liege.IndexOf("sovereign", StringComparison.Ordinal) >= 0 && !h.Status.StartsWith("extinct", StringComparison.Ordinal);
+                if (great || sov) foreach (string c in h.Clans) l.Add(c);
+            }
+            return l;
+        }
+
         internal static string[] NamesOf(string area)
         {
             EnsureLoaded();
