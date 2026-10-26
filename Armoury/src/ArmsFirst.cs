@@ -56,6 +56,13 @@ namespace Armoury
     ///      RaidTribute (Low). Miasto, ktore w liscie ocen ma JAKIEKOLWIEK zachowanie z wynikiem <= -1 (odczyt PRZED naszymi -1 opcjom bitwy), jest dla wyjazdu
     ///      zablokowane: Nearest je pomija, a biezacy wyjazd do niego konczy sie wytchnieniem miasta (Cool) i wyborem nastepnego. Nigdy nie podnosimy wyniku <= -1.
     /// Stan wyjazdow bez zapisu - po wczytaniu liczony od nowa. Liczniki do linii "Gotowosc do bitwy (p9): dzien" (ArmedStrength.Daily). Potkniecia per wywolanie.
+    /// 159c (druga recenzja 159b): (e) WYJAZD PO PIERWSZA BRON dla partii, ktorej p9 nie wysyla (gotowa albo zwolniona z czekania) z bronia ponad
+    ///     UnarmedMenAllowedPercent: zleca NewLordKit.OverCap raz na dobe (StartCapTrip - miasto wyceny NearestTown, stac go na pierwsza bron dla nadwyzki), ta sama mysl
+    ///     godzinowa (CapThink): GoToSettlement z ta sama ocena co wyjazd p9, BEZ gaszenia opcji bitwy i bez stanu "niegotowa"; obrona zagrozonej osady rodu ma
+    ///     pierwszenstwo; postoj StayHours, za dlugo w drodze (2 x zasieg + 12 h), cel zablokowany cudza latka albo niewazny (wojna, oblezenie, wytchnienie) - koniec
+    ///     i wytchnienie miasta; armia, nieczynna, przejeta przez p9 (niegotowa, nie zwolniona) - koniec. Najwyzej raz na UnarmedMenSentHomeDays dob na partie
+    ///     (_capLast), nigdy obok wyjazdu p9. (b) "nie stac" p9: niegotowa, ktorej nie stac na pelne dozbrojenie (CanAfford), a stac na pierwsza bron dla nadwyzki
+    ///     (NewLordKit.FirstOk - wycena polki) - wyjazd p9 (TripTown firstOnly: w miescie i przy przedluzeniu postoju ten sam sprawdzian) zamiast "nie stac".
     /// </summary>
     internal static class ArmsFirst
     {
@@ -75,6 +82,10 @@ namespace Armoury
         private static readonly Dictionary<MBGUID, Streak> _noGain = new Dictionary<MBGUID, Streak>();   // recenzja p9: wizyty z rzedu bez postepu
         [ThreadStatic] private static int _inCreate;   // recenzja p9 (uwaga 2): w toku bazowego CanLordCreateArmy (filtr kandydatow przed progiem)
         private static readonly Dictionary<string, double> _cool = new Dictionary<string, double>(StringComparer.Ordinal);   // partia|miasto -> godzina konca wytchnienia
+        // 159c: wyjazdy po pierwsza bron (NewLordKit.OverCap) i godzina ostatniego startu na partie (najwyzej raz na UnarmedMenSentHomeDays dob); bez zapisu
+        private static readonly Dictionary<MBGUID, Trip> _capTrip = new Dictionary<MBGUID, Trip>();
+        private static readonly Dictionary<MBGUID, double> _capLast = new Dictionary<MBGUID, double>();
+        private const double CapLastKeepH = 31 * 24.0;   // UnarmedMenSentHomeDays najwyzej 30
         // 159 (UnarmedMenSentHome): powod, dla ktorego ostatnia mysl nie dala wyjazdu (ThinkPostfix -> NewLordKit.NoteStuck); watek glowny
         internal const string WhyPoor = "nie stac", WhyNoTown = "brak miasta w zasiegu", WhyNoBudgetTown = "nie stac w miescie (rezerwa napraw)", WhyNoGain = "2 wizyty bez postepu";
         private static string _why;
@@ -102,7 +113,7 @@ namespace Armoury
             try { if (n <= 5 || n % 100 == 0) Log.Error("ArmsFirst." + where + " (potkniecie " + n + ")", e); } catch { }
         }
 
-        internal static void Reset() { _trip.Clear(); _cool.Clear(); _noGain.Clear(); ClearDay(); _stumbles = 0; }
+        internal static void Reset() { _trip.Clear(); _cool.Clear(); _noGain.Clear(); _capTrip.Clear(); _capLast.Clear(); ClearDay(); _stumbles = 0; }
 
         internal static void ClearDay()
         {
@@ -244,7 +255,12 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.AiArmsBeforeBattle || !party.IsLordParty || party.IsMainParty) return;
                 var info = ArmedStrength.InfoOf(party);
-                if (info == null || !info.Low || info.Free) return;   // recenzja p9: zwolniona z czekania - zwykle decyzje
+                if (info == null || !info.Low || info.Free)   // recenzja p9: zwolniona z czekania - zwykle decyzje
+                {
+                    if (_capTrip.Count > 0) CapThink(party, partyThinkParams, s);   // 159c: wyjazd po pierwsza bron (gotowa albo zwolniona, bron ponad %)
+                    return;
+                }
+                if (_capTrip.Count > 0 && _capTrip.Remove(party.Id)) NewLordKit.CapTripEvent(NewLordKit.CapEnded);   // 159c: niegotowa - wyjazd prowadzi p9
                 if (party.Army != null || party.MapEvent != null || party.BesiegedSettlement != null) return;
                 if (party.CurrentSettlement != null && party.CurrentSettlement.SiegeEvent != null) return;
                 if (partyThinkParams.DoNotChangeBehavior) return;
@@ -277,7 +293,14 @@ namespace Armoury
                     int b, need;
                     _why = null;
                     if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); _trip.Remove(party.Id); _why = WhyNoGain; }   // recenzja p9: seria wizyt bez postepu - jak "nie stac"
-                    else if (CanAfford(party, info.Short, null, out b, out need)) town = TripTown(party, info, CampaignTime.Now.ToHours, s, blocked);
+                    else if (CanAfford(party, info.Short, null, out b, out need)) town = TripTown(party, info, CampaignTime.Now.ToHours, s, blocked, false);
+                    else if (NewLordKit.FirstOk(party, null))
+                    {
+                        // 159c (druga recenzja 159b, uwaga 2): nie stac na pelne dozbrojenie (prog p9 MinNeed 300 zl), ale stac na pierwsza bron dla nadwyzki bez broni
+                        // wedlug wyceny polki (2-3 zl za sztuke) - wyjazd zamiast "nie stac" (bez niego regula 159 odsylalaby ludzi, ktorych pan moze uzbroic)
+                        town = TripTown(party, info, CampaignTime.Now.ToHours, s, blocked, true);
+                        NewLordKit.NoteLowFirst(party, town != null);
+                    }
                     else { _dPoor.Add(party.Id); Forget(party); _why = WhyPoor; }
                     // 159 (UnarmedMenSentHome): od kiedy i czemu niegotowa partia nie moze sie dozbroic (bez wyjazdu); wyjazd - koniec stania. Tylko zapis stanu
                     NewLordKit.NoteStuck(party, town == null ? (_why ?? "?") : null);
@@ -294,24 +317,109 @@ namespace Armoury
                     _dOff++;
                 }
                 if (town == null) return;
-                float nv = Math.Max(FloorScore, Edge * other) + 0.01f;
-                bool set = false;
-                for (int i = 0; i < scores.Count; i++)
-                {
-                    var d = scores[i].Item1;
-                    if (d.AiBehavior != AiBehavior.GoToSettlement || d.WillGatherArmy || d.NavigationType != MobileParty.NavigationType.Default || !ReferenceEquals(d.Party, town)) continue;   // droga ladowa (Nearest)
-                    if (scores[i].Item2 > -1f && scores[i].Item2 < nv) partyThinkParams.SetBehaviorScore(in d, nv);   // wyniku <= -1 (cudza blokada) nie podnosimy
-                    set = true;
-                    break;
-                }
-                if (!set)
-                {
-                    var a = new AIBehaviorData(town, AiBehavior.GoToSettlement, MobileParty.NavigationType.Default, false, false, false);
-                    partyThinkParams.AddBehaviorScore((a, nv));
-                }
+                Aim(partyThinkParams, scores, town, other);
             }
             catch (Exception e) { Stumble("ThinkPostfix", e); }
         }
+
+        /// <summary>Ocena wyjazdu do miasta: GoToSettlement droga ladowa max(FloorScore, Edge x najlepsza inna) + 0.01; wyniku &lt;= -1 (cudza blokada) nie podnosimy.
+        /// Wspolne dla wyjazdu p9 i (159c) wyjazdu po pierwsza bron.</summary>
+        private static void Aim(PartyThinkParams partyThinkParams, MBReadOnlyList<(AIBehaviorData, float)> scores, Settlement town, float other)
+        {
+            float nv = Math.Max(FloorScore, Edge * other) + 0.01f;
+            bool set = false;
+            for (int i = 0; i < scores.Count; i++)
+            {
+                var d = scores[i].Item1;
+                if (d.AiBehavior != AiBehavior.GoToSettlement || d.WillGatherArmy || d.NavigationType != MobileParty.NavigationType.Default || !ReferenceEquals(d.Party, town)) continue;   // droga ladowa (Nearest)
+                if (scores[i].Item2 > -1f && scores[i].Item2 < nv) partyThinkParams.SetBehaviorScore(in d, nv);   // wyniku <= -1 (cudza blokada) nie podnosimy
+                set = true;
+                break;
+            }
+            if (!set)
+            {
+                var a = new AIBehaviorData(town, AiBehavior.GoToSettlement, MobileParty.NavigationType.Default, false, false, false);
+                partyThinkParams.AddBehaviorScore((a, nv));
+            }
+        }
+
+        /// <summary>
+        /// 159c: mysl godzinowa partii, ktorej p9 nie wysyla (gotowa albo zwolniona z czekania), z wyjazdem po pierwsza bron (StartCapTrip): te same warunki co
+        /// wyjazd p9 (armia - koniec; bitwa, oblezenie, osada w oblezeniu, DoNotChangeBehavior, glod - bez zmian w tej godzinie), cel zablokowany cudza latka
+        /// (wynik &lt;= -1) albo niewazny (Valid: wojna, oblezenie, wytchnienie) - koniec i wytchnienie; obrona zagrozonej osady rodu ma pierwszenstwo (bez oceny,
+        /// wyjazd czeka); przyjazd, postoj StayHours (AiGear kupuje raz na dobe), za dlugo w drodze - koniec i wytchnienie miasta. Opcji bitwy NIE gasi. Nie rzuca.
+        /// </summary>
+        private static void CapThink(MobileParty party, PartyThinkParams partyThinkParams, Settings s)
+        {
+            Trip t;
+            if (!_capTrip.TryGetValue(party.Id, out t)) return;
+            if (party.Army != null) { _capTrip.Remove(party.Id); NewLordKit.CapTripEvent(NewLordKit.CapEnded); return; }
+            if (party.MapEvent != null || party.BesiegedSettlement != null || party.IsCurrentlyAtSea) return;   // na morzu - wyjazd ladowy czeka (za dlugo - koniec)
+            if (party.CurrentSettlement != null && party.CurrentSettlement.SiegeEvent != null) return;
+            if (partyThinkParams.DoNotChangeBehavior) return;
+            if (party.Party.IsStarving) return;   // najpierw jedzenie - droga gry
+            var scores = partyThinkParams.AIBehaviorScores;
+            if (scores == null) return;
+            double now = CampaignTime.Now.ToHours;
+            var clan = party.ActualClan;
+            float other = 0f, own = -1f;
+            bool blocked = false;
+            for (int i = 0; i < scores.Count; i++)
+            {
+                var e = scores[i];
+                if (e.Item2 <= -1f) { if (ReferenceEquals(e.Item1.Party, t.Town)) blocked = true; continue; }
+                if (IsOwnDefend(e.Item1, clan)) { if (e.Item2 > own) own = e.Item2; }
+                else if (e.Item2 > other) other = e.Item2;
+            }
+            if (blocked || !Valid(party, t.Town, now))
+            {
+                if (blocked) Cool(party, t.Town, now, s);
+                _capTrip.Remove(party.Id); NewLordKit.CapTripEvent(NewLordKit.CapEnded);
+                return;
+            }
+            bool inTown = party.CurrentSettlement == t.Town;
+            if (inTown && t.ArriveH < 0) { t.ArriveH = now; NewLordKit.CapTripEvent(NewLordKit.CapArrived); }
+            bool done = t.ArriveH >= 0 && (!inTown || now - t.ArriveH >= StayHours);
+            bool late = t.ArriveH < 0 && now - t.StartH > TripDays(s) * 48.0 + 12.0;
+            if (done || late)
+            {
+                NewLordKit.CapTripEvent(late ? NewLordKit.CapLate : NewLordKit.CapDone);
+                Cool(party, t.Town, now, s);
+                _capTrip.Remove(party.Id);
+                return;
+            }
+            if (own >= 0f) return;   // obrona zagrozonej osady wlasnego rodu - pierwszenstwo (wyjazd czeka)
+            Aim(partyThinkParams, scores, t.Town, other);
+        }
+
+        /// <summary>159c (NewLordKit.OverCap): wyjazd po pierwsza bron do miasta wyceny - nie obok wyjazdu p9, nie drugi w toku, najwyzej raz na UnarmedMenSentHomeDays
+        /// dob (CapTripRecent). Watek glowny.</summary>
+        internal static bool StartCapTrip(MobileParty mp, Settlement town, double now)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.AiArmsBeforeBattle || mp == null || town == null || _trip.ContainsKey(mp.Id) || _capTrip.ContainsKey(mp.Id)) return false;
+            _capTrip[mp.Id] = new Trip { P = mp, Town = town, StartH = now };
+            _capLast[mp.Id] = now;
+            return true;
+        }
+
+        /// <summary>159c: wyjazd po pierwsza bron w toku (w drodze albo na postoju) - zegar OverCap czeka.</summary>
+        internal static bool CapTripActive(MobileParty mp) { return mp != null && _capTrip.ContainsKey(mp.Id); }
+
+        /// <summary>159c: ostatni wyjazd po pierwsza bron tej partii zaczal sie mniej niz spacingH godzin temu (albo wyjazd p9 w toku).</summary>
+        internal static bool CapTripRecent(MobileParty mp, double now, double spacingH)
+        {
+            double h;
+            return mp != null && (_trip.ContainsKey(mp.Id) || (_capLast.TryGetValue(mp.Id, out h) && now - h < spacingH));
+        }
+
+        /// <summary>159c: koniec wyjazdu po pierwsza bron (NewLordKit: bez nadwyzki, poza regula, w armii, p9 przejmuje). Godzina startu zostaje (odstep).</summary>
+        internal static void ForgetCap(MobileParty mp)
+        {
+            if (mp != null && _capTrip.Remove(mp.Id)) NewLordKit.CapTripEvent(NewLordKit.CapEnded);
+        }
+
+        internal static int CapTripCount { get { return _capTrip.Count; } }
 
         private static string Key(MobileParty mp, Settlement st) { return mp.StringId + "|" + st.StringId; }
 
@@ -330,7 +438,7 @@ namespace Armoury
         }
 
         /// <summary>Cel wyjazdu po sprzet: biezacy (do konca wizyty) albo najblizsze wazne miasto w zasiegu; null - brak.</summary>
-        private static Settlement TripTown(MobileParty party, ArmedStrength.Info info, double now, Settings s, HashSet<Settlement> blocked)
+        private static Settlement TripTown(MobileParty party, ArmedStrength.Info info, double now, Settings s, HashSet<Settlement> blocked, bool firstOnly)
         {
             Trip t;
             if (_trip.TryGetValue(party.Id, out t))
@@ -347,7 +455,8 @@ namespace Armoury
                     bool gain = !late && info.R > t.R0;
                     // recenzja p9 (uwaga 4): postep w tej wizycie i dalej go stac (podglad z rezerwa napraw tego miasta) - zostaje kolejna dobe (AiGear kupuje raz na dobe)
                     int b2, need2;
-                    if (gain && inTown && CanAfford(party, info.Short, t.Town, out b2, out need2))
+                    // 159c: wyjazd po pierwsza bron dla nadwyzki (firstOnly) - "dalej go stac" wedlug wyceny pierwszej broni w tym miescie (NewLordKit.FirstOk)
+                    if (gain && inTown && (firstOnly ? NewLordKit.FirstOk(party, t.Town) : CanAfford(party, info.Short, t.Town, out b2, out need2)))
                     {
                         t.ArriveH = now; t.R0 = info.R; t.Ext++; _dExt++; _noGain.Remove(party.Id);
                         return t.Town;
@@ -372,7 +481,12 @@ namespace Armoury
             if (town == null) town = Nearest(party, now, s, blocked);
             if (town == null) { _dNoTown.Add(party.Id); _why = WhyNoTown; return null; }
             int b, need;
-            if (!CanAfford(party, info.Short, town, out b, out need)) { _dNoBudgetTown.Add(party.Id); _why = WhyNoBudgetTown; return null; }   // recenzja p9: rezerwa napraw z materialem tego miasta
+            if (firstOnly)
+            {
+                // 159c: wycena pierwszej broni dla nadwyzki na polce TEGO miasta (moze byc inne niz najblizsze bez blokad); nie stac - jak dotad "nie stac"
+                if (!NewLordKit.FirstOk(party, town)) { _dPoor.Add(party.Id); _why = WhyPoor; return null; }
+            }
+            else if (!CanAfford(party, info.Short, town, out b, out need)) { _dNoBudgetTown.Add(party.Id); _why = WhyNoBudgetTown; return null; }   // recenzja p9: rezerwa napraw z materialem tego miasta
             _trip[party.Id] = new Trip { P = party, Town = town, StartH = now, R0 = info.R };
             _dTrips++;
             return town;
@@ -459,6 +573,28 @@ namespace Armoury
                     if (p == null || !p.IsActive || p.Army != null || !ArmedStrength.IsLow(p)) { if (rm == null) rm = new List<MBGUID>(); rm.Add(kv.Key); }
                 }
                 if (rm != null) foreach (var k in rm) _noGain.Remove(k);
+            }
+            if (_capTrip.Count > 0)
+            {
+                // 159c: wyjazd po pierwsza bron - koniec przy partii nieczynnej, w armii albo przejetej przez p9 (niegotowa, nie zwolniona); zapas: partia, ktora nie
+                // mysli (CapThink konczy wyjazd w mysli), najpozniej po 2 x zasieg + 12 h + postoj + doba (zegar OverCap czeka na koniec wyjazdu)
+                var s = Settings.Current;
+                double now = CampaignTime.Now.ToHours, maxH = (s != null ? TripDays(s) : 3) * 48.0 + 12.0 + StayHours + 24.0;
+                List<MBGUID> rm = null;
+                foreach (var kv in _capTrip)
+                {
+                    var p = kv.Value.P;
+                    var i = p != null && p.IsActive ? ArmedStrength.InfoOf(p) : null;
+                    if (p == null || !p.IsActive || p.Army != null || (i != null && i.Low && !i.Free) || now - kv.Value.StartH > maxH) { if (rm == null) rm = new List<MBGUID>(); rm.Add(kv.Key); }
+                }
+                if (rm != null) foreach (var k in rm) { _capTrip.Remove(k); NewLordKit.CapTripEvent(NewLordKit.CapEnded); }
+            }
+            if (_capLast.Count > 0)
+            {
+                double now = CampaignTime.Now.ToHours;
+                List<MBGUID> rm = null;
+                foreach (var kv in _capLast) if (now - kv.Value > CapLastKeepH) { if (rm == null) rm = new List<MBGUID>(); rm.Add(kv.Key); }
+                if (rm != null) foreach (var k in rm) _capLast.Remove(k);
             }
             if (_cool.Count > 0)
             {
