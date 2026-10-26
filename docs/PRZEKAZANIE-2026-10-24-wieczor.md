@@ -1,5 +1,18 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 00:20 CET - n161 = 126 + 202 + 203 + 204 + 222 + 223 (584f9f96, Armoury c6b74f23); AUTOTEST 127a W TOKU
+- Scalenia: 202+203 f3413043, 204 e4817be0, 222 7a51c053 (ZEPSUTE sprawdz_logi - naprawa 99956c53), 223 8d7becef, polaczenie 222+223 584f9f96
+  (RescueHunt.Hunters pomija LordEscort.HeldBack). UWAGA: rozwiaz_oba.py ("zostaw oba") psuje sprawdz_logi, gdy git sparuje wspolne konce funkcji
+  dwoch galezi - uzywac scratchpad 1e1c276a...\scratchpad\scal_wstawki.py <plik> [OURS THEIRS [BAZA]] (wstawia bloki dopisane wzgledem bazy; odmawia,
+  gdy galaz cos zmienia) i ZAWSZE sprawdzic self-testy po scaleniu (ladowanie pliku ok. 60 s).
+- 204 dokonczone: 65fc23dc + 5a63aa89 (koszt passu, lamiaca sie strona, FF lucznikow co pass). Testowy CrashScribe-at-n204.dll (test\, md5 6160e8ef = n103 +
+  konni lucznicy "harasser"); wrapper m113\testy-noc-204.ps1 -Harasser 3.
+- 222 recheck 038ffb78 (odsiecz OB5 wladcy), 223 recheck 5dd6d0d2 (223b znani lordowie: wielkie rody kanonu, glowy bez lenna, postacie ksiazek) + 5f050614.
+- Zapis testowy odswiezony z zapisu Jeffa 26.10 22:19 (Tywin w niewoli); stare zdjecie bazy -> D:\Backup-Bannerlord\zapisy-testowe-archiwum. Logi Jeffa z 26.10
+  recznie na D:\Backup-Bannerlord\logi-jeffa\2026-10-26-wieczor-dodatkowo (bieg "kopia" po polnocy ich nie bral).
+- 00:14 AUTOTEST 127a (m113\seria-127a.out.txt): kopia, bitwaN (harasser 3), probyN 6 dob, flagi dzwiek-bitwy + odbicie. Potem sprawdz_logi grupy p202 p203
+  m204jazda odbicie222 e223 m109muz m165mapa; zapis testowy na D:; WGRANIE 127 = DLL + Bitwa\lufs21.4/24.4/27.4/30.4 (40 ogg).
+
 ## DOPISEK 27.10 ok. 00:35 CET - 222 i 223 zbudowane po recenzji; recheck w toku; 204 dokonczenie w toku
 - 222 (zb\n222): 96a90b9b + d245fde1 + recenzja 47b9f8b8 (md5 8f06d41c). Tywin (juz jeniec) przejety przy starcie sesji - komunikat w 1. godzinie po wgraniu.
   Probe: flaga CrashScribe\armoury-odbicie.flag, sprawdz_logi --grupa odbicie222.
