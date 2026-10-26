@@ -10092,7 +10092,7 @@ namespace Armoury
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool NewLordPartyKitLoan { get; set; } = true;
 
-        [SettingPropertyBool("Unarmed Men Sent Home", HintText = "A lord's party still counted as unarmed (AI Arms Below Percent) that cannot arm its men - no gold for kit, no friendly town within reach, or shelves that sold it nothing - for Unarmed Men Sent Home Days sends home men who have no weapon at all - only as many as are above Unarmed Men Allowed (%) of the party. A man counts as armed when the party's stores hold a weapon he can use; a man without armour but with a weapon stays. They go back to the villages they came from: nobody vanishes and nobody appears. Parties in an army, a battle or a siege, at sea, of your clan, of the Night's Watch and of the dead keep their men. Off = such lords keep marching with men in tunics and clubs", RequireRestart = false)]
+        [SettingPropertyBool("Unarmed Men Sent Home", HintText = "A lord's party still counted as unarmed (AI Arms Below Percent) that cannot arm its men - no gold for kit, no friendly town within reach, or shelves that sold it nothing - for Unarmed Men Sent Home Days sends home men who have no weapon at all - only as many as are above Unarmed Men Allowed (%) of the party (with Unarmed Cap All Lord Parties also any other lord's party above that share that cannot pay for their weapons). A man counts as armed when the party's stores hold a weapon he can use; a man without armour but with a weapon stays. They go back to the villages they came from: nobody vanishes and nobody appears. Parties in an army, a battle or a siege, at sea, of your clan, of the Night's Watch and of the dead keep their men. Off = such lords keep marching with men in tunics and clubs", RequireRestart = false)]
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool UnarmedMenSentHome { get; set; } = true;
 
@@ -10103,6 +10103,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Unarmed Men Allowed (%)", 0.00f, 50.00f, "0", HintText = "A lord may keep men without any weapon up to this share of his party; men lacking armour but carrying a weapon are not counted as unarmed", RequireRestart = false)]
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public float UnarmedMenAllowedPercent { get; set; } = 10f;
+
+        [SettingPropertyBool("Unarmed Cap All Lord Parties", HintText = "Unarmed Men Allowed (%) holds for every AI lord's party, not only for parties counted as unarmed (AI Arms Below Percent): a well-armoured party whose men without any weapon exceed that share buys a first weapon for the excess before armour at its next town, and if it cannot pay for those weapons for Unarmed Men Sent Home Days, sends the excess home (with Unarmed Men Sent Home). Parties in an army, of your clan, of the Night's Watch and of the dead are untouched. Off = only parties counted as unarmed that cannot arm their men send anyone home", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool UnarmedCapAllLordParties { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -12629,6 +12633,7 @@ namespace Armoury
             s.UnarmedMenSentHome = UnarmedMenSentHome;
             s.UnarmedMenSentHomeDays = UnarmedMenSentHomeDays;
             s.UnarmedMenAllowedPercent = UnarmedMenAllowedPercent;
+            s.UnarmedCapAllLordParties = UnarmedCapAllLordParties;
         }
 
         internal static void Apply()

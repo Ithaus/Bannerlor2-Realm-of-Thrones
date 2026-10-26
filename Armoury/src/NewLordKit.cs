@@ -31,6 +31,8 @@ namespace Armoury
     ///     jego wzorca - WeaponOpts: bron biala albo rzucana, luk ze strzalami, kusza z beltami; x zapas Margin w funduszu) - kazdy, kto dostaje bron, idzie;
     ///     potem reszta kompletu wzietych, ile starczy funduszu (kolejnosc zakupow AiGear.Order); ludzie bez broni najwyzej UnarmedMenAllowedPercent partii
     ///     (AllowedWith), reszta szablonu zostaje we wsi (zdjeta przed poborem - z ksiegi ludzi nic nie schodzi). Brak miasta w zasiegu - nikt.
+    ///     Recenzja 159b: krok "jeszcze jeden uzbrojony" liczony jak CountArms (ArmStep: wszystkie sloty typu, uzbrojeni = max po opcjach, nie suma), a gotowy plan
+    ///     sprawdzony ta sama miara na sztukach wyceny (PlanCheck) - bez broni ponad % wedlug niej tez zostaja we wsi.
     ///     Sztuki NIE przenosza sie: druzyna jedzie do tego miasta (ArmsFirst.TripTown - miasto planu; CanAfford przez AiGear.BudgetPreview widzi fundusz planu)
     ///     i kupuje z polki ta sama droga AiGear (VisitBudget w TryBuyCore): przy pierwszej wizycie w miescie budzet = zloto ponad rezerwe (jak wyzej) + sakiewka
     ///     ludzi + pozyczka na brak wobec wyceny TEJ polki (IronBank.Lend - prawdziwa pozyczka z oplata i oprocentowaniem, splata drabiny 168; zloto Banku ->
@@ -46,6 +48,8 @@ namespace Armoury
     ///     ClanBudget.ToVillagePop159 z przyczyna M166 - ludnosc BK wsi rodu, znani pochodzeniem do DOM swojego regionu, weterani E4/10 - karczma w linii 159, nie
     ///     w linii 166). Wies bez danych BK - nikt nie odchodzi (licznik). Tylko przy czynnych zakupach AI i p9.
     ///     Sakiewki ludzi i zbrojownia zostaja w partii (jak przepelnienie W4c). Bez: armii, bitwy, oblezenia, morza, rozwiazywanej partii, rodu gracza, Strazy, umarlych.
+    ///     Recenzja 159b (klucz UnarmedCapAllLordParties): takze partia GOTOWA wedlug p9 - bez broni ponad % i nie stac na pierwsza bron przez UnarmedMenSentHomeDays
+    ///     dob - nadwyzka do domu (OverCap); zwykla wizyta lorda AI z bronia ponad % kupuje najpierw pierwsza bron dla nadwyzki (FirstNeed, AiGear.TryBuyCore).
     /// (3) p9 bez zmian. P0: linia "Bitwa gracza (159 P0)" (kazda bitwa gracza - start spotkania i misja - stan kazdej partii lorda AI) i linia doby "Nowe druzyny i sprzet (159)" (plany,
     ///     pozyczki, zakupy, odeslani, spis partii bez wpisu DTE i z R = 0 wedlug wieku partii). Potkniecia liczone, bez wylacznikow.
     /// </summary>
@@ -99,6 +103,14 @@ namespace Armoury
         private static long _dVisitFirstMen, _dVisitFirstPieces, _dVisitFirstGold;
         private static int _dHomeChecked;
         private static long _dHomeAll, _dHomeNoW, _dHomePool, _dHomeKeep, _dHomeOver, _dHomeNoBody;
+        // recenzja 159b: plan - przycieci miara bitwy (PlanCheck); wizyty - kolejne przebiegi pierwszej broni (FirstAgain); uwaga 2 - partie gotowe wedlug p9
+        // (UnarmedCapAllLordParties): sprawdzone, ponad %, stac (pierwsza bron przy wizycie), zegar biegnie, w ruchu (bitwa/oblezenie/morze...), do domu (partie);
+        // zwykle wizyty z pierwsza bronia ponad % (wizyty, ludzi, szt., zl)
+        private static long _dPlanCut, _dFirstRounds;
+        private static int _dCapChecked, _dCapOver, _dCapAfford, _dCapWait, _dCapBusy, _dCapHome;
+        private static long _dCapVisits, _dCapVisitMen, _dCapVisitPieces, _dCapVisitGold;
+        private static readonly Dictionary<MobileParty, double> _over = new Dictionary<MobileParty, double>();               // od kiedy (h) gotowa wedlug p9 partia ma bez broni ponad %
+        private static readonly Dictionary<string, double> _savedOver = new Dictionary<string, double>(StringComparer.Ordinal);
         private static readonly List<string> _dEx = new List<string>();
         private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -114,7 +126,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _plans.Clear(); _savedPlans.Clear(); _stuck.Clear(); _savedStuck.Clear(); _born.Clear(); _savedBorn.Clear(); _lastHome.Clear();
+            _plans.Clear(); _savedPlans.Clear(); _stuck.Clear(); _savedStuck.Clear(); _born.Clear(); _savedBorn.Clear(); _lastHome.Clear(); _over.Clear(); _savedOver.Clear();
             _lastBattle = null; _lastBattleWhere = null; _importN = -1; _importBad = 0; _stumbles = 0; _err.Clear();
             ClearDay();
         }
@@ -133,6 +145,9 @@ namespace Armoury
             _dVisitFirstMen = _dVisitFirstPieces = _dVisitFirstGold = 0;
             _dHomeChecked = 0;
             _dHomeAll = _dHomeNoW = _dHomePool = _dHomeKeep = _dHomeOver = _dHomeNoBody = 0;
+            _dPlanCut = _dFirstRounds = 0;
+            _dCapChecked = _dCapOver = _dCapAfford = _dCapWait = _dCapBusy = _dCapHome = 0;
+            _dCapVisits = _dCapVisitMen = _dCapVisitPieces = _dCapVisitGold = 0;
             _dEx.Clear(); Array.Clear(_dExN, 0, _dExN.Length);
             AiGear.QuoteStumbles = 0;
         }
@@ -176,7 +191,11 @@ namespace Armoury
         }
 
         /// <summary>159b: mozliwe "pierwsze bronie" czlowieka typu ch - koszyki NeedKey (AiGear.NeedKey, jak KitBuckets - pierwszy zestaw bojowy) broni wzorca ze slotow
-        /// 0-3: bron biala i rzucana pojedynczo, luk z koszykiem strzal i kusza z koszykiem beltow parami (sam luk nie uzbraja - GearFit.Armed). Pusta - wzorzec bez broni.</summary>
+        /// 0-3: bron biala i rzucana na typ, luk ze strzalami i kusza z beltami razem (sam luk nie uzbraja - GearFit.Armed). Pusta - wzorzec bez broni.
+        /// Recenzja 159b (uwaga 1): opcja to WSZYSTKIE sloty 0-3 jej typu (dwa kolczany, dwa peki oszczepow, dwie bronie drzewcowe - po sztuce na slot), jak miara
+        /// reguly (2): CountArms liczy wpisy MenOf MenPerSlot (ludzie x QuartermasterLaw.SlotsOfType), a DTE (PartyEquipmentDistributor.AssignWeaponByWeaponClass -
+        /// petla po ludziach, w niej sloty 0-3) daje pierwszemu czlowiekowi sztuke na kazdy jego slot. Dotad jedna sztuka na opcje: 20 lucznikow z dwoma slotami
+        /// strzal dostawalo w planie 20 lukow i 20 kolczanow (20 "z bronia"), a CountArms (i bitwa) - 10 z lukiem i strzalami, 10 z samym lukiem.</summary>
         private static List<int[]> WeaponOpts(CharacterObject ch, bool oneUp)
         {
             var l = new List<int[]>();
@@ -184,41 +203,94 @@ namespace Armoury
             int kn = Math.Max(1, GoldenKits.Count(ch));
             Equipment eq = GoldenKits.Kit(ch, 0, kn);
             if (eq == null) return l;
-            int bow = -1, arrows = -1, xbow = -1, bolts = -1;
-            var seen = new HashSet<int>();
+            var byType = new Dictionary<ItemObject.ItemTypeEnum, List<int>>();
+            var order = new List<ItemObject.ItemTypeEnum>();
             for (int sl = 0; sl < 4; sl++)
             {
                 var it = eq[(EquipmentIndex)sl].Item;
                 if (it == null || !SupplyDemand.Equipmentish(it)) continue;
                 var t = it.ItemType;
-                int k = AiGear.NeedKey(ch, it, oneUp);
-                if (SelfArms(t)) { if (seen.Add(k)) l.Add(new[] { k }); }
-                else if (t == ItemObject.ItemTypeEnum.Bow) { if (bow < 0) bow = k; }
-                else if (t == ItemObject.ItemTypeEnum.Arrows) { if (arrows < 0) arrows = k; }
-                else if (t == ItemObject.ItemTypeEnum.Crossbow) { if (xbow < 0) xbow = k; }
-                else if (t == ItemObject.ItemTypeEnum.Bolts) { if (bolts < 0) bolts = k; }
+                List<int> ks;
+                if (!byType.TryGetValue(t, out ks)) { byType[t] = ks = new List<int>(); order.Add(t); }
+                ks.Add(AiGear.NeedKey(ch, it, oneUp));
             }
-            if (bow >= 0 && arrows >= 0) l.Add(new[] { bow, arrows });
-            if (xbow >= 0 && bolts >= 0) l.Add(new[] { xbow, bolts });
+            foreach (var t in order) if (SelfArms(t)) l.Add(byType[t].ToArray());
+            AddPair(l, byType, ItemObject.ItemTypeEnum.Bow, ItemObject.ItemTypeEnum.Arrows);
+            AddPair(l, byType, ItemObject.ItemTypeEnum.Crossbow, ItemObject.ItemTypeEnum.Bolts);
             return l;
         }
 
-        /// <summary>159b: cena nastepnej sztuki kazdego koszyka opcji (units - wycena QuoteUnits, pos - zuzyte); -1 - ktoregos koszyka juz nie ma na polce.</summary>
-        private static long OptCost(int[] opt, Dictionary<int, List<int>> units, Dictionary<int, int> pos)
+        private static void AddPair(List<int[]> l, Dictionary<ItemObject.ItemTypeEnum, List<int>> byType, ItemObject.ItemTypeEnum arm, ItemObject.ItemTypeEnum ammo)
         {
+            List<int> a, b;
+            if (!byType.TryGetValue(arm, out a) || !byType.TryGetValue(ammo, out b)) return;
+            var o = new List<int>(a); o.AddRange(b);
+            l.Add(o.ToArray());
+        }
+
+        /// <summary>
+        /// Recenzja 159b (uwaga 1): oddzial w kroku "jeszcze jeden uzbrojony" (plan (a) i FirstWeapons) liczony jak CountArms: Cov - ludzie z bronia wzorca na typ
+        /// ArmTypes, Armed = ArmedOf(Cov) (max po bron biala / rzucana / luk ze strzalami / kusza z beltami - ci sami pierwsi ludzie, nie suma), Left - ilu jeszcze
+        /// mozna uzbroic. Dotad krok liczyl czlowieka uzbrojonego jedna opcja kupiona dla niego: 6 ludzi z bronia jednoreczna (polka sie skonczyla) i 4 z drzewcem
+        /// to w planie 10 uzbrojonych, a w CountArms (i w bitwie - DTE daje obie sztuki pierwszym ludziom) max(6, 4) = 6.
+        /// </summary>
+        private sealed class ArmStep { internal CharacterObject Ch; internal int Left, Armed; internal int[] Cov; internal List<int[]> Opts; }
+
+        private static int TypeIdx(int key) { return Array.IndexOf(ArmTypes, (ItemObject.ItemTypeEnum)(key / 10)); }
+
+        /// <summary>Recenzja 159b: koszyki kroku - opcja o uzbraja czlowieka Armed + 1, gdy kazdy jej typ jest u Armed + 1 ludzi: na typ brakujacy ludzie x kazdy
+        /// jego slot w opcji (ten sam koszyk kilka razy - kolejne sztuki). Pusta - opcja nic nie daje.</summary>
+        private static List<int> StepKeys(ArmStep g, int[] o)
+        {
+            var l = new List<int>();
+            int target = g.Armed + 1;
+            foreach (var k in o)
+            {
+                int ti = TypeIdx(k);
+                if (ti < 0) continue;
+                for (int j = Math.Max(0, target - g.Cov[ti]); j > 0; j--) l.Add(k);
+            }
+            return l;
+        }
+
+        private static void StepApply(ArmStep g, int[] o)
+        {
+            int target = g.Armed + 1;
+            foreach (var k in o) { int ti = TypeIdx(k); if (ti >= 0 && g.Cov[ti] < target) g.Cov[ti] = target; }
+            g.Armed = Math.Max(target, ArmedOf(g.Cov)); g.Left--;
+        }
+
+        /// <summary>159b: cena kolejnych sztuk koszykow kroku (units - wycena QuoteUnits, pos - zuzyte; ten sam koszyk kilka razy - kolejne sztuki); -1 - pusty krok
+        /// albo sztuk koszyka juz nie ma na polce.</summary>
+        private static long KeysCost(List<int> keys, Dictionary<int, List<int>> units, Dictionary<int, int> pos)
+        {
+            if (keys == null || keys.Count == 0) return -1;
             long c = 0;
-            foreach (var k in opt)
+            var off = new Dictionary<int, int>();
+            foreach (var k in keys)
             {
                 List<int> u;
                 if (!units.TryGetValue(k, out u)) return -1;
-                int p0; pos.TryGetValue(k, out p0);
-                if (p0 >= u.Count) return -1;
-                c += u[p0];
+                int p0, o; pos.TryGetValue(k, out p0); off.TryGetValue(k, out o);
+                if (p0 + o >= u.Count) return -1;
+                c += u[p0 + o];
+                off[k] = o + 1;
             }
             return c;
         }
 
-        private static void OptTake(int[] opt, Dictionary<int, int> pos) { foreach (var k in opt) { int p0; pos.TryGetValue(k, out p0); pos[k] = p0 + 1; } }
+        /// <summary>Recenzja 159b: zuzycie sztuk kroku; items/trial - przedmiot zuzytej sztuki do zbrojowni na probe planu (CountArms; null - bez).</summary>
+        private static void KeysTake(List<int> keys, Dictionary<int, int> pos, Dictionary<int, List<ItemObject>> items, Dictionary<ItemObject, int> trial)
+        {
+            foreach (var k in keys) { int p0; pos.TryGetValue(k, out p0); TrialAdd(trial, items, k, p0); pos[k] = p0 + 1; }
+        }
+
+        private static void TrialAdd(Dictionary<ItemObject, int> trial, Dictionary<int, List<ItemObject>> items, int k, int j)
+        {
+            List<ItemObject> l;
+            if (trial == null || items == null || !items.TryGetValue(k, out l) || j < 0 || j >= l.Count || l[j] == null) return;
+            int v; trial.TryGetValue(l[j], out v); trial[l[j]] = v + 1;
+        }
         private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
         private static string Nm(MobileParty mp) { try { return mp != null && mp.Name != null ? mp.Name.ToString() : "?"; } catch { return "?"; } }
         private static string Nm(Settlement st) { try { return st != null && st.Name != null ? st.Name.ToString() : "-"; } catch { return "?"; } }
@@ -243,7 +315,7 @@ namespace Armoury
                 if (mp == null) return;
                 KitPlan p;
                 if (_plans.TryGetValue(mp, out p)) { if (!p.Done) _dDestroyed++; _plans.Remove(mp); }
-                _stuck.Remove(mp); _born.Remove(mp); _lastHome.Remove(mp);
+                _stuck.Remove(mp); _born.Remove(mp); _lastHome.Remove(mp); _over.Remove(mp);
             }
             catch (Exception e) { Stumble("OnDestroyed", e); }
         }
@@ -371,8 +443,10 @@ namespace Armoury
                     if (!l.Contains(ch)) l.Add(ch);
                 }
             }
-            var units = AiGear.QuoteUnits(town, mp, need, lifters);
+            var items = new Dictionary<int, List<ItemObject>>();   // recenzja 159b (uwaga 1): przedmioty sztuk wyceny - zbrojownia na probe (CountArms)
+            var units = AiGear.QuoteUnits(town, mp, need, lifters, items);
             if (units == null) { _dPlanParties--; _dTemplate -= template; _dStumbles++; _stumbles++; return null; }   // wycena nieudana - sklad bez zmian
+            var trial = new Dictionary<ItemObject, int>();
             int own = OwnFund(lord, s);
             string why;
             int room = LoanRoom(lord.Clan, out why);
@@ -380,22 +454,26 @@ namespace Armoury
             double pct = AllowedPct(s);
             var pos = new Dictionary<int, int>();
             long spent = 0; int pieces = 0, armed = 0;
-            // 159b (a) najpierw bron (regula Jeffa 26.10): po jednym czlowieku najtansza dostepna pierwsza bron wsrod wszystkich typow (WeaponOpts) - najwiecej
-            // uzbrojonych za fundusz; kazdy, kto dostaje bron, idzie. Najtansza nie miesci sie w funduszu (x Margin) - zadna inna tez nie
+            // 159b (a) najpierw bron (regula Jeffa 26.10): po jednym czlowieku najtanszy krok "jeszcze jeden uzbrojony" wsrod wszystkich typow (WeaponOpts) -
+            // najwiecej uzbrojonych za fundusz; kazdy, kto dostaje bron, idzie. Najtanszy nie miesci sie w funduszu (x Margin) - zaden inny tez nie.
+            // Recenzja 159b (uwaga 1): krok liczony jak CountArms (ArmStep: pokrycie na typ, wszystkie sloty typu, uzbrojeni = max po opcjach, nie suma)
             var firstUsed = new Dictionary<int, int>();
+            var steps = new List<ArmStep>();
+            foreach (var kd in kinds) steps.Add(new ArmStep { Ch = kd.Ch, Left = kd.Count, Cov = new int[ArmTypes.Length], Opts = kd.Opts });
             while (true)
             {
-                int best = -1; int[] bo = null; long bc = long.MaxValue;
-                for (int i = 0; i < kinds.Count; i++)
+                int best = -1; int[] bo = null; List<int> bk = null; long bc = long.MaxValue;
+                for (int i = 0; i < steps.Count; i++)
                 {
-                    var kd = kinds[i];
-                    if (kd.Taken >= kd.Count) continue;
-                    foreach (var o in kd.Opts) { long c = OptCost(o, units, pos); if (c >= 0 && c < bc) { best = i; bo = o; bc = c; } }
+                    var g = steps[i];
+                    if (g.Left <= 0) continue;
+                    foreach (var o in g.Opts) { var ks = StepKeys(g, o); long c = KeysCost(ks, units, pos); if (c >= 0 && c < bc) { best = i; bo = o; bk = ks; bc = c; } }
                 }
                 if (best < 0 || (spent + bc) * Margin > fund + 1e-6) break;
-                OptTake(bo, pos);
-                foreach (var k in bo) { int v; firstUsed.TryGetValue(k, out v); firstUsed[k] = v + 1; }
-                kinds[best].Taken++; armed++; spent += bc; pieces += bo.Length;
+                KeysTake(bk, pos, items, trial);
+                foreach (var k in bk) { int v; firstUsed.TryGetValue(k, out v); firstUsed[k] = v + 1; }
+                StepApply(steps[best], bo);
+                kinds[best].Taken++; armed++; spent += bc; pieces += bk.Count;
             }
             long firstCost = spent; int firstPieces = pieces;
             // (b) reszta kompletu wzietych z bronia, ile starczy funduszu - kolejnosc zakupow AiGear (typy Order: korpus pierwszy, tiery 6..1); sztuka za droga
@@ -425,6 +503,7 @@ namespace Armoury
                     {
                         if ((spent + u[j]) * Margin > fund + 1e-6) continue;
                         spent += u[j]; pieces++; d--;
+                        TrialAdd(trial, items, k, j);
                         if (type == ItemObject.ItemTypeEnum.BodyArmor) bodyBought++;
                     }
                 }
@@ -437,10 +516,16 @@ namespace Armoury
                 if (bi < 0) break;
                 kinds[bi].Taken++; unarmed++;
             }
-            int taken = armed + unarmed;
-            foreach (var kd in kinds) keep[kd.Ch] = kd.Taken;
+            // (d) recenzja 159b (uwaga 1): sprawdzenie miara reguly (2) - CountArms na wzietych i sztukach wyceny (PlanCheck); ludzie bez broni ponad pct% wedlug
+            // tej miary zostaja we wsi. Wyjatek - liczby planu jak wyzej (bez przyciecia)
+            int cut = 0;
+            try { cut = PlanCheck(kinds, trial, pct, ref armed, ref unarmed); }
+            catch (Exception e) { Stumble("Plan(CountArms)", e); }
+            maxU = AllowedWith(armed, pct);
+            int taken = 0;
+            foreach (var kd in kinds) { keep[kd.Ch] = kd.Taken; taken += kd.Taken; }
             long noBody = Math.Max(0, bodyMen - bodyBought);
-            _dTaken += taken + other; _dArmed += armed; _dUnarmed += unarmed; _dAllowed += maxU;
+            _dTaken += taken + other; _dArmed += armed; _dUnarmed += unarmed; _dAllowed += maxU; _dPlanCut += cut;
             long plannedLoan = Math.Max(0, Math.Min(room, (long)Math.Ceiling(spent * Margin) - own));
             if (armed > 0 && pieces > 0)
             {
@@ -451,10 +536,46 @@ namespace Armoury
             if (taken + other <= 0) _dZero++;
             if (room <= 0) NoLoan(why);
             Ex(ExPlan, Nm(mp) + ": szablon " + template + " -> wzieci " + (taken + other) + " (z bronia " + armed + ", bez broni " + unarmed + " z dozwolonych " + maxU
-               + " = " + PctTxt(pct) + "%; zostali we wsi bez broni ponad % " + (template - taken - other) + "; bez zbroi korpusu u wzietych z bronia (info) " + noBody
+               + " = " + PctTxt(pct) + "% - miara bitwy CountArms, przyciete nia " + cut + "; zostali we wsi bez broni ponad % " + (template - taken - other) + "; bez zbroi korpusu u wzietych z bronia (info) " + noBody
                + ") (miasto " + Nm(town) + ", wycena " + pieces + " szt. za " + spent + " zl - najpierw bron " + firstPieces + " szt. za " + firstCost + " zl, wlasne " + own
                + ", miejsce pozyczki " + room + (room <= 0 && why != null ? " - " + why : "") + ")");
             return keep;
+        }
+
+        /// <summary>
+        /// Recenzja 159b (uwaga 1): plan sprawdzony ta sama miara co regula (2) - CountArms na ludziach wzietych (TroopRoster na probe) i sztukach wyceny planu
+        /// (zbrojownia na probe: pierwsza bron i reszta kompletu - przedmioty z QuoteUnits). Krok (a) planu liczy czlowieka uzbrojonego sztukami kupionymi DLA
+        /// niego, a CountArms (jak DTE) rozdaje sztuki typu po oddzialach od najwyzszego skilla (MenOf) na kazdy slot wzorca: sztuka kupiona dla pospolitego
+        /// ruszenia z sama bronia jednoreczna trafia na slot jednoreczny zbrojnego, ktory juz ma drzewce - i pospolity jest bez broni. Ludzie bez broni ponad
+        /// pct% (ExcessOf) zostaja we wsi, na typy jak w SendHome (Share); do 3 przebiegow (przyciecie ludzi bez broni nie zabiera broni innym). Zwraca
+        /// przycietych; armed / unarmed - wedlug miary (bez bohaterow, wightow i umarlych - jak regula 2).
+        /// </summary>
+        private static int PlanCheck(List<Kind> kinds, Dictionary<ItemObject, int> trial, double pct, ref int armed, ref int unarmed)
+        {
+            var tr = TroopRoster.CreateDummyTroopRoster();
+            var byCh = new Dictionary<CharacterObject, Kind>();
+            foreach (var kd in kinds) if (kd.Taken > 0 && kd.Ch != null) { tr.AddToCounts(kd.Ch, kd.Taken); byCh[kd.Ch] = kd; }
+            if (byCh.Count == 0) return 0;
+            int cut = 0;
+            var a = CountArms(tr, trial);
+            for (int round = 0; round < 3; round++)
+            {
+                int go = ExcessOf(a.NoWeapon, a.Men, pct);
+                if (go <= 0) break;
+                int c0 = cut;
+                foreach (var kv in Share(a.NoW, a.NoWeapon, go))
+                {
+                    Kind kd;
+                    if (kv.Value <= 0 || !byCh.TryGetValue(kv.Key, out kd)) continue;
+                    int n = Math.Min(kv.Value, kd.Taken);
+                    if (n <= 0) continue;
+                    kd.Taken -= n; tr.AddToCounts(kd.Ch, -n); cut += n;
+                }
+                if (cut == c0) break;
+                a = CountArms(tr, trial);
+            }
+            armed = a.Men - a.NoWeapon; unarmed = a.NoWeapon;
+            return cut;
         }
 
         // ------------------------------------------------------------ (1) wizyta w miescie (AiGear.TryBuyCore, BudgetPreview, ArmsFirst.TripTown)
@@ -527,7 +648,7 @@ namespace Armoury
                 // "najpierw bron" na zbroje, a ludzie wzieci za bron zostaliby bez niej
                 try
                 {
-                    int fm = FirstWeapons(mp, st, arm, s.MenUpgradeOneTierUp, out firstNeed, out firstLift);
+                    int fm = FirstWeapons(mp, st, arm, s.MenUpgradeOneTierUp, true, AllowedPct(s), out firstNeed, out firstLift);
                     p.VFirstMen = fm; _dVisitFirstMen += fm;
                 }
                 catch (Exception e) { Stumble("VisitBudget(bron)", e); firstNeed = null; firstLift = null; }
@@ -567,11 +688,14 @@ namespace Armoury
             catch (Exception e) { Stumble("VisitDone", e); }
         }
 
-        /// <summary>159b: AiGear.TryBuyCore po pierwszym przebiegu (pierwsza bron dla ludzi bez broni) wizyty z planem - sztuki i zloto (tylko log).</summary>
-        internal static void NoteFirst(MobileParty mp, int pieces, int gold)
+        /// <summary>159b: AiGear.TryBuyCore po pierwszym przebiegu (pierwsza bron dla ludzi bez broni) wizyty z planem - sztuki i zloto (tylko log). Recenzja 159b:
+        /// plan=false - zwykla wizyta z bronia ponad % (uwaga 2); round &gt; 0 - kolejny przebieg po zmierzeniu od nowa (uwaga 1).</summary>
+        internal static void NoteFirst(MobileParty mp, int pieces, int gold, bool plan, int round)
         {
             try
             {
+                if (round > 0) _dFirstRounds++;
+                if (!plan) { _dCapVisitPieces += Math.Max(0, pieces); _dCapVisitGold += Math.Max(0, gold); return; }
                 _dVisitFirstPieces += Math.Max(0, pieces); _dVisitFirstGold += Math.Max(0, gold);
                 KitPlan p;
                 if (mp != null && _plans.TryGetValue(mp, out p)) { p.VFirstPcs += Math.Max(0, pieces); p.VFirstGold += Math.Max(0, gold); }
@@ -579,30 +703,77 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteFirst", e); }
         }
 
+        /// <summary>Recenzja 159b (uwaga 2): zwykla wizyta lorda AI z bronia ponad % - liczniki (wizyty, ludzi do uzbrojenia; tylko log).</summary>
+        internal static void NoteCapVisit(int men) { _dCapVisits++; _dCapVisitMen += Math.Max(0, men); }
+
+        /// <summary>Recenzja 159b (uwaga 2): regula "bez broni najwyzej X%" obejmuje kazda partie lorda AI (klucz UnarmedCapAllLordParties), nie tylko niegotowe p9;
+        /// miara CountArms ma sens tylko przy TroopsFightWithOwnKitOnly (bez niego bitwa daje wzorzec) i przy zakupach AI.</summary>
+        private static bool CapAllOn(Settings s) { return s != null && s.UnarmedCapAllLordParties && GarrisonKit.OwnKitOn && AiGear.On; }
+
+        /// <summary>Recenzja 159b (uwaga 2): partia, ktorej dotyczy regula X% poza p9 - lord AI w regule DTE (GarrisonKit.LordRule), bez rodu gracza, Strazy i umarlych.</summary>
+        private static bool CapParty(MobileParty mp)
+        {
+            return mp != null && mp.IsActive && !mp.IsMainParty && GarrisonKit.LordRule(mp) && mp.ActualClan != Clan.PlayerClan && !CrownGifts.IsWatchParty(mp) && !Undead.Party(mp);
+        }
+
         /// <summary>
-        /// 159b: pierwsza bron dla ludzi bez broni (CountArms - jak bitwa) na polce tego miasta: na czlowieka najtansza dostepna pierwsza bron jego wzorca (WeaponOpts),
-        /// wycena QuoteUnits tylko z oddzialami tych ludzi (udzwig, kultura - Lift). need - koszyki NeedKey pierwszego przebiegu zakupu, lift - oddzialy koszyka.
-        /// Zwraca liczbe ludzi, dla ktorych na polce jest pierwsza bron. Tylko odczyt.
+        /// Recenzja 159b: pierwsza bron do kupienia teraz (AiGear.TryBuyCore) - plan=true: kolejny przebieg wizyty z planem (wszyscy bez broni, uwaga 1: sztuki
+        /// poprzedniego przebiegu mogly trafic do wyzszych oddzialow - miara od nowa na zbrojowni po zakupie); plan=false: zwykla wizyta lorda AI (uwaga 2) - tylko
+        /// nadwyzka bez broni ponad UnarmedMenAllowedPercent (ExcessOf), przy kluczu UnarmedCapAllLordParties. Bez zakupu przed siodlami i korpusem (AiGear.Order)
+        /// lord wydawal budzet na zbroje, a ludzie bez broni zostawali ponad %. Zwraca ludzi (0 - need/lift null). Tylko odczyt, nie rzuca.
         /// </summary>
-        private static int FirstWeapons(MobileParty mp, Settlement st, Dictionary<ItemObject, int> arm, bool oneUp, out Dictionary<int, int> need,
+        internal static int FirstNeed(MobileParty mp, Settlement st, bool plan, out Dictionary<int, int> need, out Dictionary<int, List<CharacterObject>> lift)
+        {
+            need = null; lift = null;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || mp == null || st == null || st.Town == null) return 0;
+                if (!plan && (!CapAllOn(s) || !CapParty(mp) || Active(mp))) return 0;
+                var all = AiGear.Armories();
+                Dictionary<ItemObject, int> arm = null;
+                if (all != null) all.TryGetValue(mp.Id, out arm);
+                int men = FirstWeapons(mp, st, arm, s.MenUpgradeOneTierUp, plan, AllowedPct(s), out need, out lift);
+                if (men <= 0 || need == null || need.Count == 0) { need = null; lift = null; return 0; }
+                return men;
+            }
+            catch (Exception e) { Stumble("FirstNeed", e); need = null; lift = null; return 0; }
+        }
+
+        /// <summary>
+        /// 159b: pierwsza bron dla ludzi bez broni (CountArms - jak bitwa) na polce tego miasta: na czlowieka najtanszy krok jego wzorca (WeaponOpts),
+        /// wycena QuoteUnits tylko z oddzialami tych ludzi (udzwig, kultura - Lift). need - koszyki NeedKey pierwszego przebiegu zakupu, lift - oddzialy koszyka.
+        /// Zwraca liczbe ludzi, dla ktorych na polce jest pierwsza bron. Tylko odczyt. Recenzja 159b: all=false - najwyzej nadwyzka ponad pct% (ExcessOf; zwykla
+        /// wizyta, uwaga 2), all=true - wszyscy bez broni (wizyta z planem); krok ArmStep na pokryciu CountArms, opcje po wszystkich slotach typu (uwaga 1).
+        /// </summary>
+        private static int FirstWeapons(MobileParty mp, Settlement st, Dictionary<ItemObject, int> arm, bool oneUp, bool all, double pct, out Dictionary<int, int> need,
                                         out Dictionary<int, List<CharacterObject>> lift)
         {
             need = null; lift = null;
             var a = CountArms(mp.MemberRoster, arm);
             if (a.NoWeapon <= 0) return 0;
+            int limit = all ? int.MaxValue : ExcessOf(a.NoWeapon, a.Men, pct);
+            if (limit <= 0) return 0;
+            // recenzja 159b (uwaga 1): oddzial z pokryciem CountArms (Cov na typ - luk bez strzal dostaje same strzaly, wolne sloty pierwszych ludzi najpierw);
+            // kandydaci wyceny - najwiecej tyle sztuk na koszyk, ile wymaga uzbrojenie wszystkich ludzi bez broni oddzialu ta opcja
             var cand = new Dictionary<int, int>();
             var cl = new Dictionary<int, List<CharacterObject>>();
-            var opts = new Dictionary<CharacterObject, List<int[]>>();
-            var left = new Dictionary<CharacterObject, int>();
+            var steps = new List<ArmStep>();
             foreach (var kv in a.NoW)
             {
                 var o = WeaponOpts(kv.Key, oneUp);
                 if (o.Count == 0) continue;
-                opts[kv.Key] = o; left[kv.Key] = kv.Value;
+                int[] c0;
+                var cov = a.Cov != null && a.Cov.TryGetValue(kv.Key, out c0) ? (int[])c0.Clone() : new int[ArmTypes.Length];
+                var g = new ArmStep { Ch = kv.Key, Left = kv.Value, Cov = cov, Armed = ArmedOf(cov), Opts = o };
+                steps.Add(g);
                 foreach (var opt in o)
                     foreach (var k in opt)
                     {
-                        int v; cand.TryGetValue(k, out v); cand[k] = v + kv.Value;
+                        int ti = TypeIdx(k);
+                        int n = ti >= 0 ? Math.Max(0, g.Armed + g.Left - g.Cov[ti]) : 0;
+                        if (n <= 0) continue;
+                        int v; cand.TryGetValue(k, out v); cand[k] = v + n;
                         List<CharacterObject> l;
                         if (!cl.TryGetValue(k, out l)) cl[k] = l = new List<CharacterObject>();
                         if (!l.Contains(kv.Key)) l.Add(kv.Key);
@@ -615,22 +786,22 @@ namespace Armoury
             var nd = new Dictionary<int, int>();
             var lf = new Dictionary<int, List<CharacterObject>>();
             int men = 0;
-            while (true)
+            while (men < limit)
             {
-                CharacterObject bch = null; int[] bo = null; long bc = long.MaxValue;
-                foreach (var kv in opts)
+                ArmStep bg = null; int[] bo = null; List<int> bk = null; long bc = long.MaxValue;
+                foreach (var g in steps)
                 {
-                    if (left[kv.Key] <= 0) continue;
-                    foreach (var o in kv.Value) { long c = OptCost(o, units, pos); if (c >= 0 && c < bc) { bch = kv.Key; bo = o; bc = c; } }
+                    if (g.Left <= 0) continue;
+                    foreach (var o in g.Opts) { var ks = StepKeys(g, o); long c = KeysCost(ks, units, pos); if (c >= 0 && c < bc) { bg = g; bo = o; bk = ks; bc = c; } }
                 }
-                if (bch == null) break;
-                OptTake(bo, pos); left[bch] = left[bch] - 1; men++;
-                foreach (var k in bo)
+                if (bg == null) break;
+                KeysTake(bk, pos, null, null); StepApply(bg, bo); men++;
+                foreach (var k in bk)
                 {
                     int v; nd.TryGetValue(k, out v); nd[k] = v + 1;
                     List<CharacterObject> l;
                     if (!lf.TryGetValue(k, out l)) lf[k] = l = new List<CharacterObject>();
-                    if (!l.Contains(bch)) l.Add(bch);
+                    if (!l.Contains(bg.Ch)) l.Add(bg.Ch);
                 }
             }
             if (men <= 0) return 0;
@@ -677,6 +848,18 @@ namespace Armoury
             internal readonly Dictionary<CharacterObject, int> Reg = new Dictionary<CharacterObject, int>();
             internal readonly Dictionary<CharacterObject, int> NoW = new Dictionary<CharacterObject, int>();
             internal int Men, NoWeapon, FromPool, NoBody, BodyMen;
+            internal Dictionary<CharacterObject, int[]> Cov;   // recenzja 159b: ludzie z bronia wzorca na typ ArmTypes (krok (1), przed podloga) - FirstWeapons
+        }
+
+        /// <summary>Recenzja 159b: uzbrojeni bronia wzorca z pokrycia na typ ArmTypes - jak CountArms (ci sami pierwsi ludzie, nie suma).</summary>
+        private static int ArmedOf(int[] c)
+        {
+            if (c == null) return 0;
+            int armed = 0;
+            for (int ti = 0; ti < 4; ti++) armed = Math.Max(armed, c[ti]);   // bron biala i rzucana
+            armed = Math.Max(armed, Math.Min(c[4], c[5]));                  // luk ze strzalami
+            armed = Math.Max(armed, Math.Min(c[6], c[7]));                  // kusza z beltami
+            return armed;
         }
 
         /// <summary>
@@ -746,15 +929,11 @@ namespace Armoury
                 }
                 if (MeleeType(type)) foreach (var p in pieces) if (!p.Barred && p.Total - p.Used > 0) pool.Add(p);   // niewydane przez wzorce - pula podlogi
             }
+            a.Cov = cov;
             foreach (var kv in a.Reg)
             {
                 int[] c; int armed = 0;
-                if (cov.TryGetValue(kv.Key, out c))
-                {
-                    for (int ti = 0; ti < 4; ti++) armed = Math.Max(armed, c[ti]);   // bron biala i rzucana
-                    armed = Math.Max(armed, Math.Min(c[4], c[5]));                  // luk ze strzalami
-                    armed = Math.Max(armed, Math.Min(c[6], c[7]));                  // kusza z beltami
-                }
+                if (cov.TryGetValue(kv.Key, out c)) armed = ArmedOf(c);   // bron biala, rzucana, luk ze strzalami, kusza z beltami - max, nie suma
                 int nw = kv.Value - Math.Min(kv.Value, armed);
                 if (nw > 0) a.NoW[kv.Key] = nw;
             }
@@ -873,6 +1052,38 @@ namespace Armoury
             return gone;
         }
 
+        /// <summary>
+        /// Recenzja 159b (uwaga 2; regula Jeffa 26.10 "max 10% armii" - tylko ludzie bez broni): partia lorda AI GOTOWA wedlug p9 (R - odsetek slotow wzorca, takze
+        /// zbroi - nie widzi ludzi bez broni w dobrze opancerzonej partii; dotad regula (2) jej nie sprawdzala). Raz na dobe CountArms (ta sama miara co SendHome);
+        /// bez broni ponad pct% (ExcessOf) i nie stac na pierwsza bron dla nadwyzki (ArmsFirst.CanAfford - jak zwolniona p9; stac - kupi ja przy najblizszej wizycie,
+        /// AiGear: najpierw bron ponad %) - zegar od pierwszej takiej doby (w zapisie); po UnarmedMenSentHomeDays dobach nadwyzka do domu (SendHome). Bez: armii (zegar
+        /// od nowa, jak stanie p9), planu w toku, wpisu DTE, rodu gracza, Strazy, umarlych; bitwa, oblezenie, morze, rozwiazywana - zegar czeka.
+        /// </summary>
+        private static void OverCap(MobileParty mp, bool hasEntry, double now, double wait, double pct)
+        {
+            if (!CapParty(mp) || mp.Army != null || Active(mp) || !hasEntry) { _over.Remove(mp); return; }
+            if (!ArmedStrength.Computed(mp)) return;   // po wczytaniu p9 liczy partie kolejka - zegar z zapisu zostaje
+            if (mp.MapEvent != null || mp.SiegeEvent != null || mp.BesiegedSettlement != null || mp.IsCurrentlyAtSea || mp.IsDisbanding || mp.LeaderHero == null
+                || (mp.CurrentSettlement != null && mp.CurrentSettlement.IsUnderSiege))
+            { _dCapBusy++; return; }
+            var all = AiGear.Armories();
+            Dictionary<ItemObject, int> arm = null;
+            if (all != null) all.TryGetValue(mp.Id, out arm);
+            var a = CountArms(mp.MemberRoster, arm);
+            _dCapChecked++;
+            int go = ExcessOf(a.NoWeapon, a.Men, pct);
+            if (go <= 0) { _over.Remove(mp); return; }
+            _dCapOver++;
+            int b, need;
+            if (ArmsFirst.CanAfford(mp, go, null, out b, out need)) { _over.Remove(mp); _dCapAfford++; return; }
+            double since;
+            if (!_over.TryGetValue(mp, out since)) _over[mp] = since = now;
+            if (now - since < wait) { _dCapWait++; return; }
+            int gone = SendHome(mp, "gotowa wedlug p9, bez broni ponad % i nie stac", (now - since) / 24.0, pct);
+            if (gone > 0) _dCapHome++;
+            _over.Remove(mp);   // od nowa: po odeslaniu (albo gdy nie bylo kogo / wsi) zegar liczy sie znowu przy nastepnej nadwyzce
+        }
+
         // ------------------------------------------------------------ doba
         private static int AgeBucket(MobileParty mp, int today)
         {
@@ -910,8 +1121,13 @@ namespace Armoury
                     Get(mp);   // plan z zapisu do partii (gdy byl)
                     Stuck sv;
                     if (_savedStuck.Count > 0 && mp.StringId != null && _savedStuck.TryGetValue(mp.StringId, out sv) && !_stuck.ContainsKey(mp)) _stuck[mp] = sv;   // zegar z zapisu
+                    double ov;
+                    if (_savedOver.Count > 0 && mp.StringId != null && _savedOver.TryGetValue(mp.StringId, out ov) && !_over.ContainsKey(mp)) _over[mp] = ov;   // recenzja 159b: zegar ponad % z zapisu
                 }
-                _savedBorn.Clear(); _savedPlans.Clear(); _savedStuck.Clear();   // reszta z zapisu: partii juz nie ma
+                _savedBorn.Clear(); _savedPlans.Clear(); _savedStuck.Clear(); _savedOver.Clear();   // reszta z zapisu: partii juz nie ma
+                List<MobileParty> ro = null;
+                foreach (var mp in _over.Keys) if (mp == null || !mp.IsActive) { if (ro == null) ro = new List<MobileParty>(); ro.Add(mp); }
+                if (ro != null) foreach (var mp in ro) _over.Remove(mp);
                 int maxAge = 2 * ArmsFirst.TripDays(s) + 2;
                 List<MobileParty> rm = null;
                 foreach (var kv in _plans)
@@ -938,11 +1154,12 @@ namespace Armoury
                 bool home = s.UnarmedMenSentHome && GarrisonKit.OwnKitOn && AiGear.On && s.AiArmsBeforeBattle;
                 double wait = HomeDays(s) * 24.0;
                 double pct = AllowedPct(s);   // 159b: bez broni najwyzej tyle % partii
+                bool capAll = home && CapAllOn(s);   // recenzja 159b (uwaga 2): regula X% takze dla partii gotowych wedlug p9
                 foreach (var mp in lordList)
                 {
                     try
                     {
-                        if (!mp.IsActive || !GarrisonKit.LordRule(mp)) continue;
+                        if (!mp.IsActive || !GarrisonKit.LordRule(mp)) { _over.Remove(mp); continue; }
                         lords++;
                         int ab = AgeBucket(mp, today);
                         bool hasEntry = all != null && all.ContainsKey(mp.Id);
@@ -951,7 +1168,14 @@ namespace Armoury
                         byAge[ab, 0]++;
                         if (!hasEntry) { noEntry++; byAge[ab, 1]++; }
                         if (zero) { r0++; byAge[ab, 2]++; }
-                        if (info == null || !info.Low) continue;
+                        if (info == null || !info.Low)
+                        {
+                            // recenzja 159b (uwaga 2): partia gotowa wedlug p9 (R liczy sloty, takze zbroje - dobrze opancerzona z 30% ludzi bez broni nie jest
+                            // niegotowa) - regula X% wprost: bez broni ponad % i nie stac na pierwsza bron przez UnarmedMenSentHomeDays dob - nadwyzka do domu (OverCap)
+                            if (capAll) OverCap(mp, hasEntry, now, wait, pct); else _over.Remove(mp);
+                            continue;
+                        }
+                        _over.Remove(mp);   // niegotowa - regula (2) jak dotad (zegar stania p9)
                         if (mp.Army == null && mp.ActualClan != Clan.PlayerClan) worst.Add(new KeyValuePair<MobileParty, int>(mp, info.R));
                         Stuck st;
                         bool isStuck = _stuck.TryGetValue(mp, out st);
@@ -1002,6 +1226,7 @@ namespace Armoury
               .Append(", New Lord Party Kit Loan ").Append(s.NewLordPartyKitLoan ? "TAK" : "NIE")
               .Append(", Unarmed Men Sent Home ").Append(s.UnarmedMenSentHome ? "TAK po " + HomeDays(s) + " dobach" : "NIE")
               .Append(", Unarmed Men Allowed ").Append(PctTxt(AllowedPct(s))).Append("%")
+              .Append(", Unarmed Cap All Lord Parties ").Append(s.UnarmedCapAllLordParties ? "TAK" : "NIE")
               .Append(GearFit.FloorOn ? "" : " (Gear Fit Weapon Floor NIE - bez broni liczone bez puli)")
               .Append(GarrisonKit.OwnKitOn ? "" : " (TroopsFightWithOwnKitOnly NIE - regula 2 nieczynna)")
               .Append(AiGear.On ? "" : " (AI Buys Gear NIE - plan i regula 2 nieczynne)")
@@ -1014,11 +1239,13 @@ namespace Armoury
               .Append("; wycena planow ").Append(_dPlanPieces).Append(" szt. za ").Append(_dPlanCost).Append(" zl (najpierw bron ").Append(_dFirstPieces).Append(" szt. za ").Append(_dFirstCost)
               .Append(" zl; x").Append(Margin.ToString("0.00", Inv))
               .Append(": wlasne ").Append(_dPlanOwn).Append(", pozyczka planowana ").Append(_dPlanLoan).Append("), bez zbroi korpusu u wzietych z bronia (info) ").Append(_dPlanNoBody)
+              .Append(", przycieci miara bitwy (CountArms na sztukach planu) ").Append(_dPlanCut)
               .Append("; bez planu: klucz wylaczony ").Append(_dOff).Append(", start gry ").Append(_dStart).Append(", okno nowej gry (ColdStart) ").Append(_dLate)
               .Append(", zakupy AI wylaczone ").Append(_dNoGear).Append(", p9 wylaczone ").Append(_dNoP9).Append(", darmowy komplet DTE ").Append(_dFreeKit)
               .Append(" | WIZYTY z planem: ").Append(_dVisits).Append(" (polka bez sztuk - zwykly zakup, plan czeka ").Append(_dVisitEmpty).Append(")")
               .Append(", kupione ").Append(_dVisitPieces).Append(" szt. za ").Append(_dVisitSpent).Append(" zl (wodz -> kasy miast), z tego wlasne do ").Append(_dVisitOwn)
               .Append("; najpierw bron dla ludzi bez broni: ludzi ").Append(_dVisitFirstMen).Append(", kupione ").Append(_dVisitFirstPieces).Append(" szt. za ").Append(_dVisitFirstGold).Append(" zl")
+              .Append(" (kolejne przebiegi po zmierzeniu od nowa, wszystkie wizyty ").Append(_dFirstRounds).Append(")")
               .Append("; POZYCZKI Banku ").Append(_dLoans).Append(" na ").Append(_dLoanSum).Append(" zl (Bank -> glowa rodu -> wodz; drabina 168 splaca), z pozyczki zostalo w kiesach ").Append(_dLoanLeft)
               .Append(", pozyczka przycieta do wyceny planu ").Append(_dLoanCapped)
               .Append("; bez pozyczki (przy planie albo przy wizycie, wedlug powodu): ");
@@ -1037,6 +1264,12 @@ namespace Armoury
               .Append("; stoja (nie moga sie dozbroic) ").Append(stuckNow).Append(" partii, krocej niz ").Append(HomeDays(s)).Append(" dob ").Append(stuckShort).Append(" [");
             for (int i = 0; i < WhyCodes.Length; i++) { if (i > 0) sb.Append(", "); sb.Append(WhyCodes[i]).Append(' ').Append(whyN[i]); }
             sb.Append("]");
+            // recenzja 159b (uwaga 2): regula X% dla partii gotowych wedlug p9 (OverCap) i zwykle wizyty z pierwsza bronia ponad % (do domu - w licznikach (2) wyzej)
+            sb.Append(" | (2b) GOTOWE wedlug p9 - bez broni ponad ").Append(pt).Append("%: sprawdzone ").Append(_dCapChecked).Append(", ponad % ").Append(_dCapOver)
+              .Append(" (stac - pierwsza bron przy wizycie ").Append(_dCapAfford).Append(", zegar krocej niz ").Append(HomeDays(s)).Append(" dob ").Append(_dCapWait)
+              .Append(", do domu partii ").Append(_dCapHome).Append("), w bitwie/oblezeniu/na morzu (zegar czeka) ").Append(_dCapBusy).Append(", zegarow w toku ").Append(_over.Count + _savedOver.Count)
+              .Append("; zwykle wizyty z pierwsza bronia ponad %: ").Append(_dCapVisits).Append(", ludzi ").Append(_dCapVisitMen).Append(", kupione ").Append(_dCapVisitPieces)
+              .Append(" szt. za ").Append(_dCapVisitGold).Append(" zl");
             sb.Append(" | SPIS (P0): partie lordow AI ").Append(lords).Append(", bez wpisu DTE ").Append(noEntry).Append(", R = 0 (z brakiem wpisu) ").Append(r0)
               .Append("; wedlug wieku partii (wszystkie/bez wpisu/R=0): < 1 doby ").Append(Age3(byAge, 0)).Append(", 1-3 ").Append(Age3(byAge, 1)).Append(", 3-7 ").Append(Age3(byAge, 2))
               .Append(", 7+ ").Append(Age3(byAge, 3)).Append(", sprzed wczytania (wiek nieznany) ").Append(Age3(byAge, 4));
@@ -1110,7 +1343,7 @@ namespace Armoury
         private static bool IdOk(string id) { return !string.IsNullOrEmpty(id) && id.IndexOfAny(Bad) < 0; }
 
         /// <summary>"1|plany|stanie|doby powstania": plan "partia,miasto,ludzi,szablon,sztuk,wycena,wlasne,pozyczka,dzien"; stanie "partia,odH,kod"; powstanie
-        /// "partia,dzien". Razem z wpisami z zapisu jeszcze nie przypietymi do partii.</summary>
+        /// "partia,dzien". Razem z wpisami z zapisu jeszcze nie przypietymi do partii. Recenzja 159b: "|zegar ponad %" - "partia,odH" (OverCap).</summary>
         internal static string Export()
         {
             var sb = new StringBuilder("1|");
@@ -1159,6 +1392,23 @@ namespace Armoury
                 if (!first) sb.Append(';'); first = false;
                 sb.Append(kv.Key).Append(',').Append(kv.Value);
             }
+            // recenzja 159b (uwaga 2): czwarta sekcja - zegar "bez broni ponad %" partii gotowych wedlug p9 "partia,odH" (starsza wersja czyta trzy sekcje - pomija)
+            sb.Append('|');
+            first = true;
+            seen.Clear();
+            foreach (var kv in _over)
+            {
+                var id = kv.Key != null && kv.Key.IsActive ? kv.Key.StringId : null;
+                if (!IdOk(id) || !seen.Add(id)) continue;
+                if (!first) sb.Append(';'); first = false;
+                sb.Append(id).Append(',').Append(kv.Value.ToString("0.##", Inv));
+            }
+            foreach (var kv in _savedOver)
+            {
+                if (!IdOk(kv.Key) || !seen.Add(kv.Key)) continue;
+                if (!first) sb.Append(';'); first = false;
+                sb.Append(kv.Key).Append(',').Append(kv.Value.ToString("0.##", Inv));
+            }
             return sb.ToString();
         }
 
@@ -1171,7 +1421,7 @@ namespace Armoury
         /// <summary>Wczytanie (po Reset z konstruktora zachowania): brak klucza albo zly format - pusto (plany i zegary od nowa).</summary>
         internal static void Import(string v)
         {
-            _savedPlans.Clear(); _savedStuck.Clear(); _savedBorn.Clear(); _importN = -1; _importBad = 0;
+            _savedPlans.Clear(); _savedStuck.Clear(); _savedBorn.Clear(); _savedOver.Clear(); _importN = -1; _importBad = 0;
             if (string.IsNullOrEmpty(v) || !v.StartsWith("1|", StringComparison.Ordinal)) return;
             _importN = 0;
             var sec = v.Substring(2).Split('|');
@@ -1206,6 +1456,15 @@ namespace Armoury
                         int day;
                         if (c.Length < 2 || c[0].Length == 0 || !int.TryParse(c[1], NumberStyles.Integer, Inv, out day)) { _importBad++; continue; }
                         _savedBorn[c[0]] = day;
+                        _importN++;
+                    }
+                if (sec.Length > 3)   // recenzja 159b: zegar "bez broni ponad %" (zapis bez tej sekcji - pusto)
+                    foreach (var row in sec[3].Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        var c = row.Split(',');
+                        double h;
+                        if (c.Length < 2 || c[0].Length == 0 || !double.TryParse(c[1], NumberStyles.Float, Inv, out h) || h < 0) { _importBad++; continue; }
+                        _savedOver[c[0]] = h;
                         _importN++;
                     }
             }
