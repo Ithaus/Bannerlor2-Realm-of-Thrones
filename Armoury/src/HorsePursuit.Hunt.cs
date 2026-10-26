@@ -52,6 +52,8 @@ namespace Armoury
     /// Recenzja 204 (2): koszt passu ograniczony - najwyzej ThreatsPerPass strzelcow na pass (gracz i nekajacy testu zawsze, reszta po kolei z obrotem) i najwyzej
     /// ScanPerPass ludzi przejrzanych w szykach (Take / RangedPass; reszta w nastepnym passie), czas passu mierzony (linia bitwy "koszt passu"); strona, ktora
     /// wrog lamie (i strzelec w szyku), obniza juz podniesiony poziom do L1 i oddaje nadwyzke jezdzcow ponad oddzial (powrot "nadwyzka po obnizeniu", przerwa).
+    /// Recenzja 204 (3): sprawdzenie swoich w 8 m od strzelca (zdjecie celu lucznikow) co pass dla kazdego strzelca z lucznikami 204, takze odlozonego w obrocie;
+    /// do limitu przegladu licza sie tylko ludzie do wziecia (nie juz pod 204, nie piesi / bez amunicji), gracz i nekajacy testu najwyzej pol limitu.
     /// </summary>
     internal static partial class HorsePursuit
     {
@@ -90,6 +92,7 @@ namespace Armoury
             public readonly Queue<float> Shots = new Queue<float>();
             public float LastFire, L2At, Start, FirstContact = -1f, MaxFar;
             public bool Active, Screen, LosingNoted;
+            public int FfPass = -1;   // recenzja 204 (3): pass, w ktorym sprawdzono swoich przy strzelcu (_hPassN)
             public bool Group;   // recenzja 204: strzelec AI w nietknietym szyku swojej strony (konni lucznicy szykiem) - tylko L1, wspolny limit PerVictim z szyku
             public Vec2 ScreenC = Vec2.Invalid, EscC = Vec2.Invalid;
             public float ScreenR;
@@ -143,6 +146,8 @@ namespace Armoury
         // recenzja 204 (2): koszt passu (obrot strzelcow, ludzie przejrzani, czas), obnizenie poziomu (nadwyzka jezdzcow)
         private static readonly List<KeyValuePair<float, Hunter>> HTrim = new List<KeyValuePair<float, Hunter>>();
         private static int _hScan, _hScanOff, _hThrRot, _hScanCut, _hScanMax, _hThrMax, _hThrDefer, _hPassN, _hLower;
+        // recenzja 204 (3): limit przegladu biezacego strzelca (gracz / nekajacy testu - pol ScanPerPass), sprawdzenia swoich poza kolejka strzelcow
+        private static int _hScanCap = ScanPerPass, _hFfOut;
         private static long _hPassTicks, _hPassMaxTicks;
         // tablice wedlug Agent.Index (OnHit z dowolnego watku): strzelcy z Threat, lucznicy z celem 204 (rola strzelecka)
         private static Agent[] _hunted, _aiming;
@@ -196,7 +201,8 @@ namespace Armoury
             FormRiders.Clear(); FormGroup.Clear(); MeleeUntil.Clear(); HChk.Clear(); HGroupShooters.Clear();
             _hQChk = _hQFriend = _hChkRot = _hGroupCut = _hGroupMax = _hChkOver = 0;
             HTrim.Clear();
-            _hScan = _hScanOff = _hThrRot = _hScanCut = _hScanMax = _hThrMax = _hThrDefer = _hPassN = _hLower = 0;
+            _hScan = _hScanOff = _hThrRot = _hScanCut = _hScanMax = _hThrMax = _hThrDefer = _hPassN = _hLower = _hFfOut = 0;
+            _hScanCap = ScanPerPass;
             _hPassTicks = _hPassMaxTicks = 0L;
             Array.Clear(HDet, 0, HDet.Length); Array.Clear(HOut, 0, HOut.Length); Array.Clear(HEpL, 0, HEpL.Length);
             Array.Clear(UEnd, 0, UEnd.Length); Array.Clear(Nw, 0, Nw.Length);
@@ -502,10 +508,15 @@ namespace Armoury
             ThreatTmp.AddRange(ThreatList);
             int nt = ThreatTmp.Count;
             if (nt > _hThrMax) _hThrMax = nt;
-            for (int i = 0; i < nt; i++)
+            _hScanCap = ScanPerPass / 2;   // recenzja 204 (3): gracz / nekajacy testu nie zabieraja calego limitu reszcie strzelcow
+            try
             {
-                if (ThreatPrio(ThreatTmp[i])) RunThreat(m, ThreatTmp[i], now);
+                for (int i = 0; i < nt; i++)
+                {
+                    if (ThreatPrio(ThreatTmp[i])) RunThreat(m, ThreatTmp[i], now);
+                }
             }
+            finally { _hScanCap = ScanPerPass; }
             int start = _hThrRot > 0 && _hThrRot < nt ? _hThrRot : 0;
             int next = 0, done = 0;
             for (int k = 0; k < nt; k++)
@@ -523,6 +534,16 @@ namespace Armoury
                 done++;
             }
             _hThrRot = next;
+            // recenzja 204 (3): swoi przy strzelcu sprawdzani co pass dla kazdego strzelca z lucznikami 204 - takze odlozonego w obrocie (bez tego lucznicy
+            // strzelali w zwarcie przy nim do jego kolejki, a przy graczu zabierajacym limit - wcale); wlasny limit _hQFriend jak w RangedPass
+            for (int i = 0; i < nt; i++)
+            {
+                var t = ThreatTmp[i];
+                if (t.Ranged <= 0 || t.FfPass == _hPassN || t.S == null || !Threats.ContainsKey(t.S) || !t.S.IsActive()) continue;
+                _hFfOut++;
+                try { FriendsBlock(m, t, t.S.Position.AsVec2, now); }
+                catch (Exception e) { HStumble("HorsePursuit.JazdaFF", e); }
+            }
             ThreatTmp.Clear();
         }
 
@@ -832,31 +853,26 @@ namespace Armoury
                 if (room <= 0) { _hGroupCut++; return; }   // szyk oddal juz limit - bez przegladu
                 if (room < cap) cap = room;
             }
-            int left = ScanPerPass - _hScan;
+            int left = _hScanCap - _hScan;
             if (left <= 0) { _hScanCut++; return; }
             HUnits.Clear();
             fi.F.ApplyActionOnEachUnit(HCollect);   // gra iteruje swoje listy - my tylko zbieramy
             HCand.Clear();
             Vec2 sp = t.S.Position.AsVec2;
-            int nu = HUnits.Count, cnt = nu, off = 0;
-            if (nu > left)
-            {
-                cnt = left;
-                off = _hScanOff % nu;
-                _hScanOff += cnt;
-                _hScanCut++;
-            }
-            _hScan += cnt;
-            for (int k = 0; k < cnt; k++)
+            int nu = HUnits.Count, off = nu > left ? _hScanOff % nu : 0, used = 0;
+            for (int k = 0; k < nu; k++)
             {
                 int u = off + k;
                 if (u >= nu) u -= nu;
                 var a = HUnits[u];
                 int why = Elig(m, a, t, now);
-                if (why == -2) continue;
+                if (why == -2) continue;   // recenzja 204 (3): juz pod 204 / pieszy / konny lucznik - poza limitem przegladu
+                if (used >= left) { _hScanCut++; _hScanOff += k; break; }   // reszta szyku w nastepnym passie (poczatek przesuniety)
+                used++;
                 if (why >= 0) { NoteNw(a, why); continue; }
                 HCand.Add(new KeyValuePair<float, Agent>(a.Position.AsVec2.Distance(sp), a));
             }
+            _hScan += used;
             HUnits.Clear();
             if (t.Group && HCand.Count > cap) _hGroupCut++;
             // najblizsi strzelcowi najpierw; zapytanie o zwarcie tylko dla potrzebnych (recenzja 204: limit zapytan nie idzie na ludzi, ktorych nie wyslemy)
@@ -939,8 +955,50 @@ namespace Armoury
                 RangedRange.Add(range);
             }
             if (RangedForms.Count == 0 && t.Ranged <= 0) return 0;
-            // FF: swoi w LandRadius od strzelca - lucznicy zdejmuja cel (jedno zapytanie na strzelca na pass; recenzja 204: wlasny limit, nie po jezdzcach;
-            // bez sprawdzenia - cel zdjety, nie trzymany)
+            if (FriendsBlock(m, t, sp, now)) return 0;
+            int n = 0;
+            for (int j = 0; j < RangedForms.Count; j++)
+            {
+                if (_hNewRanged >= TrackPerStep) { _hRangedCap++; break; }
+                if (_hScan >= _hScanCap) { _hScanCut++; break; }   // recenzja 204 (2): wspolny limit przegladu ludzi na pass
+                var fi = fl[RangedForms[j]];
+                float range = RangedRange[j];
+                HUnits.Clear();
+                fi.F.ApplyActionOnEachUnit(HCollect);
+                int nu = HUnits.Count, off = nu > _hScanCap - _hScan ? _hScanOff % nu : 0;
+                for (int k = 0; k < nu && _hNewRanged < TrackPerStep; k++)
+                {
+                    int u = off + k;
+                    if (u >= nu) u -= nu;
+                    var a = HUnits[u];
+                    // recenzja 204 (3): juz pod 204 (takze na innego strzelca) i bez amunicji - poza limitem przegladu
+                    if (a == null || !a.IsActive() || !a.IsHuman || Hunters.ContainsKey(a) || !a.IsRangedCached) continue;
+                    if (_hScan >= _hScanCap) { _hScanCut++; _hScanOff += k; break; }   // reszta szyku w nastepnym passie (poczatek przesuniety)
+                    _hScan++;
+                    if (!a.IsAIControlled || a.IsMainAgent || a.IsHero) continue;
+                    if (Banner(a) || Undead.Character(a.Character)) continue;
+                    var mt = a.MountAgent;
+                    if (mt != null && MarchToContact.IsDragon(mt)) continue;
+                    if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a) || RidingAnyThread(a)) continue;
+                    if (!a.CanBeAssignedForScriptedMovement()) continue;
+                    float mu;
+                    if (MeleeUntil.TryGetValue(a, out mu) && now < mu) continue;   // recenzja 204: w zwarciu - bron sie, nie strzelaj do dalekiego
+                    if (a.Position.AsVec2.Distance(sp) > range) continue;
+                    StartHunter(t, a, fi, RoleRanged, range, now);
+                    _hNewRanged++;
+                    n++;
+                }
+                HUnits.Clear();
+            }
+            return n;
+        }
+
+        /// <summary>FF: swoi w LandRadius od strzelca - lucznicy 204 zdejmuja cel (jedno zapytanie na strzelca na pass; recenzja 204: wlasny limit, nie po
+        /// jezdzcach; bez sprawdzenia - cel zdjety, nie trzymany). Recenzja 204 (3): wolane z RangedPass i co pass z ThreatsRun dla strzelca bez ThreatPass
+        /// (znacznik FfPass). true = bez nowych lucznikow w tym passie.</summary>
+        private static bool FriendsBlock(Mission m, Threat t, Vec2 sp, float now)
+        {
+            t.FfPass = _hPassN;
             if (_hQFriend >= ShieldsUp.QueriesPerPass)
             {
                 for (int i = t.Hs.Count - 1; i >= 0; i--)
@@ -949,7 +1007,7 @@ namespace Armoury
                     var h = t.Hs[i];
                     if (h.Role == RoleRanged) EndHunter(h, UNoCheck, now, false, false);
                 }
-                return 0;
+                return true;
             }
             _hQFriend++;
             bool friends = false;
@@ -972,38 +1030,9 @@ namespace Armoury
                         if (h.Role == RoleRanged) EndHunter(h, UFriend, now, false, false);
                     }
                 }
-                return 0;
+                return true;
             }
-            int n = 0;
-            for (int j = 0; j < RangedForms.Count; j++)
-            {
-                if (_hNewRanged >= TrackPerStep) { _hRangedCap++; break; }
-                if (_hScan >= ScanPerPass) { _hScanCut++; break; }   // recenzja 204 (2): wspolny limit przegladu ludzi na pass
-                var fi = fl[RangedForms[j]];
-                float range = RangedRange[j];
-                HUnits.Clear();
-                fi.F.ApplyActionOnEachUnit(HCollect);
-                for (int u = 0; u < HUnits.Count && _hNewRanged < TrackPerStep; u++)
-                {
-                    if (_hScan >= ScanPerPass) { _hScanCut++; break; }
-                    _hScan++;
-                    var a = HUnits[u];
-                    if (a == null || !a.IsActive() || !a.IsHuman || Hunters.ContainsKey(a) || !a.IsAIControlled || a.IsMainAgent || a.IsHero) continue;
-                    if (!a.IsRangedCached || Banner(a) || Undead.Character(a.Character)) continue;
-                    var mt = a.MountAgent;
-                    if (mt != null && MarchToContact.IsDragon(mt)) continue;
-                    if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a) || RidingAnyThread(a)) continue;
-                    if (!a.CanBeAssignedForScriptedMovement()) continue;
-                    float mu;
-                    if (MeleeUntil.TryGetValue(a, out mu) && now < mu) continue;   // recenzja 204: w zwarciu - bron sie, nie strzelaj do dalekiego
-                    if (a.Position.AsVec2.Distance(sp) > range) continue;
-                    StartHunter(t, a, fi, RoleRanged, range, now);
-                    _hNewRanged++;
-                    n++;
-                }
-                HUnits.Clear();
-            }
-            return n;
+            return false;
         }
 
         private static void StartHunter(Threat t, Agent a, FI fi, byte role, float range, float now)
@@ -1438,7 +1467,7 @@ namespace Armoury
               .Append(" / max ").Append(_hPassN > 0 ? (_hPassMaxTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.000", Inv) : "-")
               .Append(" ms (passow ").Append(_hPassN).Append("; ludzi przejrzanych najwiecej ").Append(_hScanMax).Append(" na pass, limit ").Append(ScanPerPass)
               .Append(", ciec przegladu ").Append(_hScanCut).Append("; strzelcow naraz najwiecej ").Append(_hThrMax).Append(", na pass ").Append(ThreatsPerPass)
-              .Append(", passow z odlozonymi ").Append(_hThrDefer).Append("; obnizen poziomu ").Append(_hLower).Append(')')
+              .Append(", passow z odlozonymi ").Append(_hThrDefer).Append("; obnizen poziomu ").Append(_hLower).Append("; FF poza kolejka ").Append(_hFfOut).Append(')')
               .Append(" | z szyku gracza ").Append(_hFromPlayer).Append(" (oczekiwane 0)")
               .Append(" | pod sterowaniem 204 na koniec ").Append(_hLeft).Append(" (oczekiwane 0)")
               .Append(" | FF w jezdzcow ").Append(Volatile.Read(ref _hFFMissile) + Volatile.Read(ref _hFFMelee)).Append(" (pociski ").Append(Volatile.Read(ref _hFFMissile))
