@@ -58,6 +58,10 @@ namespace Armoury
     ///     najblizszego wyjazdu p9, dla min(nadwyzka, FirstUnit) ludzi x Margin) wobec AiGear.BudgetPreview - w OverCap, u zwolnionej z czekania p9 i w galezi
     ///     "nie stac" mysli p9 (FirstOk: niegotowa, ktorej nie stac na pelne dozbrojenie, a stac na pierwsza bron dla nadwyzki - wyjazd zamiast "nie stac");
     ///     p9 dalej liczy pelne dozbrajanie swoim CanAfford / MinNeed. Wycena raz na dobe na partie (pamiec _quotes, od nowa po zakupie pierwszej broni).
+    ///     159c recenzja 3: postep zegara OverCap = nadwyzka ponizej NAJMNIEJSZEJ od startu zegara (werbunek nie podnosi poprzeczki - "werbunek i jeden polegly"
+    ///     nie zeruje zegara); zegar z zapisu po terminie - pierwsza doba po wczytaniu raz wyjazd po pierwsza bron zamiast odsylki, gdy stac (wyjazdy bez zapisu);
+    ///     wycena bez sztuk dla nadwyzki - wytchnienie miasta (nastepnej doby kolejne); FirstOk tylko przy UnarmedCapAllLordParties (bez niego wizyta nie kupuje
+    ///     najpierw pierwszej broni - FirstNeed).
     /// (3) p9 bez zmian. P0: linia "Bitwa gracza (159 P0)" (kazda bitwa gracza - start spotkania i misja - stan kazdej partii lorda AI) i linia doby "Nowe druzyny i sprzet (159)" (plany,
     ///     pozyczki, zakupy, odeslani, spis partii bez wpisu DTE i z R = 0 wedlug wieku partii). Potkniecia liczone, bez wylacznikow.
     /// </summary>
@@ -118,7 +122,8 @@ namespace Armoury
         private static int _dCapChecked, _dCapOver, _dCapWait, _dCapBusy, _dCapHome;
         private static long _dCapVisits, _dCapVisitMen, _dCapVisitPieces, _dCapVisitGold;
         // 159c (druga recenzja 159b): zegar ponad % - od kiedy (h) bez postepu i nadwyzka przy ostatnim sprawdzeniu (-1 - z zapisu sprzed 159c, nieznana)
-        private sealed class Over { internal double SinceH; internal int Go = -1; }
+        // 159c recenzja 3: Go - NAJMNIEJSZA nadwyzka od startu zegara (postep = ponizej niej); Loaded - wpis z zapisu, jeszcze bez sprawdzenia terminu (bez zapisu)
+        private sealed class Over { internal double SinceH; internal int Go = -1; internal bool Loaded; }
         private static readonly Dictionary<MobileParty, Over> _over = new Dictionary<MobileParty, Over>();               // partia, ktorej p9 nie wysyla, z bronia ponad %
         private static readonly Dictionary<string, Over> _savedOver = new Dictionary<string, Over>(StringComparer.Ordinal);
         // 159c: wycena pierwszej broni dla nadwyzki (QuoteOf) - raz na dobe na partie; Town null - brak miasta w zasiegu
@@ -127,7 +132,7 @@ namespace Armoury
         private static readonly Dictionary<MobileParty, Quote> _quotes = new Dictionary<MobileParty, Quote>(RefEq.I);
         // 159c liczniki doby (2b): zwolnione z czekania p9 w OverCap, zegar od nowa po postepie, zegar czeka (wyjazd w toku), wyjazdy po pierwsza bron i powody
         // bez wyjazdu, zdarzenia wyjazdu (ArmsFirst: dojechaly, po postoju, za dlugo w drodze, przerwane), wyceny (liczba, takty Stopwatch)
-        private static int _dCapFree, _dCapProgress, _dCapTripping, _dCapTrips, _dCapNoTown, _dCapNoShelf, _dCapPoor, _dCapSpaced, _dQuotes;
+        private static int _dCapFree, _dCapProgress, _dCapTripping, _dCapTrips, _dCapNoTown, _dCapNoShelf, _dCapPoor, _dCapSpaced, _dQuotes, _dCapLoadTrip;
         private static long _dQuoteTicks;
         private static readonly int[] _dCapTripEv = new int[4];
         internal const int CapArrived = 0, CapDone = 1, CapLate = 2, CapEnded = 3;
@@ -169,7 +174,7 @@ namespace Armoury
             _dPlanCut = _dFirstRounds = 0;
             _dCapChecked = _dCapOver = _dCapWait = _dCapBusy = _dCapHome = 0;
             _dCapVisits = _dCapVisitMen = _dCapVisitPieces = _dCapVisitGold = 0;
-            _dCapFree = _dCapProgress = _dCapTripping = _dCapTrips = _dCapNoTown = _dCapNoShelf = _dCapPoor = _dCapSpaced = _dQuotes = 0;
+            _dCapFree = _dCapProgress = _dCapTripping = _dCapTrips = _dCapNoTown = _dCapNoShelf = _dCapPoor = _dCapSpaced = _dQuotes = _dCapLoadTrip = 0;
             _dQuoteTicks = 0; Array.Clear(_dCapTripEv, 0, _dCapTripEv.Length); _dLowFirst.Clear(); _dLowFirstNoTrip.Clear();
             _dEx.Clear(); Array.Clear(_dExN, 0, _dExN.Length);
             AiGear.QuoteStumbles = 0;
@@ -902,7 +907,9 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (!HomeOn(s) || !CapParty(mp)) return false;
+                // 159c recenzja 3: tylko przy UnarmedCapAllLordParties - bez niego zwykla wizyta nie kupuje najpierw pierwszej broni (FirstNeed: CapAllOn), wyjazd
+                // "po pierwsza bron" wydalby budzet na zbroje (AiGear.Order), a ludzie bez broni zostaliby ponad %
+                if (!HomeOn(s) || !CapAllOn(s) || !CapParty(mp)) return false;
                 return QuoteOk(QuoteOf(mp, town));
             }
             catch (Exception e) { Stumble("FirstOk", e); return false; }
@@ -1171,7 +1178,8 @@ namespace Armoury
         /// zbroi - nie widzi ludzi bez broni w dobrze opancerzonej partii; dotad regula (2) jej nie sprawdzala). Raz na dobe CountArms (ta sama miara co SendHome).
         /// 159c (druga recenzja 159b, uwaga 1 - dotad zegar znikal kazdego dnia, gdy p9 CanAfford, wiec partia z pieniedzmi, ktora nie trafia na polke z pierwsza
         /// bronia, trzymala ponad % bez konca): takze partia ZWOLNIONA z czekania p9 (freed - p9 jej nie wysyla). Bez broni ponad pct% (ExcessOf) - zegar (w zapisie):
-        /// biegnie, dopoki nadwyzka nie maleje; mniejsza niz przy ostatnim sprawdzeniu (zakup, polegli) - od nowa; wieksza (werbunek) - biegnie dalej. Po
+        /// biegnie, dopoki nadwyzka nie maleje; ponizej najmniejszej od startu zegara (zakup, polegli; recenzja 3 - nie "mniejsza niz wczoraj") - od nowa;
+        /// wieksza (werbunek) - biegnie dalej. Po
         /// UnarmedMenSentHomeDays dobach bez postepu nadwyzka do domu (SendHome) BEZ WZGLEDU na pieniadze (jak p9 "2 wizyty bez postepu" u niegotowych). Do tego czasu,
         /// gdy stac ja na pierwsza bron dla nadwyzki wedlug wyceny polki (QuoteOf - min(nadwyzka, FirstUnit) ludzi x Margin wobec BudgetPreview) - wyjazd do tego
         /// miasta (ArmsFirst.StartCapTrip: mysl godzinowa p9, bez stanu "niegotowa"; najwyzej raz na UnarmedMenSentHomeDays dob; nie przy wyjezdzie p9); w drodze
@@ -1196,22 +1204,40 @@ namespace Armoury
             _dCapOver++;
             Over o;
             if (!_over.TryGetValue(mp, out o)) _over[mp] = o = new Over { SinceH = now, Go = go };
-            else if (o.Go >= 0 && go < o.Go) { o.SinceH = now; o.Go = go; _dCapProgress++; }   // postep - zegar od nowa
-            else o.Go = go;                                                                    // bez postepu (albo zegar z zapisu sprzed 159c) - biegnie dalej
+            else if (o.Go >= 0 && go < o.Go) { o.SinceH = now; o.Go = go; _dCapProgress++; }   // postep - ponizej najmniejszej od startu zegara: od nowa
+            else if (o.Go < 0) o.Go = go;   // zegar z zapisu sprzed 159c - nadwyzka nieznana: od teraz najmniejsza; wieksza (werbunek) nie podnosi poprzeczki (recenzja 3)
             if (ArmsFirst.CapTripActive(mp)) { _dCapTripping++; return; }   // w drodze po pierwsza bron albo na postoju - zegar czeka do konca wyjazdu
             if (now - o.SinceH >= wait)
             {
+                // 159c recenzja 3: zegar z zapisu po terminie - wyjazdy po pierwsza bron nie ida do zapisu (Reset przed wczytaniem), wiec partia przerwana w drodze
+                // dostaje raz wyjazd zamiast odsylki, gdy stac ja na pierwsza bron (jak bez wczytania: zakup = postep, inaczej odsylka po koncu wyjazdu)
+                if (o.Loaded)
+                {
+                    o.Loaded = false;
+                    if (!ArmsFirst.CapTripRecent(mp, now, wait))
+                    {
+                        var lq = QuoteOf(mp, null);
+                        if (QuoteOk(lq) && ArmsFirst.StartCapTrip(mp, lq.Town, now))
+                        {
+                            _dCapTrips++; _dCapLoadTrip++;
+                            Ex(ExCap, Nm(mp) + ": po wczytaniu zegar po terminie - wyjazd po pierwsza bron do " + Nm(lq.Town) + " zamiast odsylki (ponad " + PctTxt(pct) + "% " + go
+                               + ", za min(" + go + ", " + FirstUnit + ") ludzi " + lq.Cost + " zl z zapasem, budzet " + lq.Budget + ")");
+                            return;
+                        }
+                    }
+                }
                 int gone = SendHome(mp, (freed ? "zwolniona z czekania p9" : "gotowa wedlug p9") + ", bez broni ponad % bez postepu", (now - o.SinceH) / 24.0, pct);
                 if (gone > 0) _dCapHome++;
                 _over.Remove(mp);   // od nowa: po odeslaniu (albo gdy nie bylo kogo / wsi) zegar liczy sie znowu przy nastepnej nadwyzce
                 return;
             }
+            o.Loaded = false;
             _dCapWait++;
             // wyjazd po pierwsza bron dla nadwyzki (najwyzej raz na `wait` godzin na partie)
             if (ArmsFirst.CapTripRecent(mp, now, wait)) { _dCapSpaced++; return; }
             var q = QuoteOf(mp, null);
             if (q.Town == null) { _dCapNoTown++; return; }
-            if (q.Men <= 0) { _dCapNoShelf++; return; }
+            if (q.Men <= 0) { _dCapNoShelf++; ArmsFirst.CoolTown(mp, q.Town); return; }   // 159c recenzja 3: wytchnienie miasta - nastepnej doby wycena w kolejnym
             if (!QuoteOk(q)) { _dCapPoor++; return; }
             if (!ArmsFirst.StartCapTrip(mp, q.Town, now)) { _dCapSpaced++; return; }
             _dCapTrips++;
@@ -1419,12 +1445,13 @@ namespace Armoury
             double qms = _dQuoteTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
             sb.Append(" | (2b) GOTOWE wedlug p9 (i zwolnione z czekania) - bez broni ponad ").Append(pt).Append("%: sprawdzone ").Append(_dCapChecked)
               .Append(" (z tego zwolnione z czekania p9 ").Append(_dCapFree).Append("), ponad % ").Append(_dCapOver)
-              .Append(" (zegar biegnie, krocej niz ").Append(HomeDays(s)).Append(" dob bez postepu ").Append(_dCapWait).Append(" - z tego od nowa po postepie (nadwyzka mniejsza niz wczoraj) ").Append(_dCapProgress)
+              .Append(" (zegar biegnie, krocej niz ").Append(HomeDays(s)).Append(" dob bez postepu ").Append(_dCapWait).Append(" - z tego od nowa po postepie (nadwyzka ponizej najmniejszej od startu zegara) ").Append(_dCapProgress)
               .Append("; w drodze po pierwsza bron albo na postoju - zegar czeka ").Append(_dCapTripping)
               .Append("; do domu po ").Append(HomeDays(s)).Append(" dobach bez postepu partii ").Append(_dCapHome).Append("), w bitwie/oblezeniu/na morzu (zegar czeka) ").Append(_dCapBusy)
               .Append(", zegarow w toku ").Append(_over.Count + _savedOver.Count)
-              .Append("; WYJAZDY po pierwsza bron (159c): nowe ").Append(_dCapTrips).Append(", bez wyjazdu: brak miasta w zasiegu ").Append(_dCapNoTown)
-              .Append(", na polce nic dla nich ").Append(_dCapNoShelf).Append(", nie stac wedlug wyceny polki ").Append(_dCapPoor)
+              .Append("; WYJAZDY po pierwsza bron (159c): nowe ").Append(_dCapTrips).Append(" (z tego po wczytaniu zamiast odsylki ").Append(_dCapLoadTrip).Append(")")
+              .Append(", bez wyjazdu: brak miasta w zasiegu ").Append(_dCapNoTown)
+              .Append(", na polce nic dla nich (wytchnienie miasta) ").Append(_dCapNoShelf).Append(", nie stac wedlug wyceny polki ").Append(_dCapPoor)
               .Append(", wyjazd w ostatnich ").Append(HomeDays(s)).Append(" dobach albo p9 w drodze ").Append(_dCapSpaced)
               .Append("; dojechaly ").Append(_dCapTripEv[CapArrived]).Append(", po postoju ").Append(_dCapTripEv[CapDone]).Append(", za dlugo w drodze ").Append(_dCapTripEv[CapLate])
               .Append(", przerwane (armia, p9, miasto niewazne, bez nadwyzki) ").Append(_dCapTripEv[CapEnded]).Append(", w toku ").Append(ArmsFirst.CapTripCount)
@@ -1636,7 +1663,7 @@ namespace Armoury
                         double h; int go = -1;
                         if (c.Length < 2 || c[0].Length == 0 || !double.TryParse(c[1], NumberStyles.Float, Inv, out h) || h < 0) { _importBad++; continue; }
                         if (c.Length >= 3 && (!int.TryParse(c[2], NumberStyles.Integer, Inv, out go) || go < 0)) { go = -1; _importBad++; }
-                        _savedOver[c[0]] = new Over { SinceH = h, Go = go };
+                        _savedOver[c[0]] = new Over { SinceH = h, Go = go, Loaded = true };
                         _importN++;
                     }
             }

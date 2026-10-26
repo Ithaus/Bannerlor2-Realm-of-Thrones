@@ -63,6 +63,11 @@ namespace Armoury
     ///     i wytchnienie miasta; armia, nieczynna, przejeta przez p9 (niegotowa, nie zwolniona) - koniec. Najwyzej raz na UnarmedMenSentHomeDays dob na partie
     ///     (_capLast), nigdy obok wyjazdu p9. (b) "nie stac" p9: niegotowa, ktorej nie stac na pelne dozbrojenie (CanAfford), a stac na pierwsza bron dla nadwyzki
     ///     (NewLordKit.FirstOk - wycena polki) - wyjazd p9 (TripTown firstOnly: w miescie i przy przedluzeniu postoju ten sam sprawdzian) zamiast "nie stac".
+    /// 159c recenzja 3: (1) TripTown pelnego dozbrojenia, ktorego nie stac w wybranym miescie (rezerwa napraw z materialem tego miasta), a stac na pierwsza bron dla
+    ///     nadwyzki w tym miescie (FirstOk) - wyjazd jak firstOnly (Trip.First: przedluzenie postoju tym samym sprawdzianem), "nie stac w miescie" tylko gdy oba nie.
+    ///     (2) CapThink: obrona zagrozonej osady KROLESTWA partii (oblezenie albo bitwa o nia), gdy jest najlepsza opcja (np. podbita przez OB5 BesiegedRelief -
+    ///     Jeff 14.10 "stolicy i miast trzeba bronic za wszelka cene") - wyjazd po pierwsza bron czeka, jak przy osadzie rodu. (3) Wyjazd po pierwsza bron
+    ///     zakonczony przed przyjazdem przez cudza blokade albo niewazne miasto nie liczy sie do odstepu (_capLast) - nastepnej doby nowa proba (inne miasto).
     /// </summary>
     internal static class ArmsFirst
     {
@@ -76,7 +81,7 @@ namespace Armoury
         private const float ArmyFloor = 1000f;   // DefaultArmyManagementCalculationModel.CanLordCreateArmy: num5 < 1000f -> false (Siege, krolestwo z osadami)
         private static readonly TextObject NotArmedText = new TextObject("{=!}Its men lack arms and armour - it must arm them before joining an army.");
 
-        private sealed class Trip { internal MobileParty P; internal Settlement Town; internal double StartH, ArriveH = -1; internal int R0, Ext; }
+        private sealed class Trip { internal MobileParty P; internal Settlement Town; internal double StartH, ArriveH = -1; internal int R0, Ext; internal bool First; }   // First - 159c: wyjazd p9 po pierwsza bron (FirstOk)
         private static readonly Dictionary<MBGUID, Trip> _trip = new Dictionary<MBGUID, Trip>();
         private sealed class Streak { internal MobileParty P; internal int N; }
         private static readonly Dictionary<MBGUID, Streak> _noGain = new Dictionary<MBGUID, Streak>();   // recenzja p9: wizyty z rzedu bez postepu
@@ -101,7 +106,7 @@ namespace Armoury
 
         // liczniki doby (mysl i armie - watek glowny; atak - dowolny watek, pod zamkiem)
         private static readonly object Gate = new object();
-        private static int _dTrips, _dArrived, _dArmed, _dPart, _dNoGain, _dTimeout, _dOff, _dOwnDef, _dStarve, _stumbles, _dExt, _dFreedTrip, _dBlocked;
+        private static int _dTrips, _dArrived, _dArmed, _dPart, _dNoGain, _dTimeout, _dOff, _dOwnDef, _dStarve, _stumbles, _dExt, _dFreedTrip, _dBlocked, _dCapRelief, _dFirstInTown;
         private static int _vAttackCalls, _vThresh;
         private static readonly HashSet<MBGUID> _vAttack = new HashSet<MBGUID>(), _vLead = new HashSet<MBGUID>(), _vMember = new HashSet<MBGUID>(),
                                                 _vAvail = new HashSet<MBGUID>(), _vElig = new HashSet<MBGUID>(), _dPoor = new HashSet<MBGUID>(), _dNoTown = new HashSet<MBGUID>(),
@@ -117,7 +122,7 @@ namespace Armoury
 
         internal static void ClearDay()
         {
-            _dTrips = _dArrived = _dArmed = _dPart = _dNoGain = _dTimeout = _dOff = _dOwnDef = _dStarve = _dExt = _dFreedTrip = _dBlocked = 0;
+            _dTrips = _dArrived = _dArmed = _dPart = _dNoGain = _dTimeout = _dOff = _dOwnDef = _dStarve = _dExt = _dFreedTrip = _dBlocked = _dCapRelief = _dFirstInTown = 0;
             lock (Gate) { _vAttackCalls = 0; _vThresh = 0; _vAttack.Clear(); _vLead.Clear(); _vMember.Clear(); _vAvail.Clear(); _vElig.Clear(); _vPre.Clear(); }
             _dPoor.Clear(); _dNoTown.Clear(); _dNoBuy.Clear(); _dNoBudgetTown.Clear();
         }
@@ -182,6 +187,15 @@ namespace Armoury
             if (d.AiBehavior != AiBehavior.DefendSettlement) return false;
             var st = d.Party as Settlement;
             return OwnClanSettlement(st, clan) && (st.SiegeEvent != null || (st.Party != null && st.Party.MapEvent != null));
+        }
+
+        /// <summary>159c recenzja 3: obrona ZAGROZONEJ osady krolestwa partii (MapFaction - te same osady co OB5 BesiegedRelief), takze cudzego rodu.</summary>
+        private static bool IsKinDefend(in AIBehaviorData d, MobileParty party)
+        {
+            if (d.AiBehavior != AiBehavior.DefendSettlement) return false;
+            var st = d.Party as Settlement;
+            var f = party.MapFaction;
+            return st != null && f != null && st.MapFaction == f && (st.SiegeEvent != null || (st.Party != null && st.Party.MapEvent != null));
         }
 
         /// <summary>Opcja oceny celow, ktora szuka bitwy: oblezenie, szturm, rabunek, obrona cudzej osady, poscig za partia (bandy - wedlug klucza).</summary>
@@ -362,18 +376,22 @@ namespace Armoury
             if (scores == null) return;
             double now = CampaignTime.Now.ToHours;
             var clan = party.ActualClan;
-            float other = 0f, own = -1f;
+            float other = 0f, own = -1f, kin = -1f;
             bool blocked = false;
             for (int i = 0; i < scores.Count; i++)
             {
                 var e = scores[i];
                 if (e.Item2 <= -1f) { if (ReferenceEquals(e.Item1.Party, t.Town)) blocked = true; continue; }
                 if (IsOwnDefend(e.Item1, clan)) { if (e.Item2 > own) own = e.Item2; }
+                else if (IsKinDefend(e.Item1, party)) { if (e.Item2 > kin) kin = e.Item2; }   // 159c recenzja 3: odsiecz osady krolestwa
                 else if (e.Item2 > other) other = e.Item2;
             }
             if (blocked || !Valid(party, t.Town, now))
             {
                 if (blocked) Cool(party, t.Town, now, s);
+                // 159c recenzja 3: partia nie dojechala - wyjazd sie nie liczy do odstepu (nastepnej doby nowa wycena: miasto zablokowane ma wytchnienie, niewazne
+                // odpada w Valid); inaczej CapTripRecent blokowal nowy wyjazd do konca zegara i nadwyzka szla do domu bez osiagalnego miasta
+                if (t.ArriveH < 0) _capLast.Remove(party.Id);
                 _capTrip.Remove(party.Id); NewLordKit.CapTripEvent(NewLordKit.CapEnded);
                 return;
             }
@@ -389,7 +407,10 @@ namespace Armoury
                 return;
             }
             if (own >= 0f) return;   // obrona zagrozonej osady wlasnego rodu - pierwszenstwo (wyjazd czeka)
-            Aim(partyThinkParams, scores, t.Town, other);
+            // 159c recenzja 3: obrona zagrozonej osady krolestwa najlepsza opcja (OB5 podbija odsiecz ponad inne cele; Jeff 14.10 "stolicy i miast trzeba bronic za
+            // wszelka cene") - wyjazd czeka (partia gotowa zostaje w zasiegu odsieczy OB5); gdy inna opcja jest lepsza - wyjazd ponad nia jak dotad
+            if (kin >= 0f && kin >= other) { _dCapRelief++; return; }
+            Aim(partyThinkParams, scores, t.Town, Math.Max(other, kin));
         }
 
         /// <summary>159c (NewLordKit.OverCap): wyjazd po pierwsza bron do miasta wyceny - nie obok wyjazdu p9, nie drugi w toku, najwyzej raz na UnarmedMenSentHomeDays
@@ -431,6 +452,14 @@ namespace Armoury
             if (d > 0 && st != null) _cool[Key(mp, st)] = now + d * 24.0;
         }
 
+        /// <summary>159c recenzja 3 (NewLordKit.OverCap): wycena pierwszej broni w miescie bez sztuk dla nadwyzki - wytchnienie tego miasta dla partii (nastepnej doby
+        /// NearestTown bierze kolejne). Watek glowny.</summary>
+        internal static void CoolTown(MobileParty mp, Settlement st)
+        {
+            var s = Settings.Current;
+            if (s != null && mp != null && st != null) Cool(mp, st, CampaignTime.Now.ToHours, s);
+        }
+
         private static bool Valid(MobileParty mp, Settlement st, double now)
         {
             return st != null && st.IsTown && st.Town != null && st.ItemRoster != null && !st.IsUnderSiege
@@ -456,7 +485,8 @@ namespace Armoury
                     // recenzja p9 (uwaga 4): postep w tej wizycie i dalej go stac (podglad z rezerwa napraw tego miasta) - zostaje kolejna dobe (AiGear kupuje raz na dobe)
                     int b2, need2;
                     // 159c: wyjazd po pierwsza bron dla nadwyzki (firstOnly) - "dalej go stac" wedlug wyceny pierwszej broni w tym miescie (NewLordKit.FirstOk)
-                    if (gain && inTown && (firstOnly ? NewLordKit.FirstOk(party, t.Town) : CanAfford(party, info.Short, t.Town, out b2, out need2)))
+                    // 159c recenzja 3: wyjazd zaczety jako pierwsza bron (t.First) - ten sam sprawdzian, takze gdy ta godzina idzie galezia pelnego dozbrojenia
+                    if (gain && inTown && ((firstOnly || t.First) ? NewLordKit.FirstOk(party, t.Town) : CanAfford(party, info.Short, t.Town, out b2, out need2)))
                     {
                         t.ArriveH = now; t.R0 = info.R; t.Ext++; _dExt++; _noGain.Remove(party.Id);
                         return t.Town;
@@ -481,13 +511,21 @@ namespace Armoury
             if (town == null) town = Nearest(party, now, s, blocked);
             if (town == null) { _dNoTown.Add(party.Id); _why = WhyNoTown; return null; }
             int b, need;
+            bool first = firstOnly;
             if (firstOnly)
             {
                 // 159c: wycena pierwszej broni dla nadwyzki na polce TEGO miasta (moze byc inne niz najblizsze bez blokad); nie stac - jak dotad "nie stac"
                 if (!NewLordKit.FirstOk(party, town)) { _dPoor.Add(party.Id); _why = WhyPoor; return null; }
             }
-            else if (!CanAfford(party, info.Short, town, out b, out need)) { _dNoBudgetTown.Add(party.Id); _why = WhyNoBudgetTown; return null; }   // recenzja p9: rezerwa napraw z materialem tego miasta
-            _trip[party.Id] = new Trip { P = party, Town = town, StartH = now, R0 = info.R };
+            else if (!CanAfford(party, info.Short, town, out b, out need))   // recenzja p9: rezerwa napraw z materialem tego miasta
+            {
+                // 159c recenzja 3: nie stac w tym miescie na pelne dozbrojenie (podglad z rezerwa napraw <= bez miasta), a stac na pierwsza bron dla nadwyzki na jego
+                // polce - wyjazd jak firstOnly; inaczej "nie stac w miescie" i po UnarmedMenSentHomeDays odsylka ludzi, ktorych pan moze uzbroic
+                if (!NewLordKit.FirstOk(party, town)) { _dNoBudgetTown.Add(party.Id); _why = WhyNoBudgetTown; return null; }
+                first = true; _dFirstInTown++;
+                NewLordKit.NoteLowFirst(party, true);
+            }
+            _trip[party.Id] = new Trip { P = party, Town = town, StartH = now, R0 = info.R, First = first };
             _dTrips++;
             return town;
         }
@@ -784,6 +822,8 @@ namespace Armoury
                    + ", bez miasta w zasiegu " + _dNoTown.Count + " partii, w miescie nie stac (rezerwa napraw z materialem) " + _dNoBudgetTown.Count
                    + ", po " + NoGainMax + " wizytach bez postepu bez wyjazdow " + streak + " partii (mysli " + _dNoBuy.Count + "), wyjazd przerwany zwolnieniem z czekania " + _dFreedTrip
                    + ", cel zablokowany cudza latka (wynik <= -1, wytchnienie i nastepne miasto) " + _dBlocked
+                   + ", w miescie nie stac na pelne, stac na pierwsza bron (wyjazd) " + _dFirstInTown
+                   + ", wyjazd po pierwsza bron czeka na obrone osady krolestwa (mysli) " + _dCapRelief
                    + ", w wytchnieniu " + _cool.Count + " par partia-miasto"
                    + " | odmowy: atak " + a + " partii (" + aCalls + " razy), opcje bitwy zgaszone " + _dOff + " (mysli bez pieniedzy " + _dPoor.Count + " partii)"
                    + ", obrona wlasnej osady zostawiona " + _dOwnDef + ", glod (bez zmian) " + _dStarve
