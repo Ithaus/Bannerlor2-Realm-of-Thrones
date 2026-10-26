@@ -390,6 +390,13 @@ namespace Armoury
         /// <summary>p9 recenzja (ArmsFirst - braki do progu): to samo z liczbami - sloty wzorca (need) i obsadzone ze zbrojowni (used).</summary>
         internal static int FillPercent(MobileParty g, Dictionary<ItemObject, int> arm, List<string> shorts, bool battle, out int need, out int used)
         {
+            return FillPercent(g, arm, shorts, battle, out need, out used, null);
+        }
+
+        /// <summary>159 (NewLordKit - ludzie bez zbroi albo broni do domu): to samo, a perType dostaje na kazdy typ {typ, sloty wzorca, obsadzone} - ta sama miara,
+        /// bez zmiany wyniku (null - jak dotad).</summary>
+        internal static int FillPercent(MobileParty g, Dictionary<ItemObject, int> arm, List<string> shorts, bool battle, out int need, out int used, List<int[]> perType)
+        {
             need = 0; used = 0;
             try
             {
@@ -402,6 +409,7 @@ namespace Armoury
                     if (men.Length == 0) continue;
                     int unfit = pieces.Count > 0 ? SwapMath.Fit(men, troops.Count, QuartermasterLaw.MeetsFitOf(troops), pieces) : men.Length;   // GearFit (po recenzji): jak nadwyzki
                     need += men.Length; used += men.Length - unfit;
+                    if (perType != null) perType.Add(new[] { (int)type, men.Length, men.Length - unfit });
                     if (unfit > 0 && shorts != null && shorts.Count < 4) shorts.Add(unfit + " " + Plural(type));
                 }
             }
@@ -626,6 +634,7 @@ namespace Armoury
                 if (me == null || dists == null || sides == null || mission == null) return;
                 BattleFor(mission);
                 _mountsOk = MountsOk(mission);
+                NewLordKit.BattleLine(me, "misja");   // 159 P0: stan partii lordow AI tej bitwy PRZED pustymi wpisami OwnAssignments (tylko log, raz na bitwe, nie rzuca)
                 // sklad7b: jedna regula dla druzyny gracza i lordow AI (OwnKitOn); "tylko pozyczone" (LordBattleKitIsLent) tylko bez niej
                 if (OwnKitOn) OwnAssignments(dists, sides, me, mission);   // PRZED rozdzielaczami zalog - te dochodza nizej
                 else if (s.LordBattleKitIsLent) LordAssignments(dists);

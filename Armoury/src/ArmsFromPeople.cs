@@ -77,6 +77,7 @@ namespace Armoury
             public long mTickUp, mTickDown;      // tylko okno ticku (N7 - porownanie z "milicja (E4/0): z modelu w ticku")
             // nowe druzyny
             public int p, p1, p2, p3; public long n, nOff; public double a1, aFrac; public long a2, a3h, a3g, a3f, a4;
+            public long kitCut;     // 159: ludzie szablonu bez sprzetu, ktorzy zostali we wsi (poza rachunkiem szablonu - NewLordKit.Plan)
             public long g, g1, g2, g3, g3x, gOth; public int gN; public long gifts; public long giftsValue;   // m6b (5): g3x - zboze bez zapasu zdjete (FoodSourcesInLedger), gOth - zboze gry dla druzyn Innych (nazwane w ksiedze towarow)
             // karawany
             public int k; public long kMen; public double c1, c1t, c1c, c1v, cFrac; public long c2, c2Master; public double c3; public long c4; public int c3N;
@@ -151,7 +152,7 @@ namespace Armoury
         }
 
         /// <summary>Rozdzial n proporcjonalnie do wag (najwieksze reszty), nie wiecej niz waga typu.</summary>
-        private static Dictionary<CharacterObject, int> Split(Dictionary<CharacterObject, int> w, int n)
+        internal static Dictionary<CharacterObject, int> Split(Dictionary<CharacterObject, int> w, int n)   // 159: takze NewLordKit (ludzie bez zbroi albo broni do domu)
         {
             var res = new Dictionary<CharacterObject, int>();
             int all = 0; foreach (var v in w.Values) all += Math.Max(0, v);
@@ -549,10 +550,37 @@ namespace Armoury
                 try { SpawnGrain(__0, __1, __state.Grain0); } catch (Exception e) { Stumble("SpawnPost(zboze)", e); }
                 if (__0 == MobileParty.MainParty || __1.Clan == Clan.PlayerClan) { day.p3++; return; }      // rod gracza - bez szablonu (gra)
                 var r = __0.MemberRoster;
-                int n = 0; foreach (var v in AddedOf(__state.Before, r).Values) n += v;
+                var added = AddedOf(__state.Before, r);
+                int n = 0; foreach (var v in added.Values) n += v;
                 if (n <= 0) return;
+                bool watch = CrownGifts.IsWatch(__1.MapFaction);
+                // 159 (NewLordPartyArmedMenOnly, Jeff 26.10 "Pozyczka + mniejsze"): tylko ludzie, ktorych pan ubierze (NewLordKit.Plan - wycena na polce najblizszego
+                // przyjaznego miasta, zloto ponad rezerwe i pozyczka Banku do limitu); reszta szablonu zdjeta PRZED rachunkiem szablonu i poborem z DOM - zostaja we
+                // wsi (z ksiegi ludzi nic nie schodzi). "szablon" linii E4/8 = wzieci (kontrola N8 bez zmian), zdjeci osobno "bez sprzetu zostali we wsi (159)"
+                if (!watch && SpawnOn && PeopleBook.LevyLive)
+                {
+                    try
+                    {
+                        var kitKeep = NewLordKit.Plan(__0, __1, added);
+                        if (kitKeep != null)
+                        {
+                            int cut = 0;
+                            foreach (var kv in added)
+                            {
+                                int k; kitKeep.TryGetValue(kv.Key, out k);
+                                int x = Math.Min(kv.Value, kv.Value - Math.Max(0, k));
+                                if (x <= 0) continue;
+                                r.AddToCounts(kv.Key, -x);
+                                cut += x;
+                            }
+                            n -= cut; day.kitCut += cut;
+                            if (n <= 0) return;
+                        }
+                    }
+                    catch (Exception e) { Stumble("SpawnPost(159)", e); }
+                }
                 day.n += n;
-                if (CrownGifts.IsWatch(__1.MapFaction)) { day.p1++; WatchLaw.GiveLevy(r, n, WatchLaw.KSpawn, PeopleBook.FWatchArms); day.a4 += n; return; }   // E4/9 (Y3): szablon Strazy z Westeros (pulap - SpawnPrefix)
+                if (watch) { day.p1++; WatchLaw.GiveLevy(r, n, WatchLaw.KSpawn, PeopleBook.FWatchArms); day.a4 += n; return; }   // E4/9 (Y3): szablon Strazy z Westeros (pulap - SpawnPrefix)
                 if (!SpawnOn || !PeopleBook.LevyLive) { day.nOff += n; return; }      // jak dotad (uzgodnienie E4/7 nazwie "z niczego - partie rodow")
                 bool foreign;
                 var seat = SeatOf(__1, __0, out foreign);
@@ -1102,6 +1130,7 @@ namespace Armoury
               .Append(", szablon ").Append(d.n).Append(" = z wolnych rak ").Append(F1(d.a1)).Append(" + ulamki bez DOM ").Append(F1(d.aFrac)).Append(" + z zalogi siedziby ").Append(d.a2)
               .Append(" + nie wystawieni ").Append(a3).Append(" (bez wolnych rak ").Append(d.a3h).Append(", zaloga ponizej rezerwy albo w bitwie/oblezeniu ").Append(d.a3g).Append(", podloga ").Append(d.a3f).Append(")")
               .Append(" + Straz \"\" ").Append(d.a4).Append(" + ksiega bez poboru ").Append(d.nOff)
+              .Append(" (159: bez sprzetu zostali we wsi, poza rachunkiem szablonu ").Append(d.kitCut).Append(")")
               .Append("; zboze ").Append(d.g).Append(" szt. (").Append(d.gN).Append(" partii): z zapasu siedziby ").Append(d.g1).Append(", z innej warowni ").Append(d.g2).Append(", z niczego (brak zapasu) ").Append(d.g3)
               .Append(" (zdjete m6b ").Append(d.g3x).Append(", zboze gry dla druzyn Innych ").Append(d.gOth).Append(")")
               .Append("; dary startowe gry (poza E4/8 - etap 6): ").Append(d.gifts).Append(" szt. za ").Append(d.giftsValue).Append(" zl");

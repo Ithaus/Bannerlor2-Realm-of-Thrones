@@ -75,6 +75,9 @@ namespace Armoury
         private static readonly Dictionary<MBGUID, Streak> _noGain = new Dictionary<MBGUID, Streak>();   // recenzja p9: wizyty z rzedu bez postepu
         [ThreadStatic] private static int _inCreate;   // recenzja p9 (uwaga 2): w toku bazowego CanLordCreateArmy (filtr kandydatow przed progiem)
         private static readonly Dictionary<string, double> _cool = new Dictionary<string, double>(StringComparer.Ordinal);   // partia|miasto -> godzina konca wytchnienia
+        // 159 (UnarmedMenSentHome): powod, dla ktorego ostatnia mysl nie dala wyjazdu (ThinkPostfix -> NewLordKit.NoteStuck); watek glowny
+        internal const string WhyPoor = "nie stac", WhyNoTown = "brak miasta w zasiegu", WhyNoBudgetTown = "nie stac w miescie (rezerwa napraw)", WhyNoGain = "2 wizyty bez postepu";
+        private static string _why;
 
         // latki (raz na proces)
         private static Harmony _h;
@@ -151,6 +154,8 @@ namespace Armoury
             {
                 int pcs = Math.Max(1, Math.Min(PiecesUnit, shortPieces));
                 need = Math.Max(MinNeed, pcs * Math.Max(0, AiGear.AvgPiecePriceYesterday));
+                int planNeed = NewLordKit.PlanNeed(mp);   // 159: nowa druzyna z planem - prog najwyzej wycena jej planu (mala druzyna nie potrzebuje MinNeed)
+                if (planNeed > 0) need = Math.Min(need, planNeed);
                 budget = town != null ? AiGear.BudgetPreview(mp, town) : AiGear.BudgetPreview(mp);
                 return AiGear.On && budget >= need;
             }
@@ -270,9 +275,12 @@ namespace Armoury
                 else
                 {
                     int b, need;
-                    if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); _trip.Remove(party.Id); }   // recenzja p9: seria wizyt bez postepu - jak "nie stac"
+                    _why = null;
+                    if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); _trip.Remove(party.Id); _why = WhyNoGain; }   // recenzja p9: seria wizyt bez postepu - jak "nie stac"
                     else if (CanAfford(party, info.Short, null, out b, out need)) town = TripTown(party, info, CampaignTime.Now.ToHours, s, blocked);
-                    else { _dPoor.Add(party.Id); Forget(party); }
+                    else { _dPoor.Add(party.Id); Forget(party); _why = WhyPoor; }
+                    // 159 (UnarmedMenSentHome): od kiedy i czemu niegotowa partia nie moze sie dozbroic (bez wyjazdu); wyjazd - koniec stania. Tylko zapis stanu
+                    NewLordKit.NoteStuck(party, town == null ? (_why ?? "?") : null);
                 }
                 // opcje bitwy -1 (kopia listy - SetBehaviorScore zmienia elementy)
                 var copy = new List<(AIBehaviorData, float)>(scores.Count);
@@ -355,16 +363,28 @@ namespace Armoury
                     }
                     Cool(party, t.Town, now, s);
                     _trip.Remove(party.Id);
-                    if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); return null; }   // recenzja p9: bez kolejnych wyjazdow
+                    if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); _why = WhyNoGain; return null; }   // recenzja p9: bez kolejnych wyjazdow
                 }
             }
-            var town = Nearest(party, now, s, blocked);
-            if (town == null) { _dNoTown.Add(party.Id); return null; }
+            // 159: nowa druzyna z planem jedzie do miasta, w ktorym wyceniono jej komplet (gdy dalej wazne, niezablokowane i bez wytchnienia); inaczej najblizsze
+            var town = NewLordKit.PlanTown(party);
+            if (town != null && (!Valid(party, town, now) || (blocked != null && blocked.Contains(town)))) town = null;
+            if (town == null) town = Nearest(party, now, s, blocked);
+            if (town == null) { _dNoTown.Add(party.Id); _why = WhyNoTown; return null; }
             int b, need;
-            if (!CanAfford(party, info.Short, town, out b, out need)) { _dNoBudgetTown.Add(party.Id); return null; }   // recenzja p9: rezerwa napraw z materialem tego miasta
+            if (!CanAfford(party, info.Short, town, out b, out need)) { _dNoBudgetTown.Add(party.Id); _why = WhyNoBudgetTown; return null; }   // recenzja p9: rezerwa napraw z materialem tego miasta
             _trip[party.Id] = new Trip { P = party, Town = town, StartH = now, R0 = info.R };
             _dTrips++;
             return town;
+        }
+
+        /// <summary>159 (NewLordKit.Plan): najblizsze wazne miasto w zasiegu wyjazdu po sprzet dla nowej druzyny - ta sama regula co wyjazd p9 (Nearest). failed - wyjatek
+        /// (wolajacy NIE traktuje go jak "brak miasta": plan bez zmian skladu). Nie rzuca.</summary>
+        internal static Settlement NearestTown(MobileParty party, out bool failed)
+        {
+            failed = false;
+            try { var s = Settings.Current; return s != null && party != null ? Nearest(party, CampaignTime.Now.ToHours, s, null) : null; }
+            catch (Exception e) { failed = true; Stumble("NearestTown", e); return null; }
         }
 
         /// <summary>Najblizsze droga ladowa wazne miasto w zasiegu AiArmsTripMaxDays dob marszu (EstimatedAverageLordPartySpeed x 24 h), po tej samej stronie Muru.</summary>
