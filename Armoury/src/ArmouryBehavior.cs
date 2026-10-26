@@ -2744,7 +2744,7 @@ namespace Armoury
             try { PregnancyYear.Daily(); } catch (Exception e) { Log.Error("PregnancyYear.Daily", e); } DayProfile.Lap("PregnancyYear.Daily");   // CR (zasada Jeffa 14.10): linia "Ciaza i plodnosc (CR): dzien N" - ciaze w toku, poczecia, porody, rzuty szansy (tylko log)
             try { ArmyCohesionYear.Daily(); } catch (Exception e) { Log.Error("ArmyCohesionYear.Daily", e); } DayProfile.Lap("ArmyCohesionYear.Daily");   // AC: linia "Spojnosc armii (AC): dzien N"
             try { ArmedStrength.Daily(); } catch (Exception e) { Log.Error("ArmedStrength.Daily", e); } DayProfile.Lap("ArmedStrength.Daily");   // p9: linia "Gotowosc do bitwy (p9): dzien N"
-            try { NewLordKit.Daily(); } catch (Exception e) { Log.Error("NewLordKit.Daily", e); } DayProfile.Lap("NewLordKit.Daily");   // 159: ludzie bez zbroi albo broni do domu (UnarmedMenSentHome), wygasle plany, linia "Nowe druzyny i sprzet (159): dzien N"
+            try { NewLordKit.Daily(); } catch (Exception e) { Log.Error("NewLordKit.Daily", e); } DayProfile.Lap("NewLordKit.Daily");   // 159: ludzie bez broni ponad UnarmedMenAllowedPercent do domu (UnarmedMenSentHome, 159b), wygasle plany, linia "Nowe druzyny i sprzet (159): dzien N"
             try { FiefGrants.Daily(); } catch (Exception e) { Log.Error("FiefGrants.Daily", e); } DayProfile.Lap("FiefGrants.Daily");   // PROJEKT-LENNA (14.10): linia "Nadania lenn (N) doba N" (gdy cos sie dzialo albo co 28 dob), pamiec szturmow i nadan 60 dob
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); } DayProfile.Lap("Orders.DailyTick");

@@ -3558,7 +3558,8 @@ def etap4_main(logp, start_arg, until=120, csp=None, bdp=None):
             "dezercja poza pula": max(0.0, L(d, r"dezercja (\d+) \(partie rodow", lud) - L(d, r"naplyw: dezercja (\d+)", wyr)),
             "zwolnieni 166 (do wsi i zniklo)": L(d, r"zwolnieni: do wsi (\d+) ludzi", bud) + L(d, r"zwolnieni: do wsi \d+ ludzi \([^)]*\), zniklo (\d+)", bud),
             # 159 (recenzja, uwaga 6): ludzie bez sprzetu do domu (do wsi i do karczmy E4/10 - razem); log bez 159 - 0
-            "159 do domu (ludzie bez zbroi albo broni)": L(d, r"\(2\) DO DOMU \(ludzie bez zbroi albo broni\): partii \d+, ludzi (\d+)", n159),
+            # 159b (regula Jeffa 10%): etykieta "(ludzie bez broni ponad X% partii)"; stary log - "(ludzie bez zbroi albo broni)"
+            "159 do domu (ludzie bez broni ponad %)": L(d, r"\(2\) DO DOMU \(ludzie bez (?:zbroi albo broni|broni ponad [\d.]+% partii)\): partii \d+, ludzi (\d+)", n159),
             "partie rozwiazane i usuniete (sklad, jency)": L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi (\d+)", par) + L(d, r"rozwiazane \d+ \(przy rozwiazaniu zdrowi \d+, ranni (\d+)", par)
                                                           + L(d, r"ranni \d+, jency (\d+) - znikaja", par) + L(d, r"usuniete bez zniszczenia \d+ \(ostatni stan (\d+)", par),
             "jency bez odbiorcy (gra) i skasowani przez ROT": L(d, r"bez odbiorcy \(gra usuwa[^)]*\) (\d+)", jen) + L(d, r"jency Innych skasowani przez ROT (\d+)", inn),

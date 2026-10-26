@@ -694,8 +694,10 @@ namespace Armoury
         /// (AiBuyRules.OverCap przy wyborze, cap w ShelfBuy.Take dla kolejnych sztuk partii) - W CIENIU, dopoki klucz ma 0.
         /// </summary>
         private static int BuyLoop(Settlement market, MobileParty buyer, Dictionary<int, int> need, Dictionary<int, List<CharacterObject>> lifters, int budget, int maxPieces,
-                                   ref int pieces, List<string> bought, Deliver deliver, int who)
+                                   ref int pieces, List<string> bought, Deliver deliver, int who, bool quiet = false)
         {
+            // 159b: quiet - pierwszy przebieg wizyty z planem (pierwsza bron); koszyk bez zakupu i tak wraca w drugim przebiegu - liczniki koszyka bez zakupu
+            // (rezerwa kramu, E8/Z, cel oszczedzania m96) tylko raz, w drugim
             int spent = 0;
             _lastBudgetStop = false;
             var shelf = market.ItemRoster;
@@ -746,6 +748,7 @@ namespace Armoury
                         }
                         if (bestI < 0)
                         {
+                            if (quiet) break;
                             if (resHit) Measure174b.NoteHeld(who, 1);
                             if (!zBudget) AiBuyRules.NoteUnbought(Math.Min(deficit, maxPieces - pieces), zFine, zDress, zCap);   // E8/Z: brak zostal, a na polce lezala sztuka nie dla AI (tylko licznik)
                             else SavingsByNeed.NoteWant(zPoor, true);   // m96: brak zostal, bo nie bylo ich stac - cel oszczedzania (tylko suma wizyty, nie rzuca)
@@ -1009,11 +1012,13 @@ namespace Armoury
                 // ponad rezerwe (przydzial sprzetu 166 i nadwyzka ponad rezerwe wojny), sakiewka ludzi i - przy braku - pozyczka Banku do limitu drabiny (zloto Banku ->
                 // glowa rodu -> wodz partii; NewLordKit.VisitBudget); limit sztuk wizyty = sztuki planu na tej polce. Ta sama droga zakupu (BuyLoop -> here -> kasa miasta)
                 bool kitVisit = false;
+                Dictionary<int, int> kitFirst = null; Dictionary<int, List<CharacterObject>> kitFirstLift = null;   // 159b: pierwsza bron dla ludzi bez broni
                 if (!garrison && lordPays && NewLordKit.Active(mp))
                 {
                     int kitPcs;
-                    int kb = NewLordKit.VisitBudget(mp, st, lord, s, budget, purse, out kitPcs);
+                    int kb = NewLordKit.VisitBudget(mp, st, lord, s, budget, purse, out kitPcs, out kitFirst, out kitFirstLift);
                     if (kb >= 0) { kitVisit = true; budget = Math.Max(budget, kb); if (kitPcs > maxPieces) maxPieces = kitPcs; }
+                    else { kitFirst = null; kitFirstLift = null; }
                 }
                 if (budget <= 0) return;
                 SavingsByNeed.Saw(castleCart && !orderDay);   // m96: przeglad brakow w tej wizycie; zamek bez zamowienia w miescie - wezszy (sama polka zamku)
@@ -1071,11 +1076,30 @@ namespace Armoury
                     return true;
                 };
                 AiBuyRules.NewVisit();   // E8/Z (251): licznik "w ilu wizytach" (tylko log)
+                // 159b (regula Jeffa 26.10 "max 10% bez broni"): wizyta z planem - NAJPIERW jedna bron na czlowieka bez broni (NewLordKit.FirstWeapons), przed siodlami
+                // i reszta brakow (Order: korpus pierwszy - budzet planu "najpierw bron" poszedlby na zbroje). Ta sama droga zakupu (BuyLoop -> here), ten sam budzet
+                // i limit sztuk wizyty; kupione schodza z brakow (need), reszta jak dotad. Zwykla wizyta - bez zmian
+                int firstSpent = 0;
+                if (kitVisit && kitFirst != null && kitFirst.Count > 0)
+                {
+                    var first0 = new Dictionary<int, int>(kitFirst);
+                    int pc0 = pieces;
+                    long tf = Cost174.Begin(Cost174.SBuyLoop);
+                    firstSpent = BuyLoop(st, mp, kitFirst, kitFirstLift, budget, maxPieces, ref pieces, bought, here, who, true);
+                    Cost174.End(Cost174.SBuyLoop, tf);
+                    foreach (var kv in first0)
+                    {
+                        int rest; kitFirst.TryGetValue(kv.Key, out rest);
+                        int got = Math.Max(0, kv.Value - rest), d;
+                        if (got > 0 && need.TryGetValue(kv.Key, out d)) need[kv.Key] = Math.Max(0, d - got);
+                    }
+                    NewLordKit.NoteFirst(mp, pieces - pc0, firstSpent);
+                }
                 // E8/H (271): siodlo dla jezdzcow bez pary (partie lordow, nie zalogi) - PRZED brakami: najtansza sztuka partii, a bez niej kon stoi.
                 // Ta sama droga co braki (ShelfBuy.Take -> here -> AddToArmory), z tego samego budzetu i limitu sztuk wizyty
-                int sadSpent = !garrison ? BuySaddles(st, mp, budget, maxPieces, ref pieces, bought, here) : 0;
+                int sadSpent = !garrison ? BuySaddles(st, mp, budget - firstSpent, maxPieces, ref pieces, bought, here) : 0;
                 long tl = Cost174.Begin(Cost174.SBuyLoop);
-                int spent = sadSpent + BuyLoop(st, mp, need, lifters, budget - sadSpent, maxPieces, ref pieces, bought, here, who);
+                int spent = firstSpent + sadSpent + BuyLoop(st, mp, need, lifters, budget - firstSpent - sadSpent, maxPieces, ref pieces, bought, here, who);
                 Cost174.End(Cost174.SBuyLoop, tl);
                 if (bardNeed > 0)
                     foreach (var kv in need) if (kv.Value > 0 && kv.Key / 10 == (int)ItemObject.ItemTypeEnum.HorseHarness) _dBardShort += kv.Value;   // E6/R3: brak uprzezy po zakupach (tylko licznik)

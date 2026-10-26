@@ -834,6 +834,25 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>159b (NewLordKit - "bez broni" liczone jak bitwa, regula Jeffa 26.10 10%): czy podloga broni (Best) moglaby dac temu czlowiekowi te sztuke
+        /// z puli zbrojowni - te same wykluczenia (Melee: tylko bron biala, bez BarredInBattle i legend; GiantGear) i te same przejscia (1 uzywalna dozwolonej
+        /// kultury, 2 przy GearFitFloorForeign uzywalna obcej, 3 przy GearFitFloorOverSkill ponad umiejetnosc - obca tylko przy GearFitFloorForeign). Bez warunku
+        /// siodla (na mapie nie wiadomo, kto dostanie konia z puli). Klucza GearFitWeaponFloor nie sprawdza (wolajacy). Tylko odczyt, nie rzuca.</summary>
+        internal static bool FloorTakes(CharacterObject co, ItemObject it)
+        {
+            if (co == null || it == null || co.IsHero || !IsMelee(it.ItemType)) return false;
+            try
+            {
+                if (QuartermasterLaw.BarredInBattle(it) || LegendaryLaw.IsLegend(it)) return false;
+                if (GiantGear.Is(it) && !GiantGear.MayWear(co)) return false;
+                bool meets = ItemReq.Meets(co, it);
+                if (meets && CultureOk(co, it)) return true;               // przejscie 1
+                if (meets && FloorForeignOn) return true;                  // przejscie 2
+                return FloorOverSkillOn && (FloorForeignOn || CultureOk(co, it));   // przejscie 3 (ostatnia deska)
+            }
+            catch (Exception e) { Stumble("FloorTakes", e); return false; }
+        }
+
         private static void Keep(Equipment eq, int slot)
         {
             lock (_lock) { int m; _floorKept.TryGetValue(eq, out m); _floorKept[eq] = m | (1 << slot); }
