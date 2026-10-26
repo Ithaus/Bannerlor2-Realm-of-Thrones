@@ -46,6 +46,17 @@ namespace Armoury
     /// - Przy wystawieniu: LOSOWO jedna z puli (tunika i buty osobno) sposrod tych, ktore czlowiek udzwignie (ItemReq.Meets - Atletyka; kobieta - bez
     ///   NotUsableByFemale). Pula pusta albo nic w Atletyce: (c) neutralne z flaga, losowo; (d) dowolne z flaga, najtansza - oba w granicy i w handlu;
     ///   zadna - slot pusty (licznik linii bitwy).
+    ///
+    /// m160 BARWY ZIEMI (Jeff 26.10, po bitwie: "strasznie maja spotkate te koszule, to ludzie z pola ze wsi powinni miec kolory ziemi szare, brazowe
+    /// a nie czerwone" i "trudno beda mniej zroznicowani ale nie dawaj kolorow szlachetnych w sredniowieczu chlop nie chodzil w czerwonej czy innej
+    /// zlotej koszuli"). Dwie przyczyny czerwieni (CHANGELOG 160): (1) sztuki z flaga UseTeamColor (prawie wszystkie tuniki chlopskie gry: sackcloth_tunic,
+    /// long_woolen_tunic, cloth_tunic, northern_tunic...) gra barwi na Team.Color / Color2 strony (Mission.SpawnTroop: ClothingColor1(agentTeam.Color)) -
+    /// Lannisterowie = karmazyn i zloto; (2) ubrania ROT bez tej flagi sa farbowane w teksturze (andal_clothes2 czerwona, 3 zielona z czerwonym pasem, 8 zolta,
+    /// fm_clothes1-5/7/8 zielone, niebieskie, sliwkowe, rhoynar_clothes1-4 czerwone i ze zlota lamowka). Teraz TULOW tylko z tabeli barw ziemi (Tables -
+    /// kazda sztuka sprawdzona na teksturze rozproszenia z paczek gry), wedlug kultury (CultureTable; reszta - ogolna), przy wystawieniu losowo to, co
+    /// udzwignie, potem ogolna, potem najprostsza (wymog 1); nigdy zapasy (c)/(d) - tam kolorowe. Sztuka tabeli przechodzi to samo sito, granice i flage
+    /// Civilian co dotad, plus straz barwy (ColourOk). NOGI - jak dotad z puli kultury i zapasow, ale bez sztuk z barwami rodu i farbowanych (ColourOk:
+    /// UseTeamColor, slowo barwy albo stroju szlachty w id / nazwie, spis Dyed z tekstur - rhoynar_civ_boots z czerwonymi owijaczami).
     /// </summary>
     internal static class Civvies
     {
@@ -58,7 +69,9 @@ namespace Armoury
             internal readonly ItemObject[][] Items = { None, None };
             internal readonly int[] Rec = new int[2], Civ = new int[2], Max = new int[2], RecOut = new int[2];
             internal readonly List<string>[] Over = { new List<string>(), new List<string>() };   // sztuki rekrutow ponad granica ("id ochrona")
+            internal readonly int[] ColOut = new int[2];                                           // m160: odrzucone kolorowe / z barwami rodu (nogi)
             internal string Src;                                                                   // skad pula (do logu)
+            internal string Table;                                                                 // m160: tabela barw ziemi tulowia (do logu)
         }
 
         private static readonly Dictionary<string, Pool> _pool = new Dictionary<string, Pool>();   // klucz - id kultury
@@ -75,6 +88,53 @@ namespace Armoury
         private static int _cutFemale, _cutTier, _cutBarred, _cutArmour;
         private static readonly int[] _cutCap = new int[2];
 
+        // ------------------------------------------------------------ m160: barwy ziemi
+        // Tabela tulowia. Kazda sztuka sprawdzona na teksturze rozproszenia z paczek gry (material siatki z ItemObject mesh, slot 0; CHANGELOG 160 - plik:linia
+        // i srednia barwa ubrania): bez flagi UseTeamColor, barwa szara, brazowa albo niebielony len. Dluzsza lista = wiecej roznorodnosci, ale Jeff 26.10:
+        // "trudno beda mniej zroznicowani".
+        private const string TAndal = "andal", TFirstMen = "first men", TBandit = "bandits", TGeneric = "generic", TPlain = "plainest";
+        private static readonly Dictionary<string, string[]> Tables = new Dictionary<string, string[]>
+        {
+            // Westeros poludniowy: andal_clothes4 len niebielony (#645e55), andal_clothes5 szara (#413d3a), andal_clothes6 jasnoszara (#827f7c),
+            // nord_poor_civil "Old Linen Tunic" (#715e50); andal_clothes1/2/3/7/8 farbowane (turkus, czerwien, zielen z czerwonym pasem, zielen, zolc)
+            { TAndal, new[] { "andal_clothes4", "andal_clothes5", "andal_clothes6", "nord_poor_civil" } },
+            // Polnoc i Pierwsi Ludzie: fm_clothes6 brazowa dluga tunika (#382d20) - jedyna z fm_clothes1-8 bez farby
+            { TFirstMen, new[] { "fm_clothes6", "andal_clothes5", "nord_poor_civil" } },
+            // bandyci: tattered_rags szare lachmany (#57524b)
+            { TBandit, new[] { "tattered_rags", "nord_poor_civil", "fm_clothes6" } },
+            // reszta (Zelazne Wyspy, Dorne, Essos, kultury innych modow): wlasne ubrania Dorne / Essos w ROT farbowane albo z barwami rodu - len i szarosc
+            { TGeneric, new[] { "nord_poor_civil", "andal_clothes4", "andal_clothes5", "fm_clothes6" } },
+            // ostatni zapas (nic z tabeli w Atletyce albo sztuk brak w danych): najprostsze, wymog Atletyki 1
+            { TPlain, new[] { "fm_clothes6", "tattered_rags" } },
+        };
+        private static readonly Dictionary<string, string> CultureTable = new Dictionary<string, string>
+        {
+            // ROT: vlandia = Westerlands, battania = Polnoc, sturgia = Zelazne Wyspy (ogolna), aserai = Dorne (ogolna), empire = Braavos (ogolna)
+            { "vlandia", TAndal }, { "reach", TAndal }, { "river", TAndal }, { "vale", TAndal }, { "stormlands", TAndal }, { "crownlands", TAndal },
+            { "dragonstone", TAndal },
+            { "battania", TFirstMen }, { "skagosi", TFirstMen }, { "nightswatch", TFirstMen }, { "freefolk", TFirstMen }, { "wildlings", TFirstMen },
+            { "looters", TBandit }, { "sea_raiders", TBandit }, { "mountain_bandits", TBandit }, { "forest_bandits", TBandit }, { "desert_bandits", TBandit },
+            { "steppe_bandits", TBandit }, { "hilltribesmen", TBandit }, { "kingswood_outlaw", TBandit }, { "yiti_bandits", TBandit }, { "robber_knights", TBandit },
+        };
+        // Farbowane wedlug tekstur (nazwa tego nie mowi): tulow - straz i licznik (tulow i tak tylko z tabeli); nogi - rhoynar_civ_boots (czerwone owijacze, 65% pikseli)
+        private static readonly HashSet<string> Dyed = new HashSet<string>
+        {
+            "andal_clothes1", "andal_clothes2", "andal_clothes3", "andal_clothes7", "andal_clothes8",
+            "fm_clothes1", "fm_clothes2", "fm_clothes3", "fm_clothes4", "fm_clothes5", "fm_clothes7", "fm_clothes8",
+            "rhoynar_clothes1", "rhoynar_clothes2", "rhoynar_clothes3", "rhoynar_clothes4",
+            "rhoynar_civ_boots",
+        };
+        // slowa barwy albo stroju szlachty (cale slowa id albo nazwy): "Fine Town Boots", andal_noble_boots, "Red Northern Garb"...
+        private static readonly string[] DyeWords = { "red", "crimson", "scarlet", "gold", "golden", "yellow", "purple", "violet", "blue", "azure", "green",
+                                                      "royal", "noble", "lord", "lady", "king", "queen", "prince", "fine", "silk", "velvet", "embroidered",
+                                                      "brocade", "fancy", "rich", "merchant" };
+        private static readonly Dictionary<ItemObject, bool>[] _colour = { new Dictionary<ItemObject, bool>(), new Dictionary<ItemObject, bool>() };
+        private static readonly int[] _cutTeam = new int[2], _cutDyed = new int[2];       // odrzucone: z barwami rodu / kolorowe (kazda sztuka raz na slot)
+        private static readonly Dictionary<string, ItemObject[]> _tableRes = new Dictionary<string, ItemObject[]>();   // tabela -> sztuki po sitach
+        private static readonly List<string> _tableOut = new List<string>();               // sztuki tabeli odrzucone ("id przyczyna", kazda raz)
+        private static ItemObject[] _generic = None, _plainest = None;
+        private static readonly int[] _bLv = new int[3];   // bitwa: tunika z [0] tabeli kultury, [1] ogolnej, [2] najprostszej
+
         // agent -> ubranie [0] tulow, [1] nogi (null - slot bez ubrania); wpis z GarrisonKit.RegisterPostfix, czyszczony na koniec misji
         private static readonly Dictionary<Agent, ItemObject[]> _agents = new Dictionary<Agent, ItemObject[]>();
         private static int _bCut, _bWreck, _bStumbles;
@@ -89,14 +149,16 @@ namespace Armoury
             {
                 _neutral[s] = None; _any[s] = None; _cap[s] = 0; _capBy[s] = null; _cutCap[s] = 0; _judged[s].Clear();
                 _capV[s] = _capR[s] = 0; _capVBy[s] = _capRBy[s] = null;
+                _colour[s].Clear(); _cutTeam[s] = _cutDyed[s] = 0;   // m160
             }
             _built = false; _cutFemale = _cutTier = _cutBarred = _cutArmour = 0;
+            _tableRes.Clear(); _tableOut.Clear(); _generic = None; _plainest = None;   // m160
             ClearMission(); ClearCounters();
         }
 
         internal static void ClearMission() { _agents.Clear(); }
 
-        internal static void ClearCounters() { _bCut = _bWreck = _bStumbles = 0; }
+        internal static void ClearCounters() { _bCut = _bWreck = _bStumbles = 0; _bLv[0] = _bLv[1] = _bLv[2] = 0; }
 
         private static void Stumble(string where, Exception e) { if (++_bStumbles <= 3) Log.Error("Civvies." + where, e); }
 
@@ -169,6 +231,64 @@ namespace Armoury
             r = Fits(it, s);
             _judged[s][it] = r;
             return r;
+        }
+
+        /// <summary>m160: czy w tekscie (id albo nazwie) jest ktores ze slow - calymi slowami (litery a-z; "_" i cyfry dziela).</summary>
+        private static bool HasWord(string text, string[] words)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            var sb = new StringBuilder(16);
+            string t = text.ToLowerInvariant();
+            for (int i = 0; i <= t.Length; i++)
+            {
+                char ch = i < t.Length ? t[i] : ' ';
+                if (ch >= 'a' && ch <= 'z') { sb.Append(ch); continue; }
+                if (sb.Length == 0) continue;
+                string w = sb.ToString(); sb.Length = 0;
+                foreach (var x in words) if (x == w) return true;
+            }
+            return false;
+        }
+
+        /// <summary>m160: barwa ziemi? false - sztuka z barwami rodu (UseTeamColor: gra barwi ja na Team.Color / Color2 strony, w ROT np. karmazyn i zloto
+        /// Lannisterow) albo farbowana (spis Dyed z tekstur, slowo barwy / stroju szlachty w id albo nazwie). Osobno od sita Fits (granica ochrony liczy sie
+        /// jak dotad - barwa to nie ochrona). Liczy odrzucone, kazda sztuka raz na slot; tylko w czasie Build.</summary>
+        private static bool ColourOk(ItemObject it, int s)
+        {
+            if (it == null) return false;
+            bool r;
+            if (_colour[s].TryGetValue(it, out r)) return r;
+            if (it.IsUsingTeamColor) { _cutTeam[s]++; r = false; }
+            else if (Dyed.Contains(it.StringId ?? "") || HasWord(it.StringId, DyeWords) || HasWord(it.Name != null ? it.Name.ToString() : null, DyeWords))
+            { _cutDyed[s]++; r = false; }
+            else r = true;
+            _colour[s][it] = r;
+            return r;
+        }
+
+        /// <summary>m160: tabele barw ziemi -> sztuki gry. Sztuka musi istniec, byc tulowiem z flaga Civilian, przejsc sito Fits, granice ochrony (jak pula
+        /// dotad) i straz barwy; odrzucona idzie do logu z przyczyna (kazde id raz).</summary>
+        private static void ResolveTables()
+        {
+            var told = new HashSet<string>();
+            foreach (var kv in Tables)
+            {
+                var l = new List<ItemObject>();
+                foreach (var id in kv.Value)
+                {
+                    ItemObject it;
+                    try { it = MBObjectManager.Instance.GetObject<ItemObject>(id); } catch { it = null; }
+                    string why = it == null ? "brak w grze" : !TypeFits(it, 0) ? "nie tulow" : !it.IsCivilian ? "bez flagi Civilian"
+                                 : !Ok(it, 0) ? "sito (tier / unikat / kobiece / zbroja)" : Total(it) > _cap[0] ? "ponad granica " + Total(it) + " > " + _cap[0]
+                                 : !ColourOk(it, 0) ? (it.IsUsingTeamColor ? "z barwami rodu" : "kolorowa") : null;
+                    if (why != null) { if (told.Add(id)) _tableOut.Add(id + " " + why); continue; }
+                    if (!l.Contains(it)) l.Add(it);
+                }
+                _tableRes[kv.Key] = l.ToArray();
+            }
+            ItemObject[] g;
+            _generic = _tableRes.TryGetValue(TGeneric, out g) ? g : None;
+            _plainest = _tableRes.TryGetValue(TPlain, out g) ? g : None;
         }
 
         private static ItemObject[] Sorted(List<ItemObject> l, int s)
@@ -274,7 +394,10 @@ namespace Armoury
                     _cap[s] = byRecruit ? _capR[s] : _capV[s];
                     _capBy[s] = byRecruit ? _capRBy[s] : _capVBy[s];
                 }
-                // (3) pule kultur: rekruci tieru 1 (albo BasicTroop) razem z Villager i Townsman, w granicy
+                // (3a) m160: tulow - tabele barw ziemi (po granicy, przed pulami kultur)
+                ResolveTables();
+                // (3) pule kultur: nogi - rekruci tieru 1 (albo BasicTroop) razem z Villager i Townsman, w granicy, bez kolorowych (m160);
+                // tulow - tabela barw ziemi kultury (bez wpisu albo pusta - ogolna)
                 foreach (var cu in cultures)
                 {
                     try
@@ -310,13 +433,19 @@ namespace Armoury
                         var l = new[] { new List<ItemObject>(), new List<ItemObject>() };
                         if (rec != null) foreach (var man in rec) Gather(man, true, p, seen, l);
                         foreach (var man in civ) Gather(man, false, p, seen, l);
-                        for (int s = 0; s < 2; s++) p.Items[s] = l[s].ToArray();
+                        p.Items[1] = l[1].ToArray();
+                        string tn;
+                        ItemObject[] arr;
+                        if (!CultureTable.TryGetValue(cu.StringId, out tn)) tn = TGeneric;
+                        if (!_tableRes.TryGetValue(tn, out arr) || arr.Length == 0) { tn = TGeneric; arr = _generic; }
+                        p.Items[0] = arr; p.Table = tn;
                         _pool[cu.StringId] = p;
                         _order.Add(cu.StringId);
                     }
                     catch { bad++; }
                 }
-                // (4) zapasy: (c) neutralne i (d) dowolne - z flaga Civilian, w handlu, w granicy
+                // (4) zapasy nog: (c) neutralne i (d) dowolne - z flaga Civilian, w handlu, w granicy, bez kolorowych (m160). Tulow tu tylko liczony
+                // (odrzucone kolorowe / z barwami rodu wsrod ubran cywilnych w granicy - do logu): m160 - tulow wylacznie z tabeli barw ziemi
                 var neu = new[] { new List<ItemObject>(), new List<ItemObject>() };
                 var any = new[] { new List<ItemObject>(), new List<ItemObject>() };
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
@@ -327,6 +456,7 @@ namespace Armoury
                         int s = it.ItemType == ItemObject.ItemTypeEnum.BodyArmor ? 0 : it.ItemType == ItemObject.ItemTypeEnum.LegArmor ? 1 : -1;
                         if (s < 0 || !it.IsCivilian || it.NotMerchandise || !Ok(it, s)) continue;
                         if (Total(it) > _cap[s]) { _cutCap[s]++; continue; }
+                        if (!ColourOk(it, s) || s == 0) continue;   // m160
                         string c = it.Culture != null ? it.Culture.StringId ?? "" : "";
                         if (c.Length == 0 || c == "neutral_culture") neu[s].Add(it);
                         any[s].Add(it);
@@ -337,21 +467,23 @@ namespace Armoury
                 StartLines(bad);
             }
             catch (Exception e) { Log.Error("Civvies.Build", e); }
-            finally { for (int s = 0; s < 2; s++) _judged[s].Clear(); }
+            finally { for (int s = 0; s < 2; s++) { _judged[s].Clear(); _colour[s].Clear(); } }
         }
 
-        /// <summary>Tulow i nogi zestawow jednej postaci do puli kultury: kazda sztuka oceniana raz na kulture; ponad granica - do listy "ponad"
-        /// (tylko rekruci, do logu), bez flagi Civilian albo przez sito - odpada.</summary>
+        /// <summary>Nogi zestawow jednej postaci do puli kultury: kazda sztuka oceniana raz na kulture; ponad granica - do listy "ponad"
+        /// (tylko rekruci, do logu), bez flagi Civilian albo przez sito - odpada; kolorowa / z barwami rodu - odpada (m160, licznik ColOut).
+        /// m160: tulow juz nie stad - z tabeli barw ziemi (ResolveTables).</summary>
         private static void Gather(CharacterObject man, bool recruit, Pool p, HashSet<ItemObject>[] seen, List<ItemObject>[] l)
         {
             foreach (var eq in Sets(man))
-                for (int s = 0; s < 2; s++)
+                for (int s = 1; s < 2; s++)
                 {
                     var it = eq[Slots[s]].Item;
                     if (it == null || !seen[s].Add(it)) continue;
                     int pr = Total(it);
                     if (pr > _cap[s]) { if (recruit && TypeFits(it, s)) p.Over[s].Add(it.StringId + " " + pr); continue; }
                     if (!it.IsCivilian || !Ok(it, s)) { if (recruit) p.RecOut[s]++; continue; }
+                    if (!ColourOk(it, s)) { p.ColOut[s]++; continue; }   // m160
                     l[s].Add(it);
                     if (recruit) p.Rec[s]++; else p.Civ[s]++;
                     if (pr > p.Max[s]) p.Max[s] = pr;
@@ -359,7 +491,8 @@ namespace Armoury
         }
 
         /// <summary>Ubranie dla czlowieka i slotu (Body albo Leg): pula kultury (losowo) -> (c) neutralne (losowo) -> (d) dowolne (najtansza); zawsze to,
-        /// co udzwignie. skill - byly sztuki, ale zadna w jego Atletyce (slot zostaje pusty).</summary>
+        /// co udzwignie. skill - byly sztuki, ale zadna w jego Atletyce (slot zostaje pusty).
+        /// m160: tulow tylko z tabel barw ziemi - tabela kultury (losowo) -> ogolna (losowo) -> najprostsza (pierwsza, ktora udzwignie); nigdy (c)/(d).</summary>
         internal static ItemObject Pick(CharacterObject co, EquipmentIndex slot, out bool skill)
         {
             skill = false;
@@ -369,6 +502,13 @@ namespace Armoury
             string c = co.Culture != null ? co.Culture.StringId ?? "" : "";
             Pool p;
             ItemObject r;
+            if (s == 0)
+            {
+                if (_pool.TryGetValue(c, out p) && (r = RandomFit(co, p.Items[0], ref skill)) != null) { _bLv[0]++; return r; }
+                if ((r = RandomFit(co, _generic, ref skill)) != null) { _bLv[1]++; return r; }
+                if ((r = First(co, _plainest, ref skill)) != null) { _bLv[2]++; return r; }
+                return null;
+            }
             if (_pool.TryGetValue(c, out p) && (r = RandomFit(co, p.Items[s], ref skill)) != null) return r;   // pula kultury
             if ((r = RandomFit(co, _neutral[s], ref skill)) != null) return r;                                   // (c)
             return First(co, _any[s], ref skill);                                                            // (d)
@@ -411,28 +551,61 @@ namespace Armoury
                 if (!_pool.TryGetValue(c, out p)) continue;
                 if (p.Items[0].Length == 0 && p.Items[1].Length == 0) empty.Add(c); else withPool++;
             }
-            var sb = new StringBuilder(1000);
-            sb.Append("Ubranie cywilne (m117 v3): raz na kampanie; pula kultury = sztuki z flaga Civilian, ktore na tulowiu / nogach nosza jej jednostki tieru 1")
-              .Append(" (bez nich Culture.BasicTroop) i jej Villager / Townsman, w granicy; przy wystawieniu losowo z puli to, co czlowiek udzwignie (Atletyka)")
+            var sb = new StringBuilder(1600);
+            sb.Append("Ubranie cywilne (m117 v4, m160 barwy ziemi): raz na kampanie; TULOW tylko z tabeli barw ziemi wedlug kultury (sztuki sprawdzone na teksturach")
+              .Append(" - szare, brazowe, niebielony len; bez UseTeamColor), przy wystawieniu losowo to, co czlowiek udzwignie (Atletyka), potem tabela ogolna, potem")
+              .Append(" najprostsza; tabele po sitach: ").Append(TablesText())
+              .Append("; odrzucone z tabel: ").Append(_tableOut.Count > 0 ? string.Join(", ", _tableOut.ToArray()) : "zadna")
+              .Append("; NOGI - pula kultury = sztuki z flaga Civilian, ktore nosza jej jednostki tieru 1 (bez nich Culture.BasicTroop) i jej Villager / Townsman,")
+              .Append(" w granicy, bez kolorowych i z barwami rodu; przy wystawieniu losowo z puli to, co czlowiek udzwignie")
               .Append("; ochrona sztuki = glowa+tulow+rece+nogi; granica = mniejsza z (A) najmocniejsze ubranie chlopow (Villager) kultur glownych, ktorego nie nosi")
               .Append(" zaden zolnierz, i (B) najmocniejsza sztuka rekrutow tieru 1 kultur glownych: tulow ").Append(_cap[0])
               .Append(" (").Append(_capBy[0] ?? "BRAK - tulow bez ubrania").Append("; A ").Append(_capV[0]).Append(' ').Append(_capVBy[0] ?? "-")
               .Append(", B ").Append(_capR[0]).Append(' ').Append(_capRBy[0] ?? "-").Append("), nogi ").Append(_cap[1]).Append(" (").Append(_capBy[1] ?? "BRAK - nogi bez ubrania")
               .Append("; A ").Append(_capV[1]).Append(' ').Append(_capVBy[1] ?? "-").Append(", B ").Append(_capR[1]).Append(' ').Append(_capRBy[1] ?? "-")
-              .Append("); zapasy w granicy: (c) neutralne tulow ").Append(_neutral[0].Length).Append(" / nogi ").Append(_neutral[1].Length)
-              .Append(" (losowo), (d) dowolne tulow ").Append(_any[0].Length).Append(" / nogi ").Append(_any[1].Length).Append(" (najtansza)")
+              .Append("); zapasy nog w granicy: (c) neutralne ").Append(_neutral[1].Length).Append(" (losowo), (d) dowolne ").Append(_any[1].Length).Append(" (najtansza)")
               .Append("; odrzucone sztuki: ponad granica (z flaga, w handlu) tulow ").Append(_cutCap[0]).Append(" / nogi ").Append(_cutCap[1])
               .Append(", ponad tier 3 ").Append(_cutTier).Append(", unikaty/olbrzymy/umarli ").Append(_cutBarred).Append(", kobiece ").Append(_cutFemale)
               .Append(", przeszywanice/zbroje z nazwy ").Append(_cutArmour)
+              .Append("; odrzucone kolorowe / z barwami rodu (m160; ubrania cywilne w granicy, pule nog, tabele): tulow ").Append(_cutDyed[0]).Append(" / ").Append(_cutTeam[0])
+              .Append(", nogi ").Append(_cutDyed[1]).Append(" / ").Append(_cutTeam[1])
               .Append(bad > 0 ? ", bledy odczytu " + bad : "").Append("; kultur z pula ").Append(withPool);
-            if (empty.Count > 0) sb.Append(", bez puli (zapas c/d) ").Append(empty.Count).Append(": ").Append(string.Join(", ", empty.ToArray()));
+            if (empty.Count > 0) sb.Append(", bez puli (nogi: zapas c/d) ").Append(empty.Count).Append(": ").Append(string.Join(", ", empty.ToArray()));
             Log.Info(sb.Append('.').ToString());
             foreach (var c in _order)
             {
                 Pool p;
                 if (!_pool.TryGetValue(c, out p) || (p.Items[0].Length == 0 && p.Items[1].Length == 0)) continue;
-                Log.Info("Ubranie cywilne (m117 v3) | " + c + ": tulow " + SlotText(p, 0) + " | nogi " + SlotText(p, 1) + " | skad: " + p.Src);
+                Log.Info("Ubranie cywilne (m117 v4) | " + c + ": tulow " + BodyText(p) + " | nogi " + SlotText(p, 1) + " | skad nogi: " + p.Src);
             }
+        }
+
+        /// <summary>m160: tabele barw ziemi po sitach do logu ("andal: andal_clothes4, ...; ...").</summary>
+        private static string TablesText()
+        {
+            var sb = new StringBuilder(400);
+            foreach (var kv in Tables)
+            {
+                ItemObject[] l;
+                if (!_tableRes.TryGetValue(kv.Key, out l)) l = None;
+                if (sb.Length > 0) sb.Append("; ");
+                sb.Append(kv.Key).Append(": ");
+                if (l.Length == 0) { sb.Append("PUSTA"); continue; }
+                for (int i = 0; i < l.Length; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].StringId);
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>m160: tulow kultury - nazwa tabeli i wybrane sztuki (ochrona sztuki / w slocie).</summary>
+        private static string BodyText(Pool p)
+        {
+            var l = p.Items[0];
+            var sb = new StringBuilder(160);
+            sb.Append(l.Length).Append(" (tabela ").Append(p.Table ?? "-").Append(')');
+            if (l.Length == 0) return sb.Append(" - ogolna / najprostsza").ToString();
+            sb.Append(": ");
+            for (int i = 0; i < l.Length; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].StringId).Append(' ').Append(Total(l[i])).Append('/').Append(Prot(l[i], 0));
+            return sb.ToString();
         }
 
         private static string SlotText(Pool p, int s)
@@ -447,11 +620,12 @@ namespace Armoury
                 if (p.Over[s].Count > 3) sb.Append(", ...");
             }
             if (p.RecOut[s] > 0) sb.Append("; rekrutow bez flagi Civilian / przez sito ").Append(p.RecOut[s]);
+            if (p.ColOut[s] > 0) sb.Append("; odrzucone kolorowe / z barwami rodu ").Append(p.ColOut[s]);   // m160
             sb.Append(')');
             if (l.Length == 0) return sb.Append(" - zapas c/d").ToString();
-            sb.Append(" max ").Append(p.Max[s]).Append(", np. (ochrona sztuki / w slocie) ");
-            for (int i = 0; i < l.Length && i < 5; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].StringId).Append(' ').Append(Total(l[i])).Append('/').Append(Prot(l[i], s));
-            if (l.Length > 5) sb.Append(", ... (+").Append(l.Length - 5).Append(')');
+            sb.Append(" max ").Append(p.Max[s]).Append(", (ochrona sztuki / w slocie) ");
+            for (int i = 0; i < l.Length && i < 6; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].StringId).Append(' ').Append(Total(l[i])).Append('/').Append(Prot(l[i], s));
+            if (l.Length > 6) sb.Append(", ... (+").Append(l.Length - 6).Append(')');
             return sb.ToString();
         }
 
@@ -487,10 +661,13 @@ namespace Armoury
             catch (Exception e) { Stumble("ArmorsPostfix", e); }
         }
 
-        /// <summary>Dopisek do linii bitwy GarrisonKit: ile razy lista zbroi DTE byla bez ubrania, ile wrakow zatrzymal zapas, potkniecia.</summary>
+        /// <summary>Dopisek do linii bitwy GarrisonKit: ile razy lista zbroi DTE byla bez ubrania, ile wrakow zatrzymal zapas, potkniecia.
+        /// m160: skad tunika (tabela kultury / ogolna / najprostsza) i odrzucone przy budowie list kolorowe / z barwami rodu.</summary>
         internal static string BattleNote()
         {
-            return "z listy zbroi DTE (rozbite ciosem) wyjete " + _bCut + ", wrak z ubrania zatrzymany (zapas) " + _bWreck + ", potkniecia listy " + _bStumbles;
+            return "tunika z tabeli barw ziemi (m160): kultury " + _bLv[0] + ", ogolnej " + _bLv[1] + ", najprostszej " + _bLv[2]
+                   + "; odrzucone kolorowe / z barwami rodu (budowa list) tulow " + _cutDyed[0] + " / " + _cutTeam[0] + ", nogi " + _cutDyed[1] + " / " + _cutTeam[1]
+                   + "; z listy zbroi DTE (rozbite ciosem) wyjete " + _bCut + ", wrak z ubrania zatrzymany (zapas) " + _bWreck + ", potkniecia listy " + _bStumbles;
         }
     }
 }

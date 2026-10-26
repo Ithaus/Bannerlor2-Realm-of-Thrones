@@ -988,9 +988,11 @@ namespace Armoury
             if (!Civvies.ArmorsHooked) return "; ubranie cywilne (m117) BRAK latki listy zbroi DTE - nikt nie ubrany";
             var ex = new List<string>();
             foreach (var kv in _bCivSample) ex.Add(kv.Key + " " + (kv.Value[0] ?? "-") + "/" + (kv.Value[1] ?? "-"));
+            var tun = new List<string>();   // m160: tuniki tej bitwy (id, najwyzej 8)
+            foreach (var it in _bCivKinds[0]) { if (tun.Count >= 8) { tun.Add("..."); break; } tun.Add(it.StringId); }
             return "; ubranie cywilne (m117, wlasne, poza zbrojownia) - tunika: gracz " + _bCivBody[0] + ", lordowie " + _bCivBody[1] + ", zalogi " + _bCivBody[2]
                    + "; buty: gracz " + _bCivLeg[0] + ", lordowie " + _bCivLeg[1] + ", zalogi " + _bCivLeg[2]
-                   + "; roznych sztuk: tulow " + _bCivKinds[0].Count + ", nogi " + _bCivKinds[1].Count
+                   + "; roznych sztuk: tulow " + _bCivKinds[0].Count + (tun.Count > 0 ? " (" + string.Join(", ", tun.ToArray()) + ")" : "") + ", nogi " + _bCivKinds[1].Count
                    + "; bez ubrania - wzorzec bez sztuki w slocie (projekt jednostki) " + _bCivTpl + ", brak sztuki dla kultury " + _bCivNone + ", ponad Atletyke " + _bCivSkill + ", umarli pominieci (ludzi) " + _bCivDead
                    + "; " + Civvies.BattleNote() + ", potkniecia ubierania " + _bCivStumbles
                    + (ex.Count > 0 ? "; np. " + string.Join(", ", ex.ToArray()) : "");
@@ -1279,7 +1281,7 @@ namespace Armoury
 
         /// <summary>m117: tulow i nogi pustego po strazach przydzialu "tylko to, co ma" (druzyna gracza, lord AI, zaloga - jedna regula), gdy wzorzec
         /// (Assignment.ReferenceEquipment - ten sam, ktory widza Missing, FillPrefix, BattleNotice i DTE) ma w tym slocie sztuke: ubranie cywilne
-        /// kultury czlowieka, losowo z puli (Civvies.Pick - m117 v2). NAJPIERW oznaczenie tymczasowej (DTE: spawn jej nie zdejmuje, zwrot i lup jej nie oddaja),
+        /// kultury czlowieka, losowo z puli (Civvies.Pick - m117 v2; m160: tulow z tabeli barw ziemi, nogi bez kolorowych). NAJPIERW oznaczenie tymczasowej (DTE: spawn jej nie zdejmuje, zwrot i lup jej nie oddaja),
         /// potem slot - wyjatek miedzy nimi zostawia slot pusty (wpis tymczasowy pustego slotu nic nie robi), nigdy nietymczasowej sztuki z niczego.
         /// Potkniecie liczone na slot czlowieka, bez wylacznika. Zwraca liczbe ubranych slotow.</summary>
         private static int CivilDress(SpawnInfo si, Equipment eq, Equipment rf)
