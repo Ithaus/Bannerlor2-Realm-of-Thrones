@@ -422,7 +422,7 @@ namespace Armoury
         private static float Clamp(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
         /// <summary>Odleglosc od szyku do najblizszego szyku wroga (miedzy medianami minus polowy glebokosci); MaxValue = brak wroga.
-        /// 157: takze ShieldsUp.RiderCharge (szarza szyku jezdzca do zwarcia) - ta sama miara zwarcia (ContactGap). Glowny watek.</summary>
+        /// 157: internal (recenzja 157: ShieldsUp.RiderCharge juz bez progu zwarcia - FormCharging). Glowny watek.</summary>
         internal static float EnemyGap(Formation f)
         {
             var eq = f.CachedClosestEnemyFormation;

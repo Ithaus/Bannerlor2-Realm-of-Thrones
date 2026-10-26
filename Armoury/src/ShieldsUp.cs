@@ -637,7 +637,12 @@ namespace Armoury
                 {
                     try { RiderHit(m, at, v); } catch (Exception e) { CavStumble("ShieldsUp.JezdziecTrafiony", e); }
                 }
-                if (!v.IsHuman) return;
+                if (!v.IsHuman)
+                {
+                    // recenzja 157 (P2): strzala w konia - znacznik S1 i zdarzenie S4 dla jezdzca (tylko przy regule konnych; histogram i CloseRanks - tylko ludzie)
+                    if (act && _riders && v.IsMount) HorseHit(v, at, ev.I);
+                    return;
+                }
                 if (at != null && at.Team != null && v.Team != null && !v.Team.IsEnemyOf(at.Team)) return;   // swoj w swojego - nie ostrzal
                 if (_hist)
                 {
@@ -654,6 +659,16 @@ namespace Armoury
             if (!act || at == null || at.Team == null) return;
             _misses++;
             MarkNear(m, ev.P.AsVec2, MissRadius, at.Team, ev.I);   // S3 (K6): pudlo - punkt zderzenia
+        }
+
+        /// <summary>Recenzja 157: kon trafiony pociskiem - jego jezdziec jak trafiony (S1, S4); swoj w swojego - nic (jak u ludzi).</summary>
+        private static void HorseHit(Agent horse, Agent at, int missile)
+        {
+            var r = horse.RiderAgent;
+            if (r == null || !r.IsHuman || !r.IsActive()) return;
+            if (at != null && at.Team != null && r.Team != null && !r.Team.IsEnemyOf(at.Team)) return;
+            TryMark(r, _now + _hold);   // S1
+            FEvent(r.Formation, missile);
         }
 
         /// <summary>Wrogowie druzyny strzelca w promieniu od punktu: znacznik (S3), przy indeksie pocisku jedno zdarzenie S4 na szyk.</summary>
@@ -1026,9 +1041,11 @@ namespace Armoury
             int kind = MainKind(a, out mainSlot);
             bool off = OffShield(a);
             bool horse = !rider && PikeHorse(e);   // K11 dotyczy pieszego pikiniera (zaparcie piki) - nie jezdzca
-            // 157 P2: szarza szyku (od sygnalu / rozkazu do zwarcia) albo kontra na strzelca P3 - jezdziec z dwureczna zostaje przy lancy
-            bool charge = rider && RiderCharge(a);
-            if (rider && !expired && !charge && kind == KTwo) e.RiderTwo = true;
+            // 157 P2: szarza szyku (rozkaz albo zachowanie szarzy - FormCharging) - jezdziec z dwureczna zostaje przy lancy;
+            // recenzja 157: kontra na strzelca P3 osobno - bron i preferencja zamrozone (zwolnienie preferencji przy wejsciu w kontre zabieralo tarcze z reki)
+            bool counter = rider && HorsePursuit.Countering(a);
+            bool charge = rider && !counter && RiderCharge(a);
+            if (rider && !expired && !charge && !counter && kind == KTwo) e.RiderTwo = true;
 
             // preferencja (K3/K4/K11): flaga tylko przy zmianie, od razu UpdateAgentProperties; w 8 m od wroga zadnej zmiany broni (D2)
             // tylko z OSOBNA jednoreczna - u czlowieka z sama wlocznia o kilku uzyciach Polearm 1 nie ma czego wybrac (rzuty, R6)
@@ -1036,7 +1053,7 @@ namespace Armoury
             // prog jezdzca 4 m (Near8 liczone z RiderNoSwapNear)
             bool want = rider ? (!expired && !charge && e.RiderTwo && e.Pole2 && e.OneSlot >= 0 && e.OnePure && e.Evaluated)
                               : (!expired && e.Pole2 && e.OneSlot >= 0 && e.OnePure && !horse && e.Evaluated);
-            if (want != e.Favor)
+            if (want != e.Favor && !counter)
             {
                 bool allowed;
                 if (!e.Near8) allowed = true;
@@ -1115,7 +1132,7 @@ namespace Armoury
             if (e.Pending || e.Stubborn || e.NoOne || e.Tries >= MaxTries || _now < e.NextTry || !e.Evaluated) return;
             if (off && kind == KOne) return;
             if (horse) { SkipMen[WHorse].Add(idx); return; }
-            if (charge && kind != KOne) { RiderInCharge.Add(idx); return; }   // 157: dwureczna w szarzy szyku / kontrze - bez zmiany broni
+            if ((charge || counter) && kind != KOne) { RiderInCharge.Add(idx); return; }   // 157: dwureczna w szarzy szyku / kontrze - bez zmiany broni
             if (e.Near8) { if (rider) RiderNear.Add(idx); else SkipMen[WNear].Add(idx); return; }
             if (cmds >= CmdPerPass || _commands >= CmdPerBattle) { _limitHits++; return; }
             bool both = false, onlyShield = false;

@@ -12,8 +12,8 @@ namespace Armoury
     /// 157 P3 (26.10, Jeff 25.10 ok. 22:45: kawalerzysta "nie zaatakowal mnie tylko stal jak debil i dostawal strzaly"; plan 23:55 bez sprzeciwu: "1-2 jezdzcow
     /// moze na 15-20 s porzucic oslone skrzydla, zeby dopasc lucznika w 60 m, ktory do nich strzela"). Klucz RidersRunDownShooters.
     /// Wejscie TYLKO po prawdziwym trafieniu (ShieldsUp.RiderHit z kolejki trafien 140, glowny watek): jezdziec AI z bronia do walki wrecz (nie konny lucznik
-    /// z amunicja - IsRangedCached) w szyku konnicy AI (QuerySystem.IsCavalryFormation, nie szyk gracza - PlayerForm), szyk NIE szarzuje (rozkaz inny niz
-    /// Charge / ChargeToTarget - oslona skrzydla RBM trzyma go rozkazem Move), strzelec w 60 m od jezdzca i nie w 15 m od nietknietego szyku pieszego swojej
+    /// z amunicja - IsRangedCached) w szyku konnicy AI (QuerySystem.IsCavalryFormation, nie szyk gracza - PlayerForm), szyk NIE szarzuje (ShieldsUp.FormCharging:
+    /// rozkaz Charge / ChargeToTarget albo zachowanie szarzy - szarza RBM w kazdym stanie, szarza gry, oslona skrzydla szarzuje / wraca; trzymajaca oslona = Move), strzelec w 60 m od jezdzca i nie w 15 m od nietknietego szyku pieszego swojej
     /// strony (szyk od 8 ludzi, nie konny - jak IntactMin 148), najwyzej 2 jezdzcow szyku naraz, kon nie zajechany (HorseAiRestBelow 136), jezdziec nie dalej
     /// niz 150 m od miejsca szyku. Wykluczeni: gracz i ludzie pod jego sterowaniem, bohaterowie (149 HeroCaution ustawia ich pozycja skryptowa), chorazowie
     /// (RBM sam steruje ich celem), smoki ROT, umarli, jezdzcy w poscigu 148, panika / odwrot 143, jezdziec z pozycja skryptowa kogos innego albo przy
@@ -24,7 +24,7 @@ namespace Armoury
     /// przejal szyk / klucz wylaczony; potem cel automatyczny, pozycja skryptowa zdjeta (nie u stojacego w odwrocie 143 - ta jest jego) i przerwa 30 s.
     /// Zgodnosc: 136/128 - MarchToContact.PostSpeed pomija cap marszu / odpoczynku u kontrujacego (CounterAnyThread, tablica wedlug Agent.Index jak _riding);
     /// 148 - kontrujacy nie wchodzi do poscigu (RidersPass), gonacy nie kontruje; 143 - BeforeWithdraw zdejmuje kontre przed pierwszym ruchem odwrotu;
-    /// 140 P2 - kontrujacy z dwureczna nie zmienia broni (ShieldsUp.RiderCharge). Klucz NIE: ta sama ocena na sucho (licznik "na sucho"), bez sterowania.
+    /// 140 P2 - kontrujacy nie zmienia broni ani preferencji (ShieldsUp.One - recenzja 157). Klucz NIE: ta sama ocena na sucho (licznik "na sucho"), bez sterowania.
     /// Segment "kontra na strzelca (157)" w linii "poscig (148)". Wyjatek na jezdzcu = licznik; po 5 kontra konczy sie (bez globalnego wylacznika).
     /// </summary>
     internal static partial class HorsePursuit
@@ -90,7 +90,7 @@ namespace Armoury
         /// <summary>MarchToContact.PostSpeed: cap marszu pominiety u jezdzca w kontrze (licznik segmentu).</summary>
         internal static void NoteCounterCapSkip() { Interlocked.Increment(ref _cCapSkip); }
 
-        /// <summary>ShieldsUp.RiderCharge (glowny watek): jezdziec teraz w kontrze na strzelca.</summary>
+        /// <summary>ShieldsUp.One (glowny watek): jezdziec teraz w kontrze na strzelca (bron i preferencja zamrozone).</summary>
         internal static bool Countering(Agent a)
         {
             return a != null && Counters.ContainsKey(a);
@@ -150,7 +150,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ wejscie (ShieldsUp.RiderHit, glowny watek)
 
-        /// <summary>Jezdziec AI z szyku konnicy AI trafiony pociskiem (on albo kon) przez strzelca s; charging = szyk ma rozkaz szarzy.</summary>
+        /// <summary>Jezdziec AI z szyku konnicy AI trafiony pociskiem (on albo kon) przez strzelca s; charging = szyk w szarzy (ShieldsUp.FormCharging).</summary>
         internal static void OnRiderShot(Mission m, Agent a, Agent s, bool horse, bool charging)
         {
             if (!_live || a == null || m == null) return;
@@ -324,8 +324,7 @@ namespace Armoury
             float df = p.Distance(Home(c.F));
             if (df > _cMaxFar) _cMaxFar = df;
             if (df > CounterFromForm) return KFarForm;
-            var oe = c.F.GetReadonlyMovementOrderReference().OrderEnum;
-            if (oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget) return KFormCharge;
+            if (ShieldsUp.FormCharging(c.F)) return KFormCharge;   // recenzja 157: ta sama miara co wejscie (rozkaz albo zachowanie szarzy)
             if (pass && FootNear(m, s)) return KFoot;
             return -1;
         }

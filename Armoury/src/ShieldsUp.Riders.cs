@@ -22,7 +22,7 @@ namespace Armoury
     /// (MarchToContact.CapKind: marsz 128 / odpoczynek koni 136 / szarza marszem 128) i odleglosci do najblizszego czlowieka wroga
     /// (QuerySystem.ClosestEnemyAgent); trafienia jezdzcow pociskiem bez szarzy szyku (z kolejki 140, glowny watek). Linia "konnica AI pod ostrzalem (157)"
     /// raz na bitwe polowa (ShieldsUp.End). Do linii HIT (VictimState) - id przedmiotu w rece.
-    /// P2 (klucz RidersShieldsUpUnderFire, przy AiShieldsUpUnderFire): liczniki konnych do linii 140 i RiderCharge (szarza szyku albo kontra P3).
+    /// P2 (klucz RidersShieldsUpUnderFire, przy AiShieldsUpUnderFire): liczniki konnych do linii 140 i RiderCharge (szarza szyku - FormCharging).
     /// Wyjatki: RoutHold.Stumble miejsce "tarcze" (ShieldsUp.*) i wlasny licznik linii - bez wylacznika.
     /// </summary>
     internal static partial class ShieldsUp
@@ -105,18 +105,25 @@ namespace Armoury
 
         // ------------------------------------------------------------ P2: szarza jezdzca
 
-        /// <summary>P2 (glowny watek): jezdziec w szarzy szyku albo w kontrze na strzelca (P3) - dwureczna zostaje, preferencja jednorecznej zwolniona.
-        /// Szarza = rozkaz Charge / ChargeToTarget i swieza szarza (MarchToContact.ChargeFresh: od sygnalu BattleCries do zwarcia, najwyzej 20 s) albo
-        /// szyk wroga jeszcze dalej niz 25 m (MarchToContact.EnemyGap - klus szarzy marszem 128 przed sygnalem i bitwa bez klucza marszu).</summary>
+        /// <summary>P2 (glowny watek): jezdziec w szarzy szyku - dwureczna zostaje, preferencja jednorecznej zwolniona. Kontra P3 osobno (One: bron i
+        /// preferencja zamrozone). Recenzja 157: szarza = FormCharging (bez progu 25 m - zmiana broni ok. 2 s przed uderzeniem i w kazdym cyklu RBM).</summary>
         internal static bool RiderCharge(Agent a)
         {
-            if (HorsePursuit.Countering(a)) return true;
-            var f = a.Formation;
+            return FormCharging(a.Formation);
+        }
+
+        /// <summary>Recenzja 157 (glowny watek): szyk w szarzy - rozkaz Charge / ChargeToTarget albo (szyk AI) zachowanie szarzy: RBMBehaviorCavalryCharge
+        /// w kazdym stanie (przejazd i przegrupowanie ida rozkazem Move - RBMAI CalculateCurrentOrder: ChargingPast / Reforming = MovementOrderMove),
+        /// BehaviorCharge, oslona skrzydla szarzuje / wraca (Returning tez Move - BehaviorProtectFlank 1.4.8). Jedna miara dla P1 (trafienia bez szarzy),
+        /// P2 (RiderCharge) i P3 (wejscie i koniec kontry). Szyk pod rozkazami gracza - tylko rozkaz.</summary>
+        internal static bool FormCharging(Formation f)
+        {
             if (f == null) return false;
             var oe = f.GetReadonlyMovementOrderReference().OrderEnum;
-            if (oe != MovementOrder.MovementOrderEnum.Charge && oe != MovementOrder.MovementOrderEnum.ChargeToTarget) return false;
-            if (MarchToContact.ChargeFresh(f)) return true;
-            return MarchToContact.EnemyGap(f) > MarchToContact.ContactGap;
+            if (oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget) return true;
+            if (!f.IsAIControlled) return false;
+            int b = Behave(f, false);
+            return b == BPfCharge || b == BPfBack || b == BCharge || b == BRbm;
         }
 
         /// <summary>Segment " | konni (157) ..." linii 140 (wolane z Write).</summary>
@@ -151,7 +158,7 @@ namespace Armoury
             if (q == null || !q.IsCavalryFormation || HorsePursuit.PlayerForm(f)) return;
             bool horse = v.IsMount;
             var oe = f.GetReadonlyMovementOrderReference().OrderEnum;
-            bool charging = oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget;
+            bool charging = FormCharging(f);   // recenzja 157: takze przejazd / przegrupowanie RBM i powrot oslony skrzydla (rozkaz Move)
             if (_cavLog)
             {
                 var st = GetCf(f);
@@ -355,7 +362,7 @@ namespace Armoury
             sb.Append(" | najblizszy czlowiek wroga od szyku: sr. ").Append(_cfDN > 0 ? (_cfDSum / _cfDN).ToString("0", Inv) : "-").Append(" m, min ").Append(Fm(_cfDMin))
               .Append(" m (<15 m ").Append(CfD[0]).Append(", 15-40 m ").Append(CfD[1]).Append(", 40-80 m ").Append(CfD[2]).Append(", 80+ m ").Append(CfD[3])
               .Append(", brak ").Append(CfD[4]).Append(')')
-              .Append(" | trafienia jezdzcow AI pociskiem bez szarzy szyku ").Append(_cfHitNoCharge).Append(" (jezdzcow ").Append(CfRidersNoCharge.Count)
+              .Append(" | trafienia jezdzcow AI pociskiem bez szarzy szyku (szarza = rozkaz Charge / ChargeToTarget albo szarza RBM w kazdym stanie, szarza gry, oslona skrzydla szarzuje / wraca) ").Append(_cfHitNoCharge).Append(" (jezdzcow ").Append(CfRidersNoCharge.Count)
               .Append(", w konia ").Append(_cfHorseNoCharge).Append("), w szarzy szyku ").Append(_cfHitCharge)
               .Append(" | szyki:");
             int shown = 0;
