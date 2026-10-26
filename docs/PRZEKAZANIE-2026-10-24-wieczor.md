@@ -1,5 +1,14 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 00:35 CET - 222 i 223 zbudowane po recenzji; recheck w toku; 204 dokonczenie w toku
+- 222 (zb\n222): 96a90b9b + d245fde1 + recenzja 47b9f8b8 (md5 8f06d41c). Tywin (juz jeniec) przejety przy starcie sesji - komunikat w 1. godzinie po wgraniu.
+  Probe: flaga CrashScribe\armoury-odbicie.flag, sprawdz_logi --grupa odbicie222.
+- 223 (zb\n223): e0e600a8 + 6ddfb3f5 + recenzja 11b6dffc (md5 2663767f). Tywin: 95 ludzi, 90% sprzetu, sam zaatakowal (sila gry z tieru), nocny marsz -25%.
+  sprawdz_logi --grupa e223. Jeff "znani lordowie a juz glowy rodu" -> 223b: znani lordowie bez ziemi (Jaime itd.) w workflow wf_b6fa88ea-c4c.
+- Uwagi recenzji w plikach: scratchpad 1e1c276a...\scratchpad\recenzje\uwagi-222.json, uwagi-223.json; 204: scratchpad\n204\uwagi-204-recenzja.json.
+- Plan: po wf_0055b61c-6fc (204) i wf_b6fa88ea-c4c (222/223) scalic 204, 222, 223 do n161 (rozwiaz_oba.py), build, autotest 127a (bitwaN z CrashScribe-at-n204
+  i "harasser": 3, probyN 6 dob, flaga armoury-odbicie.flag), sprawdz_logi p202 p203 m204jazda odbicie222 e223 m109muz m165mapa -> po zamknieciu gry WGRANIE 127.
+
 ## DOPISEK 26.10 ok. 23:40 CET - 202, 203 gotowe i scalone do n161 (f3413043, NIE wgrane); 204 dokonczenie; 222/223 w toku
 - n161 HEAD f3413043 = 126 + 202 (426fe0ba) + 203 (8f48dbcb); build kod 0, Armoury 06c8ab82 (do testu; NIE wgrane - w grze dalej 126).
   203 usunal z repo stare Bitwa\lufs17-26\bit_*.ogg, nowe zestawy Bitwa\lufs21.4/24.4/27.4/30.4 (40 ogg) - przy wgraniu dodac te katalogi (stare moga zostac).
