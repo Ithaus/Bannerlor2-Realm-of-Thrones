@@ -70602,6 +70602,74 @@ def m204jazda_synth():
             open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(L)) + "\n")
             rep = Report()
             m204jazda_rows(rep, m204jazda_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def m204jazda_main(logp):
+    """m204jazda (26.10, paczka 204): J204-S, J204-S2, J204-0..J204-8 - opis w --help. Strumieniowo."""
+    rep = Report()
+    s1 = m204jazda_selftest()
+    rep.add("J204-S: self-test wyrazen (linie kontrolne jak w kodzie C#: HorsePursuit.Hunt.cs, HorsePursuit.HuntTest.cs)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = m204jazda_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("J204-S2: test syntetyczny (dobry, zly, bez nekajacego, bez bitwy)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("J204-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = m204jazda_collect(logp)
+    print(f"plik: {logp} | bitew polowych {D['field']}, linii bitwy 204 {len(D['lines'])}, epizodow (linie startu) {len(D['starts'])}, nekajacych {len(D['tstarts'])}, "
+          f"ERROR {len(D['err'])}")
+    m204jazda_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_p202_main_prev = main
+
+
+def main(argv):
+    # paczka 202: grupa p202 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "p202":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return p202_main(rest[0] if rest else None)
+    return _p202_main_prev(argv)
+_p203_main_prev = main
+
+
+def main(argv):
+    # paczka 203: grupa p203 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "p203":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return p203_main(rest[0] if rest else None)
+    return _p203_main_prev(argv)
+
+_m204jazda_main_prev = main
+
+
+def main(argv):
+    # paczka 204: grupa m204jazda - opakowanie main jak ai139 / m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "m204jazda":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return m204jazda_main(rest[0] if rest else None)
+    return _m204jazda_main_prev(argv)
+
 # ============================================================ odbicie222 (26.10, paczka 222 noc/222-odbicie-lorda; Armoury/src/RescueHunt.cs, RescueHunt.Test.cs, Ransom178.ConsiderPrefix)
 # Jeff 26.10 ok. 22:15 (Tywin w niewoli): rod jenca dowiaduje sie po jezdzcu i kruku, potem tropi gracza. Stale z prefiksem ODB_, wiersze ODB-.
 ODB_TAG = "Odbicie (222): "
@@ -70840,25 +70908,6 @@ def odbicie222_synth():
     return "; ".join(diff) if diff else None
 
 
-def m204jazda_main(logp):
-    """m204jazda (26.10, paczka 204): J204-S, J204-S2, J204-0..J204-8 - opis w --help. Strumieniowo."""
-    rep = Report()
-    s1 = m204jazda_selftest()
-    rep.add("J204-S: self-test wyrazen (linie kontrolne jak w kodzie C#: HorsePursuit.Hunt.cs, HorsePursuit.HuntTest.cs)", s1 or "OK",
-            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
-    try:
-        s2 = m204jazda_synth()
-    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
-        s2 = f"wyjatek {type(e).__name__}: {e}"
-    rep.add("J204-S2: test syntetyczny (dobry, zly, bez nekajacego, bez bitwy)", s2 or "OK", "OK", s2 is None)
-    if not logp or not os.path.isfile(logp):
-        rep.add("J204-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
-        rep.show()
-        return 0
-    D = m204jazda_collect(logp)
-    print(f"plik: {logp} | bitew polowych {D['field']}, linii bitwy 204 {len(D['lines'])}, epizodow (linie startu) {len(D['starts'])}, nekajacych {len(D['tstarts'])}, "
-          f"ERROR {len(D['err'])}")
-    m204jazda_rows(rep, D)
 def odbicie222_main(logp):
     """odbicie222 (26.10, paczka 222): ODB-S, ODB-S2, ODB-0..ODB-7 - opis w --help. Strumieniowo."""
     rep = Report()
@@ -70879,44 +70928,6 @@ def odbicie222_main(logp):
     rep.show()
     return 0
 
-
-_p202_main_prev = main
-
-
-def main(argv):
-    # paczka 202: grupa p202 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
-    a = argv[1:]
-    if "--grupa" in a:
-        i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "p202":
-            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return p202_main(rest[0] if rest else None)
-    return _p202_main_prev(argv)
-_p203_main_prev = main
-
-
-def main(argv):
-    # paczka 203: grupa p203 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
-    a = argv[1:]
-    if "--grupa" in a:
-        i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "p203":
-            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return p203_main(rest[0] if rest else None)
-    return _p203_main_prev(argv)
-
-_m204jazda_main_prev = main
-
-
-def main(argv):
-    # paczka 204: grupa m204jazda - opakowanie main jak ai139 / m165mapa (grupy na koncu pliku, bez zmian w srodku main)
-    a = argv[1:]
-    if "--grupa" in a:
-        i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "m204jazda":
-            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return m204jazda_main(rest[0] if rest else None)
-    return _m204jazda_main_prev(argv)
 
 _odbicie222_main_prev = main
 
