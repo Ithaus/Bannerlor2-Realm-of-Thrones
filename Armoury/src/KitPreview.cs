@@ -57,6 +57,9 @@ namespace Armoury
             internal CharacterObject Troop; internal string Id, Name;
             internal int Men, Wounded, Missing, Armour, Weapons, Extra, Replaced, Riders, NoHorse, NoSaddle, Bare, MoraleMen, Stripped;
             internal float MoraleSum;
+            // 202: zestaw najlepiej obsluzonego czlowieka typu PO strazach wystawienia (najmniej pustych slotow i pieszo; remis - pierwszy w kolejnosci DTE)
+            // - model 3D ekranu druzyny (PartyScreenKit); Rode / Harnessed - ilu wyjedzie na koniu / z uprzeza (linia koni z zapasu ludzi)
+            internal Equipment Look; internal int LookScore, Rode, Harnessed;
             internal readonly int[] Short = new int[KitGaps.Cats], Need = new int[KitGaps.Cats], Bag = new int[KitGaps.Cats];
             internal readonly int[] StripWhy = new int[6];   // kody DragonUnmount.WouldStrip > 0
             internal readonly Dictionary<int, Dictionary<ItemObject, int>> Lost = new Dictionary<int, Dictionary<ItemObject, int>>();   // rodzaj -> sztuki wzorca bez pary
@@ -102,7 +105,11 @@ namespace Armoury
 
         /// <summary>Nowa kampania i kazde wczytanie (ArmyReview.Reset). Recenzja 133: takze pamieci klas broni (_wc, _same) - trzymaly ItemObject starej kampanii
         /// do nastepnego Compute (LeftOf i Compute tworza je od nowa).</summary>
-        internal static void Reset() { _last = null; ClearMission(); _stumbles = 0; _stumbleAt.Clear(); _wc = null; _same = null; }
+        internal static void Reset()
+        {
+            _last = null; ClearMission(); _stumbles = 0; _stumbleAt.Clear(); _wc = null; _same = null;
+            _screen = null; _screenRoster = null; _prevMount = null; _prevArmH = _prevArmS = -1; PartyScreenKit.Reset();   // 202
+        }
 
         /// <summary>Nowa bitwa i koniec misji (GarrisonKit.ClearBattle).</summary>
         internal static void ClearMission() { _mission = null; _missionNote = null; _mMen = _mDiffMen = _mDiffSlots = 0; }
@@ -224,7 +231,74 @@ namespace Armoury
             catch (Exception e) { Stumble("Compute", e); r = new Result { Why = "The hand-out could not be worked out now - the log has the details." }; }
             r.Key = r.Ok ? key : failKey;
             _last = r;
+            if (r.Ok) NoteMounts(r);   // 202: konie z zapasu ludzi (tylko log, po kazdym nowym podgladzie okna / meldunku kwatermistrza)
             return r;
+        }
+
+        // ---------------------------------------------------------------- 202: ekran druzyny i konie z zapasu ludzi
+        private const string P202 = "Konie z zapasu ludzi (202): ";
+        private static Result _screen;                    // podglad ekranu druzyny (sklad z ekranu) - osobno od _last, okno armii i bitwa bez zmian
+        private static TroopRoster _screenRoster;
+        private static Dictionary<string, int[]> _prevMount;   // typ -> {na koniu, z uprzeza} z poprzedniego podgladu skladu partii
+        private static int _prevArmH = -1, _prevArmS = -1;
+
+        /// <summary>202 (Jeff 26.10 ok. 22:15 "B"): podglad nastepnej bitwy dla skladu z ekranu druzyny (prawa strona, z wcielonymi jencami przed zatwierdzeniem).
+        /// Ten sam Compute co okno armii (te same straze i liczby), bez przyczyn i sakw; pamiec po wersji zbrojowni, skladzie ekranu (obiekt i VersionNo), dniu
+        /// i przelacznikach - liczony tylko, gdy cos z tego sie zmienilo (klik w kolejny wiersz - z pamieci). fresh - liczony teraz. Nigdy null.</summary>
+        internal static Result ForScreen(TroopRoster roster, out bool fresh)
+        {
+            fresh = false;
+            var mp = MobileParty.MainParty;
+            string why = Gate(mp);
+            if (why != null) return new Result { Why = why };
+            if (roster == null) return new Result { Why = "no roster" };
+            var arm = QuartermasterLaw.DteArmory();
+            string key = (arm != null ? arm.VersionNo : -1) + "|" + roster.VersionNo + "|" + (int)CampaignTime.Now.ToDays
+                         + "|" + (SaddleLaw.On ? 1 : 0) + (GearFit.CultureOn ? 1 : 0) + (GearFit.FloorOn ? 1 : 0) + (GearFit.FloorOverSkillOn ? 1 : 0) + (GearFit.FloorForeignOn ? 1 : 0);
+            if (_screen != null && ReferenceEquals(_screenRoster, roster) && _screen.Key == key) return _screen;
+            Result r;
+            try { r = Compute(mp, null, true, false, roster); r.Ok = r.Why == null; }
+            catch (Exception e) { Stumble("ForScreen", e); r = new Result { Why = "The hand-out could not be worked out now - the log has the details." }; }
+            r.Key = key;
+            _screen = r; _screenRoster = roster; fresh = true;
+            return r;
+        }
+
+        /// <summary>202: typ druzyny gracza zaczal jezdzic na koniu (albo z uprzeza) z zapasu ludzi w zbrojowni - jezdzcow typu przybylo, a koni (uprzezy)
+        /// w zbrojowni nie przybylo. Porownanie z poprzednim udanym podgladem skladu partii (okno armii, meldunek kwatermistrza rano / po bitwie / przy zbrojowni);
+        /// pierwszy podglad po wczytaniu - tylko punkt odniesienia. Tylko log, liczby z gotowego podgladu (bez dodatkowego przebiegu).</summary>
+        private static void NoteMounts(Result r)
+        {
+            try
+            {
+                int h = 0, s = 0;
+                foreach (var kv in r.A)
+                {
+                    if (RidingMount(kv.Key)) h += kv.Value;
+                    else if (kv.Key != null && kv.Key.ItemType == ItemObject.ItemTypeEnum.HorseHarness) s += kv.Value;
+                }
+                var now = new Dictionary<string, int[]>(StringComparer.Ordinal);
+                foreach (var t in r.Rows) now[t.Id] = new[] { t.Rode, t.Harnessed };
+                if (_prevMount != null)
+                {
+                    var parts = new List<string>();
+                    foreach (var t in r.Rows)
+                    {
+                        int[] p; _prevMount.TryGetValue(t.Id, out p);
+                        int pr = p != null ? p[0] : 0, ps = p != null ? p[1] : 0;
+                        bool hUp = t.Rode > pr && h <= _prevArmH, sUp = t.Harnessed > ps && s <= _prevArmS;
+                        if (!hUp && !sUp) continue;
+                        parts.Add(t.Id + " (" + t.Name + ") - " + (hUp ? "na koniu " + pr + " -> " + t.Rode : "")
+                                  + (hUp && sUp ? ", " : "") + (sUp ? "z uprzeza " + ps + " -> " + t.Harnessed : "") + " z " + t.Men + " zdrowych");
+                    }
+                    if (parts.Count > 0)
+                        Log.Info(P202 + "typ druzyny gracza bierze konia / uprzaz z zapasu ludzi w zbrojowni (jezdzcow przybylo, koni w zbrojowni nie) - dzien "
+                                 + (int)CampaignTime.Now.ToDays + " | konie w zbrojowni " + _prevArmH + " -> " + h + ", uprzeze " + _prevArmS + " -> " + s
+                                 + " | typy: " + string.Join("; ", parts.ToArray()) + ".");
+                }
+                _prevMount = now; _prevArmH = h; _prevArmS = s;
+            }
+            catch (Exception e) { Stumble("NoteMounts", e); }
         }
 
         private static string Gate(MobileParty mp)
@@ -260,7 +334,7 @@ namespace Armoury
 
         /// <summary>Jeden przebieg rozdzielacza DTE w trybie podgladu. mirror == null - mapa (sklad partii, wzorce BattleEquipments, sortowanie jak w bitwie);
         /// mirror - przydzialy bitwy tej misji (K15: te same wzorce i ta sama kolejnosc). Wyjatek wychodzi do wolajacego (licznik potkniec tam).</summary>
-        private static Result Compute(MobileParty mp, IList mirror, bool canMount, bool bag)
+        private static Result Compute(MobileParty mp, IList mirror, bool canMount, bool bag, TroopRoster screen = null)
         {
             var res = new Result { InMission = mirror != null };
             var sw = Stopwatch.StartNew();
@@ -289,7 +363,8 @@ namespace Armoury
             var made = new List<object>();
             if (mirror == null)
             {
-                var r = mp.MemberRoster;
+                // 202: ekran druzyny - sklad z ekranu (MemberRosters[prawa]: z wcielonymi jencami, przed zatwierdzeniem); DTE w trybie podgladu nie czyta skladu partii
+                var r = screen ?? mp.MemberRoster;
                 for (int i = 0; i < r.Count; i++)
                 {
                     var el = r.GetElementCopyAtIndex(i);
@@ -405,12 +480,16 @@ namespace Armoury
                 if (canMount && mh != null && !Temp(a, 10, mh))
                 {
                     Add(res.Rode, mh, 1);
+                    row.Rode++;   // 202
                     var mhr = e2[EquipmentIndex.HorseHarness].Item;
-                    if (mhr != null && !Temp(a, 11, mhr)) Add(res.Saddles, mhr, 1);
+                    if (mhr != null && !Temp(a, 11, mhr)) { Add(res.Saddles, mhr, 1); row.Harnessed++; }
                 }
                 var g = KitGaps.Compare(rf, e2, true);
                 int miss = GarrisonKit.Missing(a, e2);
                 if (g.Missing != miss) res.Bad++;
+                // 202: model ekranu druzyny - e2 to wlasna kopia tego czlowieka (Clone wyzej), tylko referencja, bez dodatkowej pracy
+                int score = Math.Max(0, miss) + (foot || noSad ? 1 : 0);
+                if (row.Look == null || score < row.LookScore) { row.Look = e2; row.LookScore = score; }
                 row.Men++; row.Missing += Math.Max(0, miss);
                 row.Armour += g.Armour; row.Weapons += g.Weapons; row.Extra += g.Extra; row.Replaced += g.Replaced;
                 for (int c = 0; c < KitGaps.Cats; c++) { row.Short[c] += g.Short[c]; row.Need[c] += g.Need[c]; }
@@ -449,7 +528,7 @@ namespace Armoury
             }
             res.Rows.RemoveAll(t => t.Men <= 0 && t.Wounded <= 0);
             res.Rows.Sort(ByGaps);
-            if (mirror == null)
+            if (mirror == null && screen == null)   // 202: ekran druzyny bez przyczyn i sakw (model potrzebuje tylko zestawow)
             {
                 foreach (var t in res.Rows) Explain(res, t);
                 if (bag) Baggage(res, mp);

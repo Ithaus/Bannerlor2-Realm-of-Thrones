@@ -314,6 +314,7 @@ namespace Armoury
                 try { ValyrianBlades.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ValyrianBlades.ApplyAll", e); } // 177-2: przetop VS zablokowany, karawana DTE i nagroda turniejowa bez legend z niczego
                 MountMeshGuard.ApplyAll(_harmony);   // uprzaz z cudzej rodziny = natywny crash w AddMountMesh
                 CaptiveRags.ApplyAll(_harmony);
+                PartyScreenKit.ApplyAll(_harmony);   // 202: druzyna gracza w DUZYM podgladzie w sprzecie nastepnej bitwy (podglad 133c), klucz Party Screen Real Kit
                 SightRange.ApplyAll(_harmony);
                 try { NightScout.ApplyAll(_harmony); } catch (Exception e) { Log.Error("NightScout.ApplyAll", e); }   // R3-10a: +5 XP Zwiadu za godzine nocnego marszu (postfiks OnTraverseTerrain), linia startu
                 BkArmourList.ApplyAll(_harmony);

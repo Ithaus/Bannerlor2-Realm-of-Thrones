@@ -1729,6 +1729,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("PeopleBook.OnMapEventEnded", PeopleBook.OnMapEventEnded));
             CampaignEvents.OnPartyRemovedEvent.AddNonSerializedListener(this, PeopleBook.OnPartyRemoved);
             CampaignEvents.OnMainPartyPrisonerRecruitedEvent.AddNonSerializedListener(this, PeopleBook.OnMainPartyPrisonerRecruited);
+            CampaignEvents.OnMainPartyPrisonerRecruitedEvent.AddNonSerializedListener(this, PartyScreenKit.OnPrisonerRecruited);   // 202: linia "Werbunek jencow gracza (202)" (tylko log)
             CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, WatchLaw.OnRaidCompleted);   // E4/9 (H1): rabunki z napastnikiem frakcji Strazy - tylko licznik
             CampaignEvents.OnPrisonerReleasedEvent.AddNonSerializedListener(this, PrisonerLaw.OnReleased);   // I1: gracz wypuscil jencow - w krainie bez niewoli do domu / na Mur (I1b: w krainie z niewola do domu)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("OutlawLaw.Hourly", delegate { try { OutlawLaw.Hourly(); } catch { } }));

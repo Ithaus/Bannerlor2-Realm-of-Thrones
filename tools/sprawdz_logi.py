@@ -1148,6 +1148,11 @@ Uzycie (Python 3, tylko odczyt):
                     nasza mapa w trybie menu, na warstwie 7-8 i resztki odcinkow poza motywem (tylko trzymane na 0), nowe odcinki psai, zatrzymania motywu gry, 'misja bez bitwy' / 'trzymanie misji (po 20 s)'
                     (165b recenzja; koniec okna przy trzymaniu 'koniec wydarzenia - muzyka gry trzymana na 0 (...)' w m109muz jak koniec okna). MAP-3 przyjmuje
                     stop mapy 'muzyka gry trzymana na 0 do startu misji' (165b: bez FadeUp do startu misji) i linie 'misja bez bitwy (...) - muzyka gry wraca'.
+--grupa p202      : (26.10, paczka 202 noc/202-ekran-druzyny-sprzet - Jeff 26.10 "B": prawdziwy sprzet na ekranie druzyny; Armoury/src/PartyScreenKit.cs,
+                    KitPreview.cs ForScreen / NoteMounts, klucz PartyScreenRealKit) python -I tools/sprawdz_logi.py --grupa p202 <Armoury-*.log> (strumieniowo).
+                    P202-S self-test wyrazen; P202-0 linia startu; P202-1 linie paczki bez dopasowania 0; P202-2 ERROR 0; P202-3 podglad ekranu <= 50 ms;
+                    P202-4 model: kon tylko, gdy typ jedzie, uprzaz tylko z koniem, puste <= wzorzec; P202-5/6 INFO (wzorzec zostal, werbunek jencow);
+                    P202-7 linie koni z zapasu ludzi spojne (jezdzcow typu przybylo, koni / uprzezy w zbrojowni nie).
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -69816,6 +69821,160 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return m165mapa_main(rest[0] if rest else None)
     return _m165mapa_main_prev(argv)
+
+
+# ------------------------------------------------------------ p202 (26.10, paczka 202 noc/202-ekran-druzyny-sprzet - Jeff 26.10 ok. 22:15 "B": "Prawdziwy sprzet na
+# ekranie druzyny: Twoi ludzie pokazani w tym, co naprawde dostana do bitwy, zamiast wzorca"; Armoury/src/PartyScreenKit.cs, KitPreview.cs ForScreen / NoteMounts;
+# klucz PartyScreenRealKit). Linie: 'Ekran druzyny (202): ', 'Werbunek jencow gracza (202): ', 'Konie z zapasu ludzi (202): '.
+P202_RX = {
+    "start": re.compile(r"^Ekran druzyny \(202\): model 3D szeregowego czlonka druzyny gracza w sprzecie nastepnej bitwy \(podglad 133c\), klucz Party Screen Real Kit (TAK|NIE);"),
+    "calc": re.compile(r"^Ekran druzyny \(202\): podglad nastepnej bitwy dla skladu z ekranu - typow (\d+), zdrowych (\d+) \(rannych (\d+)\), pustych slotow (\d+), pieszo (\d+), "
+                       r"zdjete przy wystawieniu (\d+); czas (\d+) ms"),
+    "model": re.compile(r"^Ekran druzyny \(202\): (\S+) - model w sprzecie nastepnej bitwy \(najlepiej obsluzony z (\d+) zdrowych\): puste sloty (\d+) z (\d+) pierwszego wzorca, "
+                        r"kon (TAK|NIE) \(wzorzec (TAK|NIE)\), uprzaz (TAK|NIE) \(wzorzec (TAK|NIE)\); typ: puste (\d+), na koniu (\d+), pieszo (\d+)\.$"),
+    "keep": re.compile(r"^Ekran druzyny \(202\): (\S+) - wzorzec zostaje: (.*)\.$"),
+    "skip": re.compile(r"^Ekran druzyny \(202\): wzorzec zostaje - podglad niedostepny: \"(.*)\"\.$"),
+    "recruit": re.compile(r"^Werbunek jencow gracza \(202\): (\S+) x(\d+), dzien (\d+)\.$"),
+    "horse": re.compile(r"^Konie z zapasu ludzi \(202\): typ druzyny gracza bierze konia / uprzaz z zapasu ludzi w zbrojowni \(jezdzcow przybylo, koni w zbrojowni nie\) - dzien (\d+) "
+                        r"\| konie w zbrojowni (-?\d+) -> (\d+), uprzeze (-?\d+) -> (\d+) \| typy: (.*)\.$"),
+    "htype": re.compile(r"(\S+) \(.*?\) - (?:na koniu (\d+) -> (\d+))?(?:, )?(?:z uprzeza (\d+) -> (\d+))? z (\d+) zdrowych"),
+    "err": re.compile(r"^ERROR in (PartyScreenKit|KitPreview\.(ForScreen|NoteMounts))"),
+}
+P202_TEST = {
+    "start": "Ekran druzyny (202): model 3D szeregowego czlonka druzyny gracza w sprzecie nastepnej bitwy (podglad 133c), klucz Party Screen Real Kit TAK; jency - lachmany CaptiveRags, ikony listy nietkniete.",
+    "calc": "Ekran druzyny (202): podglad nastepnej bitwy dla skladu z ekranu - typow 7, zdrowych 52 (rannych 3), pustych slotow 31, pieszo 2, zdjete przy wystawieniu 0; czas 11 ms.",
+    "model": "Ekran druzyny (202): lannister_knight - model w sprzecie nastepnej bitwy (najlepiej obsluzony z 6 zdrowych): puste sloty 3 z 9 pierwszego wzorca, kon NIE (wzorzec TAK), uprzaz NIE (wzorzec TAK); typ: puste 22, na koniu 0, pieszo 6.",
+    "keep": "Ekran druzyny (202): lannister_footman - wzorzec zostaje: wszyscy ranni (4) - nie wyjda do nastepnej bitwy.",
+    "skip": "Ekran druzyny (202): wzorzec zostaje - podglad niedostepny: \"Troops Fight With Own Kit Only is off - your men fight in their troop's full kit, so no slot goes empty.\".",
+    "recruit": "Werbunek jencow gracza (202): lannister_knight x6, dzien 412.",
+    "horse": "Konie z zapasu ludzi (202): typ druzyny gracza bierze konia / uprzaz z zapasu ludzi w zbrojowni (jezdzcow przybylo, koni w zbrojowni nie) - dzien 413 | konie w zbrojowni 14 -> 14, uprzeze 5 -> 5 | typy: lannister_knight (Lannister Knight) - na koniu 0 -> 4, z uprzeza 0 -> 2 z 6 zdrowych; north_rider (Rider) - z uprzeza 1 -> 3 z 8 zdrowych.",
+    "err": "ERROR in PartyScreenKit (potkniecie 1, wzorzec zostaje): NullReferenceException",
+}
+
+
+def p202_selftest():
+    """p202: wyrazenia wobec linii kontrolnych P202_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    RX, T = P202_RX, P202_TEST
+    m = RX["start"].match(T["start"])
+    if not m or m.group(1) != "TAK":
+        return "start"
+    m = RX["calc"].match(T["calc"])
+    if not m or m.groups() != ("7", "52", "3", "31", "2", "0", "11"):
+        return f"calc: {m.groups() if m else 'brak'}"
+    m = RX["model"].match(T["model"])
+    if not m or m.groups() != ("lannister_knight", "6", "3", "9", "NIE", "TAK", "NIE", "TAK", "22", "0", "6"):
+        return f"model: {m.groups() if m else 'brak'}"
+    m = RX["keep"].match(T["keep"])
+    if not m or m.group(1) != "lannister_footman":
+        return "keep"
+    m = RX["skip"].match(T["skip"])
+    if not m or not m.group(1).startswith("Troops Fight With Own Kit Only is off"):
+        return "skip"
+    m = RX["recruit"].match(T["recruit"])
+    if not m or m.groups() != ("lannister_knight", "6", "412"):
+        return f"recruit: {m.groups() if m else 'brak'}"
+    m = RX["horse"].match(T["horse"])
+    if not m or m.groups()[:5] != ("413", "14", "14", "5", "5"):
+        return f"horse: {m.groups() if m else 'brak'}"
+    ts = RX["htype"].findall(m.group(6))
+    if ts != [("lannister_knight", "0", "4", "0", "2", "6"), ("north_rider", "", "", "1", "3", "8")]:
+        return f"htype: {ts}"
+    if not RX["err"].match(T["err"]):
+        return "err"
+    # linie spoza paczki nie moga pasowac
+    for k in ("start", "calc", "model", "keep", "skip", "recruit", "horse"):
+        if RX[k].match("Sprzet ludzi (133c): podglad - typow 7, zdrowych 52"):
+            return f"falszywe dopasowanie {k}"
+    return None
+
+
+def p202_collect(logp):
+    """p202: przebieg logu (strumieniowo)."""
+    D = {"start": [], "calc": [], "model": [], "keep": [], "skip": [], "recruit": [], "horse": [], "err": [], "bad": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if P202_RX["err"].match(s):
+                    D["err"].append(s[:200])
+                continue
+            if not (s.startswith("Ekran druzyny (202): ") or s.startswith("Werbunek jencow gracza (202): ") or s.startswith("Konie z zapasu ludzi (202): ")):
+                continue
+            for k in ("start", "calc", "model", "keep", "skip", "recruit", "horse"):
+                mm = P202_RX[k].match(s)
+                if mm:
+                    D[k].append(mm.groups())
+                    break
+            else:
+                D["bad"].append(s[:200])
+    return D
+
+
+def p202_rows(rep, D):
+    st = D["start"]
+    rep.add("P202-0: linia startu (patch wpiety)", f"{len(st)} (klucz {st[-1][0] if st else '-'})", ">= 1", len(st) >= 1)
+    rep.add("P202-1: linie z napisem paczki, ktore nie pasuja do wyrazen", f"{len(D['bad'])}" + (f" (np. {D['bad'][0]})" if D["bad"] else ""), "0", len(D["bad"]) == 0)
+    rep.add("P202-2: ERROR PartyScreenKit / KitPreview.ForScreen / NoteMounts", f"{len(D['err'])}" + (f" (np. {D['err'][0]})" if D["err"] else ""), "0", len(D["err"]) == 0)
+    calc = D["calc"]
+    slow = [c for c in calc if int(c[6]) > 50]
+    rep.add("P202-3: podglad ekranu druzyny liczony (raz na zmiane skladu / zbrojowni / dnia)",
+            f"{len(calc)} razy, czas maks. {max([int(c[6]) for c in calc]) if calc else '-'} ms, ponad 50 ms {len(slow)}", ">= 1 przy otwartym ekranie druzyny; ponad 50 ms - 0",
+            (len(slow) == 0) if calc else None)
+    mod = D["model"]
+    # model nie moze miec konia, gdy typ nikogo nie wysadza na konia (na koniu 0); uprzaz tylko z koniem; puste sloty modelu <= sloty wzorca
+    bad = [m for m in mod if (m[4] == "TAK" and m[9] == "0") or int(m[2]) > int(m[3]) or (m[6] == "TAK" and m[4] == "NIE")]
+    rep.add("P202-4: model w sprzecie nastepnej bitwy (kon tylko, gdy typ jedzie; uprzaz tylko z koniem; puste <= wzorzec)",
+            f"typow pokazanych {len(mod)}, z pustymi slotami {sum(1 for m in mod if int(m[2]) > 0)}, koni zabranych wobec wzorca "
+            f"{sum(1 for m in mod if m[5] == 'TAK' and m[4] == 'NIE')}, sprzecznych {len(bad)}" + (f" (np. {bad[0]})" if bad else ""),
+            "sprzecznych 0 (brak linii - INFO: nikt nie kliknal zolnierza)", (len(bad) == 0) if mod else None)
+    rep.add("P202-5: wzorzec zostal (podglad niedostepny / typ bez podgladu)", f"niedostepny {len(D['skip'])}" + (f" ({D['skip'][-1][0][:80]})" if D["skip"] else "")
+            + f", typow bez podgladu {len(D['keep'])}", "INFO", None)
+    rec = D["recruit"]
+    rep.add("P202-6: werbunek jencow gracza", f"{len(rec)} linii, ludzi {sum(int(r[1]) for r in rec)}" + (f" (np. {rec[0][0]} x{rec[0][1]}, dzien {rec[0][2]})" if rec else ""),
+            "INFO (autotest z werbunkiem jencow: >= 1)", None)
+    hs = D["horse"]
+    hbad = []
+    for h in hs:
+        # ani koni, ani uprzezy w zbrojowni nie moglo przybyc (oba punkty odniesienia znane i oba wzrosly - sprzecznosc)
+        if int(h[1]) >= 0 and int(h[2]) > int(h[1]) and int(h[3]) >= 0 and int(h[4]) > int(h[3]):
+            hbad.append(h[0])
+        for t in P202_RX["htype"].findall(h[5]):
+            if not ((t[1] and int(t[2]) > int(t[1])) or (t[3] and int(t[4]) > int(t[3]))):
+                hbad.append(h[0] + ":" + t[0])
+    rep.add("P202-7: konie z zapasu ludzi (jezdzcow typu przybylo, koni w zbrojowni nie)", f"{len(hs)} linii, sprzecznych {len(hbad)}" + (f" ({hbad[:3]})" if hbad else ""),
+            "sprzecznych 0 (brak linii - INFO)", (len(hbad) == 0) if hs else None)
+
+
+def p202_main(logp):
+    """p202 (26.10, paczka 202): P202-S self-test, P202-0..P202-7 - opis w --help. Strumieniowo."""
+    rep = Report()
+    s1 = p202_selftest()
+    rep.add("P202-S: self-test wyrazen (linie kontrolne jak w kodzie C#: PartyScreenKit.cs, KitPreview.cs)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("P202-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = p202_collect(logp)
+    print(f"plik: {logp} | linii 202: start {len(D['start'])}, podgladow {len(D['calc'])}, modeli {len(D['model'])}, werbunkow {len(D['recruit'])}, "
+          f"koni {len(D['horse'])}, ERROR {len(D['err'])}")
+    p202_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_p202_main_prev = main
+
+
+def main(argv):
+    # paczka 202: grupa p202 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "p202":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return p202_main(rest[0] if rest else None)
+    return _p202_main_prev(argv)
 
 
 if __name__ == "__main__":
