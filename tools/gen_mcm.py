@@ -654,6 +654,7 @@ LABELS = {
     'LektorGossipLive': 'Narrator Gossip Live',
     'LektorGossipDailyChars': 'Narrator Gossip Daily Chars',
     'LektorGossipReserveChars': 'Narrator Gossip Reserve Chars',
+    'MapMusicOurs': 'Our Map Music',   # paczka 165: nazwa z polecenia Jeffa
     # p9: "AI" wielkimi literami (regula ogolna dalaby "Ai Strength Counts Gear")
     'AiStrengthCountsGear': 'AI Strength Counts Gear',
     'AiAutobattleCountsGear': 'AI Autobattle Counts Gear',

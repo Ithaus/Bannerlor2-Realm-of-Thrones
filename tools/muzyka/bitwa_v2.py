@@ -11,7 +11,11 @@
 # Armoury/ModuleData/Lektor/Muzyka/Bitwa/lufs<N>/ (kod gra tylko bit_*.ogg; stare muz_*.ogg w tych katalogach sa pomijane).
 # Niepelny zestaw jest dozwolony (np. sama probka bit_04): przerabia, co jest, i wypisuje brakujace numery; kod 0, gdy wszystkie przerobione sa w warunkach.
 # Raport TSV opisuje tylko pliki z tego przebiegu (niepelny zestaw do katalogu z poprzednim pelnym - raport nadpisany; wtedy osobny katalog wyjscia).
-# Uzycie: python -I tools/muzyka/bitwa_v2.py <katalog_mp3> <katalog_wyjscia>      (ffmpeg: zmienna FFMPEG albo sciezka ponizej)
+# Uzycie: python -I tools/muzyka/bitwa_v2.py <katalog_mp3> <katalog_wyjscia> [--prefiks bit|map]      (ffmpeg: zmienna FFMPEG albo sciezka ponizej)
+# Paczka 165 (Jeff 26.10 ok. 18:30: "zrob mi jeszcze 10 utworow na mape kampanii w stylu gry o tron lub sredniowiecza minimum 2 minuty dlugosci a najlepiej taka
+# muzyka ktora nie jest zbyt intensywna i nie rozprasza ale jako dobry podklad"): --prefiks map przerabia map_NN_nazwa.mp3 tymi samymi regulami na
+# <wyjscie>/lufs<N>/map_NN_nazwa.ogg (do paczki: Armoury/ModuleData/Lektor/Muzyka/Mapa/lufs<N>/, EventMusic.MapaTlo.cs); wejscie 4 s i wyjscie 6 s wypalane
+# tylko, gdy ich brak (zrodla ElevenLabs maja je z promptu); oczekiwana dlugosc 120-180 s; raport <wyjscie>/mapa_v2_pomiar.tsv. Bez --prefiks - bit jak dotad.
 import hashlib, os, re, shutil, subprocess, sys
 
 FF = os.environ.get('FFMPEG') or r'C:\Users\GAME\tools\ffmpeg\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe'
@@ -23,8 +27,25 @@ FADE_IN, FADE_OUT = 2.0, 4.0       # s
 EDGE_IN, EDGE_OUT = 0.25, 0.5      # s - okno brzegu do oceny, czy wyciszenie juz jest
 EDGE_DB = 30.0                     # brzeg co najmniej tyle dB pod szczytem pliku = wyciszenie jest
 DUR_OK = (120.0, 160.0)            # s - oczekiwana dlugosc (tools/sprawdz_logi.py m109muz MUZ-0); poza - UWAGA, bez bledu
+PREFIX = 'bit'
+TSV_NAME = 'bitwa_v2_pomiar.tsv'
+# paczka 165: profile prefiksow - (wejscie s, wyjscie s, dlugosc min s, dlugosc max s, raport)
+PROFILES = {
+    'bit': (2.0, 4.0, 120.0, 160.0, 'bitwa_v2_pomiar.tsv'),
+    'map': (4.0, 6.0, 120.0, 180.0, 'mapa_v2_pomiar.tsv'),   # tools/sprawdz_logi.py m165mapa MAP-0: dlugosci 120-180 s
+}
 NAME_RX = re.compile(r'^bit_(\d\d)_([a-z0-9_]+)\.mp3$')
 EXPECTED = ('01', '02', '03', '04', '05', '06', '07', '08', '09', '10')
+
+
+def use_profile(name):
+    """Paczka 165: ustawia globalne wejscie / wyjscie / dlugosc / wzor nazwy / raport wedlug prefiksu (bit albo map)."""
+    global PREFIX, TSV_NAME, FADE_IN, FADE_OUT, DUR_OK, NAME_RX
+    if name not in PROFILES:
+        raise SystemExit('nieznany prefiks %s (dozwolone: %s)' % (name, ', '.join(sorted(PROFILES))))
+    fi, fo, dmin, dmax, tsv = PROFILES[name]
+    PREFIX, TSV_NAME, FADE_IN, FADE_OUT, DUR_OK = name, tsv, fi, fo, (dmin, dmax)
+    NAME_RX = re.compile(r'^' + name + r'_(\d\d)_([a-z0-9_]+)\.mp3$')
 
 
 def run(args):
@@ -102,9 +123,18 @@ def md5(p):
 
 
 def main():
-    if len(sys.argv) != 3:
-        raise SystemExit('uzycie: python -I bitwa_v2.py <katalog_mp3> <katalog_wyjscia>')
-    src_dir, out = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
+    args = sys.argv[1:]
+    prefix = 'bit'
+    if '--prefiks' in args:   # paczka 165: --prefiks map (utwory mapy kampanii)
+        k = args.index('--prefiks')
+        if k + 1 >= len(args):
+            raise SystemExit('--prefiks bez wartosci (bit albo map)')
+        prefix = args[k + 1]
+        args = args[:k] + args[k + 2:]
+    if len(args) != 2:
+        raise SystemExit('uzycie: python -I bitwa_v2.py <katalog_mp3> <katalog_wyjscia> [--prefiks bit|map]')
+    use_profile(prefix)
+    src_dir, out = os.path.abspath(args[0]), os.path.abspath(args[1])
     if 'mount & blade ii bannerlord' in out.replace('/', '\\').lower():
         raise SystemExit('odmowa: katalog wyjscia w instalacji gry (%s) - tylko katalog posredni, do paczki kopiuje sie recznie' % out)
     if not os.path.isfile(FF):
@@ -120,7 +150,7 @@ def main():
             raise SystemExit('dwa zrodla z numerem %s: %s i %s' % (m.group(1), srcs[m.group(1)], f))
         srcs[m.group(1)] = f
     if not srcs:
-        raise SystemExit('brak plikow bit_NN_nazwa.mp3 w ' + src_dir)
+        raise SystemExit('brak plikow %s_NN_nazwa.mp3 w %s' % (PREFIX, src_dir))
     missing = [n for n in EXPECTED if n not in srcs]
     tmpd = os.path.join(out, '_tmp')
     os.makedirs(tmpd, exist_ok=True)
@@ -162,7 +192,7 @@ def main():
                     lv, lv, base, gain, i, tp, lra, dur, fin.split(' (')[0], fout.split(' (')[0], f, smd5, md5(dst)))
     finally:
         shutil.rmtree(tmpd, ignore_errors=True)
-    tsv = os.path.join(out, 'bitwa_v2_pomiar.tsv')
+    tsv = os.path.join(out, TSV_NAME)
     with open(tsv, 'w', encoding='utf-8', newline='') as fh:
         fh.write('\r\n'.join(rows) + '\r\n')
     print('raport: ' + tsv)

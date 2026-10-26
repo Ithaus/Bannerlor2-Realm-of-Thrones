@@ -1132,6 +1132,16 @@ Uzycie (Python 3, tylko odczyt):
                     MUZ-8 (m164) mapa: zaden utwor okna m108 muz_wojna / bit_*, linia 'mapa - okna z nastrojem wojna graja muz_korona.ogg' (przy kluczu StopEventThemesOnMap
                     TAK - 'psai motywy TAK'), kazda linia 'motyw wydarzenia ROT .. gra w oknie' rozliczona przed nastepnym oknem: 'zatrzymany po oknie', 'nie gra po oknie'
                     albo okno w bitwie ('koniec wydarzenia - bitwa dalej', 'przywrocona od razu'); ostatnie otwarte na koncu logu - INFO; liczba zatrzymanych - INFO.
+--grupa m165mapa  : (26.10, paczka 165 noc/165-muzyka-mapy - Jeff 26.10 "zrob mi jeszcze 10 utworow na mape kampanii ... nie rozprasza ale jako dobry podklad";
+                    Armoury/src/EventMusic.MapaTlo.cs, EventMusic.cs, klucz MapMusicOurs) python -I tools/sprawdz_logi.py --grupa m165mapa <Armoury-*.log> (strumieniowo).
+                    Linie 'Muzyka mapy (m165): ' z kontekstem bitew m109 i okien m108. MAP-S self-test wyrazen, MAP-S2 test syntetyczny. MAP-0 linia startu: klucz TAK,
+                    psai TAK, rowne niepuste zestawy lufs17/20/23/26 map_*, dlugosci 120-180 s, odrzucone 0 (zestaw niepelny - INFO, klucz NIE - INFO); MAP-1 mapa
+                    wlaczona -> >= 1 utwor 'grany po 1 s TAK', 0 'NIE' / 'nie grany' (autotest z dobami na mapie); MAP-2 zaden utwor mapy przy wylaczonej mapie, w bitwie
+                    m109, w oknie m108 ani dwa naraz; MAP-3 mapa z utworem ma 'muzyka gry wyciszona ... teraz <= 0.01', kazdy 'mapa - stop' -> 'muzyka gry wrocila'
+                    (>= zapamietana - 0.01) albo 'przejmuje bitwa' przed nastepnym wlaczeniem; MAP-4 bez tego samego dwa razy z rzedu i bez dubla w worku; MAP-5 przerwy:
+                    po utworze 20-40 s (nie grany - 5 s), wlaczenie start 5 s / po misji 5-10 s / po oknie <= 3 s; MAP-6 ERROR EventMusic.MapaTlo, 'silnik nie przyjal',
+                    rezygnacje, brak psai / utworow - 0. Paczka 165 zmienia tez m109muz: koniec okna '- mapa dalej', koniec bitwy '(muzyka mapy)' i 'przejmuje muzyka mapy'
+                    zamiast 'wrocila' (MUZ-3, MUZ-6, MUZ-8).
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -40645,7 +40655,8 @@ M109MUZ_RX = {
     "gave": re.compile(r"^rezygnacja w tej misji po (\d+) bledach \(([^)]*)\)"),
     "nores": re.compile(r"^(?:brak utworow bitewnych w .* - bitwy z muzyka gry|psai NIE - bitwy z muzyka gry)\.$"),
     "win": re.compile(r"^(?:okno \".*\"|plotki) - nastroj \S+(?: \(zamiast \S+\))?, muzyka gry cichnie"),
-    "winend": re.compile(r"^(?:koniec wydarzenia - (?:muzyka gry wraca|bitwa dalej)|muzyka gry przywrocona od razu)"),
+    "winend": re.compile(r"^(?:koniec wydarzenia - (?:muzyka gry wraca|bitwa dalej|mapa dalej)|muzyka gry przywrocona od razu)"),   # paczka 165: '- mapa dalej'
+    "mapko": re.compile(r"^muzyka gry dalej wyciszona - przejmuje muzyka mapy\.$"),   # paczka 165: po bitwie wyciszenie przejmuje muzyka mapy (bez 'wrocila')
     "windalej": re.compile(r"^koniec wydarzenia - bitwa dalej\b"),
     "gra": re.compile(r"^gra (\S+\.ogg) \(nastroj (\S+)\)\.$"),
     "mapa": re.compile(r"^mapa - okna z nastrojem wojna graja (muz_\w+\.ogg) \(muzyka wojenna tylko w bitwie\), klucz StopEventThemesOnMap (TAK|NIE) .*, psai motywy (TAK|NIE), "
@@ -40699,6 +40710,11 @@ M109MUZ_TEST = {
     "thseen": "motyw wydarzenia ROT 405 (odcinek 421) gra w oknie (warstwa psai, glos 7).",
     "thgone": "motyw wydarzenia ROT 405 (odcinek 421) nie gra po oknie - bez zatrzymania.",
     "cs": "[06:25:18] AUTOTEST: AUTOTEST BITWA 1/4 [mocna]: misja ruszyla po 3 s ladowania (scena battle_terrain_biome_040, Mission)",
+    # paczka 165 (EventMusic.MapaTlo.cs): okno przy mapie i koniec bitwy z wyciszeniem przejetym przez muzyke mapy
+    "winmap": "koniec wydarzenia - mapa dalej, muzyka gry dalej wyciszona (nasza muzyka mapy).",
+    "endmap": "koniec bitwy (koniec misji, misja Battle, 40 s) - utworow 2 (koniec silnik 0, po czasie 0, test 1, nie grane 0, grane po 1 s NIE 0), powtorki z rzedu 0 "
+              "(wymuszone 0), bledy 0, pole, grane 01>04, zwyciestwo NIE, zdarzenie przy stopie gra, stop bit_04_szarza.ogg - muzyka gry dalej wyciszona (muzyka mapy).",
+    "mapko": "muzyka gry dalej wyciszona - przejmuje muzyka mapy.",
 }
 
 
@@ -40805,6 +40821,13 @@ def m109muz_selftest():
     m = RX["cs"].search(T["cs"])
     if not m or m.groups() != ("1", "4"):
         return "cs (AUTOTEST BITWA misja ruszyla)"
+    if not RX["winend"].match(T["winmap"]) or RX["windalej"].match(T["winmap"]):
+        return "winmap (paczka 165: koniec okna - mapa dalej)"
+    m = RX["end"].match(T["endmap"])
+    if not m or m.group(18) != "muzyka gry dalej wyciszona (muzyka mapy)" or m.group(1) != "koniec misji":
+        return f"endmap: {m.groups() if m else 'brak dopasowania'}"
+    if not RX["mapko"].match(T["mapko"]) or RX["back"].match(T["mapko"]):
+        return "mapko (paczka 165: wyciszenie przejmuje muzyka mapy)"
     for k in ("start", "bat", "trk1", "trk2", "end", "endwin", "back", "skip", "gave2", "vic"):        # linie m109 nie wpadaja w wyrazenia okien m108 i odwrotnie
         if RX["win"].match(T[k]) or RX["winend"].match(T[k]) or RX["gra"].match(T[k]):
             return f"{k}: linia m109 wpada w wyrazenie okna m108"
@@ -40858,8 +40881,8 @@ def m109muz_collect(logp, csp=None):
                     win_open = False
                     if pend is not None and RX["windalej"].match(b):
                         pend["dalej"] = True       # okno w bitwie zamkniete, misja bitwy trwa
-                    if not b.startswith("koniec wydarzenia - muzyka gry wraca"):
-                        th_pend = None             # okno w bitwie / wyjscie z kampanii - bez zatrzymania motywu (EventThemeStop tylko na mapie)
+                    if not (b.startswith("koniec wydarzenia - muzyka gry wraca") or b.startswith("koniec wydarzenia - mapa dalej")):
+                        th_pend = None             # okno w bitwie / wyjscie z kampanii - bez zatrzymania motywu (EventThemeStop tylko na mapie; paczka 165: 'mapa dalej' tez)
                 elif RX["thseen"].match(b):
                     D["thseen"] += 1
                     if th_pend is not None:
@@ -40920,12 +40943,18 @@ def m109muz_collect(logp, csp=None):
             if mm:
                 e = {"why": mm.group(1), "sec": int(mm.group(3)), "n": int(mm.group(4)), "cap": int(mm.group(6)), "notp": int(mm.group(8)), "no1s": int(mm.group(9)),
                      "rep": int(mm.group(10)), "forced": int(mm.group(11)), "err": int(mm.group(12)), "kind": mm.group(13),
-                     "seq": [] if mm.group(14) == "-" else mm.group(14).split(">"), "vic": mm.group(15), "stop": mm.group(16)}
+                     "seq": [] if mm.group(14) == "-" else mm.group(14).split(">"), "vic": mm.group(15), "stop": mm.group(16),
+                     "mapa": mm.group(18).startswith("muzyka gry dalej wyciszona (muzyka mapy)")}   # paczka 165: wyciszenie przejmuje mapa - bez 'wrocila'
                 if cur is not None:
                     cur["end"] = e
                     pend, cur = cur, None
                 else:
                     D["orphan"] += 1
+                continue
+            if RX["mapko"].match(b):              # paczka 165: bitwa zamknieta poza mapa, wyciszenie przejmuje muzyka mapy - jak 'wrocila' bez glosnosci
+                if pend is not None:
+                    pend["mapko"] = True
+                    pend = None
                 continue
             mm = RX["back"].match(b)
             if mm:
@@ -41087,8 +41116,8 @@ def m109muz_rows(rep, D):
             if why not in M109MUZ_END_OK:
                 probs.append(f"{b['name']}: koniec ({why})")
             if b["back"] is None:
-                if b.get("cont"):
-                    conts += 1                 # okno wydarzenia w bitwie, po nim ta sama misja dalej - wyciszenie trwa
+                if b.get("cont") or b["end"].get("mapa") or b.get("mapko"):
+                    conts += 1                 # okno wydarzenia w bitwie, po nim ta sama misja dalej - wyciszenie trwa; paczka 165: wyciszenie przejmuje muzyka mapy
                 elif b["tail"]:
                     cutn += 1
                 else:
@@ -69137,6 +69166,450 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return ai139_main(rest[0] if rest else None)
     return _ai139_main_prev(argv)
+
+# ------------------------------------------------------------ m165mapa (26.10, paczka 165 noc/165-muzyka-mapy: nasze spokojne utwory map_NN na mapie kampanii zamiast
+# muzyki mapy gry - Jeff 26.10 ok. 18:30 "zrob mi jeszcze 10 utworow na mape kampanii w stylu gry o tron lub sredniowiecza minimum 2 minuty dlugosci a najlepiej taka
+# muzyka ktora nie jest zbyt intensywna i nie rozprasza ale jako dobry podklad"; Armoury/src/EventMusic.MapaTlo.cs, EventMusic.cs; klucz MapMusicOurs; pliki
+# Armoury/ModuleData/Lektor/Muzyka/Mapa/lufs{17,20,23,26}/map_NN_nazwa.ogg z tools/muzyka/bitwa_v2.py --prefiks map)
+M165MAPA_TAG = "Muzyka mapy (m165): "
+M165MAPA_LEVELS = (17, 20, 23, 26)
+M165MAPA_DUR = (120.0, 180.0)
+M165MAPA_GAP = (20, 40)
+M165MAPA_AFTER = {"start": (5, 5), "po misji": (5, 10), "po oknie": (0, 3), "po przerwie": (0, 40)}   # liczba w linii 'mapa - ...' (ToString("0"))
+M165MAPA_RETRY = 5
+M165MAPA_TOL = 0.01
+M165MAPA_SAVED_MIN = 0.95
+M165MAPA_RX = {
+    "start": re.compile(r"^start - klucz MapMusicOurs (TAK|NIE)\b"),
+    "full": re.compile(r"^start - klucz MapMusicOurs TAK, glosnosc bitwy (\d) -> mapa -(\d+) LUFS \(zestaw lufs(\d+)\), utwory mapy lufs17 (\d+), lufs20 (\d+), "
+                       r"lufs23 (\d+), lufs26 (\d+) \(([^)]*)\), brak numerow ([\d -]+), odrzucone (\d+), psai (TAK|NIE), przerwa 20-40 s, po oknie 3 s, "
+                       r"po misji 5-10 s, pierwszy po 5 s\.$"),
+    "dur": re.compile(r"([a-z0-9_]+) (?:([\d.]+) s|dlugosc \?)"),
+    "on": re.compile(r"^mapa - nasza muzyka, muzyka gry (cichnie|dalej wyciszona) \(psai (?:glosnosc zapamietana ([\d.]+)|BRAK)\), zestaw lufs(\d+) \((\d+) utworow\), "
+                     r"(?:po koncu okna / bitwy, )?nastepny za (\d+) s \((start|po przerwie|po oknie|po misji)\)\.$"),
+    "duck": re.compile(r"^muzyka gry wyciszona \(psai glosnosc teraz (-?[\d.]+), zapamietana ([\d.]+)\)\.$"),
+    "trk": re.compile(r"^utwor (\d+) - (map_[a-z0-9_]+\.ogg) \(lufs(\d+), (?:([\d.]+) s|dlugosc \?), (start|po przerwie|po oknie|po misji), worek (\d+)/(\d+)"
+                      r"(, nowy worek|, jedyny - powtorka)?\)\.$"),
+    "end": re.compile(r"^(koniec|przerwany) (map_[a-z0-9_]+\.ogg) po ([\d.]+) s \(([^)]*)\), grany po 1 s (TAK|NIE|-), zdarzenie przy stopie (\S+); "
+                      r"(?:nastepny za (\d+) s|(nastepny po oknie)|(mapa stop))\.$"),
+    "off": re.compile(r"^mapa - stop \(([^)]*)\) - (.*)\.$"),
+    "back": re.compile(r"^muzyka gry wrocila(?: od razu \(([^)]*)\))? - psai glosnosc (-?[\d.]+|\?) \(zapamietana ([\d.]+)\)\.$"),
+    "hand": re.compile(r"^muzyka gry dalej wyciszona - przejmuje (\S+)\.$"),
+    "rej": re.compile(r"^silnik nie przyjal (map_\S+) \(zdarzenie "),
+    "gave": re.compile(r"^rezygnacja po (\d+) bledach z rzedu"),
+    "nores": re.compile(r"^(?:psai NIE|brak utworow mapy w .*) - mapa z muzyka gry\.$"),
+}
+M165MAPA_SET = "01_krolewski_trakt 125.0 s, 02_polnoc 125.0 s, 03_dorzecze 125.0 s, 04_dwor 125.0 s, 05_ognisko 125.0 s, 06_starzy_bogowie 125.0 s, " \
+               "07_waskie_morze 125.0 s, 08_poludniowe_ziemie 125.0 s, 09_dluga_zima 125.0 s, 10_wsie_i_pola 125.0 s"
+# linie kontrolne - napisy jak w kodzie C# (EventMusic.MapaTlo.cs; m108 i m109 z EventMusic.cs / EventMusic.Bitwa.cs)
+M165MAPA_TEST = {
+    "start": "start - klucz MapMusicOurs TAK, glosnosc bitwy 3 -> mapa -23 LUFS (zestaw lufs23), utwory mapy lufs17 10, lufs20 10, lufs23 10, lufs26 10 ("
+             + M165MAPA_SET + "), brak numerow -, odrzucone 0, psai TAK, przerwa 20-40 s, po oknie 3 s, po misji 5-10 s, pierwszy po 5 s.",
+    "startpart": "start - klucz MapMusicOurs TAK, glosnosc bitwy 3 -> mapa -23 LUFS (zestaw lufs23), utwory mapy lufs17 1, lufs20 1, lufs23 1, lufs26 1 "
+                 "(01_krolewski_trakt 125.0 s), brak numerow 02 03 04 05 06 07 08 09 10, odrzucone 0, psai TAK, przerwa 20-40 s, po oknie 3 s, po misji 5-10 s, "
+                 "pierwszy po 5 s.",
+    "startno": "start - klucz MapMusicOurs NIE - mapa z muzyka gry.",
+    "on": "mapa - nasza muzyka, muzyka gry cichnie (psai glosnosc zapamietana 1.00), zestaw lufs23 (10 utworow), nastepny za 5 s (start).",
+    "onbat": "mapa - nasza muzyka, muzyka gry dalej wyciszona (psai glosnosc zapamietana 1.00), zestaw lufs23 (10 utworow), po koncu okna / bitwy, nastepny za 7 s "
+             "(po misji).",
+    "duck": "muzyka gry wyciszona (psai glosnosc teraz 0.00, zapamietana 1.00).",
+    "trk": "utwor 1 - map_01_krolewski_trakt.ogg (lufs23, 125.0 s, start, worek 1/10).",
+    "trknew": "utwor 11 - map_04_dwor.ogg (lufs23, 125.0 s, po przerwie, worek 1/10, nowy worek).",
+    "trkone": "utwor 2 - map_01_krolewski_trakt.ogg (lufs23, 125.0 s, po oknie, worek 1/1, jedyny - powtorka).",
+    "end": "koniec map_01_krolewski_trakt.ogg po 125.1 s (silnik), grany po 1 s TAK, zdarzenie przy stopie stop; nastepny za 27 s.",
+    "endnp": "koniec map_01_krolewski_trakt.ogg po 0.0 s (nie grany - silnik skonczyl), grany po 1 s -, zdarzenie przy stopie stop; nastepny za 5 s.",
+    "cutwin": "przerwany map_02_polnoc.ogg po 40.2 s (okno wydarzenia), grany po 1 s TAK, zdarzenie przy stopie gra; nastepny po oknie.",
+    "cutmis": "przerwany map_03_dorzecze.ogg po 12.5 s (misja), grany po 1 s TAK, zdarzenie przy stopie gra; mapa stop.",
+    "off": "mapa - stop (misja) - muzyka gry wraca (2.0 s).",
+    "offst": "mapa - stop (stan gry GameOverState) - muzyka gry wraca (2.0 s).",
+    "offbat": "mapa - stop (misja) - przejmuje bitwa.",
+    "back": "muzyka gry wrocila - psai glosnosc 1.00 (zapamietana 1.00).",
+    "back2": "muzyka gry wrocila od razu (wyjscie z kampanii) - psai glosnosc 1.00 (zapamietana 1.00).",
+    "hand": "muzyka gry dalej wyciszona - przejmuje bitwa.",
+    "rej": "silnik nie przyjal map_05_ognisko.ogg (zdarzenie event:/Extra/external) - proba za 5 s.",
+    "gave": "rezygnacja po 3 bledach z rzedu (Next, potkniec w sesji 0) - muzyka gry wraca, mapa od nowa po misji albo wczytaniu.",
+    "nores": "brak utworow mapy w C:\\Gry\\Modules\\Armoury\\ModuleData\\Lektor\\Muzyka\\Mapa - mapa z muzyka gry.",
+    "nopsai": "psai NIE - mapa z muzyka gry.",
+}
+
+
+def m165mapa_selftest():
+    """m165mapa: wyrazenia wobec linii kontrolnych M165MAPA_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    RX, T = M165MAPA_RX, M165MAPA_TEST
+    m = RX["full"].match(T["start"])
+    if not m or m.groups()[:7] != ("3", "23", "23", "10", "10", "10", "10") or m.groups()[8:] != ("-", "0", "TAK"):
+        return f"start: {m.groups() if m else 'brak dopasowania'}"
+    durs = RX["dur"].findall(m.group(8))
+    if len(durs) != 10 or durs[0] != ("01_krolewski_trakt", "125.0") or durs[9] != ("10_wsie_i_pola", "125.0"):
+        return f"dur: {durs}"
+    m = RX["full"].match(T["startpart"])
+    if not m or m.group(9) != "02 03 04 05 06 07 08 09 10" or m.group(4) != "1":
+        return "startpart"
+    if RX["start"].match(T["startno"]).group(1) != "NIE" or RX["full"].match(T["startno"]):
+        return "startno"
+    m = RX["on"].match(T["on"])
+    if not m or m.groups() != ("cichnie", "1.00", "23", "10", "5", "start"):
+        return f"on: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["on"].match(T["onbat"])
+    if not m or m.groups() != ("dalej wyciszona", "1.00", "23", "10", "7", "po misji"):
+        return f"onbat: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["duck"].match(T["duck"])
+    if not m or m.groups() != ("0.00", "1.00"):
+        return "duck"
+    m = RX["trk"].match(T["trk"])
+    if not m or m.groups() != ("1", "map_01_krolewski_trakt.ogg", "23", "125.0", "start", "1", "10", None):
+        return f"trk: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["trk"].match(T["trknew"])
+    if not m or m.group(8) != ", nowy worek" or m.group(5) != "po przerwie":
+        return "trknew"
+    m = RX["trk"].match(T["trkone"])
+    if not m or m.group(8) != ", jedyny - powtorka":
+        return "trkone"
+    m = RX["end"].match(T["end"])
+    if not m or m.groups() != ("koniec", "map_01_krolewski_trakt.ogg", "125.1", "silnik", "TAK", "stop", "27", None, None):
+        return f"end: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["end"].match(T["endnp"])
+    if not m or m.group(4) != "nie grany - silnik skonczyl" or m.group(5) != "-" or m.group(7) != "5":
+        return f"endnp: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["end"].match(T["cutwin"])
+    if not m or m.group(1) != "przerwany" or m.group(4) != "okno wydarzenia" or m.group(8) is None:
+        return f"cutwin: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["end"].match(T["cutmis"])
+    if not m or m.group(4) != "misja" or m.group(9) is None:
+        return f"cutmis: {m.groups() if m else 'brak dopasowania'}"
+    for k, why, tail in (("off", "misja", "muzyka gry wraca (2.0 s)"), ("offst", "stan gry GameOverState", "muzyka gry wraca (2.0 s)"), ("offbat", "misja", "przejmuje bitwa")):
+        m = RX["off"].match(T[k])
+        if not m or m.groups() != (why, tail):
+            return f"{k}: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["back"].match(T["back"])
+    if not m or m.groups() != (None, "1.00", "1.00"):
+        return "back"
+    m = RX["back"].match(T["back2"])
+    if not m or m.group(1) != "wyjscie z kampanii":
+        return "back2"
+    m = RX["hand"].match(T["hand"])
+    if not m or m.group(1) != "bitwa" or RX["back"].match(T["hand"]) or RX["duck"].match(T["hand"]):
+        return "hand"
+    if not RX["rej"].match(T["rej"]) or not RX["gave"].match(T["gave"]) or not RX["nores"].match(T["nores"]) or not RX["nores"].match(T["nopsai"]):
+        return "rej / gave / nores"
+    for k in ("start", "on", "trk", "end", "cutwin", "off", "back", "hand"):     # kazda linia tylko w swoim wyrazeniu
+        hits = [n for n in ("on", "duck", "trk", "end", "off", "back", "hand", "rej", "gave", "nores") if RX[n].match(T[k])]
+        if len(hits) > (0 if k == "start" else 1):
+            return f"{k}: pasuje do {hits}"
+    R9, T9 = M109MUZ_RX, M109MUZ_TEST
+    if not R9["winend"].match(T9["winmap"]) or not R9["mapko"].match(T9["mapko"]):
+        return "linie m108 / m109 paczki 165 (winmap, mapko)"
+    return None
+
+
+def m165mapa_collect(logp):
+    """m165mapa: przebieg logu (strumieniowo) - linie mapy w kolejnosci z kontekstem bitew m109 i okien m108."""
+    RX, R9 = M165MAPA_RX, M109MUZ_RX
+    D = {"starts": [], "ons": 0, "trk": [], "ends": [], "offs": [], "backs": [], "hands": 0, "lines": 0, "ctx_bad": [], "overlap": [], "noduck": [], "unres": [],
+         "low_back": [], "tail_off": 0, "repeats": [], "bagdup": [], "gap_bad": [], "rej": 0, "gave": 0, "nores": 0, "err": 0, "err1": "", "on_gaps": []}
+    on = False
+    in_bat = in_win = False
+    playing = None
+    seg_trk = seg_duck = False
+    off_pend = None
+    last = None
+    bag = set()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in ") and "EventMusic.MapaTlo" in s[:140]:
+                D["err"] += 1
+                D["err1"] = D["err1"] or s[:200]
+                continue
+            if s.startswith(M109MUZ_TAG):
+                b = s[len(M109MUZ_TAG):]
+                if R9["bat"].match(b):
+                    in_bat = True
+                    if playing:
+                        D["ctx_bad"].append(f"bitwa przy grajacym {playing}")
+                elif R9["end"].match(b):
+                    in_bat = False
+                continue
+            if s.startswith(M109MUZ_M108):
+                b = s[len(M109MUZ_M108):]
+                if R9["win"].match(b):
+                    in_win = True
+                    if playing:
+                        D["ctx_bad"].append(f"okno przy grajacym {playing}")
+                elif R9["winend"].match(b):
+                    in_win = False
+                continue
+            if not s.startswith(M165MAPA_TAG):
+                continue
+            b = s[len(M165MAPA_TAG):]
+            D["lines"] += 1
+            mm = RX["start"].match(b)
+            if mm:
+                D["starts"].append((mm.group(1), RX["full"].match(b), b))
+                bag = set()
+                continue
+            mm = RX["on"].match(b)
+            if mm:
+                D["ons"] += 1
+                if off_pend is not None:
+                    D["unres"].append(off_pend)
+                    off_pend = None
+                on, seg_trk, seg_duck = True, False, False
+                D["on_gaps"].append((mm.group(6), int(mm.group(5))))
+                continue
+            mm = RX["duck"].match(b)
+            if mm:
+                if on and float(mm.group(1)) <= M165MAPA_TOL:
+                    seg_duck = True
+                continue
+            mm = RX["trk"].match(b)
+            if mm:
+                f = mm.group(2)
+                D["trk"].append({"file": f, "why": mm.group(5), "k": int(mm.group(6)), "n": int(mm.group(7)), "note": mm.group(8) or ""})
+                if not on or in_bat or in_win:
+                    D["ctx_bad"].append(f"{f} ({'mapa wylaczona' if not on else 'bitwa' if in_bat else 'okno'})")
+                if playing:
+                    D["overlap"].append(f"{f} przy grajacym {playing}")
+                playing = f
+                seg_trk = True
+                if last == f and "jedyny" not in (mm.group(8) or ""):
+                    D["repeats"].append(f)
+                if "nowy worek" in (mm.group(8) or "") or int(mm.group(6)) == 1:
+                    bag = set()
+                if f in bag:
+                    D["bagdup"].append(f)
+                bag.add(f)
+                last = f
+                continue
+            mm = RX["end"].match(b)
+            if mm:
+                e = {"how": mm.group(1), "file": mm.group(2), "sec": float(mm.group(3)), "why": mm.group(4), "ok1s": mm.group(5),
+                     "next": int(mm.group(7)) if mm.group(7) else None}
+                D["ends"].append(e)
+                if playing and playing != e["file"]:
+                    D["overlap"].append(f"koniec {e['file']} przy grajacym {playing}")
+                playing = None
+                if e["next"] is not None:
+                    lo, hi = (M165MAPA_RETRY, M165MAPA_RETRY) if e["why"].startswith("nie grany") else M165MAPA_GAP
+                    if not (lo <= e["next"] <= hi):
+                        D["gap_bad"].append(f"po {e['file']} nastepny za {e['next']} s ({e['why']})")
+                continue
+            mm = RX["off"].match(b)
+            if mm:
+                D["offs"].append((mm.group(1), mm.group(2)))
+                if on and seg_trk and not seg_duck:
+                    D["noduck"].append(mm.group(1))
+                on = False
+                if playing:
+                    D["overlap"].append(f"stop mapy przy grajacym {playing} bez linii przerwania")
+                    playing = None
+                if off_pend is not None:
+                    D["unres"].append(off_pend)
+                off_pend = None if mm.group(2) == "przejmuje bitwa" else mm.group(1)
+                continue
+            mm = RX["back"].match(b)
+            if mm:
+                D["backs"].append(mm.groups())
+                now, saved = mm.group(2), float(mm.group(3))
+                if now == "?" or float(now) < saved - M165MAPA_TOL or saved < M165MAPA_SAVED_MIN:
+                    D["low_back"].append(f"{now} (zapamietana {saved:.2f})")
+                off_pend = None
+                continue
+            if RX["hand"].match(b):
+                D["hands"] += 1
+                off_pend = None
+                continue
+            if RX["rej"].match(b):
+                D["rej"] += 1
+                continue
+            if RX["gave"].match(b):
+                D["gave"] += 1
+                continue
+            if RX["nores"].match(b):
+                D["nores"] += 1
+                continue
+    if on and seg_trk and not seg_duck:
+        D["noduck"].append("koniec logu")
+    if off_pend is not None:
+        D["tail_off"] += 1                  # log uciety przed powrotem muzyki gry - INFO
+    return D
+
+
+def m165mapa_rows(rep, D):
+    """m165mapa: wiersze MAP-0..MAP-6 z danych m165mapa_collect - opis w --help."""
+    RX = M165MAPA_RX
+    starts = D["starts"]
+    tak = [x for x in starts if x[0] == "TAK"]
+    # MAP-0 linia startu
+    if not starts:
+        rep.add("MAP-0: linia startu (klucz, psai, utwory map_*)", "brak linii m165 (log sprzed paczki 165)", "INFO", None)
+    elif not tak:
+        rep.add("MAP-0: linia startu (klucz, psai, utwory map_*)", f"klucz MapMusicOurs NIE ({len(starts)} linii) - mapa z muzyka gry", "INFO", None)
+    else:
+        probs = []
+        full = tak[-1][1]
+        part = None
+        if not full:
+            probs.append("zly format: " + tak[-1][2][:90])
+        else:
+            cnt = [int(full.group(i)) for i in (4, 5, 6, 7)]
+            if min(cnt) == 0 or len(set(cnt)) != 1:
+                probs.append(f"zestawy lufs17/20/23/26 {cnt}")
+            durs = [(n, float(d) if d else 0.0) for n, d in RX["dur"].findall(full.group(8))]
+            badd = [f"{n} {d}" for n, d in durs if not (M165MAPA_DUR[0] <= d <= M165MAPA_DUR[1])]
+            if badd:
+                probs.append(f"dlugosci poza {M165MAPA_DUR[0]:.0f}-{M165MAPA_DUR[1]:.0f} s: {badd[:3]}")
+            if full.group(10) != "0":
+                probs.append(f"odrzucone pliki {full.group(10)}")
+            if full.group(11) != "TAK":
+                probs.append("psai NIE")
+            if full.group(9) != "-":
+                part = full.group(9)
+        val = f"linii startu {len(starts)} (klucz TAK {len(tak)})" + (f", mapa -{full.group(2)} LUFS (zestaw lufs{full.group(3)}), utworow {full.group(6)}" if full else "") \
+            + (f", brak numerow {part}" if part else "") + (" | " + "; ".join(probs[:3]) if probs else "")
+        rep.add("MAP-0: linia startu (klucz, psai, utwory map_*)", val,
+                "klucz TAK, psai TAK, rowne niepuste zestawy lufs17/20/23/26, dlugosci 120-180 s, odrzucone 0 (zestaw niepelny - INFO)",
+                False if probs else (None if part else True))
+    # MAP-1 utwor zagral na mapie
+    played = [e for e in D["ends"] if e["ok1s"] == "TAK"]
+    nie = [e for e in D["ends"] if e["ok1s"] == "NIE" or e["why"].startswith("nie grany")]
+    if D["ons"] == 0:
+        rep.add("MAP-1: utwor mapy zagral", f"mapa wlaczona 0 razy, utworow {len(D['trk'])}", "INFO (bez mapy: klucz NIE, brak utworow albo log bez czasu na mapie)", None)
+    else:
+        ok = bool(D["trk"]) and bool(played) and not nie
+        rep.add("MAP-1: utwor mapy zagral", f"mapa wlaczona {D['ons']} razy, utworow {len(D['trk'])} ({len({t['file'] for t in D['trk']})} roznych), grany po 1 s TAK "
+                f"{len(played)}, NIE / nie grany {len(nie)}" + (f" ({nie[0]['file']})" if nie else ""),
+                ">= 1 utwor z 'grany po 1 s TAK', 0 'NIE' / 'nie grany' (mapa wlaczona bez utworu - NIE)", ok)
+    # MAP-2 nigdy w misji, w oknie ani dwa naraz
+    bad = D["ctx_bad"] + D["overlap"]
+    rep.add("MAP-2: utwor mapy tylko na mapie (bez misji, okna, dwoch naraz)", f"utworow {len(D['trk'])}, poza mapa / w bitwie / w oknie {len(D['ctx_bad'])}, naraz {len(D['overlap'])}"
+            + (" | " + "; ".join(bad[:3]) if bad else ""), "0 i 0 (bez utworow - INFO)", (not bad) if (D["trk"] or bad) else None)
+    # MAP-3 psai: wyciszone przy utworze, wraca po stopie mapy
+    probs = []
+    if D["noduck"]:
+        probs.append(f"mapa z utworem bez 'muzyka gry wyciszona ... teraz <= 0.01' {len(D['noduck'])}")
+    if D["unres"]:
+        probs.append(f"stop mapy bez 'wrocila' / 'przejmuje' przed nastepnym wlaczeniem {len(D['unres'])} ({D['unres'][0]})")
+    if D["low_back"]:
+        probs.append(f"wrocila ponizej zapamietanej {D['low_back'][:2]}")
+    rep.add("MAP-3: muzyka gry wyciszona przy mapie, wraca po stopie", f"wlaczen {D['ons']}, stopow {len(D['offs'])} ({', '.join(sorted({o[0] for o in D['offs']}))}), "
+            f"wrocila {len(D['backs'])}, przejela bitwa {D['hands']}, log uciety przed powrotem {D['tail_off']}" + (" | " + "; ".join(probs) if probs else ""),
+            "kazda mapa z utworem wyciszona (teraz <= 0.01); kazdy stop -> 'wrocila' (>= zapamietana - 0.01, zapamietana >= 0.95) albo 'przejmuje bitwa' przed nastepnym "
+            "wlaczeniem (log uciety - INFO)", (not probs) if (D["ons"] or D["offs"]) else None)
+    # MAP-4 kolejnosc: bez powtorki z rzedu, worek bez dubli
+    probs = []
+    if D["repeats"]:
+        probs.append(f"ten sam dwa razy z rzedu {len(D['repeats'])} ({D['repeats'][0]})")
+    if D["bagdup"]:
+        probs.append(f"dubel w worku {len(D['bagdup'])} ({D['bagdup'][0]})")
+    rep.add("MAP-4: kolejnosc (worek, bez powtorki z rzedu)", f"utworow {len(D['trk'])}, powtorki z rzedu {len(D['repeats'])}, duble w worku {len(D['bagdup'])}"
+            + (" | " + "; ".join(probs) if probs else ""), "0 i 0 (zestaw z 1 utworem - 'jedyny - powtorka' dozwolone; < 2 utworow - INFO)",
+            (not probs) if (len(D["trk"]) >= 2 or probs) else None)
+    # MAP-5 przerwy
+    gb = list(D["gap_bad"])
+    for why, n in D["on_gaps"]:
+        lo, hi = M165MAPA_AFTER[why]
+        if not (lo <= n <= hi):
+            gb.append(f"wlaczenie: nastepny za {n} s ({why})")
+    whys = {}
+    for t in D["trk"]:
+        whys[t["why"]] = whys.get(t["why"], 0) + 1
+    rep.add("MAP-5: przerwy (20-40 s po utworze, 5-10 s po misji, 3 s po oknie, 5 s na start)", f"konce z przerwa {sum(1 for e in D['ends'] if e['next'] is not None)}, "
+            f"wlaczen {len(D['on_gaps'])}, powody utworow {whys}" + (" | " + "; ".join(gb[:3]) if gb else ""),
+            "kazda przerwa w swoim zakresie (nie grany - 5 s)", (not gb) if (D["ends"] or D["on_gaps"]) else None)
+    # MAP-6 bledy
+    keyno = bool(D["starts"]) and not tak
+    vals = {"ERROR EventMusic.MapaTlo": D["err"], "silnik nie przyjal": D["rej"], "rezygnacje": D["gave"], "brak psai / utworow": 0 if keyno else D["nores"]}
+    rep.add("MAP-6: bledy muzyki mapy", ", ".join(f"{k} {v}" for k, v in vals.items()) + (f" | {D['err1']}" if D["err1"] else ""), "wszystko 0",
+            all(v == 0 for v in vals.values()))
+
+
+def m165mapa_synth():
+    """m165mapa - test syntetyczny: dobry (okno, misja, bitwa z przejeciem), zly, bez linii m165, klucz NIE. None = werdykty zgodne, inaczej opis."""
+    import tempfile
+    import shutil
+    T, T9 = M165MAPA_TEST, M109MUZ_TEST
+    P, P8, P9 = "[10:00:00] " + M165MAPA_TAG, "[10:00:00] " + M109MUZ_M108, "[10:00:00] " + M109MUZ_TAG
+
+    def trk(n, f, why, k, note=""):
+        return P + "utwor %d - %s (lufs23, 125.0 s, %s, worek %d/10%s)." % (n, f, why, k, note)
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="m165mapa_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind in ("good", "bad"):
+                L.append(P + (T["start"] if kind == "good" else T["start"].replace("psai TAK", "psai NIE")))
+                L += [P + T["on"], P + T["duck"], trk(1, "map_01_krolewski_trakt.ogg", "start", 1), P + T["end"]]
+                if kind == "good":
+                    L += [trk(2, "map_02_polnoc.ogg", "po przerwie", 2), P + T["cutwin"], P8 + T9["win"], P8 + T9["winmap"],
+                          trk(3, "map_03_dorzecze.ogg", "po oknie", 3), P + T["cutmis"], P + T["off"], P + T["back"],
+                          P9 + T9["bat"], P9 + T9["endmap"], P + T["onbat"], P + T["duck"], trk(4, "map_04_dwor.ogg", "po misji", 4),
+                          P + T["end"].replace("map_01_krolewski_trakt", "map_04_dwor")]
+                else:
+                    L += [trk(2, "map_01_krolewski_trakt.ogg", "po przerwie", 2),                    # powtorka z rzedu i dubel w worku (MAP-4)
+                          P + T["end"].replace("nastepny za 27 s", "nastepny za 55 s").replace("grany po 1 s TAK", "grany po 1 s NIE"),   # MAP-5, MAP-1
+                          P + T["off"], P9 + T9["bat"], trk(3, "map_03_dorzecze.ogg", "po misji", 3),  # utwor w bitwie przy wylaczonej mapie (MAP-2)
+                          P + T["on"],                                                                # wlaczenie bez 'wrocila' po stopie (MAP-3)
+                          "[10:00:00] ERROR in EventMusic.MapaTlo.Next (potkniecie 1; kolejne tylko liczone): System.Exception: test"]
+            elif kind == "keyno":
+                L.append(P + T["startno"])
+            L.append("[10:00:00] Armoury: inna linia")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            m165mapa_rows(rep, m165mapa_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"MAP-0": "TAK", "MAP-1": "TAK", "MAP-2": "TAK", "MAP-3": "TAK", "MAP-4": "TAK", "MAP-5": "TAK", "MAP-6": "TAK"},
+        "bad": {"MAP-0": "NIE", "MAP-1": "NIE", "MAP-2": "NIE", "MAP-3": "NIE", "MAP-4": "NIE", "MAP-5": "NIE", "MAP-6": "NIE"},
+        "nostart": {"MAP-0": "INFO", "MAP-1": "INFO", "MAP-2": "INFO", "MAP-3": "INFO", "MAP-4": "INFO", "MAP-5": "INFO", "MAP-6": "TAK"},
+        "keyno": {"MAP-0": "INFO", "MAP-1": "INFO", "MAP-2": "INFO", "MAP-3": "INFO", "MAP-4": "INFO", "MAP-5": "INFO", "MAP-6": "TAK"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def m165mapa_main(logp):
+    """m165mapa (26.10, paczka 165): MAP-S, MAP-S2, MAP-0..MAP-6 - opis w --help. Strumieniowo."""
+    rep = Report()
+    s1 = m165mapa_selftest()
+    rep.add("MAP-S: self-test wyrazen (linie kontrolne jak w kodzie C#: EventMusic.MapaTlo.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = m165mapa_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("MAP-S2: test syntetyczny (dobry, zly, bez linii m165, klucz NIE)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("MAP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = m165mapa_collect(logp)
+    print(f"plik: {logp} | linii m165 {D['lines']}, startow {len(D['starts'])}, wlaczen mapy {D['ons']}, utworow {len(D['trk'])}, stopow {len(D['offs'])}, ERROR {D['err']}")
+    m165mapa_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_m165mapa_main_prev = main
+
+
+def main(argv):
+    # paczka 165: grupa m165mapa - opakowanie main jak ai139 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "m165mapa":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return m165mapa_main(rest[0] if rest else None)
+    return _m165mapa_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

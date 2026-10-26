@@ -9796,6 +9796,10 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public bool StopEventThemesOnMap { get; set; } = true;
 
+        [SettingPropertyBool("Our Map Music", HintText = "on the campaign map the game's own map music gives way to the mod's calm background pieces in the spirit of the old kingdoms - lutes, fiddles, cellos and drones, low and steady so they never pull your attention: each piece once in a shuffled order before any comes again, with twenty to forty seconds of quiet between them. Story windows and the narrator bring their own music, and the map pieces come back a few seconds after the window closes; battles and visits to towns, castles and villages keep their own music, and the map pieces return a few seconds after you are back on the map. Town, castle and village menus, talks on the map and stopped time keep the piece playing. They play one notch softer than Battle Music Loudness. Off = the game's map music, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Narrator")]
+        public bool MapMusicOurs { get; set; } = true;
+
         [SettingPropertyInteger("Narrator Gossip Reserve Chars", 0, 30000, "0", HintText = "letters always left untouched on your ElevenLabs plan: when fewer than this remain, no new gossip is recorded and only gossip already on your disk is read. The plan is checked once per session; if it cannot be checked, no new gossip is recorded", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public int LektorGossipReserveChars { get; set; } = 3000;
@@ -12556,6 +12560,7 @@ namespace Armoury
             s.BattleMusicOurs = BattleMusicOurs;
             s.BattleMusicLoudness = BattleMusicLoudness;
             s.StopEventThemesOnMap = StopEventThemesOnMap;
+            s.MapMusicOurs = MapMusicOurs;
             s.LektorGossipReserveChars = LektorGossipReserveChars;
             s.ChronicleOfWesteros = ChronicleOfWesteros;
             s.ChronicleWorldChanges = ChronicleWorldChanges;

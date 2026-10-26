@@ -85,11 +85,13 @@ namespace Armoury
 
         private static double GapOf() { return _batTest ? GapTestSec : GapSec; }
 
-        /// <summary>Zestaw utworow najblizszy zadanej glosnosci: pierwszy pelny (10), inaczej pierwszy niepusty; null - brak.</summary>
-        private static List<BTrack> PickSet(int lufs, out int got)
+        private static List<BTrack> PickSet(int lufs, out int got) { return PickFrom(_batSets, lufs, out got); }
+
+        /// <summary>Zestaw utworow najblizszy zadanej glosnosci: pierwszy pelny (10), inaczej pierwszy niepusty; null - brak. Paczka 165: wspolne dla bitwy i mapy.</summary>
+        private static List<BTrack> PickFrom(Dictionary<int, List<BTrack>> sets, int lufs, out int got)
         {
             got = lufs;
-            if (_batSets == null) return null;
+            if (sets == null) return null;
             List<BTrack> part = null;
             int partLufs = lufs;
             for (int dist = 0; dist <= 9; dist += 3)
@@ -98,7 +100,7 @@ namespace Armoury
                     if (dist == 0 && sgn == 1) continue;
                     int lu = sgn == 0 ? lufs - dist : lufs + dist;   // przy rownej odleglosci glosniejszy pierwszy
                     List<BTrack> l;
-                    if (!_batSets.TryGetValue(lu, out l) || l.Count == 0) continue;
+                    if (!sets.TryGetValue(lu, out l) || l.Count == 0) continue;
                     if (l.Count >= TrackSetFull) { got = lu; return l; }
                     if (part == null) { part = l; partLufs = lu; }
                 }
@@ -119,6 +121,7 @@ namespace Armoury
             catch (Exception e) { Stumble("MapStart", e); }
             try { BattleStartLine(); }
             catch (Exception e) { BattleStumble("Start", e); }
+            MapCampaignStart();   // paczka 165: muzyka mapy - stan od zera, linia biblioteki (wlasny try)
         }
 
         private static void BattleStartLine()
@@ -470,8 +473,9 @@ namespace Armoury
             _batPrevText = "poprzedni " + cur.File + " skonczony po " + _batPlayT.ToString("0.0", Inv) + " s (" + why + ")";
         }
 
-        /// <summary>Koniec bitwy: linia podsumowania, stop utworu. Wyciszenie psai zostaje - wraca FadeUp (linia "wrocila") albo RestoreNow, albo przejmuje okno.</summary>
-        private static void BattleEnd(string powod, bool odRazu)
+        /// <summary>Koniec bitwy: linia podsumowania, stop utworu. Wyciszenie psai zostaje - wraca FadeUp (linia "wrocila") albo RestoreNow, albo przejmuje okno
+        /// albo (paczka 165, mapa = true) nasza muzyka mapy - wtedy "muzyka gry dalej wyciszona (muzyka mapy)" i bez linii "wrocila".</summary>
+        private static void BattleEnd(string powod, bool odRazu, bool mapa = false)
         {
             bool had = _mus != null && _musMood == BattleMood;
             string file = had ? _musFile : null;
@@ -480,6 +484,7 @@ namespace Armoury
             _batCur = null;
             _batActive = false; _batOnMission = null; _active = false;
             string tail = powod == "okno wydarzenia" ? "muzyka gry dalej wyciszona (okno wydarzenia)"
+                        : mapa ? "muzyka gry dalej wyciszona (muzyka mapy)"
                         : odRazu ? "muzyka gry wraca od razu" : "muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s)";
             Log.Info(PB + "koniec bitwy (" + powod + ", misja " + _batOnName + ", " + (Now - _batBeganAt).ToString("0", Inv) + " s) - utworow " + _bN + " (koniec silnik "
                      + _bEndEngine + ", po czasie " + _bEndCap + ", test " + _bEndTest + ", nie grane " + _bNotPlayed + ", grane po 1 s NIE " + _bNo1s + "), powtorki z rzedu "

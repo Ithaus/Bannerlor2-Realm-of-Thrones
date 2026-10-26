@@ -26,6 +26,9 @@ namespace Armoury
     ///    m164: nastroj "wojna" gra muz_korona.ogg (MapMood, EventMusic.Mapa.cs) - muzyka wojenna tylko w bitwie; po oknie motyw wydarzenia ROT w psai zatrzymany
     ///    (EventThemeStop, klucz StopEventThemesOnMap); stop utworu przez StopRelease (Stop przed Release, gdy zdarzenie nie gra).
     ///  - Linie "Muzyka (m108): ..." (start okna z nastrojem i glosnoscia psai, koniec, bledy pierwsze 3). Potkniecia liczone, bez wylacznika.
+    ///  - Paczka 165 (EventMusic.MapaTlo.cs): na mapie kampanii nasze 10 spokojnych utworow map_NN zamiast muzyki mapy gry - ten sam stan wyciszenia psai i to samo
+    ///    gniazdo utworu (_mus, nastroj "mapa"); pierwszenstwo okno / plotki > bitwa > mapa. Okno przy mapie: utwor mapy stop, po oknie wyciszenie zostaje
+    ///    (linia "koniec wydarzenia - mapa dalej"); ekran ladowania - psai trzymane bez FadeUp (decyzja po ladowaniu: mapa albo misja).
     /// </summary>
     internal static partial class EventMusic
     {
@@ -110,21 +113,30 @@ namespace Armoury
                 if (!win) { try { gossip = Lektor.MusicGossipActive(); } catch (Exception e) { Stumble("Gossip", e); } }
             }
             bool battle = !win && !gossip && BattleWanted();   // m109-muzyka: okno i plotki maja pierwszenstwo (wlasny try w srodku)
-            bool want = win || gossip || battle;
-            if (!want && !_active && !_ducked && _mus == null) return;   // nic nie gra i nic nie czeka
-            try { Step(want, win, battle, dt); }
+            bool map = !win && !gossip && !battle && MapWanted();   // paczka 165: mapa kampanii na koncu kolejki (wlasny try w srodku, bez alokacji)
+            bool want = win || gossip || battle || map;
+            if (!want && !_active && !_ducked && _mus == null && !_mapOn) return;   // nic nie gra i nic nie czeka
+            try { Step(want, win, battle, map, dt); }
             catch (Exception e)
             {
                 if (battle) BattleStumble("Step", e);   // m109-muzyka: blad w bitwie liczony na misje (po 3 rezygnacja z tej misji), bez przywracania co klatke
+                else if (map) { MapStumble("Step", e); MapFail("Step"); RestoreNow("blad"); }   // paczka 165: po 3 z rzedu rezygnacja do nastepnej misji / wczytania
                 else { Stumble("Step", e); RestoreNow("blad"); }
             }
         }
 
-        private static void Step(bool want, bool win, bool battle, float dt)
+        private static void Step(bool want, bool win, bool battle, bool map, float dt)
         {
             if (want)
             {
-                if (battle) { BattleStep(dt); FadeDown(dt); return; }   // m109-muzyka: nasze utwory bitewne, psai trzymane na 0
+                if (battle)
+                {
+                    if (_mapOn) MapOff("misja", "przejmuje bitwa");   // paczka 165: nie powinno sie zdarzyc (misja wylacza mape klatki wczesniej)
+                    MapHandOver("bitwa");                               // paczka 165: psai po mapie jeszcze nie wrocilo - przejmuje bitwa (linia zamiast "wrocila")
+                    BattleStep(dt); FadeDown(dt); return;               // m109-muzyka: nasze utwory bitewne, psai trzymane na 0
+                }
+                if (map) { MapStep(dt); return; }                       // paczka 165: nasze utwory mapy, psai trzymane na 0 (EventMusic.MapaTlo.cs)
+                if (_mapOn) MapYield(win ? "okno wydarzenia" : "plotki");   // paczka 165: utwor mapy stop od razu, po oknie nastepny za ok. 3 s
                 if (_batActive) BattleEnd("okno wydarzenia", false);    // m109-muzyka: okno wydarzenia przejmuje (wyciszenie zostaje)
                 _idle = 0f;
                 string asked = win ? _mood : "plotka";
@@ -145,6 +157,9 @@ namespace Armoury
             }
             // bez okna i plotek: chwila zapasu (kolejne okno zaraz po zamknieciu), potem stop utworu i powrot muzyki gry
             _idle += dt;
+            // paczka 165: ekran ladowania w kampanii przy wyciszonym psai (np. powrot z bitwy na mape) - psai trzymane, bez FadeUp; po ladowaniu mapa albo misja
+            bool loadHold = _mapOffWhy == "ekran ladowania" && _ducked;
+            if (_mapOn && !loadHold) MapOff(_mapOffWhy, "muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s)");   // paczka 165: misja, klucz NIE, inny stan
             if (_active && _idle >= ReleaseDelay)
             {
                 _active = false;
@@ -157,7 +172,7 @@ namespace Armoury
                 }
                 _paused = false;
             }
-            if (!_active && _ducked) FadeUp(dt);
+            if (!_active && _ducked && !loadHold) FadeUp(dt);
         }
 
         // ------------------------------------------------------------ psai
@@ -225,10 +240,10 @@ namespace Armoury
         private static void FadeUp(float dt)
         {
             object ps = Psai();
-            if (ps == null) { _ducked = false; BattleUnducked(null, null); return; }
+            if (ps == null) { _ducked = false; BattleUnducked(null, null); MapUnducked(null, null); return; }
             _cur = Math.Min(_saved, _cur + dt * Math.Max(_saved, 0.1f) / FadeInSec);
             _mSetVol.Invoke(ps, new object[] { _cur });
-            if (_cur >= _saved - 0.0001f) { _ducked = false; BattleUnducked(ps, null); }   // m109-muzyka: linia powrotu po bitwie
+            if (_cur >= _saved - 0.0001f) { _ducked = false; BattleUnducked(ps, null); MapUnducked(ps, null); }   // m109-muzyka: linia powrotu po bitwie; paczka 165: po mapie
         }
 
         private static void PsaiPause(bool p)
@@ -241,6 +256,7 @@ namespace Armoury
         internal static void RestoreNow(string why)
         {
             try { if (_batActive) BattleEnd(why, true); } catch (Exception e) { Stumble("RestoreNow.Bitwa", e); }   // m109-muzyka: podsumowanie bitwy i stop utworu
+            try { MapReset(why); } catch (Exception e) { MapStumble("RestoreNow.Mapa", e); }   // paczka 165: utwor mapy stop, stan mapy od zera
             try { StopTrack(why); } catch (Exception e) { Stumble("RestoreNow.Stop", e); }
             try
             {
@@ -253,10 +269,11 @@ namespace Armoury
                     }
                     Log.Info(P + "muzyka gry przywrocona od razu (" + why + ").");
                     BattleUnducked(ps, why);   // m109-muzyka: linia powrotu po bitwie "od razu"
+                    MapUnducked(ps, why);      // paczka 165: linia powrotu po mapie "od razu"
                 }
             }
             catch (Exception e) { Stumble("RestoreNow.Psai", e); }
-            _ducked = false; _paused = false; _active = false; _idle = 0f; _cur = _saved;
+            _ducked = false; _paused = false; _active = false; _idle = 0f; _cur = _saved; _duckMap = false;
             BattleReset(why);   // m109-muzyka: stan bitwy od zera (wczytanie zapisu z misji, wyjscie do menu); blad w misji bitwy - rezygnacja z tej misji
         }
 
