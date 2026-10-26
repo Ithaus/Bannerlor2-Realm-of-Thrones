@@ -628,6 +628,18 @@ namespace Armoury
             return _sndResolved == 1;
         }
 
+        /// <summary>165b recenzja (EventMusic.StopFree): ReleaseEvent(id) przez ISoundEvent silnika, gdy id wciaz wazne po Stop (SoundEvent.Stop zeruje swoje id,
+        /// wiec Release gry po Stop nic nie zwalnia). 1 - zwolnione po id, 0 - id juz niewazne (zwolnil Stop), -1 - brak odbicia (wolajacy zostaje przy drodze gry).</summary>
+        internal static int ReleaseById(int id)
+        {
+            if (id < 0 || !EngineSnd()) return -1;
+            if ((bool)_mSndValid.Invoke(_iSnd, new object[] { id })) { _mSndRelease.Invoke(_iSnd, new object[] { id }); return 1; }
+            return 0;
+        }
+
+        /// <summary>Czy jest odbicie ISoundEvent (ReleaseById zadziala).</summary>
+        internal static bool CanReleaseById() { return EngineSnd(); }
+
         /// <summary>Zatrzymanie jednego zdarzenia (beben przy szarzy) - Release jak w grze.</summary>
         private static void Cut(Snd s)
         {

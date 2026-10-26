@@ -364,12 +364,13 @@ namespace Armoury
             SoundEvent ev = null;
             try { ev = SoundEvent.CreateEventFromExternalFile(MusicEvent, pick.Path, (Scene)null, false, false); }
             catch (Exception e) { BattleStumble("Create", e); return false; }
+            LiveAdd(ev, pick.File);   // 165b: do kontroli mapy (nasze zdarzenia grajace)
             bool ok = false, threw = false;
             try { ok = ev != null && ev.IsValid && ev.Play(); } catch (Exception e) { threw = true; BattleStumble("Play", e); }
             if (!ok)
             {
                 _batRejects++;
-                try { if (ev != null && ev.IsValid) ev.Release(); } catch { }
+                FreeRejected(ev);   // 165b recenzja: Stop i ReleaseEvent(id) (Release po Stop nic nie zwalnial), wpis z kontroli
                 if (_batRejects <= 3) Log.Info(PB + "silnik nie przyjal " + pick.File + " (zdarzenie " + MusicEvent + ") - nastepny za " + GapOf().ToString("0", Inv) + " s.");
                 if (!threw) MisFail("Next");
                 return false;
