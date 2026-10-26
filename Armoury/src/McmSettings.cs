@@ -1604,7 +1604,7 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool AutoParryMirrorSides { get; set; } = true;
 
-        [SettingPropertyBool("Ai Shields Up Under Fire", HintText = "AI soldiers who carry a shield take it up when arrows, bolts or javelins come at them or their formation: a man with a pike or two-handed weapon and a shield on his back switches to his one-handed weapon and shield (never with an enemy within 8 m), holds the shield up while the shooting lasts and goes back to his own choice of weapon when it stops - in close combat he keeps sword and shield. Archers and crossbowmen with arrows or bolts left keep shooting; panicking men, horsemen, standard bearers and men on ladders or engines are left alone. All sides alike. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Ai Shields Up Under Fire", HintText = "AI soldiers who carry a shield take it up when arrows, bolts or javelins come at them or their formation: a man with a pike or two-handed weapon and a shield on his back switches to his one-handed weapon and shield (never with an enemy within 8 m), holds the shield up while the shooting lasts and goes back to his own choice of weapon when it stops - in close combat he keeps sword and shield. Archers and crossbowmen with arrows or bolts left keep shooting; panicking men, standard bearers and men on ladders or engines are left alone; horsemen follow Riders Shields Up Under Fire. All sides alike. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool AiShieldsUpUnderFire { get; set; } = true;
 
@@ -1627,6 +1627,18 @@ namespace Armoury
         [SettingPropertyBool("Ai Formations Under Fire", HintText = "with AI Shields Up Under Fire: an AI infantry formation that comes under arrows, bolts or javelins before it closes with the enemy changes its order to live through it - a shield wall when at least six in ten of its men hold a shield, open order when fewer do (but not with enemy horse within 90 m) - and leaves the choice to RBM again once it is in close combat or the shooting stops; the order changes at most once in 10 seconds. Field battles only; formations under your command are never touched. Needs RBM. Off = RBM picks the order alone, as before", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool AiFormationsUnderFire { get; set; } = true;
+
+        [SettingPropertyBool("Cavalry Under Fire Log", HintText = "log only, no change to the battle: once per field battle Armoury.log gets a line on how AI cavalry formations behave while arrows and bolts fall on them - which RBM or game behaviour holds them, their movement order, the mod's own pace limits, how near the closest enemy is and how often their riders are hit while the formation does not charge. Off = no such line", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool CavalryUnderFireLog { get; set; } = true;
+
+        [SettingPropertyBool("Riders Shields Up Under Fire", HintText = "with AI Shields Up Under Fire: AI horsemen who carry a shield take it too when they are shot at. A rider with a one-handed weapon or one-handed lance only takes the shield onto his arm; a rider with a two-handed lance or polearm changes to his one-handed side weapon and shield (or holds the same weapon one-handed if it allows it) - but never while his formation charges or with an enemy within 4 m, so the lance is kept for the charge. Once the shooting has stopped for a while, or his formation charges, he may take the lance again. Horse archers with arrows left, standard bearers, dragon riders and riders chasing the routed are left alone. Off = horsemen are left alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool RidersShieldsUpUnderFire { get; set; } = true;
+
+        [SettingPropertyBool("Riders Run Down Shooters", HintText = "when an AI horseman with a melee weapon is hit by an arrow or bolt while his formation is not charging (for example while it guards a flank), he may ride down the man who shot him - at most two riders of a formation at once, only if the shooter is within 60 m and not standing by an unbroken enemy formation on foot. He gives up after 20 seconds, when the shooter gets more than 80 m away, when his horse is blown (Horse AI Rest Below), when he is 150 m from his formation or when his formation charges, and may do it again after 30 seconds. Lords, standard bearers, horse archers, dragon riders and your own formations never do it. Field battles only. Off = riders stay in their formation, as before (still measured for the log)", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool RidersRunDownShooters { get; set; } = true;
 
         [SettingPropertyBool("Duel Ai Enabled", HintText = "in tournaments, the arena and duels a skilled opponent fights like one: he attacks on his own, ripostes after a parry, feints and kicks, and does not stand behind his guard waiting for you - from about skill 100 up (on Realistic; a lower difficulty raises this, later tournament rounds lower it), the higher his skill the bolder he is; below that he fights as RBM sets him. A knight handed an unfamiliar weapon in the lists still fights with most of his best skill, and later rounds of a tournament field harder opponents. Needs RBM with posture; field battles are not touched. Off = plain RBM in duels, as before", RequireRestart = false)]
         [SettingPropertyGroup("Duels and tournaments")]
@@ -10490,6 +10502,9 @@ namespace Armoury
             s.ShieldsUpYourMenToo = ShieldsUpYourMenToo;
             s.PikesKeptAgainstHorse = PikesKeptAgainstHorse;
             s.AiFormationsUnderFire = AiFormationsUnderFire;
+            s.CavalryUnderFireLog = CavalryUnderFireLog;
+            s.RidersShieldsUpUnderFire = RidersShieldsUpUnderFire;
+            s.RidersRunDownShooters = RidersRunDownShooters;
             s.DuelAiEnabled = DuelAiEnabled;
             s.DuelAiBestSkillShare = DuelAiBestSkillShare;
             s.DuelAiTourneyRoundStep = DuelAiTourneyRoundStep;
