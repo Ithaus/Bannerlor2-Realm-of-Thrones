@@ -1155,6 +1155,8 @@ Uzycie (Python 3, tylko odczyt):
                     >= 1 wykrycie, w tym pudlo albo przelot; J204-2 >= 1 epizod i jezdzcow >= min(2, wolnej jazdy); J204-3 kontakt albo epizod 'padl od jezdzcow' /
                     'odpedzony'; J204-4 z szyku gracza 0; J204-5 pod sterowaniem 204 na koniec 0, potkniecia jazda 0, 'ERROR in HorsePursuit' 0; J204-6 INFO (gra Jeffa:
                     epizody na gracza). Bez nekajacego (DLL autotestu bez klucza harasser, plan bitwy inny niz mocna) J204-1..3 = NIE SPRAWDZONE (INFO), nie TAK.
+                    J204-7 (recenzja 204): strzelcy AI w nietknietym szyku swojej strony - z jednego szyku konnicy najwyzej 'limit' (PerVictim 2) jezdzcow naraz na wszystkich
+                    takich strzelcow (segment 'strzelcy w szyku'); w INFO takze powroty 'zwarcie' / 'przy szyku strzelca' / 'bez sprawdzenia FF'.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -69842,6 +69844,8 @@ M204_RX = {
     "player": re.compile(r"\| z szyku gracza (\d+) \(oczekiwane 0\)"),
     "left": re.compile(r"\| pod sterowaniem 204 na koniec (\d+) \(oczekiwane 0\)"),
     "stum": re.compile(r"\| potkniecia jazda (\d+) \(wypadli (\d+)\)\.$"),
+    "grp": re.compile(r"\| strzelcy w szyku (\d+) \(najwiecej z jednego szyku (\d+), limit (\d+), ucietych limitem (\d+); kontrola zwarcia ponad limit (\d+)\)"),
+    "ret": re.compile(r"\| powroty: .*?, zwarcie (\d+), przy szyku strzelca (\d+), bez sprawdzenia FF (\d+);"),
     "start": re.compile(r"^Jazda na strzelca \(204\) start: strzelec (\S+) \((gracz|AI), konno, (\S+)\) \| strona (atak|obrona) \| wykrycie (trafienie|pudlo|przelot|cel AI), "
                         r"pociskow w 5 s (\d+), padlo od niego (\d+) \| poziom (oddzial|szyk|cala jazda).*? \| jezdzcow (\d+) \(z szyku w szarzy (\d+)\), "
                         r"lucznikow na cel (\d+) \| odleglosc od szyku (\d+) m$"),
@@ -69864,8 +69868,9 @@ M204_TEST = {
              "na cel 4, strzaly w strzelca 2, cel zdjety - swoi przy strzelcu 0, limit lucznikow 0) | kontakt 2 (sr. 6.5 / min 5.0 / max 8.0 s; ciosy w strzelca 3) | "
              "wyniki padl od jezdzcow 1, padl od innych 0, odpedzony 1, uszedl poza smycz 0, konie 0, odwrot wodza 0, koniec bitwy 0, inne 0 | nie wyslani: w zwarciu 3, "
              "panika/odwrot 0, poscig 148 0, bohater 1, chorazy 0, kon 0, daleko 0, szyk gracza 0, strona przegrywa 0, zajety 0, przerwa 0, limit zapytan 0, "
-             "smok/umarly 0 | powroty: padl 1, panika 0, kon 0, smycz 0, odwrot wodza 0, gracz przejal 0, klucz 0, koniec bitwy 0, koniec strzelca 6, poza zasiegiem 0, "
-             "swoi przy strzelcu 0, inne 0; najdalej od szyku 80 m; jezdzcy padli 1 | z szyku gracza 0 (oczekiwane 0) | pod sterowaniem 204 na koniec 0 "
+             "smok/umarly 0, przy szyku strzelca 0 | powroty: padl 1, panika 0, kon 0, smycz 0, odwrot wodza 0, gracz przejal 0, klucz 0, koniec bitwy 0, koniec strzelca 6, "
+             "poza zasiegiem 0, swoi przy strzelcu 0, inne 0, zwarcie 2, przy szyku strzelca 1, bez sprawdzenia FF 0; najdalej od szyku 80 m; jezdzcy padli 1 | strzelcy "
+             "w szyku 3 (najwiecej z jednego szyku 2, limit 2, ucietych limitem 4; kontrola zwarcia ponad limit 0) | z szyku gracza 0 (oczekiwane 0) | pod sterowaniem 204 na koniec 0 "
              "(oczekiwane 0) | FF w jezdzcow 0 (pociski 0, wrecz 0) | cap marszu pominiety 5, odswiezen celu 120 | test: nekajacy strzalow 12, wykryc 14, epizodow 2, "
              "jezdzcow 7, wynik padl | potkniecia jazda 0 (wypadli 0)."),
     "lineno": ("Jazda na strzelca (204): misja bitwa, klucz NIE (tylko wykrycia, bez sterowania) (konny strzelec ...) | wykrycia 0 (trafienia 0, pudla przy ludziach 0, "
@@ -69910,6 +69915,12 @@ def m204jazda_selftest():
         return f"wyniki {out}"
     if RX["player"].search(s).group(1) != "0" or RX["left"].search(s).group(1) != "0" or RX["stum"].search(s).groups() != ("0", "0"):
         return "player/left/stum"
+    m = RX["grp"].search(s)
+    if not m or m.groups() != ("3", "2", "2", "4", "0"):
+        return f"grp: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["ret"].search(s)
+    if not m or m.groups() != ("2", "1", "0"):
+        return f"ret: {m.groups() if m else 'brak dopasowania'}"
     s = T["lineno"]
     m = RX["line"].match(s)
     if not m or m.group(2) != "NIE" or RX["stum"].search(s).group(1) != "0":
@@ -70039,6 +70050,17 @@ def m204jazda_rows(rep, D):
             for k, v in RX["outkv"].findall(mo.group(1)):
                 outs[k.strip()] = outs.get(k.strip(), 0) + int(v)
     onpl = [m for _, m in D["starts"] if m.group(2) == "gracz"]
+    # J204-7: strzelcy w szyku - z jednego szyku najwyzej limit jezdzcow naraz (recenzja 204)
+    grp = [RX["grp"].search(s) for s in lines]
+    grp = [m for m in grp if m]
+    ret = [RX["ret"].search(s) for s in lines]
+    ret = [m for m in ret if m]
+    over = [m for m in grp if int(m.group(2)) > int(m.group(3))]
+    rep.add("J204-7: strzelcy w szyku - jezdzcow z jednego szyku naraz <= limit",
+            f"linii {len(grp)}, strzelcow w szyku {sum(int(m.group(1)) for m in grp)}, najwiecej z jednego szyku {max([int(m.group(2)) for m in grp] + [0])}, "
+            f"ucietych limitem {sum(int(m.group(4)) for m in grp)}, ponad limit {len(over)}; powroty zwarcie {sum(int(m.group(1)) for m in ret)}, przy szyku strzelca "
+            f"{sum(int(m.group(2)) for m in ret)}, bez sprawdzenia FF {sum(int(m.group(3)) for m in ret)}",
+            "najwiecej <= limit w kazdej bitwie (brak segmentu - INFO)", None if not grp else not over)
     rep.add("J204-6: bitwy (INFO)",
             f"wykrycia {sum(int(m.group(1)) for m in det)} (trafienia {sum(int(m.group(2)) for m in det)}, pudla {sum(int(m.group(3)) for m in det)}, przelot "
             f"{sum(int(m.group(4)) for m in det)}, cel AI {sum(int(m.group(5)) for m in det)}; strzelec gracz w {sum(int(m.group(7)) for m in det)} bitwach); epizody "
@@ -70056,7 +70078,8 @@ def m204jazda_synth():
     nb2 = "Bitwa (NB2): misja bitwa (pole bitwy TAK, ...)"
     bad_line = (T["line"].replace("| z szyku gracza 0 (oczekiwane 0)", "| z szyku gracza 2 (oczekiwane 0)")
                 .replace("| pod sterowaniem 204 na koniec 0 (oczekiwane 0)", "| pod sterowaniem 204 na koniec 1 (oczekiwane 0)")
-                .replace("| potkniecia jazda 0 (wypadli 0).", "| potkniecia jazda 3 (wypadli 1)."))
+                .replace("| potkniecia jazda 0 (wypadli 0).", "| potkniecia jazda 3 (wypadli 1).")
+                .replace("najwiecej z jednego szyku 2, limit 2", "najwiecej z jednego szyku 9, limit 2"))
     bad_tend = ("Jazda na strzelca (204) TEST koniec: strzalow 9, wykryc 2 (w tym pudla/przelot 0), epizodow 0, jezdzcow 0, kontakt -, wynik zwolniony po 120 s "
                 "po 120.0 s | wolnej jazdy wroga 6 (szykow 1)")
     runs = {
@@ -70066,10 +70089,10 @@ def m204jazda_synth():
         "empty": ["Armoury: inna linia"],
     }
     exp = {
-        "good": {"J204-0": "TAK", "J204-1": "TAK", "J204-2": "TAK", "J204-3": "TAK", "J204-4": "TAK", "J204-5": "TAK", "J204-6": "INFO"},
-        "bad": {"J204-1": "NIE", "J204-2": "NIE", "J204-3": "NIE", "J204-4": "NIE", "J204-5": "NIE"},
-        "nohar": {"J204-0": "TAK", "J204-1": "INFO", "J204-2": "INFO", "J204-3": "INFO", "J204-5": "TAK"},
-        "empty": {"J204-0": "INFO", "J204-1": "INFO", "J204-4": "INFO", "J204-5": "INFO"},
+        "good": {"J204-0": "TAK", "J204-1": "TAK", "J204-2": "TAK", "J204-3": "TAK", "J204-4": "TAK", "J204-5": "TAK", "J204-6": "INFO", "J204-7": "TAK"},
+        "bad": {"J204-1": "NIE", "J204-2": "NIE", "J204-3": "NIE", "J204-4": "NIE", "J204-5": "NIE", "J204-7": "NIE"},
+        "nohar": {"J204-0": "TAK", "J204-1": "INFO", "J204-2": "INFO", "J204-3": "INFO", "J204-5": "TAK", "J204-7": "TAK"},
+        "empty": {"J204-0": "INFO", "J204-1": "INFO", "J204-4": "INFO", "J204-5": "INFO", "J204-7": "INFO"},
     }
     tmp = tempfile.mkdtemp(prefix="m204_")
     diff = []
@@ -70087,7 +70110,7 @@ def m204jazda_synth():
 
 
 def m204jazda_main(logp):
-    """m204jazda (26.10, paczka 204): J204-S, J204-S2, J204-0..J204-6 - opis w --help. Strumieniowo."""
+    """m204jazda (26.10, paczka 204): J204-S, J204-S2, J204-0..J204-7 - opis w --help. Strumieniowo."""
     rep = Report()
     s1 = m204jazda_selftest()
     rep.add("J204-S: self-test wyrazen (linie kontrolne jak w kodzie C#: HorsePursuit.Hunt.cs, HorsePursuit.HuntTest.cs)", s1 or "OK",

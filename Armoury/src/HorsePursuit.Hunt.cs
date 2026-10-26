@@ -44,6 +44,11 @@ namespace Armoury
     /// Watki: OnFire / pass / krok - glowny watek; OnHit bywa z ticku asynchronicznego - tylko tablice wedlug Agent.Index i Interlocked, ciosy w strzelca do
     /// kolejki pod lockiem. Nic nie trafia do zapisu - stan jednej misji (Begin / End). Wyjatek = licznik "potkniecia jazda" (bez wylacznika).
     /// Linie: "Jazda na strzelca (204) start / poziom / kontakt / koniec" (najwyzej 12 na bitwe) i "Jazda na strzelca (204): misja ..." raz na bitwe polowa.
+    /// Recenzja 204: strzelec AI w nietknietym szyku swojej strony (szyk konnych lucznikow) = zagrozenie szyku - tylko L1, z jednego szyku najwyzej PerVictim
+    /// jezdzcow naraz na wszystkich takich strzelcow (FormGroup); czlowiek 204 z wrogiem innym niz strzelec w RaiseNear oddany grze (zwarcie, wlasny limit zapytan
+    /// z obrotem, zwarcie zapamietane ShieldsUp.Window s); jezdziec w CounterFootGap od nietknietego szyku strony strzelca zawraca (jak OIntact 148); zapytanie
+    /// o zwarcie tylko dla potrzebnych najblizszych; sprawdzenie swoich przy strzelcu ma wlasny limit (bez niego cel lucznikow zdjety); odpedzony i odciecie
+    /// mierzone od ludzi szyku, ktorzy nie jada za strzelcem (FI.Rest).
     /// </summary>
     internal static partial class HorsePursuit
     {
@@ -61,10 +66,13 @@ namespace Armoury
         private const int HDownRiders = 0, HDownOthers = 1, HAway = 2, HLeash = 3, HHorses = 4, HRetreat = 5, HEnded = 6, HOther = 7, HKinds = 8;
         private static readonly string[] HName = { "padl od jezdzcow", "padl od innych", "odpedzony", "uszedl poza smycz", "konie", "odwrot wodza", "koniec bitwy", "inne" };
         // koniec jezdzca / lucznika
-        private const int UGone = 0, UPanic = 1, UHorse = 2, ULeash = 3, URetreat = 4, UPlayer = 5, UKey = 6, UEnded = 7, UOther = 8, UThreat = 9, URange = 10, UFriend = 11, UKinds = 12;
+        // recenzja 204: UMelee - wrog inny niz strzelec w RaiseNear (bron sie sam), UIntact - jezdziec w CounterFootGap od nietknietego szyku strony strzelca
+        // (bez wjazdu w jego szyk, jak OIntact 148), UNoCheck - lucznicy bez sprawdzenia swoich przy strzelcu (limit zapytan) - cel zdjety
+        private const int UGone = 0, UPanic = 1, UHorse = 2, ULeash = 3, URetreat = 4, UPlayer = 5, UKey = 6, UEnded = 7, UOther = 8, UThreat = 9, URange = 10, UFriend = 11,
+                          UMelee = 12, UIntact = 13, UNoCheck = 14, UKinds = 15;
         // nie wyslani (rozni ludzie)
         private const int NwMelee = 0, NwPanic = 1, NwChase = 2, NwHero = 3, NwBanner = 4, NwHorse = 5, NwFar = 6, NwPlayer = 7, NwLosing = 8, NwBusy = 9, NwCool = 10,
-                          NwQuery = 11, NwOther = 12, NwKinds = 13;
+                          NwQuery = 11, NwOther = 12, NwIntact = 13, NwKinds = 14;
         private static readonly string[] LName = { "-", "oddzial", "szyk", "cala jazda" };
 
         private sealed class Threat
@@ -75,6 +83,7 @@ namespace Armoury
             public readonly Queue<float> Shots = new Queue<float>();
             public float LastFire, L2At, Start, FirstContact = -1f, MaxFar;
             public bool Active, Screen, LosingNoted;
+            public bool Group;   // recenzja 204: strzelec AI w nietknietym szyku swojej strony (konni lucznicy szykiem) - tylko L1, wspolny limit PerVictim z szyku
             public Vec2 ScreenC = Vec2.Invalid, EscC = Vec2.Invalid;
             public float ScreenR;
             public readonly List<Hunter> Hs = new List<Hunter>();
@@ -86,6 +95,7 @@ namespace Armoury
             public Formation F;
             public Threat T;
             public byte Role;
+            public bool Group;   // wyslany na strzelca w szyku (licznik FormGroup)
             public float Start, Range;
             public int Fails;
         }
@@ -94,6 +104,7 @@ namespace Armoury
         {
             public Formation F;
             public Vec2 C;
+            public Vec2 Rest;   // recenzja 204: srodek ludzi szyku bez jezdzcow 204 (odpedzony / kierunek odciecia - mediana szyku jedzie z poscigiem)
             public float R;
             public int N;
             public bool Cav, Ha, Foot, Rng, Player, Retreat, Charging;
@@ -102,7 +113,7 @@ namespace Armoury
         // ------------------------------------------------------------ stan misji (glowny watek)
         private static bool _hKey;
         private static float _hold = 8f;
-        private static int _shots3 = 3, _hFrameQ, _hQPass, _hNewRanged, _hRot;
+        private static int _shots3 = 3, _hFrameQ, _hQPass, _hNewRanged, _hRot, _hQChk, _hQFriend, _hChkRot;
         private static readonly Dictionary<Agent, Threat> Threats = new Dictionary<Agent, Threat>();
         private static readonly List<Threat> ThreatList = new List<Threat>();
         private static readonly List<Threat> ThreatTmp = new List<Threat>();
@@ -118,6 +129,10 @@ namespace Armoury
         private static readonly List<int> RangedForms = new List<int>();
         private static readonly List<float> RangedRange = new List<float>();
         private static readonly StringBuilder HFormsTxt = new StringBuilder(128);
+        // recenzja 204: jezdzcy 204 wedlug szyku (wszyscy / na strzelcow w szyku), zwarcie zapamietane (bez ponownego zapytania), lista kontroli zwarcia
+        private static readonly Dictionary<Formation, int> FormRiders = new Dictionary<Formation, int>(), FormGroup = new Dictionary<Formation, int>();
+        private static readonly Dictionary<Agent, float> MeleeUntil = new Dictionary<Agent, float>();
+        private static readonly List<Hunter> HChk = new List<Hunter>();
         // tablice wedlug Agent.Index (OnHit z dowolnego watku): strzelcy z Threat, lucznicy z celem 204 (rola strzelecka)
         private static Agent[] _hunted, _aiming;
         private static readonly object HLock = new object();
@@ -125,6 +140,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki misji
         private static readonly int[] HDet = new int[DKinds], HOut = new int[HKinds], HEpL = new int[4], UEnd = new int[UKinds], Nw = new int[NwKinds];
+        private static readonly HashSet<int> HGroupShooters = new HashSet<int>();
+        private static int _hGroupCut, _hGroupMax, _hChkOver;
         private static readonly HashSet<int> HShooters = new HashSet<int>(), HRiders = new HashSet<int>(), HHorseArch = new HashSet<int>(), HFootArch = new HashSet<int>();
         private static readonly HashSet<long> NwSeen = new HashSet<long>();
         private static readonly HashSet<Formation> HFormsSent = new HashSet<Formation>(), NwPlayerForms = new HashSet<Formation>();
@@ -165,6 +182,8 @@ namespace Armoury
             Threats.Clear(); ThreatList.Clear(); ThreatTmp.Clear(); Hunters.Clear(); HList.Clear(); HuntCool.Clear(); DownBy.Clear();
             HForms[0].Clear(); HForms[1].Clear(); HUnits.Clear(); HBuf.Clear(); HCand.Clear(); RangedForms.Clear(); RangedRange.Clear();
             lock (HLock) BlowQ.Clear();
+            FormRiders.Clear(); FormGroup.Clear(); MeleeUntil.Clear(); HChk.Clear(); HGroupShooters.Clear();
+            _hQChk = _hQFriend = _hChkRot = _hGroupCut = _hGroupMax = _hChkOver = 0;
             Array.Clear(HDet, 0, HDet.Length); Array.Clear(HOut, 0, HOut.Length); Array.Clear(HEpL, 0, HEpL.Length);
             Array.Clear(UEnd, 0, UEnd.Length); Array.Clear(Nw, 0, Nw.Length);
             HShooters.Clear(); HRiders.Clear(); HHorseArch.Clear(); HFootArch.Clear(); NwSeen.Clear(); HFormsSent.Clear(); NwPlayerForms.Clear();
@@ -387,6 +406,9 @@ namespace Armoury
                         Cav = cav, Ha = q.IsRangedCavalryFormation, Foot = !cav && (q.IsInfantryFormation || q.IsRangedFormation), Rng = !cav && q.IsRangedFormation,
                         Player = PlayerForm(f) || f.HasPlayerControlledTroop
                     };
+                    fi.Rest = c;
+                    int rc;
+                    if (FormRiders.TryGetValue(f, out rc) && rc > 0) fi.Rest = RestPos(f);
                     if (!fi.Player)
                     {
                         try { fi.Retreat = FormRetreat(f); } catch { fi.Retreat = false; }
@@ -397,6 +419,35 @@ namespace Armoury
             }
         }
 
+        /// <summary>Recenzja 204: srodek ludzi szyku, ktorzy nie jada za strzelcem (jezdzcy 204 pominieci); wszyscy jada - miejsce szyku (Home).</summary>
+        private static Vec2 RestPos(Formation f)
+        {
+            HUnits.Clear();
+            f.ApplyActionOnEachUnit(HCollect);
+            float x = 0f, y = 0f;
+            int n = 0;
+            for (int i = 0; i < HUnits.Count; i++)
+            {
+                var a = HUnits[i];
+                if (a == null || !a.IsActive()) continue;
+                Hunter h;
+                if (Hunters.TryGetValue(a, out h) && h.Role != RoleRanged) continue;
+                var q = a.Position.AsVec2;
+                x += q.x; y += q.y; n++;
+            }
+            HUnits.Clear();
+            return n > 0 ? new Vec2(x / n, y / n) : Home(f);
+        }
+
+        private static void Bump(Dictionary<Formation, int> d, Formation f, int by)
+        {
+            if (f == null) return;
+            int c;
+            d.TryGetValue(f, out c);
+            c += by;
+            if (c <= 0) d.Remove(f); else d[f] = c;
+        }
+
         // ------------------------------------------------------------ pass (co 1 s, po Pass 148 - BuildSides: panika, nietkniete szyki)
 
         private static void HuntPass(Mission m, float now)
@@ -404,10 +455,13 @@ namespace Armoury
             var c = Settings.Current;
             _hKey = c != null && c.RidersRunDownShooters;
             _hQPass = 0;
+            _hQChk = 0;
+            _hQFriend = 0;
             _hNewRanged = 0;
             BuildHForms(m);
             DrainBlows(m, now);
             HuntersPass(m, now);
+            HuntersMelee(m, now);
             ThreatTmp.Clear();
             ThreatTmp.AddRange(ThreatList);
             for (int i = 0; i < ThreatTmp.Count; i++)
@@ -450,6 +504,61 @@ namespace Armoury
             }
         }
 
+        /// <summary>Recenzja 204: czlowiek 204 (jezdziec albo lucznik) z wrogiem innym niz strzelec w RaiseNear - oddany grze (cel automatyczny, bron sie sam),
+        /// zwarcie zapamietane na ShieldsUp.Window (bez ponownego wyslania i zapytania). Wlasny limit QueriesPerPass, kolejka z obrotem (kazdy po kolei).</summary>
+        private static void HuntersMelee(Mission m, float now)
+        {
+            int n = HList.Count;
+            if (n == 0) return;
+            int start = _hChkRot > 0 && _hChkRot < n ? _hChkRot : 0;
+            HChk.Clear();
+            for (int k = 0; k < n; k++) HChk.Add(HList[(start + k) % n]);
+            int next = 0;
+            for (int k = 0; k < HChk.Count; k++)
+            {
+                var h = HChk[k];
+                Hunter cur;
+                if (h.A == null || !Hunters.TryGetValue(h.A, out cur) || !ReferenceEquals(cur, h)) continue;   // zwolniony wczesniej w tym passie
+                if (_hQChk >= ShieldsUp.QueriesPerPass) { _hChkOver++; next = (start + k) % n; break; }
+                _hQChk++;
+                try
+                {
+                    var a = h.A;
+                    if (!a.IsActive()) continue;
+                    if (!EnemyNear(m, a, h.T.S)) continue;
+                    MeleeUntil[a] = now + ShieldsUp.Window;
+                    EndHunter(h, UMelee, now, true, false);
+                }
+                catch (Exception e)
+                {
+                    HStumble("HorsePursuit.JazdaZwarcie", e);
+                    if (++h.Fails >= FailsOut)
+                    {
+                        _hDropped++;
+                        try { EndHunter(h, UOther, now, true, false); } catch { DropHunter(h); }
+                    }
+                }
+            }
+            HChk.Clear();
+            _hChkRot = next;
+        }
+
+        /// <summary>Wrog (czlowiek, nie strzelec) w RaiseNear od a - jedno zapytanie (licznik zapytan po stronie wolajacego).</summary>
+        private static bool EnemyNear(Mission m, Agent a, Agent shooter)
+        {
+            bool locked = false;
+            m.GetNearbyEnemyAgents(a.Position.AsVec2, ShieldsUp.RaiseNear, a.Team, HBuf);
+            for (int i = 0; i < HBuf.Count; i++)
+            {
+                var x = HBuf[i];
+                if (x == null || !x.IsHuman || !x.IsActive() || ReferenceEquals(x, shooter)) continue;
+                locked = true;
+                break;
+            }
+            HBuf.Clear();
+            return locked;
+        }
+
         /// <summary>-1 = dalej, inaczej przyczyna konca U*. pass = takze kon, smycz, odwrot szyku, klucz, zasieg lucznika.</summary>
         private static int HunterCheck(Mission m, Hunter h, float now, bool pass)
         {
@@ -461,6 +570,8 @@ namespace Armoury
             if (h.F == null || PlayerForm(h.F)) return UPlayer;
             var s = h.T.S;
             if (s == null || !s.IsActive()) return UThreat;
+            // recenzja 204: jezdziec nie wjezdza w nietkniety szyk strony strzelca (jak OIntact 148; zaslona przy piechocie trzyma 30 m od jej krawedzi)
+            if (h.Role != RoleRanged && IntactNear(h.T.SSide, a.Position.AsVec2, CounterFootGap)) return UIntact;
             if (!pass) return h.Role != RoleRanged && a.MountAgent == null ? UOther : -1;
             if (!_hKey) return UKey;
             if (FormRetreat(h.F)) return URetreat;
@@ -492,11 +603,12 @@ namespace Armoury
             {
                 var fi = fl[i];
                 float e = Math.Max(0f, sp.Distance(fi.C) - fi.R);
-                if (e < dAll) { dAll = e; iNear = i; }
+                float ea = Math.Max(0f, sp.Distance(fi.Rest) - fi.R);   // recenzja 204: odpedzony / odciecie od ludzi, ktorzy nie jada za strzelcem
+                if (ea < dAll) { dAll = ea; iNear = i; }
                 if (fi.Foot && e < dFoot) { dFoot = e; iFoot = i; }
                 if (fi.Cav && !fi.Player && !fi.Retreat && e < dCav) { dCav = e; iCav = i; }
             }
-            t.EscC = iNear >= 0 ? fl[iNear].C : Vec2.Invalid;
+            t.EscC = iNear >= 0 ? fl[iNear].Rest : Vec2.Invalid;
             bool screen = FootNear(m, s);
             t.Screen = screen && iFoot >= 0;
             if (t.Screen) { t.ScreenC = fl[iFoot].C; t.ScreenR = fl[iFoot].R; }
@@ -518,6 +630,15 @@ namespace Armoury
             {
                 lvl = 1;
                 if (!t.LosingNoted) { t.LosingNoted = true; Nw[NwLosing]++; }
+            }
+            // recenzja 204: strzelec AI w nietknietym szyku swojej strony (np. szyk konnych lucznikow) - zagrozenie szyku, nie jednego czlowieka: tylko L1,
+            // jezdzcy z szyku bez szarzy, razem na wszystkich takich strzelcow najwyzej PerVictim z jednego szyku (157: dwoch z szyku); samotny i gracz - bez zmian
+            t.Group = !lone && !s.IsMainAgent;
+            if (t.Group)
+            {
+                HGroupShooters.Add(s.Index);
+                lvl = 1;
+                if (t.Level > 1) t.Level = 1;
             }
             int prev = t.Level;
             if (lvl > t.Level)
@@ -602,11 +723,33 @@ namespace Armoury
                 HCand.Add(new KeyValuePair<float, Agent>(a.Position.AsVec2.Distance(sp), a));
             }
             HUnits.Clear();
-            if (want < HCand.Count) HCand.Sort((x, y) => x.Key.CompareTo(y.Key));
-            int n = 0;
-            for (int i = 0; i < HCand.Count && n < want; i++)
+            int cap = want;
+            if (t.Group)
             {
-                StartHunter(t, HCand[i].Value, fi, (byte)(t.MeleeEver % 2 == 0 ? RoleIntercept : RoleCut), 0f, now);
+                int g;
+                FormGroup.TryGetValue(fi.F, out g);
+                int room = Math.Max(0, PerVictim - g);
+                if (room < cap) { cap = room; if (HCand.Count > room) _hGroupCut++; }
+            }
+            // najblizsi strzelcowi najpierw; zapytanie o zwarcie tylko dla potrzebnych (recenzja 204: limit zapytan nie idzie na ludzi, ktorych nie wyslemy)
+            if (HCand.Count > 1) HCand.Sort((x, y) => x.Key.CompareTo(y.Key));
+            int n = 0;
+            for (int i = 0; i < HCand.Count && n < cap; i++)
+            {
+                var a = HCand[i].Value;
+                if (_hQPass >= ShieldsUp.QueriesPerPass)
+                {
+                    for (int j = i; j < HCand.Count; j++) NoteNw(HCand[j].Value, NwQuery);
+                    break;
+                }
+                _hQPass++;
+                if (EnemyNear(m, a, t.S))
+                {
+                    MeleeUntil[a] = now + ShieldsUp.Window;   // zapamietane - nastepne passy bez zapytania
+                    NoteNw(a, NwMelee);
+                    continue;
+                }
+                StartHunter(t, a, fi, (byte)(t.MeleeEver % 2 == 0 ? RoleIntercept : RoleCut), 0f, now);
                 n++;
             }
             HCand.Clear();
@@ -622,7 +765,7 @@ namespace Armoury
             if (NwSeen.Add(((long)a.Index << 4) | (long)why)) Nw[why]++;
         }
 
-        /// <summary>-1 = moze, -2 = pominiety bez licznika (pieszy, juz pod 204, konny lucznik z amunicja - rola strzelecka), inaczej Nw*.</summary>
+        /// <summary>-1 = moze (zwarcie sprawdza Take), -2 = pominiety bez licznika (pieszy, juz pod 204, konny lucznik z amunicja - rola strzelecka), inaczej Nw*.</summary>
         private static int Elig(Mission m, Agent a, Threat t, float now)
         {
             if (a == null || !a.IsActive() || !a.IsHuman || Hunters.ContainsKey(a)) return -2;
@@ -642,19 +785,10 @@ namespace Armoury
             if (Blown(HorseS(a))) return NwHorse;
             if (a.Position.AsVec2.Distance(t.S.Position.AsVec2) > _maxFrom) return NwFar;
             if (!a.CanBeAssignedForScriptedMovement()) return NwBusy;   // pozycja skryptowa kogos innego (143 / 149 / 158), odlaczony, przy obiekcie
-            if (_hQPass >= ShieldsUp.QueriesPerPass) return NwQuery;
-            _hQPass++;
-            bool locked = false;
-            m.GetNearbyEnemyAgents(a.Position.AsVec2, ShieldsUp.RaiseNear, a.Team, HBuf);
-            for (int i = 0; i < HBuf.Count; i++)
-            {
-                var x = HBuf[i];
-                if (x == null || !x.IsHuman || !x.IsActive() || ReferenceEquals(x, t.S)) continue;
-                locked = true;
-                break;
-            }
-            HBuf.Clear();
-            return locked ? NwMelee : -1;
+            float mu;
+            if (MeleeUntil.TryGetValue(a, out mu) && now < mu) return NwMelee;   // recenzja 204: zwarcie z ostatnich ShieldsUp.Window s - bez zapytania
+            if (IntactNear(t.SSide, a.Position.AsVec2, CounterFootGap)) return NwIntact;   // recenzja 204: przy nietknietym szyku strony strzelca
+            return -1;   // zapytanie o zwarcie w Take - tylko dla potrzebnych, najblizszych
         }
 
         /// <summary>Lucznicy strony (piesi i konni lucznicy z amunicja) w zasiegu strzelca - cel na niego, gdy nikt z ich strony nie stoi w 8 m od niego.
@@ -677,9 +811,19 @@ namespace Armoury
                 RangedRange.Add(range);
             }
             if (RangedForms.Count == 0 && t.Ranged <= 0) return 0;
-            // FF: swoi w LandRadius od strzelca - lucznicy zdejmuja cel (jedno zapytanie na strzelca na pass)
-            if (_hQPass >= ShieldsUp.QueriesPerPass) return 0;
-            _hQPass++;
+            // FF: swoi w LandRadius od strzelca - lucznicy zdejmuja cel (jedno zapytanie na strzelca na pass; recenzja 204: wlasny limit, nie po jezdzcach;
+            // bez sprawdzenia - cel zdjety, nie trzymany)
+            if (_hQFriend >= ShieldsUp.QueriesPerPass)
+            {
+                for (int i = t.Hs.Count - 1; i >= 0; i--)
+                {
+                    if (i >= t.Hs.Count) continue;
+                    var h = t.Hs[i];
+                    if (h.Role == RoleRanged) EndHunter(h, UNoCheck, now, false, false);
+                }
+                return 0;
+            }
+            _hQFriend++;
             bool friends = false;
             m.GetNearbyEnemyAgents(sp, ShieldsUp.LandRadius, t.S.Team, HBuf);
             for (int i = 0; i < HBuf.Count; i++)
@@ -719,6 +863,8 @@ namespace Armoury
                     if (mt != null && MarchToContact.IsDragon(mt)) continue;
                     if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a) || RidingAnyThread(a)) continue;
                     if (!a.CanBeAssignedForScriptedMovement()) continue;
+                    float mu;
+                    if (MeleeUntil.TryGetValue(a, out mu) && now < mu) continue;   // recenzja 204: w zwarciu - bron sie, nie strzelaj do dalekiego
                     if (a.Position.AsVec2.Distance(sp) > range) continue;
                     StartHunter(t, a, fi, RoleRanged, range, now);
                     _hNewRanged++;
@@ -748,6 +894,15 @@ namespace Armoury
             MarkCounter(a, true);
             t.Melee++;
             t.MeleeEver++;
+            h.Group = t.Group;
+            Bump(FormRiders, fi.F, 1);
+            if (h.Group)
+            {
+                Bump(FormGroup, fi.F, 1);
+                int g;
+                FormGroup.TryGetValue(fi.F, out g);
+                if (g > _hGroupMax) _hGroupMax = g;
+            }
             HRiders.Add(a.Index);
             HFormsSent.Add(fi.F);
             if (fi.Charging) _hSentCharge++;
@@ -834,7 +989,7 @@ namespace Armoury
             t.Hs.Remove(h);
             UEnd[why]++;
             bool melee = h.Role != RoleRanged;
-            if (melee) { MarkCounter(a, false); t.Melee--; t.LastEnd = why; }
+            if (melee) { MarkCounter(a, false); t.Melee--; t.LastEnd = why; Bump(FormRiders, h.F, -1); if (h.Group) Bump(FormGroup, h.F, -1); }
             else { MarkIn(ref _aiming, a, false); t.Ranged--; }
             if (a != null && a.IsActive())
             {
@@ -855,7 +1010,11 @@ namespace Armoury
             HList.Remove(h);
             if (h.T != null)
             {
-                if (h.T.Hs.Remove(h)) { if (h.Role != RoleRanged) h.T.Melee--; else h.T.Ranged--; }
+                if (h.T.Hs.Remove(h))
+                {
+                    if (h.Role != RoleRanged) { h.T.Melee--; Bump(FormRiders, h.F, -1); if (h.Group) Bump(FormGroup, h.F, -1); }
+                    else h.T.Ranged--;
+                }
             }
         }
 
@@ -1134,12 +1293,15 @@ namespace Armoury
             sb.Append(" | nie wyslani: w zwarciu ").Append(Nw[NwMelee]).Append(", panika/odwrot ").Append(Nw[NwPanic]).Append(", poscig 148 ").Append(Nw[NwChase])
               .Append(", bohater ").Append(Nw[NwHero]).Append(", chorazy ").Append(Nw[NwBanner]).Append(", kon ").Append(Nw[NwHorse]).Append(", daleko ").Append(Nw[NwFar])
               .Append(", szyk gracza ").Append(Nw[NwPlayer]).Append(", strona przegrywa ").Append(Nw[NwLosing]).Append(", zajety ").Append(Nw[NwBusy]).Append(", przerwa ")
-              .Append(Nw[NwCool]).Append(", limit zapytan ").Append(Nw[NwQuery]).Append(", smok/umarly ").Append(Nw[NwOther])
+              .Append(Nw[NwCool]).Append(", limit zapytan ").Append(Nw[NwQuery]).Append(", smok/umarly ").Append(Nw[NwOther]).Append(", przy szyku strzelca ").Append(Nw[NwIntact])
               .Append(" | powroty: padl ").Append(UEnd[UGone]).Append(", panika ").Append(UEnd[UPanic]).Append(", kon ").Append(UEnd[UHorse]).Append(", smycz ")
               .Append(UEnd[ULeash]).Append(", odwrot wodza ").Append(UEnd[URetreat]).Append(", gracz przejal ").Append(UEnd[UPlayer]).Append(", klucz ").Append(UEnd[UKey])
               .Append(", koniec bitwy ").Append(UEnd[UEnded]).Append(", koniec strzelca ").Append(UEnd[UThreat]).Append(", poza zasiegiem ").Append(UEnd[URange])
-              .Append(", swoi przy strzelcu ").Append(UEnd[UFriend]).Append(", inne ").Append(UEnd[UOther]).Append("; najdalej od szyku ").Append(F0(_hMaxFar)).Append(" m")
+              .Append(", swoi przy strzelcu ").Append(UEnd[UFriend]).Append(", inne ").Append(UEnd[UOther]).Append(", zwarcie ").Append(UEnd[UMelee])
+              .Append(", przy szyku strzelca ").Append(UEnd[UIntact]).Append(", bez sprawdzenia FF ").Append(UEnd[UNoCheck]).Append("; najdalej od szyku ").Append(F0(_hMaxFar)).Append(" m")
               .Append("; jezdzcy padli ").Append(_hRidersLost)
+              .Append(" | strzelcy w szyku ").Append(HGroupShooters.Count).Append(" (najwiecej z jednego szyku ").Append(_hGroupMax).Append(", limit ").Append(PerVictim)
+              .Append(", ucietych limitem ").Append(_hGroupCut).Append("; kontrola zwarcia ponad limit ").Append(_hChkOver).Append(')')
               .Append(" | z szyku gracza ").Append(_hFromPlayer).Append(" (oczekiwane 0)")
               .Append(" | pod sterowaniem 204 na koniec ").Append(_hLeft).Append(" (oczekiwane 0)")
               .Append(" | FF w jezdzcow ").Append(Volatile.Read(ref _hFFMissile) + Volatile.Read(ref _hFFMelee)).Append(" (pociski ").Append(Volatile.Read(ref _hFFMissile))
