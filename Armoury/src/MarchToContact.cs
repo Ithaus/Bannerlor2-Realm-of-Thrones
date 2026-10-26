@@ -252,6 +252,8 @@ namespace Armoury
                     // 148: jezdziec w poscigu (HorsePursuit, cel na czlowieka) - bez capu marszu / odpoczynku koni szyku; szyk w odpoczynku poscigu nie zaczyna,
                     // a zajechany kon jezdzca zawraca (ten sam prog HorseAiRestBelow)
                     if (HorsePursuit.RidingAnyThread(agent)) { HorsePursuit.NoteCapSkip(); return; }
+                    // 157 (P3): jezdziec w kontrze na strzelca (cel na czlowieku, najwyzej 20 s) - tez bez capu marszu / odpoczynku szyku; kon zajechany wraca
+                    if (HorsePursuit.CounterAnyThread(agent)) { HorsePursuit.NoteCounterCapSkip(); return; }
                     var mount = agent.MountAgent;
                     if (mount != null && IsDragon(mount)) { Interlocked.Increment(ref _postDragon); return; }
                     bool catchUp = desiredSpeed < 0f;
@@ -419,8 +421,9 @@ namespace Armoury
 
         private static float Clamp(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
-        /// <summary>Odleglosc od szyku do najblizszego szyku wroga (miedzy medianami minus polowy glebokosci); MaxValue = brak wroga.</summary>
-        private static float EnemyGap(Formation f)
+        /// <summary>Odleglosc od szyku do najblizszego szyku wroga (miedzy medianami minus polowy glebokosci); MaxValue = brak wroga.
+        /// 157: internal (recenzja 157: ShieldsUp.RiderCharge juz bez progu zwarcia - FormCharging). Glowny watek.</summary>
+        internal static float EnemyGap(Formation f)
         {
             var eq = f.CachedClosestEnemyFormation;
             var ef = eq != null ? eq.Formation : null;
@@ -764,6 +767,18 @@ namespace Armoury
             if (!_on) return false;
             int idx = Idx(f);
             return idx >= 0 && ReferenceEquals(_who[idx], f) && _capMove[idx] > 0f;
+        }
+
+        /// <summary>157 (pomiar konnicy AI pod ostrzalem): rodzaj obecnego capu predkosci szyku - 0 brak, 1 marsz (128 / M1), 2 odpoczynek koni (136, RestCap),
+        /// 3 szarza marszem (128, rozkaz szarzy przed progiem biegu). Tylko odczyt tablic z ostatniego Eval. Glowny watek.</summary>
+        internal static int CapKind(Formation f)
+        {
+            if (!_on || f == null) return 0;
+            int idx = Idx(f);
+            if (idx < 0 || !ReferenceEquals(_who[idx], f) || _capMove[idx] <= 0f) return 0;
+            if (_capRest[idx]) return 2;
+            if (_chargeHeld[idx]) return 3;
+            return 1;
         }
 
         /// <summary>Gorny limit marszu czlowieka AI w m/s (cap x 1.1, ten sam co w latce AdjustSpeedLimit); -1 = brak capu. Glowny watek (FieldCraft, M0).

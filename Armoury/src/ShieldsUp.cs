@@ -56,8 +56,12 @@ namespace Armoury
     /// Potkniecia: RoutHold.Stumble miejsce "tarcze" (wyjatek w postfiksie: pierwsze 3 do Stumble, reszta w liczniku) - funkcji nie gasimy,
     /// czlowiek z 5 potknieciami wypada z listy. Linia "Bitwa (140 tarcze)" raz na bitwe (BattleSense.Clean); histogram stanu rak ofiar pociskow (K13)
     /// takze przy kluczu NIE (gdy HitScribeEnabled - punkt wyjscia testu A). Nazwa klasy nie moze byc "Log", "Settings" ani "McmSettings".
+    /// 157 (26.10, Jeff 25.10 ok. 22:45 "strzelalem do kawalerzysty mial tarcze na plecach ... nie wzial tarczy do reki"): jezdzcy (klucz
+    /// RidersShieldsUpUnderFire) zamiast stalego pominiecia WMounted - regula konnych w One (jednoreczna: tylko tarcza do lewej reki; dwureczna: tarcza
+    /// + jednoreczna boczna albo ta sama bron jednorecznie, nie w szarzy szyku ani w kontrze P3; prog zmiany broni 4 m; bez EnforceShieldUsage);
+    /// pomiar konnicy AI pod ostrzalem (P1) i wejscie kontry na strzelca (P3, HorsePursuit.Counter.cs) - plik ShieldsUp.Riders.cs.
     /// </summary>
-    internal static class ShieldsUp
+    internal static partial class ShieldsUp
     {
         // ------------------------------------------------------------ stale
         internal const float PassEvery = 0.25f;     // pass ludzi
@@ -74,8 +78,10 @@ namespace Armoury
         // ------------------------------------------------------------ stan misji (glowny watek)
         private static WeakReference _m;
         private static volatile bool _on;           // klucz TAK w tej bitwie - czytane przez postfiksy
-        private static volatile bool _live;         // kolejka przyjmuje zdarzenia (klucz albo sam histogram przy HitScribe)
+        private static volatile bool _live;         // kolejka przyjmuje zdarzenia (klucz albo sam histogram przy HitScribe; 157: albo pomiar konnicy / kontra)
         private static bool _key, _written, _yourMen, _pikes;
+        private static bool _hist;                  // 157: histogram ofiar i linia 140 (klucz albo HitScribe - jak dawne _live)
+        private static bool _riders;                // 157 P2: regula konnych (RidersShieldsUpUnderFire)
         private static float _hold = 8f;
         private static int _shots = 3;
         private static float _now, _accMen, _accForm;
@@ -98,6 +104,7 @@ namespace Armoury
             public float NextTry, CheckAt, SwappedAt;
             public bool Pending, Swapped, Stubborn, NoOne, Done, DeferSeen, Evaluated;
             public bool Near8 = true, NearRaise = true;   // nieznane = blisko (zadnej zmiany, zadnego uniesienia do pierwszej oceny)
+            public bool RiderTwo;                         // 157: jezdziec widziany pod ostrzalem z dwureczna w rece (poza szarza) - preferencja jednorecznej
         }
 
         private sealed class FState
@@ -154,7 +161,9 @@ namespace Armoury
         private static readonly HashSet<int> MarkedMen = new HashSet<int>(), AlreadyMen = new HashSet<int>(), CmdMen = new HashSet<int>(),
                                              NoOneMen = new HashSet<int>(), OkMen = new HashSet<int>(), FavorMen = new HashSet<int>();
         private static readonly HashSet<Formation> FormUnder = new HashSet<Formation>();
-        private const int WRanged = 0, WMounted = 1, WBanner = 2, WObject = 3, WDetached = 4, WUndead = 5, WPanic = 6, WPlayer = 7, WHorse = 8, WNear = 9, WReasons = 10;
+        // 157: WDragon (jezdziec na smoku ROT), WChase (jezdziec w poscigu 148) - tylko przy RidersShieldsUpUnderFire (bez klucza konny = WMounted jak dotad)
+        private const int WRanged = 0, WMounted = 1, WBanner = 2, WObject = 3, WDetached = 4, WUndead = 5, WPanic = 6, WPlayer = 7, WHorse = 8, WNear = 9,
+                          WDragon = 10, WChase = 11, WReasons = 12;
         private static readonly HashSet<int>[] SkipMen = NewSets(WReasons);
         private static readonly Dictionary<string, int[]> Types = new Dictionary<string, int[]>();
         // postfiksy (watek dowolny) - Interlocked
@@ -208,6 +217,9 @@ namespace Armoury
                 var w = v.Equipment[mi];
                 var d = w.CurrentUsageItem;
                 sb.Append(d != null ? d.WeaponClass.ToString() : "?").Append('#').Append(w.CurrentUsageIndex);
+                // 157 (P1, weryfikacja konnik): KTORA bron - id przedmiotu (wzorzec, przydzial DTE czy podniesiona) i liczba uzyc
+                var it = w.Item;
+                sb.Append(" [").Append(it != null ? (it.StringId ?? "?") : "?").Append(", uzyc ").Append(w.WeaponsCount).Append(']');
             }
             else sb.Append("pusta");
             bool offShield = OffShield(v);
@@ -218,6 +230,7 @@ namespace Armoury
             else sb.Append("pusta");
             sb.Append(", tarcza w ekw.=").Append(v.HasShieldCached ? "TAK" : "NIE").Append(", plecy=").Append(back ? "TAK" : "NIE")
               .Append(", 140=").Append(IsMarked(v) ? "TAK" : "NIE");
+            if (v.HasMount) sb.Append(", konno");   // 157: jezdziec (regula konnych 140 / kontra 157)
             if (offShield)
             {
                 var p = v.AgentDrivenProperties;
@@ -417,11 +430,15 @@ namespace Armoury
             _shots = c != null ? Math.Max(1, Math.Min(20, c.ShieldsUpFormationShots)) : 3;
             _yourMen = c == null || c.ShieldsUpYourMenToo;
             _pikes = c == null || c.PikesKeptAgainstHorse;
+            _riders = c == null || c.RidersShieldsUpUnderFire;   // 157 P2
             if (naval) return;   // Naval ma wlasna regule tarcz (ShipPlacementDetachment:678) - bez linii
             if (_key) EnsurePatched();
             CheckOrder();
             _now = m.CurrentTime;
-            _live = _key || (c != null && c.HitScribeEnabled);
+            // 157: histogram i linia 140 jak dotad (klucz albo HitScribe); kolejka zdarzen takze dla pomiaru konnicy (P1) i kontry na strzelca (P3)
+            _hist = _key || (c != null && c.HitScribeEnabled);
+            CavBegin(m, c);
+            _live = _hist || _cavLog || _counterKey;
             _on = _key;
         }
 
@@ -482,10 +499,13 @@ namespace Armoury
             _now = m.CurrentTime;
             _qFrame = 0;
             Drain(m);
-            if (!_on) return;
+            // 157 P1: pomiar konnicy AI pod ostrzalem (co 1 s, bitwa polowa) - takze przy kluczu 140 NIE
+            if (!_on && !_cavLog) return;
             bool deployed = false;
             try { deployed = m.IsDeploymentFinished; } catch { }
             if (!deployed) return;
+            if (_cavLog) { try { CavTick(m, dt); } catch (Exception e) { CavStumble("ShieldsUp.Konnica", e); } }
+            if (!_on) return;
             _accMen += dt;
             if (_accMen >= PassEvery)
             {
@@ -512,7 +532,9 @@ namespace Armoury
             if (!_written && live)
             {
                 _written = true;
-                try { Write(); } catch (Exception e) { Stumble("ShieldsUp.Write", e); }
+                if (_hist) { try { Write(); } catch (Exception e) { Stumble("ShieldsUp.Write", e); } }
+                // 157 P1: linia "konnica AI pod ostrzalem (157)" raz na bitwe polowa
+                if (_cavLog) { try { CavWrite(); } catch (Exception e) { CavStumble("ShieldsUp.KonnicaLinia", e); } }
             }
             Clear();
             _m = null;
@@ -541,6 +563,7 @@ namespace Armoury
             MarkedMen.Clear(); AlreadyMen.Clear(); CmdMen.Clear(); NoOneMen.Clear(); OkMen.Clear(); FavorMen.Clear(); FormUnder.Clear();
             for (int i = 0; i < SkipMen.Length; i++) SkipMen[i].Clear();
             Types.Clear();
+            RiderClear();   // 157: liczniki konnych (P2) i pomiar konnicy (P1)
             Interlocked.Exchange(ref _setAiCalls, 0); Interlocked.Exchange(ref _setAiFavor, 0); Interlocked.Exchange(ref _ufoCalls, 0);
             Interlocked.Exchange(ref _enfCalls, 0); Interlocked.Exchange(ref _enfMen, 0); Interlocked.Exchange(ref _resets, 0); Interlocked.Exchange(ref _postErr, 0);
         }
@@ -559,13 +582,13 @@ namespace Armoury
             _qOverTotal += over;
             bool act = _on;
             bool deployed = false;
-            if (act) { try { deployed = m.IsDeploymentFinished; } catch { } }
+            if (n > 0 && (act || _cavLog || _counterKey)) { try { deployed = m.IsDeploymentFinished; } catch { } }
             for (int i = 0; i < n; i++)
             {
                 try
                 {
                     if (q[i].K == 1) Shot(m, ref q[i], act && deployed);
-                    else if (q[i].K == 2) Hit(m, ref q[i], act && deployed);
+                    else if (q[i].K == 2) Hit(m, ref q[i], act && deployed, deployed);
                 }
                 catch (Exception e) { Stumble("ShieldsUp.Zdarzenie", e); }
                 q[i].A = null; q[i].V = null;
@@ -576,7 +599,7 @@ namespace Armoury
         {
             var s = ev.A;
             if (s == null) return;
-            if (ev.Thrown) { _throws++; if (IsMarked(s)) _throwsMarked++; }
+            if (ev.Thrown && _hist) { _throws++; if (IsMarked(s)) _throwsMarked++; }
             if (!act || !s.IsActive() || s.Team == null) return;
             if (s.IsAIControlled && !s.IsMainAgent)
             {
@@ -602,18 +625,32 @@ namespace Armoury
             MarkNear(m, land, LandRadius, s.Team, -1);
         }
 
-        private static void Hit(Mission m, ref Ev ev, bool act)
+        private static void Hit(Mission m, ref Ev ev, bool act, bool deployed)
         {
             var at = ev.A;
             var v = ev.V;
             if (v != null)
             {
-                if (!v.IsHuman) return;
+                // 157: jezdziec trafiony pociskiem (on sam albo jego kon) - pomiar P1 i wejscie kontry P3; przed filtrem IsHuman (strzala w konia to tez
+                // ostrzal jezdzca); wlasny try - wyjatek tu nie moze zabrac 140 tego trafienia
+                if ((_cavLog || _counterKey) && deployed)
+                {
+                    try { RiderHit(m, at, v); } catch (Exception e) { CavStumble("ShieldsUp.JezdziecTrafiony", e); }
+                }
+                if (!v.IsHuman)
+                {
+                    // recenzja 157 (P2): strzala w konia - znacznik S1 i zdarzenie S4 dla jezdzca (tylko przy regule konnych; histogram i CloseRanks - tylko ludzie)
+                    if (act && _riders && v.IsMount) HorseHit(v, at, ev.I);
+                    return;
+                }
                 if (at != null && at.Team != null && v.Team != null && !v.Team.IsEnemyOf(at.Team)) return;   // swoj w swojego - nie ostrzal
-                _hits++;
-                if (ev.F == 1) _hitShield++; else if (ev.F == 2) _hitBack++; else _hitBody++;
-                Histogram(v, ev.F == 1);
-                CloseRanks.OnHit(v, ev.F);   // 146: trafienia wedlug szyku pod ostrzalem (nasz ShieldWall / Loose / bez zmiany)
+                if (_hist)
+                {
+                    _hits++;
+                    if (ev.F == 1) _hitShield++; else if (ev.F == 2) _hitBack++; else _hitBody++;
+                    Histogram(v, ev.F == 1);
+                    CloseRanks.OnHit(v, ev.F);   // 146: trafienia wedlug szyku pod ostrzalem (nasz ShieldWall / Loose / bez zmiany)
+                }
                 if (!act || !v.IsActive()) return;
                 TryMark(v, _now + _hold);   // S1
                 FEvent(v.Formation, ev.I);
@@ -622,6 +659,16 @@ namespace Armoury
             if (!act || at == null || at.Team == null) return;
             _misses++;
             MarkNear(m, ev.P.AsVec2, MissRadius, at.Team, ev.I);   // S3 (K6): pudlo - punkt zderzenia
+        }
+
+        /// <summary>Recenzja 157: kon trafiony pociskiem - jego jezdziec jak trafiony (S1, S4); swoj w swojego - nic (jak u ludzi).</summary>
+        private static void HorseHit(Agent horse, Agent at, int missile)
+        {
+            var r = horse.RiderAgent;
+            if (r == null || !r.IsHuman || !r.IsActive()) return;
+            if (at != null && at.Team != null && r.Team != null && !r.Team.IsEnemyOf(at.Team)) return;
+            TryMark(r, _now + _hold);   // S1
+            FEvent(r.Formation, missile);
         }
 
         /// <summary>Wrogowie druzyny strzelca w promieniu od punktu: znacznik (S3), przy indeksie pocisku jedno zdarzenie S4 na szyk.</summary>
@@ -716,7 +763,13 @@ namespace Armoury
             }
             int slot;
             if (MainKind(a, out slot) == KBanner) return WBanner;
-            if (a.HasMount) return WMounted;
+            if (a.HasMount)
+            {
+                // 157 P2: konny wchodzi tylko przy RidersShieldsUpUnderFire; smok ROT i jezdziec w poscigu 148 (cel na uciekajacym) - poza regula
+                if (!_riders) return WMounted;
+                if (MarchToContact.IsDragon(a.MountAgent)) return WDragon;
+                if (HorsePursuit.RidingAnyThread(a)) return WChase;
+            }
             if (a.IsUsingGameObject) return WObject;
             if (a.IsDetachedFromFormation) return WDetached;
             if (a.IsRangedCached)
@@ -911,11 +964,13 @@ namespace Armoury
             return f != null && Forms.TryGetValue(f, out st) && st.Cav;
         }
 
-        /// <summary>Wrog w 8 m (zmiana broni) i w promieniu uniesienia (6 m, u rzucajacych 35 m). Szyk daleko od najblizszego szyku wroga = bez zapytania.</summary>
-        private static void Near(Mission m, Entry e, ref int queries)
+        /// <summary>Wrog w 8 m (zmiana broni) i w promieniu uniesienia (6 m, u rzucajacych 35 m). Szyk daleko od najblizszego szyku wroga = bez zapytania.
+        /// 157: jezdziec - prog zmiany broni RiderNoSwapNear (4 m), bez uniesienia (NearRaise zawsze "blisko").</summary>
+        private static void Near(Mission m, Entry e, bool rider, ref int queries)
         {
             var a = e.A;
-            float r = e.Thrower ? ThrowerRaiseNear : NoSwapNear;
+            float swap = rider ? RiderNoSwapNear : NoSwapNear;
+            float r = rider ? RiderNoSwapNear : (e.Thrower ? ThrowerRaiseNear : NoSwapNear);
             var f = a.Formation;
             if (f != null)
             {
@@ -937,9 +992,9 @@ namespace Armoury
                 if (d < best) best = d;
             }
             Buf.Clear();
-            e.Near8 = best < NoSwapNear * NoSwapNear;
+            e.Near8 = best < swap * swap;
             float rr = e.Thrower ? ThrowerRaiseNear : RaiseNear;
-            e.NearRaise = best < rr * rr;
+            e.NearRaise = rider || best < rr * rr;
             e.Evaluated = true;
         }
 
@@ -977,24 +1032,35 @@ namespace Armoury
             Kit(e);
             if (e.ShieldSlot < 0) { Finish(e, uaps++ < UapPerPass); return; }
             e.Thrower = a.HasAnyRangedWeaponCached && !a.IsRangedCached;   // po ostatnim rzucie - zwykly promien uniesienia
-            Near(m, e, ref queries);
+            // 157 P2: jezdziec (Skip przepuszcza konnego tylko przy RidersShieldsUpUnderFire) - wlasna regula ponizej; po utracie konia jak pieszy
+            bool rider = a.HasMount;
+            if (rider) RiderMen.Add(idx);
+            Near(m, e, rider, ref queries);
             bool expired = _now >= e.Until;
             int mainSlot;
             int kind = MainKind(a, out mainSlot);
             bool off = OffShield(a);
-            bool horse = PikeHorse(e);
+            bool horse = !rider && PikeHorse(e);   // K11 dotyczy pieszego pikiniera (zaparcie piki) - nie jezdzca
+            // 157 P2: szarza szyku (rozkaz albo zachowanie szarzy - FormCharging) - jezdziec z dwureczna zostaje przy lancy;
+            // recenzja 157: kontra na strzelca P3 osobno - bron i preferencja zamrozone (zwolnienie preferencji przy wejsciu w kontre zabieralo tarcze z reki)
+            bool counter = rider && HorsePursuit.Countering(a);
+            bool charge = rider && !counter && RiderCharge(a);
+            if (rider && !expired && !charge && !counter && kind == KTwo) e.RiderTwo = true;
 
             // preferencja (K3/K4/K11): flaga tylko przy zmianie, od razu UpdateAgentProperties; w 8 m od wroga zadnej zmiany broni (D2)
             // tylko z OSOBNA jednoreczna - u czlowieka z sama wlocznia o kilku uzyciach Polearm 1 nie ma czego wybrac (rzuty, R6)
-            bool want = !expired && e.Pole2 && e.OneSlot >= 0 && e.OnePure && !horse && e.Evaluated;
-            if (want != e.Favor)
+            // 157: jezdziec - tylko gdy pod ostrzalem trzymal dwureczna (z jednoreczna w rece nic nie zmieniamy), zwolnienie po ostrzale albo przy szarzy szyku;
+            // prog jezdzca 4 m (Near8 liczone z RiderNoSwapNear)
+            bool want = rider ? (!expired && !charge && e.RiderTwo && e.Pole2 && e.OneSlot >= 0 && e.OnePure && e.Evaluated)
+                              : (!expired && e.Pole2 && e.OneSlot >= 0 && e.OnePure && !horse && e.Evaluated);
+            if (want != e.Favor && !counter)
             {
                 bool allowed;
                 if (!e.Near8) allowed = true;
-                else allowed = !want && kind == KTwo;   // w 8 m: zwolnic wolno tylko, gdy i tak trzyma dwureczna (preferencja idzie za reka)
+                else allowed = !want && kind == KTwo;   // w 8 m (jezdziec 4 m): zwolnic wolno tylko, gdy i tak trzyma dwureczna (preferencja idzie za reka)
                 if (!allowed)
                 {
-                    if (want) SkipMen[WNear].Add(idx);
+                    if (want) { if (rider) RiderNear.Add(idx); else SkipMen[WNear].Add(idx); }
                     else if (!e.DeferSeen) { e.DeferSeen = true; _favorDefer++; }
                 }
                 else if (uaps < UapPerPass)
@@ -1002,7 +1068,13 @@ namespace Armoury
                     uaps++;
                     e.Favor = want;
                     _favor[idx] = want;
-                    if (want) { _favorOn++; FavorMen.Add(idx); } else _favorOff++;
+                    if (want) { _favorOn++; FavorMen.Add(idx); if (rider) RiderFavorMen.Add(idx); }
+                    else
+                    {
+                        _favorOff++;
+                        // 157: zwolnienie przez szarze - powrot do lancy jest zamierzony, nie liczy sie jako "powrot do dwurecznej" ani do uporu
+                        if (rider && charge && !expired) { _rChargeRelease++; e.Swapped = false; }
+                    }
                     a.UpdateAgentProperties();
                     _uap++;
                 }
@@ -1012,22 +1084,23 @@ namespace Armoury
             {
                 _raise[idx] = false;
                 _mark[idx] = false;
-                if (!e.Favor) Finish(e, false);   // z preferencja czeka na zwolnienie (wrog poza 8 m)
+                if (!e.Favor) Finish(e, false);   // z preferencja czeka na zwolnienie (wrog poza 8 m, jezdziec 4 m)
                 return;
             }
             _mark[idx] = true;
 
-            // uniesienie (postfiks UpdateFormationOrders): tarcza w rece i wrog poza promieniem
-            _raise[idx] = off && !e.NearRaise && e.Evaluated;
+            // uniesienie (postfiks UpdateFormationOrders): tarcza w rece i wrog poza promieniem; 157: jezdziec nigdy (AI gry samo unosi tarcze na pociski -
+            // BLOK u ROTlord_247 w 1. bitwie 25.10; EnforceShieldUsage w siodle niesprawdzone)
+            _raise[idx] = !rider && off && !e.NearRaise && e.Evaluated;
 
-            // kontrola po 1.5 s od wykonania polecenia
+            // kontrola po 1.5 s od wykonania polecenia (157: jezdzcy w osobnych licznikach - wiersz AI-5 sprawdz_logi dalej o pieszych)
             if (e.Pending && _now >= e.CheckAt)
             {
                 e.Pending = false;
-                _checks++;
+                if (rider) _rChecks++; else _checks++;
                 if (off)
                 {
-                    _checksOk++;
+                    if (rider) _rChecksOk++; else _checksOk++;
                     e.Swapped = true;
                     e.SwappedAt = _now;
                     if (OkMen.Add(idx))
@@ -1046,16 +1119,21 @@ namespace Armoury
             if (e.Swapped && !(off && kind == KOne))
             {
                 e.Swapped = false;
-                _reverts++;
-                _revertTime += _now - e.SwappedAt;
-                if (++e.Reverts >= StubbornAfter && !e.Stubborn) { e.Stubborn = true; _stubborn++; }
+                if (rider) _rReverts++;
+                else
+                {
+                    _reverts++;
+                    _revertTime += _now - e.SwappedAt;
+                }
+                if (++e.Reverts >= StubbornAfter && !e.Stubborn) { e.Stubborn = true; if (rider) _rStubborn++; else _stubborn++; }
             }
 
             // przelozenie (K5): tarcza, potem jednoreczna, w jednym passie
             if (e.Pending || e.Stubborn || e.NoOne || e.Tries >= MaxTries || _now < e.NextTry || !e.Evaluated) return;
             if (off && kind == KOne) return;
             if (horse) { SkipMen[WHorse].Add(idx); return; }
-            if (e.Near8) { SkipMen[WNear].Add(idx); return; }
+            if ((charge || counter) && kind != KOne) { RiderInCharge.Add(idx); return; }   // 157: dwureczna w szarzy szyku / kontrze - bez zmiany broni
+            if (e.Near8) { if (rider) RiderNear.Add(idx); else SkipMen[WNear].Add(idx); return; }
             if (cmds >= CmdPerPass || _commands >= CmdPerBattle) { _limitHits++; return; }
             bool both = false, onlyShield = false;
             if (kind == KOne)
@@ -1066,16 +1144,25 @@ namespace Armoury
             {
                 if (e.OneSlot >= 0 && e.OneSlot != mainSlot) both = true;
                 else if (e.OneSlot >= 0 && !off) onlyShield = true;   // wlocznia z kilkoma uzyciami trzymana oburacz - sama tarcza
-                else if (e.OneSlot < 0) { e.NoOne = true; NoOneMen.Add(idx); return; }
+                else if (e.OneSlot < 0) { e.NoOne = true; if (rider) RiderNoOne.Add(idx); else NoOneMen.Add(idx); return; }
             }
             if (!both && !onlyShield) return;
             if (!off) Wield(m, a, e.ShieldSlot);
             if (both) Wield(m, a, e.OneSlot);
             cmds += (off ? 0 : 1) + (both ? 1 : 0);
             _commands += (off ? 0 : 1) + (both ? 1 : 0);
-            if (both) _cmdBoth++; else _cmdShield++;
-            CmdMen.Add(idx);
-            if (e.Tries > 0) _retries++;
+            if (rider)
+            {
+                // 157: jezdziec - jednoreczna w rece: tylko tarcza; dwureczna (albo pusta reka): jednoreczna boczna + tarcza albo ta sama bron jednorecznie
+                if (kind == KOne) { _rCmdShield++; RiderShieldMen.Add(idx); }
+                else { _rCmdTwo++; RiderTwoMen.Add(idx); }
+            }
+            else
+            {
+                if (both) _cmdBoth++; else _cmdShield++;
+                CmdMen.Add(idx);
+            }
+            if (e.Tries > 0) { if (rider) _rRetries++; else _retries++; }
             e.Tries++;
             e.Pending = true;
             e.CheckAt = _now + CheckAfter;
@@ -1185,7 +1272,9 @@ namespace Armoury
               .Append(", Inni ").Append(SkipMen[WUndead].Count).Append(", panika ").Append(SkipMen[WPanic].Count).Append(", ludzie gracza ").Append(SkipMen[WPlayer].Count)
               .Append(" (ranni w odwrocie 143 NIE pominieci ").Append(WithdrawMen.Count).Append(')')
               .Append(", konnica blisko ").Append(SkipMen[WHorse].Count).Append(", wrog <").Append(NoSwapNear.ToString("0", Inv)).Append(" m ").Append(SkipMen[WNear].Count)
-              .Append(", limit polecen ").Append(_limitHits)
+              .Append(", limit polecen ").Append(_limitHits);
+            AppendRiders(sb);   // 157 P2: segment " | konni (157) ..." - jezdzcy poza licznikami pieszych
+            sb
               .Append(" | po 1.5 s tarcza w rece ").Append(_checksOk).Append('/').Append(_checks).Append(", powtorki ").Append(_retries)
               .Append(", powroty do dwurecznej ").Append(_reverts).Append(" (srednio po ").Append(Avg(_revertTime, _reverts, "0.0")).Append(" s), uparci ").Append(_stubborn)
               .Append(" | preferencja (Polearm ").Append(FavorPolearm.ToString("0", Inv)).Append(", Melee ").Append(FavorMelee.ToString("0", Inv)).Append("): wlaczona ")

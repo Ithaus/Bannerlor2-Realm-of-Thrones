@@ -49,8 +49,11 @@ namespace Armoury
     /// BloodPools) - OnHit czyta tylko tablice _riding (bez slownika Riders), liczniki FF przez Interlocked; latka PostSpeed (watki robocze) tez czyta tylko
     /// tablice _riding wedlug Agent.Index (wzor RoutHold.KnownAnyThread). Wyjatek na jezdzcu = licznik; po 5 jezdziec wypada z poscigu (bez
     /// globalnego wylacznika). Nazwa klasy nie moze byc "Log", "Settings" ani "McmSettings".
+    /// 157 (P3, klucz RidersRunDownShooters): kontra jezdzca na strzelca - HorsePursuit.Counter.cs (wejscie z kolejki trafien 140, krok co 0.25 s w Tick,
+    /// segment "kontra na strzelca (157)" w linii "poscig (148)"); jezdziec w kontrze nie wchodzi do poscigu (RidersPass), a odwrot rannego 143 zdejmuje
+    /// kontre w BeforeWithdraw.
     /// </summary>
-    internal static class HorsePursuit
+    internal static partial class HorsePursuit
     {
         // ------------------------------------------------------------ stale (karta syntezy 143 / D5)
         internal const float PassEvery = 1f;        // decyzje co 1 s
@@ -210,6 +213,8 @@ namespace Armoury
             _maxFrom = MaxFromMain * (_night ? NightMul : 1f);
             var c = Settings.Current;
             _key = c != null && c.AiCavalryPursues;
+            _restBelow = c != null && c.HorseStaminaEnabled ? Math.Max(0, Math.Min(80, c.HorseAiRestBelow)) : 0;   // 157: kontra moze wejsc przed pierwszym passem
+            CounterBegin(c);   // 157 P3
             _live = _field;
         }
 
@@ -230,11 +235,13 @@ namespace Armoury
                 _passAcc = 0f;
                 _trackAcc = 0f;
                 Pass(m, now);
+                CounterStep(m, now, true);    // 157 P3: kontra - kontrola i cel co 0.25 s (pass: takze klucz i szyk pieszy przy strzelcu)
             }
             else if (_trackAcc >= TrackEvery)
             {
                 _trackAcc = 0f;
                 Track(now);
+                CounterStep(m, now, false);
             }
         }
 
@@ -264,6 +271,7 @@ namespace Armoury
         internal static void BeforeWithdraw(Agent a)
         {
             if (!_live || a == null) return;
+            CounterBeforeWithdraw(a);   // 157 P3: jezdziec w kontrze oddany grze przed pierwszym ruchem 143
             Rider r;
             if (!Riders.TryGetValue(a, out r) || r.St != RChase) return;
             Dec(r.V);
@@ -288,6 +296,7 @@ namespace Armoury
                 int k = state == AgentState.Killed ? 0 : (state == AgentState.Unconscious ? 1 : (state == AgentState.Routed ? 2 : 3));
                 if (s >= 0) Lost[s, k]++;
                 bool down = state == AgentState.Killed || state == AgentState.Unconscious;
+                CounterRemoved(m, a, by, down);   // 157 P3: jezdziec w kontrze padl / strzelec dopadniety
                 Rider r;
                 if (Riders.TryGetValue(a, out r))
                 {
@@ -336,6 +345,7 @@ namespace Armoury
                 EndList.Clear();
             }
             catch (Exception e) { Stumble("HorsePursuit.End", e); }
+            try { CounterEndAll(now); } catch (Exception e) { Stumble("HorsePursuit.KontraKoniec", e); }   // 157 P3: jezdzcy w kontrze oddani grze
             if (!_written)
             {
                 _written = true;
@@ -370,6 +380,7 @@ namespace Armoury
             Array.Clear(Lost, 0, Lost.Length);
             ExSeen.Clear(); EverRiders.Clear(); EverVictims.Clear(); PursuedForms.Clear(); DryForms.Clear(); PlayerSkipped.Clear();
             _formsPlayerSide = _formsFoe = _formsCav = _formsHa = 0;
+            CounterClear();   // 157 P3
         }
 
         // ------------------------------------------------------------ pomocnicze
@@ -477,6 +488,7 @@ namespace Armoury
             var c = Settings.Current;
             _key = c != null && c.AiCavalryPursues;
             _restBelow = c != null && c.HorseStaminaEnabled ? Math.Max(0, Math.Min(80, c.HorseAiRestBelow)) : 0;   // ten sam prog co odpoczynek konnicy AI (MarchToContact)
+            _cKey = c != null && c.RidersRunDownShooters;   // 157 P3: klucz kontry na zywo (wylaczony w bitwie - kontry koncza sie w CounterStep)
             try { BuildSides(m); }
             catch (Exception e) { Stumble("HorsePursuit.Strony", e); return; }
             foreach (var st in Forms.Values) st.Seen = false;
@@ -675,6 +687,7 @@ namespace Armoury
             {
                 var a = Units[u];
                 if (a == null || !a.IsActive() || !a.IsHuman || Riders.ContainsKey(a)) continue;
+                if (Counters.ContainsKey(a)) continue;   // 157 P3: w kontrze na strzelca - do poscigu dopiero po jej koncu (nastepny pass)
                 int x = Excl(a);
                 if (x != 0) { NoteEx(a, x); continue; }
                 if (a.MountAgent == null || a.IsDetachedFromFormation || a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) continue;
@@ -711,6 +724,7 @@ namespace Armoury
             {
                 var r = st.Riders[i];
                 if (r.St != RFree) continue;
+                if (Counters.ContainsKey(r.A)) continue;   // 157 P3: wolny jezdziec poscigu w kontrze - bez celu poscigu, dopoki kontra trwa
                 try
                 {
                     if (Check(r, st) >= 0) continue;
@@ -1025,6 +1039,7 @@ namespace Armoury
                 sb.Append("; przegrani (").Append(loser == 1 ? "atakujacy" : "obroncy").Append(") zabici ").Append(Pct(Lost[loser, 0], tl))
                   .Append(" - cel historyczny 15-40%, do 60-65% przy poscigu konnicy na pieszych; zwyciezca ").Append(Pct(Lost[w, 0], tw)).Append(" - cel 1-5%");
             }
+            AppendCounter(sb);   // 157 P3: segment " | kontra na strzelca (157) ..." (przed potknieciami - wzor AI139_LINES)
             sb.Append(" | potkniecia poscig ").Append(stum).Append(" (wypadli ").Append(_dropped).Append(").");
             Log.Info(sb.ToString());
         }
