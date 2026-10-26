@@ -1590,6 +1590,22 @@ namespace Armoury
             return v != null && ch != null && n > 0 && BkResolve() && HasPop(v) && ToVillage(v, ch, n, cause, org, party);
         }
 
+        // 159 (recenzja, uwaga 6): odeslani bez sprzetu (NewLordKit.SendHome) - ta sama droga co zwolnieni 166 (przyczyna M166 w ksiedze ludzi, weterani E4/10 V166),
+        // ale nie sa w "zwolnieni: do wsi" linii 166 (_dRelMen tylko w ReleaseFrom) - ich karczma idzie do linii 159, nie do _dRelTavern ("z tego do karczmy")
+        private static bool _put159On;
+        private static int _put159;
+
+        /// <summary>159 (NewLordKit.SendHome): ToVillagePop z przyczyna M166; tavern - ilu z n stanelo w karczmie (E4/10), poza licznikami linii 166.</summary>
+        internal static bool ToVillagePop159(Settlement v, CharacterObject ch, int n, PeopleBook.Shares org, MobileParty party, out int tavern)
+        {
+            bool ok;
+            _put159 = 0; _put159On = true;
+            try { ok = ToVillagePop(v, ch, n, PeopleBook.M166, org, party); }
+            finally { _put159On = false; }
+            tavern = _put159; _put159 = 0;
+            return ok;
+        }
+
         /// <summary>E4/10 (W1): weterani do ludnosci BK miasta karczmy (sklad, nie ludzie - R0) - ta sama refleksja co ToVillage, bez ksiegi ludzi. false - miasto bez danych BK.</summary>
         internal static bool BkPopAdd(Settlement town, CharacterObject ch, int n)
         {
@@ -1643,7 +1659,7 @@ namespace Armoury
             if (vt != null)
             {
                 put = PeopleBook.VetCommit(vt, org);          // nie rzuca; dopisanie do puli ostatnim krokiem; org pomniejszony o put
-                if (cause == PeopleBook.M166) _dRelTavern += put;
+                if (cause == PeopleBook.M166) { if (_put159On) _put159 += put; else _dRelTavern += put; }   // 159 (recenzja): odeslani bez sprzetu - w linii 159
                 // E5/B6 (201): miasto karczmy tego zwolnienia (tylko w ReleaseFrom - 179 i W4c nie niosa sakiewki)
                 try { if (_relTavOn && put > 0 && vt.Town != null && vt.Town.Settlement != null) _relTav.Add(new KeyValuePair<Settlement, int>(vt.Town.Settlement, put)); } catch { }
             }

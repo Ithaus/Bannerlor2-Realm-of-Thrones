@@ -148,6 +148,13 @@ namespace Armoury
             return FitCore(group, new Meets(groups, pieces, meets), pieces, false, null);
         }
 
+        /// <summary>159 (recenzja, NewLordKit.SendHome): to samo dopasowanie co Fit, a unfitOut[m] = true - czlowiek m (grupa group[m]) bez sztuki. Wynik jak Fit.</summary>
+        internal static int Fit(int[] group, int groups, Func<int, Piece, bool> meets, List<Piece> pieces, bool[] unfitOut)
+        {
+            pieces.Sort(FitOrder);
+            return FitCore(group, new Meets(groups, pieces, meets), pieces, false, unfitOut);
+        }
+
         /// <summary>K1 (Jeff 09.10 04:40): dopasowanie calej polki "najlepsze najpierw" (Greedy - ten sam algorytm co wymiana), wynik w Used.
         /// Nadwyzki ludzi gracza (przy wymianie 1:1), lordow AI i zalog licza wolne sztuki tak jak wymiana: ludzie nosza najlepsze, co
         /// udzwigna, a do kupca idzie najgorsze. Dotad FitCore stawial wymog przed sila: ciezki gorszy grat (albo gorsza sztuka gracza) byl

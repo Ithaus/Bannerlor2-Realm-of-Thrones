@@ -152,7 +152,7 @@ namespace Armoury
         }
 
         /// <summary>Rozdzial n proporcjonalnie do wag (najwieksze reszty), nie wiecej niz waga typu.</summary>
-        internal static Dictionary<CharacterObject, int> Split(Dictionary<CharacterObject, int> w, int n)   // 159: takze NewLordKit (ludzie bez zbroi albo broni do domu)
+        private static Dictionary<CharacterObject, int> Split(Dictionary<CharacterObject, int> w, int n)
         {
             var res = new Dictionary<CharacterObject, int>();
             int all = 0; foreach (var v in w.Values) all += Math.Max(0, v);

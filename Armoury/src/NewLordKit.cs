@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -35,11 +36,12 @@ namespace Armoury
     ///     Plan wazny 2 x AiArmsTripMaxDays + 2 doby; bez wizyty - wygasa (bez pozyczki). Plan i zegary w zapisie (arm_159_kit).
     /// (2) LUDZIE BEZ SPRZETU DO DOMU (klucz UnarmedMenSentHome): niegotowa partia lorda AI (ArmedStrength Low), ktora nie moze sie dozbroic - ArmsFirst.ThinkPostfix
     ///     zapisuje (NoteStuck) od kiedy i czemu nie ma wyjazdu (nie stac / brak miasta / nie stac w miescie / 2 wizyty bez postepu) - po UnarmedMenSentHomeDays
-    ///     dobach (albo zwolniona z czekania p9) odsyla ludzi bez zbroi albo bez broni: zostaje ceil(min(pokrycie korpusu, pokrycie broni) x ludzi) (miara
-    ///     GarrisonKit.FillPercent per typ, wszyscy ludzie), reszta proporcjonalnie do skladu do domu droga zwolnionych 166 (PeopleBook.Take, ClanBudget.ToVillagePop
-    ///     z przyczyna M166 - ludnosc BK wsi rodu, znani pochodzeniem do DOM swojego regionu, weterani E4/10). Wies bez danych BK - nikt nie odchodzi (licznik).
+    ///     dobach (albo zwolniona z czekania p9) odsyla ludzi bez zbroi albo bez broni: na typ ludzi max(bez korpusu, bez zadnej broni) (recenzja: miara ludzi -
+    ///     Lacking, dopasowanie jak GarrisonKit.FillPercent; korpus tylko u oddzialow z korpusem we wzorcu) do domu droga zwolnionych 166 (PeopleBook.Take,
+    ///     ClanBudget.ToVillagePop159 z przyczyna M166 - ludnosc BK wsi rodu, znani pochodzeniem do DOM swojego regionu, weterani E4/10 - karczma w linii 159, nie
+    ///     w linii 166). Wies bez danych BK - nikt nie odchodzi (licznik). Tylko przy czynnych zakupach AI i p9.
     ///     Sakiewki ludzi i zbrojownia zostaja w partii (jak przepelnienie W4c). Bez: armii, bitwy, oblezenia, morza, rozwiazywanej partii, rodu gracza, Strazy, umarlych.
-    /// (3) p9 bez zmian. P0: linia "Bitwa gracza (159 P0)" (kazda bitwa gracza - stan kazdej partii lorda AI) i linia doby "Nowe druzyny i sprzet (159)" (plany,
+    /// (3) p9 bez zmian. P0: linia "Bitwa gracza (159 P0)" (kazda bitwa gracza - start spotkania i misja - stan kazdej partii lorda AI) i linia doby "Nowe druzyny i sprzet (159)" (plany,
     ///     pozyczki, zakupy, odeslani, spis partii bez wpisu DTE i z R = 0 wedlug wieku partii). Potkniecia liczone, bez wylacznikow.
     /// </summary>
     internal static class NewLordKit
@@ -56,7 +58,16 @@ namespace Armoury
         }
         private sealed class Stuck { internal double SinceH; internal int Why; }
 
-        private static readonly Dictionary<MobileParty, KitPlan> _plans = new Dictionary<MobileParty, KitPlan>();
+        // recenzja 159 (uwaga 1): plan powstaje w komponencie partii, PRZED CampaignObjectManager.AddMobileParty (dopiero tam Id), a MBObjectBase.GetHashCode = Id.GetHashCode
+        // (MBGUID: (int)_internalValue, przed nadaniem 0) - slownik z domyslnym porownaniem zapisywal plan z haszem 0 i zaden pozniejszy odczyt (haszem prawdziwego Id)
+        // go nie znajdowal. Plany po referencji obiektu partii (hasz niezalezny od Id); zapis i zapis z wczytania - po StringId jak dotad
+        private sealed class RefEq : IEqualityComparer<MobileParty>
+        {
+            internal static readonly RefEq I = new RefEq();
+            public bool Equals(MobileParty a, MobileParty b) { return ReferenceEquals(a, b); }
+            public int GetHashCode(MobileParty o) { return RuntimeHelpers.GetHashCode(o); }
+        }
+        private static readonly Dictionary<MobileParty, KitPlan> _plans = new Dictionary<MobileParty, KitPlan>(RefEq.I);
         private static readonly Dictionary<string, KitPlan> _savedPlans = new Dictionary<string, KitPlan>(StringComparer.Ordinal);
         private static readonly Dictionary<MobileParty, Stuck> _stuck = new Dictionary<MobileParty, Stuck>();
         private static readonly Dictionary<string, Stuck> _savedStuck = new Dictionary<string, Stuck>(StringComparer.Ordinal);
@@ -64,16 +75,18 @@ namespace Armoury
         private static readonly Dictionary<string, int> _savedBorn = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly Dictionary<MobileParty, int> _lastHome = new Dictionary<MobileParty, int>();
         private static WeakReference _lastBattle;
+        private static string _lastBattleWhere;   // recenzja 159 (uwaga 5): linia raz na bitwe I zrodlo (start spotkania - bez dolaczajacych z okolicy; misja - pelny sklad)
         private static int _importN = -1, _importBad;
 
         // liczniki doby (linia "Nowe druzyny i sprzet (159)")
         private static int _dPlanParties, _dOff, _dStart, _dLate, _dNoGear, _dNoTown, _dZero, _dStumbles, _stumbles;
+        private static int _dFreeKit, _dNoP9;   // recenzja 159 (uwagi 3, 7): bez planu - darmowy komplet DTE wlaczony (NoFreeKitForNewParties NIE), p9 wylaczone
         private static long _dTemplate, _dTaken, _dNoTownMen, _dPlanPieces, _dPlanCost, _dPlanOwn, _dPlanLoan;
-        private static int _dVisits, _dVisitEmpty, _dLoans, _dExpired, _dDestroyed;
+        private static int _dVisits, _dVisitEmpty, _dLoans, _dExpired, _dDestroyed, _dLoanCapped;   // _dLoanCapped - recenzja (uwaga 2): pozyczka przycieta do planu
         private static long _dLoanSum, _dVisitSpent, _dVisitPieces, _dLoanLeft, _dVisitOwn;
         private static readonly Dictionary<string, int> _dLoanNo = new Dictionary<string, int>(StringComparer.Ordinal);
         private static int _dHomeParties, _dHomeNothing, _dHomeRepeat, _dHomeSkipBusy, _dHomeSkipPlayer, _dHomeSkipOther;
-        private static long _dHomeMen, _dHomeWounded, _dHomeNoVillage;
+        private static long _dHomeMen, _dHomeWounded, _dHomeNoVillage, _dHomeTavern;   // _dHomeTavern - recenzja (uwaga 6): z odeslanych staneli w karczmie (E4/10)
         private static readonly List<string> _dEx = new List<string>();
         private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -90,19 +103,20 @@ namespace Armoury
         internal static void Reset()
         {
             _plans.Clear(); _savedPlans.Clear(); _stuck.Clear(); _savedStuck.Clear(); _born.Clear(); _savedBorn.Clear(); _lastHome.Clear();
-            _lastBattle = null; _importN = -1; _importBad = 0; _stumbles = 0; _err.Clear();
+            _lastBattle = null; _lastBattleWhere = null; _importN = -1; _importBad = 0; _stumbles = 0; _err.Clear();
             ClearDay();
         }
 
         private static void ClearDay()
         {
             _dPlanParties = _dOff = _dStart = _dLate = _dNoGear = _dNoTown = _dZero = _dStumbles = 0;
+            _dFreeKit = _dNoP9 = 0;
             _dTemplate = _dTaken = _dNoTownMen = _dPlanPieces = _dPlanCost = _dPlanOwn = _dPlanLoan = 0;
-            _dVisits = _dVisitEmpty = _dLoans = _dExpired = _dDestroyed = 0;
+            _dVisits = _dVisitEmpty = _dLoans = _dExpired = _dDestroyed = _dLoanCapped = 0;
             _dLoanSum = _dVisitSpent = _dVisitPieces = _dLoanLeft = _dVisitOwn = 0;
             _dLoanNo.Clear();
             _dHomeParties = _dHomeNothing = _dHomeRepeat = _dHomeSkipBusy = _dHomeSkipPlayer = _dHomeSkipOther = 0;
-            _dHomeMen = _dHomeWounded = _dHomeNoVillage = 0;
+            _dHomeMen = _dHomeWounded = _dHomeNoVillage = _dHomeTavern = 0;
             _dEx.Clear(); Array.Clear(_dExN, 0, _dExN.Length);
             AiGear.QuoteStumbles = 0;
         }
@@ -210,8 +224,8 @@ namespace Armoury
 
         /// <summary>
         /// Wolane z ArmsFromPeople.SpawnPost (droga E4/8, przed rachunkiem szablonu): ile ludzi kazdego typu z dopisanych przez gre wziac. null - bez zmian (klucz
-        /// wylaczony, start gry, okno nowej gry ColdStart, zakupy AI wylaczone, rod gracza, umarli). Pusty slownik - nikt (brak miasta w zasiegu albo nic nie da
-        /// sie ubrac). Partia nie ma jeszcze Id (CampaignObjectManager.AddMobileParty po komponencie) - plan po obiekcie partii.
+        /// wylaczony, start gry, okno nowej gry ColdStart, zakupy AI wylaczone, p9 wylaczone, darmowy komplet DTE wlaczony, rod gracza, umarli). Pusty slownik - nikt (brak miasta w zasiegu albo nic nie da
+        /// sie ubrac). Partia nie ma jeszcze Id (CampaignObjectManager.AddMobileParty po komponencie) - plan po referencji obiektu partii (RefEq; hasz MBObjectBase to Id).
         /// </summary>
         internal static Dictionary<CharacterObject, int> Plan(MobileParty mp, Hero owner, Dictionary<CharacterObject, int> added)
         {
@@ -222,6 +236,10 @@ namespace Armoury
             if (mp.IsMainParty || owner.Clan == Clan.PlayerClan || Undead.Party(mp)) return null;
             if (ColdStart.LateWindowFor(mp)) { _dLate++; return null; }   // okno nowej gry: dorobek stuleci (ColdStart.LateLord)
             if (!AiGear.On) { _dNoGear++; return null; }                   // nikt nie kupuje - jak dotad
+            // recenzja 159 (uwaga 7): wyjazd do miasta planu prowadzi p9 (ArmsFirst.ThinkPostfix -> TripTown) - p9 wylaczone, sklad jak dotad
+            if (!s.AiArmsBeforeBattle) { _dNoP9++; return null; }
+            // recenzja 159 (uwaga 3): darmowy komplet DTE wlaczony (LevyGold.PartyCreatedPrefix przepuszcza OnMobilePartyCreated) - kazdy wziety dostanie sprzet rekruta
+            if (!s.NoFreeKitForNewParties) { _dFreeKit++; return null; }
             var keep = new Dictionary<CharacterObject, int>();
             int template = 0;
             foreach (var v in added.Values) template += Math.Max(0, v);
@@ -362,7 +380,7 @@ namespace Armoury
 
         /// <summary>
         /// AiGear.TryBuyCore (lord AI w miescie, przed petla zakupow): budzet wizyty z planem - braki zbrojowni wycenione na tej polce (QuoteUnits) x Margin;
-        /// zloto ponad rezerwe (OwnFund) i sakiewka ludzi, brak - pozyczka Banku (Borrow). -1 - bez planu, nie miasto albo polka bez sztuk (zwykly zakup; plan
+        /// zloto ponad rezerwe (OwnFund) i sakiewka ludzi, brak - pozyczka Banku (Borrow; najwyzej wycena planu x Margin minus zloto i sakiewka). -1 - bez planu, nie miasto albo polka bez sztuk (zwykly zakup; plan
         /// zostaje do nastepnego miasta albo wygasniecia). pieces - limit sztuk wizyty (sztuki wyceny).
         /// </summary>
         internal static int VisitBudget(MobileParty mp, Settlement st, Hero lord, Settings s, int budget0, int purse, out int pieces)
@@ -387,6 +405,10 @@ namespace Armoury
                 int own = OwnFund(lord, s);
                 long want = (long)Math.Ceiling(est * Margin);
                 long shortfall = want - own - Math.Max(0, purse);
+                // recenzja 159 (uwaga 2): pozyczka najwyzej na komplet ludzi PLANU (wycena planu x Margin, p.Cost jeszcze z planu) - braki ludzi dobranych po drodze
+                // (werbunek z wsi) placi zwykly budzet AiGear jak u kazdego lorda
+                long planCap = (long)Math.Ceiling(p.Cost * Margin) - own - Math.Max(0, purse);
+                if (shortfall > 0 && shortfall > planCap) { shortfall = planCap; _dLoanCapped++; }
                 int got = 0; string why = null;
                 if (shortfall > 0) got = Borrow(lord.Clan, lord, (int)Math.Min(int.MaxValue, shortfall), out why);
                 if (got > 0) { _dLoans++; _dLoanSum += got; }
@@ -435,30 +457,56 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteStuck", e); }
         }
 
-        private static bool IsWeapon(ItemObject.ItemTypeEnum t)
+        // korpus i bron (bez tarcz i amunicji lukow/kusz) - miara regule (2)
+        private static readonly ItemObject.ItemTypeEnum[] HomeTypes =
         {
-            return t == ItemObject.ItemTypeEnum.OneHandedWeapon || t == ItemObject.ItemTypeEnum.TwoHandedWeapon || t == ItemObject.ItemTypeEnum.Polearm
-                   || t == ItemObject.ItemTypeEnum.Bow || t == ItemObject.ItemTypeEnum.Crossbow || t == ItemObject.ItemTypeEnum.Thrown;
+            ItemObject.ItemTypeEnum.BodyArmor, ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.TwoHandedWeapon, ItemObject.ItemTypeEnum.Polearm,
+            ItemObject.ItemTypeEnum.Bow, ItemObject.ItemTypeEnum.Crossbow, ItemObject.ItemTypeEnum.Thrown
+        };
+
+        /// <summary>
+        /// Recenzja 159 (uwaga 4): miara LUDZI, nie slotow (dotad min(pokrycie slotow korpusu, pokrycie slotow broni) x wszyscy ludzie - druga bron i peki oszczepow
+        /// zanizaly "bron", a brak korpusu oddzialu bez korpusu we wzorcu odsylal tez lucznikow). Na typ ludzi: noBody - ilu nie ma zbroi korpusu (tylko oddzialy
+        /// z korpusem we wzorcu - QuartermasterLaw.MenTemplate), armed - ilu ma jakas bron (kazdy typ broni 1 na czlowieka - MenClassic, peki oszczepow po slotach,
+        /// najwyzej ludzie oddzialu; rozne typy broni u roznych ludzi), wantW - oddzialy z bronia we wzorcu. To samo dopasowanie co GarrisonKit.FillPercent
+        /// (sztuki zbrojowni MenUpgrade.AiPieces, SwapMath.Fit, MeetsFitOf, wszyscy ludzie z rannymi). Tylko odczyt.
+        /// </summary>
+        private static void Lacking(TroopRoster r, Dictionary<ItemObject, int> arm, Dictionary<CharacterObject, int> reg, Dictionary<CharacterObject, int> noBody,
+                                    Dictionary<CharacterObject, int> armed, HashSet<CharacterObject> wantW)
+        {
+            foreach (var type in HomeTypes)
+            {
+                bool body = type == ItemObject.ItemTypeEnum.BodyArmor;
+                var pieces = MenUpgrade.AiPieces(arm, type);
+                List<CharacterObject> troops; int[] idx; SkillObject skill;
+                QuartermasterLaw.MenOf(r, type, pieces, out troops, out idx, out skill, body ? QuartermasterLaw.MenTemplate : QuartermasterLaw.MenClassic, false);
+                if (idx.Length == 0) continue;
+                var unfit = new bool[idx.Length];
+                if (pieces.Count > 0) SwapMath.Fit(idx, troops.Count, QuartermasterLaw.MeetsFitOf(troops), pieces, unfit);
+                else for (int m = 0; m < unfit.Length; m++) unfit[m] = true;
+                var tot = new int[troops.Count]; var cov = new int[troops.Count];
+                for (int m = 0; m < idx.Length; m++) { int g = idx[m]; if (g < 0 || g >= troops.Count) continue; tot[g]++; if (!unfit[m]) cov[g]++; }
+                for (int g = 0; g < troops.Count; g++)
+                {
+                    var ch = troops[g];
+                    int n;
+                    if (ch == null || !reg.TryGetValue(ch, out n) || n <= 0) continue;   // bohaterowie, wighty, umarli - poza regula
+                    int v;
+                    if (body) { noBody.TryGetValue(ch, out v); noBody[ch] = v + Math.Max(0, tot[g] - cov[g]); }
+                    else { wantW.Add(ch); armed.TryGetValue(ch, out v); armed[ch] = v + Math.Min(n, cov[g]); }
+                }
+            }
         }
 
-        /// <summary>Odsyla do domu ludzi bez zbroi albo bez broni (opis klasy, (2)). Zwraca odeslanych.</summary>
+        /// <summary>Odsyla do domu ludzi bez zbroi albo bez broni (opis klasy, (2); miara - Lacking: na typ ludzi max(bez korpusu, bez broni) - braki u tych samych
+        /// ludzi, jak dotad min(cb, cw)). Zwraca odeslanych.</summary>
         private static int SendHome(MobileParty mp, string why, double days)
         {
             var all = AiGear.Armories();
             Dictionary<ItemObject, int> arm = null;
             if (all != null) all.TryGetValue(mp.Id, out arm);
-            var per = new List<int[]>();
             int needS, usedS;
-            int r0 = GarrisonKit.FillPercent(mp, arm, null, false, out needS, out usedS, per);
-            long bm = 0, bu = 0, wm = 0, wu = 0;
-            foreach (var x in per)
-            {
-                var t = (ItemObject.ItemTypeEnum)x[0];
-                if (t == ItemObject.ItemTypeEnum.BodyArmor) { bm += x[1]; bu += x[2]; }
-                else if (IsWeapon(t)) { wm += x[1]; wu += x[2]; }
-            }
-            double cb = bm > 0 ? bu / (double)bm : 1.0, cw = wm > 0 ? wu / (double)wm : 1.0;
-            double f = Math.Max(0.0, Math.Min(1.0, Math.Min(cb, cw)));
+            int r0 = GarrisonKit.FillPercent(mp, arm, null, false, out needS, out usedS);   // tylko do przykladu (R)
             var r = mp.MemberRoster;
             var reg = new Dictionary<CharacterObject, int>();
             int men = 0;
@@ -469,13 +517,33 @@ namespace Armoury
                 if (ch == null || ch.IsHero || el.Number <= 0 || PeopleBook.IsWight(ch) || Undead.Character(ch)) continue;
                 int v; reg.TryGetValue(ch, out v); reg[ch] = v + el.Number; men += el.Number;
             }
-            int keepN = (int)Math.Ceiling(f * men - 1e-9);
-            int go = men - keepN;
+            var noBody = new Dictionary<CharacterObject, int>();
+            var armed = new Dictionary<CharacterObject, int>();
+            var wantW = new HashSet<CharacterObject>();
+            Lacking(r, arm, reg, noBody, armed, wantW);
+            var lack = new Dictionary<CharacterObject, int>();
+            long bodyNo = 0, wMen = 0, wArmed = 0, bodyMen = 0;
+            int go = 0;
+            var types = new List<string>();
+            foreach (var kv in reg)
+            {
+                var ch = kv.Key; int n = kv.Value;
+                int nb; noBody.TryGetValue(ch, out nb); nb = Math.Min(n, nb);
+                if (QuartermasterLaw.TemplateSlots(ch, ItemObject.ItemTypeEnum.BodyArmor) > 0) bodyMen += n;
+                bodyNo += nb;
+                int nw = 0;
+                if (wantW.Contains(ch)) { int a; armed.TryGetValue(ch, out a); a = Math.Min(n, a); nw = n - a; wMen += n; wArmed += a; }
+                int x = Math.Max(nb, nw);
+                if (x <= 0) continue;
+                lack[ch] = x; go += x;
+                if (types.Count < 3) { string nm; try { nm = ch.Name != null ? ch.Name.ToString() : ch.StringId; } catch { nm = "?"; } types.Add(nm + " " + x + "/" + n + " (bez korpusu " + nb + ", bez broni " + nw + ")"); }
+            }
+            double cb = bodyMen > 0 ? 1.0 - bodyNo / (double)bodyMen : 1.0, cw = wMen > 0 ? wArmed / (double)wMen : 1.0;
             if (go <= 0) { _dHomeNothing++; return 0; }
             var village = ClanBudget.OverflowVillage(mp);
             if (village == null) { _dHomeNoVillage += go; return 0; }   // bez wsi z danymi BK nikt nie odchodzi (nikt nie znika - Z6)
-            int gone = 0, wounded = 0;
-            foreach (var kv in ArmsFromPeople.Split(reg, go))
+            int gone = 0, wounded = 0, tavern = 0;
+            foreach (var kv in lack)
             {
                 var ch = kv.Key;
                 int idx = r.FindIndexOfTroop(ch);
@@ -488,7 +556,8 @@ namespace Armoury
                 PeopleBook.Shares org = null;
                 try { if (PeopleBook.OriginLive) org = PeopleBook.Take(r, n, PeopleBook.FRelease166); } catch (Exception e) { Stumble("SendHome.Take", e); org = null; }
                 bool ok = false;
-                try { ok = ClanBudget.ToVillagePop(village, ch, n, PeopleBook.M166, org, mp); } catch (Exception e) { Stumble("SendHome.ToVillagePop", e); ok = false; }
+                int tav = 0;   // recenzja 159 (uwaga 6): karczma E4/10 odeslanych - w linii 159, nie w "z tego do karczmy" linii 166 (ci ludzie nie sa w jej "zwolnieni: do wsi")
+                try { ok = ClanBudget.ToVillagePop159(village, ch, n, org, mp, out tav); } catch (Exception e) { Stumble("SendHome.ToVillagePop", e); ok = false; }
                 if (!ok)
                 {
                     try { if (org != null) PeopleBook.Untake(r, org, PeopleBook.FRelease166); } catch (Exception e) { Stumble("SendHome.Untake", e); }
@@ -496,16 +565,17 @@ namespace Armoury
                     continue;
                 }
                 r.AddToCounts(ch, -n, false, -w);
-                gone += n; wounded += w;
+                gone += n; wounded += w; tavern += Math.Max(0, tav);
             }
             if (gone <= 0) return 0;
-            _dHomeParties++; _dHomeMen += gone; _dHomeWounded += wounded;
+            _dHomeParties++; _dHomeMen += gone; _dHomeWounded += wounded; _dHomeTavern += tavern;
             int last;
             if (_lastHome.TryGetValue(mp, out last) && Today - last <= RepeatDays) _dHomeRepeat++;
             _lastHome[mp] = Today;
             try { ArmedStrength.MarkDirty(mp); } catch { }
-            Ex(ExHome, Nm(mp) + ": do domu " + gone + " z " + men + " (" + why + " od " + days.ToString("0.0", Inv) + " dob; zbroja " + (int)Math.Round(cb * 100) + "%, bron "
-               + (int)Math.Round(cw * 100) + "%, R " + r0 + "%; wies " + Nm(village) + ")");
+            Ex(ExHome, Nm(mp) + ": do domu " + gone + " z " + men + " (" + why + " od " + days.ToString("0.0", Inv) + " dob; z korpusem " + (int)Math.Round(cb * 100) + "%, z bronia "
+               + (int)Math.Round(cw * 100) + "% ludzi, R " + r0 + "%; wies " + Nm(village) + (tavern > 0 ? ", do karczmy " + tavern : "") + "; typy (do domu/ludzi): "
+               + string.Join(", ", types.ToArray()) + ")");
             return gone;
         }
 
@@ -569,7 +639,9 @@ namespace Armoury
                 }
                 if (rs != null) foreach (var mp in rs) _stuck.Remove(mp);
                 // (c) spis P0 i regula (2)
-                bool home = s.UnarmedMenSentHome && GarrisonKit.OwnKitOn;
+                // recenzja 159 (uwaga 7): regula (2) tylko przy czynnych zakupach AI i p9 (zakupy AI wylaczone = nikt nie kupuje, "nie stac" nie znaczy braku pieniedzy;
+                // p9 wylaczone = bez wyjazdow po sprzet) - inaczej jak dotad
+                bool home = s.UnarmedMenSentHome && GarrisonKit.OwnKitOn && AiGear.On && s.AiArmsBeforeBattle;
                 double wait = HomeDays(s) * 24.0;
                 foreach (var mp in lordList)
                 {
@@ -634,22 +706,27 @@ namespace Armoury
               .Append(" | klucze: New Lord Party Armed Men Only ").Append(s.NewLordPartyArmedMenOnly ? "TAK" : "NIE")
               .Append(", New Lord Party Kit Loan ").Append(s.NewLordPartyKitLoan ? "TAK" : "NIE")
               .Append(", Unarmed Men Sent Home ").Append(s.UnarmedMenSentHome ? "TAK po " + HomeDays(s) + " dobach" : "NIE")
-              .Append(GarrisonKit.OwnKitOn ? "" : " (TroopsFightWithOwnKitOnly NIE - regula 2 nieczynna)");
+              .Append(GarrisonKit.OwnKitOn ? "" : " (TroopsFightWithOwnKitOnly NIE - regula 2 nieczynna)")
+              .Append(AiGear.On ? "" : " (AI Buys Gear NIE - plan i regula 2 nieczynne)")
+              .Append(s.AiArmsBeforeBattle ? "" : " (AI Arms Before Battle NIE - plan i regula 2 nieczynne)")
+              .Append(s.NoFreeKitForNewParties ? "" : " (No Free Kit For New Parties NIE - darmowy komplet DTE, plan nieczynny)");
             sb.Append(" | (1) NOWE DRUZYNY z planem: ").Append(_dPlanParties).Append(" partii, szablon ").Append(_dTemplate).Append(" ludzi -> wzieci ").Append(_dTaken)
               .Append(", zostali we wsi ").Append(_dTemplate - _dTaken).Append(_dTemplate > 0 ? " (" + (100.0 * (_dTemplate - _dTaken) / _dTemplate).ToString("0", Inv) + "%)" : "")
               .Append(", bez miasta w zasiegu ").Append(_dNoTown).Append(" partii (").Append(_dNoTownMen).Append(" ludzi), bez nikogo ").Append(_dZero)
               .Append("; wycena planow ").Append(_dPlanPieces).Append(" szt. za ").Append(_dPlanCost).Append(" zl (x").Append(Margin.ToString("0.00", Inv))
               .Append(": wlasne ").Append(_dPlanOwn).Append(", pozyczka planowana ").Append(_dPlanLoan).Append(")")
               .Append("; bez planu: klucz wylaczony ").Append(_dOff).Append(", start gry ").Append(_dStart).Append(", okno nowej gry (ColdStart) ").Append(_dLate)
-              .Append(", zakupy AI wylaczone ").Append(_dNoGear)
+              .Append(", zakupy AI wylaczone ").Append(_dNoGear).Append(", p9 wylaczone ").Append(_dNoP9).Append(", darmowy komplet DTE ").Append(_dFreeKit)
               .Append(" | WIZYTY z planem: ").Append(_dVisits).Append(" (polka bez sztuk - zwykly zakup, plan czeka ").Append(_dVisitEmpty).Append(")")
               .Append(", kupione ").Append(_dVisitPieces).Append(" szt. za ").Append(_dVisitSpent).Append(" zl (wodz -> kasy miast), z tego wlasne do ").Append(_dVisitOwn)
               .Append("; POZYCZKI Banku ").Append(_dLoans).Append(" na ").Append(_dLoanSum).Append(" zl (Bank -> glowa rodu -> wodz; drabina 168 splaca), z pozyczki zostalo w kiesach ").Append(_dLoanLeft)
+              .Append(", pozyczka przycieta do wyceny planu ").Append(_dLoanCapped)
               .Append("; bez pozyczki (przy planie albo przy wizycie, wedlug powodu): ");
             if (_dLoanNo.Count == 0) sb.Append("-");
             else { bool f = true; foreach (var kv in _dLoanNo) { if (!f) sb.Append(", "); f = false; sb.Append(kv.Key).Append(' ').Append(kv.Value); } }
             sb.Append("; plany wygasle bez wizyty ").Append(_dExpired).Append(", partie zniszczone przed wizyta ").Append(_dDestroyed).Append(", plany w toku ").Append(_plans.Count + _savedPlans.Count);
-            sb.Append(" | (2) DO DOMU (ludzie bez zbroi albo broni): partii ").Append(_dHomeParties).Append(", ludzi ").Append(_dHomeMen).Append(" (rannych ").Append(_dHomeWounded).Append(")")
+            sb.Append(" | (2) DO DOMU (ludzie bez zbroi albo broni): partii ").Append(_dHomeParties).Append(", ludzi ").Append(_dHomeMen).Append(" (rannych ").Append(_dHomeWounded)
+              .Append(", z tego do karczmy (E4/10) ").Append(_dHomeTavern).Append(")")
               .Append(", wies bez danych BK - zostali ").Append(_dHomeNoVillage).Append(", nic do odeslania (maja zbroje i bron) ").Append(_dHomeNothing)
               .Append(", ta sama partia znowu w ").Append(RepeatDays).Append(" dobach ").Append(_dHomeRepeat)
               .Append("; pominiete: armia/bitwa/oblezenie/morze/rozwiazywana ").Append(_dHomeSkipBusy).Append(", rod gracza ").Append(_dHomeSkipPlayer).Append(", Straz/umarli ").Append(_dHomeSkipOther)
@@ -667,15 +744,17 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ P0: bitwa gracza
-        /// <summary>Raz na bitwe gracza (start spotkania z gracza i misja DTE - ktore pierwsze): stan kazdej partii lorda AI tej bitwy. Tylko log, nie rzuca.</summary>
+        /// <summary>Raz na bitwe gracza i zrodlo: start spotkania z gracza (MapEventStarted - partie dolaczajace z okolicy dochodza dopiero potem, w
+        /// PlayerEncounter.CheckNearbyPartiesToJoinPlayerMapEvent; bez misji - jedyna linia) i misja DTE (pelny sklad bitwy): stan kazdej partii lorda AI tej bitwy.
+        /// Tylko log, nie rzuca.</summary>
         internal static void BattleLine(MapEvent me, string where)
         {
             try
             {
                 if (me == null) return;
                 var last = _lastBattle != null ? _lastBattle.Target : null;
-                if (ReferenceEquals(last, me)) return;
-                _lastBattle = new WeakReference(me);
+                if (ReferenceEquals(last, me) && string.Equals(_lastBattleWhere, where, StringComparison.Ordinal)) return;
+                _lastBattle = new WeakReference(me); _lastBattleWhere = where;
                 var parts = new List<string>();
                 BattleSideEnum my = BattleSideEnum.None;
                 try { my = PartyBase.MainParty != null ? PartyBase.MainParty.Side : BattleSideEnum.None; } catch { }
