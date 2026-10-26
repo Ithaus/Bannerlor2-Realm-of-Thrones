@@ -4595,6 +4595,11 @@ namespace Armoury
         public float BannerBreakChance = 0.5f;             // with Banner Companies: base chance that a shaken company breaks, divided by the morale resistance of its average tier (tier 1 x0.67, tier 3 x0.4, tier 6 x0.25)
         public bool BannerVictoryCheer = true;             // with Banner Companies: the nearest enemy formation cheers when a company breaks
         public bool BannerCompanyMessages = true;          // with Banner Companies: messages when a standard or a commander falls and when a company breaks (at most one every 2 seconds)
+        // 158 (Jeff 25.10: "baner stoi pusty bo zabilem baner mena to ktos powinien podbiec i zlapac baner i isc dalej"): biegacz po wlasny sztandar -
+        // BannerCompanies.Pickup.cs (BannerCompaniesMission, bitwa polowa). Zasieg 0 = wylaczone (podnosi tylko gra, przy okazji); kod przycina do 0..40 m.
+        // Okrzyk "Save the banner!" tylko przy wyslaniu biegacza (BattleSound ERunner). Linia 'Sztandar (158)' raz na bitwe
+        public float BannerPickupRange = 20f;              // when a standard falls in a field battle, the nearest man of its own formation within this many metres runs to it and raises it again - unless the enemy holds the spot (more foes than friends plus one within 6 m), his formation is falling back or his company has broken. He gives up after 8 seconds, when he stops getting closer, panics or is badly wounded, and the next man tries. Only then does the commander call to save the banner. 0 = off: as in the game, a standard is picked up only by a man who happens to stand right next to it
+        public bool BannerPickupYourFormations = true;     // with Banner Pickup Range: formations under your orders also send a man for their fallen standard, but only from within 12 m. Off = your formations leave their fallen standard to you
 
         // --- Army review ---
         // P4 (Jeff: "w obozie powinna byc opcja przeglad armii ... popup, gdzie mamy pokazane wojsko, gdzie mozna stworzyc choragwie i przenosic wojsko i dodawac dowodcow ...

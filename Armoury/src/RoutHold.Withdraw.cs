@@ -131,6 +131,10 @@ namespace Armoury
             // HorsePursuit.Uncontrol nie zdejmowal pozycji czlowiekowi juz w Withdrawing - zostawala na nim pozycja uciekajacego)
             try { HorsePursuit.BeforeWithdraw(a); }
             catch (Exception ex) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.BeforeWithdraw", ex); }
+            // recenzja 158: biegacz po sztandar - claim i pozycja NoAttack zdjete TERAZ (Step zdejmowal je co 0.25 s przez StopUsingGameObject, a ten wola
+            // DisableScriptedMovement bezwarunkowo - kasowal postoj 143 z Arrive; przy natywnym odwrocie nasza pozycja trzymala rannego)
+            try { BannerCompanies.BeforeWithdraw(a); }
+            catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteBanner, "BannerCompanies.BeforeWithdraw", ex); }
 
             float now = m.CurrentTime;
             var w = new Wd { A = a, Since = now, NextEval = now };

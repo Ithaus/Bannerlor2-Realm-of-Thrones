@@ -600,6 +600,8 @@ RANGES = {
     'BannerShockStandardLost': (0.0, 40.0, "0.0"),
     'BannerShockCommanderLost': (0.0, 40.0, "0.0"),
     'BannerBreakChance': (0.0, 1.0, "0.00"),
+    # 158 biegacz po wlasny sztandar: zasieg 0..40 m (0 = wylaczone; BannerCompaniesMission.Pick przycina do 40)
+    'BannerPickupRange': (0.0, 40.0, "0"),
     # P5 okno lupu: prog wartosci 0..5000 denarow
     'SpoilsWindowMinWorth': (0, 5000, "0"),
     # P6 friendly fire: procent obrazen 0..100
