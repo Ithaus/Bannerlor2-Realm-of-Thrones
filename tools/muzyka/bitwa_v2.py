@@ -16,10 +16,13 @@
 # muzyka ktora nie jest zbyt intensywna i nie rozprasza ale jako dobry podklad"): --prefiks map przerabia map_NN_nazwa.mp3 tymi samymi regulami na
 # <wyjscie>/lufs<N>/map_NN_nazwa.ogg (do paczki: Armoury/ModuleData/Lektor/Muzyka/Mapa/lufs<N>/, EventMusic.MapaTlo.cs); wejscie 4 s i wyjscie 6 s wypalane
 # tylko, gdy ich brak (zrodla ElevenLabs maja je z promptu); oczekiwana dlugosc 120-180 s; raport <wyjscie>/mapa_v2_pomiar.tsv. Bez --prefiks - bit jak dotad.
+# Paczka 203 (Jeff 26.10 ok. 22:15: "muzyka w bitwie jest za glosna, nie slychac bebnow etc. scisz ja o 40%"): poziomy bit o 4.4 dB ciszej
+# (amplituda x0.60, 20*log10(0.6) = -4.44 dB): 21.4 / 24.4 / 27.4 / 30.4 LUFS w katalogach lufs21.4 / lufs24.4 / lufs27.4 / lufs30.4
+# (EventMusic.Bitwa.cs BattleLufs10); poziomy map bez zmian 17 / 20 / 23 / 26 (muzyka mapy z paczki 165 tak glosna jak dotad).
 import hashlib, os, re, shutil, subprocess, sys
 
 FF = os.environ.get('FFMPEG') or r'C:\Users\GAME\tools\ffmpeg\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe'
-LEVELS = (17, 20, 23, 26)          # -LUFS; suwak 4 = 17, 3 = 20, 2 = 23, 1 = 26 (EventMusic.Bitwa.cs LufsOf)
+LEVELS = (21.4, 24.4, 27.4, 30.4)  # -LUFS bit (paczka 203); suwak 4 = 21.4, 3 = 24.4, 2 = 27.4, 1 = 30.4 (EventMusic.Bitwa.cs BattleLufs10)
 TOL_I = 0.5                        # LU
 TP_MAX = -1.0                      # dBTP
 TRIES = 3
@@ -29,10 +32,11 @@ EDGE_DB = 30.0                     # brzeg co najmniej tyle dB pod szczytem plik
 DUR_OK = (120.0, 160.0)            # s - oczekiwana dlugosc (tools/sprawdz_logi.py m109muz MUZ-0); poza - UWAGA, bez bledu
 PREFIX = 'bit'
 TSV_NAME = 'bitwa_v2_pomiar.tsv'
-# paczka 165: profile prefiksow - (wejscie s, wyjscie s, dlugosc min s, dlugosc max s, raport)
+# paczka 165: profile prefiksow - (wejscie s, wyjscie s, dlugosc min s, dlugosc max s, raport, poziomy -LUFS)
+# paczka 203: poziomy w profilu - bit o 4.4 dB ciszej niz 164 (17/20/23/26 + 4.4), map bez zmian
 PROFILES = {
-    'bit': (2.0, 4.0, 120.0, 160.0, 'bitwa_v2_pomiar.tsv'),
-    'map': (4.0, 6.0, 120.0, 180.0, 'mapa_v2_pomiar.tsv'),   # tools/sprawdz_logi.py m165mapa MAP-0: dlugosci 120-180 s
+    'bit': (2.0, 4.0, 120.0, 160.0, 'bitwa_v2_pomiar.tsv', (21.4, 24.4, 27.4, 30.4)),
+    'map': (4.0, 6.0, 120.0, 180.0, 'mapa_v2_pomiar.tsv', (17, 20, 23, 26)),   # tools/sprawdz_logi.py m165mapa MAP-0: dlugosci 120-180 s
 }
 NAME_RX = re.compile(r'^bit_(\d\d)_([a-z0-9_]+)\.mp3$')
 EXPECTED = ('01', '02', '03', '04', '05', '06', '07', '08', '09', '10')
@@ -40,12 +44,17 @@ EXPECTED = ('01', '02', '03', '04', '05', '06', '07', '08', '09', '10')
 
 def use_profile(name):
     """Paczka 165: ustawia globalne wejscie / wyjscie / dlugosc / wzor nazwy / raport wedlug prefiksu (bit albo map)."""
-    global PREFIX, TSV_NAME, FADE_IN, FADE_OUT, DUR_OK, NAME_RX
+    global PREFIX, TSV_NAME, FADE_IN, FADE_OUT, DUR_OK, NAME_RX, LEVELS
     if name not in PROFILES:
         raise SystemExit('nieznany prefiks %s (dozwolone: %s)' % (name, ', '.join(sorted(PROFILES))))
-    fi, fo, dmin, dmax, tsv = PROFILES[name]
-    PREFIX, TSV_NAME, FADE_IN, FADE_OUT, DUR_OK = name, tsv, fi, fo, (dmin, dmax)
+    fi, fo, dmin, dmax, tsv, lv = PROFILES[name]
+    PREFIX, TSV_NAME, FADE_IN, FADE_OUT, DUR_OK, LEVELS = name, tsv, fi, fo, (dmin, dmax), lv
     NAME_RX = re.compile(r'^' + name + r'_(\d\d)_([a-z0-9_]+)\.mp3$')
+
+
+def lvname(lv):
+    """Paczka 203: nazwa poziomu w katalogu i raporcie - 17 -> '17', 21.4 -> '21.4' (EventMusic.Bitwa.cs L10)."""
+    return '%g' % lv
 
 
 def run(args):
@@ -172,7 +181,7 @@ def main():
                 warn.append('%s %.1f s (poza %.0f-%.0f s)' % (f, dur1, DUR_OK[0], DUR_OK[1]))
             smd5 = md5(src)
             for lv in LEVELS:
-                d = os.path.join(out, 'lufs%d' % lv)
+                d = os.path.join(out, 'lufs' + lvname(lv))
                 os.makedirs(d, exist_ok=True)
                 dst = os.path.join(d, base + '.ogg')
                 gain = -lv - i1
@@ -181,15 +190,15 @@ def main():
                     encode(wav, dst, gain)
                     i, lra, tp, dur = measure(dst)
                     ok = abs(i + lv) <= TOL_I and tp <= TP_MAX
-                    print('  lufs%d %s.ogg: wzmocnienie %+.2f dB -> I %.1f LUFS, TP %.1f dBTP, LRA %.1f, %.2f s%s' % (
-                        lv, base, gain, i, tp, lra, dur, '' if ok else ' - POZA (proba %d/%d)' % (t + 1, TRIES)))
+                    print('  lufs%s %s.ogg: wzmocnienie %+.2f dB -> I %.1f LUFS, TP %.1f dBTP, LRA %.1f, %.2f s%s' % (
+                        lvname(lv), base, gain, i, tp, lra, dur, '' if ok else ' - POZA (proba %d/%d)' % (t + 1, TRIES)))
                     if ok or tp <= TP_MAX or t == TRIES - 1:
                         break             # ostatnia proba: wzmocnienie w raporcie = to, z ktorym zakodowano plik
                     gain -= tp + 1.1      # szczyt za wysoko: mniej o nadwyzke ponad -1.1 dBTP
                 if not ok:
                     bad += 1
-                rows.append('%d\tlufs%d/%s.ogg\t%.2f\t%.1f\t%.1f\t%.1f\t%.2f\t%s\t%s\t%s\t%s\t%s' % (
-                    lv, lv, base, gain, i, tp, lra, dur, fin.split(' (')[0], fout.split(' (')[0], f, smd5, md5(dst)))
+                rows.append('%s\tlufs%s/%s.ogg\t%.2f\t%.1f\t%.1f\t%.1f\t%.2f\t%s\t%s\t%s\t%s\t%s' % (
+                    lvname(lv), lvname(lv), base, gain, i, tp, lra, dur, fin.split(' (')[0], fout.split(' (')[0], f, smd5, md5(dst)))
     finally:
         shutil.rmtree(tmpd, ignore_errors=True)
     tsv = os.path.join(out, TSV_NAME)

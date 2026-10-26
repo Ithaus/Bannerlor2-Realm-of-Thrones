@@ -39,6 +39,7 @@ namespace Armoury
     ///    A/B autotestu: zmienna srodowiska ARMOURY_MAPHOLD_STARE=1 - stare trzymanie (odczyt i zapis co 0,25 s) bez zatrzymywania motywu.
     ///  - Utwory: ModuleData/Lektor/Muzyka/Mapa/lufs{17,20,23,26}/map_NN_nazwa.ogg (tools/muzyka/bitwa_v2.py --prefiks map: samo wzmocnienie z mp3 ElevenLabs,
     ///    wejscie 4 s i wyjscie 6 s w zrodle). Glosnosc: o jeden stopien ciszej niz muzyka bitwy (suwak BattleMusicLoudness: 4 -> -20, 3 -> -23, 2 i 1 -> -26 LUFS)
+    ///    ze stopni 164 (LufsOf, StepLufs). Paczka 203: bitwa o 4.4 dB ciszej (BattleLufs10), mapa bez zmian - przy tym samym suwaku mapa o 1.4 dB glosniej niz bitwa
     ///    - tlo pod gra, nie nad zgielkiem bitwy; zestaw jak w bitwie (PickFrom: pierwszy pelny 10, inaczej najblizszy niepusty). Zdarzenie event:/Extra/external
     ///    jak okna i bitwa, w tym samym gniezdzie _mus (nastroj "mapa") - okno wydarzenia i bitwa zatrzymuja go jak kazdy inny utwor (nigdy dwa naraz).
     ///  - Kolejnosc: worek - kazdy utwor zestawu raz, potem nowy worek; nigdy ten sam dwa razy z rzedu (takze na granicy workow i po wczytaniu w tej samej sesji),
@@ -114,7 +115,7 @@ namespace Armoury
         /// <summary>Zestaw mapy: o jeden stopien ciszej niz muzyka bitwy (17 + 3 * (4 - poziom) + 3), najciszej -26 LUFS.</summary>
         private static int MapLufs() { return Math.Min(MapLufsQuietest, LufsOf(Level()) + 3); }
 
-        private static List<BTrack> PickMapSet(out int got) { return PickFrom(_mapSets, MapLufs(), out got); }
+        private static List<BTrack> PickMapSet(out int got) { return PickFrom(_mapSets, MapLufs(), 3, out got); }   // paczka 203: krok 3 LU jak dotad
 
         // ============================================================ start kampanii (BattleStartCheck - raz na obiekt Campaign)
         /// <summary>Nowa kampania (takze wczytanie zapisu): stan mapy od zera, pierwszy utwor po 5 s mapy; linia biblioteki. Nie rzuca.</summary>
@@ -134,10 +135,10 @@ namespace Armoury
                 int got;
                 var set = PickMapSet(out got);
                 var sb = new StringBuilder(PM + "start - klucz MapMusicOurs TAK, glosnosc bitwy " + Level() + " -> mapa -" + MapLufs() + " LUFS (zestaw lufs" + got + "), utwory mapy");
-                for (int i = 0; i < BattleLufs.Length; i++)
+                for (int i = 0; i < StepLufs.Length; i++)
                 {
                     List<BTrack> l;
-                    sb.Append(i == 0 ? " " : ", ").Append("lufs").Append(BattleLufs[i]).Append(' ').Append(_mapSets.TryGetValue(BattleLufs[i], out l) ? l.Count : 0);
+                    sb.Append(i == 0 ? " " : ", ").Append("lufs").Append(StepLufs[i]).Append(' ').Append(_mapSets.TryGetValue(StepLufs[i], out l) ? l.Count : 0);
                 }
                 sb.Append(" (");
                 if (set != null)
@@ -708,7 +709,7 @@ namespace Armoury
             try
             {
                 _mapDir = Path.Combine(Path.Combine(Path.Combine(Path.Combine(Lektor.ModuleDir(), "ModuleData"), "Lektor"), "Muzyka"), "Mapa");
-                foreach (int lu in BattleLufs)
+                foreach (int lu in StepLufs)   // paczka 203: mapa na stopniach 17/20/23/26 (bitwa ma wlasne BattleLufs10)
                 {
                     var list = new List<BTrack>();
                     _mapSets[lu] = list;

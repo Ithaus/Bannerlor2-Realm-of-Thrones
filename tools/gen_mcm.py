@@ -615,7 +615,7 @@ RANGES = {
     'FriendlyFireSiegeRangedPercent': (0, 100, "0"),
     # 127 bieg wedlug fizjologii: sekundy pelnego biegu bez zbroi 30..300, koszt zbroi 0..5 %/kg
     'RunSecondsUnarmoured': (30.0, 300.0, "0"),
-    'ArmourRunCostPerKgPercent': (0.0, 5.0, "0.00"),
+    'ArmourRunCostPerKgPercent': (0.0, 5.0, "0.000"),   # paczka 203: domyslne 1.125 - trzy miejsca, zeby MCM nie pokazywal 1.13
     # 128 szarza marszem: prog biegu 20..200 m
     'ChargeRunsFrom': (20.0, 200.0, "0"),
     # 130 krzywa Atletyki 1.0..1.5
