@@ -29,6 +29,9 @@ namespace Armoury
     ///  - Paczka 165 (EventMusic.MapaTlo.cs): na mapie kampanii nasze 10 spokojnych utworow map_NN zamiast muzyki mapy gry - ten sam stan wyciszenia psai i to samo
     ///    gniazdo utworu (_mus, nastroj "mapa"); pierwszenstwo okno / plotki > bitwa > mapa. Okno przy mapie: utwor mapy stop, po oknie wyciszenie zostaje
     ///    (linia "koniec wydarzenia - mapa dalej"); ekran ladowania - psai trzymane bez FadeUp (decyzja po ladowaniu: mapa albo misja).
+    ///  - 165b (Jeff 26.10 "i leca dwie naraz"): ekran ladowania, misja ladowana nad mapa (przed Continuing) i koniec bitwy przy zamykaniu misji - zapis 0 co klatke
+    ///    (HoldDown), bez FadeUp (misja: najwyzej 20 s, potem albo przy spacerze "misja bez bitwy - muzyka gry wraca"); nieprzyjete zdarzenie - Stop przed Release;
+    ///    kazde nasze zdarzenie w spisie kontroli mapy (LiveAdd). Szczegoly w EventMusic.MapaTlo.cs.
     /// </summary>
     internal static partial class EventMusic
     {
@@ -129,6 +132,7 @@ namespace Armoury
         {
             if (want)
             {
+                MissionHoldReset();   // 165b: trzymanie misji nad mapa od zera
                 if (battle)
                 {
                     if (_mapOn) MapOff("misja", "przejmuje bitwa");   // paczka 165: nie powinno sie zdarzyc (misja wylacza mape klatki wczesniej)
@@ -159,12 +163,15 @@ namespace Armoury
             _idle += dt;
             // paczka 165: ekran ladowania w kampanii przy wyciszonym psai (np. powrot z bitwy na mape) - psai trzymane, bez FadeUp; po ladowaniu mapa albo misja
             bool loadHold = _mapOffWhy == "ekran ladowania" && _ducked;
-            if (_mapOn && !loadHold) MapOff(_mapOffWhy, "muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s)");   // paczka 165: misja, klucz NIE, inny stan
+            // 165b: misja nad mapa przed Continuing (ladowanie) albo koniec bitwy przy zamykaniu misji - psai trzymane na 0 (najwyzej 20 s), bez FadeUp
+            bool misHold = !loadHold && MissionHoldWanted();
+            bool hold = loadHold || misHold;
+            if (_mapOn && !loadHold) MapOff(_mapOffWhy, misHold ? "muzyka gry trzymana na 0 do startu misji" : "muzyka gry wraca (" + FadeInSec.ToString("0.0", Inv) + " s)");   // paczka 165: misja, klucz NIE, inny stan
             if (_active && _idle >= ReleaseDelay && loadHold && _mapOn) MapRelease();   // recenzja 165: ladowanie nad wlaczona mapa - koniec jak w MapStep (psai trzymane, bez "wraca")
             else if (_active && _idle >= ReleaseDelay)
             {
                 _active = false;
-                if (_batActive) BattleEnd(_batWhy, false);   // m109-muzyka: koniec bitwy (powod z BattleWanted) - linia bitwy zamiast linii wydarzenia
+                if (_batActive) BattleEnd(_batWhy, false, hold && MapKeyOn);   // m109-muzyka: koniec bitwy (powod z BattleWanted); 165b: przy trzymaniu - "dalej wyciszona (muzyka mapy)"
                 else
                 {
                     StopTrack("koniec wydarzenia");
@@ -173,7 +180,8 @@ namespace Armoury
                 }
                 _paused = false;
             }
-            if (!_active && _ducked && !loadHold) FadeUp(dt);
+            if (hold) HoldDown(dt);   // 165b: zapis 0 co klatke (wczesniej ekran ladowania tylko wstrzymywal FadeUp, bez zapisu)
+            else if (!_active && _ducked) FadeUp(dt);
         }
 
         // ------------------------------------------------------------ psai
@@ -275,6 +283,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("RestoreNow.Psai", e); }
             _ducked = false; _paused = false; _active = false; _idle = 0f; _cur = _saved; _duckMap = false;
+            MissionHoldReset();   // 165b
             BattleReset(why);   // m109-muzyka: stan bitwy od zera (wczytanie zapisu z misji, wyjscie do menu); blad w misji bitwy - rezygnacja z tej misji
         }
 
@@ -306,12 +315,13 @@ namespace Armoury
             SoundEvent ev = null;
             try { ev = SoundEvent.CreateEventFromExternalFile(MusicEvent, path, (Scene)null, false, false); }
             catch (Exception e) { Stumble("CreateEventFromExternalFile", e); return; }
+            LiveAdd(ev, Path.GetFileName(path));   // 165b: do kontroli mapy (nasze zdarzenia grajace)
             bool ok = false;
             try { ok = ev != null && ev.IsValid && ev.Play(); } catch (Exception e) { Stumble("Play", e); }
             if (!ok)
             {
                 _createFails++;
-                try { if (ev != null && ev.IsValid) ev.Release(); } catch { }
+                try { if (ev != null && ev.IsValid) { ev.Stop(); if (ev.IsValid) ev.Release(); } } catch { }   // 165b: Stop przed Release
                 if (_createFails <= 3) Log.Info(P + "silnik nie przyjal utworu " + Path.GetFileName(path) + " (zdarzenie " + MusicEvent + ") - bez naszej muzyki, muzyka gry dalej wyciszona.");
                 return;
             }

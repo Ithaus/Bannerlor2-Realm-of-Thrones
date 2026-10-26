@@ -1141,7 +1141,12 @@ Uzycie (Python 3, tylko odczyt):
                     (>= zapamietana - 0.01) albo 'przejmuje bitwa' przed nastepnym wlaczeniem; MAP-4 bez tego samego dwa razy z rzedu i bez dubla w worku; MAP-5 przerwy:
                     po utworze 20-40 s (nie grany - 5 s), wlaczenie start 5 s / po misji 5-10 s / po oknie <= 3 s; MAP-6 ERROR EventMusic.MapaTlo, 'silnik nie przyjal',
                     rezygnacje, brak psai / utworow - 0. Paczka 165 zmienia tez m109muz: koniec okna '- mapa dalej', koniec bitwy '(muzyka mapy)' i 'przejmuje muzyka mapy'
-                    zamiast 'wrocila' (MUZ-3, MUZ-6, MUZ-8).
+                    zamiast 'wrocila' (MUZ-3, MUZ-6, MUZ-8). 165b (Jeff 26.10 ok. 20:10 "i leca dwie naraz"): MAP-7 jedno zrodlo muzyki na mapie - linie 'kontrola (...)'
+                    (co 30 s mapy, po 1 s i po koncu utworu): NIE, gdy nasze zdarzenia grajace > 1 albo 0 przy utworze mapy, psai master > 0.01, zapisow 0 < 0.9 x klatek
+                    (brak trzymania co klatke - np. ARMOURY_MAPHOLD_STARE=1), 2 kolejne linie z glosem psai 0-6 grajacym natywnie poza trybem menu (zatrzymanie motywu
+                    nie dziala), mapa wlaczona >= 90 s zegara (poza oknami) bez linii kontroli (log sprzed 165b z mapa >= 90 s - NIE); MAP-7b INFO: glosy psai pod
+                    nasza mapa w trybie menu i na warstwie 7-8 (tylko trzymane na 0), nowe odcinki psai, zatrzymania motywu gry, 'misja bez bitwy'. MAP-3 przyjmuje
+                    stop mapy 'muzyka gry trzymana na 0 do startu misji' (165b: bez FadeUp do startu misji) i linie 'misja bez bitwy (...) - muzyka gry wraca'.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -69179,6 +69184,9 @@ M165MAPA_AFTER = {"start": (5, 5), "po misji": (5, 10), "po oknie": (0, 3), "po 
 M165MAPA_RETRY = 5
 M165MAPA_TOL = 0.01
 M165MAPA_SAVED_MIN = 0.95
+M165MAPA_CTL_GAP = 90       # 165b: kontrola co 30 s czasu mapy (krok klatki do 0,25 s - przy wolnych klatkach czas mapy idzie wolniej niz zegar); prog zegara 90 s
+M165MAPA_WRITE_MIN = 0.9    # 165b: zapisow 0 >= 0.9 x klatek trzymania
+M165MAPA_LAYER = 7          # glosy psai 7-8 to warstwa (PlaySegment / motywy wydarzen ROT), 0-6 motywy
 M165MAPA_RX = {
     "start": re.compile(r"^start - klucz MapMusicOurs (TAK|NIE)\b"),
     "full": re.compile(r"^start - klucz MapMusicOurs TAK, glosnosc bitwy (\d) -> mapa -(\d+) LUFS \(zestaw lufs(\d+)\), utwory mapy lufs17 (\d+), lufs20 (\d+), "
@@ -69187,7 +69195,8 @@ M165MAPA_RX = {
     "dur": re.compile(r"([a-z0-9_]+) (?:([\d.]+) s|dlugosc \?)"),
     "on": re.compile(r"^mapa - nasza muzyka, muzyka gry (cichnie|dalej wyciszona) \(psai (?:glosnosc zapamietana ([\d.]+)|BRAK)\), zestaw lufs(\d+) \((\d+) utworow\), "
                      r"(?:po koncu okna / bitwy, )?nastepny za (\d+) s \((start|po przerwie|po oknie|po misji)\)\.$"),
-    "duck": re.compile(r"^muzyka gry wyciszona \(psai glosnosc teraz (-?[\d.]+), zapamietana ([\d.]+)\)\.$"),
+    # 165b: 'psai master teraz X - pole psai, zapis 0 co klatke; zapamietana Y' (stare 165: 'psai glosnosc teraz X, zapamietana Y')
+    "duck": re.compile(r"^muzyka gry wyciszona \(psai (?:glosnosc|master) teraz (-?[\d.]+)(?: - pole psai, zapis 0 ([^;]+);|,) zapamietana ([\d.]+)\)\.$"),
     "trk": re.compile(r"^utwor (\d+) - (map_[a-z0-9_]+\.ogg) \(lufs(\d+), (?:([\d.]+) s|dlugosc \?), (start|po przerwie|po oknie|po misji), worek (\d+)/(\d+)"
                       r"(, nowy worek|, jedyny - powtorka)?\)\.$"),
     "end": re.compile(r"^(koniec|przerwany) (map_[a-z0-9_]+\.ogg) po ([\d.]+) s \(([^)]*)\), grany po 1 s (TAK|NIE|-), zdarzenie przy stopie (\S+); "
@@ -69198,6 +69207,15 @@ M165MAPA_RX = {
     "rej": re.compile(r"^silnik nie przyjal (map_\S+) \(zdarzenie "),
     "gave": re.compile(r"^rezygnacja po (\d+) bledach z rzedu"),
     "nores": re.compile(r"^(?:psai NIE|brak utworow mapy w .*) - mapa z muzyka gry\.$"),
+    # 165b
+    "ctl": re.compile(r"^kontrola \(([^)]*)\) - psai master (-?[\d.]+|\?), zapisow 0 (\d+)/(\d+) klatek od ostatniej, stan psai (\S+), motyw (-?\d+), tryb menu (TAK|NIE|\?), "
+                      r"glosy psai grajace (\d+|\?) \[([^\]]*)\], nowe odcinki psai (\d+), zatrzyman motywu gry (\d+); nasze zdarzenia grajace (\d+) \(([^)]*)\), "
+                      r"utwor mapy (\S+)\.$"),
+    "voice": re.compile(r"v(\d+):m(-?\d+)/o(-?\d+) fade (\S+) master (\S+) natywnie (TAK|NIE|\?)"),
+    "seg": re.compile(r"^psai nowy odcinek pod nasza mapa - v(\d+):"),
+    "thstop": re.compile(r"^motyw mapy gry (-?\d+) zatrzymany pod nasza mapa \(ForceStopThemeWithFadeOut"),
+    "nobat": re.compile(r"^misja bez bitwy \(([^)]*)\) - muzyka gry wraca"),
+    "diag": re.compile(r"^kontrola psai (TAK|NIE) \("),
 }
 M165MAPA_SET = "01_krolewski_trakt 125.0 s, 02_polnoc 125.0 s, 03_dorzecze 125.0 s, 04_dwor 125.0 s, 05_ognisko 125.0 s, 06_starzy_bogowie 125.0 s, " \
                "07_waskie_morze 125.0 s, 08_poludniowe_ziemie 125.0 s, 09_dluga_zima 125.0 s, 10_wsie_i_pola 125.0 s"
@@ -69213,6 +69231,23 @@ M165MAPA_TEST = {
     "onbat": "mapa - nasza muzyka, muzyka gry dalej wyciszona (psai glosnosc zapamietana 1.00), zestaw lufs23 (10 utworow), po koncu okna / bitwy, nastepny za 7 s "
              "(po misji).",
     "duck": "muzyka gry wyciszona (psai glosnosc teraz 0.00, zapamietana 1.00).",
+    "duck2": "muzyka gry wyciszona (psai master teraz 0.00 - pole psai, zapis 0 co klatke; zapamietana 1.00).",
+    "duck3": "muzyka gry wyciszona (psai master teraz 0.00 - pole psai, zapis 0 co 0.25 s po odczycie (ARMOURY_MAPHOLD_STARE); zapamietana 1.00).",
+    "ctl1": "kontrola (po 1 s utworu) - psai master 0.00, zapisow 0 240/240 klatek od ostatniej, stan psai playing, motyw 12, tryb menu NIE, glosy psai grajace 1 "
+            "[v2:m12/o340 fade 0.40 master 0.00 natywnie TAK], nowe odcinki psai 1, zatrzyman motywu gry 1; nasze zdarzenia grajace 1 (map_01_krolewski_trakt.ogg), "
+            "utwor mapy map_01_krolewski_trakt.ogg.",
+    "ctlgap": "kontrola (po koncu utworu) - psai master 0.00, zapisow 0 7200/7200 klatek od ostatniej, stan psai silence, motyw -1, tryb menu NIE, glosy psai grajace 0 [-], "
+              "nowe odcinki psai 1, zatrzyman motywu gry 1; nasze zdarzenia grajace 0 (-), utwor mapy przerwa.",
+    "ctlmenu": "kontrola (co 30 s) - psai master 0.00, zapisow 0 1800/1800 klatek od ostatniej, stan psai playing, motyw 30, tryb menu TAK, glosy psai grajace 2 "
+               "[v0:m30/o5 fade 1.00 master 0.00 natywnie TAK; v7:m421/o421 fade 1.00 master 0.00 natywnie TAK], nowe odcinki psai 2, zatrzyman motywu gry 1; "
+               "nasze zdarzenia grajace 1 (map_02_polnoc.ogg), utwor mapy map_02_polnoc.ogg.",
+    "ctlno": "kontrola (co 30 s) - psai master ?, zapisow 0 0/0 klatek od ostatniej, stan psai ?, motyw -1, tryb menu ?, glosy psai grajace ? [-], nowe odcinki psai 0, "
+             "zatrzyman motywu gry 0; nasze zdarzenia grajace 0 (-), utwor mapy przerwa.",
+    "seg": "psai nowy odcinek pod nasza mapa - v3:m12/o341 fade 1.00 master 0.00 natywnie NIE (nowych w sesji 1).",
+    "thstop": "motyw mapy gry 12 zatrzymany pod nasza mapa (ForceStopThemeWithFadeOut, psai na 0; gra wraca do swojej przerwy 30-120 s; zatrzyman w sesji 1).",
+    "offhold": "mapa - stop (misja) - muzyka gry trzymana na 0 do startu misji.",
+    "nobat": "misja bez bitwy (misja trwa) - muzyka gry wraca (2.0 s).",
+    "diag": "kontrola psai TAK (stan, tryb menu, motyw; glosy natywnie TAK, glosnosc glosow TAK), trzymanie 0 co klatke, zatrzymanie motywu mapy gry TAK.",
     "trk": "utwor 1 - map_01_krolewski_trakt.ogg (lufs23, 125.0 s, start, worek 1/10).",
     "trknew": "utwor 11 - map_04_dwor.ogg (lufs23, 125.0 s, po przerwie, worek 1/10, nowy worek).",
     "trkone": "utwor 2 - map_01_krolewski_trakt.ogg (lufs23, 125.0 s, po oknie, worek 1/1, jedyny - powtorka).",
@@ -69254,8 +69289,35 @@ def m165mapa_selftest():
     if not m or m.groups() != ("dalej wyciszona", "1.00", "23", "10", "7", "po misji"):
         return f"onbat: {m.groups() if m else 'brak dopasowania'}"
     m = RX["duck"].match(T["duck"])
-    if not m or m.groups() != ("0.00", "1.00"):
+    if not m or m.groups() != ("0.00", None, "1.00"):
         return "duck"
+    m = RX["duck"].match(T["duck2"])
+    if not m or m.groups() != ("0.00", "co klatke", "1.00"):
+        return f"duck2: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["duck"].match(T["duck3"])
+    if not m or not m.group(2).startswith("co 0.25 s"):
+        return "duck3"
+    m = RX["ctl"].match(T["ctl1"])
+    if not m or m.groups() != ("po 1 s utworu", "0.00", "240", "240", "playing", "12", "NIE", "1", "v2:m12/o340 fade 0.40 master 0.00 natywnie TAK", "1", "1", "1",
+                               "map_01_krolewski_trakt.ogg", "map_01_krolewski_trakt.ogg"):
+        return f"ctl1: {m.groups() if m else 'brak dopasowania'}"
+    if RX["voice"].findall(m.group(9)) != [("2", "12", "340", "0.40", "0.00", "TAK")]:
+        return "ctl1 glosy"
+    m = RX["ctl"].match(T["ctlmenu"])
+    if not m or m.group(7) != "TAK" or len(RX["voice"].findall(m.group(9))) != 2 or m.group(14) != "map_02_polnoc.ogg":
+        return f"ctlmenu: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["ctl"].match(T["ctlgap"])
+    if not m or m.group(9) != "-" or m.group(12) != "0" or m.group(13) != "-" or m.group(14) != "przerwa":
+        return f"ctlgap: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["ctl"].match(T["ctlno"])
+    if not m or m.group(2) != "?" or m.group(8) != "?":
+        return f"ctlno: {m.groups() if m else 'brak dopasowania'}"
+    if not RX["seg"].match(T["seg"]) or RX["thstop"].match(T["thstop"]).group(1) != "12" or RX["nobat"].match(T["nobat"]).group(1) != "misja trwa" \
+            or not RX["diag"].match(T["diag"]):
+        return "seg / thstop / nobat / diag"
+    m = RX["off"].match(T["offhold"])
+    if not m or m.groups() != ("misja", "muzyka gry trzymana na 0 do startu misji"):
+        return "offhold"
     m = RX["trk"].match(T["trk"])
     if not m or m.groups() != ("1", "map_01_krolewski_trakt.ogg", "23", "125.0", "start", "1", "10", None):
         return f"trk: {m.groups() if m else 'brak dopasowania'}"
@@ -69292,8 +69354,8 @@ def m165mapa_selftest():
         return "hand"
     if not RX["rej"].match(T["rej"]) or not RX["gave"].match(T["gave"]) or not RX["nores"].match(T["nores"]) or not RX["nores"].match(T["nopsai"]):
         return "rej / gave / nores"
-    for k in ("start", "on", "trk", "end", "cutwin", "off", "back", "hand"):     # kazda linia tylko w swoim wyrazeniu
-        hits = [n for n in ("on", "duck", "trk", "end", "off", "back", "hand", "rej", "gave", "nores") if RX[n].match(T[k])]
+    for k in ("start", "on", "trk", "end", "cutwin", "off", "back", "hand", "duck2", "ctl1", "ctlgap", "seg", "thstop", "nobat", "diag", "offhold"):   # kazda linia tylko w swoim wyrazeniu
+        hits = [n for n in ("on", "duck", "trk", "end", "off", "back", "hand", "rej", "gave", "nores", "ctl", "seg", "thstop", "nobat", "diag") if RX[n].match(T[k])]
         if len(hits) > (0 if k == "start" else 1):
             return f"{k}: pasuje do {hits}"
     R9, T9 = M109MUZ_RX, M109MUZ_TEST
@@ -69306,8 +69368,18 @@ def m165mapa_collect(logp):
     """m165mapa: przebieg logu (strumieniowo) - linie mapy w kolejnosci z kontekstem bitew m109 i okien m108."""
     RX, R9 = M165MAPA_RX, M109MUZ_RX
     D = {"starts": [], "ons": 0, "trk": [], "ends": [], "offs": [], "backs": [], "hands": 0, "lines": 0, "ctx_bad": [], "overlap": [], "noduck": [], "unres": [],
-         "low_back": [], "tail_off": 0, "repeats": [], "bagdup": [], "gap_bad": [], "rej": 0, "gave": 0, "nores": 0, "err": 0, "err1": "", "on_gaps": []}
+         "low_back": [], "tail_off": 0, "repeats": [], "bagdup": [], "gap_bad": [], "rej": 0, "gave": 0, "nores": 0, "err": 0, "err1": "", "on_gaps": [],
+         "ctl": 0, "ctl_bad": [], "ctl_gap": [], "ctl_warn": [], "on_sec": 0.0, "segs": 0, "thstops": 0, "nobat": 0, "diag": None, "ctl_last": None}
     on = False
+    t_now = t_prev = None
+    day = 0
+    clk = None              # 165b: czas zegara od ostatniej kontroli (mapa wlaczona, bez okna); None - mapa wylaczona albo okno
+    on_t = None
+    prev_main = False       # poprzednia linia kontroli z glosem psai 0-6 grajacym natywnie poza trybem menu
+
+    def gap_check(where):
+        if clk is not None and t_now is not None and t_now - clk >= M165MAPA_CTL_GAP:
+            D["ctl_gap"].append(f"{t_now - clk:.0f} s bez kontroli ({where})")
     in_bat = in_win = False
     playing = None
     seg_trk = seg_duck = False
@@ -69318,6 +69390,13 @@ def m165mapa_collect(logp):
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
+            if m:                                   # 165b: zegar logu (przejscie przez polnoc - +24 h)
+                hh, mi, ss = (int(x) for x in m.group(1).split(":"))
+                t = day + hh * 3600 + mi * 60 + ss
+                if t_prev is not None and t < t_prev - 3600:
+                    day += 86400
+                    t += 86400
+                t_now = t_prev = t
             if s.startswith("ERROR in ") and "EventMusic.MapaTlo" in s[:140]:
                 D["err"] += 1
                 D["err1"] = D["err1"] or s[:200]
@@ -69337,8 +69416,12 @@ def m165mapa_collect(logp):
                     in_win = True
                     if playing:
                         D["ctx_bad"].append(f"okno przy grajacym {playing}")
+                    gap_check("przed oknem")
+                    clk = None
                 elif R9["winend"].match(b):
                     in_win = False
+                    if on:
+                        clk = t_now
                 continue
             if not s.startswith(M165MAPA_TAG):
                 continue
@@ -69352,6 +69435,7 @@ def m165mapa_collect(logp):
             mm = RX["on"].match(b)
             if mm:
                 D["ons"] += 1
+                clk, on_t, prev_main = t_now, t_now, False
                 if off_pend is not None and mm.group(1) != "dalej wyciszona":   # recenzja 165: mapa wlaczona przed koncem FadeUp - psai nie wrocilo, mapa przejela
                     D["unres"].append(off_pend)
                 off_pend = None
@@ -69397,6 +69481,10 @@ def m165mapa_collect(logp):
                 continue
             mm = RX["off"].match(b)
             if mm:
+                gap_check("do stopu mapy")
+                if on and on_t is not None and t_now is not None:
+                    D["on_sec"] += t_now - on_t
+                clk, on_t, prev_main = None, None, False
                 D["offs"].append((mm.group(1), mm.group(2)))
                 if on and seg_trk and not seg_duck:
                     D["noduck"].append(mm.group(1))
@@ -69429,6 +69517,57 @@ def m165mapa_collect(logp):
             if RX["nores"].match(b):
                 D["nores"] += 1
                 continue
+            mm = RX["ctl"].match(b)                 # 165b: MAP-7
+            if mm:
+                D["ctl"] += 1
+                D["ctl_last"] = mm.groups()
+                gap_check("kontrola")
+                if on and not in_win:
+                    clk = t_now
+                why, master, wr, fr, menu, ours, track = mm.group(1), mm.group(2), int(mm.group(3)), int(mm.group(4)), mm.group(7), int(mm.group(12)), mm.group(14)
+                tag = f"kontrola {D['ctl']} ({why})"
+                if ours > 1:
+                    D["ctl_bad"].append(f"{tag}: nasze zdarzenia grajace {ours} ({mm.group(13)})")
+                elif ours == 0 and track != "przerwa":
+                    D["ctl_bad"].append(f"{tag}: utwor mapy {track}, nasze zdarzenia grajace 0")
+                if master != "?" and float(master) > M165MAPA_TOL:
+                    D["ctl_bad"].append(f"{tag}: psai master {master}")
+                if fr > 0 and wr < M165MAPA_WRITE_MIN * fr:
+                    D["ctl_bad"].append(f"{tag}: zapisow 0 {wr}/{fr} klatek - brak trzymania co klatke")
+                main = layer = False
+                for v in RX["voice"].findall(mm.group(9)):
+                    if v[5] != "TAK":
+                        continue
+                    if int(v[0]) >= M165MAPA_LAYER:
+                        layer = True
+                    else:
+                        main = True
+                cur_main = main and menu == "NIE"
+                if cur_main and prev_main:
+                    D["ctl_bad"].append(f"{tag}: glos psai 0-6 gra natywnie w 2 kolejnych kontrolach poza trybem menu ({mm.group(9)[:80]})")
+                prev_main = cur_main
+                if main and menu == "TAK":
+                    D["ctl_warn"].append(f"{tag}: tryb menu - glos psai gra natywnie (trzymany na 0)")
+                if layer:
+                    D["ctl_warn"].append(f"{tag}: warstwa psai 7-8 gra natywnie (trzymana na 0)")
+                continue
+            if RX["seg"].match(b):
+                D["segs"] += 1
+                continue
+            if RX["thstop"].match(b):
+                D["thstops"] += 1
+                continue
+            if RX["nobat"].match(b):
+                D["nobat"] += 1
+                continue
+            mm = RX["diag"].match(b)
+            if mm:
+                D["diag"] = mm.group(1)
+                continue
+    if on:
+        gap_check("do konca logu")
+        if on_t is not None and t_now is not None:
+            D["on_sec"] += t_now - on_t
     if on and seg_trk and not seg_duck:
         D["noduck"].append("koniec logu")
     if off_pend is not None:
@@ -69523,6 +69662,24 @@ def m165mapa_rows(rep, D):
     vals = {"ERROR EventMusic.MapaTlo": D["err"], "silnik nie przyjal": D["rej"], "rezygnacje": D["gave"], "brak psai / utworow": 0 if keyno else D["nores"]}
     rep.add("MAP-6: bledy muzyki mapy", ", ".join(f"{k} {v}" for k, v in vals.items()) + (f" | {D['err1']}" if D["err1"] else ""), "wszystko 0",
             all(v == 0 for v in vals.values()))
+    # MAP-7 (165b, Jeff 26.10 ok. 20:10 "i leca dwie naraz") jedno zrodlo muzyki na mapie
+    probs = list(D["ctl_bad"])
+    if D["ctl"] == 0 and D["on_sec"] >= M165MAPA_CTL_GAP:
+        probs.append(f"mapa wlaczona {D['on_sec']:.0f} s zegara, 0 linii kontroli (log sprzed 165b albo kontrola nie dziala)")
+    elif D["ctl"] > 0:
+        probs += D["ctl_gap"]
+    last = D["ctl_last"]
+    val = f"linii kontroli {D['ctl']}, mapa wlaczona {D['on_sec']:.0f} s zegara" \
+        + (f", ostatnia: psai master {last[1]}, zapisow 0 {last[2]}/{last[3]}, stan psai {last[4]}, glosy psai {last[7]}, nasze zdarzenia {last[11]}" if last else "") \
+        + (" | " + "; ".join(probs[:3]) + (f" (+{len(probs) - 3})" if len(probs) > 3 else "") if probs else "")
+    rep.add("MAP-7: jedno zrodlo muzyki na mapie (kontrola 165b)", val,
+            "w kazdej kontroli: nasze zdarzenia grajace <= 1 (0 tylko w przerwie), psai master <= 0.01, zapisow 0 >= 0.9 x klatek; glos psai 0-6 grajacy natywnie poza "
+            f"trybem menu najwyzej w 1 kontroli z rzedu; mapa (poza oknami) bez kontroli < {M165MAPA_CTL_GAP} s zegara (bez mapy - INFO)",
+            (not probs) if (D["ctl"] or D["ons"] or probs) else None)
+    rep.add("MAP-7b: glosy psai pod nasza mapa (tryb menu / warstwa), nowe odcinki, zatrzymania motywu", f"ostrzezen {len(D['ctl_warn'])}"
+            + (f" ({D['ctl_warn'][0]})" if D["ctl_warn"] else "") + f", linii nowych odcinkow {D['segs']}, linii zatrzyman motywu {D['thstops']}, misja bez bitwy "
+            f"{D['nobat']}, kontrola psai {D['diag'] or '-'}" + (f", w ostatniej kontroli nowych odcinkow {D['ctl_last'][9]}, zatrzyman {D['ctl_last'][10]}" if D["ctl_last"] else ""),
+            "INFO (tryb menu i warstwa 7-8 - psai tylko trzymane na 0; sluchem sprawdza Jeff)", None)
 
 
 def m165mapa_synth():
@@ -69542,10 +69699,16 @@ def m165mapa_synth():
             L = []
             if kind in ("good", "bad"):
                 L.append(P + (T["start"] if kind == "good" else T["start"].replace("psai TAK", "psai NIE")))
-                L += [P + T["on"], P + T["duck"], trk(1, "map_01_krolewski_trakt.ogg", "start", 1), P + T["end"]]
+                L += [P + T["on"], P + (T["duck2"] if kind == "good" else T["duck"]), trk(1, "map_01_krolewski_trakt.ogg", "start", 1)]
                 if kind == "good":
-                    L += [trk(2, "map_02_polnoc.ogg", "po przerwie", 2), P + T["cutwin"], P8 + T9["win"], P8 + T9["winmap"],
-                          trk(3, "map_03_dorzecze.ogg", "po oknie", 3), P + T["cutmis"], P + T["off"], P + T["back"],
+                    L += [P + T["diag"], P + T["seg"], P + T["thstop"], P + T["ctl1"]]
+                else:   # 165b MAP-7: psai master > 0.01, dwa nasze naraz, zapisy 0 bez trzymania co klatke
+                    L += [P + T["ctl1"].replace("psai master 0.00", "psai master 0.40").replace("zapisow 0 240/240", "zapisow 0 3/240")
+                          .replace("grajace 1 (map_01_krolewski_trakt.ogg)", "grajace 2 (map_01_krolewski_trakt.ogg, map_05_ognisko.ogg)")]
+                L += [P + T["end"]]
+                if kind == "good":
+                    L += [P + T["ctlgap"], trk(2, "map_02_polnoc.ogg", "po przerwie", 2), P + T["ctlmenu"], P + T["ctlmenu"], P + T["cutwin"], P8 + T9["win"],
+                          P8 + T9["winmap"], trk(3, "map_03_dorzecze.ogg", "po oknie", 3), P + T["cutmis"], P + T["offhold"], P + T["nobat"], P + T["back"],
                           P9 + T9["bat"], P9 + T9["endmap"], P + T["onbat"], P + T["duck"], trk(4, "map_04_dwor.ogg", "po misji", 4),
                           P + T["end"].replace("map_01_krolewski_trakt", "map_04_dwor"),
                           P + T["offst"], P + T["on"].replace("cichnie", "dalej wyciszona")]   # recenzja 165: powrot na mape w trakcie FadeUp - bez 'wrocila'
@@ -69557,7 +69720,17 @@ def m165mapa_synth():
                           "[10:00:00] ERROR in EventMusic.MapaTlo.Next (potkniecie 1; kolejne tylko liczone): System.Exception: test"]
             elif kind == "keyno":
                 L.append(P + T["startno"])
-            L.append("[10:00:00] Armoury: inna linia")
+            elif kind in ("gap", "voice", "stare", "old"):   # 165b: pojedyncze reguly MAP-7
+                L += [P + T["start"], P + T["on"], P + (T["duck3"] if kind == "stare" else T["duck2"]), trk(1, "map_01_krolewski_trakt.ogg", "start", 1)]
+                if kind == "gap":
+                    L += [P + T["ctl1"], "[10:01:40] Armoury: inna linia"]
+                elif kind == "voice":
+                    L += [P + T["ctl1"], P + T["ctl1"].replace("po 1 s utworu", "co 30 s")]
+                elif kind == "stare":
+                    L += [P + T["ctl1"].replace("zapisow 0 240/240", "zapisow 0 1/240")]
+                else:
+                    L += ["[10:02:00] Armoury: inna linia"]
+            L.append("[10:00:00] Armoury: inna linia" if kind not in ("gap", "old") else "[10:02:00] Armoury: inna linia")
             open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
             rep = Report()
             m165mapa_rows(rep, m165mapa_collect(logp))
@@ -69565,10 +69738,12 @@ def m165mapa_synth():
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
     exp = {
-        "good": {"MAP-0": "TAK", "MAP-1": "TAK", "MAP-2": "TAK", "MAP-3": "TAK", "MAP-4": "TAK", "MAP-5": "TAK", "MAP-6": "TAK"},
-        "bad": {"MAP-0": "NIE", "MAP-1": "NIE", "MAP-2": "NIE", "MAP-3": "NIE", "MAP-4": "NIE", "MAP-5": "NIE", "MAP-6": "NIE"},
-        "nostart": {"MAP-0": "INFO", "MAP-1": "INFO", "MAP-2": "INFO", "MAP-3": "INFO", "MAP-4": "INFO", "MAP-5": "INFO", "MAP-6": "TAK"},
-        "keyno": {"MAP-0": "INFO", "MAP-1": "INFO", "MAP-2": "INFO", "MAP-3": "INFO", "MAP-4": "INFO", "MAP-5": "INFO", "MAP-6": "TAK"},
+        "good": {"MAP-0": "TAK", "MAP-1": "TAK", "MAP-2": "TAK", "MAP-3": "TAK", "MAP-4": "TAK", "MAP-5": "TAK", "MAP-6": "TAK", "MAP-7": "TAK", "MAP-7b": "INFO"},
+        "bad": {"MAP-0": "NIE", "MAP-1": "NIE", "MAP-2": "NIE", "MAP-3": "NIE", "MAP-4": "NIE", "MAP-5": "NIE", "MAP-6": "NIE", "MAP-7": "NIE"},
+        "nostart": {"MAP-0": "INFO", "MAP-1": "INFO", "MAP-2": "INFO", "MAP-3": "INFO", "MAP-4": "INFO", "MAP-5": "INFO", "MAP-6": "TAK", "MAP-7": "INFO"},
+        "keyno": {"MAP-0": "INFO", "MAP-1": "INFO", "MAP-2": "INFO", "MAP-3": "INFO", "MAP-4": "INFO", "MAP-5": "INFO", "MAP-6": "TAK", "MAP-7": "INFO"},
+        # 165b MAP-7 - kazda regula osobno (gap: 100 s mapy bez kontroli; voice: glos 0-6 natywnie w 2 kontrolach; stare: zapisy 0 bez trzymania; old: log sprzed 165b)
+        "gap": {"MAP-7": "NIE"}, "voice": {"MAP-7": "NIE"}, "stare": {"MAP-7": "NIE"}, "old": {"MAP-7": "NIE"},
     }
     diff = []
     for kind, e in exp.items():
@@ -69586,7 +69761,8 @@ def m165mapa_main(logp):
         s2 = m165mapa_synth()
     except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
         s2 = f"wyjatek {type(e).__name__}: {e}"
-    rep.add("MAP-S2: test syntetyczny (dobry, zly, bez linii m165, klucz NIE)", s2 or "OK", "OK", s2 is None)
+    rep.add("MAP-S2: test syntetyczny (dobry, zly, bez linii m165, klucz NIE; 165b MAP-7: przerwa kontroli, glos psai, stare trzymanie, log sprzed 165b)", s2 or "OK", "OK",
+            s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("MAP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
