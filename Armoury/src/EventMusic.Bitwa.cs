@@ -21,9 +21,11 @@ namespace Armoury
     ///    Turniej, arena, kryjowka, spacer po miescie / wsi / obozie, rozmowy - inne widoki muzyki, bez zmian. Klasyfikacja raz na misje (pierwsza klatka Continuing);
     ///    muzyka gra, poki ta sama misja jest w Continuing / EndingNextFrame i trwa kampania. Okno wydarzenia i plotki maja pierwszenstwo (EventMusic.Step).
     ///  - Muzyka gry: ten sam stan i te same metody co okna (DuckStart / FadeDown - 0 trzymane co klatke, bez SetPaused; po bitwie FadeUp w 2 s).
-    ///  - Nasze utwory (m164): TYLKO ModuleData/Lektor/Muzyka/Bitwa/lufs{17,20,23,26}/bit_NN_nazwa.ogg - 10 utworow bitewnych (tools/muzyka/bitwa_v2.py: samo
-    ///    wzmocnienie z mp3 ElevenLabs, wypalone wejscie 2 s i wyjscie 4 s; suwak 4..1 = -17..-26 LUFS). Stare muz_*.ogg w tych katalogach (utwory wydarzen)
-    ///    sa pomijane - muzyka wydarzen (mapa) i bitwy to osobne biblioteki. Zdarzenie event:/Extra/external jak okna, przerwa 1 s miedzy utworami.
+    ///  - Nasze utwory (m164): TYLKO ModuleData/Lektor/Muzyka/Bitwa/lufs{21.4,24.4,27.4,30.4}/bit_NN_nazwa.ogg - 10 utworow bitewnych (tools/muzyka/bitwa_v2.py:
+    ///    samo wzmocnienie z mp3 ElevenLabs, wypalone wejscie 2 s i wyjscie 4 s; suwak 4..1 = -21.4..-30.4 LUFS). Paczka 203 (Jeff 26.10 ok. 22:15: "muzyka w
+    ///    bitwie jest za glosna, nie slychac bebnow etc. scisz ja o 40%"): kazdy stopien suwaka o 4.4 dB ciszej niz w 164 (amplituda x0.60) - nowe pliki w nowych
+    ///    katalogach (SoundEvent nie ma glosnosci); stare lufs17/20/23/26 nie sa juz czytane w bitwie. Mapa (165, MapLufs) liczy dalej ze stopni 17/20/23/26 -
+    ///    tak glosna jak dotad. Stare muz_*.ogg w katalogach lufsNN (utwory wydarzen) sa pomijane - muzyka wydarzen (mapa) i bitwy to osobne biblioteki. Zdarzenie event:/Extra/external jak okna, przerwa 1 s miedzy utworami.
     ///    Kolejnosc wedlug numeru: pierwszy w bitwie z puli otwarcia (pole i reszta: 01 zbiorka / 02 marsz; oblezenie i wypad: 09 pod murami), dalej losowo bez
     ///    powtorki az do wyczerpania puli starcia (03-07, w oblezeniu takze 10), potem nowe kolo; nigdy ten sam dwa razy z rzedu (takze miedzy bitwami), chyba
     ///    ze pula ma tylko ten jeden (linia "powtorka", licznik "wymuszone"). 08 (triumf) tylko po zwyciestwie gracza (wynik misji PlayerVictory, misja dalej
@@ -43,7 +45,11 @@ namespace Armoury
         private const double GapSec = 1.0, GapTestSec = 1.0, CheckSec = 1.0, TestCutSec = 4.0, CapExtraSec = 5.0, CapUnknownSec = 200.0, NotPlayedRealSec = 10.0;
         private const int MisFailMax = 3, DetailPerMission = 8, SkipLogFirst = 20, SkipLogEvery = 50, ErrEvery = 50, TrackSetFull = 10;
         private const int NumVictory = 8, NumSiegeOpen = 9, NumSiegeOnly = 10;   // role wedlug numeru pliku (01/02 otwarcie pola, 03-07 starcie)
-        private static readonly int[] BattleLufs = { 17, 20, 23, 26 };   // suwak 4, 3, 2, 1
+        // Stopnie suwaka 4, 3, 2, 1 w -LUFS (164): z nich liczy mapa (165, MapLufs, katalogi Mapa/lufsNN) - paczka 203 ich nie zmienia
+        private static readonly int[] StepLufs = { 17, 20, 23, 26 };
+        // Paczka 203: bitwa w dziesiatych czesciach LU (katalogi Bitwa/lufs21.4 ...): stopien + 4.4 dB = amplituda x0.60 (Jeff "scisz ja o 40%", 20*log10(0.6) = -4.44)
+        private const int BattleQuieter10 = 44;
+        private static readonly int[] BattleLufs10 = { 170 + BattleQuieter10, 200 + BattleQuieter10, 230 + BattleQuieter10, 260 + BattleQuieter10 };
 
         private sealed class BTrack { internal string Name, File, Path; internal double Dur; internal int Num; }
 
@@ -67,7 +73,7 @@ namespace Armoury
         private static readonly StringBuilder _batSeq = new StringBuilder();
         // biezacy utwor
         private static BTrack _batCur;
-        private static int _batCurLufs;
+        private static int _batCurLufs;   // paczka 203: dziesiate czesci LU (214 = -21.4 LUFS)
         private static double _batT0, _batPlayT;
         private static bool _batChecked;
         private static string _batCurWhy = "";
@@ -81,20 +87,29 @@ namespace Armoury
             return v < 1 ? 1 : v > 4 ? 4 : v;
         }
 
+        /// <summary>Stopien suwaka w -LUFS (164): 4 -> 17 ... 1 -> 26. Paczka 203: tylko mapa (MapLufs) i podstawa bitwy (BattleLufs10Of).</summary>
         private static int LufsOf(int level) { return 17 + 3 * (4 - level); }
+
+        /// <summary>Paczka 203: glosnosc bitwy w dziesiatych czesciach LU - stopien suwaka + 4.4 dB (4 -> 214 = -21.4 LUFS ... 1 -> 304).</summary>
+        private static int BattleLufs10Of(int level) { return 10 * LufsOf(level) + BattleQuieter10; }
+
+        /// <summary>Paczka 203: dziesiate czesci LU jako tekst katalogu / logu (214 -> "21.4").</summary>
+        private static string L10(int lufs10) { return (lufs10 / 10.0).ToString("0.0", Inv); }
 
         private static double GapOf() { return _batTest ? GapTestSec : GapSec; }
 
-        private static List<BTrack> PickSet(int lufs, out int got) { return PickFrom(_batSets, lufs, out got); }
+        /// <summary>Zestaw bitwy (paczka 203: lufs10 w dziesiatych czesciach LU, krok stopnia 30).</summary>
+        private static List<BTrack> PickSet(int lufs10, out int got) { return PickFrom(_batSets, lufs10, 30, out got); }
 
-        /// <summary>Zestaw utworow najblizszy zadanej glosnosci: pierwszy pelny (10), inaczej pierwszy niepusty; null - brak. Paczka 165: wspolne dla bitwy i mapy.</summary>
-        private static List<BTrack> PickFrom(Dictionary<int, List<BTrack>> sets, int lufs, out int got)
+        /// <summary>Zestaw utworow najblizszy zadanej glosnosci: pierwszy pelny (10), inaczej pierwszy niepusty; null - brak. Paczka 165: wspolne dla bitwy i mapy.
+        /// Paczka 203: step = odstep stopni w kluczach zestawu (mapa 3 LU, bitwa 30 dziesiatych LU) - szukanie do 3 stopni w obie strony jak dotad.</summary>
+        private static List<BTrack> PickFrom(Dictionary<int, List<BTrack>> sets, int lufs, int step, out int got)
         {
             got = lufs;
             if (sets == null) return null;
             List<BTrack> part = null;
             int partLufs = lufs;
-            for (int dist = 0; dist <= 9; dist += 3)
+            for (int dist = 0; dist <= 3 * step; dist += step)
                 for (int sgn = 0; sgn < 2; sgn++)
                 {
                     if (dist == 0 && sgn == 1) continue;
@@ -135,12 +150,14 @@ namespace Armoury
             LoadBattleTracks();
             PsaiResolve();
             int lv = Level(), got;
-            var set = PickSet(LufsOf(lv), out got);
-            var sb = new StringBuilder(PB + "start - klucz BattleMusicOurs TAK, glosnosc " + lv + " (-" + got + " LUFS), utwory bitewne");
-            for (int i = 0; i < BattleLufs.Length; i++)
+            var set = PickSet(BattleLufs10Of(lv), out got);
+            // paczka 203: "-21.4 LUFS" i ", ciszej o 4.4 dB (amplituda x0.60)" - wspolczynnik w linii startu (tools/sprawdz_logi.py m109muz MUZ-0)
+            var sb = new StringBuilder(PB + "start - klucz BattleMusicOurs TAK, glosnosc " + lv + " (-" + L10(got) + " LUFS), ciszej o " + L10(BattleQuieter10)
+                                       + " dB (amplituda x" + Math.Pow(10.0, -BattleQuieter10 / 200.0).ToString("0.00", Inv) + "), utwory bitewne");
+            for (int i = 0; i < BattleLufs10.Length; i++)
             {
                 List<BTrack> l;
-                sb.Append(i == 0 ? " " : ", ").Append("lufs").Append(BattleLufs[i]).Append(' ').Append(_batSets.TryGetValue(BattleLufs[i], out l) ? l.Count : 0);
+                sb.Append(i == 0 ? " " : ", ").Append("lufs").Append(L10(BattleLufs10[i])).Append(' ').Append(_batSets.TryGetValue(BattleLufs10[i], out l) ? l.Count : 0);
             }
             sb.Append(" (");
             if (set != null)
@@ -227,7 +244,7 @@ namespace Armoury
             }
             LoadBattleTracks();
             int got;
-            if (PickSet(LufsOf(Level()), out got) == null)
+            if (PickSet(BattleLufs10Of(Level()), out got) == null)
             {
                 if (!_batNoReady) { _batNoReady = true; Log.Info(PB + "brak utworow bitewnych w " + (_batDir ?? "?") + " - bitwy z muzyka gry."); }
                 return false;
@@ -285,10 +302,10 @@ namespace Armoury
             _batSiege = kind == "oblezenie" || kind == "wypad";   // m164: otwarcie 09 i 10 w puli starcia; reszta (pole, wies, morze, inne, bez wydarzenia) jak pole
             try { scene = _batMission.SceneName ?? "?"; } catch { }
             int lv = Level(), got;
-            var set = PickSet(LufsOf(lv), out got);
+            var set = PickSet(BattleLufs10Of(lv), out got);
             Log.Info(PB + "bitwa - misja " + _batOnName + " (mapa " + map + ", " + kind + ", scena " + scene + ", oboz " + (NightRest.PlayerCamped ? "TAK" : "NIE")
                      + ", widok " + _batMusicView + (_batTest ? ", test autotestu TAK" : "") + ") - muzyka gry cichnie (psai "
-                     + (_psaiOk && _ducked ? "glosnosc " + _saved.ToString("0.00", Inv) : "BRAK") + "), nasza: glosnosc " + lv + " (-" + got + " LUFS), utworow "
+                     + (_psaiOk && _ducked ? "glosnosc " + _saved.ToString("0.00", Inv) : "BRAK") + "), nasza: glosnosc " + lv + " (-" + L10(got) + " LUFS), utworow "
                      + (set != null ? set.Count : 0) + ".");
         }
 
@@ -348,7 +365,7 @@ namespace Armoury
         private static void BattleNext()
         {
             int lv = Level(), got;
-            var set = PickSet(LufsOf(lv), out got);
+            var set = PickSet(BattleLufs10Of(lv), out got);
             _batGap = GapOf();
             if (set == null || set.Count == 0) return;
             string why;
@@ -403,13 +420,13 @@ namespace Armoury
         {
             _batWon = true;
             int got;
-            var set = PickSet(LufsOf(Level()), out got);
+            var set = PickSet(BattleLufs10Of(Level()), out got);
             BTrack v = null;
             if (set != null) foreach (var t in set) if (t.Num == NumVictory) { v = t; break; }
             if (v == null)
             {
                 _batVicText = "brak-08";
-                Log.Info(PB + "zwyciestwo gracza - brak bit_08 w zestawie lufs" + got + ", biezacy utwor gra dalej.");
+                Log.Info(PB + "zwyciestwo gracza - brak bit_08 w zestawie lufs" + L10(got) + ", biezacy utwor gra dalej.");
                 return;
             }
             string cut = "bez utworu";
@@ -449,7 +466,7 @@ namespace Armoury
                 if (!playing) _bNo1s++;
                 _bDetail++;
                 if (_batTest || _bDetail <= DetailPerMission)
-                    Log.Info(PB + "utwor " + _bN + " - " + cur.File + " (lufs" + _batCurLufs + ", " + DurText(cur.Dur) + ", wybor " + _batCurWhy + "), grany po 1 s " + (playing ? "TAK" : "NIE")
+                    Log.Info(PB + "utwor " + _bN + " - " + cur.File + " (lufs" + L10(_batCurLufs) + ", " + DurText(cur.Dur) + ", wybor " + _batCurWhy + "), grany po 1 s " + (playing ? "TAK" : "NIE")
                              + "; " + (_batPrevText ?? ("pierwszy w bitwie" + (_batPrevBattle != null ? " (ostatni wczesniej " + _batPrevBattle + ")" : ""))) + ".");
             }
             string why = null;
@@ -465,7 +482,7 @@ namespace Armoury
             {
                 _bNotPlayed++;
                 _batPrevText = "poprzedni " + cur.File + " nie grany";
-                Log.Info(PB + "utwor " + _bN + " - " + cur.File + " (lufs" + _batCurLufs + ", " + DurText(cur.Dur) + ", wybor " + _batCurWhy + "), nie grany - silnik skonczyl po "
+                Log.Info(PB + "utwor " + _bN + " - " + cur.File + " (lufs" + L10(_batCurLufs) + ", " + DurText(cur.Dur) + ", wybor " + _batCurWhy + "), nie grany - silnik skonczyl po "
                          + (Now - _batT0).ToString("0.0", Inv) + " s; nastepny za " + GapOf().ToString("0", Inv) + " s.");
                 MisFail("NotPlayed");
                 return;
@@ -547,11 +564,11 @@ namespace Armoury
             try
             {
                 _batDir = Path.Combine(Path.Combine(Path.Combine(Path.Combine(Lektor.ModuleDir(), "ModuleData"), "Lektor"), "Muzyka"), "Bitwa");
-                foreach (int lu in BattleLufs)
+                foreach (int lu in BattleLufs10)   // paczka 203: katalogi lufs21.4 / 24.4 / 27.4 / 30.4
                 {
                     var list = new List<BTrack>();
                     _batSets[lu] = list;
-                    string d = Path.Combine(_batDir, "lufs" + lu.ToString(Inv));
+                    string d = Path.Combine(_batDir, "lufs" + L10(lu));
                     if (!Directory.Exists(d)) continue;
                     var files = Directory.GetFiles(d, "bit_*.ogg");   // m164: tylko utwory bitewne; muz_*.ogg (utwory wydarzen z 109) pomijane
                     Array.Sort(files, StringComparer.Ordinal);

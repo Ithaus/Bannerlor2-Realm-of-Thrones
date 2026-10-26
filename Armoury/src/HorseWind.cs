@@ -47,6 +47,9 @@ namespace Armoury
     ///    g = clamp((CP - D x f) / (CP - 0.23), 0, 1); kon bez jezdzca tylko odpoczywa (jak stepem);
     ///  - mnoznik predkosci m = S &lt; 30 ? HorseTiredFloor + (1 - HorseTiredFloor) x S/30 : 1.
     /// Przecietny kon (r 20%) pelnym galopem do zera ok. 60 s, rycerz z bardem (r 35%) ok. 40 s; step i prawdziwy klus (u ok. 0.3, ok. 3.5-4 m/s) to odpoczynek.
+    /// Paczka 203 (Jeff 26.10 ok. 22:15: "kon za szybko sie meczy, wydluz x2 ilosc staminy lub zmniejsz o 50% zuzycie staminy konia w galopie"): domyslne
+    /// HorseGallopDrainScale 1 -> 0.5 (Armoury.json Jeffa klucza nie ma) - drenaz ponad CP o polowe, wiec galop do zera x2 (przecietny ok. 120 s, rycerz z bardem
+    /// ok. 80 s, kon gracza t3_empire_horse 46 -> 92 s); odpoczynek (tau, g, HorseRecoverySeconds) i prog zmeczenia bez zmian. Linie: start i koniec bitwy.
     /// Recenzja 136: "klus" podejscia konnicy w MarchToContact (CavalryApproachPace 0.45 x pelna, z marginesem linii u ok. 0.5) to w modelu canter - typowy kon ROT
     /// (vlandia_horse 425 kg, "siodlo" 100 kg, r ok. 0.37, f ok. 1.34) traci na nim powoli (D x f ok. 0.76-0.83 &gt; CP 0.75). Dlatego odpoczynek konnicy AI ma wlasne tempo:
     /// RestSpeed(szyk) = srednia z koni szyku u_odp x Vbase, gdzie u_odp daje g = 0.5 przy obciazeniu konia (D(u) x f = 0.23 + 0.5 x (CP - 0.23); u 0.12..0.35).
@@ -677,6 +680,14 @@ namespace Armoury
                 sb.Append(" | czynny model statystyk: ").Append(model != null ? model.GetType().FullName : "-");
             }
             catch { }
+            try   // paczka 203: wspolczynnik drenazu galopu w linii startu (czytany na zywo w takcie - tu wartosc przy pierwszej bitwie)
+            {
+                var c = Settings.Current;
+                sb.Append(" | drenaz galopu x").Append(c != null ? F(Clamp(c.HorseGallopDrainScale, 0.25f, 3f), "0.00") : "-")
+                  .Append(" (HorseGallopDrainScale; 203: domyslnie 0.50 = polowa z 136, galop do zera x2), odpoczynek bez zmian (HorseRecoverySeconds ")
+                  .Append(c != null ? F(Clamp(c.HorseRecoverySeconds, 30f, 600f), "0") : "-").Append(" s)");
+            }
+            catch { }
             sb.Append('.');
             Log.Info(sb.ToString());
         }
@@ -762,6 +773,7 @@ namespace Armoury
               .Append(" (tempo odpoczynku AI sr. u ").Append(_rN > 0 ? F(_restUSum / _rN, "0.00") : "-").Append(')')
               .Append(" (uprzaz przeliczona x").Append(F(c != null ? Clamp(c.HorseHarnessHeavyScale, 0.1f, 1f) : 0.2f, "0.##")).Append(' ').Append(_harnessScaled).Append(" razy)")
               .Append(", pelny galop do zera sr. ").Append(_tN > 0 ? F(_tSum / _tN, "0") + " s" : "-")
+              .Append(" (drenaz galopu x").Append(F(scale, "0.00")).Append(')')   // paczka 203
               .Append(" | zapisow MountSpeed ").Append(_writes).Append(" (kon gracza poza limitem ").Append(_plWrites).Append(")")
               .Append(", przeliczen modelu ").Append(_postN).Append(" (postfiks; z kara ").Append(_postPen)
               .Append(", obcy watek ").Append(Volatile.Read(ref _postOff)).Append(", bledy ").Append(Volatile.Read(ref _postErr)).Append(')')
@@ -775,6 +787,7 @@ namespace Armoury
                 float t = GallopToZero(p, scale);
                 sb.Append(" | gracz: kon ").Append(p.Id).Append(' ').Append(F(p.Kg, "0")).Append(" kg, r ").Append(F(100f * p.R, "0")).Append("%, Vbase ")
                   .Append(F(p.Vbase, "0.0")).Append(" m/s, pelny galop do zera ").Append(t < 100000f ? F(t, "0") + " s" : "nigdy")
+                  .Append(" (przy x1 z 136: ").Append(GallopToZero(p, 1f) < 100000f ? F(GallopToZero(p, 1f), "0") + " s" : "nigdy").Append(')')   // paczka 203
                   .Append(", S na koniec ").Append(F(p.S, "0"))
                   .Append(", najwieksza zmierzona v ").Append(F(_plMaxV, "0.0")).Append(" m/s (surowa, z odstajacymi)")
                   .Append(", galop przy m=1: sr. v/Vbase ").Append(_p1N > 0 ? F(_p1Sum / _p1N, "0.00") : "-").Append(" (probek ").Append(_p1N)

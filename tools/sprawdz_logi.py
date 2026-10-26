@@ -1117,7 +1117,7 @@ Uzycie (Python 3, tylko odczyt):
                     m164-muzyka - 10 utworow bitewnych bit_NN, mapa bez muzyki wojennej; Armoury/src/EventMusic.Bitwa.cs, EventMusic.Mapa.cs, EventMusic.cs, klucze
                     BattleMusicOurs, BattleMusicLoudness, StopEventThemesOnMap) python -I tools/sprawdz_logi.py --grupa m109muz <Armoury-*.log>
                     [--crashscribe <session-*.log>] (strumieniowo). Linie 'Muzyka bitwy (m109): '. MUZ-S self-test wyrazen, MUZ-S2 test syntetyczny. MUZ-0 linia startu: klucz
-                    TAK, psai TAK, 4 x 10 utworow bit_* (lufs17/20/23/26), dlugosci 120-160 s, brak numerow -, odrzucone 0 (klucz NIE / log sprzed m109 - INFO); MUZ-1 kazda bitwa ('bitwa - misja')
+                    TAK, psai TAK, 4 x 10 utworow bit_* (lufs21.4/24.4/27.4/30.4 od paczki 203; dawne lufs17/20/23/26 tez czytane), dlugosci 120-160 s, brak numerow -, odrzucone 0 (klucz NIE / log sprzed m109 - INFO); MUZ-1 kazda bitwa ('bitwa - misja')
                     ma 'muzyka gry wyciszona ... teraz <= 0.01', misja nie z listy bez zmian (turniej, arena, kryjowka, spacer, rozmowy; nieznana - INFO), z --crashscribe:
                     bitew = linii 'AUTOTEST BITWA n/N [..]: misja ruszyla' (bitwa dalej po oknie wydarzenia sie nie liczy; bez bitew przy kluczu NIE / logu sprzed m109 -
                     INFO); MUZ-2 utwory: pod flaga armoury-muzyka-bitwy.flag bitwa >= 15 s ma >= 2 utwory, konce '(test 4 s)' (albo przerwany przez zwyciestwo),
@@ -1148,6 +1148,14 @@ Uzycie (Python 3, tylko odczyt):
                     nasza mapa w trybie menu, na warstwie 7-8 i resztki odcinkow poza motywem (tylko trzymane na 0), nowe odcinki psai, zatrzymania motywu gry, 'misja bez bitwy' / 'trzymanie misji (po 20 s)'
                     (165b recenzja; koniec okna przy trzymaniu 'koniec wydarzenia - muzyka gry trzymana na 0 (...)' w m109muz jak koniec okna). MAP-3 przyjmuje
                     stop mapy 'muzyka gry trzymana na 0 do startu misji' (165b: bez FadeUp do startu misji) i linie 'misja bez bitwy (...) - muzyka gry wraca'.
+--grupa p203      : (26.10, paczka 203 noc/203-bitwa-glosnosc-stamina - Jeff 26.10 ok. 22:15 "muzyka w bitwie jest za glosna ... scisz ja o 40%", "bieganie w
+                    zbroi za szybko meczy obniz o polowe wzor ... w stosunku do kg", "kon za szybko sie meczy ... zmniejsz o 50% zuzycie staminy konia w galopie";
+                    Armoury/src/EventMusic.Bitwa.cs, FieldCraft.cs, HorseWind.cs) python -I tools/sprawdz_logi.py --grupa p203 <Armoury-*.log> (strumieniowo).
+                    P203-S self-test wyrazen i wzoru biegu, P203-S2 test syntetyczny. P203-0 linia startu muzyki bitwy: 'ciszej o 4.4 dB (amplituda x0.60)', glosnosc N =
+                    -(21.4 + 3 x (4 - N)) LUFS, zestawy lufs21.4/24.4/27.4/30.4 po 10 (log sprzed 203 - NIE); P203-1 kazdy utwor bitwy z tych zestawow; P203-2 mapa bez zmian
+                    (-min(26, 17 + 3 x (4 - N) + 3) LUFS); P203-3 'Bieg (127)': k 1.125%/kg z dopiskiem 203, czas gracza = 120 x sprawnosc / (1 + kg x k/100)^2 (+-1 s,
+                    takze 'przy 2.25%/kg z 127 bylo'); P203-4 'Konie (136): latka': drenaz galopu x0.50, odpoczynek bez zmian; P203-5 'Konie (136)' koniec bitwy:
+                    '(drenaz galopu x0.50)', gracz T = T(x1) / 0.5 (+-1.5 s). Bez linii - INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -40632,7 +40640,7 @@ def m103lektor_main(logp, csp=None):
 # EventMusic.Mapa.cs: okna "wojna" -> muz_korona.ogg, motyw wydarzenia ROT po oknie zatrzymany (klucz StopEventThemesOnMap))
 M109MUZ_TAG = "Muzyka bitwy (m109): "
 M109MUZ_M108 = "Muzyka (m108): "
-M109MUZ_LEVELS = (17, 20, 23, 26)
+M109MUZ_LEVELS = (21.4, 24.4, 27.4, 30.4)   # paczka 203: bitwa o 4.4 dB ciszej (dawniej 17, 20, 23, 26 - stary format dalej dopasowany)
 M109MUZ_TRACKS = 10
 M109MUZ_DUR = (120.0, 160.0)
 M109MUZ_MIN_BATTLE_SEC = 15   # 23.10 test 109c: bitwa przegranej "slaba" - walka 4 s, potem ekran konca (10 s misji, 1 utwor) - 8 s za scisle
@@ -40649,15 +40657,16 @@ M109MUZ_SKIP_MISSIONS = {"TournamentFight", "ArenaPracticeFight", "ArenaDuel", "
 M109MUZ_END_OK = {"koniec misji", "wyjscie z kampanii", "klucz NIE", "okno wydarzenia"}
 M109MUZ_RX = {
     "start": re.compile(r"^start - klucz BattleMusicOurs (TAK|NIE)\b"),
-    "full": re.compile(r"^start - klucz BattleMusicOurs TAK, glosnosc (\d) \(-(\d+) LUFS\), utwory bitewne lufs17 (\d+), lufs20 (\d+), lufs23 (\d+), lufs26 (\d+) "
+    "full": re.compile(r"^start - klucz BattleMusicOurs TAK, glosnosc (\d) \(-([\d.]+) LUFS\)(?:, ciszej o [\d.]+ dB \(amplituda x[\d.]+\))?, utwory bitewne "
+                       r"lufs(?:17|21\.4) (\d+), lufs(?:20|24\.4) (\d+), lufs(?:23|27\.4) (\d+), lufs(?:26|30\.4) (\d+) "   # paczka 203: nowe zestawy, stare dalej
                        r"\(([^)]*)\), brak numerow ([\d -]+), odrzucone (\d+), psai (TAK|NIE), test autotestu (TAK|NIE)\.$"),
     "dur": re.compile(r"([a-z0-9_]+) (?:([\d.]+) s|dlugosc \?)"),
     "bat": re.compile(r"^bitwa - misja (\S+) \(mapa ([^,]*), ([^,]*), scena ([^,]*), oboz (TAK|NIE), widok ([^,)]*)(, test autotestu TAK)?\) - muzyka gry cichnie "
-                      r"\(psai (?:glosnosc ([\d.]+)|BRAK)\), nasza: glosnosc (\d) \(-(\d+) LUFS\), utworow (\d+)\.$"),
+                      r"\(psai (?:glosnosc ([\d.]+)|BRAK)\), nasza: glosnosc (\d) \(-([\d.]+) LUFS\), utworow (\d+)\.$"),
     "duck": re.compile(r"^muzyka gry wyciszona \(bez pauzy psai; psai glosnosc teraz (-?[\d.]+), zapamietana ([\d.]+)\)\.$"),
-    "trk": re.compile(r"^utwor (\d+) - (bit_[a-z0-9_]+\.ogg) \(lufs(\d+), (?:([\d.]+) s|dlugosc \?), wybor ([^()]*)\), grany po 1 s (TAK|NIE); "
+    "trk": re.compile(r"^utwor (\d+) - (bit_[a-z0-9_]+\.ogg) \(lufs([\d.]+), (?:([\d.]+) s|dlugosc \?), wybor ([^()]*)\), grany po 1 s (TAK|NIE); "
                       r"(?:poprzedni (bit_[a-z0-9_]+\.ogg) (?:skonczony po ([\d.]+) s \(([^)]*)\)|nie grany)|pierwszy w bitwie(?: \(ostatni wczesniej (bit_[a-z0-9_]+\.ogg)\))?)\.$"),
-    "notp": re.compile(r"^utwor (\d+) - (bit_[a-z0-9_]+\.ogg) \(lufs(\d+), [^)]*\), nie grany - silnik skonczyl po ([\d.]+) s"),
+    "notp": re.compile(r"^utwor (\d+) - (bit_[a-z0-9_]+\.ogg) \(lufs([\d.]+), [^)]*\), nie grany - silnik skonczyl po ([\d.]+) s"),
     "rej": re.compile(r"^silnik nie przyjal (\S+) \(zdarzenie "),
     "vic": re.compile(r"^zwyciestwo gracza (?:\(wynik misji, misja trwa\) - (.*), (gra|silnik nie przyjal) (bit_[a-z0-9_]+\.ogg), po nim cisza do konca misji|- brak bit_08 .*)\.$"),
     "end": re.compile(r"^koniec bitwy \(([^,]+), misja (\S+), (\d+) s\) - utworow (\d+) \(koniec silnik (\d+), po czasie (\d+), test (\d+), nie grane (\d+), "
@@ -40683,21 +40692,22 @@ M109MUZ_SET = "01_zbiorka 120.1 s, 02_marsz 150.0 s, 03_mur_tarcz 150.1 s, 04_sz
               "08_pole_nasze 138.2 s, 09_pod_murami 150.0 s, 10_szturm 150.1 s"
 # linie kontrolne - napisy jak w kodzie C# (EventMusic.Bitwa.cs, EventMusic.Mapa.cs; m108 z EventMusic.cs, linie okna z logu Jeffa 22.10)
 M109MUZ_TEST = {
-    "start": "start - klucz BattleMusicOurs TAK, glosnosc 4 (-17 LUFS), utwory bitewne lufs17 10, lufs20 10, lufs23 10, lufs26 10 (" + M109MUZ_SET + "), brak numerow -, "
+    "start": "start - klucz BattleMusicOurs TAK, glosnosc 4 (-21.4 LUFS), ciszej o 4.4 dB (amplituda x0.60), utwory bitewne lufs21.4 10, lufs24.4 10, lufs27.4 10, "
+             "lufs30.4 10 (" + M109MUZ_SET + "), brak numerow -, "
              "odrzucone 0, psai TAK, test autotestu TAK.",
     "startno": "start - klucz BattleMusicOurs NIE - bitwy z muzyka gry (jak w 103.5).",
     "bat": "bitwa - misja Battle (mapa FieldBattle, pole, scena battle_terrain_biome_040, oboz NIE, widok MusicBattleMissionView, test autotestu TAK) - muzyka gry cichnie "
-           "(psai glosnosc 1.00), nasza: glosnosc 4 (-17 LUFS), utworow 10.",
+           "(psai glosnosc 1.00), nasza: glosnosc 4 (-21.4 LUFS), utworow 10.",
     "duck": "muzyka gry wyciszona (bez pauzy psai; psai glosnosc teraz 0.00, zapamietana 1.00).",
-    "trk1": "utwor 1 - bit_02_marsz.ogg (lufs17, 150.0 s, wybor otwarcie pola 01/02 - losowo z 2), grany po 1 s TAK; pierwszy w bitwie (ostatni wczesniej bit_06_choragwie.ogg).",
-    "trk2": "utwor 2 - bit_05_stal_i_bloto.ogg (lufs17, 150.0 s, wybor starcie 03-07 - losowo z 5, nowe kolo), grany po 1 s TAK; poprzedni bit_02_marsz.ogg skonczony po 4.0 s "
+    "trk1": "utwor 1 - bit_02_marsz.ogg (lufs21.4, 150.0 s, wybor otwarcie pola 01/02 - losowo z 2), grany po 1 s TAK; pierwszy w bitwie (ostatni wczesniej bit_06_choragwie.ogg).",
+    "trk2": "utwor 2 - bit_05_stal_i_bloto.ogg (lufs21.4, 150.0 s, wybor starcie 03-07 - losowo z 5, nowe kolo), grany po 1 s TAK; poprzedni bit_02_marsz.ogg skonczony po 4.0 s "
             "(test 4 s).",
-    "trk3": "utwor 3 - bit_03_mur_tarcz.ogg (lufs17, 150.1 s, wybor starcie 03-07 - losowo z 4), grany po 1 s NIE; poprzedni bit_05_stal_i_bloto.ogg nie grany.",
-    "trkvic": "utwor 4 - bit_08_pole_nasze.ogg (lufs17, 138.2 s, wybor zwyciestwo gracza 08), grany po 1 s TAK; poprzedni bit_03_mur_tarcz.ogg skonczony po 30.5 s "
+    "trk3": "utwor 3 - bit_03_mur_tarcz.ogg (lufs21.4, 150.1 s, wybor starcie 03-07 - losowo z 4), grany po 1 s NIE; poprzedni bit_05_stal_i_bloto.ogg nie grany.",
+    "trkvic": "utwor 4 - bit_08_pole_nasze.ogg (lufs21.4, 138.2 s, wybor zwyciestwo gracza 08), grany po 1 s TAK; poprzedni bit_03_mur_tarcz.ogg skonczony po 30.5 s "
               "(zwyciestwo - przerwany).",
     "vic": "zwyciestwo gracza (wynik misji, misja trwa) - przerwany bit_03_mur_tarcz.ogg po 30.5 s (zdarzenie gra), gra bit_08_pole_nasze.ogg, po nim cisza do konca misji.",
-    "vicno": "zwyciestwo gracza - brak bit_08 w zestawie lufs17, biezacy utwor gra dalej.",
-    "notp": "utwor 3 - bit_03_mur_tarcz.ogg (lufs17, 150.1 s, wybor starcie 03-07 - losowo z 4), nie grany - silnik skonczyl po 0.2 s; nastepny za 1 s.",
+    "vicno": "zwyciestwo gracza - brak bit_08 w zestawie lufs21.4, biezacy utwor gra dalej.",
+    "notp": "utwor 3 - bit_03_mur_tarcz.ogg (lufs21.4, 150.1 s, wybor starcie 03-07 - losowo z 4), nie grany - silnik skonczyl po 0.2 s; nastepny za 1 s.",
     "rej": "silnik nie przyjal bit_03_mur_tarcz.ogg (zdarzenie event:/Extra/external) - nastepny za 1 s.",
     "end": "koniec bitwy (koniec misji, misja Battle, 22 s) - utworow 4 (koniec silnik 0, po czasie 0, test 3, nie grane 0, grane po 1 s NIE 0), powtorki z rzedu 0 "
            "(wymuszone 0), bledy 0, pole, grane 02>05>03>08, zwyciestwo 08, zdarzenie przy stopie gra, stop bit_08_pole_nasze.ogg - muzyka gry wraca (2.0 s).",
@@ -40715,7 +40725,7 @@ M109MUZ_TEST = {
               "(wymuszone 0), bledy 0, pole, grane 01>04>07, zwyciestwo NIE, zdarzenie przy stopie gra, stop bit_07_ostatni_szyk.ogg - muzyka gry dalej wyciszona "
               "(okno wydarzenia).",
     "gave2": "rezygnacja w tej misji po 1 bledach (RestoreNow) - muzyka gry wraca, nastepna bitwa od nowa.",
-    "trkerr": "utwor 2 - bit_04_szarza.ogg (lufs17, 150.0 s, wybor starcie 03-07 - losowo z 5), grany po 1 s TAK; poprzedni bit_01_zbiorka.ogg skonczony po 0.5 s (blad).",
+    "trkerr": "utwor 2 - bit_04_szarza.ogg (lufs21.4, 150.0 s, wybor starcie 03-07 - losowo z 5), grany po 1 s TAK; poprzedni bit_01_zbiorka.ogg skonczony po 0.5 s (blad).",
     "psai": "psai TAK (GetVolume/SetVolume/SetPaused).",
     "mapa": "mapa - okna z nastrojem wojna graja muz_korona.ogg (muzyka wojenna tylko w bitwie), klucz StopEventThemesOnMap TAK (motywy wydarzen ROT 402-415 na warstwie "
             "psai wyciszane 50 ms po oknie), psai motywy TAK, klucz EventMusicEnabled TAK.",
@@ -40735,7 +40745,7 @@ def m109muz_selftest():
     """m109muz: wyrazenia wobec linii kontrolnych M109MUZ_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
     RX, T = M109MUZ_RX, M109MUZ_TEST
     m = RX["full"].match(T["start"])
-    if not m or m.groups()[:6] != ("4", "17", "10", "10", "10", "10") or m.groups()[7:] != ("-", "0", "TAK", "TAK"):
+    if not m or m.groups()[:6] != ("4", "21.4", "10", "10", "10", "10") or m.groups()[7:] != ("-", "0", "TAK", "TAK"):
         return f"start: {m.groups() if m else 'brak dopasowania'}"
     durs = RX["dur"].findall(m.group(7))
     if len(durs) != 10 or durs[9] != ("10_szturm", "150.1") or durs[0] != ("01_zbiorka", "120.1"):
@@ -40743,11 +40753,16 @@ def m109muz_selftest():
     m = RX["full"].match(T["start"].replace("brak numerow -", "brak numerow 01 08 10"))
     if not m or m.group(8) != "01 08 10":
         return "start z brakami"
+    # paczka 203: stary format linii startu (lufs17 ... bez wspolczynnika) dalej dopasowany - logi sprzed 203
+    m = RX["full"].match("start - klucz BattleMusicOurs TAK, glosnosc 3 (-20 LUFS), utwory bitewne lufs17 10, lufs20 10, lufs23 10, lufs26 10 (" + M109MUZ_SET
+                         + "), brak numerow -, odrzucone 0, psai TAK, test autotestu NIE.")
+    if not m or m.group(2) != "20" or m.group(3) != "10":
+        return "start w formacie sprzed 203"
     if not RX["start"].match(T["startno"]) or RX["start"].match(T["startno"]).group(1) != "NIE" or RX["full"].match(T["startno"]):
         return "startno"
     m = RX["bat"].match(T["bat"])
     if not m or m.group(1) != "Battle" or m.group(2) != "FieldBattle" or m.group(3) != "pole" or m.group(6) != "MusicBattleMissionView" or not m.group(7) \
-            or m.group(8) != "1.00" or m.groups()[8:] != ("4", "17", "10"):
+            or m.group(8) != "1.00" or m.groups()[8:] != ("4", "21.4", "10"):
         return f"bat: {m.groups() if m else 'brak dopasowania'}"
     if RX["bat"].match(T["bat"].replace(", test autotestu TAK", "")).group(7) is not None:
         return "bat bez testu"
@@ -40762,7 +40777,7 @@ def m109muz_selftest():
     if not m or m.group(10) is not None:
         return "trk1 bez poprzedniej bitwy"
     m = RX["trk"].match(T["trk2"])
-    if not m or m.groups()[:9] != ("2", "bit_05_stal_i_bloto.ogg", "17", "150.0", "starcie 03-07 - losowo z 5, nowe kolo", "TAK", "bit_02_marsz.ogg", "4.0", "test 4 s"):
+    if not m or m.groups()[:9] != ("2", "bit_05_stal_i_bloto.ogg", "21.4", "150.0", "starcie 03-07 - losowo z 5, nowe kolo", "TAK", "bit_02_marsz.ogg", "4.0", "test 4 s"):
         return f"trk2: {m.groups() if m else 'brak dopasowania'}"
     m = RX["trk"].match(T["trk3"])
     if not m or m.group(6) != "NIE" or m.group(7) != "bit_05_stal_i_bloto.ogg" or m.group(9) is not None:
@@ -40777,7 +40792,7 @@ def m109muz_selftest():
     if not m or m.group(3) is not None:
         return "vicno"
     m = RX["notp"].match(T["notp"])
-    if not m or m.groups() != ("3", "bit_03_mur_tarcz.ogg", "17", "0.2") or RX["trk"].match(T["notp"]):
+    if not m or m.groups() != ("3", "bit_03_mur_tarcz.ogg", "21.4", "0.2") or RX["trk"].match(T["notp"]):
         return f"notp: {m.groups() if m else 'brak dopasowania'}"
     if not RX["rej"].match(T["rej"]):
         return "rej"
@@ -41051,7 +41066,7 @@ def m109muz_rows(rep, D):
                 continue
             cnt = [int(full.group(i)) for i in (3, 4, 5, 6)]
             if cnt != [M109MUZ_TRACKS] * len(M109MUZ_LEVELS):
-                probs.append(f"zestawy lufs17/20/23/26 {cnt}")
+                probs.append(f"zestawy bitwy (4 poziomy) {cnt}")
             durs = [(n, float(d) if d else 0.0) for n, d in RX["dur"].findall(full.group(7))]
             badd = [f"{n} {d}" for n, d in durs if not (M109MUZ_DUR[0] <= d <= M109MUZ_DUR[1])]
             if len(durs) != M109MUZ_TRACKS or badd:
@@ -41244,9 +41259,9 @@ def m109muz_synth():
                 tail = "pierwszy w bitwie" + (" (ostatni wczesniej " + fn(last) + ")" if last else "")
             else:
                 tail = "poprzedni " + fn(seq[k - 1]) + " skonczony po 4.0 s (test 4 s)"
-            L.append(P + "utwor %d - %s (lufs17, 150.0 s, wybor %s), grany po 1 s %s; %s." % (k + 1, fn(n), wyb, ok, tail))
+            L.append(P + "utwor %d - %s (lufs21.4, 150.0 s, wybor %s), grany po 1 s %s; %s." % (k + 1, fn(n), wyb, ok, tail))
         if bad and i == 1:
-            L.append(P + "utwor 4 - %s (lufs17, 150.0 s, wybor starcie 03-07 - losowo z 5), grany po 1 s TAK; poprzedni %s skonczony po 4.0 s (test 4 s)." % (fn(7), fn(7)))
+            L.append(P + "utwor 4 - %s (lufs21.4, 150.0 s, wybor starcie 03-07 - losowo z 5), grany po 1 s TAK; poprzedni %s skonczony po 4.0 s (test 4 s)." % (fn(7), fn(7)))
             seq.append(7)
         if win and i == 1:                                  # okno wydarzenia w bitwie 2: koniec "okno wydarzenia", potem ta sama misja dalej (bat) albo inna bez 'wrocila' (bad)
             L.append(P + T["endwin"])
@@ -41256,15 +41271,15 @@ def m109muz_synth():
                 L.append(P8 + T["winbat"])
             L.append(P + T["bat"].replace("misja Battle", "misja " + (name if win == "bat" else "SiegeMissionWithDeployment")))
             L.append(P8 + T["duck"])
-            L.append(P + "utwor 1 - %s (lufs17, 150.0 s, wybor otwarcie pola 01/02 - losowo z 2), grany po 1 s TAK; pierwszy w bitwie (ostatni wczesniej %s)." % (fn(1), fn(7)))
-            L.append(P + "utwor 2 - %s (lufs17, 150.0 s, wybor starcie 03-07 - losowo z 5), grany po 1 s TAK; poprzedni %s skonczony po 4.0 s (test 4 s)." % (fn(5), fn(1)))
+            L.append(P + "utwor 1 - %s (lufs21.4, 150.0 s, wybor otwarcie pola 01/02 - losowo z 2), grany po 1 s TAK; pierwszy w bitwie (ostatni wczesniej %s)." % (fn(1), fn(7)))
+            L.append(P + "utwor 2 - %s (lufs21.4, 150.0 s, wybor starcie 03-07 - losowo z 5), grany po 1 s TAK; poprzedni %s skonczony po 4.0 s (test 4 s)." % (fn(5), fn(1)))
             seq = [1, 5]
             if win == "bad":
                 L.append(P8 + T["win"])                     # nastepne okno - poprzednie bez konca
         vic = "NIE"
         if i == 3 and not bad:                              # bitwa 4: zwyciestwo gracza - 08 na koncu
             L.append(P + T["vic"].replace("bit_03_mur_tarcz.ogg", fn(seq[-1])))
-            L.append(P + "utwor 4 - %s (lufs17, 138.2 s, wybor zwyciestwo gracza 08), grany po 1 s TAK; poprzedni %s skonczony po 2.5 s (zwyciestwo - przerwany)."
+            L.append(P + "utwor 4 - %s (lufs21.4, 138.2 s, wybor zwyciestwo gracza 08), grany po 1 s TAK; poprzedni %s skonczony po 2.5 s (zwyciestwo - przerwany)."
                      % (fn(8), fn(seq[-1])))
             seq.append(8)
             vic = "08"
@@ -41285,7 +41300,7 @@ def m109muz_synth():
             L = [P8 + T["psai"]]
             if kind in ("good", "bad", "cut", "winbat", "winbad", "thmiss"):
                 L.append(P8 + (T["mapa"] if kind != "bad" else T["mapa"].replace("graja muz_korona.ogg", "graja muz_wojna.ogg")))
-                L.append(P + (T["start"] if kind != "bad" else T["start"].replace("lufs26 10", "lufs26 9")))
+                L.append(P + (T["start"] if kind != "bad" else T["start"].replace("lufs30.4 10", "lufs30.4 9")))
             elif kind == "keyno":
                 L.append(P + T["startno"])
             L += [P8 + T["winwar"], P8 + T["thseen"], P8 + (T["gra"] if kind != "bad" else "gra muz_wojna.ogg (nastroj wojna)."), P8 + T["duck"], P8 + T["winend"]]
@@ -69816,6 +69831,291 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return m165mapa_main(rest[0] if rest else None)
     return _m165mapa_main_prev(argv)
+
+
+# ------------------------------------------------------------ p203 (26.10, paczka 203 noc/203-bitwa-glosnosc-stamina: Jeff 26.10 ok. 22:15 "muzyka w bitwie jest za glosna,
+# nie slychac bebnow etc. scisz ja o 40%", "stamina, bieganie w zbroi za szybko meczy obniz o polowe wzor na meczenie sie w zbroi w stosunku do kg", "kon za szybko sie
+# meczy, wydluz x2 ilosc staminy lub zmniejsz o 50% zuzycie staminy konia w galopie"; Armoury/src/EventMusic.Bitwa.cs, FieldCraft.cs, HorseWind.cs)
+P203_BAT_LEVELS = (21.4, 24.4, 27.4, 30.4)   # suwak 4..1 (EventMusic.Bitwa.cs BattleLufs10 / 10)
+P203_QUIETER_DB, P203_AMP = 4.4, 0.60
+P203_K, P203_K127 = 1.125, 2.25              # FieldCraft: ArmourRunCostPerKgPercent (domyslne 203) i k z 127
+P203_HORSE_SCALE = 0.5                       # HorseWind: HorseGallopDrainScale (domyslne 203)
+P203_RX = {
+    "bst": re.compile(r"Muzyka bitwy \(m109\): start - klucz BattleMusicOurs TAK, glosnosc (\d) \(-([\d.]+) LUFS\)(?:, ciszej o ([\d.]+) dB \(amplituda x([\d.]+)\))?, "
+                      r"utwory bitewne lufs([\d.]+) (\d+), lufs([\d.]+) (\d+), lufs([\d.]+) (\d+), lufs([\d.]+) (\d+) "),
+    "btrk": re.compile(r"Muzyka bitwy \(m109\): utwor \d+ - (bit_[a-z0-9_]+\.ogg) \(lufs([\d.]+), "),
+    "mst": re.compile(r"Muzyka mapy \(m165\): start - klucz MapMusicOurs TAK, glosnosc bitwy (\d) -> mapa -(\d+) LUFS \(zestaw lufs(\d+)\)"),
+    "run": re.compile(r"Bieg \(127\): ludzi zmierzonych (\d+) \|.*\| regula: (\d+) s bez zbroi przy Atletyce 100, ([\d.]+)%/kg do kwadratu"
+                      r"(?: \(203: domyslnie ([\d.]+) = polowa ([\d.]+) z 127\))? \|.*?\| gracz: (?:zbroja ([\d.]+) kg, Atletyka (\d+) -> (\d+) s"
+                      r"(?: \(sprawnosc ([\d.]+), przy ([\d.]+)%/kg z 127 bylo (\d+) s\))?|-)"),
+    "hst": re.compile(r"Konie \(136\): latka UpdateAgentStats wpieta .*?(?:\| drenaz galopu x([\d.]+) \(HorseGallopDrainScale; 203: domyslnie 0\.50 = polowa z 136, "
+                      r"galop do zera x2\), odpoczynek bez zmian \(HorseRecoverySeconds (\d+) s\))?\.$"),
+    "hend": re.compile(r"Konie \(136\): koni z jezdzcem \d+ .*?, pelny galop do zera sr\. (?:(\d+) s|-)(?: \(drenaz galopu x([\d.]+)\))? \|"
+                       r".*?\| gracz: (?:kon (\S+) \d+ kg, r \d+%, Vbase [\d.]+ m/s, pelny galop do zera (?:(\d+) s|nigdy)(?: \(przy x1 z 136: (?:(\d+) s|nigdy)\))?|-)"),
+}
+# linie kontrolne - napisy jak w kodzie C# (EventMusic.Bitwa.cs BattleStartLine / BattlePlay, EventMusic.MapaTlo.cs, FieldCraft.OnEndMission, HorseWind EnsurePatched / Write)
+P203_TEST = {
+    "bst": "[22:40:00] Muzyka bitwy (m109): start - klucz BattleMusicOurs TAK, glosnosc 3 (-24.4 LUFS), ciszej o 4.4 dB (amplituda x0.60), utwory bitewne lufs21.4 10, "
+           "lufs24.4 10, lufs27.4 10, lufs30.4 10 (01_zbiorka 120.1 s, 02_marsz 150.0 s), brak numerow -, odrzucone 0, psai TAK, test autotestu NIE.",
+    "bstold": "[21:33:09] Muzyka bitwy (m109): start - klucz BattleMusicOurs TAK, glosnosc 3 (-20 LUFS), utwory bitewne lufs17 10, lufs20 10, lufs23 10, lufs26 10 "
+              "(01_zbiorka 120.1 s), brak numerow -, odrzucone 0, psai TAK, test autotestu NIE.",
+    "btrk": "[22:41:00] Muzyka bitwy (m109): utwor 1 - bit_02_marsz.ogg (lufs24.4, 150.0 s, wybor otwarcie pola 01/02 - losowo z 2), grany po 1 s TAK; pierwszy w bitwie.",
+    "mst": "[22:40:00] Muzyka mapy (m165): start - klucz MapMusicOurs TAK, glosnosc bitwy 3 -> mapa -23 LUFS (zestaw lufs23), utwory mapy lufs17 10, lufs20 10, lufs23 10, "
+           "lufs26 10 (01_krolewski_trakt 125.0 s), brak numerow -, odrzucone 0, psai TAK, przerwa 20-40 s, po oknie 3 s, po misji 5-10 s, pierwszy po 5 s.",
+    "run": "[22:50:00] Bieg (127): ludzi zmierzonych 125 | zbroja sr. 12.4 kg (najwiecej 49.8) | pelny bieg do zera sr. 95 s (najkrocej 50) | regula: 120 s bez zbroi "
+           "przy Atletyce 100, 1.125%/kg do kwadratu (203: domyslnie 1.125 = polowa 2.25 z 127) | bez oddechu w biegu TAK (pominiete regeneracje RBM 6438) | gracz: "
+           "zbroja 46.3 kg, Atletyka 241 -> 69 s (sprawnosc 1.320, przy 2.25%/kg z 127 bylo 38 s)",
+    "runold": "[21:57:40] Bieg (127): ludzi zmierzonych 125 | zbroja sr. 12.4 kg (najwiecej 49.8) | pelny bieg do zera sr. 71 s (najkrocej 28) | regula: 120 s bez zbroi "
+              "przy Atletyce 100, 2.25%/kg do kwadratu | bez oddechu w biegu TAK (pominiete regeneracje RBM 6438) | gracz: zbroja 46.3 kg, Atletyka 241 -> 38 s",
+    "hst": "[22:40:30] Konie (136): latka UpdateAgentStats wpieta TAK (postfiksy na celu: BannerKings, com.jeff.armoury.horsewind) | postfiks RBM na UpdateHorseStats "
+           "(com.rbmcombat) TAK | czynny model statystyk: X.Y | drenaz galopu x0.50 (HorseGallopDrainScale; 203: domyslnie 0.50 = polowa z 136, galop do zera x2), "
+           "odpoczynek bez zmian (HorseRecoverySeconds 120 s).",
+    "hend": "[22:50:00] Konie (136): koni z jezdzcem 10 (wykluczonych 0: smoki 0, rydwany 0, slonie i mamuty 0, umarli 0, inne 0) | stamina koni TAK | zajechanych do 0: "
+            "strona gracza 0, wrog 0 | sr. S na koniec 70 (koni 5) | sr. obciazenie r 34% (tempo odpoczynku AI sr. u 0.29) (uprzaz przeliczona x0.2 6 razy), pelny galop "
+            "do zera sr. 94 s (drenaz galopu x0.50) | zapisow MountSpeed 39 (kon gracza poza limitem 4) | odpoczynkow konnicy AI 1 (ponizej 35, do 65) | gracz: kon "
+            "t3_empire_horse 520 kg, r 37%, Vbase 13.9 m/s, pelny galop do zera 92 s (przy x1 z 136: 46 s), S na koniec 70, najwieksza zmierzona v 10.6 m/s",
+}
+
+
+def p203_run_t(base, fit, k, kg):
+    """FieldCraft.RunSecondsWith: max(5, max(10, base) x fit / (1 + kg x k/100)^2)."""
+    m = 1.0 + max(0.0, kg) * max(0.0, k) / 100.0
+    return max(5.0, max(10.0, base) * fit / (m * m))
+
+
+def p203_selftest():
+    """p203: wyrazenia wobec linii kontrolnych P203_TEST i rachunek wzoru biegu. None = OK, inaczej opis."""
+    RX, T = P203_RX, P203_TEST
+    m = RX["bst"].search(T["bst"])
+    if not m or m.group(1) != "3" or m.group(2) != "24.4" or m.group(3) != "4.4" or m.group(4) != "0.60" or m.group(5, 7, 9, 11) != ("21.4", "24.4", "27.4", "30.4"):
+        return f"bst: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["bst"].search(T["bstold"])
+    if not m or m.group(3) is not None or m.group(5) != "17":
+        return "bstold (stary format musi sie dopasowac bez wspolczynnika)"
+    m = RX["btrk"].search(T["btrk"])
+    if not m or m.groups() != ("bit_02_marsz.ogg", "24.4"):
+        return f"btrk: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["mst"].search(T["mst"])
+    if not m or m.groups() != ("3", "23", "23"):
+        return f"mst: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["run"].search(T["run"])
+    if not m or m.group(2, 3, 4, 5, 6, 7, 8, 9, 10, 11) != ("120", "1.125", "1.125", "2.25", "46.3", "241", "69", "1.320", "2.25", "38"):
+        return f"run: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["run"].search(T["runold"])
+    if not m or m.group(3) != "2.25" or m.group(4) is not None or m.group(8) != "38" or m.group(9) is not None:
+        return f"runold: {m.groups() if m else 'brak dopasowania'}"
+    if round(p203_run_t(120, 1.32, 1.125, 46.3)) != 68 or round(p203_run_t(120, 1.32, 2.25, 46.3)) != 38:
+        return f"wzor biegu: {p203_run_t(120, 1.32, 1.125, 46.3):.2f} / {p203_run_t(120, 1.32, 2.25, 46.3):.2f}"
+    m = RX["hst"].search(T["hst"])
+    if not m or m.groups() != ("0.50", "120"):
+        return f"hst: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["hst"].search(T["hst"].split(" | drenaz")[0] + ".")
+    if not m or m.group(1) is not None:
+        return "hst bez wspolczynnika (log sprzed 203)"
+    m = RX["hend"].search(T["hend"])
+    if not m or m.groups() != ("94", "0.50", "t3_empire_horse", "92", "46"):
+        return f"hend: {m.groups() if m else 'brak dopasowania'}"
+    return None
+
+
+def p203_collect(logp):
+    """p203: przebieg logu (strumieniowo) - linie startu muzyki, utwory bitwy, 'Bieg (127)', 'Konie (136)'."""
+    RX = P203_RX
+    D = {"bst": [], "btrk": [], "mst": [], "run": [], "hst": [], "hend": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for s in fh:
+            s = s.rstrip("\r\n")
+            if "Muzyka bitwy (m109): start - klucz BattleMusicOurs TAK" in s:
+                D["bst"].append((RX["bst"].search(s), s))
+            elif "Muzyka bitwy (m109): utwor " in s:
+                m = RX["btrk"].search(s)
+                if m:
+                    D["btrk"].append(m)
+            elif "Muzyka mapy (m165): start - klucz MapMusicOurs TAK" in s:
+                D["mst"].append((RX["mst"].search(s), s))
+            elif "Bieg (127): ludzi zmierzonych" in s:
+                D["run"].append((RX["run"].search(s), s))
+            elif "Konie (136): latka UpdateAgentStats" in s:
+                D["hst"].append((RX["hst"].search(s), s))
+            elif "Konie (136): koni z jezdzcem" in s:
+                D["hend"].append((RX["hend"].search(s), s))
+    return D
+
+
+def p203_rows(rep, D):
+    """p203: wiersze P203-0..P203-5 z danych p203_collect - opis w --help."""
+    lv_db = {4: 21.4, 3: 24.4, 2: 27.4, 1: 30.4}
+    # P203-0 muzyka bitwy: linia startu
+    name = "P203-0: muzyka bitwy o 4.4 dB ciszej (linia startu m109)"
+    if not D["bst"]:
+        rep.add(name, "brak linii startu m109 z kluczem TAK", "INFO (log bez startu kampanii)", None)
+    else:
+        probs, lv = [], None
+        for m, s in D["bst"]:
+            if not m:
+                probs.append("zly format: " + s[-90:])
+                continue
+            if m.group(3) is None:
+                probs.append(f"log sprzed 203 (glosnosc {m.group(1)}, -{m.group(2)} LUFS, zestawy lufs{m.group(5)}...)")
+                continue
+            lv = int(m.group(1))
+            if abs(float(m.group(2)) - lv_db[lv]) > 0.05:
+                probs.append(f"glosnosc {lv}: -{m.group(2)} LUFS (oczekiwane -{lv_db[lv]})")
+            if abs(float(m.group(3)) - P203_QUIETER_DB) > 0.01 or abs(float(m.group(4)) - P203_AMP) > 0.005:
+                probs.append(f"wspolczynnik {m.group(3)} dB x{m.group(4)}")
+            sets = [(float(m.group(i)), int(m.group(i + 1))) for i in (5, 7, 9, 11)]
+            if [x[0] for x in sets] != list(P203_BAT_LEVELS) or any(n != 10 for _, n in sets):
+                probs.append(f"zestawy {sets}")
+        rep.add(name, f"linii {len(D['bst'])}" + (f", glosnosc {lv}" if lv else "") + (" | " + "; ".join(probs[:3]) if probs else ""),
+                "kazda linia: 'ciszej o 4.4 dB (amplituda x0.60)', glosnosc N = -(21.4 + 3 x (4 - N)) LUFS, zestawy lufs21.4/24.4/27.4/30.4 po 10", not probs)
+    # P203-1 utwory bitwy tylko z nowych zestawow
+    name = "P203-1: utwory bitwy z zestawow 203 (lufs21.4..30.4)"
+    if not D["btrk"]:
+        rep.add(name, "utworow bitwy 0", "INFO (bez bitwy z muzyka)", None)
+    else:
+        old = [m.group(2) for m in D["btrk"] if float(m.group(2)) not in P203_BAT_LEVELS]
+        rep.add(name, f"utworow {len(D['btrk'])}, zestawy {sorted(set(m.group(2) for m in D['btrk']))}" + (f" | spoza 203: {old[:3]}" if old else ""),
+                "kazdy utwor z lufs21.4/24.4/27.4/30.4", not old)
+    # P203-2 mapa bez zmian
+    name = "P203-2: muzyka mapy bez zmian (165: -min(26, 17 + 3 x (4 - N) + 3) LUFS)"
+    if not D["mst"]:
+        rep.add(name, "brak linii startu m165 z kluczem TAK", "INFO", None)
+    else:
+        probs = []
+        for m, s in D["mst"]:
+            if not m:
+                probs.append("zly format: " + s[-80:])
+                continue
+            lv, lu = int(m.group(1)), int(m.group(2))
+            if lu != min(26, 17 + 3 * (4 - lv) + 3):
+                probs.append(f"glosnosc bitwy {lv} -> mapa -{lu} LUFS")
+        rep.add(name, f"linii {len(D['mst'])}" + (" | " + "; ".join(probs[:3]) if probs else ""), "mapa -20/-23/-26 LUFS przy suwaku 4/3/2-1 jak w 165", not probs)
+    # P203-3 bieg w zbroi: k i rachunek gracza
+    name = "P203-3: bieg w zbroi - k 1.125%/kg (polowa 2.25 z 127), czas gracza z wzoru"
+    if not D["run"]:
+        rep.add(name, "brak linii 'Bieg (127)'", "INFO (bez bitwy pieszo)", None)
+    else:
+        probs, info = [], ""
+        for m, s in D["run"]:
+            if not m:
+                probs.append("zly format: " + s[-80:])
+                continue
+            if m.group(4) is None:
+                probs.append(f"log sprzed 203 (k {m.group(3)}%/kg)")
+                continue
+            k = float(m.group(3))
+            if abs(k - P203_K) > 0.0005:
+                probs.append(f"k {k} (MCM zmienione? domyslne {P203_K})")
+            if m.group(6) and m.group(9):
+                base, kg, ath, t, fit, t127 = float(m.group(2)), float(m.group(6)), m.group(7), int(m.group(8)), float(m.group(9)), int(m.group(11))
+                tn, to = p203_run_t(base, fit, k, kg), p203_run_t(base, fit, P203_K127, kg)
+                info = f"gracz {kg} kg, Atletyka {ath}: {t} s (wzor {tn:.1f}), przy 2.25 bylo {t127} s (wzor {to:.1f}), x{(t / t127 if t127 else 0):.2f}"
+                if abs(t - tn) > 1.0 or abs(t127 - to) > 1.0:
+                    probs.append("czas gracza poza wzorem: " + info)
+        rep.add(name, f"linii {len(D['run'])}" + (" | " + info if info else "") + (" | " + "; ".join(probs[:3]) if probs else ""),
+                "kazda linia: k 1.125 z dopiskiem 203; czas gracza = 120 x sprawnosc / (1 + kg x k/100)^2 (+-1 s)", not probs)
+    # P203-4 konie: start
+    name = "P203-4: konie - drenaz galopu x0.50 w linii startu (odpoczynek bez zmian)"
+    if not D["hst"]:
+        rep.add(name, "brak linii 'Konie (136): latka'", "INFO (bez bitwy z konmi w tej sesji)", None)
+    else:
+        probs = []
+        for m, s in D["hst"]:
+            if not m or m.group(1) is None:
+                probs.append("bez wspolczynnika (log sprzed 203?)")
+            elif abs(float(m.group(1)) - P203_HORSE_SCALE) > 0.005:
+                probs.append(f"drenaz x{m.group(1)} (MCM zmienione? domyslne 0.50)")
+        rep.add(name, f"linii {len(D['hst'])}" + (" | " + "; ".join(probs[:3]) if probs else ""), "drenaz galopu x0.50, HorseRecoverySeconds jak dotad", not probs)
+    # P203-5 konie: koniec bitwy - galop gracza x2 wobec x1
+    name = "P203-5: konie - pelny galop do zera x2 (gracz: T = T(x1) / 0.5)"
+    if not D["hend"]:
+        rep.add(name, "brak linii 'Konie (136): koni z jezdzcem'", "INFO (bez bitwy z konmi)", None)
+    else:
+        probs, info = [], ""
+        for m, s in D["hend"]:
+            if not m or m.group(2) is None:
+                probs.append("bez wspolczynnika (log sprzed 203?)")
+                continue
+            sc = float(m.group(2))
+            if abs(sc - P203_HORSE_SCALE) > 0.005:
+                probs.append(f"drenaz x{sc}")
+            if m.group(4) and m.group(5):
+                t, t1 = int(m.group(4)), int(m.group(5))
+                info = f"gracz {m.group(3)}: {t} s (przy x1 {t1} s, x{t / t1:.2f}), sr. {m.group(1) or '-'} s"
+                if abs(t - t1 / sc) > 1.5:
+                    probs.append("czas gracza poza wzorem: " + info)
+        rep.add(name, f"linii {len(D['hend'])}" + (" | " + info if info else "") + (" | " + "; ".join(probs[:3]) if probs else ""),
+                "kazda linia z '(drenaz galopu x0.50)'; gracz: T = T(x1) / 0.5 (+-1.5 s)", not probs)
+
+
+def p203_synth():
+    """p203 - test syntetyczny: dobry, zly (stary format, zly czas, mapa zmieniona, x1), bez linii. None = werdykty zgodne, inaczej opis."""
+    import shutil, tempfile
+    T = P203_TEST
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="p203_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            if kind == "good":
+                L = [T["bst"], T["mst"], T["btrk"], T["hst"], T["run"], T["hend"]]
+            elif kind == "bad":
+                L = [T["bstold"], T["mst"].replace("mapa -23 LUFS", "mapa -26 LUFS"), T["btrk"].replace("lufs24.4", "lufs20"),
+                     T["hst"].replace("x0.50 (", "x1.00 ("), T["run"].replace("-> 69 s", "-> 55 s"), T["hend"].replace("92 s (przy", "60 s (przy")]
+            else:
+                L = ["[10:00:00] Armoury: inna linia"]
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            p203_rows(rep, p203_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"P203-0": "TAK", "P203-1": "TAK", "P203-2": "TAK", "P203-3": "TAK", "P203-4": "TAK", "P203-5": "TAK"},
+        "bad": {"P203-0": "NIE", "P203-1": "NIE", "P203-2": "NIE", "P203-3": "NIE", "P203-4": "NIE", "P203-5": "NIE"},
+        "none": {"P203-0": "INFO", "P203-1": "INFO", "P203-2": "INFO", "P203-3": "INFO", "P203-4": "INFO", "P203-5": "INFO"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def p203_main(logp):
+    """p203 (26.10, paczka 203): P203-S, P203-S2, P203-0..P203-5 - opis w --help. Strumieniowo."""
+    rep = Report()
+    s1 = p203_selftest()
+    rep.add("P203-S: self-test wyrazen i wzoru biegu (linie kontrolne jak w kodzie C#)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = p203_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("P203-S2: test syntetyczny (dobry, zly, bez linii)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("P203-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = p203_collect(logp)
+    print(f"plik: {logp} | startow muzyki bitwy {len(D['bst'])}, utworow bitwy {len(D['btrk'])}, startow mapy {len(D['mst'])}, linii biegu {len(D['run'])}, "
+          f"linii koni start/koniec {len(D['hst'])}/{len(D['hend'])}")
+    p203_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_p203_main_prev = main
+
+
+def main(argv):
+    # paczka 203: grupa p203 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "p203":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return p203_main(rest[0] if rest else None)
+    return _p203_main_prev(argv)
 
 
 if __name__ == "__main__":

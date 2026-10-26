@@ -1300,9 +1300,9 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float RunSecondsUnarmoured { get; set; } = 120f;
 
-        [SettingPropertyFloatingInteger("Armour Run Cost Per Kg Percent", 0.00f, 5.00f, "0.00", HintText = "every kilogram of armour makes running this much harder, and the time a man can run shrinks with the square of it - no armour 2 minutes, 10 kg about 80 s, 25 kg about 50 s, 46 kg about 30 s (a study of men running in real plate armour of 30 to 50 kg found it nearly doubles the effort, more than a backpack of the same weight, because the limbs are loaded and the breath is squeezed)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Armour Run Cost Per Kg Percent", 0.000f, 5.000f, "0.000", HintText = "every kilogram of armour makes running this much harder, and the time a man can run shrinks with the square of it - at Athletics 100: no armour 2 minutes, 10 kg about 95 s, 25 kg about 75 s, 46 kg about 50 s. The default is half the cost measured on men running in real plate armour of 30 to 50 kg (it nearly doubled their effort; at that full cost, 2.25, a man in 46 kg of plate is spent after about 30 s)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
-        public float ArmourRunCostPerKgPercent { get; set; } = 2.25f;
+        public float ArmourRunCostPerKgPercent { get; set; } = 1.125f;
 
         [SettingPropertyBool("No Breath While Running", HintText = "nobody gets his breath back while running - stamina comes back only when walking, standing or trading blows. Off = RBM's regeneration keeps running during a sprint, as before (a hero with fast breath never lost any)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
@@ -1504,9 +1504,9 @@ namespace Armoury
         [SettingPropertyGroup("Horse wind")]
         public bool HorseStaminaBar { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Horse Gallop Drain Scale", 0.25f, 3.00f, "0.00", HintText = "how fast a gallop spends a horse's wind. At 1 an average horse with an average load (about a fifth of its own weight) gallops flat out for about a minute and a knight's horse in barding for about 40 seconds; a working canter lasts many minutes (fewer under a heavy load), a walk or an easy trot rests it. 2 = twice as fast, 0.5 = half as fast", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Horse Gallop Drain Scale", 0.25f, 3.00f, "0.00", HintText = "how fast a gallop spends a horse's wind. At 0.5 an average horse with an average load (about a fifth of its own weight) gallops flat out for about two minutes and a knight's horse in barding for about 80 seconds; a working canter lasts many minutes (fewer under a heavy load), a walk or an easy trot rests it. 1 = twice as fast (a minute of full gallop), 0.25 = half as fast. How fast a horse gets its wind back does not depend on this", RequireRestart = false)]
         [SettingPropertyGroup("Horse wind")]
-        public float HorseGallopDrainScale { get; set; } = 1f;
+        public float HorseGallopDrainScale { get; set; } = 0.5f;
 
         [SettingPropertyFloatingInteger("Horse Recovery Seconds", 30.00f, 600.00f, "0", HintText = "how fast a horse gets its wind back: at a walk it regains about two thirds of what it lost in this many seconds (a 450 kg horse - heavier horses take a little longer); a trot rests it more slowly, a canter hardly at all", RequireRestart = false)]
         [SettingPropertyGroup("Horse wind")]
@@ -9788,7 +9788,7 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public bool BattleMusicOurs { get; set; } = true;
 
-        [SettingPropertyInteger("Battle Music Loudness", 1, 4, "0", HintText = "how loud the mod's music plays in battle, 1 to 4: 4 is loud enough to carry over the clash of a big battle, each step down is a notch quieter (about a fifth to the ear), and 1 is almost as soft as the music under the narrator. A new setting is heard from the next piece", RequireRestart = false)]
+        [SettingPropertyInteger("Battle Music Loudness", 1, 4, "0", HintText = "how loud the mod's music plays in battle, 1 to 4: the music sits under the sounds of the battle, so the drums, horns, cries and the clash of steel stay clear above it at every step; 4 is the loudest, each step down is a notch quieter (about a fifth to the ear) and 1 is very soft. A new setting is heard from the next piece", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public int BattleMusicLoudness { get; set; } = 3;
 
@@ -9796,7 +9796,7 @@ namespace Armoury
         [SettingPropertyGroup("Narrator")]
         public bool StopEventThemesOnMap { get; set; } = true;
 
-        [SettingPropertyBool("Our Map Music", HintText = "on the campaign map the game's own map music gives way to the mod's calm background pieces in the spirit of the old kingdoms - lutes, fiddles, cellos and drones, low and steady so they never pull your attention: each piece once in a shuffled order before any comes again, with twenty to forty seconds of quiet between them. Story windows and the narrator bring their own music, and the map pieces come back a few seconds after the window closes; battles and visits to towns, castles and villages keep their own music, and the map pieces return a few seconds after you are back on the map. Town, castle and village menus, talks on the map and stopped time keep the piece playing. They play one notch softer than Battle Music Loudness (at 1 they play as softly as the battle music). Off = the game's map music, as before", RequireRestart = false)]
+        [SettingPropertyBool("Our Map Music", HintText = "on the campaign map the game's own map music gives way to the mod's calm background pieces in the spirit of the old kingdoms - lutes, fiddles, cellos and drones, low and steady so they never pull your attention: each piece once in a shuffled order before any comes again, with twenty to forty seconds of quiet between them. Story windows and the narrator bring their own music, and the map pieces come back a few seconds after the window closes; battles and visits to towns, castles and villages keep their own music, and the map pieces return a few seconds after you are back on the map. Town, castle and village menus, talks on the map and stopped time keep the piece playing. Their loudness follows Battle Music Loudness: the higher the setting, the louder they play (a little louder than the battle music at the same setting). Off = the game's map music, as before", RequireRestart = false)]
         [SettingPropertyGroup("Narrator")]
         public bool MapMusicOurs { get; set; } = true;
 

@@ -77,7 +77,9 @@ namespace Armoury
         private static readonly HashSet<object> _runningStances = new HashSet<object>();
         private static int _runN, _regenSkipped;
         private static float _runKgSum, _runKgMax, _runTSum, _runTMin = float.MaxValue;
-        private static float _plKg = -1f, _plAth, _plT;
+        private static float _plKg = -1f, _plAth, _plT, _plFit;   // paczka 203: _plFit - sprawnosc gracza (linia "Bieg (127)", sprawdz_logi p203 liczy T od nowa)
+        // Paczka 203: k z paczki 127 - tylko do porownania w linii "Bieg (127)" ("przy 2.25%/kg z 127 bylo X s"); regula liczy z ArmourRunCostPerKgPercent
+        private const float ArmourRunCost127 = 2.25f;
 
         internal static bool IsRunning(object stance) { return stance != null && _runningStances.Count > 0 && _runningStances.Contains(stance); }
 
@@ -88,19 +90,33 @@ namespace Armoury
             _runningStances.Clear();
             _runN = 0; _regenSkipped = 0;
             _runKgSum = 0f; _runKgMax = 0f; _runTSum = 0f; _runTMin = float.MaxValue;
-            _plKg = -1f; _plAth = 0f; _plT = 0f;
+            _plKg = -1f; _plAth = 0f; _plT = 0f; _plFit = 0f;
             PanicRun.Reset();                   // 147: liczniki linii "Bieg zlamanych (147)"
         }
 
         /// <summary>127: sekundy pelnego biegu do zera, jedna regula dla kazdego czlowieka na polu:
         /// T = RunSecondsUnarmoured x sprawnosc / (1 + k x kg)^2; sprawnosc = 0.75 + Atletyka/400 (0.6..1.6); k = ArmourRunCostPerKgPercent/100
-        /// (Askew, Formenti, Minetti 2012: zbroja 30-50 kg = koszt biegu x1.9 -> 2.25%/kg; kwadrat - drozszy krok i nizsze tempo, ktore cialo utrzyma).</summary>
+        /// (Askew, Formenti, Minetti 2012: zbroja 30-50 kg = koszt biegu x1.9 -> 2.25%/kg; kwadrat - drozszy krok i nizsze tempo, ktore cialo utrzyma).
+        /// Paczka 203 (Jeff 26.10 ok. 22:15: "stamina, bieganie w zbroi za szybko meczy obniz o polowe wzor na meczenie sie w zbroi w stosunku do kg"):
+        /// domyslne k 2.25 -> 1.125%/kg (Settings.ArmourRunCostPerKgPercent; Armoury.json Jeffa klucza nie ma). Wzor bez zmian: Atletyka 241 i 46.3 kg = 38 -> 69 s.</summary>
         internal static float RunSecondsFor(float athletics, float armourKg, Settings c)
+        {
+            return RunSecondsWith(RunFit(athletics, c), armourKg, c.ArmourRunCostPerKgPercent, c);
+        }
+
+        /// <summary>Paczka 203: sprawnosc biegacza (0.6..2.5) z Atletyki - wydzielone z RunSecondsFor bez zmiany liczb (linia "Bieg (127)" pokazuje ja dla gracza).</summary>
+        private static float RunFit(float athletics, Settings c)
         {
             float fit = 0.75f + BattleWind.CurvedAthletics(Math.Max(0f, athletics), c) / 400f;   // 130: Atletyka po tej samej krzywej co pula RBM
             if (fit < 0.6f) fit = 0.6f;
             if (fit > 2.5f) fit = 2.5f;   // 152: mistrzowie ponad 300 Atletyki (A' rosnie wykladniczo) biegna dluzej - dotad sufit 1.6 (A' 340)
-            float m = 1f + Math.Max(0f, armourKg) * Math.Max(0f, c.ArmourRunCostPerKgPercent) / 100f;
+            return fit;
+        }
+
+        /// <summary>Paczka 203: T przy danym k (%/kg) - RunSecondsFor z k z ustawien; linia "Bieg (127)" takze z k z 127 do porownania.</summary>
+        private static float RunSecondsWith(float fit, float armourKg, float kPercent, Settings c)
+        {
+            float m = 1f + Math.Max(0f, armourKg) * Math.Max(0f, kPercent) / 100f;
             return Math.Max(5f, Math.Max(10f, c.RunSecondsUnarmoured) * fit / (m * m));
         }
 
@@ -213,7 +229,7 @@ namespace Armoury
             if (w > _runKgMax) _runKgMax = w;
             _runTSum += st.RunSeconds;
             if (st.RunSeconds < _runTMin) _runTMin = st.RunSeconds;
-            if (agent.IsMainAgent) { _plKg = w; _plAth = ath; _plT = st.RunSeconds; }
+            if (agent.IsMainAgent) { _plKg = w; _plAth = ath; _plT = st.RunSeconds; _plFit = RunFit(ath, c); }
             st.TiredFloor = Math.Min(0.92f, c.TiredSpeedFactor + ath / 1000f);
 
             // wlasna pula (gdy RBM nieobecny) - te same zasady co RBM: 1000 * bonus z Atletyki
@@ -388,9 +404,12 @@ namespace Armoury
                     Log.Info("Bieg (127): ludzi zmierzonych " + _runN + " | zbroja sr. " + (_runKgSum / _runN).ToString("0.0") + " kg (najwiecej "
                              + _runKgMax.ToString("0.0") + ") | pelny bieg do zera sr. " + (_runTSum / _runN).ToString("0") + " s (najkrocej "
                              + _runTMin.ToString("0") + ") | regula: " + c.RunSecondsUnarmoured.ToString("0") + " s bez zbroi przy Atletyce 100, "
-                             + c.ArmourRunCostPerKgPercent.ToString("0.##") + "%/kg do kwadratu | bez oddechu w biegu " + (c.NoBreathWhileRunning ? "TAK" : "NIE")
+                             + c.ArmourRunCostPerKgPercent.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "%/kg do kwadratu (203: domyslnie 1.125 = polowa "
+                             + ArmourRunCost127.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " z 127) | bez oddechu w biegu " + (c.NoBreathWhileRunning ? "TAK" : "NIE")
                              + " (pominiete regeneracje RBM " + _regenSkipped + ")"
-                             + (_plKg >= 0f ? " | gracz: zbroja " + _plKg.ToString("0.0") + " kg, Atletyka " + _plAth.ToString("0") + " -> " + _plT.ToString("0") + " s" : " | gracz: -"));
+                             + (_plKg >= 0f ? " | gracz: zbroja " + _plKg.ToString("0.0") + " kg, Atletyka " + _plAth.ToString("0") + " -> " + _plT.ToString("0") + " s"
+                                + " (sprawnosc " + _plFit.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + ", przy " + ArmourRunCost127.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                                + "%/kg z 127 bylo " + RunSecondsWith(_plFit, _plKg, ArmourRunCost127, c).ToString("0") + " s)" : " | gracz: -"));
             }
             catch { }
             // 144: linia "Oddech AI (144)" raz na bitwe - biegi w toku zamkniete, capy zdjete
