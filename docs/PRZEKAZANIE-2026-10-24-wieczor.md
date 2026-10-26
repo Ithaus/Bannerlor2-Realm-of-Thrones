@@ -1,5 +1,15 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 12:35 CET - WGRANE 121-124 (ubrania, jezdziec, glosy v4, sztandar); w toku 159b, muzyka
+- LINIA GLOWNA: noc/161-integracja (worktree scratchpad\zb\n161) = 120 + 160 + 157 + 158 (+ wpis 123). Kolejne paczki scalac tu.
+- WGRANE 121 (11:45): Armoury 72b07d42 = 160 ubrania chlopow w barwach ziemi (bez barw rodu - UseTeamColor, bez farbowanych ROT; tekstury sprawdzone).
+- WGRANE 122 (12:14): Armoury 2d20df52 = 157 jezdziec: tarcza pod ostrzalem (bez zmiany w szarzy szyku), kontra 1-2 jezdzcow na strzelca (20 s), pomiar konnicy AI.
+- WGRANE 123 (12:15, DANE): 314 glosow bitwy na nowo (eleven_v4, bloki, 14 glosow z konta, Karda fonetycznie "Kar-da"); kopie starych: Modules\Armoury\kopie\Bitwa-przed-wgranie123 i D:.
+  Narzedzia: scratchpad\glosy_v4 (blok_v4.py, nagraj_v4.py, roles_v4.json, klipy_v4.csv, klipy_v4_nowe.csv - 200 nowych NIE nagranych).
+- WGRANE 124 (12:29): Armoury 05503a8c = 158 biegacz po upuszczony sztandar (w autotescie niesprawdzony - szyki puste).
+- W TOKU: 159b (nadzy lordowie, regula Jeffa: tylko bez broni, max 10%) w zb\n159; muzyka: probka bit_04_szarza czeka na odsluch Jeffa
+  (scratchpad\muzyka_bitwy, zadania/*.json, probka_muzyki.py); pytanie do Jeffa: "spotkate" koszule = kolory czy dlugosc.
+
 ## DOPISEK 26.10 ok. 11:05 CET - WGRANE 119 (pasek konia) i 120 (dzwiek 3D); w toku 157-160, glosy v4, muzyka
 - LINIA GLOWNA: noc/156-dzwiek-3d-na-119 (worktree scratchpad\zb\n156) = 118 + 155 + 154. Nowe galezie 157-160 odgalezione od niej.
 - WGRANE 119 (10:49): Armoury 4372c1cb = 155 pasek staminy konia pod paskiem zdrowia konia (UIExtenderEx, klucz HorseStaminaBar). Autotest 155a TAK.
