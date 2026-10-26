@@ -1,5 +1,18 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 26.10 ok. 11:05 CET - WGRANE 119 (pasek konia) i 120 (dzwiek 3D); w toku 157-160, glosy v4, muzyka
+- LINIA GLOWNA: noc/156-dzwiek-3d-na-119 (worktree scratchpad\zb\n156) = 118 + 155 + 154. Nowe galezie 157-160 odgalezione od niej.
+- WGRANE 119 (10:49): Armoury 4372c1cb = 155 pasek staminy konia pod paskiem zdrowia konia (UIExtenderEx, klucz HorseStaminaBar). Autotest 155a TAK.
+- WGRANE 120 (11:03): Armoury 7b6dc24c = 154 dzwiek bitwy 3D: 395 klipow przez event:/mod/mission/voice_shout / voice / ambient_3d_big
+  (Extra/voiceover bylo 2D - stad "werble przy uchu"), odleglosci przy zrodle, pozycja co klatke, blad 'Save the banner!' przy smierci dowodcy.
+  Autotest 156a: kod 0, ERROR 0, zdarzenia 3D odrzucone 0. Slyszalnosc 3D - tylko ucho Jeffa. tools/sprawdz_logi.py ND-7 do poprawy (13 probek, nie 6).
+- Uwagi Jeffa z gry 25.10 22:45 (przez sesje SKYRIM) i sledztwo: scratchpad\sledztwo-2245.txt. Zold: nie blad (druzyna 331 + karawana 313, regula BK).
+- Decyzje Jeffa 26.10: nadzy lordowie = "Pozyczka + mniejsze" + najwyzej 10% nieuzbrojonych; ubrania chlopow - kolory ziemi, dluzsze, bez barw szlacheckich;
+  glosy - dziko jak runda 2 (eleven_v4, bloki, wybor glosow zostawil Claude); muzyka - 10 utworow tylko w bitwie, rozdzielic od mapy; muzykant w szyku - pozniej.
+- W TOKU: workflow paczek 157 (jezdziec: tarcza, kontra na strzelca, pomiar konnicy), 158 (biegacz po sztandar), 159 (nadzy lordowie), 160 (ubrania chlopow);
+  glosy v4: scratchpad\glosy_v4 (klipy_v4.csv, roles_v4.json, blok_v4.py - nagrywanie blokami z with-timestamps, probka bloki_probka czeka na odsluch Jeffa);
+  muzyka: scratchpad\muzyka_bitwy\RAPORT.md (10 utworow, ElevenLabs Music, ok. 22-28k kredytow; najpierw 1 probka).
+
 ## DOPISEK 25.10 ok. 22:20 CET - WGRANE 118 (fala "AI walczy o zycie" 139-149 + 153 + 117)
 - WGRANE 118 (22:13): Armoury 86195e02 z galezi noc/139-ai-zycie (worktree scratchpad\zb\n139, build 8995f2ab, wpis 86fc8054). Galaz zawiera scalone noc/138-calosc (117 + 153),
   wiec to jest TERAZ linia glowna - nowe prace odgalezniac od noc/139-ai-zycie. CrashScribe bez zmian (bef9db58). Kopie: Armoury.dll.bak-2026-10-25-przed-wgranie118, D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie118-przed.
