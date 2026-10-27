@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 21:15 CET - paczka 282 ruda (workflow wf_7236362f-1af) obok 280/281
+- Jeff pytal o inwestycje (odpowiedz z logu 12:57: kuznia ~123 d/dobe, tkalnia welny ~98, len ~68; tartak ~0, rzeznik -5, platnerz zbroi konskich -8 - zmiana branzy
+  E3-D3 po 60 dobach strat), potem: "tak zob paczke, ale ta rude to my chyba juz ktoreys raz naprawiamy i mowiles ze naprawione".
+- 282 (zb\n282, noc/282-ruda-przeplyw od 9d807118): DIAGNOZA czemu f5-ruda / 174 / 174b / 214 nie dzialaja w kampanii Jeffa (28 z 97 miast bez rudy, kontrakty rudy
+  ~0, zapas w Norvos/Oldtown/Fairmarket/Lannisport), potem naprawa przyczyny; tez 'Drewno ... bez wyjasnienia -1562/dobe'. Grupa ruda282.
+- Wznowienie: ten sam scriptPath co 280/281 (paczki-280-281-wf_d8c1bd65-fa1.js), resumeFromRunId wf_7236362f-1af, args z journal.jsonl runu.
+- Potem: scalenie 280+281+282 do n161, autotest 131a, WGRANIE 131.
+
 ## DOPISEK 27.10 ok. 20:55 CET - Jeff "tak napraw wszystko": paczki 280 i 281 w toku (workflow wf_d8c1bd65-fa1)
 - 280 (zb\n280, noc/280-ksiega-doba-po-wczytaniu od n161 9d807118 = WGRANE 130): B1 narodziny wsi ksiegowane w ticku wsi (nie prognoza doby moda; niezaleznie od
   Measure40.On), reszta niewyjasnionych skokow, decyzja o -5.4k w zapisie Jeffa; B2 centralny straznik doby moda (raz na numer doby, nadrobienie pominietej, zapis);
