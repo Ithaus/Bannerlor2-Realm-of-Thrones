@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 22:40 CET - 282 GOTOWE (zbudowane, po recenzji, NIE scalone, NIE testowane); czeka 283
+- 282 (zb
+282): 90699a3e + 0564e798 + recenzja 04810741 (Armoury 0fac1b16). Przyczyna: karawany trzymaja ok. 1/4 zelaza swiata w jukach (1666-2463),
+  prog zrodla 174 sumuje sie ponad polki, zamowienia do najtanszego zrodla nawet 8 dob drogi w dowolnej kolejnosci. F1 CaravanBulk.cs (bramka przeplywu rudy
+  karawan, zapis arm_cb282), F2 najbardziej potrzebujace miasto pierwsze + zrodlo wedlug zysku na dobe drogi (7 surowcow), F3 rowne pokrycie rudy, F4 rece
+  przy kopalniach licza towar w drodze, F5 linia Drewno bez 'bez wyjasnienia' (to nie wyciek). Grupa ruda282 (RU282-0..9), nruda NRU-2 zmienione.
+  Do zrobienia potem (decyzja Claude): ta sama bramka dla plotna (ok. 2500 w jukach przy braku 430) i skory - teraz tylko 'na sucho' w linii 282.
+
 ## DOPISEK 27.10 ok. 22:10 CET - 280 i 281 GOTOWE (zbudowane, po recenzji, NIE scalone, NIE testowane)
 - 280 (zb
 280): 6e964978 + 673fb061 (Armoury 2a9f1216); recenzje 2 soczewki - 0 uwag. DayGate.cs (zapis arm_daygate, klucz DailyTickOncePerDay; P1 przestawia
