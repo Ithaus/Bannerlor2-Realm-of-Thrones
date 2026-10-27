@@ -71417,10 +71417,10 @@ P264_RX = {
     "start": re.compile(r"^Pokoj kanonu \(264\): latki - Diplomacy ApplyPeace (TAK|BRAK|BLAD)[^,]*, AddDecision (TAK|BRAK|BLAD)[^,]*, IsAllowed (TAK|BRAK|BLAD)[^,]*, "
                         r"mysl AI (TAK|BRAK|BLAD)[^;]*; klucz Canon War No Peace Until Red Wedding (tak|nie) \| zakres: (.*?) \| pary: (.*?)\."
                         r"(?: \| proba autotestu: flaga \S+ (TAK|NIE))?$"),
-    "block": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| (.+?) -> (.+?): pokoj ZABLOKOWANY \(droga: (.*)\) - wojna kanonu trwa do Krwawych Godow \((.*), "
+    "block": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| (.+?) -> (.+?): pokoj ZABLOKOWANY \(droga: (.*)\) - (?:wojna kanonu trwa do Krwawych Godow|ROT wymusza te wojne, pokoj trwalby dobe) \((.*), "
                         r"(Polnoc-korona|Dorzecze-korona)\)\.$"),
-    "day": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| blokada (CZYNNA|KONIEC|WYLACZONA|NIE DOTYCZY) \((.*?)\) \| Polnoc-korona: (CZYNNA|KONIEC), wojna (TAK .*?|NIE) "
-                      r"\| Dorzecze-korona: (CZYNNA|KONIEC), wojna (TAK .*?|NIE) \| zablokowane dzis (\d+)(?: \[(.*?)\])?, sesja (\d+) \| gracz rzadzi: (tak|nie) "
+    "day": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| blokada (CZYNNA|KONIEC|WYLACZONA|NIE DOTYCZY) \((.*?)\) \| Polnoc-korona: (CZYNNA|KONIEC)(?: \(ROT wymusza\))?, wojna (TAK .*?|NIE) "
+                      r"\| Dorzecze-korona: (CZYNNA|KONIEC)(?: \(ROT wymusza\))?, wojna (TAK .*?|NIE) \| zablokowane dzis (\d+)(?: \[(.*?)\])?, sesja (\d+) \| gracz rzadzi: (tak|nie) "
                       r"\| potkniecia (\d+) \(sesja (\d+)\)\.$"),
     "test": re.compile(r"^Pokoj kanonu \(264\): test - (T\d+a?) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
     "ruler": re.compile(r"^Wojna kanonu - wladca \(264\): dzien (\d+) \| (.+?): (.*?) \| partia: (.*?) \| AI: (.*?) \| armia: (.*?) \| dzis: bitwy polowe (\d+), oblezenia (\d+), "
@@ -71441,14 +71441,20 @@ P264_CROWN, P264_RIVER = "House Baratheon of King's Landing", "Riverlands"
 # linie kontrolne - jak w kodzie C# (CanonPeaceLock.cs, CanonPeaceLock.Test.cs, CanonWarWatch.cs, PeaceHold.cs, Prologue.River.cs, WorldClock7.cs)
 P264_TEST = {
     "start": "Pokoj kanonu (264): latki - Diplomacy ApplyPeace TAK, AddDecision TAK, IsAllowed TAK, mysl AI TAK; klucz Canon War No Peace Until Red Wedding tak "
-             "| zakres: kampania kanonu | pary: Polnoc-korona (battania-vlandia, do RedWeddingEvent albo smierci lord_5_1), Dorzecze-korona (riverlands-vlandia, do "
-             "RedWeddingEvent albo smierci lord_5_1).",
+             "| zakres: kampania kanonu | pary: Polnoc-korona (battania-vlandia, do konca RedWeddingEvent albo smierci lord_5_1, potem gdy ROT wymusza wojne), "
+             "Dorzecze-korona (riverlands-vlandia, do konca RedWeddingEvent albo smierci lord_5_1, potem gdy ROT wymusza wojne).",
     "block": "Pokoj kanonu (264): dzien {d} | Riverlands -> House Baratheon of King's Landing: pokoj ZABLOKOWANY (droga: {p}) - wojna kanonu trwa do Krwawych Godow "
              "(Robb zyje, RedWeddingEvent 0, Dorzecze-korona).",
     "day": "Pokoj kanonu (264): dzien {d} | blokada CZYNNA (Robb zyje, RedWeddingEvent 0) | Polnoc-korona: CZYNNA, wojna TAK od dnia 8.7 | Dorzecze-korona: CZYNNA, "
            "wojna TAK od dnia 147.4, wznowiona po pokoju z dnia 146.4; pierwsza od dnia 34 | zablokowane dzis {n} [Diplomacy zmeczenie wojna {n}], sesja {s} "
            "| gracz rzadzi: nie | potkniecia {p} (sesja {p}).",
     "test": "Pokoj kanonu (264): test - T1 ApplyPeace Diplomacy Dorzecze -> korona: wojna dalej TAK, blokad 1 - wynik {r}.",
+    # recenzja 264: blokada po koncu kanonu (ROT wymusza) i zmeczenie wojna u gracza wladcy (bez wyboru)
+    "block_rot": "Pokoj kanonu (264): dzien {d} | Riverlands -> House Baratheon of King's Landing: pokoj ZABLOKOWANY (droga: {p}) - ROT wymusza te wojne, pokoj "
+                 "trwalby dobe (Robb nie zyje, RedWeddingEvent 2 - ROT wymusza te wojne, pokoj cofnalby nastepnej doby, Dorzecze-korona).",
+    "day_rot": "Pokoj kanonu (264): dzien {d} | blokada CZYNNA (Robb nie zyje, RedWeddingEvent 2 - ROT wymusza te wojne, pokoj cofnalby nastepnej doby) | Polnoc-korona: "
+               "KONIEC, wojna NIE | Dorzecze-korona: CZYNNA (ROT wymusza), wojna TAK od dnia 960.2, wznowiona po pokoju z dnia 959.2; pierwsza od dnia 34 "
+               "| zablokowane dzis 1 [Diplomacy zmeczenie wojna - gracz wladca, pokoj bez wyboru 1], sesja 1 | gracz rzadzi: tak | potkniecia 0 (sesja 0).",
     "ruler": "Wojna kanonu - wladca (264): dzien {d} | {lab}: Robb Stark (lord_5_1, The North) | partia: w Winterfell, ludzi 212/260, jedzenie 14.2 dni | AI: Hold -> -, "
              "krotko Hold -> -, AI wylaczone nie, bez nowych decyzji nie | armia: brak | dzis: bitwy polowe {f}, oblezenia 0, najazdy 0 (godzin oblezenia 0, bitwy 0, w osadzie 24/24) "
              "| mysl AI (mysli 4, latka TAK): 1. BesiegeSettlement Riverrun 0.080 zbiorka armii, 2. PatrolAroundPoint Winterfell 0.020, 3. GoToSettlement Moat Cailin 0.010 "
@@ -71497,9 +71503,17 @@ def pokoj264_selftest():
     if m and (m.group(1) != "108983" or m.group(2) != "CZYNNA" or m.group(8) != "3" or m.group(10) != "5" or m.group(11) != "nie" or m.group(12) != "0"):
         probs.append("day grupy")
     m = P264_RX["day"].match(T["day"].format(d=1, n=0, s=0, p=0).replace(" [Diplomacy zmeczenie wojna 0]", "").replace("blokada CZYNNA (Robb zyje, RedWeddingEvent 0)",
-                                                                                                               "blokada KONIEC (Krwawe Gody (RedWeddingEvent 1))"))
-    if not m or m.group(2) != "KONIEC" or m.group(3) != "Krwawe Gody (RedWeddingEvent 1)":
+                                                                                                               "blokada KONIEC (Robb nie zyje, RedWeddingEvent 2 - ROT nie wymusza tej wojny)"))
+    if not m or m.group(2) != "KONIEC" or m.group(3) != "Robb nie zyje, RedWeddingEvent 2 - ROT nie wymusza tej wojny":
         probs.append("day KONIEC")
+    # recenzja 264: blokada po koncu kanonu i droga gracza wladcy (znana droga P264-2 - przedrostek "Diplomacy zmeczenie wojna")
+    m = P264_RX["day"].match(T["day_rot"].format(d=9))
+    if not m or m.group(2) != "CZYNNA" or m.group(4) != "KONIEC" or m.group(6) != "CZYNNA" or m.group(11) != "tak" or "zmeczenie wojna - gracz wladca" not in (m.group(9) or ""):
+        probs.append("day ROT wymusza")
+    p_w = "Diplomacy zmeczenie wojna - gracz wladca, pokoj bez wyboru"
+    m = P264_RX["block"].match(T["block_rot"].format(d=9, p=p_w))
+    if not m or m.group(4) != p_w or not m.group(4).startswith(P264_PATHS) or m.group(6) != "Dorzecze-korona" or "ROT wymusza" not in m.group(5):
+        probs.append("block ROT wymusza")
     m = P264_RX["block"].match(T["block"].format(d=5, p="decyzja krolestwa (AddDecision, wnioskodawca House Tully)"))
     if not m or m.group(4) != "decyzja krolestwa (AddDecision, wnioskodawca House Tully)" or m.group(6) != "Dorzecze-korona":
         probs.append("block grupy")

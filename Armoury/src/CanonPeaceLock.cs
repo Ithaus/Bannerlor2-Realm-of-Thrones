@@ -21,9 +21,12 @@ namespace Armoury
     /// REGULA (tabela Rules nizej - przelacznik danych): para Polnoc (battania) - korona (vlandia, House Baratheon of King's Landing z Lannisterami) i Dorzecze
     /// (riverlands) - korona, kolejnosc stron dowolna. Blokada CZYNNA, gdy: klucz TAK, kampania kanonu (Prologue.CanonHere - zakres m104 decyzji nr 5), zadna strona
     /// nie jest krolestwem gracza (gracz WLADCA jednej strony = pokoj to jego wybor - jak model ROT "PlayerKingdom == kingdom1" i regula m116 "Never if you rule
-    /// either realm"; gracz wasal nie zawrze ani nie zaproponuje tego pokoju), oba krolestwa istnieja, wydarzenie ROT RedWeddingEvent nie ruszylo (stan < 1 - ten
-    /// sam sygnal, ktory konczy sojusz A3 m116; -1 = nie widac - blokada trwa do smierci Robba, linia doby mowi "Krwawe Gody nie widac") i Robb (lord_5_1) zyje.
-    /// Bez nowych liczb.
+    /// either realm"; gracz wasal nie zawrze ani nie zaproponuje tego pokoju; recenzja 264 (2): pokoj ze zmeczenia wojna Diplomacy bez wyboru gracza - okno tylko OK
+    /// albo odmowa wylaczona - blokowany i u gracza wladcy), oba krolestwa istnieja, Robb (lord_5_1) zyje (IsAlive czytane na zywo) i wydarzenie ROT RedWeddingEvent
+    /// nie skonczone (stan < 2; recenzja 264 (1): stan 1 = wesele zapowiedziane, ROT czeka 14 dni i dalej wymusza obie wojny - blokada trwa; -1 = nie widac -
+    /// blokada trwa do smierci Robba, linia doby mowi "Krwawe Gody nie widac"). Po koncu kanonu (stan 2 albo smierc Robba, poza stanem 1 - wesele ROT w toku, ROT sam
+    /// zawiera pokoj Polnoc-korona w ExecuteRobb) para zostaje zablokowana, dopoki ROT wymusza te wojne (Prologue.RotWarForced - EnforceWars wypowiedzialby ja
+    /// nastepnej doby; Dorzecze-korona ROT wymusza zawsze, Polnoc-korona po uratowaniu Robba) - recenzja 264 (3). Bez nowych liczb.
     /// LATKI (jedna instancja Harmony SubModuleMain, raz na proces, EnsureHooks w kampanii obok PeaceHold):
     ///  H1 prefiks First Diplomacy KingdomPeaceAction.ApplyPeace(Kingdom, Kingdom, int?, bool, bool, bool) - false dla pary z blokada PRZED kosztem Diplomacy,
     ///     zwrotem lenn, oknem gracza i MakePeaceAction (zloto nie rusza - nic z niczego). Obejmuje zmeczenie wojna (co dobe - blokada co dobe), wynik glosowania
@@ -42,9 +45,12 @@ namespace Armoury
     internal static class CanonPeaceLock
     {
         internal const string Tag = "Pokoj kanonu (264): ";
+        private const string PhraseCanon = "wojna kanonu trwa do Krwawych Godow";
+        private const string PhraseRot = "ROT wymusza te wojne, pokoj trwalby dobe";   // recenzja 264 (3): po koncu kanonu
+        internal const string PathWeariness = "Diplomacy zmeczenie wojna";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        /// <summary>Wiersz tabeli: para krolestw (id ROT ROTKingdoms), etykieta linii, wydarzenie ROT konczace blokade (stan >= 1) i bohater, ktorego smierc ja konczy.</summary>
+        /// <summary>Wiersz tabeli: para krolestw (id ROT ROTKingdoms), etykieta linii, wydarzenie ROT konczace kanon (stan 2 - skonczone) i bohater, ktorego smierc go konczy.</summary>
         private sealed class Rule
         {
             public string A, B, Label, EndEvent, EndHero, EndHeroName;
@@ -65,18 +71,19 @@ namespace Armoury
         private static int _dBlocked, _sBlocked, _stumbles, _dStumbles;
         private static readonly Dictionary<string, int> _dPaths = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly HashSet<string> _dSaid = new HashSet<string>(StringComparer.Ordinal);   // para|droga - linia raz na dobe
-        private static bool _playerTold;
+        private static bool _playerTold, _playerToldWeary;
         // pamiec konca blokady na godzine gry (IsAllowed pyta czesto - RotEventState i Hero.FindFirst raz na godzine)
         private static long _cacheHour = long.MinValue;
         private static string[] _cacheEnd = new string[Rules.Length];
         private static int _cacheRw = -1;
-        private static bool _cacheRobbDead, _cacheRobbMissing;
+        private static bool _cacheRobbMissing;
+        private static Hero _cacheRobb;   // obiekt bohatera na godzine; IsAlive czytane na zywo (ROT ExecuteRobb zabija Robba tuz przed swoim pokojem)
 
         internal static void Reset()
         {
             _dBlocked = _sBlocked = _stumbles = _dStumbles = 0;
-            _dPaths.Clear(); _dSaid.Clear(); _playerTold = false;
-            _cacheHour = long.MinValue; _cacheEnd = new string[Rules.Length]; _cacheRw = -1; _cacheRobbDead = _cacheRobbMissing = false;
+            _dPaths.Clear(); _dSaid.Clear(); _playerTold = _playerToldWeary = false;
+            _cacheHour = long.MinValue; _cacheEnd = new string[Rules.Length]; _cacheRw = -1; _cacheRobbMissing = false; _cacheRobb = null;
             CanonWarWatch.Reset();
             CanonPeaceLockTest.Reset();
         }
@@ -91,18 +98,32 @@ namespace Armoury
 
         // ------------------------------------------------------------ regula (czysta funkcja - autotest T4 sprawdza tabele prawdy)
 
-        /// <summary>Blokada pary wedlug warunkow (opis klasy). true = pokoj zablokowany; why - powod stanu do linii.</summary>
-        internal static bool Locked(bool key, bool canon, bool playerRules, bool eliminated, int redWedding, bool heroDead, out string why)
+        /// <summary>Blokada pary wedlug warunkow (opis klasy). true = pokoj zablokowany; why - powod stanu do linii (bez nawiasow - wyrazenia sprawdz_logi).
+        /// playerChoice - gracz rzadzi strona i pokoj jest jego wyborem (PlayerChoice); rotForced - ROT wymusza te wojne (liczone tylko po koncu kanonu).</summary>
+        internal static bool Locked(bool key, bool canon, bool playerChoice, bool eliminated, int redWedding, bool heroDead, bool rotForced, out string why)
         {
             if (!key) { why = "klucz NIE"; return false; }
             if (!canon) { why = "kampania klasyczna - nie dotyczy"; return false; }
-            if (playerRules) { why = "gracz rzadzi strona - pokoj to jego wybor"; return false; }
+            if (playerChoice) { why = "gracz rzadzi strona - pokoj to jego wybor"; return false; }
             if (eliminated) { why = "krolestwo zniszczone"; return false; }
-            if (redWedding >= 1) { why = "Krwawe Gody (RedWeddingEvent " + redWedding + ")"; return false; }
-            if (heroDead) { why = "Robb nie zyje"; return false; }
-            why = redWedding < 0 ? "Robb zyje, Krwawe Gody nie widac" : "Robb zyje, RedWeddingEvent 0";
-            return true;
+            if (!CanonOver(redWedding, heroDead))
+            {
+                why = redWedding < 0 ? "Robb zyje, Krwawe Gody nie widac"
+                    : redWedding == 1 ? "Robb zyje, RedWeddingEvent 1 - Krwawe Gody zapowiedziane, ROT czeka 14 dni i wymusza wojne" : "Robb zyje, RedWeddingEvent 0";
+                return true;
+            }
+            string end = (heroDead ? "Robb nie zyje" : "Robb zyje") + ", RedWeddingEvent " + redWedding;
+            if (redWedding == 1) { why = end + " - wesele ROT w toku, ROT sam zawiera pokoj"; return false; }
+            if (rotForced) { why = end + " - ROT wymusza te wojne, pokoj cofnalby nastepnej doby"; return true; }
+            why = end + " - ROT nie wymusza tej wojny";
+            return false;
         }
+
+        /// <summary>Koniec kanonu pary: RedWeddingEvent skonczone (stan 2 - CompleteEvent ROT) albo Robb nie zyje.</summary>
+        internal static bool CanonOver(int redWedding, bool heroDead) { return redWedding >= 2 || heroDead; }
+
+        /// <summary>Gracz wladca strony - pokoj jego wyborem, chyba ze droga nie daje mu wyboru (zmeczenie wojna Diplomacy: okno tylko OK albo odmowa wylaczona).</summary>
+        internal static bool PlayerChoice(bool playerRules, bool noChoice) { return playerRules && !noChoice; }
 
         private static void RefreshCache()
         {
@@ -112,7 +133,7 @@ namespace Armoury
             _cacheRw = Prologue.RotEventState("RedWeddingEvent");
             var robb = Prologue.HeroById(Prologue.RobbId);
             _cacheRobbMissing = robb == null;
-            _cacheRobbDead = robb != null && !robb.IsAlive;
+            _cacheRobb = robb;
         }
 
         private static int RuleIndex(IFaction a, IFaction b)
@@ -127,25 +148,40 @@ namespace Armoury
             return -1;
         }
 
-        /// <summary>Stan reguly i pary teraz (bez logu); idx - wiersz tabeli albo -1.</summary>
-        private static bool State(IFaction a, IFaction b, out int idx, out string why)
+        /// <summary>Stan reguly i pary teraz (bez logu); idx - wiersz tabeli albo -1; noChoice - droga bez wyboru gracza (recenzja 264 (2)); rotPhase - blokada
+        /// po koncu kanonu (ROT wymusza); playerRules - gracz rzadzi strona.</summary>
+        private static bool State(IFaction a, IFaction b, bool noChoice, out int idx, out string why, out bool rotPhase, out bool playerRules)
         {
             why = "-";
             idx = -1;
+            rotPhase = playerRules = false;
             if (a == null || b == null || !a.IsKingdomFaction || !b.IsKingdomFaction) return false;
             idx = RuleIndex(a, b);
             if (idx < 0) return false;
             if (!KeyOn) { why = "klucz NIE"; return false; }   // bez odczytu ROT, gdy wylaczone
             if (!Prologue.CanonHere) { why = "kampania klasyczna - nie dotyczy"; return false; }
             RefreshCache();
-            bool heroDead = _cacheRobbDead;   // tabela: jeden bohater konca (Robb) dla obu wierszy
-            return Locked(true, true, Prologue.RulesRealm(a) || Prologue.RulesRealm(b), a.IsEliminated || b.IsEliminated, _cacheRw, heroDead, out why);
+            // tabela: jeden bohater konca (Robb) dla obu wierszy; IsAlive na zywo - pamiec godziny dalaby "zyje" w chwili pokoju ROT ExecuteRobb (falszywe MIMO BLOKADY)
+            bool heroDead = _cacheRobb != null && !_cacheRobb.IsAlive;
+            int rw = _cacheRw;
+            playerRules = Prologue.RulesRealm(a) || Prologue.RulesRealm(b);
+            bool over = CanonOver(rw, heroDead);
+            bool rotForced = over && rw != 1 && Prologue.RotWarForced(a, b);   // odczyt ROT tylko po koncu kanonu
+            bool on = Locked(true, true, PlayerChoice(playerRules, noChoice), a.IsEliminated || b.IsEliminated, rw, heroDead, rotForced, out why);
+            rotPhase = on && over;
+            return on;
+        }
+
+        private static bool State(IFaction a, IFaction b, out int idx, out string why, out bool rotPhase)
+        {
+            bool pr;
+            return State(a, b, false, out idx, out why, out rotPhase, out pr);
         }
 
         /// <summary>Pokoj pary jest teraz zablokowany (tylko odczyt, bez logu). WorldClock7 (linia POKOJ) i autotest.</summary>
         internal static bool Blocks(IFaction a, IFaction b)
         {
-            try { int i; string w; return State(a, b, out i, out w); }
+            try { int i; string w; bool rp; return State(a, b, out i, out w, out rp); }
             catch (Exception e) { Stumble("Blocks", e); return false; }
         }
 
@@ -154,15 +190,15 @@ namespace Armoury
         {
             try
             {
-                int i; string why;
-                if (!State(a, b, out i, out why)) return false;
-                Note(a, b, i, why, path);
+                int i; string why; bool rp;
+                if (!State(a, b, out i, out why, out rp)) return false;
+                Note(a, b, i, why, path, rp);
                 return true;
             }
             catch (Exception e) { Stumble("Stops", e); return false; }
         }
 
-        private static void Note(IFaction a, IFaction b, int idx, string why, string path)
+        private static void Note(IFaction a, IFaction b, int idx, string why, string path, bool rotPhase)
         {
             _dBlocked++; _sBlocked++;
             string pk = PathKey(path);
@@ -172,8 +208,8 @@ namespace Armoury
             if (s == null || !s.LogEnabled) return;
             string key = (a.StringId ?? "") + "|" + (b.StringId ?? "") + "|" + pk;
             if (!_dSaid.Add(key)) return;
-            Log.Info(Tag + "dzien " + (int)CampaignTime.Now.ToDays + " | " + Name(a) + " -> " + Name(b) + ": pokoj ZABLOKOWANY (droga: " + path + ") - wojna kanonu trwa do Krwawych Godow ("
-                     + why + ", " + Rules[idx].Label + ").");
+            Log.Info(Tag + "dzien " + (int)CampaignTime.Now.ToDays + " | " + Name(a) + " -> " + Name(b) + ": pokoj ZABLOKOWANY (droga: " + path + ") - "
+                     + (rotPhase ? PhraseRot : PhraseCanon) + " (" + why + ", " + Rules[idx].Label + ").");
         }
 
         /// <summary>Klucz drogi do licznikow: tekst do pierwszego nawiasu (wnioskodawca i wolajacy tylko w linii).</summary>
@@ -247,7 +283,7 @@ namespace Armoury
         private static string RulesText()
         {
             var l = new List<string>();
-            foreach (var r in Rules) l.Add(r.Label + " (" + r.A + "-" + r.B + ", do " + r.EndEvent + " albo smierci " + r.EndHero + ")");
+            foreach (var r in Rules) l.Add(r.Label + " (" + r.A + "-" + r.B + ", do konca " + r.EndEvent + " albo smierci " + r.EndHero + ", potem gdy ROT wymusza wojne)");
             return string.Join(", ", l.ToArray());
         }
 
@@ -263,7 +299,7 @@ namespace Armoury
                     var m = st.GetFrame(i)?.GetMethod();
                     if (m == null) continue;
                     string n = m.Name ?? "", t = m.DeclaringType != null ? m.DeclaringType.FullName ?? "" : "";
-                    if (n.IndexOf("ConsiderPeaceActions", StringComparison.Ordinal) >= 0 || t.IndexOf("WarExhaustion", StringComparison.Ordinal) >= 0) return "Diplomacy zmeczenie wojna";
+                    if (n.IndexOf("ConsiderPeaceActions", StringComparison.Ordinal) >= 0 || t.IndexOf("WarExhaustion", StringComparison.Ordinal) >= 0) return PathWeariness;
                     if (t.IndexOf("MakePeaceKingdomDecision", StringComparison.Ordinal) >= 0 || n.IndexOf("ApplyChosenOutcome", StringComparison.Ordinal) >= 0) return "decyzja krolestwa (wynik glosowania, Diplomacy)";
                     if (t.IndexOf("CivilWar", StringComparison.Ordinal) >= 0) return "Diplomacy wojna domowa";
                     if (t.IndexOf("ViewModel", StringComparison.Ordinal) >= 0 || t.EndsWith("VM", StringComparison.Ordinal)) return "ekran krolestwa (Diplomacy)";
@@ -274,17 +310,78 @@ namespace Armoury
             catch { return "Diplomacy ApplyPeace"; }
         }
 
-        /// <summary>H1: prefiks First Diplomacy KingdomPeaceAction.ApplyPeace - para z blokada: false (nic dalej - koszt, lenna, okno, pokoj). Nie rzuca.</summary>
+        /// <summary>H1: prefiks First Diplomacy KingdomPeaceAction.ApplyPeace - para z blokada: false (nic dalej - koszt, lenna, okno, pokoj). Recenzja 264 (2): gracz
+        /// wladca strony - zmeczenie wojna Diplomacy bez wyboru gracza (NoChoiceForPlayer) blokowane jak u AI; ekran krolestwa i oferta z odmowa otwarte. Nie rzuca.</summary>
         public static bool DipApplyPeacePrefix(Kingdom __0, Kingdom __1)
         {
             try
             {
-                int i; string why;
-                if (!State(__0, __1, out i, out why)) return true;
-                Note(__0, __1, i, why, DipPath());
+                int i; string why; bool rp, pr;
+                if (State(__0, __1, false, out i, out why, out rp, out pr)) { Note(__0, __1, i, why, DipPath(), rp); return false; }
+                if (i < 0 || !pr) return true;
+                string path = DipPath();
+                if (!path.StartsWith(PathWeariness, StringComparison.Ordinal)) return true;
+                string how;
+                if (!NoChoiceForPlayer(__0, __1, out how)) return true;
+                if (!State(__0, __1, true, out i, out why, out rp, out pr)) return true;
+                Note(__0, __1, i, why + ", gracz wladca - " + how, PathWeariness + " - gracz wladca, pokoj bez wyboru", rp);
+                if (!_playerToldWeary)
+                {
+                    _playerToldWeary = true;
+                    Log.Player("War weariness does not force peace between " + Name(__0) + " and " + Name(__1) + " while this war goes on. If you want peace, propose it yourself.", true);
+                }
                 return false;
             }
             catch (Exception e) { Stumble("DipApplyPeacePrefix", e); return true; }
+        }
+
+        /// <summary>Pokoj Diplomacy ApplyPeace bez wyboru gracza (jak KingdomPeaceAction.ApplyPeaceInternal / IsDeclineAvailable): krolestwo gracza zawiera pokoj -
+        /// okno tylko OK (albo od razu AcceptPeace); krolestwo gracza po drugiej stronie - oferta z odmowa, chyba ze wynik wojny gracza Loss/Tie/PyrrhicVictory (1-3).</summary>
+        private static bool NoChoiceForPlayer(Kingdom maker, Kingdom other, out string how)
+        {
+            how = "-";
+            var pk = Clan.PlayerClan != null ? Clan.PlayerClan.Kingdom : null;
+            if (pk == null) return false;
+            if (maker == pk) { how = "okno Diplomacy tylko OK"; return true; }
+            if (other != pk) return false;
+            if (other.Leader == null || !other.Leader.IsHumanPlayerCharacter) { how = "pokoj bez okna gracza"; return true; }
+            string name;
+            int r = DipWarResult(other, maker, out name);
+            if (r < 0) { how = "wynik wojny Diplomacy nie widac - jak bez odmowy"; return true; }
+            if (r >= 1 && r <= 3) { how = "odmowa wylaczona, wynik gracza " + name; return true; }
+            how = "oferta z odmowa, wynik gracza " + name;
+            return false;
+        }
+
+        private static bool _wemTried;
+        private static PropertyInfo _wemInstance;
+        private static MethodInfo _wemResult;
+
+        /// <summary>Diplomacy WarExhaustionManager.Instance.GetWarResult(k1, k2) odbiciem (None 0, Loss 1, Tie 2, PyrrhicVictory 3, CloseVictory 4, Victory 5); -1 = brak.</summary>
+        private static int DipWarResult(Kingdom k1, Kingdom k2, out string name)
+        {
+            name = "?";
+            try
+            {
+                if (!_wemTried)
+                {
+                    _wemTried = true;
+                    var t = AccessTools.TypeByName("Diplomacy.WarExhaustion.WarExhaustionManager");
+                    if (t != null)
+                    {
+                        _wemInstance = AccessTools.Property(t, "Instance");
+                        _wemResult = AccessTools.Method(t, "GetWarResult", new[] { typeof(Kingdom), typeof(Kingdom) });
+                    }
+                }
+                if (_wemInstance == null || _wemResult == null) return -1;
+                var inst = _wemInstance.GetValue(null, null);
+                if (inst == null) return -1;
+                var r = _wemResult.Invoke(inst, new object[] { k1, k2 });
+                if (r == null) return -1;
+                name = r.ToString();
+                return Convert.ToInt32(r, Inv);
+            }
+            catch (Exception e) { Stumble("DipWarResult", e); return -1; }
         }
 
         /// <summary>H2: prefiks First Kingdom.AddDecision - MakePeaceKingdomDecision pary z blokada: false przed kosztem wplywow i wyborami. Nie rzuca.</summary>
@@ -296,10 +393,10 @@ namespace Armoury
                 if (d == null) return true;
                 var k = d.Kingdom ?? __instance;
                 var other = d.FactionToMakePeaceWith;
-                int i; string why;
-                if (!State(k, other, out i, out why)) return true;
+                int i; string why; bool rp;
+                if (!State(k, other, out i, out why, out rp)) return true;
                 var who = d.ProposerClan;
-                Note(k, other, i, why, "decyzja krolestwa (AddDecision, wnioskodawca " + (who != null && who.Name != null ? who.Name.ToString() : "-") + ")");
+                Note(k, other, i, why, "decyzja krolestwa (AddDecision, wnioskodawca " + (who != null && who.Name != null ? who.Name.ToString() : "-") + ")", rp);
                 if (who != null && who == Clan.PlayerClan && !_playerTold)
                 {
                     _playerTold = true;
@@ -317,10 +414,10 @@ namespace Armoury
             if (!__result || __instance == null) return;
             try
             {
-                int i; string why;
-                if (!State(__instance.Kingdom, __instance.FactionToMakePeaceWith, out i, out why)) return;
+                int i; string why; bool rp;
+                if (!State(__instance.Kingdom, __instance.FactionToMakePeaceWith, out i, out why, out rp)) return;
                 __result = false;
-                Note(__instance.Kingdom, __instance.FactionToMakePeaceWith, i, why, "decyzja w toku (IsAllowed)");
+                Note(__instance.Kingdom, __instance.FactionToMakePeaceWith, i, why, "decyzja w toku (IsAllowed)", rp);
             }
             catch (Exception e) { Stumble("IsAllowedPostfix", e); }
         }
@@ -353,19 +450,19 @@ namespace Armoury
                 var r = Rules[i];
                 var a = Prologue.KingdomById(r.A); var b = Prologue.KingdomById(r.B);
                 string why;
-                bool on;
+                bool on, rp = false;
                 if (a == null || b == null) { on = false; why = "brak krolestwa (" + (a == null ? r.A : r.B) + ")"; }
                 else
                 {
                     int idx;
-                    on = State(a, b, out idx, out why);
+                    on = State(a, b, out idx, out why, out rp);
                     if (Prologue.RulesRealm(a) || Prologue.RulesRealm(b)) player = true;
                 }
                 if (on) any = true;
                 if (global == null || on) global = why;
                 bool war = a != null && b != null && !a.IsEliminated && !b.IsEliminated && a.IsAtWarWith(b);
                 string since = war ? Prologue.WarSinceText(a, b, r.A == Prologue.RiverId || r.B == Prologue.RiverId ? Prologue.RiverFirstDay : Prologue.NoDayValue) : "";
-                parts.Add(r.Label + ": " + (on ? "CZYNNA" : "KONIEC") + ", wojna " + (war ? "TAK " + since : "NIE"));
+                parts.Add(r.Label + ": " + (on ? (rp ? "CZYNNA (ROT wymusza)" : "CZYNNA") : "KONIEC") + ", wojna " + (war ? "TAK " + since : "NIE"));
             }
             if (!KeyOn) sb.Append("blokada WYLACZONA (klucz NIE)");
             else if (!Prologue.CanonHere) sb.Append("blokada NIE DOTYCZY (kampania klasyczna)");

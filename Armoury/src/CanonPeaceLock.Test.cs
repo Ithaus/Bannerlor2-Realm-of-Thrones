@@ -13,8 +13,8 @@ namespace Armoury
     ///  T1 ApplyPeace Diplomacy (odbiciem) Dorzecze -> korona: wojna dalej, blokada policzona (bez okna gracza, bez reparacji);
     ///  T2 vlandia.AddDecision(MakePeaceKingdomDecision(rod korony, Dorzecze)): brak czekajacej decyzji, wplywy wnioskodawcy bez zmian, wojna dalej;
     ///  T3 MakePeaceKingdomDecision(rod Dorzecza, korona).IsAllowed() = false;
-    ///  T4 tabela prawdy Locked (Krwawe Gody 0/1/-1, Robb martwy, gracz rzadzi, klucz, kampania, krolestwo zniszczone) i Blocks tej chwili (obie kolejnosci TAK,
-    ///     para spoza tabeli NIE);
+    ///  T4 tabela prawdy Locked (Krwawe Gody 0/1/-1/2, Robb martwy, po koncu kanonu ROT wymusza / nie, wesele ROT w toku, gracz rzadzi, gracz rzadzi + zmeczenie
+    ///     bez wyboru, klucz, kampania, krolestwo zniszczone - recenzja 264) i Blocks tej chwili (obie kolejnosci TAK, para spoza tabeli NIE);
     ///  T5 tabela prawdy PeaceHold.Decide i bieg: pokoj ApplyByKingdomDecision pary wymuszonej ROT spoza tabeli (Essos) - wynik po wznowieniu: "odwolane",
     ///     nigdy "uwolnione" (czekanie na ROT - INFO, zalezy od kolejnosci dob ROT i Armoury);
     ///  T6 MakePeaceAction.Apply(korona, Dorzecze) (droga Kroniki, celowo bez blokady): m104 widzi WZNOWIONA, M6a-3 "odwolane";
@@ -185,20 +185,32 @@ namespace Armoury
             return false;
         }
 
-        private static bool L(bool key, bool canon, bool pr, bool el, int rw, bool dead) { string w; return CanonPeaceLock.Locked(key, canon, pr, el, rw, dead, out w); }
+        private static bool L(bool key, bool canon, bool pr, bool el, int rw, bool dead, bool forced = false)
+        { string w; return CanonPeaceLock.Locked(key, canon, pr, el, rw, dead, forced, out w); }
+
+        // gracz rzadzi i droga bez wyboru (zmeczenie wojna Diplomacy - okno tylko OK / odmowa wylaczona) - jak w CanonPeaceLock.State
+        private static bool LWeary(int rw, bool dead, bool forced) { return L(true, true, CanonPeaceLock.PlayerChoice(true, true), false, rw, dead, forced); }
 
         private static bool TruthLockedOk()
         {
-            return L(true, true, false, false, 0, false) && L(true, true, false, false, -1, false) && !L(true, true, false, false, 1, false) && !L(true, true, false, false, 2, false)
-                   && !L(true, true, false, false, 0, true) && !L(true, true, false, false, -1, true) && !L(true, true, true, false, 0, false) && !L(false, true, false, false, 0, false)
-                   && !L(true, false, false, false, 0, false) && !L(true, true, false, true, 0, false);
+            // recenzja 264 (1): RedWeddingEvent 1 (zapowiedziane, ROT czeka 14 dni) - blokada TRWA; koniec dopiero stan 2 albo smierc Robba
+            // recenzja 264 (3): po koncu kanonu blokada trwa, dopoki ROT wymusza wojne; stan 1 + Robb martwy (ExecuteRobb ROT) - otwarte zawsze
+            // recenzja 264 (2): gracz rzadzi - pokoj jego wyborem (otwarte), ale zmeczenie wojna bez wyboru zablokowane jak u AI
+            return L(true, true, false, false, 0, false) && L(true, true, false, false, -1, false) && L(true, true, false, false, 1, false) && !L(true, true, false, false, 2, false)
+                   && L(true, true, false, false, 2, false, true) && !L(true, true, false, false, 0, true) && L(true, true, false, false, 0, true, true)
+                   && !L(true, true, false, false, -1, true) && !L(true, true, false, false, 1, true, true) && !L(true, true, false, false, 2, true)
+                   && !L(true, true, CanonPeaceLock.PlayerChoice(true, false), false, 0, false) && LWeary(0, false, false) && LWeary(2, false, true) && !LWeary(2, true, false)
+                   && !L(false, true, false, false, 0, false) && !L(true, false, false, false, 0, false) && !L(true, true, false, true, 0, false);
         }
 
         private static string TruthLocked()
         {
             return "RW0 " + T(L(true, true, false, false, 0, false)) + ", RW-1 " + T(L(true, true, false, false, -1, false)) + ", RW1 " + T(L(true, true, false, false, 1, false))
-                   + ", Robb martwy " + T(L(true, true, false, false, 0, true)) + ", gracz rzadzi " + T(L(true, true, true, false, 0, false)) + ", klucz NIE " + T(L(false, true, false, false, 0, false))
-                   + ", klasyczna " + T(L(true, false, false, false, 0, false)) + ", zniszczone " + T(L(true, true, false, true, 0, false));
+                   + ", RW2 " + T(L(true, true, false, false, 2, false)) + ", RW2 ROT wymusza " + T(L(true, true, false, false, 2, false, true))
+                   + ", Robb martwy " + T(L(true, true, false, false, 0, true)) + ", Robb martwy ROT wymusza " + T(L(true, true, false, false, 0, true, true))
+                   + ", RW1 Robb martwy ROT wymusza " + T(L(true, true, false, false, 1, true, true))
+                   + ", gracz rzadzi " + T(L(true, true, CanonPeaceLock.PlayerChoice(true, false), false, 0, false)) + ", gracz rzadzi zmeczenie bez wyboru " + T(LWeary(0, false, false))
+                   + ", klucz NIE " + T(L(false, true, false, false, 0, false)) + ", klasyczna " + T(L(true, false, false, false, 0, false)) + ", zniszczone " + T(L(true, true, false, true, 0, false));
         }
 
         private static void Live()

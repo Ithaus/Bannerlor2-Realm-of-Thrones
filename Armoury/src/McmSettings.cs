@@ -9776,7 +9776,7 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonNorthRiverlandsAlliance { get; set; } = true;
 
-        [SettingPropertyBool("Canon War No Peace Until Red Wedding", HintText = "No peace in the War of the Five Kings before the Red Wedding: the crown, the North and the Riverlands do not make peace by council vote, war weariness (Diplomacy) or Banner Kings pressure while Robb Stark lives. If you rule one of these realms, peace is your choice. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Canon War No Peace Until Red Wedding", HintText = "No peace in the War of the Five Kings before the Red Wedding: the crown, the North and the Riverlands do not make peace by council vote, war weariness (Diplomacy) or Banner Kings pressure while Robb Stark lives. After that, a peace that Realm of Thrones would break again the next day stays blocked too. If you rule one of these realms, peace is your choice, but war weariness alone does not force it on you. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarNoPeaceUntilRedWedding { get; set; } = true;
 
