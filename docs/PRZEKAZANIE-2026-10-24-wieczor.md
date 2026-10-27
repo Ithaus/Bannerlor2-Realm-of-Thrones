@@ -1,5 +1,17 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 01:15 CET - WGRANE 127 (202, 203, 204, 222/222c, 223/223b); w toku 222d
+- WGRANE 127 (01:10): Armoury a06033ef (n161 6e5a9186, statusy a485ec5a, wypchniete n161 i galezie 202/203/204/222/223) + 40 ogg Bitwa\lufs21.4/24.4/27.4/30.4.
+  Kopie: Armoury.dll.bak-2026-10-27-przed-wgranie127 i D:\Backup-Bannerlord\wgrane\2026-10-27-wgranie127-przed (f67326e2 = 126, lista pliki-127.txt).
+- Autotesty: 127a (bitwaN + 3 konni lucznicy CrashScribe-at-n204, probyN 6 dob; build c6b74f23) i 127b (probyN 8 dob; a06033ef): kod 0, ERROR 0, 0 NIE.
+  203: muzyka bitwy z lufs24.4 przy suwaku 3, bieg w zbroi gracza 39 -> 70 s, kon 47 -> 94 s. 223: slabe partie 358/2138, 16 eskort (935 ludzi), wladcy/glowy slabe 42 -> 19.
+  204: wykrycia 158 (pudla 28), koszt 0.02 ms - reakcji jazdy autotest NIE sprawdzil (wrog bez jazdy) - sprawdzi gra Jeffa.
+  222c: wiesc o Tywinie po 139 h (bylo 13 dob); ale potem "trop zimny" (wszyscy lowcy 850 jedn. dalej) a komunikat "Their lords ride to free him" i tak sie pokazuje -> 222d.
+- NAPRAWY NARZEDZI: tools/sprawdz_logi.py zlozony od nowa (fb66a074) - scalenia "zostaw oba" w 202/203/204/222 zgubily konce p202_main/p203_main.
+  Odtad scalanie: scratchpad 1e1c276a...\scratchpad\scal_sklad.py <plik> <BAZA> <galezie...> albo scal_wstawki.py; po scaleniu uruchomic KAZDA grupe w calosci.
+- W toku: workflow 222d wf_2d1e8111-b57 (zimny trop -> szukanie w okolicy pojmania i lennach porywacza; nikt w zasiegu -> czeka; uczciwy komunikat). Potem autotest + WGRANIE 128.
+- Zapis testowy przeniesiony na D:\Backup-Bannerlord\zapisy-testowe-archiwum (autotest-...-2026-10-27_po-127b.sav); w m113\zapisy jest swieze zdjecie bazy z zapisu Jeffa 26.10 22:19.
+
 ## DOPISEK 27.10 ok. 00:20 CET - n161 = 126 + 202 + 203 + 204 + 222 + 223 (584f9f96, Armoury c6b74f23); AUTOTEST 127a W TOKU
 - Scalenia: 202+203 f3413043, 204 e4817be0, 222 7a51c053 (ZEPSUTE sprawdz_logi - naprawa 99956c53), 223 8d7becef, polaczenie 222+223 584f9f96
   (RescueHunt.Hunters pomija LordEscort.HeldBack). UWAGA: rozwiaz_oba.py ("zostaw oba") psuje sprawdz_logi, gdy git sparuje wspolne konce funkcji
