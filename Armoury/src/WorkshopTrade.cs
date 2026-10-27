@@ -57,8 +57,9 @@ namespace Armoury
     ///     PACZKA 241 (Jeff 27.10 "czemu moj warsztat prawie nic nie zarabia"; audyt: 567 z 591 cykli przycietych, ok. 90 tys./dobe zostawalo w kasach miast, srebrnicy
     ///     koszt 28.8 tys. a utarg 538 tys.): zamiast kosztu x marza - CENA KUPCA. Kupiec miasta placi za kazda sztuke najwyzej tyle, za ile ja odsprzedaje: srednia
     ///     prawdziwej sprzedazy tego towaru w tym miescie z 28 dob (MarketSales), a bez sprzedazy - cena graniczna ludu (TownFolk.PeopleCeilingIndex). Wytworca dostaje
-    ///     cene rynku, wiec brak towaru przyciaga warsztaty; prog cyklu gry i warunek kasy miasta licza utarg ta sama cena (ItemsGatePost, Gate200 - kasa placi tylko,
-    ///     co ma). Z zaplaty mistrz placi czeladnikom ich udzial (TownFolkCraftWageShare) - doplata ludu N4 z kasy miasta spada sama. SmithProfitPercent juz nie dotyczy
+    ///     cene rynku, wiec brak towaru przyciaga warsztaty; prog cyklu gry i warunek kasy miasta licza utarg ta sama cena (ItemsGatePost, Gate200). Recenzja 241: BK
+    ///     placi mimo to pelna cene polki (kasa obcieta do 0 - SettlementComponent.ChangeGold), wiec zloto ponad to, co kasa naprawde stracila, OutPostfix cofa
+    ///     z kapitalu warsztatu w nicosc (ClampBack - to zloto powstalo z niczego). Z zaplaty mistrz placi czeladnikom ich udzial (TownFolkCraftWageShare) - doplata ludu N4 z kasy miasta spada sama. SmithProfitPercent juz nie dotyczy
     ///     warsztatow (zostaje w ArmsPricing i TownCrafts).
     /// Linii uzbrojenia (WorkshopLaw), ukrytych rzemieslnikow, receptur i szybkosci NIE rusza. Przy wylaczonym - gra jak dotad.
     /// </summary>
@@ -107,7 +108,10 @@ namespace Armoury
         private static long _cycAllowed; private static int _cycUnits, _cycHistU, _cycCeilU, _cycShelf0;
         private sealed class FairStat { public int Cycles, Capped, Units, HistU, CeilU; public long Credit, Cost, Kept, Allowed, Craft; }
         private static readonly Dictionary<string, FairStat> _dFair = new Dictionary<string, FairStat>();
-        private static int _dTownNeg, _dGateCut; private static long _dGateCutGold;   // 241: kasa miasta ponizej zera po cyklu; cykle, ktorym prog gry policzono cena kupca (i o ile mniej)
+        private static int _dGateCut; private static long _dGateCutGold;   // 241: cykle, ktorym prog gry policzono cena kupca (i o ile mniej)
+        // recenzja 241: zaplata BK ponad kase miasta (kasa obcieta do 0) - wyrobow, zloto z niczego cofniete z kapitalu warsztatu, niecofniete (kapital za maly)
+        private static int _dClampN; private static long _dClampBack, _dClampLeft;
+        private static int _cycGold0 = int.MinValue;          // recenzja 241: kasa miasta przed prefiksem BK biezacego wyrobu
         private static long _dNotFrom, _dNotTo;             // kiesy notabli: zdarzenia gry "z niczego" i "w nicosc" (pomiar do ryzyka 123)
         // recenzja 123: regula tylko przy wpietym CALYM pomiarze (wsad z targu, wsad z magazynu, wyrob do miasta, poczatek obu cykli) -
         // bez latki wsadu cykl liczylby koszt 0 i warsztat oddawalby miastu cene wsadu w kazdym cyklu. Raz na proces (Reset nie rusza)
@@ -137,7 +141,8 @@ namespace Armoury
             _dWageCap = _dWagePurse = _dKeepCap = _dKeepPurse = _dUnpaid = _dPayNotable = _dPayLord = _dPayPlayer = _dFunded = _dSalePaid = _dSaleShort = _dGear = 0;
             _dNotFrom = _dNotTo = 0;
             _dFail = _dNoTaker = _dStumbles = 0;
-            _dTownNeg = _dGateCut = 0; _dGateCutGold = 0;
+            _dGateCut = 0; _dGateCutGold = 0;
+            _dClampN = 0; _dClampBack = _dClampLeft = 0;
         }
 
         /// <summary>Nowa moneta warsztatow ma sens tylko przy cenach historycznych (HistoricalPrices) - bez nich zostaje gra.
@@ -633,16 +638,44 @@ namespace Armoury
             // 241: polka wyrobu przed wywolaniem - BK kladzie na polke `count` sztuk bez modyfikatora (rzemieslnicy i kopalnie wiecej niz 1)
             try { _cycShelf0 = __state != int.MinValue && __0.Item != null ? __1.Settlement.Town.Owner.ItemRoster.GetItemNumber(__0.Item) : 0; }
             catch { _cycShelf0 = 0; }
+            // recenzja 241: kasa miasta przed zaplata BK - OutPostfix porownuje, ile kasa naprawde stracila, z tym, co BK dopisal warsztatowi
+            try { _cycGold0 = __state != int.MinValue ? __1.Settlement.Town.Gold : int.MinValue; }
+            catch { _cycGold0 = int.MinValue; }
+        }
+
+        /// <summary>
+        /// Recenzja 241: prefiks BK ProduceOutputPrefix placi warsztatowi pelna cene polki (Town.GetItemPrice, kupno) i robi town.ChangeGold(-cena) bez limitu;
+        /// SettlementComponent.ChangeGold obcina kase do 0, wiec gdy kasa ma mniej, roznica powstaje z niczego. Prog cyklu liczony cena kupca (ItemsGatePost)
+        /// wpuszcza takie cykle w biednych miastach (klejnoty, aksamit przy pustej polce). Tu: zloto dopisane warsztatowi ponad to, co kasa naprawde stracila
+        /// (tylko gdy kasa skonczyla na 0 - obciecie), wraca z kapitalu warsztatu w nicosc - znosi zloto z niczego. Wolane w OutPostfix PRZED zamknieciem okna O35
+        /// (CirculationWindows.WorkshopOutPost), wiec okno i pomiar N3 widza wyrob netto. Reszte (kasa zaplacila - cena kupca) oddaje jak dotad FairCycle.
+        /// </summary>
+        private static void ClampBack(Workshop w, int state)
+        {
+            int g0 = _cycGold0; _cycGold0 = int.MinValue;
+            if (state == int.MinValue || g0 == int.MinValue || _cyc == null || w != _cyc) return;
+            var town = w.Settlement != null ? w.Settlement.Town : null;
+            if (town == null || town.Gold > 0) return;
+            long cred = (long)w.Capital - state;
+            long paid = Math.Max(0L, (long)g0 - town.Gold);
+            long minted = cred - paid;
+            if (minted <= 0) return;
+            int n = (int)Math.Min(minted, (long)Math.Max(0, w.Capital));
+            if (n > 0) w.ChangeGold(-n);
+            _dClampN++; _dClampBack += Math.Max(0, n); _dClampLeft += minted - Math.Max(0, n);
         }
 
         public static void OutPostfix(WorkshopsCampaignBehavior __instance, EquipmentElement __0, Workshop __1, int __state)
         {
+            // recenzja 241: zloto z obciecia kasy miasta do 0 cofniete PRZED oknem O35 - utarg ponizej to juz tylko to, co kasa naprawde zaplacila
+            try { ClampBack(__1, __state); }
+            catch (Exception e) { _cycGold0 = int.MinValue; Stumble("WorkshopTrade.ClampBack", e); }
             CirculationWindows.WorkshopOutPost(__1);       // paczka 169: okno O35 - PRZED wplatami rzemieslnikow 147 (ArtisanInputs.OutPost), wlasny try
             try
             {
                 if (__state != int.MinValue && _cyc != null && __1 == _cyc)
                 {
-                    long cred = (long)__1.Capital - __state;
+                    long cred = (long)__1.Capital - __state;   // po ClampBack: tyle, ile kasa miasta naprawde zaplacila (+ niecofniete przy za malym kapitale)
                     _cycCredit += cred; _cycOut++;
                     // 241: cena kupca - za sztuki, ktore naprawde przybyly na polke, kupiec placi najwyzej tyle, za ile je odsprzedaje (RefUnit); reszte FairCycle oddaje kasie
                     var town = __1.Settlement.Town;
@@ -729,7 +762,7 @@ namespace Armoury
             long allowed = Math.Max(0L, Math.Min(credit, _cycAllowed));
             st.Allowed += allowed;
             long over = credit - allowed;
-            if (over <= 0) { if (town.Gold < 0) _dTownNeg++; return credit; }
+            if (over <= 0) return credit;
             int n = (int)Math.Min(over, (long)Math.Max(0, w.Capital));
             if (n > 0)
             {
@@ -739,7 +772,6 @@ namespace Armoury
                 try { TownFolk.Note(w.Settlement, n, TownFolk.KCraftFair); } catch { }   // E5/0 (195): nadwyzka ceny wyrobu (odczyt - jest w wartosci wyrobow)
                 st.Capped++; st.Kept += n;
             }
-            if (town.Gold < 0) _dTownNeg++;   // kasa miasta po cyklu ponizej zera (BK placi pelna cene przed zwrotem) - licznik
             return credit - Math.Max(0, n);
         }
 
@@ -1470,7 +1502,7 @@ namespace Armoury
             }
             return "cena kupca (241) CZYNNA: cykli " + cyc + ", przycietych " + capped + "; sztuk do miast " + units + " (z historii " + hist + ", z ceny granicznej " + ceil + ")"
                    + "; utarg wedle polki " + credit + ", zaplacono warsztatom " + (credit - kept) + ", oddane kasom miast " + kept + ", rzemieslnikom " + craft
-                   + "; kasa miasta ponizej zera po cyklu " + _dTownNeg + "; prog cyklu wedlug ceny kupca: cykli " + _dGateCut + " (utarg progu mniejszy o " + _dGateCutGold + ")"
+                   + "; zaplata BK ponad kase miasta: wyrobow " + _dClampN + ", z niczego cofniete " + _dClampBack + ", niecofniete " + _dClampLeft + "; prog cyklu wedlug ceny kupca: cykli " + _dGateCut + " (utarg progu mniejszy o " + _dGateCutGold + ")"
                    + " [wedlug typu: " + (parts.Count > 0 ? string.Join("; ", parts.ToArray()) : "-") + "]"
                    + " [indeksy polka/kupiec/28 dob: " + IndexText() + "]";
         }

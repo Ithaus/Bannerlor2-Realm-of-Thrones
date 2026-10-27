@@ -1192,7 +1192,7 @@ Uzycie (Python 3, tylko odczyt):
 --grupa war241    : (27.10, paczka 241 noc/241-warsztaty-cena-rynkowa-podatek - Jeff 27.10 "czemu moj warsztat prawie nic nie zarabia"; Armoury/src/MarketSales.cs,
                     WorkshopTrade.cs, Seal31B.cs) python -I tools/sprawdz_logi.py --grupa war241 <Armoury-*.log> (strumieniowo). Cena kupca warsztatow (srednia sprzedaz
                     miasta z 28 dob / cena graniczna ludu) i podatek BK raz od wyplaty. W241-S self-test, W241-S2 test syntetyczny; W241-0 linie startu; W241-1 zaplacono +
-                    oddane = utarg; W241-2 rzemieslnikom >= udzial x zaplacono; W241-3 sprzedaz miast > 0; W241-4/5 podatek / wyplata <= 50.5%; W241-6 kasa < 0 po cyklu 0;
+                    oddane = utarg; W241-2 rzemieslnikom >= udzial x zaplacono; W241-3 sprzedaz miast > 0; W241-4/5 podatek / wyplata <= 50.5%; W241-6 zloto z niczego (zaplata BK ponad kase) niecofniete 0;
                     W241-7 ARYTMETYKA OK; W241-8 INFO; W241-9 ERROR 0. Log sprzed 241: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
@@ -71414,7 +71414,7 @@ def main(argv):
 #  W241-2  rzemieslnikom >= udzial x zaplacono - cykli (udzial z linii startu);
 #  W241-3  sprzedaz miast: konsumpcja i partie > 0 w kazdej dobie (bez pierwszej doby sesji), potkniecia 0, poza watkiem glownym 0;
 #  W241-4  D11-3 podatek / wyplata <= 50.5% (stawka BK najwyzej 0.5; ok. 2 x stawka = znak starego bledu);  W241-5 to samo E3/8a (notable);
-#  W241-6  kasa miasta ponizej zera po cyklu = 0;  W241-7 "ARYTMETYKA OK" w kazdej linii bilansu;  W241-8 INFO: udzial sztuk z historii, oddane kasom,
+#  W241-6  zaplata BK ponad kase miasta (obciecie do 0): niecofniete = 0 (recenzja 241; wyrobow i cofniete - w wyniku);  W241-7 "ARYTMETYKA OK" w kazdej linii bilansu;  W241-8 INFO: udzial sztuk z historii, oddane kasom,
 #  indeksy jewelry/velvet/tools;  W241-9 brak ERROR z WorkshopTrade / MarketSales / Seal31B.
 W241_MS = "Sprzedaz miast (241): "
 W241_WS = "Warsztaty towarowe: dzien "
@@ -71429,7 +71429,7 @@ W241_RX = {
     "ws_start": re.compile(r"cena kupca \(241\) (WLACZONA|NIECZYNNA|wylaczona)(?: - za sztuke najwyzej srednia sprzedaz miasta z (\d+) dob albo cena graniczna ludu; rzemieslnikom udzial "
                            r"([\d.]+) zaplaty( \(NIECZYNNY - place cyklu wylaczone\))?; prog cyklu gry wedlug ceny kupca: (wpiety|BRAK))?"),
     "ws_day": re.compile(r"cena kupca \(241\) CZYNNA: cykli (\d+), przycietych (\d+); sztuk do miast (\d+) \(z historii (\d+), z ceny granicznej (\d+)\); utarg wedle polki (-?\d+), "
-                         r"zaplacono warsztatom (-?\d+), oddane kasom miast (-?\d+), rzemieslnikom (\d+); kasa miasta ponizej zera po cyklu (\d+); prog cyklu wedlug ceny kupca: "
+                         r"zaplacono warsztatom (-?\d+), oddane kasom miast (-?\d+), rzemieslnikom (\d+); zaplata BK ponad kase miasta: wyrobow (\d+), z niczego cofniete (\d+), niecofniete (\d+); prog cyklu wedlug ceny kupca: "
                          r"cykli (\d+) \(utarg progu mniejszy o (\d+)\)"),
     "ws_idx": re.compile(r"\[indeksy polka/kupiec/28 dob: (.*?)\]$"),
     "seal_start": re.compile(r"; 241 podatek warsztatow raz od wyplaty \(Workshop Tax On Payout\): (WL|WYL)"),
@@ -71451,7 +71451,7 @@ W241_TEST = {
                 "(241) WLACZONA - za sztuke najwyzej srednia sprzedaz miasta z 28 dob albo cena graniczna ludu; rzemieslnikom udzial 0.35 zaplaty; prog cyklu gry wedlug ceny kupca: wpiety.",
     "ws_day": "Warsztaty towarowe: dzien {d} | warsztatow 500 (bez ukrytych rzemieslnikow) | kiesy notabli (gra trzyma je w pasie 4500-10500): notabli 255 | cena kupca (241) "
               "CZYNNA: cykli 600, przycietych 300; sztuk do miast 650 (z historii 500, z ceny granicznej 150); utarg wedle polki 385668, zaplacono warsztatom {y}, oddane kasom "
-              "miast {z}, rzemieslnikom {l}; kasa miasta ponizej zera po cyklu {n}; prog cyklu wedlug ceny kupca: cykli 40 (utarg progu mniejszy o 9000) [wedlug typu: silversmithy "
+              "miast {z}, rzemieslnikom {l}; zaplata BK ponad kase miasta: wyrobow {n}, z niczego cofniete {g}, niecofniete {u}; prog cyklu wedlug ceny kupca: cykli 40 (utarg progu mniejszy o 9000) [wedlug typu: silversmithy "
               "10/15 cykli: sztuk 15, utarg 186259, zaplacono 90000, oddane 96259, rzemieslnikom 31500] [indeksy polka/kupiec/28 dob: jewelry 7.85/6.20/6.10 (miast z historia 40), "
               "velvet 3.10/2.50/- (miast z historia 0), tools 1.10/1.05/1.02 (miast z historia 80), rzemieslnicy BK (poza regula 241, pelna cena polki) polka 1.20 / kupiec 1.10 "
               "(300 wyrobow-miast)] | cena kupna dla gracza: mediana 5000.",
@@ -71577,22 +71577,26 @@ def w241_rows(rep, D):
     else:
         b1, b2, b6 = [], [], []
         hist = ceil = kept = paid = 0
+        clampn = clampg = 0
         for d in days:
             md = D["ws_days"][d][0]
             cyc, units, hu, cu = int(md.group(1)), int(md.group(3)), int(md.group(4)), int(md.group(5))
-            x, y, z, l, neg = int(md.group(6)), int(md.group(7)), int(md.group(8)), int(md.group(9)), int(md.group(10))
+            x, y, z, l = int(md.group(6)), int(md.group(7)), int(md.group(8)), int(md.group(9))
+            cn, cg, neg = int(md.group(10)), int(md.group(11)), int(md.group(12))
             if y + z != x or y > x or z < 0 or hu + cu != units:
                 b1.append(f"d{d}: utarg {x}, zaplacono {y}, oddane {z}, sztuk {units}={hu}+{cu}")
             if share is not None and l < share * y - cyc - 1:
                 b2.append(f"d{d}: rzemieslnikom {l} < {share} x {y} - {cyc}")
             if neg:
                 b6.append(f"d{d}: {neg}")
+            clampn += cn; clampg += cg
             hist += hu; ceil += cu; kept += z; paid += y
         rep.add("W241-1: doba warsztatow - zaplacono + oddane = utarg wedle polki, sztuki = z historii + z ceny granicznej", f"zle {len(b1)} z {len(days)} dob" + (f" ({b1[0]})" if b1 else ""),
                 "0", not b1)
         rep.add("W241-2: rzemieslnikom >= udzial x zaplacono - cykli", (f"zle {len(b2)} z {len(days)} dob" + (f" ({b2[0]})" if b2 else "")) if share is not None else "brak udzialu w linii startu",
                 "0", (not b2) if share is not None else None)
-        rep.add("W241-6: kasa miasta ponizej zera po cyklu", f"dob z > 0: {len(b6)}" + (f" ({', '.join(b6[:3])})" if b6 else ""), "0", not b6)
+        rep.add("W241-6: zaplata BK ponad kase miasta - zloto z niczego niecofniete", f"dob z > 0: {len(b6)}" + (f" ({', '.join(b6[:3])})" if b6 else "")
+                + f"; wyrobow z obcieciem kasy {clampn}, cofniete {clampg}", "0", not b6)
         tot = hist + ceil
         lastidx = D["ws_days"][days[-1]][1]
         rep.add("W241-8: cena kupca - sztuki z historii sprzedazy, oddane kasom miast, indeksy (ostatnia doba)",
@@ -71656,9 +71660,10 @@ def w241_selftest():
     m = R["ws_start"].search(T["ws_start"])
     if not m or m.group(1) != "WLACZONA" or m.group(2) != "28" or m.group(3) != "0.35" or m.group(5) != "wpiety" or m.group(4):
         probs.append("ws_start")
-    s = T["ws_day"].format(d=108990, y=300000, z=85668, l=105000, n=0)
+    s = T["ws_day"].format(d=108990, y=300000, z=85668, l=105000, n=3, g=4500, u=0)
     m = R["ws_day"].search(s)
-    if not m or m.group(6) != "385668" or m.group(7) != "300000" or m.group(9) != "105000" or m.group(12) != "9000":
+    if (not m or m.group(6) != "385668" or m.group(7) != "300000" or m.group(9) != "105000" or m.group(10) != "3" or m.group(11) != "4500" or m.group(12) != "0"
+            or m.group(14) != "9000"):
         probs.append("ws_day")
     mi = R["ws_idx"].search(s[:s.find(" | ", m.end())] if m else s)
     if not mi or not mi.group(1).startswith("jewelry 7.85/6.20/6.10"):
@@ -71700,7 +71705,7 @@ def w241_synth():
                 for i, d in enumerate(range(108990, 108996)):
                     c = 100 if (good or i != 3) else 0
                     L.append(P + "Sprzedaz miast (241): " + T["ms_day"].format(d=d, c=c, p=20, o=0, s=0 if good else 1))
-                    L.append(P + T["ws_day"].format(d=d, y=300000, z=85668, l=105000 if good else 50000, n=0 if good else 2))
+                    L.append(P + T["ws_day"].format(d=d, y=300000, z=85668, l=105000 if good else 50000, n=1 if good else 2, g=2300, u=0 if good else 700))
                     L.append(P + T["seal_day"].format(d=d, r1="25.7%" if good else "52.4%", r2="26.1%" if good else "52.2%"))
                     L.append(P + "Pieniadz swiata (bilans - przyczyny): dzien %d | x | ARYTMETYKA OK." % d if good or i != 2 else
                              P + "Pieniadz swiata (bilans - przyczyny): dzien %d | x | ARYTMETYKA ROZJAZD 5." % d)
