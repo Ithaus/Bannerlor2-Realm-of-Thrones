@@ -1,5 +1,15 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 23:05 CET - WGRANIE 131 (280+281+282); w toku 284; potem 283+284 -> 132
+- Biegi wczytania (bieg-bitwa-204.ps1 -Days 4 -LoadSave, A 22:44 zapis, B 22:54 wczytanie): kod 0 oba; ksiega280 na logu B NIE 0 - K280-2 odstep W 24.02 h,
+  K280-3 swiat po wczytaniu wobec zapisu +0.1 (przed 280: -82..-707 na wczytanie).
+- WGRANIE 131 o 23:04 (scratchpad\wgraj131.ps1): Armoury 591d0ecc (n161 6f30e9ac); pliki danych bez zmian od 130; kopie .bak-2026-10-27-przed-wgranie131 i
+  D:\Backup-Bannerlord\wgrane\2026-10-27-wgranie131-przed. Zapis testowy -> D:\Backup-Bannerlord\zapisy-testowe-archiwum\2026-10-27-131a.
+  CHANGELOG 23cc393c (statusy 280/281/282 = WGRANE 131).
+- Nastepne: po 284 (wf_627247df-0c5) scalic 283 (od 9d807118) i 284 (od 6f30e9ac) do n161 (scal_sklad: baza 6f30e9ac dla CHANGELOG/sprawdz_logi - 283 ma
+  inna baze, uwaga), build, autotest 132a: bitwaN z -Battles 7 i -CsAt cs-at283\CrashScribe-at-n283.dll (scenariusze A/B/C 283) + probyN 30 dob;
+  grupy nekanie283 m110anim m204jazda handel284 ruda282 + reszta; WGRANIE 132.
+
 ## DOPISEK 27.10 ok. 23:00 CET - 131a OK (czeka bieg wczytania), 283 GOTOWE (nie scalone), 284 w toku
 - 131a (n161 6f30e9ac, Armoury 591d0ecc): bitwaN 13.2 min + probyN 30 dob kod 0, zapisy Jeffa nietkniete. Grupy (m113\wyniki\grupy-131a; bitwaN log
   Armoury-2026-10-27_22-14-49.log - w katalogu lezy tez stary log z 25.10, nie brac globem): ksiega280 / rody277 / m204jazda / nwar / war241 itd. NIE 0.
