@@ -1,5 +1,17 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 22:10 CET - 280 i 281 GOTOWE (zbudowane, po recenzji, NIE scalone, NIE testowane)
+- 280 (zb
+280): 6e964978 + 673fb061 (Armoury 2a9f1216); recenzje 2 soczewki - 0 uwag. DayGate.cs (zapis arm_daygate, klucz DailyTickOncePerDay; P1 przestawia
+  nastepny takt doby gry na kanoniczna pore po wczytaniu, prefiks Campaign.DailyTick pomija pierwszy takt z tym samym numerem), narodziny w ticku wsi
+  (PopulationLaw.FloorPrefix/Finalizer, klucz BirthsAtVillageTick), udzialy band w zapisie (pd:), sw: v2 (polegli bez pochodzenia, reszta przy zapisie),
+  reszta -5.4k ZAMROZONA i pokazywana osobno ('od 280'), B3 tekst, B4 'Bitwy: dzien N (doba ksiegi'. Grupa ksiega280. Test: bieg A 4 doby z zapisem,
+  bieg B wczytanie zapisu z A 4 doby (K280-3 skok ~0), bitwy (K280-7). Zostaje 5-8 ludzi/dobe 'w nicosc ... inne' (E4/7) - poza 280.
+- 281 (zb
+281): bcb49094 + 52416361 + recenzja 7a2b03c3 (Armoury 8654c20e). Release() na kazdej drodze, ReleaseLate przed wczesnymi return, przeglad godzinny
+  (mysl co 6 h), Restore wpisow z zapisu przed wczesnymi return; grupa e223 + E223-8, E223-9.
+- Czekaja: 282 (wf_7236362f-1af), 283 (wf_4a1d4aa3-b15). Potem scalenie 4 galezi, autotest 131a, WGRANIE 131.
+
 ## DOPISEK 27.10 ok. 21:50 CET - paczka 283 reakcja na nekanie z tylu (workflow wf_13ad8807-a09); TYDZIEN 93%
 - Jeff gra na 130 (sesja od 20:56, log skopiowany: D:\Backup-Bannerlord\logi-jeffa\2026-10-27-2145-bitwa\). Uwagi do bitwy (21:40): strzelal z 3 m w plecy lucznikow
   i piechoty (konno, potem pieszo) - lucznicy szli dalej, konnica ruszyla tylko czesciowo, piechota nie reagowala. Log 204 (linia 7304): wykryc 52, epizody 2,
