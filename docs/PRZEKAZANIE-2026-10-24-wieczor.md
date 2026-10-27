@@ -1,5 +1,22 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 19:55 CET - straty ludnosci: wynik sprawdzenia (wf_ac2622a4-2b8, 2 sledztwa + 2 recenzje)
+- Straty SA odejmowane trwale: rekrut schodzi z DOM przy werbunku (FromVillage hearth -1/k, FromTown stan E4/4; PeopleBook.Origin.cs:1187-1228), polegly nie wraca
+  (DieShares Fallen, Origin.cs:811-827), wracaja tylko zywi z pochodzeniem. Narodziny = wlasny model PopulationLaw.GrowthOf (0.5%/rok + dobrobyt - wojna - glod),
+  NIE zalezy od poleglych (zbieznosc +86.6k ~ +86.9k w oknie 108768-109002 to zbieg; wojna obniza g z 0.60% do 0.41%/rok). Od siewu 108648 zywych +30k.
+- Skutki w grze: mniej ludzi = mniejszy plon wsi, renta/oplaty wsi, rynek miasta, milicja. NIE: dobrobyt miast (ksiega 10.43 mln vs z dobrobytu 14.77 mln,
+  ZC6 wylaczone - decyzja projektu), miejsca u notabli (LevyByPeople nie). Hamulec wolnych rak dziala w 1 regionie z 227 (ibbenese).
+- BLEDY (do paczki - Jeff pytany o zgode 19:55):
+  B1 narodziny wsi ksiegowane raz na dobe moda jako prognoza pelnej doby (PopulationLaw.cs:970-988), a hearth rosnie w ciaglym ticku wsi (zapisywanym); doba moda
+     dostaje nowa pore po wczytaniu (Campaign.CreateCampaignEvents initialWait) -> kazde wczytanie zmienia 'swiat' o (W-1 doby) x narodziny (-707..+112).
+     Poprawka: NoteBorn w ticku wsi (wlasna latka, NIE zalezna od Measure40.On = LogEnabled && PeopleMeasureEnabled), w GrowthDaily tylko log. Czesc skokow
+     (-150..-270 przy 108984 i 108987, dryf w sesjach wojennych -6..-15/dobe) niewyjasniona.
+  B2 po wczytaniu cala doba moda (OnDailyTick) moze isc 2x tego samego dnia gry (W<1) albo przepasc (W>1); brak straznika (ArmouryBehavior.cs:2733, Campaign.cs:1002).
+     W logach: podwojne 108829, 108836, brak 108986. Czesc modulow ma wlasny straznik numeru doby (ArmsScrap, KsHunger, PlagueWatch, MapFields, InfluenceWatch, BkrotChains).
+  B3 tekst linii 'Ludzie (ksiega)': 'werbunek jeszcze nie zdejmuje z DOM' (PeopleBook.cs:1177, komentarze :127, ClanBudget.cs:1634) - nieaktualny.
+  B4 kosmetyka: 'Bitwy: dzien N' = dzien ksiegi + 1.
+- Dane: scratchpad\ksiega_ludzi.py/.tsv, krainy.py; pelny wynik: tasks\w0tuyln4t.output (sesja 1e1c276a).
+
 ## DOPISEK 27.10 ok. 19:25 CET - WGRANIE 129 (241+259+264+268+272+274); w toku 277 i sprawdzenie strat ludnosci
 - Autotest 129a (18:50-19:15): bitwaN + probyN kod 0, zapisy Jeffa nietkniete, bledy CrashScribe 25 = jak 128a (cudze latki Harmony). 15 grup sprawdz_logi x 2 biegi
   (war241 karawany259 pokoj264 z268 krol272 rownowaga274 p202 p203 m204jazda odbicie222 e223 m109muz m165mapa m6a nwar) - NIE 0, jedyny NIE: K259-7 T2 w bitwaN (bieg
