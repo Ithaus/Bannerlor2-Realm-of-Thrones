@@ -1194,6 +1194,28 @@ Uzycie (Python 3, tylko odczyt):
                     miasta z 28 dob / cena graniczna ludu) i podatek BK raz od wyplaty. W241-S self-test, W241-S2 test syntetyczny; W241-0 linie startu; W241-1 zaplacono +
                     oddane = utarg; W241-2 rzemieslnikom >= udzial x zaplacono; W241-3 sprzedaz miast > 0; W241-4/5 podatek / wyplata <= 50.5%; W241-6 zloto z niczego (zaplata BK ponad kase) niecofniete 0;
                     W241-7 ARYTMETYKA OK; W241-8 INFO; W241-9 ERROR 0. Log sprzed 241: INFO.
+--grupa karawany259 : (27.10, paczka 259 noc/259-karawany-gracza-rozliczenie - Jeff 27.10 "czemu moja karawana nic nie zarabia"; Armoury/src/CaravanSettle.cs,
+                    CaravanSettle.Player.cs, CaravanSettle.Test.cs) python -I tools/sprawdz_logi.py --grupa karawany259 <Armoury-*.log> (strumieniowo). Linie
+                    'Karawany rodow - rozliczenie dnia (259): ', 'Majatek gracza (karawany i warsztaty) (259): ', 'Karawany rodow (259): test - '. K259-S self-test,
+                    K259-S2 test syntetyczny; K259-0 latki TAK; K259-1 linia doby co dobe; K259-2 wyplata == wzor i kapital == min(dane E3/7, model); K259-3 nic dwa razy;
+                    K259-4 kontrola 0 (kiesy = wynik prefiksu); K259-5
+                    komunikat wyplaty; K259-6 rytm 'ponizej kapitalu'; K259-7 zapis i T1-T6; K259-8 potkniecia i ERROR 0; K259-9 straznik m105; K259-10 INFO.
+--grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
+                    ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
+                    --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
+                    'zbroja na tulow (268)' w linii doby p9; Z268-2 przyczyny = poza armia; Z268-3 sprawdzian Lydden (159 P0: B p9 < prog i 'gotowa' - 0);
+                    Z268-4 linia 'Zbroja AI - zamowienia (268)' co dobe, zamowione <= pusta polka i sufit, zloto 0; Z268-5 wyjazdy po zbroje -> korpusy;
+                    Z268-6 potkniecia i ERROR 0; Z268-7 autotest T1-T6 (flaga armoury-zbroja268.flag); Z268-8 INFO pierwsza / ostatnia doba.
+--grupa krol272   : (27.10, paczka 272 noc/272-krol-polnocy - Jeff 27.10 "a tak potem jak dolaczaja do roberta to staja sie jednym krolestwem King in the North";
+                    Armoury/src/KingInTheNorth.cs, KingInTheNorth.Test.cs; klucz CanonNorthRiverlandsUnion) python -I tools/sprawdz_logi.py --grupa krol272 <Armoury-*.log>
+                    (strumieniowo). Linie 'Krol Polnocy (272): '. KP-S self-test wyrazen, KP-S2 test syntetyczny. KP-0 start sesji; KP-1 dokladnie jedna unia
+                    (UNIA start -> UNIA ZAKONCZONA); KP-2 rody przeniesione = rody na starcie, zniszczonych 0, kazdy rod: lenna/wsie/partie/ludzie/zalogi przed = po,
+                    wplywy i dlug wobec krolestwa zachowane; KP-3 armie zachowane/odtworzone z tymi samymi czlonkami i spojnoscia albo NIE z powodem; KP-4 kontrola
+                    pieniedzy 0; KP-5 Dorzecze zniszczone i doba Wojny kanonu (4) po unii 'brak krolestwa'; KP-6 jency gracza przed = po (Tywin); KP-7 proba
+                    autotestu T1-T9 bez NIE (flaga armoury-krol-polnocy.flag); KP-8 po unii zadnego UNIA start, start sesji ze stanem 'zrobione'; KP-9 Krwawe Gody:
+                    rody Dorzecza ROT z unii do korony (kazdy TAK albo z powodem); KP-10 ERROR KingInTheNorth i potkniecia 0; recenzja: KP-11 kariera najemnika BK
+                    przepisana na Polnoc (linia rodu najemnika, zadne 'przeniesiona NIE'); KP-12 Krwawe Gody - Dorzecze znowu osobno (rody n/n, wojna z korona TAK;
+                    KP-5 liczy doby (4) tylko do tej linii, KP-8 przyjmuje stan 'rozdzielone'). Brak linii - INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -71763,6 +71785,1675 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return w241_main(rest[0] if rest else None)
     return _w241_main_prev(argv)
+
+# ------------------------------------------------------------ karawany259 (27.10, paczka 259 noc/259-karawany-gracza-rozliczenie: Jeff 27.10 "czemu moja karawana nic nie
+# zarabia", "te karawany", "tak zacznij od tych pieciu"; Armoury/src/CaravanSettle.cs, CaravanSettle.Player.cs, CaravanSettle.Test.cs; klucze CaravanClanSettlement,
+# CaravanReports)
+#   python -I tools/sprawdz_logi.py --grupa karawany259 <Armoury-*.log>
+# K259-S self-test wyrazen (linie kontrolne jak w kodzie C#), K259-S2 test syntetyczny (dobry, zly, bez linii 259). K259-0 linia startu: 4 latki TAK i latka na liscie
+# straznika m105 TAK (klucz NIE - INFO); K259-1 linia swiata co dobe (najwyzej 1 brak); K259-2 kazda karawana gracza z rozliczeniem doby: wyplata ==
+# min(max(0, wartosc - kapital), max(0, kiesa - podloga)) i wartosc == kiesa + towar (liczby calkowite z linii); K259-3 nic dwa razy: rozliczana karawana gracza
+# bez wyplat BK / E3/9 / gra 10%, E3-T2 "graczowi" 0 w dobach z czynnym 259, drugie wywolanie w dobie 0; K259-4 kontrola doby roznica 0 (recenzja: kiesy = wynik
+# prefiksu - spojnosc wewnetrzna, nie pomiar salda rodu); K259-2 takze (recenzja 259): kapital == min(dane E3/7, model) albo model, zwierzeta i inne <= towar; K259-5 komunikaty PayNotes
+# "caravans" == doby z komunikatem wyplaty PayNotes, doba z wyplata 259 graczowi ma komunikat (PayNotes / ekran / wylaczone); K259-6 komunikat "ponizej kapitalu"
+# w 7. dobie z rzedu i co 7; K259-7 rekordy z zapisu bledne 0, testy T1-T6 TAK (bez testow - INFO); K259-8 potkniecia 0 i 0 linii "ERROR in CaravanSettle";
+# K259-9 straznik m105 nie wylacza pominiecia przez nasza latke (linia "Optym (m105)" bez "CaravanSettle"); K259-10 INFO: wyplaty, kapital, czas regul.
+K259_TAG = "Karawany rodow - rozliczenie dnia (259): "
+K259_PTAG = "Majatek gracza (karawany i warsztaty) (259): "
+K259_TTAG = "Karawany rodow (259): test - "
+K259_RX = {
+    "start": re.compile(r"^start sesji \| klucz Caravan Clan Settlement (tak|nie), Caravan Reports (tak|nie) \| latki: AddIncomeFromParty \(First, przed BK\) (TAK|NIE), "
+                        r"BK AddRealisticIncome (TAK|NIE), BK OnWeeklyCaravanLedger (TAK|NIE), DailyTickClan gracza (TAK|NIE) \(kolejnosc prefiksow: .*?\) "
+                        r"\| BK zwrot zoldu karawan rodu \(PartyExpensesPrefix\) (TAK|NIE) \| Optym m105: latka na liscie znanych (TAK|NIE) "
+                        r"\| rekordy z zapisu: karawan (\d+), warsztatow (\d+) \(bledne (\d+)[^)]*\) \| regula: "),
+    "day": re.compile(r"^dzien (\d+) \| (CZYNNE|WYLACZONE[^|]*|NIECZYNNE[^|]*) \| karawan rodow (\d+) \(gracza (\d+), lordow (\d+)\), z wyplata (\d+) za (\d+) zl "
+                      r"\(graczowi (\d+), lordom (\d+)\), ponizej kapitalu (\d+), wartosc>kapital ale kiesa<=podloga (\d+), bez zwrotu zoldu \(tytul\) (\d+), "
+                      r"konwoje pominiete (\d+), w bitwie/rozwiazywane (\d+) \| kontrola: kiesy -(\d+) = (?:salda rodow|wynik prefiksu) \+(\d+) \(roznica (-?\d+)\) "
+                      r"\| zastapione/zablokowane: gra 10% (\d+) \(bylo by (\d+)\), BK przy wjezdzie (\d+) \(bylo by (\d+)\), E3/9 (\d+), tydzien BK (\d+) "
+                      r"\| drugie wywolanie w dobie (\d+) \(sesja (\d+)\) \| czas regul ([\d.]+) ms \(podgladow (\d+)\) \| potkniecia (\d+) \(sesja (\d+)\)"
+                      r"(?: \| kapital karawan: z E3/7 (\d+) \(nizszy od modelu (\d+)\), z modelu (\d+), nowe zapisy E3/7 (\d+) \(rekordow (\d+)\))?\.$"),
+    "car": re.compile(r"^karawana '(.+?)' \(wodz (.+?), (zwykla|elitarna|morska|morska elitarna), kapital (\d+)(?: \((?:E3/7: dane \d+, model \d+|model \d+)\))?, "
+                      r"(rozliczana przez rod|NIE rozliczana przez rod)\) "
+                      r"\| rozliczenie doby: (?:kiesa (\d+) \(podloga (\d+)(?:, bez zwrotu zoldu)?\), towar w jukach (\d+) \(koszt (\d+), rynek (\d+), (\d+) rodzajow, (\d+) szt\.(?:, w tym zwierzeta i inne \d+)?\), "
+                      r"wartosc (\d+), kapital (\d+), wyplata (\d+)( \(w bitwie albo rozwiazywana\))?|brak [^|]*) \| teraz: kiesa (-?\d+), towar (\d+), wartosc (-?\d+) "
+                      r"\| dzis: sprzedaz (\d+) \(myto (\d+)\), zakupy (\d+), zysk ze sprzedazy (-?\d+) \| zold (\d+) zaplacil rod, doplata BK (\d+), brak rodu (\d+)[^|]* "
+                      r"\| wyplaty dzis: rozliczenie 259 (\d+), BK (\d+), E3/9 (\d+), gra 10% (\d+), rozwiazanie (\d+) \| ponizej kapitalu (\d+) dob \| (od zakupu|od wczytania 259) "),
+    "ws": re.compile(r"^warsztat '(.+?)' \((.+), glowa rodu\) \| kapital (\d+) \(poczatkowy (\d+)\), zysk przed wyplata (-?\d+|-), wyplata (\d+), "
+                     r"podatek BK \(D11-3\) nalezny (\d+) zaplacony (\d+) \| (od zakupu|od wczytania 259) "),
+    "tot": re.compile(r"^razem dzis: karawany do rodu (\d+) \(rozliczenie 259 (\d+), BK (\d+), E3/9 (\d+), gra 10% (\d+), rozwiazanie (\d+)\), zold rodu (\d+), doplaty BK (\d+), "
+                      r"brak rodu (\d+), warsztaty do rodu (\d+), podatek warsztatow (\d+) \| komunikaty: wyplata (\S+), ponizej kapitalu (\d+), tydzien (TAK|NIE) "
+                      r"\| BK Workshop taxes w modelu warsztatow (TAK|NIE)[^|]* \| potkniecia (\d+)\.$"),
+    "pay": re.compile(r"^komunikat - wyplata \((PayNotes|ekran)\) (\d+) \| "),
+    "low": re.compile(r"^komunikat - ponizej kapitalu: karawana '(.+?)' ponizej kapitalu (\d+) dob \| "),
+    "test": re.compile(r"^(T\d) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
+}
+K259_PN = re.compile(r"^Komunikaty platnosci \(m96-wies\): wplyw caravans (\d+) ")
+# recenzja 259: zrodlo kapitalu karawany gracza (E3/7 - dane i model; model) i zwierzeta / inne w towarze rozliczenia doby
+K259_CAPSRC = re.compile(r", kapital (\d+) \((?:E3/7: dane (\d+), model (\d+)|model (\d+))\), (?:NIE )?rozliczana przez rod\) \| ")
+K259_OTHER = re.compile(r" szt\., w tym zwierzeta i inne (\d+)\), wartosc ")
+K259_T2 = re.compile(r"^Karawany - zysk do wlasciciela \(E3-T2\): dzien (\d+) \| CZYNNE .*?graczowi (\d+)/(\d+)\)")
+# linie kontrolne - jak w kodzie C# (CaravanSettle.cs, CaravanSettle.Player.cs, CaravanSettle.Test.cs)
+K259_TEST = {
+    "start": "start sesji | klucz Caravan Clan Settlement tak, Caravan Reports tak | latki: AddIncomeFromParty (First, przed BK) TAK, BK AddRealisticIncome TAK, "
+             "BK OnWeeklyCaravanLedger TAK, DailyTickClan gracza TAK (kolejnosc prefiksow: nasza 800; inne: ClanFinancesPatches.AddIncomeFromPartyPrefix 400; brak: -) "
+             "| BK zwrot zoldu karawan rodu (PartyExpensesPrefix) TAK | Optym m105: latka na liscie znanych TAK | rekordy z zapisu: karawan 1, warsztatow 1 (bledne 0) "
+             "| regula: wyplata = min(wartosc - kapital, kiesa - podloga); kapital z CaravanModel.GetInitialTradeGold; podloga = PartyGoldLowerThreshold + zold doby "
+             "(bez zwrotu zoldu przez rod - 30 dni zoldu); towar: nizsza z kosztu (ksiega E3-T1) i rynku (wartosc x srednia indeksu), bez kosztu - wartosc x min(1, srednia indeksu).",
+    "day": "dzien {d} | CZYNNE | karawan rodow 140 (gracza 1, lordow 139), z wyplata 60 za {p} zl (graczowi {pp}, lordom 29480), ponizej kapitalu 50, "
+           "wartosc>kapital ale kiesa<=podloga 20, bez zwrotu zoldu (tytul) 3, konwoje pominiete 2, w bitwie/rozwiazywane 1 | kontrola: kiesy -{p} = wynik prefiksu +{q} "
+           "(roznica {r}) | zastapione/zablokowane: gra 10% 1 (bylo by 12), BK przy wjezdzie 4 (bylo by 900), E3/9 2, tydzien BK 0 | drugie wywolanie w dobie {u} (sesja {u}) "
+           "| czas regul 0.85 ms (podgladow 400) | potkniecia {s} (sesja {s}) | kapital karawan: z E3/7 12 (nizszy od modelu 3), z modelu 128, nowe zapisy E3/7 1 (rekordow 12).",
+    "car": "karawana 'Ser Jon's caravan' (wodz Ser Jon, zwykla, kapital 15000 (E3/7: dane 15000, model 15000), rozliczana przez rod) | rozliczenie doby: kiesa {k} (podloga 5293), "
+           "towar w jukach 9100 (koszt 9400, rynek 9100, 14 rodzajow, 212 szt., w tym zwierzeta i inne 600), wartosc {w}, kapital 15000, wyplata {y} | teraz: kiesa 5900, towar 9100, "
+           "wartosc 15000 | dzis: sprzedaz 3100 "
+           "(myto 62), zakupy 2900, zysk ze sprzedazy 180 | zold 293 zaplacil rod, doplata BK 0, brak rodu 0 | wyplaty dzis: rozliczenie 259 {y}, BK {b}, E3/9 0, gra 10% 0, "
+           "rozwiazanie 0 | ponizej kapitalu {lo} dob | od zakupu (dzien 108965, 26 dob): wyplaty 520, zold rodu 7000, doplaty 0, brak rodu 0, sprzedaz 50000, zakupy 49000, "
+           "myto 1000, zysk ze sprzedazy 3000, netto dla rodu -6480",
+    "carn": "karawana 'Ser Jon's caravan' (wodz Ser Jon, zwykla, kapital 15000 (model 15000), rozliczana przez rod) | rozliczenie doby: brak (rod gracza nie rozliczony od ostatniej linii "
+            "albo klucz WYL) | teraz: kiesa 5900, towar 9100, wartosc 15000 | dzis: sprzedaz 0 (myto 0), zakupy 0, zysk ze sprzedazy 0 | zold 0 zaplacil rod, doplata BK 0, "
+            "brak rodu 0 (bez rozliczenia rodu) | wyplaty dzis: rozliczenie 259 0, BK 0, E3/9 0, gra 10% 0, rozwiazanie 0 | ponizej kapitalu 0 dob | od wczytania 259 "
+            "(dzien 108980, 11 dob): wyplaty 0, zold rodu 0, doplaty 0, brak rodu 0, sprzedaz 0, zakupy 0, myto 0, zysk ze sprzedazy 0, netto dla rodu 0",
+    "ws": "warsztat 'Brewery' (Sunspear, glowa rodu) | kapital 12000 (poczatkowy 10000), zysk przed wyplata 2000, wyplata 1000, podatek BK (D11-3) nalezny 150 zaplacony 150 "
+          "| od wczytania 259 (dzien 108980, 11 dob): wyplaty 1000, podatek 150",
+    "tot": "razem dzis: karawany do rodu {y} (rozliczenie 259 {y}, BK {b}, E3/9 0, gra 10% 0, rozwiazanie 0), zold rodu 293, doplaty BK 0, brak rodu 0, warsztaty do rodu 1000, "
+           "podatek warsztatow 150 | komunikaty: wyplata {m}, ponizej kapitalu 0, tydzien NIE | BK Workshop taxes w modelu warsztatow NIE | potkniecia {s}.",
+    "pay": "komunikat - wyplata (PayNotes) {y} | Ser Jon's caravan {y}.",
+    "low": "komunikat - ponizej kapitalu: karawana 'Ser Jon's caravan' ponizej kapitalu {n} dob | Ser Jon's caravan is worth 12,300 (coin 4,100, goods 8,200 valued at the "
+           "lower of what it paid and the market) - less than the 15,000 it was given to trade with. Last 7 days it sold 3,200, bought 2,900, paid 120 in tolls; your clan paid "
+           "its wages, 2,051, and topped up its purse with 1,400. It sends you profit only once its coin and goods are worth more than 15,000 and it holds more than 5,293 "
+           "in coin for its wages.",
+    "test": "T2 rozliczenie rodu celu: kiesa 6420 -> 5900, wyplata 520, wzor na wejsciach (wartosc 15520, kapital 15000, kiesa 6420, podloga 5293) 520 - wynik TAK.",
+    "pn": "Komunikaty platnosci (m96-wies): wplyw caravans {y} | podmienione w sesji 1 (zaplaty 0 za 0, wplywy 1 za {y}) | wg powodu: caravans 1",
+    "t2": "Karawany - zysk do wlasciciela (E3-T2): dzien {d} | CZYNNE | karawan 490, oddaly 5 za 3000 zl (notablom 5/3000, lordom i innym 0/0, graczowi {g}/{gg}) "
+          "| rozliczane przez rod (259) 140 | kapital obrotowy (zostaje w kiesie): max(10000, 30 dni zoldu) - razem 1, w kiesach do kapitalu 1 (1.0%).",
+}
+
+
+def k259_player_line(d, y, k, w, b=0, m="PayNotes", s=0, lo=0):
+    T = K259_TEST
+    return (K259_PTAG + "dzien %d || " % d + T["car"].format(k=k, w=w, y=y, b=b, lo=lo) + " || " + T["ws"] + " || " + T["tot"].format(y=y, b=b, m=m, s=s))
+
+
+def k259_selftest():
+    T = K259_TEST
+    R = K259_RX
+    probs = []
+    m = R["start"].match(T["start"])
+    if not m or m.group(3) != "TAK" or m.group(8) != "TAK" or m.group(11) != "0":
+        probs.append("start")
+    m = R["day"].match(T["day"].format(d=108990, p=30000, pp=520, q=30000, r=0, u=0, s=0))
+    if not m or m.group(1) != "108990" or m.group(7) != "30000" or m.group(17) != "0" or m.group(29) != "0" or m.group(30) != "12" or m.group(32) != "128":
+        probs.append("day")
+    m = R["day"].match(T["day"].format(d=108990, p=30000, pp=520, q=30000, r=0, u=0, s=0).replace(" | kapital karawan: z E3/7 12 (nizszy od modelu 3), z modelu 128, "
+                                                                                              "nowe zapisy E3/7 1 (rekordow 12).", "."))
+    if not m or m.group(29) != "0" or m.group(30) is not None:
+        probs.append("day (bez kapitalu - linia sprzed recenzji)")
+    cs = K259_CAPSRC.search(T["car"].format(k=6420, w=15520, y=520, b=0, lo=0))
+    if not cs or cs.group(1) != "15000" or cs.group(2) != "15000" or cs.group(3) != "15000" or cs.group(4) is not None:
+        probs.append("kapital E3/7")
+    cs = K259_CAPSRC.search(T["carn"])
+    if not cs or cs.group(4) != "15000" or cs.group(2) is not None:
+        probs.append("kapital model")
+    mo = K259_OTHER.search(T["car"].format(k=6420, w=15520, y=520, b=0, lo=0))
+    if not mo or mo.group(1) != "600":
+        probs.append("zwierzeta i inne")
+    m = R["car"].match(T["car"].format(k=6420, w=15520, y=520, b=0, lo=0))
+    if not m or m.group(6) != "6420" or m.group(7) != "5293" or m.group(8) != "9100" or m.group(15) != "520" or m.group(32) != "0" or m.group(33) != "od zakupu":
+        probs.append("car")
+    m = R["car"].match(T["carn"])
+    if not m or m.group(6) is not None or m.group(33) != "od wczytania 259":
+        probs.append("carn")
+    m = R["ws"].match(T["ws"])
+    if not m or m.group(6) != "1000" or m.group(8) != "150":
+        probs.append("ws")
+    m = R["tot"].match(T["tot"].format(y=520, b=0, m="PayNotes", s=0))
+    if not m or m.group(2) != "520" or m.group(12) != "PayNotes" or m.group(16) != "0":
+        probs.append("tot")
+    if not R["pay"].match(T["pay"].format(y=520)):
+        probs.append("pay")
+    m = R["low"].match(T["low"].format(n=7))
+    if not m or m.group(2) != "7":
+        probs.append("low")
+    m = R["test"].match(T["test"])
+    if not m or m.group(1) != "T2" or m.group(3) != "TAK":
+        probs.append("test")
+    if not K259_PN.match(T["pn"].format(y=520)):
+        probs.append("pn")
+    m = K259_T2.match(T["t2"].format(d=108990, g=0, gg=0))
+    if not m or m.group(3) != "0":
+        probs.append("t2")
+    return ("nie pasuja: " + ", ".join(probs)) if probs else None
+
+
+def k259_collect(logp):
+    R = K259_RX
+    D = {"starts": [], "days": {}, "bad": [], "cars": [], "capsrc": [], "ws": 0, "tots": [], "pay": [], "low": [], "tests": {}, "pn": 0, "t2": {}, "err": 0, "err1": "",
+         "optym_off": 0, "optym": 0, "plines": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            mt = TS.match(ln)
+            s = mt.group(2) if mt else ln
+            if "ERROR in CaravanSettle" in s:
+                D["err"] += 1
+                if not D["err1"]:
+                    D["err1"] = s[:160]
+                continue
+            if s.startswith(K259_TAG):
+                r = s[len(K259_TAG):]
+                if r.startswith("start sesji"):
+                    D["starts"].append((R["start"].match(r), r))
+                elif r.startswith("dzien "):
+                    md = R["day"].match(r)
+                    if md:
+                        D["days"][int(md.group(1))] = md
+                    else:
+                        D["bad"].append("linia doby: " + r[:90])
+                continue
+            if s.startswith(K259_PTAG):
+                r = s[len(K259_PTAG):]
+                if r.startswith("dzien "):
+                    D["plines"] += 1
+                    parts = r.split(" || ")
+                    try:
+                        day = int(parts[0][len("dzien "):].split()[0])
+                    except ValueError:
+                        day = -1
+                    for p in parts[1:]:
+                        if p.startswith("karawana '"):
+                            mc = R["car"].match(p)
+                            if mc:
+                                D["cars"].append((day, mc))
+                                cs = K259_CAPSRC.search(p)
+                                mo = K259_OTHER.search(p)
+                                D["capsrc"].append((day, mc.group(1), int(mc.group(4)), cs, int(mo.group(1)) if mo else None, int(mc.group(8)) if mc.group(8) else None))
+                            else:
+                                D["bad"].append("karawana gracza: " + p[:90])
+                        elif p.startswith("warsztat '"):
+                            if R["ws"].match(p):
+                                D["ws"] += 1
+                            else:
+                                D["bad"].append("warsztat gracza: " + p[:90])
+                        elif p.startswith("razem dzis:"):
+                            mo = R["tot"].match(p)
+                            if mo:
+                                D["tots"].append((day, mo))
+                            else:
+                                D["bad"].append("razem dzis: " + p[:90])
+                        else:
+                            D["bad"].append("nieznany kawalek: " + p[:60])
+                elif r.startswith("komunikat - wyplata"):
+                    mp_ = R["pay"].match(r)
+                    D["pay"].append(mp_.group(1) if mp_ else "?")
+                elif r.startswith("komunikat - ponizej kapitalu"):
+                    ml = R["low"].match(r)
+                    D["low"].append(int(ml.group(2)) if ml else -1)
+                continue
+            if s.startswith(K259_TTAG):
+                mt2 = R["test"].match(s[len(K259_TTAG):])
+                if mt2:
+                    D["tests"][mt2.group(1)] = (mt2.group(3), mt2.group(2)[:120])
+                else:
+                    D["bad"].append("test: " + s[:90])
+                continue
+            if s.startswith("Komunikaty platnosci (m96-wies): wplyw caravans "):
+                D["pn"] += 1
+                continue
+            if s.startswith("Karawany - zysk do wlasciciela (E3-T2): dzien "):
+                m2 = K259_T2.match(s)
+                if m2:
+                    D["t2"][int(m2.group(1))] = int(m2.group(3))
+                continue
+            if s.startswith("Optym (m105): dzien "):
+                D["optym"] += 1
+                if "CaravanSettle" in s:
+                    D["optym_off"] += 1
+    return D
+
+
+def k259_rows(rep, D):
+    starts = D["starts"]
+    ok_starts = [m for m, _ in starts if m]
+    if not starts:
+        rep.add("K259-0: linia startu (latki 4/4, straznik m105)", "brak linii 259 (log sprzed paczki 259)", "INFO", None)
+    elif not ok_starts:
+        rep.add("K259-0: linia startu (latki 4/4, straznik m105)", "zly format: " + starts[-1][1][:100], "format jak w kodzie", False)
+    else:
+        m = ok_starts[-1]
+        if m.group(1) != "tak":
+            rep.add("K259-0: linia startu (latki 4/4, straznik m105)", "klucz Caravan Clan Settlement nie", "INFO", None)
+        else:
+            hooks = [m.group(i) for i in (3, 4, 5, 6)]
+            rep.add("K259-0: linia startu (latki 4/4, straznik m105)", f"startow {len(starts)}, latki {hooks}, zwrot zoldu BK {m.group(7)}, m105 {m.group(8)}, "
+                    f"rekordy z zapisu karawan {m.group(9)}, warsztatow {m.group(10)}", "4 x TAK i m105 TAK", all(h == "TAK" for h in hooks) and m.group(8) == "TAK")
+    days = D["days"]
+    if not days:
+        rep.add("K259-1: linia swiata co dobe", "0 linii doby", "INFO (log sprzed 259)", None)
+    else:
+        ds = sorted(days)
+        miss = [d for d in range(ds[0], ds[-1] + 1) if d not in days]
+        rep.add("K259-1: linia swiata co dobe", f"dob {len(ds)} ({ds[0]}..{ds[-1]}), braki {miss[:5]}" + (f", zle linie {len(D['bad'])} ({D['bad'][0]})" if D["bad"] else ""),
+                "najwyzej 1 brak, 0 zlych linii", len(miss) <= 1 and not D["bad"])
+    bad2, n2 = [], 0
+    for day, mc in D["cars"]:
+        if mc.group(6) is None or mc.group(16):
+            continue
+        n2 += 1
+        purse, floor, goods, worth, cap, pay = (int(mc.group(i)) for i in (6, 7, 8, 13, 14, 15))
+        exp = min(max(0, worth - cap), max(0, purse - floor))
+        if pay != exp or worth != purse + goods:
+            bad2.append(f"d{day} '{mc.group(1)}': kiesa {purse}, podloga {floor}, towar {goods}, wartosc {worth}, kapital {cap} -> wyplata {pay}, wzor {exp}")
+    # recenzja 259: kapital == min(dane E3/7, model) albo == model; zwierzeta i inne <= towar
+    nE37 = nMod = 0
+    for day, name, cap, cs, oth, goods in D["capsrc"]:
+        if cs is None:
+            continue
+        if cs.group(2) is not None:
+            nE37 += 1
+            if cap != min(int(cs.group(2)), int(cs.group(3))):
+                bad2.append(f"d{day} '{name}': kapital {cap} != min(dane {cs.group(2)}, model {cs.group(3)})")
+        else:
+            nMod += 1
+            if cap != int(cs.group(4)):
+                bad2.append(f"d{day} '{name}': kapital {cap} != model {cs.group(4)}")
+        if oth is not None and goods is not None and oth > goods:
+            bad2.append(f"d{day} '{name}': zwierzeta i inne {oth} > towar {goods}")
+    wE37 = sum(int(m.group(30)) for m in days.values() if m.group(30) is not None)
+    wLow = sum(int(m.group(31)) for m in days.values() if m.group(31) is not None)
+    wMod = sum(int(m.group(32)) for m in days.values() if m.group(32) is not None)
+    capinfo = f"; kapital gracza z E3/7 {nE37}, z modelu {nMod}; swiat (suma dob): z E3/7 {wE37} (nizszy od modelu {wLow}), z modelu {wMod}"
+    if n2 == 0:
+        rep.add("K259-2: wyplata == wzor (karawany gracza)", "brak rozliczen karawan gracza w liniach" + capinfo + (f" | {bad2[0]}" if bad2 else ""),
+                "INFO (gracz bez karawany albo log sprzed 259)", False if bad2 else None)
+    else:
+        rep.add("K259-2: wyplata == wzor (karawany gracza)", f"rozliczen {n2}, niezgodnych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else "") + capinfo,
+                "min(max(0, wartosc - kapital), max(0, kiesa - podloga)), wartosc == kiesa + towar, kapital == min(dane E3/7, model) albo model, zwierzeta <= towar", not bad2)
+    dbl = []
+    for day, mc in D["cars"]:
+        if mc.group(5) == "rozliczana przez rod" and (int(mc.group(28)) or int(mc.group(29)) or int(mc.group(30))):
+            dbl.append(f"d{day} '{mc.group(1)}': BK {mc.group(28)}, E3/9 {mc.group(29)}, gra 10% {mc.group(30)}")
+    on_days = {d for d, m in days.items() if m.group(2) == "CZYNNE"}
+    t2p = [d for d in on_days if D["t2"].get(d, 0) > 0]
+    dup = sum(int(m.group(24)) for m in days.values())
+    if not days:
+        rep.add("K259-3: nic dwa razy", "brak linii 259", "INFO", None)
+    else:
+        rep.add("K259-3: nic dwa razy", f"rozliczana karawana gracza z wyplata BK / E3/9 / gra 10%: {len(dbl)}" + (f" ({dbl[0]})" if dbl else "")
+                + f"; E3-T2 graczowi > 0 w dobach z czynnym 259: {len(t2p)}; drugie wywolanie w dobie {dup}", "0 / 0 / 0", not dbl and not t2p and dup == 0)
+    diffs = [d for d, m in days.items() if int(m.group(17)) != 0]
+    if days:
+        rep.add("K259-4: kontrola doby (kiesy = wynik prefiksu; spojnosc wewnetrzna prefiksu, nie pomiar salda rodu)", f"dob z roznica {len(diffs)}" + (f" (np. d{diffs[0]})" if diffs else ""), "0", not diffs)
+    else:
+        rep.add("K259-4: kontrola doby (kiesy = wynik prefiksu; spojnosc wewnetrzna prefiksu, nie pomiar salda rodu)", "brak linii", "INFO", None)
+    pn_days = sum(1 for _, mo in D["tots"] if mo.group(12) == "PayNotes")
+    no_msg = [d for d, mo in D["tots"] if int(mo.group(2)) > 0 and mo.group(12) not in ("PayNotes", "ekran", "wylaczone")]
+    pay_pn = sum(1 for k in D["pay"] if k == "PayNotes")
+    if not D["tots"]:
+        rep.add("K259-5: komunikat wyplaty graczowi", f"linii gracza 0; PayNotes 'caravans' {D['pn']}", "INFO (gracz bez majatku albo log sprzed 259)", None)
+    else:
+        rep.add("K259-5: komunikat wyplaty graczowi", f"dob z komunikatem PayNotes {pn_days}, linii 'komunikat - wyplata (PayNotes)' {pay_pn}, PayNotes 'wplyw caravans' {D['pn']}; "
+                f"doby z wyplata 259 bez komunikatu {len(no_msg)}" + (f" (np. d{no_msg[0]})" if no_msg else ""),
+                "PayNotes == doby PayNotes == linie komunikatu, bez komunikatu 0", D["pn"] == pn_days == pay_pn and not no_msg)
+    low_bad = [n for n in D["low"] if n < 7 or n % 7 != 0]
+    if not D["low"]:
+        rep.add("K259-6: komunikat 'ponizej kapitalu' (7. doba, potem co 7)", "0 komunikatow", "INFO", None)
+    else:
+        rep.add("K259-6: komunikat 'ponizej kapitalu' (7. doba, potem co 7)", f"komunikatow {len(D['low'])}, dni {sorted(set(D['low']))[:6]}, poza rytmem {len(low_bad)}",
+                "dni % 7 == 0 i >= 7", not low_bad)
+    tests = D["tests"]
+    bad_imp = sum(int(m.group(11)) for m in ok_starts)
+    if not tests:
+        rep.add("K259-7: zapis i autotest T1-T6", f"rekordy z zapisu bledne {bad_imp}; testow brak", "bledne 0 (testy - INFO bez flagi armoury-karawany.flag)",
+                (bad_imp == 0) if ok_starts else None)
+    elif set(tests) == {"T0"} and tests["T0"][0] == "POMINIETY":
+        rep.add("K259-7: zapis i autotest T1-T6", f"bledne {bad_imp}; proba POMINIETA: {tests['T0'][1]}", "INFO (bez rozliczanej karawany albo klucz NIE)", None)
+    else:
+        nie = [f"{k}: {v[1]}" for k, v in sorted(tests.items()) if v[0] == "NIE"]
+        miss = [t for t in ("T1", "T2", "T3", "T4", "T5", "T6") if t not in tests]
+        rep.add("K259-7: zapis i autotest T1-T6", f"bledne {bad_imp}; testy " + ", ".join(f"{k} {v[0]}" for k, v in sorted(tests.items())) + (f" | NIE: {nie[0]}" if nie else "")
+                + (f" | brak {miss}" if miss else ""), "bledne 0, T1-T6 TAK (POMINIETY - INFO w opisie)", bad_imp == 0 and not nie and not miss)
+    st_d = sum(int(m.group(28)) for m in days.values())
+    st_p = sum(int(mo.group(16)) for _, mo in D["tots"])
+    rep.add("K259-8: potkniecia i ERROR", f"potkniecia w liniach doby {st_d}, w liniach gracza {st_p}, ERROR in CaravanSettle {D['err']}" + (f" ({D['err1']})" if D["err1"] else ""),
+            "0, 0, 0", st_d == 0 and st_p == 0 and D["err"] == 0)
+    if D["optym"] == 0:
+        rep.add("K259-9: straznik m105 nie wylacza sie przez latke 259", "brak linii 'Optym (m105)'", "INFO", None)
+    else:
+        rep.add("K259-9: straznik m105 nie wylacza sie przez latke 259", f"linii Optym {D['optym']}, z CaravanSettle {D['optym_off']}", "0", D["optym_off"] == 0)
+    if days:
+        paid = [int(m.group(7)) for m in days.values()]
+        pl = [int(m.group(8)) for m in days.values()]
+        ms = [float(m.group(26)) for m in days.values()]
+        last = days[max(days)]
+        rep.add("K259-10: wyplaty i koszt (INFO)", f"wyplata swiata srednio {sum(paid) / len(paid):.0f} zl/d (graczowi {sum(pl) / len(pl):.0f}), ostatnia doba: karawan {last.group(3)}, "
+                f"ponizej kapitalu {last.group(10)}, kiesa<=podloga {last.group(11)}, zablokowane BK {last.group(20)} (bylo by {last.group(21)}), gra 10% {last.group(18)} "
+                f"(bylo by {last.group(19)}); czas regul srednio {sum(ms) / len(ms):.2f} ms/d, najwiecej {max(ms):.2f}", "INFO", None)
+
+
+def k259_synth():
+    import tempfile
+    import shutil
+    T = K259_TEST
+    P = "[10:00:00] " + K259_TAG
+    PT = "[10:00:00] " + K259_TTAG
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="k259_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind in ("good", "bad"):
+                L.append(P + (T["start"] if kind == "good" else T["start"].replace("BK AddRealisticIncome TAK", "BK AddRealisticIncome NIE")))
+                for i, d in enumerate(range(108990, 108998)):
+                    if kind == "bad" and i in (3, 4):
+                        continue
+                    if kind == "good":
+                        L.append(P + T["day"].format(d=d, p=30000, pp=520, q=30000, r=0, u=0, s=0))
+                        L.append("[10:00:00] " + K259_PTAG + "komunikat - wyplata (PayNotes) 520 | Ser Jon's caravan 520.")
+                        L.append("[10:00:00] " + T["pn"].format(y=520))
+                        L.append("[10:00:00] " + k259_player_line(d, 520, 6420, 15520, lo=(i + 1)))
+                        if i + 1 == 7:
+                            L.append("[10:00:00] " + K259_PTAG + T["low"].format(n=7))
+                        L.append("[10:00:00] " + T["t2"].format(d=d, g=0, gg=0))
+                    else:
+                        L.append(P + T["day"].format(d=d, p=30000, pp=520, q=29990, r=10, u=1, s=1))
+                        L.append("[10:00:00] " + k259_player_line(d, 600, 6420, 15520, b=300, m="brak", s=1))
+                        L.append("[10:00:00] " + K259_PTAG + T["low"].format(n=5))
+                        L.append("[10:00:00] " + T["t2"].format(d=d, g=1, gg=400))
+                L.append("[10:00:00] Optym (m105): dzien 108995 | KingdomTreasury.Daily model dochodu: pominiety u 40 rodow (z 60 bez lenn i warsztatu glowy z podstawa ziemia; sesja 40) | potkniecia 0 (sesja 0)."
+                         if kind == "good" else
+                         "[10:00:00] Optym (m105): dzien 108995 | KingdomTreasury.Daily model dochodu: pominiecie WYLACZONE - niesprawdzone latki na sciezce modelu: "
+                         "Armoury:CaravanSettle.IncomePrefix na DefaultClanFinanceModel.AddIncomeFromParty | potkniecia 0 (sesja 0).")
+                for t in ("T1", "T2", "T3", "T4", "T5", "T6"):
+                    L.append(PT + T["test"].replace("T2 ", t + " ").replace("wynik TAK", "wynik " + ("NIE" if kind == "bad" and t == "T3" else "TAK")))
+                L.append("[10:00:00] ERROR in CaravanSettle.IncomePrefix: x" if kind == "bad" else "[10:00:00] Armoury: inna linia")
+            else:
+                L.append("[10:00:00] Armoury: inna linia")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            k259_rows(rep, k259_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"K259-0": "TAK", "K259-1": "TAK", "K259-2": "TAK", "K259-3": "TAK", "K259-4": "TAK", "K259-5": "TAK", "K259-6": "TAK", "K259-7": "TAK", "K259-8": "TAK",
+                 "K259-9": "TAK", "K259-10": "INFO"},
+        "bad": {"K259-0": "NIE", "K259-1": "NIE", "K259-2": "NIE", "K259-3": "NIE", "K259-4": "NIE", "K259-5": "NIE", "K259-6": "NIE", "K259-7": "NIE", "K259-8": "NIE",
+                "K259-9": "NIE"},
+        "none": {"K259-0": "INFO", "K259-1": "INFO", "K259-2": "INFO", "K259-3": "INFO", "K259-4": "INFO", "K259-5": "INFO", "K259-6": "INFO", "K259-7": "INFO",
+                 "K259-8": "TAK", "K259-9": "INFO"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def karawany259_main(logp):
+    """karawany259 (27.10, paczka 259): K259-S, K259-S2, K259-0..K259-10 - opis w komentarzu nad stalymi K259_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = k259_selftest()
+    rep.add("K259-S: self-test wyrazen (linie kontrolne jak w kodzie C#: CaravanSettle.cs, CaravanSettle.Player.cs, CaravanSettle.Test.cs)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = k259_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("K259-S2: test syntetyczny (dobry, zly, bez linii 259)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("K259-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = k259_collect(logp)
+    print(f"plik: {logp} | startow 259 {len(D['starts'])}, dob {len(D['days'])}, linii gracza {D['plines']}, rozliczen karawan gracza {len(D['cars'])}, warsztatow {D['ws']}, "
+          f"testow {len(D['tests'])}, ERROR {D['err']}")
+    k259_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_karawany259_main_prev = main
+
+
+def main(argv):
+    # paczka 259: grupa karawany259 - opakowanie main jak e223 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "karawany259":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return karawany259_main(rest[0] if rest else None)
+    return _karawany259_main_prev(argv)
+
+
+
+# ------------------------------------------------------------ pokoj264 (27.10, paczka 264 noc/264-pokoj-wojny-kanonu: bez pokoju w wojnie kanonu do Krwawych Godow - Jeff 27.10
+# "czemu dorzecze i polnoc jest slabsza od lannisterow i krolewskiej przystani to nie ma sensu", audyt 27.10 rozdz. 3 pkt 4 "tak zacznij od tych pieciu";
+# Armoury/src/CanonPeaceLock.cs, CanonPeaceLock.Test.cs, CanonWarWatch.cs, PeaceHold.cs (M6a-3 koncowy stan wojny), Prologue.River.cs (data wznowionej wojny),
+# WorldClock7.cs (lancuch wolajacych pokoju); klucz CanonWarNoPeaceUntilRedWedding)
+#   python -I tools/sprawdz_logi.py --grupa pokoj264 <Armoury-*.log>
+# P264-S self-test wyrazen (linie kontrolne jak w kodzie C#), P264-S2 test syntetyczny (dobry, zly, bez linii 264). P264-0 linia startu: latki Diplomacy ApplyPeace,
+# AddDecision, IsAllowed, mysl AI - TAK (klucz nie - INFO); P264-1 0 linii E7/0 "POKOJ KANONU MIMO BLOKADY" (pokoj pary kanonu przy czynnej blokadzie; "(test 264)" - INFO);
+# P264-2 kazda linia ZABLOKOWANY ma znana droge, a linia doby liczy co najmniej tyle blokad, ile linii od poprzedniej doby; P264-3 0 linii M6a-3 "nadal pokoj" dla pary,
+# ktora ma linie E7/0 WOJNA w tej samej lub 2 nastepnych dobach (uwolnienie przez pokoj, ktory ROT zaraz cofnal); P264-4 po kazdej linii E7/0 WOJNA korona-Dorzecze
+# z "NOWA WOJNA < 21 DNI PO POKOJU" linia m104 "WZNOWIONA" najpozniej w 3. linii doby 264 (koniec logu wczesniej - INFO); P264-5 co dobe linii 264: 4 linie wladcow
+# i 3 linie krolestw tej doby (najwyzej 1 doba z brakiem; "NIE DOTYCZY" - INFO); P264-6 0 linii "ERROR in CanonPeaceLock/CanonWarWatch" i potkniecia 0;
+# P264-7 testy autotestu T1-T7 TAK (POMINIETY / brak - INFO); P264-8 INFO: wladcy (doby w osadzie, mysli, ponizej progu, bitwy, oblezenia), hipoteza SCA (doby
+# "wyczerpane wzorem SCA z bandami tak, bez band nie"), blokady wedlug drogi, M6a-3 czekanie na ROT.
+# Nazwy pary korona-Dorzecze w liniach E7/0 (P264-4): "House Baratheon of King's Landing" i "Riverlands" (nazwy krolestw ROT w kampanii Jeffa).
+P264_TAG = "Pokoj kanonu (264): "
+P264_RX = {
+    "start": re.compile(r"^Pokoj kanonu \(264\): latki - Diplomacy ApplyPeace (TAK|BRAK|BLAD)[^,]*, AddDecision (TAK|BRAK|BLAD)[^,]*, IsAllowed (TAK|BRAK|BLAD)[^,]*, "
+                        r"mysl AI (TAK|BRAK|BLAD)[^;]*; klucz Canon War No Peace Until Red Wedding (tak|nie) \| zakres: (.*?) \| pary: (.*?)\."
+                        r"(?: \| proba autotestu: flaga \S+ (TAK|NIE))?$"),
+    "block": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| (.+?) -> (.+?): pokoj ZABLOKOWANY \(droga: (.*)\) - (?:wojna kanonu trwa do Krwawych Godow|ROT wymusza te wojne, pokoj trwalby dobe) \((.*), "
+                        r"(Polnoc-korona|Dorzecze-korona)\)\.$"),
+    "day": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| blokada (CZYNNA|KONIEC|WYLACZONA|NIE DOTYCZY) \((.*?)\) \| Polnoc-korona: (CZYNNA|KONIEC)(?: \(ROT wymusza\))?, wojna (TAK .*?|NIE) "
+                      r"\| Dorzecze-korona: (CZYNNA|KONIEC)(?: \(ROT wymusza\))?, wojna (TAK .*?|NIE) \| zablokowane dzis (\d+)(?: \[(.*?)\])?, sesja (\d+) \| gracz rzadzi: (tak|nie) "
+                      r"\| potkniecia (\d+) \(sesja (\d+)\)\.$"),
+    "test": re.compile(r"^Pokoj kanonu \(264\): test - (T\d+a?) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
+    "ruler": re.compile(r"^Wojna kanonu - wladca \(264\): dzien (\d+) \| (.+?): (.*?) \| partia: (.*?) \| AI: (.*?) \| armia: (.*?) \| dzis: bitwy polowe (\d+), oblezenia (\d+), "
+                        r"najazdy (\d+) \(godzin oblezenia (\d+), bitwy (\d+), w osadzie (\d+)/(\d+)\) \| mysl AI \(mysli (\d+), latka (\S+)\): (.*?)"
+                        r"(?: \| najlepsza ([\d.]+) / prog gry ([\d.]+) \(cel obecny (-?[\d.]+), ponizej progu (\d+) z (\d+)\))? \| dlaczego stoi: (.*?) \| SCA: (.*)\.$"),
+    "kingdom": re.compile(r"^Wojna kanonu - krolestwo \(264\): dzien (\d+) \| (.+?) \((\w+)\)(?: \| krolestwa brak\.|"
+                          r" \| wladca (.*?) \| partie lordow (\d+) \(ludzi (\d+), w osadach (\d+), w polu (-?\d+)\), armie (\d+) \(partii (\d+)\) \| oblega teraz (\d+)(?: \[.*?\])?, "
+                          r"oblegane osady (\d+) \| dzis: bitwy polowe (\d+), oblezenia (\d+), najazdy (\d+) \| wojny: (.*?) \| SCA: (.*?) \| wrog wedlug SCA (.*?) "
+                          r"\| potkniecia (\d+) \(sesja (\d+)\)\.)$"),
+    "rotwait": re.compile(r"^Pokoj a jency \(M6a-3\): dzien (\d+) \| (.+?) - (.+?): para nie w wojnie, ale ROT wymusza te wojne \(IsWarForced\) - uwolnienie czeka na wznowienie "
+                          r"\(najdluzej do (\d+) h od pokoju\)\.$"),
+    "freed": re.compile(r"^Pokoj a jency \(M6a-3\): dzien (\d+) \| (.+?) - (.+?): nadal pokoj - gra uwalnia (\d+) jencow-bohaterow"),
+    "resumed": re.compile(r"^Wojny kanonu \(m104\): \(4\) Dorzecze - wojna korona-Dorzecze WZNOWIONA \(dzien opowiesci (-?[\d.]+), po pokoju z dnia (\S+); pierwsza od dnia (-?\d+)\)"),
+}
+P264_PATHS = ("Diplomacy zmeczenie wojna", "decyzja krolestwa", "decyzja w toku (IsAllowed)", "Diplomacy wojna domowa", "ekran krolestwa", "Diplomacy ApplyPeace",
+              "wezwanie 168 zerwane")
+P264_CROWN, P264_RIVER = "House Baratheon of King's Landing", "Riverlands"
+# linie kontrolne - jak w kodzie C# (CanonPeaceLock.cs, CanonPeaceLock.Test.cs, CanonWarWatch.cs, PeaceHold.cs, Prologue.River.cs, WorldClock7.cs)
+P264_TEST = {
+    "start": "Pokoj kanonu (264): latki - Diplomacy ApplyPeace TAK, AddDecision TAK, IsAllowed TAK, mysl AI TAK; klucz Canon War No Peace Until Red Wedding tak "
+             "| zakres: kampania kanonu | pary: Polnoc-korona (battania-vlandia, do konca RedWeddingEvent albo smierci lord_5_1, potem gdy ROT wymusza wojne), "
+             "Dorzecze-korona (riverlands-vlandia, do konca RedWeddingEvent albo smierci lord_5_1, potem gdy ROT wymusza wojne).",
+    "block": "Pokoj kanonu (264): dzien {d} | Riverlands -> House Baratheon of King's Landing: pokoj ZABLOKOWANY (droga: {p}) - wojna kanonu trwa do Krwawych Godow "
+             "(Robb zyje, RedWeddingEvent 0, Dorzecze-korona).",
+    "day": "Pokoj kanonu (264): dzien {d} | blokada CZYNNA (Robb zyje, RedWeddingEvent 0) | Polnoc-korona: CZYNNA, wojna TAK od dnia 8.7 | Dorzecze-korona: CZYNNA, "
+           "wojna TAK od dnia 147.4, wznowiona po pokoju z dnia 146.4; pierwsza od dnia 34 | zablokowane dzis {n} [Diplomacy zmeczenie wojna {n}], sesja {s} "
+           "| gracz rzadzi: nie | potkniecia {p} (sesja {p}).",
+    "test": "Pokoj kanonu (264): test - T1 ApplyPeace Diplomacy Dorzecze -> korona: wojna dalej TAK, blokad 1 - wynik {r}.",
+    # recenzja 264: blokada po koncu kanonu (ROT wymusza) i zmeczenie wojna u gracza wladcy (bez wyboru)
+    "block_rot": "Pokoj kanonu (264): dzien {d} | Riverlands -> House Baratheon of King's Landing: pokoj ZABLOKOWANY (droga: {p}) - ROT wymusza te wojne, pokoj "
+                 "trwalby dobe (Robb nie zyje, RedWeddingEvent 2 - ROT wymusza te wojne, pokoj cofnalby nastepnej doby, Dorzecze-korona).",
+    "day_rot": "Pokoj kanonu (264): dzien {d} | blokada CZYNNA (Robb nie zyje, RedWeddingEvent 2 - ROT wymusza te wojne, pokoj cofnalby nastepnej doby) | Polnoc-korona: "
+               "KONIEC, wojna NIE | Dorzecze-korona: CZYNNA (ROT wymusza), wojna TAK od dnia 960.2, wznowiona po pokoju z dnia 959.2; pierwsza od dnia 34 "
+               "| zablokowane dzis 1 [Diplomacy zmeczenie wojna - gracz wladca, pokoj bez wyboru 1], sesja 1 | gracz rzadzi: tak | potkniecia 0 (sesja 0).",
+    "ruler": "Wojna kanonu - wladca (264): dzien {d} | {lab}: Robb Stark (lord_5_1, The North) | partia: w Winterfell, ludzi 212/260, jedzenie 14.2 dni | AI: Hold -> -, "
+             "krotko Hold -> -, AI wylaczone nie, bez nowych decyzji nie | armia: brak | dzis: bitwy polowe {f}, oblezenia 0, najazdy 0 (godzin oblezenia 0, bitwy 0, w osadzie 24/24) "
+             "| mysl AI (mysli 4, latka TAK): 1. BesiegeSettlement Riverrun 0.080 zbiorka armii, 2. PatrolAroundPoint Winterfell 0.020, 3. GoToSettlement Moat Cailin 0.010 "
+             "| najlepsza 0.080 / prog gry 0.200 (cel obecny 0.40, ponizej progu 4 z 4) | dlaczego stoi: najlepsza ponizej progu gry - zostaje przy starym rozkazie (4 z 4 mysli); "
+             "SCA: wyczerpane - cele oblezen x0.55 | SCA: cel BorderWar, operacja brak, wyczerpane tak (wrog 41000 / swoi 9000, fortece 12 zagrozone 1, wojen 9, wioski spladrowane 0), "
+             "chce pokoju tak, zakaz nowej armii nie.",
+    "ruler_p": "Wojna kanonu - wladca (264): dzien {d} | glowa rodu clan_vlandia_1: Tywin Lannister (lord_4_1, House Baratheon of King's Landing) | partia: w niewoli u Jeff's Party (gracza) "
+               "| AI: - | armia: brak | dzis: bitwy polowe 0, oblezenia 0, najazdy 0 (godzin oblezenia 0, bitwy 0, w osadzie 0/0) | mysl AI (mysli 0, latka TAK): - "
+               "| dlaczego stoi: w niewoli u gracza | SCA: cel ForcePeace, operacja brak, wyczerpane nie (wrog 1 / swoi 2, fortece 1 zagrozone 0, wojen 1, wioski spladrowane 0), "
+               "chce pokoju nie, zakaz nowej armii nie.",
+    "kingdom": "Wojna kanonu - krolestwo (264): dzien {d} | The North (battania) | wladca Robb Stark | partie lordow 31 (ludzi 2400, w osadach 20, w polu 11), armie 0 (partii 0) "
+               "| oblega teraz 0, oblegane osady 0 | dzis: bitwy polowe 1, oblezenia 0, najazdy 2 | wojny: vlandia (od dnia 8.7), freefolk (od dnia ?) | SCA: cel BorderWar, "
+               "operacja brak, wyczerpane tak (wrog 41000 / swoi 9000, fortece 12 zagrozone 1, wojen 9, wioski spladrowane 0), chce pokoju tak, zakaz nowej armii nie "
+               "| wrog wedlug SCA 41000 (9 frakcji; krolestwa 12000 z 2, bandy i inni 29000), swoi 9000 -> wyczerpane wzorem SCA (wrog > swoi x 1.35): z bandami {zb}, bez band {bb} "
+               "| potkniecia 0 (sesja 0).",
+    "kingdom_x": "Wojna kanonu - krolestwo (264): dzien {d} | - (riverlands) | krolestwa brak.",
+    "rotwait": "Pokoj a jency (M6a-3): dzien {d} | Riverlands - House Baratheon of King's Landing: para nie w wojnie, ale ROT wymusza te wojne (IsWarForced) - uwolnienie czeka na "
+               "wznowienie (najdluzej do 72 h od pokoju).",
+    "kept": "Pokoj a jency (M6a-3): dzien {d} | Riverlands - House Baratheon of King's Landing: znow w wojnie - uwolnienie odwolane, 7 jencow-bohaterow z chwili pokoju zostaje "
+            "w niewoli (gra uwolnilaby dzis 0) - ROT wznowil wojne.",
+    "freed": "Pokoj a jency (M6a-3): dzien {d} | Riverlands - House Baratheon of King's Landing: nadal pokoj - gra uwalnia 6 jencow-bohaterow (w chwili pokoju 7).",
+    "e7peace": "Wojna i pokoj (E7/0): dzien {d} | Riverlands - House Baratheon of King's Landing: POKOJ (przyczyna ByKingdomDecision, wola: KingdomPeaceAction.AcceptPeace <- "
+               "KingdomPeaceAction.ApplyPeaceInternal <- KingdomPeaceAction.ApplyPeace <- WarExhaustionManager.ConsiderPeaceActions [Bannerlord.Diplomacy]) | dni od poprzedniego "
+               "zdarzenia tej pary - (brak w pamieci sesji){t}",
+    "e7war": "Wojna i pokoj (E7/0): dzien {d} | House Baratheon of King's Landing - Riverlands: WOJNA (przyczyna Default, wola: TaleWorlds.CampaignSystem.Campaign.DailyTick "
+             "[TaleWorlds.CampaignSystem]) | dni od poprzedniego zdarzenia tej pary 1 (POKOJ) - NOWA WOJNA < 21 DNI PO POKOJU",
+    "resumed": "Wojny kanonu (m104): (4) Dorzecze - wojna korona-Dorzecze WZNOWIONA (dzien opowiesci 147.4, po pokoju z dnia 146.4; pierwsza od dnia 34) | korona w wojnie z "
+               "battania, riverlands; Dorzecze w wojnie z vlandia.",
+}
+
+
+def pokoj264_selftest():
+    T = P264_TEST
+    probs = []
+    cases = [("start", T["start"]), ("start", T["start"][:-1] + ". | proba autotestu: flaga armoury-pokoj264.flag TAK"),
+             ("block", T["block"].format(d=108982, p="Diplomacy zmeczenie wojna")),
+             ("block", T["block"].format(d=108982, p="decyzja krolestwa (AddDecision, wnioskodawca House Tully)")),
+             ("day", T["day"].format(d=108983, n=1, s=2, p=0)), ("test", T["test"].format(r="TAK")),
+             ("ruler", T["ruler"].format(d=108983, lab="Robb", f=0)), ("ruler", T["ruler_p"].format(d=108983)),
+             ("kingdom", T["kingdom"].format(d=108983, zb="tak", bb="nie")), ("kingdom", T["kingdom_x"].format(d=108983)),
+             ("rotwait", T["rotwait"].format(d=108983)), ("freed", T["freed"].format(d=108983)), ("resumed", T["resumed"])]
+    for name, line in cases:
+        if not P264_RX[name].match(line):
+            probs.append(name)
+    m = P264_RX["day"].match(T["day"].format(d=108983, n=3, s=5, p=0))
+    if m and (m.group(1) != "108983" or m.group(2) != "CZYNNA" or m.group(8) != "3" or m.group(10) != "5" or m.group(11) != "nie" or m.group(12) != "0"):
+        probs.append("day grupy")
+    m = P264_RX["day"].match(T["day"].format(d=1, n=0, s=0, p=0).replace(" [Diplomacy zmeczenie wojna 0]", "").replace("blokada CZYNNA (Robb zyje, RedWeddingEvent 0)",
+                                                                                                               "blokada KONIEC (Robb nie zyje, RedWeddingEvent 2 - ROT nie wymusza tej wojny)"))
+    if not m or m.group(2) != "KONIEC" or m.group(3) != "Robb nie zyje, RedWeddingEvent 2 - ROT nie wymusza tej wojny":
+        probs.append("day KONIEC")
+    # recenzja 264: blokada po koncu kanonu i droga gracza wladcy (znana droga P264-2 - przedrostek "Diplomacy zmeczenie wojna")
+    m = P264_RX["day"].match(T["day_rot"].format(d=9))
+    if not m or m.group(2) != "CZYNNA" or m.group(4) != "KONIEC" or m.group(6) != "CZYNNA" or m.group(11) != "tak" or "zmeczenie wojna - gracz wladca" not in (m.group(9) or ""):
+        probs.append("day ROT wymusza")
+    p_w = "Diplomacy zmeczenie wojna - gracz wladca, pokoj bez wyboru"
+    m = P264_RX["block"].match(T["block_rot"].format(d=9, p=p_w))
+    if not m or m.group(4) != p_w or not m.group(4).startswith(P264_PATHS) or m.group(6) != "Dorzecze-korona" or "ROT wymusza" not in m.group(5):
+        probs.append("block ROT wymusza")
+    m = P264_RX["block"].match(T["block"].format(d=5, p="decyzja krolestwa (AddDecision, wnioskodawca House Tully)"))
+    if not m or m.group(4) != "decyzja krolestwa (AddDecision, wnioskodawca House Tully)" or m.group(6) != "Dorzecze-korona":
+        probs.append("block grupy")
+    m = P264_RX["ruler"].match(T["ruler"].format(d=7, lab="Robb", f=2))
+    if not m or m.group(2) != "Robb" or m.group(7) != "2" or m.group(14) != "4" or m.group(20) != "4" or "ponizej progu" not in m.group(22):
+        probs.append("ruler grupy")
+    m = P264_RX["ruler"].match(T["ruler_p"].format(d=7))
+    if not m or m.group(17) is not None or m.group(22) != "w niewoli u gracza":
+        probs.append("ruler niewola")
+    m = P264_RX["kingdom"].match(T["kingdom"].format(d=7, zb="tak", bb="nie"))
+    if not m or m.group(3) != "battania" or m.group(5) != "31" or m.group(19) != "0" or "z bandami tak, bez band nie" not in m.group(18):
+        probs.append("kingdom grupy")
+    if not E7_WAR.match(T["e7peace"].format(d=1, t="")) or not E7_WAR.match(T["e7war"].format(d=1)) or not E7_WAR.match(T["e7peace"].format(d=1, t=" | POKOJ KANONU MIMO BLOKADY")):
+        probs.append("E7/0 z lancuchem wolajacych")
+    return ("nie pasuje: " + ", ".join(probs)) if probs else None
+
+
+def _p264_pair(a, b):
+    return tuple(sorted((a, b)))
+
+
+def pokoj264_collect(logp):
+    RX = P264_RX
+    D = {"starts": [], "blocks": [], "days": [], "tests": [], "rulers": [], "kingdoms": [], "rotwait": [], "freed": [], "e7": [], "resumed": [], "err": 0, "err1": "",
+         "against": [], "test_peace": 0, "bad_lines": [], "seq": []}
+    since = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            if "ERROR in CanonPeaceLock" in s or "ERROR in CanonWarWatch" in s:
+                D["err"] += 1
+                if not D["err1"]:
+                    D["err1"] = s[:160]
+                continue
+            if s.startswith("Wojna i pokoj (E7/0): dzien") and (": POKOJ (" in s or ": WOJNA (" in s):
+                me = E7_WAR.match(s)
+                if me:
+                    D["e7"].append((int(me.group(1)), _p264_pair(me.group(2), me.group(3)), me.group(4), s))
+                    D["seq"].append(("e7", len(D["e7"]) - 1))
+                if "POKOJ KANONU MIMO BLOKADY" in s:
+                    D["against"].append(s[:200])
+                elif "POKOJ KANONU (test 264)" in s:
+                    D["test_peace"] += 1
+                continue
+            if s.startswith("Pokoj a jency (M6a-3): dzien"):
+                mw = RX["rotwait"].match(s)
+                if mw:
+                    D["rotwait"].append(mw)
+                    continue
+                mf = RX["freed"].match(s)
+                if mf:
+                    D["freed"].append((int(mf.group(1)), _p264_pair(mf.group(2), mf.group(3)), s))
+                continue
+            if s.startswith("Wojny kanonu (m104): (4) Dorzecze - wojna korona-Dorzecze WZNOWIONA"):
+                mr = RX["resumed"].match(s)
+                D["resumed"].append(mr)
+                D["seq"].append(("res", len(D["resumed"]) - 1))
+                continue
+            if s.startswith("Wojna kanonu - wladca (264): "):
+                mr = RX["ruler"].match(s)
+                (D["rulers"] if mr else D["bad_lines"]).append(mr if mr else s[:120])
+                continue
+            if s.startswith("Wojna kanonu - krolestwo (264): "):
+                mk = RX["kingdom"].match(s)
+                (D["kingdoms"] if mk else D["bad_lines"]).append(mk if mk else s[:120])
+                continue
+            if not s.startswith(P264_TAG):
+                continue
+            r = s[len(P264_TAG):]
+            if r.startswith("latki - "):
+                D["starts"].append((RX["start"].match(s), s))
+                since = 0
+                D["seq"].append(("start", len(D["starts"]) - 1))
+            elif r.startswith("test - "):
+                mt = RX["test"].match(s)
+                if mt:
+                    D["tests"].append(mt)
+            elif r.startswith("dzien ") and " pokoj ZABLOKOWANY " in r:
+                mb = RX["block"].match(s)
+                if not mb:
+                    D["bad_lines"].append(s[:120])
+                    continue
+                D["blocks"].append(mb)
+                since += 1
+            elif r.startswith("dzien ") and " | blokada " in r:
+                md = RX["day"].match(s)
+                if not md:
+                    D["bad_lines"].append(s[:120])
+                    continue
+                D["days"].append((md, since))
+                D["seq"].append(("day", len(D["days"]) - 1))
+                since = 0
+    return D
+
+
+def pokoj264_rows(rep, D):
+    starts = D["starts"]
+    ok_starts = [m for m, _ in starts if m]
+    if not starts:
+        rep.add("P264-0: linia startu (latki ApplyPeace, AddDecision, IsAllowed, mysl AI)", "brak linii 264 (log sprzed paczki 264)", "INFO", None)
+    elif not ok_starts:
+        rep.add("P264-0: linia startu (latki ApplyPeace, AddDecision, IsAllowed, mysl AI)", "zly format: " + starts[-1][1][:100], "format jak w kodzie", False)
+    else:
+        m = ok_starts[-1]
+        hooks = [m.group(1), m.group(2), m.group(3), m.group(4)]
+        if m.group(5) != "tak":
+            rep.add("P264-0: linia startu (latki ApplyPeace, AddDecision, IsAllowed, mysl AI)", f"klucz nie, latki {hooks}", "INFO", None)
+        else:
+            rep.add("P264-0: linia startu (latki ApplyPeace, AddDecision, IsAllowed, mysl AI)", f"startow {len(starts)}, latki {hooks}, zakres {m.group(6)}", "4 x TAK",
+                    all(h == "TAK" for h in hooks))
+    has = bool(starts)
+    rep.add("P264-1: pokoj pary kanonu mimo czynnej blokady (E7/0 'POKOJ KANONU MIMO BLOKADY')",
+            f"{len(D['against'])}" + (f" ({D['against'][0][:140]})" if D["against"] else "") + f"; pokoje proby T6 (test 264) {D['test_peace']}",
+            "0", (len(D["against"]) == 0) if has else None)
+    bad_path = [m.group(4) for m in D["blocks"] if not m.group(4).startswith(P264_PATHS)]
+    under = [f"doba {md.group(1)}: linii {n}, licznik {md.group(8)}" for md, n in D["days"] if int(md.group(8)) < n]
+    paths = {}
+    for m in D["blocks"]:
+        k = m.group(4).split(" (")[0]
+        paths[k] = paths.get(k, 0) + 1
+    if not D["blocks"] and not D["days"]:
+        rep.add("P264-2: blokady z droga i licznik doby", "brak linii 264", "INFO", None)
+    else:
+        rep.add("P264-2: blokady z droga i licznik doby", f"linii ZABLOKOWANY {len(D['blocks'])} {paths}, bez znanej drogi {len(bad_path)}"
+                + (f" ({bad_path[0][:60]})" if bad_path else "") + (f", licznik doby ponizej linii: {under[:3]}" if under else ""),
+                "kazda linia z droga, licznik doby >= linie od poprzedniej doby", not bad_path and not under)
+    wars = [(d, p) for d, p, kind, _ in D["e7"] if kind == "WOJNA"]
+    viol = []
+    for d, p, s in D["freed"]:
+        if any(p == wp and d <= wd <= d + 2 for wd, wp in wars):
+            viol.append(f"doba {d}: {p[0]} - {p[1]}")
+    rep.add("P264-3: 'nadal pokoj' (M6a-3) dla pary z WOJNA w tej samej lub 2 nastepnych dobach",
+            f"{len(viol)}" + (f" {viol[:3]}" if viol else "") + f" | uwolnien 'nadal pokoj' {len(D['freed'])}, czekan na ROT {len(D['rotwait'])}",
+            "0 (log sprzed 264: dzien 108983 Riverlands - korona - NIE, dowod bledu)", len(viol) == 0)
+    rp = _p264_pair(P264_CROWN, P264_RIVER)
+    seq = D["seq"]
+    need, miss, unk = 0, [], 0
+    for i, (kind, j) in enumerate(seq):
+        if kind != "e7":
+            continue
+        d, p, k, s = D["e7"][j]
+        if p != rp or k != "WOJNA" or "NOWA WOJNA <" not in s:
+            continue
+        need += 1
+        days_seen, found, ended = 0, False, True
+        for kind2, j2 in seq[i + 1:]:
+            if kind2 == "res":
+                found = True
+                ended = False
+                break
+            if kind2 == "start":
+                ended = False
+                break
+            if kind2 == "day":
+                days_seen += 1
+                if days_seen >= 3:
+                    ended = False
+                    break
+        if not found:
+            if ended and days_seen < 3:
+                unk += 1
+            else:
+                miss.append(f"doba {d}")
+    if not has:
+        rep.add("P264-4: wznowiona wojna korona-Dorzecze ma linie m104 'WZNOWIONA'", f"wznowien (E7/0) {need}", "INFO (log sprzed 264)", None)
+    elif need == 0:
+        rep.add("P264-4: wznowiona wojna korona-Dorzecze ma linie m104 'WZNOWIONA'", "brak wznowien w logu", "INFO", None)
+    else:
+        rep.add("P264-4: wznowiona wojna korona-Dorzecze ma linie m104 'WZNOWIONA'", f"wznowien {need}, z linia {need - len(miss) - unk}, bez linii {miss[:3]}, koniec logu przed 3. doba {unk}",
+                "kazde wznowienie (koniec logu - INFO)", len(miss) == 0)
+    days = [md for md, _ in D["days"]]
+    na = [md for md in days if md.group(2) == "NIE DOTYCZY"]
+    rdays = {}
+    for m in D["rulers"]:
+        rdays.setdefault(int(m.group(1)), set()).add(m.group(2))
+    kdays = {}
+    for m in D["kingdoms"]:
+        kdays.setdefault(int(m.group(1)), set()).add(m.group(3))
+    want = [int(md.group(1)) for md in days if md.group(2) != "NIE DOTYCZY"]
+    short = [d for d in want if len(rdays.get(d, ())) < 4 or len(kdays.get(d, ())) < 3]
+    if not days:
+        rep.add("P264-5: linie wladcow (4) i krolestw (3) co dobe", "brak linii doby 264", "INFO", None)
+    elif not want:
+        rep.add("P264-5: linie wladcow (4) i krolestw (3) co dobe", f"dob {len(days)}, wszystkie 'NIE DOTYCZY' (kampania klasyczna)", "INFO", None)
+    else:
+        rep.add("P264-5: linie wladcow (4) i krolestw (3) co dobe", f"dob {len(want)}, z brakami {len(short)} {short[:5]}; linii wladcow {len(D['rulers'])}, krolestw "
+                f"{len(D['kingdoms'])}, nieczytelnych {len(D['bad_lines'])}" + (f" ({D['bad_lines'][0][:80]})" if D["bad_lines"] else ""),
+                "najwyzej 1 doba z brakiem, 0 nieczytelnych", len(short) <= 1 and not D["bad_lines"])
+    st = sum(int(md.group(12)) for md in days) + sum(int(m.group(19)) for m in D["kingdoms"] if m.group(19))
+    rep.add("P264-6: bledy i potkniecia CanonPeaceLock / CanonWarWatch", f"ERROR {D['err']}" + (f" ({D['err1']})" if D["err1"] else "") + f", potkniecia w liniach doby {st}",
+            "0 i 0", D["err"] == 0 and st == 0)
+    tests = D["tests"]
+    if not tests:
+        rep.add("P264-7: testy autotestu T1-T7", "brak linii testu", "INFO (bieg bez flagi armoury-pokoj264.flag)", None)
+    else:
+        res = {}
+        for m in tests:
+            res[m.group(1)] = m.group(3)
+        no = [k for k, v in res.items() if v == "NIE"]
+        miss_t = [t for t in ("T1", "T2", "T3", "T4", "T5a", "T5", "T6", "T7") if t not in res]
+        rep.add("P264-7: testy autotestu T1-T7", f"{res}" + (f", brak {miss_t}" if miss_t else ""), "zadnego NIE, wszystkie obecne (POMINIETY - INFO w wartosci)",
+                not no and not miss_t)
+    if D["rulers"]:
+        agg = {}
+        for m in D["rulers"]:
+            a = agg.setdefault(m.group(2), [0, 0, 0, 0, 0, 0, 0])
+            a[0] += 1
+            a[1] += 1 if m.group(12) == m.group(13) and int(m.group(13)) > 0 else 0
+            a[2] += int(m.group(14))
+            a[3] += int(m.group(20) or 0)
+            a[4] += int(m.group(7))
+            a[5] += int(m.group(8))
+            a[6] += 1 if "niewoli" in m.group(4) else 0
+        txt = "; ".join(f"{k}: dob {v[0]}, caly dzien w osadzie {v[1]}, mysli {v[2]} (ponizej progu {v[3]}), bitwy polowe {v[4]}, oblezenia {v[5]}, w niewoli {v[6]}"
+                        for k, v in agg.items())
+        hyp = sum(1 for m in D["kingdoms"] if m.group(18) and "z bandami tak, bez band nie" in m.group(18))
+        rep.add("P264-8: wladcy wojny kanonu i hipoteza SCA (INFO)", txt + f" | doby krolestw 'wyczerpane wzorem SCA z bandami tak, bez band nie' {hyp} z {len(D['kingdoms'])}",
+                "INFO (dlaczego Robb stoi)", None)
+    else:
+        rep.add("P264-8: wladcy wojny kanonu i hipoteza SCA (INFO)", "brak linii wladcow", "INFO", None)
+
+
+def pokoj264_synth():
+    import tempfile
+    import shutil
+    T = P264_TEST
+    P = "[10:00:00] "
+
+    def day_block(d, kind):
+        L = []
+        if kind == "good":
+            L.append(P + T["block"].format(d=d, p="Diplomacy zmeczenie wojna"))
+            L.append(P + T["day"].format(d=d, n=1, s=1, p=0))
+        else:
+            L.append(P + T["block"].format(d=d, p="cos innego"))
+            L.append(P + T["block"].format(d=d, p="Diplomacy zmeczenie wojna"))
+            L.append(P + T["day"].format(d=d, n=1, s=1, p=1))
+        for lab in ("Robb", "wladca korony", "wladca Dorzecza"):
+            L.append(P + T["ruler"].format(d=d, lab=lab, f=0))
+        if kind == "good":
+            L.append(P + T["ruler_p"].format(d=d))
+        for k in ("battania", "vlandia", "riverlands"):
+            L.append(P + T["kingdom"].format(d=d, zb="tak", bb="nie").replace("(battania)", "(" + k + ")"))
+        return L
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="p264_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind == "none":
+                L.append(P + "Armoury: inna linia")
+            else:
+                st = T["start"] if kind == "good" else T["start"].replace("IsAllowed TAK", "IsAllowed BRAK")
+                L.append(P + st[:-1] + ". | proba autotestu: flaga armoury-pokoj264.flag TAK")
+                for d in range(108982, 108988):
+                    L += day_block(d, kind)
+                    if d == 108983:
+                        L.append(P + T["e7peace"].format(d=d, t=(" | POKOJ KANONU (test 264)" if kind == "good" else " | POKOJ KANONU MIMO BLOKADY")))
+                        L.append(P + T["rotwait"].format(d=d + 1) if kind == "good" else P + T["freed"].format(d=d + 1))
+                        L.append(P + T["e7war"].format(d=d + 1))
+                        if kind == "good":
+                            L.append(P + T["kept"].format(d=d + 1))
+                    if d == 108985 and kind == "good":
+                        L.append(P + T["resumed"])
+                for t in ("T1", "T2", "T3", "T4", "T5a", "T5", "T6", "T7"):
+                    r = "TAK" if kind == "good" or t != "T6" else "NIE"
+                    L.append(P + T["test"].format(r=r).replace("T1 ApplyPeace", t + " ApplyPeace"))
+                if kind == "bad":
+                    L.append(P + "ERROR in CanonPeaceLock.AddDecisionPrefix (potkniecie 1): x")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            pokoj264_rows(rep, pokoj264_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"P264-0": "TAK", "P264-1": "TAK", "P264-2": "TAK", "P264-3": "TAK", "P264-4": "TAK", "P264-5": "TAK", "P264-6": "TAK", "P264-7": "TAK", "P264-8": "INFO"},
+        "bad": {"P264-0": "NIE", "P264-1": "NIE", "P264-2": "NIE", "P264-3": "NIE", "P264-4": "NIE", "P264-5": "NIE", "P264-6": "NIE", "P264-7": "NIE"},
+        "none": {"P264-0": "INFO", "P264-1": "INFO", "P264-2": "INFO", "P264-3": "TAK", "P264-4": "INFO", "P264-5": "INFO", "P264-6": "TAK", "P264-7": "INFO", "P264-8": "INFO"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def pokoj264_main(logp):
+    """pokoj264 (27.10, paczka 264): P264-S, P264-S2, P264-0..P264-8 - opis w komentarzu nad stalymi P264_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = pokoj264_selftest()
+    rep.add("P264-S: self-test wyrazen (linie kontrolne jak w kodzie C#: CanonPeaceLock.cs, CanonWarWatch.cs, PeaceHold.cs, Prologue.River.cs, WorldClock7.cs)",
+            s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = pokoj264_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("P264-S2: test syntetyczny (dobry, zly, bez linii 264)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("P264-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = pokoj264_collect(logp)
+    print(f"plik: {logp} | startow 264 {len(D['starts'])}, dob {len(D['days'])}, blokad {len(D['blocks'])}, wladcow {len(D['rulers'])}, krolestw {len(D['kingdoms'])}, "
+          f"testow {len(D['tests'])}, E7/0 {len(D['e7'])}, ERROR {D['err']}")
+    pokoj264_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_pokoj264_main_prev = main
+
+
+def main(argv):
+    # paczka 264: grupa pokoj264 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "pokoj264":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return pokoj264_main(rest[0] if rest else None)
+    return _pokoj264_main_prev(argv)
+
+# ------------------------------------------------------------ z268 (27.10, paczka 268 noc/268-gotowosc-zbroja: gotowosc p9 liczy zbroje na tulow, zamowienia zbroi
+# i helmow na caly brak - Jeff 27.10 "czemu wojsko czesto nie ma pancerza albo ma tylko ja zle trafiam i mam pecha", "tak zacznij od tych pieciu"; audyt 27.10
+# Lady Jana Lydden: 47 z 77 ludzi w tunice, R 67% "p9: gotowa"; Armoury/src/ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs,
+# MenUpgradeOrders.cs, NewLordKit.cs; klucze AiArmsCountsBodyArmour, AiArmourOrderFull)
+#   python -I tools/sprawdz_logi.py --grupa z268 <Armoury-*.log>
+# Z268-S self-test wyrazen (linie kontrolne jak w kodzie C#), Z268-S2 test syntetyczny (dobry, zly, bez linii 268). Z268-0 linia startu p9 z oboma kluczami;
+# Z268-1 segment 'zbroja na tulow (268)' w kazdej linii doby p9 (najwyzej 1 brak); Z268-2 przyczyny: tylko sloty + tylko zbroja + oba = poza armia (kazda doba);
+# Z268-3 (sprawdzian Lydden) zadna partia lorda AI w linii 159 P0 z 'B p9' ponizej progu wejscia i 'p9: gotowa' (ani 'niegotowa przez zbroje TAK' bez NIEGOTOWA);
+# Z268-4 linia 'Zbroja AI - zamowienia (268)' co dobe, w kazdej klasie i rodzaju zamowione szt. <= brak polki pustej i <= sufit x koszyki, zloto przy zamowieniu 0;
+# Z268-5 wyjazdy po zbroje > 0 w biegu -> dokupione korpusy > 0, sakiewka + kiesa pana = zl (kazda doba); Z268-6 potkniecia 0 i bez ERROR in ArmedStrength /
+# ArmsFirst / ArmourOrders / MenUpgradeOrders; Z268-7 autotest (flaga armoury-zbroja268.flag) T1-T6 bez NIE, T1/T2/T5 TAK; Z268-8 INFO pierwsza / ostatnia doba
+# (pokrycie korpusu i helmu lordow 'dowolny szczebel', platnerze przeniesieni, warsztaty BodyArmor / HeadArmor, cena korpusu lordow 174b, koszt p9 ms, tworzenie
+# armii, niegotowe przez zbroje, zamowienia Z1 zbroi bez limitu doby). Log bez linii 268 - INFO.
+Z268_RX = {
+    "start": re.compile(r"^Gotowosc do bitwy \(p9\): start sesji \|.*? \| AI Arms Counts Body Armour (TAK|NIE) \(tulow: niegotowa ponizej (\d+)%, gotowa od (\d+)% "
+                        r"ludzi z korpusem we wzorcu\) \| AI Armour Order Full (TAK|NIE) \|"),
+    "p9day": re.compile(r"^Gotowosc do bitwy \(p9\): dzien (\d+) \|"),
+    "low": re.compile(r"\| niegotowe \(R < (\d+)%, do (\d+)%\): poza armia (\d+), w tym bez pieniedzy (\d+), w armii (\d+), zwolnione z czekania \(po \d+ dobach walcza tym, co maja\) (\d+)"),
+    "body": re.compile(r"\| zbroja na tulow \(268\): klucz (TAK|NIE), srednio B (\d+%|-), B 0-25: (\d+), 25-50: (\d+), 50-75: (\d+), 75-100: (\d+), bez korpusu we wzorcu (\d+) "
+                       r"\| niegotowe poza armia wedlug przyczyny: tylko sloty (\d+), tylko zbroja (\d+), oba (\d+); nowe dzis (\d+), w tym przez zbroje (\d+)"),
+    "trip": re.compile(r"; 268: wyjazdy po zbroje \(B ponizej progu\) (\d+) \(teraz w toku (\d+)\), dokupione korpusy w wyjazdach (\d+) szt\. za (\d+) zl "
+                       r"\(sakiewka (\d+), kiesa pana (\d+); zakupow (\d+)\)"),
+    "cost": re.compile(r"\| przeliczen \d+ \(.*?\), koszt ([\d.]+) ms"),
+    "army": re.compile(r", tworzenie armii (\d+) partii"),
+    "p9st": re.compile(r", potkniecia (\d+)\.$"),
+    "afst": re.compile(r"\| potkniecia ArmsFirst (\d+)"),
+    "seg": re.compile(r"([^|]*?) \[(sojusznik|wrog|doba)\] ludzi (\d+) .*?\| R teraz (\d+)% \(\d+/\d+ slotow\), wpis DTE (?:TAK|NIE), p9: (.+?)(?:, czeka [\d.]+ dob)? "
+                      r"\| zbroja na tulow \(268\): B teraz (\d+)% \((\d+)/(\d+) ludzi\), B p9 (?:(\d+)% \(R p9 (\d+)%\)|-), niegotowa przez zbroje (TAK|NIE) \|"),
+    "ordhead": re.compile(r"^Zbroja AI - zamowienia \(268\): dzien (\d+) \| korpus i helm przy pustej polce (?:\[WL caly brak w granicach kiesy, najwyzej (\d+) szt\.\]"
+                          r"|W CIENIU \(AiArmourOrderFull\) - najwyzej 10 szt\.)"),
+    "ordwho": re.compile(r"^(lordowie AI|zalogi miast|zamowienia zamkow \(w miescie\)|lordowie w zamku \(miasto zamku\)): wizyt (\d+), z brakiem zbroi po zakupach (\d+)"
+                         r"(?:, bez miasta zamku (\d+), bez kiesy (\d+), zamek w wojnie (\d+))?;"),
+    "ordkind": re.compile(r"(korpus|helm) - brak (\d+) szt\., polka bez tieru i nizszego (\d+) koszykow / (\d+) szt\. - zamowione (\d+) \((\d+) szt\., ponad dawne 10: (\d+), "
+                          r"przyciete kiesa (\d+) szt\.\), juz zamowione (\d+), na polce zostala sztuka (\d+) koszykow / (\d+) szt\."),
+    "ordopen": re.compile(r"\| otwarte zamowienia w osadach: korpus (\d+) szt\. \((\d+) koszykow\), helm (\d+) szt\. \((\d+) koszykow\)"),
+    "ordprice": re.compile(r"\| cena sztuki wczoraj \(lordowie\): korpus (\d+) zl, helm (\d+) zl, wszystkie sztuki AI (\d+) zl"),
+    "ordtail": re.compile(r"\| zloto przy zamowieniu (\d+) \| potkniecia (\d+) \(zamek (\d+)\)\.$"),
+    "z1": re.compile(r"zbroja i helm bez limitu doby \(268, AI Armour Order Full (tak|nie)\): zamowien (\d+) za (\d+) szt\., w miescie zamku (\d+)(?: \(pominiete - jest na polce miasta zamku (\d+)\))?"),
+    "z1cap": re.compile(r"partia zamowila juz dzis (\d+)"),
+    "n159": re.compile(r"niegotowe przez zbroje na tulow \(268\): wszystkie (\d+), nowe druzyny niegotowe przez zbroje \(wiek do 7 dob\) (\d+)"),
+    "test": re.compile(r"^Zbroja \(268\): test - (T\d) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
+    "cov": re.compile(r"^Pokrycie zbrojowni AI \(171\): dzien (\d+) - partie rodow AI \((\d+) ludzi\): .*?\| dowolny szczebel: korpus (\d+)%, glowna bron (\d+)%, helm (\d+)%"),
+    "ws": re.compile(r"^Warsztaty: dzien (\d+) - wykonano (\d+) szt\. \[([^\]]*)\]"),
+    "plat": re.compile(r"rece przeniesione z cechow bez roboty: (\d+) \([^)]*?platnerz (\d+)"),
+    "b174": re.compile(r"^ZakupyAI wedlug kupujacego \(174b\): dzien (\d+) - lordowie \[[^\]]*?korpus (\d+)/(\d+) zl"),
+}
+Z268_ERR = ("ERROR in ArmedStrength", "ERROR in ArmsFirst", "ERROR in ArmourOrders", "ERROR in MenUpgradeOrders")
+# linie kontrolne - jak w kodzie C# (ArmedStrength.cs, ArmsFirst.cs, ArmourOrders.cs, NewLordKit.cs, MenUpgradeOrders.cs, ArmedStrength.Test.cs)
+Z268_TEST = {
+    "start": "Gotowosc do bitwy (p9): start sesji | klucze: AI Strength Counts Gear TAK (pelna sila od 75% slotow wzorca, ponizej liniowo do sily ludzi bez sprzetu P0 = 0.40), "
+             "AI Arms Before Battle TAK (niegotowa ponizej 50%, gotowa od 60%, miasto najwyzej 3 dob drogi, wytchnienie miasta 3 dob, bandy wolno, czekanie najwyzej 12 dob "
+             "- potem walczy tym, co ma, do gotowosci albo pieniedzy na sprzet) | AI Arms Counts Body Armour {k} (tulow: niegotowa ponizej 50%, gotowa od 60% ludzi z korpusem "
+             "we wzorcu) | AI Armour Order Full TAK | regula: lordowie i druzyna gracza TAK, zalogi TAK | AI Autobattle Counts Gear TAK | latki: sila partii wpieta | x | pelny "
+             "przeglad partii w pierwszych godzinach (najwyzej 400 na godzine, lordowie najpierw); do przeliczenia F = 1.",
+    "p9day": "Gotowosc do bitwy (p9): dzien {d} | sila z uzbrojeniem TAK | partie lordow (bez gracza): 730, R srednio 67%, R 0-25: 74, 25-50: 96, 50-75: 175, 75-100: 363, "
+             "F srednio 0.88, najmniejsze 0.24 Forim's Party (97 ludzi, R 4%) | R lordow wedlug krolestw (srednio, partii, niegotowych): aserai 73% (57, 7) | gracz: R 95%, F 1.00 "
+             "| zalogi: 925, R srednio 90%, z F < 1: 12 | niegotowe (R < 50%, do 60%): poza armia {low}, w tym bez pieniedzy 5, w armii 12, zwolnione z czekania (po 12 dobach "
+             "walcza tym, co maja) 3 (dzis nowe 1, powrot do dozbrajania - stac na sprzet 0) | zbroja na tulow (268): klucz TAK, srednio B 81%, B 0-25: 20, 25-50: 40, 50-75: 150, "
+             "75-100: 500, bez korpusu we wzorcu 20 | niegotowe poza armia wedlug przyczyny: tylko sloty {cs}, tylko zbroja {cb}, oba {co}; nowe dzis 9, w tym przez zbroje 4; "
+             "gracz B 100% (40/40) | autobitwa (ta sama regula, AI Autobattle Counts Gear TAK): ciosy z poprawka 100 (zadane przez slabo uzbrojonych 50, otrzymane 60, sredni "
+             "mnoznik ciosu 0.90, potkniecia 0) | jada po sprzet: nowe wyjazdy 11, teraz w drodze 5 i na miejscu 2, dojechaly 3, dozbrojone 2, postoj przedluzony (postep i dalej "
+             "stac) 1, po wizycie czesciowo 1 i bez poprawy 0, za dlugo w drodze 0, bez miasta w zasiegu 2 partii, w miescie nie stac (rezerwa napraw z materialem) 0, po 2 "
+             "wizytach bez postepu bez wyjazdow 0 partii (mysli 0), wyjazd przerwany zwolnieniem z czekania 0, cel zablokowany cudza latka (wynik <= -1, wytchnienie i nastepne "
+             "miasto) 0, w miescie nie stac na pelne, stac na pierwsza bron (wyjazd) 0, wyjazd po pierwsza bron czeka na obrone osady krolestwa (mysli) 0, w wytchnieniu 4 par "
+             "partia-miasto; 268: wyjazdy po zbroje (B ponizej progu) {tb} (teraz w toku 3), dokupione korpusy w wyjazdach {k} szt. za {g} zl (sakiewka {sp}, kiesa pana {kl}; "
+             "zakupow 4) | odmowy: atak 3 partii (5 razy), opcje bitwy zgaszone 40 (mysli bez pieniedzy 2 partii), obrona wlasnej osady zostawiona 0, glod (bez zmian) 0, "
+             "tworzenie armii 2 partii, kandydaci armii przed progiem gry 1 i po nim 0 (armia ponizej progu 1000 po odjeciu 0), wezwania BK 0, okno armii gracza 0 | potkniecia "
+             "ArmsFirst 0 | przyklady: Lady Jana Lydden's Party (77 ludzi, R 67%, B 39% (30/77), przyczyna zbroja, F 0.94, brak do progu 17 szt., czeka 0.5 dob, budzet 4795 z 690, "
+             "cel Lannisport) | przeliczen 1300 (pelny przeglad 0 z 925, w kolejce 0, brudnych czeka 0), koszt 240.5 ms, publikacji 24, wyzerowan pamieci sily 30, lup DTE bez "
+             "mnoznika 0, zbrojownie nieczytelne 0, zalogi ilu zostawic / wziac bez mnoznika 10, zegary czekania z zapisu przywrocone dzis 0 (czeka na przeliczenie 0), potkniecia {p}.",
+    "p0": "Bitwa gracza (159 P0, misja DTE): partie lordow AI 1 || Lady Jana Lydden's Party [wrog] ludzi 77 (rannych 0) | R teraz 67% (282/420 slotow), wpis DTE TAK, "
+          "p9: {st}, czeka 0.5 dob | zbroja na tulow (268): B teraz 39% (30/77 ludzi), B p9 {b9}% (R p9 67%), niegotowa przez zbroje {nz} | cel p9 Lannisport, stoi: - | zloto wodza "
+          "19180, budzet AiGear 4795 z potrzebnych 690 | w armii NIE | powstala sprzed wczytania | AI GoToSettlement -> Lannisport, krotko GoToSettlement | plan 159: -.",
+    "ord": "Zbroja AI - zamowienia (268): dzien {d} | korpus i helm przy pustej polce [WL caly brak w granicach kiesy, najwyzej 60 szt.] | lordowie AI: wizyt 30, z brakiem zbroi po "
+           "zakupach 12; korpus - brak 300 szt., polka bez tieru i nizszego 8 koszykow / 200 szt. - zamowione 6 ({op} szt., ponad dawne 10: 90, przyciete kiesa 20 szt.), juz "
+           "zamowione 2, na polce zostala sztuka 3 koszykow / 100 szt.; helm - brak 50 szt., polka bez tieru i nizszego 2 koszykow / 30 szt. - zamowione 2 (30 szt., ponad dawne "
+           "10: 10, przyciete kiesa 0 szt.), juz zamowione 0, na polce zostala sztuka 1 koszykow / 20 szt. | zalogi miast: wizyt 90, z brakiem zbroi po zakupach 10; korpus - "
+           "brak 20 szt., polka bez tieru i nizszego 1 koszykow / 20 szt. - zamowione 1 (20 szt., ponad dawne 10: 10, przyciete kiesa 0 szt.), juz zamowione 0, na polce zostala "
+           "sztuka 0 koszykow / 0 szt.; helm - brak 0 szt., polka bez tieru i nizszego 0 koszykow / 0 szt. - zamowione 0 (0 szt., ponad dawne 10: 0, przyciete kiesa 0 szt.), juz "
+           "zamowione 0, na polce zostala sztuka 0 koszykow / 0 szt. | zamowienia zamkow (w miescie): wizyt 40, z brakiem zbroi po zakupach 5; korpus - brak 0 szt., polka bez "
+           "tieru i nizszego 0 koszykow / 0 szt. - zamowione 0 (0 szt., ponad dawne 10: 0, przyciete kiesa 0 szt.), juz zamowione 0, na polce zostala sztuka 0 koszykow / 0 szt.; "
+           "helm - brak 0 szt., polka bez tieru i nizszego 0 koszykow / 0 szt. - zamowione 0 (0 szt., ponad dawne 10: 0, przyciete kiesa 0 szt.), juz zamowione 0, na polce "
+           "zostala sztuka 0 koszykow / 0 szt. | lordowie w zamku (miasto zamku): wizyt 15, z brakiem zbroi po zakupach 9, bez miasta zamku 1, bez kiesy 2, zamek w wojnie 0; "
+           "korpus - brak 90 szt., polka bez tieru i nizszego 5 koszykow / 90 szt. - zamowione 5 (70 szt., ponad dawne 10: 30, przyciete kiesa 0 szt.), juz zamowione 0, na "
+           "polce zostala sztuka 0 koszykow / 0 szt.; helm - brak 0 szt., polka bez tieru i nizszego 0 koszykow / 0 szt. - zamowione 0 (0 szt., ponad dawne 10: 0, przyciete "
+           "kiesa 0 szt.), juz zamowione 0, na polce zostala sztuka 0 koszykow / 0 szt. | otwarte zamowienia w osadach: korpus 2400 szt. (90 koszykow), helm 800 szt. (40 "
+           "koszykow) | cena sztuki wczoraj (lordowie): korpus 69 zl, helm 30 zl, wszystkie sztuki AI 34 zl | zloto przy zamowieniu {g} | potkniecia {p} (zamek 0).",
+    "z1": "Dozbrajanie: dzien {d} - gracz 0/0 | brak lepszej na polce 10396 (E3-Z1: na suficie tieru 1076, pod sufitem bez towaru 9320; zamowienia tier+1 (Men Upgrade Orders "
+          "tak) 300 za 900 szt., pominiete: partia zamowila juz dzis 4000, ten sam rodzaj w 7 dobach 10, bez miasta w wizycie 900, amunicja 482; zbroja i helm bez limitu doby "
+          "(268, AI Armour Order Full tak): zamowien 200 za 600 szt., w miescie zamku 40 (pominiete - jest na polce miasta zamku 12); czyszczenia slownika zamowien wpisu 81 dzis 0 (cel 0); potkniecia 0 (sesja 0)), x.",
+    "n159": "Nowe druzyny i sprzet (159): dzien {d} | klucze: x | SPIS (P0): partie lordow AI 700, bez wpisu DTE 3, R = 0 (z brakiem wpisu) 3; wedlug wieku partii (wszystkie/bez "
+            "wpisu/R=0): < 1 doby 1/0/0, 1-3 2/0/0, 3-7 3/0/0, 7+ 4/0/0, sprzed wczytania (wiek nieznany) 690/3/3; niegotowe przez zbroje na tulow (268): wszystkie 30, nowe "
+            "druzyny niegotowe przez zbroje (wiek do 7 dob) 5 | P0 niegotowe poza armia - 3 najnizsze R (stan po regule 2): brak | przyklady: brak | zapis: wczytane 0 | potkniecia 0.",
+    "test": "Zbroja (268): test - {t} regula LowRule i przyczyna: przypadkow 7, zle 0 - wynik {r}.",
+}
+
+
+def z268_selftest():
+    T = Z268_TEST
+    R = Z268_RX
+    probs = []
+    st = T["start"].format(k="TAK")
+    d = T["p9day"].format(d=109010, low=50, cs=20, cb=25, co=5, tb=7, k=40, g=2760, sp=760, kl=2000, p=0)
+    checks = (("start", st), ("p9day", d), ("low", d), ("body", d), ("trip", d), ("cost", d), ("army", d), ("p9st", d), ("afst", d),
+              ("ordhead", T["ord"].format(d=109010, op=150, g=0, p=0)), ("ordtail", T["ord"].format(d=109010, op=150, g=0, p=0)),
+              ("ordopen", T["ord"].format(d=109010, op=150, g=0, p=0)), ("ordprice", T["ord"].format(d=109010, op=150, g=0, p=0)),
+              ("z1", T["z1"].format(d=109010)), ("z1cap", T["z1"].format(d=109010)), ("n159", T["n159"].format(d=109010)), ("test", T["test"].format(t="T1", r="TAK")))
+    for name, line in checks:
+        if not R[name].search(line):
+            probs.append(name)
+    m = R["body"].search(d)
+    if m and (m.group(1) != "TAK" or m.group(8) != "20" or m.group(9) != "25" or m.group(10) != "5" or m.group(12) != "4"):
+        probs.append("body grupy")
+    m = R["trip"].search(d)
+    if m and (m.group(1) != "7" or m.group(3) != "40" or m.group(4) != "2760" or m.group(5) != "760" or m.group(6) != "2000"):
+        probs.append("trip grupy")
+    m = R["low"].search(d)
+    if m and (m.group(1) != "50" or m.group(3) != "50"):
+        probs.append("low grupy")
+    p0 = T["p0"].format(st="gotowa (F 0.94)", b9=39, nz="NIE")
+    segs = [x for x in (R["seg"].search(pc) for pc in p0.split(" || ")) if x]
+    if len(segs) != 1 or segs[0].group(5) != "gotowa (F 0.94)" or segs[0].group(9) != "39" or segs[0].group(11) != "NIE" or segs[0].group(6) != "39":
+        probs.append("seg")
+    p0n = T["p0"].format(st="NIEGOTOWA", b9=39, nz="TAK").replace("B p9 39% (R p9 67%)", "B p9 -")
+    sn = [x for x in (R["seg"].search(pc) for pc in p0n.split(" || ")) if x]
+    if len(sn) != 1 or sn[0].group(9) is not None or sn[0].group(5) != "NIEGOTOWA":
+        probs.append("seg bez B p9")
+    o = T["ord"].format(d=109010, op=150, g=0, p=0)
+    parts = o.split(" | ")
+    whos = [R["ordwho"].match(pc) for pc in parts]
+    whos = [w for w in whos if w]
+    kinds = [list(R["ordkind"].finditer(pc)) for pc in parts if R["ordwho"].match(pc)]
+    if len(whos) != 4 or any(len(k) != 2 for k in kinds) or whos[3].group(4) != "1" or kinds[0][0].group(6) != "150":
+        probs.append("ord klasy")
+    if not R["ordhead"].match(o.replace("[WL caly brak w granicach kiesy, najwyzej 60 szt.]", "W CIENIU (AiArmourOrderFull) - najwyzej 10 szt.")):
+        probs.append("ordhead cien")
+    if R["start"].search(st.replace(" | AI Armour Order Full TAK", "")):
+        probs.append("start bez klucza zamowien pasuje")
+    return ("nie pasuje: " + ", ".join(probs)) if probs else None
+
+
+def z268_collect(logp):
+    R = Z268_RX
+    D = {"p9starts": 0, "starts": [], "p9days": [], "bodyless": [], "low": {}, "body": {}, "trip": {}, "cost": {}, "army": {}, "p9st": {}, "afst": {},
+         "segs": [], "ord": [], "ordbad": [], "z1": [], "n159": [], "tests": [], "err": 0, "err1": "", "cov": [], "ws": [], "plat": [], "b174": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            if s.startswith("ERROR in "):
+                if s.startswith(Z268_ERR):
+                    D["err"] += 1
+                    if not D["err1"]:
+                        D["err1"] = s[:160]
+                continue
+            if s.startswith("Gotowosc do bitwy (p9): start sesji"):
+                D["p9starts"] += 1
+                ms = R["start"].search(s)
+                if ms:
+                    D["starts"].append(ms)
+                continue
+            if s.startswith("Gotowosc do bitwy (p9): dzien "):
+                md = R["p9day"].match(s)
+                if not md:
+                    continue
+                d = int(md.group(1))
+                D["p9days"].append(d)
+                mb = R["body"].search(s)
+                if not mb:
+                    D["bodyless"].append(d)
+                else:
+                    D["body"][d] = mb
+                for k in ("low", "trip", "cost", "army", "p9st", "afst"):
+                    mk = R[k].search(s)
+                    if mk:
+                        D[k][d] = mk
+                continue
+            if s.startswith("Bitwa gracza (159 P0") or s.startswith("Nowe druzyny i sprzet (159): dzien"):
+                if s.startswith("Nowe druzyny i sprzet (159): dzien"):
+                    mn = R["n159"].search(s)
+                    if mn:
+                        D["n159"].append(mn)
+                for pc in s.split(" || "):
+                    sg = R["seg"].search(pc)
+                    if sg:
+                        D["segs"].append(sg)
+                continue
+            if s.startswith("Zbroja AI - zamowienia (268): dzien"):
+                mh = R["ordhead"].match(s)
+                mt = R["ordtail"].search(s)
+                if not mh or not mt:
+                    D["ordbad"].append("zly format: " + s[:90])
+                    continue
+                cls = []
+                for pc in s.split(" | "):
+                    mw = R["ordwho"].match(pc)
+                    if mw:
+                        cls.append((mw, list(R["ordkind"].finditer(pc))))
+                D["ord"].append({"day": int(mh.group(1)), "cap": int(mh.group(2)) if mh.group(2) else 10, "cls": cls, "gold": int(mt.group(1)), "st": int(mt.group(2)),
+                                 "open": R["ordopen"].search(s), "price": R["ordprice"].search(s)})
+                continue
+            if s.startswith("Zbroja (268): test - "):
+                mt = R["test"].match(s)
+                D["tests"].append((mt.group(1), mt.group(3), mt.group(2)) if mt else ("?", "NIE", s[:100]))
+                continue
+            if "E3-Z1:" in s:
+                mz = R["z1"].search(s)
+                mc = R["z1cap"].search(s)
+                if mz:
+                    D["z1"].append((mz, mc))
+                continue
+            if s.startswith("Pokrycie zbrojowni AI (171)"):
+                mc = R["cov"].match(s)
+                if mc:
+                    D["cov"].append(mc)
+                continue
+            if s.startswith("Warsztaty: dzien"):
+                mw = R["ws"].match(s)
+                mp = R["plat"].search(s)
+                if mw:
+                    D["ws"].append(mw)
+                if mp:
+                    D["plat"].append((int(mw.group(1)) if mw else -1, mp))
+                continue
+            if s.startswith("ZakupyAI wedlug kupujacego (174b)"):
+                mb = R["b174"].match(s)
+                if mb:
+                    D["b174"].append(mb)
+    return D
+
+
+def z268_rows(rep, D):
+    starts = D["starts"]
+    below, key_on = 50, True
+    if not starts:
+        rep.add("Z268-0: linia startu p9 z kluczami 268", f"startow p9 {D['p9starts']}, z czescia 268 0", "INFO (log sprzed 268)" if D["p9starts"] else "INFO (brak p9)", None)
+    else:
+        m = starts[-1]
+        below, key_on = int(m.group(2)), m.group(1) == "TAK"
+        rep.add("Z268-0: linia startu p9 z kluczami 268", f"startow {len(starts)}, AI Arms Counts Body Armour {m.group(1)} (ponizej {m.group(2)}%, od {m.group(3)}%), "
+                f"AI Armour Order Full {m.group(4)}", "oba TAK (NIE - INFO)", True if (m.group(1) == "TAK" and m.group(4) == "TAK") else None)
+    days = D["p9days"]
+    has268 = bool(D["body"]) or bool(starts)
+    if not has268:
+        rep.add("Z268-1: segment 'zbroja na tulow (268)' w linii doby p9", f"dob p9 {len(days)}, z segmentem 0", "INFO (log sprzed 268)", None)
+    else:
+        miss = sorted(set(D["bodyless"]))
+        rep.add("Z268-1: segment 'zbroja na tulow (268)' w linii doby p9", f"dob p9 {len(days)}, z segmentem {len(D['body'])}, bez {miss[:5]}", "najwyzej 1 brak", len(miss) <= 1)
+    bad2 = []
+    for d, mb in sorted(D["body"].items()):
+        ml = D["low"].get(d)
+        if not ml:
+            bad2.append(f"{d}: brak segmentu niegotowych")
+            continue
+        s3 = int(mb.group(8)) + int(mb.group(9)) + int(mb.group(10))
+        if s3 != int(ml.group(3)):
+            bad2.append(f"{d}: {mb.group(8)}+{mb.group(9)}+{mb.group(10)} != {ml.group(3)}")
+    if not D["body"]:
+        rep.add("Z268-2: przyczyny = poza armia", "brak segmentu 268", "INFO", None)
+    else:
+        last = D["body"][max(D["body"])]
+        rep.add("Z268-2: przyczyny = poza armia", f"dob {len(D['body'])}, niezgodne {len(bad2)}" + (f" ({'; '.join(bad2[:3])})" if bad2 else "")
+                + f" | ostatnia doba: tylko sloty {last.group(8)}, tylko zbroja {last.group(9)}, oba {last.group(10)}, srednio B {last.group(2)}", "suma == poza armia", not bad2)
+    segs = D["segs"]
+    lyd, mis, stale, n9 = [], [], 0, 0
+    for sg in segs:
+        state, b9, nz = sg.group(5), sg.group(9), sg.group(11)
+        ready = state.startswith("gotowa") or state.startswith("nie niegotowa")
+        if nz == "TAK" and not state.startswith("NIEGOTOWA"):
+            mis.append(f"{sg.group(1).split(': ')[-1].strip()} ({state})")
+        if b9 is None:
+            continue
+        n9 += 1
+        if key_on and ready and int(b9) < below:
+            lyd.append(f"{sg.group(1).split(': ')[-1].strip()} B p9 {b9}% p9: {state}")
+        if ready and int(sg.group(6)) < below:
+            stale += 1
+    if not segs:
+        rep.add("Z268-3: sprawdzian Lydden (159 P0: B p9 ponizej progu i 'gotowa')", "brak opisow partii z czescia 268", "INFO (brak bitew gracza albo log sprzed 268)", None)
+    else:
+        rep.add("Z268-3: sprawdzian Lydden (159 P0: B p9 ponizej progu i 'gotowa')", f"opisow partii {len(segs)} (z B p9 {n9}), gotowych z B p9 < {below}%: {len(lyd)}"
+                + (f" ({'; '.join(lyd[:3])})" if lyd else "") + f", 'niegotowa przez zbroje TAK' bez NIEGOTOWA {len(mis)}" + (f" ({'; '.join(mis[:2])})" if mis else "")
+                + f" | INFO: gotowe z B teraz < {below}% (zbrojownia zmienila sie od przeliczenia) {stale}", "0 i 0", not lyd and not mis)
+    ords = D["ord"]
+    bad4 = list(D["ordbad"])
+    for o in ords:
+        if o["gold"] != 0:
+            bad4.append(f"{o['day']}: zloto przy zamowieniu {o['gold']}")
+        cap = max(10, o["cap"])
+        for mw, ks in o["cls"]:
+            for k in ks:
+                emp, ordn, opcs = int(k.group(4)), int(k.group(5)), int(k.group(6))
+                if opcs > emp or opcs > cap * ordn:
+                    bad4.append(f"{o['day']} {mw.group(1)} {k.group(1)}: zamowione {opcs} szt. przy pustej polce {emp} szt., {ordn} koszykow x {cap}")
+        if len(o["cls"]) != 4:
+            bad4.append(f"{o['day']}: klas {len(o['cls'])}")
+    odays = {o["day"] for o in ords}
+    omiss = sorted(set(days) - odays) if days else []
+    if not ords and not has268:
+        rep.add("Z268-4: zamowienia zbroi (268) co dobe, zamowione <= brak i sufit, zloto 0", "brak linii", "INFO (log sprzed 268)", None)
+    else:
+        tot = {}
+        for o in ords:
+            for mw, ks in o["cls"]:
+                for k in ks:
+                    t = tot.setdefault(mw.group(1) + " " + k.group(1), [0, 0, 0])
+                    t[0] += int(k.group(6)); t[1] += int(k.group(7)); t[2] += int(k.group(8))
+        z1 = D["z1"]
+        z1t = (f" | Z1 zbroja bez limitu doby: zamowien {sum(int(a.group(2)) for a, _ in z1)} za {sum(int(a.group(3)) for a, _ in z1)} szt., w miescie zamku "
+               f"{sum(int(a.group(4)) for a, _ in z1)} (pominiete - jest na polce miasta zamku {sum(int(a.group(5) or 0) for a, _ in z1)}), 'partia zamowila juz dzis' (inne typy) {sum(int(c.group(1)) for _, c in z1 if c)}") if z1 else ""
+        rep.add("Z268-4: zamowienia zbroi (268) co dobe, zamowione <= brak i sufit, zloto 0", f"dob z linia {len(ords)}, braki wobec p9 {omiss[:5]}, problemy {len(bad4)}"
+                + (f" ({'; '.join(bad4[:3])})" if bad4 else "") + " | zamowione szt. (ponad dawne 10, przyciete kiesa): "
+                + ", ".join(f"{k} {v[0]} ({v[1]}, {v[2]})" for k, v in tot.items() if v[0] or v[2]) + z1t,
+                "linia co dobe (najwyzej 1 brak), zamowione <= pusta polka i <= sufit x koszyki, zloto przy zamowieniu 0", not bad4 and len(omiss) <= 1 and len(ords) > 0)
+    trips = D["trip"]
+    if not trips:
+        rep.add("Z268-5: wyjazdy po zbroje -> dokupione korpusy, sakiewka + kiesa = zl", "brak segmentu", "INFO (log sprzed 268)", None)
+    else:
+        tb = sum(int(m.group(1)) for m in trips.values())
+        pcs = sum(int(m.group(3)) for m in trips.values())
+        g = sum(int(m.group(4)) for m in trips.values())
+        badsum = [d for d, m in trips.items() if int(m.group(5)) + int(m.group(6)) != int(m.group(4))]
+        if tb == 0:
+            rep.add("Z268-5: wyjazdy po zbroje -> dokupione korpusy, sakiewka + kiesa = zl", f"wyjazdow po zbroje 0, korpusow w wyjazdach {pcs}, niezgodne sumy {badsum[:3]}",
+                    "INFO (brak wyjazdow po zbroje)", None if not badsum else False)
+        else:
+            rep.add("Z268-5: wyjazdy po zbroje -> dokupione korpusy, sakiewka + kiesa = zl", f"wyjazdow po zbroje {tb}, korpusow kupionych w wyjazdach {pcs} za {g} zl "
+                    f"(sakiewka {sum(int(m.group(5)) for m in trips.values())}, kiesa pana {sum(int(m.group(6)) for m in trips.values())}), niezgodne sumy {badsum[:3]}",
+                    "korpusy > 0 i sumy zgodne", pcs > 0 and not badsum)
+    st9 = sum(int(m.group(1)) for m in D["p9st"].values())
+    staf = max([int(m.group(1)) for m in D["afst"].values()] or [0])
+    sto = sum(o["st"] for o in ords)
+    rep.add("Z268-6: potkniecia i ERROR", f"p9 (suma dob) {st9}, ArmsFirst (najwiecej) {staf}, zamowienia zbroi {sto}, ERROR in ArmedStrength/ArmsFirst/ArmourOrders/MenUpgradeOrders "
+            f"{D['err']}" + (f" ({D['err1']})" if D["err1"] else ""), "0", st9 == 0 and staf == 0 and sto == 0 and D["err"] == 0)
+    tests = D["tests"]
+    if not tests:
+        rep.add("Z268-7: autotest 268 (T1-T6)", "brak linii proby", "INFO (bez flagi armoury-zbroja268.flag albo DLL autotestu)", None)
+    else:
+        res = {}
+        for t, r, w in tests:
+            res[t] = r
+        nie = [f"{t}: {w[:80]}" for t, r, w in tests if r == "NIE"]
+        must = all(res.get(t) == "TAK" for t in ("T1", "T2", "T5"))
+        skip0 = res.get("T0") == "POMINIETY"
+        rep.add("Z268-7: autotest 268 (T1-T6)", ", ".join(f"{t} {r}" for t, r in sorted(res.items())) + (f" | NIE: {'; '.join(nie[:3])}" if nie else ""),
+                "bez NIE, T1/T2/T5 TAK (T0 POMINIETY - INFO)", None if skip0 else (not nie and must))
+    info = []
+    cov = D["cov"]
+    if cov:
+        info.append(f"pokrycie lordow (dowolny szczebel) korpus {cov[0].group(3)}% -> {cov[-1].group(3)}%, helm {cov[0].group(5)}% -> {cov[-1].group(5)}% "
+                    f"(d{cov[0].group(1)} -> d{cov[-1].group(1)})")
+    if D["plat"]:
+        info.append(f"platnerze przeniesieni (wedlug braku) {D['plat'][0][1].group(2)} -> {D['plat'][-1][1].group(2)}")
+    if D["ws"]:
+        def wk(m, k):
+            mm = re.search(k + r" (\d+)", m.group(3))
+            return mm.group(1) if mm else "0"
+        info.append(f"warsztaty BodyArmor {wk(D['ws'][0], 'BodyArmor')} -> {wk(D['ws'][-1], 'BodyArmor')}, HeadArmor {wk(D['ws'][0], 'HeadArmor')} -> {wk(D['ws'][-1], 'HeadArmor')}")
+    if D["b174"]:
+        f, l = D["b174"][0], D["b174"][-1]
+        pf = int(f.group(3)) // max(1, int(f.group(2)))
+        pl = int(l.group(3)) // max(1, int(l.group(2)))
+        info.append(f"cena korpusu lordow (174b) {pf} zl -> {pl} zl")
+    if D["cost"]:
+        ks = sorted(D["cost"])
+        info.append(f"koszt p9 {D['cost'][ks[0]].group(1)} ms -> {D['cost'][ks[-1]].group(1)} ms")
+    if D["army"]:
+        ks = sorted(D["army"])
+        info.append(f"tworzenie armii (odmowy) {D['army'][ks[0]].group(1)} -> {D['army'][ks[-1]].group(1)}")
+    if D["body"]:
+        ks = sorted(D["body"])
+        info.append(f"niegotowe tylko przez zbroje {D['body'][ks[0]].group(9)} -> {D['body'][ks[-1]].group(9)}, srednio B {D['body'][ks[0]].group(2)} -> {D['body'][ks[-1]].group(2)}")
+    if D["n159"]:
+        info.append(f"159: niegotowe przez zbroje {D['n159'][-1].group(1)}, nowe druzyny {D['n159'][-1].group(2)} (ostatnia doba)")
+    if ords and ords[-1]["price"]:
+        p = ords[-1]["price"]
+        info.append(f"cena wczoraj (linia 268) korpus {p.group(1)} zl, helm {p.group(2)} zl")
+    rep.add("Z268-8: pierwsza / ostatnia doba (pokrycie, platnerze, warsztaty, ceny, koszt, armie)", " | ".join(info) if info else "brak linii", "INFO (porownanie z baza)", None)
+
+
+def z268_synth():
+    import tempfile
+    import shutil
+    T = Z268_TEST
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="z268_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            P = "[10:00:00] "
+            L = []
+            if kind == "none":
+                L.append(P + "Gotowosc do bitwy (p9): start sesji | klucze: x | regula: y")
+                for d in range(109000, 109004):
+                    L.append(P + "Gotowosc do bitwy (p9): dzien %d | sila z uzbrojeniem TAK | potkniecia 0." % d)
+            else:
+                good = kind == "good"
+                L.append(P + T["start"].format(k="TAK"))
+                for i, d in enumerate(range(109000, 109006)):
+                    if good:
+                        L.append(P + T["p9day"].format(d=d, low=50, cs=20, cb=25, co=5, tb=7, k=40, g=2760, sp=760, kl=2000, p=0))
+                        L.append(P + T["ord"].format(d=d, op=150, g=0, p=0))
+                        L.append(P + T["z1"].format(d=d))
+                        L.append(P + T["n159"].format(d=d))
+                        L.append(P + T["p0"].format(st="NIEGOTOWA", b9=39, nz="TAK"))
+                    else:
+                        if i in (2, 3):
+                            L.append(P + "Gotowosc do bitwy (p9): dzien %d | sila z uzbrojeniem TAK | potkniecia 0." % d)
+                            continue
+                        L.append(P + T["p9day"].format(d=d, low=50, cs=20, cb=20, co=5, tb=7, k=0, g=100, sp=10, kl=20, p=1))
+                        L.append(P + T["ord"].format(d=d, op=250, g=15, p=0))
+                        L.append(P + T["p0"].format(st="gotowa (F 0.94)", b9=39, nz="NIE"))
+                if good:
+                    for t in ("T0", "T1", "T2", "T3", "T4", "T5", "T6"):
+                        L.append(P + "Zbroja (268): test - %s cos - wynik %s." % (t, "POMINIETY" if t == "T3" else "TAK"))
+                else:
+                    L.append(P + "Zbroja (268): test - T2 B rozne - wynik NIE.")
+                    L.append(P + "ERROR in ArmourOrders.Order (potkniecie 1): x")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            z268_rows(rep, z268_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"Z268-0": "TAK", "Z268-1": "TAK", "Z268-2": "TAK", "Z268-3": "TAK", "Z268-4": "TAK", "Z268-5": "TAK", "Z268-6": "TAK", "Z268-7": "TAK", "Z268-8": "INFO"},
+        "bad": {"Z268-0": "TAK", "Z268-1": "NIE", "Z268-2": "NIE", "Z268-3": "NIE", "Z268-4": "NIE", "Z268-5": "NIE", "Z268-6": "NIE", "Z268-7": "NIE"},
+        "none": {"Z268-0": "INFO", "Z268-1": "INFO", "Z268-2": "INFO", "Z268-3": "INFO", "Z268-4": "INFO", "Z268-5": "INFO", "Z268-6": "TAK", "Z268-7": "INFO"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def z268_main(logp):
+    """z268 (27.10, paczka 268): Z268-S, Z268-S2, Z268-0..Z268-8 - opis w komentarzu nad stalymi Z268_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = z268_selftest()
+    rep.add("Z268-S: self-test wyrazen (linie kontrolne jak w kodzie C#)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = z268_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("Z268-S2: test syntetyczny (dobry, zly, bez linii 268)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("Z268-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = z268_collect(logp)
+    print(f"plik: {logp} | startow p9 {D['p9starts']} (z 268 {len(D['starts'])}), dob p9 {len(D['p9days'])} (z segmentem 268 {len(D['body'])}), linii zamowien zbroi "
+          f"{len(D['ord'])}, opisow partii 159 P0 z 268 {len(D['segs'])}, linii proby {len(D['tests'])}, ERROR {D['err']}")
+    z268_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_z268_main_prev = main
+
+
+def main(argv):
+    # paczka 268: grupa z268 - opakowanie main jak e223 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "z268":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return z268_main(rest[0] if rest else None)
+    return _z268_main_prev(argv)
+
+
+# ------------------------------------------------------------ krol272 (27.10, paczka 272 noc/272-krol-polnocy: unia Dorzecza z Polnoca - Jeff 27.10 ok. 15:25 "a tak potem
+# jak dolaczaja do roberta to staja sie jednym krolestwem King in the North"; Armoury/src/KingInTheNorth.cs, KingInTheNorth.Test.cs; klucz CanonNorthRiverlandsUnion)
+#   python -I tools/sprawdz_logi.py --grupa krol272 <Armoury-*.log>   (strumieniowo). Linie 'Krol Polnocy (272): '. Stale z prefiksem KP_, wiersze KP-.
+KP_TAG = "Krol Polnocy (272): "
+KP_ERR = ("ERROR in KingInTheNorth",)
+KP_RE_START = re.compile(r"Krol Polnocy \(272\): start sesji \| klucz (TAK|NIE) \| stan (czeka|zrobione|nigdy|rozdzielone)")
+KP_RE_USTART = re.compile(r"Krol Polnocy \(272\): UNIA start \| dzien opowiesci (-?[\d.]+) \(dzien kampanii (\d+)\) \| wyzwalacz: (.+?) \| Dorzecze: rodow (\d+) \(najemnikow (\d+), gracz (\S+)\)")
+KP_RE_ROD = re.compile(r"Krol Polnocy \(272\): rod (.+?) \((\S+)\) (wasal|najemnik|gracz-najemnik|gracz-wasal|wladca Dorzecza) -> Polnoc (TAK|NIE) \| lenna (\d+)/(\d+), wsie (\d+)/(\d+), "
+                       r"partie (\d+)/(\d+), ludzie (\d+)/(\d+), zalogi (\d+)/(\d+) \| wplywy (-?[\d.]+) -> (-?[\d.]+) \| dlug wobec krolestwa (-?\d+) -> (-?\d+)")
+KP_RE_ARMY = re.compile(r"Krol Polnocy \(272\): armia (.+?) (zachowana pod Polnoca|odtworzona pod Polnoca) \| partii (\d+)/(\d+), spojnosc (-?[\d.]+) -> (-?[\d.]+)")
+KP_RE_ARMY_NO = re.compile(r"Krol Polnocy \(272\): armia (.+?) NIE \((.+?)\) \| partii (\d+)\.")
+KP_RE_MONEY = re.compile(r"Krol Polnocy \(272\): skarbiec Dorzecza (-?\d+) .*\| kontrola: zdjete (-?\d+) - dopisane (-?\d+) = (-?\d+)\.\s*$")
+KP_RE_END = re.compile(r"Krol Polnocy \(272\): UNIA ZAKONCZONA \| Dorzecze zniszczone (TAK|NIE) \| rodow przeniesionych (\d+)/(\d+), zniszczonych (\d+) \| lenna (\d+)/(\d+), partie (\d+)/(\d+), "
+                       r"ludzie (\d+)/(\d+) \| .*\| jency gracza przed (\d+) \((.*?)\) / po (\d+) \((.*?)\) (TAK|NIE) \| .*potkniecia (\d+)\.\s*$")
+KP_RE_RW = re.compile(r"Krol Polnocy \(272\): Krwawe Gody - rody Dorzecza ROT do korony \(jak ROT dla krolestwa Dorzecza\): (.+?) \| przeniesionych (\d+)")
+KP_RE_TEST = re.compile(r"Krol Polnocy \(272\): test - (T\d|T\?) (.+) - wynik (TAK|NIE|POMINIETY)\.\s*$")
+KP_RE_CAREER = re.compile(r"\| kariera BK (przeniesiona TAK|przeniesiona NIE|bez zmian) \((.*?)\)")
+KP_RE_SPLIT = re.compile(r"Krol Polnocy \(272\): Krwawe Gody - Dorzecze znowu osobno \| krolestwo (wskrzeszone|bylo zywe) \| wladca (.+?) \((\S+), (.+?)\) \| rodow przeniesionych (\d+)/(\d+), "
+                         r"lenna (\d+) \| wojna z korona (.+?) \|")
+KP_RE_SPLIT_NO = re.compile(r"Krol Polnocy \(272\): Krwawe Gody - Dorzecze NIE rozdzielone \((.+?)\) - ")
+KP_RE_DAY4 = re.compile(r"Wojny kanonu \(m104\): doba \|.*\(4\) Dorzecze: wojna: (.+?);")
+
+KP_TEST = {
+    "start": "[13:00:25] Krol Polnocy (272): start sesji | klucz TAK | stan czeka | ROT RiverlandsDeclareWarEvent stan 2, Krwawe Gody stan 0 | Robb zyje, krol Polnocy | Dorzecze: wladca House Tully (clan_empire_north_2), rodow 39 (najemnikow 3) | gracz: najemnik riverlands | latki: Krwawe Gody TAK, armie leniwie (przy unii) | dzien opowiesci 150.9.",
+    "start_done": "[09:00:25] Krol Polnocy (272): start sesji | klucz TAK | stan zrobione (dzien opowiesci 151, dzien kampanii 108988, rodow 39) | ROT RiverlandsDeclareWarEvent stan 2, Krwawe Gody stan 0 | Robb zyje, krol Polnocy | Dorzecze: zniszczone | gracz: najemnik battania (w chwili unii: najemnik) | latki: Krwawe Gody TAK, armie leniwie (przy unii) | dzien opowiesci 160.2.",
+    "ustart": "[13:01:00] Krol Polnocy (272): UNIA start | dzien opowiesci 151.0 (dzien kampanii 108988) | wyzwalacz: ROT RiverlandsDeclareWarEvent zakonczone - nadrobienie po wczytaniu | Dorzecze: rodow 2 (najemnikow 1, gracz najemnik), twierdz 2, wsi 6, partii 3, ludzi 300 (zalogi 200), armii 1 | wladca House Tully (clan_empire_north_2) | Polnoc przed: rodow 56, twierdz 23 | jency gracza 12 (bohaterowie: lord_4_1).",
+    "rod": "[13:01:00] Krol Polnocy (272): rod House Tully (clan_empire_north_2) wladca Dorzecza -> Polnoc TAK | lenna 2/2, wsie 6/6, partie 2/2, ludzie 254/254, zalogi 200/200 | wplywy 120.5 -> 120.5 | dlug wobec krolestwa 0 -> 0 | zostaje do dnia 0.",
+    "rodp": "[13:01:00] Krol Polnocy (272): rod Karda (player_faction) gracz-najemnik -> Polnoc TAK | lenna 0/0, wsie 0/0, partie 1/1, ludzie 46/46, zalogi 0/0 | wplywy 10 -> 10 | dlug wobec krolestwa 0 -> 0 | zostaje do dnia 108990 | mnoznik 25 -> 25 (kolejnosc: po najemnikach i wasalach, przed rodem panujacym - zadania od lordow rzecznych zostaja) | kariera BK przeniesiona TAK (punkty 240, przywileje 0, czas przywilejow dzien 108880, termin kontraktu dzien 109244 bez zmian, kariera battania).",
+    "split": "[10:00:00] Krol Polnocy (272): Krwawe Gody - Dorzecze znowu osobno | krolestwo wskrzeszone | wladca House Tully (clan_empire_north_2, Tully) | rodow przeniesionych 30/30, lenna 12 | wojna z korona TAK | gracz zostaje: najemnik battania | aliasy Kroniki wylaczone (riverlands = Dorzecze).",
+    "split_no": "[10:00:00] Krol Polnocy (272): Krwawe Gody - Dorzecze NIE rozdzielone (zaden wasal AI z unii nie zostal w Polnocy) - rody z unii zostaja w Polnocy, aliasy Kroniki dalej.",
+    "day4b": "[11:14:21] Wojny kanonu (m104): doba | dzien opowiesci 960.8 (dzien kalendarza 1150) | (4) Dorzecze: wojna: wojna z korona TAK (od dnia 34); sojusz z Polnoca: zakonczony (Krwawe Gody (RedWeddingEvent ruszyl)); wymuszen Enforced dzis 0 (w sesji 0) | potkniecia dzis 0 (razem 0).",
+    "start_split": "[12:00:25] Krol Polnocy (272): start sesji | klucz TAK | stan rozdzielone po Krwawych Godach (unia dnia opowiesci 151, rodow 39) | ROT RiverlandsDeclareWarEvent stan 2, Krwawe Gody stan 2 | Robb nie zyje | Dorzecze: wladca House Tully (clan_empire_north_2), rodow 30 (najemnikow 0) | gracz: najemnik battania (w chwili unii: najemnik) | latki: Krwawe Gody TAK, armie leniwie (przy unii) | dzien opowiesci 961.2.",
+    "army": "[13:01:00] Krol Polnocy (272): armia Edmure Tully's Party zachowana pod Polnoca | partii 2/2, spojnosc 80.5 -> 80.5 | oblezenie - -> - | krolestwo armii battania.",
+    "army_no": "[13:01:00] Krol Polnocy (272): armia Jason Mallister's Party NIE (wodz nieaktywny, martwy albo w niewoli) | partii 3.",
+    "money": "[13:01:00] Krol Polnocy (272): skarbiec Dorzecza 7324319 -> splata Banku 0, do skarbca Polnocy 7324319 | dlug Banku przeniesiony 0 | portfele gry: najemnicy -611, danina 0, wezwania 0 | pozyczki od miast (korona2) przeniesione 0 | kontrola: zdjete 7323708 - dopisane 7323708 = 0.",
+    "end": "[13:01:00] Krol Polnocy (272): UNIA ZAKONCZONA | Dorzecze zniszczone TAK | rodow przeniesionych 2/2, zniszczonych 0 | lenna 2/2, partie 3/3, ludzie 300/300 | Polnoc po: rodow 58, twierdz 25, armii 2 | jency gracza przed 12 (lord_4_1) / po 12 (lord_4_1) TAK | gracz najemnik -> najemnik battania | zadatki BK wstrzymane (ta sama sluzba) 1 | komunikat gracza TAK | potkniecia 0.",
+    "rw": "[10:00:00] Krol Polnocy (272): Krwawe Gody - rody Dorzecza ROT do korony (jak ROT dla krolestwa Dorzecza): Frey (clan_empire_north_3) -> vlandia TAK, Mooton nie z unii, Cox (ROTclan_14) -> vlandia TAK, Bracken poza Polnoca (vlandia) | przeniesionych 2 | Polnoc-korona pokoj.",
+    "test": "[13:01:00] Krol Polnocy (272): test - T5 kontrola pieniedzy (zdjete - dopisane) 0 - wynik TAK.",
+    "day4": "[13:14:21] Wojny kanonu (m104): doba | dzien opowiesci 152.8 (dzien kalendarza 342) | (4) Dorzecze: wojna: brak krolestwa (korona jest, Dorzecze BRAK); sojusz z Polnoca: zakonczony (unia - Dorzecze w krolestwie Polnocy (272)); wymuszen Enforced dzis 0 (w sesji 0) | potkniecia dzis 0 (razem 0).",
+}
+
+
+def krol272_selftest():
+    """krol272: wyrazenia wobec linii kontrolnych KP_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    T = KP_TEST
+    m = KP_RE_START.search(T["start"])
+    if not m or m.group(1) != "TAK" or m.group(2) != "czeka":
+        return "start sesji"
+    m = KP_RE_START.search(T["start_done"])
+    if not m or m.group(2) != "zrobione":
+        return "start sesji (zrobione)"
+    m = KP_RE_USTART.search(T["ustart"])
+    if not m or m.group(4) != "2" or m.group(6) != "najemnik" or "nadrobienie" not in m.group(3):
+        return "UNIA start"
+    m = KP_RE_ROD.search(T["rod"])
+    if not m or m.group(3) != "wladca Dorzecza" or m.group(4) != "TAK" or m.group(11) != "254":
+        return "rod"
+    m = KP_RE_ROD.search(T["rodp"])
+    if not m or m.group(3) != "gracz-najemnik" or m.group(2) != "player_faction":
+        return "rod gracza"
+    m = KP_RE_ARMY.search(T["army"])
+    if not m or m.group(3) != "2" or m.group(4) != "2" or float(m.group(5)) != 80.5:
+        return "armia"
+    m = KP_RE_ARMY_NO.search(T["army_no"])
+    if not m or m.group(3) != "3" or KP_RE_ARMY.search(T["army_no"]):
+        return "armia NIE"
+    m = KP_RE_MONEY.search(T["money"])
+    if not m or m.group(4) != "0" or m.group(2) != "7323708":
+        return "skarbiec"
+    m = KP_RE_END.search(T["end"])
+    if not m or m.group(1) != "TAK" or m.group(2) != "2" or m.group(4) != "0" or m.group(15) != "TAK" or m.group(12) != "lord_4_1" or m.group(16) != "0":
+        return "UNIA ZAKONCZONA"
+    m = KP_RE_RW.search(T["rw"])
+    if not m or m.group(2) != "2":
+        return "Krwawe Gody"
+    m = KP_RE_TEST.search(T["test"])
+    if not m or m.group(1) != "T5" or m.group(3) != "TAK":
+        return "test"
+    m = KP_RE_DAY4.search(T["day4"])
+    if not m or not m.group(1).startswith("brak krolestwa"):
+        return "doba Wojny kanonu (4)"
+    m = KP_RE_CAREER.search(T["rodp"])
+    if not m or m.group(1) != "przeniesiona TAK" or not KP_RE_ROD.search(T["rodp"]):
+        return "kariera BK w linii rodu gracza"
+    m = KP_RE_SPLIT.search(T["split"])
+    if not m or m.group(1) != "wskrzeszone" or m.group(3) != "clan_empire_north_2" or m.group(5) != "30" or m.group(8) != "TAK":
+        return "Krwawe Gody - Dorzecze znowu osobno"
+    m = KP_RE_SPLIT_NO.search(T["split_no"])
+    if not m or not m.group(1).startswith("zaden wasal"):
+        return "Krwawe Gody - Dorzecze NIE rozdzielone"
+    m = KP_RE_START.search(T["start_split"])
+    if not m or m.group(2) != "rozdzielone":
+        return "start sesji (rozdzielone)"
+    return None
+
+
+def krol272_collect(logp):
+    """krol272: przebieg logu (strumieniowo) -> zdarzenia w kolejnosci (rodzaj, dane) i liczniki."""
+    D = {"ev": [], "lines": 0, "err": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if any(e in ln for e in KP_ERR):
+                D["err"] += 1
+            if "Wojny kanonu (m104): doba" in ln:
+                m = KP_RE_DAY4.search(ln)
+                if m:
+                    D["ev"].append(("day4", m.group(1)))
+                continue
+            if KP_TAG not in ln:
+                continue
+            D["lines"] += 1
+            m = KP_RE_START.search(ln)
+            if m:
+                D["ev"].append(("start", m.group(1), m.group(2)))
+                continue
+            m = KP_RE_USTART.search(ln)
+            if m:
+                D["ev"].append(("ustart", int(m.group(4))))
+                continue
+            m = KP_RE_ROD.search(ln)
+            if m:
+                g = m.groups()
+                ok = g[3] == "TAK" and g[4] == g[5] and g[6] == g[7] and g[8] == g[9] and g[10] == g[11] and g[12] == g[13] \
+                    and abs(float(g[14]) - float(g[15])) < 0.11 and g[16] == g[17]
+                D["ev"].append(("rod", g[1], ok, g[2]))
+                mc = KP_RE_CAREER.search(ln)
+                if mc:
+                    D["ev"].append(("career", g[1], mc.group(1), g[2]))
+                continue
+            m = KP_RE_SPLIT.search(ln)
+            if m:
+                D["ev"].append(("split", m.group(1), m.group(3), int(m.group(5)), int(m.group(6)), m.group(8)))
+                continue
+            m = KP_RE_SPLIT_NO.search(ln)
+            if m:
+                D["ev"].append(("split_no", m.group(1)))
+                continue
+            m = KP_RE_ARMY.search(ln)
+            if m:
+                D["ev"].append(("army", m.group(1), m.group(3) == m.group(4) and abs(float(m.group(5)) - float(m.group(6))) < 0.11))
+                continue
+            m = KP_RE_ARMY_NO.search(ln)
+            if m:
+                D["ev"].append(("army_no", m.group(1), m.group(2)))
+                continue
+            m = KP_RE_MONEY.search(ln)
+            if m:
+                D["ev"].append(("money", int(m.group(4))))
+                continue
+            m = KP_RE_END.search(ln)
+            if m:
+                g = m.groups()
+                D["ev"].append(("end", g[0] == "TAK", int(g[1]), int(g[2]), int(g[3]), g[4] == g[5] and g[6] == g[7] and g[8] == g[9],
+                                g[10] == g[12] and g[11] == g[13] and g[14] == "TAK", int(g[15])))
+                continue
+            m = KP_RE_RW.search(ln)
+            if m:
+                D["ev"].append(("rw", m.group(1), int(m.group(2))))
+                continue
+            m = KP_RE_TEST.search(ln)
+            if m:
+                D["ev"].append(("test", m.group(1), m.group(3)))
+                continue
+    return D
+
+
+def krol272_rows(rep, D):
+    """krol272: wiersze KP-0..KP-10 z zebranych zdarzen (opis w --help). Log bez linii 272 - INFO."""
+    ev = D["ev"]
+    starts = [e for e in ev if e[0] == "start"]
+    rep.add("KP-0: linia startu sesji paczki 272", f"linii 272 {D['lines']}, startow {len(starts)}" + (f" (klucz {starts[-1][1]}, stan {starts[-1][2]})" if starts else ""),
+            ">= 1 start sesji", True if starts else None)
+    us = [i for i, e in enumerate(ev) if e[0] == "ustart"]
+    ends = [i for i, e in enumerate(ev) if e[0] == "end"]
+    ok1 = len(us) == 1 and len(ends) == 1 and us[0] < ends[0]
+    rep.add("KP-1: jedna unia na kampanie (UNIA start -> UNIA ZAKONCZONA)", f"UNIA start {len(us)}, UNIA ZAKONCZONA {len(ends)}",
+            "dokladnie 1 i 1 (brak unii - INFO)", None if not us and not ends else ok1)
+    if ends:
+        e = ev[ends[-1]]
+        rods = [x for x in ev if x[0] == "rod"]
+        bad = [x[1] for x in rods if not x[2]]
+        n0 = ev[us[-1]][1] if us else None
+        ok2 = e[1] and e[2] == e[3] and e[4] == 0 and e[5] and not bad and (n0 is None or n0 == e[3])
+        rep.add("KP-2: rody przeniesione = rody na starcie, zniszczonych 0, lenna/partie/ludzie/wplywy/dlug bez zmian", f"Dorzecze zniszczone {'TAK' if e[1] else 'NIE'}, rodow {e[2]}/{e[3]}"
+                f" (na starcie {n0 if n0 is not None else '?'}), zniszczonych {e[4]}, sumy {'rowne' if e[5] else 'ROZNE'}, linii rodow {len(rods)}, zlych {len(bad)}"
+                + (f" ({', '.join(bad[:4])})" if bad else ""), "rowne, 0 zniszczonych, 0 zlych", ok2)
+    else:
+        rep.add("KP-2: rody przeniesione = rody na starcie", "brak UNIA ZAKONCZONA", "-", None)
+    arm = [x for x in ev if x[0] == "army"]
+    arm_no = [x for x in ev if x[0] == "army_no"]
+    bad3 = [x[1] for x in arm if not x[2]]
+    rep.add("KP-3: armie zachowane albo odtworzone (ci sami czlonkowie, ta sama spojnosc) albo NIE z powodem", f"zachowane/odtworzone {len(arm)}, NIE z powodem {len(arm_no)}, zlych {len(bad3)}"
+            + (f" ({', '.join(bad3[:3])})" if bad3 else ""), "0 zlych (brak armii - INFO)", None if not arm and not arm_no else not bad3)
+    mon = [x for x in ev if x[0] == "money"]
+    rep.add("KP-4: kontrola pieniedzy unii (zdjete - dopisane = 0)", f"linii {len(mon)}, roznice {[x[1] for x in mon][:3]}", "0 (brak unii - INFO)",
+            None if not mon else all(x[1] == 0 for x in mon))
+    if ends:
+        e = ev[ends[-1]]
+        cut = next((i for i in range(ends[-1] + 1, len(ev)) if ev[i][0] == "split"), len(ev))   # po rozdzieleniu (Krwawe Gody) Dorzecze znowu jest
+        after = [x for x in ev[ends[-1] + 1:cut] if x[0] == "day4"]
+        ok5 = e[1] and all(x[1].startswith("brak krolestwa") for x in after)
+        rep.add("KP-5: Dorzecze zniszczone, Wojny kanonu (4) po unii: 'brak krolestwa'", f"zniszczone {'TAK' if e[1] else 'NIE'}, dob (4) po unii {len(after)}"
+                + (f", pierwsza: {after[0][1]}" if after else ""), "TAK (bez doby po unii - INFO)", ok5 if after else (None if e[1] else False))
+        rep.add("KP-6: jency gracza przed = po (Tywin)", "TAK" if e[6] else "ROZNE", "rowne", e[6])
+    else:
+        rep.add("KP-5: Dorzecze zniszczone", "brak UNIA ZAKONCZONA", "-", None)
+        rep.add("KP-6: jency gracza przed = po", "brak UNIA ZAKONCZONA", "-", None)
+    tests = [x for x in ev if x[0] == "test"]
+    nie = [x[1] for x in tests if x[2] == "NIE"]
+    rep.add("KP-7: proba autotestu T1-T9 (flaga armoury-krol-polnocy.flag)", f"linii {len(tests)}, TAK {sum(1 for x in tests if x[2] == 'TAK')}, POMINIETY {sum(1 for x in tests if x[2] == 'POMINIETY')}, NIE {len(nie)}"
+            + (f" ({', '.join(nie)})" if nie else ""), "0 NIE (brak linii - INFO)", None if not tests else not nie)
+    # KP-8: po pierwszej unii zaden 'UNIA start'; kazdy start sesji po niej ze stanem 'zrobione'
+    bad8, n8 = [], 0
+    if ends:
+        for x in ev[ends[0] + 1:]:
+            if x[0] == "ustart":
+                bad8.append("UNIA start po unii")
+            elif x[0] == "start":
+                n8 += 1
+                if x[2] not in ("zrobione", "rozdzielone"):
+                    bad8.append(f"start sesji ze stanem {x[2]}")
+    rep.add("KP-8: bez powtorki w kolejnych sesjach (stan 'zrobione', zadnego UNIA start)", f"startow sesji po unii {n8}, zlych {len(bad8)}" + (f" ({'; '.join(bad8[:3])})" if bad8 else ""),
+            "0 (bez unii albo bez sesji po niej - INFO)", None if not ends or (n8 == 0 and not bad8) else not bad8)
+    rw = [x for x in ev if x[0] == "rw"]
+    bad9 = [x[1] for x in rw if " NIE" in x[1]]
+    rep.add("KP-9: Krwawe Gody - rody Dorzecza ROT z unii do korony", f"linii {len(rw)}" + (f", przeniesionych {rw[-1][2]} ({rw[-1][1]})" if rw else ""),
+            "kazdy rod TAK albo z powodem, jedna linia (brak Krwawych God - INFO)", None if not rw else (len(rw) == 1 and not bad9))
+    stum = ev[ends[-1]][7] if ends else 0
+    rep.add("KP-10: ERROR KingInTheNorth i potkniecia 0", f"ERROR {D['err']}, potkniecia w unii {stum}", "0", None if D["lines"] == 0 and D["err"] == 0 else (D["err"] == 0 and stum == 0))
+    car = [x for x in ev if x[0] == "career"]
+    bad11 = [x[1] for x in car if x[2] == "przeniesiona NIE"]
+    rep.add("KP-11: kariera najemnika BK przepisana z Dorzecza na Polnoc (recenzja)", f"linii {len(car)}, przeniesiona TAK {sum(1 for x in car if x[2] == 'przeniesiona TAK')}, bez zmian "
+            f"{sum(1 for x in car if x[2] == 'bez zmian')}, NIE {len(bad11)}" + (f" ({', '.join(bad11[:4])})" if bad11 else ""), "0 NIE (brak najemnikow - INFO)", None if not car else not bad11)
+    sp = [x for x in ev if x[0] == "split"]
+    spn = [x for x in ev if x[0] == "split_no"]
+    ok12 = len(sp) == 1 and sp[0][3] == sp[0][4] and sp[0][5] in ("TAK", "korony brak", "krolestwo gracza - poza regula")
+    rep.add("KP-12: Krwawe Gody - Dorzecze znowu osobno (rody z unii wrocily, wojna z korona)", (f"linii {len(sp)}, rodow {sp[-1][3]}/{sp[-1][4]}, wojna z korona {sp[-1][5]}, krolestwo {sp[-1][1]}"
+            if sp else "brak") + (f"; NIE rozdzielone: {spn[-1][1]}" if spn else ""), "jedna linia, rody n/n, wojna TAK (brak Krwawych God - INFO)", ok12 if sp else None)
+
+
+def krol272_synth():
+    """krol272 - test syntetyczny: dobry, zly, bez linii przez krol272_collect / krol272_rows. None = werdykty zgodne, inaczej opis roznicy."""
+    import tempfile, shutil
+    T = KP_TEST
+    good = [T["start"], T["ustart"], T["rodp"], T["rod"], T["army"], T["army_no"], T["money"], T["end"], T["test"], T["day4"], T["start_done"], T["rw"], T["split"], T["day4b"],
+            T["start_split"]]
+    bad = [T["start"], T["ustart"], T["rodp"].replace("kariera BK przeniesiona TAK", "kariera BK przeniesiona NIE"),   # KP-11
+           T["rod"].replace("lenna 2/2", "lenna 1/2"),                                         # KP-2: rod stracil lenno
+           T["army"].replace("partii 2/2", "partii 1/2"),                                      # KP-3
+           T["money"].replace("dopisane 7323708 = 0", "dopisane 7323000 = 708"),               # KP-4
+           T["end"].replace("zniszczonych 0", "zniszczonych 1").replace("po 12 (lord_4_1) TAK", "po 11 (-) NIE").replace("potkniecia 0", "potkniecia 2"),   # KP-2, KP-6, KP-10
+           T["test"].replace("wynik TAK", "wynik NIE"),                                        # KP-7
+           T["day4"].replace("wojna: brak krolestwa (korona jest, Dorzecze BRAK)", "wojna: wojna z korona TAK (od dnia 34)"),   # KP-5
+           T["start"], T["ustart"],                                                            # KP-1 i KP-8: druga unia
+           T["rw"].replace("vlandia TAK, Mooton", "vlandia NIE, Mooton"),                      # KP-9
+           T["split"].replace("wojna z korona TAK", "wojna z korona NIE").replace("30/30", "29/30")]   # KP-12
+    exp = {
+        "good": {"KP-0": "TAK", "KP-1": "TAK", "KP-2": "TAK", "KP-3": "TAK", "KP-4": "TAK", "KP-5": "TAK", "KP-6": "TAK", "KP-7": "TAK", "KP-8": "TAK", "KP-9": "TAK", "KP-10": "TAK", "KP-11": "TAK", "KP-12": "TAK"},
+        "bad": {"KP-0": "TAK", "KP-1": "NIE", "KP-2": "NIE", "KP-3": "NIE", "KP-4": "NIE", "KP-5": "NIE", "KP-6": "NIE", "KP-7": "NIE", "KP-8": "NIE", "KP-9": "NIE", "KP-10": "NIE", "KP-11": "NIE", "KP-12": "NIE"},
+        "none": {"KP-0": "INFO", "KP-1": "INFO", "KP-2": "INFO", "KP-3": "INFO", "KP-4": "INFO", "KP-5": "INFO", "KP-6": "INFO", "KP-7": "INFO", "KP-8": "INFO", "KP-9": "INFO", "KP-10": "INFO", "KP-11": "INFO", "KP-12": "INFO"},
+    }
+    runs = {"good": good, "bad": bad, "none": ["[10:00:00] Armoury: inna linia"]}
+    diff = []
+    tmp = tempfile.mkdtemp(prefix="krol272_")
+    try:
+        for kind, L in runs.items():
+            logp = os.path.join(tmp, kind + ".log")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            krol272_rows(rep, krol272_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def krol272_main(logp):
+    """krol272 (27.10, paczka 272): KP-S, KP-S2, KP-0..KP-10 - opis w --help. Strumieniowo."""
+    rep = Report()
+    s1 = krol272_selftest()
+    rep.add("KP-S: self-test wyrazen (linie kontrolne jak w kodzie C#: KingInTheNorth.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = krol272_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("KP-S2: test syntetyczny (dobry, zly, bez linii 272)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("KP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = krol272_collect(logp)
+    print(f"plik: {logp} | linii 272 {D['lines']}, zdarzen {len(D['ev'])}, ERROR {D['err']}")
+    krol272_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_krol272_main_prev = main
+
+
+def main(argv):
+    # paczka 272: grupa krol272 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "krol272":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return krol272_main(rest[0] if rest else None)
+    return _krol272_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
