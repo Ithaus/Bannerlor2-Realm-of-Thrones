@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 18:40 CET - 241 i 259 GOTOWE (zbudowane po recenzji, nie wgrane)
+- 241 (zb\n241): 6cf804cd + 56485d08 + recenzja 237e6c60 (Armoury 0a0b45e8). MarketSales.cs (sprzedaz miast 28 dni, zapis arm_mktsales); kupiec placi cene z
+  historii sprzedazy albo pulap ludu; rzemieslnicy 35% (TownFolkCraftWageShare); WorkshopTaxOnPayout (podatek BK od wyplaty, 1x stawka); ClampBack (BK placi ponad
+  kase miasta -> cofniete z kapitalu warsztatu). sprawdz_logi --grupa war241. Test: 120 dob swiata (liczby warsztatow, ceny bizuterii/aksamitu/narzedzi, kasy miast).
+- 259 (zb\n259): 7da9cfd1 + 361f8451 + recenzja 6366da19 (Armoury f0381e70). Rozliczenie karawan rodow raz na dobe w prefiksie AddIncomeFromParty; kapital =
+  min(model, dane przez E3/7) (arm_259_kapital); BK wplata i E3/9 dla nich wylaczone; linia "Majatek gracza (karawany i warsztaty)"; sprawdz_logi --grupa karawany259.
+- W toku: 268+272 (wf_755f2f7e-043), 274 (wf_1f03e327-b32). Potem scalanie (scal_sklad dla sprawdz_logi i CHANGELOG), autotest dlugi.
+
 ## DOPISEK 27.10 ok. 17:35 CET - 264 GOTOWE (zbudowane po recenzji, nie wgrane)
 - 264 (zb\n264, noc/264-pokoj-wojny-kanonu): 114ba627 + 34feb90a, recenzja 351fac2a (Armoury be852bc6). CanonPeaceLock.cs (klucz CanonWarNoPeaceUntilRedWedding):
   pary battania-vlandia i riverlands-vlandia; blokada do RedWeddingEvent ROT stan 2 (zakonczone) albo smierci Robba (lord_5_1) - ZNACZNIK DLA 274; Diplomacy
