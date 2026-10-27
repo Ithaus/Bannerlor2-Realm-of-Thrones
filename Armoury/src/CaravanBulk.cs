@@ -871,7 +871,7 @@ namespace Armoury
                 // 284 (klucz CaravanBkSellAtCost): nie ponizej kosztu z ksiegi E3-T1 (cena kazdej sztuki po mycie >= koszt sztuki); wyjscia na stracie T1 (rozwiazanie, brak na
                 // zold, juki ponad udzwig, towar > 30 dob) bez zmian; karawana z kontraktem 174 - bez zmian (dostawa kontraktu)
                 // koszt choc czesciowo z oszacowania (stary zapis: wczytanie bez arm_cg284) - bez progu, jak dotad (BK surowcow nie kupuje - jego prog nie jest ich kosztem)
-                if (s.CaravanBkSellAtCost && !MaterialOrders.HasContract(mp) && !CaravanGoods.CostEstimated(mp, g.Item) && CaravanGoods.LossReason(mp, g.Item) == 0)
+                if (s.CaravanBkSellAtCost && !MaterialOrders.HasContract(mp) && !CaravanGoods.CostEstimated(mp, g.Item) && CaravanGoods.LossReason(mp, g.Item, town.Settlement) == 0)
                 {
                     double unit = CaravanGoods.UnitCost(mp, g.Item);
                     if (unit > 0.0)

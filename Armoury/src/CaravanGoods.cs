@@ -498,15 +498,35 @@ namespace Armoury
         }
 
         /// <summary>284: powod sprzedazy na stracie dla towaru karawany teraz (te same wyjscia co T1 - LossWhy): 0 brak; 1 rozwiazanie, 2 kiesa < 3 dni zoldu, 3 juki ponad
-        /// udzwig, 4 jedzenie > 7 dob, 5 towar > 30 dob.</summary>
-        internal static int LossReason(MobileParty mp, ItemObject it)
+        /// udzwig, 4 jedzenie > 7 dob, 5 towar > 30 dob bez rynku z zyskiem (poprawka 132a - AgeMarket; st - miasto sprzedazy, myto E3-G3).</summary>
+        internal static int LossReason(MobileParty mp, ItemObject it, Settlement st)
         {
             if (mp == null || it == null || mp.ItemRoster == null) return 0;
             int wage = Math.Max(0, mp.TotalWage);
             bool cash = mp.PartyTradeGold < CashDays * wage, full = mp.TotalWeightCarried > Math.Max(1, mp.InventoryCapacity);
             var l = Sync(mp, it, mp.ItemRoster.GetItemNumber(it), false);
             double age = l != null ? Math.Max(0, Now - l.Day) : 0;
-            return LossWhy(mp.IsDisbanding, cash, full, it.IsFood, age);
+            bool market = l != null && l.N > 0 && AgeMarket(mp, it, l.Cost / l.N, 1.0 - TownToll.CaravanRateFor(mp, st), age);
+            return LossWhy(mp.IsDisbanding, cash, full, it.IsFood, age, market);
+        }
+
+        /// <summary>
+        /// Poprawka 132a (autotest 132a, 30 dob: T1 "dlugo w jukach" 0-15 szt./d do doby 109048, od 109049 - 24 doby po wczytaniu, migawka ksiegi daje sztukom bez
+        /// wpisu dziennika BK dzien zakupu 7 dob wstecz - 325/336/330/264/240/289 szt./d za 86/79/59/65/69/50 tys. zl przy koszcie ok. 2x; T1 na stracie ostatnie 10 dob
+        /// 44 783 zl/d, z tego dlugo w jukach 42 459; ta sama doba bawelna i futra szly tez z zyskiem po 3 000 i 400 zl/szt. w innych miastach): towar > 30 dob
+        /// nie jest "bez wyjscia", gdy rynek z zyskiem istnieje - mediana indeksu miast placacych co najmniej srednia (CaravanTrade284.SellIdxOf - ta sama miara co
+        /// zakup "zysk osiagalny") daje cene po karze handlu (cena sprzedazy gry = wartosc x indeks / (1 + kara), DefaultTradeItemPriceFactorModel.GetPriceFactor) i po
+        /// mycie co najmniej `min` (koszt sztuki; T1 - prog sprzedazy z zyskiem). Wtedy towar czeka na takie miasto (T1 i BK sprzedaja tam z zyskiem); bez takiego
+        /// rynku - wyjscie na stracie porcjami jak dotad. Jedzenie - bez zmian (powod 4 przed wiekiem). Tylko przy age > 30 dob (liczy sie licznik "czeka").
+        /// </summary>
+        private static bool AgeMarket(MobileParty mp, ItemObject it, double min, double keep, double age)
+        {
+            if (!(age > MaxAgeDays) || it == null || it.IsFood || it.ItemCategory == null || !(min > 0.0)) return false;
+            double e = CaravanTrade284.SellIdxOf(it.ItemCategory);
+            if (!(e > 0.0)) return false;
+            bool ok = Math.Max(1, it.Value) * e / (1.0 + Penalty(mp, it)) * keep >= min;
+            if (ok) CaravanTrade284.NoteAgeWait();
+            return ok;
         }
 
         /// <summary>284: najwiecej sztuk z n, ktorych KAZDA idzie w tym miescie po cenie po mycie (E3-G3) nie nizszej niz koszt sztuki (cena k-tej sztuki maleje z k -
@@ -738,14 +758,15 @@ namespace Armoury
 
         private sealed class Cand { public ItemObject It; public EquipmentElement El; public int Have; public double Unit, Min; public bool Food; public float Gain; public int Price; }
 
-        /// <summary>Powod sprzedazy na stracie (0 - brak wyjscia nie zachodzi): 1 rozwiazanie, 2 brak na zold, 3 juki ponad udzwig, 4 jedzenie psuje sie, 5 dlugo w jukach.</summary>
-        private static int LossWhy(bool disband, bool cash, bool full, bool food, double age)
+        /// <summary>Powod sprzedazy na stracie (0 - brak wyjscia nie zachodzi): 1 rozwiazanie, 2 brak na zold, 3 juki ponad udzwig, 4 jedzenie psuje sie, 5 dlugo w jukach
+        /// (poprawka 132a: tylko bez rynku z zyskiem - market z AgeMarket).</summary>
+        private static int LossWhy(bool disband, bool cash, bool full, bool food, double age, bool market)
         {
             if (disband) return 1;
             if (cash) return 2;
             if (full) return 3;
             if (food && age > FoodAgeDays) return 4;
-            if (age > MaxAgeDays) return 5;
+            if (age > MaxAgeDays && !market) return 5;
             return 0;
         }
 
@@ -882,7 +903,7 @@ namespace Armoury
                         while (kp >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kp, wv) * keepK <= c.Min) kp--;
                         if (kp >= 1) { step = kp; pLast = PriceAt(model, el.EquipmentElement, mp, d, kp, wv); profit = true; _profitCut++; }
                     }
-                    int why = profit ? 0 : LossWhy(disband, cash, full, c.Food, age);
+                    int why = profit ? 0 : LossWhy(disband, cash, full, c.Food, age, AgeMarket(mp, it, c.Min, keepK, age));   // 132a: > 30 dob bez rynku z zyskiem
                     if (why == 3)
                     {
                         // juki ponad udzwig: na stracie tylko tyle wagi, ile trzeba do zejscia pod udzwig
