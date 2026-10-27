@@ -58,6 +58,19 @@ namespace Armoury
         private static readonly Dictionary<string, Acc> _acc = new Dictionary<string, Acc>();          // id bohatera -> podstawa 1/9 doby i zaleglosc
         private static readonly Dictionary<string, string> _crownCaptive = new Dictionary<string, string>(); // id jenca -> id korony zdobywcy
         private static readonly List<Reward> _rewards = new List<Reward>();
+
+        /// <summary>272 (unia Dorzecza z Polnoca): wielcy jency korony `fromId` (okup do jej skarbca) i nagrody, ktore ta korona jest winna zdobywcom, przechodza na
+        /// korone `toId` razem z jej skarbcem - inaczej po upadku krolestwa nagroda przepada, a okup wielkiego jenca idzie do porywacza. Nie rzuca.</summary>
+        internal static void MoveKingdom(string fromId, string toId, out int captives, out int rewards)
+        {
+            captives = 0; rewards = 0;
+            try
+            {
+                foreach (var k in new List<string>(_crownCaptive.Keys)) if (_crownCaptive[k] == fromId) { _crownCaptive[k] = toId; captives++; }
+                foreach (var r in _rewards) if (r != null && r.Kingdom == fromId) { r.Kingdom = toId; rewards++; }
+            }
+            catch (Exception e) { Stumble("MoveKingdom", e); }
+        }
         private static readonly Dictionary<string, Ema> _crownIncome = new Dictionary<string, Ema>();   // id krolestwa -> srednia wplywow dnia (28 dob)
         private static readonly Dictionary<Kingdom, long> _thirdsToday = new Dictionary<Kingdom, long>();
         private static readonly Dictionary<Kingdom, Hero> _heirCache = new Dictionary<Kingdom, Hero>();

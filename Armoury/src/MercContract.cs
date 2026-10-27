@@ -57,6 +57,28 @@ namespace Armoury
         private sealed class Deal { public string Kingdom; public long K, Wage; public int Men, Day, Review, Unpaid, Peace = NoPeace; }
         private static readonly Dictionary<string, Deal> _deals = new Dictionary<string, Deal>();   // id rodu -> umowa
 
+        /// <summary>272 (unia Dorzecza z Polnoca): umowy kompanii przeniesionych z korony `fromId` do `toId` (rod juz w `toId`) przepisane na nowa korone - ta sama umowa
+        /// (K, ludzie, przeglad, niedoplata), bez nowego najmu i bez doby "bez umowy" (gra placilaby wtedy z MercenaryWallet). Zwraca liczbe umow. Nie rzuca.</summary>
+        internal static int MoveDeals(string fromId, string toId)
+        {
+            int n = 0;
+            try
+            {
+                foreach (var kv in _deals)
+                {
+                    if (kv.Value == null || kv.Value.Kingdom != fromId) continue;
+                    var c = Clan.FindFirst(x => x != null && x.StringId == kv.Key);
+                    if (c == null || c.Kingdom == null || c.Kingdom.StringId != toId || !c.IsUnderMercenaryService) continue;
+                    kv.Value.Kingdom = toId; n++;
+                }
+            }
+            catch (Exception e) { Stumble("MoveDeals", e); }
+            return n;
+        }
+
+        /// <summary>272: zadatki BK wstrzymane w czasie unii (KingInTheNorth.Moving - "najem" u Polnocy to dalszy ciag tej samej sluzby, nie nowy najem; takze gracz).</summary>
+        internal static int BkDownUnion;
+
         // liczniki doby
         internal static long LastDue, LastPaid, LastTierOff, LastGameOff;
         internal static int LastClans, LastNew, LastCut, LastLeft;
@@ -365,6 +387,7 @@ namespace Armoury
         {
             try
             {
+                if (KingInTheNorth.Moving) { BkDownUnion++; return false; }   // 272: unia - ta sama sluzba (BK przelalby z kiesy Robba zadatek jak przy nowym najmie)
                 var s = Settings.Current;
                 if (s == null || !s.MercBkDownPaymentAiOff || !On || __0 == null || __0 == Clan.PlayerClan) return true;
                 _dBkDownN++;

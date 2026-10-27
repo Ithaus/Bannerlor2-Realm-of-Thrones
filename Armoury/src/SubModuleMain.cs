@@ -811,6 +811,7 @@ namespace Armoury
                 starter.AddBehavior(new PrologueBehavior());        // m101-prolog: wybor startu w zapisie (arm_prologue), zdarzenia prologu 298
                 starter.AddBehavior(new CanonWarsBehavior());       // m104-wojny: wojny wedlug ksiazki - Essos na kalendarzu, Reach i Dorne z korona, smoki Daenerys (zapis arm_m104)
                 starter.AddBehavior(new ChronicleBehavior());       // m105-kronika K0: Kronika Westeros - okna z arm_kronika_kNN.tsv (zapis arm_kronika); PO CanonCompanions (doba po dobie postaci kanonu)
+                starter.AddBehavior(new KingInTheNorthBehavior(_harmony));   // 272: unia Dorzecza z Polnoca (hold lordow rzecznych - Krol Polnocy i Tridentu), zapis arm_k272; latki leniwie (Krwawe Gody przy starcie sesji, armie przy unii)
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

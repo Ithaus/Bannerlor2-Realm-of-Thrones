@@ -102,6 +102,21 @@ namespace Armoury
             catch (Exception e) { DvStumble("NoteCrownLent", e); }
         }
 
+        /// <summary>272 (CrownBorrow.MoveLoan - unia Dorzecza z Polnoca): koszt kredytu korony `fromId` przechodzi na korone `toId` razem z dlugiem - inaczej DvClamp
+        /// wzialby znikniecie dlugu `fromId` za zwrot kosztu, a dlug `toId` ponad koszt za zysk. Bez startu f20-d3 - nic. Nie rzuca.</summary>
+        internal static void MoveCrownCost(string fromId, string toId)
+        {
+            try
+            {
+                if (!_dvInit || fromId == null || toId == null || fromId == toId) return;
+                double c;
+                if (!_dvCostK.TryGetValue(fromId, out c)) return;
+                _dvCostK.Remove(fromId);
+                double t; _dvCostK.TryGetValue(toId, out t); _dvCostK[toId] = t + c;
+            }
+            catch (Exception e) { DvStumble("MoveCrownCost", e); }
+        }
+
         /// <summary>Recenzja f20-d3: wplyw do kapitalu, ktory NIE jest zyskiem (ani odsetki, ani oplata) - reszta skarbca upadlego krolestwa bez odbiorcy
         /// (FallenCrown, zaraz po IronBank.CapitalAdd). Migawka kapitalu rosnie o te kwote - wplyw doby (zmiana kapitalu od migawki) jej nie widzi; zostaje w Banku
         /// jako kapital wlasny (nie jako zysk; recenzja calosci noc-ks4: nadwyzka kapitalu wlasnego ponad IronBankCapital wraca do puli po 1/BankProfitToBraavosDays

@@ -74,6 +74,16 @@ namespace Armoury
         private sealed class Svc { public string Kingdom; public long Mask; public int Seen; }
         private static readonly Dictionary<string, Svc> _svc = new Dictionary<string, Svc>();        // id rodu -> sluzba
 
+        /// <summary>272 (unia Dorzecza z Polnoca): sluzba rodow z unii liczona dalej pod nowa korona (ta sama wojna) - wpisy z korona `fromId` przepisane na `toId`
+        /// (inaczej doba rent zaczelaby sluzbe od zera: "nowy wasal tej korony"). Zwraca liczbe wpisow. Nie rzuca.</summary>
+        internal static int MoveKingdom(string fromId, string toId)
+        {
+            int n = 0;
+            try { foreach (var kv in _svc) if (kv.Value != null && kv.Value.Kingdom == fromId) { kv.Value.Kingdom = toId; n++; } }
+            catch (Exception e) { Stumble("MoveKingdom", e); }
+            return n;
+        }
+
         // stala norma zalogi: srednia zalogi twierdz rodzaju w krolestwie (klucz "idKrolestwa/T" albo "/C"; swiat "*/T", "*/C") z 28 dob
         private sealed class Norm
         {

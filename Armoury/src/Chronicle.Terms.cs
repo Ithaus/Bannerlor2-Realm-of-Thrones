@@ -512,7 +512,7 @@ namespace Armoury
                             var h = FindHero(a[0], null);
                             if (h == null) return false;
                             if (h.IsDead) { never = true; return false; }
-                            var k = FindKingdom(a[1], null);
+                            var k = FindKingdom(KingInTheNorth.AliasKingdom(a[1]), null);   // 272: po unii "riverlands" = Polnoc
                             return k != null && !k.IsEliminated && k.Leader == h;
                         }
                     case "prisoner":
@@ -525,10 +525,10 @@ namespace Armoury
                         }
                     case "peace":
                         {
-                            var k1 = FindKingdom(a[0], null); var k2 = FindKingdom(a[1], null);
+                            var k1 = FindKingdom(KingInTheNorth.AliasKingdom(a[0]), null); var k2 = FindKingdom(KingInTheNorth.AliasKingdom(a[1]), null);   // 272
                             return k1 != null && k2 != null && k1 != k2 && !k1.IsEliminated && !k2.IsEliminated && !FactionManager.IsAtWarAgainstFaction(k1, k2);
                         }
-                    case "kexists": { var k = FindKingdom(a[0], null); return k != null && !k.IsEliminated; }
+                    case "kexists": { var k = FindKingdom(KingInTheNorth.AliasKingdom(a[0]), null); return k != null && !k.IsEliminated; }   // 272: po unii Dorzecze trwa w Polnocy
                     case "kr": return KrTrue(a[0], out never);
                     case "flag": return State.Flag(a[0]);
                     case "mv": return MvTrue(a[0], out never);
@@ -566,6 +566,7 @@ namespace Armoury
                             if (h == null) return false;
                             if (h.IsDead) { never = true; return false; }
                             var s = HeroRegion(h);
+                            if (KingInTheNorth.IsRiverAlias(a[1])) return KingInTheNorth.HeldAsRiverlands(s);   // 272: po unii - ziemia Tridentu w Polnocy
                             return s != null && s.MapFaction != null && s.MapFaction.StringId == a[1];
                         }
                 }
@@ -678,7 +679,7 @@ namespace Armoury
                 var st = FindSettlement(x, null);
                 if (st != null)
                     return (pb.IsSettlement && pb.Settlement == st) || (pb.MobileParty != null && pb.MobileParty.CurrentSettlement == st);
-                var k = FindKingdom(x, null);
+                var k = FindKingdom(KingInTheNorth.AliasKingdom(x), null);   // 272: po unii jeniec "u Dorzecza" = u Polnocy
                 if (k != null) return ReferenceEquals(pb.MapFaction, k);
                 var c = FindClan(x, null);
                 if (c != null)
@@ -698,6 +699,7 @@ namespace Armoury
                     case "region":
                         {
                             var s = NearestSettlement();
+                            if (KingInTheNorth.IsRiverAlias(a[1])) return KingInTheNorth.HeldAsRiverlands(s);   // 272: po unii - ziemia Tridentu w Polnocy
                             return s != null && s.MapFaction != null && s.MapFaction.StringId == a[1];
                         }
                     case "in":
@@ -717,7 +719,7 @@ namespace Armoury
                         {
                             var pc = Clan.PlayerClan;
                             // recenzja K0 (R-6): najemnik (StartMercenaryServiceAction ustawia Clan.Kingdom) to nie wasal - FORMAT 10 "wasal albo wladca"
-                            return pc != null && pc.Kingdom != null && !pc.IsUnderMercenaryService && pc.Kingdom.StringId == a[1];
+                            return pc != null && pc.Kingdom != null && !pc.IsUnderMercenaryService && pc.Kingdom.StringId == KingInTheNorth.AliasKingdom(a[1]);   // 272
                         }
                     case "army": return mp != null && mp.Army != null;
                     case "rel":
