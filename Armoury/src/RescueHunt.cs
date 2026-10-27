@@ -37,7 +37,18 @@ namespace Armoury
     ///    Kurier z okupem (RansomOfferCampaignBehavior / Ransom178.ConsiderPrefix) nie przychodzi, zanim rod nie wie (HoldCourier).
     ///  - Slady (ostatnie znane miejsce, najwyzej 8): druzyna lorda krolestwa jenca widzi cel (odleglosc &lt;= jej SeeingRange; sama wie od razu, inni - jezdziec
     ///    2.5 jedn./h); osada krolestwa widzi cel (w niej albo w 12 jedn. dniem / 6 noca - podstawa widzenia gry; wiesc wzorem wiesci o pojmaniu); loch osady.
-    ///    Slad starszy niz 72 h (trzy dni jazdy - ostatnie pasmo Rumours.Days) - zimny trop, druzyna wraca do ocen gry.
+    ///    Slad starszy niz 72 h (trzy dni jazdy - ostatnie pasmo Rumours.Days) - zimny trop.
+    ///  - 222d ZIMNY TROP (autotest 127b: wiesc o Tywinie po 139 h, jedyny slad - pojmanie - starszy niz 72 h, wiec nikt nic nie robil, a gracz czytal "Their
+    ///    lords ride to free him"): wiesc niesie miejsce pojmania i porywacza, a wiec lenna jego rodu (zamki i miasta rodu gracza - wiedza publiczna). Lord bez
+    ///    znanego swiezego sladu szuka: PatrolAroundPoint wokol blizszego mu z dwoch celow - miejsce pojmania albo twierdza rodu porywacza najblizsza miejsca
+    ///    pojmania (porywacz bez twierdz - tylko miejsce pojmania); loch znany rodowi - oblezenie jak dotad. Okno szukania ColdHours od chwili, gdy TEN lord
+    ///    dostal wiesc (NewsAt - siedziba + kruk, pierwszy przeglad w sesji), nie od pojmania. Zasieg jak dla sladu (ReachOwnDays / ReachHelpDays) - dalej nikt
+    ///    nie rusza (bez wszechwiedzy i marszow przez cala mape): lowy czekaja i budza sie same w przegladzie godzinnym, gdy gracza zobaczy lord albo osada
+    ///    krolestwa jenca (slad - poscig jak dotad), gdy wiesc dojdzie do lorda w zasiegu, gdy rod porywacza ma twierdze w zasiegu albo gdy loch w zasiegu stanie
+    ///    sie znany. Tryby "szuka - zimny trop", "czeka (poza zasiegiem)", "czeka (szukanie bez sladu)"; "trop zimny" juz nie wystepuje.
+    ///    Komunikat przy wiesci wedlug wyniku pierwszego wyboru: rozkazy (poscig, slad, armia, loch) - "ride to free", samo szukanie - "searching the lands where
+    ///    X was taken" / "your lands", nikt w zasiegu - "too far away ... - for now", za slabi - "not strong enough ... - for now"; pierwsze rozkazy po czekaniu -
+    ///    raz "House X rides to free Y." (Rode, zapis pole 23 "r").
     ///  - Lowcy: druzyny lordow krolestwa jenca w wojnie z celem, ktore juz wiedza i znaja slad: T1 - rod jenca; T2 - rod + rody krolestwa, ktorych glowa jest
     ///    przyjacielem jenca albo glowy jego rodu (IsFriend gry, bez najemnikow); T3 - cale krolestwo. Bez: glodujacych, niegotowych (ArmsFirst.Unready p9),
     ///    druzyn sceny prologu, w bitwie, oblegajacych inna osade, czlonkow cudzej armii (wodz armii liczy cala armie, jak OB5 Contrib). Zasieg (linia prosta):
@@ -86,6 +97,11 @@ namespace Armoury
         private const int SParty = 0, SSettlement = 1, SDungeon = 2, SCapture = 3;
         private static readonly string[] SightName = { "druzyna", "osada", "loch", "pojmanie" };
         private const int ONone = 0, OChase = 1, OPatrol = 2, OArmy = 3, OSiege = 4;
+        // 222d: wynik wyboru lowcow (komunikat dla gracza) i werdykt lorda bez sladu (T9)
+        private const int OutFar = 0, OutRide = 1, OutSearch = 2, OutWeak = 3;
+        private static readonly string[] OutName = { "daleko", "jada", "szukaja", "za slabi" };
+        private const int VCand = 0, VFar = 1, VSpent = 2;
+        private const string MSearch = "szuka - zimny trop", MWaitFar = "czeka (poza zasiegiem)", MWaitSpent = "czeka (szukanie bez sladu)";
 
         // ------------------------------------------------------------ stan
         private sealed class Sight
@@ -106,10 +122,14 @@ namespace Armoury
             public string DungeonId = ""; public double DungeonH = -1.0; public bool DungeonTold;
             public int Armies, Battles, Wins; public float TopStr;
             public bool Planned;                            // recenzja 222c: plan wiesci liczony droga 222c (SeatNews) - zapis pole 22 "c", Recalc tylko bez niego
+            public bool Rode;                               // 222d: lowy choc raz wydaly rozkazy (komunikat "rides to free" raz) - zapis pole 23 "r"
             public readonly List<Sight> Sights = new List<Sight>();
             // sesja
             public double PeaceH = -1.0, MarkH = -1000.0, SightLogH = -1000.0;
             public string Mode = "";
+            public readonly Dictionary<MobileParty, double> Heard = new Dictionary<MobileParty, double>();   // 222d: wiesc u lorda (poczatek jego okna szukania)
+            public readonly List<ColdRec> Cold = new List<ColdRec>();   // 222d: lordowie bez swiezego sladu z ostatniego przegladu (T9)
+            public int Out = -1; public bool OutFief, OutCap; public string SearchSig = "";
             public readonly HashSet<MobileParty> Elig = new HashSet<MobileParty>();
             public MapEvent BattleMe; public int BattleSide = -1; public double BattleEndH = -1.0;
             public Vec2 Seat { get { return new Vec2(SX, SY); } }
@@ -119,7 +139,13 @@ namespace Armoury
         {
             public Hunt H; public int Kind; public MobileParty Target; public Vec2 Pos; public Settlement Fort; public Settlement Dungeon;
             public float P, Need, Own;
+            public bool Search;                             // 222d: PatrolAroundPoint po zimnym tropie (cel szukania, nie slad)
             public double OfferedH = -10.0;
+        }
+
+        private sealed class ColdRec
+        {
+            public MobileParty Mp; public Vec2 Kp; public float D, Reach; public double Heard; public int V; public bool Own; public Settlement Fief;
         }
 
         private static readonly Dictionary<Hero, Hunt> _hunts = new Dictionary<Hero, Hunt>();
@@ -136,6 +162,7 @@ namespace Armoury
         // liczniki doby (watek kampanii) i mysli AI (Interlocked)
         private static int _dNew, _dEnded, _dSkipped, _dCourier, _dRethink, _dSight, _dSightCap, _dMarkMsg, _dStumbles, _stumbles, _dSkipTrip, _dSkipHeld;
         private static int _dRaise, _dAdd, _dPatrol, _dArmyOffer, _dArmyNoCall, _dArmyShort, _dSiege, _dRaid, _dSkipRelief, _dSkipOwn, _dSkipDnc, _dArmies;
+        private static int _dSearch, _dWake;   // 222d: szukanie po zimnym tropie w mysli AI (Interlocked), lowy ruszone po czekaniu
         private static readonly Dictionary<string, int> _dSkipWhy = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly HashSet<string> _err = new HashSet<string>(StringComparer.Ordinal);
 
@@ -192,8 +219,8 @@ namespace Armoury
             Interlocked.Exchange(ref _dRaise, 0); Interlocked.Exchange(ref _dAdd, 0); Interlocked.Exchange(ref _dPatrol, 0);
             Interlocked.Exchange(ref _dArmyOffer, 0); Interlocked.Exchange(ref _dArmyNoCall, 0); Interlocked.Exchange(ref _dArmyShort, 0);
             Interlocked.Exchange(ref _dSiege, 0); Interlocked.Exchange(ref _dRaid, 0); Interlocked.Exchange(ref _dSkipRelief, 0);
-            Interlocked.Exchange(ref _dSkipOwn, 0); Interlocked.Exchange(ref _dSkipDnc, 0);
-            _dArmies = 0;
+            Interlocked.Exchange(ref _dSkipOwn, 0); Interlocked.Exchange(ref _dSkipDnc, 0); Interlocked.Exchange(ref _dSearch, 0);
+            _dArmies = 0; _dWake = 0;
             _dSkipWhy.Clear();
         }
 
@@ -270,7 +297,8 @@ namespace Armoury
                      + " | kurier 178 " + CourierWired()
                      + " | lowy z zapisu " + (_importN >= 0 ? _importN + " (bledne " + _importBad + ")" : "0 (brak klucza arm_odbicie - nowa kampania albo stary zapis)")
                      + " | jezdziec " + F1(RiderPerHour) + " jedn./h, od razu do " + F0(NearRange) + " jedn., potrzeba " + F1(NeedMult) + " x sila celu, trop zimny po " + F0(ColdHours)
-                     + " h, zasieg " + F2(ReachOwnDays) + "/" + F2(ReachHelpDays) + " dob marszu.");
+                     + " h, zasieg " + F2(ReachOwnDays) + "/" + F2(ReachHelpDays) + " dob marszu"
+                     + " | zimny trop: szukanie (222d) " + F0(ColdHours) + " h od wiesci u lorda, cele: miejsce pojmania i twierdza rodu porywacza najblizsza miejsca pojmania; poza zasiegiem - czekaja.");
         }
 
         // ------------------------------------------------------------ kto jest czyj
@@ -328,6 +356,24 @@ namespace Armoury
                 var st = fs[i] != null ? fs[i].Settlement : null;
                 if (st == null || !st.IsFortification) continue;
                 float d = st.GetPosition2D.Distance(p);
+                if (d < bd) { bd = d; best = st; }
+            }
+            return best;
+        }
+
+        /// <summary>222d: twierdza (zamek albo miasto) rodu porywacza najblizsza miejsca pojmania - lenna rodu to wiedza publiczna. Porywaczem jest zawsze rod
+        /// gracza (PlayerHolds: druzyna gracza, druzyna jego rodu, loch jego osady). Brak twierdz - null.</summary>
+        private static Settlement CaptorFief(Vec2 cap)
+        {
+            var pc = Clan.PlayerClan;
+            if (pc == null) return null;
+            Settlement best = null; float bd = float.MaxValue;
+            var fs = pc.Fiefs;
+            for (int i = 0; i < fs.Count; i++)
+            {
+                var st = fs[i] != null ? fs[i].Settlement : null;
+                if (st == null || !st.IsFortification) continue;
+                float d = st.GetPosition2D.Distance(cap);
                 if (d < bd) { bd = d; best = st; }
             }
             return best;
@@ -780,7 +826,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ godzina
-        private sealed class Cand { public MobileParty Mp; public float Str, D; public Vec2 Pos, Kp; public bool Own, Sees; public double Age; }
+        private sealed class Cand { public MobileParty Mp; public float Str, D; public Vec2 Pos, Kp; public bool Own, Sees, Search; public double Age; public Settlement SF; }
         private static readonly List<Cand> _cands = new List<Cand>();
         private static readonly List<Hunt> _tmpHunts = new List<Hunt>();
         private static readonly List<KeyValuePair<Hunt, string>> _tmpEnd = new List<KeyValuePair<Hunt, string>>();
@@ -832,7 +878,7 @@ namespace Armoury
 
         private static bool Changed(Order a, Order b)
         {
-            if (a.Kind != b.Kind || a.H != b.H || a.Target != b.Target || a.Fort != b.Fort || a.Dungeon != b.Dungeon) return true;
+            if (a.Kind != b.Kind || a.H != b.H || a.Target != b.Target || a.Fort != b.Fort || a.Dungeon != b.Dungeon || a.Search != b.Search) return true;
             return a.Kind == OPatrol && a.Pos.Distance(b.Pos) > 1f;
         }
 
@@ -895,21 +941,63 @@ namespace Armoury
             }
             t.PeaceH = -1.0;
             if (now < t.SeatH) return;
-            if (arrived && TellOn)
-            {
-                string pr = h.IsFemale ? "her" : "him";
-                if (t.Tier == TThree)
-                    Show(Nm(t.K) + " has learned that you hold " + Nm(h) + (t.K.Leader == h ? ", their liege" : " of their ruling house") + ". The lords of the realm ride to free " + pr + ".");
-                else Show(House(c) + " has learned that you hold " + Nm(h) + ". Their lords ride to free " + pr + ".");
-            }
+            bool dungeonMsg = false;
             if (x != null && t.DungeonH >= 0 && now >= t.DungeonH && !t.DungeonTold)
             {
-                t.DungeonTold = true;
-                if (TellOn) Show(House(c) + " has learned that " + Nm(h) + " is held at " + Nm(x) + ".");
+                t.DungeonTold = true; dungeonMsg = true;
                 Log.Info(P + "loch -> cel " + Nm(x) + " | " + When() + " | " + Nm(h) + " | rod " + Nm(c) + " wie o lochu.");
             }
             bool xKnown = x != null && t.DungeonTold;
-            Hunters(t, xKnown ? null : tp, xKnown ? x : null, now, nw, arrived);
+            int outc = Hunters(t, xKnown ? null : tp, xKnown ? x : null, now, nw, arrived);
+            // 222d: komunikat wedlug wyniku wyboru (dotad zawsze "ride to free" - autotest 127b: nikt nie ruszyl); pierwsze rozkazy po czekaniu - raz "rides to free"
+            bool rides = outc == OutRide || outc == OutSearch;
+            if (arrived)
+            {
+                if (TellOn) Show(NewsText(t, outc));
+                if (rides) t.Rode = true;
+            }
+            else if (rides && !t.Rode)
+            {
+                t.Rode = true; _dWake++;
+                Log.Info(P + "rusza | " + When() + " | " + Nm(h) + " | rod " + Nm(c) + " | po " + F1(now - t.SeatH) + " h od wiesci w siedzibie | " + OutName[outc] + " | tryb " + t.Mode + ".");
+                if (TellOn) Show(RideText(t, outc));
+            }
+            if (dungeonMsg && TellOn) Show(House(c) + " has learned that " + Nm(h) + " is held at " + Nm(x) + ".");
+        }
+
+        /// <summary>222d: gdzie szukaja (komunikat): lenno rodu gracza i/albo miejsce pojmania.</summary>
+        private static string SearchWhere(Hunt t)
+        {
+            string nm = Nm(t.Captive);
+            if (t.OutFief && t.OutCap) return "your lands and the lands where " + nm + " was taken";
+            return t.OutFief ? "your lands" : "the lands where " + nm + " was taken";
+        }
+
+        /// <summary>222d: komunikat przy wiesci - wedlug wyniku pierwszego wyboru lowcow (wariant wladcy T3 jak dotad).</summary>
+        private static string NewsText(Hunt t, int outc)
+        {
+            var h = t.Captive;
+            string pr = h.IsFemale ? "her" : "him";
+            bool realm = t.Tier == TThree;
+            string head = realm ? Nm(t.K) + " has learned that you hold " + Nm(h) + (t.K.Leader == h ? ", their liege" : " of their ruling house") + "."
+                                : House(t.Clan) + " has learned that you hold " + Nm(h) + ".";
+            string who = realm ? "The lords of the realm" : "Their lords";
+            switch (outc)
+            {
+                case OutRide: return head + " " + who + " ride to free " + pr + ".";
+                case OutSearch: return head + " " + (realm ? "The lords of the realm are" : "They are") + " searching " + SearchWhere(t) + ".";
+                case OutWeak: return head + " " + who + " are not strong enough to come for " + pr + " - for now.";
+                default: return head + " " + who + " are too far away to come for " + pr + " - for now.";
+            }
+        }
+
+        /// <summary>222d: pierwsze rozkazy lowow po czekaniu (raz).</summary>
+        private static string RideText(Hunt t, int outc)
+        {
+            string nm = Nm(t.Captive);
+            if (t.Tier == TThree)
+                return outc == OutSearch ? "The lords of " + Nm(t.K) + " are searching " + SearchWhere(t) + "." : "The lords of " + Nm(t.K) + " ride to free " + nm + ".";
+            return outc == OutSearch ? House(t.Clan) + " is searching " + SearchWhere(t) + "." : House(t.Clan) + " rides to free " + nm + ".";
         }
 
         private static bool Friendly(Clan mc, Hunt t)
@@ -922,16 +1010,21 @@ namespace Armoury
             return cl != null && cl != t.Captive && l.IsFriend(cl);
         }
 
-        private static void Hunters(Hunt t, MobileParty tp, Settlement x, double now, Dictionary<MobileParty, Order> nw, bool arrived)
+        /// <summary>Wybor lowcow i rozkazy (watek kampanii). Wynik (222d): OutRide / OutSearch / OutWeak / OutFar - komunikat dla gracza.</summary>
+        private static int Hunters(Hunt t, MobileParty tp, Settlement x, double now, Dictionary<MobileParty, Order> nw, bool arrived)
         {
-            _cands.Clear(); t.Elig.Clear();
+            _cands.Clear(); t.Elig.Clear(); t.Cold.Clear();
             float march = Campaign.Current.EstimatedAverageLordPartySpeed * 24f;
             float engage = Campaign.Current.Models.EncounterModel.NeededMaximumLandDistanceForEncounteringMobileParty * EngageMul;
             Vec2 tpos = tp != null ? tp.GetPosition2D : (x != null ? x.GetPosition2D : Vec2.Zero);
             bool tVisible = tp != null && tp.CurrentSettlement == null && !tp.IsCurrentlyAtSea;
             float max = Campaign.Current.Models.MapVisibilityModel.MaximumSeeingRange();
             IFaction tf = x != null ? x.MapFaction : tp != null ? tp.MapFaction : null;
-            int notYet = 0, cold = 0, far = 0, skip = 0, trip = 0, held = 0;
+            // 222d: cele szukania po zimnym tropie - miejsce pojmania i twierdza rodu porywacza najblizsza miejsca pojmania (wiesc niesie miejsce i porywacza)
+            Vec2 cap = new Vec2(t.X, t.Y);
+            Settlement fief = x == null ? CaptorFief(cap) : null;
+            int notYet = 0, cold = 0, far = 0, skip = 0, trip = 0, held = 0, spent = 0;
+            MobileParty farMp = null; float farD = 0f, farR = 0f; Settlement farFief = null; bool farSearch = false;
             var wpcs = t.K.WarPartyComponents;
             for (int i = 0; i < wpcs.Count; i++)
             {
@@ -954,7 +1047,7 @@ namespace Armoury
                 if (now < NewsAt(t, q)) { notYet++; continue; }
                 // recenzja 222: o lochu kazdy dowiaduje sie wiescia z siedziby (DungeonH + kruk), nie razem z siedziba - kto jeszcze nie wie, nie oblega
                 if (x != null && now < t.DungeonH + FromSeat(t.Seat, q)) { notYet++; continue; }
-                Vec2 kp; double age = 0;
+                Vec2 kp; double age = 0; bool search = false; Settlement sf = null; ColdRec rec = null;
                 if (x != null) kp = x.GetPosition2D;
                 else
                 {
@@ -966,19 +1059,38 @@ namespace Armoury
                         if (KnownAt(s, mp, q) > now) continue;
                         if (best == null || s.H > best.H) best = s;
                     }
-                    if (best == null) { cold++; continue; }
-                    kp = best.Pos; age = now - best.H;
+                    if (best != null) { kp = best.Pos; age = now - best.H; }
+                    else
+                    {
+                        // 222d: zimny trop - szuka wokol blizszego z celow (dotad: nic)
+                        cold++; search = true;
+                        kp = cap;
+                        if (fief != null && q.Distance(fief.GetPosition2D) < q.Distance(cap)) { kp = fief.GetPosition2D; sf = fief; }
+                        double heard;
+                        if (!t.Heard.TryGetValue(mp, out heard)) { heard = Math.Min(now, NewsAt(t, q)); t.Heard[mp] = heard; }
+                        rec = new ColdRec { Mp = mp, Kp = kp, Heard = heard, Own = own, Fief = sf, V = VCand };
+                        t.Cold.Add(rec);
+                    }
                 }
                 float d = q.Distance(kp);
                 double reach = (own || t.Tier == TThree ? ReachOwnDays : ReachHelpDays) * march;
-                if (d > reach) { far++; continue; }
+                if (rec != null) { rec.D = d; rec.Reach = (float)reach; }
+                if (d > reach)
+                {
+                    far++;
+                    if (rec != null) rec.V = VFar;
+                    if (farMp == null || d - reach < farD - farR) { farMp = mp; farD = d; farR = (float)reach; farFief = sf; farSearch = search; }
+                    continue;
+                }
+                // 222d: okno szukania ColdHours od wiesci u tego lorda - potem czeka na slad (lord w zasiegu)
+                if (rec != null && now - rec.Heard > ColdHours) { spent++; rec.V = VSpent; continue; }
                 bool sees = false;
                 if (tVisible)
                 {
                     float dt = q.Distance(tpos);
                     sees = dt <= max && dt <= mp.SeeingRange;
                 }
-                _cands.Add(new Cand { Mp = mp, Str = Contrib(mp), D = d, Pos = q, Kp = kp, Own = own, Sees = sees, Age = age });
+                _cands.Add(new Cand { Mp = mp, Str = Contrib(mp), D = d, Pos = q, Kp = kp, Own = own, Sees = sees, Age = age, Search = search, SF = sf });
                 t.Elig.Add(mp);
             }
             float tStr = x != null ? Defenders(x) : (tp != null ? TargetStrength(tp) : 0f);
@@ -988,9 +1100,10 @@ namespace Armoury
             _cands.Sort(delegate (Cand a, Cand b) { return a.D.CompareTo(b.D); });
             float sel = 0f; int nSel = 0;
             string mode;
-            int nChase = 0, nPatrol = 0, nSiege = 0;
+            int nChase = 0, nPatrol = 0, nSiege = 0, nSearch = 0, nArmy = 0;
+            bool sFief = false, sCap = false;
             if (x == null && tp == null) mode = "brak celu";   // gracz w niewoli, jeniec w lochu, o ktorym rod nie wie - bez rozkazow
-            else if (_cands.Count == 0) mode = cold > 0 ? "trop zimny" : "brak lowcow";
+            else if (_cands.Count == 0) mode = spent > 0 ? MWaitSpent : far > 0 ? MWaitFar : "brak lowcow";   // 222d: zamiast "trop zimny" - czekaja
             else if (total < need)
             {
                 // za slabi wszyscy - wodz lowow zwoluje armie (gdy gra da mu druzyny), inaczej czekaja
@@ -1008,7 +1121,7 @@ namespace Armoury
                     if (fort != null)
                     {
                         nw[lead.Mp] = new Order { H = t, Kind = OArmy, Fort = fort, P = PFor(t, lead.Own), Need = need, Own = lead.Str };
-                        mode = "armia";
+                        mode = "armia"; nArmy = 1;
                     }
                     else mode = "za slabi - czekaja";
                 }
@@ -1026,28 +1139,51 @@ namespace Armoury
                     float p = PFor(t, cd.Own);
                     if (x != null) { nw[cd.Mp] = new Order { H = t, Kind = OSiege, Dungeon = x, P = p, Need = need }; nSiege++; }
                     else if (cd.Sees) { if (nearT >= need) { nw[cd.Mp] = new Order { H = t, Kind = OChase, Target = tp, P = p, Need = need }; nChase++; } }
-                    else { nw[cd.Mp] = new Order { H = t, Kind = OPatrol, Pos = cd.Kp, P = p, Need = need }; nPatrol++; }
+                    else
+                    {
+                        nw[cd.Mp] = new Order { H = t, Kind = OPatrol, Pos = cd.Kp, P = p, Need = need, Search = cd.Search };
+                        if (cd.Search) { nSearch++; if (cd.SF != null) sFief = true; else sCap = true; } else nPatrol++;
+                    }
                 }
-                mode = nSiege > 0 ? "oblezenie lochu" : nChase > 0 ? "poscig" : nPatrol > 0 ? "szuka" : "widza - za slabi blisko";
+                mode = nSiege > 0 ? "oblezenie lochu" : nChase > 0 ? "poscig" : nPatrol > 0 ? "szuka" : nSearch > 0 ? MSearch : "widza - za slabi blisko";
                 if (sel > t.TopStr) t.TopStr = sel;
             }
+            // 222d: wynik dla komunikatu - rozkazy inne niz szukanie = "ride to free", samo szukanie = "searching", bez rozkazow - za slabi albo za daleko
+            int orders = nChase + nPatrol + nSiege + nSearch + nArmy;
+            int outc = orders > 0 ? (orders > nSearch ? OutRide : OutSearch)
+                     : (mode == "za slabi - czekaja" || mode == "loch - za slabi" || mode == "widza - za slabi blisko") ? OutWeak : OutFar;
+            t.Out = outc; t.OutFief = sFief; t.OutCap = sCap;
+            string sig = "";
+            if (nSearch > 0)
+            {
+                if (sFief) sig = Nm(fief) + " (twierdza rodu porywacza)";
+                if (sCap) sig += (sig.Length > 0 ? ", " : "") + "okolice " + NearName(cap) + " (miejsce pojmania)";
+            }
+            string farTxt = "";
+            if (orders == 0 && farMp != null)
+                farTxt = " | najblizszy poza zasiegiem: " + Nm(farMp) + " " + F0(farD) + " jedn. od " + (x != null ? "lochu " + Nm(x) : farFief != null ? Nm(farFief) : farSearch ? "miejsca pojmania" : "sladu")
+                         + " (zasieg " + F0(farR) + " jedn.)";
+            string extra = (sig.Length > 0 ? " | przeszukanie: " + sig : "") + farTxt;
             if (arrived)
             {
                 string last = "-";
                 if (t.Sights.Count > 0) { var ls = t.Sights[t.Sights.Count - 1]; last = NearName(ls.Pos) + " " + F0(now - ls.H) + " h temu (" + SightName[ls.Kind] + ")"; }
                 Log.Info(P + "wiesc doszla | " + When() + " | rod " + Nm(t.Clan) + " wie o " + Nm(t.Captive) + " po " + F1(now - t.StartH) + " h (godzina gry " + F1(now) + ", plan " + F1(t.SeatH) + ")"
                          + " | wybrani " + nSel + " sila " + F0(sel) + " / potrzeba " + F0(need) + " (1.5 x " + F0(tStr) + ") | lowcow " + _cands.Count + " sila " + F0(total)
-                         + " (jeszcze nie wiedza " + notYet + ", zimny trop " + cold + ", za daleko " + far + ", pominieci " + skip + " w tym wyjazd po bron " + trip + ", wstrzymani 223 " + held + ") | zasieg " + F2(ReachOwnDays) + "/" + F2(ReachHelpDays)
-                         + " dob | ostatnio widziany " + last + ".");
+                         + " (jeszcze nie wiedza " + notYet + ", zimny trop " + cold + ", za daleko " + far + ", po oknie szukania " + spent + ", pominieci " + skip + " w tym wyjazd po bron " + trip + ", wstrzymani 223 " + held + ")"
+                         + " | rozkazy " + orders + " (szukanie po zimnym tropie " + nSearch + ") | komunikat " + OutName[outc] + extra
+                         + " | zasieg " + F2(ReachOwnDays) + "/" + F2(ReachHelpDays) + " dob | ostatnio widziany " + last + ".");
             }
-            if (mode != t.Mode)
+            if (mode != t.Mode || (nSearch > 0 && sig != t.SearchSig))
             {
-                t.Mode = mode;
+                t.Mode = mode; t.SearchSig = sig;
                 Log.Info(P + mode + " | " + When() + " | " + Nm(t.Captive) + " | wybrani " + nSel + " sila " + F0(sel) + " / potrzeba " + F0(need) + " | lowcow " + _cands.Count + " sila " + F0(total)
                          + " | cel " + (x != null ? "loch " + Nm(x) : Nm(tp)) + " (sila " + F0(tStr) + ") | rozkazy: poscig " + nChase + ", szukanie " + nPatrol + ", oblezenie " + nSiege
-                         + (mode == "armia" ? ", armia 1" : "") + " | nie wiedza " + notYet + ", zimny trop " + cold + ", za daleko " + far + ", pominieci " + skip + " (wyjazd po bron " + trip + ", wstrzymani 223 " + held + ").");
+                         + ", szukanie po zimnym tropie " + nSearch + (mode == "armia" ? ", armia 1" : "") + " | nie wiedza " + notYet + ", zimny trop " + cold + ", za daleko " + far
+                         + ", po oknie szukania " + spent + ", pominieci " + skip + " (wyjazd po bron " + trip + ", wstrzymani 223 " + held + ")" + extra + ".");
             }
             _cands.Clear();
+            return outc;
         }
 
         private static float PFor(Hunt t, bool own) { return t.Tier == TThree ? PRealm : own ? POwn : PHelp; }
@@ -1101,6 +1237,7 @@ namespace Armoury
                             var item = (a, o.P * b);
                             partyThinkParams.AddBehaviorScore(in item);
                             Interlocked.Increment(ref _dPatrol);
+                            if (o.Search) Interlocked.Increment(ref _dSearch);
                             break;
                         }
                     case OArmy:
@@ -1182,7 +1319,7 @@ namespace Armoury
             _sessionDays++;
             try
             {
-                int pre = 0, chase = 0, look = 0, army = 0, weak = 0, dun = 0, other = 0;
+                int pre = 0, chase = 0, look = 0, army = 0, weak = 0, dun = 0, other = 0, coldLook = 0, wait = 0;
                 double now = NowH;
                 foreach (var kv in _hunts)
                 {
@@ -1190,6 +1327,8 @@ namespace Armoury
                     if (now < t.SeatH) pre++;
                     else if (t.Mode == "poscig") chase++;
                     else if (t.Mode == "szuka") look++;
+                    else if (t.Mode == MSearch) coldLook++;
+                    else if (t.Mode == MWaitFar || t.Mode == MWaitSpent) wait++;
                     else if (t.Mode == "armia") army++;
                     else if (t.Mode.StartsWith("za slabi", StringComparison.Ordinal) || t.Mode == "loch - za slabi") weak++;
                     else if (t.Mode == "oblezenie lochu") dun++;
@@ -1198,9 +1337,9 @@ namespace Armoury
                 var sk = new StringBuilder();
                 foreach (var kv in _dSkipWhy) { if (sk.Length > 0) sk.Append(", "); sk.Append(kv.Key).Append(' ').Append(kv.Value); }
                 Log.Info(P + "dzien " + Today + " | " + (On ? "CZYNNE" : "WYLACZONE (Rescue Hunt NIE)") + " | lowy czynne " + _hunts.Count + " (przed wiescia " + pre + ", poscig " + chase + ", szuka " + look
-                         + ", armia " + army + ", za slabi " + weak + ", oblezenie lochu " + dun + ", inne " + other + ")"
-                         + " | dzis: nowe " + _dNew + ", skonczone " + _dEnded + ", pojmania bez lowow " + _dSkipped + (sk.Length > 0 ? " (" + sk + ")" : "")
-                         + " | rozkazy w mysli AI: poscig podbity " + _dRaise + ", poscig dodany " + _dAdd + ", szukanie " + _dPatrol + ", armia " + _dArmyOffer + " (bez druzyn do wezwania "
+                         + ", armia " + army + ", za slabi " + weak + ", oblezenie lochu " + dun + ", szuka po zimnym tropie " + coldLook + ", czeka " + wait + ", inne " + other + ")"
+                         + " | dzis: nowe " + _dNew + ", skonczone " + _dEnded + ", pojmania bez lowow " + _dSkipped + (sk.Length > 0 ? " (" + sk + ")" : "") + ", ruszone po czekaniu " + _dWake
+                         + " | rozkazy w mysli AI: poscig podbity " + _dRaise + ", poscig dodany " + _dAdd + ", szukanie " + _dPatrol + " (w tym po zimnym tropie " + _dSearch + "), armia " + _dArmyOffer + " (bez druzyn do wezwania "
                          + _dArmyNoCall + ", za slabi z wezwanymi " + _dArmyShort + ", zalozone " + _dArmies + "), oblezenie lochu " + _dSiege + ", najazd wsi lochu " + _dRaid
                          + " | pominiete: odsiecz OB5 " + _dSkipRelief + ", obrona osady wlasnego rodu " + _dSkipOwn + ", zbiorka armii " + _dSkipDnc + ", wyjazd po bron (druzynogodziny) " + _dSkipTrip + ", wstrzymani przez 223 (druzynogodziny) " + _dSkipHeld
                          + " | slady " + _dSight + " (bezpiecznik " + _dSightCap + ")" + ", komunikaty 'marked your column' " + _dMarkMsg + ", wstrzymani kurierzy " + _dCourier + ", przemyslenia " + _dRethink
@@ -1228,7 +1367,8 @@ namespace Armoury
                       .Append('\t').Append(Clean(t.SeatName)).Append('\t').Append(t.SX.ToString("R", Inv)).Append('\t').Append(t.SY.ToString("R", Inv)).Append('\t').Append(t.SeatH.ToString("R", Inv))
                       .Append('\t').Append(t.Told ? "1" : "0").Append('\t').Append(Clean(t.DungeonId)).Append('\t').Append(t.DungeonH.ToString("R", Inv)).Append('\t').Append(t.DungeonTold ? "1" : "0")
                       .Append('\t').Append(t.Armies.ToString(Inv)).Append('\t').Append(t.Battles.ToString(Inv)).Append('\t').Append(t.Wins.ToString(Inv)).Append('\t').Append(t.TopStr.ToString("R", Inv))
-                      .Append('\t').Append(t.Planned ? "c" : "-");   // recenzja 222c: pole 22 - stary build (f.Length >= 22) je pomija
+                      .Append('\t').Append(t.Planned ? "c" : "-")    // recenzja 222c: pole 22 - stary build (f.Length >= 22) je pomija
+                      .Append('\t').Append(t.Rode ? "r" : "-");      // 222d: pole 23 - lowy juz wydaly rozkazy (komunikat "rides to free" byl)
                     foreach (var s in t.Sights)
                     {
                         sb.Append("\ns\t").Append(t.Captive.StringId).Append('\t').Append(s.H.ToString("R", Inv)).Append('\t').Append(s.X.ToString("R", Inv)).Append('\t').Append(s.Y.ToString("R", Inv))
@@ -1288,7 +1428,10 @@ namespace Armoury
                     {
                         Captive = h, Clan = c, K = k ?? c.Kingdom, Tier = I(f[4]), CaptorKind = I(f[5]), CaptorId = f[6], StartH = D(f[7]), X = Fl(f[8]), Y = Fl(f[9]),
                         SeatName = f[10], SX = Fl(f[11]), SY = Fl(f[12]), SeatH = D(f[13]), Told = f[14] == "1", DungeonId = f[15], DungeonH = D(f[16]), DungeonTold = f[17] == "1",
-                        Armies = I(f[18]), Battles = I(f[19]), Wins = I(f[20]), TopStr = Fl(f[21]), Planned = f.Length > 22 && f[22] == "c"
+                        Armies = I(f[18]), Battles = I(f[19]), Wins = I(f[20]), TopStr = Fl(f[21]), Planned = f.Length > 22 && f[22] == "c",
+                        // 222d: zapis sprzed 222d - lowy po wiesci, ktore kiedykolwiek wybraly lowcow (najwieksza sila > 0) albo zalozyly armie, juz ruszyly;
+                        // po samym "trop zimny" (127b: Tywin) - nie, wiec pierwsze rozkazy pokaza "rides to free"
+                        Rode = f.Length > 23 ? f[23] == "r" : f[14] == "1" && (Fl(f[21]) > 0f || I(f[18]) > 0)
                     };
                     if (t.K == null) { _importBad++; continue; }
                     _hunts[h] = t; map[f[1]] = t;

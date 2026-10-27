@@ -1181,6 +1181,10 @@ Uzycie (Python 3, tylko odczyt):
                     ODB-2 zadna linia trybu (poscig/szuka/armia/...) jenca przed jego 'wiesc doszla'; ODB-3 'lowy czynne' w linii doby = z zapisu + pojmania - konce;
                     ODB-4 tryb z wyborem: sila wybranych >= potrzeby, tryb slabych: sila lowcow < potrzeby; ODB-5 'kurier wstrzymany' tylko przed wiescia;
                     ODB-6 proba autotestu (flaga armoury-odbicie.flag) bez NIE; ODB-7 potkniecia 0 i bez ERROR RescueHunt. Brak linii - INFO.
+                    222d (sesje z ogonem 'zimny trop: szukanie (222d)' w linii startu; starsze - INFO): ODB-8 po wiesci zimny trop to szukanie albo czekanie - zadnej
+                    linii trybu 'trop zimny', kazda 'wiesc doszla' w wojnie z polem 'rozkazy N (szukanie po zimnym tropie M) | komunikat K'; ODB-9 komunikat zgodny
+                    z rozkazami (rozkazy > 0: jada albo szukaja - szukaja tylko gdy wszystkie to szukanie; 0: daleko albo za slabi), 'rusza' (pierwsze rozkazy po
+                    czekaniu) najwyzej raz na jenca w sesji i nigdy po wiesci z komunikatem jada / szukaja.
 --grupa e223      : (26.10, paczka 223 noc/223-eskorta-lordow - Jeff 26.10 "znani lordowie a juz glowy rodu nie moga ... czekac az ktos ich schwyta"; Armoury/src/
                     LordEscort.cs, LordEscort.Probe.cs) python -I tools/sprawdz_logi.py --grupa e223 <Armoury-*.log> (strumieniowo). Linie 'Eskorta lordow (223): '.
                     E223-S self-test, E223-S2 test syntetyczny; E223-0 latki TAK; E223-1 linia doby co dobe; E223-2 slabe i dzialania; E223-3 eskorta z zalog: wzial ==
@@ -70691,8 +70695,9 @@ ODB_TAG = "Odbicie (222): "
 ODB_HOUR_TOL = 1.2             # ODB-1: przeglad co godzine - wiesc najpozniej godzine po planie (+ przeskok zegara gry ok. 0.05 h + 2 x zaokraglenie do 0.1; recenzja 222)
 ODB_PLAN_TOL = 0.11            # ODB-1: plan z linii pojmania = plan z linii wiesci (dwa zaokraglenia do 0.1)
 ODB_ERR = ("ERROR in RescueHunt",)
-ODB_SEL_MODES = ("poscig", "szuka", "oblezenie lochu", "widza - za slabi blisko")
-ODB_WEAK_MODES = ("armia", "za slabi - czekaja", "loch - za slabi", "trop zimny", "brak lowcow")
+ODB_SEL_MODES = ("poscig", "szuka", "oblezenie lochu", "widza - za slabi blisko", "szuka - zimny trop")   # 222d: szukanie po zimnym tropie
+ODB_WEAK_MODES = ("armia", "za slabi - czekaja", "loch - za slabi", "trop zimny", "brak lowcow",
+                  "czeka (poza zasiegiem)", "czeka (szukanie bez sladu)")   # 222d: zamiast 'trop zimny' (zostaje dla starych logow; w sesji 222d - ODB-8 NIE)
 ODB_MODES = ODB_SEL_MODES + ODB_WEAK_MODES + ("brak celu",)   # brak celu: gracz w niewoli albo jeniec w lochu, o ktorym rod nie wie (bez lowcow - ODB-4 m == 0)
 ODB_RE_START = re.compile(r"Odbicie \(222\): start sesji \| .*\| lowy z zapisu (\d+) \((?:bledne (\d+)|brak klucza)")
 ODB_RE_POJ = re.compile(r"Odbicie \(222\): pojmanie \| dzien (\d+) godz (\d+) \| (.+?) \((T\d) [^)]*\) rodu (.+?) krolestwa (.+?) przez (.+?) \| przy (.+?) \| twierdza (.+?) "
@@ -70707,6 +70712,10 @@ ODB_RE_KUR = re.compile(r"Odbicie \(222\): kurier wstrzymany \| dzien \d+ godz \
 ODB_RE_KON = re.compile(r"Odbicie \(222\): koniec \| dzien \d+ godz \d+ \| (.+?) - (.+?) \| dob ")
 ODB_RE_DAY = re.compile(r"Odbicie \(222\): dzien (\d+) \| (CZYNNE|WYLACZONE[^|]*) \| lowy czynne (\d+) .*\| potkniecia (\d+) \(sesja (\d+)\)\.\s*$")
 ODB_RE_TEST = re.compile(r"Odbicie \(222\): test - (T\d) (.*) - wynik (TAK|NIE|POMINIETY)\.\s*$")
+# 222d: znacznik w linii startu, pola 'wiesc doszla' (rozkazy, komunikat), linia 'rusza' (pierwsze rozkazy po czekaniu)
+ODB_RE_D222 = re.compile(r"\| zimny trop: szukanie \(222d\)")
+ODB_RE_WIE_D = re.compile(r"\| rozkazy (\d+) \(szukanie po zimnym tropie (\d+)\) \| komunikat (jada|szukaja|daleko|za slabi)")
+ODB_RE_RUSZA = re.compile(r"Odbicie \(222\): rusza \| dzien \d+ godz \d+ \| (.+?) \| rod (.+?) \| po ([\d.]+) h od wiesci w siedzibie \| (jada|szukaja) \| tryb (.+?)\.\s*$")
 # linie kontrolne (napisy jak w kodzie C# RescueHunt.cs)
 ODB_TEST = {
     "start": "[22:00:00] Odbicie (222): start sesji | klucze Rescue Hunt tak, Rescue Hunt Realm tak, Rescue Hunt Tell Player tak | latka AiHourlyTick 150 TAK (wlasciciele a/b) | kurier 178 TAK | lowy z zapisu 2 (bledne 0) | jezdziec 2.5 jedn./h, od razu do 40 jedn., potrzeba 1.5 x sila celu, trop zimny po 72 h, zasieg 8.02/4.01 dob marszu.",
@@ -70720,6 +70729,12 @@ ODB_TEST = {
     "kon": "[22:20:00] Odbicie (222): koniec | dzien 4503 godz 2 | Tywin Lannister - po bitwie | dob 2.5 | wiesc doszla | bitwy lowcow z graczem 1 (wygrane 0) | armie 0 | najwieksza sila 450.",
     "day": "[22:30:00] Odbicie (222): dzien 4502 | CZYNNE | lowy czynne 1 (przed wiescia 0, poscig 0, szuka 1, armia 0, za slabi 0, oblezenie lochu 0, inne 0) | dzis: nowe 1, skonczone 0 | slady 3 | kurier 178 TAK | potkniecia 0 (sesja 0).",
     "test": "[22:40:00] Odbicie (222): test - T1 pojmanie X: plan lowow 24.30 h, wzor niezalezny 24.30 h (jazda 0.00, kruk 24.30) - wynik TAK.",
+    # 222d (napisy jak w kodzie C# po 222d)
+    "start_d": "[22:00:00] Odbicie (222): start sesji | klucze Rescue Hunt tak, Rescue Hunt Realm tak, Rescue Hunt Tell Player tak | latka AiHourlyTick 150 TAK (wlasciciele a/b) | kurier 178 TAK | lowy z zapisu 0 (bledne 0) | jezdziec 2.5 jedn./h, od razu do 40 jedn., potrzeba 1.5 x sila celu, trop zimny po 72 h, zasieg 8.02/4.01 dob marszu | zimny trop: szukanie (222d) 72 h od wiesci u lorda, cele: miejsce pojmania i twierdza rodu porywacza najblizsza miejsca pojmania; poza zasiegiem - czekaja.",
+    "wie_d": "[22:10:00] Odbicie (222): wiesc doszla | dzien 108992 godz 9 | rod Lannister wie o Tywin Lannister po 139.3 h (godzina gry 2615817.9, plan 2615817.9) | wybrani 0 sila 0 / potrzeba 112 (1.5 x 74) | lowcow 0 sila 0 (jeszcze nie wiedza 12, zimny trop 2, za daleko 2, po oknie szukania 0, pominieci 0 w tym wyjazd po bron 0, wstrzymani 223 0) | rozkazy 0 (szukanie po zimnym tropie 0) | komunikat daleko | najblizszy poza zasiegiem: Kevan Lannister's Party 852 jedn. od miejsca pojmania (zasieg 647 jedn.) | zasieg 8.02/4.01 dob | ostatnio widziany Driftwood Hall 126 h temu (pojmanie).",
+    "mode_cz": "[22:10:00] Odbicie (222): czeka (poza zasiegiem) | dzien 108992 godz 9 | Tywin Lannister | wybrani 0 sila 0 / potrzeba 112 | lowcow 0 sila 0 | cel Ithauser's Party (sila 74) | rozkazy: poscig 0, szukanie 0, oblezenie 0, szukanie po zimnym tropie 0 | nie wiedza 12, zimny trop 2, za daleko 2, po oknie szukania 0, pominieci 0 (wyjazd po bron 0, wstrzymani 223 0) | najblizszy poza zasiegiem: Kevan Lannister's Party 852 jedn. od miejsca pojmania (zasieg 647 jedn.).",
+    "rusza": "[22:12:00] Odbicie (222): rusza | dzien 108993 godz 4 | Tywin Lannister | rod Lannister | po 19.0 h od wiesci w siedzibie | szukaja | tryb szuka - zimny trop.",
+    "mode_szz": "[22:12:00] Odbicie (222): szuka - zimny trop | dzien 108993 godz 4 | Tywin Lannister | wybrani 2 sila 180 / potrzeba 112 | lowcow 3 sila 260 | cel Ithauser's Party (sila 74) | rozkazy: poscig 0, szukanie 0, oblezenie 0, szukanie po zimnym tropie 2 | nie wiedza 9, zimny trop 5, za daleko 2, po oknie szukania 0, pominieci 0 (wyjazd po bron 0, wstrzymani 223 0) | przeszukanie: okolice Driftwood Hall (miejsce pojmania).",
 }
 
 
@@ -70764,6 +70779,29 @@ def odbicie222_selftest():
     m = ODB_RE_TEST.search(T["test"])
     if not m or m.group(1) != "T1" or m.group(3) != "TAK":
         return "test"
+    # 222d
+    if not ODB_RE_D222.search(T["start_d"]) or ODB_RE_D222.search(T["start"]) or not ODB_RE_START.search(T["start_d"]):
+        return "start sesji 222d"
+    m = ODB_RE_WIE.search(T["wie_d"])
+    if not m or m.group(2) != "Tywin Lannister" or float(m.group(4)) != 2615817.9:
+        return "wiesc doszla 222d"
+    w = ODB_RE_WIE_D.search(m.group(6))
+    if not w or w.groups() != ("0", "0", "daleko") or ODB_RE_WIE_D.search(T["wie"]):
+        return "wiesc doszla 222d - rozkazy i komunikat"
+    s = ODB_RE_SEL.search(m.group(6))
+    if not s or [int(x) for x in s.groups()] != [0, 0, 112, 0, 0]:
+        return "wybrani (wiesc 222d)"
+    m = ODB_RE_MODE.search(T["mode_cz"])
+    if not m or m.group(1) != "czeka (poza zasiegiem)" or m.group(2) != "Tywin Lannister":
+        return "tryb czeka"
+    m = ODB_RE_MODE.search(T["mode_szz"])
+    if not m or m.group(1) != "szuka - zimny trop" or m.group(2) != "Tywin Lannister" or not ODB_RE_SEL.search(T["mode_szz"]):
+        return "tryb szuka - zimny trop"
+    m = ODB_RE_RUSZA.search(T["rusza"])
+    if not m or m.group(1) != "Tywin Lannister" or m.group(4) != "szukaja" or m.group(5) != "szuka - zimny trop":
+        return "rusza"
+    if ODB_RE_MODE.search(T["rusza"]) or ODB_RE_WIE.search(T["rusza"]):
+        return "rusza lapane przez inne wyrazenia"
     return None
 
 
@@ -70780,7 +70818,7 @@ def odbicie222_collect(logp):
             m = ODB_RE_START.search(ln)
             if m:
                 D["starts"] += 1
-                D["ev"].append(("start", int(m.group(1)), int(m.group(2) or 0)))
+                D["ev"].append(("start", int(m.group(1)), int(m.group(2) or 0), bool(ODB_RE_D222.search(ln))))   # e[3]: sesja 222d
                 continue
             m = ODB_RE_POJ.search(ln)
             if m:
@@ -70793,7 +70831,13 @@ def odbicie222_collect(logp):
             m = ODB_RE_WIE.search(ln)
             if m:
                 s = ODB_RE_SEL.search(m.group(6))
-                D["ev"].append(("wie", m.group(2), float(m.group(4)), float(m.group(5)), [int(x) for x in s.groups()] if s else None))
+                w = ODB_RE_WIE_D.search(m.group(6))   # 222d: (rozkazy, szukanie, komunikat); 'bez wojny' - bez wyboru
+                D["ev"].append(("wie", m.group(2), float(m.group(4)), float(m.group(5)), [int(x) for x in s.groups()] if s else None,
+                                (int(w.group(1)), int(w.group(2)), w.group(3)) if w else None, "bez wojny" in m.group(6)))
+                continue
+            m = ODB_RE_RUSZA.search(ln)
+            if m:
+                D["ev"].append(("rusza", m.group(1), m.group(4)))
                 continue
             m = ODB_RE_MODE.search(ln)
             if m:
@@ -70820,7 +70864,7 @@ def odbicie222_collect(logp):
 
 
 def odbicie222_rows(rep, D):
-    """odbicie222: wiersze ODB-0..ODB-7 z zebranych zdarzen (opis w --help). Log bez linii 222 - INFO."""
+    """odbicie222: wiersze ODB-0..ODB-9 z zebranych zdarzen (opis w --help). Log bez linii 222 - INFO."""
     ev = D["ev"]
     rep.add("ODB-0: linie paczki 222 (start sesji)", f"linii {D['lines']}, startow {D['starts']}", ">= 1 start sesji", True if D["starts"] > 0 else None)
     # ODB-1: wiesc o planie (+- 1 h), plan z linii pojmania
@@ -70903,6 +70947,44 @@ def odbicie222_rows(rep, D):
             "0 NIE (brak proby - INFO)", None if not D["tests"] else not nt)
     st = sum(D["days"])
     rep.add("ODB-7: potkniecia 222 (linie doby) i ERROR RescueHunt", f"potkniecia {st}, ERROR {D['err']}", "0 i 0", None if D["lines"] == 0 else (st == 0 and D["err"] == 0))
+    # ODB-8 / ODB-9 (222d): tylko w sesjach z ogonem 222d w linii startu
+    d222, n8, bad8, n9, bad9, sess = False, 0, [], 0, [], 0
+    kom, rode = {}, {}
+    for e in ev:
+        if e[0] == "start":
+            d222, kom, rode = e[3], {}, {}
+            sess += 1 if e[3] else 0
+        elif not d222:
+            continue
+        elif e[0] == "poj" or e[0] == "kon":
+            kom.pop(e[1], None); rode.pop(e[1], None)
+        elif e[0] == "mode":
+            n8 += 1
+            if e[2] == "trop zimny":
+                bad8.append(f"trop zimny {e[1]}")
+        elif e[0] == "wie":
+            if e[6]:
+                continue   # bez wojny - bez wyboru lowcow
+            n8 += 1; n9 += 1
+            if e[5] is None:
+                bad8.append(f"wiesc {e[1]} bez pola komunikat")
+                continue
+            o, sr, k = e[5]
+            kom[e[1]] = k
+            ok = (k in ("jada", "szukaja") and (k == "szukaja") == (sr == o)) if o > 0 else k in ("daleko", "za slabi")
+            if not ok:
+                bad9.append(f"wiesc {e[1]} rozkazy {o} (szukanie {sr}) komunikat {k}")
+        elif e[0] == "rusza":
+            n9 += 1
+            if kom.get(e[1]) in ("jada", "szukaja"):
+                bad9.append(f"rusza {e[1]} po komunikacie {kom[e[1]]}")
+            if rode.get(e[1]):
+                bad9.append(f"rusza {e[1]} drugi raz")
+            rode[e[1]] = True
+    rep.add("ODB-8: zimny trop po wiesci - szukanie albo czekanie (222d)", f"sesji 222d {sess}, linii {n8}, zlych {len(bad8)}" + (f" ({'; '.join(bad8[:3])})" if bad8 else ""),
+            "0 zlych (brak sesji 222d albo linii - INFO)", None if sess == 0 or n8 == 0 else not bad8)
+    rep.add("ODB-9: komunikat zgodny z rozkazami, 'rusza' raz (222d)", f"linii {n9}, zlych {len(bad9)}" + (f" ({'; '.join(bad9[:3])})" if bad9 else ""),
+            "0 zlych (brak sesji 222d albo linii - INFO)", None if sess == 0 or n9 == 0 else not bad9)
 
 
 def odbicie222_synth():
@@ -70919,12 +71001,19 @@ def odbicie222_synth():
            T["mode"].replace("wybrani 3 sila 450", "wybrani 1 sila 100"),               # ODB-4: 100 < 300
            T["day"].replace("lowy czynne 1", "lowy czynne 3").replace("potkniecia 0 (sesja 0)", "potkniecia 2 (sesja 2)"),   # ODB-3, ODB-7
            T["test"].replace("wynik TAK", "wynik NIE")]                                 # ODB-6
+    # 222d: wiesc 'za daleko', czekanie, potem pierwsze rozkazy (szukanie) - dobrze; zly: komunikat 'jada' bez rozkazow, 'trop zimny', 'rusza' dwa razy
+    poj_d = T["poj2"]
+    good_d = [T["start_d"], poj_d, T["wie_d"], T["mode_cz"], T["rusza"], T["mode_szz"]]
+    bad_d = [T["start_d"], poj_d, T["wie_d"].replace("komunikat daleko", "komunikat jada"),
+             T["mode_cz"].replace("czeka (poza zasiegiem)", "trop zimny"), T["rusza"], T["rusza"]]
     exp = {
-        "good": {"ODB-0": "TAK", "ODB-1": "TAK", "ODB-2": "TAK", "ODB-3": "TAK", "ODB-4": "TAK", "ODB-5": "TAK", "ODB-6": "TAK", "ODB-7": "TAK"},
-        "bad": {"ODB-0": "TAK", "ODB-1": "NIE", "ODB-2": "NIE", "ODB-3": "NIE", "ODB-4": "NIE", "ODB-5": "NIE", "ODB-6": "NIE", "ODB-7": "NIE"},
-        "none": {"ODB-0": "INFO", "ODB-1": "INFO", "ODB-2": "INFO", "ODB-3": "INFO", "ODB-4": "INFO", "ODB-5": "INFO", "ODB-6": "INFO", "ODB-7": "INFO"},
+        "good": {"ODB-0": "TAK", "ODB-1": "TAK", "ODB-2": "TAK", "ODB-3": "TAK", "ODB-4": "TAK", "ODB-5": "TAK", "ODB-6": "TAK", "ODB-7": "TAK", "ODB-8": "INFO", "ODB-9": "INFO"},
+        "bad": {"ODB-0": "TAK", "ODB-1": "NIE", "ODB-2": "NIE", "ODB-3": "NIE", "ODB-4": "NIE", "ODB-5": "NIE", "ODB-6": "NIE", "ODB-7": "NIE", "ODB-8": "INFO", "ODB-9": "INFO"},
+        "none": {"ODB-0": "INFO", "ODB-1": "INFO", "ODB-2": "INFO", "ODB-3": "INFO", "ODB-4": "INFO", "ODB-5": "INFO", "ODB-6": "INFO", "ODB-7": "INFO", "ODB-8": "INFO", "ODB-9": "INFO"},
+        "good_d": {"ODB-0": "TAK", "ODB-1": "TAK", "ODB-2": "TAK", "ODB-4": "TAK", "ODB-8": "TAK", "ODB-9": "TAK"},
+        "bad_d": {"ODB-8": "NIE", "ODB-9": "NIE"},
     }
-    runs = {"good": good, "bad": bad, "none": ["[10:00:00] Armoury: inna linia"]}
+    runs = {"good": good, "bad": bad, "none": ["[10:00:00] Armoury: inna linia"], "good_d": good_d, "bad_d": bad_d}
     diff = []
     tmp = tempfile.mkdtemp(prefix="odb222_")
     try:
@@ -70941,7 +71030,7 @@ def odbicie222_synth():
 
 
 def odbicie222_main(logp):
-    """odbicie222 (26.10, paczka 222): ODB-S, ODB-S2, ODB-0..ODB-7 - opis w --help. Strumieniowo."""
+    """odbicie222 (26.10, paczka 222; 222d 27.10): ODB-S, ODB-S2, ODB-0..ODB-9 - opis w --help. Strumieniowo."""
     rep = Report()
     s1 = odbicie222_selftest()
     rep.add("ODB-S: self-test wyrazen (linie kontrolne jak w kodzie C#: RescueHunt.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
