@@ -255,6 +255,9 @@ namespace Armoury
                     // 204 (dawniej 157 P3): jezdziec w poscigu za konnym strzelcem (cel na czlowieku, pozycja skryptowa) - tez bez capu marszu / odpoczynku szyku;
                     // kon zajechany (HorseAiRestBelow) konczy poscig w HorsePursuit.Hunt; lucznicy z celem 204 (bez pozycji skryptowej) zostaja pod capem szyku
                     if (HorsePursuit.CounterAnyThread(agent)) { HorsePursuit.NoteCounterCapSkip(); return; }
+                    // 283a (poprawka 132a): nekajacy autotestu (pozycja skryptowa za szykiem wroga) - bez capu marszu swojego szyku (frey_rider w szyku piechoty
+                    // szedl 1.33 m/s z piechota); tylko LogGate.Mode 1 i klucz HuntHarasserInAutotest - w grze Jeffa zawsze false
+                    if (HorsePursuit.TestRunAnyThread(agent)) return;
                     var mount = agent.MountAgent;
                     if (mount != null && IsDragon(mount)) { Interlocked.Increment(ref _postDragon); return; }
                     bool catchUp = desiredSpeed < 0f;
@@ -281,6 +284,7 @@ namespace Armoury
                 if (agent.IsRunningAway || agent.IsDetachedFromFormation || agent.MissionPeer != null || agent.MountAgent != null) return;
                 // 283: pieszy oddzial na nekajacego (HorsePursuit R2, pozycja skryptowa, _countering) biegnie - bez capu oddechu, jak jezdziec 204 bez capu marszu
                 if (HorsePursuit.CounterAnyThread(agent)) { HorsePursuit.NoteCounterCapSkip(); return; }
+                if (HorsePursuit.TestRunAnyThread(agent)) return;   // 283a: nekajacy autotestu - bez capu oddechu
                 bool cu = desiredSpeed < 0f;
                 if (cu && agent.IsRetreating()) return;
                 float bc = AiBreath.CapOf(agent);
@@ -798,6 +802,7 @@ namespace Armoury
             breath = false;
             if (a == null || !a.IsAIControlled || a.IsRunningAway) return -1f;
             if (HorsePursuit.CounterAnyThread(a)) return -1f;   // 283: pieszy oddzial na nekajacego - kara FieldCraft bez gornego capu marszu / oddechu (jak PostSpeed)
+            if (HorsePursuit.TestRunAnyThread(a)) return -1f;   // 283a: nekajacy autotestu - jak wyzej
             var f = a.Formation;
             if (_on)
             {

@@ -809,7 +809,8 @@ namespace Armoury
             // recenzja 204: strzelec AI w nietknietym szyku swojej strony (np. szyk konnych lucznikow) - zagrozenie szyku, nie jednego czlowieka: tylko L1,
             // jezdzcy z szyku bez szarzy, razem na wszystkich takich strzelcow najwyzej PerVictim z jednego szyku (157: dwoch z szyku); samotny i gracz - bez zmian
             // recenzja 283 (2): strzelec AI w nietknietym szyku zostaje "szyk na szyk" (L1, PerVictim z szyku, bez postoju) takze przy wodzu - wodza oslania jego szyk
-            t.Group = !lone && !s.IsMainAgent;
+            // poprawka 132a: nekajacy testu stoi za graczem (jak w OnFire / MeleeEvent / ThreatPrio) - nie "szyk na szyk" (L1, PerVictim, bez piechoty i postoju)
+            t.Group = !lone && !s.IsMainAgent && !ReferenceEquals(s, _tA);
             if (t.Group)
             {
                 HGroupShooters.Add(s.Index);
