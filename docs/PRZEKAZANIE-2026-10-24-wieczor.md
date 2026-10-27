@@ -1,5 +1,17 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 21:50 CET - paczka 283 reakcja na nekanie z tylu (workflow wf_13ad8807-a09); TYDZIEN 93%
+- Jeff gra na 130 (sesja od 20:56, log skopiowany: D:\Backup-Bannerlord\logi-jeffa\2026-10-27-2145-bitwa\). Uwagi do bitwy (21:40): strzelal z 3 m w plecy lucznikow
+  i piechoty (konno, potem pieszo) - lucznicy szli dalej, konnica ruszyla tylko czesciowo, piechota nie reagowala. Log 204 (linia 7304): wykryc 52, epizody 2,
+  jezdzcy 3, lucznicy na cel 32, ale 'cel zdjety - swoi przy strzelcu 19' i powroty 'swoi przy strzelcu 204' (straznik FF po bliskosci zamiast linii strzalu);
+  204 liczy tylko KONNYCH strzelcow - pieszy gracz bez reakcji.
+- 283 (zb\n283, noc/283-reakcja-na-nekanie-z-tylu od 9d807118): zatrzymanie/obrot szyku pod ostrzalem z tylu/boku, lucznicy strzelaja (FF = linia strzalu),
+  cala konnica na konnego, oddzial piechoty na pieszego, wodz wstrzymuje marsz; autotest -Harasser rozszerzony o pieszego i pozycje tuz za lucznikami.
+- Wznowienie: scriptPath paczki-280-281-wf_d8c1bd65-fa1.js, resumeFromRunId wf_13ad8807-a09 (args w journal.jsonl).
+- W toku rownolegle: 280+281 (wf_d8c1bd65-fa1), 282 (wf_7236362f-1af), 283. Potem: scalenie wszystkich czterech do n161 (git merge + scal_sklad), autotest 131a
+  (bitwaN z -Harasser + probyN 30 dob + wczytanie zapisu dla 280 B2), grupy ksiega280 e223 ruda282 m204jazda/nekanie283 + reszta, WGRANIE 131 gdy Jeff nie gra.
+- LIMIT TYGODNIA 93% o 21:45 - przy 99% zatrzymac sie i przekazac drugiemu kontu (wszystkie runy wznawialne z journal.jsonl).
+
 ## DOPISEK 27.10 ok. 21:15 CET - paczka 282 ruda (workflow wf_7236362f-1af) obok 280/281
 - Jeff pytal o inwestycje (odpowiedz z logu 12:57: kuznia ~123 d/dobe, tkalnia welny ~98, len ~68; tartak ~0, rzeznik -5, platnerz zbroi konskich -8 - zmiana branzy
   E3-D3 po 60 dobach strat), potem: "tak zob paczke, ale ta rude to my chyba juz ktoreys raz naprawiamy i mowiles ze naprawione".
