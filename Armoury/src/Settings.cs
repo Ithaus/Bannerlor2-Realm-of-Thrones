@@ -4312,7 +4312,7 @@ namespace Armoury
         public bool CaravanBulkFlowGateAll = true;          // with Caravans Hold Only What They Sell: the same rule for wood, hides, leather, flax, linen and wool, not only iron - caravans keep at most what they sell to towns in ten days and unload the rest. Off = iron only, as before
         public bool TownMaterialOrderEqualCoverAll = true;  // with Iron Sources Sell Down To Reorder Point: the same rule for wood, leather, linen, flax, hides and wool - a source town sells down to its own reorder point and never so much that it keeps fewer days than the buyer gets. Off = iron only, as before
         public bool TownMaterialOrderWorkshopInputs = true; // a goods workshop (tannery, weavery, smithy, wood workshop) that stops for lack of hides, flax, wool, iron or wood makes its town order that material like the armour workshops do, and its use counts in the town's measured use. Silver, cotton, clay and food inputs are only measured in the log. Off = as before
-        public bool CaravanSizeByTrade = false;             // a caravan whose trade earned less per day over the last two weeks than its wages cost hires no more guards (only after a week of measured trade). Off = measured in the log only
+        public bool CaravanSizeByTrade = true;              // a caravan whose trade earned less per day over the last two weeks than its wages cost hires no more guards (only after a week of measured trade). Off = measured in the log only
 
         // --- Food follows the market under the start calibration (night 18.10) ---
         // Paczka f20-d4 (decyzja Jeffa 18.10 "4. b"): po D+49 (koniec sterowania rynku) podaz jedzenia i soli pod KS nie szla za cena - A7 wylaczona, Plan rusza tylko

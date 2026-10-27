@@ -9558,7 +9558,7 @@ namespace Armoury
 
         [SettingPropertyBool("Caravan Guards By Trade Earnings", HintText = "a caravan whose trade earned less per day over the last two weeks than its wages cost hires no more guards (only after a week of measured trade). Off = measured in the log only", RequireRestart = false)]
         [SettingPropertyGroup("Merchant trade and raw materials (284)")]
-        public bool CaravanSizeByTrade { get; set; } = false;
+        public bool CaravanSizeByTrade { get; set; } = true;
 
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
