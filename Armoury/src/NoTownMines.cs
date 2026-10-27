@@ -158,7 +158,14 @@ namespace Armoury
                 if (p.Inputs == null || p.Inputs.Count == 0 || p.Outputs == null || p.Outputs.Count == 0) continue;   // linia bez wsadu: "z niczego" (WorkshopLaw ja zamyka) - nie liczymy
                 if (net && !WorkshopTrade.IsTradeLine(p)) continue;
                 float v = 0f; bool ok = true;
-                foreach (var o in p.Outputs) { float pr = Price(town, o.Item1); if (pr < 0f) { ok = false; break; } v += pr * o.Item2; }
+                bool merchant = net && WorkshopTrade.MerchantRule;   // 241: wyrob warsztatu wedlug ceny kupca (najwyzej tyle, za ile kupiec go odsprzedaje) - jak LineCycleAt
+                foreach (var o in p.Outputs)
+                {
+                    float pr = Price(town, o.Item1);
+                    if (pr < 0f) { ok = false; break; }
+                    if (merchant) { var smp = WorkshopTrade.Sample(o.Item1); if (smp != null) pr = Math.Min(pr, WorkshopTrade.RefUnit(town, smp)); }
+                    v += pr * o.Item2;
+                }
                 if (!ok) continue;
                 foreach (var i in p.Inputs) { float pr = Price(town, i.Item1); if (pr < 0f) { ok = false; break; } v -= pr * i.Item2; }
                 if (!ok) continue;

@@ -22,7 +22,7 @@ namespace Armoury
     /// (WorkshopInputs.HasInput), choc prawdziwy cykl dostaje najwyzej cene sprawiedliwa (WorkshopTrade.FairCycle: (wsad + place) x marza mistrza) i rusza tylko, gdy
     /// wsad lezy na polce miasta.
     /// Regula (klucz wlaczony, razem z E3-D3 WorkshopRetoolByPrice; dla podmiany kopalni N10 - z NoTownMines):
-    ///  1. cykl linii = WorkshopTrade.LineCycleAt (prog gry, cena miasta, sufit ceny sprawiedliwej - ta sama regula co cykl);
+    ///  1. cykl linii = WorkshopTrade.LineCycleAt (prog gry, cena miasta, cena kupca 241 - ta sama regula co cykl);
     ///  2. cykli na dobe = min(szybkosc linii gry, wsad regionu na dobe / warsztaty regionu, ktore biora ten wsad (z nowym) / sztuk wsadu na cykl); linie od najlepszej,
     ///     wsad dzielony miedzy linie typu; warsztat, ktory sie przezbraja, z kapitalem ponizej ceny wsadu linii - ta linia nie rusza (CanNotableWorkshopProduceThisCycle);
     ///  3. wsad regionu naprawde dostepny = srednia produkcja 28 dob x f + polka / 30 dob, f = min(1, polka / 7 dob produkcji) - produkcja, ktora zostaje na rynku

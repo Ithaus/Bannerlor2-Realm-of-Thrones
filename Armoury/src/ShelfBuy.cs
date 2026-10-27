@@ -94,6 +94,7 @@ namespace Armoury
                 }
             }
             finally { if (tally) _dTicks += Stopwatch.GetTimestamp() - t0; }
+            if (n > 0) MarketSales.NoteShelf(shelf, el, n, cost);   // 241: sprzedaz miasta (srednia ceny kupca z 28 dob) - tylko polki miast i towary warsztatow; nie rzuca
             if (n > 0 && tally)
             {
                 _dBatches++; _dPieces += n; _dCost += cost; _dFlat += (long)first * n;
@@ -111,6 +112,7 @@ namespace Armoury
             shelf.AddToCounts(el, n);
             ShelfIndex.NoteOwn(shelf);   // E8/0: zrodlo przebudowy pamieci polki (tylko licznik)
             ShelfIndex.OwnAfter(shelf, idx0, el, n);   // E8/O1: indeks +n zamiast przebudowy (nowy stos = skok wersji o 2 - zwykla przebudowa)
+            MarketSales.NoteShelf(shelf, el, n, cost, -1);   // 241: zakup cofniety - sprzedaz miasta tez (nie rzuca)
             if (!tally) return;
             _dBatches--; _dPieces -= n; _dCost -= cost; _dFlat -= (long)first * n; _dBack += n;
             if (n > 1) _dMulti--;

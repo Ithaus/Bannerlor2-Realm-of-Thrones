@@ -223,6 +223,7 @@ namespace Armoury
             if (paid <= 0) { b.NoGold++; b.Broke = true; return 0; }
             b.T.ChangeGold(paid);
             b.R.AddToCounts(e, -k);
+            MarketSales.Note(b.T, e, k, paid);   // 241: sprzedaz miasta (srednia ceny kupca z 28 dob)
             b.Spent += paid; b.Pcs += k; b.Got += k; b.Rg[rung] += k;
             if (b.CapOn)
             {
@@ -344,6 +345,7 @@ namespace Armoury
             if (paid <= 0) return 0;
             b.T.ChangeGold(paid);
             b.R.AddToCounts(e, -k);
+            MarketSales.Note(b.T, e, k, paid);   // 241: sprzedaz miasta (srednia ceny kupca z 28 dob)
             b.Spent += paid; b.Pcs += k; b.P2Got += k;
             b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
             b.D.VBuy += paid; b.D.VPieces += k;

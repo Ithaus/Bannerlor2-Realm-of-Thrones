@@ -146,7 +146,17 @@ namespace Armoury
                     if (Paced(p) && !TownFletchers.ClosesLine(p, w))
                     {
                         float idx = 1f;
-                        try { var o = p.Outputs[0].Item1; if (o != null) idx = town.GetItemCategoryPriceIndex(o); } catch { idx = 1f; }
+                        try
+                        {
+                            var o = p.Outputs[0].Item1;
+                            if (o != null)
+                            {
+                                idx = town.GetItemCategoryPriceIndex(o);
+                                // 241: przy cenie kupca tempo nie goni ceny pustej polki, ktorej nikt nie placi - najwyzej indeks kupca (srednia sprzedaz z 28 dob / cena graniczna ludu)
+                                if (WorkshopTrade.MerchantRule) { bool fh; float mi = (float)WorkshopTrade.MerchantIndex(town, o, out fh); if (mi < idx) idx = Math.Max(0.01f, mi); }
+                            }
+                        }
+                        catch { idx = 1f; }
                         if (!(idx > 0f) || float.IsInfinity(idx)) idx = 1f;
                         float pp = MBMath.ClampFloat((float)Math.Sqrt(idx), PMin, PMax);
                         f = MBMath.ClampFloat(mp * pp, MMin, FMax);   // razem 0.3-4 (progi NE3-23)

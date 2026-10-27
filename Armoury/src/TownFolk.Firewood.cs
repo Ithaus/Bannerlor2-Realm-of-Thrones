@@ -156,6 +156,7 @@ namespace Armoury
                             {
                                 // nie powinno sie zdarzyc (Take nie wydaje ponad budzet = wolne pieniadze) - drewno wraca na polke w tej samej ramce, nikt nie placi
                                 shelf.AddToCounts(el, got);
+                                MarketSales.NoteShelf(shelf, el, got, cost, -1);   // 241: zakup cofniety - sprzedaz miasta tez (Take ja zapisal)
                                 _fwStumbles++; got = -1;
                             }
                         }

@@ -1180,9 +1180,14 @@ namespace Armoury
                 // 3.1 poprawka po recenzji (E3/8a, BkWorkshopTaxToLord): wpis 51 zakladal, ze BK pobiera podatek od cudzych warsztatow od wlascicieli - od lordow
                 // i gracza nie pobiera (czynny model warsztatow gry to nie BKWorkshopModel) - te linie byly z niczego; zdjete bez przelewu, takze z podstawy rady
                 float ownerPaid;   // D11-3: z tych linii czesc placona panu przelewem przez wlasciciela (OwnerTaxDaily) - jak linie notabli E3/8a liczy sie do podstawy rady
-                float unpaid = Seal31B.UnpaidOwnerTaxLines(__0, out ownerPaid);
-                __result = new TaleWorlds.CampaignSystem.ExplainedNumber(kept - unpaid - Seal31B.NotableTaxLines(__0), __1, _txtRent);   // 3.1/3.3 (31b) E3/8a: warsztaty notabli placa panu przelewem (BkWorkshopTaxToLord) - bez linii z niczego
-                CouncilWages35.TownBase(__0, kept - unpaid + ownerPaid);   // 3.5a: pensje rady BK od tego podatku i renty, nie od zastapionego podatku klas ludnosci (wlasny try); bez linii, ktorych nikt nie placi (D11-3: placone przez wlasciciela - w podstawie)
+                float ownerPaid1, notPaid1;   // 241: czesci tych linii naprawde placone przy podatku od wyplaty (stawka x wyplata - polowa linii BK w stanie ustalonym)
+                float unpaid = Seal31B.UnpaidOwnerTaxLines(__0, out ownerPaid, out ownerPaid1);
+                float notLines = Seal31B.NotableTaxLines(__0, out notPaid1);
+                __result = new TaleWorlds.CampaignSystem.ExplainedNumber(kept - unpaid - notLines, __1, _txtRent);   // 3.1/3.3 (31b) E3/8a: warsztaty notabli placa panu przelewem (BkWorkshopTaxToLord) - bez linii z niczego
+                // 3.5a: pensje rady BK od tego podatku i renty, nie od zastapionego podatku klas ludnosci (wlasny try); bez linii, ktorych nikt nie placi (D11-3: placone przez
+                // wlasciciela - w podstawie). 241 (Workshop Tax On Payout): linie warsztatow (notabli w `kept`, D11-3 w ownerPaid) w podstawie tyle, ile naprawde placa - od wyplaty
+                float councilBase = Seal31B.PayoutRule ? kept - unpaid + ownerPaid1 - notLines + notPaid1 : kept - unpaid + ownerPaid;
+                CouncilWages35.TownBase(__0, councilBase);
             }
             catch { }
         }

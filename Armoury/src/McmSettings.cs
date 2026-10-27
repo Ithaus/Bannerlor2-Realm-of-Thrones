@@ -2864,7 +2864,7 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public float ArtisanWoolPerSheep { get; set; } = 0.15f;
 
-        [SettingPropertyBool("Workshop Trade Fair Price", HintText = "the just price of the towns (assize of bread, guild prices): for each batch of trade goods the town pays a workshop at most what the batch cost - its materials at the town's price and its wages - plus the master's profit (Smith Profit Percent, the same margin as in the price of arms); whatever an empty stall would pay above that stays in the town purse. Bakers, weavers and silversmiths earn a craftsman's living instead of a lord's rent, so a workshop costs what such a living is worth. Your own workshops too; arms lines keep their own price (off = a workshop gets the town's full price for every piece)", RequireRestart = false)]
+        [SettingPropertyBool("Workshop Trade Fair Price", HintText = "the town's merchants pay a workshop for each piece of trade goods no more than they sell it for: the average price the town's buyers paid for that good over the last 28 days, or, if nobody bought it there yet, the most the townsfolk will pay (Folk Ladder Price Ceiling). A good the town lacks pays well and draws workshops; the price an empty stall asks but nobody pays stays in the town purse, and a batch is made only if the town purse can pay what the merchants will. The workshop pays its craftsmen their share (Town Folk Craft Wage Share) of what it gets. Your own workshops too; arms lines keep their own price (off = a workshop gets the stall's full price for every piece)", RequireRestart = false)]
         [SettingPropertyGroup("Workshops")]
         public bool WorkshopTradeFairPrice { get; set; } = true;
 
@@ -6580,6 +6580,10 @@ namespace Armoury
         [SettingPropertyGroup("Every coin has a payer (stage 3)")]
         public bool BkWorkshopTaxToLord { get; set; } = true;
 
+        [SettingPropertyBool("Workshop Tax On Payout", HintText = "the Banner Kings workshop tax that notables and the owners of workshops in other houses' towns pay is taken once, from the profit the workshop pays out each day, at the Banner Kings rate. Banner Kings reckons it on all the profit sitting in the till - and half of that stays in the workshop and is taxed again the next day, so the owner paid about twice the rate. The price of a workshop counts the tax once too. Needs BK Workshop Tax To Lord (off = the Banner Kings sum, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Every coin has a payer (stage 3)")]
+        public bool WorkshopTaxOnPayout { get; set; } = true;
+
         [SettingPropertyBool("Bk Lord Fees Have Recipients", HintText = "gold Banner Kings takes from lords goes somewhere: title claims, grants, revocations, usurpations and dilemma levers to the realm's treasury (no realm - the nearest town), court cost changes to the seat's purse, moving the court to the new seat's purse, a new knight's endowment to the knight's new house (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Every coin has a payer (stage 3)")]
         public bool BkLordFeesHaveRecipients { get; set; } = true;
@@ -6728,7 +6732,7 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TownFolkLabourVillageBuys { get; set; } = 0.1f;
 
-        [SettingPropertyFloatingInteger("Town Folk Craft Wage Share", 0.00f, 1.00f, "0.00", HintText = "the people's wages in every workshop's goods - the merchants pay the rest up to this share of their worth", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Town Folk Craft Wage Share", 0.00f, 1.00f, "0.00", HintText = "the people's wages in every workshop's goods - with Workshop Trade Fair Price on, a trade workshop pays its craftsmen this share of what the merchants pay it; the merchants pay the rest up to this share of their worth", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TownFolkCraftWageShare { get; set; } = 0.35f;
 
@@ -11812,6 +11816,7 @@ namespace Armoury
             s.BkEstateIncomeFromSalesOnly = BkEstateIncomeFromSalesOnly;
             s.CaravanWageToPurse = CaravanWageToPurse;
             s.BkWorkshopTaxToLord = BkWorkshopTaxToLord;
+            s.WorkshopTaxOnPayout = WorkshopTaxOnPayout;
             s.BkLordFeesHaveRecipients = BkLordFeesHaveRecipients;
             s.DeadHeroGoldStays = DeadHeroGoldStays;
             s.CaravanProfitInRealmTown = CaravanProfitInRealmTown;

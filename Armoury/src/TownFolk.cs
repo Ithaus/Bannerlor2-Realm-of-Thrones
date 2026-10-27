@@ -257,7 +257,11 @@ namespace Armoury
                 var f = Get(st);
                 if (f != null)
                 {
-                    double v = (double)count * Math.Max(0, st.Town.MarketData.GetPrice(item));
+                    int pr = Math.Max(0, st.Town.MarketData.GetPrice(item));
+                    // 241: wyrob warsztatu pod cena kupca - wartosc najwyzej tyle, ile kupiec za niego placi (RefUnit) - doplata N4 liczy od tego, co naprawde zaplacono
+                    int ru = WorkshopTrade.MerchantValueInCycle(st, item);
+                    if (ru > 0 && ru < pr) pr = ru;
+                    double v = (double)count * pr;
                     if (!CsAdd(st, item, count, v)) f.ProdV += v;      // N4 (FolkCraftWageOnSale): wyrob miasta do puli - wartosc do doplaty 35% dopiero przy zejsciu z polki
                 }
                 _patchTicks += Stopwatch.GetTimestamp() - t;

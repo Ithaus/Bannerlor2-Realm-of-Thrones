@@ -1189,6 +1189,11 @@ Uzycie (Python 3, tylko odczyt):
                     LordEscort.cs, LordEscort.Probe.cs) python -I tools/sprawdz_logi.py --grupa e223 <Armoury-*.log> (strumieniowo). Linie 'Eskorta lordow (223): '.
                     E223-S self-test, E223-S2 test syntetyczny; E223-0 latki TAK; E223-1 linia doby co dobe; E223-2 slabe i dzialania; E223-3 eskorta z zalog: wzial ==
                     spadek zalogi, podloga, suma doby == zdarzenia, <= 169c; E223-4 potkniecia 0; E223-5 najdluzej w stanie <= postoj + 1; E223-6 INFO pojmania.
+--grupa war241    : (27.10, paczka 241 noc/241-warsztaty-cena-rynkowa-podatek - Jeff 27.10 "czemu moj warsztat prawie nic nie zarabia"; Armoury/src/MarketSales.cs,
+                    WorkshopTrade.cs, Seal31B.cs) python -I tools/sprawdz_logi.py --grupa war241 <Armoury-*.log> (strumieniowo). Cena kupca warsztatow (srednia sprzedaz
+                    miasta z 28 dob / cena graniczna ludu) i podatek BK raz od wyplaty. W241-S self-test, W241-S2 test syntetyczny; W241-0 linie startu; W241-1 zaplacono +
+                    oddane = utarg; W241-2 rzemieslnikom >= udzial x zaplacono; W241-3 sprzedaz miast > 0; W241-4/5 podatek / wyplata <= 50.5%; W241-6 kasa < 0 po cyklu 0;
+                    W241-7 ARYTMETYKA OK; W241-8 INFO; W241-9 ERROR 0. Log sprzed 241: INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -71396,6 +71401,363 @@ def main(argv):
             return e223_main(rest[0] if rest else None)
     return _e223_main_prev(argv)
 
+
+
+# ============================================================ war241 (27.10, paczka 241): cena kupca warsztatow i podatek BK raz od wyplaty
+# Linie (Armoury, C#): "Sprzedaz miast (241): start sesji | ..." i "... dzien N | ..." (MarketSales.cs), segment "cena kupca (241) ..." w linii startu
+# "WorkshopTrade: warsztaty towarowe ..." i w linii doby "Warsztaty towarowe: dzien N" (WorkshopTrade.cs FairText), segmenty E3/8a i D11-3 linii
+# "Szczelnosc (164a/31b): dzien N" i "241 podatek warsztatow raz od wyplaty" w linii startu Szczelnosc (Seal31B.cs), "ARYTMETYKA OK" linii
+# "Pieniadz swiata (bilans - przyczyny)". Wiersze:
+#  W241-S  self-test wyrazen na liniach w formacie z kodu C#;  W241-S2 test syntetyczny (dobry, zly, stary format sprzed 241);
+#  W241-0  linie startu: cena kupca WLACZONA, prog cyklu wpiety, sprzedaz miast bez BRAK, podatek raz od wyplaty WL (1 x stawka);
+#  W241-1  doba warsztatow: zaplacono + oddane = utarg wedle polki, zaplacono <= utarg, oddane >= 0;
+#  W241-2  rzemieslnikom >= udzial x zaplacono - cykli (udzial z linii startu);
+#  W241-3  sprzedaz miast: konsumpcja i partie > 0 w kazdej dobie (bez pierwszej doby sesji), potkniecia 0, poza watkiem glownym 0;
+#  W241-4  D11-3 podatek / wyplata <= 50.5% (stawka BK najwyzej 0.5; ok. 2 x stawka = znak starego bledu);  W241-5 to samo E3/8a (notable);
+#  W241-6  kasa miasta ponizej zera po cyklu = 0;  W241-7 "ARYTMETYKA OK" w kazdej linii bilansu;  W241-8 INFO: udzial sztuk z historii, oddane kasom,
+#  indeksy jewelry/velvet/tools;  W241-9 brak ERROR z WorkshopTrade / MarketSales / Seal31B.
+W241_MS = "Sprzedaz miast (241): "
+W241_WS = "Warsztaty towarowe: dzien "
+W241_SEAL = "Szczelnosc (164a/31b): "
+W241_BAL = "Pieniadz swiata (bilans - przyczyny): dzien "
+W241_ERR = ("ERROR in WorkshopTrade", "ERROR in MarketSales", "ERROR in Seal31B")
+W241_RX = {
+    "ms_start": re.compile(r"^start sesji \| kategorii (\d+) \[(.*?)\] \| wpiete: (.*?); BRAK: (.*?) \| z zapisu wierszy (\d+) \(miast (\d+)\)"),
+    "ms_day": re.compile(r"^dzien (\d+) \| 28 dob: sztuk (\d+), zloto (\d+), komorek z historia (\d+) \| dzis wedlug drogi: konsumpcja (-?\d+)/(-?\d+), partie (-?\d+)/(-?\d+), "
+                         r"Armoury (-?\d+)/(-?\d+), lud (-?\d+)/(-?\d+); poza watkiem glownym (\d+) \| konsumpcja: kupiec dostal (\d+) z (\d+) wedle ceny polki "
+                         r"\(([\d.]+%|-), tickow (\d+)\) \| potkniecia (\d+)\.$"),
+    "ws_start": re.compile(r"cena kupca \(241\) (WLACZONA|NIECZYNNA|wylaczona)(?: - za sztuke najwyzej srednia sprzedaz miasta z (\d+) dob albo cena graniczna ludu; rzemieslnikom udzial "
+                           r"([\d.]+) zaplaty( \(NIECZYNNY - place cyklu wylaczone\))?; prog cyklu gry wedlug ceny kupca: (wpiety|BRAK))?"),
+    "ws_day": re.compile(r"cena kupca \(241\) CZYNNA: cykli (\d+), przycietych (\d+); sztuk do miast (\d+) \(z historii (\d+), z ceny granicznej (\d+)\); utarg wedle polki (-?\d+), "
+                         r"zaplacono warsztatom (-?\d+), oddane kasom miast (-?\d+), rzemieslnikom (\d+); kasa miasta ponizej zera po cyklu (\d+); prog cyklu wedlug ceny kupca: "
+                         r"cykli (\d+) \(utarg progu mniejszy o (\d+)\)"),
+    "ws_idx": re.compile(r"\[indeksy polka/kupiec/28 dob: (.*?)\]$"),
+    "seal_start": re.compile(r"; 241 podatek warsztatow raz od wyplaty \(Workshop Tax On Payout\): (WL|WYL)"),
+    "e38a": re.compile(r"podatek warsztatow BK \(E3/8a (WL|WYL)[^)]*\): notabli (\d+), podatek BK (\d+), nalezny od wyplat \(241\) (\d+), wyplaty notabli (\d+), "
+                       r"podatek / wyplata ([\d.]+%|-) \(241 (WL|WYL)[^)]*\), zniklo u notabli \(oddane w wyplacie\) (\d+)"),
+    "d113": re.compile(r"\(D11-3 (WL|WYL)[^)]*\): placi wlasciciel - warsztatow (\d+) \(wlascicieli (\d+)\), kwota BK od zysku nagromadzonego (\d+), pobrane "
+                       r"(od wyplaty \(241, 1 x stawka\)|wedlug kwoty BK \(241 WYL\)) (\d+) .*?kontrola: wyplaty z tych warsztatow ok\. (\d+), podatek / wyplata ([\d.]+%|-) "
+                       r"\(cena warsztatu zaklada (\d) x stawka BK\)"),
+}
+W241_OLD = ("cena sprawiedliwa CZYNNA", "cena sprawiedliwa WLACZONA")
+W241_TEST = {
+    "ms_start": "start sesji | kategorii 3 [jewelry, tools, velvet] | wpiete: konsumpcja, partie, ShelfBuy, lud (P5/potrzeby/KS); BRAK: - | z zapisu wierszy 12 (miast 4) "
+                "| okno 28 dob, indeks = zloto / wartosc sztuk (ItemValue).",
+    "ms_day": "dzien {d} | 28 dob: sztuk 1234, zloto 56789, komorek z historia 321 | dzis wedlug drogi: konsumpcja {c}/2000, partie {p}/800, Armoury 5/100, lud 7/140; "
+              "poza watkiem glownym {o} | konsumpcja: kupiec dostal 1500 z 2000 wedle ceny polki (75.0%, tickow 100) | potkniecia {s}.",
+    "ws_start": "WorkshopTrade: warsztaty towarowe w nowej monecie CZYNNE - wpiete: prog cyklu notabla, cena kupca: prog cyklu; stala 200 podmieniona w 2 z 2 metod; latka modelu "
+                "finansow rodu dojdzie w kampanii. Utrzymanie 4 d na dobe do kasy miasta (gra: 100 w nicosc), place cyklu wlaczone, kapital startowy warsztatu czysto towarowego "
+                "2000 (gra: 10000; typy z uzbrojeniem zostaja przy 10000), prog kiesy gracza 500 (gra: 5000), sprzet x20%, cena = 3 x roczny zysk po podatku + kapital; cena kupca "
+                "(241) WLACZONA - za sztuke najwyzej srednia sprzedaz miasta z 28 dob albo cena graniczna ludu; rzemieslnikom udzial 0.35 zaplaty; prog cyklu gry wedlug ceny kupca: wpiety.",
+    "ws_day": "Warsztaty towarowe: dzien {d} | warsztatow 500 (bez ukrytych rzemieslnikow) | kiesy notabli (gra trzyma je w pasie 4500-10500): notabli 255 | cena kupca (241) "
+              "CZYNNA: cykli 600, przycietych 300; sztuk do miast 650 (z historii 500, z ceny granicznej 150); utarg wedle polki 385668, zaplacono warsztatom {y}, oddane kasom "
+              "miast {z}, rzemieslnikom {l}; kasa miasta ponizej zera po cyklu {n}; prog cyklu wedlug ceny kupca: cykli 40 (utarg progu mniejszy o 9000) [wedlug typu: silversmithy "
+              "10/15 cykli: sztuk 15, utarg 186259, zaplacono 90000, oddane 96259, rzemieslnikom 31500] [indeksy polka/kupiec/28 dob: jewelry 7.85/6.20/6.10 (miast z historia 40), "
+              "velvet 3.10/2.50/- (miast z historia 0), tools 1.10/1.05/1.02 (miast z historia 80), rzemieslnicy BK (poza regula 241, pelna cena polki) polka 1.20 / kupiec 1.10 "
+              "(300 wyrobow-miast)] | cena kupna dla gracza: mediana 5000.",
+    "seal_start": "Szczelnosc (164a/31b): latki - x; BRAK: - | podatek warsztatow BK: lancuch modelu a, podatek miast b -> CZYNNE; kwoty podatku warsztatow (GetWorkshopTaxes): c; "
+                  "241 podatek warsztatow raz od wyplaty (Workshop Tax On Payout): WL - stawka BK x dzienna wyplata (notable E3/8a, D11-3), cena warsztatu 1 x stawka | wylaczniki: x.",
+    "seal_day": "Szczelnosc (164a/31b): dzien {d} | karawany (E3/4 WL): x | podatek warsztatow BK (E3/8a WL): notabli 255, podatek BK 73787, nalezny od wyplat (241) 36000, "
+                "wyplaty notabli 140000, podatek / wyplata {r1} (241 WL: raz od wyplaty, 1 x stawka BK), zniklo u notabli (oddane w wyplacie) 36000 -> do panow 35000, do kas "
+                "miast (autonomia) 1000 | podatek warsztatow lordow i gracza w cudzych miastach (D11-3 WL): placi wlasciciel - warsztatow 1 (wlascicieli 1), kwota BK od zysku "
+                "nagromadzonego 12, pobrane od wyplaty (241, 1 x stawka) 6 -> do panow miast (renta) 6, do kas miast (autonomia) 0, do kas miast bez pana 0, nie zaplacone - brak w "
+                "kiesie wlasciciela (zaleglosc nie rosnie) 0 (0 warsztatow); w tym gracz zaplacil 6 (warsztatow gracza 1); kontrola: wyplaty z tych warsztatow ok. 23, podatek / "
+                "wyplata {r2} (cena warsztatu zaklada 1 x stawka BK); migawki przepadle (wlasciciel zmarl albo miasto juz nie cudze) 0 (0) | potkniecia 0.",
+}
+
+
+def _w241_pct(s):
+    return None if s in (None, "-") else float(s.rstrip("%"))
+
+
+def w241_collect(logp):
+    """Strumieniowo (tylko odczyt): linie 241 i wycinki, ERROR paczki."""
+    D = {"ms_starts": [], "ms_days": [], "ms_bad": [], "ws_starts": [], "ws_days": {}, "ws_old": 0, "seal_starts": [], "e38a": {}, "d113": {}, "bal": {}, "err": 0, "err1": "",
+         "first_ms": set()}
+    new_sess = True
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            if s.startswith("ERROR in "):
+                if s.startswith(W241_ERR):
+                    D["err"] += 1
+                    if not D["err1"]:
+                        D["err1"] = s[:160]
+                continue
+            if s.startswith(W241_MS):
+                r = s[len(W241_MS):]
+                if r.startswith("start sesji"):
+                    D["ms_starts"].append(W241_RX["ms_start"].match(r))
+                    new_sess = True
+                elif r.startswith("dzien "):
+                    md = W241_RX["ms_day"].match(r)
+                    if not md:
+                        D["ms_bad"].append(r[:80])
+                        continue
+                    if new_sess:
+                        D["first_ms"].add(int(md.group(1)))
+                        new_sess = False
+                    D["ms_days"].append(md)
+                continue
+            if s.startswith("WorkshopTrade: warsztaty towarowe"):
+                D["ws_starts"].append((W241_RX["ws_start"].search(s), "; BRAK: " in s, any(o in s for o in W241_OLD)))
+                continue
+            if s.startswith(W241_WS):
+                mm = re.match(r"^Warsztaty towarowe: dzien (\d+) ", s)
+                if not mm:
+                    continue
+                d = int(mm.group(1))
+                md = W241_RX["ws_day"].search(s)
+                if md:
+                    mi = W241_RX["ws_idx"].search(s[:s.find(" | ", md.end())] if s.find(" | ", md.end()) > 0 else s)
+                    D["ws_days"][d] = (md, mi.group(1) if mi else "")
+                elif any(o in s for o in W241_OLD):
+                    D["ws_old"] += 1
+                continue
+            if s.startswith(W241_SEAL):
+                r = s[len(W241_SEAL):]
+                if r.startswith("latki"):
+                    D["seal_starts"].append(W241_RX["seal_start"].search(r))
+                elif r.startswith("dzien "):
+                    d = int(re.match(r"^dzien (\d+)", r).group(1))
+                    a = W241_RX["e38a"].search(r)
+                    b = W241_RX["d113"].search(r)
+                    if a:
+                        D["e38a"][d] = a
+                    if b:
+                        D["d113"][d] = b
+                continue
+            if s.startswith(W241_BAL):
+                mm = re.match(r"^Pieniadz swiata \(bilans - przyczyny\): dzien (\d+)", s)
+                if mm:
+                    D["bal"][int(mm.group(1))] = "ARYTMETYKA OK" in s
+    return D
+
+
+def w241_rows(rep, D):
+    # W241-0 linie startu
+    ws = [x for x in D["ws_starts"] if x[0] is not None]
+    ms = [x for x in D["ms_starts"] if x is not None]
+    se = [x for x in D["seal_starts"] if x is not None]
+    share = None
+    if not ws and not ms:
+        old = any(x[2] for x in D["ws_starts"]) or D["ws_old"] > 0
+        rep.add("W241-0: linie startu 241 (cena kupca, sprzedaz miast, podatek raz od wyplaty)", "brak" + (" (log sprzed 241 - cena sprawiedliwa)" if old else ""),
+                "INFO (log bez paczki 241)", None)
+    else:
+        bad = []
+        last = ws[-1][0] if ws else None
+        if last is None or last.group(1) != "WLACZONA":
+            bad.append("cena kupca " + (last.group(1) if last else "brak linii"))
+        elif last.group(5) != "wpiety":
+            bad.append("prog cyklu BRAK")
+        if last is not None and last.group(4):
+            bad.append("udzial rzemieslnikow NIECZYNNY")
+        if last is not None and last.group(3):
+            share = float(last.group(3))
+        if ws and ws[-1][1]:
+            bad.append("BRAK w linii WorkshopTrade")
+        if not ms:
+            bad.append("brak linii Sprzedaz miast start")
+        elif ms[-1].group(4) != "-":
+            bad.append("Sprzedaz miast BRAK: " + ms[-1].group(4))
+        if not se:
+            bad.append("brak '241 podatek' w linii startu Szczelnosc")
+        elif se[-1].group(1) != "WL":
+            bad.append("podatek raz od wyplaty WYL")
+        rep.add("W241-0: linie startu 241 (cena kupca WLACZONA, prog cyklu wpiety, sprzedaz miast bez BRAK, podatek raz od wyplaty WL)",
+                "; ".join(bad) if bad else f"OK (startow {len(ws)}; udzial rzemieslnikow {share}; kategorii {ms[-1].group(1) if ms else '-'}, z zapisu wierszy {ms[-1].group(5) if ms else '-'})",
+                "wszystko czynne", not bad)
+    # W241-1 / W241-2 / W241-6 / W241-8 doba warsztatow
+    days = sorted(D["ws_days"])
+    if not days:
+        rep.add("W241-1: doba warsztatow - zaplacono + oddane = utarg", "brak segmentu 'cena kupca (241) CZYNNA'", "INFO", None)
+    else:
+        b1, b2, b6 = [], [], []
+        hist = ceil = kept = paid = 0
+        for d in days:
+            md = D["ws_days"][d][0]
+            cyc, units, hu, cu = int(md.group(1)), int(md.group(3)), int(md.group(4)), int(md.group(5))
+            x, y, z, l, neg = int(md.group(6)), int(md.group(7)), int(md.group(8)), int(md.group(9)), int(md.group(10))
+            if y + z != x or y > x or z < 0 or hu + cu != units:
+                b1.append(f"d{d}: utarg {x}, zaplacono {y}, oddane {z}, sztuk {units}={hu}+{cu}")
+            if share is not None and l < share * y - cyc - 1:
+                b2.append(f"d{d}: rzemieslnikom {l} < {share} x {y} - {cyc}")
+            if neg:
+                b6.append(f"d{d}: {neg}")
+            hist += hu; ceil += cu; kept += z; paid += y
+        rep.add("W241-1: doba warsztatow - zaplacono + oddane = utarg wedle polki, sztuki = z historii + z ceny granicznej", f"zle {len(b1)} z {len(days)} dob" + (f" ({b1[0]})" if b1 else ""),
+                "0", not b1)
+        rep.add("W241-2: rzemieslnikom >= udzial x zaplacono - cykli", (f"zle {len(b2)} z {len(days)} dob" + (f" ({b2[0]})" if b2 else "")) if share is not None else "brak udzialu w linii startu",
+                "0", (not b2) if share is not None else None)
+        rep.add("W241-6: kasa miasta ponizej zera po cyklu", f"dob z > 0: {len(b6)}" + (f" ({', '.join(b6[:3])})" if b6 else ""), "0", not b6)
+        tot = hist + ceil
+        lastidx = D["ws_days"][days[-1]][1]
+        rep.add("W241-8: cena kupca - sztuki z historii sprzedazy, oddane kasom miast, indeksy (ostatnia doba)",
+                f"z historii {100.0 * hist / tot:.1f}% z {tot} sztuk" if tot else "0 sztuk", "INFO (po 28 dobach >= 50%)", None)
+        rep.add("W241-8b: zaplacono warsztatom / oddane kasom miast (suma dob)", f"{paid} / {kept}; indeksy d{days[-1]}: {lastidx[:240]}", "INFO", None)
+    # W241-3 sprzedaz miast
+    md = [m for m in D["ms_days"] if int(m.group(1)) not in D["first_ms"]]
+    if not D["ms_days"]:
+        rep.add("W241-3: sprzedaz miast (konsumpcja i partie > 0, potkniecia 0, poza watkiem 0)", "brak linii 'Sprzedaz miast (241): dzien'" + (f"; zly format {len(D['ms_bad'])}" if D["ms_bad"] else ""),
+                "INFO", None if not D["ms_bad"] else False)
+    else:
+        bad = []
+        for m in md:
+            if int(m.group(5)) <= 0 or int(m.group(7)) <= 0:
+                bad.append(f"d{m.group(1)}: konsumpcja {m.group(5)}, partie {m.group(7)}")
+        st_ = sum(int(m.group(18)) for m in D["ms_days"])
+        off = sum(int(m.group(13)) for m in D["ms_days"])
+        ok = not bad and st_ == 0 and off == 0 and not D["ms_bad"]
+        last = D["ms_days"][-1]
+        rep.add("W241-3: sprzedaz miast (konsumpcja i partie > 0 w dobach poza pierwsza sesji, potkniecia 0, poza watkiem 0)",
+                f"dob {len(D['ms_days'])}, bez sprzedazy {len(bad)}" + (f" ({bad[0]})" if bad else "") + f", potkniecia {st_}, poza watkiem {off}, zly format {len(D['ms_bad'])}"
+                + f"; ostatnio 28 dob: sztuk {last.group(2)}, zloto {last.group(3)}, komorek {last.group(4)}, konsumpcja kupiec dostal {last.group(16)}", "0", ok)
+    # W241-4 / W241-5 podatek / wyplata
+    for key, name, grp_pct, grp_on in (("d113", "W241-4: D11-3 podatek / wyplata (lordowie, gracz)", 8, 5), ("e38a", "W241-5: E3/8a podatek / wyplata (notable)", 6, 7)):
+        rows = D[key]
+        if not rows:
+            rep.add(name, "brak segmentu 241", "INFO (log bez 241 albo bez wyplat)", None)
+            continue
+        bad, mx, on = [], 0.0, 0
+        for d in sorted(rows):
+            m = rows[d]
+            p = _w241_pct(m.group(grp_pct))
+            onv = m.group(grp_on)
+            if key == "d113":
+                onv = "WL" if "od wyplaty" in m.group(5) else "WYL"
+            if onv == "WL":
+                on += 1
+            if p is None:
+                continue
+            mx = max(mx, p)
+            if p > 50.5:
+                bad.append(f"d{d}: {p}%")
+        rep.add(name, f"dob {len(rows)} (regula WL {on}), najwyzej {mx:.1f}%" + (f"; ponad 50.5%: {len(bad)} ({bad[0]})" if bad else ""), "<= 50.5% (ok. stawka BK)", not bad)
+    # W241-7 arytmetyka
+    if not D["bal"]:
+        rep.add("W241-7: 'ARYTMETYKA OK' w linii bilansu swiata", "brak linii bilansu", "INFO", None)
+    else:
+        bad = [d for d, ok in D["bal"].items() if not ok]
+        rep.add("W241-7: 'ARYTMETYKA OK' w linii bilansu swiata", f"bez OK {len(bad)} z {len(D['bal'])} dob" + (f" (d{sorted(bad)[0]})" if bad else ""), "0", not bad)
+    rep.add("W241-9: ERROR z WorkshopTrade / MarketSales / Seal31B", f"{D['err']}" + (f" ({D['err1']})" if D["err1"] else ""), "0", D["err"] == 0)
+
+
+def w241_selftest():
+    T, R = W241_TEST, W241_RX
+    probs = []
+    if not R["ms_start"].match(T["ms_start"]):
+        probs.append("ms_start")
+    m = R["ms_day"].match(T["ms_day"].format(d=108990, c=100, p=20, o=0, s=0))
+    if not m or m.group(1) != "108990" or m.group(5) != "100" or m.group(16) != "75.0%" or m.group(18) != "0":
+        probs.append("ms_day")
+    m = R["ws_start"].search(T["ws_start"])
+    if not m or m.group(1) != "WLACZONA" or m.group(2) != "28" or m.group(3) != "0.35" or m.group(5) != "wpiety" or m.group(4):
+        probs.append("ws_start")
+    s = T["ws_day"].format(d=108990, y=300000, z=85668, l=105000, n=0)
+    m = R["ws_day"].search(s)
+    if not m or m.group(6) != "385668" or m.group(7) != "300000" or m.group(9) != "105000" or m.group(12) != "9000":
+        probs.append("ws_day")
+    mi = R["ws_idx"].search(s[:s.find(" | ", m.end())] if m else s)
+    if not mi or not mi.group(1).startswith("jewelry 7.85/6.20/6.10"):
+        probs.append("ws_idx")
+    if "(pracowalo" in s:   # nwar (NWAR_WSTYPE) nie moze widziec segmentu typu ceny kupca jako typu warsztatu
+        probs.append("ws_day koliduje z nwar")
+    m = R["seal_start"].search(T["seal_start"])
+    if not m or m.group(1) != "WL":
+        probs.append("seal_start")
+    sd = T["seal_day"].format(d=108990, r1="25.7%", r2="26.1%")
+    a, b = R["e38a"].search(sd), R["d113"].search(sd)
+    if not a or a.group(4) != "36000" or a.group(6) != "25.7%" or a.group(7) != "WL":
+        probs.append("e38a")
+    if not b or b.group(4) != "12" or b.group(6) != "6" or b.group(7) != "23" or b.group(8) != "26.1%" or b.group(9) != "1":
+        probs.append("d113")
+    return ("nie pasuje: " + ", ".join(probs)) if probs else None
+
+
+def w241_synth():
+    import tempfile
+    import shutil
+    T = W241_TEST
+    P = "[10:00:00] "
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="w241_")
+        try:
+            logp = os.path.join(tmp, "Armoury-x.log")
+            L = []
+            if kind == "old":
+                L.append(P + "WorkshopTrade: warsztaty towarowe w nowej monecie CZYNNE - wpiete: x; cena sprawiedliwa WLACZONA - za wyrob cyklu najwyzej (wsad + place) x1.25.")
+                for d in range(108990, 108993):
+                    L.append(P + "Warsztaty towarowe: dzien %d | cena sprawiedliwa CZYNNA (za wyrob cyklu ...): cykli 1 | x" % d)
+            else:
+                good = kind == "good"
+                L.append(P + (T["ws_start"] if good else T["ws_start"].replace("wpiety.", "BRAK.")))
+                L.append(P + "Sprzedaz miast (241): " + T["ms_start"])
+                L.append(P + (T["seal_start"] if good else T["seal_start"].replace("): WL -", "): WYL -")))
+                for i, d in enumerate(range(108990, 108996)):
+                    c = 100 if (good or i != 3) else 0
+                    L.append(P + "Sprzedaz miast (241): " + T["ms_day"].format(d=d, c=c, p=20, o=0, s=0 if good else 1))
+                    L.append(P + T["ws_day"].format(d=d, y=300000, z=85668, l=105000 if good else 50000, n=0 if good else 2))
+                    L.append(P + T["seal_day"].format(d=d, r1="25.7%" if good else "52.4%", r2="26.1%" if good else "52.2%"))
+                    L.append(P + "Pieniadz swiata (bilans - przyczyny): dzien %d | x | ARYTMETYKA OK." % d if good or i != 2 else
+                             P + "Pieniadz swiata (bilans - przyczyny): dzien %d | x | ARYTMETYKA ROZJAZD 5." % d)
+                if not good:
+                    L.append(P + "ERROR in MarketSales.ConsPost: x")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            w241_rows(rep, w241_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"W241-0": "TAK", "W241-1": "TAK", "W241-2": "TAK", "W241-3": "TAK", "W241-4": "TAK", "W241-5": "TAK", "W241-6": "TAK", "W241-7": "TAK", "W241-9": "TAK"},
+        "bad": {"W241-0": "NIE", "W241-1": "TAK", "W241-2": "NIE", "W241-3": "NIE", "W241-4": "NIE", "W241-5": "NIE", "W241-6": "NIE", "W241-7": "NIE", "W241-9": "NIE"},
+        "old": {"W241-0": "INFO", "W241-1": "INFO", "W241-3": "INFO", "W241-4": "INFO", "W241-5": "INFO", "W241-9": "TAK"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def w241_main(logp):
+    """war241 (27.10, paczka 241): W241-S, W241-S2, W241-0..W241-9 - opis w komentarzu nad stalymi W241_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = w241_selftest()
+    rep.add("W241-S: self-test wyrazen (linie jak w kodzie C#: MarketSales.cs, WorkshopTrade.cs, Seal31B.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = w241_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("W241-S2: test syntetyczny (dobry, zly, stary format sprzed 241)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("W241-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = w241_collect(logp)
+    print(f"plik: {logp} | startow cena kupca {len(D['ws_starts'])}, sprzedaz miast {len(D['ms_starts'])}, dob sprzedazy {len(D['ms_days'])}, dob warsztatow 241 {len(D['ws_days'])}"
+          f" (sprzed 241 {D['ws_old']}), dob E3/8a {len(D['e38a'])}, D11-3 {len(D['d113'])}, ERROR {D['err']}")
+    w241_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_w241_main_prev = main
+
+
+def main(argv):
+    # paczka 241: grupa war241 - opakowanie main jak e223 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "war241":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return w241_main(rest[0] if rest else None)
+    return _w241_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

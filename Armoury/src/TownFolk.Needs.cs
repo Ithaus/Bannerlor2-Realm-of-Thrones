@@ -134,6 +134,7 @@ namespace Armoury
                         if (got <= 0) return spent;
                         town.ChangeGold(got);
                         roster.AddToCounts(e, -n);
+                        MarketSales.Note(town, e, n, got);   // 241: sprzedaz miasta (srednia ceny kupca z 28 dob)
                         spent += got; left -= got; d.VBuy += got; d.VPieces += n;
                         NoteVillBought(mk, c, got);
                         if (g >= 0) { pcs[g] += n; VillNeeds.Note(vil, e.Item, n); }

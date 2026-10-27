@@ -1174,7 +1174,7 @@ namespace Armoury
             if (_shopFair[c] != 0)
             {
                 known += _shopFair[c];
-                parts.Add("warsztaty towarowe - nadwyzka ceny wyrobow ponad koszt i marze (cena sprawiedliwa) " + S(_shopFair[c]) + " [P]");
+                parts.Add("warsztaty towarowe - nadwyzka ceny polki ponad cene kupca (241) " + S(_shopFair[c]) + " [P]");
             }
             if (_artIn[c] != 0 || _artBack[c] != 0)
             {

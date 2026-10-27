@@ -113,6 +113,29 @@ namespace Armoury
             return double.IsNaN(c) ? baseCeil : Math.Min(mx, c);
         }
 
+        /// <summary>
+        /// 241 (cena kupca warsztatow): cena graniczna ludu dla kategorii `cat` w osadzie `st` - indeks wzgledem wartosci sztuki, ktorego lud nie przekroczy (FolkLadderPriceCeiling;
+        /// dla listy dostatku wedlug zasobnosci ludu miasta - LxCeilFor, towar wojska i klucz wylaczony - bazowa). Kupiec placi warsztatowi tyle, gdy w miescie nie bylo
+        /// jeszcze sprzedazy tego towaru (WorkshopTrade.MerchantIndex). Sam odczyt (Folk tworzy sie leniwie jak w Get).
+        /// </summary>
+        internal static double PeopleCeilingIndex(Settlement st, ItemCategory cat)
+        {
+            var s = Settings.Current;
+            double baseCeil = LxCeil(s);
+            try
+            {
+                if (st == null || cat == null) return baseCeil;
+                EnsureLx();
+                int li;
+                var map = _lxIdx;
+                if (map == null || !map.TryGetValue(cat, out li)) return baseCeil;
+                Folk f;
+                if (!_f.TryGetValue(st, out f)) f = null;   // bez tworzenia ludu (wolane tez przed kalibracja) - bez ludu bazowa
+                return LxCeilFor(f, li, baseCeil);
+            }
+            catch (Exception e) { LxStumble("PeopleCeilingIndex", e); return baseCeil; }
+        }
+
         private static void LxStumble(string where, Exception e) { _lxSt++; Stumble(where, e); }
 
         private static void ResetLadder()
@@ -506,6 +529,7 @@ namespace Armoury
                     if (got <= 0) { if (spent > 0) mf.VillWin += spent; return spent; }
                     town.ChangeGold(got);
                     roster.AddToCounts(e, -n);
+                    MarketSales.Note(town, e, n, got);                   // 241: sprzedaz miasta (srednia ceny kupca z 28 dob)
                     spent += got; left -= got; pieces += n;
                     if (vil != null) VillNeeds.Note(vil, e.Item, n);     // r4-bkwies: zapas potrzeb wsi (len, sukno, garnki z listy dostatku) - klucze wylaczone: nic
                     if (wide) _lxWideP5 += got;                          // obieg2 (2): zakup P5 ponad bazowa cena graniczna

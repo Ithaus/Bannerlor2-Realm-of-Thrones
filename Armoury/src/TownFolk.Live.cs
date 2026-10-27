@@ -1545,6 +1545,7 @@ namespace Armoury
                     int got = had - vil.Gold;
                     town.ChangeGold(got);
                     roster.AddToCounts(e, -n);
+                    MarketSales.Note(town, e, n, got);   // 241: sprzedaz miasta (srednia ceny kupca z 28 dob)
                     spent += got; left -= got; d.VBuy += got; d.VPieces += n;
                     NoteVillBought(mk, c, got);   // ZC1 (CartPriceByDestination): co wsie naprawde kupily w tym miescie - koszyk wycen wozow nastepnej doby
                     VillNeeds.Note(vil, e.Item, n);   // r4-bkwies: zapas potrzeb wsi (koszyk dnia, woz E3-W1, krok 5) - klucze wylaczone: nic

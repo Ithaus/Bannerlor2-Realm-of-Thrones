@@ -88,6 +88,14 @@ namespace Armoury
         internal static bool DeadOn { get { var s = S; return s != null && s.DeadHeroGoldStays; } }
         internal static bool ProfitOn { get { var s = S; return s != null && s.CaravanProfitInRealmTown; } }
         internal static bool OwnerTaxOn { get { var s = S; return s != null && s.WorkshopOwnerPaysTownTax; } }
+        /// <summary>241 (D11-3 / E3/8a, klucz WorkshopTaxOnPayout): podatek warsztatu BK pobierany raz od dziennej wyplaty (stawka x wyplata), nie od zysku nagromadzonego
+        /// w kapitale (BK: stawka x caly zysk, z ktorego polowa zostaje w warsztacie i jutro jest opodatkowana znowu - 2 x stawka). Wymaga BK Workshop Tax To Lord.</summary>
+        internal static bool PayoutRule { get { var s = S; return s != null && s.WorkshopTaxOnPayout && s.BkWorkshopTaxToLord; } }
+        /// <summary>241: E3/8a czynne (notabl naprawde placi podatek panu - nasz przelew) - dla ceny warsztatu (WorkshopTrade.TaxShare).</summary>
+        internal static bool NotableTaxLive { get { return TaxLive; } }
+        /// <summary>241: podatek od ostatniej wyplaty warsztatu (stawka x wyplata) - TaxPost (notable) i ClanPayPost (glowy rodow, D11-3); czytane z watkow AI
+        /// (NotableCore / UnpaidCore - podstawa pensji rady). Brak wpisu - polowa linii BK (wyplata = polowa zysku). Stan sesji.</summary>
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Workshop, int> _lastTax1 = new System.Collections.Concurrent.ConcurrentDictionary<Workshop, int>();
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
         private static Harmony _harmony;
@@ -117,18 +125,23 @@ namespace Armoury
         private static int _notN, _notMismatch, _lordCarN, _carSpentN, _carPurseN, _carPurseOddN;
         // E3/8a
         private static long _taxSeen, _taxZ, _taxToLords, _taxToTowns, _taxNoLord, _taxShort, _taxLinesCut, _unpaidCut;
+        private static long _taxSeen1, _taxPayout;          // 241: podatek nalezny od wyplat (stawka x wyplata) i wyplaty notabli z warsztatow z podatkiem
         private static int _unpaidN;
         private static int _taxNotables, _taxNeg;
         private static readonly Dictionary<Clan, int> _rentPend = new Dictionary<Clan, int>();
         private static long _rentMerged;
         // D11-3: podatek warsztatow lordow i gracza w cudzych miastach placi wlasciciel
         private static long _otDue, _otToLords, _otToTowns, _otNoLord, _otShort, _otPlayer, _otPayout, _otDrop;
+        private static long _otDueBk;                       // 241: kwota BK od zysku nagromadzonego (GetWorkshopTaxes) dla tych samych wyplat - porownanie w linii doby
         private static int _otN, _otOwners, _otShortN, _otPlayerN, _otDropN;
         private static bool _otTold;                        // komunikat dla gracza przy pierwszym poborze w sesji
         // 121 (recenzja uwaga 2): podatek z prawdziwej wyplaty rodu - migawka kwoty BK w postfiksie DailyTickClan, pobierana raz w OwnerTaxDaily
-        private sealed class OtPay { public Workshop W; public Hero Owner; public int Tax, Payout; }
+        private sealed class OtPay { public Workshop W; public Hero Owner; public int Tax, Payout, TaxBk; }
+        // 241: kapital warsztatow glowy rodu przed rozliczeniem rodu (ClanPayPre) - wyplata zmierzona, nie zalozona (inny model wyplaty w lancuchu nie psuje rachunku)
+        private static readonly Dictionary<Workshop, int> _clanCap0 = new Dictionary<Workshop, int>();
         private static readonly List<OtPay> _otPay = new List<OtPay>();
         private static bool _wPay;                          // postfiks DailyTickClan (migawka) wpiety - bez niego D11-3 nieczynne
+        private static bool _wPayPre;                       // 241: prefiks DailyTickClan (kapital przed wyplata) wpiety
         // E3/8b - wedlug rodzaju
         private const int FClaim = 0, FCreate = 1, FRevoke = 2, FUsurp = 3, FDilemma = 4, FCourt = 5, FMove = 6, FKnight = 7, Fees = 8;
         private static readonly string[] FeeName = { "roszczenia", "nadania", "odebrania", "uzurpacje", "dylematy", "dwor", "przeniesienie dworu", "pasowanie" };
@@ -145,6 +158,7 @@ namespace Armoury
             _allPurseBand = _allPurseParty = _allPurseSettl = _carPurseOdd = _carPurseOddLost = 0;
             _notN = _notMismatch = _lordCarN = _carSpentN = _carPurseN = _carPurseOddN = 0;
             _taxSeen = _taxZ = _taxToLords = _taxToTowns = _taxNoLord = _taxShort = 0; _taxNotables = _taxNeg = 0;
+            _taxSeen1 = _taxPayout = 0; _otDueBk = 0;
             System.Threading.Interlocked.Exchange(ref _taxLinesCut, 0);
             System.Threading.Interlocked.Exchange(ref _unpaidCut, 0); System.Threading.Interlocked.Exchange(ref _unpaidN, 0);
             _rentMerged = 0;
@@ -167,6 +181,7 @@ namespace Armoury
         {
             ZeroDay(); _rentPend.Clear(); _pend = null; _tickHero = null; _otTold = false;   // nowa sesja / kampania - liczniki i stan od zera (latki zostaja w procesie)
             _otPay.Clear();   // 121: migawki wyplat poprzedniej kampanii (cudze obiekty Workshop) nie przechodza do nowej
+            _lastTax1.Clear(); _clanCap0.Clear();   // 241: podatek od ostatniej wyplaty i kapital przed rozliczeniem rodu - stan sesji
             if (_harmony == null || Campaign.Current == null) return;
             if (!_hooksTried)
             {
@@ -196,6 +211,7 @@ namespace Armoury
                      + "; warsztaty lordow i gracza: czynny model warsztatow gry " + wsModel + " - BK pobiera od glow rodow 'Workshop taxes': " + (BkWorkshopModelActive() ? "TAK (linie glow rodow w miastach innych rodow zostaja, reszta zdjeta)" : "NIE (linie 'Taxes from' warsztatow nie-notabli zdjete z podatku miast - nikt ich nie placi)")
                      + "; D11-3 wlasciciel warsztatu (glowa rodu, gracz) w cudzym miescie placi ten podatek panu miasta (kwota BK z wyplaty rodu): " + OwnerTaxState()
                      + "; kwoty podatku warsztatow (GetWorkshopTaxes): " + FinSourceNote()
+                     + "; 241 podatek warsztatow raz od wyplaty (Workshop Tax On Payout): " + (PayoutRule ? "WL - stawka BK x dzienna wyplata (notable E3/8a, D11-3), cena warsztatu 1 x stawka" + (_wPayPre ? "" : " (BRAK prefiksu wyplaty rodu - D11-3 liczy polowe kwoty BK)") : "WYL - kwota BK od zysku nagromadzonego (2 x stawka)")
                      + " | wylaczniki: Caravan Wage To Purse " + Onoff(WageOn) + ", BK Workshop Tax To Lord " + Onoff(TaxOn) + ", Workshop Owner Pays Town Tax " + Onoff(OwnerTaxOn) + ", BK Lord Fees Have Recipients " + Onoff(FeesOn)
                      + ", Dead Hero Gold Stays " + Onoff(DeadOn) + ", Caravan Profit In Realm Town " + Onoff(ProfitOn) + " | E3/8d (Inni bez zoldu) - odlozone.");
         }
@@ -308,6 +324,13 @@ namespace Armoury
             // Priority.First - zaraz po ciele gry, przed innymi postfiksami rozliczenia rodu (zaden z nich nie przelicza dochodu z warsztatow)
             var mClanTick = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "DailyTickClan", new[] { typeof(Clan) });
             _wPay = Patch(mClanTick, "podatek warsztatow z wyplaty rodu (ClanVariablesCampaignBehavior.DailyTickClan)", null, nameof(ClanPayPost), null, Priority.First, Priority.Normal, wired, missing);
+            // 241: prefiks First (przed prefiksami innych modow, ktore moga pominac oryginal - Harmony pomija wtedy dalsze prefiksy z parametrem-obiektem): kapital
+            // warsztatow glowy rodu przed wyplata; tylko odczyt. Bez niego wyplata z ProfitMade po wyplacie (jak przed 241)
+            if (_wPay)
+            {
+                try { _harmony.Patch(mClanTick, prefix: new HarmonyMethod(typeof(Seal31B), nameof(ClanPayPre)) { priority = Priority.First }); wired.Add("kapital przed wyplata rodu (241)"); _wPayPre = true; }
+                catch (Exception e) { missing.Add("kapital przed wyplata rodu (241) (blad: " + e.Message + ")"); Stumble("Patch(ClanPayPre)", e); }
+            }
         }
 
         /// <summary>E3/8a: obie nogi naraz - przelew notabl -> pan (TaxPre) i zdjecie linii "Taxes from" z podatku miasta (NotableTaxLines, wolane
@@ -556,7 +579,13 @@ namespace Armoury
         }
 
         // ================================================================= E3/8a: podatek warsztatow BK - prawdziwy platnik
-        internal sealed class TaxState { public Hero H; public long Sum, Orig, Z; public readonly List<Workshop> W = new List<Workshop>(); public readonly List<int> T = new List<int>(); }
+        internal sealed class TaxState
+        {
+            public Hero H; public long Sum, Orig, Z;
+            public readonly List<Workshop> W = new List<Workshop>(); public readonly List<int> T = new List<int>();
+            // 241: kapital przed wyplata, podatek od wyplaty (stawka x wyplata) na warsztat i razem, wyplaty razem; podzial przelewu (T albo T1 - wedlug reguly)
+            public readonly List<int> C0 = new List<int>(); public readonly List<int> T1 = new List<int>(); public long Sum1, Pay; public List<int> Split;
+        }
         private static Hero _tickHero;                     // doba notabla w toku (ClanVariablesCampaignBehavior.DailyTickHero)
         private static TaxState _pend;                     // podatek tej doby do przelania po wyplacie gry
 
@@ -578,7 +607,7 @@ namespace Armoury
                     var w = ws[i];
                     if (w == null) continue;
                     int t = (int)_mTaxExp.Invoke(null, new object[] { w });
-                    st.W.Add(w); st.T.Add(t); st.Sum += t;
+                    st.W.Add(w); st.T.Add(t); st.Sum += t; st.C0.Add(w.Capital);   // 241: kapital przed wyplata (gra zdejmie ja w srodku tej metody)
                 }
                 if (st.Sum > 0) __state = st;
             }
@@ -592,8 +621,29 @@ namespace Armoury
             try
             {
                 long orig = __result;
-                long z = Math.Min(__state.Sum, Math.Max(0L, orig + __state.Sum));   // to, co naprawde zniklo (przy wyniku <= 0 gra nic nie wyplaca)
-                if (z <= 0) return;
+                // 241: podatek od wyplaty - stawka BK x to, co gra wlasnie zdjela z kapitalu (TaxExpenses = stawka x zysk przed wyplata, wiec t x wyplata / zysk)
+                for (int i = 0; i < __state.W.Count; i++)
+                {
+                    var w = __state.W[i];
+                    int t = __state.T[i], t1 = 0;
+                    if (t > 0)
+                    {
+                        long pay = Math.Max(0L, (long)__state.C0[i] - w.Capital);
+                        long pb = Math.Max(0L, (long)__state.C0[i] - w.InitialCapital);
+                        t1 = pb > 0 ? (int)Math.Min(t, (long)t * pay / pb) : 0;
+                        __state.Pay += pay;
+                    }
+                    __state.T1.Add(t1); __state.Sum1 += t1;
+                    if (w != null) _lastTax1[w] = t1;
+                }
+                bool once = PayoutRule;
+                __state.Split = once ? __state.T1 : __state.T;
+                long due = once ? __state.Sum1 : __state.Sum;
+                // to, co naprawde zniklo (przy wyniku <= 0 gra nic nie wyplaca); 241: najwyzej podatek od wyplaty. Brutto > 0 oddajemy zawsze (takze przy podatku od wyplaty 0 -
+                // inaczej potracenie BK zostaloby w wyniku i zniknelo); przed 241 z <= 0 tylko przy brutto <= 0, wiec bez zmian przy wylaczonej regule
+                long gross = orig + __state.Sum;
+                if (gross <= 0) return;
+                long z = Math.Max(0L, Math.Min(due, gross));
                 __state.Orig = orig; __state.Z = z;
                 // poprawka po recenzji: gra wyplaca brutto (= wynik BK + caly podatek), a HeroTickPost zdejmuje Z. Dotad orig + z: przy 0 < brutto < podatek
                 // (orig < 0) wychodzilo 2 x brutto - podatek, a przelew Z = brutto - notabl doplacal roznice z oszczednosci. Przy orig >= 0 bez zmian (z = podatek).
@@ -612,16 +662,18 @@ namespace Armoury
             if (p == null || __0 == null || !ReferenceEquals(p.H, __0)) return;
             try
             {
-                _taxNotables++; _taxSeen += p.Sum; _taxZ += p.Z;
+                _taxNotables++; _taxSeen += p.Sum; _taxZ += p.Z; _taxSeen1 += p.Sum1; _taxPayout += p.Pay;
                 long given = 0;
                 int last = -1;
-                for (int i = 0; i < p.W.Count; i++) if (p.T[i] > 0) last = i;
+                var split = p.Split ?? p.T;   // 241: podzial wedlug podatku od wyplaty (regula) albo kwoty BK (jak dotad)
+                long ssum = 0;
+                for (int i = 0; i < p.W.Count; i++) if (split[i] > 0) { last = i; ssum += split[i]; }
                 for (int i = 0; i < p.W.Count; i++)
                 {
-                    if (p.T[i] <= 0) continue;
+                    if (split[i] <= 0) continue;
                     try
                     {
-                        long zw = i == last ? p.Z - given : p.Z * p.T[i] / p.Sum;
+                        long zw = i == last ? p.Z - given : p.Z * split[i] / ssum;
                         given += zw;
                         if (zw <= 0) continue;
                         var st = p.W[i].Settlement;
@@ -756,41 +808,60 @@ namespace Armoury
 
         /// <summary>PopulationLaw.TownTaxPostfix: linie "Taxes from" warsztatow notabli x autonomia (to samo, co KeptTownLines dla nich liczy) - odejmowane
         /// od podatku miasta, gdy podatek ida przelewem. 0 - przelew nieczynny (linia zostaje jak dotad). Moze byc wolane z watkow AI.</summary>
-        internal static float NotableTaxLines(Town town)
+        internal static float NotableTaxLines(Town town) { float paid1; return NotableTaxLines(town, out paid1); }
+
+        /// <summary>To samo; 241: `paid1` - z tych linii czesc, ktora notable naprawde placa przy podatku od wyplaty (stawka x ostatnia wyplata, brak - polowa linii)
+        /// x autonomia jak linia - do podstawy pensji rady (PopulationLaw.TownTaxPostfix). Licznik linii zdjetych liczy raz (jedno wywolanie zamiast dwoch).</summary>
+        internal static float NotableTaxLines(Town town, out float paid1)
         {
+            paid1 = 0f;
             try
             {
                 if (!TaxLive || town == null || town.Workshops == null) return 0f;
                 // perf-d2d3 (PerfTownTaxFastHooks): rdzen przez delegaty; co 64. wywolanie tez stara droga - rozjazd: wynik starej drogi (licznik w linii "Szybkosc doby")
-                float sum;
+                float sum, p1;
                 if (PerfD2.FastHooksOn)
                 {
-                    sum = NotableCore(town, true);
-                    if (PerfD2.FastProbe(PerfD2.FNotable)) { float s = NotableCore(town, false); if (!PerfD2.FastSame(PerfD2.FNotable, s == sum)) sum = s; }
+                    sum = NotableCore(town, true, out p1);
+                    if (PerfD2.FastProbe(PerfD2.FNotable)) { float q1; float s = NotableCore(town, false, out q1); if (!PerfD2.FastSame(PerfD2.FNotable, s == sum && q1 == p1)) { sum = s; p1 = q1; } }
                 }
-                else sum = NotableCore(town, false);
+                else sum = NotableCore(town, false, out p1);
                 if (sum <= 0f) return 0f;
+                paid1 = p1;
                 System.Threading.Interlocked.Add(ref _taxLinesCut, (long)sum);
                 return sum;
             }
             catch (Exception e) { Stumble("NotableTaxLines", e); return 0f; }
         }
 
-        /// <summary>NotableTaxLines bez licznika (fast = false: cialo sprzed perf-d2d3 - odbicie). 0 - brak linii.</summary>
-        private static float NotableCore(Town town, bool fast)
+        /// <summary>241: podatek od ostatniej wyplaty warsztatu (TaxPost / ClanPayPost); brak - polowa linii BK (wyplata = polowa zysku). Bezpieczne z watkow AI.</summary>
+        private static float Tax1Of(Workshop w, float line)
         {
+            int v;
+            return w != null && _lastTax1.TryGetValue(w, out v) ? Math.Min(line, v) : line * 0.5f;
+        }
+
+        /// <summary>NotableTaxLines bez licznika (fast = false: cialo sprzed perf-d2d3 - odbicie). 0 - brak linii. 241: paid1 - czesc placona od wyplat (ta sama autonomia).</summary>
+        private static float NotableCore(Town town, bool fast, out float paid1)
+        {
+            paid1 = 0f;
             var cfg = fast ? BkCfgFast() : BkCfg();
             var fin = TaxFin(cfg, fast);   // 121: egzemplarz BK z lancucha gry (zapas - konfiguracja BK)
             if (fin == null) return 0f;
             var tax = fast ? PerfFast.M1<Workshop, int>(_mGetWsTax) : null;
             var leader = town.OwnerClan != null ? town.OwnerClan.Leader : null;
-            float sum = 0f;
+            float sum = 0f, p1 = 0f;
             foreach (var w in town.Workshops)
                 if (w != null && w.Owner != null && w.Owner != leader && w.Owner.IsNotable)
-                    sum += WsTax(fin, w, tax);
+                {
+                    float t = WsTax(fin, w, tax);
+                    sum += t;
+                    if (t > 0f) p1 += Tax1Of(w, t);
+                }
             if (sum <= 0f) return 0f;
             float aut = fast ? AutonomyFast(town.Settlement) : Autonomy(town.Settlement);
-            if (aut > 0f) sum *= Math.Max(0f, 1f - 0.6f * aut);
+            if (aut > 0f) { float f = Math.Max(0f, 1f - 0.6f * aut); sum *= f; p1 *= f; }
+            paid1 = p1;
             return sum;
         }
 
@@ -807,28 +878,31 @@ namespace Armoury
 
         /// <summary>To samo; `ownerPaid` - z tych linii czesc, ktora od D11-3 placi wlasciciel panu przelewem (OwnerTaxDaily; x autonomia jak linia) - do podstawy
         /// pensji rady (CouncilWages35.TownBase), tak jak linie notabli placone przelewem E3/8a. 0 przy D11-3 nieczynnym.</summary>
-        internal static float UnpaidOwnerTaxLines(Town town, out float ownerPaid)
+        internal static float UnpaidOwnerTaxLines(Town town, out float ownerPaid) { float p1; return UnpaidOwnerTaxLines(town, out ownerPaid, out p1); }
+
+        /// <summary>To samo; 241: `ownerPaid1` - czesc placona przez wlasciciela przy podatku od wyplaty (stawka x ostatnia wyplata, brak - polowa linii) x autonomia.</summary>
+        internal static float UnpaidOwnerTaxLines(Town town, out float ownerPaid, out float ownerPaid1)
         {
-            ownerPaid = 0f;
+            ownerPaid = 0f; ownerPaid1 = 0f;
             try
             {
                 if (!TaxOn || town == null || town.Workshops == null || _mGetWsTax == null || _pCfgFin == null) return 0f;
                 // perf-d2d3 (PerfTownTaxFastHooks): rdzen przez delegaty; co 64. wywolanie tez stara droga - rozjazd: wynik starej drogi (licznik w linii "Szybkosc doby")
-                float paidSum; int n;
+                float paidSum, paid1; int n;
                 float sum;
                 if (PerfD2.FastHooksOn)
                 {
-                    sum = UnpaidCore(town, true, out paidSum, out n);
+                    sum = UnpaidCore(town, true, out paidSum, out n, out paid1);
                     if (PerfD2.FastProbe(PerfD2.FUnpaid))
                     {
-                        float p2; int n2;
-                        float s2 = UnpaidCore(town, false, out p2, out n2);
-                        if (!PerfD2.FastSame(PerfD2.FUnpaid, s2 == sum && p2 == paidSum && n2 == n)) { sum = s2; paidSum = p2; n = n2; }
+                        float p2, q1; int n2;
+                        float s2 = UnpaidCore(town, false, out p2, out n2, out q1);
+                        if (!PerfD2.FastSame(PerfD2.FUnpaid, s2 == sum && p2 == paidSum && n2 == n && q1 == paid1)) { sum = s2; paidSum = p2; n = n2; paid1 = q1; }
                     }
                 }
-                else sum = UnpaidCore(town, false, out paidSum, out n);
+                else sum = UnpaidCore(town, false, out paidSum, out n, out paid1);
                 if (sum <= 0f) return 0f;
-                ownerPaid = paidSum;
+                ownerPaid = paidSum; ownerPaid1 = paid1;
                 System.Threading.Interlocked.Add(ref _unpaidCut, (long)sum);
                 System.Threading.Interlocked.Add(ref _unpaidN, n);
                 return sum;
@@ -837,9 +911,9 @@ namespace Armoury
         }
 
         /// <summary>UnpaidOwnerTaxLines bez licznikow (fast = false: cialo sprzed perf-d2d3 - odbicie). 0 (paid 0) - brak linii.</summary>
-        private static float UnpaidCore(Town town, bool fast, out float paid, out int n)
+        private static float UnpaidCore(Town town, bool fast, out float paid, out int n, out float paid1)
         {
-            paid = 0f; n = 0;
+            paid = 0f; n = 0; paid1 = 0f;
             var cfg = fast ? BkCfgFast() : BkCfg();
             var fin = TaxFin(cfg, fast);   // 121: egzemplarz BK z lancucha gry (zapas - konfiguracja BK)
             if (fin == null || !_mGetWsTax.DeclaringType.IsInstanceOfType(fin)) return 0f;
@@ -848,7 +922,7 @@ namespace Armoury
             var leader = townClan != null ? townClan.Leader : null;
             bool bkCharges = BkWorkshopModelActive();
             bool d113 = OwnerTaxLive;
-            float sum = 0f, paidSum = 0f;
+            float sum = 0f, paidSum = 0f, p1 = 0f;
             foreach (var w in town.Workshops)
             {
                 var o = w != null ? w.Owner : null;
@@ -858,12 +932,12 @@ namespace Armoury
                 float t = WsTax(fin, w, tax);
                 if (t <= 0f) continue;
                 sum += t; n++;
-                if (d113 && OwnerPays(o, townClan, leader, bkCharges)) paidSum += t;            // D11-3: placi wlasciciel przelewem (bez czlonkow rodu pana)
+                if (d113 && OwnerPays(o, townClan, leader, bkCharges)) { paidSum += t; p1 += Tax1Of(w, t); }   // D11-3: placi wlasciciel przelewem (bez czlonkow rodu pana); 241: od wyplaty
             }
             if (sum <= 0f) { n = 0; return 0f; }
             float aut = fast ? AutonomyFast(town.Settlement) : Autonomy(town.Settlement);
-            if (aut > 0f) { float f = Math.Max(0f, 1f - 0.6f * aut); sum *= f; paidSum *= f; }
-            paid = paidSum;
+            if (aut > 0f) { float f = Math.Max(0f, 1f - 0.6f * aut); sum *= f; paidSum *= f; p1 *= f; }
+            paid = paidSum; paid1 = p1;
             return sum;
         }
 
@@ -937,11 +1011,27 @@ namespace Armoury
         /// dokladnie te kwote, raz na wyplate. Slownika nie czytamy w dobie: kazde pozniejsze przeliczenie (podpowiedzi, AI, KingdomTreasury, IronBank)
         /// nadpisuje go stanem po wyplacie (1-2 x stawka), a po zmianie wlasciciela trzyma kwote poprzedniego.
         /// </summary>
+        /// <summary>241: prefiks DailyTickClan (Priority.First, tylko odczyt) - kapital warsztatow glowy rodu przed wyplata dochodu (ClanPayPost mierzy wyplate).</summary>
+        public static void ClanPayPre(Clan __0)
+        {
+            try
+            {
+                _clanCap0.Clear();
+                if (__0 == null || __0.IsBanditFaction || !OwnerTaxLive || !Live) return;
+                var o = __0.Leader;
+                if (o == null || o.IsNotable) return;
+                var ws = o.OwnedWorkshops;
+                if (ws == null) return;
+                foreach (var w in ws) if (w != null) _clanCap0[w] = w.Capital;
+            }
+            catch (Exception e) { _clanCap0.Clear(); Stumble("ClanPayPre", e); }
+        }
+
         public static void ClanPayPost(Clan __0)
         {
             try
             {
-                if (__0 == null || __0.IsBanditFaction || !OwnerTaxLive || !Live) return;   // bandy: gra nie rozlicza (DailyTickClan)
+                if (__0 == null || __0.IsBanditFaction || !OwnerTaxLive || !Live) { _clanCap0.Clear(); return; }   // bandy: gra nie rozlicza (DailyTickClan)
                 var o = __0.Leader;
                 if (o == null || o.IsNotable) return;
                 var ws = o.OwnedWorkshops;
@@ -960,13 +1050,25 @@ namespace Armoury
                         if (!OwnerPays(o, tc, tc != null ? tc.Leader : null, bkCharges)) continue;
                         int t = Convert.ToInt32(_mGetWsTax.Invoke(fin, new object[] { w }));
                         if (t <= 0) continue;
-                        // wyplata (tylko do kontroli w linii doby): gra zdjela z kapitalu floor(zysk/2), zostalo ceil(zysk/2) - ProfitMade teraz = wyplata (+1)
-                        _otPay.Add(new OtPay { W = w, Owner = o, Tax = t, Payout = Math.Max(0, w.ProfitMade) });
+                        // wyplata: gra zdjela z kapitalu floor(zysk/2), zostalo ceil(zysk/2) - ProfitMade teraz = wyplata (+1); 241: zmierzona z kapitalu przed (ClanPayPre)
+                        int c0, payout = Math.Max(0, w.ProfitMade), tax = t;
+                        if (_clanCap0.TryGetValue(w, out c0))
+                        {
+                            payout = Math.Max(0, c0 - w.Capital);
+                            long pb = Math.Max(0L, (long)c0 - w.InitialCapital);   // zysk przed wyplata - z niego BK policzyl kwote t (stawka x zysk)
+                            int t1 = pb > 0 ? (int)Math.Min(t, (long)t * payout / pb) : 0;
+                            _lastTax1[w] = t1;
+                            if (PayoutRule) tax = t1;   // 241: raz od wyplaty - stawka BK x wyplata
+                        }
+                        else if (PayoutRule) tax = (t + 1) / 2;   // bez migawki kapitalu (brak prefiksu) - wyplata to polowa zysku, jak w BK
+                        if (tax <= 0) continue;
+                        _otPay.Add(new OtPay { W = w, Owner = o, Tax = tax, Payout = payout, TaxBk = t });
                     }
                     catch (Exception e) { Stumble("ClanPayPost(warsztat)", e); }
                 }
             }
             catch (Exception e) { Stumble("ClanPayPost", e); }
+            finally { _clanCap0.Clear(); }
         }
 
         /// <summary>
@@ -998,7 +1100,7 @@ namespace Armoury
                         if (!OwnerPays(o, townClan, lord, bkCharges) || !o.IsAlive || CW.OutOfWorld(o)) { _otDrop += t; _otDropN++; continue; }
                         float aut;
                         if (!auts.TryGetValue(st, out aut)) { aut = Autonomy(st); auts[st] = aut; }
-                        _otN++; _otDue += t; _otPayout += p.Payout; owners.Add(o);
+                        _otN++; _otDue += t; _otDueBk += p.TaxBk; _otPayout += p.Payout; owners.Add(o);
                         bool lordOk = lord != null && lord.IsAlive && !CW.OutOfWorld(lord) && !ReferenceEquals(lord, o);
                         long toTown = lordOk ? (long)Math.Round(t * Math.Min(1.0, 0.6 * aut)) : t;
                         long toLord = t - toTown;
@@ -1391,7 +1493,10 @@ namespace Armoury
                   .Append("; W13 wszystkie partie: do band ").Append(_allPurseBand).Append(", do innych partii ").Append(_allPurseParty).Append(", do osad niszczyciela ").Append(_allPurseSettl);
                 // E3/8a
                 sb.Append(" | podatek warsztatow BK (E3/8a ").Append(Onoff(TaxOn)).Append(TaxLive || !TaxOn ? "" : ", NIECZYNNE - BK poza lancuchem modelu, brak latki renty miast albo renty wylaczone").Append("): notabli ").Append(_taxNotables)
-                  .Append(", podatek BK ").Append(_taxSeen).Append(", zniklo u notabli (oddane w wyplacie) ").Append(_taxZ).Append(" -> do panow ").Append(_taxToLords)
+                  .Append(", podatek BK ").Append(_taxSeen).Append(", nalezny od wyplat (241) ").Append(_taxSeen1).Append(", wyplaty notabli ").Append(_taxPayout)
+                  .Append(", podatek / wyplata ").Append(_taxPayout > 0 ? (100.0 * _taxZ / _taxPayout).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%" : "-")
+                  .Append(PayoutRule ? " (241 WL: raz od wyplaty, 1 x stawka BK)" : " (241 WYL: kwota BK od zysku nagromadzonego)")
+                  .Append(", zniklo u notabli (oddane w wyplacie) ").Append(_taxZ).Append(" -> do panow ").Append(_taxToLords)
                   .Append(", do kas miast (autonomia) ").Append(_taxToTowns).Append(", do kas miast bez pana ").Append(_taxNoLord).Append(", nie przelane ").Append(_taxShort)
                   .Append(" (wynik BK <= 0: ").Append(_taxNeg).Append(" notabli); linie 'Taxes from' warsztatow notabli zdjete z podatku miast (suma wywolan modelu) ")
                   .Append(System.Threading.Interlocked.Read(ref _taxLinesCut)).Append("; do rent panow (RentToday) dzis ").Append(_rentMerged)
@@ -1399,12 +1504,13 @@ namespace Armoury
                   .Append(System.Threading.Interlocked.Read(ref _unpaidCut)).Append(" (").Append(System.Threading.Volatile.Read(ref _unpaidN)).Append(" linii)");
                 // D11-3
                 sb.Append(" | podatek warsztatow lordow i gracza w cudzych miastach (D11-3 ").Append(Onoff(OwnerTaxOn)).Append(OwnerTaxLive || !OwnerTaxOn ? "" : ", " + OwnerTaxState())
-                  .Append("): placi wlasciciel - warsztatow ").Append(_otN).Append(" (wlascicieli ").Append(_otOwners).Append("), podatek BK z wyplat rodow (kwota BK w chwili wyplaty) ").Append(_otDue)
+                  .Append("): placi wlasciciel - warsztatow ").Append(_otN).Append(" (wlascicieli ").Append(_otOwners).Append("), kwota BK od zysku nagromadzonego ").Append(_otDueBk)
+                  .Append(", pobrane ").Append(PayoutRule ? "od wyplaty (241, 1 x stawka) " : "wedlug kwoty BK (241 WYL) ").Append(_otDue)
                   .Append(" -> do panow miast (renta) ").Append(_otToLords).Append(", do kas miast (autonomia) ").Append(_otToTowns).Append(", do kas miast bez pana ").Append(_otNoLord)
                   .Append(", nie zaplacone - brak w kiesie wlasciciela (zaleglosc nie rosnie) ").Append(_otShort).Append(" (").Append(_otShortN).Append(" warsztatow); w tym gracz zaplacil ").Append(_otPlayer)
                   .Append(" (warsztatow gracza ").Append(_otPlayerN).Append("); kontrola: wyplaty z tych warsztatow ok. ").Append(_otPayout).Append(", podatek / wyplata ")
                   .Append(_otPayout > 0 ? (100.0 * _otDue / _otPayout).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%" : "-")
-                  .Append(" (cena warsztatu zaklada 2 x stawka BK); migawki przepadle (wlasciciel zmarl albo miasto juz nie cudze) ").Append(_otDropN).Append(" (").Append(_otDrop).Append(")");
+                  .Append(PayoutRule ? " (cena warsztatu zaklada 1 x stawka BK)" : " (cena warsztatu zaklada 2 x stawka BK)").Append("; migawki przepadle (wlasciciel zmarl albo miasto juz nie cudze) ").Append(_otDropN).Append(" (").Append(_otDrop).Append(")");
                 // E3/8b
                 sb.Append(" | oplaty lordow BK (E3/8b ").Append(Onoff(FeesOn)).Append(", latek ").Append(_wFees).Append("/8):");
                 long feeAll = 0;
