@@ -9,29 +9,25 @@
 - Jeff 22:10: karawana nic nie zarabia - PRAWDA: 'Caravan of Isa Storm' 22 doby: sprzedaz 22857, zakupy 17991, zysk ze sprzedazy -5071, zold 10890,
   netto -11890, wartosc 17744 -> 14703 (< kapitalu 15000, wyplat 0). Swiat: 88 karawan rodow, wyplacilo 13, 63 z kiesa na podlodze. Warsztat Silversmith
   Seagard ok. 208/dobe (4588 w 22 doby, podatek 1310). Jeff: 'rob te plotna skory wszystkie surowce aby ta gospodarka zyla'.
-- 284 (zb
-284, noc/284-karawany-surowce-przeplyw od 6f30e9ac; workflow wf_627247df-0c5): diagnoza strat karawan, zysk z prawdziwych roznic cen,
+- 284 (zb\n284, noc/284-karawany-surowce-przeplyw od 6f30e9ac; workflow wf_627247df-0c5): diagnoza strat karawan, zysk z prawdziwych roznic cen,
   bramka przeplywu 282 dla wszystkich towarow, kolejnosc zamowien i rowne pokrycie dla wszystkich surowcow warsztatow, marze warsztatow po 241; grupa handel284.
-- 283 nadal w toku (wf_4a1d4aa3-b15). Log Jeffa calej sesji 20:56-22:09: D:\Backup-Bannerlord\logi-jeffa6-10-27-2210-po-grze\.
+- 283 nadal w toku (wf_4a1d4aa3-b15). Log Jeffa calej sesji 20:56-22:09: D:\Backup-Bannerlord\logi-jeffa\2026-10-27-2210-po-grze\.
 - Limit tygodnia 94% o 22:15.
 
 ## DOPISEK 27.10 ok. 22:40 CET - 282 GOTOWE (zbudowane, po recenzji, NIE scalone, NIE testowane); czeka 283
-- 282 (zb
-282): 90699a3e + 0564e798 + recenzja 04810741 (Armoury 0fac1b16). Przyczyna: karawany trzymaja ok. 1/4 zelaza swiata w jukach (1666-2463),
+- 282 (zb\n282): 90699a3e + 0564e798 + recenzja 04810741 (Armoury 0fac1b16). Przyczyna: karawany trzymaja ok. 1/4 zelaza swiata w jukach (1666-2463),
   prog zrodla 174 sumuje sie ponad polki, zamowienia do najtanszego zrodla nawet 8 dob drogi w dowolnej kolejnosci. F1 CaravanBulk.cs (bramka przeplywu rudy
   karawan, zapis arm_cb282), F2 najbardziej potrzebujace miasto pierwsze + zrodlo wedlug zysku na dobe drogi (7 surowcow), F3 rowne pokrycie rudy, F4 rece
   przy kopalniach licza towar w drodze, F5 linia Drewno bez 'bez wyjasnienia' (to nie wyciek). Grupa ruda282 (RU282-0..9), nruda NRU-2 zmienione.
   Do zrobienia potem (decyzja Claude): ta sama bramka dla plotna (ok. 2500 w jukach przy braku 430) i skory - teraz tylko 'na sucho' w linii 282.
 
 ## DOPISEK 27.10 ok. 22:10 CET - 280 i 281 GOTOWE (zbudowane, po recenzji, NIE scalone, NIE testowane)
-- 280 (zb
-280): 6e964978 + 673fb061 (Armoury 2a9f1216); recenzje 2 soczewki - 0 uwag. DayGate.cs (zapis arm_daygate, klucz DailyTickOncePerDay; P1 przestawia
+- 280 (zb\n280): 6e964978 + 673fb061 (Armoury 2a9f1216); recenzje 2 soczewki - 0 uwag. DayGate.cs (zapis arm_daygate, klucz DailyTickOncePerDay; P1 przestawia
   nastepny takt doby gry na kanoniczna pore po wczytaniu, prefiks Campaign.DailyTick pomija pierwszy takt z tym samym numerem), narodziny w ticku wsi
   (PopulationLaw.FloorPrefix/Finalizer, klucz BirthsAtVillageTick), udzialy band w zapisie (pd:), sw: v2 (polegli bez pochodzenia, reszta przy zapisie),
   reszta -5.4k ZAMROZONA i pokazywana osobno ('od 280'), B3 tekst, B4 'Bitwy: dzien N (doba ksiegi'. Grupa ksiega280. Test: bieg A 4 doby z zapisem,
   bieg B wczytanie zapisu z A 4 doby (K280-3 skok ~0), bitwy (K280-7). Zostaje 5-8 ludzi/dobe 'w nicosc ... inne' (E4/7) - poza 280.
-- 281 (zb
-281): bcb49094 + 52416361 + recenzja 7a2b03c3 (Armoury 8654c20e). Release() na kazdej drodze, ReleaseLate przed wczesnymi return, przeglad godzinny
+- 281 (zb\n281): bcb49094 + 52416361 + recenzja 7a2b03c3 (Armoury 8654c20e). Release() na kazdej drodze, ReleaseLate przed wczesnymi return, przeglad godzinny
   (mysl co 6 h), Restore wpisow z zapisu przed wczesnymi return; grupa e223 + E223-8, E223-9.
 - Czekaja: 282 (wf_7236362f-1af), 283 (wf_4a1d4aa3-b15). Potem scalenie 4 galezi, autotest 131a, WGRANIE 131.
 
@@ -459,10 +455,10 @@ i C (piesn zwyciezcow); muzykant w szyku (rog/bodhran, raport w transkrypcie: co
 - Zapis testowy autotest-przekierowany przeniesiony na D:\Backup-Bannerlord\zapisy-testowe-archiwum.
 
 ## DOPISEK 25.10 ok. 04:05 CET - WGRANE 112
-- W grze: Armoury 68f74d0f = galaz noc/wgranie112 (a14c76d3 + noc/p7-przesluchanie 443b13f5 + noc/p8-podatek 8be4aeca; CHANGELOG 120, 121). Kopia przed: ...\Armoury.dll.bak-2026-10-25-przed-wgranie112 i D:\Backup-Bannerlord\wgrane6-10-25-wgranie112-przed.
+- W grze: Armoury 68f74d0f = galaz noc/wgranie112 (a14c76d3 + noc/p7-przesluchanie 443b13f5 + noc/p8-podatek 8be4aeca; CHANGELOG 120, 121). Kopia przed: ...\Armoury.dll.bak-2026-10-25-przed-wgranie112 i D:\Backup-Bannerlord\wgrane\2026-10-25-wgranie112-przed.
 - Autotest 112a: ERROR 0, 4/4 bitwy. Do sprawdzenia w grze Jeffa: "Przesluchanie (m109): pochodzenie - banda", "bez migawki 0", opcja szara; D11-3 "w tym gracz zaplacil X".
 - KOLEJNA INTEGRACJA (noc/calosc z workflow noc-bitwa-kod) MUSI scalic noc/wgranie112 i noc/p9-gotowosc (gotowosc AI) + dzwiek szturmu murow i bebny oblezenia (do dopisania).
-- Logi sesji Jeffa 02:11-03:46: D:\Backup-Bannerlord\logi-jeffa6-10-25_03-50-po-grze. Zapis testowy = kopia jego zapisu z 03:46 (md5 0ea55e89).
+- Logi sesji Jeffa 02:11-03:46: D:\Backup-Bannerlord\logi-jeffa\2026-10-25_03-50-po-grze. Zapis testowy = kopia jego zapisu z 03:46 (md5 0ea55e89).
 
 ## DOPISEK 25.10 ok. 02:35 CET - NOC W TOKU (workflow noc-bitwa-kod, run wf_d049918d-367)
 - Projekty z rozpoznania: scratchpad fffc991e...\scratchpad\noc\projekty\ (ai-marsz-taktyki.json, dzwiek-glosy.json, choragwie.json, przeglad-armii.json, okno-lupu.json, friendly-fire.txt, krytyk.txt - podzial P0-P5, kolizje K1-K17, zakres v1).
