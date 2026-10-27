@@ -3792,6 +3792,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool PressUntakenGoHome { get; set; } = true;
 
+        [SettingPropertyBool("Daily Tick Once Per Day", HintText = "After loading a save the game restarts its daily tick at the wrong time of day, so a day could run twice or be skipped. On: the daily tick keeps the campaign's time of day. Off: game behaviour.", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool DailyTickOncePerDay { get; set; } = true;
+
+        [SettingPropertyBool("Births At Village Tick", HintText = "People ledger counts village births when the village really grows (daily village tick), not as a forecast at the mod's day.", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool BirthsAtVillageTick { get; set; } = true;
+
         [SettingPropertyBool("Party Gone Men Go Home", HintText = "when a house falls (for example in a story event, or when its last lord dies) while one of its war parties is in the middle of a battle, the game pulls that party out of the fight and removes it; its living men now go home to their own lands (sworn brothers back to the Wall) instead of vanishing from the world. Parties of a fallen house that were not fighting already went home, and parties beaten in battle are not affected (off = the men pulled out of the battle vanish, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool PartyGoneMenGoHome { get; set; } = true;
@@ -11167,6 +11175,8 @@ namespace Armoury
             s.PeopleOriginEnabled = PeopleOriginEnabled;
             s.LevyFromVillages = LevyFromVillages;
             s.PressUntakenGoHome = PressUntakenGoHome;
+            s.DailyTickOncePerDay = DailyTickOncePerDay;
+            s.BirthsAtVillageTick = BirthsAtVillageTick;
             s.PartyGoneMenGoHome = PartyGoneMenGoHome;
             s.PartyGoneMenCounted = PartyGoneMenCounted;
             s.LevyVillageFromTown = LevyVillageFromTown;

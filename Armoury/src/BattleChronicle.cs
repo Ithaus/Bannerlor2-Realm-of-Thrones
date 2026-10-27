@@ -88,7 +88,8 @@ namespace Armoury
         internal static void Daily()
         {
             if (_battles + _small > 0)
-                Log.Info("Bitwy: dzien " + (int)CampaignTime.Now.ToDays + " - " + _battles + " starc (w tym pogromow/nierownych " + _routs + ", malych potyczek pominietych " + _small + "), zabitych " + _dead + ", rannych " + _wounded
+                // 280 (B4): dzien jak ksiega ludzi (doba zakonczona = Now - 1) - te same polegli maja ten sam numer co "Ludzie (ksiega): dzien" i "POLEGLI dzis"
+                Log.Info("Bitwy: dzien " + ((int)CampaignTime.Now.ToDays - 1) + " (doba ksiegi, od poprzedniej linii) - " + _battles + " starc (w tym pogromow/nierownych " + _routs + ", malych potyczek pominietych " + _small + "), zabitych " + _dead + ", rannych " + _wounded
                          + "; w " + _winN + " prawdziwych bitwach zwyciezcy tracili zabitych srednio " + (_winN > 0 ? (_winLossPct / _winN).ToString("0.#") + "%" : "-")
                          + ", przegrani " + (_loseN > 0 ? (_loseLossPct / _loseN).ToString("0.#") + "%" : "-") + " (historia: 1-5% / 15-40%).");
             _battles = _dead = _wounded = _small = _routs = 0; _winLossPct = _loseLossPct = 0; _winN = _loseN = 0;

@@ -216,6 +216,7 @@ namespace Armoury
                 try { FoodChain.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodChain.ApplyAll", e); }   // E4/6a: RBL liczy pory roku na wyniku lancucha ROT -> NavalDLC -> BEE -> BK (jeden lancuch modelu jedzenia)
                 try { WinterRealm.ApplyBkFeed(_harmony); } catch (Exception e) { Log.Error("WinterRealm.ApplyBkFeed", e); }   // wariant (a) Jeffa 11.10: pasza BK po glowie (warunki terenu BK bez zmian)
                 ScorchedEarth.ApplyAll(_harmony);
+                try { DayGate.Apply(_harmony); } catch (Exception e) { Log.Error("DayGate.Apply", e); }   // 280 (B2): straznik taktu doby - prefiks First na Campaign.DailyTick (pierwszy takt po wczytaniu z numerem dnia ostatniej doby z zapisu pomijany; P1 w OnSessionLaunched)
                 // E4/4 (109n): przyrost naturalny wsi - ten sam cel i priorytet co blizna ScorchedEarth, wpiety PO niej (biegnie ostatni); podloga 10 (R17) - okno
                 // na Village.DailyTick wpiete PRZED oknem W1 Measure40; we wlasnym try
                 try { PopulationLaw.ApplyGrowth(_harmony); } catch (Exception e) { Log.Error("PopulationLaw.ApplyGrowth", e); }

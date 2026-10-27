@@ -74184,5 +74184,516 @@ def main(argv):
     return _rody277_main_prev(argv)
 
 
+# ------------------------------------------------------------ ksiega280 (27.10, paczka 280 noc/280-ksiega-doba-po-wczytaniu: ksiega ludzi i takt doby po wczytaniu - Jeff 27.10
+# "sprawdz w logu ile osob pochlonela wojna ile ludnosci stracily wioski miasta i czy straty sa odejmowane od liczby ludnosci" -> "tak napraw wszystko";
+# Armoury/src/DayGate.cs, PopulationLaw.cs FloorPrefix/FloorFinalizer, PeopleBook.Origin.cs sw:/pd:/rg: pole 22, BattleChronicle.cs; klucze DailyTickOncePerDay, BirthsAtVillageTick)
+#   python -I tools/sprawdz_logi.py --grupa ksiega280 <Armoury-*.log>
+# K280-S self-test wyrazen (linie kontrolne jak w kodzie C#), K280-S2 test syntetyczny (dobry, zly, bez linii 280).
+# K280-1 etykiety "Ludzie (ksiega): dzien" w odcinkach sesji (podzial: "Doba gry po wczytaniu (280)" albo "Kalendarz: rok ma"): kazda nastepna = poprzednia + 1, pierwsza
+#   po wczytaniu = L z linii wczytania (ostatnia doba moda z zapisu); zero powtorzen i luk (log bez linii 280 - INFO).
+# K280-2 "Doba moda (280)": zero POWTORZONA i LUKA; odstep W jako INFO, przy zrodle arm_daygate i takcie nie spoznionym 24 h +-0.1 h.
+# K280-3 "Ksiega po wczytaniu (280)": |swiat po wczytaniu - przy zapisie| <= 5 (zaokraglenie zapisu 0.0005 x 22 pol x 227 regionow ok. 2.5, x2).
+# K280-3b skok "od 280 (dnia D1): swiat" na wczytaniu (ostatnia linia przed - pierwsza po) <= max(3 sigma, 30); sigma - odchylenie dziennych zmian w sesjach tego logu.
+# K280-4 narodziny z tickow wsi: "tick wsi razem" linii "Ludzie: przyrost naturalny" (= narodziny + uchodzcy + podloga) wobec "w ludziach tabeli ... tick" z "Hearth (E4/0)"
+#   tej samej doby (bez pierwszej doby sesji): |roznica| <= 1 + 0.2%.
+# K280-5 tekst B3: przy "pobor z DOM LevyLive: TAK" brak "werbunek jeszcze nie zdejmuje z DOM" i "smierc zdejmuje z DOM razem z werbunkiem" w "Ludzie (ksiega)".
+# K280-6 "POLEGLI bez pochodzenia od dnia D0 Z" w kazdej linii "Ludzie (ksiega)" od 280 i niemalejace (takze ponad wczytaniem, gdy zapis idzie naprzod).
+# K280-7 "Bitwy: dzien N (doba ksiegi...)" - nastepna linia "Ludzie (ksiega)" ma ten sam dzien N; stosunek zabitych bitew do "POLEGLI dzis" - INFO (wighty, male potyczki).
+# K280-8 POLEGLI dzis(N) = (od siewu + bez pochodzenia)(N) - (...)(N-1), +-2.5 (trzy liczby zaokraglone do czlowieka); pierwsza linia po wczytaniu tez (zapis z 280).
+# K280-9 "z niczego ... bandy" pierwszej doby po wczytaniu z sekcja pd: <= max(dob w sesji, 10) (wczytanie bez pd: - INFO).
+K280_RX = {
+    "load": re.compile(r"^Doba gry po wczytaniu \(280\): (?:dzien (\d+) \(godz\. (\d\d:\d\d)(; start nowej kampanii)?\) \| ostatnia doba moda z zapisu (-?\d+|-) \(zrodlo: ([^)]*)\)"
+                       r".*? h \[(poprawione|bez zmian|klucz wylaczony)\]|BRAK pola)"),
+    "first": re.compile(r"^Doba moda \(280\): dzien (\d+) - pierwsza doba (po wczytaniu|nowej kampanii), odstep (?:([\d.]+) h|nieznany) od ostatniej doby przed zapisem "
+                        r"\((-?\d+|-), zrodlo ([^)]*)\), takt o (\d\d:\d\d) \| (.*?)(?: \| spozniona albo o zlej porze \((\d\d:\d\d)\): pora kanoniczna przywrocona od dnia (\d+))?\.$"),
+    "insess": re.compile(r"^Doba moda \(280\): dzien (\d+) - (POWTORZONA w sesji|LUKA \d+\.\.\d+ w sesji)"),
+    "kb": re.compile(r"^Ludzie \(ksiega\): dzien (\d+) \|"),
+    "fallen": re.compile(r"POLEGLI od siewu (\d+) \(dzis (-?\d+)\), POLEGLI bez pochodzenia od dnia (-?\d+) (\d+) \(dzis (-?\d+|-)\)"),
+    "since": re.compile(r" \| od 280 \(dnia (\d+)\): swiat ([+-]?\d+(?:\.\d+)?), kraina najgorsza (\S+): reszta ([+-]?\d+(?:\.\d+)?) \((-?[\d.]+)% ludzi krainy\); "
+                        r"do 280 zamrozone ([+-]?\d+(?:\.\d+)?)"),
+    "nobase": re.compile(r" \| od 280: baza przy nastepnej dobie"),
+    "kload": re.compile(r"^Ksiega po wczytaniu \(280\): dzien (\d+) \| swiat przy zapisie (?:([+-]?\d+(?:\.\d+)?), po wczytaniu ([+-]?\d+(?:\.\d+)?), roznica ([+-]?\d+(?:\.\d+)?)"
+                        r"|- \(zapis sprzed 280\), po wczytaniu ([+-]?\d+(?:\.\d+)?))"),
+    "kload_pd": re.compile(r"oczekujace udzialy band z zapisu ([\d.]+) ludzi w (\d+) partiach \(rozwiazane (\d+), porzucone (\d+)"),
+    "kload_dead": re.compile(r"\| POLEGLI dzis po wczytaniu: (za cala dobe|od wczytania)"),
+    "prz": re.compile(r"^Ludzie: przyrost naturalny .*?dzien (\d+)"),
+    "births": re.compile(r" \| ksiega \(280\): narodziny wsi z tickow od poprzedniej linii ([+-]?\d+) ludzi w (\d+) tickach \(prognoza poprzedniej doby "
+                         r"(?:- \(pierwsza linia sesji\)|([+-]?\d+), roznica ([+-]?\d+))\), powrot uchodzcow z niczego ([+-]?\d+), podloga 10 ([+-]?\d+), tick wsi razem ([+-]?\d+)"),
+    "hearth": re.compile(r"^Hearth \(E4/0\): dzien (\d+) \|"),
+    "htick": re.compile(r"\| w ludziach tabeli \(hearth x k\): ludzie wsi \d+ \([+-]?\d+\) = tick ([+-]?\d+)"),
+    "bitwy": re.compile(r"^Bitwy: dzien (\d+) \(doba ksiegi, od poprzedniej linii\) - (\d+) starc .*?zabitych (\d+)"),
+    "bitwy_old": re.compile(r"^Bitwy: dzien (\d+) - \d+ starc"),
+    "poc": re.compile(r"^Pochodzenie \(E4/7\): dzien (\d+) \|"),
+    "znic": re.compile(r"\| bez nazwy: z niczego \+([\d.]+) \(([^)]*)\)"),
+    "bandy": re.compile(r"(?:^|, )bandy ([\d.]+)"),
+    "levy": re.compile(r"\| pobor z DOM LevyLive: (TAK|NIE)"),
+}
+K280_OLD = ("werbunek jeszcze nie zdejmuje z DOM", "smierc zdejmuje z DOM razem z werbunkiem")
+K280_NEW = ("zolnierz zszedl z DOM juz przy werbunku (E4/7 LevyLive)", "przy werbunku nikogo z DOM nie zdjeto")
+# linie kontrolne - jak w kodzie C# (DayGate.SessionStart / DailyPrefix, PeopleBook.Origin.cs OriginSegment / Since280Segment / LoadLine280, PeopleBook.cs Daily / UnitSegment,
+# PopulationLaw.Births280Note, BattleChronicle.Daily); {..} - pola
+K280_TEST = {
+    "load": "Doba gry po wczytaniu (280): dzien {d} (godz. 13:02) | ostatnia doba moda z zapisu {L} (zrodlo: {src}), ostatni takt przed zapisem dzien {L} o 06:00 "
+            "| gra ustawila takt doby za 7.03 h (initialWait = uplyniety ulamek doby - blad gry Campaign.CreateCampaignEvents), Armoury: takt doby {L1} o 06:00 "
+            "(pora kanoniczna od startu kampanii 06:00), za 16.97 h [poprawione] | takt godzinowy przesuniety o 2 min (gra, bez zmian) "
+            "| straznik pierwszego taktu (Campaign.DailyTick) wpieta, 280 od dnia {d} | klucz Daily Tick Once Per Day tak.",
+    "loadnew": "Doba gry po wczytaniu (280): dzien {d} (godz. 06:00; start nowej kampanii) | ostatnia doba moda z zapisu - (zrodlo: nowa kampania), ostatni takt przed zapisem nieznany "
+               "| gra ustawila takt doby za 24.00 h (initialWait = uplyniety ulamek doby - blad gry Campaign.CreateCampaignEvents), Armoury: takt doby {L1} o 06:00 "
+               "(pora kanoniczna od startu kampanii 06:00), za 24.00 h [bez zmian] | takt godzinowy przesuniety o 0 min (gra, bez zmian) "
+               "| straznik pierwszego taktu (Campaign.DailyTick) wpieta, 280 od dnia {d} | klucz Daily Tick Once Per Day tak.",
+    "first": "Doba moda (280): dzien {d} - pierwsza doba po wczytaniu, odstep {w} h od ostatniej doby przed zapisem ({L}, zrodlo {src}), takt o 06:00 | {kind}.",
+    "firstfix": "Doba moda (280): dzien {d} - pierwsza doba po wczytaniu, odstep 31.05 h od ostatniej doby przed zapisem ({L}, zrodlo ArmsScrap 174b.6), takt o 13:02 | kolejna "
+                "| spozniona albo o zlej porze (13:02): pora kanoniczna przywrocona od dnia {d1}.",
+    "insess": "Doba moda (280): dzien {d} - POWTORZONA w sesji (odstep 0.00 h; przewiniecie czasu - gra nadrabia, bez pomijania), powtorzen w sesji 1.",
+    "kb": "Ludzie (ksiega): dzien {n} | konto CIALA (pula Innych, nie-ludzie; E4/2): 6565 w 3 regionach = wczoraj 6565 + doplyw 0 (bilans otwarcia 0) - narodziny band 0 "
+          "| bilans otwarcia w zapisie 616 | polegli z rak Innych dzis (R3, region miejsca; zolnierz zszedl z DOM juz przy werbunku (E4/7 LevyLive) - smierc to ubytek trwaly "
+          "w POLEGLYCH regionu pochodzenia) 0, od wczytania 0 | E4/3 jednostka ludzi (1 czlowiek = 1/k osady): CZYNNA | trzy punkty powrotu do DOM, razem 12 (bez podwojenia): "
+          "LosersFlee.SendHome 3 (rozbite tabory 1, prosci i bandyci 1 - do wsi dalej przez OutlawLaw.ReturnHome, zolnierze do ludnosci BK 1), ClanBudget.ToVillage 4 (166 1, W4c 1, "
+          "179 2; SLUZBA -> DOM: z pochodzeniem do hearth regionu (E4/7, nizej), bez pochodzenia tylko liczona - przy werbunku nikogo z DOM nie zdjeto), OutlawLaw.ReturnHome 5 "
+          "| E4/7: konto SLUZBA 306000 + \"\" 12000, JENCY 9000 + \"\" 1000, POLEGLI od siewu {f} (dzis {x}), POLEGLI bez pochodzenia od dnia {d0} {z} (dzis {zx}), "
+          "cywile od siewu 5000, narodziny netto od siewu 60000 | pobor z DOM dzis 300 ludzi / -7.2 hearth (w tym ze stanu miast 10), powroty z pochodzeniem +100 ludzi / +2.5 hearth "
+          "(w tym do stanu miast 3) | rownanie krain: najgorsza kraina vlandia reszta -900.5 (-0.012% ludzi krainy), swiat -5365.5{since} | ludzie zywi (rownanie krain: DOM + uchodzcy "
+          "+ SLUZBA + JENCY + pula + tabory + w drodze + WETERANI + NIEWOLNI + Mur, z pochodzeniem) 51900000.",
+    "since": " | od 280 (dnia {b}): swiat {r}, kraina najgorsza vlandia: reszta {r} (0.001% ludzi krainy); do 280 zamrozone -5365.5 (prognoza narodzin wsi przy wczytaniach, "
+             "udzialy band bez zapisu)",
+    "nobase": " | od 280: baza przy nastepnej dobie",
+    "kload": "Ksiega po wczytaniu (280): dzien {d} | swiat przy zapisie -5365.5, po wczytaniu {r1}, roznica {dd} (zaokraglenie zapisu do 2.5) | konta: DOM 41524453->41524453, "
+             "SLUZBA 318434->318434, JENCY 10000->10000, pula 2000->2000, UCHODZCY 300->300, tabory 900->900, w drodze 50->50, WETERANI 400->400, NIEWOLNI 30->30, Mur 800->800, "
+             "zbiorka 5->5 | oczekujace udzialy band z zapisu 135 ludzi w 9 partiach (rozwiazane 9, porzucone 0) | POLEGLI dzis po wczytaniu: za cala dobe (sumy z konca ostatniej doby "
+             "z zapisu) | baza reszty od 280: dnia 108988.",
+    "kloadold": "Ksiega po wczytaniu (280): dzien {d} | swiat przy zapisie - (zapis sprzed 280), po wczytaniu -5365.5 | konta: DOM -->41524453, SLUZBA -->318434 "
+                "| oczekujace udzialy band z zapisu: brak sekcji pd: (zapis sprzed 280 albo brak oczekujacych) | POLEGLI dzis po wczytaniu: od wczytania (zapis sprzed 280) "
+                "| baza reszty od 280: przy drugiej dobie sesji.",
+    "prz": "Ludzie: przyrost naturalny +469 ludzi (g srednio +0.411% rocznie, wazone ludnoscia wsi; dzien {n}; +2.5547 hearth na 569 wsi, w rok ok. +170723 ludzi) "
+           "| miasta: 10.4 mln | ksiega (280): narodziny wsi z tickow od poprzedniej linii {a} ludzi w 571 tickach (prognoza poprzedniej doby {fc}), "
+           "powrot uchodzcow z niczego +0, podloga 10 +0, tick wsi razem {s} | wylacznik Births At Village Tick tak.",
+    "hearth": "Hearth (E4/0): dzien {n} | wsie 569, hearth 217593.2 (zmiana od wczoraj -5.01) = tick wsi +2.56 w 571 wsiach | w ludziach tabeli (hearth x k): ludzie wsi 41524453 "
+              "(-506) = tick {t}, tabory i lodzie -74 | czas 1.5 ms.",
+    "bitwy": "Bitwy: dzien {n} (doba ksiegi, od poprzedniej linii) - 15 starc (w tym pogromow/nierownych 15, malych potyczek pominietych 3), zabitych {k}, rannych 500; w 9 prawdziwych "
+             "bitwach zwyciezcy tracili zabitych srednio 2.1%, przegrani 30.5% (historia: 1-5% / 15-40%).",
+    "poc": "Pochodzenie (E4/7): dzien {n} | stan: SLUZBA 318434 (z pochodzeniem 306000 w 200 regionach; bez pochodzenia 12434: bandy 4000) | bez nazwy: z niczego +{z} "
+           "(partie rodow 3, bandy {b}), w nicosc -7 (inne 7; przy zniknieciu partii 0) | pobor z DOM LevyLive: TAK (ksiega) | czas 9.0 ms (uzgodnienie i regiony 5.0 ms).",
+}
+
+
+def k280_selftest():
+    T, RX = K280_TEST, K280_RX
+    probs = []
+
+    def need(name, line, groups=None):
+        m = RX[name].search(line) if name in ("fallen", "since", "nobase", "kload_pd", "kload_dead", "births", "htick", "znic", "levy") else RX[name].match(line)
+        if not m:
+            probs.append(name)
+            return None
+        if groups:
+            for i, v in groups.items():
+                if m.group(i) != v:
+                    probs.append(f"{name} grupa {i}: {m.group(i)!r} != {v!r}")
+        return m
+
+    need("load", T["load"].format(d=108987, L=108986, L1=108987, src="arm_daygate"), {1: "108987", 4: "108986", 5: "arm_daygate", 6: "poprawione"})
+    need("load", T["loadnew"].format(d=1, L1=2), {3: "; start nowej kampanii", 4: "-", 5: "nowa kampania", 6: "bez zmian"})
+    need("load", "Doba gry po wczytaniu (280): BRAK pola (Campaign._dailyTickEvent) - takt doby gry bez zmian, zostaje tylko straznik pierwszego taktu (latka wpieta).")
+    need("first", T["first"].format(d=108987, w="24.00", L=108986, src="arm_daygate", kind="kolejna"), {1: "108987", 3: "24.00", 4: "108986", 5: "arm_daygate", 7: "kolejna"})
+    need("first", T["first"].format(d=108986, w="7.10", L=108986, src="arm_daygate", kind="POWTORZONA - pominieta dla wszystkich sluchaczy"),
+         {7: "POWTORZONA - pominieta dla wszystkich sluchaczy"})
+    need("first", T["firstfix"].format(d=108987, L=108986, d1=108988), {7: "kolejna", 8: "13:02", 9: "108988"})
+    need("first", "Doba moda (280): dzien 5 - pierwsza doba nowej kampanii, odstep nieznany od ostatniej doby przed zapisem (-, zrodlo nowa kampania), takt o 06:00 | nowa kampania.",
+         {2: "nowej kampanii", 3: None, 7: "nowa kampania"})
+    need("insess", T["insess"].format(d=7))
+    need("insess", "Doba moda (280): dzien 9 - LUKA 7..8 w sesji (odstep 72.00 h), luk w sesji 1.")
+    kb = T["kb"].format(n=108988, f=102658, x=344, d0=108987, z=12, zx=3, since=T["since"].format(b=108988, r="+12.5"))
+    need("kb", kb, {1: "108988"})
+    need("fallen", kb, {1: "102658", 2: "344", 3: "108987", 4: "12", 5: "3"})
+    need("since", kb, {1: "108988", 2: "+12.5", 3: "vlandia", 6: "-5365.5"})
+    need("nobase", T["kb"].format(n=1, f=1, x=1, d0=1, z=0, zx="-", since=T["nobase"]))
+    need("fallen", T["kb"].format(n=1, f=1, x=1, d0=1, z=0, zx="-", since=T["nobase"]), {5: "-"})
+    if any(o in kb for o in K280_OLD) or not all(n in kb for n in K280_NEW):
+        probs.append("kb tekst B3")
+    need("kload", T["kload"].format(d=108987, r1="-5364.2", dd="+1.3"), {1: "108987", 2: "-5365.5", 3: "-5364.2", 4: "+1.3"})
+    need("kload_pd", T["kload"].format(d=108987, r1="-5364.2", dd="+1.3"), {1: "135", 2: "9", 3: "9", 4: "0"})
+    need("kload_dead", T["kload"].format(d=108987, r1="-5364.2", dd="+1.3"), {1: "za cala dobe"})
+    need("kload", T["kloadold"].format(d=108987), {5: "-5365.5"})
+    need("kload_dead", T["kloadold"].format(d=108987), {1: "od wczytania"})
+    pz = T["prz"].format(n=108989, a="+469", fc="+467, roznica +2", s="+470")
+    need("prz", pz, {1: "108989"})
+    need("births", pz, {1: "+469", 2: "571", 3: "+467", 4: "+2", 7: "+470"})
+    need("births", T["prz"].format(n=108989, a="+469", fc="- (pierwsza linia sesji)", s="+470"), {3: None})
+    need("hearth", T["hearth"].format(n=108989, t="+470"), {1: "108989"})
+    need("htick", T["hearth"].format(n=108989, t="+470"), {1: "+470"})
+    need("bitwy", T["bitwy"].format(n=108988, k=363), {1: "108988", 3: "363"})
+    if K280_RX["bitwy_old"].match(T["bitwy"].format(n=108988, k=363)):
+        probs.append("bitwy_old lapie nowy format")
+    pc = T["poc"].format(n=108988, z=140, b=135)
+    need("poc", pc, {1: "108988"})
+    m = need("znic", pc, {1: "140"})
+    if m:
+        mb = K280_RX["bandy"].search(m.group(2))
+        if not mb or mb.group(1) != "135":
+            probs.append("bandy")
+    need("levy", pc, {1: "TAK"})
+    return ("nie pasuje: " + ", ".join(str(p) for p in probs)) if probs else None
+
+
+def k280_collect(logp):
+    """Zdarzenia logu w kolejnosci, w odcinkach sesji. Odcinek: {"load": dict|None, "kb": [(dzien, linia)], ...}."""
+    RX = K280_RX
+    D = {"segs": [], "first": [], "insess": [], "kload": [], "births": {}, "hearth": {}, "bitwy": [], "bitwy_old": 0, "poc": [], "has280": False, "events": []}
+
+    def new_seg():
+        seg = {"load": None, "kb": [], "kload": None, "poc": [], "first": None}
+        D["segs"].append(seg)
+        return seg
+
+    seg = new_seg()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            c = s[:4]
+            if c == "Kale" and s.startswith("Kalendarz: rok ma"):
+                if seg["kb"] or seg["poc"]:
+                    seg = new_seg()
+                continue
+            if c == "Doba":
+                mm = RX["load"].match(s)
+                if mm:
+                    D["has280"] = True
+                    if seg["kb"] or seg["poc"] or seg["load"] is not None:
+                        seg = new_seg()
+                    seg["load"] = {"brak": mm.group(1) is None, "day": int(mm.group(1)) if mm.group(1) else None,
+                                   "L": int(mm.group(4)) if mm.group(4) not in (None, "-") else None, "src": mm.group(5), "status": mm.group(6), "new": bool(mm.group(3))}
+                    continue
+                mm = RX["first"].match(s)
+                if mm:
+                    D["has280"] = True
+                    f = {"day": int(mm.group(1)), "W": float(mm.group(3)) if mm.group(3) else None, "L": mm.group(4), "src": mm.group(5), "kind": mm.group(7),
+                         "late": mm.group(8) is not None, "seg": len(D["segs"]) - 1}
+                    D["first"].append(f)
+                    seg["first"] = f
+                    continue
+                mm = RX["insess"].match(s)
+                if mm:
+                    D["insess"].append((int(mm.group(1)), mm.group(2)))
+                continue
+            if c == "Ludz":
+                mm = RX["kb"].match(s)
+                if mm:
+                    d = int(mm.group(1))
+                    seg["kb"].append((d, s))
+                    D["events"].append(("kb", d, len(D["segs"]) - 1, s))
+                    continue
+                mm = RX["prz"].match(s)
+                if mm:
+                    mb = RX["births"].search(s)
+                    if mb:
+                        D["has280"] = True
+                        D["births"].setdefault(len(D["segs"]) - 1, {})[int(mm.group(1))] = (int(mb.group(1)), mb.group(3) is None and "pierwsza linia sesji" in s, int(mb.group(7)),
+                                                                                             int(mb.group(5)), int(mb.group(6)))
+                continue
+            if c == "Hear":
+                mm = RX["hearth"].match(s)
+                if mm:
+                    mt = RX["htick"].search(s)
+                    D["hearth"].setdefault(len(D["segs"]) - 1, {})[int(mm.group(1))] = int(mt.group(1)) if mt else None
+                continue
+            if c == "Bitw":
+                mm = RX["bitwy"].match(s)
+                if mm:
+                    D["bitwy"].append((int(mm.group(1)), int(mm.group(3))))
+                    D["events"].append(("bitwy", int(mm.group(1)), len(D["segs"]) - 1, s))
+                elif RX["bitwy_old"].match(s):
+                    D["bitwy_old"] += 1
+                continue
+            if c == "Poch":
+                mm = RX["poc"].match(s)
+                if mm:
+                    seg["poc"].append((int(mm.group(1)), s))
+                continue
+            if c == "Ksie":
+                mm = RX["kload"].match(s)
+                if mm:
+                    D["has280"] = True
+                    pd = RX["kload_pd"].search(s)
+                    dd = RX["kload_dead"].search(s)
+                    k = {"day": int(mm.group(1)), "d": float(mm.group(4)) if mm.group(4) else None, "pd": int(pd.group(2)) if pd else None,
+                         "dead_full": bool(dd and dd.group(1) == "za cala dobe")}
+                    seg["kload"] = k
+                    D["kload"].append(k)
+    D["segs"] = [g for g in D["segs"] if g["kb"] or g["poc"] or g["load"] is not None]
+    return D
+
+
+def k280_rows(rep, D):
+    RX = K280_RX
+    has = D["has280"]
+    segs = D["segs"]
+    # K280-1
+    rep_dup, rep_gap, rep_l = [], [], []
+    for i, g in enumerate(segs):
+        days = [d for d, _ in g["kb"]]
+        for a, b in zip(days, days[1:]):
+            if b == a:
+                rep_dup.append(b)
+            elif b != a + 1:
+                rep_gap.append(f"{a}->{b}")
+        ld = g["load"]
+        if ld and ld["L"] is not None and days and days[0] != ld["L"]:
+            rep_l.append(f"odcinek {i + 1}: L {ld['L']}, pierwsza etykieta {days[0]}")
+    nseg = sum(1 for g in segs if g["load"] is not None)
+    rep.add("K280-1: etykiety 'Ludzie (ksiega): dzien' w odcinkach sesji", f"odcinkow {len(segs)} (z linia 280: {nseg}), powtorzen {len(rep_dup)}" + (f" {rep_dup[:4]}" if rep_dup else "")
+            + f", luk {len(rep_gap)}" + (f" {rep_gap[:4]}" if rep_gap else "") + f", pierwsza != L: {len(rep_l)}" + (f" {rep_l[:2]}" if rep_l else ""),
+            "0 / 0 / 0 (log bez linii 280 - INFO)", (not rep_dup and not rep_gap and not rep_l) if nseg else None)
+    # K280-2
+    fr = D["first"]
+    bad2 = [f"{f['day']} {f['kind']}" for f in fr if f["kind"].startswith("POWTORZONA") or f["kind"].startswith("LUKA")] + [f"{d} {k}" for d, k in D["insess"]]
+    wl = [f["W"] for f in fr if f["W"] is not None]
+    wbad = [f"{f['day']}: {f['W']} h" for f in fr if f["src"] == "arm_daygate" and not f["late"] and f["W"] is not None and abs(f["W"] - 24.0) > 0.1]
+    rep.add("K280-2: 'Doba moda (280)' - pierwsze doby po wczytaniu", f"linii {len(fr)}, POWTORZONA/LUKA {len(bad2)}" + (f" {bad2[:3]}" if bad2 else "")
+            + f"; odstepy W {', '.join(f'{w:.2f}' for w in wl[:6]) or '-'} h; zrodlo arm_daygate poza 24+-0.1 h: {len(wbad)}" + (f" {wbad[:3]}" if wbad else ""),
+            "0 i 0 (bez linii - INFO)", (not bad2 and not wbad) if fr else None)
+    # K280-3
+    kl = [k for k in D["kload"] if k["d"] is not None]
+    bad3 = [f"{k['day']}: {k['d']:+.1f}" for k in kl if abs(k["d"]) > 5.0]
+    rep.add("K280-3: 'Ksiega po wczytaniu (280)' - swiat po wczytaniu wobec zapisu", f"wczytan z zapisem 280 {len(kl)} (wszystkich {len(D['kload'])}), roznice "
+            + (", ".join(f"{k['d']:+.1f}" for k in kl[:6]) or "-") + (f"; ponad 5: {bad3}" if bad3 else ""), "|d| <= 5 (zapis sprzed 280 - INFO)", (not bad3) if kl else None)
+    # K280-3b: skok "od 280 swiat" na wczytaniu
+    ser = []   # (odcinek, dzien, wartosc)
+    for i, g in enumerate(segs):
+        for d, s in g["kb"]:
+            m = RX["since"].search(s)
+            if m:
+                ser.append((i, d, float(m.group(2))))
+    diffs = [b[2] - a[2] for a, b in zip(ser, ser[1:]) if a[0] == b[0] and b[1] == a[1] + 1]
+    jumps = [(b[1], b[2] - a[2]) for a, b in zip(ser, ser[1:]) if a[0] != b[0] and segs[b[0]]["load"] is not None and b[1] == a[1] + 1]
+    sig = st.pstdev(diffs) if len(diffs) >= 2 else None
+    thr = max(3 * sig, 30.0) if sig is not None else 30.0
+    bad3b = [f"{d}: {j:+.1f}" for d, j in jumps if abs(j) > thr]
+    rep.add("K280-3b: skok 'od 280 swiat' na wczytaniu", f"wczytan z ciagloscia dni {len(jumps)}: " + (", ".join(f"{d} {j:+.1f}" for d, j in jumps[:6]) or "-")
+            + f"; sigma dziennych zmian w sesji {sig:.1f} ({len(diffs)} dob)" if sig is not None else f"wczytan {len(jumps)}; dziennych zmian w sesji {len(diffs)} (za malo do sigma)",
+            f"|skok| <= max(3 sigma, 30) = {thr:.1f}", (not bad3b) if jumps else None)
+    # K280-4
+    pairs, bad4 = 0, []
+    for si, bd in D["births"].items():
+        hd = D["hearth"].get(si, {})
+        for d, (a, first, s, r, f) in bd.items():
+            if first or d not in hd or hd[d] is None:
+                continue
+            pairs += 1
+            t = hd[d]
+            if abs(s - t) > 1 + 0.002 * abs(t) or abs((a + r + f) - s) > 2:
+                bad4.append(f"{d}: tick ksiegi {s:+d} (A+R+F {a + r + f:+d}), Hearth {t:+d}")
+    rep.add("K280-4: narodziny z tickow wsi wobec 'Hearth (E4/0)' tick", f"dob porownanych {pairs}, poza progiem {len(bad4)}" + (f" {bad4[:3]}" if bad4 else ""),
+            "|tick ksiegi - Hearth| <= 1 + 0.2% (bez pierwszej doby sesji)", (not bad4) if pairs else None)
+    # K280-5
+    levy = {}
+    for g in segs:
+        for d, s in g["poc"]:
+            m = RX["levy"].search(s)
+            if m:
+                levy[d] = m.group(1)
+    old5, new5, n5 = [], 0, 0
+    for g in segs:
+        for d, s in g["kb"]:
+            if levy.get(d) != "TAK":
+                continue
+            n5 += 1
+            if any(o in s for o in K280_OLD):
+                old5.append(d)
+            if all(n in s for n in K280_NEW):
+                new5 += 1
+    rep.add("K280-5: tekst B3 przy LevyLive TAK", f"linii {n5}, ze starym tekstem {len(old5)}" + (f" {old5[:3]}" if old5 else "") + f", z nowym {new5}",
+            "stary 0 (przy linii 280); bez linii 280 - INFO", (not old5 and new5 == n5) if (n5 and has) else None)
+    # K280-6
+    miss6, dec6, n6 = [], [], 0
+    prev = None
+    for i, g in enumerate(segs):
+        if prev is not None and g["kb"] and g["load"] is not None and g["kb"][0][0] <= prev[1]:
+            prev = None      # wczytanie starszego zapisu - bez porownania ponad wczytaniem
+        for d, s in g["kb"]:
+            m = RX["fallen"].search(s)
+            if not m:
+                if has:
+                    miss6.append(d)
+                continue
+            n6 += 1
+            z = int(m.group(4))
+            if prev is not None and z < prev[0]:
+                dec6.append(f"{prev[1]}->{d}: {prev[0]}->{z}")
+            prev = (z, d)
+    rep.add("K280-6: 'POLEGLI bez pochodzenia od dnia' obecne i niemalejace", f"linii z licznikiem {n6}, bez licznika {len(miss6)}" + (f" {miss6[:3]}" if miss6 else "")
+            + f", spadkow {len(dec6)}" + (f" {dec6[:3]}" if dec6 else ""), "0 i 0 (log bez 280 - INFO)", (not miss6 and not dec6) if (has and n6 + len(miss6)) else None)
+    # K280-7
+    ev = D["events"]
+    bad7, rat, n7 = [], [], 0
+    for j, e in enumerate(ev):
+        if e[0] != "bitwy":
+            continue
+        n7 += 1
+        nxt = next((x for x in ev[j + 1:] if x[0] == "kb"), None)
+        if nxt is None:
+            continue
+        if nxt[1] != e[1]:
+            bad7.append(f"Bitwy {e[1]} -> ksiega {nxt[1]}")
+        else:
+            m = RX["fallen"].search(nxt[3]) or re.search(r"POLEGLI od siewu \d+ \(dzis (-?\d+)\)", nxt[3])
+            k = next((b[1] for b in D["bitwy"] if b[0] == e[1]), None)
+            if m and k:
+                x = int(m.group(2) if m.re is RX["fallen"] else m.group(1))
+                if x > 0:
+                    rat.append(k / x)
+    rep.add("K280-7: 'Bitwy: dzien N' = dzien nastepnej 'Ludzie (ksiega)'", f"linii Bitwy (280) {n7}, niezgodnych {len(bad7)}" + (f" {bad7[:3]}" if bad7 else "")
+            + f"; stary format bez '(doba ksiegi' {D['bitwy_old']}; zabitych bitew / POLEGLI dzis: " + (f"mediana {st.median(rat):.2f} ({len(rat)} dob)" if rat else "-"),
+            "0 niezgodnych (stosunek - INFO)", (not bad7) if n7 else None)
+    # K280-8
+    bad8, n8 = [], 0
+    last = None
+    for i, g in enumerate(segs):
+        full = g["kload"]["dead_full"] if g["kload"] else (g["load"] is None)
+        for j, (d, s) in enumerate(g["kb"]):
+            m = RX["fallen"].search(s)
+            if not m:
+                last = None
+                continue
+            cur = (d, int(m.group(1)) + int(m.group(4)), int(m.group(2)))
+            ok_pair = last is not None and cur[0] == last[0] + 1 and (j > 0 or full)
+            if ok_pair:
+                n8 += 1
+                if abs((cur[1] - last[1]) - cur[2]) > 2.5:
+                    bad8.append(f"{d}: dzis {cur[2]}, roznica sum {cur[1] - last[1]}")
+            last = cur
+    rep.add("K280-8: POLEGLI dzis = przyrost (od siewu + bez pochodzenia)", f"par dob {n8}, poza +-2.5: {len(bad8)}" + (f" {bad8[:3]}" if bad8 else ""),
+            "0 (pierwsza linia po wczytaniu zapisu z 280 tez)", (not bad8) if n8 else None)
+    # K280-9
+    def bands(s):
+        m = RX["znic"].search(s)
+        if not m:
+            return None
+        mb = RX["bandy"].search(m.group(2))
+        return float(mb.group(1)) if mb else 0.0
+    insess = [b for g in segs for _, s in g["poc"][1:] for b in [bands(s)] if b is not None]
+    mx = max(insess) if insess else 0.0
+    res9, bad9 = [], []
+    for g in segs:
+        if g["load"] is None or not g["poc"] or not g["kload"]:
+            continue
+        b0 = bands(g["poc"][0][1])
+        if b0 is None:
+            continue
+        if g["kload"]["pd"] is None:
+            res9.append(f"{g['poc'][0][0]} {b0:.0f} (bez pd:)")
+            continue
+        res9.append(f"{g['poc'][0][0]} {b0:.0f}")
+        if b0 > max(mx, 10.0):
+            bad9.append(f"{g['poc'][0][0]}: {b0:.0f}")
+    withpd = sum(1 for g in segs if g["kload"] and g["kload"]["pd"] is not None and g["poc"])
+    rep.add("K280-9: 'z niczego ... bandy' pierwszej doby po wczytaniu", f"pierwsze doby: {', '.join(res9[:6]) or '-'}; max w sesji {mx:.0f}" + (f"; ponad: {bad9}" if bad9 else ""),
+            "<= max(dob w sesji, 10) przy sekcji pd: (bez pd: - INFO)", (not bad9) if withpd else None)
+
+
+def k280_synth():
+    import tempfile
+    import shutil
+    T = K280_TEST
+    P = "[10:00:00] "
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="k280_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind == "none":
+                L.append(P + "Kalendarz: rok ma 364 dni")
+                for d in (100, 101, 102):
+                    L.append(P + f"Ludzie (ksiega): dzien {d} | konto CIALA 0 | E4/7: konto SLUZBA 1, POLEGLI od siewu 5 (dzis 1), cywile od siewu 0 | trzy punkty powrotu do DOM, "
+                                 "razem 0 (bez podwojenia): ClanBudget.ToVillage 0 (SLUZBA -> DOM tylko liczona do E4/7 - werbunek jeszcze nie zdejmuje z DOM).")
+            else:
+                bad = kind == "bad"
+                f, z = 1000, 0
+                for seg in range(2):
+                    d0 = 200 + seg * 4
+                    L.append(P + "Kalendarz: rok ma 364 dni")
+                    L.append(P + T["load"].format(d=d0, L=d0 - 1, L1=d0, src=("arm_daygate" if seg else "ArmsScrap 174b.6")))
+                    L.append(P + (T["kload"].format(d=d0, r1="-5364.2", dd=("+9.0" if bad and seg else "+1.3")) if seg else T["kloadold"].format(d=d0)))
+                    L.append(P + T["first"].format(d=d0, w=("24.00" if not (bad and seg) else "7.00"), L=d0 - 1, src=("arm_daygate" if seg else "ArmsScrap 174b.6"),
+                                                   kind=("POWTORZONA - pominieta dla wszystkich sluchaczy" if bad and seg else "kolejna")))
+                    for i in range(4):
+                        n = d0 - 1 + i
+                        if bad and seg == 1 and i == 2:
+                            n = d0 - 1 + 1        # powtorzona etykieta
+                        x = 10 + i
+                        zx = 1
+                        f += x - zx
+                        z += zx
+                        if bad and seg == 1 and i == 3:
+                            z -= 5                # spadek licznika bez pochodzenia
+                        L.append(P + T["bitwy"].format(n=(n + 1 if bad and i == 1 else n), k=x + 5))
+                        L.append(P + T["poc"].format(n=n, z=(150 if i == 0 else 20), b=(140 if (i == 0 and bad and seg) else (3 if i == 0 else 5))))
+                        L.append(P + T["hearth"].format(n=n, t=("+470" if not (bad and i == 2) else "+300")))
+                        L.append(P + T["prz"].format(n=n, a="+469", fc=("- (pierwsza linia sesji)" if i == 0 else "+467, roznica +2"), s="+469"))
+                        sinc = T["nobase"] if (seg == 0 and i < 1) else T["since"].format(b=200, r="+%d" % (2 * i + (6 + (400 if bad else 0) if seg else 0)))
+                        kb = T["kb"].format(n=n, f=f, x=(x if not (bad and i == 3) else x + 9), d0=200, z=z, zx=zx, since=sinc)
+                        if bad and i == 3:
+                            kb = kb.replace(K280_NEW[1], K280_OLD[0])
+                        L.append(P + kb)
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            k280_rows(rep, k280_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"K280-1": "TAK", "K280-2": "TAK", "K280-3": "TAK", "K280-3b": "TAK", "K280-4": "TAK", "K280-5": "TAK", "K280-6": "TAK", "K280-7": "TAK", "K280-8": "TAK",
+                 "K280-9": "TAK"},
+        "bad": {"K280-1": "NIE", "K280-2": "NIE", "K280-3": "NIE", "K280-3b": "NIE", "K280-4": "NIE", "K280-5": "NIE", "K280-6": "NIE", "K280-7": "NIE", "K280-8": "NIE",
+                "K280-9": "NIE"},
+        "none": {"K280-1": "INFO", "K280-2": "INFO", "K280-3": "INFO", "K280-3b": "INFO", "K280-4": "INFO", "K280-5": "INFO", "K280-6": "INFO", "K280-7": "INFO", "K280-8": "INFO",
+                 "K280-9": "INFO"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def ksiega280_main(logp):
+    """ksiega280 (27.10, paczka 280): K280-S, K280-S2, K280-1..K280-9 - opis w komentarzu nad K280_RX. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = k280_selftest()
+    rep.add("K280-S: self-test wyrazen (linie kontrolne jak w kodzie C#: DayGate.cs, PeopleBook*.cs, PopulationLaw.cs, BattleChronicle.cs)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = k280_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("K280-S2: test syntetyczny (dobry, zly, bez linii 280)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("K280-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = k280_collect(logp)
+    print(f"plik: {logp} | odcinkow sesji {len(D['segs'])}, linii 280: wczytan {sum(1 for g in D['segs'] if g['load'] is not None)}, pierwszych dob {len(D['first'])}, "
+          f"'Ksiega po wczytaniu' {len(D['kload'])}, Bitwy (280) {len(D['bitwy'])}")
+    k280_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_ksiega280_main_prev = main
+
+
+def main(argv):
+    # paczka 280: grupa ksiega280 - opakowanie main jak rody277 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "ksiega280":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return ksiega280_main(rest[0] if rest else None)
+    return _ksiega280_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
