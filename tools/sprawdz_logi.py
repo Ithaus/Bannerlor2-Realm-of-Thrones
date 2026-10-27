@@ -71440,7 +71440,7 @@ Z268_RX = {
     "ordopen": re.compile(r"\| otwarte zamowienia w osadach: korpus (\d+) szt\. \((\d+) koszykow\), helm (\d+) szt\. \((\d+) koszykow\)"),
     "ordprice": re.compile(r"\| cena sztuki wczoraj \(lordowie\): korpus (\d+) zl, helm (\d+) zl, wszystkie sztuki AI (\d+) zl"),
     "ordtail": re.compile(r"\| zloto przy zamowieniu (\d+) \| potkniecia (\d+) \(zamek (\d+)\)\.$"),
-    "z1": re.compile(r"zbroja i helm bez limitu doby \(268, AI Armour Order Full (tak|nie)\): zamowien (\d+) za (\d+) szt\., w miescie zamku (\d+)"),
+    "z1": re.compile(r"zbroja i helm bez limitu doby \(268, AI Armour Order Full (tak|nie)\): zamowien (\d+) za (\d+) szt\., w miescie zamku (\d+)(?: \(pominiete - jest na polce miasta zamku (\d+)\))?"),
     "z1cap": re.compile(r"partia zamowila juz dzis (\d+)"),
     "n159": re.compile(r"niegotowe przez zbroje na tulow \(268\): wszystkie (\d+), nowe druzyny niegotowe przez zbroje \(wiek do 7 dob\) (\d+)"),
     "test": re.compile(r"^Zbroja \(268\): test - (T\d) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
@@ -71492,7 +71492,7 @@ Z268_TEST = {
            "koszykow) | cena sztuki wczoraj (lordowie): korpus 69 zl, helm 30 zl, wszystkie sztuki AI 34 zl | zloto przy zamowieniu {g} | potkniecia {p} (zamek 0).",
     "z1": "Dozbrajanie: dzien {d} - gracz 0/0 | brak lepszej na polce 10396 (E3-Z1: na suficie tieru 1076, pod sufitem bez towaru 9320; zamowienia tier+1 (Men Upgrade Orders "
           "tak) 300 za 900 szt., pominiete: partia zamowila juz dzis 4000, ten sam rodzaj w 7 dobach 10, bez miasta w wizycie 900, amunicja 482; zbroja i helm bez limitu doby "
-          "(268, AI Armour Order Full tak): zamowien 200 za 600 szt., w miescie zamku 40; czyszczenia slownika zamowien wpisu 81 dzis 0 (cel 0); potkniecia 0 (sesja 0)), x.",
+          "(268, AI Armour Order Full tak): zamowien 200 za 600 szt., w miescie zamku 40 (pominiete - jest na polce miasta zamku 12); czyszczenia slownika zamowien wpisu 81 dzis 0 (cel 0); potkniecia 0 (sesja 0)), x.",
     "n159": "Nowe druzyny i sprzet (159): dzien {d} | klucze: x | SPIS (P0): partie lordow AI 700, bez wpisu DTE 3, R = 0 (z brakiem wpisu) 3; wedlug wieku partii (wszystkie/bez "
             "wpisu/R=0): < 1 doby 1/0/0, 1-3 2/0/0, 3-7 3/0/0, 7+ 4/0/0, sprzed wczytania (wiek nieznany) 690/3/3; niegotowe przez zbroje na tulow (268): wszystkie 30, nowe "
             "druzyny niegotowe przez zbroje (wiek do 7 dob) 5 | P0 niegotowe poza armia - 3 najnizsze R (stan po regule 2): brak | przyklady: brak | zapis: wczytane 0 | potkniecia 0.",
@@ -71713,7 +71713,7 @@ def z268_rows(rep, D):
                     t[0] += int(k.group(6)); t[1] += int(k.group(7)); t[2] += int(k.group(8))
         z1 = D["z1"]
         z1t = (f" | Z1 zbroja bez limitu doby: zamowien {sum(int(a.group(2)) for a, _ in z1)} za {sum(int(a.group(3)) for a, _ in z1)} szt., w miescie zamku "
-               f"{sum(int(a.group(4)) for a, _ in z1)}, 'partia zamowila juz dzis' (inne typy) {sum(int(c.group(1)) for _, c in z1 if c)}") if z1 else ""
+               f"{sum(int(a.group(4)) for a, _ in z1)} (pominiete - jest na polce miasta zamku {sum(int(a.group(5) or 0) for a, _ in z1)}), 'partia zamowila juz dzis' (inne typy) {sum(int(c.group(1)) for _, c in z1 if c)}") if z1 else ""
         rep.add("Z268-4: zamowienia zbroi (268) co dobe, zamowione <= brak i sufit, zloto 0", f"dob z linia {len(ords)}, braki wobec p9 {omiss[:5]}, problemy {len(bad4)}"
                 + (f" ({'; '.join(bad4[:3])})" if bad4 else "") + " | zamowione szt. (ponad dawne 10, przyciete kiesa): "
                 + ", ".join(f"{k} {v[0]} ({v[1]}, {v[2]})" for k, v in tot.items() if v[0] or v[2]) + z1t,
