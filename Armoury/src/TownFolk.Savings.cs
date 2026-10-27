@@ -344,6 +344,7 @@ namespace Armoury
                 {
                     var el = items[i].Item1; int n = items[i].Item2;
                     var it = el.Item;
+                    if (n > 0) n -= CaravanTrade284.TakeWithheld(caravan, el);   // recenzja 284: sztuki wstrzymane ponizej kosztu w BK SellGoods nie doszly do miasta
                     if (n <= 0 || it == null || it.ItemCategory == null) continue;
                     if (vg == null) { vg = new double[CvGroups]; wg = new double[CvGroups]; }
                     double v = (double)n * Math.Max(0, town.MarketData.GetPrice(el));

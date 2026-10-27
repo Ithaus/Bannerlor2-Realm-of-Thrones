@@ -26,7 +26,7 @@ namespace Armoury
     internal static class CommodityInputs284
     {
         private static Workshop _ctx;
-        private static bool _ctxChecked;
+        private static bool _ctxChecked, _ctxMarket;   // _ctxMarket - wsad przeszedl na polce miasta (nie w magazynie gracza) - recenzja 284
         private static readonly Dictionary<ItemCategory, int> _miss = new Dictionary<ItemCategory, int>(), _use = new Dictionary<ItemCategory, int>();
         private static int _missCycles, _okCycles, _toOrders, _useOrders, _stumbles, _stumbleSess;
         private static bool _wCycle, _wSuf;
@@ -44,7 +44,7 @@ namespace Armoury
 
         public static void CyclePre(Workshop __1)
         {
-            _ctxChecked = false;
+            _ctxChecked = false; _ctxMarket = false;
             try { _ctx = __1 != null && __1.WorkshopType != null && !__1.WorkshopType.IsHidden && __1.Settlement != null && __1.Settlement.Town != null ? __1 : null; }
             catch { _ctx = null; }
         }
@@ -61,7 +61,8 @@ namespace Armoury
                 {
                     if (inp.Item1 == null || inp.Item2 <= 0) continue;
                     int x; _use.TryGetValue(inp.Item1, out x); _use[inp.Item1] = x + inp.Item2;
-                    if (s != null && s.TownMaterialOrderWorkshopInputs && MaterialOrders.NoteUseCategory(town, inp.Item1, inp.Item2)) _useOrders += inp.Item2;
+                    // recenzja 284 (drobna 2): wsad z magazynu gracza nie zdjal nic z polki miasta - bez zuzycia miasta do zamowien
+                    if (s != null && s.TownMaterialOrderWorkshopInputs && _ctxMarket && MaterialOrders.NoteUseCategory(town, inp.Item1, inp.Item2)) _useOrders += inp.Item2;
                 }
             }
             catch (Exception e) { Stumble("CyclePost", e); }
@@ -75,7 +76,7 @@ namespace Armoury
             if (_ctx == null || __1 == null || __2 == null || __0.Inputs == null) return;
             try
             {
-                if (__result) { _ctxChecked = true; return; }
+                if (__result) { _ctxChecked = true; _ctxMarket = __2.Owner != null && ReferenceEquals(__1, __2.Owner.ItemRoster); return; }   // gra: magazyn, potem polka - wazne ostatnie sprawdzenie
                 if (__2.Owner == null || !ReferenceEquals(__1, __2.Owner.ItemRoster) || _ctx.Settlement == null || _ctx.Settlement.Town != __2) return;   // magazyn gracza - potem polka miasta
                 _missCycles++;
                 var s = Settings.Current;

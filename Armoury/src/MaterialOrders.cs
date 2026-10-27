@@ -155,7 +155,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _items = null; _ix.Clear(); _contracts.Clear(); _byCar.Clear(); _miss.Clear(); _useToday.Clear(); _useAvg.Clear(); _last.Clear(); _pending = null;
+            _items = null; _ix.Clear(); _contracts.Clear(); _byCar.Clear(); _miss.Clear(); _useToday.Clear(); _ore284.Clear(); _useAvg.Clear(); _last.Clear(); _pending = null;
             _missOreSince.Clear(); _srcOreSince.Clear(); _dstOreSince.Clear(); _namesSince = -1; _trip.Clear(); _auditAll = 0; _keepDay.Clear();
             MaterialCarts.Reset(M); _cartRoad.Clear(); for (int k = 0; k < M; k++) _cartSrc[k] = null;   // P3/Z1
             _oreWhy.Clear(); _dstOreCartSince.Clear(); _srcOreCartSince.Clear();
@@ -266,8 +266,16 @@ namespace Armoury
         /// <summary>P3/P2a (IronLands - tylko log): zuzycie rudy zmierzone od ostatniego Daily (warsztaty zbrojne, strzelarze, rzemioslo miasta) wedlug miasta.</summary>
         internal static void ForEachOreUseToday(Action<Town, float> f)
         {
-            foreach (var kv in _useToday) if (kv.Key != null && kv.Value != null && kv.Value[Ore] > 0f) f(kv.Key, kv.Value[Ore]);
+            foreach (var kv in _useToday)
+            {
+                if (kv.Key == null || kv.Value == null) continue;
+                float g; _ore284.TryGetValue(kv.Key, out g);
+                float v = kv.Value[Ore] - g;   // recenzja 284 (drobne 2 i 6): bez rudy warsztatow towarowych (CommodityInputs284) - IronLands liczy ja w _lines z OreLedger
+                if (v > 0f) f(kv.Key, v);
+            }
         }
+
+        private static readonly Dictionary<Town, float> _ore284 = new Dictionary<Town, float>();   // recenzja 284: ruda z NoteUseCategory od ostatniego Daily
 
         // ------------------------------------------------------------ doba
         internal static void Daily()
@@ -294,7 +302,7 @@ namespace Armoury
                     float[] today; _useToday.TryGetValue(t, out today);
                     for (int m = 0; m < M; m++) avg[m] += ((today != null ? today[m] : 0f) - avg[m]) / 14f;
                 }
-                _useToday.Clear();
+                _useToday.Clear(); _ore284.Clear();
                 if (On && Settings.Current.TownMaterialOrderNeediestFirst) OrdersNeediestFirst(day);   // 282 (F2): te same zamowienia, kolejnosc wedlug dni zapasu
                 else if (On)
                 {
@@ -429,7 +437,13 @@ namespace Armoury
             try
             {
                 if (town == null || c == null || n <= 0 || !Ready()) return false;
-                for (int m = 0; m < M; m++) if (_items[m] != null && _items[m].ItemCategory == c) { NoteUse(town, _items[m], n); return true; }
+                for (int m = 0; m < M; m++)
+                    if (_items[m] != null && _items[m].ItemCategory == c)
+                    {
+                        NoteUse(town, _items[m], n);
+                        if (m == Ore) { float x; _ore284.TryGetValue(town, out x); _ore284[town] = x + n; }   // recenzja 284: IronLands ma ten wsad w "linie towarowe" (OreLedger)
+                        return true;
+                    }
             }
             catch (Exception e) { Stumble("NoteUseCategory", e); }
             return false;

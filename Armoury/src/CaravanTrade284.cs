@@ -29,8 +29,8 @@ namespace Armoury
     ///    arm_cs284) i juki karawan wedlug kategorii (przeglad doby + zakupy i sprzedaze na zywo);
     ///  - zasady zakupu BK (postfiks CalculateBuyValue w CaravanGoods, tylko w BuyGoods): bramka przeplywu (juki > sprzedaz 14 dob x 10 dob, jedzenie x 7 - klucz
     ///    CaravanBuyByFlow), kapital obrotowy (towar po koszcie >= kapital - podloga 259) i rezerwa zoldu (kiesa po zakupie < 3 dni zoldu - klucz CaravanBuyWorkingCapital),
-    ///    zysk osiagalny (indeks tu x (1 + kara) x (1 + zold drogi) >= mediana indeksu miast placacych ponad srednia / (1 + kara) x (1 - myto); jedzenie, ktore jechaloby
-    ///    > 7 dob - klucz CaravanBuyProfitCheck); kontrakt 174 i rozkaz gracza BK - pominiete (jak T1); surowce masowe - regula CaravanBulk (bez zmian);
+    ///    zysk osiagalny (indeks tu x (1 + kara) >= mediana indeksu miast placacych ponad srednia / (1 + kara) x (1 - myto) - bez zoldu, recenzja 284; jedzenie, ktore
+    ///    jechaloby > 7 dob, po 3 dobach pomiaru - klucz CaravanBuyProfitCheck); kontrakt 174 i rozkaz gracza BK - pominiete (jak T1); surowce masowe - regula CaravanBulk;
     ///  - BK SellGoods nie sprzedaje ponizej kosztu (prefiks SellItemsAction.ApplyInternal, Priority.First, tylko w SellGoods: liczba sztuk przycieta do sztuk z cena po mycie
     ///    >= koszt; wyjscia na stracie T1 bez zmian - klucz CaravanBkSellAtCost);
     ///  - gabka BK przy wyjezdzie cofnieta dla kategorii z zamknietym kupnem (towar na polke, zloto do kiesy - wzor CaravanBulk);
@@ -67,12 +67,18 @@ namespace Armoury
         private static readonly long[] _pLossN = new long[Paths], _pLossG = new long[Paths], _pLossC = new long[Paths], _plG = new long[Paths], _plR = new long[Paths];
         private static int _rGate, _rCap, _rWage, _rGain, _rFood, _skipExempt, _buyVisits, _bkExit, _bulkHeldGlut, _stumbles, _stumbleSess, _fCalls, _fWould, _fSkip;
         private static long _bkHeldN, _bkHeldC, _bulkHeldN, _spongeN, _spongeG, _ticks;
+        // recenzja 284: wizyty z podloga >= kapital (regula kapitalu pominieta), przeliczenie jukow po wczytaniu przed pierwsza doba, sztuki wstrzymane zdjete z dostaw P1
+        private static int _noRoom, _heldLazy; private static long _p1Phantom;
+        private static bool _heldReady;
+        private static readonly Dictionary<EquipmentElement, int> _bkWithheld = new Dictionary<EquipmentElement, int>();
+        private static MobileParty _bkWithheldMp;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _wSell, _wGuard, _wLeft, _wSize;
 
         internal static void Reset()
         {
-            _soldToday.Clear(); _soldLast.Clear(); _ema.Clear(); _days = 0; _held.Clear(); _food = null;
+            _soldToday.Clear(); _soldLast.Clear(); _ema.Clear(); _days = 0; _held.Clear(); _heldReady = false; _food = null;
+            _bkWithheld.Clear(); _bkWithheldMp = null;
             _impOk = _impBad = 0; _impHad = _impLogged = false;
             _acc.Clear(); _sellIdx.Clear(); _sellDay = -1;
             Path = 0; _bkSelling = 0; _b.Mp = null;
@@ -86,6 +92,7 @@ namespace Armoury
             Array.Clear(_pLossN, 0, Paths); Array.Clear(_pLossG, 0, Paths); Array.Clear(_pLossC, 0, Paths); Array.Clear(_plG, 0, Paths); Array.Clear(_plR, 0, Paths);
             _rGate = _rCap = _rWage = _rGain = _rFood = _skipExempt = _buyVisits = _bkExit = _bulkHeldGlut = _stumbles = _fCalls = _fWould = _fSkip = 0;
             _bkHeldN = _bkHeldC = _bulkHeldN = _spongeN = _spongeG = _ticks = 0;
+            _noRoom = _heldLazy = 0; _p1Phantom = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -134,7 +141,47 @@ namespace Armoury
         internal static bool GateShut(ItemCategory c)
         {
             var s = Settings.Current;
-            return s != null && s.CaravanBuyByFlow && _days >= FlowMinDays && Tracked(c) && Held(c) > Cap(c);
+            if (s == null || !s.CaravanBuyByFlow || _days < FlowMinDays || !Tracked(c)) return false;
+            EnsureHeld();
+            return Held(c) > Cap(c);
+        }
+
+        /// <summary>Recenzja 284 (drobna 1): po wczytaniu zapisu _held jest pusty az do pierwszej doby (pomiar _days i _ema wraca z zapisu, juki nie) - bramka bylaby
+        /// otwarta dla kazdego towaru. Pierwsze uzycie po wczytaniu przelicza juki ze wszystkich karawan (ten sam przeglad co Daily); do tej chwili NoteBuy/NoteSale nie
+        /// zmieniaja _held (przeglad i tak widzi juki po tych ruchach).</summary>
+        private static void EnsureHeld()
+        {
+            if (_heldReady) return;
+            var cg = Campaign.Current;
+            if (cg == null || !cg.GameStarted) return;
+            _heldReady = true;
+            _held.Clear();
+            long n = 0;
+            foreach (var mp in MobileParty.AllCaravanParties)
+                if (mp != null && mp.IsActive && mp.ItemRoster != null) n += ScanHeld(mp, null);
+            _heldLazy++;
+            Log.Info("Karawany przeplyw towarow (284): juki karawan przeliczone po wczytaniu przed pierwsza doba - kategorii " + _held.Count + ", sztuk " + n + ".");
+        }
+
+        /// <summary>Juki jednej karawany wedlug kategorii do _held (i koszt, gdy cost != null) - przeglad doby i EnsureHeld.</summary>
+        private static long ScanHeld(MobileParty mp, Dictionary<ItemCategory, double> cost)
+        {
+            var r = mp.ItemRoster;
+            HashSet<ItemObject> seen = null;
+            long n = 0;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (it == null || el.Amount <= 0 || !Tracked(it.ItemCategory)) continue;
+                if (seen == null) seen = new HashSet<ItemObject>();
+                if (!seen.Add(it)) continue;
+                int have = r.GetItemNumber(it);
+                var c = it.ItemCategory;
+                _held[c] = Held(c) + have; n += have;
+                if (cost != null) { double c0; cost.TryGetValue(c, out c0); cost[c] = c0 + CaravanGoods.HeldCost(mp, it, have); }
+            }
+            return n;
         }
 
         // ------------------------------------------------------------ zdarzenia handlu (CaravanGoods.TradePostfix)
@@ -143,7 +190,7 @@ namespace Armoury
             try
             {
                 var c = it != null ? it.ItemCategory : null;
-                if (got > 0 && Tracked(c)) _held[c] = Held(c) + got;
+                if (got > 0 && _heldReady && Tracked(c)) _held[c] = Held(c) + got;
             }
             catch (Exception e) { Stumble("NoteBuy", e); }
         }
@@ -165,7 +212,7 @@ namespace Armoury
                 var c = it != null ? it.ItemCategory : null;
                 if (Tracked(c))
                 {
-                    _held[c] = Math.Max(0, Held(c) - moved);
+                    if (_heldReady) _held[c] = Math.Max(0, Held(c) - moved);
                     if (p != PathBulkGlut && !mp.IsDisbanding) { int x; _soldToday.TryGetValue(c, out x); _soldToday[c] = x + moved; }
                 }
             }
@@ -225,6 +272,7 @@ namespace Armoury
                 _b.Toll = TownToll.CaravanRateFor(mp, town.Settlement);
                 _b.Exempt = false;
                 _buyVisits++;
+                if (s.CaravanBuyWorkingCapital && cap - floor <= 0) _noRoom++;   // recenzja 284 (drobna 4): podloga 30 dni zoldu >= kapital - regula kapitalu pominieta (Why)
             }
             catch (Exception e) { _b.Exempt = true; Stumble("BuyStart", e); }   // karawana bez zasad 284 w tej wizycie (BK kupuje jak dotad)
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
@@ -258,20 +306,31 @@ namespace Armoury
             double spend = Math.Min(0.5 * Math.Max(0, purse), 1500.0);        // BK BuyCategory: najwyzej pol kiesy i 1 500 na kategorie
             if (s.CaravanBuyWorkingCapital)
             {
-                if (cargo >= _b.Capital - _b.Floor) return 2;
+                // recenzja 284 (drobna 4): podloga z rezerwa 30 dni zoldu (karawana bez zwrotu zoldu) moze byc >= kapital - to podloga wyplaty, nie granica handlu;
+                // wtedy bez reguly kapitalu (kiese dalej pilnuje rezerwa zoldu nizej)
+                if (_b.Capital - _b.Floor > 0 && cargo >= _b.Capital - _b.Floor) return 2;
                 if (purse - spend < CashDays * _b.Wage) return 3;
             }
             if (s.CaravanBuyProfitCheck)
             {
                 float idx = town.GetItemCategoryPriceIndex(cat), e = SellIdx(cat);
                 if (_b.Pen < 0) _b.Pen = PenOf(mp, town);
-                long h = Held(cat); float ema = Ema(cat);
-                int dd = DaysOf(cat);
-                double raw = ema > 0.01f ? h / (double)ema : double.PositiveInfinity;
-                double T = Math.Max(1.0, Math.Min(dd, raw));
-                double carry = Math.Min(1.0, _b.Wage * T / Math.Max(1.0, cargo + spend));
-                if (!(e > 0f) || idx * (1.0 + _b.Pen) * (1.0 + carry) >= e / (1.0 + _b.Pen) * (1.0 - _b.Toll)) return 4;
-                if (IsFoodCat(cat) && raw > FoodDays) return 5;
+                // recenzja 284 (wazne 1 i 3): bez zoldu w tescie zakupu - zold karawana placi, czy kupi, czy nie (koszt staly, jak po stronie sprzedazy
+                // CaravanSellNoSunkWage); odmowa zakupu z dodatnia marza nie oszczedza zoldu, tylko traci marze. Koszty stale pilnuja reguly 2 i 3.
+                if (!(e > 0f) || idx * (1.0 + _b.Pen) >= e / (1.0 + _b.Pen) * (1.0 - _b.Toll)) return 4;
+                // recenzja 284 (wazne 2): jedzenie > 7 dob dopiero po FlowMinDays dobach pomiaru (jak bramka) i tylko gdy cos jest w jukach - 0 w jukach to 0 dob,
+                // nie nieskonczonosc (inaczej kategoria bez sprzedazy zostaje zamknieta na zawsze)
+                if (_days >= FlowMinDays && IsFoodCat(cat))
+                {
+                    EnsureHeld();
+                    long h = Held(cat);
+                    if (h > 0)
+                    {
+                        float ema = Ema(cat);
+                        double raw = ema > 0.01f ? h / (double)ema : double.PositiveInfinity;
+                        if (raw > FoodDays) return 5;
+                    }
+                }
             }
             return 0;
         }
@@ -308,7 +367,19 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ BK SellGoods: nie ponizej kosztu
-        public static void SellGoodsPre() { _bkSelling++; Path = PathBk; }
+        public static void SellGoodsPre() { if (_bkSelling <= 0) { _bkWithheld.Clear(); _bkWithheldMp = null; } _bkSelling++; Path = PathBk; }
+
+        /// <summary>Recenzja 284 (drobne 3 i 5): BK SellGoods dopisuje do listy transakcji liczbe sztuk sprzed przyciecia (SellGuardPrefix) i po petli wola
+        /// OnCaravanTransactionCompleted z ta lista. TownFolk.OnCaravanTrade (P1) odejmuje tu sztuki wstrzymane tej karawany (raz - wpis zdjety).</summary>
+        internal static int TakeWithheld(MobileParty mp, EquipmentElement el)
+        {
+            if (_bkWithheld.Count == 0 || mp == null || !ReferenceEquals(mp, _bkWithheldMp)) return 0;
+            int x;
+            if (!_bkWithheld.TryGetValue(el, out x)) return 0;
+            _bkWithheld.Remove(el);
+            _p1Phantom += x;
+            return x;
+        }
         public static Exception SellGoodsFin(Exception __exception) { if (_bkSelling > 0) _bkSelling--; if (_bkSelling == 0) Path = PathOther; return __exception; }
 
         /// <summary>Prefiks SellItemsAction.ApplyInternal (Priority.First, tylko w BK SellGoods): karawana sprzedaje miastu towar handlowy - liczba sztuk przycieta do tylu,
@@ -335,6 +406,9 @@ namespace Armoury
                 if (k < __3)
                 {
                     _bkHeldN += __3 - k; _bkHeldC += (long)Math.Round((__3 - k) * unit);
+                    if (!ReferenceEquals(_bkWithheldMp, mp)) { _bkWithheld.Clear(); _bkWithheldMp = mp; }
+                    int w0; _bkWithheld.TryGetValue(__2.EquipmentElement, out w0);
+                    _bkWithheld[__2.EquipmentElement] = w0 + (__3 - Math.Max(0, k));
                     __3 = Math.Max(0, k);
                 }
             }
@@ -542,7 +616,7 @@ namespace Armoury
                 }
                 _soldToday.Clear();
                 // 2. przeglad karawan: juki wedlug kategorii, zysk zrealizowany 7 dob, F
-                _held.Clear();
+                _held.Clear(); _heldReady = true;
                 var cost = new Dictionary<ItemCategory, double>();
                 var reals = new List<long>();
                 int nCar = 0, withTrade = 0, withProfit = 0, fN = 0, fBelow = 0;
@@ -552,20 +626,7 @@ namespace Armoury
                 {
                     if (mp == null || !mp.IsActive || mp.ItemRoster == null) continue;
                     nCar++; alive.Add(mp);
-                    var r = mp.ItemRoster;
-                    HashSet<ItemObject> seen = null;
-                    for (int i = 0; i < r.Count; i++)
-                    {
-                        var el = r.GetElementCopyAtIndex(i);
-                        var it = el.EquipmentElement.Item;
-                        if (it == null || el.Amount <= 0 || !Tracked(it.ItemCategory)) continue;
-                        if (seen == null) seen = new HashSet<ItemObject>();
-                        if (!seen.Add(it)) continue;
-                        int have = r.GetItemNumber(it);
-                        var c = it.ItemCategory;
-                        _held[c] = Held(c) + have;
-                        double c0; cost.TryGetValue(c, out c0); cost[c] = c0 + CaravanGoods.HeldCost(mp, it, have);
-                    }
+                    ScanHeld(mp, cost);
                     var a = AccOf(mp, today);
                     bool any;
                     long r7 = SumLast(a, day, 7, out any);
@@ -613,6 +674,8 @@ namespace Armoury
                   .Append(" | karawany gracza wedlug drogi (utarg/zysk): ");
                 for (int p = 0; p < Paths; p++) { if (p > 0) sb.Append(", "); sb.Append(PathNames[p]).Append(' ').Append(_plG[p]).Append('/').Append(_plR[p]); }
                 sb.Append(" | latki: BK sprzedaz ").Append(YN(_wSell && _wGuard)).Append(", gabka ").Append(YN(_wLeft)).Append(", werbunek ").Append(YN(_wSize))
+                  .Append(" | recenzja 284: wizyt z podloga >= kapital (bez reguly kapitalu) ").Append(_noRoom).Append(", juki przeliczone po wczytaniu ").Append(_heldLazy)
+                  .Append(", wstrzymane zdjete z dostaw P1 ").Append(_p1Phantom).Append(" szt.")
                   .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
                 Log.Info(sb.ToString());
 
