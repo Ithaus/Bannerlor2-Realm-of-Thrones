@@ -25,7 +25,7 @@ namespace Armoury
         private static bool F4CarOn { get { var s = Settings.Current; return s != null && s.MeasureCaravanTrade; } }
         private static int _f4Days, _f4FirstDay = -1, _f4St;
         private static readonly long[] _f4Sell = new long[Classes], _f4Buy = new long[Classes];
-        private static long _f4Due, _f4Short, _f4Top, _f4Own, _f4LordWage, _f4DPurse, _f4V0 = -1, _f4V1, _f4VPrev = -1, _f4Ms;
+        private static long _f4Due, _f4Short, _f4Top, _f4Own, _f4Own259, _f4LordWage, _f4DPurse, _f4V0 = -1, _f4V1, _f4VPrev = -1, _f4Ms;
         private static long _f4CarWage;                     // recenzja: zold karawan notabli z kas karawan (O02 netto + E3/4 do sakiewek)
         private static int _f4N, _f4Empty;
 
@@ -62,7 +62,8 @@ namespace Armoury
                 bool cw = CW.On;
                 if (cw) { _f4Due += CW.Sum[CW.ICaravanDue]; _f4Short += CW.Sum[CW.ICaravanShort]; _f4Top += CW.Sum[CW.ICaravanTopup]; }
                 if (cw && CW.Wired[CW.WCaravanWage]) _f4CarWage += CW.Sum[CW.UCaravanFromCaravan] + Seal31B.NotFromCarToday;   // te same warunki co odjecie w Seal31B.NotableCarPost
-                _f4Own += CaravanGoods.LastOwnerPaid;
+                _f4Own += CaravanGoods.LastOwnerPaid + CaravanSettle.LastPaid;   // 259: rozliczenie karawan rodow - tez z kies karawan do wlascicieli (przez saldo rodu)
+                _f4Own259 += CaravanSettle.LastPaid;
                 _f4LordWage += _wage[WCaravan];
                 if (now != null && last != null && now.Length > HCaravans && last.Length > HCaravans) _f4DPurse += now[HCaravans] - last[HCaravans];
                 _f4V1 = v; _f4VPrev = v; _f4N = n; _f4Empty = empty;
@@ -77,7 +78,7 @@ namespace Armoury
             {
                 _f4Days = 0;
                 Array.Clear(_f4Sell, 0, Classes); Array.Clear(_f4Buy, 0, Classes);
-                _f4Due = _f4Short = _f4Top = _f4Own = _f4LordWage = _f4DPurse = 0; _f4Ms = 0; _f4St = 0; _f4CarWage = 0;
+                _f4Due = _f4Short = _f4Top = _f4Own = _f4Own259 = _f4LordWage = _f4DPurse = 0; _f4Ms = 0; _f4St = 0; _f4CarWage = 0;
             }
         }
 
@@ -100,7 +101,7 @@ namespace Armoury
               .Append(", zold karawan lordow naliczony (kiesy rodow) ").Append(_f4LordWage / d).Append(" (").Append(_f4LordWage).Append(')')
               .Append(" | wynik handlu - zold zaplacony ").Append(S((trade - paid) / d)).Append(" (").Append(S(trade - paid)).Append(')')
               .Append(", z towarem w jukach (handel + zmiana towaru - zold) ").Append(S((trade + dv - paid) / d)).Append(" (").Append(S(trade + dv - paid)).Append(')')
-              .Append(" | doplaty notabli do 5000 ").Append(S(_f4Top / d)).Append(" (").Append(S(_f4Top)).Append("), zysk do wlascicieli (E3-T2) ").Append(S(-_f4Own / d)).Append(" (").Append(S(-_f4Own)).Append(')')
+              .Append(" | doplaty notabli do 5000 ").Append(S(_f4Top / d)).Append(" (").Append(S(_f4Top)).Append("), zysk do wlascicieli (E3-T2) ").Append(S(-_f4Own / d)).Append(" (").Append(S(-_f4Own)).Append(')').Append(", w tym rozliczenie rodow (259) ").Append(S(-_f4Own259))
               .Append(" | kiesy karawan: zmiana ").Append(S(_f4DPurse / d)).Append(" (").Append(S(_f4DPurse)).Append(") = handel ").Append(S(trade)).Append(" + doplaty ").Append(S(_f4Top))
               .Append(" - zold z kas karawan ").Append(_f4CarWage).Append(" - zysk do wlascicieli ").Append(_f4Own)
               .Append(" + reszta ").Append(S(rest)).Append(" (dochod BK do wlascicieli, myto, nowe i rozbite karawany, lup band, zakupy jucznych)")
@@ -113,7 +114,7 @@ namespace Armoury
         {
             _f4Days = 0; _f4FirstDay = -1; _f4V0 = -1; _f4V1 = 0; _f4VPrev = -1; _f4N = _f4Empty = 0;
             Array.Clear(_f4Sell, 0, Classes); Array.Clear(_f4Buy, 0, Classes);
-            _f4Due = _f4Short = _f4Top = _f4Own = _f4LordWage = _f4DPurse = 0; _f4Ms = 0; _f4St = 0; _f4CarWage = 0;
+            _f4Due = _f4Short = _f4Top = _f4Own = _f4Own259 = _f4LordWage = _f4DPurse = 0; _f4Ms = 0; _f4St = 0; _f4CarWage = 0;
             _f4Err.Clear();                                 // recenzja: po wczytaniu / nowej kampanii pierwszy blad miejsca znow trafia do logu
         }
 

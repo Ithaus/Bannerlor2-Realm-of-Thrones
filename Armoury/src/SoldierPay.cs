@@ -360,6 +360,17 @@ namespace Armoury
             catch { return null; }
         }
 
+        /// <summary>259 (CaravanSettle, postfiks DailyTickClan Priority.First - przed naszym ClanTickPostfix (Last), ktory czysci rekordy): zold partii w tym
+        /// rozliczeniu rodu - naliczony przez gre (wage) i zdjety z kiesy platnika (paid). false - brak rekordu (mechanizm wylaczony, partia bez zoldu).</summary>
+        internal static bool PaidOf(MobileParty mp, out int wage, out int paid)
+        {
+            wage = paid = 0;
+            if (mp == null) return false;
+            for (int i = 0; i < _recs.Count; i++)
+                if (ReferenceEquals(_recs[i].Party, mp)) { wage = _recs[i].Wage; paid = _recs[i].Paid; return true; }
+            return false;
+        }
+
         /// <summary>ClanVariablesCampaignBehavior.DailyTickClan - koniec rozliczenia rodu: saldo dopisane, kiesy po wyplatach.</summary>
         public static void ClanTickPostfix()
         {

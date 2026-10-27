@@ -380,6 +380,7 @@ namespace Armoury
                 SideVillageFief.SetHarmony(_harmony);   // n20-wioska: tylko zapamietanie - latki (BK start, podpowiedz zlota) w kampanii
                 EstateIncome187.SetHarmony(_harmony); // 3.1/3.3 (31b) E3/2: tylko zapamietanie - latki majatkow BK w kampanii
                 Seal31B.SetHarmony(_harmony);        // 3.1/3.3 (31b) E3/4, E3/8, E3/9: tylko zapamietanie - latki gry i BK w kampanii
+                CaravanSettle.SetHarmony(_harmony);  // 259: tylko zapamietanie - latki rozliczenia karawan rodow (gra i BK) w kampanii
                 PerfD2.SetHarmony(_harmony);         // perf-d2d3: tylko zapamietanie - prefiks podatku miast BK (PerfTownTaxSkipBk) w kampanii, po straznika
                 MercTenure.SetHarmony(_harmony);    // M6a-1: tylko zapamietanie - latki najmu gry i BK w kampanii
                 PeaceHold.SetHarmony(_harmony);     // M6a-3: tylko zapamietanie - latka pokoju gry w kampanii

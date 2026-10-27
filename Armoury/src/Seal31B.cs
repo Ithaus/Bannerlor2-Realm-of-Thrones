@@ -943,7 +943,7 @@ namespace Armoury
 
         private static Type _tBkWs;
         /// <summary>Czy czynnym modelem warsztatow gry jest BKWorkshopModel (tylko wtedy BK pobiera od glow rodow "Workshop taxes").</summary>
-        private static bool BkWorkshopModelActive()
+        internal static bool BkWorkshopModelActive()   // 259: takze linia majatku gracza (CaravanSettle)
         {
             var m = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.WorkshopModel : null;
             return _tBkWs != null && m != null && _tBkWs.IsInstanceOfType(m);
@@ -1127,7 +1127,7 @@ namespace Armoury
                             }
                         }
                         if (paid < t) { _otShort += t - paid; _otShortN++; }
-                        if (o == Hero.MainHero) { plPaid += paid; _otPlayerN++; }
+                        if (o == Hero.MainHero) { plPaid += paid; _otPlayerN++; CaravanSettle.NoteWsTax(w, t, paid); }   // 259: linia majatku gracza (nalezny / zaplacony)
                     }
                     catch (Exception e) { Stumble("OwnerTaxDaily(warsztat)", e); }
                 }
@@ -1384,10 +1384,17 @@ namespace Armoury
         private static Settlement Fief(Settlement st) { return st != null && (st.IsTown || st.IsCastle || st.IsVillage) && st.SettlementComponent != null ? st : null; }
 
         // ================================================================= E3/9: zysk karawany pana w kazdym miescie jego krolestwa
-        public static void ProfitPre(MobileParty __0, out int __state)
+        public static void ProfitPre(MobileParty __0, Settlement __1, out int __state)
         {
             __state = int.MinValue;
-            try { if (ProfitOn && __0 != null && __0.IsCaravan) __state = __0.PartyTradeGold; }
+            try
+            {
+                if (!ProfitOn || __0 == null || !__0.IsCaravan) return;
+                // 259: karawana rozliczana przez rod (CaravanSettle) - zysk idzie codziennie w rozliczeniu rodu; ten prefiks (void) biegnie nawet, gdy prefiks 259
+                // na AddRealisticIncome zwrocil false (Harmony pomija tylko prefiksy bool / z ref) - stad wlasny warunek; licznik "E3/9 n" w linii 259
+                if (CaravanSettle.Settled(__0)) { CaravanSettle.NoteE39Blocked(__0, __1); return; }
+                __state = __0.PartyTradeGold;
+            }
             catch { __state = int.MinValue; }
         }
 
@@ -1397,7 +1404,13 @@ namespace Armoury
             try
             {
                 if (!RealisticCaravanIncome()) return;                  // BK nie wplaca wcale (wtedy dochod karawan liczy model) - my tez nie
-                if (__0.PartyTradeGold < __state) { _profitBk += __state - __0.PartyTradeGold; _profitBkN++; return; }   // BK wplacil (siedziba, osada wlasciciela, udzialowiec)
+                if (CaravanSettle.Settled(__0)) return;                 // 259: rozliczana przez rod - druga zapora (gdyby prefiks wyzej dal stan mimo to)
+                if (__0.PartyTradeGold < __state)
+                {
+                    _profitBk += __state - __0.PartyTradeGold; _profitBkN++;   // BK wplacil (siedziba, osada wlasciciela, udzialowiec)
+                    if (__0.ActualClan == Clan.PlayerClan) CaravanSettle.NoteDeposit(__0, CaravanSettle.DepBk, __state - __0.PartyTradeGold);   // 259: linia majatku gracza
+                    return;
+                }
                 var owner = __0.Owner;
                 if (owner == null || !owner.IsAlive || !owner.IsLord || owner.Clan == null) return;
                 var k = owner.Clan.Kingdom;
@@ -1410,6 +1423,7 @@ namespace Armoury
                 int moved = before - __0.PartyTradeGold;
                 if (moved <= 0) return;
                 _profitPaid += moved; _profitN++;
+                if (__0.ActualClan == Clan.PlayerClan) CaravanSettle.NoteDeposit(__0, CaravanSettle.DepE39, moved);   // 259: linia majatku gracza
                 // te same skutki co wplata BK: komunikat dla gracza, doswiadczenie handlu dowodcy, slawa za perk Great Investor
                 if (pn) PayNotes.Got("caravan", moved, ": the " + __0.Name + " deposited its profit with you in " + __1.Name + ".");
                 else if (owner == Hero.MainHero) Log.Player("The " + __0.Name + " has deposited " + moved + " denars with you in " + __1.Name + ".");

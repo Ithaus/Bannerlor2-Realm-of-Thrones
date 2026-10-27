@@ -897,6 +897,8 @@ namespace Armoury
               .Append(" | zysk karawan do wlascicieli (E3-T2, przelew kiesa karawany -> wlasciciel, nie z niczego) ").Append(CaravanGoods.LastOwnerPaid).Append(" (")
               .Append(CaravanGoods.LastOwnerN).Append(" karawan; notablom ").Append(CaravanGoods.LastOwnerNot).Append(", lordom i innym ").Append(CaravanGoods.LastOwnerLord)
               .Append(", graczowi ").Append(CaravanGoods.LastOwnerPlayer).Append(')')
+              .Append(" | rozliczenie karawan rodow (259, kiesa karawany -> saldo rodu, nie z niczego) ").Append(CaravanSettle.LastPaid).Append(" (graczowi ").Append(CaravanSettle.LastPaidPlayer)
+              .Append(", lordom ").Append(CaravanSettle.LastPaid - CaravanSettle.LastPaidPlayer).Append(')')
               .Append(" | karawany lordow: zold naliczony ").Append(Neg(_wage[WCaravan])).Append(" (").Append(_wageN[WCaravan]).Append(" karawan)")
               .Append(" | nowe karawany: ").Append(newN).Append(" (notable ").Append(newNot).Append(", lordowie ").Append(newN - newNot).Append(", w tym kupione przez lordow BK ")
               .Append(Sm[CW.ICaravanBuyN]).Append("), kapital nadany z niczego ").Append(Both(z2, CW.WCaravanCap, CW.WCaravanNew, true)).Append(CW.Wired[CW.WCaravanCap] && CW.Wired[CW.WCaravanNew] ? " zl" : "").Append(" (w kasach zaraz po wejsciu do osady ")

@@ -125,10 +125,11 @@ namespace Armoury
             long paid = Math.Max(0L, (long)c.G0 - Hero.MainHero.Gold);
             long x = Math.Min(c.K, paid);
             _plN++; _plK += c.K; _plPaid += paid;
-            if (x <= 0) return;
+            if (x <= 0) { CaravanSettle.NoteFunded(c.Created, 0); return; }   // recenzja 259: kapital karawany = to, co naprawde dostala
             int g0 = c.Created.PartyTradeGold;
             GiveGoldAction.ApplyForSettlementToParty(c.Town, c.Created.Party, (int)Math.Min(int.MaxValue, x), true);
             _plMoved += c.Created.PartyTradeGold - g0;
+            CaravanSettle.NoteFunded(c.Created, Math.Max(0, c.Created.PartyTradeGold - g0));   // recenzja 259: przelew obciety do kasy miasta - zapis tego, co doszlo
         }
 
         // ------------------------------------------------------------ CreateCaravanParty i kapital z modelu
@@ -173,6 +174,7 @@ namespace Armoury
                 Seal31.AddWorld(Seal31.KCapFromPrice, c.Cap);
                 Seal31.AddWorld(Seal31.MLordBuyPaid, c.Cap + toTown);
                 _bkN++; _bkPrice += c.Price; _bkCap += c.Cap;
+                if (__result != null) CaravanSettle.NoteFunded(__result, c.Cap);   // recenzja 259: kapital karawany lorda = min(model, cena BK), nie model
             }
             catch (Exception e) { Seal31.Stumble("CaravanCapital.CreateFin", e); }
         }
@@ -219,6 +221,7 @@ namespace Armoury
                     GiveGoldAction.ApplyForPartyToCharacter(mp.Party, head, g, true);
                     moved = g - mp.PartyTradeGold;
                     _toHead[kind] += moved; _toHeadN[kind]++;
+                    if (mp.IsCaravan && mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteDeposit(mp, CaravanSettle.DepEnd, moved);   // 259: linia majatku gracza (kiesa przy rozwiazaniu)
                 }
                 else
                 {

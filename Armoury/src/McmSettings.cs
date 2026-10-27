@@ -8156,9 +8156,17 @@ namespace Armoury
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool CaravanSellWhereDear { get; set; } = true;
 
-        [SettingPropertyBool("Caravan Profit To Owner", HintText = "once a day a caravan without a hero at its head hands its owner - the notable, the lord or you - all the coin it holds above what it keeps for trade: 10,000, or a month of its wages if that is more. It works only with the Banner Kings realistic caravan income, which otherwise pays the owner only when the caravan calls at his home; a caravan being broken up or in a battle keeps its purse, and a notable's gold above his usual band still goes to his market town for influence, as before (off = the profit reaches the owner only when the caravan calls at his home, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Caravan Profit To Owner", HintText = "once a day a notable's caravan without a hero at its head hands the notable all the coin it holds above what it keeps for trade: 10,000, or a month of its wages if that is more (with Caravan Clan Settlement on, the caravans of lords, of their companions and yours are settled by their house instead - see there). It works only with the Banner Kings realistic caravan income, which otherwise pays the owner only when the caravan calls at his home; a caravan being broken up or in a battle keeps its purse, and a notable's gold above his usual band still goes to his market town for influence, as before (off = the profit reaches the owner only when the caravan calls at his home, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool CaravanProfitToOwner { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Clan Settlement", HintText = "once a day the caravans of lords, of their companions and yours - whose wages the house pays - send the house what they have earned: what the caravan is worth (coin plus its goods, counted at what it paid or at the market if that is lower) above what it was given to trade with (15,000 for yours, 10,000 for a lord's; more for armed and sea caravans), but never so much that its coin falls below 5,000 and a day of wages. It is paid with the house's daily income ('Caravan income' in the clan finances) and replaces the game's 10% a day and the Banner Kings deposit at the owner's home, so nothing is paid twice; notables' caravans keep their own rule (off = as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool CaravanClanSettlement { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Reports", HintText = "messages about your caravans: what they sent you each day, a warning when a caravan has been worth less than you put in for a week (what it sold, bought and cost you), and once a week a summary of your caravans and workshops (off = no messages; the log still has the daily report)", RequireRestart = false)]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool CaravanReports { get; set; } = true;
 
         [SettingPropertyBool("Village Cart Brings Goods", HintText = "what a village could not buy in its own market town - salt, tools, flax and linen, pots, beer - it buys when its cart sells the village's produce in another town or castle: up to seven days of the village's need from that stall, paid from the village purse (off = only the market town, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
@@ -12211,6 +12219,8 @@ namespace Armoury
             s.TownGroundRent = TownGroundRent;
             s.CaravanSellWhereDear = CaravanSellWhereDear;
             s.CaravanProfitToOwner = CaravanProfitToOwner;
+            s.CaravanClanSettlement = CaravanClanSettlement;
+            s.CaravanReports = CaravanReports;
             s.VillageCartBringsGoods = VillageCartBringsGoods;
             s.VillageClothHalfReserve = VillageClothHalfReserve;
             s.WorkshopPaceByMarket = WorkshopPaceByMarket;

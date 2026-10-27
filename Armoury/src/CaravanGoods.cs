@@ -153,6 +153,86 @@ namespace Armoury
             return v;
         }
 
+        private static readonly object _worthLock = new object();
+
+        /// <summary>
+        /// 259 (CaravanSettle): wartosc TOWARU w jukach karawany - TYLKO ODCZYT (bez EnsureSnap / Sync / Restore - nic nie zapisuje do ksiegi; dozwolone tylko
+        /// pamieci sredniej indeksu AvgIndex). Towar handlowy jak T1 (IsTradeGood), a zwierzeta i inne przedmioty - tylko kupione z kiesy (nizej, recenzja 259).
+        /// Na sztuke: znany koszt zakupu (ksiega E3-T1) -> nizsza z kosztu i rynku (wartosc x srednia indeksu 97 miast); sztuki bez wpisu w ksiedze
+        /// (po wczytaniu, przed migawka) -> wartosc x min(1, srednia indeksu) (blad w dol). cost - koszt (znany + oszacowanie bez wpisu), market - rynek,
+        /// kinds / units - rodzaje i sztuki. Wynik zaokraglony w dol do pelnych denarow (te same liczby ida do logu i do reguly wyplaty).
+        /// Recenzja 259: ZWIERZETA I INNE PRZEDMIOTY KUPIONE Z KIESY (konie, bydlo, juczne ponad potrzebe, bron i zbroje z BK OnSettlementLeft) - to tez towar
+        /// na sprzedaz (BK BuyGoods kupuje kategorie IsTradeGood || IsAnimal, SellGoods sprzedaje je z zyskiem), a zakup jest w ksiedze E3-T1 (TradePostfix
+        /// ksieguje kazdy przedmiot). Licza sie tylko sztuki z wpisem w ksiedze (kupione z kiesy), po nizszej z kosztu i rynku; bez wpisu - pominiete (juczne
+        /// gry i K5, dary BK, lup - nie z kiesy). Juczne potrzebne do niesienia (do MemberRoster.TotalManCount - ta sama granica, od ktorej BK uznaje juczne
+        /// za nadwyzke na sprzedaz) - pominiete, najpierw sztuki bez wpisu. other - ta czesc wyniku (zwierzeta i inne), osobno w linii gracza.
+        /// </summary>
+        internal static long WorthOf(MobileParty mp, out long cost, out long market, out int kinds, out int units, out long other)
+        {
+            cost = market = other = 0; kinds = units = 0;
+            var r = mp != null ? mp.ItemRoster : null;
+            if (r == null) return 0;
+            lock (_worthLock)
+            {
+                Dictionary<ItemObject, Lot> d;
+                if (!_book.TryGetValue(mp, out d)) d = null;
+                double worth = 0, dc = 0, dm = 0, dOther = 0;
+                int packNeed = mp.MemberRoster != null ? Math.Max(0, mp.MemberRoster.TotalManCount) : 0;
+                HashSet<ItemObject> seen = null;
+                // juczne bez wpisu w ksiedze (K5, gra, dary BK) niosa jako pierwsze - zmniejszaja potrzebe, zanim policzymy kupione z kiesy
+                for (int i = 0; i < r.Count && packNeed > 0; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0 || it.ItemCategory != DefaultItemCategories.PackAnimal) continue;
+                    if (seen == null) seen = new HashSet<ItemObject>();
+                    if (!seen.Add(it)) continue;
+                    int have = r.GetItemNumber(it);
+                    Lot lp;
+                    int known = d != null && d.TryGetValue(it, out lp) && lp != null && lp.N > 0 ? Math.Min(lp.N, have) : 0;
+                    packNeed -= Math.Min(packNeed, Math.Max(0, have - known));
+                }
+                if (seen != null) seen.Clear();
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    bool goods = it.IsTradeGood && !it.HasHorseComponent && it.ItemCategory != DefaultItemCategories.PackAnimal;
+                    Lot l = null;
+                    if (!goods && (d == null || !d.TryGetValue(it, out l) || l == null || l.N <= 0)) continue;   // nie towar i bez zakupu z kiesy - pominiete
+                    if (seen == null) seen = new HashSet<ItemObject>();
+                    if (!seen.Add(it)) continue;                      // ten sam towar w kilku wierszach (modyfikatory) - GetItemNumber liczy wszystkie
+                    int have = r.GetItemNumber(it);
+                    if (have <= 0) continue;
+                    double val = Math.Max(1, it.Value), idx = AvgIndex(it.ItemCategory);
+                    if (!goods)
+                    {
+                        int known = Math.Min(l.N, have), cnt = known;
+                        if (it.ItemCategory == DefaultItemCategories.PackAnimal)
+                        {
+                            int skip = Math.Min(packNeed, known);     // reszta potrzeby (po jucznych bez wpisu - petla wyzej) z kupionych
+                            packNeed -= skip; cnt = known - skip;
+                        }
+                        if (cnt <= 0) continue;
+                        double kcO = l.Cost * cnt / l.N, mO = cnt * val * idx, wO = Math.Min(kcO, mO);
+                        kinds++; units += cnt;
+                        worth += wO; dOther += wO; dc += kcO; dm += mO;
+                        continue;
+                    }
+                    kinds++; units += have;
+                    int knownG = 0; double kc = 0;
+                    if (d != null && d.TryGetValue(it, out l) && l != null && l.N > 0) { knownG = Math.Min(l.N, have); kc = l.Cost * knownG / l.N; }
+                    double unk = (have - knownG) * val * Math.Min(1.0, idx);
+                    worth += Math.Min(kc, knownG * val * idx) + unk;
+                    dc += kc + unk;
+                    dm += have * val * idx;
+                }
+                cost = (long)Math.Floor(dc); market = (long)Math.Floor(dm); other = (long)Math.Floor(dOther);
+                return (long)Math.Floor(worth);
+            }
+        }
+
         /// <summary>Wiazanie odczytu dziennika BK (raz na sesje): BKCaravansBehavior._tradeActionLogs i pola TradeActionLog (BuyPrice - cena sztuki, BoughtTime, ItemRosterElement).</summary>
         private static bool BkLogInit()
         {
@@ -342,6 +422,7 @@ namespace Armoury
                     l.Day = l.N > 0 ? (l.Day * l.N + now * got) / (l.N + got) : now;
                     l.Cost += paid; l.N += got;
                     _bookBuys++; _bookBuyUnits += got;
+                    if (mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 1, paid, 0, 0.0);   // 259: zakup karawany gracza (linia majatku gracza)
                     var cat = it.ItemCategory;
                     Visit v;
                     if (_visit.TryGetValue(mp, out v) && ReferenceEquals(v.St, __state.St) && v.Cats.Contains(cat)) _rebought += got;   // odkupione to, co tu sprzedalismy (gabka, CaravanBulk)
@@ -355,12 +436,14 @@ namespace Armoury
                 {
                     int moved = __state.N0 - n1;
                     int got = mp.PartyTradeGold - __state.Gold0;
+                    double costRm = 0;   // 259: koszt zdjety z ksiegi (zysk ze sprzedazy w linii majatku gracza)
                     if (moved > 0)
                     {
                         var l = Sync(mp, it, __state.N0, false);
-                        if (l != null && l.N > 0) { int m = Math.Min(moved, l.N); l.Cost -= l.Cost * m / l.N; l.N -= m; }
+                        if (l != null && l.N > 0) { int m = Math.Min(moved, l.N); costRm = l.Cost * m / l.N; l.Cost -= costRm; l.N -= m; }
                     }
                     if (got > 0) TownToll.LastTaken = TownToll.TakeCaravan(__state.St, mp, got);
+                    if (got > 0 && mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 2, got, TownToll.LastTaken, costRm);   // 259: sprzedaz karawany gracza (utarg przed mytem, myto)
                 }
             }
             catch (Exception e) { Stumble("TradePostfix", e); }
@@ -833,7 +916,8 @@ namespace Armoury
         /// Te same skutki co wplata zysku w grze: slawa rodu za perk Great Investor (AddIncomeFromParty, AddRealisticIncome). Gracz = AI; jeden komunikat dziennie.
         /// Nic w zapisie. Wyjatek per karawana - licznik potkniec (reszta karawan dalej).
         /// </summary>
-        private const int KeepGold = 10000, KeepWageDays = 30;
+        private const int KeepGold = 10000;
+        internal const int KeepWageDays = 30;   // 259: ten sam zapas zoldu dla karawany rodu, ktorej rod nie zwraca zoldu (CaravanSettle - wodz z tytulem Lordship)
         internal static long LastOwnerPaid, LastOwnerNot, LastOwnerLord, LastOwnerPlayer;   // linia "Obieg: notable i karawany" (MoneyLedger.Daily - ta sama doba)
         internal static int LastOwnerN;
         private static int _oStumbles, _oStumbleSess;
@@ -862,7 +946,7 @@ namespace Armoury
                 _oStumbles = 0;
                 return;
             }
-            int n = 0, below = 0, paidN = 0, notN = 0, lordN = 0, plN = 0, sDis = 0, sBat = 0, sLead = 0, sOwn = 0, sModel = 0;
+            int n = 0, below = 0, paidN = 0, notN = 0, lordN = 0, plN = 0, sDis = 0, sBat = 0, sLead = 0, sOwn = 0, sModel = 0, sClan = 0;
             long keepAll = 0, held = 0, paid = 0, pNot = 0, pLord = 0, pPl = 0, ctlFrom = 0, ctlTo = 0;
             var cfm = Campaign.Current.Models.ClanFinanceModel;
             var list = new List<MobileParty>(MobileParty.AllCaravanParties);
@@ -872,6 +956,8 @@ namespace Armoury
                 {
                     if (mp == null || !mp.IsActive || !mp.IsCaravan) continue;
                     n++;
+                    // 259: karawana lorda albo towarzysza, ktorej zold placi rod - rozlicza ja rod codziennie (CaravanSettle, w rozliczeniu rodu); tu tylko licznik
+                    if (CaravanSettle.Settled(mp)) { sClan++; continue; }
                     int g = mp.PartyTradeGold;
                     long keep = Math.Max(KeepGold, (long)KeepWageDays * Math.Max(0, mp.TotalWage));
                     keepAll += keep; held += Math.Min(Math.Max(0, g), keep);
@@ -901,6 +987,7 @@ namespace Armoury
             if (pPl > 0) Log.Player("Your caravans handed you " + pPl + " denars - all they held above what they keep for trade and a month of wages.");
             sb.Append(" | CZYNNE | karawan ").Append(n).Append(", oddaly ").Append(paidN).Append(" za ").Append(paid).Append(" zl (notablom ").Append(notN).Append('/').Append(pNot)
               .Append(", lordom i innym ").Append(lordN).Append('/').Append(pLord).Append(", graczowi ").Append(plN).Append('/').Append(pPl).Append(')')
+              .Append(" | rozliczane przez rod (259) ").Append(sClan)
               .Append(" | kapital obrotowy (zostaje w kiesie): max(").Append(KeepGold).Append(", ").Append(KeepWageDays).Append(" dni zoldu) - razem ").Append(keepAll)
               .Append(", w kiesach do kapitalu ").Append(held).Append(" (").Append(keepAll > 0 ? (100.0 * held / keepAll).ToString("0.0", Inv) : "-").Append("%), karawan z kiesa nie wieksza niz kapital ").Append(below)
               .Append(" | pominiete z nadwyzka: rozwiazywane ").Append(sDis).Append(" (kiesa do wlasciciela przy rozwiazaniu - E3/7), w bitwie ").Append(sBat)
