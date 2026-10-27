@@ -48,7 +48,8 @@ namespace Armoury
     ///     przy oblezeniu i wrogim lordzie w zasiegu twierdzy; nie przy przekroczonym limicie zoldu partii (jak gra);
     ///  5. postoj do odbudowy (wypelnienie >= progu i S >= T), najwyzej AiArmsWaitMaxDays dob - potem zwolniony na AiArmsTripCooldownDays dob (regula Jeffa 12.10:
     ///     nie bezczynnosc); 281: zwolnienie takze przy wczesnym wyjsciu mysli (glod, bitwa, oblezenie, morze, p9/159c, DoNotChangeBehavior) i w przegladzie godziny
-    ///     (partia bez mysli gry ponad AiArmsWaitMaxDays dob + 6 h - AI wylaczone, DoNotMakeNewDecisions); glod w stanie - zakaz zaczepiania zdjety;
+    ///     (partia bez mysli gry ponad AiArmsWaitMaxDays dob + 6 h - AI wylaczone, DoNotMakeNewDecisions); recenzja 281: glod nie zdejmuje zakazu zaczepiania
+    ///     (gra nie ma drogi "atak po jedzenie"), wpis z zapisu przywracany do stanu przed wczesnymi wyjsciami mysli (termin biegnie dalej po wczytaniu);
     ///  6. w stanie narazenia opcje bitwy (oblezenie, szturm, rabunek, obrona cudzej osady, poscig za partia nie-banda) -1; obrona osady wlasnego rodu zostaje; obrona
     ///     osady krolestwa zostaje, gdy jest najlepsza (OB5); zebranie armii zostaje dla partii nie ponizej progu; R1-R3 ponizej progu nie zaczepia partii poza bandami
     ///     (postfiks ShouldConsiderAttacking, jak p9), poza obrona wlasnej osady.
@@ -69,6 +70,8 @@ namespace Armoury
             internal MobileParty P; internal int Rank, Kind; internal double SinceH = -1, FreeUntilH = -1, ArriveH = -1; internal Settlement Fort; internal string Act = "";
             // recenzja 223b: stan byl (choc raz) ponizej progu - wyjscie "odbudowany" i wahadlo tylko wtedy; sam "slabszy" bez braku ludzi to "zagrozenie minelo"
             internal bool Low;
+            // recenzja 281: stan przywrocony z zapisu (Restore) przed pierwsza pelna mysla - wyjscie bez licznikow "odbudowany" / "zagrozenie minelo" (jak wpis z zapisu dotad)
+            internal bool Restored;
         }
         private static readonly Dictionary<MBGUID, St> _st = new Dictionary<MBGUID, St>();
         private struct Saved { internal double Since, Free; }
@@ -79,6 +82,9 @@ namespace Armoury
         // (krok "za silniejszym" - recenzja 223), Friends - sila przyjaznych partii lordow w zasiegu (przewaga lokalna jak gra GetBestInitiativeBehavior)
         private sealed class Thr { internal double H; internal float T, Free, Lords, Friends; internal MobileParty Who; }
         private static double _savedH0 = -1;   // godzina pierwszej godziny sesji z wpisami z zapisu (po dobie reszta usuwana)
+        // recenzja 281: wpisy z zapisu przywrocone do stanu przed mysla (Restore; w stanie / zwolnione), linia "stan z zapisu - po dobie" juz wypisana
+        private static int _savedRestored, _savedRestoredFree;
+        private static bool _savedDone;
         private static readonly Dictionary<MBGUID, Thr> _thr = new Dictionary<MBGUID, Thr>();
         private static readonly Dictionary<Settlement, Thr> _fortThr = new Dictionary<Settlement, Thr>();
 
@@ -120,7 +126,7 @@ namespace Armoury
         private static readonly HashSet<MBGUID> _dLowFree = new HashSet<MBGUID>(), _dStayForeign = new HashSet<MBGUID>();
         // 281 (Jeff 27.10 "tak napraw wszystko"; autotest 130a: Ookpik Wolfcaller 27.1 doby w stanie, "zwolnieni po 12 dobach 0"): zwolnienia po AiArmsWaitMaxDays poza
         // pelna mysla - [0] glod, [1] bitwa / oblezenie / morze, [2] p9 / 159c, [3] DoNotChangeBehavior (wczesne wyjscie mysli); przeglad godziny (partia bez mysli
-        // gry ponad ThinkHours po terminie); glod w stanie - zakaz zaczepiania zdjety (partie doby)
+        // gry ponad ThinkHours po terminie); glod w stanie z zakazem zaczepiania (partie doby, INFO - recenzja 281: glod zakazu nie zdejmuje)
         private const int ThinkHours = 6;   // AiPartyThinkBehavior.PartyHourlyAiTick: partia poza armia mysli co 6 h (num = 6, gra 1.4.8)
         private static readonly int[] _dFreedEarly = new int[4];
         private static int _dFreedSweep, _dLateEx;
@@ -137,7 +143,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _st.Clear(); _saved.Clear(); _savedLoaded = 0; _savedH0 = -1; _thr.Clear(); _fortThr.Clear(); _noAtk = new HashSet<MBGUID>(); _joinQ.Clear(); _escQ.Clear(); _seen.Clear();
+            _st.Clear(); _saved.Clear(); _savedLoaded = 0; _savedH0 = -1; _savedRestored = _savedRestoredFree = 0; _savedDone = false; _thr.Clear(); _fortThr.Clear(); _noAtk = new HashSet<MBGUID>(); _joinQ.Clear(); _escQ.Clear(); _seen.Clear();
             _rebuiltH.Clear();
             ClearDay(); _stumbles = 0;
         }
@@ -348,6 +354,24 @@ namespace Armoury
             _saved.Remove(mp.StringId);
         }
 
+        /// <summary>Recenzja 281: wpis z zapisu tej partii -> stan (_st) przed wczesnymi wyjsciami mysli, zeby termin postoju (SinceH) i zwolnienie (FreeUntilH)
+        /// biegly dalej takze przy glodzie, bitwie, p9, DoNotChangeBehavior i w przegladzie godziny (dotad wpis czytala tylko pelna mysl, a po dobie byl usuwany -
+        /// autotest 130a: 9 z 47 wpisow). Te same reguly co pelna mysl: najpierw zwolnienie (Free &gt; teraz), potem stan (0 &lt;= Since &lt;= teraz); inaczej wpis zuzyty,
+        /// pelna mysl zaczyna od nowa jak dotad. Watek glowny.</summary>
+        private static St Restore(MobileParty party, double now)
+        {
+            Saved sv;
+            if (_saved.Count == 0 || party.StringId == null || !_saved.TryGetValue(party.StringId, out sv)) return null;
+            _saved.Remove(party.StringId);
+            var st = new St { P = party, Restored = true };
+            if (sv.Free > now) st.FreeUntilH = sv.Free;
+            else if (sv.Since >= 0 && sv.Since <= now) st.SinceH = sv.Since;
+            else return null;
+            _st[party.Id] = st;
+            if (st.SinceH >= 0) _savedRestored++; else _savedRestoredFree++;
+            return st;
+        }
+
         private static void Drop(MobileParty mp)
         {
             if (mp == null) return;
@@ -455,6 +479,8 @@ namespace Armoury
                 // 281: termin postoju (AiArmsWaitMaxDays) takze przy wczesnym wyjsciu mysli - dotad zwolnienie bylo tylko po pelnej mysli, a SinceH biegl dalej
                 // (autotest 130a: 27.1 doby w stanie, zwolnieni 0); przed terminem kolejka dolaczenia do armii zdjeta (bez oceny tej mysli)
                 var st0 = _st.Count > 0 ? StateOf(party) : null;
+                // recenzja 281: wpis z zapisu przywrocony juz tutaj (przed wczesnymi wyjsciami) - termin i zwolnienie biegna dalej po wczytaniu na kazdej drodze
+                if (st0 == null && _saved.Count > 0) st0 = Restore(party, now);
                 bool due = Overdue(st0, now, s);
                 if (party.MapEvent != null || party.BesiegedSettlement != null || party.IsCurrentlyAtSea || (party.CurrentSettlement != null && party.CurrentSettlement.SiegeEvent != null))
                 {
@@ -465,9 +491,11 @@ namespace Armoury
                 if (partyThinkParams.DoNotChangeBehavior) { Early(party, st0, due, now, s, 3); return; }
                 if (party.Party.IsStarving)
                 {
-                    // najpierw jedzenie - droga gry (opcje gry bez zmian); 281: zakaz zaczepiania zdjety - glodna partia moze napasc po jedzenie jak w grze
+                    // najpierw jedzenie - droga gry (opcje gry bez zmian: zakupy w osadzie AiVisitSettlement, rabunek); recenzja 281: zakaz zaczepiania ZOSTAJE - gra
+                    // (ShouldConsiderAttacking 1.4.8) nie ma drogi "atak po jedzenie", zdjecie zakazu tylko narazalo slabego R1-R3 (jak p9: ArmsFirst trzyma zakaz
+                    // przy glodzie); po terminie zwalnia Early/Release (zakaz zdjety wtedy); licznik INFO - glodne partie z zakazem
                     _dStarve++;
-                    if (_noAtk.Contains(party.Id)) { _dStarveNoAtk.Add(party.Id); SetNoAtk(party, false); }
+                    if (_noAtk.Contains(party.Id)) _dStarveNoAtk.Add(party.Id);
                     Early(party, st0, due, now, s, 0);
                     return;
                 }
@@ -494,7 +522,7 @@ namespace Armoury
                     if (st != null)
                     {
                         // 223b: godzina wyjscia "odbudowany" - licznik wahadla; recenzja 223b: tylko stan ponizej progu (sam "slabszy" - zagrozenie minelo, osobny licznik)
-                        if (st.SinceH >= 0) { if (st.Low) { _dRebuilt++; _rebuiltH[party.Id] = now; } else _dThreatGone++; }
+                        if (st.SinceH >= 0 && !st.Restored) { if (st.Low) { _dRebuilt++; _rebuiltH[party.Id] = now; } else _dThreatGone++; }
                         Drop(party);
                     }
                     return;
@@ -523,6 +551,7 @@ namespace Armoury
                     }
                 }
                 else if (st.SinceH < 0) { st.SinceH = now; st.FreeUntilH = -1; st.Low = false; }
+                st.Restored = false;   // recenzja 281: pierwsza pelna mysl po przywroceniu z zapisu
                 st.Rank = rank; st.Kind = kind;
                 if (low) st.Low = true;
                 int wait = ArmsFirst.WaitDays(s);
@@ -803,14 +832,16 @@ namespace Armoury
             try
             {
                 // reszta wpisow z zapisu po pierwszej dobie sesji (partii juz nie ma albo cala dobe w bitwie / p9) - usunieta, nie wraca do zapisu (wzor NewLordKit)
-                if (_saved.Count > 0)
+                // recenzja 281: linia raz na wczytanie z wpisami (takze gdy wszystkie zuzyte) - z liczba przywroconych do stanu przed mysla (Restore)
+                if (_savedLoaded > 0 && !_savedDone)
                 {
                     double h0 = Math.Floor(CampaignTime.Now.ToHours);
                     if (_savedH0 < 0) _savedH0 = h0;
                     else if (h0 - _savedH0 >= 24.0)
                     {
-                        Log.Info("Eskorta lordow (223): stan z zapisu - po dobie usunieto " + _saved.Count + " nieuzytych wpisow (z " + _savedLoaded + ").");
-                        _saved.Clear();
+                        Log.Info("Eskorta lordow (223): stan z zapisu - po dobie usunieto " + _saved.Count + " nieuzytych wpisow (z " + _savedLoaded + "); recenzja 281: przywrocone przed mysla "
+                                 + (_savedRestored + _savedRestoredFree) + " (w stanie " + _savedRestored + ", zwolnione " + _savedRestoredFree + ").");
+                        _saved.Clear(); _savedDone = true;
                     }
                 }
                 var s = Settings.Current;
@@ -1007,7 +1038,7 @@ namespace Armoury
                   .Append(" | 281: zwolnieni poza pelna mysla ").Append(_dFreedEarly[0] + _dFreedEarly[1] + _dFreedEarly[2] + _dFreedEarly[3])
                   .Append(" (glod ").Append(_dFreedEarly[0]).Append(", bitwa/oblezenie/morze ").Append(_dFreedEarly[1]).Append(", p9 ").Append(_dFreedEarly[2])
                   .Append(", bez zmiany zachowania ").Append(_dFreedEarly[3]).Append("), w przegladzie godziny ").Append(_dFreedSweep)
-                  .Append(", glod w stanie - zakaz zaczepiania zdjety ").Append(_dStarveNoAtk.Count).Append(" partii.");
+                  .Append(", glod w stanie z zakazem zaczepiania ").Append(_dStarveNoAtk.Count).Append(" partii.");   // recenzja 281: zakaz zostaje (INFO)
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -1047,7 +1078,7 @@ namespace Armoury
         /// <summary>Wczytanie (po Reset z konstruktora zachowania): brak klucza albo zly format - pusto (stan od nowa).</summary>
         internal static void Import(string v)
         {
-            _saved.Clear(); _savedLoaded = 0; _savedH0 = -1;
+            _saved.Clear(); _savedLoaded = 0; _savedH0 = -1; _savedRestored = _savedRestoredFree = 0; _savedDone = false;
             if (string.IsNullOrEmpty(v) || !v.StartsWith("1|", StringComparison.Ordinal)) return;
             foreach (var row in v.Substring(2).Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
             {

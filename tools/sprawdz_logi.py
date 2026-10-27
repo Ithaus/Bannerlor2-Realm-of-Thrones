@@ -71108,6 +71108,9 @@ def main(argv):
 # oblezenie/morze, p9, bez zmiany zachowania), w przegladzie godziny M, glod w stanie - zakaz zaczepiania zdjety K partii" (grupy 60-66) i linie "zwolniony poza mysla
 # (281) - ... po X dob w stanie, droga: ...". E223-8: w kazdej dobie suma drog + przeglad <= "zwolnieni po N dobach" (Release liczy kazde zwolnienie), linie 281 po
 # <= postoj + 1 dob, format linii; bez ogona 281 - INFO (log sprzed 281). E223-5 bez zmian (najdluzej w stanie <= postoj + 1) - z 281 ma byc TAK.
+# Recenzja 281: glod nie zdejmuje zakazu zaczepiania - pole ogona "glod w stanie z zakazem zaczepiania K partii" (INFO; stary napis "- zakaz zaczepiania zdjety" tez
+# pasuje, grupa 66). Wpisy z zapisu przywracane do stanu przed wczesnymi wyjsciami mysli: linia "stan z zapisu - po dobie usunieto U nieuzytych wpisow (z Z); recenzja
+# 281: przywrocone przed mysla R (w stanie A, zwolnione F)." raz na wczytanie - E223-9: R == A + F, R + U <= Z; bez ogona (log sprzed recenzji) - INFO.
 E223_TAG = "Eskorta lordow (223): "
 E223_RX = {
     "start": re.compile(r"^start sesji \| klucze: Lords Avoid Danger (TAK|NIE), Lord Escort From Garrison (TAK|NIE), Lords Join Near Army (TAK|NIE) \| prog wypelnienia ([\d.]+) "
@@ -71126,7 +71129,9 @@ E223_RX = {
                       r"\| wahadlo - powrot do stanu w (\d+) dob po odbudowie (\d+) razy \((\d+) partii\))?"   # ogon 223b (grupy 42-56; starsze logi bez niego)
                       r"(?: \| zagrozenie minelo (\d+), werbunek gry bez twierdzy (\d+), postoj w cudzym zamku (\d+))?"   # ogon recenzji 223b (grupy 57-59)
                       r"(?: \| 281: zwolnieni poza pelna mysla (\d+) \(glod (\d+), bitwa/oblezenie/morze (\d+), p9 (\d+), bez zmiany zachowania (\d+)\), "
-                      r"w przegladzie godziny (\d+), glod w stanie - zakaz zaczepiania zdjety (\d+) partii)?\.$"),   # ogon 281 (grupy 60-66)
+                      r"w przegladzie godziny (\d+), glod w stanie (?:- zakaz zaczepiania zdjety|z zakazem zaczepiania) (\d+) partii)?\.$"),   # ogon 281 (grupy 60-66; recenzja 281 - nowy napis)
+    "saved": re.compile(r"^stan z zapisu - po dobie usunieto (\d+) nieuzytych wpisow \(z (\d+)\)"
+                        r"(?:; recenzja 281: przywrocone przed mysla (\d+) \(w stanie (\d+), zwolnione (\d+)\))?\.$"),   # ogon recenzji 281 (grupy 3-5)
     "late": re.compile(r"^zwolniony poza mysla \(281\) - (.+) po ([\d.]+) dob w stanie, droga: (glod|bitwa/oblezenie/morze|p9|bez zmiany zachowania|przeglad godziny) "
                        r"- (\d+) dob bez stanu\.$"),
     "esc": re.compile(r"^eskorta z zalogi \((wejscie|doba)\): (.+?) w (.+) wzial (\d+) \(zaloga (\d+) -> (\d+), podloga (\d+), zgodnosc (TAK|NIE)\), "
@@ -71150,8 +71155,9 @@ E223_TEST = {
            "{k} dob (Tywin Lannister) | potkniecia {p} | zbiera armie (gra) 2 | znani lordowie 11 (ponizej progu 4, slabsze od zagrozenia 2; glowy rodow bez lenna 3, "
            "rody wielkie lub panujace 6, postacie ksiag 2) | pojmania znanych lordow 1 (sam slaby 0, sam silny 1, w armii 0, w osadzie 0, bez obrazu 0) "
            "| wahadlo - powrot do stanu w 3 dob po odbudowie {h} razy (2 partii) | zagrozenie minelo 4, werbunek gry bez twierdzy 3, postoj w cudzym zamku 1"
-           " | 281: zwolnieni poza pelna mysla {z} (glod {z}, bitwa/oblezenie/morze 0, p9 0, bez zmiany zachowania 0), w przegladzie godziny {y}, glod w stanie - "
-           "zakaz zaczepiania zdjety 2 partii.",
+           " | 281: zwolnieni poza pelna mysla {z} (glod {z}, bitwa/oblezenie/morze 0, p9 0, bez zmiany zachowania 0), w przegladzie godziny {y}, glod w stanie "
+           "z zakazem zaczepiania 2 partii.",
+    "saved": "stan z zapisu - po dobie usunieto {u} nieuzytych wpisow (z {z}); recenzja 281: przywrocone przed mysla {r} (w stanie {a}, zwolnione {f}).",
     "late": "zwolniony poza mysla (281) - Ookpik Wolfcaller (Ookpik Wolfcaller's Party) po {k} dob w stanie, droga: {r} - 3 dob bez stanu.",
     "esc": "eskorta z zalogi (wejscie): Tywin Lannister w Casterly Rock wzial {n} (zaloga 420 -> {a}, podloga 125, zgodnosc {z}), wypelnienie 0.31 -> 0.60/0.60.",
     "join": "do armii - Kevan Lannister dolaczyl do armii Tywin Lannister, Lord Paramount of Casterly Rock's Party (4 partii, sila 812).",
@@ -71186,6 +71192,15 @@ def e223_selftest():
         probs.append("day grupy recenzji 223b")
     if m and (m.group(60) != "1" or m.group(61) != "1" or m.group(62) != "0" or m.group(65) != "2" or m.group(66) != "2"):
         probs.append("day grupy 281")
+    m3 = E223_RX["day"].match(day.replace("glod w stanie z zakazem zaczepiania", "glod w stanie - zakaz zaczepiania zdjety"))   # ogon 281 sprzed recenzji 281
+    if not m3 or m3.group(66) != "2":
+        probs.append("day ogon 281 sprzed recenzji")
+    sv = E223_RX["saved"].match(T["saved"].format(u=9, z=47, r=36, a=30, f=6))
+    if not sv or sv.group(1) != "9" or sv.group(2) != "47" or sv.group(3) != "36" or sv.group(4) != "30" or sv.group(5) != "6":
+        probs.append("saved grupy")
+    sv0 = E223_RX["saved"].match("stan z zapisu - po dobie usunieto 9 nieuzytych wpisow (z 47).")   # linia sprzed recenzji 281 (log 130a)
+    if not sv0 or sv0.group(1) != "9" or sv0.group(3) is not None:
+        probs.append("saved bez ogona recenzji 281")
     m2 = E223_RX["day"].match(day[:day.index(" | 281:")] + ".")   # linia sprzed 281 (bez ogona 281)
     if not m2 or m2.group(59) != "1" or m2.group(60) is not None:
         probs.append("day bez ogona 281")
@@ -71209,7 +71224,7 @@ def e223_selftest():
 def e223_collect(logp):
     RX = E223_RX
     D = {"starts": [], "days": [], "esc": [], "esc_bad": [], "sum_mis": [], "joins": 0, "caps": [], "ex": 0, "err": 0, "err1": "", "p9": set(), "z169": 0, "has169": False,
-         "saved_drop": 0, "fcaps": [], "late": [], "late_bad": []}
+         "saved_drop": 0, "fcaps": [], "late": [], "late_bad": [], "saved": [], "saved_bad": []}
     acc = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -71266,6 +71281,8 @@ def e223_collect(logp):
             elif r.startswith("stan z zapisu - po dobie usunieto "):
                 mz = re.match(r"stan z zapisu - po dobie usunieto (\d+) ", r)
                 D["saved_drop"] += int(mz.group(1)) if mz else 0
+                ms = RX["saved"].match(r)
+                (D["saved"] if ms else D["saved_bad"]).append(ms if ms else r[:100])
             elif r.startswith("POJMANY "):
                 mc = RX["cap"].match(r)
                 # 223b: znani lordowie i nastepcy spoza glow rodow - osobno (E223-7); E223-6 tylko glowy rodow
@@ -71376,11 +71393,32 @@ def e223_rows(rep, D):
                 f"dob z ogonem 281 {len(t281)}, zwolnieni po {wait} dobach (suma) {sum(int(m.group(22)) for m in t281)}, w tym poza mysla "
                 f"{sum(int(m.group(60)) for m in t281)} (glod {sum(int(m.group(61)) for m in t281)}, bitwa/oblezenie/morze {sum(int(m.group(62)) for m in t281)}, "
                 f"p9 {sum(int(m.group(63)) for m in t281)}, bez zmiany zachowania {sum(int(m.group(64)) for m in t281)}), w przegladzie godziny "
-                f"{sum(int(m.group(65)) for m in t281)}, glod w stanie - zakaz zdjety (suma dob) {sum(int(m.group(66)) for m in t281)} | linii 281 {len(D['late'])} {drogi}"
+                f"{sum(int(m.group(65)) for m in t281)}, glod w stanie z zakazem (suma dob) {sum(int(m.group(66)) for m in t281)} | linii 281 {len(D['late'])} {drogi}"
                 + (" | " + "; ".join(probs[:3]) if probs else ""),
                 f"suma drog == poza mysla, poza mysla + przeglad <= zwolnieni, linie 281 po <= {wait + 1} dob", not probs)
     else:
         rep.add("E223-8: zwolnienia poza pelna mysla (281)", "brak ogona 281 w liniach doby", "INFO (log sprzed 281)", None)
+    # recenzja 281: wpisy z zapisu przywrocone do stanu przed mysla (Restore) - przywrocone + usuniete po dobie <= wczytane, przywrocone == w stanie + zwolnione
+    sv = [m for m in D["saved"] if m.group(3) is not None]
+    if sv:
+        probs = []
+        for m in sv:
+            u, z, r, a, f = (int(m.group(i)) for i in range(1, 6))
+            if r != a + f:
+                probs.append(f"przywrocone {r} != w stanie {a} + zwolnione {f}")
+            if r + u > z:
+                probs.append(f"przywrocone {r} + usuniete {u} > wczytane {z}")
+        if D["saved_bad"]:
+            probs.append(f"zly format: {D['saved_bad'][0]}")
+        rep.add("E223-9: stan z zapisu przywrocony przed mysla (recenzja 281)",
+                f"linii {len(sv)}: wczytane {sum(int(m.group(2)) for m in sv)}, przywrocone {sum(int(m.group(3)) for m in sv)} (w stanie {sum(int(m.group(4)) for m in sv)}, "
+                f"zwolnione {sum(int(m.group(5)) for m in sv)}), usuniete po dobie {sum(int(m.group(1)) for m in sv)}" + (" | " + "; ".join(probs[:3]) if probs else ""),
+                "przywrocone == w stanie + zwolnione, przywrocone + usuniete <= wczytane", not probs)
+    elif D["saved"] or D["saved_bad"]:
+        rep.add("E223-9: stan z zapisu przywrocony przed mysla (recenzja 281)", f"linii bez ogona recenzji 281 {len(D['saved'])}, zly format {len(D['saved_bad'])}",
+                "INFO (log sprzed recenzji 281)" if not D["saved_bad"] else "format jak w kodzie", None if not D["saved_bad"] else False)
+    else:
+        rep.add("E223-9: stan z zapisu przywrocony przed mysla (recenzja 281)", "brak linii 'stan z zapisu - po dobie'", "INFO (bieg bez wczytania zapisu z 223 albo < 1 doby)", None)
 
 
 def e223_synth():
@@ -71402,6 +71440,7 @@ def e223_synth():
                     L.append(P + T["day"].format(d=d, w=0, g=0, e=0, m=0, b=0, k="0.0", p=0, h=0, z=0, y=0).replace("partii lordow AI 120", "partii lordow AI 0"))
             elif kind != "none":
                 L.append(P + T["start"] if kind == "good" else P + T["start"].replace("atak TAK", "atak BRAK"))
+                L.append(P + T["saved"].format(u=9, z=47, r=36, a=30, f=6) if kind == "good" else P + T["saved"].format(u=12, z=47, r=36, a=30, f=5))   # recenzja 281 (E223-9)
                 for i, d in enumerate(range(108990, 108996)):
                     L.append("[10:00:00] Gotowosc do bitwy (p9): dzien %d | reszta" % d)
                     if kind == "good":
@@ -71428,10 +71467,11 @@ def e223_synth():
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
     exp = {
-        "good": {"E223-0": "TAK", "E223-1": "TAK", "E223-2": "TAK", "E223-3": "TAK", "E223-4": "TAK", "E223-5": "TAK", "E223-6": "INFO", "E223-7": "INFO", "E223-8": "TAK"},
-        "bad": {"E223-0": "NIE", "E223-1": "NIE", "E223-3": "NIE", "E223-4": "NIE", "E223-5": "NIE", "E223-8": "NIE"},
-        "none": {"E223-0": "INFO", "E223-1": "INFO", "E223-2": "INFO", "E223-3": "INFO", "E223-4": "TAK", "E223-5": "INFO", "E223-8": "INFO"},
-        "off": {"E223-0": "INFO", "E223-1": "TAK", "E223-2": "INFO", "E223-3": "INFO", "E223-4": "TAK", "E223-5": "TAK", "E223-8": "TAK"},
+        "good": {"E223-0": "TAK", "E223-1": "TAK", "E223-2": "TAK", "E223-3": "TAK", "E223-4": "TAK", "E223-5": "TAK", "E223-6": "INFO", "E223-7": "INFO", "E223-8": "TAK",
+                 "E223-9": "TAK"},
+        "bad": {"E223-0": "NIE", "E223-1": "NIE", "E223-3": "NIE", "E223-4": "NIE", "E223-5": "NIE", "E223-8": "NIE", "E223-9": "NIE"},
+        "none": {"E223-0": "INFO", "E223-1": "INFO", "E223-2": "INFO", "E223-3": "INFO", "E223-4": "TAK", "E223-5": "INFO", "E223-8": "INFO", "E223-9": "INFO"},
+        "off": {"E223-0": "INFO", "E223-1": "TAK", "E223-2": "INFO", "E223-3": "INFO", "E223-4": "TAK", "E223-5": "TAK", "E223-8": "TAK", "E223-9": "INFO"},
     }
     diff = []
     for kind, e in exp.items():
@@ -71441,7 +71481,7 @@ def e223_synth():
 
 
 def e223_main(logp):
-    """e223 (26.10, paczka 223; 281 - E223-8): E223-S, E223-S2, E223-0..E223-8 - opis w komentarzu nad stalymi E223_*. Strumieniowo, tylko odczyt logu."""
+    """e223 (26.10, paczka 223; 281 - E223-8, recenzja 281 - E223-9): E223-S, E223-S2, E223-0..E223-9 - opis w komentarzu nad stalymi E223_*. Strumieniowo, tylko odczyt logu."""
     rep = Report()
     s1 = e223_selftest()
     rep.add("E223-S: self-test wyrazen (linie kontrolne jak w kodzie C#: LordEscort.cs, LordEscort.Probe.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)",
