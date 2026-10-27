@@ -339,6 +339,8 @@ namespace Armoury
 
         /// <summary>Regula czynna teraz (po Daily albo przeliczeniu po wczytaniu) - T4 autotestu.</summary>
         internal static bool IsActiveNow { get { return _active; } }
+        /// <summary>277 (linia doby, tylko odczyt): stosunek S_B / S_A z ostatniego liczenia 274 (1.0 - jeszcze nie liczony).</summary>
+        internal static double LastRatio { get { return _ratio; } }
 
         internal static bool IsFrontTarget(Kingdom k, Settlement st)
         {

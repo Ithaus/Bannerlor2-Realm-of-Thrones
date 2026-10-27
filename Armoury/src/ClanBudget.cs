@@ -1046,8 +1046,18 @@ namespace Armoury
                         {
                             // W7 (KingdomTreasury.LordLevy.cs): pobor stawki wojennej pana z wlasnych lenn - ten sam przydzial znaczony na druzyny (podniesienie
                             // pulapu ponad W5 i gotowka za ludzi, ktorzy sa); klucz LordWarLevy wylaczony albo rod bez poboru = 0 i budzet jak przed paczka
-                            double aid = KingdomTreasury.NeedAidBoostOf(c) + KingdomTreasury.LordLevyBoostOf(c);
-                            if (aid > 0) { b.Aid = aid; b.PartyCap += aid; b.Cap += aid; b.AidCash = Math.Max(0, Math.Min(Math.Min(aid, (double)b.WPar), (double)(KingdomTreasury.NeedAidCashOf(c) + KingdomTreasury.LordLevyCashOf(c)))); }
+                            // 277 (CanonHouses277.Pay.cs): zold od pana lennego rodom panow 277 - ten sam przydzial znaczony na druzyny co W5 (miejsce + gotowka pana tej doby);
+                            // rod bez przydzialu i klucz wylaczony = 0 i budzet co do zlotowki jak dotad
+                            double aid = KingdomTreasury.NeedAidBoostOf(c) + KingdomTreasury.LordLevyBoostOf(c) + CanonHouses277.BoostOf(c);
+                            if (aid > 0) { b.Aid = aid; b.PartyCap += aid; b.Cap += aid; b.AidCash = Math.Max(0, Math.Min(Math.Min(aid, (double)b.WPar), (double)(KingdomTreasury.NeedAidCashOf(c) + KingdomTreasury.LordLevyCashOf(c)) + CanonHouses277.CashOf(c))); }
+                            // 277: pan lenny oddaje to miejsce ze swojego pulapu partii (pulap rodu o tyle samo) - jedna zlotowka pulapu nie sluzy dwom rodom
+                            double give277 = CanonHouses277.CommitOf(c);
+                            if (give277 > 0)
+                            {
+                                double cut277 = Math.Min(give277, Math.Max(0, b.PartyCap));
+                                b.PartyCap -= cut277; b.Cap = Math.Max(0, b.Cap - cut277);
+                                CanonHouses277.NoteCut(c, cut277);
+                            }
                         }
                         // recenzja R1-3 (miara WW-4 "lup wydany"): pulap druzyn KONCOWY (z lupem i z W5/W7) - narzedzie liczy wydany lup jako zold ponad (pulap - lup);
                         // pulap przed W5/W7 dawal "wydany" 100% zawsze (zold Wysp oplacony z W5/W7 lezal ponad nim)
