@@ -390,7 +390,16 @@ namespace Armoury
         /// <summary>p9 recenzja (ArmsFirst - braki do progu): to samo z liczbami - sloty wzorca (need) i obsadzone ze zbrojowni (used).</summary>
         internal static int FillPercent(MobileParty g, Dictionary<ItemObject, int> arm, List<string> shorts, bool battle, out int need, out int used)
         {
-            need = 0; used = 0;
+            int bm, bf;
+            return FillPercent(g, arm, shorts, battle, out need, out used, out bm, out bf);
+        }
+
+        /// <summary>268 (gotowosc liczy zbroje na tulow): to samo plus przebieg BodyArmor tej samej petli - bodyMen = ludzie (zdrowi przy battle), ktorych wzorzec ma
+        /// slot korpusu (MenOf z MenTemplate), bodyFit = ilu z nich zbrojownia da pasujacy korpus (SwapMath.Fit z MeetsFitOf - jak DTE, takze sztuki zastepcze
+        /// AiWorseBodyArmourWhenShort). Zero dodatkowych przebiegow.</summary>
+        internal static int FillPercent(MobileParty g, Dictionary<ItemObject, int> arm, List<string> shorts, bool battle, out int need, out int used, out int bodyMen, out int bodyFit)
+        {
+            need = 0; used = 0; bodyMen = 0; bodyFit = 0;
             try
             {
                 foreach (var type in QuartermasterLaw.KitTypes)
@@ -402,6 +411,7 @@ namespace Armoury
                     if (men.Length == 0) continue;
                     int unfit = pieces.Count > 0 ? SwapMath.Fit(men, troops.Count, QuartermasterLaw.MeetsFitOf(troops), pieces) : men.Length;   // GearFit (po recenzji): jak nadwyzki
                     need += men.Length; used += men.Length - unfit;
+                    if (type == ItemObject.ItemTypeEnum.BodyArmor) { bodyMen = men.Length; bodyFit = men.Length - unfit; }   // 268
                     if (unfit > 0 && shorts != null && shorts.Count < 4) shorts.Add(unfit + " " + Plural(type));
                 }
             }

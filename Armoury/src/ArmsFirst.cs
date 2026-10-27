@@ -68,6 +68,10 @@ namespace Armoury
     ///     (2) CapThink: obrona zagrozonej osady KROLESTWA partii (oblezenie albo bitwa o nia), gdy jest najlepsza opcja (np. podbita przez OB5 BesiegedRelief -
     ///     Jeff 14.10 "stolicy i miast trzeba bronic za wszelka cene") - wyjazd po pierwsza bron czeka, jak przy osadzie rodu. (3) Wyjazd po pierwsza bron
     ///     zakonczony przed przyjazdem przez cudza blokade albo niewazne miasto nie liczy sie do odstepu (_capLast) - nastepnej doby nowa proba (inne miasto).
+    /// 268 (gotowosc liczy zbroje na tulow - ArmedStrength.LowRule): partia niegotowa przez zbroje jedzie ta sama droga (wyjazd, zakup AiGear - Order: korpus pierwszy,
+    ///     przed nim 159b pierwsza bron dla nadwyzki). Postep wizyty = R albo B wzroslo (Trip.B0 - zakup samych korpusow podnosi R czasem o mniej niz 1 pkt). "Stac go"
+    ///     przy przyczynie zbroja: cena sztuki = max(srednia zakupow AI wczoraj, wczorajsza srednia korpusu lordow - Measure174b.AvgYesterday). Liczniki: wyjazdy po
+    ///     zbroje (przyczyna zbroja przy starcie) i korpusy kupione w wyjazdach (AiGear here: sakiewka ludzi / kiesa pana). Pozyczki - bez zmian (tylko plan 159).
     /// </summary>
     internal static class ArmsFirst
     {
@@ -81,7 +85,7 @@ namespace Armoury
         private const float ArmyFloor = 1000f;   // DefaultArmyManagementCalculationModel.CanLordCreateArmy: num5 < 1000f -> false (Siege, krolestwo z osadami)
         private static readonly TextObject NotArmedText = new TextObject("{=!}Its men lack arms and armour - it must arm them before joining an army.");
 
-        private sealed class Trip { internal MobileParty P; internal Settlement Town; internal double StartH, ArriveH = -1; internal int R0, Ext; internal bool First; }   // First - 159c: wyjazd p9 po pierwsza bron (FirstOk)
+        private sealed class Trip { internal MobileParty P; internal Settlement Town; internal double StartH, ArriveH = -1; internal int R0, Ext, B0; internal bool First, Body; }   // First - 159c: wyjazd p9 po pierwsza bron (FirstOk); 268: B0 - B przy starcie / przedluzeniu, Body - wyjazd przez zbroje
         private static readonly Dictionary<MBGUID, Trip> _trip = new Dictionary<MBGUID, Trip>();
         private sealed class Streak { internal MobileParty P; internal int N; }
         private static readonly Dictionary<MBGUID, Streak> _noGain = new Dictionary<MBGUID, Streak>();   // recenzja p9: wizyty z rzedu bez postepu
@@ -107,6 +111,7 @@ namespace Armoury
         // liczniki doby (mysl i armie - watek glowny; atak - dowolny watek, pod zamkiem)
         private static readonly object Gate = new object();
         private static int _dTrips, _dArrived, _dArmed, _dPart, _dNoGain, _dTimeout, _dOff, _dOwnDef, _dStarve, _stumbles, _dExt, _dFreedTrip, _dBlocked, _dCapRelief, _dFirstInTown;
+        private static int _dTripsBody, _dBodyPcs, _dBodyBuys; private static long _dBodyGold, _dBodyPurse, _dBodyLord;   // 268: wyjazdy po zbroje, korpusy kupione w wyjazdach p9
         private static int _vAttackCalls, _vThresh;
         private static readonly HashSet<MBGUID> _vAttack = new HashSet<MBGUID>(), _vLead = new HashSet<MBGUID>(), _vMember = new HashSet<MBGUID>(),
                                                 _vAvail = new HashSet<MBGUID>(), _vElig = new HashSet<MBGUID>(), _dPoor = new HashSet<MBGUID>(), _dNoTown = new HashSet<MBGUID>(),
@@ -123,6 +128,7 @@ namespace Armoury
         internal static void ClearDay()
         {
             _dTrips = _dArrived = _dArmed = _dPart = _dNoGain = _dTimeout = _dOff = _dOwnDef = _dStarve = _dExt = _dFreedTrip = _dBlocked = _dCapRelief = _dFirstInTown = 0;
+            _dTripsBody = _dBodyPcs = _dBodyBuys = 0; _dBodyGold = _dBodyPurse = _dBodyLord = 0;
             lock (Gate) { _vAttackCalls = 0; _vThresh = 0; _vAttack.Clear(); _vLead.Clear(); _vMember.Clear(); _vAvail.Clear(); _vElig.Clear(); _vPre.Clear(); }
             _dPoor.Clear(); _dNoTown.Clear(); _dNoBuy.Clear(); _dNoBudgetTown.Clear();
         }
@@ -163,19 +169,37 @@ namespace Armoury
         /// pelne braki naraz - AiGear kupuje raz na dobe AiGearBudgetPercent kiesy, a partia z postepem zostaje w miescie kolejne doby; prog "jedna wizyta pokrywa
         /// min(braki, AiGearMaxPiecesPerVisit)" (Darlessa: min(121, 60) = 60 szt. x 36 d = ok. 2.2 tys. na wizyte, przy 25% kiesy ponad rezerwe 2000 - kiesa ok.
         /// 10.6 tys.) zostawilby bez wyjazdu lordow, ktorzy dozbroja sie w kilka dob. Zakupy AI wylaczone - nie stac (nikt nie kupuje).</summary>
-        internal static bool CanAfford(MobileParty mp, int shortPieces, Settlement town, out int budget, out int need)
+        // 268: body - niegotowa (takze) przez zbroje na tulow: cena sztuki = max(srednia wczoraj wszystkich sztuk, wczorajsza srednia korpusu lordow AI - Measure174b).
+        internal static bool CanAfford(MobileParty mp, int shortPieces, Settlement town, out int budget, out int need, bool body = false)
         {
             budget = 0; need = MinNeed;
             try
             {
                 int pcs = Math.Max(1, Math.Min(PiecesUnit, shortPieces));
-                need = Math.Max(MinNeed, pcs * Math.Max(0, AiGear.AvgPiecePriceYesterday));
+                need = Math.Max(MinNeed, pcs * UnitPrice(body));
                 int planNeed = NewLordKit.PlanNeed(mp);   // 159: nowa druzyna z planem - prog najwyzej wycena jej planu (mala druzyna nie potrzebuje MinNeed)
                 if (planNeed > 0) need = Math.Min(need, planNeed);
                 budget = town != null ? AiGear.BudgetPreview(mp, town) : AiGear.BudgetPreview(mp);
                 return AiGear.On && budget >= need;
             }
             catch (Exception e) { Stumble("CanAfford", e); return false; }
+        }
+
+        /// <summary>268: cena sztuki do "stac go" - srednia zakupow AI wczoraj; przy przyczynie zbroja nie mniej niz wczorajsza srednia korpusu lordow (0 - nieznana).</summary>
+        internal static int UnitPrice(bool body)
+        {
+            int u = Math.Max(0, AiGear.AvgPiecePriceYesterday);
+            return body ? Math.Max(u, Measure174b.AvgYesterday(Measure174b.BLord, Measure174b.GBody)) : u;
+        }
+
+        /// <summary>268: partia w wyjezdzie p9 (w drodze albo na postoju) - licznik korpusow kupionych w wyjazdach (AiGear here). Watek glowny.</summary>
+        internal static bool OnTrip(MobileParty mp) { return mp != null && _trip.Count > 0 && _trip.ContainsKey(mp.Id); }
+
+        /// <summary>268: korpusy kupione przez partie w wyjezdzie p9 (AiGear here): sztuk, zloto, z tego sakiewka ludzi i kiesa pana. Tylko licznik.</summary>
+        internal static void NoteTripBody(int n, int cost, int fromPurse)
+        {
+            if (n <= 0) return;
+            _dBodyBuys++; _dBodyPcs += n; _dBodyGold += cost; _dBodyPurse += fromPurse; _dBodyLord += cost - fromPurse;
         }
 
         private static bool OwnClanSettlement(Settlement st, Clan clan) { return st != null && clan != null && st.OwnerClan == clan; }
@@ -307,7 +331,7 @@ namespace Armoury
                     int b, need;
                     _why = null;
                     if (NoGainOf(party) >= NoGainMax) { _dNoBuy.Add(party.Id); _trip.Remove(party.Id); _why = WhyNoGain; }   // recenzja p9: seria wizyt bez postepu - jak "nie stac"
-                    else if (CanAfford(party, info.Short, null, out b, out need)) town = TripTown(party, info, CampaignTime.Now.ToHours, s, blocked, false);
+                    else if (CanAfford(party, info.Short, null, out b, out need, info.ByBody)) town = TripTown(party, info, CampaignTime.Now.ToHours, s, blocked, false);
                     else if (NewLordKit.FirstOk(party, null))
                     {
                         // 159c (druga recenzja 159b, uwaga 2): nie stac na pelne dozbrojenie (prog p9 MinNeed 300 zl), ale stac na pierwsza bron dla nadwyzki bez broni
@@ -481,14 +505,14 @@ namespace Armoury
                     bool done = t.ArriveH >= 0 && (!inTown || now - t.ArriveH >= StayHours);
                     bool late = t.ArriveH < 0 && now - t.StartH > TripDays(s) * 48.0 + 12.0;
                     if (!done && !late) return t.Town;
-                    bool gain = !late && info.R > t.R0;
+                    bool gain = !late && (info.R > t.R0 || (ArmedStrength.BodyOn(s) && info.B > t.B0));   // 268: postep takze przez korpusy (B)
                     // recenzja p9 (uwaga 4): postep w tej wizycie i dalej go stac (podglad z rezerwa napraw tego miasta) - zostaje kolejna dobe (AiGear kupuje raz na dobe)
                     int b2, need2;
                     // 159c: wyjazd po pierwsza bron dla nadwyzki (firstOnly) - "dalej go stac" wedlug wyceny pierwszej broni w tym miescie (NewLordKit.FirstOk)
                     // 159c recenzja 3: wyjazd zaczety jako pierwsza bron (t.First) - ten sam sprawdzian, takze gdy ta godzina idzie galezia pelnego dozbrojenia
-                    if (gain && inTown && ((firstOnly || t.First) ? NewLordKit.FirstOk(party, t.Town) : CanAfford(party, info.Short, t.Town, out b2, out need2)))
+                    if (gain && inTown && ((firstOnly || t.First) ? NewLordKit.FirstOk(party, t.Town) : CanAfford(party, info.Short, t.Town, out b2, out need2, info.ByBody)))
                     {
-                        t.ArriveH = now; t.R0 = info.R; t.Ext++; _dExt++; _noGain.Remove(party.Id);
+                        t.ArriveH = now; t.R0 = info.R; t.B0 = info.B; t.Ext++; _dExt++; _noGain.Remove(party.Id);
                         return t.Town;
                     }
                     // wizyta skonczona, a partia dalej niegotowa (albo za dlugo w drodze) - wytchnienie tego miasta i nastepne w zasiegu
@@ -517,7 +541,7 @@ namespace Armoury
                 // 159c: wycena pierwszej broni dla nadwyzki na polce TEGO miasta (moze byc inne niz najblizsze bez blokad); nie stac - jak dotad "nie stac"
                 if (!NewLordKit.FirstOk(party, town)) { _dPoor.Add(party.Id); _why = WhyPoor; return null; }
             }
-            else if (!CanAfford(party, info.Short, town, out b, out need))   // recenzja p9: rezerwa napraw z materialem tego miasta
+            else if (!CanAfford(party, info.Short, town, out b, out need, info.ByBody))   // recenzja p9: rezerwa napraw z materialem tego miasta
             {
                 // 159c recenzja 3: nie stac w tym miescie na pelne dozbrojenie (podglad z rezerwa napraw <= bez miasta), a stac na pierwsza bron dla nadwyzki na jego
                 // polce - wyjazd jak firstOnly; inaczej "nie stac w miescie" i po UnarmedMenSentHomeDays odsylka ludzi, ktorych pan moze uzbroic
@@ -525,8 +549,9 @@ namespace Armoury
                 first = true; _dFirstInTown++;
                 NewLordKit.NoteLowFirst(party, true);
             }
-            _trip[party.Id] = new Trip { P = party, Town = town, StartH = now, R0 = info.R, First = first };
+            _trip[party.Id] = new Trip { P = party, Town = town, StartH = now, R0 = info.R, B0 = info.B, First = first, Body = info.ByBody };
             _dTrips++;
+            if (info.ByBody) _dTripsBody++;   // 268
             return town;
         }
 
@@ -815,8 +840,8 @@ namespace Armoury
             lock (Gate) { a = _vAttack.Count; aCalls = _vAttackCalls; lead = _vLead.Count; mem = _vMember.Count; avail = _vAvail.Count; elig = _vElig.Count; pre = _vPre.Count; thr = _vThresh; }
             int streak = 0;
             foreach (var kv in _noGain) if (kv.Value.N >= NoGainMax) streak++;
-            int onWay = 0, there = 0;
-            foreach (var t in _trip.Values) { if (t.ArriveH >= 0) there++; else onWay++; }
+            int onWay = 0, there = 0, bodyNow = 0;
+            foreach (var t in _trip.Values) { if (t.ArriveH >= 0) there++; else onWay++; if (t.Body) bodyNow++; }
             return "jada po sprzet: nowe wyjazdy " + _dTrips + ", teraz w drodze " + onWay + " i na miejscu " + there + ", dojechaly " + _dArrived + ", dozbrojone " + _dArmed
                    + ", postoj przedluzony (postep i dalej stac) " + _dExt + ", po wizycie czesciowo " + _dPart + " i bez poprawy " + _dNoGain + ", za dlugo w drodze " + _dTimeout
                    + ", bez miasta w zasiegu " + _dNoTown.Count + " partii, w miescie nie stac (rezerwa napraw z materialem) " + _dNoBudgetTown.Count
@@ -825,6 +850,8 @@ namespace Armoury
                    + ", w miescie nie stac na pelne, stac na pierwsza bron (wyjazd) " + _dFirstInTown
                    + ", wyjazd po pierwsza bron czeka na obrone osady krolestwa (mysli) " + _dCapRelief
                    + ", w wytchnieniu " + _cool.Count + " par partia-miasto"
+                   + "; 268: wyjazdy po zbroje (B ponizej progu) " + _dTripsBody + " (teraz w toku " + bodyNow + "), dokupione korpusy w wyjazdach " + _dBodyPcs + " szt. za " + _dBodyGold
+                   + " zl (sakiewka " + _dBodyPurse + ", kiesa pana " + _dBodyLord + "; zakupow " + _dBodyBuys + ")"
                    + " | odmowy: atak " + a + " partii (" + aCalls + " razy), opcje bitwy zgaszone " + _dOff + " (mysli bez pieniedzy " + _dPoor.Count + " partii)"
                    + ", obrona wlasnej osady zostawiona " + _dOwnDef + ", glod (bez zmian) " + _dStarve
                    + ", tworzenie armii " + lead + " partii, kandydaci armii przed progiem gry " + pre + " i po nim " + mem + " (armia ponizej progu 1000 po odjeciu " + thr + ")"

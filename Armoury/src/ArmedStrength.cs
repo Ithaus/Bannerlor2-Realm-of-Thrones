@@ -65,8 +65,16 @@ namespace Armoury
     ///
     /// ZAPIS (druga recenzja p9): zegar czekania (od kiedy niegotowa, od kiedy zwolniona, zwolniona) partii niegotowych idzie do zapisu (klucz arm_p9_wait,
     /// StringId partii) - inaczej kazde wczytanie zaczynaloby AiArmsWaitMaxDays od nowa i lord bez pieniedzy przy krotkich sesjach nie bylby nigdy zwolniony.
+    ///
+    /// 268 - GOTOWOSC LICZY ZBROJE NA TULOW (Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; audyt 27.10: Lady Jana Lydden 26.10 - 47 z 77
+    /// ludzi w samej tunice, a R 67% (282/420 slotow) i "p9: gotowa" - R sumuje wszystkie typy, korpus to ok. 1 z 5.4 slotu czlowieka). Klucz AiArmsCountsBodyArmour.
+    /// B = % zdrowych ludzi, ktorych wzorzec ma slot korpusu i ktorym zbrojownia da pasujacy korpus (ten sam przebieg BodyArmor petli FillPercent - MenOf z MenTemplate,
+    /// SwapMath.Fit z MeetsFitOf, takze sztuki zastepcze; nikt ze slotem korpusu - 100). Regula (LowRule, te same progi co sloty - bez nowej stalej, histereza):
+    /// niegotowa = poprzednio niegotowa ? (R &lt; Ready || B &lt; Ready) : (R &lt; Below || B &lt; Below). Przyczyna (Cause): sloty, zbroja albo oba. Braki do progu
+    /// Short = max(braki slotow, ceil(Ready% x ludzie ze slotem korpusu) - z korpusem). Reszta bez zmian: ta sama publikacja (Info.Low), te same skutki (ArmsFirst,
+    /// 223, 222, OB5, 159), ten sam zegar czekania i zapis (arm_p9_wait - bez nowego klucza, przyczyna liczona od nowa po wczytaniu). F i G (sila, autobitwa) - z R jak dotad.
     /// </summary>
-    internal static class ArmedStrength
+    internal static partial class ArmedStrength
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal const int KNone = 0, KLord = 1, KPlayer = 2, KGarrison = 3;
@@ -80,13 +88,22 @@ namespace Armoury
         internal sealed class Info
         {
             internal readonly float F, G; internal readonly int R, Short; internal readonly bool Low, Free; internal readonly MobileParty P;
-            internal Info(float f, float g, int r, int sh, bool low, bool free, MobileParty p) { F = f; G = g; R = r; Short = sh; Low = low; Free = free; P = p; }
+            // 268: B - % ludzi ze slotem korpusu, ktorym zbrojownia da korpus (100 - nikt ze slotem); BodyMen / BodyFit - ilu ze slotem i ilu z korpusem; Cause - przyczyna
+            // stanu "niegotowa" (CSlots, CBody albo oba; 0 - gotowa)
+            internal readonly int B, BodyMen, BodyFit, Cause;
+            internal Info(float f, float g, int r, int sh, bool low, bool free, MobileParty p, int b = 100, int bodyMen = 0, int bodyFit = 0, int cause = 0)
+            { F = f; G = g; R = r; Short = sh; Low = low; Free = free; P = p; B = b; BodyMen = bodyMen; BodyFit = bodyFit; Cause = cause; }
+            /// <summary>268: niegotowa (takze) przez brak zbroi na tulow - ArmsFirst.CanAfford liczy wtedy cene korpusu.</summary>
+            internal bool ByBody { get { return (Cause & CBody) != 0; } }
         }
+
+        internal const int CSlots = 1, CBody = 2;   // 268: przyczyna stanu "niegotowa" (bity)
 
         private sealed class Ent
         {
             internal MobileParty P; internal int Kind, R = 100, Ver, Healthy, ArmVer, Day, Short; internal float F = 1f, G = 1f; internal bool Low, Known, Free;
             internal double LowSinceH = -1, FreeFromH = -1;   // recenzja p9 (uwaga 3): od kiedy niegotowa (zegar czekania), od kiedy zwolniona
+            internal int B = 100, BodyMen, BodyFit, Cause;   // 268
         }
 
         private static readonly Dictionary<MBGUID, Ent> _ent = new Dictionary<MBGUID, Ent>();
@@ -114,6 +131,7 @@ namespace Armoury
 
         // liczniki
         private static int _stumbles, _dComputed, _dUnknown, _dFull, _fullTotal, _dInvalid, _dPublish, _dHold, _dFreed, _dUnfree, _simStumbles;
+        private static int _dNewBody, _dNewLow;   // 268: partie, ktore dzis staly sie niegotowe - tylko przez zbroje na tulow / wszystkie
         private static long _dTicks, _dSimHits, _dSimOut, _dSimIn, _dSimMilli;   // autobitwa: ciosy z poprawka, zadane / otrzymane przez slabo uzbrojonych, suma mnoznikow x 1000
 
         private static void Stumble(string where, Exception e)
@@ -126,6 +144,7 @@ namespace Armoury
         {
             _ent.Clear(); _dirty.Clear(); _fullQ.Clear(); _pub = Empty; _strOn = false; _simOn = false; _savedWait.Clear(); _waitLoaded = 0; _pubDirty = _invAll = false; _needFull = true; _anyOn = false; _knee = -1;
             _stumbles = 0; _simStumbles = 0; ClearDay(); _fullTotal = 0; _share.Clear();
+            TestReset();   // 268: proba autotestu - raz na sesje
             ArmsFirst.Reset();
             NewLordKit.Reset();   // 159: plany nowych druzyn, zegary "nie moze sie dozbroic", liczniki - od zera przy nowej kampanii / przed wczytaniem
         }
@@ -133,6 +152,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _dComputed = _dUnknown = _dFull = _dInvalid = _dPublish = _dHold = _dFreed = _dUnfree = _dRestored = _dGarHold = 0; _dTicks = 0;
+            _dNewBody = _dNewLow = 0;
             Interlocked.Exchange(ref _dSimHits, 0); Interlocked.Exchange(ref _dSimOut, 0); Interlocked.Exchange(ref _dSimIn, 0); Interlocked.Exchange(ref _dSimMilli, 0);
         }
 
@@ -151,6 +171,17 @@ namespace Armoury
 
         /// <summary>159: czy partia byla juz przeliczona w tej sesji (po wczytaniu pelny przeglad idzie kolejka) - brak publikacji przy policzonej = gotowa.</summary>
         internal static bool Computed(MobileParty mp) { return mp != null && _ent.ContainsKey(mp.Id); }
+
+        /// <summary>268 (159 P0, autotest): stan z ostatniego przeliczenia partii (takze gotowej bez publikacji) - R, B, niegotowa, przyczyna; false - nie policzona
+        /// albo zbrojownia nieczytelna. Watek glowny, tylko odczyt.</summary>
+        internal static bool StateOf(MobileParty mp, out int r, out int b, out bool low, out int cause)
+        {
+            r = -1; b = -1; low = false; cause = 0;
+            Ent e;
+            if (mp == null || !_ent.TryGetValue(mp.Id, out e) || !e.Known) return false;
+            r = e.R; b = e.B; low = e.Low; cause = e.Cause;
+            return true;
+        }
 
         /// <summary>159 P0: ile dob partia czeka jako niegotowa (zegar ArmedStrength.Wait; -1 - nie czeka albo nie policzona). Watek glowny, tylko odczyt.</summary>
         internal static double WaitDaysOf(MobileParty mp)
@@ -346,6 +377,21 @@ namespace Armoury
 
         private static int Clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
         internal static int Below(Settings s) { return Clamp(s.AiArmsBelowPercent, 0, 100); }
+        internal static bool BodyOn(Settings s) { return s != null && s.AiArmsCountsBodyArmour; }   // 268
+
+        /// <summary>268: regula "niegotowa" - jedna para progow dla slotow (R) i zbroi na tulow (B), histereza: poprzednio niegotowa - wychodzi od ready, gotowa -
+        /// wchodzi ponizej below. body = AiArmsCountsBodyArmour (NIE - tylko R, jak przed 268). Czysta funkcja (autotest T1).</summary>
+        internal static bool LowRule(bool prev, int r, int b, int below, int ready, bool body)
+        {
+            return CauseOf(prev, r, b, below, ready, body) != 0;
+        }
+
+        /// <summary>268: przyczyna wedlug tych samych progow: CSlots (R ponizej), CBody (B ponizej, przy kluczu), oba; 0 - gotowa.</summary>
+        internal static int CauseOf(bool prev, int r, int b, int below, int ready, bool body)
+        {
+            int t = prev ? ready : below;
+            return (r < t ? CSlots : 0) | (body && b < t ? CBody : 0);
+        }
         internal static int Ready(Settings s) { return Math.Max(Below(s), Clamp(s.AiArmsReadyPercent, 0, 100)); }
         private static int Knee(Settings s) { return Clamp(s.AiStrengthFullKitPercent, 1, 100); }
 
@@ -416,16 +462,23 @@ namespace Armoury
                     known = all != null;
                     if (known) all.TryGetValue(mp.Id, out arm);
                 }
-                if (!known) { e.Known = false; e.R = -1; e.F = 1f; e.G = 1f; e.Short = 0; e.Low = false; e.Free = false; e.LowSinceH = -1; _dUnknown++; }
+                bool wasLow = e.Low;   // 268: przed przeliczeniem (nowe niegotowe dzis - licznik)
+                if (!known) { e.Known = false; e.R = -1; e.F = 1f; e.G = 1f; e.Short = 0; e.Low = false; e.Free = false; e.LowSinceH = -1; e.B = 100; e.BodyMen = 0; e.BodyFit = 0; e.Cause = 0; _dUnknown++; }
                 else
                 {
                     e.Known = true;
-                    int slots, filled;
-                    int r = GarrisonKit.FillPercent(mp, arm, null, true, out slots, out filled);
+                    int slots, filled, bodyMen, bodyFit;
+                    int r = GarrisonKit.FillPercent(mp, arm, null, true, out slots, out filled, out bodyMen, out bodyFit);   // 268: przebieg korpusu z tej samej petli
                     e.R = r;
                     e.F = Factor(mp, r, s);
                     e.G = (float)Math.Min(1.0, Math.Max(0, r) / (double)Knee(s));
-                    e.Short = Math.Max(0, (int)Math.Ceiling(Ready(s) * (double)slots / 100.0) - filled);   // sztuk do progu gotowosci (ArmsFirst.CanAfford)
+                    e.BodyMen = bodyMen; e.BodyFit = bodyFit;
+                    int b = BodyPercent(bodyMen, bodyFit);
+                    e.B = b;
+                    bool body = BodyOn(s);
+                    int shortR = Math.Max(0, (int)Math.Ceiling(Ready(s) * (double)slots / 100.0) - filled);
+                    int shortB = Math.Max(0, (int)Math.Ceiling(Ready(s) * (double)bodyMen / 100.0) - bodyFit);   // 268: korpusow do progu (kazdy korpus to tez slot)
+                    e.Short = body ? Math.Max(shortR, shortB) : shortR;   // sztuk do progu gotowosci (ArmsFirst.CanAfford)
                     // druga recenzja p9: stan z zapisu (niegotowa - histereza - i zegar czekania), raz, przy pierwszym czytelnym przeliczeniu po wczytaniu
                     SavedWait sw;
                     bool restored = false;
@@ -434,7 +487,10 @@ namespace Armoury
                         _savedWait.Remove(mp.StringId);
                         if (kind == KLord) { e.Low = true; e.LowSinceH = sw.LowH; e.FreeFromH = sw.FreeH; e.Free = sw.Free; restored = true; }
                     }
-                    e.Low = kind == KLord && (e.Low ? r < Ready(s) : r < Below(s));
+                    bool prev = e.Low;
+                    e.Low = kind == KLord && LowRule(prev, r, b, Below(s), Ready(s), body);   // 268: sloty albo zbroja na tulow, ta sama histereza
+                    e.Cause = e.Low ? CauseOf(prev, r, b, Below(s), Ready(s), body) : 0;
+                    if (e.Low && !wasLow && !restored) { _dNewLow++; if (e.Cause == CBody) _dNewBody++; }
                     if (restored && e.Low) _dRestored++;
                     Wait(e, mp, s);
                 }
@@ -442,8 +498,8 @@ namespace Armoury
                 var pi = InfoOf(mp);
                 float pf = pi != null ? pi.F : 1f;
                 bool pl = pi != null && pi.Low, pfr = pi != null && pi.Free;
-                int psh = pi != null ? pi.Short : 0;
-                if (Math.Abs(pf - e.F) >= 0.01f || pl != e.Low || pfr != e.Free || (e.Low && psh != e.Short)) _pubDirty = true;
+                int psh = pi != null ? pi.Short : 0, pb = pi != null ? pi.B : 100, pc = pi != null ? pi.Cause : 0;
+                if (Math.Abs(pf - e.F) >= 0.01f || pl != e.Low || pfr != e.Free || (e.Low && (psh != e.Short || pb != e.B || pc != e.Cause))) _pubDirty = true;   // 268: B i przyczyna
             }
             catch (Exception ex) { Stumble("Compute", ex); }
             finally { _dTicks += Stopwatch.GetTimestamp() - t0; }
@@ -463,7 +519,7 @@ namespace Armoury
             if (e.Free)
             {
                 int b, need;
-                if (now - e.FreeFromH >= wait && ArmsFirst.CanAfford(mp, e.Short, null, out b, out need)) { e.Free = false; e.FreeFromH = -1; e.LowSinceH = now; _dUnfree++; }
+                if (now - e.FreeFromH >= wait && ArmsFirst.CanAfford(mp, e.Short, null, out b, out need, (e.Cause & CBody) != 0)) { e.Free = false; e.FreeFromH = -1; e.LowSinceH = now; _dUnfree++; }
             }
             else if (now - e.LowSinceH >= wait && !ArmsFirst.Progressing(mp))   // w miescie z postepem (postoj przedluzony) - dokupuje dalej, zwolnienie pozniej
             {
@@ -628,7 +684,7 @@ namespace Armoury
             {
                 var e = kv.Value;
                 if (e.P == null) continue;
-                if (e.F < 0.9995f || e.Low) nu[kv.Key] = new Info(e.F, e.G, e.R, e.Short, e.Low, e.Free, e.P);
+                if (e.F < 0.9995f || e.Low) nu[kv.Key] = new Info(e.F, e.G, e.R, e.Short, e.Low, e.Free, e.P, e.B, e.BodyMen, e.BodyFit, e.Cause);
             }
             _pub = nu;
             bool all = _invAll; _invAll = false;
@@ -744,6 +800,8 @@ namespace Armoury
                          + " (niegotowa ponizej " + Below(s) + "%, gotowa od " + Ready(s) + "%, miasto najwyzej " + ArmsFirst.TripDays(s) + " dob drogi, wytchnienie miasta "
                          + ArmsFirst.CoolDays(s) + " dob, bandy " + (s.AiArmsBlockBanditAttacks ? "tez zakazane" : "wolno") + ", czekanie najwyzej " + ArmsFirst.WaitDays(s)
                          + " dob - potem walczy tym, co ma, do gotowosci albo pieniedzy na sprzet)"
+                         + " | AI Arms Counts Body Armour " + (BodyOn(s) ? "TAK" : "NIE") + " (tulow: niegotowa ponizej " + Below(s) + "%, gotowa od " + Ready(s)
+                         + "% ludzi z korpusem we wzorcu) | AI Armour Order Full " + (s.AiArmourOrderFull ? "TAK" : "NIE")
                          + " | regula: lordowie i druzyna gracza " + (GarrisonKit.OwnKitOn ? "TAK" : "NIE (TroopsFightWithOwnKitOnly wylaczone)") + ", zalogi " + (GarrisonKit.BareOn ? "TAK" : "NIE (walcza we wzorcu)")
                          + " | AI Autobattle Counts Gear " + (s.AiAutobattleCountsGear ? "TAK" : "NIE") + (s.AiAutobattleCountsGear && !s.AiStrengthCountsGear ? " (bez skutku - AI Strength Counts Gear NIE)" : "")
                          + " | latki: sila partii " + _hPower + "; autobitwa (ta sama regula na cios) " + _hSim + "; pamiec sily gry (PartyBase._lastEstimatedStrengthVersionNo) " + _hMem
@@ -779,6 +837,7 @@ namespace Armoury
             {
                 if (!(s.AiStrengthCountsGear || s.AiArmsBeforeBattle)) { ClearDay(); ArmsFirst.ClearDay(); return; }
                 int lords = 0, lordsKnown = 0, gars = 0, garsKnown = 0, garsLow = 0, low = 0, lowArmy = 0, poor = 0, freed = 0;
+                int bLords = 0, bNone = 0, cSlots = 0, cBody = 0, cBoth = 0; long bSum = 0; var bBucket = new int[4];   // 268: zbroja na tulow lordow i przyczyny
                 long rSum = 0, gSum = 0; double fSum = 0, fMin = 2; string fMinName = null;
                 var bucket = new int[4];
                 var byK = new SortedDictionary<string, long[]>(StringComparer.Ordinal);   // druga recenzja p9: R lordow wedlug krolestw (HorseCensus.KeyOfParty) - [suma R, partii, niegotowych]
@@ -798,25 +857,30 @@ namespace Armoury
                     if (!byK.TryGetValue(kk, out kr)) { kr = new long[3]; byK[kk] = kr; }
                     kr[0] += e.R; kr[1]++; if (e.Low && !e.Free) kr[2]++;
                     bucket[Math.Min(3, Math.Max(0, e.R) / 25)]++;
+                    if (e.BodyMen > 0) { bLords++; bSum += e.B; bBucket[Math.Min(3, Math.Max(0, e.B) / 25)]++; } else bNone++;   // 268
                     if (e.F < fMin) { fMin = e.F; fMinName = Nm(e.P) + " (" + e.P.MemberRoster.TotalManCount + " ludzi, R " + e.R + "%)"; }
                     if (e.Low)
                     {
                         if (e.P.Army != null) { lowArmy++; continue; }
                         if (e.Free) { freed++; continue; }   // recenzja p9 (uwaga 3): zwolniona z czekania - walczy tym, co ma
                         low++; lows.Add(e);
+                        if (e.Cause == CBody) cBody++; else if (e.Cause == (CSlots | CBody)) cBoth++; else cSlots++;   // 268: przyczyna
                         int b, need;
-                        if (!ArmsFirst.CanAfford(e.P, e.Short, null, out b, out need)) poor++;
+                        if (!ArmsFirst.CanAfford(e.P, e.Short, null, out b, out need, (e.Cause & CBody) != 0)) poor++;
                     }
                 }
-                lows.Sort((a, b) => a.R != b.R ? a.R.CompareTo(b.R) : b.P.MemberRoster.TotalManCount.CompareTo(a.P.MemberRoster.TotalManCount));
+                // 268: najnizsza z miar przyczyny (R albo B przy niegotowej przez zbroje) - inaczej przyklady nigdy nie pokazalyby partii niegotowej tylko przez zbroje
+                Func<Ent, int> low0 = x => (x.Cause & CBody) != 0 ? Math.Min(x.R, x.B) : x.R;
+                lows.Sort((a, b) => low0(a) != low0(b) ? low0(a).CompareTo(low0(b)) : b.P.MemberRoster.TotalManCount.CompareTo(a.P.MemberRoster.TotalManCount));
                 var ex = new StringBuilder();
                 for (int i = 0; i < lows.Count && i < 3; i++)
                 {
                     var e = lows[i];
-                    int b, need; bool can = ArmsFirst.CanAfford(e.P, e.Short, null, out b, out need);
+                    int b, need; bool can = ArmsFirst.CanAfford(e.P, e.Short, null, out b, out need, (e.Cause & CBody) != 0);
                     double waited = e.LowSinceH >= 0 ? (CampaignTime.Now.ToHours - e.LowSinceH) / 24.0 : 0;
                     if (ex.Length > 0) ex.Append("; ");
-                    ex.Append(Nm(e.P)).Append(" (").Append(e.P.MemberRoster.TotalManCount).Append(" ludzi, R ").Append(e.R).Append("%, F ").Append(F2(e.F))
+                    ex.Append(Nm(e.P)).Append(" (").Append(e.P.MemberRoster.TotalManCount).Append(" ludzi, R ").Append(e.R).Append("%, B ").Append(e.B).Append("% (")
+                      .Append(e.BodyFit).Append('/').Append(e.BodyMen).Append("), przyczyna ").Append(CauseText(e.Cause)).Append(", F ").Append(F2(e.F))
                       .Append(", brak do progu ").Append(e.Short).Append(" szt., czeka ").Append(waited.ToString("0.0", Inv)).Append(" dob")
                       .Append(", budzet ").Append(b).Append(" z ").Append(need).Append(can ? "" : " - nie stac").Append(", cel ").Append(ArmsFirst.TargetName(e.P)).Append(')');
                 }
@@ -835,6 +899,12 @@ namespace Armoury
                   .Append(", w armii ").Append(lowArmy)
                   .Append(", zwolnione z czekania (po ").Append(ArmsFirst.WaitDays(s)).Append(" dobach walcza tym, co maja) ").Append(freed)
                   .Append(" (dzis nowe ").Append(_dFreed).Append(", powrot do dozbrajania - stac na sprzet ").Append(_dUnfree).Append(')')
+                  .Append(" | zbroja na tulow (268): klucz ").Append(BodyOn(s) ? "TAK" : "NIE").Append(", srednio B ").Append(bLords > 0 ? (bSum / (double)bLords).ToString("0", Inv) + "%" : "-")
+                  .Append(", B 0-25: ").Append(bBucket[0]).Append(", 25-50: ").Append(bBucket[1]).Append(", 50-75: ").Append(bBucket[2]).Append(", 75-100: ").Append(bBucket[3])
+                  .Append(", bez korpusu we wzorcu ").Append(bNone)
+                  .Append(" | niegotowe poza armia wedlug przyczyny: tylko sloty ").Append(cSlots).Append(", tylko zbroja ").Append(cBody).Append(", oba ").Append(cBoth)
+                  .Append("; nowe dzis ").Append(_dNewLow).Append(", w tym przez zbroje ").Append(_dNewBody)
+                  .Append(pl != null && pl.Known ? "; gracz B " + pl.B + "% (" + pl.BodyFit + "/" + pl.BodyMen + ")" : "")
                   .Append(" | autobitwa (ta sama regula, AI Autobattle Counts Gear ").Append(_simOn ? "TAK" : "NIE").Append("): ciosy z poprawka ").Append(Interlocked.Read(ref _dSimHits))
                   .Append(" (zadane przez slabo uzbrojonych ").Append(Interlocked.Read(ref _dSimOut)).Append(", otrzymane ").Append(Interlocked.Read(ref _dSimIn))
                   .Append(", sredni mnoznik ciosu ").Append(Interlocked.Read(ref _dSimHits) > 0 ? (Interlocked.Read(ref _dSimMilli) / 1000.0 / Interlocked.Read(ref _dSimHits)).ToString("0.00", Inv) : "-")
@@ -853,6 +923,15 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily", e); }
             ClearDay();
             ArmsFirst.ClearDay();
+            _sessDays++;
+            try { TestStep((int)CampaignTime.Now.ToDays); } catch (Exception e) { Stumble("TestStep", e); }   // 268: proba autotestu (tylko DLL autotestu i flaga)
         }
+
+        private static int _sessDays;   // 268: doby od wczytania (autotest; zerowane w TestReset)
+
+        /// <summary>268: B z liczb przebiegu korpusu - % ludzi ze slotem korpusu, ktorym zbrojownia da korpus; nikt ze slotem - 100.</summary>
+        internal static int BodyPercent(int bodyMen, int bodyFit) { return bodyMen > 0 ? (int)((long)Math.Max(0, bodyFit) * 100 / bodyMen) : 100; }
+
+        private static string CauseText(int c) { return c == CBody ? "zbroja" : c == (CSlots | CBody) ? "oba" : c == CSlots ? "sloty" : "-"; }
     }
 }

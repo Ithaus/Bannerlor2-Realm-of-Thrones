@@ -40,7 +40,7 @@ namespace Armoury
     /// </summary>
     internal static class AiGear
     {
-        internal static void Reset() { _lastDay.Clear(); _dteRefused.Clear(); _dteOk.Clear(); AiBuyRules.Reset(); AmmoOrders.Reset(); _avgPrice = 0; }   // E8/Z (251): liczniki regul zakupow AI; tb: liczniki zamowien amunicji
+        internal static void Reset() { _lastDay.Clear(); _dteRefused.Clear(); _dteOk.Clear(); AiBuyRules.Reset(); AmmoOrders.Reset(); ArmourOrders.Reset(); _avgPrice = 0; }   // E8/Z (251): liczniki regul zakupow AI; tb: liczniki zamowien amunicji; 268: liczniki zamowien zbroi i pamiec doby lordow w zamkach
         private static Type _dte;
         private static FieldInfo _armories;
         private static MethodInfo _add;
@@ -403,6 +403,7 @@ namespace Armoury
         {
             AiBuyRules.Daily();   // E8/Z (251): linia doby "Zakupy i nadwyzki AI (E8/Z)" - ten sam takt co linia "Uprzaz (215)" (ma wlasny try)
             AmmoOrders.Daily();   // tb: linia doby "Amunicja AI - zamowienia (tb)" - ten sam takt (ma wlasny try)
+            ArmourOrders.Daily();   // 268: linia doby "Zbroja AI - zamowienia (268)" - ten sam takt (ma wlasny try)
             try
             {
                 int shelf = SupplyDemand.HarnessOnShelves;
@@ -882,6 +883,9 @@ namespace Armoury
         /// <summary>Czy na polce lezy sztuka typu i tieru (t albo t-1), bez unikatow - "za drogie" to nie brak towaru (wpis 81). 174b.4: tylko sztuki PONAD
         /// rezerwe kramu - gdy zostala sama rezerwa, zamowienie dla kowali idzie jak przy pustej polce. E8/Z (251): sztuka, ktorej AI nie wezmie (dodatni
         /// stan, stroj mieszczan bez zolnierza, cena ponad sufit - AiBuyRules), tez nie liczy sie jako "jest na polce" - brak idzie jako zamowienie.</summary>
+        /// <summary>268 (ArmourOrders.CastleVisit): to samo co OnShelf - polka miasta zamku dla lorda stojacego w zamku.</summary>
+        internal static bool OnShelfFor(Settlement market, ItemObject.ItemTypeEnum ty, int tr, MobileParty buyer) { return OnShelf(market, ty, tr, buyer); }
+
         private static bool OnShelf(Settlement market, ItemObject.ItemTypeEnum ty, int tr, MobileParty buyer)
         {
             var shelf = market.ItemRoster;
@@ -917,6 +921,7 @@ namespace Armoury
         {
             // 174b.5 F5: tanie filtry przed ramka ksiegi (ramka bez AddToCounts rozlicza sie na zero - ksiega ta sama). Scalenie sklad8: WouldBuy
             // filtruje tylko braki (TryBuyCore); lepsze za swoje (MenUpgrade.ForAi) maja wlasne warunki i bramke doby - wolane jak w sklad7
+            ArmourOrders.CastleVisit(mp, st);   // 268 (2b): lord w zamku - braki korpusu i helmu zamawiane w miescie zamku (raz na dobe, bez zakupu i bez zlota; ma wlasny try)
             bool core = WouldBuy(mp, st);
             if (!core && !MenUpgrade.On) return;
             var gf = GoodsLedger.Begin(GoodsLedger.FArmsBuy, mp);
@@ -1068,7 +1073,8 @@ namespace Armoury
                     AiBuyRules.NoteBought(el, n, cost);   // E8/Z (251): dodatnie stany, stroj mieszczan i sztuki ponad sufit w kupionych (tylko licznik; slad tej samej partii)
                     AiWear.NoteBought(mp, el, n);   // wpis 89: zuzyta z polki zostaje zuzyta; 171/K1 (recenzje): takze w zalodze
                     MenUpgrade.NoteChurn(mp, el.Item, true);
-                    pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy), nie cena pierwszej x n
+                    int fromPurse0 = pay(cost);   // ceny hurtu (09.10): cost - suma cen sztuk (ShelfBuy), nie cena pierwszej x n
+                    if (!garrison && el.Item.ItemType == ItemObject.ItemTypeEnum.BodyArmor && ArmsFirst.OnTrip(mp)) ArmsFirst.NoteTripBody(n, cost, fromPurse0);   // 268: korpusy w wyjazdach p9 (tylko licznik)
                     st.Town.ChangeGold(cost);
                     ClanIncomeBook.NoteOwnPaid(st, lord != null ? lord.Clan : null, cost);   // 169c: "wlasne" D stalego - sprzet rodu kupiony w jego osadzie (tylko licznik)
                     MoneyLedger.Note(MoneyLedger.NGear, st, cost);   // ksiega przeplywow osad (tylko licznik)
@@ -1181,17 +1187,27 @@ namespace Armoury
                             }
                             int unmet = 0;
                             bool ammoShort = false;   // tb (AmmoOrders): tylko licznik
+                            bool armShort = false; int armBack = budget;   // 268 (ArmourOrders): kiesa zamowienia zamku pokrywa zamowienia zbroi i helmow
                             foreach (var kv in need)
                             {
                                 if (kv.Value <= 0) continue;
                                 var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
                                 bool onShelf = OnShelf(market, ty, tr, mp), ordered = false;
                                 float amt = 0f;
+                                if (ArmourOrders.IsArmour(ty))
+                                {
+                                    // 268 (AiArmourOrderFull): korpus i helm - caly brak w granicach kiesy (najwyzej SupplyDemandOrderCap); klucz NIE - 10 jak dotad
+                                    armShort = true;
+                                    if (!onShelf) { ArmourOrders.Order(ArmourOrders.WCastle, mp, market, ty, tr, kv.Value, ref armBack, Measure174b.BCastleOrder, out amt); unmet++; }
+                                    else ArmourOrders.NoteLeft(ArmourOrders.WCastle, ty, kv.Value);
+                                    continue;
+                                }
                                 // tb (AiAmmoOrderFull): strzaly i belty - zamowienie na caly brak (najwyzej SupplyDemandOrderCap); reszta i klucz wylaczony - 10 jak dotad
                                 if (!onShelf) { amt = AmmoOrders.Amount(ty, kv.Value); ordered = SupplyDemand.NoteUnmetOnce(mp, market, ty, tr, amt); unmet++; }
                                 if (AmmoOrders.IsAmmo(ty)) { ammoShort = true; AmmoOrders.NoteBasket(AmmoOrders.WCastle, kv.Value, onShelf, ordered, amt); }
                             }
                             AmmoOrders.NoteVisit(AmmoOrders.WCastle, ammoShort);
+                            ArmourOrders.NoteVisit(ArmourOrders.WCastle, armShort);   // 268: tylko licznik
                             if (unmet > 0) GarrisonCarts.NoteUnmet(unmet);
                         }
                     }
@@ -1204,17 +1220,28 @@ namespace Armoury
                     var shelf = st.ItemRoster;
                     int aw = garrison ? AmmoOrders.WGarrison : AmmoOrders.WLord;   // tb (AmmoOrders): tylko licznik
                     bool ammoShort = false;
+                    int rw = garrison ? ArmourOrders.WGarrison : ArmourOrders.WLord;   // 268 (ArmourOrders)
+                    bool armShort = false; int armBack = budget;   // 268: kiesa wizyty (GoldPart + sakiewka, przydzial rodu) pokrywa zamowienia zbroi i helmow
                     foreach (var kv in need)
                     {
                         if (kv.Value <= 0) continue;
                         var ty = (ItemObject.ItemTypeEnum)(kv.Key / 10); int tr = kv.Key % 10;
                         bool onShelf = OnShelf(st, ty, tr, mp), ordered = false;
                         float amt = 0f;
+                        if (ArmourOrders.IsArmour(ty))
+                        {
+                            // 268 (AiArmourOrderFull): korpus i helm - caly brak w granicach kiesy (najwyzej SupplyDemandOrderCap); klucz NIE - 10 jak dotad
+                            armShort = true;
+                            if (!onShelf) ArmourOrders.Order(rw, mp, st, ty, tr, kv.Value, ref armBack, who, out amt);
+                            else ArmourOrders.NoteLeft(rw, ty, kv.Value);
+                            continue;
+                        }
                         // tb (AiAmmoOrderFull): strzaly i belty - zamowienie na caly brak (najwyzej SupplyDemandOrderCap); reszta i klucz wylaczony - 10 jak dotad
                         if (!onShelf) { amt = AmmoOrders.Amount(ty, kv.Value); ordered = SupplyDemand.NoteUnmetOnce(mp, st, ty, tr, amt); }
                         if (AmmoOrders.IsAmmo(ty)) { ammoShort = true; AmmoOrders.NoteBasket(aw, kv.Value, onShelf, ordered, amt); }
                     }
                     AmmoOrders.NoteVisit(aw, ammoShort);
+                    ArmourOrders.NoteVisit(rw, armShort);   // 268: tylko licznik
                 }
                 if (pieces <= 0) return;
                 try { ArmedStrength.MarkDirty(mp); } catch { }   // p9: zakup zmienia gotowosc zbrojowni - przeliczenie sily i progu w nastepnej godzinie

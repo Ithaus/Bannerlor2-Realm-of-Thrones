@@ -1276,6 +1276,7 @@ namespace Armoury
             var byAge = new int[5, 3];
             var whyN = new int[WhyCodes.Length];
             var worst = new List<KeyValuePair<MobileParty, int>>();   // P0 doby: niegotowe poza armia (R) - 3 najgorsze opisane jak w bitwie gracza
+            _d268Body = _d268BodyNew = 0;
             try
             {
                 var all = AiGear.Armories();
@@ -1338,6 +1339,7 @@ namespace Armoury
                         byAge[ab, 0]++;
                         if (!hasEntry) { noEntry++; byAge[ab, 1]++; }
                         if (zero) { r0++; byAge[ab, 2]++; }
+                        if (info != null && info.Low && info.ByBody) { _d268Body++; if (ab <= 2) _d268BodyNew++; }   // 268: niegotowe (takze) przez zbroje na tulow
                         if (info == null || !info.Low)
                         {
                             // recenzja 159b (uwaga 2): partia gotowa wedlug p9 (R liczy sloty, takze zbroje - dobrze opancerzona z 30% ludzi bez broni nie jest
@@ -1358,7 +1360,7 @@ namespace Armoury
                             // na pierwsza bron dla nadwyzki wedlug wyceny polki (FirstOk), regula X% jak u gotowej (OverCap: zegar bez postepu, wyjazd po pierwsza bron);
                             // nie stac na zadne - do domu od razu jak dotad
                             int fb, fn;
-                            bool can = ArmsFirst.CanAfford(mp, info.Short, null, out fb, out fn);
+                            bool can = ArmsFirst.CanAfford(mp, info.Short, null, out fb, out fn, info.ByBody);
                             if (capAll && (can || FirstOk(mp, null))) { OverCap(mp, hasEntry, now, wait, pct, true); continue; }
                             due = !can;
                         }
@@ -1393,6 +1395,8 @@ namespace Armoury
         }
 
         private static string Age3(int[,] a, int i) { return a[i, 0] + "/" + a[i, 1] + "/" + a[i, 2]; }
+
+        private static int _d268Body, _d268BodyNew;   // 268: spis doby - partie niegotowe (takze) przez zbroje na tulow, z tego nowe druzyny (wiek do 7 dob)
 
         private static void Line(Settings s, int today, int lords, int noEntry, int r0, int[,] byAge, int stuckNow, int stuckShort, int[] whyN, string p0)
         {
@@ -1462,7 +1466,8 @@ namespace Armoury
               .Append(" szt. za ").Append(_dCapVisitGold).Append(" zl");
             sb.Append(" | SPIS (P0): partie lordow AI ").Append(lords).Append(", bez wpisu DTE ").Append(noEntry).Append(", R = 0 (z brakiem wpisu) ").Append(r0)
               .Append("; wedlug wieku partii (wszystkie/bez wpisu/R=0): < 1 doby ").Append(Age3(byAge, 0)).Append(", 1-3 ").Append(Age3(byAge, 1)).Append(", 3-7 ").Append(Age3(byAge, 2))
-              .Append(", 7+ ").Append(Age3(byAge, 3)).Append(", sprzed wczytania (wiek nieznany) ").Append(Age3(byAge, 4));
+              .Append(", 7+ ").Append(Age3(byAge, 3)).Append(", sprzed wczytania (wiek nieznany) ").Append(Age3(byAge, 4))
+              .Append("; niegotowe przez zbroje na tulow (268): wszystkie ").Append(_d268Body).Append(", nowe druzyny niegotowe przez zbroje (wiek do 7 dob) ").Append(_d268BodyNew);
             sb.Append(" | P0 niegotowe poza armia - 3 najnizsze R (stan po regule 2): ").Append(p0);
             sb.Append(" | przyklady: ").Append(_dEx.Count > 0 ? string.Join("; ", _dEx.ToArray()) : "brak");
             sb.Append(" | zapis: wczytane ").Append(_importN < 0 ? "brak klucza" : _importN.ToString()).Append(_importBad > 0 ? " (bledne " + _importBad + ")" : "")
@@ -1504,13 +1509,15 @@ namespace Armoury
             var all = AiGear.Armories();
             Dictionary<ItemObject, int> arm = null;
             bool entry = all != null && all.TryGetValue(mp.Id, out arm);
-            int needS, usedS;
-            int r = GarrisonKit.FillPercent(mp, arm, null, true, out needS, out usedS);
+            int needS, usedS, bodyM, bodyF;
+            int r = GarrisonKit.FillPercent(mp, arm, null, true, out needS, out usedS, out bodyM, out bodyF);   // 268: takze zbroja na tulow teraz
             var info = ArmedStrength.InfoOf(mp);
+            int r9, b9, c9; bool l9;
+            bool k9 = ArmedStrength.StateOf(mp, out r9, out b9, out l9, out c9);   // 268: B, na ktorym p9 oparlo ostatnia decyzje
             string state = info == null ? "nie niegotowa (albo niepoliczona)" : info.Low ? (info.Free ? "NIEGOTOWA, zwolniona z czekania" : "NIEGOTOWA") : "gotowa (F " + info.F.ToString("0.00", Inv) + ")";
             double w = ArmedStrength.WaitDaysOf(mp);
             int b, need;
-            bool can = ArmsFirst.CanAfford(mp, info != null ? info.Short : 0, null, out b, out need);
+            bool can = ArmsFirst.CanAfford(mp, info != null ? info.Short : 0, null, out b, out need, info != null && info.ByBody);
             Stuck st;
             string stuck = _stuck.TryGetValue(mp, out st) ? WhyCodes[Math.Max(0, Math.Min(WhyCodes.Length - 1, st.Why))] + " od " + ((CampaignTime.Now.ToHours - st.SinceH) / 24.0).ToString("0.0", Inv) + " dob" : "-";
             var lord = mp.LeaderHero;
@@ -1523,6 +1530,8 @@ namespace Armoury
             return Nm(mp) + " [" + side + "] ludzi " + mp.MemberRoster.TotalManCount + " (rannych " + mp.MemberRoster.TotalWounded + ")"
                    + " | R teraz " + r + "% (" + usedS + "/" + needS + " slotow), wpis DTE " + (entry ? "TAK" : "NIE") + ", p9: " + state
                    + (w >= 0 ? ", czeka " + w.ToString("0.0", Inv) + " dob" : "")
+                   + " | zbroja na tulow (268): B teraz " + ArmedStrength.BodyPercent(bodyM, bodyF) + "% (" + bodyF + "/" + bodyM + " ludzi), B p9 " + (k9 ? b9 + "% (R p9 " + r9 + "%)" : "-")
+                   + ", niegotowa przez zbroje " + (info != null && info.Low && info.ByBody ? "TAK" : "NIE")
                    + " | cel p9 " + ArmsFirst.TargetName(mp) + ", stoi: " + stuck + " | zloto wodza " + (lord != null ? lord.Gold.ToString(Inv) : "-")
                    + ", budzet AiGear " + b + " z potrzebnych " + need + (can ? "" : " - nie stac")
                    + " | w armii " + (mp.Army != null ? "TAK (" + Nm(mp.Army.LeaderParty) + ")" : "NIE") + " | powstala " + born + " | AI " + ai + " | plan 159: " + plan;

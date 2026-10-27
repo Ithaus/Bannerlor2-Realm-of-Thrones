@@ -670,6 +670,9 @@ LABELS = {
     'AiArmsTripCooldownDays': 'AI Arms Trip Cooldown Days',
     'AiArmsWaitMaxDays': 'AI Arms Wait Max Days',
     'AiArmsBlockBanditAttacks': 'AI Arms Block Bandit Attacks',
+    # 268: gotowosc liczy zbroje na tulow, zamowienia zbroi i helmow na caly brak - "AI" wielkimi literami jak p9
+    'AiArmsCountsBodyArmour': 'AI Arms Counts Body Armour',
+    'AiArmourOrderFull': 'AI Armour Order Full',
     # 136: stamina koni - progi odpoczynku konnicy AI
     'HorseAiRestBelow': 'Horse AI Rest Below',
     'HorseAiRestUntil': 'Horse AI Rest Until',

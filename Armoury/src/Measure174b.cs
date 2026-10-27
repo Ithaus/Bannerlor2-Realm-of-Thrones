@@ -50,7 +50,7 @@ namespace Armoury
         {
             Array.Clear(_buyN, 0, _buyN.Length); Array.Clear(_buyG, 0, _buyG.Length); Array.Clear(_sellN, 0, Groups); Array.Clear(_sellG, 0, Groups);
             Array.Clear(_held, 0, Buyers); Array.Clear(_arr, 0, ArrKinds); _prev.Clear(); _lastNew.Clear(); _stumbles = 0; _errSites.Clear();
-            _lastOwn.Clear(); _xfer.Clear();
+            _lastOwn.Clear(); _xfer.Clear(); Array.Clear(_avgY, 0, _avgY.Length);   // 268
             P2Clear();   // E8/P2 (244)
         }
 
@@ -266,8 +266,24 @@ namespace Armoury
             try { BuyLine(day); } catch (Exception e) { Stumble("BuyLine", e); }
             try { P2Line(day); } catch (Exception e) { Stumble("P2Line", e); }   // E8/P2 (244): "ZakupyAI cena do wartosci (E8/P2)" (tylko log)
             P2Clear();
+            // 268: srednia cena sztuki doby wedlug kupujacego i grupy - "wczoraj" dla ArmsFirst.CanAfford (korpus) i ArmourOrders (pokrycie zamowienia kiesa); 0 = brak zakupow
+            for (int bb = 0; bb < Buyers; bb++)
+                for (int g = 0; g < Groups; g++)
+                    _avgY[bb, g] = _buyN[bb, g] > 0 ? (int)Math.Max(1, _buyG[bb, g] / _buyN[bb, g]) : 0;
             Array.Clear(_buyN, 0, _buyN.Length); Array.Clear(_buyG, 0, _buyG.Length); Array.Clear(_sellN, 0, Groups); Array.Clear(_sellG, 0, Groups);
             Array.Clear(_held, 0, Buyers); Array.Clear(_arr, 0, ArrKinds); _stumbles = 0;
+        }
+
+        // 268: wczorajsze srednie ceny sztuki (kupujacy x grupa) - liczone w Daily przed zerowaniem licznikow; od wczytania do pierwszej doby 0
+        private static readonly int[,] _avgY = new int[Buyers, Groups];
+        internal const int GBody = 0, GHelm = 1;
+
+        /// <summary>268: wczorajsza srednia cena sztuki grupy (GBody, GHelm, ...) u kupujacego (BLord, BTownGarrison, BCastleOrder ...); 0 - nieznana (brak zakupow
+        /// wczoraj albo pierwsza doba sesji). Tylko odczyt.</summary>
+        internal static int AvgYesterday(int buyer, int group)
+        {
+            if (buyer < 0 || buyer >= Buyers || group < 0 || group >= Groups) return 0;
+            return _avgY[buyer, group];
         }
 
         private static void Census(int day)
