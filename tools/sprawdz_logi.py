@@ -1189,6 +1189,11 @@ Uzycie (Python 3, tylko odczyt):
                     LordEscort.cs, LordEscort.Probe.cs) python -I tools/sprawdz_logi.py --grupa e223 <Armoury-*.log> (strumieniowo). Linie 'Eskorta lordow (223): '.
                     E223-S self-test, E223-S2 test syntetyczny; E223-0 latki TAK; E223-1 linia doby co dobe; E223-2 slabe i dzialania; E223-3 eskorta z zalog: wzial ==
                     spadek zalogi, podloga, suma doby == zdarzenia, <= 169c; E223-4 potkniecia 0; E223-5 najdluzej w stanie <= postoj + 1; E223-6 INFO pojmania.
+--grupa karawany259 : (27.10, paczka 259 noc/259-karawany-gracza-rozliczenie - Jeff 27.10 "czemu moja karawana nic nie zarabia"; Armoury/src/CaravanSettle.cs,
+                    CaravanSettle.Player.cs, CaravanSettle.Test.cs) python -I tools/sprawdz_logi.py --grupa karawany259 <Armoury-*.log> (strumieniowo). Linie
+                    'Karawany rodow - rozliczenie dnia (259): ', 'Majatek gracza (karawany i warsztaty) (259): ', 'Karawany rodow (259): test - '. K259-S self-test,
+                    K259-S2 test syntetyczny; K259-0 latki TAK; K259-1 linia doby co dobe; K259-2 wyplata == wzor; K259-3 nic dwa razy; K259-4 kontrola 0; K259-5
+                    komunikat wyplaty; K259-6 rytm 'ponizej kapitalu'; K259-7 zapis i T1-T6; K259-8 potkniecia i ERROR 0; K259-9 straznik m105; K259-10 INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -71395,6 +71400,403 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return e223_main(rest[0] if rest else None)
     return _e223_main_prev(argv)
+
+
+# ------------------------------------------------------------ karawany259 (27.10, paczka 259 noc/259-karawany-gracza-rozliczenie: Jeff 27.10 "czemu moja karawana nic nie
+# zarabia", "te karawany", "tak zacznij od tych pieciu"; Armoury/src/CaravanSettle.cs, CaravanSettle.Player.cs, CaravanSettle.Test.cs; klucze CaravanClanSettlement,
+# CaravanReports)
+#   python -I tools/sprawdz_logi.py --grupa karawany259 <Armoury-*.log>
+# K259-S self-test wyrazen (linie kontrolne jak w kodzie C#), K259-S2 test syntetyczny (dobry, zly, bez linii 259). K259-0 linia startu: 4 latki TAK i latka na liscie
+# straznika m105 TAK (klucz NIE - INFO); K259-1 linia swiata co dobe (najwyzej 1 brak); K259-2 kazda karawana gracza z rozliczeniem doby: wyplata ==
+# min(max(0, wartosc - kapital), max(0, kiesa - podloga)) i wartosc == kiesa + towar (liczby calkowite z linii); K259-3 nic dwa razy: rozliczana karawana gracza
+# bez wyplat BK / E3/9 / gra 10%, E3-T2 "graczowi" 0 w dobach z czynnym 259, drugie wywolanie w dobie 0; K259-4 kontrola doby roznica 0; K259-5 komunikaty PayNotes
+# "caravans" == doby z komunikatem wyplaty PayNotes, doba z wyplata 259 graczowi ma komunikat (PayNotes / ekran / wylaczone); K259-6 komunikat "ponizej kapitalu"
+# w 7. dobie z rzedu i co 7; K259-7 rekordy z zapisu bledne 0, testy T1-T6 TAK (bez testow - INFO); K259-8 potkniecia 0 i 0 linii "ERROR in CaravanSettle";
+# K259-9 straznik m105 nie wylacza pominiecia przez nasza latke (linia "Optym (m105)" bez "CaravanSettle"); K259-10 INFO: wyplaty, kapital, czas regul.
+K259_TAG = "Karawany rodow - rozliczenie dnia (259): "
+K259_PTAG = "Majatek gracza (karawany i warsztaty) (259): "
+K259_TTAG = "Karawany rodow (259): test - "
+K259_RX = {
+    "start": re.compile(r"^start sesji \| klucz Caravan Clan Settlement (tak|nie), Caravan Reports (tak|nie) \| latki: AddIncomeFromParty \(First, przed BK\) (TAK|NIE), "
+                        r"BK AddRealisticIncome (TAK|NIE), BK OnWeeklyCaravanLedger (TAK|NIE), DailyTickClan gracza (TAK|NIE) \(kolejnosc prefiksow: .*?\) "
+                        r"\| BK zwrot zoldu karawan rodu \(PartyExpensesPrefix\) (TAK|NIE) \| Optym m105: latka na liscie znanych (TAK|NIE) "
+                        r"\| rekordy z zapisu: karawan (\d+), warsztatow (\d+) \(bledne (\d+)[^)]*\) \| regula: "),
+    "day": re.compile(r"^dzien (\d+) \| (CZYNNE|WYLACZONE[^|]*|NIECZYNNE[^|]*) \| karawan rodow (\d+) \(gracza (\d+), lordow (\d+)\), z wyplata (\d+) za (\d+) zl "
+                      r"\(graczowi (\d+), lordom (\d+)\), ponizej kapitalu (\d+), wartosc>kapital ale kiesa<=podloga (\d+), bez zwrotu zoldu \(tytul\) (\d+), "
+                      r"konwoje pominiete (\d+), w bitwie/rozwiazywane (\d+) \| kontrola: kiesy -(\d+) = salda rodow \+(\d+) \(roznica (-?\d+)\) "
+                      r"\| zastapione/zablokowane: gra 10% (\d+) \(bylo by (\d+)\), BK przy wjezdzie (\d+) \(bylo by (\d+)\), E3/9 (\d+), tydzien BK (\d+) "
+                      r"\| drugie wywolanie w dobie (\d+) \(sesja (\d+)\) \| czas regul ([\d.]+) ms \(podgladow (\d+)\) \| potkniecia (\d+) \(sesja (\d+)\)\.$"),
+    "car": re.compile(r"^karawana '(.+?)' \(wodz (.+?), (zwykla|elitarna|morska|morska elitarna), kapital (\d+), (rozliczana przez rod|NIE rozliczana przez rod)\) "
+                      r"\| rozliczenie doby: (?:kiesa (\d+) \(podloga (\d+)(?:, bez zwrotu zoldu)?\), towar w jukach (\d+) \(koszt (\d+), rynek (\d+), (\d+) rodzajow, (\d+) szt\.\), "
+                      r"wartosc (\d+), kapital (\d+), wyplata (\d+)( \(w bitwie albo rozwiazywana\))?|brak [^|]*) \| teraz: kiesa (-?\d+), towar (\d+), wartosc (-?\d+) "
+                      r"\| dzis: sprzedaz (\d+) \(myto (\d+)\), zakupy (\d+), zysk ze sprzedazy (-?\d+) \| zold (\d+) zaplacil rod, doplata BK (\d+), brak rodu (\d+)[^|]* "
+                      r"\| wyplaty dzis: rozliczenie 259 (\d+), BK (\d+), E3/9 (\d+), gra 10% (\d+), rozwiazanie (\d+) \| ponizej kapitalu (\d+) dob \| (od zakupu|od wczytania 259) "),
+    "ws": re.compile(r"^warsztat '(.+?)' \((.+), glowa rodu\) \| kapital (\d+) \(poczatkowy (\d+)\), zysk przed wyplata (-?\d+|-), wyplata (\d+), "
+                     r"podatek BK \(D11-3\) nalezny (\d+) zaplacony (\d+) \| (od zakupu|od wczytania 259) "),
+    "tot": re.compile(r"^razem dzis: karawany do rodu (\d+) \(rozliczenie 259 (\d+), BK (\d+), E3/9 (\d+), gra 10% (\d+), rozwiazanie (\d+)\), zold rodu (\d+), doplaty BK (\d+), "
+                      r"brak rodu (\d+), warsztaty do rodu (\d+), podatek warsztatow (\d+) \| komunikaty: wyplata (\S+), ponizej kapitalu (\d+), tydzien (TAK|NIE) "
+                      r"\| BK Workshop taxes w modelu warsztatow (TAK|NIE)[^|]* \| potkniecia (\d+)\.$"),
+    "pay": re.compile(r"^komunikat - wyplata \((PayNotes|ekran)\) (\d+) \| "),
+    "low": re.compile(r"^komunikat - ponizej kapitalu: karawana '(.+?)' ponizej kapitalu (\d+) dob \| "),
+    "test": re.compile(r"^(T\d) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
+}
+K259_PN = re.compile(r"^Komunikaty platnosci \(m96-wies\): wplyw caravans (\d+) ")
+K259_T2 = re.compile(r"^Karawany - zysk do wlasciciela \(E3-T2\): dzien (\d+) \| CZYNNE .*?graczowi (\d+)/(\d+)\)")
+# linie kontrolne - jak w kodzie C# (CaravanSettle.cs, CaravanSettle.Player.cs, CaravanSettle.Test.cs)
+K259_TEST = {
+    "start": "start sesji | klucz Caravan Clan Settlement tak, Caravan Reports tak | latki: AddIncomeFromParty (First, przed BK) TAK, BK AddRealisticIncome TAK, "
+             "BK OnWeeklyCaravanLedger TAK, DailyTickClan gracza TAK (kolejnosc prefiksow: nasza 800; inne: ClanFinancesPatches.AddIncomeFromPartyPrefix 400; brak: -) "
+             "| BK zwrot zoldu karawan rodu (PartyExpensesPrefix) TAK | Optym m105: latka na liscie znanych TAK | rekordy z zapisu: karawan 1, warsztatow 1 (bledne 0) "
+             "| regula: wyplata = min(wartosc - kapital, kiesa - podloga); kapital z CaravanModel.GetInitialTradeGold; podloga = PartyGoldLowerThreshold + zold doby "
+             "(bez zwrotu zoldu przez rod - 30 dni zoldu); towar: nizsza z kosztu (ksiega E3-T1) i rynku (wartosc x srednia indeksu), bez kosztu - wartosc x min(1, srednia indeksu).",
+    "day": "dzien {d} | CZYNNE | karawan rodow 140 (gracza 1, lordow 139), z wyplata 60 za {p} zl (graczowi {pp}, lordom 29480), ponizej kapitalu 50, "
+           "wartosc>kapital ale kiesa<=podloga 20, bez zwrotu zoldu (tytul) 3, konwoje pominiete 2, w bitwie/rozwiazywane 1 | kontrola: kiesy -{p} = salda rodow +{q} "
+           "(roznica {r}) | zastapione/zablokowane: gra 10% 1 (bylo by 12), BK przy wjezdzie 4 (bylo by 900), E3/9 2, tydzien BK 0 | drugie wywolanie w dobie {u} (sesja {u}) "
+           "| czas regul 0.85 ms (podgladow 400) | potkniecia {s} (sesja {s}).",
+    "car": "karawana 'Ser Jon's caravan' (wodz Ser Jon, zwykla, kapital 15000, rozliczana przez rod) | rozliczenie doby: kiesa {k} (podloga 5293), towar w jukach 9100 "
+           "(koszt 9400, rynek 9100, 14 rodzajow, 212 szt.), wartosc {w}, kapital 15000, wyplata {y} | teraz: kiesa 5900, towar 9100, wartosc 15000 | dzis: sprzedaz 3100 "
+           "(myto 62), zakupy 2900, zysk ze sprzedazy 180 | zold 293 zaplacil rod, doplata BK 0, brak rodu 0 | wyplaty dzis: rozliczenie 259 {y}, BK {b}, E3/9 0, gra 10% 0, "
+           "rozwiazanie 0 | ponizej kapitalu {lo} dob | od zakupu (dzien 108965, 26 dob): wyplaty 520, zold rodu 7000, doplaty 0, brak rodu 0, sprzedaz 50000, zakupy 49000, "
+           "myto 1000, zysk ze sprzedazy 3000, netto dla rodu -6480",
+    "carn": "karawana 'Ser Jon's caravan' (wodz Ser Jon, zwykla, kapital 15000, rozliczana przez rod) | rozliczenie doby: brak (rod gracza nie rozliczony od ostatniej linii "
+            "albo klucz WYL) | teraz: kiesa 5900, towar 9100, wartosc 15000 | dzis: sprzedaz 0 (myto 0), zakupy 0, zysk ze sprzedazy 0 | zold 0 zaplacil rod, doplata BK 0, "
+            "brak rodu 0 (bez rozliczenia rodu) | wyplaty dzis: rozliczenie 259 0, BK 0, E3/9 0, gra 10% 0, rozwiazanie 0 | ponizej kapitalu 0 dob | od wczytania 259 "
+            "(dzien 108980, 11 dob): wyplaty 0, zold rodu 0, doplaty 0, brak rodu 0, sprzedaz 0, zakupy 0, myto 0, zysk ze sprzedazy 0, netto dla rodu 0",
+    "ws": "warsztat 'Brewery' (Sunspear, glowa rodu) | kapital 12000 (poczatkowy 10000), zysk przed wyplata 2000, wyplata 1000, podatek BK (D11-3) nalezny 150 zaplacony 150 "
+          "| od wczytania 259 (dzien 108980, 11 dob): wyplaty 1000, podatek 150",
+    "tot": "razem dzis: karawany do rodu {y} (rozliczenie 259 {y}, BK {b}, E3/9 0, gra 10% 0, rozwiazanie 0), zold rodu 293, doplaty BK 0, brak rodu 0, warsztaty do rodu 1000, "
+           "podatek warsztatow 150 | komunikaty: wyplata {m}, ponizej kapitalu 0, tydzien NIE | BK Workshop taxes w modelu warsztatow NIE | potkniecia {s}.",
+    "pay": "komunikat - wyplata (PayNotes) {y} | Ser Jon's caravan {y}.",
+    "low": "komunikat - ponizej kapitalu: karawana 'Ser Jon's caravan' ponizej kapitalu {n} dob | Ser Jon's caravan is worth 12,300 (coin 4,100, goods 8,200 at what it paid) - "
+           "less than the 15,000 you put in. Last 7 days it sold 3,200, bought 2,900, paid 120 in tolls; your clan paid its wages, 2,051, and topped up its purse with 1,400. "
+           "It sends you nothing until it is back above 15,000.",
+    "test": "T2 rozliczenie rodu celu: kiesa 6420 -> 5900, wyplata 520, wzor na wejsciach (wartosc 15520, kapital 15000, kiesa 6420, podloga 5293) 520 - wynik TAK.",
+    "pn": "Komunikaty platnosci (m96-wies): wplyw caravans {y} | podmienione w sesji 1 (zaplaty 0 za 0, wplywy 1 za {y}) | wg powodu: caravans 1",
+    "t2": "Karawany - zysk do wlasciciela (E3-T2): dzien {d} | CZYNNE | karawan 490, oddaly 5 za 3000 zl (notablom 5/3000, lordom i innym 0/0, graczowi {g}/{gg}) "
+          "| rozliczane przez rod (259) 140 | kapital obrotowy (zostaje w kiesie): max(10000, 30 dni zoldu) - razem 1, w kiesach do kapitalu 1 (1.0%).",
+}
+
+
+def k259_player_line(d, y, k, w, b=0, m="PayNotes", s=0, lo=0):
+    T = K259_TEST
+    return (K259_PTAG + "dzien %d || " % d + T["car"].format(k=k, w=w, y=y, b=b, lo=lo) + " || " + T["ws"] + " || " + T["tot"].format(y=y, b=b, m=m, s=s))
+
+
+def k259_selftest():
+    T = K259_TEST
+    R = K259_RX
+    probs = []
+    m = R["start"].match(T["start"])
+    if not m or m.group(3) != "TAK" or m.group(8) != "TAK" or m.group(11) != "0":
+        probs.append("start")
+    m = R["day"].match(T["day"].format(d=108990, p=30000, pp=520, q=30000, r=0, u=0, s=0))
+    if not m or m.group(1) != "108990" or m.group(7) != "30000" or m.group(17) != "0" or m.group(29) != "0":
+        probs.append("day")
+    m = R["car"].match(T["car"].format(k=6420, w=15520, y=520, b=0, lo=0))
+    if not m or m.group(6) != "6420" or m.group(7) != "5293" or m.group(8) != "9100" or m.group(15) != "520" or m.group(32) != "0" or m.group(33) != "od zakupu":
+        probs.append("car")
+    m = R["car"].match(T["carn"])
+    if not m or m.group(6) is not None or m.group(33) != "od wczytania 259":
+        probs.append("carn")
+    m = R["ws"].match(T["ws"])
+    if not m or m.group(6) != "1000" or m.group(8) != "150":
+        probs.append("ws")
+    m = R["tot"].match(T["tot"].format(y=520, b=0, m="PayNotes", s=0))
+    if not m or m.group(2) != "520" or m.group(12) != "PayNotes" or m.group(16) != "0":
+        probs.append("tot")
+    if not R["pay"].match(T["pay"].format(y=520)):
+        probs.append("pay")
+    m = R["low"].match(T["low"].format(n=7))
+    if not m or m.group(2) != "7":
+        probs.append("low")
+    m = R["test"].match(T["test"])
+    if not m or m.group(1) != "T2" or m.group(3) != "TAK":
+        probs.append("test")
+    if not K259_PN.match(T["pn"].format(y=520)):
+        probs.append("pn")
+    m = K259_T2.match(T["t2"].format(d=108990, g=0, gg=0))
+    if not m or m.group(3) != "0":
+        probs.append("t2")
+    return ("nie pasuja: " + ", ".join(probs)) if probs else None
+
+
+def k259_collect(logp):
+    R = K259_RX
+    D = {"starts": [], "days": {}, "bad": [], "cars": [], "ws": 0, "tots": [], "pay": [], "low": [], "tests": {}, "pn": 0, "t2": {}, "err": 0, "err1": "",
+         "optym_off": 0, "optym": 0, "plines": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            mt = TS.match(ln)
+            s = mt.group(2) if mt else ln
+            if "ERROR in CaravanSettle" in s:
+                D["err"] += 1
+                if not D["err1"]:
+                    D["err1"] = s[:160]
+                continue
+            if s.startswith(K259_TAG):
+                r = s[len(K259_TAG):]
+                if r.startswith("start sesji"):
+                    D["starts"].append((R["start"].match(r), r))
+                elif r.startswith("dzien "):
+                    md = R["day"].match(r)
+                    if md:
+                        D["days"][int(md.group(1))] = md
+                    else:
+                        D["bad"].append("linia doby: " + r[:90])
+                continue
+            if s.startswith(K259_PTAG):
+                r = s[len(K259_PTAG):]
+                if r.startswith("dzien "):
+                    D["plines"] += 1
+                    parts = r.split(" || ")
+                    try:
+                        day = int(parts[0][len("dzien "):].split()[0])
+                    except ValueError:
+                        day = -1
+                    for p in parts[1:]:
+                        if p.startswith("karawana '"):
+                            mc = R["car"].match(p)
+                            if mc:
+                                D["cars"].append((day, mc))
+                            else:
+                                D["bad"].append("karawana gracza: " + p[:90])
+                        elif p.startswith("warsztat '"):
+                            if R["ws"].match(p):
+                                D["ws"] += 1
+                            else:
+                                D["bad"].append("warsztat gracza: " + p[:90])
+                        elif p.startswith("razem dzis:"):
+                            mo = R["tot"].match(p)
+                            if mo:
+                                D["tots"].append((day, mo))
+                            else:
+                                D["bad"].append("razem dzis: " + p[:90])
+                        else:
+                            D["bad"].append("nieznany kawalek: " + p[:60])
+                elif r.startswith("komunikat - wyplata"):
+                    mp_ = R["pay"].match(r)
+                    D["pay"].append(mp_.group(1) if mp_ else "?")
+                elif r.startswith("komunikat - ponizej kapitalu"):
+                    ml = R["low"].match(r)
+                    D["low"].append(int(ml.group(2)) if ml else -1)
+                continue
+            if s.startswith(K259_TTAG):
+                mt2 = R["test"].match(s[len(K259_TTAG):])
+                if mt2:
+                    D["tests"][mt2.group(1)] = (mt2.group(3), mt2.group(2)[:120])
+                else:
+                    D["bad"].append("test: " + s[:90])
+                continue
+            if s.startswith("Komunikaty platnosci (m96-wies): wplyw caravans "):
+                D["pn"] += 1
+                continue
+            if s.startswith("Karawany - zysk do wlasciciela (E3-T2): dzien "):
+                m2 = K259_T2.match(s)
+                if m2:
+                    D["t2"][int(m2.group(1))] = int(m2.group(3))
+                continue
+            if s.startswith("Optym (m105): dzien "):
+                D["optym"] += 1
+                if "CaravanSettle" in s:
+                    D["optym_off"] += 1
+    return D
+
+
+def k259_rows(rep, D):
+    starts = D["starts"]
+    ok_starts = [m for m, _ in starts if m]
+    if not starts:
+        rep.add("K259-0: linia startu (latki 4/4, straznik m105)", "brak linii 259 (log sprzed paczki 259)", "INFO", None)
+    elif not ok_starts:
+        rep.add("K259-0: linia startu (latki 4/4, straznik m105)", "zly format: " + starts[-1][1][:100], "format jak w kodzie", False)
+    else:
+        m = ok_starts[-1]
+        if m.group(1) != "tak":
+            rep.add("K259-0: linia startu (latki 4/4, straznik m105)", "klucz Caravan Clan Settlement nie", "INFO", None)
+        else:
+            hooks = [m.group(i) for i in (3, 4, 5, 6)]
+            rep.add("K259-0: linia startu (latki 4/4, straznik m105)", f"startow {len(starts)}, latki {hooks}, zwrot zoldu BK {m.group(7)}, m105 {m.group(8)}, "
+                    f"rekordy z zapisu karawan {m.group(9)}, warsztatow {m.group(10)}", "4 x TAK i m105 TAK", all(h == "TAK" for h in hooks) and m.group(8) == "TAK")
+    days = D["days"]
+    if not days:
+        rep.add("K259-1: linia swiata co dobe", "0 linii doby", "INFO (log sprzed 259)", None)
+    else:
+        ds = sorted(days)
+        miss = [d for d in range(ds[0], ds[-1] + 1) if d not in days]
+        rep.add("K259-1: linia swiata co dobe", f"dob {len(ds)} ({ds[0]}..{ds[-1]}), braki {miss[:5]}" + (f", zle linie {len(D['bad'])} ({D['bad'][0]})" if D["bad"] else ""),
+                "najwyzej 1 brak, 0 zlych linii", len(miss) <= 1 and not D["bad"])
+    bad2, n2 = [], 0
+    for day, mc in D["cars"]:
+        if mc.group(6) is None or mc.group(16):
+            continue
+        n2 += 1
+        purse, floor, goods, worth, cap, pay = (int(mc.group(i)) for i in (6, 7, 8, 13, 14, 15))
+        exp = min(max(0, worth - cap), max(0, purse - floor))
+        if pay != exp or worth != purse + goods:
+            bad2.append(f"d{day} '{mc.group(1)}': kiesa {purse}, podloga {floor}, towar {goods}, wartosc {worth}, kapital {cap} -> wyplata {pay}, wzor {exp}")
+    if n2 == 0:
+        rep.add("K259-2: wyplata == wzor (karawany gracza)", "brak rozliczen karawan gracza w liniach", "INFO (gracz bez karawany albo log sprzed 259)", None)
+    else:
+        rep.add("K259-2: wyplata == wzor (karawany gracza)", f"rozliczen {n2}, niezgodnych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else ""),
+                "min(max(0, wartosc - kapital), max(0, kiesa - podloga)) i wartosc == kiesa + towar", not bad2)
+    dbl = []
+    for day, mc in D["cars"]:
+        if mc.group(5) == "rozliczana przez rod" and (int(mc.group(28)) or int(mc.group(29)) or int(mc.group(30))):
+            dbl.append(f"d{day} '{mc.group(1)}': BK {mc.group(28)}, E3/9 {mc.group(29)}, gra 10% {mc.group(30)}")
+    on_days = {d for d, m in days.items() if m.group(2) == "CZYNNE"}
+    t2p = [d for d in on_days if D["t2"].get(d, 0) > 0]
+    dup = sum(int(m.group(24)) for m in days.values())
+    if not days:
+        rep.add("K259-3: nic dwa razy", "brak linii 259", "INFO", None)
+    else:
+        rep.add("K259-3: nic dwa razy", f"rozliczana karawana gracza z wyplata BK / E3/9 / gra 10%: {len(dbl)}" + (f" ({dbl[0]})" if dbl else "")
+                + f"; E3-T2 graczowi > 0 w dobach z czynnym 259: {len(t2p)}; drugie wywolanie w dobie {dup}", "0 / 0 / 0", not dbl and not t2p and dup == 0)
+    diffs = [d for d, m in days.items() if int(m.group(17)) != 0]
+    if days:
+        rep.add("K259-4: kontrola doby (kiesy = salda rodow)", f"dob z roznica {len(diffs)}" + (f" (np. d{diffs[0]})" if diffs else ""), "0", not diffs)
+    else:
+        rep.add("K259-4: kontrola doby (kiesy = salda rodow)", "brak linii", "INFO", None)
+    pn_days = sum(1 for _, mo in D["tots"] if mo.group(12) == "PayNotes")
+    no_msg = [d for d, mo in D["tots"] if int(mo.group(2)) > 0 and mo.group(12) not in ("PayNotes", "ekran", "wylaczone")]
+    pay_pn = sum(1 for k in D["pay"] if k == "PayNotes")
+    if not D["tots"]:
+        rep.add("K259-5: komunikat wyplaty graczowi", f"linii gracza 0; PayNotes 'caravans' {D['pn']}", "INFO (gracz bez majatku albo log sprzed 259)", None)
+    else:
+        rep.add("K259-5: komunikat wyplaty graczowi", f"dob z komunikatem PayNotes {pn_days}, linii 'komunikat - wyplata (PayNotes)' {pay_pn}, PayNotes 'wplyw caravans' {D['pn']}; "
+                f"doby z wyplata 259 bez komunikatu {len(no_msg)}" + (f" (np. d{no_msg[0]})" if no_msg else ""),
+                "PayNotes == doby PayNotes == linie komunikatu, bez komunikatu 0", D["pn"] == pn_days == pay_pn and not no_msg)
+    low_bad = [n for n in D["low"] if n < 7 or n % 7 != 0]
+    if not D["low"]:
+        rep.add("K259-6: komunikat 'ponizej kapitalu' (7. doba, potem co 7)", "0 komunikatow", "INFO", None)
+    else:
+        rep.add("K259-6: komunikat 'ponizej kapitalu' (7. doba, potem co 7)", f"komunikatow {len(D['low'])}, dni {sorted(set(D['low']))[:6]}, poza rytmem {len(low_bad)}",
+                "dni % 7 == 0 i >= 7", not low_bad)
+    tests = D["tests"]
+    bad_imp = sum(int(m.group(11)) for m in ok_starts)
+    if not tests:
+        rep.add("K259-7: zapis i autotest T1-T6", f"rekordy z zapisu bledne {bad_imp}; testow brak", "bledne 0 (testy - INFO bez flagi armoury-karawany.flag)",
+                (bad_imp == 0) if ok_starts else None)
+    elif set(tests) == {"T0"} and tests["T0"][0] == "POMINIETY":
+        rep.add("K259-7: zapis i autotest T1-T6", f"bledne {bad_imp}; proba POMINIETA: {tests['T0'][1]}", "INFO (bez rozliczanej karawany albo klucz NIE)", None)
+    else:
+        nie = [f"{k}: {v[1]}" for k, v in sorted(tests.items()) if v[0] == "NIE"]
+        miss = [t for t in ("T1", "T2", "T3", "T4", "T5", "T6") if t not in tests]
+        rep.add("K259-7: zapis i autotest T1-T6", f"bledne {bad_imp}; testy " + ", ".join(f"{k} {v[0]}" for k, v in sorted(tests.items())) + (f" | NIE: {nie[0]}" if nie else "")
+                + (f" | brak {miss}" if miss else ""), "bledne 0, T1-T6 TAK (POMINIETY - INFO w opisie)", bad_imp == 0 and not nie and not miss)
+    st_d = sum(int(m.group(28)) for m in days.values())
+    st_p = sum(int(mo.group(16)) for _, mo in D["tots"])
+    rep.add("K259-8: potkniecia i ERROR", f"potkniecia w liniach doby {st_d}, w liniach gracza {st_p}, ERROR in CaravanSettle {D['err']}" + (f" ({D['err1']})" if D["err1"] else ""),
+            "0, 0, 0", st_d == 0 and st_p == 0 and D["err"] == 0)
+    if D["optym"] == 0:
+        rep.add("K259-9: straznik m105 nie wylacza sie przez latke 259", "brak linii 'Optym (m105)'", "INFO", None)
+    else:
+        rep.add("K259-9: straznik m105 nie wylacza sie przez latke 259", f"linii Optym {D['optym']}, z CaravanSettle {D['optym_off']}", "0", D["optym_off"] == 0)
+    if days:
+        paid = [int(m.group(7)) for m in days.values()]
+        pl = [int(m.group(8)) for m in days.values()]
+        ms = [float(m.group(26)) for m in days.values()]
+        last = days[max(days)]
+        rep.add("K259-10: wyplaty i koszt (INFO)", f"wyplata swiata srednio {sum(paid) / len(paid):.0f} zl/d (graczowi {sum(pl) / len(pl):.0f}), ostatnia doba: karawan {last.group(3)}, "
+                f"ponizej kapitalu {last.group(10)}, kiesa<=podloga {last.group(11)}, zablokowane BK {last.group(20)} (bylo by {last.group(21)}), gra 10% {last.group(18)} "
+                f"(bylo by {last.group(19)}); czas regul srednio {sum(ms) / len(ms):.2f} ms/d, najwiecej {max(ms):.2f}", "INFO", None)
+
+
+def k259_synth():
+    import tempfile
+    import shutil
+    T = K259_TEST
+    P = "[10:00:00] " + K259_TAG
+    PT = "[10:00:00] " + K259_TTAG
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="k259_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind in ("good", "bad"):
+                L.append(P + (T["start"] if kind == "good" else T["start"].replace("BK AddRealisticIncome TAK", "BK AddRealisticIncome NIE")))
+                for i, d in enumerate(range(108990, 108998)):
+                    if kind == "bad" and i in (3, 4):
+                        continue
+                    if kind == "good":
+                        L.append(P + T["day"].format(d=d, p=30000, pp=520, q=30000, r=0, u=0, s=0))
+                        L.append("[10:00:00] " + K259_PTAG + "komunikat - wyplata (PayNotes) 520 | Ser Jon's caravan 520.")
+                        L.append("[10:00:00] " + T["pn"].format(y=520))
+                        L.append("[10:00:00] " + k259_player_line(d, 520, 6420, 15520, lo=(i + 1)))
+                        if i + 1 == 7:
+                            L.append("[10:00:00] " + K259_PTAG + T["low"].format(n=7))
+                        L.append("[10:00:00] " + T["t2"].format(d=d, g=0, gg=0))
+                    else:
+                        L.append(P + T["day"].format(d=d, p=30000, pp=520, q=29990, r=10, u=1, s=1))
+                        L.append("[10:00:00] " + k259_player_line(d, 600, 6420, 15520, b=300, m="brak", s=1))
+                        L.append("[10:00:00] " + K259_PTAG + T["low"].format(n=5))
+                        L.append("[10:00:00] " + T["t2"].format(d=d, g=1, gg=400))
+                L.append("[10:00:00] Optym (m105): dzien 108995 | KingdomTreasury.Daily model dochodu: pominiety u 40 rodow (z 60 bez lenn i warsztatu glowy z podstawa ziemia; sesja 40) | potkniecia 0 (sesja 0)."
+                         if kind == "good" else
+                         "[10:00:00] Optym (m105): dzien 108995 | KingdomTreasury.Daily model dochodu: pominiecie WYLACZONE - niesprawdzone latki na sciezce modelu: "
+                         "Armoury:CaravanSettle.IncomePrefix na DefaultClanFinanceModel.AddIncomeFromParty | potkniecia 0 (sesja 0).")
+                for t in ("T1", "T2", "T3", "T4", "T5", "T6"):
+                    L.append(PT + T["test"].replace("T2 ", t + " ").replace("wynik TAK", "wynik " + ("NIE" if kind == "bad" and t == "T3" else "TAK")))
+                L.append("[10:00:00] ERROR in CaravanSettle.IncomePrefix: x" if kind == "bad" else "[10:00:00] Armoury: inna linia")
+            else:
+                L.append("[10:00:00] Armoury: inna linia")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            k259_rows(rep, k259_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"K259-0": "TAK", "K259-1": "TAK", "K259-2": "TAK", "K259-3": "TAK", "K259-4": "TAK", "K259-5": "TAK", "K259-6": "TAK", "K259-7": "TAK", "K259-8": "TAK",
+                 "K259-9": "TAK", "K259-10": "INFO"},
+        "bad": {"K259-0": "NIE", "K259-1": "NIE", "K259-2": "NIE", "K259-3": "NIE", "K259-4": "NIE", "K259-5": "NIE", "K259-6": "NIE", "K259-7": "NIE", "K259-8": "NIE",
+                "K259-9": "NIE"},
+        "none": {"K259-0": "INFO", "K259-1": "INFO", "K259-2": "INFO", "K259-3": "INFO", "K259-4": "INFO", "K259-5": "INFO", "K259-6": "INFO", "K259-7": "INFO",
+                 "K259-8": "TAK", "K259-9": "INFO"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def karawany259_main(logp):
+    """karawany259 (27.10, paczka 259): K259-S, K259-S2, K259-0..K259-10 - opis w komentarzu nad stalymi K259_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = k259_selftest()
+    rep.add("K259-S: self-test wyrazen (linie kontrolne jak w kodzie C#: CaravanSettle.cs, CaravanSettle.Player.cs, CaravanSettle.Test.cs)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = k259_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("K259-S2: test syntetyczny (dobry, zly, bez linii 259)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("K259-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = k259_collect(logp)
+    print(f"plik: {logp} | startow 259 {len(D['starts'])}, dob {len(D['days'])}, linii gracza {D['plines']}, rozliczen karawan gracza {len(D['cars'])}, warsztatow {D['ws']}, "
+          f"testow {len(D['tests'])}, ERROR {D['err']}")
+    k259_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_karawany259_main_prev = main
+
+
+def main(argv):
+    # paczka 259: grupa karawany259 - opakowanie main jak e223 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "karawany259":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return karawany259_main(rest[0] if rest else None)
+    return _karawany259_main_prev(argv)
 
 
 if __name__ == "__main__":

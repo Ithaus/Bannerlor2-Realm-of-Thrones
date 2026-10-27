@@ -59,7 +59,21 @@ namespace Armoury
             "BannerKings:ClanFinancesPatches.AddIncomeFromPartyPrefix",
             "BannerKings:ClanFinancesPatches.VillageIncomePrefix",   // AddSettlementIncome: lenna i wsie z tytulu (u pominietych puste)
             "BKROTPatch:CalculateHeroSuzerainPatch.Postfix",    // TitleManager.CalculateHeroSuzerain: filtr wyniku
+            // 259: AddIncomeFromParty - rozliczenie karawan rodow; przy applyWithdrawals = false tylko odczyt (kiesa, juki, ksiega E3-T1 bez zapisu,
+            // model kapitalu gry), bez MBRandom; zapis (kiesa, XP, slawa, zdarzenie gracza, straz doby) tylko przy applyWithdrawals = true
+            "Armoury:CaravanSettle.IncomePrefix",
         };
+
+        /// <summary>259 (CaravanSettle - linia startu): czy latka jest na liscie sprawdzonych latek sciezki modelu (inaczej straznik m105 wylacza pominiecie).</summary>
+        internal static bool KtKnows(string key) { return key != null && KtKnownPatches.Contains(key); }
+
+        /// <summary>259 (CaravanSettle.Test T5): wynik straznika m105 teraz (null - pominiecie dozwolone). Tylko autotest.</summary>
+        internal static string KtGuardProbe()
+        {
+            try { return KtGuard(); }
+            catch (Exception e) { return "wyjatek " + e.GetType().Name; }
+            finally { _ktBk = null; }   // straznik ustawia _ktBk (sondy petli rodow) - poza petla nie trzymamy modelu
+        }
 
         /// <summary>Poczatek petli rodow KingdomTreasury.Daily (po OptBegin): klucz tej doby i straznik.</summary>
         private static void KtSkipBegin(Settings s, bool land)

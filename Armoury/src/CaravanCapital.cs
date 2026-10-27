@@ -219,6 +219,7 @@ namespace Armoury
                     GiveGoldAction.ApplyForPartyToCharacter(mp.Party, head, g, true);
                     moved = g - mp.PartyTradeGold;
                     _toHead[kind] += moved; _toHeadN[kind]++;
+                    if (mp.IsCaravan && mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteDeposit(mp, CaravanSettle.DepEnd, moved);   // 259: linia majatku gracza (kiesa przy rozwiazaniu)
                 }
                 else
                 {
