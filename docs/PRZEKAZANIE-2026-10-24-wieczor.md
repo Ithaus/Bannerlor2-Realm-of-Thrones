@@ -1,5 +1,21 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 15:30 CET - AUDYT GOTOWY (docs/AUDYT-2026-10-27.md); Jeff: "tak zacznij od tych pieciu" + Krol Polnocy
+- Jeff 27.10 ok. 15:25: "tak zacznij od tych pieciu, a tak potem jak dolaczaja do roberta to staja sie jednym krolestwem King in the North".
+- Paczki (galezie od noc/161-integracja 056ae5f4 = WGRANE 128, drzewa scratchpad fffc991e...\zb\nNNN):
+  241 warsztaty-cena-rynkowa-podatek: "cena sprawiedliwa" -> kupiec miejski placi tyle, za ile odsprzeda (srednia sprzedazy 28 dni albo cena graniczna ludu 1.5x
+      wartosci), producent dostaje cene rynkowa; podatek BK warsztatow liczony od dziennej wyplaty (raz), cena warsztatu od 1x stawki (audyt pkt 1.1 i 1.2). Test 120 dob.
+  259 karawany-gracza-rozliczenie: karawany gracza (i lordow), ktorym zold placi rod: codziennie nadwyzka ponad kapital z modelu gry (10 000 / 17 500 elitarna /
+      30 000 morska, bez rezerwy 30 dni zoldu) do wlasciciela przelewem, bez podwojnej wyplaty z gry; linia logu + komunikat "Twoje karawany i warsztaty" (audyt pkt 4).
+  264 pokoj-wojny-kanonu: pokoj z decyzji krolestwa zablokowany w wojnie kanonu do Krwawych Godow, sprawdzenie jencow M6a-3 po ROT, data wojny w logu, linia planow
+      wladcow (Robb) - URUCHOMIONE 15:26 (workflow wf_09849f4a-635).
+  268 gotowosc-zbroja: ocena gotowosci p9 liczy zbroje na tulow (prog 60% jak bron), zamowienia zbroi bez limitu 1/dzien, braki liczone w miescie (audyt pkt 2).
+  272 krol-polnocy: Polnoc i Dorzecze jednym krolestwem, gdy Dorzecze dolacza do Robba (kanon: Robb ogloszony Krolem Polnocy i Tridentu w Riverrun) - wydarzenie
+      (Kronika/prolog), przeniesienie rodow Dorzecza do krolestwa Polnocy, dyplomacja, przynaleznosc gracza (Jeff jest w Dorzeczu?) - najpierw projekt.
+- Limit 5h 82% o 15:25 (odnowienie 16:40) -> 241, 259, 268, 272 uruchomic po 16:42 (budzik w tle). Skrypt workflow paczek: workflows\scripts\paczki-jeff-26-10-wieczor-wf_03ae36fd-43a.js
+  (args: lista paczek {id, wt, br, design, auth, task, lens1, lens2}). Po paczkach: scalanie TYLKO scal_sklad.py/scal_wstawki.py, self-testy i pelne grupy sprawdz_logi,
+  autotest (bitwaN + probyN, przy 241 i 259 dluzszy bieg), wgranie po zamknieciu gry.
+
 ## DOPISEK 27.10 ok. 15:10 CET - AUDYT GRY JEFFA W TOKU (po awarii pradu); w grze 128
 - Jeff 27.10 ok. 13:45: "zaproponuj naprawy ... czy ekonomia dziala poprawnie, czemu wojsko czesto nie ma pancerza albo ma tylko ja zle trafiam i mam pecha, i czemu
   dorzecze i polnoc jest slabsza od lannisterow i krolewskiej przystani to nie ma sensu, zrob audyt ... i te karawany". Wczesniej (13:40) odpowiedz o karawanie
