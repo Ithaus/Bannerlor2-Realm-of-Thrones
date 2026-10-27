@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 19:20 CET - paczka 277 rody kanonu Zachodu/Ziem Koronnych "po ksiazce"; autotest 129a w toku
+- Jeff 19:10: "Czemu lannisterowie maja tak malo rodow, w ksiazce tez tak malo mieli?" -> odpowiedz: w ksiazce Tywin ok. 20k + Jaime ok. 15k, dziesiatki rodow
+  Zachodu; w ROT strona korony 50 rodow, 17 z ziemia, 19 twierdz (strona Robba 95 / 34 / 38). Pieniadze NIE sa przyczyna (KL 6.2 mln skarbiec). Kredyt W3 niepotrzebny.
+  Jeff: "ksiazce" -> paczka 277 (zb\n277, noc/277-rody-kanonu-zachod od n161 2a96d15b, workflow wf_f21d9616-2f0): rozpoznanie rodow kanonu, potem siedziby/tier/drużyny
+  wedlug ksiazek, bez zabierania stronie Robba, migracja zapisu Jeffa raz (flaga), klucz MCM, linia 'Rody kanonu (277)'.
+- Autotest 129a (od 18:50, m113\seria-129a.out.txt; 6 paczek, build a25f28c0). Po nim: grupy (war241 karawany259 pokoj264 z268 krol272 rownowaga274 + stare),
+  zapis testowy na D:, WGRANIE 129 (bez 277) gdy Jeff nie gra; 277 osobno potem (130).
+
 ## DOPISEK 27.10 ok. 18:50 CET - 274 gotowe; WSZYSTKIE 6 PACZEK SCALONE w n161 (2a96d15b, Armoury a25f28c0, NIE wgrane); nastepny krok AUTOTEST 129a
 - 274 (zb\n274): 3b37dd98 + 22a7ca04 + recenzja 48710016 (cc91a05c). CanonWarClock.cs, CanonWarBalance(.Levers/.Restraint/.Test).cs; klucze Canon War Balance /
   Restraint / Muster; zapis arm_cwb274; koniec przy RedWeddingEvent >= 2 albo smierci Robba (jak 264). Przyczyna slabosci B: ROT - B ma 17 rodow z lennami i 19
