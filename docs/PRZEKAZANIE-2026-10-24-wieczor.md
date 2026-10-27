@@ -1,5 +1,16 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 02:00 CET - WGRANE 128 (222d); nic w toku
+- WGRANE 128 (01:58): Armoury 35f2df7e (n161 6eda5012, status 056ae5f4, wypchniete) = 127 + 222d. Kopie: Armoury.dll.bak-2026-10-27-przed-wgranie128 i
+  D:\Backup-Bannerlord\wgrane\2026-10-27-wgranie128-przed (a06033ef = 127).
+- 222d (20719bda + recenzja 6eda5012): zimny trop -> lordowie w zasiegu (droga gry, ReachOwnDays/ReachHelpDays) szukaja wokol osady najblizszej miejsca pojmania
+  albo twierdzy rodu porywacza przez 72 h od swojej wiesci; nikt w zasiegu -> "czeka (poza zasiegiem)", budzi sie przy sladzie / wiesci w zasiegu / lochu;
+  komunikat wedlug wyniku (ride to free / searching / too far away - for now / not strong enough - for now). Okno wiesci (Heard) w zapisie (pole 24).
+- Autotest 128a (probyN 8 dob, zapis Jeffa z Tywinem): kod 0, ERROR 0, odbicie222 12 progow 0 NIE; Tywin: wiesc po 140.4 h, czeka (poza zasiegiem), T9 TAK.
+- Do sprawdzenia u Jeffa w grze: ekran druzyny (202), jazda AI na konnego strzelca (204 - autotest bez wrogiej jazdy), komunikat o Tywinie po ok. 6 dobach gry,
+  muzyka bitwy -40%, bieg w zbroi i kon (203), eskorty lordow (223).
+- Zapis testowy na D:\Backup-Bannerlord\zapisy-testowe-archiwum (..._po-128a.sav). W Game Saves brak autotest-*.
+
 ## DOPISEK 27.10 ok. 01:15 CET - WGRANE 127 (202, 203, 204, 222/222c, 223/223b); w toku 222d
 - WGRANE 127 (01:10): Armoury a06033ef (n161 6e5a9186, statusy a485ec5a, wypchniete n161 i galezie 202/203/204/222/223) + 40 ogg Bitwa\lufs21.4/24.4/27.4/30.4.
   Kopie: Armoury.dll.bak-2026-10-27-przed-wgranie127 i D:\Backup-Bannerlord\wgrane\2026-10-27-wgranie127-przed (f67326e2 = 126, lista pliki-127.txt).
