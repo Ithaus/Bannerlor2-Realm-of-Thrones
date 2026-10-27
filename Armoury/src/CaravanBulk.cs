@@ -201,6 +201,17 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>284 (CaravanTrade284): kategoria surowca z tabeli przy czynnej regule - zasady 284 jej nie ruszaja (bramka 282, jedna regula na jeden towar).</summary>
+        internal static bool OwnsCategory(ItemCategory c)
+        {
+            try
+            {
+                var s = Settings.Current;
+                return c != null && _wired && s != null && s.CaravanBulkEnabled && Ready() && _cats.Contains(c);
+            }
+            catch { return false; }
+        }
+
         /// <summary>E3-T1: ta sama bramka handlu karawany co sprzedaz surowcow (Trades).</summary>
         internal static bool TradesForT1(MobileParty mp) { return mp != null && Trades(mp); }
 
@@ -497,7 +508,8 @@ namespace Armoury
         private const int FlowSmooth = 14;      // srednia ok. 14 dob - to samo wygladzenie co zuzycie miast w MaterialOrders (_useAvg)
         private static string _seg282;         // segment linii "Ruda przeplyw (282)" zbudowany w Daily (przed NewDay) - czyta MaterialOrders
 
-        private static bool FlowOn(Good g, Settings s) { return g.Ix == OreIx && s.CaravanBulkFlowGate && g.SoldDays >= FlowMinDays; }
+        // 284 (klucz CaravanBulkFlowGateAll): ta sama bramka dla wszystkich surowcow tabeli (drewno, skory, skora, len, plotno, welna) - dotad tylko ruda, reszta na sucho
+        private static bool FlowOn(Good g, Settings s) { return (g.Ix == OreIx || s.CaravanBulkFlowGateAll) && s.CaravanBulkFlowGate && g.SoldDays >= FlowMinDays; }
 
         private static float FlowCap(Good g, Settings s) { return g.SoldEma * Math.Max(0, s.CaravanBulkStockDays); }
 
@@ -562,7 +574,9 @@ namespace Armoury
                   .Append(" (nasza sprzedaz przy wjezdzie), rozladunek ponad brak miast ").Append(g.Unload).Append(" szt. w ").Append(g.UnloadTowns.Count).Append(" miastach za ")
                   .Append(g.UnloadGold).Append(" zl, pomiar sprzedazy minionej doby ").Append(g.SoldLast).Append(" (rozladunek ponad brak poza pomiarem ").Append(g.UnloadOutLast).Append(')');
             }
-            sb.Append("; na sucho (282 - bez zmian, decyzja Jeffa): ");
+            // 284: przy czynnej bramce wszystkich surowcow (CaravanBulkFlowGateAll) segment mowi o stanie bramki; poczatek "; na sucho" zostaje (wyrazenie RU282_RE)
+            bool all = s.CaravanBulkFlowGateAll && s.CaravanBulkFlowGate;
+            sb.Append(all ? "; na sucho (282) - od 284 bramka czynna dla wszystkich surowcow: " : "; na sucho (282 - bez zmian, decyzja Jeffa): ");
             bool any = false;
             foreach (var g in _goods)
             {
@@ -570,7 +584,9 @@ namespace Armoury
                 float old = Math.Max(0f, s.CaravanBulkTransitCover) * g.Need, cap = FlowCap(g, s);
                 bool now = g.Carried > old, would = g.SoldDays >= FlowMinDays && g.Carried > Math.Min(old, cap);
                 sb.Append(any ? ", " : "").Append(g.Name).Append(" w jukach ").Append(g.Carried).Append(" / sprzedaz ").Append(g.SoldEma.ToString("0.0", inv)).Append("/d / prog przeplywu ")
-                  .Append(cap.ToString("0", inv)).Append(" / dawny ").Append(old.ToString("0", inv)).Append(" -> ").Append(would && !now ? "KUPNO STALOBY" : now ? "stoi i tak" : "czynne");
+                  .Append(cap.ToString("0", inv)).Append(" / dawny ").Append(old.ToString("0", inv)).Append(" -> ");
+                if (all) sb.Append(Glut(g, s) ? "KUPNO STOI" : "CZYNNE").Append(g.SoldDays < FlowMinDays ? " (za malo dob pomiaru)" : "").Append(", rozladunek ").Append(g.Unload);
+                else sb.Append(would && !now ? "KUPNO STALOBY" : now ? "stoi i tak" : "czynne");
                 any = true;
             }
             if (!any) sb.Append('-');
@@ -852,11 +868,26 @@ namespace Armoury
                 int price = Math.Max(1, town.GetItemPrice(el.EquipmentElement, mp, true));
                 int n = Math.Min(Math.Min(want, el.Amount), spare / price);   // cena spada z kazda sztuka - pierwsza jest gorna granica
                 if (n <= 0) { _poor++; continue; }
+                // 284 (klucz CaravanBkSellAtCost): nie ponizej kosztu z ksiegi E3-T1 (cena kazdej sztuki po mycie >= koszt sztuki); wyjscia na stracie T1 (rozwiazanie, brak na
+                // zold, juki ponad udzwig, towar > 30 dob) bez zmian; karawana z kontraktem 174 - bez zmian (dostawa kontraktu)
+                // koszt choc czesciowo z oszacowania (stary zapis: wczytanie bez arm_cg284) - bez progu, jak dotad (BK surowcow nie kupuje - jego prog nie jest ich kosztem)
+                if (s.CaravanBkSellAtCost && !MaterialOrders.HasContract(mp) && !CaravanGoods.CostEstimated(mp, g.Item) && CaravanGoods.LossReason(mp, g.Item) == 0)
+                {
+                    double unit = CaravanGoods.UnitCost(mp, g.Item);
+                    if (unit > 0.0)
+                    {
+                        int k = CaravanGoods.MaxAtCost(town, town.Settlement, mp, el.EquipmentElement, n, unit);
+                        if (k < n) { CaravanTrade284.NoteBulkHeld(n - k, glut && want > lack); n = k; }
+                        if (n <= 0) continue;
+                    }
+                }
                 int purse = mp.PartyTradeGold, had = el.Amount;
                 bool broke = false;
                 TownToll.LastTaken = 0;
+                CaravanTrade284.Path = glut && want > lack ? CaravanTrade284.PathBulkGlut : CaravanTrade284.PathBulkShort;   // 284: droga sprzedazy w ksiedze zysku
                 try { SellItemsAction.Apply(mp.Party, town.Owner, el, n, town.Settlement); }
                 catch (Exception e) { broke = true; if (!_errSell) { _errSell = true; Log.Error("CaravanBulk.Sell", e); } }
+                finally { CaravanTrade284.Path = 0; }
                 int moved = had - pack.GetItemNumber(g.Item);                 // liczymy to, co faktycznie zeszlo z jukow
                 int got = Math.Max(0, mp.PartyTradeGold - purse) + TownToll.LastTaken;   // E3-G3: utarg przed mytem targowym (licznik "kasy miast zaplacily")
                 TownToll.LastTaken = 0;

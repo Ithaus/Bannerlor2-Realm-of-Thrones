@@ -1217,6 +1217,12 @@ Uzycie (Python 3, tylko odczyt):
                     RU282-1 miasta bez rudy z zuzyciem maleja, doby 21-30 <= 10; RU282-2 zawarte i dowiezione > 0; RU282-3 stosunek cen <= 2.5; RU282-4 nic z
                     niczego (Towary iron, reszta wozow, E3-T1); RU282-5 drewno 'bez wyjasnienia' |x| <= 2; RU282-6 juki karawan do progu przeplywu, rozladunek poza pomiarem sprzedazy; RU282-7 zelazo
                     swiata <= +10/d; RU282-8 f5 BRAK tylko przy S+R < T; RU282-9 INFO.
+--grupa handel284 : (27.10, paczka 284 noc/284-karawany-surowce-przeplyw - Jeff 27.10 "karawana nic nie zarabia", "rob te plotna skory wszystkie surowce";
+                    Armoury/src/CaravanGoods.cs, CaravanTrade284.cs, CaravanBulk.cs, MaterialOrders.cs, CommodityInputs284.cs, CaravanSettle.cs) python -I tools/sprawdz_logi.py
+                    --grupa handel284 <Armoury-*.log> (strumieniowo). Linie 'Handel karawan (284)', 'Przeplyw towarow karawan (284)', 'Wsad warsztatow (284)',
+                    'Wielkosc karawan (284, na sucho)', 'Ksiega kosztu karawan (284)'. H284-S self-test, H284-S2 test syntetyczny; H284-0 linie co dobe; H284-1 mediana
+                    zysku karawan > 0; H284-2 udzial wyplat 259 >= 0.25 i rosnie; H284-3 juki do progu przeplywu, srebro <= 15 dob; H284-4 T1 na stracie <= 30%;
+                    H284-5 brak surowca kazdego surowca maleje; H284-6 nic z niczego; H284-7 ksiega po wczytaniu; H284-8 INFO.
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -75656,6 +75662,448 @@ def main(argv):
     return _nekanie283_main_prev(argv)
 
 
+
+# ------------------------------------------------------------ handel284 (27.10, paczka 284 noc/284-karawany-surowce-przeplyw: handel karawan z prawdziwej roznicy cen,
+# bramka przeplywu wszystkich towarow, surowce dla wszystkich wsadow - Jeff 27.10 "karawana nic nie zarabia", "rob te plotna skory wszystkie surowce aby ta gospodarka
+# zyla"; Armoury/src/CaravanGoods.cs (ksiega w zapisie arm_cg284, bez zoldu w cenie), CaravanTrade284.cs (zasady zakupu BK, BK nie ponizej kosztu, gabka, linie),
+# CaravanBulk.cs (bramka wszystkich surowcow, prog kosztu), MaterialOrders.cs (rowny zapas dni wszystkich surowcow, sygnal warsztatow towarowych),
+# CommodityInputs284.cs (wsad warsztatow towarowych), CaravanSettle.cs (CapFloor)). Uzycie:
+#   python -I tools/sprawdz_logi.py --grupa handel284 <Armoury-*.log>
+# Progi (bazy: log Jeffa 27.10 20-56-51, build 130, doby 109003-109024 - bez paczki):
+#   H284-S  self-test wyrazen (linie jak w kodzie C#); H284-S2 test syntetyczny (2 logi dobre, 8 zlych);
+#   H284-0  linie "Handel karawan (284)", "Przeplyw towarow karawan (284)", "Wsad warsztatow (284)", "Wielkosc karawan (284, na sucho)" co dobe, rozpoznane,
+#           potkniecia 0, latki TAK, ERROR paczki 0;
+#   H284-1  mediana zysku zrealizowanego karawan (7 dob): w ostatnich 10 dobach srednia > 0 i co najmniej 7 dob > 0;
+#   H284-2  udzial karawan rodow z wyplata 259 (z wyplata / karawan rodow): srednia ostatnich 7 dob > srednia pierwszych 3 i >= H284_PAY_MIN (baza 0.148);
+#   H284-3  juki karawan: kazda kategoria z "KUPNO STOI" w pierwszej dobie z bramka (dob pomiaru >= 3) - na koniec w jukach <= max(1.5 x prog, prog + 100) albo
+#           najwyzej polowa poczatku; srebro: w jukach / sprzedaz 14 dob <= H284_SILVER_DAYS na koniec biegu >= 25 dob (baza 44);
+#   H284-4  sprzedaz T1 na stracie (utarg/d): srednia ostatnich 10 dob <= H284_LOSS_SHARE x srednia pierwszych 3 (baza ok. 14.5 tys./d);
+#   H284-5  "Warsztaty" brak surowca: kazdy surowiec (ruda, drewno, skora, len/welna) srednia ostatnich 10 dob <= srednia pierwszych 5 (albo obie <= 2) i suma
+#           maleje; warsztaty towarowe: brak wsadu kazdej kategorii poza jedzeniem (srednia pierwszych 5 >= 1) - ostatnie 10 <= pierwsze 5;
+#   H284-6  nic z niczego: "ARYTMETYKA OK." co dobe, Towary "bez wyjasnienia" |x| <= 2, E3-T1 "(roznica 0)", 259 "(roznica 0)";
+#   H284-7  ksiega kosztu po wczytaniu: kazda linia "Ksiega kosztu karawan (284)" nieczytelnych 0, a wczytanie po zapisie (druga i dalsze linie) z wpisow > 0
+#           (jedna linia - INFO: bieg bez ponownego wczytania);
+#   H284-8  INFO: zysk wedlug drogi, odrzucone zakupy, wstrzymane ponizej kosztu, gabka, F (wielkosc), liczby pierwszej i ostatniej doby.
+H284_L1 = "Handel karawan (284): dzien "
+H284_L2 = "Przeplyw towarow karawan (284): dzien "
+H284_L3 = "Wsad warsztatow (284): dzien "
+H284_L4 = "Wielkosc karawan (284, na sucho): dzien "
+H284_BOOK = "Ksiega kosztu karawan (284): "
+H284_RE1 = re.compile(
+    r"^Handel karawan \(284\): dzien (?P<d>\d+) \| klucze: (?P<keys>[^|]*) \| sprzedaz wedlug drogi \(szt\./utarg/myto/koszt/zysk; ponizej kosztu szt\./utarg/koszt\): "
+    r"(?P<paths>[^|]*) \| razem zysk zrealizowany (?P<real>-?\d+) zl \| karawany 7 dob: karawan (?P<n>\d+), z handlem (?P<trade>\d+), z zyskiem > 0 (?P<prof>\d+), "
+    r"mediana zysku (?P<med>-?\d+|-) zl, suma (?P<sum>-?\d+) zl \| kupno BK odrzucone \(kategoria x wizyta\): przesyt (?P<rg>\d+), kapital w towarze (?P<rc>\d+), "
+    r"rezerwa zoldu (?P<rw>\d+), bez zysku po mycie i drodze (?P<rn>\d+), jedzenie > 7 dob (?P<rf>\d+); wizyt z zasadami (?P<visits>\d+), "
+    r"pominiete \(kontrakt, rozkaz gracza, nie handluje\) (?P<skip>\d+) \| ponizej kosztu wstrzymane: BK (?P<bkn>\d+) szt\. \(koszt (?P<bkc>\d+) zl\), "
+    r"BK na stracie z wyjscia (?P<bkx>\d+), surowce masowe (?P<bun>\d+) szt\. \(w tym rozladunek (?P<bug>\d+)\) \| gabka BK cofnieta (?P<sp>\d+) szt\. \(zwrot (?P<spg>\d+) zl\) \| "
+    r"karawany gracza wedlug drogi \(utarg/zysk\): (?P<pl>[^|]*) \| latki: BK sprzedaz (?P<w1>TAK|NIE), gabka (?P<w2>TAK|NIE), werbunek (?P<w3>TAK|NIE) \| "
+    r"(?:recenzja 284: wizyt z podloga >= kapital \(bez reguly kapitalu\) (?P<noroom>\d+), juki przeliczone po wczytaniu (?P<hlazy>\d+), "
+    r"wstrzymane zdjete z dostaw P1 (?P<p1ph>\d+) szt\. \| )?czas (?P<ms>[\d.]+) ms \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
+H284_PATH = re.compile(r"(inne|T1|BK|surowce masowe - brak miasta|surowce masowe - rozladunek ponad brak|kontrakt 174) (\d+)/(\d+)/(\d+)/(\d+)/(-?\d+) \((\d+)/(\d+)/(\d+)\)")
+H284_RE2 = re.compile(
+    r"^Przeplyw towarow karawan \(284\): dzien (?P<d>\d+) \| klucz kupno wedlug sprzedazy (?P<k>TAK|NIE), dob pomiaru (?P<days>\d+) \(bramka od 3\) \| "
+    r"kategorii (?P<cats>\d+), z kupnem stoi (?P<shut>\d+) \| w jukach razem (?P<held>\d+) szt\. \(koszt (?P<cost>\d+) zl\), sprzedaz 14 dob (?P<ema>[\d.]+)/d \| "
+    r"wedlug kategorii \(w jukach / sprzedaz 14 dob / prog / stan\): (?P<rows>.*)\.$")
+H284_CAT = re.compile(r"(\S+) (\d+) / ([\d.]+)/d / (\d+) / (KUPNO STOI|CZYNNE)")
+H284_RE3 = re.compile(
+    r"^Wsad warsztatow \(284\): dzien (?P<d>\d+) \| klucz Town Material Order Workshop Inputs (?P<k>TAK|NIE), rowny zapas dni wszystkich surowcow (?P<k2>TAK|NIE) \| "
+    r"cykle warsztatow towarowych bez wsadu (?P<miss>\d+), udane (?P<ok>\d+) \| brak wsadu wedlug kategorii \(cykle; poza jedzeniem\): (?P<rows>[^|]*) \| "
+    r"jedzenie i zwierzeta \(tylko pomiar\): [^|]* \| zuzycie wsadu \(udane cykle; poza jedzeniem\): [^|]* \| do zamowien surowca \(tabela 174\): braki (?P<to>\d+), "
+    r"zuzycie (?P<tu>\d+) szt\. \| przyciete rownym zapasem dni \(poza ruda\) (?P<cap>\d+) \| latki (?P<w>TAK|NIE) \| potkniecia (?P<st>\d+) \(sesja \d+\)\.$")
+H284_PAIR = re.compile(r"(\S+) (\d+)")
+H284_RE4 = re.compile(
+    r"^Wielkosc karawan \(284, na sucho\): dzien (?P<d>\d+) \| klucz Caravan Size By Trade (?P<k>TAK|NIE) \| karawan zmierzonych \(>= 7 dob\) (?P<n>\d+): "
+    r"zysk handlu/d ponizej zoldu/d (?P<below>\d+), nie ponizej (?P<above>\d+); suma zysku handlu/d (?P<m>-?\d+) zl, suma zoldu/d (?P<w>\d+) zl \| "
+    r"proby werbunku karawan (?P<calls>\d+), regula pominelaby (?P<would>\d+), pominela (?P<skip>\d+)\.$")
+H284_RE_BOOK = re.compile(
+    r"^Ksiega kosztu karawan \(284\): (?:wczytano wpisow (?P<lots>\d+) \(sztuk (?P<units>\d+)\) z zapisu arm_cg284, bez karawany albo towaru (?P<gone>\d+), nieczytelnych (?P<bad>\d+)"
+    r"|zapis bez klucza arm_cg284 [^|]*nieczytelnych (?P<bad0>\d+)) \|")
+H284_RE259 = re.compile(r"^Karawany rodow - rozliczenie dnia \(259\): dzien (\d+) \| CZYNNE \| karawan rodow (\d+) \([^)]*\), z wyplata (\d+) za .*?\(roznica (-?\d+)\)")
+H284_RE_T1 = re.compile(r"^Karawany - towar tam, gdzie maja zysk \(E3-T1\): dzien (\d+) .*?\| na stracie (\d+) szt\. za (\d+) .*?\(roznica (-?\d+)\)")
+H284_RE_WS = re.compile(r"^Warsztaty: dzien (\d+) - .*?brak surowca (\d+) \[ruda (\d+), drewno (\d+), skora (\d+), len/welna (\d+)")
+H284_RE_MONEY = re.compile(r"^Pieniadz swiata \(bilans - przyczyny\): dzien (\d+) ")
+H284_RE_TOW = re.compile(r"^Towary: dzien (\d+) - (\S+) .*?\| bez wyjasnienia ([+-]?\d+|-)")
+H284_ERR = ("ERROR in CaravanTrade284.", "ERROR in CommodityInputs284.", "ERROR in CaravanGoods.Resolve284", "ERROR in CaravanGoods.BkValuePostfix(284)",
+            "ERROR in CaravanGoods.BkBuyPrefix(284)", "ERROR in CaravanGoods.EnsureSnap(linia 284)", "ERROR in SyncData.arm_cg284", "ERROR in SyncData.arm_cs284",
+            "ERROR in MaterialOrders.NoteMissCategory", "ERROR in MaterialOrders.NoteUseCategory")
+H284_PAY_MIN = 0.25
+H284_SILVER_DAYS = 15.0
+H284_LOSS_SHARE = 0.30
+H284_TOW_TOL = 2
+
+H284_PATHS0 = ("inne {a}, T1 {t}, BK {b}, surowce masowe - brak miasta 5/400/8/300/92 (0/0/0), surowce masowe - rozladunek ponad brak 0/0/0/0/0 (0/0/0), "
+               "kontrakt 174 3/90/0/60/30 (0/0/0)")
+H284_TEST = {
+    "l1": ("Handel karawan (284): dzien {d} | klucze: ksiega w zapisie TAK, bez zoldu w cenie TAK, nie ponizej kosztu TAK, kupno wedlug sprzedazy TAK, kapital obrotowy TAK, "
+           "zysk osiagalny TAK, surowce masowe wszystkie TAK, wielkosc wedlug handlu NIE | sprzedaz wedlug drogi (szt./utarg/myto/koszt/zysk; ponizej kosztu szt./utarg/koszt): "
+           "{paths} | razem zysk zrealizowany {real} zl | karawany 7 dob: karawan 480, z handlem {trade}, z zyskiem > 0 {prof}, mediana zysku {med} zl, suma {sum} zl | "
+           "kupno BK odrzucone (kategoria x wizyta): przesyt 40, kapital w towarze 31, rezerwa zoldu 2, bez zysku po mycie i drodze 55, jedzenie > 7 dob 6; wizyt z zasadami 90, "
+           "pominiete (kontrakt, rozkaz gracza, nie handluje) 4 | ponizej kosztu wstrzymane: BK 12 szt. (koszt 900 zl), BK na stracie z wyjscia 3, surowce masowe 2 szt. "
+           "(w tym rozladunek 1) | gabka BK cofnieta 5 szt. (zwrot 40 zl) | karawany gracza wedlug drogi (utarg/zysk): inne 0/0, T1 300/40, BK 120/10, "
+           "surowce masowe - brak miasta 0/0, surowce masowe - rozladunek ponad brak 0/0, kontrakt 174 0/0 | latki: BK sprzedaz TAK, gabka TAK, werbunek TAK | "
+           "recenzja 284: wizyt z podloga >= kapital (bez reguly kapitalu) 0, juki przeliczone po wczytaniu 1, wstrzymane zdjete z dostaw P1 12 szt. | "
+           "czas 0.61 ms | potkniecia {st} (sesja {st})."),
+    "l2": ("Przeplyw towarow karawan (284): dzien {d} | klucz kupno wedlug sprzedazy TAK, dob pomiaru {days} (bramka od 3) | kategorii 3, z kupnem stoi {shut} | "
+           "w jukach razem {held} szt. (koszt 412000 zl), sprzedaz 14 dob 140.0/d | wedlug kategorii (w jukach / sprzedaz 14 dob / prog / stan): {rows}."),
+    "l3": ("Wsad warsztatow (284): dzien {d} | klucz Town Material Order Workshop Inputs TAK, rowny zapas dni wszystkich surowcow TAK | cykle warsztatow towarowych bez wsadu "
+           "{miss}, udane 135 | brak wsadu wedlug kategorii (cykle; poza jedzeniem): {rows} | jedzenie i zwierzeta (tylko pomiar): grain 5 (razem 5) | zuzycie wsadu "
+           "(udane cykle; poza jedzeniem): hides 40, silver 12 (jedzenie 70) | do zamowien surowca (tabela 174): braki 12, zuzycie 40 szt. | przyciete rownym zapasem dni "
+           "(poza ruda) 3 | latki TAK | potkniecia 0 (sesja 0)."),
+    "l4": ("Wielkosc karawan (284, na sucho): dzien {d} | klucz Caravan Size By Trade NIE | karawan zmierzonych (>= 7 dob) 400: zysk handlu/d ponizej zoldu/d 350, nie ponizej 50; "
+           "suma zysku handlu/d 1234 zl, suma zoldu/d 150000 zl | proby werbunku karawan 30, regula pominelaby 20, pominela 0."),
+    "book": ("Ksiega kosztu karawan (284): wczytano wpisow {lots} (sztuk 64000) z zapisu arm_cg284, bez karawany albo towaru 3, nieczytelnych {bad} | migawka: karawan z towarem 480, "
+             "sztuk dopelnionych oszacowaniem 120 (cena z dziennika BK 40, bez wpisu 80, w tym prog zakupu BK 80; dziennik BK czytany) | klucz Caravan Cost Book Save TAK."),
+    "book0": ("Ksiega kosztu karawan (284): zapis bez klucza arm_cg284 (starszy zapis albo klucz byl wylaczony) - wpisow 0, nieczytelnych 0 | migawka: karawan z towarem 480, "
+              "sztuk dopelnionych oszacowaniem 64264 (cena z dziennika BK 1349, bez wpisu 62915, w tym prog zakupu BK 62915; dziennik BK czytany) | klucz Caravan Cost Book Save TAK."),
+    "k259": ("Karawany rodow - rozliczenie dnia (259): dzien {d} | CZYNNE | karawan rodow 88 (gracza 1, lordow 87), z wyplata {paid} za 23142 zl (graczowi 0, lordom 23142), "
+             "ponizej kapitalu 10, wartosc>kapital ale kiesa<=podloga 63, bez zwrotu zoldu (tytul) 0, konwoje pominiete 2, w bitwie/rozwiazywane 0 | kontrola: kiesy -23142 = "
+             "wynik prefiksu +23142 (roznica {r}) | zastapione/zablokowane: gra 10% 0 (bylo by 0) | potkniecia 0 (sesja 0)."),
+    "t1": ("Karawany - towar tam, gdzie maja zysk (E3-T1): dzien {d} | CZYNNE | wjazdow z towarem 95, sprzedaly 53 | z zyskiem 367 szt. za 47174 (koszt zakupu 27371, marza +72.4%) | "
+           "na stracie {ln} szt. za {lg} (koszt 22375, strata 8498): rozwiazanie 0/0 | zloto: z kas miast 198; kontrola: kasy -198 = kiesy +196 + myto 2 - myto do kas osad 0 (roznica {r}) | koniec"),
+    "ws": ("Warsztaty: dzien {d} - wykonano 1623 szt. [HeadArmor 624], koszt 77438, sprzedaz 153202; odpuszczone: bez zysku 554, brak surowca {all} [ruda {o}, drewno {w}, skora {l}, "
+           "len/welna {f} - cykl liczony przy kazdym surowcu]"),
+    "money": "Pieniadz swiata (bilans - przyczyny): dzien {d} | zmiana sumy +561 [P] = zrodla +789696 - ujscia 778383 | ARYTMETYKA {a}.",
+    "tow": "Towary: dzien {d} - silver (38 d): zapas 8204 (+12) | produkcja 401 | zuzycie 389 | bez wyjasnienia {u} | ruch 12",
+}
+
+
+def h284_selftest():
+    T = H284_TEST
+    errs = []
+    paths = H284_PATHS0.format(a="1/2/0/4/-2 (1/2/4)", t="300/47000/900/27000/19100 (20/800/1300)", b="200/9000/180/9500/-680 (60/2000/2900)")
+    m = H284_RE1.match(T["l1"].format(d=109010, paths=paths, real=18540, trade=300, prof=210, med=150, sum=99999, st=0))
+    if not m:
+        errs.append("linia 1 nierozpoznana")
+    else:
+        p = H284_PATH.findall(m.group("paths"))
+        if m.group("med") != "150" or len(p) != 6 or p[2][0] != "BK" or p[2][5] != "-680" or m.group("w3") != "TAK":
+            errs.append("linia 1: zle pola " + str((m.group("med"), len(p))))
+    if not H284_RE1.match(T["l1"].format(d=109010, paths=paths, real=0, trade=0, prof=0, med="-", sum=0, st=0)):
+        errs.append("linia 1 z mediana '-' nierozpoznana")
+    m = H284_RE1.match(T["l1"].format(d=109010, paths=paths, real=1, trade=1, prof=1, med=1, sum=1, st=0))
+    if not m or (m.group("noroom"), m.group("hlazy"), m.group("p1ph")) != ("0", "1", "12"):
+        errs.append("linia 1: pola recenzji 284")
+    old = T["l1"].replace("recenzja 284: wizyt z podloga >= kapital (bez reguly kapitalu) 0, juki przeliczone po wczytaniu 1, wstrzymane zdjete z dostaw P1 12 szt. | ", "")
+    m = H284_RE1.match(old.format(d=109010, paths=paths, real=1, trade=1, prof=1, med=1, sum=1, st=0))
+    if not m or m.group("noroom") is not None:
+        errs.append("linia 1 bez pol recenzji (build 284 przed recenzja) nierozpoznana")
+    m = H284_RE2.match(T["l2"].format(d=109010, days=9, shut=1, held=4500, rows="silver 4123 / 94.0/d / 940 / KUPNO STOI, fur 100 / 20.0/d / 200 / CZYNNE, date_fruit 3 / 0.0/d / 0 / KUPNO STOI"))
+    if not m:
+        errs.append("linia 2 nierozpoznana")
+    else:
+        c = H284_CAT.findall(m.group("rows"))
+        if len(c) != 3 or c[0] != ("silver", "4123", "94.0", "940", "KUPNO STOI") or c[2][0] != "date_fruit":
+            errs.append("linia 2: kategorie " + str(c))
+    if not H284_RE2.match(T["l2"].format(d=109010, days=1, shut=0, held=0, rows="-")):
+        errs.append("linia 2 bez kategorii nierozpoznana")
+    m = H284_RE3.match(T["l3"].format(d=109010, miss=50, rows="silver 30, iron 12"))
+    if not m or H284_PAIR.findall(m.group("rows")) != [("silver", "30"), ("iron", "12")]:
+        errs.append("linia 3")
+    if not H284_RE3.match(T["l3"].format(d=109010, miss=0, rows="-")):
+        errs.append("linia 3 bez brakow")
+    if not H284_RE4.match(T["l4"].format(d=109010)):
+        errs.append("linia 4")
+    a = H284_RE_BOOK.match(T["book"].format(lots=4800, bad=0))
+    if not a or a.group("lots") != "4800" or a.group("bad") != "0":
+        errs.append("ksiega (wczytano)")
+    a = H284_RE_BOOK.match(T["book0"])
+    if not a or a.group("bad0") != "0" or a.group("lots") is not None:
+        errs.append("ksiega (bez klucza)")
+    a = H284_RE259.match(T["k259"].format(d=109010, paid=13, r=0))
+    if not a or a.groups()[1:] != ("88", "13", "0"):
+        errs.append("259")
+    a = H284_RE_T1.match(T["t1"].format(d=109010, ln=869, lg=13877, r=0))
+    if not a or a.group(3) != "13877" or a.group(4) != "0":
+        errs.append("E3-T1")
+    a = H284_RE_WS.match(T["ws"].format(d=109010, all=260, o=184, w=46, l=16, f=21))
+    if not a or a.groups()[1:] != ("260", "184", "46", "16", "21"):
+        errs.append("Warsztaty")
+    if not H284_RE_MONEY.match(T["money"].format(d=109010, a="OK")):
+        errs.append("Pieniadz swiata")
+    a = H284_RE_TOW.match(T["tow"].format(d=109010, u="+0"))
+    if not a or a.group(3) != "+0":
+        errs.append("Towary")
+    return "; ".join(errs) if errs else None
+
+
+def h284_collect(logp):
+    D = {"l1": {}, "l2": {}, "l3": {}, "l4": {}, "bad": 0, "book": [], "k259": {}, "t1": {}, "ws": {}, "money": {}, "tow": {}, "err": 0, "errs": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(H284_ERR):
+                    D["err"] += 1
+                    if len(D["errs"]) < 3:
+                        D["errs"].append(s[:160])
+                continue
+            for key, pref, rx in (("l1", H284_L1, H284_RE1), ("l2", H284_L2, H284_RE2), ("l3", H284_L3, H284_RE3), ("l4", H284_L4, H284_RE4)):
+                if s.startswith(pref):
+                    a = rx.match(s)
+                    if a:
+                        D[key][int(a.group("d"))] = a.groupdict()
+                    else:
+                        D["bad"] += 1
+                    break
+            else:
+                if s.startswith(H284_BOOK):
+                    a = H284_RE_BOOK.match(s)
+                    if a:
+                        D["book"].append(a.groupdict())
+                    else:
+                        D["bad"] += 1
+                elif s.startswith("Karawany rodow - rozliczenie dnia (259): dzien "):
+                    a = H284_RE259.match(s)
+                    if a:
+                        D["k259"][int(a.group(1))] = (int(a.group(2)), int(a.group(3)), int(a.group(4)))
+                elif s.startswith("Karawany - towar tam, gdzie maja zysk (E3-T1): dzien "):
+                    a = H284_RE_T1.match(s)
+                    if a:
+                        D["t1"][int(a.group(1))] = (int(a.group(3)), int(a.group(4)))
+                elif s.startswith("Warsztaty: dzien "):
+                    a = H284_RE_WS.match(s)
+                    if a:
+                        D["ws"][int(a.group(1))] = tuple(int(x) for x in a.groups()[1:])
+                elif s.startswith("Pieniadz swiata (bilans - przyczyny): dzien "):
+                    a = H284_RE_MONEY.match(s)
+                    if a:
+                        D["money"][int(a.group(1))] = "ARYTMETYKA OK." in s
+                elif s.startswith("Towary: dzien "):
+                    a = H284_RE_TOW.match(s)
+                    if a and a.group(3) != "-":
+                        d = int(a.group(1))
+                        D["tow"][d] = max(D["tow"].get(d, 0), abs(int(a.group(3))))
+    return D
+
+
+def _h284_mean(v):
+    return sum(v) / len(v) if v else 0.0
+
+
+def h284_rows(rep, D):
+    L1, L2, L3, L4 = D["l1"], D["l2"], D["l3"], D["l4"]
+    days = sorted(L1)
+    if not days:
+        rep.add("H284-0: linie paczki 284 co dobe", f"brak linii 'Handel karawan (284)' (nierozpoznanych {D['bad']})", "linia co dobe", False)
+        return
+    span = list(range(days[0], days[-1] + 1))
+    miss = [d for d in span if d not in L1 or d not in L2 or d not in L3 or d not in L4]
+    stum = sum(int(L1[d]["st"]) for d in days) + sum(int(L3[d]["st"]) for d in L3)
+    wired = all(L1[d]["w1"] == "TAK" and L1[d]["w2"] == "TAK" and L1[d]["w3"] == "TAK" for d in days) and all(L3[d]["w"] == "TAK" for d in L3)
+    ok0 = not miss and D["bad"] == 0 and stum == 0 and D["err"] == 0 and wired
+    rep.add("H284-0: linie 284 co dobe, potkniecia 0, latki TAK, ERROR 0",
+            f"dob {len(span)} ({span[0]}-{span[-1]}), bez kompletu linii {len(miss)}{' ' + str(miss[:5]) if miss else ''}, nierozpoznanych {D['bad']}, potkniecia {stum}, "
+            f"latki {'TAK' if wired else 'NIE'}, ERROR {D['err']}{' ' + str(D['errs']) if D['errs'] else ''}", "wszystko 0 / TAK", ok0)
+    # 1. mediana zysku karawan
+    last = days[-10:]
+    meds = [int(L1[d]["med"]) for d in last if L1[d]["med"] != "-"]
+    pos = sum(1 for x in meds if x > 0)
+    ok1 = len(meds) >= min(7, len(last)) and _h284_mean(meds) > 0 and pos >= min(7, len(last))
+    rep.add("H284-1: mediana zysku zrealizowanego karawan (7 dob) > 0", f"ostatnie {len(last)} dob: srednia {_h284_mean(meds):.0f} zl, dob > 0: {pos}, wartosci {meds}",
+            "srednia > 0 i >= 7 dob > 0", ok1)
+    # 2. udzial wyplat 259
+    k = D["k259"]
+    kd = sorted(d for d in k if d in span or not span)
+    sh = [k[d][1] / k[d][0] for d in kd if k[d][0] > 0]
+    if len(sh) >= 10:
+        f3, l7 = _h284_mean(sh[:3]), _h284_mean(sh[-7:])
+        rep.add("H284-2: udzial karawan rodow z wyplata 259", f"pierwsze 3 doby {f3:.3f}, ostatnie 7 dob {l7:.3f} (dob {len(sh)})", f"> pierwsze 3 i >= {H284_PAY_MIN}",
+                l7 > f3 and l7 >= H284_PAY_MIN)
+    else:
+        rep.add("H284-2: udzial karawan rodow z wyplata 259", f"za malo dob z linia 259 ({len(sh)})", ">= 10 dob", False)
+    # 3. juki wedlug kategorii
+    d2 = sorted(L2)
+    first = next((d for d in d2 if int(L2[d]["days"]) >= 3), None)
+    if first is None:
+        rep.add("H284-3: juki karawan schodza do progu przeplywu", "brak doby z bramka (dob pomiaru >= 3)", "bramka czynna", False)
+    else:
+        cat0 = {c[0]: (int(c[1]), int(c[3])) for c in H284_CAT.findall(L2[first]["rows"]) if c[4] == "KUPNO STOI"}
+        catN = {c[0]: (int(c[1]), float(c[2]), int(c[3])) for c in H284_CAT.findall(L2[d2[-1]]["rows"])}
+        bad = []
+        for c, (h0, _) in cat0.items():
+            hN, eN, capN = catN.get(c, (0, 0.0, 0))
+            if not (hN <= max(1.5 * capN, capN + 100) or hN <= h0 / 2):
+                bad.append(f"{c} {h0}->{hN} (prog {capN})")
+        sv = catN.get("silver")
+        sdays = (sv[0] / sv[1]) if sv and sv[1] > 0 else (0.0 if not sv or sv[0] == 0 else float("inf"))
+        long_run = len(d2) >= 25
+        ok3 = not bad and (not long_run or sdays <= H284_SILVER_DAYS)
+        rep.add("H284-3: juki karawan do progu przeplywu (kategorie z KUPNO STOI), srebro",
+                f"kategorii z kupnem zamknietym w dobie {first}: {len(cat0)}, nie zeszly {len(bad)} {bad[:4]}; srebro na koniec {sv[0] if sv else 0} szt. = "
+                f"{'-' if sdays == float('inf') else f'{sdays:.1f}'} dob sprzedazy (bieg {len(d2)} dob{'' if long_run else ' < 25 - prog srebra INFO'})",
+                f"koniec <= max(1.5 x prog, prog + 100) albo polowa; srebro <= {H284_SILVER_DAYS} dob", ok3)
+    # 4. T1 na stracie
+    t = D["t1"]
+    td = sorted(d for d in t if d >= span[0])
+    if len(td) >= 13:
+        f3, l10 = _h284_mean([t[d][0] for d in td[:3]]), _h284_mean([t[d][0] for d in td[-10:]])
+        rep.add("H284-4: sprzedaz T1 na stracie (utarg/d)", f"pierwsze 3 doby {f3:.0f}, ostatnie 10 dob {l10:.0f}", f"<= {H284_LOSS_SHARE} x pierwsze 3",
+                l10 <= H284_LOSS_SHARE * f3 or (f3 == 0 and l10 == 0))
+    else:
+        rep.add("H284-4: sprzedaz T1 na stracie (utarg/d)", f"za malo dob E3-T1 ({len(td)})", ">= 13 dob", False)
+    # 5. brak surowca warsztatow zbrojnych i towarowych
+    w = D["ws"]
+    wd = sorted(d for d in w if d >= span[0])
+    bad5 = []
+    txt = []
+    if len(wd) >= 15:
+        names = ("razem", "ruda", "drewno", "skora", "len/welna")
+        for i, nm in enumerate(names):
+            f5, l10 = _h284_mean([w[d][i] for d in wd[:5]]), _h284_mean([w[d][i] for d in wd[-10:]])
+            txt.append(f"{nm} {f5:.1f}->{l10:.1f}")
+            if i == 0 and not l10 < f5:
+                bad5.append("razem nie maleje")
+            elif i > 0 and l10 > f5 and not (f5 <= 2 and l10 <= 2):
+                bad5.append(nm)
+    else:
+        bad5.append(f"za malo dob Warsztaty ({len(wd)})")
+    d3 = sorted(L3)
+    if len(d3) >= 15:
+        def cm(ds):
+            acc = {}
+            for d in ds:
+                for c, n in H284_PAIR.findall(L3[d]["rows"]):
+                    acc[c] = acc.get(c, 0) + int(n)
+            return {c: v / len(ds) for c, v in acc.items()}
+        a5, a10 = cm(d3[:5]), cm(d3[-10:])
+        for c, v in a5.items():
+            if v >= 1 and a10.get(c, 0.0) > v:
+                bad5.append(f"wsad {c} {v:.1f}->{a10.get(c, 0.0):.1f}")
+        txt.append(f"wsad towarowy kategorii {len(a5)}")
+    else:
+        bad5.append(f"za malo dob linii wsadu ({len(d3)})")
+    rep.add("H284-5: brak surowca warsztatow (kazdy surowiec) i wsadu warsztatow towarowych maleje", f"{', '.join(txt)}; nie maleje: {bad5[:6]}",
+            "ostatnie 10 <= pierwsze 5 dla kazdego, razem maleje", not bad5)
+    # 6. nic z niczego
+    mon = D["money"]
+    nm_ok = [d for d in span if mon.get(d) is True]
+    tw = [D["tow"][d] for d in span if d in D["tow"]]
+    t1r = [t[d][1] for d in span if d in t]
+    kr = [k[d][2] for d in span if d in k]
+    ok6 = len(nm_ok) == len([d for d in span if d in mon]) and len(nm_ok) > 0 and (not tw or max(tw) <= H284_TOW_TOL) and all(x == 0 for x in t1r) and all(x == 0 for x in kr)
+    rep.add("H284-6: nic z niczego (ARYTMETYKA OK, Towary, E3-T1, 259)",
+            f"ARYTMETYKA OK {len(nm_ok)} z {len([d for d in span if d in mon])} dob, Towary max |bez wyjasnienia| {max(tw) if tw else '-'}, E3-T1 roznica != 0: "
+            f"{sum(1 for x in t1r if x)}, 259 roznica != 0: {sum(1 for x in kr if x)}", f"wszystkie OK, |x| <= {H284_TOW_TOL}, roznice 0", ok6)
+    # 7. ksiega po wczytaniu
+    b = D["book"]
+    badb = sum(int(x["bad"] or x["bad0"] or 0) for x in b)
+    later = b[1:]
+    if len(b) >= 2:
+        ok7 = badb == 0 and all(x["lots"] is not None and int(x["lots"]) > 0 for x in later)
+        rep.add("H284-7: ksiega kosztu karawan po wczytaniu", f"linii {len(b)}, nieczytelnych razem {badb}, wpisy po ponownym wczytaniu {[x['lots'] for x in later]}",
+                "nieczytelnych 0, wpisow > 0", ok7)
+    else:
+        rep.add("H284-7: ksiega kosztu karawan po wczytaniu", f"linii {len(b)} (nieczytelnych {badb}) - bieg bez ponownego wczytania", "INFO", None if badb == 0 else False)
+    # 8. INFO
+    a, z = L1[days[0]], L1[days[-1]]
+    f4 = L4.get(days[-1])
+    rep.add("H284-8: INFO", f"doba {days[0]}: zysk {a['real']}, mediana {a['med']}, odrzucone przesyt/kapital/zold/bez zysku/jedzenie {a['rg']}/{a['rc']}/{a['rw']}/{a['rn']}/{a['rf']}; "
+            f"doba {days[-1]}: zysk {z['real']}, mediana {z['med']}, z handlem {z['trade']}, z zyskiem {z['prof']}, BK wstrzymane {z['bkn']} szt., gabka {z['sp']} szt., "
+            f"recenzja: podloga >= kapital {z.get('noroom') or '-'}, juki po wczytaniu {sum(int(L1[d].get('hlazy') or 0) for d in days)}, "
+            f"zdjete z P1 {z.get('p1ph') or '-'} szt.; drogi [{z['paths'][:300]}]; F: {('ponizej zoldu ' + f4['below'] + ' z ' + f4['n'] + ', pominelaby ' + f4['would']) if f4 else '-'}", "INFO", None)
+
+
+def h284_synth():
+    import tempfile
+    import shutil
+    T = H284_TEST
+    P = "[10:00:00] "
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="h284_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = [P + T["book0"]]
+            d0 = 109002
+            for i in range(30):
+                d = d0 + i
+                if kind == "bad1" and i == 12:
+                    continue
+                med = 120 if i >= 5 else -300
+                if kind == "bad2":
+                    med = -50
+                paths = H284_PATHS0.format(a="0/0/0/0/0 (0/0/0)", t="300/47000/900/27000/19100 (20/800/1300)", b="200/9000/180/9500/-680 (60/2000/2900)")
+                L.append(P + T["l1"].format(d=d, paths=paths, real=18000, trade=300, prof=200, med=med, sum=90000, st=(1 if kind == "bad1" and i == 3 else 0)))
+                sv = max(900, 4100 - 150 * i) if kind != "bad4" else 4100
+                rows = f"silver {sv} / 94.0/d / 940 / {'KUPNO STOI' if sv > 940 else 'CZYNNE'}, fur 100 / 20.0/d / 200 / CZYNNE"
+                L.append(P + T["l2"].format(d=d, days=i + 1, shut=1 if sv > 940 else 0, held=sv + 100, rows=rows))
+                cm = max(2, 30 - i) if kind != "bad6" else 30 + i
+                L.append(P + T["l3"].format(d=d, miss=cm + 12, rows=f"silver {cm}, iron 12"))
+                L.append(P + T["l4"].format(d=d))
+                paid = 13 + (i if kind != "bad3" else 0)
+                L.append(P + T["k259"].format(d=d, paid=min(80, paid), r=0))
+                lg = max(1000, 14500 - 1000 * i) if kind != "bad5" else 14500
+                L.append(P + T["t1"].format(d=d, ln=800, lg=lg, r=(5 if kind == "bad7" and i == 8 else 0)))
+                o = max(20, 190 - 8 * i) if kind != "bad6" else 190 + i
+                L.append(P + T["ws"].format(d=d, all=o + 60, o=o, w=33, l=16, f=11))
+                L.append(P + T["money"].format(d=d, a=("BLAD" if kind == "bad7" and i == 9 else "OK")))
+                L.append(P + T["tow"].format(d=d, u="+0"))
+                if i == 20 and kind in ("good2", "bad8"):
+                    L.append(P + T["book"].format(lots=4800, bad=(2 if kind == "bad8" else 0)))
+            if kind == "bad1":
+                L.append(P + "ERROR in CaravanTrade284.Daily: x")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            h284_rows(rep, h284_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    allt = {"H284-0": "TAK", "H284-1": "TAK", "H284-2": "TAK", "H284-3": "TAK", "H284-4": "TAK", "H284-5": "TAK", "H284-6": "TAK"}
+    exp = {
+        "good1": dict(allt, **{"H284-7": "INFO"}),
+        "good2": dict(allt, **{"H284-7": "TAK"}),
+        "bad1": {"H284-0": "NIE"},
+        "bad2": {"H284-1": "NIE", "H284-0": "TAK"},
+        "bad3": {"H284-2": "NIE", "H284-1": "TAK"},
+        "bad4": {"H284-3": "NIE", "H284-2": "TAK"},
+        "bad5": {"H284-4": "NIE", "H284-3": "TAK"},
+        "bad6": {"H284-5": "NIE", "H284-4": "TAK"},
+        "bad7": {"H284-6": "NIE", "H284-5": "TAK"},
+        "bad8": {"H284-7": "NIE", "H284-6": "TAK"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def handel284_main(logp):
+    """handel284 (27.10, paczka 284): H284-S, H284-S2, H284-0..H284-8 - opis w komentarzu nad stalymi H284_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = h284_selftest()
+    rep.add("H284-S: self-test wyrazen (linie jak w kodzie C#: CaravanTrade284.Daily, CommodityInputs284.Daily, CaravanGoods.EnsureSnap, 259, E3-T1, Warsztaty)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = h284_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("H284-S2: test syntetyczny (2 logi dobre, 8 zlych)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("H284-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = h284_collect(logp)
+    print(f"plik: {logp} | linii 284: handel {len(D['l1'])}, przeplyw {len(D['l2'])}, wsad {len(D['l3'])}, wielkosc {len(D['l4'])} (nierozpoznanych {D['bad']}), ksiega {len(D['book'])}, "
+          f"259 {len(D['k259'])}, E3-T1 {len(D['t1'])}, Warsztaty {len(D['ws'])}, Pieniadz swiata {len(D['money'])}, ERROR {D['err']}")
+    h284_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_handel284_main_prev = main
+
+
+def main(argv):
+    # paczka 284: grupa handel284 - opakowanie main jak ruda282 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "handel284":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return handel284_main(rest[0] if rest else None)
+    return _handel284_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
