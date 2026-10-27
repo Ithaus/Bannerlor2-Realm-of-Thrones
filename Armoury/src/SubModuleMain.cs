@@ -385,6 +385,7 @@ namespace Armoury
                 PeaceHold.SetHarmony(_harmony);     // M6a-3: tylko zapamietanie - latka pokoju gry w kampanii
                 MercContract.SetHarmony(_harmony);  // 185: tylko zapamietanie - latki modelu finansow w kampanii   // 169c: tylko zapamietanie - okna pomiaru wpina EnsureHooks w kampanii
                 try { CanonCompanions.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CanonCompanions.ApplyAll", e); }   // m101-postacie: dworzanie bez druzyny (postfiks GetBestAvailableCommander, jak BK)
+                CanonWarBalance.SetHarmony(_harmony); // 274: tylko zapamietanie - latki mysli AI i BK celu armii w kampanii (CanonWarBalance.EnsureHooks)
                 // paczka 146: ksiega towarow (tylko log) - NA KONCU: ramki (prefiks + finalizer) na metodach, ktore wolaja metody juz
                 // zalatane wyzej i przez BK, i podsluch ItemRoster.AddToCounts dopiero gdy wszystkie ramki sa wpiete
                 try { GoodsLedger.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GoodsLedger.ApplyAll", e); }

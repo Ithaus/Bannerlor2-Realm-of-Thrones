@@ -228,6 +228,14 @@ namespace Armoury
             return c != null && On && _b.TryGetValue(c, out b) && b.Today ? b : null;
         }
 
+        /// <summary>274 (W1b, tylko odczyt): kiesy rodziny G i rezerwa wojenna R rodu z rozliczenia dzisiejszej doby; false - rod bez budzetu dzis (wtedy dzwignia stoi).</summary>
+        internal static bool Reserve(Clan c, out double g, out double r)
+        {
+            var b = Of(c);
+            g = b != null ? b.G : 0.0; r = b != null ? b.R : 0.0;
+            return b != null && !b.Zero;
+        }
+
         private static Clan OwnerOf(MobileParty mp)
         {
             if (mp == null) return null;
