@@ -97,7 +97,8 @@ namespace Armoury
                 {
                     if (Recruit(party, partyThinkParams)) return;
                 }
-                if (MusterOn && Idle(side) && !_homeGuard.Contains(clan)) Muster(party, partyThinkParams, side, clan);
+                // recenzja 274 (3): bezczynnosc krolestwa partii (Polnoc stoi, gdy walczy tylko Dorzecze), nie calej koalicji
+                if (MusterOn && IdleK(party.MapFaction as Kingdom) && !_homeGuard.Contains(clan)) Muster(party, partyThinkParams, side, clan);
             }
             catch (Exception e) { Stumble("BoostPostfix", e); }
         }
@@ -174,7 +175,7 @@ namespace Armoury
                     var e = scores[i];
                     var st = e.Item1.Party as Settlement;
                     bool cand = e.Item1.AiBehavior == AiBehavior.BesiegeSettlement && st != null && e.Item2 > -1f && SideOf(st.MapFaction) != 0 && SideOf(st.MapFaction) != side
-                                && !IsSeat(st) && IsFrontTarget(k, st);
+                                && !SeatHeld(st) && IsFrontTarget(k, st);   // recenzja 274 (1): wlasna siedziba w rekach wroga moze byc celem odbicia
                     if (cand)
                     {
                         // armia pierwsza, potem ocena
@@ -200,7 +201,8 @@ namespace Armoury
                     }
                     _dMusterKing++;
                     _musterKingNote = "-> " + (army || (p.PossibleArmyMembersUponArmyCreation != null && p.PossibleArmyMembersUponArmyCreation.Count > 0) ? "armia na " : "oblezenie ") + Nm(tgt);
-                    OnceLine("zbiorka|k|" + k.StringId, "zbiorka | dzien " + Today + " | strona " + SideName(side) + " bez walki " + IdleOf(side, Today) + " dob: wladca " + Nm(party.LeaderHero)
+                    if (Say("zbiorka|k|" + k.StringId))
+                        Log.Info(Tag + "zbiorka | dzien " + Today + " | " + Nm(k) + " bez walki " + IdleOfK(k, Today) + " dob (strona " + SideName(side) + " " + IdleOf(side, Today) + " dob): wladca " + Nm(party.LeaderHero)
                              + " (" + Nm(k) + ") " + _musterKingNote + " (ocena " + F2(nv) + ", najlepsza inna " + F2(other) + ").");
                     return;
                 }
@@ -234,16 +236,16 @@ namespace Armoury
             var pa = new AIBehaviorData(f.Front, AiBehavior.PatrolAroundPoint, f.Nav, false, f.Port, false);
             p.AddBehaviorScore((pa, v));
             _dMusterLords++;
-            OnceLine("zbiorka|l|" + party.StringId, "zbiorka | dzien " + Today + " | strona " + SideName(side) + " bez walki " + IdleOf(side, Today) + " dob: " + Nm(party) + " (" + Nm(clan)
+            if (Say("zbiorka|l|" + party.StringId))
+                Log.Info(Tag + "zbiorka | dzien " + Today + " | " + Nm(k) + " bez walki " + IdleOfK(k, Today) + " dob (strona " + SideName(side) + " " + IdleOf(side, Today) + " dob): " + Nm(party) + " (" + Nm(clan)
                      + ", " + Nm(party.MapFaction) + ") idzie na front - patrol wokol " + Nm(f.Front) + " (dalej niz " + DefendRangeDays.ToString("0.00", Inv) + " doby; ocena " + F2(v) + ").");
         }
 
-        /// <summary>Linia zdarzenia raz na klucz i dobe (zbiorka, weto, najem).</summary>
-        private static void OnceLine(string key, string text)
+        /// <summary>Linia zdarzenia raz na klucz i dobe (zbiorka, weto, najem, nowa druzyna). Recenzja 274 (M4): pytanie PRZED skladaniem tekstu.</summary>
+        private static bool Say(string key)
         {
             var s = S;
-            if (s == null || !s.LogEnabled || !_dSaid.Add(key)) return;
-            Log.Info(Tag + text);
+            return s != null && s.LogEnabled && _dSaid.Add(key);
         }
 
         // ================================================================ W1b: najem z karczmy przy wejsciu do miasta strony
@@ -281,14 +283,16 @@ namespace Armoury
             int budget = mp.GetAvailableWageBudget();
             if (price <= 0) return;
             int byGold = (lead.Gold - FamilyFloor) / price;
-            int n = Math.Min(Math.Min(room, md.Number), Math.Min(byGold, budget / wage));
+            int byReserve = (int)Math.Min(int.MaxValue, Math.Floor((g - r) / price));   // recenzja 274 (M5): wydatek rodu najwyzej G - R (tylko zloto ponad rezerwa wojenna 166)
+            int n = Math.Min(Math.Min(room, md.Number), Math.Min(Math.Min(byGold, byReserve), budget / wage));
             if (n <= 0) return;
             int tav0 = md.Number, gold0 = lead.Gold;
             _miHire.Invoke(rcb, new object[] { mp, st, troop, n });
             int got = mp.Party.NumberOfAllMembers - men0, paid = gold0 - lead.Gold;
             if (got <= 0) return;
             _hired += got; _dHireN++; _dHireMen += got; _goldHired += paid; _dHireGold += paid;
-            OnceLine("najem|" + mp.StringId, "najem z karczmy | dzien " + Today + " | " + Nm(mp) + " (" + Nm(clan) + ", " + Nm(mp.MapFaction) + ") w " + Nm(st) + ": " + got + " x " + troop.StringId
+            if (Say("najem|" + mp.StringId))
+                Log.Info(Tag + "najem z karczmy | dzien " + Today + " | " + Nm(mp) + " (" + Nm(clan) + ", " + Nm(mp.MapFaction) + ") w " + Nm(st) + ": " + got + " x " + troop.StringId
                      + " za " + paid + " zl (cena " + price + ", zold " + wage + ") | ludzi " + men0 + " -> " + mp.Party.NumberOfAllMembers + " z limitu " + lim + ", cel " + F2(_target)
                      + " | zloto pana " + gold0 + " -> " + lead.Gold + ", rod " + F0(g) + " ponad rezerwa " + F0(r) + ", budzet zoldu " + budget + " | karczma " + tav0 + " -> " + md.Number + ".");
         }
@@ -323,7 +327,8 @@ namespace Armoury
                     _clanSpawnDay[c.StringId] = today;
                     _spawned++;
                     _dSpawnNames.Add(Nm(c));
-                    OnceLine("druzyna|" + c.StringId, "nowa druzyna | dzien " + today + " | " + Nm(c) + " (" + Nm(c.Kingdom) + ", strona " + SideName(side) + "): " + Nm(hero)
+                    if (Say("druzyna|" + c.StringId))
+                        Log.Info(Tag + "nowa druzyna | dzien " + today + " | " + Nm(c) + " (" + Nm(c.Kingdom) + ", strona " + SideName(side) + "): " + Nm(hero)
                              + " prowadzi " + Nm(mp) + " - ludzi " + mp.MemberRoster.TotalManCount + " z limitu " + mp.Party.PartySizeLimit + " | druzyn rodu " + cnt + " -> " + c.WarPartyComponents.Count
                              + " (limit gry " + lim + ", najwyzej " + cap + ") | zloto rodu " + c.Gold + ".");
                 }

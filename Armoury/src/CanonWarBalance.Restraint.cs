@@ -41,13 +41,15 @@ namespace Armoury
                     int ts = SideOf(st.MapFaction);
                     bool other = ts != 0 && ts != side;
                     bool running = ReferenceEquals(st, own) || RunningOwn(st, side);
-                    int kind = VetoKind(other, running, IsSeat(st), restrained, IsFrontTarget(k, st));
+                    // recenzja 274 (1): weto siedziby tylko, gdy jest w rekach swojej strony domowej; strona domowa odbija swoja siedzibe bez weta
+                    int kind = VetoKind(other, running, SeatHeld(st), restrained, IsFrontTarget(k, st), SeatHomeOf(st) == side);
                     if (kind == 0) continue;
                     var d = e.Item1;
                     partyThinkParams.SetBehaviorScore(in d, -1f);
                     if (kind == 1) _dVetoSeat++; else _dVetoFront++;
-                    OnceLine("weto|" + kind + "|" + st.StringId + "|" + (k != null ? k.StringId : "-"),
-                             "weto | dzien " + Today + " | " + (kind == 1 ? "siedziba" : "za frontem") + " " + Nm(st) + " (" + st.StringId + ", " + Nm(st.MapFaction) + ") - "
+                    // recenzja 274 (M4): tekst tylko, gdy linia pojdzie (raz na klucz i dobe) - bez skladania napisu przy kazdym wecie w mysli AI
+                    if (Say("weto|" + kind + "|" + st.StringId + "|" + (k != null ? k.StringId : "-")))
+                        Log.Info(Tag + "weto | dzien " + Today + " | " + (kind == 1 ? "siedziba" : "za frontem") + " " + Nm(st) + " (" + st.StringId + ", " + Nm(st.MapFaction) + ") - "
                              + Nm(party.MapFaction) + " (strona " + SideName(side) + ", pierwszy " + Nm(party) + (e.Item1.WillGatherArmy ? ", zbiorka armii" : "") + ", ocena gry " + F2(e.Item2) + ")"
                              + (kind == 1 ? " - siedziby bez nowych oblezen do Krwawych Godow." : " - przewaga " + SideName(side) + " ponad 1.5: nowe oblezenia tylko celow frontu (SCA 55)."));
                 }
@@ -74,7 +76,7 @@ namespace Armoury
             int side = SideOf(k);
             if (side == 0) return 0;
             int ts = SideOf(st.MapFaction);
-            return VetoKind(ts != 0 && ts != side, RunningOwn(st, side), IsSeat(st), _restrain == side && RestraintOn, IsFrontTarget(k, st));
+            return VetoKind(ts != 0 && ts != side, RunningOwn(st, side), SeatHeld(st), _restrain == side && RestraintOn, IsFrontTarget(k, st), SeatHomeOf(st) == side);
         }
 
         // ================================================================ BK: cel armii
@@ -105,8 +107,8 @@ namespace Armoury
                 if (kind == 0) return;
                 __result = null;
                 _dVetoBk++;
-                OnceLine("wetobk|" + v.Item1.StringId + "|" + (__1 != null ? __1.StringId : "-"),
-                         "weto | dzien " + Today + " | BK cel armii " + (kind == 1 ? "siedziba " : "za frontem ") + Nm(v.Item1) + " (" + v.Item1.StringId + ") - " + Nm(__1) + " (pierwszy "
+                if (Say("wetobk|" + v.Item1.StringId + "|" + (__1 != null ? __1.StringId : "-")))
+                    Log.Info(Tag + "weto | dzien " + Today + " | BK cel armii " + (kind == 1 ? "siedziba " : "za frontem ") + Nm(v.Item1) + " (" + v.Item1.StringId + ") - " + Nm(__1) + " (pierwszy "
                          + Nm(__0) + ") - BK nie zaklada armii z tym celem.");
             }
             catch (Exception e) { Stumble("BkObjectivePostfix", e); }

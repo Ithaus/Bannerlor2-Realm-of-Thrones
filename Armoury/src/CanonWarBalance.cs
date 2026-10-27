@@ -67,6 +67,9 @@ namespace Armoury
         // TABELA siedzib (przelacznik danych): bez nowych oblezen do Krwawych Godow, obie strony.
         internal static readonly string[] SeatIds = { "town_B2", "town_V2", CanonWarClock.TwinsId, "castle_V5", "town_EW4" };
         private static readonly string[] SeatNames = { "Winterfell", "Riverrun", "Blizniaki", "Casterly Rock", "Krolewska Przystan" };
+        // recenzja 274 (1): strona domowa siedziby (wlasciciel z ROT-Map settlements.xml: Stark, Tully, Frey - A; Lannister, Krolewska Przystan - B). Weto tylko,
+        // gdy siedziba jest w rekach swojej strony domowej - strona domowa zawsze moze odbic swoja siedzibe.
+        private static readonly int[] SeatHome = { 1, 1, 1, 2, 2 };
 
         internal static bool KeyOn { get { var s = Settings.Current; return s != null && s.CanonWarBalance; } }
         private static bool RestraintOn { get { var s = Settings.Current; return s != null && s.CanonWarBalance && s.CanonWarBalanceRestraint; } }
@@ -79,6 +82,8 @@ namespace Armoury
         private static bool _levers;
         private static long _goldHired;
         private static readonly Dictionary<string, int> _clanSpawnDay = new Dictionary<string, int>(StringComparer.Ordinal);
+        // recenzja 274 (3): doba ostatniej walki z druga strona NA KROLESTWO (druzyny lordow AI tego krolestwa) - zbiorka liczy bezczynnosc krolestwa, nie koalicji
+        private static readonly Dictionary<string, int> _lastFightK = new Dictionary<string, int>(StringComparer.Ordinal);
         // okno walki 28 dob: [dzien % 28] -> bitwy A, oblezenia A, bitwy B, oblezenia B (z zapisem)
         private static readonly int[,] _ring = new int[Window, 4];
         private static readonly int[] _ringDay = new int[Window];
@@ -90,6 +95,8 @@ namespace Armoury
         private static double _ratio = 1.0;
         private static readonly Dictionary<Kingdom, int> _side = new Dictionary<Kingdom, int>();
         private static readonly HashSet<Settlement> _seats = new HashSet<Settlement>();
+        private static readonly Dictionary<Settlement, int> _seatHome = new Dictionary<Settlement, int>();
+        private static readonly List<string> _coreNoWar = new List<string>();      // recenzja 274 (M2): krolestwa rdzenia bez wojny z druga strona (poza stronami)
         private static readonly Dictionary<Kingdom, HashSet<Settlement>> _frontTargets = new Dictionary<Kingdom, HashSet<Settlement>>();
         private static readonly List<Settlement>[] _frontOwn = { new List<Settlement>(), new List<Settlement>(), new List<Settlement>() };
         private static readonly HashSet<Clan> _homeGuard = new HashSet<Clan>();
@@ -108,10 +115,10 @@ namespace Armoury
         internal static void Reset()
         {
             _lastFightA = _lastFightB = -1; _weak = 0; _streakOn = _streakOff = 0; _leverSince = -1; _spawned = _hired = 0; _fortsA0 = _fortsB0 = -1; _startDay = -1; _endDay = -1;
-            _levers = false; _goldHired = 0; _clanSpawnDay.Clear();
+            _levers = false; _goldHired = 0; _clanSpawnDay.Clear(); _lastFightK.Clear();
             Array.Clear(_ring, 0, _ring.Length); for (int i = 0; i < Window; i++) _ringDay[i] = -1;
             _active = false; _restrain = 0; _target = 1f; _ratio = 1.0;
-            _side.Clear(); _seats.Clear(); _frontTargets.Clear(); for (int i = 0; i < 3; i++) _frontOwn[i].Clear(); _homeGuard.Clear();
+            _side.Clear(); _seats.Clear(); _seatHome.Clear(); _coreNoWar.Clear(); _frontTargets.Clear(); for (int i = 0; i < 3; i++) _frontOwn[i].Clear(); _homeGuard.Clear();
             _stumbles = _dStumbles = 0;
             ZeroDay();
             _farCache.Clear();
@@ -184,10 +191,11 @@ namespace Armoury
             return (float)Math.Max(MinFill, Math.Min(1.0, t));
         }
 
-        /// <summary>Weto oblezenia (T3): 0 - bez weta, 1 - siedziba, 2 - za frontem (silniejszy powsciagany). Tylko cel drugiej strony; trwajace oblezenie - bez weta.</summary>
-        internal static int VetoKind(bool otherSide, bool running, bool seat, bool restrained, bool frontTarget)
+        /// <summary>Weto oblezenia (T3): 0 - bez weta, 1 - siedziba, 2 - za frontem (silniejszy powsciagany). Tylko cel drugiej strony; trwajace oblezenie - bez weta.
+        /// seat - siedziba w rekach swojej strony domowej; retake - oblega strona domowa siedziby (odbicie, recenzja 274 (1)) - bez weta, takze przy powsciagliwosci.</summary>
+        internal static int VetoKind(bool otherSide, bool running, bool seat, bool restrained, bool frontTarget, bool retake = false)
         {
-            if (!otherSide || running) return 0;
+            if (!otherSide || running || retake) return 0;
             if (seat) return 1;
             if (restrained && !frontTarget) return 2;
             return 0;
@@ -205,13 +213,27 @@ namespace Armoury
 
         private static void BuildSides()
         {
-            _side.Clear();
-            var core = new List<Kingdom>();
+            _side.Clear(); _coreNoWar.Clear();
+            var cand = new List<Kingdom>(); var candSide = new List<int>();
             foreach (var k in Kingdom.All)
             {
                 if (k == null) continue;
                 int s = CoreSide(k.StringId, k.IsEliminated);
-                if (s != 0) { _side[k] = s; core.Add(k); }
+                if (s != 0) { cand.Add(k); candSide.Add(s); }
+            }
+            // recenzja 274 (M2): krolestwo rdzenia liczy sie do strony tylko w wojnie z co najmniej jednym krolestwem rdzenia drugiej strony (jak sojusznik w AllySide) -
+            // Polnoc w pokoju z korona nie zawyza S_A, a dzwignie nie ida dla B przeciw krolestwu, ktore samo walczy
+            var core = new List<Kingdom>();
+            for (int i = 0; i < cand.Count; i++)
+            {
+                bool war = false;
+                for (int j = 0; j < cand.Count && !war; j++)
+                {
+                    if (candSide[j] == candSide[i]) continue;
+                    try { war = cand[i].IsAtWarWith(cand[j]); } catch { war = false; }
+                }
+                if (war) { _side[cand[i]] = candSide[i]; core.Add(cand[i]); }
+                else _coreNoWar.Add(Nm(cand[i]) + " (" + SideName(candSide[i]) + ")");
             }
             foreach (var k in Kingdom.All)
             {
@@ -244,8 +266,8 @@ namespace Armoury
         /// stron (wlasne w 55 od twierdzy drugiej strony) i rody "stoja w domu" (twierdza w BorderGarrisonRadius od twierdzy trzeciego wroga - R3-08g).</summary>
         private static void BuildMap()
         {
-            _seats.Clear(); _frontTargets.Clear(); for (int i = 0; i < 3; i++) _frontOwn[i].Clear(); _homeGuard.Clear();
-            foreach (var id in SeatIds) { try { var st = Settlement.Find(id); if (st != null) _seats.Add(st); } catch { } }
+            _seats.Clear(); _seatHome.Clear(); _frontTargets.Clear(); for (int i = 0; i < 3; i++) _frontOwn[i].Clear(); _homeGuard.Clear();
+            for (int i = 0; i < SeatIds.Length; i++) { try { var st = Settlement.Find(SeatIds[i]); if (st != null) { _seats.Add(st); _seatHome[st] = SeatHome[i]; } } catch { } }
             var forts = new List<Settlement>(256);
             foreach (var t in Town.AllFiefs) { var st = t != null ? t.Settlement : null; if (st != null && st.MapFaction != null) forts.Add(st); }
             float r2 = FrontRadius * FrontRadius;
@@ -308,6 +330,15 @@ namespace Armoury
         }
 
         internal static bool IsSeat(Settlement st) { return st != null && _seats.Contains(st); }
+
+        /// <summary>Strona domowa siedziby (1 A, 2 B) albo 0 - nie siedziba.</summary>
+        internal static int SeatHomeOf(Settlement st) { int h; return st != null && _seatHome.TryGetValue(st, out h) ? h : 0; }
+
+        /// <summary>Recenzja 274 (1): siedziba w rekach swojej strony domowej - tylko taka ma weto (zdobyta przez druga strone moze byc odbita).</summary>
+        internal static bool SeatHeld(Settlement st) { int h = SeatHomeOf(st); return h != 0 && SideOf(st.MapFaction) == h; }
+
+        /// <summary>Regula czynna teraz (po Daily albo przeliczeniu po wczytaniu) - T4 autotestu.</summary>
+        internal static bool IsActiveNow { get { return _active; } }
 
         internal static bool IsFrontTarget(Kingdom k, Settlement st)
         {
@@ -391,6 +422,21 @@ namespace Armoury
             if (siege) _dSieges[side]++; else _dBattles[side]++;
         }
 
+        /// <summary>Recenzja 274 (3): doba walki krolestwa druzyny lorda AI strony (druzyna gracza nie liczy sie - zbiorka dotyczy lordow AI).</summary>
+        private static void NoteKingdom(MobileParty mp)
+        {
+            if (mp == null || mp.IsMainParty || !mp.IsLordParty) return;
+            var k = mp.MapFaction as Kingdom;
+            if (k == null || k.StringId == null || SideOf(k) == 0) return;
+            _lastFightK[k.StringId] = Today;
+        }
+
+        private static void NoteKingdoms(MapEventSide sd)
+        {
+            try { foreach (var p in sd.Parties) if (p != null && p.Party != null && p.Party.IsMobile) NoteKingdom(p.Party.MobileParty); }
+            catch { }
+        }
+
         private static bool HasLord(MapEventSide sd)
         {
             try { foreach (var p in sd.Parties) if (p != null && p.Party != null && p.Party.IsMobile && p.Party.MobileParty != null && p.Party.MobileParty.IsLordParty) return true; }
@@ -410,6 +456,7 @@ namespace Armoury
                 if (sa == 0 || sd == 0 || sa == sd) return;
                 if (!HasLord(a) || !HasLord(d)) return;
                 NoteFight(1, false); NoteFight(2, false);
+                NoteKingdoms(a); NoteKingdoms(d);
             }
             catch (Exception e) { Stumble("OnMapEventEnded", e); }
         }
@@ -424,9 +471,20 @@ namespace Armoury
                 int sb = SideOf(ev.BesiegerCamp.LeaderParty.MapFaction), ss = SideOf(st.MapFaction);
                 if (sb == 0 || ss == 0 || sb == ss) return;
                 NoteFight(sb, true);
+                var lead = ev.BesiegerCamp.LeaderParty;
+                NoteKingdom(lead);
+                if (lead != null && lead.Army != null) { try { foreach (var mp in lead.Army.Parties) if (mp != lead) NoteKingdom(mp); } catch { } }
                 if (IsSeat(st))
-                    Log.Info(Tag + "OBLEZENIE SIEDZIBY | dzien " + Today + " | " + Nm(st) + " (" + st.StringId + ", " + Nm(st.MapFaction) + ") oblega " + Nm(ev.BesiegerCamp.LeaderParty)
-                             + " (" + Nm(ev.BesiegerCamp.LeaderParty.MapFaction) + ") - weto nie zadzialalo (droga spoza mysli AI i BK).");
+                {
+                    string head = Nm(st) + " (" + st.StringId + ", " + Nm(st.MapFaction) + ") oblega " + Nm(ev.BesiegerCamp.LeaderParty) + " (" + Nm(ev.BesiegerCamp.LeaderParty.MapFaction);
+                    // recenzja 274 (M3): druzyna gracza nie ma weta (jego wybor); recenzja 274 (1): odbicie wlasnej siedziby przez strone domowa - bez weta
+                    if (lead != null && lead.IsMainParty)
+                        Log.Info(Tag + "siedziba bez weta | dzien " + Today + " | " + head + ", strona " + SideName(sb) + ") - druzyna gracza, weto tylko dla AI (wybor gracza).");
+                    else if (SeatHomeOf(st) == sb)
+                        Log.Info(Tag + "siedziba bez weta | dzien " + Today + " | " + head + ", strona domowa " + SideName(sb) + ") - odbicie wlasnej siedziby, bez weta.");
+                    else
+                        Log.Info(Tag + "OBLEZENIE SIEDZIBY | dzien " + Today + " | " + head + ") - weto nie zadzialalo (droga spoza mysli AI i BK).");
+                }
             }
             catch (Exception e) { Stumble("OnSiegeStarted", e); }
         }
@@ -447,6 +505,25 @@ namespace Armoury
 
         internal static bool Idle(int side) { return IdleOf(side, Today) >= IdleDays; }
 
+        /// <summary>Recenzja 274 (3): doby bez walki krolestwa (jego lordow AI) z druga strona; brak wpisu - od startu reguly.</summary>
+        private static int IdleOfK(Kingdom k, int today)
+        {
+            int last;
+            if (k == null || k.StringId == null || !_lastFightK.TryGetValue(k.StringId, out last) || last < 0) last = _startDay >= 0 ? _startDay : today;
+            return Math.Max(0, today - last);
+        }
+
+        /// <summary>Zbiorka: krolestwo bez walki 7 dob - takze gdy sojusznik z koalicji walczy (Polnoc stoi, Dorzecze walczy).</summary>
+        internal static bool IdleK(Kingdom k) { return IdleOfK(k, Today) >= IdleDays; }
+
+        private static string KingdomIdleText(int today)
+        {
+            var l = new List<string>();
+            foreach (var kv in _side) l.Add(Nm(kv.Key) + " " + IdleOfK(kv.Key, today));
+            l.Sort(StringComparer.Ordinal);
+            return "[" + string.Join(", ", l.ToArray()) + "]";
+        }
+
         // ================================================================ doba
 
         /// <summary>Raz na dobe (ArmouryBehavior, po KingdomBalance.Daily - miara 175 i p9 ArmedStrength opublikowane): strony, miara, przelacznik, W2, linia.</summary>
@@ -465,7 +542,7 @@ namespace Armoury
                 bool sides = HasSide(1) && HasSide(2);
                 int rw = CanonWarClock.RedWeddingState; bool robbDead = CanonWarClock.RobbDead;
                 bool over = CanonWarClock.Over(rw, robbDead);
-                if (off == null && !sides) off = "strona nie istnieje (A " + SideList(1) + ", B " + SideList(2) + ")";
+                if (off == null && !sides) off = "strona nie istnieje (A " + SideList(1) + ", B " + SideList(2) + NoWarText() + ")";
                 if (off == null && over)
                 {
                     if (_endDay < 0)
@@ -485,6 +562,8 @@ namespace Armoury
                     return;
                 }
                 if (_startDay < 0) _startDay = today;
+                foreach (var c in _coreNoWar)
+                    if (Say("rdzen|" + c)) Log.Info(Tag + "rdzen bez wojny | dzien " + today + " | " + c + " nie jest w wojnie z zadnym krolestwem rdzenia drugiej strony - poza miara, dzwigniami, wetami i zbiorka do wznowienia wojny.");
                 BuildMap();
                 Measure();
                 var A = _m[1]; var B = _m[2];
@@ -507,6 +586,41 @@ namespace Armoury
             finally { ZeroDay(); }
         }
 
+        private static string NoWarText() { return _coreNoWar.Count > 0 ? "; rdzen bez wojny z druga strona: " + string.Join(", ", _coreNoWar.ToArray()) : ""; }
+
+        /// <summary>Recenzja 274 (2): po wczytaniu (EnsureHooks, po Import i BuildSides) - stan doby bez czekania na polnoc: czynnosc reguly, siedziby, front, miara,
+        /// powsciagliwosc z zapisanych dzwigni (_levers, _weak). Bez Step, SpawnDaily i linii KONIEC (serie dob nie rosna drugi raz). Linia "po wczytaniu".</summary>
+        private static void RefreshAfterLoad()
+        {
+            var s = S;
+            if (s == null) return;
+            int today = Today;
+            bool sides = HasSide(1) && HasSide(2);
+            int rw = CanonWarClock.RedWeddingState; bool robbDead = CanonWarClock.RobbDead;
+            bool over = CanonWarClock.Over(rw, robbDead);
+            _active = Active(s.CanonWarBalance, Prologue.CanonHere, sides, over);
+            if (!_active)
+            {
+                _restrain = 0;
+                Log.Info(Tag + "po wczytaniu | dzien " + today + " | regula NIE (" + (!s.CanonWarBalance ? "klucz NIE" : !Prologue.CanonHere ? "kampania klasyczna - nie dotyczy"
+                         : !sides ? "strona nie istnieje" + NoWarText() : "Krwawe Gody") + ") - weta, dzwignie i zbiorka nieczynne.");
+                return;
+            }
+            BuildMap();
+            Measure();
+            var A = _m[1]; var B = _m[2];
+            _ratio = A.S > 0 ? B.S / A.S : (B.S > 0 ? 99.0 : 1.0);
+            bool outside = _ratio < 1.0 / Band || _ratio > Band;
+            _restrain = _levers && outside && s.CanonWarBalanceRestraint ? (_weak == 1 ? 2 : _weak == 2 ? 1 : 0) : 0;
+            var W = _weak == 1 ? A : _weak == 2 ? B : null;
+            var X = _weak == 1 ? B : _weak == 2 ? A : null;
+            _target = W != null ? TargetFill(W.Fill, X.S, W.S) : 1f;
+            int fronts = 0; foreach (var kv in _frontTargets) fronts += kv.Value.Count;
+            Log.Info(Tag + "po wczytaniu | dzien " + today + " | regula TAK | siedziby " + _seats.Count + ", cele frontu " + fronts + ", stosunek B/A " + _ratio.ToString("0.000", Inv)
+                     + ", dzwignie z zapisu " + (_levers ? "TAK, slabszy " + SideName(_weak) : "NIE") + ", powsciagany " + (_restrain == 0 ? "-" : SideName(_restrain))
+                     + " | bezczynnosc krolestw " + KingdomIdleText(today) + NoWarText() + " - weta i zbiorka czynne od teraz, nie od polnocy.");
+        }
+
         private static string SideText(M m)
         {
             return "sila " + F0(m.S) + " (ludzie " + m.Men + ", partii " + m.Parties + ", armii " + m.Armies + ", wypelnienie " + F2(m.Fill) + ", limit " + m.Limit
@@ -527,7 +641,8 @@ namespace Armoury
               .Append("; powsciagany ").Append(_restrain == 0 ? "-" : SideName(_restrain)).Append(')');
             sb.Append(" | walka dzis: A bitwy ").Append(_dBattles[1]).Append(" oblezenia ").Append(_dSieges[1]).Append(", B bitwy ").Append(_dBattles[2]).Append(" oblezenia ").Append(_dSieges[2])
               .Append("; 28 dob: A bitwy ").Append(Count28(1, false)).Append(" oblezenia ").Append(Count28(1, true)).Append(", B bitwy ").Append(Count28(2, false)).Append(" oblezenia ").Append(Count28(2, true))
-              .Append("; bezczynnosc A ").Append(IdleOf(1, today)).Append(" dob, B ").Append(IdleOf(2, today)).Append(" dob");
+              .Append("; bezczynnosc A ").Append(IdleOf(1, today)).Append(" dob, B ").Append(IdleOf(2, today)).Append(" dob")
+              .Append("; krolestwa ").Append(KingdomIdleText(today));
             sb.Append(" | twierdze A ").Append(A.Forts).Append(" (start ").Append(_fortsA0).Append(") B ").Append(B.Forts).Append(" (start ").Append(_fortsB0).Append(')')
               .Append(", front A ").Append(_frontOwn[1].Count).Append(" B ").Append(_frontOwn[2].Count)
               .Append(", rody w domu (trzeci wrog) A ").Append(HomeGuard(1)).Append(" B ").Append(HomeGuard(2));
@@ -610,10 +725,12 @@ namespace Armoury
                          + (_endDay >= 0 ? ", koniec dnia " + _endDay : "") + "." + CanonWarBalanceTest.StartText());
             }
             catch (Exception e) { Stumble("StartLine", e); }
+            try { RefreshAfterLoad(); }
+            catch (Exception e) { Stumble("RefreshAfterLoad", e); }
         }
 
         // ================================================================ zapis
-        /// <summary>v1|lastFightA|lastFightB|weak|streakOn|streakOff|levers|leverSince|spawned|hired|goldHired|fortsA0|fortsB0|startDay|endDay|rody|okno</summary>
+        /// <summary>v1|lastFightA|lastFightB|weak|streakOn|streakOff|levers|leverSince|spawned|hired|goldHired|fortsA0|fortsB0|startDay|endDay|rody|okno|krolestwa</summary>
         internal static string Export()
         {
             var sb = new StringBuilder(512);
@@ -635,6 +752,14 @@ namespace Armoury
                 if (_ringDay[i] < 0) continue;
                 if (!first) sb.Append(','); first = false;
                 sb.Append(_ringDay[i]).Append(':').Append(_ring[i, 0]).Append('.').Append(_ring[i, 1]).Append('.').Append(_ring[i, 2]).Append('.').Append(_ring[i, 3]);
+            }
+            // recenzja 274 (3): doba ostatniej walki krolestw (pole 17; stary zapis bez pola - od startu reguly)
+            sb.Append('|');
+            first = true;
+            foreach (var kv in _lastFightK)
+            {
+                if (!first) sb.Append(','); first = false;
+                sb.Append(kv.Key).Append(':').Append(kv.Value);
             }
             return sb.ToString();
         }
@@ -671,6 +796,13 @@ namespace Armoury
                         int i = d % Window; if (i < 0) i += Window;
                         _ringDay[i] = d;
                         for (int k = 0; k < 4; k++) { int x; _ring[i, k] = int.TryParse(q[k], NumberStyles.Integer, Inv, out x) ? x : 0; }
+                    }
+                _lastFightK.Clear();
+                if (p.Length > 17 && p[17].Length > 0)
+                    foreach (var e in p[17].Split(','))
+                    {
+                        int c = e.LastIndexOf(':'); int d;
+                        if (c > 0 && int.TryParse(e.Substring(c + 1), NumberStyles.Integer, Inv, out d)) _lastFightK[e.Substring(0, c)] = d;
                     }
             }
             catch (Exception e) { Stumble("Import", e); }

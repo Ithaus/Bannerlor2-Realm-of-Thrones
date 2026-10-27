@@ -10,10 +10,11 @@ namespace Armoury
     /// plik tylko czytany; w zwyklej grze nic nie robi). Na kopii zapisu autotestu, nigdy na zapisach Jeffa. Raz, w pierwszej godzinie sesji od 2. godziny poza bitwa:
     ///  T1 tabela przelacznika (3 doby poza 1.5 - wlacz, 3 doby w 1.2 - wylacz, 1.2-1.5 trzyma, slabszy co dobe) i cel wypelnienia W1 (min 0.6, max 1);
     ///  T2 strony z danych: Dorzecze obecne (A = battania + riverlands), po unii 272 (riverlands zniszczone -> A = battania), sojusznik korony w wojnie z Polnoca -> B;
-    ///  T3 tabela weta (siedziba, za frontem przy powsciagliwosci, cel frontu, trwajace oblezenie, cel nie drugiej strony);
+    ///  T3 tabela weta (siedziba, za frontem przy powsciagliwosci, cel frontu, trwajace oblezenie, cel nie drugiej strony, odbicie wlasnej siedziby - recenzja 274);
     ///  T4 (zamiast SCA - martwy kod) postfiks BK FindArmyObjective: Krolewska Przystan jako cel oblezenia dla Polnocy -> brak celu (tylko przy czynnej regule);
     ///  T5 znacznik Krwawych Godow: RedWeddingEvent 2 albo smierc Robba wylacza regule; 0, 1 i -1 nie;
-    ///  T6 zapis: Export -> Import -> Export bez roznic.
+    ///  T6 zapis: Export -> Import -> Export bez roznic;
+    ///  T7 (recenzja 274, tylko gdy Casterly Rock jest w rekach A) BK cel korony: odbicie wlasnej siedziby zostaje.
     /// Linie "Rownowaga wojny (274): test - Tn ... - wynik TAK|NIE|POMINIETY."
     /// </summary>
     internal static class CanonWarBalanceTest
@@ -108,14 +109,19 @@ namespace Armoury
                 int seat = CanonWarBalance.VetoKind(true, false, true, false, true), back = CanonWarBalance.VetoKind(true, false, false, true, false);
                 int front = CanonWarBalance.VetoKind(true, false, false, true, true), free = CanonWarBalance.VetoKind(true, false, false, false, false);
                 int run = CanonWarBalance.VetoKind(true, true, true, true, false), own = CanonWarBalance.VetoKind(false, false, true, true, false);
-                bool ok = seat == 1 && back == 2 && front == 0 && free == 0 && run == 0 && own == 0;
-                Line("T3 weto: siedziba " + seat + ", za frontem (powsciagany) " + back + ", cel frontu " + front + ", bez powsciagliwosci " + free + ", trwajace " + run + ", nie druga strona " + own, ok);
+                // recenzja 274 (1): odbicie wlasnej siedziby (w rekach wroga, oblega strona domowa) - bez weta, takze powsciagany za frontem
+                int retake = CanonWarBalance.VetoKind(true, false, false, true, false, true);
+                bool ok = seat == 1 && back == 2 && front == 0 && free == 0 && run == 0 && own == 0 && retake == 0;
+                Line("T3 weto: siedziba " + seat + ", za frontem (powsciagany) " + back + ", cel frontu " + front + ", bez powsciagliwosci " + free + ", trwajace " + run + ", nie druga strona " + own
+                     + ", odbicie wlasnej siedziby " + retake, ok);
             }
             // T4
             {
                 Kingdom north = null; foreach (var k in Kingdom.All) if (k != null && k.StringId == Prologue.NorthId) north = k;
                 Settlement kl = null; try { kl = Settlement.Find("town_EW4"); } catch { }
-                if (north == null || kl == null || CanonWarBalance.SideOf(north) != 1 || CanonWarBalance.SideOf(kl.MapFaction) != 2)
+                // recenzja 274 (M1): nieczynna regula (przed pierwsza doba bez przeliczenia, kampania klasyczna) - POMINIETY, nie NIE
+                if (!CanonWarBalance.IsActiveNow || north == null || kl == null || CanonWarBalance.SideOf(north) != 1 || CanonWarBalance.SideOf(kl.MapFaction) != 2
+                    || !CanonWarBalance.SeatHeld(kl))
                     Line("T4 BK cel armii (regula nieczynna albo brak Polnocy / Krolewskiej Przystani po stronach)", null);
                 else
                 {
@@ -124,6 +130,14 @@ namespace Armoury
                     ValueTuple<Settlement, Army.ArmyTypes>? def = (kl, Army.ArmyTypes.Defender);
                     CanonWarBalance.BkObjectivePostfix(null, north, ref def);
                     Line("T4 BK cel armii Polnocy: oblezenie Krolewskiej Przystani zdjete " + T(!res.HasValue) + ", cel obrony zostaje " + T(def.HasValue), !res.HasValue && def.HasValue);
+                    // odbicie: Casterly Rock w rekach A (zdobyte) - cel korony zostaje; tylko gdy tak jest w zapisie
+                    Settlement cr = null; try { cr = Settlement.Find("castle_V5"); } catch { }
+                    if (cr != null && CanonWarBalance.SideOf(cr.MapFaction) == 1 && kl.MapFaction is Kingdom)
+                    {
+                        ValueTuple<Settlement, Army.ArmyTypes>? rt = (cr, Army.ArmyTypes.Besieger);
+                        CanonWarBalance.BkObjectivePostfix(null, (Kingdom)kl.MapFaction, ref rt);
+                        Line("T7 odbicie Casterly Rock przez korone (zdobyte przez A): cel zostaje " + T(rt.HasValue), rt.HasValue);
+                    }
                 }
             }
             // T5
