@@ -22,6 +22,9 @@ namespace Armoury
     ///     obozu bez wpisu powodu; linia raz na noc o swicie (po ostatniej godzinie obozu).
     ///  3. TURNIEJE wedlug tygodnia pory - sluchacz TournamentStarted, w toku z TournamentManager gry (raz na dobe, po miastach).
     /// Stan czyszczony w konstruktorze ArmouryBehavior (Reset); bez zapisu (pamiec sesji).
+    /// 264: kazdy POKOJ krolestw (nie tylko Default) ma lancuch 4 ramek wolajacych za MakePeaceAction ("wola: AcceptPeace &lt;- ApplyPeaceInternal &lt;- ApplyPeace
+    /// &lt;- ConsiderPeaceActions [Bannerlord.Diplomacy]") - droga nieznanych pokojow widoczna bez dekompilacji. Pokoj pary wojny kanonu przy czynnej blokadzie
+    /// (CanonPeaceLock.Blocks) - dopisek "POKOJ KANONU MIMO BLOKADY" (autotest 264 T6 - "POKOJ KANONU (test 264)").
     /// </summary>
     internal static class WorldClock7
     {
@@ -90,7 +93,7 @@ namespace Armoury
                 if (!On || a == null || b == null || a.IsBanditFaction || b.IsBanditFaction) return;
                 if (!a.IsKingdomFaction || !b.IsKingdomFaction) { _dOther++; Bump(_dOtherCauses, "wojna " + detail); return; }
                 string kind = detail.ToString();
-                Event(a, b, true, kind, detail == DeclareWarAction.DeclareWarDetail.Default ? Caller() : null);
+                Event(a, b, true, kind, detail == DeclareWarAction.DeclareWarDetail.Default ? Caller() : null, null);
             }
             catch (Exception e) { Stumble("OnWarDeclared", e); }
         }
@@ -103,7 +106,10 @@ namespace Armoury
                 if (!a.IsKingdomFaction || !b.IsKingdomFaction) { _dOther++; Bump(_dOtherCauses, "pokoj " + detail); return; }
                 bool c168 = _p168a != null && ((_p168a == a && _p168b == b) || (_p168a == b && _p168b == a));
                 string kind = c168 ? Cause168 : detail.ToString();
-                Event(a, b, false, kind, !c168 && detail == MakePeaceAction.MakePeaceDetail.Default ? Caller() : null);
+                // 264: lancuch wolajacych przy kazdym pokoju krolestw (rzadkie); pokoj pary kanonu mimo blokady - dopisek
+                string tail = null;
+                try { if (CanonPeaceLock.Blocks(a, b)) tail = CanonPeaceLock.TestDirect ? " | POKOJ KANONU (test 264)" : " | POKOJ KANONU MIMO BLOKADY"; } catch { }
+                Event(a, b, false, kind, c168 ? null : Chain(), tail);
             }
             catch (Exception e) { Stumble("OnMakePeace", e); }
         }
@@ -142,7 +148,7 @@ namespace Armoury
             catch (Exception e) { Stumble("OnKingdomDestroyed", e); }
         }
 
-        private static void Event(IFaction a, IFaction b, bool war, string kind, string caller)
+        private static void Event(IFaction a, IFaction b, bool war, string kind, string caller, string tail)
         {
             int day = (int)CampaignTime.Now.ToDays;
             string ia = a.StringId ?? "", ib = b.StringId ?? "";
@@ -165,6 +171,7 @@ namespace Armoury
             _pairs[key] = new PairEvent { Day = day, War = war };
             if (war) _dWar++; else _dPeace++;
             Bump(_dCauses, (war ? "wojna " : "pokoj ") + kind);
+            if (tail != null) sb.Append(tail);
             Log.Info(sb.ToString());
         }
 
@@ -190,6 +197,48 @@ namespace Armoury
                                      || t.Name == "CampaignEventDispatcher" || t.Name == "CampaignEvents")) continue;   // akcja niewidoczna - pomijamy rozsylanie zdarzenia
                     return t.FullName + "." + m.Name + " [" + t.Assembly.GetName().Name + "]";
                 }
+            }
+            catch { }
+            return "?";
+        }
+
+        /// <summary>264: 4 ramki wolajacych za ostatnia ramka MakePeaceAction ("Typ.Metoda &lt;- ... [zespol pierwszej]"); metody dynamiczne Harmony
+        /// (DMD&lt;nazwa&gt;) - nazwa z nawiasu. Tylko przy pokoju krolestw (rzadkie).</summary>
+        private static string Chain()
+        {
+            try
+            {
+                var st = new StackTrace(1, false);
+                int n = st.FrameCount, last = -1;
+                for (int i = 0; i < n; i++)
+                {
+                    var t = st.GetFrame(i)?.GetMethod()?.DeclaringType;
+                    if (t == typeof(MakePeaceAction)) last = i;
+                }
+                var l = new List<string>(4);
+                string asm = null;
+                for (int i = last + 1; i < n && l.Count < 4; i++)
+                {
+                    var m = st.GetFrame(i)?.GetMethod();
+                    if (m == null) continue;
+                    var t = m.DeclaringType;
+                    string name = m.Name ?? "?";
+                    if (t == null)
+                    {
+                        int lt = name.IndexOf("DMD<", StringComparison.Ordinal);
+                        if (lt >= 0) { int gt = name.IndexOf('>', lt + 4); if (gt > lt) name = name.Substring(lt + 4, gt - lt - 4); }
+                        l.Add(name);
+                        continue;
+                    }
+                    if (last < 0 && (t == typeof(WorldClock7) || t.Name.StartsWith("MbEvent", StringComparison.Ordinal)
+                                     || t.Name == "CampaignEventDispatcher" || t.Name == "CampaignEvents")) continue;   // akcja niewidoczna - pomijamy rozsylanie zdarzenia
+                    string tn = t.Name;
+                    int lam = tn.IndexOf("<>", StringComparison.Ordinal);
+                    if (lam >= 0 && t.DeclaringType != null) tn = t.DeclaringType.Name;   // klasa domkniecia - typ zewnetrzny
+                    l.Add(tn + "." + name);
+                    if (asm == null) asm = t.Assembly.GetName().Name;
+                }
+                return l.Count == 0 ? "?" : string.Join(" <- ", l.ToArray()) + " [" + (asm ?? "?") + "]";
             }
             catch { }
             return "?";

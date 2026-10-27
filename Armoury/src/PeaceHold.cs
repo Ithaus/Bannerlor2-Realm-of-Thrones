@@ -31,19 +31,28 @@ namespace Armoury
     /// (ClanChangedKingdom) - bez zmian. Gracz w niewoli - jak w grze (gra go tu nie uwalnia).
     /// Klucz wylaczony = stan 4d33042 (prefiks przepuszcza; czekajace pary z zapisu sa i tak sprawdzane po 24 h). Zloto: brak. Zapis: czekajace pary
     /// (segment 3 klucza "arm_m6a"). Linie "Pokoj a jency (M6a-3)": przy kazdym odlozeniu i rozstrzygnieciu oraz linia doby.
+    /// 264 (2) - KONCOWY STAN WOJNY (log Jeffa 26.10, dzien 108982/108983: pokoj Diplomacy w tikach doby, "nadal pokoj - gra uwalnia 6" o 21:43:26 PRZED linia
+    /// "WOJNA ... wola: Campaign.DailyTick" ROT EnforceWars tej samej sekundy). Hour = floor(T) - rozstrzygniecie w pierwszej godzinie >= floor(T) + 24, a ta
+    /// przychodzi przed nastepna doba (T + 24), wiec ROT jeszcze nie wznowil wojny. Teraz: po 24 h para nie w wojnie, ale Prologue.RotWarForced(a, b) (ten sam
+    /// warunek, ktorym ROT EnforceWars wypowiada wojne w nastepnej dobie) - czekamy dalej, najdluzej 24 + 48 h od pokoju (2 dni = RiverNetDays m116, jak
+    /// "jesli nie wroci w ciagu 2 dob" CrashScribe); potem uwolnienie jak dotad ("ROT nie wznowil"). Dotyczy wszystkich wojen fabularnych ROT (bieg roczny:
+    /// 73 cykle pokoj/wojna tej samej doby, glownie Essos). Linia raz na czekajaca pare; w linii doby dopisek "| czeka na ROT N" na koncu (wyrazenia m6a bez
+    /// zmian). Zapis bez zmian (Hour - long w segmencie 3). Odrzucone: postfiks Campaign.DailyTick (dziala, ale nowa latka bez zysku).
     /// </summary>
     internal static class PeaceHold
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const double WaitHours = 24.0;
+        private const double RotWaitHours = Prologue.RiverNetDays * 24.0;   // 264 (2): najdluzsze czekanie na wznowienie ROT po 24 h (48 h)
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.PeaceReleaseAfterDay; } }
 
-        private sealed class Wait { public string A, B; public long Hour; public int Lords; }
+        private sealed class Wait { public string A, B; public long Hour; public int Lords; public bool RotSaid; }
         private static readonly List<Wait> _wait = new List<Wait>();
 
         // liczniki doby i sesji
         private static int _dHeld, _dHeldLords, _dKept, _dKeptLords, _dFreed, _dFreedLords, _dGone;
+        private static readonly Dictionary<string, string> _outcome = new Dictionary<string, string>(StringComparer.Ordinal);   // 264 autotest: para -> ostatni stan (sesja)
         private static int _sHeld, _sKept, _sKeptLords, _sFreed, _sFreedLords;
         private static int _stumbles, _importN = -1, _importBad;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -52,11 +61,37 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _wait.Clear(); ZeroDay(); _sHeld = _sKept = _sKeptLords = _sFreed = _sFreedLords = 0;
+            _wait.Clear(); ZeroDay(); _sHeld = _sKept = _sKeptLords = _sFreed = _sFreedLords = 0; _outcome.Clear(); _rotSeen.Clear();
             _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
         }
 
         private static void ZeroDay() { _dHeld = _dHeldLords = _dKept = _dKeptLords = _dFreed = _dFreedLords = _dGone = 0; }
+
+        // ------------------------------------------------------------ 264 (2): decyzja po czasie (czysta funkcja - autotest T5 sprawdza tabele prawdy)
+        internal const int ActWait = 0, ActKeep = 1, ActWaitRot = 2, ActRelease = 3;
+
+        /// <summary>Co zrobic z czekajaca para po elapsedH godzinach od pokoju: czekaj (&lt; 24 h), jency zostaja (znow w wojnie), czekaj na ROT (nie w wojnie, ROT
+        /// wymusza te wojne, &lt; 24 + 48 h), uwolnij (pokoj prawdziwy albo ROT nie wznowil w czasie).</summary>
+        internal static int Decide(long elapsedH, bool atWar, bool rotForced)
+        {
+            if (elapsedH < (long)WaitHours) return ActWait;
+            if (atWar) return ActKeep;
+            if (rotForced && elapsedH < (long)(WaitHours + RotWaitHours)) return ActWaitRot;
+            return ActRelease;
+        }
+
+        private static string PairKey(string a, string b) { return string.CompareOrdinal(a, b) <= 0 ? a + "|" + b : b + "|" + a; }
+
+        /// <summary>264 autotest: ostatni stan pary w tej sesji ("czeka", "czeka na ROT", "odwolane", "uwolnione", "upadlo") albo null.</summary>
+        internal static string Outcome(string a, string b)
+        {
+            string v;
+            return a != null && b != null && _outcome.TryGetValue(PairKey(a, b), out v) ? v : null;
+        }
+
+        /// <summary>264 autotest: para czekala na wznowienie ROT w tej sesji.</summary>
+        internal static bool RotWaitSeen(string a, string b) { return a != null && b != null && _rotSeen.Contains(PairKey(a, b)); }
+        private static readonly HashSet<string> _rotSeen = new HashSet<string>(StringComparer.Ordinal);
 
         private static void Stumble(string where, Exception e)
         {
@@ -140,6 +175,7 @@ namespace Armoury
                 if (a.StringId == null || b.StringId == null || a.StringId.IndexOfAny(Bad) >= 0 || b.StringId.IndexOfAny(Bad) >= 0) return true;
                 int lords = Releasable(a) + Releasable(b);
                 _wait.Add(new Wait { A = a.StringId, B = b.StringId, Hour = (long)Math.Floor(CampaignTime.Now.ToHours), Lords = lords });
+                _outcome[PairKey(a.StringId, b.StringId)] = "czeka";
                 _dHeld++; _dHeldLords += lords; _sHeld++;
                 var s = Settings.Current;
                 if (s != null && s.LogEnabled)
@@ -162,30 +198,49 @@ namespace Armoury
                 {
                     var w = _wait[i];
                     if (now - w.Hour < (long)WaitHours) continue;
-                    _wait.RemoveAt(i); i--;
                     try
                     {
                         var a = KingdomById(w.A); var b = KingdomById(w.B);
-                        if (a == null || b == null || a.IsEliminated || b.IsEliminated) { _dGone++; continue; }   // krolestwo upadlo - jency rozliczone przy zmianie krolestwa rodow (gra)
-                        if (a.IsAtWarWith(b))
+                        if (a == null || b == null || a.IsEliminated || b.IsEliminated)   // krolestwo upadlo - jency rozliczone przy zmianie krolestwa rodow (gra)
+                        { _wait.RemoveAt(i); i--; _dGone++; _outcome[PairKey(w.A, w.B)] = "upadlo"; continue; }
+                        bool war = a.IsAtWarWith(b);
+                        // 264 (2): koncowy stan wojny - ROT wymusza te wojne, a jeszcze jej nie wypowiedzial (doba ROT po tej godzinie) - czekamy (opis klasy)
+                        int act = Decide(now - w.Hour, war, !war && Prologue.RotWarForced(a, b));
+                        if (act == ActWaitRot)
+                        {
+                            _outcome[PairKey(w.A, w.B)] = "czeka na ROT";
+                            _rotSeen.Add(PairKey(w.A, w.B));
+                            if (!w.RotSaid)
+                            {
+                                w.RotSaid = true;
+                                if (s != null && s.LogEnabled)
+                                    Log.Info("Pokoj a jency (M6a-3): dzien " + (int)CampaignTime.Now.ToDays + " | " + Name(a) + " - " + Name(b) + ": para nie w wojnie, ale ROT wymusza te wojne (IsWarForced)"
+                                             + " - uwolnienie czeka na wznowienie (najdluzej do " + (WaitHours + RotWaitHours).ToString("0", Inv) + " h od pokoju).");
+                            }
+                            continue;
+                        }
+                        _wait.RemoveAt(i); i--;
+                        if (act == ActKeep)
                         {
                             int kept = Releasable(a) + Releasable(b);   // w wojnie przeglad gry zwraca 0 dla tej pary - licznik z chwili pokoju ponizej
                             _dKept++; _dKeptLords += w.Lords; _sKept++; _sKeptLords += w.Lords;
+                            _outcome[PairKey(w.A, w.B)] = "odwolane";
                             if (s != null && s.LogEnabled)
                                 Log.Info("Pokoj a jency (M6a-3): dzien " + (int)CampaignTime.Now.ToDays + " | " + Name(a) + " - " + Name(b) + ": znow w wojnie - uwolnienie odwolane, "
-                                         + w.Lords + " jencow-bohaterow z chwili pokoju zostaje w niewoli (gra uwolnilaby dzis " + kept + ").");
+                                         + w.Lords + " jencow-bohaterow z chwili pokoju zostaje w niewoli (gra uwolnilaby dzis " + kept + ")" + (w.RotSaid ? " - ROT wznowil wojne" : "") + ".");
                             continue;
                         }
-                        if (_mRelease == null) { _dGone++; continue; }   // metoda gry niedostepna (latki nie wpiete po wczytaniu) - nie ma czym uwolnic
+                        if (_mRelease == null) { _dGone++; _outcome[PairKey(w.A, w.B)] = "upadlo"; continue; }   // metoda gry niedostepna (latki nie wpiete po wczytaniu) - nie ma czym uwolnic
                         int n = Releasable(a) + Releasable(b);
                         _mRelease.Invoke(null, new object[] { a });
                         _mRelease.Invoke(null, new object[] { b });
                         _dFreed++; _dFreedLords += n; _sFreed++; _sFreedLords += n;
+                        _outcome[PairKey(w.A, w.B)] = "uwolnione";
                         if (s != null && s.LogEnabled)
                             Log.Info("Pokoj a jency (M6a-3): dzien " + (int)CampaignTime.Now.ToDays + " | " + Name(a) + " - " + Name(b) + ": nadal pokoj - gra uwalnia "
-                                     + n + " jencow-bohaterow (w chwili pokoju " + w.Lords + ").");
+                                     + n + " jencow-bohaterow (w chwili pokoju " + w.Lords + ")" + (w.RotSaid ? " - ROT nie wznowil wojny w " + (WaitHours + RotWaitHours).ToString("0", Inv) + " h mimo wymuszenia" : "") + ".");
                     }
-                    catch (Exception e) { Stumble("Hourly(para)", e); }
+                    catch (Exception e) { if (i >= 0 && i < _wait.Count && _wait[i] == w) { _wait.RemoveAt(i); i--; } Stumble("Hourly(para)", e); }
                 }
             }
             catch (Exception e) { Stumble("Hourly", e); }
@@ -203,12 +258,15 @@ namespace Armoury
                              + ", rozstrzygniete: znow w wojnie - jency zostaja " + _dKept + " (jencow-bohaterow " + _dKeptLords + "), nadal pokoj - uwolnieni " + _dFreed
                              + " (jencow-bohaterow " + _dFreedLords + "), krolestwo upadlo " + _dGone + " | czeka " + _wait.Count
                              + " | sesja: odlozone " + _sHeld + ", odwolane " + _sKept + " (jencow " + _sKeptLords + "), uwolnione po dobie " + _sFreed + " (jencow " + _sFreedLords + ")"
-                             + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + (_importN >= 0 ? " | wczytano par " + _importN + " (bledne " + _importBad + ")" : "") + ".");
+                             + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + (_importN >= 0 ? " | wczytano par " + _importN + " (bledne " + _importBad + ")" : "")
+                             + " | czeka na ROT " + RotWaiting() + ".");
                 _importN = -1;
             }
             catch (Exception e) { Stumble("Daily", e); }
             ZeroDay();
         }
+
+        private static int RotWaiting() { int n = 0; foreach (var w in _wait) if (w.RotSaid) n++; return n; }
 
         private static bool _hooksTried;
         private static Harmony _harmony;

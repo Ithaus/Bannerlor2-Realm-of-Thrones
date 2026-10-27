@@ -43,8 +43,8 @@ namespace Armoury
     /// </summary>
     internal static partial class Prologue
     {
-        private const string RiverId = "riverlands";
-        private const double RiverNetDays = 2.0;     // zapas A2: ROT nie wypowiedzial mimo wymuszenia - po tylu dniach wypowiada doba Armoury
+        internal const string RiverId = "riverlands";   // 264: internal - tabela par CanonPeaceLock
+        internal const double RiverNetDays = 2.0;     // zapas A2: ROT nie wypowiedzial mimo wymuszenia - po tylu dniach wypowiada doba Armoury; 264: tez najdluzsze czekanie M6a-3 na wznowienie ROT
         private const int RiverAllyRetryDays = 7;    // sojusz zgubiony - ponowna proba najwyzej raz na tyle dni
         private const int RiverWaitLineDays = 7;     // linia "sojusz czeka" najwyzej raz na tyle dni
 
@@ -59,6 +59,7 @@ namespace Armoury
         private static int _raRetryDay, _raWaitSaidDay;
         private static double _rwNoWarSince, _raLeft;
         private static string _rwState = "-", _raState = "-", _rlWire = "nie wpieta";
+        private static double _rwSeenStart = double.NaN;   // 264 (3): poczatek biezacej wojny korona-Dorzecze juz widziany w tej sesji (dzien opowiesci; bez zapisu)
 
         private static void ResetRiver()
         {
@@ -68,6 +69,7 @@ namespace Armoury
             _raRetryDay = NoDay; _raWaitSaidDay = NoDay;
             _rwNoWarSince = -1.0; _raLeft = -1.0;
             _rwState = "-"; _raState = "-";
+            _rwSeenStart = double.NaN;
         }
 
         private static string PackRiver()
@@ -192,7 +194,7 @@ namespace Armoury
                 _rlPopups++; _warsEventDay = true;
                 Log.Info(CwTag + "(4) Dorzecze - okno ROT RiverlandsDeclareWarEvent (dzien opowiesci " + StoryDays().ToString("0.0", Inv) + "): " + (oath ? "tekst holdu lordow rzecznych" : "tekst wojny Dorzecza bez holdu (Robb "
                          + (robb == null ? "brak" : robb.IsAlive ? "zyje" : "nie zyje") + ", Polnoc " + (Alive(north) ? "jest" : "BRAK") + ", sojusz " + (_raEnded ? "zakonczony" : "nie zakonczony") + ")")
-                         + " zamiast wypowiedzenia wojny (wojna z korona trwa od dnia opowiesci " + (_rwDay != NoDay ? _rwDay.ToString(Inv) : "?") + "); ustawione " + n + "/3, relacje ROT bez zmian.");
+                         + " zamiast wypowiedzenia wojny (wojna z korona trwa " + WarSinceText(crown, river, _rwDay) + "); ustawione " + n + "/3, relacje ROT bez zmian.");
             }
             catch (Exception e) { CwStumble("RiverPopupPrefix", e); }
         }
@@ -234,7 +236,8 @@ namespace Armoury
                              + " | korona w wojnie z " + Wars(crown) + "; Dorzecze w wojnie z " + Wars(river) + " | komunikat gracza: " + (sd < 5.0 ? "nowa kampania" : "nadrobienie") + ".");
                     Log.Player(sd < 5.0 ? RiverNewText : RiverCatchUpText, true);
                 }
-                _rwState = "wojna z korona TAK (od dnia " + (_rwDay != NoDay ? _rwDay.ToString(Inv) : "?") + ")";
+                RiverResumedLine(crown, river, sd);
+                _rwState = "wojna z korona TAK (" + WarSinceText(crown, river, _rwDay) + ")";
                 return;
             }
             if (sd < 1.0) { _rwNoWarSince = -1.0; _rwState = "czeka (bramka ROT EnforceWars - dzien opowiesci 1)"; return; }
@@ -376,7 +379,7 @@ namespace Armoury
             {
                 var crown = K(Crown); var river = K(RiverId); var north = K(NorthId);
                 bool w = Alive(crown) && Alive(river) && crown.IsAtWarWith(river);
-                war = w ? "TAK" + (_rwOn && _rwDay != NoDay ? " (od dnia " + _rwDay.ToString(Inv) + ")" : " (jeszcze nie zapisana)") : "NIE" + (_kingFallen ? "" : " (krol zyje)");
+                war = w ? "TAK" + (_rwOn && _rwDay != NoDay ? " (" + WarSinceText(crown, river, _rwDay) + ")" : " (jeszcze nie zapisana)") : "NIE" + (_kingFallen ? "" : " (krol zyje)");
                 var beh = Campaign.Current != null ? Campaign.Current.GetCampaignBehavior<IAllianceCampaignBehavior>() : null;
                 bool a = beh != null && Alive(north) && Alive(river) && beh.IsAllyWithKingdom(north, river);
                 if (a)
@@ -390,6 +393,69 @@ namespace Armoury
             return "klucz wojny " + (RiverWarKey ? "TAK" : "NIE") + ", klucz sojuszu " + (RiverAllyKey ? "TAK" : "NIE") + ", okno ROT " + _rlWire
                    + ", wojna z korona " + war + ", sojusz z Polnoca " + ally;
         }
+
+        // ---------------------------------------------------------------- 264 (3): data poczatku BIEZACEJ wojny z rekordu postawy gry
+        // Dotad linie mowily "od dnia 34" (rwd - pierwszy poczatek) takze po pokoju i wznowieniu przez ROT (dzien 108982/108983 w logu Jeffa 26.10: pokoj
+        // Diplomacy, nastepnej doby ROT EnforceWars wypowiada znowu). Gra trzyma w StanceLink WarStartDate (ustawiany przy kazdym wejsciu w wojne)
+        // i PeaceDeclarationDate (przy wyjsciu z wojny; nie zerowany przy nowej wojnie) - z nich biezacy poczatek i przerwa. rwd zostaje pierwszym poczatkiem.
+
+        /// <summary>264 (3): poczatek biezacej wojny pary (dzien opowiesci, StanceLink.WarStartDate - StoryStart); NaN - brak wojny albo rekordu.
+        /// peaceStory - ostatni pokoj tej pary przed tym poczatkiem (PeaceDeclarationDate), NaN gdy go nie bylo.</summary>
+        internal static double WarStartStory(Kingdom a, Kingdom b, out double peaceStory)
+        {
+            peaceStory = double.NaN;
+            try
+            {
+                if (a == null || b == null || a.IsEliminated || b.IsEliminated || !a.IsAtWarWith(b)) return double.NaN;
+                var link = a.GetStanceWith(b);
+                if (link == null) return double.NaN;
+                var st = StoryStart();
+                var ws = link.WarStartDate;
+                var pd = link.PeaceDeclarationDate;
+                if (pd != CampaignTime.Zero && pd <= ws) peaceStory = (pd - st).ToDays;
+                return (ws - st).ToDays;
+            }
+            catch (Exception e) { CwStumble("WarStartStory", e); return double.NaN; }
+        }
+
+        /// <summary>264 (3): "od dnia 147.4, wznowiona po pokoju z dnia 146.4; pierwsza od dnia 34" albo "od dnia 34.0" - firstDay (rwd) NoDay = nieznany pierwszy
+        /// poczatek (para bez pamieci): wznowiona, gdy rekord gry ma pokoj po starcie opowiesci przed biezacym poczatkiem.</summary>
+        internal static string WarSinceText(Kingdom a, Kingdom b, int firstDay)
+        {
+            double peace;
+            double w = WarStartStory(a, b, out peace);
+            if (double.IsNaN(w)) return "od dnia " + (firstDay != NoDay ? firstDay.ToString(Inv) : "?");
+            bool resumed = firstDay != NoDay ? w >= firstDay + 1.0 : !double.IsNaN(peace) && peace >= 0.0;
+            string s = "od dnia " + w.ToString("0.0", Inv);
+            if (resumed)
+                s += ", wznowiona po pokoju" + (double.IsNaN(peace) ? "" : " z dnia " + peace.ToString("0.0", Inv)) + (firstDay != NoDay ? "; pierwsza od dnia " + firstDay.ToString(Inv) : "");
+            return s;
+        }
+
+        /// <summary>264 (3): linia raz na nowy poczatek wojny korona-Dorzecze widziany w tej sesji (wznowiona po pokoju; poczatek mlodszy niz 2 dni - po
+        /// wczytaniu starsze wznowienie tylko zapamietane, bez linii).</summary>
+        private static void RiverResumedLine(Kingdom crown, Kingdom river, double sd)
+        {
+            double peace;
+            double w = WarStartStory(crown, river, out peace);
+            if (double.IsNaN(w) || (!double.IsNaN(_rwSeenStart) && Math.Abs(w - _rwSeenStart) < 0.01)) return;
+            _rwSeenStart = w;
+            if (_rwDay == NoDay || w < _rwDay + 1.0 || sd - w > RiverNetDays) return;
+            _warsEventDay = true;
+            Log.Info(CwTag + "(4) Dorzecze - wojna korona-Dorzecze WZNOWIONA (dzien opowiesci " + w.ToString("0.0", Inv) + ", po pokoju z dnia "
+                     + (double.IsNaN(peace) ? "?" : peace.ToString("0.0", Inv)) + "; pierwsza od dnia " + _rwDay.ToString(Inv) + ") | korona w wojnie z " + Wars(crown)
+                     + "; Dorzecze w wojnie z " + Wars(river) + ".");
+            RiverResumedSeen++;
+        }
+
+        internal static int RiverResumedSeen;   // 264 autotest T6: ile wznowien zobaczyla doba m104 w tej sesji (bez zapisu)
+
+        // ---------------------------------------------------------------- 264: dostep tylko do odczytu dla CanonPeaceLock / CanonWarWatch
+        internal static Kingdom KingdomById(string id) { return K(id); }
+        internal static bool RulesRealm(IFaction f) { return PlayerRules(f); }
+        internal static Hero HeroById(string id) { return H(id); }   // Hero.Find, zapas FindFirst
+        internal static int RiverFirstDay { get { return _rwDay; } }
+        internal const int NoDayValue = NoDay;   // pierwszy poczatek nieznany (para bez pamieci m104)
 
         private static string RiverDayText()
         {
