@@ -5640,6 +5640,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiAmmoOrderFull { get; set; } = true;
 
+        [SettingPropertyBool("AI Armour Order Full", HintText = "when a lord's men or a garrison leave a market still short of body armour or helmets and none of the right kind is left on the stall, the order they leave with the town's armourers is for all they still lack, as far as the purse that pays for their kit can cover at yesterday's prices (up to Supply Demand Order Cap), not just 10; a lord staying in a castle leaves that order in the castle's market town, and better armour wanted for men who already wear some is ordered without the one-order-a-day limit (off = at most 10 of a kind from one visit and one better-kit order a day, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiArmourOrderFull { get; set; } = true;
+
         [SettingPropertyBool("Ai Skip Fine Goods", HintText = "the lords' men and the garrisons, buying the kit they lack, leave the finer-than-usual pieces on the shelf (Fine, Masterwork and the like): their armoury keeps no record of such quality, so the piece would turn ordinary the moment they paid the higher price for it; those pieces stay for you and for the heroes (off = as before: they buy them and the quality is lost)", RequireRestart = false)]
         [SettingPropertyGroup("Time at the forge")]
         public bool AiSkipFineGoods { get; set; } = true;
@@ -10116,6 +10120,10 @@ namespace Armoury
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public int AiArmsReadyPercent { get; set; } = 60;
 
+        [SettingPropertyBool("AI Arms Counts Body Armour", HintText = "A lord's party also counts as unarmed while fewer than AI Arms Below Percent of its men who should wear body armour have one in its stores, and counts as armed again from AI Arms Ready Percent; such a lord rides to a town and buys body armour first, as for missing kit. Off = only the share of filled template slots counts", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool AiArmsCountsBodyArmour { get; set; } = true;
+
         [SettingPropertyInteger("AI Arms Trip Max Days", 1, 14, "0", HintText = "the farthest friendly town, in days of march, an unarmed lord rides to for kit", RequireRestart = false)]
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public int AiArmsTripMaxDays { get; set; } = 3;
@@ -11577,6 +11585,7 @@ namespace Armoury
             s.AiMendQueueContinue = AiMendQueueContinue;
             s.AiAmmoUse = AiAmmoUse;
             s.AiAmmoOrderFull = AiAmmoOrderFull;
+            s.AiArmourOrderFull = AiArmourOrderFull;
             s.AiSkipFineGoods = AiSkipFineGoods;
             s.AiSkipTownsfolkDress = AiSkipTownsfolkDress;
             s.AiGearMaxPriceFactor = AiGearMaxPriceFactor;
@@ -12696,6 +12705,7 @@ namespace Armoury
             s.AiArmsBeforeBattle = AiArmsBeforeBattle;
             s.AiArmsBelowPercent = AiArmsBelowPercent;
             s.AiArmsReadyPercent = AiArmsReadyPercent;
+            s.AiArmsCountsBodyArmour = AiArmsCountsBodyArmour;
             s.AiArmsTripMaxDays = AiArmsTripMaxDays;
             s.AiArmsTripCooldownDays = AiArmsTripCooldownDays;
             s.AiArmsWaitMaxDays = AiArmsWaitMaxDays;

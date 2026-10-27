@@ -1189,6 +1189,12 @@ Uzycie (Python 3, tylko odczyt):
                     LordEscort.cs, LordEscort.Probe.cs) python -I tools/sprawdz_logi.py --grupa e223 <Armoury-*.log> (strumieniowo). Linie 'Eskorta lordow (223): '.
                     E223-S self-test, E223-S2 test syntetyczny; E223-0 latki TAK; E223-1 linia doby co dobe; E223-2 slabe i dzialania; E223-3 eskorta z zalog: wzial ==
                     spadek zalogi, podloga, suma doby == zdarzenia, <= 169c; E223-4 potkniecia 0; E223-5 najdluzej w stanie <= postoj + 1; E223-6 INFO pojmania.
+--grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
+                    ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
+                    --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
+                    'zbroja na tulow (268)' w linii doby p9; Z268-2 przyczyny = poza armia; Z268-3 sprawdzian Lydden (159 P0: B p9 < prog i 'gotowa' - 0);
+                    Z268-4 linia 'Zbroja AI - zamowienia (268)' co dobe, zamowione <= pusta polka i sufit, zloto 0; Z268-5 wyjazdy po zbroje -> korpusy;
+                    Z268-6 potkniecia i ERROR 0; Z268-7 autotest T1-T6 (flaga armoury-zbroja268.flag); Z268-8 INFO pierwsza / ostatnia doba.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -71395,6 +71401,479 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return e223_main(rest[0] if rest else None)
     return _e223_main_prev(argv)
+
+
+# ------------------------------------------------------------ z268 (27.10, paczka 268 noc/268-gotowosc-zbroja: gotowosc p9 liczy zbroje na tulow, zamowienia zbroi
+# i helmow na caly brak - Jeff 27.10 "czemu wojsko czesto nie ma pancerza albo ma tylko ja zle trafiam i mam pecha", "tak zacznij od tych pieciu"; audyt 27.10
+# Lady Jana Lydden: 47 z 77 ludzi w tunice, R 67% "p9: gotowa"; Armoury/src/ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs,
+# MenUpgradeOrders.cs, NewLordKit.cs; klucze AiArmsCountsBodyArmour, AiArmourOrderFull)
+#   python -I tools/sprawdz_logi.py --grupa z268 <Armoury-*.log>
+# Z268-S self-test wyrazen (linie kontrolne jak w kodzie C#), Z268-S2 test syntetyczny (dobry, zly, bez linii 268). Z268-0 linia startu p9 z oboma kluczami;
+# Z268-1 segment 'zbroja na tulow (268)' w kazdej linii doby p9 (najwyzej 1 brak); Z268-2 przyczyny: tylko sloty + tylko zbroja + oba = poza armia (kazda doba);
+# Z268-3 (sprawdzian Lydden) zadna partia lorda AI w linii 159 P0 z 'B p9' ponizej progu wejscia i 'p9: gotowa' (ani 'niegotowa przez zbroje TAK' bez NIEGOTOWA);
+# Z268-4 linia 'Zbroja AI - zamowienia (268)' co dobe, w kazdej klasie i rodzaju zamowione szt. <= brak polki pustej i <= sufit x koszyki, zloto przy zamowieniu 0;
+# Z268-5 wyjazdy po zbroje > 0 w biegu -> dokupione korpusy > 0, sakiewka + kiesa pana = zl (kazda doba); Z268-6 potkniecia 0 i bez ERROR in ArmedStrength /
+# ArmsFirst / ArmourOrders / MenUpgradeOrders; Z268-7 autotest (flaga armoury-zbroja268.flag) T1-T6 bez NIE, T1/T2/T5 TAK; Z268-8 INFO pierwsza / ostatnia doba
+# (pokrycie korpusu i helmu lordow 'dowolny szczebel', platnerze przeniesieni, warsztaty BodyArmor / HeadArmor, cena korpusu lordow 174b, koszt p9 ms, tworzenie
+# armii, niegotowe przez zbroje, zamowienia Z1 zbroi bez limitu doby). Log bez linii 268 - INFO.
+Z268_RX = {
+    "start": re.compile(r"^Gotowosc do bitwy \(p9\): start sesji \|.*? \| AI Arms Counts Body Armour (TAK|NIE) \(tulow: niegotowa ponizej (\d+)%, gotowa od (\d+)% "
+                        r"ludzi z korpusem we wzorcu\) \| AI Armour Order Full (TAK|NIE) \|"),
+    "p9day": re.compile(r"^Gotowosc do bitwy \(p9\): dzien (\d+) \|"),
+    "low": re.compile(r"\| niegotowe \(R < (\d+)%, do (\d+)%\): poza armia (\d+), w tym bez pieniedzy (\d+), w armii (\d+), zwolnione z czekania \(po \d+ dobach walcza tym, co maja\) (\d+)"),
+    "body": re.compile(r"\| zbroja na tulow \(268\): klucz (TAK|NIE), srednio B (\d+%|-), B 0-25: (\d+), 25-50: (\d+), 50-75: (\d+), 75-100: (\d+), bez korpusu we wzorcu (\d+) "
+                       r"\| niegotowe poza armia wedlug przyczyny: tylko sloty (\d+), tylko zbroja (\d+), oba (\d+); nowe dzis (\d+), w tym przez zbroje (\d+)"),
+    "trip": re.compile(r"; 268: wyjazdy po zbroje \(B ponizej progu\) (\d+) \(teraz w toku (\d+)\), dokupione korpusy w wyjazdach (\d+) szt\. za (\d+) zl "
+                       r"\(sakiewka (\d+), kiesa pana (\d+); zakupow (\d+)\)"),
+    "cost": re.compile(r"\| przeliczen \d+ \(.*?\), koszt ([\d.]+) ms"),
+    "army": re.compile(r", tworzenie armii (\d+) partii"),
+    "p9st": re.compile(r", potkniecia (\d+)\.$"),
+    "afst": re.compile(r"\| potkniecia ArmsFirst (\d+)"),
+    "seg": re.compile(r"([^|]*?) \[(sojusznik|wrog|doba)\] ludzi (\d+) .*?\| R teraz (\d+)% \(\d+/\d+ slotow\), wpis DTE (?:TAK|NIE), p9: (.+?)(?:, czeka [\d.]+ dob)? "
+                      r"\| zbroja na tulow \(268\): B teraz (\d+)% \((\d+)/(\d+) ludzi\), B p9 (?:(\d+)% \(R p9 (\d+)%\)|-), niegotowa przez zbroje (TAK|NIE) \|"),
+    "ordhead": re.compile(r"^Zbroja AI - zamowienia \(268\): dzien (\d+) \| korpus i helm przy pustej polce (?:\[WL caly brak w granicach kiesy, najwyzej (\d+) szt\.\]"
+                          r"|W CIENIU \(AiArmourOrderFull\) - najwyzej 10 szt\.)"),
+    "ordwho": re.compile(r"^(lordowie AI|zalogi miast|zamowienia zamkow \(w miescie\)|lordowie w zamku \(miasto zamku\)): wizyt (\d+), z brakiem zbroi po zakupach (\d+)"
+                         r"(?:, bez miasta zamku (\d+), bez kiesy (\d+), zamek w wojnie (\d+))?;"),
+    "ordkind": re.compile(r"(korpus|helm) - brak (\d+) szt\., polka bez tieru i nizszego (\d+) koszykow / (\d+) szt\. - zamowione (\d+) \((\d+) szt\., ponad dawne 10: (\d+), "
+                          r"przyciete kiesa (\d+) szt\.\), juz zamowione (\d+), na polce zostala sztuka (\d+) koszykow / (\d+) szt\."),
+    "ordopen": re.compile(r"\| otwarte zamowienia w osadach: korpus (\d+) szt\. \((\d+) koszykow\), helm (\d+) szt\. \((\d+) koszykow\)"),
+    "ordprice": re.compile(r"\| cena sztuki wczoraj \(lordowie\): korpus (\d+) zl, helm (\d+) zl, wszystkie sztuki AI (\d+) zl"),
+    "ordtail": re.compile(r"\| zloto przy zamowieniu (\d+) \| potkniecia (\d+) \(zamek (\d+)\)\.$"),
+    "z1": re.compile(r"zbroja i helm bez limitu doby \(268, AI Armour Order Full (tak|nie)\): zamowien (\d+) za (\d+) szt\., w miescie zamku (\d+)"),
+    "z1cap": re.compile(r"partia zamowila juz dzis (\d+)"),
+    "n159": re.compile(r"niegotowe przez zbroje na tulow \(268\): wszystkie (\d+), nowe druzyny niegotowe przez zbroje \(wiek do 7 dob\) (\d+)"),
+    "test": re.compile(r"^Zbroja \(268\): test - (T\d) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
+    "cov": re.compile(r"^Pokrycie zbrojowni AI \(171\): dzien (\d+) - partie rodow AI \((\d+) ludzi\): .*?\| dowolny szczebel: korpus (\d+)%, glowna bron (\d+)%, helm (\d+)%"),
+    "ws": re.compile(r"^Warsztaty: dzien (\d+) - wykonano (\d+) szt\. \[([^\]]*)\]"),
+    "plat": re.compile(r"rece przeniesione z cechow bez roboty: (\d+) \([^)]*?platnerz (\d+)"),
+    "b174": re.compile(r"^ZakupyAI wedlug kupujacego \(174b\): dzien (\d+) - lordowie \[[^\]]*?korpus (\d+)/(\d+) zl"),
+}
+Z268_ERR = ("ERROR in ArmedStrength", "ERROR in ArmsFirst", "ERROR in ArmourOrders", "ERROR in MenUpgradeOrders")
+# linie kontrolne - jak w kodzie C# (ArmedStrength.cs, ArmsFirst.cs, ArmourOrders.cs, NewLordKit.cs, MenUpgradeOrders.cs, ArmedStrength.Test.cs)
+Z268_TEST = {
+    "start": "Gotowosc do bitwy (p9): start sesji | klucze: AI Strength Counts Gear TAK (pelna sila od 75% slotow wzorca, ponizej liniowo do sily ludzi bez sprzetu P0 = 0.40), "
+             "AI Arms Before Battle TAK (niegotowa ponizej 50%, gotowa od 60%, miasto najwyzej 3 dob drogi, wytchnienie miasta 3 dob, bandy wolno, czekanie najwyzej 12 dob "
+             "- potem walczy tym, co ma, do gotowosci albo pieniedzy na sprzet) | AI Arms Counts Body Armour {k} (tulow: niegotowa ponizej 50%, gotowa od 60% ludzi z korpusem "
+             "we wzorcu) | AI Armour Order Full TAK | regula: lordowie i druzyna gracza TAK, zalogi TAK | AI Autobattle Counts Gear TAK | latki: sila partii wpieta | x | pelny "
+             "przeglad partii w pierwszych godzinach (najwyzej 400 na godzine, lordowie najpierw); do przeliczenia F = 1.",
+    "p9day": "Gotowosc do bitwy (p9): dzien {d} | sila z uzbrojeniem TAK | partie lordow (bez gracza): 730, R srednio 67%, R 0-25: 74, 25-50: 96, 50-75: 175, 75-100: 363, "
+             "F srednio 0.88, najmniejsze 0.24 Forim's Party (97 ludzi, R 4%) | R lordow wedlug krolestw (srednio, partii, niegotowych): aserai 73% (57, 7) | gracz: R 95%, F 1.00 "
+             "| zalogi: 925, R srednio 90%, z F < 1: 12 | niegotowe (R < 50%, do 60%): poza armia {low}, w tym bez pieniedzy 5, w armii 12, zwolnione z czekania (po 12 dobach "
+             "walcza tym, co maja) 3 (dzis nowe 1, powrot do dozbrajania - stac na sprzet 0) | zbroja na tulow (268): klucz TAK, srednio B 81%, B 0-25: 20, 25-50: 40, 50-75: 150, "
+             "75-100: 500, bez korpusu we wzorcu 20 | niegotowe poza armia wedlug przyczyny: tylko sloty {cs}, tylko zbroja {cb}, oba {co}; nowe dzis 9, w tym przez zbroje 4; "
+             "gracz B 100% (40/40) | autobitwa (ta sama regula, AI Autobattle Counts Gear TAK): ciosy z poprawka 100 (zadane przez slabo uzbrojonych 50, otrzymane 60, sredni "
+             "mnoznik ciosu 0.90, potkniecia 0) | jada po sprzet: nowe wyjazdy 11, teraz w drodze 5 i na miejscu 2, dojechaly 3, dozbrojone 2, postoj przedluzony (postep i dalej "
+             "stac) 1, po wizycie czesciowo 1 i bez poprawy 0, za dlugo w drodze 0, bez miasta w zasiegu 2 partii, w miescie nie stac (rezerwa napraw z materialem) 0, po 2 "
+             "wizytach bez postepu bez wyjazdow 0 partii (mysli 0), wyjazd przerwany zwolnieniem z czekania 0, cel zablokowany cudza latka (wynik <= -1, wytchnienie i nastepne "
+             "miasto) 0, w miescie nie stac na pelne, stac na pierwsza bron (wyjazd) 0, wyjazd po pierwsza bron czeka na obrone osady krolestwa (mysli) 0, w wytchnieniu 4 par "
+             "partia-miasto; 268: wyjazdy po zbroje (B ponizej progu) {tb} (teraz w toku 3), dokupione korpusy w wyjazdach {k} szt. za {g} zl (sakiewka {sp}, kiesa pana {kl}; "
+             "zakupow 4) | odmowy: atak 3 partii (5 razy), opcje bitwy zgaszone 40 (mysli bez pieniedzy 2 partii), obrona wlasnej osady zostawiona 0, glod (bez zmian) 0, "
+             "tworzenie armii 2 partii, kandydaci armii przed progiem gry 1 i po nim 0 (armia ponizej progu 1000 po odjeciu 0), wezwania BK 0, okno armii gracza 0 | potkniecia "
+             "ArmsFirst 0 | przyklady: Lady Jana Lydden's Party (77 ludzi, R 67%, B 39% (30/77), przyczyna zbroja, F 0.94, brak do progu 17 szt., czeka 0.5 dob, budzet 4795 z 690, "
+             "cel Lannisport) | przeliczen 1300 (pelny przeglad 0 z 925, w kolejce 0, brudnych czeka 0), koszt 240.5 ms, publikacji 24, wyzerowan pamieci sily 30, lup DTE bez "
+             "mnoznika 0, zbrojownie nieczytelne 0, zalogi ilu zostawic / wziac bez mnoznika 10, zegary czekania z zapisu przywrocone dzis 0 (czeka na przeliczenie 0), potkniecia {p}.",
+    "p0": "Bitwa gracza (159 P0, misja DTE): partie lordow AI 1 || Lady Jana Lydden's Party [wrog] ludzi 77 (rannych 0) | R teraz 67% (282/420 slotow), wpis DTE TAK, "
+          "p9: {st}, czeka 0.5 dob | zbroja na tulow (268): B teraz 39% (30/77 ludzi), B p9 {b9}% (R p9 67%), niegotowa przez zbroje {nz} | cel p9 Lannisport, stoi: - | zloto wodza "
+          "19180, budzet AiGear 4795 z potrzebnych 690 | w armii NIE | powstala sprzed wczytania | AI GoToSettlement -> Lannisport, krotko GoToSettlement | plan 159: -.",
+    "ord": "Zbroja AI - zamowienia (268): dzien {d} | korpus i helm przy pustej polce [WL caly brak w granicach kiesy, najwyzej 60 szt.] | lordowie AI: wizyt 30, z brakiem zbroi po "
+           "zakupach 12; korpus - brak 300 szt., polka bez tieru i nizszego 8 koszykow / 200 szt. - zamowione 6 ({op} szt., ponad dawne 10: 90, przyciete kiesa 20 szt.), juz "
+           "zamowione 2, na polce zostala sztuka 3 koszykow / 100 szt.; helm - brak 50 szt., polka bez tieru i nizszego 2 koszykow / 30 szt. - zamowione 2 (30 szt., ponad dawne "
+           "10: 10, przyciete kiesa 0 szt.), juz zamowione 0, na polce zostala sztuka 1 koszykow / 20 szt. | zalogi miast: wizyt 90, z brakiem zbroi po zakupach 10; korpus - "
+           "brak 20 szt., polka bez tieru i nizszego 1 koszykow / 20 szt. - zamowione 1 (20 szt., ponad dawne 10: 10, przyciete kiesa 0 szt.), juz zamowione 0, na polce zostala "
+           "sztuka 0 koszykow / 0 szt.; helm - brak 0 szt., polka bez tieru i nizszego 0 koszykow / 0 szt. - zamowione 0 (0 szt., ponad dawne 10: 0, przyciete kiesa 0 szt.), juz "
+           "zamowione 0, na polce zostala sztuka 0 koszykow / 0 szt. | zamowienia zamkow (w miescie): wizyt 40, z brakiem zbroi po zakupach 5; korpus - brak 0 szt., polka bez "
+           "tieru i nizszego 0 koszykow / 0 szt. - zamowione 0 (0 szt., ponad dawne 10: 0, przyciete kiesa 0 szt.), juz zamowione 0, na polce zostala sztuka 0 koszykow / 0 szt.; "
+           "helm - brak 0 szt., polka bez tieru i nizszego 0 koszykow / 0 szt. - zamowione 0 (0 szt., ponad dawne 10: 0, przyciete kiesa 0 szt.), juz zamowione 0, na polce "
+           "zostala sztuka 0 koszykow / 0 szt. | lordowie w zamku (miasto zamku): wizyt 15, z brakiem zbroi po zakupach 9, bez miasta zamku 1, bez kiesy 2, zamek w wojnie 0; "
+           "korpus - brak 90 szt., polka bez tieru i nizszego 5 koszykow / 90 szt. - zamowione 5 (70 szt., ponad dawne 10: 30, przyciete kiesa 0 szt.), juz zamowione 0, na "
+           "polce zostala sztuka 0 koszykow / 0 szt.; helm - brak 0 szt., polka bez tieru i nizszego 0 koszykow / 0 szt. - zamowione 0 (0 szt., ponad dawne 10: 0, przyciete "
+           "kiesa 0 szt.), juz zamowione 0, na polce zostala sztuka 0 koszykow / 0 szt. | otwarte zamowienia w osadach: korpus 2400 szt. (90 koszykow), helm 800 szt. (40 "
+           "koszykow) | cena sztuki wczoraj (lordowie): korpus 69 zl, helm 30 zl, wszystkie sztuki AI 34 zl | zloto przy zamowieniu {g} | potkniecia {p} (zamek 0).",
+    "z1": "Dozbrajanie: dzien {d} - gracz 0/0 | brak lepszej na polce 10396 (E3-Z1: na suficie tieru 1076, pod sufitem bez towaru 9320; zamowienia tier+1 (Men Upgrade Orders "
+          "tak) 300 za 900 szt., pominiete: partia zamowila juz dzis 4000, ten sam rodzaj w 7 dobach 10, bez miasta w wizycie 900, amunicja 482; zbroja i helm bez limitu doby "
+          "(268, AI Armour Order Full tak): zamowien 200 za 600 szt., w miescie zamku 40; czyszczenia slownika zamowien wpisu 81 dzis 0 (cel 0); potkniecia 0 (sesja 0)), x.",
+    "n159": "Nowe druzyny i sprzet (159): dzien {d} | klucze: x | SPIS (P0): partie lordow AI 700, bez wpisu DTE 3, R = 0 (z brakiem wpisu) 3; wedlug wieku partii (wszystkie/bez "
+            "wpisu/R=0): < 1 doby 1/0/0, 1-3 2/0/0, 3-7 3/0/0, 7+ 4/0/0, sprzed wczytania (wiek nieznany) 690/3/3; niegotowe przez zbroje na tulow (268): wszystkie 30, nowe "
+            "druzyny niegotowe przez zbroje (wiek do 7 dob) 5 | P0 niegotowe poza armia - 3 najnizsze R (stan po regule 2): brak | przyklady: brak | zapis: wczytane 0 | potkniecia 0.",
+    "test": "Zbroja (268): test - {t} regula LowRule i przyczyna: przypadkow 7, zle 0 - wynik {r}.",
+}
+
+
+def z268_selftest():
+    T = Z268_TEST
+    R = Z268_RX
+    probs = []
+    st = T["start"].format(k="TAK")
+    d = T["p9day"].format(d=109010, low=50, cs=20, cb=25, co=5, tb=7, k=40, g=2760, sp=760, kl=2000, p=0)
+    checks = (("start", st), ("p9day", d), ("low", d), ("body", d), ("trip", d), ("cost", d), ("army", d), ("p9st", d), ("afst", d),
+              ("ordhead", T["ord"].format(d=109010, op=150, g=0, p=0)), ("ordtail", T["ord"].format(d=109010, op=150, g=0, p=0)),
+              ("ordopen", T["ord"].format(d=109010, op=150, g=0, p=0)), ("ordprice", T["ord"].format(d=109010, op=150, g=0, p=0)),
+              ("z1", T["z1"].format(d=109010)), ("z1cap", T["z1"].format(d=109010)), ("n159", T["n159"].format(d=109010)), ("test", T["test"].format(t="T1", r="TAK")))
+    for name, line in checks:
+        if not R[name].search(line):
+            probs.append(name)
+    m = R["body"].search(d)
+    if m and (m.group(1) != "TAK" or m.group(8) != "20" or m.group(9) != "25" or m.group(10) != "5" or m.group(12) != "4"):
+        probs.append("body grupy")
+    m = R["trip"].search(d)
+    if m and (m.group(1) != "7" or m.group(3) != "40" or m.group(4) != "2760" or m.group(5) != "760" or m.group(6) != "2000"):
+        probs.append("trip grupy")
+    m = R["low"].search(d)
+    if m and (m.group(1) != "50" or m.group(3) != "50"):
+        probs.append("low grupy")
+    p0 = T["p0"].format(st="gotowa (F 0.94)", b9=39, nz="NIE")
+    segs = [x for x in (R["seg"].search(pc) for pc in p0.split(" || ")) if x]
+    if len(segs) != 1 or segs[0].group(5) != "gotowa (F 0.94)" or segs[0].group(9) != "39" or segs[0].group(11) != "NIE" or segs[0].group(6) != "39":
+        probs.append("seg")
+    p0n = T["p0"].format(st="NIEGOTOWA", b9=39, nz="TAK").replace("B p9 39% (R p9 67%)", "B p9 -")
+    sn = [x for x in (R["seg"].search(pc) for pc in p0n.split(" || ")) if x]
+    if len(sn) != 1 or sn[0].group(9) is not None or sn[0].group(5) != "NIEGOTOWA":
+        probs.append("seg bez B p9")
+    o = T["ord"].format(d=109010, op=150, g=0, p=0)
+    parts = o.split(" | ")
+    whos = [R["ordwho"].match(pc) for pc in parts]
+    whos = [w for w in whos if w]
+    kinds = [list(R["ordkind"].finditer(pc)) for pc in parts if R["ordwho"].match(pc)]
+    if len(whos) != 4 or any(len(k) != 2 for k in kinds) or whos[3].group(4) != "1" or kinds[0][0].group(6) != "150":
+        probs.append("ord klasy")
+    if not R["ordhead"].match(o.replace("[WL caly brak w granicach kiesy, najwyzej 60 szt.]", "W CIENIU (AiArmourOrderFull) - najwyzej 10 szt.")):
+        probs.append("ordhead cien")
+    if R["start"].search(st.replace(" | AI Armour Order Full TAK", "")):
+        probs.append("start bez klucza zamowien pasuje")
+    return ("nie pasuje: " + ", ".join(probs)) if probs else None
+
+
+def z268_collect(logp):
+    R = Z268_RX
+    D = {"p9starts": 0, "starts": [], "p9days": [], "bodyless": [], "low": {}, "body": {}, "trip": {}, "cost": {}, "army": {}, "p9st": {}, "afst": {},
+         "segs": [], "ord": [], "ordbad": [], "z1": [], "n159": [], "tests": [], "err": 0, "err1": "", "cov": [], "ws": [], "plat": [], "b174": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            if s.startswith("ERROR in "):
+                if s.startswith(Z268_ERR):
+                    D["err"] += 1
+                    if not D["err1"]:
+                        D["err1"] = s[:160]
+                continue
+            if s.startswith("Gotowosc do bitwy (p9): start sesji"):
+                D["p9starts"] += 1
+                ms = R["start"].search(s)
+                if ms:
+                    D["starts"].append(ms)
+                continue
+            if s.startswith("Gotowosc do bitwy (p9): dzien "):
+                md = R["p9day"].match(s)
+                if not md:
+                    continue
+                d = int(md.group(1))
+                D["p9days"].append(d)
+                mb = R["body"].search(s)
+                if not mb:
+                    D["bodyless"].append(d)
+                else:
+                    D["body"][d] = mb
+                for k in ("low", "trip", "cost", "army", "p9st", "afst"):
+                    mk = R[k].search(s)
+                    if mk:
+                        D[k][d] = mk
+                continue
+            if s.startswith("Bitwa gracza (159 P0") or s.startswith("Nowe druzyny i sprzet (159): dzien"):
+                if s.startswith("Nowe druzyny i sprzet (159): dzien"):
+                    mn = R["n159"].search(s)
+                    if mn:
+                        D["n159"].append(mn)
+                for pc in s.split(" || "):
+                    sg = R["seg"].search(pc)
+                    if sg:
+                        D["segs"].append(sg)
+                continue
+            if s.startswith("Zbroja AI - zamowienia (268): dzien"):
+                mh = R["ordhead"].match(s)
+                mt = R["ordtail"].search(s)
+                if not mh or not mt:
+                    D["ordbad"].append("zly format: " + s[:90])
+                    continue
+                cls = []
+                for pc in s.split(" | "):
+                    mw = R["ordwho"].match(pc)
+                    if mw:
+                        cls.append((mw, list(R["ordkind"].finditer(pc))))
+                D["ord"].append({"day": int(mh.group(1)), "cap": int(mh.group(2)) if mh.group(2) else 10, "cls": cls, "gold": int(mt.group(1)), "st": int(mt.group(2)),
+                                 "open": R["ordopen"].search(s), "price": R["ordprice"].search(s)})
+                continue
+            if s.startswith("Zbroja (268): test - "):
+                mt = R["test"].match(s)
+                D["tests"].append((mt.group(1), mt.group(3), mt.group(2)) if mt else ("?", "NIE", s[:100]))
+                continue
+            if "E3-Z1:" in s:
+                mz = R["z1"].search(s)
+                mc = R["z1cap"].search(s)
+                if mz:
+                    D["z1"].append((mz, mc))
+                continue
+            if s.startswith("Pokrycie zbrojowni AI (171)"):
+                mc = R["cov"].match(s)
+                if mc:
+                    D["cov"].append(mc)
+                continue
+            if s.startswith("Warsztaty: dzien"):
+                mw = R["ws"].match(s)
+                mp = R["plat"].search(s)
+                if mw:
+                    D["ws"].append(mw)
+                if mp:
+                    D["plat"].append((int(mw.group(1)) if mw else -1, mp))
+                continue
+            if s.startswith("ZakupyAI wedlug kupujacego (174b)"):
+                mb = R["b174"].match(s)
+                if mb:
+                    D["b174"].append(mb)
+    return D
+
+
+def z268_rows(rep, D):
+    starts = D["starts"]
+    below, key_on = 50, True
+    if not starts:
+        rep.add("Z268-0: linia startu p9 z kluczami 268", f"startow p9 {D['p9starts']}, z czescia 268 0", "INFO (log sprzed 268)" if D["p9starts"] else "INFO (brak p9)", None)
+    else:
+        m = starts[-1]
+        below, key_on = int(m.group(2)), m.group(1) == "TAK"
+        rep.add("Z268-0: linia startu p9 z kluczami 268", f"startow {len(starts)}, AI Arms Counts Body Armour {m.group(1)} (ponizej {m.group(2)}%, od {m.group(3)}%), "
+                f"AI Armour Order Full {m.group(4)}", "oba TAK (NIE - INFO)", True if (m.group(1) == "TAK" and m.group(4) == "TAK") else None)
+    days = D["p9days"]
+    has268 = bool(D["body"]) or bool(starts)
+    if not has268:
+        rep.add("Z268-1: segment 'zbroja na tulow (268)' w linii doby p9", f"dob p9 {len(days)}, z segmentem 0", "INFO (log sprzed 268)", None)
+    else:
+        miss = sorted(set(D["bodyless"]))
+        rep.add("Z268-1: segment 'zbroja na tulow (268)' w linii doby p9", f"dob p9 {len(days)}, z segmentem {len(D['body'])}, bez {miss[:5]}", "najwyzej 1 brak", len(miss) <= 1)
+    bad2 = []
+    for d, mb in sorted(D["body"].items()):
+        ml = D["low"].get(d)
+        if not ml:
+            bad2.append(f"{d}: brak segmentu niegotowych")
+            continue
+        s3 = int(mb.group(8)) + int(mb.group(9)) + int(mb.group(10))
+        if s3 != int(ml.group(3)):
+            bad2.append(f"{d}: {mb.group(8)}+{mb.group(9)}+{mb.group(10)} != {ml.group(3)}")
+    if not D["body"]:
+        rep.add("Z268-2: przyczyny = poza armia", "brak segmentu 268", "INFO", None)
+    else:
+        last = D["body"][max(D["body"])]
+        rep.add("Z268-2: przyczyny = poza armia", f"dob {len(D['body'])}, niezgodne {len(bad2)}" + (f" ({'; '.join(bad2[:3])})" if bad2 else "")
+                + f" | ostatnia doba: tylko sloty {last.group(8)}, tylko zbroja {last.group(9)}, oba {last.group(10)}, srednio B {last.group(2)}", "suma == poza armia", not bad2)
+    segs = D["segs"]
+    lyd, mis, stale, n9 = [], [], 0, 0
+    for sg in segs:
+        state, b9, nz = sg.group(5), sg.group(9), sg.group(11)
+        ready = state.startswith("gotowa") or state.startswith("nie niegotowa")
+        if nz == "TAK" and not state.startswith("NIEGOTOWA"):
+            mis.append(f"{sg.group(1).split(': ')[-1].strip()} ({state})")
+        if b9 is None:
+            continue
+        n9 += 1
+        if key_on and ready and int(b9) < below:
+            lyd.append(f"{sg.group(1).split(': ')[-1].strip()} B p9 {b9}% p9: {state}")
+        if ready and int(sg.group(6)) < below:
+            stale += 1
+    if not segs:
+        rep.add("Z268-3: sprawdzian Lydden (159 P0: B p9 ponizej progu i 'gotowa')", "brak opisow partii z czescia 268", "INFO (brak bitew gracza albo log sprzed 268)", None)
+    else:
+        rep.add("Z268-3: sprawdzian Lydden (159 P0: B p9 ponizej progu i 'gotowa')", f"opisow partii {len(segs)} (z B p9 {n9}), gotowych z B p9 < {below}%: {len(lyd)}"
+                + (f" ({'; '.join(lyd[:3])})" if lyd else "") + f", 'niegotowa przez zbroje TAK' bez NIEGOTOWA {len(mis)}" + (f" ({'; '.join(mis[:2])})" if mis else "")
+                + f" | INFO: gotowe z B teraz < {below}% (zbrojownia zmienila sie od przeliczenia) {stale}", "0 i 0", not lyd and not mis)
+    ords = D["ord"]
+    bad4 = list(D["ordbad"])
+    for o in ords:
+        if o["gold"] != 0:
+            bad4.append(f"{o['day']}: zloto przy zamowieniu {o['gold']}")
+        cap = max(10, o["cap"])
+        for mw, ks in o["cls"]:
+            for k in ks:
+                emp, ordn, opcs = int(k.group(4)), int(k.group(5)), int(k.group(6))
+                if opcs > emp or opcs > cap * ordn:
+                    bad4.append(f"{o['day']} {mw.group(1)} {k.group(1)}: zamowione {opcs} szt. przy pustej polce {emp} szt., {ordn} koszykow x {cap}")
+        if len(o["cls"]) != 4:
+            bad4.append(f"{o['day']}: klas {len(o['cls'])}")
+    odays = {o["day"] for o in ords}
+    omiss = sorted(set(days) - odays) if days else []
+    if not ords and not has268:
+        rep.add("Z268-4: zamowienia zbroi (268) co dobe, zamowione <= brak i sufit, zloto 0", "brak linii", "INFO (log sprzed 268)", None)
+    else:
+        tot = {}
+        for o in ords:
+            for mw, ks in o["cls"]:
+                for k in ks:
+                    t = tot.setdefault(mw.group(1) + " " + k.group(1), [0, 0, 0])
+                    t[0] += int(k.group(6)); t[1] += int(k.group(7)); t[2] += int(k.group(8))
+        z1 = D["z1"]
+        z1t = (f" | Z1 zbroja bez limitu doby: zamowien {sum(int(a.group(2)) for a, _ in z1)} za {sum(int(a.group(3)) for a, _ in z1)} szt., w miescie zamku "
+               f"{sum(int(a.group(4)) for a, _ in z1)}, 'partia zamowila juz dzis' (inne typy) {sum(int(c.group(1)) for _, c in z1 if c)}") if z1 else ""
+        rep.add("Z268-4: zamowienia zbroi (268) co dobe, zamowione <= brak i sufit, zloto 0", f"dob z linia {len(ords)}, braki wobec p9 {omiss[:5]}, problemy {len(bad4)}"
+                + (f" ({'; '.join(bad4[:3])})" if bad4 else "") + " | zamowione szt. (ponad dawne 10, przyciete kiesa): "
+                + ", ".join(f"{k} {v[0]} ({v[1]}, {v[2]})" for k, v in tot.items() if v[0] or v[2]) + z1t,
+                "linia co dobe (najwyzej 1 brak), zamowione <= pusta polka i <= sufit x koszyki, zloto przy zamowieniu 0", not bad4 and len(omiss) <= 1 and len(ords) > 0)
+    trips = D["trip"]
+    if not trips:
+        rep.add("Z268-5: wyjazdy po zbroje -> dokupione korpusy, sakiewka + kiesa = zl", "brak segmentu", "INFO (log sprzed 268)", None)
+    else:
+        tb = sum(int(m.group(1)) for m in trips.values())
+        pcs = sum(int(m.group(3)) for m in trips.values())
+        g = sum(int(m.group(4)) for m in trips.values())
+        badsum = [d for d, m in trips.items() if int(m.group(5)) + int(m.group(6)) != int(m.group(4))]
+        if tb == 0:
+            rep.add("Z268-5: wyjazdy po zbroje -> dokupione korpusy, sakiewka + kiesa = zl", f"wyjazdow po zbroje 0, korpusow w wyjazdach {pcs}, niezgodne sumy {badsum[:3]}",
+                    "INFO (brak wyjazdow po zbroje)", None if not badsum else False)
+        else:
+            rep.add("Z268-5: wyjazdy po zbroje -> dokupione korpusy, sakiewka + kiesa = zl", f"wyjazdow po zbroje {tb}, korpusow kupionych w wyjazdach {pcs} za {g} zl "
+                    f"(sakiewka {sum(int(m.group(5)) for m in trips.values())}, kiesa pana {sum(int(m.group(6)) for m in trips.values())}), niezgodne sumy {badsum[:3]}",
+                    "korpusy > 0 i sumy zgodne", pcs > 0 and not badsum)
+    st9 = sum(int(m.group(1)) for m in D["p9st"].values())
+    staf = max([int(m.group(1)) for m in D["afst"].values()] or [0])
+    sto = sum(o["st"] for o in ords)
+    rep.add("Z268-6: potkniecia i ERROR", f"p9 (suma dob) {st9}, ArmsFirst (najwiecej) {staf}, zamowienia zbroi {sto}, ERROR in ArmedStrength/ArmsFirst/ArmourOrders/MenUpgradeOrders "
+            f"{D['err']}" + (f" ({D['err1']})" if D["err1"] else ""), "0", st9 == 0 and staf == 0 and sto == 0 and D["err"] == 0)
+    tests = D["tests"]
+    if not tests:
+        rep.add("Z268-7: autotest 268 (T1-T6)", "brak linii proby", "INFO (bez flagi armoury-zbroja268.flag albo DLL autotestu)", None)
+    else:
+        res = {}
+        for t, r, w in tests:
+            res[t] = r
+        nie = [f"{t}: {w[:80]}" for t, r, w in tests if r == "NIE"]
+        must = all(res.get(t) == "TAK" for t in ("T1", "T2", "T5"))
+        skip0 = res.get("T0") == "POMINIETY"
+        rep.add("Z268-7: autotest 268 (T1-T6)", ", ".join(f"{t} {r}" for t, r in sorted(res.items())) + (f" | NIE: {'; '.join(nie[:3])}" if nie else ""),
+                "bez NIE, T1/T2/T5 TAK (T0 POMINIETY - INFO)", None if skip0 else (not nie and must))
+    info = []
+    cov = D["cov"]
+    if cov:
+        info.append(f"pokrycie lordow (dowolny szczebel) korpus {cov[0].group(3)}% -> {cov[-1].group(3)}%, helm {cov[0].group(5)}% -> {cov[-1].group(5)}% "
+                    f"(d{cov[0].group(1)} -> d{cov[-1].group(1)})")
+    if D["plat"]:
+        info.append(f"platnerze przeniesieni (wedlug braku) {D['plat'][0][1].group(2)} -> {D['plat'][-1][1].group(2)}")
+    if D["ws"]:
+        def wk(m, k):
+            mm = re.search(k + r" (\d+)", m.group(3))
+            return mm.group(1) if mm else "0"
+        info.append(f"warsztaty BodyArmor {wk(D['ws'][0], 'BodyArmor')} -> {wk(D['ws'][-1], 'BodyArmor')}, HeadArmor {wk(D['ws'][0], 'HeadArmor')} -> {wk(D['ws'][-1], 'HeadArmor')}")
+    if D["b174"]:
+        f, l = D["b174"][0], D["b174"][-1]
+        pf = int(f.group(3)) // max(1, int(f.group(2)))
+        pl = int(l.group(3)) // max(1, int(l.group(2)))
+        info.append(f"cena korpusu lordow (174b) {pf} zl -> {pl} zl")
+    if D["cost"]:
+        ks = sorted(D["cost"])
+        info.append(f"koszt p9 {D['cost'][ks[0]].group(1)} ms -> {D['cost'][ks[-1]].group(1)} ms")
+    if D["army"]:
+        ks = sorted(D["army"])
+        info.append(f"tworzenie armii (odmowy) {D['army'][ks[0]].group(1)} -> {D['army'][ks[-1]].group(1)}")
+    if D["body"]:
+        ks = sorted(D["body"])
+        info.append(f"niegotowe tylko przez zbroje {D['body'][ks[0]].group(9)} -> {D['body'][ks[-1]].group(9)}, srednio B {D['body'][ks[0]].group(2)} -> {D['body'][ks[-1]].group(2)}")
+    if D["n159"]:
+        info.append(f"159: niegotowe przez zbroje {D['n159'][-1].group(1)}, nowe druzyny {D['n159'][-1].group(2)} (ostatnia doba)")
+    if ords and ords[-1]["price"]:
+        p = ords[-1]["price"]
+        info.append(f"cena wczoraj (linia 268) korpus {p.group(1)} zl, helm {p.group(2)} zl")
+    rep.add("Z268-8: pierwsza / ostatnia doba (pokrycie, platnerze, warsztaty, ceny, koszt, armie)", " | ".join(info) if info else "brak linii", "INFO (porownanie z baza)", None)
+
+
+def z268_synth():
+    import tempfile
+    import shutil
+    T = Z268_TEST
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="z268_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            P = "[10:00:00] "
+            L = []
+            if kind == "none":
+                L.append(P + "Gotowosc do bitwy (p9): start sesji | klucze: x | regula: y")
+                for d in range(109000, 109004):
+                    L.append(P + "Gotowosc do bitwy (p9): dzien %d | sila z uzbrojeniem TAK | potkniecia 0." % d)
+            else:
+                good = kind == "good"
+                L.append(P + T["start"].format(k="TAK"))
+                for i, d in enumerate(range(109000, 109006)):
+                    if good:
+                        L.append(P + T["p9day"].format(d=d, low=50, cs=20, cb=25, co=5, tb=7, k=40, g=2760, sp=760, kl=2000, p=0))
+                        L.append(P + T["ord"].format(d=d, op=150, g=0, p=0))
+                        L.append(P + T["z1"].format(d=d))
+                        L.append(P + T["n159"].format(d=d))
+                        L.append(P + T["p0"].format(st="NIEGOTOWA", b9=39, nz="TAK"))
+                    else:
+                        if i in (2, 3):
+                            L.append(P + "Gotowosc do bitwy (p9): dzien %d | sila z uzbrojeniem TAK | potkniecia 0." % d)
+                            continue
+                        L.append(P + T["p9day"].format(d=d, low=50, cs=20, cb=20, co=5, tb=7, k=0, g=100, sp=10, kl=20, p=1))
+                        L.append(P + T["ord"].format(d=d, op=250, g=15, p=0))
+                        L.append(P + T["p0"].format(st="gotowa (F 0.94)", b9=39, nz="NIE"))
+                if good:
+                    for t in ("T0", "T1", "T2", "T3", "T4", "T5", "T6"):
+                        L.append(P + "Zbroja (268): test - %s cos - wynik %s." % (t, "POMINIETY" if t == "T3" else "TAK"))
+                else:
+                    L.append(P + "Zbroja (268): test - T2 B rozne - wynik NIE.")
+                    L.append(P + "ERROR in ArmourOrders.Order (potkniecie 1): x")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            z268_rows(rep, z268_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"Z268-0": "TAK", "Z268-1": "TAK", "Z268-2": "TAK", "Z268-3": "TAK", "Z268-4": "TAK", "Z268-5": "TAK", "Z268-6": "TAK", "Z268-7": "TAK", "Z268-8": "INFO"},
+        "bad": {"Z268-0": "TAK", "Z268-1": "NIE", "Z268-2": "NIE", "Z268-3": "NIE", "Z268-4": "NIE", "Z268-5": "NIE", "Z268-6": "NIE", "Z268-7": "NIE"},
+        "none": {"Z268-0": "INFO", "Z268-1": "INFO", "Z268-2": "INFO", "Z268-3": "INFO", "Z268-4": "INFO", "Z268-5": "INFO", "Z268-6": "TAK", "Z268-7": "INFO"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def z268_main(logp):
+    """z268 (27.10, paczka 268): Z268-S, Z268-S2, Z268-0..Z268-8 - opis w komentarzu nad stalymi Z268_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = z268_selftest()
+    rep.add("Z268-S: self-test wyrazen (linie kontrolne jak w kodzie C#)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = z268_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("Z268-S2: test syntetyczny (dobry, zly, bez linii 268)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("Z268-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = z268_collect(logp)
+    print(f"plik: {logp} | startow p9 {D['p9starts']} (z 268 {len(D['starts'])}), dob p9 {len(D['p9days'])} (z segmentem 268 {len(D['body'])}), linii zamowien zbroi "
+          f"{len(D['ord'])}, opisow partii 159 P0 z 268 {len(D['segs'])}, linii proby {len(D['tests'])}, ERROR {D['err']}")
+    z268_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_z268_main_prev = main
+
+
+def main(argv):
+    # paczka 268: grupa z268 - opakowanie main jak e223 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "z268":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return z268_main(rest[0] if rest else None)
+    return _z268_main_prev(argv)
 
 
 if __name__ == "__main__":
