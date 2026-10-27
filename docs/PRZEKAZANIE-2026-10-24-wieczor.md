@@ -7,7 +7,9 @@
   204 liczy tylko KONNYCH strzelcow - pieszy gracz bez reakcji.
 - 283 (zb\n283, noc/283-reakcja-na-nekanie-z-tylu od 9d807118): zatrzymanie/obrot szyku pod ostrzalem z tylu/boku, lucznicy strzelaja (FF = linia strzalu),
   cala konnica na konnego, oddzial piechoty na pieszego, wodz wstrzymuje marsz; autotest -Harasser rozszerzony o pieszego i pozycje tuz za lucznikami.
-- Wznowienie: scriptPath paczki-280-281-wf_d8c1bd65-fa1.js, resumeFromRunId wf_13ad8807-a09 (args w journal.jsonl).
+- 21:57 Jeff doprecyzowal: konnica w zwiazanej walce walczy dalej, chyba ze ostrzelany szyk wazniejszy albo jest w nim wodz party (wodz chroniony); atak gracza
+  mieczem na lucznikow = lucznicy strzelaja, piechota biegnie, konnica (niezwiazana) szarzuje. Run wf_13ad8807-a09 ZATRZYMANY, nowy: wf_20af758b-7a4.
+- Wznowienie: scriptPath paczki-280-281-wf_d8c1bd65-fa1.js, resumeFromRunId wf_20af758b-7a4 (args w journal.jsonl).
 - W toku rownolegle: 280+281 (wf_d8c1bd65-fa1), 282 (wf_7236362f-1af), 283. Potem: scalenie wszystkich czterech do n161 (git merge + scal_sklad), autotest 131a
   (bitwaN z -Harasser + probyN 30 dob + wczytanie zapisu dla 280 B2), grupy ksiega280 e223 ruda282 m204jazda/nekanie283 + reszta, WGRANIE 131 gdy Jeff nie gra.
 - LIMIT TYGODNIA 93% o 21:45 - przy 99% zatrzymac sie i przekazac drugiemu kontu (wszystkie runy wznawialne z journal.jsonl).
