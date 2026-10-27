@@ -39,6 +39,8 @@ namespace Armoury
     /// Rece przesuwaja sie tylko w bloku (rece zelaza + rece reszty zajec = rece bloku) - zadnego zlota ani towaru (produkcja z prawdziwych rak i ziemi, jedna tabela
     /// swiata). RF jest w zapisie KS (arm_ks, Live.cs) - bez nowego klucza zapisu. Klucz NIE - RegaleCycle jak dotad co do bitu, krok tygodniowy nie biegnie.
     /// Linia "Ruda KS (f5-ruda): dzien N" co 7 dob. Koszt: 97 miast + bloki z zelazem (ok. 550) raz na 7 dob (czas w linii).
+    /// 282 (F4, klucz Ks Iron Hands Count Transit): brak rynku liczony z polek i zelaza w drodze do miast (wozy kupcow, kontrakty karawan) - log 27.10: krok podnosil
+    /// rece, gdy zapas swiata rosl +36 lup/d, bo nie widzial 1000-1300 lup w wozach; segment ", w drodze do miast R" w linii po decyzji rynku.
     /// </summary>
     internal static partial class StartCalibration
     {
@@ -64,6 +66,11 @@ namespace Armoury
             if (iron == null) { Stumble("F5IronWeek(brak przedmiotu iron)", null); return; }
             // 1. rynek: polki wobec zapasu rzemiosla
             var S = new long[2]; var T = new long[2]; var D = new long[2]; var nT = new int[2]; var nE = new int[2]; var nS = new int[2];
+            // 282 (F4, klucz KsIronHandsCountTransit): zelazo w drodze do miast rynku (wozy kupcow P3/Z1 + kontrakty karawan 174) - brak rynku to polki + droga < cel
+            // (ta sama regula co jedzenie f20-d4); pelny - jak dotad S > 2T (S + R > 2T wynika z tego samego). Klucz NIE - co do bitu jak dotad (R tylko w linii)
+            var R = new long[2];
+            var sR = Settings.Current;
+            bool rOn = sR != null && sR.KsIronHandsCountTransit;
             foreach (var t in Town.AllTowns)
             {
                 try
@@ -73,13 +80,14 @@ namespace Armoury
                     int have = Math.Max(0, t.Settlement.ItemRoster.GetItemNumber(iron));
                     int tg = Math.Max(0, CaravanBulk.TargetFor(t, iron));
                     S[m] += have; T[m] += tg; nT[m]++;
+                    R[m] += Math.Max(0, MaterialOrders.InTransitTo(t.Settlement, iron));
                     if (have <= 0) nE[m]++;
                     if (have < tg) { nS[m]++; D[m] += tg - have; }
                 }
                 catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(miasto)", e); }
             }
             var dec = new int[2];                                  // +1 brak, -1 pelny, 0 pasmo, 2 bez celu (zapas rzemiosla nieznany)
-            for (int m = 0; m < 2; m++) dec[m] = T[m] <= 0 ? 2 : S[m] < T[m] ? 1 : S[m] > 2 * T[m] ? -1 : 0;
+            for (int m = 0; m < 2; m++) dec[m] = T[m] <= 0 ? 2 : S[m] + (rOn ? R[m] : 0) < T[m] ? 1 : S[m] > 2 * T[m] ? -1 : 0;
             // 2. bloki z zelazem
             int nIn = 0, nUp = 0, nDnFull = 0, nDnStarv = 0, nPart = 0, nBand = 0, nNoT = 0, nNoData = 0, nCap = 0, nBusy = 0;
             int nColl = 0;                                         // f7-wegiel (recenzja): wpisy bez wzrostu tylko przez rece weglarzy (bez drewna < 10%, z weglarzami >= 10%)
@@ -183,7 +191,9 @@ namespace Armoury
                 sb.Append(" | ").Append(mn[m]).Append(": polki ").Append(S[m]).Append(" / cel ").Append(T[m])
                   .Append(" (").Append(T[m] > 0 ? ((double)S[m] / T[m]).ToString("0.00", inv) : "-").Append("), brak ").Append(D[m]).Append(" w ").Append(nS[m])
                   .Append(" miastach, bez rudy ").Append(nE[m]).Append(" z ").Append(nT[m]).Append(" miast -> ")
-                  .Append(dec[m] == 1 ? "BRAK (w gore)" : dec[m] == -1 ? "PELNY (w dol)" : dec[m] == 0 ? "PASMO (bez zmian)" : "BEZ CELU (bez zmian)");
+                  .Append(dec[m] == 1 ? "BRAK (w gore)" : dec[m] == -1 ? "PELNY (w dol)" : dec[m] == 0 ? "PASMO (bez zmian)" : "BEZ CELU (bez zmian)")
+                  .Append(", w drodze do miast ").Append(R[m]).Append(" (polki z droga ").Append(T[m] > 0 ? ((double)(S[m] + R[m]) / T[m]).ToString("0.00", inv) : "-")
+                  .Append(rOn ? ", 282 - liczone)" : ", 282 - klucz NIE, nie liczone)");
             }
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
               .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(Bloomery.F7On ? " (w tym przez rece weglarzy f7-wegiel " + nColl + ")" : "").Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)

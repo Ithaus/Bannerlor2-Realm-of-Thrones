@@ -1368,6 +1368,41 @@ namespace Armoury
             catch { dst.Clear(); return -1; }
         }
 
+        /// <summary>282 (F5): drewno w linii "Drewno:" ksiegi rudy (OreLedger.Line, ten sam tick dobowy, zaraz przed Daily tej ksiegi) - netto doby (+ zrodlo, - ujscie)
+        /// grup mieszczanie (opal i koszyk BK), pola mieszczan (KS) i naprawy kowali (135) z otwartych licznikow towaru (ksiegowane na biezaco w Book). false - ksiega
+        /// wylaczona albo towaru nie ma w ksiedze. Nie rzuca.</summary>
+        internal static bool OpenFolk282(string id, out long town, out long fields, out long mend, out long other)
+        {
+            town = fields = mend = other = 0;
+            try
+            {
+                if (!On || _acc == null || _items == null || id == null) return false;
+                int i = -1;
+                for (int k = 0; k < _items.Length; k++) if (_items[k] != null && _items[k].StringId == id) { i = k; break; }
+                if (i < 0 || i >= _acc.Length) return false;
+                var a = _acc[i];
+                town = Group(a.Src, GTown) - Group(a.Sink, GTown);
+                fields = Group(a.Src, GKs) - Group(a.Sink, GKs);
+                mend = Group(a.Src, GMend) - Group(a.Sink, GMend);
+                other = Other282(a);
+                return true;
+            }
+            catch { town = fields = mend = other = 0; return false; }
+        }
+
+        // 282 (F5): grupy, ktore ksiega rudy liczy sama (wsie, las, wyroby i wsad warsztatow, zbrojne, budowy, strzelarze, dymarki, wegiel/sztaby ZC1, rzemioslo,
+        // zlom) i trzy pozycje nazwane osobno - reszta grup ksiegi towarow (zamki, zaopatrzenie BK, inne ticki, dwory, partie rozbite ...) to "inne pozycje" linii Drewno
+        // (log Jeffa 27.10: "zamki" i "zaopatrzenie BK" drewna w 4 z 16 dob - bez nich "bez wyjasnienia" nie schodzilo do 0)
+        private static readonly HashSet<string> _known282 = new HashSet<string> { GVil, GWoodlot, GShop, GArt, GShopIn, GArms, GBuild, GFletch, GBloom, GZc1, GCraft, GScrap, GDrill, GTanW, GTown, GKs, GMend };
+
+        private static long Other282(Acc a)
+        {
+            long n = 0;
+            foreach (var kv in a.Src) if (!_known282.Contains(kv.Key)) foreach (var v in kv.Value.Values) n += v;
+            foreach (var kv in a.Sink) if (!_known282.Contains(kv.Key)) foreach (var v in kv.Value.Values) n -= v;
+            return n;
+        }
+
         private static long Group(Dictionary<string, Dictionary<string, long>> d, string g)
         {
             Dictionary<string, long> subs;
@@ -1747,8 +1782,17 @@ namespace Armoury
                     ok = ok && crafts == o[7];
                     craft = ", przetwory miast " + crafts + "/" + o[7];
                 }
+                // 282 (F5): drewno - dawne "bez wyjasnienia" linii Drewno wobec mieszczan, pol mieszczan (KS) i napraw kowali tej ksiegi (liczby na koniec doby)
+                string folk = "";
+                var f = id == "hardwood" ? OreLedger.WoodFolkToday() : null;
+                if (f != null && f.Length >= 4)
+                {
+                    long ft = Group(a.Src, GTown) - Group(a.Sink, GTown), fk = Group(a.Src, GKs) - Group(a.Sink, GKs), fm = Group(a.Src, GMend) - Group(a.Sink, GMend), fo = Other282(a);
+                    folk = "; bez wyjasnienia linii Drewno (282): dawne " + (f[0] >= 0 ? "+" : "") + f[0] + " = mieszczanie " + ft + " + pola mieszczan (KS) " + fk + " + naprawy kowali " + fm + " + inne pozycje " + fo
+                           + " + reszta " + (f[0] - ft - fk - fm - fo) + " (w linii Drewno: " + f[1] + "/" + f[2] + "/" + f[3] + "/" + (f.Length >= 5 ? f[4] : 0) + ")";
+                }
                 return name + " " + (ok ? "ZGODNA" : "NIEZGODNA") + " (wsie " + vil + "/" + o[0] + ", las " + wood + "/" + o[1] + ", zbrojne " + shops + "/" + o[3]
-                       + ", linie " + lines + "/" + o[4] + ", budowy " + builds + "/" + o[5] + craft + ", zapas " + stock + "/" + o[6] + "; wyroby miast " + towns + " wobec zdarzen gry " + o[2] + ")";
+                       + ", linie " + lines + "/" + o[4] + ", budowy " + builds + "/" + o[5] + craft + ", zapas " + stock + "/" + o[6] + "; wyroby miast " + towns + " wobec zdarzen gry " + o[2] + ")" + folk;
             }
             catch (Exception e) { Stumble("Control", e); return name + " - blad kontroli"; }
         }

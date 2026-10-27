@@ -1201,6 +1201,13 @@ Uzycie (Python 3, tylko odczyt):
                     K259-S2 test syntetyczny; K259-0 latki TAK; K259-1 linia doby co dobe; K259-2 wyplata == wzor i kapital == min(dane E3/7, model); K259-3 nic dwa razy;
                     K259-4 kontrola 0 (kiesy = wynik prefiksu); K259-5
                     komunikat wyplaty; K259-6 rytm 'ponizej kapitalu'; K259-7 zapis i T1-T6; K259-8 potkniecia i ERROR 0; K259-9 straznik m105; K259-10 INFO.
+--grupa ruda282   : (27.10, paczka 282 noc/282-ruda-przeplyw - Jeff 27.10 "ta rude to my chyba juz ktoreys raz naprawiamy"; Armoury/src/CaravanBulk.cs,
+                    MaterialOrders.cs, StartCalibration.Ruda.cs, OreLedger.cs, GoodsLedger.cs; klucze Caravan Bulk Flow Gate, Town Material Order Neediest First,
+                    Town Material Order Ore Equal Cover, Ks Iron Hands Count Transit) python -I tools/sprawdz_logi.py --grupa ruda282 <Armoury-*.log> (strumieniowo).
+                    Linia 'Ruda przeplyw (282): dzien N'. RU282-S self-test, RU282-S2 test syntetyczny (4 dobre, 5 zlych); RU282-0 linia co dobe, potkniecia 0;
+                    RU282-1 miasta bez rudy z zuzyciem maleja, doby 21-30 <= 10; RU282-2 zawarte i dowiezione > 0; RU282-3 stosunek cen <= 2.5; RU282-4 nic z
+                    niczego (Towary iron, reszta wozow, E3-T1); RU282-5 drewno 'bez wyjasnienia' |x| <= 2; RU282-6 juki karawan do progu przeplywu, rozladunek poza pomiarem sprzedazy; RU282-7 zelazo
+                    swiata <= +10/d; RU282-8 f5 BRAK tylko przy S+R < T; RU282-9 INFO.
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -56213,6 +56220,7 @@ def nruda_main(logp):
         rep.show()
         return 0
     weeks, creds, zc4, price, iron, istock, plan, errs = {}, {}, {}, {}, {}, {}, {}, []
+    wtr = {}   # 282 (F4): dzien -> {"W"/"E": R zelaza w drodze do miast} przy "282 - liczone"
     imodel, ramp, rampl = {}, None, 0
     bad_w = bad_c = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -56223,6 +56231,12 @@ def nruda_main(logp):
                 a = NRU_W.match(s)
                 if a:
                     weeks[int(a.group(1))] = a.groups()
+                    tr = {}
+                    for mk, _S, _T, _dec, R_, cnt in RU282_F5.findall(s):
+                        if R_ and cnt == "liczone":
+                            tr["W" if mk == "Westeros" else "E"] = int(R_)
+                    if tr:
+                        wtr[int(a.group(1))] = tr
                 else:
                     bad_w += 1
                 continue
@@ -56313,14 +56327,15 @@ def nruda_main(logp):
                 bad.append((d, "w dol (rynek pelny) bez rynku pelnego"))
             for side, (sv, tv, dec) in (("W", (g[NRUW_SW], g[NRUW_TW], g[NRUW_DECW])), ("E", (g[NRUW_SE], g[NRUW_TE], g[NRUW_DECE]))):
                 S_, T_ = int(sv), int(tv)
-                exp = "BEZ CELU" if T_ <= 0 else ("BRAK" if S_ < T_ else ("PELNY" if S_ > 2 * T_ else "PASMO"))
+                R_ = wtr.get(d, {}).get(side, 0)   # 282 (F4): brak rynku z polek i zelaza w drodze ("282 - liczone"); bez segmentu - jak dotad
+                exp = "BEZ CELU" if T_ <= 0 else ("BRAK" if S_ + R_ < T_ else ("PELNY" if S_ > 2 * T_ else "PASMO"))
                 if exp != dec:
                     bad.append((d, f"{side}: {S_}/{T_} -> {dec} (oczekiwane {exp})"))
             n = int(g[NRUW_IN])
             s_ = up + dnf + dns + int(g[NRUW_PART]) + int(g[NRUW_NODATA]) + int(g[NRUW_BAND]) + int(g[NRUW_NOT])
             if s_ != n:
                 bad.append((d, f"suma decyzji {s_} != wpisow {n}"))
-        rep.add("NRU-2: decyzje kroku zgodne z rynkiem (S < T brak, S > 2T pelny) i suma decyzji = wpisy", f"krokow {len(weeks)}, niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""),
+        rep.add("NRU-2: decyzje kroku zgodne z rynkiem (S < T brak - od 282 S + w drodze < T, S > 2T pelny) i suma decyzji = wpisy", f"krokow {len(weeks)}, niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""),
                 "0", not bad)
     else:
         rep.add("NRU-2: decyzje kroku zgodne z rynkiem", "brak linii", "INFO", None)
@@ -74786,6 +74801,455 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return ksiega280_main(rest[0] if rest else None)
     return _ksiega280_main_prev(argv)
+
+
+# ------------------------------------------------------------ ruda282 (27.10, paczka 282 noc/282-ruda-przeplyw: przeplyw rudy miedzy miastami - Jeff 27.10
+# "ta rude to my chyba juz ktoreys raz naprawiamy i mowiles ze naprawione"; Armoury/src/CaravanBulk.cs (F1 bramka przeplywu karawan), MaterialOrders.cs (F2 kolejnosc
+# i zysk na dobe drogi, F3 zrodla rudy do punktu zamowienia, linia "Ruda przeplyw (282)"), StartCalibration.Ruda.cs (F4 f5 z towarem w drodze), OreLedger.cs /
+# GoodsLedger.cs (F5 drewno mieszczan w linii "Drewno:")). Uzycie:
+#   python -I tools/sprawdz_logi.py --grupa ruda282 <Armoury-*.log>
+# Progi (bazy: log Jeffa 27.10 12:57 dni 108987-109003 i autotest 130a 109002-109030 - bez paczki):
+#   RU282-S  self-test wyrazen (linie jak w kodzie C#); RU282-S2 test syntetyczny (4 logi dobre, 5 zlych);
+#   RU282-0  linia "Ruda przeplyw (282)" co dobe, rozpoznana, potkniecia 0, ERROR paczki 0;
+#   RU282-1  miasta bez rudy Z ZUZYCIEM: srednia ostatnich 10 dob < srednia dob 1-5 (albo obie <= 10), a w dobach 21-30 srednio <= RU282_EMPTY_MAX (baza 19-21);
+#   RU282-2  zamowienia rudy zawarte (woz + karawana) > 0 i dowiezione > 0;
+#   RU282-3  stosunek ceny pierwszej sztuki w miastach bez rudy do ceny zrodel: maleje (ostatnie 5 dob < pierwsze 5) albo juz <= RU282_RATIO_MAX, a na koniec <= RU282_RATIO_MAX (baza ok. 4);
+#   RU282-4  nic z niczego: Towary iron "bez wyjasnienia" 0, wozy kupcow "reszta wozow 0", E3-T1 "(roznica 0)";
+#   RU282-5  drewno: "bez wyjasnienia" linii Drewno |x| <= 2 w dobach z segmentem 282, kontrola ksiegi towarow "reszta" |x| <= 2 (baza -1114..-1562;
+#            recenzja 282: reszta = wlasne +-1 ksiegi towarow, np. log Jeffa 108995 -1);
+#   RU282-6  ruda w jukach karawan schodzi do progu przeplywu (koniec <= max(1.5 x prog, prog + 100) albo spadek o polowe); zakupy rudy karawan w dobach z
+#            kupnem zamknietym i jukami > 1.2 x prog srednio <= RU282_GATED_BUY (baza 83.7/d); recenzja 282: rozladunek ponad brak poza pomiarem sprzedazy
+#            (suma "poza pomiarem" >= 0.8 x suma "rozladunek ponad brak miast" i <= ta suma + najwiekszy dzien) i srednia 14 dob liczona od nowa z "pomiar
+#            sprzedazy minionej doby" zgodna z logiem (|roznica| <= 0.15) - prog przeplywu z samej sprzedazy, bez wlasnego rozladunku bramki;
+#   RU282-7  zelazo swiata (lupy): zmiana ostatnich 10 dob <= +RU282_WORLD_MAX/d (baza +34..+36/d);
+#   RU282-8  krok f5-ruda: BRAK (rece w gore) tylko przy polkach + drodze < cel (przy "282 - liczone");
+#   RU282-9  INFO: zrodla, odmowy, doby drogi wozow, rozladunek, liczby pierwszej i ostatniej doby.
+RU282_LINE = "Ruda przeplyw (282): dzien "
+RU282_RE = re.compile(
+    r"^Ruda przeplyw \(282\): dzien (?P<d>\d+) \| klucze: karawany trzymaja tyle, ile sprzedaja (?P<k1>TAK|NIE), najpierw miasta z najmniejszym zapasem (?P<k2>TAK|NIE), "
+    r"zrodla rudy do punktu zamowienia (?P<k3>TAK|NIE), f5 z towarem w drodze (?P<k4>TAK|NIE) \| "
+    r"zamowienia rudy: proby (?P<tries>\d+) \(kolejnosc wedlug dni zapasu: \[(?P<order>.*?)\]\), zawarte wozem (?P<cart>\d+) / karawana (?P<car>\d+) "
+    r"\(sztuk (?P<qty>\d+), srednio (?P<days>[\d.]+|-) dob drogi, zysk na dobe drogi srednio (?P<profit>-?\d+|-) zl\), dowiezione wozem (?P<cdone>\d+) / karawana (?P<kdone>\d+), "
+    r"odmowy \[brak zrodla (?P<nosrc>\d+), bez drogi (?P<noroad>\d+), kasa miasta (?P<nogold>\d+), bez zysku (?P<nogain>\d+), ladunek za maly (?P<small>\d+), "
+    r"brak karawany (?P<nocar>\d+), zapas dosc (?P<enough>\d+), przerwa (?P<pause>\d+)\] \| "
+    r"zrodla rudy: prog dawny (?P<s0>\d+), punkt zamowienia (?P<s1>\d+) \(sztuk ponad (?P<p1>\d+)\), przyciete rownym zapasem dni (?P<capped>\d+) \| "
+    r"ceny: miasta bez rudy placa za pierwsza sztuke (?P<x>[\d.]+|-) d \(mediana \d+ miast\), zrodla sprzedaja (?P<y>[\d.]+|-) d \(mediana \d+ zrodel\), "
+    r"wozy zaplacily srednio (?P<w>[\d.]+|-) d, stosunek (?P<ratio>[\d.]+|-) \| "
+    r"miasta bez rudy (?P<empty>\d+) z (?P<towns>\d+) \(z zuzyciem (?P<n1>\d+), bez zuzycia (?P<n2>\d+)\) \| "
+    r"(?:karawany ruda: w jukach (?P<packs>\d+) \(w \d+ karawanach\), sprzedaz 14 dob (?P<sold>[\d.]+)/d \(dob pomiaru (?P<sdays>\d+)\), prog przeplywu (?P<gate>\d+), "
+    r"prog dawny (?P<old>\d+) -> (?P<state>KUPNO STOI|CZYNNE) \(bramka przeplywu (?P<gk>TAK|NIE|za malo dob pomiaru)\), przez miniona dobe kupno (?P<was>stalo|czynne): "
+    r"kupily (?P<bought>\d+), sprzedaly (?P<csold>\d+) \(nasza sprzedaz przy wjezdzie\), rozladunek ponad brak miast (?P<unload>\d+) szt\. w (?P<utowns>\d+) miastach za (?P<ugold>\d+) zl"
+    r"(?:, pomiar sprzedazy minionej doby (?P<meas>\d+) \(rozladunek ponad brak poza pomiarem (?P<uout>\d+)\))?"
+    r"; na sucho [^|]*|karawany ruda: brak [^|]*) \| "
+    r"swiat lupy: (?:razem (?P<world>\d+) \((?:(?P<wdelta>[+-]\d+)|pierwszy pomiar)\)[^|]*|brak linii ksiegi rudy) \| "
+    r"czas (?P<ms>[\d.]+) ms, potkniecia (?P<stum>\d+)\.$")
+RU282_TOWARY = re.compile(r"^Towary: dzien (\d+) - iron \(\d+ d\):.*?\| bez wyjasnienia ([+-]?\d+|-)")
+RU282_CARTS = re.compile(r"^Kontrakty surowca \(174\): dzien (\d+) .*?reszta wozow (-?\d+)")
+RU282_T1 = re.compile(r"^Karawany - towar tam, gdzie maja zysk \(E3-T1\): dzien (\d+) .*?\(roznica (-?\d+)\)")
+RU282_WOOD = re.compile(r"^Drewno: dzien (\d+) - .*?razem \d+ \(([+-]\d+), bez wyjasnienia ([+-]\d+)\)")
+RU282_WOODSEG = "mieszczanie i pola (ksiega towarow, 282): mieszczanie "
+RU282_CTL = re.compile(r"^Towary \(bilans\): dzien (\d+) .*?bez wyjasnienia linii Drewno \(282\): dawne ([+-]?\d+) = mieszczanie (-?\d+) \+ pola mieszczan \(KS\) (-?\d+) "
+                       r"\+ naprawy kowali (-?\d+) \+ inne pozycje (-?\d+) \+ reszta (-?\d+)")
+RU282_F5 = re.compile(r"(Westeros|Essos): polki (\d+) / cel (\d+) \([^)]*\), brak \d+ w \d+ miastach, bez rudy \d+ z \d+ miast -> (BRAK|PELNY|PASMO|BEZ CELU) \([^)]*\)"
+                      r"(?:, w drodze do miast (\d+) \(polki z droga [^,]*, 282 - (liczone|klucz NIE, nie liczone)\))?")
+RU282_ERR = ("ERROR in CaravanBulk.Import282", "ERROR in CaravanBulk.BuildSeg282", "ERROR in SyncData.arm_cb282", "ERROR in MaterialOrders.Line282",
+             "ERROR in MaterialOrders.InTransitTo", "ERROR in MaterialOrders.Order", "ERROR in MaterialOrders.OrderByCart", "ERROR in MaterialOrders.Daily")
+RU282_EMPTY_MAX = 10.0
+RU282_RATIO_MAX = 2.5
+RU282_GATED_BUY = 10.0
+RU282_WORLD_MAX = 10.0
+RU282_WOOD_TOL = 2
+
+RU282_TEST = {
+    "line": ("Ruda przeplyw (282): dzien {d} | klucze: karawany trzymaja tyle, ile sprzedaja TAK, najpierw miasta z najmniejszym zapasem TAK, zrodla rudy do punktu zamowienia TAK, "
+             "f5 z towarem w drodze TAK | zamowienia rudy: proby {tries} (kolejnosc wedlug dni zapasu: [Ashford 0.0 d, Flint's Finger 0.4 d (punkt zamowienia)]), zawarte wozem {cart} / "
+             "karawana {car} (sztuk {qty}, srednio 4.5 dob drogi, zysk na dobe drogi srednio 61 zl), dowiezione wozem {cdone} / karawana {kdone}, odmowy [brak zrodla {nosrc}, bez drogi 2, "
+             "kasa miasta 1, bez zysku 0, ladunek za maly 0, brak karawany 0, zapas dosc 3, przerwa 4] | zrodla rudy: prog dawny 3, punkt zamowienia {s1} (sztuk ponad 612), "
+             "przyciete rownym zapasem dni 5 | ceny: miasta bez rudy placa za pierwsza sztuke {x} d (mediana 12 miast), zrodla sprzedaja {y} d (mediana 30 zrodel), "
+             "wozy zaplacily srednio 16.2 d, stosunek {ratio} | miasta bez rudy {empty} z 97 (z zuzyciem {n1}, bez zuzycia {n2}) | karawany ruda: w jukach {packs} (w 211 karawanach), "
+             "sprzedaz 14 dob {sold}/d (dob pomiaru {sdays}), prog przeplywu {gate}, prog dawny 2700 -> {state} (bramka przeplywu TAK), przez miniona dobe kupno {was}: kupily {bought}, "
+             "sprzedaly 52 (nasza sprzedaz przy wjezdzie), rozladunek ponad brak miast {unl} szt. w 7 miastach za 1220 zl, pomiar sprzedazy minionej doby {meas} "
+             "(rozladunek ponad brak poza pomiarem {uout}); na sucho (282 - bez zmian, decyzja Jeffa): drewno w jukach 965 / "
+             "sprzedaz 3.1/d / prog przeplywu 31 / dawny 7020 -> KUPNO STALOBY, plotno w jukach 2408 / sprzedaz 12.0/d / prog przeplywu 120 / dawny 2160 -> stoi i tak | "
+             "swiat lupy: razem {world} ({wd}), miasta 2790, karawany 1450, wozy kupcow 1311 | czas 0.8 ms, potkniecia {stum}."),
+    "line_nocb": ("Ruda przeplyw (282): dzien 109003 | klucze: karawany trzymaja tyle, ile sprzedaja NIE, najpierw miasta z najmniejszym zapasem NIE, zrodla rudy do punktu zamowienia NIE, "
+                  "f5 z towarem w drodze NIE | zamowienia rudy: proby 0 (kolejnosc wedlug dni zapasu: [dowolna - klucz NIE]), zawarte wozem 0 / karawana 0 (sztuk 0, srednio - dob drogi, "
+                  "zysk na dobe drogi srednio - zl), dowiezione wozem 0 / karawana 0, odmowy [brak zrodla 0, bez drogi 0, kasa miasta 0, bez zysku 0, ladunek za maly 0, brak karawany 0, "
+                  "zapas dosc 0, przerwa 0] | zrodla rudy: prog dawny 0, punkt zamowienia 0 (sztuk ponad 0), przyciete rownym zapasem dni 0 | ceny: miasta bez rudy placa za pierwsza "
+                  "sztuke - d (mediana 0 miast), zrodla sprzedaja - d (mediana 0 zrodel), wozy zaplacily srednio - d, stosunek - | miasta bez rudy 0 z 97 (z zuzyciem 0, bez zuzycia 0) | "
+                  "karawany ruda: brak (regula CaravanBulk nieczynna) | swiat lupy: brak linii ksiegi rudy | czas 0.1 ms, potkniecia 0."),
+    "towary": "Towary: dzien {d} - iron (38 d): zapas 8204 (+12) | produkcja 401 [wsie 401] | zuzycie 389 [warsztaty zbrojne 200] | bez wyjasnienia {u} | ruch 12",
+    "carts": "Kontrakty surowca (174): dzien {d} - zawarto 0 [ruda 0 sztuk]; wozy kupcow: kontrola: w drodze wczoraj 2566 + kupione 249 - dowiezione - zawrocone - bez celu 0 - w drodze dzis = reszta wozow {r} [-]; potkniecia 0 (od wczytania 0).",
+    "t1": "Karawany - towar tam, gdzie maja zysk (E3-T1): dzien {d} | CZYNNE | zloto: z kas miast 198 (nadwyzka 1), myto E3-G3 2, przyrost kies karawan 196; kontrola: kasy -198 = kiesy +196 + myto 2 - myto do kas osad 0 (roznica {r}) | koniec",
+    "wood": ("Drewno: dzien {d} - wsie dopisaly 3506 ladunkow (350.6 t, 199 wsi; model 3587.3 w 217 wsiach z wynikiem > 0), miasta i zamki +0, las wsi (126) +1356 (357 wsi); "
+             "zuzycie: warsztaty zbrojne 276, dymarki przy kopalniach (214) 818 (las okregu poza zapasem 636), mieszczanie i pola (ksiega towarow, 282): mieszczanie -1940, "
+             "pola mieszczan (KS) +380, naprawy kowali (135) -2, inne pozycje ksiegi towarow (zamki, zaopatrzenie BK, ticki) +0; zapas: miasta 11411 (+665), zamki 1, wsie 28232, tabory 9073 (wiesniacy 7770, karawany 1028, lordowie 65, inne 210 - "
+             "w tym bandy 192), razem 48735 (+118, bez wyjasnienia {u}); miast bez towaru 1 z 97; zima: nie. Ladunek = 100 kg."),
+    "ctl": ("Towary (bilans): dzien {d} - towarow w ksiedze 169; kontrola z ksiega rudy i drewna: ruda ZGODNA (wsie 1/1, zapas 2/2), drewno ZGODNA (wsie 3926/3926, zapas 46609/46609; "
+            "wyroby miast 0 wobec zdarzen gry 0); bez wyjasnienia linii Drewno (282): dawne -1562 = mieszczanie -1940 + pola mieszczan (KS) 380 + naprawy kowali -2 + inne pozycje 0 + reszta {r} "
+            "(w linii Drewno: -1940/380/-2/0); koszt: zapas 1.0 ms."),
+    "f5": ("Ruda KS (f5-ruda): dzien {d} | klucz Ks Iron Hands Follow Market TAK, co 7 dob od D 108900 (rece) | Westeros: polki {sw} / cel {tw} (0.80), brak 400 w 30 miastach, "
+           "bez rudy 12 z 59 miast -> {dw} ({dwt}), w drodze do miast {rw} (polki z droga 1.10, 282 - liczone) | Essos: polki 900 / cel 600 (1.50), brak 10 w 3 miastach, "
+           "bez rudy 2 z 38 miast -> PASMO (bez zmian), w drodze do miast 50 (polki z droga 1.58, 282 - liczone) | wpisow zelaza 10: w gore 0 | czas 1.0 ms | potkniecia 0."),
+}
+
+
+def ru282_selftest():
+    T = RU282_TEST
+    errs = []
+    s = T["line"].format(d=109010, tries=12, cart=5, car=1, qty=80, cdone=40, kdone=7, nosrc=1, s1=31, x="38.0", y="19.0", ratio="2.00", empty=12, n1=8, n2=4,
+                         packs=1200, gate=410, state="KUPNO STOI", was="stalo", bought=0, world=9206, wd="+3", stum=0, sold="41.3", sdays=9, unl=61, meas=38, uout=59)
+    m = RU282_RE.match(s)
+    if not m:
+        errs.append("linia 282 nierozpoznana")
+    else:
+        g = m.groupdict()
+        if (g["cart"], g["car"], g["cdone"], g["n1"], g["packs"], g["gate"], g["state"], g["was"], g["ratio"], g["world"], g["wdelta"], g["stum"],
+                g["sold"], g["sdays"], g["unload"], g["meas"], g["uout"]) != \
+                ("5", "1", "40", "8", "1200", "410", "KUPNO STOI", "stalo", "2.00", "9206", "+3", "0", "41.3", "9", "61", "38", "59"):
+            errs.append("linia 282: zle pola " + str((g["cart"], g["n1"], g["packs"], g["ratio"], g["world"], g["meas"], g["uout"])))
+    old = s.replace(", pomiar sprzedazy minionej doby 38 (rozladunek ponad brak poza pomiarem 59)", "")
+    m = RU282_RE.match(old)
+    if not m or m.group("meas") is not None or m.group("unload") != "61":
+        errs.append("linia 282 bez pomiaru (build sprzed recenzji) nierozpoznana")
+    if not RU282_RE.match(T["line_nocb"]):
+        errs.append("linia 282 bez karawan nierozpoznana")
+    a = RU282_TOWARY.match(T["towary"].format(d=109010, u="+0"))
+    if not a or a.group(2) != "+0":
+        errs.append("Towary iron")
+    a = RU282_CARTS.match(T["carts"].format(d=109010, r=0))
+    if not a or a.group(2) != "0":
+        errs.append("reszta wozow")
+    a = RU282_T1.match(T["t1"].format(d=109010, r=0))
+    if not a or a.group(2) != "0":
+        errs.append("E3-T1 roznica")
+    w = T["wood"].format(d=109010, u="+0")
+    a = RU282_WOOD.match(w)
+    if not a or a.group(3) != "+0" or RU282_WOODSEG not in w:
+        errs.append("Drewno")
+    a = RU282_CTL.match(T["ctl"].format(d=109010, r=0))
+    if not a or a.group(7) != "0" or a.group(2) != "-1562":
+        errs.append("kontrola Drewno 282")
+    f = RU282_F5.findall(T["f5"].format(d=109010, sw=800, tw=1000, dw="PASMO", dwt="bez zmian", rw=300))
+    if len(f) != 2 or f[0] != ("Westeros", "800", "1000", "PASMO", "300", "liczone"):
+        errs.append("f5 segment 282: " + str(f))
+    return "; ".join(errs) if errs else None
+
+
+def ru282_collect(logp):
+    D = {"days": {}, "bad": 0, "towary": {}, "carts": [], "t1": [], "wood": {}, "woodseg": set(), "ctl": {}, "f5": [], "err": 0, "errs": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(RU282_LINE):
+                a = RU282_RE.match(s)
+                if a:
+                    D["days"][int(a.group("d"))] = a.groupdict()
+                else:
+                    D["bad"] += 1
+                continue
+            if s.startswith("Towary: dzien ") and " - iron (" in s:
+                a = RU282_TOWARY.match(s)
+                if a and a.group(2) != "-":
+                    D["towary"][int(a.group(1))] = int(a.group(2))
+                continue
+            if s.startswith("Kontrakty surowca (174): dzien "):
+                a = RU282_CARTS.match(s)
+                if a:
+                    D["carts"].append((int(a.group(1)), int(a.group(2))))
+                continue
+            if s.startswith("Karawany - towar tam, gdzie maja zysk (E3-T1): dzien "):
+                a = RU282_T1.match(s)
+                if a:
+                    D["t1"].append((int(a.group(1)), int(a.group(2))))
+                continue
+            if s.startswith("Drewno: dzien "):
+                a = RU282_WOOD.match(s)
+                if a:
+                    d = int(a.group(1))
+                    D["wood"][d] = int(a.group(3))
+                    if RU282_WOODSEG in s:
+                        D["woodseg"].add(d)
+                continue
+            if s.startswith("Towary (bilans): dzien ") and "Drewno (282)" in s:
+                a = RU282_CTL.match(s)
+                if a:
+                    D["ctl"][int(a.group(1))] = int(a.group(7))
+                continue
+            if s.startswith("Ruda KS (f5-ruda): dzien "):
+                dm = re.match(r"^Ruda KS \(f5-ruda\): dzien (\d+)", s)
+                for mk, S_, T_, dec, R_, cnt in RU282_F5.findall(s):
+                    D["f5"].append((int(dm.group(1)), mk, int(S_), int(T_), dec, int(R_) if R_ else None, cnt))
+                continue
+            if s.startswith("ERROR in ") and any(s.startswith(e) for e in RU282_ERR):
+                D["err"] += 1
+                if len(D["errs"]) < 3:
+                    D["errs"].append(s[:120])
+    return D
+
+
+def _ru_f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ru_mean(v):
+    v = [x for x in v if x is not None]
+    return sum(v) / len(v) if v else None
+
+
+def ru282_rows(rep, D):
+    days = D["days"]
+    dd = sorted(days)
+    have = bool(dd)
+    # RU282-0
+    if have:
+        gaps = [(a, b) for a, b in zip(dd, dd[1:]) if b - a != 1]
+        stum = sum(int(days[d]["stum"]) for d in dd)
+        ok = D["bad"] == 0 and stum == 0 and D["err"] == 0 and len(gaps) <= 1
+        rep.add("RU282-0: linia 'Ruda przeplyw (282)' co dobe, rozpoznana, potkniecia 0, ERROR paczki 0",
+                f"linii {len(dd)} ({dd[0]}-{dd[-1]}), nierozpoznanych {D['bad']}, dziur {len(gaps)}, potkniec {stum}, ERROR {D['err']}" + (f" ({D['errs']})" if D["errs"] else ""),
+                "0 nierozpoznanych, potkniecia 0, ERROR 0, najwyzej 1 dziura (wczytanie)", ok)
+    else:
+        rep.add("RU282-0: linia 'Ruda przeplyw (282)'", f"brak linii (nierozpoznanych {D['bad']}, ERROR {D['err']})", "INFO (log sprzed paczki 282)", None if D["bad"] == 0 and D["err"] == 0 else False)
+    # RU282-1 miasta bez rudy z zuzyciem
+    if have and len(dd) >= 15:
+        n1 = [int(days[d]["n1"]) for d in dd]
+        first, last = _ru_mean(n1[:5]), _ru_mean(n1[-10:])
+        late = [int(days[d]["n1"]) for i, d in enumerate(dd) if 20 <= i < 30]
+        lm = _ru_mean(late)
+        trend = last < first or (first <= RU282_EMPTY_MAX and last <= RU282_EMPTY_MAX)
+        level = lm is None or lm <= RU282_EMPTY_MAX
+        rep.add("RU282-1: miasta bez rudy z zuzyciem - spadek i poziom w dobach 21-30",
+                f"doby 1-5 srednio {first:.1f}, ostatnie 10 {last:.1f}, doby 21-30 " + (f"{lm:.1f} ({len(late)} dob)" if lm is not None else "- (bieg krotszy niz 21 dob)")
+                + f"; wszystkich bez rudy: pierwsza {days[dd[0]]['empty']}, ostatnia {days[dd[-1]]['empty']}",
+                f"ostatnie 10 < doby 1-5 (albo obie <= {RU282_EMPTY_MAX:.0f}) i doby 21-30 <= {RU282_EMPTY_MAX:.0f} (baza: 19-21 miast bez rudy)", trend and level)
+    else:
+        rep.add("RU282-1: miasta bez rudy z zuzyciem", f"dob z linia {len(dd)}", "INFO (potrzeba >= 15 dob)", None)
+    # RU282-2 zawarte i dowiezione
+    if have:
+        made = sum(int(days[d]["cart"]) + int(days[d]["car"]) for d in dd)
+        qty = sum(int(days[d]["qty"]) for d in dd)
+        done = sum(int(days[d]["cdone"]) + int(days[d]["kdone"]) for d in dd)
+        rep.add("RU282-2: zamowienia rudy zawarte i dowiezione (wozy + karawany)", f"zawarte {made} (sztuk {qty}), dowiezione {done} szt. w {len(dd)} dob",
+                "> 0 i > 0 (log Jeffa: kontrakty karawan z ruda prawie 0, wozy ok. 163/d)", made > 0 and done > 0)
+    else:
+        rep.add("RU282-2: zamowienia rudy zawarte i dowiezione", "brak linii", "INFO", None)
+    # RU282-3 stosunek cen
+    rs = [(d, _ru_f(days[d]["ratio"])) for d in dd]
+    rs = [(d, r) for d, r in rs if r is not None]
+    if len(rs) >= 6:
+        a5, b5 = _ru_mean([r for _, r in rs[:5]]), _ru_mean([r for _, r in rs[-5:]])
+        ok = (b5 < a5 or b5 <= RU282_RATIO_MAX) and b5 <= RU282_RATIO_MAX
+        rep.add("RU282-3: cena pierwszej sztuki w miastach bez rudy / cena zrodel (mediany)",
+                f"pierwsze 5 dob {a5:.2f}, ostatnie 5 {b5:.2f} ({len(rs)} dob z cena obu stron)", f"maleje (albo juz <= {RU282_RATIO_MAX}) i na koniec <= {RU282_RATIO_MAX} (baza 71.5/18 = ok. 4)", ok)
+    else:
+        rep.add("RU282-3: stosunek cen", f"dob z cena obu stron {len(rs)}", "INFO (potrzeba >= 6 dob; brak zrodel albo brak miast bez rudy)", None)
+    # RU282-4 nic z niczego
+    tw = sorted(D["towary"].items())
+    badt = [(d, u) for d, u in tw if u != 0]
+    badc = [(d, r) for d, r in D["carts"] if r != 0]
+    bad1 = [(d, r) for d, r in D["t1"] if r != 0]
+    anyl = bool(tw) or bool(D["carts"]) or bool(D["t1"])
+    rep.add("RU282-4: nic z niczego - Towary iron 'bez wyjasnienia', 'reszta wozow', E3-T1 '(roznica)'",
+            f"Towary iron dob {len(tw)} z != 0: {len(badt)}" + (f" {badt[:3]}" if badt else "") + f"; wozy dob {len(D['carts'])} z reszta != 0: {len(badc)}" + (f" {badc[:3]}" if badc else "")
+            + f"; E3-T1 dob {len(D['t1'])} z roznica != 0: {len(bad1)}" + (f" {bad1[:3]}" if bad1 else ""),
+            "wszystkie 0", (not badt and not badc and not bad1) if anyl else None)
+    # RU282-5 drewno
+    ws = sorted(D["woodseg"])
+    if ws:
+        badw = [(d, D["wood"][d]) for d in ws if abs(D["wood"][d]) > RU282_WOOD_TOL]
+        badk = [(d, r) for d, r in sorted(D["ctl"].items()) if abs(r) > RU282_WOOD_TOL]   # recenzja 282: reszta = wlasne +-1 ksiegi towarow (hardwood)
+        ok = not badw and not badk and bool(D["ctl"])
+        rep.add("RU282-5: drewno - 'bez wyjasnienia' linii Drewno i kontrola ksiegi towarow (282)",
+                f"dob z segmentem 282 {len(ws)}, |bez wyjasnienia| > {RU282_WOOD_TOL}: {len(badw)}" + (f" {badw[:3]}" if badw else "")
+                + f"; kontroli {len(D['ctl'])}, |reszta| > {RU282_WOOD_TOL}: {len(badk)}" + (f" {badk[:3]}" if badk else ""),
+                f"|x| <= {RU282_WOOD_TOL} i |reszta| <= {RU282_WOOD_TOL} (baza -1114..-1562)", ok)
+    else:
+        base = [u for _, u in sorted(D["wood"].items())[-5:]]
+        rep.add("RU282-5: drewno - 'bez wyjasnienia'", f"brak segmentu 282 (ostatnie 'bez wyjasnienia' {base})", "INFO (log sprzed paczki albo ksiega towarow wylaczona)", None)
+    # RU282-6 juki karawan i bramka
+    cb = [d for d in dd if days[d]["packs"] is not None]
+    if len(cb) >= 5:
+        k0, k1 = int(days[cb[0]]["packs"]), int(days[cb[-1]]["packs"])
+        g1 = int(days[cb[-1]]["gate"])
+        fall = k1 <= max(1.5 * g1, g1 + 100) or k1 < 0.5 * k0
+        gated = []
+        for a, b in zip(cb, cb[1:]):
+            pa = days[a]
+            if pa["state"] == "KUPNO STOI" and pa["gk"] == "TAK" and int(pa["packs"]) > 1.2 * int(pa["gate"]):
+                gated.append(int(days[b]["bought"]))
+        gm = _ru_mean(gated)
+        okb = gm is None or gm <= RU282_GATED_BUY
+        # recenzja 282: prog z samej sprzedazy - rozladunek ponad brak poza pomiarem, srednia z pomiaru zgodna z logiem
+        cm = [d for d in cb if days[d].get("meas") is not None]
+        okm, tm = True, "pomiar: brak (build sprzed recenzji 282)"
+        if cm:
+            su = sum(int(days[d]["unload"]) for d in cm)
+            so = sum(int(days[d]["uout"]) for d in cm)
+            mx = max(int(days[d]["unload"]) for d in cm)
+            oku = so <= su + mx and (su == 0 or so >= 0.8 * su)
+            bade = []
+            for a, b in zip(cm, cm[1:]):
+                pa, pb = days[a], days[b]
+                if b - a != 1 or int(pb["sdays"]) != int(pa["sdays"]) + 1:
+                    continue
+                e = float(pa["sold"]) + (int(pb["meas"]) - float(pa["sold"])) / min(14, int(pb["sdays"]))
+                if abs(e - float(pb["sold"])) > 0.15:
+                    bade.append((b, round(e, 2), pb["sold"]))
+            okm = oku and not bade
+            tm = (f"rozladunek ponad brak {su}, poza pomiarem sprzedazy {so} (dob {len(cm)}); srednia z pomiaru niezgodna z logiem: {len(bade)}"
+                  + (f" {bade[:3]}" if bade else ""))
+        rep.add("RU282-6: ruda w jukach karawan schodzi do progu przeplywu; zakupy przy zamknietym kupnie; rozladunek poza pomiarem sprzedazy",
+                f"w jukach {k0} -> {k1} (prog przeplywu na koniec {g1}); zakupy w dobach z kupnem zamknietym i jukami > 1.2 x prog: "
+                + (f"srednio {gm:.1f}/d ({len(gated)} dob)" if gm is not None else "brak takich dob") + "; " + tm,
+                f"koniec <= max(1.5 x prog, prog + 100) albo spadek o polowe; zakupy <= {RU282_GATED_BUY:.0f}/d (baza: juki 1666-2463, zakupy 83.7/d); "
+                "poza pomiarem >= 0.8 x rozladunek, srednia zgodna (|r| <= 0.15)", fall and okb and okm)
+    else:
+        rep.add("RU282-6: ruda w jukach karawan", f"dob ze stanem karawan {len(cb)}", "INFO (potrzeba >= 5 dob; regula CaravanBulk nieczynna?)", None)
+    # RU282-7 zelazo swiata
+    wl = [(d, int(days[d]["world"])) for d in dd if days[d]["world"] is not None]
+    if len(wl) >= 11:
+        w = wl[-11:]
+        slope = (w[-1][1] - w[0][1]) / max(1, w[-1][0] - w[0][0])
+        rep.add("RU282-7: zelazo swiata (lupy) - zmiana ostatnich 10 dob", f"{w[0][1]} -> {w[-1][1]} ({slope:+.1f}/d)", f"<= +{RU282_WORLD_MAX:.0f}/d (baza +34..+36/d)", slope <= RU282_WORLD_MAX)
+    else:
+        rep.add("RU282-7: zelazo swiata", f"dob z zapasem {len(wl)}", "INFO (potrzeba >= 11 dob)", None)
+    # RU282-8 f5
+    f5 = [x for x in D["f5"] if x[5] is not None and x[6] == "liczone"]
+    if f5:
+        bad = [(d, mk, S_, R_, T_) for d, mk, S_, T_, dec, R_, cnt in f5 if dec == "BRAK" and S_ + R_ >= T_]
+        miss = [(d, mk, S_, R_, T_) for d, mk, S_, T_, dec, R_, cnt in f5 if dec != "BRAK" and dec != "BEZ CELU" and T_ > 0 and S_ + R_ < T_]
+        rep.add("RU282-8: krok f5-ruda - BRAK (rece w gore) tylko przy polkach + drodze < cel",
+                f"wpisow rynku {len(f5)}, BRAK przy S+R >= T: {len(bad)}" + (f" {bad[:3]}" if bad else "") + f", brak bez BRAK przy S+R < T: {len(miss)}" + (f" {miss[:3]}" if miss else ""),
+                "0 i 0", not bad and not miss)
+    else:
+        rep.add("RU282-8: krok f5-ruda z towarem w drodze", f"wpisow z '282 - liczone' {len(f5)} (wszystkich {len(D['f5'])})", "INFO (krok co 7 dob pod KS; klucz NIE albo log sprzed paczki)", None)
+    # RU282-9 INFO
+    if have:
+        f, l = days[dd[0]], days[dd[-1]]
+        s1 = _ru_mean([int(days[d]["s1"]) for d in dd]); ns = _ru_mean([int(days[d]["nosrc"]) for d in dd])
+        dv = _ru_mean([_ru_f(days[d]["days"]) for d in dd]); un = sum(int(days[d]["unload"] or 0) for d in dd)
+        rep.add("RU282-9: liczby biegu (INFO)",
+                f"zrodla rudy (punkt zamowienia) srednio {s1:.1f}, odmowy 'brak zrodla' srednio {ns:.1f}/d, doby drogi zamowien srednio " + (f"{dv:.1f}" if dv is not None else "-")
+                + f", rozladunek karawan razem {un}; pierwsza doba: bez rudy {f['empty']} (z zuzyciem {f['n1']}), stosunek {f['ratio']}, juki {f['packs']}; ostatnia: bez rudy {l['empty']}"
+                f" (z zuzyciem {l['n1']}), stosunek {l['ratio']}, juki {l['packs']}, prog {l['gate']}",
+                "INFO (oczekiwane: zrodla 25-50, brak zrodla <= 5/d, doby drogi 4-6)", None)
+
+
+def ru282_synth():
+    import tempfile
+    import shutil
+    T = RU282_TEST
+    P = "[10:00:00] "
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="ru282_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            bad = kind.startswith("bad")
+            d0 = 109002
+            ema = 0.0
+            for i in range(30):
+                d = d0 + i
+                n1 = max(4, 20 - i) if not (kind == "bad1") else 20
+                ratio = max(1.6, 4.0 - 0.1 * i) if kind != "bad2" else 4.0 + 0.05 * i
+                if kind == "good4":
+                    ratio = 2.0
+                packs = max(450, 2400 - 90 * i) if kind != "bad4" else 2400 + 20 * i
+                gate = 420
+                state = "KUPNO STOI" if packs > gate else "CZYNNE"
+                bought = 0 if (packs > 1.2 * gate or kind != "bad4") else 40
+                if kind == "bad4":
+                    bought = 60
+                world = 9200 + (35 * i if kind == "bad4" else (30 * i if i < 15 else 450 + 2 * (i - 15)))
+                unl = 61 if state == "KUPNO STOI" else 0
+                meas = 38 + (i % 5) + (unl if kind == "bad5" else 0)          # bad5: rozladunek policzony jako sprzedaz
+                uout = 0 if kind == "bad5" else unl - (2 if i % 4 == 0 and unl else 0)
+                ema += (meas - ema) / min(14, i + 1)
+                cart = 0 if kind == "bad2" else 4
+                cdone = 0 if kind == "bad2" else 30
+                L.append(P + T["line"].format(d=d, tries=10, cart=cart, car=0, qty=cart * 12, cdone=cdone, kdone=0, nosrc=2, s1=30, x="40.0", y="%.1f" % (40.0 / ratio),
+                                              ratio="%.2f" % ratio, empty=n1 + 3, n1=n1, n2=3, packs=packs, gate=gate, state=state, was="stalo" if i and packs > gate else "czynne",
+                                              bought=bought, world=world, wd="+5", stum=(1 if kind == "bad1" and i == 5 else 0),
+                                              sold="%.1f" % ema, sdays=i + 1, unl=unl, meas=meas, uout=uout))
+                L.append(P + T["towary"].format(d=d, u=("+7" if kind == "bad3" and i == 9 else "+0")))
+                L.append(P + T["carts"].format(d=d, r=0))
+                if kind != "good3":
+                    L.append(P + T["t1"].format(d=d, r=0))
+                L.append(P + T["wood"].format(d=d, u=("-1562" if kind == "bad3" and i == 4 else "+0")))
+                L.append(P + T["ctl"].format(d=d, r=(3 if kind == "bad3" and i == 6 else 0)))
+                if i % 7 == 3 and kind != "good2":
+                    if kind == "bad4":
+                        L.append(P + T["f5"].format(d=d, sw=800, tw=1000, dw="BRAK", dwt="w gore", rw=300))
+                    else:
+                        L.append(P + T["f5"].format(d=d, sw=800, tw=1000, dw="PASMO", dwt="bez zmian", rw=300))
+            if kind == "bad1":
+                L.append(P + "ERROR in MaterialOrders.Line282 (potkniecie 1): x")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            ru282_rows(rep, ru282_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    allt = {"RU282-0": "TAK", "RU282-1": "TAK", "RU282-2": "TAK", "RU282-3": "TAK", "RU282-4": "TAK", "RU282-5": "TAK", "RU282-6": "TAK", "RU282-7": "TAK", "RU282-8": "TAK"}
+    exp = {
+        "good1": dict(allt),
+        "good2": dict(allt, **{"RU282-8": "INFO"}),
+        "good3": dict(allt),
+        "good4": dict(allt),
+        "bad1": {"RU282-0": "NIE", "RU282-1": "NIE"},
+        "bad2": {"RU282-2": "NIE", "RU282-3": "NIE"},
+        "bad3": {"RU282-4": "NIE", "RU282-5": "NIE"},
+        "bad4": {"RU282-6": "NIE", "RU282-7": "NIE", "RU282-8": "NIE"},
+        "bad5": dict(allt, **{"RU282-6": "NIE"}),
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def ruda282_main(logp):
+    """ruda282 (27.10, paczka 282): RU282-S, RU282-S2, RU282-0..RU282-9 - opis w komentarzu nad stalymi RU282_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = ru282_selftest()
+    rep.add("RU282-S: self-test wyrazen (linie jak w kodzie C#: MaterialOrders.Line282, CaravanBulk.BuildSeg282, OreLedger, GoodsLedger.Control, F5IronWeek)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = ru282_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("RU282-S2: test syntetyczny (4 logi dobre, 5 zlych)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("RU282-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = ru282_collect(logp)
+    print(f"plik: {logp} | linii 282 {len(D['days'])} (nierozpoznanych {D['bad']}), Towary iron {len(D['towary'])}, wozow {len(D['carts'])}, E3-T1 {len(D['t1'])}, "
+          f"Drewno {len(D['wood'])} (z segmentem 282 {len(D['woodseg'])}), kontroli drewna 282 {len(D['ctl'])}, wpisow f5 {len(D['f5'])}, ERROR {D['err']}")
+    ru282_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_ruda282_main_prev = main
+
+
+def main(argv):
+    # paczka 282: grupa ruda282 - opakowanie main jak rody277 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "ruda282":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return ruda282_main(rest[0] if rest else None)
+    return _ruda282_main_prev(argv)
 
 
 if __name__ == "__main__":

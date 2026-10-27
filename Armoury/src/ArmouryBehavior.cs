@@ -1259,6 +1259,9 @@ namespace Armoury
             // 174.2: kontrakty surowca w drodze (karawana, cel, zrodlo, surowiec, ilosc) - zawsze, takze przy wylaczonym wylaczniku (po wczytaniu karawana zwolniona)
             try { string mo = dataStore.IsSaving ? MaterialOrders.Export() : null; SaveText.Sync(dataStore, "arm_matorders", ref mo); if (dataStore.IsLoading) MaterialOrders.Import(mo); }
             catch (Exception e) { Log.Error("SyncData.arm_matorders", e); try { if (dataStore.IsLoading) MaterialOrders.ImportFailed(); } catch { } }   // recenzja 174: linia, ze kontrakty pominiete
+            // 282 (F1): srednia sprzedazy karawan wedlug surowca (bramka przeplywu rudy) - brak klucza = pomiar od zera; starszy DLL klucz pomija
+            try { string cb = dataStore.IsSaving ? CaravanBulk.Export282() : null; SaveText.Sync(dataStore, "arm_cb282", ref cb); if (dataStore.IsLoading) CaravanBulk.Import282(cb); }
+            catch (Exception e) { Log.Error("SyncData.arm_cb282", e); }
             // 174b.6: zlom ze starego nadmiaru - rozgrzewka (doby pomiaru), ostatnia doba, srednie zakupow koszykow, ulamki skupu i rudy; Export tylko przy zapisie
             // (z probnym odczytem), brak klucza = zapis sprzed 174b (rozgrzewka od zera, jak dotad); rozwiazanie w OnSessionLaunched
             try { string sc = dataStore.IsSaving ? ArmsScrap.Export() : null; SaveText.Sync(dataStore, "arm_scrap", ref sc); if (dataStore.IsLoading) ArmsScrap.Import(sc); }
