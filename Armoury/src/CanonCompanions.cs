@@ -1105,6 +1105,7 @@ namespace Armoury
 
         private static Kingdom FindKingdom(string id)
         {
+            id = KingInTheNorth.AliasKingdom(id);   // 272: po unii "riverlands" w warunku politycznym (war) = Polnoc
             foreach (var k in Kingdom.All) if (k != null && k.StringId == id) return k;
             return null;
         }
@@ -1139,6 +1140,7 @@ namespace Armoury
                         var p = a.Split(':');
                         if (p.Length < 2) return false;
                         var st = Settlement.Find(p[0]);
+                        if (KingInTheNorth.IsRiverAlias(p[1])) return KingInTheNorth.HeldAsRiverlands(st);   // 272: po unii - osada Polnocy na ziemi Tridentu
                         return st != null && st.MapFaction != null && st.MapFaction.StringId == p[1];
                     }
                 case "kr": return Chronicle.Resolved(a, out never);   // A4: okno Kroniki rozstrzygniete (=x - wybor); Kronika wylaczona / okno pominiete - nigdy

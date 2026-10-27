@@ -9780,6 +9780,10 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool DaenerysDragonsGrow { get; set; } = true;
 
+        [SettingPropertyBool("Canon North Riverlands Union", HintText = "as in the books, when House Tully pledges fealty to Robb Stark (Realm of Thrones' 'Riverlands Join the Fight', or a few days after its planned date) the Riverlands stop being a realm of their own: every river lord with his castles, villages, hosts and treasury becomes a vassal of the King in the North, and their sellswords (and your company, if you serve House Tully) keep their contract with King Robb. Once per campaign; if that moment has already passed in your game, it happens at the next session start. Never if you rule either realm. At the Red Wedding the Freys and their allies go over to the crown as in Realm of Thrones. Off = two allied realms, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonNorthRiverlandsUnion { get; set; } = true;
+
         [SettingPropertyBool("Story Images For Rot Windows", HintText = "the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Story windows")]
         public bool StoryImagesForRotWindows { get; set; } = true;
@@ -12612,6 +12616,7 @@ namespace Armoury
             s.CanonRiverlandsWarAtPrologueEnd = CanonRiverlandsWarAtPrologueEnd;
             s.CanonNorthRiverlandsAlliance = CanonNorthRiverlandsAlliance;
             s.DaenerysDragonsGrow = DaenerysDragonsGrow;
+            s.CanonNorthRiverlandsUnion = CanonNorthRiverlandsUnion;
             s.StoryImagesForRotWindows = StoryImagesForRotWindows;
             s.LektorEnabled = LektorEnabled;
             s.LektorEventWindows = LektorEventWindows;

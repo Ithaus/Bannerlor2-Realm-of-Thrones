@@ -1189,6 +1189,14 @@ Uzycie (Python 3, tylko odczyt):
                     LordEscort.cs, LordEscort.Probe.cs) python -I tools/sprawdz_logi.py --grupa e223 <Armoury-*.log> (strumieniowo). Linie 'Eskorta lordow (223): '.
                     E223-S self-test, E223-S2 test syntetyczny; E223-0 latki TAK; E223-1 linia doby co dobe; E223-2 slabe i dzialania; E223-3 eskorta z zalog: wzial ==
                     spadek zalogi, podloga, suma doby == zdarzenia, <= 169c; E223-4 potkniecia 0; E223-5 najdluzej w stanie <= postoj + 1; E223-6 INFO pojmania.
+--grupa krol272   : (27.10, paczka 272 noc/272-krol-polnocy - Jeff 27.10 "a tak potem jak dolaczaja do roberta to staja sie jednym krolestwem King in the North";
+                    Armoury/src/KingInTheNorth.cs, KingInTheNorth.Test.cs; klucz CanonNorthRiverlandsUnion) python -I tools/sprawdz_logi.py --grupa krol272 <Armoury-*.log>
+                    (strumieniowo). Linie 'Krol Polnocy (272): '. KP-S self-test wyrazen, KP-S2 test syntetyczny. KP-0 start sesji; KP-1 dokladnie jedna unia
+                    (UNIA start -> UNIA ZAKONCZONA); KP-2 rody przeniesione = rody na starcie, zniszczonych 0, kazdy rod: lenna/wsie/partie/ludzie/zalogi przed = po,
+                    wplywy i dlug wobec krolestwa zachowane; KP-3 armie zachowane/odtworzone z tymi samymi czlonkami i spojnoscia albo NIE z powodem; KP-4 kontrola
+                    pieniedzy 0; KP-5 Dorzecze zniszczone i doba Wojny kanonu (4) po unii 'brak krolestwa'; KP-6 jency gracza przed = po (Tywin); KP-7 proba
+                    autotestu T1-T9 bez NIE (flaga armoury-krol-polnocy.flag); KP-8 po unii zadnego UNIA start, start sesji ze stanem 'zrobione'; KP-9 Krwawe Gody:
+                    rody Dorzecza ROT z unii do korony (kazdy TAK albo z powodem); KP-10 ERROR KingInTheNorth i potkniecia 0. Brak linii - INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
                     MK-3 pieniadz w obiegu (roznica 0), MK-4 towar z polki miasta = towar w sklepie, MK-5 uzycie (INFO), MK-6 skup w limicie dnia, MK-7 zabawa w pulapie morale,
@@ -71395,6 +71403,275 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return e223_main(rest[0] if rest else None)
     return _e223_main_prev(argv)
+
+
+# ------------------------------------------------------------ krol272 (27.10, paczka 272 noc/272-krol-polnocy: unia Dorzecza z Polnoca - Jeff 27.10 ok. 15:25 "a tak potem
+# jak dolaczaja do roberta to staja sie jednym krolestwem King in the North"; Armoury/src/KingInTheNorth.cs, KingInTheNorth.Test.cs; klucz CanonNorthRiverlandsUnion)
+#   python -I tools/sprawdz_logi.py --grupa krol272 <Armoury-*.log>   (strumieniowo). Linie 'Krol Polnocy (272): '. Stale z prefiksem KP_, wiersze KP-.
+KP_TAG = "Krol Polnocy (272): "
+KP_ERR = ("ERROR in KingInTheNorth",)
+KP_RE_START = re.compile(r"Krol Polnocy \(272\): start sesji \| klucz (TAK|NIE) \| stan (czeka|zrobione|nigdy)")
+KP_RE_USTART = re.compile(r"Krol Polnocy \(272\): UNIA start \| dzien opowiesci (-?[\d.]+) \(dzien kampanii (\d+)\) \| wyzwalacz: (.+?) \| Dorzecze: rodow (\d+) \(najemnikow (\d+), gracz (\S+)\)")
+KP_RE_ROD = re.compile(r"Krol Polnocy \(272\): rod (.+?) \((\S+)\) (wasal|najemnik|gracz-najemnik|gracz-wasal|wladca Dorzecza) -> Polnoc (TAK|NIE) \| lenna (\d+)/(\d+), wsie (\d+)/(\d+), "
+                       r"partie (\d+)/(\d+), ludzie (\d+)/(\d+), zalogi (\d+)/(\d+) \| wplywy (-?[\d.]+) -> (-?[\d.]+) \| dlug wobec krolestwa (-?\d+) -> (-?\d+)")
+KP_RE_ARMY = re.compile(r"Krol Polnocy \(272\): armia (.+?) (zachowana pod Polnoca|odtworzona pod Polnoca) \| partii (\d+)/(\d+), spojnosc (-?[\d.]+) -> (-?[\d.]+)")
+KP_RE_ARMY_NO = re.compile(r"Krol Polnocy \(272\): armia (.+?) NIE \((.+?)\) \| partii (\d+)\.")
+KP_RE_MONEY = re.compile(r"Krol Polnocy \(272\): skarbiec Dorzecza (-?\d+) .*\| kontrola: zdjete (-?\d+) - dopisane (-?\d+) = (-?\d+)\.\s*$")
+KP_RE_END = re.compile(r"Krol Polnocy \(272\): UNIA ZAKONCZONA \| Dorzecze zniszczone (TAK|NIE) \| rodow przeniesionych (\d+)/(\d+), zniszczonych (\d+) \| lenna (\d+)/(\d+), partie (\d+)/(\d+), "
+                       r"ludzie (\d+)/(\d+) \| .*\| jency gracza przed (\d+) \((.*?)\) / po (\d+) \((.*?)\) (TAK|NIE) \| .*potkniecia (\d+)\.\s*$")
+KP_RE_RW = re.compile(r"Krol Polnocy \(272\): Krwawe Gody - rody Dorzecza ROT do korony \(jak ROT dla krolestwa Dorzecza\): (.+?) \| przeniesionych (\d+)")
+KP_RE_TEST = re.compile(r"Krol Polnocy \(272\): test - (T\d|T\?) (.+) - wynik (TAK|NIE|POMINIETY)\.\s*$")
+KP_RE_DAY4 = re.compile(r"Wojny kanonu \(m104\): doba \|.*\(4\) Dorzecze: wojna: (.+?);")
+
+KP_TEST = {
+    "start": "[13:00:25] Krol Polnocy (272): start sesji | klucz TAK | stan czeka | ROT RiverlandsDeclareWarEvent stan 2, Krwawe Gody stan 0 | Robb zyje, krol Polnocy | Dorzecze: wladca House Tully (clan_empire_north_2), rodow 39 (najemnikow 3) | gracz: najemnik riverlands | latki: Krwawe Gody TAK, armie leniwie (przy unii) | dzien opowiesci 150.9.",
+    "start_done": "[09:00:25] Krol Polnocy (272): start sesji | klucz TAK | stan zrobione (dzien opowiesci 151, dzien kampanii 108988, rodow 39) | ROT RiverlandsDeclareWarEvent stan 2, Krwawe Gody stan 0 | Robb zyje, krol Polnocy | Dorzecze: zniszczone | gracz: najemnik battania (w chwili unii: najemnik) | latki: Krwawe Gody TAK, armie leniwie (przy unii) | dzien opowiesci 160.2.",
+    "ustart": "[13:01:00] Krol Polnocy (272): UNIA start | dzien opowiesci 151.0 (dzien kampanii 108988) | wyzwalacz: ROT RiverlandsDeclareWarEvent zakonczone - nadrobienie po wczytaniu | Dorzecze: rodow 2 (najemnikow 1, gracz najemnik), twierdz 2, wsi 6, partii 3, ludzi 300 (zalogi 200), armii 1 | wladca House Tully (clan_empire_north_2) | Polnoc przed: rodow 56, twierdz 23 | jency gracza 12 (bohaterowie: lord_4_1).",
+    "rod": "[13:01:00] Krol Polnocy (272): rod House Tully (clan_empire_north_2) wladca Dorzecza -> Polnoc TAK | lenna 2/2, wsie 6/6, partie 2/2, ludzie 254/254, zalogi 200/200 | wplywy 120.5 -> 120.5 | dlug wobec krolestwa 0 -> 0 | zostaje do dnia 0.",
+    "rodp": "[13:01:00] Krol Polnocy (272): rod Karda (player_faction) gracz-najemnik -> Polnoc TAK | lenna 0/0, wsie 0/0, partie 1/1, ludzie 46/46, zalogi 0/0 | wplywy 10 -> 10 | dlug wobec krolestwa 0 -> 0 | zostaje do dnia 108990 | mnoznik 25 -> 25.",
+    "army": "[13:01:00] Krol Polnocy (272): armia Edmure Tully's Party zachowana pod Polnoca | partii 2/2, spojnosc 80.5 -> 80.5 | oblezenie - -> - | krolestwo armii battania.",
+    "army_no": "[13:01:00] Krol Polnocy (272): armia Jason Mallister's Party NIE (wodz nieaktywny, martwy albo w niewoli) | partii 3.",
+    "money": "[13:01:00] Krol Polnocy (272): skarbiec Dorzecza 7324319 -> splata Banku 0, do skarbca Polnocy 7324319 | dlug Banku przeniesiony 0 | portfele gry: najemnicy -611, danina 0, wezwania 0 | pozyczki od miast (korona2) przeniesione 0 | kontrola: zdjete 7323708 - dopisane 7323708 = 0.",
+    "end": "[13:01:00] Krol Polnocy (272): UNIA ZAKONCZONA | Dorzecze zniszczone TAK | rodow przeniesionych 2/2, zniszczonych 0 | lenna 2/2, partie 3/3, ludzie 300/300 | Polnoc po: rodow 58, twierdz 25, armii 2 | jency gracza przed 12 (lord_4_1) / po 12 (lord_4_1) TAK | gracz najemnik -> najemnik battania | zadatki BK wstrzymane (ta sama sluzba) 1 | komunikat gracza TAK | potkniecia 0.",
+    "rw": "[10:00:00] Krol Polnocy (272): Krwawe Gody - rody Dorzecza ROT do korony (jak ROT dla krolestwa Dorzecza): Frey (clan_empire_north_3) -> vlandia TAK, Mooton nie z unii, Cox (ROTclan_14) -> vlandia TAK, Bracken poza Polnoca (vlandia) | przeniesionych 2 | Polnoc-korona pokoj.",
+    "test": "[13:01:00] Krol Polnocy (272): test - T5 kontrola pieniedzy (zdjete - dopisane) 0 - wynik TAK.",
+    "day4": "[13:14:21] Wojny kanonu (m104): doba | dzien opowiesci 152.8 (dzien kalendarza 342) | (4) Dorzecze: wojna: brak krolestwa (korona jest, Dorzecze BRAK); sojusz z Polnoca: zakonczony (unia - Dorzecze w krolestwie Polnocy (272)); wymuszen Enforced dzis 0 (w sesji 0) | potkniecia dzis 0 (razem 0).",
+}
+
+
+def krol272_selftest():
+    """krol272: wyrazenia wobec linii kontrolnych KP_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    T = KP_TEST
+    m = KP_RE_START.search(T["start"])
+    if not m or m.group(1) != "TAK" or m.group(2) != "czeka":
+        return "start sesji"
+    m = KP_RE_START.search(T["start_done"])
+    if not m or m.group(2) != "zrobione":
+        return "start sesji (zrobione)"
+    m = KP_RE_USTART.search(T["ustart"])
+    if not m or m.group(4) != "2" or m.group(6) != "najemnik" or "nadrobienie" not in m.group(3):
+        return "UNIA start"
+    m = KP_RE_ROD.search(T["rod"])
+    if not m or m.group(3) != "wladca Dorzecza" or m.group(4) != "TAK" or m.group(11) != "254":
+        return "rod"
+    m = KP_RE_ROD.search(T["rodp"])
+    if not m or m.group(3) != "gracz-najemnik" or m.group(2) != "player_faction":
+        return "rod gracza"
+    m = KP_RE_ARMY.search(T["army"])
+    if not m or m.group(3) != "2" or m.group(4) != "2" or float(m.group(5)) != 80.5:
+        return "armia"
+    m = KP_RE_ARMY_NO.search(T["army_no"])
+    if not m or m.group(3) != "3" or KP_RE_ARMY.search(T["army_no"]):
+        return "armia NIE"
+    m = KP_RE_MONEY.search(T["money"])
+    if not m or m.group(4) != "0" or m.group(2) != "7323708":
+        return "skarbiec"
+    m = KP_RE_END.search(T["end"])
+    if not m or m.group(1) != "TAK" or m.group(2) != "2" or m.group(4) != "0" or m.group(15) != "TAK" or m.group(12) != "lord_4_1" or m.group(16) != "0":
+        return "UNIA ZAKONCZONA"
+    m = KP_RE_RW.search(T["rw"])
+    if not m or m.group(2) != "2":
+        return "Krwawe Gody"
+    m = KP_RE_TEST.search(T["test"])
+    if not m or m.group(1) != "T5" or m.group(3) != "TAK":
+        return "test"
+    m = KP_RE_DAY4.search(T["day4"])
+    if not m or not m.group(1).startswith("brak krolestwa"):
+        return "doba Wojny kanonu (4)"
+    return None
+
+
+def krol272_collect(logp):
+    """krol272: przebieg logu (strumieniowo) -> zdarzenia w kolejnosci (rodzaj, dane) i liczniki."""
+    D = {"ev": [], "lines": 0, "err": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if any(e in ln for e in KP_ERR):
+                D["err"] += 1
+            if "Wojny kanonu (m104): doba" in ln:
+                m = KP_RE_DAY4.search(ln)
+                if m:
+                    D["ev"].append(("day4", m.group(1)))
+                continue
+            if KP_TAG not in ln:
+                continue
+            D["lines"] += 1
+            m = KP_RE_START.search(ln)
+            if m:
+                D["ev"].append(("start", m.group(1), m.group(2)))
+                continue
+            m = KP_RE_USTART.search(ln)
+            if m:
+                D["ev"].append(("ustart", int(m.group(4))))
+                continue
+            m = KP_RE_ROD.search(ln)
+            if m:
+                g = m.groups()
+                ok = g[3] == "TAK" and g[4] == g[5] and g[6] == g[7] and g[8] == g[9] and g[10] == g[11] and g[12] == g[13] \
+                    and abs(float(g[14]) - float(g[15])) < 0.11 and g[16] == g[17]
+                D["ev"].append(("rod", g[1], ok, g[2]))
+                continue
+            m = KP_RE_ARMY.search(ln)
+            if m:
+                D["ev"].append(("army", m.group(1), m.group(3) == m.group(4) and abs(float(m.group(5)) - float(m.group(6))) < 0.11))
+                continue
+            m = KP_RE_ARMY_NO.search(ln)
+            if m:
+                D["ev"].append(("army_no", m.group(1), m.group(2)))
+                continue
+            m = KP_RE_MONEY.search(ln)
+            if m:
+                D["ev"].append(("money", int(m.group(4))))
+                continue
+            m = KP_RE_END.search(ln)
+            if m:
+                g = m.groups()
+                D["ev"].append(("end", g[0] == "TAK", int(g[1]), int(g[2]), int(g[3]), g[4] == g[5] and g[6] == g[7] and g[8] == g[9],
+                                g[10] == g[12] and g[11] == g[13] and g[14] == "TAK", int(g[15])))
+                continue
+            m = KP_RE_RW.search(ln)
+            if m:
+                D["ev"].append(("rw", m.group(1), int(m.group(2))))
+                continue
+            m = KP_RE_TEST.search(ln)
+            if m:
+                D["ev"].append(("test", m.group(1), m.group(3)))
+                continue
+    return D
+
+
+def krol272_rows(rep, D):
+    """krol272: wiersze KP-0..KP-10 z zebranych zdarzen (opis w --help). Log bez linii 272 - INFO."""
+    ev = D["ev"]
+    starts = [e for e in ev if e[0] == "start"]
+    rep.add("KP-0: linia startu sesji paczki 272", f"linii 272 {D['lines']}, startow {len(starts)}" + (f" (klucz {starts[-1][1]}, stan {starts[-1][2]})" if starts else ""),
+            ">= 1 start sesji", True if starts else None)
+    us = [i for i, e in enumerate(ev) if e[0] == "ustart"]
+    ends = [i for i, e in enumerate(ev) if e[0] == "end"]
+    ok1 = len(us) == 1 and len(ends) == 1 and us[0] < ends[0]
+    rep.add("KP-1: jedna unia na kampanie (UNIA start -> UNIA ZAKONCZONA)", f"UNIA start {len(us)}, UNIA ZAKONCZONA {len(ends)}",
+            "dokladnie 1 i 1 (brak unii - INFO)", None if not us and not ends else ok1)
+    if ends:
+        e = ev[ends[-1]]
+        rods = [x for x in ev if x[0] == "rod"]
+        bad = [x[1] for x in rods if not x[2]]
+        n0 = ev[us[-1]][1] if us else None
+        ok2 = e[1] and e[2] == e[3] and e[4] == 0 and e[5] and not bad and (n0 is None or n0 == e[3])
+        rep.add("KP-2: rody przeniesione = rody na starcie, zniszczonych 0, lenna/partie/ludzie/wplywy/dlug bez zmian", f"Dorzecze zniszczone {'TAK' if e[1] else 'NIE'}, rodow {e[2]}/{e[3]}"
+                f" (na starcie {n0 if n0 is not None else '?'}), zniszczonych {e[4]}, sumy {'rowne' if e[5] else 'ROZNE'}, linii rodow {len(rods)}, zlych {len(bad)}"
+                + (f" ({', '.join(bad[:4])})" if bad else ""), "rowne, 0 zniszczonych, 0 zlych", ok2)
+    else:
+        rep.add("KP-2: rody przeniesione = rody na starcie", "brak UNIA ZAKONCZONA", "-", None)
+    arm = [x for x in ev if x[0] == "army"]
+    arm_no = [x for x in ev if x[0] == "army_no"]
+    bad3 = [x[1] for x in arm if not x[2]]
+    rep.add("KP-3: armie zachowane albo odtworzone (ci sami czlonkowie, ta sama spojnosc) albo NIE z powodem", f"zachowane/odtworzone {len(arm)}, NIE z powodem {len(arm_no)}, zlych {len(bad3)}"
+            + (f" ({', '.join(bad3[:3])})" if bad3 else ""), "0 zlych (brak armii - INFO)", None if not arm and not arm_no else not bad3)
+    mon = [x for x in ev if x[0] == "money"]
+    rep.add("KP-4: kontrola pieniedzy unii (zdjete - dopisane = 0)", f"linii {len(mon)}, roznice {[x[1] for x in mon][:3]}", "0 (brak unii - INFO)",
+            None if not mon else all(x[1] == 0 for x in mon))
+    if ends:
+        e = ev[ends[-1]]
+        after = [x for x in ev[ends[-1] + 1:] if x[0] == "day4"]
+        ok5 = e[1] and all(x[1].startswith("brak krolestwa") for x in after)
+        rep.add("KP-5: Dorzecze zniszczone, Wojny kanonu (4) po unii: 'brak krolestwa'", f"zniszczone {'TAK' if e[1] else 'NIE'}, dob (4) po unii {len(after)}"
+                + (f", pierwsza: {after[0][1]}" if after else ""), "TAK (bez doby po unii - INFO)", ok5 if after else (None if e[1] else False))
+        rep.add("KP-6: jency gracza przed = po (Tywin)", "TAK" if e[6] else "ROZNE", "rowne", e[6])
+    else:
+        rep.add("KP-5: Dorzecze zniszczone", "brak UNIA ZAKONCZONA", "-", None)
+        rep.add("KP-6: jency gracza przed = po", "brak UNIA ZAKONCZONA", "-", None)
+    tests = [x for x in ev if x[0] == "test"]
+    nie = [x[1] for x in tests if x[2] == "NIE"]
+    rep.add("KP-7: proba autotestu T1-T9 (flaga armoury-krol-polnocy.flag)", f"linii {len(tests)}, TAK {sum(1 for x in tests if x[2] == 'TAK')}, POMINIETY {sum(1 for x in tests if x[2] == 'POMINIETY')}, NIE {len(nie)}"
+            + (f" ({', '.join(nie)})" if nie else ""), "0 NIE (brak linii - INFO)", None if not tests else not nie)
+    # KP-8: po pierwszej unii zaden 'UNIA start'; kazdy start sesji po niej ze stanem 'zrobione'
+    bad8, n8 = [], 0
+    if ends:
+        for x in ev[ends[0] + 1:]:
+            if x[0] == "ustart":
+                bad8.append("UNIA start po unii")
+            elif x[0] == "start":
+                n8 += 1
+                if x[2] != "zrobione":
+                    bad8.append(f"start sesji ze stanem {x[2]}")
+    rep.add("KP-8: bez powtorki w kolejnych sesjach (stan 'zrobione', zadnego UNIA start)", f"startow sesji po unii {n8}, zlych {len(bad8)}" + (f" ({'; '.join(bad8[:3])})" if bad8 else ""),
+            "0 (bez unii albo bez sesji po niej - INFO)", None if not ends or (n8 == 0 and not bad8) else not bad8)
+    rw = [x for x in ev if x[0] == "rw"]
+    bad9 = [x[1] for x in rw if " NIE" in x[1]]
+    rep.add("KP-9: Krwawe Gody - rody Dorzecza ROT z unii do korony", f"linii {len(rw)}" + (f", przeniesionych {rw[-1][2]} ({rw[-1][1]})" if rw else ""),
+            "kazdy rod TAK albo z powodem, jedna linia (brak Krwawych God - INFO)", None if not rw else (len(rw) == 1 and not bad9))
+    stum = ev[ends[-1]][7] if ends else 0
+    rep.add("KP-10: ERROR KingInTheNorth i potkniecia 0", f"ERROR {D['err']}, potkniecia w unii {stum}", "0", None if D["lines"] == 0 and D["err"] == 0 else (D["err"] == 0 and stum == 0))
+
+
+def krol272_synth():
+    """krol272 - test syntetyczny: dobry, zly, bez linii przez krol272_collect / krol272_rows. None = werdykty zgodne, inaczej opis roznicy."""
+    import tempfile, shutil
+    T = KP_TEST
+    good = [T["start"], T["ustart"], T["rodp"], T["rod"], T["army"], T["army_no"], T["money"], T["end"], T["test"], T["day4"], T["start_done"], T["rw"]]
+    bad = [T["start"], T["ustart"], T["rodp"],
+           T["rod"].replace("lenna 2/2", "lenna 1/2"),                                         # KP-2: rod stracil lenno
+           T["army"].replace("partii 2/2", "partii 1/2"),                                      # KP-3
+           T["money"].replace("dopisane 7323708 = 0", "dopisane 7323000 = 708"),               # KP-4
+           T["end"].replace("zniszczonych 0", "zniszczonych 1").replace("po 12 (lord_4_1) TAK", "po 11 (-) NIE").replace("potkniecia 0", "potkniecia 2"),   # KP-2, KP-6, KP-10
+           T["test"].replace("wynik TAK", "wynik NIE"),                                        # KP-7
+           T["day4"].replace("wojna: brak krolestwa (korona jest, Dorzecze BRAK)", "wojna: wojna z korona TAK (od dnia 34)"),   # KP-5
+           T["start"], T["ustart"],                                                            # KP-1 i KP-8: druga unia
+           T["rw"].replace("vlandia TAK, Mooton", "vlandia NIE, Mooton")]                      # KP-9
+    exp = {
+        "good": {"KP-0": "TAK", "KP-1": "TAK", "KP-2": "TAK", "KP-3": "TAK", "KP-4": "TAK", "KP-5": "TAK", "KP-6": "TAK", "KP-7": "TAK", "KP-8": "TAK", "KP-9": "TAK", "KP-10": "TAK"},
+        "bad": {"KP-0": "TAK", "KP-1": "NIE", "KP-2": "NIE", "KP-3": "NIE", "KP-4": "NIE", "KP-5": "NIE", "KP-6": "NIE", "KP-7": "NIE", "KP-8": "NIE", "KP-9": "NIE", "KP-10": "NIE"},
+        "none": {"KP-0": "INFO", "KP-1": "INFO", "KP-2": "INFO", "KP-3": "INFO", "KP-4": "INFO", "KP-5": "INFO", "KP-6": "INFO", "KP-7": "INFO", "KP-8": "INFO", "KP-9": "INFO", "KP-10": "INFO"},
+    }
+    runs = {"good": good, "bad": bad, "none": ["[10:00:00] Armoury: inna linia"]}
+    diff = []
+    tmp = tempfile.mkdtemp(prefix="krol272_")
+    try:
+        for kind, L in runs.items():
+            logp = os.path.join(tmp, kind + ".log")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            krol272_rows(rep, krol272_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def krol272_main(logp):
+    """krol272 (27.10, paczka 272): KP-S, KP-S2, KP-0..KP-10 - opis w --help. Strumieniowo."""
+    rep = Report()
+    s1 = krol272_selftest()
+    rep.add("KP-S: self-test wyrazen (linie kontrolne jak w kodzie C#: KingInTheNorth.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = krol272_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("KP-S2: test syntetyczny (dobry, zly, bez linii 272)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("KP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = krol272_collect(logp)
+    print(f"plik: {logp} | linii 272 {D['lines']}, zdarzen {len(D['ev'])}, ERROR {D['err']}")
+    krol272_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_krol272_main_prev = main
+
+
+def main(argv):
+    # paczka 272: grupa krol272 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "krol272":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return krol272_main(rest[0] if rest else None)
+    return _krol272_main_prev(argv)
 
 
 if __name__ == "__main__":

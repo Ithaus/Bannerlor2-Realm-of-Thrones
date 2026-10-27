@@ -276,6 +276,41 @@ namespace Armoury
             catch (Exception e) { Stumble("RepayOnFall", e); return 0; }
         }
 
+        /// <summary>272 (unia Dorzecza z Polnoca, KingInTheNorth): kredyt korony `from` przechodzi na korone `to` (PO RepayOnFall - zostaje tylko to, czego skarbiec
+        /// nie splacil). Bank nic nie traci: dlug i szczyt dodane, oprocentowanie wazone dlugiem, zaleglosc i "kiedys zaleglosc" sumowane (OR), raty okna 28 dob dodane
+        /// wedlug wieku (oba pierscienie przesuwaja sie w tym samym kroku doby), clo zastawione tej doby przeniesione; koszt kredytu (zysk Banku f20-d3) - IronBank.MoveCrownCost.
+        /// Zwraca przeniesiony dlug (0 - brak kredytu). Nie rzuca.</summary>
+        internal static double MoveLoan(Kingdom from, Kingdom to)
+        {
+            try
+            {
+                Loan l;
+                if (from == null || to == null || from.StringId == null || to.StringId == null || from == to || !_loans.TryGetValue(from.StringId, out l)) return 0;
+                if (l.Principal < 1) return 0;   // splacony (RepayOnFall) - wpis zostaje, Instalments go usunie (strata 0), koszt kredytu rozliczy IronBank jako splate
+                _loans.Remove(from.StringId); _arrDirty = true;
+                long pl; if (_pledged.TryGetValue(from.StringId, out pl)) { _pledged.Remove(from.StringId); long pt; _pledged.TryGetValue(to.StringId, out pt); _pledged[to.StringId] = pt + pl; }
+                IronBank.MoveCrownCost(from.StringId, to.StringId);
+                double p = Math.Max(0, l.Principal);
+                Loan t;
+                if (!_loans.TryGetValue(to.StringId, out t)) { l.Name = NameOf(to); _loans[to.StringId] = l; return p; }
+                double tp = Math.Max(0, t.Principal);
+                if (tp + p > 0) t.Rate = (t.Rate * tp + l.Rate * p) / (tp + p);
+                t.Principal = tp + p; t.Peak += l.Peak;
+                if (l.Arrears && (!t.Arrears || t.ArrearsDay < 0 || (l.ArrearsDay >= 0 && l.ArrearsDay < t.ArrearsDay))) t.ArrearsDay = l.ArrearsDay;
+                t.Arrears |= l.Arrears; t.EverArrears |= l.EverArrears; t.Told |= l.Told;
+                t.Borrowed += l.Borrowed; t.Repaid += l.Repaid; t.Seized += l.Seized;
+                t.DLent += l.DLent; t.DDue += l.DDue; t.DPaid += l.DPaid;
+                for (int j = 0; j < l.Filled && j < Ring; j++)
+                {
+                    int it = ((t.Head - 1 - j) % Ring + Ring) % Ring, il = ((l.Head - 1 - j) % Ring + Ring) % Ring;
+                    t.Due[it] += l.Due[il]; t.Paid[it] += l.Paid[il];
+                }
+                t.Filled = Math.Max(t.Filled, l.Filled);
+                return p;
+            }
+            catch (Exception e) { Stumble("MoveLoan", e); return 0; }
+        }
+
         /// <summary>E5/B2 (184): korona krolestwa w zaleglosci wobec Banku (linia 184 - prog "bez zaleglosci przy s ponizej pulapu"). Tylko odczyt.</summary>
         internal static bool InArrears(Kingdom k)
         {

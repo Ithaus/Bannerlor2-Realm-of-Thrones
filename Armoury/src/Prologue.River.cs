@@ -309,6 +309,7 @@ namespace Armoury
             string endWhy = null;
             if (RotEventState("RedWeddingEvent") >= 1) endWhy = "Krwawe Gody (RedWeddingEvent ruszyl)";
             else if (robb != null && !robb.IsAlive) endWhy = "Robb Stark nie zyje";
+            else if (KingInTheNorth.Done) endWhy = "unia - Dorzecze w krolestwie Polnocy (272)";
             else if (!Alive(north) || !Alive(river)) endWhy = "krolestwo zniszczone (Polnoc " + (Alive(north) ? "jest" : "BRAK") + ", Dorzecze " + (Alive(river) ? "jest" : "BRAK") + ")";
             bool allied = Alive(north) && Alive(river) && beh.IsAllyWithKingdom(north, river);
             if (endWhy != null)

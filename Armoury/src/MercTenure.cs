@@ -48,6 +48,7 @@ namespace Armoury
         // liczniki doby i sesji (linia M6a-1)
         private static int _dHire, _dEnd, _dShortOk, _dShortBad, _dShortUnknown, _dToEnemy, _dToEnemyPlayer, _dBlockJoin, _dBlockFire, _dBlockEnemyBk, _dArmed, _dFreed;
         private static int _sHire, _sEnd, _sShortBad, _sToEnemy, _sBlockJoin, _sBlockFire, _sBlockEnemyBk;
+        private static int _sUnion;   // 272: kompanie przeniesione unia Dorzecza z Polnoca (ta sama sluzba)
         private static long _sServiceDays; private static int _sServiceN;
         private static readonly int[] _dWhy = new int[5];   // krotka sluzba z wyjatkiem: 0 pokoj u pracodawcy, 1 niedoplata 185, 2 upadek krolestwa, 3 zwolnienie BK w pokoju, 4 krolestwo gracza
         private static int _stumbles, _importN = -1, _importBad;
@@ -62,7 +63,7 @@ namespace Armoury
         internal static void Reset()
         {
             _prev.Clear(); _joined.Clear(); _pendBad.Clear(); ZeroDay();
-            _sHire = _sEnd = _sShortBad = _sToEnemy = _sBlockJoin = _sBlockFire = _sBlockEnemyBk = 0; _sServiceDays = 0; _sServiceN = 0;
+            _sHire = _sEnd = _sShortBad = _sToEnemy = _sBlockJoin = _sBlockFire = _sBlockEnemyBk = 0; _sUnion = 0; _sServiceDays = 0; _sServiceN = 0;
             _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _inBkFiring = false; UnpaidLeave = false;
         }
 
@@ -132,6 +133,9 @@ namespace Armoury
                 bool ruin = detail == ChangeKingdomAction.ChangeKingdomActionDetail.LeaveByKingdomDestruction;
                 int today = Today, jd;
                 bool wasMerc = _joined.TryGetValue(clan.StringId, out jd);
+                // 272 (unia Dorzecza z Polnoca, KingInTheNorth.Moving): ta sama sluzba pod nowa korona - bez konca sluzby, bez nowego najmu, doba najmu bez zmian
+                // (pole ShouldStayInKingdomUntil przywraca unia z migawki; przeglad doby liczy dalej od pierwszego najmu)
+                if (KingInTheNorth.Moving && join && wasMerc) { _sUnion++; return; }
                 // koniec sluzby u starego pana: odejscie, zmiana pana wprost (najem z innego krolestwa), upadek krolestwa
                 if (oldK != null && oldK != newK && (leave || join || (ruin && wasMerc)))
                 {
@@ -239,7 +243,7 @@ namespace Armoury
                              + ", przejscie BK do wroga (zostaje samo zwolnienie) " + _dBlockEnemyBk
                              + " | pole gry ShouldStayInKingdomUntil: ustawione " + _dArmed + ", wyzerowane " + _dFreed
                              + " | sesja: najmy " + _sHire + ", konce sluzby " + _sEnd + ", srednia sluzba " + (_sServiceN > 0 ? ((double)_sServiceDays / _sServiceN).ToString("0.0", Inv) : "-")
-                             + " dob (z " + _sServiceN + "), krotkie bez wyjatku " + _sShortBad + ", najem u wroga poprzedniego pana " + _sToEnemy
+                             + " dob (z " + _sServiceN + "), krotkie bez wyjatku " + _sShortBad + ", najem u wroga poprzedniego pana " + _sToEnemy + (_sUnion > 0 ? ", przeniesione unia 272 (ta sama sluzba) " + _sUnion : "")
                              + ", wstrzymane (gra / BK zwolnienie / BK do wroga) " + _sBlockJoin + " / " + _sBlockFire + " / " + _sBlockEnemyBk
                              + " | latki " + _wired + (_stumbles > 0 ? " | potkniecia " + _stumbles : "")
                              + (_importN >= 0 ? " | wczytano wpisow " + _importN + " (bledne " + _importBad + ")" : "") + ".");

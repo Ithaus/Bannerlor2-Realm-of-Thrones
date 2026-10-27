@@ -53,6 +53,32 @@ namespace Armoury
         private static readonly Dictionary<string, KlDebtK> _kl = new Dictionary<string, KlDebtK>();     // id krolestwa -> dlug u miast i mieszczan
         private static readonly Dictionary<string, int> _klBan = new Dictionary<string, int>();          // id krolestwa -> doba konca zakazu po niesplacie
         private static readonly Dictionary<string, KlInc> _klInc = new Dictionary<string, KlInc>();      // id krolestwa -> sredni nasz wplyw dnia 165 (84 doby)
+
+        /// <summary>272 (unia Dorzecza z Polnoca, KingInTheNorth): dlug korony `fromId` u miast i mieszczan przechodzi na korone `toId` - wierzyciele (kasy miast, kiesy
+        /// klas) zostaja ci sami, czesci dlugu dopisane do jej listy; liczniki sumowane, szczyt dodany (rata 1/182 szczytu), doby bez raty - wieksze; zakaz po niesplacie -
+        /// pozniejszy. Inaczej przy upadku krolestwa "dlug przepada" i miasta traca pozyczone zloto. Zwraca przeniesiony dlug. Nie rzuca.</summary>
+        internal static double KlMoveKingdom(string fromId, string toId)
+        {
+            try
+            {
+                KlDebtK x;
+                if (fromId == null || toId == null || fromId == toId || !_kl.TryGetValue(fromId, out x) || x == null) return 0;
+                double total = KlDebt(x);
+                _kl.Remove(fromId);
+                KlDebtK t;
+                if (!_kl.TryGetValue(toId, out t) || t == null) _kl[toId] = x;
+                else
+                {
+                    t.Parts.AddRange(x.Parts);
+                    t.Missed = Math.Max(t.Missed, x.Missed);
+                    t.Lent += x.Lent; t.Repaid += x.Repaid; t.Interest += x.Interest; t.Peak += x.Peak; t.DLent += x.DLent; t.DPaid += x.DPaid;
+                }
+                int ban;
+                if (_klBan.TryGetValue(fromId, out ban)) { _klBan.Remove(fromId); int tb; if (!_klBan.TryGetValue(toId, out tb) || tb < ban) _klBan[toId] = ban; }
+                return total;
+            }
+            catch (Exception e) { Stumble("KlMoveKingdom", e); return 0; }
+        }
         private static readonly CultureInfo KlInv = CultureInfo.InvariantCulture;
         private const int KlPerTown = 50000, KlBanDays = 182, KlRepayDays = 182, KlIncDays = 84, KlIncWarmup = 7, KlSurplusDays = 30;
         private const double KlSrcShare = 0.5, KlIncomeShare = 0.30;
