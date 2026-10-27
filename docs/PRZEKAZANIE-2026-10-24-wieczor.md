@@ -1,5 +1,11 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 16:45 CET - po odnowieniu limitu: 264 wznowione, 241+259 i 268+272 w toku
+- Workflowy (skrypt workflows\scripts\paczki-jeff-26-10-wieczor-wf_03ae36fd-43a.js): 264 wf_09849f4a-635 (wznowiony, args scratchpad\args-264.json),
+  241+259 wf_d5f20a7a-22b, 268+272 wf_755f2f7e-043. Przy przerwaniu: wznowic resumeFromRunId z TYMI SAMYMI args (z pliku runu w workflows\wf_*.json, pole args).
+- Uwaga: skrypt tnie liste potwierdzonych uwag dla poprawiajacego do 20000 znakow - po wyniku sprawdzic w journal.jsonl, czy wszystkie potwierdzone uwagi poprawione.
+- Limit 5h 0% o 16:42, tydzien 74%.
+
 ## DOPISEK 27.10 ok. 15:35 CET - PAUZA do odnowienia limitu (Jeff: "zrob pauze i kontynuuj po resecie limitu")
 - 264 zatrzymane (run wf_09849f4a-635: projekt gotowy w pamieci podrecznej, wykonanie przerwane - drzewo zb\n264 czyste). Wznowienie po 16:40:
   Workflow(scriptPath=workflows\scripts\paczki-jeff-26-10-wieczor-wf_03ae36fd-43a.js, resumeFromRunId=wf_09849f4a-635, args = scratchpad 1e1c276a...\scratchpad\args-264.json).
