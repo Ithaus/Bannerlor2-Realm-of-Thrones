@@ -1,5 +1,18 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 19:25 CET - WGRANIE 129 (241+259+264+268+272+274); w toku 277 i sprawdzenie strat ludnosci
+- Autotest 129a (18:50-19:15): bitwaN + probyN kod 0, zapisy Jeffa nietkniete, bledy CrashScribe 25 = jak 128a (cudze latki Harmony). 15 grup sprawdz_logi x 2 biegi
+  (war241 karawany259 pokoj264 z268 krol272 rownowaga274 p202 p203 m204jazda odbicie222 e223 m109muz m165mapa m6a nwar) - NIE 0, jedyny NIE: K259-7 T2 w bitwaN (bieg
+  bitew za krotki; w probyN T2 TAK). Wyniki: m113\wyniki\grupy-129a\. NWAR-10 tym razem TAK.
+- WGRANIE 129 o 19:19: Armoury.dll a25f28c0 (n161 2a96d15b), skrypt scratchpad\wgraj129.ps1; kopie Armoury.dll.bak-2026-10-27-przed-wgranie129 i
+  D:\Backup-Bannerlord\wgrane\2026-10-27-wgranie129-przed. Pliki danych bez zmian od 128. Zapis testowy -> D:\Backup-Bannerlord\zapisy-testowe-archiwum\2026-10-27-129a.
+  CHANGELOG statusy 6 paczek = WGRANE 129 (086fc0c9, wypchniete).
+- Jeff 19:05: "sprawdz w logu ile osob pochlonela wojna, ile ludnosci stracily wioski i miasta i czy straty sa odejmowane od liczby ludnosci".
+  Dane (scratchpad\ksiega_ludzi.py -> ksiega_ludzi.tsv, krainy.py): dzien 108768 -> 109002: polegli +86 876 (od siewu 108648: 108 478), cywile 1 176, wsie -102 tys.,
+  miasta -42 tys. (razem -0.28%), SLUZBA +104 tys., uchodzcy 3.6 -> 28 tys., narodziny netto +86.6 tys.; reszta rownania krain -1582 -> -5365 (skoki przy wczytaniu).
+  Weryfikacja w kodzie: workflow wf_ac2622a4-2b8 (rachunek strat + dryf rownania, z recenzja).
+- Nastepne: 277 (wf_f21d9616-2f0) -> scalenie do n161 -> autotest 130 -> WGRANIE 130.
+
 ## DOPISEK 27.10 ok. 19:20 CET - paczka 277 rody kanonu Zachodu/Ziem Koronnych "po ksiazce"; autotest 129a w toku
 - Jeff 19:10: "Czemu lannisterowie maja tak malo rodow, w ksiazce tez tak malo mieli?" -> odpowiedz: w ksiazce Tywin ok. 20k + Jaime ok. 15k, dziesiatki rodow
   Zachodu; w ROT strona korony 50 rodow, 17 z ziemia, 19 twierdz (strona Robba 95 / 34 / 38). Pieniadze NIE sa przyczyna (KL 6.2 mln skarbiec). Kredyt W3 niepotrzebny.
