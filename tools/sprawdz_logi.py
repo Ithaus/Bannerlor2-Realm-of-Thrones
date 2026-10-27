@@ -73866,6 +73866,8 @@ def main(argv):
 # i "pelne parostwo" == "w koronie" w kazdej linii doby; R277-5 linia doby co dobe (od pierwszej do ostatniej, bez dziur); R277-6 druzyny: od 2. doby po przeniesieniu
 # druzyn > 0, od 10. doby ludzi > 0 (log krotszy - INFO); R277-7 0 linii "ERROR in CanonHouses277" i potkniecia doby 0; R277-8 testy autotestu T1-T4 TAK (brak - INFO,
 # POMINIETY - bez wplywu); R277-9 INFO: rody, druzyny, ludzie / limit, zold od pana i stosunek B/A 274 pierwszej i ostatniej doby.
+# Recenzja 277: R277-10 zwrot 70% korony: gotowka od pana nie jest podstawa zwrotu - w dobach po sobie "zdjete wczoraj" (doba d) <= "do zdjecia dzis" (doba d-1),
+# i "do zdjecia dzis" (doba d) == "otrzymane" (doba d-1) - cala wczorajsza gotowka idzie do ciecia (bez dopisku albo bez dob po sobie - INFO).
 R277_TAG = "Rody kanonu (277): "
 R277_RX = {
     "start": re.compile(r"^Rody kanonu \(277\): start sesji \| klucz (TAK|NIE), nowe nazwy (TAK|NIE), zold od pana (TAK|NIE) \| zakres: (kampania kanonu|kampania klasyczna - nie dotyczy) "
@@ -73879,11 +73881,14 @@ R277_RX = {
     "day": re.compile(r"^Rody kanonu \(277\): dzien (\d+) \| rody (\d+) \(w koronie (\d+), pelne parostwo (\d+)\), druzyn (\d+) \(nowe dzis (\d+), blokada 166/179 (\d+)\), "
                       r"ludzi (\d+) / limit (\d+), zold druzyn (\d+) zl \| glowy: czynne (\d+), w niewoli (\d+), z cudzej druzyny do domu (\d+), czeka \(bitwa\) (\d+), "
                       r"NotSpawned -> czynna (\d+), parostwo przywrocone (\d+) \| od pana lennego: (WYLACZONE|pokoj - bez zoldu|zaplacone (\d+), otrzymane (\d+) \(rodow (\d+)\), "
-                      r"miejsce (\d+) z potrzeby (\d+) \(pan bez miejsca (\d+), pan bez zlota (\d+), bez pana (\d+), bez budzetu 166 (\d+), pan w niewoli (\d+)\) \[(.*?)\]) "
+                      r"miejsce (\d+) z potrzeby (\d+) \(pan bez miejsca (\d+), pan bez zlota (\d+), bez pana (\d+), bez budzetu 166 (\d+), pan w niewoli (\d+)\) \[(.*?)\])"
+                      r"(?: \| poza zwrotem 70% korony: do zdjecia dzis \d+ \(rodow \d+\), zdjete wczoraj \d+ \(wpisow \d+\))? "
                       r"\| stosunek B/A \(274, wczoraj\) ([\d.]+) \| potkniecia (\d+) \(sesja (\d+)\)\.$"),
     "off": re.compile(r"^Rody kanonu \(277\): dzien (\d+) \| wylaczone \((.*?)\) \| rody z zapisu (\d+) \| potkniecia (\d+) \(sesja (\d+)\)\.$"),
     "party": re.compile(r"^Rody kanonu \(277\): nowa druzyna \| dzien (\d+) \| "),
     "test": re.compile(r"^Rody kanonu \(277\): test - (T\d+) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
+    # recenzja 277: dopisek linii doby (CanonHouses277.Pay.cs RefundText) - search w linii "day"
+    "refund": re.compile(r" \| poza zwrotem 70% korony: do zdjecia dzis (\d+) \(rodow (\d+)\), zdjete wczoraj (\d+) \(wpisow (\d+)\) \| stosunek B/A"),
 }
 # linie kontrolne - jak w kodzie C# (CanonHouses277.cs SessionStart / Promote / RenameKnight / Migrate / DayLine, .Pay.cs PayText, .Test.cs)
 R277_TEST = {
@@ -73899,10 +73904,11 @@ R277_TEST = {
     "day": "Rody kanonu (277): dzien {d} | rody 12 (w koronie 12, pelne parostwo {fp}), druzyn {par} (nowe dzis 0, blokada 166/179 {blk}), ludzi {men} / limit 1500, zold druzyn 900 zl "
            "| glowy: czynne 12, w niewoli 0, z cudzej druzyny do domu 0, czeka (bitwa) 0, NotSpawned -> czynna 0, parostwo przywrocone 0 | od pana lennego: zaplacone {pd}, "
            "otrzymane {got} (rodow 10), miejsce 2100 z potrzeby 2300 (pan bez miejsca 0, pan bez zlota 0, bez pana 0, bez budzetu 166 0, pan w niewoli 6) "
-           "[Lannister 700/1600, Baratheon, Joffrey 200/500] | stosunek B/A (274, wczoraj) {r} | potkniecia {p} (sesja {p}).",
+           "[Lannister 700/1600, Baratheon, Joffrey 200/500] | poza zwrotem 70% korony: do zdjecia dzis {tc} (rodow 10), zdjete wczoraj {cy} (wpisow 10) "
+           "| stosunek B/A (274, wczoraj) {r} | potkniecia {p} (sesja {p}).",
     "dayoff": "Rody kanonu (277): dzien {d} | rody 12 (w koronie 12, pelne parostwo 12), druzyn 12 (nowe dzis 0, blokada 166/179 0), ludzi 900 / limit 1500, zold druzyn 900 zl "
               "| glowy: czynne 12, w niewoli 0, z cudzej druzyny do domu 0, czeka (bitwa) 0, NotSpawned -> czynna 0, parostwo przywrocone 0 | od pana lennego: pokoj - bez zoldu "
-              "| stosunek B/A (274, wczoraj) 0.512 | potkniecia 0 (sesja 0).",
+              "| poza zwrotem 70% korony: do zdjecia dzis 0 (rodow 0), zdjete wczoraj 0 (wpisow 0) | stosunek B/A (274, wczoraj) 0.512 | potkniecia 0 (sesja 0).",
     "off": "Rody kanonu (277): dzien {d} | wylaczone (kampania klasyczna - nie dotyczy) | rody z zapisu 0 | potkniecia 0 (sesja 0).",
     "party": "Rody kanonu (277): nowa druzyna | dzien {d} | Prester (gentryClan_Feastfires_Westerlands): Ser Lyonel, ludzi 12, limit 140 - droga gry SpawnLordParty (166, 159, E4/8).",
     "test": "Rody kanonu (277): test - {t} przydzial: Prester -> Feastfires 0 - wynik {r}.",
@@ -73911,8 +73917,8 @@ R277_PAYTXT = ("od pana lennego: zaplacone 900, otrzymane 900 (rodow 10), miejsc
                "bez budzetu 166 0, pan w niewoli 6) [Lannister 700/1600, Baratheon, Joffrey 200/500]")
 
 
-def _r277_day(d, fp=12, par=12, blk=0, men=900, pd=900, got=900, r=0.512, p=0):
-    return R277_TEST["day"].format(d=d, fp=fp, par=par, blk=blk, men=men, pd=pd, got=got, r=f"{r:.3f}", p=p)
+def _r277_day(d, fp=12, par=12, blk=0, men=900, pd=900, got=900, r=0.512, p=0, tc=900, cy=800):
+    return R277_TEST["day"].format(d=d, fp=fp, par=par, blk=blk, men=men, pd=pd, got=got, r=f"{r:.3f}", p=p, tc=tc, cy=cy)
 
 
 def rody277_selftest():
@@ -73922,7 +73928,8 @@ def rody277_selftest():
              ("start", T["start"].format(st="przeniesione dnia 109010", p=12, k=3)[:-1] + ". | proba autotestu: flaga armoury-rody277.flag TAK"),
              ("house", T["lord"].format(peer="pelne", t=3)), ("house", T["knight"]), ("summary", T["summary"].format(d=5, p=12, n=9, k=3)), ("day", _r277_day(5)),
              ("day", T["dayoff"].format(d=5)), ("off", T["off"].format(d=5)), ("party", T["party"].format(d=5)), ("test", T["test"].format(t="T1", r="TAK")),
-             ("day", _r277_day(5).replace(R277_PAYTXT, "od pana lennego: WYLACZONE"))]
+             ("day", _r277_day(5).replace(R277_PAYTXT, "od pana lennego: WYLACZONE")),
+             ("day", re.sub(r" \| poza zwrotem 70% korony: [^|]*?\)(?= \|)", "", _r277_day(5)).replace(R277_PAYTXT, "od pana lennego: WYLACZONE"))]
     for name, line in cases:
         if not R277_RX[name].match(line):
             probs.append(name)
@@ -73930,6 +73937,9 @@ def rody277_selftest():
     if not m or m.group(1) != "7" or m.group(4) != "11" or m.group(5) != "10" or m.group(7) != "1" or m.group(8) != "800" or m.group(18) != "950" or m.group(19) != "940" \
             or m.group(29) != "0.600" or m.group(30) != "2":
         probs.append("day grupy")
+    m = R277_RX["refund"].search(_r277_day(7, tc=123, cy=45))
+    if not m or m.group(1) != "123" or m.group(3) != "45" or R277_RX["refund"].search(T["dayoff"].format(d=5)) is None:
+        probs.append("refund grupy")
     m = R277_RX["house"].match(T["lord"].format(peer="pelne", t=3))
     if not m or m.group(2) != "gentryClan_Feastfires_Westerlands" or m.group(4) != "Reyne" or m.group(10) != "Prester" or m.group(11) != "pan":
         probs.append("house grupy")
@@ -73941,7 +73951,7 @@ def rody277_selftest():
 
 def rody277_collect(logp):
     RX = R277_RX
-    D = {"segs": [], "days": {}, "off": [], "parties": [], "tests": [], "err": 0, "err1": "", "bad": [], "defer": 0}
+    D = {"segs": [], "days": {}, "off": [], "parties": [], "tests": [], "err": 0, "err1": "", "bad": [], "defer": 0, "refund": []}
     seg = None
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -73969,6 +73979,9 @@ def rody277_collect(logp):
                     seg["summ" if name == "summary" else "houses"].append(mm)
                 elif name == "day":
                     D["days"][int(mm.group(1))] = mm
+                    rf = RX["refund"].search(s)
+                    D["refund"].append((int(mm.group(1)), int(mm.group(19)) if mm.group(19) is not None else 0,
+                                        int(rf.group(1)) if rf else None, int(rf.group(3)) if rf else None))
                 elif name == "off":
                     D["off"].append(mm)
                 elif name == "party":
@@ -74058,6 +74071,15 @@ def rody277_rows(rep, D):
     else:
         no = [m.group(1) for m in D["tests"] if m.group(3) == "NIE"]
         rep.add("R277-8: testy autotestu T1-T4", " ".join(f"{m.group(1)}={m.group(3)}" for m in D["tests"]), "brak NIE", not no)
+    # R277-10 (recenzja 277): zwrot 70% korony bez gotowki od pana
+    R = D["refund"]
+    pairs = [(R[i - 1], R[i]) for i in range(1, len(R)) if R[i][0] == R[i - 1][0] + 1 and R[i][2] is not None and R[i - 1][2] is not None]
+    over = [b[0] for a, b in pairs if b[3] > a[2]]
+    miss = [b[0] for a, b in pairs if b[2] != a[1]]
+    cutsum = sum(x[3] for x in R if x[3] is not None)
+    rep.add("R277-10: gotowka od pana poza zwrotem 70% korony", f"dob z dopiskiem {sum(1 for x in R if x[2] is not None)}, par dob {len(pairs)}, zdjete razem {cutsum}, "
+            f"zdjete ponad wczorajsze 'do zdjecia' {len(over)}" + (f" {over[:3]}" if over else "") + f", 'do zdjecia' != wczorajsze 'otrzymane' {len(miss)}" + (f" {miss[:3]}" if miss else ""),
+            "0 i 0", (not over and not miss) if pairs else None)
     # R277-9
     if dl:
         a, b = days[dl[0]], days[dl[-1]]
@@ -74095,7 +74117,7 @@ def rody277_synth():
                     par = 0 if i < 1 or (kind == "bad" and i == 4) else 12
                     men = 0 if i < 3 else 900
                     L.append(P + _r277_day(d, par=par, men=men, blk=(1 if kind == "bad" and i == 2 else 0), got=(899 if kind == "bad" and i == 9 else 900),
-                                           p=(1 if kind == "bad" and i == 11 else 0)))
+                                           p=(1 if kind == "bad" and i == 11 else 0), cy=(950 if kind == "bad" and i == 10 else 800)))
                     if i == 1:
                         L.append(P + T["party"].format(d=d))
                 L.append(P + T["start"].format(st="przeniesione dnia 109000", p=12, k=3))
@@ -74113,10 +74135,11 @@ def rody277_synth():
             shutil.rmtree(tmp, ignore_errors=True)
     exp = {
         "good": {"R277-0": "TAK", "R277-1": "TAK", "R277-2": "TAK", "R277-3": "TAK", "R277-4": "TAK", "R277-5": "TAK", "R277-6": "TAK", "R277-7": "TAK", "R277-8": "TAK",
-                 "R277-9": "INFO"},
-        "bad": {"R277-0": "NIE", "R277-1": "NIE", "R277-2": "NIE", "R277-3": "NIE", "R277-4": "NIE", "R277-5": "NIE", "R277-6": "NIE", "R277-7": "NIE", "R277-8": "NIE"},
+                 "R277-9": "INFO", "R277-10": "TAK"},
+        "bad": {"R277-0": "NIE", "R277-1": "NIE", "R277-2": "NIE", "R277-3": "NIE", "R277-4": "NIE", "R277-5": "NIE", "R277-6": "NIE", "R277-7": "NIE", "R277-8": "NIE",
+                "R277-10": "NIE"},
         "none": {"R277-0": "INFO", "R277-1": "INFO", "R277-2": "INFO", "R277-3": "INFO", "R277-4": "INFO", "R277-5": "INFO", "R277-6": "INFO", "R277-7": "TAK", "R277-8": "INFO",
-                 "R277-9": "INFO"},
+                 "R277-9": "INFO", "R277-10": "INFO"},
     }
     diff = []
     for kind, e in exp.items():
@@ -74126,7 +74149,7 @@ def rody277_synth():
 
 
 def rody277_main(logp):
-    """rody277 (27.10, paczka 277): R277-S, R277-S2, R277-0..R277-9 - opis w komentarzu nad stalymi R277_*. Strumieniowo, tylko odczyt logu."""
+    """rody277 (27.10, paczka 277): R277-S, R277-S2, R277-0..R277-10 - opis w komentarzu nad stalymi R277_*. Strumieniowo, tylko odczyt logu."""
     rep = Report()
     s1 = rody277_selftest()
     rep.add("R277-S: self-test wyrazen (linie kontrolne jak w kodzie C#: CanonHouses277*.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)

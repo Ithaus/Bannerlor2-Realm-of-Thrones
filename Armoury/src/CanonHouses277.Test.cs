@@ -9,7 +9,7 @@ namespace Armoury
     /// plik tylko czytany; w zwyklej grze nic nie robi). Na kopii zapisu autotestu, nigdy na zapisach Jeffa. Raz, w pierwszej godzinie sesji od 2. godziny:
     ///  T1 przydzial rycerzy do rodow (AssignCore): siedziba = wies majatku pierwsza, rod z punktem - najblizszy majatek, reszta po kolei, bez dwoch rodow na jednym rycerzu;
     ///  T2 regula zoldu od pana (PayPlan, regula W5): ludzie ponizej celu - gotowka = zold ponad pulap wlasny, miejsce = gotowka + krok; ludzie ponad celem - gotowka do celu;
-    ///     rod stac samemu - 0 gotowki; limit 0 - nic;
+    ///     rod stac samemu (pulap wlasny >= koszt) - nic; pulap wlasny miedzy zoldem a kosztem - miejsce = ludzie + krok - pulap (recenzja 277, W5); limit 0 - nic;
     ///  T3 zapis: Export -> Import -> Export bez roznic;
     ///  T4 (stan swiata, tylko gdy przeniesienie juz bylo) kazdy rod pana 277 w koronie ma pelne parostwo BK i tier >= 3, a GentryService nie liczy go jako rycerza.
     /// Linie "Rody kanonu (277): test - Tn ... - wynik TAK|NIE|POMINIETY."
@@ -79,16 +79,18 @@ namespace Armoury
 
         private static void T2()
         {
-            double c1, r1, c2, r2, c3, r3, c4, r4;
+            double c1, r1, c2, r2, c3, r3, c4, r4, c5, r5;
             // limit 200, 50 ludzi, zold 100 (2/czl), pulap wlasny 30: gotowka 70, krok min(20, 120-50) x 2 = 40 -> miejsce 110
             CanonHouses277.PayPlan(200, 50, 100, 2, 30, 0.6, 0.1, out c1, out r1);
             // 150 ludzi ponad cel 120: gotowka = 300 x 120/150 - 30 = 210, krok 0
             CanonHouses277.PayPlan(200, 150, 300, 2, 30, 0.6, 0.1, out c2, out r2);
-            // rod stac samemu (pulap 500): gotowka 0, miejsce = krok 40
+            // rod stac samemu (pulap 500 >= koszt 240): nic (recenzja 277 - W5 NaCost <= 0; dotad miejsce 40)
             CanonHouses277.PayPlan(200, 50, 100, 2, 500, 0.6, 0.1, out c3, out r3);
+            // pulap 120 miedzy zoldem 100 a kosztem 240: gotowka 0, miejsce = min(240 - 120, 100 + 40 - 120) = 20 (W5 boost)
+            CanonHouses277.PayPlan(200, 50, 100, 2, 120, 0.6, 0.1, out c5, out r5);
             CanonHouses277.PayPlan(0, 0, 0, 2, 0, 0.6, 0.1, out c4, out r4);
-            bool ok = Near(c1, 70) && Near(r1, 110) && Near(c2, 210) && Near(r2, 210) && Near(c3, 0) && Near(r3, 40) && c4 == 0 && r4 == 0;
-            Line("T2 zold od pana (regula W5): " + c1 + "/" + r1 + ", " + c2 + "/" + r2 + ", " + c3 + "/" + r3 + ", " + c4 + "/" + r4, ok);
+            bool ok = Near(c1, 70) && Near(r1, 110) && Near(c2, 210) && Near(r2, 210) && Near(c3, 0) && Near(r3, 0) && c4 == 0 && r4 == 0 && Near(c5, 0) && Near(r5, 20);
+            Line("T2 zold od pana (regula W5): " + c1 + "/" + r1 + ", " + c2 + "/" + r2 + ", " + c3 + "/" + r3 + ", " + c4 + "/" + r4 + ", " + c5 + "/" + r5, ok);
         }
 
         private static bool Near(double a, double b) { return Math.Abs(a - b) < 0.001; }

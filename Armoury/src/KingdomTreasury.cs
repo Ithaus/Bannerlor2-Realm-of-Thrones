@@ -287,6 +287,9 @@ namespace Armoury
                     if (cur) { long cutN = NeedAidRefundCut(c, v); if (cutN > 0) { v -= (int)cutN; if (v <= 0) continue; } }
                     // W7: zold oplacony wczorajszym poborem stawki wojennej pana tez nie jest podstawa zwrotu (bez wczorajszego poboru - 0, jak przed paczka)
                     if (cur) { long cutL = LordLevyRefundCut(c, v); if (cutL > 0) { v -= (int)cutL; if (v <= 0) continue; } }
+                    // 277 (recenzja): zold oplacony wczorajsza gotowka pana lennego rodom panow 277 (CanonHouses277.Pay) tez nie jest podstawa zwrotu - korona nie zwraca
+                    // zoldu, ktory juz oplacil Lannister / Joffrey (jak W5 i W7; bez wczorajszej gotowki 277 - 0)
+                    { long cut277 = CanonHouses277.RefundCut(c, v); if (cut277 > 0) { v -= (int)cut277; if (v <= 0) continue; } }
                     long own;
                     // E5/A1 (E5K1-08b): przy czynnym zaworze kas miast do pana wraca tylko jego udzial (TownPurse.LordShare: TownRentLordShare, z wyrownaniem
                     // E5/B3 TownRentLordShareWithFolk) - tyle tniemy; korona swojej czesci nie oddaje drugi raz

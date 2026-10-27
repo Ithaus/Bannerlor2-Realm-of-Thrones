@@ -26,7 +26,8 @@ namespace Armoury
     ///
     /// CO ROBI (raz na zapis, pierwsza doba po wczytaniu albo pierwsza doba nowej kampanii; tylko kampania kanonu i tylko gdy krolestwo vlandia istnieje):
     ///  (1) dane: rody lordowskie (kolumna status "lordly") krain Westerlands i Crownlands z arm_houses_canon.tsv bez klanu ROT - Estren, Falwell, Jast, Moreland, Plumm,
-    ///      Prester, Spicer, Stackspear; Buckwell, Chelsted, Hayford, Stokeworth (statusy ziem koronnych dopisane w tools/herby/dane - paczka 277);
+    ///      Prester, Stackspear; Buckwell, Chelsted, Hayford, Stokeworth (statusy ziem koronnych dopisane w tools/herby/dane - paczka 277); Spicer (recenzja 277) - lordowski
+    ///      dopiero po Krwawych Godach (LordOnlyAfterRedWedding), przed RedWeddingEvent 2 rod rycerski;
     ///  (2) rod rycerza BK korony z majatkiem w okregu tej krainy, ktory juz nosi nazwe rodu - zostaje; rod rycerza z nazwa spoza kanonu (zapas GentryNames: nazwa wsi)
     ///      albo rodu wymarlego przed startem (Reyne) dostaje nazwe brakujacego rodu (klucz CanonHouses277Rename): najpierw rod, ktorego siedziba w pliku JEST wsia majatku
     ///      (Prester - Feastfires), potem rody z punktem (siedziba / osada podkrainy - CanonHouses.RefPos) do najblizszego majatku, potem reszta w kolejnosci pliku;
@@ -330,12 +331,20 @@ namespace Armoury
             var lords = new List<KeyValuePair<CanonHouses.House, Cand>>();       // rod -> rycerz z ta nazwa (istniejacy) albo kandydat do nowej nazwy
             var missLord = new List<CanonHouses.House>();
             var missKnight = new List<CanonHouses.House>();
+            var late = new List<string>(); int rw = -9;    // recenzja 277: rody lordowskie dopiero po Krwawych Godach - do nich rycerskie
             foreach (var h in CanonHouses.All())
             {
                 if (h.Area != AreaWest && h.Area != AreaCrown) continue;
                 if (h.Region != AreaWest && h.Region != AreaCrown) continue;                 // bez podkrain (Dragonstone, Crackclaw Point - strona Stannisa)
                 if (!h.Holder || h.Clans.Length > 0) continue;                                // rod z klanem ROT (Banefort, Rosby ...) - jak w ROT
                 bool lordly = h.Status.StartsWith("lordly", StringComparison.Ordinal), knightly = h.Status.StartsWith("knightly", StringComparison.Ordinal);
+                if (lordly && LordOnlyAfterRedWedding(h))
+                {
+                    // recenzja 277: status w pliku to stan KONCOWY awoiaf; przed Krwawymi Godami ten rod jest rycerski (Ser Rolph Spicer u Westerlingow - ROT
+                    // notablesROT "Ser Rolf Spicer", wiejskie lore "Ser Harys Spicer"); lenno Castamere Tywin daje dopiero po Blizniakach
+                    if (rw < 0) rw = Prologue.RotEventState("RedWeddingEvent");
+                    if (rw < 2) { lordly = false; knightly = true; late.Add(Short(h.Base.Length > 0 ? h.Base : h.Name) + " (RedWeddingEvent " + rw + ")"); }
+                }
                 if (!lordly && !knightly) continue;
                 string sh = Short(h.Base.Length > 0 ? h.Base : h.Name);
                 Clan has;
@@ -386,7 +395,17 @@ namespace Armoury
             _doneDay = today;
             Log.Info(Tag + "przeniesienie | dzien " + today + " | panowie " + (nExisting + nRenamed) + " (istniejace nazwy " + nExisting + ", nowe nazwy " + nRenamed + "), rycerze z nazwa kanonu " + nKnight
                      + ", rycerzy BK korony w okregach Zachodu i ziem koronnych " + knights.Count + " | pominiete " + skipped.Count + (skipped.Count > 0 ? " [" + string.Join("; ", skipped.ToArray()) + "]" : "")
-                     + " | bez rodu kanonu zostaja " + stay.Count + (stay.Count > 0 ? " [" + string.Join(", ", stay.ToArray()) + "]" : "") + ".");
+                     + " | bez rodu kanonu zostaja " + stay.Count + (stay.Count > 0 ? " [" + string.Join(", ", stay.ToArray()) + "]" : "")
+                     + " | rycerskie do Krwawych Godow " + late.Count + (late.Count > 0 ? " [" + string.Join(", ", late.ToArray()) + "]" : "") + ".");
+        }
+
+        /// <summary>Recenzja 277: rody, ktorych status "lordly" w arm_houses_canon.tsv to stan po wojnie (awoiaf - koniec historii), a w 298/299 sa rycerskie: Spicer
+        /// (Castamere - nagroda Tywina po Krwawych Godach; Ser Rolph u Westerlingow, strona Robba). Lista z ksiag (Jeff "ksiazce"), nie stala ekonomii.</summary>
+        internal static bool LordOnlyAfterRedWedding(CanonHouses.House h)
+        {
+            if (h == null) return false;
+            string sh = Short(h.Base.Length > 0 ? h.Base : h.Name);
+            return h.Area == AreaWest && string.Equals(sh, "Spicer", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Przydzial rycerzy do rodow (stala kolejnosc): (1) siedziba rodu w pliku = wies majatku, (2) rody z punktem (CanonHouses.RefPos) - najblizszy majatek,
@@ -648,7 +667,7 @@ namespace Armoury
               .Append(", ludzi ").Append(men).Append(" / limit ").Append(lim).Append(", zold druzyn ").Append(wage).Append(" zl")
               .Append(" | glowy: czynne ").Append(active).Append(", w niewoli ").Append(_dPrisoner).Append(", z cudzej druzyny do domu ").Append(_dHomeFromParty)
               .Append(", czeka (bitwa) ").Append(_dWaitBattle).Append(", NotSpawned -> czynna ").Append(_dWoke).Append(", parostwo przywrocone ").Append(_dRegrant)
-              .Append(" | ").Append(PayText())
+              .Append(" | ").Append(PayText()).Append(RefundText())
               .Append(" | stosunek B/A (274, wczoraj) ").Append(CanonWarBalance.LastRatio.ToString("0.000", Inv))
               .Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(").");
             return sb.ToString();
@@ -668,6 +687,7 @@ namespace Armoury
                 sb.Append(Esc(r.Clan)).Append('~').Append(r.Kind.ToString(Inv)).Append('~').Append(Esc(r.House)).Append('~').Append(Esc(r.Old)).Append('~').Append(Esc(r.New))
                   .Append('~').Append(Esc(r.Liege)).Append('~').Append(r.Ren.ToString(Inv)).Append('~').Append(r.T0.ToString(Inv)).Append('~').Append(r.T1.ToString(Inv));
             }
+            sb.Append('|').Append(CashExport());   // recenzja 277: pola 4-5 - gotowka od pana tej doby (jutrzejszy zwrot 70% korony ja tnie; stary zapis bez pol - pusto)
             return sb.ToString();
         }
 
@@ -682,6 +702,7 @@ namespace Armoury
                 var parts = v.Split('|');
                 if (parts.Length < 3 || parts[0] != "v1") return;
                 _doneDay = int.Parse(parts[1], Inv);
+                if (parts.Length >= 5) { try { CashImport(parts[3], parts[4]); } catch (Exception e) { _cashT.Clear(); Stumble("Import(gotowka)", e); } }
                 if (parts[2].Length == 0) return;
                 foreach (var row in parts[2].Split(';'))
                 {
@@ -718,6 +739,7 @@ namespace Armoury
             why = "";
             string a = Export();
             int d0 = _doneDay; var keep = new List<Rec>(_recs);
+            int cd0 = _cashDay; var cash0 = new Dictionary<string, long>(_cashT, StringComparer.Ordinal);
             try
             {
                 Import(a);
@@ -725,7 +747,7 @@ namespace Armoury
                 if (a != b) { why = "rozne napisy"; return false; }
                 return true;
             }
-            finally { _doneDay = d0; _recs.Clear(); _recs.AddRange(keep); Link(); }
+            finally { _doneDay = d0; _recs.Clear(); _recs.AddRange(keep); _cashDay = cd0; _cashT.Clear(); foreach (var kv in cash0) _cashT[kv.Key] = kv.Value; Link(); }
         }
     }
 }
