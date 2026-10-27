@@ -1,5 +1,17 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 20:45 CET - WGRANIE 130 (277 rody kanonu Zachodu); nic w toku, czeka odpowiedz Jeffa o 280
+- Autotest 130a (20:10-20:40): bitwaN + probyN 30 dob (109002 -> 109031) kod 0, zapisy Jeffa nietkniete, bledy CrashScribe 27/25 jak 128a. Grupy (m113\wyniki\grupy-130a):
+  rody277 13 progow NIE 0 w obu biegach; przeniesienie na kopii zapisu Jeffa: panow 11 (Spicer rycerski do Krwawych Godow), rycerzy z nazwa kanonu 4 (Greenfield,
+  Hetherspoon, Lorch, Ruttiger), nowe druzyny (limit 190). NIE tylko: K259-7 T2 w bitwaN (jak 129a) i E223-5 "najdluzej w stanie" 27.1 dob (Ookpik Wolfcaller,
+  Wolni Ludzie) - starsze 223: LordEscort.ThinkPostfix wychodzi (Unready/CapTrip, DoNotChangeBehavior, IsStarving - linie 410-414) PRZED zwolnieniem po 12 dobach
+  (:469-477), stan wisi; 277 LordEscort.cs nie rusza. Do poprawki osobno (razem z 280?).
+- WGRANIE 130 o 20:42 (scratchpad\wgraj130.ps1): Armoury.dll 88d10a9a (n161 12eb9216) + ModuleData\arm_houses_canon.tsv 5e1d8c20; kopie .bak-2026-10-27-przed-wgranie130
+  (DLL i tsv) i D:\Backup-Bannerlord\wgrane\2026-10-27-wgranie130-przed. Zapis testowy -> D:\Backup-Bannerlord\zapisy-testowe-archiwum\2026-10-27-130a.
+  CHANGELOG 1c0059d2 + 9d807118 (wypchniete). Przy pierwszym wczytaniu kampanii Jeffa: przeniesienie raz (nazwy i herby NIEODWRACALNE w Ironmanie).
+- Do sprawdzenia w logu Jeffa po jego grze: linie "Rody kanonu (277)" (przeniesienie raz, panowie 11, druzyny), stosunek B/A w linii 274.
+- Czeka na Jeffa: paczka 280 (B1-B4 z dopisku 19:55) + E223-5.
+
 ## DOPISEK 27.10 ok. 20:15 CET - 277 gotowe i scalone (n161 12eb9216, build 88d10a9a), AUTOTEST 130a w toku
 - 277 (zb\n277): 6ff77201 + fbd0f287 + recenzja 653bdca6 (Armoury 711c6712). CanonHouses277.cs/.Pay.cs/.Test.cs; 12 rodow Zachodu i ziem koronnych z rycerzy BK korony
   panami (nazwa i herb z arm_houses_canon.tsv, pelne parostwo BK, tier 3, druzyna glowy SpawnLordParty); zold od pana lennego regula W5 (Lannister / Joffrey);
