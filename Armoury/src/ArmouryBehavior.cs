@@ -1417,6 +1417,8 @@ namespace Armoury
             // 259 (karawany rodow): rekordy majatku gracza (karawany i warsztaty od zakupu) - wlasny klucz, starsza DLL go pomija; brak klucza = liczniki od wczytania
             try { string mj = dataStore.IsSaving ? CaravanSettle.Export() : null; SaveText.Sync(dataStore, "arm_259_majatek", ref mj); if (dataStore.IsLoading) CaravanSettle.Import(mj); }
             catch (Exception e) { Log.Error("SyncData.arm_259_majatek", e); }
+            try { string kp = dataStore.IsSaving ? CaravanSettle.ExportFunded() : null; SaveText.Sync(dataStore, "arm_259_kapital", ref kp); if (dataStore.IsLoading) CaravanSettle.ImportFunded(kp); }   // recenzja 259: kapital dany karawanom przez E3/7
+            catch (Exception e) { Log.Error("SyncData.arm_259_kapital", e); }
             // KS r4 (r4-ceny): stan cen i sterowania rynku (doba restartu srednich cen, czynnik popytu targu do 1.25, brak miast C1) - osobny klucz, starsza DLL go pomija;
             // brak klucza (stary zapis) = stan od zera (po D+14 srednie cen uznane za juz zerowane)
             try { string k4 = dataStore.IsSaving ? StartCalibration.ExportR4c() : null; SaveText.Sync(dataStore, "arm_ks_r4c", ref k4); if (dataStore.IsLoading) StartCalibration.ImportR4c(k4); }

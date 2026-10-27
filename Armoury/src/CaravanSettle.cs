@@ -24,7 +24,8 @@ namespace Armoury
     /// Regula (jedna dla gracza i lordow; Settled): karawana czynna, nie konwoj DTE (DoNotMakeNewDecisions), wlasciciel zywy w AliveLords albo Companions
     /// swojego rodu (ta sama lista, z ktorej gra i BK licza dochod i zold karawan rodu), wodz nie glowa rodu. Notable - dalej E3-T2 (bez zmian).
     /// Raz na dobe na karawane, w rozliczeniu rodu gry (prefiks DefaultClanFinanceModel.AddIncomeFromParty, Priority.First - przed prefiksem BK):
-    ///   kapital = CaravanModel.GetInitialTradeGold(wlasciciel, morska, elitarna) (gracz 15 000 / 22 500 / 35 000 / 45 000, lord 10 000 / 17 500 / 30 000 / 40 000);
+    ///   kapital = CaravanModel.GetInitialTradeGold(wlasciciel, morska, elitarna) (gracz 15 000 / 22 500 / 35 000 / 45 000, lord 10 000 / 17 500 / 30 000 / 40 000),
+    ///             a gdy E3/7 dal karawanie mniej (zaplacone przez gracza, cena BK) - min(model, dane) (recenzja 259, rekordy arm_259_kapital);
     ///   wartosc = kiesa + towar (CaravanGoods.WorthOf: nizsza z kosztu z ksiegi E3-T1 i rynku; bez kosztu - wartosc x min(1, srednia indeksu));
     ///   podloga = PartyGoldLowerThreshold (5 000 - prog doplaty BK i gry) + zold doby (BK sprawdza kiese PO zdjeciu zoldu; bez tego co dobe +200 BK i z
     ///             powrotem); gdy rod NIE zwraca zoldu (wodz z tytulem Lordship albo glowa rodu - PartyExpensesPrefix BK; bez BK) - 30 dni zoldu (E3-T2 KeepWageDays);
@@ -61,6 +62,7 @@ namespace Armoury
         private static readonly object _lk = new object();
         private static int _dN, _dNPl, _dNLord, _dPaidN, _dBelow, _dNoCash, _dNoRefund, _dConvoy, _dBusy, _dDup, _dVanN, _dBkN, _dE39N, _dWeekN, _dSt;
         private static long _dPaid, _dPaidPl, _dPaidLord, _dCtlFrom, _dCtlTo, _dVanV, _dBkV, _dTicks, _dReads;
+        private static int _dCapE37, _dCapE37Low, _dCapModel, _dFundNew;   // recenzja 259: zrodlo kapitalu w rozliczeniu doby, nowe zapisy kapitalu E3/7
         private static int _sSt, _sDup;
         private static readonly Dictionary<MobileParty, int> _paidDay = new Dictionary<MobileParty, int>();   // straz: jedna wyplata na karawane na dobe
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -73,6 +75,7 @@ namespace Armoury
         internal static void Reset()
         {
             lock (_lk) { ZeroDay(); _paidDay.Clear(); }
+            lock (_funded) { _funded.Clear(); _fundImp = _fundImpBad = 0; _fundHad = false; }
             _sSt = _sDup = 0; _err.Clear(); _startDone = false;
             LastPaid = LastPaidPlayer = 0;
             PlayerReset();
@@ -83,6 +86,7 @@ namespace Armoury
         {
             _dN = _dNPl = _dNLord = _dPaidN = _dBelow = _dNoCash = _dNoRefund = _dConvoy = _dBusy = _dDup = _dVanN = _dBkN = _dE39N = _dWeekN = _dSt = 0;
             _dPaid = _dPaidPl = _dPaidLord = _dCtlFrom = _dCtlTo = _dVanV = _dBkV = _dTicks = _dReads = 0;
+            _dCapE37 = _dCapE37Low = _dCapModel = _dFundNew = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -180,8 +184,10 @@ namespace Armoury
         internal struct Calc
         {
             public int Purse, Capital, Floor, Wage, Payout, Kinds, Units;
-            public long Goods, Cost, Market, Worth;
+            public long Goods, Cost, Market, Worth, Other;
             public bool NoRefund;
+            public int CapModel, Funded;          // recenzja 259: kapital z modelu gry i dany przez E3/7 (-1 - brak zapisu, kapital z modelu)
+            public bool CapE37 { get { return Funded >= 0; } }
         }
 
         /// <summary>Wyplata wedlug reguli - TYLKO ODCZYT (kiesa, juki, ksiega E3-T1 bez zapisu, model kapitalu i progu gry).</summary>
@@ -191,11 +197,13 @@ namespace Armoury
             var ms = Campaign.Current.Models;
             var cpc = mp.CaravanPartyComponent;
             c.Purse = mp.PartyTradeGold;
-            c.Capital = ms.CaravanModel.GetInitialTradeGold(owner, cpc != null && cpc.CanHaveNavalNavigationCapability, cpc != null && cpc.IsElite);
+            c.CapModel = ms.CaravanModel.GetInitialTradeGold(owner, cpc != null && cpc.CanHaveNavalNavigationCapability, cpc != null && cpc.IsElite);
+            c.Funded = FundedOf(mp);
+            c.Capital = c.Funded >= 0 ? Math.Min(c.CapModel, c.Funded) : c.CapModel;   // recenzja 259: kapital = to, co karawana dostala (E3/7), nie wiecej niz model
             c.Wage = Math.Max(0, mp.TotalWage);
             c.NoRefund = NoRefund(mp);
             c.Floor = ms.ClanFinanceModel.PartyGoldLowerThreshold + (c.NoRefund ? CaravanGoods.KeepWageDays * c.Wage : c.Wage);
-            c.Goods = CaravanGoods.WorthOf(mp, out c.Cost, out c.Market, out c.Kinds, out c.Units);
+            c.Goods = CaravanGoods.WorthOf(mp, out c.Cost, out c.Market, out c.Kinds, out c.Units, out c.Other);
             c.Worth = c.Purse + c.Goods;
             c.Payout = Formula(c.Worth, c.Capital, c.Purse, c.Floor);
             return c;
@@ -254,6 +262,7 @@ namespace Armoury
                 {
                     _dN++; if (pl) _dNPl++; else _dNLord++;
                     if (c.NoRefund) _dNoRefund++;
+                    if (c.CapE37) { _dCapE37++; if (c.Funded < c.CapModel) _dCapE37Low++; } else _dCapModel++;
                     if (van) { _dVanN++; _dVanV += (c.Purse - BkKeep) / 10; }
                 }
                 if (busy)
@@ -461,12 +470,15 @@ namespace Armoury
                       .Append(" za ").Append(_dPaid).Append(" zl (graczowi ").Append(_dPaidPl).Append(", lordom ").Append(_dPaidLord).Append("), ponizej kapitalu ").Append(_dBelow)
                       .Append(", wartosc>kapital ale kiesa<=podloga ").Append(_dNoCash).Append(", bez zwrotu zoldu (tytul) ").Append(_dNoRefund)
                       .Append(", konwoje pominiete ").Append(_dConvoy).Append(", w bitwie/rozwiazywane ").Append(_dBusy)
-                      .Append(" | kontrola: kiesy -").Append(_dCtlFrom).Append(" = salda rodow +").Append(_dCtlTo).Append(" (roznica ").Append(_dCtlFrom - _dCtlTo).Append(')')
+                      .Append(" | kontrola: kiesy -").Append(_dCtlFrom).Append(" = wynik prefiksu +").Append(_dCtlTo).Append(" (roznica ").Append(_dCtlFrom - _dCtlTo).Append(')')
                       .Append(" | zastapione/zablokowane: gra 10% ").Append(_dVanN).Append(" (bylo by ").Append(_dVanV).Append("), BK przy wjezdzie ").Append(_dBkN)
                       .Append(" (bylo by ").Append(_dBkV).Append("), E3/9 ").Append(_dE39N).Append(", tydzien BK ").Append(_dWeekN)
                       .Append(" | drugie wywolanie w dobie ").Append(_dDup).Append(" (sesja ").Append(_sDup).Append(')')
                       .Append(" | czas regul ").Append(ms.ToString("0.00", Inv)).Append(" ms (podgladow ").Append(_dReads).Append(')')
-                      .Append(" | potkniecia ").Append(_dSt).Append(" (sesja ").Append(_sSt).Append(").");
+                      .Append(" | potkniecia ").Append(_dSt).Append(" (sesja ").Append(_sSt).Append(')');
+                    int fundN; lock (_funded) fundN = _funded.Count;
+                    sb.Append(" | kapital karawan: z E3/7 ").Append(_dCapE37).Append(" (nizszy od modelu ").Append(_dCapE37Low).Append("), z modelu ").Append(_dCapModel)
+                      .Append(", nowe zapisy E3/7 ").Append(_dFundNew).Append(" (rekordow ").Append(fundN).Append(").");
                     ZeroDay();
                     // porzadki strazy doby: karawany, ktorych juz nie ma
                     if (_paidDay.Count > 0)
@@ -480,8 +492,74 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             LastPaid = paid; LastPaidPlayer = paidPl;
+            try { FundPrune(); } catch (Exception e) { Stumble("FundPrune", e); }
             try { PlayerDaily(s, day); } catch (Exception e) { Stumble("PlayerDaily", e); }
             try { TestStep(day); } catch (Exception e) { Stumble("TestStep", e); }
+        }
+
+        // ------------------------------------------------------------ recenzja 259: kapital dany karawanie przez E3/7 (CaravanCapital: kupno BK, karawana gracza)
+        // E3/7 daje karawanie min(kapital modelu, zaplacone) - np. konwoj morski gracza: model 35 000, zaplacone 30 000; konwoj lorda BK: model 30 000, cena BK 15 000.
+        // Kapital w regule = min(model, dane); bez zapisu (start gry, karawany sprzed recenzji, E3/7 wylaczone, notable) - model jak dotad. Zapis: klucz arm_259_kapital.
+        private static readonly Dictionary<string, int> _funded = new Dictionary<string, int>(StringComparer.Ordinal);
+        private static int _fundImp, _fundImpBad;
+        private static bool _fundHad;
+
+        /// <summary>CaravanCapital.PlayerSettle (przelew miasto -> karawana gracza) i CreateFin (kupno BK, c.Cap): ile karawana dostala na handel.</summary>
+        internal static void NoteFunded(MobileParty mp, long cap)
+        {
+            try
+            {
+                if (mp == null || mp.StringId == null) return;
+                int v = (int)Math.Max(0L, Math.Min(int.MaxValue, cap));
+                lock (_funded) _funded[mp.StringId] = v;
+                lock (_lk) _dFundNew++;
+            }
+            catch (Exception e) { Stumble("NoteFunded", e); }
+        }
+
+        private static int FundedOf(MobileParty mp)
+        {
+            if (mp == null || mp.StringId == null) return -1;
+            int v;
+            lock (_funded) return _funded.TryGetValue(mp.StringId, out v) ? v : -1;
+        }
+
+        /// <summary>Raz na dobe: rekordy karawan, ktorych juz nie ma.</summary>
+        private static void FundPrune()
+        {
+            lock (_funded) { if (_funded.Count == 0) return; }
+            var live = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var mp in MobileParty.AllCaravanParties) if (mp != null && mp.IsActive && mp.StringId != null) live.Add(mp.StringId);
+            lock (_funded)
+            {
+                var gone = new List<string>();
+                foreach (var k in _funded.Keys) if (!live.Contains(k)) gone.Add(k);
+                foreach (var k in gone) _funded.Remove(k);
+            }
+        }
+
+        internal static string ExportFunded()
+        {
+            var sb = new StringBuilder(256);
+            lock (_funded) foreach (var kv in _funded) sb.Append(kv.Key).Append('|').Append(kv.Value.ToString(Inv)).Append('\n');
+            return sb.ToString();
+        }
+
+        internal static void ImportFunded(string s)
+        {
+            lock (_funded)
+            {
+                _funded.Clear(); _fundImp = _fundImpBad = 0; _fundHad = s != null;
+                if (string.IsNullOrEmpty(s)) return;
+                foreach (var line in s.Split('\n'))
+                {
+                    if (line.Length == 0) continue;
+                    var p = line.Split('|');
+                    int v;
+                    if (p.Length == 2 && p[0].Length > 0 && int.TryParse(p[1], NumberStyles.Integer, Inv, out v) && v >= 0) { _funded[p[0]] = v; _fundImp++; }
+                    else _fundImpBad++;
+                }
+            }
         }
 
         private static void StartLine(Settings s)
@@ -495,7 +573,9 @@ namespace Armoury
                      + " | Optym m105: latka na liscie znanych " + Tn(KingdomTreasury.KtKnows("Armoury:CaravanSettle.IncomePrefix"))
                      + " | rekordy z zapisu: karawan " + _impCars + ", warsztatow " + _impWs + " (bledne " + _impBad + (_impHad ? "" : "; brak klucza arm_259_majatek - liczniki od wczytania") + ")"
                      + " | regula: wyplata = min(wartosc - kapital, kiesa - podloga); kapital z CaravanModel.GetInitialTradeGold; podloga = PartyGoldLowerThreshold + zold doby"
-                     + " (bez zwrotu zoldu przez rod - " + CaravanGoods.KeepWageDays + " dni zoldu); towar: nizsza z kosztu (ksiega E3-T1) i rynku (wartosc x srednia indeksu), bez kosztu - wartosc x min(1, srednia indeksu).");
+                     + " (bez zwrotu zoldu przez rod - " + CaravanGoods.KeepWageDays + " dni zoldu); towar: nizsza z kosztu (ksiega E3-T1) i rynku (wartosc x srednia indeksu), bez kosztu - wartosc x min(1, srednia indeksu)."
+                     + " | recenzja 259: kapital = min(model, dane przez E3/7) - rekordy kapitalu z zapisu " + _fundImp + " (bledne " + _fundImpBad + (_fundHad ? "" : "; brak klucza arm_259_kapital - karawany sprzed recenzji z modelu") + ")"
+                     + "; towar liczy tez zwierzeta i inne przedmioty kupione z kiesy (ksiega E3-T1), bez jucznych do liczby ludzi.");
         }
     }
 }

@@ -157,43 +157,78 @@ namespace Armoury
 
         /// <summary>
         /// 259 (CaravanSettle): wartosc TOWARU w jukach karawany - TYLKO ODCZYT (bez EnsureSnap / Sync / Restore - nic nie zapisuje do ksiegi; dozwolone tylko
-        /// pamieci sredniej indeksu AvgIndex). Towar handlowy jak T1 (IsTradeGood; bez koni i jucznych - te nie sa towarem na sprzedaz, wymiana idzie z zysku).
+        /// pamieci sredniej indeksu AvgIndex). Towar handlowy jak T1 (IsTradeGood), a zwierzeta i inne przedmioty - tylko kupione z kiesy (nizej, recenzja 259).
         /// Na sztuke: znany koszt zakupu (ksiega E3-T1) -> nizsza z kosztu i rynku (wartosc x srednia indeksu 97 miast); sztuki bez wpisu w ksiedze
         /// (po wczytaniu, przed migawka) -> wartosc x min(1, srednia indeksu) (blad w dol). cost - koszt (znany + oszacowanie bez wpisu), market - rynek,
         /// kinds / units - rodzaje i sztuki. Wynik zaokraglony w dol do pelnych denarow (te same liczby ida do logu i do reguly wyplaty).
+        /// Recenzja 259: ZWIERZETA I INNE PRZEDMIOTY KUPIONE Z KIESY (konie, bydlo, juczne ponad potrzebe, bron i zbroje z BK OnSettlementLeft) - to tez towar
+        /// na sprzedaz (BK BuyGoods kupuje kategorie IsTradeGood || IsAnimal, SellGoods sprzedaje je z zyskiem), a zakup jest w ksiedze E3-T1 (TradePostfix
+        /// ksieguje kazdy przedmiot). Licza sie tylko sztuki z wpisem w ksiedze (kupione z kiesy), po nizszej z kosztu i rynku; bez wpisu - pominiete (juczne
+        /// gry i K5, dary BK, lup - nie z kiesy). Juczne potrzebne do niesienia (do MemberRoster.TotalManCount - ta sama granica, od ktorej BK uznaje juczne
+        /// za nadwyzke na sprzedaz) - pominiete, najpierw sztuki bez wpisu. other - ta czesc wyniku (zwierzeta i inne), osobno w linii gracza.
         /// </summary>
-        internal static long WorthOf(MobileParty mp, out long cost, out long market, out int kinds, out int units)
+        internal static long WorthOf(MobileParty mp, out long cost, out long market, out int kinds, out int units, out long other)
         {
-            cost = market = 0; kinds = units = 0;
+            cost = market = other = 0; kinds = units = 0;
             var r = mp != null ? mp.ItemRoster : null;
             if (r == null) return 0;
             lock (_worthLock)
             {
                 Dictionary<ItemObject, Lot> d;
                 if (!_book.TryGetValue(mp, out d)) d = null;
-                double worth = 0, dc = 0, dm = 0;
+                double worth = 0, dc = 0, dm = 0, dOther = 0;
+                int packNeed = mp.MemberRoster != null ? Math.Max(0, mp.MemberRoster.TotalManCount) : 0;
                 HashSet<ItemObject> seen = null;
+                // juczne bez wpisu w ksiedze (K5, gra, dary BK) niosa jako pierwsze - zmniejszaja potrzebe, zanim policzymy kupione z kiesy
+                for (int i = 0; i < r.Count && packNeed > 0; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0 || it.ItemCategory != DefaultItemCategories.PackAnimal) continue;
+                    if (seen == null) seen = new HashSet<ItemObject>();
+                    if (!seen.Add(it)) continue;
+                    int have = r.GetItemNumber(it);
+                    Lot lp;
+                    int known = d != null && d.TryGetValue(it, out lp) && lp != null && lp.N > 0 ? Math.Min(lp.N, have) : 0;
+                    packNeed -= Math.Min(packNeed, Math.Max(0, have - known));
+                }
+                if (seen != null) seen.Clear();
                 for (int i = 0; i < r.Count; i++)
                 {
                     var el = r.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
-                    if (it == null || el.Amount <= 0 || !it.IsTradeGood) continue;
-                    if (it.HasHorseComponent || it.ItemCategory == DefaultItemCategories.PackAnimal) continue;
+                    if (it == null || el.Amount <= 0) continue;
+                    bool goods = it.IsTradeGood && !it.HasHorseComponent && it.ItemCategory != DefaultItemCategories.PackAnimal;
+                    Lot l = null;
+                    if (!goods && (d == null || !d.TryGetValue(it, out l) || l == null || l.N <= 0)) continue;   // nie towar i bez zakupu z kiesy - pominiete
                     if (seen == null) seen = new HashSet<ItemObject>();
                     if (!seen.Add(it)) continue;                      // ten sam towar w kilku wierszach (modyfikatory) - GetItemNumber liczy wszystkie
                     int have = r.GetItemNumber(it);
                     if (have <= 0) continue;
-                    kinds++; units += have;
                     double val = Math.Max(1, it.Value), idx = AvgIndex(it.ItemCategory);
-                    int known = 0; double kc = 0;
-                    Lot l;
-                    if (d != null && d.TryGetValue(it, out l) && l != null && l.N > 0) { known = Math.Min(l.N, have); kc = l.Cost * known / l.N; }
-                    double unk = (have - known) * val * Math.Min(1.0, idx);
-                    worth += Math.Min(kc, known * val * idx) + unk;
+                    if (!goods)
+                    {
+                        int known = Math.Min(l.N, have), cnt = known;
+                        if (it.ItemCategory == DefaultItemCategories.PackAnimal)
+                        {
+                            int skip = Math.Min(packNeed, known);     // reszta potrzeby (po jucznych bez wpisu - petla wyzej) z kupionych
+                            packNeed -= skip; cnt = known - skip;
+                        }
+                        if (cnt <= 0) continue;
+                        double kcO = l.Cost * cnt / l.N, mO = cnt * val * idx, wO = Math.Min(kcO, mO);
+                        kinds++; units += cnt;
+                        worth += wO; dOther += wO; dc += kcO; dm += mO;
+                        continue;
+                    }
+                    kinds++; units += have;
+                    int knownG = 0; double kc = 0;
+                    if (d != null && d.TryGetValue(it, out l) && l != null && l.N > 0) { knownG = Math.Min(l.N, have); kc = l.Cost * knownG / l.N; }
+                    double unk = (have - knownG) * val * Math.Min(1.0, idx);
+                    worth += Math.Min(kc, knownG * val * idx) + unk;
                     dc += kc + unk;
                     dm += have * val * idx;
                 }
-                cost = (long)Math.Floor(dc); market = (long)Math.Floor(dm);
+                cost = (long)Math.Floor(dc); market = (long)Math.Floor(dm); other = (long)Math.Floor(dOther);
                 return (long)Math.Floor(worth);
             }
         }

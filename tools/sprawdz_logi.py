@@ -1192,7 +1192,8 @@ Uzycie (Python 3, tylko odczyt):
 --grupa karawany259 : (27.10, paczka 259 noc/259-karawany-gracza-rozliczenie - Jeff 27.10 "czemu moja karawana nic nie zarabia"; Armoury/src/CaravanSettle.cs,
                     CaravanSettle.Player.cs, CaravanSettle.Test.cs) python -I tools/sprawdz_logi.py --grupa karawany259 <Armoury-*.log> (strumieniowo). Linie
                     'Karawany rodow - rozliczenie dnia (259): ', 'Majatek gracza (karawany i warsztaty) (259): ', 'Karawany rodow (259): test - '. K259-S self-test,
-                    K259-S2 test syntetyczny; K259-0 latki TAK; K259-1 linia doby co dobe; K259-2 wyplata == wzor; K259-3 nic dwa razy; K259-4 kontrola 0; K259-5
+                    K259-S2 test syntetyczny; K259-0 latki TAK; K259-1 linia doby co dobe; K259-2 wyplata == wzor i kapital == min(dane E3/7, model); K259-3 nic dwa razy;
+                    K259-4 kontrola 0 (kiesy = wynik prefiksu); K259-5
                     komunikat wyplaty; K259-6 rytm 'ponizej kapitalu'; K259-7 zapis i T1-T6; K259-8 potkniecia i ERROR 0; K259-9 straznik m105; K259-10 INFO.
 --grupa m99markietani : (21.10, w-toku/m99-markietani; Armoury/src/CampSutlers.cs, klucz CampSutlersRow) rzad markietanow w menu obozu gracza (duzy oboz).
                     python -I tools/sprawdz_logi.py --grupa m99markietani <Armoury-*.log> (strumieniowo). MK-0 start, MK-1 ERROR i potkniecia 0, MK-2 tylko duzy oboz,
@@ -71409,7 +71410,8 @@ def main(argv):
 # K259-S self-test wyrazen (linie kontrolne jak w kodzie C#), K259-S2 test syntetyczny (dobry, zly, bez linii 259). K259-0 linia startu: 4 latki TAK i latka na liscie
 # straznika m105 TAK (klucz NIE - INFO); K259-1 linia swiata co dobe (najwyzej 1 brak); K259-2 kazda karawana gracza z rozliczeniem doby: wyplata ==
 # min(max(0, wartosc - kapital), max(0, kiesa - podloga)) i wartosc == kiesa + towar (liczby calkowite z linii); K259-3 nic dwa razy: rozliczana karawana gracza
-# bez wyplat BK / E3/9 / gra 10%, E3-T2 "graczowi" 0 w dobach z czynnym 259, drugie wywolanie w dobie 0; K259-4 kontrola doby roznica 0; K259-5 komunikaty PayNotes
+# bez wyplat BK / E3/9 / gra 10%, E3-T2 "graczowi" 0 w dobach z czynnym 259, drugie wywolanie w dobie 0; K259-4 kontrola doby roznica 0 (recenzja: kiesy = wynik
+# prefiksu - spojnosc wewnetrzna, nie pomiar salda rodu); K259-2 takze (recenzja 259): kapital == min(dane E3/7, model) albo model, zwierzeta i inne <= towar; K259-5 komunikaty PayNotes
 # "caravans" == doby z komunikatem wyplaty PayNotes, doba z wyplata 259 graczowi ma komunikat (PayNotes / ekran / wylaczone); K259-6 komunikat "ponizej kapitalu"
 # w 7. dobie z rzedu i co 7; K259-7 rekordy z zapisu bledne 0, testy T1-T6 TAK (bez testow - INFO); K259-8 potkniecia 0 i 0 linii "ERROR in CaravanSettle";
 # K259-9 straznik m105 nie wylacza pominiecia przez nasza latke (linia "Optym (m105)" bez "CaravanSettle"); K259-10 INFO: wyplaty, kapital, czas regul.
@@ -71423,11 +71425,13 @@ K259_RX = {
                         r"\| rekordy z zapisu: karawan (\d+), warsztatow (\d+) \(bledne (\d+)[^)]*\) \| regula: "),
     "day": re.compile(r"^dzien (\d+) \| (CZYNNE|WYLACZONE[^|]*|NIECZYNNE[^|]*) \| karawan rodow (\d+) \(gracza (\d+), lordow (\d+)\), z wyplata (\d+) za (\d+) zl "
                       r"\(graczowi (\d+), lordom (\d+)\), ponizej kapitalu (\d+), wartosc>kapital ale kiesa<=podloga (\d+), bez zwrotu zoldu \(tytul\) (\d+), "
-                      r"konwoje pominiete (\d+), w bitwie/rozwiazywane (\d+) \| kontrola: kiesy -(\d+) = salda rodow \+(\d+) \(roznica (-?\d+)\) "
+                      r"konwoje pominiete (\d+), w bitwie/rozwiazywane (\d+) \| kontrola: kiesy -(\d+) = (?:salda rodow|wynik prefiksu) \+(\d+) \(roznica (-?\d+)\) "
                       r"\| zastapione/zablokowane: gra 10% (\d+) \(bylo by (\d+)\), BK przy wjezdzie (\d+) \(bylo by (\d+)\), E3/9 (\d+), tydzien BK (\d+) "
-                      r"\| drugie wywolanie w dobie (\d+) \(sesja (\d+)\) \| czas regul ([\d.]+) ms \(podgladow (\d+)\) \| potkniecia (\d+) \(sesja (\d+)\)\.$"),
-    "car": re.compile(r"^karawana '(.+?)' \(wodz (.+?), (zwykla|elitarna|morska|morska elitarna), kapital (\d+), (rozliczana przez rod|NIE rozliczana przez rod)\) "
-                      r"\| rozliczenie doby: (?:kiesa (\d+) \(podloga (\d+)(?:, bez zwrotu zoldu)?\), towar w jukach (\d+) \(koszt (\d+), rynek (\d+), (\d+) rodzajow, (\d+) szt\.\), "
+                      r"\| drugie wywolanie w dobie (\d+) \(sesja (\d+)\) \| czas regul ([\d.]+) ms \(podgladow (\d+)\) \| potkniecia (\d+) \(sesja (\d+)\)"
+                      r"(?: \| kapital karawan: z E3/7 (\d+) \(nizszy od modelu (\d+)\), z modelu (\d+), nowe zapisy E3/7 (\d+) \(rekordow (\d+)\))?\.$"),
+    "car": re.compile(r"^karawana '(.+?)' \(wodz (.+?), (zwykla|elitarna|morska|morska elitarna), kapital (\d+)(?: \((?:E3/7: dane \d+, model \d+|model \d+)\))?, "
+                      r"(rozliczana przez rod|NIE rozliczana przez rod)\) "
+                      r"\| rozliczenie doby: (?:kiesa (\d+) \(podloga (\d+)(?:, bez zwrotu zoldu)?\), towar w jukach (\d+) \(koszt (\d+), rynek (\d+), (\d+) rodzajow, (\d+) szt\.(?:, w tym zwierzeta i inne \d+)?\), "
                       r"wartosc (\d+), kapital (\d+), wyplata (\d+)( \(w bitwie albo rozwiazywana\))?|brak [^|]*) \| teraz: kiesa (-?\d+), towar (\d+), wartosc (-?\d+) "
                       r"\| dzis: sprzedaz (\d+) \(myto (\d+)\), zakupy (\d+), zysk ze sprzedazy (-?\d+) \| zold (\d+) zaplacil rod, doplata BK (\d+), brak rodu (\d+)[^|]* "
                       r"\| wyplaty dzis: rozliczenie 259 (\d+), BK (\d+), E3/9 (\d+), gra 10% (\d+), rozwiazanie (\d+) \| ponizej kapitalu (\d+) dob \| (od zakupu|od wczytania 259) "),
@@ -71441,6 +71445,9 @@ K259_RX = {
     "test": re.compile(r"^(T\d) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
 }
 K259_PN = re.compile(r"^Komunikaty platnosci \(m96-wies\): wplyw caravans (\d+) ")
+# recenzja 259: zrodlo kapitalu karawany gracza (E3/7 - dane i model; model) i zwierzeta / inne w towarze rozliczenia doby
+K259_CAPSRC = re.compile(r", kapital (\d+) \((?:E3/7: dane (\d+), model (\d+)|model (\d+))\), (?:NIE )?rozliczana przez rod\) \| ")
+K259_OTHER = re.compile(r" szt\., w tym zwierzeta i inne (\d+)\), wartosc ")
 K259_T2 = re.compile(r"^Karawany - zysk do wlasciciela \(E3-T2\): dzien (\d+) \| CZYNNE .*?graczowi (\d+)/(\d+)\)")
 # linie kontrolne - jak w kodzie C# (CaravanSettle.cs, CaravanSettle.Player.cs, CaravanSettle.Test.cs)
 K259_TEST = {
@@ -71450,15 +71457,16 @@ K259_TEST = {
              "| regula: wyplata = min(wartosc - kapital, kiesa - podloga); kapital z CaravanModel.GetInitialTradeGold; podloga = PartyGoldLowerThreshold + zold doby "
              "(bez zwrotu zoldu przez rod - 30 dni zoldu); towar: nizsza z kosztu (ksiega E3-T1) i rynku (wartosc x srednia indeksu), bez kosztu - wartosc x min(1, srednia indeksu).",
     "day": "dzien {d} | CZYNNE | karawan rodow 140 (gracza 1, lordow 139), z wyplata 60 za {p} zl (graczowi {pp}, lordom 29480), ponizej kapitalu 50, "
-           "wartosc>kapital ale kiesa<=podloga 20, bez zwrotu zoldu (tytul) 3, konwoje pominiete 2, w bitwie/rozwiazywane 1 | kontrola: kiesy -{p} = salda rodow +{q} "
+           "wartosc>kapital ale kiesa<=podloga 20, bez zwrotu zoldu (tytul) 3, konwoje pominiete 2, w bitwie/rozwiazywane 1 | kontrola: kiesy -{p} = wynik prefiksu +{q} "
            "(roznica {r}) | zastapione/zablokowane: gra 10% 1 (bylo by 12), BK przy wjezdzie 4 (bylo by 900), E3/9 2, tydzien BK 0 | drugie wywolanie w dobie {u} (sesja {u}) "
-           "| czas regul 0.85 ms (podgladow 400) | potkniecia {s} (sesja {s}).",
-    "car": "karawana 'Ser Jon's caravan' (wodz Ser Jon, zwykla, kapital 15000, rozliczana przez rod) | rozliczenie doby: kiesa {k} (podloga 5293), towar w jukach 9100 "
-           "(koszt 9400, rynek 9100, 14 rodzajow, 212 szt.), wartosc {w}, kapital 15000, wyplata {y} | teraz: kiesa 5900, towar 9100, wartosc 15000 | dzis: sprzedaz 3100 "
+           "| czas regul 0.85 ms (podgladow 400) | potkniecia {s} (sesja {s}) | kapital karawan: z E3/7 12 (nizszy od modelu 3), z modelu 128, nowe zapisy E3/7 1 (rekordow 12).",
+    "car": "karawana 'Ser Jon's caravan' (wodz Ser Jon, zwykla, kapital 15000 (E3/7: dane 15000, model 15000), rozliczana przez rod) | rozliczenie doby: kiesa {k} (podloga 5293), "
+           "towar w jukach 9100 (koszt 9400, rynek 9100, 14 rodzajow, 212 szt., w tym zwierzeta i inne 600), wartosc {w}, kapital 15000, wyplata {y} | teraz: kiesa 5900, towar 9100, "
+           "wartosc 15000 | dzis: sprzedaz 3100 "
            "(myto 62), zakupy 2900, zysk ze sprzedazy 180 | zold 293 zaplacil rod, doplata BK 0, brak rodu 0 | wyplaty dzis: rozliczenie 259 {y}, BK {b}, E3/9 0, gra 10% 0, "
            "rozwiazanie 0 | ponizej kapitalu {lo} dob | od zakupu (dzien 108965, 26 dob): wyplaty 520, zold rodu 7000, doplaty 0, brak rodu 0, sprzedaz 50000, zakupy 49000, "
            "myto 1000, zysk ze sprzedazy 3000, netto dla rodu -6480",
-    "carn": "karawana 'Ser Jon's caravan' (wodz Ser Jon, zwykla, kapital 15000, rozliczana przez rod) | rozliczenie doby: brak (rod gracza nie rozliczony od ostatniej linii "
+    "carn": "karawana 'Ser Jon's caravan' (wodz Ser Jon, zwykla, kapital 15000 (model 15000), rozliczana przez rod) | rozliczenie doby: brak (rod gracza nie rozliczony od ostatniej linii "
             "albo klucz WYL) | teraz: kiesa 5900, towar 9100, wartosc 15000 | dzis: sprzedaz 0 (myto 0), zakupy 0, zysk ze sprzedazy 0 | zold 0 zaplacil rod, doplata BK 0, "
             "brak rodu 0 (bez rozliczenia rodu) | wyplaty dzis: rozliczenie 259 0, BK 0, E3/9 0, gra 10% 0, rozwiazanie 0 | ponizej kapitalu 0 dob | od wczytania 259 "
             "(dzien 108980, 11 dob): wyplaty 0, zold rodu 0, doplaty 0, brak rodu 0, sprzedaz 0, zakupy 0, myto 0, zysk ze sprzedazy 0, netto dla rodu 0",
@@ -71467,9 +71475,10 @@ K259_TEST = {
     "tot": "razem dzis: karawany do rodu {y} (rozliczenie 259 {y}, BK {b}, E3/9 0, gra 10% 0, rozwiazanie 0), zold rodu 293, doplaty BK 0, brak rodu 0, warsztaty do rodu 1000, "
            "podatek warsztatow 150 | komunikaty: wyplata {m}, ponizej kapitalu 0, tydzien NIE | BK Workshop taxes w modelu warsztatow NIE | potkniecia {s}.",
     "pay": "komunikat - wyplata (PayNotes) {y} | Ser Jon's caravan {y}.",
-    "low": "komunikat - ponizej kapitalu: karawana 'Ser Jon's caravan' ponizej kapitalu {n} dob | Ser Jon's caravan is worth 12,300 (coin 4,100, goods 8,200 at what it paid) - "
-           "less than the 15,000 you put in. Last 7 days it sold 3,200, bought 2,900, paid 120 in tolls; your clan paid its wages, 2,051, and topped up its purse with 1,400. "
-           "It sends you nothing until it is back above 15,000.",
+    "low": "komunikat - ponizej kapitalu: karawana 'Ser Jon's caravan' ponizej kapitalu {n} dob | Ser Jon's caravan is worth 12,300 (coin 4,100, goods 8,200 valued at the "
+           "lower of what it paid and the market) - less than the 15,000 it was given to trade with. Last 7 days it sold 3,200, bought 2,900, paid 120 in tolls; your clan paid "
+           "its wages, 2,051, and topped up its purse with 1,400. It sends you profit only once its coin and goods are worth more than 15,000 and it holds more than 5,293 "
+           "in coin for its wages.",
     "test": "T2 rozliczenie rodu celu: kiesa 6420 -> 5900, wyplata 520, wzor na wejsciach (wartosc 15520, kapital 15000, kiesa 6420, podloga 5293) 520 - wynik TAK.",
     "pn": "Komunikaty platnosci (m96-wies): wplyw caravans {y} | podmienione w sesji 1 (zaplaty 0 za 0, wplywy 1 za {y}) | wg powodu: caravans 1",
     "t2": "Karawany - zysk do wlasciciela (E3-T2): dzien {d} | CZYNNE | karawan 490, oddaly 5 za 3000 zl (notablom 5/3000, lordom i innym 0/0, graczowi {g}/{gg}) "
@@ -71490,8 +71499,21 @@ def k259_selftest():
     if not m or m.group(3) != "TAK" or m.group(8) != "TAK" or m.group(11) != "0":
         probs.append("start")
     m = R["day"].match(T["day"].format(d=108990, p=30000, pp=520, q=30000, r=0, u=0, s=0))
-    if not m or m.group(1) != "108990" or m.group(7) != "30000" or m.group(17) != "0" or m.group(29) != "0":
+    if not m or m.group(1) != "108990" or m.group(7) != "30000" or m.group(17) != "0" or m.group(29) != "0" or m.group(30) != "12" or m.group(32) != "128":
         probs.append("day")
+    m = R["day"].match(T["day"].format(d=108990, p=30000, pp=520, q=30000, r=0, u=0, s=0).replace(" | kapital karawan: z E3/7 12 (nizszy od modelu 3), z modelu 128, "
+                                                                                              "nowe zapisy E3/7 1 (rekordow 12).", "."))
+    if not m or m.group(29) != "0" or m.group(30) is not None:
+        probs.append("day (bez kapitalu - linia sprzed recenzji)")
+    cs = K259_CAPSRC.search(T["car"].format(k=6420, w=15520, y=520, b=0, lo=0))
+    if not cs or cs.group(1) != "15000" or cs.group(2) != "15000" or cs.group(3) != "15000" or cs.group(4) is not None:
+        probs.append("kapital E3/7")
+    cs = K259_CAPSRC.search(T["carn"])
+    if not cs or cs.group(4) != "15000" or cs.group(2) is not None:
+        probs.append("kapital model")
+    mo = K259_OTHER.search(T["car"].format(k=6420, w=15520, y=520, b=0, lo=0))
+    if not mo or mo.group(1) != "600":
+        probs.append("zwierzeta i inne")
     m = R["car"].match(T["car"].format(k=6420, w=15520, y=520, b=0, lo=0))
     if not m or m.group(6) != "6420" or m.group(7) != "5293" or m.group(8) != "9100" or m.group(15) != "520" or m.group(32) != "0" or m.group(33) != "od zakupu":
         probs.append("car")
@@ -71522,7 +71544,7 @@ def k259_selftest():
 
 def k259_collect(logp):
     R = K259_RX
-    D = {"starts": [], "days": {}, "bad": [], "cars": [], "ws": 0, "tots": [], "pay": [], "low": [], "tests": {}, "pn": 0, "t2": {}, "err": 0, "err1": "",
+    D = {"starts": [], "days": {}, "bad": [], "cars": [], "capsrc": [], "ws": 0, "tots": [], "pay": [], "low": [], "tests": {}, "pn": 0, "t2": {}, "err": 0, "err1": "",
          "optym_off": 0, "optym": 0, "plines": 0}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -71559,6 +71581,9 @@ def k259_collect(logp):
                             mc = R["car"].match(p)
                             if mc:
                                 D["cars"].append((day, mc))
+                                cs = K259_CAPSRC.search(p)
+                                mo = K259_OTHER.search(p)
+                                D["capsrc"].append((day, mc.group(1), int(mc.group(4)), cs, int(mo.group(1)) if mo else None, int(mc.group(8)) if mc.group(8) else None))
                             else:
                                 D["bad"].append("karawana gracza: " + p[:90])
                         elif p.startswith("warsztat '"):
@@ -71635,11 +71660,31 @@ def k259_rows(rep, D):
         exp = min(max(0, worth - cap), max(0, purse - floor))
         if pay != exp or worth != purse + goods:
             bad2.append(f"d{day} '{mc.group(1)}': kiesa {purse}, podloga {floor}, towar {goods}, wartosc {worth}, kapital {cap} -> wyplata {pay}, wzor {exp}")
+    # recenzja 259: kapital == min(dane E3/7, model) albo == model; zwierzeta i inne <= towar
+    nE37 = nMod = 0
+    for day, name, cap, cs, oth, goods in D["capsrc"]:
+        if cs is None:
+            continue
+        if cs.group(2) is not None:
+            nE37 += 1
+            if cap != min(int(cs.group(2)), int(cs.group(3))):
+                bad2.append(f"d{day} '{name}': kapital {cap} != min(dane {cs.group(2)}, model {cs.group(3)})")
+        else:
+            nMod += 1
+            if cap != int(cs.group(4)):
+                bad2.append(f"d{day} '{name}': kapital {cap} != model {cs.group(4)}")
+        if oth is not None and goods is not None and oth > goods:
+            bad2.append(f"d{day} '{name}': zwierzeta i inne {oth} > towar {goods}")
+    wE37 = sum(int(m.group(30)) for m in days.values() if m.group(30) is not None)
+    wLow = sum(int(m.group(31)) for m in days.values() if m.group(31) is not None)
+    wMod = sum(int(m.group(32)) for m in days.values() if m.group(32) is not None)
+    capinfo = f"; kapital gracza z E3/7 {nE37}, z modelu {nMod}; swiat (suma dob): z E3/7 {wE37} (nizszy od modelu {wLow}), z modelu {wMod}"
     if n2 == 0:
-        rep.add("K259-2: wyplata == wzor (karawany gracza)", "brak rozliczen karawan gracza w liniach", "INFO (gracz bez karawany albo log sprzed 259)", None)
+        rep.add("K259-2: wyplata == wzor (karawany gracza)", "brak rozliczen karawan gracza w liniach" + capinfo + (f" | {bad2[0]}" if bad2 else ""),
+                "INFO (gracz bez karawany albo log sprzed 259)", False if bad2 else None)
     else:
-        rep.add("K259-2: wyplata == wzor (karawany gracza)", f"rozliczen {n2}, niezgodnych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else ""),
-                "min(max(0, wartosc - kapital), max(0, kiesa - podloga)) i wartosc == kiesa + towar", not bad2)
+        rep.add("K259-2: wyplata == wzor (karawany gracza)", f"rozliczen {n2}, niezgodnych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else "") + capinfo,
+                "min(max(0, wartosc - kapital), max(0, kiesa - podloga)), wartosc == kiesa + towar, kapital == min(dane E3/7, model) albo model, zwierzeta <= towar", not bad2)
     dbl = []
     for day, mc in D["cars"]:
         if mc.group(5) == "rozliczana przez rod" and (int(mc.group(28)) or int(mc.group(29)) or int(mc.group(30))):
@@ -71654,9 +71699,9 @@ def k259_rows(rep, D):
                 + f"; E3-T2 graczowi > 0 w dobach z czynnym 259: {len(t2p)}; drugie wywolanie w dobie {dup}", "0 / 0 / 0", not dbl and not t2p and dup == 0)
     diffs = [d for d, m in days.items() if int(m.group(17)) != 0]
     if days:
-        rep.add("K259-4: kontrola doby (kiesy = salda rodow)", f"dob z roznica {len(diffs)}" + (f" (np. d{diffs[0]})" if diffs else ""), "0", not diffs)
+        rep.add("K259-4: kontrola doby (kiesy = wynik prefiksu; spojnosc wewnetrzna prefiksu, nie pomiar salda rodu)", f"dob z roznica {len(diffs)}" + (f" (np. d{diffs[0]})" if diffs else ""), "0", not diffs)
     else:
-        rep.add("K259-4: kontrola doby (kiesy = salda rodow)", "brak linii", "INFO", None)
+        rep.add("K259-4: kontrola doby (kiesy = wynik prefiksu; spojnosc wewnetrzna prefiksu, nie pomiar salda rodu)", "brak linii", "INFO", None)
     pn_days = sum(1 for _, mo in D["tots"] if mo.group(12) == "PayNotes")
     no_msg = [d for d, mo in D["tots"] if int(mo.group(2)) > 0 and mo.group(12) not in ("PayNotes", "ekran", "wylaczone")]
     pay_pn = sum(1 for k in D["pay"] if k == "PayNotes")

@@ -351,16 +351,20 @@ namespace Armoury
                     Calc now = owner != null ? Compute(mp, owner) : new Calc();
                     if (owner != null) r.Capital = now.Capital;
                     var basis = r.HaveCalc ? r.Last : now;
+                    bool settled = Settled(mp);
                     int low = 0;
-                    if (basis.Capital > 0 && basis.Worth < basis.Capital) { if (r.LowSince < 0) r.LowSince = day; low = day - r.LowSince + 1; }
+                    // recenzja 259: dni ponizej kapitalu i komunikat tylko dla karawany rozliczanej przez rod (bez rozliczenia placa BK i E3/9 - komunikat bylby nieprawda)
+                    if (settled && basis.Capital > 0 && basis.Worth < basis.Capital) { if (r.LowSince < 0) r.LowSince = day; low = day - r.LowSince + 1; }
                     else { r.LowSince = -1; r.LastLowMsg = -1; }
                     sb.Append(" || karawana '").Append(r.Name).Append("' (wodz ").Append(r.Leader).Append(", ").Append(Kind(mp)).Append(", kapital ").Append(r.Capital)
-                      .Append(", ").Append(Settled(mp) ? "rozliczana przez rod" : "NIE rozliczana przez rod").Append(')');
+                      .Append(owner == null ? "" : now.CapE37 ? " (E3/7: dane " + now.Funded + ", model " + now.CapModel + ")" : " (model " + now.CapModel + ")")
+                      .Append(", ").Append(settled ? "rozliczana przez rod" : "NIE rozliczana przez rod").Append(')');
                     if (r.HaveCalc)
                     {
                         var c = r.Last;
                         sb.Append(" | rozliczenie doby: kiesa ").Append(c.Purse).Append(" (podloga ").Append(c.Floor).Append(c.NoRefund ? ", bez zwrotu zoldu" : "").Append("), towar w jukach ").Append(c.Goods)
-                          .Append(" (koszt ").Append(c.Cost).Append(", rynek ").Append(c.Market).Append(", ").Append(c.Kinds).Append(" rodzajow, ").Append(c.Units).Append(" szt.), wartosc ").Append(c.Worth)
+                          .Append(" (koszt ").Append(c.Cost).Append(", rynek ").Append(c.Market).Append(", ").Append(c.Kinds).Append(" rodzajow, ").Append(c.Units).Append(" szt., w tym zwierzeta i inne ")
+                          .Append(c.Other).Append("), wartosc ").Append(c.Worth)
                           .Append(", kapital ").Append(c.Capital).Append(", wyplata ").Append(c.Payout).Append(r.LastBusy ? " (w bitwie albo rozwiazywana)" : "");
                     }
                     else sb.Append(" | rozliczenie doby: brak (rod gracza nie rozliczony od ostatniej linii albo klucz WYL)");
@@ -382,9 +386,12 @@ namespace Armoury
                         long wg = WkSum(r.Wk, r.WkDay, 3, out nd), tp = WkSum(r.Wk, r.WkDay, 4, out nd);
                         int days = 0; for (int i = 0; i < Ring; i++) if (r.WkDay[i] >= Today - 7) days++;
                         string span = days >= 7 ? "Last 7 days" : "Since the game was loaded";
-                        string txt = r.Name + " is worth " + N(basis.Worth) + " (coin " + N(basis.Purse) + ", goods " + N(basis.Goods) + " at what it paid) - less than the "
-                                     + N(basis.Capital) + " you put in. " + span + " it sold " + N(sold) + ", bought " + N(bought) + ", paid " + N(toll) + " in tolls; your clan paid its wages, "
-                                     + N(wg) + ", and topped up its purse with " + N(tp) + ". It sends you nothing until it is back above " + N(basis.Capital) + ".";
+                        // recenzja 259: kapital - to, co karawana dostala (E3/7) albo kapital modelu; towar - nizsza z ceny zakupu i rynku; warunek wyplaty - oba warunki reguly
+                        string capTxt = basis.CapE37 ? "the " + N(basis.Capital) + " it was given to trade with" : "its trading capital of " + N(basis.Capital);
+                        string txt = r.Name + " is worth " + N(basis.Worth) + " (coin " + N(basis.Purse) + ", goods " + N(basis.Goods) + " valued at the lower of what it paid and the market) - less than "
+                                     + capTxt + ". " + span + " it sold " + N(sold) + ", bought " + N(bought) + ", paid " + N(toll) + " in tolls; your clan paid its wages, "
+                                     + N(wg) + ", and topped up its purse with " + N(tp) + ". It sends you profit only once its coin and goods are worth more than " + N(basis.Capital)
+                                     + " and it holds more than " + N(basis.Floor) + " in coin for its wages.";
                         Log.Player(txt);
                         Log.Info(PP + "komunikat - ponizej kapitalu: karawana '" + r.Name + "' ponizej kapitalu " + low + " dob | " + txt);
                     }
