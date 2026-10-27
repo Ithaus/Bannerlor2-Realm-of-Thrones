@@ -9,7 +9,7 @@
 - 284 (handel284, probyN): H284-1 mediana zysku karawan ostatnie 10 dob [6,11,7,7,-7,-28,-58,-88,-185,-272] - SPADA; H284-2 udzial z wyplata 0.172 -> 0.177 (cel 0.25);
   H284-3 8 kategorii nie zeszlo do bramki (whale_oil, planks ...); H284-4 sprzedaz T1 na stracie 3550/d -> 44783/d (ROSNIE 12x - prawdopodobnie CaravanSizeByTrade
   albo bramka/kapital zmuszaja do wyprzedazy). Ruda RU282-1 18 -> 8 bez rudy (cel <= 10 w dobach 21-30: 12.9). NWAR-15 plotno/len 1.59 -> 1.14.
-- Poprawki: workflow (283b w zb\n283, 284b w zb\n284) - diagnoza z logow 132a + naprawa + build + commit; potem ponowne scalenie do n161 (scal_sklad),
+- Poprawki: workflow wf_58c46e57-213 (skrypt workflows\scripts\poprawki-283b-284b-wf_58c46e57-213.js, bez args; resumeFromRunId) (283b w zb\n283, 284b w zb\n284) - diagnoza z logow 132a + naprawa + build + commit; potem ponowne scalenie do n161 (scal_sklad),
   autotest 132b (testy-noc-283.ps1, -CsAt cs-at283\CrashScribe-at-n283.dll), WGRANIE 132 tylko gdy nekanie283 i handel284 bez NIE.
 - W grze dalej 131 (Armoury 591d0ecc). Przy 99% tygodnia - stop i drugie konto (wszystko tu + journal.jsonl runow).
 
