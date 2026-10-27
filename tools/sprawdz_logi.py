@@ -1175,6 +1175,15 @@ Uzycie (Python 3, tylko odczyt):
                     J204-8 (recenzja 204 (2)): segment 'koszt passu' - sr. <= 2 ms i max <= 16.7 ms (jedna klatka 60 fps), ludzi przejrzanych na pass <= limit (512);
                     w wierszu takze ciecia przegladu, strzelcy naraz, passy z odlozonymi strzelcami, obnizenia poziomu (strona lamana / strzelec w szyku),
                     'FF poza kolejka' (recenzja 204 (3): sprawdzenia swoich przy strzelcu poza jego ThreatPass; stary log bez segmentu - 0).
+--grupa nekanie283 : (27.10, paczka 283 noc/283-reakcja-na-nekanie-z-tylu - Jeff 27.10 ok. 21:40 "wjechalem za plecy lucznikom wroga ... lucznicy by sie zatrzymali
+                    zaczeli walic do mnie ... ruszyla by kawaleria ... armia powinna sie zatrzymac"; Armoury/src/HorsePursuit.React.cs, ReactFire.cs, ReactHalt.cs,
+                    HuntTest.cs; klucze FormationsAnswerHarassers, ArmyHaltsForHarassers, HuntHarasserInAutotest) macierz odpowiedzi szykow AI na nekanie z tylu.
+                    python -I tools/sprawdz_logi.py --grupa nekanie283 <Armoury-*.log> (strumieniowo). N283-S self-test wyrazen, N283-S2 test syntetyczny;
+                    N283-0 linia 'Nekanie (283): misja' w kazdej bitwie polowej (NB2), klucz TAK; N283-1 scenariusz A (konny strzelec 3 m za strzelcami wroga:
+                    wykrycie, lucznicy na cel i strzaly, jazda >= min(2, wolnej), postoj przy marszu); N283-2 B (pieszy strzelec: piechota >= min(2, wolnej), jazda);
+                    N283-3 C (wojownik wrecz na lucznikow: wykrycie wrecz, R1 strzal / krok / bron boczna, piechota); N283-4 regresja (z szyku gracza 0, pod
+                    sterowaniem i zatrzymane na koniec 0, FF lucznikow 283 <= max(2, 5%), piechota <= 60 m, jazda <= 265 m, kazdy start z koncem, potkniecia 0,
+                    'ERROR in HorsePursuit' 0); N283-5 koszt passu sr. <= 2 ms, max <= 16.7 ms, promieni <= 64; N283-6 INFO. Scenariusz bez biegu - NIE SPRAWDZONE.
 --grupa odbicie222 : (26.10, paczka 222 noc/222-odbicie-lorda - Jeff 26.10 "zlapalem ... Tywina Lannistera ... po jakims czasie zaczna mnie tropic"; Armoury/src/RescueHunt.cs,
                     RescueHunt.Test.cs, Ransom178.ConsiderPrefix) python -I tools/sprawdz_logi.py --grupa odbicie222 <Armoury-*.log> (strumieniowo). Linie 'Odbicie (222): '.
                     ODB-S self-test wyrazen, ODB-S2 test syntetyczny. ODB-0 start sesji; ODB-1 'wiesc doszla' najpozniej 1 h po planie (plan = 'godzina gry' z linii pojmania);
@@ -74182,6 +74191,394 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return rody277_main(rest[0] if rest else None)
     return _rody277_main_prev(argv)
+
+
+# ------------------------------------------------------------ nekanie283 (27.10, paczka 283 noc/283-reakcja-na-nekanie-z-tylu: macierz odpowiedzi szykow AI na nekanie z tylu
+# i z boku - Jeff 27.10 ok. 21:40 "wjechalem za plecy lucznikom wroga ... lucznicy by sie zatrzymali zaczeli walic do mnie ... ruszyla by kawaleria ... armia powinna sie
+# zatrzymac", 22:00 "wydedukuj kazde zachowanie"; Armoury/src/HorsePursuit.React.cs, ReactFire.cs, ReactHalt.cs, HuntTest.cs; klucze FormationsAnswerHarassers,
+# ArmyHaltsForHarassers, HuntHarasserInAutotest; autotest: -Harasser 3 -Battles 7, bitwy mocne 1/4/7 = scenariusze A/B/C)
+#   python -I tools/sprawdz_logi.py --grupa nekanie283 <Armoury-*.log>
+# Wiersze: N283-S self-test wyrazen, N283-S2 test syntetyczny, N283-0 linia w kazdej bitwie polowej (klucz TAK, linie rozpoznane), N283-1 scenariusz A (konny strzelec
+# 3 m za szykiem strzelcow), N283-2 B (pieszy strzelec 15 m za piechota), N283-3 C (wojownik wrecz na lucznikow), N283-4 regresja (szyki gracza, sterowanie i postoje na
+# koniec, FF lucznikow 283, smycze, epizody z koncem, potkniecia, ERROR in HorsePursuit), N283-5 koszt passu i promienie, N283-6 INFO (gra Jeffa).
+# Scenariusz, ktory nie biegl - NIE SPRAWDZONE (INFO), nigdy TAK.
+N283_FIELD = re.compile(r"^Bitwa \(NB2\): misja bitwa \(pole bitwy TAK")
+N283_FF_MIN, N283_FF_SHARE = 2, 0.05            # FF od lucznikow 283: najwyzej max(2, 5% ich strzalow)
+N283_FOOT_FAR, N283_CAV_FAR = 60.0, 265.0       # smycz piechoty 50 m (InfRearm) + pass biegu; jazdy 250 m (MaxFromMain 148) + pass galopu
+N283_COST_AVG, N283_COST_MAX, N283_RAYS = 2.0, 16.7, 64
+N283_LINES = 12                                 # linii epizodow 283 na bitwe (RLinesMax)
+N283_RX = {
+    "line": re.compile(r"^Nekanie \(283\): misja (\S+), klucz (TAK|NIE), postoj (TAK|NIE) "),
+    "det": re.compile(r"\| wykrycia (\d+) \(konny strzelec (\d+), pieszy strzelec (\d+), konny wrecz (\d+), pieszy wrecz (\d+); gracz (\d+), AI (\d+); samotni (\d+); "
+                      r"na lucznikow (\d+), na wodza (\d+) \(w \d+ m (\d+)\), na chorazego (\d+); kolejka wrecz (\d+), nadmiar (\d+)"),
+    "ep": re.compile(r"\| epizody (\d+) \|"),
+    "r1": re.compile(r"R1 lucznicy na cel (\d+) \(strzaly w nekajacego (\d+), polowa w pojedynku (\d+), bron boczna (\d+), krok w tyl (\d+)\)"),
+    "r1b": re.compile(r"R1b promieni (\d+) \(czysta (\d+), swoi na linii (\d+), silnik FriendInWay (\d+), krok w bok (\d+) udany (\d+), limit (\d+)\)"),
+    "r2": re.compile(r"R2 piechota wyslani (\d+) \(szykow (\d+)\)"),
+    "r3": re.compile(r"R3 jazda wolnej (\d+) / wyslanej (\d+) / w zwarciu zostala (\d+) / wyciagnieta (\d+) \(wodz (\d+), wartosc szyku (\d+), lucznicy strony (\d+)\) "
+                     r"/ oslona przed jazda (\d+)"),
+    "r45": re.compile(r"R4 szyk staje (\d+), R5 armia staje (\d+) \(szykow (\d+)\), R6 oslon wodza (\d+), R7 chorazego (\d+)"),
+    "halt": re.compile(r"\| postoj: sekund (\d+), przejete znowu (\d+), puszczone: koniec (\d+), 60 s (\d+), wrog w \d+ m (\d+), szarza (\d+), gracz (\d+), taktyka (\d+), "
+                       r"odwrot (\d+), S4 (\d+), klucz (\d+), koniec bitwy (\d+);"),
+    "out": re.compile(r"\| wyniki (.*?); najdalej piechota (\d+) m, jazda (\d+) m; piechoty padlo (\d+) \|"),
+    "outkv": re.compile(r"([a-z][a-z ]*?) (\d+)(?:, |$)"),
+    "ff": re.compile(r"\| FF od lucznikow 283 (\d+) \(strzalow (\d+)\)"),
+    "player": re.compile(r"\| z szyku gracza (\d+) \(oczekiwane 0\)"),
+    "left": re.compile(r"\| pod sterowaniem 283 na koniec (\d+) \(oczekiwane 0\)"),
+    "halted": re.compile(r"\| zatrzymane szyki na koniec (\d+) \(oczekiwane 0\)"),
+    "cost": re.compile(r"\| koszt passu sr\. (\S+) / max (\S+) ms \(passow (\d+); promieni najwiecej (\d+) na pass, limit (\d+)\)"),
+    "stum": re.compile(r"\| potkniecia nekanie (\d+)\.$"),
+    "start": re.compile(r"^Nekanie \(283\) start: nekajacy (\S+) \((gracz|AI), (konno|pieszo), (\S+)\) \| rodzaj (konny strzelec|pieszy strzelec|konny wrecz|pieszy wrecz) "
+                        r"\| wiersz ([R0-9 -]+) \| samotny (TAK|NIE) \| wodz (TAK|NIE) \| lucznikow (\d+), piechoty (\d+), jezdzcow (\d+), szykow stoi (\d+) \| tier (\d+) "
+                        r"\| odleglosc od szyku (\d+) m$"),
+    "end": re.compile(r"^Nekanie \(283\) koniec: (padl od odpowiedzi|padl od innych|odpedzony|uszedl|koniec bitwy|inne) po ([\d.]+) s \| nekajacy (\S+) \| rodzaj "
+                      r"(konny strzelec|pieszy strzelec|konny wrecz|pieszy wrecz) \| piechoty wyslanej (\d+), jezdzcow (\d+), szykow stoi (\d+) \| padlo od niego (\d+)$"),
+    "tstart": re.compile(r"^Nekanie \(283\) TEST ([ABC]): nekajacy (\S+) \((konno|pieszo), (\S+), tier (\d+)\) \| cel .* \| wolnej piechoty wroga (\d+) \(szykow (\d+)\), "
+                         r"wolnej jazdy wroga (\d+) \(szykow (\d+)\), lucznikow wroga (\d+) \| wrog w marszu (TAK|NIE)$"),
+    "tnone": re.compile(r"^Nekanie \(283\) TEST ([ABC]): brak nekajacego - (.*)$"),
+    "tphase": re.compile(r"^Nekanie \(283\) TEST ([ABC]): nekajacy (\S+) faza (\S+) po ([\d.]+) s"),
+    "tend": re.compile(r"^Nekanie \(283\) TEST koniec: scenariusz ([ABC]), nekajacy (\S+), wynik (.+?) po ([\d.]+) s \| strzalow (\d+), wykryc (\d+), epizodow (\d+), "
+                       r"lucznikow na cel (\d+), piechoty (\d+), jezdzcow (\d+), szykow stoi (\d+) \| wolnej piechoty wroga (\d+), wolnej jazdy wroga (\d+), "
+                       r"lucznikow wroga (\d+), wrog w marszu (TAK|NIE)$"),
+}
+N283_ERR = re.compile(r"^ERROR in HorsePursuit\b")
+# linie kontrolne - napisy jak w kodzie C# (HorsePursuit.React.cs ReactWrite / ReactStartLine / ReactEndLine, HorsePursuit.HuntTest.cs TestPick / TestEnd / TestPhase)
+N283_TEST = {
+    "line": ("Nekanie (283): misja bitwa, klucz TAK, postoj TAK (samotny nekajacy - bez nietknietego szyku swojej strony w 80 m, gracz zawsze; lucznicy z czysta linia, "
+             "krok w bok; piechota 2 x tier + padlo, smycz 50 m / 60 s; jazda w zwarciu tylko dla wodza, wartosci, strzelcow; postoj gdy wrog dalej niz 110 m, najwyzej 60 s; "
+             "wodz w 10 m chroniony) | wykrycia 20 (konny strzelec 8, pieszy strzelec 5, konny wrecz 0, pieszy wrecz 7; gracz 1, AI 2; samotni 3; na lucznikow 2, na wodza 0 "
+             "(w 10 m 0), na chorazego 0; kolejka wrecz 7, nadmiar 0, w szyku swoich 3, front 1; strzalow pieszo 9) | epizody 3 | odpowiedzi: R1 lucznicy na cel 12 "
+             "(strzaly w nekajacego 15, polowa w pojedynku 0, bron boczna 2, krok w tyl 1), R1b promieni 40 (czysta 30, swoi na linii 10, silnik FriendInWay 3, krok w bok 6 "
+             "udany 4, limit 0), R2 piechota wyslani 6 (szykow 1), R3 jazda wolnej 10 / wyslanej 8 / w zwarciu zostala 0 / wyciagnieta 0 (wodz 0, wartosc szyku 0, lucznicy "
+             "strony 0) / oslona przed jazda 0, R4 szyk staje 1, R5 armia staje 1 (szykow 3), R6 oslon wodza 0, R7 chorazego 0 | postoj: sekund 45, przejete znowu 1, "
+             "puszczone: koniec 3, 60 s 0, wrog w 110 m 1, szarza 0, gracz 0, taktyka 0, odwrot 0, S4 0, klucz 0, koniec bitwy 0; nie stanely: zwarcie 2, S2 0, strona "
+             "lamana 0, bez marszu 1 | piechota wrocila: padl 1, smycz 50 m 2, czas 60 s 1, cel padl 2, zwarcie 0, konny uszedl 0, przy szyku nekajacego 0, panika 0, "
+             "inne 0; nie wyslani: szyk w zwarciu 0, ponizej polowy 0, bohater 1, chorazy 0, zajety 0, przerwa 0, w zwarciu 0, przy szyku nekajacego 0, limit zapytan 0, "
+             "panika 0 | wyniki padl od odpowiedzi 1, padl od innych 0, odpedzony 1, uszedl 0, koniec bitwy 1, inne 0; najdalej piechota 42 m, jazda 120 m; piechoty "
+             "padlo 1 | FF od lucznikow 283 0 (strzalow 15) | z szyku gracza 0 (oczekiwane 0) | pod sterowaniem 283 na koniec 0 (oczekiwane 0) | zatrzymane szyki na "
+             "koniec 0 (oczekiwane 0) | koszt passu sr. 0.300 / max 3.100 ms (passow 120; promieni najwiecej 30 na pass, limit 64) | test: scenariusz A, wykryc 9, "
+             "epizodow 1, lucznikow 6, piechoty 0, jezdzcow 8, szykow stoi 3, wynik padl | potkniecia nekanie 0."),
+    "start": ("Nekanie (283) start: nekajacy gracz (gracz, konno, Bow) | rodzaj konny strzelec | wiersz R1 R3 R4 R5 | samotny TAK | wodz NIE | lucznikow 6, piechoty 0, "
+              "jezdzcow 8, szykow stoi 3 | tier 7 | odleglosc od szyku 3 m"),
+    "start2": ("Nekanie (283) start: nekajacy sea_raiders_raider#77 (AI, pieszo, OneHandedSword) | rodzaj pieszy wrecz | wiersz R2 | samotny TAK | wodz NIE | lucznikow 0, "
+               "piechoty 4, jezdzcow 0, szykow stoi 0 | tier 3 | odleglosc od szyku 0 m"),
+    "end": ("Nekanie (283) koniec: padl od odpowiedzi po 12.5 s | nekajacy gracz | rodzaj konny strzelec | piechoty wyslanej 0, jezdzcow 8, szykow stoi 3 | padlo od niego 2"),
+    "tstart": ("Nekanie (283) TEST A: nekajacy vlandian_horse_archer#211 (konno, Bow, tier 4) | cel sea_raiders_bandit#90 szyku Ranged (8 ludzi) | podjazd na 3 m za "
+               "szykiem | wolnej piechoty wroga 30 (szykow 1), wolnej jazdy wroga 6 (szykow 1), lucznikow wroga 8 | wrog w marszu TAK"),
+    "tnone": "Nekanie (283) TEST B: brak nekajacego - brak pieszego strzelca AI w druzynie gracza (30 s po rozstawieniu)",
+    "tphase": "Nekanie (283) TEST B: nekajacy imperial_archer#55 faza ucieczka po 5.0 s (jezdziec 204 w 12 m)",
+    "tend": ("Nekanie (283) TEST koniec: scenariusz A, nekajacy vlandian_horse_archer#211, wynik padl po 30.0 s | strzalow 12, wykryc 14, epizodow 1, lucznikow na cel 6, "
+             "piechoty 0, jezdzcow 8, szykow stoi 3 | wolnej piechoty wroga 30, wolnej jazdy wroga 6, lucznikow wroga 8, wrog w marszu TAK"),
+}
+
+
+def nekanie283_selftest():
+    """nekanie283: wyrazenia wobec linii kontrolnych N283_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    RX, T = N283_RX, N283_TEST
+    s = T["line"]
+    m = RX["line"].match(s)
+    if not m or m.groups() != ("bitwa", "TAK", "TAK"):
+        return "line"
+    exp = {
+        "det": ("20", "8", "5", "0", "7", "1", "2", "3", "2", "0", "0", "0", "7", "0"),
+        "ep": ("3",), "r1": ("12", "15", "0", "2", "1"), "r1b": ("40", "30", "10", "3", "6", "4", "0"), "r2": ("6", "1"),
+        "r3": ("10", "8", "0", "0", "0", "0", "0", "0"), "r45": ("1", "1", "3", "0", "0"),
+        "halt": ("45", "1", "3", "0", "1", "0", "0", "0", "0", "0", "0", "0"),
+        "ff": ("0", "15"), "player": ("0",), "left": ("0",), "halted": ("0",), "cost": ("0.300", "3.100", "120", "30", "64"), "stum": ("0",),
+    }
+    for k, v in exp.items():
+        mm = RX[k].search(s)
+        if not mm or mm.groups() != v:
+            return f"{k}: {mm.groups() if mm else 'brak dopasowania'}"
+    mo = RX["out"].search(s)
+    if not mo or mo.groups()[1:] != ("42", "120", "1"):
+        return f"out: {mo.groups() if mo else 'brak dopasowania'}"
+    out = dict((k.strip(), int(v)) for k, v in RX["outkv"].findall(mo.group(1)))
+    if out.get("padl od odpowiedzi") != 1 or out.get("koniec bitwy") != 1 or len(out) != 6:
+        return f"wyniki {out}"
+    m = RX["start"].match(T["start"])
+    if not m or m.groups() != ("gracz", "gracz", "konno", "Bow", "konny strzelec", "R1 R3 R4 R5", "TAK", "NIE", "6", "0", "8", "3", "7", "3"):
+        return f"start: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["start"].match(T["start2"])
+    if not m or m.group(3) != "pieszo" or m.group(5) != "pieszy wrecz" or m.group(10) != "4":
+        return f"start2: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["end"].match(T["end"])
+    if not m or m.groups() != ("padl od odpowiedzi", "12.5", "gracz", "konny strzelec", "0", "8", "3", "2"):
+        return f"end: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["tstart"].match(T["tstart"])
+    if not m or m.groups() != ("A", "vlandian_horse_archer#211", "konno", "Bow", "4", "30", "1", "6", "1", "8", "TAK"):
+        return f"tstart: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["tnone"].match(T["tnone"])
+    if not m or m.group(1) != "B" or not m.group(2).startswith("brak pieszego strzelca"):
+        return "tnone"
+    m = RX["tphase"].match(T["tphase"])
+    if not m or m.groups() != ("B", "imperial_archer#55", "ucieczka", "5.0"):
+        return "tphase"
+    m = RX["tend"].match(T["tend"])
+    if not m or m.groups() != ("A", "vlandian_horse_archer#211", "padl", "30.0", "12", "14", "1", "6", "0", "8", "3", "30", "6", "8", "TAK"):
+        return f"tend: {m.groups() if m else 'brak dopasowania'}"
+    return None
+
+
+def nekanie283_collect(logp):
+    """Strumieniowo: bitwy polowe NB2, linie 283 w odcinkach bitwy (linia misji zamyka odcinek - TEST i epizody tej bitwy sa przed nia), ERROR in HorsePursuit."""
+    D = {"field": 0, "segs": [], "err": [], "bad": []}
+    cur = {"starts": [], "ends": [], "tstarts": [], "tnone": [], "tends": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            mt = TS.match(ln.rstrip("\n"))
+            s = mt.group(2) if mt else ln.rstrip("\n")
+            if N283_FIELD.match(s):
+                D["field"] += 1
+                continue
+            if s.startswith("ERROR in ") and N283_ERR.match(s):
+                D["err"].append(s[:200])
+                continue
+            if not s.startswith("Nekanie (283)"):
+                continue
+            if N283_RX["line"].match(s):
+                cur["line"] = s
+                D["segs"].append(cur)
+                cur = {"starts": [], "ends": [], "tstarts": [], "tnone": [], "tends": []}
+                continue
+            for key, dst in (("start", "starts"), ("end", "ends"), ("tstart", "tstarts"), ("tnone", "tnone"), ("tend", "tends")):
+                m = N283_RX[key].match(s)
+                if m:
+                    cur[dst].append(m)
+                    break
+            else:
+                if not N283_RX["tphase"].match(s):
+                    D["bad"].append(s[:160])
+    if any(cur[k] for k in cur):
+        cur["line"] = None   # odcinek bez linii misji (log urwany w bitwie)
+        D["segs"].append(cur)
+    return D
+
+
+def _n283_g(rx, s, i=1, conv=int, default=0):
+    m = N283_RX[rx].search(s) if s else None
+    return conv(m.group(i)) if m else default
+
+
+def nekanie283_rows(rep, D):
+    RX = N283_RX
+    segs = [g for g in D["segs"] if g.get("line")]
+    keys = [RX["line"].match(g["line"]).groups() for g in segs]
+    nfield = sum(1 for k in keys if k[0] == "bitwa")
+    # N283-0
+    if D["field"] == 0 and not segs:
+        ok0 = None
+    else:
+        ok0 = nfield >= D["field"] and all(k[1] == "TAK" for k in keys) and not D["bad"]
+    rep.add("N283-0: linia 'Nekanie (283): misja' w kazdej bitwie polowej, klucz TAK, linie 283 rozpoznane",
+            f"bitew polowych {D['field']}, linii {len(segs)} (bitwa {nfield}), klucz NIE {sum(1 for k in keys if k[1] != 'TAK')}, postoj NIE "
+            f"{sum(1 for k in keys if k[2] != 'TAK')}, nierozpoznanych {len(D['bad'])}" + (f" ({D['bad'][0]})" if D["bad"] else ""),
+            "linii >= bitew, klucz TAK, nierozpoznanych 0 (brak bitew - INFO)", ok0)
+    # scenariusze A / B / C (TEST koniec + linia misji tej samej bitwy)
+    by = {"A": [], "B": [], "C": []}
+    none = {"A": [], "B": [], "C": []}
+    for g in D["segs"]:
+        for m in g["tends"]:
+            by[m.group(1)].append((m, g.get("line")))
+        for m in g["tnone"]:
+            none[m.group(1)].append(m.group(2))
+
+    def _skip(row, sc, rule):
+        why = none[sc][-1] if none[sc] else "scenariusz nie biegl (bitwy mocne 1/4/7 przy -Harasser 3 -Battles 7, klucz HuntHarasserInAutotest)"
+        rep.add(row, f"NIE SPRAWDZONE - {why}", rule, None)
+
+    # N283-1: A - konny strzelec 3 m za strzelcami wroga
+    row1 = "N283-1: scenariusz A (konny strzelec za szykiem strzelcow): wykrycie, lucznicy na cel / strzaly, jazda, postoj przy marszu"
+    rule1 = "wykryc >= 1; lucznikow wroga > 0: lucznikow na cel >= 1 i strzaly w nekajacego >= 1; jezdzcow >= min(2, wolnej jazdy); wrog w marszu: szykow stoi >= 1"
+    if not by["A"]:
+        _skip(row1, "A", rule1)
+    else:
+        parts, ok = [], True
+        for m, line in by["A"]:
+            det, arch, rid, halt = int(m.group(6)), int(m.group(8)), int(m.group(10)), int(m.group(11))
+            free_cav, earch, march = int(m.group(13)), int(m.group(14)), m.group(15) == "TAK"
+            shots = _n283_g("r1", line, 2)
+            o = det >= 1 and rid >= min(2, free_cav)
+            if earch > 0:
+                o = o and arch >= 1 and shots >= 1
+            if march:
+                o = o and halt >= 1
+            ok = ok and o
+            parts.append(f"wykryc {det}, lucznikow {arch} (wroga {earch}), strzaly {shots}, jezdzcow {rid} (wolnej {free_cav}), stoi {halt} (marsz {m.group(15)}), wynik {m.group(3)}")
+        rep.add(row1, "; ".join(parts), rule1, ok)
+    # N283-2: B - pieszy strzelec 15 m za piechota wroga
+    row2 = "N283-2: scenariusz B (pieszy strzelec za piechota): wykrycie, oddzial piechoty, jazda"
+    rule2 = "wykryc >= 1; piechoty >= min(2, wolnej piechoty); wolna jazda > 0: jezdzcow > 0"
+    if not by["B"]:
+        _skip(row2, "B", rule2)
+    else:
+        parts, ok = [], True
+        for m, line in by["B"]:
+            det, foot, rid = int(m.group(6)), int(m.group(9)), int(m.group(10))
+            free_inf, free_cav = int(m.group(12)), int(m.group(13))
+            o = det >= 1 and foot >= min(2, free_inf) and (free_cav <= 0 or rid > 0)
+            ok = ok and o
+            parts.append(f"wykryc {det}, piechoty {foot} (wolnej {free_inf}), jezdzcow {rid} (wolnej {free_cav}), wynik {m.group(3)}")
+        rep.add(row2, "; ".join(parts), rule2, ok)
+    # N283-3: C - wojownik wrecz na lucznikow
+    row3 = "N283-3: scenariusz C (wojownik wrecz na lucznikow): wykrycie wrecz, odpowiedz lucznikow (strzal / krok / bron boczna), oddzial piechoty"
+    rule3 = "wykryc >= 1; lucznikow wroga > 0: lucznikow na cel + krok w bok udany + krok w tyl + bron boczna >= 1; wolna piechota > 0: piechoty >= 1"
+    if not by["C"]:
+        _skip(row3, "C", rule3)
+    else:
+        parts, ok = [], True
+        for m, line in by["C"]:
+            det, arch, foot = int(m.group(6)), int(m.group(8)), int(m.group(9))
+            free_inf, earch = int(m.group(12)), int(m.group(14))
+            r1 = arch + _n283_g("r1b", line, 6) + _n283_g("r1", line, 5) + _n283_g("r1", line, 4)
+            dmel = _n283_g("det", line, 5) + _n283_g("det", line, 4)
+            o = det >= 1 and dmel >= 1 and (earch <= 0 or r1 >= 1) and (free_inf <= 0 or foot >= 1)
+            ok = ok and o
+            parts.append(f"wykryc {det} (wrecz w bitwie {dmel}), R1 {r1} (lucznikow wroga {earch}), piechoty {foot} (wolnej {free_inf}), wynik {m.group(3)}")
+        rep.add(row3, "; ".join(parts), rule3, ok)
+    # N283-4: regresja
+    lines = [g["line"] for g in segs]
+    bad4, info4 = [], []
+    for g in segs:
+        s = g["line"]
+        pl, left, halted, stum = _n283_g("player", s), _n283_g("left", s), _n283_g("halted", s), _n283_g("stum", s)
+        ff, ffs = _n283_g("ff", s), _n283_g("ff", s, 2)
+        mo = RX["out"].search(s)
+        ffar, cfar = (int(mo.group(2)), int(mo.group(3))) if mo else (0, 0)
+        nep = len(g["starts"]) + len(g["ends"])
+        if pl: bad4.append(f"z szyku gracza {pl}")
+        if left: bad4.append(f"pod sterowaniem na koniec {left}")
+        if halted: bad4.append(f"zatrzymane na koniec {halted}")
+        if stum: bad4.append(f"potkniecia {stum}")
+        if ff > max(N283_FF_MIN, N283_FF_SHARE * ffs): bad4.append(f"FF lucznikow {ff} przy {ffs} strzalach")
+        if ffar > N283_FOOT_FAR: bad4.append(f"piechota {ffar} m")
+        if cfar > N283_CAV_FAR: bad4.append(f"jazda {cfar} m")
+        if nep < N283_LINES and len(g["ends"]) < len(g["starts"]): bad4.append(f"epizodow bez konca {len(g['starts']) - len(g['ends'])}")
+        info4.append(f"FF {ff}/{ffs}, piechota {ffar} m, jazda {cfar} m")
+    known4 = bool(lines or D["err"])
+    rep.add("N283-4: regresja - z szyku gracza / pod sterowaniem i zatrzymane na koniec / potkniecia / FF lucznikow 283 / smycze / epizody z koncem / 'ERROR in HorsePursuit'",
+            (", ".join(bad4[:6]) if bad4 else "brak naruszen") + f"; bitew {len(lines)}" + (f" ({'; '.join(info4[:3])})" if info4 else "")
+            + f"; ERROR {len(D['err'])}" + (f" ({D['err'][0]})" if D["err"] else ""),
+            f"0 / 0 / 0 / 0 / FF <= max({N283_FF_MIN}, {int(N283_FF_SHARE * 100)}% strzalow) / piechota <= {N283_FOOT_FAR:.0f} m, jazda <= {N283_CAV_FAR:.0f} m / "
+            f"kazdy start ma koniec (ponizej {N283_LINES} linii) / 0", None if not known4 else (not bad4 and not D["err"]))
+    # N283-5: koszt
+    cost = [RX["cost"].search(s) for s in lines]
+    cost = [m for m in cost if m]
+
+    def _ms(v):
+        try:
+            return float(v)
+        except ValueError:
+            return 0.0
+    bad5 = [m for m in cost if _ms(m.group(1)) > N283_COST_AVG or _ms(m.group(2)) > N283_COST_MAX or int(m.group(4)) > int(m.group(5))]
+    rep.add("N283-5: koszt passu 204+283 (sr. / max ms) i promienie na pass",
+            f"linii {len(cost)}, sr. najwiecej {max([_ms(m.group(1)) for m in cost] + [0.0]):.3f} ms, max {max([_ms(m.group(2)) for m in cost] + [0.0]):.3f} ms, "
+            f"promieni najwiecej {max([int(m.group(4)) for m in cost] + [0])}, ponad prog {len(bad5)}",
+            f"sr. <= {N283_COST_AVG} ms, max <= {N283_COST_MAX} ms, promieni <= {N283_RAYS} (brak linii - INFO)", None if not cost else not bad5)
+    # N283-6: INFO
+    tot = {}
+    for s in lines:
+        for k in ("det", "r1", "r1b", "r2", "r3", "r45"):
+            mm = RX[k].search(s)
+            if mm:
+                tot[k] = [a + int(b) for a, b in zip(tot.get(k, [0] * len(mm.groups())), mm.groups())]
+    outs = {}
+    for s in lines:
+        mo = RX["out"].search(s)
+        if mo:
+            for k, v in RX["outkv"].findall(mo.group(1)):
+                outs[k.strip()] = outs.get(k.strip(), 0) + int(v)
+    st = [m for g in segs for m in g["starts"]]
+    d, r1, r1b, r2, r3, r45 = (tot.get(k, [0] * 14) for k in ("det", "r1", "r1b", "r2", "r3", "r45"))
+    rep.add("N283-6: bitwy (INFO)",
+            f"wykrycia {d[0]} (konny strzelec {d[1]}, pieszy strzelec {d[2]}, konny wrecz {d[3]}, pieszy wrecz {d[4]}; samotni {d[7]}; na lucznikow {d[8]}, na wodza {d[9]}); "
+            f"epizodow (linie startu) {len(st)}, na gracza {sum(1 for m in st if m.group(2) == 'gracz')}; R1 {r1[0]} (strzaly {r1[1]}), R1b promieni {r1b[0]} "
+            f"(swoi {r1b[2]}, krok udany {r1b[5]}), R2 {r2[0]}, R3 wolnej {r3[0]} / wyslanej {r3[1]} / w zwarciu zostala {r3[2]} / wyciagnieta {r3[3]}, R4 {r45[0]}, "
+            f"R5 {r45[1]} (szykow {r45[2]}), R6 {r45[3]}, R7 {r45[4]}; wyniki " + (", ".join(f"{k} {v}" for k, v in outs.items() if v) or "-"),
+            "INFO: gra Jeffa - odpowiedzi na gracza (konno / pieszo / wrecz); autotest - nekajacy A/B/C", None)
+
+
+def nekanie283_synth():
+    """Test syntetyczny: dobry bieg (A, B, C), zly bieg, bez nekajacego, bez bitwy. None = OK, inaczej opis roznic."""
+    import tempfile
+    import shutil
+    T = N283_TEST
+    nb2 = "Bitwa (NB2): misja bitwa (pole bitwy TAK, ...)"
+    tend_b = ("Nekanie (283) TEST koniec: scenariusz B, nekajacy imperial_archer#55, wynik 2 epizody po 40.0 s | strzalow 9, wykryc 9, epizodow 2, lucznikow na cel 0, "
+              "piechoty 5, jezdzcow 2, szykow stoi 1 | wolnej piechoty wroga 30, wolnej jazdy wroga 6, lucznikow wroga 8, wrog w marszu TAK")
+    tend_c = ("Nekanie (283) TEST koniec: scenariusz C, nekajacy imperial_legionary#60, wynik padl po 20.0 s | strzalow 0, wykryc 6, epizodow 1, lucznikow na cel 3, "
+              "piechoty 4, jezdzcow 6, szykow stoi 1 | wolnej piechoty wroga 30, wolnej jazdy wroga 6, lucznikow wroga 8, wrog w marszu NIE")
+    bad_line = (T["line"].replace("| z szyku gracza 0 (oczekiwane 0)", "| z szyku gracza 2 (oczekiwane 0)")
+                .replace("| zatrzymane szyki na koniec 0 (oczekiwane 0)", "| zatrzymane szyki na koniec 1 (oczekiwane 0)")
+                .replace("najdalej piechota 42 m", "najdalej piechota 140 m")
+                .replace("| FF od lucznikow 283 0 (strzalow 15)", "| FF od lucznikow 283 9 (strzalow 15)")
+                .replace("koszt passu sr. 0.300 / max 3.100 ms", "koszt passu sr. 0.300 / max 40.000 ms")
+                .replace("| potkniecia nekanie 0.", "| potkniecia nekanie 2."))
+    bad_tend_a = T["tend"].replace("lucznikow na cel 6", "lucznikow na cel 0").replace("jezdzcow 8, szykow stoi 3", "jezdzcow 0, szykow stoi 0")
+    bad_tend_b = tend_b.replace("piechoty 5", "piechoty 0").replace("jezdzcow 2, szykow", "jezdzcow 0, szykow")
+    runs = {
+        "good": [nb2, T["tstart"], T["start"], T["end"], T["tend"], T["line"], nb2, T["tphase"], T["start2"], T["end"], tend_b, T["line"], nb2, tend_c, T["line"]],
+        "bad": [nb2, T["tstart"], T["start"], bad_tend_a, bad_line, nb2, bad_tend_b, T["line"], "ERROR in HorsePursuit.NekanieWrecz: NullReferenceException"],
+        "none": [nb2, T["tnone"], T["line"]],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"N283-0": "TAK", "N283-1": "TAK", "N283-2": "TAK", "N283-3": "TAK", "N283-4": "TAK", "N283-5": "TAK", "N283-6": "INFO"},
+        "bad": {"N283-1": "NIE", "N283-2": "NIE", "N283-3": "INFO", "N283-4": "NIE", "N283-5": "NIE"},
+        "none": {"N283-0": "TAK", "N283-1": "INFO", "N283-2": "INFO", "N283-3": "INFO", "N283-4": "TAK", "N283-5": "TAK"},
+        "empty": {"N283-0": "INFO", "N283-1": "INFO", "N283-4": "INFO", "N283-5": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="n283_")
+    diff = []
+    try:
+        for kind, L in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(L)) + "\n")
+            rep = Report()
+            nekanie283_rows(rep, nekanie283_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def nekanie283_main(logp):
+    """nekanie283 (27.10, paczka 283): N283-S, N283-S2, N283-0..N283-6 - opis w komentarzu nad stalymi N283_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = nekanie283_selftest()
+    rep.add("N283-S: self-test wyrazen (linie kontrolne jak w kodzie C#: HorsePursuit.React.cs, HorsePursuit.HuntTest.cs)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = nekanie283_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("N283-S2: test syntetyczny (dobry A/B/C, zly, bez nekajacego, bez bitwy)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("N283-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = nekanie283_collect(logp)
+    print(f"plik: {logp} | bitew polowych {D['field']}, linii bitwy 283 {sum(1 for g in D['segs'] if g.get('line'))}, epizodow (linie startu) "
+          f"{sum(len(g['starts']) for g in D['segs'])}, testow {sum(len(g['tends']) for g in D['segs'])}, ERROR {len(D['err'])}")
+    nekanie283_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_nekanie283_main_prev = main
+
+
+def main(argv):
+    # paczka 283: grupa nekanie283 - opakowanie main jak rody277 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "nekanie283":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return nekanie283_main(rest[0] if rest else None)
+    return _nekanie283_main_prev(argv)
+
 
 
 if __name__ == "__main__":

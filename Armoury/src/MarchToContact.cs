@@ -279,6 +279,8 @@ namespace Armoury
                 // 144: oddech AI - tylko pieszy w szyku, nie uciekajacy, nie odlaczony, nie gracz sieci, nie w odwrocie (B1); zapis tylko przy obnizeniu
                 if (!AiBreath.On) return;
                 if (agent.IsRunningAway || agent.IsDetachedFromFormation || agent.MissionPeer != null || agent.MountAgent != null) return;
+                // 283: pieszy oddzial na nekajacego (HorsePursuit R2, pozycja skryptowa, _countering) biegnie - bez capu oddechu, jak jezdziec 204 bez capu marszu
+                if (HorsePursuit.CounterAnyThread(agent)) { HorsePursuit.NoteCounterCapSkip(); return; }
                 bool cu = desiredSpeed < 0f;
                 if (cu && agent.IsRetreating()) return;
                 float bc = AiBreath.CapOf(agent);
@@ -795,6 +797,7 @@ namespace Armoury
         {
             breath = false;
             if (a == null || !a.IsAIControlled || a.IsRunningAway) return -1f;
+            if (HorsePursuit.CounterAnyThread(a)) return -1f;   // 283: pieszy oddzial na nekajacego - kara FieldCraft bez gornego capu marszu / oddechu (jak PostSpeed)
             var f = a.Formation;
             if (_on)
             {
