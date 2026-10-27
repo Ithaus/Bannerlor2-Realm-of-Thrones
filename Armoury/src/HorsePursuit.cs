@@ -52,6 +52,9 @@ namespace Armoury
     /// 157 (P3) kontra na strzelca WYCOFANA - 204 "Jazda na strzelca" (klucz RidersRunDownShooters): HorsePursuit.Hunt.cs (wykrycie OnFire z kolejki 140,
     /// pass co 1 s po Pass 148, sterowanie co 0.25 s po Track 148, linia "Jazda na strzelca (204)" po linii 148) i HorsePursuit.HuntTest.cs (proba autotestu);
     /// czlowiek pod 204 nie wchodzi do poscigu (RidersPass), jezdziec w poscigu 148 nie idzie na strzelca, odwrot rannego 143 zdejmuje 204 w BeforeWithdraw.
+    /// 283 "Nekanie (283)" (klucze FormationsAnswerHarassers, ArmyHaltsForHarassers): HorsePursuit.React.cs (macierz, kolejka ciosow wrecz, piechota R2, linia),
+    /// HorsePursuit.ReactFire.cs (lucznicy R1 / R1b - czysta linia, krok), HorsePursuit.ReactHalt.cs (postoj R4 / R5) - w tym samym passie 204 (Begin / End,
+    /// OnHit, OnRemoved, BeforeWithdraw jak wyzej; piechota 283 tez w _countering, krok lucznika zdejmuje EndHunter).
     /// </summary>
     internal static partial class HorsePursuit
     {
@@ -353,6 +356,7 @@ namespace Armoury
                 _written = true;
                 try { Write(m); } catch (Exception e) { Stumble("HorsePursuit.Write", e); }
                 try { HuntWrite(); } catch (Exception e) { Stumble("HorsePursuit.JazdaLinia", e); }   // 204: linia "Jazda na strzelca (204)" raz na bitwe polowa
+                try { ReactWrite(); } catch (Exception e) { Stumble("HorsePursuit.NekanieLinia", e); }   // 283: linia "Nekanie (283)" raz na bitwe polowa
             }
             _live = false;
             Clear();

@@ -78,7 +78,7 @@ namespace Armoury
         // recenzja 204: UMelee - wrog inny niz strzelec w RaiseNear (bron sie sam), UIntact - jezdziec w CounterFootGap od nietknietego szyku strony strzelca
         // (bez wjazdu w jego szyk, jak OIntact 148), UNoCheck - lucznicy bez sprawdzenia swoich przy strzelcu (limit zapytan) - cel zdjety
         private const int UGone = 0, UPanic = 1, UHorse = 2, ULeash = 3, URetreat = 4, UPlayer = 5, UKey = 6, UEnded = 7, UOther = 8, UThreat = 9, URange = 10, UFriend = 11,
-                          UMelee = 12, UIntact = 13, UNoCheck = 14, UTrim = 15, UKinds = 16;   // UTrim - recenzja 204 (2): nadwyzka po obnizeniu poziomu
+                          UMelee = 12, UIntact = 13, UNoCheck = 14, UTrim = 15, UTime = 16, UKinds = 17;   // UTrim - recenzja 204 (2): nadwyzka po obnizeniu poziomu; UTime - 283: piechota 60 s
         // nie wyslani (rozni ludzie)
         private const int NwMelee = 0, NwPanic = 1, NwChase = 2, NwHero = 3, NwBanner = 4, NwHorse = 5, NwFar = 6, NwPlayer = 7, NwLosing = 8, NwBusy = 9, NwCool = 10,
                           NwQuery = 11, NwOther = 12, NwIntact = 13, NwKinds = 14;
@@ -97,6 +97,12 @@ namespace Armoury
             public Vec2 ScreenC = Vec2.Invalid, EscC = Vec2.Invalid;
             public float ScreenR;
             public readonly List<Hunter> Hs = new List<Hunter>();
+            // 283: rodzaj (pocisk / cios, konno / pieszo - na zywo), ofiara (szyk, lucznicy, chorazy, wodz), tier, piechota, postoje, linie epizodu
+            public int Kind, Tier = 1, MeleeHits, Foot, FootEver, Halt4, Halt5, DownAtEnd;
+            public float LastShot = -1f, LastMelee = -1f, GoneAt = -1f;
+            public float FootCool;   // recenzja 283 (3): do kiedy piechota (R2) nie rusza na tego nekajacego po powrocie ze smyczy / czasu / konny uszedl
+            public bool Lone, Leader, OnArchers, OnBanner, H4Used, H5Used, Line204, Rx, DownByResp;
+            public Formation VicF, LeaderF;
         }
 
         private sealed class Hunter
@@ -108,6 +114,8 @@ namespace Armoury
             public bool Group;   // wyslany na strzelca w szyku (licznik FormGroup)
             public float Start, Range;
             public int Fails;
+            public bool Step;   // 283: lucznik na punkcie kroku (pozycja skryptowa - zdejmuje EndHunter)
+            public int Blk;     // 283: passow z rzedu z FriendInWay silnika
         }
 
         private struct FI
@@ -118,6 +126,10 @@ namespace Armoury
             public float R;
             public int N;
             public bool Cav, Ha, Foot, Rng, Player, Retreat, Charging;
+            public float Gap;      // 283: odleglosc do najblizszego szyku wroga (MarchToContact.EnemyGap)
+            public bool Engaged;   // 283: w zwarciu (Gap <= ContactGap 25 m)
+            public bool Pf;        // 283: oslona skrzydla (BehaviorProtectFlank)
+            public Agent Cap;      // 283: dowodca szyku (R6)
         }
 
         // ------------------------------------------------------------ stan misji (glowny watek)
@@ -188,6 +200,7 @@ namespace Armoury
             _hKey = c != null && c.RidersRunDownShooters;
             _hold = c != null ? Math.Max(2f, Math.Min(30f, c.ShieldsUpHoldSeconds)) : 8f;           // jak ShieldsUp.Begin
             _shots3 = c != null ? Math.Max(1, Math.Min(20, c.ShieldsUpFormationShots)) : 3;          // jak ShieldsUp.Begin
+            ReactBegin(c);   // 283 (przed testem - scenariusz zalezy od klucza 283)
             HuntTestBegin(c);
         }
 
@@ -212,6 +225,7 @@ namespace Armoury
             _hLines = _hStum = _hDropped = _hEscal = _hScreenSec = _hRangedCap = _hFriendBlock = 0;
             _hContactSum = 0f; _hContactMin = float.MaxValue; _hContactMax = 0f; _hMaxFar = 0f;
             Interlocked.Exchange(ref _hBlows, 0); Interlocked.Exchange(ref _hFFMissile, 0); Interlocked.Exchange(ref _hFFMelee, 0);
+            ReactClear();   // 283
             HuntTestClear();
         }
 
@@ -233,7 +247,10 @@ namespace Armoury
                 catch (Exception e) { HStumble("HorsePursuit.JazdaKoniec", e); if (i < HList.Count) DropHunter(HList[i]); }
             }
             try { TestEnd(Mission.Current, "koniec bitwy", now); } catch (Exception e) { HStumble("HorsePursuit.JazdaTest", e); }
+            Volatile.Write(ref _rLive, 0);
+            try { HaltEndAll(); } catch (Exception e) { RStumble("HorsePursuit.NekanieKoniec", e); }   // 283: postoje zwolnione
             _hLeft = CountIn(Volatile.Read(ref _countering)) + CountIn(Volatile.Read(ref _aiming)) + HList.Count;
+            _rLeft = _hLeft;   // 283: ten sam stan (piechota 283 w _countering)
         }
 
         private static void HStumble(string where, Exception e)
@@ -264,16 +281,23 @@ namespace Armoury
                     try { tg = s.GetTargetAgent(); } catch { tg = null; }
                     if (tg != null && (ReferenceEquals(tg, rh.T.S) || ReferenceEquals(tg, rh.T.S.MountAgent))) _hRangedShots++;
                 }
-                if (!s.IsHuman || s.MountAgent == null || !s.IsActive()) return;
+                if (!s.IsHuman || !s.IsActive()) return;
                 int ss = SideOf(s.Team);
                 if (ss < 0) return;
                 int side = 1 - ss;
                 Threat t;
                 Threats.TryGetValue(s, out t);
                 bool test = ReferenceEquals(s, _tA);
+                bool mounted = s.MountAgent != null;
+                if (!mounted)
+                {
+                    // 283: pieszy strzelec - tylko przy kluczu 283; nowy tylko gracz, nekajacy testu albo samotny (AI w swoim szyku to zwykla bitwa)
+                    if (!_rKey) return;
+                    if (t == null && !s.IsMainAgent && !test && IntactNear(ss, s.Position.AsVec2, IntactRadius)) return;
+                }
                 if (k == 1)
                 {
-                    _hShotsSeen++;
+                    if (mounted) _hShotsSeen++; else _rFootShots++;
                     if (test) _tShots++;
                     Agent tg = null;
                     if (s.IsAIControlled && !s.IsMainAgent) { try { tg = s.GetTargetAgent(); } catch { tg = null; } }
@@ -282,7 +306,7 @@ namespace Armoury
                     if (t != null)
                     {
                         Fire(t, now);
-                        if (ai) Detect(t, DAi, test);
+                        if (ai) { Detect(t, DAi, test, now); Victim(t, tg, false); }
                         return;
                     }
                     int kind = -1;
@@ -295,9 +319,10 @@ namespace Armoury
                         else if (PassNear(side, p.AsVec2, land)) kind = DPass;
                     }
                     if (kind < 0) return;
-                    t = Notice(s, ss, side, kind, now);
+                    t = Notice(s, ss, side, kind, now, true);
                     Fire(t, now);
-                    Detect(t, kind, test);
+                    Detect(t, kind, test, now);
+                    if (ai) Victim(t, tg, false);
                     return;
                 }
                 if (k != 2) return;
@@ -305,15 +330,16 @@ namespace Armoury
                 {
                     Agent hv = v.IsMount ? v.RiderAgent : v;
                     if (hv == null || !hv.IsHuman || SideOf(hv.Team) != side) return;   // kon bez jezdzca, swoj w swojego
-                    if (t == null) { t = Notice(s, ss, side, DHit, now); Fire(t, now); }
+                    if (t == null) { t = Notice(s, ss, side, DHit, now, true); Fire(t, now); }
                     else t.LastFire = now;
-                    Detect(t, DHit, test);
+                    Detect(t, DHit, test, now);
+                    Victim(t, hv, true);
                     return;
                 }
                 if (!NearMen(m, p.AsVec2, ShieldsUp.MissRadius, s.Team)) return;
-                if (t == null) { t = Notice(s, ss, side, DMiss, now); Fire(t, now); }
+                if (t == null) { t = Notice(s, ss, side, DMiss, now, true); Fire(t, now); }
                 else t.LastFire = now;
-                Detect(t, DMiss, test);
+                Detect(t, DMiss, test, now);
             }
             catch (Exception e) { HStumble("HorsePursuit.JazdaWykrycie", e); }
         }
@@ -326,22 +352,26 @@ namespace Armoury
             t.LastFire = now;
         }
 
-        private static void Detect(Threat t, int kind, bool test)
+        private static void Detect(Threat t, int kind, bool test, float now)
         {
-            HDet[kind]++;
+            t.LastShot = now;   // 283: ostatnia szkoda pociskiem (rodzaj strzelec / wrecz)
+            if (t.First < 0) t.First = kind;   // recenzja 283 (M3): zagrozenie zauwazone ciosem - pierwsze wykrycie pociskiem do linii 204 (bez "wykrycie ?")
+            if (_rKey) RDet[KindNow(t)]++;
+            if (t.S != null && t.S.MountAgent != null) HDet[kind]++;   // 204: linia liczy konnych strzelcow (jak dotad)
             if (kind == DHit) t.Hits++; else if (kind == DMiss) t.Misses++; else if (kind == DPass) t.Pass++; else t.AiTgt++;
             if (!test) return;
             _tDet++;
             if (kind == DMiss || kind == DPass) _tMissPass++;
         }
 
-        private static Threat Notice(Agent s, int ss, int side, int kind, float now)
+        /// <summary>Nowe zagrozenie. shot - strzelec (204: lista strzelcow linii; 283: nekajacy wrecz bez niej).</summary>
+        private static Threat Notice(Agent s, int ss, int side, int kind, float now, bool shot)
         {
-            var t = new Threat { S = s, SSide = ss, Side = side, First = kind, LastFire = now };
+            var t = new Threat { S = s, SSide = ss, Side = side, First = kind, LastFire = now, Tier = TierOf(s) };
             Threats[s] = t;
             ThreatList.Add(t);
             MarkIn(ref _hunted, s, true);
-            if (HShooters.Add(s.Index) && s.IsMainAgent) _hPlayerShooter++;
+            if (shot && s.MountAgent != null && HShooters.Add(s.Index) && s.IsMainAgent) _hPlayerShooter++;
             return t;
         }
 
@@ -434,6 +464,16 @@ namespace Armoury
                         try { fi.Retreat = FormRetreat(f); } catch { fi.Retreat = false; }
                         try { fi.Charging = ShieldsUp.FormCharging(f); } catch { fi.Charging = false; }
                     }
+                    if (_rKey)
+                    {
+                        // 283: zwarcie szyku (ContactGap MarchToContact), oslona skrzydla, dowodca; szyk nie w zwarciu - cios w niego to nekanie (OnHit)
+                        try { fi.Gap = MarchToContact.EnemyGap(f); } catch { fi.Gap = float.MaxValue; }
+                        fi.Engaged = fi.Gap <= MarchToContact.ContactGap;
+                        try { fi.Pf = f.AI != null && f.AI.ActiveBehavior is BehaviorProtectFlank; } catch { fi.Pf = false; }
+                        try { fi.Cap = f.Captain; } catch { fi.Cap = null; }
+                        QuietSet(f, fi.Engaged);
+                    }
+                    else fi.Gap = float.MaxValue;
                     HForms[s].Add(fi);
                 }
             }
@@ -477,16 +517,22 @@ namespace Armoury
             {
                 var c = Settings.Current;
                 _hKey = c != null && c.RidersRunDownShooters;
+                _rKey = c != null && c.FormationsAnswerHarassers;            // 283: klucze z MCM na zywo (jak 204)
+                _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
+                Volatile.Write(ref _rLive, _rKey ? 1 : 0);                   // OnHit: kolejka wrecz tylko po rozstawieniu (Tick wola pass po IsDeploymentFinished)
                 _hQPass = 0;
                 _hQChk = 0;
                 _hQFriend = 0;
                 _hNewRanged = 0;
                 _hScan = 0;
+                _rRays = 0;
                 BuildHForms(m);
                 DrainBlows(m, now);
+                if (_rKey) DrainMelee(m, now);
                 HuntersPass(m, now);
                 HuntersMelee(m, now);
                 ThreatsRun(m, now);
+                try { HaltPass(m, now); } catch (Exception e) { RStumble("HorsePursuit.NekaniePostoj", e); }   // 283: R4/R5 zwolnienia (takze przy kluczu NIE)
                 HuntTrack(m, now);
                 try { HuntTestStep(m, now, true); } catch (Exception e) { HStumble("HorsePursuit.JazdaTest", e); }
             }
@@ -497,6 +543,13 @@ namespace Armoury
                 if (dt > _hPassMaxTicks) _hPassMaxTicks = dt;
                 _hPassN++;
                 if (_hScan > _hScanMax) _hScanMax = _hScan;
+                if (_rKey)
+                {
+                    _rTicks += dt;   // 283: caly pass 204 + 283 (wspolne szyki, przeglad i promienie)
+                    if (dt > _rMaxTicks) _rMaxTicks = dt;
+                    _rPassN++;
+                    if (_rRays > _rRayMax) _rRayMax = _rRays;
+                }
             }
         }
 
@@ -539,7 +592,15 @@ namespace Armoury
             for (int i = 0; i < nt; i++)
             {
                 var t = ThreatTmp[i];
-                if (t.Ranged <= 0 || t.FfPass == _hPassN || t.S == null || !Threats.ContainsKey(t.S) || !t.S.IsActive()) continue;
+                if (t.Ranged <= 0 || t.S == null || !Threats.ContainsKey(t.S) || !t.S.IsActive()) continue;
+                if (_rKey)
+                {
+                    // 283: zamiast kuli 8 m - stan linii wedlug silnika u kazdego przypisanego lucznika (bez zapytan; krok albo cel zdjety)
+                    try { RangedRecheck(m, t, now); }
+                    catch (Exception e) { RStumble("HorsePursuit.NekanieLinia", e); }
+                    continue;
+                }
+                if (t.FfPass == _hPassN) continue;
                 _hFfOut++;
                 try { FriendsBlock(m, t, t.S.Position.AsVec2, now); }
                 catch (Exception e) { HStumble("HorsePursuit.JazdaFF", e); }
@@ -654,15 +715,29 @@ namespace Armoury
             if (h.F == null || PlayerForm(h.F)) return UPlayer;
             var s = h.T.S;
             if (s == null || !s.IsActive()) return UThreat;
-            // recenzja 204: jezdziec nie wjezdza w nietkniety szyk strony strzelca (jak OIntact 148; zaslona przy piechocie trzyma 30 m od jej krawedzi)
+            // recenzja 204: jezdziec nie wjezdza w nietkniety szyk strony strzelca (jak OIntact 148; zaslona przy piechocie trzyma 30 m od jej krawedzi);
+            // 283: piechota tez nie wbiega w jego szyk
+            bool rider = h.Role == RoleIntercept || h.Role == RoleCut;
             if (h.Role != RoleRanged && IntactNear(h.T.SSide, a.Position.AsVec2, CounterFootGap)) return UIntact;
-            if (!pass) return h.Role != RoleRanged && a.MountAgent == null ? UOther : -1;
-            if (!_hKey) return UKey;
+            if (!pass) return rider && a.MountAgent == null ? UOther : -1;
+            // klucze: jezdzcy 204, piechota 283, lucznicy - ktorykolwiek (283 sam strzela, gdy jazda wylaczona)
+            if (rider ? !_hKey : (h.Role == RoleFoot ? !_rKey : !_hKey && !_rKey)) return UKey;
             if (FormRetreat(h.F)) return URetreat;
             if (h.Role == RoleRanged)
             {
                 if (!a.IsRangedCached) return UOther;
                 if (a.Position.AsVec2.Distance(s.Position.AsVec2) > h.Range) return URange;
+                if (h.Step && a.Position.AsVec2.Distance(FootHome(h.F)) > MarchToContact.InfRearm) return ULeash;   // 283: krok, a szyk odszedl
+                return -1;
+            }
+            if (h.Role == RoleFoot)
+            {
+                // 283 R8: smycz 50 m od szyku (InfRearm), 60 s (MaxSeconds 148), konny nekajacy (nie w walce wrecz) dalej niz 30 m - piechota konia nie dogoni
+                float dh = a.Position.AsVec2.Distance(FootHome(h.F));
+                if (dh > _rFootFar) _rFootFar = dh;
+                if (dh > MarchToContact.InfRearm) return ULeash;
+                if (now - h.Start >= MaxSeconds) return UTime;
+                if (s.MountAgent != null && !MeleeKind(h.T) && a.Position.AsVec2.Distance(s.Position.AsVec2) > HuntScreen) return URange;
                 return -1;
             }
             if (a.MountAgent == null) return UOther;
@@ -698,20 +773,34 @@ namespace Armoury
             if (t.Screen) { t.ScreenC = fl[iFoot].C; t.ScreenR = fl[iFoot].R; }
             if (t.Screen && t.Active) _hScreenSec++;
             if (m.MissionEnded) { EndThreat(t, HEnded, now); return; }
-            float range = ShooterRange(s);
+            bool rx = _rKey;
+            bool lone = !IntactNear(t.SSide, sp, IntactRadius);
+            if (rx) ReactRefresh(m, t, sp, lone);   // 283: rodzaj na zywo, samotny, wodz w 10 m
+            bool mounted = s.MountAgent != null;
+            float range = rx && MeleeKind(t) ? HuntScreen : ShooterRange(s);   // 283: nekajacy wrecz - "odpedzony" dalej niz 30 m (HuntScreen)
+            if (rx && range <= 1f) range = HuntScreen;
             bool quiet = now - t.LastFire >= _hold;
             if (quiet && dAll > range) { EndThreat(t, HAway, now); return; }   // odpedzony (albo zapomniany, gdy bez epizodu)
             if (quiet && !t.Active) { EndThreat(t, HOther, now); return; }     // zauwazony, ale bez jezdzcow i cicho - zapomniany (nowy strzal = nowe wykrycie)
+            if (quiet && rx && t.Melee + t.Foot <= 0) { EndThreat(t, HOther, now); return; }   // 283: epizod tylko lucznikow / postoju - cisza konczy
             // poziom
             int lvl = 1;
             int down;
             DownBy.TryGetValue(s, out down);
             if (dCav <= HuntClose || t.Shots.Count >= _shots3 || down > 0) lvl = 2;
-            bool lone = !IntactNear(t.SSide, sp, IntactRadius);
             if (lone && lvl < 2) lvl = 2;
             if (t.Level >= 2 && now - t.L2At >= ShieldsUp.Window && t.Shots.Count >= _shots3) lvl = 3;
+            if (rx)
+            {
+                // 283 R3: pieszy nekajacy - oddzial na miare R2, cala wolna jazda przy 3 szkodach w 5 s albo powalonym; samotny konny, ktory kogos powalil, dal
+                // 3 szkody w 5 s albo uderzyl w lucznikow - od razu cala jazda; wodz (R6) - zawsze cala jazda
+                // recenzja 283 (4): pieszy przy swoim nietknietym szyku (gracz w swojej linii) - zwykla bitwa, bez calej jazdy
+                if (!mounted) lvl = lone && (t.Shots.Count >= _shots3 || down > 0) ? 3 : 1;
+                else if (lone && (down > 0 || t.Shots.Count >= _shots3 || t.OnArchers)) lvl = 3;
+                if (t.Leader) lvl = 3;
+            }
             // recenzja 204 (2): strona lamana obniza takze juz podniesiony poziom (t.Level), nie tylko nowy; samotny nekajacy dalej co najmniej L2
-            bool losing = !lone && (lvl > 1 || t.Level > 1) && Broke(t.SSide, t.Side);
+            bool losing = !lone && !(rx && t.Leader) && (lvl > 1 || t.Level > 1) && Broke(t.SSide, t.Side);
             if (losing)
             {
                 lvl = 1;
@@ -719,6 +808,7 @@ namespace Armoury
             }
             // recenzja 204: strzelec AI w nietknietym szyku swojej strony (np. szyk konnych lucznikow) - zagrozenie szyku, nie jednego czlowieka: tylko L1,
             // jezdzcy z szyku bez szarzy, razem na wszystkich takich strzelcow najwyzej PerVictim z jednego szyku (157: dwoch z szyku); samotny i gracz - bez zmian
+            // recenzja 283 (2): strzelec AI w nietknietym szyku zostaje "szyk na szyk" (L1, PerVictim z szyku, bez postoju) takze przy wodzu - wodza oslania jego szyk
             t.Group = !lone && !s.IsMainAgent;
             if (t.Group)
             {
@@ -736,29 +826,29 @@ namespace Armoury
                 if (t.Level < 2 && lvl >= 2) t.L2At = now;
                 t.Level = lvl;
             }
-            if (!_hKey) return;   // klucz NIE: tylko wykrycia (bez sterowania)
+            if (!_hKey && !rx) return;   // klucz NIE: tylko wykrycia (bez sterowania); 283 bez 204 - bez jazdy, reszta macierzy dziala
             int sent = 0, sentCharge = 0;
             HFormsTxt.Length = 0;
-            if (t.Level <= 1)
+            if (!_hKey) { }
+            else if (t.Level <= 1)
             {
-                int want = PerVictim + down - t.Melee;
-                if (want > 0)
+                // najblizszy szyk konnicy AI bez szarzy (szarza wodza zostaje), w smyczy od strzelca
+                int best = -1;
+                float bd = float.MaxValue;
+                for (int i = 0; i < fl.Count; i++)
                 {
-                    // najblizszy szyk konnicy AI bez szarzy (szarza wodza zostaje), w smyczy od strzelca
-                    int best = -1;
-                    float bd = float.MaxValue;
-                    for (int i = 0; i < fl.Count; i++)
-                    {
-                        var fi = fl[i];
-                        if (!fi.Cav || fi.Retreat || fi.Charging) continue;
-                        float e = Math.Max(0f, sp.Distance(fi.C) - fi.R);
-                        if (fi.Player) { NotePlayerForm(t, fi, e); continue; }
-                        if (e > _maxFrom || e >= bd) continue;
-                        bd = e;
-                        best = i;
-                    }
-                    if (best >= 0) Take(m, t, fl[best], want, now, ref sent, ref sentCharge);
+                    var fi = fl[i];
+                    if (!fi.Cav || fi.Retreat || fi.Charging) continue;
+                    float e = Math.Max(0f, sp.Distance(fi.C) - fi.R);
+                    if (fi.Player) { NotePlayerForm(t, fi, e); continue; }
+                    if (e > _maxFrom || e >= bd) continue;
+                    if (rx && fi.Engaged) continue;   // 283: oddzial nie z szyku w zwarciu
+                    bd = e;
+                    best = i;
                 }
+                // 283: oddzial na miare zagrozenia (PerVictim x tier nekajacego / tier szyku + padlo); 204: PerVictim + padlo
+                int want = best < 0 ? 0 : (rx ? RWant(t, FormTier(fl[best].F), down) : PerVictim + down) - t.Melee;
+                if (want > 0) Take(m, t, fl[best], want, now, ref sent, ref sentCharge);
             }
             else
             {
@@ -773,12 +863,19 @@ namespace Armoury
                     Take(m, t, fi, int.MaxValue, now, ref sent, ref sentCharge);
                 }
             }
-            int archers = RangedPass(m, t, sp, now);
+            int foot = 0, halted = 0;
+            if (rx)
+            {
+                if (sent > 0) for (int i = 0; i < t.Hs.Count; i++) if (t.Hs[i].Role != RoleRanged && t.Hs[i].Role != RoleFoot && t.Hs[i].A != null) RCavSent.Add(t.Hs[i].A.Index);
+                foot = FootPass(m, t, sp, now, down);       // R2 (R6 / R7 - szyk wodza / ofiary pierwszy)
+                halted = HaltAsk(t, sp, now, down);         // R4 / R5
+            }
+            int archers = rx ? RangedPassR(m, t, sp, now) : RangedPass(m, t, sp, now);   // R1 / R1b
             if (!t.Active)
             {
-                if (t.Melee > 0) StartEp(t, now, sent, sentCharge, archers, dAll, down);
+                if (t.Melee > 0 || (rx && (t.Foot > 0 || t.Ranged > 0 || halted > 0))) StartEp(t, now, sent, sentCharge, archers, dAll, down);
             }
-            else if (t.Level > prev && sent > 0)
+            else if (t.Level > prev && sent > 0 && t.Line204)
             {
                 _hEscal++;
                 if (_hLines < HuntMaxLines)
@@ -844,6 +941,9 @@ namespace Armoury
         /// ludzi przejrzanych na pass (wszystkie Take i RangedPass razem; przy cieciu poczatek przegladu przesuwany - kazdy po kolei).</summary>
         private static void Take(Mission m, Threat t, FI fi, int want, float now, ref int sent, ref int sentCharge)
         {
+            // 283 R3: szyk w zwarciu zostaje (chyba ze wodz, wartosc szyku ofiary, polowa strzelcow strony), oslona skrzydla przed jazda wroga zostaje
+            int pull;
+            if (!CavAllowed(t, fi, out pull)) return;
             int cap = want;
             if (t.Group)
             {
@@ -871,6 +971,7 @@ namespace Armoury
                 used++;
                 if (why >= 0) { NoteNw(a, why); continue; }
                 HCand.Add(new KeyValuePair<float, Agent>(a.Position.AsVec2.Distance(sp), a));
+                if (_rKey) RCavFree.Add(a.Index);   // 283: wolna jazda (do wyslania)
             }
             _hScan += used;
             HUnits.Clear();
@@ -898,6 +999,7 @@ namespace Armoury
             }
             HCand.Clear();
             if (n <= 0) return;
+            NotePull(pull, n);
             sent += n;
             if (fi.Charging) sentCharge += n;
             if (HFormsTxt.Length > 0) HFormsTxt.Append(", ");
@@ -1035,7 +1137,7 @@ namespace Armoury
             return false;
         }
 
-        private static void StartHunter(Threat t, Agent a, FI fi, byte role, float range, float now)
+        private static Hunter StartHunter(Threat t, Agent a, FI fi, byte role, float range, float now)
         {
             var h = new Hunter { A = a, F = fi.F, T = t, Role = role, Start = now, Range = range };
             Hunters[a] = h;
@@ -1043,13 +1145,29 @@ namespace Armoury
             t.Hs.Add(h);
             a.SetAutomaticTargetSelection(false);
             a.SetTargetAgent(t.S);
-            if (fi.Player) _hFromPlayer++;   // nie powinno sie zdarzyc (kontrola - oczekiwane 0)
+            if (fi.Player) { _hFromPlayer++; if (_rKey) _rFromPlayer++; }   // nie powinno sie zdarzyc (kontrola - oczekiwane 0)
+            bool test = ReferenceEquals(t.S, _tA);
             if (role == RoleRanged)
             {
                 MarkIn(ref _aiming, a, true);
                 t.Ranged++;
                 if (a.MountAgent != null) HHorseArch.Add(a.Index); else HFootArch.Add(a.Index);
-                return;
+                if (_rKey) RArch.Add(a.Index);
+                if (test) _tArch++;
+                return h;
+            }
+            if (role == RoleFoot)
+            {
+                // 283 R2: pieszy oddzial - cel na nekajacego, pozycja skryptowa na nim co 0.25 s (Steer), bez capu marszu (PostSpeed / CapFor - _countering)
+                MarkCounter(a, true);
+                t.Foot++;
+                t.FootEver++;
+                Bump(FormFoot, fi.F, 1);
+                RFoot.Add(a.Index);
+                RFootForms.Add(fi.F);
+                if (test) _tFoot++;
+                Steer(h, now);
+                return h;
             }
             MarkCounter(a, true);
             t.Melee++;
@@ -1066,8 +1184,9 @@ namespace Armoury
             HRiders.Add(a.Index);
             HFormsSent.Add(fi.F);
             if (fi.Charging) _hSentCharge++;
-            if (ReferenceEquals(t.S, _tA)) _tRiders++;
+            if (test) _tRiders++;
             Steer(h, now);
+            return h;
         }
 
         private static void StartEp(Threat t, float now, int sent, int sentCharge, int archers, float dist, int down)
@@ -1081,6 +1200,11 @@ namespace Armoury
             t.LastEnd = -1;
             t.Ep = ++_hEp;
             if (ReferenceEquals(t.S, _tA)) _tEp++;
+            // 204: linie i liczniki epizodow tylko dla konnego strzelca (jak dotad); 283: linia "Nekanie (283) start" dla kazdego epizodu przy kluczu
+            t.Line204 = t.S != null && t.S.MountAgent != null && !(_rKey && MeleeKind(t));
+            t.Rx = _rKey;
+            if (t.Rx) ReactStartLine(t, dist);
+            if (!t.Line204) return;
             if (_hLines >= HuntMaxLines) return;
             _hLines++;
             var s = t.S;
@@ -1096,8 +1220,11 @@ namespace Armoury
         {
             if (!t.Active) return;
             t.Active = false;
-            HOut[outcome]++;
-            HEpL[Math.Max(1, Math.Min(3, t.Level))]++;
+            if (t.Line204)
+            {
+                HOut[outcome]++;
+                HEpL[Math.Max(1, Math.Min(3, t.Level))]++;
+            }
             float dur = Math.Max(0f, now - t.Start);
             for (int i = t.Hs.Count - 1; i >= 0; i--)
             {
@@ -1108,6 +1235,14 @@ namespace Armoury
             }
             t.Level = 0;
             t.L2At = 0f;
+            if (t.Rx)
+            {
+                int dn;
+                DownBy.TryGetValue(t.S, out dn);
+                t.DownAtEnd = dn;
+                ReactEndLine(t, outcome, dur);
+            }
+            if (!t.Line204) return;
             if (_hLines >= HuntMaxLines) return;
             _hLines++;
             Log.Info("Jazda na strzelca (204) koniec: " + HName[outcome] + " po " + dur.ToString("0.0", Inv) + " s | strzelec " + Who(t.S) + " | jezdzcy padli "
@@ -1133,6 +1268,7 @@ namespace Armoury
             if (t.S != null && Threats.TryGetValue(t.S, out cur) && ReferenceEquals(cur, t)) Threats.Remove(t.S);
             ThreatList.Remove(t);
             MarkIn(ref _hunted, t.S, false);
+            try { t.GoneAt = Mission.Current != null ? Mission.Current.CurrentTime : 0f; } catch { t.GoneAt = 0f; }   // 283: postoj trzyma jeszcze ShieldsUpHoldSeconds
         }
 
         /// <summary>Czlowiek oddany grze: cel automatyczny, pozycja skryptowa zdjeta (jak 148 Uncontrol; force - przed pierwszym ruchem 143).</summary>
@@ -1147,20 +1283,28 @@ namespace Armoury
             }
             HList.Remove(h);
             t.Hs.Remove(h);
-            UEnd[why]++;
-            bool melee = h.Role != RoleRanged;
-            if (melee) { MarkCounter(a, false); t.Melee--; t.LastEnd = why; Bump(FormRiders, h.F, -1); if (h.Group) Bump(FormGroup, h.F, -1); }
+            bool rider = h.Role == RoleIntercept || h.Role == RoleCut;
+            bool foot = h.Role == RoleFoot;   // 283
+            if (foot) FEnd[why]++; else UEnd[why]++;
+            if (rider) { MarkCounter(a, false); t.Melee--; t.LastEnd = why; Bump(FormRiders, h.F, -1); if (h.Group) Bump(FormGroup, h.F, -1); }
+            else if (foot)
+            {
+                MarkCounter(a, false); t.Foot--; t.LastEnd = why; Bump(FormFoot, h.F, -1);
+                // recenzja 283 (3): powrot bez dogonienia - przerwa na nekajacego (nie co pass nowi ludzie z tego samego szyku)
+                if (why == ULeash || why == UTime || why == URange) { t.FootCool = now + CounterCool; _rFootCoolN++; }
+            }
             else { MarkIn(ref _aiming, a, false); t.Ranged--; }
             if (a != null && a.IsActive())
             {
                 try { a.SetAutomaticTargetSelection(true); a.InvalidateTargetAgent(); } catch { }
-                if (melee && (force || a.IsRunningAway || !Withdrawing(a)))
+                // pozycja skryptowa: jezdzcy, piechota 283 i lucznicy na punkcie kroku 283 (odwrot rannego 143 - jego pozycja zostaje, chyba ze force)
+                if ((rider || foot || h.Step) && (force || a.IsRunningAway || !Withdrawing(a)))
                 {
                     try { if ((a.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) != 0) a.DisableScriptedMovement(); } catch { }
                 }
             }
-            if (cool && melee && a != null) HuntCool[a] = now + CounterCool;
-            if (melee && t.Active && t.Melee <= 0) EndEp(t, Outcome(why), now);
+            if (cool && (rider || foot) && a != null) HuntCool[a] = now + CounterCool;
+            if ((rider || foot) && t.Active && t.Melee + t.Foot <= 0) EndEp(t, Outcome(why), now);
         }
 
         /// <summary>Po wyjatku przy zwalnianiu - tylko wypisanie ze stanu (bez wolania gry).</summary>
@@ -1172,7 +1316,8 @@ namespace Armoury
             {
                 if (h.T.Hs.Remove(h))
                 {
-                    if (h.Role != RoleRanged) { h.T.Melee--; Bump(FormRiders, h.F, -1); if (h.Group) Bump(FormGroup, h.F, -1); }
+                    if (h.Role == RoleFoot) { h.T.Foot--; Bump(FormFoot, h.F, -1); }
+                    else if (h.Role != RoleRanged) { h.T.Melee--; Bump(FormRiders, h.F, -1); if (h.Group) Bump(FormGroup, h.F, -1); }
                     else h.T.Ranged--;
                 }
             }
@@ -1244,7 +1389,8 @@ namespace Armoury
             float d = a.Position.AsVec2.Distance(sp);
             if (d <= ShieldsUp.RaiseNear && t.Active && t.FirstContact < 0f) Contact(t, a, d, now);
             Vec2 p = sp;
-            if (t.Screen && t.ScreenC.IsValid)
+            if (h.Role == RoleFoot) { }   // 283: piechota prosto na nekajacego (bez wyprzedzenia i zaslony - smycz 50 m trzyma ja przy szyku)
+            else if (t.Screen && t.ScreenC.IsValid)
             {
                 Vec2 c = t.ScreenC;
                 float dc = c.Distance(sp);
@@ -1295,7 +1441,7 @@ namespace Armoury
             if (dt < _hContactMin) _hContactMin = dt;
             if (dt > _hContactMax) _hContactMax = dt;
             if (ReferenceEquals(t.S, _tA) && _tContact < 0f) _tContact = dt;
-            if (_hLines >= HuntMaxLines) return;
+            if (!t.Line204 || _hLines >= HuntMaxLines) return;   // 283: linia kontaktu 204 tylko w epizodzie konnego strzelca
             _hLines++;
             Log.Info("Jazda na strzelca (204) kontakt: po " + dt.ToString("0.0", Inv) + " s, jezdziec " + Who(a) + ", " + d.ToString("0.0", Inv) + " m | strzelec " + Who(t.S));
         }
@@ -1348,10 +1494,13 @@ namespace Armoury
                 lock (HLock) { if (BlowQ.Count < HuntBlowCap) BlowQ.Add(vic.Index); }
                 return;
             }
-            if (!HuntAnyThread(vic)) return;
+            ReactOnHit(att, vic, in blow);   // 283: cios wrecz w szyk, ktory nie jest w zwarciu - kolejka nekania
             var at = att.Team;
             var vt = vic.Team;
             if (!MissionTeams.Valid(at) || !MissionTeams.Valid(vt) || at.Side != vt.Side) return;
+            // 283: FF od lucznikow z celem 283 (pocisk lucznika pod sterowaniem w swojego)
+            if (blow.IsMissile && Volatile.Read(ref _rLive) != 0 && In(Volatile.Read(ref _aiming), att)) Interlocked.Increment(ref _rFfArch);
+            if (!HuntAnyThread(vic)) return;
             if (blow.IsMissile) Interlocked.Increment(ref _hFFMissile); else Interlocked.Increment(ref _hFFMelee);
         }
 
@@ -1362,7 +1511,8 @@ namespace Armoury
             if (down && by != null)
             {
                 Agent k = by.IsMount ? by.RiderAgent : by;
-                if (k != null && k.IsHuman && k.MountAgent != null && a.Team != null && k.Team != null && a.Team.IsEnemyOf(k.Team))
+                // 204: padlo od konnego; 283: od kazdego (pieszy nekajacy - jeden za jednego R2, poziom jazdy)
+                if (k != null && k.IsHuman && (k.MountAgent != null || _rKey) && a.Team != null && k.Team != null && a.Team.IsEnemyOf(k.Team))
                 {
                     int c;
                     DownBy.TryGetValue(k, out c);
@@ -1372,7 +1522,8 @@ namespace Armoury
             Hunter h;
             if (Hunters.TryGetValue(a, out h))
             {
-                if (down && h.Role != RoleRanged) { h.T.RidersLost++; _hRidersLost++; }
+                if (down && h.Role == RoleFoot) _rFootLost++;
+                else if (down && h.Role != RoleRanged) { h.T.RidersLost++; _hRidersLost++; }
                 EndHunter(h, UGone, now, false, false);
             }
             Threat t;
@@ -1383,7 +1534,11 @@ namespace Armoury
                 {
                     Agent k = by.IsMount ? by.RiderAgent : by;
                     Hunter bh;
-                    if (k != null && Hunters.TryGetValue(k, out bh) && ReferenceEquals(bh.T, t) && bh.Role != RoleRanged) byRider = true;
+                    if (k != null && Hunters.TryGetValue(k, out bh) && ReferenceEquals(bh.T, t))
+                    {
+                        if (bh.Role == RoleIntercept || bh.Role == RoleCut) byRider = true;
+                        else t.DownByResp = true;   // 283: padl od lucznika / piechoty z celem na niego
+                    }
                 }
                 EndThreat(t, down ? (byRider ? HDownRiders : HDownOthers) : HOther, now);
             }
