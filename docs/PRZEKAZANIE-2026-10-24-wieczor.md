@@ -1,5 +1,17 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 23:25 CET - 283 + 284 SCALONE (n161 e714ccca, Armoury 6b2ef43e), AUTOTEST 132a w toku
+- 284 (zb\n284): 0a3596d2 + da10b580 + recenzja 93bac7ea (Armoury 7bd84054); 9 uwag recenzji naprawione. Ksiega kosztu karawan w zapisie (arm_cg284), sprzedaz
+  bez zoldu juz wydanego, BK i surowce nie ponizej kosztu, zakupy BK wedlug sprzedazy (bramka kazdego towaru, arm_cs284), kapital obrotowy, sprawdzenie zysku,
+  bramka 282 i rowne pokrycie dla 7 surowcow tabeli, wsad warsztatow towarowych (CommodityInputs284.cs). Wnioski: marza handlu swiata ok. 89k/d < zold karawan
+  ok. 153k/d - dlatego przy scaleniu CaravanSizeByTrade domyslnie TAK (e714ccca; karawana bez zysku na zold nie dobiera strazy). Srebro, bawelna, glina poza
+  tabela zamowien (na pozniej, jesli warsztaty dalej stoja).
+- Scalenie: 283 (cbba16f2; CHANGELOG/sprawdz_logi scal_sklad z bazy 9d807118, galezie 23cc393c + 283), 284 (3222286f; sprawdz_logi scal_sklad z bazy 6f30e9ac,
+  HEAD + 284), gen_mcm, build 0 bledow. Self-testy N283, H284, J204, RU282, K259 TAK.
+- AUTOTEST 132a (zadanie bouf9dys6, m113\seria-132a.out.txt): NOWY wrapper m113\testy-noc-283.ps1 (= 204 z 7 bitwami w bitwaN), -CsAt scratchpad sesji
+  1e1c276a\cs-at283\CrashScribe-at-n283.dll, kopia,bitwaN,probyN 30 dob. Werdykt 'linie misji = liczba bitew' moze oczekiwac 4 - sprawdzic recznie.
+  Grupy: nekanie283 m204jazda m110anim handel284 ruda282 karawany259 ksiega280 e223 + reszta. Potem bieg wczytania (H284-7 ksiega kosztu po wczytaniu) i WGRANIE 132.
+
 ## DOPISEK 27.10 ok. 23:05 CET - WGRANIE 131 (280+281+282); w toku 284; potem 283+284 -> 132
 - Biegi wczytania (bieg-bitwa-204.ps1 -Days 4 -LoadSave, A 22:44 zapis, B 22:54 wczytanie): kod 0 oba; ksiega280 na logu B NIE 0 - K280-2 odstep W 24.02 h,
   K280-3 swiat po wczytaniu wobec zapisu +0.1 (przed 280: -82..-707 na wczytanie).
