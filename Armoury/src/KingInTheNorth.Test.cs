@@ -11,7 +11,7 @@ namespace Armoury
     /// (wymuszonej albo prawdziwej, np. kopia zapisu Jeffa - znacznik dawno minal) linie "Krol Polnocy (272): test - Tn ... - wynik TAK|NIE|POMINIETY":
     ///  T1 migawka (rodow &gt; 0); T2 rody / lenna / partie / ludzie przed = po, zniszczonych 0; T3 kazda armia z tymi samymi czlonkami i spojnoscia (bez armii -
     ///  POMINIETY); T4 Dorzecze zniszczone, sojuszu nie ma, korona w wojnie z kazdym przeniesionym rodem; T5 kontrola pieniedzy 0; T6 rola i mnoznik gracza, jency gracza
-    ///  ci sami (Tywin); T7 zapis tam i z powrotem (Export -&gt; Import -&gt; Export) identyczny; T8 Kronika: war:riverlands:vlandia = war:battania:vlandia,
+    ///  ci sami (Tywin), kariera najemnika BK gracza przepisana na Polnoc (recenzja); T7 zapis tam i z powrotem (Export -&gt; Import -&gt; Export) identyczny; T8 Kronika: war:riverlands:vlandia = war:battania:vlandia,
     ///  own:town_V2:riverlands = Riverrun w Polnocy na ziemi Tridentu; T9 drugie wyzwolenie nic nie robi. Bez unii do 10. doby sesji - T0 POMINIETY z powodem.
     /// </summary>
     internal static partial class KingInTheNorth
@@ -67,7 +67,8 @@ namespace Armoury
                 TLine("T4", "Dorzecze zniszczone " + (_tRiverGone ? "TAK" : "NIE") + ", sojusz Polnoc+Dorzecze " + (_tAllyGone ? "brak" : "JEST") + ", korona w wojnie z rodami unii " + (_tCrownWar ? "TAK" : "NIE"),
                       _tRiverGone && _tAllyGone && _tCrownWar ? "TAK" : "NIE");
                 TLine("T5", "kontrola pieniedzy (zdjete - dopisane) " + (_tControl == long.MinValue ? "brak" : _tControl.ToString()), _tControl == 0 ? "TAK" : "NIE");
-                TLine("T6", "gracz (" + _player + ") rola i mnoznik " + (_tPlayerOk ? "zachowane" : "ZMIENIONE") + ", jency " + (_tPrisOk ? "ci sami" : "INNI"), _tPlayerOk && _tPrisOk ? "TAK" : "NIE");
+                TLine("T6", "gracz (" + _player + ") rola i mnoznik " + (_tPlayerOk ? "zachowane" : "ZMIENIONE") + ", jency " + (_tPrisOk ? "ci sami" : "INNI") + ", " + _tCareer,
+                      _tPlayerOk && _tPrisOk && _tCareerOk ? "TAK" : "NIE");
                 string e1 = Export(); Import(e1); string e2 = Export();
                 TLine("T7", "zapis tam i z powrotem (" + e1.Length + " znakow)", e1 == e2 ? "TAK" : "NIE");
                 bool w1 = Chronicle.Terms.Eval("war:riverlands:vlandia"), w2 = Chronicle.Terms.Eval("war:battania:vlandia");

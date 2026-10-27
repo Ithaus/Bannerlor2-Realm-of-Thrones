@@ -54,6 +54,11 @@ namespace Armoury
     /// KRONIKA: po unii "riverlands" w warunkach politycznych (war, peace, kexists, leads, prisoner, p:vassal) = Polnoc; ziemia (own, region, p:region) = osada
     /// Polnocy z listy twierdz z chwili unii (wies - jej twierdza) albo kultury Dorzecza; relk - glowy rodow z unii; plotka - siedziba Dorzecza z chwili unii.
     /// Zapis "arm_k272" (starsza DLL go pomija). Bledy: licznik potkniec, bez globalnego wylacznika.
+    /// RECENZJA 272: (1) kariera najemnika BK (MercenaryCareer) przepisana z Dorzecza na Polnoc (punkty, przywileje, czas przywilejow, Kingdom; termin kontraktu bez
+    /// zmian) - inaczej Tick BK widzi inne krolestwo i AddKingdom zaczyna od zera z nowym rokiem kontraktu; (2) Krwawe Gody: po pokoju ROT Polnoc-korona Dorzecze
+    /// znowu osobno (ReactivateKingdom, wladca Tully, rody z unii - wasale AI - wracaja, wojna z korona jak wpis ROT bez konca, ktory unia usunela) - stan 3, aliasy
+    /// Kroniki wylaczone; (3) gracz przenoszony po najemnikach i wasalach, przed rodem panujacym (gdy ten ma lenna) - zadania od lordow rzecznych nie przepadaja;
+    /// (4) zakres jak klucze Wojen kanonu: tylko Prologue.CanonHere (kampania z prologiem albo nowa z m104 - decyzja Jeffa nr 5).
     /// </summary>
     internal static partial class KingInTheNorth
     {
@@ -64,7 +69,7 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         // ---------------------------------------------------------------- stan (zapis arm_k272)
-        private static int _st;                     // 0 czeka, 1 unia zrobiona, 2 nigdy
+        private static int _st;                     // 0 czeka, 1 unia zrobiona, 2 nigdy, 3 rozdzielone po Krwawych Godach (recenzja)
         private static int _day = int.MinValue, _dayC = -1;   // dzien opowiesci (calkowity) i dzien kampanii unii
         private static string _wy = "";             // rodzaj wyzwalacza: rot / plan / test (+n - nadrobienie)
         private static string _player = "-";        // rola gracza w chwili unii: - / najemnik / wasal
@@ -218,7 +223,7 @@ namespace Armoury
                 var f = v.Split('|');
                 if (f.Length < 14 || f[0] != "v1") { _importBad++; return; }
                 int.TryParse(f[1], NumberStyles.Integer, Inv, out _st);
-                if (_st < 0 || _st > 2) { _st = 0; _importBad++; }
+                if (_st < 0 || _st > 3) { _st = 0; _importBad++; }
                 if (!int.TryParse(f[2], NumberStyles.Integer, Inv, out _day)) _day = int.MinValue;
                 if (!int.TryParse(f[3], NumberStyles.Integer, Inv, out _dayC)) _dayC = -1;
                 _wy = f[4]; _player = f[5].Length > 0 ? f[5] : "-";
@@ -238,7 +243,7 @@ namespace Armoury
             _sessionDays = 0; _sessionChecked = false; _markerAtStart = false; _lastWait = ""; _lastWaitDay = int.MinValue;
             InstallRedWedding();
             string st = _st == 1 ? "zrobione (dzien opowiesci " + (_day != int.MinValue ? _day.ToString(Inv) : "?") + ", dzien kampanii " + _dayC + ", rodow " + _clans.Count + ")"
-                       : _st == 2 ? "nigdy (" + _never + ")" : "czeka";
+                       : _st == 2 ? "nigdy (" + _never + ")" : _st == 3 ? "rozdzielone po Krwawych Godach (unia dnia opowiesci " + (_day != int.MinValue ? _day.ToString(Inv) : "?") + ", rodow " + _clans.Count + ")" : "czeka";
             string robb = "-", river = "-", role = "-";
             int rs = -9;
             try
@@ -263,7 +268,12 @@ namespace Armoury
 
         private static int SafeRot(string ev) { try { return Prologue.RotEventState(ev); } catch { return -9; } }
 
-        internal static void Daily() { _sessionDays++; }
+        internal static void Daily()
+        {
+            _sessionDays++;
+            if (_st != 3) return;
+            try { SplitWar(); } catch (Exception e) { Stumble("SplitWar", e); }
+        }
 
         // ---------------------------------------------------------------- przeglad co godzine
         internal static void Hourly()
@@ -298,6 +308,8 @@ namespace Armoury
         {
             if (!On) return;
             double sd = StoryDay();
+            // recenzja: zakres jak klucze Wojen kanonu (decyzja Jeffa nr 5) - bez zapisu stanu (Wait), wiec nic nie zamyka sie na stale
+            if (!Prologue.CanonHere) { Wait("zakres - kampania klasyczna bez prologu i bez znacznika m104 (decyzja Jeffa nr 5, jak klucze Wojen kanonu)", sd); return; }
             var river = K(RiverId); var north = K(NorthId); var crown = K(CrownId);
             var robb = HeroOf(RobbId);
             // nigdy
@@ -542,7 +554,7 @@ namespace Armoury
                      + " | Dorzecze: rodow " + snaps.Count + " (najemnikow " + mercN + ", gracz " + role + "), twierdz " + totF + ", wsi " + totV + ", partii " + totP + ", ludzi " + totM
                      + " (zalogi " + totG + "), armii " + armies.Count + " | wladca " + Nm(ruler) + " (" + (ruler != null ? ruler.StringId : "-") + ") | Polnoc przed: rodow " + north.Clans.Count
                      + ", twierdz " + north.Fiefs.Count + " | jency gracza " + prisTot0 + " (bohaterowie: " + (pris0.Count > 0 ? string.Join(",", pris0.ToArray()) : "-") + ").");
-            _tClans = snaps.Count; _tFiefs0 = totF; _tParties0 = totP; _tMen0 = totM;
+            _tClans = snaps.Count; _tFiefs0 = totF; _tParties0 = totP; _tMen0 = totM; _tCareerOk = true; _tCareer = "kariera BK gracza nie dotyczy (" + role + ")";
             int bk0 = MercContract.BkDownUnion;
             Moving = true;
             long control = 0;
@@ -587,16 +599,24 @@ namespace Armoury
                 catch (Exception e) { Stumble("Merge.Alliances", e); }
                 // ---- 4. pieniadze
                 control = Money(river, north);
-                // ---- 5. rody: gracz, najemnicy AI, wasale, rod panujacy
+                // ---- 5. rody: najemnicy AI, wasale, gracz, rod panujacy (recenzja: gracz po dawcach zadan - zadania gry "Army Needs Supplies", "Raid", "Scout",
+                //      "Conquest" koncza sie, gdy gracz wychodzi z krolestwa dawcy; Dorzecze ma wtedy jeszcze lenna wladcy - FactionDiscontinuation go nie konczy).
+                //      Rod panujacy bez lenn - gracz pierwszy jak dotad (wyjscie gracza z krolestwa bez osad konczy je razem z rodami).
+                var ps0 = snaps.FirstOrDefault(s => s.Player);
+                var rs0 = snaps.FirstOrDefault(s => !s.Player && s.Ruler);
+                bool playerLate = ps0 != null && rs0 != null && rs0.Fiefs > 0;
+                if (ps0 != null) ps0.Note += playerLate ? " (kolejnosc: po najemnikach i wasalach, przed rodem panujacym - zadania od lordow rzecznych zostaja)"
+                                                        : " (kolejnosc: pierwszy - rod panujacy bez lenn)";
                 var order = new List<ClanSnap>();
-                order.AddRange(snaps.Where(s => s.Player));
+                if (!playerLate) order.AddRange(snaps.Where(s => s.Player));
                 order.AddRange(snaps.Where(s => !s.Player && s.Merc));
                 order.AddRange(snaps.Where(s => !s.Player && !s.Merc && !s.Ruler));
+                if (playerLate) order.AddRange(snaps.Where(s => s.Player));
                 order.AddRange(snaps.Where(s => !s.Player && !s.Merc && s.Ruler));
                 EnsureArmyPatch();
-                foreach (var s in order) MoveClan(s, north, renewal);
+                foreach (var s in order) MoveClan(s, river, north, renewal);
                 // drugie podejscie dla rodow, ktore zostaly (wyjatek przy pierwszym)
-                foreach (var s in order) if (!s.Ok && !s.C.IsEliminated && s.C.Kingdom == river) MoveClan(s, north, renewal);
+                foreach (var s in order) if (!s.Ok && !s.C.IsEliminated && s.C.Kingdom == river) MoveClan(s, river, north, renewal);
                 RestoreDetached();
                 // ---- 6. armie
                 Armies(armies, north);
@@ -737,7 +757,7 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------------- rody
-        private static void MoveClan(ClanSnap s, Kingdom north, float renewal)
+        private static void MoveClan(ClanSnap s, Kingdom river, Kingdom north, float renewal)
         {
             var c = s.C;
             if (c == null || c.IsEliminated || c.Kingdom == north) return;
@@ -756,6 +776,13 @@ namespace Armoury
                 c.DebtToKingdom = s.Debt;
                 if (s.Player && s.Merc && renewal > 0f) Campaign.Current.KingdomManager.PlayerMercenaryServiceNextRenewalDay = renewal;
                 s.Ok = c.Kingdom == north;
+                if (s.Merc && s.Ok)
+                {
+                    bool bkOk;
+                    string bk = BkCareerMove(c, river, north, out bkOk);
+                    s.Note += " | " + bk;
+                    if (s.Player) { _tCareerOk = bkOk; _tCareer = bk; }
+                }
             }
             catch (Exception e) { Stumble("MoveClan", e); s.Note += " (wyjatek " + e.GetType().Name + ")"; }
             int pp, gg; int men = Men(c, out pp, out gg);
@@ -763,6 +790,110 @@ namespace Armoury
             Log.Info(P + "rod " + Nm(c) + " (" + c.StringId + ") " + kind + " -> Polnoc " + (s.Ok ? "TAK" : "NIE") + " | lenna " + c.Fiefs.Count + "/" + s.Fiefs + ", wsie " + c.Villages.Count + "/" + s.Villages
                      + ", partie " + pp + "/" + s.Parties + ", ludzie " + men + "/" + s.Men + ", zalogi " + gg + "/" + s.Garrison + " | wplywy " + s.Inf.ToString("0.#", Inv) + " -> " + c.Influence.ToString("0.#", Inv)
                      + " | dlug wobec krolestwa " + s.Debt + " -> " + c.DebtToKingdom + " | zostaje do dnia " + s.Stay.ToDays.ToString("0", Inv) + (s.Merc ? " | mnoznik " + s.Mult + " -> " + c.MercenaryAwardMultiplier : "") + s.Note + ".");
+        }
+
+        // ---------------------------------------------------------------- kariera najemnika BK (recenzja 272)
+        // BK MercenaryCareer.Tick: "if (Clan.IsUnderMercenaryService && Kingdom != Clan.Kingdom) AddKingdom(Clan.Kingdom)" - AddKingdom zaklada puste przywileje, punkty 0,
+        // czas przywilejow = teraz i termin kontraktu = rok od dzis. Unia to ta sama sluzba (okno: "on the same terms"), wiec wpisy Dorzecza ida pod Polnoc (scalone, gdy
+        // Polnoc juz ma wpis z dawnej sluzby: punkty dodane, przywilej - wyzszy poziom, czas przywilejow - pozniejszy), Kingdom = Polnoc; ContractDueDate bez zmian.
+        private static bool _bkTried;
+        private static Type _tBkBeh;
+        private static MethodInfo _mBkGetCareer, _mBkGetBeh, _setCKingdom;
+        private static PropertyInfo _pCKingdom, _pCPriv, _pCProg, _pCTimes, _pCDue;
+        private static bool _tCareerOk = true;
+        private static string _tCareer = "-";
+
+        private static int PrivLevel(object x)
+        {
+            try { var p = x != null ? AccessTools.Property(x.GetType(), "Level") : null; return p != null ? Convert.ToInt32(p.GetValue(x, null), Inv) : -1; } catch { return -1; }
+        }
+
+        private static string BkCareerMove(Clan c, Kingdom river, Kingdom north, out bool ok)
+        {
+            ok = true;
+            try
+            {
+                if (!_bkTried)
+                {
+                    _bkTried = true;
+                    _tBkBeh = AccessTools.TypeByName("BannerKings.Behaviours.Mercenary.BKMercenaryCareerBehavior");
+                    var tC = AccessTools.TypeByName("BannerKings.Behaviours.Mercenary.MercenaryCareer");
+                    if (_tBkBeh != null && tC != null)
+                    {
+                        _mBkGetCareer = AccessTools.Method(_tBkBeh, "GetCareer", new[] { typeof(Clan) });
+                        var gm = typeof(Campaign).GetMethod("GetCampaignBehavior", Type.EmptyTypes);
+                        _mBkGetBeh = gm != null ? gm.MakeGenericMethod(_tBkBeh) : null;
+                        _pCKingdom = AccessTools.Property(tC, "Kingdom");
+                        _setCKingdom = AccessTools.PropertySetter(tC, "Kingdom");
+                        _pCPriv = AccessTools.Property(tC, "KingdomPrivileges");
+                        _pCProg = AccessTools.Property(tC, "KingdomProgress");
+                        _pCTimes = AccessTools.Property(tC, "PrivilegeTimes");
+                        _pCDue = AccessTools.Property(tC, "ContractDueDate");
+                    }
+                }
+                if (_tBkBeh == null) return "kariera BK bez zmian (brak BannerKings)";
+                if (_mBkGetCareer == null || _mBkGetBeh == null || _setCKingdom == null || _pCKingdom == null || _pCPriv == null || _pCProg == null || _pCTimes == null)
+                { ok = false; return "kariera BK przeniesiona NIE (brak odczytu MercenaryCareer)"; }
+                var beh = _mBkGetBeh.Invoke(Campaign.Current, null);
+                if (beh == null) { ok = false; return "kariera BK przeniesiona NIE (brak BKMercenaryCareerBehavior)"; }
+                var car = _mBkGetCareer.Invoke(beh, new object[] { c });
+                if (car == null) return "kariera BK bez zmian (rod bez kariery)";
+                var k0 = _pCKingdom.GetValue(car, null) as Kingdom;
+                var priv = _pCPriv.GetValue(car, null) as System.Collections.IDictionary;
+                var prog = _pCProg.GetValue(car, null) as System.Collections.IDictionary;
+                var times = _pCTimes.GetValue(car, null) as System.Collections.IDictionary;
+                if (priv == null || prog == null || times == null) { ok = false; return "kariera BK przeniesiona NIE (brak slownikow kariery)"; }
+                bool hasR = priv.Contains(river) || prog.Contains(river) || times.Contains(river);
+                if (!hasR && k0 != river)
+                    return "kariera BK bez zmian (kariera " + (k0 != null ? k0.StringId : "-") + ", bez wpisu Dorzecza)";
+                // punkty
+                float pR = prog.Contains(river) ? Convert.ToSingle(prog[river], Inv) : 0f;
+                float pN = prog.Contains(north) ? Convert.ToSingle(prog[north], Inv) : 0f;
+                if (prog.Contains(river)) { prog[north] = pN + pR; prog.Remove(river); }
+                // przywileje
+                int nPriv = 0;
+                var lr = priv.Contains(river) ? priv[river] as System.Collections.IList : null;
+                if (lr != null)
+                {
+                    var ln = priv.Contains(north) ? priv[north] as System.Collections.IList : null;
+                    if (ln == null) { priv[north] = lr; nPriv = lr.Count; }
+                    else
+                        foreach (var x in lr)
+                        {
+                            int at = -1;
+                            for (int i = 0; i < ln.Count; i++) if (ln[i] != null && ln[i].Equals(x)) { at = i; break; }
+                            if (at < 0) { ln.Add(x); nPriv++; }
+                            else if (PrivLevel(x) > PrivLevel(ln[at])) { ln[at] = x; nPriv++; }
+                        }
+                    priv.Remove(river);
+                }
+                // czas przywilejow (2 sezony od ostatniego przywileju / najmu)
+                string tTxt = "-";
+                if (times.Contains(river))
+                {
+                    var tR = (CampaignTime)times[river];
+                    if (!times.Contains(north) || (CampaignTime)times[north] < tR) times[north] = tR;
+                    times.Remove(river);
+                }
+                // Tick BK czyta KingdomProgress[Kingdom] i KingdomPrivileges[Kingdom] bez sprawdzenia - wpisy Polnocy musza byc (jak AddKingdom, bez terminu kontraktu)
+                if (!prog.Contains(north)) prog[north] = 0f;
+                if (!priv.Contains(north))
+                {
+                    var ga = priv.GetType().GetGenericArguments();
+                    if (ga.Length == 2) priv[north] = Activator.CreateInstance(ga[1]);
+                }
+                if (!times.Contains(north)) times[north] = CampaignTime.Now;
+                if (times.Contains(north)) tTxt = ((CampaignTime)times[north]).ToDays.ToString("0", Inv);
+                if (!priv.Contains(north)) { ok = false; return "kariera BK przeniesiona NIE (brak listy przywilejow Polnocy)"; }
+                if (k0 != north) _setCKingdom.Invoke(car, new object[] { north });   // rod jest juz najemnikiem Polnocy - to samo zrobilby Tick, ale bez AddKingdom
+                var k1 = _pCKingdom.GetValue(car, null) as Kingdom;
+                string due = "?";
+                try { if (_pCDue != null) due = ((CampaignTime)_pCDue.GetValue(car, null)).ToDays.ToString("0", Inv); } catch { }
+                ok = k1 == north;
+                return "kariera BK przeniesiona " + (ok ? "TAK" : "NIE") + " (punkty " + pR.ToString("0", Inv) + (pN != 0f ? " + " + pN.ToString("0", Inv) + " z dawnej sluzby Polnocy" : "")
+                       + ", przywileje " + nPriv + ", czas przywilejow dzien " + tTxt + ", termin kontraktu dzien " + due + " bez zmian, kariera " + (k1 != null ? k1.StringId : "-") + ")";
+            }
+            catch (Exception e) { Stumble("BkCareerMove", e); ok = false; return "kariera BK przeniesiona NIE (wyjatek " + e.GetType().Name + ")"; }
         }
 
         // ---------------------------------------------------------------- armie
@@ -920,8 +1051,102 @@ namespace Armoury
                 _rw = true;
                 Log.Info(P + "Krwawe Gody - rody Dorzecza ROT do korony (jak ROT dla krolestwa Dorzecza): " + string.Join(", ", res.ToArray()) + " | przeniesionych " + n + " | Polnoc-korona "
                          + (Alive(west) && Alive(north) && north.IsAtWarWith(west) ? "w wojnie" : "pokoj") + ".");
+                try { SplitAtRedWedding(north, west); } catch (Exception e) { Stumble("SplitAtRedWedding", e); }
             }
             catch (Exception e) { Stumble("RedWeddingPostfix", e); }
+        }
+
+        private static Clan RotClan(string name)
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("ROT.Misc.ROTClans");
+                var pi = t != null ? AccessTools.Property(t, name) : null;
+                return pi != null ? pi.GetValue(null, null) as Clan : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Recenzja 272 - Krwawe Gody: ROT zawarl pokoj Polnoc-korona (ExecuteRobb), wiec rzeczni lordowie z unii byli w pokoju z korona, a okna Kroniki
+        /// war:riverlands:vlandia (063.1 Oblezenie Riverrun, 070.2 Raventree) przepadaly. Bez unii ROT trzyma wojne Westerlands-Riverlands bez konca (wpis usuniety, gdy
+        /// unia zniszczyla Dorzecze). Teraz: Dorzecze wskrzeszone (Kingdom.ReactivateKingdom), wladca Tully (lord_1_3; zapas Blackfish ROT, potem rod z najwieksza
+        /// liczba lenn) - ChangeRulingClanAction przed wejsciem rodu jak gra przy CreateKingdom; wasale AI z unii, ktorzy sa jeszcze w Polnocy, wracaja
+        /// (ApplyByJoinToKingdom, wplywy i dlug wobec krolestwa jak w unii); najemnicy i gracz zostaja u Polnocy; wojna z korona (DeclareWarAction z flaga ROT
+        /// CallingDeclareWar) i potem co dobe SplitWar (jak wpis ROT). Stan 3 - aliasy Kroniki wylaczone (riverlands = Dorzecze). Nie rzuca (wywolujacy ma try).</summary>
+        private static void SplitAtRedWedding(Kingdom north, Kingdom crown)
+        {
+            Fields();
+            var river = K(RiverId);
+            var pc = Clan.PlayerClan;
+            string skip = null;
+            var back = new List<Clan>();
+            if (river == null) skip = "brak krolestwa " + RiverId;
+            else if (!Alive(north)) skip = "Polnoc zniszczona";
+            else if (PlayerRules(north)) skip = "Polnoca rzadzi gracz - rody zostaja";
+            else
+            {
+                foreach (var c in Clan.All)
+                    if (c != null && c.StringId != null && _clanSet.Contains(c.StringId) && !c.IsEliminated && c != pc && !c.IsUnderMercenaryService && c.Kingdom == north) back.Add(c);
+                if (back.Count == 0) skip = "zaden wasal AI z unii nie zostal w Polnocy";
+            }
+            if (skip != null) { Log.Info(P + "Krwawe Gody - Dorzecze NIE rozdzielone (" + skip + ") - rody z unii zostaja w Polnocy, aliasy Kroniki dalej."); return; }
+            Clan ruler = null; string rwhy = "";
+            var th = HeroOf(TullyLordId);
+            if (th != null && th.Clan != null && back.Contains(th.Clan)) { ruler = th.Clan; rwhy = "Tully"; }
+            else
+            {
+                var bf = RotClan("TullyBlackfish");
+                if (bf != null && back.Contains(bf)) { ruler = bf; rwhy = "Blackfish - Tully poza lista"; }
+            }
+            if (ruler == null) { ruler = back.OrderByDescending(c => c.Fiefs.Count).First(); rwhy = "najwiecej lenn - bez Tully i Blackfisha"; }
+            back.Remove(ruler); back.Insert(0, ruler);
+            bool wasDead = river.IsEliminated;
+            if (wasDead) river.ReactivateKingdom();
+            ChangeRulingClanAction.Apply(river, ruler);
+            int moved = 0, fiefs = 0;
+            foreach (var c in back)
+            {
+                try
+                {
+                    float inf = c.Influence; int debt = c.DebtToKingdom; var stay = c.ShouldStayInKingdomUntil; int f0 = c.Fiefs.Count;
+                    bool raw = SetInfluenceRaw(c, 0f);
+                    ChangeKingdomAction.ApplyByJoinToKingdom(c, river, stay, false);
+                    if (raw) SetInfluenceRaw(c, inf);
+                    else { float d = inf - c.Influence; if (d != 0f) ChangeClanInfluenceAction.Apply(c, d); }
+                    c.DebtToKingdom = debt;
+                    bool ok = c.Kingdom == river;
+                    if (ok) { moved++; fiefs += c.Fiefs.Count; }
+                    Log.Info(P + "Krwawe Gody - rod " + Nm(c) + " (" + c.StringId + ") " + (c == ruler ? "wladca " : "wasal ") + "-> Dorzecze " + (ok ? "TAK" : "NIE") + " | lenna " + c.Fiefs.Count + "/" + f0
+                             + " | wplywy " + inf.ToString("0.#", Inv) + " -> " + c.Influence.ToString("0.#", Inv) + " | dlug wobec krolestwa " + debt + " -> " + c.DebtToKingdom + ".");
+                }
+                catch (Exception e) { Stumble("Split.Clan", e); }
+            }
+            if (moved == 0)
+            {
+                // nic nie weszlo - Dorzecze z powrotem zniszczone (bez rodow DestroyKingdomAction nikogo nie niszczy), unia trwa
+                try { if (wasDead && river.Clans.Count(c => c != null && !c.IsEliminated) == 0) { river.RulingClan = null; DestroyKingdomAction.Apply(river); } } catch (Exception e) { Stumble("Split.Undo", e); }
+                Log.Info(P + "Krwawe Gody - Dorzecze NIE rozdzielone (zaden rod nie wszedl) - unia trwa.");
+                return;
+            }
+            if (river.RulingClan != ruler && ruler.Kingdom == river) ChangeRulingClanAction.Apply(river, ruler);
+            string war;
+            if (!Alive(crown)) war = "korony brak";
+            else if (PlayerRules(crown) || PlayerRules(river)) war = "krolestwo gracza - poza regula";
+            else war = river.IsAtWarWith(crown) || Prologue.RotDeclareWar272(river, crown) ? "TAK" : "NIE";
+            _st = 3;
+            string role = pc == null || pc.Kingdom == null ? "bez krolestwa" : (pc.IsUnderMercenaryService ? "najemnik " : "wasal ") + pc.Kingdom.StringId;
+            Log.Info(P + "Krwawe Gody - Dorzecze znowu osobno | krolestwo " + (wasDead ? "wskrzeszone" : "bylo zywe") + " | wladca " + Nm(ruler) + " (" + ruler.StringId + ", " + rwhy + ") | rodow przeniesionych "
+                     + moved + "/" + back.Count + ", lenna " + fiefs + " | wojna z korona " + war + " | gracz zostaje: " + role + " | aliasy Kroniki wylaczone (riverlands = Dorzecze).");
+            Log.Player("With the Young Wolf dead, the river lords hold to House Tully: the Riverlands stand as a realm of their own again" + (war == "TAK" ? ", still at war with the crown." : "."));
+        }
+
+        /// <summary>Stan 3 (co dobe): wojna Dorzecze-korona jak wpis ROT Westerlands-Riverlands bez konca (usuniety przez ROT, gdy unia zniszczyla Dorzecze).</summary>
+        private static void SplitWar()
+        {
+            var river = K(RiverId); var crown = K(CrownId);
+            if (!Alive(river) || !Alive(crown) || PlayerRules(river) || PlayerRules(crown) || river.IsAtWarWith(crown)) return;
+            bool now = Prologue.RotDeclareWar272(river, crown);
+            Log.Info(P + "Dorzecze po Krwawych Godach - wojna z korona wznowiona " + (now ? "TAK" : "NIE") + " (jak wpis ROT Westerlands-Riverlands bez konca) | dzien opowiesci " + F1(StoryDay()) + ".");
         }
     }
 
@@ -930,6 +1155,20 @@ namespace Armoury
     {
         internal static double RiverNetDays272 { get { return RiverNetDays; } }
         internal static int RiverAllyRetryDays272 { get { return RiverAllyRetryDays; } }
+
+        /// <summary>Recenzja 272: DeclareWarAction z flaga ROT CallingDeclareWar na czas wywolania (jak RiverWar / EssosDaily). Zwraca stan wojny po wywolaniu.</summary>
+        internal static bool RotDeclareWar272(IFaction a, IFaction b)
+        {
+            object beh = null; bool prev = false;
+            try { RotWarsReady(); beh = RotWarsBehavior(); } catch { beh = null; }
+            try
+            {
+                if (_fCalling != null && beh != null) { prev = (bool)_fCalling.GetValue(beh); _fCalling.SetValue(beh, true); }
+                DeclareWarAction.ApplyByDefault(a, b);
+            }
+            finally { if (_fCalling != null && beh != null) _fCalling.SetValue(beh, prev); }
+            return FactionManager.IsAtWarAgainstFaction(a, b);
+        }
     }
 
     /// <summary>272: zachowanie kampanii - przeglad co godzine, start sesji, zapis arm_k272.</summary>
