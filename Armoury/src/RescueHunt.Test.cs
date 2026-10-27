@@ -238,8 +238,8 @@ namespace Armoury
         }
 
         /// <summary>T9 (222d): decyzja zimnego tropu proby (lowy T0) bez bitwy - kazdy lord bez swiezego sladu z ostatniego przegladu sprawdzony wzorem
-        /// niezaleznym: cel = blizszy z (miejsce pojmania z T1, twierdza rodu gracza najblizsza tego miejsca - z Settlement.All), zasieg 8.02 / 4.01 doby
-        /// marszu, wiesc u lorda = siedziba + kruk (do 40 jedn. od razu, dalej 3 h + d / 6.25, najwyzej 288 h), okno 72 h; werdykt (szuka / poza zasiegiem /
+        /// niezaleznym: cel = blizszy droga gry (AiHelper, patrol ladowy) z (osada najblizsza miejsca pojmania z T1, twierdza rodu gracza najblizsza tego
+        /// miejsca - z Settlement.All), cel bez drogi - poza zasiegiem (recenzja 222d: Skagos), zasieg 8.02 / 4.01 doby marszu droga, wiesc u lorda = siedziba + kruk (do 40 jedn. od razu, dalej 3 h + d / 6.25, najwyzej 288 h), okno 72 h; werdykt (szuka / poza zasiegiem /
         /// po oknie) i cel jak w lowach; tryb nie "trop zimny", bez kandydatow - "czeka (...)"; komunikat zgodny z rozkazami w migawce.</summary>
         private static void TestSearch(Hunt t)
         {
@@ -258,32 +258,45 @@ namespace Armoury
                     float d = st.GetPosition2D.Distance(cap);
                     if (d < fd) { fd = d; fief = st; }
                 }
+                Settlement site = null; float sd = float.MaxValue;
+                foreach (var st in Settlement.All)
+                {
+                    if (st == null || !(st.IsTown || st.IsCastle || st.IsVillage)) continue;
+                    float d = st.GetPosition2D.Distance(cap);
+                    if (d < sd) { sd = d; site = st; }
+                }
                 double now = NowH;
                 float day = Campaign.Current.EstimatedAverageLordPartySpeed * 24f;
-                int ok = 0, nc = 0, nf = 0, ns = 0, cand = 0;
+                int ok = 0, nc = 0, nf = 0, ns = 0, cand = 0, nr = 0;
                 string bad = "";
                 foreach (var r in t.Cold)
                 {
                     var q = r.Mp.GetPosition2D;
-                    Vec2 kp = cap; bool toFief = false;
-                    if (fief != null && q.Distance(fief.GetPosition2D) < q.Distance(cap)) { kp = fief.GetPosition2D; toFief = true; }
-                    float d = q.Distance(kp);
+                    MobileParty.NavigationType nvc = MobileParty.NavigationType.None, nvf = MobileParty.NavigationType.None;
+                    float dc = float.MaxValue, df = float.MaxValue; bool pc, pf;
+                    if (site != null) Helpers.AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(r.Mp, site, false, out nvc, out dc, out pc);
+                    if (fief != null) Helpers.AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(r.Mp, fief, false, out nvf, out df, out pf);
+                    bool rc = nvc != MobileParty.NavigationType.None, rf = nvf != MobileParty.NavigationType.None;
+                    Vec2 kp = cap; bool toFief = false, noRoad = false; float d;
+                    if (rf && (!rc || df < dc)) { kp = fief.GetPosition2D; toFief = true; d = df; }
+                    else if (rc) { kp = site.GetPosition2D; d = dc; }
+                    else { noRoad = true; d = float.PositiveInfinity; nr++; }
                     double reach = (r.Own || t.Tier == TThree ? 8.02 : 4.01) * day;
                     float ds = q.Distance(t.Seat);
                     double heard = t.SeatH + (ds <= 40f ? 0.0 : Math.Min(288.0, 3.0 + ds / 6.25));
                     int exp = d > reach ? VFar : now - heard > 72.0 ? VSpent : VCand;
                     if (exp == VCand) nc++; else if (exp == VFar) nf++; else ns++;
                     if (r.V == VCand) cand++;
-                    if (exp == r.V && kp.Distance(r.Kp) < 1f && toFief == (r.Fief != null)) ok++;
-                    else if (bad.Length == 0) bad = " (pierwszy niezgodny: " + Nm(r.Mp) + " lowy " + r.V + " wzor " + exp + ", " + F0(d) + " / " + F0(reach) + " jedn.)";
+                    if (exp == r.V && noRoad == r.NoRoad && (noRoad || (kp.Distance(r.Kp) < 1f && toFief == (r.Fief != null)))) ok++;
+                    else if (bad.Length == 0) bad = " (pierwszy niezgodny: " + Nm(r.Mp) + " lowy " + r.V + " wzor " + exp + ", " + (noRoad ? "bez drogi" : F0(d)) + " / " + F0(reach) + " jedn.)";
                 }
                 // tryb: zadnego "trop zimny"; bez kandydatow (zadnych - takze ze sladem) czekaja wedlug werdyktow
                 bool modeOk = t.Mode != "trop zimny";
                 if (t.Elig.Count == 0 && t.Cold.Count > 0) modeOk &= t.Mode == (ns > 0 ? MWaitSpent : nf > 0 ? MWaitFar : "brak lowcow") || t.Mode == "brak celu";
                 if (cand > 0) modeOk &= !t.Mode.StartsWith("czeka", StringComparison.Ordinal);
                 bool all = ok == t.Cold.Count && modeOk && msgOk;
-                string what = "zimny trop " + Nm(t.Captive) + ": lordow bez sladu " + t.Cold.Count + " (wzor: szuka " + nc + ", poza zasiegiem " + nf + ", po oknie " + ns + "; zgodne " + ok + ")"
-                              + ", cele: miejsce pojmania" + (fief != null ? " i " + Nm(fief) : " (rod gracza bez twierdz)") + ", tryb " + t.Mode + ", komunikat " + OutName[t.Out]
+                string what = "zimny trop " + Nm(t.Captive) + ": lordow bez sladu " + t.Cold.Count + " (wzor: szuka " + nc + ", poza zasiegiem " + nf + " w tym bez drogi " + nr + ", po oknie " + ns + "; zgodne " + ok + ")"
+                              + ", cele: okolice " + Nm(site) + " (miejsce pojmania)" + (fief != null ? " i " + Nm(fief) : " (rod gracza bez twierdz)") + ", tryb " + t.Mode + ", komunikat " + OutName[t.Out]
                               + " (rozkazy w migawce " + orders + ", szukanie " + search + ")" + bad;
                 if (t.Cold.Count == 0) TLine("T9", what + " - brak lordow bez sladu", modeOk && msgOk ? "POMINIETY" : "NIE");
                 else TLine("T9", what, all ? "TAK" : "NIE");

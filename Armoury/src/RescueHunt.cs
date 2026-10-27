@@ -40,9 +40,12 @@ namespace Armoury
     ///    Slad starszy niz 72 h (trzy dni jazdy - ostatnie pasmo Rumours.Days) - zimny trop.
     ///  - 222d ZIMNY TROP (autotest 127b: wiesc o Tywinie po 139 h, jedyny slad - pojmanie - starszy niz 72 h, wiec nikt nic nie robil, a gracz czytal "Their
     ///    lords ride to free him"): wiesc niesie miejsce pojmania i porywacza, a wiec lenna jego rodu (zamki i miasta rodu gracza - wiedza publiczna). Lord bez
-    ///    znanego swiezego sladu szuka: PatrolAroundPoint wokol blizszego mu z dwoch celow - miejsce pojmania albo twierdza rodu porywacza najblizsza miejsca
-    ///    pojmania (porywacz bez twierdz - tylko miejsce pojmania); loch znany rodowi - oblezenie jak dotad. Okno szukania ColdHours od chwili, gdy TEN lord
-    ///    dostal wiesc (NewsAt - siedziba + kruk, pierwszy przeglad w sesji), nie od pojmania. Zasieg jak dla sladu (ReachOwnDays / ReachHelpDays) - dalej nikt
+    ///    znanego swiezego sladu szuka: PatrolAroundPoint wokol blizszego mu z dwoch celow - osada najblizsza miejsca pojmania albo twierdza rodu porywacza
+    ///    najblizsza miejsca pojmania (porywacz bez twierdz - tylko miejsce pojmania); loch znany rodowi - oblezenie jak dotad. Recenzja 222d: cel to osada,
+    ///    nie punkt, a blizszy i zasieg liczone droga gry (AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty, jak AiPatrollingBehavior;
+    ///    rozkaz z jej rodzajem nawigacji) - cel bez drogi (wyspa bez statkow: Skagos; pojmanie na morzu) jest poza zasiegiem, zamiast marszu prosto na brzeg.
+    ///    Okno szukania ColdHours od chwili, gdy TEN lord dostal wiesc (NewsAt - siedziba + kruk, z pozycji w pierwszej godzinie, w ktorej juz wie - takze
+    ///    pominiety albo idacy za sladem; zapis pole 24, wiec wczytanie go nie przesuwa), nie od pojmania. Zasieg jak dla sladu (ReachOwnDays / ReachHelpDays) - dalej nikt
     ///    nie rusza (bez wszechwiedzy i marszow przez cala mape): lowy czekaja i budza sie same w przegladzie godzinnym, gdy gracza zobaczy lord albo osada
     ///    krolestwa jenca (slad - poscig jak dotad), gdy wiesc dojdzie do lorda w zasiegu, gdy rod porywacza ma twierdze w zasiegu albo gdy loch w zasiegu stanie
     ///    sie znany. Tryby "szuka - zimny trop", "czeka (poza zasiegiem)", "czeka (szukanie bez sladu)"; "trop zimny" juz nie wystepuje.
@@ -123,11 +126,14 @@ namespace Armoury
             public int Armies, Battles, Wins; public float TopStr;
             public bool Planned;                            // recenzja 222c: plan wiesci liczony droga 222c (SeatNews) - zapis pole 22 "c", Recalc tylko bez niego
             public bool Rode;                               // 222d: lowy choc raz wydaly rozkazy (komunikat "rides to free" raz) - zapis pole 23 "r"
+            // 222d: wiesc u lorda (poczatek jego okna szukania) - godzina z pierwszego przegladu, w ktorym lord juz wie (z jego pozycji w tej godzinie);
+            // recenzja 222d: w zapisie (wiersz 'h' pole 24), bo liczona po wczytaniu z pozycji z chwili wczytania przesuwala okno o czas kruka
+            public readonly Dictionary<Hero, double> Heard = new Dictionary<Hero, double>();
             public readonly List<Sight> Sights = new List<Sight>();
             // sesja
             public double PeaceH = -1.0, MarkH = -1000.0, SightLogH = -1000.0;
             public string Mode = "";
-            public readonly Dictionary<MobileParty, double> Heard = new Dictionary<MobileParty, double>();   // 222d: wiesc u lorda (poczatek jego okna szukania)
+            public Settlement CapSite; public bool CapSiteSet;   // recenzja 222d: osada najblizsza miejsca pojmania (cel szukania zamiast punktu - wyspa, morze)
             public readonly List<ColdRec> Cold = new List<ColdRec>();   // 222d: lordowie bez swiezego sladu z ostatniego przegladu (T9)
             public int Out = -1; public bool OutFief, OutCap; public string SearchSig = "";
             public readonly HashSet<MobileParty> Elig = new HashSet<MobileParty>();
@@ -140,12 +146,13 @@ namespace Armoury
             public Hunt H; public int Kind; public MobileParty Target; public Vec2 Pos; public Settlement Fort; public Settlement Dungeon;
             public float P, Need, Own;
             public bool Search;                             // 222d: PatrolAroundPoint po zimnym tropie (cel szukania, nie slad)
+            public Settlement Area;                         // recenzja 222d: osada szukania (PatrolAroundPoint wokol osady z droga gry - AiHelper, jak AiPatrollingBehavior)
             public double OfferedH = -10.0;
         }
 
         private sealed class ColdRec
         {
-            public MobileParty Mp; public Vec2 Kp; public float D, Reach; public double Heard; public int V; public bool Own; public Settlement Fief;
+            public MobileParty Mp; public Vec2 Kp; public float D, Reach; public double Heard; public int V; public bool Own; public Settlement Fief, Area; public bool NoRoad;
         }
 
         private static readonly Dictionary<Hero, Hunt> _hunts = new Dictionary<Hero, Hunt>();
@@ -298,7 +305,8 @@ namespace Armoury
                      + " | lowy z zapisu " + (_importN >= 0 ? _importN + " (bledne " + _importBad + ")" : "0 (brak klucza arm_odbicie - nowa kampania albo stary zapis)")
                      + " | jezdziec " + F1(RiderPerHour) + " jedn./h, od razu do " + F0(NearRange) + " jedn., potrzeba " + F1(NeedMult) + " x sila celu, trop zimny po " + F0(ColdHours)
                      + " h, zasieg " + F2(ReachOwnDays) + "/" + F2(ReachHelpDays) + " dob marszu"
-                     + " | zimny trop: szukanie (222d) " + F0(ColdHours) + " h od wiesci u lorda, cele: miejsce pojmania i twierdza rodu porywacza najblizsza miejsca pojmania; poza zasiegiem - czekaja.");
+                     + " | zimny trop: szukanie (222d) " + F0(ColdHours) + " h od wiesci u lorda, cele: osada najblizsza miejsca pojmania i twierdza rodu porywacza najblizsza miejsca pojmania"
+                     + " (droga gry - AiHelper; bez drogi - poza zasiegiem; wiesc u lorda w zapisie); poza zasiegiem - czekaja.");
         }
 
         // ------------------------------------------------------------ kto jest czyj
@@ -377,6 +385,34 @@ namespace Armoury
                 if (d < bd) { bd = d; best = st; }
             }
             return best;
+        }
+
+        /// <summary>Recenzja 222d: osada (miasto, zamek, wies) najblizsza miejsca pojmania - cel szukania "okolice miejsca pojmania". Punkt pojmania moze
+        /// lezec na morzu albo na wyspie (Skagos); osada ma droge w siatce gry (AiHelper), punkt nie. Raz na lowy w sesji (miejsce sie nie zmienia).</summary>
+        private static Settlement CapSite(Hunt t)
+        {
+            if (t.CapSiteSet) return t.CapSite;
+            var cap = new Vec2(t.X, t.Y);
+            Settlement best = null; float bd = float.MaxValue;
+            foreach (var st in Settlement.All)
+            {
+                if (st == null || !(st.IsTown || st.IsCastle || st.IsVillage)) continue;
+                float d = st.GetPosition2D.Distance(cap);
+                if (d < bd) { bd = d; best = st; }
+            }
+            t.CapSite = best; t.CapSiteSet = true;
+            return best;
+        }
+
+        /// <summary>Recenzja 222d: droga lorda do osady wedlug gry - AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty, jak
+        /// AiPatrollingBehavior (patrol ladowy: isTargetingPort false). false = brak drogi (NavigationType.None: wyspa bez statkow); dist - droga, nie linia prosta.</summary>
+        private static bool Road(MobileParty mp, Settlement st, out float dist)
+        {
+            dist = float.MaxValue;
+            if (mp == null || st == null) return false;
+            MobileParty.NavigationType nav; bool port;
+            AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(mp, st, false, out nav, out dist, out port);
+            return nav != MobileParty.NavigationType.None;
         }
 
         /// <summary>Wiesc z miejsca p do punktu q: jezdziec do najblizszej twierdzy krolestwa (powyzej NearRange), potem kruk (Ravens.EtaHours; twierdza = cel
@@ -826,7 +862,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ godzina
-        private sealed class Cand { public MobileParty Mp; public float Str, D; public Vec2 Pos, Kp; public bool Own, Sees, Search; public double Age; public Settlement SF; }
+        private sealed class Cand { public MobileParty Mp; public float Str, D; public Vec2 Pos, Kp; public bool Own, Sees, Search; public double Age; public Settlement SF, SA; }
         private static readonly List<Cand> _cands = new List<Cand>();
         private static readonly List<Hunt> _tmpHunts = new List<Hunt>();
         private static readonly List<KeyValuePair<Hunt, string>> _tmpEnd = new List<KeyValuePair<Hunt, string>>();
@@ -878,7 +914,7 @@ namespace Armoury
 
         private static bool Changed(Order a, Order b)
         {
-            if (a.Kind != b.Kind || a.H != b.H || a.Target != b.Target || a.Fort != b.Fort || a.Dungeon != b.Dungeon || a.Search != b.Search) return true;
+            if (a.Kind != b.Kind || a.H != b.H || a.Target != b.Target || a.Fort != b.Fort || a.Dungeon != b.Dungeon || a.Search != b.Search || a.Area != b.Area) return true;
             return a.Kind == OPatrol && a.Pos.Distance(b.Pos) > 1f;
         }
 
@@ -1023,7 +1059,8 @@ namespace Armoury
             // 222d: cele szukania po zimnym tropie - miejsce pojmania i twierdza rodu porywacza najblizsza miejsca pojmania (wiesc niesie miejsce i porywacza)
             Vec2 cap = new Vec2(t.X, t.Y);
             Settlement fief = x == null ? CaptorFief(cap) : null;
-            int notYet = 0, cold = 0, far = 0, skip = 0, trip = 0, held = 0, spent = 0;
+            Settlement capSite = x == null ? CapSite(t) : null;
+            int notYet = 0, cold = 0, far = 0, skip = 0, trip = 0, held = 0, spent = 0, noRoad = 0;
             MobileParty farMp = null; float farD = 0f, farR = 0f; Settlement farFief = null; bool farSearch = false;
             var wpcs = t.K.WarPartyComponents;
             for (int i = 0; i < wpcs.Count; i++)
@@ -1034,6 +1071,17 @@ namespace Armoury
                 if (mc == null) continue;
                 bool own = mc == t.Clan;
                 if (!own && !(RealmOn && (t.Tier == TThree || (t.Tier == TTwo && Friendly(mc, t))))) continue;
+                // recenzja 222d: wiesc u lorda zapamietana w pierwszej godzinie, w ktorej juz wie (z pozycji w tej godzinie) - takze gdy jest pominiety
+                // (armia, bitwa, wyjazd po bron) albo idzie za swiezym sladem; potem stala (zapis pole 24) - wczytanie gry ani ruch lorda jej nie przesuwa
+                var q = mp.GetPosition2D;
+                var lh = mp.LeaderHero;
+                double heard;
+                bool knows = t.Heard.TryGetValue(lh, out heard);
+                if (!knows)
+                {
+                    double na = NewsAt(t, q);
+                    if (now >= na) { heard = Math.Min(now, na); t.Heard[lh] = heard; knows = true; }
+                }
                 if (mp.Army != null && mp.Army.LeaderParty != mp) continue;
                 if (tf == null || mp.MapFaction == null || !mp.MapFaction.IsAtWarWith(tf)) continue;
                 if (mp.MapEvent != null || (mp.CurrentSettlement != null && mp.CurrentSettlement.SiegeEvent != null)) { skip++; continue; }
@@ -1043,11 +1091,10 @@ namespace Armoury
                 if (ArmsFirst.CapTripActive(mp)) { skip++; trip++; _dSkipTrip++; continue; }
                 // scalenie 222 + 223: lord wstrzymany przez 223 (slaby albo narazony - nie zaczepia, jedzie do armii / twierdzy) - nie wybierac i nie liczyc sily
                 if (LordEscort.HeldBack(mp)) { skip++; held++; _dSkipHeld++; continue; }
-                var q = mp.GetPosition2D;
-                if (now < NewsAt(t, q)) { notYet++; continue; }
+                if (!knows) { notYet++; continue; }
                 // recenzja 222: o lochu kazdy dowiaduje sie wiescia z siedziby (DungeonH + kruk), nie razem z siedziba - kto jeszcze nie wie, nie oblega
                 if (x != null && now < t.DungeonH + FromSeat(t.Seat, q)) { notYet++; continue; }
-                Vec2 kp; double age = 0; bool search = false; Settlement sf = null; ColdRec rec = null;
+                Vec2 kp; double age = 0; bool search = false; Settlement sf = null, sa = null; ColdRec rec = null; float dPath = 0f;
                 if (x != null) kp = x.GetPosition2D;
                 else
                 {
@@ -1063,21 +1110,26 @@ namespace Armoury
                     else
                     {
                         // 222d: zimny trop - szuka wokol blizszego z celow (dotad: nic)
+                        // recenzja 222d: cele to osady z droga gry (AiHelper, jak AiPatrollingBehavior) - osada najblizsza miejsca pojmania i twierdza rodu
+                        // porywacza; blizszy droga; zadna osiagalna (wyspa bez statkow, Skagos) - poza zasiegiem, bez marszu na brzeg
                         cold++; search = true;
-                        kp = cap;
-                        if (fief != null && q.Distance(fief.GetPosition2D) < q.Distance(cap)) { kp = fief.GetPosition2D; sf = fief; }
-                        double heard;
-                        if (!t.Heard.TryGetValue(mp, out heard)) { heard = Math.Min(now, NewsAt(t, q)); t.Heard[mp] = heard; }
-                        rec = new ColdRec { Mp = mp, Kp = kp, Heard = heard, Own = own, Fief = sf, V = VCand };
+                        float dc, df = float.MaxValue;
+                        bool rc = Road(mp, capSite, out dc), rf = fief != null && Road(mp, fief, out df);
+                        if (rf && (!rc || df < dc)) { sa = fief; sf = fief; dPath = df; }
+                        else if (rc) { sa = capSite; dPath = dc; }
+                        else { sa = fief != null && q.Distance(fief.GetPosition2D) < q.Distance(cap) ? fief : capSite; sf = sa == fief ? fief : null; dPath = float.PositiveInfinity; }
+                        kp = sa != null ? sa.GetPosition2D : cap;
+                        rec = new ColdRec { Mp = mp, Kp = kp, Heard = heard, Own = own, Fief = sf, Area = sa, NoRoad = float.IsPositiveInfinity(dPath), V = VCand };
                         t.Cold.Add(rec);
                     }
                 }
-                float d = q.Distance(kp);
+                float d = search ? dPath : q.Distance(kp);
                 double reach = (own || t.Tier == TThree ? ReachOwnDays : ReachHelpDays) * march;
                 if (rec != null) { rec.D = d; rec.Reach = (float)reach; }
                 if (d > reach)
                 {
                     far++;
+                    if (rec != null && rec.NoRoad) noRoad++;
                     if (rec != null) rec.V = VFar;
                     if (farMp == null || d - reach < farD - farR) { farMp = mp; farD = d; farR = (float)reach; farFief = sf; farSearch = search; }
                     continue;
@@ -1090,7 +1142,7 @@ namespace Armoury
                     float dt = q.Distance(tpos);
                     sees = dt <= max && dt <= mp.SeeingRange;
                 }
-                _cands.Add(new Cand { Mp = mp, Str = Contrib(mp), D = d, Pos = q, Kp = kp, Own = own, Sees = sees, Age = age, Search = search, SF = sf });
+                _cands.Add(new Cand { Mp = mp, Str = Contrib(mp), D = d, Pos = q, Kp = kp, Own = own, Sees = sees, Age = age, Search = search, SF = sf, SA = sa });
                 t.Elig.Add(mp);
             }
             float tStr = x != null ? Defenders(x) : (tp != null ? TargetStrength(tp) : 0f);
@@ -1141,7 +1193,7 @@ namespace Armoury
                     else if (cd.Sees) { if (nearT >= need) { nw[cd.Mp] = new Order { H = t, Kind = OChase, Target = tp, P = p, Need = need }; nChase++; } }
                     else
                     {
-                        nw[cd.Mp] = new Order { H = t, Kind = OPatrol, Pos = cd.Kp, P = p, Need = need, Search = cd.Search };
+                        nw[cd.Mp] = new Order { H = t, Kind = OPatrol, Pos = cd.Kp, P = p, Need = need, Search = cd.Search, Area = cd.Search ? cd.SA : null };
                         if (cd.Search) { nSearch++; if (cd.SF != null) sFief = true; else sCap = true; } else nPatrol++;
                     }
                 }
@@ -1157,13 +1209,18 @@ namespace Armoury
             if (nSearch > 0)
             {
                 if (sFief) sig = Nm(fief) + " (twierdza rodu porywacza)";
-                if (sCap) sig += (sig.Length > 0 ? ", " : "") + "okolice " + NearName(cap) + " (miejsce pojmania)";
+                if (sCap) sig += (sig.Length > 0 ? ", " : "") + "okolice " + Nm(capSite) + " (miejsce pojmania)";
             }
             string farTxt = "";
             if (orders == 0 && farMp != null)
-                farTxt = " | najblizszy poza zasiegiem: " + Nm(farMp) + " " + F0(farD) + " jedn. od " + (x != null ? "lochu " + Nm(x) : farFief != null ? Nm(farFief) : farSearch ? "miejsca pojmania" : "sladu")
+            {
+                string farTo = x != null ? "lochu " + Nm(x) : farFief != null ? Nm(farFief) : farSearch ? "miejsca pojmania" : "sladu";
+                // recenzja 222d: cel szukania bez drogi gry (wyspa bez statkow, morze) - zamiast odleglosci
+                farTxt = " | najblizszy poza zasiegiem: " + Nm(farMp) + (float.IsPositiveInfinity(farD) ? " bez drogi do " + farTo : " " + F0(farD) + " jedn. od " + farTo)
                          + " (zasieg " + F0(farR) + " jedn.)";
-            string extra = (sig.Length > 0 ? " | przeszukanie: " + sig : "") + farTxt;
+            }
+            string extra = (sig.Length > 0 ? " | przeszukanie: " + sig : "") + farTxt
+                           + (noRoad > 0 ? " | bez drogi do celu szukania " + noRoad + " (droga gry: AiHelper, jak AiPatrollingBehavior)" : "");
             if (arrived)
             {
                 string last = "-";
@@ -1233,7 +1290,17 @@ namespace Armoury
                     case OPatrol:
                         {
                             if (party.IsCurrentlyAtSea) return;
-                            var a = new AIBehaviorData(new CampaignVec2(o.Pos, true), AiBehavior.PatrolAroundPoint, MobileParty.NavigationType.Default, false, false, false);
+                            AIBehaviorData a;
+                            if (o.Area != null)
+                            {
+                                // recenzja 222d: szukanie wokol osady z droga i rodzajem nawigacji gry (AiPatrollingBehavior.CalculateDefensivePatrollingScoreForSettlement);
+                                // brak drogi - bez rozkazu (dotad punkt z NavigationType.Default: lord szedl prosto na brzeg wyspy i stal)
+                                MobileParty.NavigationType nav; float dist; bool port;
+                                AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, o.Area, false, out nav, out dist, out port);
+                                if (nav == MobileParty.NavigationType.None) return;
+                                a = new AIBehaviorData(o.Area, AiBehavior.PatrolAroundPoint, nav, false, port, false);
+                            }
+                            else a = new AIBehaviorData(new CampaignVec2(o.Pos, true), AiBehavior.PatrolAroundPoint, MobileParty.NavigationType.Default, false, false, false);
                             var item = (a, o.P * b);
                             partyThinkParams.AddBehaviorScore(in item);
                             Interlocked.Increment(ref _dPatrol);
@@ -1368,7 +1435,8 @@ namespace Armoury
                       .Append('\t').Append(t.Told ? "1" : "0").Append('\t').Append(Clean(t.DungeonId)).Append('\t').Append(t.DungeonH.ToString("R", Inv)).Append('\t').Append(t.DungeonTold ? "1" : "0")
                       .Append('\t').Append(t.Armies.ToString(Inv)).Append('\t').Append(t.Battles.ToString(Inv)).Append('\t').Append(t.Wins.ToString(Inv)).Append('\t').Append(t.TopStr.ToString("R", Inv))
                       .Append('\t').Append(t.Planned ? "c" : "-")    // recenzja 222c: pole 22 - stary build (f.Length >= 22) je pomija
-                      .Append('\t').Append(t.Rode ? "r" : "-");      // 222d: pole 23 - lowy juz wydaly rozkazy (komunikat "rides to free" byl)
+                      .Append('\t').Append(t.Rode ? "r" : "-")       // 222d: pole 23 - lowy juz wydaly rozkazy (komunikat "rides to free" byl)
+                      .Append('\t').Append(HeardOut(t));             // recenzja 222d: pole 24 - wiesc u lordow (bohater@godzina;...), "-" = brak
                     foreach (var s in t.Sights)
                     {
                         sb.Append("\ns\t").Append(t.Captive.StringId).Append('\t').Append(s.H.ToString("R", Inv)).Append('\t').Append(s.X.ToString("R", Inv)).Append('\t').Append(s.Y.ToString("R", Inv))
@@ -1406,6 +1474,41 @@ namespace Armoury
             catch (Exception e) { Stumble("Import", e); }
         }
 
+        private static readonly char[] HeardBad = { '@', ';', '\t', '\n', '\r' };
+
+        /// <summary>Recenzja 222d: pole 24 wiersza 'h' - wiesc u lordow: "StringId bohatera@godzina" rozdzielone ';' ("-" = brak). Id z '@', ';' albo
+        /// znakiem konca linii - pominiete (lord dostanie wiesc z pozycji po wczytaniu, jak w zapisie bez pola 24).</summary>
+        private static string HeardOut(Hunt t)
+        {
+            if (t.Heard.Count == 0) return "-";
+            var sb = new StringBuilder(t.Heard.Count * 32);
+            foreach (var kv in t.Heard)
+            {
+                var id = kv.Key != null ? kv.Key.StringId : null;
+                if (string.IsNullOrEmpty(id) || id.IndexOfAny(HeardBad) >= 0) continue;
+                if (sb.Length > 0) sb.Append(';');
+                sb.Append(id).Append('@').Append(kv.Value.ToString("R", Inv));
+            }
+            return sb.Length > 0 ? sb.ToString() : "-";
+        }
+
+        private static void HeardIn(Hunt t, string v)
+        {
+            if (string.IsNullOrEmpty(v) || v == "-") return;
+            foreach (var e in v.Split(';'))
+            {
+                try
+                {
+                    int at = e.LastIndexOf('@');
+                    if (at <= 0) { _importBad++; continue; }
+                    var h = Hero.Find(e.Substring(0, at));
+                    if (h == null) continue;   // bohater zginal albo zniknal - bez znaczenia
+                    t.Heard[h] = D(e.Substring(at + 1));
+                }
+                catch { _importBad++; }
+            }
+        }
+
         private static double D(string s) { return double.Parse(s, NumberStyles.Float, Inv); }
         private static float Fl(string s) { return float.Parse(s, NumberStyles.Float, Inv); }
         private static int I(string s) { return int.Parse(s, NumberStyles.Integer, Inv); }
@@ -1434,6 +1537,8 @@ namespace Armoury
                         Rode = f.Length > 23 ? f[23] == "r" : f[14] == "1" && (Fl(f[21]) > 0f || I(f[18]) > 0)
                     };
                     if (t.K == null) { _importBad++; continue; }
+                    // recenzja 222d: zapis bez pola 24 (222/222c/222d) - wiesc u lorda z pierwszego przegladu po wczytaniu (z pozycji w tej chwili), potem stala
+                    if (f.Length > 24) HeardIn(t, f[24]);
                     _hunts[h] = t; map[f[1]] = t;
                 }
                 catch { _importBad++; }
