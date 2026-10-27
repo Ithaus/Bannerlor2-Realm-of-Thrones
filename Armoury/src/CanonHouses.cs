@@ -301,6 +301,13 @@ namespace Armoury
             return l;
         }
 
+        /// <summary>277: wszystkie rody pliku (kolejnosc pliku; tylko odczyt).</summary>
+        internal static List<House> All()
+        {
+            EnsureLoaded();
+            return _all;
+        }
+
         internal static string[] NamesOf(string area)
         {
             EnsureLoaded();

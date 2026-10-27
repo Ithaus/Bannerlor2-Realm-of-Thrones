@@ -137,6 +137,9 @@ namespace Armoury
             }
         }
 
+        /// <summary>277: rod przestal byc rodem rycerza w trakcie doby (pelne parostwo BK) - bez niego w pamieci doby juz dzis (HoldParties, KnightWage, wezwania).</summary>
+        internal static void Forget(Clan c) { if (c != null) _knights.Remove(c); }
+
         /// <summary>Rod rycerza (pamiec z ostatniego odswiezenia; wylaczone 179 - nie).</summary>
         internal static bool IsKnightClan(Clan c)
         {

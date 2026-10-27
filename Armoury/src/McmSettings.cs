@@ -9816,6 +9816,18 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarBalanceMuster { get; set; } = true;
 
+        [SettingPropertyBool("Canon Houses of the West", HintText = "As in the books, the lordly houses of the Westerlands and the Crownlands that Realm of Thrones leaves without a castle (Estren, Falwell, Jast, Moreland, Plumm, Prester, Spicer, Stackspear, Buckwell, Chelsted, Hayford, Stokeworth) answer their liege's call with a host of their own: the Banner Kings gentry family that keeps an estate in their lands is raised to full peerage (exactly as a realm vote would grant it) and to clan tier 3, and its head leads a party raised the usual way from the villages. Once per campaign, at the first day after loading or at the start of a new game. No castles are taken from anyone. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonHouses277 { get; set; } = true;
+
+        [SettingPropertyBool("Canon Houses of the West - Book Names", HintText = "With Canon Houses of the West: gentry families with a made-up name (the name of their village) or the name of a house that died out long ago (Reyne) take the name and arms of a missing lordly house of their own lands, and the rest of a missing knightly house. Off = only the families that already carry a book name are raised", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonHouses277Rename { get; set; } = true;
+
+        [SettingPropertyBool("Canon Houses of the West - Liege Pays the Host", HintText = "With Canon Houses of the West: in war the liege of those houses (House Lannister for the Westerlands, the king for the Crownlands) pays the wages of their hosts out of his own purse and his own wage budget, by the same rule the crown uses to help its vassals (Crown War Aid By Need): the men who are already there, plus room for a few recruits a day. If the liege runs short of coin or budget, their hosts stay small", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonHouses277LiegePay { get; set; } = true;
+
         [SettingPropertyBool("Story Images For Rot Windows", HintText = "the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Story windows")]
         public bool StoryImagesForRotWindows { get; set; } = true;
@@ -12661,6 +12673,9 @@ namespace Armoury
             s.CanonWarBalance = CanonWarBalance;
             s.CanonWarBalanceRestraint = CanonWarBalanceRestraint;
             s.CanonWarBalanceMuster = CanonWarBalanceMuster;
+            s.CanonHouses277 = CanonHouses277;
+            s.CanonHouses277Rename = CanonHouses277Rename;
+            s.CanonHouses277LiegePay = CanonHouses277LiegePay;
             s.StoryImagesForRotWindows = StoryImagesForRotWindows;
             s.LektorEnabled = LektorEnabled;
             s.LektorEventWindows = LektorEventWindows;

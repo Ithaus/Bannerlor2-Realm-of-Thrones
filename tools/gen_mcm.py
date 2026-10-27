@@ -686,6 +686,10 @@ LABELS = {
     'AiCavalryPursues': 'AI Cavalry Pursues',
     # 159b: nazwa z procentem (regula ogolna dalaby "Unarmed Men Allowed Percent")
     'UnarmedMenAllowedPercent': 'Unarmed Men Allowed (%)',
+    # 277: nazwy bez numeru paczki (regula ogolna dalaby "Canon Houses277")
+    'CanonHouses277': 'Canon Houses of the West',
+    'CanonHouses277Rename': 'Canon Houses of the West - Book Names',
+    'CanonHouses277LiegePay': 'Canon Houses of the West - Liege Pays the Host',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial
