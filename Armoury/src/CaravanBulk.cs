@@ -100,6 +100,8 @@ namespace Armoury
             // SoldToday - od ostatniego Daily, SoldEma - srednia ok. 14 dob, SoldDays - dob pomiaru (zapis arm_cb282). Unload* - rozladunek przy zamknietym kupnie (tylko log)
             public int SoldToday, SoldDays;
             public float SoldEma;
+            // 282 recenzja: UnloadOut - rozladunek ponad brak miast wyjety z pomiaru sprzedazy (od ostatniego Daily); SoldLast / UnloadOutLast - to samo z minionej doby (tylko log)
+            public int UnloadOut, SoldLast, UnloadOutLast;
             public int Unload; public long UnloadGold;
             public readonly HashSet<Town> UnloadTowns = new HashSet<Town>();
             public bool WasGlut;                               // stan bramki z poprzedniego Daily (kupno przez miniona dobe) - do linii 282
@@ -119,6 +121,7 @@ namespace Armoury
             {
                 NewDay(); Item = null; Need = 0; Carried = 0; Short = 0; Empty = 0; Buyers = 0; AvgIndex = 0f; SellPrice = 0f; LoggedShort = -1; LoggedEmpty = -1; Carriers = 0; InTown = 0;
                 SoldToday = 0; SoldDays = 0; SoldEma = 0f; WasGlut = false;   // 282: pomiar sprzedazy nowej kampanii od zera (wczytanie - Import arm_cb282 po Reset)
+                UnloadOut = 0; SoldLast = 0; UnloadOutLast = 0;
             }
         }
 
@@ -506,15 +509,22 @@ namespace Armoury
         }
 
         /// <summary>282 (F1): wyjazd z miasta - to, co zeszlo z jukow od wjazdu (migawka _cameWith), to sprzedaz miastu w tej wizycie (kazda droga: nasza, BK, gra,
-        /// dostawa kontraktu). Zakup w tej wizycie podnosi juki tylko dla surowca, ktorego karawana tu nie sprzedawala (regula "nie odkupuje"), wiec max(0, wjazd - teraz).</summary>
+        /// dostawa kontraktu). Zakup w tej wizycie podnosi juki tylko dla surowca, ktorego karawana tu nie sprzedawala (regula "nie odkupuje"), wiec max(0, wjazd - teraz).
+        /// Recenzja 282: bez rozladunku ponad brak miasta (Sell przy zamknietym kupnie, druga polowa migawki) - to nie jest sprzedaz, ktora miasta przejmuja,
+        /// tylko zrzut nadmiaru; liczony do pomiaru podnosilby prog przeplywu i otwieral kupno z powrotem (bramka znosilaby sama siebie).</summary>
         private static void NoteSold(MobileParty mp, int[] came)
         {
             if (mp == null || came == null || _goods == null || mp.ItemRoster == null) return;
+            int n = _all.Length;
             foreach (var g in _goods)
             {
-                if (g.Ix < 0 || g.Ix >= came.Length) continue;
+                if (g.Ix < 0 || g.Ix >= n || g.Ix >= came.Length) continue;
                 int now = mp.ItemRoster.GetItemNumber(g.Item);
-                if (came[g.Ix] > now) g.SoldToday += came[g.Ix] - now;
+                int left = came[g.Ix] - now;
+                if (left <= 0) continue;
+                int unload = came.Length >= 2 * n ? Math.Min(left, Math.Max(0, came[n + g.Ix])) : 0;
+                g.SoldToday += left - unload;
+                g.UnloadOut += unload;
             }
         }
 
@@ -527,7 +537,8 @@ namespace Armoury
                 if (g.Item == null) continue;
                 if (g.SoldDays < int.MaxValue) g.SoldDays++;
                 g.SoldEma += (g.SoldToday - g.SoldEma) / Math.Min(FlowSmooth, g.SoldDays);
-                g.SoldToday = 0;
+                g.SoldLast = g.SoldToday; g.UnloadOutLast = g.UnloadOut;   // recenzja 282: do linii doby (sprawdz_logi RU282-6 liczy srednia od nowa)
+                g.SoldToday = 0; g.UnloadOut = 0;
             }
         }
 
@@ -549,7 +560,7 @@ namespace Armoury
                   .Append(" (bramka przeplywu ").Append(!s.CaravanBulkFlowGate ? "NIE" : g.SoldDays < FlowMinDays ? "za malo dob pomiaru" : "TAK")
                   .Append("), przez miniona dobe kupno ").Append(g.WasGlut ? "stalo" : "czynne").Append(": kupily ").Append(g.Bought).Append(", sprzedaly ").Append(g.Sold)
                   .Append(" (nasza sprzedaz przy wjezdzie), rozladunek ponad brak miast ").Append(g.Unload).Append(" szt. w ").Append(g.UnloadTowns.Count).Append(" miastach za ")
-                  .Append(g.UnloadGold).Append(" zl");
+                  .Append(g.UnloadGold).Append(" zl, pomiar sprzedazy minionej doby ").Append(g.SoldLast).Append(" (rozladunek ponad brak poza pomiarem ").Append(g.UnloadOutLast).Append(')');
             }
             sb.Append("; na sucho (282 - bez zmian, decyzja Jeffa): ");
             bool any = false;
@@ -683,11 +694,12 @@ namespace Armoury
                 var s = Settings.Current;
                 if (!_wired || s == null || !s.CaravanBulkEnabled || st.Town == null || !Trades(mp) || !Ready()) return;
                 EnsureWorld(s);
-                // migawka jukow przed jakakolwiek sprzedaza tej wizyty (nasza, BK i gry) - przy wyjezdzie nie odkupujemy tego, co tu zeszlo
-                var came = new int[_all.Length];
+                // migawka jukow przed jakakolwiek sprzedaza tej wizyty (nasza, BK i gry) - przy wyjezdzie nie odkupujemy tego, co tu zeszlo;
+                // recenzja 282: druga polowa (indeks _all.Length + Ix) - rozladunek ponad brak miasta w tej wizycie (Sell), poza pomiarem sprzedazy (NoteSold)
+                var came = new int[2 * _all.Length];
                 foreach (var g in _goods) came[g.Ix] = mp.ItemRoster.GetItemNumber(g.Item);
                 _cameWith[mp] = came;
-                Sell(mp, st.Town, s);
+                Sell(mp, st.Town, s, came);
             }
             catch (Exception e)
             {
@@ -810,7 +822,7 @@ namespace Armoury
             return priced > 1 ? Ordered(gain) : _goods;
         }
 
-        private static void Sell(MobileParty mp, Town town, Settings s)
+        private static void Sell(MobileParty mp, Town town, Settings s, int[] came)
         {
             var pack = mp.ItemRoster;
             var shelf = town.Owner.ItemRoster;
@@ -860,7 +872,11 @@ namespace Armoury
                         g.Fed.Add(town);
                     }
                     int over = moved - Math.Max(0, Math.Min(moved, lack));   // 282: rozladunek ponad brak miasta (kupno stoi) - tylko log
-                    if (glut && over > 0) { g.Unload += over; g.UnloadTowns.Add(town); g.UnloadGold += (long)got * over / moved; }
+                    if (glut && over > 0)
+                    {
+                        g.Unload += over; g.UnloadTowns.Add(town); g.UnloadGold += (long)got * over / moved;
+                        if (came != null && came.Length >= 2 * _all.Length) came[_all.Length + g.Ix] += over;   // recenzja 282: poza pomiarem sprzedazy (NoteSold)
+                    }
                     if (done == null) done = new List<(EquipmentElement, int)>();
                     done.Add((el.EquipmentElement, moved));
                 }
