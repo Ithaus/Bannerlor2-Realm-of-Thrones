@@ -1,5 +1,19 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 20:00 CET - 268, 272 gotowe; 241+259+264+268+272 SCALONE w n161 (cf193290, build 2a226448, NIE wgrane); 274 w toku
+- 268 (zb\n268): 9fc4889c + c087422c + recenzja 03d5313c. p9 liczy B (udzial ludzi ze zbroja korpusu), ArmourOrders.cs (zamowienia zbroi/helmow pelne, cap 60),
+  E3-Z1 bez limitu 1/dzien dla korpusu i helmu, klucze AiArmsCountsBodyArmour, AiArmourOrderFull; flaga armoury-zbroja268.flag, grupa z268.
+- 272 (zb\n272): 25436c96 + 05eee9cc + recenzja 45048904. KingInTheNorth.cs (zapis arm_k272, klucz CanonNorthRiverlandsUnion): unia po ROT RiverlandsDeclareWarEvent
+  stan 2 albo 2 dni od daty z planu Fabuli, Robb zyje, przed Krwawymi Godami; rody przez ApplyByJoinToKingdom / najemnicy ApplyByJoinFactionAsMercenary (kariera BK
+  przepisana); skarbiec: splata Banku, reszta do Polnocy; DestroyKingdomAction Dorzecza; okno "The King in the North and the Trident"; ExecuteRobb postfiks
+  (Freyowie, Mootonowie, Coxowie, Brackenowie do korony). Grupa krol272.
+- SCALANIE n161: 241 (ff), 259 ab0f28b2, 264 2deb7796 (konflikt konstruktora ArmouryBehavior - suma Reset()), 268 a00425ea, 272 96c073f3; CHANGELOG i sprawdz_logi
+  zlozone scal_sklad z bazy 056ae5f4 (cf193290). Wszystkie grupy (war241 karawany259 pokoj264 z268 krol272 + stare) daja tabele; NWAR-10 NIE starsze (tez na 056ae5f4).
+- Po 274: scalic 274 (git merge + scal_sklad z 6 galeziami), build, autotest: bitwaN (flagi pokoj264, zbroja268) + dlugi bieg probyN (120 dob dla 241/259/274, flagi
+  krol272/odbicie) -> grupy -> wgranie 129 po zamknieciu gry.
+- Na pozniej (z audytu): daniny z miast od biezacego zysku, pamiec cen karawan w zapisie, karawany z zysku, sprzedaz na przyszlosc, licznik podatku 2 wsi BK (NaN),
+  ubytek przy budowach, log trafien, NWAR-10 (pola KS w F4 6.74x).
+
 ## DOPISEK 27.10 ok. 18:40 CET - 241 i 259 GOTOWE (zbudowane po recenzji, nie wgrane)
 - 241 (zb\n241): 6cf804cd + 56485d08 + recenzja 237e6c60 (Armoury 0a0b45e8). MarketSales.cs (sprzedaz miast 28 dni, zapis arm_mktsales); kupiec placi cene z
   historii sprzedazy albo pulap ludu; rzemieslnicy 35% (TownFolkCraftWageShare); WorkshopTaxOnPayout (podatek BK od wyplaty, 1x stawka); ClampBack (BK placi ponad
