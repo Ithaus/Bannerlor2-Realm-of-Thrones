@@ -17,8 +17,8 @@ namespace Armoury
     /// w bandach z nekromancji, z odbitych jencow i z jencow, ktorych ROT kasuje - oraz bilansem otwarcia nowej kampanii (616 "dawnych umarlych",
     /// Jeff 07.10, STAN-PRAC pyt. 2; RK 4.2 B pkt 8). Wydawane tylko na narodziny bandy Innych (szablon 53 + wodz -> z puli; pusta pula = sam wodz).
     /// Nigdy nie wraca do ludzi (wight nie jest czlowiekiem z niczego).
-    /// Do tego licznik POLEGLI (R3) z rak Innych wedlug miejsca - tylko log do E4/7 (smierc zolnierza zdejmuje z DOM dopiero razem z werbunkiem,
-    /// ktory zdejmuje rekruta z DOM - R3/R4 w E4/7; trwaly licznik POLEGLI w zapisie - w E4/7).
+    /// Do tego licznik POLEGLI (R3) z rak Innych wedlug miejsca - tylko log (280: od E4/7 LevyLive zolnierz schodzi z DOM juz przy werbunku, a jego smierc to ubytek
+    /// trwaly w POLEGLYCH regionu pochodzenia - PeopleBook.Origin.cs DieShares; przy wylaczonym LevyLive smierc tylko liczona).
     /// E4/3 (108n): konta DOM (wsie: hearth x k_v - stan w hearth gry; miasta: stan od E4/4), WYRZUTKI (pula OutlawLaw - stan w "arm_outlaws"),
     /// TABOR (tabory wsi i lodzie - zdjete z DOM przez gre) i SLUZBA (partie, zalogi, milicje, bandy - konto od E4/7) oraz jedyna droga zmiany
     /// hearth za ludzi: Move (PeopleUnit.Shift wola tylko Move). k_v na osade z dnia kalibracji ("v:" w "arm_people", U3) - zmiana kultury osady
@@ -124,8 +124,9 @@ namespace Armoury
             "powrot z pochodzeniem: niewzieci z poboru wymuszonego gracza do swojej wsi (E4/7b)",
             "pobor do Strazy z ludnosci Westeros (E4/9)", "dluznicy: odeszli z braku pieniedzy do domu (E4/9 DLUG 4, ClanBudget.ToVillage)",
             "powrot z pochodzeniem: dluznicy do domu (E4/9 DLUG 4)", "zdobycie: zabici mieszczanie (L6 lupu miast, BK - stan miasta)" };
-        // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) tylko liczona: werbunek nie zdejmuje jeszcze czlowieka z DOM
-        // (R4 w E4/7), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); incydenty i podloga 10 - hearth zmienila gra (licznik).
+        // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) BEZ pochodzenia tylko liczona: przy werbunku tego czlowieka z DOM nikt nie zdjal
+        // (zolnierz sprzed siewu albo z kanalu bez okna), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); 280: zolnierz z pochodzeniem
+        // zszedl z DOM przy werbunku (E4/7 LevyLive) i wraca do hearth regionu przez MBack* nizej; incydenty i podloga 10 - hearth zmienila gra (licznik).
         // E4/5: spustoszenie i powrot uchodzcow ruszaja hearth; podloga 10 z uchodzcow - hearth dopisala gra (okno W1 E4/0 ja mierzy), tylko licznik
         // E4/6: zmarli i uciekli z glodu ruszaja hearth (DOM -> smierc, DOM -> UCHODZCY); zmarli mieszczanie - stan miasta "t:" (TownDie), bez hearth wsi
         // E4/7: pobor z wsi i powroty z pochodzeniem ruszaja hearth (symetria - LevyLive, PeopleBook.Origin.cs); pobor z miasta - stan miasta, nie hearth
@@ -1082,7 +1083,9 @@ namespace Armoury
                     sb.Append(") - narodziny band ").Append(_out[CBirth]);
                     sb.Append(" | ").Append(_openingNote ?? ("bilans otwarcia w zapisie " + _opening));
                     long dd = 0; for (int c = 0; c < DKinds; c++) for (int p = 0; p < 5; p++) dd += _dead[c, p];
-                    sb.Append(" | polegli z rak Innych dzis (R3, region miejsca do E4/7; tylko licznik do E4/7 - smierc zdejmuje z DOM razem z werbunkiem) ").Append(dd);
+                    // 280 (B3): tekst prawdziwy - przy LevyLive (E4/7) rekrut zszedl z DOM przy werbunku, smierc jest ubytkiem trwalym w POLEGLYCH regionu pochodzenia
+                    sb.Append(LevyLive ? " | polegli z rak Innych dzis (R3, region miejsca; zolnierz zszedl z DOM juz przy werbunku (E4/7 LevyLive) - smierc to ubytek trwaly w POLEGLYCH regionu pochodzenia) "
+                                       : " | polegli z rak Innych dzis (R3, region miejsca; tylko licznik - LevyLive wylaczone, werbunek nie zdejmuje z DOM) ").Append(dd);
                     if (dd > 0)
                     {
                         sb.Append(" (");
@@ -1174,7 +1177,10 @@ namespace Armoury
             sb.Append(" | trzy punkty powrotu do DOM, razem ").Append(M0(back)).Append(" (bez podwojenia): LosersFlee.SendHome ").Append(M0(men[MH3Cart] + men[MCommon] + men[MSoldier]))
               .Append(" (rozbite tabory ").Append(M0(men[MH3Cart])).Append(", prosci i bandyci ").Append(M0(men[MCommon])).Append(" - do wsi dalej przez OutlawLaw.ReturnHome, zolnierze do ludnosci BK ").Append(M0(men[MSoldier]))
               .Append("), ClanBudget.ToVillage ").Append(M0(men[M166] + men[MW4c] + men[M179] + men[MDebt])).Append(" (166 ").Append(M0(men[M166])).Append(", W4c ").Append(M0(men[MW4c]))
-              .Append(", 179 ").Append(M0(men[M179])).Append(men[MDebt] > 0 ? ", dluznicy E4/9 " + M0(men[MDebt]) : "").Append("; SLUZBA -> DOM tylko liczona do E4/7 - werbunek jeszcze nie zdejmuje z DOM), OutlawLaw.ReturnHome ")
+              .Append(", 179 ").Append(M0(men[M179])).Append(men[MDebt] > 0 ? ", dluznicy E4/9 " + M0(men[MDebt]) : "")
+              // 280 (B3): od E4/7 LevyLive rekrut schodzi z DOM przy werbunku - powrot z pochodzeniem idzie do hearth (E4/7 nizej); stary tekst prawdziwy tylko bez LevyLive
+              .Append(LevyLive ? "; SLUZBA -> DOM: z pochodzeniem do hearth regionu (E4/7, nizej), bez pochodzenia tylko liczona - przy werbunku nikogo z DOM nie zdjeto), OutlawLaw.ReturnHome "
+                               : "; SLUZBA -> DOM tylko liczona - LevyLive wylaczone, werbunek nie zdejmuje z DOM), OutlawLaw.ReturnHome ")
               .Append(M0(men[MPoolHome])).Append(" (tylko z puli; prosci i bandyci z LosersFlee policzeni w punkcie LosersFlee.SendHome)")
               .Append("; E4/7 z pochodzeniem (hearth regionu pochodzenia) ").Append(M0(backE47)).Append(men[MBackTown] > 0 ? " (w tym do stanu miasta " + M0(men[MBackTown]) + ")" : "")
               .Append(men[MBackVeteran] > 0 || men[MVetStart] > 0 ? "; E4/10 weterani: po czasie czekania do DOM regionu pochodzenia (hearth) " + M0(men[MBackVeteran]) + ", siew z ludzi miast do karczm " + M0(men[MVetStart]) : "");

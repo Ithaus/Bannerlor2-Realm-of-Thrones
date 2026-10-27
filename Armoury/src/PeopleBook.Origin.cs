@@ -172,6 +172,8 @@ namespace Armoury
             public double MigIn, MigOut;
             // E4/9 (Z10): niewolni z regionu (wedlug pochodzenia) i konto MUR z regionu w dniu siewu, zmarli niewolni z regionu od siewu - rownanie regionu
             public double TRef, WRef, TDead;
+            // 280: reszta rownania regionu zamrozona przy zalozeniu bazy (druga doba po pierwszym wczytaniu z 280; nowa kampania - 0 przy siewie) - "od 280" = Rest - Base280
+            public double Base280;
         }
 
         // ================================================================ stan w zapisie
@@ -183,7 +185,20 @@ namespace Armoury
         private static int _sowDay = -1;
         private static string _pendSo, _pendJo;                                                         // so:/jo: z zapisu do rozwiazania w OnSessionLaunched
         // udzialy czekajace na roster (narodziny bandy); fixA (P11): klucz dodany przed nadaniem Id partii - porownanie po referencji (RefEq)
+        // 280 (U7): w zapisie (sekcja "pd:") - dotad przepadaly przy kazdym wczytaniu (pula wo: juz pomniejszona, banda wracala jako "" "z niczego bandy" 116-171 ludzi)
         private static readonly Dictionary<MobileParty, Shares> _pending = new Dictionary<MobileParty, Shares>(RefEq.I);
+        // 280 - stan w zapisie (sw: wersja 2): POLEGLI bez pochodzenia (B5), sumy poleglych z konca ostatniej doby ("dzis" za cala dobe ponad wczytaniem, U8),
+        // dzien zalozenia bazy reszty (6); NaN / -1 = nieznane (zapis sprzed 280)
+        private static double _fallenNone;
+        private static int _noneSinceDay = -1;
+        private static double _lastFallenSum = double.NaN, _lastNone = double.NaN;
+        private static int _base280Day = -1;
+        // 280 - sesja (bez zapisu): pd: z zapisu do rozwiazania, konta i swiat przy zapisie (linia "Ksiega po wczytaniu (280)"), takty sesji, wynik rozwiazania pd:
+        private static string _pendPd;
+        private static double[] _savedAcc;
+        private static bool _loadLine, _fallenFromSave;
+        private static int _sessTicks;
+        private static string _pdNote;
 
         // ================================================================ liczniki doby (bez zapisu)
         private static readonly double[] _fIn = new double[FKinds], _fOut = new double[FKinds];
@@ -245,6 +260,9 @@ namespace Armoury
         {
             _mem.Clear(); _pris.Clear(); _poolOrg.Clear(); _rg.Clear(); _sown = false; _sowDay = -1; _pendSo = _pendJo = null; _pending.Clear();
             _node.Clear(); _wight.Clear(); _kind.Clear();
+            // 280: stan sw: wersji 2 i sesja (Import czyta zapis po tym resecie)
+            _fallenNone = 0; _noneSinceDay = -1; _lastFallenSum = _lastNone = double.NaN; _base280Day = -1;
+            _pendPd = null; _savedAcc = null; _loadLine = _fallenFromSave = false; _sessTicks = 0; _pdNote = null;
             _oStumbles = 0; _badIds = 0; _resolveMissing = _resolveFound = 0; _sowNote = null; _resolveNote = null; _state0 = double.NaN;
             _press = null; _pressVil = null;
             _escAll = _escHome = _escPool = _escTavern = _escLost = 0;     // fixA (P2-T4-lochy): liczniki ucieczek tylko z tej kampanii
@@ -315,7 +333,14 @@ namespace Armoury
 
         private static void ExportOriginBody(StringBuilder sb)
         {
-            sb.Append("|sw:").Append(_sowDay.ToString(Inv)).Append(";1");
+            // 280: sw: wersja 2 - "<siew>;2;<polegli bez pochodzenia>;<od dnia>;<suma poleglych z konca doby>;<bez pochodzenia z konca doby>;<swiat R0>;<11 kont>;<dzien bazy>"
+            // (stary DLL czyta tylko a[0]); R0 i konta z rachunku widokow w tej chwili (ComputeViews - cache _view bez zmian, liczby gry bez zmian)
+            sb.Append("|sw:").Append(_sowDay.ToString(Inv)).Append(";2;").Append(N3(_fallenNone)).Append(';').Append(_noneSinceDay.ToString(Inv))
+              .Append(';').Append(double.IsNaN(_lastFallenSum) ? "-" : N3(_lastFallenSum)).Append(';').Append(double.IsNaN(_lastNone) ? "-" : N3(_lastNone));
+            double[] acc = null;
+            try { if (OriginOn) acc = Accounts(ComputeViews().Values); } catch (Exception e) { OStumble("Export(280 konta)", e); }
+            for (int i = 0; i < AccN; i++) sb.Append(';').Append(acc != null ? N3(acc[i]) : "-");
+            sb.Append(';').Append(_base280Day.ToString(Inv));
             bool first = true;
             sb.Append("|so:");
             foreach (var kv in _mem) AppendOrg(sb, PartyKey(kv.Key), kv.Value, ref first);
@@ -352,8 +377,23 @@ namespace Armoury
                   .Append(N3(r.Enslaved)).Append(';').Append(N3(r.ToWall)).Append(';').Append(N3(r.PoolRef)).Append(';').Append(N3(r.RefRef)).Append(';').Append(N3(r.CartRef))
                   .Append(';').Append(N3(r.TownOut)).Append(';').Append(N3(r.VillOut)).Append(';').Append(N3(r.TownBack)).Append(';').Append(N3(r.Drift))
                   .Append(';').Append(N3(r.MigIn)).Append(';').Append(N3(r.MigOut))        // E4/8 (pola 17, 18; zapis bez nich - 0)
-                  .Append(';').Append(N3(r.TRef)).Append(';').Append(N3(r.WRef)).Append(';').Append(N3(r.TDead));     // E4/9 (pola 19-21; zapis bez nich - 0)
+                  .Append(';').Append(N3(r.TRef)).Append(';').Append(N3(r.WRef)).Append(';').Append(N3(r.TDead))     // E4/9 (pola 19-21; zapis bez nich - 0)
+                  .Append(';').Append(N3(r.Base280));                                                                  // 280 (pole 22, ze znakiem; zapis bez niego - 0)
                 first = false;
+            }
+            // 280 (U7): oczekujace udzialy band "pd:idPartii=region:liczba;..." (jak so:; "" jako "~") - rozwiazanie w ResolveOrigin
+            first = true;
+            foreach (var kv in _pending)
+            {
+                var mp = kv.Key; var sh = kv.Value;
+                if (mp == null || sh == null || !(sh.Total > Eps)) continue;
+                string id = mp.StringId;
+                if (BadKey(id)) { _badIds++; continue; }
+                var o = new Org();
+                foreach (var x in sh.M) if (x.Value > Eps) OrgAdd(o, x.Key, x.Value);
+                if (o.Sum <= Eps) continue;
+                if (first) sb.Append("|pd:");
+                AppendOrg(sb, id, o, ref first);
             }
             ExportGone(sb);     // A12: "zp:" - ludzie przy zniknieciu partii wedlug regionu od siewu (bez sekcji, gdy pusto)
         }
@@ -362,7 +402,7 @@ namespace Armoury
         private static bool ImportOriginPart(string part)
         {
             string p2 = part.Substring(0, 3);
-            if (p2 != "sw:" && p2 != "so:" && p2 != "jo:" && p2 != "wo:" && p2 != "rg:" && p2 != "zp:") return false;
+            if (p2 != "sw:" && p2 != "so:" && p2 != "jo:" && p2 != "wo:" && p2 != "rg:" && p2 != "zp:" && p2 != "pd:") return false;
             try
             {
                 string body = part.Substring(3);
@@ -371,7 +411,10 @@ namespace Armoury
                 {
                     var a = body.Split(';');
                     int d; if (a.Length > 0 && int.TryParse(a[0], NumberStyles.Integer, Inv, out d)) { _sown = true; _sowDay = d; }
+                    _loadLine = true;
+                    if (a.Length > 1 && a[1] == "2") ImportSw2(a);     // 280
                 }
+                else if (p2 == "pd:") _pendPd = body;     // 280 (U7): do ResolveOrigin (partii w SyncData jeszcze nie ma)
                 else if (p2 == "so:") _pendSo = body;
                 else if (p2 == "jo:") _pendJo = body;
                 else if (p2 == "wo:")
@@ -404,7 +447,8 @@ namespace Armoury
                             Born = SNum(a, 7), Enslaved = Num(a, 8), ToWall = Num(a, 9), PoolRef = Num(a, 10), RefRef = Num(a, 11), CartRef = Num(a, 12),
                             TownOut = Num(a, 13), VillOut = Num(a, 14), TownBack = Num(a, 15), Drift = SNum(a, 16),     // recenzja E4/7 (R1-1, R2-3); zapis bez nich - 0
                             MigIn = Num(a, 17), MigOut = Num(a, 18),                                                   // E4/8 (R19); zapis E4/7 bez nich - 0
-                            TRef = Num(a, 19), WRef = Num(a, 20), TDead = Num(a, 21)                                   // E4/9 (Z10); zapis bez nich - 0 (Num poza dlugoscia - 0)
+                            TRef = Num(a, 19), WRef = Num(a, 20), TDead = Num(a, 21),                                  // E4/9 (Z10); zapis bez nich - 0 (Num poza dlugoscia - 0)
+                            Base280 = SNum(a, 22)                                                                      // 280 (ze znakiem); zapis bez niego - 0
                         };
                         _rg[item.Substring(0, eq)] = r;
                     }
@@ -412,6 +456,76 @@ namespace Armoury
             }
             catch (Exception e) { OStumble("ImportOriginPart(" + p2 + ")", e); }
             return true;
+        }
+
+        // ================================================================ 280: sw: wersja 2, konta przy zapisie, pd:
+        private const int AccN = 12;     // swiat (suma reszt) + 11 kont rownania krain
+        private static readonly string[] AccName = { "swiat", "DOM", "SLUZBA", "JENCY", "pula", "UCHODZCY", "tabory", "w drodze", "WETERANI", "NIEWOLNI", "Mur", "zbiorka" };
+
+        /// <summary>Swiat (suma reszt regionow) i konta rownania krain z widokow - jedna definicja dla zapisu i dla linii "Ksiega po wczytaniu (280)".</summary>
+        private static double[] Accounts(IEnumerable<RegionView> views)
+        {
+            var a = new double[AccN];
+            foreach (var v in views)
+            {
+                a[0] += v.Rest; a[1] += v.Dom; a[2] += v.S; a[3] += v.J; a[4] += v.Wy; a[5] += v.U; a[6] += v.Carts; a[7] += v.Road; a[8] += v.Vet; a[9] += v.T; a[10] += v.W; a[11] += v.Rally;
+            }
+            return a;
+        }
+
+        private static double DNum(string[] a, int i)
+        {
+            double x;
+            if (a == null || i >= a.Length || a[i] == "-" || !double.TryParse(a[i], NumberStyles.Float, Inv, out x) || double.IsInfinity(x)) return double.NaN;
+            return x;
+        }
+
+        private static void ImportSw2(string[] a)
+        {
+            double fn = DNum(a, 2); _fallenNone = double.IsNaN(fn) || fn < 0 ? 0.0 : fn;
+            int d; _noneSinceDay = a.Length > 3 && int.TryParse(a[3], NumberStyles.Integer, Inv, out d) ? d : -1;
+            _lastFallenSum = DNum(a, 4); _lastNone = DNum(a, 5);
+            _fallenFromSave = !double.IsNaN(_lastFallenSum);
+            var acc = new double[AccN]; bool any = false;
+            for (int i = 0; i < AccN; i++) { acc[i] = DNum(a, 6 + i); if (!double.IsNaN(acc[i])) any = true; }
+            _savedAcc = any ? acc : null;
+            int b; _base280Day = a.Length > 6 + AccN && int.TryParse(a[6 + AccN], NumberStyles.Integer, Inv, out b) ? b : -1;
+        }
+
+        private static double FallenSum() { double f = 0; foreach (var r in _rg.Values) f += r.Fallen; return f + _fallenNone; }
+
+        /// <summary>280 (6): baza reszty - druga doba sesji po pierwszym wczytaniu z 280 (jednorazowe skutki przejscia: podwojne narodziny jednej doby, utracone udzialy band,
+        /// juz w niej). Nazbierana dotad reszta zostaje zamrozona i pokazywana osobno (bez przeliczania narodzin - K_m i dowody bez zmian).</summary>
+        private static void SetBase280(int day)
+        {
+            double world = 0; int n = 0;
+            foreach (var v in Views()) { var r = Rg(v.Id); r.Base280 = v.Rest; world += v.Rest; n++; }
+            _base280Day = day;
+            Log.Info("Ksiega (280): baza reszty rownania krain zamrozona dnia " + day + " - swiat " + H3d(world) + " w " + n + " regionach (prognoza narodzin wsi przy wczytaniach, udzialy band bez zapisu,"
+                     + " w nicosc i inne skladniki do 280); od jutra linia \"Ludzie (ksiega)\" podaje reszte od 280 osobno.");
+        }
+
+        /// <summary>280: linia "Ksiega po wczytaniu (280)" - swiat i konta przy zapisie wobec stanu po wczytaniu (strata w samym wczytaniu, oddzielnie od zdarzen w oknie taktu).</summary>
+        private static void LoadLine280()
+        {
+            if (!_loadLine) return;
+            _loadLine = false;
+            if (!_sown || !OriginOn) return;
+            var now = Accounts(Views());
+            var sb = new StringBuilder(900);
+            sb.Append("Ksiega po wczytaniu (280): dzien ").Append((int)CampaignTime.Now.ToDays);
+            if (_savedAcc == null || double.IsNaN(_savedAcc[0]))
+                sb.Append(" | swiat przy zapisie - (zapis sprzed 280), po wczytaniu ").Append(H3d(now[0]));
+            else
+                sb.Append(" | swiat przy zapisie ").Append(H3d(_savedAcc[0])).Append(", po wczytaniu ").Append(H3d(now[0])).Append(", roznica ").Append(H3d(now[0] - _savedAcc[0]))
+                  .Append(" (zaokraglenie zapisu do 2.5)");
+            sb.Append(" | konta:");
+            for (int i = 1; i < AccN; i++)
+                sb.Append(i > 1 ? "," : "").Append(' ').Append(AccName[i]).Append(' ').Append(_savedAcc != null && !double.IsNaN(_savedAcc[i]) ? N0(_savedAcc[i]) : "-").Append("->").Append(N0(now[i]));
+            sb.Append(" | ").Append(_pdNote ?? "oczekujace udzialy band z zapisu: brak sekcji pd: (zapis sprzed 280 albo brak oczekujacych)");
+            sb.Append(" | POLEGLI dzis po wczytaniu: ").Append(_fallenFromSave ? "za cala dobe (sumy z konca ostatniej doby z zapisu)" : "od wczytania (zapis sprzed 280)");
+            sb.Append(" | baza reszty od 280: ").Append(_base280Day >= 0 ? "dnia " + _base280Day : "przy drugiej dobie sesji").Append('.');
+            Log.Info(sb.ToString());
         }
 
         /// <summary>Liczba ze znakiem (narodziny netto moga byc ujemne - przyrost naturalny E4/4 w wojnie).</summary>
@@ -426,9 +540,10 @@ namespace Armoury
         internal static void ResolveOrigin(string how)
         {
             try { EnsureFallHook(); } catch (Exception e) { OStumble("ResolveOrigin(A12 latka)", e); }     // recenzja A12 (1): latka upadku rodu - raz na proces, w kampanii (start sesji)
-            if (_pendSo != null || _pendJo != null) ResolveDicts(how);
+            if (_pendSo != null || _pendJo != null || _pendPd != null) ResolveDicts(how);
             // cache doby od razu po wczytaniu (hamulec poboru, plon, menu) - bez czekania na pierwsza dobe sesji
             try { if (_sown && OriginOn) { BuildViews(); FreeHands.Update(_view); } } catch (Exception e) { OStumble("ResolveOrigin(cache)", e); }
+            try { LoadLine280(); } catch (Exception e) { OStumble("ResolveOrigin(280 linia)", e); }     // 280: "Ksiega po wczytaniu (280)" - raz na wczytanie
         }
 
         private static void ResolveDicts(string how)
@@ -464,6 +579,36 @@ namespace Armoury
                 };
                 load(_pendSo, _mem, false);
                 load(_pendJo, _pris, true);
+                // 280 (U7): oczekujace udzialy band z zapisu -> _pending (pierwsze uzgodnienie skladu je zjada); partii nie ma - porzucone (nazwane, jak dotad)
+                if (!string.IsNullOrEmpty(_pendPd))
+                {
+                    int pdOk = 0, pdLost = 0; double pdMen = 0, pdLostMen = 0;
+                    foreach (var item in _pendPd.Split(','))
+                    {
+                        int eq = item.IndexOf('=');
+                        if (eq <= 0) continue;
+                        var sh = new Shares();
+                        foreach (var kv in item.Substring(eq + 1).Split(';'))
+                        {
+                            int c = kv.LastIndexOf(':');
+                            if (c <= 0) continue;
+                            double n; if (!double.TryParse(kv.Substring(c + 1), NumberStyles.Float, Inv, out n) || !(n > 0.0) || double.IsInfinity(n)) continue;
+                            string k = kv.Substring(0, c); if (k == "~") k = "";
+                            sh.Add(k, n);
+                        }
+                        if (!(sh.Total > Eps)) continue;
+                        MobileParty mp;
+                        if (byId.TryGetValue(item.Substring(0, eq), out mp) && mp != null && mp.Party != null)
+                        {
+                            Shares old;
+                            if (_pending.TryGetValue(mp, out old)) old.AddAll(sh); else _pending[mp] = sh;
+                            pdOk++; pdMen += sh.Total;
+                        }
+                        else { pdLost++; pdLostMen += sh.Total; _pendLost += sh.Total; }
+                    }
+                    _pdNote = "oczekujace udzialy band z zapisu " + N0(pdMen + pdLostMen) + " ludzi w " + (pdOk + pdLost) + " partiach (rozwiazane " + pdOk + ", porzucone " + pdLost
+                              + (pdLost > 0 ? " - " + N0(pdLostMen) + " ludzi do \"oczekujace udzialy band porzucone\"" : "") + ")";
+                }
                 _resolveFound = found; _resolveMissing = missing;
                 double pc = found + missing > 0 ? 100.0 * missing / (found + missing) : 0.0;
                 _resolveNote = how + ": z zapisu " + found + " slownikow (" + _mem.Count + " partii, " + _pris.Count + " lochow, w tym lochy osad " + dungeons + "), regionow " + _rg.Count
@@ -471,7 +616,7 @@ namespace Armoury
                 Log.Info("Pochodzenie (E4/7): " + _resolveNote + "; siew dnia " + _sowDay + ".");
             }
             catch (Exception e) { OStumble("ResolveOrigin", e); }
-            _pendSo = _pendJo = null;
+            _pendSo = _pendJo = null; _pendPd = null;
         }
 
         // ================================================================ pomocnicze
@@ -815,7 +960,8 @@ namespace Armoury
             {
                 foreach (var kv in s.M)
                 {
-                    if (kv.Key.Length == 0 || !(kv.Value > 0.0)) continue;
+                    if (!(kv.Value > 0.0)) continue;
+                    if (kv.Key.Length == 0) { _fallenNone += kv.Value; continue; }     // 280 (B5): polegli bez pochodzenia - licznik w zapisie (sw:)
                     var r = Rg(kv.Key);
                     r.Fallen += kv.Value; r.FallenMen += kv.Value;
                 }
@@ -833,6 +979,7 @@ namespace Armoury
             var home = mp.HomeSettlement;
             string k = RegKey(home != null ? OutlawLaw.RegionFor(home) : null);
             if (k.Length > 0) { var r = Rg(k); r.Fallen += dead; r.FallenMen += dead; }
+            else _fallenNone += dead;     // 280 (B5): tabory bez regionu wsi - polegli bez pochodzenia
             _deadCarts += dead;
         }
 
@@ -1270,7 +1417,8 @@ namespace Armoury
             try { Rg(regionId).Civil += n; } catch (Exception e) { OStumble("NoteCivilDead", e); }
         }
 
-        /// <summary>D2: przyrost naturalny wsi (E4/4, ludzie netto - moze byc ujemny) - K_m = ... - 0.27 x narodziny. Wola PopulationLaw.GrowthDaily (raz na dobe, kazda wies raz).</summary>
+        /// <summary>D2: przyrost naturalny wsi (E4/4, ludzie netto - moze byc ujemny) - K_m = ... - 0.27 x narodziny. 280 (B1): wola PopulationLaw.FloorFinalizer w ticku wsi
+        /// (prawdziwa zmiana hearth, kazdy tick); przy wylaczonym BirthsAtVillageTick - PopulationLaw.GrowthDaily (prognoza raz na dobe, kazda wies raz).</summary>
         internal static void NoteBorn(Village v, double men)
         {
             if (v == null || double.IsNaN(men) || double.IsInfinity(men) || men == 0.0 || !_sown) return;
@@ -1491,6 +1639,7 @@ namespace Armoury
                 }
                 _sown = true;
                 _sowDay = day;
+                _base280Day = day; _noneSinceDay = day; _fallenNone = 0; _lastFallenSum = _lastNone = double.NaN;     // 280: nowa kampania (siew) - baza reszty 0, polegli bez pochodzenia od siewu
                 // stan dnia siewu wedlug regionu (L_ref = dom + sluzba + jency; P R5, DOK krok 6 poprawka)
                 var now = RegionNow();
                 double lref = 0;
@@ -1817,7 +1966,10 @@ namespace Armoury
         /// <summary>U19: S z regionu (sluzba + jency u wroga) z cache doby - jedna definicja dla linii, hamulca, plonu, menu i PeopleLedger.</summary>
         internal static double UnderArms(Settlement region) { var r = ViewOf(region); return r != null ? r.S + r.J : 0.0; }
 
-        private static void BuildViews()
+        private static void BuildViews() { _view = ComputeViews(); }
+
+        /// <summary>Widoki regionow z tej chwili (bez zmiany cache _view - zapis 280 liczy nimi swiat i konta, nie ruszajac liczb gry).</summary>
+        private static Dictionary<string, RegionView> ComputeViews()
         {
             var now = RegionNow();
             var view = new Dictionary<string, RegionView>();
@@ -1856,7 +2008,7 @@ namespace Armoury
                 catch (Exception e) { OStumble("BuildViews(wsie)", e); }
                 view[kv.Key] = v;
             }
-            _view = view;
+            return view;
         }
 
         // ================================================================ doba
@@ -1867,13 +2019,16 @@ namespace Armoury
                 if (_sown) { _view = new Dictionary<string, RegionView>(); try { FreeHands.Update(null); } catch { } }
                 return;
             }
-            if (_pendSo != null || _pendJo != null) ResolveOrigin("pierwsza doba (bez OnSessionLaunched)");
+            if (_pendSo != null || _pendJo != null || _pendPd != null) ResolveOrigin("pierwsza doba (bez OnSessionLaunched)");
             EnsureSown(day);
             if (!_sown) return;
+            if (_noneSinceDay < 0) _noneSinceDay = day;     // 280 (B5): zapis sprzed 280 - licznik bez pochodzenia od pierwszej doby z 280 (wstecz sie nie da)
             if (_press != null) { double left = _press.Total; _press = null; PressUntaken(left); }   // R1-5: ekran lupu bez Done do konca doby - niewzieci (E4/7b: do DOM swojej wsi)
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             try { ReconcileDaily(); } catch (Exception e) { OStumble("ReconcileDaily", e); }
             try { BuildViews(); } catch (Exception e) { OStumble("BuildViews", e); }
+            _sessTicks++;
+            try { if (_base280Day < 0 && _sessTicks >= 2) SetBase280(day); } catch (Exception e) { OStumble("SetBase280", e); }     // 280 (6)
             try { FreeHands.Update(_view); } catch (Exception e) { OStumble("FreeHands.Update", e); }
             _lastMs = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
         }
@@ -1935,19 +2090,58 @@ namespace Armoury
                 bool off = Math.Abs(pc) > 0.1 && Math.Abs(kv.Value[0]) > 200.0;
                 if (worst == "-" || (off && !worstOff) || (off == worstOff && Math.Abs(pc) > Math.Abs(worstPc))) { worst = kv.Key; worstRest = kv.Value[0]; worstPc = pc; worstOff = off; }
             }
+            // 280 (U8): POLEGLI dzis z roznicy sum (od siewu + bez pochodzenia) wobec konca ostatniej doby - za cala dobe takze ponad wczytaniem (Fallen pisza tylko
+            // DieShares i DieCarts); bez sumy z zapisu (zapis sprzed 280, pierwsza doba) - licznik od wczytania jak dotad
+            double deadToday = double.IsNaN(_lastFallenSum) ? _dest[ODead] + _deadCarts : (fallen + _fallenNone) - _lastFallenSum;
+            double noneToday = double.IsNaN(_lastNone) ? double.NaN : _fallenNone - _lastNone;
             var sb = new StringBuilder(500);
             sb.Append(" | E4/7: konto SLUZBA ").Append(N0(sk)).Append(" + \"\" ").Append(N0(s - sk)).Append(", JENCY ").Append(N0(jk)).Append(" + \"\" ").Append(N0(j - jk))
-              .Append(", POLEGLI od siewu ").Append(N0(fallen)).Append(" (dzis ").Append(N0(_dest[ODead] + _deadCarts)).Append("), cywile od siewu ").Append(N0(civil))
+              .Append(", POLEGLI od siewu ").Append(N0(fallen)).Append(" (dzis ").Append(N0(deadToday)).Append(")")
+              .Append(", POLEGLI bez pochodzenia od dnia ").Append(_noneSinceDay).Append(' ').Append(N0(_fallenNone)).Append(" (dzis ").Append(double.IsNaN(noneToday) ? "-" : N0(noneToday)).Append(")")
+              .Append(", cywile od siewu ").Append(N0(civil))
               .Append(", narodziny netto od siewu ").Append(N0(born))
               .Append(" | pobor z DOM dzis ").Append(N0(levy)).Append(" ludzi / ").Append(H3d(levyH)).Append(" hearth (w tym ze stanu miast ").Append(N0(men[MLevyTown])).Append(")")
               .Append(", powroty z pochodzeniem +").Append(N0(back)).Append(" ludzi / ").Append(H3d(backH)).Append(" hearth (w tym do stanu miast ").Append(N0(men[MBackTown])).Append(")")
               .Append(" | rownanie krain: najgorsza kraina ").Append(worst).Append(" reszta ").Append(H3d(worstRest)).Append(" (").Append(worstPc.ToString("0.###", Inv)).Append("% ludzi krainy), swiat ").Append(H3d(world));
+            try { sb.Append(Since280Segment()); } catch (Exception e) { OStumble("OriginSegment(280)", e); }
             try { sb.Append(ArmsSegment()); } catch (Exception e) { OStumble("OriginSegment(E4/8)", e); }     // E4/8 (10.5): migracja R19 od siewu, w drodze
             try { sb.Append(CanonSegment()); } catch (Exception e) { OStumble("OriginSegment(E4/9)", e); }    // E4/9: NIEWOLNI, MUR, rownanie z T i W
             // recenzja fixC (1), tylko log: ludzie zywi swiata z definicji rownania krain (suma stanow regionow - te same skladniki co reszta v.Rest; SLUZBA bez
             // wedrowcow BK, ktorzy sa w drodze; tabory; NIEWOLNI, Mur i pula tylko z pochodzeniem) - jedna liczba dla progow E4/7 T11 i E4/5 S15 narzedzia
             sb.Append(" | ludzie zywi (rownanie krain: DOM + uchodzcy + SLUZBA + JENCY + pula + tabory + w drodze + WETERANI + NIEWOLNI + Mur, z pochodzeniem) ").Append(N0(alive));
+            // 280 (U8): pierwsza linia po wczytaniu - ktore liczniki "dzis" obejmuja cala dobe
+            if (_sessTicks == 1 && DayGate.Loaded)
+            {
+                double h = DayGate.HoursSinceSessionStart();
+                sb.Append(" | liczniki doby po wczytaniu: POLEGLI dzis ").Append(_fallenFromSave ? "za cala dobe (sumy od siewu z zapisu)" : "od wczytania (zapis sprzed 280)")
+                  .Append(", pozostale 'dzis' (pobor, powroty, ruch DOM, wejscia i wyjscia) od wczytania (").Append(h >= 0 ? h.ToString("0.0", Inv) : "?").Append(" h)");
+            }
             return sb.ToString();
+        }
+
+        /// <summary>280 (6): reszta rownania krain od zalozenia bazy (swiat i najgorsza kraina - ta sama regula progu co linia) i zamrozona reszta sprzed 280.</summary>
+        private static string Since280Segment()
+        {
+            if (_base280Day < 0) return " | od 280: baza przy nastepnej dobie";
+            var realms = new Dictionary<string, double[]>();
+            double world = 0, frozen = 0;
+            foreach (var v in Views())
+            {
+                RegRef r; double b = _rg.TryGetValue(v.Id, out r) ? r.Base280 : 0.0;
+                double[] a; string rk = v.Realm ?? "?";
+                if (!realms.TryGetValue(rk, out a)) { a = new double[2]; realms[rk] = a; }
+                a[0] += v.Rest - b; a[1] += v.Dom + v.S + v.J + v.Wy + v.U + v.Carts + v.Road + v.Vet + v.T + v.W + v.Rally;
+                world += v.Rest - b; frozen += b;
+            }
+            string worst = "-"; double wr = 0, wp = 0; bool wo = false;
+            foreach (var kv in realms)
+            {
+                double pc = kv.Value[1] > 0 ? 100.0 * kv.Value[0] / kv.Value[1] : 0.0;
+                bool off = Math.Abs(pc) > 0.1 && Math.Abs(kv.Value[0]) > 200.0;
+                if (worst == "-" || (off && !wo) || (off == wo && Math.Abs(pc) > Math.Abs(wp))) { worst = kv.Key; wr = kv.Value[0]; wp = pc; wo = off; }
+            }
+            return " | od 280 (dnia " + _base280Day + "): swiat " + H3d(world) + ", kraina najgorsza " + worst + ": reszta " + H3d(wr) + " (" + wp.ToString("0.###", Inv) + "% ludzi krainy)"
+                   + "; do 280 zamrozone " + H3d(frozen) + " (prognoza narodzin wsi przy wczytaniach, udzialy band bez zapisu)";
         }
 
         /// <summary>fixA (T6): do 3 regionow z najwiekszym odwrotem wsi do stanu miasta w dobie - " [nazwa N, ...]" albo "".</summary>
@@ -2065,6 +2259,13 @@ namespace Armoury
                 else _state0 = double.NaN;
             }
             catch (Exception e) { _state0 = double.NaN; OStumble("OriginEndDay", e); }
+            // 280 (U8): sumy poleglych z konca tej doby (takze bez logu) - "dzis" jutro i po wczytaniu (sw:)
+            try
+            {
+                if (_sown && OriginOn) { _lastFallenSum = FallenSum(); _lastNone = _fallenNone; }
+                else { _lastFallenSum = _lastNone = double.NaN; }
+            }
+            catch (Exception e) { _lastFallenSum = _lastNone = double.NaN; OStumble("OriginEndDay(280)", e); }
             _poolTrim = 0;
             OriginNewDay();
         }

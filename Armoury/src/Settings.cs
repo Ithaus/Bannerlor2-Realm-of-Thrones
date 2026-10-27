@@ -1441,6 +1441,13 @@ namespace Armoury
         public bool LevyFromVillages = true;               // a recruit leaves his village (1/k of a hearth, as any man who leaves it) or his town; a soldier from that land who comes home brings him back. Works only with People Origin Enabled and People Unit Enabled. Change it only when you start a new campaign
         // E4/7b (decyzja Jeffa 11.10 12:40): niewzieci z ekranu lupu poboru wymuszonego wracaja do DOM swojej wsi - PeopleBook.PressUntaken
         public bool PressUntakenGoHome = true;             // villagers you force into service but leave behind on the loot screen go back home to their village and its hearth instead of being lost to it
+        // 280 (DayGate.cs; Jeff 27.10 "tak napraw wszystko"): po wczytaniu gra startuje takt doby od uplynietego ulamka doby (Campaign.CreateCampaignEvents) - doba drugi raz
+        // albo pominieta (logi Jeffa: 108829, 108836 podwojne, 108986 brak). Wlaczony: takt doby na pore kanoniczna (start kampanii + k dob), pierwszy takt z numerem dnia
+        // ostatniej doby z zapisu pomijany. Wylaczony: gra jak dotad. Nowy klucz - Armoury.json Jeffa go nie ma.
+        public bool DailyTickOncePerDay = true;            // After loading a save the game restarts its daily tick at the wrong time of day, so a day could run twice or be skipped. On: the daily tick keeps the campaign's time of day. Off: game behaviour.
+        // 280 (PopulationLaw.FloorFinalizer): narodziny wsi do ksiegi ludzi (rg: Born, K_m wolnych rak) w ticku wsi - prawdziwa zmiana hearth minus milicja, podloga 10
+        // i powrot uchodzcow - zamiast prognozy na pelna dobe w linii "Ludzie: przyrost naturalny" (przy wczytaniu przesuwala reszte rownania krain). Nowy klucz.
+        public bool BirthsAtVillageTick = true;            // People ledger counts village births when the village really grows (daily village tick), not as a forecast at the mod's day.
         // A12 (rownanie krain, bieg dwuletni "przy zniknieciu partii" 9 581 ludzi, d130 921 przy zniknieciu rodu; 6-letni JeorMutinyEvent: 6 partii Strazy, 1 422 ludzi jednej doby): partia
         // rodu wyjeta z bitwy przy upadku rodu (DestroyClanAction - fabula ROT albo smierc ostatniego z rodu: partia w bitwie dostaje MapEventSide = null i niszczyciela z drugiej
         // strony; partie poza bitwa szly juz dotad droga R6 do DOM) - zywi ida ta sama droga co partia rozwiazana bez bitwy (bracia Strazy na Mur, reszta do DOM pochodzenia).

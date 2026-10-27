@@ -97,6 +97,7 @@ namespace Armoury
             _townSeeded = 0; _errTowns = false; _townStumbles = 0;
             lock (_gLock) { _gDay = int.MinValue; _gW.Clear(); _gWar.Clear(); }
             _gStumbles = 0; _floorStumbles = 0; _errGrowth = false; _errGrowthLog = false; _errFloor = false; _modelLogged = false;
+            ZeroBirths280(); _bForecast = double.NaN; _bSwitch = -1;     // 280 (B1): liczniki narodzin z ticku wsi i prognoza poprzedniej linii - od nowa w kampanii
         }
 
         /// <summary>A14 / G21 (audyt zapis 3, drobne2): kalibracja biegnie leniwie - w nowej kampanii w tickach startowych OnNewGameCreated, PRZED McmSettings.Apply
@@ -786,8 +787,22 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ E4/4 (R17, U15d): podloga 10 hearth bez ludzi z niczego
-        /// <summary>Stan wsi sprzed ticku gry - tylko dla wsi przy samym dnie (ponizej FloorProbe).</summary>
-        internal sealed class FloorState { public Village V; public float H0, R; }
+        /// <summary>Stan wsi sprzed ticku gry: wies przy samym dnie (ponizej FloorProbe) - wynik modelu R; 280 (B1) przy BirthsAtVillageTick - kazda wies: hearth przed tickiem
+        /// i powrot uchodzcow tej chwili (Births).</summary>
+        internal sealed class FloorState { public Village V; public float H0, R, Ref; public bool HasR, Births; }
+
+        // ------------------------------------------------------------ 280 (B1): narodziny wsi do ksiegi ludzi w ticku wsi (nie prognoza linii doby)
+        // Dowod (Jeff 27.10, logi 26/27.10): prognoza na pelna dobe (GrowthDaily -> NoteBorn) ksiegowana raz na dobe moda, a hearth rosnie w ticku wsi gry (zapisywany ticker
+        // osad); po wczytaniu takt doby moda zmienia faze (Campaign.CreateCampaignEvents) - reszta "rownanie krain ... swiat" skakala o (W - 1 doba) x narodziny dobowe przy
+        // kazdym wczytaniu (-707..+112; -1582 -> -5365 w 234 dobach Jeffa). Tu: prawdziwa zmiana hearth wsi w ticku minus milicja ksiegi (ArmsFromPeople.PeekTickHearth),
+        // podloga 10 (FloorFromPool) i powrot uchodzcow (ScorchedEarth.RefugeeReturn - ta sama regula i dane, z ktorych model liczy ten tick) - razy k osady.
+        // Liczby wylacznie z istniejacych modeli (k osady, RefugeeFloorHearth, FloorProbe) - bez nowej stalej. Wsie powtorzone w Settlement.All - tyle razy, ile rosna.
+        private static double _bA, _bR, _bF, _bS;     // od poprzedniej linii "Ludzie: przyrost naturalny": narodziny w ludziach, uchodzcy x k, podloga x k, tick razem x k
+        private static int _bT, _bNoK;                 // ticki wsi z ksiegowaniem; ticki bez przelicznika k (bez ksiegi)
+        private static double _bForecast = double.NaN; // prognoza poprzedniej linii (natPeople) - NaN w pierwszej linii sesji
+        private static int _bSwitch = -1;              // stan wylacznika przy poprzedniej linii (1/0; -1 = pierwsza linia) - przelaczenie w ciagu doby w linii
+        internal static bool BirthsLive { get { var s = Settings.Current; return s != null && s.BirthsAtVillageTick && GrowthOn; } }
+        private static void ZeroBirths280() { _bA = _bR = _bF = _bS = 0; _bT = _bNoK = 0; }
 
         /// <summary>Prefiks void Priority.First na Village.DailyTick (przed prefiksem BK, ktory zastepuje tick): tylko wies ponizej FloorProbe hearth - zapamietuje
         /// hearth i wynik modelu (czysty rachunek; okno W1 Measure40 na chwile wylaczone, zeby nie liczylo blizny drugi raz). Niczego nie zmienia.</summary>
@@ -798,14 +813,27 @@ namespace Armoury
             {
                 if (!GrowthOn || __instance == null || Campaign.Current == null) return;
                 float h0 = __instance.Hearth;
-                if (!(h0 < FloorProbe)) return;
-                bool was = Measure40.InVillageTick;
-                float r;
-                Measure40.InVillageTick = false;
-                try { r = Campaign.Current.Models.SettlementProsperityModel.CalculateHearthChange(__instance, false).ResultNumber; }
-                finally { Measure40.InVillageTick = was; _gLast = default(Growth); _gLastVillage = null; }
-                if (float.IsNaN(r) || float.IsInfinity(r)) return;
-                __state = new FloorState { V = __instance, H0 = h0, R = r };
+                bool births = BirthsLive;                       // 280 (B1): kazda wies - narodziny w finalizerze
+                bool probe = h0 < FloorProbe;
+                if (!probe && !births) return;
+                var st = new FloorState { V = __instance, H0 = h0, Births = births };
+                if (births)
+                {
+                    // ta sama regula i te same dane co model w tym ticku (hearth jeszcze H0 - BK dopisuje dopiero w swoim prefiksie, po naszym First)
+                    try { st.Ref = ScorchedEarth.RefugeeReturn(__instance); } catch { st.Ref = 0f; }
+                    if (float.IsNaN(st.Ref) || float.IsInfinity(st.Ref)) st.Ref = 0f;
+                }
+                if (probe)
+                {
+                    bool was = Measure40.InVillageTick;
+                    float r;
+                    Measure40.InVillageTick = false;
+                    try { r = Campaign.Current.Models.SettlementProsperityModel.CalculateHearthChange(__instance, false).ResultNumber; }
+                    finally { Measure40.InVillageTick = was; _gLast = default(Growth); _gLastVillage = null; }
+                    if (!float.IsNaN(r) && !float.IsInfinity(r)) { st.R = r; st.HasR = true; }
+                }
+                if (!st.HasR && !births) return;
+                __state = st;
             }
             catch (Exception e)
             {
@@ -820,10 +848,31 @@ namespace Armoury
             if (__state == null) return __exception;
             try
             {
-                float add = __state.V.Hearth - (__state.H0 + __state.R);
                 // E4/8 (recenzja R1-5/R2-6): hearth przesuniety przez ksiege w postfiksie milicji tej wsi (powrot milicji do DOM +m/k, pobor milicji -m/k) to nie podloga gry
-                try { add -= (float)ArmsFromPeople.PeekTickHearth(__state.V); } catch { }
-                if (add > 0.0001f && !float.IsInfinity(add)) PeopleBook.FloorFromPool(__state.V, add);
+                float mil = 0f;
+                try { mil = (float)ArmsFromPeople.PeekTickHearth(__state.V); } catch { }
+                float floorAdd = 0f;
+                if (__state.HasR)
+                {
+                    float add = __state.V.Hearth - (__state.H0 + __state.R) - mil;
+                    if (add > 0.0001f && !float.IsInfinity(add)) { PeopleBook.FloorFromPool(__state.V, add); floorAdd = add; }
+                }
+                // 280 (B1): narodziny netto tego ticku = zmiana hearth - milicja ksiegi - podloga 10 - powrot uchodzcow (ten sam podzial co prognoza: gain - backGain)
+                if (__state.Births)
+                {
+                    float dH = __state.V.Hearth - __state.H0 - mil;
+                    if (!float.IsNaN(dH) && !float.IsInfinity(dH))
+                    {
+                        float k = KFor(__state.V.Settlement);
+                        if (k > 0f && !float.IsInfinity(k))
+                        {
+                            double nat = ((double)dH - floorAdd - __state.Ref) * k;
+                            PeopleBook.NoteBorn(__state.V, nat);
+                            _bA += nat; _bR += (double)__state.Ref * k; _bF += (double)floorAdd * k; _bS += (double)dH * k; _bT++;
+                        }
+                        else _bNoK++;
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -925,6 +974,7 @@ namespace Armoury
                 if (s == null) return;
                 bool on = GrowthOn;
                 int days = YearDays();
+                bool birthsTick = BirthsLive;     // 280 (B1)
 
                 if (!_modelLogged)
                 {
@@ -985,7 +1035,9 @@ namespace Armoury
                         RealmGrowth rg; string c = PeopleBook.CultureAtCalibration(st);
                         if (!realms.TryGetValue(c, out rg)) realms[c] = rg = new RealmGrowth();
                         rg.Villages++; rg.People += weight; rg.Rate += weight * rate; rg.Gain += gain - backGain;
-                        if (g.Set && k > 0f) PeopleBook.NoteBorn(v, gain - backGain);      // E4/7 (D2): przyrost naturalny netto wedlug regionu od siewu - K_m wolnych rak (nie rzuca)
+                        // E4/7 (D2): przyrost naturalny netto wedlug regionu od siewu - K_m wolnych rak (nie rzuca); 280 (B1): przy BirthsAtVillageTick ksieguje tick wsi
+                        // (FloorFinalizer) - tu zostaje tylko prognoza w logu
+                        if (g.Set && k > 0f && !birthsTick) PeopleBook.NoteBorn(v, gain - backGain);
                         if (!g.Set) continue;                                       // przyrost wylaczony: tylko suma wyniku gry
                         rates.Add(g.G); wRate += weight * g.G;
                         // pokoj / wojna (ta sama regula wojny co g); wies spalona, lupiona albo pod przymusem (g 0) - wedle wojny swojego regionu
@@ -1117,10 +1169,31 @@ namespace Armoury
                 int st0 = _gStumbles, sf = _floorStumbles, stT = _townStumbles; _gStumbles = 0; _floorStumbles = 0; _townStumbles = 0;
                 if (st0 + stumbles + sf + stT > 0)
                     sb.Append(" | potkniecia: rachunek wsi ").Append(st0).Append(", linia dobowa ").Append(stumbles).Append(", podloga ").Append(sf).Append(", miasta ").Append(stT);
+                // 280 (B1): narodziny wsi zaksiegowane w tickach od poprzedniej linii wobec prognozy poprzedniej linii (ticki wsi ida przez cala dobe po niej)
+                try { sb.Append(Births280Note(on ? gainPeople - backPeople : double.NaN, birthsTick)); } catch (Exception e) { _floorStumbles++; if (!_errFloor) { _errFloor = true; Log.Error("PopulationLaw.Births280Note", e); } }
                 sb.Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Log.Error("PopulationLaw.GrowthDaily", e); }
+        }
+
+        /// <summary>280 (B1): dopisek linii "Ludzie: przyrost naturalny" - narodziny z tickow wsi od poprzedniej linii, prognoza poprzedniej linii, uchodzcy, podloga;
+        /// zeruje liczniki i zapamietuje dzisiejsza prognoze (natPeople; NaN - przyrost wylaczony).</summary>
+        private static string Births280Note(double forecastToday, bool birthsTick)
+        {
+            var sb = new StringBuilder(400);
+            sb.Append(" | ksiega (280): narodziny wsi z tickow od poprzedniej linii ").Append(Sg(_bA, "0")).Append(" ludzi w ").Append(_bT).Append(" tickach (prognoza poprzedniej doby ")
+              .Append(double.IsNaN(_bForecast) ? "- (pierwsza linia sesji)" : Sg(_bForecast, "0") + ", roznica " + Sg(_bA - _bForecast, "0")).Append(")")
+              .Append(", powrot uchodzcow z niczego ").Append(Sg(_bR, "0")).Append(", podloga 10 ").Append(Sg(_bF, "0")).Append(", tick wsi razem ").Append(Sg(_bS, "0"));
+            if (_bNoK > 0) sb.Append(", tickow bez przelicznika k (bez ksiegi) ").Append(_bNoK);
+            int sw = birthsTick ? 1 : 0;
+            sb.Append(" | wylacznik Births At Village Tick ").Append(birthsTick ? "tak" : "nie");
+            if (_bSwitch >= 0 && _bSwitch != sw) sb.Append(" (PRZELACZONY od poprzedniej linii - ta doba czesciowo podwojnie albo bez ksiegowania)");
+            if (!birthsTick) sb.Append(" (ksiega bierze prognoze tej linii - stara droga)");
+            _bSwitch = sw;
+            _bForecast = forecastToday;
+            ZeroBirths280();
+            return sb.ToString();
         }
 
         private static float DailyRent(float people)

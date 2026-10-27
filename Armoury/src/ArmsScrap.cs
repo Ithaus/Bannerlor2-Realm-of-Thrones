@@ -72,7 +72,7 @@ namespace Armoury
         {
             int day = (int)CampaignTime.Now.ToDays;
             if (_pending != null) { try { ResolvePending("doba przed startem sesji"); } catch (Exception e) { Stumble("ResolvePending(doba)", e); } }
-            if (day == _lastDay) return;   // 174b.6: _lastDay z zapisu - pierwsza doba po wczytaniu moze miec ten sam numer co ostatnia przed zapisem (Campaign.CreateCampaignEvents)
+            if (day == _lastDay) return;   // 174b.6: _lastDay z zapisu - pierwsza doba po wczytaniu moze miec ten sam numer co ostatnia przed zapisem (Campaign.CreateCampaignEvents); od 280 przyczyne usuwa DayGate (wartownik zostaje - przy wylaczonym DailyTickOncePerDay)
             _lastDay = day;
             // srednia zakupow (ok. 30 dob); recenzja 174: w pierwszych 30 dobach sesji srednia arytmetyczna dni pomiaru (krok 1/n), nie EMA od zera -
             // EMA 1/30 po 30 dobach rozgrzewki miala ok. 63% prawdziwej wartosci, a skup bral wiecej niz "ponad rok popytu"
@@ -270,6 +270,19 @@ namespace Armoury
             _ema.Clear(); _today.Clear(); _acc.Clear(); _oreAcc.Clear(); _keys.Clear(); _days = 0; _lastDay = -1;
             _pending = string.IsNullOrEmpty(s) ? null : s;
             _loaded = _pending != null ? 2 : 1;
+        }
+
+        /// <summary>280 (DayGate, zapis sprzed 280): ostatnia doba moda z zapisu - po ResolvePending z pola, przed nim z naglowka odlozonego napisu "1|doby|ostatnia~".
+        /// -1 = brak (nowa gra, zapis bez klucza albo nieczytelny). Tylko odczyt.</summary>
+        internal static int SavedLastDay()
+        {
+            if (_loaded == 3) return _lastDay;
+            var s = _pending;
+            if (_loaded != 2 || string.IsNullOrEmpty(s)) return -1;
+            int t = s.IndexOf('~');
+            var head = (t >= 0 ? s.Substring(0, t) : s).Split('|');
+            int d;
+            return head.Length >= 3 && head[0] == "1" && int.TryParse(head[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out d) ? d : -1;
         }
 
         internal static void ImportFailed()

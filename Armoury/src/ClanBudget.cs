@@ -1641,7 +1641,8 @@ namespace Armoury
         }
 
         /// <summary>Drugi punkt powrotu do DOM (R0, U2): zwolnieni 166, przepelnienie W4c, rycerze 179 - do ludnosci BK wsi (sklad BK) i do ksiegi ludzi
-        /// (PeopleBook: SLUZBA -> DOM tylko liczona do E4/7 - werbunek jeszcze nie zdejmuje rekruta z DOM, wiec hearth bylby ludzmi z niczego).</summary>
+        /// (PeopleBook: SLUZBA -> DOM z pochodzeniem do hearth regionu - od E4/7 LevyLive rekrut zszedl z DOM przy werbunku; bez pochodzenia tylko liczona - przy werbunku
+        /// nikogo z DOM nie zdjeto, wiec hearth bylby ludzmi z niczego; 280).</summary>
         private static bool ToVillage(Settlement v, CharacterObject ch, int n, int cause, PeopleBook.Shares org = null, MobileParty party = null)
         {
             // E4/10 (W1, R16): plan weteranow PRZED ludnoscia BK wsi (bez zapisu stanu): t z n stanie w karczmie najblizszego miasta (1/3 uprawnionych od tieru
