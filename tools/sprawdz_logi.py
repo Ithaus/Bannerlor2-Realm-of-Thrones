@@ -75293,7 +75293,10 @@ H284_RE1 = re.compile(
     r"BK na stracie z wyjscia (?P<bkx>\d+), surowce masowe (?P<bun>\d+) szt\. \(w tym rozladunek (?P<bug>\d+)\) \| gabka BK cofnieta (?P<sp>\d+) szt\. \(zwrot (?P<spg>\d+) zl\) \| "
     r"karawany gracza wedlug drogi \(utarg/zysk\): (?P<pl>[^|]*) \| latki: BK sprzedaz (?P<w1>TAK|NIE), gabka (?P<w2>TAK|NIE), werbunek (?P<w3>TAK|NIE) \| "
     r"(?:recenzja 284: wizyt z podloga >= kapital \(bez reguly kapitalu\) (?P<noroom>\d+), juki przeliczone po wczytaniu (?P<hlazy>\d+), "
-    r"wstrzymane zdjete z dostaw P1 (?P<p1ph>\d+) szt\. \| )?czas (?P<ms>[\d.]+) ms \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
+    r"wstrzymane zdjete z dostaw P1 (?P<p1ph>\d+) szt\. \| )?"
+    r"(?:poprawka 132a: sprzedaz gry ponizej kosztu wstrzymana (?P<vann>\d+) szt\. \(koszt (?P<vanc>\d+) zl\), gra na stracie z wyjscia (?P<vanx>\d+), "
+    r"latka gry (?P<w4>TAK|NIE), dlugo w jukach przy rynku z zyskiem - czeka (?P<agew>\d+) \| )?"
+    r"czas (?P<ms>[\d.]+) ms \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
 H284_PATH = re.compile(r"(inne|T1|BK|surowce masowe - brak miasta|surowce masowe - rozladunek ponad brak|kontrakt 174) (\d+)/(\d+)/(\d+)/(\d+)/(-?\d+) \((\d+)/(\d+)/(\d+)\)")
 H284_RE2 = re.compile(
     r"^Przeplyw towarow karawan \(284\): dzien (?P<d>\d+) \| klucz kupno wedlug sprzedazy (?P<k>TAK|NIE), dob pomiaru (?P<days>\d+) \(bramka od 3\) \| "
@@ -75337,7 +75340,8 @@ H284_TEST = {
            "(w tym rozladunek 1) | gabka BK cofnieta 5 szt. (zwrot 40 zl) | karawany gracza wedlug drogi (utarg/zysk): inne 0/0, T1 300/40, BK 120/10, "
            "surowce masowe - brak miasta 0/0, surowce masowe - rozladunek ponad brak 0/0, kontrakt 174 0/0 | latki: BK sprzedaz TAK, gabka TAK, werbunek TAK | "
            "recenzja 284: wizyt z podloga >= kapital (bez reguly kapitalu) 0, juki przeliczone po wczytaniu 1, wstrzymane zdjete z dostaw P1 12 szt. | "
-           "czas 0.61 ms | potkniecia {st} (sesja {st})."),
+           "poprawka 132a: sprzedaz gry ponizej kosztu wstrzymana 41 szt. (koszt 5200 zl), gra na stracie z wyjscia 7, latka gry TAK, "
+           "dlugo w jukach przy rynku z zyskiem - czeka 19 | czas 0.61 ms | potkniecia {st} (sesja {st})."),
     "l2": ("Przeplyw towarow karawan (284): dzien {d} | klucz kupno wedlug sprzedazy TAK, dob pomiaru {days} (bramka od 3) | kategorii 3, z kupnem stoi {shut} | "
            "w jukach razem {held} szt. (koszt 412000 zl), sprzedaz 14 dob 140.0/d | wedlug kategorii (w jukach / sprzedaz 14 dob / prog / stan): {rows}."),
     "l3": ("Wsad warsztatow (284): dzien {d} | klucz Town Material Order Workshop Inputs TAK, rowny zapas dni wszystkich surowcow TAK | cykle warsztatow towarowych bez wsadu "
@@ -75378,7 +75382,15 @@ def h284_selftest():
     m = H284_RE1.match(T["l1"].format(d=109010, paths=paths, real=1, trade=1, prof=1, med=1, sum=1, st=0))
     if not m or (m.group("noroom"), m.group("hlazy"), m.group("p1ph")) != ("0", "1", "12"):
         errs.append("linia 1: pola recenzji 284")
-    old = T["l1"].replace("recenzja 284: wizyt z podloga >= kapital (bez reguly kapitalu) 0, juki przeliczone po wczytaniu 1, wstrzymane zdjete z dostaw P1 12 szt. | ", "")
+    s132 = ("poprawka 132a: sprzedaz gry ponizej kosztu wstrzymana 41 szt. (koszt 5200 zl), gra na stracie z wyjscia 7, latka gry TAK, "
+            "dlugo w jukach przy rynku z zyskiem - czeka 19 | ")
+    m = H284_RE1.match(T["l1"].format(d=109010, paths=paths, real=1, trade=1, prof=1, med=1, sum=1, st=0))
+    if not m or (m.group("vann"), m.group("vanc"), m.group("vanx"), m.group("w4"), m.group("agew")) != ("41", "5200", "7", "TAK", "19"):
+        errs.append("linia 1: pola poprawki 132a")
+    m = H284_RE1.match(T["l1"].replace(s132, "").format(d=109010, paths=paths, real=1, trade=1, prof=1, med=1, sum=1, st=0))
+    if not m or m.group("vann") is not None or m.group("p1ph") != "12":
+        errs.append("linia 1 bez pol poprawki 132a (build 284 autotestu 132a) nierozpoznana")
+    old = T["l1"].replace(s132, "").replace("recenzja 284: wizyt z podloga >= kapital (bez reguly kapitalu) 0, juki przeliczone po wczytaniu 1, wstrzymane zdjete z dostaw P1 12 szt. | ", "")
     m = H284_RE1.match(old.format(d=109010, paths=paths, real=1, trade=1, prof=1, med=1, sum=1, st=0))
     if not m or m.group("noroom") is not None:
         errs.append("linia 1 bez pol recenzji (build 284 przed recenzja) nierozpoznana")
@@ -75485,7 +75497,7 @@ def h284_rows(rep, D):
     span = list(range(days[0], days[-1] + 1))
     miss = [d for d in span if d not in L1 or d not in L2 or d not in L3 or d not in L4]
     stum = sum(int(L1[d]["st"]) for d in days) + sum(int(L3[d]["st"]) for d in L3)
-    wired = all(L1[d]["w1"] == "TAK" and L1[d]["w2"] == "TAK" and L1[d]["w3"] == "TAK" for d in days) and all(L3[d]["w"] == "TAK" for d in L3)
+    wired = all(L1[d]["w1"] == "TAK" and L1[d]["w2"] == "TAK" and L1[d]["w3"] == "TAK" and L1[d].get("w4") in (None, "TAK") for d in days) and all(L3[d]["w"] == "TAK" for d in L3)
     ok0 = not miss and D["bad"] == 0 and stum == 0 and D["err"] == 0 and wired
     rep.add("H284-0: linie 284 co dobe, potkniecia 0, latki TAK, ERROR 0",
             f"dob {len(span)} ({span[0]}-{span[-1]}), bez kompletu linii {len(miss)}{' ' + str(miss[:5]) if miss else ''}, nierozpoznanych {D['bad']}, potkniecia {stum}, "
@@ -75596,7 +75608,9 @@ def h284_rows(rep, D):
     rep.add("H284-8: INFO", f"doba {days[0]}: zysk {a['real']}, mediana {a['med']}, odrzucone przesyt/kapital/zold/bez zysku/jedzenie {a['rg']}/{a['rc']}/{a['rw']}/{a['rn']}/{a['rf']}; "
             f"doba {days[-1]}: zysk {z['real']}, mediana {z['med']}, z handlem {z['trade']}, z zyskiem {z['prof']}, BK wstrzymane {z['bkn']} szt., gabka {z['sp']} szt., "
             f"recenzja: podloga >= kapital {z.get('noroom') or '-'}, juki po wczytaniu {sum(int(L1[d].get('hlazy') or 0) for d in days)}, "
-            f"zdjete z P1 {z.get('p1ph') or '-'} szt.; drogi [{z['paths'][:300]}]; F: {('ponizej zoldu ' + f4['below'] + ' z ' + f4['n'] + ', pominelaby ' + f4['would']) if f4 else '-'}", "INFO", None)
+            f"zdjete z P1 {z.get('p1ph') or '-'} szt.; 132a: sprzedaz gry wstrzymana {sum(int(L1[d].get('vann') or 0) for d in days)} szt., gra na stracie z wyjscia "
+            f"{sum(int(L1[d].get('vanx') or 0) for d in days)}, dlugo w jukach czeka {sum(int(L1[d].get('agew') or 0) for d in days)} (pole {'jest' if z.get('w4') else 'brak - build sprzed 132a'}); "
+            f"drogi [{z['paths'][:300]}]; F: {('ponizej zoldu ' + f4['below'] + ' z ' + f4['n'] + ', pominelaby ' + f4['would']) if f4 else '-'}", "INFO", None)
 
 
 def h284_synth():

@@ -49,6 +49,10 @@ namespace Armoury
         /// <summary>Droga sprzedazy - ustawiaja wolajacy wokol SellItemsAction (T1, CaravanBulk, MaterialOrders.Deliver) i prefiks BK SellGoods; 0 - inne.</summary>
         internal static int Path;
         private static int _bkSelling;
+        // poprawka 132a: sprzedaz gry (CaravansCampaignBehavior.SellGoods - wjazd i wyjazd karawany; BK wylacza tylko HourlyTickParty i DoInitialTradeRuns) - droga "inne"
+        private static int _vanSelling, _vanExit, _ageWait;
+        private static long _vanHeldN, _vanHeldC;
+        private static bool _wVan;
 
         // ------------------------------------------------------------ pomiar (zapis arm_cs284)
         private static readonly Dictionary<ItemCategory, int> _soldToday = new Dictionary<ItemCategory, int>(), _soldLast = new Dictionary<ItemCategory, int>();
@@ -81,7 +85,7 @@ namespace Armoury
             _bkWithheld.Clear(); _bkWithheldMp = null;
             _impOk = _impBad = 0; _impHad = _impLogged = false;
             _acc.Clear(); _sellIdx.Clear(); _sellDay = -1;
-            Path = 0; _bkSelling = 0; _b.Mp = null;
+            Path = 0; _bkSelling = 0; _vanSelling = 0; _b.Mp = null;
             _stumbleSess = 0; _err.Clear();
             ZeroDay();
         }
@@ -93,6 +97,7 @@ namespace Armoury
             _rGate = _rCap = _rWage = _rGain = _rFood = _skipExempt = _buyVisits = _bkExit = _bulkHeldGlut = _stumbles = _fCalls = _fWould = _fSkip = 0;
             _bkHeldN = _bkHeldC = _bulkHeldN = _spongeN = _spongeG = _ticks = 0;
             _noRoom = _heldLazy = 0; _p1Phantom = 0;
+            _vanExit = _ageWait = 0; _vanHeldN = _vanHeldC = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -351,6 +356,12 @@ namespace Armoury
         private static readonly Dictionary<ItemCategory, float> _sellIdx = new Dictionary<ItemCategory, float>();
         private static int _sellDay = -1;
 
+        /// <summary>Poprawka 132a (CaravanGoods.AgeMarket): mediana indeksu miast placacych za kategorie co najmniej srednia - pamiec doby jak SellIdx.</summary>
+        internal static float SellIdxOf(ItemCategory c) { try { return c != null ? SellIdx(c) : 0f; } catch (Exception e) { Stumble("SellIdxOf", e); return 0f; } }
+
+        /// <summary>Poprawka 132a: towar > 30 dob nie poszedl na strate, bo rynek z zyskiem istnieje (CaravanGoods.AgeMarket) - licznik doby.</summary>
+        internal static void NoteAgeWait() { _ageWait++; }
+
         private static float SellIdx(ItemCategory c)
         {
             int d = (int)CampaignTime.Now.ToDays;
@@ -382,12 +393,20 @@ namespace Armoury
         }
         public static Exception SellGoodsFin(Exception __exception) { if (_bkSelling > 0) _bkSelling--; if (_bkSelling == 0) Path = PathOther; return __exception; }
 
-        /// <summary>Prefiks SellItemsAction.ApplyInternal (Priority.First, tylko w BK SellGoods): karawana sprzedaje miastu towar handlowy - liczba sztuk przycieta do tylu,
+        /// <summary>Poprawka 132a: sprzedaz gry CaravansCampaignBehavior.SellGoods (wjazd do miasta i zrzut wagi przy wyjezdzie) - ta sama straz "nie ponizej kosztu"
+        /// co BK SellGoods (SellGuardPrefix), droga sprzedazy zostaje "inne". Dowod (132a, 30 dob): droga "inne" 5 925 szt. za 1.54 mln, zysk -599 tys. zl; ponizej
+        /// kosztu 3 779 szt. za 1.31 mln przy koszcie 1.96 mln - gra sprzedaje wedlug swojego indeksu (priceIndexSellLimit 1.1), bez kosztu zakupu. Lista transakcji gry
+        /// (OnCaravanTransactionCompleted) ma liczbe sprzed przyciecia - TakeWithheld jak w BK.</summary>
+        public static void VanSellPre() { if (_vanSelling <= 0 && _bkSelling <= 0) { _bkWithheld.Clear(); _bkWithheldMp = null; } _vanSelling++; }
+        public static Exception VanSellFin(Exception __exception) { if (_vanSelling > 0) _vanSelling--; return __exception; }
+
+        /// <summary>Prefiks SellItemsAction.ApplyInternal (Priority.First, tylko w BK SellGoods i - poprawka 132a - w SellGoods gry): karawana sprzedaje miastu towar handlowy - liczba sztuk przycieta do tylu,
         /// ile idzie po cenie po mycie nie nizszej niz koszt sztuki (0 - nic nie schodzi, gra nie przenosi zlota). Wyjscia na stracie T1 (rozwiazanie, brak na zold, juki ponad
         /// udzwig - takze toLoseWeight BK, jedzenie > 7 dob, towar > 30 dob) - bez zmian.</summary>
         public static void SellGuardPrefix(PartyBase __0, PartyBase __1, ItemRosterElement __2, ref int __3)
         {
-            if (_bkSelling <= 0 || __3 <= 0) return;
+            if ((_bkSelling <= 0 && _vanSelling <= 0) || __3 <= 0) return;   // poprawka 132a: takze sprzedaz gry (VanSellPre)
+            bool bk = _bkSelling > 0;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -399,13 +418,14 @@ namespace Armoury
                 if (it == null || !it.IsTradeGood || it.HasHorseComponent || it.ItemCategory == null || it.ItemCategory == DefaultItemCategories.PackAnimal) return;
                 if (!CaravanBulk.TradesForT1(mp) || MaterialOrders.HasContract(mp) || CaravanBulk.HasOrders(mp)) return;
                 if (CaravanBulk.Owns(it) && CaravanGoods.CostEstimated(mp, it)) return;   // surowiec masowy z kosztem z oszacowania - bez progu (jak CaravanBulk.Sell)
-                if (CaravanGoods.LossReason(mp, it) != 0) { _bkExit++; return; }
+                if (CaravanGoods.LossReason(mp, it, __1.Settlement) != 0) { if (bk) _bkExit++; else _vanExit++; return; }
                 double unit = CaravanGoods.UnitCost(mp, it);
                 if (!(unit > 0.0)) return;
                 int k = CaravanGoods.MaxAtCost(__1.Settlement.Town, __1.Settlement, mp, __2.EquipmentElement, __3, unit);
                 if (k < __3)
                 {
-                    _bkHeldN += __3 - k; _bkHeldC += (long)Math.Round((__3 - k) * unit);
+                    if (bk) { _bkHeldN += __3 - k; _bkHeldC += (long)Math.Round((__3 - k) * unit); }
+                    else { _vanHeldN += __3 - k; _vanHeldC += (long)Math.Round((__3 - k) * unit); }
                     if (!ReferenceEquals(_bkWithheldMp, mp)) { _bkWithheld.Clear(); _bkWithheldMp = mp; }
                     int w0; _bkWithheld.TryGetValue(__2.EquipmentElement, out w0);
                     _bkWithheld[__2.EquipmentElement] = w0 + (__3 - Math.Max(0, k));
@@ -565,6 +585,14 @@ namespace Armoury
                     _wGuard = true;
                 }
                 parts.Add("BK SellGoods + SellItemsAction.ApplyInternal (nie ponizej kosztu) " + (_wSell && _wGuard ? "wpiete" : "NIE (brak metody BK albo inna sygnatura)"));
+                // poprawka 132a: sprzedaz gry przy wjezdzie/wyjezdzie karawany (CaravansCampaignBehavior.SellGoods, prywatna) - ta sama straz kosztu
+                var van = _wGuard ? AccessTools.DeclaredMethod(typeof(CaravansCampaignBehavior), "SellGoods", new[] { typeof(MobileParty), typeof(Town), typeof(float), typeof(bool) }) : null;
+                if (van != null)
+                {
+                    h.Patch(van, prefix: new HarmonyMethod(typeof(CaravanTrade284), nameof(VanSellPre)), finalizer: new HarmonyMethod(typeof(CaravanTrade284), nameof(VanSellFin)));
+                    _wVan = true;
+                }
+                parts.Add("sprzedaz gry CaravansCampaignBehavior.SellGoods (nie ponizej kosztu, poprawka 132a) " + (_wVan ? "wpieta" : "NIE"));
                 var bkp = AccessTools.TypeByName("BannerKings.Behaviours.BKPartyBehavior");
                 var left = bkp != null ? AccessTools.DeclaredMethod(bkp, "OnSettlementLeft", new[] { typeof(MobileParty), typeof(Settlement) }) : null;
                 if (left != null)
@@ -676,6 +704,8 @@ namespace Armoury
                 sb.Append(" | latki: BK sprzedaz ").Append(YN(_wSell && _wGuard)).Append(", gabka ").Append(YN(_wLeft)).Append(", werbunek ").Append(YN(_wSize))
                   .Append(" | recenzja 284: wizyt z podloga >= kapital (bez reguly kapitalu) ").Append(_noRoom).Append(", juki przeliczone po wczytaniu ").Append(_heldLazy)
                   .Append(", wstrzymane zdjete z dostaw P1 ").Append(_p1Phantom).Append(" szt.")
+                  .Append(" | poprawka 132a: sprzedaz gry ponizej kosztu wstrzymana ").Append(_vanHeldN).Append(" szt. (koszt ").Append(_vanHeldC).Append(" zl), gra na stracie z wyjscia ")
+                  .Append(_vanExit).Append(", latka gry ").Append(YN(_wVan)).Append(", dlugo w jukach przy rynku z zyskiem - czeka ").Append(_ageWait)
                   .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
                 Log.Info(sb.ToString());
 
