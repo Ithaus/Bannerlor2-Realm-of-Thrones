@@ -1,5 +1,18 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 00:00 CET - 132a: stabilnie, ale 283 i 284 NIE DZIALAJA jak trzeba - 132 NIE WGRANE; poprawki 283b/284b w toku; TYDZIEN 96%
+- 132a (n161 e714ccca, Armoury 6b2ef43e): bitwaN 7 bitew + probyN 30 dob kod 0, zapisy Jeffa nietkniete, ERROR 0. Grupy: m113\wyniki\grupy-132a\.
+  UWAGA: w logi\132a-probyN lezy tez stary log z 25.10 - brac Armoury-2026-10-27_23-38-07.log; bitwaN: Armoury-2026-10-27_23-24-37.log.
+- 283 (nekanie283): N283-1 scen. A (konny za lucznikami): wykryc 2, lucznikow na cel 11, strzaly 38, ALE jezdzcow 0 (wolnej 6), stoi 0 (marsz TAK);
+  N283-2 scen. B (pieszy): wykryc 0; N283-3 scen. C (wrecz): wykryc 0, R1 219. Do diagnozy: wykrywanie pieszego i wrecz, jazda nie wyslana, postoj nie dziala
+  (moze tez sam scenariusz testowy CrashScribe-at-n283 - sprawdzic linie 'Nekanie (283) TEST').
+- 284 (handel284, probyN): H284-1 mediana zysku karawan ostatnie 10 dob [6,11,7,7,-7,-28,-58,-88,-185,-272] - SPADA; H284-2 udzial z wyplata 0.172 -> 0.177 (cel 0.25);
+  H284-3 8 kategorii nie zeszlo do bramki (whale_oil, planks ...); H284-4 sprzedaz T1 na stracie 3550/d -> 44783/d (ROSNIE 12x - prawdopodobnie CaravanSizeByTrade
+  albo bramka/kapital zmuszaja do wyprzedazy). Ruda RU282-1 18 -> 8 bez rudy (cel <= 10 w dobach 21-30: 12.9). NWAR-15 plotno/len 1.59 -> 1.14.
+- Poprawki: workflow (283b w zb\n283, 284b w zb\n284) - diagnoza z logow 132a + naprawa + build + commit; potem ponowne scalenie do n161 (scal_sklad),
+  autotest 132b (testy-noc-283.ps1, -CsAt cs-at283\CrashScribe-at-n283.dll), WGRANIE 132 tylko gdy nekanie283 i handel284 bez NIE.
+- W grze dalej 131 (Armoury 591d0ecc). Przy 99% tygodnia - stop i drugie konto (wszystko tu + journal.jsonl runow).
+
 ## DOPISEK 27.10 ok. 23:25 CET - 283 + 284 SCALONE (n161 e714ccca, Armoury 6b2ef43e), AUTOTEST 132a w toku
 - 284 (zb\n284): 0a3596d2 + da10b580 + recenzja 93bac7ea (Armoury 7bd84054); 9 uwag recenzji naprawione. Ksiega kosztu karawan w zapisie (arm_cg284), sprzedaz
   bez zoldu juz wydanego, BK i surowce nie ponizej kosztu, zakupy BK wedlug sprzedazy (bramka kazdego towaru, arm_cs284), kapital obrotowy, sprawdzenie zysku,
