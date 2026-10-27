@@ -1,5 +1,16 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 20:55 CET - Jeff "tak napraw wszystko": paczki 280 i 281 w toku (workflow wf_d8c1bd65-fa1)
+- 280 (zb\n280, noc/280-ksiega-doba-po-wczytaniu od n161 9d807118 = WGRANE 130): B1 narodziny wsi ksiegowane w ticku wsi (nie prognoza doby moda; niezaleznie od
+  Measure40.On), reszta niewyjasnionych skokow, decyzja o -5.4k w zapisie Jeffa; B2 centralny straznik doby moda (raz na numer doby, nadrobienie pominietej, zapis);
+  B3 tekst linii 'Ludzie (ksiega)'; B4 dzien w linii 'Bitwy'; B5 licznik poleglych bez pochodzenia; grupa sprawdz_logi ksiega280. Projekt + wykonanie + 2 recenzje.
+- 281 (zb\n281, noc/281-eskorta-postoj-12-dob od 9d807118): LordEscort.ThinkPostfix - zwolnienie po 12 dobach na kazdej drodze (wczesne return 410-414), bez
+  zostawionych NoAtk/kolejek przy glodzie; E223-5 ma przejsc.
+- Wznowienie: Workflow scriptPath ~\.claude\projects\C--Program-Files--x86--...\1e1c276a-...\workflows\scripts\paczki-280-281-wf_d8c1bd65-fa1.js,
+  resumeFromRunId wf_d8c1bd65-fa1, te same args (w journal.jsonl runu). Potem: scalenie obu do n161 (git merge + scal_sklad dla CHANGELOG i sprawdz_logi z bazy
+  9d807118), build, autotest 131a (bitwaN + probyN 30 dob + bieg z wczytaniem zapisu - B2), grupy ksiega280 + e223 + reszta, WGRANIE 131 gdy Jeff nie gra.
+- Limit: tydzien 90% o 20:50 (do 99% wolno, potem przekazanie na drugie konto).
+
 ## DOPISEK 27.10 ok. 20:45 CET - WGRANIE 130 (277 rody kanonu Zachodu); nic w toku, czeka odpowiedz Jeffa o 280
 - Autotest 130a (20:10-20:40): bitwaN + probyN 30 dob (109002 -> 109031) kod 0, zapisy Jeffa nietkniete, bledy CrashScribe 27/25 jak 128a. Grupy (m113\wyniki\grupy-130a):
   rody277 13 progow NIE 0 w obu biegach; przeniesienie na kopii zapisu Jeffa: panow 11 (Spicer rycerski do Krwawych Godow), rycerzy z nazwa kanonu 4 (Greenfield,
