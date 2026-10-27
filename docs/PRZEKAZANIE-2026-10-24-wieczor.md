@@ -1,5 +1,14 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 17:00 CET - paczka 274 rownowaga wojny kanonu do Krwawych Godow (Jeff)
+- Jeff 17:00: "lannisterowie i krolewska przystan byli minimum porownywalnie tak samo silni jak polnoc, chodzi o to zeby zadna ze stron nie uzyskala wyraznej
+  przewagi az do krwawych godow aby walczyli i aby sily byly porownywalne dorzecze + polnoc i lannisterowie i krolewska przystan".
+- Stan z audytu: strona Robba ok. 17.7 tys. w polu (Polnoc 11.0k + Dorzecze 6.7k) wobec KL 7.9k.
+- 274 (zb\n274, noc/274-rownowaga-wojny-kanonu, workflow wf_1f03e327-b32): najpierw przyczyny slabosci KL, potem dzwignie tylko z zamknietej ekonomii
+  (kredyt Banku/Iron Bank, rekruci z prawdziwej ludnosci, najemnicy za kredyt, pelne druzyny, armie), powsciagliwosc silniejszego (bez oblezen gniazd rodow przed
+  Krwawymi Godami), obie strony walcza; wylacznik po znaczniku Krwawych Godow (wspolny z 264); zgodnosc z 272 (Krol Polnocy). Test 120 dob.
+- W toku: 264 (wf_09849f4a-635), 241+259 (wf_d5f20a7a-22b), 268+272 (wf_755f2f7e-043), 274 (wf_1f03e327-b32). Limit 5h 24%, tydzien 80% (17:00).
+
 ## DOPISEK 27.10 ok. 16:45 CET - po odnowieniu limitu: 264 wznowione, 241+259 i 268+272 w toku
 - Workflowy (skrypt workflows\scripts\paczki-jeff-26-10-wieczor-wf_03ae36fd-43a.js): 264 wf_09849f4a-635 (wznowiony, args scratchpad\args-264.json),
   241+259 wf_d5f20a7a-22b, 268+272 wf_755f2f7e-043. Przy przerwaniu: wznowic resumeFromRunId z TYMI SAMYMI args (z pliku runu w workflows\wf_*.json, pole args).
