@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 17:35 CET - 264 GOTOWE (zbudowane po recenzji, nie wgrane)
+- 264 (zb\n264, noc/264-pokoj-wojny-kanonu): 114ba627 + 34feb90a, recenzja 351fac2a (Armoury be852bc6). CanonPeaceLock.cs (klucz CanonWarNoPeaceUntilRedWedding):
+  pary battania-vlandia i riverlands-vlandia; blokada do RedWeddingEvent ROT stan 2 (zakonczone) albo smierci Robba (lord_5_1) - ZNACZNIK DLA 274; Diplomacy
+  ApplyPeace / Kingdom.AddDecision / MakePeaceKingdomDecision.IsAllowed; gracz-wladca: wybor tylko gdy Diplomacy daje Decline. PeaceHold (M6a-3) czeka do 72 h na ROT.
+  Data wojny z rekordu gry. CanonWarWatch.cs: 4 linie wladcow (Robb, Joffrey, Tully, rod Tywina) + 3 linie krolestw dziennie.
+- Autotest: flaga CrashScribe\armoury-pokoj264.flag, sprawdz_logi --grupa pokoj264 (P264-7 T1-T7 TAK, P264-0 4 haki, P264-5 linie co dobe); potem m6a i m104wojny.
+- W toku: 241+259 (wf_d5f20a7a-22b), 268+272 (wf_755f2f7e-043), 274 (wf_1f03e327-b32).
+
 ## DOPISEK 27.10 ok. 17:00 CET - paczka 274 rownowaga wojny kanonu do Krwawych Godow (Jeff)
 - Jeff 17:00: "lannisterowie i krolewska przystan byli minimum porownywalnie tak samo silni jak polnoc, chodzi o to zeby zadna ze stron nie uzyskala wyraznej
   przewagi az do krwawych godow aby walczyli i aby sily byly porownywalne dorzecze + polnoc i lannisterowie i krolewska przystan".
