@@ -82,6 +82,9 @@ namespace Armoury
         private static int _rQ, _rNotLone, _rFrontSkip, _rEp, _rFootShots, _rRayN, _rRayClear, _rRayFriend, _rRayMax, _rRayCap, _rEngine, _rStepTry, _rStepOk,
                            _rSide, _rBack, _rHalf, _rKeptMen, _rPulled, _rPullLeader, _rPullValue, _rPullRanged, _rPfMen, _rFootLost, _rFromPlayer, _rLeft, _rStum,
                            _rFootTake, _rLeaderNear;
+        // recenzja 283
+        private static int _rLeaderAim, _rFootCoolN, _rRespNear, _rRespDrop;
+        private static readonly HashSet<int> RUnreachT = new HashSet<int>();
         private static float _rFootFar;
         private static int _rQOver, _rFfArch;   // Interlocked (OnHit)
 
@@ -109,6 +112,8 @@ namespace Armoury
             _rQ = _rNotLone = _rFrontSkip = _rEp = _rFootShots = _rRayN = _rRayClear = _rRayFriend = _rRayMax = _rRayCap = _rEngine = _rStepTry = _rStepOk = 0;
             _rSide = _rBack = _rHalf = _rKeptMen = _rPulled = _rPullLeader = _rPullValue = _rPullRanged = _rPfMen = _rFootLost = _rFromPlayer = _rLeft = _rStum = 0;
             _rFootTake = _rLeaderNear = 0;
+            _rLeaderAim = _rFootCoolN = _rRespNear = _rRespDrop = 0;
+            RUnreachT.Clear();
             _rFootFar = 0f;
             Interlocked.Exchange(ref _rQOver, 0); Interlocked.Exchange(ref _rFfArch, 0);
             HaltClear();
@@ -182,22 +187,21 @@ namespace Armoury
             int ss = SideOf(a.Team), vs = SideOf(v.Team);
             if (ss < 0 || vs < 0 || ss == vs) return;
             _rQ++;
-            Threat t;
-            if (!Threats.TryGetValue(a, out t))
+            // recenzja 283 (5): filtr frontu dla kazdego ciosu, takze przy istniejacym zagrozeniu (gracz po jednym strzale w zwarciu frontu nie podnosi poziomu,
+            // nie odswieza ciszy i nie zmienia ofiary)
+            bool lone = !IntactNear(ss, a.Position.AsVec2, IntactRadius);
+            if (!lone)
             {
-                bool lone = !IntactNear(ss, a.Position.AsVec2, IntactRadius);
-                if (!lone)
-                {
-                    if (!a.IsMainAgent && !ReferenceEquals(a, _tA)) { _rNotLone++; return; }   // AI w swoim szyku - zwykla walka (RBM)
-                    int sl = Slot(v.Team, v.Formation);
-                    if (sl < 0 || !_quiet[sl]) { _rFrontSkip++; return; }                         // gracz w zwarciu frontu - nie nekanie
-                }
-                t = Notice(a, ss, vs, -1, now, false);
+                if (!a.IsMainAgent && !ReferenceEquals(a, _tA)) { _rNotLone++; return; }   // AI w swoim szyku - zwykla walka (RBM)
+                int sl = Slot(v.Team, v.Formation);
+                if (sl < 0 || !_quiet[sl]) { _rFrontSkip++; return; }                         // gracz w zwarciu frontu - nie nekanie
             }
+            Threat t;
+            if (!Threats.TryGetValue(a, out t)) t = Notice(a, ss, vs, -1, now, false);
             t.LastMelee = now;
             t.MeleeHits++;
             Fire(t, now);
-            Victim(t, v);
+            Victim(t, v, true);
             RDet[KindNow(t)]++;
             if (ReferenceEquals(a, _tA)) _tDet++;
         }
@@ -214,8 +218,9 @@ namespace Armoury
 
         private static bool MeleeKind(Threat t) { return t.Kind == KMeleeM || t.Kind == KMeleeF; }
 
-        /// <summary>Ofiara szkody (trafiony, cel AI, cios): szyk zagrozony, lucznicy, chorazy (R7), wodz / dowodca / pan druzyny (R6).</summary>
-        private static void Victim(Threat t, Agent v)
+        /// <summary>Ofiara szkody (trafiony, cel AI, cios): szyk zagrozony, lucznicy, chorazy (R7), wodz / dowodca / pan druzyny (R6). harm - trafienie albo cios;
+        /// recenzja 283 (2): sam cel AI (bez trafienia) nie robi z zagrozenia "wodz" (R6).</summary>
+        private static void Victim(Threat t, Agent v, bool harm)
         {
             if (v == null || !_rKey) return;
             var f = v.Formation;
@@ -226,7 +231,18 @@ namespace Armoury
                 if (v.IsRangedCached || (q != null && (q.IsRangedFormation || q.IsRangedCavalryFormation))) { t.OnArchers = true; RArchT.Add(t.S.Index); }
             }
             if (!t.OnBanner && Banner(v)) { t.OnBanner = true; RBannerT.Add(t.S.Index); }
-            if (!t.Leader && IsLeader(v)) MarkLeader(t, v);
+            if (!t.Leader && IsLeader(v))
+            {
+                if (harm) MarkLeader(t, v);
+                else _rLeaderAim++;
+            }
+        }
+
+        /// <summary>Recenzja 283 (5): szyk nie w zwarciu (tablica _quiet z passu).</summary>
+        private static bool Quiet(Formation f)
+        {
+            int sl = f != null ? Slot(f.Team, f) : -1;
+            return sl >= 0 && _quiet[sl];
         }
 
         /// <summary>Wodz druzyny, dowodca szyku albo pan druzyny kampanii (Hero.PartyBelongedTo.LeaderHero).</summary>
@@ -283,9 +299,18 @@ namespace Armoury
         /// <summary>Tier szyku: pierwszy czlowiek szyku, ktory nie jest bohaterem (bez niego 1).</summary>
         private static int FormTier(Formation f)
         {
-            Agent u = null;
-            try { u = f.GetFirstUnit(); } catch { u = null; }
-            return u != null ? TierOf(u) : 1;
+            // recenzja 283 (M2): bohater (dowodca szyku) na czele listy nie zawyza tieru - pierwszy, ktory nie jest bohaterem (bohaterow kilku, petla krotka)
+            try
+            {
+                int n = f.CountOfUnits;
+                for (int i = 0; i < n; i++)
+                {
+                    var u = f.GetUnitWithIndex(i);
+                    if (u != null && !u.IsHero) return TierOf(u);
+                }
+            }
+            catch { }
+            return 1;
         }
 
         /// <summary>Ilu na nekajacego: PerVictim x max(1, tier nekajacego / tier odpowiadajacych) + padlo od niego (jeden za jednego 148/204).</summary>
@@ -304,6 +329,7 @@ namespace Armoury
             if (lone) RLoneT.Add(s.Index);
             if (s.IsMainAgent) RPlayerT.Add(s.Index); else RAiT.Add(s.Index);
             if (t.Leader) return;
+            if (!lone && !Quiet(t.VicF)) return;   // recenzja 283 (5): kapitan w 10 m w zwarciu frontu - zwykla bitwa, nie ochrona wodza
             var fl = HForms[t.Side];
             for (int i = 0; i < fl.Count; i++)
             {
@@ -399,6 +425,7 @@ namespace Armoury
         private static int FootPass(Mission m, Threat t, Vec2 sp, float now, int down)
         {
             if (t.Group || t.S == null) return 0;
+            if (now < t.FootCool) return 0;   // recenzja 283 (3): piechota wrocila ze smyczy / czasu / konny uszedl - przerwa 30 s na tego nekajacego
             // nekajacy przy swoim nietknietym szyku (15 m, CounterFootGap) - piechota nie biegnie w jego szyk (i tak wrocilaby "przy szyku nekajacego")
             if (IntactNear(t.SSide, sp, CounterFootGap)) return 0;
             bool mounted = t.S.MountAgent != null;
@@ -417,9 +444,12 @@ namespace Armoury
                 if (!fi.Foot || fi.Rng || fi.Cav || fi.Retreat) continue;
                 bool lead = t.Leader && ReferenceEquals(fi.F, t.LeaderF);
                 bool own = lead || ReferenceEquals(fi.F, t.VicF);
-                float e = Math.Max(0f, sp.Distance(fi.C) - fi.R);
+                float dm = sp.Distance(fi.C);
+                float e = Math.Max(0f, dm - fi.R);
                 if (!own && e > MarchToContact.InfRearm) continue;
                 if (fi.Player) continue;   // szyk gracza - nigdy
+                // recenzja 283 (3): nekajacy poza smycza 50 m od srodka szyku (InfRearm, smycz HunterCheck) - nieosiagalny, takze dla szyku ofiary i wodza (R1, jazda)
+                if (dm > MarchToContact.InfRearm) { RUnreachT.Add(t.S.Index); continue; }
                 if (fi.Engaged && !lead)
                 {
                     if (RFwSeenF.Add(fi.F)) Fw[FwEngaged] += fi.N;
@@ -617,6 +647,9 @@ namespace Armoury
               .Append("; nie wyslani: szyk w zwarciu ").Append(Fw[FwEngaged]).Append(", ponizej polowy ").Append(Fw[FwHalf]).Append(", bohater ").Append(Fw[FwHero])
               .Append(", chorazy ").Append(Fw[FwBanner]).Append(", zajety ").Append(Fw[FwBusy]).Append(", przerwa ").Append(Fw[FwCool]).Append(", w zwarciu ").Append(Fw[FwMelee])
               .Append(", przy szyku nekajacego ").Append(Fw[FwIntact]).Append(", limit zapytan ").Append(Fw[FwQuery]).Append(", panika ").Append(Fw[FwPanic])
+              .Append(" | recenzja 283: cel AI na wodza bez trafienia ").Append(_rLeaderAim).Append("; piechota: nekajacy poza smycza ").Append(RUnreachT.Count)
+              .Append(", przerwa po powrocie ").Append(_rFootCoolN).Append("; lucznicy: wstrzymani przy odpowiedzi ").Append(_rRespNear).Append(", zdjeci ").Append(_rRespDrop)
+              .Append("; postoj: z przodu ").Append(_lNoFront).Append(", pieszy przy swoich ").Append(_lNoFootNear)
               .Append(" | wyniki ");
             for (int i = 0; i < ROKinds; i++) sb.Append(i > 0 ? ", " : "").Append(ROName[i]).Append(' ').Append(ROutN[i]);
             sb.Append("; najdalej piechota ").Append(F0(_rFootFar)).Append(" m, jazda ").Append(F0(_hMaxFar)).Append(" m; piechoty padlo ").Append(_rFootLost)

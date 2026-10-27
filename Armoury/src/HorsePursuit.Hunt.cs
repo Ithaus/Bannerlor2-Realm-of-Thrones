@@ -100,6 +100,7 @@ namespace Armoury
             // 283: rodzaj (pocisk / cios, konno / pieszo - na zywo), ofiara (szyk, lucznicy, chorazy, wodz), tier, piechota, postoje, linie epizodu
             public int Kind, Tier = 1, MeleeHits, Foot, FootEver, Halt4, Halt5, DownAtEnd;
             public float LastShot = -1f, LastMelee = -1f, GoneAt = -1f;
+            public float FootCool;   // recenzja 283 (3): do kiedy piechota (R2) nie rusza na tego nekajacego po powrocie ze smyczy / czasu / konny uszedl
             public bool Lone, Leader, OnArchers, OnBanner, H4Used, H5Used, Line204, Rx, DownByResp;
             public Formation VicF, LeaderF;
         }
@@ -305,7 +306,7 @@ namespace Armoury
                     if (t != null)
                     {
                         Fire(t, now);
-                        if (ai) { Detect(t, DAi, test, now); Victim(t, tg); }
+                        if (ai) { Detect(t, DAi, test, now); Victim(t, tg, false); }
                         return;
                     }
                     int kind = -1;
@@ -321,7 +322,7 @@ namespace Armoury
                     t = Notice(s, ss, side, kind, now, true);
                     Fire(t, now);
                     Detect(t, kind, test, now);
-                    if (ai) Victim(t, tg);
+                    if (ai) Victim(t, tg, false);
                     return;
                 }
                 if (k != 2) return;
@@ -332,7 +333,7 @@ namespace Armoury
                     if (t == null) { t = Notice(s, ss, side, DHit, now, true); Fire(t, now); }
                     else t.LastFire = now;
                     Detect(t, DHit, test, now);
-                    Victim(t, hv);
+                    Victim(t, hv, true);
                     return;
                 }
                 if (!NearMen(m, p.AsVec2, ShieldsUp.MissRadius, s.Team)) return;
@@ -354,6 +355,7 @@ namespace Armoury
         private static void Detect(Threat t, int kind, bool test, float now)
         {
             t.LastShot = now;   // 283: ostatnia szkoda pociskiem (rodzaj strzelec / wrecz)
+            if (t.First < 0) t.First = kind;   // recenzja 283 (M3): zagrozenie zauwazone ciosem - pierwsze wykrycie pociskiem do linii 204 (bez "wykrycie ?")
             if (_rKey) RDet[KindNow(t)]++;
             if (t.S != null && t.S.MountAgent != null) HDet[kind]++;   // 204: linia liczy konnych strzelcow (jak dotad)
             if (kind == DHit) t.Hits++; else if (kind == DMiss) t.Misses++; else if (kind == DPass) t.Pass++; else t.AiTgt++;
@@ -792,7 +794,8 @@ namespace Armoury
             {
                 // 283 R3: pieszy nekajacy - oddzial na miare R2, cala wolna jazda przy 3 szkodach w 5 s albo powalonym; samotny konny, ktory kogos powalil, dal
                 // 3 szkody w 5 s albo uderzyl w lucznikow - od razu cala jazda; wodz (R6) - zawsze cala jazda
-                if (!mounted) lvl = t.Shots.Count >= _shots3 || down > 0 ? 3 : 1;
+                // recenzja 283 (4): pieszy przy swoim nietknietym szyku (gracz w swojej linii) - zwykla bitwa, bez calej jazdy
+                if (!mounted) lvl = lone && (t.Shots.Count >= _shots3 || down > 0) ? 3 : 1;
                 else if (lone && (down > 0 || t.Shots.Count >= _shots3 || t.OnArchers)) lvl = 3;
                 if (t.Leader) lvl = 3;
             }
@@ -805,7 +808,8 @@ namespace Armoury
             }
             // recenzja 204: strzelec AI w nietknietym szyku swojej strony (np. szyk konnych lucznikow) - zagrozenie szyku, nie jednego czlowieka: tylko L1,
             // jezdzcy z szyku bez szarzy, razem na wszystkich takich strzelcow najwyzej PerVictim z jednego szyku (157: dwoch z szyku); samotny i gracz - bez zmian
-            t.Group = !lone && !s.IsMainAgent && !(rx && t.Leader);   // 283: wodz trafiony - nie "zwykla bitwa szykow"
+            // recenzja 283 (2): strzelec AI w nietknietym szyku zostaje "szyk na szyk" (L1, PerVictim z szyku, bez postoju) takze przy wodzu - wodza oslania jego szyk
+            t.Group = !lone && !s.IsMainAgent;
             if (t.Group)
             {
                 HGroupShooters.Add(s.Index);
@@ -1283,7 +1287,12 @@ namespace Armoury
             bool foot = h.Role == RoleFoot;   // 283
             if (foot) FEnd[why]++; else UEnd[why]++;
             if (rider) { MarkCounter(a, false); t.Melee--; t.LastEnd = why; Bump(FormRiders, h.F, -1); if (h.Group) Bump(FormGroup, h.F, -1); }
-            else if (foot) { MarkCounter(a, false); t.Foot--; t.LastEnd = why; Bump(FormFoot, h.F, -1); }
+            else if (foot)
+            {
+                MarkCounter(a, false); t.Foot--; t.LastEnd = why; Bump(FormFoot, h.F, -1);
+                // recenzja 283 (3): powrot bez dogonienia - przerwa na nekajacego (nie co pass nowi ludzie z tego samego szyku)
+                if (why == ULeash || why == UTime || why == URange) { t.FootCool = now + CounterCool; _rFootCoolN++; }
+            }
             else { MarkIn(ref _aiming, a, false); t.Ranged--; }
             if (a != null && a.IsActive())
             {

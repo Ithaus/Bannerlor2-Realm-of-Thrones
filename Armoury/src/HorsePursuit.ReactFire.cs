@@ -86,6 +86,7 @@ namespace Armoury
         /// nekajacy wrecz w 6 m - lucznik z bronia boczna walczy (gra), bez niej krok w tyl na 12 m. Zwraca liczbe nowych.</summary>
         private static int RangedPassR(Mission m, Threat t, Vec2 sp, float now)
         {
+            if (RespNear(t)) { _rRespNear++; return 0; }   // recenzja 283 (6): swoi (R2 / R3) walcza z nim - lucznicy nie strzelaja w to zwarcie
             var fl = HForms[t.Side];
             RangedForms.Clear();
             RangedRange.Clear();
@@ -112,9 +113,12 @@ namespace Armoury
                 if (_rRays >= RaysPerPass) { _rRayCap++; break; }
                 var fi = fl[RangedForms[j]];
                 float range = RangedRange[j];
-                // pojedynek strzelecki: wrog (inny szyk) w zasiegu - obraca sie tylko polowa blizsza nekajacemu (RBM 0.5), reszta trzyma swoj cel
+                // pojedynek strzelecki: wrog (inny szyk) w zasiegu - obraca sie tylko polowa blizsza nekajacemu (RBM 0.5), reszta trzyma swoj cel;
+                // recenzja 283 (1): polowa = polplaszczyzna przez srodek szyku od strony nekajacego (nie kolo wokol niego); nekajacy w szyku albo przy nim
+                // (w promieniu szyku) - odpowiadaja wszyscy w zasiegu
                 bool duel = fi.Gap <= range;
-                float half = duel ? sp.Distance(fi.C) : float.MaxValue;
+                Vec2 hv = sp - fi.C;
+                bool halfOn = duel && hv.Length > fi.R;
                 HUnits.Clear();
                 fi.F.ApplyActionOnEachUnit(HCollect);
                 int nu = HUnits.Count, off = nu > _hScanCap - _hScan ? _hScanOff % nu : 0;
@@ -137,7 +141,6 @@ namespace Armoury
                     Vec2 ap = a.Position.AsVec2;
                     float d = ap.Distance(sp);
                     if (d > range) continue;
-                    if (d > half) { _rHalf++; continue; }
                     if (melee && d <= ShieldsUp.RaiseNear)
                     {
                         if (a.HasMeleeWeaponCached || mt != null) { _rSide++; continue; }   // bron boczna (albo konny) - walczy, gra prowadzi
@@ -154,6 +157,7 @@ namespace Armoury
                         n++;
                         continue;
                     }
+                    if (halfOn && Vec2.DotProduct(ap - fi.C, hv) < 0f) { _rHalf++; continue; }   // dalsza polowa trzyma swoj cel (po walce wrecz / kroku w tyl)
                     int r = Line(m, a, a.GetEyeGlobalPosition(), t.S);
                     if (r < 0) break;
                     if (r == 1)
@@ -182,6 +186,19 @@ namespace Armoury
         /// <summary>Co pass (283, zamiast FriendsBlock): przypisani lucznicy wedlug stanu silnika - FriendInWay: krok (raz), drugi raz z rzedu - cel zdjety.</summary>
         private static void RangedRecheck(Mission m, Threat t, float now)
         {
+            if (RespNear(t))
+            {
+                // recenzja 283 (6): promien widzi tylko linie do celu - swoi walczacy przy nim (obok, za nim) zbieraliby chybione strzaly; cel zdjety
+                for (int i = t.Hs.Count - 1; i >= 0; i--)
+                {
+                    if (i >= t.Hs.Count) continue;
+                    var h = t.Hs[i];
+                    if (h.Role != RoleRanged) continue;
+                    EndHunter(h, UFriend, now, false, false);
+                    _rRespDrop++;
+                }
+                return;
+            }
             for (int i = t.Hs.Count - 1; i >= 0; i--)
             {
                 if (i >= t.Hs.Count) continue;
@@ -196,6 +213,21 @@ namespace Armoury
                 if (!h.Step && h.A.MountAgent == null && t.S != null && TryStep(m, h.A, t.S, h.F, out at)) { ApplyStep(h, at); h.Blk = 0; continue; }
                 if (h.Blk >= 2) EndHunter(h, UFriend, now, false, false);
             }
+        }
+
+        /// <summary>Recenzja 283 (6): czlowiek odpowiedzi tego nekajacego (piechota R2 albo jezdziec R3) w 6 m od niego (RaiseNear 140 - zwarcie). Bez zapytan.</summary>
+        private static bool RespNear(Threat t)
+        {
+            var s = t.S;
+            if (s == null) return false;
+            Vec2 sp = s.Position.AsVec2;
+            for (int i = 0; i < t.Hs.Count; i++)
+            {
+                var h = t.Hs[i];
+                if (h.Role == RoleRanged || h.A == null || !h.A.IsActive()) continue;
+                if (h.A.Position.AsVec2.Distance(sp) <= ShieldsUp.RaiseNear) return true;
+            }
+            return false;
         }
     }
 }

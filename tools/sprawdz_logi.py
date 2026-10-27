@@ -74228,6 +74228,10 @@ N283_RX = {
     "halted": re.compile(r"\| zatrzymane szyki na koniec (\d+) \(oczekiwane 0\)"),
     "cost": re.compile(r"\| koszt passu sr\. (\S+) / max (\S+) ms \(passow (\d+); promieni najwiecej (\d+) na pass, limit (\d+)\)"),
     "stum": re.compile(r"\| potkniecia nekanie (\d+)\.$"),
+    # recenzja 283: cel AI na wodza bez trafienia (R6 tylko po szkodzie), piechota nieosiagalna / przerwa po powrocie (R2), lucznicy przy zwarciu odpowiedzi (R1),
+    # postoj nie przed czolem i nie dla pieszego przy swoich (R4/R5)
+    "rev": re.compile(r"\| recenzja 283: cel AI na wodza bez trafienia (\d+); piechota: nekajacy poza smycza (\d+), przerwa po powrocie (\d+); lucznicy: wstrzymani "
+                      r"przy odpowiedzi (\d+), zdjeci (\d+); postoj: z przodu (\d+), pieszy przy swoich (\d+) \|"),
     "start": re.compile(r"^Nekanie \(283\) start: nekajacy (\S+) \((gracz|AI), (konno|pieszo), (\S+)\) \| rodzaj (konny strzelec|pieszy strzelec|konny wrecz|pieszy wrecz) "
                         r"\| wiersz ([R0-9 -]+) \| samotny (TAK|NIE) \| wodz (TAK|NIE) \| lucznikow (\d+), piechoty (\d+), jezdzcow (\d+), szykow stoi (\d+) \| tier (\d+) "
                         r"\| odleglosc od szyku (\d+) m$"),
@@ -74254,7 +74258,8 @@ N283_TEST = {
              "puszczone: koniec 3, 60 s 0, wrog w 110 m 1, szarza 0, gracz 0, taktyka 0, odwrot 0, S4 0, klucz 0, koniec bitwy 0; nie stanely: zwarcie 2, S2 0, strona "
              "lamana 0, bez marszu 1 | piechota wrocila: padl 1, smycz 50 m 2, czas 60 s 1, cel padl 2, zwarcie 0, konny uszedl 0, przy szyku nekajacego 0, panika 0, "
              "inne 0; nie wyslani: szyk w zwarciu 0, ponizej polowy 0, bohater 1, chorazy 0, zajety 0, przerwa 0, w zwarciu 0, przy szyku nekajacego 0, limit zapytan 0, "
-             "panika 0 | wyniki padl od odpowiedzi 1, padl od innych 0, odpedzony 1, uszedl 0, koniec bitwy 1, inne 0; najdalej piechota 42 m, jazda 120 m; piechoty "
+             "panika 0 | recenzja 283: cel AI na wodza bez trafienia 1; piechota: nekajacy poza smycza 2, przerwa po powrocie 3; lucznicy: wstrzymani przy "
+             "odpowiedzi 4, zdjeci 5; postoj: z przodu 6, pieszy przy swoich 7 | wyniki padl od odpowiedzi 1, padl od innych 0, odpedzony 1, uszedl 0, koniec bitwy 1, inne 0; najdalej piechota 42 m, jazda 120 m; piechoty "
              "padlo 1 | FF od lucznikow 283 0 (strzalow 15) | z szyku gracza 0 (oczekiwane 0) | pod sterowaniem 283 na koniec 0 (oczekiwane 0) | zatrzymane szyki na "
              "koniec 0 (oczekiwane 0) | koszt passu sr. 0.300 / max 3.100 ms (passow 120; promieni najwiecej 30 na pass, limit 64) | test: scenariusz A, wykryc 9, "
              "epizodow 1, lucznikow 6, piechoty 0, jezdzcow 8, szykow stoi 3, wynik padl | potkniecia nekanie 0."),
@@ -74284,6 +74289,7 @@ def nekanie283_selftest():
         "ep": ("3",), "r1": ("12", "15", "0", "2", "1"), "r1b": ("40", "30", "10", "3", "6", "4", "0"), "r2": ("6", "1"),
         "r3": ("10", "8", "0", "0", "0", "0", "0", "0"), "r45": ("1", "1", "3", "0", "0"),
         "halt": ("45", "1", "3", "0", "1", "0", "0", "0", "0", "0", "0", "0"),
+        "rev": ("1", "2", "3", "4", "5", "6", "7"),
         "ff": ("0", "15"), "player": ("0",), "left": ("0",), "halted": ("0",), "cost": ("0.300", "3.100", "120", "30", "64"), "stum": ("0",),
     }
     for k, v in exp.items():
@@ -74478,7 +74484,7 @@ def nekanie283_rows(rep, D):
     # N283-6: INFO
     tot = {}
     for s in lines:
-        for k in ("det", "r1", "r1b", "r2", "r3", "r45"):
+        for k in ("det", "r1", "r1b", "r2", "r3", "r45", "rev"):
             mm = RX[k].search(s)
             if mm:
                 tot[k] = [a + int(b) for a, b in zip(tot.get(k, [0] * len(mm.groups())), mm.groups())]
@@ -74494,7 +74500,9 @@ def nekanie283_rows(rep, D):
             f"wykrycia {d[0]} (konny strzelec {d[1]}, pieszy strzelec {d[2]}, konny wrecz {d[3]}, pieszy wrecz {d[4]}; samotni {d[7]}; na lucznikow {d[8]}, na wodza {d[9]}); "
             f"epizodow (linie startu) {len(st)}, na gracza {sum(1 for m in st if m.group(2) == 'gracz')}; R1 {r1[0]} (strzaly {r1[1]}), R1b promieni {r1b[0]} "
             f"(swoi {r1b[2]}, krok udany {r1b[5]}), R2 {r2[0]}, R3 wolnej {r3[0]} / wyslanej {r3[1]} / w zwarciu zostala {r3[2]} / wyciagnieta {r3[3]}, R4 {r45[0]}, "
-            f"R5 {r45[1]} (szykow {r45[2]}), R6 {r45[3]}, R7 {r45[4]}; wyniki " + (", ".join(f"{k} {v}" for k, v in outs.items() if v) or "-"),
+            f"R5 {r45[1]} (szykow {r45[2]}), R6 {r45[3]}, R7 {r45[4]}; recenzja 283 " + (", ".join(str(x) for x in tot["rev"]) if "rev" in tot else "-")
+            + " (cel AI na wodza bez trafienia, piechota poza smycza, przerwa, lucznicy wstrzymani, zdjeci, postoj z przodu, pieszy przy swoich); wyniki "
+            + (", ".join(f"{k} {v}" for k, v in outs.items() if v) or "-"),
             "INFO: gra Jeffa - odpowiedzi na gracza (konno / pieszo / wrecz); autotest - nekajacy A/B/C", None)
 
 

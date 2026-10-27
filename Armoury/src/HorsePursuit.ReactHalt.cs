@@ -37,6 +37,12 @@ namespace Armoury
         private static readonly Dictionary<Formation, Halt> Halts = new Dictionary<Formation, Halt>();
         private static readonly List<Halt> HaltList = new List<Halt>(), HaltTmp = new List<Halt>();
         private static readonly HashSet<Formation> LR4F = new HashSet<Formation>(), LR5F = new HashSet<Formation>();
+        // recenzja 283: postoj raz na nekajacego (czlowieka, nie obiekt zagrozenia - nowe zagrozenie po ciszy nie zatrzymuje znowu); R4 raz na pare nekajacy-szyk;
+        // liczniki "nie stanely" raz na szyk i przyczyne (warunek sprawdzany co pass)
+        private static readonly HashSet<int> LR5Who = new HashSet<int>();
+        private static readonly Dictionary<Formation, HashSet<int>> LR4Who = new Dictionary<Formation, HashSet<int>>();
+        private static readonly HashSet<long> LNoSeen = new HashSet<long>();
+        private static int _lNoFront, _lNoFootNear;
         private static AccessTools.FieldRef<FormationAI, List<BehaviorComponent>> _rBeh;
         private static bool _rBehTried;
         private static int _lR4, _lR5, _lR5F, _lRetake, _lLeft, _lNoEng, _lNoS2, _lNoBroke, _lNoMove;
@@ -45,6 +51,8 @@ namespace Armoury
         private static void HaltClear()
         {
             Halts.Clear(); HaltList.Clear(); HaltTmp.Clear(); LR4F.Clear(); LR5F.Clear();
+            LR5Who.Clear(); LR4Who.Clear(); LNoSeen.Clear();
+            _lNoFront = _lNoFootNear = 0;
             Array.Clear(LRel, 0, LRel.Length);
             _lR4 = _lR5 = _lR5F = _lRetake = _lLeft = _lNoEng = _lNoS2 = _lNoBroke = _lNoMove = 0;
             _lSec = 0f;
@@ -90,10 +98,34 @@ namespace Armoury
         {
             if (fi.Player || fi.Retreat || fi.F == null || fi.F.CountOfUnits <= 0 || fi.F.AI == null) return false;
             if (Halts.ContainsKey(fi.F)) return false;
-            if (fi.Gap <= HuntClose) { _lNoEng++; return false; }
+            if (fi.Gap <= HuntClose) { if (LNo(fi.F, 1)) _lNoEng++; return false; }
             if (Charging(fi.F) || Doctrine.S4Held(fi.F)) return false;
-            if (!Moving(fi.F)) { _lNoMove++; return false; }
+            if (!Moving(fi.F)) { if (LNo(fi.F, 2)) _lNoMove++; return false; }
             return true;
+        }
+
+        private static void Mark4(Formation f, int who)
+        {
+            HashSet<int> r4;
+            if (!LR4Who.TryGetValue(f, out r4)) { r4 = new HashSet<int>(); LR4Who[f] = r4; }
+            r4.Add(who);
+        }
+
+        private static bool LNo(Formation f, int why) { return LNoSeen.Add(((long)f.GetHashCode() << 4) | (long)why); }
+
+        /// <summary>Recenzja 283 (4): nekajacy z tylu albo z boku szyku - nie przed czolem. Przed czolem = dalej przed przednim szeregiem (pol glebokosci szyku
+        /// w kierunku Formation.Direction) niz w bok poza skrzydlem (pol szerokosci) - cwiartka czola; reszta to bok i tyl.</summary>
+        private static bool RearOrFlank(FI fi, Vec2 sp)
+        {
+            Vec2 dir;
+            float w, dp;
+            try { dir = fi.F.Direction; w = fi.F.Width; dp = fi.F.Depth; } catch { return false; }
+            if (!dir.IsValid || dir.LengthSquared < 1E-04f) return false;
+            dir = dir.Normalized();
+            Vec2 o = sp - fi.C;
+            float fwd = Vec2.DotProduct(o, dir) - 0.5f * dp;
+            float lat = Math.Abs(Vec2.DotProduct(o, new Vec2(-dir.y, dir.x))) - 0.5f * w;
+            return !(fwd > 0f && fwd >= lat);
         }
 
         /// <summary>ThreatPass (283): R4 szyk ofiary, R5 cala armia. Zwraca liczbe nowo zatrzymanych szykow.</summary>
@@ -108,8 +140,16 @@ namespace Armoury
             if (team == null) return 0;
             if (Broke(t.SSide, t.Side)) { _lNoBroke++; return 0; }
             if (Doctrine.S2On(team)) { _lNoS2++; return 0; }
+            // recenzja 283 (4): pieszy przy swoim nietknietym szyku (gracz w swojej linii) - zwykla bitwa; nekajacy przed czolem szyku ofiary - szyk idzie dalej
+            // (pod pociskami z przodu sie zwiera, nie staje - S2/141)
+            if (!t.Lone && t.S.MountAgent == null) { if (LNo(vf, 3)) _lNoFootNear++; return 0; }
+            int vi = -1;
+            for (int i = 0; i < fl.Count; i++) if (ReferenceEquals(fl[i].F, vf)) { vi = i; break; }
+            if (vi < 0) return 0;
+            if (!RearOrFlank(fl[vi], sp)) { if (LNo(vf, 4)) _lNoFront++; return 0; }
             int n = 0;
-            bool army = !t.H5Used && (t.Lone || t.Leader) && (down > 0 || t.Shots.Count >= _shots3);
+            int who = t.S.Index;
+            bool army = !LR5Who.Contains(who) && (t.Lone || t.Leader) && (down > 0 || t.Shots.Count >= _shots3);
             if (army)
             {
                 // glowna piechota druzyny (najwiekszy szyk piechoty) dalej niz 110 m od wroga
@@ -121,11 +161,10 @@ namespace Armoury
                     bn = fi.N;
                     best = i;
                 }
-                if (best >= 0 && fl[best].Gap <= HuntClose) { army = false; _lNoEng++; }
+                if (best >= 0 && fl[best].Gap <= HuntClose) { army = false; if (LNo(fl[best].F, 1)) _lNoEng++; }
             }
             if (army)
             {
-                t.H5Used = true;
                 int k = 0;
                 for (int i = 0; i < fl.Count; i++)
                 {
@@ -134,28 +173,31 @@ namespace Armoury
                     if (!CanHalt(fi)) continue;
                     if (!TakeHalt(fi.F, t, true, now)) continue;
                     LR5F.Add(fi.F);
+                    Mark4(fi.F, who);   // szyk stal w R5 - R4 tego nekajacego juz go nie zatrzyma drugi raz
                     t.Halt5++;
                     k++;
                 }
-                if (k > 0) { _lR5++; _lR5F = LR5F.Count; if (ReferenceEquals(t.S, _tA)) _tHalt += k; }
-                n += k;
-                return n;
+                if (k > 0)
+                {
+                    t.H5Used = true;   // recenzja 283 (M1): zuzyte tylko, gdy cos stanelo
+                    LR5Who.Add(who);
+                    _lR5++; _lR5F = LR5F.Count; if (ReferenceEquals(t.S, _tA)) _tHalt += k;
+                    return k;
+                }
+                // nic nie stanelo (bez marszu) - R4 szyku ofiary ponizej
             }
-            if (t.H4Used) return 0;
-            for (int i = 0; i < fl.Count; i++)
-            {
-                var fi = fl[i];
-                if (!ReferenceEquals(fi.F, vf)) continue;
-                if (fi.Ha) break;
-                t.H4Used = true;
-                if (!CanHalt(fi) || !TakeHalt(fi.F, t, false, now)) break;
-                LR4F.Add(fi.F);
-                t.Halt4++;
-                _lR4++;
-                if (ReferenceEquals(t.S, _tA)) _tHalt++;
-                n++;
-                break;
-            }
+            HashSet<int> r4;
+            if (LR4Who.TryGetValue(vf, out r4) && r4.Contains(who)) return 0;
+            var fv = fl[vi];
+            if (fv.Ha) return 0;
+            if (!CanHalt(fv) || !TakeHalt(fv.F, t, false, now)) return 0;
+            t.H4Used = true;   // recenzja 283 (M1): zuzyte dopiero po przejeciu
+            Mark4(vf, who);
+            LR4F.Add(fv.F);
+            t.Halt4++;
+            _lR4++;
+            if (ReferenceEquals(t.S, _tA)) _tHalt++;
+            n++;
             return n;
         }
 
