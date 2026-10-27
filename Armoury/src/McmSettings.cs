@@ -9512,6 +9512,46 @@ namespace Armoury
         [SettingPropertyGroup("Iron ore flow between towns (282)")]
         public bool KsIronHandsCountTransit { get; set; } = true;
 
+        [SettingPropertyBool("Caravans Remember What They Paid", HintText = "what each caravan paid for the goods in its packs is kept in the save; until now it was forgotten on every load and guessed from the average price (too high), so the first sales after a load counted as losses and old stock was never seen as old. A save without it: the guess now uses what Banner Kings' own log says was paid, or the most Banner Kings would have paid there. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool CaravanCostBookSave { get; set; } = true;
+
+        [SettingPropertyBool("Caravans Sell Without Counting Spent Wages", HintText = "a caravan sells a good once the price after the market toll is above what it paid - the wages already spent on the road no longer raise the price it asks (they are spent either way; asking for them only kept goods in the packs until they spoiled or the purse ran dry). The forced sales (disbanding, no coin for three days of wages, packs over their load, food older than 7 days, goods older than 30 days) are as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool CaravanSellNoSunkWage { get; set; } = true;
+
+        [SettingPropertyBool("Caravans Never Sell Below Cost", HintText = "Banner Kings' own selling and the bulk raw-material selling never sell a unit for less than the caravan paid for it (after the market toll) - only as many units as still earn are sold, the rest waits for a better town; the forced sales above still go through. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool CaravanBkSellAtCost { get; set; } = true;
+
+        [SettingPropertyBool("Caravans Hold Only What They Sell - All Goods", HintText = "caravans stop buying a trade good once all of them together carry more of it than they really sell to towns in ten days (seven for food), measured over the last two weeks - the same rule as iron (282) for every good. Needs three days of measured sales first. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool CaravanBuyByFlow { get; set; } = true;
+
+        [SettingPropertyBool("Caravans Buy Within Working Capital", HintText = "a caravan buys only while the goods in its packs (at what it paid) are below its trading capital minus the coin it must keep (the same capital and floor the clan settlement uses), and keeps three days of wages in the purse - its profit stays in coin and can be paid out to the owner instead of being turned into more stock. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool CaravanBuyWorkingCapital { get; set; } = true;
+
+        [SettingPropertyBool("Caravans Buy Only With Reachable Profit", HintText = "a caravan buys a good only when the towns that pay above the average for it pay more than its price here after the trade penalty, the market toll and the wages of the days the good will ride in the packs (from how fast caravans sell it); food that would ride more than 7 days is not bought. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool CaravanBuyProfitCheck { get; set; } = true;
+
+        [SettingPropertyBool("Caravans Hold Only What They Sell - All Raw Materials", HintText = "with Caravans Hold Only What They Sell: the same rule for wood, hides, leather, flax, linen and wool, not only iron - caravans keep at most what they sell to towns in ten days and unload the rest. Off = iron only, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool CaravanBulkFlowGateAll { get; set; } = true;
+
+        [SettingPropertyBool("All Material Sources Sell Down To Reorder Point", HintText = "with Iron Sources Sell Down To Reorder Point: the same rule for wood, leather, linen, flax, hides and wool - a source town sells down to its own reorder point and never so much that it keeps fewer days than the buyer gets. Off = iron only, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool TownMaterialOrderEqualCoverAll { get; set; } = true;
+
+        [SettingPropertyBool("Material Orders For Goods Workshops", HintText = "a goods workshop (tannery, weavery, smithy, wood workshop) that stops for lack of hides, flax, wool, iron or wood makes its town order that material like the armour workshops do, and its use counts in the town's measured use. Silver, cotton, clay and food inputs are only measured in the log. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool TownMaterialOrderWorkshopInputs { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Guards By Trade Earnings", HintText = "a caravan whose trade earned less per day over the last two weeks than its wages cost hires no more guards (only after a week of measured trade). Off = measured in the log only", RequireRestart = false)]
+        [SettingPropertyGroup("Merchant trade and raw materials (284)")]
+        public bool CaravanSizeByTrade { get; set; } = false;
+
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsFollowMarket { get; set; } = true;
@@ -12621,6 +12661,16 @@ namespace Armoury
             s.TownMaterialOrderNeediestFirst = TownMaterialOrderNeediestFirst;
             s.TownMaterialOrderOreEqualCover = TownMaterialOrderOreEqualCover;
             s.KsIronHandsCountTransit = KsIronHandsCountTransit;
+            s.CaravanCostBookSave = CaravanCostBookSave;
+            s.CaravanSellNoSunkWage = CaravanSellNoSunkWage;
+            s.CaravanBkSellAtCost = CaravanBkSellAtCost;
+            s.CaravanBuyByFlow = CaravanBuyByFlow;
+            s.CaravanBuyWorkingCapital = CaravanBuyWorkingCapital;
+            s.CaravanBuyProfitCheck = CaravanBuyProfitCheck;
+            s.CaravanBulkFlowGateAll = CaravanBulkFlowGateAll;
+            s.TownMaterialOrderEqualCoverAll = TownMaterialOrderEqualCoverAll;
+            s.TownMaterialOrderWorkshopInputs = TownMaterialOrderWorkshopInputs;
+            s.CaravanSizeByTrade = CaravanSizeByTrade;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;

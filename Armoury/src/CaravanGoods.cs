@@ -68,7 +68,7 @@ namespace Armoury
         private static readonly string[] WatchIds = { "tools", "fur", "silver", "wine", "Papyrus", "velvet", "jewelry", "Eggs", "honey", "salt" };
 
         // ------------------------------------------------------------ ksiega kosztu (sesja)
-        private sealed class Lot { public int N; public double Cost, Day; }
+        private sealed class Lot { public int N; public double Cost, Day; public bool Est; }   // 284: Est - czesc kosztu z oszacowania (wczytanie bez wpisu, towar bez zakupu w ksiedze)
         private static readonly Dictionary<MobileParty, Dictionary<ItemObject, Lot>> _book = new Dictionary<MobileParty, Dictionary<ItemObject, Lot>>();
         private sealed class Visit { public Settlement St; public HashSet<ItemCategory> Cats = new HashSet<ItemCategory>(); }
         private static readonly Dictionary<MobileParty, Visit> _visit = new Dictionary<MobileParty, Visit>();
@@ -112,6 +112,7 @@ namespace Armoury
             _bkBeh = null; _fLogs = _fItem = _fPrice = _fTime = null; _bkTried = false; _bkLogState = "nie czytany";
             _startDone = false; _stumbleSess = 0; _err.Clear();
             LastOwnerPaid = LastOwnerNot = LastOwnerLord = LastOwnerPlayer = 0; LastOwnerN = 0; _oStumbles = _oStumbleSess = 0;
+            _pend284 = null; _had284 = false; _cbLots = _cbBad = _cbGone = 0; _cbUnits = 0; _snapLimit = 0;   // 284: ksiega z zapisu (Import284 po Reset)
             ZeroDay();
         }
 
@@ -152,6 +153,9 @@ namespace Armoury
             _avgIdx[c] = v;
             return v;
         }
+
+        /// <summary>284 (CaravanTrade284): srednia indeksu kategorii w 97 miastach (ta sama miara co BK) - pamiec doby.</summary>
+        internal static float AvgIndexOf(ItemCategory c) { return AvgIndex(c); }
 
         private static readonly object _worthLock = new object();
 
@@ -291,6 +295,7 @@ namespace Armoury
             var c = Campaign.Current;
             if (c == null || !c.GameStarted) return;
             _snapDone = true;
+            if (_pend284 != null) { try { Resolve284(); } catch (Exception e) { Stumble("Resolve284", e); } }   // 284: wpisy z zapisu najpierw - migawka dopelnia tylko braki
             try
             {
                 foreach (var mp in MobileParty.AllCaravanParties)
@@ -315,6 +320,232 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("EnsureSnap", e); }
+            try
+            {
+                var s = Settings.Current;
+                Log.Info("Ksiega kosztu karawan (284): " + (_had284 ? "wczytano wpisow " + _cbLots + " (sztuk " + _cbUnits + ") z zapisu arm_cg284, bez karawany albo towaru " + _cbGone
+                                                                     + ", nieczytelnych " + _cbBad : "zapis bez klucza arm_cg284 (starszy zapis albo klucz byl wylaczony) - wpisow 0, nieczytelnych 0")
+                         + " | migawka: karawan z towarem " + _snapCaravans + ", sztuk dopelnionych oszacowaniem " + _snapUnits + " (cena z dziennika BK " + _snapBk + ", bez wpisu " + _snapAvg
+                         + (Est284 ? ", w tym prog zakupu BK " + _snapLimit : ", wartosc x max(1, srednia indeksu)") + "; dziennik BK " + _bkLogState + ")"
+                         + " | klucz Caravan Cost Book Save " + (s != null && s.CaravanCostBookSave ? "TAK" : "NIE") + ".");
+            }
+            catch (Exception e) { Stumble("EnsureSnap(linia 284)", e); }
+        }
+
+        // ------------------------------------------------------------ 284 (klucz CaravanCostBookSave): ksiega kosztu w zapisie
+        private static string _pend284; private static bool _had284;
+        private static int _cbLots, _cbBad, _cbGone; private static long _cbUnits, _snapLimit;
+        private static bool Est284 { get { var s = Settings.Current; return s != null && s.CaravanCostBookSave; } }
+
+        /// <summary>284: prog zakupu BK dla sztuki bez wpisu (BKCaravansBehavior.CalculateBuyValue kupuje tylko przy indeksie miasta < srednia x (1 - h), h = sqrt(min(V, 5000)
+        /// / 5000) x 0.4, V - wartosc kategorii w jukach jak RefreshTotalValueOfItemsAtCategoryForParty: sztuki x (wartosc + 10)); cena zakupu = wartosc x indeks x (1 + kara
+        /// handlu). Gorna granica tego, co BK zaplacil, ale ciasna (dotad wartosc x max(1, srednia) - bez progu).</summary>
+        private static double BkBuyLimit(MobileParty mp, ItemObject it)
+        {
+            var cat = it.ItemCategory;
+            double avg = AvgIndex(cat);
+            long vc = 0;
+            var r = mp != null ? mp.ItemRoster : null;
+            if (r != null)
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    var x = el.EquipmentElement.Item;
+                    if (x != null && el.Amount > 0 && x.ItemCategory == cat) vc += (long)el.Amount * (x.Value + 10);
+                }
+            double h = Math.Sqrt(Math.Min(vc, 5000L) / 5000.0) * 0.4;
+            double pen = Penalty(mp, it);
+            return Math.Max(1.0, Math.Max(1, it.Value) * avg * (1.0 - h) * (1.0 + pen));
+        }
+
+        /// <summary>284: kara handlu karawany przy zakupie (model cen gry - GetTradePenalty, bez kupca); blad albo poza 0..1 - 0.</summary>
+        internal static double Penalty(MobileParty mp, ItemObject it)
+        {
+            try
+            {
+                var m = Campaign.Current != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
+                double p = m != null && it != null ? m.GetTradePenalty(it, mp, null, false, 0f, 0f, 0f) : 0.0;
+                return p >= 0.0 && p <= 1.0 ? p : 0.0;
+            }
+            catch { return 0.0; }
+        }
+
+        private static bool BadId(string id) { return string.IsNullOrEmpty(id) || id.IndexOf(';') >= 0 || id.IndexOf(':') >= 0 || id.IndexOf('~') >= 0 || id.IndexOf('|') >= 0; }
+
+        /// <summary>284: zapis arm_cg284 - "cg284|karawana~towar:sztuk:koszt:doba:oszacowanie(0/1);..." (sztuk najwyzej tyle, ile w jukach). Migawka jeszcze nie zrobiona (zapis tuz po
+        /// wczytaniu) - wpisy z wczytania bez zmian. Klucz wylaczony - pusty napis (wczytanie: ksiega z oszacowania).</summary>
+        internal static string Export284()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.CaravanCostBookSave) return "";
+            if (!_snapDone && _pend284 != null) return _pend284;
+            var sb = new StringBuilder(1 << 16);
+            sb.Append("cg284|");
+            bool first = true;
+            lock (_worthLock)
+            {
+                foreach (var kv in _book)
+                {
+                    var mp = kv.Key;
+                    if (mp == null || !mp.IsActive || !mp.IsCaravan || mp.ItemRoster == null || BadId(mp.StringId)) continue;
+                    foreach (var lv in kv.Value)
+                    {
+                        var it = lv.Key; var l = lv.Value;
+                        if (it == null || l == null || l.N <= 0 || BadId(it.StringId)) continue;
+                        int n = Math.Min(l.N, mp.ItemRoster.GetItemNumber(it));
+                        if (n <= 0) continue;
+                        double cost = l.Cost * n / l.N;
+                        sb.Append(first ? "" : ";").Append(mp.StringId).Append('~').Append(it.StringId).Append(':').Append(n).Append(':')
+                          .Append(cost.ToString("0.##", Inv)).Append(':').Append(l.Day.ToString("0.###", Inv)).Append(':').Append(l.Est ? '1' : '0');
+                        first = false;
+                    }
+                }
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>284: wczytanie arm_cg284 (po Reset) - napis czeka do pierwszej migawki ksiegi (karawany i przedmioty juz sa). null - zapis bez klucza.</summary>
+        internal static void Import284(string s)
+        {
+            _had284 = !string.IsNullOrEmpty(s);
+            _pend284 = _had284 ? s : null;
+        }
+
+        private static void Resolve284()
+        {
+            string s = _pend284; _pend284 = null;
+            if (s == null) return;
+            if (!s.StartsWith("cg284|", StringComparison.Ordinal)) { _cbBad++; return; }
+            var cars = new Dictionary<string, MobileParty>();
+            foreach (var mp in MobileParty.AllCaravanParties) if (mp != null && mp.IsActive && mp.StringId != null) cars[mp.StringId] = mp;
+            var om = MBObjectManager.Instance;
+            double now = Now;
+            foreach (var rec in s.Substring(6).Split(';'))
+            {
+                if (rec.Length == 0) continue;
+                int t = rec.IndexOf('~');
+                var f = t > 0 ? rec.Substring(t + 1).Split(':') : null;
+                int n; double cost, day;
+                if (f == null || (f.Length != 4 && f.Length != 5) || !int.TryParse(f[1], NumberStyles.Integer, Inv, out n) || !double.TryParse(f[2], NumberStyles.Float, Inv, out cost)
+                    || !double.TryParse(f[3], NumberStyles.Float, Inv, out day) || n <= 0 || !(cost >= 0.0) || double.IsInfinity(cost) || double.IsNaN(day) || double.IsInfinity(day)) { _cbBad++; continue; }
+                MobileParty mp;
+                ItemObject it = null;
+                try { it = om != null ? om.GetObject<ItemObject>(f[0]) : null; } catch { it = null; }
+                if (!cars.TryGetValue(rec.Substring(0, t), out mp) || it == null || mp.ItemRoster == null) { _cbGone++; continue; }
+                int have = mp.ItemRoster.GetItemNumber(it);
+                if (have <= 0) { _cbGone++; continue; }
+                int k = Math.Min(n, have);
+                Dictionary<ItemObject, Lot> d;
+                if (!_book.TryGetValue(mp, out d)) { d = new Dictionary<ItemObject, Lot>(); _book[mp] = d; }
+                d[it] = new Lot { N = k, Cost = cost * k / n, Day = Math.Min(now, day), Est = f.Length < 5 || f[4] != "0" };
+                _cbLots++; _cbUnits += k;
+            }
+        }
+
+        // ------------------------------------------------------------ 284: pomocnicze dla BK SellGoods, CaravanBulk i CaravanTrade284
+        /// <summary>284: koszt sztuki z ksiegi (wpis zgodny z jukami - Sync, takze odtworzenie oszacowaniem). 0 - brak towaru.</summary>
+        internal static double UnitCost(MobileParty mp, ItemObject it)
+        {
+            if (mp == null || it == null || mp.ItemRoster == null) return 0.0;
+            var l = Sync(mp, it, mp.ItemRoster.GetItemNumber(it), true);
+            return l != null && l.N > 0 ? l.Cost / l.N : 0.0;
+        }
+
+        /// <summary>284: koszt sztuki w ksiedze choc czesciowo z oszacowania (wczytanie bez wpisu) - CaravanBulk i straz BK dla surowcow masowych nie stawiaja wtedy progu kosztu
+        /// (BK surowcow nie kupuje, wiec jego prog zakupu nie jest ich kosztem; surowiec kupiony regula CaravanBulk taniej niz srednia).</summary>
+        internal static bool CostEstimated(MobileParty mp, ItemObject it)
+        {
+            if (mp == null || it == null) return true;
+            lock (_worthLock)
+            {
+                Dictionary<ItemObject, Lot> d; Lot l;
+                return !(_book.TryGetValue(mp, out d) && d.TryGetValue(it, out l) && l != null && l.N > 0 && !l.Est);
+            }
+        }
+
+        /// <summary>284: koszt calego ladunku towarow handlowych z ksiegi (jak "cargo" w T1 - podzial zoldu).</summary>
+        internal static double CargoCost(MobileParty mp)
+        {
+            var pack = mp != null ? mp.ItemRoster : null;
+            if (pack == null) return 0.0;
+            double cargo = 0;
+            HashSet<ItemObject> seen = null;
+            for (int i = 0; i < pack.Count; i++)
+            {
+                var el = pack.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (it == null || el.Amount <= 0 || !it.IsTradeGood) continue;
+                if (seen == null) seen = new HashSet<ItemObject>();
+                if (!seen.Add(it)) continue;
+                int have = pack.GetItemNumber(it);
+                var l = Sync(mp, it, have, true);
+                if (l != null && l.N > 0) cargo += l.Cost * Math.Min(have, l.N) / l.N;
+            }
+            return cargo;
+        }
+
+        /// <summary>284: koszt towaru w jukach TYLKO ODCZYT (bez Sync - przeglad doby): znany koszt z ksiegi, reszta wartosc x min(1, srednia indeksu) - jak WorthOf.</summary>
+        internal static double HeldCost(MobileParty mp, ItemObject it, int have)
+        {
+            if (mp == null || it == null || have <= 0) return 0.0;
+            lock (_worthLock)
+            {
+                Dictionary<ItemObject, Lot> d; Lot l;
+                int known = 0; double kc = 0;
+                if (_book.TryGetValue(mp, out d) && d.TryGetValue(it, out l) && l != null && l.N > 0) { known = Math.Min(l.N, have); kc = l.Cost * known / l.N; }
+                return kc + (have - known) * Math.Max(1, it.Value) * Math.Min(1.0, AvgIndex(it.ItemCategory));
+            }
+        }
+
+        /// <summary>284: powod sprzedazy na stracie dla towaru karawany teraz (te same wyjscia co T1 - LossWhy): 0 brak; 1 rozwiazanie, 2 kiesa < 3 dni zoldu, 3 juki ponad
+        /// udzwig, 4 jedzenie > 7 dob, 5 towar > 30 dob bez rynku z zyskiem (poprawka 132a - AgeMarket; st - miasto sprzedazy, myto E3-G3).</summary>
+        internal static int LossReason(MobileParty mp, ItemObject it, Settlement st)
+        {
+            if (mp == null || it == null || mp.ItemRoster == null) return 0;
+            int wage = Math.Max(0, mp.TotalWage);
+            bool cash = mp.PartyTradeGold < CashDays * wage, full = mp.TotalWeightCarried > Math.Max(1, mp.InventoryCapacity);
+            var l = Sync(mp, it, mp.ItemRoster.GetItemNumber(it), false);
+            double age = l != null ? Math.Max(0, Now - l.Day) : 0;
+            bool market = l != null && l.N > 0 && AgeMarket(mp, it, l.Cost / l.N, 1.0 - TownToll.CaravanRateFor(mp, st), age);
+            return LossWhy(mp.IsDisbanding, cash, full, it.IsFood, age, market);
+        }
+
+        /// <summary>
+        /// Poprawka 132a (autotest 132a, 30 dob: T1 "dlugo w jukach" 0-15 szt./d do doby 109048, od 109049 - 24 doby po wczytaniu, migawka ksiegi daje sztukom bez
+        /// wpisu dziennika BK dzien zakupu 7 dob wstecz - 325/336/330/264/240/289 szt./d za 86/79/59/65/69/50 tys. zl przy koszcie ok. 2x; T1 na stracie ostatnie 10 dob
+        /// 44 783 zl/d, z tego dlugo w jukach 42 459; ta sama doba bawelna i futra szly tez z zyskiem po 3 000 i 400 zl/szt. w innych miastach): towar > 30 dob
+        /// nie jest "bez wyjscia", gdy rynek z zyskiem istnieje - mediana indeksu miast placacych co najmniej srednia (CaravanTrade284.SellIdxOf - ta sama miara co
+        /// zakup "zysk osiagalny") daje cene po karze handlu (cena sprzedazy gry = wartosc x indeks / (1 + kara), DefaultTradeItemPriceFactorModel.GetPriceFactor) i po
+        /// mycie co najmniej `min` (koszt sztuki; T1 - prog sprzedazy z zyskiem). Wtedy towar czeka na takie miasto (T1 i BK sprzedaja tam z zyskiem); bez takiego
+        /// rynku - wyjscie na stracie porcjami jak dotad. Jedzenie - bez zmian (powod 4 przed wiekiem). Tylko przy age > 30 dob (liczy sie licznik "czeka").
+        /// </summary>
+        private static bool AgeMarket(MobileParty mp, ItemObject it, double min, double keep, double age)
+        {
+            if (!(age > MaxAgeDays) || it == null || it.IsFood || it.ItemCategory == null || !(min > 0.0)) return false;
+            double e = CaravanTrade284.SellIdxOf(it.ItemCategory);
+            if (!(e > 0.0)) return false;
+            bool ok = Math.Max(1, it.Value) * e / (1.0 + Penalty(mp, it)) * keep >= min;
+            if (ok) CaravanTrade284.NoteAgeWait();
+            return ok;
+        }
+
+        /// <summary>284: najwiecej sztuk z n, ktorych KAZDA idzie w tym miescie po cenie po mycie (E3-G3) nie nizszej niz koszt sztuki (cena k-tej sztuki maleje z k -
+        /// PriceAt, ta sama miara co T1; wyszukiwanie polowkowe).</summary>
+        internal static int MaxAtCost(Town town, Settlement st, MobileParty mp, EquipmentElement el, int n, double unit)
+        {
+            var model = Campaign.Current != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
+            var cat = el.Item != null ? el.Item.ItemCategory : null;
+            if (model == null || cat == null || town == null || n <= 0) return n;
+            var d = town.MarketData.GetCategoryData(cat);
+            int wv = Math.Max(1, HistoricalPrices.ShelfWorth(el.Item));
+            double keep = 1.0 - TownToll.CaravanRateFor(mp, st);
+            int lo = 0, hi = n;
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) / 2;
+                if (PriceAt(model, el, mp, d, mid, wv) * keep >= unit) lo = mid; else hi = mid - 1;
+            }
+            return lo;
         }
 
         /// <summary>Wpis ksiegi dla `have` sztuk: brakujace sztuki z gornym oszacowaniem ceny zakupu (atStart - migawka: dzien z dziennika BK albo 7 dob wstecz;
@@ -329,10 +560,15 @@ namespace Armoury
             int miss = have - l.N;
             double now = Now, day = now;
             double unit = Math.Max(1, it.Value) * Math.Max(1.0, AvgIndex(it.ItemCategory));
+            // 284 (klucz CaravanCostBookSave): bez wpisu dziennika BK - prog zakupu BK (wartosc x srednia x (1 - h) x (1 + kara handlu)), z wpisem - cena z dziennika
+            // (to naprawde zaplacono); dotad wyzsza z dwoch i wartosc x max(1, srednia) - zysk pierwszych sprzedazy po wczytaniu wychodzil ujemny
+            bool est = Est284;
+            if (est) unit = BkBuyLimit(mp, it);
             BkRow br;
             if (atStart && bk != null && bk.TryGetValue(it, out br))
             {
-                if (br.Price > unit) unit = br.Price;
+                if (est) unit = Math.Max(1, br.Price);
+                else if (br.Price > unit) unit = br.Price;
                 day = Math.Min(now, br.Day);
                 _snapBk += miss;
             }
@@ -340,9 +576,11 @@ namespace Armoury
             {
                 if (bk != null) day = now - BkLogDays;              // dziennik czytelny, zakupu brak - starszy niz 7 dob
                 _snapAvg += miss;
+                if (est) _snapLimit += miss;
             }
             else _rebuiltLate += miss;
             if (atStart) _snapUnits += miss;
+            l.Est = true;
             l.Day = l.N > 0 ? (l.Day * l.N + day * miss) / have : day;
             l.Cost += miss * unit;
             l.N = have;
@@ -361,7 +599,7 @@ namespace Armoury
             if (!d.TryGetValue(it, out l)) { if (have <= 0 && !create) return null; l = new Lot { N = 0, Cost = 0, Day = Now }; d[it] = l; }
             if (l.N > have)
             {
-                if (have <= 0) { l.N = 0; l.Cost = 0; }
+                if (have <= 0) { l.N = 0; l.Cost = 0; l.Est = false; }
                 else { l.Cost = l.Cost * have / l.N; l.N = have; }
             }
             else if (l.N < have) Restore(mp, it, have, null, false);
@@ -423,6 +661,7 @@ namespace Armoury
                     l.Cost += paid; l.N += got;
                     _bookBuys++; _bookBuyUnits += got;
                     if (mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 1, paid, 0, 0.0);   // 259: zakup karawany gracza (linia majatku gracza)
+                    CaravanTrade284.NoteBuy(mp, it, got);   // 284: juki karawan wedlug kategorii (bramka przeplywu na zywo)
                     var cat = it.ItemCategory;
                     Visit v;
                     if (_visit.TryGetValue(mp, out v) && ReferenceEquals(v.St, __state.St) && v.Cats.Contains(cat)) _rebought += got;   // odkupione to, co tu sprzedalismy (gabka, CaravanBulk)
@@ -440,10 +679,11 @@ namespace Armoury
                     if (moved > 0)
                     {
                         var l = Sync(mp, it, __state.N0, false);
-                        if (l != null && l.N > 0) { int m = Math.Min(moved, l.N); costRm = l.Cost * m / l.N; l.Cost -= costRm; l.N -= m; }
+                        if (l != null && l.N > 0) { int m = Math.Min(moved, l.N); costRm = l.Cost * m / l.N; l.Cost -= costRm; l.N -= m; if (l.N <= 0) l.Est = false; }
                     }
                     if (got > 0) TownToll.LastTaken = TownToll.TakeCaravan(__state.St, mp, got);
                     if (got > 0 && mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 2, got, TownToll.LastTaken, costRm);   // 259: sprzedaz karawany gracza (utarg przed mytem, myto)
+                    if (moved > 0) CaravanTrade284.NoteSale(mp, it, moved, Math.Max(0, got), got > 0 ? TownToll.LastTaken : 0, costRm);   // 284: zysk zrealizowany wedlug drogi, pomiar sprzedazy kategorii
                 }
             }
             catch (Exception e) { Stumble("TradePostfix", e); }
@@ -480,13 +720,24 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ blokada odkupienia przez BK w miescie sprzedazy
-        public static void BkBuyPrefix(MobileParty __0) { _bkBuyer = __0; }
-        public static Exception BkBuyFinalizer(Exception __exception) { _bkBuyer = null; return __exception; }
+        public static void BkBuyPrefix(MobileParty __0, Town __1)
+        {
+            _bkBuyer = __0;
+            try { CaravanTrade284.BuyStart(__0, __1); } catch (Exception e) { Stumble("BkBuyPrefix(284)", e); }   // 284: kapital, podloga, ladunek - raz na BuyGoods
+        }
+        public static Exception BkBuyFinalizer(Exception __exception) { _bkBuyer = null; CaravanTrade284.BuyEnd(); return __exception; }
 
         /// <summary>BK CalculateBuyValue: kategoria, ktora T1 sprzedal w tym miescie (do 7 dob, dopoki sprzedane sztuki leza na polce) - wycena 0 dla KAZDEJ karawany. Nie rzuca.</summary>
         public static void BkValuePostfix(ItemCategory __0, Town __1, ref float __result)
         {
-            if (__result <= 0f || __0 == null || __1 == null || _blocks.Count == 0) return;
+            if (__result <= 0f || __0 == null || __1 == null) return;
+            // 284: zasady zakupu (bramka przeplywu, kapital obrotowy, rezerwa zoldu, zysk osiagalny) - PRZED wczesnym wyjsciem blokady odkupienia (bez blokad tez dzialaja)
+            if (_bkBuyer != null)
+            {
+                try { if (CaravanTrade284.BuyBlocked(_bkBuyer, __0, __1)) { __result = 0f; return; } }
+                catch (Exception e) { Stumble("BkValuePostfix(284)", e); }
+            }
+            if (_blocks.Count == 0) return;
             try
             {
                 var st = __1.Settlement;
@@ -507,14 +758,15 @@ namespace Armoury
 
         private sealed class Cand { public ItemObject It; public EquipmentElement El; public int Have; public double Unit, Min; public bool Food; public float Gain; public int Price; }
 
-        /// <summary>Powod sprzedazy na stracie (0 - brak wyjscia nie zachodzi): 1 rozwiazanie, 2 brak na zold, 3 juki ponad udzwig, 4 jedzenie psuje sie, 5 dlugo w jukach.</summary>
-        private static int LossWhy(bool disband, bool cash, bool full, bool food, double age)
+        /// <summary>Powod sprzedazy na stracie (0 - brak wyjscia nie zachodzi): 1 rozwiazanie, 2 brak na zold, 3 juki ponad udzwig, 4 jedzenie psuje sie, 5 dlugo w jukach
+        /// (poprawka 132a: tylko bez rynku z zyskiem - market z AgeMarket).</summary>
+        private static int LossWhy(bool disband, bool cash, bool full, bool food, double age, bool market)
         {
             if (disband) return 1;
             if (cash) return 2;
             if (full) return 3;
             if (food && age > FoodAgeDays) return 4;
-            if (age > MaxAgeDays) return 5;
+            if (age > MaxAgeDays && !market) return 5;
             return 0;
         }
 
@@ -601,7 +853,7 @@ namespace Armoury
                 var l = Sync(mp, c.It, c.Have, false);
                 double age = l != null ? Math.Min(MaxAgeDays, Math.Max(0, now - l.Day)) : 0;
                 double travel = cargo > 0 ? c.Unit * Math.Min(1.0, wage * age / cargo) : 0;
-                c.Min = c.Unit + travel;
+                c.Min = s.CaravanSellNoSunkWage ? c.Unit : c.Unit + travel;   // 284: zold juz wydany nie podnosi ceny (koszt utopiony); wyjscia na stracie bez zmian
                 c.Price = Math.Max(1, town.GetItemPrice(c.El, mp, true));
                 c.Gain = (float)((c.Price * keepK - c.Min) / c.Price);
             }
@@ -651,7 +903,7 @@ namespace Armoury
                         while (kp >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kp, wv) * keepK <= c.Min) kp--;
                         if (kp >= 1) { step = kp; pLast = PriceAt(model, el.EquipmentElement, mp, d, kp, wv); profit = true; _profitCut++; }
                     }
-                    int why = profit ? 0 : LossWhy(disband, cash, full, c.Food, age);
+                    int why = profit ? 0 : LossWhy(disband, cash, full, c.Food, age, AgeMarket(mp, it, c.Min, keepK, age));   // 132a: > 30 dob bez rynku z zyskiem
                     if (why == 3)
                     {
                         // juki ponad udzwig: na stracie tylko tyle wagi, ile trzeba do zejscia pod udzwig
@@ -694,8 +946,10 @@ namespace Armoury
                     int purse = mp.PartyTradeGold, had = pack.GetItemNumber(it), tg0 = town.Gold;
                     bool broke = false;
                     TownToll.LastTaken = 0; TownToll.LastToTown = 0;
+                    CaravanTrade284.Path = CaravanTrade284.PathT1;   // 284: droga sprzedazy w ksiedze zysku
                     try { SellItemsAction.Apply(mp.Party, town.Owner, el, step, st); }
                     catch (Exception e) { broke = true; Stumble("Sell(SellItemsAction)", e); }
+                    finally { CaravanTrade284.Path = 0; }
                     int moved = had - pack.GetItemNumber(it);
                     int toll = TownToll.LastTaken; TownToll.LastTaken = 0;
                     int tollTown = TownToll.LastToTown; TownToll.LastToTown = 0;
@@ -781,7 +1035,7 @@ namespace Armoury
                              + " | latka SellItemsAction.ApplyInternal " + (_hooked ? "wpieta" : "NIE") + " (ksiega kosztu partii w jukach - sesja)"
                              + " | migawka ksiegi przy wczytaniu: karawan " + _snapCaravans + ", sztuk " + _snapUnits + " (cena z dziennika BK " + _snapBk + ", ze sredniej indeksu " + _snapAvg
                              + "; koszt = wartosc x max(1, srednia indeksu 97 miast), z dziennika BK wyzsza z cen; dzien z dziennika BK, bez wpisu " + BkLogDays + " dob wstecz; dziennik BK " + _bkLogState + ")"
-                             + " | regula: sprzedaz, gdy cena po mycie E3-G3 > koszt zakupu + zold za dni w drodze (najwyzej " + MaxAgeDays + " dob, najwyzej 100% kosztu); na stracie tylko: rozwiazanie, kiesa < "
+                             + " | regula: sprzedaz, gdy cena po mycie E3-G3 > koszt zakupu" + (s.CaravanSellNoSunkWage ? " (284: bez zoldu juz wydanego)" : " + zold za dni w drodze (najwyzej " + MaxAgeDays + " dob, najwyzej 100% kosztu)") + "; na stracie tylko: rozwiazanie, kiesa < "
                              + CashDays + " dni zoldu, juki ponad udzwig (tylko do zejscia pod udzwig), jedzenie > " + FoodAgeDays + " dob, towar > " + MaxAgeDays + " dob"
                              + " | na stracie (poza rozwiazaniem i brakiem na zold) porcjami: indeks kategorii w miescie najwyzej -" + (100 * PortionDrop).ToString("0", Inv)
                              + "% w dobie wobec indeksu przed pierwsza sprzedaza, cena sztuki >= " + LossFloor.ToString("0.00", Inv) + " x wartosci (reszta czeka na nastepne miasto); krok z zyskiem"
