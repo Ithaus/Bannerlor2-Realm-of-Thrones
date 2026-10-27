@@ -1,5 +1,20 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 00:50 CET - 132b: 284 OK, 283 NIE; 132 = 131 + 284 (bez 283), autotest 132c w toku; 283c DO ZROBIENIA; TYDZIEN 97%
+- 132b (n161 8983380b): kod 0, ERROR 0. handel284 probyN: H284-1 TAK (mediana zysku karawan ostatnie 10 dob 88, 69, 67, 76 ... > 0), H284-6 TAK (ARYTMETYKA OK,
+  nic z niczego), H284-5 brak surowcow 238.6 -> 144.5 (ruda 196 -> 114, drewno 23 -> 13, skora 18 -> ...), tylko srebro wsad 4.8 -> 5.3; NIE poza celem:
+  H284-2 udzial z wyplata 0.148 -> 0.188 (cel 0.25), H284-3 14 kategorii nie zeszlo do bramki, H284-4 sprzedaz na stracie 3746 -> 3451/d (cel 0.3x).
+  ruda282 RU282-1 bez rudy 18 -> 6 na koniec (dni 21-30 srednio 14.2).
+- 283 NIE GOTOWE: scen. A wykryc 12, lucznikow 143, strzaly 49, jezdzcow 2, ALE stoi 0 (postoj nie dziala); B 'brak pieszego szyku wroga' (scenariusz);
+  C wykryc 2, piechoty 0, wynik panika/odwrot; N283-4 REGRESJA: FF lucznikow 5 przy 43 strzalach (> 5%); J204-3 brak kontaktu. Logi: m113\logi\132b-bitwaN\
+  Armoury-2026-10-28_00-15-31.log, wyniki m113\wyniki\grupy-132b\. 283 zostaje na galezi noc/283-reakcja-na-nekanie-z-tylu (8fe43105) i w n161 (8983380b) - NIE wgrywac.
+- 132 = WGRANE 131 + 284: worktree zb\n132h, galaz noc/132-handel-bez-283 (a2ef2e32; scalenie 284 od 23cc393c bez konfliktow), build Armoury 1a112ad9.
+  AUTOTEST 132c (zadanie biqckgjkn, m113\seria-132c.out.txt; testy-noc-204.ps1 kopia,bitwaN,probyN 30 dob). Gdy grupy (handel284 jak 132b, reszta bez nowych NIE)
+  -> WGRANIE 132 (DLL test\mfinal132c, z kopia 131 591d0ecc; pliki danych bez zmian), statusy CHANGELOG 284 = WGRANE 132 na galezi n132h.
+- DALEJ (drugie konto, gdy limit): 283c - postoj armii (R4/R5 nie zatrzymuje szyku w marszu), FF lucznikow (linia strzalu przepuszcza swoich), scenariusz B bez
+  pieszego szyku wroga, C bez oddzialu piechoty; potem nowa linia glowna: n161 ma 283+284, n132h tylko 284 - kolejne paczki od n161 po naprawie 283.
+  Tez: H284-2/3/4 (zold karawan 146k/d wobec marzy), srebro/bawelna/glina w tabeli zamowien, NWAR-15 klin plotno/len.
+
 ## DOPISEK 28.10 ok. 00:40 CET - poprawki 283b/284b scalone (n161 8983380b, Armoury 2849ca38), AUTOTEST 132b w toku
 - 283b (8fe43105): nekajacy z testu nie dochodzil za wroga - ograniczenie predkosci marszu (MarchToContact.PostSpeed) obejmowalo go jako czlonka szyku; obejscie
   przez skrzydlo (TestRoute), postoj przy celu, rozkaz tylko przy zmianie punktu; nekajacy testu nie jest 'Group'. Logika reakcji dzialala dla innych (R1 24,
