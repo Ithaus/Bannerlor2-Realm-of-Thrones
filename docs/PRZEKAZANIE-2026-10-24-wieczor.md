@@ -1,5 +1,16 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 00:40 CET - poprawki 283b/284b scalone (n161 8983380b, Armoury 2849ca38), AUTOTEST 132b w toku
+- 283b (8fe43105): nekajacy z testu nie dochodzil za wroga - ograniczenie predkosci marszu (MarchToContact.PostSpeed) obejmowalo go jako czlonka szyku; obejscie
+  przez skrzydlo (TestRoute), postoj przy celu, rozkaz tylko przy zmianie punktu; nekajacy testu nie jest 'Group'. Logika reakcji dzialala dla innych (R1 24,
+  R2 19, jezdzcow 16). DLL CrashScribe-at-n283 bez zmian.
+- 284b (4161b3e3): (1) sprzedaz gry CaravansCampaignBehavior.SellGoods (sciezka 'inne') ignorowala koszt: 30 dob -599k; teraz straznik 'nie ponizej kosztu' tez
+  tam; (2) towar bez wpisu kupna BK dostawal date 7 dob wstecz przy wczytaniu i po 30 dobach caly naraz szedl na wyprzedaz (dzien 109049, ok. 300 szt./d) -
+  teraz towar po 30 dobach na strate tylko bez rynku z zyskiem (AgeMarket). CaravanSizeByTrade z powrotem NIE (865cfeb9 - przyczyna strat gdzie indziej).
+  Spodziewane: H284-1 TAK; H284-4 pewnie dalej NIE (sprzedaz z braku gotowki i psujace sie jedzenie; zold ok. 146k/d wobec marzy - nieruszone).
+- AUTOTEST 132b (zadanie bui9nrk0s, m113\seria-132b.out.txt; testy-noc-283.ps1, 7 bitew + probyN 30 dob). Potem grupy jak 132a; WGRANIE 132 gdy nekanie283
+  i handel284 (poza H284-4/H284-3 jesli wyjasnione) bez NIE.
+
 ## DOPISEK 28.10 ok. 00:00 CET - 132a: stabilnie, ale 283 i 284 NIE DZIALAJA jak trzeba - 132 NIE WGRANE; poprawki 283b/284b w toku; TYDZIEN 96%
 - 132a (n161 e714ccca, Armoury 6b2ef43e): bitwaN 7 bitew + probyN 30 dob kod 0, zapisy Jeffa nietkniete, ERROR 0. Grupy: m113\wyniki\grupy-132a\.
   UWAGA: w logi\132a-probyN lezy tez stary log z 25.10 - brac Armoury-2026-10-27_23-38-07.log; bitwaN: Armoury-2026-10-27_23-24-37.log.
