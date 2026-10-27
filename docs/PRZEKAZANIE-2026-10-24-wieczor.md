@@ -1,5 +1,17 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 23:00 CET - 131a OK (czeka bieg wczytania), 283 GOTOWE (nie scalone), 284 w toku
+- 131a (n161 6f30e9ac, Armoury 591d0ecc): bitwaN 13.2 min + probyN 30 dob kod 0, zapisy Jeffa nietkniete. Grupy (m113\wyniki\grupy-131a; bitwaN log
+  Armoury-2026-10-27_22-14-49.log - w katalogu lezy tez stary log z 25.10, nie brac globem): ksiega280 / rody277 / m204jazda / nwar / war241 itd. NIE 0.
+  NIE: E223-8 dwa zwolnienia po 15.6 i 13.4 doby (wpisy z zapisu starej DLL - jednorazowo; E223-5 12.1 TAK); RU282-1 (bez rudy 17.4 -> 13.4, cel <= 10;
+  wszystkich bez rudy 18 -> 9), RU282-3 (cena bez rudy / zrodlo 2.32 -> 3.55 - GORZEJ, do 284), RU282-7 (zelazo +20.6/d, cel <= 10); zamowienia rudy 441,
+  dowiezione 5736 szt. (bylo ~0), juki 2246 -> 1032. bitwaN: NRU-10 i P264-7 tylko krotki bieg (w probyN TAK), K259-7 T2 jak zawsze.
+- W toku: biegi wczytania dla 280 (zadanie bq6xwg7us): A 4 doby z zapisem, B wczytuje zapis A 4 doby; logi m113\seria-131a-wczytA/B.out.txt -> ksiega280 K280-3/8/9.
+  Jesli OK: WGRANIE 131 (DLL test\mfinal131a, md5 591d0ecc; pliki danych bez zmian od 130? sprawdzic git diff 9d807118..6f30e9ac ModuleData).
+- 283 (zb\n283): 0da797db + 0c2d6081 + recenzja 4bfffb1b (Armoury 4afa102e); 10 uwag recenzji naprawione. Autotest wymaga CrashScribe-at-n283.dll
+  (scratchpad sesji 1e1c276a\cs-at283\, md5 8922f2fc) i -Battles 7 (scenariusze A konny za lucznikami, B pieszy, C miecz) + grupa nekanie283 i m110anim.
+- 284 w toku (wf_627247df-0c5). Potem: scalic 283 + 284 do n161, autotest 132a, WGRANIE 132.
+
 ## DOPISEK 27.10 ok. 22:20 CET - 280+281+282 SCALONE (n161 6f30e9ac, Armoury 591d0ecc), AUTOTEST 131a w toku; paczka 284 karawany i wszystkie surowce
 - Scalenie: git merge 280 (bez konfliktow), 281 i 282 (CHANGELOG/sprawdz_logi zlozone scal_sklad z bazy 9d807118), gen_mcm, build Release 0 bledow.
   Self-testy K280, E223, RU282, R277 TAK. Zapis testowy odswiezony z zapisu Jeffa 22:09 (zdjecie bazy usuniete - wrapper robi nowe).
