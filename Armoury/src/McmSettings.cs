@@ -9488,6 +9488,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool KsRampMineralTimes { get; set; } = true;
 
+        [SettingPropertyBool("Caravans Hold Only What They Sell", HintText = "caravans keep at most as much iron as they really sell to towns in ten days (their own sales over the last two weeks) - above that they stop buying it and unload it into every town they enter, up to that town's surplus mark, paid from the town's spare coin as any sale. Until now they kept buying while all of them carried less than six times what all towns lacked - a mark never reached, so about a quarter of the world's iron rode in caravan packs while many towns had none. Only iron; other bulk goods are measured in the log only. Needs three days of measured sales first (a new or older save uses the old mark until then). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron ore flow between towns (282)")]
+        public bool CaravanBulkFlowGate { get; set; } = true;
+
+        [SettingPropertyBool("Material Orders - Neediest Town First", HintText = "a town's raw material orders are served in order of how many days its stall and goods on the way would last, the emptiest first (until now in no particular order, so the first orders of the day took the few sources), and a source is chosen by profit per day of the carts' journey, not profit per kilogram alone (a cheap source eight days away no longer beats a dearer one two days away when the margin is about the same). Only the order and the choice of source change, not the amounts. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron ore flow between towns (282)")]
+        public bool TownMaterialOrderNeediestFirst { get; set; } = true;
+
+        [SettingPropertyBool("Iron Sources Sell Down To Reorder Point", HintText = "a town sells iron to another town's order down to its own reorder point (what it would order itself: the journey plus two days of its use) instead of the larger caravan surplus mark, which over all towns came to more than all their stalls held, so almost no town counted as a source - and never so much that it is left with fewer days of iron than the buyer gets. Only iron, only for town orders (the caravans', the people's and the bloomeries' marks are as before). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron ore flow between towns (282)")]
+        public bool TownMaterialOrderOreEqualCover { get; set; } = true;
+
+        [SettingPropertyBool("Ks Iron Hands Count Iron On The Road", HintText = "with Ks Iron Hands Follow Market: the weekly step counts the iron already on its way to the towns of the market (merchant carts and caravan contracts) together with the stalls - mines get more hands only while stalls and the goods on the road are below the smiths' stock, as with food. Hands still only move between the work of a district part; nothing is made from nothing. Off = stalls alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron ore flow between towns (282)")]
+        public bool KsIronHandsCountTransit { get; set; } = true;
+
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsFollowMarket { get; set; } = true;
@@ -12591,6 +12607,10 @@ namespace Armoury
             s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
             s.BloomeryWoodCredit = BloomeryWoodCredit;
             s.KsRampMineralTimes = KsRampMineralTimes;
+            s.CaravanBulkFlowGate = CaravanBulkFlowGate;
+            s.TownMaterialOrderNeediestFirst = TownMaterialOrderNeediestFirst;
+            s.TownMaterialOrderOreEqualCover = TownMaterialOrderOreEqualCover;
+            s.KsIronHandsCountTransit = KsIronHandsCountTransit;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;

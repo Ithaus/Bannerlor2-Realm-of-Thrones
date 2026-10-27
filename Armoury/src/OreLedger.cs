@@ -55,10 +55,11 @@ namespace Armoury
             public readonly HashSet<Village> Modelled = new HashSet<Village>();
             public int LastAll = -1, LastTowns = -1;
             public int[] Shown; public int ShownDay = -1;           // paczka 146: liczby ostatniej wydrukowanej linii - kontrola ksiegi towarow (GoodsLedger)
+            public long[] Folk; public int FolkDay = -1;            // 282 (F5): drewno - [dawne bez wyjasnienia, mieszczanie, pola mieszczan (KS), naprawy kowali, inne pozycje] z dzisiejszej linii
 
             public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
             public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Scrap = 0; DrillScrap = 0; BloomWood = 0; Coal = 0; Ingot = 0; Crafts = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
-            public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; Shown = null; ShownDay = -1; }
+            public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; Shown = null; ShownDay = -1; Folk = null; FolkDay = -1; }
         }
 
         /// <summary>Paczka 146: liczby dzisiejszej linii "Ruda:"/"Drewno:" (wsie, las wsi, miasta i zamki, warsztaty zbrojne, linie towarowe,
@@ -80,7 +81,21 @@ namespace Armoury
             return id == "iron" ? _iron : (id == "hardwood" ? _wood : null);
         }
 
-        internal static void Reset() { _iron.Reset(); _wood.Reset(); IronLands.Reset(); _craftDepth = 0; }
+        internal static void Reset() { _iron.Reset(); _wood.Reset(); IronLands.Reset(); _craftDepth = 0; _w282 = null; }
+
+        // ------------------------------------------------------------ 282: odczyty do linii "Ruda przeplyw (282)" i kontroli ksiegi towarow
+        private static string _w282;   // zelazo swiata z dzisiejszej linii "Zelazo (lupy) (214)"/"Ruda:" (zapas razem, zmiana, miasta, karawany)
+
+        /// <summary>282: zelazo swiata z dzisiejszej linii ksiegi rudy (MaterialOrders.Line282 biegnie pozniej w tej samej dobie).</summary>
+        internal static string IronWorld282() { return _w282 ?? "brak linii ksiegi rudy"; }
+
+        /// <summary>282 (F5): drewno - liczby dzisiejszej linii "Drewno:" do kontroli ksiegi towarow: [dawne bez wyjasnienia, mieszczanie, pola mieszczan (KS),
+        /// naprawy kowali (135), inne pozycje ksiegi towarow] (netto: + zrodlo, - ujscie); null - linia nie byla dzis drukowana albo bez ksiegi towarow.</summary>
+        internal static long[] WoodFolkToday()
+        {
+            var b = _wood;
+            return b.Folk != null && b.FolkDay == (int)CampaignTime.Now.ToDays ? b.Folk : null;
+        }
 
         // ------------------------------------------------------------ fix-ksiega: nawias rzemiosla miasta (TownCrafts.OnDailyTickTown)
         private static int _craftDepth;   // > 0 - trwa doba rzemiosla miasta (148 + przetwory ZC5); tylko watek glowny (DailyTickTown)
@@ -290,6 +305,12 @@ namespace Armoury
             if (craftCol) sb.Append(", przetwory miast (ZC5/148) ").Append(b.Crafts);
             if (b == _wood && (b.BloomWood > 0 || Bloomery.On)) sb.Append(Bloomery.WoodSegment(b.BloomWood));   // E6/R1 (214): dymarki przy kopalniach (targ - ujscie zapasu; las okregu - poza zapasem)
             if (bloom) sb.Append(Bloomery.SmeltSegment(b.Scrap, b.DrillScrap));
+            // 282 (F5): drewno - mieszczanie (opal i koszyk BK), pola mieszczan (KS) i naprawy kowali (135) z ksiegi towarow (te same ramki, ta sama doba - ksiega towarow
+            // drukuje zaraz po tej linii); dotad poza "znanym", wiec cale szly do "bez wyjasnienia" (log Jeffa 109002: -1940 + 380 - 2 = -1562). Bez ksiegi towarow - jak dotad
+            long fTown = 0, fKs = 0, fMend = 0, fOther = 0;
+            bool folk = b == _wood && GoodsLedger.OpenFolk282(b.Id, out fTown, out fKs, out fMend, out fOther);
+            if (folk) sb.Append(", mieszczanie i pola (ksiega towarow, 282): mieszczanie ").Append(Signed((int)fTown)).Append(", pola mieszczan (KS) ").Append(Signed((int)fKs))
+                         .Append(", naprawy kowali (135) ").Append(Signed((int)fMend)).Append(", inne pozycje ksiegi towarow (zamki, zaopatrzenie BK, ticki) ").Append(Signed((int)fOther));
             sb.Append("; zapas: miasta ").Append(towns);
             if (b.LastTowns >= 0) sb.Append(" (").Append(Signed(towns - b.LastTowns)).Append(")");
             sb.Append(", zamki ").Append(castles).Append(", wsie ").Append(villages).Append(", tabory ").Append(road)
@@ -301,12 +322,15 @@ namespace Armoury
             {
                 int delta = all - b.LastAll;
                 int known = b.Villages + b.Woodlot + b.Towns + b.Scrap + b.DrillScrap + b.Ingot - b.Shops - b.Lines - b.Builds - b.Fletch - b.BloomWood - b.Coal - b.Crafts;
+                int raw = delta - known;
+                if (folk) { known += (int)(fTown + fKs + fMend + fOther); b.Folk = new[] { (long)raw, fTown, fKs, fMend, fOther }; b.FolkDay = (int)CampaignTime.Now.ToDays; }   // 282 (F5)
                 sb.Append(" (").Append(Signed(delta)).Append(", bez wyjasnienia ").Append(Signed(delta - known)).Append(")");
             }
             sb.Append("; miast bez towaru ").Append(empty).Append(" z ").Append(townCount)
               .Append("; zima: ").Append(WinterBite.WinterNow() ? "TAK" : "nie")
               .Append(bloom ? ". Lupa = " : ". Ladunek = ").Append(kg.ToString("0")).Append(" kg.");
             Log.Info(sb.ToString());
+            if (b == _iron) _w282 = "razem " + all + (b.LastAll >= 0 ? " (" + Signed(all - b.LastAll) + ")" : " (pierwszy pomiar)") + ", miasta " + towns + ", karawany " + roadCaravans + ", wozy kupcow " + carts;   // 282
             if (b == _iron) IronLands.Daily(it, (int)CampaignTime.Now.ToDays - 1);   // P3/P2a: linia "Zelazo wedlug ladow" (tylko log; wlasny licznik potkniec)
             // fix-ksiega: przy kluczu osma liczba - przetwory miast (kontrola ksiegi towarow porownuje ja z ramka rzemiosla miasta); bez klucza 7 liczb jak dotad
             b.Shown = craftCol ? new[] { b.Villages, b.Woodlot, b.Towns, b.Shops, b.Lines, b.Builds, all, b.Crafts } : new[] { b.Villages, b.Woodlot, b.Towns, b.Shops, b.Lines, b.Builds, all };

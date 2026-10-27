@@ -690,6 +690,11 @@ LABELS = {
     'CanonHouses277': 'Canon Houses of the West',
     'CanonHouses277Rename': 'Canon Houses of the West - Book Names',
     'CanonHouses277LiegePay': 'Canon Houses of the West - Liege Pays the Host',
+    # 282: nazwy opisowe (regula ogolna dalaby "Caravan Bulk Flow Gate", "Town Material Order Ore Equal Cover")
+    'CaravanBulkFlowGate': 'Caravans Hold Only What They Sell',
+    'TownMaterialOrderNeediestFirst': 'Material Orders - Neediest Town First',
+    'TownMaterialOrderOreEqualCover': 'Iron Sources Sell Down To Reorder Point',
+    'KsIronHandsCountTransit': 'Ks Iron Hands Count Iron On The Road',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial
