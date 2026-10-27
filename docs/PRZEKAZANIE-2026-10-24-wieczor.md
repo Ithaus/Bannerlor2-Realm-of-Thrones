@@ -1,5 +1,15 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 18:50 CET - 274 gotowe; WSZYSTKIE 6 PACZEK SCALONE w n161 (2a96d15b, Armoury a25f28c0, NIE wgrane); nastepny krok AUTOTEST 129a
+- 274 (zb\n274): 3b37dd98 + 22a7ca04 + recenzja 48710016 (cc91a05c). CanonWarClock.cs, CanonWarBalance(.Levers/.Restraint/.Test).cs; klucze Canon War Balance /
+  Restraint / Muster; zapis arm_cwb274; koniec przy RedWeddingEvent >= 2 albo smierci Robba (jak 264). Przyczyna slabosci B: ROT - B ma 17 rodow z lennami i 19
+  twierdz, A 34 i 38 (pelne B to ok. 0.78 A). Siedziby z "strona domowa" (odbicie wlasnej siedziby bez weta). Decyzja dla Jeffa: W3 (wiekszy kredyt 168 dla slabszego).
+- Scalenie 274: konflikt Settings.cs (bloki 272 i 274 - oba), McmSettings z gen_mcm, CHANGELOG i sprawdz_logi scal_sklad z bazy 056ae5f4 i 6 galezi.
+- AUTOTEST 129a do zrobienia (gra wylaczona o 18:49): wrapper m113\testy-noc-204.ps1 -Tree n161 -Dll mfinal129a -Runs kopia,bitwaN,probyN -Harasser 3
+  -CsAt test\CrashScribe-at-n204.dll -ExtraFlags armoury-dzwiek-bitwy.flag,armoury-pokoj264.flag,armoury-zbroja268.flag,armoury-rownowaga274.flag,armoury-karawany.flag
+  (+ odswiezyc zapis testowy z zapisu Jeffa, przeniesc stare zdjecie bazy m113\zapisy na D:; logi Jeffa z dnia na D: przed testem). Potem grupy war241 karawany259
+  pokoj264 z268 krol272 rownowaga274 + stare; dlugi bieg swiata (241/259/274) osobno.
+
 ## DOPISEK 27.10 ok. 20:00 CET - 268, 272 gotowe; 241+259+264+268+272 SCALONE w n161 (cf193290, build 2a226448, NIE wgrane); 274 w toku
 - 268 (zb\n268): 9fc4889c + c087422c + recenzja 03d5313c. p9 liczy B (udzial ludzi ze zbroja korpusu), ArmourOrders.cs (zamowienia zbroi/helmow pelne, cap 60),
   E3-Z1 bez limitu 1/dzien dla korpusu i helmu, klucze AiArmsCountsBodyArmour, AiArmourOrderFull; flaga armoury-zbroja268.flag, grupa z268.
