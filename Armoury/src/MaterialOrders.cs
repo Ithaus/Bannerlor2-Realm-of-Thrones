@@ -144,7 +144,7 @@ namespace Armoury
         private static readonly Dictionary<Town, int> _dstOreCartSince = new Dictionary<Town, int>();
         private static readonly Dictionary<Settlement, int> _srcOreCartSince = new Dictionary<Settlement, int>();
         // 282 (F2/F3, linia "Ruda przeplyw (282)"): pamiec doby rudy miasta (prog zrodla = wlasny punkt zamowienia, zuzycie) i liczniki doby rudy - tylko log
-        private static readonly Dictionary<Town, float[]> _oreDay = new Dictionary<Town, float[]>();   // [0] punkt zamowienia (sztuki), [1] zuzycie dobowe (UseDest)
+        private static readonly Dictionary<Town, float[]> _oreDay = new Dictionary<Town, float[]>();   // [2m] punkt zamowienia surowca m (sztuki), [2m+1] zuzycie dobowe (UseDest); NaN - nie liczone (284: kazdy surowiec)
         private static int _o2Try, _o2Cart, _o2CartQty, _o2CartDays, _o2CarDays, _o2Capped, _o2Enough, _o2Pause, _o2CartDone, _o2CarDone;
         private static long _o2CartCost;
         private static double _o2Profit; private static int _o2ProfitN;
@@ -384,33 +384,72 @@ namespace Armoury
 
         /// <summary>282 (F3): punkt zamowienia miasta-zrodla rudy = ceil((D + 2) x zuzycie) - ten sam warunek, ktorym miasto samo zamawia (174b.2); [1] - zuzycie
         /// (UseDest). Z pamieci doby (_oreDay - czyszczona w Daily i Reset).</summary>
-        private static float[] OreDay(Town t)
+        private static float[] OreDay(Town t) { return MatDay(t, Ore); }
+
+        /// <summary>284: punkt zamowienia i zuzycie dobowe surowca m w miescie ([0], [1]) - ta sama miara co ruda (282 F3), pamiec doby na miasto i surowiec.</summary>
+        private static float[] MatDay(Town t, int m)
         {
             float[] a;
-            if (_oreDay.TryGetValue(t, out a)) return a;
-            float use = UseDest(t, Ore);
-            a = new[] { (float)Math.Ceiling((TravelDays(t, Ore) + 2f) * use), use };
-            _oreDay[t] = a;
-            return a;
+            if (!_oreDay.TryGetValue(t, out a)) { a = new float[2 * M]; for (int k = 0; k < a.Length; k++) a[k] = float.NaN; _oreDay[t] = a; }
+            if (float.IsNaN(a[2 * m]))
+            {
+                float use = UseDest(t, m);
+                a[2 * m] = (float)Math.Ceiling((TravelDays(t, m) + 2f) * use); a[2 * m + 1] = use;
+            }
+            return new[] { a[2 * m], a[2 * m + 1] };
         }
 
         private static bool OreEqOn { get { var s = Settings.Current; return s != null && s.TownMaterialOrderOreEqualCover; } }
+
+        /// <summary>284 (klucz TownMaterialOrderEqualCoverAll): zrodlo do wlasnego punktu zamowienia i rownego zapasu dni - ruda zawsze (282), reszta tabeli przy kluczu.</summary>
+        private static bool EqOn(int m)
+        {
+            var s = Settings.Current;
+            return s != null && s.TownMaterialOrderOreEqualCover && (m == Ore || s.TownMaterialOrderEqualCoverAll);
+        }
+
+        private static int _eqCappedOther;   // 284: przyciecia rownym zapasem dni poza ruda (linia "Wsad warsztatow (284)")
+        internal static int TakeEqCappedOther() { int x = _eqCappedOther; _eqCappedOther = 0; return x; }
+
+        /// <summary>284 (klucz TownMaterialOrderWorkshopInputs, CommodityInputs284): cykl warsztatu towarowego bez wsadu kategorii c - sygnal zamowienia surowca tabeli o tej kategorii.</summary>
+        internal static bool NoteMissCategory(Town town, ItemCategory c)
+        {
+            try
+            {
+                if (town == null || c == null || !Ready()) return false;
+                for (int m = 0; m < M; m++) if (_items[m] != null && _items[m].ItemCategory == c) { Bump(_miss, town, m); return true; }
+            }
+            catch (Exception e) { Stumble("NoteMissCategory", e); }
+            return false;
+        }
+
+        /// <summary>284: zuzycie wsadu warsztatu towarowego (udany cykl) w zmierzonym zuzyciu miasta - surowiec tabeli o tej kategorii.</summary>
+        internal static bool NoteUseCategory(Town town, ItemCategory c, int n)
+        {
+            try
+            {
+                if (town == null || c == null || n <= 0 || !Ready()) return false;
+                for (int m = 0; m < M; m++) if (_items[m] != null && _items[m].ItemCategory == c) { NoteUse(town, _items[m], n); return true; }
+            }
+            catch (Exception e) { Stumble("NoteUseCategory", e); }
+            return false;
+        }
 
         /// <summary>282 (F3, klucz TownMaterialOrderOreEqualCover): ile rudy miasto-zrodlo sprzeda na zamowienie miasta dst: ponad wlasny punkt zamowienia (zamiast
         /// progu karawan 174 - suma progow wszystkich miast byla wieksza niz wszystkie polki), i nie wiecej niz rowny zapas dni: po sprzedazy zrodlo ma co najmniej tyle
         /// dob zapasu, ile cel z polka i dowozem: (have - x) / uS >= (haveDst + inTr + x) / uD. Zrodlo bez zuzycia - bez tej granicy. Marza ceny i przerwa 3 dob -
         /// jak dotad (straz przed przerzucaniem tam i z powrotem).</summary>
-        private static int OreSellable(Town src, int have, Town dst, int haveDst, int inTrDst)
+        private static int MatSellable(Town src, int m, int have, Town dst, int haveDst, int inTrDst)
         {
-            var a = OreDay(src);
+            var a = MatDay(src, m);
             int sell = have - (int)a[0];
             if (sell <= 0) return sell;
-            float uS = a[1], uD = dst != null ? OreDay(dst)[1] : 0f;
+            float uS = a[1], uD = dst != null ? MatDay(dst, m)[1] : 0f;
             if (uS > 0f && uS + uD > 0f)
             {
                 double c = Math.Floor(((double)have * uD - (double)(haveDst + inTrDst) * uS) / (uS + uD));
                 int cap = c >= int.MaxValue ? int.MaxValue : (int)Math.Max(-1.0, c);
-                if (cap < sell) { _o2Capped++; sell = cap; }
+                if (cap < sell) { if (m == Ore) _o2Capped++; else _eqCappedOther++; sell = cap; }
             }
             return sell;
         }
@@ -664,7 +703,7 @@ namespace Armoury
             int haveDst = town.Owner.ItemRoster.GetItemNumber(item), inTrDst = InTransit(dest, m);
             int want = (int)Math.Ceiling(Math.Max(10f, D + 4f) * use) - haveDst - inTrDst;
             if (want <= 0) { _dEnough++; if (m == Ore) _o2Enough++; return; }
-            bool oreEq = m == Ore && s.TownMaterialOrderOreEqualCover;   // 282 (F3): ruda - zrodlo do wlasnego punktu zamowienia i rownego zapasu dni
+            bool oreEq = EqOn(m);   // 282 (F3): ruda - zrodlo do wlasnego punktu zamowienia i rownego zapasu dni; 284: kazdy surowiec tabeli (TownMaterialOrderEqualCoverAll)
             bool perDay = s.TownMaterialOrderNeediestFirst;               // 282 (F2): wybor zrodla wedlug zysku na dobe drogi wozu
             float bestScore = 0f;
             // P3/Z1 (O2-1 P1 pkt 2): przy lupie (Bloomery.On - z kopalni wyjezdza zelazo, nie ruda) i kontrakcie wozem zelazo jedzie jak inne surowce
@@ -719,7 +758,7 @@ namespace Armoury
                 // niczego nie zmieni - pomijamy je bez progu nadwyzki i bez tras (wynik i liczniki te same)
                 if (cL == null && cS == null && pL == null && pS == null && anySrc && anyRoute && landNoCar) continue;
                 int have = src.ItemRoster.GetItemNumber(item);
-                int surplus = have <= 0 ? 0 : oreEq ? OreSellable(t, have, town, haveDst, inTrDst) : have - SourceKeepDay(t, m);
+                int surplus = have <= 0 ? 0 : oreEq ? MatSellable(t, m, have, town, haveDst, inTrDst) : have - SourceKeepDay(t, m);
                 if (surplus <= 0) { cL = cS = null; fL = fS = 0f; }   // przewoznik zakupu tylko przy nadwyzce (jak dotad)
                 if (surplus <= 0 && pL == null && pS == null) continue;   // nie ma czego wiezc
                 anySrc = true;
@@ -869,7 +908,7 @@ namespace Armoury
                     if (st == null || st.ItemRoster == null || t.MarketData == null) continue;
                     int have = st.ItemRoster.GetItemNumber(item);
                     if (have < minPcs) continue;
-                    int keep = !t.IsTown ? CastleKeep(t, m) : m == Ore && OreEqOn ? (int)OreDay(t)[0] : SourceKeepDay(t, m);   // 282 (F3): ruda - wlasny punkt zamowienia miasta
+                    int keep = !t.IsTown ? CastleKeep(t, m) : EqOn(m) ? (int)MatDay(t, m)[0] : SourceKeepDay(t, m);   // 282 (F3): ruda - wlasny punkt zamowienia miasta; 284: kazdy surowiec przy kluczu
                     if (have - keep < minPcs) continue;
                     list.Add(new CartSrc { T = t, St = st, Keep = keep });
                 }
@@ -962,7 +1001,7 @@ namespace Armoury
             var dstPrice = new Dictionary<int, int>();
             CartSrc best = null; int bestQ = 0, bestDays = 0; float bestPerKg = 0f, bestScore = 0f; bool bestNaval = false, bestMixed = false;
             bool anySrc = false, anyRoute = false, anyWant = false, noGold = false, anySmall = false;
-            bool oreEq = m == Ore && s.TownMaterialOrderOreEqualCover, perDay = s.TownMaterialOrderNeediestFirst;   // 282 (F3, F2)
+            bool oreEq = EqOn(m), perDay = s.TownMaterialOrderNeediestFirst;   // 282 (F3, F2); 284: rowny zapas dni dla kazdego surowca przy kluczu
             foreach (var c in CartSources(m, minPcs))
             {
                 var src = c.St;
@@ -972,7 +1011,7 @@ namespace Armoury
                 if (!landTry && !seaTry) continue;
                 if (src.IsUnderSiege || (src.MapFaction != null && dest.MapFaction != null && FactionManager.IsAtWarAgainstFaction(src.MapFaction, dest.MapFaction))) continue;
                 int haveSrc = src.ItemRoster.GetItemNumber(item);
-                int surplus = oreEq && c.T.IsTown ? OreSellable(c.T, haveSrc, town, haveDst, inTr) : haveSrc - c.Keep;   // polka na swiezo - z tego zrodla kupuja dzis takze inne miasta
+                int surplus = oreEq && c.T.IsTown ? MatSellable(c.T, m, haveSrc, town, haveDst, inTr) : haveSrc - c.Keep;   // polka na swiezo - z tego zrodla kupuja dzis takze inne miasta
                 if (surplus < minPcs) continue;
                 anySrc = true;
                 float dL, dS;
@@ -1427,9 +1466,10 @@ namespace Armoury
                     if (n <= 0) break;                                                    // miasto bez kasy ponad rezerwe - reszta zostaje karawanie
                     int had = el.Amount, purse = mp.PartyTradeGold, packAll = Total(pack, item), shelfAll = Total(town.Owner.ItemRoster, item);
                     TownToll.ExemptBegin();                                      // E3-G3: dostawa kontraktu 174 bez myta targowego (marza liczona bez myta, Cost174)
+                    CaravanTrade284.Path = CaravanTrade284.PathContract;         // 284: droga sprzedazy w ksiedze zysku
                     try { SellItemsAction.Apply(mp.Party, town.Owner, el, n, st); }
                     catch (Exception e) { Stumble("Deliver(sprzedaz)", e); break; }
-                    finally { TownToll.ExemptEnd(); }
+                    finally { TownToll.ExemptEnd(); CaravanTrade284.Path = 0; }
                     int moved = packAll - Total(pack, item);   // 174b.2: wszystkie stosy (oprozniony stos zmienia kolejnosc w rosterze)
                     if (moved != Total(town.Owner.ItemRoster, item) - shelfAll) { _dAudit++; _auditAll++; }   // 174b.2 audyt: ubytek jukow == przyrost polki celu (wszystkie stosy)
                     if (moved <= 0) break;

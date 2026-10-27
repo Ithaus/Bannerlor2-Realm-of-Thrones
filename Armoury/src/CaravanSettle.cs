@@ -209,6 +209,28 @@ namespace Armoury
             return c;
         }
 
+        /// <summary>284 (CaravanTrade284, zasada kapitalu obrotowego przy zakupie): kapital i podloga kiesy - TE SAME liczby co Compute dla karawany rozliczanej przez rod
+        /// (kapital = min(model, dane E3/7), podloga = PartyGoldLowerThreshold + zold doby albo 30 dni zoldu bez zwrotu); karawana spoza rozliczenia (notabl - E3-T2):
+        /// kapital z modelu gry, podloga = PartyGoldLowerThreshold + zold doby (zold idzie z kiesy, notabl dopelnia kiese do progu). Tylko odczyt.</summary>
+        internal static void CapFloor(MobileParty mp, out int capital, out int floor)
+        {
+            var ms = Campaign.Current.Models;
+            var cpc = mp.CaravanPartyComponent;
+            int model = ms.CaravanModel.GetInitialTradeGold(mp.Owner, cpc != null && cpc.CanHaveNavalNavigationCapability, cpc != null && cpc.IsElite);
+            int wage = Math.Max(0, mp.TotalWage);
+            if (Settled(mp))
+            {
+                int f = FundedOf(mp);
+                capital = f >= 0 ? Math.Min(model, f) : model;
+                floor = ms.ClanFinanceModel.PartyGoldLowerThreshold + (NoRefund(mp) ? CaravanGoods.KeepWageDays * wage : wage);
+            }
+            else
+            {
+                capital = model;
+                floor = ms.ClanFinanceModel.PartyGoldLowerThreshold + wage;
+            }
+        }
+
         /// <summary>max(0, min(wartosc - kapital, kiesa - podloga)) - ta sama postac co K259-2 w sprawdz_logi.</summary>
         internal static int Formula(long worth, int capital, int purse, int floor)
         {
