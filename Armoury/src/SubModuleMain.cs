@@ -383,6 +383,7 @@ namespace Armoury
                 PerfD2.SetHarmony(_harmony);         // perf-d2d3: tylko zapamietanie - prefiks podatku miast BK (PerfTownTaxSkipBk) w kampanii, po straznika
                 MercTenure.SetHarmony(_harmony);    // M6a-1: tylko zapamietanie - latki najmu gry i BK w kampanii
                 PeaceHold.SetHarmony(_harmony);     // M6a-3: tylko zapamietanie - latka pokoju gry w kampanii
+                CanonPeaceLock.SetHarmony(_harmony); // 264: tylko zapamietanie - latki pokoju kanonu (Diplomacy, AddDecision, IsAllowed) i mysli AI w kampanii
                 MercContract.SetHarmony(_harmony);  // 185: tylko zapamietanie - latki modelu finansow w kampanii   // 169c: tylko zapamietanie - okna pomiaru wpina EnsureHooks w kampanii
                 try { CanonCompanions.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CanonCompanions.ApplyAll", e); }   // m101-postacie: dworzanie bez druzyny (postfiks GetBestAvailableCommander, jak BK)
                 // paczka 146: ksiega towarow (tylko log) - NA KONCU: ramki (prefiks + finalizer) na metodach, ktore wolaja metody juz

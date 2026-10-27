@@ -71397,5 +71397,434 @@ def main(argv):
     return _e223_main_prev(argv)
 
 
+
+# ------------------------------------------------------------ pokoj264 (27.10, paczka 264 noc/264-pokoj-wojny-kanonu: bez pokoju w wojnie kanonu do Krwawych Godow - Jeff 27.10
+# "czemu dorzecze i polnoc jest slabsza od lannisterow i krolewskiej przystani to nie ma sensu", audyt 27.10 rozdz. 3 pkt 4 "tak zacznij od tych pieciu";
+# Armoury/src/CanonPeaceLock.cs, CanonPeaceLock.Test.cs, CanonWarWatch.cs, PeaceHold.cs (M6a-3 koncowy stan wojny), Prologue.River.cs (data wznowionej wojny),
+# WorldClock7.cs (lancuch wolajacych pokoju); klucz CanonWarNoPeaceUntilRedWedding)
+#   python -I tools/sprawdz_logi.py --grupa pokoj264 <Armoury-*.log>
+# P264-S self-test wyrazen (linie kontrolne jak w kodzie C#), P264-S2 test syntetyczny (dobry, zly, bez linii 264). P264-0 linia startu: latki Diplomacy ApplyPeace,
+# AddDecision, IsAllowed, mysl AI - TAK (klucz nie - INFO); P264-1 0 linii E7/0 "POKOJ KANONU MIMO BLOKADY" (pokoj pary kanonu przy czynnej blokadzie; "(test 264)" - INFO);
+# P264-2 kazda linia ZABLOKOWANY ma znana droge, a linia doby liczy co najmniej tyle blokad, ile linii od poprzedniej doby; P264-3 0 linii M6a-3 "nadal pokoj" dla pary,
+# ktora ma linie E7/0 WOJNA w tej samej lub 2 nastepnych dobach (uwolnienie przez pokoj, ktory ROT zaraz cofnal); P264-4 po kazdej linii E7/0 WOJNA korona-Dorzecze
+# z "NOWA WOJNA < 21 DNI PO POKOJU" linia m104 "WZNOWIONA" najpozniej w 3. linii doby 264 (koniec logu wczesniej - INFO); P264-5 co dobe linii 264: 4 linie wladcow
+# i 3 linie krolestw tej doby (najwyzej 1 doba z brakiem; "NIE DOTYCZY" - INFO); P264-6 0 linii "ERROR in CanonPeaceLock/CanonWarWatch" i potkniecia 0;
+# P264-7 testy autotestu T1-T7 TAK (POMINIETY / brak - INFO); P264-8 INFO: wladcy (doby w osadzie, mysli, ponizej progu, bitwy, oblezenia), hipoteza SCA (doby
+# "wyczerpane wzorem SCA z bandami tak, bez band nie"), blokady wedlug drogi, M6a-3 czekanie na ROT.
+# Nazwy pary korona-Dorzecze w liniach E7/0 (P264-4): "House Baratheon of King's Landing" i "Riverlands" (nazwy krolestw ROT w kampanii Jeffa).
+P264_TAG = "Pokoj kanonu (264): "
+P264_RX = {
+    "start": re.compile(r"^Pokoj kanonu \(264\): latki - Diplomacy ApplyPeace (TAK|BRAK|BLAD)[^,]*, AddDecision (TAK|BRAK|BLAD)[^,]*, IsAllowed (TAK|BRAK|BLAD)[^,]*, "
+                        r"mysl AI (TAK|BRAK|BLAD)[^;]*; klucz Canon War No Peace Until Red Wedding (tak|nie) \| zakres: (.*?) \| pary: (.*?)\."
+                        r"(?: \| proba autotestu: flaga \S+ (TAK|NIE))?$"),
+    "block": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| (.+?) -> (.+?): pokoj ZABLOKOWANY \(droga: (.*)\) - wojna kanonu trwa do Krwawych Godow \((.*), "
+                        r"(Polnoc-korona|Dorzecze-korona)\)\.$"),
+    "day": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| blokada (CZYNNA|KONIEC|WYLACZONA|NIE DOTYCZY) \((.*?)\) \| Polnoc-korona: (CZYNNA|KONIEC), wojna (TAK .*?|NIE) "
+                      r"\| Dorzecze-korona: (CZYNNA|KONIEC), wojna (TAK .*?|NIE) \| zablokowane dzis (\d+)(?: \[(.*?)\])?, sesja (\d+) \| gracz rzadzi: (tak|nie) "
+                      r"\| potkniecia (\d+) \(sesja (\d+)\)\.$"),
+    "test": re.compile(r"^Pokoj kanonu \(264\): test - (T\d+a?) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
+    "ruler": re.compile(r"^Wojna kanonu - wladca \(264\): dzien (\d+) \| (.+?): (.*?) \| partia: (.*?) \| AI: (.*?) \| armia: (.*?) \| dzis: bitwy polowe (\d+), oblezenia (\d+), "
+                        r"najazdy (\d+) \(godzin oblezenia (\d+), bitwy (\d+), w osadzie (\d+)/(\d+)\) \| mysl AI \(mysli (\d+), latka (\S+)\): (.*?)"
+                        r"(?: \| najlepsza ([\d.]+) / prog gry ([\d.]+) \(cel obecny (-?[\d.]+), ponizej progu (\d+) z (\d+)\))? \| dlaczego stoi: (.*?) \| SCA: (.*)\.$"),
+    "kingdom": re.compile(r"^Wojna kanonu - krolestwo \(264\): dzien (\d+) \| (.+?) \((\w+)\)(?: \| krolestwa brak\.|"
+                          r" \| wladca (.*?) \| partie lordow (\d+) \(ludzi (\d+), w osadach (\d+), w polu (-?\d+)\), armie (\d+) \(partii (\d+)\) \| oblega teraz (\d+)(?: \[.*?\])?, "
+                          r"oblegane osady (\d+) \| dzis: bitwy polowe (\d+), oblezenia (\d+), najazdy (\d+) \| wojny: (.*?) \| SCA: (.*?) \| wrog wedlug SCA (.*?) "
+                          r"\| potkniecia (\d+) \(sesja (\d+)\)\.)$"),
+    "rotwait": re.compile(r"^Pokoj a jency \(M6a-3\): dzien (\d+) \| (.+?) - (.+?): para nie w wojnie, ale ROT wymusza te wojne \(IsWarForced\) - uwolnienie czeka na wznowienie "
+                          r"\(najdluzej do (\d+) h od pokoju\)\.$"),
+    "freed": re.compile(r"^Pokoj a jency \(M6a-3\): dzien (\d+) \| (.+?) - (.+?): nadal pokoj - gra uwalnia (\d+) jencow-bohaterow"),
+    "resumed": re.compile(r"^Wojny kanonu \(m104\): \(4\) Dorzecze - wojna korona-Dorzecze WZNOWIONA \(dzien opowiesci (-?[\d.]+), po pokoju z dnia (\S+); pierwsza od dnia (-?\d+)\)"),
+}
+P264_PATHS = ("Diplomacy zmeczenie wojna", "decyzja krolestwa", "decyzja w toku (IsAllowed)", "Diplomacy wojna domowa", "ekran krolestwa", "Diplomacy ApplyPeace",
+              "wezwanie 168 zerwane")
+P264_CROWN, P264_RIVER = "House Baratheon of King's Landing", "Riverlands"
+# linie kontrolne - jak w kodzie C# (CanonPeaceLock.cs, CanonPeaceLock.Test.cs, CanonWarWatch.cs, PeaceHold.cs, Prologue.River.cs, WorldClock7.cs)
+P264_TEST = {
+    "start": "Pokoj kanonu (264): latki - Diplomacy ApplyPeace TAK, AddDecision TAK, IsAllowed TAK, mysl AI TAK; klucz Canon War No Peace Until Red Wedding tak "
+             "| zakres: kampania kanonu | pary: Polnoc-korona (battania-vlandia, do RedWeddingEvent albo smierci lord_5_1), Dorzecze-korona (riverlands-vlandia, do "
+             "RedWeddingEvent albo smierci lord_5_1).",
+    "block": "Pokoj kanonu (264): dzien {d} | Riverlands -> House Baratheon of King's Landing: pokoj ZABLOKOWANY (droga: {p}) - wojna kanonu trwa do Krwawych Godow "
+             "(Robb zyje, RedWeddingEvent 0, Dorzecze-korona).",
+    "day": "Pokoj kanonu (264): dzien {d} | blokada CZYNNA (Robb zyje, RedWeddingEvent 0) | Polnoc-korona: CZYNNA, wojna TAK od dnia 8.7 | Dorzecze-korona: CZYNNA, "
+           "wojna TAK od dnia 147.4, wznowiona po pokoju z dnia 146.4; pierwsza od dnia 34 | zablokowane dzis {n} [Diplomacy zmeczenie wojna {n}], sesja {s} "
+           "| gracz rzadzi: nie | potkniecia {p} (sesja {p}).",
+    "test": "Pokoj kanonu (264): test - T1 ApplyPeace Diplomacy Dorzecze -> korona: wojna dalej TAK, blokad 1 - wynik {r}.",
+    "ruler": "Wojna kanonu - wladca (264): dzien {d} | {lab}: Robb Stark (lord_5_1, The North) | partia: w Winterfell, ludzi 212/260, jedzenie 14.2 dni | AI: Hold -> -, "
+             "krotko Hold -> -, AI wylaczone nie, bez nowych decyzji nie | armia: brak | dzis: bitwy polowe {f}, oblezenia 0, najazdy 0 (godzin oblezenia 0, bitwy 0, w osadzie 24/24) "
+             "| mysl AI (mysli 4, latka TAK): 1. BesiegeSettlement Riverrun 0.080 zbiorka armii, 2. PatrolAroundPoint Winterfell 0.020, 3. GoToSettlement Moat Cailin 0.010 "
+             "| najlepsza 0.080 / prog gry 0.200 (cel obecny 0.40, ponizej progu 4 z 4) | dlaczego stoi: najlepsza ponizej progu gry - zostaje przy starym rozkazie (4 z 4 mysli); "
+             "SCA: wyczerpane - cele oblezen x0.55 | SCA: cel BorderWar, operacja brak, wyczerpane tak (wrog 41000 / swoi 9000, fortece 12 zagrozone 1, wojen 9, wioski spladrowane 0), "
+             "chce pokoju tak, zakaz nowej armii nie.",
+    "ruler_p": "Wojna kanonu - wladca (264): dzien {d} | glowa rodu clan_vlandia_1: Tywin Lannister (lord_4_1, House Baratheon of King's Landing) | partia: w niewoli u Jeff's Party (gracza) "
+               "| AI: - | armia: brak | dzis: bitwy polowe 0, oblezenia 0, najazdy 0 (godzin oblezenia 0, bitwy 0, w osadzie 0/0) | mysl AI (mysli 0, latka TAK): - "
+               "| dlaczego stoi: w niewoli u gracza | SCA: cel ForcePeace, operacja brak, wyczerpane nie (wrog 1 / swoi 2, fortece 1 zagrozone 0, wojen 1, wioski spladrowane 0), "
+               "chce pokoju nie, zakaz nowej armii nie.",
+    "kingdom": "Wojna kanonu - krolestwo (264): dzien {d} | The North (battania) | wladca Robb Stark | partie lordow 31 (ludzi 2400, w osadach 20, w polu 11), armie 0 (partii 0) "
+               "| oblega teraz 0, oblegane osady 0 | dzis: bitwy polowe 1, oblezenia 0, najazdy 2 | wojny: vlandia (od dnia 8.7), freefolk (od dnia ?) | SCA: cel BorderWar, "
+               "operacja brak, wyczerpane tak (wrog 41000 / swoi 9000, fortece 12 zagrozone 1, wojen 9, wioski spladrowane 0), chce pokoju tak, zakaz nowej armii nie "
+               "| wrog wedlug SCA 41000 (9 frakcji; krolestwa 12000 z 2, bandy i inni 29000), swoi 9000 -> wyczerpane wzorem SCA (wrog > swoi x 1.35): z bandami {zb}, bez band {bb} "
+               "| potkniecia 0 (sesja 0).",
+    "kingdom_x": "Wojna kanonu - krolestwo (264): dzien {d} | - (riverlands) | krolestwa brak.",
+    "rotwait": "Pokoj a jency (M6a-3): dzien {d} | Riverlands - House Baratheon of King's Landing: para nie w wojnie, ale ROT wymusza te wojne (IsWarForced) - uwolnienie czeka na "
+               "wznowienie (najdluzej do 72 h od pokoju).",
+    "kept": "Pokoj a jency (M6a-3): dzien {d} | Riverlands - House Baratheon of King's Landing: znow w wojnie - uwolnienie odwolane, 7 jencow-bohaterow z chwili pokoju zostaje "
+            "w niewoli (gra uwolnilaby dzis 0) - ROT wznowil wojne.",
+    "freed": "Pokoj a jency (M6a-3): dzien {d} | Riverlands - House Baratheon of King's Landing: nadal pokoj - gra uwalnia 6 jencow-bohaterow (w chwili pokoju 7).",
+    "e7peace": "Wojna i pokoj (E7/0): dzien {d} | Riverlands - House Baratheon of King's Landing: POKOJ (przyczyna ByKingdomDecision, wola: KingdomPeaceAction.AcceptPeace <- "
+               "KingdomPeaceAction.ApplyPeaceInternal <- KingdomPeaceAction.ApplyPeace <- WarExhaustionManager.ConsiderPeaceActions [Bannerlord.Diplomacy]) | dni od poprzedniego "
+               "zdarzenia tej pary - (brak w pamieci sesji){t}",
+    "e7war": "Wojna i pokoj (E7/0): dzien {d} | House Baratheon of King's Landing - Riverlands: WOJNA (przyczyna Default, wola: TaleWorlds.CampaignSystem.Campaign.DailyTick "
+             "[TaleWorlds.CampaignSystem]) | dni od poprzedniego zdarzenia tej pary 1 (POKOJ) - NOWA WOJNA < 21 DNI PO POKOJU",
+    "resumed": "Wojny kanonu (m104): (4) Dorzecze - wojna korona-Dorzecze WZNOWIONA (dzien opowiesci 147.4, po pokoju z dnia 146.4; pierwsza od dnia 34) | korona w wojnie z "
+               "battania, riverlands; Dorzecze w wojnie z vlandia.",
+}
+
+
+def pokoj264_selftest():
+    T = P264_TEST
+    probs = []
+    cases = [("start", T["start"]), ("start", T["start"][:-1] + ". | proba autotestu: flaga armoury-pokoj264.flag TAK"),
+             ("block", T["block"].format(d=108982, p="Diplomacy zmeczenie wojna")),
+             ("block", T["block"].format(d=108982, p="decyzja krolestwa (AddDecision, wnioskodawca House Tully)")),
+             ("day", T["day"].format(d=108983, n=1, s=2, p=0)), ("test", T["test"].format(r="TAK")),
+             ("ruler", T["ruler"].format(d=108983, lab="Robb", f=0)), ("ruler", T["ruler_p"].format(d=108983)),
+             ("kingdom", T["kingdom"].format(d=108983, zb="tak", bb="nie")), ("kingdom", T["kingdom_x"].format(d=108983)),
+             ("rotwait", T["rotwait"].format(d=108983)), ("freed", T["freed"].format(d=108983)), ("resumed", T["resumed"])]
+    for name, line in cases:
+        if not P264_RX[name].match(line):
+            probs.append(name)
+    m = P264_RX["day"].match(T["day"].format(d=108983, n=3, s=5, p=0))
+    if m and (m.group(1) != "108983" or m.group(2) != "CZYNNA" or m.group(8) != "3" or m.group(10) != "5" or m.group(11) != "nie" or m.group(12) != "0"):
+        probs.append("day grupy")
+    m = P264_RX["day"].match(T["day"].format(d=1, n=0, s=0, p=0).replace(" [Diplomacy zmeczenie wojna 0]", "").replace("blokada CZYNNA (Robb zyje, RedWeddingEvent 0)",
+                                                                                                               "blokada KONIEC (Krwawe Gody (RedWeddingEvent 1))"))
+    if not m or m.group(2) != "KONIEC" or m.group(3) != "Krwawe Gody (RedWeddingEvent 1)":
+        probs.append("day KONIEC")
+    m = P264_RX["block"].match(T["block"].format(d=5, p="decyzja krolestwa (AddDecision, wnioskodawca House Tully)"))
+    if not m or m.group(4) != "decyzja krolestwa (AddDecision, wnioskodawca House Tully)" or m.group(6) != "Dorzecze-korona":
+        probs.append("block grupy")
+    m = P264_RX["ruler"].match(T["ruler"].format(d=7, lab="Robb", f=2))
+    if not m or m.group(2) != "Robb" or m.group(7) != "2" or m.group(14) != "4" or m.group(20) != "4" or "ponizej progu" not in m.group(22):
+        probs.append("ruler grupy")
+    m = P264_RX["ruler"].match(T["ruler_p"].format(d=7))
+    if not m or m.group(17) is not None or m.group(22) != "w niewoli u gracza":
+        probs.append("ruler niewola")
+    m = P264_RX["kingdom"].match(T["kingdom"].format(d=7, zb="tak", bb="nie"))
+    if not m or m.group(3) != "battania" or m.group(5) != "31" or m.group(19) != "0" or "z bandami tak, bez band nie" not in m.group(18):
+        probs.append("kingdom grupy")
+    if not E7_WAR.match(T["e7peace"].format(d=1, t="")) or not E7_WAR.match(T["e7war"].format(d=1)) or not E7_WAR.match(T["e7peace"].format(d=1, t=" | POKOJ KANONU MIMO BLOKADY")):
+        probs.append("E7/0 z lancuchem wolajacych")
+    return ("nie pasuje: " + ", ".join(probs)) if probs else None
+
+
+def _p264_pair(a, b):
+    return tuple(sorted((a, b)))
+
+
+def pokoj264_collect(logp):
+    RX = P264_RX
+    D = {"starts": [], "blocks": [], "days": [], "tests": [], "rulers": [], "kingdoms": [], "rotwait": [], "freed": [], "e7": [], "resumed": [], "err": 0, "err1": "",
+         "against": [], "test_peace": 0, "bad_lines": [], "seq": []}
+    since = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            if "ERROR in CanonPeaceLock" in s or "ERROR in CanonWarWatch" in s:
+                D["err"] += 1
+                if not D["err1"]:
+                    D["err1"] = s[:160]
+                continue
+            if s.startswith("Wojna i pokoj (E7/0): dzien") and (": POKOJ (" in s or ": WOJNA (" in s):
+                me = E7_WAR.match(s)
+                if me:
+                    D["e7"].append((int(me.group(1)), _p264_pair(me.group(2), me.group(3)), me.group(4), s))
+                    D["seq"].append(("e7", len(D["e7"]) - 1))
+                if "POKOJ KANONU MIMO BLOKADY" in s:
+                    D["against"].append(s[:200])
+                elif "POKOJ KANONU (test 264)" in s:
+                    D["test_peace"] += 1
+                continue
+            if s.startswith("Pokoj a jency (M6a-3): dzien"):
+                mw = RX["rotwait"].match(s)
+                if mw:
+                    D["rotwait"].append(mw)
+                    continue
+                mf = RX["freed"].match(s)
+                if mf:
+                    D["freed"].append((int(mf.group(1)), _p264_pair(mf.group(2), mf.group(3)), s))
+                continue
+            if s.startswith("Wojny kanonu (m104): (4) Dorzecze - wojna korona-Dorzecze WZNOWIONA"):
+                mr = RX["resumed"].match(s)
+                D["resumed"].append(mr)
+                D["seq"].append(("res", len(D["resumed"]) - 1))
+                continue
+            if s.startswith("Wojna kanonu - wladca (264): "):
+                mr = RX["ruler"].match(s)
+                (D["rulers"] if mr else D["bad_lines"]).append(mr if mr else s[:120])
+                continue
+            if s.startswith("Wojna kanonu - krolestwo (264): "):
+                mk = RX["kingdom"].match(s)
+                (D["kingdoms"] if mk else D["bad_lines"]).append(mk if mk else s[:120])
+                continue
+            if not s.startswith(P264_TAG):
+                continue
+            r = s[len(P264_TAG):]
+            if r.startswith("latki - "):
+                D["starts"].append((RX["start"].match(s), s))
+                since = 0
+                D["seq"].append(("start", len(D["starts"]) - 1))
+            elif r.startswith("test - "):
+                mt = RX["test"].match(s)
+                if mt:
+                    D["tests"].append(mt)
+            elif r.startswith("dzien ") and " pokoj ZABLOKOWANY " in r:
+                mb = RX["block"].match(s)
+                if not mb:
+                    D["bad_lines"].append(s[:120])
+                    continue
+                D["blocks"].append(mb)
+                since += 1
+            elif r.startswith("dzien ") and " | blokada " in r:
+                md = RX["day"].match(s)
+                if not md:
+                    D["bad_lines"].append(s[:120])
+                    continue
+                D["days"].append((md, since))
+                D["seq"].append(("day", len(D["days"]) - 1))
+                since = 0
+    return D
+
+
+def pokoj264_rows(rep, D):
+    starts = D["starts"]
+    ok_starts = [m for m, _ in starts if m]
+    if not starts:
+        rep.add("P264-0: linia startu (latki ApplyPeace, AddDecision, IsAllowed, mysl AI)", "brak linii 264 (log sprzed paczki 264)", "INFO", None)
+    elif not ok_starts:
+        rep.add("P264-0: linia startu (latki ApplyPeace, AddDecision, IsAllowed, mysl AI)", "zly format: " + starts[-1][1][:100], "format jak w kodzie", False)
+    else:
+        m = ok_starts[-1]
+        hooks = [m.group(1), m.group(2), m.group(3), m.group(4)]
+        if m.group(5) != "tak":
+            rep.add("P264-0: linia startu (latki ApplyPeace, AddDecision, IsAllowed, mysl AI)", f"klucz nie, latki {hooks}", "INFO", None)
+        else:
+            rep.add("P264-0: linia startu (latki ApplyPeace, AddDecision, IsAllowed, mysl AI)", f"startow {len(starts)}, latki {hooks}, zakres {m.group(6)}", "4 x TAK",
+                    all(h == "TAK" for h in hooks))
+    has = bool(starts)
+    rep.add("P264-1: pokoj pary kanonu mimo czynnej blokady (E7/0 'POKOJ KANONU MIMO BLOKADY')",
+            f"{len(D['against'])}" + (f" ({D['against'][0][:140]})" if D["against"] else "") + f"; pokoje proby T6 (test 264) {D['test_peace']}",
+            "0", (len(D["against"]) == 0) if has else None)
+    bad_path = [m.group(4) for m in D["blocks"] if not m.group(4).startswith(P264_PATHS)]
+    under = [f"doba {md.group(1)}: linii {n}, licznik {md.group(8)}" for md, n in D["days"] if int(md.group(8)) < n]
+    paths = {}
+    for m in D["blocks"]:
+        k = m.group(4).split(" (")[0]
+        paths[k] = paths.get(k, 0) + 1
+    if not D["blocks"] and not D["days"]:
+        rep.add("P264-2: blokady z droga i licznik doby", "brak linii 264", "INFO", None)
+    else:
+        rep.add("P264-2: blokady z droga i licznik doby", f"linii ZABLOKOWANY {len(D['blocks'])} {paths}, bez znanej drogi {len(bad_path)}"
+                + (f" ({bad_path[0][:60]})" if bad_path else "") + (f", licznik doby ponizej linii: {under[:3]}" if under else ""),
+                "kazda linia z droga, licznik doby >= linie od poprzedniej doby", not bad_path and not under)
+    wars = [(d, p) for d, p, kind, _ in D["e7"] if kind == "WOJNA"]
+    viol = []
+    for d, p, s in D["freed"]:
+        if any(p == wp and d <= wd <= d + 2 for wd, wp in wars):
+            viol.append(f"doba {d}: {p[0]} - {p[1]}")
+    rep.add("P264-3: 'nadal pokoj' (M6a-3) dla pary z WOJNA w tej samej lub 2 nastepnych dobach",
+            f"{len(viol)}" + (f" {viol[:3]}" if viol else "") + f" | uwolnien 'nadal pokoj' {len(D['freed'])}, czekan na ROT {len(D['rotwait'])}",
+            "0 (log sprzed 264: dzien 108983 Riverlands - korona - NIE, dowod bledu)", len(viol) == 0)
+    rp = _p264_pair(P264_CROWN, P264_RIVER)
+    seq = D["seq"]
+    need, miss, unk = 0, [], 0
+    for i, (kind, j) in enumerate(seq):
+        if kind != "e7":
+            continue
+        d, p, k, s = D["e7"][j]
+        if p != rp or k != "WOJNA" or "NOWA WOJNA <" not in s:
+            continue
+        need += 1
+        days_seen, found, ended = 0, False, True
+        for kind2, j2 in seq[i + 1:]:
+            if kind2 == "res":
+                found = True
+                ended = False
+                break
+            if kind2 == "start":
+                ended = False
+                break
+            if kind2 == "day":
+                days_seen += 1
+                if days_seen >= 3:
+                    ended = False
+                    break
+        if not found:
+            if ended and days_seen < 3:
+                unk += 1
+            else:
+                miss.append(f"doba {d}")
+    if not has:
+        rep.add("P264-4: wznowiona wojna korona-Dorzecze ma linie m104 'WZNOWIONA'", f"wznowien (E7/0) {need}", "INFO (log sprzed 264)", None)
+    elif need == 0:
+        rep.add("P264-4: wznowiona wojna korona-Dorzecze ma linie m104 'WZNOWIONA'", "brak wznowien w logu", "INFO", None)
+    else:
+        rep.add("P264-4: wznowiona wojna korona-Dorzecze ma linie m104 'WZNOWIONA'", f"wznowien {need}, z linia {need - len(miss) - unk}, bez linii {miss[:3]}, koniec logu przed 3. doba {unk}",
+                "kazde wznowienie (koniec logu - INFO)", len(miss) == 0)
+    days = [md for md, _ in D["days"]]
+    na = [md for md in days if md.group(2) == "NIE DOTYCZY"]
+    rdays = {}
+    for m in D["rulers"]:
+        rdays.setdefault(int(m.group(1)), set()).add(m.group(2))
+    kdays = {}
+    for m in D["kingdoms"]:
+        kdays.setdefault(int(m.group(1)), set()).add(m.group(3))
+    want = [int(md.group(1)) for md in days if md.group(2) != "NIE DOTYCZY"]
+    short = [d for d in want if len(rdays.get(d, ())) < 4 or len(kdays.get(d, ())) < 3]
+    if not days:
+        rep.add("P264-5: linie wladcow (4) i krolestw (3) co dobe", "brak linii doby 264", "INFO", None)
+    elif not want:
+        rep.add("P264-5: linie wladcow (4) i krolestw (3) co dobe", f"dob {len(days)}, wszystkie 'NIE DOTYCZY' (kampania klasyczna)", "INFO", None)
+    else:
+        rep.add("P264-5: linie wladcow (4) i krolestw (3) co dobe", f"dob {len(want)}, z brakami {len(short)} {short[:5]}; linii wladcow {len(D['rulers'])}, krolestw "
+                f"{len(D['kingdoms'])}, nieczytelnych {len(D['bad_lines'])}" + (f" ({D['bad_lines'][0][:80]})" if D["bad_lines"] else ""),
+                "najwyzej 1 doba z brakiem, 0 nieczytelnych", len(short) <= 1 and not D["bad_lines"])
+    st = sum(int(md.group(12)) for md in days) + sum(int(m.group(19)) for m in D["kingdoms"] if m.group(19))
+    rep.add("P264-6: bledy i potkniecia CanonPeaceLock / CanonWarWatch", f"ERROR {D['err']}" + (f" ({D['err1']})" if D["err1"] else "") + f", potkniecia w liniach doby {st}",
+            "0 i 0", D["err"] == 0 and st == 0)
+    tests = D["tests"]
+    if not tests:
+        rep.add("P264-7: testy autotestu T1-T7", "brak linii testu", "INFO (bieg bez flagi armoury-pokoj264.flag)", None)
+    else:
+        res = {}
+        for m in tests:
+            res[m.group(1)] = m.group(3)
+        no = [k for k, v in res.items() if v == "NIE"]
+        miss_t = [t for t in ("T1", "T2", "T3", "T4", "T5a", "T5", "T6", "T7") if t not in res]
+        rep.add("P264-7: testy autotestu T1-T7", f"{res}" + (f", brak {miss_t}" if miss_t else ""), "zadnego NIE, wszystkie obecne (POMINIETY - INFO w wartosci)",
+                not no and not miss_t)
+    if D["rulers"]:
+        agg = {}
+        for m in D["rulers"]:
+            a = agg.setdefault(m.group(2), [0, 0, 0, 0, 0, 0, 0])
+            a[0] += 1
+            a[1] += 1 if m.group(12) == m.group(13) and int(m.group(13)) > 0 else 0
+            a[2] += int(m.group(14))
+            a[3] += int(m.group(20) or 0)
+            a[4] += int(m.group(7))
+            a[5] += int(m.group(8))
+            a[6] += 1 if "niewoli" in m.group(4) else 0
+        txt = "; ".join(f"{k}: dob {v[0]}, caly dzien w osadzie {v[1]}, mysli {v[2]} (ponizej progu {v[3]}), bitwy polowe {v[4]}, oblezenia {v[5]}, w niewoli {v[6]}"
+                        for k, v in agg.items())
+        hyp = sum(1 for m in D["kingdoms"] if m.group(18) and "z bandami tak, bez band nie" in m.group(18))
+        rep.add("P264-8: wladcy wojny kanonu i hipoteza SCA (INFO)", txt + f" | doby krolestw 'wyczerpane wzorem SCA z bandami tak, bez band nie' {hyp} z {len(D['kingdoms'])}",
+                "INFO (dlaczego Robb stoi)", None)
+    else:
+        rep.add("P264-8: wladcy wojny kanonu i hipoteza SCA (INFO)", "brak linii wladcow", "INFO", None)
+
+
+def pokoj264_synth():
+    import tempfile
+    import shutil
+    T = P264_TEST
+    P = "[10:00:00] "
+
+    def day_block(d, kind):
+        L = []
+        if kind == "good":
+            L.append(P + T["block"].format(d=d, p="Diplomacy zmeczenie wojna"))
+            L.append(P + T["day"].format(d=d, n=1, s=1, p=0))
+        else:
+            L.append(P + T["block"].format(d=d, p="cos innego"))
+            L.append(P + T["block"].format(d=d, p="Diplomacy zmeczenie wojna"))
+            L.append(P + T["day"].format(d=d, n=1, s=1, p=1))
+        for lab in ("Robb", "wladca korony", "wladca Dorzecza"):
+            L.append(P + T["ruler"].format(d=d, lab=lab, f=0))
+        if kind == "good":
+            L.append(P + T["ruler_p"].format(d=d))
+        for k in ("battania", "vlandia", "riverlands"):
+            L.append(P + T["kingdom"].format(d=d, zb="tak", bb="nie").replace("(battania)", "(" + k + ")"))
+        return L
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="p264_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind == "none":
+                L.append(P + "Armoury: inna linia")
+            else:
+                st = T["start"] if kind == "good" else T["start"].replace("IsAllowed TAK", "IsAllowed BRAK")
+                L.append(P + st[:-1] + ". | proba autotestu: flaga armoury-pokoj264.flag TAK")
+                for d in range(108982, 108988):
+                    L += day_block(d, kind)
+                    if d == 108983:
+                        L.append(P + T["e7peace"].format(d=d, t=(" | POKOJ KANONU (test 264)" if kind == "good" else " | POKOJ KANONU MIMO BLOKADY")))
+                        L.append(P + T["rotwait"].format(d=d + 1) if kind == "good" else P + T["freed"].format(d=d + 1))
+                        L.append(P + T["e7war"].format(d=d + 1))
+                        if kind == "good":
+                            L.append(P + T["kept"].format(d=d + 1))
+                    if d == 108985 and kind == "good":
+                        L.append(P + T["resumed"])
+                for t in ("T1", "T2", "T3", "T4", "T5a", "T5", "T6", "T7"):
+                    r = "TAK" if kind == "good" or t != "T6" else "NIE"
+                    L.append(P + T["test"].format(r=r).replace("T1 ApplyPeace", t + " ApplyPeace"))
+                if kind == "bad":
+                    L.append(P + "ERROR in CanonPeaceLock.AddDecisionPrefix (potkniecie 1): x")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            pokoj264_rows(rep, pokoj264_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"P264-0": "TAK", "P264-1": "TAK", "P264-2": "TAK", "P264-3": "TAK", "P264-4": "TAK", "P264-5": "TAK", "P264-6": "TAK", "P264-7": "TAK", "P264-8": "INFO"},
+        "bad": {"P264-0": "NIE", "P264-1": "NIE", "P264-2": "NIE", "P264-3": "NIE", "P264-4": "NIE", "P264-5": "NIE", "P264-6": "NIE", "P264-7": "NIE"},
+        "none": {"P264-0": "INFO", "P264-1": "INFO", "P264-2": "INFO", "P264-3": "TAK", "P264-4": "INFO", "P264-5": "INFO", "P264-6": "TAK", "P264-7": "INFO", "P264-8": "INFO"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def pokoj264_main(logp):
+    """pokoj264 (27.10, paczka 264): P264-S, P264-S2, P264-0..P264-8 - opis w komentarzu nad stalymi P264_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = pokoj264_selftest()
+    rep.add("P264-S: self-test wyrazen (linie kontrolne jak w kodzie C#: CanonPeaceLock.cs, CanonWarWatch.cs, PeaceHold.cs, Prologue.River.cs, WorldClock7.cs)",
+            s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = pokoj264_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("P264-S2: test syntetyczny (dobry, zly, bez linii 264)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("P264-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = pokoj264_collect(logp)
+    print(f"plik: {logp} | startow 264 {len(D['starts'])}, dob {len(D['days'])}, blokad {len(D['blocks'])}, wladcow {len(D['rulers'])}, krolestw {len(D['kingdoms'])}, "
+          f"testow {len(D['tests'])}, E7/0 {len(D['e7'])}, ERROR {D['err']}")
+    pokoj264_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_pokoj264_main_prev = main
+
+
+def main(argv):
+    # paczka 264: grupa pokoj264 - opakowanie main jak m165mapa (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "pokoj264":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return pokoj264_main(rest[0] if rest else None)
+    return _pokoj264_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

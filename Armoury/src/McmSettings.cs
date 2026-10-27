@@ -9776,6 +9776,10 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonNorthRiverlandsAlliance { get; set; } = true;
 
+        [SettingPropertyBool("Canon War No Peace Until Red Wedding", HintText = "No peace in the War of the Five Kings before the Red Wedding: the crown, the North and the Riverlands do not make peace by council vote, war weariness (Diplomacy) or Banner Kings pressure while Robb Stark lives. If you rule one of these realms, peace is your choice. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonWarNoPeaceUntilRedWedding { get; set; } = true;
+
         [SettingPropertyBool("Daenerys Dragons Grow", HintText = "Daenerys' dragons grow up with the story: in the prologue they are still eggs, and while they grow none of them can carry her, so Daenerys rides a horse from her own train. Drogon first carries her when he is full-grown, as in the books (about the time of Daznak's Pit, before her invasion of Westeros). Only in Prologue 298 campaigns and in campaigns started after this update. Off = Drogon is full-grown from the first day, as in Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool DaenerysDragonsGrow { get; set; } = true;
@@ -12611,6 +12615,7 @@ namespace Armoury
             s.CanonDorneJoinsCrown = CanonDorneJoinsCrown;
             s.CanonRiverlandsWarAtPrologueEnd = CanonRiverlandsWarAtPrologueEnd;
             s.CanonNorthRiverlandsAlliance = CanonNorthRiverlandsAlliance;
+            s.CanonWarNoPeaceUntilRedWedding = CanonWarNoPeaceUntilRedWedding;
             s.DaenerysDragonsGrow = DaenerysDragonsGrow;
             s.StoryImagesForRotWindows = StoryImagesForRotWindows;
             s.LektorEnabled = LektorEnabled;

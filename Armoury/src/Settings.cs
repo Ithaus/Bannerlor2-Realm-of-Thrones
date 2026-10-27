@@ -4479,6 +4479,10 @@ namespace Armoury
         // m116-fabula: przy wojnie wyzej SOJUSZ gry Polnoc+Dorzecze (IAllianceCampaignBehavior.StartAlliance, koniec przesuwany na +364 dni) do Krwawych Godow albo
         // smierci Robba; przed zalozeniem czeka, az obie strony maja te same wojny krolestw (inaczej gra sklada wnioski wezwan do wojny). Co dobe.
         public bool CanonNorthRiverlandsAlliance = true;   // with the war above: the North and the Riverlands fight the crown as allies (Robb Stark, King in the North and the Trident) until the Red Wedding. Never if you rule either realm
+        // 264 (CanonPeaceLock.cs; Jeff 27.10 "czemu dorzecze i polnoc jest slabsza od lannisterow" - audyt: pokoj w wojnie kanonu zablokowany do Krwawych Godow):
+        // pary Polnoc-korona i Dorzecze-korona - bez pokoju z glosowania rady, zmeczenia wojna Diplomacy i nacisku BK (latki ApplyPeace Diplomacy, Kingdom.AddDecision,
+        // MakePeaceKingdomDecision.IsAllowed) do RedWeddingEvent ROT albo smierci Robba; gracz wladca jednej strony - pokoj jego wyborem. Tylko kampania kanonu. Na zywo.
+        public bool CanonWarNoPeaceUntilRedWedding = true;   // No peace in the War of the Five Kings before the Red Wedding: the crown, the North and the Riverlands do not make peace by council vote, war weariness (Diplomacy) or Banner Kings pressure while Robb Stark lives. If you rule one of these realms, peace is your choice. Off = as before
         // m104-wojny (3) (Prologue.Dragons.cs): wierzchowiec Daenerys (lord_1_14, slot konia zestawu bojowego) wedlug dnia opowiesci: jaja (prolog), smoczeta (do 0.40 D),
         // mlode (0.40 D) i podrosle (0.625 D) - bez smoka pod siodlem, kon z jej taboru (kanon, recenzja R5: Daenerys dosiada tylko Drogona, pierwszy raz na arenie Daznaka);
         // dorosle (0.85 D albo najazd) dragon_black - Drogon jak w ROT. D = dzien najazdu Daenerys (450 x skala Fabuli). Tylko kampania (bez latek bitwy). Zakres jak (2).
