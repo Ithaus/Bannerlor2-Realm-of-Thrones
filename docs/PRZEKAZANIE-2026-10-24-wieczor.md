@@ -1,5 +1,17 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 20:15 CET - 277 gotowe i scalone (n161 12eb9216, build 88d10a9a), AUTOTEST 130a w toku
+- 277 (zb\n277): 6ff77201 + fbd0f287 + recenzja 653bdca6 (Armoury 711c6712). CanonHouses277.cs/.Pay.cs/.Test.cs; 12 rodow Zachodu i ziem koronnych z rycerzy BK korony
+  panami (nazwa i herb z arm_houses_canon.tsv, pelne parostwo BK, tier 3, druzyna glowy SpawnLordParty); zold od pana lennego regula W5 (Lannister / Joffrey);
+  raz na zapis (arm_rody277); Spicer rycerski do Krwawych Godow; klucze "Canon Houses of the West" / "- Book Names" / "- Liege Pays the Host"; grupa rody277.
+  Szacunek B/A 0.50 -> 0.54-0.58 (reszte trzyma 274). NIEODWRACALNE w Ironmanie: nazwy i herby rodow zostaja w zapisie (klucz wylacza tylko zold i nowe druzyny).
+  Dane: arm_houses_canon.tsv (status lordly 6 rodow ziem koronnych) - przy wgraniu 130 RAZEM z DLL.
+- Scalenie: git merge bez konfliktow (12eb9216), build Release kod 0, Armoury 88d10a9a.
+- AUTOTEST 130a (od ok. 20:10, zadanie bn33kv8y4, m113\seria-130a.out.txt): kopia,bitwaN,probyN -ProbyDays 30, flagi jak 129a + armoury-rody277.flag.
+  tsv 277 wgrany do gry NA CZAS TESTU, kopia 129: D:\Backup-Bannerlord\wgrane\2026-10-27-test130a-tsv (komenda sama przywraca po tescie - SPRAWDZIC md5).
+  Potem grupy (rody277 + 15 z 129a), zapis testowy na D:, WGRANIE 130 = DLL + arm_houses_canon.tsv, gdy Jeff nie gra.
+- Jeff pytany 19:55 o paczke 280 (B1 narodziny przy wczytaniu, B2 podwojna/brakujaca doba moda po wczytaniu, B3 tekst) - czeka na odpowiedz.
+
 ## DOPISEK 27.10 ok. 19:55 CET - straty ludnosci: wynik sprawdzenia (wf_ac2622a4-2b8, 2 sledztwa + 2 recenzje)
 - Straty SA odejmowane trwale: rekrut schodzi z DOM przy werbunku (FromVillage hearth -1/k, FromTown stan E4/4; PeopleBook.Origin.cs:1187-1228), polegly nie wraca
   (DieShares Fallen, Origin.cs:811-827), wracaja tylko zywi z pochodzeniem. Narodziny = wlasny model PopulationLaw.GrowthOf (0.5%/rok + dobrobyt - wojna - glod),
