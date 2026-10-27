@@ -1,5 +1,10 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 15:35 CET - PAUZA do odnowienia limitu (Jeff: "zrob pauze i kontynuuj po resecie limitu")
+- 264 zatrzymane (run wf_09849f4a-635: projekt gotowy w pamieci podrecznej, wykonanie przerwane - drzewo zb\n264 czyste). Wznowienie po 16:40:
+  Workflow(scriptPath=workflows\scripts\paczki-jeff-26-10-wieczor-wf_03ae36fd-43a.js, resumeFromRunId=wf_09849f4a-635, args = scratchpad 1e1c276a...\scratchpad\args-264.json).
+- Potem uruchomic 241, 259, 268, 272 (opis w dopisku 15:30). Budzik w tle na 16:42.
+
 ## DOPISEK 27.10 ok. 15:30 CET - AUDYT GOTOWY (docs/AUDYT-2026-10-27.md); Jeff: "tak zacznij od tych pieciu" + Krol Polnocy
 - Jeff 27.10 ok. 15:25: "tak zacznij od tych pieciu, a tak potem jak dolaczaja do roberta to staja sie jednym krolestwem King in the North".
 - Paczki (galezie od noc/161-integracja 056ae5f4 = WGRANE 128, drzewa scratchpad fffc991e...\zb\nNNN):
