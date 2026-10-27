@@ -75346,6 +75346,9 @@ N283_TEST = {
                "szykiem | wolnej piechoty wroga 30 (szykow 1), wolnej jazdy wroga 6 (szykow 1), lucznikow wroga 8 | wrog w marszu TAK"),
     "tnone": "Nekanie (283) TEST B: brak nekajacego - brak pieszego strzelca AI w druzynie gracza (30 s po rozstawieniu)",
     "tphase": "Nekanie (283) TEST B: nekajacy imperial_archer#55 faza ucieczka po 5.0 s (jezdziec 204 w 12 m)",
+    # poprawka 132a: linie drogi nekajacego (HuntTest.cs TestRoute / TestGo / TestStat) - faza obejscie / skrzydlo / cel / miejsce / stan
+    "tphase2": ("Nekanie (283) TEST C: nekajacy river_swordmaster#63 faza stan po 30.0 s (etap obejscie, do punktu 42 m, od szyku celu 61 m, od swoich 95 m, "
+                "samotny TAK, strzalow 0, predkosc 4.6 m/s, punkt poza polem 0)"),
     "tend": ("Nekanie (283) TEST koniec: scenariusz A, nekajacy vlandian_horse_archer#211, wynik padl po 30.0 s | strzalow 12, wykryc 14, epizodow 1, lucznikow na cel 6, "
              "piechoty 0, jezdzcow 8, szykow stoi 3 | wolnej piechoty wroga 30, wolnej jazdy wroga 6, lucznikow wroga 8, wrog w marszu TAK"),
 }
@@ -75394,6 +75397,9 @@ def nekanie283_selftest():
     m = RX["tphase"].match(T["tphase"])
     if not m or m.groups() != ("B", "imperial_archer#55", "ucieczka", "5.0"):
         return "tphase"
+    m = RX["tphase"].match(T["tphase2"])
+    if not m or m.groups() != ("C", "river_swordmaster#63", "stan", "30.0"):
+        return "tphase2"
     m = RX["tend"].match(T["tend"])
     if not m or m.groups() != ("A", "vlandian_horse_archer#211", "padl", "30.0", "12", "14", "1", "6", "0", "8", "3", "30", "6", "8", "TAK"):
         return f"tend: {m.groups() if m else 'brak dopasowania'}"
@@ -75599,7 +75605,7 @@ def nekanie283_synth():
     bad_tend_a = T["tend"].replace("lucznikow na cel 6", "lucznikow na cel 0").replace("jezdzcow 8, szykow stoi 3", "jezdzcow 0, szykow stoi 0")
     bad_tend_b = tend_b.replace("piechoty 5", "piechoty 0").replace("jezdzcow 2, szykow", "jezdzcow 0, szykow")
     runs = {
-        "good": [nb2, T["tstart"], T["start"], T["end"], T["tend"], T["line"], nb2, T["tphase"], T["start2"], T["end"], tend_b, T["line"], nb2, tend_c, T["line"]],
+        "good": [nb2, T["tstart"], T["start"], T["end"], T["tend"], T["line"], nb2, T["tphase"], T["start2"], T["end"], tend_b, T["line"], nb2, T["tphase2"], tend_c, T["line"]],
         "bad": [nb2, T["tstart"], T["start"], bad_tend_a, bad_line, nb2, bad_tend_b, T["line"], "ERROR in HorsePursuit.NekanieWrecz: NullReferenceException"],
         "none": [nb2, T["tnone"], T["line"]],
         "empty": ["Armoury: inna linia"],

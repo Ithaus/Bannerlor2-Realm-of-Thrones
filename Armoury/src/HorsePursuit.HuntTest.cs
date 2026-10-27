@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -20,11 +21,23 @@ namespace Armoury
     /// B - pieszy strzelec druzyny gracza 15 m za szykiem piechoty wroga (ucieka jak A przed jezdzcem albo piechota 283 w 15 m); C - pieszy wojownik wrecz (najwyzszy tier)
     /// idzie na najblizszego lucznika wroga (bez lucznikow - na piechote) i walczy (bez ucieczki - widac wzrost oddzialu jeden za jednego). B i C - tylko linie
     /// "Nekanie (283) TEST B/C" (linie 204 TEST zostaja dla A - grupa m204jazda bez zmian). Koniec jak wyzej (C bez limitu epizodow).
+    /// Poprawka 132a (autotest 132a: A strzalow 1, wykrycie 67 m od wroga przy wlasnej piechocie; B strzalow 0 i padl; C ani jednego ciosu przez 120 s):
+    /// nekajacy zostaje w swoim szyku (A - frey_rider w szyku 0 piechoty "p36 l1 kl3"), a MarchToContact.PostSpeed (cap marszu P1, 1.33 m/s) i CapFor / AiBreath
+    /// trzymaly go tempem marszu szyku - konny strzelec szedl z piechota, pieszy strzelec i wojownik szli marszem prosto w szyk wroga (punkt za szykiem = droga przez
+    /// jego piechote). Teraz: nekajacy testu bez capu marszu i oddechu (TestRunAnyThread, jak jezdziec 204), droga skrzydlem (przed czolem armii wroga - naroznik
+    /// skrzydla 30 m za jej szerokoscia, HuntScreen; potem wzdluz skrzydla na glebokosc celu; potem prosto), na miejscu postoj (pozycja skryptowa nowa dopiero, gdy
+    /// punkt odjedzie o 8 m - strzelec stoi i strzela; wczesniej nowa pozycja co 0.25 s), B / C limit 180 s (pieszo dluzsza droga), linie "faza obejscie / skrzydlo
+    /// / cel / miejsce / stan" (stan co 30 s: etap, do punktu, od szyku celu, od swoich - samotny, strzalow, predkosc) - dowod drogi w nastepnym autotescie.
     /// </summary>
     internal static partial class HorsePursuit
     {
         private const float TestPickAfter = 8f, TestPickUntil = 30f, TestMaxSec = 120f, TestStandOff = 10f;
-        private const int TestMaxEp = 2, TestPhaseLines = 8;
+        private const int TestMaxEp = 2, TestPhaseLines = 12;   // 283a: 12 (droga obejscia i linie stanu)
+        // 283a (poprawka 132a): B / C pieszo - dluzsza droga skrzydlem; obejscie 30 m od skrzydla armii wroga (HuntScreen - oslona skrzydla RBM), punkt drogi
+        // osiagniety w 15 m (CounterFootGap); nowa pozycja skryptowa dopiero przy przesunieciu punktu o 2 m; na miejscu w 4 m, postoj trzymany do odjazdu punktu o 8 m
+        private const float TestMaxFoot = 180f, TestFlankGap = HuntScreen, TestWayReach = CounterFootGap, TestRepath = 2f, TestHoldR = 4f, TestHoldDrift = 8f,
+                            TestStatEvery = 30f;
+        private static readonly string[] TestLegName = { "obejscie", "skrzydlo", "cel" };
         private const float TestBehindA = 3f, TestBehindB = 15f;   // 283: Jeff 27.10 "3 m za plecami", strzelec pieszy 15 m za szykiem (CounterFootGap)
         private static readonly string[] TestScenName = { "A", "B", "C" };
 
@@ -40,6 +53,12 @@ namespace Armoury
         // 283: scenariusz (licznik bitew mocnych sesji - nie zerowany miedzy misjami), liczniki odpowiedzi na nekajacego testu
         private static int _tSeq, _tScen, _tArch, _tFoot, _tHalt, _tFreeInf, _tInfForms, _tEnemyArch;
         private static bool _tBehind, _tMarch;
+        // 283a: nekajacy bez capu marszu (MarchToContact - watki robocze, Volatile), etap drogi, punkt drogi, ostatnia pozycja skryptowa, postoj
+        private static Agent _tRun;
+        private static int _tLeg, _tSide, _tOff, _tLegLog;
+        private static Vec2 _tWay = Vec2.Invalid, _tSet = Vec2.Invalid, _tHoldP = Vec2.Invalid;
+        private static bool _tInPlace, _tPlaced;
+        private static float _tStatAt;
 
         private static void HuntTestBegin(Settings c)
         {
@@ -66,6 +85,19 @@ namespace Armoury
             _tScen = 0; _tArch = _tFoot = _tHalt = _tFreeInf = _tInfForms = _tEnemyArch = 0;
             _tBehind = _tMarch = false;
             _tEnd = "-";
+            Volatile.Write(ref _tRun, null);
+            _tLeg = _tSide = _tOff = _tLegLog = 0;
+            _tWay = _tSet = _tHoldP = Vec2.Invalid;
+            _tInPlace = _tPlaced = false;
+            _tStatAt = 0f;
+        }
+
+        /// <summary>283a: MarchToContact.PostSpeed / CapFor (watki robocze) - nekajacy testu w polu (bez capu marszu i oddechu szyku, jak jezdziec 204).</summary>
+        internal static bool TestRunAnyThread(Agent a)
+        {
+            if (a == null) return false;
+            var r = Volatile.Read(ref _tRun);
+            return r != null && ReferenceEquals(r, a);
         }
 
         /// <summary>Segment linii bitwy 204.</summary>
@@ -113,7 +145,8 @@ namespace Armoury
             if (a == null || !a.IsActive()) { TestEnd(m, "padl", now); return; }
             if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) { TestEnd(m, "panika/odwrot", now); return; }
             if (m.MissionEnded) { TestEnd(m, "koniec bitwy", now); return; }
-            if (now - _tStart >= TestMaxSec) { TestEnd(m, "zwolniony po " + F0(TestMaxSec) + " s", now); return; }
+            float lim = _tScen == 0 ? TestMaxSec : TestMaxFoot;   // 283a: B / C pieszo - dluzsza droga skrzydlem
+            if (now - _tStart >= lim) { TestEnd(m, "zwolniony po " + F0(lim) + " s", now); return; }
             Threat t;
             bool active = Threats.TryGetValue(a, out t) && t.Active;
             if (_tScen != 2 && _tEp >= TestMaxEp && !active) { TestEnd(m, TestMaxEp + " epizody", now); return; }
@@ -130,19 +163,19 @@ namespace Armoury
                     if (d < hd) { hd = d; hp = h.A.Position.AsVec2; }
                 }
             }
+            if (pass && now >= _tStatAt) TestStat(a, now);   // 283a: stan drogi co 30 s
             if (_tScen == 2)
             {
-                // C: wojownik wrecz walczy dalej (cel - najblizszy lucznik wroga, po jego upadku nastepny)
+                // C: wojownik wrecz walczy dalej (cel - najblizszy lucznik wroga, po jego upadku nastepny); 283a: droga skrzydlem, bez postoju
                 if (pass || _tTgt == null || !_tTgt.IsActive()) TestTarget(m, a);
                 if (_tF == null || _tTgt == null) { TestEnd(m, "brak celu", now); return; }
-                var wc = _tTgt.GetWorldPosition();
-                if (!wc.IsValid || wc.GetNavMesh() == UIntPtr.Zero) return;
-                a.SetScriptedPosition(ref wc, false, Agent.AIScriptedFrameFlags.None);
+                TestGo(m, a, _tTgt.Position.AsVec2, now, pass, false);
                 return;
             }
             if (_tFlee && now >= _tFleeUntil)
             {
                 _tFlee = false;
+                _tLeg = 0; _tSide = 0; _tWay = Vec2.Invalid; _tInPlace = false;   // 283a: po ucieczce droga od nowa
                 TestPhase("podjazd", now, hd);
             }
             if (!_tFlee && hd <= CounterFootGap)
@@ -152,26 +185,193 @@ namespace Armoury
                 TestPhase("ucieczka", now, hd);
             }
             Vec2 ap = a.Position.AsVec2;
-            Vec2 p;
             if (_tFlee)
             {
-                Vec2 home;
+                Vec2 home, p;
                 if (a.Team != null && MainForce(a.Team, out home)) p = home;
                 else if (hp.IsValid && hp.Distance(ap) > 0.1f) p = ap + (ap - hp) * (HuntScreen / hp.Distance(ap));
                 else p = ap;
+                TestIssue(a, p);
+                return;
             }
-            else
+            if (pass || _tF == null || _tF.CountOfUnits <= 0 || _tTgt == null || !_tTgt.IsActive()) TestTarget(m, a);
+            if (_tF == null) { TestEnd(m, "brak pieszego szyku wroga", now); return; }
+            TestGo(m, a, StandPoint(_tF, ap), now, pass, true);
+        }
+
+        /// <summary>283a: droga do celu (skrzydlem, gdy trzeba - TestRoute), na miejscu postoj (hold: A / B - strzelec stoi i strzela, punkt nowy dopiero po
+        /// odjezdzie o TestHoldDrift), pozycja skryptowa przez TestIssue.</summary>
+        private static void TestGo(Mission m, Agent a, Vec2 goal, float now, bool pass, bool hold)
+        {
+            if (!goal.IsValid) return;
+            Vec2 ap = a.Position.AsVec2;
+            if (_tLeg < 2)
             {
-                if (pass || _tF == null || _tF.CountOfUnits <= 0 || _tTgt == null || !_tTgt.IsActive()) TestTarget(m, a);
-                if (_tF == null) { TestEnd(m, "brak pieszego szyku wroga", now); return; }
-                p = StandPoint(_tF, ap);
+                if (pass || !_tWay.IsValid) _tWay = TestRoute(m, a, ap, goal, now);
+                if (_tWay.IsValid) { TestIssue(a, _tWay); return; }
             }
-            var wp = a.GetWorldPosition();
-            if (!wp.IsValid) return;
-            var wq = wp;
+            if ((_tLegLog & 4) == 0)
+            {
+                _tLegLog |= 4;
+                TestPhase("cel", now, " (do celu " + F0(ap.Distance(goal)) + " m, " + TestOwnTxt(a, ap) + ")");
+            }
+            if (hold)
+            {
+                if (_tInPlace && goal.Distance(_tHoldP) > TestHoldDrift) _tInPlace = false;
+                if (!_tInPlace && ap.Distance(goal) <= TestHoldR)
+                {
+                    _tInPlace = true;
+                    _tHoldP = goal;
+                    if (!_tPlaced)
+                    {
+                        _tPlaced = true;
+                        TestPhase("miejsce", now, " (" + TestOwnTxt(a, ap) + ", strzalow " + _tShots + ")");
+                    }
+                }
+                if (_tInPlace) goal = _tHoldP;
+            }
+            TestIssue(a, goal);
+        }
+
+        /// <summary>283a: droga skrzydlem w ukladzie szyku celu (srodek - mediana, os - Formation.Direction, czolo armii wroga = najdalej wysuniety pieszy szyk
+        /// strony, szerokosc - wszystkie piesze szyki). Etap 0: nekajacy przed czolem i w szerokosci armii - naroznik skrzydla od jego strony (TestFlankGap za
+        /// szerokoscia, pol odstepu przed czolem); etap 1: poza szerokoscia - wzdluz skrzydla na glebokosc celu; etap 2: prosto. Punkt poza polem albo bez siatki
+        /// - druga strona, potem prosto. Etapy tylko naprzod (bez wahania). Vec2.Invalid = prosto do celu.</summary>
+        private static Vec2 TestRoute(Mission m, Agent a, Vec2 ap, Vec2 goal, float now)
+        {
+            if (!_rKey || _tF == null || _tF.CountOfUnits <= 0) { _tLeg = 2; return Vec2.Invalid; }
+            Vec2 dir;
+            try { dir = _tF.Direction; } catch { dir = Vec2.Invalid; }
+            int es = SideOf(_tF.Team);
+            if (es < 0 || !dir.IsValid || dir.LengthSquared < 1E-04f) { _tLeg = 2; return Vec2.Invalid; }
+            dir = dir.Normalized();
+            var right = new Vec2(dir.y, -dir.x);
+            Vec2 c = FootHome(_tF);
+            float lo = 0f, hi = 0f, front = 0f;
+            var fl = HForms[es];
+            for (int i = 0; i < fl.Count; i++)
+            {
+                var fi = fl[i];
+                if (!fi.Foot || fi.F == null || fi.F.CountOfUnits <= 0) continue;
+                Vec2 o = fi.C - c;
+                float l = Vec2.DotProduct(o, right), f = Vec2.DotProduct(o, dir);
+                if (l - fi.R < lo) lo = l - fi.R;
+                if (l + fi.R > hi) hi = l + fi.R;
+                if (f + fi.R > front) front = f + fi.R;
+            }
+            Vec2 oa = ap - c;
+            float al = Vec2.DotProduct(oa, right), af = Vec2.DotProduct(oa, dir), gf = Vec2.DotProduct(goal - c, dir);
+            float gap = TestFlankGap;
+            if (_tSide == 0) _tSide = al >= 0.5f * (lo + hi) ? 1 : -1;
+            if (_tLeg == 0)
+            {
+                // nie przed czolem armii albo cel przed jej czolem - prosto (droga nie idzie przez szyki)
+                if (af <= front || gf >= front) { _tLeg = 2; return Vec2.Invalid; }
+                float L = _tSide > 0 ? hi + gap : lo - gap;
+                if (_tSide * al < _tSide * L - 0.5f * gap)
+                {
+                    Vec2 w = c + right * L + dir * (front + 0.5f * gap);
+                    if (!TestOnField(m, a, w))
+                    {
+                        _tSide = -_tSide;
+                        L = _tSide > 0 ? hi + gap : lo - gap;
+                        w = c + right * L + dir * (front + 0.5f * gap);
+                        if (!TestOnField(m, a, w)) { _tOff++; _tLeg = 2; return Vec2.Invalid; }
+                    }
+                    if (ap.Distance(w) > TestWayReach)
+                    {
+                        if ((_tLegLog & 1) == 0)
+                        {
+                            _tLegLog |= 1;
+                            TestPhase("obejscie", now, " (skrzydlo " + (_tSide > 0 ? "prawe" : "lewe") + ", " + F0(Math.Abs(L)) + " m od srodka szyku celu, czolo armii "
+                                      + F0(af - front) + " m przed nekajacym, armia szeroka " + F0(hi - lo) + " m)");
+                        }
+                        return w;
+                    }
+                }
+                _tLeg = 1;
+            }
+            if (_tLeg == 1)
+            {
+                float L = _tSide > 0 ? hi + gap : lo - gap;
+                if (af <= gf + 0.5f * gap || _tSide * al < _tSide * L - gap) { _tLeg = 2; return Vec2.Invalid; }   // juz na glebokosci celu albo w szerokosci armii
+                Vec2 w = c + right * L + dir * gf;
+                if (ap.Distance(w) <= TestWayReach) { _tLeg = 2; return Vec2.Invalid; }
+                if (!TestOnField(m, a, w)) { _tOff++; _tLeg = 2; return Vec2.Invalid; }
+                if ((_tLegLog & 2) == 0)
+                {
+                    _tLegLog |= 2;
+                    TestPhase("skrzydlo", now, " (do glebokosci celu " + F0(af - gf) + " m, " + TestOwnTxt(a, ap) + ")");
+                }
+                return w;
+            }
+            return Vec2.Invalid;
+        }
+
+        /// <summary>283a: punkt w granicach pola i na siatce nawigacji.</summary>
+        private static bool TestOnField(Mission m, Agent a, Vec2 p)
+        {
+            try
+            {
+                if (!m.IsPositionInsideBoundaries(p)) return false;
+                var wq = a.GetWorldPosition();
+                if (!wq.IsValid) return false;
+                wq.SetVec2(p);
+                return wq.GetNavMesh() != UIntPtr.Zero;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>283a: pozycja skryptowa nekajacego - nowa tylko, gdy punkt przesunal sie o TestRepath albo gra zdjela GoToPosition z dala od punktu
+        /// (wczesniej co 0.25 s: strzelec bez przerwy "w drodze").</summary>
+        private static void TestIssue(Agent a, Vec2 p)
+        {
+            if (!p.IsValid) return;
+            bool lost;
+            try { lost = (a.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) == 0; } catch { lost = true; }
+            if (_tSet.IsValid && _tSet.Distance(p) < TestRepath && !(lost && a.Position.AsVec2.Distance(p) > TestHoldR)) return;
+            var wq = a.GetWorldPosition();
+            if (!wq.IsValid) return;
             wq.SetVec2(p);
-            if (wq.GetNavMesh() == UIntPtr.Zero) return;
+            if (wq.GetNavMesh() == UIntPtr.Zero) { _tOff++; return; }
             a.SetScriptedPosition(ref wq, false, Agent.AIScriptedFrameFlags.None);
+            _tSet = p;
+        }
+
+        /// <summary>283a: odleglosc od krawedzi najblizszego nietknietego szyku strony s (IntactPos / IntactR - ta sama miara co IntactNear).</summary>
+        private static float OwnIntactGap(int s, Vec2 p)
+        {
+            float bd = float.MaxValue;
+            if (s < 0) return bd;
+            var ps = IntactPos[s];
+            var rs = IntactR[s];
+            for (int i = 0; i < ps.Count; i++)
+            {
+                float d = p.Distance(ps[i]) - rs[i];
+                if (d < bd) bd = d;
+            }
+            return bd;
+        }
+
+        private static string TestOwnTxt(Agent a, Vec2 ap)
+        {
+            float own = OwnIntactGap(SideOf(a.Team), ap);
+            return "od swoich " + (own < float.MaxValue ? F0(own) : "-") + " m, samotny " + (own >= IntactRadius ? "TAK" : "NIE");
+        }
+
+        /// <summary>283a: linia stanu co TestStatEvery (dowod drogi: etap, do punktu, od szyku celu, od swoich, strzalow, predkosc).</summary>
+        private static void TestStat(Agent a, float now)
+        {
+            _tStatAt = now + TestStatEvery;
+            Vec2 ap = a.Position.AsVec2;
+            float df = -1f;
+            if (_tF != null && _tF.CountOfUnits > 0)
+                df = Math.Max(0f, ap.Distance(FootHome(_tF)) - Math.Min(RadiusCap, 0.5f * Math.Max(_tF.Width, _tF.Depth)));
+            float v = 0f;
+            try { var mv = (a.MountAgent ?? a).MovementVelocity; v = mv.Length; } catch { v = 0f; }
+            TestPhase("stan", now, " (etap " + TestLegName[Math.Min(2, Math.Max(0, _tLeg))] + (_tInPlace ? ", na miejscu" : "") + ", do punktu "
+                      + (_tSet.IsValid ? F0(ap.Distance(_tSet)) : "-") + " m, od szyku celu " + (df >= 0f ? F0(df) : "-") + " m, " + TestOwnTxt(a, ap) + ", strzalow "
+                      + _tShots + ", predkosc " + v.ToString("0.0", Inv) + " m/s, punkt poza polem " + _tOff + ")");
         }
 
         /// <summary>Punkt nekajacego: 283 A / B - za szykiem (mediana - Direction x (Depth/2 + 3 albo 15 m)); 204 - 10 m od krawedzi szyku od strony nekajacego.</summary>
@@ -192,9 +392,15 @@ namespace Armoury
 
         private static void TestPhase(string what, float now, float hd)
         {
+            TestPhase(what, now, hd < float.MaxValue ? " (jezdziec 204 w " + hd.ToString("0", Inv) + " m)" : "");
+        }
+
+        /// <summary>Linia fazy (jedno slowo - wyrazenia tphase sprawdz_logi), detail - reszta w nawiasie.</summary>
+        private static void TestPhase(string what, float now, string detail)
+        {
             if (_tLines >= TestPhaseLines) return;
             _tLines++;
-            string tail = " faza " + what + " po " + (now - _tStart).ToString("0.0", Inv) + " s" + (hd < float.MaxValue ? " (jezdziec 204 w " + hd.ToString("0", Inv) + " m)" : "");
+            string tail = " faza " + what + " po " + (now - _tStart).ToString("0.0", Inv) + " s" + detail;
             if (_tScen == 0) Log.Info("Jazda na strzelca (204) TEST: nekajacy " + Who(_tA) + tail);
             else Log.Info("Nekanie (283) TEST " + TestScenName[_tScen] + ": nekajacy " + Who(_tA) + tail);
         }
@@ -253,6 +459,8 @@ namespace Armoury
             }
             _tState = 1;
             _tStart = now;
+            _tStatAt = now + TestStatEvery;
+            Volatile.Write(ref _tRun, best);   // 283a: bez capu marszu / oddechu szyku (MarchToContact)
             best.SetAutomaticTargetSelection(false);
             if (_tTgt != null) best.SetTargetAgent(_tTgt);
             string where = _tBehind ? F0(_tScen == 1 ? TestBehindB : TestBehindA) + " m za szykiem" : F0(TestStandOff) + " m od krawedzi szyku";
@@ -333,6 +541,7 @@ namespace Armoury
             if (!_tOn || _tState != 1) return;
             _tState = 2;
             _tEnd = why;
+            Volatile.Write(ref _tRun, null);   // 283a: znowu pod capem szyku
             var a = _tA;
             if (a != null && a.IsActive())
             {
