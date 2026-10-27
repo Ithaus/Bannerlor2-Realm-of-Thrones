@@ -1,5 +1,20 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 22:20 CET - 280+281+282 SCALONE (n161 6f30e9ac, Armoury 591d0ecc), AUTOTEST 131a w toku; paczka 284 karawany i wszystkie surowce
+- Scalenie: git merge 280 (bez konfliktow), 281 i 282 (CHANGELOG/sprawdz_logi zlozone scal_sklad z bazy 9d807118), gen_mcm, build Release 0 bledow.
+  Self-testy K280, E223, RU282, R277 TAK. Zapis testowy odswiezony z zapisu Jeffa 22:09 (zdjecie bazy usuniete - wrapper robi nowe).
+- AUTOTEST 131a (zadanie btw7kzz1c, m113\seria-131a.out.txt): kopia,bitwaN,probyN 30 dob, flagi jak 130a. PO NIM (dla 280 B2): drugi bieg wczytujacy zapis
+  zostawiony przez probyN, 4 doby (autotest-bitwa-204.ps1 -Days 4 -LoadSave autotest-przekierowany-IronmanKkUpHftX7ZIq) -> grupa ksiega280 K280-3/8/9.
+  Grupy: ksiega280 e223 ruda282 nruda rody277 + 15 z 129a. Potem WGRANIE 131 (280+281+282).
+- Jeff 22:10: karawana nic nie zarabia - PRAWDA: 'Caravan of Isa Storm' 22 doby: sprzedaz 22857, zakupy 17991, zysk ze sprzedazy -5071, zold 10890,
+  netto -11890, wartosc 17744 -> 14703 (< kapitalu 15000, wyplat 0). Swiat: 88 karawan rodow, wyplacilo 13, 63 z kiesa na podlodze. Warsztat Silversmith
+  Seagard ok. 208/dobe (4588 w 22 doby, podatek 1310). Jeff: 'rob te plotna skory wszystkie surowce aby ta gospodarka zyla'.
+- 284 (zb
+284, noc/284-karawany-surowce-przeplyw od 6f30e9ac; workflow wf_627247df-0c5): diagnoza strat karawan, zysk z prawdziwych roznic cen,
+  bramka przeplywu 282 dla wszystkich towarow, kolejnosc zamowien i rowne pokrycie dla wszystkich surowcow warsztatow, marze warsztatow po 241; grupa handel284.
+- 283 nadal w toku (wf_4a1d4aa3-b15). Log Jeffa calej sesji 20:56-22:09: D:\Backup-Bannerlord\logi-jeffa6-10-27-2210-po-grze\.
+- Limit tygodnia 94% o 22:15.
+
 ## DOPISEK 27.10 ok. 22:40 CET - 282 GOTOWE (zbudowane, po recenzji, NIE scalone, NIE testowane); czeka 283
 - 282 (zb
 282): 90699a3e + 0564e798 + recenzja 04810741 (Armoury 0fac1b16). Przyczyna: karawany trzymaja ok. 1/4 zelaza swiata w jukach (1666-2463),
