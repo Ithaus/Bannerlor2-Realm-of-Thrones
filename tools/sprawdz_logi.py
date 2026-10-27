@@ -73455,5 +73455,405 @@ def main(argv):
     return _krol272_main_prev(argv)
 
 
+# ------------------------------------------------------------ rownowaga274 (27.10, paczka 274 noc/274-rownowaga-wojny-kanonu: rownowaga Wojny Pieciu Krolow do Krwawych Godow - Jeff 27.10
+# "lannisterowie i krolewska przystan byli minimum porownywalnie tak samo silni jak polnoc, chodzi o to zeby zadna ze stron nie uzyskala wyraznej przewagi az do krwawych
+# godow"; Armoury/src/CanonWarBalance.cs, .Levers.cs, .Restraint.cs, .Test.cs, CanonWarClock.cs; klucze CanonWarBalance, CanonWarBalanceRestraint, CanonWarBalanceMuster)
+#   python -I tools/sprawdz_logi.py --grupa rownowaga274 <Armoury-*.log>
+# R274-S self-test wyrazen (linie kontrolne jak w kodzie C#), R274-S2 test syntetyczny (dobry, zly, bez linii 274). R274-0 linia startu: latki mysli AI (podbicia, weta),
+# BK cel armii, najem z karczmy, nowa druzyna - TAK (klucz NIE / kampania klasyczna - INFO); R274-1 linia doby co dobe bez dziur (od pierwszej do ostatniej); R274-2 udzial dob
+# w pasmie 0.667-1.5 od 61. doby czynnej reguly >= 80% i najwyzej 28 dob z rzedu ponad 1.5 (krotszy log - INFO); R274-3 kazda strona >= 1 bitwa lordow z druga w kazdym oknie
+# 28 dob (z linii "walka dzis"; log < 28 dob - INFO); R274-4 0 linii "OBLEZENIE SIEDZIBY"; R274-5 strata twierdz strony <= jej twierdze frontu z pierwszej linii doby;
+# R274-6 przelacznik zgodny z progami (serie poza 1.5 / w 1.2 z r nastepnej doby, wlaczenie po 3, wylaczenie po 3; r w 0.001 od progu - pominiete); R274-7 dzien konca
+# 274 ("KONIEC - Krwawe Gody") = pierwszy dzien linii 264 "blokada KONIEC" (+-1; brak ktorejs - INFO); R274-8 "Pieniadz swiata (bilans - przyczyny)" w dobach czynnej
+# reguly: ARYTMETYKA OK; R274-9 0 linii "ERROR in CanonWarBalance" i potkniecia doby 0; R274-10 testy autotestu T1-T6 TAK (brak - INFO); R274-11 INFO: stosunek pierwszy /
+# ostatni / min / max, bitwy i oblezenia stron, najmy z karczmy, nowe druzyny, weta, zbiorki.
+# Recenzja 274: R274-4 liczy tylko "OBLEZENIE SIEDZIBY" (oblezenie gracza i odbicie wlasnej siedziby przez strone domowa - linia "siedziba bez weta", poza R274-4);
+# R274-7 - dzien konca kanonu 264 = pierwsza linia 264 z "CZYNNA (ROT wymusza)" albo powodem po koncu kanonu ("ROT sam zawiera pokoj", "ROT wymusza te wojne",
+# "ROT nie wymusza tej wojny"), nie "blokada KONIEC" (264 trzyma Dorzecze-korona po koncu); R274-10 takze T7 (odbicie), gdy jest; R274-12 linia "po wczytaniu" przy
+# kazdym starcie sesji z regula (stan doby od razu po wczytaniu, nie od polnocy); linia doby: opcjonalny segment "; krolestwa [...]" (bezczynnosc krolestw).
+R274_TAG = "Rownowaga wojny (274): "
+R274_NUM = r"-?\d+"
+R274_SIDE = (r"sila (\d+) \(ludzie (\d+), partii (\d+), armii (\d+), wypelnienie ([\d.]+), limit (\d+), zalogi (\d+), wolni dowodcy (\d+)\)")
+R274_RX = {
+    "start": re.compile(r"^Rownowaga wojny \(274\): start sesji \| klucz (TAK|NIE), powsciagliwosc (TAK|NIE), zbiorka (TAK|NIE) \| latki: mysl AI podbicia (TAK|BRAK|BLAD)[^,]*, "
+                        r"weta (TAK|BRAK|BLAD)[^,]*, BK cel armii (TAK|BRAK|BLAD)[^;]*; gra: najem z karczmy (TAK|BRAK|BLAD)[^,]*, nowa druzyna (TAK|BRAK|BLAD)[^;]*; (.*?) "
+                        r"\| zakres: (kampania kanonu|kampania klasyczna - nie dotyczy) \| koalicje A=\[(.*?)\] B=\[(.*?)\] \| Krwawe Gody: (TAK|nie) \(RedWeddingEvent (-?\d+), Robb (zyje|nie zyje)\) "
+                        r"\| stan z zapisu: dzwignie (TAK|NIE), slabszy (A|B|-), od dnia startu (-?\d+)(?:, koniec dnia (\d+))?\.(?: \| proba autotestu: flaga \S+ (TAK|NIE))?$"),
+    "day": re.compile(r"^Rownowaga wojny \(274\): dzien (\d+) \| A " + R274_SIDE + r" \| B " + R274_SIDE
+                      + r" \| stosunek B/A ([\d.]+) \(pasmo 0\.67-1\.50; poza pasmem (\d+) dob, w 1\.2 (\d+) dob; dzwignie (TAK od dnia (-?\d+), slabszy (A|B|-)|NIE); powsciagany (A|B|-)\)"
+                      r" \| walka dzis: A bitwy (\d+) oblezenia (\d+), B bitwy (\d+) oblezenia (\d+); 28 dob: A bitwy (\d+) oblezenia (\d+), B bitwy (\d+) oblezenia (\d+); "
+                      r"bezczynnosc A (\d+) dob, B (\d+) dob(?:; krolestwa \[[^\]]*\])? \| twierdze A (\d+) \(start (-?\d+)\) B (\d+) \(start (-?\d+)\), front A (\d+) B (\d+), rody w domu \(trzeci wrog\) A (\d+) B (\d+)"
+                      r" \| dzwignie: werbunek (.*?) \(podbic wizyt (\d+), karczma najmow (\d+) ludzi (\d+) za (-?\d+) zl\), nowe druzyny (\d+)(?: \[(.*?)\])? \(blokada 166 (\d+)\), "
+                      r"weta oblezen: siedziby (\d+) / za frontem (\d+), BK cel zdjety (\d+), zbiorka: wladca (\d+) (.*?), lordow do frontu (\d+); razem najetych (\d+) za (-?\d+) zl, "
+                      r"nowych druzyn (\d+) \| kredyt: (.*?) \| kompanie najemne wolne (\d+) \| warunki Krwawych Godow ROT: (.*?) \(RedWeddingEvent (-?\d+)\) \| koalicje A=\[(.*?)\] "
+                      r"B=\[(.*?)\] \| potkniecia (\d+) \(sesja (\d+)\)\.$"),
+    "off": re.compile(r"^Rownowaga wojny \(274\): dzien (\d+) \| wylaczone \((.*)\) \| potkniecia (\d+) \(sesja (\d+)\)\.$"),
+    "end": re.compile(r"^Rownowaga wojny \(274\): KONIEC - Krwawe Gody \| dzien (\d+) \| RedWeddingEvent (-?\d+), Robb (zyje|nie zyje) - "),
+    "event": re.compile(r"^Rownowaga wojny \(274\): (weto|zbiorka|najem z karczmy|nowa druzyna|OBLEZENIE SIEDZIBY|siedziba bez weta|rdzen bez wojny) \| dzien (\d+) \| "),
+    "test": re.compile(r"^Rownowaga wojny \(274\): test - (T\d+) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
+    "p264end": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| blokada .*?(?:CZYNNA \(ROT wymusza\)|ROT sam zawiera pokoj|ROT wymusza te wojne|ROT nie wymusza tej wojny)"),
+    "load": re.compile(r"^Rownowaga wojny \(274\): po wczytaniu \| dzien (\d+) \| regula (TAK|NIE)"),
+    "money": re.compile(r"^Pieniadz swiata \(bilans - przyczyny\): dzien (\d+)"),
+}
+# linie kontrolne - jak w kodzie C# (CanonWarBalance.cs DayLine / Daily / EnsureHooks, .Levers.cs, .Restraint.cs, .Test.cs)
+R274_SIDE_T = "sila {s} (ludzie {m}, partii 114, armii 0, wypelnienie 0.62, limit 29282, zalogi 14642, wolni dowodcy 12)"
+R274_TEST = {
+    "start": "Rownowaga wojny (274): start sesji | klucz TAK, powsciagliwosc TAK, zbiorka TAK | latki: mysl AI podbicia TAK, weta TAK, BK cel armii TAK; gra: najem z karczmy TAK, "
+             "nowa druzyna TAK; SCA rozkazy armii martwe w tej wersji - cele przez model ocen w mysli AI | zakres: kampania kanonu | koalicje A=[Riverlands, The North] "
+             "B=[House Baratheon of King's Landing] | Krwawe Gody: nie (RedWeddingEvent 0, Robb zyje) | stan z zapisu: dzwignie NIE, slabszy -, od dnia startu -1.",
+    "day": "Rownowaga wojny (274): dzien {d} | A " + R274_SIDE_T.format(s="{sa}", m="17706") + " | B " + R274_SIDE_T.format(s="{sb}", m="7946")
+           + " | stosunek B/A {r} (pasmo 0.67-1.50; poza pasmem {so} dob, w 1.2 {sf} dob; {lev}; powsciagany {rs}) | walka dzis: A bitwy {ba} oblezenia 0, B bitwy {bb} oblezenia {sb2}; "
+           "28 dob: A bitwy 3 oblezenia 0, B bitwy 3 oblezenia 1; bezczynnosc A 2 dob, B 0 dob; krolestwa [Riverlands 2, The North 9] | twierdze A {fa} (start 38) B 19 (start 19), front A 6 B 5, "
+           "rody w domu (trzeci wrog) A 2 B 0 | dzwignie: werbunek B cel 1.00 (podbic wizyt 12, karczma najmow 2 ludzi 9 za 4100 zl), nowe druzyny 1 [House Lefford] "
+           "(blokada 166 0), weta oblezen: siedziby {vs} / za frontem 0, BK cel zdjety 0, zbiorka: wladca 1 -> armia na Harrenhal, lordow do frontu 3; razem najetych 9 za 4100 zl, "
+           "nowych druzyn 1 | kredyt: A Bank 120000 (rodow 3), dluznicy 168 5, zloto rodow 3570000; B Bank 0 (rodow 0), dluznicy 168 0, zloto rodow 5490000 "
+           "| kompanie najemne wolne 0 | warunki Krwawych Godow ROT: Roose T, Walder T, Blizniaki Frey T, Robb T, Polnoc T (RedWeddingEvent 0) "
+           "| koalicje A=[Riverlands, The North] B=[House Baratheon of King's Landing] | potkniecia {p} (sesja {p}).",
+    "off": "Rownowaga wojny (274): dzien {d} | wylaczone (Krwawe Gody od dnia {e} (RedWeddingEvent 2, Robb nie zyje)) | potkniecia 0 (sesja 0).",
+    "end": "Rownowaga wojny (274): KONIEC - Krwawe Gody | dzien {d} | RedWeddingEvent 2, Robb nie zyje - dzwignie, weta siedzib, powsciagliwosc i zbiorka wylaczone na zawsze "
+           "(druzyny W2 zostaja; 3 nowych, najetych z karczmy 40).",
+    "veto": "Rownowaga wojny (274): weto | dzien {d} | siedziba Riverrun (town_V2, Riverlands) - House Baratheon of King's Landing (strona B, pierwszy Tywin's Party, "
+            "zbiorka armii, ocena gry 0.41) - siedziby bez nowych oblezen do Krwawych Godow.",
+    "seat": "Rownowaga wojny (274): OBLEZENIE SIEDZIBY | dzien {d} | Riverrun (town_V2, Riverlands) oblega Tywin's Party (House Baratheon of King's Landing) - weto nie zadzialalo "
+            "(droga spoza mysli AI i BK).",
+    "test": "Rownowaga wojny (274): test - {t} przelacznik: 2 doby NIE, 3 doby TAK slabszy 2 - wynik {r}.",
+    "load": "Rownowaga wojny (274): po wczytaniu | dzien {d} | regula TAK | siedziby 5, cele frontu 14, stosunek B/A 0.472, dzwignie z zapisu NIE, powsciagany - "
+            "| bezczynnosc krolestw [Riverlands 0, The North 9] - weta i zbiorka czynne od teraz, nie od polnocy.",
+    "seatok": "Rownowaga wojny (274): siedziba bez weta | dzien {d} | Casterly Rock (castle_V5, The North) oblega Tywin's Party (House Baratheon of King's Landing, "
+              "strona domowa B) - odbicie wlasnej siedziby, bez weta.",
+    "nowar": "Rownowaga wojny (274): rdzen bez wojny | dzien {d} | The North (A) nie jest w wojnie z zadnym krolestwem rdzenia drugiej strony - poza miara, dzwigniami, "
+             "wetami i zbiorka do wznowienia wojny.",
+    "p264end": "Pokoj kanonu (264): dzien {d} | blokada KONIEC (Robb nie zyje, RedWeddingEvent 2 - ROT nie wymusza tej wojny) | Polnoc-korona: KONIEC, wojna NIE "
+               "| Dorzecze-korona: KONIEC, wojna NIE | zablokowane dzis 0, sesja 0 | gracz rzadzi: nie | potkniecia 0 (sesja 0).",
+    "money": "Pieniadz swiata (bilans - przyczyny): dzien {d} | ARYTMETYKA {a}",
+}
+R274_LO, R274_HI, R274_CLO, R274_CHI = 1 / 1.5, 1.5, 1 / 1.2, 1.2
+
+
+def _r274_day(d, sa=19500, sb=9200, r=None, so=0, sf=0, lev="dzwignie NIE", rs="-", ba=1, bb=1, sb2=0, fa=38, vs=0, p=0):
+    if r is None:
+        r = sb / sa
+    return R274_TEST["day"].format(d=d, sa=sa, sb=sb, r=f"{r:.3f}", so=so, sf=sf, lev=lev, rs=rs, ba=ba, bb=bb, sb2=sb2, fa=fa, vs=vs, p=p)
+
+
+def rownowaga274_selftest():
+    T = R274_TEST
+    probs = []
+    cases = [("start", T["start"]), ("start", T["start"][:-1] + ", koniec dnia 109900. | proba autotestu: flaga armoury-rownowaga274.flag TAK"),
+             ("day", _r274_day(109000)), ("day", _r274_day(109001, lev="dzwignie TAK od dnia 108999, slabszy B", rs="A", so=5)),
+             ("off", T["off"].format(d=109001, e=109000)), ("end", T["end"].format(d=109000)), ("event", T["veto"].format(d=1)), ("event", T["seat"].format(d=1)),
+             ("test", T["test"].format(t="T1", r="TAK")), ("p264end", T["p264end"].format(d=5)), ("money", T["money"].format(d=5, a="OK")),
+             ("day", _r274_day(109002).replace("; krolestwa [Riverlands 2, The North 9]", "")), ("load", T["load"].format(d=5)),
+             ("event", T["seatok"].format(d=1)), ("event", T["nowar"].format(d=1)),
+             ("p264end", "Pokoj kanonu (264): dzien 7 | blokada CZYNNA (Robb nie zyje, RedWeddingEvent 2 - ROT wymusza te wojne, pokoj cofnalby nastepnej doby) "
+                         "| Polnoc-korona: KONIEC, wojna NIE | Dorzecze-korona: CZYNNA (ROT wymusza), wojna TAK od dnia 3")]
+    # recenzja 274 (M6): przed koncem kanonu (stan 1 zapowiedziany, zniszczone krolestwo) - nie koniec 264
+    for line in ("Pokoj kanonu (264): dzien 7 | blokada CZYNNA (Robb zyje, RedWeddingEvent 1 - Krwawe Gody zapowiedziane, ROT czeka 14 dni i wymusza wojne) | Polnoc-korona: CZYNNA, wojna TAK",
+                 "Pokoj kanonu (264): dzien 7 | blokada KONIEC (krolestwo zniszczone) | Polnoc-korona: KONIEC, wojna NIE"):
+        if R274_RX["p264end"].match(line):
+            probs.append("p264end przed koncem kanonu")
+    for name, line in cases:
+        if not R274_RX[name].match(line):
+            probs.append(name)
+    m = R274_RX["day"].match(_r274_day(109001, lev="dzwignie TAK od dnia 108999, slabszy B", rs="A", so=5, sf=0, ba=2, bb=3, sb2=1, fa=36, vs=4, p=1))
+    if not m or m.group(1) != "109001" or m.group(2) != "19500" or m.group(10) != "9200" or m.group(18) != "0.472" or m.group(19) != "5" or not m.group(21).startswith("TAK") \
+            or m.group(23) != "B" or m.group(24) != "A" or m.group(25) != "2" or m.group(27) != "3" or m.group(28) != "1" or m.group(35) != "36" or m.group(36) != "38" \
+            or m.group(39) != "6" or m.group(51) != "4" or m.group(67) != "1":
+        probs.append("day grupy")
+    m = R274_RX["start"].match(T["start"])
+    if not m or m.group(4) != "TAK" or m.group(8) != "TAK" or m.group(10) != "kampania kanonu" or m.group(13) != "nie":
+        probs.append("start grupy")
+    return ("nie pasuje: " + ", ".join(probs)) if probs else None
+
+
+def rownowaga274_collect(logp):
+    RX = R274_RX
+    D = {"starts": [], "days": {}, "off": {}, "ends": [], "events": {}, "tests": [], "p264end": [], "money": {}, "err": 0, "err1": "", "bad": [], "loads": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            if "ERROR in CanonWarBalance" in s:
+                D["err"] += 1
+                if not D["err1"]:
+                    D["err1"] = s[:160]
+                continue
+            if s.startswith("Pieniadz swiata (bilans - przyczyny): dzien"):
+                mm = RX["money"].match(s)
+                if mm:
+                    D["money"][int(mm.group(1))] = "ARYTMETYKA OK" in s
+                continue
+            if s.startswith("Pokoj kanonu (264): dzien"):
+                me = RX["p264end"].match(s)
+                if me:
+                    D["p264end"].append(int(me.group(1)))
+                continue
+            if not s.startswith(R274_TAG):
+                continue
+            for name in ("day", "off", "start", "end", "test", "event", "load"):
+                mm = RX[name].match(s)
+                if not mm:
+                    continue
+                if name == "day":
+                    D["days"][int(mm.group(1))] = mm
+                elif name == "off":
+                    D["off"][int(mm.group(1))] = mm
+                elif name == "start":
+                    D["starts"].append(mm)
+                elif name == "end":
+                    D["ends"].append(int(mm.group(1)))
+                elif name == "test":
+                    D["tests"].append(mm)
+                elif name == "load":
+                    D["loads"].append(mm)
+                else:
+                    D["events"].setdefault(mm.group(1), []).append(int(mm.group(2)))
+                break
+            else:
+                D["bad"].append(s[:140])
+    return D
+
+
+def _r274_near(r):
+    return any(abs(r - t) < 0.001 for t in (R274_LO, R274_HI, R274_CLO, R274_CHI))
+
+
+def rownowaga274_rows(rep, D):
+    days, off = D["days"], D["off"]
+    # R274-0
+    if not D["starts"]:
+        rep.add("R274-0: linia startu sesji", "brak", "latki TAK", None)
+    else:
+        bad = [m for m in D["starts"] if m.group(1) == "TAK" and m.group(10) == "kampania kanonu" and not all(m.group(i) == "TAK" for i in (4, 5, 6, 7, 8))]
+        live = [m for m in D["starts"] if m.group(1) == "TAK" and m.group(10) == "kampania kanonu"]
+        rep.add("R274-0: linia startu: mysl AI podbicia, weta, BK cel armii, najem z karczmy, nowa druzyna", f"startow {len(D['starts'])}, z regula {len(live)}, z BRAK/BLAD {len(bad)}",
+                "wszystkie TAK", (not bad) if live else None)
+    # R274-1
+    alld = sorted(set(days) | set(off))
+    if not alld:
+        rep.add("R274-1: linia doby co dobe", "brak linii doby", "bez dziur", None)
+    else:
+        gaps = [(a, b) for a, b in zip(alld, alld[1:]) if b - a > 1]
+        rep.add("R274-1: linia doby co dobe (czynna + wylaczone)", f"dob {len(alld)} ({alld[0]}-{alld[-1]}), dziur {len(gaps)}" + (f" {gaps[:3]}" if gaps else ""), "0 dziur", not gaps)
+    act = sorted(days)
+    rs = {d: float(days[d].group(18)) for d in act}
+    # R274-2
+    if len(act) < 61:
+        rep.add("R274-2: udzial dob w pasmie od 61. doby, najdluzsza seria > 1.5", f"dob czynnych {len(act)}", ">= 80% i <= 28 dob", None)
+    else:
+        tail = act[60:]
+        inb = sum(1 for d in tail if R274_LO - 0.0005 <= rs[d] <= R274_HI + 0.0005)
+        run = best = 0
+        for d in act:
+            run = run + 1 if (rs[d] > R274_HI or rs[d] < R274_LO) else 0
+            best = max(best, run)
+        share = inb / len(tail)
+        rep.add("R274-2: udzial dob w pasmie 0.667-1.5 od 61. doby; najdluzsza seria poza pasmem", f"{share:.0%} z {len(tail)} dob; seria {best} dob", ">= 80% i <= 28 dob",
+                share >= 0.8 and best <= 28)
+    # R274-3
+    if len(act) < 28:
+        rep.add("R274-3: kazda strona >= 1 bitwa lordow z druga w kazdym oknie 28 dob", f"dob czynnych {len(act)}", "w kazdym oknie", None)
+    else:
+        bad = []
+        for i in range(0, len(act) - 27):
+            win = act[i:i + 28]
+            if win[-1] - win[0] != 27:
+                continue
+            ba = sum(int(days[d].group(25)) for d in win)
+            bb = sum(int(days[d].group(27)) for d in win)
+            if ba < 1 or bb < 1:
+                bad.append(win[0])
+        rep.add("R274-3: kazda strona >= 1 bitwa lordow z druga w kazdym oknie 28 dob", f"okien bez bitwy {len(bad)}" + (f" (od dnia {bad[:3]})" if bad else ""), "0", not bad)
+    # R274-4
+    seats = D["events"].get("OBLEZENIE SIEDZIBY", [])
+    rep.add("R274-4: oblezenia siedzib (Winterfell, Riverrun, Blizniaki, Casterly Rock, Krolewska Przystan)", f"{len(seats)}" + (f" (dni {seats[:3]})" if seats else ""), "0", not seats)
+    # R274-5
+    if not act:
+        rep.add("R274-5: strata twierdz <= twierdze frontu z pierwszej doby", "brak linii doby", "A i B", None)
+    else:
+        m0 = days[act[0]]
+        fa0, fb0, frA, frB = int(m0.group(35)), int(m0.group(37)), int(m0.group(39)), int(m0.group(40))
+        la = fa0 - min(int(days[d].group(35)) for d in act)
+        lb = fb0 - min(int(days[d].group(37)) for d in act)
+        rep.add("R274-5: strata twierdz strony <= jej twierdze frontu z pierwszej doby", f"A strata {la} z frontu {frA}, B strata {lb} z frontu {frB}", "A <= front A, B <= front B",
+                la <= frA and lb <= frB)
+    # R274-6
+    bad6, chk = [], 0
+    for a, b in zip(act, act[1:]):
+        if b - a != 1 or _r274_near(rs[b]):
+            continue
+        ma, mb = days[a], days[b]
+        so, sf = int(ma.group(19)), int(ma.group(20))
+        on = ma.group(21).startswith("TAK")
+        out = rs[b] < R274_LO or rs[b] > R274_HI
+        calm = R274_CLO <= rs[b] <= R274_CHI
+        so2 = so + 1 if out else 0
+        sf2 = sf + 1 if calm else 0
+        on2 = True if (not on and so2 >= 3) else (False if (on and sf2 >= 3) else on)
+        chk += 1
+        if int(mb.group(19)) != so2 or int(mb.group(20)) != sf2 or mb.group(21).startswith("TAK") != on2:
+            bad6.append(b)
+        elif on2 and mb.group(23) != ("B" if rs[b] < 1 else "A" if rs[b] > 1 else "-"):
+            bad6.append(b)
+    rep.add("R274-6: przelacznik zgodny z progami (serie, wlaczenie po 3 poza 1.5, wylaczenie po 3 w 1.2, slabszy)", f"sprawdzonych par dob {chk}, niezgodnych {len(bad6)}"
+            + (f" {bad6[:3]}" if bad6 else ""), "0", (not bad6) if chk else None)
+    # R274-7
+    if not D["ends"] or not D["p264end"]:
+        rep.add("R274-7: dzien konca 274 = dzien konca kanonu w linii 264", f"koniec 274 {D['ends'][:1] or '-'}, koniec 264 {D['p264end'][:1] or '-'}", "+-1 doba", None)
+    else:
+        e1, e2 = D["ends"][0], min(D["p264end"])
+        rep.add("R274-7: dzien konca 274 = dzien konca kanonu w linii 264", f"274 dzien {e1}, 264 dzien {e2}", "+-1 doba", abs(e1 - e2) <= 1)
+    # R274-8
+    md = [d for d in act if d in D["money"]]
+    badm = [d for d in md if not D["money"][d]]
+    rep.add("R274-8: Pieniadz swiata - ARYTMETYKA OK w dobach czynnej reguly", f"dob z linia {len(md)} z {len(act)}, zle {len(badm)}" + (f" {badm[:3]}" if badm else ""), "0 zlych",
+            (not badm) if md else None)
+    # R274-9
+    stum = sum(int(days[d].group(66)) for d in act) + sum(int(off[d].group(3)) for d in off)
+    rep.add("R274-9: ERROR CanonWarBalance i potkniecia doby", f"ERROR {D['err']}" + (f" ({D['err1']})" if D["err1"] else "") + f", potkniecia {stum}, linii 274 bez wzoru {len(D['bad'])}"
+            + (f" ({D['bad'][0]})" if D["bad"] else ""), "0 / 0 / 0", D["err"] == 0 and stum == 0 and not D["bad"])
+    # R274-10
+    if not D["tests"]:
+        rep.add("R274-10: autotest T1-T6", "brak linii testu", "wszystkie TAK", None)
+    else:
+        res = {m.group(1): m.group(3) for m in D["tests"]}
+        need = [f"T{i}" for i in range(1, 7)] + (["T7"] if "T7" in res else [])   # T7 (recenzja 274, odbicie) tylko gdy Casterly Rock w rekach A
+        bad = [t for t in need if res.get(t) not in ("TAK", "POMINIETY")]
+        rep.add("R274-10: autotest T1-T6", " ".join(f"{t}={res.get(t, '-')}" for t in need), "wszystkie TAK (T4 POMINIETY przy nieczynnej regule)", not bad)
+    # R274-12 (recenzja 274 (2)): stan doby od razu po wczytaniu
+    live12 = [m for m in D["starts"] if m.group(1) == "TAK" and m.group(10) == "kampania kanonu"]
+    if not live12:
+        rep.add("R274-12: linia 'po wczytaniu' przy starcie sesji z regula", f"startow z regula 0, linii {len(D['loads'])}", "tyle co startow", None)
+    else:
+        rep.add("R274-12: linia 'po wczytaniu' przy starcie sesji z regula", f"startow z regula {len(live12)}, linii po wczytaniu {len(D['loads'])}"
+                f" (regula TAK {sum(1 for m in D['loads'] if m.group(2) == 'TAK')})", "tyle co startow", len(D["loads"]) >= len(live12))
+    # R274-11
+    if act:
+        r = [rs[d] for d in act]
+        sie = sum(int(days[d].group(26)) + int(days[d].group(28)) for d in act)
+        ba = sum(int(days[d].group(25)) for d in act)
+        bb = sum(int(days[d].group(27)) for d in act)
+        ev = {k: len(v) for k, v in D["events"].items()}
+        rep.add("R274-11: przebieg", f"r {r[0]:.3f} -> {r[-1]:.3f} (min {min(r):.3f}, max {max(r):.3f}); bitwy A {ba} B {bb}, oblezenia {sie}; zdarzenia {ev}", "INFO", None)
+    else:
+        rep.add("R274-11: przebieg", "brak linii doby" + (f" (wylaczone dob {len(off)})" if off else ""), "INFO", None)
+
+
+def rownowaga274_synth():
+    import tempfile
+    import shutil
+    T = R274_TEST
+    P = "[10:00:00] "
+
+    def run(kind):
+        tmp = tempfile.mkdtemp(prefix="r274_")
+        try:
+            logp = os.path.join(tmp, "Armoury-test.log")
+            L = []
+            if kind == "none":
+                L.append(P + "Armoury: inna linia")
+            else:
+                st = T["start"] if kind == "good" else T["start"].replace("weta TAK", "weta BRAK")
+                L.append(P + st)
+                if kind == "good":
+                    L.append(P + T["load"].format(d=109000))
+                    L.append(P + T["seatok"].format(d=109000))
+                so = sf = 0
+                on = False
+                d0 = 109000
+                for i in range(70):
+                    d = d0 + i
+                    if kind == "good":
+                        sb = 9200 if i < 10 else 17000
+                    else:
+                        sb = 9200
+                    r = sb / 19500
+                    out = r < R274_LO or r > R274_HI
+                    calm = R274_CLO <= r <= R274_CHI
+                    so = so + 1 if out else 0
+                    sf = sf + 1 if calm else 0
+                    if not on and so >= 3:
+                        on = True
+                    elif on and sf >= 3:
+                        on = False
+                    if kind == "bad" and i == 5:
+                        so += 2   # rozjazd przelacznika
+                    lev = ("dzwignie TAK od dnia %d, slabszy B" % d0) if on else "dzwignie NIE"
+                    if i == 30 and kind == "bad":
+                        continue   # dziura
+                    fa = 38 if kind == "good" or i < 40 else 30
+                    L.append(P + _r274_day(d, sb=sb, so=so, sf=sf, lev=lev, rs=("A" if on and out else "-"), ba=(1 if kind == "good" or i < 20 else 0),
+                                           bb=(1 if kind == "good" or i < 20 else 0), fa=fa, p=(0 if kind == "good" else 1)))
+                    L.append(P + T["money"].format(d=d, a=("OK" if kind == "good" or i != 40 else "ZLE")))
+                    if kind == "bad" and i == 50:
+                        L.append(P + T["seat"].format(d=d))
+                    if i == 3:
+                        L.append(P + T["veto"].format(d=d))
+                d = d0 + 70
+                L.append(P + T["end"].format(d=d))
+                L.append(P + T["p264end"].format(d=(d if kind == "good" else d + 5)))
+                L.append(P + T["off"].format(d=d, e=d))
+                for t in ("T1", "T2", "T3", "T4", "T5", "T6"):
+                    L.append(P + T["test"].format(t=t, r=("TAK" if kind == "good" or t != "T3" else "NIE")))
+                if kind == "bad":
+                    L.append(P + "ERROR in CanonWarBalance.VetoPostfix (potkniecie 1): x")
+            open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            rep = Report()
+            rownowaga274_rows(rep, rownowaga274_collect(logp))
+            return {r[0].split(":")[0]: r[3] for r in rep.rows}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    exp = {
+        "good": {"R274-0": "TAK", "R274-1": "TAK", "R274-2": "TAK", "R274-3": "TAK", "R274-4": "TAK", "R274-5": "TAK", "R274-6": "TAK", "R274-7": "TAK", "R274-8": "TAK",
+                 "R274-9": "TAK", "R274-10": "TAK", "R274-11": "INFO", "R274-12": "TAK"},
+        "bad": {"R274-0": "NIE", "R274-1": "NIE", "R274-2": "NIE", "R274-3": "NIE", "R274-4": "NIE", "R274-5": "NIE", "R274-6": "NIE", "R274-7": "NIE", "R274-8": "NIE",
+                "R274-9": "NIE", "R274-10": "NIE", "R274-12": "NIE"},
+        "none": {"R274-0": "INFO", "R274-1": "INFO", "R274-2": "INFO", "R274-3": "INFO", "R274-4": "TAK", "R274-5": "INFO", "R274-6": "INFO", "R274-7": "INFO", "R274-8": "INFO",
+                 "R274-9": "TAK", "R274-10": "INFO", "R274-11": "INFO", "R274-12": "INFO"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def rownowaga274_main(logp):
+    """rownowaga274 (27.10, paczka 274): R274-S, R274-S2, R274-0..R274-12 - opis w komentarzu nad stalymi R274_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = rownowaga274_selftest()
+    rep.add("R274-S: self-test wyrazen (linie kontrolne jak w kodzie C#: CanonWarBalance*.cs)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = rownowaga274_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("R274-S2: test syntetyczny (dobry, zly, bez linii 274)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("R274-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = rownowaga274_collect(logp)
+    print(f"plik: {logp} | startow 274 {len(D['starts'])}, dob czynnych {len(D['days'])}, wylaczonych {len(D['off'])}, zdarzen "
+          f"{ {k: len(v) for k, v in D['events'].items()} }, testow {len(D['tests'])}, ERROR {D['err']}")
+    rownowaga274_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_rownowaga274_main_prev = main
+
+
+def main(argv):
+    # paczka 274: grupa rownowaga274 - opakowanie main jak e223 / pokoj264 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "rownowaga274":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return rownowaga274_main(rest[0] if rest else None)
+    return _rownowaga274_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

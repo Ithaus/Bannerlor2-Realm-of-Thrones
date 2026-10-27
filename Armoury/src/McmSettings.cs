@@ -9804,6 +9804,18 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonNorthRiverlandsUnion { get; set; } = true;
 
+        [SettingPropertyBool("Canon War Balance", HintText = "War of the Five Kings stays an even fight until the Red Wedding: the North and the Riverlands on one side, the crown with the Westerlands on the other. When one side has been more than 1.5 times stronger for three days, the weaker side's lords recruit to full strength in their own lands (volunteers, and veterans hired from town taverns with their own gold) and houses at their party limit may raise one more party from their own idle lords and garrisons. No men or gold come from nothing. Nobody besieges Winterfell, Riverrun, the Twins, Casterly Rock or King's Landing before the Red Wedding. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonWarBalance { get; set; } = true;
+
+        [SettingPropertyBool("Canon War Balance Restraint", HintText = "With Canon War Balance: while one side of the War of the Five Kings is more than 1.5 times stronger, it only starts new sieges of enemy castles and towns on the front line, as in the books. Field battles are not limited and nobody loses men for it", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonWarBalanceRestraint { get; set; } = true;
+
+        [SettingPropertyBool("Canon War Balance Muster", HintText = "With Canon War Balance: a side of the War of the Five Kings that has not fought the other side for 7 days musters: its king gathers an army against a castle or town on the front (never a great seat), and lords far from the front march to it. Houses that border another enemy, like the Iron Islands, stay home", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonWarBalanceMuster { get; set; } = true;
+
         [SettingPropertyBool("Story Images For Rot Windows", HintText = "the story windows of Realm of Thrones show your own pictures when you add them: a file in Modules/Armoury/Images/ROT named after the window (for example rot_NedEvent_0.png for the execution of Ned Stark; the Armoury log names the file each window looks for) replaces that window's picture. Without a file the window is unchanged. Off = always the pictures of Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Story windows")]
         public bool StoryImagesForRotWindows { get; set; } = true;
@@ -12646,6 +12658,9 @@ namespace Armoury
             s.CanonWarNoPeaceUntilRedWedding = CanonWarNoPeaceUntilRedWedding;
             s.DaenerysDragonsGrow = DaenerysDragonsGrow;
             s.CanonNorthRiverlandsUnion = CanonNorthRiverlandsUnion;
+            s.CanonWarBalance = CanonWarBalance;
+            s.CanonWarBalanceRestraint = CanonWarBalanceRestraint;
+            s.CanonWarBalanceMuster = CanonWarBalanceMuster;
             s.StoryImagesForRotWindows = StoryImagesForRotWindows;
             s.LektorEnabled = LektorEnabled;
             s.LektorEventWindows = LektorEventWindows;
