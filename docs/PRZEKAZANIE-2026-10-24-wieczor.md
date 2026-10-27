@@ -1,5 +1,15 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 27.10 ok. 15:10 CET - AUDYT GRY JEFFA W TOKU (po awarii pradu); w grze 128
+- Jeff 27.10 ok. 13:45: "zaproponuj naprawy ... czy ekonomia dziala poprawnie, czemu wojsko czesto nie ma pancerza albo ma tylko ja zle trafiam i mam pecha, i czemu
+  dorzecze i polnoc jest slabsza od lannisterow i krolewskiej przystani to nie ma sensu, zrob audyt ... i te karawany". Wczesniej (13:40) odpowiedz o karawanie
+  (kapital obrotowy max(10000, 30 dni zoldu) w kiesie, BK placi tylko w osadzie wlasciciela - Jeff bez twierdzy) i warsztacie (cena sprawiedliwa: koszt + 25%,
+  nadmiar bizuterii 6/dobe vs popyt 1, podatek BK 57.8% w Lannisport; wyplata ok. 22 zl/dobe).
+- Kopie logow do audytu: scratchpad 1e1c276a...\scratchpad\audyt (Armoury-2026-10-27_12-57-35.log, Armoury-2026-10-26_21-30-37.log, session-2026-10-27_12-57-33.log).
+- Workflow audyt-gry-jeffa-27-10 (run wf_02052cf7-373; skrypt workflows\scripts\audyt-gry-jeffa-27-10-wf_02052cf7-373.js): 4 sledztwa (ekonomia, pancerz, krolestwa,
+  karawany) + sceptycy + synteza po polsku. Po awarii pradu wznowiony z resumeFromRunId (15:08). Wynik = propozycje dla Jeffa, NIC nie wdrazac bez jego zgody.
+- Po awarii sprawdzone: Armoury 35f2df7e / CrashScribe bef9db58 w grze, zapis Jeffa (13:49) bez zer, repo i n161 bez wyzerowanych plikow.
+
 ## DOPISEK 27.10 ok. 02:00 CET - WGRANE 128 (222d); nic w toku
 - WGRANE 128 (01:58): Armoury 35f2df7e (n161 6eda5012, status 056ae5f4, wypchniete) = 127 + 222d. Kopie: Armoury.dll.bak-2026-10-27-przed-wgranie128 i
   D:\Backup-Bannerlord\wgrane\2026-10-27-wgranie128-przed (a06033ef = 127).
