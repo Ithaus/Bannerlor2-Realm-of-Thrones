@@ -1,5 +1,10 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 14:55 CET - Jeff "dzialaj tutaj" - poprawka 286b w toku (workflow wf_a79698e9-c4c) mimo 99% tygodnia
+- Skrypt workflows/scripts/poprawka-286b-wf_a79698e9-c4c.js (bez args; resumeFromRunId), galaz noc/285-zold-srebro-ruda (zb/n285). Zakres: regresje 135a -
+  wyplaty 259 (0.023) i wyprzedaz starego towaru, ciecie rak przy zelazie (KsIronLocalGlut). Potem test 90 dob (135b) i WGRANIE 135 przy H286-3 >= 0.25,
+  RU282-1 i NRU-3 TAK.
+
 ## DOPISEK 28.10 ok. 14:45 CET - TEST 90 DOB 135a: 286 NIE WGRANE (regresje); W GRZE DALEJ 134 (13ee0fc5); TYDZIEN 99% - KONIEC PRAC NA TYM KONCIE
 - 135a (noc/285-zold-srebro-ruda cd44422b, Armoury 17668068): bitwaN + probyN 90 dob (109025 -> 109114) kod 0, ERROR 0. Logi m113\logi\135a-probyN\
   Armoury-2026-10-28_14-12-51.log, wyniki m113\wyniki\grupy-135a\.
