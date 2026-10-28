@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 23:45 CET - 288 + 289 gotowe (noc/285-zold-srebro-ruda 52da829d, Armoury ba0fbc05), AUTOTEST 90 DOB 136a w toku
+- 288 (c304ab3c + 7f8a6afe): CaravanWageHalf (MountedWage.CaravanHalf, linia podpowiedzi 'Merchant escort wage'); CaravanRoadFood (CaravanEscort.cs) - karawany
+  wczesniej NIE jadly w drodze (DoesPartyConsumeFood false dla IsCaravan), teraz 1 szt./20 ludzi/dobe z jukow + zakup na droge przy wyjezdzie z kiesy karawany;
+  w miescie nocleg i jedzenie dalej z sakiewek strazy. Grupa karawany288.
+- 289 (52da829d, sam): EfficientCampaignerAlways - MountedWage.TotalPostfix AddFactor(SecondaryBonus) poza armia dla kwatermistrza z perkiem; CHANGELOG 289.
+- AUTOTEST 136a (zadanie bqtzdmoi3, m113/seria-136a.out.txt; kopia,probyN 90 dob; zapis testowy odswiezony z zapisu Jeffa 23:20, stare zdjecie bazy usuniete).
+  Grupy karawany288 handel287 handel286 handel284 karawany259 ruda282 nruda + reszta; porownac z grupy-135c; WGRANIE 136 gdy bez regresji.
+
 ## DOPISEK 28.10 ok. 23:30 CET - log Jeffa na 135 (sesja 22:18, doby 109025-109045): gospodarka zamknieta, wojna
 - ARYTMETYKA OK; war241/karawany259/rownowaga274/pokoj264 bez NIE. Handel 287: sprzedaz karawan miastom 1524 szt./d, kupno stoi w 10 z 36 kategorii, w jukach
   39 724 szt.; mediana wyniku handlu karawany 10 zl/d wobec zoldu 169 zl/d (tylko 62 z 449 >= zold) - po 288 (-50%) dalej za malo: nastepny krok - czemu obrot
