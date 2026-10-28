@@ -1,5 +1,25 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 18:40 CET - POROWNANIE 90 DOB: 134 (w grze) vs 135b (286b) - 135 NIE WGRANE; w grze dalej 134
+- Te same 90 dob na kopii zapisu Jeffa (m113\wyniki\grupy-134b i grupy-135b):
+  | miara                         | 134 (134b) | 135b (286b) |
+  | rozbite karawany / d (90 dob)  | 4.21       | 2.37        |
+  | udzial karawan z wyplata 259   | 0.128      | 0.081       |
+  | zold swiata / handel (k zl/d)  | 84.7 / ?   | 89.8 / 55.6 |
+  | srebro w jukach na koniec      | 1053       | 1501        |
+  | miasta bez rudy ost. 10 dob    | 22.8       | 15.4        |
+  | zelazo swiata / d              | -28        | -74         |
+  | rece przy zelazie              | -20%       | -30%        |
+  | sprzedaz na stracie / d        | 348        | 664         |
+  | R274-2 dob w pasmie rownowagi  | 10% (!)    | 73%         |
+- KARAWANA JEFFA ('Caravan of Isa Storm'): w 134b zyje, ale netto dla rodu -52 728 w 112 dobach (zold 54 945, wyplaty 5 217, zysk ze sprzedazy -4 599);
+  w 135b po zwolnieniu 30 strazy (CaravanGuardPlayerAfterNotice) ROZBITA w dobie ok. 109062 (netto -16 950 do tego czasu). Dlatego 135 nie wgrane.
+- WNIOSEK STRUKTURALNY: mediana zysku handlu karawany ok. 50-70 zl/d wobec zoldu ok. 470-490 zl/d (karawana Jeffa) - marza miedzy miastami za mala
+  (reguly ceny sprawiedliwej 241/E8 sciskaja rozrzut cen); sama straz tego nie naprawi. Nastepny krok: zmierzyc rozrzut cen towarow miedzy regionami
+  wobec kosztu przewozu (dni drogi x zold/ladunek) i dac kupcom marze z prawdziwej roznicy regionalnej (np. towary regionalne, dalekie trasy), a strazy
+  gracza NIE zwalniac (CaravanGuardPlayerAfterNotice domyslnie NIE). Tez: R274-2 w 134 (rownowaga wojny kanonu poza pasmem 68 dob) - do sprawdzenia.
+- Galaz noc/285-zold-srebro-ruda (409dc1db) = 134 + 286 + 286b - niewgrane; zachowane klucze dzialajace: CaravanGuardByRoadStrength (rozbite 4.2 -> 2.4/d).
+
 ## DOPISEK 28.10 ok. 18:05 CET - 135b (286b, 90 dob) wyniki mieszane; BAZA 134 na 90 dob (134b) w toku dla porownania
 - 135b: rozbite 2.17/d (TAK), zold 89.8k wobec handlu +55.6k (NIE), udzial wyplat 0.135 -> 0.081 (NIE; 135a 0.023), sprzedaz na stracie 3704 -> 664/d (TAK),
   srebro 4180 -> 1501, ruda: miasta bez rudy ostatnie 10 dob 15.4, zelazo swiata -74/d, rece -30%; R274-2 73% dob w pasmie (prog 80%).
