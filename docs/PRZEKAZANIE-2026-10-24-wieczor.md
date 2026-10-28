@@ -1,5 +1,10 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 18:50 CET - Jeff "rob teraz" - paczka 287 w toku (workflow wf_50bb38ba-8e2)
+- Skrypt workflows/scripts/paczka-287-wf_50bb38ba-8e2.js (bez args; resumeFromRunId), galaz noc/285-zold-srebro-ruda (zb/n285, od 409dc1db).
+  Zakres: rozrzut cen regionalnych wobec kosztu drogi (marza kupcow), CaravanGuardPlayerAfterNotice domyslnie NIE, zelazo -74/d, R274-2. Potem test
+  90 dob (testy-noc-204.ps1 -Runs kopia,probyN -ProbyDays 90, ok. 31 min) i porownanie z grupy-134b; WGRANIE 135 gdy lepsza od 134 i karawana Jeffa zyje.
+
 ## DOPISEK 28.10 ok. 18:40 CET - POROWNANIE 90 DOB: 134 (w grze) vs 135b (286b) - 135 NIE WGRANE; w grze dalej 134
 - Te same 90 dob na kopii zapisu Jeffa (m113\wyniki\grupy-134b i grupy-135b):
   | miara                         | 134 (134b) | 135b (286b) |
