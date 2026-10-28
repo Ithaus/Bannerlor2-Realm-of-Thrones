@@ -56275,7 +56275,7 @@ def nruda_main(logp):
                         w285[int(a.group(1))] = t285
                     sg286 = h286_f5_seg(s)
                     if sg286:
-                        w286[int(a.group(1))] = sum(v[1] + v[4] + v[5] for v in sg286.values())   # 286b: trzymane przy BRAK i powrot w pasmie - osobne kubly
+                        w286[int(a.group(1))] = sum(v[1] + v[4] + v[5] for v in sg286.values()) + h287_hold(s)   # 286b: trzymane przy BRAK i powrot w pasmie, 287: trzymane przy PELNYM - osobne kubly
                 else:
                     bad_w += 1
                 continue
@@ -76717,6 +76717,7 @@ def h286_collect(logp):
                 sg = h286_f5_seg(s)
                 if sg:
                     D["f5"][d] = sg
+                    D.setdefault("f5h", {})[d] = h287_hold(s)   # 287: trzymane przy PELNYM - osobny kubel decyzji
                     a = NRU_W.match(s)
                     if a:
                         x = a.groups()
@@ -76820,7 +76821,7 @@ def h286_rows(rep, D):
                     bad.append(f"{d} {mk}: 286b - w dol przy BRAK {nu} (rynek w braku - kopalnie trzymaja rece)")
             if d in D["f5n"]:
                 n, s_, dw, de = D["f5n"][d]
-                loc = sum(v[1] + v[4] + v[5] for v in sg.values())
+                loc = sum(v[1] + v[4] + v[5] for v in sg.values()) + D.get("f5h", {}).get(d, 0)   # 287: z kublem 'trzymane przy PELNYM'
                 if s_ + loc != n:
                     bad.append(f"{d}: suma decyzji {s_} + 286 {loc} != wpisow {n}")
                 for mk, dec in (("W", dw), ("E", de)):
@@ -76974,6 +76975,337 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return handel286_main(rest[0] if rest else None)
     return _handel286_main_prev(argv)
+
+
+# ------------------------------------------------------------ handel287 (28.10, paczka 287 noc/285-zold-srebro-ruda: bramka przeplywu karawan wedlug popytu rynkow miast,
+# krok f5-ruda - przy rynku PELNYM w dol tylko kopalnie miast pelnych, karawany gracza bez zwolnien strazy).
+#   python -I tools/sprawdz_logi.py --grupa handel287 <Armoury-*.log>      (progi na bieg 90 dob; krotszy bieg - progi te same, liczone na tym, co jest)
+# Baza (autotesty 90 dob 109025-109114 na kopii zapisu Jeffa): 134b = WGRANE 134 (Armoury-2026-10-28_18-01-13.log), 135b = 286b (Armoury-2026-10-28_17-29-45.log).
+# Bramka 284 (kupno wedlug sprzedazy karawan): kupno stoi w 33 / 35-36 z 36 kategorii od doby 109031 do konca (134b / 135b); mediana zysku karawan 7 dob 71-74 zl;
+# udzial karawan rodow z wyplata 259 (ostatnie 7 dob) 0.128 / 0.081; miasta bez rudy ostatnie 10 dob 22.8 / 15.4; zelazo swiata (lupy, linia 282) w dol.
+#   H287-S  self-test wyrazen (linia jak w kodzie C#: CaravanTrade284.Line287; segment 287 linii f5 wobec NRU_W, RU282_F5, H285_F5, H286_F5, H286B_F5)
+#   H287-S2 test syntetyczny (1 log dobry, 8 zlych)
+#   H287-0  linia 287 co dobe (jak linia 259, roznica <= 1), nierozpoznanych 0, potkniecia 287 0, ERROR 0
+#   H287-1  bramka: udzial kategorii z zamknietym kupnem srednio w ostatnich 7 dobach <= H287_SHUT_MAX (karawany znowu kupuja)
+#   H287-2  mediana wyniku handlu karawan na dobe >= mediana ich zoldu na dobe (srednio z ostatnich 7 dob) - zwykla karawana zarabia na zold
+#   H287-3  udzial karawan rodow z wyplata 259 ostatnie 7 dob > H287_PAY_MIN (poziom 134b)
+#   H287-4  roznica cen miast wobec kosztu drogi: mediana marzy (cwiartka tansza -> drozsza, po karze i mycie) unosi >= H287_ROAD_DAYS dob zoldu (ostatnie 7 dob)
+#   H287-5  zelazo swiata (lupy, 'Ruda przeplyw (282)') - trend ostatnich 30 dob (prosta najmniejszych kwadratow) w [H287_IRON_LO, H287_IRON_HI] na dobe
+#   H287-6  miasta bez rudy srednio w ostatnich 10 dobach <= H287_NOORE_MAX (poziom 134b)
+#   H287-7  krok f5: segment 287 spojny - trzymane przy PELNYM tylko przy decyzji PELNY, suma decyzji z kublami 286 + 286b + 287 = wpisy
+#   H287-8  karawany gracza: przy kluczu 'karawany gracza po komunikacie' NIE zwolnionych 0 (linia 286)
+#   H287-9  INFO: popyt rynkow / sprzedaz karawan / juki, kupno stoi wedlug samej sprzedazy karawan, rozbite karawany ostatnie 30 dob
+H287_G = "Handel z roznicy cen (287): dzien "
+H287_RE = re.compile(
+    r"^Handel z roznicy cen \(287\): dzien (?P<d>\d+) \| klucz popyt rynkow (?P<k>TAK|NIE) \| bramka: kategorii (?P<cats>\d+), kupno stoi (?P<shut>\d+) "
+    r"\(wedlug samej sprzedazy karawan (?P<shut0>\d+)\), popyt rynkow razem (?P<mkt>-?\d+) szt\./d, sprzedaz karawan miastom (?P<ema>[\d.]+) szt\./d, "
+    r"w jukach (?P<held>\d+) szt\. \| karawany zmierzone \(>= 7 dob\) (?P<nm>\d+): wynik handlu/d mediana (?P<pd>-?\d+|-) zl, zold/d mediana (?P<wg>-?\d+|-) zl, "
+    r"wynik >= zold (?P<cov>\d+) \| roznica cen miast \(indeks cwiartki tanszej / drozszej, kara handlowa (?P<pen>[\d.]+)%, myto (?P<toll>[\d.]+)%\): "
+    r"kategorii (?P<mc>\d+), z marza > 0 (?P<mp>\d+), mediana marzy (?P<mg>-?\d+%|-) \| koszt drogi: zold karawan (?P<wall>\d+) zl/d, juki po koszcie (?P<cargo>-?\d+) zl, "
+    r"zold doby (?P<q>[\d.]+%|-) jukow, mediana marzy unosi (?P<rd>-?[\d.]+|-) dob drogi \| wedlug kategorii \(popyt rynkow/d / sprzedaz karawan/d / indeks p25-p75 / "
+    r"marza\): (?P<list>.*) \| potkniecia 287 (?P<st>\d+) \(sesja\)\.$")
+H287_F5 = re.compile(r"(Westeros|Essos): [^|]*?; 287: przy rynku PELNYM w dol tylko kopalnie miast pelnych TAK, trzymane przy PELNYM \(miasto bez nadmiaru\) (\d+)")
+H287_ERR = ("ERROR in CaravanTrade284.", "ERROR in StartCalibration.F5IronWeek")
+H287_SHUT_MAX = 0.5          # udzial kategorii z zamknietym kupnem (ostatnie 7 dob): 134b 33/36 = 0.92, 135b 35-36/36 = 0.97-1.00
+H287_PAY_MIN = 0.13          # udzial karawan rodow z wyplata 259 (ostatnie 7 dob): wiecej niz 134b 0.128 (135b 0.081)
+H287_ROAD_DAYS = 7.0         # mediana marzy miast (p25 -> p75 po karze i mycie) unosi co najmniej tydzien zoldu karawan (wobec ich jukow po koszcie)
+H287_IRON_LO, H287_IRON_HI = -20.0, 40.0   # zelazo swiata (lupy) - trend ostatnich 30 dob na dobe: cel ok. 0 (134b i 135b w dol)
+H287_NOORE_MAX = 22.8        # miasta bez rudy srednio w ostatnich 10 dobach: najwyzej poziom 134b (135b 15.4)
+H287_SEG = "; 287: przy rynku PELNYM w dol tylko kopalnie miast pelnych TAK, trzymane przy PELNYM (miasto bez nadmiaru) {nh}"
+
+
+def h287_hold(s):
+    """287: suma 'trzymane przy PELNYM' z segmentow 287 linii f5 (oba rynki); 0 - linia bez segmentu 287."""
+    return sum(int(g.group(2)) for g in H287_F5.finditer(s))
+
+
+def h287_line():
+    """Linia wzorcowa zbudowana jak w kodzie C# (CaravanTrade284.Line287)."""
+    return ("Handel z roznicy cen (287): dzien {d} | klucz popyt rynkow TAK | bramka: kategorii 36, kupno stoi {shut} (wedlug samej sprzedazy karawan {shut0}), "
+            "popyt rynkow razem 5210 szt./d, sprzedaz karawan miastom 151.2 szt./d, w jukach 9371 szt. | karawany zmierzone (>= 7 dob) 410: wynik handlu/d mediana {pd} zl, "
+            "zold/d mediana {wg} zl, wynik >= zold {cov} | roznica cen miast (indeks cwiartki tanszej / drozszej, kara handlowa 12.5%, myto 2.0%): kategorii 36, "
+            "z marza > 0 30, mediana marzy {mg} | koszt drogi: zold karawan 89610 zl/d, juki po koszcie 3534534 zl, zold doby 2.54% jukow, mediana marzy unosi {rd} dob drogi | "
+            "wedlug kategorii (popyt rynkow/d / sprzedaz karawan/d / indeks p25-p75 / marza): silver 270.3/12.5/1.20-6.50/300%, wine 640.0/1.2/1.50-3.10/62%, "
+            "marble 0.0/0.0/-/- | potkniecia 287 {st} (sesja).")
+
+
+def h287_selftest():
+    bad = []
+    t = h287_line()
+    a = H287_RE.match(t.format(d=109030, shut=3, shut0=35, pd=-52, wg=186, cov=120, mg="104%", rd="41.0", st=0))
+    if not a or a.group("shut") != "3" or a.group("shut0") != "35" or a.group("pd") != "-52" or a.group("wg") != "186" or a.group("mg") != "104%" \
+            or a.group("rd") != "41.0" or not a.group("list").startswith("silver 270.3/"):
+        bad.append("linia 287")
+    if not H287_RE.match(t.format(d=109030, shut=0, shut0=0, pd="-", wg="-", cov=0, mg="-", rd="-", st=0)):
+        bad.append("linia 287 ('-')")
+    if H287_RE.match("Handel z roznicy cen (287): dzien 109030 | blad linii | potkniecia 287 1 (sesja)."):
+        bad.append("linia bledu 287 rozpoznana jako dobra")
+    # f5 z segmentami 286 + 286b + 287 (po 'prog trendu' kazdego rynku) - wyrazenia grup nruda / ruda282 / handel285 / handel286 dalej pasuja
+    _g5, _s5, f5 = h285_lines()
+    _g6, seg = h286_lines()
+    x = f5.format(d=109035, sw=1856, dw="PELNY (w dol, zapas rosnie - 285)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="W DOL")
+    x = x.replace(", trend W DOL, prog trendu 90", ", trend W DOL, prog trendu 90" + seg.format(nf=7, nl=0, nu=0, nb=0) + H286B_SEG.format(nh=0, ns=2, nr=0)
+                  + H287_SEG.format(nh=300))
+    x = x.replace(", trend -, prog trendu 56", ", trend -, prog trendu 56" + seg.format(nf=3, nl=12, nu=0, nb=12) + H286B_SEG.format(nh=0, ns=4, nr=9) + H287_SEG.format(nh=0))
+    if not NRU_W.match(x):
+        bad.append("f5 287 wobec NRU_W")
+    if len(RU282_F5.findall(x)) != 2:
+        bad.append("f5 287 wobec RU282_F5")
+    c = list(H285_F5.finditer(x))
+    if len(c) != 2 or c[0].group(14) != "90" or c[1].group(14) != "56":
+        bad.append("f5 287 wobec H285_F5")
+    sg = h286_f5_seg(x)
+    if sg.get("W") != (7, 0, 0, 0, 0, 0, True) or sg.get("E") != (3, 12, 0, 12, 0, 9, True):
+        bad.append("f5 287 wobec segmentow 286 / 286b")
+    if h287_hold(x) != 300 or [g.group(1) for g in H287_F5.finditer(x)] != ["Westeros", "Essos"]:
+        bad.append("segment 287 f5")
+    if h287_hold(f5.format(d=109035, sw=1856, dw="PASMO (bez zmian)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="-")):
+        bad.append("f5 bez segmentu 287")
+    return "; ".join(bad) if bad else None
+
+
+def h287_collect(logp):
+    D = {"g": {}, "f5": {}, "ru": {}, "k259": {}, "g286": {}, "lost": {}, "bad": 0, "err": 0, "errs": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(H287_ERR):
+                    D["err"] += 1
+                    if len(D["errs"]) < 3:
+                        D["errs"].append(s[:160])
+                continue
+            if s.startswith(H287_G):
+                a = H287_RE.match(s)
+                if a:
+                    D["g"][int(a.group("d"))] = a.groupdict()
+                else:
+                    D["bad"] += 1
+            elif s.startswith(NRU_WEEK):
+                a = NRU_W.match(s)
+                if a and H287_F5.search(s):
+                    x = a.groups()
+                    holds = {("W" if g.group(1) == "Westeros" else "E"): int(g.group(2)) for g in H287_F5.finditer(s)}
+                    sg = h286_f5_seg(s)
+                    loc = sum(v[1] + v[4] + v[5] for v in sg.values())
+                    base = (int(x[NRUW_UP]) + int(x[NRUW_DNF]) + int(x[NRUW_DNS]) + int(x[NRUW_PART]) + int(x[NRUW_NODATA]) + int(x[NRUW_BAND]) + int(x[NRUW_NOT]))
+                    D["f5"][int(x[NRUW_DAY])] = (holds, {"W": x[NRUW_DECW], "E": x[NRUW_DECE]}, int(x[NRUW_IN]), base + loc + sum(holds.values()))
+                elif s.find("; 287: ") >= 0:
+                    D["bad"] += 1
+            elif s.startswith("Ruda przeplyw (282): dzien "):
+                a = H285_RU.match(s)
+                if a:
+                    D["ru"][int(a.group(1))] = (int(a.group(3)), int(a.group(4)))
+            elif s.startswith("Karawany rodow - rozliczenie dnia (259): dzien "):
+                a = H284_RE259.match(s)
+                if a:
+                    D["k259"][int(a.group(1))] = (int(a.group(2)), int(a.group(3)))
+            elif s.startswith(H286_G):
+                a = H286_RE_G.match(s)
+                if a:
+                    D["g286"][int(a.group("d"))] = (a.group("k2"), int(a.group("pr")))
+            elif s.startswith("Szczelnosc (164a/31b): dzien "):
+                a = H285_LOST.match(s)
+                if a:
+                    D["lost"][int(a.group(1))] = int(a.group(2))
+    return D
+
+
+def _h287_slope(pts):
+    """Prosta najmniejszych kwadratow (doba, wartosc) -> nachylenie na dobe; None przy < 2 punktach."""
+    if len(pts) < 2:
+        return None
+    n = len(pts)
+    mx = sum(p[0] for p in pts) / n
+    my = sum(p[1] for p in pts) / n
+    sxx = sum((p[0] - mx) ** 2 for p in pts)
+    return sum((p[0] - mx) * (p[1] - my) for p in pts) / sxx if sxx > 0 else None
+
+
+def h287_rows(rep, D):
+    av = _h285_avg
+    gd = sorted(D["g"])
+    last7 = gd[-7:]
+    stum = int(D["g"][gd[-1]]["st"]) if gd else 0
+    n259 = len(D["k259"])
+    rep.add("H287-0: linia 287 co dobe (jak linia 259), nierozpoznanych 0, potkniecia 287 0, ERROR 0",
+            f"linii 287 {len(gd)}, linii 259 {n259}, nierozpoznanych {D['bad']}, potkniecia 287 (sesja, ostatnia linia) {stum}, ERROR {D['err']}"
+            + (f" {D['errs']}" if D["errs"] else ""), "roznica <= 1, 0 / 0 / 0", bool(gd) and abs(len(gd) - n259) <= 1 and D["bad"] == 0 and stum == 0 and D["err"] == 0)
+    if last7:
+        sh = av([int(D["g"][d]["shut"]) / max(1, int(D["g"][d]["cats"])) for d in last7])
+        sh0 = av([int(D["g"][d]["shut0"]) / max(1, int(D["g"][d]["cats"])) for d in last7])
+        rep.add("H287-1: bramka - udzial kategorii z zamknietym kupnem (ostatnie 7 dob)", f"{sh:.2f} (wedlug samej sprzedazy karawan {sh0:.2f}); kategorii ostatnio "
+                f"{D['g'][last7[-1]]['cats']}, klucz {D['g'][last7[-1]]['k']}", f"<= {H287_SHUT_MAX} (134b 0.92, 135b 0.97)", sh <= H287_SHUT_MAX)
+        pds = [int(D["g"][d]["pd"]) for d in last7 if D["g"][d]["pd"] != "-"]
+        wgs = [int(D["g"][d]["wg"]) for d in last7 if D["g"][d]["wg"] != "-"]
+        cov = av([int(D["g"][d]["cov"]) / max(1, int(D["g"][d]["nm"])) for d in last7])
+        if pds and wgs:
+            p, w = av(pds), av(wgs)
+            rep.add("H287-2: mediana wyniku handlu karawan/d >= mediana zoldu/d (ostatnie 7 dob)", f"wynik {p:.0f} zl/d wobec zoldu {w:.0f} zl/d; karawan z wynikiem >= zold {cov:.2f}",
+                    ">= (cel paczki: zwykla karawana zarabia na zold; 135b mediana zysku 7 dob 63-98 zl)", p >= w)
+        else:
+            rep.add("H287-2: wynik handlu karawan wobec zoldu", "brak karawan zmierzonych", "INFO", None)
+        rds = [float(D["g"][d]["rd"]) for d in last7 if D["g"][d]["rd"] != "-"]
+        mgs = [D["g"][d]["mg"] for d in last7]
+        if rds:
+            r = av(rds)
+            rep.add("H287-4: roznica cen miast (cwiartka tansza -> drozsza) wobec kosztu drogi - ile dob zoldu unosi mediana marzy (ostatnie 7 dob)",
+                    f"{r:.1f} dob (mediana marzy ostatnio {mgs[-1]}, z marza > 0 {D['g'][last7[-1]]['mp']} z {D['g'][last7[-1]]['mc']}, zold doby {D['g'][last7[-1]]['q']} jukow)",
+                    f">= {H287_ROAD_DAYS}", r >= H287_ROAD_DAYS)
+        else:
+            rep.add("H287-4: roznica cen miast wobec kosztu drogi", "brak liczby", "INFO", None)
+    else:
+        rep.add("H287-1: bramka", "brak linii 287", "INFO (log sprzed paczki)", None)
+    kd = sorted(D["k259"])[-7:]
+    if kd:
+        share = av([D["k259"][d][1] / max(1, D["k259"][d][0]) for d in kd])
+        rep.add("H287-3: udzial karawan rodow z wyplata 259 (ostatnie 7 dob)", f"{share:.3f}", f"> {H287_PAY_MIN} (134b; 135b 0.081)", share > H287_PAY_MIN)
+    else:
+        rep.add("H287-3: wyplaty 259", "brak linii 259", "INFO", None)
+    rd = sorted(D["ru"])
+    if len(rd) >= 15:
+        w30 = rd[-30:]
+        sl = _h287_slope([(d, D["ru"][d][1]) for d in w30])
+        rep.add("H287-5: zelazo swiata (lupy, linia 282) - trend ostatnich 30 dob", f"{sl:+.1f}/d ({D['ru'][w30[0]][1]} -> {D['ru'][w30[-1]][1]})",
+                f"w [{H287_IRON_LO:+.0f}, {H287_IRON_HI:+.0f}]/d (cel ok. 0)", sl is not None and H287_IRON_LO <= sl <= H287_IRON_HI)
+        no = av([D["ru"][d][0] for d in rd[-10:]])
+        rep.add("H287-6: miasta bez rudy (srednio ostatnie 10 dob)", f"{no:.1f} (pierwsza doba {D['ru'][rd[0]][0]})", f"<= {H287_NOORE_MAX} (134b; 135b 15.4)", no <= H287_NOORE_MAX)
+    else:
+        rep.add("H287-5: zelazo swiata", f"za malo dob ({len(rd)})", ">= 15 dob", None)
+    if D["f5"]:
+        bad = []
+        held = 0
+        for d in sorted(D["f5"]):
+            holds, decs, n, s_ = D["f5"][d]
+            for mk, h in holds.items():
+                held += h
+                if h > 0 and decs.get(mk) != "PELNY":
+                    bad.append(f"{d} {mk}: trzymane przy PELNYM {h} przy {decs.get(mk)}")
+            if s_ != n:
+                bad.append(f"{d}: suma decyzji z kublami 286/286b/287 {s_} != wpisow {n}")
+        rep.add("H287-7: krok f5 - segment 287 (przy rynku PELNYM w dol tylko kopalnie miast pelnych)", f"krokow {len(D['f5'])}, trzymanych razem {held}, niezgodnych {len(bad)}"
+                + (f" {bad[:3]}" if bad else ""), "0", not bad)
+    else:
+        rep.add("H287-7: krok f5 z segmentem 287", "brak (bieg krotszy niz 7 dob, KS bez kroku albo klucz NIE)", "INFO", None)
+    g6 = D["g286"]
+    if g6:
+        off = [d for d in g6 if g6[d][0] == "NIE"]
+        rel = sum(g6[d][1] for d in off)
+        if off:
+            rep.add("H287-8: karawany gracza - bez zwolnien strazy przy kluczu NIE", f"dob z kluczem NIE {len(off)}, zwolnionych {rel}", "0", rel == 0)
+        else:
+            rep.add("H287-8: karawany gracza", f"klucz 'karawany gracza po komunikacie' TAK w {len(g6)} dobach, zwolnionych {sum(v[1] for v in g6.values())}",
+                    "INFO (domyslnie 287 - NIE)", None)
+    else:
+        rep.add("H287-8: karawany gracza", "brak linii 286", "INFO", None)
+    if gd:
+        a0, a1 = D["g"][gd[0]], D["g"][gd[-1]]
+        ld = sorted(D["lost"])[-30:]
+        lost = av([D["lost"][d] for d in ld]) if ld else None
+        rep.add("H287-9: przebieg (INFO)", f"popyt rynkow {a0['mkt']} -> {a1['mkt']} szt./d, sprzedaz karawan {a0['ema']} -> {a1['ema']} szt./d, juki {a0['held']} -> {a1['held']} szt., "
+                f"kupno stoi {a0['shut']} -> {a1['shut']} (wedlug samej sprzedazy {a0['shut0']} -> {a1['shut0']}), wynik/zold mediana {a0['pd']}/{a0['wg']} -> {a1['pd']}/{a1['wg']} zl, "
+                f"rozbite karawany ostatnie 30 dob {('%.2f' % lost) if lost is not None else '-'}/d", "INFO", None)
+
+
+def h287_synth():
+    """Test syntetyczny: 1 log dobry, 8 zlych - kazdy zly psuje jeden prog."""
+    import tempfile
+    t = h287_line()
+    _g5, _s5, f5 = h285_lines()
+    g6, seg = h286_lines()
+    ru = ("Ruda przeplyw (282): dzien {d} | klucze | ceny: miasta bez rudy placa za pierwsza sztuke 60.0 d (mediana 9 miast), zrodla sprzedaja 20.0 d (mediana 37 zrodel), "
+          "wozy zaplacily srednio 8.6 d, stosunek 2.10 | miasta bez rudy {no} z 97 (z zuzyciem 9, bez zuzycia 0) | x | swiat lupy: razem {w} (+1) | czas 0.2 ms, potkniecia 0.")
+    k259 = ("Karawany rodow - rozliczenie dnia (259): dzien {d} | CZYNNE | karawan rodow 60 (gracza 1, lordow 59), z wyplata {p} za 23142 zl (graczowi 0, lordom 23142) | "
+            "kontrola: kiesy -23142 = wynik prefiksu +23142 (roznica 0) | reszta")
+
+    def mk(kind):
+        out = []
+        for i in range(40):
+            d = 109000 + i
+            out.append("[00:00:00] " + t.format(d=d, shut=30 if kind == "gate" else 4, shut0=35, pd=150 if kind == "wage" else 260, wg=186, cov=200,
+                                                 mg="104%", rd="3.0" if kind == "road" else "41.0", st=0))
+            out.append("[00:00:00] " + ru.format(d=d, no=30 if kind == "noore" else 12, w=6000 - (60 * i if kind == "iron" else 0)))
+            out.append("[00:00:00] " + k259.format(d=d, p=5 if kind == "pay" else 12))
+            x = g6.format(d=d, below=5, rm=100, rw=900, ru=1100, rpm="11.00", pn=0, pnd="-", pr=3 if (kind == "player" and i == 20) else 0, men=11000, unit=85000,
+                          upm="7.73", al="silver 30", st=0)
+            out.append("[00:00:00] " + x.replace("karawany gracza po komunikacie TAK", "karawany gracza po komunikacie NIE"))
+            if i == 14:
+                y = f5.format(d=d, sw=1856, dw="PELNY (w dol, zapas rosnie - 285)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="W DOL")
+                y = y.replace(", trend W DOL, prog trendu 90", ", trend W DOL, prog trendu 90" + seg.format(nf=4, nl=0, nu=0, nb=0) + H286B_SEG.format(nh=0, ns=0, nr=0)
+                              + H287_SEG.format(nh=300))
+                y = y.replace(", trend -, prog trendu 56", ", trend -, prog trendu 56" + seg.format(nf=3, nl=12, nu=0, nb=12) + H286B_SEG.format(nh=0, ns=2, nr=0)
+                              + H287_SEG.format(nh=7 if kind == "f5" else 0))
+                y = y.replace("pasmo 512,", "pasmo 200," if kind != "f5" else "pasmo 193,")
+                out.append("[00:00:00] " + y)
+        return out
+
+    def run(kind):
+        fd, path = tempfile.mkstemp(suffix=".log")
+        os.close(fd)
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("\n".join(mk(kind)) + "\n")
+            r = Report()
+            h287_rows(r, h287_collect(path))
+            return {row[0].split(":")[0]: row[3] for row in r.rows}
+        finally:
+            os.remove(path)
+
+    allt = {"H287-0": "TAK", "H287-1": "TAK", "H287-2": "TAK", "H287-3": "TAK", "H287-4": "TAK", "H287-5": "TAK", "H287-6": "TAK", "H287-7": "TAK", "H287-8": "TAK"}
+    exp = {
+        "good": allt,
+        "gate": {"H287-1": "NIE", "H287-2": "TAK"},
+        "wage": {"H287-2": "NIE", "H287-1": "TAK"},
+        "pay": {"H287-3": "NIE"},
+        "road": {"H287-4": "NIE", "H287-3": "TAK"},
+        "iron": {"H287-5": "NIE", "H287-6": "TAK"},
+        "noore": {"H287-6": "NIE", "H287-5": "TAK"},
+        "f5": {"H287-7": "NIE"},
+        "player": {"H287-8": "NIE", "H287-7": "TAK"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def handel287_main(logp):
+    """handel287 (28.10, paczka 287): H287-S, H287-S2, H287-0..H287-9 - opis w komentarzu nad stalymi H287_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = h287_selftest()
+    rep.add("H287-S: self-test wyrazen (linia jak w kodzie C#: CaravanTrade284.Line287; segment 287 linii f5 wobec NRU_W, RU282_F5, H285_F5, h286_f5_seg)",
+            s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = h287_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("H287-S2: test syntetyczny (1 log dobry, 8 zlych)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("H287-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = h287_collect(logp)
+    print(f"plik: {logp} | linii 287 {len(D['g'])} (nierozpoznanych {D['bad']}), f5 z 287 {len(D['f5'])}, Ruda 282 {len(D['ru'])}, 259 {len(D['k259'])}, 286 {len(D['g286'])}, "
+          f"Szczelnosc {len(D['lost'])}, ERROR {D['err']}")
+    h287_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_handel287_main_prev = main
+
+
+def main(argv):
+    # paczka 287: grupa handel287 - opakowanie main jak handel286
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "handel287":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return handel287_main(rest[0] if rest else None)
+    return _handel287_main_prev(argv)
 
 
 if __name__ == "__main__":

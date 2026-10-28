@@ -79,8 +79,25 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _wSell, _wGuard, _wLeft, _wSize;
 
+        // ------------------------------------------------------------ 287: popyt rynkow (klucz CaravanFlowByMarketDemand)
+        // Dowod (autotest 135b = 286b, 90 dob 109025-109114 na kopii zapisu Jeffa, Armoury-2026-10-28_17-29-45.log; 134b = WGRANE 134 tak samo): bramka przeplywu
+        // mierzyla zbyt karawan ich WLASNA sprzedaza miastom (Ema). Od doby 109031 kupno stalo w 35-36 z 36 kategorii do konca biegu (134b: 33 z 36), 'kupno BK
+        // odrzucone - przesyt' 1 355-1 885 wizyt x kategorii na dobe, 'Towary' - karawany kupily 0 srebra / wina / soli / futer. Karawany tylko wyprzedawaly juki
+        // z wczytania (56 979 -> 9 371 szt.), sprzedaz 14 dob malala razem z nimi (1 818 -> 151 szt./d), stosunek juki / sprzedaz rosl 24 -> 62 dob - bramka nie
+        // mogla sie otworzyc (miara zalezy od tego, co bramka blokuje). Rynek jej nie widzial: wino w jukach 172 szt. = 0.2 doby zuzycia swiata (620/d), a 143 doby
+        // 'sprzedazy karawan' (1.2/d); srebro 1 501 = 5.6 doby zuzycia (267.6/d), 120 dob 'sprzedazy karawan'. Miara 287: ile kupuja rynki miast - popyt targu
+        // gry (ItemData.Demand, ten, z ktorego idzie cena) zamieniony na sztuki tak, jak gra zamienia go na zakupy mieszczan: budzet doby
+        // SettlementEconomyModel.CalculateDailySettlementBudgetForItemCategory (popyt x indeks^0.3) / cena sztuki (wartosc na polce x indeks), suma 97 miast.
+        // Bramka i reguly, ktore pytaja o dni zbytu (jedzenie > 7 dob, przesyt gleboki 286b) - na max(sprzedaz karawan, popyt rynkow). Zysk osiagalny (regula 4),
+        // kapital obrotowy, rezerwa zoldu, 'nie ponizej kosztu' - bez zmian. Pamiec doby (kategoria liczona przy pierwszym pytaniu w dobie), nic w zapisie.
+        private static readonly Dictionary<ItemCategory, float> _mkt = new Dictionary<ItemCategory, float>();
+        private static int _mktDay = int.MinValue;
+        private static Dictionary<ItemCategory, float> _unit;          // wartosc sztuki kategorii na polce (srednia ShelfWorth towarow handlowych) - raz na dobe
+        private static int _mktStum;
+
         internal static void Reset()
         {
+            _mkt.Clear(); _mktDay = int.MinValue; _unit = null; _mktStum = 0;   // 287
             _soldToday.Clear(); _soldLast.Clear(); _ema.Clear(); _days = 0; _held.Clear(); _heldReady = false; _food = null;
             _bkWithheld.Clear(); _bkWithheldMp = null;
             _impOk = _impBad = 0; _impHad = _impLogged = false;
@@ -141,7 +158,78 @@ namespace Armoury
 
         private static float Ema(ItemCategory c) { float e; return _ema.TryGetValue(c, out e) ? e : 0f; }
         private static long Held(ItemCategory c) { long h; return _held.TryGetValue(c, out h) ? h : 0; }
-        private static float Cap(ItemCategory c) { return Ema(c) * DaysOf(c); }
+        private static float CapOld(ItemCategory c) { return Ema(c) * DaysOf(c); }
+        private static float Cap(ItemCategory c) { return Flow(c) * DaysOf(c); }
+
+        /// <summary>287: zbyt doby kategorii, z ktorego licza sie dni (bramka, jedzenie > 7 dob, przesyt gleboki): przy kluczu CaravanFlowByMarketDemand
+        /// max(sprzedaz karawan miastom, popyt rynkow miast w sztukach); bez klucza - sama sprzedaz karawan (jak 284).</summary>
+        private static float Flow(ItemCategory c)
+        {
+            float e = Ema(c);
+            var s = Settings.Current;
+            return s != null && s.CaravanFlowByMarketDemand ? Math.Max(e, Mkt(c)) : e;
+        }
+
+        /// <summary>287: wartosc sztuki kategorii na polce (jednostka danych rynku - HistoricalPrices.ShelfWorth), srednia towarow handlowych kategorii; raz na dobe (z pamiecia Mkt).</summary>
+        private static float Unit(ItemCategory c)
+        {
+            if (_unit == null)
+            {
+                var u = new Dictionary<ItemCategory, float>();
+                var n = new Dictionary<ItemCategory, int>();
+                try
+                {
+                    var om = MBObjectManager.Instance;
+                    var all = om != null ? om.GetObjectTypeList<ItemObject>() : null;
+                    if (all != null)
+                        foreach (var it in all)
+                        {
+                            if (it == null || !it.IsTradeGood || it.HasHorseComponent || it.ItemCategory == null) continue;
+                            int w = HistoricalPrices.ShelfWorth(it);
+                            if (w <= 0) continue;
+                            float x; u.TryGetValue(it.ItemCategory, out x); u[it.ItemCategory] = x + w;
+                            int k; n.TryGetValue(it.ItemCategory, out k); n[it.ItemCategory] = k + 1;
+                        }
+                    foreach (var kv in n) u[kv.Key] = u[kv.Key] / Math.Max(1, kv.Value);
+                }
+                catch (Exception e) { _mktStum++; Stumble("Unit", e); }
+                _unit = u;
+            }
+            float v;
+            return c != null && _unit.TryGetValue(c, out v) ? v : 0f;
+        }
+
+        /// <summary>287: popyt rynkow miast na kategorie w sztukach na dobe - budzet zakupow doby z modelu gry (CalculateDailySettlementBudgetForItemCategory
+        /// z popytu targu ItemData.Demand) / cena sztuki (wartosc na polce x indeks miasta), suma miast. Pamiec doby.</summary>
+        internal static float Mkt(ItemCategory c)
+        {
+            if (c == null) return 0f;
+            int d = (int)CampaignTime.Now.ToDays;
+            if (d != _mktDay) { _mkt.Clear(); _mktDay = d; _unit = null; }   // wartosc sztuki tez od nowa (przeliczenie cen historycznych przy starcie sesji)
+            float v;
+            if (_mkt.TryGetValue(c, out v)) return v;
+            double sum = 0;
+            try
+            {
+                float w = Unit(c);
+                var cg = Campaign.Current;
+                var em = cg != null && cg.Models != null ? cg.Models.SettlementEconomyModel : null;
+                if (w > 0f)
+                    foreach (var t in Town.AllTowns)
+                    {
+                        if (t == null || !t.IsTown || t.MarketData == null) continue;
+                        float dem = t.MarketData.GetCategoryData(c).Demand;
+                        if (!(dem > 0f)) continue;
+                        float idx = Math.Max(0.1f, t.GetItemCategoryPriceIndex(c));
+                        float bud = em != null ? em.CalculateDailySettlementBudgetForItemCategory(t, dem, c) : dem * (float)Math.Pow(idx, 0.3);
+                        if (bud > 0f && !float.IsNaN(bud) && !float.IsInfinity(bud)) sum += bud / (w * (double)idx);
+                    }
+            }
+            catch (Exception e) { _mktStum++; Stumble("Mkt", e); sum = 0; }   // bez miary rynku - bramka jak 284 (sama sprzedaz karawan)
+            v = (float)sum;
+            _mkt[c] = v;
+            return v;
+        }
 
         /// <summary>Bramka przeplywu (klucz CaravanBuyByFlow): po FlowMinDays dobach pomiaru wszystkie karawany razem wioza wiecej niz sprzedaja miastom w 10 dob (jedzenie 7).</summary>
         internal static bool GateShut(ItemCategory c)
@@ -158,7 +246,7 @@ namespace Armoury
         internal static bool GlutDeep(ItemCategory c, int days)
         {
             if (!GateShut(c)) return false;
-            float e = Ema(c);
+            float e = Flow(c);   // 287: ta sama miara zbytu co bramka (przy kluczu CaravanFlowByMarketDemand - z popytem rynkow)
             long h = Held(c);
             return e > 0.01f ? h > (double)e * Math.Max(1, days) : h > 0;
         }
@@ -343,7 +431,7 @@ namespace Armoury
                     long h = Held(cat);
                     if (h > 0)
                     {
-                        float ema = Ema(cat);
+                        float ema = Flow(cat);   // 287: zbyt z popytem rynkow (klucz CaravanFlowByMarketDemand), bez klucza - sprzedaz karawan jak dotad
                         double raw = ema > 0.01f ? h / (double)ema : double.PositiveInfinity;
                         if (raw > FoodDays) return 5;
                     }
@@ -698,6 +786,72 @@ namespace Armoury
         // ------------------------------------------------------------ doba
         private static string YN(bool b) { return b ? "TAK" : "NIE"; }
 
+        private static double Med(List<double> l)
+        {
+            if (l == null || l.Count == 0) return double.NaN;
+            l.Sort();
+            return l.Count % 2 == 1 ? l[l.Count / 2] : 0.5 * (l[l.Count / 2 - 1] + l[l.Count / 2]);
+        }
+
+        /// <summary>287: linia doby "Handel z roznicy cen (287)" - tylko pomiar (bramka liczy sie w GateShut). Roznica cen miast: indeks cwiartki tanszej (p25 - tam
+        /// karawana kupuje) i drozszej (p75 - tam sprzedaje) kategorii w 97 miastach, marza po karze handlowej (mediana probki karawan, w obie strony) i mycie;
+        /// koszt drogi: zold karawan swiata na dobe wobec ich jukow po koszcie - marza / ten udzial = ile dob drogi marza unosi.</summary>
+        private static string Line287(Settings s, int day, List<ItemCategory> rows, List<double> pdL, List<double> wgL,
+                                      List<double> penL, int nCover, double wAll, double toll, double cAll)
+        {
+            var sb = new StringBuilder(3000);
+            try
+            {
+                double pen = penL.Count > 0 ? Med(penL) : 0.0;
+                if (double.IsNaN(pen) || pen < 0 || pen > 1) pen = 0.0;
+                int shut = 0, shutOld = 0; double mAll = 0, eAll = 0; long hAll = 0;
+                var mg = new List<double>(); int pos = 0;
+                var cat = new StringBuilder(1600);
+                int k = 0;
+                foreach (var c in rows)
+                {
+                    long h = Held(c); hAll += h;
+                    float m = Mkt(c), e = Ema(c);
+                    mAll += m; eAll += e;
+                    if (GateShut(c)) shut++;
+                    if (s.CaravanBuyByFlow && _days >= FlowMinDays && h > CapOld(c)) shutOld++;
+                    var ix = new List<double>();
+                    foreach (var t in Town.AllTowns) if (t != null && t.IsTown) ix.Add(t.GetItemCategoryPriceIndex(c));
+                    double p25 = double.NaN, p75 = double.NaN, mr = double.NaN;
+                    if (ix.Count >= 4)
+                    {
+                        ix.Sort();
+                        p25 = ix[ix.Count / 4]; p75 = ix[(3 * ix.Count) / 4];
+                        if (p25 > 0) { mr = (p75 / (1.0 + pen) * (1.0 - toll)) / (p25 * (1.0 + pen)) - 1.0; mg.Add(mr); if (mr > 0) pos++; }
+                    }
+                    if (k++ > 0) cat.Append(", ");
+                    cat.Append(c.StringId).Append(' ').Append(m.ToString("0.0", Inv)).Append('/').Append(e.ToString("0.0", Inv)).Append('/')
+                       .Append(double.IsNaN(p25) ? "-" : p25.ToString("0.00", Inv)).Append('-').Append(double.IsNaN(p75) ? "-" : p75.ToString("0.00", Inv)).Append('/')
+                       .Append(double.IsNaN(mr) ? "-" : (100.0 * mr).ToString("0", Inv) + "%");
+                }
+                if (k == 0) cat.Append('-');
+                double mgMed = Med(mg), q = cAll > 0 ? wAll / cAll : double.NaN;
+                double pdMed = Med(pdL), wgMed = Med(wgL);
+                sb.Append("Handel z roznicy cen (287): dzien ").Append(day).Append(" | klucz popyt rynkow ").Append(YN(s.CaravanFlowByMarketDemand))
+                  .Append(" | bramka: kategorii ").Append(rows.Count).Append(", kupno stoi ").Append(shut).Append(" (wedlug samej sprzedazy karawan ").Append(shutOld)
+                  .Append("), popyt rynkow razem ").Append(mAll.ToString("0", Inv)).Append(" szt./d, sprzedaz karawan miastom ").Append(eAll.ToString("0.0", Inv))
+                  .Append(" szt./d, w jukach ").Append(hAll).Append(" szt.")
+                  .Append(" | karawany zmierzone (>= ").Append(MeasureDays).Append(" dob) ").Append(pdL.Count).Append(": wynik handlu/d mediana ")
+                  .Append(double.IsNaN(pdMed) ? "-" : pdMed.ToString("0", Inv)).Append(" zl, zold/d mediana ").Append(double.IsNaN(wgMed) ? "-" : wgMed.ToString("0", Inv))
+                  .Append(" zl, wynik >= zold ").Append(nCover)
+                  .Append(" | roznica cen miast (indeks cwiartki tanszej / drozszej, kara handlowa ").Append((100.0 * pen).ToString("0.0", Inv)).Append("%, myto ")
+                  .Append((100.0 * toll).ToString("0.0", Inv)).Append("%): kategorii ").Append(mg.Count).Append(", z marza > 0 ").Append(pos).Append(", mediana marzy ")
+                  .Append(double.IsNaN(mgMed) ? "-" : (100.0 * mgMed).ToString("0", Inv) + "%")
+                  .Append(" | koszt drogi: zold karawan ").Append(wAll.ToString("0", Inv)).Append(" zl/d, juki po koszcie ").Append(((long)cAll).ToString(Inv))
+                  .Append(" zl, zold doby ").Append(double.IsNaN(q) ? "-" : (100.0 * q).ToString("0.00", Inv) + "%").Append(" jukow, mediana marzy unosi ")
+                  .Append(double.IsNaN(q) || double.IsNaN(mgMed) || q <= 0 ? "-" : (mgMed / q).ToString("0.0", Inv)).Append(" dob drogi")
+                  .Append(" | wedlug kategorii (popyt rynkow/d / sprzedaz karawan/d / indeks p25-p75 / marza): ").Append(cat)
+                  .Append(" | potkniecia 287 ").Append(_mktStum).Append(" (sesja).");
+            }
+            catch (Exception e) { _mktStum++; Stumble("Line287", e); return "Handel z roznicy cen (287): dzien " + day + " | blad linii | potkniecia 287 " + _mktStum + " (sesja)."; }
+            return sb.ToString();
+        }
+
         internal static void Daily()
         {
             var s = Settings.Current;
@@ -732,11 +886,25 @@ namespace Armoury
                 int nCar = 0, withTrade = 0, withProfit = 0, fN = 0, fBelow = 0;
                 long sum7 = 0; double fMargin = 0, fWage = 0;
                 var alive = new HashSet<MobileParty>();
+                var pdL = new List<double>(); var wgL = new List<double>(); var penL = new List<double>();   // 287: wynik handlu i zold na dobe, kara handlowa
+                int nCover = 0; double wAll = 0, toll = 0;
                 foreach (var mp in MobileParty.AllCaravanParties)
                 {
                     if (mp == null || !mp.IsActive || mp.ItemRoster == null) continue;
                     nCar++; alive.Add(mp);
                     ScanHeld(mp, cost);
+                    try   // 287: zold swiata karawan, kara handlowa (probka do 60 karawan z towarem), myto karawan
+                    {
+                        wAll += Math.Max(0, mp.TotalWage);
+                        if (penL.Count < 60)
+                            for (int i = 0; i < mp.ItemRoster.Count; i++)
+                            {
+                                var it0 = mp.ItemRoster.GetElementCopyAtIndex(i).EquipmentElement.Item;
+                                if (it0 != null && it0.IsTradeGood && !it0.HasHorseComponent) { penL.Add(CaravanGoods.Penalty(mp, it0)); break; }
+                            }
+                        if (toll <= 0) toll = TownToll.CaravanRateFor(mp);
+                    }
+                    catch (Exception e) { _mktStum++; Stumble("Daily(287)", e); }
                     var a = AccOf(mp, today);
                     bool any;
                     long r7 = SumLast(a, day, 7, out any);
@@ -747,6 +915,7 @@ namespace Armoury
                         double pd = SumLast(a, day, Ring, out any2) / (double)Math.Min(Ring, Math.Max(1, today - a.First));
                         fN++; fMargin += pd; fWage += Math.Max(0, mp.TotalWage);
                         if (pd < Math.Max(0, mp.TotalWage)) fBelow++;
+                        pdL.Add(pd); wgL.Add(Math.Max(0, mp.TotalWage)); if (pd >= Math.Max(0, mp.TotalWage)) nCover++;   // 287
                     }
                 }
                 var gone = new List<MobileParty>();
@@ -814,6 +983,9 @@ namespace Armoury
                 if (n == 0) sb2.Append('-');
                 sb2.Append('.');
                 Log.Info(sb2.ToString());
+
+                // linia 287: bramka wedlug popytu rynkow, roznica cen miast wobec kosztu drogi, wynik handlu karawan wobec zoldu
+                Log.Info(Line287(s, day, rows, pdL, wgL, penL, nCover, wAll, toll, cAll));
 
                 // linia 4 (F, na sucho przy kluczu NIE)
                 Log.Info(new StringBuilder(500).Append("Wielkosc karawan (284, na sucho): dzien ").Append(day).Append(" | klucz Caravan Size By Trade ").Append(YN(s.CaravanSizeByTrade))

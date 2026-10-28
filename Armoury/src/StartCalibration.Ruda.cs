@@ -86,6 +86,13 @@ namespace Armoury
             // nadmiar zejdzie wozami w kroku, ciecie rak go nie zmieni); przy BRAKU rynku te kopalnie trzymaja rece (bez wzrostu, nigdy w dol); w pasmie kopalnie miasta,
             // ktore spadlo ponizej celu (polki + droga < cel), rosna jak przy braku (powrot po cieciu). Klucz NIE - jak 286.
             bool bandOn = locOn && sR.KsIronLocalGlutBand;
+            // 287 (klucz KsIronFullOnlyOwnTown, przy 286b): autotest 135b - rynek PELNY (polki + droga > 2 x cel calego rynku) ciac WSZYSTKIE kopalnie rynku (512 wpisow
+            // w kroku), takze przy miastach targowych z brakiem: Westeros PELNY 109035-109077 przy 5-15 z 59 miast bez rudy, Essos 109056-109105 przy 2-8 z 38; rece przy
+            // zelazie 113 344 -> 79 346, zelazo swiata ostatnie 30 dob -69/d. Przy rynku PELNYM tna sie tylko kopalnie, ktorych wlasne miasto targowe jest pelne (ta sama
+            // miara co 286b: polki + droga - 2 x cel > tydzien wydobycia jego kopalni); kopalnie miasta bez nadmiaru trzymaja rece (bez wzrostu - rynek jako calosc ma
+            // nadmiar, rozwoza go wozy). Kopalnia bez znanego miasta targowego - jak dotad (w dol). Klucz NIE - jak 286b.
+            bool fullOwnOn = bandOn && sR.KsIronFullOnlyOwnTown;
+            var nFullHold = new int[2];
             var townRate = new Dictionary<Town, double>(); var shortTown = new HashSet<Town>(); var nShortT = new int[2];
             if (bandOn)
             {
@@ -206,10 +213,11 @@ namespace Armoury
                     float starvG = starv;
                     if (starv >= 0f && ld.V != null) starvG = Bloomery.F7StarvedGrow(ld.V, starv);
                     // 286: miasto targowe kopalni (pola mieszczan - ich miasto; wies - TradeBound, inaczej Bound - jak RegaleCycle)
-                    bool locFull = false, locShort = false;
-                    if (locOn && (fullTown.Count > 0 || shortTown.Count > 0))
+                    bool locFull = false, locShort = false, mtKnown = false;
+                    if (locOn)   // 287: miasto targowe potrzebne takze bez miast pelnych i z brakiem (rynek PELNY - kopalnia przy miescie bez nadmiaru trzyma rece)
                     {
                         Town mt = ld.TF ? ld.T : (ld.V != null && ld.V.TradeBound != null ? ld.V.TradeBound.Town : (ld.V != null && ld.V.Bound != null ? ld.V.Bound.Town : null));
+                        mtKnown = mt != null;
                         locFull = mt != null && fullTown.Contains(mt);
                         locShort = mt != null && shortTown.Contains(mt);
                     }
@@ -248,6 +256,7 @@ namespace Armoury
                                     f = F5Down; nLoc[m]++;
                                     if (dec[m] == 1) nLocUp[m]++; else nLocBand[m]++;
                                 }
+                                else if (fullOwnOn && dec[m] == -1 && mtKnown && !locFull) nFullHold[m]++;   // 287: rynek pelny, wlasne miasto bez nadmiaru - trzyma rece (miasto pelne - w dol nizej)
                                 else if (dec[m] == -1) { f = F5Down; nDnFull++; }
                                 else if (dec[m] == 1)
                                 {
@@ -311,6 +320,7 @@ namespace Armoury
                   .Append(" (zamiast wzrostu przy BRAK ").Append(nLocUp[m]).Append(", w pasmie ").Append(nLocBand[m]).Append(')');
                 if (bandOn) sb.Append("; 286b: pas martwy tydzien wydobycia kopalni miasta TAK, trzymane przy BRAK ").Append(nLocHold[m])
                   .Append(", miasta targowe z brakiem (polki + droga < cel) ").Append(nShortT[m]).Append(", kopalnie przy nich w gore (pasmo) ").Append(nLocRec[m]);
+                if (fullOwnOn) sb.Append("; 287: przy rynku PELNYM w dol tylko kopalnie miast pelnych TAK, trzymane przy PELNYM (miasto bez nadmiaru) ").Append(nFullHold[m]);
             }
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
               .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(Bloomery.F7On ? " (w tym przez rece weglarzy f7-wegiel " + nColl + ")" : "").Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)
