@@ -1,5 +1,19 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 01:20 CET - WGRANIE 132 (131 + 284, BEZ 283); START DLA NASTEPNEGO KONTA: 283c
+- 132c (zb\n132h, noc/132-handel-bez-283 a2ef2e32): bitwaN 4 bitwy + probyN 30 dob kod 0, ERROR 0; handel284 jak 132b (H284-1 TAK, H284-6 TAK; H284-2/3/4/5 NIE
+  poza celem), ruda282 RU282-1/3/7 jak przed, E223-8 jednorazowe, NWAR-15 jak 132a. Wyniki m113\wyniki\grupy-132c\.
+- WGRANIE 132 o 01:15 (scratchpad\wgraj132.ps1): Armoury 1a112ad9; kopie .bak-2026-10-28-przed-wgranie132 i D:\Backup-Bannerlord\wgrane\2026-10-28-wgranie132-przed;
+  zapis testowy -> D:\Backup-Bannerlord\zapisy-testowe-archiwum\2026-10-28-132. CHANGELOG 14b55ae5 na noc/132-handel-bez-283 (wypchniete).
+- LINIE: zainstalowane = noc/132-handel-bez-283 (131 + 284). noc/161-integracja (8983380b) = 131 + 283 + 284 (283 NIEGOTOWE). Nastepna paczka: naprawic 283
+  na galezi noc/283-reakcja-na-nekanie-z-tylu (8fe43105), potem scalic 283 do noc/132-handel-bez-283 (albo przesunac n161 = n132h + 283) i test.
+- 283c ZADANIE (z 132b, log m113\logi\132b-bitwaN\Armoury-2026-10-28_00-15-31.log): (1) postoj R4/R5 nie zatrzymuje szyku w marszu (stoi 0 przy marsz TAK);
+  (2) FF lucznikow 5 przy 43 strzalach (> 5%) - linia strzalu przepuszcza swoich; (3) scen. B 'brak pieszego szyku wroga' (scenariusz CrashScribe-at-n283
+  - wrog bez piechoty w tej bitwie?); (4) scen. C wykryc 2, piechoty 0, wynik panika/odwrot; (5) J204-3 brak kontaktu jezdzcow. Test: testy-noc-283.ps1
+  (7 bitew) -CsAt scratchpad sesji 1e1c276a\cs-at283\CrashScribe-at-n283.dll; grupy nekanie283 m204jazda m110anim.
+- Inne otwarte: zold karawan ok. 146k/d wobec marzy (H284-2 udzial wyplat 0.19 < 0.25), srebro/bawelna/glina w tabeli zamowien, NWAR-15 klin plotno/len,
+  RU282-3 cena rudy bez rudy / zrodlo. Zostaje 5-8 ludzi/dobe 'w nicosc ... inne' (E4/7).
+
 ## DOPISEK 28.10 ok. 00:50 CET - 132b: 284 OK, 283 NIE; 132 = 131 + 284 (bez 283), autotest 132c w toku; 283c DO ZROBIENIA; TYDZIEN 97%
 - 132b (n161 8983380b): kod 0, ERROR 0. handel284 probyN: H284-1 TAK (mediana zysku karawan ostatnie 10 dob 88, 69, 67, 76 ... > 0), H284-6 TAK (ARYTMETYKA OK,
   nic z niczego), H284-5 brak surowcow 238.6 -> 144.5 (ruda 196 -> 114, drewno 23 -> 13, skora 18 -> ...), tylko srebro wsad 4.8 -> 5.3; NIE poza celem:
