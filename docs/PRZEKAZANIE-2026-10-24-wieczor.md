@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 15:15 CET - 286b gotowe (1001b6cf + 409dc1db, Armoury ea5b76bf), AUTOTEST 90 DOB 135b w toku (bez bitew)
+- Przyczyny: wyplaty 259 padly od 109055 przez fale wyprzedazy starego towaru ponizej wartosci ksiegowej 259 (1.07M zl za towar kosztujacy 2.34M, 33-36
+  kategorii, nie tylko srebro); KsIronLocalGlut ciela rece przy braku rynku (ok. 1300 wpisow, ~20k rak). Klucze CaravanAgedGlutAtBookWorth (wyprzedaz tylko
+  towarow > 30 dob sprzedazy swiata w jukach i nie ponizej wartosci 259 po myle) i KsIronLocalGlutBand (pelny = nadwyzka ponad 2T > tydzien wydobycia, przy
+  braku rynku bez ciecia, odrost przy spadku ponizej celu). Spadek rak Essos 109084-109091 poza krokiem f5 - niewyjasniony.
+- AUTOTEST 135b (zadanie be60hicf8, m113/seria-135b.out.txt; kopia,probyN 90 dob). Grupy handel286 handel285 handel284 karawany259 ruda282 nruda nwar +
+  reszta; WGRANIE 135 przy H286-3 >= ok. 0.2 i bez zapasci rudy (RU282-1).
+
 ## DOPISEK 28.10 ok. 14:55 CET - Jeff "dzialaj tutaj" - poprawka 286b w toku (workflow wf_a79698e9-c4c) mimo 99% tygodnia
 - Skrypt workflows/scripts/poprawka-286b-wf_a79698e9-c4c.js (bez args; resumeFromRunId), galaz noc/285-zold-srebro-ruda (zb/n285). Zakres: regresje 135a -
   wyplaty 259 (0.023) i wyprzedaz starego towaru, ciecie rak przy zelazie (KsIronLocalGlut). Potem test 90 dob (135b) i WGRANIE 135 przy H286-3 >= 0.25,
