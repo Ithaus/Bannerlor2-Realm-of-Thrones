@@ -1,5 +1,9 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 29.10 - Jeff "sprobuj to" (zelazo swiata -66/d, sprzedaz na stracie 2.6k/d) - paczka 290 w toku (workflow wf_86d2f62a-4ca)
+- Skrypt workflows/scripts/paczka-290-wf_86d2f62a-4ca.js (bez args; resumeFromRunId), galaz noc/285-zold-srebro-ruda (zb/n285, od 40d2e207 = WGRANE 136).
+  Potem test 90 dob (testy-noc-204.ps1 -Runs kopia,probyN -ProbyDays 90; Jeff gra na 136 - test dopiero po zamknieciu gry; odswiezyc zapis testowy) i WGRANIE 137.
+
 ## DOPISEK 29.10 ok. 00:15 CET - START DLA DRUGIEGO KONTA (Jeff: "ok zapisz do przekazania na drugie konto") - stan zebrany w jednym miejscu
 - W GRZE: WGRANE 136 = Armoury.dll md5 ba0fbc0566593f77093b2b4fa07628e8 (galaz noc/285-zold-srebro-ruda, commit statusu po 52da829d, wypchnieta).
   CrashScribe bef9db58, pliki danych: arm_houses_canon.tsv z 277 (5e1d8c20). Kopie poprzednich: Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll.bak-*
