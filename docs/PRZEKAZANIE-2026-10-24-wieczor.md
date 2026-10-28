@@ -1,5 +1,22 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 14:45 CET - TEST 90 DOB 135a: 286 NIE WGRANE (regresje); W GRZE DALEJ 134 (13ee0fc5); TYDZIEN 99% - KONIEC PRAC NA TYM KONCIE
+- 135a (noc/285-zold-srebro-ruda cd44422b, Armoury 17668068): bitwaN + probyN 90 dob (109025 -> 109114) kod 0, ERROR 0. Logi m113\logi\135a-probyN\
+  Armoury-2026-10-28_14-12-51.log, wyniki m113\wyniki\grupy-135a\.
+- DOBRZE: rozbite karawany 2.38/d (90 dob; ostatnie 30 dob 2.67, baza 2.23, 134a 3.83); zold swiata 144k -> 89.6k zl/d; stawka 9.54 -> 8.37 zl/czl, ludzi 17443 ->
+  11680; zwalniani najdrozsi (12.39 zl wobec 8.45); gracz zwalniany po komunikacie (TAK); srebro w jukach 4180 -> 633; ruda w jukach 2246 -> 275; stosunek cen
+  rudy 2.46 -> 2.07 (RU282-3 TAK); mediana zysku karawan > 0 (H284-1 TAK).
+- REGRESJE (dlatego bez wgrania): (1) udzial karawan z wyplata 259: 0.150 -> 0.023 (!) - przy 134a bylo 0.246; wynik handlu swiata spadl do +52k zl/d (134a ok.
+  +89k) - podejrzana CaravanAgedGlutSells (stary towar w przesycie schodzi porcjami po cenie dnia - sprzedaz ponizej kosztu H284-4 3894 -> 4930/d) i/lub
+  kapital karawan; (2) KsIronLocalGlut: rece przy zelazie 113344 -> 73226 (-35%, NRU-3 NIE), zelazo swiata -17/d, miasta bez rudy na koniec 25 (ostatnie 10 dob
+  srednio 30.9; RU282-1 NIE) - za mocne ciecie rak przy 'pelnym' miescie targowym; (3) NWAR-3/4a/15 (przezbrojone warsztaty 81 wobec 335 spodziewanego,
+  kuznie srebra/aksamit 11 -> 14, klin plotno/len 1.47 -> 1.24).
+- NASTEPNE KONTO: na galezi noc/285-zold-srebro-ruda (zb\n285) zostawic CaravanGuardByRoadStrength + CaravanGuardPlayerAfterNotice (dzialaja), a:
+  (a) KsIronLocalGlut - ciac rece tylko o nadwyzke ponad 2T, z progiem i bez ciecia przy braku rynku/regionu; albo klucz NIE; (b) CaravanAgedGlutSells - tylko
+  srebro/kategorie z udzialem w jukach > N dob sprzedazy i nie ponizej kosztu przy miastach z brakiem; sprawdzic, czemu wyplaty 259 padly (kiesa vs kapital
+  po wyprzedazy); (c) test 90 dob ponownie (testy-noc-204.ps1 -ProbyDays 90, ok. 30 min probyN); WGRANIE 135 dopiero, gdy H286-3 >= 0.25 i RU282-1/NRU-3 TAK.
+- Inne otwarte bez zmian: 283 scenariusze testowe B/C i J204-1 regex; NWAR-15; 5-8 ludzi/dobe 'w nicosc ... inne'.
+
 ## DOPISEK 28.10 ok. 14:00 CET - 286 GOTOWE (02916a7f + cd44422b, Armoury 17668068), AUTOTEST 90 DOB 135a w toku
 - Zold strazy: stawka wedlug tieru jak wszyscy, ale karawany to same tiery 3-5 (9.68 zl/czl wobec 5.26 partie rodow, 4.56 garnizony), a 285 zwalnial najtanszych.
   286: CaravanGuardByRoadStrength (zagrozenie wzdluz calej drogi, dobor sily nie liczby, odchodza najdrozsi za jednostke sily), CaravanGuardPlayerAfterNotice
