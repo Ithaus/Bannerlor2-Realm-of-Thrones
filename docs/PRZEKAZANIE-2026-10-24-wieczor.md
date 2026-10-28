@@ -1,5 +1,18 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 13:25 CET - WGRANIE 134 (133 + 285); LINIA GLOWNA = noc/285-zold-srebro-ruda (zb\n285); TYDZIEN 98% - stop nowych prac na tym koncie
+- 134a (f73fcbd8, Armoury 13ee0fc5): 4 bitwy + probyN 30 dob kod 0, ERROR 0. Wyniki m113\wyniki\grupy-134a\. handel285: H285-0 TAK, H285-2 TAK (ludzi na karawane
+  35.1 -> 25.4, potrzeba 22.3), H285-5 TAK; NIE: H285-1 zold z modelu 148k -> 104k zl/d wobec wyniku handlu ok. +89k (blisko, ale wciaz wiecej), H285-3 rozbite
+  karawany 3.83/d (ostatnie 10 dob 4.00) wobec bazy 2.23/d - mniejsza straz = wiecej napadow, H285-4 srebro: wozy/kontrakty 376 szt., juki 4180 -> 2326 (dalej
+  90 dob sprzedazy). handel284: H284-1 TAK (mediana +55..+74), H284-2 udzial wyplat 0.150 -> 0.246 (cel 0.25 - prawie), H284-5 braki 225 -> 135. ruda282: RU282-1
+  TAK (9.3), RU282-6 TAK (juki 2236 -> 787), RU282-7 TAK (+1.3/d); RU282-3 stosunek cen 2.42 -> 3.59 NIE (zrodla taniej, bo zalane).
+- WGRANIE 134 o 13:23 (wgraj134.ps1), kopie .bak-2026-10-28-przed-wgranie134 i D:\Backup-Bannerlord\wgrane\2026-10-28-wgranie134-przed; zapis testowy na D:.
+  CHANGELOG 285 = WGRANE 134 (13630d15, wypchniete).
+- NASTEPNE (drugie konto): (1) H285-3 - straz karawan: potrzeba z bandy w dniu drogi zaniza strefy po trasie; rozbitych 2.2 -> 3.8/d - doliczyc bandy na trasie
+  (miedzy miastami), albo wieksza rezerwa przy wartosciowym ladunku; (2) H285-1 zold nadal > handel; (3) srebro dalej 90 dob w jukach - bramka/zamowienia
+  srebra wolno; (4) RU282-3 rozrzut cen rudy (zrodla zalane - mniej rak przy zlozach po trendzie?); (5) 283 scenariusze testowe B/C, J204-1 regex;
+  (6) NWAR-15, 5-8 ludzi/dobe 'w nicosc ... inne'. Karawany gracza tylko dobieraja straz (nie zwalniaja) - zold karawany Jeffa bez zmian.
+
 ## DOPISEK 28.10 ok. 12:45 CET - 285 GOTOWE (f73fcbd8, Armoury 13ee0fc5), AUTOTEST 134a w toku
 - 285: 1fc91a09 + d101aea1 + recenzja f73fcbd8 (4 uwagi naprawione). CaravanGuards285.cs (CaravanGuardByRisk - straz wedlug najsilniejszej bandy w dniu drogi
   od miasta i celu oraz wartosci ladunku; nadwyzka odprawiana przy wyjezdzie BK raz na dobe droga 166), tabela zamowien 10 surowcow (srebro, bawelna, glina;
