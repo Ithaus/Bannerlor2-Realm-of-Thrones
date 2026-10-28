@@ -1,5 +1,11 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 18:05 CET - 135b (286b, 90 dob) wyniki mieszane; BAZA 134 na 90 dob (134b) w toku dla porownania
+- 135b: rozbite 2.17/d (TAK), zold 89.8k wobec handlu +55.6k (NIE), udzial wyplat 0.135 -> 0.081 (NIE; 135a 0.023), sprzedaz na stracie 3704 -> 664/d (TAK),
+  srebro 4180 -> 1501, ruda: miasta bez rudy ostatnie 10 dob 15.4, zelazo swiata -74/d, rece -30%; R274-2 73% dob w pasmie (prog 80%).
+- 134b (zadanie bx4elury2, m113/seria-134b.out.txt): ta sama seria na zainstalowanej 134 (test/mfinal134a) - decyzja o WGRANIU 135 po porownaniu tych samych
+  liczb (udzial wyplat, rozbite, zelazo, miasta bez rudy, srebro) w 90 dobach.
+
 ## DOPISEK 28.10 ok. 15:15 CET - 286b gotowe (1001b6cf + 409dc1db, Armoury ea5b76bf), AUTOTEST 90 DOB 135b w toku (bez bitew)
 - Przyczyny: wyplaty 259 padly od 109055 przez fale wyprzedazy starego towaru ponizej wartosci ksiegowej 259 (1.07M zl za towar kosztujacy 2.34M, 33-36
   kategorii, nie tylko srebro); KsIronLocalGlut ciela rece przy braku rynku (ok. 1300 wpisow, ~20k rak). Klucze CaravanAgedGlutAtBookWorth (wyprzedaz tylko
