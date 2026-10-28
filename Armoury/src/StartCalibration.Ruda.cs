@@ -98,6 +98,8 @@ namespace Armoury
                 {
                     if (cp == null || !cp.IsActive || cp.ItemRoster == null) continue;
                     int n = cp.ItemRoster.GetItemNumber(iron);
+                    // recenzja: ruda kontraktu karawany jest juz w R (InTransitTo celu) - w jukach tylko reszta, inaczej kontrakt do miasta z brakiem liczy sie jak wzrost zapasu
+                    if (n > 0) n -=Math.Min(n, MaterialOrders.ContractQty(cp, iron));
                     if (n <= 0) continue;
                     var ct = cp.CurrentSettlement != null ? cp.CurrentSettlement.Town : null;
                     if (ct == null && cp.TargetSettlement != null) ct = cp.TargetSettlement.Town;
@@ -110,16 +112,37 @@ namespace Armoury
             // 285 (klucz KsIronFullCountsTransit): rynek pelny liczony tak jak brak - z polkami i zelazem w drodze: S + R > 2T (dotad S > 2T przy brak S + R < T -
             // log 133a: Westeros polki z droga 2.10 i 2.29 przy decyzji PASMO w 109028 i 109035, pierwszy PELNY dopiero 109042). Klucz KsIronStockTrend: w pasmie
             // T..2T zapas rynku (polki + droga + juki karawan) wiekszy niz przy poprzednim kroku = wydobycie ponad zuzycie - w dol x0.95 (log 133a: swiat +52 lup/d
-            // w ostatnich 10 dobach przy PASMIE). Pierwszy krok sesji bez pomiaru - bez trendu.
+            // w ostatnich 10 dobach przy PASMIE). Pierwszy krok sesji bez pomiaru - bez trendu. Recenzja: tylko zmiana ponad prog kroku i w obie strony (nizej).
             var s285 = Settings.Current;
             bool fullR = rOn && s285 != null && s285.KsIronFullCountsTransit, trendOn = s285 != null && s285.KsIronStockTrend;
-            var tot = new long[2]; var prevTot = new long[2]; var trend = new bool[2];
+            // recenzja: prog trendu = zmiana wydobycia, ktora robi jeden krok (rece x0.95 / x1.05 = 5% stawki KS zelaza rynku przez 7 dob) - zmiana zapasu mniejsza
+            // niz to, co zmienia krok, jest w szumie kroku (krok by ja przestrzelil); w pasmie dziala w obie strony: zapas rosnie ponad prog - w dol, spada ponad prog
+            // - w gore (kopalnie z drewnem, jak BRAK). Dotad kazdy wzrost o 1 obnizal rece, a spadek nic - zapas schodzil krokami do krawedzi braku T. Bez stawki KS - bez trendu
+            var rate = new double[2]; var rateN = new int[2];
+            try
+            {
+                var rates = _rates;
+                foreach (var kv in rates)
+                {
+                    var a = kv.Value; if (a == null || a.A == null || KsDeliver.IIron >= a.A.Length) continue;
+                    float x = a.A[KsDeliver.IIron]; if (!(x > 0f)) continue;
+                    int m = a.M == 0 ? 0 : 1; rate[m] += x; rateN[m]++;
+                }
+            }
+            catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(stawki)", e); }
+            var tot = new long[2]; var prevTot = new long[2]; var trend = new int[2]; var thr = new long[2];
             var dec = new int[2];                                  // +1 brak, -1 pelny, 0 pasmo, 2 bez celu (zapas rzemiosla nieznany)
             for (int m = 0; m < 2; m++)
             {
                 tot[m] = S[m] + R[m] + C[m]; prevTot[m] = _f5Tot[m];
+                thr[m] = (long)Math.Round(rate[m] * F5IronEvery * (1.0 - F5Down));
                 dec[m] = T[m] <= 0 ? 2 : S[m] + (rOn ? R[m] : 0) < T[m] ? 1 : S[m] + (fullR ? R[m] : 0) > 2 * T[m] ? -1 : 0;
-                if (dec[m] == 0 && trendOn && prevTot[m] >= 0 && tot[m] > prevTot[m]) { dec[m] = -1; trend[m] = true; }
+                if (dec[m] == 0 && trendOn && prevTot[m] >= 0 && thr[m] > 0)
+                {
+                    long dl = tot[m] - prevTot[m];
+                    if (dl > thr[m]) { dec[m] = -1; trend[m] = -1; }
+                    else if (-dl > thr[m]) { dec[m] = 1; trend[m] = 1; }
+                }
                 _f5Tot[m] = tot[m];
             }
             // 2. bloki z zelazem
@@ -199,19 +222,7 @@ namespace Armoury
                 }
                 catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(okreg)", e); }
             }
-            // 3. linia: stawka KS zelaza na jutro (wsie) i wytop 7 dob wedlug rynku
-            var rate = new double[2]; var rateN = new int[2];
-            try
-            {
-                var rates = _rates;
-                foreach (var kv in rates)
-                {
-                    var a = kv.Value; if (a == null || a.A == null || KsDeliver.IIron >= a.A.Length) continue;
-                    float x = a.A[KsDeliver.IIron]; if (!(x > 0f)) continue;
-                    int m = a.M == 0 ? 0 : 1; rate[m] += x; rateN[m]++;
-                }
-            }
-            catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(stawki)", e); }
+            // 3. linia: stawka KS zelaza na jutro (wsie - policzona przed decyzja, prog trendu) i wytop 7 dob wedlug rynku
             var wm = new double[2]; var wu = new double[2]; var ok = new int[2]; var part = new int[2]; var bad = new int[2];
             try { Bloomery.F5Sums(wm, wu, ok, part, bad); } catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(wytop)", e); }
             double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
@@ -225,13 +236,14 @@ namespace Armoury
                 sb.Append(" | ").Append(mn[m]).Append(": polki ").Append(S[m]).Append(" / cel ").Append(T[m])
                   .Append(" (").Append(T[m] > 0 ? ((double)S[m] / T[m]).ToString("0.00", inv) : "-").Append("), brak ").Append(D[m]).Append(" w ").Append(nS[m])
                   .Append(" miastach, bez rudy ").Append(nE[m]).Append(" z ").Append(nT[m]).Append(" miast -> ")
-                  .Append(dec[m] == 1 ? "BRAK (w gore)" : dec[m] == -1 ? (trend[m] ? "PELNY (w dol, zapas rosnie - 285)" : "PELNY (w dol)") : dec[m] == 0 ? "PASMO (bez zmian)" : "BEZ CELU (bez zmian)")
+                  .Append(dec[m] == 1 ? (trend[m] == 1 ? "BRAK (w gore, zapas spada - 285)" : "BRAK (w gore)") : dec[m] == -1 ? (trend[m] == -1 ? "PELNY (w dol, zapas rosnie - 285)" : "PELNY (w dol)") : dec[m] == 0 ? "PASMO (bez zmian)" : "BEZ CELU (bez zmian)")
                   .Append(", w drodze do miast ").Append(R[m]).Append(" (polki z droga ").Append(T[m] > 0 ? ((double)(S[m] + R[m]) / T[m]).ToString("0.00", inv) : "-")
                   .Append(rOn ? ", 282 - liczone)" : ", 282 - klucz NIE, nie liczone)")
                   .Append("; 285: pelny z droga ").Append(fullR ? "TAK" : "NIE").Append(", zapas rynku (polki + droga + juki karawan) ")
                   .Append(prevTot[m] >= 0 ? prevTot[m].ToString(inv) : "-").Append(" -> ").Append(tot[m])
                   .Append(prevTot[m] >= 0 ? " (" + (tot[m] - prevTot[m] >= 0 ? "+" : "") + (tot[m] - prevTot[m]).ToString(inv) + ")" : "")
-                  .Append(", juki karawan ").Append(C[m]).Append(", trend ").Append(trend[m] ? "W DOL" : trendOn ? "-" : "NIE (klucz)");
+                  .Append(", juki karawan ").Append(C[m]).Append(", trend ").Append(trend[m] == -1 ? "W DOL" : trend[m] == 1 ? "W GORE" : trendOn ? "-" : "NIE (klucz)")
+                  .Append(", prog trendu ").Append(thr[m]);
             }
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
               .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(Bloomery.F7On ? " (w tym przez rece weglarzy f7-wegiel " + nColl + ")" : "").Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)

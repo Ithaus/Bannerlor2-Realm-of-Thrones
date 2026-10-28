@@ -32,6 +32,8 @@ namespace Armoury
     /// karawane AI, nadwyzka ponad potrzebe do domu ta sama droga co zwolnieni 166 (ClanBudget.ReleaseCaravanGuards - ludzie do wsi okregu tego miasta, czesc do
     /// karczmy E4/10, sakiewka z ludzmi). Karawany gracza: najem do potrzeby, bez zwolnienia (straz kupil gracz). Zold placi wlasciciel jak dotad - zmienia sie
     /// tylko liczba ludzi; nic z niczego, nic nie znika (zold mniejszy = mniej zlota z kies karawan do sakiewek strazy).
+    /// Recenzja: przy wjezdzie celem karawany jest to miasto, a BK wybiera nastepny cel i rusza w jednym tiku (po CheckRecruiting tej godziny) - ocena z banda
+    /// celu idzie w postfiksie BK HourlyTickPartyImpl (karawana jeszcze w miescie, cel ustawiony); zwolnienie tylko wtedy (cel znany), bez celu nadwyzka czeka.
     /// Klucz NIE - tylko pomiar (potrzeba liczona, gra werbuje jak dotad). Linia doby "Straz karawan (285): dzien N". Wyjatek - licznik potkniec, gra jak dotad.
     /// </summary>
     internal static class CaravanGuards285
@@ -41,25 +43,29 @@ namespace Armoury
 
         private static int _day = -1;
         private static readonly Dictionary<Settlement, float> _band = new Dictionary<Settlement, float>();     // najsilniejsza banda w dniu drogi (pamiec doby)
-        private static readonly Dictionary<MobileParty, int> _seen = new Dictionary<MobileParty, int>();       // doba pierwszej oceny karawany (zwolnienie raz na dobe)
+        private static readonly Dictionary<MobileParty, int> _seen = new Dictionary<MobileParty, int>();       // doba pierwszej oceny karawany (liczniki doby)
+        private static readonly Dictionary<MobileParty, int> _relDay = new Dictionary<MobileParty, int>();     // recenzja: doba zwolnienia karawany (raz na dobe, przy wyjezdzie)
         private static MethodInfo _hire; private static bool _hireTried;
         private static readonly HashSet<string> _err = new HashSet<string>();
+        internal static bool DepartWired;   // recenzja: postfiks BK BKCaravansBehavior.HourlyTickPartyImpl wpiety (ocena przy wyjezdzie z celem)
 
         // liczniki doby (linia "Straz karawan (285)")
         private static int _eval, _evalPlayer, _noRule, _atLimitBase, _hireVisits, _hired, _blocked, _relCar, _relMen, _relNone, _relPlayerSkip, _short, _stumbles, _stumbleSess;
+        private static int _dep, _depTgt, _relWait;   // recenzja: oceny przy wyjezdzie (cel znany), w tym banda celu silniejsza niz miasta; nadwyzka bez celu - zwolnienie odlozone
         private static long _hireCost, _relWage;
         private static double _sNeed, _sBase, _sThreat, _sV, _sLim, _sMen;
         private static long _ticks;
 
         internal static void Reset()
         {
-            _day = -1; _band.Clear(); _seen.Clear(); _err.Clear(); _stumbleSess = 0;
+            _day = -1; _band.Clear(); _seen.Clear(); _relDay.Clear(); _err.Clear(); _stumbleSess = 0;
             ZeroDay();
         }
 
         private static void ZeroDay()
         {
             _eval = _evalPlayer = _noRule = _atLimitBase = _hireVisits = _hired = _blocked = _relCar = _relMen = _relNone = _relPlayerSkip = _short = _stumbles = 0;
+            _dep = _depTgt = _relWait = 0;
             _hireCost = _relWage = 0; _sNeed = _sBase = _sThreat = _sV = _sLim = _sMen = 0; _ticks = 0;
         }
 
@@ -74,6 +80,7 @@ namespace Armoury
             if (today == _day) return;
             _day = today; _band.Clear();
             if (_seen.Count > 2000) _seen.Clear();
+            if (_relDay.Count > 2000) _relDay.Clear();
         }
 
         /// <summary>Najsilniejsza banda (EstimatedStrength) w promieniu dnia drogi od osady - pamiec doby.</summary>
@@ -184,11 +191,25 @@ namespace Armoury
                     if (baseN >= lim) _atLimitBase++;
                     if (men < need) _short++;
                 }
+                // recenzja: cel nastepnego odcinka znany (BK ustawil go w miescie - postfiks HourlyTickPartyImpl, albo gra po ThinkNextDestination) - ocena
+                // przy wyjezdzie; przy wjezdzie celem jest to miasto i potrzeba widzi tylko jego bande
+                var tgt = mp.TargetSettlement;
+                bool dep = tgt != null && tgt != st;
+                if (dep)
+                {
+                    _dep++;
+                    if (tgt.IsTown && BandNear(tgt, Math.Max(1.0, MarketCarts.PerDay(s))) > BandNear(st, Math.Max(1.0, MarketCarts.PerDay(s)))) _depTgt++;
+                }
                 if (!s.CaravanGuardByRisk) return true;   // klucz NIE - tylko pomiar
                 if (men > need)
                 {
-                    if (first)
+                    // recenzja: zwolnienie tylko przy wyjezdzie (potrzeba z banda miasta i celu), raz na dobe; bez celu (wjazd, postoj) straz czeka - inaczej odcinek
+                    // do groznego celu szedl ze straza dobrana do bandy samego miasta
+                    int r0;
+                    if (!dep) { if (first && !player) _relWait++; }
+                    else if (!_relDay.TryGetValue(mp, out r0) || r0 != today)
                     {
+                        _relDay[mp] = today;
                         if (player) _relPlayerSkip++;
                         else
                         {
@@ -206,6 +227,35 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Recruit", e); return true; }
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>Recenzja 285: postfiks BK BKCaravansBehavior.HourlyTickPartyImpl - BK w miescie robi BuyGoods -> ThinkNextDestination -> SetMoveGoToSettlement(cel)
+        /// w jednym tiku, a CheckRecruiting gry szedl w tej godzinie wczesniej (cel = to miasto) i po wyjezdzie juz nie (karawana dalej niz 1 od miasta). Tu karawana
+        /// jeszcze stoi w miescie z nowym celem - ta sama ocena co w CheckRecruiting (warunki gry: miasto bez oblezenia, bez bitwy), z banda celu.</summary>
+        public static void DepartPostfix(MobileParty __0)
+        {
+            try
+            {
+                var mp = __0;
+                if (mp == null || !mp.IsCaravan || !mp.IsActive || mp.MapEvent != null || mp == MobileParty.MainParty) return;
+                var st = mp.CurrentSettlement;
+                if (st == null || !st.IsTown || st.Town == null || st.IsUnderSiege) return;
+                var tgt = mp.TargetSettlement;
+                if (tgt == null || tgt == st) return;
+                Recruit(mp, st);
+            }
+            catch (Exception e) { Stumble("DepartPostfix", e); }
+        }
+
+        internal static void Apply(Harmony h)
+        {
+            try
+            {
+                var bkc = AccessTools.TypeByName("BannerKings.Behaviours.BKCaravansBehavior");
+                var m = bkc != null ? AccessTools.DeclaredMethod(bkc, "HourlyTickPartyImpl", new[] { typeof(MobileParty) }) : null;
+                if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(CaravanGuards285), nameof(DepartPostfix))); DepartWired = true; }
+            }
+            catch (Exception e) { Log.Error("CaravanGuards285.Apply", e); }
         }
 
         /// <summary>Najem z karczmy do potrzeby - warunki gry (karczma z najemnikami straz karawan albo najemnik, kiesa > cena + 2000), akcja gry ApplyRecruitMercenary.</summary>
@@ -269,6 +319,8 @@ namespace Armoury
               .Append(" | najem do potrzeby: wizyt ").Append(_hireVisits).Append(", ludzi ").Append(_hired).Append(" za ").Append(_hireCost).Append(" zl; najem ponad potrzebe wstrzymany ")
               .Append(_blocked).Append(" | zwolnieni do domu (droga 166): ").Append(_relMen).Append(" ludzi z ").Append(_relCar).Append(" karawan (zold dzienny ok. ").Append(_relWage)
               .Append(" zl), bez wsi z danymi BK ").Append(_relNone).Append(", karawany gracza bez zwolnienia ").Append(_relPlayerSkip)
+              .Append(" | ocena przy wyjezdzie (cel znany, recenzja 285; BK ").Append(DepartWired ? "wpiety" : "BRAK").Append("): ").Append(_dep)
+              .Append(", w tym banda celu silniejsza niz miasta ").Append(_depTgt).Append(", nadwyzka bez celu - zwolnienie odlozone do wyjazdu ").Append(_relWait)
               .Append(" | karawany swiata ").Append(cars).Append(": ludzi ").Append(men).Append(" (").Append(cars > 0 ? ((double)men / cars).ToString("0.0", Inv) : "-")
               .Append(" na karawane), zold z modelu ").Append(wage).Append(" zl/d")
               .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");

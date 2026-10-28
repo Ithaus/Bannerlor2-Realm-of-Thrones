@@ -56261,7 +56261,8 @@ def nruda_main(logp):
                         wtr[int(a.group(1))] = tr
                     t285 = {}
                     for g5 in H285_F5.finditer(s):
-                        t285["W" if g5.group(1) == "Westeros" else "E"] = (g5.group(8) == "TAK", None if g5.group(9) == "-" else int(g5.group(9)), int(g5.group(10)), g5.group(13))
+                        t285["W" if g5.group(1) == "Westeros" else "E"] = (g5.group(8) == "TAK", None if g5.group(9) == "-" else int(g5.group(9)), int(g5.group(10)), g5.group(13),
+                                                                       None if g5.group(14) is None else int(g5.group(14)))
                     if t285:
                         w285[int(a.group(1))] = t285
                 else:
@@ -56358,7 +56359,7 @@ def nruda_main(logp):
                 exp = "BEZ CELU" if T_ <= 0 else ("BRAK" if S_ + R_ < T_ else ("PELNY" if S_ > 2 * T_ else "PASMO"))
                 g285 = w285.get(d, {}).get(side)   # 285: pelny z droga (S + R > 2T) i trend zapasu w pasmie; bez segmentu - jak dotad
                 if g285 is not None:
-                    exp = h285_f5_expect(S_, T_, R_, g285[0], g285[1], g285[2], g285[3])
+                    exp = h285_f5_expect(S_, T_, R_, g285[0], g285[1], g285[2], g285[3], g285[4])
                 if exp != dec:
                     bad.append((d, f"{side}: {S_}/{T_} -> {dec} (oczekiwane {exp})"))
             n = int(g[NRUW_IN])
@@ -76169,6 +76170,7 @@ def main(argv):
 #   H285-4  srebro: kontrakty + wozy srebra > 0; juki karawan srebra na koniec <= polowa poczatku albo <= 15 dob sprzedazy (Przeplyw 284); brak wsadu srebra
 #           (Wsad warsztatow 284) ostatnie 10 dob <= pierwsze 5 dob
 #   H285-5  krok f5 zgodny z regula 285 (BRAK S+R<T; PELNY S(+R przy 'pelny z droga TAK')>2T; w pasmie zapas rosnie i trend czynny -> PELNY 'W DOL'; inaczej PASMO)
+#           recenzja 285: w pasmie zmiana zapasu ponad 'prog trendu' (5% stawki KS zelaza x 7 dob): wzrost -> PELNY 'W DOL', spadek -> BRAK 'W GORE'; w progu PASMO
 #   H285-6  ruda (INFO; progi w grupie ruda282): miasta bez rudy, stosunek cen, zelazo swiata na dobe w ostatnich 10 dobach
 #   H285-7  INFO
 H285_G = "Straz karawan (285): dzien "
@@ -76179,7 +76181,8 @@ H285_RE_G = re.compile(
     r"zagrozenie bandy w dniu drogi (?P<thr>[\d.]+) ludzi, udzial majatku (?P<v>[\d.]+), limit gry (?P<lim>[\d.]+), podstawa >= limit (?P<abl>\d+)\), ludzi przy ocenie srednio "
     r"(?P<men>[\d.]+), ponizej potrzeby (?P<short>\d+) \| najem do potrzeby: wizyt (?P<hv>\d+), ludzi (?P<hn>\d+) za (?P<hc>\d+) zl; najem ponad potrzebe wstrzymany (?P<bl>\d+) "
     r"\| zwolnieni do domu \(droga 166\): (?P<rm>\d+) ludzi z (?P<rc>\d+) karawan \(zold dzienny ok\. (?P<rw>\d+) zl\), bez wsi z danymi BK (?P<rn>\d+), karawany gracza "
-    r"bez zwolnienia (?P<rp>\d+) \| karawany swiata (?P<cars>\d+): ludzi (?P<wm>\d+) \((?P<per>[\d.]+|-) na karawane\), zold z modelu (?P<wage>\d+) zl/d \| czas (?P<ms>[\d.]+) ms "
+    r"bez zwolnienia (?P<rp>\d+) (?:\| ocena przy wyjezdzie \(cel znany, recenzja 285; BK (?P<dw>wpiety|BRAK)\): (?P<dep>\d+), w tym banda celu silniejsza niz miasta "
+    r"(?P<dept>\d+), nadwyzka bez celu - zwolnienie odlozone do wyjazdu (?P<rwait>\d+) )?\| karawany swiata (?P<cars>\d+): ludzi (?P<wm>\d+) \((?P<per>[\d.]+|-) na karawane\), zold z modelu (?P<wage>\d+) zl/d \| czas (?P<ms>[\d.]+) ms "
     r"\| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
 H285_MAT = (r"(?P<n{k}>srebro|bawelna|glina): proby (?P<try{k}>\d+), kontrakty karawan (?P<con{k}>\d+) szt\., wozem kupcow (?P<cart{k}>\d+) szt\., dowiezione kontraktem "
             r"(?P<cdn{k}>\d+) / wozem (?P<adn{k}>\d+) szt\., w drodze wozami (?P<tr{k}>\d+), polki miast (?P<sh{k}>\d+), juki karawan (?P<pk{k}>\d+), zuzycie zmierzone miast "
@@ -76191,7 +76194,7 @@ H285_RE_S = re.compile(
       r"sprzedazach \[(?P<gl>[^\]]*)\] \| czas (?P<ms>[\d.]+) ms, potkniecia (?P<st>\d+)\.$")
 H285_F5 = re.compile(r"(Westeros|Essos): polki (\d+) / cel (\d+) \([^)]*\), brak \d+ w \d+ miastach, bez rudy \d+ z \d+ miast -> (BRAK|PELNY|PASMO|BEZ CELU) \(([^)]*)\)"
                      r", w drodze do miast (\d+) \(polki z droga [^,]*, 282 - (liczone|klucz NIE, nie liczone)\); 285: pelny z droga (TAK|NIE), zapas rynku "
-                     r"\(polki \+ droga \+ juki karawan\) (-|\d+) -> (\d+)(?: \(([+-]\d+)\))?, juki karawan (\d+), trend (W DOL|-|NIE \(klucz\))")
+                     r"\(polki \+ droga \+ juki karawan\) (-|\d+) -> (\d+)(?: \(([+-]\d+)\))?, juki karawan (\d+), trend (W DOL|W GORE|-|NIE \(klucz\))(?:, prog trendu (\d+))?")
 H285_ERR = ("ERROR in CaravanGuards285.", "ERROR in MaterialOrders.Line285", "ERROR in MaterialOrders.ShortOf", "ERROR in CaravanGuards285.Daily",
             "ERROR in ClanBudget.ReleaseCaravanGuards")
 H285_LOST_MAX = 3.5          # rozbite karawany na dobe: 1.5 x baza 133a (2.23/d)
@@ -76204,16 +76207,25 @@ H285_WSAD_SILVER = re.compile(r"^Wsad warsztatow \(284\): dzien (\d+) .*?brak ws
 H285_RU = re.compile(r"^Ruda przeplyw \(282\): dzien (\d+) .*?stosunek ([\d.]+|-) \| miasta bez rudy (\d+) z \d+ .*?swiat lupy: razem (\d+)")
 
 
-def h285_f5_expect(S_, T_, R_, fullR, prev, tot, trend):
-    """Oczekiwana decyzja kroku f5 wedlug reguly 285 (StartCalibration.F5IronWeek): R_ - zelazo w drodze liczone ('282 - liczone'), inaczej 0."""
+def h285_f5_expect(S_, T_, R_, fullR, prev, tot, trend, thr=None):
+    """Oczekiwana decyzja kroku f5 wedlug reguly 285 (StartCalibration.F5IronWeek): R_ - zelazo w drodze liczone ('282 - liczone'), inaczej 0.
+    Recenzja 285: thr - prog trendu z linii (5% stawki KS zelaza x 7 dob); w pasmie zapas rosnie ponad prog -> PELNY, spada ponad prog -> BRAK; prog 0 - bez trendu;
+    linia bez progu (przed recenzja) - kazdy wzrost -> PELNY."""
     if T_ <= 0:
         return "BEZ CELU"
     if S_ + R_ < T_:
         return "BRAK"
     if S_ + (R_ if fullR else 0) > 2 * T_:
         return "PELNY"
-    if trend != "NIE (klucz)" and prev is not None and tot > prev:
-        return "PELNY"
+    if trend != "NIE (klucz)" and prev is not None:
+        if thr is None:
+            if tot > prev:
+                return "PELNY"
+        elif thr > 0:
+            if tot - prev > thr:
+                return "PELNY"
+            if prev - tot > thr:
+                return "BRAK"
     return "PASMO"
 
 
@@ -76223,6 +76235,7 @@ def h285_lines():
          " | potrzeba strazy srednio {need} (podstawa szablonu 15.0, zagrozenie bandy w dniu drogi 21.3 ludzi, udzial majatku 0.84, limit gry 38.2, podstawa >= limit 0),"
          " ludzi przy ocenie srednio 33.1, ponizej potrzeby 9 | najem do potrzeby: wizyt 9, ludzi 31 za 2950 zl; najem ponad potrzebe wstrzymany 40"
          " | zwolnieni do domu (droga 166): {rm} ludzi z 61 karawan (zold dzienny ok. 2400 zl), bez wsi z danymi BK {rn}, karawany gracza bez zwolnienia 0"
+         " | ocena przy wyjezdzie (cel znany, recenzja 285; BK wpiety): 70, w tym banda celu silniejsza niz miasta 31, nadwyzka bez celu - zwolnienie odlozone do wyjazdu 44"
          " | karawany swiata 450: ludzi {wm} ({per} na karawane), zold z modelu {wage} zl/d | czas 3.41 ms | potkniecia {st} (sesja {st}).")
     mat = ("{n}: proby {t}, kontrakty karawan {c} szt., wozem kupcow {w} szt., dowiezione kontraktem 0 / wozem 4 szt., w drodze wozami 12, polki miast 900, juki karawan {pk},"
            " zuzycie zmierzone miast 2.5/d, miasta bez towaru 40 z 97 (z zuzyciem 3)")
@@ -76233,9 +76246,9 @@ def h285_lines():
            " | czas 0.4 ms, potkniecia 0.")
     f5 = ("Ruda KS (f5-ruda): dzien {d} | klucz Ks Iron Hands Follow Market TAK, co 7 dob od D 108699 (rece przy zlozach zelaza za ruda rynku; kopalnia z drewnem x1.05 przy braku,"
           " x0.95 przy rynku pelnym albo dymarce bez drewna >= 50%) | Westeros: polki {sw} / cel 1296 (1.43), brak 362 w 37 miastach, bez rudy 17 z 59 miast -> {dw}, w drodze do"
-          " miast {rw} (polki z droga 2.10, 282 - liczone); 285: pelny z droga TAK, zapas rynku (polki + droga + juki karawan) {pw} -> {tw}{dlw}, juki karawan 900, trend {trw}"
+          " miast {rw} (polki z droga 2.10, 282 - liczone); 285: pelny z droga TAK, zapas rynku (polki + droga + juki karawan) {pw} -> {tw}{dlw}, juki karawan 900, trend {trw}, prog trendu 90"
           " | Essos: polki 751 / cel 781 (0.96), brak 271 w 26 miastach, bez rudy 8 z 38 miast -> PASMO (bez zmian), w drodze do miast 448 (polki z droga 1.54, 282 - liczone);"
-          " 285: pelny z droga TAK, zapas rynku (polki + droga + juki karawan) - -> 1500, juki karawan 300, trend -"
+          " 285: pelny z droga TAK, zapas rynku (polki + droga + juki karawan) - -> 1500, juki karawan 300, trend -, prog trendu 56"
           " | wpisow zelaza 512: w gore 0, w dol (rynek pelny) 0, w dol (dymarka bez drewna) 0, bez zmian: dymarka czesciowo bez drewna 0, bez danych wytopu 0, pasmo 512,"
           " bez celu 0; bloki przyciete sufitem 0, w przebudowie (pominiete) 14 | sufit bloku (suma rak przy zlozach <= 0.5 x rece poza domem): blokow z zelazem 512, na suficie"
           " przed krokiem 0 (rece przy zelazie 0 = 0% rak zelaza), przyciete po wzroscie 0 (zelazo -0 rak z zamiaru, inne zloza -0 rak -> do zelaza), nad sufitem bez wzrostu"
@@ -76266,6 +76279,16 @@ def h285_selftest():
         bad.append("f5 wobec RU282_F5 (grupa ruda282)")
     if h285_f5_expect(1856, 1296, 865, True, 3000, 3621, "W DOL") != "PELNY" or h285_f5_expect(1300, 1296, 0, True, 3000, 2900, "-") != "PASMO":
         bad.append("oczekiwana decyzja f5")
+    # recenzja 285: prog trendu - zmiana w progu bez kroku, spadek ponad prog w gore, prog 0 bez trendu
+    if (h285_f5_expect(1856, 1296, 865, False, 3000, 3080, "-", 90) != "PASMO" or h285_f5_expect(1856, 1296, 865, False, 3000, 3091, "W DOL", 90) != "PELNY"
+            or h285_f5_expect(1856, 1296, 865, False, 3000, 2900, "W GORE", 90) != "BRAK" or h285_f5_expect(1856, 1296, 865, False, 3000, 3500, "-", 0) != "PASMO"):
+        bad.append("oczekiwana decyzja f5 (prog trendu)")
+    c2 = list(H285_F5.finditer(f5.format(d=109035, sw=1856, dw="BRAK (w gore, zapas spada - 285)", rw=865, pw=3000, tw=2800, dlw=" (-200)", trw="W GORE")))
+    if len(c2) != 2 or c2[0].group(13) != "W GORE" or c2[0].group(14) != "90" or c2[0].group(4) != "BRAK":
+        bad.append("f5 (W GORE, prog trendu)")
+    a2 = H285_RE_G.match(g.format(d=109030, key="TAK", need="21.4", rm=120, rn=0, wm=15000, per="33.3", wage=120000, st=0))
+    if not a2 or a2.group("dep") != "70" or a2.group("rwait") != "44":
+        bad.append("straz (ocena przy wyjezdzie)")
     return "; ".join(bad) if bad else None
 
 
@@ -76386,15 +76409,22 @@ def h285_rows(rep, D):
     if D["f5"]:
         bad = []
         for d, g in D["f5"]:
-            mk, S_, T_, dec, txt, R_, cnt, full, prev, tot, dl, C_, trend = g
+            mk, S_, T_, dec, txt, R_, cnt, full, prev, tot, dl, C_, trend, thr = g
             Rc = int(R_) if cnt == "liczone" else 0
-            exp = h285_f5_expect(int(S_), int(T_), Rc, full == "TAK", None if prev == "-" else int(prev), int(tot), trend)
+            thr = None if thr is None else int(thr)
+            exp = h285_f5_expect(int(S_), int(T_), Rc, full == "TAK", None if prev == "-" else int(prev), int(tot), trend, thr)
             if exp != dec:
                 bad.append(f"{d} {mk}: {dec} (oczekiwane {exp})")
             band = int(T_) > 0 and int(S_) + Rc >= int(T_) and not (int(S_) + (Rc if full == "TAK" else 0) > 2 * int(T_))
-            want_trend = band and trend != "NIE (klucz)" and prev != "-" and int(tot) > int(prev)
-            if want_trend != (trend == "W DOL"):
-                bad.append(f"{d} {mk}: trend {trend} (oczekiwany {'W DOL' if want_trend else '-'})")
+            live = band and trend != "NIE (klucz)" and prev != "-"
+            dlt = int(tot) - int(prev) if prev != "-" else 0
+            want = "-"
+            if live and thr is None:
+                want = "W DOL" if dlt > 0 else "-"   # linia sprzed recenzji (bez progu): kazdy wzrost
+            elif live and thr > 0:
+                want = "W DOL" if dlt > thr else "W GORE" if -dlt > thr else "-"
+            if (want if want != "-" else "") != (trend if trend in ("W DOL", "W GORE") else ""):
+                bad.append(f"{d} {mk}: trend {trend} (oczekiwany {want})")
         rep.add("H285-5: krok f5-ruda zgodny z regula 285 (pelny z droga, trend zapasu w pasmie)", f"wpisow {len(D['f5'])}, niezgodnych {len(bad)}" + (f" {bad[:3]}" if bad else ""),
                 "0", not bad)
     else:

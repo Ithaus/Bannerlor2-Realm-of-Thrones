@@ -1493,7 +1493,7 @@ namespace Armoury
         /// <summary>Zwalnia z partii (albo zalogi) ludzi za `amount` zl zoldu dziennie (albo `amount` ludzi przy zoldzie 0), od najnizszego tieru (P3/W2: przy
         /// ReleaseAcrossTiers - losowo z calej partii, DrawAcross); mercsOnly - tylko najemnicy z karczmy (zawsze od najnizszego tieru).
         /// Ludzie do ludnosci BK wsi; czesc sakiewki partii do kiesy wsi (E5/B6: czesc ludzi w karczmie - do puli weteranow). Zwraca zwolnione (zl albo ludzi).</summary>
-        private static double ReleaseFrom(MobileParty mp, Settlement fortress, Clan c, double amount, bool menUnit, bool mercsOnly, bool garrison)
+        private static double ReleaseFrom(MobileParty mp, Settlement fortress, Clan c, double amount, bool menUnit, bool mercsOnly, bool garrison, CharacterObject keep = null)
         {
             var r = mp.MemberRoster;
             if (r == null || amount <= 0) return 0;
@@ -1508,6 +1508,7 @@ namespace Armoury
                 var el = r.GetElementCopyAtIndex(i); var ch = el.Character;
                 if (ch == null || ch.IsHero || el.Number <= 0) continue;
                 if (mercsOnly && ch.Occupation != Occupation.Mercenary) continue;
+                if (keep != null && ch == keep) continue;   // 285 (recenzja): mistrz karawany notabla (przywodca bez bohatera) nie odchodzi ze straza
                 stacks.Add(el);
             }
             if (stacks.Count == 0) return 0;
@@ -1577,7 +1578,10 @@ namespace Armoury
         internal static int ReleaseCaravanGuards(MobileParty mp, Settlement town, int men)
         {
             if (mp == null || town == null || men <= 0 || !mp.IsCaravan) return 0;
-            try { return (int)Math.Round(ReleaseFrom(mp, town, null, men, true, false, false)); }
+            // 285 (recenzja): mistrz karawany (CaravanMaster kultury wlasciciela - jak ArmsFromPeople.StripMost2) zostaje; karawana bez niego dostalaby innego przywodce
+            CharacterObject master = null;
+            try { var o = mp.Party != null ? mp.Party.Owner : null; master = o != null && o.Culture != null ? o.Culture.CaravanMaster : null; } catch { master = null; }
+            try { return (int)Math.Round(ReleaseFrom(mp, town, null, men, true, false, false, master)); }
             catch (Exception e) { Stumble("ReleaseCaravanGuards(285)", e); return 0; }
         }
 

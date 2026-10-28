@@ -646,6 +646,8 @@ namespace Armoury
                     _wSize = true;
                 }
                 parts.Add("werbunek karawan (CheckRecruiting) " + (_wSize ? "wpiety" : "NIE"));
+                if (_wSize) CaravanGuards285.Apply(h);   // recenzja 285: ocena strazy przy wyjezdzie BK (postfiks HourlyTickPartyImpl - cel nastepnego odcinka znany)
+                parts.Add("straz 285 przy wyjezdzie BK (HourlyTickPartyImpl) " + (CaravanGuards285.DepartWired ? "wpieta" : "NIE"));
             }
             catch (Exception e) { parts.Add("wyjatek " + e.GetType().Name); Log.Error("CaravanTrade284.ApplyAll", e); }
             Log.Info("CaravanTrade284 (284): " + string.Join(", ", parts.ToArray()) + "; zasady zakupu BK - postfiks CalculateBuyValue w CaravanGoods (BuyGoods).");

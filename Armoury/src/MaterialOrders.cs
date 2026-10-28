@@ -286,6 +286,19 @@ namespace Armoury
 
         internal static bool HasContract(MobileParty mp) { return mp != null && _byCar.Count > 0 && _byCar.ContainsKey(mp); }
 
+        /// <summary>Recenzja 285: ilosc kontraktu karawany na ten przedmiot (liczona w InTransitTo celu) - 0 bez kontraktu albo inny surowiec. f5-ruda odejmuje
+        /// ja od jukow karawany, zeby zapas rynku nie liczyl tej samej rudy dwa razy (droga R i juki C).</summary>
+        internal static int ContractQty(MobileParty mp, ItemObject item)
+        {
+            try
+            {
+                Contract c; int m;
+                if (mp == null || item == null || _byCar.Count == 0 || !_byCar.TryGetValue(mp, out c) || c == null || !Ready() || !Ix(item, out m)) return 0;
+                return c.Mat == m ? Math.Max(0, c.Qty) : 0;
+            }
+            catch (Exception e) { Stumble("ContractQty", e); return 0; }
+        }
+
         /// <summary>P3/P2a (IronLands - tylko log): zuzycie rudy zmierzone od ostatniego Daily (warsztaty zbrojne, strzelarze, rzemioslo miasta) wedlug miasta.</summary>
         internal static void ForEachOreUseToday(Action<Town, float> f)
         {
