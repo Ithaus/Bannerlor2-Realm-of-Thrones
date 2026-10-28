@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 14:00 CET - 286 GOTOWE (02916a7f + cd44422b, Armoury 17668068), AUTOTEST 90 DOB 135a w toku
+- Zold strazy: stawka wedlug tieru jak wszyscy, ale karawany to same tiery 3-5 (9.68 zl/czl wobec 5.26 partie rodow, 4.56 garnizony), a 285 zwalnial najtanszych.
+  286: CaravanGuardByRoadStrength (zagrozenie wzdluz calej drogi, dobor sily nie liczby, odchodza najdrozsi za jednostke sily), CaravanGuardPlayerAfterNotice
+  (karawana gracza po komunikacie), CaravanAgedGlutSells (stary towar w przesycie schodzi porcjami po cenie dnia), KsIronLocalGlut (kopalnia przy pelnym
+  miescie traci rece). Grupa handel286 (H286-1..8).
+- AUTOTEST 135a (zadanie bax5id0mg, m113/seria-135a.out.txt; testy-noc-204.ps1 kopia,bitwaN,probyN -ProbyDays 90). Grupy handel286 handel285 handel284
+  ruda282 nruda karawany259 ksiega280 + reszta; WGRANIE 135 (DLL test/mfinal135a, stara 13ee0fc5).
+
 ## DOPISEK 28.10 ok. 13:35 CET - Jeff: "napraw to, moze zold jest za wysoki ochrony? kolejna runda poprawek i test 90 dniowy" - paczka 286 w toku
 - Workflow wf_5a92f7bf-0f4 (skrypt workflows/scripts/poprawka-286-wf_5a92f7bf-0f4.js, bez args; resumeFromRunId), na galezi noc/285-zold-srebro-ruda (zb/n285).
   Zakres: straz wedlug calej trasy (H285-3), stawka zoldu strazy karawan (tier najemnikow, zold tylko w drodze), srebro w jukach, rak przy zlozach mniej
