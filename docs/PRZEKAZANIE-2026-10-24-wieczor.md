@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 19:15 CET - 287 GOTOWE (a2c137f6 + c3b5528d, Armoury 5cfd8c21), AUTOTEST 90 DOB 135c w toku
+- Przyczyna handlu: NIE za male roznice cen (futra Westeros 7.36 / Essos 3.93 itd.), tylko bramka przeplywu 284 mierzona sprzedaza samych karawan -
+  kupno stalo w 35-36 z 36 kategorii przez 84 doby, karawany tylko wyprzedawaly juki z wczytania. Klucz CaravanFlowByMarketDemand (zbyt = max(sprzedaz
+  karawan, popyt targow miast)). CaravanGuardPlayerAfterNotice domyslnie NIE. KsIronFullOnlyOwnTown (przy pelnym rynku tna sie tylko kopalnie pelnych miast).
+  R274-2 to nie blad 274 (bieg startuje poza pasmem, wielka bitwa 109049-109051). Grupa handel287. Bramka surowcow masowych (osobny kod) - nastepny kandydat.
+- AUTOTEST 135c (zadanie biwz7ifr3, m113/seria-135c.out.txt; kopia,probyN 90 dob). Porownac z grupy-134b (udzial wyplat 0.128, rozbite 4.21, zelazo -28,
+  bez rudy 22.8) i karawana Jeffa; WGRANIE 135 gdy lepsza i karawana zyje.
+
 ## DOPISEK 28.10 ok. 18:50 CET - Jeff "rob teraz" - paczka 287 w toku (workflow wf_50bb38ba-8e2)
 - Skrypt workflows/scripts/paczka-287-wf_50bb38ba-8e2.js (bez args; resumeFromRunId), galaz noc/285-zold-srebro-ruda (zb/n285, od 409dc1db).
   Zakres: rozrzut cen regionalnych wobec kosztu drogi (marza kupcow), CaravanGuardPlayerAfterNotice domyslnie NIE, zelazo -74/d, R274-2. Potem test
