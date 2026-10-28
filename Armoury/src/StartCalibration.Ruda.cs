@@ -80,6 +80,30 @@ namespace Armoury
             // (Westeros / Essos) podnosil rece takze kopalniom przy zalanych miastach (Essos BRAK 109049 - 123 wpisy w gore)
             bool locOn = sR != null && sR.KsIronLocalGlut;
             var fullTown = new HashSet<Town>(); var nFullT = new int[2];
+            // poprawka 135a (286b, klucz KsIronLocalGlutBand): log 135a (90 dob) - rece przy zelazie 113 344 -> 73 226, kopalnie przy miastach pelnych ciete takze przy
+            // rynku w BRAKU (Essos 109049/109056/109070 - 124/103/60 wpisow, Westeros 109077-109112 - 195/129/108/21/19), miasta bez rudy 9 -> 25 na koniec. Miasto pelne
+            // dopiero, gdy nadmiar ponad 2 x cel jest wiekszy niz tydzien wydobycia jego kopalni (stawka KS zelaza wsi tego miasta targowego x 7 dob - jeden krok; mniejszy
+            // nadmiar zejdzie wozami w kroku, ciecie rak go nie zmieni); przy BRAKU rynku te kopalnie trzymaja rece (bez wzrostu, nigdy w dol); w pasmie kopalnie miasta,
+            // ktore spadlo ponizej celu (polki + droga < cel), rosna jak przy braku (powrot po cieciu). Klucz NIE - jak 286.
+            bool bandOn = locOn && sR.KsIronLocalGlutBand;
+            var townRate = new Dictionary<Town, double>(); var shortTown = new HashSet<Town>(); var nShortT = new int[2];
+            if (bandOn)
+            {
+                try
+                {
+                    foreach (var kv in _rates)
+                    {
+                        var a = kv.Value; var v = kv.Key;
+                        if (a == null || a.A == null || v == null || KsDeliver.IIron >= a.A.Length) continue;
+                        float x = a.A[KsDeliver.IIron]; if (!(x > 0f)) continue;
+                        var mk = v.TradeBound ?? v.Bound;
+                        var tw = mk != null ? mk.Town : null;
+                        if (tw == null) continue;
+                        double r0; townRate.TryGetValue(tw, out r0); townRate[tw] = r0 + x;
+                    }
+                }
+                catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(stawki miast 286b)", e); }
+            }
             foreach (var t in Town.AllTowns)
             {
                 try
@@ -93,7 +117,14 @@ namespace Armoury
                     R[m] += tr;
                     if (have <= 0) nE[m]++;
                     if (have < tg) { nS[m]++; D[m] += tg - have; }
-                    if (locOn && tg > 0 && have + (rOn ? tr : 0) > 2L * tg) { fullTown.Add(t); nFullT[m]++; }
+                    long onT = have + (rOn ? tr : 0);
+                    if (bandOn)
+                    {
+                        double wk; townRate.TryGetValue(t, out wk); wk *= F5IronEvery;
+                        if (tg > 0 && onT - 2L * tg > wk) { fullTown.Add(t); nFullT[m]++; }
+                        else if (tg > 0 && onT < tg) { shortTown.Add(t); nShortT[m]++; }
+                    }
+                    else if (locOn && tg > 0 && onT > 2L * tg) { fullTown.Add(t); nFullT[m]++; }
                 }
                 catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(miasto)", e); }
             }
@@ -156,6 +187,7 @@ namespace Armoury
             int nIn = 0, nUp = 0, nDnFull = 0, nDnStarv = 0, nPart = 0, nBand = 0, nNoT = 0, nNoData = 0, nCap = 0, nBusy = 0;
             int nColl = 0;                                         // f7-wegiel (recenzja): wpisy bez wzrostu tylko przez rece weglarzy (bez drewna < 10%, z weglarzami >= 10%)
             var nLoc = new int[2]; var nLocUp = new int[2]; var nLocBand = new int[2];   // 286: w dol przy miescie targowym pelnym (w tym zamiast wzrostu przy BRAK, w pasmie)
+            var nLocHold = new int[2]; var nLocRec = new int[2];   // 286b: trzymane przy BRAK (miasto pelne), w gore w pasmie (miasto ponizej celu)
             int nBlk = 0, nAtCap0 = 0, nOver = 0;                  // recenzja: bloki z zelazem, na suficie przed krokiem, nad sufitem bez wzrostu zelaza (bez przyciecia)
             var h0 = new double[2]; var h1 = new double[2]; var hMid = new double[2]; var hAt0 = new double[2];
             double capIron = 0, capOther = 0;                      // rece zdjete sufitem po wzroscie: zelazu (z zamiaru) i innym zlozom bloku (oddane zelazu)
@@ -174,11 +206,12 @@ namespace Armoury
                     float starvG = starv;
                     if (starv >= 0f && ld.V != null) starvG = Bloomery.F7StarvedGrow(ld.V, starv);
                     // 286: miasto targowe kopalni (pola mieszczan - ich miasto; wies - TradeBound, inaczej Bound - jak RegaleCycle)
-                    bool locFull = false;
-                    if (locOn && fullTown.Count > 0)
+                    bool locFull = false, locShort = false;
+                    if (locOn && (fullTown.Count > 0 || shortTown.Count > 0))
                     {
                         Town mt = ld.TF ? ld.T : (ld.V != null && ld.V.TradeBound != null ? ld.V.TradeBound.Town : (ld.V != null && ld.V.Bound != null ? ld.V.Bound.Town : null));
                         locFull = mt != null && fullTown.Contains(mt);
+                        locShort = mt != null && shortTown.Contains(mt);
                     }
                     foreach (var b in ld.B)
                     {
@@ -200,6 +233,14 @@ namespace Armoury
                                 float f = 1f;
                                 if (starv >= F5StarvDown) { f = F5Down; nDnStarv++; }
                                 else if (dec[m] == 2) nNoT++;
+                                else if (bandOn && locFull && dec[m] == 1) nLocHold[m]++;   // 286b: rynek w braku - kopalnia przy miescie pelnym trzyma rece (nigdy w dol)
+                                else if (bandOn && locShort && dec[m] == 0)
+                                {
+                                    // 286b: pasmo, miasto targowe kopalni ponizej celu - powrot jak przy braku (te same warunki drewna; bez danych / czesciowo - jak dotad)
+                                    if (starv == -1f) nNoData++;
+                                    else if (starvG < F5StarvUp) { f = F5Up; nLocRec[m]++; }
+                                    else { nPart++; if (starv < F5StarvUp) nColl++; }
+                                }
                                 else if (locFull && dec[m] != -1)
                                 {
                                     // 286: rynek w braku albo w pasmie, ale miasto targowe tej kopalni zalane - rece w dol (wydobycie tu tylko zalewa zrodlo; brak rynku
@@ -268,6 +309,8 @@ namespace Armoury
                   .Append(", prog trendu ").Append(thr[m]);
                 if (locOn) sb.Append("; 286: miasta targowe pelne (polki + droga > 2 x cel) ").Append(nFullT[m]).Append(", kopalnie przy nich w dol ").Append(nLoc[m])
                   .Append(" (zamiast wzrostu przy BRAK ").Append(nLocUp[m]).Append(", w pasmie ").Append(nLocBand[m]).Append(')');
+                if (bandOn) sb.Append("; 286b: pas martwy tydzien wydobycia kopalni miasta TAK, trzymane przy BRAK ").Append(nLocHold[m])
+                  .Append(", miasta targowe z brakiem (polki + droga < cel) ").Append(nShortT[m]).Append(", kopalnie przy nich w gore (pasmo) ").Append(nLocRec[m]);
             }
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
               .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(Bloomery.F7On ? " (w tym przez rece weglarzy f7-wegiel " + nColl + ")" : "").Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)

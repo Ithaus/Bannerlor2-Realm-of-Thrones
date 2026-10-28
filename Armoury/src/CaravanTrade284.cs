@@ -152,6 +152,17 @@ namespace Armoury
             return Held(c) > Cap(c);
         }
 
+        /// <summary>Poprawka 135a (286b, CaravanGoods.AgedGlut): przesyt gleboki - bramka zamknieta i juki karawan swiata wiecej niz `days` dob sprzedazy miastom
+        /// (ta sama miara co bramka: juki / srednia sprzedaz doby). Przy days = wiek starego towaru (30 dob) sztuka kupiona dzis zestarzeje sie, zanim stos zejdzie
+        /// sprzedaza swiata - tylko taki stos nie czeka na rynek z zyskiem. Sprzedaz zmierzona 0 przy towarze w jukach - gleboki.</summary>
+        internal static bool GlutDeep(ItemCategory c, int days)
+        {
+            if (!GateShut(c)) return false;
+            float e = Ema(c);
+            long h = Held(c);
+            return e > 0.01f ? h > (double)e * Math.Max(1, days) : h > 0;
+        }
+
         /// <summary>Recenzja 284 (drobna 1): po wczytaniu zapisu _held jest pusty az do pierwszej doby (pomiar _days i _ema wraca z zapisu, juki nie) - bramka bylaby
         /// otwarta dla kazdego towaru. Pierwsze uzycie po wczytaniu przelicza juki ze wszystkich karawan (ten sam przeglad co Daily); do tej chwili NoteBuy/NoteSale nie
         /// zmieniaja _held (przeglad i tak widzi juki po tych ruchach).</summary>
@@ -423,7 +434,24 @@ namespace Armoury
                 if (lr != 0)
                 {
                     if (bk) _bkExit++; else _vanExit++;
-                    if (lr == 5 && GateShut(it.ItemCategory)) CaravanGoods.NoteAged286(__3, 0, 0, it.ItemCategory, false);   // 286: stary towar w przesycie (licznik)
+                    if (lr == 5 && !it.IsFood && CaravanGoods.AgedGlut(it.ItemCategory))
+                    {
+                        // poprawka 135a (286b, klucz CaravanAgedGlutAtBookWorth): stary towar w przesycie schodzi w sprzedazy BK / gry tylko po cenie po mycie nie nizszej
+                        // niz wartosc sztuki w ksiedze 259 (min(koszt, wartosc x srednia indeksu 97 miast) - CaravanGoods.WorthOf); reszta czeka na miasto, ktore placi wiecej
+                        double u5 = CaravanGoods.UnitCost(mp, it);
+                        double fl = u5 > 0.0 ? CaravanGoods.AgedGlutFloor(it, u5) : 0.0;
+                        if (fl > 0.0)
+                        {
+                            int kf = Math.Max(0, CaravanGoods.MaxAtCost(__1.Settlement.Town, __1.Settlement, mp, __2.EquipmentElement, __3, fl));
+                            if (kf < __3)
+                            {
+                                CaravanGoods.NoteAgedFloor286(__3 - kf, false);
+                                Withhold(mp, __2.EquipmentElement, bk, __3 - kf, u5);
+                                __3 = kf;
+                            }
+                        }
+                        CaravanGoods.NoteAged286(__3, 0, 0, it.ItemCategory, false);   // 286: stary towar w przesycie (licznik - sztuki wypuszczone)
+                    }
                     return;
                 }
                 double unit = CaravanGoods.UnitCost(mp, it);
@@ -449,16 +477,24 @@ namespace Armoury
                 }
                 if (k < __3)
                 {
-                    if (bk) { _bkHeldN += __3 - k; _bkHeldC += (long)Math.Round((__3 - k) * unit); }
-                    else { _vanHeldN += __3 - k; _vanHeldC += (long)Math.Round((__3 - k) * unit); }
-                    if (!ReferenceEquals(_bkWithheldMp, mp)) { _bkWithheld.Clear(); _bkWithheldMp = mp; }
-                    int w0; _bkWithheld.TryGetValue(__2.EquipmentElement, out w0);
-                    _bkWithheld[__2.EquipmentElement] = w0 + (__3 - Math.Max(0, k));
+                    Withhold(mp, __2.EquipmentElement, bk, __3 - Math.Max(0, k), unit);
                     __3 = Math.Max(0, k);
                 }
             }
             catch (Exception e) { Stumble("SellGuardPrefix", e); }
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>SellGuardPrefix: n sztuk wstrzymanych (licznik BK / gry, koszt) i wpis dla TakeWithheld (lista transakcji ma liczbe sprzed przyciecia) - wydzielone
+        /// w poprawce 135a, ta sama ksiega co dotad (takze dla progu wartosci starego towaru w przesycie).</summary>
+        private static void Withhold(MobileParty mp, EquipmentElement el, bool bk, int n, double unit)
+        {
+            if (n <= 0) return;
+            if (bk) { _bkHeldN += n; _bkHeldC += (long)Math.Round(n * unit); }
+            else { _vanHeldN += n; _vanHeldC += (long)Math.Round(n * unit); }
+            if (!ReferenceEquals(_bkWithheldMp, mp)) { _bkWithheld.Clear(); _bkWithheldMp = mp; }
+            int w0; _bkWithheld.TryGetValue(el, out w0);
+            _bkWithheld[el] = w0 + n;
         }
 
         // 285: przesyt karawan do miasta z brakiem surowca tabeli (SellGuardPrefix) - liczniki od ostatniej linii 285

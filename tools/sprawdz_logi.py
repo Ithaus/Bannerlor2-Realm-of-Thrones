@@ -56275,7 +56275,7 @@ def nruda_main(logp):
                         w285[int(a.group(1))] = t285
                     sg286 = h286_f5_seg(s)
                     if sg286:
-                        w286[int(a.group(1))] = sum(v[1] for v in sg286.values())
+                        w286[int(a.group(1))] = sum(v[1] + v[4] + v[5] for v in sg286.values())   # 286b: trzymane przy BRAK i powrot w pasmie - osobne kubly
                 else:
                     bad_w += 1
                 continue
@@ -76571,6 +76571,9 @@ def main(argv):
 #   H286-7  zwalniani to najdrozsi za sile: stawka jednostki zwolnionych na czlowieka >= stawka swiata na czlowieka (bieg)
 #   H286-8  karawany gracza: zwolnienie dopiero w dobie po komunikacie (linia 'Straz karawan (286): komunikat graczowi w dobie N')
 #   H286-9  INFO: stawka na czlowieka, sklad tierow, zagrozenie drogi wobec koncow, stary towar w przesycie, wynik 284 'ponizej zoldu'
+#   Poprawka 135a (286b): linia 286 z odcinkiem '; 286b: tylko przesyt ponad 30 dob ... wstrzymane: T1 N krokow, BK i gra N szt.' (klucz CaravanAgedGlutAtBookWorth),
+#   segment f5 '; 286b: pas martwy ... trzymane przy BRAK H, miasta targowe z brakiem N, kopalnie przy nich w gore (pasmo) R' (klucz KsIronLocalGlutBand) - H286-6:
+#   przy 286b 'zamiast wzrostu przy BRAK' 0, trzymane tylko przy BRAK, w gore tylko w PASMIE, suma decyzji z kublami 286 + 286b = wpisy (tak samo NRU-2).
 H286_G = "Straz karawan wedlug sily drogi (286): dzien "
 H286_NOTE = re.compile(r"^Straz karawan \(286\): komunikat graczowi w dobie (\d+) - zwolnienia strazy karawan gracza od doby (\d+)\.$")
 H286_RE_G = re.compile(
@@ -76583,9 +76586,14 @@ H286_RE_G = re.compile(
     r"sklad strazy karawan swiata \((?P<cars>\d+) karawan\): ludzi (?P<men>\d+), stawki jednostek (?P<unit>\d+) zl/d \((?P<upm>[\d.]+|-) na czlowieka\); "
     r"tier <=3 (?P<t0>\d+) \((?P<w0>\d+) zl\), tier 4 (?P<t1>\d+) \((?P<w1>\d+) zl\), tier 5\+ (?P<t2>\d+) \((?P<w2>\d+) zl\), najemnicy (?P<mc>\d+) \((?P<mw>\d+) zl\), "
     r"konni (?P<mo>\d+) \| stary towar w przesycie \(> (?P<age>\d+) dob, kupno stoi - bez czekania na rynek z zyskiem\): ocen bez czekania (?P<aw>\d+), T1 na stracie "
-    r"(?P<an>\d+) szt\. za (?P<ag>\d+) zl \(koszt (?P<ac>\d+) zl\), BK i gra wypuszczone (?P<ab>\d+) szt\. \[(?P<al>[^\]]*)\] \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
+    r"(?P<an>\d+) szt\. za (?P<ag>\d+) zl \(koszt (?P<ac>\d+) zl\), BK i gra wypuszczone (?P<ab>\d+) szt\. \[(?P<al>[^\]]*)\]"
+    r"(?:; 286b: tylko przesyt ponad (?P<bd>\d+) dob sprzedazy swiata, nie ponizej wartosci w ksiedze 259 \(min\(koszt, wartosc x srednia indeksu\)\) - wstrzymane: "
+    r"T1 (?P<bft>\d+) krokow, BK i gra (?P<bfb>\d+) szt\.)? \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
 H286_F5 = re.compile(r"(Westeros|Essos): [^|]*?; 286: miasta targowe pelne \(polki \+ droga > 2 x cel\) (\d+), kopalnie przy nich w dol (\d+) "
                      r"\(zamiast wzrostu przy BRAK (\d+), w pasmie (\d+)\)")
+# poprawka 135a (286b, klucz KsIronLocalGlutBand): odcinek po segmencie 286 kazdego rynku
+H286B_F5 = re.compile(r"(Westeros|Essos): [^|]*?; 286b: pas martwy tydzien wydobycia kopalni miasta TAK, trzymane przy BRAK (\d+), miasta targowe z brakiem "
+                      r"\(polki \+ droga < cel\) (\d+), kopalnie przy nich w gore \(pasmo\) (\d+)")
 H286_ERR = ("ERROR in CaravanGuards285.", "ERROR in ClanBudget.ReleaseCaravanGuards", "ERROR in CaravanGoods.", "ERROR in StartCalibration.F5IronWeek")
 H286_LOST_MAX = 2.5          # rozbite karawany na dobe (ostatnie 30 dob): baza 133a 2.23/d + ok. 10% (134a: 3.83)
 H286_SILVER_DAYS = 15.0      # srebro w jukach na koniec: najwyzej 15 dob sprzedazy (jak H284-3 / H285-4)
@@ -76594,10 +76602,16 @@ H286_PAY = re.compile(r"^Wielkosc karawan \(284[^)]*\): dzien (\d+) .*?karawan z
 
 
 def h286_f5_seg(s):
-    """286: per rynek (W/E) -> (miasta pelne, w dol, zamiast wzrostu, w pasmie) z segmentu 286 linii f5; {} - linia bez segmentu."""
+    """286: per rynek (W/E) -> (miasta pelne, w dol, zamiast wzrostu, w pasmie, 286b trzymane przy BRAK, 286b w gore w pasmie, 286b obecny) z segmentow 286 / 286b
+    linii f5; {} - linia bez segmentu 286. Bez odcinka 286b (klucz KsIronLocalGlutBand NIE albo log 286) - 0, 0, False."""
     out = {}
+    b = {}
+    for g in H286B_F5.finditer(s):
+        b["W" if g.group(1) == "Westeros" else "E"] = (int(g.group(2)), int(g.group(4)))
     for g in H286_F5.finditer(s):
-        out["W" if g.group(1) == "Westeros" else "E"] = (int(g.group(2)), int(g.group(3)), int(g.group(4)), int(g.group(5)))
+        mk = "W" if g.group(1) == "Westeros" else "E"
+        h, r = b.get(mk, (0, 0))
+        out[mk] = (int(g.group(2)), int(g.group(3)), int(g.group(4)), int(g.group(5)), h, r, mk in b)
     return out
 
 
@@ -76614,6 +76628,12 @@ def h286_lines():
     return g, seg
 
 
+# poprawka 135a (286b): odcinki jak w kodzie C# (CaravanGoods.Seg286 - po liscie kategorii; StartCalibration.F5IronWeek - po segmencie 286 kazdego rynku)
+H286B_G = ("; 286b: tylko przesyt ponad 30 dob sprzedazy swiata, nie ponizej wartosci w ksiedze 259 (min(koszt, wartosc x srednia indeksu)) - wstrzymane: T1 {ft} krokow, "
+           "BK i gra {fb} szt.")
+H286B_SEG = "; 286b: pas martwy tydzien wydobycia kopalni miasta TAK, trzymane przy BRAK {nh}, miasta targowe z brakiem (polki + droga < cel) {ns}, kopalnie przy nich w gore (pasmo) {nr}"
+
+
 def h286_selftest():
     g, seg = h286_lines()
     bad = []
@@ -76625,6 +76645,11 @@ def h286_selftest():
         bad.append("linia 286 ('-')")
     if not H286_NOTE.match("Straz karawan (286): komunikat graczowi w dobie 109031 - zwolnienia strazy karawan gracza od doby 109032."):
         bad.append("komunikat 286")
+    gb = g.format(d=109030, below=0, rm=0, rw=0, ru=0, rpm="-", pn=0, pnd="-", pr=0, men=0, unit=0, upm="-", al="silver 3", st=0)
+    gb = gb.replace("[silver 3]", "[silver 3]" + H286B_G.format(ft=17, fb=240))
+    a = H286_RE_G.match(gb)
+    if not a or a.group("bft") != "17" or a.group("bfb") != "240" or a.group("al") != "silver 3":
+        bad.append("linia 286 z odcinkiem 286b")
     # linia f5 z segmentem 286 (po 'prog trendu' kazdego rynku) - wyrazenia grup nruda / ruda282 / handel285 dalej pasuja
     _g5, _s5, f5 = h285_lines()
     f5x = f5.format(d=109035, sw=1856, dw="PELNY (w dol, zapas rosnie - 285)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="W DOL")
@@ -76638,10 +76663,24 @@ def h286_selftest():
     if len(c) != 2 or c[0].group(14) != "90" or c[1].group(14) != "56":
         bad.append("f5 286 wobec H285_F5")
     sg = h286_f5_seg(f5x)
-    if sg.get("W") != (7, 40, 0, 0) or sg.get("E") != (3, 12, 0, 12):
+    if sg.get("W") != (7, 40, 0, 0, 0, 0, False) or sg.get("E") != (3, 12, 0, 12, 0, 0, False):
         bad.append("segment 286 f5")
     if h286_f5_seg(f5.format(d=109035, sw=1856, dw="PASMO (bez zmian)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="-")):
         bad.append("f5 bez segmentu 286")
+    # 286b: odcinek po segmencie 286 kazdego rynku - wyrazenia grup nruda / ruda282 / handel285 dalej pasuja
+    f5b = f5.format(d=109035, sw=1856, dw="PELNY (w dol, zapas rosnie - 285)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="W DOL")
+    f5b = f5b.replace(", trend W DOL, prog trendu 90", ", trend W DOL, prog trendu 90" + seg.format(nf=7, nl=40, nu=0, nb=0) + H286B_SEG.format(nh=0, ns=2, nr=0))
+    f5b = f5b.replace(", trend -, prog trendu 56", ", trend -, prog trendu 56" + seg.format(nf=3, nl=12, nu=0, nb=12) + H286B_SEG.format(nh=0, ns=4, nr=9))
+    if not NRU_W.match(f5b):
+        bad.append("f5 286b wobec NRU_W")
+    if len(RU282_F5.findall(f5b)) != 2:
+        bad.append("f5 286b wobec RU282_F5")
+    c = list(H285_F5.finditer(f5b))
+    if len(c) != 2 or c[0].group(14) != "90" or c[1].group(14) != "56":
+        bad.append("f5 286b wobec H285_F5")
+    sg = h286_f5_seg(f5b)
+    if sg.get("W") != (7, 40, 0, 0, 0, 0, True) or sg.get("E") != (3, 12, 0, 12, 0, 9, True):
+        bad.append("segment 286b f5")
     return "; ".join(bad) if bad else None
 
 
@@ -76772,19 +76811,25 @@ def h286_rows(rep, D):
         bad = []
         for d in sorted(D["f5"]):
             sg = D["f5"][d]
-            for mk, (nf, nl, nu, nb) in sg.items():
-                if nf == 0 and nl > 0:
-                    bad.append(f"{d} {mk}: w dol {nl} bez miast pelnych")
+            for mk, (nf, nl, nu, nb, nh, nr, b6) in sg.items():
+                if nf == 0 and (nl > 0 or nh > 0):
+                    bad.append(f"{d} {mk}: w dol {nl} / trzymane {nh} bez miast pelnych")
                 if nu + nb != nl:
                     bad.append(f"{d} {mk}: {nu} + {nb} != {nl}")
+                if b6 and nu > 0:
+                    bad.append(f"{d} {mk}: 286b - w dol przy BRAK {nu} (rynek w braku - kopalnie trzymaja rece)")
             if d in D["f5n"]:
                 n, s_, dw, de = D["f5n"][d]
-                loc = sum(v[1] for v in sg.values())
+                loc = sum(v[1] + v[4] + v[5] for v in sg.values())
                 if s_ + loc != n:
                     bad.append(f"{d}: suma decyzji {s_} + 286 {loc} != wpisow {n}")
                 for mk, dec in (("W", dw), ("E", de)):
                     if mk in sg and sg[mk][2] > 0 and dec != "BRAK":
                         bad.append(f"{d} {mk}: 'zamiast wzrostu' {sg[mk][2]} przy {dec}")
+                    if mk in sg and sg[mk][4] > 0 and dec != "BRAK":
+                        bad.append(f"{d} {mk}: 286b 'trzymane przy BRAK' {sg[mk][4]} przy {dec}")
+                    if mk in sg and sg[mk][5] > 0 and dec != "PASMO":
+                        bad.append(f"{d} {mk}: 286b 'w gore (pasmo)' {sg[mk][5]} przy {dec}")
         rep.add("H286-6: krok f5 - kopalnie przy miastach targowych pelnych (segment 286)", f"krokow {len(D['f5'])}, niezgodnych {len(bad)}" + (f" {bad[:3]}" if bad else ""),
                 "0", not bad)
     else:
@@ -76815,13 +76860,14 @@ def h286_rows(rep, D):
             p0, p1 = D["pay"][pd[0]], D["pay"][pd[-1]]
             pinfo = f"{p0[1]}/{p0[0]} -> {p1[1]}/{p1[0]} (zysk handlu {p1[2]} wobec zoldu {p1[3]} zl/d)"
         aw = sum(int(D["g"][d]["aw"]) for d in gd); an = sum(int(D["g"][d]["an"]) for d in gd); ab = sum(int(D["g"][d]["ab"]) for d in gd)
+        bft = sum(int(D["g"][d]["bft"] or 0) for d in gd); bfb = sum(int(D["g"][d]["bfb"] or 0) for d in gd)   # 286b (brak odcinka - 0)
         rep.add("H286-9: INFO", f"stawka na czlowieka {a0['upm']} -> {a1['upm']} zl (ludzi {a0['men']} -> {a1['men']}; tier<=3/4/5+/najemnicy {a1['t0']}/{a1['t1']}/{a1['t2']}/{a1['mc']}); "
                 f"zagrozenie drogi {a1['route']} wobec koncow {a1['town']}, sila karawan {a1['str']}, slabszych {a1['below']} z {a1['dep']}; stary towar w przesycie: ocen {aw}, "
-                f"T1 {an} szt., BK/gra {ab} szt.; 284 'ponizej zoldu' {pinfo}", "INFO", None)
+                f"T1 {an} szt., BK/gra {ab} szt.; 286b wstrzymane ponizej wartosci w ksiedze 259: T1 {bft} krokow, BK/gra {bfb} szt.; 284 'ponizej zoldu' {pinfo}", "INFO", None)
 
 
 def h286_synth():
-    """Test syntetyczny: 1 log dobry, 7 zlych - kazdy zly psuje jeden prog."""
+    """Test syntetyczny: 1 log dobry, 9 zlych - kazdy zly psuje jeden prog (poprawka 135a: 'f5b' - odcinek 286b, trzymane przy rynku PELNYM)."""
     import tempfile
     g, seg = h286_lines()
     g285, _s, f5 = h285_lines()
@@ -76841,7 +76887,7 @@ def h286_synth():
             pr = 3 if (i == 12) else 0
             rpm = "11.00" if kind != "cheap" else "6.00"
             out.append("[00:00:00] " + g.format(d=d, below=5, rm=100, rw=900, ru=int(float(rpm) * 100), rpm=rpm, pn=1 if i == 10 else 0, pnd="109010" if i >= 10 else "-",
-                                                 pr=pr, men=11000, unit=85000, upm="7.73", al="silver 30", st=0))
+                                                 pr=pr, men=11000, unit=85000, upm="7.73", al="silver 30", st=0).replace("[silver 30]", "[silver 30]" + H286B_G.format(ft=3, fb=20)))
             if i == 10 and kind != "nonote":
                 out.append("[00:00:00] Straz karawan (286): komunikat graczowi w dobie 109010 - zwolnienia strazy karawan gracza od doby 109011.")
             out.append("[00:00:00] " + g285.format(d=d, key="TAK", need="21.4", rm=100, rn=0, wm=11000, per="24.4", wage=80000 if kind != "wage" else 120000, st=0))
@@ -76853,10 +76899,11 @@ def h286_synth():
             out.append("[00:00:00] " + k259.format(d=d, p=18 if kind != "pay" else 9))
             if i == 14:
                 x = f5.format(d=d, sw=1856, dw="PELNY (w dol, zapas rosnie - 285)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="W DOL")
-                x = x.replace(", trend W DOL, prog trendu 90", ", trend W DOL, prog trendu 90" + seg.format(nf=4, nl=0, nu=0, nb=0))
+                nh = 0 if kind != "f5b" else 5   # 286b: trzymane przy BRAK przy rynku PELNYM - NIE
+                x = x.replace(", trend W DOL, prog trendu 90", ", trend W DOL, prog trendu 90" + seg.format(nf=4, nl=0, nu=0, nb=0) + H286B_SEG.format(nh=nh, ns=0, nr=0))
                 nb = 12 if kind != "f5" else 0
-                x = x.replace(", trend -, prog trendu 56", ", trend -, prog trendu 56" + seg.format(nf=3, nl=12, nu=0, nb=nb))
-                x = x.replace("pasmo 512,", "pasmo 500,")
+                x = x.replace(", trend -, prog trendu 56", ", trend -, prog trendu 56" + seg.format(nf=3, nl=12, nu=0, nb=nb) + H286B_SEG.format(nh=0, ns=2, nr=0))
+                x = x.replace("pasmo 512,", "pasmo 500," if kind != "f5b" else "pasmo 495,")
                 out.append("[00:00:00] " + x)
         return out
 
@@ -76881,6 +76928,7 @@ def h286_synth():
         "silver": {"H286-4": "NIE", "H286-5": "TAK"},
         "ore": {"H286-5": "NIE", "H286-4": "TAK"},
         "f5": {"H286-6": "NIE"},
+        "f5b": {"H286-6": "NIE", "H286-4": "TAK"},
         "cheap": {"H286-7": "NIE"},
         "nonote": {"H286-8": "NIE"},
     }
@@ -76895,13 +76943,13 @@ def handel286_main(logp):
     """handel286 (28.10, paczka 286): H286-S, H286-S2, H286-0..H286-9 - opis w komentarzu nad stalymi H286_*. Strumieniowo, tylko odczyt logu."""
     rep = Report()
     s1 = h286_selftest()
-    rep.add("H286-S: self-test wyrazen (linia jak w kodzie C#: CaravanGuards285.Daily286, CaravanGoods.Seg286; segment 286 linii f5 wobec NRU_W, RU282_F5, H285_F5)",
+    rep.add("H286-S: self-test wyrazen (linia jak w kodzie C#: CaravanGuards285.Daily286, CaravanGoods.Seg286 z odcinkiem 286b; segmenty 286 / 286b linii f5 wobec NRU_W, RU282_F5, H285_F5)",
             s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     try:
         s2 = h286_synth()
     except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
         s2 = f"wyjatek {type(e).__name__}: {e}"
-    rep.add("H286-S2: test syntetyczny (1 log dobry, 8 zlych)", s2 or "OK", "OK", s2 is None)
+    rep.add("H286-S2: test syntetyczny (1 log dobry, 9 zlych)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("H286-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()

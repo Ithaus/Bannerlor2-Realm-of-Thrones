@@ -107,6 +107,37 @@ namespace Armoury
 
         // 286 (klucz CaravanAgedGlutSells): stary towar w przesycie - liczniki od ostatniej linii 286 (CaravanGuards285.Daily286)
         private static long _ag6Wait, _ag6T1N, _ag6T1G, _ag6T1C, _ag6BkN;
+        // poprawka 135a (286b, klucz CaravanAgedGlutAtBookWorth): wstrzymane progiem wartosci w ksiedze 259 - T1 (kroki) i BK / gra (sztuki)
+        private static long _ag6FloorT1, _ag6FloorBk;
+
+        /// <summary>286 / 286b: stary towar tej kategorii nie czeka na rynek z zyskiem (klucz CaravanAgedGlutSells). Przy kluczu CaravanAgedGlutAtBookWorth (poprawka
+        /// 135a) tylko przesyt gleboki - juki swiata ponad 30 dob sprzedazy (CaravanTrade284.GlutDeep, 30 = wiek starego towaru MaxAgeDays); bez niego - jak 286
+        /// (kazda kategoria z zamknietym kupnem, CaravanTrade284.GateShut). Dowod 135a: 286 objal 36 kategorii (sol, futra, deski, narzedzia, bawelna, miod ...), nie
+        /// tylko srebro (134a: 90.5 doby sprzedazy).</summary>
+        internal static bool AgedGlut(ItemCategory c)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.CaravanAgedGlutSells || c == null) return false;
+            return s.CaravanAgedGlutAtBookWorth ? CaravanTrade284.GlutDeep(c, MaxAgeDays) : CaravanTrade284.GateShut(c);
+        }
+
+        /// <summary>Poprawka 135a (286b, klucz CaravanAgedGlutAtBookWorth): najnizsza cena sztuki po mycie dla starego towaru w przesycie = wartosc tej sztuki w ksiedze
+        /// 259 (WorthOf: min(koszt, wartosc x srednia indeksu 97 miast)). Sprzedaz po takiej cenie nie obniza wartosci karawany (kiesa + towar) - karawana nie schodzi
+        /// ponizej kapitalu na samej sprzedazy (log 135a: utarg 1.61 mln zl przy koszcie 3.71 mln, karawan rodow ponizej kapitalu 23 -> 46 w dobach 109054-109061,
+        /// wyplaty 259 14 -> 4 w dobie); towar idzie do miast placacych wiecej niz wiekszosc (indeks >= srednia), tam, gdzie go brak. 0 - bez progu (klucz NIE).</summary>
+        internal static double AgedGlutFloor(ItemObject it, double unitCost)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.CaravanAgedGlutAtBookWorth || it == null || !(unitCost > 0.0)) return 0.0;
+            return Math.Min(unitCost, Math.Max(1, it.Value) * (double)AvgIndex(it.ItemCategory));
+        }
+
+        /// <summary>Poprawka 135a: wstrzymane progiem wartosci w ksiedze 259 (t1 - kroki T1, inaczej sztuki BK / gry).</summary>
+        internal static void NoteAgedFloor286(long n, bool t1)
+        {
+            if (n <= 0) return;
+            if (t1) _ag6FloorT1 += n; else _ag6FloorBk += n;
+        }
         private static readonly Dictionary<string, long> _ag6By = new Dictionary<string, long>();
 
         /// <summary>286: sprzedaz starego towaru w przesycie - T1 (t1 = true, sztuki, utarg, koszt) albo wypuszczenie do sprzedazy BK/gry (SellGuardPrefix - sztuki zadane).</summary>
@@ -129,13 +160,17 @@ namespace Armoury
             l.Sort((a, b) => b.Value.CompareTo(a.Value));
             for (int i = 0; i < l.Count && i < 8; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].Key).Append(' ').Append(l[i].Value);
             sb.Append(l.Count == 0 ? "-]" : "]");
-            _ag6Wait = _ag6T1N = _ag6T1G = _ag6T1C = _ag6BkN = 0; _ag6By.Clear();
+            var s = Settings.Current;
+            if (s != null && s.CaravanAgedGlutSells && s.CaravanAgedGlutAtBookWorth)
+                sb.Append("; 286b: tylko przesyt ponad ").Append(MaxAgeDays).Append(" dob sprzedazy swiata, nie ponizej wartosci w ksiedze 259 (min(koszt, wartosc x srednia indeksu)) - wstrzymane: T1 ")
+                  .Append(_ag6FloorT1).Append(" krokow, BK i gra ").Append(_ag6FloorBk).Append(" szt.");
+            _ag6Wait = _ag6T1N = _ag6T1G = _ag6T1C = _ag6BkN = 0; _ag6By.Clear(); _ag6FloorT1 = _ag6FloorBk = 0;
             return sb.ToString();
         }
 
         internal static void Reset()
         {
-            _ag6Wait = _ag6T1N = _ag6T1G = _ag6T1C = _ag6BkN = 0; _ag6By.Clear();
+            _ag6Wait = _ag6T1N = _ag6T1G = _ag6T1C = _ag6BkN = 0; _ag6By.Clear(); _ag6FloorT1 = _ag6FloorBk = 0;
             _book.Clear(); _visit.Clear(); _townLeft.Clear(); _townDay = -1; _bkBuyer = null; _blocks.Clear();
             _snapDone = false; _snapCaravans = 0; _snapUnits = _snapBk = _snapAvg = 0; _avgIdx.Clear(); _avgDay = -1;
             _bkBeh = null; _fLogs = _fItem = _fPrice = _fTime = null; _bkTried = false; _bkLogState = "nie czytany";
@@ -554,8 +589,8 @@ namespace Armoury
             // 286 (klucz CaravanAgedGlutSells): towar w przesycie (kupno stoi - karawany swiata wioza wiecej niz 10 dob sprzedazy miastom, CaravanTrade284.GateShut)
             // nie czeka na rynek z zyskiem - ten rynek bierze tylko tyle, ile sprzedaz (log 134a: srebro w jukach 2 326 = 90.5 doby sprzedazy, 'dlugo w jukach czeka'
             // 2 394 ocen w dobie); stary towar (> 30 dob) schodzi na stracie porcjami T1 jak towar bez rynku (kupiec nie trzyma kapitalu w towarze bez konca)
-            var s286 = Settings.Current;
-            if (s286 != null && s286.CaravanAgedGlutSells && CaravanTrade284.GateShut(it.ItemCategory)) { _ag6Wait++; return false; }
+            // poprawka 135a (286b): przy kluczu CaravanAgedGlutAtBookWorth tylko przesyt gleboki (> 30 dob sprzedazy swiata), sprzedaz z progiem wartosci w ksiedze 259
+            if (AgedGlut(it.ItemCategory)) { _ag6Wait++; return false; }
             double e = CaravanTrade284.SellIdxOf(it.ItemCategory);
             if (!(e > 0.0)) return false;
             bool ok = Math.Max(1, it.Value) * e / (1.0 + Penalty(mp, it)) * keep >= min;
@@ -964,6 +999,19 @@ namespace Armoury
                         if (kl <= 0) { if (stop == 1) _rPortionIdx++; else _rPortionPrice++; break; }
                         if (kl < step) { step = kl; _portionCut++; pLast = PriceAt(model, el.EquipmentElement, mp, d, kl, wv); }
                     }
+                    if (why == 5 && !c.Food && AgedGlut(cat))
+                    {
+                        // poprawka 135a (286b): stary towar w przesycie - kazda sztuka kroku po mycie nie ponizej wartosci w ksiedze 259 (AgedGlutFloor); reszta czeka
+                        // na miasto, ktore placi wiecej (indeks ponad srednia - tam, gdzie towaru brak)
+                        double fl = AgedGlutFloor(it, c.Unit);
+                        if (fl > 0.0)
+                        {
+                            int kf = step;
+                            while (kf >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kf, wv) * keepK < fl) kf--;
+                            if (kf <= 0) { NoteAgedFloor286(1, true); break; }
+                            if (kf < step) { step = kf; pLast = PriceAt(model, el.EquipmentElement, mp, d, kf, wv); }
+                        }
+                    }
                     if (pLast < GabkaFloor * it.Value) { _rGabka++; break; }
                     int price = Math.Max(1, town.GetItemPrice(el.EquipmentElement, mp, true));
                     int spare = town.Gold - TownPurse.BuyFloor(town, reserve);
@@ -1007,7 +1055,7 @@ namespace Armoury
                     {
                         r.LossN += moved; r.LossG += gross; r.LossCost += (long)cost;
                         switch (why) { case 1: _lDisband += moved; _lDisbandG += gross; break; case 2: _lCash += moved; _lCashG += gross; break; case 3: _lFull += moved; _lFullG += gross; break; case 4: _lFood += moved; _lFoodG += gross; break; default: _lAge += moved; _lAgeG += gross; break; }
-                        if (why == 5 && CaravanTrade284.GateShut(cat)) NoteAged286(moved, gross, (long)cost, cat, true);   // 286: stary towar w przesycie (licznik)
+                        if (why == 5 && !c.Food && AgedGlut(cat)) NoteAged286(moved, gross, (long)cost, cat, true);   // 286: stary towar w przesycie (licznik)
                     }
                     Visit v; if (!_visit.TryGetValue(mp, out v)) { v = new Visit { St = st }; _visit[mp] = v; }
                     v.Cats.Add(cat);
