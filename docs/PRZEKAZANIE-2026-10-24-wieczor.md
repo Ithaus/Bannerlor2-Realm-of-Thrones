@@ -1,5 +1,11 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 11:50 CET - Jeff "Rob to!" (zold karawan, srebro, ceny rudy) - paczka 285 w toku (workflow wf_94a337d3-cfa)
+- zb/n285, galaz noc/285-zold-srebro-ruda od d7b23443 (= WGRANE 133). Skrypt workflows/scripts/paczka-285-wf_94a337d3-cfa.js (bez args; resumeFromRunId).
+  Zakres: straz i zold karawan wedlug niebezpieczenstwa drogi i wartosci ladunku (bez placenia za postoj), srebro/bawelna/glina w tabeli zamowien (zmienna
+  liczba surowcow, zapis kontraktow wstecznie zgodny) + bramka uwalnia srebro, ruda: czemu rozrzut cen rosnie i zelazo +52/d. Potem: autotest 134a
+  (testy-noc-204.ps1 kopia,bitwaN,probyN 30) -> WGRANIE 134. Logi dowodowe: m113/logi/133a-probyN/Armoury-2026-10-28_02-13-05.log.
+
 ## DOPISEK 28.10 ok. 02:30 CET - WGRANIE 133 (132 + 283); LINIA GLOWNA = noc/132-handel-bez-283 (zb\n132h)
 - 133a (ea1df735, Armoury 85a4c057): 7 bitew + probyN 30 dob kod 0, ERROR 0, m110anim czysto. nekanie283: N283-1 A TAK (wykryc 13, lucznikow 42, strzaly 30,
   jezdzcow 7 / wolnej 6, szykow stoi 3), N283-4 TAK (FF 1/30), N283-5 TAK, J204-3 TAK (kontakt 6.6 s); NIE: N283-2 B (testowy pieszy - 'odwrot rannego', wykryc 0),
