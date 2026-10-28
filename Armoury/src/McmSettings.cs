@@ -9612,6 +9612,14 @@ namespace Armoury
         [SettingPropertyGroup("Caravans buy by what the markets take, iron mines by their own town when the market is full (287)")]
         public bool KsIronFullOnlyOwnTown { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Wage Half", HintText = "caravans pay their escort half the wage: every caravan in the world - of notables, of lords and yours - pays its armed merchants, guards, veterans and the sellswords it hires half the daily wage (about 3, 4 and 6 denars a man instead of 5, 8 and 12); the wage tooltip shows it as Merchant escort wage. The guards still pay their own bed and food in towns from that wage. Off = full wages, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan escort half pay and road food (288)")]
+        public bool CaravanWageHalf { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Road Food", HintText = "caravans feed their escort on the road: each day away from a town a caravan eats one load of food for every twenty men, as an army does, from its packs (its own food goods count); when it leaves a town it buys at the market price, with its own purse, the food it lacks for the road to its next stop. In town the men eat and sleep at the inn from their own wages, as before. A caravan with no food left goes hungry (counted in the log only). Off = caravans eat nothing, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan escort half pay and road food (288)")]
+        public bool CaravanRoadFood { get; set; } = true;
+
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsFollowMarket { get; set; } = true;
@@ -12746,6 +12754,8 @@ namespace Armoury
             s.KsIronLocalGlutBand = KsIronLocalGlutBand;
             s.CaravanFlowByMarketDemand = CaravanFlowByMarketDemand;
             s.KsIronFullOnlyOwnTown = KsIronFullOnlyOwnTown;
+            s.CaravanWageHalf = CaravanWageHalf;
+            s.CaravanRoadFood = CaravanRoadFood;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;

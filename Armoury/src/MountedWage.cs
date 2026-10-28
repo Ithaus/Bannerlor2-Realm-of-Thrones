@@ -139,6 +139,7 @@ namespace Armoury
             if (_fullGold || (__state.T && __state.P == __0)) return;   // linia "przed" albo wywolanie wewnetrzne (base) tej samej partii
             try
             {
+                if (__0 != null && __0.IsCaravan) { if (CaravanHalfOn) CaravanHalf(__0, ref __result); return; }   // 288: karawany (Wysp w IsIronbornCrew i tak nie ma)
                 if (!CrownGifts.IsIronbornCrew(__0)) return;
                 float b = __result.BaseNumber;
                 if (!(b > 0f)) return;
@@ -152,7 +153,64 @@ namespace Armoury
             }
         }
 
-        /// <summary>WW-J: zold partii bez polowy w lupie (linia doby "przed"; ta sama droga modelu zoldu co TotalWage).</summary>
+        // 288 (Jeff 28.10: "no to bez sensu jest obniz koszta karawany o 50% dla calego swiata, czyli kupiec zbrojny 3 straznik 4 weteran 6"; klucz CaravanWageHalf):
+        // kazda karawana swiata (notabli, lordow, gracza) placi ludziom eskorty polowe zoldu. Ten sam punkt i ta sama arytmetyka co WW-J: Add(-(1 - udzial) x podstawa
+        // ludzi) - wynik modelu = podstawa x (1 + czynniki), wiec zold ludzi dokladnie x0.5 po czynnikach BK (kultura, karawana -25%, perki), a podpowiedz zoldu
+        // ma linie "Merchant escort wage". Tylko ludzie (nie bohaterowie): zold wodza-towarzysza gracza idzie z tabeli CW (CompanionWage, decyzja Jeffa) i
+        // CompanionWage.Pay liczy jego udzial jako nalezny x (wynik / podstawa) - ten stosunek Add nie zmienia. Karawana bez bohatera (prawie wszystkie) - cala
+        // podstawa (dokladnie); z bohaterem - podstawa ludzi ta sama formula co BK GetVanillaWage ((int)max(stawka x BaseWage, 1) x liczba, z Aid Corps tylko zdrowi),
+        // najwyzej cala podstawa. Kazdy czytelnik zoldu karawany (TotalWage: 259, 284, 285/286, 166, E3/4, sakiewki) widzi te sama liczbe; FullTotalWage - przed.
+        // Zloto nie powstaje: kiesa karawany (albo notabla) placi mniej, sakiewka ludzi (E3/4) dostaje mniej i mniej wydaje "na zycie" w miastach.
+        internal const float CaravanWageShare = 0.5f;
+        internal static bool CaravanHalfOn { get { var s = Settings.Current; return s != null && s.CaravanWageHalf; } }
+        private static TaleWorlds.Localization.TextObject _carTxt;
+        private static int _carStumbles;
+        private static bool _carErr;
+        internal static int CarStumbles { get { return _carStumbles; } }
+
+        private static void CaravanHalf(MobileParty mp, ref ExplainedNumber r)
+        {
+            try
+            {
+                float b = r.BaseNumber;
+                if (!(b > 0f)) return;
+                float t = b;
+                var ros = mp.MemberRoster;
+                if (ros != null && ros.TotalHeroes > 0) t = Math.Min(b, TroopBase(mp));
+                if (!(t > 0f)) return;
+                if (_carTxt == null) _carTxt = new TaleWorlds.Localization.TextObject("{=!}Merchant escort wage (half pay)");
+                r.Add(-(1f - CaravanWageShare) * t, _carTxt);
+            }
+            catch (Exception e)
+            {
+                _carStumbles++;   // licznik potkniec (bez globalnego wylacznika - CLAUDE.md 7); pierwszy do pliku
+                if (!_carErr) { _carErr = true; try { Log.Error("MountedWage.CaravanHalf (288)", e); } catch { } }
+            }
+        }
+
+        /// <summary>288: podstawa zoldu ludzi (bez bohaterow) partii tak, jak liczy ja BK GetVanillaWage: (int)max(stawka jednostki x BaseWage, 1) x liczba
+        /// (z perkiem Aid Corps tylko zdrowi; jednostki bez kultury BK pomija). Stawka jednostki w tej partii - InParty (karawana bez premii konnego).</summary>
+        internal static float TroopBase(MobileParty mp)
+        {
+            var ros = mp != null ? mp.MemberRoster : null;
+            if (ros == null) return 0f;
+            float bw = CompanionWage.BaseWageNow();
+            bool aid = false;
+            try { aid = mp.HasPerk(TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Steward.AidCorps); } catch { aid = false; }
+            long sum = 0;
+            for (int i = 0; i < ros.Count; i++)
+            {
+                var el = ros.GetElementCopyAtIndex(i);
+                var c = el.Character;
+                if (c == null || c.IsHero || c.Culture == null || el.Number <= 0) continue;
+                int n = aid ? el.Number - el.WoundedNumber : el.Number;
+                if (n <= 0) continue;
+                sum += (long)CompanionWage.BkPerMan(InParty(c, mp), bw) * n;
+            }
+            return sum;
+        }
+
+        /// <summary>WW-J: zold partii bez polowy w lupie (linia doby "przed"; ta sama droga modelu zoldu co TotalWage). 288: takze bez polowy zoldu eskorty karawan.</summary>
         internal static int FullTotalWage(MobileParty mp)
         {
             bool was = _fullGold; _fullGold = true;
@@ -295,6 +353,7 @@ namespace Armoury
             };
             Log.Info("Zold konnych (160, premia " + (On ? "CZYNNA x" + Factor(s).ToString("0.00", inv) : "WYLACZONA") + "): dzien " + (int)CampaignTime.Now.ToDays
                      + " | " + F("partie rodow AI", lords, true) + " | " + F("gracz", player, true) + " | " + F("garnizony", gar, true) + " | " + F("karawany", car, false)
+                     + (CaravanHalfOn ? " (zold partii karawan ludzi x0.5 - 288, linia 'Karawany - zold eskorty')" : "")
                      + " | stawki jednostek z modelu zoldu (bez mnoznikow BK - BaseWage, kultura, garnizon -50%, perki - one mnoza zold partii po rowno, wiec procent premii jest ten sam)"
                      + "; latki: zold jednostki " + _wageModels + " modeli, zold partii " + _totalHooked.Count + ", werbunek AI " + _recruitHook + "/1.");
         }

@@ -1236,6 +1236,10 @@ Uzycie (Python 3, tylko odczyt):
                     H286-1 zold karawan <= wynik handlu; H286-2 rozbite karawany ostatnie 30 dob <= 2.5/d; H286-3 udzial wyplat 259 >= 0.25; H286-4 srebro w jukach do
                     bramki przeplywu; H286-5 stosunek cen rudy maleje; H286-6 segment 286 f5 spojny; H286-7 zwalniani najdrozsi za sile; H286-8 karawany gracza po
                     komunikacie; H286-9 INFO.
+--grupa karawany288: (28.10, paczka 288 noc/285-zold-srebro-ruda - Jeff 28.10 "obniz koszta karawany o 50% dla calego swiata ... kto pokrywa wyzywienie
+                    i nocleg w karawanie?"; Armoury/src/CaravanEscort.cs, MountedWage.cs) python -I tools/sprawdz_logi.py --grupa karawany288 <Armoury-*.log>
+                    (strumieniowo). Linia 'Karawany - zold eskorty i jedzenie w drodze (288)'. K288-S self-test; K288-0 linia co dobe, potkniecia 0; K288-1 zold
+                    karawan swiata po/przed 0.45-0.56; K288-2 stawki na czlowieka x0.5 (t1-3, t4, t5+); K288-3 jedzenie w drodze i zakupy przy wyjezdzie; K288-4 INFO.
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -77307,6 +77311,162 @@ def main(argv):
             return handel287_main(rest[0] if rest else None)
     return _handel287_main_prev(argv)
 
+
+# ------------------------------------------------------------ karawany288 (28.10, paczka 288 noc/285-zold-srebro-ruda: polowa zoldu eskorty karawan i jedzenie w drodze,
+#   Jeff 28.10 "no to bez sensu jest obniz koszta karawany o 50% dla calego swiata, czyli kupiec zbrojny 3 straznik 4 weteran 6 i kto pokrywa wyzywienie i nocleg
+#   w karawanie?"; Armoury/src/CaravanEscort.cs, MountedWage.cs CaravanHalf)
+#   python -I tools/sprawdz_logi.py --grupa karawany288 <Armoury-*.log>      (strumieniowo; progi na bieg 30-90 dob)
+# K288-S  self-test wyrazenia (linia jak w kodzie C#: CaravanEscort.Daily)
+# K288-0  linia co dobe (bez dziur), potkniecia 0 (linia i zold 288), ERROR CaravanEscort/CaravanHalf 0, linie nierozpoznane 0
+# K288-1  klucz TAK: zold karawan swiata po / przed w [0.45, 0.56] (bohaterowie-wodzowie karawan gracza biora pelny zold z tabeli CW); klucz NIE - x1.000
+# K288-2  stawki na czlowieka (karawany bez bohatera, ostatnia doba): po / przed w [0.47, 0.53] dla t1-3, t4, t5+; po: t1-3 1.5-3.5, t4 2.8-5.0, t5+ 4.2-7.5
+# K288-3  jedzenie (klucz TAK, od 4. doby): zjedzone >= 0.8 x potrzeba karawan w drodze (srednia dob), glodne <= 15% karawan w drodze, zakupy przy wyjezdzie > 0 zl,
+#         kupione <= brak (szt.)
+# K288-4  INFO: srednie (zold swiata, na czlowieka, jedzenie, zakupy na dobe, dni drogi)
+K288_G = "Karawany - zold eskorty i jedzenie w drodze (288): dzien "
+K288_ERR = ("ERROR in CaravanEscort.", "ERROR in MountedWage.CaravanHalf")
+_K288_RATE = r"(\S+)(?: \(przed (\S+), ludzi (\d+)\))?"
+K288_RE = re.compile(
+    r"^Karawany - zold eskorty i jedzenie w drodze \(288\): dzien (?P<d>\d+) \| klucze: polowa zoldu eskorty (?P<kh>TAK|NIE), jedzenie w drodze (?P<kf>TAK|NIE) "
+    r"\| zold karawan swiata: karawan (?P<cars>\d+) \(z bohaterem (?P<ch>\d+)\), ludzi (?P<men>\d+), zl/d przed (?P<wb>\d+), po (?P<wa>\d+) \(x(?P<x>[\d.]+|-)\), "
+    r"na czlowieka przed (?P<pmb>[\d.]+|-), po (?P<pma>[\d.]+|-) "
+    r"\| stawki na czlowieka po \(karawany bez bohatera\): kupiec zbrojny t1-3 " + _K288_RATE + r", straznik t4 " + _K288_RATE + r", weteran t5\+ " + _K288_RATE
+    + r", najemnicy karczmy " + _K288_RATE +
+    r" \| jedzenie: w drodze (?P<road>\d+) karawan, w miescie \(karczma z zoldu\) (?P<town>\d+), w bitwie (?P<bat>\d+), konwoje DTE (?P<conv>\d+); "
+    r"potrzeba (?P<need>[\d.]+) szt\., zjedzone (?P<eat>\d+), najedzone (?P<fed>\d+), glodne (?P<hun>\d+) \(brak (?P<lack>\d+) szt\., bez jedzenia (?P<empty>\d+)\), "
+    r"zywnosc w jukach po jedzeniu (?P<stock>\d+) "
+    r"\| zapas na droge przy wyjezdzie: wyjazdow (?P<dep>\d+) \(dni drogi srednio (?P<rd>[\d.]+|-)\), z zapasem w jukach (?P<enough>\d+), kupilo (?P<bc>\d+) karawan "
+    r"(?P<bu>\d+) z (?P<want>\d+) szt\. za (?P<bg>\d+) zl z kies karawan do kas (?P<bt>\d+) miast, bez towaru (?P<ng>\d+), bez kiesy (?P<np>\d+), konwoje DTE (?P<dc>\d+) "
+    r"\| potkniecia (?P<st>\d+) \(zold 288 (?P<sw>\d+)\), w sesji (?P<ss>\d+)$")
+K288_SAMPLE = ("Karawany - zold eskorty i jedzenie w drodze (288): dzien 109070 | klucze: polowa zoldu eskorty TAK, jedzenie w drodze TAK | zold karawan swiata: "
+               "karawan 490 (z bohaterem 3), ludzi 11208, zl/d przed 104000, po 52300 (x0.503), na czlowieka przed 9.28, po 4.67 | stawki na czlowieka po (karawany "
+               "bez bohatera): kupiec zbrojny t1-3 2.30 (przed 4.60, ludzi 4000), straznik t4 3.75 (przed 7.50, ludzi 4000), weteran t5+ 5.60 (przed 11.20, ludzi 2000), "
+               "najemnicy karczmy - | jedzenie: w drodze 420 karawan, w miescie (karczma z zoldu) 70, w bitwie 0, konwoje DTE 0; potrzeba 480.5 szt., zjedzone 470, "
+               "najedzone 410, glodne 10 (brak 12 szt., bez jedzenia 8), zywnosc w jukach po jedzeniu 9000 | zapas na droge przy wyjezdzie: wyjazdow 150 (dni drogi "
+               "srednio 3.2), z zapasem w jukach 90, kupilo 55 karawan 600 z 640 szt. za 9000 zl z kies karawan do kas 40 miast, bez towaru 3, bez kiesy 2, konwoje DTE 0 "
+               "| potkniecia 0 (zold 288 0), w sesji 0")
+
+
+def k288_collect(logp):
+    D = {"g": {}, "bad": 0, "err": 0, "errs": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(K288_ERR):
+                    D["err"] += 1
+                    if len(D["errs"]) < 3:
+                        D["errs"].append(s[:160])
+                continue
+            if s.startswith(K288_G):
+                a = K288_RE.match(s)
+                if a:
+                    D["g"][int(a.group("d"))] = a.groups(), a.groupdict()
+                else:
+                    D["bad"] += 1
+    return D
+
+
+def _k288_f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def k288_rows(rep, D):
+    g = D["g"]
+    days = sorted(g)
+    if not days:
+        rep.add("K288-0: linia 288 co dobe", "brak linii", "linia w kazdej dobie", False)
+        return
+    holes = [d for d in range(days[0], days[-1] + 1) if d not in g]
+    st = sum(int(g[d][1]["st"]) + int(g[d][1]["sw"]) for d in days)
+    rep.add("K288-0: linia co dobe, potkniecia 0, ERROR 0", f"dob {len(days)} (d{days[0]}-d{days[-1]}), dziur {len(holes)}, potkniec {st}, ERROR {D['err']}, nierozpoznanych {D['bad']}"
+            + (f"; {D['errs']}" if D["errs"] else ""), "dziur 0, potkniec 0, ERROR 0, nierozpoznanych 0", not holes and st == 0 and D["err"] == 0 and D["bad"] == 0)
+    last = g[days[-1]][1]
+    xs = [(_k288_f(g[d][1]["x"]), g[d][1]["kh"]) for d in days]
+    bad1 = [(d, x, k) for d, (x, k) in zip(days, xs) if x is not None and ((k == "TAK" and not 0.45 <= x <= 0.56) or (k == "NIE" and abs(x - 1.0) > 0.001))]
+    rep.add("K288-1: zold karawan swiata po / przed", f"ostatnia doba x{last['x']} (przed {last['wb']}, po {last['wa']} zl/d, klucz {last['kh']}); dob poza pasmem {len(bad1)}"
+            + (f" (np. {bad1[:3]})" if bad1 else ""), "TAK: 0.45-0.56; NIE: 1.000", not bad1)
+    grp = g[days[-1]][0]
+    # grupy stawek: po kolei (po, przed, ludzi) x 4 od indeksu 11 (po 11 nazwanych grupach)
+    base = 11
+    names = ["t1-3", "t4", "t5+", "najemnicy"]
+    lim = {"t1-3": (1.5, 3.5), "t4": (2.8, 5.0), "t5+": (4.2, 7.5)}
+    parts, ok2 = [], True
+    for i, nm in enumerate(names):
+        a, b, n = _k288_f(grp[base + 3 * i]), _k288_f(grp[base + 3 * i + 1]), grp[base + 3 * i + 2]
+        if a is None or b is None or not n:
+            parts.append(f"{nm} -")
+            continue
+        r = a / b if b > 0 else 0.0
+        parts.append(f"{nm} {a:.2f} (przed {b:.2f}, x{r:.3f}, ludzi {n})")
+        if last["kh"] == "TAK" and nm in lim:
+            lo, hi = lim[nm]
+            if not (0.47 <= r <= 0.53 and lo <= a <= hi):
+                ok2 = False
+    rep.add("K288-2: stawki na czlowieka (karawany bez bohatera, ostatnia doba)", "; ".join(parts),
+            "klucz TAK: po/przed 0.47-0.53; po t1-3 1.5-3.5, t4 2.8-5.0, t5+ 4.2-7.5 (klucz NIE - INFO)", ok2 if last["kh"] == "TAK" else None)
+    fd = [d for d in days[3:] if g[d][1]["kf"] == "TAK"]
+    if not fd:
+        rep.add("K288-3: jedzenie w drodze i zakupy", "brak dob z kluczem TAK od 4. doby", "od 4. doby", None if last["kf"] == "NIE" else False)
+    else:
+        need = sum(float(g[d][1]["need"]) for d in fd)
+        eat = sum(int(g[d][1]["eat"]) for d in fd)
+        road = sum(int(g[d][1]["road"]) for d in fd)
+        hun = sum(int(g[d][1]["hun"]) for d in fd)
+        bg = sum(int(g[d][1]["bg"]) for d in fd)
+        bu = sum(int(g[d][1]["bu"]) for d in fd)
+        want = sum(int(g[d][1]["want"]) for d in fd)
+        er = eat / need if need > 0 else 0.0
+        hr = hun / road if road > 0 else 0.0
+        rep.add("K288-3: jedzenie w drodze i zakupy", f"dob {len(fd)}: zjedzone {eat} z potrzeby {need:.0f} ({er:.2f}), glodne {hr:.1%} karawan w drodze, zakupy {bu} szt. z braku {want} za {bg} zl",
+                "zjedzone >= 0.8 x potrzeba, glodne <= 15%, zakupy > 0 zl, kupione <= brak", er >= 0.8 and hr <= 0.15 and bg > 0 and bu <= want)
+    n = len(days)
+    avg = lambda k: sum(float(g[d][1][k]) for d in days) / n
+    rep.add("K288-4: srednie na dobe", f"zold swiata przed {avg('wb'):.0f}, po {avg('wa'):.0f} zl/d; ludzi {avg('men'):.0f}, karawan {avg('cars'):.0f}; zjedzone {avg('eat'):.0f} szt./d, "
+            f"zakupy {avg('bu'):.0f} szt. za {avg('bg'):.0f} zl/d, wyjazdow {avg('dep'):.0f}/d; zywnosc w jukach {avg('stock'):.0f}", "INFO", None)
+
+
+def k288_selftest():
+    a = K288_RE.match(K288_SAMPLE)
+    if not a:
+        return "wyrazenie nie pasuje do wzoru linii"
+    if a.group("d") != "109070" or a.group("x") != "0.503" or a.group("bg") != "9000" or a.group("ss") != "0" or a.groups()[11] != "2.30" or a.groups()[20] != "-":
+        return f"zle grupy: {a.groups()[:24]}"
+    return None
+
+
+def karawany288_main(logp):
+    """karawany288 (28.10, paczka 288): K288-S, K288-0..K288-4 - opis w komentarzu nad stalymi K288_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = k288_selftest()
+    rep.add("K288-S: self-test wyrazenia (linia jak w kodzie C#: CaravanEscort.Daily)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazenia - NIE)", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("K288-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = k288_collect(logp)
+    print(f"plik: {logp} | linii 288 {len(D['g'])} (nierozpoznanych {D['bad']}), ERROR {D['err']}")
+    k288_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_karawany288_main_prev = main
+
+
+def main(argv):
+    # paczka 288: grupa karawany288 - opakowanie main jak handel287
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "karawany288":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return karawany288_main(rest[0] if rest else None)
+    return _karawany288_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
