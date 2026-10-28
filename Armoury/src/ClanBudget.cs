@@ -1493,7 +1493,8 @@ namespace Armoury
         /// <summary>Zwalnia z partii (albo zalogi) ludzi za `amount` zl zoldu dziennie (albo `amount` ludzi przy zoldzie 0), od najnizszego tieru (P3/W2: przy
         /// ReleaseAcrossTiers - losowo z calej partii, DrawAcross); mercsOnly - tylko najemnicy z karczmy (zawsze od najnizszego tieru).
         /// Ludzie do ludnosci BK wsi; czesc sakiewki partii do kiesy wsi (E5/B6: czesc ludzi w karczmie - do puli weteranow). Zwraca zwolnione (zl albo ludzi).</summary>
-        private static double ReleaseFrom(MobileParty mp, Settlement fortress, Clan c, double amount, bool menUnit, bool mercsOnly, bool garrison, CharacterObject keep = null)
+        private static double ReleaseFrom(MobileParty mp, Settlement fortress, Clan c, double amount, bool menUnit, bool mercsOnly, bool garrison, CharacterObject keep = null,
+            Dictionary<CharacterObject, int> plan = null)
         {
             var r = mp.MemberRoster;
             if (r == null || amount <= 0) return 0;
@@ -1520,7 +1521,8 @@ namespace Armoury
             // P3/W2: poza przebiegiem najemnikow z karczmy - liczby na stos z losowania czlowieka (take), potem to samo cialo petli co dotad (najwyzej jedno
             // ToVillage na stos); klucz wylaczony albo najemnicy - take == null i stara petla "od najnizszego tieru az do kwoty"
             var st0 = Settings.Current;
-            int[] take = !mercsOnly && st0 != null && st0.ReleaseAcrossTiers ? DrawAcross(stacks, wageModel, amount, menUnit) : null;
+            // 286 (CaravanGuards285.Plan286, klucz CaravanGuardByRoadStrength): karawana podaje, kogo odprawia (najdrozszych za sile) - liczby na stos z planu
+            int[] take = plan != null ? PlanTake(stacks, plan) : !mercsOnly && st0 != null && st0.ReleaseAcrossTiers ? DrawAcross(stacks, wageModel, amount, menUnit) : null;
             _relTav.Clear(); _relTavOn = true;      // E5/B6 (201): ToVillage dopisuje miasta karczm tego zwolnienia
             try
             {
@@ -1583,6 +1585,28 @@ namespace Armoury
             try { var o = mp.Party != null ? mp.Party.Owner : null; master = o != null && o.Culture != null ? o.Culture.CaravanMaster : null; } catch { master = null; }
             try { return (int)Math.Round(ReleaseFrom(mp, town, null, men, true, false, false, master)); }
             catch (Exception e) { Stumble("ReleaseCaravanGuards(285)", e); return 0; }
+        }
+
+        /// <summary>286: liczby na stos z planu karawany (stosy bez wpisu - 0).</summary>
+        private static int[] PlanTake(List<TroopRosterElement> stacks, Dictionary<CharacterObject, int> plan)
+        {
+            var t = new int[stacks.Count];
+            for (int i = 0; i < stacks.Count; i++) { int n; if (stacks[i].Character != null && plan.TryGetValue(stacks[i].Character, out n) && n > 0) t[i] = n; }
+            return t;
+        }
+
+        /// <summary>286 (CaravanGuards285.Recruit286, klucz CaravanGuardByRoadStrength): karawana odprawia ludzi z planu (najdrozsi za sile, ktorej droga nie potrzebuje) -
+        /// ta sama droga co ReleaseCaravanGuards 285 (ReleaseFrom: wies okregu miasta, karczma E4/10, ksiega ludzi M166, czesc sakiewki). Mistrz karawany nie odchodzi.
+        /// Zwraca, ilu odeszlo (0 - brak wsi z danymi BK albo wyjatek; nikt nie znika).</summary>
+        internal static int ReleaseCaravanGuards(MobileParty mp, Settlement town, Dictionary<CharacterObject, int> plan)
+        {
+            if (mp == null || town == null || plan == null || plan.Count == 0 || !mp.IsCaravan) return 0;
+            int men = 0; foreach (var kv in plan) men += Math.Max(0, kv.Value);
+            if (men <= 0) return 0;
+            CharacterObject master = null;
+            try { var o = mp.Party != null ? mp.Party.Owner : null; master = o != null && o.Culture != null ? o.Culture.CaravanMaster : null; } catch { master = null; }
+            try { return (int)Math.Round(ReleaseFrom(mp, town, null, men, true, false, false, master, plan)); }
+            catch (Exception e) { Stumble("ReleaseCaravanGuards(286)", e); return 0; }
         }
 
         // ------------------------------------------------------------ ludnosc BK (refleksja - wzor LosersFlee/Levy; tylko osady z danymi BK)

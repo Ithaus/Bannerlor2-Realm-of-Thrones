@@ -36,7 +36,7 @@ namespace Armoury
     /// celu idzie w postfiksie BK HourlyTickPartyImpl (karawana jeszcze w miescie, cel ustawiony); zwolnienie tylko wtedy (cel znany), bez celu nadwyzka czeka.
     /// Klucz NIE - tylko pomiar (potrzeba liczona, gra werbuje jak dotad). Linia doby "Straz karawan (285): dzien N". Wyjatek - licznik potkniec, gra jak dotad.
     /// </summary>
-    internal static class CaravanGuards285
+    internal static partial class CaravanGuards285
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const int GameKeepGold = 2000;   // RecruitmentCampaignBehavior.CheckRecruiting: karawana werbuje tylko przy kiesie > cena + 2000 (stala gry)
@@ -60,6 +60,7 @@ namespace Armoury
         {
             _day = -1; _band.Clear(); _seen.Clear(); _relDay.Clear(); _err.Clear(); _stumbleSess = 0;
             ZeroDay();
+            Reset286();
         }
 
         private static void ZeroDay()
@@ -78,7 +79,7 @@ namespace Armoury
         private static void NewDayIfNeeded(int today)
         {
             if (today == _day) return;
-            _day = today; _band.Clear();
+            _day = today; _band.Clear(); _route.Clear();
             if (_seen.Count > 2000) _seen.Clear();
             if (_relDay.Count > 2000) _relDay.Clear();
         }
@@ -141,9 +142,16 @@ namespace Armoury
             if (healthy <= 0 || !(str > 0f)) return -1;
             double perMan = str / healthy;
             double radius = Math.Max(1.0, MarketCarts.PerDay(s));
-            float band = BandNear(at, radius);
+            float band;
             var tgt = mp.TargetSettlement;
-            if (tgt != null && tgt != at && tgt.IsTown) band = Math.Max(band, BandNear(tgt, radius));
+            bool r286 = Road286On(s);
+            // 286 (klucz CaravanGuardByRoadStrength): przy znanym celu - najsilniejsza banda w dniu drogi od CALEJ drogi (odcinek miasto - cel), nie tylko od jej koncow
+            if (r286 && tgt != null && tgt != at) band = BandRoute(at, tgt, radius, mp.HasNavalNavigationCapability);
+            else
+            {
+                band = BandNear(at, radius);
+                if (tgt != null && tgt != at && tgt.IsTown) band = Math.Max(band, BandNear(tgt, radius));
+            }
             threat = band > 0f ? (int)Math.Ceiling(band / perMan) : 0;
             int cap, floor;
             CaravanSettle.CapFloor(mp, out cap, out floor);
@@ -156,7 +164,8 @@ namespace Armoury
                     if (el.Amount > 0 && el.EquipmentElement.Item != null) wealth += (long)el.Amount * Math.Max(0, el.EquipmentElement.ItemValue);
                 }
             v = cap > 0 ? Math.Min(1.0, wealth / (double)cap) : 1.0;
-            int need = baseN + (int)Math.Ceiling(Math.Max(0, threat - baseN) * v);
+            // 286: bez udzialu majatku - banda AI napada wedlug sily (przewaga lokalna > 1, DefaultMobilePartyAIModel), nie wedlug ladunku; v zostaje w linii (pomiar)
+            int need = baseN + (int)Math.Ceiling(Math.Max(0, threat - baseN) * (r286 ? 1.0 : v));
             return Math.Min(need, lim);
         }
 
@@ -201,6 +210,7 @@ namespace Armoury
                     if (tgt.IsTown && BandNear(tgt, Math.Max(1.0, MarketCarts.PerDay(s))) > BandNear(st, Math.Max(1.0, MarketCarts.PerDay(s)))) _depTgt++;
                 }
                 if (!s.CaravanGuardByRisk) return true;   // klucz NIE - tylko pomiar
+                if (Road286On(s)) return Recruit286(mp, st, s, today, first, player, dep, baseN, lim);   // 286: sila drogi, najdrozsi za sile odchodza pierwsi
                 if (men > need)
                 {
                     // recenzja: zwolnienie tylko przy wyjezdzie (potrzeba z banda miasta i celu), raz na dobe; bez celu (wjazd, postoj) straz czeka - inaczej odcinek
@@ -259,9 +269,9 @@ namespace Armoury
         }
 
         /// <summary>Najem z karczmy do potrzeby - warunki gry (karczma z najemnikami straz karawan albo najemnik, kiesa > cena + 2000), akcja gry ApplyRecruitMercenary.</summary>
-        private static void Hire(MobileParty mp, Settlement st, int want)
+        private static void Hire(MobileParty mp, Settlement st, int want, double strGap = 0, double k = 0)
         {
-            if (want <= 0) return;
+            if (want <= 0 && !(strGap > 0)) return;
             if (!_hireTried)
             {
                 _hireTried = true;
@@ -275,6 +285,14 @@ namespace Armoury
             if (md == null || (!md.HasAvailableMercenary(Occupation.CaravanGuard) && !md.HasAvailableMercenary(Occupation.Mercenary))) return;
             var troop = md.TroopType;
             if (troop == null) return;
+            // 286: brak sily wobec bandy drogi - ludzi tylu, ilu wnosi te sile jednostka karczmy (moc jednostki z modelu sily gry, mnoznik partii k)
+            if (strGap > 0 && k > 0)
+            {
+                double dp = Campaign.Current.Models.MilitaryPowerModel.GetDefaultTroopPower(troop);
+                if (dp > 0) want = Math.Max(want, (int)Math.Ceiling(strGap / (k * dp)));
+                want = Math.Min(want, Math.Max(0, mp.Party.PartySizeLimit - mp.MemberRoster.TotalManCount));
+            }
+            if (want <= 0) return;
             int price = Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(troop, mp.LeaderHero).RoundedResultNumber;
             int n = Math.Min(want, md.Number);
             int got = 0; long paid = 0;
@@ -325,6 +343,7 @@ namespace Armoury
               .Append(" na karawane), zold z modelu ").Append(wage).Append(" zl/d")
               .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
             Log.Info(sb.ToString());
+            try { Daily286(s, day); } catch (Exception e) { Stumble("Daily286", e); }   // 286: linia "Straz karawan wedlug sily drogi (286)" (przed zerowaniem licznikow potkniec)
             ZeroDay();
         }
     }

@@ -9580,6 +9580,22 @@ namespace Armoury
         [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
         public bool KsIronStockTrend { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Guards By Road Strength", HintText = "with Caravan Guards By Road And Cargo: a caravan keeps as much fighting strength as the strongest bandit band within a day of its whole road to the next town (bandits attack only when stronger), hires from the tavern only what that needs, and when it can spare men it pays off first those who cost the most for the strength they bring (veterans and tavern mercenaries before its own armed traders). Off = the 285 rule (bands near the two towns, scaled by cargo)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards by road strength, old surplus goods, iron mines by their own town (286)")]
+        public bool CaravanGuardByRoadStrength { get; set; } = true;
+
+        [SettingPropertyBool("Player Caravans Follow Road Guard Rule", HintText = "your own caravans follow the same road guard rule, starting the day after a message tells you (once per session); every pay-off is announced. Off = your caravans only hire up to the need and never pay anyone off", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards by road strength, old surplus goods, iron mines by their own town (286)")]
+        public bool CaravanGuardPlayerAfterNotice { get; set; } = true;
+
+        [SettingPropertyBool("Old Hoarded Caravan Goods Sell At Market Price", HintText = "a good caravans hoard (they stopped buying it - more in their packs than ten days of sales) that has lain in a pack for over 30 days no longer waits for a town that pays above cost: it goes at the day's price in small portions, like any good with no market", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards by road strength, old surplus goods, iron mines by their own town (286)")]
+        public bool CaravanAgedGlutSells { get; set; } = true;
+
+        [SettingPropertyBool("Ks Iron Mines Follow Their Own Town", HintText = "with Ks Iron Hands Follow Market: a mine whose own market town is already full of iron (stalls and iron on the road above twice the crafts' stock) loses hands at the weekly step even when the market as a whole is short - the shortage is filled by mines near empty towns and by carts from the full ones", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards by road strength, old surplus goods, iron mines by their own town (286)")]
+        public bool KsIronLocalGlut { get; set; } = true;
+
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsFollowMarket { get; set; } = true;
@@ -12706,6 +12722,10 @@ namespace Armoury
             s.CaravanGlutToShortTown = CaravanGlutToShortTown;
             s.KsIronFullCountsTransit = KsIronFullCountsTransit;
             s.KsIronStockTrend = KsIronStockTrend;
+            s.CaravanGuardByRoadStrength = CaravanGuardByRoadStrength;
+            s.CaravanGuardPlayerAfterNotice = CaravanGuardPlayerAfterNotice;
+            s.CaravanAgedGlutSells = CaravanAgedGlutSells;
+            s.KsIronLocalGlut = KsIronLocalGlut;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;

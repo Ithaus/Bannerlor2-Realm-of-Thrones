@@ -105,8 +105,37 @@ namespace Armoury
         private static readonly Dictionary<Town, Dictionary<ItemCategory, float>> _idx0 = new Dictionary<Town, Dictionary<ItemCategory, float>>();
         private static float _dropMax; private static string _dropWhere;
 
+        // 286 (klucz CaravanAgedGlutSells): stary towar w przesycie - liczniki od ostatniej linii 286 (CaravanGuards285.Daily286)
+        private static long _ag6Wait, _ag6T1N, _ag6T1G, _ag6T1C, _ag6BkN;
+        private static readonly Dictionary<string, long> _ag6By = new Dictionary<string, long>();
+
+        /// <summary>286: sprzedaz starego towaru w przesycie - T1 (t1 = true, sztuki, utarg, koszt) albo wypuszczenie do sprzedazy BK/gry (SellGuardPrefix - sztuki zadane).</summary>
+        internal static void NoteAged286(int n, long gross, long cost, ItemCategory cat, bool t1)
+        {
+            if (n <= 0) return;
+            if (t1) { _ag6T1N += n; _ag6T1G += gross; _ag6T1C += cost; } else _ag6BkN += n;
+            var id = cat != null ? (cat.StringId ?? "?") : "?";
+            long x; _ag6By.TryGetValue(id, out x); _ag6By[id] = x + n;
+        }
+
+        /// <summary>286: odcinek linii 286 i zerowanie licznikow.</summary>
+        internal static string Seg286()
+        {
+            var sb = new StringBuilder(240);
+            sb.Append("stary towar w przesycie (> ").Append(MaxAgeDays).Append(" dob, kupno stoi - bez czekania na rynek z zyskiem): ocen bez czekania ").Append(_ag6Wait)
+              .Append(", T1 na stracie ").Append(_ag6T1N).Append(" szt. za ").Append(_ag6T1G).Append(" zl (koszt ").Append(_ag6T1C).Append(" zl), BK i gra wypuszczone ")
+              .Append(_ag6BkN).Append(" szt. [");
+            var l = new List<KeyValuePair<string, long>>(_ag6By);
+            l.Sort((a, b) => b.Value.CompareTo(a.Value));
+            for (int i = 0; i < l.Count && i < 8; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].Key).Append(' ').Append(l[i].Value);
+            sb.Append(l.Count == 0 ? "-]" : "]");
+            _ag6Wait = _ag6T1N = _ag6T1G = _ag6T1C = _ag6BkN = 0; _ag6By.Clear();
+            return sb.ToString();
+        }
+
         internal static void Reset()
         {
+            _ag6Wait = _ag6T1N = _ag6T1G = _ag6T1C = _ag6BkN = 0; _ag6By.Clear();
             _book.Clear(); _visit.Clear(); _townLeft.Clear(); _townDay = -1; _bkBuyer = null; _blocks.Clear();
             _snapDone = false; _snapCaravans = 0; _snapUnits = _snapBk = _snapAvg = 0; _avgIdx.Clear(); _avgDay = -1;
             _bkBeh = null; _fLogs = _fItem = _fPrice = _fTime = null; _bkTried = false; _bkLogState = "nie czytany";
@@ -522,6 +551,11 @@ namespace Armoury
         private static bool AgeMarket(MobileParty mp, ItemObject it, double min, double keep, double age)
         {
             if (!(age > MaxAgeDays) || it == null || it.IsFood || it.ItemCategory == null || !(min > 0.0)) return false;
+            // 286 (klucz CaravanAgedGlutSells): towar w przesycie (kupno stoi - karawany swiata wioza wiecej niz 10 dob sprzedazy miastom, CaravanTrade284.GateShut)
+            // nie czeka na rynek z zyskiem - ten rynek bierze tylko tyle, ile sprzedaz (log 134a: srebro w jukach 2 326 = 90.5 doby sprzedazy, 'dlugo w jukach czeka'
+            // 2 394 ocen w dobie); stary towar (> 30 dob) schodzi na stracie porcjami T1 jak towar bez rynku (kupiec nie trzyma kapitalu w towarze bez konca)
+            var s286 = Settings.Current;
+            if (s286 != null && s286.CaravanAgedGlutSells && CaravanTrade284.GateShut(it.ItemCategory)) { _ag6Wait++; return false; }
             double e = CaravanTrade284.SellIdxOf(it.ItemCategory);
             if (!(e > 0.0)) return false;
             bool ok = Math.Max(1, it.Value) * e / (1.0 + Penalty(mp, it)) * keep >= min;
@@ -973,6 +1007,7 @@ namespace Armoury
                     {
                         r.LossN += moved; r.LossG += gross; r.LossCost += (long)cost;
                         switch (why) { case 1: _lDisband += moved; _lDisbandG += gross; break; case 2: _lCash += moved; _lCashG += gross; break; case 3: _lFull += moved; _lFullG += gross; break; case 4: _lFood += moved; _lFoodG += gross; break; default: _lAge += moved; _lAgeG += gross; break; }
+                        if (why == 5 && CaravanTrade284.GateShut(cat)) NoteAged286(moved, gross, (long)cost, cat, true);   // 286: stary towar w przesycie (licznik)
                     }
                     Visit v; if (!_visit.TryGetValue(mp, out v)) { v = new Visit { St = st }; _visit[mp] = v; }
                     v.Cats.Add(cat);

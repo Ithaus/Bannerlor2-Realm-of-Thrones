@@ -4326,6 +4326,18 @@ namespace Armoury
         public bool KsIronFullCountsTransit = true;         // with Ks Iron Hands Count Iron On The Road: the weekly step also counts the iron on its way to the towns when it decides the market is full (until now only when it decided it was short)
         public bool KsIronStockTrend = true;                // with Ks Iron Hands Follow Market: when the market is neither short nor full but its iron (stalls, carts on the road and caravan packs) grew since the last weekly step, the mines get fewer hands - the mines follow what is really used
 
+        // --- Caravan guards by road strength, old surplus goods, iron mines by their own town (286) ---
+        // Paczka 286 (28.10, Jeff: "napraw to, moze zold jest za wysoki ochrony? kolejna runda poprawek i test 90 dniowy"; autotest 134a, 30 dob): rozbite karawany
+        // 3.83/d wobec 2.23/d (straz 285 widziala bande tylko przy koncach drogi i ciela ja udzialem majatku), zold karawan 104 tys. zl/d wobec wyniku handlu +89 tys.
+        // (stawka jednostki karawany 9.68 zl na czlowieka wobec 5.26 w partiach rodow - same tiery 3-5, a zwolnienie 285 odprawialo od najnizszego tieru), srebro
+        // w jukach 2 326 = 90.5 doby sprzedazy (stary towar czekal na rynek z zyskiem), stosunek cen rudy 2.42 -> 3.59 (zrodla zalane wlasna ruda, krok f5 podnosil
+        // rece takze przy nich). CaravanGuards285.Road.cs, CaravanGuards285.cs, ClanBudget.cs, CaravanGoods.cs, CaravanTrade284.cs, StartCalibration.Ruda.cs.
+        // Nowe klucze (plik MCM Jeffa ma wszystkie stare).
+        public bool CaravanGuardByRoadStrength = true;      // with Caravan Guards By Road And Cargo: a caravan keeps as much fighting strength as the strongest bandit band within a day of its whole road to the next town (bandits attack only when stronger), hires from the tavern only what that needs, and when it can spare men it pays off first those who cost the most for the strength they bring (veterans and tavern mercenaries before its own armed traders). Off = the 285 rule (bands near the two towns, scaled by cargo)
+        public bool CaravanGuardPlayerAfterNotice = true;   // your own caravans follow the same road guard rule, starting the day after a message tells you (once per session); every pay-off is announced. Off = your caravans only hire up to the need and never pay anyone off
+        public bool CaravanAgedGlutSells = true;            // a good caravans hoard (they stopped buying it - more in their packs than ten days of sales) that has lain in a pack for over 30 days no longer waits for a town that pays above cost: it goes at the day's price in small portions, like any good with no market
+        public bool KsIronLocalGlut = true;                 // with Ks Iron Hands Follow Market: a mine whose own market town is already full of iron (stalls and iron on the road above twice the crafts' stock) loses hands at the weekly step even when the market as a whole is short - the shortage is filled by mines near empty towns and by carts from the full ones
+
         // --- Food follows the market under the start calibration (night 18.10) ---
         // Paczka f20-d4 (decyzja Jeffa 18.10 "4. b"): po D+49 (koniec sterowania rynku) podaz jedzenia i soli pod KS nie szla za cena - A7 wylaczona, Plan rusza tylko
         // prace domowa (fin93: Essos oliwki 0.14 T*, mieso 0.20, winogrona 0.33 przy indeksie 3-4.5; sol Essos 3.62 T*, ryby Westeros 3.28 T* i rosna). Ta sama regula

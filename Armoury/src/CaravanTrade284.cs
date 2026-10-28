@@ -419,7 +419,13 @@ namespace Armoury
                 if (it == null || !it.IsTradeGood || it.HasHorseComponent || it.ItemCategory == null || it.ItemCategory == DefaultItemCategories.PackAnimal) return;
                 if (!CaravanBulk.TradesForT1(mp) || MaterialOrders.HasContract(mp) || CaravanBulk.HasOrders(mp)) return;
                 if (CaravanBulk.Owns(it) && CaravanGoods.CostEstimated(mp, it)) return;   // surowiec masowy z kosztem z oszacowania - bez progu (jak CaravanBulk.Sell)
-                if (CaravanGoods.LossReason(mp, it, __1.Settlement) != 0) { if (bk) _bkExit++; else _vanExit++; return; }
+                int lr = CaravanGoods.LossReason(mp, it, __1.Settlement);
+                if (lr != 0)
+                {
+                    if (bk) _bkExit++; else _vanExit++;
+                    if (lr == 5 && GateShut(it.ItemCategory)) CaravanGoods.NoteAged286(__3, 0, 0, it.ItemCategory, false);   // 286: stary towar w przesycie (licznik)
+                    return;
+                }
                 double unit = CaravanGoods.UnitCost(mp, it);
                 if (!(unit > 0.0)) return;
                 int k = CaravanGoods.MaxAtCost(__1.Settlement.Town, __1.Settlement, mp, __2.EquipmentElement, __3, unit);
