@@ -1,5 +1,11 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 13:35 CET - Jeff: "napraw to, moze zold jest za wysoki ochrony? kolejna runda poprawek i test 90 dniowy" - paczka 286 w toku
+- Workflow wf_5a92f7bf-0f4 (skrypt workflows/scripts/poprawka-286-wf_5a92f7bf-0f4.js, bez args; resumeFromRunId), na galezi noc/285-zold-srebro-ruda (zb/n285).
+  Zakres: straz wedlug calej trasy (H285-3), stawka zoldu strazy karawan (tier najemnikow, zold tylko w drodze), srebro w jukach, rak przy zlozach mniej
+  przy zalanych zrodlach (RU282-3), karawany gracza ta sama regula po komunikacie. Potem AUTOTEST 90 DOB: testy-noc-204.ps1 -Runs kopia,bitwaN,probyN
+  -ProbyDays 90 (limit czasu liczy wrapper: 90 x 25 s + 10 min), grupy handel286/285/284 ruda282 + reszta, WGRANIE 135.
+
 ## DOPISEK 28.10 ok. 13:25 CET - WGRANIE 134 (133 + 285); LINIA GLOWNA = noc/285-zold-srebro-ruda (zb\n285); TYDZIEN 98% - stop nowych prac na tym koncie
 - 134a (f73fcbd8, Armoury 13ee0fc5): 4 bitwy + probyN 30 dob kod 0, ERROR 0. Wyniki m113\wyniki\grupy-134a\. handel285: H285-0 TAK, H285-2 TAK (ludzi na karawane
   35.1 -> 25.4, potrzeba 22.3), H285-5 TAK; NIE: H285-1 zold z modelu 148k -> 104k zl/d wobec wyniku handlu ok. +89k (blisko, ale wciaz wiecej), H285-3 rozbite
