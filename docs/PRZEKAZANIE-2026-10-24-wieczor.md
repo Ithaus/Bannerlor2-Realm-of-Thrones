@@ -1,5 +1,12 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 12:45 CET - 285 GOTOWE (f73fcbd8, Armoury 13ee0fc5), AUTOTEST 134a w toku
+- 285: 1fc91a09 + d101aea1 + recenzja f73fcbd8 (4 uwagi naprawione). CaravanGuards285.cs (CaravanGuardByRisk - straz wedlug najsilniejszej bandy w dniu drogi
+  od miasta i celu oraz wartosci ladunku; nadwyzka odprawiana przy wyjezdzie BK raz na dobe droga 166), tabela zamowien 10 surowcow (srebro, bawelna, glina;
+  TownMaterialOrderLuxuryInputs), CaravanGlutToShortTown, KsIronFullCountsTransit + KsIronStockTrend (f5 z droga i trendem). Grupa handel285 (H285-0..7).
+- AUTOTEST 134a (zadanie b677ht74u, m113/seria-134a.out.txt; testy-noc-204.ps1 kopia,bitwaN,probyN 30). Grupy handel285 handel284 ruda282 nruda karawany259
+  ksiega280 + reszta; potem WGRANIE 134 (DLL test/mfinal134a, stara 85a4c057).
+
 ## DOPISEK 28.10 ok. 11:50 CET - Jeff "Rob to!" (zold karawan, srebro, ceny rudy) - paczka 285 w toku (workflow wf_94a337d3-cfa)
 - zb/n285, galaz noc/285-zold-srebro-ruda od d7b23443 (= WGRANE 133). Skrypt workflows/scripts/paczka-285-wf_94a337d3-cfa.js (bez args; resumeFromRunId).
   Zakres: straz i zold karawan wedlug niebezpieczenstwa drogi i wartosci ladunku (bez placenia za postoj), srebro/bawelna/glina w tabeli zamowien (zmienna
