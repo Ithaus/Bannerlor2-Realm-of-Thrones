@@ -1,5 +1,11 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 23:15 CET - Jeff: zold karawan -50% dla calego swiata (kupiec 3, straznik 4, weteran 6) + kto placi jedzenie i nocleg - paczka 288 w toku
+- Workflow wf_b1c73599-411 (skrypt workflows/scripts/paczka-288-wf_b1c73599-411.js, bez args; resumeFromRunId) na noc/285-zold-srebro-ruda (zb/n285, od 352ebab2).
+  Klucz CaravanWageHalf (MountedWage.TotalPostfix), wszystkie odczyty zoldu karawan (259, 285/286, 284, 166, linie, grupy), jedzenie/nocleg karawan.
+- Jeff gra (sesja od 22:18, 135). Pytal o Efficient Campaigner (-25% zoldu w armii): BK BKPartyWageModel stosuje przy Army != null i HasPerk(perk, true)
+  (kwatermistrz); Jeff jest kwatermistrzem, poza armia brak obnizki - zgodnie z opisem perka.
+
 ## DOPISEK 28.10 ok. 21:45 CET - WGRANIE 135 (134 + 286 + 286b + 287); LINIA GLOWNA noc/285-zold-srebro-ruda (zb/n285)
 - 135c (90 dob, wyniki m113/wyniki/grupy-135c) wobec 134b: sprzedaz karawan 167 -> 1062 szt./d, mediana zysku karawan 54 -> 368 (7 dob), bramka zamknieta
   w 9% kategorii (bylo 100%), rozbite 4.21 -> 2.98/d (ostatnie 30 dob 3.27), miasta bez rudy 22.8 -> 7.9, udzial wyplat 0.128 -> 0.115, zelazo -28 -> -36/d,
