@@ -18,6 +18,11 @@ namespace Armoury
     /// Zwolnienie: nekajacy skonczony + ShieldsUpHoldSeconds, 60 s (MaxSeconds 148), wrog w 110 m, rozkaz szarzy, gracz przejal, odwrot, S4, klucz, koniec bitwy.
     /// Taktyka przestawila wagi w czasie postoju - przejecie od nowa (licznik "przejete znowu", kopia nowych wag), do limitu 60 s.
     /// Szyk gracza - nigdy. Glowny watek (pass co 1 s; tick druzyn nie biegnie rownolegle - jak Doctrine).
+    /// Poprawka 132b (autotest 132b A: "stoi 0 (marsz TAK)" - nie stanely: strona lamana 10, zwarcie 2; jedyny R4 zwolniony po 2 s "wrog w 110 m"): (1) bramka
+    /// strony byla odwrocona (Broke(nekajacy, ofiara) - u ofiary 3 rannych w ucieczce po dlugich lukach z 260 m) - teraz bez postoju tylko strona ofiary
+    /// w poscigu; (2) 110 m od nietknietego PIESZEGO szyku wroga (FI.FootGap, HFormsGaps) - jazda przy szyku i 2-osobowy szyk nekajacego nie sa "zwarciem";
+    /// (3) R5 takze po 3 szkodach od nekajacego w calej bitwie; (4) R4 - szyk ofiary frontem do nekajacego (FacingOrderLookAtDirection), zwrot wraca przy
+    /// zwolnieniu. Nekajacy testu dojezdza przed zwarciem armii (MarchToContact.PostSpeed - bez limitu tempa szyku).
     /// </summary>
     internal static partial class HorsePursuit
     {
@@ -30,6 +35,10 @@ namespace Armoury
             public float StopW, Start;
             public Threat T;
             public bool Army;
+            // poprawka 132b: R4 - szyk ofiary staje frontem do nekajacego (FacingOrder gry), poprzedni zwrot wraca przy zwolnieniu
+            public bool Faced;
+            public FacingOrder Facing0;
+            public Vec2 FaceDir;
         }
 
         private const int LEnd = 0, LTime = 1, LNear = 2, LCharge = 3, LPlayer = 4, LTactic = 5, LRetreat = 6, LS4 = 7, LKey = 8, LBattle = 9, LKinds = 10;
@@ -47,6 +56,9 @@ namespace Armoury
         private static bool _rBehTried;
         private static int _lR4, _lR5, _lR5F, _lRetake, _lLeft, _lNoEng, _lNoS2, _lNoBroke, _lNoMove;
         private static float _lSec;
+        // poprawka 132b: zwroty frontem do nekajacego (R4), postoje R5 z sumy szkod (3 szkody, nie tylko 3 w 5 s)
+        private static int _lFace, _lR5Sum;
+        private const float FaceTurnCos = 0.866f;   // nowy zwrot dopiero przy zmianie kierunku o 30 stopni (bez przestawiania szyku co pass)
 
         private static void HaltClear()
         {
@@ -56,6 +68,7 @@ namespace Armoury
             Array.Clear(LRel, 0, LRel.Length);
             _lR4 = _lR5 = _lR5F = _lRetake = _lLeft = _lNoEng = _lNoS2 = _lNoBroke = _lNoMove = 0;
             _lSec = 0f;
+            _lFace = _lR5Sum = 0;
         }
 
         private static List<BehaviorComponent> Beh(Formation f)
@@ -93,12 +106,14 @@ namespace Armoury
             return oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget;
         }
 
-        /// <summary>Szyk moze stanac: AI, nie gracza, w marszu, wrog dalej niz 110 m, bez odwrotu i szarzy, bez S4.</summary>
+        /// <summary>Szyk moze stanac: AI, nie gracza, w marszu, pieszy szyk wroga dalej niz 110 m, bez odwrotu i szarzy, bez S4.
+        /// Poprawka 132b: 110 m od nietknietego PIESZEGO szyku wroga (FootGap) - autotest 132b A: konnica sojusznika gracza przy lucznikach wroga i najblizszy
+        /// szyk z gry (takze 2-osobowy) dawaly "zwarcie 2" i zwolnienie "wrog w 110 m" po 2 s; jazda wokol szyku to powod postoju, nie przeszkoda.</summary>
         private static bool CanHalt(FI fi)
         {
             if (fi.Player || fi.Retreat || fi.F == null || fi.F.CountOfUnits <= 0 || fi.F.AI == null) return false;
             if (Halts.ContainsKey(fi.F)) return false;
-            if (fi.Gap <= HuntClose) { if (LNo(fi.F, 1)) _lNoEng++; return false; }
+            if (fi.FootGap <= HuntClose) { if (LNo(fi.F, 1)) _lNoEng++; return false; }
             if (Charging(fi.F) || Doctrine.S4Held(fi.F)) return false;
             if (!Moving(fi.F)) { if (LNo(fi.F, 2)) _lNoMove++; return false; }
             return true;
@@ -133,12 +148,16 @@ namespace Armoury
         {
             if (!_rHaltKey || t.Group || t.S == null) return 0;
             if (t.Hits + t.MeleeHits <= 0 && down <= 0) return 0;   // tylko po szkodzie (pudlo z daleka nie zatrzymuje wojska)
+            if (ReferenceEquals(t.S, _tA)) TestHarm(t, now);   // poprawka 132b: stan wroga w chwili pierwszej szkody nekajacego testu (marsz, wolna piechota)
             var fl = HForms[t.Side];
             Formation vf = t.VicF;
             if (vf == null) return 0;
             var team = vf.Team;
             if (team == null) return 0;
-            if (Broke(t.SSide, t.Side)) { _lNoBroke++; return 0; }
+            // poprawka 132b: bramka byla odwrocona - Broke(t.SSide, t.Side) = "strona nekajacego lamie strone ofiary" (u ofiary 3 rannych w ucieczce 143 przy
+            // wyzszym odsetku niz u nekajacego - w autotescie 132b po kilku strzalach dlugich lukow z 260 m, 10 + 25 odmow); szyk strony, ktora sie chwieje, staje
+            // i zwiera szereg - to wlasnie odpowiedz. Bez postoju tylko strona ofiary w poscigu (lamie strone nekajacego - szyki w szarzy 148, CanHalt i tak).
+            if (Broke(t.Side, t.SSide)) { _lNoBroke++; return 0; }
             if (Doctrine.S2On(team)) { _lNoS2++; return 0; }
             // recenzja 283 (4): pieszy przy swoim nietknietym szyku (gracz w swojej linii) - zwykla bitwa; nekajacy przed czolem szyku ofiary - szyk idzie dalej
             // (pod pociskami z przodu sie zwiera, nie staje - S2/141)
@@ -149,10 +168,12 @@ namespace Armoury
             if (!RearOrFlank(fl[vi], sp)) { if (LNo(vf, 4)) _lNoFront++; return 0; }
             int n = 0;
             int who = t.S.Index;
-            bool army = !LR5Who.Contains(who) && (t.Lone || t.Leader) && (down > 0 || t.Shots.Count >= _shots3);
+            // poprawka 132b: armia staje takze po 3 szkodach od tego nekajacego w calej bitwie (strzelec konny strzela co 2-3 s - "3 w 5 s" prawie nie wypada)
+            bool sum = t.Hits + t.MeleeHits >= _shots3;
+            bool army = !LR5Who.Contains(who) && (t.Lone || t.Leader) && (down > 0 || t.Shots.Count >= _shots3 || sum);
             if (army)
             {
-                // glowna piechota druzyny (najwiekszy szyk piechoty) dalej niz 110 m od wroga
+                // glowna piechota druzyny (najwiekszy szyk piechoty) dalej niz 110 m od pieszego szyku wroga (poprawka 132b: FootGap)
                 int best = -1, bn = 0;
                 for (int i = 0; i < fl.Count; i++)
                 {
@@ -161,7 +182,7 @@ namespace Armoury
                     bn = fi.N;
                     best = i;
                 }
-                if (best >= 0 && fl[best].Gap <= HuntClose) { army = false; if (LNo(fl[best].F, 1)) _lNoEng++; }
+                if (best >= 0 && fl[best].FootGap <= HuntClose) { army = false; if (LNo(fl[best].F, 1)) _lNoEng++; }
             }
             if (army)
             {
@@ -181,6 +202,7 @@ namespace Armoury
                 {
                     t.H5Used = true;   // recenzja 283 (M1): zuzyte tylko, gdy cos stanelo
                     LR5Who.Add(who);
+                    if (down <= 0 && t.Shots.Count < _shots3) _lR5Sum++;
                     _lR5++; _lR5F = LR5F.Count; if (ReferenceEquals(t.S, _tA)) _tHalt += k;
                     return k;
                 }
@@ -191,6 +213,8 @@ namespace Armoury
             var fv = fl[vi];
             if (fv.Ha) return 0;
             if (!CanHalt(fv) || !TakeHalt(fv.F, t, false, now)) return 0;
+            Halt h4;
+            if (Halts.TryGetValue(fv.F, out h4)) Face(h4, sp);   // poprawka 132b: szyk ofiary frontem do nekajacego
             t.H4Used = true;   // recenzja 283 (M1): zuzyte dopiero po przejeciu
             Mark4(vf, who);
             LR4F.Add(fv.F);
@@ -237,6 +261,35 @@ namespace Armoury
             }
         }
 
+        /// <summary>Poprawka 132b: R4 - szyk ofiary frontem do nekajacego (FacingOrderLookAtDirection gry; BehaviorStop sam zwrotu nie ustawia - szyk tarcz
+        /// stal plecami do konnego strzelca). Zwrot z chwili przejecia zapamietany, nowy dopiero przy zmianie kierunku o 30 stopni.</summary>
+        private static void Face(Halt h, Vec2 sp)
+        {
+            if (h == null || h.Army || h.F == null) return;
+            Vec2 c;
+            try { var mp = h.F.CachedMedianPosition; c = mp.IsValid ? mp.AsVec2 : h.F.CachedAveragePosition; } catch { return; }
+            if (!c.IsValid || !sp.IsValid) return;
+            Vec2 d = sp - c;
+            if (d.LengthSquared < 1f) return;
+            d = d.Normalized();
+            if (h.Faced && Vec2.DotProduct(d, h.FaceDir) >= FaceTurnCos) return;
+            if (!h.Faced) { h.Facing0 = h.F.FacingOrder; h.Faced = true; }
+            h.FaceDir = d;
+            h.F.SetFacingOrder(FacingOrder.FacingOrderLookAtDirection(d));
+            _lFace++;
+        }
+
+        /// <summary>Odleglosc szyku od nietknietego pieszego szyku wroga z tego passu (HForms); szyku nie ma w HForms - EnemyGap gry.</summary>
+        private static float FootGapOf(Formation f)
+        {
+            for (int s = 0; s < 2; s++)
+            {
+                var fl = HForms[s];
+                for (int i = 0; i < fl.Count; i++) if (ReferenceEquals(fl[i].F, f)) return fl[i].FootGap;
+            }
+            return MarchToContact.EnemyGap(f);
+        }
+
         /// <summary>Wagi to dalej nasze (taktyka ich nie przestawila).</summary>
         private static bool OursHalt(Halt h, List<BehaviorComponent> lst)
         {
@@ -270,6 +323,8 @@ namespace Armoury
                     }
                 }
                 if (h.Stop != null) h.Stop.WeightFactor = h.StopW;
+                // poprawka 132b: zwrot sprzed postoju (zachowania gry ustawiaja potem swoj)
+                if (h.Faced && h.F != null && h.F.CountOfUnits > 0) h.F.SetFacingOrder(h.Facing0);
             }
             catch (Exception e) { RStumble("HorsePursuit.NekaniePostojZwolnij", e); }
         }
@@ -295,6 +350,8 @@ namespace Armoury
                         Snap(h, lst);   // taktyka przestawila wagi (zmiana fazy) - od nowa, kopia nowych wag
                         _lRetake++;
                     }
+                    // poprawka 132b: R4 - front za nekajacym, poki zyje
+                    if (!h.Army && h.T != null && h.T.S != null && h.T.S.IsActive()) Face(h, h.T.S.Position.AsVec2);
                 }
                 catch (Exception e)
                 {
@@ -317,7 +374,7 @@ namespace Armoury
             if (Charging(f)) return LCharge;
             if (Doctrine.S4Held(f)) return LS4;
             if (now - h.Start >= MaxSeconds) return LTime;
-            if (MarchToContact.EnemyGap(f) <= HuntClose) return LNear;
+            if (FootGapOf(f) <= HuntClose) return LNear;   // poprawka 132b: pieszy szyk wroga (jak CanHalt)
             var t = h.T;
             bool live = t != null && t.S != null && Threats.TryGetValue(t.S, out var cur) && ReferenceEquals(cur, t);
             if (!live && (t == null || now - t.GoneAt >= _hold)) return LEnd;

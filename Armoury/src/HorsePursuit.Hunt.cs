@@ -116,6 +116,9 @@ namespace Armoury
             public int Fails;
             public bool Step;   // 283: lucznik na punkcie kroku (pozycja skryptowa - zdejmuje EndHunter)
             public int Blk;     // 283: passow z rzedu z FriendInWay silnika
+            public Vec2 StepAt = Vec2.Invalid;   // poprawka 132b: punkt kroku (ponowna pozycja z NoAttack / bez)
+            public bool Hold;                     // poprawka 132b: krok z NoAttack (nekajacy wrecz w zwarciu ze swoimi)
+            public Formation Home;                // poprawka 132b: R2 straz strzelcow - smycz od szyku strzezonego, nie od swojego
         }
 
         private struct FI
@@ -126,8 +129,10 @@ namespace Armoury
             public float R;
             public int N;
             public bool Cav, Ha, Foot, Rng, Player, Retreat, Charging;
-            public float Gap;      // 283: odleglosc do najblizszego szyku wroga (MarchToContact.EnemyGap)
+            public float Gap;      // 283: odleglosc do najblizszego szyku wroga (poprawka 132b: nietknietego - od IntactMin ludzi; bez takiego MarchToContact.EnemyGap)
             public bool Engaged;   // 283: w zwarciu (Gap <= ContactGap 25 m)
+            public float D;        // poprawka 132b: glebokosc szyku (Formation.Depth - miara EnemyGap)
+            public float FootGap;  // poprawka 132b: odleglosc do najblizszego nietknietego PIESZEGO szyku wroga (postoj R4/R5 - linia wroga, nie jezdzcy wokol)
             public bool Pf;        // 283: oslona skrzydla (BehaviorProtectFlank)
             public Agent Cap;      // 283: dowodca szyku (R6)
         }
@@ -464,17 +469,50 @@ namespace Armoury
                         try { fi.Retreat = FormRetreat(f); } catch { fi.Retreat = false; }
                         try { fi.Charging = ShieldsUp.FormCharging(f); } catch { fi.Charging = false; }
                     }
+                    fi.FootGap = float.MaxValue;
                     if (_rKey)
                     {
                         // 283: zwarcie szyku (ContactGap MarchToContact), oslona skrzydla, dowodca; szyk nie w zwarciu - cios w niego to nekanie (OnHit)
                         try { fi.Gap = MarchToContact.EnemyGap(f); } catch { fi.Gap = float.MaxValue; }
-                        fi.Engaged = fi.Gap <= MarchToContact.ContactGap;
+                        try { fi.D = f.Depth; } catch { fi.D = 0f; }
                         try { fi.Pf = f.AI != null && f.AI.ActiveBehavior is BehaviorProtectFlank; } catch { fi.Pf = false; }
                         try { fi.Cap = f.Captain; } catch { fi.Cap = null; }
-                        QuietSet(f, fi.Engaged);
                     }
                     else fi.Gap = float.MaxValue;
                     HForms[s].Add(fi);
+                }
+            }
+            if (_rKey) HFormsGaps();
+        }
+
+        /// <summary>Poprawka 132b: odleglosc do szyku wroga liczona po szykach stron z tego passu, tylko od nietknietych (IntactMin ludzi 148 - jak "samotny").
+        /// Autotest 132b: Gap z CachedClosestEnemyFormation gry bral kazdy szyk wroga - 2 piesi lucznicy proby B (szyk 1 gracza "l2") albo szyk gracza jadacy za nim
+        /// robily z szyku ofiary "zwarcie" (piechota 283 nie szla, postoj nie stawal). Ta sama miara co EnemyGap (mediany minus pol glebokosci obu). FootGap - tylko
+        /// piesze szyki wroga (piechota, lucznicy): postoj R4/R5 trzyma odleglosc od linii wroga, a jezdzcy wokol szyku sa powodem postoju, nie przeszkoda
+        /// (sredniowieczna odpowiedz na jazde - stanac i zewrzec szyk). Bez nietknietego szyku wroga - Gap z gry jak dotad.</summary>
+        private static void HFormsGaps()
+        {
+            for (int s = 0; s < 2; s++)
+            {
+                var fl = HForms[s];
+                var el = HForms[1 - s];
+                for (int i = 0; i < fl.Count; i++)
+                {
+                    var fi = fl[i];
+                    float g = float.MaxValue, gf = float.MaxValue;
+                    for (int j = 0; j < el.Count; j++)
+                    {
+                        var e = el[j];
+                        if (e.N < IntactMin) continue;
+                        float d = Math.Max(0f, fi.C.Distance(e.C) - 0.5f * (fi.D + e.D));
+                        if (d < g) g = d;
+                        if (e.Foot && d < gf) gf = d;
+                    }
+                    if (g < float.MaxValue) fi.Gap = g;
+                    fi.FootGap = gf;
+                    fi.Engaged = fi.Gap <= MarchToContact.ContactGap;
+                    fl[i] = fi;
+                    QuietSet(fi.F, fi.Engaged);
                 }
             }
         }
@@ -733,7 +771,7 @@ namespace Armoury
             if (h.Role == RoleFoot)
             {
                 // 283 R8: smycz 50 m od szyku (InfRearm), 60 s (MaxSeconds 148), konny nekajacy (nie w walce wrecz) dalej niz 30 m - piechota konia nie dogoni
-                float dh = a.Position.AsVec2.Distance(FootHome(h.F));
+                float dh = FootLeash(h, a.Position.AsVec2);   // poprawka 132b: straz strzelcow - od drogi do szyku strzezonego
                 if (dh > _rFootFar) _rFootFar = dh;
                 if (dh > MarchToContact.InfRearm) return ULeash;
                 if (now - h.Start >= MaxSeconds) return UTime;

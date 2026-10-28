@@ -28,6 +28,13 @@ namespace Armoury
     /// skrzydla 30 m za jej szerokoscia, HuntScreen; potem wzdluz skrzydla na glebokosc celu; potem prosto), na miejscu postoj (pozycja skryptowa nowa dopiero, gdy
     /// punkt odjedzie o 8 m - strzelec stoi i strzela; wczesniej nowa pozycja co 0.25 s), B / C limit 180 s (pieszo dluzsza droga), linie "faza obejscie / skrzydlo
     /// / cel / miejsce / stan" (stan co 30 s: etap, do punktu, od szyku celu, od swoich - samotny, strzalow, predkosc) - dowod drogi w nastepnym autotescie.
+    /// Poprawka 132b (autotest 132b: A na miejscu po 70 s, B po 171 s przy 1.0-1.2 m/s, C po 122 s - armie juz w zwarciu, B skonczyl "brak pieszego szyku wroga"
+    /// przy zwyciestwie): bez capu marszu nekajacy dalej szedl tempem szyku - gra liczy limit czlowieka w szyku z Formation.CachedMovementSpeed (latka 1
+    /// MarchToContact obniza ja do tempa marszu), a PostSpeed tylko nie obnizal dalej. Teraz PostSpeed zdejmuje limit nekajacego testu (-1, czlowiek i kon).
+    /// Stan wroga do progow (wrog w marszu, wolna piechota) - z chwili pierwszej szkody od nekajacego (HaltAsk -> TestHarm, linia "faza szkoda"), nie z wyboru
+    /// 8 s po rozstawieniu: marsz = szyk ofiary w marszu i pieszy szyk wroga dalej niz 110 m (warunek R4), wolna piechota = szyki piechoty wroga nie w zwarciu
+    /// do 110 m od nekajacego (zasieg R2 ze straza strzelcow). B - cel najwiekszy szyk piechoty wroga (nie najblizszy - staly cel drogi); koniec bez szyku
+    /// wroga - "wrog rozbity".
     /// </summary>
     internal static partial class HorsePursuit
     {
@@ -59,6 +66,7 @@ namespace Armoury
         private static Vec2 _tWay = Vec2.Invalid, _tSet = Vec2.Invalid, _tHoldP = Vec2.Invalid;
         private static bool _tInPlace, _tPlaced;
         private static float _tStatAt;
+        private static bool _tHarmed;   // poprawka 132b: stan wroga z chwili pierwszej szkody (TestHarm)
 
         private static void HuntTestBegin(Settings c)
         {
@@ -90,6 +98,47 @@ namespace Armoury
             _tWay = _tSet = _tHoldP = Vec2.Invalid;
             _tInPlace = _tPlaced = false;
             _tStatAt = 0f;
+            _tHarmed = false;
+        }
+
+        /// <summary>Poprawka 132b: HaltAsk przy pierwszej szkodzie od nekajacego testu - stan wroga do progow sprawdz_logi (TEST koniec: wrog w marszu, wolnej
+        /// piechoty wroga) i linia "faza szkoda".</summary>
+        private static void TestHarm(Threat t, float now)
+        {
+            if (_tHarmed || !_tOn || _tState != 1 || t == null || t.S == null) return;
+            _tHarmed = true;
+            Vec2 sp = t.S.Position.AsVec2;
+            var fl = HForms[t.Side];
+            bool march = false;
+            float vg = -1f;
+            int free = 0, forms = 0;
+            for (int i = 0; i < fl.Count; i++)
+            {
+                var fi = fl[i];
+                if (fi.Player || fi.Retreat || fi.F == null) continue;
+                if (ReferenceEquals(fi.F, t.VicF))
+                {
+                    vg = fi.FootGap;
+                    try { march = !fi.Ha && Moving(fi.F) && fi.FootGap > HuntClose; } catch { march = false; }
+                }
+                if (fi.Foot && !fi.Rng && !fi.Cav && !fi.Engaged && Math.Max(0f, sp.Distance(fi.C) - fi.R) <= HuntClose) { free += fi.N; forms++; }
+            }
+            _tMarch = march;
+            _tFreeInf = free;
+            _tInfForms = forms;
+            TestPhase("szkoda", now, " (szyk ofiary " + (t.VicF != null ? t.VicF.FormationIndex.ToString() : "-") + ", od pieszego szyku wroga "
+                      + (vg >= 0f && vg < float.MaxValue ? F0(vg) : "-") + " m, wrog w marszu " + (march ? "TAK" : "NIE") + ", wolnej piechoty wroga w "
+                      + F0(HuntClose) + " m " + free + " (szykow " + forms + "), " + TestOwnTxt(t.S, sp) + ", strzalow " + _tShots + ")");
+        }
+
+        /// <summary>Poprawka 132b: koniec bez szyku wroga - wrog rozbity albo naprawde brak pieszego szyku.</summary>
+        private static string TestNoForm(Agent a, string what)
+        {
+            int ps = a != null ? SideOf(a.Team) : -1;
+            if (ps < 0) return what;
+            var fl = HForms[1 - ps];
+            for (int i = 0; i < fl.Count; i++) if (fl[i].F != null && fl[i].F.CountOfUnits > 0) return what;
+            return "wrog rozbity (bez szyku wroga)";
         }
 
         /// <summary>283a: MarchToContact.PostSpeed / CapFor (watki robocze) - nekajacy testu w polu (bez capu marszu i oddechu szyku, jak jezdziec 204).</summary>
@@ -168,7 +217,7 @@ namespace Armoury
             {
                 // C: wojownik wrecz walczy dalej (cel - najblizszy lucznik wroga, po jego upadku nastepny); 283a: droga skrzydlem, bez postoju
                 if (pass || _tTgt == null || !_tTgt.IsActive()) TestTarget(m, a);
-                if (_tF == null || _tTgt == null) { TestEnd(m, "brak celu", now); return; }
+                if (_tF == null || _tTgt == null) { TestEnd(m, TestNoForm(a, "brak celu"), now); return; }
                 TestGo(m, a, _tTgt.Position.AsVec2, now, pass, false);
                 return;
             }
@@ -195,7 +244,7 @@ namespace Armoury
                 return;
             }
             if (pass || _tF == null || _tF.CountOfUnits <= 0 || _tTgt == null || !_tTgt.IsActive()) TestTarget(m, a);
-            if (_tF == null) { TestEnd(m, "brak pieszego szyku wroga", now); return; }
+            if (_tF == null) { TestEnd(m, TestNoForm(a, "brak pieszego szyku wroga"), now); return; }
             TestGo(m, a, StandPoint(_tF, ap), now, pass, true);
         }
 
@@ -509,7 +558,8 @@ namespace Armoury
                     if (fi.F == null || fi.F.CountOfUnits <= 0) continue;
                     if (pass == 0 && (_tScen == 1 ? !(fi.Foot && !fi.Rng) : !fi.Rng)) continue;
                     if (pass == 1 && !fi.Foot) continue;
-                    float d = ap.Distance(fi.C);
+                    // poprawka 132b: B - najwiekszy szyk piechoty wroga (potem najwiekszy pieszy), staly cel drogi skrzydlem; reszta - najblizszy
+                    float d = _tScen == 1 && pass < 2 ? -fi.N : ap.Distance(fi.C);
                     if (d < bd) { bd = d; best = i; }
                 }
                 if (best >= 0) _tBehind = _rKey && _tScen != 2 && pass == 0;

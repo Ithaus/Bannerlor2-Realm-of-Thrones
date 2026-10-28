@@ -74232,6 +74232,10 @@ N283_RX = {
     # postoj nie przed czolem i nie dla pieszego przy swoich (R4/R5)
     "rev": re.compile(r"\| recenzja 283: cel AI na wodza bez trafienia (\d+); piechota: nekajacy poza smycza (\d+), przerwa po powrocie (\d+); lucznicy: wstrzymani "
                       r"przy odpowiedzi (\d+), zdjeci (\d+); postoj: z przodu (\d+), pieszy przy swoich (\d+) \|"),
+    # poprawka 132b (283c): swoi przy celu (zwarcie / rozrzut / zdjeci / krok bez strzalu, zapytania), straz strzelcow (R2 do 110 m), postoj frontem do nekajacego,
+    # armia z sumy szkod (R5)
+    "fix": re.compile(r"\| poprawka 132b: lucznicy - swoi przy celu: zwarcie (\d+), rozrzut (\d+), zdjeci (\d+), krok bez strzalu (\d+) \(zapytan (\d+)\); "
+                      r"piechota: straz strzelcow (\d+) \(szykow (\d+)\); postoj: frontem do nekajacego (\d+), armia z sumy szkod (\d+) \|"),
     "start": re.compile(r"^Nekanie \(283\) start: nekajacy (\S+) \((gracz|AI), (konno|pieszo), (\S+)\) \| rodzaj (konny strzelec|pieszy strzelec|konny wrecz|pieszy wrecz) "
                         r"\| wiersz ([R0-9 -]+) \| samotny (TAK|NIE) \| wodz (TAK|NIE) \| lucznikow (\d+), piechoty (\d+), jezdzcow (\d+), szykow stoi (\d+) \| tier (\d+) "
                         r"\| odleglosc od szyku (\d+) m$"),
@@ -74256,10 +74260,11 @@ N283_TEST = {
              "udany 4, limit 0), R2 piechota wyslani 6 (szykow 1), R3 jazda wolnej 10 / wyslanej 8 / w zwarciu zostala 0 / wyciagnieta 0 (wodz 0, wartosc szyku 0, lucznicy "
              "strony 0) / oslona przed jazda 0, R4 szyk staje 1, R5 armia staje 1 (szykow 3), R6 oslon wodza 0, R7 chorazego 0 | postoj: sekund 45, przejete znowu 1, "
              "puszczone: koniec 3, 60 s 0, wrog w 110 m 1, szarza 0, gracz 0, taktyka 0, odwrot 0, S4 0, klucz 0, koniec bitwy 0; nie stanely: zwarcie 2, S2 0, strona "
-             "lamana 0, bez marszu 1 | piechota wrocila: padl 1, smycz 50 m 2, czas 60 s 1, cel padl 2, zwarcie 0, konny uszedl 0, przy szyku nekajacego 0, panika 0, "
+             "ofiary w poscigu 0, bez marszu 1 | piechota wrocila: padl 1, smycz 50 m 2, czas 60 s 1, cel padl 2, zwarcie 0, konny uszedl 0, przy szyku nekajacego 0, panika 0, "
              "inne 0; nie wyslani: szyk w zwarciu 0, ponizej polowy 0, bohater 1, chorazy 0, zajety 0, przerwa 0, w zwarciu 0, przy szyku nekajacego 0, limit zapytan 0, "
              "panika 0 | recenzja 283: cel AI na wodza bez trafienia 1; piechota: nekajacy poza smycza 2, przerwa po powrocie 3; lucznicy: wstrzymani przy "
-             "odpowiedzi 4, zdjeci 5; postoj: z przodu 6, pieszy przy swoich 7 | wyniki padl od odpowiedzi 1, padl od innych 0, odpedzony 1, uszedl 0, koniec bitwy 1, inne 0; najdalej piechota 42 m, jazda 120 m; piechoty "
+             "odpowiedzi 4, zdjeci 5; postoj: z przodu 6, pieszy przy swoich 7 | poprawka 132b: lucznicy - swoi przy celu: zwarcie 8, rozrzut 9, zdjeci 10, "
+             "krok bez strzalu 11 (zapytan 12); piechota: straz strzelcow 13 (szykow 1); postoj: frontem do nekajacego 2, armia z sumy szkod 1 | wyniki padl od odpowiedzi 1, padl od innych 0, odpedzony 1, uszedl 0, koniec bitwy 1, inne 0; najdalej piechota 42 m, jazda 120 m; piechoty "
              "padlo 1 | FF od lucznikow 283 0 (strzalow 15) | z szyku gracza 0 (oczekiwane 0) | pod sterowaniem 283 na koniec 0 (oczekiwane 0) | zatrzymane szyki na "
              "koniec 0 (oczekiwane 0) | koszt passu sr. 0.300 / max 3.100 ms (passow 120; promieni najwiecej 30 na pass, limit 64) | test: scenariusz A, wykryc 9, "
              "epizodow 1, lucznikow 6, piechoty 0, jezdzcow 8, szykow stoi 3, wynik padl | potkniecia nekanie 0."),
@@ -74275,6 +74280,9 @@ N283_TEST = {
     # poprawka 132a: linie drogi nekajacego (HuntTest.cs TestRoute / TestGo / TestStat) - faza obejscie / skrzydlo / cel / miejsce / stan
     "tphase2": ("Nekanie (283) TEST C: nekajacy river_swordmaster#63 faza stan po 30.0 s (etap obejscie, do punktu 42 m, od szyku celu 61 m, od swoich 95 m, "
                 "samotny TAK, strzalow 0, predkosc 4.6 m/s, punkt poza polem 0)"),
+    # poprawka 132b: stan wroga przy pierwszej szkodzie od nekajacego testu (HuntTest.cs TestHarm)
+    "tphase3": ("Nekanie (283) TEST B: nekajacy blackwood_archer#110 faza szkoda po 64.2 s (szyk ofiary Infantry, od pieszego szyku wroga 140 m, wrog w marszu TAK, "
+                "wolnej piechoty wroga w 110 m 30 (szykow 1), od swoich 120 m, samotny TAK, strzalow 1)"),
     "tend": ("Nekanie (283) TEST koniec: scenariusz A, nekajacy vlandian_horse_archer#211, wynik padl po 30.0 s | strzalow 12, wykryc 14, epizodow 1, lucznikow na cel 6, "
              "piechoty 0, jezdzcow 8, szykow stoi 3 | wolnej piechoty wroga 30, wolnej jazdy wroga 6, lucznikow wroga 8, wrog w marszu TAK"),
 }
@@ -74293,6 +74301,7 @@ def nekanie283_selftest():
         "r3": ("10", "8", "0", "0", "0", "0", "0", "0"), "r45": ("1", "1", "3", "0", "0"),
         "halt": ("45", "1", "3", "0", "1", "0", "0", "0", "0", "0", "0", "0"),
         "rev": ("1", "2", "3", "4", "5", "6", "7"),
+        "fix": ("8", "9", "10", "11", "12", "13", "1", "2", "1"),
         "ff": ("0", "15"), "player": ("0",), "left": ("0",), "halted": ("0",), "cost": ("0.300", "3.100", "120", "30", "64"), "stum": ("0",),
     }
     for k, v in exp.items():
@@ -74326,6 +74335,9 @@ def nekanie283_selftest():
     m = RX["tphase"].match(T["tphase2"])
     if not m or m.groups() != ("C", "river_swordmaster#63", "stan", "30.0"):
         return "tphase2"
+    m = RX["tphase"].match(T["tphase3"])
+    if not m or m.groups() != ("B", "blackwood_archer#110", "szkoda", "64.2"):
+        return "tphase3"
     m = RX["tend"].match(T["tend"])
     if not m or m.groups() != ("A", "vlandian_horse_archer#211", "padl", "30.0", "12", "14", "1", "6", "0", "8", "3", "30", "6", "8", "TAK"):
         return f"tend: {m.groups() if m else 'brak dopasowania'}"
@@ -74490,7 +74502,7 @@ def nekanie283_rows(rep, D):
     # N283-6: INFO
     tot = {}
     for s in lines:
-        for k in ("det", "r1", "r1b", "r2", "r3", "r45", "rev"):
+        for k in ("det", "r1", "r1b", "r2", "r3", "r45", "rev", "fix"):
             mm = RX[k].search(s)
             if mm:
                 tot[k] = [a + int(b) for a, b in zip(tot.get(k, [0] * len(mm.groups())), mm.groups())]
@@ -74507,7 +74519,9 @@ def nekanie283_rows(rep, D):
             f"epizodow (linie startu) {len(st)}, na gracza {sum(1 for m in st if m.group(2) == 'gracz')}; R1 {r1[0]} (strzaly {r1[1]}), R1b promieni {r1b[0]} "
             f"(swoi {r1b[2]}, krok udany {r1b[5]}), R2 {r2[0]}, R3 wolnej {r3[0]} / wyslanej {r3[1]} / w zwarciu zostala {r3[2]} / wyciagnieta {r3[3]}, R4 {r45[0]}, "
             f"R5 {r45[1]} (szykow {r45[2]}), R6 {r45[3]}, R7 {r45[4]}; recenzja 283 " + (", ".join(str(x) for x in tot["rev"]) if "rev" in tot else "-")
-            + " (cel AI na wodza bez trafienia, piechota poza smycza, przerwa, lucznicy wstrzymani, zdjeci, postoj z przodu, pieszy przy swoich); wyniki "
+            + " (cel AI na wodza bez trafienia, piechota poza smycza, przerwa, lucznicy wstrzymani, zdjeci, postoj z przodu, pieszy przy swoich); poprawka 132b "
+            + (", ".join(str(x) for x in tot["fix"]) if "fix" in tot else "-")
+            + " (swoi przy celu: zwarcie, rozrzut, zdjeci, krok bez strzalu, zapytan; straz strzelcow, szykow; frontem do nekajacego, armia z sumy szkod); wyniki "
             + (", ".join(f"{k} {v}" for k, v in outs.items() if v) or "-"),
             "INFO: gra Jeffa - odpowiedzi na gracza (konno / pieszo / wrecz); autotest - nekajacy A/B/C", None)
 
@@ -74531,7 +74545,8 @@ def nekanie283_synth():
     bad_tend_a = T["tend"].replace("lucznikow na cel 6", "lucznikow na cel 0").replace("jezdzcow 8, szykow stoi 3", "jezdzcow 0, szykow stoi 0")
     bad_tend_b = tend_b.replace("piechoty 5", "piechoty 0").replace("jezdzcow 2, szykow", "jezdzcow 0, szykow")
     runs = {
-        "good": [nb2, T["tstart"], T["start"], T["end"], T["tend"], T["line"], nb2, T["tphase"], T["start2"], T["end"], tend_b, T["line"], nb2, T["tphase2"], tend_c, T["line"]],
+        "good": [nb2, T["tstart"], T["start"], T["end"], T["tend"], T["line"], nb2, T["tphase"], T["tphase3"], T["start2"], T["end"], tend_b, T["line"], nb2, T["tphase2"], tend_c,
+                 T["line"]],
         "bad": [nb2, T["tstart"], T["start"], bad_tend_a, bad_line, nb2, bad_tend_b, T["line"], "ERROR in HorsePursuit.NekanieWrecz: NullReferenceException"],
         "none": [nb2, T["tnone"], T["line"]],
         "empty": ["Armoury: inna linia"],

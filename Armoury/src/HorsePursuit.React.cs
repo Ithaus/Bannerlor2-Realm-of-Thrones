@@ -87,6 +87,9 @@ namespace Armoury
         private static readonly HashSet<int> RUnreachT = new HashSet<int>();
         private static float _rFootFar;
         private static int _rQOver, _rFfArch;   // Interlocked (OnHit)
+        // poprawka 132b: R2 straz strzelcow - oddzial z szyku piechoty dalej niz smycz (do 110 m), gdy nekajacy bije strzelcow / wodza / chorazego
+        private static int _rGuardN;
+        private static readonly HashSet<Formation> RGuardForms = new HashSet<Formation>();
 
         // ------------------------------------------------------------ poczatek / koniec misji
 
@@ -117,6 +120,8 @@ namespace Armoury
             _rFootFar = 0f;
             Interlocked.Exchange(ref _rQOver, 0); Interlocked.Exchange(ref _rFfArch, 0);
             HaltClear();
+            NearClear();                 // poprawka 132b
+            _rGuardN = 0; RGuardForms.Clear();
         }
 
         private static void RStumble(string where, Exception e)
@@ -438,6 +443,14 @@ namespace Armoury
                 if (!near) return 0;
             }
             RFormOrder.Clear();
+            // poprawka 132b (autotest 132b C: wojownik wrecz w lucznikach wroga, "piechoty 0 (wolnej 30)", a w linii bitwy zadnego "nie wyslani" - piechota wroga
+            // szla do zwarcia z armia gracza dalej niz smycz 50 m od nekajacego i odpadala bez licznika): straz strzelcow - gdy nekajacy bije strzelcow, wodza
+            // albo chorazego i stoi w smyczy od ich szyku, oddzial moze przyjsc z szyku piechoty do 110 m (HuntClose - zasieg odpowiedzi 204) od nekajacego,
+            // nie w zwarciu; smycz takiego czlowieka - od drogi miedzy jego szykiem a szykiem strzezonym (FootLeash), nie od jego szyku
+            Formation guard = null, gf = null;
+            if (t.Leader && t.LeaderF != null && t.LeaderF.CountOfUnits > 0) gf = t.LeaderF;
+            else if (t.VicF != null && t.VicF.CountOfUnits > 0 && (t.OnBanner || RangedF(t.VicF))) gf = t.VicF;
+            if (gf != null && sp.Distance(FootHome(gf)) <= MarchToContact.InfRearm) guard = gf;
             for (int i = 0; i < fl.Count; i++)
             {
                 var fi = fl[i];
@@ -446,23 +459,26 @@ namespace Armoury
                 bool own = lead || ReferenceEquals(fi.F, t.VicF);
                 float dm = sp.Distance(fi.C);
                 float e = Math.Max(0f, dm - fi.R);
-                if (!own && e > MarchToContact.InfRearm) continue;
+                bool far = !own && e > MarchToContact.InfRearm;
+                if (far && (guard == null || e > HuntClose)) continue;
                 if (fi.Player) continue;   // szyk gracza - nigdy
                 // recenzja 283 (3): nekajacy poza smycza 50 m od srodka szyku (InfRearm, smycz HunterCheck) - nieosiagalny, takze dla szyku ofiary i wodza (R1, jazda)
-                if (dm > MarchToContact.InfRearm) { RUnreachT.Add(t.S.Index); continue; }
+                if (!far && dm > MarchToContact.InfRearm) { RUnreachT.Add(t.S.Index); continue; }
                 if (fi.Engaged && !lead)
                 {
                     if (RFwSeenF.Add(fi.F)) Fw[FwEngaged] += fi.N;
                     continue;
                 }
-                RFormOrder.Add(new KeyValuePair<float, int>(lead ? -2f : (own ? -1f : e), i));
+                RFormOrder.Add(new KeyValuePair<float, int>(lead ? -2f : (own ? -1f : e), far ? (i | GuardBit) : i));
             }
             if (RFormOrder.Count == 0) return 0;
             if (RFormOrder.Count > 1) RFormOrder.Sort((x, y) => x.Key.CompareTo(y.Key));
             int sent = 0;
             for (int k = 0; k < RFormOrder.Count; k++)
             {
-                var fi = fl[RFormOrder[k].Value];
+                int idx = RFormOrder[k].Value;
+                var fi = fl[idx & ~GuardBit];
+                Formation home = (idx & GuardBit) != 0 ? guard : null;
                 int want = RWant(t, FormTier(fi.F), down) * (t.Leader ? 2 : 1);
                 int need = want - t.Foot;
                 if (need <= 0) break;
@@ -475,9 +491,31 @@ namespace Armoury
                     if (RFwSeen.Add(((long)fi.F.GetHashCode() << 8) | FwHalf)) Fw[FwHalf]++;
                     continue;
                 }
-                sent += TakeFoot(m, t, fi, Math.Min(need, room), now);
+                sent += TakeFoot(m, t, fi, Math.Min(need, room), now, home);
             }
             return sent;
+        }
+
+        private const int GuardBit = 1 << 20;   // poprawka 132b: indeks szyku strazy w RFormOrder
+
+        private static bool RangedF(Formation f)
+        {
+            try { var q = f.QuerySystem; return q != null && (q.IsRangedFormation || q.IsRangedCavalryFormation); } catch { return false; }
+        }
+
+        /// <summary>Poprawka 132b: smycz piechoty 283 - od srodka jej szyku, a u strazy strzelcow od odcinka miedzy jej szykiem i szykiem strzezonym
+        /// (biegnie ta droga; wraca, gdy odbiegnie od niej dalej niz InfRearm).</summary>
+        private static float FootLeash(Hunter h, Vec2 p)
+        {
+            Vec2 a = FootHome(h.F);
+            var g = h.Home;
+            if (g == null || g.CountOfUnits <= 0) return p.Distance(a);
+            Vec2 b = FootHome(g);
+            Vec2 ab = b - a;
+            float l2 = ab.LengthSquared;
+            float u = l2 > 0.01f ? Vec2.DotProduct(p - a, ab) / l2 : 0f;
+            if (u < 0f) u = 0f; else if (u > 1f) u = 1f;
+            return p.Distance(a + ab * u);
         }
 
         private static void NoteFw(Agent a, int why)
@@ -503,7 +541,7 @@ namespace Armoury
             return -1;
         }
 
-        private static int TakeFoot(Mission m, Threat t, FI fi, int cap, float now)
+        private static int TakeFoot(Mission m, Threat t, FI fi, int cap, float now, Formation home = null)
         {
             int left = _hScanCap - _hScan;
             if (left <= 0) { _hScanCut++; return 0; }
@@ -543,7 +581,8 @@ namespace Armoury
                     NoteFw(a, FwMelee);
                     continue;
                 }
-                StartHunter(t, a, fi, RoleFoot, 0f, now);
+                var hf = StartHunter(t, a, fi, RoleFoot, 0f, now);
+                if (home != null) { hf.Home = home; _rGuardN++; RGuardForms.Add(fi.F); }   // poprawka 132b: straz strzelcow
                 n++;
             }
             HCand.Clear();
@@ -639,7 +678,7 @@ namespace Armoury
               .Append(LRel[LTime]).Append(", wrog w ").Append(F0(HuntClose)).Append(" m ").Append(LRel[LNear]).Append(", szarza ").Append(LRel[LCharge]).Append(", gracz ")
               .Append(LRel[LPlayer]).Append(", taktyka ").Append(LRel[LTactic]).Append(", odwrot ").Append(LRel[LRetreat]).Append(", S4 ").Append(LRel[LS4]).Append(", klucz ")
               .Append(LRel[LKey]).Append(", koniec bitwy ").Append(LRel[LBattle]).Append("; nie stanely: zwarcie ").Append(_lNoEng).Append(", S2 ").Append(_lNoS2)
-              .Append(", strona lamana ").Append(_lNoBroke).Append(", bez marszu ").Append(_lNoMove)
+              .Append(", strona ofiary w poscigu ").Append(_lNoBroke).Append(", bez marszu ").Append(_lNoMove)
               .Append(" | piechota wrocila: padl ").Append(FEnd[UGone]).Append(", smycz ").Append(F0(MarchToContact.InfRearm)).Append(" m ").Append(FEnd[ULeash]).Append(", czas ")
               .Append(F0(MaxSeconds)).Append(" s ").Append(FEnd[UTime]).Append(", cel padl ").Append(FEnd[UThreat]).Append(", zwarcie ").Append(FEnd[UMelee]).Append(", konny uszedl ")
               .Append(FEnd[URange]).Append(", przy szyku nekajacego ").Append(FEnd[UIntact]).Append(", panika ").Append(FEnd[UPanic]).Append(", inne ")
@@ -650,6 +689,10 @@ namespace Armoury
               .Append(" | recenzja 283: cel AI na wodza bez trafienia ").Append(_rLeaderAim).Append("; piechota: nekajacy poza smycza ").Append(RUnreachT.Count)
               .Append(", przerwa po powrocie ").Append(_rFootCoolN).Append("; lucznicy: wstrzymani przy odpowiedzi ").Append(_rRespNear).Append(", zdjeci ").Append(_rRespDrop)
               .Append("; postoj: z przodu ").Append(_lNoFront).Append(", pieszy przy swoich ").Append(_lNoFootNear)
+              .Append(" | poprawka 132b: lucznicy - swoi przy celu: zwarcie ").Append(_rNearMelee).Append(", rozrzut ").Append(_rNearSpread).Append(", zdjeci ")
+              .Append(_rNearDrop).Append(", krok bez strzalu ").Append(_rNearHold).Append(" (zapytan ").Append(_rNearQ).Append("); piechota: straz strzelcow ")
+              .Append(_rGuardN).Append(" (szykow ").Append(RGuardForms.Count).Append("); postoj: frontem do nekajacego ").Append(_lFace).Append(", armia z sumy szkod ")
+              .Append(_lR5Sum)
               .Append(" | wyniki ");
             for (int i = 0; i < ROKinds; i++) sb.Append(i > 0 ? ", " : "").Append(ROName[i]).Append(' ').Append(ROutN[i]);
             sb.Append("; najdalej piechota ").Append(F0(_rFootFar)).Append(" m, jazda ").Append(F0(_hMaxFar)).Append(" m; piechoty padlo ").Append(_rFootLost)

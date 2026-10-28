@@ -238,7 +238,16 @@ namespace Armoury
         /// 144: szyk bez capu marszu - cap oddechu AiBreath (pieszy AI, ktory oszczedza sily), za wszystkimi wyjsciami (B1).</summary>
         private static void PostSpeed(Agent agent, float desiredSpeed, bool limitIsMultiplier)
         {
-            if ((!_on && !AiBreath.On) || agent == null) return;
+            if (agent == null) return;
+            // poprawka 132b: nekajacy autotestu (HorsePursuit.TestRunAnyThread - tylko LogGate.Mode 1, klucz HuntHarasserInAutotest) - bez limitu tempa szyku.
+            // Gra wpisuje tu limit czlowieka w szyku z Formation.CachedMovementSpeed (latka 1 obniza ja do tempa marszu) - samo pominiecie capu (283a) zostawialo
+            // tempo szyku: autotest 132b A 2.0 m/s przy swoim szyku, B 1.0-1.2 m/s przez 170 s. -1 = bez limitu (jak OnRetreating gry), takze kon.
+            if (HorsePursuit.TestRunAnyThread(agent))
+            {
+                try { agent.SetMaximumSpeedLimit(-1f, false); agent.MountAgent?.SetMaximumSpeedLimit(-1f, false); } catch { }
+                return;
+            }
+            if (!_on && !AiBreath.On) return;
             try
             {
                 var f = agent.Formation;
