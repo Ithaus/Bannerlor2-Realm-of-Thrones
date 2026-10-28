@@ -238,7 +238,16 @@ namespace Armoury
         /// 144: szyk bez capu marszu - cap oddechu AiBreath (pieszy AI, ktory oszczedza sily), za wszystkimi wyjsciami (B1).</summary>
         private static void PostSpeed(Agent agent, float desiredSpeed, bool limitIsMultiplier)
         {
-            if ((!_on && !AiBreath.On) || agent == null) return;
+            if (agent == null) return;
+            // poprawka 132b: nekajacy autotestu (HorsePursuit.TestRunAnyThread - tylko LogGate.Mode 1, klucz HuntHarasserInAutotest) - bez limitu tempa szyku.
+            // Gra wpisuje tu limit czlowieka w szyku z Formation.CachedMovementSpeed (latka 1 obniza ja do tempa marszu) - samo pominiecie capu (283a) zostawialo
+            // tempo szyku: autotest 132b A 2.0 m/s przy swoim szyku, B 1.0-1.2 m/s przez 170 s. -1 = bez limitu (jak OnRetreating gry), takze kon.
+            if (HorsePursuit.TestRunAnyThread(agent))
+            {
+                try { agent.SetMaximumSpeedLimit(-1f, false); agent.MountAgent?.SetMaximumSpeedLimit(-1f, false); } catch { }
+                return;
+            }
+            if (!_on && !AiBreath.On) return;
             try
             {
                 var f = agent.Formation;
@@ -255,6 +264,9 @@ namespace Armoury
                     // 204 (dawniej 157 P3): jezdziec w poscigu za konnym strzelcem (cel na czlowieku, pozycja skryptowa) - tez bez capu marszu / odpoczynku szyku;
                     // kon zajechany (HorseAiRestBelow) konczy poscig w HorsePursuit.Hunt; lucznicy z celem 204 (bez pozycji skryptowej) zostaja pod capem szyku
                     if (HorsePursuit.CounterAnyThread(agent)) { HorsePursuit.NoteCounterCapSkip(); return; }
+                    // 283a (poprawka 132a): nekajacy autotestu (pozycja skryptowa za szykiem wroga) - bez capu marszu swojego szyku (frey_rider w szyku piechoty
+                    // szedl 1.33 m/s z piechota); tylko LogGate.Mode 1 i klucz HuntHarasserInAutotest - w grze Jeffa zawsze false
+                    if (HorsePursuit.TestRunAnyThread(agent)) return;
                     var mount = agent.MountAgent;
                     if (mount != null && IsDragon(mount)) { Interlocked.Increment(ref _postDragon); return; }
                     bool catchUp = desiredSpeed < 0f;
@@ -279,6 +291,9 @@ namespace Armoury
                 // 144: oddech AI - tylko pieszy w szyku, nie uciekajacy, nie odlaczony, nie gracz sieci, nie w odwrocie (B1); zapis tylko przy obnizeniu
                 if (!AiBreath.On) return;
                 if (agent.IsRunningAway || agent.IsDetachedFromFormation || agent.MissionPeer != null || agent.MountAgent != null) return;
+                // 283: pieszy oddzial na nekajacego (HorsePursuit R2, pozycja skryptowa, _countering) biegnie - bez capu oddechu, jak jezdziec 204 bez capu marszu
+                if (HorsePursuit.CounterAnyThread(agent)) { HorsePursuit.NoteCounterCapSkip(); return; }
+                if (HorsePursuit.TestRunAnyThread(agent)) return;   // 283a: nekajacy autotestu - bez capu oddechu
                 bool cu = desiredSpeed < 0f;
                 if (cu && agent.IsRetreating()) return;
                 float bc = AiBreath.CapOf(agent);
@@ -795,6 +810,8 @@ namespace Armoury
         {
             breath = false;
             if (a == null || !a.IsAIControlled || a.IsRunningAway) return -1f;
+            if (HorsePursuit.CounterAnyThread(a)) return -1f;   // 283: pieszy oddzial na nekajacego - kara FieldCraft bez gornego capu marszu / oddechu (jak PostSpeed)
+            if (HorsePursuit.TestRunAnyThread(a)) return -1f;   // 283a: nekajacy autotestu - jak wyzej
             var f = a.Formation;
             if (_on)
             {

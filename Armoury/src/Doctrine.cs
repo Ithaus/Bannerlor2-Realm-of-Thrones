@@ -352,6 +352,24 @@ namespace Armoury
             _on = AnyKey(c) && m != null && m.IsFieldBattle && _patched + _patchedAttack > 0;
         }
 
+        /// <summary>283 (HorsePursuit.ReactHalt, glowny watek): szyk trzymany teraz przez S4 (lucznicy za piechota - wagi zachowan przejete) - postoj 283 go
+        /// nie bierze i puszcza swoj, gdy S4 wejdzie (dwa przejecia wag jednego szyku nigdy naraz).</summary>
+        internal static bool S4Held(Formation f)
+        {
+            if (f == null) return false;
+            for (int i = 0; i < Slots; i++)
+                if (_sBack[i] && ReferenceEquals(_sWho[i], f)) return true;
+            return false;
+        }
+
+        /// <summary>283 (HorsePursuit.ReactHalt, glowny watek): S2 (141) dziala dla druzyny - obronca idzie pod strzalami do zwarcia; armia nie staje (R5).</summary>
+        internal static bool S2On(Team t)
+        {
+            if (t == null) return false;
+            int ti = t.TeamIndex;
+            return ti >= 0 && ti < MaxTeams && _s2Live[ti] && ReferenceEquals(_s2Ref[ti], t);
+        }
+
         /// <summary>Ktorykolwiek klucz doktryny i manewrow (WarCouncil.Council biegnie takze przy CommanderTactics NIE, gdy ten jest TAK).</summary>
         internal static bool AnyKey(Settings c)
         {
