@@ -1,5 +1,14 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 23:30 CET - log Jeffa na 135 (sesja 22:18, doby 109025-109045): gospodarka zamknieta, wojna
+- ARYTMETYKA OK; war241/karawany259/rownowaga274/pokoj264 bez NIE. Handel 287: sprzedaz karawan miastom 1524 szt./d, kupno stoi w 10 z 36 kategorii, w jukach
+  39 724 szt.; mediana wyniku handlu karawany 10 zl/d wobec zoldu 169 zl/d (tylko 62 z 449 >= zold) - po 288 (-50%) dalej za malo: nastepny krok - czemu obrot
+  na karawane taki maly przy marzy 78% (juki 26 dob sprzedazy, malo kursow?). Karawana Jeffa: netto -19 676 w 42 dobach (zold 20 295, wyplaty 1 819).
+  Srebrnik Seagard: zysk dnia 875, wyplata 437. Braki surowcow 206 -> 156, ruda w jukach 2246 -> 1406.
+- Wojna: unia 272 zrobiona (Dorzecze zniszczone, Robb krol Polnocy, gracz najemnik battania). A (Polnoc+Dorzecze) sila 21 056 / 113 partii / 39 twierdz
+  (start 38) wobec B (korona) 13 695 / 67 / 18 (start 19); B/A 0.650 (pasmo 0.67-1.5, poza 43 doby, dzwignie dla B czynne); 28 dob: A 11 bitew 3 oblezenia,
+  B 11 bitew 0 oblezen. Pokoj korona-Polnoc zablokowany do Krwawych Godow (wniosek Marbranda 109043).
+
 ## DOPISEK 28.10 ok. 23:25 CET - Jeff: Efficient Campaigner ma dzialac CALY CZAS, nie tylko w armii
 - Jeff: "tak nie tylko w armii efektywny campaigner oznacza ze caly czas a nie ze w armii". DO ZROBIENIA po 288 (ten sam plik MountedWage.cs - nie rownolegle):
   w TotalPostfix GetTotalWage, gdy partia NIE w armii i HasPerk(Steward.EfficientCampaigner, true) (kwatermistrz) -> AddFactor(SecondaryBonus = -0.25,
