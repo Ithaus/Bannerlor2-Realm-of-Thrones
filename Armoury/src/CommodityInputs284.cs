@@ -21,6 +21,7 @@ namespace Armoury
     /// Zamowienia (klucz): kategoria wsadu, ktora jest surowcem tabeli zamowien 174 (ruda, drewno, skora, plotno, len, skory surowe, welna), daje sygnal
     /// MaterialOrders.NoteMiss i zuzycie MaterialOrders.NoteUse - miasto zamawia surowiec jak dla warsztatow zbrojnych. Srebro, bawelna, glina i jedzenie - tylko pomiar
     /// (rozszerzenie tabeli 174 o nowe surowce - osobny krok po pomiarze; jedzenie zabieraloby mieszczanom).
+    /// 285: srebro, bawelna i glina sa w tabeli zamowien (MaterialOrders, klucz TownMaterialOrderLuxuryInputs) - ten sam sygnal i zuzycie co reszta tabeli; jedzenie - dalej pomiar.
     /// Bez zlota i bez towaru - tylko liczniki i sygnal. Linia doby "Wsad warsztatow (284): dzien N". Ukryte warsztaty (rzemieslnicy BK) - pominiete.
     /// </summary>
     internal static class CommodityInputs284

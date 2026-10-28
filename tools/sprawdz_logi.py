@@ -1223,6 +1223,12 @@ Uzycie (Python 3, tylko odczyt):
                     'Wielkosc karawan (284, na sucho)', 'Ksiega kosztu karawan (284)'. H284-S self-test, H284-S2 test syntetyczny; H284-0 linie co dobe; H284-1 mediana
                     zysku karawan > 0; H284-2 udzial wyplat 259 >= 0.25 i rosnie; H284-3 juki do progu przeplywu, srebro <= 15 dob; H284-4 T1 na stracie <= 30%;
                     H284-5 brak surowca kazdego surowca maleje; H284-6 nic z niczego; H284-7 ksiega po wczytaniu; H284-8 INFO.
+--grupa handel285 : (28.10, paczka 285 noc/285-zold-srebro-ruda - Jeff 28.10 "Rob to!" o zoldzie strazy karawan, srebrze dla warsztatow i cenach rudy; Armoury/src/
+                    CaravanGuards285.cs, ClanBudget.cs, CaravanTrade284.cs, MaterialOrders.cs, MaterialCarts.cs, StartCalibration.Ruda.cs) python -I tools/sprawdz_logi.py
+                    --grupa handel285 <Armoury-*.log> (strumieniowo). Linie 'Straz karawan (285)', 'Srebro i surowce zbytkow (285)', segment 285 linii 'Ruda KS (f5-ruda)'.
+                    H285-S self-test, H285-S2 test syntetyczny; H285-0 linie co dobe, potkniecia 0; H285-1 zold karawan <= wynik handlu (f4); H285-2 ludzie na karawane
+                    schodza do potrzeby; H285-3 rozbite karawany <= 3.5/d; H285-4 srebro: zamowienia > 0, juki karawan maleja, brak wsadu srebra maleje; H285-5 krok
+                    f5 zgodny z regula 285; H285-6 ruda (INFO, progi w ruda282); H285-7 INFO.
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -56236,6 +56242,7 @@ def nruda_main(logp):
         return 0
     weeks, creds, zc4, price, iron, istock, plan, errs = {}, {}, {}, {}, {}, {}, {}, []
     wtr = {}   # 282 (F4): dzien -> {"W"/"E": R zelaza w drodze do miast} przy "282 - liczone"
+    w285 = {}  # 285: dzien -> {"W"/"E": (pelny z droga, zapas poprzedni albo None, zapas teraz, trend)}
     imodel, ramp, rampl = {}, None, 0
     bad_w = bad_c = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -56252,6 +56259,11 @@ def nruda_main(logp):
                             tr["W" if mk == "Westeros" else "E"] = int(R_)
                     if tr:
                         wtr[int(a.group(1))] = tr
+                    t285 = {}
+                    for g5 in H285_F5.finditer(s):
+                        t285["W" if g5.group(1) == "Westeros" else "E"] = (g5.group(8) == "TAK", None if g5.group(9) == "-" else int(g5.group(9)), int(g5.group(10)), g5.group(13))
+                    if t285:
+                        w285[int(a.group(1))] = t285
                 else:
                     bad_w += 1
                 continue
@@ -56344,6 +56356,9 @@ def nruda_main(logp):
                 S_, T_ = int(sv), int(tv)
                 R_ = wtr.get(d, {}).get(side, 0)   # 282 (F4): brak rynku z polek i zelaza w drodze ("282 - liczone"); bez segmentu - jak dotad
                 exp = "BEZ CELU" if T_ <= 0 else ("BRAK" if S_ + R_ < T_ else ("PELNY" if S_ > 2 * T_ else "PASMO"))
+                g285 = w285.get(d, {}).get(side)   # 285: pelny z droga (S + R > 2T) i trend zapasu w pasmie; bez segmentu - jak dotad
+                if g285 is not None:
+                    exp = h285_f5_expect(S_, T_, R_, g285[0], g285[1], g285[2], g285[3])
                 if exp != dec:
                     bad.append((d, f"{side}: {S_}/{T_} -> {dec} (oczekiwane {exp})"))
             n = int(g[NRUW_IN])
@@ -76138,6 +76153,361 @@ def main(argv):
             return nekanie283_main(rest[0] if rest else None)
     return _nekanie283_main_prev(argv)
 
+
+# ------------------------------------------------------------ handel285 (28.10, paczka 285 noc/285-zold-srebro-ruda: straz karawan wedlug drogi i majatku,
+# srebro / bawelna / glina w tabeli zamowien miast i przesyt karawan do miasta z brakiem, krok f5-ruda: pelny z droga i trend zapasu w pasmie).
+#   python -I tools/sprawdz_logi.py --grupa handel285 <Armoury-*.log>
+# Baza (autotest 133a, 30 dob, Armoury-2026-10-28_02-13-05.log): zold karawan notabli 132 148 + lordow 16 415 zl/d wobec wyniku handlu +87 111 zl/d (f4, doba 109053);
+# 36.9 ludzi na karawane; rozbite karawany 2.23/d; srebro w jukach 4 180 -> 2 955 (96.6 doby sprzedazy), brak wsadu srebra 4.8 -> 5.3 cyklu/d (H284-5);
+# f5: Westeros polki z droga 2.10 / 2.29 przy PASMIE (109028 / 109035), swiat lup +52/d w ostatnich 10 dobach.
+#   H285-S  self-test wyrazen (linie jak w kodzie C#: CaravanGuards285.Daily, MaterialOrders.Line285 + CaravanTrade284.Seg285, StartCalibration.F5IronWeek)
+#   H285-S2 test syntetyczny (1 dobry, 6 zlych)
+#   H285-0  linie 285 co dobe (straz i srebro), potkniecia 0, ERROR 0, f5 z segmentem 285
+#   H285-1  zold karawan swiata (model, linia straz) ostatnie 7 dob <= wynik handlu (f4 'wynik handlu') ostatnie 7 dob; przy kluczu NIE - INFO
+#   H285-2  ludzie na karawane: ostatnie 3 doby <= 1.25 x potrzeba srednia ostatnich 3 dob albo <= 0.75 x pierwsze 3 doby; zwolnienia "bez wsi" <= 10% zwolnionych
+#   H285-3  rozbite karawany ('sakiewki rozbitych karawan N', Szczelnosc): srednia <= H285_LOST_MAX (1.5 x baza 133a)
+#   H285-4  srebro: kontrakty + wozy srebra > 0; juki karawan srebra na koniec <= polowa poczatku albo <= 15 dob sprzedazy (Przeplyw 284); brak wsadu srebra
+#           (Wsad warsztatow 284) ostatnie 10 dob <= pierwsze 5 dob
+#   H285-5  krok f5 zgodny z regula 285 (BRAK S+R<T; PELNY S(+R przy 'pelny z droga TAK')>2T; w pasmie zapas rosnie i trend czynny -> PELNY 'W DOL'; inaczej PASMO)
+#   H285-6  ruda (INFO; progi w grupie ruda282): miasta bez rudy, stosunek cen, zelazo swiata na dobe w ostatnich 10 dobach
+#   H285-7  INFO
+H285_G = "Straz karawan (285): dzien "
+H285_S = "Srebro i surowce zbytkow (285): dzien "
+H285_RE_G = re.compile(
+    r"^Straz karawan \(285\): dzien (?P<d>\d+) \| klucz Caravan Guards By Road And Cargo (?P<key>TAK|NIE \(tylko pomiar\)) \| ocenione karawany w miastach (?P<ev>\d+) "
+    r"\(gracza (?P<evp>\d+)\), bez reguly \(brak szablonu albo sily\) (?P<nr>\d+) \| potrzeba strazy srednio (?P<need>[\d.]+) \(podstawa szablonu (?P<base>[\d.]+), "
+    r"zagrozenie bandy w dniu drogi (?P<thr>[\d.]+) ludzi, udzial majatku (?P<v>[\d.]+), limit gry (?P<lim>[\d.]+), podstawa >= limit (?P<abl>\d+)\), ludzi przy ocenie srednio "
+    r"(?P<men>[\d.]+), ponizej potrzeby (?P<short>\d+) \| najem do potrzeby: wizyt (?P<hv>\d+), ludzi (?P<hn>\d+) za (?P<hc>\d+) zl; najem ponad potrzebe wstrzymany (?P<bl>\d+) "
+    r"\| zwolnieni do domu \(droga 166\): (?P<rm>\d+) ludzi z (?P<rc>\d+) karawan \(zold dzienny ok\. (?P<rw>\d+) zl\), bez wsi z danymi BK (?P<rn>\d+), karawany gracza "
+    r"bez zwolnienia (?P<rp>\d+) \| karawany swiata (?P<cars>\d+): ludzi (?P<wm>\d+) \((?P<per>[\d.]+|-) na karawane\), zold z modelu (?P<wage>\d+) zl/d \| czas (?P<ms>[\d.]+) ms "
+    r"\| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
+H285_MAT = (r"(?P<n{k}>srebro|bawelna|glina): proby (?P<try{k}>\d+), kontrakty karawan (?P<con{k}>\d+) szt\., wozem kupcow (?P<cart{k}>\d+) szt\., dowiezione kontraktem "
+            r"(?P<cdn{k}>\d+) / wozem (?P<adn{k}>\d+) szt\., w drodze wozami (?P<tr{k}>\d+), polki miast (?P<sh{k}>\d+), juki karawan (?P<pk{k}>\d+), zuzycie zmierzone miast "
+            r"(?P<use{k}>[\d.]+)/d, miasta bez towaru (?P<em{k}>\d+) z (?P<tw{k}>\d+) \(z zuzyciem (?P<emu{k}>\d+)\)")
+H285_RE_S = re.compile(
+    r"^Srebro i surowce zbytkow \(285\): dzien (?P<d>\d+) \| klucze: w tabeli zamowien (?P<k1>TAK|NIE), przesyt karawan do miasta z brakiem (?P<k2>TAK|NIE), zamowienia (?P<k3>TAK|NIE)"
+    + "".join(r" \| " + H285_MAT.format(k=k) for k in range(3))
+    + r" \| przesyt karawan do miasta z brakiem \(sprzedaz BK i gry ponizej kosztu dopuszczona do braku miasta\): sztuk (?P<gn>\d+) \(koszt (?P<gc>\d+) zl\) w (?P<ga>\d+) "
+      r"sprzedazach \[(?P<gl>[^\]]*)\] \| czas (?P<ms>[\d.]+) ms, potkniecia (?P<st>\d+)\.$")
+H285_F5 = re.compile(r"(Westeros|Essos): polki (\d+) / cel (\d+) \([^)]*\), brak \d+ w \d+ miastach, bez rudy \d+ z \d+ miast -> (BRAK|PELNY|PASMO|BEZ CELU) \(([^)]*)\)"
+                     r", w drodze do miast (\d+) \(polki z droga [^,]*, 282 - (liczone|klucz NIE, nie liczone)\); 285: pelny z droga (TAK|NIE), zapas rynku "
+                     r"\(polki \+ droga \+ juki karawan\) (-|\d+) -> (\d+)(?: \(([+-]\d+)\))?, juki karawan (\d+), trend (W DOL|-|NIE \(klucz\))")
+H285_ERR = ("ERROR in CaravanGuards285.", "ERROR in MaterialOrders.Line285", "ERROR in MaterialOrders.ShortOf", "ERROR in CaravanGuards285.Daily",
+            "ERROR in ClanBudget.ReleaseCaravanGuards")
+H285_LOST_MAX = 3.5          # rozbite karawany na dobe: 1.5 x baza 133a (2.23/d)
+H285_SILVER_DAYS = 15.0      # srebro w jukach na koniec: najwyzej 15 dob sprzedazy (jak H284-3)
+H285_F4 = re.compile(r"^Karawany - wynik handlowy \(f4-pomiary\): dzien (\d+) .*?-> wynik handlu ([+-]?\d+) .*?zold karawan notabli nalezny (\d+) .*?zold karawan lordow naliczony "
+                     r"\(kiesy rodow\) (\d+)")
+H285_LOST = re.compile(r"^Szczelnosc \(164a/31b\): dzien (\d+) .*?sakiewki rozbitych karawan (\d+)")
+H285_FLOW_SILVER = re.compile(r"^Przeplyw towarow karawan \(284\): dzien (\d+) .*? silver (\d+) / ([\d.]+)/d / (\d+) / ")
+H285_WSAD_SILVER = re.compile(r"^Wsad warsztatow \(284\): dzien (\d+) .*?brak wsadu wedlug kategorii \(cykle; poza jedzeniem\): ([^|]*)\|")
+H285_RU = re.compile(r"^Ruda przeplyw \(282\): dzien (\d+) .*?stosunek ([\d.]+|-) \| miasta bez rudy (\d+) z \d+ .*?swiat lupy: razem (\d+)")
+
+
+def h285_f5_expect(S_, T_, R_, fullR, prev, tot, trend):
+    """Oczekiwana decyzja kroku f5 wedlug reguly 285 (StartCalibration.F5IronWeek): R_ - zelazo w drodze liczone ('282 - liczone'), inaczej 0."""
+    if T_ <= 0:
+        return "BEZ CELU"
+    if S_ + R_ < T_:
+        return "BRAK"
+    if S_ + (R_ if fullR else 0) > 2 * T_:
+        return "PELNY"
+    if trend != "NIE (klucz)" and prev is not None and tot > prev:
+        return "PELNY"
+    return "PASMO"
+
+
+def h285_lines():
+    """Linie wzorcowe zbudowane jak w kodzie C# (CaravanGuards285.Daily, MaterialOrders.Line285, CaravanTrade284.Seg285, StartCalibration.F5IronWeek)."""
+    g = ("Straz karawan (285): dzien {d} | klucz Caravan Guards By Road And Cargo {key} | ocenione karawany w miastach 118 (gracza 1), bez reguly (brak szablonu albo sily) 2"
+         " | potrzeba strazy srednio {need} (podstawa szablonu 15.0, zagrozenie bandy w dniu drogi 21.3 ludzi, udzial majatku 0.84, limit gry 38.2, podstawa >= limit 0),"
+         " ludzi przy ocenie srednio 33.1, ponizej potrzeby 9 | najem do potrzeby: wizyt 9, ludzi 31 za 2950 zl; najem ponad potrzebe wstrzymany 40"
+         " | zwolnieni do domu (droga 166): {rm} ludzi z 61 karawan (zold dzienny ok. 2400 zl), bez wsi z danymi BK {rn}, karawany gracza bez zwolnienia 0"
+         " | karawany swiata 450: ludzi {wm} ({per} na karawane), zold z modelu {wage} zl/d | czas 3.41 ms | potkniecia {st} (sesja {st}).")
+    mat = ("{n}: proby {t}, kontrakty karawan {c} szt., wozem kupcow {w} szt., dowiezione kontraktem 0 / wozem 4 szt., w drodze wozami 12, polki miast 900, juki karawan {pk},"
+           " zuzycie zmierzone miast 2.5/d, miasta bez towaru 40 z 97 (z zuzyciem 3)")
+    s = ("Srebro i surowce zbytkow (285): dzien {d} | klucze: w tabeli zamowien TAK, przesyt karawan do miasta z brakiem TAK, zamowienia TAK | "
+         + mat.format(n="srebro", t="{t}", c="{c}", w="{w}", pk="{pk}") + " | " + mat.format(n="bawelna", t=1, c=0, w=0, pk=900) + " | "
+         + mat.format(n="glina", t=0, c=0, w=0, pk=300)
+         + " | przesyt karawan do miasta z brakiem (sprzedaz BK i gry ponizej kosztu dopuszczona do braku miasta): sztuk 14 (koszt 1310 zl) w 3 sprzedazach [silver 14]"
+           " | czas 0.4 ms, potkniecia 0.")
+    f5 = ("Ruda KS (f5-ruda): dzien {d} | klucz Ks Iron Hands Follow Market TAK, co 7 dob od D 108699 (rece przy zlozach zelaza za ruda rynku; kopalnia z drewnem x1.05 przy braku,"
+          " x0.95 przy rynku pelnym albo dymarce bez drewna >= 50%) | Westeros: polki {sw} / cel 1296 (1.43), brak 362 w 37 miastach, bez rudy 17 z 59 miast -> {dw}, w drodze do"
+          " miast {rw} (polki z droga 2.10, 282 - liczone); 285: pelny z droga TAK, zapas rynku (polki + droga + juki karawan) {pw} -> {tw}{dlw}, juki karawan 900, trend {trw}"
+          " | Essos: polki 751 / cel 781 (0.96), brak 271 w 26 miastach, bez rudy 8 z 38 miast -> PASMO (bez zmian), w drodze do miast 448 (polki z droga 1.54, 282 - liczone);"
+          " 285: pelny z droga TAK, zapas rynku (polki + droga + juki karawan) - -> 1500, juki karawan 300, trend -"
+          " | wpisow zelaza 512: w gore 0, w dol (rynek pelny) 0, w dol (dymarka bez drewna) 0, bez zmian: dymarka czesciowo bez drewna 0, bez danych wytopu 0, pasmo 512,"
+          " bez celu 0; bloki przyciete sufitem 0, w przebudowie (pominiete) 14 | sufit bloku (suma rak przy zlozach <= 0.5 x rece poza domem): blokow z zelazem 512, na suficie"
+          " przed krokiem 0 (rece przy zelazie 0 = 0% rak zelaza), przyciete po wzroscie 0 (zelazo -0 rak z zamiaru, inne zloza -0 rak -> do zelaza), nad sufitem bez wzrostu"
+          " (bez przyciecia - RegaleCycle co 28 dob) 0 | rece przy zelazie: Westeros 69874 -> 69861, Essos 43468 -> 43468 (razem 0.0%; zamiar po mnoznikach 0.0%) | stawka KS"
+          " zelaza na jutro (wsie, szt./d): Westeros 256 w 17 wsiach, Essos 161 w 8 wsiach | wytop 7 dob (dymarki): Westeros model 554, bez drewna 4 (1%), Essos model 201,"
+          " bez drewna 0 (0%); kopalnie z drewnem 22, czesciowo 1, bez drewna 1 | pieniadze i towar: bez przelewow - zmiana tylko podzialu rak bloku (rece zelaza + rece"
+          " reszty zajec = rece bloku) | czas 0.6 ms | potkniecia 0.")
+    return g, s, f5
+
+
+def h285_selftest():
+    g, s, f5 = h285_lines()
+    bad = []
+    a = H285_RE_G.match(g.format(d=109030, key="TAK", need="21.4", rm=120, rn=0, wm=15000, per="33.3", wage=120000, st=0))
+    if not a or a.group("rm") != "120" or a.group("wage") != "120000":
+        bad.append("straz")
+    if not H285_RE_G.match(g.format(d=109030, key="NIE (tylko pomiar)", need="21.4", rm=0, rn=0, wm=0, per="-", wage=0, st=0)):
+        bad.append("straz (klucz NIE, '-')")
+    b = H285_RE_S.match(s.format(d=109030, t=3, c=12, w=20, pk=2900))
+    if not b or b.group("n0") != "srebro" or b.group("pk0") != "2900" or b.group("gn") != "14":
+        bad.append("srebro")
+    c = list(H285_F5.finditer(f5.format(d=109035, sw=1856, dw="PASMO (bez zmian)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="W DOL")))
+    if len(c) != 2 or c[0].group(13) != "W DOL" or c[0].group(9) != "3000" or c[1].group(9) != "-":
+        bad.append("f5")
+    if not NRU_W.match(f5.format(d=109035, sw=1856, dw="PELNY (w dol, zapas rosnie - 285)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="W DOL")):
+        bad.append("f5 wobec NRU_W (grupa nruda)")
+    if not RU282_F5.findall(f5.format(d=109035, sw=1856, dw="PELNY (w dol, zapas rosnie - 285)", rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="W DOL")):
+        bad.append("f5 wobec RU282_F5 (grupa ruda282)")
+    if h285_f5_expect(1856, 1296, 865, True, 3000, 3621, "W DOL") != "PELNY" or h285_f5_expect(1300, 1296, 0, True, 3000, 2900, "-") != "PASMO":
+        bad.append("oczekiwana decyzja f5")
+    return "; ".join(bad) if bad else None
+
+
+def h285_collect(logp):
+    D = {"g": {}, "s": {}, "f5": [], "bad": 0, "f4": {}, "lost": {}, "flow": {}, "wsad": {}, "ru": {}, "err": 0, "errs": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(H285_ERR):
+                    D["err"] += 1
+                    if len(D["errs"]) < 3:
+                        D["errs"].append(s[:160])
+                continue
+            if s.startswith(H285_G):
+                a = H285_RE_G.match(s)
+                if a:
+                    D["g"][int(a.group("d"))] = a.groupdict()
+                else:
+                    D["bad"] += 1
+            elif s.startswith(H285_S):
+                a = H285_RE_S.match(s)
+                if a:
+                    D["s"][int(a.group("d"))] = a.groupdict()
+                else:
+                    D["bad"] += 1
+            elif s.startswith("Ruda KS (f5-ruda): dzien ") and "; 285: " in s:
+                dm = re.match(r"^Ruda KS \(f5-ruda\): dzien (\d+)", s)
+                for g5 in H285_F5.finditer(s):
+                    D["f5"].append((int(dm.group(1)), g5.groups()))
+            elif s.startswith("Karawany - wynik handlowy (f4-pomiary): dzien "):
+                a = H285_F4.match(s)
+                if a:
+                    D["f4"][int(a.group(1))] = (int(a.group(2)), int(a.group(3)), int(a.group(4)))
+            elif s.startswith("Szczelnosc (164a/31b): dzien "):
+                a = H285_LOST.match(s)
+                if a:
+                    D["lost"][int(a.group(1))] = int(a.group(2))
+            elif s.startswith("Przeplyw towarow karawan (284): dzien "):
+                a = H285_FLOW_SILVER.match(s)
+                if a:
+                    D["flow"][int(a.group(1))] = (int(a.group(2)), float(a.group(3)))
+            elif s.startswith("Wsad warsztatow (284): dzien "):
+                a = H285_WSAD_SILVER.match(s)
+                if a:
+                    x = re.search(r"\bsilver (\d+)", a.group(2))
+                    D["wsad"][int(a.group(1))] = int(x.group(1)) if x else 0
+            elif s.startswith("Ruda przeplyw (282): dzien "):
+                a = H285_RU.match(s)
+                if a:
+                    D["ru"][int(a.group(1))] = (a.group(2), int(a.group(3)), int(a.group(4)))
+    return D
+
+
+def _h285_avg(v):
+    return sum(v) / len(v) if v else None
+
+
+def h285_rows(rep, D):
+    gd = sorted(D["g"]); sd = sorted(D["s"])
+    stum = sum(int(D["g"][d]["st"]) for d in gd) + sum(int(D["s"][d]["st"]) for d in sd)
+    rep.add("H285-0: linie 285 co dobe (straz i srebro), potkniecia 0, ERROR 0, krok f5 z segmentem 285",
+            f"straz {len(gd)} dob, srebro {len(sd)} dob, nierozpoznanych {D['bad']}, potkniecia {stum}, ERROR {D['err']}{' ' + str(D['errs']) if D['errs'] else ''}, "
+            f"wpisow f5 285 {len(D['f5'])}", "obie linie w kazdej dobie (roznica <= 1), 0 nierozpoznanych, 0 potkniec, 0 ERROR",
+            bool(gd) and bool(sd) and abs(len(gd) - len(sd)) <= 1 and D["bad"] == 0 and stum == 0 and D["err"] == 0)
+    keyOn = bool(gd) and D["g"][gd[-1]]["key"] == "TAK"
+    # H285-1
+    f4d = sorted(D["f4"])
+    if gd and f4d:
+        wage7 = _h285_avg([int(D["g"][d]["wage"]) for d in gd[-7:]])
+        f47 = [D["f4"][f4d[-1]]]   # linia f4 to juz srednia okna 7 dob (drukowana co 7 dob) - ostatnie okno
+        marg7 = _h285_avg([x[0] for x in f47]); due7 = _h285_avg([x[1] + x[2] for x in f47])
+        wage3 = _h285_avg([int(D["g"][d]["wage"]) for d in gd[:3]])
+        rep.add("H285-1: zold karawan swiata (model, ostatnie 7 dob) wobec wyniku handlu karawan (f4, ostatnie okno 7 dob)",
+                f"zold z modelu {wage7:.0f} zl/d (pierwsze 3 doby {wage3:.0f}), zold nalezny f4 {due7:.0f} zl/d, wynik handlu {marg7:+.0f} zl/d",
+                "zold z modelu <= wynik handlu (baza 133a: ok. 148.6 tys. wobec +87.1 tys. zl/d); klucz NIE - INFO", (wage7 <= marg7) if keyOn else None)
+    else:
+        rep.add("H285-1: zold karawan swiata wobec wyniku handlu", "brak linii straz albo f4", "INFO", None)
+    # H285-2
+    if gd:
+        per = [int(D["g"][d]["wm"]) / max(1, int(D["g"][d]["cars"])) for d in gd]
+        need3 = _h285_avg([float(D["g"][d]["need"]) for d in gd[-3:] if int(D["g"][d]["ev"]) > 0]) or 0.0
+        last3, first3 = _h285_avg(per[-3:]), _h285_avg(per[:3])
+        rm = sum(int(D["g"][d]["rm"]) for d in gd); rc = sum(int(D["g"][d]["rc"]) for d in gd); rn = sum(int(D["g"][d]["rn"]) for d in gd)
+        ok2 = (last3 <= 1.25 * need3 or last3 <= 0.75 * first3) and rn <= max(1, 0.1 * max(1, rc + rn))
+        rep.add("H285-2: ludzie na karawane schodza do potrzeby drogi i ladunku; zwolnienia do domu",
+                f"ludzi na karawane pierwsze 3 doby {first3:.1f}, ostatnie 3 {last3:.1f}, potrzeba srednio ostatnie 3 doby {need3:.1f}; zwolnieni {rm} z {rc} wizyt, bez wsi {rn}",
+                "ostatnie 3 <= 1.25 x potrzeba albo <= 0.75 x pierwsze 3; bez wsi <= 10% (baza 133a: 36.9 na karawane); klucz NIE - INFO", ok2 if keyOn else None)
+    else:
+        rep.add("H285-2: ludzie na karawane", "brak linii straz", "INFO", None)
+    # H285-3
+    ld = sorted(D["lost"])
+    if ld:
+        lost = _h285_avg([D["lost"][d] for d in ld])
+        rep.add("H285-3: rozbite karawany na dobe (Szczelnosc 'sakiewki rozbitych karawan')", f"srednio {lost:.2f}/d ({len(ld)} dob), ostatnie 10 dob "
+                f"{_h285_avg([D['lost'][d] for d in ld[-10:]]):.2f}/d", f"<= {H285_LOST_MAX}/d (baza 133a 2.23/d)", lost <= H285_LOST_MAX)
+    else:
+        rep.add("H285-3: rozbite karawany", "brak linii Szczelnosc", "INFO", None)
+    # H285-4
+    if sd:
+        con = sum(int(D["s"][d]["con0"]) + int(D["s"][d]["cart0"]) for d in sd)
+        pk0, pk1 = int(D["s"][sd[0]]["pk0"]), int(D["s"][sd[-1]]["pk0"])
+        fd = sorted(D["flow"]); sales = D["flow"][fd[-1]][1] if fd else 0.0
+        days = pk1 / sales if sales > 0 else None
+        wd = sorted(D["wsad"])
+        w5 = _h285_avg([D["wsad"][d] for d in wd[:5]]); w10 = _h285_avg([D["wsad"][d] for d in wd[-10:]])
+        okp = pk1 <= 0.5 * pk0 or (days is not None and days <= H285_SILVER_DAYS)
+        okw = w5 is None or w10 is None or w10 <= w5
+        rep.add("H285-4: srebro - zamowienia miast, juki karawan, brak wsadu srebra",
+                f"kontrakty + wozy srebra {con} szt.; juki karawan {pk0} -> {pk1} ({'-' if days is None else f'{days:.1f}'} dob sprzedazy); brak wsadu srebra pierwsze 5 dob "
+                f"{'-' if w5 is None else f'{w5:.1f}'}, ostatnie 10 {'-' if w10 is None else f'{w10:.1f}'} cykli/d",
+                f"zamowienia > 0, juki <= polowa poczatku albo <= {H285_SILVER_DAYS} dob, brak wsadu nie rosnie (baza 133a: 4180 -> 2955, 96.6 doby; 4.8 -> 5.3)",
+                con > 0 and okp and okw)
+    else:
+        rep.add("H285-4: srebro", "brak linii srebra", "INFO", None)
+    # H285-5
+    if D["f5"]:
+        bad = []
+        for d, g in D["f5"]:
+            mk, S_, T_, dec, txt, R_, cnt, full, prev, tot, dl, C_, trend = g
+            Rc = int(R_) if cnt == "liczone" else 0
+            exp = h285_f5_expect(int(S_), int(T_), Rc, full == "TAK", None if prev == "-" else int(prev), int(tot), trend)
+            if exp != dec:
+                bad.append(f"{d} {mk}: {dec} (oczekiwane {exp})")
+            band = int(T_) > 0 and int(S_) + Rc >= int(T_) and not (int(S_) + (Rc if full == "TAK" else 0) > 2 * int(T_))
+            want_trend = band and trend != "NIE (klucz)" and prev != "-" and int(tot) > int(prev)
+            if want_trend != (trend == "W DOL"):
+                bad.append(f"{d} {mk}: trend {trend} (oczekiwany {'W DOL' if want_trend else '-'})")
+        rep.add("H285-5: krok f5-ruda zgodny z regula 285 (pelny z droga, trend zapasu w pasmie)", f"wpisow {len(D['f5'])}, niezgodnych {len(bad)}" + (f" {bad[:3]}" if bad else ""),
+                "0", not bad)
+    else:
+        rep.add("H285-5: krok f5-ruda", "brak wpisow z segmentem 285 (bieg krotszy niz 7 dob albo log sprzed 285)", "INFO", None)
+    # H285-6 (INFO)
+    rd = sorted(D["ru"])
+    if rd:
+        w = rd[-10:]
+        dw = (D["ru"][w[-1]][2] - D["ru"][w[0]][2]) / max(1, len(w) - 1)
+        rep.add("H285-6: ruda (INFO - progi w grupie ruda282)",
+                f"miasta bez rudy {D['ru'][rd[0]][1]} -> {D['ru'][rd[-1]][1]} (ostatnie 10 dob srednio {_h285_avg([D['ru'][d][1] for d in w]):.1f}), stosunek cen "
+                f"{D['ru'][rd[0]][0]} -> {D['ru'][rd[-1]][0]}, zelazo swiata ostatnie 10 dob {dw:+.1f}/d", "INFO (baza 133a: 11.7 miast, 3.96, +52.1/d)", None)
+    # H285-7 (INFO)
+    if gd and sd:
+        g0, g1 = D["g"][gd[0]], D["g"][gd[-1]]
+        s1 = D["s"][sd[-1]]
+        rep.add("H285-7: INFO", f"doba {gd[0]}: karawan {g0['cars']}, ludzi {g0['wm']}, zold {g0['wage']}; doba {gd[-1]}: karawan {g1['cars']}, ludzi {g1['wm']}, zold {g1['wage']}, "
+                f"potrzeba {g1['need']} (podstawa {g1['base']}, zagrozenie {g1['thr']}, majatek {g1['v']}, limit {g1['lim']}), najem {g1['hn']} za {g1['hc']} zl; srebro: polki "
+                f"{s1['sh0']}, juki {s1['pk0']}, w drodze {s1['tr0']}, przesyt do miasta z brakiem {s1['gn']} szt. [{s1['gl']}]", "INFO", None)
+
+
+def h285_synth():
+    """Test syntetyczny: 1 log dobry, 5 zlych - kazdy zly psuje jeden prog."""
+    import tempfile
+    g, s, f5 = h285_lines()
+    f4 = ("Karawany - wynik handlowy (f4-pomiary): dzien {d} | okno 7 dob | -> wynik handlu +{m} (+1) | zold karawan notabli nalezny {w1} (1), niedoplata 0 (0), zaplacony 0 (0), "
+          "w tym z kas karawan 0 (0), z kies notabli 0 (0), zold karawan lordow naliczony (kiesy rodow) {w2} (1) | reszta")
+    lost = "Szczelnosc (164a/31b): dzien {d} | karawany (E3/4 WL): sakiewki rozbitych karawan {n}: do zwyciezcow 0"
+    flow = "Przeplyw towarow karawan (284): dzien {d} | x | wedlug kategorii: silver {pk} / {sl}/d / 300 / KUPNO STOI, gold 1 / 1.0/d / 10 / KUPNO STOI."
+    wsad = "Wsad warsztatow (284): dzien {d} | klucz | brak wsadu wedlug kategorii (cykle; poza jedzeniem): silver {m} | reszta"
+
+    def mk(kind):
+        out = []
+        for i in range(20):
+            d = 109000 + i
+            wage = 120000 if kind != "wage" else 160000
+            per = (33.0 - i * 0.6) if kind != "men" else 36.9
+            rn = 0 if kind != "novill" else 50
+            out.append("[00:00:00] " + g.format(d=d, key="TAK", need="21.4", rm=100, rn=rn, wm=int(per * 450), per=f"{per:.1f}", wage=wage, st=0))
+            pk = 2900 - i * 100 if kind != "silver" else 2900
+            out.append("[00:00:00] " + s.format(d=d, t=2, c=5, w=10, pk=pk))
+            out.append("[00:00:00] " + f4.format(d=d, m=130000, w1=100000, w2=15000))
+            out.append("[00:00:00] " + lost.format(d=d, n=2 if kind != "lost" else 6))
+            out.append("[00:00:00] " + flow.format(d=d, pk=pk, sl="30.0"))
+            out.append("[00:00:00] " + wsad.format(d=d, m=5 if i < 10 else 3))
+            if i == 7:
+                out.append("[00:00:00] " + f5.format(d=d, sw=1300, dw="PASMO (bez zmian)" if kind == "f5" else "PELNY (w dol, zapas rosnie - 285)", rw=865, pw=3000, tw=3621,
+                                                     dlw=" (+621)", trw="-" if kind == "f5" else "W DOL"))
+        return out
+
+    def run(kind):
+        fd, path = tempfile.mkstemp(suffix=".log")
+        os.close(fd)
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("\n".join(mk(kind)) + "\n")
+            r = Report()
+            h285_rows(r, h285_collect(path))
+            return {row[0].split(":")[0]: row[3] for row in r.rows}
+        finally:
+            os.remove(path)
+
+    exp = {
+        "good": {"H285-0": "TAK", "H285-1": "TAK", "H285-2": "TAK", "H285-3": "TAK", "H285-4": "TAK", "H285-5": "TAK"},
+        "wage": {"H285-1": "NIE", "H285-2": "TAK"},
+        "men": {"H285-2": "NIE", "H285-1": "TAK"},
+        "novill": {"H285-2": "NIE"},
+        "lost": {"H285-3": "NIE", "H285-4": "TAK"},
+        "silver": {"H285-4": "NIE", "H285-3": "TAK"},
+        "f5": {"H285-5": "NIE"},
+    }
+    diff = []
+    for kind, e in exp.items():
+        got = run(kind)
+        diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in e.items() if got.get(k) != v]
+    return "; ".join(diff) if diff else None
+
+
+def handel285_main(logp):
+    """handel285 (28.10, paczka 285): H285-S, H285-S2, H285-0..H285-7 - opis w komentarzu nad stalymi H285_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = h285_selftest()
+    rep.add("H285-S: self-test wyrazen (linie jak w kodzie C#: CaravanGuards285.Daily, MaterialOrders.Line285, CaravanTrade284.Seg285, StartCalibration.F5IronWeek)",
+            s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = h285_synth()
+    except Exception as e:   # test syntetyczny nie moze zatrzymac grupy
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("H285-S2: test syntetyczny (1 log dobry, 6 zlych)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("H285-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = h285_collect(logp)
+    print(f"plik: {logp} | linii 285: straz {len(D['g'])}, srebro {len(D['s'])}, f5 {len(D['f5'])} (nierozpoznanych {D['bad']}), f4 {len(D['f4'])}, Szczelnosc {len(D['lost'])}, "
+          f"Przeplyw 284 {len(D['flow'])}, Wsad 284 {len(D['wsad'])}, Ruda 282 {len(D['ru'])}, ERROR {D['err']}")
+    h285_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_handel285_main_prev = main
+
+
+def main(argv):
+    # paczka 285: grupa handel285 - opakowanie main jak handel284 (grupy na koncu pliku, bez zmian w srodku main)
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "handel285":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return handel285_main(rest[0] if rest else None)
+    return _handel285_main_prev(argv)
 
 
 if __name__ == "__main__":

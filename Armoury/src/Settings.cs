@@ -4314,6 +4314,18 @@ namespace Armoury
         public bool TownMaterialOrderWorkshopInputs = true; // a goods workshop (tannery, weavery, smithy, wood workshop) that stops for lack of hides, flax, wool, iron or wood makes its town order that material like the armour workshops do, and its use counts in the town's measured use. Silver, cotton, clay and food inputs are only measured in the log. Off = as before
         public bool CaravanSizeByTrade = false;             // a caravan whose trade earned less per day over the last two weeks than its wages cost hires no more guards (only after a week of measured trade). Off = measured in the log only
 
+        // --- Caravan guards, silver and iron flow (285) ---
+        // Paczka 285 (28.10, Jeff: "Rob to!" o trzech sprawach z przekazania): (1) zold karawan swiata ok. 148.6 tys. zl/d wobec wyniku handlu +87 tys. zl/d - gra werbuje
+        // karawanie najemnikow do limitu partii bez wzgledu na droge i ladunek (36.9 ludzi na karawane); (2) srebro, bawelna i glina poza tabela zamowien miast (srebro
+        // w jukach karawan 2 955 = 96.6 doby sprzedazy, warsztaty srebra bez wsadu); (3) krok f5-ruda liczyl zelazo w drodze tylko po stronie braku, a w pasmie T..2T
+        // zapas rynku rosl bez korekty (swiat +52 lup/d). CaravanGuards285.cs, ClanBudget.cs, CaravanTrade284.cs, MaterialOrders.cs, MaterialCarts.cs,
+        // StartCalibration.Ruda.cs. Nowe klucze (plik MCM Jeffa ma wszystkie stare).
+        public bool CaravanGuardByRisk = true;              // a caravan hires guards only up to what its road and cargo need: the smallest escort its culture's caravans set out with, more when a strong bandit band roams within a day's road of this town or its next one (enough men to match the strongest band), scaled by how much coin and goods it carries against its trading capital; guards above that are paid off in town and go home like any discharged soldier. Off = measured in the log only
+        public bool TownMaterialOrderLuxuryInputs = true;   // silver, raw silk and clay join the raw materials towns order: a town whose silversmith, silk weaver or potter stops for lack of them (or whose stock falls below its reorder point) orders them from towns with a surplus, by merchant cart or a caravan that already carries them
+        public bool CaravanGlutToShortTown = true;          // a good caravans already hoard (they stopped buying it - more in their packs than ten days of sales) may be sold below what the caravan paid, but only as much as the town is short of it for its own workshops - the loss was made when it was bought, the empty workshop is real
+        public bool KsIronFullCountsTransit = true;         // with Ks Iron Hands Count Iron On The Road: the weekly step also counts the iron on its way to the towns when it decides the market is full (until now only when it decided it was short)
+        public bool KsIronStockTrend = true;                // with Ks Iron Hands Follow Market: when the market is neither short nor full but its iron (stalls, carts on the road and caravan packs) grew since the last weekly step, the mines get fewer hands - the mines follow what is really used
+
         // --- Food follows the market under the start calibration (night 18.10) ---
         // Paczka f20-d4 (decyzja Jeffa 18.10 "4. b"): po D+49 (koniec sterowania rynku) podaz jedzenia i soli pod KS nie szla za cena - A7 wylaczona, Plan rusza tylko
         // prace domowa (fin93: Essos oliwki 0.14 T*, mieso 0.20, winogrona 0.33 przy indeksie 3-4.5; sol Essos 3.62 T*, ryby Westeros 3.28 T* i rosna). Ta sama regula

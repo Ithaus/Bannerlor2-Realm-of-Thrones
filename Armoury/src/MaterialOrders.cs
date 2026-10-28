@@ -43,14 +43,35 @@ namespace Armoury
     /// 174b (docs/PROJEKT-174B-DOWOZ-2026-10-09.md): cel pilnowany co godzine po nocnym obozie (Hourly - spiaca karawana to nie cudzy cel), BK Shipping
     /// zablokowany dla karawan z kontraktem; najpierw trasa (lad albo morze), potem przewoznik dobrany do trasy (karawana ladowa / konwoj), ilosc wedlug
     /// zysku, surowiec z jukow, punkt zamowienia przed zerem; linia nazw miast bez rudy i strzal co 5 dob.
+    /// 285 (Jeff 28.10 "srebro wciaz nie plynie do warsztatow"): tabela ma 10 surowcow - srebro, bawelna (jedwab surowy) i glina dopisane NA KONCU (indeksy 7-9; zapis
+    /// po id przedmiotu, wiec stare rekordy kontraktow i wozow czytaja sie bez zmian). Nowe surowce dzialaja tylko przy kluczu TownMaterialOrderLuxuryInputs (MatOn):
+    /// sygnal braku i zuzycie warsztatow towarowych (CommodityInputs284 - NoteMissCategory / NoteUseCategory), zamowienia, wozy, kontrakty z jukow, prog polki
+    /// (ShelfReserve), ShortOf (CaravanTrade284 - przesyt karawan do miasta z brakiem). Klucz NIE - jak 133 (przedmiot spoza tabeli).
     /// </summary>
     internal static class MaterialOrders
     {
-        private static readonly string[] Ids = { "iron", "hardwood", "leather", "linen", "flax", "hides", "wool" };
-        private static readonly string[] Names = { "ruda", "drewno", "skora", "plotno", "len", "skory surowe", "welna" };
-        private const int M = 7, Ore = 0;
+        private static readonly string[] Ids = { "iron", "hardwood", "leather", "linen", "flax", "hides", "wool", "silver", "cotton", "clay" };
+        private static readonly string[] Names = { "ruda", "drewno", "skora", "plotno", "len", "skory surowe", "welna", "srebro", "bawelna", "glina" };
+        private const int M = 10, Ore = 0;
+        private const int M0 = 7;   // 285: surowce tabeli sprzed 285 (0-6) - zawsze czynne; 7-9 (srebro, bawelna, glina) tylko przy kluczu TownMaterialOrderLuxuryInputs
         private static ItemObject[] _items;
         private static readonly Dictionary<ItemObject, int> _ix = new Dictionary<ItemObject, int>();
+
+        /// <summary>285: surowiec m czynny w zamowieniach (0-6 zawsze; srebro, bawelna, glina przy kluczu TownMaterialOrderLuxuryInputs).</summary>
+        private static bool MatOn(int m)
+        {
+            if (m < M0) return m >= 0;
+            var s = Settings.Current;
+            return m < M && s != null && s.TownMaterialOrderLuxuryInputs;
+        }
+
+        /// <summary>285: przedmiot z tabeli i czynny (MatOn) - jedno miejsce zamiast _ix.TryGetValue w punktach wejscia (NoteMiss, NoteUse, InTransitTo, SourceKeepFor,
+        /// ShelfReserve, ExportNet, ShortOf).</summary>
+        private static bool Ix(ItemObject item, out int m)
+        {
+            m = -1;
+            return item != null && _ix.TryGetValue(item, out m) && MatOn(m);
+        }
 
         private sealed class Contract
         {
@@ -150,6 +171,8 @@ namespace Armoury
         private static double _o2Profit; private static int _o2ProfitN;
         private static readonly List<string> _o2First = new List<string>();
         private sealed class OrdItem { public Town T; public int M; public bool Ahead; public float Cover; public string Id; }
+        // 285 (linia "Srebro i surowce zbytkow (285)"): liczniki doby srebra, bawelny i gliny (indeks m - M0) - tylko log
+        private static readonly int[] _l285Try = new int[M - M0], _l285Done = new int[M - M0], _l285Arr = new int[M - M0];
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.TownMaterialOrders; } }
 
@@ -223,7 +246,7 @@ namespace Armoury
 
         internal static void NoteMiss(Town town, ItemObject item)
         {
-            try { int m; if (town != null && item != null && Ready() && _ix.TryGetValue(item, out m)) Bump(_miss, town, m); }
+            try { int m; if (town != null && item != null && Ready() && Ix(item, out m)) Bump(_miss, town, m); }
             catch (Exception e) { Stumble("NoteMiss", e); }
         }
 
@@ -238,7 +261,7 @@ namespace Armoury
             try
             {
                 int m;
-                if (town == null || item == null || n <= 0 || !Ready() || !_ix.TryGetValue(item, out m)) return;
+                if (town == null || item == null || n <= 0 || !Ready() || !Ix(item, out m)) return;
                 float[] a; if (!_useToday.TryGetValue(town, out a)) { a = new float[M]; _useToday[town] = a; }
                 a[m] += n;
             }
@@ -330,8 +353,11 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily", e); }
             string l282 = null;
             try { l282 = Line282(day); } catch (Exception e) { Stumble("Line282", e); }   // 282: przed Line (Line zeruje liczniki doby w NewDay)
+            string l285 = null;
+            try { l285 = Line285(day); } catch (Exception e) { Stumble("Line285", e); }   // 285: przed Line (Line zeruje liczniki doby i wozow)
             Line(day);
             if (l282 != null) Log.Info(l282);
+            if (l285 != null) Log.Info(l285);
             try { if (_items != null && (_namesSince < 0 || day % 5 == 0)) NamesLine(day); } catch (Exception e) { Stumble("NamesLine", e); }
         }
 
@@ -384,7 +410,7 @@ namespace Armoury
             try
             {
                 int m;
-                if (dest == null || item == null || !Ready() || !_ix.TryGetValue(item, out m)) return 0;
+                if (dest == null || item == null || !Ready() || !Ix(item, out m)) return 0;
                 return InTransit(dest, m);
             }
             catch (Exception e) { Stumble("InTransitTo", e); return 0; }
@@ -425,7 +451,7 @@ namespace Armoury
             try
             {
                 if (town == null || c == null || !Ready()) return false;
-                for (int m = 0; m < M; m++) if (_items[m] != null && _items[m].ItemCategory == c) { Bump(_miss, town, m); return true; }
+                for (int m = 0; m < M; m++) if (MatOn(m) && _items[m] != null && _items[m].ItemCategory == c) { Bump(_miss, town, m); return true; }
             }
             catch (Exception e) { Stumble("NoteMissCategory", e); }
             return false;
@@ -438,7 +464,7 @@ namespace Armoury
             {
                 if (town == null || c == null || n <= 0 || !Ready()) return false;
                 for (int m = 0; m < M; m++)
-                    if (_items[m] != null && _items[m].ItemCategory == c)
+                    if (MatOn(m) && _items[m] != null && _items[m].ItemCategory == c)
                     {
                         NoteUse(town, _items[m], n);
                         if (m == Ore) { float x; _ore284.TryGetValue(town, out x); _ore284[town] = x + n; }   // recenzja 284: IronLands ma ten wsad w "linie towarowe" (OreLedger)
@@ -470,6 +496,8 @@ namespace Armoury
 
         private static void OrderTimed(Town town, int m, int day, bool ahead)
         {
+            if (!MatOn(m)) return;   // 285: srebro, bawelna, glina tylko przy kluczu TownMaterialOrderLuxuryInputs
+            if (m >= M0) _l285Try[m - M0]++;
             if (m == Ore) _o2Try++;   // 282: proby zamowien rudy (linia 282)
             long tc = Cost174.Begin(Cost174.SMoOrder);   // 174b.5 F6 (probka 1/16, tylko log)
             try { Order(town, m, day, ahead); } catch (Exception e) { Stumble("Order", e); }
@@ -903,6 +931,7 @@ namespace Armoury
             var t = dst != null ? dst.Town : null;
             if (t == null) return;
             NoteTrip(t, m, Math.Max(1, days));
+            if (m >= M0 && m < M) _l285Arr[m - M0] += n;   // 285: tylko log
             if (m == Ore) { int q; _dstOreCartSince.TryGetValue(t, out q); _dstOreCartSince[t] = q + n; _o2CartDone += n; }   // 282: + licznik doby
         }
 
@@ -1150,6 +1179,65 @@ namespace Armoury
             return a[m];
         }
 
+        /// <summary>285 (CaravanTrade284.SellGuardPrefix, klucz CaravanGlutToShortTown): ile sztuk surowca tabeli brakuje miastu do wlasnego punktu zamowienia
+        /// (ceil((D + 2) x zuzycie) - ten sam, od ktorego miasto samo zamawia, MatDay) po polce i towarze w drodze. Przedmiot spoza tabeli, surowiec nieczynny,
+        /// zamowienia wylaczone albo blad - 0.</summary>
+        internal static int ShortOf(Town t, ItemObject item)
+        {
+            try
+            {
+                int m;
+                if (!On || t == null || item == null || !t.IsTown || t.Settlement == null || t.Owner == null || t.Owner.ItemRoster == null || !Ready() || !Ix(item, out m)) return 0;
+                float rp = MatDay(t, m)[0];
+                int have = t.Owner.ItemRoster.GetItemNumber(item), tr = InTransit(t.Settlement, m);
+                return Math.Max(0, (int)Math.Ceiling(rp) - have - tr);
+            }
+            catch (Exception e) { Stumble("ShortOf", e); return 0; }
+        }
+
+        /// <summary>285: linia doby "Srebro i surowce zbytkow (285)" - srebro, bawelna, glina: proby zamowien, kontrakty karawan (z tego z jukow), wozy kupcow,
+        /// dostawy; stan swiata (polki miast, juki karawan, wozy w drodze), miasta z zuzyciem bez towaru; przesyt karawan do miasta z brakiem (CaravanTrade284.Seg285).
+        /// Liczona przed Line (Line zeruje liczniki doby i wozow). Tylko log.</summary>
+        private static string Line285(int day)
+        {
+            var s = Settings.Current;
+            if (s == null || _items == null) return null;
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            var inv = CultureInfo.InvariantCulture;
+            var sb = new StringBuilder(900);
+            sb.Append("Srebro i surowce zbytkow (285): dzien ").Append(day).Append(" | klucze: w tabeli zamowien ").Append(s.TownMaterialOrderLuxuryInputs ? "TAK" : "NIE")
+              .Append(", przesyt karawan do miasta z brakiem ").Append(s.CaravanGlutToShortTown ? "TAK" : "NIE").Append(", zamowienia ").Append(On ? "TAK" : "NIE");
+            for (int m = M0; m < M; m++)
+            {
+                var it = _items[m];
+                int k = m - M0;
+                long shelf = 0, packs = 0; int towns = 0, empty = 0, emptyUse = 0;
+                if (it != null)
+                {
+                    foreach (var t in Town.AllTowns)
+                    {
+                        if (t == null || !t.IsTown || t.Owner == null || t.Owner.ItemRoster == null) continue;
+                        towns++;
+                        int h = t.Owner.ItemRoster.GetItemNumber(it);
+                        shelf += h;
+                        if (h <= 0) { empty++; float[] a; if (_useAvg.TryGetValue(t, out a) && a[m] > 0.05f) emptyUse++; }
+                    }
+                    foreach (var mp in MobileParty.AllCaravanParties) if (mp != null && mp.IsActive && mp.ItemRoster != null) packs += mp.ItemRoster.GetItemNumber(it);
+                }
+                float use = 0f; foreach (var kv in _useAvg) if (kv.Value != null) use += kv.Value[m];
+                sb.Append(" | ").Append(Names[m]).Append(": proby ").Append(_l285Try[k]).Append(", kontrakty karawan ").Append(_dMadeQty[m]).Append(" szt.")
+                  .Append(", wozem kupcow ").Append(MaterialCarts.QtyToday(m)).Append(" szt., dowiezione kontraktem ").Append(_l285Done[k]).Append(" / wozem ").Append(_l285Arr[k])
+                  .Append(" szt., w drodze wozami ").Append(it != null ? MaterialCarts.InTransitOf(it) : 0).Append(", polki miast ").Append(shelf).Append(", juki karawan ").Append(packs)
+                  .Append(", zuzycie zmierzone miast ").Append(use.ToString("0.0", inv)).Append("/d, miasta bez towaru ").Append(empty).Append(" z ").Append(towns)
+                  .Append(" (z zuzyciem ").Append(emptyUse).Append(')');
+            }
+            sb.Append(" | ").Append(CaravanTrade284.Seg285());
+            double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            sb.Append(" | czas ").Append(ms.ToString("0.0", inv)).Append(" ms, potkniecia ").Append(_stumbles).Append('.');
+            Array.Clear(_l285Try, 0, _l285Try.Length); Array.Clear(_l285Done, 0, _l285Done.Length); Array.Clear(_l285Arr, 0, _l285Arr.Length);
+            return sb.ToString();
+        }
+
         /// <summary>F4a (test zbiorczy 5-8, R1-7): prog nadwyzki miasta-zrodla dla wozow dymarek (Bloomery.Daily) - ta sama regula co kontrakty 174
         /// ("co miasto sprzedaje na zewnatrz": prog karawan, 10 dob zuzycia, wlasny punkt zamowienia), z pamieci doby (SourceKeepDay; Bloomery.Daily biegnie
         /// przed MaterialOrders.Daily, ktore te pamiec czysci - kontrakty licza swoj prog od nowa jak dotad). Surowiec spoza tabeli albo blad -
@@ -1159,7 +1247,7 @@ namespace Armoury
             try
             {
                 int m;
-                if (t == null || item == null || Settings.Current == null || !Ready() || !_ix.TryGetValue(item, out m)) return int.MaxValue;
+                if (t == null || item == null || Settings.Current == null || !Ready() || !Ix(item, out m)) return int.MaxValue;
                 return SourceKeepDay(t, m);
             }
             catch (Exception e) { Stumble("SourceKeepFor", e); return int.MaxValue; }
@@ -1190,7 +1278,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || t == null || item == null || !t.IsTown) return 0;
                 int m;
-                int sk = Ready() && _ix.TryGetValue(item, out m) ? SourceKeepDay(t, m) : SafeKeep(t, item);
+                int sk = Ready() && Ix(item, out m) ? SourceKeepDay(t, m) : SafeKeep(t, item);
                 int load = (int)Math.Ceiling(Math.Max(0f, s.TownMaterialOrderMinLoadKg) / Kg(item));
                 return Math.Max(0, sk) + Math.Max(Math.Max(0, sk), load);
             }
@@ -1214,7 +1302,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 int m;
-                if (s == null || !On || src == null || item == null || !src.IsTown || !Ready() || !_ix.TryGetValue(item, out m)) return 0;
+                if (s == null || !On || src == null || item == null || !src.IsTown || !Ready() || !Ix(item, out m)) return 0;
                 var from = src.Settlement;
                 if (from == null || from.IsUnderSiege) return 0;
                 int day = (int)CampaignTime.Now.ToDays;
@@ -1496,6 +1584,7 @@ namespace Armoury
             if (c.Naval) _dDoneSea++;
             if (c.Packs) _dDonePacks++;
             if (c.Mat == Ore && sold > 0 && town != null) { int dq; _dstOreSince.TryGetValue(town, out dq); _dstOreSince[town] = dq + sold; _o2CarDone += sold; }   // 282: + licznik doby
+            if (c.Mat >= M0 && c.Mat < M) _l285Done[c.Mat - M0] += sold;   // 285: tylko log
             // poprawka 174b (recenzja): dni drogi od chwili zawarcia (Start), nie od doby ucietej do int - bez fazy taktu doby (w sklad6 ok. +0.2 doby);
             // srednia "dob drogi" w linii dnia liczy dalej od c.Day (porownywalna z sklad6)
             NoteTrip(town, c.Mat, (float)(CampaignTime.Now.ToDays - (c.Start >= 0.0 ? c.Start : c.Day)));

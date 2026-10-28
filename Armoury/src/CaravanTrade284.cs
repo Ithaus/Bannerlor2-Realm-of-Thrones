@@ -87,6 +87,7 @@ namespace Armoury
             _acc.Clear(); _sellIdx.Clear(); _sellDay = -1;
             Path = 0; _bkSelling = 0; _vanSelling = 0; _b.Mp = null;
             _stumbleSess = 0; _err.Clear();
+            _g285N = _g285C = 0; _g285Acts = 0; _g285By.Clear();   // 285
             ZeroDay();
         }
 
@@ -422,6 +423,24 @@ namespace Armoury
                 double unit = CaravanGoods.UnitCost(mp, it);
                 if (!(unit > 0.0)) return;
                 int k = CaravanGoods.MaxAtCost(__1.Settlement.Town, __1.Settlement, mp, __2.EquipmentElement, __3, unit);
+                // 285 (klucz CaravanGlutToShortTown): towar z zamknietym kupnem (przesyt - juki ponad 10 dob sprzedazy swiata) i surowiec tabeli zamowien, ktorego temu miastu
+                // brakuje do wlasnego punktu zamowienia (MaterialOrders.ShortOf) - brak miasta schodzi po cenie dnia takze ponizej kosztu (strata juz zaszla przy zakupie;
+                // stos w jukach i pusta polka warsztatu to ten sam towar). Reszta jak dotad - nie ponizej kosztu.
+                if (k < __3 && s.CaravanGlutToShortTown && GateShut(it.ItemCategory))
+                {
+                    int sh = MaterialOrders.ShortOf(__1.Settlement.Town, it);
+                    if (sh > 0)
+                    {
+                        int k2 = Math.Min(__3, Math.Max(Math.Max(0, k), sh));
+                        int rel = k2 - Math.Max(0, k);
+                        if (rel > 0)
+                        {
+                            _g285N += rel; _g285C += (long)Math.Round(rel * unit); _g285Acts++;
+                            var cid = it.ItemCategory.StringId ?? "?"; int g0; _g285By.TryGetValue(cid, out g0); _g285By[cid] = g0 + rel;
+                            k = k2;
+                        }
+                    }
+                }
                 if (k < __3)
                 {
                     if (bk) { _bkHeldN += __3 - k; _bkHeldC += (long)Math.Round((__3 - k) * unit); }
@@ -434,6 +453,23 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("SellGuardPrefix", e); }
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        // 285: przesyt karawan do miasta z brakiem surowca tabeli (SellGuardPrefix) - liczniki od ostatniej linii 285
+        private static long _g285N, _g285C; private static int _g285Acts;
+        private static readonly Dictionary<string, int> _g285By = new Dictionary<string, int>();
+
+        /// <summary>285 (MaterialOrders.Line285): odcinek "przesyt karawan do miasta z brakiem" i zerowanie licznikow.</summary>
+        internal static string Seg285()
+        {
+            var sb = new StringBuilder(200);
+            sb.Append("przesyt karawan do miasta z brakiem (sprzedaz BK i gry ponizej kosztu dopuszczona do braku miasta): sztuk ").Append(_g285N).Append(" (koszt ").Append(_g285C)
+              .Append(" zl) w ").Append(_g285Acts).Append(" sprzedazach [");
+            bool f = true;
+            foreach (var kv in _g285By) { sb.Append(f ? "" : ", ").Append(kv.Key).Append(' ').Append(kv.Value); f = false; }
+            sb.Append(f ? "-]" : "]");
+            _g285N = _g285C = 0; _g285Acts = 0; _g285By.Clear();
+            return sb.ToString();
         }
 
         /// <summary>CaravanBulk.Sell: sztuki surowca wstrzymane, bo poszlyby ponizej kosztu (glut - rozladunek ponad brak).</summary>
@@ -506,6 +542,8 @@ namespace Armoury
         public static bool SizePrefix(MobileParty __0, Settlement __1)
         {
             if (__0 == null || __1 == null || !__0.IsCaravan || !__1.IsTown) return true;
+            // 285 (klucz CaravanGuardByRisk): straz wedlug drogi i majatku - najem do potrzeby i zwolnienie nadwyzki (CaravanGuards285); false = cialo gry pominiete
+            if (!CaravanGuards285.Recruit(__0, __1)) return false;
             try
             {
                 _fCalls++;

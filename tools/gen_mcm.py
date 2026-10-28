@@ -706,6 +706,12 @@ LABELS = {
     'TownMaterialOrderEqualCoverAll': 'All Material Sources Sell Down To Reorder Point',
     'TownMaterialOrderWorkshopInputs': 'Material Orders For Goods Workshops',
     'CaravanSizeByTrade': 'Caravan Guards By Trade Earnings',
+    # 285: nazwy opisowe (regula ogolna dalaby "Caravan Guard By Risk", "Ks Iron Stock Trend")
+    'CaravanGuardByRisk': 'Caravan Guards By Road And Cargo',
+    'TownMaterialOrderLuxuryInputs': 'Material Orders - Silver, Silk And Clay',
+    'CaravanGlutToShortTown': 'Hoarded Caravan Goods To Towns Short Of Them',
+    'KsIronFullCountsTransit': 'Ks Iron Market Full Counts Iron On The Road',
+    'KsIronStockTrend': 'Ks Iron Hands Follow Growing Stock',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
@@ -48,6 +49,9 @@ namespace Armoury
         private const float F5Up = 1.05f, F5Down = 0.95f;
         private const float F5StarvUp = 0.1f, F5StarvDown = 0.5f;   // wzrost tylko przy dymarce prawie bez brakow drewna (< 10% modelu bez drewna) - 'kopalnia bez wegla' nie rosnie z rekami
         private static int _f5Stum;
+        // 285: zapas rynku (polki + droga + juki karawan) z poprzedniego kroku - trend; -1 = bez pomiaru (pierwszy krok sesji). Pamiec sesji, zerowana w Reset.
+        private static readonly long[] _f5Tot = { -1, -1 };
+        internal static void F5Reset285() { _f5Tot[0] = _f5Tot[1] = -1; }
 
         internal static bool F5IronOn { get { var s = Settings.Current; return s != null && s.KsIronHandsFollowMarket; } }
 
@@ -86,8 +90,38 @@ namespace Armoury
                 }
                 catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(miasto)", e); }
             }
+            // 285: juki karawan rynku (miasto, w ktorym stoi, jego cel albo dom) - do trendu zapasu rynku (rozladunek karawan na polki to nie produkcja)
+            var C = new long[2];
+            try
+            {
+                foreach (var cp in MobileParty.AllCaravanParties)
+                {
+                    if (cp == null || !cp.IsActive || cp.ItemRoster == null) continue;
+                    int n = cp.ItemRoster.GetItemNumber(iron);
+                    if (n <= 0) continue;
+                    var ct = cp.CurrentSettlement != null ? cp.CurrentSettlement.Town : null;
+                    if (ct == null && cp.TargetSettlement != null) ct = cp.TargetSettlement.Town;
+                    if (ct == null && cp.HomeSettlement != null) ct = cp.HomeSettlement.Town;
+                    int cm = ct != null ? TownMarket(ct) : -1;
+                    if (cm == 0 || cm == 1) C[cm] += n;
+                }
+            }
+            catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(juki 285)", e); }
+            // 285 (klucz KsIronFullCountsTransit): rynek pelny liczony tak jak brak - z polkami i zelazem w drodze: S + R > 2T (dotad S > 2T przy brak S + R < T -
+            // log 133a: Westeros polki z droga 2.10 i 2.29 przy decyzji PASMO w 109028 i 109035, pierwszy PELNY dopiero 109042). Klucz KsIronStockTrend: w pasmie
+            // T..2T zapas rynku (polki + droga + juki karawan) wiekszy niz przy poprzednim kroku = wydobycie ponad zuzycie - w dol x0.95 (log 133a: swiat +52 lup/d
+            // w ostatnich 10 dobach przy PASMIE). Pierwszy krok sesji bez pomiaru - bez trendu.
+            var s285 = Settings.Current;
+            bool fullR = rOn && s285 != null && s285.KsIronFullCountsTransit, trendOn = s285 != null && s285.KsIronStockTrend;
+            var tot = new long[2]; var prevTot = new long[2]; var trend = new bool[2];
             var dec = new int[2];                                  // +1 brak, -1 pelny, 0 pasmo, 2 bez celu (zapas rzemiosla nieznany)
-            for (int m = 0; m < 2; m++) dec[m] = T[m] <= 0 ? 2 : S[m] + (rOn ? R[m] : 0) < T[m] ? 1 : S[m] > 2 * T[m] ? -1 : 0;
+            for (int m = 0; m < 2; m++)
+            {
+                tot[m] = S[m] + R[m] + C[m]; prevTot[m] = _f5Tot[m];
+                dec[m] = T[m] <= 0 ? 2 : S[m] + (rOn ? R[m] : 0) < T[m] ? 1 : S[m] + (fullR ? R[m] : 0) > 2 * T[m] ? -1 : 0;
+                if (dec[m] == 0 && trendOn && prevTot[m] >= 0 && tot[m] > prevTot[m]) { dec[m] = -1; trend[m] = true; }
+                _f5Tot[m] = tot[m];
+            }
             // 2. bloki z zelazem
             int nIn = 0, nUp = 0, nDnFull = 0, nDnStarv = 0, nPart = 0, nBand = 0, nNoT = 0, nNoData = 0, nCap = 0, nBusy = 0;
             int nColl = 0;                                         // f7-wegiel (recenzja): wpisy bez wzrostu tylko przez rece weglarzy (bez drewna < 10%, z weglarzami >= 10%)
@@ -191,9 +225,13 @@ namespace Armoury
                 sb.Append(" | ").Append(mn[m]).Append(": polki ").Append(S[m]).Append(" / cel ").Append(T[m])
                   .Append(" (").Append(T[m] > 0 ? ((double)S[m] / T[m]).ToString("0.00", inv) : "-").Append("), brak ").Append(D[m]).Append(" w ").Append(nS[m])
                   .Append(" miastach, bez rudy ").Append(nE[m]).Append(" z ").Append(nT[m]).Append(" miast -> ")
-                  .Append(dec[m] == 1 ? "BRAK (w gore)" : dec[m] == -1 ? "PELNY (w dol)" : dec[m] == 0 ? "PASMO (bez zmian)" : "BEZ CELU (bez zmian)")
+                  .Append(dec[m] == 1 ? "BRAK (w gore)" : dec[m] == -1 ? (trend[m] ? "PELNY (w dol, zapas rosnie - 285)" : "PELNY (w dol)") : dec[m] == 0 ? "PASMO (bez zmian)" : "BEZ CELU (bez zmian)")
                   .Append(", w drodze do miast ").Append(R[m]).Append(" (polki z droga ").Append(T[m] > 0 ? ((double)(S[m] + R[m]) / T[m]).ToString("0.00", inv) : "-")
-                  .Append(rOn ? ", 282 - liczone)" : ", 282 - klucz NIE, nie liczone)");
+                  .Append(rOn ? ", 282 - liczone)" : ", 282 - klucz NIE, nie liczone)")
+                  .Append("; 285: pelny z droga ").Append(fullR ? "TAK" : "NIE").Append(", zapas rynku (polki + droga + juki karawan) ")
+                  .Append(prevTot[m] >= 0 ? prevTot[m].ToString(inv) : "-").Append(" -> ").Append(tot[m])
+                  .Append(prevTot[m] >= 0 ? " (" + (tot[m] - prevTot[m] >= 0 ? "+" : "") + (tot[m] - prevTot[m]).ToString(inv) + ")" : "")
+                  .Append(", juki karawan ").Append(C[m]).Append(", trend ").Append(trend[m] ? "W DOL" : trendOn ? "-" : "NIE (klucz)");
             }
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
               .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(Bloomery.F7On ? " (w tym przez rece weglarzy f7-wegiel " + nColl + ")" : "").Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)

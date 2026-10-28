@@ -91,6 +91,9 @@ namespace Armoury
             return dst != null && m >= 0 && m < _mats && _incoming.TryGetValue(dst, out a) ? a[m] : 0;
         }
 
+        /// <summary>285 (MaterialOrders.Line285): sztuki surowca m kupione wozem od ostatniej linii 174 (licznik doby, tylko odczyt).</summary>
+        internal static int QtyToday(int m) { return m >= 0 && m < _dQty.Length ? _dQty[m] : 0; }
+
         internal static long InTransitPieces() { long n = 0; foreach (var c in _carts) n += c.N; return n; }
 
         internal static long InTransitOf(ItemObject item) { long n = 0; if (item != null) foreach (var c in _carts) if (ReferenceEquals(c.Item, item)) n += c.N; return n; }

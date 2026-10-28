@@ -9560,6 +9560,26 @@ namespace Armoury
         [SettingPropertyGroup("Merchant trade and raw materials (284)")]
         public bool CaravanSizeByTrade { get; set; } = false;
 
+        [SettingPropertyBool("Caravan Guards By Road And Cargo", HintText = "a caravan hires guards only up to what its road and cargo need: the smallest escort its culture's caravans set out with, more when a strong bandit band roams within a day's road of this town or its next one (enough men to match the strongest band), scaled by how much coin and goods it carries against its trading capital; guards above that are paid off in town and go home like any discharged soldier. Off = measured in the log only", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
+        public bool CaravanGuardByRisk { get; set; } = true;
+
+        [SettingPropertyBool("Material Orders - Silver, Silk And Clay", HintText = "silver, raw silk and clay join the raw materials towns order: a town whose silversmith, silk weaver or potter stops for lack of them (or whose stock falls below its reorder point) orders them from towns with a surplus, by merchant cart or a caravan that already carries them", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
+        public bool TownMaterialOrderLuxuryInputs { get; set; } = true;
+
+        [SettingPropertyBool("Hoarded Caravan Goods To Towns Short Of Them", HintText = "a good caravans already hoard (they stopped buying it - more in their packs than ten days of sales) may be sold below what the caravan paid, but only as much as the town is short of it for its own workshops - the loss was made when it was bought, the empty workshop is real", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
+        public bool CaravanGlutToShortTown { get; set; } = true;
+
+        [SettingPropertyBool("Ks Iron Market Full Counts Iron On The Road", HintText = "with Ks Iron Hands Count Iron On The Road: the weekly step also counts the iron on its way to the towns when it decides the market is full (until now only when it decided it was short)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
+        public bool KsIronFullCountsTransit { get; set; } = true;
+
+        [SettingPropertyBool("Ks Iron Hands Follow Growing Stock", HintText = "with Ks Iron Hands Follow Market: when the market is neither short nor full but its iron (stalls, carts on the road and caravan packs) grew since the last weekly step, the mines get fewer hands - the mines follow what is really used", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
+        public bool KsIronStockTrend { get; set; } = true;
+
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsFollowMarket { get; set; } = true;
@@ -12681,6 +12701,11 @@ namespace Armoury
             s.TownMaterialOrderEqualCoverAll = TownMaterialOrderEqualCoverAll;
             s.TownMaterialOrderWorkshopInputs = TownMaterialOrderWorkshopInputs;
             s.CaravanSizeByTrade = CaravanSizeByTrade;
+            s.CaravanGuardByRisk = CaravanGuardByRisk;
+            s.TownMaterialOrderLuxuryInputs = TownMaterialOrderLuxuryInputs;
+            s.CaravanGlutToShortTown = CaravanGlutToShortTown;
+            s.KsIronFullCountsTransit = KsIronFullCountsTransit;
+            s.KsIronStockTrend = KsIronStockTrend;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;

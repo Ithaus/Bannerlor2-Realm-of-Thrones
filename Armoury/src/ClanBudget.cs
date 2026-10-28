@@ -1570,6 +1570,17 @@ namespace Armoury
             return done * gold;   // WW-J: zold partii zdjety zwolnieniem (bez zalog okretow Wysp gold = 1 - jak dotad)
         }
 
+        /// <summary>285 (CaravanGuards285, klucz CaravanGuardByRisk): karawana w miescie odprawia straz ponad potrzebe drogi - TA SAMA droga co zwolnieni 166
+        /// (ReleaseFrom: ludzie do ludnosci BK wsi tego miasta - wies jego okregu, czesc od VeteranMinTier do karczmy E4/10, udzialy pochodzenia do ksiegi ludzi
+        /// przyczyna M166, czesc sakiewki partii z odchodzacymi do kiesy wsi / puli weteranow). Liczone tez w linii 166 "zwolnieni: do wsi ... z partii" (jedno
+        /// zjawisko - jedna droga i jedna ksiega). Zwraca, ilu odeszlo (0 - brak wsi z danymi BK albo wyjatek; nikt nie znika).</summary>
+        internal static int ReleaseCaravanGuards(MobileParty mp, Settlement town, int men)
+        {
+            if (mp == null || town == null || men <= 0 || !mp.IsCaravan) return 0;
+            try { return (int)Math.Round(ReleaseFrom(mp, town, null, men, true, false, false)); }
+            catch (Exception e) { Stumble("ReleaseCaravanGuards(285)", e); return 0; }
+        }
+
         // ------------------------------------------------------------ ludnosc BK (refleksja - wzor LosersFlee/Levy; tylko osady z danymi BK)
         private static bool _bkTried;
         private static object _popMgr;

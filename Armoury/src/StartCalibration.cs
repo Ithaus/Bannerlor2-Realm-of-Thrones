@@ -88,6 +88,7 @@ namespace Armoury
             _armDay = -1; _armHash = 0; _armLandCrc = 0; _applyHash = 0; _autotest = false; _shelvesDone = false;
             _pending = null; _keepRaw = null; _loadNote = ""; _exportLogged = -1;
             _stumbles = _stumblesDay = 0; _err.Clear(); _offLogged = false; _lastPlanDay = int.MinValue; _keyLineDay = int.MinValue;
+            F5Reset285();   // 285: trend zapasu rudy rynku - pamiec sesji
             PlanReset();
             LiveReset();
             RampReset();
