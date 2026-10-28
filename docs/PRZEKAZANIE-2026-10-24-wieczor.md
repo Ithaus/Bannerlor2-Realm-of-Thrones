@@ -1,5 +1,16 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 02:30 CET - WGRANIE 133 (132 + 283); LINIA GLOWNA = noc/132-handel-bez-283 (zb\n132h)
+- 133a (ea1df735, Armoury 85a4c057): 7 bitew + probyN 30 dob kod 0, ERROR 0, m110anim czysto. nekanie283: N283-1 A TAK (wykryc 13, lucznikow 42, strzaly 30,
+  jezdzcow 7 / wolnej 6, szykow stoi 3), N283-4 TAK (FF 1/30), N283-5 TAK, J204-3 TAK (kontakt 6.6 s); NIE: N283-2 B (testowy pieszy - 'odwrot rannego', wykryc 0),
+  N283-3 C (testowy wrecz - panika/odwrot, wykryc 0), J204-1 (wykryc 13, a prog liczy linie testu - do sprawdzenia regexu). W bitwach ogolnie: wykryc 555
+  (pieszy strzelec 127, wrecz 83) - reakcje dzialaja tez dla nie-testowych. Ekonomia jak 132c (H284-1 TAK; H284-2/3/4, RU282-1/3/6/7 NIE poza celem).
+- WGRANIE 133 o 02:29 (wgraj133.ps1); kopie .bak-2026-10-28-przed-wgranie133 i D:\Backup-Bannerlord\wgrane\2026-10-28-wgranie133-przed; zapis testowy na D:.
+  CHANGELOG 283 = WGRANE 133 (d7b23443 na noc/132-handel-bez-283, wypchniete).
+- noc/161-integracja (8983380b) jest NIEAKTUALNA (283 bez 283c) - kolejne paczki od noc/132-handel-bez-283.
+- Do zrobienia: scenariusze testowe B/C 283 (nekajacy pieszy i wrecz ranny przed wykryciem), J204-1 regex, zold karawan vs marza (H284-2), srebro/bawelna/glina
+  w tabeli zamowien, ruda RU282-3/7, NWAR-15, 5-8 ludzi/dobe 'w nicosc ... inne'.
+
 ## DOPISEK 28.10 ok. 02:05 CET - 283c gotowe (b469d60d), 133 zbudowane (noc/132-handel-bez-283 ea1df735, Armoury 85a4c057), AUTOTEST 133a w toku
 - 283c: wspolna przyczyna - nekajacy testu jechal tempem szyku (gra ustawia predkosc z szyku); PostSpeed zdejmuje limit tylko w autotescie. Postoj: brama 'strona
   lamana' byla odwrocona, 110 m liczone do pieszych szykow wroga >= 8; R5 po 3 trafieniach; szyk obraca sie frontem. FF: przyjaciel przy celu w rozrzucie blokuje
