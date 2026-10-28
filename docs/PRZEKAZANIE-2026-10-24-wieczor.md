@@ -1,5 +1,10 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 01:40 CET - Jeff: "dokoncz na tym koncie" - 283c w toku (workflow wf_9a99a574-e3d)
+- Skrypt: workflows/scripts/poprawka-283c-wf_9a99a574-e3d.js (bez args; resumeFromRunId). Agent poprawia zb/n283 (od 8fe43105). Potem: 133 = noc/132-handel-bez-283
+  + merge 283 (CHANGELOG/sprawdz_logi scal_sklad z bazy 9d807118: galezie 14b55ae5 i 283 - albo rozwiazac recznie), build, autotest testy-noc-283.ps1 7 bitew
+  -CsAt cs-at283/CrashScribe-at-n283.dll + probyN 30 dob, grupy nekanie283 m204jazda m110anim handel284 + reszta, WGRANIE 133 gdy nekanie283 bez NIE.
+
 ## DOPISEK 28.10 ok. 01:20 CET - WGRANIE 132 (131 + 284, BEZ 283); START DLA NASTEPNEGO KONTA: 283c
 - 132c (zb\n132h, noc/132-handel-bez-283 a2ef2e32): bitwaN 4 bitwy + probyN 30 dob kod 0, ERROR 0; handel284 jak 132b (H284-1 TAK, H284-6 TAK; H284-2/3/4/5 NIE
   poza celem), ruda282 RU282-1/3/7 jak przed, E223-8 jednorazowe, NWAR-15 jak 132a. Wyniki m113\wyniki\grupy-132c\.
