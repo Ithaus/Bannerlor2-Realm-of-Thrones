@@ -1,5 +1,12 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 02:05 CET - 283c gotowe (b469d60d), 133 zbudowane (noc/132-handel-bez-283 ea1df735, Armoury 85a4c057), AUTOTEST 133a w toku
+- 283c: wspolna przyczyna - nekajacy testu jechal tempem szyku (gra ustawia predkosc z szyku); PostSpeed zdejmuje limit tylko w autotescie. Postoj: brama 'strona
+  lamana' byla odwrocona, 110 m liczone do pieszych szykow wroga >= 8; R5 po 3 trafieniach; szyk obraca sie frontem. FF: przyjaciel przy celu w rozrzucie blokuje
+  strzal, wrecz z przyjacielem w 6 m - bez strzalu. C: straz strzelcow - piechota do 110 m. Linia 'faza szkoda' - sprawdzic przed uznaniem TAK.
+- AUTOTEST 133a (zadanie bs7mx6gt7, m113/seria-133a.out.txt; testy-noc-283.ps1 7 bitew + probyN 30). Gdy nekanie283 bez NIE i reszta jak 132c -> WGRANIE 133
+  (DLL test/mfinal133a, stara 1a112ad9). Jesli 283 dalej NIE - 132 zostaje.
+
 ## DOPISEK 28.10 ok. 01:40 CET - Jeff: "dokoncz na tym koncie" - 283c w toku (workflow wf_9a99a574-e3d)
 - Skrypt: workflows/scripts/poprawka-283c-wf_9a99a574-e3d.js (bez args; resumeFromRunId). Agent poprawia zb/n283 (od 8fe43105). Potem: 133 = noc/132-handel-bez-283
   + merge 283 (CHANGELOG/sprawdz_logi scal_sklad z bazy 9d807118: galezie 14b55ae5 i 283 - albo rozwiazac recznie), build, autotest testy-noc-283.ps1 7 bitew
