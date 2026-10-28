@@ -1,5 +1,12 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 23:25 CET - Jeff: Efficient Campaigner ma dzialac CALY CZAS, nie tylko w armii
+- Jeff: "tak nie tylko w armii efektywny campaigner oznacza ze caly czas a nie ze w armii". DO ZROBIENIA po 288 (ten sam plik MountedWage.cs - nie rownolegle):
+  w TotalPostfix GetTotalWage, gdy partia NIE w armii i HasPerk(Steward.EfficientCampaigner, true) (kwatermistrz) -> AddFactor(SecondaryBonus = -0.25,
+  nazwa perka); w armii BK juz dodaje - nie dublowac. Dla wszystkich partii z perkiem (AI tez). Klucz MCM 'EfficientCampaignerAlways' TAK. Razem z 288 w tescie.
+- Jeff pytal o slub z towarzyszka: BK BKMarriageModel dopuszcza towarzyszki (CompanionOf: -25% wartosci malzonka i posagu; warunki: klan, nie w armii/bitwie/
+  niewoli, wiek, wiara i pokrewienstwo z doktryny religii).
+
 ## DOPISEK 28.10 ok. 23:15 CET - Jeff: zold karawan -50% dla calego swiata (kupiec 3, straznik 4, weteran 6) + kto placi jedzenie i nocleg - paczka 288 w toku
 - Workflow wf_b1c73599-411 (skrypt workflows/scripts/paczka-288-wf_b1c73599-411.js, bez args; resumeFromRunId) na noc/285-zold-srebro-ruda (zb/n285, od 352ebab2).
   Klucz CaravanWageHalf (MountedWage.TotalPostfix), wszystkie odczyty zoldu karawan (259, 285/286, 284, 166, linie, grupy), jedzenie/nocleg karawan.
