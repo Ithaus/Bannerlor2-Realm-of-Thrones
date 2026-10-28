@@ -1,5 +1,14 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 28.10 ok. 21:45 CET - WGRANIE 135 (134 + 286 + 286b + 287); LINIA GLOWNA noc/285-zold-srebro-ruda (zb/n285)
+- 135c (90 dob, wyniki m113/wyniki/grupy-135c) wobec 134b: sprzedaz karawan 167 -> 1062 szt./d, mediana zysku karawan 54 -> 368 (7 dob), bramka zamknieta
+  w 9% kategorii (bylo 100%), rozbite 4.21 -> 2.98/d (ostatnie 30 dob 3.27), miasta bez rudy 22.8 -> 7.9, udzial wyplat 0.128 -> 0.115, zelazo -28 -> -36/d,
+  srebro w jukach 1053 -> 1745, sprzedaz na stracie 348 -> 2964/d. H287-2 mediana wyniku handlu 18 wobec zoldu 159 zl/d (NIE). Karawana Jeffa w tescie rozbita
+  po 57 dobach (bez zwolnien strazy; w 134b przezyla) - przypadek bandy czy straz za slaba przy kluczu tylko-dobor - DO SPRAWDZENIA.
+- WGRANIE 135 o 21:42 (wgraj135.ps1), kopie .bak-2026-10-28-przed-wgranie135 i D:/Backup-Bannerlord/wgrane/2026-10-28-wgranie135-przed; zapis testowy na D:.
+- Dalej: karawana gracza (czemu rozbita, straz pelna), wynik handlu wobec zoldu (H287-2), zelazo -36/d i spadek rak Essos poza f5, srebro, bramka surowcow
+  masowych z popytu miast (jak 287), sprzedaz na stracie 2964/d.
+
 ## DOPISEK 28.10 ok. 19:15 CET - 287 GOTOWE (a2c137f6 + c3b5528d, Armoury 5cfd8c21), AUTOTEST 90 DOB 135c w toku
 - Przyczyna handlu: NIE za male roznice cen (futra Westeros 7.36 / Essos 3.93 itd.), tylko bramka przeplywu 284 mierzona sprzedaza samych karawan -
   kupno stalo w 35-36 z 36 kategorii przez 84 doby, karawany tylko wyprzedawaly juki z wczytania. Klucz CaravanFlowByMarketDemand (zbyt = max(sprzedaz
