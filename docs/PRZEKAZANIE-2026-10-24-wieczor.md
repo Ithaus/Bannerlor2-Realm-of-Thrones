@@ -1,5 +1,13 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 29.10 ok. 00:05 CET - WGRANIE 136 (135 + 288 + 289)
+- 136a (90 dob, m113/wyniki/grupy-136a): zold karawan x0.499, stawki t1-3 2.21 / t4 3.71 / t5+ 5.60 / najemnicy 3.39, jedzenie w drodze 83% (glodne 13.4%),
+  zakupy na droge 15 640 szt. za 231 060 zl; mediana zysku karawan 414 (135c 368), udzial wyplat 0.146 (135c 0.115), wynik handlu 33 wobec zoldu 85 zl/d
+  (37% karawan >= zold), rozbite 2.27/d, miasta bez rudy 6.8; NIE: zelazo swiata -66.5/d (rosnie spadek - DO NAPRAWY), sprzedaz na stracie 2649/d.
+  Karawana Jeffa w tescie przezyla (132 doby), zysk ze sprzedazy +3 896, netto -34 841 (w tym 42 doby na pelnym zoldzie).
+- WGRANIE 136 o 23:59 (wgraj136.ps1), kopie .bak-2026-10-29-przed-wgranie136 i D:/Backup-Bannerlord/wgrane/2026-10-29-wgranie136-przed; zapis testowy na D:.
+- Nastepne: zelazo swiata (-66.5/d) - rece przy zlozach i spadek Essos poza f5; obrot karawan (wynik 33 wobec zoldu 85); sprzedaz na stracie.
+
 ## DOPISEK 28.10 ok. 23:45 CET - 288 + 289 gotowe (noc/285-zold-srebro-ruda 52da829d, Armoury ba0fbc05), AUTOTEST 90 DOB 136a w toku
 - 288 (c304ab3c + 7f8a6afe): CaravanWageHalf (MountedWage.CaravanHalf, linia podpowiedzi 'Merchant escort wage'); CaravanRoadFood (CaravanEscort.cs) - karawany
   wczesniej NIE jadly w drodze (DoesPartyConsumeFood false dla IsCaravan), teraz 1 szt./20 ludzi/dobe z jukow + zakup na droge przy wyjezdzie z kiesy karawany;
