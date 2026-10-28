@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
@@ -140,6 +141,7 @@ namespace Armoury
             try
             {
                 if (__0 != null && __0.IsCaravan) { if (CaravanHalfOn) CaravanHalf(__0, ref __result); return; }   // 288: karawany (Wysp w IsIronbornCrew i tak nie ma)
+                EfficientCampaignerAlways(__0, ref __result);   // 289: perk kwatermistrza takze poza armia
                 if (!CrownGifts.IsIronbornCrew(__0)) return;
                 float b = __result.BaseNumber;
                 if (!(b > 0f)) return;
@@ -151,6 +153,22 @@ namespace Armoury
                 _ironStumbles++;   // licznik potkniec (bez globalnego wylacznika - CLAUDE.md 7); pierwszy do pliku
                 if (!_ironErr) { _ironErr = true; try { Log.Error("MountedWage.TotalPostfix (WW-J)", e); } catch { } }
             }
+        }
+
+        // 289 (Jeff 28.10: "tak nie tylko w armii efektywny campaigner oznacza ze caly czas a nie ze w armii"; klucz EfficientCampaignerAlways): BK dodaje
+        // Steward.EfficientCampaigner (SecondaryBonus -0.25, kwatermistrz - HasPerk(perk, true)) tylko przy Army != null; poza armia ten sam czynnik tu, ten sam
+        // perk i ta sama wartosc, z nazwa perka w podpowiedzi zoldu. W armii nic (BK juz dodal) - bez dublowania. Kazda partia z perkiem (gracz i lordowie AI).
+        private static int _ecHits;
+        internal static int EfficientCampaignerHits { get { return _ecHits; } }
+        private static void EfficientCampaignerAlways(MobileParty mp, ref ExplainedNumber r)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.EfficientCampaignerAlways || mp == null || mp.Army != null) return;
+            var perk = DefaultPerks.Steward.EfficientCampaigner;
+            if (perk == null || !mp.HasPerk(perk, true)) return;
+            if (!(r.BaseNumber > 0f)) return;
+            r.AddFactor(perk.SecondaryBonus, perk.Name);
+            _ecHits++;
         }
 
         // 288 (Jeff 28.10: "no to bez sensu jest obniz koszta karawany o 50% dla calego swiata, czyli kupiec zbrojny 3 straznik 4 weteran 6"; klucz CaravanWageHalf):

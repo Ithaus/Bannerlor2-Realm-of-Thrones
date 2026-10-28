@@ -9620,6 +9620,10 @@ namespace Armoury
         [SettingPropertyGroup("Caravan escort half pay and road food (288)")]
         public bool CaravanRoadFood { get; set; } = true;
 
+        [SettingPropertyBool("Efficient Campaigner Always", HintText = "the Steward perk Efficient Campaigner (the party's quartermaster has it) cuts the party's troop wages by 25% all the time, not only while the party is part of an army - for your party and for every lord whose quartermaster has the perk. Off = as in the game, only in an army", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan escort half pay and road food (288)")]
+        public bool EfficientCampaignerAlways { get; set; } = true;
+
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsFollowMarket { get; set; } = true;
@@ -12756,6 +12760,7 @@ namespace Armoury
             s.KsIronFullOnlyOwnTown = KsIronFullOnlyOwnTown;
             s.CaravanWageHalf = CaravanWageHalf;
             s.CaravanRoadFood = CaravanRoadFood;
+            s.EfficientCampaignerAlways = EfficientCampaignerAlways;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;

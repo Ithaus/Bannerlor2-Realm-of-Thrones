@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-28 289 (galaz noc/285-zold-srebro-ruda, po 288) - perk Efficient Campaigner (kwatermistrz, -25% zoldu ludzi partii) takze poza armia
+**Problem:** Jeff 28.10: "czy to -25% party wage dziala, bo nie widze abym mniej placil za utrzymanie armii", potem "ale to powinien byc zold w mojej druzynie
+a nie w armii" i "tak nie tylko w armii efektywny campaigner oznacza ze caly czas a nie ze w armii".
+**Przyczyna:** BannerKings BKPartyWageModel dodaje Steward.EfficientCampaigner (SecondaryBonus, kwatermistrz - HasPerk(perk, true)) tylko przy
+mobileParty.Army != null - zgodnie z opisem perka w grze. Jeff (kwatermistrz swojej druzyny, 498 zl/d za 50 ludzi) poza armia nie mial obnizki.
+**Zmiana:** MountedWage.TotalPostfix (GetTotalWage, Priority.Last): partia nie-karawana poza armia z perkiem kwatermistrza dostaje AddFactor(SecondaryBonus)
+z nazwa perka w podpowiedzi zoldu; w armii nic (BK juz dodal - bez dublowania). Dla gracza i lordow AI. Klucz EfficientCampaignerAlways (TAK).
+**Ryzyko / co sprawdzic:** zold druzyny Jeffa poza armia ok. 498 -> 375 zl/d (podpowiedz: linia Efficient Campaigner); w armii dalej -25% (nie -50%);
+budzet rodow 166 czyta ten sam zold. Licznik MountedWage.EfficientCampaignerHits (bez osobnej linii).
+**Status:** ZBUDOWANE - do autotestu (razem z 288).
+
 ## 2026-10-28 288 (galaz noc/285-zold-srebro-ruda od 352ebab2 = WGRANE 135, nie wgrane) - polowa zoldu eskorty karawan calego swiata (kupiec zbrojny, straznik, weteran, najemnicy karczmy; linia podpowiedzi 'Merchant escort wage'), karawany karmia eskorte w drodze z jukow i dokupuja jedzenie na droge przy wyjezdzie z miasta za kiese karawany; linia 'Karawany - zold eskorty i jedzenie w drodze (288)'; grupa karawany288
 **Problem:** Jeff 28.10 ok. 23:10, po wyjasnieniu, ze straz karawany kosztuje 5 (kupiec zbrojny, tier 3) / 8 (straznik karawan, tier 4 konny) / 12 (weteran, tier 5 konny) zl na dobe, a jego karawana 45 ludzi ok. 400-450 zl/d: "no to bez sensu jest obniz koszta karawany o 50% dla calego swiata, czyli kupiec zbrojny 3 straznik 4 weteran 6 i kto pokrywa wyzywienie i nocleg w karawanie?". Dowod z 285/286: 'Zold konnych (160)' 109055 - stawki jednostek karawan 9.68 zl na czlowieka wobec 5.26 w partiach rodow (karawana ma same tiery 3-5), zold karawan swiata ok. 104 tys. zl/d wobec wyniku handlu ok. +89 tys. zl/d.
 **Przyczyna:** (1) ZOLD: model gry - stawka jednostki wedlug tieru (t3 5, t4 8, t5 12, najemnik x1.5), BK (BKPartyWageModel.GetTotalWage) x BaseWage 1.25, karawana -25%, kultura wlasciciela -10% x udzial - nikt nie obniza zoldu eskorty ponizej zoldu zolnierza tego samego tieru. (2) JEDZENIE: gra DefaultMobilePartyFoodConsumptionModel.DoesPartyConsumeFood = false dla IsCaravan (BK BKPartyConsumptionModel, BEE, NavalDLC, ROT, BKROT tylko opakowuja - FoodChain.cs; BK BKPartyBehavior kupuje jedzenie tylko partiom, ktore jedza) - ludzie karawany w drodze nie jedli nic i nikt za to nie placil. NOCLEG I JEDZENIE W MIESCIE: zold ludzi karawany idzie do ich sakiewki (E3/4, Seal31B.CaravanWage - karawany notabli, lordow i gracza), a przy wyjezdzie karawana wydaje cala sakiewke 'na zycie' (karczma, jedzenie, nocleg - Seal31B.CaravanSpends -> kasa miasta i kiesa ludu) - to placa straznicy z wlasnego zoldu i tak zostaje. Karczmy TownInns (nocleg z sakiewki) dotycza tylko druzyny gracza - karawan nie.
