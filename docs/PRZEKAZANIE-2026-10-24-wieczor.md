@@ -1,5 +1,31 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 29.10 ok. 00:15 CET - START DLA DRUGIEGO KONTA (Jeff: "ok zapisz do przekazania na drugie konto") - stan zebrany w jednym miejscu
+- W GRZE: WGRANE 136 = Armoury.dll md5 ba0fbc0566593f77093b2b4fa07628e8 (galaz noc/285-zold-srebro-ruda, commit statusu po 52da829d, wypchnieta).
+  CrashScribe bef9db58, pliki danych: arm_houses_canon.tsv z 277 (5e1d8c20). Kopie poprzednich: Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll.bak-*
+  i D:\Backup-Bannerlord\wgrane\2026-10-2x-wgranieNNN-przed. Kampania Jeffa: IronmanKkUpHftX7ZIq.sav (Ironman), Jeff gra jako najemnik Polnocy (battania).
+- LINIA GLOWNA kodu: worktree scratchpad sesji fffc991e (projekt C--Users-GAME-Bannerlor2-Realm-of-Thrones)\zb\n285, galaz noc/285-zold-srebro-ruda.
+  Historia wgran: 129 (241/259/264/268/272/274), 130 (277), 131 (280/281/282), 132 (284), 133 (283), 134 (285), 135 (286/286b/287), 136 (288/289).
+  UWAGA: noc/161-integracja i noc/132-handel-bez-283 sa STARSZE - nie budowac z nich. Kolejne paczki: nowa galaz od noc/285-zold-srebro-ruda.
+- PROCEDURA (sprawdzona dzis): build `cd zb\<w>\Armoury && dotnet build Armoury.csproj -c Release -v q --nologo`; autotest przy WYLACZONEJ grze:
+  scratchpad sesji 6570af7b...\m113\testy-noc-204.ps1 -Dll <katalog> -NowyArmoury <dll> -Tree <worktree> -Prefix <id> -Runs kopia,bitwaN,probyN -ProbyDays 30|90
+  -CsAt <...\6ba92574...\scratchpad\test\CrashScribe-at-n204.dll> -ExtraFlags armoury-pokoj264.flag,armoury-zbroja268.flag,armoury-rownowaga274.flag,
+  armoury-karawany.flag,armoury-rody277.flag (bitwy 283: testy-noc-283.ps1 z 7 bitwami i -CsAt scratchpad sesji 1e1c276a\cs-at283\CrashScribe-at-n283.dll).
+  Przed testem: gdy Jeff gral - skopiowac jego Ironman do autotest-przekierowany-IronmanKkUpHftX7ZIq.sav i usunac m113\zapisy\baza-*.sav (wrapper zrobi nowe zdjecie).
+  Grupy: python -I <worktree>\tools\sprawdz_logi.py --grupa <g> <log> (w logi\<id>-probyN moze lezec stary log - brac najnowszy po dacie).
+  Wgranie: skrypt scratchpad sesji 1e1c276a\wgrajNNN.ps1 (wzor wgraj136.ps1: sprawdza gre, md5 starej i nowej, kopie .bak i na D:), potem zapis testowy na D:
+  (zapisy-testowe-archiwum), statusy CHANGELOG (python z bytes([92]) dla backslashy - heredoc je gubi), pamiec jeff-gra-od-15-10-monitoring + MEMORY.md.
+  Scalanie CHANGELOG/sprawdz_logi: scratchpad sesji 1e1c276a\scal_sklad.py <plik> <BAZA> <GALAZ1> <GALAZ2>.
+- OTWARTE (kolejnosc wedlug wagi dla Jeffa):
+  1. ZELAZO SWIATA spada (136a: -66.5/d, rece przy zelazie -27%); miast bez rudy malo (6.8), ale zapas sie kurczy - KsIronFullOnlyOwnTown/KsIronLocalGlutBand/
+     KsIronStockTrend ciagle tna; spadek rak Essos miedzy krokami f5 (109084-109091) niewyjasniony.
+  2. KARAWANY: wynik handlu mediana 33 zl/d wobec zoldu 85 (37% karawan >= zold); udzial wyplat 0.146; sprzedaz na stracie 2649/d (H284-4); srebro w jukach;
+     karawana Jeffa: zysk z handlu juz dodatni, netto po zoldzie ujemne.
+  3. 283 bitwa: scenariusze testowe B (pieszy) i C (wrecz) nie wykrywaja (testowy ranny/w panice), J204-1 regex; scen. A i FF dzialaja.
+  4. Drobne: NWAR-15 klin plotno/len, 5-8 ludzi/dobe 'w nicosc ... inne' (E4/7), R274-2 (bieg startujacy poza pasmem - nie blad).
+- ZASADY JEFFA (pamiec): stala zgoda na wgranie po udanym tescie (nie gdy gra); jego przyklady = przypadki testowe, dedukowac pelna logike; ekonomia z podazy
+  i popytu, zamknieta, liczby z istniejacych modeli; mowic prosto po polsku; nie wgrywac, gdy cos psuje karawane/zapis Jeffa.
+
 ## DOPISEK 29.10 ok. 00:05 CET - WGRANIE 136 (135 + 288 + 289)
 - 136a (90 dob, m113/wyniki/grupy-136a): zold karawan x0.499, stawki t1-3 2.21 / t4 3.71 / t5+ 5.60 / najemnicy 3.39, jedzenie w drodze 83% (glodne 13.4%),
   zakupy na droge 15 640 szt. za 231 060 zl; mediana zysku karawan 414 (135c 368), udzial wyplat 0.146 (135c 0.115), wynik handlu 33 wobec zoldu 85 zl/d
