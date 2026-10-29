@@ -4806,7 +4806,8 @@ namespace Armoury
         // podjazdami ... ale nie wdaje sie w walke"; log 00:46: obronca Lewys Lydden 36 ludzi wobec 50 gracza - 'obrona ... [FullScaleAttack s. 2]'):
         // Doctrine.Hold291.cs - druzyna AI obroncy w polu (takze tlum ponizej 30 Tactics - WarCouncil daje mu DefensiveEngagement + DefensiveLine): wagi taktyk ataku 0,
         // gdy obrona ma wage > 0; puszczone: S2, napastnik nie podchodzi 90 s, zwarcie glownej piechoty (recenzja 291: bez wyjatku 'silniejszy x1.5'). Wylaczone =
-        // wagi gry / RBM / doktryny i lista taktyk tlumu jak dotad
+        // wagi gry / RBM / doktryny i lista taktyk tlumu jak dotad. 291d: w trzymaniu obrona gry (TeamAI.IsDefenseApplicable) wymuszona TAK - gra liczyla ja z sumy
+        // poleglych od pociskow i gasila taktyki obrony do konca bitwy; przestrzelanego puszcza S2 jak dotad
         public bool DefendersHoldTheirGround = true;       // an AI army that was attacked in a field battle holds its position and lets the attacker come: it does not march out to meet you, even as a bandit rabble, unless it is being shot down without an answer (Defenders Advance Under Fire), or the attacker has not come on for 90 seconds; once its main infantry is in close combat it fights as usual. Its horse archers may still ride out and skirmish. When you are the one attacked, the AI attacks you as before. Off = as before
         // 291 (29.10, Jeff: "jak strzelam do piechoty a piechota nie ma tarcz to nie idzie jak glupi powoli tylko biegnie na przeciwnika aby jak najszybciej skrocic
         // dystans ... jak ma tarcze to idzie za murem tarcz"; log 00:49: wrog 'szyk bez naszej zmiany 24/0/0' (cialo/tarcza), 'pod ostrzalem bez zwarcia do konca:

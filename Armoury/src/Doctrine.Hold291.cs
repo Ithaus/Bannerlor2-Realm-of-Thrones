@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Threading;
+using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -28,6 +29,25 @@ namespace Armoury
     ///    gdy ktoras z taktyk obrony tej druzyny (DefensiveEngagement, DefensiveLine, DefensiveRing, HoldChokePoint) miala w ostatniej decyzji wage > 0;
     ///    bez wagi obrony (gra: IsDefenseApplicable NIE albo brak piechoty) - nic (gra wybiera atak, bo nie ma z czego sie bronic). Konni lucznicy w obronie
     ///    harcuja jak dotad (RBM TacticDefensiveEngagementPatch.PostfixDefend: BehaviorMountedSkirmish).
+    ///  - 291d (autotest 299a, bitwa 1: obronca sea_raiders sila x0.48 'bez wagi obrony 14', 30 s taktyki ataku przy trzymaniu, 'taktyka DefensiveEngagement s. 4
+    ///    -> Charge'; 296b tak samo). DOWOD [K] (TaleWorlds.MountAndBlade 1.4.8): wszystkie cztery taktyki obrony (DefensiveEngagement :175, DefensiveLine :206,
+    ///    DefensiveRing :117, HoldChokePoint :116) daja 0, gdy TeamAI.IsDefenseApplicable NIE; CheckIsDefenseApplicable (TeamAIComponent :215-247, tylko z
+    ///    MakeDecision przed MaxBy wag) = (ostrzal x ludzie + polegli od pociskow) / (ludzie + polegli) obroncy wobec tego samego u wroga, do potegi 3 x (strzelcy
+    ///    + konni strzelcy wroga), NIE ponad 1.5 - polegli od pociskow sie sumuja, wiec obronca bez strzelcow (bandy: 8 lucznikow w szyku piechoty) po kilku
+    ///    zabitych strzala traci obrone do konca bitwy, choc S2 (141 - nasza regula 'przestrzelany', 20% trafionych przez 20 s) nie weszla (bitwa 1:
+    ///    'pod ostrzalem >= 0.2 30 s', 'wejsc w S2 0', 'padli od pociskow do zwarcia 6'). IsDefenseApplicable czytaja tylko te cztery wagi (grep gry; RBM bez
+    ///    latki; NavalDLC tylko taktyki morskie). Zmiana (ten sam klucz): postfiks CheckIsDefenseApplicable (DhDefPost) - druzyna pod 291 w trzymaniu (nie
+    ///    puszczona, nie w S2) ma obrone gry TAK, wiec gra sama wybiera DefensiveEngagement / DefensiveLine / HoldChokePoint ze swoimi pozycjami (wzgorze,
+    ///    linia, przesmyk); 'przestrzelany' puszcza S2 jak dotad (w S2 obrona gry wlasna). Kolejnosc wag w decyzji: lista tlumu ma Charge i FullScaleAttack
+    ///    przed DefensiveEngagement, wiec waga obrony z poprzedniej decyzji bywala 0 (pierwsza decyzja, wyjscie z S2) - DhMul tnie tez wtedy, gdy
+    ///    DefensiveEngagement w tej decyzji na pewno da wage > 0 (obrona gry TAK, szyk piechoty z ludzmi, piechota + strzelcy > 0, RemainingPowerRatio > 0 -
+    ///    wzor :173-192). Bez szyku piechoty taktyki obrony gry nie maja z czego sie bronic - atak jak dotad, liczony osobno ('bez szyku piechoty N s').
+    ///    Recenzja 291d: (1) druzyna po S2 bez wymuszenia do konca bitwy - gdy gra sama mowi obrona NIE, puszczona (jak przed 291d), zeby wymuszenie nie
+    ///    wracalo jej na pozycje po 10 s ciszy i pod nastepny ostrzal (wahadlo); 'S2 ponownie' liczy powroty do trzymania i znow S2 (obrona gry wlasna TAK).
+    ///    (2) atak bez szyku piechoty z pieszymi w innych szykach liczony osobno (bitwa291 B291-2b - DECYZJA: gra nie ma taktyki obrony bez szyku piechoty).
+    ///    (3) RBM TacticDefensiveEngagementPatch / TacticDefensiveLinePatch.PrefixHasBattleBeenJoined (Utilities.HasBattleBeenJoined, 75 m od szyku pieszego
+    ///    albo strzelcow wroga) przelacza taktyke obrony w Engage (piechota Charge, strzelcy RBMArcherSkirmish) przed zwarciem 291 (25 m) - mierzone
+    ///    ('taktyka obrony w Engage (RBM 75 m) N s'), bez zmiany zachowania (do decyzji Jeffa).
     ///  - puszczone (wagi gry, RBM i doktryny jak dotad): S2 (141, obronca przestrzelany pod ostrzalem) - na czas S2; napastnik nie podchodzi - najblizszy szyk wroga nie zblizyl sie
     ///    o 25 m (S1ContactGap) przez 90 s (BaseShootSec - czas ostrzalu przed atakiem S1) - do konca bitwy; zwarcie glownej piechoty (25 m od pieszego wroga) -
     ///    do konca bitwy (taktyka obrony sama przechodzi w Engage). Recenzja 291: bez wyjatku "silniejszy" (dawniej RemainingPowerRatio >= 1.5 / ponizej 1.0 -
@@ -57,11 +77,23 @@ namespace Armoury
         private static readonly float[] _dhOnAt = new float[MaxTeams];       // poczatek biezacego trzymania (-1 = nie trzyma)
         private static readonly string[] _dhTac = new string[MaxTeams];      // biezaca taktyka (nazwa)
         private static readonly string[] _dhTac0 = new string[MaxTeams];     // pierwsza taktyka po rozstawieniu
+        private static readonly bool[] _dhHasDE = new bool[MaxTeams];        // 291d: DefensiveEngagement na liscie (przewidywanie wagi w DhMul)
+        private static readonly bool[] _dhS2Was = new bool[MaxTeams];        // 291d recenzja: druzyna byla w S2 - obrona gry bez wymuszenia (gra decyduje jak przed 291d)
+        private static readonly byte[] _dhS2Cnt = new byte[MaxTeams];        // 291d recenzja: puszczen S2 tej druzyny (powrot do trzymania i znow S2 = 'ponownie')
 
         // ---- liczniki misji (glowny watek; postfiksy - Interlocked)
         private static int _dhTeams, _dhS2N, _dhStallN, _dhContactN, _dhStum;
         private static float _dhHoldSec, _dhAtkSec;
         private static int _dhCut, _dhNoDef;
+        // 291d (Interlocked - tick druzyn): decyzje trzymania, obrona gry NIE, wymuszona, ciete z przewidywania, bez wagi wedlug powodu
+        private static int _dhDec, _dhGameNo, _dhForced, _dhPred, _dhNoDep, _dhNoInf, _dhNoGame, _dhNoOther;
+        // 291d recenzja (Interlocked - tick druzyn): obrona gry NIE po S2 bez wymuszenia, bez wagi po S2; (glowny watek) S2 ponownie w tej samej druzynie
+        private static int _dhPostS2, _dhNoPostS2, _dhS2Again;
+        private static float _dhAtkNoInf, _dhAtkNoInfFoot, _dhEngSec;
+        private static Action<TeamAIComponent, bool> _setDefApp;
+        // 291d recenzja: RBM HasBattleBeenJoined (75 m od pieszego / strzelcow wroga) - taktyka obrony w Engage (piechota TacticalCharge / Charge)
+        private static AccessTools.FieldRef<TacticDefensiveEngagement, bool> _fDeJoined;
+        private static AccessTools.FieldRef<TacticDefensiveLine, bool> _fDlJoined;
         private static string _dhSample;
         private static int _dhSampleTi = -1;
 
@@ -72,6 +104,11 @@ namespace Armoury
             _dhHoldSec = _dhAtkSec = 0f;
             Interlocked.Exchange(ref _dhCut, 0);
             Interlocked.Exchange(ref _dhNoDef, 0);
+            Interlocked.Exchange(ref _dhDec, 0); Interlocked.Exchange(ref _dhGameNo, 0); Interlocked.Exchange(ref _dhForced, 0); Interlocked.Exchange(ref _dhPred, 0);
+            Interlocked.Exchange(ref _dhNoDep, 0); Interlocked.Exchange(ref _dhNoInf, 0); Interlocked.Exchange(ref _dhNoGame, 0); Interlocked.Exchange(ref _dhNoOther, 0);
+            Interlocked.Exchange(ref _dhPostS2, 0); Interlocked.Exchange(ref _dhNoPostS2, 0);
+            _dhS2Again = 0;
+            _dhAtkNoInf = _dhAtkNoInfFoot = _dhEngSec = 0f;
             _dhSample = null;
             _dhSampleTi = -1;
             _dhSampleTac = null;
@@ -80,7 +117,7 @@ namespace Armoury
         private static void DhClearTeam(int i)
         {
             _dhRef[i] = null; _dhOn[i] = false; _dhOff[i] = 0; _dhStarted[i] = false; _dhBest[i] = 0f; _dhBestAt[i] = 0f; _dhOnAt[i] = -1f;
-            _dhTac[i] = null; _dhTac0[i] = null;
+            _dhTac[i] = null; _dhTac0[i] = null; _dhHasDE[i] = false; _dhS2Was[i] = false; _dhS2Cnt[i] = 0;
             for (int k = 0; k < DhK; k++) _dhW[i * DhK + k] = 0f;
         }
 
@@ -98,12 +135,13 @@ namespace Armoury
         private static void DhRegister(Team team, int ti, List<Type> have, Settings c)
         {
             if (team == null || team.Side != BattleSideEnum.Defender) return;
-            bool def = false;
+            bool def = false, de = false;
             int n = have != null ? have.Count : 0;
-            for (int i = 0; i < n; i++) if (IsDefensive(have[i])) def = true;
+            for (int i = 0; i < n; i++) { if (IsDefensive(have[i])) def = true; if (have[i] == typeof(TacticDefensiveEngagement)) de = true; }
             if (!def) return;
             if (!ReferenceEquals(_dhRef[ti], team)) _dhTeams++;
             DhClearTeam(ti);
+            _dhHasDE[ti] = de;
             _dhRef[ti] = team;
             bool key = c != null && c.DefendersHoldTheirGround;
             _dhOn[ti] = key;   // od pierwszej decyzji gry (przed pierwszym taktem doktryny)
@@ -124,9 +162,106 @@ namespace Armoury
                 if (r <= 0f || float.IsNaN(r) || float.IsInfinity(r)) return;
                 float hw = 0f;
                 for (int k = 0; k < DhK; k++) { float v = _dhW[ti * DhK + k]; if (v > hw) hw = v; }
-                if (hw <= 0f) { Interlocked.Increment(ref _dhNoDef); return; }
+                if (hw <= 0f)
+                {
+                    // 291d: waga obrony z poprzedniej decyzji 0 (lista tlumu: ataki przed DefensiveEngagement) - tnie, gdy DefensiveEngagement w tej decyzji da wage > 0
+                    int why = DhWhy(team, ti);
+                    if (why == 0) { r = 0f; Interlocked.Increment(ref _dhCut); Interlocked.Increment(ref _dhPred); return; }
+                    Interlocked.Increment(ref _dhNoDef);
+                    var mm = team.Mission;
+                    if (mm == null || !mm.IsDeploymentFinished) Interlocked.Increment(ref _dhNoDep);
+                    else if (why == 2) Interlocked.Increment(ref _dhNoInf);
+                    else if (why == 3) Interlocked.Increment(ref _dhNoGame);
+                    else if (why == 5) Interlocked.Increment(ref _dhNoPostS2);
+                    else Interlocked.Increment(ref _dhNoOther);
+                    return;
+                }
                 r = 0f;
                 Interlocked.Increment(ref _dhCut);
+            }
+            catch { Interlocked.Increment(ref _postErr); }
+        }
+
+        /// <summary>291d (tick druzyn, DhMul): czy DefensiveEngagement da w tej decyzji wage > 0 (wzor gry :173-192). 0 tak, 2 bez szyku piechoty z ludzmi,
+        /// 3 obrona gry NIE (latka DhDefPost nie wpieta albo druzyna puszczona), 4 inne (bez DefensiveEngagement na liscie, piechota + strzelcy 0, sila 0),
+        /// 5 obrona gry NIE po S2 (bez wymuszenia - recenzja 291d; DhTick puszcza taka druzyne w najblizszym takcie).</summary>
+        private static int DhWhy(Team team, int ti)
+        {
+            if (!DhHasInfantry(team)) return 2;
+            var ai = team.TeamAI;
+            if (ai == null || !ai.IsDefenseApplicable) return _dhS2Was[ti] ? 5 : 3;
+            if (!_dhHasDE[ti]) return 4;
+            var q = team.QuerySystem;
+            if (q == null) return 4;
+            float share = q.InfantryRatio + q.RangedRatio, rp = q.RemainingPowerRatio;
+            if (!(share > 0f) || !(rp > 0f) || float.IsInfinity(rp)) return 4;
+            return 0;
+        }
+
+        /// <summary>291d: szyk piechoty z ludzmi - ten sam warunek co TacticDefensiveEngagement.GetTacticWeight (FormationsIncludingEmpty, IsInfantryFormation).</summary>
+        private static bool DhHasInfantry(Team team)
+        {
+            var fl = team.FormationsIncludingEmpty;
+            int nf = fl != null ? fl.Count : 0;
+            for (int j = 0; j < nf; j++)
+            {
+                var f = fl[j];
+                if (f == null || f.CountOfUnits <= 0) continue;
+                var fq = f.QuerySystem;
+                if (fq != null && fq.IsInfantryFormation) return true;
+            }
+            return false;
+        }
+
+        /// <summary>291d: latka raz na proces (Doctrine.ApplyMissionPatches) - postfiks TeamAIComponent.CheckIsDefenseApplicable. Opis do linii "Latki nocy (K3)".</summary>
+        private static string DhPatchDefense(Harmony h)
+        {
+            try
+            {
+                var set = AccessTools.PropertySetter(typeof(TeamAIComponent), "IsDefenseApplicable");
+                var target = AccessTools.DeclaredMethod(typeof(TeamAIComponent), "CheckIsDefenseApplicable");
+                if (set == null || target == null) return "NIE (brak " + (set == null ? "settera" : "metody") + ")";
+                // recenzja 291d: pomiar trybu Engage taktyk obrony (bez wplywu na wymuszenie - brak pola = bez pomiaru)
+                try { _fDeJoined = AccessTools.FieldRefAccess<TacticDefensiveEngagement, bool>("_hasBattleBeenJoined"); } catch { _fDeJoined = null; }
+                try { _fDlJoined = AccessTools.FieldRefAccess<TacticDefensiveLine, bool>("_hasBattleBeenJoined"); } catch { _fDlJoined = null; }
+                _setDefApp = AccessTools.MethodDelegate<Action<TeamAIComponent, bool>>(set);
+                h.Patch(target, postfix: new HarmonyMethod(typeof(Doctrine), nameof(DhDefPost)) { priority = Priority.Last });
+                bool ok = false;
+                var info = Harmony.GetPatchInfo(target);
+                if (info != null) foreach (var p in info.Postfixes) if (p != null && p.owner == h.Id && p.PatchMethod != null && p.PatchMethod.DeclaringType == typeof(Doctrine)) ok = true;
+                if (!ok) _setDefApp = null;
+                return ok ? "TAK" : "NIE";
+            }
+            catch (Exception e)
+            {
+                _setDefApp = null;
+                RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.LatkaObrony291d", e);
+                return "NIE (" + e.GetType().Name + ")";
+            }
+        }
+
+        /// <summary>291d: postfiks CheckIsDefenseApplicable (MakeDecision, tick druzyn, przed MaxBy wag): druzyna pod 291 w trzymaniu (nie puszczona, nie w S2)
+        /// ma obrone gry TAK - taktyki obrony gry licza swoje wagi i pozycje. Klucz NIE: tylko licznik 'obrona gry NIE'. Bez alokacji.
+        /// Recenzja 291d: druzyna, ktora byla w S2 (przestrzelana), bez wymuszenia do konca bitwy - gra decyduje sama jak przed 291d (polegli od pociskow sumuja sie,
+        /// wiec obrona gry zwykle zostaje NIE); inaczej po wyjsciu z S2 (10 s bez ostrzalu) wymuszenie wracaloby na pozycje i pod nastepny ostrzal (wahadlo).</summary>
+        private static void DhDefPost(TeamAIComponent __instance)
+        {
+            if (!_on || __instance == null) return;
+            try
+            {
+                int ti = -1;
+                for (int i = 0; i < MaxTeams; i++) { var t = _dhRef[i]; if (t != null && ReferenceEquals(t.TeamAI, __instance)) { ti = i; break; } }
+                if (ti < 0) return;
+                var team = _dhRef[ti];
+                if (team.Side != BattleSideEnum.Defender || _dhOff[ti] != 0 || (_s2Live[ti] && ReferenceEquals(_s2Ref[ti], team))) return;
+                Interlocked.Increment(ref _dhDec);
+                if (__instance.IsDefenseApplicable) return;
+                Interlocked.Increment(ref _dhGameNo);
+                if (_dhS2Was[ti]) { Interlocked.Increment(ref _dhPostS2); return; }
+                var set = _setDefApp;
+                if (!_dhOn[ti] || set == null) return;
+                set(__instance, true);
+                Interlocked.Increment(ref _dhForced);
             }
             catch { Interlocked.Increment(ref _postErr); }
         }
@@ -171,9 +306,19 @@ namespace Armoury
                 }
             }
             bool s2 = _s2Live[ti] && ReferenceEquals(_s2Ref[ti], t);
-            bool on = key && _dhOff[ti] == 0 && !s2;
+            // recenzja 291d: po S2 obrona gry bez wymuszenia (DhDefPost) - gdy gra sama mowi NIE, druzyna puszczona jak przed 291d (taktyki obrony maja 0, atak gry);
+            // gdy gra sama mowi TAK - trzyma dalej jak w 291
+            if (s2) _dhS2Was[ti] = true;
+            bool post = false;
+            if (_dhS2Was[ti] && !s2) { var ai = t.TeamAI; post = ai != null && !ai.IsDefenseApplicable; }
+            bool on = key && _dhOff[ti] == 0 && !s2 && !post;
             bool dep = m.IsDeploymentFinished;
-            if (_dhOn[ti] && !on && s2) _dhS2N++;
+            if (_dhOn[ti] && !on && s2)
+            {
+                _dhS2N++;
+                if (_dhS2Cnt[ti] < 255) _dhS2Cnt[ti]++;
+                if (_dhS2Cnt[ti] > 1) _dhS2Again++;
+            }
             // recenzja 291: w rozstawieniu zegar trzymania stoi na biezacej chwili - DhGrace liczy sie od pierwszego taktu po rozstawieniu (pierwsza decyzja gry)
             if (on && (!_dhOn[ti] || !dep)) _dhOnAt[ti] = now;
             if (!on) _dhOnAt[ti] = -1f;
@@ -188,7 +333,20 @@ namespace Armoury
             {
                 _dhHoldSec += TickEvery;
                 // gra decyduje co ok. 5 s - pierwsze DhGrace s trzymania bez liczenia (stara taktyka ataku jeszcze biezaca)
-                if (cur != null && Offensive(cur) && _dhOnAt[ti] >= 0f && now - _dhOnAt[ti] >= DhGrace) _dhAtkSec += TickEvery;
+                if (cur != null && Offensive(cur) && _dhOnAt[ti] >= 0f && now - _dhOnAt[ti] >= DhGrace)
+                {
+                    // 291d: bez szyku piechoty taktyki obrony gry nie maja wagi (nie ma z czego sie bronic) - osobno
+                    if (DhHasInfantry(t)) _dhAtkSec += TickEvery;
+                    else
+                    {
+                        _dhAtkNoInf += TickEvery;
+                        // recenzja 291d: piesi w szykach z przewaga strzelcow / konnicy (IsInfantryFormation NIE) - jest kim trzymac, a gra nie ma taktyki obrony
+                        if (q.InfantryRatio > 0f) _dhAtkNoInfFoot += TickEvery;
+                    }
+                }
+                // recenzja 291d: RBM HasBattleBeenJoined (75 m) przelacza taktyke obrony w Engage (piechota Charge) przed zwarciem 291 (25 m) - pomiar
+                if (cur is TacticDefensiveEngagement de) { var f = _fDeJoined; if (f != null && f(de)) _dhEngSec += TickEvery; }
+                else if (cur is TacticDefensiveLine dl) { var f = _fDlJoined; if (f != null && f(dl)) _dhEngSec += TickEvery; }
             }
             if (_dhSampleTi < 0 && m.IsDeploymentFinished)
             {
@@ -202,11 +360,20 @@ namespace Armoury
         {
             var c = Settings.Current;
             bool key = c != null && c.DefendersHoldTheirGround;
-            var sb = new StringBuilder(400);
+            var sb = new StringBuilder(960);
             sb.Append("B obronca trzyma pozycje ").Append(key ? "TAK" : "NIE (tylko pomiar)").Append(": druzyn obroncy ").Append(_dhTeams)
               .Append(", sekund trzymania ").Append(_dhHoldSec.ToString("0", DhInv)).Append(", wagi ataku ciete ").Append(Volatile.Read(ref _dhCut))
-              .Append(" (bez wagi obrony ").Append(Volatile.Read(ref _dhNoDef)).Append("), taktyka ataku przy trzymaniu ").Append(_dhAtkSec.ToString("0", DhInv))
-              .Append(" s; puszczone: S2 ").Append(_dhS2N)
+              .Append(" (bez wagi obrony ").Append(Volatile.Read(ref _dhNoDef))
+              .Append("; 291d: decyzji trzymania ").Append(Volatile.Read(ref _dhDec)).Append(", obrona gry NIE ").Append(Volatile.Read(ref _dhGameNo))
+              .Append(", wymuszona ").Append(Volatile.Read(ref _dhForced)).Append(", po S2 bez wymuszenia ").Append(Volatile.Read(ref _dhPostS2))
+              .Append(", ciete z przewidywania ").Append(Volatile.Read(ref _dhPred))
+              .Append(", bez wagi: rozstawienie ").Append(Volatile.Read(ref _dhNoDep)).Append(", bez szyku piechoty ").Append(Volatile.Read(ref _dhNoInf))
+              .Append(", po S2 ").Append(Volatile.Read(ref _dhNoPostS2))
+              .Append(", gra bez obrony ").Append(Volatile.Read(ref _dhNoGame)).Append(", inne ").Append(Volatile.Read(ref _dhNoOther))
+              .Append("), taktyka ataku przy trzymaniu ").Append(_dhAtkSec.ToString("0", DhInv))
+              .Append(" s (bez szyku piechoty ").Append(_dhAtkNoInf.ToString("0", DhInv)).Append(" s, w tym z pieszymi w innych szykach ")
+              .Append(_dhAtkNoInfFoot.ToString("0", DhInv)).Append(" s), taktyka obrony w Engage (RBM 75 m) ").Append(_dhEngSec.ToString("0", DhInv))
+              .Append(" s; puszczone: S2 ").Append(_dhS2N).Append(" (ponownie ").Append(_dhS2Again).Append(')')
               .Append(", napastnik nie podchodzi ").Append(DhStallSec.ToString("0", DhInv)).Append(" s ").Append(_dhStallN).Append(", zwarcie ").Append(_dhContactN)
               .Append("; probka ").Append(_dhSample ?? "-").Append(", taktyka ").Append(_dhSampleTac ?? "-").Append("; potkniecia ").Append(_dhStum);
             return sb.ToString();
