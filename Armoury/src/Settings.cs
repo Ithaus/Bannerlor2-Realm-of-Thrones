@@ -4383,6 +4383,14 @@ namespace Armoury
         // WinterBite.cs, StartCalibration.Live.cs (ComputeDistrict), StartCalibration.Zima297.cs, VillageCrafts.cs, DistrictWorks.cs. Nowy klucz (plik MCM Jeffa go nie ma).
         public bool WinterSparesMinesAndFelling = true;     // winter cuts what grows, not what is dug or felled: iron ore, silver ore and gold ore from the mines and hardwood from the woodcutters keep their output through the winter (in villages under the start calibration, in villages under the game's rules and in side-village works alike) - the mine and the forest are worked by hands, and winter was the season for felling timber and hauling it by sledge. Crops, fruit, herds, fish, salt pans, clay pits and quarries are cut by winter as before. Off = as before (winter cuts every village good)
 
+        // --- Village carts ride out with the village militia past roaming bands (297b) ---
+        // Paczka 297b (29.10, ta sama prosba Jeffa). Autotest 137a: zatkane wsie (zapas >= 1.5 W - gra nie wola TickGoodProduction) 40-75 z 571, z nich 24-56 z wozem
+        // "w domu, gotowy do wyjazdu" srednio 20-40 dob od wyjazdu (max rosnie 1 doba na dobe) - to wsie wstrzymane przez m107 K1 (Village Cart Flee Unload): 30-55 wsi,
+        // 13-23 ponad 30 dob, wrog w 51 z 51 przykladow to Broken Men (wynik ucieczki 3-11), bandy z domem w tej wsi kraza wokol niej, wiec woz nigdy nie wyjezdza;
+        // kopalnie zelaza zatkane 1-4 z 26 (Tylemos w domu 60 dob), model 365 wobec wydobycia ok. 340 lup/d. CartEscort297.cs, CartGuard.cs (HoldCheck, Home).
+        // Nowy klucz (plik MCM Jeffa go nie ma).
+        public bool VillageCartMilitiaEscort = true;        // with Village Cart Flee Unload: when bands roam around a village so that its cart would only flee back in, the village sends its own militia with the cart - just as many men as the game's own judgement of danger needs so the cart no longer flees and is at least as strong as the band - and the cart takes its goods to market; the militia men ride the whole journey and go back into the village militia when the cart is home and no longer needs them (men killed or taken on the road are lost, as any militia). With too few militia the village waits as before. Nothing is made or lost. Off = as before (the village waits until the bands move off)
+
         // --- Food follows the market under the start calibration (night 18.10) ---
         // Paczka f20-d4 (decyzja Jeffa 18.10 "4. b"): po D+49 (koniec sterowania rynku) podaz jedzenia i soli pod KS nie szla za cena - A7 wylaczona, Plan rusza tylko
         // prace domowa (fin93: Essos oliwki 0.14 T*, mieso 0.20, winogrona 0.33 przy indeksie 3-4.5; sol Essos 3.62 T*, ryby Westeros 3.28 T* i rosna). Ta sama regula
