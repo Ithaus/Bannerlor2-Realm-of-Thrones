@@ -1247,13 +1247,14 @@ Uzycie (Python 3, tylko odczyt):
                     Z290-3 miasta bez rudy nie rosna; Z290-4 T1 jedzenie na stracie <= 80 szt./d, utarg na stracie <= 1000 zl/d; Z290-5 bramka jedzenia spojna;
                     Z290-6 jedzenie w jukach <= 12 dob wlasnej sprzedazy; Z290-7 INFO.
 --grupa stamina292: (29.10, paczka 292 noc/292-stamina - Jeff 29.10 "Stamina zwieksz poziom staminy wszystkim AI i jednostkom i mi x 2, za szybko sie
-                    konczy i zaraz jestes zmeczony. Konie sa okay."; Armoury/src/BattleWind.cs ApplyHumanMul / StartLine292, FieldCraft.cs MeasureWind,
-                    HorseWind.cs Note292, klucz HumanStaminaMultiplier) python -I tools/sprawdz_logi.py --grupa stamina292 <Armoury-*.log> (strumieniowo;
-                    log bitew autotestu albo bieg 90 dob - bez bitew wiersze INFO). Linia 'Stamina (292): start misji', dopisek '| 292: ...' linii 'Bieg (127)'.
-                    S292-S self-test wyrazen, S292-S2 test syntetyczny; S292-0 linia startu w kazdej misji z biegiem 292, bledy 0; S292-1 mnoznik 2.00 i sr. pula
-                    ludzi po = K x przed; S292-2 gracz: pula i regeneracja RBM po = K x przed; S292-3 pelny bieg do zera po = K x przed (sr. i gracz);
-                    S292-4 koniec misji spojny ('Bieg (127)' dopisek 292, 'Oddech (137)' i 'BattleWind (130)' - pula gracza = pula po); S292-5 konie bez
-                    mnoznika (x1.00, galop gracza start = koniec); S292-6 INFO (zadyszki).
+                    konczy i zaraz jestes zmeczony. Konie sa okay."; Armoury/src/BattleWind.cs ApplyHumanMul / StartLine292, FieldCraft.cs MeasureWind /
+                    Measured292, HorseWind.cs Note292, klucz HumanStaminaMultiplier) python -I tools/sprawdz_logi.py --grupa stamina292 <Armoury-*.log>
+                    [<Armoury-*.log bazowy sprzed 292, ten sam skrypt bitew>] (strumieniowo; log bitew autotestu albo bieg 90 dob - bez bitew wiersze INFO).
+                    Linia 'Stamina (292): start misji', dopiski '| 292: ...' i '| 292 zmierzone: ...' linii 'Bieg (127)'.
+                    S292-S self-test wyrazen, S292-S2 test syntetyczny; S292-0 linia startu w kazdej misji z biegiem 292, bledy 0; S292-1..S292-5 spojnosc linii
+                    (mnoznik 2.00, pule, regeneracja, pelny bieg po = K x przed; 'Oddech (137)' = ostatnia 'BattleWind (130)' misji; konie x1.00); POMIAR:
+                    S292-7 pasek w ciaglym biegu wobec reguly sprzed 292 (R ok. x K), S292-8 maxStamina RBM zywych na koniec / pula przed mnoznikiem (ok. x K);
+                    S292-9 konie wobec logu bazowego (galop do zera rowny); S292-6 INFO (zadyszki, z baza: baza -> teraz).
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -77816,18 +77817,30 @@ def main(argv):
 
 # ------------------------------------------------------------ stamina292 (29.10, paczka 292 noc/292-stamina: stamina ludzi x2 - Jeff 29.10 "Stamina zwieksz
 # poziom staminy wszystkim AI i jednostkom i mi x 2, za szybko sie konczy i zaraz jestes zmeczony. Konie sa okay."; Armoury/src/BattleWind.cs ApplyHumanMul,
-# StartLine292, FieldCraft.cs MeasureWind, HorseWind.cs Note292; klucz HumanStaminaMultiplier, domyslnie 2.0)
-#   python -I tools/sprawdz_logi.py --grupa stamina292 <Armoury-*.log>      (strumieniowo; log bitew autotestu albo bieg 90 dob)
+# StartLine292, FieldCraft.cs MeasureWind / Measured292, HorseWind.cs Note292; klucz HumanStaminaMultiplier, domyslnie 2.0)
+#   python -I tools/sprawdz_logi.py --grupa stamina292 <Armoury-*.log> [<Armoury-*.log bazowy sprzed 292, ten sam skrypt bitew>]
+#   (strumieniowo; log bitew autotestu albo bieg 90 dob; log bazowy - tylko S292-9 i porownanie w S292-6)
 # Regula: pula, stan i regeneracja RBM kazdego zywego czlowieka x K (koszty RBM to stale punkty, skutki czytaja stosunek), pelny bieg do zera x K (drenaz biegu
 # = pula / RunSeconds), oddech dwufazowy 137 bez zmian (tau), konie bez mnoznika. Wiersze:
-#   S292-0 kazda linia 'Bieg (127)' z dopiskiem 292 ma przed soba linie 'Stamina (292): start misji' tej misji; ERROR BattleWind.StaminaInit / StartLine292 = 0
+#   S292-0 kazda linia 'Bieg (127)' z dopiskiem 292 ma przed soba linie 'Stamina (292): start misji' tej misji (misja < 3 s: linia startu na koncu, ze znakiem);
+#          ERROR BattleWind.StaminaInit / StartLine292 = 0
+#   S292-1..S292-5 SPOJNOSC LINII (obie strony z tego samego wyrazenia C# - format i rachunek, nie dowod celu):
 #   S292-1 mnoznik w linii startu = STAMINA292_K (inny - INFO, MCM zmienione); sr. pula RBM po = K x przed (+-0.5 K + 1.5)
 #   S292-2 gracz: pula RBM po = K x przed (+-0.5 K + 0.5), regeneracja RBM po = K x przed (+-0.005 K + 0.006)
 #   S292-3 pelny bieg do zera: sr. i gracz po = K x przed (+-0.5 K + 0.5)
-#   S292-4 koniec misji: dopisek 'Bieg (127)' - K jak w starcie, sr. = K x sr. 127, gracz = K x gracz 127; 'Oddech (137)' pula gracza = pula po (+-1.5);
-#          'BattleWind (130)' przed startem: pula = pula po (+-1.5) i znak 'x<K> - 292'
+#   S292-4 koniec misji: dopisek 'Bieg (127)' - K jak w starcie, sr. = K x sr. 127, gracz = K x gracz 127; 'Oddech (137)' pula gracza (odczyt postawy w ticku)
+#          = pula z OSTATNIEJ linii 'BattleWind (130)' tej misji (turniej, arena, kryjowka: gracz odradza sie, Atletyka rosnie - recenzja) albo pula po (+-1.5);
+#          'BattleWind (130)' przed startem: pula = pula po (+-1.5); kazda 130 z K != 1 ze znakiem 'x<K> - 292'
 #   S292-5 konie: 'bez mnoznika (x1.00)'; kon gracza z linii startu = ten sam kon w 'Konie (136)' na koniec - pelny galop do zera rowny (+-1 s)
-#   S292-6 INFO: zadyszki ludzi i gracza na misje ('Oddech (137)')
+#   POMIAR (odczyt postaw RBM w grze, niezalezny od wyrazen linii startu):
+#   S292-7 pasek w ciaglym biegu (FieldCraft co takt: spadek od konca poprzedniego taktu - tick RBM, koszty RBM i oddech 137 w srodku) wobec reguly sprzed 292:
+#          krotnosc R (wazona sekundami biegu) w [0.6 K, 1.3 K] przy >= 20 s biegu; misja z >= 20 s poza [0.5 K, 1.5 K] - NIE. Ponizej K: koszty RBM w biegu
+#          (ciosy, trafienia) zjadaja pasek obok biegu; R ok. 1 przy K = 2 = bieg nie dluzszy (np. oddech 137 albo RBM nadpisuje pasek)
+#   S292-8 sr. maxStamina RBM zywych ludzi na koniec misji (odczyt postawy) / sr. pula RBM PRZED mnoznikiem z linii startu w [0.75 K, 1.3 K] (lacznie, wazone
+#          liczba ludzi); misja z >= 10 ludzmi poza [0.6 K, 1.6 K] - NIE (inna populacja - polegli i posilki - stad szerokie progi; ok. 1 przy K = 2 = pula wrocila)
+#   S292-9 log bazowy (ten sam skrypt bitew sprzed 292): konie - 'Konie (136)' pelny galop do zera sr. i kon gracza w kolejnych misjach rowne bazie
+#          (+-max(3 s, 8%) / +-1 s); misje laczone po kolei, ta sama bitwa = 'Bieg (127)' sr. reguly 127 +-3 s; bez bazy albo inna liczba misji - INFO
+#   S292-6 INFO: zadyszki ludzi i gracza na misje ('Oddech (137)'), z baza - baza -> teraz
 STAMINA292_K = 2.0
 STAMINA292_RX = {
     "start": re.compile(r"Stamina \(292\): start misji \| mnoznik staminy ludzi x(?P<k>[\d.]+) \(klucz HumanStaminaMultiplier;[^)]*\)"
@@ -77837,16 +77850,20 @@ STAMINA292_RX = {
                         r"(?:(?P<pt0>\d+) -> (?P<pt1>\d+) s|-), (?P<foot>pieszo|konno)|-)"
                         r" \| konie: (?:bez mnoznika \(x(?P<hk>[\d.]+)\), pula 0-100, z jezdzcem (?P<hn>\d+), pelny galop do zera sr\. (?:(?P<ht>\d+) s|-) \(drenaz galopu x[\d.]+\)"
                         r", gracz: (?:kon (?P<hid>\S+), pelny galop do zera (?:(?P<hpt>\d+) s|nigdy)|-)|-.*)$"),
-    "run": re.compile(r"Bieg \(127\): ludzi zmierzonych \d+ \|.*?\| pelny bieg do zera sr\. (?P<t>\d+) s .*?\| gracz: (?:zbroja [\d.]+ kg, Atletyka \d+ -> (?P<pt>\d+) s.*?|-)"
-                      r"(?: \| 292: stamina ludzi x(?P<k>[\d.]+), pelny bieg do zera sr\. (?P<t2>\d+) s, gracz (?:(?P<pt2>\d+) s|-))?$"),
+    "run": re.compile(r"Bieg \(127\): ludzi zmierzonych (?P<n>\d+) \|.*?\| pelny bieg do zera sr\. (?P<t>\d+) s .*?\| gracz: (?:zbroja [\d.]+ kg, Atletyka \d+ -> (?P<pt>\d+) s.*?|-)"
+                      r"(?: \| 292: stamina ludzi x(?P<k>[\d.]+), pelny bieg do zera sr\. (?P<t2>\d+) s, gracz (?:(?P<pt2>\d+) s|-)"
+                      r"(?: \| 292 zmierzone: bieg ludzi (?P<ms>\d+) s, pelny pasek w (?:(?P<mt>\d+) s, x(?P<mx>[\d.]+) wobec reguly sprzed 292|- s), gracz (?P<mps>\d+) s"
+                      r"(?: \(pelny pasek w (?P<mpt>\d+) s, x(?P<mpx>[\d.]+)\))? \| pula RBM zywych ludzi na koniec: ludzi (?P<en>\d+)(?:, sr\. (?P<ep>\d+))?)?)?$"),
     "breath": re.compile(r"Oddech \(137\): ludzi \d+ \| zadyszek (?P<w>\d+) \(ludzi \d+\).*?\| gracz: (?:Atletyka \d+ \(\d+\), zbroja [\d.]+ kg, pula (?P<p>\d+), .*?"
                          r"zadyszek (?P<pw>\d+), sekund w zadyszce (?P<ps>\d+)|-)"),
     "b130": re.compile(r"BattleWind \(130\): gracz - stamina z Atletyki jak kazdy .*?\| pula (?P<p>\d+), regeneracja [\d.]+ pkt/s \(bez mnoznika Endurance"
                        r"(?:, z mnoznikiem ludzi x(?P<k>[\d.]+) - 292)?\)\."),
     "hend": re.compile(r"Konie \(136\): koni z jezdzcem \d+ .*?\| gracz: (?:kon (?P<id>\S+) \d+ kg, r \d+%, Vbase [\d.]+ m/s, pelny galop do zera (?:(?P<t>\d+) s|nigdy)|-)"),
+    "hend2": re.compile(r"Konie \(136\): koni z jezdzcem (?P<n>\d+) .*?zajechanych do 0: strona gracza (?P<z0>\d+), wrog (?P<z1>\d+) .*?pelny galop do zera sr\. (?:(?P<avg>\d+) s|-)"),
     "err": re.compile(r"ERROR in (?:BattleWind\.StaminaInit|BattleWind\.StartLine292)"),
 }
-# linie kontrolne - napisy jak w kodzie C# (BattleWind.StartLine292 / StaminaInitPostfix / BreathFlush, FieldCraft.OnEndMission, HorseWind.Note292 / Write)
+STAMINA292_ATEND = "wypisane na koncu misji krotszej niz 3 s"
+# linie kontrolne - napisy jak w kodzie C# (BattleWind.StartLine292 / StaminaInitPostfix / BreathFlush, FieldCraft.OnEndMission / Measured292, HorseWind.Note292 / Write)
 STAMINA292_TEST = {
     "start": "[02:02:20] Stamina (292): start misji | mnoznik staminy ludzi x2.00 (klucz HumanStaminaMultiplier; pula, stan i regeneracja RBM x K, pelny bieg do "
              "zera x K, oddech dwufazowy 137 bez zmian, konie bez mnoznika) | ludzi z pula 153 (x2.00): sr. pula RBM 1864 -> 3728, umarli bez mnoznika 0 | bieg: "
@@ -77856,6 +77873,9 @@ STAMINA292_TEST = {
     "start0": "[02:02:20] Stamina (292): start misji | mnoznik staminy ludzi x1.00 (klucz HumanStaminaMultiplier; pula, stan i regeneracja RBM x K, pelny bieg do "
               "zera x K, oddech dwufazowy 137 bez zmian, konie bez mnoznika) | ludzi z pula 0 (stamina RBM nieczynna albo latka InitializeStamina niewpieta), umarli "
               "bez mnoznika 0 | bieg: - | gracz: - | konie: - (stamina koni nieczynna w tej misji)",
+    "startE": "[02:05:53] Stamina (292): start misji | mnoznik staminy ludzi x2.00 (klucz HumanStaminaMultiplier; pula, stan i regeneracja RBM x K, pelny bieg do "
+              "zera x K, oddech dwufazowy 137 bez zmian, konie bez mnoznika; wypisane na koncu misji krotszej niz 3 s) | ludzi z pula 52 (x2.00): sr. pula RBM 1850 "
+              "-> 3700, umarli bez mnoznika 0 | bieg: ludzi 41, pelny bieg do zera sr. 76 -> 152 s | gracz: - | konie: - (stamina koni nieczynna w tej misji)",
     "b130": "[02:02:17] BattleWind (130): gracz - stamina z Atletyki jak kazdy (RBM po krzywej 1.12): Atletyka 250 liczona jak 245 | pula 4934, regeneracja 3.6 "
             "pkt/s (bez mnoznika Endurance, z mnoznikiem ludzi x2.00 - 292).",
     "b130old": "[02:02:17] BattleWind (130): gracz - stamina z Atletyki jak kazdy (RBM po krzywej 1.12): Atletyka 250 liczona jak 245 | pula 2467, regeneracja 1.8 "
@@ -77863,7 +77883,8 @@ STAMINA292_TEST = {
     "run": "[02:02:40] Bieg (127): ludzi zmierzonych 124 | zbroja sr. 20.1 kg (najwiecej 50.0) | pelny bieg do zera sr. 75 s (najkrocej 51) | regula: 120 s bez "
            "zbroi przy Atletyce 100, 1.125%/kg do kwadratu (203: domyslnie 1.125 = polowa 2.25 z 127) | bez oddechu w biegu TAK (pominiete regeneracje RBM 3269) | "
            "gracz: zbroja 46.3 kg, Atletyka 250 -> 71 s (sprawnosc 1.337, przy 2.25%/kg z 127 bylo 38 s) | 292: stamina ludzi x2.00, pelny bieg do zera sr. 150 s, "
-           "gracz 143 s",
+           "gracz 143 s | 292 zmierzone: bieg ludzi 412 s, pelny pasek w 141 s, x1.93 wobec reguly sprzed 292, gracz 6 s (pelny pasek w 140 s, x1.97) | pula RBM "
+           "zywych ludzi na koniec: ludzi 131, sr. 3702",
     "runold": "[02:02:40] Bieg (127): ludzi zmierzonych 124 | zbroja sr. 20.1 kg (najwiecej 50.0) | pelny bieg do zera sr. 75 s (najkrocej 51) | regula: 120 s bez "
               "zbroi przy Atletyce 100, 1.125%/kg do kwadratu (203: domyslnie 1.125 = polowa 2.25 z 127) | bez oddechu w biegu TAK (pominiete regeneracje RBM 3269) | "
               "gracz: zbroja 46.3 kg, Atletyka 250 -> 71 s (sprawnosc 1.337, przy 2.25%/kg z 127 bylo 38 s)",
@@ -77888,12 +77909,24 @@ def STAMINA292_selftest():
     m = RX["start"].search(T["start0"])
     if not m or m["k"] != "1.00" or m["n"] is not None or m["rn"] is not None or m["pl0"] is not None or m["hk"] is not None:
         return f"start0: {m.groupdict() if m else 'brak dopasowania'}"
+    m = RX["start"].search(T["startE"])
+    if not m or (m["p0"], m["rn"], m["pl0"]) != ("1850", "41", None) or STAMINA292_ATEND not in T["startE"]:
+        return f"startE: {m.groupdict() if m else 'brak dopasowania'}"
     m = RX["run"].search(T["run"])
-    if not m or (m["t"], m["pt"], m["k"], m["t2"], m["pt2"]) != ("75", "71", "2.00", "150", "143"):
+    if not m or (m["n"], m["t"], m["pt"], m["k"], m["t2"], m["pt2"], m["ms"], m["mt"], m["mx"], m["mps"], m["mpt"], m["mpx"], m["en"], m["ep"]) != (
+            "124", "75", "71", "2.00", "150", "143", "412", "141", "1.93", "6", "140", "1.97", "131", "3702"):
         return f"run: {m.groupdict() if m else 'brak dopasowania'}"
     m = RX["run"].search(T["runold"])
-    if not m or m["k"] is not None or m["t"] != "75":
+    if not m or m["k"] is not None or m["t"] != "75" or m["ms"] is not None:
         return f"runold: {m.groupdict() if m else 'brak dopasowania'}"
+    # dopisek 292 bez pomiaru (build 5111a147) i pomiar bez biegu / bez postaw
+    s = T["runold"] + " | 292: stamina ludzi x2.00, pelny bieg do zera sr. 150 s, gracz -"
+    m = RX["run"].search(s)
+    if not m or (m["k"], m["t2"], m["pt2"], m["ms"]) != ("2.00", "150", None, None):
+        return f"run 292 bez pomiaru: {m.groupdict() if m else 'brak dopasowania'}"
+    m = RX["run"].search(s + " | 292 zmierzone: bieg ludzi 0 s, pelny pasek w - s, gracz 0 s | pula RBM zywych ludzi na koniec: ludzi 0")
+    if not m or (m["ms"], m["mt"], m["mx"], m["mps"], m["mpx"], m["en"], m["ep"]) != ("0", None, None, "0", None, "0", None):
+        return f"run pomiar pusty: {m.groupdict() if m else 'brak dopasowania'}"
     m = RX["breath"].search(T["breath"])
     if not m or (m["w"], m["p"], m["pw"], m["ps"]) != ("3", "4934", "0", "0"):
         return f"breath: {m.groupdict() if m else 'brak dopasowania'}"
@@ -77906,6 +77939,9 @@ def STAMINA292_selftest():
     m = RX["hend"].search(T["hend"])
     if not m or (m["id"], m["t"]) != ("t3_empire_horse", "92"):
         return f"hend: {m.groupdict() if m else 'brak dopasowania'}"
+    m = RX["hend2"].search(T["hend"])
+    if not m or (m["n"], m["z0"], m["z1"], m["avg"]) != ("14", "3", "0", "77"):
+        return f"hend2: {m.groupdict() if m else 'brak dopasowania'}"
     # wzor: ten sam co w kodzie (po = K x przed) - przyklad z linii kontrolnej
     if abs(3728 - 2.0 * 1864) > 0.5 * 2.0 + 1.5 or abs(143 - 2.0 * 71) > 0.5 * 2.0 + 0.5:
         return "rachunek K x przed"
@@ -77914,9 +77950,10 @@ def STAMINA292_selftest():
 
 def STAMINA292_collect(logp):
     """stamina292: przebieg logu (strumieniowo). Misja = linia startu 292; linie konca ('Bieg (127)', 'Oddech (137)', 'Konie (136)') ida do ostatniej misji,
-    ktora jeszcze ich nie ma; 'BattleWind (130)' - ostatnia przed linia startu (spawn gracza jest przed startem + 3 s)."""
+    ktora jeszcze ich nie ma; 'BattleWind (130)' przed linia startu - pierwsza pula misji (b130), po linii startu do 'Bieg' / 'Oddech' tej misji - ostatnia
+    pula misji (b130last: turniej, arena, kryjowka - gracz odradza sie). "seq": kolejne linie konca misji (porownanie z logiem bazowym, S292-9 / S292-6)."""
     RX = STAMINA292_RX
-    D = {"mis": [], "orph_run": [], "old_run": 0, "bad": [], "err": 0}
+    D = {"mis": [], "orph_run": [], "old_run": 0, "bad": [], "err": 0, "seq": {"run": [], "hend": [], "breath": []}}
     pend130 = None
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for s in fh:
@@ -77926,18 +77963,23 @@ def STAMINA292_collect(logp):
                 if not m:
                     D["bad"].append(s[-120:])
                     continue
-                D["mis"].append({"s": m, "b130": pend130, "run": None, "breath": None, "hend": None})
+                D["mis"].append({"s": m, "b130": pend130, "b130last": None, "run": None, "breath": None, "hend": None, "atend": STAMINA292_ATEND in s})
                 pend130 = None
             elif "BattleWind (130): gracz" in s:
                 m = RX["b130"].search(s)
                 if m:
-                    pend130 = m
+                    cur = D["mis"][-1] if D["mis"] and D["mis"][-1]["run"] is None and D["mis"][-1]["breath"] is None else None
+                    if cur is not None:
+                        cur["b130last"] = m
+                    else:
+                        pend130 = m
             elif "Bieg (127): ludzi zmierzonych" in s:
                 pend130 = None       # 130 po koncu misji nalezy do nastepnej
                 m = RX["run"].search(s)
                 if not m:
                     D["bad"].append(s[-120:])
                     continue
+                D["seq"]["run"].append(m)
                 if m["k"] is None:
                     D["old_run"] += 1
                     continue
@@ -77949,10 +77991,15 @@ def STAMINA292_collect(logp):
             elif "Oddech (137): ludzi" in s:
                 pend130 = None
                 m = RX["breath"].search(s)
+                if m:
+                    D["seq"]["breath"].append(m)
                 if m and D["mis"] and D["mis"][-1]["breath"] is None:
                     D["mis"][-1]["breath"] = m
             elif "Konie (136): koni z jezdzcem" in s:
                 m = RX["hend"].search(s)
+                m2 = RX["hend2"].search(s)
+                if m2:
+                    D["seq"]["hend"].append((m2, m))
                 if m and D["mis"] and D["mis"][-1]["hend"] is None:
                     D["mis"][-1]["hend"] = m
             elif "ERROR in BattleWind." in s and RX["err"].search(s):
@@ -77960,26 +78007,28 @@ def STAMINA292_collect(logp):
     return D
 
 
-def STAMINA292_rows(rep, D):
-    """stamina292: wiersze S292-0..S292-6 z danych STAMINA292_collect - opis w komentarzu nad STAMINA292_K."""
+def STAMINA292_rows(rep, D, B=None):
+    """stamina292: wiersze S292-0..S292-9 z danych STAMINA292_collect (B - log bazowy, tez z STAMINA292_collect, albo None) - opis nad STAMINA292_K."""
     K0 = STAMINA292_K
     mis = D["mis"]
     # S292-0
     name = "S292-0: linia 'Stamina (292): start misji' w kazdej misji z biegiem 292, bledy BattleWind 0"
+    n_end = sum(1 for r in mis if r["atend"])
     if not mis and not D["orph_run"]:
         rep.add(name, f"linii startu 0, 'Bieg (127)' z dopiskiem 292 0 (sprzed 292 {D['old_run']}), ERROR {D['err']}" + (f", zly format {len(D['bad'])}" if D["bad"] else ""),
                 "INFO (log bez bitwy z 292 - np. bieg 90 dob)", None if not D["err"] and not D["bad"] else False)
     else:
         ok = not D["orph_run"] and not D["err"] and not D["bad"]
-        rep.add(name, f"linii startu {len(mis)}, 'Bieg (127)' z dopiskiem 292 bez linii startu {len(D['orph_run'])}, ERROR {D['err']}"
+        rep.add(name, f"linii startu {len(mis)} (z nich na koncu misji < 3 s {n_end}), 'Bieg (127)' z dopiskiem 292 bez linii startu {len(D['orph_run'])}, ERROR {D['err']}"
                 + (f", zly format {len(D['bad'])}: {D['bad'][0]}" if D["bad"] else ""), "kazda misja z biegiem ma linie startu; ERROR 0; zly format 0", ok)
     if not mis:
-        for nm in ("S292-1: mnoznik i sr. pula ludzi", "S292-2: pula i regeneracja gracza", "S292-3: pelny bieg do zera", "S292-4: koniec misji spojny",
-                   "S292-5: konie bez mnoznika", "S292-6: zadyszki (INFO)"):
+        for nm in ("S292-1: mnoznik i sr. pula ludzi (spojnosc)", "S292-2: pula i regeneracja gracza (spojnosc)", "S292-3: pelny bieg do zera (spojnosc)",
+                   "S292-4: koniec misji spojny", "S292-5: konie bez mnoznika (spojnosc)", "S292-7: POMIAR pasek w biegu", "S292-8: POMIAR pula RBM na koniec",
+                   "S292-9: konie wobec logu bazowego", "S292-6: zadyszki (INFO)"):
             rep.add(nm, "brak linii startu 292", "INFO (log bez bitwy z 292)", None)
         return
     # S292-1
-    name = "S292-1: mnoznik staminy ludzi x2.00 i sr. pula RBM po = K x przed"
+    name = "S292-1: mnoznik staminy ludzi x2.00 i sr. pula RBM po = K x przed (spojnosc linii)"
     probs, ks, nn = [], set(), 0
     for r in mis:
         m = r["s"]
@@ -78000,7 +78049,7 @@ def STAMINA292_rows(rep, D):
         rep.add(name, f"misji {len(mis)} (z pula RBM {nn}), mnoznik {sorted(ks)}" + (" | " + "; ".join(probs[:3]) if probs else ""),
                 f"po = K x przed (+-0.5 K + 1.5); K = {K0:.2f} (inny - INFO, MCM zmienione)", False if probs else (None if other else True))
     # S292-2
-    name = "S292-2: gracz - pula i regeneracja RBM po = K x przed"
+    name = "S292-2: gracz - pula i regeneracja RBM po = K x przed (spojnosc linii)"
     probs, n2, info = [], 0, ""
     for r in mis:
         m = r["s"]
@@ -78015,7 +78064,7 @@ def STAMINA292_rows(rep, D):
     rep.add(name, (f"misji z graczem {n2} | ostatnia: {info}" if n2 else "gracz '-' we wszystkich misjach") + (" | " + "; ".join(probs[:3]) if probs else ""),
             "po = K x przed (pula +-0.5 K + 0.5, regeneracja +-0.005 K + 0.006)", (not probs) if n2 else None)
     # S292-3
-    name = "S292-3: pelny bieg do zera po = K x przed (sr. i gracz)"
+    name = "S292-3: pelny bieg do zera po = K x przed (sr. i gracz, spojnosc linii)"
     probs, n3, info = [], 0, ""
     for r in mis:
         m = r["s"]
@@ -78034,8 +78083,8 @@ def STAMINA292_rows(rep, D):
     rep.add(name, (f"misji z biegiem {n3} | ostatnia: {info}" if n3 else "bieg '-' we wszystkich misjach (Sprint Fatigue NIE?)") + (" | " + "; ".join(probs[:3]) if probs else ""),
             "po = K x przed (+-0.5 K + 0.5 s)", (not probs) if n3 else None)
     # S292-4
-    name = "S292-4: koniec misji spojny ('Bieg (127)' 292, 'Oddech (137)' i 'BattleWind (130)' - pula gracza = pula po)"
-    probs, n4 = [], 0
+    name = "S292-4: koniec misji spojny ('Bieg (127)' 292, 'Oddech (137)' = ostatnia 'BattleWind (130)' misji, 130 przed startem = pula po)"
+    probs, n4, nre = [], 0, 0
     for r in mis:
         m = r["s"]
         k = float(m["k"])
@@ -78050,21 +78099,26 @@ def STAMINA292_rows(rep, D):
                 probs.append(f"Bieg gracz {ru['pt']} -> {ru['pt2']} s")
         if m["pl1"] is not None:
             br = r["breath"]
+            last = r["b130last"] if r["b130last"] is not None else r["b130"]
+            if r["b130last"] is not None:
+                nre += 1
             if br is not None and br["p"] is not None:
                 n4 += 1
-                if abs(int(br["p"]) - int(m["pl1"])) > 1.5:
-                    probs.append(f"Oddech pula gracza {br['p']} przy pula po {m['pl1']}")
+                ref, src = (int(last["p"]), "ostatnia 130") if last is not None else (int(m["pl1"]), "pula po")
+                if abs(int(br["p"]) - ref) > 1.5:
+                    probs.append(f"Oddech pula gracza {br['p']} przy {src} {ref}")
             b = r["b130"]
             if b is not None:
                 n4 += 1
                 if abs(int(b["p"]) - int(m["pl1"])) > 1.5:
                     probs.append(f"130 pula {b['p']} przy pula po {m['pl1']}")
-                if abs(k - 1.0) > 0.005 and (b["k"] is None or abs(float(b["k"]) - k) > 0.005):
+            for bb in (b, r["b130last"]):
+                if bb is not None and abs(k - 1.0) > 0.005 and (bb["k"] is None or abs(float(bb["k"]) - k) > 0.005):
                     probs.append(f"130 bez znaku x{m['k']} - 292")
-    rep.add(name, f"sprawdzen {n4}" + (" | " + "; ".join(probs[:3]) if probs else ""),
-            "Bieg: K jak w starcie, sr. i gracz = K x 127 (+-0.5 K + 0.5); Oddech / 130: pula gracza = pula po (+-1.5)", (not probs) if n4 else None)
+    rep.add(name, f"sprawdzen {n4} (misji z odrodzeniem gracza po starcie {nre})" + (" | " + "; ".join(probs[:3]) if probs else ""),
+            "Bieg: K jak w starcie, sr. i gracz = K x 127 (+-0.5 K + 0.5); Oddech = ostatnia 130 misji, 130 przed startem = pula po (+-1.5)", (not probs) if n4 else None)
     # S292-5
-    name = "S292-5: konie bez mnoznika staminy ludzi (x1.00, galop gracza start = koniec)"
+    name = "S292-5: konie bez mnoznika staminy ludzi (x1.00, galop gracza start = koniec; spojnosc linii)"
     probs, n5, info = [], 0, ""
     for r in mis:
         m = r["s"]
@@ -78080,43 +78134,138 @@ def STAMINA292_rows(rep, D):
                 probs.append(info)
     val = (f"misji z konmi {n5}" + (" | " + info if info else "")) if n5 else "konie '-' (stamina koni nieczynna w misjach)"
     rep.add(name, val + (" | " + "; ".join(probs[:3]) if probs else ""), "x1.00; galop gracza do zera na starcie = na koncu (+-1 s)", (not probs) if n5 else None)
+    # S292-7 POMIAR: pasek w ciaglym biegu
+    name = "S292-7: POMIAR - pasek postawy RBM w ciaglym biegu wobec reguly sprzed 292 (krotnosc R = x K)"
+    sec, wsum, probs, parts, pls, plw, kk = 0, 0.0, [], [], 0, 0.0, set()
+    for r in mis:
+        ru = r["run"]
+        if ru is None or ru["ms"] is None:
+            continue
+        k = float(ru["k"])
+        kk.add(k)
+        if ru["mx"] is not None:
+            s_, x = int(ru["ms"]), float(ru["mx"])
+            sec += s_
+            wsum += s_ * x
+            parts.append(f"{s_} s x{x:.2f}")
+            if s_ >= 20 and not (0.5 * k <= x <= 1.5 * k):
+                probs.append(f"misja {s_} s biegu: x{x:.2f} przy K {k:.2f}")
+        if ru["mpx"] is not None:
+            pls += int(ru["mps"])
+            plw += int(ru["mps"]) * float(ru["mpx"])
+    if not parts:
+        rep.add(name, "brak pomiaru biegu w liniach 'Bieg (127)' (build sprzed recenzji 292 albo nikt nie biegl)", "INFO", None)
+    else:
+        k = max(kk) if kk else K0
+        R = wsum / sec if sec > 0 else 0.0
+        val = (f"bieg ludzi {sec} s, R = x{R:.2f} (K {k:.2f}) | misje: " + ", ".join(parts[-6:])
+               + (f" | gracz {pls} s, x{plw / pls:.2f}" if pls > 0 else " | gracz - (nie biegl)") + (" | " + "; ".join(probs[:3]) if probs else ""))
+        ok = None if sec < 20 else (not probs and 0.6 * k <= R <= 1.3 * k)
+        rep.add(name, val, "R w [0.6 K, 1.3 K] przy >= 20 s biegu; misja >= 20 s poza [0.5 K, 1.5 K] - NIE (mniej niz 20 s - INFO)", ok)
+    # S292-8 POMIAR: pula RBM zywych na koniec / pula przed mnoznikiem ze startu
+    name = "S292-8: POMIAR - sr. maxStamina RBM zywych ludzi na koniec misji / sr. pula przed mnoznikiem (x K)"
+    nsum, wsum, probs, parts, kk = 0, 0.0, [], [], set()
+    for r in mis:
+        ru, m = r["run"], r["s"]
+        if ru is None or ru["ep"] is None or m["p0"] is None or int(m["p0"]) <= 0:
+            continue
+        k = float(m["k"])
+        kk.add(k)
+        en, x = int(ru["en"]), int(ru["ep"]) / int(m["p0"])
+        nsum += en
+        wsum += en * x
+        parts.append(f"{en} ludzi x{x:.2f}")
+        if en >= 10 and not (0.6 * k <= x <= 1.6 * k):
+            probs.append(f"misja {en} ludzi: {ru['ep']} / {m['p0']} = x{x:.2f} przy K {k:.2f}")
+    if not parts:
+        rep.add(name, "brak odczytu puli na koniec (build sprzed recenzji 292 albo stamina RBM nieczynna)", "INFO", None)
+    else:
+        k = max(kk)
+        R = wsum / nsum if nsum > 0 else 0.0
+        rep.add(name, f"ludzi {nsum}, x{R:.2f} (K {k:.2f}) | misje: " + ", ".join(parts[-6:]) + (" | " + "; ".join(probs[:3]) if probs else ""),
+                "lacznie w [0.75 K, 1.3 K]; misja z >= 10 ludzmi poza [0.6 K, 1.6 K] - NIE", (not probs and 0.75 * k <= R <= 1.3 * k) if nsum > 0 else None)
+    # S292-9 konie wobec logu bazowego
+    name = "S292-9: konie wobec logu bazowego sprzed 292 (pelny galop do zera sr. i kon gracza w tych samych bitwach)"
+    if B is None:
+        rep.add(name, "bez logu bazowego", "INFO (podaj drugi log: ten sam skrypt bitew sprzed 292)", None)
+    else:
+        rc, rb = D["seq"]["run"], B["seq"]["run"]
+        hc, hb = D["seq"]["hend"], B["seq"]["hend"]
+        if not hc or len(hc) != len(hb) or len(rc) != len(rb):
+            rep.add(name, f"misji: teraz Bieg {len(rc)} / Konie {len(hc)}, baza Bieg {len(rb)} / Konie {len(hb)} - inna liczba, bez laczenia", "INFO", None)
+        else:
+            same = [abs(int(a["t"]) - int(b["t"])) <= 3 for a, b in zip(rc, rb)] if len(rc) == len(hc) else [True] * len(hc)
+            probs, parts, nm = [], [], 0
+            for i, ((c2, c1), (b2, b1)) in enumerate(zip(hc, hb)):
+                if not same[i]:
+                    parts.append(f"#{i + 1} inna bitwa")
+                    continue
+                if c2["avg"] is None or b2["avg"] is None:
+                    continue
+                nm += 1
+                ca, ba = int(c2["avg"]), int(b2["avg"])
+                parts.append(f"#{i + 1} {ba} -> {ca} s")
+                if abs(ca - ba) > max(3.0, 0.08 * ba):
+                    probs.append(f"#{i + 1} sr. galop {ba} -> {ca} s")
+                if c1 is not None and b1 is not None and c1["id"] == b1["id"] and c1["t"] and b1["t"] and abs(int(c1["t"]) - int(b1["t"])) > 1:
+                    probs.append(f"#{i + 1} kon gracza {b1['id']} {b1['t']} -> {c1['t']} s")
+            rep.add(name, f"misji polaczonych {nm} | " + ", ".join(parts[-8:]) + (" | " + "; ".join(probs[:3]) if probs else ""),
+                    "sr. galop +-max(3 s, 8%), kon gracza +-1 s (ta sama bitwa: sr. regula 127 +-3 s)", (not probs) if nm else None)
     # S292-6 INFO
     parts = []
-    for i, r in enumerate(mis[-6:]):
+    for r in mis[-6:]:
         br = r["breath"]
         if br is not None:
             parts.append(f"zadyszek {br['w']}" + (f", gracz {br['pw']} ({br['ps']} s)" if br["pw"] is not None else ""))
-    rep.add("S292-6: zadyszki na misje (ostatnie 6, INFO)", "; ".join(parts) if parts else "-", "INFO (porownac z biegiem przed 292)", None)
+    val = "; ".join(parts) if parts else "-"
+    if B is not None:
+        oc, ob = D["seq"]["breath"], B["seq"]["breath"]
+        val += (f" | baza -> teraz (wszystkie misje): zadyszek {sum(int(x['w']) for x in ob)} -> {sum(int(x['w']) for x in oc)}, gracz w zadyszce "
+                f"{sum(int(x['ps'] or 0) for x in ob)} -> {sum(int(x['ps'] or 0) for x in oc)} s (misji {len(ob)} / {len(oc)})")
+    rep.add("S292-6: zadyszki na misje (ostatnie 6, INFO)", val, "INFO (porownac z biegiem przed 292 - drugi log)", None)
 
 
 def STAMINA292_synth():
-    """stamina292 - test syntetyczny: dobry, zly (pula, bieg, Oddech, kon), bez linii. None = werdykty zgodne, inaczej opis."""
+    """stamina292 - test syntetyczny: dobry (z odrodzeniem gracza i misja < 3 s), zly (pula, bieg, Oddech, kon, pomiar), bez linii. None = werdykty zgodne."""
     import shutil, tempfile
     T = STAMINA292_TEST
+    b130b = T["b130"].replace("[02:02:17]", "[02:02:30]").replace("pula 4934", "pula 4960")
+    runE = (T["runold"].replace("[02:02:40]", "[02:05:53]").replace("ludzi zmierzonych 124", "ludzi zmierzonych 41").replace("sr. 75 s", "sr. 76 s")
+            + " | 292: stamina ludzi x2.00, pelny bieg do zera sr. 152 s, gracz 143 s | 292 zmierzone: bieg ludzi 3 s, pelny pasek w 150 s, x1.98 wobec reguly sprzed"
+            " 292, gracz 0 s | pula RBM zywych ludzi na koniec: ludzi 41, sr. 3690")
 
     def run(kind):
         tmp = tempfile.mkdtemp(prefix="s292_")
         try:
             logp = os.path.join(tmp, "Armoury-test.log")
+            basep = os.path.join(tmp, "Armoury-baza.log")
+            base = [T["b130old"], T["runold"], T["breath"].replace("pula 4934", "pula 2467"), T["hend"]]
             if kind == "good":
-                L = [T["b130"], T["start"], T["run"], T["breath"], T["hend"]]
+                L = [T["b130"], T["start"], b130b, T["run"], T["breath"].replace("pula 4934", "pula 4960"), T["hend"], T["startE"], runE]
+                base += [T["runold"].replace("[02:02:40]", "[02:05:53]").replace("sr. 75 s", "sr. 77 s")]
             elif kind == "bad":
                 L = [T["b130"].replace("pula 4934", "pula 2467"), T["start"].replace("-> 3728", "-> 1864").replace("-> 4934, regeneracja RBM 1.80 -> 3.60",
                      "-> 2467, regeneracja RBM 1.80 -> 1.80").replace("75 -> 150 s", "75 -> 75 s").replace("(x1.00), pula", "(x2.00), pula"),
-                     T["run"].replace("sr. 150 s", "sr. 75 s"), T["breath"].replace("pula 4934", "pula 2467"), T["hend"].replace("do zera 92 s", "do zera 184 s"),
+                     T["run"].replace("sr. 150 s", "sr. 75 s").replace("x1.93 wobec", "x1.02 wobec").replace("sr. 3702", "sr. 1870"),
+                     T["breath"].replace("pula 4934", "pula 2467"), T["hend"].replace("do zera 92 s", "do zera 184 s"),
                      T["runold"].replace("[02:02:40]", "[02:05:00]") + " | 292: stamina ludzi x2.00, pelny bieg do zera sr. 150 s, gracz 143 s"]
+                base += [T["runold"].replace("[02:02:40]", "[02:05:00]")]
             else:
                 L = ["[10:00:00] Armoury: inna linia", T["runold"]]
             open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
+            open(basep, "w", encoding="utf-8").write("\n".join(base) + "\n")
             rep = Report()
-            STAMINA292_rows(rep, STAMINA292_collect(logp))
+            STAMINA292_rows(rep, STAMINA292_collect(logp), STAMINA292_collect(basep) if kind != "none" else None)
             return {r[0].split(":")[0]: r[3] for r in rep.rows}
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
     exp = {
-        "good": {"S292-0": "TAK", "S292-1": "TAK", "S292-2": "TAK", "S292-3": "TAK", "S292-4": "TAK", "S292-5": "TAK", "S292-6": "INFO"},
-        "bad": {"S292-0": "NIE", "S292-1": "NIE", "S292-2": "NIE", "S292-3": "NIE", "S292-4": "NIE", "S292-5": "NIE", "S292-6": "INFO"},
-        "none": {"S292-0": "INFO", "S292-1": "INFO", "S292-2": "INFO", "S292-3": "INFO", "S292-4": "INFO", "S292-5": "INFO", "S292-6": "INFO"},
+        "good": {"S292-0": "TAK", "S292-1": "TAK", "S292-2": "TAK", "S292-3": "TAK", "S292-4": "TAK", "S292-5": "TAK", "S292-7": "TAK", "S292-8": "TAK",
+                 "S292-9": "TAK", "S292-6": "INFO"},
+        "bad": {"S292-0": "NIE", "S292-1": "NIE", "S292-2": "NIE", "S292-3": "NIE", "S292-4": "NIE", "S292-5": "NIE", "S292-7": "NIE", "S292-8": "NIE",
+                "S292-9": "NIE", "S292-6": "INFO"},
+        "none": {"S292-0": "INFO", "S292-1": "INFO", "S292-2": "INFO", "S292-3": "INFO", "S292-4": "INFO", "S292-5": "INFO", "S292-7": "INFO", "S292-8": "INFO",
+                 "S292-9": "INFO", "S292-6": "INFO"},
     }
     diff = []
     for kind, e in exp.items():
@@ -78125,8 +78274,8 @@ def STAMINA292_synth():
     return "; ".join(diff) if diff else None
 
 
-def STAMINA292_main(logp):
-    """stamina292 (29.10, paczka 292): S292-S, S292-S2, S292-0..S292-6 - opis w komentarzu nad STAMINA292_K. Strumieniowo, tylko odczyt logu."""
+def STAMINA292_main(logp, basep=None):
+    """stamina292 (29.10, paczka 292): S292-S, S292-S2, S292-0..S292-9 - opis w komentarzu nad STAMINA292_K. Strumieniowo, tylko odczyt logow."""
     rep = Report()
     s1 = STAMINA292_selftest()
     rep.add("S292-S: self-test wyrazen (linie kontrolne jak w kodzie C#)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
@@ -78140,8 +78289,15 @@ def STAMINA292_main(logp):
         rep.show()
         return 0
     D = STAMINA292_collect(logp)
-    print(f"plik: {logp} | linii startu 292 {len(D['mis'])}, 'Bieg (127)' bez startu {len(D['orph_run'])}, sprzed 292 {D['old_run']}, zly format {len(D['bad'])}, ERROR {D['err']}")
-    STAMINA292_rows(rep, D)
+    B = None
+    if basep:
+        if os.path.isfile(basep):
+            B = STAMINA292_collect(basep)
+        else:
+            rep.add("S292-L2: log bazowy", f"brak pliku {basep}", "drugi argument - log bazowy sprzed 292 (opcja)", None)
+    print(f"plik: {logp} | linii startu 292 {len(D['mis'])}, 'Bieg (127)' bez startu {len(D['orph_run'])}, sprzed 292 {D['old_run']}, zly format {len(D['bad'])}, ERROR {D['err']}"
+          + (f" | baza: {basep} (Bieg {len(B['seq']['run'])}, Konie {len(B['seq']['hend'])})" if B is not None else ""))
+    STAMINA292_rows(rep, D, B)
     rep.show()
     return 0
 
@@ -78156,7 +78312,7 @@ def main(argv):
         i = a.index("--grupa")
         if i + 1 < len(a) and a[i + 1] == "stamina292":
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return STAMINA292_main(rest[0] if rest else None)
+            return STAMINA292_main(rest[0] if rest else None, rest[1] if len(rest) > 1 else None)
     return STAMINA292_main_prev(argv)
 
 

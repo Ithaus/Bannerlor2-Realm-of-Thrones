@@ -278,8 +278,9 @@ namespace Armoury
         }
 
         /// <summary>292: linia "Stamina (292)" raz na misje, kilka sekund po starcie (FieldCraft.OnMissionTick): mnoznik, pule ludzi przed / po, gracz (pula,
-        /// regeneracja RBM, pelny bieg do zera przed / po), konie (HorseWind.Note292 - bez mnoznika).</summary>
-        internal static void StartLine292(Mission m, Settings c, int runN, float runT0Sum, float runT1Sum, float plT0, float plT1, bool playerOnFoot)
+        /// regeneracja RBM, pelny bieg do zera przed / po), konie (HorseWind.Note292 - bez mnoznika). atEnd: misja skonczyla sie przed 3 s (FieldCraft.OnEndMission,
+        /// przed linia "Bieg (127)") - znak w nawiasie.</summary>
+        internal static void StartLine292(Mission m, Settings c, int runN, float runT0Sum, float runT1Sum, float plT0, float plT1, bool playerOnFoot, bool atEnd)
         {
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             float k = HumanStaminaMul(c);
@@ -287,7 +288,8 @@ namespace Armoury
             bool here = w != null && ReferenceEquals(w.Target, m);
             var sb = new System.Text.StringBuilder(600);
             sb.Append("Stamina (292): start misji | mnoznik staminy ludzi x").Append(k.ToString("0.00", inv))
-              .Append(" (klucz HumanStaminaMultiplier; pula, stan i regeneracja RBM x K, pelny bieg do zera x K, oddech dwufazowy 137 bez zmian, konie bez mnoznika)");
+              .Append(" (klucz HumanStaminaMultiplier; pula, stan i regeneracja RBM x K, pelny bieg do zera x K, oddech dwufazowy 137 bez zmian, konie bez mnoznika")
+              .Append(atEnd ? "; wypisane na koncu misji krotszej niz 3 s)" : ")");
             if (here && _k292N > 0)
                 sb.Append(" | ludzi z pula ").Append(_k292N).Append(" (x").Append(_k292K.ToString("0.00", inv)).Append("): sr. pula RBM ")
                   .Append((_k292Sum0 / _k292N).ToString("0", inv)).Append(" -> ").Append((_k292Sum1 / _k292N).ToString("0", inv));
