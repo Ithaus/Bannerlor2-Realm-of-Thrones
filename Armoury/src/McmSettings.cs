@@ -9670,11 +9670,11 @@ namespace Armoury
 
         [SettingPropertyBool("Caravans Head Where Their Cargo Sells", HintText = "a Banner Kings caravan picks its next town by what it can really sell there: each good counts only for the units the town will still pay at least the caravan's floor for (its cost; old or spoiling goods by the same floors as in town), after the goods other caravans are already bringing to that town (less what the town uses while this caravan is on the road), within the town's purse and, for raw goods, the town's own shortage. The escort's food does not count as cargo. Player caravans with Banner Kings orders, quest caravans and contract carriers are left as they are. Off = as before (Banner Kings scores towns by the price index alone)", RequireRestart = false)]
         [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
-        public bool CaravanRouteBySale { get; set; } = true;
+        public bool CaravanRouteBySale { get; set; } = false;
 
         [SettingPropertyBool("Caravans Skip Towns Where Our Rules Block Buying", HintText = "a Banner Kings caravan does not head for a town to buy a good that our buying rules would stop it from buying there anyway (the flow gate of the world's caravan stock, the caravan's working capital, the price the unit would fetch in a typical dearer town, spoiling food over a week of sales; raw goods by their own flow gate and profit). If no town scores at all, the caravan picks as before. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
-        public bool CaravanRouteByBuyRules { get; set; } = true;
+        public bool CaravanRouteByBuyRules { get; set; } = false;
 
         [SettingPropertyBool("Caravan Raw Goods Gate By Short Towns", HintText = "the caravans' flow gate for iron ore (and, with the all-goods gate, the other raw goods) lets them carry at least ten days of what the towns short of that good use, not only ten days of what caravans themselves sold - so ore that never reached a short town no longer keeps the gate shut. Off = as before (ten days of the caravans' own sales)", RequireRestart = false)]
         [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
