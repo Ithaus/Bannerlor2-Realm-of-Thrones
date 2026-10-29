@@ -25,17 +25,21 @@ namespace Armoury
     ///     sprzedaje je na stracie, ale nie taniej niz koszt x (1 - 1.5% x doby w jukach) - strata nie wieksza niz to, co juz sie zepsulo; reszta czeka na
     ///     nastepne miasto (T1 i sprzedaz BK / gry - ta sama granica). Reszta jedzenia (zboze, ser, oliwki, piwo, miod, ...) nie psuje sie - jak kazdy towar:
     ///     na stracie dopiero po 30 dobach bez rynku z zyskiem (regula 5, AgeMarket, 286/286b).
-    ///  B. STRATNA KARAWANA ZWIJANA (klucz CaravanLosingWoundUp) - kupiec (albo rod) nie trzyma karawany, ktora nie zarabia na swoj zold: karawana AI w miescie,
-    ///     sledzona w sesji co najmniej 28 dob (CaravanFlow.IdleDisbandDays - ten sam czas co karawana bez zysku m6b), ktorej wynik handlu (utarg - myto - koszt,
-    ///     ksiega 284, okno 14 dob) jest nizszy od zoldu przez 14 kolejnych dob pomiaru, jest zwijana w miescie ta sama droga co karawana bez drogi (CaravanFlow.
-    ///     Resolve: towar miastu z nadwyzki kasy, kiesa do wlasciciela E3/7, ludzie do domu E4/8). Karawany rodu gracza, z bohaterem, z zadania, konwoje DTE -
-    ///     nigdy (Blocker).
+    ///  B. STRATNA KARAWANA ZWIJANA (klucz CaravanLosingWoundUp) - kupiec (albo rod) nie trzyma karawany, ktora nie zarabia na swoj zold. Karawana AI sledzona
+    ///     co najmniej 28 dob (CaravanFlow.IdleDisbandDays - ten sam czas co m6b), ktorej wynik handlu (utarg - myto - koszt, ksiega 284, okno 14 dob) jest nizszy
+    ///     od zoldu przez 14 kolejnych dob pomiaru, ZACZYNA ZWIJANIE (CaravanTrade284.Daily): kupno BK stoi (Why 6), towar schodzi zwyklymi regulami T1 / BK
+    ///     w nastepnych miastach (z zyskiem, potem regula 5 po 30 dobach) - bez wyprzedazy ponizej kosztu w jednym miescie (recenzja 294). Rozwiazanie
+    ///     (CaravanFlow.WindHourly, co godzine, karawana w miescie bez bitwy i oblezenia), gdy gotowa: towar po koszcie <= tydzien zoldu albo 28 dob zwijania -
+    ///     reszta miastu z nadwyzki kasy (SellOut), kiesa do wlasciciela E3/7, ludzie do domu E4/8, niesprzedane na polke E6/K1. Nigdy: rod gracza, bohater
+    ///     w skladzie, zadanie, kontrakt, konwoj DTE, karawana morska (statki przepadlyby - DestroyPartyAction ich nie rusza) - CaravanFlow.WindBlocker.
+    ///     Ksiega zysku karawan w zapisie (arm_k294) - seria, sledzenie i zwijanie przezywaja wczytanie.
     ///  C. NOWA KARAWANA TYLKO, GDY HANDEL PLACI (klucz CaravanEntryWhenTradePays) - kupiec (CanHeroCreateCaravan) i lord BK (ShouldHaveCaravan) wysylaja nowa
-    ///     karawane tylko wtedy, gdy karawan placacych zold jest wiecej niz tracacych i nowych razem (nowa jeszcze niczego nie dowiodla): miejsce = W - L - T
-    ///     z wczorajszego pomiaru (W - wynik >= zold, L - wynik < zold, T - nowe ponizej 7 dob pomiaru; bez konwojow DTE), kazda dopuszczona dzis zmniejsza
-    ///     miejsce o 1; kupiec, ktoremu zwinieto karawane, czeka 28 dob. Zloto zostaje u kupca / lorda.
-    /// Nic z niczego: A - mniej sprzedazy ponizej kosztu (towar w jukach, zloto w kasie miasta); B - istniejaca droga rozwiazania (kazda moneta i sztuka z platnikiem);
-    /// C - zakup karawany nie zachodzi. Linia doby "Rynek karawan (294): dzien N" (CaravanTrade284.Daily, takze przy kluczach NIE - pomiar). Stan w sesji.
+    ///     karawane tylko wtedy, gdy po jej dodaniu placacych zold jest nadal co najmniej PayShare (0.60) wszystkich: miejsce = W / 0.60 - (W + L + T + U)
+    ///     z wczorajszego pomiaru (W - wynik >= zold, L - wynik < zold, T - nowe ponizej 7 dob pomiaru, U - bez historii; bez konwojow DTE), kazda dopuszczona
+    ///     zmniejsza miejsce o 1; kupiec, ktoremu zwinieto karawane, czeka 28 dob. Brama dziala, gdy zmierzona jest co najmniej polowa karawan (inaczej - jak w grze:
+    ///     nowa gra, wczytanie zapisu bez ksiegi 294). Zloto zostaje u kupca / lorda.
+    /// Nic z niczego: A - mniej sprzedazy ponizej kosztu (towar w jukach, zloto w kasie miasta); B - istniejace drogi sprzedazy i rozwiazania (kazda moneta i sztuka
+    /// z platnikiem); C - zakup karawany nie zachodzi. Linia doby "Rynek karawan (294): dzien N" (CaravanTrade284.Daily, takze przy kluczach NIE - pomiar).
     /// </summary>
     internal static class CaravanMarket294
     {
@@ -98,14 +102,19 @@ namespace Armoury
         // ------------------------------------------------------------ B / C. pomiar rynku karawan (z CaravanTrade284.Daily)
 
         internal static int ExitDays { get { return (int)CaravanFlow.IdleDisbandDays; } }
+        private const int ReadyWageDays = 7;                                   // jak CaravanTrade284.MeasureDays: towar wart mniej niz tydzien zoldu nie jest wart dalszej drogi
 
-        private static bool _have;                                             // jest pomiar z tej sesji (pierwsza linia 294 po wczytaniu)
-        private static int _room, _roomStart;                                 // _room - zostalo na dzis, _roomStart - miejsce z pomiaru (W - L - T)
+        /// <summary>C: udzial placacych zold, ponizej ktorego nowa karawana nie rusza (cel paczki 294 - wyrazna wiekszosc karawan placi zold; ten sam prog co K294-1
+        /// w sprawdz_logi). Miejsce = W / PayShare - wszystkie: nowa karawana dopuszczona tylko, gdy po jej dodaniu placacych jest nadal co najmniej PayShare.</summary>
+        internal const double PayShare = 0.60;
+
+        private static bool _have;                                             // pomiar na brame: zmierzone (W + L) co najmniej polowa wszystkich karawan
+        private static int _room, _roomStart;                                 // _room - zostalo na dzis, _roomStart - miejsce z pomiaru
         private static double _medNet = double.NaN, _medPd = double.NaN, _medWg = double.NaN;
         // liczniki od ostatniej linii (B, C)
-        private static int _xCand, _xDone, _xLeft, _xFail;
+        private static int _xDone, _xFail, _xUnwound, _xNotReady;
         private static readonly Dictionary<string, int> _xWhy = new Dictionary<string, int>();
-        private static long _xSoldG, _xPurse; private static int _xMen;
+        private static long _xSoldU, _xSoldG, _xSoldC, _xLeftU, _xLeftC, _xPurse; private static int _xMen;
         private static int _eAsk, _eNoData, _eRoom, _eOwner, _eOk, _eLordAsk, _eLordNo;
 
         internal static void Reset()
@@ -119,34 +128,40 @@ namespace Armoury
         private static void ZeroDay()
         {
             _fT1Held = _fBkHeld = _fDurN = _fDurG = _fDurWait = 0;
-            _xCand = _xDone = _xLeft = _xFail = 0; _xWhy.Clear(); _xSoldG = _xPurse = 0; _xMen = 0;
+            _xDone = _xFail = _xUnwound = _xNotReady = 0; _xWhy.Clear(); _xSoldU = _xSoldG = _xSoldC = _xLeftU = _xLeftC = _xPurse = 0; _xMen = 0;
             _eAsk = _eNoData = _eRoom = _eOwner = _eOk = _eLordAsk = _eLordNo = 0;
             _stumbles = 0;
         }
 
-        /// <summary>B (CaravanFlow.Islands): czy karawane AI w miescie zwinac jako stratna - seria >= 14 dob pomiaru z wynikiem ponizej zoldu i sesja >= 28 dob.</summary>
-        internal static bool Losing(MobileParty mp)
+        /// <summary>B (CaravanFlow.WindHourly, karawana w zwijaniu w miescie): gotowa do rozwiazania - towar handlowy po koszcie nie wiecej niz tydzien jej zoldu
+        /// (reszta nie jest warta dalszej drogi) albo zwijana juz ExitDays dob (do tej pory towar mial 30 dob na regule 5 - rynek z zyskiem, potem na stracie w T1).</summary>
+        internal static bool WindReady(MobileParty mp)
         {
-            var s = Settings.Current;
-            if (s == null || !s.CaravanLosingWoundUp || mp == null) return false;
             try
             {
-                int streak, age;
-                if (!CaravanTrade284.LosingStreak(mp, out streak, out age)) return false;
-                if (streak < CaravanTrade284.RingDays || age < ExitDays) return false;
-                _xCand++;
-                return true;
+                int d = CaravanTrade284.WindDays(mp);
+                if (d < 0) return false;
+                if (d >= ExitDays) return true;
+                double cargo = CaravanGoods.CargoCost(mp);
+                if (cargo <= ReadyWageDays * Math.Max(0, mp.TotalWage)) return true;
+                _xNotReady++;
+                return false;
             }
-            catch (Exception e) { Stumble("Losing", e); return false; }
+            catch (Exception e) { Stumble("WindReady", e); return false; }
         }
 
-        internal static void NoteExit(bool done, string why, long soldG, long purse, int men)
+        internal static void NoteExit(int soldU, long soldG, long soldC, int leftU, long leftC, long purse, int men)
         {
-            if (done) { _xDone++; _xSoldG += soldG; _xPurse += purse; _xMen += men; }
-            else { _xLeft++; if (why != null) { int n; _xWhy.TryGetValue(why, out n); _xWhy[why] = n + 1; } }
+            _xDone++; _xSoldU += soldU; _xSoldG += soldG; _xSoldC += soldC; _xLeftU += leftU; _xLeftC += leftC; _xPurse += purse; _xMen += men;
         }
 
         internal static void NoteExitFail() { _xFail++; }
+
+        internal static void NoteUnwound(string why)
+        {
+            _xUnwound++;
+            if (why != null) { int n; _xWhy.TryGetValue(why, out n); _xWhy[why] = n + 1; }
+        }
 
         /// <summary>C: czy nowa karawana tego bohatera moze ruszyc (true - tak). waited - kupiec / lord, ktoremu zwinieto karawane w ostatnich 28 dobach. lord - zakup BK.</summary>
         internal static bool EntryAllowed(bool waited, bool lord)
@@ -155,7 +170,7 @@ namespace Armoury
             if (s == null || !s.CaravanEntryWhenTradePays) return true;
             if (lord) _eLordAsk++; else _eAsk++;
             if (waited) { _eOwner++; if (lord) _eLordNo++; return false; }
-            if (!_have) { _eNoData++; _eOk++; return true; }                  // bez pomiaru w tej sesji (nowa gra, pierwsza doba po wczytaniu) - jak w grze
+            if (!_have) { _eNoData++; _eOk++; return true; }                  // bez pomiaru (nowa gra, wczytanie bez ksiegi - mniej niz polowa zmierzona) - jak w grze
             if (_room <= 0) { _eRoom++; if (lord) _eLordNo++; return false; }
             _room--; _eOk++;
             return true;
@@ -170,18 +185,30 @@ namespace Armoury
 
         private static string F0(double v) { return double.IsNaN(v) ? "-" : v.ToString("0", Inv); }
 
-        /// <summary>CaravanTrade284.Daily (po przegladzie karawan): W/L/T, seria stratnych, mediany; linia doby "Rynek karawan (294)". net - wynik handlu/d minus zold/d
-        /// zmierzonych (bez konwojow DTE), pd / wg - wynik i zold tych samych.</summary>
-        internal static string Daily(int day, int w, int l, int t, int streak, List<double> net, List<double> pd, List<double> wg)
+        private static void Top(StringBuilder sb, Dictionary<string, int> d)
+        {
+            if (d == null || d.Count == 0) return;
+            sb.Append(" [");
+            int k = 0;
+            foreach (var kv in d) { if (k++ > 0) sb.Append(", "); sb.Append(kv.Key).Append(' ').Append(kv.Value); }
+            sb.Append(']');
+        }
+
+        /// <summary>CaravanTrade284.Daily (po przegladzie karawan): W/L/T/U, seria stratnych, mediany, zwijanie; linia doby "Rynek karawan (294)". net - wynik handlu/d
+        /// minus zold/d zmierzonych (bez konwojow DTE), pd / wg - wynik i zold tych samych; wNew - zaczete dzis zwijanie, winding - w zwijaniu, wWhy - powody, dla
+        /// ktorych kandydat nie zaczal zwijania; rWind - kupno BK wstrzymane zwijaniem (kategoria x wizyta); book* - ksiega 294 z zapisu (sesja).</summary>
+        internal static string Daily(int day, int w, int l, int t, int u, int streak, List<double> net, List<double> pd, List<double> wg, int wNew, int winding,
+                                     Dictionary<string, int> wWhy, int rWind, bool bookHad, int bookOk, int bookGone, int bookBad)
         {
             var s = Settings.Current;
-            var sb = new StringBuilder(1600);
+            var sb = new StringBuilder(1800);
             try
             {
                 int room0 = _have ? _roomStart : 0; bool had = _have;
-                _roomStart = _room = w - l - t; _have = true;
+                int m = w + l, all = w + l + t + u;
+                _have = m > 0 && 2 * m >= all;
+                _roomStart = _room = (int)Math.Floor(w / PayShare + 1e-9) - all;
                 _medNet = Med(net); _medPd = Med(pd); _medWg = Med(wg);
-                int m = w + l;
                 sb.Append("Rynek karawan (294): dzien ").Append(day)
                   .Append(" | klucze: jedzenie wedlug rodzaju ").Append(s != null && s.CaravanFoodKeepsByKind ? "TAK" : "NIE")
                   .Append(", stratne karawany zwijane ").Append(s != null && s.CaravanLosingWoundUp ? "TAK" : "NIE")
@@ -190,22 +217,21 @@ namespace Armoury
                   .Append("% x doby) - wstrzymane T1 ").Append(_fT1Held).Append(" krokow, BK i gra ").Append(_fBkHeld).Append(" szt.; trwale jedzenie jak towar: na stracie (dlugo w jukach) ")
                   .Append(_fDurN).Append(" szt. za ").Append(_fDurG).Append(" zl, czeka na rynek z zyskiem ").Append(_fDurWait)
                   .Append(" | karawany zmierzone ").Append(m).Append(": placace ").Append(w).Append(", tracace ").Append(l).Append(" (seria >= ").Append(CaravanTrade284.RingDays)
-                  .Append(" dob ").Append(streak).Append("), nowe ").Append(t).Append(", udzial placacych ").Append(m > 0 ? (w / (double)m).ToString("0.000", Inv) : "-")
+                  .Append(" dob ").Append(streak).Append("), nowe ").Append(t).Append(", bez historii ").Append(u).Append(", udzial placacych ").Append(m > 0 ? (w / (double)m).ToString("0.000", Inv) : "-")
                   .Append(", mediana wyniku - zoldu/d ").Append(F0(_medNet)).Append(" zl, mediana wyniku/d ").Append(F0(_medPd)).Append(" zl, mediana zoldu/d ").Append(F0(_medWg)).Append(" zl")
-                  .Append(" | zwijanie stratnych (w miescie, seria >= ").Append(CaravanTrade284.RingDays).Append(" dob, sesja >= ").Append(ExitDays).Append(" dob): kandydaci ").Append(_xCand)
-                  .Append(", zwiniete ").Append(_xDone).Append(" (towar miastu ").Append(_xSoldG).Append(" zl, kiesy ").Append(_xPurse).Append(" zl do wlascicieli, ludzie ").Append(_xMen)
-                  .Append("), zostaly ").Append(_xLeft);
-                if (_xWhy.Count > 0)
-                {
-                    sb.Append(" [");
-                    int k = 0;
-                    foreach (var kv in _xWhy) { if (k++ > 0) sb.Append(", "); sb.Append(kv.Key).Append(' ').Append(kv.Value); }
-                    sb.Append(']');
-                }
+                  .Append(" | ksiega 294 z zapisu ").Append(bookHad ? "TAK" : "NIE").Append(" (wczytane ").Append(bookOk).Append(", karawan juz nie ma ").Append(bookGone).Append(", nieczytelne ").Append(bookBad).Append(')')
+                  .Append(" | zwijanie stratnych (seria >= ").Append(CaravanTrade284.RingDays).Append(" dob, sledzona >= ").Append(ExitDays).Append(" dob, bez morskich): zaczete ").Append(wNew);
+                Top(sb, wWhy);
+                sb.Append(", w zwijaniu ").Append(winding).Append(" (kupno BK wstrzymane ").Append(rWind).Append(" kategorii x wizyta, niegotowe w miescie - godzin ").Append(_xNotReady)
+                  .Append("), zwiniete ").Append(_xDone).Append(" (towar miastu ").Append(_xSoldU).Append(" szt. za ").Append(_xSoldG).Append(" zl, koszt ").Append(_xSoldC)
+                  .Append(" zl; niesprzedane na polke ").Append(_xLeftU).Append(" szt., koszt ").Append(_xLeftC).Append(" zl; kiesy ").Append(_xPurse).Append(" zl do wlascicieli, ludzie ").Append(_xMen)
+                  .Append("), przerwane ").Append(_xUnwound);
+                Top(sb, _xWhy);
                 sb.Append(", nie zniknely ").Append(_xFail)
                   .Append(" | nowe karawany: prosby kupcow ").Append(_eAsk).Append(", lordow BK ").Append(_eLordAsk).Append(", dopuszczone ").Append(_eOk)
                   .Append(" (bez pomiaru - jak w grze ").Append(_eNoData).Append("), wstrzymane: brak miejsca ").Append(_eRoom).Append(", wlasciciel po zwinieciu ").Append(_eOwner)
-                  .Append(" (w tym lordow ").Append(_eLordNo).Append("); miejsce wczoraj ").Append(had ? room0.ToString(Inv) : "-").Append(", na jutro W - L - T = ").Append(_room)
+                  .Append(" (w tym lordow ").Append(_eLordNo).Append("); pomiar na brame ").Append(_have ? "TAK" : "NIE").Append(" (zmierzone ").Append(m).Append(" z ").Append(all)
+                  .Append("), miejsce wczoraj ").Append(had ? room0.ToString(Inv) : "-").Append(", na jutro W / ").Append(PayShare.ToString("0.00", Inv)).Append(" - wszystkie = ").Append(_room)
                   .Append(" | potkniecia 294 ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
             }
             catch (Exception e) { Stumble("Daily", e); sb.Clear(); sb.Append("Rynek karawan (294): dzien ").Append(day).Append(" | blad linii | potkniecia 294 ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(")."); }

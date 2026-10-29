@@ -63,9 +63,15 @@ namespace Armoury
         private static int _impOk, _impBad; private static bool _impHad, _impLogged;
 
         // ------------------------------------------------------------ ksiega zysku na karawane (14 dob, bez zapisu)
-        // 294: Below - kolejne doby pomiaru z wynikiem handlu ponizej zoldu (CaravanMarket294 - zwijanie stratnej karawany), BelowDay - doba ostatniego liczenia
-        private sealed class Acc { public readonly long[] R = new long[Ring]; public readonly int[] D = new int[Ring]; public int First, Below, BelowDay = int.MinValue; }
+        // 294: Below - kolejne doby pomiaru z wynikiem handlu ponizej zoldu (CaravanMarket294 - zwijanie stratnej karawany), BelowDay - doba ostatniego liczenia,
+        // Wind - doba poczatku zwijania (int.MinValue - nie), Old - karawana sprzed pierwszej doby sesji bez wpisu w zapisie (bez historii - nie 'nowa').
+        // Zapis (klucz arm_k294, tylko przy kluczu CaravanLosingWoundUp albo CaravanEntryWhenTradePays): ksiega przezywa wczytanie - zwijanie i brama nie zaczynaja
+        // od zera po kazdym wczytaniu (recenzja 294: przy krotkich sesjach Jeffa wszystkie karawany byly 'nowe' przez 7 dob, a zwijanie nie ruszalo przed 28. doba).
+        private sealed class Acc { public readonly long[] R = new long[Ring]; public readonly int[] D = new int[Ring]; public int First, Below, BelowDay = int.MinValue, Wind = int.MinValue; public bool Old; }
         private static readonly Dictionary<MobileParty, Acc> _acc = new Dictionary<MobileParty, Acc>();
+        private static string _bookPend;                                        // 294: napis arm_k294 do pierwszego uzycia ksiegi (karawany juz sa)
+        private static bool _bookHad, _dayRan;                                  // klucz w zapisie; pierwsza doba sesji juz byla
+        private static int _bookOk, _bookGone, _bookBad, _rWind;               // wpisy wczytane / karawan juz nie ma / nieczytelne; kupno BK wstrzymane zwijaniem
 
         // ------------------------------------------------------------ liczniki doby
         private static readonly long[] _pN = new long[Paths], _pG = new long[Paths], _pT = new long[Paths], _pC = new long[Paths], _pR = new long[Paths];
@@ -103,6 +109,7 @@ namespace Armoury
             _bkWithheld.Clear(); _bkWithheldMp = null;
             _impOk = _impBad = 0; _impHad = _impLogged = false;
             _acc.Clear(); _sellIdx.Clear(); _sellDay = -1;
+            _bookPend = null; _bookHad = _dayRan = false; _bookOk = _bookGone = _bookBad = 0;   // 294
             Path = 0; _bkSelling = 0; _vanSelling = 0; _b.Mp = null;
             _stumbleSess = 0; _err.Clear();
             _g285N = _g285C = 0; _g285Acts = 0; _g285By.Clear();   // 285
@@ -117,6 +124,7 @@ namespace Armoury
             _bkHeldN = _bkHeldC = _bulkHeldN = _spongeN = _spongeG = _ticks = 0;
             _noRoom = _heldLazy = 0; _p1Phantom = 0;
             _vanExit = _ageWait = 0; _vanHeldN = _vanHeldC = 0;
+            _rWind = 0;   // 294
         }
 
         private static void Stumble(string where, Exception e)
@@ -336,27 +344,123 @@ namespace Armoury
         /// <summary>294: okno ksiegi zysku karawany (doby) - seria stratnej karawany liczy sie w tych dobach.</summary>
         internal const int RingDays = Ring;
 
-        /// <summary>294 (CaravanMarket294.Losing): seria dob pomiaru z wynikiem handlu ponizej zoldu i doby sledzenia karawany w sesji; false - karawana bez ksiegi.</summary>
-        internal static bool LosingStreak(MobileParty mp, out int streak, out int age)
+        /// <summary>294: karawany w zwijaniu (kopia listy - WindHourly moze je usuwac); null - zadnej.</summary>
+        internal static List<MobileParty> Winding()
         {
-            streak = 0; age = 0;
+            EnsureBook();
+            List<MobileParty> l = null;
+            foreach (var kv in _acc) if (kv.Value.Wind != int.MinValue) { if (l == null) l = new List<MobileParty>(); l.Add(kv.Key); }
+            return l;
+        }
+
+        /// <summary>294: doby zwijania karawany; -1 - nie jest zwijana.</summary>
+        internal static int WindDays(MobileParty mp)
+        {
             Acc a;
-            if (mp == null || !_acc.TryGetValue(mp, out a)) return false;
-            streak = a.Below;
-            age = (int)CampaignTime.Now.ToDays - a.First;
-            return true;
+            if (mp == null || !_acc.TryGetValue(mp, out a) || a.Wind == int.MinValue) return -1;
+            return Math.Max(0, (int)CampaignTime.Now.ToDays - a.Wind);
+        }
+
+        /// <summary>294: koniec zwijania (karawana nie moze byc zwinieta - bohater, kontrakt, statki) - kupno BK znow czynne, seria od zera.</summary>
+        internal static void Unwind(MobileParty mp)
+        {
+            Acc a;
+            if (mp != null && _acc.TryGetValue(mp, out a)) { a.Wind = int.MinValue; a.Below = 0; }
         }
 
         private static Acc AccOf(MobileParty mp, int day)
         {
+            EnsureBook();
             Acc a;
             if (!_acc.TryGetValue(mp, out a))
             {
-                a = new Acc { First = day };
+                a = new Acc { First = day, Old = !_dayRan };
                 for (int i = 0; i < Ring; i++) a.D[i] = int.MinValue;
                 _acc[mp] = a;
             }
             return a;
+        }
+
+        private static bool BookOn(Settings s) { return s != null && (s.CaravanLosingWoundUp || s.CaravanEntryWhenTradePays); }
+
+        /// <summary>294: zapis ksiegi zysku karawan (arm_k294): "k294|1|" + wpisy "id,First,Below,BelowDay,Wind,dob_temu:wynik/..." (doba sprzedazy jako doby przed
+        /// zapisem, tylko okno 14 dob). Pusty napis przy kluczach 294 B i C NIE - ksiega jak dotad tylko w sesji.</summary>
+        internal static string ExportBook()
+        {
+            var s = Settings.Current;
+            if (!BookOn(s)) return "";
+            if (_bookPend != null) return _bookPend;                            // zapis przed pierwszym uzyciem ksiegi - wczytany napis bez zmian
+            int now = (int)CampaignTime.Now.ToDays;
+            var sb = new StringBuilder(1 << 16);
+            sb.Append("k294|1|");
+            bool first = true;
+            foreach (var kv in _acc)
+            {
+                var mp = kv.Key; var a = kv.Value;
+                string id = mp != null ? mp.StringId : null;
+                if (mp == null || !mp.IsActive || string.IsNullOrEmpty(id) || id.IndexOfAny(BadIdChars) >= 0) continue;
+                if (!first) sb.Append(';');
+                first = false;
+                sb.Append(id).Append(',').Append(a.First.ToString(Inv)).Append(',').Append(a.Below.ToString(Inv)).Append(',').Append(a.BelowDay.ToString(Inv))
+                  .Append(',').Append(a.Wind.ToString(Inv)).Append(',');
+                bool f2 = true;
+                for (int k = 0; k < Ring; k++)
+                {
+                    if (a.D[k] == int.MinValue || a.D[k] > now || now - a.D[k] >= Ring) continue;
+                    if (!f2) sb.Append('/');
+                    f2 = false;
+                    sb.Append((now - a.D[k]).ToString(Inv)).Append(':').Append(a.R[k].ToString(Inv));
+                }
+            }
+            return sb.ToString();
+        }
+
+        private static readonly char[] BadIdChars = { ';', ',', '|', ':', '/' };
+
+        /// <summary>294: wczytanie arm_k294 (po Reset) - napis czeka do pierwszego uzycia ksiegi. null / pusty - zapis bez klucza (ksiega od zera, jak dotad).</summary>
+        internal static void ImportBook(string s)
+        {
+            _bookHad = !string.IsNullOrEmpty(s);
+            _bookPend = _bookHad ? s : null;
+        }
+
+        private static void EnsureBook()
+        {
+            string s = _bookPend;
+            if (s == null) return;
+            _bookPend = null;
+            try
+            {
+                if (!BookOn(Settings.Current)) return;                          // klucze 294 B i C NIE - ksiega tylko w sesji (jak 290)
+                if (!s.StartsWith("k294|1|", StringComparison.Ordinal)) { _bookBad++; return; }
+                int now = (int)CampaignTime.Now.ToDays;
+                var cars = new Dictionary<string, MobileParty>();
+                foreach (var mp in MobileParty.AllCaravanParties) if (mp != null && mp.IsActive && mp.StringId != null) cars[mp.StringId] = mp;
+                foreach (var rec in s.Substring(7).Split(';'))
+                {
+                    if (rec.Length == 0) continue;
+                    var f = rec.Split(',');
+                    int first, below, bday, wind;
+                    if (f.Length != 6 || !int.TryParse(f[1], NumberStyles.Integer, Inv, out first) || !int.TryParse(f[2], NumberStyles.Integer, Inv, out below)
+                        || !int.TryParse(f[3], NumberStyles.Integer, Inv, out bday) || !int.TryParse(f[4], NumberStyles.Integer, Inv, out wind) || below < 0 || first > now) { _bookBad++; continue; }
+                    MobileParty mp;
+                    if (!cars.TryGetValue(f[0], out mp) || _acc.ContainsKey(mp)) { _bookGone++; continue; }
+                    var a = new Acc { First = first, Below = below, BelowDay = bday, Wind = wind };
+                    for (int i = 0; i < Ring; i++) a.D[i] = int.MinValue;
+                    bool ok = true;
+                    foreach (var e in f[5].Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        int c = e.IndexOf(':'), ago; long r;
+                        if (c <= 0 || !int.TryParse(e.Substring(0, c), NumberStyles.Integer, Inv, out ago) || !long.TryParse(e.Substring(c + 1), NumberStyles.Integer, Inv, out r)
+                            || ago < 0 || ago >= Ring) { ok = false; break; }
+                        int d = now - ago, k = ((d % Ring) + Ring) % Ring;
+                        a.D[k] = d; a.R[k] = r;
+                    }
+                    if (!ok) { _bookBad++; continue; }
+                    _acc[mp] = a; _bookOk++;
+                }
+            }
+            catch (Exception e) { _bookBad++; Stumble("EnsureBook", e); }
         }
 
         private static void AddReal(MobileParty mp, int day, long v)
@@ -419,7 +523,7 @@ namespace Armoury
             {
                 int why = Why(mp, cat, town, s);
                 if (why != 0 && _b.Seen.Add(cat))
-                    switch (why) { case 1: _rGate++; break; case 2: _rCap++; break; case 3: _rWage++; break; case 4: _rGain++; break; default: _rFood++; break; }
+                    switch (why) { case 1: _rGate++; break; case 2: _rCap++; break; case 3: _rWage++; break; case 4: _rGain++; break; case 6: _rWind++; break; default: _rFood++; break; }
                 return why != 0;
             }
             catch (Exception e) { Stumble("BuyBlocked", e); return false; }
@@ -428,6 +532,7 @@ namespace Armoury
 
         private static int Why(MobileParty mp, ItemCategory cat, Town town, Settings s)
         {
+            if (s.CaravanLosingWoundUp && WindDays(mp) >= 0) return 6;          // 294: karawana w zwijaniu - wlasciciel juz nie kupuje, tylko wyprzedaje
             if (s.CaravanBuyByFlow && GateShut(cat)) return 1;
             int purse = mp.PartyTradeGold;
             double cargo = _b.Stock0 + Math.Max(0, _b.Purse0 - purse);      // ladunek po koszcie: z poczatku BuyGoods + to, co BK juz wydal w tym wywolaniu
@@ -960,8 +1065,11 @@ namespace Armoury
                 var alive = new HashSet<MobileParty>();
                 var pdL = new List<double>(); var wgL = new List<double>(); var penL = new List<double>();   // 287: wynik handlu i zold na dobe, kara handlowa
                 int nCover = 0; double wAll = 0, toll = 0;
-                // 294: rynek karawan bez konwojow DTE - placace (W), tracace (L), nowe ponizej MeasureDays (T), seria stratnych, wynik - zold, wynik, zold
-                int w294 = 0, l294 = 0, t294 = 0, s294 = 0;
+                // 294: rynek karawan bez konwojow DTE - placace (W), tracace (L), nowe ponizej MeasureDays (T), bez historii (U - sprzed pierwszej doby sesji, bez wpisu
+                // w zapisie, jeszcze bez pomiaru), seria stratnych, zwijanie (zaczete dzis / w zwijaniu / wstrzymane), wynik - zold, wynik, zold
+                int w294 = 0, l294 = 0, t294 = 0, u294 = 0, s294 = 0, wind294 = 0, wNew294 = 0;
+                var wWhy294 = new Dictionary<string, int>();
+                bool windOn = s.CaravanLosingWoundUp;
                 var n294 = new List<double>(); var p294 = new List<double>(); var g294 = new List<double>();
                 foreach (var mp in MobileParty.AllCaravanParties)
                 {
@@ -998,10 +1106,21 @@ namespace Armoury
                             double wg = Math.Max(0, mp.TotalWage);
                             if (pd >= wg) w294++; else { l294++; if (a.Below >= Ring) s294++; }
                             n294.Add(pd - wg); p294.Add(pd); g294.Add(wg);
+                            // 294 (klucz CaravanLosingWoundUp): seria >= 14 dob pomiaru ponizej zoldu i karawana sledzona >= 28 dob - wlasciciel zaczyna zwijac: kupno BK
+                            // stoi (Why 6), towar schodzi zwyklymi regulami T1 / BK w nastepnych miastach, rozwiazanie w miescie, gdy gotowa (CaravanFlow.WindHourly)
+                            if (windOn && a.Wind == int.MinValue && a.Below >= Ring && today - a.First >= CaravanMarket294.ExitDays)
+                            {
+                                string why = CaravanFlow.WindBlocker(mp);
+                                if (why == null) { a.Wind = today; wNew294++; }
+                                else { int q; wWhy294.TryGetValue(why, out q); wWhy294[why] = q + 1; }
+                            }
                         }
                     }
-                    else if (!Measure31.IsDteConvoy(mp)) t294++;   // 294: nowa (jeszcze bez pomiaru) - niczego nie dowiodla
+                    else if (!Measure31.IsDteConvoy(mp)) { if (a.Old) u294++; else t294++; }   // 294: nowa (jeszcze bez pomiaru) - niczego nie dowiodla; bez historii osobno
+                    if (a.Wind != int.MinValue && !windOn) a.Wind = int.MinValue;   // 294: klucz NIE - koniec zwijania (kupno BK jak dotad)
+                    if (a.Wind != int.MinValue) wind294++;
                 }
+                _dayRan = true;
                 var gone = new List<MobileParty>();
                 foreach (var k in _acc.Keys) if (!alive.Contains(k)) gone.Add(k);
                 foreach (var k in gone) _acc.Remove(k);
@@ -1075,7 +1194,7 @@ namespace Armoury
                 if (s.CaravanFlowByMarketDemand) Log.Info(Line290(s, day, rows));
 
                 // linia 294: rynek karawan (jedzenie wedlug rodzaju, zwijanie stratnych, nowe karawany wedlug miejsca) - takze przy kluczach NIE (pomiar)
-                Log.Info(CaravanMarket294.Daily(day, w294, l294, t294, s294, n294, p294, g294));
+                Log.Info(CaravanMarket294.Daily(day, w294, l294, t294, u294, s294, n294, p294, g294, wNew294, wind294, wWhy294, _rWind, _bookHad, _bookOk, _bookGone, _bookBad));
 
                 // linia 4 (F, na sucho przy kluczu NIE)
                 Log.Info(new StringBuilder(500).Append("Wielkosc karawan (284, na sucho): dzien ").Append(day).Append(" | klucz Caravan Size By Trade ").Append(YN(s.CaravanSizeByTrade))

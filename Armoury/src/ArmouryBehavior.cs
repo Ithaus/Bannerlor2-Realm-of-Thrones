@@ -1268,6 +1268,10 @@ namespace Armoury
             // 284 (C): srednia sprzedazy karawan miastom wedlug kategorii (bramka kupna wszystkich towarow) - brak klucza = pomiar od zera
             try { string cs = dataStore.IsSaving ? CaravanTrade284.Export() : null; SaveText.Sync(dataStore, "arm_cs284", ref cs); if (dataStore.IsLoading) CaravanTrade284.Import(cs); }
             catch (Exception e) { Log.Error("SyncData.arm_cs284", e); }
+            // 294: ksiega zysku karawan (seria stratnych, zwijanie, okno 14 dob) - tylko przy kluczu CaravanLosingWoundUp albo CaravanEntryWhenTradePays; brak klucza
+            // (stary zapis) albo klucze NIE = ksiega od zera w sesji, jak dotad; starszy DLL klucz pomija
+            try { string kb = dataStore.IsSaving ? CaravanTrade284.ExportBook() : null; SaveText.Sync(dataStore, "arm_k294", ref kb); if (dataStore.IsLoading) CaravanTrade284.ImportBook(kb); }
+            catch (Exception e) { Log.Error("SyncData.arm_k294", e); }
             // 174b.6: zlom ze starego nadmiaru - rozgrzewka (doby pomiaru), ostatnia doba, srednie zakupow koszykow, ulamki skupu i rudy; Export tylko przy zapisie
             // (z probnym odczytem), brak klucza = zapis sprzed 174b (rozgrzewka od zera, jak dotad); rozwiazanie w OnSessionLaunched
             try { string sc = dataStore.IsSaving ? ArmsScrap.Export() : null; SaveText.Sync(dataStore, "arm_scrap", ref sc); if (dataStore.IsLoading) ArmsScrap.Import(sc); }
@@ -1710,6 +1714,7 @@ namespace Armoury
             // na zywo (wylaczony = sluchacz nic nie robi, kolejka w GarrisonArmory.Daily jak dotad). Rejestracja PRZED ArmoryFit.HourlyOnce = wolanie PO nim (gra dopisuje
             // sluchacza na poczatek listy - MbEvent): przeglad zbrojowni pierwszej godziny sesji widzi stan sprzed sprzedazy, jak dotad
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("GarrisonArmory.Hourly", delegate { try { GarrisonArmory.Hourly(); } catch (Exception e) { Log.Error("GarrisonArmory.Hourly", e); } }));
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CaravanFlow.WindHourly", delegate { try { CaravanFlow.WindHourly(); } catch (Exception e) { Log.Error("CaravanFlow.WindHourly", e); } }));   // 294: stratna karawana w zwijaniu - rozwiazanie w miescie, gdy gotowa
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("ArmoryFit.HourlyOnce", delegate { try { ArmoryFit.HourlyOnce(); } catch (Exception e) { Log.Error("ArmoryFit.HourlyOnce", e); } }));
             // sprzet startowy dopasowany do umiejetnosci (Jeff 04.10)
             CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, delegate { try { StartKit.OnCharacterCreationOver(); } catch { } });   // wpis 86 (audyt pkt 17): limit zlota startowego niezalezny od StartKitEnabled
