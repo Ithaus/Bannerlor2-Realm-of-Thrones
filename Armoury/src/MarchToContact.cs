@@ -98,6 +98,9 @@ namespace Armoury
         private static readonly bool[] _rest = new bool[Slots];         // 136: konnica AI daje koniom odsapnac (klus) - srednia S koni szyku z HorseWind
         private static readonly bool[] _capRest = new bool[Slots];      // 136 (recenzja): obecny cap to odpoczynek (wyjscie z niego w marsz liczy sie jako wejscie w marsz)
         private static readonly float[] _freshUntil = new float[Slots];  // 144 (B2): swieza szarza do tej chwili (0 = nie; zerowane przy pierwszym zwarciu)
+        // 291 (UnshieldedRushUnderFire): czesc ludzi szyku z tarcza w ekwipunku (skan co ScanEvery; -1 = jeszcze nie), szyk bez tarcz biegnie pod ostrzalem
+        private static readonly float[] _shield = new float[Slots];
+        private static readonly bool[] _rushNow = new bool[Slots];
 
         private static WeakReference _m;
         private static float _acc, _sampleAcc;
@@ -135,6 +138,13 @@ namespace Armoury
 
         // ---- pomocnicze bez alokacji (glowny watek)
         private static float _scanWalk;
+        private static int _scanMen, _scanShield;   // 291: ludzie i ludzie z tarcza w skanie szyku
+        // 291: bieg bez tarcz - klucz (kopia z Tick), stan biezacego Eval (szyk biegl w poprzednim takcie, rozkaz), liczniki linii 'Bitwa (291)' (glowny watek)
+        private static bool _rush = true, _evalWasRush;
+        private static MovementOrder.MovementOrderEnum _evalOe;
+        private static int _rushIn, _rushOut, _rushShieldKept;
+        private static float _rushSec, _rushShareSum;
+        private static readonly HashSet<int> _rushForms = new HashSet<int>(), _rushKeptForms = new HashSet<int>();
         private static bool _scanDragon;
         private static readonly Action<Agent> _scan = ScanUnit;
         private static int _sampleLeft;
@@ -337,6 +347,7 @@ namespace Armoury
                 _kind[i] = KNone; _freeUntil[i] = 0f; _released[i] = false; _archFree[i] = false; _walk[i] = 0f; _nextScan[i] = 0f;
                 _dragon[i] = false; _player[i] = false; _wasCharge[i] = false; _signal[i] = false; _chargeAt[i] = -1000f; _everMarched[i] = false;
                 _chargeHeld[i] = false; _rest[i] = false; _capRest[i] = false; _freshUntil[i] = 0f;
+                _shield[i] = -1f; _rushNow[i] = false;   // 291
             }
             _any = false;
         }
@@ -375,6 +386,7 @@ namespace Armoury
             _restUntil = Math.Max(20, Math.Min(100, c.HorseAiRestUntil));
             if (_restUntil <= _restBelow) _restUntil = Math.Min(100, _restBelow + 5);
             _trueWalk = c.MarchAtWalkingPace;   // 144 (134c)
+            _rush = c.UnshieldedRushUnderFire;    // 291
             _on = true;
             float now = m.CurrentTime;
             var teams = m.Teams;
@@ -456,6 +468,7 @@ namespace Armoury
                 float ws = a.WalkSpeedCached;
                 if (ws > 0.3f && ws < _scanWalk) _scanWalk = ws;
                 if (!_scanDragon && a.MountAgent != null && IsDragon(a.MountAgent)) _scanDragon = true;
+                if (a.IsHuman) { _scanMen++; if (a.HasShieldCached) _scanShield++; }   // 291: tarcza w ekwipunku (jak 'has' w CloseRanks)
             }
             catch { }
         }
@@ -469,8 +482,12 @@ namespace Armoury
                 _kind[idx] = KNone; _freeUntil[idx] = 0f; _released[idx] = false; _archFree[idx] = false; _walk[idx] = 0f; _nextScan[idx] = 0f;
                 _dragon[idx] = false; _wasCharge[idx] = false; _signal[idx] = false; _chargeAt[idx] = -1000f; _everMarched[idx] = false;
                 _chargeHeld[idx] = false; _rest[idx] = false; _capRest[idx] = false; _freshUntil[idx] = 0f;
+                _shield[idx] = -1f; _rushNow[idx] = false;   // 291
                 _who[idx] = f;
             }
+            // 291: bieg pod ostrzalem trwa tylko przez MarchCap tego taktu (zwarcie, szarza, inny rozkaz - koniec biegu, zwykla sciezka)
+            _evalWasRush = _rushNow[idx];
+            if (_rushNow[idx]) { _rushNow[idx] = false; _rushOut++; }
             if (f.CountOfUnits <= 0) { Set(f, idx, 0f, 0f, false); return; }
 
             if (now >= _nextScan[idx])
@@ -478,7 +495,9 @@ namespace Armoury
                 _nextScan[idx] = now + ScanEvery;
                 _scanWalk = float.MaxValue;
                 _scanDragon = false;
+                _scanMen = _scanShield = 0;
                 f.ApplyActionOnEachUnit(_scan);
+                _shield[idx] = _scanMen > 0 ? (float)_scanShield / _scanMen : -1f;   // 291
                 _walk[idx] = _scanWalk < 10f ? Clamp(_scanWalk, 1.2f, 2.2f) : 1.8f;
                 if (_scanDragon && !_dragon[idx]) _tDragon++;
                 _dragon[idx] = _scanDragon;
@@ -490,6 +509,7 @@ namespace Armoury
             bool player = !f.IsAIControlled;
             _player[idx] = player;
             var oe = f.GetReadonlyMovementOrderReference().OrderEnum;
+            _evalOe = oe;   // 291
             bool charge = oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget;
             bool orderWalk;
             if (player) orderWalk = oe == MovementOrder.MovementOrderEnum.Advance || (oe == MovementOrder.MovementOrderEnum.Move && _playerMove);
@@ -673,6 +693,26 @@ namespace Armoury
             if (_trueWalk && pace > WalkPace) pace = WalkPace;   // 144 (134c, W3): szyk krokiem ok. 1.6 m/s - utrzymanie linii (x1.1) miesci sie w 1.75
             bool underFire = false;
             if (kind == KInf) { try { underFire = q.UnderRangedAttackRatio >= 0.33f; } catch { underFire = false; } }
+            // 291 (Jeff 29.10: piechota bez tarcz pod strzalami "nie idzie jak glupi powoli tylko biegnie na przeciwnika aby jak najszybciej skrocic dystans ... jak ma
+            // tarcze to idzie za murem tarcz"; log 00:49 'szyk bez naszej zmiany 24/0/0' - same trafienia w cialo, 'padli od pociskow 19' bez zwarcia): szyk piechoty AI
+            // pod ostrzalem (miara gry UnderRangedAttackRatio >= 0.33 albo sygnal S4 140 - pociski na szyk) z tarcza u mniej niz 60% ludzi (CloseRanks.WallFrom - prog muru
+            // tarcz 146: ponizej niego szyk idzie Loose) bez capu marszu - biegnie (AiBreath z zapasem pod ostrzalem 25%) az do zwarcia albo zmiany rozkazu; z tarczami
+            // zostaje krok i mur tarcz 146. Odwrot (FallBack) - bez zmian. Szyki gracza i smoki - nigdy.
+            if (kind == KInf && _rush && !_player[idx] && !_dragon[idx] && _evalOe != MovementOrder.MovementOrderEnum.FallBack)
+            {
+                bool fire = underFire || ShieldsUp.FormFire(f);
+                bool bare = _shield[idx] >= 0f && _shield[idx] < CloseRanks.WallFrom;
+                if (bare && (fire || _evalWasRush))
+                {
+                    if (_evalWasRush) _rushOut--;   // dalej biegnie (zdjecie na poczatku Eval nie bylo koncem)
+                    else { _rushIn++; _rushShareSum += _shield[idx]; _rushForms.Add(idx); }
+                    _rushNow[idx] = true;
+                    _rushSec += TickEvery;
+                    Set(f, idx, 0f, 0f, false);
+                    return;
+                }
+                if (fire && !bare && _shield[idx] >= 0f && _rushKeptForms.Add(idx)) _rushShieldKept++;
+            }
             Set(f, idx, pace, underFire ? 0f : pace, false);
         }
 
@@ -776,6 +816,33 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ kontrakty
+
+        /// <summary>291 (AiBreath.Reserve, glowny watek): szyk biegnie teraz pod ostrzalem bez tarcz - zapas tchu jak pod ostrzalem (25%).</summary>
+        internal static bool Rushing(Formation f)
+        {
+            if (!_on || f == null) return false;
+            int idx = Idx(f);
+            return idx >= 0 && ReferenceEquals(_who[idx], f) && _rushNow[idx];
+        }
+
+        /// <summary>291: liczniki segmentu C linii 'Bitwa (291)' od zera (Battle291.Begin, przed Begin paczek).</summary>
+        internal static void Rush291Reset()
+        {
+            _rushIn = _rushOut = _rushShieldKept = 0;
+            _rushSec = _rushShareSum = 0f;
+            _rushForms.Clear(); _rushKeptForms.Clear();
+        }
+
+        /// <summary>291: segment C linii 'Bitwa (291)' (HorsePursuit.End - po MarchToContact.End; liczniki zostaja do Rush291Reset).</summary>
+        internal static string Rush291Segment()
+        {
+            var c = Settings.Current;
+            bool key = c != null && c.UnshieldedRushUnderFire && c.MarchToContactEnabled;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            return "C piechota bez tarcz biegnie pod ostrzalem " + (key ? "TAK" : "NIE") + ": szykow " + _rushForms.Count + ", wejsc w bieg " + _rushIn
+                   + " (sr. tarcz " + (_rushIn > 0 ? (_rushShareSum / _rushIn).ToString("0.00", inv) : "-") + ", prog " + CloseRanks.WallFrom.ToString("0.00", inv)
+                   + "), koncow biegu " + _rushOut + ", szyko-sekund biegu " + _rushSec.ToString("0", inv) + "; z tarczami pod ostrzalem zostal krok " + _rushShieldKept;
+        }
 
         /// <summary>Szyk idzie teraz marszem (ma cap). Glowny watek.</summary>
         internal static bool IsMarching(Formation f)

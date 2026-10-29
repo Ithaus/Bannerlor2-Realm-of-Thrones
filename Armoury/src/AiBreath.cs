@@ -492,6 +492,7 @@ namespace Armoury
             float res = _reserve;
             bool fire = false;
             try { var q = f.QuerySystem; fire = q != null && q.UnderRangedAttackRatio >= FireRatio; } catch { fire = false; }
+            if (!fire && MarchToContact.Rushing(f)) fire = true;   // 291: szyk bez tarcz biegnie pod ostrzalem (sygnal S4) - ten sam zapas pod ostrzalem
             if (fire && res > FireReserve) { res = FireReserve; if (count) _underFire++; }
             return res;
         }

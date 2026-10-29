@@ -296,10 +296,11 @@ namespace Armoury
             }
         }
 
-        private static void PostShock(object __instance, ref float __result) { Mul(__instance, KShock, ref __result); }
-        private static void PostShot(object __instance, ref float __result) { Mul(__instance, KShot, ref __result); }
-        private static void PostHorse(object __instance, ref float __result) { Mul(__instance, KHorse, ref __result); }
-        private static void PostHold(object __instance, ref float __result) { Mul(__instance, KHold, ref __result); S2Mul(__instance, ref __result); }   // 141: S2 (Doctrine.S2.cs)
+        // 291: DhMul - obronca trzyma pozycje (wagi ataku 0, Doctrine.Hold291.cs); DhNote - ostatnia waga obrony druzyny obroncy
+        private static void PostShock(object __instance, ref float __result) { Mul(__instance, KShock, ref __result); DhMul(__instance, ref __result); }
+        private static void PostShot(object __instance, ref float __result) { Mul(__instance, KShot, ref __result); DhMul(__instance, ref __result); }
+        private static void PostHorse(object __instance, ref float __result) { Mul(__instance, KHorse, ref __result); DhMul(__instance, ref __result); }
+        private static void PostHold(object __instance, ref float __result) { Mul(__instance, KHold, ref __result); S2Mul(__instance, ref __result); DhNote(__instance, __result); }   // 141: S2 (Doctrine.S2.cs)
 
         /// <summary>Postfiks GetTacticWeight (tick druzyn): waga x mnoznik doktryny druzyny. Tylko odczyt tablicy, bez alokacji.</summary>
         private static void Mul(object inst, int k, ref float r)
@@ -374,7 +375,8 @@ namespace Armoury
         internal static bool AnyKey(Settings c)
         {
             return c != null && (c.CultureDoctrines || c.ShootBeforeAttacking || c.CavalrySeeksFlanks || c.ArchersFallBackBehindInfantry
-                                 || c.DefendersAdvanceUnderFire);   // 141: S2 sam tez potrzebuje rady wojennej (ApplyList) i ticku doktryny
+                                 || c.DefendersAdvanceUnderFire     // 141: S2 sam tez potrzebuje rady wojennej (ApplyList) i ticku doktryny
+                                 || c.DefendersHoldTheirGround);    // 291: obronca trzyma pozycje - tak samo (Doctrine.Hold291.cs)
         }
 
         internal static void End(Mission m)
@@ -384,6 +386,7 @@ namespace Armoury
             try { lock (RoutHold.Gate) { if (_sampleTeamA >= 0) _histA = Hist(_sampleTeamA); if (_sampleTeamD >= 0) _histD = Hist(_sampleTeamD); } } catch { }
             // 141: linia "S2 (141)" raz na misje (przed Clear - stan druzyn; _m zerowane nizej, drugie wywolanie End nic nie pisze)
             try { S2End(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.S2End", e); }
+            try { DhEnd(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.DhEnd", e); }   // 291: probka do linii 'Bitwa (291)'
             Clear();
             _m = null;
         }
@@ -398,6 +401,7 @@ namespace Armoury
                 _s1[i] = 0; _s1Start[i] = 0f; _s1Clock[i] = -1f; _s1Ranged[i] = 0f; _cur[i] = null; _hist[i] = null;
                 _flankW[i] = 0f; _enemyRanged[i] = 0f; _shotGate[i] = false;
                 S2ClearTeam(i);   // 141
+                DhClearTeam(i);   // 291
             }
             for (int i = 0; i < Slots; i++) { _sWho[i] = null; _sBack[i] = false; Drop(i); _sFlank[i] = false; }
             _sampleTeamA = _sampleTeamD = -1;
@@ -421,6 +425,7 @@ namespace Armoury
             if (tac < HordeBelow)
             {
                 S2Register(team, ti, have, late);   // 141: S2 to zasada przetrwania, nie doktryna - tlum tez (lista po radzie)
+                DhRegister(team, ti, have, c);      // 291: obronca trzyma pozycje - tlum tez
                 lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _teams++; _horde++; if (late) _late++; }
                 return;
             }
@@ -439,6 +444,7 @@ namespace Armoury
             SetBase(ti, c);
             _teamRef[ti] = team;
             S2Register(team, ti, have, late);   // 141: po dodatkach doktryny (+Charge dzikich) - lista taktyk ataku pelna
+            DhRegister(team, ti, have, c);      // 291
             var s = new StringBuilder(160);
             s.Append('T').Append(tac).Append('/').Append(culture ?? "?").Append(' ').Append(p.Name)
              .Append(" (Shock ").Append(F(p.Shock)).Append(", Shot ").Append(F(p.Shot)).Append(", Horse ").Append(F(p.Horse)).Append(", Hold ").Append(F(p.Hold)).Append(')');
@@ -518,6 +524,12 @@ namespace Armoury
                 {
                     try { S2Tick(m, t, ti, c, now); }
                     catch (Exception e) { _s2Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.S2", e); }
+                }
+                // 291: obronca trzyma pozycje - wlasny try, po S2 (stan S2 tego taktu)
+                if (ReferenceEquals(_dhRef[ti], t))
+                {
+                    try { DhTick(m, t, ti, c, now); }
+                    catch (Exception e) { _dhStum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hold291", e); }
                 }
             }
             if (_stumLocal > 0) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _stum += _stumLocal; } _stumLocal = 0; }

@@ -1029,7 +1029,8 @@ namespace Armoury
                         // z rozkazu szyku) zostawia st.Panicked false - sprobujemy przy nastepnym takcie. Ponowne FleeTheField (Panic co 0,2 s -
                         // zapetlony krzyk z logu 16.10: 257 wywolan na 7 ludzi) tylko na starej drodze (klucz wylaczony).
                         bool rout = RoutHold.On(Mission);
-                        if (broken && c.AiFleeWhenNearDeath && !agent.IsMainAgent && agent.IsAIControlled && !st.Panicked && FleeHere(agent))
+                        if (broken && c.AiFleeWhenNearDeath && !agent.IsMainAgent && agent.IsAIControlled && !st.Panicked && FleeHere(agent)
+                            && (rout || !HorsePursuit.TestShielded(agent)))   // recenzja 291: stara droga (bez RoutHold) - nekajacy autotestu jak w RoutHold.Break
                         {
                             if (rout) st.Panicked = RoutHold.Break(agent, MissionTeams.Flee);
                             else

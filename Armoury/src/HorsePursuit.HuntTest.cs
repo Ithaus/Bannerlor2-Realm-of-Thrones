@@ -67,6 +67,14 @@ namespace Armoury
         private static bool _tInPlace, _tPlaced;
         private static float _tStatAt;
         private static bool _tHarmed;   // poprawka 132b: stan wroga z chwili pierwszej szkody (TestHarm)
+        // 291 (autotest 133a: B 'odwrot rannego po 84.6 s', C 'panika/odwrot po 88.4 s', oba wykryc 0 - ranni / bez ducha w drodze skrzydlem pod strzalami, zanim
+        // kogokolwiek drasneli): nekajacy testu zastepuje gracza (gracz nie panikuje i nie wycofuje sie ranny) - do pierwszego wykrycia HP do pelna i morale
+        // nie nizej niz przy wyborze; liczniki do linii 'faza oslona'. J204-1: wykrycia ciosem i pudla razem (takze z dala od ludzi) - osobno od wykryc pociskiem
+        private static int _tGuardHp, _tGuardMor, _tMelee, _tMissAll;
+        // recenzja 291: HP przywracane co 0.25 s przegrywalo z BrokenMen (co 0.5 s -> RoutHold.Withdraw -> BeforeWithdraw 'odwrot rannego') i FieldCraft (bol ->
+        // RoutHold.Break) - nekajacy testu do pierwszego wykrycia odrzucany u zrodla (RoutHold.Withdraw / Break, FieldCraft stara droga); ile razy - linia 'faza oslona'
+        private static int _tGuardWd;
+        private static float _tMor0 = -1f;
 
         private static void HuntTestBegin(Settings c)
         {
@@ -99,6 +107,31 @@ namespace Armoury
             _tInPlace = _tPlaced = false;
             _tStatAt = 0f;
             _tHarmed = false;
+            _tGuardHp = _tGuardMor = _tMelee = _tMissAll = _tGuardWd = 0;   // 291
+            _tMor0 = -1f;
+        }
+
+        /// <summary>291: nekajacy testu do pierwszego wykrycia - HP do pelna, morale nie nizej niz przy wyborze (jak gracz: bez odwrotu rannego 143 i paniki
+        /// przed pierwsza szkoda). Tylko LogGate.Mode 1, klucz HuntHarasserInAutotest, plan Strong (_tOn).</summary>
+        private static void TestGuard(Agent a)
+        {
+            if (_tDet > 0 || a == null) return;
+            try
+            {
+                float lim = a.HealthLimit;
+                if (lim > 0f && a.Health < lim) { a.Health = lim; _tGuardHp++; }
+                if (_tMor0 >= 0f && a.GetMorale() < _tMor0) { a.SetMorale(_tMor0); _tGuardMor++; }
+            }
+            catch (Exception e) { HStumble("HorsePursuit.TestOslona", e); }
+        }
+
+        /// <summary>Recenzja 291 (glowny watek: RoutHold.Withdraw / Break, FieldCraft): nekajacy testu w polu przed pierwszym wykryciem - odwrot rannego i panika z bolu
+        /// odrzucone (wolajacy sprobuje w nastepnym takcie, po pierwszym wykryciu juz normalnie). Poza autotestem _tOn = false - zawsze false.</summary>
+        internal static bool TestShielded(Agent a)
+        {
+            if (!_tOn || _tState != 1 || _tDet > 0 || a == null || !ReferenceEquals(a, _tA)) return false;
+            _tGuardWd++;
+            return true;
         }
 
         /// <summary>Poprawka 132b: HaltAsk przy pierwszej szkodzie od nekajacego testu - stan wroga do progow sprawdz_logi (TEST koniec: wrog w marszu, wolnej
@@ -192,6 +225,7 @@ namespace Armoury
             }
             var a = _tA;
             if (a == null || !a.IsActive()) { TestEnd(m, "padl", now); return; }
+            TestGuard(a);   // 291: przed sprawdzeniem paniki / odwrotu
             if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) { TestEnd(m, "panika/odwrot", now); return; }
             if (m.MissionEnded) { TestEnd(m, "koniec bitwy", now); return; }
             float lim = _tScen == 0 ? TestMaxSec : TestMaxFoot;   // 283a: B / C pieszo - dluzsza droga skrzydlem
@@ -510,6 +544,7 @@ namespace Armoury
             _tStart = now;
             _tStatAt = now + TestStatEvery;
             Volatile.Write(ref _tRun, best);   // 283a: bez capu marszu / oddechu szyku (MarchToContact)
+            try { _tMor0 = best.GetMorale(); } catch { _tMor0 = -1f; }   // 291: morale z chwili wyboru (TestGuard)
             best.SetAutomaticTargetSelection(false);
             if (_tTgt != null) best.SetTargetAgent(_tTgt);
             string where = _tBehind ? F0(_tScen == 1 ? TestBehindB : TestBehindA) + " m za szykiem" : F0(TestStandOff) + " m od krawedzi szyku";
@@ -592,6 +627,11 @@ namespace Armoury
             _tState = 2;
             _tEnd = why;
             Volatile.Write(ref _tRun, null);   // 283a: znowu pod capem szyku
+            // 291: linia oslony (poza limitem TestPhaseLines - zawsze, przed koncem): ile razy HP / morale przywrocone do pierwszego wykrycia
+            string og = " faza oslona po " + Math.Max(0f, now - _tStart).ToString("0.0", Inv) + " s (do pierwszego wykrycia: HP do pelna " + _tGuardHp + " razy, morale "
+                        + _tGuardMor + " razy, odwrot/panika wstrzymane " + _tGuardWd + " razy, wykryc " + _tDet + ")";
+            if (_tScen == 0) Log.Info("Jazda na strzelca (204) TEST: nekajacy " + Who(_tA) + og);
+            else Log.Info("Nekanie (283) TEST " + TestScenName[_tScen] + ": nekajacy " + Who(_tA) + og);
             var a = _tA;
             if (a != null && a.IsActive())
             {
@@ -599,7 +639,8 @@ namespace Armoury
                 try { if ((a.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) != 0) a.DisableScriptedMovement(); } catch { }
             }
             if (_tScen == 0)
-                Log.Info("Jazda na strzelca (204) TEST koniec: strzalow " + _tShots + ", wykryc " + _tDet + " (w tym pudla/przelot " + _tMissPass + "), epizodow " + _tEp
+                Log.Info("Jazda na strzelca (204) TEST koniec: strzalow " + _tShots + ", wykryc " + _tDet + " (w tym pudla/przelot " + _tMissPass + ", wrecz " + _tMelee
+                         + ", pudel razem " + _tMissAll + "), epizodow " + _tEp
                          + ", jezdzcow " + _tRiders + ", kontakt " + (_tContact >= 0f ? _tContact.ToString("0.0", Inv) + " s" : "-") + ", wynik " + why + " po "
                          + Math.Max(0f, now - _tStart).ToString("0.0", Inv) + " s | wolnej jazdy wroga " + _tFreeCav + " (szykow " + _tCavForms + ")");
             if (_rKey)

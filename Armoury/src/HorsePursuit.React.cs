@@ -61,6 +61,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ stan misji 283 (glowny watek, poza _rLive / _quiet / kolejka)
         private static bool _rKey, _rHaltKey;
+        private static bool _rMarchOn;   // 291: ArmyMarchesPastHarassers (z 283) - bez R5, R4 tylko strzelcy, smycz R2 od miejsca wyslania
         private static int _rLive;                                   // OnHit: 1 = klucz 283 i po rozstawieniu (Volatile)
         private static readonly bool[] _quiet = new bool[QuietTeams * QuietForms];   // szyk nie w zwarciu (pisze pass, czyta OnHit)
         private static readonly List<Agent> MeleeQA = new List<Agent>(), MeleeQV = new List<Agent>();   // pod HLock
@@ -97,6 +98,7 @@ namespace Armoury
         {
             _rKey = c != null && c.FormationsAnswerHarassers;
             _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
+            _rMarchOn = _rKey && c.ArmyMarchesPastHarassers;   // 291
             Volatile.Write(ref _rLive, 0);
         }
 
@@ -208,7 +210,7 @@ namespace Armoury
             Fire(t, now);
             Victim(t, v, true);
             RDet[KindNow(t)]++;
-            if (ReferenceEquals(a, _tA)) _tDet++;
+            if (ReferenceEquals(a, _tA)) { _tDet++; _tMelee++; }   // 291 (J204-1): wykrycie ciosem osobno od pociskow
         }
 
         // ------------------------------------------------------------ zagrozenie: rodzaj, ofiara, wodz, tier
@@ -507,6 +509,7 @@ namespace Armoury
         /// (biegnie ta droga; wraca, gdy odbiegnie od niej dalej niz InfRearm).</summary>
         private static float FootLeash(Hunter h, Vec2 p)
         {
+            if (h.Home == null && h.Anchor.IsValid) return p.Distance(h.Anchor);   // 291: od miejsca wyslania
             Vec2 a = FootHome(h.F);
             var g = h.Home;
             if (g == null || g.CountOfUnits <= 0) return p.Distance(a);
@@ -583,6 +586,9 @@ namespace Armoury
                 }
                 var hf = StartHunter(t, a, fi, RoleFoot, 0f, now);
                 if (home != null) { hf.Home = home; _rGuardN++; RGuardForms.Add(fi.F); }   // poprawka 132b: straz strzelcow
+                // 291: szyk nie staje (idzie dalej z armia) - oddzial trzyma sie miejsca, z ktorego wyszedl, nie uciekajacej mediany szyku (inaczej smycz 50 m
+                // sciagalaby go po ok. 30 s marszu, przerwa 30 s i znowu wypad - "raz ida do mnie raz do nich")
+                else if (_rMarchOn) { hf.Anchor = FootHome(fi.F); _l291Anchor++; }
                 n++;
             }
             HCand.Clear();

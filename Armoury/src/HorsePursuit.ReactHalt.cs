@@ -59,6 +59,10 @@ namespace Armoury
         // poprawka 132b: zwroty frontem do nekajacego (R4), postoje R5 z sumy szkod (3 szkody, nie tylko 3 w 5 s)
         private static int _lFace, _lR5Sum;
         private const float FaceTurnCos = 0.866f;   // nowy zwrot dopiero przy zmianie kierunku o 30 stopni (bez przestawiania szyku co pass)
+        // 291 (ArmyMarchesPastHarassers): nekajacy, ktorym armia nie stanela (R5 pominiete), szyki piechoty / jazdy, ktore poszly dalej (raz na szyk) i ich ludzie,
+        // postoje strzelcow (R4 dalej), ludzie R2 ze smycza od miejsca wyslania i ich powroty ze smyczy
+        private static readonly HashSet<int> H291Who = new HashSet<int>();
+        private static int _l291NoArmy, _l291Go, _l291GoMen, _l291Arch, _l291Anchor, _l291LeashBack;
 
         private static void HaltClear()
         {
@@ -69,6 +73,16 @@ namespace Armoury
             _lR4 = _lR5 = _lR5F = _lRetake = _lLeft = _lNoEng = _lNoS2 = _lNoBroke = _lNoMove = 0;
             _lSec = 0f;
             _lFace = _lR5Sum = 0;
+            H291Who.Clear();
+            _l291NoArmy = _l291Go = _l291GoMen = _l291Arch = _l291Anchor = _l291LeashBack = 0;
+        }
+
+        /// <summary>291: segment A linii 'Bitwa (291)' (HorsePursuit.End, przed Clear).</summary>
+        internal static string Seg291A()
+        {
+            return "A armia idzie dalej " + (_rMarchOn ? "TAK" : "NIE") + ": armia nie stanela " + _l291NoArmy + " (R5 " + _lR5 + "), szykow poszlo dalej " + _l291Go
+                   + " (ludzi " + _l291GoMen + "), strzelcy staja " + _l291Arch + " (R4 " + _lR4 + "); oddzial od miejsca wyslania " + _l291Anchor
+                   + " (powrotow ze smyczy " + _l291LeashBack + ")";
         }
 
         private static List<BehaviorComponent> Beh(Formation f)
@@ -171,6 +185,9 @@ namespace Armoury
             // poprawka 132b: armia staje takze po 3 szkodach od tego nekajacego w calej bitwie (strzelec konny strzela co 2-3 s - "3 w 5 s" prawie nie wypada)
             bool sum = t.Hits + t.MeleeHits >= _shots3;
             bool army = !LR5Who.Contains(who) && (t.Lone || t.Leader) && (down > 0 || t.Shots.Count >= _shots3 || sum);
+            // 291 (Jeff 29.10: "armia sie zatrzymala aby zobaczyc z kim walcze" - log 00:47 i 01:45 R5 'armia staje', postoj 112-120 s): samotny nekajacy nie zatrzymuje
+            // calej armii - odpowiada oddzial (R2 / R3) i strzelcy (R1, R4 nizej), reszta idzie swoim planem
+            if (army && _rMarchOn) { army = false; if (H291Who.Add(who)) _l291NoArmy++; }
             if (army)
             {
                 // glowna piechota druzyny (najwiekszy szyk piechoty) dalej niz 110 m od pieszego szyku wroga (poprawka 132b: FootGap)
@@ -212,6 +229,9 @@ namespace Armoury
             if (LR4Who.TryGetValue(vf, out r4) && r4.Contains(who)) return 0;
             var fv = fl[vi];
             if (fv.Ha) return 0;
+            // 291: staje tylko szyk strzelcow pieszych (staje i strzela - R1); trafiona piechota albo jazda idzie dalej z armia (log 00:47: szyk piechoty stal 2 x 60 s
+            // frontem do gracza, 'frontem do nekajacego 13', a lucznicy gracza strzelali mu w czolo - 'pod ostrzalem bez zwarcia do konca: padli od pociskow 19')
+            if (_rMarchOn && !fv.Rng) { if (LNo(fv.F, 5)) { _l291Go++; _l291GoMen += fv.N; } return 0; }
             if (!CanHalt(fv) || !TakeHalt(fv.F, t, false, now)) return 0;
             Halt h4;
             if (Halts.TryGetValue(fv.F, out h4)) Face(h4, sp);   // poprawka 132b: szyk ofiary frontem do nekajacego
@@ -220,6 +240,7 @@ namespace Armoury
             LR4F.Add(fv.F);
             t.Halt4++;
             _lR4++;
+            if (_rMarchOn) _l291Arch++;
             if (ReferenceEquals(t.S, _tA)) _tHalt++;
             n++;
             return n;

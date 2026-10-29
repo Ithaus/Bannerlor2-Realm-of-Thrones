@@ -1656,6 +1656,10 @@ namespace Armoury
         [SettingPropertyGroup("Shields under fire")]
         public bool ArmyHaltsForHarassers { get; set; } = true;
 
+        [SettingPropertyBool("Army Marches Past Harassers", HintText = "with Formations Answer Harassers: a lone harasser - you above all - no longer stops the whole AI army. Only the archers he hits halt and turn to shoot at him; the infantry and cavalry he strikes keep marching with their army, and the small detachment that goes after him stays on him up to 50 m from the spot it left (not from its formation, which marches on) for at most 60 seconds, then rejoins. Off = as before (Army Halts For Harassers stops every marching formation, or the one he struck)", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool ArmyMarchesPastHarassers { get; set; } = true;
+
         [SettingPropertyBool("Duel Ai Enabled", HintText = "in tournaments, the arena and duels a skilled opponent fights like one: he attacks on his own, ripostes after a parry, feints and kicks, and does not stand behind his guard waiting for you - from about skill 100 up (on Realistic; a lower difficulty raises this, later tournament rounds lower it), the higher his skill the bolder he is; below that he fights as RBM sets him. A knight handed an unfamiliar weapon in the lists still fights with most of his best skill, and later rounds of a tournament field harder opponents. Needs RBM with posture; field battles are not touched. Off = plain RBM in duels, as before", RequireRestart = false)]
         [SettingPropertyGroup("Duels and tournaments")]
         public bool DuelAiEnabled { get; set; } = true;
@@ -10100,6 +10104,14 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefendersAdvanceUnderFire { get; set; } = true;
 
+        [SettingPropertyBool("Defenders Hold Their Ground", HintText = "an AI army that was attacked in a field battle holds its position and lets the attacker come: it does not march out to meet you, even as a bandit rabble, unless it is being shot down without an answer (Defenders Advance Under Fire), or the attacker has not come on for 90 seconds; once its main infantry is in close combat it fights as usual. Its horse archers may still ride out and skirmish. When you are the one attacked, the AI attacks you as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool DefendersHoldTheirGround { get; set; } = true;
+
+        [SettingPropertyBool("Unshielded Rush Under Fire", HintText = "AI infantry with few shields (fewer than 60% of the men, the shield wall threshold) that comes under arrows or bolts while advancing stops marching at a walk and runs at the enemy to close the distance as fast as its breath allows (keeping a quarter of it for the fight), until it reaches them; infantry with shields keeps walking behind its shield wall. Field battles only, AI formations only. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool UnshieldedRushUnderFire { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -10777,6 +10789,7 @@ namespace Armoury
             s.HuntHarasserInAutotest = HuntHarasserInAutotest;
             s.FormationsAnswerHarassers = FormationsAnswerHarassers;
             s.ArmyHaltsForHarassers = ArmyHaltsForHarassers;
+            s.ArmyMarchesPastHarassers = ArmyMarchesPastHarassers;
             s.DuelAiEnabled = DuelAiEnabled;
             s.DuelAiBestSkillShare = DuelAiBestSkillShare;
             s.DuelAiTourneyRoundStep = DuelAiTourneyRoundStep;
@@ -12888,6 +12901,8 @@ namespace Armoury
             s.ArchersFallBackBehindInfantry = ArchersFallBackBehindInfantry;
             s.ArcherFallBackDistance = ArcherFallBackDistance;
             s.DefendersAdvanceUnderFire = DefendersAdvanceUnderFire;
+            s.DefendersHoldTheirGround = DefendersHoldTheirGround;
+            s.UnshieldedRushUnderFire = UnshieldedRushUnderFire;
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;
