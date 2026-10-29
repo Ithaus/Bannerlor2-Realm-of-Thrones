@@ -2926,7 +2926,11 @@ namespace Armoury
             try { SpoilsSeal.Daily(); } catch (Exception e) { Log.Error("SpoilsSeal.Daily", e); } DayProfile.Lap("SpoilsSeal.Daily");   // paczka 128: Spoils of War bez sprzedazy automatycznej i bez zlota z niczego (tylko log)
             try { SpoilsCompany.Daily(); } catch (Exception e) { Log.Error("SpoilsCompany.Daily", e); } DayProfile.Lap("SpoilsCompany.Daily");   // klan najemnikow Spoils tylko z prawdziwych zolnierzy (tylko log)
             // NW O4 (ciche logi, LogGate): linia "Ceny surowcow" tylko w dobie pomiaru; w innej dobie same potkniecia doby (RawPrice.QuietDay)
-            if (LogGate.Lines) { try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); } }
+            if (LogGate.Lines)
+            {
+                try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); }
+                try { PriceWalk299.Daily(); } catch (Exception e) { Log.Error("PriceWalk299.Daily", e); }   // paczka 299: sonda kroku ceny na sztuke (gra vs 299, tylko odczyt)
+            }
             else { try { RawPrice.QuietDay(); } catch (Exception e) { Log.Error("RawPrice.QuietDay", e); } }
             DayProfile.Lap("RawPrice.Daily");     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)
             try { XbowPrice.Daily(); } catch (Exception e) { Log.Error("XbowPrice.Daily", e); } DayProfile.Lap("XbowPrice.Daily");   // kusze wedlug luku (noc 15/16.10): linia "Kusze wedlug luku (zakupy)" (tylko log)

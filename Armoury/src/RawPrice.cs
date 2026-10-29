@@ -41,8 +41,9 @@ namespace Armoury
     ///      mieszczan to nie rusza (ten idzie z GetDailyDemandForCategory).
     /// Ksztalt (ten sam wzor gry, teraz w dobach zuzycia): polka pusta od dawna - sufit gry x10; za pierwszy dowieziony ladunek
     /// rudy miasto-mediana placi 37 d (x4.6), miasto z kuznia 74 d (x9); zapas na 7 dob = wartosc bazowa; zapas docelowy karawan
-    /// (10 dob) x0.82; prog nadwyzki (20 dob) x0.54; 100 dob x0.2. Swiezo dowieziony towar zbija cene slabiej (0.04) niz zapas,
-    /// ktory lezy (0.14) - dostawa calego zapasu docelowego idzie srednio po x2.5 wartosci.
+    /// (10 dob) x0.82; prog nadwyzki (20 dob) x0.54; 100 dob x0.2. Swiezo dowieziony towar zbija cene slabiej niz zapas, ktory lezy
+    /// (0.14): w grze 0.04 od razu, od paczki 299 (klucz PriceFlatterLotWalk) 0.021 od razu i reszta przez pamiec podazy (15% dziennie) -
+    /// dostawa calego zapasu docelowego idzie srednio po x2.5 wartosci (liczone wagami gry).
     /// Sufit x10 zostaje z gry - jeden dla wszystkich towarow handlowych. Historycznie (woz ok. 1.5 d za tone na mile, Anglia
     /// XIV w. - szacunek): rudzie po 75 d za tone droga ladowa doklada jej wlasna wartosc co ok. 80 km, drewnu po 35 d co
     /// ok. 37 km - x10 to ruda wieziona ok. 700 km i drewno ok. 330 km; dalej nikt masowego towaru wozem nie wiozl.
@@ -93,6 +94,25 @@ namespace Armoury
         // modelu 43 ns), z wylaczonym wlacznikiem 25 ns - przy 2 mln wycen na dobe to ok. 50 ms.
         [ThreadStatic] private static int _depth;
 
+        // ------------------------------------------------------------ paczka 299: plaski krok ceny na sztuke (Jeff 29.10: "za bardzo spada cena jak sprzedaje towar,
+        // trzeba bardziej wyplaszczyc zmiane kursu towaru gdy jest sprzedaz i zakup"). Wzor gry: (D / (0.1 S + 0.04 I + 2))^0.6 - polka, ktora lezy (S = I), wazy
+        // razem 0.14, z czego swiezo polozona sztuka od razu 0.04 (DefaultTradeItemPriceFactorModel.GetBasePriceFactor 1.4.8), a reszta dochodzi przez pamiec podazy
+        // 15% dziennie (DefaultSettlementEconomyModel.GetSupplyDemandForCategory: 0.85 stara + 0.15 polka; BEE deleguje do gry, BK tylko tnie podaz do popytu x rok).
+        // Regula 299: swiezy towar wazy od razu tyle, ile przepuszcza jedna doba tego wygladzania gry: 0.14 x 0.15 = 0.021, podaz 0.14 - 0.021 = 0.119. Przy S = I
+        // mianownik ten sam co w grze (0.14 I + 2) - ceny ustalone, "7 dob popytu na polce = indeks 1" i kalibracja startu bez zmian; krok na sztuke ok. 1.9 x
+        // mniejszy; cena zalezy tylko od stanu polki, podazy i popytu - kupno i odsprzedaz w jednej wizycie nie daja zysku. Zmienia sie tylko cena (nic z niczego).
+        internal const double GameShelfW = 0.04, GameSupplyW = 0.10, GameDayW = 0.15;   // GetBasePriceFactor; dzienne wygladzanie podazy gry
+        internal const double LotShelfW = (GameShelfW + GameSupplyW) * GameDayW;     // 0.021
+        internal const double LotSupplyW = GameShelfW + GameSupplyW - LotShelfW;      // 0.119
+        private const float KShelf = (float)(LotShelfW / GameShelfW), KSupply = (float)(LotSupplyW / GameSupplyW);  // 0.525 / 1.19
+        /// <summary>Sonda 299 (PriceWalk299): krzywa gry przy tym samym stanie rynku - tylko na watku sondy, w try/finally.</summary>
+        [ThreadStatic] internal static bool ProbeOff;
+        internal static bool LotWalkOn { get { var s = Settings.Current; return s != null && s.PriceFlatterLotWalk; } }
+        /// <summary>Wagi wzoru dla wlasnych kopii wzoru (KsFoodCarts.DestParams, KsFoodCore.LotSteps, StartCalibration.Ramp); klucz wylaczony - dokladnie literaly gry.</summary>
+        internal static double ShelfW { get { return LotWalkOn ? LotShelfW : 0.04; } }
+        internal static double SupplyW { get { return LotWalkOn ? LotSupplyW : 0.1; } }
+        internal static int FactorModels { get { return _factorModels; } }
+
         /// <summary>Prefiks GetBasePriceFactor(kategoria, wartosc polki, podaz, popyt, sprzedaz, wartosc sprzedawanej sztuki).</summary>
         public static void FactorPrefix(ItemCategory __0, ref float __1, ref float __2, ref float __3, bool __4, ref int __5)
         {
@@ -109,6 +129,13 @@ namespace Armoury
                     if (w != __5) { __1 += w; __5 = 0; }
                 }
                 var s = Settings.Current;
+                // paczka 299: sprzedawana sztuka dolacza do polki z waga polki, polka 0.525 x, podaz 1.19 x (0.04 -> 0.021, 0.1 -> 0.119; razem 0.14 jak w grze);
+                // przed przelicznikiem monety (mnozenie przez r dalej jest przemienne); GetTradePenalty dostaje wartosci oryginalne (ref zmienia tylko to wywolanie)
+                if (s != null && s.PriceFlatterLotWalk && !ProbeOff)
+                {
+                    if (__4 && __5 != 0) { __1 += __5; __5 = 0; }
+                    __1 *= KShelf; __2 *= KSupply;
+                }
                 if (s == null || !s.PriceFormulaInNewCoin || !s.HistDemandScaling) return;
                 float r = HistoricalPrices.CoinRatio(__0);        // 0 = kategoria nieprzeliczona albo przeliczenie sesji jeszcze nie weszlo
                 if (r <= 1f) return;                              // towar, ktory podrozal: 2 nowe denary waza przy nim mniej niz w grze - stala zostaje
@@ -485,6 +512,9 @@ namespace Armoury
                          + "), popyt surowcow masowych z prawdziwego zuzycia miasta wpiety w " + _demandModels + " modelach ekonomii osad ("
                          + (s != null && s.RawPriceByUse ? (s.HistDemandScaling ? "CZYNNY" : "NIECZYNNY - wymaga Hist Demand Scaling") : "wylaczony w ustawieniach") + ") [" + string.Join(", ", names.ToArray())
                          + "]; obie czesci dzialaja dopiero po przeliczeniu cen historycznych; stan co dobe w linii \"Ceny surowcow:\".");
+                Log.Info("Ceny na sztuke (299): klucz Price Flatter Lot Walk " + (s != null && s.PriceFlatterLotWalk ? "TAK" : "NIE")
+                         + " - swiezy towar wazy od razu " + LotShelfW.ToString("0.000", CultureInfo.InvariantCulture) + " (gra 0.040), podaz " + LotSupplyW.ToString("0.000", CultureInfo.InvariantCulture)
+                         + " (gra 0.100), razem 0.14 jak w grze; przez RawPrice.FactorPrefix w " + _factorModels + " modelach cen; wlasne kopie wzoru: KsFoodCarts.DestParams, KsFoodCore.LotSteps, StartCalibration.Ramp.");
             }
             catch (Exception e) { Log.Error("RawPrice.ApplyAll", e); }
         }

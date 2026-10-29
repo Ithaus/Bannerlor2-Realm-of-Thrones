@@ -981,7 +981,7 @@ namespace Armoury
         }
 
         /// <summary>KS-R4 r4-kupcy T9b (klucz Ks Lot Price Pow): cena lotu schodkami wzoru gry. Cena sztuki k = ceil(wartosc x czynnik bazowy(polka - k x wartosc sztuki)
-        /// x (1 + kara handlu)) - czynnik bazowy z modelu gry (GetBasePriceFactor, wzor (D / (0.1 S + 0.04 V + 2))^0.6), kara raz. Dwie ceny gry (pierwsza i ostatnia sztuka)
+        /// x (1 + kara handlu)) - czynnik bazowy z modelu gry (GetBasePriceFactor, wzor (D / (0.1 S + 0.04 V + 2))^0.6; paczka 299: wagi RawPrice.SupplyW / ShelfW, 0.119 / 0.021), kara raz. Dwie ceny gry (pierwsza i ostatnia sztuka)
         /// sprawdzaja wzor; poziomy cen miedzy nimi z odwrotnosci wzoru (jeden Pow na poziom, granica poprawiana wzorem obok). Inny wzor (model moda), ponad 128 poziomow cen
         /// albo niezgodna granica - false (wolajacy liczy trzy ceny, jak dotad).</summary>
         private static bool LotPriceSteps(TaleWorlds.CampaignSystem.ComponentInterfaces.TradeItemPriceFactorModel model, ItemObject it, ItemCategory cat, float ins0, float sup, float dem, int wv, int n, Func<int, long> P, out long sum)
@@ -1000,7 +1000,7 @@ namespace Armoury
                 return Math.Max(1, (int)Math.Ceiling(f));
             };
             if (Q(0) != p0 || Q(n - 1) != pl) return false;
-            return KsFoodCore.LotSteps(p0, pl, n, val * (1.0 + pen), ins0, sup, dem, wv, Q, out sum);
+            return KsFoodCore.LotSteps(p0, pl, n, val * (1.0 + pen), ins0, sup, dem, wv, Q, out sum, RawPrice.SupplyW, RawPrice.ShelfW);   // 299: wagi wzoru jak w RawPrice.FactorPrefix
         }
 
         /// <summary>KS-R4 r4-kupcy H4: wartosc n sztuk u celu po marzy - pamiec doby (cena pierwszej sztuki, polka wzoru, sufit) na (cel, towar), decyzja KsFoodCore;
@@ -1028,7 +1028,8 @@ namespace Armoury
             return (long)Math.Floor(KsFoodCore.DestIntegral(p0, a0, c, cap, n) * (1.0 - Margin));
         }
 
-        /// <summary>H4: cena pierwszej sztuki na polce celu (gra, bez sufitu pustej polki ZC4), A0 = 0.1 x podaz + 0.04 x wartosc polki + 2, c = 0.04 x wartosc sztuki,
+        /// <summary>H4: cena pierwszej sztuki na polce celu (gra, bez sufitu pustej polki ZC4), A0 = 0.1 x podaz + 0.04 x wartosc polki + 2, c = 0.04 x wartosc sztuki
+        /// (paczka 299 - klucz PriceFlatterLotWalk: wagi RawPrice.SupplyW 0.119 i ShelfW 0.021, jak w RawPrice.FactorPrefix; stala 2 bez zmian - przyblizenie jak dotad),
         /// sufit sztuki 3 x cena startu rynku celu x wartosc (F5: pusta polka nie blokuje lotu glodu).</summary>
         private static bool DestParams(Town tw, int t, int k, ItemObject it, out double p0, out double a0, out double c, out double cap)
         {
@@ -1039,8 +1040,8 @@ namespace Armoury
                 var md = tw.MarketData;
                 p0 = Math.Max(1, md.GetPrice(it, null, false, null));
                 var d = md.GetCategoryData(it.ItemCategory);
-                a0 = 0.1 * d.Supply + 0.04 * Math.Max(0f, d.InStoreValue) + 2.0;
-                c = 0.04 * Math.Max(1, HistoricalPrices.ShelfWorth(it));
+                a0 = RawPrice.SupplyW * d.Supply + RawPrice.ShelfW * Math.Max(0f, d.InStoreValue) + 2.0;   // 299: wagi jak w RawPrice.FactorPrefix (klucz wylaczony - 0.1 / 0.04)
+                c = RawPrice.ShelfW * Math.Max(1, HistoricalPrices.ShelfWorth(it));
                 int m = t >= 0 && t < _nt ? _mk[t] : StartCalibration.TownMarketOf(tw);
                 cap = 3.0 * StartCalibration.ZStartIndex(m, Z[k]) * Math.Max(1, it.Value);
                 return true;

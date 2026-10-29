@@ -226,6 +226,7 @@ namespace Armoury
                         if (!(dem > 0.01f)) continue;
                         double p = kv.Value >= 0 ? StartPrice(m, kv.Value) : 1.0;
                         // wzor ceny: 0.1 x podaz + 0.04 x wartosc polki; cel 0.14 x dni x popyt - podaz dopelnia to, czego brakuje realnej polce (najwyzej x1.4 dni x popyt)
+                        // paczka 299: wagi RawPrice.SupplyW / ShelfW (0.119 / 0.021 przy kluczu PriceFlatterLotWalk) - indeks startu ten sam cel; napis linii polek bez zmian
                         double days = ShelfDays(p), sv = Math.Max(0.0, d.InStoreValue);
                         // F2 (poprawka po autotescie 16.10): bez sztucznych polek - wygladzona podaz tylko tam, gdzie prawdziwa polka ma co najmniej polowe celu
                         // (dotad 3295 z 3977 pozycji mialo polke ponizej celu, indeks 3.87 -> 0.98 w D i wracal do 2-5); reszta - cena wzoru gry z prawdziwej polki
@@ -234,7 +235,7 @@ namespace Armoury
                         if (SwMarketControl) { double dv = DpValue(town, kv.Key); if (dv > 0.01) baseV = dv; }
                         if (sv < 0.5 * days * baseV) { noShelf++; continue; }
                         // recenzja runda 3 (drobne): ta sama podstawa w calym celu polki startu (dotad bramka z popytu zaplaconego, a want/sup z wygladzonego popytu gry)
-                        double want = (0.14 * days * baseV - 0.04 * sv) / 0.1;
+                        double want = (0.14 * days * baseV - RawPrice.ShelfW * sv) / RawPrice.SupplyW;
                         float sup = (float)Math.Max(0.1, Math.Min(1.4 * days * baseV, Math.Max(days * baseV * 0.5, want)));
                         if (sup > days * baseV * 1.001) lift++;
                         float i0 = md.GetPriceFactor(kv.Key);

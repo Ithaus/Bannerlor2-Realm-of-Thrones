@@ -497,7 +497,8 @@ namespace Armoury
         }
 
         /// <summary>H4: suma cen n sztuk dowiezionych na polke celu - wzor ceny gry przy polce rosnacej o kazda sztuke: p(j) = p0 x (A0 / (A0 + c j))^0.6
-        /// (A0 = 0.1 x podaz + 0.04 x wartosc polki + 2, c = 0.04 x wartosc sztuki na polce), kazda sztuka najwyzej cap (3 x cena startu); calka zamknieta (bez marzy).</summary>
+        /// (A0 = 0.1 x podaz + 0.04 x wartosc polki + 2, c = 0.04 x wartosc sztuki na polce; paczka 299: wagi 0.119 / 0.021 - liczy je wolajacy, KsFoodCarts.DestParams),
+        /// kazda sztuka najwyzej cap (3 x cena startu); calka zamknieta (bez marzy).</summary>
         internal static double DestIntegral(double p0, double A0, double c, double cap, int n)
         {
             if (n <= 0 || !(p0 > 0)) return 0.0;
@@ -534,8 +535,9 @@ namespace Armoury
 
         /// <summary>T9b (czysty C#, test portu): suma cen n sztuk z polki zrodla przy cenie sztuki Q(k) = ceil(q x (D / (0.1 S + 0.04 max(0, V - k x wv) + 2))^0.6)
         /// niemalejacej od p0 = Q(0) do pl = Q(n-1) (wolajacy sprawdza obie ceny gra). Poziomy cen L = p0 .. pl-1: ostatnia sztuka z cena <= L z odwrotnosci wzoru
-        /// (jeden Pow), granica poprawiana Q obok (najwyzej 6 krokow - inaczej false i wolajacy liczy trzy ceny).</summary>
-        internal static bool LotSteps(long p0, long pl, int n, double q, double ins0, double sup, double dem, int wv, Func<int, long> Q, out long sum)
+        /// (jeden Pow), granica poprawiana Q obok (najwyzej 6 krokow - inaczej false i wolajacy liczy trzy ceny). Paczka 299: wS / wI - wagi podazy i polki we wzorze
+        /// (domyslne 0.1 / 0.04 = gra; KsFoodCarts podaje RawPrice.SupplyW / ShelfW; symulator port5 kompiluje sie bez zmian).</summary>
+        internal static bool LotSteps(long p0, long pl, int n, double q, double ins0, double sup, double dem, int wv, Func<int, long> Q, out long sum, double wS = 0.1, double wI = 0.04)
         {
             sum = 0;
             if (n <= 0 || wv <= 0 || !(q > 0)) return false;
@@ -544,12 +546,12 @@ namespace Armoury
             long tot = 0; int k0 = 0;
             for (long L = p0; L < pl; L++)
             {
-                // ostatnia sztuka z cena <= L: czynnik <= L / q  <=>  0.1 S + 0.04 V + 2 >= D / (L / q)^(1/0.6)  <=>  V >= (D / y^(1/0.6) - 0.1 S - 2) / 0.04
+                // ostatnia sztuka z cena <= L: czynnik <= L / q  <=>  wS S + wI V + 2 >= D / (L / q)^(1/0.6)  <=>  V >= (D / y^(1/0.6) - wS S - 2) / wI (gra: 0.1 / 0.04)
                 double y = L / q; int kL;
                 if (y >= 10.0) kL = n - 1;
                 else
                 {
-                    double vNeed = (dem / Math.Pow(y, 1.0 / 0.6) - 0.1 * sup - 2.0) / 0.04;
+                    double vNeed = (dem / Math.Pow(y, 1.0 / 0.6) - wS * sup - 2.0) / wI;
                     double kk = (ins0 - vNeed) / wv;
                     kL = double.IsNaN(kk) ? k0 - 1 : (kk >= n ? n - 1 : (kk < -1 ? -1 : (int)Math.Floor(kk)));
                 }

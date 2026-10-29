@@ -81141,5 +81141,506 @@ def k259_rows(rep, D):
     else:
         rep.add("K259-11: udzial karawan rodow z wyplata 259 (294c)", f"za malo dob ({len(sd)})", "INFO (>= 14 dob)", None)
 
+# ================================================================ ceny299 (29.10, paczka 299 noc/299-ceny-plaskie - Jeff 29.10: "plus zmiana ceny wydjae mi sie ze za bardzo
+#   spada cena jak sprzedaje towar, ze trzeba bardziej wyplaszczyc zmiane kursu twoaru gdy jest sprzedaz i zakup"; klucz PriceFlatterLotWalk w RawPrice.FactorPrefix:
+#   swiezy towar wazy od razu 0.021 (gra 0.04), podaz 0.119 (gra 0.1), razem 0.14 jak w grze; sonda Armoury/src/PriceWalk299.cs - linia 'Ceny na sztuke (299): dzien')
+#   python -I tools/sprawdz_logi.py --grupa ceny299 <Armoury-*.log>      (strumieniowo; progi na bieg 90 dob z zapisu testowego)
+# Baza 296e (m113/logi/296e-probyN/Armoury-2026-10-29_17-41-43.log, 90 dob 109077-109166, srednie dob): E3-T1 z zyskiem 409.7 szt./d, marza 71.2%, bez zysku 132/d,
+#   BuyFloor 88.6/d, z kas miast 48272 zl/d, przyciete do sztuk z zyskiem 14.9/d, najwiekszy spadek indeksu 66.0%; 287 mediana marzy (mediana dob) 88% (68-147);
+#   294b stoi wedlug glebokosci 0.654 ocen; Ceny surowcow (mediany ostatnich 30 dob) ruda 0.75, drewno 1.16, skory surowe 0.82, skora 0.94, len 1.28, plotno 1.34, welna 1.52.
+# C299-S   self-test wyrazen (linia 299 i linia startowa jak w C#: PriceWalk299.Daily / RawPrice.ApplyAll; E3-T1, 287, 294b, Ceny surowcow)
+# C299-S2  test syntetyczny: dobry bieg i zle biegi dla wierszy 0-7 - kazdy wykryty
+# C299-0   linia startowa: jest, klucz TAK, wpieta w 2 modelach cen
+# C299-1   linie dnia 299 w >= 95% dob z 'Ceny surowcow: dzien', nierozpoznanych 0, potkniecia 0, ERROR PriceWalk299 / RawPrice.FactorPrefix 0
+# C299-2   polki >= 3 dob: stosunek spadku 30 sztuk 299/gra, mediana dob w [0.45, 0.70] (oczekiwane 0.53-0.60); C299-2b - 10 sztuk w [0.45, 0.65];
+#          C299-2c polki chude INFO (<= 0.90 oczekiwane), C299-2d puste INFO
+# C299-3   poziom 299/gra przy tym samym stanie, polki w rownowadze (|I/S-1| <= 0.1): mediana w [0.98, 1.02]; C299-3b wszystkie stany: mediana [0.95, 1.06],
+#          p10 >= 0.88, p90 <= 1.30 (mediany dob)
+# C299-4   w miejscu: kupno sztuki tansze niz odsprzedaz przy tym samym stanie - 0 kazdej doby (299 i gra); C299-4b rowne ceny INFO
+# C299-5   petla opozniona (sprzedaj 30 teraz, odkup po 7 dobach, brutto), polki >= 3 dob, mediana dob: 299 - gra <= +8 pp i 299/gra <= 1.35; C299-5b p90 INFO
+# C299-6   przypadek Jeffa grain @ town_V2 (Riverrun), 233 sztuki: spadek indeksu 299 <= 0.6 x gry (mediana dob) i pierwsza sztuka tansza o 1 zl (299) >= 1.6 x gry
+#          albo wcale (mediana dob); C299-6b inne przyklady - INFO z cen, a 299 nigdy nie placi mniej niz gra tam, gdzie polka po sprzedazy >= podazy (0)
+#          POPRAWKA PROJEKTU: projekt mowil "od 2. sztuki 299 >= gra" - to nieprawda na pustej polce z podaza: 299 - gra w mianowniku = 0.019 (S - polka po sprzedazy),
+#          wiec 299 placi mniej, dopoki polka po sprzedazy < podazy (ryba, pusta polka, S = 20 szt.: sztuki 1-19 taniej, od 20. drozej) - regula wiersza wedlug tego
+# C299-7a  E3-T1 sztuk z zyskiem na dobe >= 389 (0.95 x 409.7) i <= 820; C299-7b marza srednio >= 50%; C299-7c bez zysku <= 145/d; C299-7cb BuyFloor <= 142/d;
+#          C299-7d kontrola zamknietej ekonomii '(roznica 0)' kazdej doby; C299-7db zloto z kas miast <= 72400 zl/d (1.5 x 48272); C299-7e INFO przyciete / spadek indeksu
+# C299-8   287 mediana marzy miast (mediana dob) >= 55%; C299-8b indeks p25/p75 kategorii ostatnie 30 dob wobec 296e: >= 75% kategorii w +-15%
+#          POPRAWKA PROJEKTU: projekt "kazda w +-15%" - 296d wobec 296e (te same doby, bez zmiany cen) ma 5 z 36 kategorii poza +-15% (wino, srebro, miod pitny, klejnoty, olej;
+#          mediana odchylenia 3.7% / 2.3%) - prog na udzial, wyjatki wypisane
+# C299-9   294b 'stoi wedlug glebokosci' / ocen kupna (caly bieg) <= 0.70 (296e 0.654)
+# C299-10  'Ceny surowcow' mediany 7 surowcow, ostatnie 30 dob, kazda w [0.67, 1.5] x 296e
+# C299-11  bieg z kluczem wylaczonym (opcjonalny): klucz NIE i wszystkie pary gra = 299 identyczne; z kluczem TAK - INFO
+CENY299_L = "Ceny na sztuke (299): dzien "
+CENY299_START_L = "Ceny na sztuke (299): klucz "
+CENY299_ERR = ("ERROR in PriceWalk299", "ERROR in RawPrice.FactorPrefix")
+CENY299_N = r"(?:-?\d+(?:\.\d+)?|-)"
+
+
+def _c299_cls(t, name):
+    n = CENY299_N
+    return (re.escape(name) + rf" \((?P<{t}n>\d+)\): spadek sztuki 10 / 30 wobec 1 mediana gra (?P<{t}g10>{n})% / (?P<{t}g30>{n})% -> 299 (?P<{t}n10>{n})% / "
+            rf"(?P<{t}n30>{n})%, stosunek 10 szt\. (?P<{t}q10>{n}), 30 szt\. (?P<{t}q30>{n})")
+
+
+CENY299_RE = re.compile(
+    r"^Ceny na sztuke \(299\): dzien (?P<d>\d+) \| klucz (?P<key>TAK|NIE), wagi od razu (?P<wi>[\d.]+) / podaz (?P<ws>[\d.]+) \| ocen (?P<m>\d+) \(miasta (?P<towns>\d+); "
+    r"wsie wedlug miasta, zamki popyt 0\) \| " + _c299_cls("s", "polka >= 3 dob") + r" \| " + _c299_cls("t", "polka chuda") + r" \| " + _c299_cls("e", "polka pusta")
+    + rf" \| lot 1 doby popytu \((?P<lotn>\d+)\): spadek mediana gra (?P<lotg>{CENY299_N})% -> 299 (?P<lotx>{CENY299_N})% \(p90 gra (?P<lotg9>{CENY299_N})% -> 299 "
+    rf"(?P<lotx9>{CENY299_N})%\)"
+    rf" \| poziom 299/gra ten sam stan: rownowaga \((?P<eqn>\d+)\) mediana (?P<eq>{CENY299_N}), wszystkie mediana (?P<lv>{CENY299_N}) p10 (?P<lv1>{CENY299_N}) "
+    rf"p90 (?P<lv9>{CENY299_N})"
+    rf" \| po 7 dobach \(30 szt\.\) indeks/indeks 1\. sztuki mediana gra (?P<w7g>{CENY299_N}) -> 299 (?P<w7x>{CENY299_N})"
+    r" \| w miejscu: kupno < odsprzedaz (?P<inv>\d+) \(gra (?P<inv0>\d+)\), rowne (?P<eqp>\d+) \(gra (?P<eqp0>\d+)\) z (?P<invm>\d+)"
+    rf" \| petla opozniona \(30 szt\., 7 dob, brutto\) polka >= 3 dob \((?P<lpc>\d+)\) mediana gra (?P<lpg>{CENY299_N})% -> 299 (?P<lpx>{CENY299_N})%, "
+    rf"p90 gra (?P<lpg9>{CENY299_N})% -> 299 (?P<lpx9>{CENY299_N})%"
+    r" \| przyklady \(gracz, zl za sztuke, gra -> 299\): (?P<ex>.*?) \| identyczne pary gra = 299 (?P<id>\d+) z (?P<idm>\d+) \| potkniecia (?P<st>\d+)\.$")
+CENY299_EX = re.compile(r"^(?P<id>\w+)@(?P<town>.+?) \((?P<sid>\S+), polka (?P<days>[\d.]+) dob\) sztuki (?P<u>[\d/]+): (?P<pg>[\d/]+) -> (?P<px>[\d/]+), "
+                        r"indeks do (?P<last>\d+)\. sztuki gra (?P<dg>-?[\d.]+)% -> 299 (?P<dx>-?[\d.]+)%, spadek o 1 zl od sztuki (?P<fg>\d+|-) -> (?P<fx>\d+|-), "
+                        r"pod gra przy polce >= podazy (?P<under>\d+)$")
+CENY299_EXNO = re.compile(r"^(\w+)@- brak$")
+CENY299_START_RE = re.compile(r"^Ceny na sztuke \(299\): klucz Price Flatter Lot Walk (TAK|NIE) - swiezy towar wazy od razu ([\d.]+) \(gra 0\.040\), podaz ([\d.]+) "
+                              r"\(gra 0\.100\), razem 0\.14 jak w grze; przez RawPrice\.FactorPrefix w (\d+) modelach cen; wlasne kopie wzoru: ")
+CENY299_T1L = "Karawany - towar tam, gdzie maja zysk (E3-T1): dzien "
+CENY299_T1 = {
+    "zysk": re.compile(r"\| z zyskiem (\d+) szt\. za (\d+) \(koszt zakupu (\d+), marza ([+-]?[\d.]+)%\)"),
+    "bez": re.compile(r"odrzucone kroki: bez zysku (\d+),"),
+    "bf": re.compile(r"kasa miasta \(BuyFloor\) (\d+),"),
+    "kon": re.compile(r"; kontrola: kasy -?\d+ = kiesy [+-]?\d+ \+ myto \d+ - myto do kas osad \d+ \(roznica (-?\d+)\)"),
+    "kas": re.compile(r"\| zloto: z kas miast (\d+) "),
+    "clip": re.compile(r"kroki przyciete do sztuk z zyskiem (\d+) \|"),
+    "drop": re.compile(r"\| najwiekszy spadek indeksu sprzedanej kategorii w jednym miescie dzis ([\d.]+)%"),
+}
+CENY299_287 = re.compile(r"^Handel z roznicy cen \(287\): dzien (\d+) .*?, mediana marzy (-?\d+)% \|.*?\| wedlug kategorii \(popyt rynkow/d / sprzedaz karawan/d / "
+                         r"indeks p25-p75 / marza\): (.*?) \| potkniecia 287")
+CENY299_287CAT = re.compile(r"(\S+) [\d.]+/[\d.]+/([\d.]+)-([\d.]+)/-?\d+%")
+CENY299_294 = re.compile(r"^Glebokosc rynku karawan \(294b\): dzien (\d+) .*?\| kupno: ocen (\d+) \(kategoria x wizyta\), stoi wedlug glebokosci (\d+) ")
+CENY299_RAWL = "Ceny surowcow: dzien "
+CENY299_RAW = re.compile(r"(?:- |; )(ruda|drewno|skory surowe|skora|len|plotno|welna) \(wartosc \d+ d\): indeks min/mediana/max [\d.]+/([\d.]+)/[\d.]+")
+CENY299_RAW_BASE = {"ruda": 0.75, "drewno": 1.16, "skory surowe": 0.82, "skora": 0.94, "len": 1.28, "plotno": 1.34, "welna": 1.52}   # 296e, mediany ostatnich 30 dob
+CENY299_287_BASE = {   # 296e, ostatnie 30 dob (109137-109166): mediany dob indeksu p25 / p75 kategorii z linii 287
+    "Eggs": (3.0, 7.01), "Papyrus": (4.69, 10.0), "Spice": (7.65, 10.0), "apple": (2.76, 6.95), "arrows": (0.1, 0.1), "beer": (2.22, 4.03), "bread": (3.53, 10.0),
+    "butter": (2.12, 4.13), "cheese": (2.77, 4.61), "clay": (2.13, 4.84), "cotton": (2.37, 10.0), "date_fruit": (1.85, 2.8), "felt": (1.37, 3.72), "fish": (2.12, 5.91),
+    "fur": (2.96, 9.13), "gold": (2.27, 7.18), "grain": (2.68, 6.22), "grape": (3.18, 7.96), "honey": (2.75, 5.25), "jewelry": (5.95, 10.0), "limestone": (2.26, 4.38),
+    "marble": (2.12, 3.86), "mead": (2.39, 5.7), "meat": (3.09, 7.94), "oil": (1.74, 8.96), "olives": (2.75, 5.45), "pie": (3.45, 7.79), "planks": (2.12, 3.6),
+    "pottery": (3.26, 7.15), "salt": (1.08, 1.69), "silver": (2.35, 6.34), "tools": (1.3, 2.17), "velvet": (10.0, 10.0), "walrus_tusk": (9.57, 10.0),
+    "whale_oil": (1.37, 5.5), "wine": (1.62, 10.0)}
+CENY299_DAYS_SHARE = 0.95
+CENY299_Q30 = (0.45, 0.70)
+CENY299_Q10 = (0.45, 0.65)
+CENY299_THIN = 0.90
+CENY299_EQ = (0.98, 1.02)
+CENY299_LV = (0.95, 1.06)
+CENY299_LV_P10 = 0.88
+CENY299_LV_P90 = 1.30
+CENY299_LOOP_PP = 8.0
+CENY299_LOOP_RATIO = 1.35
+CENY299_JEFF_DROP = 0.6
+CENY299_JEFF_FLIP = 1.6
+CENY299_T1_UNITS = (389.0, 820.0)      # 0.95 x 409.7
+CENY299_T1_MARGIN = 50.0
+CENY299_T1_NOPROFIT = 145.0
+CENY299_T1_BUYFLOOR = 142.0
+CENY299_T1_PURSE = 72400.0             # 1.5 x 48272
+CENY299_287_MARGIN = 55.0
+CENY299_287_BAND = 0.15
+CENY299_287_SHARE = 0.75
+CENY299_294_STOP = 0.70
+CENY299_RAW_BAND = (0.67, 1.5)
+CENY299_SAMPLE_START = ("Ceny na sztuke (299): klucz Price Flatter Lot Walk TAK - swiezy towar wazy od razu 0.021 (gra 0.040), podaz 0.119 (gra 0.100), razem 0.14 jak w "
+                        "grze; przez RawPrice.FactorPrefix w 2 modelach cen; wlasne kopie wzoru: KsFoodCarts.DestParams, KsFoodCore.LotSteps, StartCalibration.Ramp.")
+CENY299_SAMPLE = (
+    "Ceny na sztuke (299): dzien 109100 | klucz TAK, wagi od razu 0.021 / podaz 0.119 | ocen 3512 (miasta 97; wsie wedlug miasta, zamki popyt 0) | polka >= 3 dob (912): "
+    "spadek sztuki 10 / 30 wobec 1 mediana gra 2.1% / 6.5% -> 299 1.1% / 3.6%, stosunek 10 szt. 0.531, 30 szt. 0.552 | polka chuda (1500): spadek sztuki 10 / 30 wobec 1 "
+    "mediana gra 4.0% / 11.0% -> 299 2.2% / 6.4%, stosunek 10 szt. 0.540, 30 szt. 0.580 | polka pusta (1100): spadek sztuki 10 / 30 wobec 1 mediana gra 0.0% / 0.0% -> "
+    "299 0.0% / 0.0%, stosunek 10 szt. -, 30 szt. - | lot 1 doby popytu (2100): spadek mediana gra 10.0% -> 299 5.6% (p90 gra 40.1% -> 299 26.0%) | poziom 299/gra "
+    "ten sam stan: rownowaga (300) mediana 1.000, wszystkie mediana 1.003 p10 0.951 p90 1.204 | po 7 dobach (30 szt.) indeks/indeks 1. sztuki mediana gra 0.902 -> "
+    "299 0.902 | w miejscu: kupno < odsprzedaz 0 (gra 0), rowne 12 (gra 15) z 3512 | petla opozniona (30 szt., 7 dob, brutto) polka >= 3 dob (912) mediana gra 5.0% -> "
+    "299 6.5%, p90 gra 20.0% -> 299 25.2% | przyklady (gracz, zl za sztuke, gra -> 299): grain@Riverrun (town_V2, polka 1.9 dob) sztuki 1/10/233: 6/6/5 -> 6/6/6, "
+    "indeks do 233. sztuki gra -9.0% -> 299 -5.0%, spadek o 1 zl od sztuki 109 -> 207, pod gra przy polce >= podazy 0 ; fish@Volon Therys (town_ES5, polka 0.0 dob) "
+    "sztuki 1/30/100/200: 69/54/37/27 -> 63/56/44/35, indeks do 200. sztuki gra -60.0% -> 299 -44.1%, spadek o 1 zl od sztuki 2 -> 2, pod gra przy polce >= podazy 0 ; "
+    "tools@- brak ; cotton@Lys (town_ES1, polka 0.0 dob) sztuki 1/5/10: 4981/2396/1641 -> 5745/3245/2301, indeks do 10. sztuki gra -67.0% -> 299 -60.0%, spadek o 1 zl "
+    "od sztuki 2 -> 2, pod gra przy polce >= podazy 0 ; velvet@Pentos (town_ES2, polka 0.0 dob) sztuki 1/2/3: 6037/4150/3283 -> 8188/5811/4679, indeks do 3. sztuki gra "
+    "-45.6% -> 299 -42.9%, spadek o 1 zl od sztuki 2 -> 2, pod gra przy polce >= podazy 0 ; wine@Lannisport (town_W1, polka 6.8 dob) sztuki 1/10/30: 13/12/10 -> 13/13/11, "
+    "indeks do 30. sztuki gra -24.0% -> 299 -14.0%, spadek o 1 zl od sztuki 3 -> 5, pod gra przy polce >= podazy 0 | identyczne pary gra = 299 120 z 3512 | potkniecia 0.")
+CENY299_SAMPLE_T1 = (
+    "Karawany - towar tam, gdzie maja zysk (E3-T1): dzien 109078 | CZYNNE | wjazdow z towarem 94, sprzedaly 39 | z zyskiem 175 szt. za 23898 (koszt zakupu 17464, "
+    "marza +36.8%) | na stracie 204 szt. za 76272 (koszt 130327, strata 54055): rozwiazanie 0/0 | odrzucone kroki: bez zysku 49, gabka (cena < 0.40 x wartosci) 0, "
+    "kasa miasta (BuyFloor) 104, limit 1/20 nadwyzki 52; kroki przyciete do sztuk z zyskiem 11 | pominiete: kontrakt 174 0 | zloto: z kas miast 100170 (nadwyzka "
+    "kas ponad BuyFloor przy pierwszej wizycie 5481912), myto E3-G3 1927, przyrost kies karawan 98243; kontrola: kasy -100170 = kiesy +98243 + myto 1927 - myto do kas "
+    "osad 0 (roznica 0) | blokada odkupienia ... | najwiekszy spadek indeksu sprzedanej kategorii w jednym miescie dzis 61.9% (Volon Therys pottery 10.00 -> 3.81) | "
+    "potkniecia 0 (sesja 0).")
+CENY299_SAMPLE_287 = (
+    "Handel z roznicy cen (287): dzien 109079 | klucz popyt rynkow TAK | roznica cen miast (indeks cwiartki tanszej / drozszej, kara handlowa 3.0%, myto 2.0%): "
+    "kategorii 35, z marza > 0 34, mediana marzy 80% | koszt drogi: zold karawan 46938 zl/d | wedlug kategorii (popyt rynkow/d / sprzedaz karawan/d / indeks p25-p75 / "
+    "marza): Eggs 731.9/10.8/1.84-2.68/35%, grain 13884.4/135.0/1.48-1.84/15%, velvet 9.9/0.1/10.00-10.00/-8% | potkniecia 287 0 (sesja).")
+CENY299_SAMPLE_294 = ("Glebokosc rynku karawan (294b): dzien 109133 | klucze: cena sztuki wedlug glebokosci rynku TAK, bramka jedzenia na towar handlowy TAK, jedzenie na "
+                      "zmierzona droge TAK | kupno: ocen 900 (kategoria x wizyta), stoi wedlug glebokosci 300 (stara regula ofert stalaby 120), czynne 580 | reszta")
+CENY299_SAMPLE_RAW = ("Ceny surowcow: dzien 109077 - popyt z prawdziwego zuzycia CZYNNY, stala wzoru w nowej monecie CZYNNA (model cen BKROTPriceModel, mediany po miastach; "
+                      "sztuka rudy i drewna = ladunek) - ruda (wartosc 38 d): indeks min/mediana/max 0.10/0.76/4.13, bez towaru 11 miast; drewno (wartosc 4 d): indeks "
+                      "min/mediana/max 0.14/1.10/8.52, bez towaru 3 miast; welna (wartosc 83 d): indeks min/mediana/max 0.10/1.48/10.00, bez towaru 9 miast. Potkniecia dzis "
+                      "(wyjatki, pierwszy w logu): wycena 0, popyt 0, budzet BK 0, wagi polki 0. Inne przeliczone towary, indeks min/mediana/max: grain 0.5/1.2/3.0.")
+
+
+def _c299_f(v):
+    try:
+        return None if v is None or v == "-" else float(v)
+    except ValueError:
+        return None
+
+
+def _c299_med(vals):
+    vals = sorted(v for v in vals if v is not None)
+    return st.median(vals) if vals else None
+
+
+def _c299_new():
+    return {"start": [], "g": {}, "bad": 0, "ex": {}, "exbad": 0, "err": 0, "errs": [], "rawdays": set(), "raw": {}, "t1": {}, "c287": {}, "b": {}}
+
+
+def _c299_feed(D, s):
+    if s.startswith("ERROR in "):
+        if s.startswith(CENY299_ERR):
+            D["err"] += 1
+            if len(D["errs"]) < 3:
+                D["errs"].append(s[:160])
+        return
+    if s.startswith(CENY299_L):
+        a = CENY299_RE.match(s)
+        if not a:
+            D["bad"] += 1
+            return
+        d = int(a.group("d"))
+        D["g"][d] = a.groupdict()
+        ex = {}
+        for part in a.group("ex").split(" ; "):
+            x = CENY299_EX.match(part)
+            if x:
+                ex[x.group("id")] = x.groupdict()
+                continue
+            y = CENY299_EXNO.match(part)
+            if y:
+                ex[y.group(1)] = None
+            else:
+                D["exbad"] += 1
+        D["ex"][d] = ex
+        return
+    if s.startswith(CENY299_START_L):
+        a = CENY299_START_RE.match(s)
+        D["start"].append((a.group(1), float(a.group(2)), float(a.group(3)), int(a.group(4))) if a else None)
+        return
+    if s.startswith(CENY299_RAWL):
+        try:
+            d = int(s[len(CENY299_RAWL):].split(" ", 1)[0])
+        except ValueError:
+            return
+        D["rawdays"].add(d)
+        D["raw"][d] = {n: float(v) for n, v in CENY299_RAW.findall(s.split(". Potkniecia")[0])}
+        return
+    if s.startswith(CENY299_T1L):
+        try:
+            d = int(s[len(CENY299_T1L):].split(" ", 1)[0])
+        except ValueError:
+            return
+        D["t1"][d] = {k: (rx.search(s).groups() if rx.search(s) else None) for k, rx in CENY299_T1.items()}
+        return
+    if s.startswith("Handel z roznicy cen (287): dzien "):
+        a = CENY299_287.match(s)
+        if a:
+            D["c287"][int(a.group(1))] = (int(a.group(2)), {c: (float(p), float(q)) for c, p, q in CENY299_287CAT.findall(a.group(3))})
+        return
+    if s.startswith("Glebokosc rynku karawan (294b): dzien "):
+        a = CENY299_294.match(s)
+        if a:
+            D["b"][int(a.group(1))] = (int(a.group(2)), int(a.group(3)))
+
+
+def ceny299_collect(logp):
+    D = _c299_new()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            _c299_feed(D, m.group(2) if m else ln.rstrip("\r\n"))
+    return D
+
+
+def ceny299_selftest():
+    a = CENY299_RE.match(CENY299_SAMPLE)
+    if not a:
+        return "linia 299 nie pasuje"
+    g = a.groupdict()
+    want = {"d": "109100", "key": "TAK", "m": "3512", "towns": "97", "sn": "912", "sq30": "0.552", "sq10": "0.531", "tq30": "0.580", "eq30": "-", "eq10": "-",
+            "lotg": "10.0", "lotx9": "26.0", "eq": "1.000", "lv1": "0.951", "lv9": "1.204", "w7x": "0.902", "inv": "0", "eqp0": "15", "invm": "3512", "lpg": "5.0",
+            "lpx": "6.5", "lpx9": "25.2", "id": "120", "st": "0"}
+    for k, v in want.items():
+        if g.get(k) != v:
+            return f"linia 299: {k} = {g.get(k)} (oczekiwane {v})"
+    D = _c299_new()
+    _c299_feed(D, CENY299_SAMPLE)
+    ex = D["ex"].get(109100) or {}
+    if D["exbad"] or set(ex) != {"grain", "fish", "tools", "cotton", "velvet", "wine"} or ex["tools"] is not None:
+        return f"przyklady linii 299: {sorted(ex)} (nierozpoznanych {D['exbad']})"
+    gr = ex["grain"]
+    if gr["town"] != "Riverrun" or gr["sid"] != "town_V2" or gr["pg"] != "6/6/5" or gr["px"] != "6/6/6" or gr["dg"] != "-9.0" or gr["fx"] != "207" or gr["under"] != "0":
+        return f"przyklad grain: {gr}"
+    if ex["fish"]["town"] != "Volon Therys" or ex["fish"]["u"] != "1/30/100/200":
+        return f"przyklad fish (nazwa miasta ze spacja): {ex['fish']}"
+    b = CENY299_START_RE.match(CENY299_SAMPLE_START)
+    if not b or b.group(1) != "TAK" or b.group(4) != "2" or b.group(2) != "0.021":
+        return "linia startowa 299 nie pasuje"
+    _c299_feed(D, CENY299_SAMPLE_T1)
+    t = D["t1"].get(109078) or {}
+    if not t.get("zysk") or t["zysk"][0] != "175" or t["zysk"][3] != "+36.8" or t["bez"] != ("49",) or t["bf"] != ("104",) or t["kon"] != ("0",) \
+            or t["kas"] != ("100170",) or t["clip"] != ("11",) or t["drop"] != ("61.9",):
+        return f"linia E3-T1: {t}"
+    _c299_feed(D, CENY299_SAMPLE_287)
+    c = D["c287"].get(109079)
+    if not c or c[0] != 80 or c[1].get("grain") != (1.48, 1.84) or c[1].get("velvet") != (10.0, 10.0):
+        return f"linia 287: {c}"
+    _c299_feed(D, CENY299_SAMPLE_294)
+    if D["b"].get(109133) != (900, 300):
+        return f"linia 294b: {D['b']}"
+    _c299_feed(D, CENY299_SAMPLE_RAW)
+    if D["raw"].get(109077) != {"ruda": 0.76, "drewno": 1.10, "welna": 1.48}:
+        return f"linia Ceny surowcow: {D['raw'].get(109077)}"
+    return None
+
+
+def ceny299_rows(rep, D):
+    g = D["g"]; days = sorted(g)
+    have = bool(days) or any(D["start"])
+    base = "" if have else " | log bez paczki 299 (baza) - INFO"
+
+    def J(ok):
+        return ok if have else None
+
+    # C299-0 linia startowa
+    st0 = [x for x in D["start"] if x]
+    if st0:
+        k, wi, ws, n = st0[-1]
+        rep.add("C299-0: linia startowa 'Ceny na sztuke (299)'", f"linii {len(D['start'])} (nierozpoznanych {sum(1 for x in D['start'] if not x)}), klucz {k}, wagi {wi} / {ws}, "
+                f"modeli cen {n}", "jest, klucz TAK, 2 modele cen (DefaultTradeItemPriceFactorModel, BEE_ItemPriceFactorModel)", k == "TAK" and n == 2 and len(st0) == len(D["start"]))
+    else:
+        rep.add("C299-0: linia startowa 'Ceny na sztuke (299)'", "brak" + base, "jest, klucz TAK, 2 modele cen", J(False))
+    # C299-1 linie dnia
+    nraw = len(D["rawdays"]); stum = sum(int(g[d]["st"]) for d in days)
+    ok1 = nraw > 0 and len(days) >= CENY299_DAYS_SHARE * nraw and D["bad"] == 0 and D["exbad"] == 0 and stum == 0 and D["err"] == 0
+    rep.add("C299-1: linia dnia 299 (sonda kroku ceny)", f"dob z linia {len(days)} z {nraw} dob 'Ceny surowcow', nierozpoznanych {D['bad']} (przyklady {D['exbad']}), "
+            f"potkniecia {stum}, ERROR {D['err']}" + (f" ({'; '.join(D['errs'])})" if D["errs"] else "") + base,
+            f">= {CENY299_DAYS_SHARE:.0%} dob, nierozpoznanych 0, potkniecia 0, ERROR PriceWalk299 / RawPrice.FactorPrefix 0", J(ok1))
+
+    def med(key):
+        return _c299_med([_c299_f(g[d][key]) for d in days])
+
+    def fmt(v, f="{:.3f}"):
+        return "-" if v is None else f.format(v)
+    # C299-2 polki >= 3 dob
+    q30, q10 = med("sq30"), med("sq10")
+    rep.add("C299-2: polki >= 3 dob - spadek 30 sztuk 299/gra (mediana dob)", f"{fmt(q30)} (spadek 30 szt. gra {fmt(med('sg30'), '{:.1f}')}% -> 299 {fmt(med('sn30'), '{:.1f}')}%, "
+            f"komorek {fmt(med('sn'), '{:.0f}')}/d)" + base, f"[{CENY299_Q30[0]}, {CENY299_Q30[1]}] (oczekiwane 0.53-0.60)",
+            J(q30 is not None and CENY299_Q30[0] <= q30 <= CENY299_Q30[1]))
+    rep.add("C299-2b: polki >= 3 dob - spadek 10 sztuk 299/gra", f"{fmt(q10)} (gra {fmt(med('sg10'), '{:.1f}')}% -> 299 {fmt(med('sn10'), '{:.1f}')}%)" + base,
+            f"[{CENY299_Q10[0]}, {CENY299_Q10[1]}]", J(q10 is not None and CENY299_Q10[0] <= q10 <= CENY299_Q10[1]))
+    tq = med("tq30")
+    rep.add("C299-2c: polki chude (0-3 dob) - spadek 30 sztuk 299/gra", f"{fmt(tq)} (gra {fmt(med('tg30'), '{:.1f}')}% -> 299 {fmt(med('tn30'), '{:.1f}')}%, "
+            f"komorek {fmt(med('tn'), '{:.0f}')}/d)", f"INFO (oczekiwane <= {CENY299_THIN})", None)
+    rep.add("C299-2d: polki puste - spadek 30 sztuk 299/gra", f"{fmt(med('eq30'))} (gra {fmt(med('eg30'), '{:.1f}')}% -> 299 {fmt(med('en30'), '{:.1f}')}%, "
+            f"komorek {fmt(med('en'), '{:.0f}')}/d; sufit 10 - komorki bez spadku poza stosunkiem)", "INFO", None)
+    # C299-3 poziom
+    eq, lv, lv1, lv9 = med("eq"), med("lv"), med("lv1"), med("lv9")
+    rep.add("C299-3: poziom 299/gra przy tym samym stanie - polki w rownowadze (|I/S-1| <= 0.1)", f"mediana dob {fmt(eq)} (komorek {fmt(med('eqn'), '{:.0f}')}/d)" + base,
+            f"[{CENY299_EQ[0]}, {CENY299_EQ[1]}]", J(eq is not None and CENY299_EQ[0] <= eq <= CENY299_EQ[1]))
+    rep.add("C299-3b: poziom 299/gra - wszystkie stany", f"mediana {fmt(lv)}, p10 {fmt(lv1)}, p90 {fmt(lv9)} (mediany dob)" + base,
+            f"mediana [{CENY299_LV[0]}, {CENY299_LV[1]}], p10 >= {CENY299_LV_P10}, p90 <= {CENY299_LV_P90}",
+            J(lv is not None and CENY299_LV[0] <= lv <= CENY299_LV[1] and lv1 is not None and lv1 >= CENY299_LV_P10 and lv9 is not None and lv9 <= CENY299_LV_P90))
+    # C299-4 w miejscu
+    inv = sum(int(g[d]["inv"]) for d in days); inv0 = sum(int(g[d]["inv0"]) for d in days)
+    rep.add("C299-4: kupno tansze niz odsprzedaz przy tym samym stanie (w jednej wizycie)", f"299 {inv}, gra {inv0} (sum dob {len(days)})" + base, "0 i 0 kazdej doby",
+            J(bool(days) and inv == 0 and inv0 == 0))
+    rep.add("C299-4b: rowne ceny kupna i odsprzedazy", f"299 {fmt(med('eqp'), '{:.0f}')}/d, gra {fmt(med('eqp0'), '{:.0f}')}/d z {fmt(med('invm'), '{:.0f}')} ocen", "INFO", None)
+    # C299-5 petla opozniona
+    lg, lx = med("lpg"), med("lpx")
+    if lg is not None and lx is not None:
+        ratio = lx / lg if lg > 0.5 else None
+        v5 = f"mediana dob gra {lg:+.1f}% -> 299 {lx:+.1f}% ({lx - lg:+.1f} pp" + (f", x{ratio:.2f})" if ratio is not None else ", gra <= 0.5% - bez stosunku)")
+        ok5 = lx - lg <= CENY299_LOOP_PP and (ratio is None or ratio <= CENY299_LOOP_RATIO)
+    else:
+        v5, ok5 = "brak", False
+    rep.add("C299-5: petla opozniona (sprzedaj 30 teraz, odkup po 7 dobach, brutto) - polki >= 3 dob", v5 + base,
+            f"299 - gra <= +{CENY299_LOOP_PP:.0f} pp i 299/gra <= {CENY299_LOOP_RATIO} (oczekiwane +4..+12 pp, x1.2-1.3; kara gracza w obie strony 12.4%)", J(ok5))
+    rep.add("C299-5b: petla opozniona p90", f"gra {fmt(med('lpg9'), '{:+.1f}')}% -> 299 {fmt(med('lpx9'), '{:+.1f}')}%", "INFO", None)
+    # C299-6 przypadek Jeffa
+    gr = [(d, D["ex"][d].get("grain")) for d in days if D["ex"].get(d, {}).get("grain")]
+    if gr:
+        dr = [float(x["dx"]) / float(x["dg"]) for _, x in gr if float(x["dg"]) < -0.5]
+        fl = []
+        for _, x in gr:
+            if x["fg"] == "-":
+                continue
+            fl.append(float("inf") if x["fx"] == "-" else int(x["fx"]) / int(x["fg"]))
+        mdr = _c299_med(dr); mfl = st.median(sorted(fl)) if fl else None
+        last = gr[-1][1]
+        v6 = (f"dob {len(gr)}: spadek indeksu do 233. sztuki 299/gra mediana {fmt(mdr)} (ostatnia doba gra {last['dg']}% -> 299 {last['dx']}%), pierwsza sztuka tansza o 1 zl "
+              f"299/gra mediana {'wcale' if mfl == float('inf') else fmt(mfl, '{:.2f}')} (ostatnia doba {last['fg']} -> {last['fx']}; ceny {last['u']}: {last['pg']} -> {last['px']}, "
+              f"polka {last['days']} dob)")
+        ok6 = (mdr is None or mdr <= CENY299_JEFF_DROP) and (mfl is None or mfl >= CENY299_JEFF_FLIP) and (mdr is not None or mfl is not None)
+        rep.add("C299-6: przypadek Jeffa - grain @ town_V2 (Riverrun), 233 sztuki", v6, f"spadek 299 <= {CENY299_JEFF_DROP} x gry i sztuka -1 zl (299) >= {CENY299_JEFF_FLIP} x gry "
+                f"albo wcale (projekt: -5% wobec -9%, 207 wobec 109)", ok6)
+    else:
+        rep.add("C299-6: przypadek Jeffa - grain @ town_V2 (Riverrun), 233 sztuki", "brak przykladu grain (town_V2)" + base, "spadek 299 <= 0.6 x gry", J(False))
+    under = sum(int(x["under"]) for d in days for x in (D["ex"].get(d) or {}).values() if x)
+    lastex = D["ex"].get(days[-1], {}) if days else {}
+    parts = [f"{k}@{x['town']} ({x['days']} dob) {x['u']}: {x['pg']} -> {x['px']}, -1 zl od {x['fg']} -> {x['fx']}" if x else f"{k}: brak" for k, x in lastex.items()]
+    rep.add("C299-6b: przyklady (ostatnia doba) i 299 nie tansze od gry przy polce po sprzedazy >= podazy", "; ".join(parts) + f" | sztuk 299 < gra przy polce >= podazy {under}" + base,
+            "0 (rachunek: 299 - gra = 0.019 x (S - polka po sprzedazy) w mianowniku); ceny - INFO", J(bool(days) and under == 0))
+    # C299-7 handel karawan E3-T1
+    t1 = D["t1"]; td = sorted(t1)
+
+    def tav(key, i=0, cast=float):
+        v = [cast(t1[d][key][i]) for d in td if t1[d].get(key)]
+        return (sum(v) / len(v)) if v else None
+    u, mg, nz, bf, ks, cl, dp = tav("zysk"), tav("zysk", 3), tav("bez"), tav("bf"), tav("kas"), tav("clip"), tav("drop")
+    rep.add("C299-7a: E3-T1 sztuk sprzedanych z zyskiem na dobe", f"{fmt(u, '{:.1f}')} (dob {len(td)})", f"[{CENY299_T1_UNITS[0]:.0f}, {CENY299_T1_UNITS[1]:.0f}] (296e 409.7; "
+            "oczekiwane 440-600)", u is not None and CENY299_T1_UNITS[0] <= u <= CENY299_T1_UNITS[1])
+    rep.add("C299-7b: E3-T1 marza sprzedazy z zyskiem (srednia dob)", f"{fmt(mg, '{:.1f}')}%", f">= {CENY299_T1_MARGIN:.0f}% (296e 71.2%; oczekiwane 60-75%)",
+            mg is not None and mg >= CENY299_T1_MARGIN)
+    rep.add("C299-7c: E3-T1 odrzucone kroki bez zysku na dobe", fmt(nz, "{:.1f}"), f"<= {CENY299_T1_NOPROFIT:.0f} (296e 132)", nz is not None and nz <= CENY299_T1_NOPROFIT)
+    rep.add("C299-7cb: E3-T1 odrzucone kroki - kasa miasta (BuyFloor) na dobe", fmt(bf, "{:.1f}"), f"<= {CENY299_T1_BUYFLOOR:.0f} (296e 88.6; oczekiwane 95-130)",
+            bf is not None and bf <= CENY299_T1_BUYFLOOR)
+    konbad = [d for d in td if not t1[d].get("kon") or t1[d]["kon"][0] != "0"]
+    rep.add("C299-7d: E3-T1 kontrola zamknietej ekonomii (roznica 0)", f"dob z roznica != 0 albo bez kontroli {len(konbad)} z {len(td)}" + (f" (np. {konbad[:3]})" if konbad else ""),
+            "0 (kazda doba)", bool(td) and not konbad)
+    rep.add("C299-7db: E3-T1 zloto z kas miast na dobe", fmt(ks, "{:.0f}") + " zl", f"<= {CENY299_T1_PURSE:.0f} (1.5 x 296e 48272)", ks is not None and ks <= CENY299_T1_PURSE)
+    rep.add("C299-7e: E3-T1 kroki przyciete do sztuk z zyskiem / najwiekszy spadek indeksu w miescie", f"{fmt(cl, '{:.1f}')}/d, {fmt(dp, '{:.1f}')}%",
+            "INFO (296e 14.9/d, 66.0%; spadek oczekiwany 55-70% - karawany sprzedaja do tych samych progow)", None)
+    # C299-8 linia 287
+    c287 = D["c287"]; cd = sorted(c287)
+    m287 = _c299_med([c287[d][0] for d in cd])
+    rep.add("C299-8: 287 mediana marzy miast (mediana dob)", f"{fmt(m287, '{:.0f}')}% (dob {len(cd)}, zakres {min((c287[d][0] for d in cd), default=0)}-"
+            f"{max((c287[d][0] for d in cd), default=0)})", f">= {CENY299_287_MARGIN:.0f}% (296e 88%, 68-147)", m287 is not None and m287 >= CENY299_287_MARGIN)
+    last30 = cd[-30:]; cats = {}
+    for d in last30:
+        for c, v in c287[d][1].items():
+            cats.setdefault(c, []).append(v)
+    inb, outs = 0, []
+    for c, (p25, p75) in sorted(CENY299_287_BASE.items()):
+        if c not in cats:
+            continue
+        a25 = st.median([x[0] for x in cats[c]]); a75 = st.median([x[1] for x in cats[c]])
+        if abs(a25 / p25 - 1) <= CENY299_287_BAND and abs(a75 / p75 - 1) <= CENY299_287_BAND:
+            inb += 1
+        else:
+            outs.append(f"{c} {a25:.2f}-{a75:.2f} (296e {p25:.2f}-{p75:.2f})")
+    tot = inb + len(outs)
+    rep.add("C299-8b: 287 indeks p25/p75 kategorii, ostatnie 30 dob, wobec 296e", f"w +-{CENY299_287_BAND:.0%}: {inb} z {tot}" + (f"; poza: {', '.join(outs)}" if outs else ""),
+            f">= {CENY299_287_SHARE:.0%} kategorii (296d wobec 296e: 31 z 36)", tot > 0 and inb >= CENY299_287_SHARE * tot)
+    # C299-9 linia 294b
+    ev = sum(v[0] for v in D["b"].values()); sp = sum(v[1] for v in D["b"].values())
+    rep.add("C299-9: 294b kupno stoi wedlug glebokosci / ocen (caly bieg)", f"{(sp / ev if ev else 0):.3f} ({sp} z {ev}, dob {len(D['b'])})",
+            f"<= {CENY299_294_STOP} (296e 0.654; oczekiwane 0.45-0.60)", ev > 0 and sp / ev <= CENY299_294_STOP)
+    # C299-10 ceny surowcow
+    rd = sorted(D["raw"])[-30:]; p10, ok10 = [], bool(rd)
+    for n, b0 in CENY299_RAW_BASE.items():
+        v = _c299_med([D["raw"][d].get(n) for d in rd])
+        if v is None:
+            ok10 = False; p10.append(f"{n} brak"); continue
+        r = v / b0
+        ok10 = ok10 and CENY299_RAW_BAND[0] <= r <= CENY299_RAW_BAND[1]
+        p10.append(f"{n} {v:.2f} (x{r:.2f})")
+    rep.add("C299-10: 'Ceny surowcow' mediany indeksu, ostatnie 30 dob, wobec 296e", ", ".join(p10), f"kazda w [{CENY299_RAW_BAND[0]}, {CENY299_RAW_BAND[1]}] x 296e", ok10)
+    # C299-11 klucz wylaczony
+    if days and all(g[d]["key"] == "NIE" for d in days):
+        bad = [d for d in days if g[d]["id"] != g[d]["idm"]]
+        rep.add("C299-11: bieg z kluczem NIE - pary gra = 299 identyczne", f"dob {len(days)}, z roznica {len(bad)}", "0 (klucz wylaczony = jak przed 299)", not bad)
+    else:
+        rep.add("C299-11: bieg z kluczem NIE - pary gra = 299 identyczne", f"bieg z kluczem TAK (identyczne pary mediana {fmt(med('id'), '{:.0f}')} z {fmt(med('idm'), '{:.0f}')} - sufit 10)"
+                if days else "brak linii 299", "INFO (opcjonalny krotki bieg z kluczem NIE)", None)
+
+
+def _c299_synth(key="TAK", q30=0.552, q10=0.531, eq=1.0, inv=0, lpx=6.5, gdx=-5.0, gfx="207", st_=0, under=0, units=480, kon=0, days=20, gap=0, startn=2):
+    """Bieg syntetyczny: linie jak w C# (z CENY299_SAMPLE przez zamiane wartosci) - przechodza przez _c299_feed."""
+    D = _c299_new()
+    _c299_feed(D, CENY299_SAMPLE_START.replace("Walk TAK", "Walk " + key).replace("w 2 modelach", f"w {startn} modelach"))
+    for i in range(days + 30):
+        d = 109077 + i
+        _c299_feed(D, CENY299_SAMPLE_RAW.replace("dzien 109077", f"dzien {d}").replace("0.10/0.76/4.13", "0.10/0.75/4.13").replace("0.14/1.10/8.52", "0.14/1.16/8.52")
+                   .replace("0.10/1.48/10.00", "0.10/1.52/10.00").replace("; welna", "; skory surowe (wartosc 10 d): indeks min/mediana/max 0.1/0.82/4, bez towaru 1 miast; "
+                   "skora (wartosc 40 d): indeks min/mediana/max 0.7/0.94/6, bez towaru 1 miast; len (wartosc 20 d): indeks min/mediana/max 0.1/1.28/10, bez towaru 1 miast; "
+                   "plotno (wartosc 100 d): indeks min/mediana/max 0.7/1.34/10, bez towaru 1 miast; welna"))
+        if i >= gap:
+            s = (CENY299_SAMPLE.replace("dzien 109100", f"dzien {d}").replace("klucz TAK", "klucz " + key).replace("30 szt. 0.552", f"30 szt. {q30:.3f}")
+                 .replace("10 szt. 0.531", f"10 szt. {q10:.3f}").replace("rownowaga (300) mediana 1.000", f"rownowaga (300) mediana {eq:.3f}")
+                 .replace("kupno < odsprzedaz 0 (gra 0)", f"kupno < odsprzedaz {inv} (gra 0)").replace("mediana gra 5.0% -> 299 6.5%", f"mediana gra 5.0% -> 299 {lpx:.1f}%")
+                 .replace("gra -9.0% -> 299 -5.0%, spadek o 1 zl od sztuki 109 -> 207, pod gra przy polce >= podazy 0",
+                          f"gra -9.0% -> 299 {gdx:.1f}%, spadek o 1 zl od sztuki 109 -> {gfx}, pod gra przy polce >= podazy {under}")
+                 .replace("| potkniecia 0.", f"| potkniecia {st_}."))
+            if key == "NIE":
+                s = s.replace("identyczne pary gra = 299 120 z 3512", "identyczne pary gra = 299 3512 z 3512")
+            _c299_feed(D, s)
+        _c299_feed(D, CENY299_SAMPLE_T1.replace("dzien 109078", f"dzien {d}").replace("z zyskiem 175 szt.", f"z zyskiem {units} szt.").replace("marza +36.8%", "marza +65.0%")
+                   .replace("(roznica 0)", f"(roznica {kon})").replace("bez zysku 49", "bez zysku 120").replace("z kas miast 100170 (", "z kas miast 60000 ("))
+        _c299_feed(D, CENY299_SAMPLE_287.replace("dzien 109079", f"dzien {d}").replace("mediana marzy 80%", "mediana marzy 85%")
+                   .replace("1.84-2.68", "3.00-7.01").replace("1.48-1.84", "2.68-6.22"))
+        _c299_feed(D, CENY299_SAMPLE_294.replace("dzien 109133", f"dzien {d}").replace("stoi wedlug glebokosci 300", "stoi wedlug glebokosci 500"))
+    return D
+
+
+def ceny299_selftest2():
+    def verdicts(D):
+        r = Report()
+        ceny299_rows(r, D)
+        return {x[0].split(":")[0]: x[3] for x in r.rows}
+    good = verdicts(_c299_synth())
+    need = ("C299-0", "C299-1", "C299-2", "C299-2b", "C299-3", "C299-4", "C299-5", "C299-6", "C299-6b", "C299-7a", "C299-7b", "C299-7c", "C299-7cb", "C299-7d",
+            "C299-7db", "C299-8", "C299-8b", "C299-9", "C299-10")
+    bad = [k for k in need if good.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg nie przechodzi ({bad}): {good}"
+    if verdicts(_c299_synth(key="NIE")).get("C299-11") != "TAK":
+        return "bieg z kluczem NIE: C299-11 nie TAK"
+    cases = [("C299-0", _c299_synth(key="NIE")), ("C299-0", _c299_synth(startn=1)), ("C299-1", _c299_synth(gap=5)), ("C299-1", _c299_synth(st_=1)),
+             ("C299-2", _c299_synth(q30=0.90)), ("C299-2", _c299_synth(q30=0.30)), ("C299-2b", _c299_synth(q10=0.80)), ("C299-3", _c299_synth(eq=1.10)),
+             ("C299-4", _c299_synth(inv=1)), ("C299-5", _c299_synth(lpx=15.0)), ("C299-6", _c299_synth(gdx=-8.5)), ("C299-6", _c299_synth(gfx="120")),
+             ("C299-6b", _c299_synth(under=2)), ("C299-7a", _c299_synth(units=300)), ("C299-7d", _c299_synth(kon=5))]
+    for row, D in cases:
+        v = verdicts(D)
+        if v.get(row) != "NIE":
+            return f"zly bieg nie wykryty w {row}: {v.get(row)}"
+    return None
+
+
+def ceny299_main(logp):
+    """ceny299 (29.10, paczka 299): C299-S, C299-S2, C299-0..C299-11 - opis w komentarzu nad stalymi CENY299_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = ceny299_selftest()
+    rep.add("C299-S: self-test wyrazen (linia 299 i startowa jak w C#: PriceWalk299.Daily, RawPrice.ApplyAll; E3-T1, 287, 294b, Ceny surowcow)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    s2 = ceny299_selftest2()
+    rep.add("C299-S2: test syntetyczny (1 dobry bieg, bieg z kluczem NIE, 15 zlych - wiersze 0-7)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("C299-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = ceny299_collect(logp)
+    print(f"plik: {logp} | linii 299 {len(D['g'])} (nierozpoznanych {D['bad']}), startowych {len(D['start'])}, Ceny surowcow {len(D['rawdays'])}, E3-T1 {len(D['t1'])}, "
+          f"287 {len(D['c287'])}, 294b {len(D['b'])}, ERROR {D['err']}")
+    ceny299_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_ceny299_main_prev = main
+
+
+def main(argv):
+    # paczka 299: grupa ceny299 - opakowanie main jak karawany294
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "ceny299":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return ceny299_main(rest[0] if rest else None)
+    return _ceny299_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
