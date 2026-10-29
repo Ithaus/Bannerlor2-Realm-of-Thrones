@@ -75878,7 +75878,7 @@ def main(argv):
 # Scenariusz, ktory nie biegl - NIE SPRAWDZONE (INFO), nigdy TAK.
 N283_FIELD = re.compile(r"^Bitwa \(NB2\): misja bitwa \(pole bitwy TAK")
 N283_FF_MIN, N283_FF_SHARE = 2, 0.05            # FF od lucznikow 283: najwyzej max(2, 5% ich strzalow)
-N283_FOOT_FAR, N283_CAV_FAR = 60.0, 265.0       # smycz piechoty 50 m (InfRearm) + pass biegu; jazdy 250 m (MaxFromMain 148) + pass galopu
+N283_FOOT_FAR, N283_CAV_FAR = 60.0, 375.0       # smycz piechoty 50 m (InfRearm) + pass biegu; jazdy 360 m (291c RideLeash, Jeff 29.10) + pass galopu
 N283_COST_AVG, N283_COST_MAX, N283_RAYS = 2.0, 16.7, 64
 N283_LINES = 12                                 # linii epizodow 283 na bitwe (RLinesMax)
 N283_RX = {

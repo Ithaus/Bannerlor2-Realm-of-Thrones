@@ -67,6 +67,7 @@ namespace Armoury
         internal const float MaxSeconds = 60f;      // limit czasu poscigu szyku
         internal const float MaxFromMain = 250f;    // limit odleglosci od glownej sily
         internal const float NightMul = 0.5f;       // noca polowa
+        internal const float RideLeash = 360f;      // 291c (Jeff 29.10: 'moze zostac te 358 metrow'): smycz jezdzca w poscigu za nekajacym (HunterCheck); wybor jezdzcow dalej MaxFromMain
         internal const int MinFleeing = 3;          // tylu uciekajacych w 150 m, zeby zaczac
         internal const int PerVictim = 2;           // najwyzej tylu jezdzcow na uciekajacego
         internal const float Cooldown = 30f;        // nastepny poscig szyku najwczesniej po tylu sekundach
@@ -112,7 +113,7 @@ namespace Armoury
         private static WeakReference _m;
         private static bool _live, _key, _night, _written, _field, _naval;
         private static string _kind = "?";
-        private static float _passAcc, _trackAcc, _maxSec = MaxSeconds, _maxFrom = MaxFromMain;
+        private static float _passAcc, _trackAcc, _maxSec = MaxSeconds, _maxFrom = MaxFromMain, _rideLeash = RideLeash;
         private static int _restBelow, _rot;
         private static readonly Dictionary<Formation, FormSt> Forms = new Dictionary<Formation, FormSt>();
         private static readonly Dictionary<Agent, Rider> Riders = new Dictionary<Agent, Rider>();
@@ -214,6 +215,7 @@ namespace Armoury
             try { _night = Campaign.Current != null && Campaign.Current.IsNight; } catch { }   // czas kampanii stoi w misji - pora bitwy
             _maxSec = MaxSeconds * (_night ? NightMul : 1f);
             _maxFrom = MaxFromMain * (_night ? NightMul : 1f);
+            _rideLeash = RideLeash * (_night ? NightMul : 1f);
             var c = Settings.Current;
             _key = c != null && c.AiCavalryPursues;
             _restBelow = c != null && c.HorseStaminaEnabled ? Math.Max(0, Math.Min(80, c.HorseAiRestBelow)) : 0;   // 204: odpowiedz moze wejsc w pierwszym passie

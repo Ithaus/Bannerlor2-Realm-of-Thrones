@@ -795,7 +795,7 @@ namespace Armoury
             float df = a.Position.AsVec2.Distance(LeashHome(h));   // 291b: od szyku, nie od celu drogi / starego punktu szarzy
             if (df > h.T.MaxFar) h.T.MaxFar = df;
             if (df > _hMaxFar) _hMaxFar = df;
-            if (df > _maxFrom) return ULeash;
+            if (df > _rideLeash) return ULeash;   // 291c: 360 m (Jeff), noca polowa
             return -1;
         }
 
