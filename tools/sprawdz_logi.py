@@ -1254,7 +1254,8 @@ Uzycie (Python 3, tylko odczyt):
                     syntetyczny; B291-0 linia w kazdej bitwie polowej (NB2), klucze TAK; B291-1 A: R5 (cala armia) 0, R4 tylko strzelcy (R4 = strzelcy staja);
                     B291-2 B: sekund trzymania > 0 i taktyka ataku obroncy przy trzymaniu <= 4 s na bitwe (po rozstawieniu; obronca tlum tez - recenzja 291; 291d: bitwy
                     'bez wagi obrony' (obrona gry NIE - IsDefenseApplicable) oceniane droga 291d - obrona gry wymuszona w trzymaniu, 'gra bez obrony' i 'inne' 0,
-                    atak bez szyku piechoty osobno - INFO); B291-3 C: bieg tylko szykow z tarcza ponizej progu,
+                    po S2 bez wymuszenia - recenzja 291d); B291-2b atak bez szyku piechoty w trzymaniu <= 4 s na bitwe (ponad - DECYZJA: gra nie ma taktyki
+                    obrony bez szyku piechoty); INFO: taktyka obrony w Engage (RBM 75 m), S2 ponownie; B291-3 C: bieg tylko szykow z tarcza ponizej progu,
                     koncow <= wejsc; B291-4 regresja (potkniecia B 0, 'ERROR in' Doctrine / HorsePursuit / MarchToContact 0); B291-5 INFO (sumy).
 --grupa stamina292: (29.10, paczka 292 noc/292-stamina - Jeff 29.10 "Stamina zwieksz poziom staminy wszystkim AI i jednostkom i mi x 2, za szybko sie
                     konczy i zaraz jestes zmeczony. Konie sa okay."; Armoury/src/BattleWind.cs ApplyHumanMul / StartLine292, FieldCraft.cs MeasureWind /
@@ -78058,12 +78059,15 @@ BITWA291_RX = {
     "a": re.compile(r"\| A armia idzie dalej (TAK|NIE): armia nie stanela (\d+) \(R5 (\d+)\), szykow poszlo dalej (\d+) \(ludzi (\d+)\), strzelcy staja (\d+) "
                     r"\(R4 (\d+)\); oddzial od miejsca wyslania (\d+) \(powrotow ze smyczy (\d+)\) \|"),
     "b": re.compile(r"\| B obronca trzyma pozycje (TAK|NIE)[^:]*: druzyn obroncy (\d+), sekund trzymania (\d+), wagi ataku ciete (\d+) \(bez wagi obrony (\d+)"
-                    r"(?:; 291d: [^)]*)?\), taktyka ataku przy trzymaniu (\d+) s(?: \(bez szyku piechoty \d+ s\))?; puszczone: S2 (\d+), "
+                    r"(?:; 291d: [^)]*)?\), taktyka ataku przy trzymaniu (\d+) s(?: \(bez szyku piechoty \d+ s(?:, w tym z pieszymi w innych szykach \d+ s)?\))?"
+                    r"(?:, taktyka obrony w Engage \(RBM 75 m\) \d+ s)?; puszczone: S2 (\d+)(?: \(ponownie \d+\))?, "
                     r"napastnik nie podchodzi \d+ s (\d+), zwarcie (\d+); probka (.*?); potkniecia (\d+) \|"),
     # 291d (Doctrine.Dh291Segment): droga 'obrona gry wymuszona' w trzymaniu - numery grup b bez zmian (czlony 291d w grupach nieprzechwytujacych)
-    "d": re.compile(r"\(bez wagi obrony \d+; 291d: decyzji trzymania (\d+), obrona gry NIE (\d+), wymuszona (\d+), ciete z przewidywania (\d+), bez wagi: "
-                    r"rozstawienie (\d+), bez szyku piechoty (\d+), gra bez obrony (\d+), inne (\d+)\), taktyka ataku przy trzymaniu \d+ s "
-                    r"\(bez szyku piechoty (\d+) s\); puszczone:"),
+    # recenzja 291d: po S2 bez wymuszenia (4), bez wagi po S2 (8), atak bez szyku piechoty z pieszymi w innych szykach (12), Engage RBM 75 m (13), S2 ponownie (14)
+    "d": re.compile(r"\(bez wagi obrony \d+; 291d: decyzji trzymania (\d+), obrona gry NIE (\d+), wymuszona (\d+), po S2 bez wymuszenia (\d+), ciete z "
+                    r"przewidywania (\d+), bez wagi: rozstawienie (\d+), bez szyku piechoty (\d+), po S2 (\d+), gra bez obrony (\d+), inne (\d+)\), taktyka ataku "
+                    r"przy trzymaniu \d+ s \(bez szyku piechoty (\d+) s, w tym z pieszymi w innych szykach (\d+) s\), taktyka obrony w Engage \(RBM 75 m\) (\d+) s; "
+                    r"puszczone: S2 \d+ \(ponownie (\d+)\), "),
     "c": re.compile(r"\| C piechota bez tarcz biegnie pod ostrzalem (TAK|NIE): szykow (\d+), wejsc w bieg (\d+) \(sr\. tarcz (\S+), prog ([\d.]+)\), koncow biegu (\d+), "
                     r"szyko-sekund biegu (\d+); z tarczami pod ostrzalem zostal krok (\d+)(?: \(sr\. tarcz ([\d.]+)\))?\.$"),   # 291b: sr. tarcz przy kroku > 0
 }
@@ -78071,9 +78075,10 @@ BITWA291_RX = {
 BITWA291_TEST = {
     "line": ("Bitwa (291): misja bitwa | klucze: armia idzie dalej TAK, obronca trzyma TAK, bieg bez tarcz TAK | A armia idzie dalej TAK: armia nie stanela 1 "
              "(R5 0), szykow poszlo dalej 2 (ludzi 40), strzelcy staja 1 (R4 1); oddzial od miejsca wyslania 6 (powrotow ze smyczy 1) | B obronca trzyma pozycje TAK: "
-             "druzyn obroncy 1, sekund trzymania 120, wagi ataku ciete 48 (bez wagi obrony 0; 291d: decyzji trzymania 24, obrona gry NIE 7, wymuszona 7, "
-             "ciete z przewidywania 2, bez wagi: rozstawienie 0, bez szyku piechoty 0, gra bez obrony 0, inne 0), taktyka ataku przy trzymaniu 0 s (bez szyku "
-             "piechoty 0 s); puszczone: S2 0, napastnik nie podchodzi 90 s 0, zwarcie 1; probka T176/vlandia sila x0.81 trzyma, taktyka DefensiveEngagement s. 1 -> DefensiveEngagement; potkniecia 0 "
+             "druzyn obroncy 1, sekund trzymania 120, wagi ataku ciete 48 (bez wagi obrony 0; 291d: decyzji trzymania 24, obrona gry NIE 7, wymuszona 6, "
+             "po S2 bez wymuszenia 1, ciete z przewidywania 2, bez wagi: rozstawienie 0, bez szyku piechoty 0, po S2 1, gra bez obrony 0, inne 0), taktyka ataku "
+             "przy trzymaniu 0 s (bez szyku piechoty 0 s, w tym z pieszymi w innych szykach 0 s), taktyka obrony w Engage (RBM 75 m) 8 s; puszczone: S2 0 "
+             "(ponownie 0), napastnik nie podchodzi 90 s 0, zwarcie 1; probka T176/vlandia sila x0.81 trzyma, taktyka DefensiveEngagement s. 1 -> DefensiveEngagement; potkniecia 0 "
              "| C piechota bez tarcz biegnie pod ostrzalem TAK: szykow 1, wejsc w bieg 1 (sr. tarcz 0.10, prog 0.60), koncow biegu 1, szyko-sekund biegu 24; z tarczami "
              "pod ostrzalem zostal krok 0."),
     "lineno": ("Bitwa (291): misja bitwa | klucze: armia idzie dalej NIE, obronca trzyma NIE, bieg bez tarcz NIE | A armia idzie dalej NIE: armia nie stanela 0 "
@@ -78099,7 +78104,7 @@ def bitwa291_selftest():
                                "T176/vlandia sila x0.81 trzyma, taktyka DefensiveEngagement s. 1 -> DefensiveEngagement", "0"):
         return f"b: {m.groups() if m else 'brak'}"
     m = RX["d"].search(s)
-    if not m or m.groups() != ("24", "7", "7", "2", "0", "0", "0", "0", "0"):
+    if not m or m.groups() != ("24", "7", "6", "1", "2", "0", "0", "1", "0", "0", "0", "0", "8", "0"):
         return f"d: {m.groups() if m else 'brak'}"
     m = RX["c"].search(s)
     if not m or m.groups() != ("TAK", "1", "1", "0.10", "0.60", "1", "24", "0", None):
@@ -78116,6 +78121,11 @@ def bitwa291_selftest():
         return "lineno b/c"
     if RX["d"].search(s):   # linia sprzed 291d (format 291 / 291b) - bez czlonu 291d
         return "lineno d"
+    # format 291d sprzed recenzji (071d93d5, nie bylo w grze): b rozpoznaje te same grupy, d nie
+    v1 = (T["line"].replace("wymuszona 6, po S2 bez wymuszenia 1, ", "wymuszona 6, ").replace("bez szyku piechoty 0, po S2 1, ", "bez szyku piechoty 0, ")
+          .replace(" s, w tym z pieszymi w innych szykach 0 s), taktyka obrony w Engage (RBM 75 m) 8 s;", " s);").replace("S2 0 (ponownie 0),", "S2 0,"))
+    if v1 == T["line"] or not RX["b"].search(v1) or RX["b"].search(v1).groups() != RX["b"].search(T["line"]).groups() or RX["d"].search(v1):
+        return "291d v1"
     return None
 
 
@@ -78176,7 +78186,7 @@ def bitwa291_rows(rep, D):
         # (taktyki obrony gry nie maja z czego sie bronic) poza 'taktyka ataku przy trzymaniu' - podany osobno (INFO)
         dd = [(m, BITWA291_RX["d"].search(m.string)) for m in lb]
         nd = [x for x in dd if x[1]]
-        bad = [m for m, d in dd if int(m.group(6)) > BITWA291_ATK_MAX or int(m.group(3)) <= 0 or (d and (int(d.group(7)) > 0 or int(d.group(8)) > 0))]
+        bad = [m for m, d in dd if int(m.group(6)) > BITWA291_ATK_MAX or int(m.group(3)) <= 0 or (d and (int(d.group(9)) > 0 or int(d.group(10)) > 0))]
         txt = (f"bitew z obronca {len(lb)}: sekund trzymania {sum(int(m.group(3)) for m in lb)} (najmniej {min(int(m.group(3)) for m in lb)}), wagi ataku ciete "
                f"{sum(int(m.group(4)) for m in lb)} (bez wagi obrony {sum(int(m.group(5)) for m in lb)}), taktyka ataku przy trzymaniu najwiecej {max(atk)} s; "
                f"puszczone: S2 {sum(int(m.group(7)) for m in lb)}, napastnik nie podchodzi {sum(int(m.group(8)) for m in lb)}, zwarcie "
@@ -78184,16 +78194,32 @@ def bitwa291_rows(rep, D):
         if nd:
             g = lambda k: sum(int(d.group(k)) for _, d in nd)
             txt += (f"; 291d (bitew {len(nd)}): decyzji trzymania {g(1)}, obrona gry NIE {g(2)} -> wymuszona {g(3)} (bitew z wymuszeniem "
-                    f"{sum(1 for _, d in nd if int(d.group(3)) > 0)}), ciete z przewidywania {g(4)}, bez wagi: rozstawienie {g(5)}, bez szyku piechoty {g(6)} "
-                    f"(atak bez szyku piechoty {g(9)} s, INFO), gra bez obrony {g(7)}, inne {g(8)}")
+                    f"{sum(1 for _, d in nd if int(d.group(3)) > 0)}), po S2 bez wymuszenia {g(4)}, ciete z przewidywania {g(5)}, bez wagi: rozstawienie {g(6)}, "
+                    f"bez szyku piechoty {g(7)} (atak bez szyku piechoty {g(11)} s - B291-2b), po S2 {g(8)}, gra bez obrony {g(9)}, inne {g(10)}; "
+                    f"INFO: taktyka obrony w Engage (RBM 75 m) {g(13)} s (najwiecej {max(int(d.group(13)) for _, d in nd)} s), S2 ponownie {g(14)}")
         old = [m for m, d in dd if not d and int(m.group(5)) > 0]
         if old:
             txt += (f"; bitew sprzed 291d z 'bez wagi obrony' {len(old)} (obrona gry NIE albo bez piechoty - bez rozbicia, oceniane jak dotad)")
         rep.add("B291-2: B obronca trzyma pozycje - bez taktyki ataku przy trzymaniu", txt,
-                f"sekund trzymania > 0 i <= {BITWA291_ATK_MAX:.0f} s taktyki ataku w kazdej bitwie; 291d: gra bez obrony 0 i inne 0 (obrona gry NIE -> wymuszona)",
-                not bad)
+                f"sekund trzymania > 0 i <= {BITWA291_ATK_MAX:.0f} s taktyki ataku w kazdej bitwie; 291d: gra bez obrony 0 i inne 0 (obrona gry NIE -> wymuszona, "
+                "po S2 bez wymuszenia)", not bad)
     else:
         rep.add("B291-2: B obronca trzyma pozycje - bez taktyki ataku przy trzymaniu", "brak bitwy z druzyna obroncy AI i kluczem TAK", "INFO", None)
+    # B291-2b (recenzja 291d): atak obroncy w trzymaniu bez szyku piechoty - taktyki obrony gry daja wtedy 0 (zaden szyk z ludzmi nie ma IsInfantryFormation),
+    # a sciezki trzymania bez piechoty (wlasna taktyka) nie ma - ponad prog DECYZJA (nie NIE: krok 291d tego nie usuwa; wiersz pilnuje, zeby nie zginelo)
+    nd2 = [(m, BITWA291_RX["d"].search(m.string)) for m in lb]
+    nd2 = [x for x in nd2 if x[1]]
+    if nd2:
+        ni = [int(d.group(11)) for _, d in nd2]
+        foot = sum(int(d.group(12)) for _, d in nd2)
+        over = sum(1 for v in ni if v > BITWA291_ATK_MAX)
+        rep.add("B291-2b: B obronca bez szyku piechoty - taktyka ataku przy trzymaniu",
+                f"bitew {len(nd2)}: atak bez szyku piechoty razem {sum(ni)} s (najwiecej {max(ni)} s, bitew ponad prog {over}), w tym z pieszymi w innych szykach "
+                f"{foot} s" + ("; gra nie ma taktyki obrony bez szyku piechoty - trzymanie bez piechoty niewdrozone (do decyzji: wlasna taktyka trzymania)" if over else ""),
+                f"<= {BITWA291_ATK_MAX:.0f} s w kazdej bitwie (ponad - DECYZJA)", over == 0, decide=True)
+    else:
+        rep.add("B291-2b: B obronca bez szyku piechoty - taktyka ataku przy trzymaniu", "brak bitwy z czlonem 291d (log sprzed 291d albo bez obroncy AI)",
+                "INFO", None)
     # B291-3 C
     lc = [mc for m0, _, _, mc in L if mc.group(1) == "TAK" and int(mc.group(3)) > 0]
     if lc:
@@ -78245,13 +78271,20 @@ def bitwa291_synth():
         "bad": [nb2, bad, nb2, "ERROR in HorsePursuit.Bitwa291: NullReferenceException"],
         "empty": ["Armoury: inna linia"],
         # 291d: obrona gry NIE nie wymuszona ('gra bez obrony 3') - B291-2 NIE, choc taktyka ataku przy trzymaniu 0 s
-        "bad291d": [nb2, T["line"].replace("wymuszona 7", "wymuszona 4").replace("gra bez obrony 0", "gra bez obrony 3")],
+        "bad291d": [nb2, T["line"].replace("wymuszona 6", "wymuszona 3").replace("gra bez obrony 0", "gra bez obrony 3")],
+        # recenzja 291d: atak bez szyku piechoty 30 s - B291-2 TAK (osobno), B291-2b DECYZJA; po S2 bez wymuszenia i bez wagi po S2 - B291-2 dalej TAK
+        "noinf291d": [nb2, T["line"].replace("(bez szyku piechoty 0 s, w tym z pieszymi w innych szykach 0 s)",
+                                             "(bez szyku piechoty 30 s, w tym z pieszymi w innych szykach 20 s)")],
+        "posts2": [nb2, T["line"].replace("wymuszona 6, po S2 bez wymuszenia 1", "wymuszona 2, po S2 bez wymuszenia 5").replace("po S2 1, gra", "po S2 4, gra")
+                   .replace("S2 0 (ponownie 0)", "S2 1 (ponownie 0)")],
     }
     exp = {
-        "good": {"B291-0": "TAK", "B291-1": "TAK", "B291-2": "TAK", "B291-3": "TAK", "B291-4": "TAK", "B291-5": "INFO"},
+        "good": {"B291-0": "TAK", "B291-1": "TAK", "B291-2": "TAK", "B291-2b": "TAK", "B291-3": "TAK", "B291-4": "TAK", "B291-5": "INFO"},
         "bad": {"B291-0": "NIE", "B291-1": "NIE", "B291-2": "NIE", "B291-3": "NIE", "B291-4": "NIE"},
-        "empty": {"B291-0": "INFO", "B291-1": "INFO", "B291-2": "INFO", "B291-3": "INFO", "B291-4": "INFO"},
-        "bad291d": {"B291-0": "TAK", "B291-2": "NIE", "B291-4": "TAK"},
+        "empty": {"B291-0": "INFO", "B291-1": "INFO", "B291-2": "INFO", "B291-2b": "INFO", "B291-3": "INFO", "B291-4": "INFO"},
+        "bad291d": {"B291-0": "TAK", "B291-2": "NIE", "B291-2b": "TAK", "B291-4": "TAK"},
+        "noinf291d": {"B291-0": "TAK", "B291-2": "TAK", "B291-2b": "DECYZJA", "B291-4": "TAK"},
+        "posts2": {"B291-0": "TAK", "B291-2": "TAK", "B291-2b": "TAK", "B291-4": "TAK"},
     }
     tmp = tempfile.mkdtemp(prefix="b291_")
     diff = []
