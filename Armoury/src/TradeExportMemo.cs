@@ -137,7 +137,8 @@ namespace Armoury
                 }
                 for (int i = 0; i < n; i++) _stockAt[i] = stock[places[i]];
                 if (_memRow == null || _memRow.Length != n) _memRow = new float[n][];
-                for (int i = 0; i < n; i++) _memRow[i] = ShelfMemory.Row(places[i]);
+                bool phys = SupplyDemand.ExportPhysical;   // 138c (klucz TradeExportPhysicalShelf): wiersz null = cel z polki fizycznej (EffRow zwraca dh + 1), jak stara petla (DstShelf)
+                for (int i = 0; i < n; i++) _memRow[i] = phys ? null : ShelfMemory.Row(places[i]);
                 _share = (float)RawPrice.Share;
                 _ready = true;
                 return true;
@@ -341,6 +342,8 @@ namespace Armoury
                              + " | czas w probce, stara / nowa droga (us): wybor celu " + Us(_tPickOld, _tPickNew, _tPickN) + ", popyt zrodla " + Us(_tSrcOld, _tSrcNew, _tSrcN)
                              + " | wywoz tej doby: " + _dMoved + " szt. w " + _dDeals + " transakcjach, zaplacone " + _dPaid + " zl, bez odbiorcy " + _dStuck
                              + " szt., wycen " + _dEvals + ", czas wywozu " + _dMs.ToString("0.0", inv) + " ms"
+                             + " | decyzja wywozu (138c): " + (s.TradeExportPhysicalShelf ? "polka fizyczna z towarem w drodze" : "pamiec polki (299b)")
+                             + ", z odbiorca " + (_dMoved + _dStuck > 0 ? (_dMoved / (double)(_dMoved + _dStuck)).ToString("0.000", inv) : "-")
                              + " | potkniecia od startu sesji " + _stumbles + ".");
                 }
             }

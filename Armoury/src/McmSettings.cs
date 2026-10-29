@@ -3348,6 +3348,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool PriceFlatterAllItems { get; set; } = true;
 
+        [SettingPropertyBool("Trade Export Physical Shelf", HintText = "the merchants who carry surplus arms, armour and horses between towns choose where to take them by what really lies on the stalls and on the road: every piece already on its way to a town counts there in full, and a town that holds as many as it wants is no longer seen as still short. Stall prices, what the merchants pay at the source, and what you get when you sell are unchanged (they keep the stall memory of Price Flatter All Items). Off = the merchants judge by the stall memory, where a piece shipped today or still on the road weighs only Price Instant Share - towns looked short while they filled and about three times as many pieces went back and forth", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool TradeExportPhysicalShelf { get; set; } = true;
+
         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool PopulationRentEnabled { get; set; } = true;
@@ -11316,6 +11320,7 @@ namespace Armoury
             s.PriceSupplyMemoryDaily = PriceSupplyMemoryDaily;
             s.PriceInstantShare = PriceInstantShare;
             s.PriceFlatterAllItems = PriceFlatterAllItems;
+            s.TradeExportPhysicalShelf = TradeExportPhysicalShelf;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;

@@ -1583,6 +1583,58 @@ namespace Armoury
             return measured ? 2 : 4;
         }
 
+        /// <summary>138c (tylko pomiar): linia doby "Rozklad wyniku karawan (138c)" - percentyle (wynik handlu - zold)/d karawan zmierzonych (ta sama miara co linia 294),
+        /// udzial 10% najlepszych w sumie dodatniego wyniku handlu/d i to samo dla zysku 7 dob karawan z handlem (linia 284). Autotest 138b: srednia na handlujaca 2309 -> 2429,
+        /// mediana 831 -> 718 (299a -> 138b) - bez percentyli nie da sie odroznic straty od podzialu zysku. Nic nie zmienia w grze.</summary>
+        private static string LineSpread(int day, List<double> net, List<double> pd, List<long> r7)
+        {
+            var sb = new StringBuilder(400);
+            try
+            {
+                sb.Append("Rozklad wyniku karawan (138c): dzien ").Append(day).Append(" | (wynik handlu - zold)/d karawan zmierzonych ").Append(net.Count);
+                if (net.Count > 0)
+                {
+                    var a = new List<double>(net); a.Sort();
+                    sb.Append(": p10 ").Append(Pct(a, 0.10)).Append(", p25 ").Append(Pct(a, 0.25)).Append(", p50 ").Append(Pct(a, 0.50))
+                      .Append(", p75 ").Append(Pct(a, 0.75)).Append(", p90 ").Append(Pct(a, 0.90));
+                }
+                var b = new List<double>(pd);
+                sb.Append(" | wynik handlu/d: udzial 10% najlepszych w sumie dodatnich ").Append(TopShare(b));
+                var c = new List<double>(r7.Count);
+                foreach (var x in r7) c.Add(x);
+                sb.Append(" | zysk 7 dob karawan z handlem ").Append(c.Count).Append(": udzial 10% najlepszych ").Append(TopShare(c));
+                if (c.Count > 0)
+                {
+                    c.Sort();
+                    double sum = 0; foreach (var x in c) sum += x;
+                    sb.Append(", p25 ").Append(Pct(c, 0.25)).Append(", p50 ").Append(Pct(c, 0.50)).Append(", p75 ").Append(Pct(c, 0.75))
+                      .Append(", srednia ").Append((sum / c.Count).ToString("0", Inv));
+                }
+                sb.Append('.');
+            }
+            catch (Exception e) { Stumble("LineSpread", e); sb.Clear(); sb.Append("Rozklad wyniku karawan (138c): dzien ").Append(day).Append(" | blad linii."); }
+            return sb.ToString();
+        }
+
+        /// <summary>138c: percentyl q posortowanej listy (najblizszy rzad).</summary>
+        private static string Pct(List<double> sorted, double q)
+        {
+            if (sorted.Count == 0) return "-";
+            int i = (int)Math.Floor(q * (sorted.Count - 1) + 0.5);
+            return sorted[Math.Max(0, Math.Min(sorted.Count - 1, i))].ToString("0", Inv);
+        }
+
+        /// <summary>138c: udzial 10% najlepszych (co najmniej 1) w sumie wartosci dodatnich; "-" bez dodatnich.</summary>
+        private static string TopShare(List<double> v)
+        {
+            double pos = 0; foreach (var x in v) if (x > 0) pos += x;
+            if (v.Count == 0 || !(pos > 0)) return "-";
+            var a = new List<double>(v); a.Sort(); a.Reverse();
+            int k = Math.Max(1, (int)Math.Ceiling(a.Count * 0.10));
+            double top = 0; for (int i = 0; i < k && i < a.Count; i++) if (a[i] > 0) top += a[i];
+            return (top / pos).ToString("0.000", Inv);
+        }
+
         /// <summary>298 (tylko pomiar): linia doby "Karawany bez handlu i kohorta (298)" - karawany bez sprzedazy w 7 dobach (ksiega zysku 284, ta sama miara co
         /// 'karawany 7 dob: z handlem') wedlug przyczyny (IdleWhy) i karawany powstale od 31. doby biegu (bez jukow sprzed testu): placace zold / tracace, mediana
         /// (wynik handlu - zold)/d - ta sama miara co linia 294. Nic nie zmienia w grze; wyjatek na karawane - licznik potkniec.</summary>
@@ -1925,6 +1977,9 @@ namespace Armoury
 
                 // linia 294: rynek karawan (jedzenie wedlug rodzaju, zwijanie stratnych, nowe karawany wedlug miejsca) - takze przy kluczach NIE (pomiar)
                 Log.Info(CaravanMarket294.Daily(day, w294, l294, t294, u294, s294, n294, p294, g294, wNew294, wind294, wWhy294, _rWind, _bookHad, _bookOk, _bookGone, _bookBad));
+
+                // linia 138c (tylko pomiar): rozklad wyniku karawan - czy spadek mediany to strata, czy podzial zysku (srednia rosnie, mediana spada)
+                Log.Info(LineSpread(day, n294, p294, reals));
 
                 // linia 298 (tylko pomiar): karawany bez sprzedazy w 7 dobach wedlug przyczyny i kohorta karawan od 31. doby biegu
                 Log.Info(Line298(day, nCar, idle298, n298, w298, net298, cost));

@@ -534,7 +534,17 @@ namespace Armoury
         /// dh z towarem w drodze) przez pamiec koszyka. Klucz wylaczony - (dd + 1) / (dh + 2) jak dotad (bit w bit).</summary>
         internal static float DstShelf(Settlement dst, ItemObject probe, float dd, int dh, float elast, float lo, float hi)
         {
-            return DstShelfRow(ShelfMemory.Row(dst), ShelfMemory.Slot(probe), (float)RawPrice.Share, dd, dh, elast, lo, hi);   // 299c: udzial od razu (dotad tempo)
+            return DstShelfRow(ExportPhysical ? null : ShelfMemory.Row(dst), ShelfMemory.Slot(probe), (float)RawPrice.Share, dd, dh, elast, lo, hi);   // 299c: udzial od razu (dotad tempo); 138c: bez pamieci (wiersz null = polka fizyczna)
+        }
+
+        /// <summary>138c (klucz TradeExportPhysicalShelf): decyzja wywozu kupcow (mnoznik polki zrodla i celu) z polki fizycznej - cel (dd + 1) / (dh + 2) z towarem w drodze
+        /// i dzisiejszymi dostawami w calej wadze, zrodlo (popyt + 1) / (polka + 1), jak przed 299b (bieg 299a). Powod (autotest 138b wobec 299a): przez pamiec 299b sztuka w drodze
+        /// i dzisiejsza dostawa wazyly w celu tylko udzial od razu (0.06), a granica rownowagi (ShelfMemory.Bound) trzymala cel w rownowadze na 1.0 az do ok. 16 x popytu -
+        /// wywoz 3 614 -> 10 989 szt. juz w 1. dobie (M = polka), towar w drodze 9.5 -> 30.5 tys. szt., przewiezione zloto 0.20 -> 1.31 mln zl/d. Ceny straganow (takze cena,
+        /// ktora kupiec placi u zrodla - ShelfBuy.Take przez GetPrice) bez zmian - dalej z pamieci 299b. NIE - pamiec jak w 299b / 299c.</summary>
+        internal static bool ExportPhysical
+        {
+            get { var c = Settings.Current; return c != null && c.TradeExportPhysicalShelf; }
         }
 
         /// <summary>299b po recenzji (koszt wywozu): to samo z wierszem pamieci celu i udzialem od razu p (299c: RawPrice.Share) rozwiazanymi raz (TradeExportMemo) -
@@ -735,6 +745,7 @@ namespace Armoury
                 // 171 C8 (Z6): zamek nie jest targiem broni - kupcy nie wioza tam broni natychmiast, bez drogi; zaloga zamku zamawia w miescie
                 // (GarrisonCarts). Zamek zostaje ZRODLEM: jego zapas ponad popyt kupcy wywoza do miast
                 bool noCastles = GarrisonCarts.On;
+                bool exportPhys = ExportPhysical;   // 138c: raz na wywoz doby (TradeExportMemo.Begin czyta ten sam klucz)
                 // E8/O3 (267): cele w zasiegu kazdego zrodla z pamieci z kluczem, popyt i mnoznik ceny raz na osade w koszyku (TradeExportMemo.cs);
                 // fast = false (TradeExportFast wylaczony albo potkniecie) - ponizej dokladnie kod sprzed paczki
                 bool fast = TradeExportMemo.Begin(places, stock, range);
@@ -757,7 +768,9 @@ namespace Armoury
                         int toShip = (int)Math.Ceiling(surplus * share);
                         // 299b: mnoznik polki zrodla (strona kupna, bez + 1) przez pamiec koszyka w granicy rownowagi; nadwyzka i toShip - polka fizyczna
                         float srcDem = fast ? srcD : Demand(src, probe);
-                        float srcFactor = (float)Math.Pow((srcDem + 1f) / (ShelfMemory.Eff(src, probe, have, srcDem) + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
+                        // 138c (klucz TradeExportPhysicalShelf): zrodlo z polki fizycznej (jak przed 299b) - ta sama polka, ktora liczy nadwyzke
+                        float srcShelf = exportPhys ? have : ShelfMemory.Eff(src, probe, have, srcDem);
+                        float srcFactor = (float)Math.Pow((srcDem + 1f) / (srcShelf + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
                         srcFactor = MBMath.ClampFloat(srcFactor, MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), 1f);
                         var srcPos = src.GetPosition2D;
                         var poor = new HashSet<Settlement>();   // odbiorcy bez zlota - do konca tego przebiegu
