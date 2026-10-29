@@ -167,7 +167,15 @@ namespace Armoury
         {
             float e = Ema(c);
             var s = Settings.Current;
-            return s != null && s.CaravanFlowByMarketDemand ? Math.Max(e, Mkt(c)) : e;
+            if (s == null || !s.CaravanFlowByMarketDemand) return e;
+            // 290 (klucz CaravanFoodBuyOwnSales): jedzenie psuje sie w jukach po 7 dobach (CaravanGoods FoodAgeDays - T1 sprzedaje je wtedy na stracie), wiec
+            // liczy sie to, co karawany SAME zdolaja sprzedac miastom w tym czasie, nie caly popyt miast (ten bierze glownie dowoz wsi i wozy KS-H). Autotest 136a,
+            // doba 109133: chleb juki 4 098 / sprzedaz karawan 158 szt./d = 26 dob, a prog 287 (popyt rynkow x 7) 12 283 - kupno czynne; ryby 18 dob, zboze 23,
+            // winogrona 23; T1 na stracie 'jedzenie psuje sie' 152-216 szt./d (89% sprzedazy na stracie; 134b bez 287: 22-63 szt./d). Bramka (regula 1), regula 5
+            // zakupu, gabka - ta sama miara. Towar trwaly - jak 287 (petla 'sprzedaz zalezy od tego, co bramka blokuje' dotyczy towaru, ktory czeka 30 dob; jedzenie
+            // schodzi tez przez jedzenie eskorty z jukow 288 - bramka otwiera sie, gdy juki spadna do 7 dob sprzedazy).
+            if (s.CaravanFoodBuyOwnSales && IsFoodCat(c)) return e;
+            return Math.Max(e, Mkt(c));
         }
 
         /// <summary>287: wartosc sztuki kategorii na polce (jednostka danych rynku - HistoricalPrices.ShelfWorth), srednia towarow handlowych kategorii; raz na dobe (z pamiecia Mkt).</summary>
@@ -852,6 +860,37 @@ namespace Armoury
             return sb.ToString();
         }
 
+        /// <summary>290: linia doby "Jedzenie karawan (290)" - kategorie jedzenia z jukami albo sprzedaza: juki, wlasna sprzedaz karawan miastom (14 dob), dni jukow
+        /// przy tej sprzedazy, popyt rynkow (287), prog bramki (Cap - miara Flow przy kluczu) i stan. Tylko odczyt.</summary>
+        private static string Line290(Settings s, int day, List<ItemCategory> rows)
+        {
+            try
+            {
+                var sb = new StringBuilder(1600);
+                long h = 0; double e = 0, mk = 0; int k = 0, shut = 0;
+                var parts = new StringBuilder(1200);
+                foreach (var c in rows)
+                {
+                    if (!IsFoodCat(c)) continue;
+                    long hc = Held(c); float ec = Ema(c), mc = Mkt(c);
+                    bool sh = GateShut(c);
+                    k++; if (sh) shut++; h += hc; e += ec; mk += mc;
+                    if (parts.Length > 0) parts.Append(", ");
+                    parts.Append(c.StringId).Append(' ').Append(hc).Append('/').Append(ec.ToString("0.0", Inv)).Append('/')
+                         .Append(ec > 0.05f ? (hc / (double)ec).ToString("0.0", Inv) : "-").Append('/').Append(mc.ToString("0.0", Inv)).Append('/')
+                         .Append(Cap(c).ToString("0", Inv)).Append('/').Append(sh ? "KUPNO STOI" : "CZYNNE");
+                }
+                sb.Append("Jedzenie karawan (290): dzien ").Append(day).Append(" | klucz kupno jedzenia wedlug wlasnej sprzedazy ").Append(YN(s.CaravanFoodBuyOwnSales))
+                  .Append(" | kategorii jedzenia ").Append(k).Append(", kupno stoi ").Append(shut)
+                  .Append(" | w jukach ").Append(h).Append(" szt., sprzedaz karawan miastom ").Append(e.ToString("0.0", Inv)).Append(" szt./d (")
+                  .Append(e > 0.05 ? (h / e).ToString("0.0", Inv) : "-").Append(" dob), popyt rynkow ").Append(mk.ToString("0.0", Inv)).Append(" szt./d")
+                  .Append(" | wedlug kategorii (juki / sprzedaz karawan/d / dni / popyt rynkow/d / prog / stan): ").Append(parts.Length > 0 ? parts.ToString() : "-")
+                  .Append(" | potkniecia 287 ").Append(_mktStum).Append(" (sesja).");
+                return sb.ToString();
+            }
+            catch (Exception ex) { Stumble("Line290", ex); return "Jedzenie karawan (290): dzien " + day + " | blad linii | potkniecia 287 " + _mktStum + " (sesja)."; }
+        }
+
         internal static void Daily()
         {
             var s = Settings.Current;
@@ -986,6 +1025,9 @@ namespace Armoury
 
                 // linia 287: bramka wedlug popytu rynkow, roznica cen miast wobec kosztu drogi, wynik handlu karawan wobec zoldu
                 Log.Info(Line287(s, day, rows, pdL, wgL, penL, nCover, wAll, toll, cAll));
+
+                // linia 290 (tylko pomiar): jedzenie w jukach wobec wlasnej sprzedazy karawan i popytu rynkow, stan bramki (miara Flow)
+                if (s.CaravanFlowByMarketDemand) Log.Info(Line290(s, day, rows));
 
                 // linia 4 (F, na sucho przy kluczu NIE)
                 Log.Info(new StringBuilder(500).Append("Wielkosc karawan (284, na sucho): dzien ").Append(day).Append(" | klucz Caravan Size By Trade ").Append(YN(s.CaravanSizeByTrade))

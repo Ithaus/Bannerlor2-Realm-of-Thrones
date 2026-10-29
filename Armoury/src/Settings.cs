@@ -4365,6 +4365,15 @@ namespace Armoury
         // (kwatermistrz, -25% zoldu ludzi partii) takze poza armia; w armii BK dodaje go sam (BKPartyWageModel - Army != null) - bez dublowania.
         public bool EfficientCampaignerAlways = true;       // the Steward perk Efficient Campaigner (the party's quartermaster has it) cuts the party's troop wages by 25% all the time, not only while the party is part of an army - for your party and for every lord whose quartermaster has the perk. Off = as in the game, only in an army
 
+        // --- Iron mines follow the world's iron, caravans buy only the food they can sell before it spoils (290) ---
+        // Paczka 290 (29.10, Jeff "sprobuj to": "Zelaza na swiecie ubywa coraz szybciej (-66 dziennie)... Wciaz sporo towaru idzie ze strata (ok. 2,6 tys. dziennie)").
+        // Autotest 136a (90 dob na kopii zapisu Jeffa): krok f5-ruda ciac rece przy zelazie w 13 z 13 krokow (Westeros PELNY caly bieg - nadmiar stoi w 7-14 miastach
+        // przy kopalniach), wydobycie 386 -> 289 lup/d przy zuzyciu ok. 365/d - zelazo swiata +35/d -> -66/d. Sprzedaz T1 na stracie - 89% to jedzenie > 7 dob, ktore
+        // karawany kupily od 287 wedlug popytu rynkow (chleb: juki 4 098 = 26 dob wlasnej sprzedazy karawan, bramka liczyla 12 283).
+        // StartCalibration.Ruda.cs, CaravanTrade284.cs. Nowe klucze (plik MCM Jeffa ich nie ma).
+        public bool KsIronWorldFlow = true;                 // with Ks Iron Hands Follow Market: the weekly step moves hands at iron mines by what the whole iron stock of the market did in the last week (town stalls, iron on the road, caravan packs, villages, villager carts and castles) - a full market loses hands only while its iron still grows, a market short of ore gains hands until its iron grows, and in between hands follow the stock up and down; production follows what is really used. Off = as before (full market always loses hands)
+        public bool CaravanFoodBuyOwnSales = true;          // with Caravans Measure Sales By Town Demand: food (it spoils in a caravan's packs after a week) is bought only up to a week of what caravans themselves sell to towns, not up to a week of the towns' whole demand - caravans stop buying bread and fish they would have to dump at a loss. Off = as before (food measured by town demand)
+
         // --- Food follows the market under the start calibration (night 18.10) ---
         // Paczka f20-d4 (decyzja Jeffa 18.10 "4. b"): po D+49 (koniec sterowania rynku) podaz jedzenia i soli pod KS nie szla za cena - A7 wylaczona, Plan rusza tylko
         // prace domowa (fin93: Essos oliwki 0.14 T*, mieso 0.20, winogrona 0.33 przy indeksie 3-4.5; sol Essos 3.62 T*, ryby Westeros 3.28 T* i rosna). Ta sama regula

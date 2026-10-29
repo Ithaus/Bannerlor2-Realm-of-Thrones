@@ -1240,6 +1240,12 @@ Uzycie (Python 3, tylko odczyt):
                     i nocleg w karawanie?"; Armoury/src/CaravanEscort.cs, MountedWage.cs) python -I tools/sprawdz_logi.py --grupa karawany288 <Armoury-*.log>
                     (strumieniowo). Linia 'Karawany - zold eskorty i jedzenie w drodze (288)'. K288-S self-test; K288-0 linia co dobe, potkniecia 0; K288-1 zold
                     karawan swiata po/przed 0.45-0.56; K288-2 stawki na czlowieka x0.5 (t1-3, t4, t5+); K288-3 jedzenie w drodze i zakupy przy wyjezdzie; K288-4 INFO.
+--grupa zelazo290 : (29.10, paczka 290 noc/285-zold-srebro-ruda - Jeff 29.10 "sprobuj to": "Zelaza na swiecie ubywa coraz szybciej (-66 dziennie)", "Wciaz sporo
+                    towaru idzie ze strata (ok. 2,6 tys. dziennie)"; Armoury/src/StartCalibration.Ruda.cs, CaravanTrade284.cs) python -I tools/sprawdz_logi.py --grupa
+                    zelazo290 <Armoury-*.log> (strumieniowo; progi na bieg 90 dob). Segment '; 290: ...' linii 'Ruda KS (f5-ruda)', linia 'Jedzenie karawan (290)'.
+                    Z290-S self-test; Z290-0 segment i linia co dobe; Z290-1 ruch 290 zgodny z regula; Z290-2 zelazo swiata w [-10, +10]/d (30 dob i caly bieg);
+                    Z290-3 miasta bez rudy nie rosna; Z290-4 T1 jedzenie na stracie <= 80 szt./d, utarg na stracie <= 1000 zl/d; Z290-5 bramka jedzenia spojna;
+                    Z290-6 jedzenie w jukach <= 12 dob wlasnej sprzedazy; Z290-7 INFO.
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -56279,7 +56285,9 @@ def nruda_main(logp):
                         w285[int(a.group(1))] = t285
                     sg286 = h286_f5_seg(s)
                     if sg286:
-                        w286[int(a.group(1))] = sum(v[1] + v[4] + v[5] for v in sg286.values()) + h287_hold(s)   # 286b: trzymane przy BRAK i powrot w pasmie, 287: trzymane przy PELNYM - osobne kubly
+                        w286[int(a.group(1))] = sum(v[1] + v[4] + v[5] for v in sg286.values()) + h287_hold(s) + h290_sum(s)   # 286b: trzymane przy BRAK i powrot w pasmie, 287: trzymane przy PELNYM, 290: kubly ruchu za zapasem swiata - osobne kubly
+                    elif h290_sum(s):
+                        w286[int(a.group(1))] = h290_sum(s)   # 290 bez segmentu 286 (klucz KsIronLocalGlut NIE)
                 else:
                     bad_w += 1
                 continue
@@ -76721,7 +76729,7 @@ def h286_collect(logp):
                 sg = h286_f5_seg(s)
                 if sg:
                     D["f5"][d] = sg
-                    D.setdefault("f5h", {})[d] = h287_hold(s)   # 287: trzymane przy PELNYM - osobny kubel decyzji
+                    D.setdefault("f5h", {})[d] = h287_hold(s) + h290_sum(s)   # 287: trzymane przy PELNYM, 290: kubly ruchu za zapasem swiata - osobne kubly decyzji
                     a = NRU_W.match(s)
                     if a:
                         x = a.groups()
@@ -77094,7 +77102,7 @@ def h287_collect(logp):
                     sg = h286_f5_seg(s)
                     loc = sum(v[1] + v[4] + v[5] for v in sg.values())
                     base = (int(x[NRUW_UP]) + int(x[NRUW_DNF]) + int(x[NRUW_DNS]) + int(x[NRUW_PART]) + int(x[NRUW_NODATA]) + int(x[NRUW_BAND]) + int(x[NRUW_NOT]))
-                    D["f5"][int(x[NRUW_DAY])] = (holds, {"W": x[NRUW_DECW], "E": x[NRUW_DECE]}, int(x[NRUW_IN]), base + loc + sum(holds.values()))
+                    D["f5"][int(x[NRUW_DAY])] = (holds, {"W": x[NRUW_DECW], "E": x[NRUW_DECE]}, int(x[NRUW_IN]), base + loc + sum(holds.values()) + h290_sum(s))   # 290: osobne kubly
                 elif s.find("; 287: ") >= 0:
                     D["bad"] += 1
             elif s.startswith("Ruda przeplyw (282): dzien "):
@@ -77467,6 +77475,336 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return karawany288_main(rest[0] if rest else None)
     return _karawany288_main_prev(argv)
+
+# ------------------------------------------------------------ zelazo290 (29.10, paczka 290 noc/285-zold-srebro-ruda: rece przy zelazie za zapasem swiata rynku,
+#   karawany kupuja jedzenie wedlug wlasnej sprzedazy; Jeff 29.10 "sprobuj to" o: "Zelaza na swiecie ubywa coraz szybciej (-66 dziennie)" i "Wciaz sporo towaru
+#   idzie ze strata (ok. 2,6 tys. dziennie)"; Armoury/src/StartCalibration.Ruda.cs (segment '; 290: ...' linii 'Ruda KS (f5-ruda)'), CaravanTrade284.cs (Flow,
+#   linia 'Jedzenie karawan (290)'))
+#   python -I tools/sprawdz_logi.py --grupa zelazo290 <Armoury-*.log>      (strumieniowo; progi na bieg 90 dob)
+# Bazy (90 dob na kopii zapisu Jeffa): 136a = WGRANE 136 (m113/logi/136a-probyN/Armoury-2026-10-28_23-25-56.log): zelazo swiata ostatnie 30 dob -66.5/d (cale 90 dob
+#   8920 -> 7623, -14.6/d), miasta bez rudy 7.6 -> 6.8, T1 na stracie 1191 -> 2649 zl/d (jedzenie 216 szt./d, 89%); 134b (bez 287): T1 na stracie 348 zl/d,
+#   jedzenie 22 szt./d, zelazo -28/d; 135c: -36/d, jedzenie 207 szt./d.
+# Z290-S  self-test wyrazen (linia f5 z segmentami 285/286/286b/287/290 wobec NRU_W, RU282_F5, H285_F5, h286_f5_seg, H287_F5, H290_F5; linia 'Jedzenie karawan (290)';
+#         E3-T1 z 'jedzenie psuje sie') i test decyzji z290_expect (12 przypadkow)
+# Z290-0  segment 290 w kazdej linii f5 (oba rynki), linia 290 co dobe, nierozpoznanych 0, potkniecia f5 i 287 0, ERROR 0
+# Z290-1  ruch 290 zgodny z regula (poziom x zmiana zapasu swiata x prog) i kubly zgodne z ruchem (w gore tylko W GORE, w dol tylko W DOL, trzymane - same trzymane);
+#         zapas poprzedni = zapas z poprzedniego kroku (ciaglosc)
+# Z290-2  zelazo swiata (linia 'Zelazo (lupy) (214)' - razem): prosta ostatnich 30 dob i caly bieg w [Z290_IRON_LO, Z290_IRON_HI] lup/d
+# Z290-3  miasta bez rudy (linia 'Ruda przeplyw (282)'): srednia ostatnich 10 dob <= max(srednia pierwszych 5 dob, Z290_NOORE_ABS)
+# Z290-4  sprzedaz T1 na stracie: jedzenie (psuje sie) srednio ostatnie 10 dob <= Z290_FOOD_MAX szt./d i utarg na stracie <= Z290_LOSS_MAX zl/d
+# Z290-5  bramka jedzenia spojna (klucz TAK): prog = 7 x wlasna sprzedaz karawan (+-1), CZYNNE tylko przy juki <= prog, KUPNO STOI przy juki > prog
+# Z290-6  jedzenie w jukach karawan na koniec <= Z290_FOOD_DAYS dob wlasnej sprzedazy
+# Z290-7  INFO: wydobycie i zuzycie (pierwsze / ostatnie 30 dob), rece przy zelazie, ruchy 290
+Z290_IRON_LO, Z290_IRON_HI = -10.0, 10.0   # zelazo swiata lup/d: 136a ostatnie 30 dob -66.5, caly bieg -14.6
+Z290_NOORE_ABS = 10.0                      # miasta bez rudy: prog bezwzgledny (jak RU282-1)
+Z290_FOOD_MAX = 80.0                       # T1 jedzenie na stracie szt./d (136a 216, 135c 207, 134b bez 287 22)
+Z290_LOSS_MAX = 1000.0                     # T1 utarg na stracie zl/d (136a 2649, 134b 348)
+Z290_FOOD_DAYS = 12.0                      # juki jedzenia / wlasna sprzedaz karawan na koniec (136a 109133: chleb 26, ryby 18, zboze 23 dob)
+Z290_ERR = ("ERROR in StartCalibration.F5IronWeek", "ERROR in CaravanTrade284.Line290", "ERROR in CaravanTrade284.Daily")
+H290_SEG = ("; 290: zapas swiata rynku (polki + droga + juki + wsie + wozy wsi + zamki) {p} -> {n}{dl}, wsie {v}, wozy wsi {wp}, zamki {c}, prog {thr}, poziom {lv}, "
+            "ruch {act}, w gore {u}, w dol {dn}, trzymane {h}")
+H290_F5 = re.compile(r"(Westeros|Essos): [^|]*?; 290: zapas swiata rynku \(polki \+ droga \+ juki \+ wsie \+ wozy wsi \+ zamki\) (-|\d+) -> (-|\d+)(?: \(([+-]\d+)\))?, "
+                     r"wsie (\d+), wozy wsi (\d+), zamki (\d+), prog (\d+), poziom (BRAK|PELNY|PASMO|BEZ CELU), "
+                     r"ruch (W GORE|W DOL|TRZYMANE|BEZ POMIARU \(trzymane\)|REGULY 282-287), w gore (\d+), w dol (\d+), trzymane (\d+)")
+Z290_L = "Jedzenie karawan (290): dzien "
+Z290_RE = re.compile(r"^Jedzenie karawan \(290\): dzien (?P<d>\d+) \| klucz kupno jedzenia wedlug wlasnej sprzedazy (?P<k>TAK|NIE) \| kategorii jedzenia (?P<n>\d+), "
+                     r"kupno stoi (?P<shut>\d+) \| w jukach (?P<h>\d+) szt\., sprzedaz karawan miastom (?P<e>[\d.]+) szt\./d \((?P<days>[\d.]+|-) dob\), popyt rynkow "
+                     r"(?P<mk>[\d.]+) szt\./d \| wedlug kategorii \(juki / sprzedaz karawan/d / dni / popyt rynkow/d / prog / stan\): (?P<list>.*?) "
+                     r"\| potkniecia 287 (?P<st>\d+) \(sesja\)\.$")
+Z290_ITEM = re.compile(r"(\S+) (\d+)/([\d.]+)/([\d.]+|-)/([\d.]+)/(\d+)/(KUPNO STOI|CZYNNE)")
+Z290_T1 = re.compile(r"^Karawany - towar tam, gdzie maja zysk \(E3-T1\): dzien (\d+) .*?\| na stracie (\d+) szt\. za (\d+) \(koszt (\d+), strata (-?\d+)\): .*?"
+                     r"jedzenie psuje sie (\d+)/(\d+), dlugo w jukach")
+Z290_IRON = re.compile(r"^Zelazo \(lupy\) \(214\): dzien (\d+) - wsie dopisaly (\d+) lup .*?zuzycie: warsztaty zbrojne (\d+), linie towarowe \(narzedzia\) (\d+), "
+                       r"budowy (\d+), strzelarze \(172\) (\d+), przetwory miast \(ZC5/148\) (\d+);.*?razem (\d+) \(")
+Z290_SAMPLE = ("Jedzenie karawan (290): dzien 109133 | klucz kupno jedzenia wedlug wlasnej sprzedazy TAK | kategorii jedzenia 3, kupno stoi 2 | w jukach 8263 szt., "
+               "sprzedaz karawan miastom 422.0 szt./d (19.6 dob), popyt rynkow 5648.6 szt./d | wedlug kategorii (juki / sprzedaz karawan/d / dni / popyt rynkow/d / prog / "
+               "stan): bread 4098/158.0/25.9/1747.2/1106/KUPNO STOI, fish 3992/217.3/18.4/2353.7/1521/KUPNO STOI, butter 173/46.7/3.7/399.7/327/CZYNNE | potkniecia 287 0 (sesja).")
+
+
+def h290_sum(s):
+    """290: suma kubelkow segmentu 290 (w gore + w dol + trzymane, oba rynki) linii f5; 0 - linia bez segmentu 290 (klucz NIE albo log sprzed 290)."""
+    return sum(int(g.group(11)) + int(g.group(12)) + int(g.group(13)) for g in H290_F5.finditer(s))
+
+
+def z290_expect(lv, prev, dl, thr):
+    """Ruch 290 (StartCalibration.F5IronWeek): poziom BRAK/PELNY/PASMO, prev - zapas poprzedni (None - bez pomiaru), dl - zmiana, thr - prog."""
+    if lv == "BEZ CELU" or thr <= 0:
+        return "REGULY 282-287"
+    if prev is None:
+        return "BEZ POMIARU (trzymane)"
+    if lv == "PELNY":
+        return "W DOL" if dl > 0 else ("W GORE" if dl < -2 * thr else "TRZYMANE")
+    if lv == "BRAK":
+        return "W GORE" if dl < thr else "TRZYMANE"
+    return "W DOL" if dl > thr else ("W GORE" if dl < -thr else "TRZYMANE")
+
+
+def z290_f5_line(dw="PELNY (w dol)", seg_w=None, seg_e=None):
+    """Linia f5 jak w kodzie C# z segmentami 286 / 286b / 287 i 290 (po 287 kazdego rynku)."""
+    _g5, _s5, f5 = h285_lines()
+    _g6, seg = h286_lines()
+    x = f5.format(d=109035, sw=1856, dw=dw, rw=865, pw=3000, tw=3621, dlw=" (+621)", trw="-")
+    x = x.replace(", trend -, prog trendu 90", ", trend -, prog trendu 90" + seg.format(nf=7, nl=0, nu=0, nb=0) + H286B_SEG.format(nh=0, ns=2, nr=0)
+                  + H287_SEG.format(nh=0) + (seg_w or ""))
+    x = x.replace(", trend -, prog trendu 56", ", trend -, prog trendu 56" + seg.format(nf=3, nl=0, nu=0, nb=0) + H286B_SEG.format(nh=0, ns=4, nr=0)
+                  + H287_SEG.format(nh=0) + (seg_e or ""))
+    return x
+
+
+def z290_selftest():
+    bad = []
+    sw = H290_SEG.format(p=9000, n=9100, dl=" (+100)", v=1500, wp=700, c=40, thr=90, lv="PELNY", act="W DOL", u=0, dn=300, h=12)
+    se = H290_SEG.format(p="-", n=4000, dl="", v=500, wp=200, c=9, thr=56, lv="PASMO", act="BEZ POMIARU (trzymane)", u=0, dn=0, h=200)
+    x = z290_f5_line("PELNY (w dol)", sw, se)
+    if not NRU_W.match(x):
+        bad.append("f5 290 wobec NRU_W")
+    if len(RU282_F5.findall(x)) != 2:
+        bad.append("f5 290 wobec RU282_F5")
+    c = list(H285_F5.finditer(x))
+    if len(c) != 2 or c[0].group(14) != "90" or c[1].group(14) != "56":
+        bad.append("f5 290 wobec H285_F5")
+    sg = h286_f5_seg(x)
+    if sg.get("W") != (7, 0, 0, 0, 0, 0, True) or sg.get("E") != (3, 0, 0, 0, 0, 0, True):
+        bad.append("f5 290 wobec segmentow 286 / 286b")
+    if h287_hold(x) != 0 or len(list(H287_F5.finditer(x))) != 2:
+        bad.append("f5 290 wobec segmentu 287")
+    g = list(H290_F5.finditer(x))
+    if len(g) != 2 or g[0].group(1) != "Westeros" or g[0].group(2) != "9000" or g[0].group(4) != "+100" or g[0].group(9) != "PELNY" or g[0].group(10) != "W DOL" \
+            or g[0].group(12) != "300" or g[1].group(2) != "-" or g[1].group(4) is not None or g[1].group(10) != "BEZ POMIARU (trzymane)" or g[1].group(13) != "200":
+        bad.append("segment 290")
+    if h290_sum(x) != 512:
+        bad.append(f"suma kubelkow 290 {h290_sum(x)} != 512")
+    if h290_sum(z290_f5_line()) != 0 or H290_F5.search(z290_f5_line()):
+        bad.append("f5 bez segmentu 290")
+    a = Z290_RE.match(Z290_SAMPLE)
+    if not a or a.group("k") != "TAK" or a.group("shut") != "2" or a.group("days") != "19.6":
+        bad.append("linia 290")
+    else:
+        it = Z290_ITEM.findall(a.group("list"))
+        if len(it) != 3 or it[0][0] != "bread" or it[0][5] != "1106" or it[2][6] != "CZYNNE":
+            bad.append("kategorie linii 290")
+    if not Z290_RE.match(Z290_SAMPLE.replace("bread 4098/158.0/25.9/1747.2/1106/KUPNO STOI, fish 3992/217.3/18.4/2353.7/1521/KUPNO STOI, butter 173/46.7/3.7/399.7/327/CZYNNE", "-")):
+        bad.append("linia 290 bez kategorii")
+    t1 = ("Karawany - towar tam, gdzie maja zysk (E3-T1): dzien 109134 | CZYNNE | wjazdow z towarem 81, sprzedaly 21 | z zyskiem 205 szt. za 41437 (koszt zakupu 30380, "
+          "marza +36.4%) | na stracie 188 szt. za 1482 (koszt 1948, strata 466): rozwiazanie 0/0, brak na zold 9/106, pelne juki (ponad udzwig) 0/0, jedzenie psuje sie "
+          "179/1376, dlugo w jukach 0/0 (szt./zl); kroki przyciete do zejscia pod udzwig 0 | reszta")
+    b = Z290_T1.match(t1)
+    if not b or b.group(3) != "1482" or b.group(6) != "179" or b.group(7) != "1376":
+        bad.append("E3-T1")
+    zl = ("Zelazo (lupy) (214): dzien 109134 - wsie dopisaly 289 lup (4.3 t, 21 wsi; model 360.5 w 26 wsiach z wynikiem > 0), kopalnie miast i zamkow +0 | dymarki ... |, "
+          "zlom z nadmiaru (174) +8; zuzycie: warsztaty zbrojne 288, linie towarowe (narzedzia) 124, budowy 0, strzelarze (172) 7, przetwory miast (ZC5/148) 5; przetop: "
+          "zlom (174) 8; zapas: miasta 3442 (+243), zamki 42, wsie 2037, tabory 1358, razem 7623 (-130, bez wyjasnienia -5); miast bez towaru 6 z 97.")
+    z = Z290_IRON.match(zl)
+    if not z or z.group(2) != "289" or z.group(3) != "288" or z.group(8) != "7623":
+        bad.append("Zelazo (lupy)")
+    cases = [("PELNY", 100, 1, 50, "W DOL"), ("PELNY", 100, 0, 50, "TRZYMANE"), ("PELNY", 100, -100, 50, "TRZYMANE"), ("PELNY", 100, -101, 50, "W GORE"),
+             ("BRAK", 100, 49, 50, "W GORE"), ("BRAK", 100, 50, 50, "TRZYMANE"), ("PASMO", 100, 51, 50, "W DOL"), ("PASMO", 100, -51, 50, "W GORE"),
+             ("PASMO", 100, 50, 50, "TRZYMANE"), ("PASMO", None, 0, 50, "BEZ POMIARU (trzymane)"), ("BEZ CELU", 100, 0, 50, "REGULY 282-287"),
+             ("PELNY", 100, 5, 0, "REGULY 282-287")]
+    for lv, prev, dl, thr, exp in cases:
+        if z290_expect(lv, prev, dl, thr) != exp:
+            bad.append(f"decyzja {lv} {prev} {dl} {thr} -> {z290_expect(lv, prev, dl, thr)} (oczekiwane {exp})")
+    return "; ".join(bad) if bad else None
+
+
+def z290_collect(logp):
+    D = {"f5": {}, "f5bad": 0, "f5n": 0, "f5st": 0, "g": {}, "gbad": 0, "t1": {}, "iron": {}, "ru": {}, "hands": {}, "err": 0, "errs": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(Z290_ERR):
+                    D["err"] += 1
+                    if len(D["errs"]) < 3:
+                        D["errs"].append(s[:160])
+                continue
+            if s.startswith(NRU_WEEK):
+                D["f5n"] += 1
+                a = NRU_W.match(s)
+                segs = list(H290_F5.finditer(s))
+                if a:
+                    x = a.groups()
+                    d = int(x[NRUW_DAY])
+                    D["f5st"] += int(x[NRUW_STUM])
+                    D["hands"][d] = (int(x[NRUW_H0W]) + int(x[NRUW_H0E]), int(x[NRUW_H1W]) + int(x[NRUW_H1E]))
+                    if len(segs) == 2:
+                        D["f5"][d] = {("W" if g.group(1) == "Westeros" else "E"): g.groups() for g in segs}
+                    elif segs or s.find("; 290: ") >= 0:
+                        D["f5bad"] += 1
+                else:
+                    D["f5bad"] += 1
+                continue
+            if s.startswith(Z290_L):
+                a = Z290_RE.match(s)
+                if a:
+                    D["g"][int(a.group("d"))] = a.groupdict()
+                else:
+                    D["gbad"] += 1
+                continue
+            if s.startswith("Karawany - towar tam, gdzie maja zysk (E3-T1): dzien "):
+                a = Z290_T1.match(s)
+                if a:
+                    D["t1"][int(a.group(1))] = (int(a.group(3)), int(a.group(6)), int(a.group(7)))
+                continue
+            if s.startswith("Zelazo (lupy) (214): dzien "):
+                a = Z290_IRON.match(s)
+                if a:
+                    D["iron"][int(a.group(1))] = tuple(int(v) for v in a.groups()[1:])
+                continue
+            if s.startswith("Ruda przeplyw (282): dzien "):
+                a = H285_RU.match(s)
+                if a:
+                    D["ru"][int(a.group(1))] = int(a.group(3))
+    return D
+
+
+def z290_rows(rep, D):
+    f5 = D["f5"]
+    gd = sorted(D["g"])
+    gst = int(D["g"][gd[-1]]["st"]) if gd else 0
+    rep.add("Z290-0: segment 290 w kazdej linii f5, linia 290 co dobe, nierozpoznanych 0, potkniecia 0, ERROR 0",
+            f"linii f5 {D['f5n']} (z segmentem 290 {len(f5)}, zlych {D['f5bad']}), potkniecia f5 {D['f5st']}; linii 290 {len(gd)} (nierozpoznanych {D['gbad']}), "
+            f"potkniecia 287 (ostatnia linia) {gst}; ERROR {D['err']}" + (f" {D['errs']}" if D["errs"] else ""),
+            "segment w kazdej linii f5, linia 290 w kazdej dobie (dziur <= 1), 0 / 0 / 0 (log bez segmentu i linii 290 - INFO: sprzed 290 albo klucze NIE)",
+            None if (not f5 and not gd and D["f5bad"] == 0 and D["gbad"] == 0) else bool(f5) and len(f5) == D["f5n"] and D["f5bad"] == 0 and D["f5st"] == 0 and bool(gd) and (gd[-1] - gd[0] + 1) - len(gd) <= 1
+            and D["gbad"] == 0 and gst == 0 and D["err"] == 0)
+    # Z290-1
+    if f5:
+        bad = []
+        acts = {}
+        prevn = {}
+        for d in sorted(f5):
+            for mk, g in f5[d].items():
+                prev = None if g[1] == "-" else int(g[1])
+                now = None if g[2] == "-" else int(g[2])
+                thr, lv, act = int(g[7]), g[8], g[9]
+                u, dn, h = int(g[10]), int(g[11]), int(g[12])
+                dl = (now - prev) if (prev is not None and now is not None) else 0
+                exp = z290_expect(lv, prev if now is not None else None, dl, thr) if now is not None else "REGULY 282-287"
+                if act != exp:
+                    bad.append(f"{d} {mk}: {lv} {g[1]}->{g[2]} prog {thr} -> {act} (oczekiwane {exp})")
+                if u > 0 and act != "W GORE":
+                    bad.append(f"{d} {mk}: w gore {u} przy {act}")
+                if dn > 0 and act != "W DOL":
+                    bad.append(f"{d} {mk}: w dol {dn} przy {act}")
+                if act == "REGULY 282-287" and u + dn + h > 0:
+                    bad.append(f"{d} {mk}: kubly 290 {u + dn + h} przy regulach 282-287")
+                if prev is not None and mk in prevn and prevn[mk][0] == d - 7 and prevn[mk][1] is not None and prevn[mk][1] != prev:
+                    bad.append(f"{d} {mk}: zapas poprzedni {prev} != {prevn[mk][1]} z kroku {d - 7}")
+                prevn[mk] = (d, now)
+                acts[act] = acts.get(act, 0) + 1
+        rep.add("Z290-1: ruch 290 zgodny z regula (poziom x zmiana zapasu swiata x prog) i kubly zgodne z ruchem",
+                f"krokow {len(f5)}, ruchy {dict(sorted(acts.items()))}, niezgodnych {len(bad)}" + (f" {bad[:3]}" if bad else ""), "0", not bad)
+    else:
+        rep.add("Z290-1: ruch 290", "brak segmentu 290 (klucz Ks Iron Hands Follow World Iron Stock NIE, bieg < 7 dob albo log sprzed 290)", "INFO", None)
+    # Z290-2
+    ir = D["iron"]
+    idays = sorted(ir)
+    if len(idays) >= 15:
+        tail = [(d, ir[d][6]) for d in idays[-30:]]
+        sl = _h287_slope(tail)
+        whole = (ir[idays[-1]][6] - ir[idays[0]][6]) / max(1, idays[-1] - idays[0])
+        ok = sl is not None and Z290_IRON_LO <= sl <= Z290_IRON_HI and Z290_IRON_LO <= whole <= Z290_IRON_HI
+        rep.add("Z290-2: zelazo swiata (lupy, 'Zelazo (lupy)' razem) - prosta ostatnich 30 dob i caly bieg",
+                f"ostatnie 30 dob {sl:+.1f}/d ({tail[0][1]} -> {tail[-1][1]}), caly bieg {whole:+.1f}/d ({ir[idays[0]][6]} -> {ir[idays[-1]][6]}, dob {len(idays)})",
+                f"oba w [{Z290_IRON_LO:+.0f}, {Z290_IRON_HI:+.0f}]/d (136a: -66.5 i -14.6)", ok)
+    else:
+        rep.add("Z290-2: zelazo swiata", f"za malo dob ({len(idays)})", ">= 15 dob", None)
+    # Z290-3
+    rd = sorted(D["ru"])
+    if len(rd) >= 15:
+        f5a = sum(D["ru"][d] for d in rd[:5]) / 5.0
+        l10 = sum(D["ru"][d] for d in rd[-10:]) / 10.0
+        rep.add("Z290-3: miasta bez rudy (linia 282) - nie rosna", f"pierwsze 5 dob {f5a:.1f}, ostatnie 10 dob {l10:.1f}",
+                f"ostatnie 10 <= max(pierwsze 5, {Z290_NOORE_ABS:.0f}) (136a 7.6 -> 6.8)", l10 <= max(f5a, Z290_NOORE_ABS))
+    else:
+        rep.add("Z290-3: miasta bez rudy", f"za malo dob ({len(rd)})", ">= 15 dob", None)
+    # Z290-4
+    td = sorted(D["t1"])
+    if len(td) >= 13:
+        last = td[-10:]
+        food = sum(D["t1"][d][1] for d in last) / 10.0
+        foodg = sum(D["t1"][d][2] for d in last) / 10.0
+        loss = sum(D["t1"][d][0] for d in last) / 10.0
+        rep.add("Z290-4: T1 na stracie - jedzenie (psuje sie) i utarg na stracie (ostatnie 10 dob)",
+                f"jedzenie {food:.0f} szt./d ({foodg:.0f} zl/d), utarg na stracie razem {loss:.0f} zl/d",
+                f"jedzenie <= {Z290_FOOD_MAX:.0f} szt./d i utarg <= {Z290_LOSS_MAX:.0f} zl/d (136a 216 szt. / 2649 zl; 134b 22 / 348)",
+                food <= Z290_FOOD_MAX and loss <= Z290_LOSS_MAX)
+    else:
+        rep.add("Z290-4: T1 na stracie", f"za malo dob ({len(td)})", ">= 13 dob", None)
+    # Z290-5, Z290-6
+    if gd:
+        bad = []
+        for d in gd:
+            g = D["g"][d]
+            if g["k"] != "TAK":
+                continue
+            for it, h, e, days, mk, cap, st in Z290_ITEM.findall(g["list"]):
+                h, e, cap = int(h), float(e), int(cap)
+                if abs(cap - 7.0 * e) > 1.0 + 0.0005 * cap:
+                    bad.append(f"{d} {it}: prog {cap} != 7 x {e}")
+                if st == "CZYNNE" and h > cap:
+                    bad.append(f"{d} {it}: CZYNNE przy {h} > {cap}")
+                if st == "KUPNO STOI" and h <= cap:
+                    bad.append(f"{d} {it}: KUPNO STOI przy {h} <= {cap}")
+        rep.add("Z290-5: bramka jedzenia spojna (klucz TAK): prog = 7 x wlasna sprzedaz karawan, stan wedlug jukow",
+                f"dob {len(gd)}, niezgodnych {len(bad)}" + (f" {bad[:3]}" if bad else ""), "0 (pierwsze 3 doby po wczytaniu - bramka nieczynna, tez spojne)", not bad)
+        g0, g1 = D["g"][gd[0]], D["g"][gd[-1]]
+        dd = None if g1["days"] == "-" else float(g1["days"])
+        rep.add("Z290-6: jedzenie w jukach karawan na koniec (dni wlasnej sprzedazy)",
+                f"pierwsza doba {g0['h']} szt. ({g0['days']} dob, kupno stoi {g0['shut']} z {g0['n']}), ostatnia {g1['h']} szt. ({g1['days']} dob, kupno stoi {g1['shut']} z {g1['n']})",
+                f"<= {Z290_FOOD_DAYS:.0f} dob (136a 109133: chleb 26, ryby 18, zboze 23)", None if g1["k"] != "TAK" else (dd is not None and dd <= Z290_FOOD_DAYS))
+    else:
+        rep.add("Z290-5: bramka jedzenia", "brak linii 290 (klucz Caravans Measure Sales By Town Demand NIE albo log sprzed 290)", "INFO", None)
+    # Z290-7 INFO
+    parts = []
+    if len(idays) >= 30:
+        def pc(ds):
+            n = len(ds)
+            pr = sum(ir[d][0] for d in ds) / n
+            us = sum(sum(ir[d][1:6]) for d in ds) / n
+            return pr, us
+        p0, u0 = pc(idays[:30])
+        p1, u1 = pc(idays[-30:])
+        parts.append(f"wydobycie / zuzycie: pierwsze 30 dob {p0:.0f} / {u0:.0f}, ostatnie 30 dob {p1:.0f} / {u1:.0f} lup/d")
+    hd = sorted(D["hands"])
+    if hd:
+        parts.append(f"rece przy zelazie {D['hands'][hd[0]][0]} -> {D['hands'][hd[-1]][1]}")
+    rep.add("Z290-7: przebieg (INFO)", "; ".join(parts) if parts else "-", "INFO", None)
+
+
+def zelazo290_main(logp):
+    """zelazo290 (29.10, paczka 290): Z290-S, Z290-0..Z290-7 - opis w komentarzu nad stalymi Z290_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = z290_selftest()
+    rep.add("Z290-S: self-test wyrazen (f5 z segmentem 290 wobec NRU_W, RU282_F5, H285_F5, h286_f5_seg, H287_F5; linia 290; E3-T1; Zelazo; decyzje)",
+            s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("Z290-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = z290_collect(logp)
+    print(f"plik: {logp} | linii f5 {D['f5n']} (z segmentem 290 {len(D['f5'])}), linii 290 {len(D['g'])}, E3-T1 {len(D['t1'])}, Zelazo {len(D['iron'])}, "
+          f"Ruda 282 {len(D['ru'])}, ERROR {D['err']}")
+    z290_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_zelazo290_main_prev = main
+
+
+def main(argv):
+    # paczka 290: grupa zelazo290 - opakowanie main jak karawany288
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "zelazo290":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return zelazo290_main(rest[0] if rest else None)
+    return _zelazo290_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

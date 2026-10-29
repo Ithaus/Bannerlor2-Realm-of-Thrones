@@ -51,7 +51,9 @@ namespace Armoury
         private static int _f5Stum;
         // 285: zapas rynku (polki + droga + juki karawan) z poprzedniego kroku - trend; -1 = bez pomiaru (pierwszy krok sesji). Pamiec sesji, zerowana w Reset.
         private static readonly long[] _f5Tot = { -1, -1 };
-        internal static void F5Reset285() { _f5Tot[0] = _f5Tot[1] = -1; }
+        // 290: zapas swiata rynku (polki + droga + juki karawan + wsie + wozy wsi + zamki) z poprzedniego kroku; -1 = bez pomiaru. Pamiec sesji, zerowana razem z 285.
+        private static readonly long[] _f5W = { -1, -1 };
+        internal static void F5Reset285() { _f5Tot[0] = _f5Tot[1] = -1; _f5W[0] = _f5W[1] = -1; }
 
         internal static bool F5IronOn { get { var s = Settings.Current; return s != null && s.KsIronHandsFollowMarket; } }
 
@@ -190,6 +192,62 @@ namespace Armoury
                 }
                 _f5Tot[m] = tot[m];
             }
+            // 290 (klucz KsIronWorldFlow): RECE ZA ZAPASEM SWIATA RYNKU. Autotest 136a (zainstalowany 136, 90 dob 109045-109134 na kopii zapisu Jeffa): Westeros PELNY
+            // w 13 z 13 krokow (polki + droga 2.1-2.9 x cel - nadmiar stoi w 7-14 miastach przy kopalniach, 'nadwyzka zrodel-miast' 900-1 400), Essos PELNY w 12 z 13;
+            // krok cial co tydzien (rece przy zelazie 113 896 -> 76 705, w tym -19 tys. krokami), takze gdy zapas swiata juz spadal (109091-109133: -34, -30, -284,
+            // -493, -500, -486, -256 lup na tydzien). Wydobycie 386 -> 289 lup/d przy zuzyciu ok. 365/d (warsztaty zbrojne 213, narzedzia 141, strzelarze 7) - zelazo
+            // swiata +35/d w pierwszych 30 dobach, -66/d w ostatnich 30. Poziom polek mowi, GDZIE jest zelazo (zrodla pelne), a nie czy swiat wydobywa wiecej niz zuzywa.
+            // Regula: W = zapas swiata rynku (polki + droga + juki karawan jak 285 + magazyny wsi + wozy wsi + zamki - wszystko poza taborami lordow i band), dW = zmiana
+            // od poprzedniego kroku (7 dob = wydobycie - zuzycie - straty rynku), prog = prog trendu 285 (zmiana wydobycia, ktora robi jeden krok). Poziom (bez trendu 285):
+            //   PELNY (polki + droga > 2 x cel): w dol tylko, gdy W jeszcze rosnie (dW > 0); W spada szybciej niz 2 progi - w gore; inaczej trzymane (nadmiar schodzi sam
+            //     najwyzej o 2 progi na tydzien - nie szybciej, wiec wydobycie nie zostaje daleko pod zuzyciem, gdy polki wroca do pasma);
+            //   BRAK (polki + droga < cel): w gore, dopoki W nie rosnie o prog na tydzien; potem trzymane (zelazo jest w drodze, wsiach, jukach - przyjdzie);
+            //   PASMO: W rosnie ponad prog - w dol, spada ponad prog - w gore, inaczej trzymane (jak trend 285, ale na calym zapasie).
+            // Kopalnie: w dol - wszystkie poza kopalniami miasta targowego z brakiem (286b - trzymaja); w gore - kopalnie z drewnem (< 10% bez drewna, jak BRAK) poza
+            // kopalniami miasta targowego pelnego (286 - trzymaja); bez danych wytopu i pola mieszczan - trzymane. Dymarka bez drewna >= 50% - w dol jak dotad (rece, ktore
+            // nie wytopia). Pierwszy krok sesji (bez pomiaru dW) - trzymane. Bez stawki KS rynku (prog 0), bez celu, potkniecie pomiaru - reguly 282-287 jak dotad.
+            // Decyzja rynku w linii (BRAK/PELNY/PASMO z trendem 285) bez zmian - ruch 290 i kubly decyzji w segmencie '; 290: ...' (osobne kubly, suma decyzji = wpisy).
+            // Tylko podzial rak bloku (jak caly krok) - bez zlota i towaru. Klucz NIE - co do bitu jak 287 (segment 290 nie jest drukowany).
+            bool flowOn = sR != null && sR.KsIronWorldFlow, flowOk = flowOn;
+            var wV = new long[2]; var wP = new long[2]; var wC = new long[2]; var wTot = new long[2]; var wPrev = new long[2];
+            var lv = new int[2]; var act = new int[2];             // act: +1 w gore, -1 w dol, 0 trzymane, 3 bez pomiaru (trzymane), 2 poza regula 290 (reguly 282-287)
+            var u290 = new int[2]; var d290 = new int[2]; var h290 = new int[2];
+            if (flowOn)
+            {
+                try
+                {
+                    foreach (var st in Settlement.All)
+                    {
+                        if (st == null || st.IsTown || st.ItemRoster == null || !(st.IsVillage || st.IsCastle)) continue;
+                        int n = st.ItemRoster.GetItemNumber(iron); if (n <= 0) continue;
+                        int mk = MarketOfSettlement(st); if (mk != 0 && mk != 1) continue;
+                        if (st.IsVillage) wV[mk] += n; else wC[mk] += n;
+                    }
+                    foreach (var vp in MobileParty.AllVillagerParties)
+                    {
+                        if (vp == null || !vp.IsActive || vp.ItemRoster == null) continue;
+                        int n = vp.ItemRoster.GetItemNumber(iron); if (n <= 0) continue;
+                        int mk = MarketOfSettlement(vp.HomeSettlement); if (mk != 0 && mk != 1) continue;
+                        wP[mk] += n;
+                    }
+                }
+                catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(zapas swiata 290)", e); flowOk = false; }
+            }
+            for (int m = 0; m < 2; m++)
+            {
+                wTot[m] = tot[m] + wV[m] + wP[m] + wC[m]; wPrev[m] = _f5W[m];
+                lv[m] = T[m] <= 0 ? 2 : S[m] + (rOn ? R[m] : 0) < T[m] ? 1 : S[m] + (fullR ? R[m] : 0) > 2 * T[m] ? -1 : 0;
+                if (!flowOk || lv[m] == 2 || thr[m] <= 0) act[m] = 2;
+                else if (wPrev[m] < 0) act[m] = 3;
+                else
+                {
+                    long dl = wTot[m] - wPrev[m];
+                    if (lv[m] == -1) act[m] = dl > 0 ? -1 : dl < -2 * thr[m] ? 1 : 0;
+                    else if (lv[m] == 1) act[m] = dl < thr[m] ? 1 : 0;
+                    else act[m] = dl > thr[m] ? -1 : dl < -thr[m] ? 1 : 0;
+                }
+                _f5W[m] = flowOk ? wTot[m] : -1;
+            }
             // 2. bloki z zelazem
             int nIn = 0, nUp = 0, nDnFull = 0, nDnStarv = 0, nPart = 0, nBand = 0, nNoT = 0, nNoData = 0, nCap = 0, nBusy = 0;
             int nColl = 0;                                         // f7-wegiel (recenzja): wpisy bez wzrostu tylko przez rece weglarzy (bez drewna < 10%, z weglarzami >= 10%)
@@ -241,6 +299,21 @@ namespace Armoury
                                 float f = 1f;
                                 if (starv >= F5StarvDown) { f = F5Down; nDnStarv++; }
                                 else if (dec[m] == 2) nNoT++;
+                                else if (act[m] != 2)
+                                {
+                                    // 290: ruch rynku za zapasem swiata (opis wyzej) - osobne kubly; reguly 282-287 tego rynku nie biora udzialu
+                                    if (act[m] == -1)
+                                    {
+                                        if (bandOn && locShort) h290[m]++;
+                                        else { f = F5Down; d290[m]++; }
+                                    }
+                                    else if (act[m] == 1)
+                                    {
+                                        if (locFull || starv == -1f || !(starvG < F5StarvUp)) h290[m]++;
+                                        else { f = F5Up; u290[m]++; }
+                                    }
+                                    else h290[m]++;
+                                }
                                 else if (bandOn && locFull && dec[m] == 1) nLocHold[m]++;   // 286b: rynek w braku - kopalnia przy miescie pelnym trzyma rece (nigdy w dol)
                                 else if (bandOn && locShort && dec[m] == 0)
                                 {
@@ -321,6 +394,14 @@ namespace Armoury
                 if (bandOn) sb.Append("; 286b: pas martwy tydzien wydobycia kopalni miasta TAK, trzymane przy BRAK ").Append(nLocHold[m])
                   .Append(", miasta targowe z brakiem (polki + droga < cel) ").Append(nShortT[m]).Append(", kopalnie przy nich w gore (pasmo) ").Append(nLocRec[m]);
                 if (fullOwnOn) sb.Append("; 287: przy rynku PELNYM w dol tylko kopalnie miast pelnych TAK, trzymane przy PELNYM (miasto bez nadmiaru) ").Append(nFullHold[m]);
+                if (flowOn)
+                    sb.Append("; 290: zapas swiata rynku (polki + droga + juki + wsie + wozy wsi + zamki) ").Append(wPrev[m] >= 0 ? wPrev[m].ToString(inv) : "-").Append(" -> ")
+                      .Append(flowOk ? wTot[m].ToString(inv) : "-")
+                      .Append(flowOk && wPrev[m] >= 0 ? " (" + (wTot[m] - wPrev[m] >= 0 ? "+" : "") + (wTot[m] - wPrev[m]).ToString(inv) + ")" : "")
+                      .Append(", wsie ").Append(wV[m]).Append(", wozy wsi ").Append(wP[m]).Append(", zamki ").Append(wC[m]).Append(", prog ").Append(thr[m])
+                      .Append(", poziom ").Append(lv[m] == 1 ? "BRAK" : lv[m] == -1 ? "PELNY" : lv[m] == 0 ? "PASMO" : "BEZ CELU")
+                      .Append(", ruch ").Append(act[m] == 1 ? "W GORE" : act[m] == -1 ? "W DOL" : act[m] == 0 ? "TRZYMANE" : act[m] == 3 ? "BEZ POMIARU (trzymane)" : "REGULY 282-287")
+                      .Append(", w gore ").Append(u290[m]).Append(", w dol ").Append(d290[m]).Append(", trzymane ").Append(h290[m]);
             }
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
               .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(Bloomery.F7On ? " (w tym przez rece weglarzy f7-wegiel " + nColl + ")" : "").Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)
