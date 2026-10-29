@@ -4,6 +4,8 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 299b: tempo pamieci podazy rynku - kod przycina do 0.02..0.15 (RawPrice.Pace)
+    'PriceSupplyMemoryDaily': (0.02, 0.15, "0.000"),
     # m113-zakup: kupno ziemi - relacje -100..100 (regula ogolna dalaby przy -10 suwak -30..0), lata zakupu 1..40, udzialy 0..1
     'LandRelationSideVillage': (-100, 100, "0"),
     'LandRelationLordship': (-100, 100, "0"),

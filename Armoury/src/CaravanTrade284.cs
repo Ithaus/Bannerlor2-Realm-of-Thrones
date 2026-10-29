@@ -554,7 +554,8 @@ namespace Armoury
         /// karawany), polka z migawki doby + (k - 1) x ShelfWorth (CaravanGoods.PriceAt). NaN - brak miary (bez miasta odniesienia albo modelu).
         /// Recenzja 299: kolejka (juki innych karawan + moje - zjedzone w drodze) laduje na polce przez odcinek drogi, nie w jednej wizycie - liczona krzywa gry
         /// (RawPrice.GameCurve: 0.04 / 0.1), czyli krzywa 299 dobe po dostawie (0.021 + 0.119 x 0.15 = 0.039); krzywa sztuki od razu (0.021) zawyzalaby glebokosc
-        /// rynku do 1.9 x i otwierala kupno w przesyt. Klucz PriceFlatterLotWalk wylaczony - to samo co dotad.</summary>
+        /// rynku do 1.9 x i otwierala kupno w przesyt. Klucz PriceFlatterLotWalk wylaczony - to samo co dotad. 299b (pamiec podazy 6% dziennie, swiezy towar 0.0084): krzywa gry
+        /// zostaje - to krzywa 299b ok. 4.4 doby po dostawie (0.0084 + 0.1316 x (1 - 0.94^4.44) = 0.04), brama ostrozniejsza niz krzywa dnia dostawy; pilnuje C299-9.</summary>
         internal static double DepthNet(MobileParty mp, EquipmentElement el, int k)
         {
             try

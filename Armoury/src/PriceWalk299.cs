@@ -18,6 +18,7 @@ namespace Armoury
     /// krzywa gry (RawPrice.GameCurve = true) i krzywa 299. Czysty rachunek: zadnej zmiany polki, podazy, popytu ani zlota, zadnego stanu w zapisie.
     /// Wsie handluja na danych rynku miasta (Bound), zamki maja popyt 0 (indeks na podlodze 0.1) - liczone same miasta.
     /// Linia "Ceny na sztuke (299): dzien" czyta grupa ceny299 w tools/sprawdz_logi.py.
+    /// Paczka 299b: "299" w linii to nasza krzywa (przy kluczu PriceSlowSupplyMemory wagi 0.14 x tempo); po 7 dobach gra idzie swoim tempem 0.15, nasza krzywa - RawPrice.Pace.
     /// </summary>
     internal static class PriceWalk299
     {
@@ -29,7 +30,7 @@ namespace Armoury
         private const int FlipCap = 100000;        // najdalsza sztuka szukana dla "spadek o 1 zl"
 
         /// <summary>Przedmiot probny kategorii: ten o StringId kategorii, inaczej najtanszy (raz na kampanie).</summary>
-        private static Dictionary<ItemCategory, ItemObject> Samples()
+        internal static Dictionary<ItemCategory, ItemObject> Samples()
         {
             if (_sample != null && ReferenceEquals(_sampleFor, Campaign.Current)) return _sample;
             var d = new Dictionary<ItemCategory, ItemObject>();
@@ -46,7 +47,7 @@ namespace Armoury
             return d;
         }
 
-        private static float Bf(TradeItemPriceFactorModel m, bool game, ItemCategory c, float ins, float sup, float dem, bool sell, int val)
+        internal static float Bf(TradeItemPriceFactorModel m, bool game, ItemCategory c, float ins, float sup, float dem, bool sell, int val)
         {
             bool was = RawPrice.GameCurve;
             RawPrice.GameCurve = game;
@@ -62,7 +63,7 @@ namespace Armoury
             finally { RawPrice.GameCurve = was; }
         }
 
-        private static float Q(List<float> l, double p)
+        internal static float Q(List<float> l, double p)
         {
             if (l.Count == 0) return float.NaN;
             l.Sort();
@@ -109,7 +110,8 @@ namespace Armoury
                 var loopG = new List<float>(); var loopN = new List<float>();
                 var loopBG = new List<float>(); var loopBN = new List<float>();
                 int cells = 0, towns = 0, inv = 0, inv0 = 0, eq = 0, eq0 = 0, ident = 0;
-                double d7 = 1.0 - Math.Pow(0.85, 7);
+                // 299b: podaz po 7 dobach - gra w swoim tempie (0.15), nasza krzywa w tempie RawPrice.Pace (klucz PriceSlowSupplyMemory NIE - 0.15, jak w 299)
+                double d7 = 1.0 - Math.Pow(0.85, 7), d7n = 1.0 - Math.Pow(1.0 - RawPrice.Pace, 7);
                 var sellG = new float[31]; var sellN = new float[31];
                 foreach (var t in Town.AllTowns)
                 {
@@ -153,8 +155,8 @@ namespace Armoury
                             }
                             // po 7 dobach: podaz dochodzi do polki z 30 sprzedanymi sztukami (wygladzanie gry 15% dziennie)
                             float I30 = I + 30f * w;
-                            float S7 = (float)(S + d7 * (I30 - S));
-                            float f7g = Bf(model, true, cat, I30, S7, D, false, 0), f7n = Bf(model, false, cat, I30, S7, D, false, 0);
+                            float S7 = (float)(S + d7 * (I30 - S)), S7n = (float)(S + d7n * (I30 - S));
+                            float f7g = Bf(model, true, cat, I30, S7, D, false, 0), f7n = Bf(model, false, cat, I30, S7n, D, false, 0);
                             w7G.Add(f7g / sellG[1]); w7N.Add(f7n / sellN[1]);
                             // petla opozniona: sprzedaj 30 teraz, odkup 30 po 7 dobach (brutto, bez kar i zuzycia) - polki >= 3 dob
                             if (I > 0f && days >= 3.0)
@@ -164,7 +166,7 @@ namespace Armoury
                                 {
                                     sg += sellG[n]; sn += sellN[n];
                                     bg += Bf(model, true, cat, I30 - (n - 1) * (float)w, S7, D, false, 0);
-                                    bn += Bf(model, false, cat, I30 - (n - 1) * (float)w, S7, D, false, 0);
+                                    bn += Bf(model, false, cat, I30 - (n - 1) * (float)w, S7n, D, false, 0);
                                 }
                                 if (bg > 0) loopG.Add((float)(sg / bg - 1.0));
                                 if (bn > 0) loopN.Add((float)(sn / bn - 1.0));
@@ -174,14 +176,14 @@ namespace Armoury
                             if (days >= 3.0 && I >= 30f * w)
                             {
                                 float Ib = I - 30f * w;
-                                float S7b = (float)(S + d7 * (Ib - S));
+                                float S7b = (float)(S + d7 * (Ib - S)), S7bn = (float)(S + d7n * (Ib - S));
                                 double kg = 0, kn = 0, og = 0, on2 = 0;
                                 for (int n = 1; n <= 30; n++)
                                 {
                                     kg += Bf(model, true, cat, I - (n - 1) * (float)w, S, D, false, 0);
                                     kn += Bf(model, false, cat, I - (n - 1) * (float)w, S, D, false, 0);
                                     og += Bf(model, true, cat, Ib + (n - 1) * (float)w, S7b, D, true, val);
-                                    on2 += Bf(model, false, cat, Ib + (n - 1) * (float)w, S7b, D, true, val);
+                                    on2 += Bf(model, false, cat, Ib + (n - 1) * (float)w, S7bn, D, true, val);
                                 }
                                 if (kg > 0) loopBG.Add((float)(og / kg - 1.0));
                                 if (kn > 0) loopBN.Add((float)(on2 / kn - 1.0));
@@ -211,8 +213,9 @@ namespace Armoury
                 Example(ex, model, samples, "velvet", PickTown(samples, "velvet", false), new[] { 1, 2, 3 }, ref stumbles);
                 Example(ex, model, samples, "wine", PickTown(samples, "wine", true), new[] { 1, 10, 30 }, ref stumbles);
                 bool on = s.PriceFlatterLotWalk;
-                Log.Info("Ceny na sztuke (299): dzien " + day + " | klucz " + (on ? "TAK" : "NIE") + ", wagi od razu " + (on ? RawPrice.LotShelfW : 0.04).ToString("0.000", Inv)
-                         + " / podaz " + (on ? RawPrice.LotSupplyW : 0.1).ToString("0.000", Inv)
+                // 299b: wagi czynne (RawPrice.ShelfW / SupplyW - przy kluczu PriceSlowSupplyMemory 0.14 x tempo); "299" w tej linii = nasza krzywa (299 albo 299b)
+                Log.Info("Ceny na sztuke (299): dzien " + day + " | klucz " + (on ? "TAK" : "NIE") + ", wagi od razu " + RawPrice.ShelfW.ToString("0.0000", Inv)
+                         + " / podaz " + RawPrice.SupplyW.ToString("0.0000", Inv)
                          + " | ocen " + cells + " (miasta " + towns + "; wsie wedlug miasta, zamki popyt 0)"
                          + " | " + stocked.Text("polka >= 3 dob") + " | " + thin.Text("polka chuda") + " | " + empty.Text("polka pusta")
                          + " | lot 1 doby popytu (" + lotG.Count + "): spadek mediana gra " + P(Q(lotG, 0.5)) + "% -> 299 " + P(Q(lotN, 0.5)) + "% (p90 gra " + P(Q(lotG, 0.9)) + "% -> 299 " + P(Q(lotN, 0.9)) + "%)"

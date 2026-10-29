@@ -258,7 +258,7 @@ namespace Armoury
                 int dh; _stockAt[j].TryGetValue(key, out dh);
                 if (carts) dh += TradeCarts.Incoming(dst, key);
                 float dd = Dem(j);
-                float dstShelf = MBMath.ClampFloat((float)Math.Pow((dd + 1f) / (dh + 2f), elast), minF, maxF);
+                float dstShelf = SupplyDemand.DstShelf(dst, _probe, dd, dh, elast, minF, maxF);   // 299b: ta sama liczba co stara petla (pamiec polki celu)
                 float profit = dstShelf * Mul(j) - srcIdx - perDist * dist;
                 if (profit <= bestProfit) continue;
                 best = dst; bestProfit = profit; bestCap = Math.Max(1, (int)Math.Ceiling(dd) - dh); bestDist = dist;
