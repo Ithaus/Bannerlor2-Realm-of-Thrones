@@ -9632,7 +9632,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron mines follow the world's iron, caravans buy only the food they can sell before it spoils (290)")]
         public bool CaravanFoodBuyOwnSales { get; set; } = true;
 
-        [SettingPropertyBool("Bk Retinue From Village", HintText = "with People Origin and Levy From Villages: the retinue of a village manor (Banner Kings) is made of that village's own people - a man who joins it (and every man of a newly raised retinue) leaves the village's people, and if the village has no one to spare he does not join; a man the retinue sends away goes back home to the village instead of vanishing. The retinue's size and its one-man-a-day pace stay as Banner Kings sets them. Off = as before (retinue men appear from nothing and vanish)", RequireRestart = false)]
+        [SettingPropertyBool("Bk Retinue From Village", HintText = "with People Origin and Levy From Villages: Banner Kings retinues are made of real people - the retinue of a village manor, the retinue of an estate and the Castle Retinue of a castle garrison: a man who joins (and every man of a newly raised retinue) leaves the people of the retinue's village (a castle: its villages), and if they have no one to spare he does not join; a man a manor retinue sends away goes back home instead of vanishing; when an estate's lord calls up his retinue, its men keep their origin in his party. The retinues' sizes and their one-man-a-day pace stay as Banner Kings sets them. Off = as before (retinue men appear from nothing and vanish)", RequireRestart = false)]
         [SettingPropertyGroup("Banner Kings manor retinues from the village's own people (295)")]
         public bool BkRetinueFromVillage { get; set; } = true;
 

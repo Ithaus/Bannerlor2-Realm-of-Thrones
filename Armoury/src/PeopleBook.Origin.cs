@@ -646,7 +646,6 @@ namespace Armoury
             return w;
         }
 
-        /// <summary>Szeregowi rosteru bez bohaterow i bez wightow (jedna miara ksiegi pochodzenia).</summary>
         /// <summary>295: ilu ludzi ma slownik skladu tego rosteru w ksiedze (0 - bez slownika / ksiega nieczynna). Sam odczyt, nie rzuca.</summary>
         internal static double BookMen(TroopRoster r)
         {
@@ -660,6 +659,7 @@ namespace Armoury
             catch { return 0.0; }
         }
 
+        /// <summary>Szeregowi rosteru bez bohaterow i bez wightow (jedna miara ksiegi pochodzenia).</summary>
         internal static int Men(TroopRoster r)
         {
             if (r == null) return 0;

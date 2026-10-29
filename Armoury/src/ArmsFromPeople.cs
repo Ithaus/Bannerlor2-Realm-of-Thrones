@@ -91,6 +91,8 @@ namespace Armoury
             // 295: orszaki dworow BK (RetinueComponent.DailyTick) - rt zdjeci z DOM wsi (MLevyMilitia, do KONTROLI); reszta - linia "Orszaki dworow BK (295)"
             public double rt, rtFrac, rtH1, rtH2, rtH3, rtH4;
             public int rtCalls, rtSkip, rtUp, rtNew, rtStrip, rtHome;
+            // 295 (recenzja): orszaki majatkow BK (Estate.Tick / TakeRetinue) i zamkow z Castle Retinue (TickCastle) - przyrost wliczony tez w rtUp / rt / rtFrac / rtStrip
+            public int esCalls, esUp, esNew, csUp, mvN; public double mvMen, mvLeft;
             public long ticks;
         }
         private static Day D = new Day();

@@ -77855,10 +77855,21 @@ def main(argv):
 # Grupa drobne295: (b) orszaki dworow BK z ludzi wsi (klucz BkRetinueFromVillage, ArmsFromPeople.Retinue295.cs) - linia "Orszaki dworow BK (295)",
 # "w nicosc ... inne" i "z niczego ... inne" linii "Pochodzenie (E4/7)", KONTROLA linii "Wojsko z ludzi (E4/8)" z czlonem rt, orszaki w "niedobor skladow";
 # (a) NWAR-15 z okien 14 dob (_nwar_wedge_win) - ta sama ocena co w grupie nwar. Strumieniowo, tylko odczyt; log bitwy (kilka dob) - wiersze INFO.
+# Recenzja 295: tez orszaki majatkow BK (Estate.Tick / TakeRetinue) i Castle Retinue zamkow (TickCastle) w tej samej linii; log z budowy 295 (KONTROLA E4/8
+# z czlonem " + rt") bez linii 295, bez linii startowej z 4 latkami albo z latka w BRAK - NIE (nie INFO); "z niczego - inne" na dobe z progiem (D295-7).
 DROBNE295_RET = re.compile(r"Orszaki dworow BK \(295\): dzien (\d+) \| klucz (TAK|NIE), ksiega z poborem (TAK|NIE) \| wywolan (\d+) \(pominiete: bitwa, Straz, Inni, nie wies (\d+)\)"
-                           r" \| przyrost BK \+(\d+) \(w tym nowe orszaki z szablonu (\d+)\) = z DOM wsi ([\d.]+) \+ ulamki bez DOM ([\d.]+) \+ zdjeci \(DOM na podlodze albo bez wolnych rak\) (\d+)"
+                           r" \| przyrost BK \+(\d+) \(w tym nowe orszaki z szablonu (\d+)\) = z DOM ([\d.]+) \+ bez DOM \(ulamki, nie do zdjecia\) ([\d.]+) \+ zdjeci \(DOM na podlodze albo bez wolnych rak\) (\d+)"
                            r" \| ubytek BK -(\d+) do domu \(ta wies ([\d.]+), inne regiony ([\d.]+), bez pochodzenia ([\d.]+), na Mur ([\d.]+)\)"
-                           r" \| potkniecia RetinuePre (\d+), RetinuePost (\d+)\.")
+                           r" \| majatki BK \(Estate\): wywolan (\d+), przyrost \+(\d+) \(nowe orszaki (\d+)\), do partii pana (\d+) razy, ludzi ([\d.]+) \(bez przeniesienia ([\d.]+)\)"
+                           r" \| zamki BK \(Castle Retinue\): przyrost \+(\d+)"
+                           r" \| potkniecia RetinuePre (\d+), RetinuePost (\d+), EstatePre (\d+), EstatePost (\d+), EstateTake (\d+), CastlePre (\d+), CastlePost (\d+)\.")
+# grupy: 16 wywolan majatkow, 17 przyrost majatkow, 18 nowe orszaki majatkow, 19 TakeRetinue razy, 20 przeniesieni, 21 bez przeniesienia, 22 zamki, 23-29 potkniecia
+DROBNE295_START = "Wojsko z ludzi (E4/8): wpiete: "
+DROBNE295_HOOKS = ("orszaki dworow BK (RetinueComponent.DailyTick, 295)", "orszaki majatkow BK (Estate.Tick, 295)",
+                   "orszak majatku do partii pana (Estate.TakeRetinue, 295)", "orszak zamku BK (BKSettlementBehavior.TickCastle, 295)")
+# ERROR z miejsc 295 (Stumble -> Log.Error "ArmsFromPeople.<miejsce>"): latki, linia doby, wpiecie
+DROBNE295_ERR = (b"ERROR in ArmsFromPeople.Retinue", b"ERROR in ArmsFromPeople.Estate", b"ERROR in ArmsFromPeople.Castle", b"ERROR in ArmsFromPeople.Line(295)",
+                 b"ERROR in ArmsFromPeople.WireRetinue", b"ERROR in ArmsFromPeople.Wire(orsza")
 DROBNE295_POCH = re.compile(r"^Pochodzenie \(E4/7\): dzien (\d+) ")
 DROBNE295_Z = re.compile(r"\| bez nazwy: z niczego \+([\d.]+) \(([^)]*)\), w nicosc -([\d.]+) \(([^)]*)\)")
 DROBNE295_KIND = re.compile(r"(?:^|, |; )inne ([\d.]+)")
@@ -77866,21 +77877,33 @@ DROBNE295_CUT = re.compile(r"\| niedobor skladow wedlug stanu partii \(diagnosty
 DROBNE295_E48 = re.compile(r"^Wojsko z ludzi \(E4/8\): dzien (\d+) ")
 DROBNE295_KON = re.compile(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e(?: \+ ob)?( \+ rt)?\) = (-?[\d.]+)")
 DROBNE295_SAMPLE_RET = ("Orszaki dworow BK (295): dzien 109047 | klucz TAK, ksiega z poborem TAK | wywolan 182 (pominiete: bitwa, Straz, Inni, nie wies 3) | przyrost BK +7 "
-                        "(w tym nowe orszaki z szablonu 4) = z DOM wsi 5.5 + ulamki bez DOM 0.5 + zdjeci (DOM na podlodze albo bez wolnych rak) 1 | ubytek BK -5 do domu "
-                        "(ta wies 4.2, inne regiony 0.8, bez pochodzenia 0, na Mur 0) | potkniecia RetinuePre 0, RetinuePost 0.")
+                        "(w tym nowe orszaki z szablonu 4) = z DOM 5.5 + bez DOM (ulamki, nie do zdjecia) 0.5 + zdjeci (DOM na podlodze albo bez wolnych rak) 1 | ubytek BK -5 do domu "
+                        "(ta wies 4.2, inne regiony 0.8, bez pochodzenia 0, na Mur 0) | majatki BK (Estate): wywolan 40, przyrost +3 (nowe orszaki 2), do partii pana 1 razy, "
+                        "ludzi 6.0 (bez przeniesienia 0) | zamki BK (Castle Retinue): przyrost +2 | potkniecia RetinuePre 0, RetinuePost 0, EstatePre 0, EstatePost 0, "
+                        "EstateTake 0, CastlePre 0, CastlePost 0.")
+DROBNE295_SAMPLE_START = ("Wojsko z ludzi (E4/8): wpiete: przyrost zalog z modelu (TickGarrisonChangeForTown), orszaki dworow BK (RetinueComponent.DailyTick, 295), "
+                          "orszaki majatkow BK (Estate.Tick, 295), orszak majatku do partii pana (Estate.TakeRetinue, 295), orszak zamku BK (BKSettlementBehavior.TickCastle, 295); "
+                          "BRAK: -; wlasciciele latek celow: ...")
 DROBNE295_SAMPLE_POCH = ("Pochodzenie (E4/7): dzien 109047 | stan: ... | bez nazwy: z niczego +3 (partie rodow 0, zalogi 2, patrole gry 1), w nicosc -5 (partie rodow 0, inne 5; "
                          "przy zniknieciu partii 0), pula: znani 0.3 | fixA: ... | niedobor skladow wedlug stanu partii (diagnostyka P2-T4): armia 0, w osadzie 5; najwiekszy: "
                          "Retinue from Fozzo (inne, w osadzie) 1; Retinue from Amycon (inne, w osadzie) 1 | kontrola: ...")
 DROBNE295_SAMPLE_KON = ("Wojsko z ludzi (E4/8): dzien 109047 | ... | KONTROLA: zdjete z DOM przyczynami E4/8 812.4 - (m1 + a1 + c1 + c3 + n1w + n1e + ob + rt) = 0.00 "
                         "(ob - obroncy wiosek pobocznych 0, rt - orszaki dworow BK (295) 5.5) | potkniecia 0")
 DROBNE295_NOTHING_MAX = 1.0      # D295-2: "w nicosc ... inne" srednio na dobe przy kluczu TAK (136a bez paczki: 4-6/d)
+DROBNE295_FROM_MAX = 1.0         # D295-7: "z niczego ... inne" srednio na dobe przy kluczu TAK (136a bez paczki: 11.01/d - skoki +52/+53 nowych orszakow dworow, +1/d)
 
 
 def drobne295_selftest():
     bad = []
     m = DROBNE295_RET.search(DROBNE295_SAMPLE_RET)
-    if not m or m.group(2) != "TAK" or m.group(6) != "7" or m.group(8) != "5.5" or m.group(10) != "1" or m.group(11) != "5" or m.group(17) != "0":
+    if not m or m.group(2) != "TAK" or m.group(6) != "7" or m.group(8) != "5.5" or m.group(10) != "1" or m.group(11) != "5" or m.group(16) != "40" \
+            or m.group(17) != "3" or m.group(19) != "1" or m.group(20) != "6.0" or m.group(22) != "2" or m.group(29) != "0":
         bad.append("linia 295 (ArmsFromPeople.RetinueLine)")
+    st = drobne295_hooks(DROBNE295_SAMPLE_START)
+    if st != (4, 0):
+        bad.append("linia startowa E4/8 - latki 295")
+    if drobne295_hooks(DROBNE295_SAMPLE_START.replace("BRAK: -", "BRAK: orszaki majatkow BK (Estate.Tick, 295)")) != (4, 1):
+        bad.append("linia startowa E4/8 - latka 295 w BRAK")
     z = DROBNE295_Z.search(DROBNE295_SAMPLE_POCH)
     if not z or z.group(3) != "5" or DROBNE295_KIND.findall(z.group(4)) != ["5"] or DROBNE295_KIND.findall(z.group(2)):
         bad.append("bez nazwy E4/7 (PeopleBook.OriginLines)")
@@ -77911,22 +77934,37 @@ def drobne295_selftest():
     return "; ".join(bad) if bad else None
 
 
+def drobne295_hooks(line):
+    """(ile z 4 latek 295 w czesci 'wpiete', ile z nich w czesci 'BRAK')."""
+    i = line.find("; BRAK: ")
+    wired, missing = (line[:i], line[i:]) if i >= 0 else (line, "")
+    j = missing.find("; wlasciciele")
+    missing = missing[:j] if j >= 0 else missing
+    return sum(1 for h in DROBNE295_HOOKS if h in wired), sum(1 for h in DROBNE295_HOOKS if h in missing)
+
+
 def drobne295_collect(logp):
-    D = {"ret": {}, "z": {}, "q": {}, "cut": {}, "kon": {}, "tc": {}, "err": 0}
+    D = {"ret": {}, "z": {}, "q": {}, "cut": {}, "kon": {}, "tc": {}, "err": 0, "start": None, "retbad": 0}
     with open(logp, "rb") as f:
         for raw in f:
-            if b"Orszaki dworow BK (295)" not in raw and b"Pochodzenie (E4/7): dzien" not in raw and b"Wojsko z ludzi (E4/8): dzien" not in raw \
-                    and b"Rzemioslo miasta (148): dzien" not in raw and b"ERROR in ArmsFromPeople.Retinue" not in raw:
+            if b"Orszaki dworow BK (295)" not in raw and b"Pochodzenie (E4/7): dzien" not in raw and b"Wojsko z ludzi (E4/8): " not in raw \
+                    and b"Rzemioslo miasta (148): dzien" not in raw and not any(e in raw for e in DROBNE295_ERR):
                 continue
-            s = raw.decode("utf-8", "replace").rstrip("\r\n")
-            if "ERROR in ArmsFromPeople.Retinue" in s:
+            if any(e in raw for e in DROBNE295_ERR):
                 D["err"] += 1
                 continue
+            s = raw.decode("utf-8", "replace").rstrip("\r\n")
             s = s[11:] if s.startswith("[") and len(s) > 11 and s[9] == "]" else s
+            if s.startswith(DROBNE295_START):
+                if D["start"] is None:
+                    D["start"] = s
+                continue
             if s.startswith("Orszaki dworow BK (295)"):
                 m = DROBNE295_RET.search(s)
                 if m:
                     D["ret"][int(m.group(1))] = m
+                else:
+                    D["retbad"] += 1
                 continue
             mp = DROBNE295_POCH.match(s)
             if mp:
@@ -77966,9 +78004,19 @@ def drobne295_rows(rep, D):
     ret = D["ret"]
     rd = sorted(ret)
     on = [d for d in rd if ret[d].group(2) == "TAK" and ret[d].group(3) == "TAK"]
+    b295 = bool(rd) or D["retbad"] > 0 or any(v[0] for v in D["kon"].values())     # budowa 295: linia 295 albo KONTROLA E4/8 z czlonem rt
     rep.add("D295-0: linia 'Orszaki dworow BK (295)' w kazdej dobie, klucz BkRetinueFromVillage i ksiega z poborem",
-            f"linii {len(rd)}, z kluczem i poborem {len(on)}" + (f" (d{rd[0]}-d{rd[-1]})" if rd else ""), "kazda doba z linia E4/8 ma linie 295; brak - INFO (log sprzed 295)",
-            (len(rd) >= len(D["kon"]) - 1) if rd else None)
+            f"linii {len(rd)} (nieczytelnych {D['retbad']}), z kluczem i poborem {len(on)}" + (f" (d{rd[0]}-d{rd[-1]})" if rd else "") + f"; budowa 295 {'TAK' if b295 else 'NIE'}",
+            "kazda doba z linia E4/8 ma linie 295, 0 nieczytelnych; log sprzed 295 - INFO",
+            (len(rd) > 0 and len(rd) >= len(D["kon"]) - 1 and D["retbad"] == 0) if b295 else None)
+    st = D["start"]
+    if st is not None:
+        w, mi = drobne295_hooks(st)
+        rep.add("D295-6: linia startowa E4/8 - 4 latki 295 wpiete (dwor, majatek Tick, majatek TakeRetinue, zamek)", f"wpiete {w} z 4, w BRAK {mi}",
+                "4 / 0; log sprzed 295 - INFO", (w == 4 and mi == 0) if (b295 or w or mi) else None)
+    else:
+        rep.add("D295-6: linia startowa E4/8 (latki 295)", "brak linii 'Wojsko z ludzi (E4/8): wpiete'", "jest w pierwszej dobie kampanii; log sprzed 295 - INFO",
+                False if b295 else None)
     if on:
         calls = sum(int(ret[d].group(4)) for d in on) / len(on)
         up = sum(int(ret[d].group(6)) for d in on)
@@ -77980,14 +78028,22 @@ def drobne295_rows(rep, D):
         hb = [sum(float(ret[d].group(i)) for d in on) for i in (12, 13, 14, 15)]
         bad = [d for d in on if abs(int(ret[d].group(6)) - (float(ret[d].group(8)) + float(ret[d].group(9)) + int(ret[d].group(10)))) > 1.0]
         badh = [d for d in on if abs(int(ret[d].group(11)) - sum(float(ret[d].group(i)) for i in (12, 13, 14, 15))) > 1.0]
-        rep.add("D295-1: orszaki - przyrost BK = z DOM wsi + ulamki + zdjeci, ubytek = do domu (kazda doba)",
-                f"dob {len(on)}, wywolan srednio {calls:.0f}/d; przyrost {up} (nowe orszaki {new}) = z DOM {got:.1f} + ulamki {frac:.1f} + zdjeci {strip}; ubytek {home} -> "
-                f"ta wies {hb[0]:.1f}, inne regiony {hb[1]:.1f}, bez pochodzenia {hb[2]:.1f}, Mur {hb[3]:.1f}; dob z roznica > 1: {len(bad)} / {len(badh)}",
-                "0 / 0 dob z roznica; wywolan > 0 (wsie z Dworem BK)", not bad and not badh and calls > 0)
-        stum = sum(int(ret[d].group(16)) + int(ret[d].group(17)) for d in on)
-        rep.add("D295-5: potkniecia RetinuePre / RetinuePost i ERROR", f"potkniec {stum}, ERROR {D['err']}", "0 / 0", stum == 0 and D["err"] == 0)
+        es = [sum(float(ret[d].group(i)) for d in on) for i in (16, 17, 18, 19, 20, 21, 22)]
+        rep.add("D295-1: orszaki - przyrost BK = z DOM + bez DOM + zdjeci, ubytek = do domu (kazda doba)",
+                f"dob {len(on)}, wywolan dworow srednio {calls:.0f}/d; przyrost {up} (nowe orszaki {new}) = z DOM {got:.1f} + bez DOM {frac:.1f} + zdjeci {strip}; ubytek {home} -> "
+                f"ta wies {hb[0]:.1f}, inne regiony {hb[1]:.1f}, bez pochodzenia {hb[2]:.1f}, Mur {hb[3]:.1f}; dob z roznica > 1: {len(bad)} / {len(badh)} | majatki: wywolan "
+                f"srednio {es[0] / len(on):.0f}/d, przyrost {es[1]:.0f} (nowe {es[2]:.0f}), do partii pana {es[3]:.0f} razy / {es[4]:.1f} ludzi (bez przeniesienia {es[5]:.1f}) | "
+                f"zamki Castle Retinue: przyrost {es[6]:.0f}",
+                "0 / 0 dob z roznica; wywolan dworow > 0 (wsie z Dworem BK)", not bad and not badh and calls > 0)
     else:
-        rep.add("D295-1: orszaki - rachunek linii 295", "brak dob z kluczem i poborem", "INFO (klucz NIE, ksiega bez poboru albo log sprzed 295)", None)
+        rep.add("D295-1: orszaki - rachunek linii 295", "brak dob z kluczem i poborem", "INFO (klucz NIE, ksiega bez poboru albo log sprzed 295)" if not b295 else
+                "dni z kluczem i poborem (NIE: budowa 295 bez czytelnej linii)", False if b295 and not rd else None)
+    if b295:
+        stum = sum(sum(int(ret[d].group(i)) for i in range(23, 30)) for d in rd)
+        rep.add("D295-5: potkniecia latek 295 (RetinuePre/Post, EstatePre/Post, EstateTake, CastlePre/Post) i ERROR z miejsc 295", f"potkniec {stum}, ERROR {D['err']}", "0 / 0",
+                stum == 0 and D["err"] == 0)
+    else:
+        rep.add("D295-5: ERROR z miejsc 295", f"ERROR {D['err']}", "0 (log sprzed 295 - INFO)", None if D["err"] == 0 else False)
     # D295-2: w nicosc / z niczego - inne (linia E4/7), orszaki w niedoborze skladow
     qd = sorted(D["q"])
     if qd:
@@ -78002,6 +78058,11 @@ def drobne295_rows(rep, D):
         rep.add("D295-2: ksiega ludzi - 'w nicosc ... inne' (orszaki dworow BK) na dobe", txt,
                 f"z kluczem: w nicosc - inne <= {DROBNE295_NOTHING_MAX:.0f}/d i 0 dob z orszakiem w niedoborze (136a bez paczki: 4-6/d, orszak co dobe); bez linii 295 - INFO",
                 (q <= DROBNE295_NOTHING_MAX and cutd == 0) if sel else None)
+        zs = sorted(((D["z"].get(d, 0.0), d) for d in base), reverse=True)[:5]
+        rep.add("D295-7: ksiega ludzi - 'z niczego ... inne' (nowe orszaki dworow, majatki +1/d) na dobe",
+                f"{'z kluczem 295' if sel else 'bez linii 295'} ({len(base)} dob): {z:.2f}/d; najwieksze doby: " + ", ".join(f"d{d} {v:.0f}" for v, d in zs),
+                f"z kluczem: <= {DROBNE295_FROM_MAX:.0f}/d (136a bez paczki: 11.01/d, skoki +52/+53); bez linii 295 - INFO",
+                (z <= DROBNE295_FROM_MAX) if sel else None)
     else:
         rep.add("D295-2: ksiega ludzi - 'w nicosc ... inne'", "brak linii 'Pochodzenie (E4/7)' z bez nazwy", "INFO (ksiega pochodzenia wylaczona albo log bitwy)", None)
     # D295-3: KONTROLA E4/8
@@ -78029,14 +78090,15 @@ def drobne295_main(logp):
     """drobne295 (29.10, paczka 295): D295-S, D295-0..D295-5 - opis w komentarzu nad stalymi DROBNE295_*. Strumieniowo, tylko odczyt logu."""
     rep = Report()
     s1 = drobne295_selftest()
-    rep.add("D295-S: self-test wyrazen (linia 295, bez nazwy E4/7, niedobor skladow, KONTROLA E4/8 z rt i bez, regex E4/8 N6, NWAR-15 okna)",
+    rep.add("D295-S: self-test wyrazen (linia 295, linia startowa E4/8, bez nazwy E4/7, niedobor skladow, KONTROLA E4/8 z rt i bez, regex E4/8 N6, NWAR-15 okna)",
             s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("D295-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
     D = drobne295_collect(logp)
-    print(f"plik: {logp} | linii 295 {len(D['ret'])}, E4/7 {len(D['q'])}, E4/8 {len(D['kon'])}, 'Rzemioslo miasta (148)' {len(D['tc'])}, ERROR {D['err']}")
+    print(f"plik: {logp} | linii 295 {len(D['ret'])} (nieczytelnych {D['retbad']}), E4/7 {len(D['q'])}, E4/8 {len(D['kon'])}, 'Rzemioslo miasta (148)' {len(D['tc'])}, "
+          f"linia startowa E4/8 {'TAK' if D['start'] else 'NIE'}, ERROR {D['err']}")
     drobne295_rows(rep, D)
     rep.show()
     return 0
