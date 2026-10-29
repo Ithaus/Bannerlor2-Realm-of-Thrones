@@ -3320,9 +3320,21 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool RawPriceByUse { get; set; } = true;
 
-        [SettingPropertyBool("Price Flatter Lot Walk", HintText = "goods traded at a town's stall weigh on its price at once only as much as one day of the market's memory lets through: the game counts a fresh lot at once at 0.04 of the 0.14 a stocked stall weighs; on: 0.021 at once and the rest through the town's supply memory at 15% a day, as in the game. While you trade, a lot moves the price about half as much - buying and selling, for you and every caravan, cart and townsman; the price a town settles at once the goods have lain a week is the same as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Price Flatter Lot Walk", HintText = "goods traded at a town's stall weigh on its price at once only as much as one day of the market's memory lets through: the game counts a fresh lot at once at 0.04 of the 0.14 a stocked stall weighs; on: 0.14 times the daily pace of that memory at once (0.021 at the game's 15% a day, 0.0084 at 6% - see Price Slow Supply Memory) and the rest through the town's supply memory. While you trade, a lot moves the price about half as much at the game's pace and about a fifth at 6% a day - buying and selling, for you and every caravan, cart and townsman; once the market's memory has caught up with the stall (about a week at the game's pace, several weeks at 6% a day) the price a town settles at is the same as before. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool PriceFlatterLotWalk { get; set; } = true;
+
+        [SettingPropertyBool("Price Slow Supply Memory", HintText = "a town's market follows its stalls slower: the supply the price looks at closes this share a day (Price Supply Memory Daily) of the gap to what lies on the stall instead of the game's 15%, and a lot traded weighs on the price at once only as much as one such day lets through; a glut or shortage shows slowly and lasts longer; demand still follows at the game's 15%. Needs Price Flatter Lot Walk. Off = as in package 299", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PriceSlowSupplyMemory { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Price Supply Memory Daily", 0.020f, 0.150f, "0.000", HintText = "share of the gap between a market's remembered supply and its stall closed each day (0.02-0.15; 0.15 = the game's pace)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float PriceSupplyMemoryDaily { get; set; } = 0.06f;
+
+        [SettingPropertyBool("Price Flatter All Items", HintText = "arms, armour, horses and loot follow the same rule: each stall remembers how many pieces of a kind (type and tier) it held, closing the gap by the daily share; a piece you or anyone sells or buys weighs on the price at once only by that share, the rest comes over the following days. The memory only slows the price, it never carries it past the balance: once a stall holds as many as the town wants, it stops paying a shortage price (twenty horses sold to a town that wants five fetch the balanced price, not that of an empty stable), and while it holds fewer it gives no glut discount. Needs Price Flatter Lot Walk. Off = as in package 299", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PriceFlatterAllItems { get; set; } = true;
 
         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
@@ -11286,6 +11298,9 @@ namespace Armoury
             s.PriceFormulaInNewCoin = PriceFormulaInNewCoin;
             s.RawPriceByUse = RawPriceByUse;
             s.PriceFlatterLotWalk = PriceFlatterLotWalk;
+            s.PriceSlowSupplyMemory = PriceSlowSupplyMemory;
+            s.PriceSupplyMemoryDaily = PriceSupplyMemoryDaily;
+            s.PriceFlatterAllItems = PriceFlatterAllItems;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;

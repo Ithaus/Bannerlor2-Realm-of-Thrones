@@ -44,6 +44,10 @@ namespace Armoury
         private static int[] _demAt, _mulAt;              // numer koszyka, w ktorym liczba powstala
         private static int _serial;
         private static ItemObject _probe;
+        // 299b po recenzji (koszt): wiersz pamieci polki kazdego celu raz na wywoz doby (ShelfMemory.Row), miejsce koszyka raz na koszyk, tempo raz na wywoz
+        private static float[][] _memRow;
+        private static int _slot = -1;
+        private static float _pace;
         private static bool _ready, _dayOff;
 
         // wynik nowej drogi dla jednego wyboru celu (miedzy PickStart a PickEnd)
@@ -94,6 +98,7 @@ namespace Armoury
         {
             _places = null; _pos = null; _near = null; _nearDist = null; _pairs = 0; _builds = 0; _range = 0f;
             _stockAt = null; _dem = null; _mul = null; _demAt = null; _mulAt = null; _probe = null; _ready = false; _dayOff = false; _fBest = null;
+            _memRow = null; _slot = -1;
             _picks = _srcReads = _mismatch = _misTarget = _misPieces = _misSrc = _mismatchLogged = _stumbles = 0; _errLogged = false;
             ClearDay();
         }
@@ -130,6 +135,9 @@ namespace Armoury
                     _dem = new float[n]; _mul = new float[n]; _demAt = new int[n]; _mulAt = new int[n];
                 }
                 for (int i = 0; i < n; i++) _stockAt[i] = stock[places[i]];
+                if (_memRow == null || _memRow.Length != n) _memRow = new float[n][];
+                for (int i = 0; i < n; i++) _memRow[i] = ShelfMemory.Row(places[i]);
+                _pace = (float)RawPrice.Pace;
                 _ready = true;
                 return true;
             }
@@ -166,7 +174,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ 2. popyt i mnoznik ceny raz na osade w koszyku
         /// <summary>Poczatek koszyka (typ x tier): liczby poprzedniego koszyka przestaja byc wazne.</summary>
-        internal static void Bucket(ItemObject probe) { _serial++; _probe = probe; }
+        internal static void Bucket(ItemObject probe) { _serial++; _probe = probe; _slot = ShelfMemory.Slot(probe); }
 
         private static float Dem(int i)
         {
@@ -258,7 +266,7 @@ namespace Armoury
                 int dh; _stockAt[j].TryGetValue(key, out dh);
                 if (carts) dh += TradeCarts.Incoming(dst, key);
                 float dd = Dem(j);
-                float dstShelf = MBMath.ClampFloat((float)Math.Pow((dd + 1f) / (dh + 2f), elast), minF, maxF);
+                float dstShelf = SupplyDemand.DstShelfRow(_memRow[j], _slot, _pace, dd, dh, elast, minF, maxF);   // 299b: ta sama liczba co stara petla (DstShelf - pamiec polki celu)
                 float profit = dstShelf * Mul(j) - srcIdx - perDist * dist;
                 if (profit <= bestProfit) continue;
                 best = dst; bestProfit = profit; bestCap = Math.Max(1, (int)Math.Ceiling(dd) - dh); bestDist = dist;
@@ -339,7 +347,8 @@ namespace Armoury
             ClearDay();
             // spis polek tej doby i wzorzec koszyka nie sa juz potrzebne (pamiec celow zostaje)
             if (_stockAt != null) Array.Clear(_stockAt, 0, _stockAt.Length);
-            _probe = null; _ready = false; _fBest = null;
+            if (_memRow != null) Array.Clear(_memRow, 0, _memRow.Length);
+            _probe = null; _slot = -1; _ready = false; _fBest = null;
         }
     }
 }
