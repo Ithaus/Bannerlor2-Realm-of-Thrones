@@ -48,6 +48,9 @@ namespace Armoury
         private static Harmony _h;
         private static bool _scanned;
         private static int _errors;
+        // 300b: mnoznik kary BK zmierzony na starcie sesji (Sync) - PlayerHaggle zdejmuje go ze sprzedazy strony gracza; 1 = brak pomiaru albo BK nieobecny
+        internal static float LastMult = 1f;
+        internal static bool Measured;
 
         private static bool IsBk(MethodInfo m)
         {
@@ -178,12 +181,14 @@ namespace Armoury
         {
             bool once = Settings.Current.BkTradePenaltyOnce;
             Set(once);
+            LastMult = 1f; Measured = false;
             try
             {
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
                 var armour = AnyArmour();
                 if (model == null || armour == null) { Log.Info("Kara handlowa BK: kontrola niemozliwa (brak modelu cen albo zbroi)."); return; }
                 float r = Measure(model, armour);
+                if (!float.IsNaN(r) && !float.IsInfinity(r) && r > 0f) { LastMult = r; Measured = true; }   // 300b: do zdjecia ze sprzedazy strony gracza
                 bool bkHere = BkPatchOn(AccessTools.DeclaredMethod(typeof(DefaultTradeItemPriceFactorModel), "GetTradePenalty")) != null;
                 string probe = " (model " + model.GetType().FullName + ", zbroja " + armour.StringId + ", bez partii i kupca)";
                 string x = r.ToString("0.0", CultureInfo.InvariantCulture);
@@ -261,14 +266,14 @@ namespace Armoury
         /// Bez sufitu tylko zywy inwentarz i towar (IsBeast / IsGoods): kon idzie u gry za ok. 43% wartosci (BK go nie mnozy), sufit 11%
         /// scialby go kilkukrotnie - tego Jeff nie postanowil.
         /// </summary>
-        internal static int Cap(EquipmentElement el, float f)
+        internal static int Cap(EquipmentElement el, float f, float markupPct = -1f)
         {
             var s = Settings.Current;
             if (s == null || el.Item == null || s.SellCapPercentOfNewAsk <= 0 || !HistoricalPrices.On || !s.RetailFromWorth) return 0;
             if (ArmouryBehavior.IsBeast(el.Item) || ArmouryBehavior.IsGoods(el.Item)) return 0;
             int newWorth = Math.Max(el.Item.Value, el.ItemValue);
             float share = s.SellCapPercentOfNewAsk / 100f;
-            float markup = 1f + Math.Max(0f, s.RetailMarkupPercent) / 100f;
+            float markup = 1f + (markupPct >= 0f ? markupPct : Math.Max(0f, s.RetailMarkupPercent)) / 100f;   // 300b: marza strony gracza (PlayerHaggle.MarkupPct); reszta jak dotad
             int tenth = (int)Math.Round(newWorth * markup * f * share);
             int wreck = (int)Math.Round(Math.Max(1, (int)TaleWorlds.Library.MathF.Round((float)newWorth * share)) * markup * f);   // jak cena kupna w PricePostfix
             return Math.Max(1, Math.Min(tenth, wreck));
@@ -280,15 +285,15 @@ namespace Armoury
             float pm = el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f;
             return ", stan x" + pm.ToString("0.00", CultureInfo.InvariantCulture) + (el.ItemModifier != null ? " " + el.ItemModifier.StringId : "")
                    + ", wartosc ze stanem " + el.ItemValue + ", granice " + (floor > 0 ? floor.ToString() : "-") + ".." + (cap > 0 ? cap.ToString() : "-")
-                   + ", wiaze: " + (bound == 1 ? "podloga" : bound == 2 ? "sufit" : "-");
+                   + ", wiaze: " + (bound == 1 ? "podloga" : bound == 2 ? "sufit" : bound == 3 ? "odkup" : bound == 4 ? "kupno-1" : "-");
         }
 
         // ------------------------------------------------------------ ksiega skupu (tylko log)
-        internal const int Player = 1, Lords = 2, OtherParties = 3, Men = 4, Notable = 5;
-        private static readonly string[] Who = { "-", "gracz", "lordowie AI (SellItemsAction)", "inne partie (SellItemsAction)", "sakiewki ludzi", "notable (rzeczy ochotnikow)" };
-        private class Tally { internal int N, AtFloor, AtCap; internal long Value, Worth, Paid; }
-        private static readonly Tally[] _day = { new Tally(), new Tally(), new Tally(), new Tally(), new Tally(), new Tally() };
-        // gracz: ile sztuk danej rzeczy poszlo w biezacym ekranie handlu na podlodze [0] / na suficie [1] (rozliczane przy zamknieciu ekranu)
+        internal const int Player = 1, Lords = 2, OtherParties = 3, Men = 4, Notable = 5, ClanParties = 6;
+        private static readonly string[] Who = { "-", "gracz", "lordowie AI (SellItemsAction)", "inne partie (SellItemsAction)", "sakiewki ludzi", "notable (rzeczy ochotnikow)", "rod gracza (SellItemsAction)" };
+        private class Tally { internal int N, AtFloor, AtCap, AtRebuy, AtBuy, FracN; internal long Value, Worth, Paid; internal double FracSum; }
+        private static readonly Tally[] _day = { new Tally(), new Tally(), new Tally(), new Tally(), new Tally(), new Tally(), new Tally() };
+        // gracz: ile sztuk danej rzeczy poszlo w biezacym ekranie handlu na podlodze [0] / na suficie [1] / na suficie odkupu [2] / przy cenie kupna-1 [3] (300b; rozliczane przy zamknieciu ekranu)
         private static readonly Dictionary<EquipmentElement, int[]> _screen = new Dictionary<EquipmentElement, int[]>();
         [ThreadStatic] private static int _ctx;                      // kto teraz sprzedaje (kontekst z TransferItem / SellItemsAction)
         [ThreadStatic] private static ItemObject _lastItem;
@@ -298,9 +303,11 @@ namespace Armoury
 
         internal static void Reset()
         {
-            foreach (var t in _day) { t.N = t.AtFloor = t.AtCap = 0; t.Value = t.Worth = t.Paid = 0; }
+            foreach (var t in _day) Clear(t);
             _screen.Clear(); _dayErrors = 0;
         }
+
+        private static void Clear(Tally t) { t.N = t.AtFloor = t.AtCap = t.AtRebuy = t.AtBuy = t.FracN = 0; t.Value = t.Worth = t.Paid = 0; t.FracSum = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -320,7 +327,7 @@ namespace Armoury
         {
             var t = _day[who];
             t.N += n; t.Value += (long)el.Item.Value * n; t.Worth += (long)el.ItemValue * n; t.Paid += paid;
-            if (bound == 1) t.AtFloor += n; else if (bound == 2) t.AtCap += n;
+            if (bound == 1) t.AtFloor += n; else if (bound == 2) t.AtCap += n; else if (bound == 3) t.AtRebuy += n; else if (bound == 4) t.AtBuy += n;
         }
 
         /// <summary>
@@ -340,10 +347,10 @@ namespace Armoury
                 if (who == Player)
                 {
                     int[] c;
-                    if (!_screen.TryGetValue(el, out c)) _screen[el] = c = new int[2];
-                    if (bound == 1) c[0]++; else if (bound == 2) c[1]++;
+                    if (!_screen.TryGetValue(el, out c)) _screen[el] = c = new int[4];
+                    if (bound >= 1 && bound <= 4) c[bound - 1]++;
                 }
-                else if (who == Lords || who == OtherParties) Add(who, el, 1, price, bound);   // SellItemsAction wycenia kazda sztuke osobno
+                else if (who == Lords || who == OtherParties || who == ClanParties) Add(who, el, 1, price, bound);   // SellItemsAction wycenia kazda sztuke osobno
             }
             catch (Exception e) { Stumble("Seen", e); }
         }
@@ -366,25 +373,45 @@ namespace Armoury
         {
             try
             {
-                if (!isTrading || QuartermasterEscrow.Active || sold == null) return;
+                if (!isTrading || QuartermasterEscrow.Active) return;
                 string where = "poza osada";
-                try { var st = Settlement.CurrentSettlement ?? (MobileParty.MainParty != null ? MobileParty.MainParty.CurrentSettlement : null); if (st != null) where = st.Name.ToString(); } catch { }
-                foreach (var x in sold)
-                {
-                    var el = x.Item1.EquipmentElement;
-                    int n = x.Item1.Amount, sum = x.Item2;
-                    if (el.Item == null || n <= 0 || !SupplyDemand.Equipmentish(el.Item)) continue;
-                    int[] c; _screen.TryGetValue(el, out c);
-                    int fl = c != null ? Math.Min(n, c[0]) : 0, cp = c != null ? Math.Min(n, c[1]) : 0;
-                    var t = _day[Player];
-                    t.N += n; t.Value += (long)el.Item.Value * n; t.Worth += (long)el.ItemValue * n; t.Paid += sum; t.AtFloor += fl; t.AtCap += cp;
-                    float pm = el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f;
-                    Log.Info("PodazPopyt: SPRZEDAZ GRACZA w " + where + ": " + el.Item.Name + " (" + el.Item.StringId + ") x" + n
-                             + ", stan " + (el.ItemModifier != null ? el.ItemModifier.StringId : "czysta") + " x" + pm.ToString("0.00", CultureInfo.InvariantCulture)
-                             + ", wartosc " + el.Item.Value + ", ze stanem " + el.ItemValue
-                             + ", cena " + (sum / n) + " za szt. (razem " + sum + ") = " + Pct(sum, (long)el.Item.Value * n) + " wartosci, " + Pct(sum, (long)el.ItemValue * n) + " ze stanem"
-                             + "; na podlodze " + fl + ", na suficie " + cp + ".");
-                }
+                Settlement here = null;
+                try { here = Settlement.CurrentSettlement ?? (MobileParty.MainParty != null ? MobileParty.MainParty.CurrentSettlement : null); if (here != null) where = here.Name.ToString(); } catch { }
+                bool haggle = PlayerHaggle.On;   // 300b: dopisek targu gracza i ksiega odkupu; klucz wylaczony - linia jak dotad
+                if (sold != null)
+                    foreach (var x in sold)
+                    {
+                        var el = x.Item1.EquipmentElement;
+                        int n = x.Item1.Amount, sum = x.Item2;
+                        if (el.Item == null || n <= 0 || !SupplyDemand.Equipmentish(el.Item)) continue;
+                        int[] c; _screen.TryGetValue(el, out c);
+                        int fl = c != null ? Math.Min(n, c[0]) : 0, cp = c != null ? Math.Min(n, c[1]) : 0, rb = c != null ? Math.Min(n, c[2]) : 0, ab = c != null ? Math.Min(n, c[3]) : 0;
+                        var t = _day[Player];
+                        t.N += n; t.Value += (long)el.Item.Value * n; t.Worth += (long)el.ItemValue * n; t.Paid += sum; t.AtFloor += fl; t.AtCap += cp; t.AtRebuy += rb; t.AtBuy += ab;
+                        float pm = el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f;
+                        string note = "";
+                        if (haggle)
+                        {
+                            float fr;
+                            note = PlayerHaggle.SaleNote(here, el, rb, ab, out fr);
+                            if (!float.IsNaN(fr)) { t.FracSum += (double)fr * n; t.FracN += n; }
+                            RebuyLedger.NoteCapped(rb);
+                            RebuyLedger.Commit(here, el, n);   // zatwierdzona sprzedaz zuzywa wpisy ksiegi (ten sam stan najpierw, potem najtansze)
+                        }
+                        Log.Info("PodazPopyt: SPRZEDAZ GRACZA w " + where + ": " + el.Item.Name + " (" + el.Item.StringId + ") x" + n
+                                 + ", stan " + (el.ItemModifier != null ? el.ItemModifier.StringId : "czysta") + " x" + pm.ToString("0.00", CultureInfo.InvariantCulture)
+                                 + ", wartosc " + el.Item.Value + ", ze stanem " + el.ItemValue
+                                 + ", cena " + (sum / n) + " za szt. (razem " + sum + ") = " + Pct(sum, (long)el.Item.Value * n) + " wartosci, " + Pct(sum, (long)el.ItemValue * n) + " ze stanem"
+                                 + "; na podlodze " + fl + ", na suficie " + cp + note + ".");
+                    }
+                // 300b: kupione w miescie albo zamku sztuki sprzetu w stanie < 1 do ksiegi odkupu (po rozliczeniu sprzedazy tego ekranu)
+                if (haggle && purchased != null)
+                    foreach (var x in purchased)
+                    {
+                        var el = x.Item1.EquipmentElement;
+                        int n = x.Item1.Amount;
+                        if (el.Item != null && n > 0) RebuyLedger.Note(here, el, n, x.Item2 / n);
+                    }
             }
             catch (Exception e) { Stumble("OnPlayerExchange", e); }
             finally { _screen.Clear(); }
@@ -407,16 +434,20 @@ namespace Armoury
                 if (sb.Length > 0) sb.Append("; ");
                 sb.Append(Who[w]).Append(' ').Append(t.N).Append(" szt. (wartosc ").Append(t.Value).Append(", ze stanem ").Append(t.Worth)
                   .Append(", zaplacono ").Append(t.Paid).Append(" = ").Append(Pct(t.Paid, t.Value)).Append(" wartosci, ").Append(Pct(t.Paid, t.Worth))
-                  .Append(" ze stanem; na podlodze ").Append(t.AtFloor).Append(", na suficie ").Append(t.AtCap).Append(')');
+                  .Append(" ze stanem; na podlodze ").Append(t.AtFloor).Append(", na suficie ").Append(t.AtCap);
+                if (t.AtRebuy > 0 || t.AtBuy > 0 || (w == Player && PlayerHaggle.On)) sb.Append(", na suficie odkupu ").Append(t.AtRebuy).Append(", przy cenie kupna ").Append(t.AtBuy);   // 300b
+                if (w == Player && t.FracN > 0) sb.Append(", ulamek targu sredni ").Append((t.FracSum / t.FracN).ToString("0.000", CultureInfo.InvariantCulture));
+                sb.Append(')');
             }
             if (sb.Length > 0 || _dayErrors > 0)
             {
                 var s = Settings.Current;
                 Log.Info("Skup sprzetu (doba): " + (sb.Length > 0 ? sb.ToString() : "nic") + (_dayErrors > 0 ? "; potkniecia " + _dayErrors : "")
                          + " [BkTradePenaltyOnce " + s.BkTradePenaltyOnce + ", SellPriceByCondition " + s.SellPriceByCondition + ", sufit " + s.SellCapPercentOfNewAsk
-                         + "% ceny nowej, podloga " + s.MinSellPercentOfValue + "%].");
+                         + "% ceny nowej, podloga " + s.MinSellPercentOfValue + "%, PlayerHaggle " + s.PlayerHaggle + ", PlayerRebuyCap " + s.PlayerRebuyCap
+                         + ", " + RebuyLedger.SkupBrief() + "].");
             }
-            foreach (var t in _day) { t.N = t.AtFloor = t.AtCap = 0; t.Value = t.Worth = t.Paid = 0; }
+            foreach (var t in _day) Clear(t);
             _dayErrors = 0;
         }
 
@@ -448,7 +479,11 @@ namespace Armoury
             {
                 // sprzedajacy partia (nie gracz), kupuje osada; cene kazdej sztuki liczy w srodku Town.GetItemPrice
                 if (__1 != null && __1.IsSettlement && __0 != null && __0.MobileParty != null && !__0.MobileParty.IsMainParty)
-                    _ctx = __0.MobileParty.IsLordParty ? Lords : OtherParties;
+                {
+                    var mp = __0.MobileParty;
+                    // 300b: partie rodu gracza (bez karawan) osobno - tam dziala targ gracza (PlayerHaggle.Side)
+                    _ctx = mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan && !mp.IsCaravan ? ClanParties : mp.IsLordParty ? Lords : OtherParties;
+                }
             }
             catch { }
         }

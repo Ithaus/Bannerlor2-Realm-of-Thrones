@@ -560,12 +560,16 @@ namespace Armoury
                 float arms = ArmsPricing.Multiplier(st, item);
                 float f = shelfF * arms;
                 int before = __result;
+                // 300b (Jeff 29.10 "ceny zalezne sa od persuazion i trade"): strona gracza (gracz, jego rod z przywodca, nie karawana) - marza kupca x czynnik targu h
+                // (PlayerHaggle.MarkupPct), sufit odkupu zamiast 1/10 ceny nowej, zacisk "kupno-1"; klucz wylaczony - mk = RetailMarkupPercent jak dotad (bit w bit)
+                bool side = __1 != null && PlayerHaggle.On && PlayerHaggle.Side(__1);
+                float mk = side ? PlayerHaggle.MarkupPct(__1, __2) : Math.Max(0f, Settings.Current.RetailMarkupPercent);
                 // wpis 70 (Jeff 05.10: "czy ceny w sklepie sa odpowiednie?"): przy kupnie lancuch modeli cen (gra + cudze mody,
                 // najpewniej AIInfluence) dawal juz ~2x wartosci PRZED nasza warstwa (log: karstark_boots 145 -> 211 przy wartosci 73).
                 // Cena kupna sprzetu = wartosc sztuki (ze stanem) x nasz mnoznik x marza kupca - bez cudzych narzutow.
                 float baseP = __result;
                 if (!__3 && HistoricalPrices.On && Settings.Current.RetailFromWorth)
-                    baseP = Math.Max(1, __0.ItemValue) * (1f + Math.Max(0f, Settings.Current.RetailMarkupPercent) / 100f);
+                    baseP = Math.Max(1, __0.ItemValue) * (1f + mk / 100f);
                 // CENA SPRZEDAZY OD STANU (B2, 07.10): gdy gra dala swoje minimum 1 zl, bierzemy prawdziwy ulamek (wartosc ze stanem x mnoznik
                 // ceny aktywnego modelu) i dopiero go mnozymy przez polke - "1 zl x polka" placilo za wrak tarczy wartej 2 zl 4-6 zl. Wylacznik SellPriceByCondition.
                 bool byCond = __3 && SellByCondition.On;
@@ -591,7 +595,7 @@ namespace Armoury
                     // (a przy dawnej podlodze 5% takze rupiecie x0.08 / x0.1). Wylacznik OneScrapFloor = false: jak w 126.
                     if (Settings.Current.OneScrapFloor && HistoricalPrices.On && Settings.Current.RetailFromWorth)
                     {
-                        int ask = (int)Math.Round(Math.Max(1, __0.ItemValue) * (1f + Math.Max(0f, Settings.Current.RetailMarkupPercent) / 100f) * f);
+                        int ask = (int)Math.Round(Math.Max(1, __0.ItemValue) * (1f + mk / 100f) * f);
                         if (ask < floor) floor = Math.Max(1, ask);
                     }
                     floorP = floor;
@@ -599,7 +603,19 @@ namespace Armoury
                 }
                 // B3 (decyzja Jeffa 07.10 "tak"): kupiec nie da za sztuke wiecej niz SellCapPercentOfNewAsk (10%) ceny, jaka TA polka zada za NOWA
                 // sztuke tej jakosci - czyli nie wiecej, niz sam bierze za jej wrak; sufit wygrywa z podloga
-                if (byCond) { capP = SellByCondition.Cap(__0, f); if (capP > 0 && __result > capP) { __result = capP; bound = 2; } }
+                if (byCond)
+                {
+                    // 300b B (klucz PlayerRebuyCap): dla strony gracza zamiast sufitu 1/10 ksiega odkupu - nie wiecej, niz gracz zaplacil TU za gorsza sztuke tej rzeczy
+                    if (side && PlayerHaggle.RebuyOn) { capP = RebuyLedger.Cap(st, __0); if (capP > 0 && __result > capP) { __result = capP; bound = 3; } }
+                    else { capP = SellByCondition.Cap(__0, f, mk); if (capP > 0 && __result > capP) { __result = capP; bound = 2; } }
+                }
+                // 300b A5: bez arbitrazu - sprzedaz strony gracza najwyzej cena kupna tej sztuki przy f sprzedazy (<= f kupna) minus 1 zl
+                int askP = 0;
+                if (__3 && side && HistoricalPrices.On && Settings.Current.RetailFromWorth)
+                {
+                    askP = Math.Max(1, (int)Math.Round(Math.Max(1, __0.ItemValue) * (1f + mk / 100f) * f) - 1);
+                    if (__result > askP) { __result = askP; bound = 4; }
+                }
                 if (horseOld >= 0f && _horseForce == 0)   // E8/R (254): wycena sprzedazy konia nowa droga - ile dalaby stara (ta sama polka i podloga; konie bez sufitu) - tylko licznik
                 {
                     int op = (int)Math.Round(horseOld * f);
@@ -625,7 +641,8 @@ namespace Armoury
                                  + " (podstawa " + (int)ArmsPricing.BaseOf(item) + ", surowce x" + ArmsPricing.MaterialIndex(st, item).ToString("0.00")
                                  + (ArmsPricing.IsUnique(item) ? ", UNIKAT" : "") + ") = x" + f.ToString("0.00")
                                  + " (" + before + " -> " + __result + ", wartosc " + item.Value
-                                 + (__3 ? SellByCondition.Bounds(__0, floorP, capP, bound) : "") + ").");
+                                 + (__3 ? SellByCondition.Bounds(__0, floorP, capP, bound) : "")
+                                 + (side ? PlayerHaggle.Explain(__instance, __0, __1, __2, __3, __4, __5, __6, askP) : "") + ").");
                     }
                 }
             }

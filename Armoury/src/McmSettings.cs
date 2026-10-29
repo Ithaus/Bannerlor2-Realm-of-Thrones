@@ -1184,6 +1184,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SellPriceByCondition { get; set; } = true;
 
+        [SettingPropertyBool("Player Haggle", HintText = "Banner Kings' fivefold penalty no longer applies to your own sales of arms, armour and harness; the game's trade penalty decides, lowered by your Trade and, point for point, by your persuasion (Charm and persuasion perks); the merchant's markup when you buy shrinks the same way. About 30% of worth at no skill for common gear, about 40% at middling skill, about 50% for a master, then times the stall's supply and demand. Your clan's parties led by a hero haggle the same way. AI unchanged. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PlayerHaggle { get; set; } = true;
+
+        [SettingPropertyBool("Player Rebuy Cap", HintText = "replaces the one-tenth cap (Sell Cap Percent Of New Ask) for your sales: a town will not pay you more for a piece than you paid there for a worse copy of the same item you have not sold back - buying worn gear, mending it and selling it back in the same town never pays. Needs Player Haggle", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PlayerRebuyCap { get; set; } = true;
+
         [SettingPropertyInteger("Sell Cap Percent Of New Ask", 0, 40, "0", HintText = "the most a town or castle merchant pays for a weapon, a piece of armour, a saddle or ammunition, as % of what his own stall asks for a NEW one of the same kind and quality - and never more than he charges for its wreck, so buying worn gear or spoilt arrows, putting them right and selling them back in the same town never pays; carrying mended gear to a town that lacks it still pays. Horses and pack animals are not capped (0 = no cap; needs Sell Price By Condition)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public int SellCapPercentOfNewAsk { get; set; } = 10;
@@ -10763,6 +10771,8 @@ namespace Armoury
             s.OneScrapFloor = OneScrapFloor;
             s.BkTradePenaltyOnce = BkTradePenaltyOnce;
             s.SellPriceByCondition = SellPriceByCondition;
+            s.PlayerHaggle = PlayerHaggle;
+            s.PlayerRebuyCap = PlayerRebuyCap;
             s.SellCapPercentOfNewAsk = SellCapPercentOfNewAsk;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;
             s.LordThirdOnTotal = LordThirdOnTotal;
