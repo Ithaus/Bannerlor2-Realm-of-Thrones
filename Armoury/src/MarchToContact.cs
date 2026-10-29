@@ -817,7 +817,6 @@ namespace Armoury
 
         // ------------------------------------------------------------ kontrakty
 
-        /// <summary>Szyk idzie teraz marszem (ma cap). Glowny watek.</summary>
         /// <summary>291 (AiBreath.Reserve, glowny watek): szyk biegnie teraz pod ostrzalem bez tarcz - zapas tchu jak pod ostrzalem (25%).</summary>
         internal static bool Rushing(Formation f)
         {
@@ -845,6 +844,7 @@ namespace Armoury
                    + "), koncow biegu " + _rushOut + ", szyko-sekund biegu " + _rushSec.ToString("0", inv) + "; z tarczami pod ostrzalem zostal krok " + _rushShieldKept;
         }
 
+        /// <summary>Szyk idzie teraz marszem (ma cap). Glowny watek.</summary>
         internal static bool IsMarching(Formation f)
         {
             if (!_on) return false;

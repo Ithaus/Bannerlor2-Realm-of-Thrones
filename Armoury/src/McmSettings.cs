@@ -10104,7 +10104,7 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefendersAdvanceUnderFire { get; set; } = true;
 
-        [SettingPropertyBool("Defenders Hold Their Ground", HintText = "an AI army that was attacked in a field battle holds its position and lets the attacker come: it does not march out to meet you unless it is clearly stronger (one and a half times your side's strength), it is being shot down without an answer (Defenders Advance Under Fire), or the attacker has not come on for 90 seconds; once its main infantry is in close combat it fights as usual. Its horse archers may still ride out and skirmish. When you are the one attacked, the AI attacks you as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Defenders Hold Their Ground", HintText = "an AI army that was attacked in a field battle holds its position and lets the attacker come: it does not march out to meet you, even as a bandit rabble, unless it is being shot down without an answer (Defenders Advance Under Fire), or the attacker has not come on for 90 seconds; once its main infantry is in close combat it fights as usual. Its horse archers may still ride out and skirmish. When you are the one attacked, the AI attacks you as before. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefendersHoldTheirGround { get; set; } = true;
 

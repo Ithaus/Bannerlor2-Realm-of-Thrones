@@ -169,6 +169,7 @@ namespace Armoury
         {
             var k = Live;
             if (k == null || a == null) return false;
+            if (HorsePursuit.TestShielded(a)) return false;   // recenzja 291: nekajacy autotestu przed pierwszym wykryciem (jak gracz) - odmowa, sprobuje pozniej
             try { return k.Break(a, site); }
             catch (Exception e) { Stumble(SitePanic, "RoutHold.Break", e); return false; }
         }
@@ -227,6 +228,7 @@ namespace Armoury
         {
             var k = Live;
             if (k == null || a == null) return;
+            if (HorsePursuit.TestShielded(a)) return;   // recenzja 291: jak w Break
             try { k.Withdraw(a); }
             catch (Exception e) { Stumble(SiteWithdraw, "RoutHold.Withdraw", e); }
         }

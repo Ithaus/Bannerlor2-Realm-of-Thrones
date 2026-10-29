@@ -22,15 +22,19 @@ namespace Armoury
     /// do ataku; RBM TacticFullScaleAttackPatch.PostfixGetAiWeight: obronca z piechota ponad 90% - waga ataku 100 (zawsze atak). RemainingPowerRatio (TeamQuerySystem)
     /// = (sila strony bez strat + 1) / (sila wroga bez strat + 1), cala strona (sojusznicy razem).
     ///
-    /// ZASADA (druzyna AI po stronie Defender z rady wojennej - WarCouncil.One -> ApplyList; druzyna gracza poza, tlum ponizej 30 Tactics tez, pozne DR tez):
+    /// ZASADA (druzyna AI po stronie Defender z rady wojennej - WarCouncil.One -> ApplyList; druzyna gracza poza, pozne DR tez; tlum ponizej 30 Tactics - recenzja 291:
+    /// rada zdejmowala mu obrone, teraz przy kluczu dostaje DefensiveEngagement + DefensiveLine jak obronca gry od 20 Tactics, WarCouncil.One):
     ///  - trzyma pozycje: postfiks wag taktyk ataku (FullScaleAttack, Charge, RangedHarrassmentOffensive, FrontalCavalryCharge - Priority.Last po RBM) daje 0,
     ///    gdy ktoras z taktyk obrony tej druzyny (DefensiveEngagement, DefensiveLine, DefensiveRing, HoldChokePoint) miala w ostatniej decyzji wage > 0;
     ///    bez wagi obrony (gra: IsDefenseApplicable NIE albo brak piechoty) - nic (gra wybiera atak, bo nie ma z czego sie bronic). Konni lucznicy w obronie
     ///    harcuja jak dotad (RBM TacticDefensiveEngagementPatch.PostfixDefend: BehaviorMountedSkirmish).
-    ///  - puszczone (wagi gry, RBM i doktryny jak dotad): silniejszy - RemainingPowerRatio >= 1.5 (ten sam prog "wyraznie lepiej" co MakeDecision, x1.5), powrot
-    ///    do trzymania ponizej 1.0; S2 (141, obronca przestrzelany pod ostrzalem) - na czas S2; napastnik nie podchodzi - najblizszy szyk wroga nie zblizyl sie
+    ///  - puszczone (wagi gry, RBM i doktryny jak dotad): S2 (141, obronca przestrzelany pod ostrzalem) - na czas S2; napastnik nie podchodzi - najblizszy szyk wroga nie zblizyl sie
     ///    o 25 m (S1ContactGap) przez 90 s (BaseShootSec - czas ostrzalu przed atakiem S1) - do konca bitwy; zwarcie glownej piechoty (25 m od pieszego wroga) -
-    ///    do konca bitwy (taktyka obrony sama przechodzi w Engage).
+    ///    do konca bitwy (taktyka obrony sama przechodzi w Engage). Recenzja 291: bez wyjatku "silniejszy" (dawniej RemainingPowerRatio >= 1.5 / ponizej 1.0 -
+    ///    nowa stala, ktorej Jeff nie podal: "jak ja atakuje to przeciwnik wybiera najlepsze pozycje do obrony i czeka"; silniejszy obronca tez czeka, a gdy napastnik
+    ///    nie idzie albo go przestrzeliwuje - puszczaja go 'napastnik nie podchodzi' i S2).
+    ///  - pomiar (sekund trzymania, taktyka ataku przy trzymaniu) i zegar DhGrace dopiero po rozstawieniu (recenzja 291: w rozstawieniu AI druzyn nie tyka -
+    ///    DeploymentMissionController AllowAiTicking = false - wiec pierwsza taktyka z ResetTactic AfterStart stoi do konca rozstawienia).
     ///  - klucz NIE: pomiar bez ciecia (te same liczniki - porownanie przed / po).
     /// Stan per druzyna czyszczony w Clear (Begin / End), liczniki misji w Dh291Reset (Battle291.Begin) - linia "Bitwa (291)" pisze HorsePursuit.End po Doctrine.End.
     /// Postfiksy czytaja tylko tablice pisane z glownego watku (tick druzyn nie biegnie rownolegle z OnMissionTick - jak _mul / _s2Live); wagi obrony pisze
@@ -38,7 +42,7 @@ namespace Armoury
     /// </summary>
     internal static partial class Doctrine
     {
-        internal const float DhStrongIn = 1.5f, DhStrongOut = 1.0f, DhStallSec = BaseShootSec, DhStallStep = S1ContactGap, DhGrace = 6f;
+        internal const float DhStallSec = BaseShootSec, DhStallStep = S1ContactGap, DhGrace = 6f;
         private const int DhK = 4;   // 0 DefensiveEngagement, 1 DefensiveLine, 2 DefensiveRing, 3 HoldChokePoint
         private static readonly IFormatProvider DhInv = CultureInfo.InvariantCulture;
 
@@ -47,7 +51,6 @@ namespace Armoury
         private static readonly bool[] _dhOn = new bool[MaxTeams];
         private static readonly float[] _dhW = new float[MaxTeams * DhK];
         private static readonly byte[] _dhOff = new byte[MaxTeams];          // 0 trzyma, 1 napastnik nie podchodzi, 2 zwarcie
-        private static readonly bool[] _dhStrong = new bool[MaxTeams];
         private static readonly bool[] _dhStarted = new bool[MaxTeams];
         private static readonly float[] _dhBest = new float[MaxTeams];
         private static readonly float[] _dhBestAt = new float[MaxTeams];
@@ -56,7 +59,7 @@ namespace Armoury
         private static readonly string[] _dhTac0 = new string[MaxTeams];     // pierwsza taktyka po rozstawieniu
 
         // ---- liczniki misji (glowny watek; postfiksy - Interlocked)
-        private static int _dhTeams, _dhStrongN, _dhS2N, _dhStallN, _dhContactN, _dhStum;
+        private static int _dhTeams, _dhS2N, _dhStallN, _dhContactN, _dhStum;
         private static float _dhHoldSec, _dhAtkSec;
         private static int _dhCut, _dhNoDef;
         private static string _dhSample;
@@ -65,7 +68,7 @@ namespace Armoury
         /// <summary>Battle291.Begin (BattleSense.AfterStart, przed Doctrine.Begin i rada wojenna): liczniki linii "Bitwa (291)" od zera.</summary>
         internal static void Dh291Reset()
         {
-            _dhTeams = _dhStrongN = _dhS2N = _dhStallN = _dhContactN = _dhStum = 0;
+            _dhTeams = _dhS2N = _dhStallN = _dhContactN = _dhStum = 0;
             _dhHoldSec = _dhAtkSec = 0f;
             Interlocked.Exchange(ref _dhCut, 0);
             Interlocked.Exchange(ref _dhNoDef, 0);
@@ -76,7 +79,7 @@ namespace Armoury
 
         private static void DhClearTeam(int i)
         {
-            _dhRef[i] = null; _dhOn[i] = false; _dhOff[i] = 0; _dhStrong[i] = false; _dhStarted[i] = false; _dhBest[i] = 0f; _dhBestAt[i] = 0f; _dhOnAt[i] = -1f;
+            _dhRef[i] = null; _dhOn[i] = false; _dhOff[i] = 0; _dhStarted[i] = false; _dhBest[i] = 0f; _dhBestAt[i] = 0f; _dhOnAt[i] = -1f;
             _dhTac[i] = null; _dhTac0[i] = null;
             for (int k = 0; k < DhK; k++) _dhW[i * DhK + k] = 0f;
         }
@@ -154,8 +157,6 @@ namespace Armoury
             if (q == null) return;
             float rp = 1f;
             try { rp = q.RemainingPowerRatio; } catch { rp = 1f; }
-            if (!_dhStrong[ti] && rp >= DhStrongIn) { _dhStrong[ti] = true; _dhStrongN++; }
-            else if (_dhStrong[ti] && rp < DhStrongOut) _dhStrong[ti] = false;
             if (m.IsDeploymentFinished && _dhOff[ti] == 0)
             {
                 var inf = MainInfantry(t);
@@ -170,9 +171,11 @@ namespace Armoury
                 }
             }
             bool s2 = _s2Live[ti] && ReferenceEquals(_s2Ref[ti], t);
-            bool on = key && _dhOff[ti] == 0 && !_dhStrong[ti] && !s2;
+            bool on = key && _dhOff[ti] == 0 && !s2;
+            bool dep = m.IsDeploymentFinished;
             if (_dhOn[ti] && !on && s2) _dhS2N++;
-            if (on && !_dhOn[ti]) _dhOnAt[ti] = now;
+            // recenzja 291: w rozstawieniu zegar trzymania stoi na biezacej chwili - DhGrace liczy sie od pierwszego taktu po rozstawieniu (pierwsza decyzja gry)
+            if (on && (!_dhOn[ti] || !dep)) _dhOnAt[ti] = now;
             if (!on) _dhOnAt[ti] = -1f;
             _dhOn[ti] = on;
             var cur = CurTactic(t);
@@ -181,7 +184,7 @@ namespace Armoury
                 _dhTac[ti] = TacName(cur);
                 if (_dhTac0[ti] == null && m.IsDeploymentFinished) _dhTac0[ti] = _dhTac[ti] + " s. " + ((int)now).ToString(DhInv);
             }
-            if (on)
+            if (on && dep)
             {
                 _dhHoldSec += TickEvery;
                 // gra decyduje co ok. 5 s - pierwsze DhGrace s trzymania bez liczenia (stara taktyka ataku jeszcze biezaca)
@@ -203,7 +206,7 @@ namespace Armoury
             sb.Append("B obronca trzyma pozycje ").Append(key ? "TAK" : "NIE (tylko pomiar)").Append(": druzyn obroncy ").Append(_dhTeams)
               .Append(", sekund trzymania ").Append(_dhHoldSec.ToString("0", DhInv)).Append(", wagi ataku ciete ").Append(Volatile.Read(ref _dhCut))
               .Append(" (bez wagi obrony ").Append(Volatile.Read(ref _dhNoDef)).Append("), taktyka ataku przy trzymaniu ").Append(_dhAtkSec.ToString("0", DhInv))
-              .Append(" s; puszczone: silniejszy x").Append(DhStrongIn.ToString("0.0", DhInv)).Append(' ').Append(_dhStrongN).Append(", S2 ").Append(_dhS2N)
+              .Append(" s; puszczone: S2 ").Append(_dhS2N)
               .Append(", napastnik nie podchodzi ").Append(DhStallSec.ToString("0", DhInv)).Append(" s ").Append(_dhStallN).Append(", zwarcie ").Append(_dhContactN)
               .Append("; probka ").Append(_dhSample ?? "-").Append(", taktyka ").Append(_dhSampleTac ?? "-").Append("; potkniecia ").Append(_dhStum);
             return sb.ToString();

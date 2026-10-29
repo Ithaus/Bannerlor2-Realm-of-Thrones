@@ -23,7 +23,8 @@ namespace Armoury
     ///  - tylko bitwa polowa (Mission.IsFieldBattle - morska, oblezenie, wypad, kryjowka maja swoje), druzyna z TeamAIGeneral i wazna (MissionTeams);
     ///  - druzyna GRACZA bez zmian (jej AI to rozkazy Jeffa / tryb sierzanta) - sojusznicy AI tak;
     ///  - tac = max GetTacticsSkillAmount strony (jak gra);
-    ///  - tac &lt; 30: tlum bez manewru - lista od nowa: Charge + FullScaleAttack (bandyci, partie bez bohatera);
+    ///  - tac &lt; 30: tlum bez manewru - lista od nowa: Charge + FullScaleAttack (bandyci, partie bez bohatera); 291: obronca przy DefendersHoldTheirGround
+    ///    takze DefensiveEngagement + DefensiveLine (obronca trzyma pozycje, Doctrine.Hold291.cs);
     ///  - 30..59: zestaw RBM bez zmian;
     ///  - od 60: + FrontalCavalryCharge (RBM ja obsluguje, waga x0.75), obronca + DefensiveRing i HoldChokePoint;
     ///  - od 150 i strona od 150 ludzi (poprawka 16.10, dawniej 120 / 60; MapEvent gracza; bitwa wlasna - bez limitu): okrazenie piechota RBM (RBMTacticAttackSplitInfantry /
@@ -174,6 +175,14 @@ namespace Armoury
                 note.Append("tlum");
                 if (Add(team, have, typeof(TacticCharge), note)) added++;
                 if (Add(team, have, typeof(TacticFullScaleAttack), note)) added++;
+                // 291 (recenzja: tlum tracil tu obrone, wiec "obronca trzyma pozycje" nigdy go nie obejmowal - a to bandyci, ktorych Jeff zwykle atakuje: "jak ja atakuje
+                // to przeciwnik wybiera najlepsze pozycje do obrony i czeka na mnie"): przy kluczu DefendersHoldTheirGround druzyna tlumu po stronie Defender dostaje
+                // te same dwie taktyki obrony, co gra daje obroncy od 20 Tactics (MissionCombatantsLogic: DefensiveEngagement, DefensiveLine). Klucz NIE - lista jak dotad.
+                if (team.Side == BattleSideEnum.Defender && cs.DefendersHoldTheirGround)
+                {
+                    if (Add(team, have, typeof(TacticDefensiveEngagement), note)) added++;
+                    if (Add(team, have, typeof(TacticDefensiveLine), note)) added++;
+                }
                 // CoordinatedRetreat zostaje (ta sama instancja): RBM w prefiksie jej GetTacticWeight rozbija cala strone ponizej 10% sily
                 // (Tactics.cs:376-437) - waga i tak 0, wybrana nie bedzie
                 if (added > 0)

@@ -1252,7 +1252,7 @@ Uzycie (Python 3, tylko odczyt):
                     DefendersHoldTheirGround, UnshieldedRushUnderFire) python -I tools/sprawdz_logi.py --grupa bitwa291 <Armoury-*.log> (strumieniowo; bieg bitew
                     autotestu albo bieg 90 dob - bez bitew polowych INFO). Linia 'Bitwa (291): misja ...' raz na bitwe polowa. B291-S self-test, B291-S2 test
                     syntetyczny; B291-0 linia w kazdej bitwie polowej (NB2), klucze TAK; B291-1 A: R5 (cala armia) 0, R4 tylko strzelcy (R4 = strzelcy staja);
-                    B291-2 B: taktyka ataku obroncy przy trzymaniu <= 4 s na bitwe (po pierwszej decyzji gry); B291-3 C: bieg tylko szykow z tarcza ponizej progu,
+                    B291-2 B: sekund trzymania > 0 i taktyka ataku obroncy przy trzymaniu <= 4 s na bitwe (po rozstawieniu; obronca tlum tez - recenzja 291); B291-3 C: bieg tylko szykow z tarcza ponizej progu,
                     koncow <= wejsc; B291-4 regresja (potkniecia B 0, 'ERROR in' Doctrine / HorsePursuit / MarchToContact 0); B291-5 INFO (sumy).
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
@@ -75850,6 +75850,7 @@ N283_RX = {
     "tstart": re.compile(r"^Nekanie \(283\) TEST ([ABC]): nekajacy (\S+) \((konno|pieszo), (\S+), tier (\d+)\) \| cel .* \| wolnej piechoty wroga (\d+) \(szykow (\d+)\), "
                          r"wolnej jazdy wroga (\d+) \(szykow (\d+)\), lucznikow wroga (\d+) \| wrog w marszu (TAK|NIE)$"),
     "tnone": re.compile(r"^Nekanie \(283\) TEST ([ABC]): brak nekajacego - (.*)$"),
+    "tcls": re.compile(r"\| cel \S+ szyku (\S+) "),   # recenzja 291: szyk celu proby (N283-1)
     "tphase": re.compile(r"^Nekanie \(283\) TEST ([ABC]): nekajacy (\S+) faza (\S+) po ([\d.]+) s"),
     "tend": re.compile(r"^Nekanie \(283\) TEST koniec: scenariusz ([ABC]), nekajacy (\S+), wynik (.+?) po ([\d.]+) s \| strzalow (\d+), wykryc (\d+), epizodow (\d+), "
                        r"lucznikow na cel (\d+), piechoty (\d+), jezdzcow (\d+), szykow stoi (\d+) \| wolnej piechoty wroga (\d+), wolnej jazdy wroga (\d+), "
@@ -76019,22 +76020,32 @@ def nekanie283_rows(rep, D):
 
     # N283-1: A - konny strzelec 3 m za strzelcami wroga
     row1 = "N283-1: scenariusz A (konny strzelec za szykiem strzelcow): wykrycie, lucznicy na cel / strzaly, jazda, postoj przy marszu"
-    rule1 = "wykryc >= 1; lucznikow wroga > 0: lucznikow na cel >= 1 i strzaly w nekajacego >= 1; jezdzcow >= min(2, wolnej jazdy); wrog w marszu: szykow stoi >= 1"
+    rule1 = ("wykryc >= 1; lucznikow wroga > 0: lucznikow na cel >= 1 i strzaly w nekajacego >= 1; jezdzcow >= min(2, wolnej jazdy); wrog w marszu i cel w szyku "
+             "Ranged (albo nieznany): szykow stoi >= 1 (291: R4 staja tylko strzelcy, R5 bez armii)")
+    # recenzja 291: szyk celu A z linii 'TEST A' tej samej bitwy (po kolei - jedna proba A na bitwe)
+    cls_a = []
+    for g in D["segs"]:
+        for ts in g["tstarts"]:
+            if ts.group(1) == "A":
+                mc = N283_RX["tcls"].search(ts.string)
+                cls_a.append(mc.group(1) if mc else None)
     if not by["A"]:
         _skip(row1, "A", rule1)
     else:
         parts, ok = [], True
-        for m, line in by["A"]:
+        for ia, (m, line) in enumerate(by["A"]):
             det, arch, rid, halt = int(m.group(6)), int(m.group(8)), int(m.group(10)), int(m.group(11))
             free_cav, earch, march = int(m.group(13)), int(m.group(14)), m.group(15) == "TAK"
             shots = _n283_g("r1", line, 2)
             o = det >= 1 and rid >= min(2, free_cav)
             if earch > 0:
                 o = o and arch >= 1 and shots >= 1
-            if march:
+            cls = cls_a[ia] if ia < len(cls_a) else None
+            if march and cls in (None, "Ranged"):
                 o = o and halt >= 1
             ok = ok and o
-            parts.append(f"wykryc {det}, lucznikow {arch} (wroga {earch}), strzaly {shots}, jezdzcow {rid} (wolnej {free_cav}), stoi {halt} (marsz {m.group(15)}), wynik {m.group(3)}")
+            parts.append(f"wykryc {det}, lucznikow {arch} (wroga {earch}), strzaly {shots}, jezdzcow {rid} (wolnej {free_cav}), stoi {halt} (marsz {m.group(15)}, "
+                         f"cel {cls or '?'}), wynik {m.group(3)}")
         rep.add(row1, "; ".join(parts), rule1, ok)
     # N283-2: B - pieszy strzelec 15 m za piechota wroga
     row2 = "N283-2: scenariusz B (pieszy strzelec za piechota): wykrycie, oddzial piechoty, jazda"
@@ -77854,7 +77865,7 @@ BITWA291_RX = {
     "a": re.compile(r"\| A armia idzie dalej (TAK|NIE): armia nie stanela (\d+) \(R5 (\d+)\), szykow poszlo dalej (\d+) \(ludzi (\d+)\), strzelcy staja (\d+) "
                     r"\(R4 (\d+)\); oddzial od miejsca wyslania (\d+) \(powrotow ze smyczy (\d+)\) \|"),
     "b": re.compile(r"\| B obronca trzyma pozycje (TAK|NIE)[^:]*: druzyn obroncy (\d+), sekund trzymania (\d+), wagi ataku ciete (\d+) \(bez wagi obrony (\d+)\), "
-                    r"taktyka ataku przy trzymaniu (\d+) s; puszczone: silniejszy x[\d.]+ (\d+), S2 (\d+), napastnik nie podchodzi \d+ s (\d+), zwarcie (\d+); "
+                    r"taktyka ataku przy trzymaniu (\d+) s; puszczone: S2 (\d+), napastnik nie podchodzi \d+ s (\d+), zwarcie (\d+); "
                     r"probka (.*?); potkniecia (\d+) \|"),
     "c": re.compile(r"\| C piechota bez tarcz biegnie pod ostrzalem (TAK|NIE): szykow (\d+), wejsc w bieg (\d+) \(sr\. tarcz (\S+), prog ([\d.]+)\), koncow biegu (\d+), "
                     r"szyko-sekund biegu (\d+); z tarczami pod ostrzalem zostal krok (\d+)\.$"),
@@ -77863,14 +77874,14 @@ BITWA291_RX = {
 BITWA291_TEST = {
     "line": ("Bitwa (291): misja bitwa | klucze: armia idzie dalej TAK, obronca trzyma TAK, bieg bez tarcz TAK | A armia idzie dalej TAK: armia nie stanela 1 "
              "(R5 0), szykow poszlo dalej 2 (ludzi 40), strzelcy staja 1 (R4 1); oddzial od miejsca wyslania 6 (powrotow ze smyczy 1) | B obronca trzyma pozycje TAK: "
-             "druzyn obroncy 1, sekund trzymania 120, wagi ataku ciete 48 (bez wagi obrony 0), taktyka ataku przy trzymaniu 0 s; puszczone: silniejszy x1.5 0, S2 0, "
+             "druzyn obroncy 1, sekund trzymania 120, wagi ataku ciete 48 (bez wagi obrony 0), taktyka ataku przy trzymaniu 0 s; puszczone: S2 0, "
              "napastnik nie podchodzi 90 s 0, zwarcie 1; probka T176/vlandia sila x0.81 trzyma, taktyka DefensiveEngagement s. 1 -> DefensiveEngagement; potkniecia 0 "
              "| C piechota bez tarcz biegnie pod ostrzalem TAK: szykow 1, wejsc w bieg 1 (sr. tarcz 0.10, prog 0.60), koncow biegu 1, szyko-sekund biegu 24; z tarczami "
              "pod ostrzalem zostal krok 0."),
     "lineno": ("Bitwa (291): misja bitwa | klucze: armia idzie dalej NIE, obronca trzyma NIE, bieg bez tarcz NIE | A armia idzie dalej NIE: armia nie stanela 0 "
                "(R5 1), szykow poszlo dalej 0 (ludzi 0), strzelcy staja 0 (R4 2); oddzial od miejsca wyslania 0 (powrotow ze smyczy 0) | B obronca trzyma pozycje "
                "NIE (tylko pomiar): druzyn obroncy 1, sekund trzymania 0, wagi ataku ciete 0 (bez wagi obrony 0), taktyka ataku przy trzymaniu 0 s; puszczone: "
-               "silniejszy x1.5 0, S2 0, napastnik nie podchodzi 90 s 0, zwarcie 0; probka -, taktyka -; potkniecia 0 | C piechota bez tarcz biegnie pod ostrzalem "
+               "S2 0, napastnik nie podchodzi 90 s 0, zwarcie 0; probka -, taktyka -; potkniecia 0 | C piechota bez tarcz biegnie pod ostrzalem "
                "NIE: szykow 0, wejsc w bieg 0 (sr. tarcz -, prog 0.60), koncow biegu 0, szyko-sekund biegu 0; z tarczami pod ostrzalem zostal krok 0."),
 }
 
@@ -77886,7 +77897,7 @@ def bitwa291_selftest():
     if not m or m.groups() != ("TAK", "1", "0", "2", "40", "1", "1", "6", "1"):
         return f"a: {m.groups() if m else 'brak'}"
     m = RX["b"].search(s)
-    if not m or m.groups() != ("TAK", "1", "120", "48", "0", "0", "0", "0", "0", "1",
+    if not m or m.groups() != ("TAK", "1", "120", "48", "0", "0", "0", "0", "1",
                                "T176/vlandia sila x0.81 trzyma, taktyka DefensiveEngagement s. 1 -> DefensiveEngagement", "0"):
         return f"b: {m.groups() if m else 'brak'}"
     m = RX["c"].search(s)
@@ -77953,12 +77964,13 @@ def bitwa291_rows(rep, D):
     lb = [mb for m0, _, mb, _ in L if mb.group(1) == "TAK" and int(mb.group(2)) > 0]
     if lb:
         atk = [int(m.group(6)) for m in lb]
-        bad = [a for a in atk if a > BITWA291_ATK_MAX]
-        txt = (f"bitew z obronca {len(lb)}: sekund trzymania {sum(int(m.group(3)) for m in lb)}, wagi ataku ciete {sum(int(m.group(4)) for m in lb)} "
-               f"(bez wagi obrony {sum(int(m.group(5)) for m in lb)}), taktyka ataku przy trzymaniu najwiecej {max(atk)} s; puszczone: silniejszy "
-               f"{sum(int(m.group(7)) for m in lb)}, S2 {sum(int(m.group(8)) for m in lb)}, napastnik nie podchodzi {sum(int(m.group(9)) for m in lb)}, zwarcie "
-               f"{sum(int(m.group(10)) for m in lb)}; probki: " + " / ".join(m.group(11) for m in lb[:3]))
-        rep.add("B291-2: B obronca trzyma pozycje - bez taktyki ataku przy trzymaniu", txt, f"<= {BITWA291_ATK_MAX:.0f} s w kazdej bitwie", not bad)
+        bad = [m for m in lb if int(m.group(6)) > BITWA291_ATK_MAX or int(m.group(3)) <= 0]
+        txt = (f"bitew z obronca {len(lb)}: sekund trzymania {sum(int(m.group(3)) for m in lb)} (najmniej {min(int(m.group(3)) for m in lb)}), wagi ataku ciete "
+               f"{sum(int(m.group(4)) for m in lb)} (bez wagi obrony {sum(int(m.group(5)) for m in lb)}), taktyka ataku przy trzymaniu najwiecej {max(atk)} s; "
+               f"puszczone: S2 {sum(int(m.group(7)) for m in lb)}, napastnik nie podchodzi {sum(int(m.group(8)) for m in lb)}, zwarcie "
+               f"{sum(int(m.group(9)) for m in lb)}; probki: " + " / ".join(m.group(10) for m in lb[:3]))
+        rep.add("B291-2: B obronca trzyma pozycje - bez taktyki ataku przy trzymaniu", txt,
+                f"sekund trzymania > 0 i <= {BITWA291_ATK_MAX:.0f} s taktyki ataku w kazdej bitwie", not bad)
     else:
         rep.add("B291-2: B obronca trzyma pozycje - bez taktyki ataku przy trzymaniu", "brak bitwy z druzyna obroncy AI i kluczem TAK", "INFO", None)
     # B291-3 C
@@ -77974,7 +77986,7 @@ def bitwa291_rows(rep, D):
         rep.add("B291-3: C bieg bez tarcz pod ostrzalem - tylko szyki ponizej progu tarcz, koncow <= wejsc",
                 f"brak wejsc w bieg (z tarczami zostal krok {kept})", "INFO (bitwa bez piechoty bez tarcz pod ostrzalem)", None)
     # B291-4 regresja
-    stum = sum(int(x[2].group(12)) for x in L)
+    stum = sum(int(x[2].group(11)) for x in L)
     known = bool(L or D["err"])
     rep.add("B291-4: regresja - potkniecia B, 'ERROR in' Doctrine / HorsePursuit / MarchToContact / Battle291",
             f"potkniecia {stum}, ERROR {len(D['err'])}" + (f" ({D['err'][0]})" if D["err"] else ""), "0 / 0",

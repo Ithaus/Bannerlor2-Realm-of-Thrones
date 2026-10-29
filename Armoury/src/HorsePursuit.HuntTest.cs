@@ -71,6 +71,9 @@ namespace Armoury
         // kogokolwiek drasneli): nekajacy testu zastepuje gracza (gracz nie panikuje i nie wycofuje sie ranny) - do pierwszego wykrycia HP do pelna i morale
         // nie nizej niz przy wyborze; liczniki do linii 'faza oslona'. J204-1: wykrycia ciosem i pudla razem (takze z dala od ludzi) - osobno od wykryc pociskiem
         private static int _tGuardHp, _tGuardMor, _tMelee, _tMissAll;
+        // recenzja 291: HP przywracane co 0.25 s przegrywalo z BrokenMen (co 0.5 s -> RoutHold.Withdraw -> BeforeWithdraw 'odwrot rannego') i FieldCraft (bol ->
+        // RoutHold.Break) - nekajacy testu do pierwszego wykrycia odrzucany u zrodla (RoutHold.Withdraw / Break, FieldCraft stara droga); ile razy - linia 'faza oslona'
+        private static int _tGuardWd;
         private static float _tMor0 = -1f;
 
         private static void HuntTestBegin(Settings c)
@@ -104,7 +107,7 @@ namespace Armoury
             _tInPlace = _tPlaced = false;
             _tStatAt = 0f;
             _tHarmed = false;
-            _tGuardHp = _tGuardMor = _tMelee = _tMissAll = 0;   // 291
+            _tGuardHp = _tGuardMor = _tMelee = _tMissAll = _tGuardWd = 0;   // 291
             _tMor0 = -1f;
         }
 
@@ -120,6 +123,15 @@ namespace Armoury
                 if (_tMor0 >= 0f && a.GetMorale() < _tMor0) { a.SetMorale(_tMor0); _tGuardMor++; }
             }
             catch (Exception e) { HStumble("HorsePursuit.TestOslona", e); }
+        }
+
+        /// <summary>Recenzja 291 (glowny watek: RoutHold.Withdraw / Break, FieldCraft): nekajacy testu w polu przed pierwszym wykryciem - odwrot rannego i panika z bolu
+        /// odrzucone (wolajacy sprobuje w nastepnym takcie, po pierwszym wykryciu juz normalnie). Poza autotestem _tOn = false - zawsze false.</summary>
+        internal static bool TestShielded(Agent a)
+        {
+            if (!_tOn || _tState != 1 || _tDet > 0 || a == null || !ReferenceEquals(a, _tA)) return false;
+            _tGuardWd++;
+            return true;
         }
 
         /// <summary>Poprawka 132b: HaltAsk przy pierwszej szkodzie od nekajacego testu - stan wroga do progow sprawdz_logi (TEST koniec: wrog w marszu, wolnej
@@ -617,7 +629,7 @@ namespace Armoury
             Volatile.Write(ref _tRun, null);   // 283a: znowu pod capem szyku
             // 291: linia oslony (poza limitem TestPhaseLines - zawsze, przed koncem): ile razy HP / morale przywrocone do pierwszego wykrycia
             string og = " faza oslona po " + Math.Max(0f, now - _tStart).ToString("0.0", Inv) + " s (do pierwszego wykrycia: HP do pelna " + _tGuardHp + " razy, morale "
-                        + _tGuardMor + " razy, wykryc " + _tDet + ")";
+                        + _tGuardMor + " razy, odwrot/panika wstrzymane " + _tGuardWd + " razy, wykryc " + _tDet + ")";
             if (_tScen == 0) Log.Info("Jazda na strzelca (204) TEST: nekajacy " + Who(_tA) + og);
             else Log.Info("Nekanie (283) TEST " + TestScenName[_tScen] + ": nekajacy " + Who(_tA) + og);
             var a = _tA;
