@@ -448,6 +448,9 @@ namespace Armoury
 
         private static int Hours() { int h = CampaignTime.HoursInDay; return h > 0 ? h : 24; }
 
+        /// <summary>297b (tylko odczyt, linia 'Miasta bez rudy a kopalnie'): zasieg wyboru miasta wozow wsi - ten sam co w Choose (MarketMaxDistance, 0 = zasieg gry).</summary>
+        internal static float CartRange(Settings s) { return s != null && s.MarketMaxDistance > 0f ? s.MarketMaxDistance : GameRange(); }
+
         private static float Dist(MobileParty cart, Settlement at, Settlement to)
         {
             var m = Campaign.Current.Models.MapDistanceModel;

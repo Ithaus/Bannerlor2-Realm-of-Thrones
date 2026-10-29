@@ -334,7 +334,7 @@ namespace Armoury
                 // recenzja Z11: wszystkie klucze W2 wylaczone - bez linii doby (kod jak w a7a767e8); liczniki doby tylko zerowane
                 _st.Clear(); _notes.Clear();
                 MarketCarts.TakeM106(); CartRisk.SkipDay(); ClearDay();
-                CartEscort.Daily(day, false);   // 297b: eskorty w domu wracaja do milicji, ksiega i linie doby
+                CartEscort.Daily(day, false, true);   // 297b: eskorty w domu wracaja do milicji (tylko gdy jakies sa), bez linii doby (recenzja 297b: jak reszta tej drogi)
                 return;
             }
             var ex7 = new List<string>();
@@ -384,7 +384,7 @@ namespace Armoury
             foreach (var l in ex7) Log.Info(l);   // m107 K1: przyklady wstrzymanych i bez wozu (co 5 dob, najwyzej 3 i 3)
             _ex7 = null;
             ClearDay();
-            CartEscort.Daily(day, on);            // 297b: ksiega eskort milicji i linie "Eskorta wozow (297b)", "Kopalnie rudy (297b)"
+            CartEscort.Daily(day, on, false);     // 297b: ksiega eskort milicji i linie "Eskorta wozow (297b)", "Kopalnie rudy (297b)"
         }
 
         /// <summary>m107 K1: raz na dobe kazda wstrzymana wies - woz brak / nie w domu / nieczynny - zdjecie; inaczej zagrozenie wedlug modelu AI gry (to samo zapytanie, ktore gra

@@ -1253,8 +1253,9 @@ Uzycie (Python 3, tylko odczyt):
                     Z297-3 zelazo swiata w [-10, +10]/d (30 dob i caly bieg); Z297-4 wydobycie + zlom za zuzyciem <= 10%; Z297-5 miasta bez rudy nie rosna;
                     Z297-6 model wyrebu w zimie >= 0.90 x przed zima i wytop bez drewna <= 10%; Z297-7, Z297-8 i Z297-9 INFO (hamulec ceny, stawka
                     na 1000 rak, srebro). 297b (eskorta milicji wozow, CartEscort297.cs): Z297-S2 self-test; Z297-10 zatkane kopalnie zelaza ostatnie
-                    30 dob <= 2 z 26; Z297-11 zelazo w magazynach wsi nie rosnie; Z297-12 zatkane wsie z wozem w domu <= 20 i <= 15 dob od wyjazdu;
-                    Z297-13 linia eskort, ksiega milicji, eskorty sa; Z297-14 INFO wstrzymane wsie, eskorty, kopalnie.
+                    30 dob <= 2 z 26; Z297-11 ruda w magazynach kopaln zelaza nie rosnie, srednio <= 1.0 W (Z297-11b INFO wszystkie wsie);
+                    Z297-12 zatkane wsie z wozem w domu <= 20 i <= 15 dob od wyjazdu; Z297-13 linia eskort, ksiega milicji, kontrola przenosin 0;
+                    Z297-14 INFO wstrzymane wsie, eskorty, kopalnie; Z297-15 INFO miasta bez rudy a kopalnie (zasieg wozow wsi, ceny).
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -77889,15 +77890,24 @@ ZELAZO297_WOOD_SAMPLE = ("Drewno: dzien 109150 - wsie dopisaly 1994 ladunkow (19
 #   ('Zelazo (lupy)' zapas wsie) prosta 30 dob -22.3 / +4.0 lup/d, srednia 30 dob wobec pierwszych 14 dob 0.83 / 1.08.
 # Z297-S2 self-test wyrazen 297b (linia eskort, linia kopaln, 'Zatkane wsie (diagnoza)', 'Wozy (m106)' wstrzymane, zapas wsi w 'Zelazo (lupy)')
 # Z297-10 kopalnie zelaza zatkane (zapas >= 1.5 W): srednia ostatnich 30 dob <= ZELAZO297_CLOG_MAX z 26 (137a 2.37, 136a 4.70)
-# Z297-11 zelazo w magazynach wsi: prosta ostatnich 30 dob <= ZELAZO297_VST_SLOPE lup/d i srednia 30 dob <= ZELAZO297_VST_RATIO x srednia 14 dob od 2. doby
+# Z297-11 (recenzja 297b, uwaga 3) ruda w magazynach KOPALN zelaza (linia 'Kopalnie rudy (297b)': ruda w magazynach, zapas/W srednio): prosta ostatnich 30 dob
+#         <= ZELAZO297_MST_SLOPE lup/d i srednie wypelnienie 30 dob <= ZELAZO297_MFILL_MAX W (woz wyjezdza przy W - kopalnia bez zatkania ma srednio ponizej W);
+#         bez linii 297b (baza 137a / 136a) - INFO
+# Z297-11b INFO (dawny Z297-11): zelazo w magazynach WSZYSTKICH wsi ('Zelazo (lupy)' zapas wsie) - prosta 30 dob i srednia 30 dob wobec 14 dob od 2. doby
+#         (137a -22.3 / 0.83, 136a +4.0 / 1.08 - przechodzilo na obu bazach, wiec nie mierzy 297b)
 # Z297-12 zatkane wsie z wozem w domu gotowym do wyjazdu (wstrzymane m107 bez eskorty): srednia ostatnich 30 dob <= ZELAZO297_HOME_MAX wsi i srednio
 #         <= ZELAZO297_HOME_DAYS dob od wyjazdu (137a 46.5 i 34.2)
 # Z297-13 linia 'Eskorta wozow (297b)' w kazdej dobie od 2. ('Wozy (m106)' doby, dziur <= 1), klucz TAK, potkniecia 0, ksiega: wczoraj + wydana - wrocila - dzis
-#         = straty >= 0 (kazda doba), eskorty sa (proby z wstrzymania albo ucieczki > 0 - wydane > 0); ERROR CartEscort 0
+#         = straty >= 0 (kazda doba), eskorty sa (proby z wstrzymania albo ucieczki > 0 - wydane > 0); ERROR CartEscort 0; recenzja 297b (uwaga 1): kontrola przenosin
+#         (zmiana rosteru milicji wobec wydanych / wroconych ludzi) roznica 0 w kazdej dobie, ksiega pochodzenia: oddane milicji <= zdjete + w pamieci wczoraj + region wsi
 # Z297-14 INFO: wsie wstrzymane m107 pierwsze / ostatnie 10 dob, eskorty (wydane wozom, ludzi, wrocilo, straty), kopalnie zelaza z linii 297b (wstrzymane, w domu)
+# Z297-15 INFO (recenzja 297b, uwaga 2): linia 'Miasta bez rudy a kopalnie (297b)' co 5 dob - miasta bez rudy na polce, najblizsza kopalnia zelaza ladem w zasiegu
+#         wyboru miasta wozow wsi / poza zasiegiem / bez drogi ladowej / w wojnie, cena rudy w miastach bez rudy wobec miast targowych ich kopalni (pierwsza i ostatnia linia)
 ZELAZO297_CLOG_MAX = 2.0                    # kopalnie zelaza zatkane z 26 (137a 2.37, 136a 4.70)
-ZELAZO297_VST_SLOPE = 5.0                   # zelazo w magazynach wsi - prosta 30 dob, lup/d (137a -22.3, 136a +4.0)
-ZELAZO297_VST_RATIO = 1.25                  # srednia 30 dob / srednia 14 dob od 2. doby (137a 0.83, 136a 1.08)
+ZELAZO297_VST_SLOPE = 5.0                   # Z297-11b INFO: zelazo w magazynach wsi - prosta 30 dob, lup/d (137a -22.3, 136a +4.0)
+ZELAZO297_VST_RATIO = 1.25                  # Z297-11b INFO: srednia 30 dob / srednia 14 dob od 2. doby (137a 0.83, 136a 1.08)
+ZELAZO297_MST_SLOPE = 5.0                   # Z297-11: ruda w magazynach kopaln zelaza - prosta 30 dob, lup/d
+ZELAZO297_MFILL_MAX = 1.0                   # Z297-11: srednie zapas/W kopaln zelaza w 30 dobach
 ZELAZO297_HOME_MAX = 20.0                   # zatkane wsie z wozem w domu gotowym (137a 46.5)
 ZELAZO297_HOME_DAYS = 15.0                  # ich srednie doby od wyjazdu (137a 34.2)
 ZELAZO297B_ERR = ("ERROR in CartEscort",)
@@ -77906,10 +77916,16 @@ ZELAZO297B_ESC = re.compile(r"^Eskorta wozow \(297b\): dzien (?P<d>\d+) \| klucz
                             r"\(z eskorta (?P<orr>\d+), ludzi (?P<mr>\d+)\); bez zagrozenia (?P<calm>\d+), za malo milicji (?P<weak>\d+), bez milicji albo wojska kultury (?P<nomil>\d+), "
                             r"ocen modelu (?P<ev>\d+) \| milicja: wydana (?P<tk>\d+), wrocila (?P<bk>\d+) \(wozow \d+, ludzi \d+\) \| teraz w eskortach (?P<out>\d+) ludzi w (?P<carts>\d+) wozach "
                             r"\(w domu \d+ / \d+, w drodze (?P<road>\d+) / \d+, w miescie \d+ / \d+, gdzie indziej \d+\) \| ksiega: wczoraj (?P<prev>\d+|-) \+ wydana - wrocila - dzis = straty "
-                            r"(?P<lost>-?\d+|od jutra) \(sesja: wydana \d+, wrocila \d+\) \| potkniecia (?P<st>\d+)\.$")
+                            r"(?P<lost>-?\d+|od jutra) \(sesja: wydana \d+, wrocila \d+\) \| kontrola przenosin: roster milicji -(?P<co>\d+) / \+(?P<cb>\d+) wobec wydana / wrocila, "
+                            r"roznica (?P<cd>-?\d+), czeka przy wozie bez partii milicji (?P<wait>\d+) \| pochodzenie: zdjete z milicji (?P<pt>\d+), oddane milicji (?P<pg>\d+) "
+                            r"\(z pamieci (?P<pm>\d+), region wsi (?P<pr>\d+)\), przepadle z eskortami (?P<pl>\d+), w pamieci (?P<pmem>\d+) ludzi w (?P<pc>\d+) wozach "
+                            r"\| potkniecia (?P<st>\d+)\.$")
 ZELAZO297B_MINE = re.compile(r"^Kopalnie rudy \(297b\): dzien (\d+) \| zelazo: kopaln (\d+), zatkanych \(zapas >= 1\.5 W\) (\d+) \[wstrzymane m107 (\d+), woz w domu (\d+), "
                              r"woz poza domem (\d+), brak wozu (\d+), wies poza Normal (\d+)\], ruda w magazynach (\d+), zapas/W srednio ([\d.]+|-), wozy z eskorta (\d+)")
 ZELAZO297B_CLOG = re.compile(r"^Zatkane wsie \(diagnoza\): dzien (\d+) - ")
+ZELAZO297B_NOORE = re.compile(r"^Miasta bez rudy a kopalnie \(297b\): dzien (\d+) \| miast bez rudy na polce (\d+), kopalni zelaza (\d+), zasieg wozu wsi (\d+|bez limitu) "
+                              r"\| najblizsza kopalnia ladem: w zasiegu (\d+), poza zasiegiem (\d+), bez drogi ladowej (\d+), w wojnie (\d+) \| cena rudy za pierwsza sztuke: "
+                              r"miasta bez rudy srednio (\d+|-) d, miasta targowe ich kopalni (\d+|-) d")
 ZELAZO297B_CLOG_FE = re.compile(r"\biron_mine (\d+)/(\d+)")
 ZELAZO297B_CLOG_HOME = re.compile(r"woz zatkanych: w domu (\d+) \(gotowy do wyjazdu (\d+), .*?od wyjazdu srednio ([\d.]+|-) max")
 ZELAZO297B_HELD = re.compile(r"^Wozy \(m106\): dzien (\d+) \|.*?wsie wstrzymane (\d+) ")
@@ -77917,7 +77933,12 @@ ZELAZO297B_VST = re.compile(r"zapas: miasta \d+ \([+-]?\d+\), zamki \d+, wsie (\
 ZELAZO297B_ESC_SAMPLE = ("Eskorta wozow (297b): dzien 109100 | klucz Village Cart Militia Escort TAK | proby: wstrzymane m107 12 (z eskorta 9, ludzi 140), ucieczka z jukami 3 "
                          "(z eskorta 2, ludzi 31), odswiezenie w domu 5 (z eskorta 4, ludzi 60); bez zagrozenia 2, za malo milicji 3, bez milicji albo wojska kultury 0, ocen modelu 171 "
                          "| milicja: wydana 231, wrocila 75 (wozow 5, ludzi 75) | teraz w eskortach 410 ludzi w 27 wozach (w domu 6 / 90, w drodze 15 / 230, w miescie 6 / 90, "
-                         "gdzie indziej 0) | ksiega: wczoraj 260 + wydana - wrocila - dzis = straty 6 (sesja: wydana 900, wrocila 484) | potkniecia 0.")
+                         "gdzie indziej 0) | ksiega: wczoraj 260 + wydana - wrocila - dzis = straty 6 (sesja: wydana 900, wrocila 484) | kontrola przenosin: roster milicji -231 / +75 "
+                         "wobec wydana / wrocila, roznica 0, czeka przy wozie bez partii milicji 1 | pochodzenie: zdjete z milicji 231, oddane milicji 75 (z pamieci 70, region wsi 5), "
+                         "przepadle z eskortami 6, w pamieci 405 ludzi w 26 wozach | potkniecia 0.")
+ZELAZO297B_NOORE_SAMPLE = ("Miasta bez rudy a kopalnie (297b): dzien 109105 | miast bez rudy na polce 9, kopalni zelaza 26, zasieg wozu wsi 250 | najblizsza kopalnia ladem: w zasiegu 2, "
+                           "poza zasiegiem 4, bez drogi ladowej 3, w wojnie 0 | cena rudy za pierwsza sztuke: miasta bez rudy srednio 64 d, miasta targowe ich kopalni 19 d | "
+                           "Bolozo: Tylemos 312 (poza zasiegiem), ruda 120/W 65, cena 64 d wobec 18 d (Rhyos).")
 ZELAZO297B_MINE_SAMPLE = ("Kopalnie rudy (297b): dzien 109100 | zelazo: kopaln 26, zatkanych (zapas >= 1.5 W) 2 [wstrzymane m107 1, woz w domu 0, woz poza domem 1, brak wozu 0, "
                           "wies poza Normal 0], ruda w magazynach 1450, zapas/W srednio 0.81, wozy z eskorta 3; zatkane: Tylemos [ROT_town21_village2] zapas/W 4.06 (272/67), ruda 221, "
                           "milicja 30, wstrzymana m107 od 40 dob | srebro: kopaln 26, zatkanych (zapas >= 1.5 W) 0 [wstrzymane m107 0, woz w domu 0, woz poza domem 0, brak wozu 0, "
@@ -77928,8 +77949,15 @@ def zelazo297b_selftest():
     bad = []
     a = ZELAZO297B_ESC.match(ZELAZO297B_ESC_SAMPLE)
     if not a or a.group("th") != "12" or a.group("oh") != "9" or a.group("tk") != "231" or a.group("bk") != "75" or a.group("out") != "410" or a.group("prev") != "260" \
-            or a.group("lost") != "6" or a.group("st") != "0" or a.group("road") != "15":
+            or a.group("lost") != "6" or a.group("st") != "0" or a.group("road") != "15" or a.group("co") != "231" or a.group("cd") != "0" or a.group("pg") != "75" \
+            or a.group("pl") != "6" or a.group("pmem") != "405" or a.group("wait") != "1":
         bad.append("linia eskort")
+    a3 = ZELAZO297B_ESC.match(ZELAZO297B_ESC_SAMPLE.replace("roznica 0,", "roznica -2,"))
+    if not a3 or a3.group("cd") != "-2":
+        bad.append("linia eskort - roznica przenosin < 0")
+    no = ZELAZO297B_NOORE.match(ZELAZO297B_NOORE_SAMPLE)
+    if not no or no.groups() != ("109105", "9", "26", "250", "2", "4", "3", "0", "64", "19"):
+        bad.append("Miasta bez rudy a kopalnie")
     a2 = ZELAZO297B_ESC.match(ZELAZO297B_ESC_SAMPLE.replace("wczoraj 260", "wczoraj -").replace("straty 6", "straty od jutra")
                               .replace("Escort TAK |", "Escort NIE (straznik wylaczony - eskorty w domu wracaja) |"))
     if not a2 or a2.group("lost") != "od jutra" or a2.group("k") != "NIE":
@@ -77970,7 +77998,20 @@ def zelazo297b_rows(rep, D):
                 f"<= {ZELAZO297_CLOG_MAX:.1f} (137a 2.37, 136a 4.70)", mv <= ZELAZO297_CLOG_MAX)
     else:
         rep.add("Z297-10: kopalnie zelaza zatkane", f"za malo dob linii 'Zatkane wsie (diagnoza)' ({len(cd)})", ">= 30 dob", None)
-    # Z297-11
+    # Z297-11 (kopalnie zelaza z linii 297b)
+    mn = E["mine"]
+    mdays = sorted(mn)[1:]
+    if len(mdays) >= 30:
+        L = mdays[-30:]
+        sl = zelazo297b_slope(L, [mn[d][8] for d in L])
+        fill = [mn[d][9] for d in L if isinstance(mn[d][9], float)]
+        mf = sum(fill) / len(fill) if fill else 0.0
+        rep.add("Z297-11: ruda w magazynach kopaln zelaza ('Kopalnie rudy (297b)'), ostatnie 30 dob",
+                f"prosta {sl:+.1f} lup/d ({mn[L[0]][8]} -> {mn[L[-1]][8]}, caly bieg {mn[mdays[0]][8]} -> {mn[mdays[-1]][8]}), zapas/W srednio {mf:.2f}",
+                f"prosta <= {ZELAZO297_MST_SLOPE:+.0f}/d i zapas/W <= {ZELAZO297_MFILL_MAX:.2f}", sl <= ZELAZO297_MST_SLOPE and bool(fill) and mf <= ZELAZO297_MFILL_MAX)
+    else:
+        rep.add("Z297-11: ruda w magazynach kopaln zelaza", f"za malo dob linii 'Kopalnie rudy (297b)' ({len(mdays)}; bieg bez 297b)", ">= 30 dob", None)
+    # Z297-11b INFO (wszystkie wsie)
     vd = sorted(E["vst"])[1:]
     if len(vd) >= 44:
         L = vd[-30:]
@@ -77978,12 +78019,11 @@ def zelazo297b_rows(rep, D):
         m30 = sum(E["vst"][d] for d in L) / len(L)
         m14 = sum(E["vst"][d] for d in vd[:14]) / 14.0
         q = m30 / m14 if m14 > 0 else 0.0
-        rep.add("Z297-11: zelazo w magazynach wsi ('Zelazo (lupy)' zapas wsie)",
+        rep.add("Z297-11b: zelazo w magazynach wszystkich wsi ('Zelazo (lupy)' zapas wsie, INFO)",
                 f"prosta 30 dob {sl:+.1f} lup/d, srednia 30 dob {m30:.0f} wobec pierwszych 14 dob {m14:.0f} = {q:.2f} ({E['vst'][vd[0]]} -> {E['vst'][vd[-1]]})",
-                f"prosta <= {ZELAZO297_VST_SLOPE:+.0f}/d i <= {ZELAZO297_VST_RATIO:.2f} x (137a -22.3 / 0.83, 136a +4.0 / 1.08)",
-                sl <= ZELAZO297_VST_SLOPE and q <= ZELAZO297_VST_RATIO)
+                f"INFO (137a -22.3 / 0.83, 136a +4.0 / 1.08; dawny prog {ZELAZO297_VST_SLOPE:+.0f}/d i {ZELAZO297_VST_RATIO:.2f} x)", None)
     else:
-        rep.add("Z297-11: zelazo w magazynach wsi", f"za malo dob ({len(vd)})", ">= 44 dob", None)
+        rep.add("Z297-11b: zelazo w magazynach wsi (INFO)", f"za malo dob ({len(vd)})", ">= 44 dob", None)
     # Z297-12
     hd = sorted(E["home"])[1:]
     if len(hd) >= 30:
@@ -78008,18 +78048,30 @@ def zelazo297b_rows(rep, D):
         lost = int(x["prev"]) + int(x["tk"]) - int(x["bk"]) - int(x["out"])
         if lost != int(x["lost"]) or lost < 0:
             bad_led.append(d)
+    bad_ctl = [d for d in sorted(es) if int(es[d]["cd"]) != 0]
+    bad_book = []
+    prev_mem = None
+    for d in sorted(es):
+        x = es[d]
+        if prev_mem is not None and int(x["pm"]) > prev_mem + int(x["pt"]) + 1:
+            bad_book.append(d)
+        prev_mem = int(x["pmem"])
+    waits = sum(int(x["wait"]) for x in es.values())
     tries = sum(int(x["th"]) + int(x["tf"]) for x in es.values())
     oks = sum(int(x["oh"]) + int(x["of"]) for x in es.values())
     taken = sum(int(x["tk"]) for x in es.values())
     keyno = sum(1 for x in es.values() if x["k"] != "TAK")
     st = sum(int(x["st"]) for x in es.values())
     if es:
-        ok = len(miss) <= 1 and E["escbad"] == 0 and keyno == 0 and st == 0 and not bad_led and E["err"] == 0 and (tries == 0 or (oks > 0 and taken > 0))
-        rep.add("Z297-13: linia 'Eskorta wozow (297b)', ksiega milicji, eskorty sa",
+        ok = len(miss) <= 1 and E["escbad"] == 0 and keyno == 0 and st == 0 and not bad_led and not bad_ctl and not bad_book and E["err"] == 0 \
+            and (tries == 0 or (oks > 0 and taken > 0))
+        rep.add("Z297-13: linia 'Eskorta wozow (297b)', ksiega milicji, kontrola przenosin, eskorty sa",
                 f"linii {len(es)} (brak w {len(miss)} z {len(want)} dob 'Wozy (m106)'), nierozpoznanych {E['escbad']}, klucz NIE {keyno}, potkniecia {st}, ERROR CartEscort "
                 f"{E['err']}, ksiega niezgodna albo straty < 0 w {len(bad_led)} dobach" + (f" (np. {bad_led[:3]})" if bad_led else "")
+                + f", roznica przenosin (roster milicji wobec wydanych / wroconych) w {len(bad_ctl)} dobach" + (f" (np. {bad_ctl[:3]})" if bad_ctl else "")
+                + f", pochodzenie z pamieci ponad zdjete w {len(bad_book)} dobach; czeka bez partii milicji {waits}"
                 + f"; proby (wstrzymane + ucieczka) {tries}, z eskorta {oks}, wydano ludzi {taken}",
-                "linia w kazdej dobie (dziur <= 1), klucz TAK, potkniecia 0, ksiega zgodna i straty >= 0, przy probach eskorty > 0", ok)
+                "linia w kazdej dobie (dziur <= 1), klucz TAK, potkniecia 0, ksiega zgodna i straty >= 0, roznica przenosin 0, przy probach eskorty > 0", ok)
     else:
         rep.add("Z297-13: linia 'Eskorta wozow (297b)'", f"brak linii (bieg bez 297b; ERROR CartEscort {E['err']})", "linia w kazdej dobie", None if E["err"] == 0 else False)
     # Z297-14 INFO
@@ -78041,7 +78093,25 @@ def zelazo297b_rows(rep, D):
         parts.append(f"kopalnie zelaza (linia 297b, ostatnie {len(L)} dob): zatkane srednio {sum(mn[d][2] for d in L) / len(L):.2f}, wstrzymane "
                      f"{sum(mn[d][3] for d in L) / len(L):.2f}, w domu {sum(mn[d][4] for d in L) / len(L):.2f}, poza domem {sum(mn[d][5] for d in L) / len(L):.2f}, "
                      f"ruda w magazynach {sum(mn[d][8] for d in L) / len(L):.0f}, wozy z eskorta {sum(mn[d][10] for d in L) / len(L):.1f}")
+    if es:
+        parts.append(f"pochodzenie: zdjete z milicji {sum(int(x['pt']) for x in es.values())}, oddane {sum(int(x['pg']) for x in es.values())} (region wsi "
+                     f"{sum(int(x['pr']) for x in es.values())}), przepadle z eskortami {sum(int(x['pl']) for x in es.values())}")
     rep.add("Z297-14: wstrzymane wsie, eskorty, kopalnie (INFO)", "; ".join(parts) if parts else "-", "INFO", None)
+    # Z297-15 INFO
+    no = E["noore"]
+    if no:
+        ds = sorted(no)
+        def one(d):
+            x = no[d]
+            return (f"dzien {d}: bez rudy {x[1]}, najblizsza kopalnia w zasiegu {x[4]} / poza zasiegiem {x[5]} / bez drogi {x[6]} / w wojnie {x[7]} (zasieg {x[3]}), "
+                    f"cena {x[8]} d wobec {x[9]} d")
+        k = len(ds)
+        rep.add("Z297-15: miasta bez rudy a kopalnie zelaza ('Miasta bez rudy a kopalnie (297b)', INFO)",
+                f"linii {k}; " + one(ds[0]) + ("; " + one(ds[-1]) if k > 1 else "")
+                + f"; srednio w zasiegu {sum(no[d][4] for d in ds) / k:.1f}, poza zasiegiem {sum(no[d][5] for d in ds) / k:.1f}, bez drogi {sum(no[d][6] for d in ds) / k:.1f}",
+                "INFO (miasto bez rudy z kopalnia w zasiegu - woz wsi moglby tam jechac; poza zasiegiem / bez drogi - praca karawan i kontraktow 174/282)", None)
+    else:
+        rep.add("Z297-15: miasta bez rudy a kopalnie zelaza", "brak linii (bieg bez 297b albo LogGate bez linii)", "INFO", None)
 
 
 def zelazo297_selftest():
@@ -78090,7 +78160,7 @@ def zelazo297_selftest():
 
 def zelazo297_collect(logp):
     D = {"g": {}, "gbad": 0, "iron": {}, "wood": {}, "f5": {}, "price": {}, "smith": {}, "ag": {}, "err": 0, "errs": [],
-         "b": {"clog": {}, "home": {}, "held": {}, "vst": {}, "esc": {}, "escbad": 0, "mine": {}, "err": 0}}
+         "b": {"clog": {}, "home": {}, "held": {}, "vst": {}, "esc": {}, "escbad": 0, "mine": {}, "noore": {}, "err": 0}}
     B = D["b"]
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -78115,6 +78185,12 @@ def zelazo297_collect(logp):
                 a = ZELAZO297B_MINE.match(s)
                 if a:
                     B["mine"][int(a.group(1))] = tuple(float(v) if "." in v else (int(v) if v != "-" else 0) for v in a.groups())
+                continue
+            if s.startswith("Miasta bez rudy a kopalnie (297b): dzien "):
+                a = ZELAZO297B_NOORE.match(s)
+                if a:
+                    g = a.groups()
+                    B["noore"][int(g[0])] = (int(g[0]), int(g[1]), int(g[2]), g[3], int(g[4]), int(g[5]), int(g[6]), int(g[7]), g[8], g[9])
                 continue
             if s.startswith("Zatkane wsie (diagnoza): dzien "):
                 a = ZELAZO297B_CLOG.match(s)
@@ -78335,7 +78411,7 @@ def zelazo297_main(logp):
     rep.add("Z297-S: self-test wyrazen (linia 297, Zelazo (lupy), Drewno, f5 rece / stawka / wytop, Ceny surowcow, E3-D2)", s1 or "OK",
             "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     s2 = zelazo297b_selftest()
-    rep.add("Z297-S2: self-test wyrazen 297b (Eskorta wozow, Kopalnie rudy, Zatkane wsie, Wozy (m106), zapas wsi)", s2 or "OK",
+    rep.add("Z297-S2: self-test wyrazen 297b (Eskorta wozow, Kopalnie rudy, Miasta bez rudy a kopalnie, Zatkane wsie, Wozy (m106), zapas wsi)", s2 or "OK",
             "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("Z297-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
