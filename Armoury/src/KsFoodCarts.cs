@@ -1000,7 +1000,7 @@ namespace Armoury
                 return Math.Max(1, (int)Math.Ceiling(f));
             };
             if (Q(0) != p0 || Q(n - 1) != pl) return false;
-            return KsFoodCore.LotSteps(p0, pl, n, val * (1.0 + pen), ins0, sup, dem, wv, Q, out sum, RawPrice.SupplyW, RawPrice.ShelfW);   // 299: wagi wzoru jak w RawPrice.FactorPrefix
+            return KsFoodCore.LotSteps(p0, pl, n, val * (1.0 + pen), ins0, sup, dem, wv, Q, out sum, RawPrice.SupplyW, RawPrice.ShelfW, RawPrice.FormulaConst(cat));   // 299: wagi i stala wzoru jak w RawPrice.FactorPrefix
         }
 
         /// <summary>KS-R4 r4-kupcy H4: wartosc n sztuk u celu po marzy - pamiec doby (cena pierwszej sztuki, polka wzoru, sufit) na (cel, towar), decyzja KsFoodCore;
@@ -1029,7 +1029,8 @@ namespace Armoury
         }
 
         /// <summary>H4: cena pierwszej sztuki na polce celu (gra, bez sufitu pustej polki ZC4), A0 = 0.1 x podaz + 0.04 x wartosc polki + 2, c = 0.04 x wartosc sztuki
-        /// (paczka 299 - klucz PriceFlatterLotWalk: wagi RawPrice.SupplyW 0.119 i ShelfW 0.021, jak w RawPrice.FactorPrefix; stala 2 bez zmian - przyblizenie jak dotad),
+        /// (paczka 299 - klucz PriceFlatterLotWalk: wagi RawPrice.SupplyW 0.119 i ShelfW 0.021, jak w RawPrice.FactorPrefix; recenzja 299: stala 2 / r po przeliczniku monety -
+        /// RawPrice.FormulaConst, przy wylaczonym kluczu 2 jak dotad),
         /// sufit sztuki 3 x cena startu rynku celu x wartosc (F5: pusta polka nie blokuje lotu glodu).</summary>
         private static bool DestParams(Town tw, int t, int k, ItemObject it, out double p0, out double a0, out double c, out double cap)
         {
@@ -1040,7 +1041,7 @@ namespace Armoury
                 var md = tw.MarketData;
                 p0 = Math.Max(1, md.GetPrice(it, null, false, null));
                 var d = md.GetCategoryData(it.ItemCategory);
-                a0 = RawPrice.SupplyW * d.Supply + RawPrice.ShelfW * Math.Max(0f, d.InStoreValue) + 2.0;   // 299: wagi jak w RawPrice.FactorPrefix (klucz wylaczony - 0.1 / 0.04)
+                a0 = RawPrice.SupplyW * d.Supply + RawPrice.ShelfW * Math.Max(0f, d.InStoreValue) + RawPrice.FormulaConst(it.ItemCategory);   // 299: wagi i stala jak w RawPrice.FactorPrefix (klucz wylaczony - 0.1 / 0.04 / 2)
                 c = RawPrice.ShelfW * Math.Max(1, HistoricalPrices.ShelfWorth(it));
                 int m = t >= 0 && t < _nt ? _mk[t] : StartCalibration.TownMarketOf(tw);
                 cap = 3.0 * StartCalibration.ZStartIndex(m, Z[k]) * Math.Max(1, it.Value);

@@ -514,7 +514,10 @@ namespace Armoury
         }
 
         /// <summary>294b: cena k-tej sztuki w miescie odniesienia (mediana miast placacych co najmniej srednia) po mycie tego miasta - model cen gry (kara handlu tej
-        /// karawany), polka z migawki doby + (k - 1) x ShelfWorth (CaravanGoods.PriceAt). NaN - brak miary (bez miasta odniesienia albo modelu).</summary>
+        /// karawany), polka z migawki doby + (k - 1) x ShelfWorth (CaravanGoods.PriceAt). NaN - brak miary (bez miasta odniesienia albo modelu).
+        /// Recenzja 299: kolejka (juki innych karawan + moje - zjedzone w drodze) laduje na polce przez odcinek drogi, nie w jednej wizycie - liczona krzywa gry
+        /// (RawPrice.GameCurve: 0.04 / 0.1), czyli krzywa 299 dobe po dostawie (0.021 + 0.119 x 0.15 = 0.039); krzywa sztuki od razu (0.021) zawyzalaby glebokosc
+        /// rynku do 1.9 x i otwierala kupno w przesyt. Klucz PriceFlatterLotWalk wylaczony - to samo co dotad.</summary>
         internal static double DepthNet(MobileParty mp, EquipmentElement el, int k)
         {
             try
@@ -526,7 +529,11 @@ namespace Armoury
                 var model = cg != null && cg.Models != null ? cg.Models.TradeItemPriceFactorModel : null;
                 if (r == null || r.Ref == null || r.Ref.Settlement == null || model == null) return double.NaN;
                 int wv = Math.Max(1, HistoricalPrices.ShelfWorth(it));
-                int p = model.GetPrice(el, mp, null, true, r.InStore + (Math.Max(1, k) - 1) * (float)wv, r.Supply, r.Demand);
+                int p;
+                bool was = RawPrice.GameCurve;
+                RawPrice.GameCurve = true;
+                try { p = model.GetPrice(el, mp, null, true, r.InStore + (Math.Max(1, k) - 1) * (float)wv, r.Supply, r.Demand); }
+                finally { RawPrice.GameCurve = was; }
                 return p * (1.0 - TownToll.CaravanRateFor(mp, r.Ref.Settlement));
             }
             catch (Exception e) { DStumble("Net", e); return double.NaN; }

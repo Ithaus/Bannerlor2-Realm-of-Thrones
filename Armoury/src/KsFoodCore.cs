@@ -536,8 +536,10 @@ namespace Armoury
         /// <summary>T9b (czysty C#, test portu): suma cen n sztuk z polki zrodla przy cenie sztuki Q(k) = ceil(q x (D / (0.1 S + 0.04 max(0, V - k x wv) + 2))^0.6)
         /// niemalejacej od p0 = Q(0) do pl = Q(n-1) (wolajacy sprawdza obie ceny gra). Poziomy cen L = p0 .. pl-1: ostatnia sztuka z cena <= L z odwrotnosci wzoru
         /// (jeden Pow), granica poprawiana Q obok (najwyzej 6 krokow - inaczej false i wolajacy liczy trzy ceny). Paczka 299: wS / wI - wagi podazy i polki we wzorze
-        /// (domyslne 0.1 / 0.04 = gra; KsFoodCarts podaje RawPrice.SupplyW / ShelfW; symulator port5 kompiluje sie bez zmian).</summary>
-        internal static bool LotSteps(long p0, long pl, int n, double q, double ins0, double sup, double dem, int wv, Func<int, long> Q, out long sum, double wS = 0.1, double wI = 0.04)
+        /// (domyslne 0.1 / 0.04 = gra; KsFoodCarts podaje RawPrice.SupplyW / ShelfW; symulator port5 kompiluje sie bez zmian). Recenzja 299: k2 - stala wzoru po przeliczniku
+        /// monety (RawPrice.FormulaConst: 2 / r przy r > 1, domyslnie 2 jak dotad).</summary>
+        internal static bool LotSteps(long p0, long pl, int n, double q, double ins0, double sup, double dem, int wv, Func<int, long> Q, out long sum, double wS = 0.1, double wI = 0.04,
+                                      double k2 = 2.0)
         {
             sum = 0;
             if (n <= 0 || wv <= 0 || !(q > 0)) return false;
@@ -546,12 +548,12 @@ namespace Armoury
             long tot = 0; int k0 = 0;
             for (long L = p0; L < pl; L++)
             {
-                // ostatnia sztuka z cena <= L: czynnik <= L / q  <=>  wS S + wI V + 2 >= D / (L / q)^(1/0.6)  <=>  V >= (D / y^(1/0.6) - wS S - 2) / wI (gra: 0.1 / 0.04)
+                // ostatnia sztuka z cena <= L: czynnik <= L / q  <=>  wS S + wI V + 2 >= D / (L / q)^(1/0.6)  <=>  V >= (D / y^(1/0.6) - wS S - k2) / wI (gra: 0.1 / 0.04, k2 = 2)
                 double y = L / q; int kL;
                 if (y >= 10.0) kL = n - 1;
                 else
                 {
-                    double vNeed = (dem / Math.Pow(y, 1.0 / 0.6) - wS * sup - 2.0) / wI;
+                    double vNeed = (dem / Math.Pow(y, 1.0 / 0.6) - wS * sup - k2) / wI;
                     double kk = (ins0 - vNeed) / wv;
                     kL = double.IsNaN(kk) ? k0 - 1 : (kk >= n ? n - 1 : (kk < -1 ? -1 : (int)Math.Floor(kk)));
                 }

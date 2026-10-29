@@ -105,13 +105,26 @@ namespace Armoury
         internal const double LotShelfW = (GameShelfW + GameSupplyW) * GameDayW;     // 0.021
         internal const double LotSupplyW = GameShelfW + GameSupplyW - LotShelfW;      // 0.119
         private const float KShelf = (float)(LotShelfW / GameShelfW), KSupply = (float)(LotSupplyW / GameSupplyW);  // 0.525 / 1.19
-        /// <summary>Sonda 299 (PriceWalk299): krzywa gry przy tym samym stanie rynku - tylko na watku sondy, w try/finally.</summary>
-        [ThreadStatic] internal static bool ProbeOff;
+        /// <summary>Krzywa gry przy tym samym stanie rynku (wagi 0.04 / 0.1) - ustawiana tylko w try/finally na watku wolajacego: sonda 299 (PriceWalk299) i
+        /// recenzja 299 - CaravanTrade284.DepthNet (kolejka towaru, ktory laduje na polce przez odcinek drogi: po jednej dobie pamieci podazy 299 waga swiezego towaru
+        /// to 0.021 + 0.119 x 0.15 = 0.039 - krzywa gry przy migawce jest krzywa 299 dobe po dostawie; brama 294b zostaje tak, jak ja skalibrowano na 296e).</summary>
+        [ThreadStatic] internal static bool GameCurve;
         internal static bool LotWalkOn { get { var s = Settings.Current; return s != null && s.PriceFlatterLotWalk; } }
         /// <summary>Wagi wzoru dla wlasnych kopii wzoru (KsFoodCarts.DestParams, KsFoodCore.LotSteps, StartCalibration.Ramp); klucz wylaczony - dokladnie literaly gry.</summary>
         internal static double ShelfW { get { return LotWalkOn ? LotShelfW : 0.04; } }
         internal static double SupplyW { get { return LotWalkOn ? LotSupplyW : 0.1; } }
         internal static int FactorModels { get { return _factorModels; } }
+
+        /// <summary>Recenzja 299: stala wzoru "+2" po przeliczniku monety, jak w FactorPrefix - (r D / (r X + 2))^e = (D / (X + 2 / r))^e, wiec przy r > 1
+        /// (PriceFormulaInNewCoin, HistDemandScaling) stala to 2 / r; inaczej 2. Dla wlasnych kopii wzoru (KsFoodCarts.DestParams, KsFoodCore.LotSteps): wagi 299
+        /// polowia wage polki, wiec blad stalej 2 zamiast 2 / r w sztukach rosl 1.9 x. Klucz PriceFlatterLotWalk wylaczony - 2 (jak przed 299, bit w bit).</summary>
+        internal static double FormulaConst(ItemCategory cat)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.PriceFlatterLotWalk || !s.PriceFormulaInNewCoin || !s.HistDemandScaling || cat == null) return 2.0;
+            float r = HistoricalPrices.CoinRatio(cat);
+            return r > 1f ? 2.0 / r : 2.0;
+        }
 
         /// <summary>Prefiks GetBasePriceFactor(kategoria, wartosc polki, podaz, popyt, sprzedaz, wartosc sprzedawanej sztuki).</summary>
         public static void FactorPrefix(ItemCategory __0, ref float __1, ref float __2, ref float __3, bool __4, ref int __5)
@@ -131,7 +144,7 @@ namespace Armoury
                 var s = Settings.Current;
                 // paczka 299: sprzedawana sztuka dolacza do polki z waga polki, polka 0.525 x, podaz 1.19 x (0.04 -> 0.021, 0.1 -> 0.119; razem 0.14 jak w grze);
                 // przed przelicznikiem monety (mnozenie przez r dalej jest przemienne); GetTradePenalty dostaje wartosci oryginalne (ref zmienia tylko to wywolanie)
-                if (s != null && s.PriceFlatterLotWalk && !ProbeOff)
+                if (s != null && s.PriceFlatterLotWalk && !GameCurve)
                 {
                     if (__4 && __5 != 0) { __1 += __5; __5 = 0; }
                     __1 *= KShelf; __2 *= KSupply;

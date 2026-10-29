@@ -15,7 +15,7 @@ namespace Armoury
     /// PACZKA 299 - SONDA KROKU CENY NA SZTUKE (Jeff 29.10: "za bardzo spada cena jak sprzedaje towar, trzeba bardziej wyplaszczyc zmiane kursu
     /// towaru gdy jest sprzedaz i zakup"). Regula siedzi w RawPrice.FactorPrefix (klucz PriceFlatterLotWalk); tu tylko pomiar, raz na dobe pomiaru
     /// (LogGate.Lines, zaraz po linii "Ceny surowcow"): kazde miasto x kazdy towar handlowy z popytem > 0.01 liczony dwa razy przy TYM SAMYM stanie rynku -
-    /// krzywa gry (RawPrice.ProbeOff = true) i krzywa 299. Czysty rachunek: zadnej zmiany polki, podazy, popytu ani zlota, zadnego stanu w zapisie.
+    /// krzywa gry (RawPrice.GameCurve = true) i krzywa 299. Czysty rachunek: zadnej zmiany polki, podazy, popytu ani zlota, zadnego stanu w zapisie.
     /// Wsie handluja na danych rynku miasta (Bound), zamki maja popyt 0 (indeks na podlodze 0.1) - liczone same miasta.
     /// Linia "Ceny na sztuke (299): dzien" czyta grupa ceny299 w tools/sprawdz_logi.py.
     /// </summary>
@@ -48,18 +48,18 @@ namespace Armoury
 
         private static float Bf(TradeItemPriceFactorModel m, bool game, ItemCategory c, float ins, float sup, float dem, bool sell, int val)
         {
-            bool was = RawPrice.ProbeOff;
-            RawPrice.ProbeOff = game;
+            bool was = RawPrice.GameCurve;
+            RawPrice.GameCurve = game;
             try { return m.GetBasePriceFactor(c, ins, sup, dem, sell, val); }
-            finally { RawPrice.ProbeOff = was; }
+            finally { RawPrice.GameCurve = was; }
         }
 
         private static int Pr(TradeItemPriceFactorModel m, bool game, EquipmentElement el, PartyBase merchant, bool sell, float ins, float sup, float dem)
         {
-            bool was = RawPrice.ProbeOff;
-            RawPrice.ProbeOff = game;
+            bool was = RawPrice.GameCurve;
+            RawPrice.GameCurve = game;
             try { return m.GetPrice(el, MobileParty.MainParty, merchant, sell, ins, sup, dem); }
-            finally { RawPrice.ProbeOff = was; }
+            finally { RawPrice.GameCurve = was; }
         }
 
         private static float Q(List<float> l, double p)
@@ -107,6 +107,7 @@ namespace Armoury
                 var lvEq = new List<float>(); var lvAll = new List<float>();
                 var w7G = new List<float>(); var w7N = new List<float>();
                 var loopG = new List<float>(); var loopN = new List<float>();
+                var loopBG = new List<float>(); var loopBN = new List<float>();
                 int cells = 0, towns = 0, inv = 0, inv0 = 0, eq = 0, eq0 = 0, ident = 0;
                 double d7 = 1.0 - Math.Pow(0.85, 7);
                 var sellG = new float[31]; var sellN = new float[31];
@@ -168,6 +169,23 @@ namespace Armoury
                                 if (bg > 0) loopG.Add((float)(sg / bg - 1.0));
                                 if (bn > 0) loopN.Add((float)(sn / bn - 1.0));
                             }
+                            // recenzja 299: petla lustrzana - kup 30 teraz (polka I -> I - 30 w przy podazy S), sprzedaj 30 po 7 dobach, gdy podaz zeszla do polki
+                            // (S7b = S + d7 x (I - 30 w - S)); zuzycie miasta jej pomaga (tu brutto bez zuzycia) - polki >= 3 dob z co najmniej 30 sztukami
+                            if (days >= 3.0 && I >= 30f * w)
+                            {
+                                float Ib = I - 30f * w;
+                                float S7b = (float)(S + d7 * (Ib - S));
+                                double kg = 0, kn = 0, og = 0, on2 = 0;
+                                for (int n = 1; n <= 30; n++)
+                                {
+                                    kg += Bf(model, true, cat, I - (n - 1) * (float)w, S, D, false, 0);
+                                    kn += Bf(model, false, cat, I - (n - 1) * (float)w, S, D, false, 0);
+                                    og += Bf(model, true, cat, Ib + (n - 1) * (float)w, S7b, D, true, val);
+                                    on2 += Bf(model, false, cat, Ib + (n - 1) * (float)w, S7b, D, true, val);
+                                }
+                                if (kg > 0) loopBG.Add((float)(og / kg - 1.0));
+                                if (kn > 0) loopBN.Add((float)(on2 / kn - 1.0));
+                            }
                             // w miejscu: kupno sztuki przy polce I i odsprzedaz tej samej sztuki zaraz potem (polka I - w + w) - ceny gracza
                             if (I >= w && MobileParty.MainParty != null)
                             {
@@ -204,6 +222,8 @@ namespace Armoury
                          + " | w miejscu: kupno < odsprzedaz " + inv + " (gra " + inv0 + "), rowne " + eq + " (gra " + eq0 + ") z " + cells
                          + " | petla opozniona (30 szt., 7 dob, brutto) polka >= 3 dob (" + loopG.Count + ") mediana gra " + P(Q(loopG, 0.5)) + "% -> 299 " + P(Q(loopN, 0.5))
                          + "%, p90 gra " + P(Q(loopG, 0.9)) + "% -> 299 " + P(Q(loopN, 0.9)) + "%"
+                         + " | petla kup teraz, sprzedaj po 7 dobach (30 szt., brutto) polka >= 3 dob (" + loopBG.Count + ") mediana gra " + P(Q(loopBG, 0.5)) + "% -> 299 "
+                         + P(Q(loopBN, 0.5)) + "%, p90 gra " + P(Q(loopBG, 0.9)) + "% -> 299 " + P(Q(loopBN, 0.9)) + "%"
                          + " | przyklady (gracz, zl za sztuke, gra -> 299): " + ex
                          + " | identyczne pary gra = 299 " + ident + " z " + cells
                          + " | potkniecia " + stumbles + ".");
@@ -280,7 +300,7 @@ namespace Armoury
                     if (I + n * (float)w >= S && sell(false, n) < sell(true, n)) under++;
                 string name = t.Name != null ? t.Name.ToString() : t.StringId;
                 sb.Append(id).Append('@').Append(name).Append(" (").Append(t.Settlement != null ? t.Settlement.StringId : "?").Append(", polka ")
-                  .Append((D > 0f ? I / D : 0f).ToString("0.0", Inv)).Append(" dob) sztuki ").Append(string.Join("/", Array.ConvertAll(units, x => x.ToString(Inv))))
+                  .Append((D > 0f ? I / D : 0f).ToString("0.0", Inv)).Append(" dob, polka/podaz ").Append(S > 0f ? (I / S).ToString("0.00", Inv) : "-").Append(") sztuki ").Append(string.Join("/", Array.ConvertAll(units, x => x.ToString(Inv))))
                   .Append(": ").Append(string.Join("/", pg.ToArray())).Append(" -> ").Append(string.Join("/", pn.ToArray()))
                   .Append(", indeks do ").Append(last).Append(". sztuki gra ").Append(bg1 > 0f ? (100f * (bgL / bg1 - 1f)).ToString("0.0", Inv) : "0.0")
                   .Append("% -> 299 ").Append(bn1 > 0f ? (100f * (bnL / bn1 - 1f)).ToString("0.0", Inv) : "0.0")
