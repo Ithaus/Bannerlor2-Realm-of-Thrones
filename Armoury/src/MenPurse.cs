@@ -607,6 +607,7 @@ namespace Armoury
                         n++; paidN += unit;
                     }
                     if (n <= 0) continue;
+                    RebuyLedger.Commit(st, el, n);                                         // 300b po recenzji: sprzedaz nadwyzki gracza zuzywa wpisy ksiegi odkupu jak ekran handlu (bez klucza nic)
                     Measure174b.NoteArrival(st, el.Item, n, Measure174b.ArrPurse);          // 174b.0 M1: nowa sztuka na polce
                     MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -paidN);   // paczka 169: linia kas (tylko licznik)
                     Add(main, paidN);
