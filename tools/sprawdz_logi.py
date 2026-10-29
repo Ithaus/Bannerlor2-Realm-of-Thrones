@@ -83047,5 +83047,210 @@ def main(argv):
     return _lupy300_main_prev(argv)
 
 
+# ---- 138c (29.10): pomiar wywozu kupcow i rozkladu wyniku karawan - wiersze INFO (recenzja 138c: checker nie czytal nowych linii)
+# C299-18e INFO (grupa ceny299): z linii 'Wywoz kupcow (E8/O3)' ostatnie 30 dob - decyzja wywozu (ostatnia doba), mediana: wywiezione, zaplacone zl/d, zl/szt.,
+#          z odbiorca (wywiezione / (wywiezione + bez odbiorcy)), z odbiorca bez rezerwy kramu (wywiezione / (wywiezione + bez odbiorcy - rezerwa)), rezerwa kramu szt./d;
+#          z linii 'Przewoz kupcow wozem (215)' mediana 'w drodze N szt.' ostatnie 30 dob. Logi sprzed 138c: bez czlonu 138c (decyzja '-', rezerwa '-').
+#          Bazy (ostatnie 30 dob): 299a wywiezione 2620, zaplacone 0.197 mln zl/d (75 zl/szt.), z odbiorca 0.092, w drodze 10.7 tys.; 138b 9010, 1.29 mln (144 zl/szt.), 0.268, 36.2 tys.
+# K294-26 INFO (grupa karawany294): linia 'Rozklad wyniku karawan (138c)' - ostatnia doba i srednia ostatnich 7 dob: p25 / p50 / p75 (wynik handlu - zold)/d,
+#          udzial 10% najlepszych w dodatnim wyniku handlu/d, zysk 7 dob karawan z handlem p25 / p50 / p75 / srednia i udzial 10% najlepszych. Odczyt: p50 w dol przy p75
+#          w gore = podzial zysku; p25 i p75 razem w dol = strata (wtedy ceny kupna BK).
+CENY138C_EXP = re.compile(r"^Wywoz kupcow \(E8/O3\): dzien (\d+) .*\| wywoz tej doby: (\d+) szt\. w (\d+) transakcjach, zaplacone (\d+) zl, bez odbiorcy (\d+) szt\."
+                          r"(?:.*?\| decyzja wywozu \(138c\): ([^|]*?), z odbiorca (?:[0-9.]+|-)(?: \(wywiezione / \(wywiezione \+ bez odbiorcy\)\), w tym bez odbiorcy przez rezerwe kramu (\d+) szt\.)?)?"
+                          r".*\| potkniecia od startu sesji")
+CENY138C_CART_L = "Przewoz kupcow wozem (215): dzien "
+CENY138C_CART = re.compile(r"^Przewoz kupcow wozem \(215\): dzien (\d+) .*\| w drodze (\d+) szt\. w (\d+) wozach")
+CENY138C_SAMPLE = ("Wywoz kupcow (E8/O3): dzien 109166 | TradeExportFast [WL] | osad 227, zasieg 250 | wybor celu: nowa droga 1 / stara droga 0"
+                   " | wywoz tej doby: 3000 szt. w 900 transakcjach, zaplacone 300000 zl, bez odbiorcy 27000 szt., wycen 3000, czas wywozu 12.0 ms"
+                   " | decyzja wywozu (138c): cel z polki fizycznej z towarem w drodze, zrodlo z pamieci polki, z odbiorca 0.100 (wywiezione / (wywiezione + bez odbiorcy)),"
+                   " w tym bez odbiorcy przez rezerwe kramu 7000 szt. | potkniecia od startu sesji 0.")
+CENY138C_SAMPLE_OLD = ("Wywoz kupcow (E8/O3): dzien 109166 | TradeExportFast [WL] | wywoz tej doby: 2620 szt. w 800 transakcjach, zaplacone 196732 zl, bez odbiorcy 25000 szt.,"
+                       " wycen 2620, czas wywozu 10.0 ms | potkniecia od startu sesji 0.")
+CENY138C_SAMPLE_B = ("Wywoz kupcow (E8/O3): dzien 109166 | wywoz tej doby: 9000 szt. w 2000 transakcjach, zaplacone 1290000 zl, bez odbiorcy 24000 szt., wycen 9000, czas wywozu 30.0 ms"
+                     " | decyzja wywozu (138c): polka fizyczna z towarem w drodze, z odbiorca 0.273 | potkniecia od startu sesji 0.")
+CENY138C_SAMPLE_CART = ("Przewoz kupcow wozem (215): dzien 109167 | CZYNNE | kupione 7832 szt. za 1253623 zl w 982 wozach (srednio 3.8 dob drogi) | dowiezione 9649 szt. w 1018 wozach"
+                        " | w drodze 32872 szt. w 3729 wozach | kontrola: reszta 0 | potkniecia dzis 0.")
+KARAWANY138C_L = "Rozklad wyniku karawan (138c): dzien "
+KARAWANY138C_RE = re.compile(r"^Rozklad wyniku karawan \(138c\): dzien (?P<d>\d+) \| \(wynik handlu - zold\)/d karawan zmierzonych (?P<n>\d+)"
+                             r"(?:: p10 (?P<p10>-?\d+), p25 (?P<p25>-?\d+), p50 (?P<p50>-?\d+), p75 (?P<p75>-?\d+), p90 (?P<p90>-?\d+))?"
+                             r" \| wynik handlu/d: udzial 10% najlepszych w sumie dodatnich (?P<ts>[0-9.]+|-)"
+                             r" \| zysk 7 dob karawan z handlem (?P<rn>\d+): udzial 10% najlepszych (?P<rts>[0-9.]+|-)"
+                             r"(?:, p25 (?P<r25>-?\d+), p50 (?P<r50>-?\d+), p75 (?P<r75>-?\d+), srednia (?P<rav>-?\d+))?\.$")
+KARAWANY138C_SAMPLE = ("Rozklad wyniku karawan (138c): dzien 109166 | (wynik handlu - zold)/d karawan zmierzonych 410: p10 -180, p25 -60, p50 -2, p75 85, p90 260"
+                       " | wynik handlu/d: udzial 10% najlepszych w sumie dodatnich 0.512 | zysk 7 dob karawan z handlem 250: udzial 10% najlepszych 0.455,"
+                       " p25 120, p50 718, p75 2600, srednia 2429.")
+
+
+_c138c_new_prev = _c299_new
+
+
+def _c299_new():
+    D = _c138c_new_prev()
+    D["x138"] = {}; D["cart138"] = {}
+    return D
+
+
+_c138c_feed_prev = _c299_feed
+
+
+def _c299_feed(D, s):
+    if s.startswith(CENY299B_EXPL):
+        a = CENY138C_EXP.match(s)
+        if a and "x138" in D:
+            D["x138"][int(a.group(1))] = (int(a.group(2)), int(a.group(4)), int(a.group(5)), a.group(6), int(a.group(7)) if a.group(7) else None)
+    elif s.startswith(CENY138C_CART_L):
+        a = CENY138C_CART.match(s)
+        if a and "cart138" in D:
+            D["cart138"][int(a.group(1))] = int(a.group(2))
+    _c138c_feed_prev(D, s)
+
+
+def _c138c_med(v):
+    v = sorted(x for x in v if x is not None)
+    if not v:
+        return None
+    n = len(v)
+    return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2.0
+
+
+def c138c_export_row(rep, D):
+    x = D.get("x138") or {}
+    ds = sorted(x)[-30:]
+    if not ds:
+        rep.add("C299-18e: wywoz kupcow 138c (z odbiorca, rezerwa kramu, zloto, towar w drodze) - INFO", "brak linii 'Wywoz kupcow (E8/O3)' z liczbami doby", "INFO", None)
+        return
+    mv = _c138c_med([x[d][0] for d in ds]); pd = _c138c_med([x[d][1] for d in ds])
+    ppu = _c138c_med([x[d][1] / x[d][0] for d in ds if x[d][0] > 0])
+    sh = _c138c_med([x[d][0] / (x[d][0] + x[d][2]) for d in ds if x[d][0] + x[d][2] > 0])
+    hd = [x[d][4] for d in ds if x[d][4] is not None]
+    shn = _c138c_med([x[d][0] / (x[d][0] + x[d][2] - x[d][4]) for d in ds if x[d][4] is not None and x[d][0] + x[d][2] - x[d][4] > 0])
+    cr = D.get("cart138") or {}
+    cm = _c138c_med([cr[d] for d in sorted(cr)[-30:]])
+    dec = x[ds[-1]][3] or "- (log sprzed 138c)"
+    f = lambda v, p: "-" if v is None else p.format(v)
+    rep.add("C299-18e: wywoz kupcow 138c (z odbiorca, rezerwa kramu, zloto, towar w drodze) - INFO",
+            f"decyzja (ostatnia doba): {dec}; ostatnie {len(ds)} dob, mediana: wywiezione {f(mv, '{:.0f}')} szt./d, zaplacone {f(pd, '{:.0f}')} zl/d ({f(ppu, '{:.1f}')} zl/szt.), "
+            f"z odbiorca {f(sh, '{:.3f}')}, bez rezerwy kramu {f(shn, '{:.3f}')}, rezerwa kramu {f(_c138c_med(hd), '{:.0f}')} szt./d; towar w drodze {f(cm, '{:.0f}')} szt.",
+            "INFO (299a: 2620 szt., 0.197 mln zl, 75 zl/szt., z odbiorca 0.092, w drodze 10.7 tys.; 138b: 9010, 1.29 mln, 144, 0.268, 36.2 tys.; "
+            "138c oczekiwane: wywiezione 2.2-3.5 tys., z odbiorca 0.08-0.13, w drodze 8-13 tys., zaplacone 0.17-0.5 mln zl/d)", None)
+
+
+_c138c_rows_prev = ceny299b_rows
+
+
+def ceny299b_rows(rep, D):
+    _c138c_rows_prev(rep, D)
+    c138c_export_row(rep, D)
+
+
+_c138c_selftest_prev = ceny299_selftest
+
+
+def ceny299_selftest():
+    r = _c138c_selftest_prev()
+    if r:
+        return r
+    a = CENY138C_EXP.match(CENY138C_SAMPLE)
+    if not a or a.group(2) != "3000" or a.group(4) != "300000" or a.group(5) != "27000" or a.group(7) != "7000" \
+            or a.group(6) != "cel z polki fizycznej z towarem w drodze, zrodlo z pamieci polki":
+        return f"138c: linia wywozu {a.groups() if a else None}"
+    b = CENY138C_EXP.match(CENY138C_SAMPLE_OLD)
+    if not b or b.group(2) != "2620" or b.group(6) is not None or b.group(7) is not None:
+        return f"138c: linia wywozu sprzed 138c {b.groups() if b else None}"
+    c = CENY138C_EXP.match(CENY138C_SAMPLE_B)
+    if not c or c.group(6) != "polka fizyczna z towarem w drodze" or c.group(7) is not None:
+        return f"138c: linia wywozu b37fbf0d {c.groups() if c else None}"
+    if not CENY299B_EXP.match(CENY138C_SAMPLE) or CENY299B_EXP.match(CENY138C_SAMPLE).group(2) != "3000":
+        return "138c: C299-18 (CENY299B_EXP) nie pasuje do linii 138c"
+    D = _c299_new()
+    for i in range(30):
+        _c299_feed(D, CENY138C_SAMPLE.replace("dzien 109166", f"dzien {109137 + i}"))
+        _c299_feed(D, CENY138C_SAMPLE_CART.replace("dzien 109167", f"dzien {109138 + i}"))
+    if len(D["exp"]) != 30 or len(D["x138"]) != 30 or len(D["cart138"]) != 30:
+        return f"138c: zbieranie (exp {len(D['exp'])}, x138 {len(D['x138'])}, wozy {len(D['cart138'])})"
+    rp = Report()
+    c138c_export_row(rp, D)
+    v = rp.rows[0][1] if rp.rows else ""
+    if "z odbiorca 0.100, bez rezerwy kramu 0.130" not in v or "rezerwa kramu 7000 szt./d" not in v or "towar w drodze 32872 szt." not in v or "(100.0 zl/szt.)" not in v:
+        return f"138c: wiersz C299-18e {v}"
+    return None
+
+
+_k138c_collect_prev = k294_collect
+
+
+def k294_collect(logp):
+    D = _k138c_collect_prev(logp)
+    x = {}; bad = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if KARAWANY138C_L not in ln:
+                continue
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            a = KARAWANY138C_RE.match(s)
+            if a:
+                x[int(a.group("d"))] = a.groupdict()
+            else:
+                bad += 1
+    D["s138"] = x; D["s138bad"] = bad
+    return D
+
+
+def k138c_spread_row(rep, D):
+    x = D.get("s138") or {}
+    ds = sorted(x)
+    name = "K294-26: rozklad wyniku karawan 138c (p25 / p50 / p75, udzial 10% najlepszych) - INFO"
+    if not ds:
+        rep.add(name, f"brak linii 'Rozklad wyniku karawan (138c)' (log sprzed 138c; nierozpoznanych {D.get('s138bad', 0)})", "INFO", None)
+        return
+    l7 = ds[-7:]
+
+    def av(k, fl=False):
+        v = [float(x[d][k]) for d in l7 if x[d].get(k) not in (None, "-")]
+        return None if not v else sum(v) / len(v)
+    f = lambda v, p: "-" if v is None else p.format(v)
+    last = x[ds[-1]]
+    rep.add(name,
+            f"ostatnia doba (n {last['n']}): p25 / p50 / p75 {last['p25'] or '-'} / {last['p50'] or '-'} / {last['p75'] or '-'}, udzial 10% {last['ts']}; "
+            f"zysk 7 dob (n {last['rn']}) p25 / p50 / p75 / srednia {last['r25'] or '-'} / {last['r50'] or '-'} / {last['r75'] or '-'} / {last['rav'] or '-'}, udzial 10% {last['rts']} | "
+            f"srednio ostatnie {len(l7)} dob: p25 {f(av('p25'), '{:.0f}')}, p50 {f(av('p50'), '{:.0f}')}, p75 {f(av('p75'), '{:.0f}')}, udzial 10% {f(av('ts'), '{:.3f}')}; "
+            f"zysk 7 dob p25 {f(av('r25'), '{:.0f}')}, p50 {f(av('r50'), '{:.0f}')}, p75 {f(av('r75'), '{:.0f}')}, srednia {f(av('rav'), '{:.0f}')}, udzial 10% {f(av('rts'), '{:.3f}')}"
+            f" (dob linii {len(ds)}, nierozpoznanych {D.get('s138bad', 0)})",
+            "INFO (138b bez linii: zysk 7 dob srednia 2429, mediana 718; p50 w dol i p75 w gore = podzial zysku, p25 i p75 razem w dol = strata)", None)
+
+
+_k138c_rows_prev = k294_rows
+
+
+def k294_rows(rep, D):
+    _k138c_rows_prev(rep, D)
+    k138c_spread_row(rep, D)
+
+
+_k138c_selftest_prev = k294_selftest
+
+
+def k294_selftest():
+    r = _k138c_selftest_prev()
+    if r:
+        return r
+    a = KARAWANY138C_RE.match(KARAWANY138C_SAMPLE)
+    if not a or a.group("n") != "410" or a.group("p50") != "-2" or a.group("p10") != "-180" or a.group("ts") != "0.512" or a.group("rn") != "250" \
+            or a.group("r50") != "718" or a.group("rav") != "2429" or a.group("rts") != "0.455":
+        return f"138c: linia rozkladu {a.groupdict() if a else None}"
+    e = KARAWANY138C_RE.match("Rozklad wyniku karawan (138c): dzien 109077 | (wynik handlu - zold)/d karawan zmierzonych 0 | wynik handlu/d: udzial 10% najlepszych w sumie"
+                              " dodatnich - | zysk 7 dob karawan z handlem 0: udzial 10% najlepszych -.")
+    if not e or e.group("p50") is not None or e.group("r50") is not None:
+        return "138c: pusta linia rozkladu"
+    D = {"s138": {109160 + i: KARAWANY138C_RE.match(KARAWANY138C_SAMPLE.replace("dzien 109166", f"dzien {109160 + i}")).groupdict() for i in range(7)}, "s138bad": 0}
+    rp = Report()
+    k138c_spread_row(rp, D)
+    v = rp.rows[0][1] if rp.rows else ""
+    if "p50 -2, p75 85" not in v or "srednia 2429" not in v or rp.rows[0][3] != "INFO":
+        return f"138c: wiersz K294-26 {v}"
+    return None
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

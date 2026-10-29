@@ -62,7 +62,8 @@ namespace Armoury
         private static int _dProbePick, _dProbeTarget, _dProbePieces, _dProbeSrc, _tPickN, _tSrcN;
         private static long _dProbePaid, _tPickOld, _tPickNew, _tSrcOld, _tSrcNew;
         private static bool _dRan;
-        private static int _dPlaces, _dMoved, _dDeals, _dStuck, _dEvals;
+        private static int _dPlaces, _dMoved, _dDeals, _dStuck, _dHeld, _dEvals;
+        private static bool _dPhys;   // 138c: klucz TradeExportPhysicalShelf, ktorego uzyl wywoz tej doby (nie odczyt przy pisaniu linii)
         private static long _dPaid;
         private static float _dRange;
         private static double _dMs;
@@ -109,13 +110,13 @@ namespace Armoury
             _dMem = _dPickNew = _dPickOld = _dDemHit = _dDemNew = _dMulHit = _dMulNew = 0;
             _dProbePick = _dProbeTarget = _dProbePieces = _dProbeSrc = _tPickN = _tSrcN = 0;
             _dProbePaid = _tPickOld = _tPickNew = _tSrcOld = _tSrcNew = 0L;
-            _dRan = false; _dPlaces = _dMoved = _dDeals = _dStuck = _dEvals = 0; _dPaid = 0L; _dRange = 0f; _dMs = 0.0;
+            _dRan = false; _dPhys = false; _dPlaces = _dMoved = _dDeals = _dStuck = _dHeld = _dEvals = 0; _dPaid = 0L; _dRange = 0f; _dMs = 0.0;
         }
 
         // ------------------------------------------------------------ 1. cele w zasiegu z pamieci
         /// <summary>Poczatek wywozu doby, po spisie polek. true = nowa droga gotowa (pamiec celow sprawdzona z kluczem albo zbudowana od nowa).
         /// false = klucz wylaczony albo potkniecie - caly wywoz tej doby stara droga.</summary>
-        internal static bool Begin(List<Settlement> places, Dictionary<Settlement, Dictionary<int, int>> stock, float range)
+        internal static bool Begin(List<Settlement> places, Dictionary<Settlement, Dictionary<int, int>> stock, float range, bool phys)
         {
             _ready = false; _dayOff = false; _fBest = null; _dMem = 0;
             if (!On) return false;
@@ -137,7 +138,7 @@ namespace Armoury
                 }
                 for (int i = 0; i < n; i++) _stockAt[i] = stock[places[i]];
                 if (_memRow == null || _memRow.Length != n) _memRow = new float[n][];
-                bool phys = SupplyDemand.ExportPhysical;   // 138c (klucz TradeExportPhysicalShelf): wiersz null = cel z polki fizycznej (EffRow zwraca dh + 1), jak stara petla (DstShelf)
+                // 138c (klucz TradeExportPhysicalShelf, wartosc z DailyTradeCore - ta sama co w starej petli DstShelf): wiersz null = cel z polki fizycznej (EffRow zwraca dh + 1)
                 for (int i = 0; i < n; i++) _memRow[i] = phys ? null : ShelfMemory.Row(places[i]);
                 _share = (float)RawPrice.Share;
                 _ready = true;
@@ -304,9 +305,9 @@ namespace Armoury
         internal static void SampleDeal(int pieces, long gold) { _dProbePieces += pieces; _dProbePaid += gold; }
 
         /// <summary>Koniec wywozu doby: liczby do linii (sam licznik).</summary>
-        internal static void NoteDay(int places, float range, int moved, int deals, long paid, int stuck, int evals, double ms)
+        internal static void NoteDay(int places, float range, int moved, int deals, long paid, int stuck, int held, bool phys, int evals, double ms)
         {
-            _dRan = true; _dPlaces = places; _dRange = range; _dMoved = moved; _dDeals = deals; _dPaid = paid; _dStuck = stuck; _dEvals = evals; _dMs = ms;
+            _dRan = true; _dPlaces = places; _dRange = range; _dMoved = moved; _dDeals = deals; _dPaid = paid; _dStuck = stuck; _dHeld = held; _dPhys = phys; _dEvals = evals; _dMs = ms;
         }
 
         // ------------------------------------------------------------ linia doby
@@ -342,8 +343,9 @@ namespace Armoury
                              + " | czas w probce, stara / nowa droga (us): wybor celu " + Us(_tPickOld, _tPickNew, _tPickN) + ", popyt zrodla " + Us(_tSrcOld, _tSrcNew, _tSrcN)
                              + " | wywoz tej doby: " + _dMoved + " szt. w " + _dDeals + " transakcjach, zaplacone " + _dPaid + " zl, bez odbiorcy " + _dStuck
                              + " szt., wycen " + _dEvals + ", czas wywozu " + _dMs.ToString("0.0", inv) + " ms"
-                             + " | decyzja wywozu (138c): " + (s.TradeExportPhysicalShelf ? "polka fizyczna z towarem w drodze" : "pamiec polki (299b)")
+                             + " | decyzja wywozu (138c): " + (!_dRan ? "-" : _dPhys ? "cel z polki fizycznej z towarem w drodze, zrodlo z pamieci polki" : "pamiec polki (299b)")
                              + ", z odbiorca " + (_dMoved + _dStuck > 0 ? (_dMoved / (double)(_dMoved + _dStuck)).ToString("0.000", inv) : "-")
+                             + " (wywiezione / (wywiezione + bez odbiorcy)), w tym bez odbiorcy przez rezerwe kramu " + _dHeld + " szt."
                              + " | potkniecia od startu sesji " + _stumbles + ".");
                 }
             }

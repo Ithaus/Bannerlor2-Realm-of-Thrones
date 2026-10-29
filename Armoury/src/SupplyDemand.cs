@@ -532,13 +532,15 @@ namespace Armoury
 
         /// <summary>299b: mnoznik polki celu wywozu kupcow - ta sama liczba w starej petli DailyTradeCore i w TradeExportMemo.PickCore (R9): polka celu po dostawie (dh + 1,
         /// dh z towarem w drodze) przez pamiec koszyka. Klucz wylaczony - (dd + 1) / (dh + 2) jak dotad (bit w bit).</summary>
-        internal static float DstShelf(Settlement dst, ItemObject probe, float dd, int dh, float elast, float lo, float hi)
+        internal static float DstShelf(Settlement dst, ItemObject probe, float dd, int dh, float elast, float lo, float hi, bool phys)
         {
-            return DstShelfRow(ExportPhysical ? null : ShelfMemory.Row(dst), ShelfMemory.Slot(probe), (float)RawPrice.Share, dd, dh, elast, lo, hi);   // 299c: udzial od razu (dotad tempo); 138c: bez pamieci (wiersz null = polka fizyczna)
+            return DstShelfRow(phys ? null : ShelfMemory.Row(dst), ShelfMemory.Slot(probe), (float)RawPrice.Share, dd, dh, elast, lo, hi);   // 299c: udzial od razu (dotad tempo); 138c: phys - bez pamieci (wiersz null = polka fizyczna); klucz czytany raz na wywoz doby (DailyTradeCore)
         }
 
-        /// <summary>138c (klucz TradeExportPhysicalShelf): decyzja wywozu kupcow (mnoznik polki zrodla i celu) z polki fizycznej - cel (dd + 1) / (dh + 2) z towarem w drodze
-        /// i dzisiejszymi dostawami w calej wadze, zrodlo (popyt + 1) / (polka + 1), jak przed 299b (bieg 299a). Powod (autotest 138b wobec 299a): przez pamiec 299b sztuka w drodze
+        /// <summary>138c (klucz TradeExportPhysicalShelf): decyzja wywozu kupcow - mnoznik polki CELU z polki fizycznej: (dd + 1) / (dh + 2) z towarem w drodze
+        /// i dzisiejszymi dostawami w calej wadze, jak przed 299b (bieg 299a). Zrodlo (138c po recenzji) zostaje z pamieci polki (ShelfMemory.Eff) w obu polozeniach klucza -
+        /// to ta sama polka, z ktorej liczy sie cena placona u zrodla (ShelfBuy.Take przez GetPrice -> Factor), wiec zrodlo dopiero co zapelnione (M ponizej polki) nie wyglada
+        /// taniej, niz kupiec za nie zaplaci (mniej wywozu z przepelnionego wczoraj celu - ping-pong). Powod (autotest 138b wobec 299a): przez pamiec 299b sztuka w drodze
         /// i dzisiejsza dostawa wazyly w celu tylko udzial od razu (0.06), a granica rownowagi (ShelfMemory.Bound) trzymala cel w rownowadze na 1.0 az do ok. 16 x popytu -
         /// wywoz 3 614 -> 10 989 szt. juz w 1. dobie (M = polka), towar w drodze 9.5 -> 30.5 tys. szt., przewiezione zloto 0.20 -> 1.31 mln zl/d. Ceny straganow (takze cena,
         /// ktora kupiec placi u zrodla - ShelfBuy.Take przez GetPrice) bez zmian - dalej z pamieci 299b. NIE - pamiec jak w 299b / 299c.</summary>
@@ -741,14 +743,14 @@ namespace Armoury
                 }
                 HarnessOnShelves = harness;
 
-                int moved = 0, deals = 0, stuck = 0, tradeEvals = 0; long paid = 0;
+                int moved = 0, deals = 0, stuck = 0, held = 0, tradeEvals = 0; long paid = 0;   // 138c: held - czesc stuck wstrzymana rezerwa kramu (ShopReserve), nie brakiem odbiorcy
                 // 171 C8 (Z6): zamek nie jest targiem broni - kupcy nie wioza tam broni natychmiast, bez drogi; zaloga zamku zamawia w miescie
                 // (GarrisonCarts). Zamek zostaje ZRODLEM: jego zapas ponad popyt kupcy wywoza do miast
                 bool noCastles = GarrisonCarts.On;
-                bool exportPhys = ExportPhysical;   // 138c: raz na wywoz doby (TradeExportMemo.Begin czyta ten sam klucz)
+                bool exportPhys = ExportPhysical;   // 138c: klucz raz na wywoz doby - ta sama wartosc do DstShelf, TradeExportMemo.Begin i linii doby (NoteDay)
                 // E8/O3 (267): cele w zasiegu kazdego zrodla z pamieci z kluczem, popyt i mnoznik ceny raz na osade w koszyku (TradeExportMemo.cs);
                 // fast = false (TradeExportFast wylaczony albo potkniecie) - ponizej dokladnie kod sprzed paczki
-                bool fast = TradeExportMemo.Begin(places, stock, range);
+                bool fast = TradeExportMemo.Begin(places, stock, range, exportPhys);
                 foreach (var kv in sample)
                 {
                     int key = kv.Key; var probe = kv.Value;
@@ -768,9 +770,8 @@ namespace Armoury
                         int toShip = (int)Math.Ceiling(surplus * share);
                         // 299b: mnoznik polki zrodla (strona kupna, bez + 1) przez pamiec koszyka w granicy rownowagi; nadwyzka i toShip - polka fizyczna
                         float srcDem = fast ? srcD : Demand(src, probe);
-                        // 138c (klucz TradeExportPhysicalShelf): zrodlo z polki fizycznej (jak przed 299b) - ta sama polka, ktora liczy nadwyzke
-                        float srcShelf = exportPhys ? have : ShelfMemory.Eff(src, probe, have, srcDem);
-                        float srcFactor = (float)Math.Pow((srcDem + 1f) / (srcShelf + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
+                        // 138c po recenzji: zrodlo z pamieci takze przy kluczu TradeExportPhysicalShelf - decyzja liczy z tej samej polki, z ktorej kupiec placi (GetPrice -> Factor)
+                        float srcFactor = (float)Math.Pow((srcDem + 1f) / (ShelfMemory.Eff(src, probe, have, srcDem) + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
                         srcFactor = MBMath.ClampFloat(srcFactor, MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), 1f);
                         var srcPos = src.GetPosition2D;
                         var poor = new HashSet<Settlement>();   // odbiorcy bez zlota - do konca tego przebiegu
@@ -798,7 +799,7 @@ namespace Armoury
                                 int dh; stock[dst].TryGetValue(key, out dh);
                                 if (carts) dh += TradeCarts.Incoming(dst, key);   // E6/R3 (215): towar w drodze do celu jak na jego polce (wiesc z drogi)
                                 float dd = Demand(dst, probe);
-                                float dstShelf = DstShelf(dst, probe, dd, dh, elast, MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), Math.Max(1f, c.SupplyDemandMaxFactor));   // 299b: przez pamiec polki
+                                float dstShelf = DstShelf(dst, probe, dd, dh, elast, MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), Math.Max(1f, c.SupplyDemandMaxFactor), exportPhys);   // 299b: przez pamiec polki; 138c: z kluczem - polka fizyczna
                                 float profit = dstShelf * ArmsPricing.Multiplier(dst, probe) - srcIdx - perDist * dist;
                                 if (profit <= bestProfit) continue;
                                 best = dst; bestProfit = profit; bestCap = Math.Max(1, (int)Math.Ceiling(dd) - dh); bestDist = dist;
@@ -809,7 +810,7 @@ namespace Armoury
                             int want = Math.Min(toShip, bestCap);
                             // 174b.4: wywoz kupcow to tez hurt - z polki MIASTA-zrodla nie zabiera ostatniej sztuki pasma zbroi (rezerwa kramu)
                             int resFree = ShopReserve.FreeBand(src, probe.ItemType, TierOf(probe));
-                            if (resFree <= 0) { stuck += toShip; break; }
+                            if (resFree <= 0) { stuck += toShip; held += toShip; break; }
                             want = Math.Min(want, resFree);
                             int got = 0;
                             long paid0 = paid;   // E8/O3: zloto tej transakcji do probki (sam licznik)
@@ -855,7 +856,7 @@ namespace Armoury
                         }
                     }
                 }
-                TradeExportMemo.NoteDay(places.Count, range, moved, deals, paid, stuck, tradeEvals,
+                TradeExportMemo.NoteDay(places.Count, range, moved, deals, paid, stuck, held, exportPhys, tradeEvals,
                                         (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);   // E8/O3 (267): liczby wywozu do linii doby (sam licznik)
                 if (moved > 0 || stuck > 0)
                     Log.Info("PodazPopyt: kupcy wywiezli " + moved + " szt. nadwyzki uzbrojenia w " + deals + " transakcjach miedzy osadami (zaplacone "
