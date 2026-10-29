@@ -4374,6 +4374,15 @@ namespace Armoury
         public bool KsIronWorldFlow = true;                 // with Ks Iron Hands Follow Market: the weekly step moves hands at iron mines by what the whole iron stock of the market did in the last week (town stalls, iron on the road, caravan packs, villages, villager carts and castles) - a full market loses hands only while its iron still grows, a market short of ore gains hands until its iron grows, and in between hands follow the stock up and down; production follows what is really used. Off = as before (full market always loses hands)
         public bool CaravanFoodBuyOwnSales = true;          // with Caravans Measure Sales By Town Demand: food (it spoils in a caravan's packs after a week) is bought only up to a week of what caravans themselves sell to towns, not up to a week of the towns' whole demand - caravans stop buying bread and fish they would have to dump at a loss. Off = as before (food measured by town demand)
 
+        // --- Winter spares mines and timber felling (297) ---
+        // Paczka 297 (29.10, Jeff "sprobuj to" o zelazie swiata i "napraw pozostale bledy i pusc test 90"). Autotest 137a (136 + 290, 90 dob 109077-109166 na kopii
+        // zapisu Jeffa): przed zima (109079-109140, 62 doby) zelazo swiata 9320 -> 9110 (-3.4/d, wydobycie 347 / zuzycie 356 lup/d) - krok 290 trzyma wydobycie
+        // za zuzyciem; od zimy 109141 model kopalni 365 -> 227 lup/d w 9 dobach (WinterBite tnie KAZDY towar wsi: 48.6% reszta, 15.7% cieple), wydobycie 228
+        // przy zuzyciu 338 - zelazo swiata -105.6/d, miasta bez rudy do 22. Ta sama zima tnie drewno wyrebu (wsie 3660 -> 2067 ladunkow/d, drewno swiata -570/d).
+        // Zima mowi "wioski nie rodza" - tnie plon pola i stada; ruda z kopalni i wyrab lasu to praca rak, nie plon (zima to pora wyrebu i wozenia saniami).
+        // WinterBite.cs, StartCalibration.Live.cs (ComputeDistrict), StartCalibration.Zima297.cs, VillageCrafts.cs, DistrictWorks.cs. Nowy klucz (plik MCM Jeffa go nie ma).
+        public bool WinterSparesMinesAndFelling = true;     // winter cuts what grows, not what is dug or felled: iron ore, silver ore and gold ore from the mines and hardwood from the woodcutters keep their output through the winter (in villages under the start calibration, in villages under the game's rules and in side-village works alike) - the mine and the forest are worked by hands, and winter was the season for felling timber and hauling it by sledge. Crops, fruit, herds, fish, salt pans, clay pits and quarries are cut by winter as before. Off = as before (winter cuts every village good)
+
         // --- Food follows the market under the start calibration (night 18.10) ---
         // Paczka f20-d4 (decyzja Jeffa 18.10 "4. b"): po D+49 (koniec sterowania rynku) podaz jedzenia i soli pod KS nie szla za cena - A7 wylaczona, Plan rusza tylko
         // prace domowa (fin93: Essos oliwki 0.14 T*, mieso 0.20, winogrona 0.33 przy indeksie 3-4.5; sol Essos 3.62 T*, ryby Westeros 3.28 T* i rosna). Ta sama regula

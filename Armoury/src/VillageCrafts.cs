@@ -649,7 +649,7 @@ namespace Armoury
                 // i wielblada Qarthu, ktore ten sam towar ma juz w r1 - jedno zjawisko, dwie reguly. Wynik dopisku = A x (1 + suma - ciecie) - ten sam wzor co NeutralGoods.
                 if (!pl.WorksOnly && WinterAdds)
                 {
-                    float cut = WinterBite.VillageCut(v), fs = 1f + r.SumOfFactors;
+                    float cut = WinterBite.Spares(item) ? 0f : WinterBite.VillageCut(v), fs = 1f + r.SumOfFactors;   // 297: ruda z kopalni i drewno wyrebu bez ciecia zimy (klucz WinterSparesMinesAndFelling)
                     if (cut > 0f && fs > 1e-3f && r.ResultNumber > 0f) r.Add(-A * Math.Min(cut, fs) / fs, _txtWinter);   // dopisek najwyzej do 0 (NeutralGoods: fac >= 0)
                 }
                 float got = Math.Max(0f, r.ResultNumber - r1);
@@ -1393,6 +1393,17 @@ namespace Armoury
             catch { return 1f; }
         }
 
+        /// <summary>297: czynnik dnia okregu bez zimy (rece spustoszenia E4/5 x rece wojny E4/7) - ruda z kopalni i drewno wyrebu (WinterBite.Spares). Nie rzuca.</summary>
+        internal static float NowNoWinter(Village v)
+        {
+            try
+            {
+                float f = Devastation.YieldFactor(v) * FreeHands.YieldFactor(v);
+                return f >= 0f && !float.IsNaN(f) && !float.IsInfinity(f) ? f : 1f;
+            }
+            catch { return 1f; }
+        }
+
         // ============================================================ widok czesci (KS i bez KS) - opis, ikona, prace okregu
         /// <summary>Czesc okregu z zajeciem: Craft (KsTab), przebudowa (Target, F), udzial rak/ludzi (Share), wartosc dnia zajecia czesci przy cenach miasta targowego
         /// (ValDay, sztuki x cena, biezaca pora), wartosc wedlug zajecia (CraftVal) i sztuki dnia wedlug towaru (Pcs).</summary>
@@ -1452,6 +1463,7 @@ namespace Armoury
                 {
                     ks = true;
                     double sigma = Math.Max(1, DailyLife.KsSigma), hands = 0, fnow = Now(v);   // bloki KS bez zimy i czynnikow rak - wartosc dnia z nimi (jak stawki KS)
+                    double fnowS = WinterBite.SparesOn ? NowNoWinter(v) : fnow;                 // 297: ruda z kopalni i drewno wyrebu - bez zimy (jak stawki KS, ComputeDistrict)
                     bool f17 = CraftIconKey;                                                  // f5-zajecia: ikona pod KS wedlug F17 projektu
                     int D17 = f17 ? CraftOfType(v.VillageType) : -1;
                     float M17 = f17 ? MOf(v) : 0f, gD17 = f17 ? VillageByPeople.GOf(v.VillageType) : 1f;
@@ -1469,7 +1481,7 @@ namespace Armoury
                             for (int i = 0; i < kp.Kg.Length && i < items.Length; i++)
                             {
                                 if (!(kp.Kg[i] > 0) || items[i] == null) continue;
-                                double pcs = fnow * kp.Kg[i] / (sigma * Math.Max(0.1, items[i].Weight > 0.01f ? items[i].Weight : 10.0));
+                                double pcs = (WinterBite.Spares(items[i]) ? fnowS : fnow) * kp.Kg[i] / (sigma * Math.Max(0.1, items[i].Weight > 0.01f ? items[i].Weight : 10.0));
                                 pc.Pcs[items[i]] = pcs;
                                 pc.ValDay += pcs * Price(town, items[i]);
                             }
@@ -1482,7 +1494,7 @@ namespace Armoury
                                 for (int i = 0; i < kp.IconKg.Length && i < items.Length; i++)
                                 {
                                     if (!(kp.IconKg[i] > 0) || items[i] == null) continue;
-                                    iv += fnow * kp.IconKg[i] / (sigma * StartCalibration.ItemKgOf(i)) * Price(town, items[i]);
+                                    iv += (WinterBite.Spares(items[i]) ? fnowS : fnow) * kp.IconKg[i] / (sigma * StartCalibration.ItemKgOf(i)) * Price(town, items[i]);
                                 }
                                 pc.IconVal = iv;
                             }
@@ -2009,7 +2021,7 @@ namespace Armoury
                                         bool kitchen = di.Type.StringId != "wheat_farm" && it.StringId == "grain";
                                         fac = pr[0] > 0f && (kitchen || (1.0 - other) * NMin > 1e-3) ? 1.0 + pr[1] : 1.0;
                                     }
-                                    else fac = 1.0 + pr[1] - cut;                // towar spoza listy typu: baza A x (1 + czynniki gry bez bazy - zima)
+                                    else fac = 1.0 + pr[1] - (WinterBite.Spares(it) ? 0f : cut);   // towar spoza listy typu: baza A x (1 + czynniki gry bez bazy - zima; 297: ruda i drewno bez zimy)
                                     if (!(fac > 0)) fac = 0;
                                     float side; float cf = MaterialLaw.ChainFactor(v, it, out side);
                                     double q = A * fac * cf * side, val = Math.Max(1, it.Value);

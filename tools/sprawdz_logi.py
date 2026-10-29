@@ -1246,6 +1246,12 @@ Uzycie (Python 3, tylko odczyt):
                     Z290-S self-test; Z290-0 segment i linia co dobe; Z290-1 ruch 290 zgodny z regula; Z290-2 zelazo swiata w [-10, +10]/d (30 dob i caly bieg);
                     Z290-3 miasta bez rudy nie rosna; Z290-4 T1 jedzenie na stracie <= 80 szt./d, utarg na stracie <= 1000 zl/d; Z290-5 bramka jedzenia spojna;
                     Z290-6 jedzenie w jukach <= 12 dob wlasnej sprzedazy; Z290-7 INFO.
+--grupa zelazo297 : (29.10, paczka 297 noc/297-zelazo - Jeff 29.10 "sprobuj to" o zelazie swiata i "napraw pozostale bledy i pusc test 90"; zima nie tnie rudy
+                    z kopalni ani drewna z wyrebu; Armoury/src/WinterBite.cs, StartCalibration.Live.cs, StartCalibration.Zima297.cs, VillageCrafts.cs) python -I
+                    tools/sprawdz_logi.py --grupa zelazo297 <Armoury-*.log> (strumieniowo; progi na bieg 90 dob). Linia 'Zima - kopalnie i wyrab (297)'.
+                    Z297-S self-test; Z297-0 linia w kazdej dobie zimy; Z297-1 model kopalni w zimie >= 0.90 x przed zima; Z297-2 zelazo bez ciecia > 0;
+                    Z297-3 zelazo swiata w [-10, +10]/d (30 dob i caly bieg); Z297-4 wydobycie + zlom za zuzyciem <= 10%; Z297-5 miasta bez rudy nie rosna;
+                    Z297-6 drewno w zimie >= -300/d i wytop bez drewna <= 10%; Z297-7 i Z297-8 INFO (hamulec ceny, stawka na 1000 rak).
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -77804,6 +77810,298 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return zelazo290_main(rest[0] if rest else None)
     return _zelazo290_main_prev(argv)
+
+
+# ------------------------------------------------------------ zelazo297 (29.10, paczka 297 noc/297-zelazo: zima nie tnie rudy z kopalni ani drewna z wyrebu;
+#   Jeff 29.10 "sprobuj to" o zelazie swiata i "napraw pozostale bledy i pusc test 90, rob tak dlugo poprawki az bedziesz zadowolony z wyniku";
+#   Armoury/src/WinterBite.cs (SparedId, VillageProdPostfix), StartCalibration.Live.cs (ComputeDistrict), StartCalibration.Zima297.cs (linia
+#   'Zima - kopalnie i wyrab (297)'), VillageCrafts.cs (dopiski zajec))
+#   python -I tools/sprawdz_logi.py --grupa zelazo297 <Armoury-*.log>      (strumieniowo; progi na bieg 90 dob)
+# Baza 137a (136 + 290, m113/logi/137a-probyN/Armoury-2026-10-29_12-05-50.log, 90 dob 109077-109166, zima od 109141): przed zima zelazo swiata -3.4/d (prosta -8.1/d; wydobycie
+#   347 / zuzycie 356 lup/d, model 374), zima: model 365 -> 227 lup/d, wydobycie 228 / zuzycie 338, zelazo swiata -105.6/d, ostatnie 30 dob -92.6/d (prosta
+#   -106.6), caly bieg -32.3/d; miasta bez rudy 11.6 -> 15.1 (ostatnie 10 dob; do 22); drewno swiata w zimie -570/d (przed zima -70/d); wytop bez drewna <= 1%.
+# Z297-S  self-test wyrazen (linia 297, 'Zelazo (lupy)' z modelem / zima / zlomem, 'Drewno', f5 rece / stawka / wytop, ceny rudy, tempo kuzni)
+# Z297-0  linia 297 w kazdej dobie zimy (doby 'zima: TAK' linii 'Zelazo (lupy)', dziur <= 1), klucz TAK, potkniecia 0, ERROR W297Line / WinterBite 0;
+#         bez zimy w biegu - INFO
+# Z297-1  model kopalni zelaza w zimie (srednia ostatnich 10 dob zimy) >= ZELAZO297_MODEL_MIN x srednia ostatnich 14 dob przed zima (137a 0.62); bez zimy - INFO
+# Z297-2  linia 297: zelazo, ktorego zima nie zabiera, srednio > 0 szt./d w dobach zimy po pierwszych ZELAZO297_RAMP dobach (przeliczenie okregow) - INFO bez zimy
+# Z297-3  zelazo swiata (razem 'Zelazo (lupy)'): prosta ostatnich 30 dob i caly bieg w [ZELAZO297_IRON_LO, ZELAZO297_IRON_HI] lup/d (137a -106.6 i -32.3)
+# Z297-4  wydobycie za zuzyciem: ostatnie 30 dob |wydobycie + zlom - zuzycie| / zuzycie <= ZELAZO297_FLOW_MAX (137a 242 + 12 wobec 340 = 25%)
+# Z297-5  miasta bez rudy ('Zelazo (lupy)' - miast bez towaru): srednia ostatnich 10 dob <= max(srednia pierwszych 5 dob, ZELAZO297_NOORE_ABS) (137a 11.6 -> 15.1)
+# Z297-6  drewno w zimie: prosta drewna swiata ('Drewno' razem) w dobach zimy >= ZELAZO297_WOOD_MIN ladunkow/d (137a -570) i wytop bez drewna (linia f5,
+#         kroki w zimie) <= ZELAZO297_STARVE_MAX % modelu wytopu (dymarki nie stoja bez wegla przy pelnym wydobyciu); bez zimy - INFO
+# Z297-7  INFO: hamulec ceny - mediana indeksu ceny rudy i miasta bez rudy (Ceny surowcow), tempo kuzni (E3-D2 smithy) przed zima / na koniec
+# Z297-8  INFO: stawka KS zelaza na 1000 rak przy zelazie (linia f5) przed zima / w zimie, Westeros i Essos (137a: 3.7 / 2.0 i 3.7 / 2.3)
+ZELAZO297_MODEL_MIN = 0.90                 # model zima / przed zima (137a 232 / 372 = 0.62; ciecie zimy reszty 48.6%, cieple 15.7%)
+ZELAZO297_RAMP = 10                        # doby zimy na przeliczenie okregow KS (LiveEvery) - linia 297 i model licza sie po nich
+ZELAZO297_IRON_LO, ZELAZO297_IRON_HI = -10.0, 10.0   # zelazo swiata lup/d (137a: ostatnie 30 dob -106.6, caly bieg -32.3)
+ZELAZO297_FLOW_MAX = 0.10                  # |wydobycie + zlom - zuzycie| / zuzycie ostatnie 30 dob (137a 0.25, przed zima 0.003)
+ZELAZO297_NOORE_ABS = 10.0                 # miasta bez rudy - prog bezwzgledny (jak Z290-3)
+ZELAZO297_WOOD_MIN = -300.0                # drewno swiata w zimie ladunkow/d (137a -570, przed zima -70)
+ZELAZO297_STARVE_MAX = 10.0                # wytop bez drewna % modelu wytopu w krokach zimy (137a <= 1%)
+ZELAZO297_ERR = ("ERROR in StartCalibration.W297Line", "ERROR in WinterBite")
+ZELAZO297_L = "Zima - kopalnie i wyrab (297): dzien "
+ZELAZO297_RE = re.compile(r"^Zima - kopalnie i wyrab \(297\): dzien (?P<d>\d+) \| klucz Winter Spares Mines And Timber Felling (?P<k>TAK|NIE) \([^)]*\) "
+                          r"\| okregi KS z ruda albo drewnem bez ciecia (?P<n>\d+) z (?P<all>\d+), ciecie zimy tych okregow srednio (?P<cut>[\d.]+|-)% "
+                          r"\| produkcja okregow, ktorej zima nie zabiera \(szt\./d, przed stolem okregu\): zelazo (?P<fe>[\d.]+), srebro (?P<ag>[\d.]+), "
+                          r"zloto (?P<au>[\d.]+), drewno (?P<wd>[\d.]+) \| model gry \(wsie poza pelna stawka KS\): wywolan bez ciecia zimy (?P<g>\d+) "
+                          r"\| pieniadze i towar: bez przelewow - czynnik okregu bez zimy dla tych towarow \| potkniecia (?P<st>\d+)\.$")
+ZELAZO297_IRON = re.compile(r"^Zelazo \(lupy\) \(214\): dzien (\d+) - wsie dopisaly (\d+) lup \([\d.]+ t, \d+ wsi; model ([\d.]+) w \d+ wsiach.*?"
+                            r"zuzycie: warsztaty zbrojne (\d+), linie towarowe \(narzedzia\) (\d+), budowy (\d+), strzelarze \(172\) (\d+), przetwory miast \(ZC5/148\) (\d+); "
+                            r"przetop: zlom \(174\) (\d+),.*?razem (\d+) \(.*?miast bez towaru (\d+) z \d+; zima: (TAK|nie)")
+ZELAZO297_WOOD = re.compile(r"^Drewno: dzien (\d+) - wsie dopisaly (\d+) ladunkow .*?razem (\d+) \(.*?zima: (TAK|nie)")
+ZELAZO297_F5H = re.compile(r"rece przy zelazie: Westeros (\d+) -> (\d+), Essos (\d+) -> (\d+) ")
+ZELAZO297_F5R = re.compile(r"stawka KS zelaza na jutro \(wsie, szt\./d\): Westeros (\d+) w \d+ wsiach, Essos (\d+) w \d+ wsiach")
+ZELAZO297_F5S = re.compile(r"wytop 7 dob \(dymarki\): Westeros model (\d+), bez drewna (\d+) \(\d+%\), Essos model (\d+), bez drewna (\d+) ")
+ZELAZO297_PRICE = re.compile(r"^Ceny surowcow: dzien (\d+) .*?ruda \(wartosc \d+ d\): indeks min/mediana/max [\d.]+/([\d.]+)/[\d.]+, bez towaru (\d+) miast")
+ZELAZO297_SMITH = re.compile(r"^Tempo warsztatow \(E3-D2\): dzien (\d+) .*?; smithy \d+ \(linii \d+, przed ([\d.]+) / po ([\d.]+)\)")
+ZELAZO297_SAMPLE = ("Zima - kopalnie i wyrab (297): dzien 109150 | klucz Winter Spares Mines And Timber Felling TAK (ruda zelaza, srebra, zlota i drewno wyrebu bez "
+                    "ciecia zimy; rece spustoszenia i wojny zostaja) | okregi KS z ruda albo drewnem bez ciecia 312 z 571, ciecie zimy tych okregow srednio 41.3% | "
+                    "produkcja okregow, ktorej zima nie zabiera (szt./d, przed stolem okregu): zelazo 141.2, srebro 12.0, zloto 0.4, drewno 1610.5 | model gry (wsie poza "
+                    "pelna stawka KS): wywolan bez ciecia zimy 37 | pieniadze i towar: bez przelewow - czynnik okregu bez zimy dla tych towarow | potkniecia 0.")
+ZELAZO297_IRON_SAMPLE = ("Zelazo (lupy) (214): dzien 109150 - wsie dopisaly 210 lup (3.2 t, 20 wsi; model 226.3 w 26 wsiach z wynikiem > 0), kopalnie miast i zamkow +0 | "
+                         "dymarki (E6/R1): ... |; zuzycie: warsztaty zbrojne 181, linie towarowe (narzedzia) 116, budowy 0, strzelarze (172) 5, przetwory miast (ZC5/148) 1; "
+                         "przetop: zlom (174) 10, zlom z cwiczen 0, wraki - metal napraw kowali (135), kuznia gracza - w \"bez wyjasnienia\"; zapas: miasta 5769 (+230), "
+                         "zamki 44, wsie 834, tabory 1222, razem 8375 (-85, bez wyjasnienia -1); miast bez towaru 10 z 97; zima: TAK. Lupa = 15 kg.")
+ZELAZO297_WOOD_SAMPLE = ("Drewno: dzien 109150 - wsie dopisaly 1994 ladunkow (199.4 t, 150 wsi; model 2100 w 226 wsiach z wynikiem > 0), miasta i zamki +0; zuzycie: ...; "
+                         "zapas: miasta 10986 (-12), zamki 0, wsie 20000, tabory 11000, razem 42150 (-900, bez wyjasnienia +0); miast bez towaru 1 z 97; zima: TAK. Ladunek = 100 kg.")
+
+
+def zelazo297_selftest():
+    bad = []
+    a = ZELAZO297_RE.match(ZELAZO297_SAMPLE)
+    if not a or a.group("k") != "TAK" or a.group("n") != "312" or a.group("cut") != "41.3" or a.group("fe") != "141.2" or a.group("wd") != "1610.5" or a.group("g") != "37":
+        bad.append("linia 297")
+    if not ZELAZO297_RE.match(ZELAZO297_SAMPLE.replace("srednio 41.3%", "srednio -%").replace("TAK (ruda zelaza, srebra, zlota i drewno wyrebu bez ciecia zimy; rece "
+                                                       "spustoszenia i wojny zostaja)", "NIE (zima tnie kazdy towar wsi jak dotad)")):
+        bad.append("linia 297 przy kluczu NIE")
+    z = ZELAZO297_IRON.match(ZELAZO297_IRON_SAMPLE)
+    if not z or z.group(2) != "210" or z.group(3) != "226.3" or z.group(4) != "181" or z.group(9) != "10" or z.group(10) != "8375" or z.group(11) != "10" or z.group(12) != "TAK":
+        bad.append("Zelazo (lupy)")
+    w = ZELAZO297_WOOD.match(ZELAZO297_WOOD_SAMPLE)
+    if not w or w.group(2) != "1994" or w.group(3) != "42150" or w.group(4) != "TAK":
+        bad.append("Drewno")
+    f5 = ("... | rece przy zelazie: Westeros 54295 -> 55648, Essos 26105 -> 24899 (razem +0.5%; zamiar po mnoznikach +0.5%) | stawka KS zelaza na jutro (wsie, szt./d): "
+          "Westeros 109 w 16 wsiach, Essos 74 w 7 wsiach | wytop 7 dob (dymarki): Westeros model 1237, bez drewna 6 (0%), Essos model 782, bez drewna 0 (0%); kopalnie")
+    h, r, s = ZELAZO297_F5H.search(f5), ZELAZO297_F5R.search(f5), ZELAZO297_F5S.search(f5)
+    if not h or h.group(2) != "55648" or not r or r.group(1) != "109" or r.group(2) != "74" or not s or s.group(1) != "1237" or s.group(4) != "0":
+        bad.append("f5 rece / stawka / wytop")
+    p = ("Ceny surowcow: dzien 109100 - popyt z prawdziwego zuzycia CZYNNY, ... - ruda (wartosc 38 d): indeks min/mediana/max 0.10/0.78/5.18, bez towaru 16 miast - za")
+    q = ZELAZO297_PRICE.match(p)
+    if not q or q.group(2) != "0.78" or q.group(3) != "16":
+        bad.append("Ceny surowcow")
+    t = ("Tempo warsztatow (E3-D2): dzien 109150 | CZYNNE | ... | wedlug typu: bakery 67 (linii 402, przed 413.4 / po 540.2); smithy 19 (linii 19, przed 31.4 / po 32.0); "
+         "tannery 15 (linii 15, przed 35.8 / po 26.9)")
+    u = ZELAZO297_SMITH.match(t)
+    if not u or u.group(2) != "31.4" or u.group(3) != "32.0":
+        bad.append("E3-D2 smithy")
+    return "; ".join(bad) if bad else None
+
+
+def zelazo297_collect(logp):
+    D = {"g": {}, "gbad": 0, "iron": {}, "wood": {}, "f5": {}, "price": {}, "smith": {}, "err": 0, "errs": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(ZELAZO297_ERR):
+                    D["err"] += 1
+                    if len(D["errs"]) < 3:
+                        D["errs"].append(s[:160])
+                continue
+            if s.startswith(ZELAZO297_L):
+                a = ZELAZO297_RE.match(s)
+                if a:
+                    D["g"][int(a.group("d"))] = a.groupdict()
+                else:
+                    D["gbad"] += 1
+                continue
+            if s.startswith("Zelazo (lupy) (214): dzien "):
+                a = ZELAZO297_IRON.match(s)
+                if a:
+                    x = a.groups()
+                    D["iron"][int(x[0])] = (int(x[1]), float(x[2]), sum(int(v) for v in x[3:8]), int(x[8]), int(x[9]), int(x[10]), x[11] == "TAK")
+                continue
+            if s.startswith("Drewno: dzien "):
+                a = ZELAZO297_WOOD.match(s)
+                if a:
+                    D["wood"][int(a.group(1))] = (int(a.group(2)), int(a.group(3)), a.group(4) == "TAK")
+                continue
+            if s.startswith(NRU_WEEK):
+                d0 = re.match(r"^Ruda KS \(f5-ruda\): dzien (\d+)", s)
+                h, r, w = ZELAZO297_F5H.search(s), ZELAZO297_F5R.search(s), ZELAZO297_F5S.search(s)
+                if d0 and h and r and w:
+                    D["f5"][int(d0.group(1))] = (tuple(int(v) for v in h.groups()), (int(r.group(1)), int(r.group(2))), tuple(int(v) for v in w.groups()))
+                continue
+            if s.startswith("Ceny surowcow: dzien "):
+                a = ZELAZO297_PRICE.match(s)
+                if a:
+                    D["price"][int(a.group(1))] = (float(a.group(2)), int(a.group(3)))
+                continue
+            if s.startswith("Tempo warsztatow (E3-D2): dzien "):
+                a = ZELAZO297_SMITH.match(s)
+                if a:
+                    D["smith"][int(a.group(1))] = (float(a.group(2)), float(a.group(3)))
+    return D
+
+
+def zelazo297_rows(rep, D):
+    ir = D["iron"]
+    idays = sorted(ir)[1:]                     # pierwsza doba po wczytaniu - doba niepelna (137a: 13 lup z 1 wsi)
+    wdays = [d for d in idays if ir[d][6]]
+    pre = [d for d in idays if not ir[d][6] and (not wdays or d < wdays[0])]
+    gd = sorted(D["g"])
+    # Z297-0
+    if wdays:
+        miss = [d for d in wdays if d not in D["g"]]
+        offk = [d for d in gd if D["g"][d]["k"] != "TAK"]
+        st = sum(int(D["g"][d]["st"]) for d in gd)
+        rep.add("Z297-0: linia 297 w kazdej dobie zimy, klucz TAK, nierozpoznanych 0, potkniecia 0, ERROR 0",
+                f"dob zimy {len(wdays)} ({wdays[0]}-{wdays[-1]}), linii 297 {len(gd)} (nierozpoznanych {D['gbad']}), dob zimy bez linii {len(miss)}"
+                + (f" {miss[:3]}" if miss else "") + f", klucz NIE {len(offk)}, potkniecia {st}, ERROR {D['err']}" + (f" {D['errs']}" if D["errs"] else ""),
+                "dziur <= 1, 0 / 0 / 0 / 0 (klucz NIE - NIE: bieg ma sprawdzic regule)", len(miss) <= 1 and D["gbad"] == 0 and not offk and st == 0 and D["err"] == 0)
+    else:
+        rep.add("Z297-0: linia 297", f"bieg bez zimy (dob 'Zelazo (lupy)' {len(idays)}, linii 297 {len(gd)}, ERROR {D['err']})", "INFO", None if D["err"] == 0 else False)
+    # Z297-1
+    if len(wdays) >= ZELAZO297_RAMP + 5 and len(pre) >= 14:
+        mp = sum(ir[d][1] for d in pre[-14:]) / 14.0
+        mw = sum(ir[d][1] for d in wdays[-10:]) / 10.0
+        q = mw / mp if mp > 0 else 0.0
+        rep.add("Z297-1: model kopalni zelaza w zimie wobec przed zima ('Zelazo (lupy)' model)",
+                f"przed zima (14 dob do {pre[-1]}) {mp:.1f} lup/d, zima (ostatnie 10 dob do {wdays[-1]}) {mw:.1f} lup/d = {q:.2f}",
+                f">= {ZELAZO297_MODEL_MIN:.2f} (137a 232 / 372 = 0.62)", q >= ZELAZO297_MODEL_MIN)
+    else:
+        rep.add("Z297-1: model kopalni w zimie", f"za malo dob zimy ({len(wdays)}) albo przed zima ({len(pre)})", f">= {ZELAZO297_RAMP + 5} dob zimy i 14 przed", None)
+    # Z297-2
+    gw = [d for d in gd if wdays and d >= wdays[0] + ZELAZO297_RAMP]
+    if gw:
+        fe = sum(float(D["g"][d]["fe"]) for d in gw) / len(gw)
+        wd = sum(float(D["g"][d]["wd"]) for d in gw) / len(gw)
+        ag = sum(float(D["g"][d]["ag"]) for d in gw) / len(gw)
+        gm = sum(int(D["g"][d]["g"]) for d in gw) / len(gw)
+        cuts = [float(D["g"][d]["cut"]) for d in gw if D["g"][d]["cut"] != "-"]
+        rep.add("Z297-2: linia 297 - produkcja okregow KS, ktorej zima nie zabiera (doby zimy po przeliczeniu okregow)",
+                f"dob {len(gw)}: zelazo {fe:.1f}, srebro {ag:.1f}, drewno {wd:.0f} szt./d; ciecie zimy tych okregow srednio "
+                + (f"{sum(cuts) / len(cuts):.1f}%" if cuts else "-") + f"; model gry bez ciecia {gm:.0f} wywolan/d", "zelazo > 0", fe > 0)
+    else:
+        rep.add("Z297-2: linia 297", f"brak dob zimy po {ZELAZO297_RAMP} dobach przeliczenia (linii 297 {len(gd)})", "INFO", None)
+    # Z297-3
+    if len(idays) >= 15:
+        tail = [(d, ir[d][4]) for d in idays[-30:]]
+        sl = _h287_slope(tail)
+        whole = (ir[idays[-1]][4] - ir[idays[0]][4]) / max(1, idays[-1] - idays[0])
+        wsl = _h287_slope([(d, ir[d][4]) for d in wdays]) if len(wdays) >= 5 else None
+        psl = _h287_slope([(d, ir[d][4]) for d in pre]) if len(pre) >= 5 else None
+        ok = sl is not None and ZELAZO297_IRON_LO <= sl <= ZELAZO297_IRON_HI and ZELAZO297_IRON_LO <= whole <= ZELAZO297_IRON_HI
+        rep.add("Z297-3: zelazo swiata ('Zelazo (lupy)' razem) - prosta ostatnich 30 dob i caly bieg",
+                f"ostatnie 30 dob {sl:+.1f}/d ({tail[0][1]} -> {tail[-1][1]}), caly bieg {whole:+.1f}/d ({ir[idays[0]][4]} -> {ir[idays[-1]][4]}, dob {len(idays)}); "
+                f"przed zima " + (f"{psl:+.1f}/d" if psl is not None else "-") + ", w zimie " + (f"{wsl:+.1f}/d" if wsl is not None else "-"),
+                f"oba w [{ZELAZO297_IRON_LO:+.0f}, {ZELAZO297_IRON_HI:+.0f}]/d (137a: -106.6 i -32.3)", ok)
+    else:
+        rep.add("Z297-3: zelazo swiata", f"za malo dob ({len(idays)})", ">= 15 dob", None)
+    # Z297-4
+    if len(idays) >= 30:
+        last = idays[-30:]
+        pr = sum(ir[d][0] for d in last) / 30.0
+        zl = sum(ir[d][3] for d in last) / 30.0
+        us = sum(ir[d][2] for d in last) / 30.0
+        q = abs(pr + zl - us) / us if us > 0 else 0.0
+        rep.add("Z297-4: wydobycie za zuzyciem (ostatnie 30 dob)", f"wydobycie {pr:.0f} + zlom {zl:.0f} wobec zuzycia {us:.0f} lup/d = {100 * q:.1f}%",
+                f"<= {100 * ZELAZO297_FLOW_MAX:.0f}% (137a 242 + 12 wobec 340 = 25%)", q <= ZELAZO297_FLOW_MAX)
+    else:
+        rep.add("Z297-4: wydobycie za zuzyciem", f"za malo dob ({len(idays)})", ">= 30 dob", None)
+    # Z297-5
+    if len(idays) >= 15:
+        f5a = sum(ir[d][5] for d in idays[:5]) / 5.0
+        l10 = sum(ir[d][5] for d in idays[-10:]) / 10.0
+        rep.add("Z297-5: miasta bez rudy ('Zelazo (lupy)' - miast bez towaru) - nie rosna", f"pierwsze 5 dob {f5a:.1f}, ostatnie 10 dob {l10:.1f}",
+                f"ostatnie 10 <= max(pierwsze 5, {ZELAZO297_NOORE_ABS:.0f}) (137a 11.6 -> 15.1)", l10 <= max(f5a, ZELAZO297_NOORE_ABS))
+    else:
+        rep.add("Z297-5: miasta bez rudy", f"za malo dob ({len(idays)})", ">= 15 dob", None)
+    # Z297-6
+    wo = D["wood"]
+    ww = [d for d in sorted(wo) if wo[d][2]]
+    wp = [d for d in sorted(wo)[1:] if not wo[d][2] and (not ww or d < ww[0])]
+    f5w = [d for d in sorted(D["f5"]) if wdays and d >= wdays[0]]
+    if len(ww) >= 10:
+        wsl = _h287_slope([(d, wo[d][1]) for d in ww])
+        psl = _h287_slope([(d, wo[d][1]) for d in wp]) if len(wp) >= 5 else None
+        mdl = sum(D["f5"][d][2][0] + D["f5"][d][2][2] for d in f5w)
+        bez = sum(D["f5"][d][2][1] + D["f5"][d][2][3] for d in f5w)
+        sp = 100.0 * bez / mdl if mdl > 0 else 0.0
+        rep.add("Z297-6: drewno swiata w zimie i wytop bez drewna (kroki f5 w zimie)",
+                f"drewno w zimie {wsl:+.0f}/d ({wo[ww[0]][1]} -> {wo[ww[-1]][1]}, dob {len(ww)}), przed zima " + (f"{psl:+.0f}/d" if psl is not None else "-")
+                + f"; wytop {len(f5w)} krokow: model {mdl}, bez drewna {bez} ({sp:.1f}%)",
+                f"drewno >= {ZELAZO297_WOOD_MIN:+.0f}/d i bez drewna <= {ZELAZO297_STARVE_MAX:.0f}% (137a -570/d, <= 1%)",
+                wsl is not None and wsl >= ZELAZO297_WOOD_MIN and sp <= ZELAZO297_STARVE_MAX)
+    else:
+        rep.add("Z297-6: drewno w zimie", f"za malo dob zimy ({len(ww)})", ">= 10 dob zimy", None)
+    # Z297-7 INFO
+    parts = []
+    pdays = sorted(D["price"])
+    if pdays:
+        def pav(ds):
+            return sum(D["price"][d][0] for d in ds) / len(ds), sum(D["price"][d][1] for d in ds) / len(ds)
+        b0 = [d for d in pdays if not wdays or d < wdays[0]][-10:] or pdays[:10]
+        a0, n0 = pav(b0)
+        a1, n1 = pav(pdays[-10:])
+        parts.append(f"ruda - mediana indeksu ceny / miasta bez rudy: przed zima (10 dob) {a0:.2f} / {n0:.1f}, koniec (10 dob) {a1:.2f} / {n1:.1f}")
+    sd = sorted(D["smith"])
+    if sd:
+        s0 = [d for d in sd if not wdays or d < wdays[0]]
+        x0 = D["smith"][s0[-1]] if s0 else D["smith"][sd[0]]
+        x1 = D["smith"][sd[-1]]
+        parts.append(f"kuznie (smithy) cykle/d przed tempem / po: przed zima {x0[0]:.1f} / {x0[1]:.1f}, koniec {x1[0]:.1f} / {x1[1]:.1f}")
+    rep.add("Z297-7: hamulec ceny (INFO)", "; ".join(parts) if parts else "-", "INFO (indeks < 1 - polki ponad cel, zuzycie bez hamulca; > 1 - kuznie zwalniaja)", None)
+    # Z297-8 INFO
+    fd = sorted(D["f5"])
+    if fd:
+        def per(d):
+            h, r, _w = D["f5"][d]
+            return (1000.0 * r[0] / h[0] if h[0] > 0 else 0.0), (1000.0 * r[1] / h[2] if h[2] > 0 else 0.0)
+        bp = [d for d in fd if not wdays or d < wdays[0]]
+        bw = [d for d in fd if wdays and d >= wdays[0] + 7]
+        txt = []
+        if bp:
+            w0, e0 = per(bp[-1])
+            txt.append(f"przed zima ({bp[-1]}) Westeros {w0:.2f}, Essos {e0:.2f}")
+        if bw:
+            w1, e1 = per(bw[-1])
+            txt.append(f"w zimie ({bw[-1]}) Westeros {w1:.2f}, Essos {e1:.2f}")
+        rep.add("Z297-8: stawka KS zelaza na 1000 rak przy zelazie (INFO)", "; ".join(txt) if txt else "-", "INFO (137a: przed zima 3.7 / 3.7, w zimie 2.0 / 2.3)", None)
+
+
+def zelazo297_main(logp):
+    """zelazo297 (29.10, paczka 297): Z297-S, Z297-0..Z297-8 - opis w komentarzu nad stalymi ZELAZO297_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = zelazo297_selftest()
+    rep.add("Z297-S: self-test wyrazen (linia 297, Zelazo (lupy), Drewno, f5 rece / stawka / wytop, Ceny surowcow, E3-D2)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("Z297-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = zelazo297_collect(logp)
+    print(f"plik: {logp} | linii 297 {len(D['g'])}, Zelazo {len(D['iron'])} (w zimie {sum(1 for v in D['iron'].values() if v[6])}), Drewno {len(D['wood'])}, "
+          f"f5 {len(D['f5'])}, cen {len(D['price'])}, E3-D2 {len(D['smith'])}, ERROR {D['err']}")
+    zelazo297_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_zelazo297_main_prev = main
+
+
+def main(argv):
+    # paczka 297: grupa zelazo297 - opakowanie main jak zelazo290
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "zelazo297":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return zelazo297_main(rest[0] if rest else None)
+    return _zelazo297_main_prev(argv)
 
 
 if __name__ == "__main__":

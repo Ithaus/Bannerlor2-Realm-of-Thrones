@@ -9632,6 +9632,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron mines follow the world's iron, caravans buy only the food they can sell before it spoils (290)")]
         public bool CaravanFoodBuyOwnSales { get; set; } = true;
 
+        [SettingPropertyBool("Winter Spares Mines And Timber Felling", HintText = "winter cuts what grows, not what is dug or felled: iron ore, silver ore and gold ore from the mines and hardwood from the woodcutters keep their output through the winter (in villages under the start calibration, in villages under the game's rules and in side-village works alike) - the mine and the forest are worked by hands, and winter was the season for felling timber and hauling it by sledge. Crops, fruit, herds, fish, salt pans, clay pits and quarries are cut by winter as before. Off = as before (winter cuts every village good)", RequireRestart = false)]
+        [SettingPropertyGroup("Winter spares mines and timber felling (297)")]
+        public bool WinterSparesMinesAndFelling { get; set; } = true;
+
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsFollowMarket { get; set; } = true;
@@ -12771,6 +12775,7 @@ namespace Armoury
             s.EfficientCampaignerAlways = EfficientCampaignerAlways;
             s.KsIronWorldFlow = KsIronWorldFlow;
             s.CaravanFoodBuyOwnSales = CaravanFoodBuyOwnSales;
+            s.WinterSparesMinesAndFelling = WinterSparesMinesAndFelling;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;

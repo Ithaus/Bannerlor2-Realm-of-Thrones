@@ -73,7 +73,7 @@ namespace Armoury
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed;
-            public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; }   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
+            public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; public double[] WSpareKg; }   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
         // m114-prace (recenzja): WorksAll - caly dodatek po czynnikach (sztuki gry na dobe), WorksPart - kg dodatku czesci przed zima (klucz DistrictWorks.PartKey):
         // udzial czesci w dodatku na targ (wycena okna i podzial puli miedzy posiadaczy wedlug dodatku NA TARG, nie wedlug calego E)
 
@@ -375,14 +375,32 @@ namespace Armoury
             double f = 1.0;
             if (factors)
             {
+                // 297 (klucz WinterSparesMinesAndFelling): fs - ten sam czynnik bez zimy (rece spustoszenia i wojny zostaja) dla rudy z kopalni i drewna wyrebu
+                // (WinterBite.SparedId); maska null - klucz NIE albo poza zima: petla co do bitu jak dotad
+                bool[] sp = W297Mask();
+                double fs = 1.0;
                 try
                 {
                     if (ld.TF) f = 1.0 - WinterBite.TownCut(ld.T);
                     else if (ld.V != null) f = (1.0 - WinterBite.VillageCut(ld.V)) * Devastation.YieldFactor(ld.V) * FreeHands.YieldFactor(ld.V);
+                    if (sp != null && !ld.TF && ld.V != null) fs = (double)Devastation.YieldFactor(ld.V) * FreeHands.YieldFactor(ld.V);
                 }
-                catch { f = 1.0; }
+                catch { f = 1.0; fs = 1.0; }
                 if (!(f >= 0) || double.IsInfinity(f)) f = 1.0;
-                for (int i = 0; i < ItemCount; i++) prod[i] *= f;
+                if (!(fs >= 0) || double.IsInfinity(fs)) fs = 1.0;
+                if (sp == null || !(fs > f)) for (int i = 0; i < ItemCount; i++) prod[i] *= f;
+                else
+                {
+                    double[] sk = null;
+                    for (int i = 0; i < ItemCount; i++)
+                    {
+                        if (!sp[i]) { prod[i] *= f; continue; }
+                        double p0 = prod[i];
+                        prod[i] = p0 * fs;
+                        if (p0 > 0) { if (sk == null) sk = new double[ItemCount]; sk[i] = p0 * (fs - f); }
+                    }
+                    res.WSpareKg = sk;                                // linia 297: kg produkcji okregu, ktorej zima juz nie zabiera (przed stolem okregu i targiem)
+                }
                 HarvestYear.KsApply(ld.TF ? (ld.T != null ? ld.T.Settlement : null) : (ld.V != null ? ld.V.Settlement : null), prod);   // R3-05e: plony pol okregu x rok urodzaju (poza zima)
                 // R3-06d (TiredLand): ziemia zajeta ponad baze okregu - tylko gra (Plan bez zmian); przedtem kopia plonu bez stada i ziemi do bramki krainy (StartCalibration.Stada.cs)
                 LandKs(ld, prod, f);
@@ -681,6 +699,7 @@ namespace Armoury
             if (!_shelvesDone && today >= DDay) { try { StartShelves(today); } catch (Exception e) { Stumble("StartShelves", e); } _shelvesDone = true; RulePxReset(); }
             try { R4cPriceRestart(today); } catch (Exception e) { Stumble("R4cPriceRestart", e); }   // KS r4 P7 (r4-ceny, Ks Price Restart): srednie cen od nowa w D+14
             string coffers = CoffersDaily(day);
+            try { W297Line(day); } catch (Exception e) { Stumble("W297Line", e); }   // 297: zima - ruda z kopalni i drewno wyrebu bez ciecia (tylko zima)
             tq = T0Lap(T0Shelf, tq);
             if (!LogGate.Lines) return;
             var sb = new StringBuilder(2500);

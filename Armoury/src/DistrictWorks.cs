@@ -353,8 +353,11 @@ namespace Armoury
                     }
                     q.V = q.Craft >= 0 && q.Craft < pc.CraftVal.Length ? pc.CraftVal[q.Craft] : 0;
                     if (q.Craft >= 0 && KsTab.Crafts[q.Craft] == "cattle_farm") q.V += pc.CraftVal[KsTab.CCattleB];
-                    q.Winter = winter;
-                    q.VNorm = q.V / Math.Max(0.05, 1.0 - winter);
+                    // 297 (klucz WinterSparesMinesAndFelling): kopalnia rudy i wyrab - zima nie tnie ich wyniku (jak stawki KS) - bez ciecia w wycenie i zwrocie
+                    int rg = q.Craft >= 0 && q.Craft < KsTab.NC ? KsTab.RegGood(q.Craft) : -1;
+                    double wq = rg >= 0 && WinterBite.SparesOn && WinterBite.SparedId(KsTab.Goods[rg]) ? 0.0 : winter;
+                    q.Winter = wq;
+                    q.VNorm = q.V / Math.Max(0.05, 1.0 - wq);
                     q.ShareDist = vd > 0 ? pc.ValDay / vd : 0;
                     q.Bmax = pc.Main ? bMain : bSide;
                     q.KitPer = q.S > 0.5 ? years * 364.0 * q.VNorm / q.S : 0;
