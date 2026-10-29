@@ -3320,19 +3320,23 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool RawPriceByUse { get; set; } = true;
 
-        [SettingPropertyBool("Price Flatter Lot Walk", HintText = "goods traded at a town's stall weigh on its price at once only as much as one day of the market's memory lets through: the game counts a fresh lot at once at 0.04 of the 0.14 a stocked stall weighs; on: 0.14 times the daily pace of that memory at once (0.021 at the game's 15% a day, 0.0084 at 6% - see Price Slow Supply Memory) and the rest through the town's supply memory. While you trade, a lot moves the price about half as much at the game's pace and about a fifth at 6% a day - buying and selling, for you and every caravan, cart and townsman; once the market's memory has caught up with the stall (about a week at the game's pace, several weeks at 6% a day) the price a town settles at is the same as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Price Flatter Lot Walk", HintText = "goods traded at a town's stall weigh on its price at once only by a small share of what a stocked stall weighs: the game counts a fresh lot at once at 0.04 of the 0.14 a stocked stall weighs; on: 0.14 times Price Instant Share at once (0.0084 at 0.06; 0.021 with Price Slow Supply Memory off) and the rest through the town's supply memory, which closes Price Supply Memory Daily of the gap to the stall each day (the game's 15%: half the way in about 4 days, nearly all in two weeks). While you trade, a lot moves the price about a fifth as much as in the game - buying and selling, for you and every caravan, cart and townsman; over the next days the price follows the stall as fast as in the game, and the price a town settles at is the same as before. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool PriceFlatterLotWalk { get; set; } = true;
 
-        [SettingPropertyBool("Price Slow Supply Memory", HintText = "a town's market follows its stalls slower: the supply the price looks at closes this share a day (Price Supply Memory Daily) of the gap to what lies on the stall instead of the game's 15%, and a lot traded weighs on the price at once only as much as one such day lets through; a glut or shortage shows slowly and lasts longer; demand still follows at the game's 15%. Needs Price Flatter Lot Walk. Off = as in package 299", RequireRestart = false)]
+        [SettingPropertyBool("Price Slow Supply Memory", HintText = "keeps apart the two parts of a town's market memory: how much a lot traded weighs on the price at once (Price Instant Share) and how fast the remembered supply then follows the stall (Price Supply Memory Daily, the game's 15% a day). On: a lot weighs at once only the instant share, so the price you get barely moves while you sell; the glut or shortage it leaves then shows in the price at the memory's pace and lasts no longer than in the game; demand still follows at the game's 15%. Needs Price Flatter Lot Walk. Off = as in package 299 (a lot weighs 0.15 of a stocked stall at once)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool PriceSlowSupplyMemory { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Price Supply Memory Daily", 0.020f, 0.150f, "0.000", HintText = "share of the gap between a market's remembered supply and its stall closed each day (0.02-0.15; 0.15 = the game's pace)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Price Supply Memory Daily", 0.020f, 0.150f, "0.000", HintText = "share of the gap between a market's remembered supply and its stall closed each day, for trade goods and for each stall's arms, armour and horses (0.02-0.15; 0.15 = the game's pace, half the way in about 4 days). Lower keeps a glut or shortage in the price longer: at 0.06 the towns caravans had sold to stayed glutted about 2.5 times longer and the caravans earned less than half as much. How much one sale moves the price right away is Price Instant Share", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
-        public float PriceSupplyMemoryDaily { get; set; } = 0.06f;
+        public float PriceSupplyMemoryDaily { get; set; } = 0.15f;
 
-        [SettingPropertyBool("Price Flatter All Items", HintText = "arms, armour, horses and loot follow the same rule: each stall remembers how many pieces of a kind (type and tier) it held, closing the gap by the daily share; a piece you or anyone sells or buys weighs on the price at once only by that share, the rest comes over the following days. The memory only slows the price, it never carries it past the balance: once a stall holds as many as the town wants, it stops paying a shortage price (twenty horses sold to a town that wants five fetch the balanced price, not that of an empty stable), and while it holds fewer it gives no glut discount. Needs Price Flatter Lot Walk. Off = as in package 299", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Price Instant Share", 0.020f, 0.150f, "0.000", HintText = "share of a stocked stall's weight that a piece or lot bought or sold weighs on the town's price at once (0.02-0.15; 0.06 = for trade goods about a fifth of the game's step, for arms, armour and horses 6 parts in 100 of a whole piece; 0.15 = package 299). The rest reaches the price over the next days at Price Supply Memory Daily. Needs Price Slow Supply Memory", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float PriceInstantShare { get; set; } = 0.06f;
+
+        [SettingPropertyBool("Price Flatter All Items", HintText = "arms, armour, horses and loot follow the same rule: each stall remembers how many pieces of a kind (type and tier) it held, and the memory closes Price Supply Memory Daily of the gap each day; a piece you or anyone sells or buys weighs on the price at once only by Price Instant Share, the rest comes over the following days. The memory only slows the price, it never carries it past the balance: once a stall holds as many as the town wants, it stops paying a shortage price (twenty horses sold to a town that wants five fetch the balanced price, not that of an empty stable), and while it holds fewer it gives no glut discount. Needs Price Flatter Lot Walk. Off = as in package 299", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool PriceFlatterAllItems { get; set; } = true;
 
@@ -11300,6 +11304,7 @@ namespace Armoury
             s.PriceFlatterLotWalk = PriceFlatterLotWalk;
             s.PriceSlowSupplyMemory = PriceSlowSupplyMemory;
             s.PriceSupplyMemoryDaily = PriceSupplyMemoryDaily;
+            s.PriceInstantShare = PriceInstantShare;
             s.PriceFlatterAllItems = PriceFlatterAllItems;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;

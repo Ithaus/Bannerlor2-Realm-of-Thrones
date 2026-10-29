@@ -227,7 +227,7 @@ namespace Armoury
                         double p = kv.Value >= 0 ? StartPrice(m, kv.Value) : 1.0;
                         // wzor ceny: 0.1 x podaz + 0.04 x wartosc polki; cel 0.14 x dni x popyt - podaz dopelnia to, czego brakuje realnej polce (najwyzej x1.4 dni x popyt)
                         // paczka 299: wagi RawPrice.SupplyW / ShelfW (0.119 / 0.021 przy kluczu PriceFlatterLotWalk) - indeks startu ten sam cel; napis linii polek bez zmian;
-                        // 299b (PriceSlowSupplyMemory): 0.1316 / 0.0084 - podaz przy polce 0.5 celu 1.032 x celu (299: 1.09, gra 1.2), przy 2 x celu 0.936 (299: 0.82); dzwignia startu gasnie 6% dziennie
+                        // 299b (PriceSlowSupplyMemory): 0.1316 / 0.0084 - podaz przy polce 0.5 celu 1.032 x celu (299: 1.09, gra 1.2), przy 2 x celu 0.936 (299: 0.82); dzwignia startu gasnie w tempie pamieci (299c: 15% dziennie, 299b: 6%)
                         double days = ShelfDays(p), sv = Math.Max(0.0, d.InStoreValue);
                         // F2 (poprawka po autotescie 16.10): bez sztucznych polek - wygladzona podaz tylko tam, gdzie prawdziwa polka ma co najmniej polowe celu
                         // (dotad 3295 z 3977 pozycji mialo polke ponizej celu, indeks 3.87 -> 0.98 w D i wracal do 2-5); reszta - cena wzoru gry z prawdziwej polki

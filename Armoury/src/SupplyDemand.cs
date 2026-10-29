@@ -365,7 +365,8 @@ namespace Armoury
             var c = Settings.Current;
             d = Demand(st, it) + Substitution(st, it);
             s = Stock(st.ItemRoster, it, isSelling ? 1 : -1) + (isSelling ? 1 : 0);
-            // 299b (klucz PriceFlatterAllItems): cena widzi polke z pamiecia koszyka (ShelfMemory.Eff = Pace x s + (1 - Pace) x M, w granicy rownowagi popytu d);
+            // 299b (klucz PriceFlatterAllItems): cena widzi polke z pamiecia koszyka (ShelfMemory.Eff = Share x s + (1 - Share) x M, w granicy rownowagi popytu d;
+            // 299c: Share = udzial od razu PriceInstantShare, M idzie za polka tempem Pace);
             // s zostaje fizyczne - wolajacy licza z niego brak
             float se = ShelfMemory.Eff(st, it, s, d);
             float f = (float)Math.Pow((d + 1f) / (se + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
@@ -533,10 +534,11 @@ namespace Armoury
         /// dh z towarem w drodze) przez pamiec koszyka. Klucz wylaczony - (dd + 1) / (dh + 2) jak dotad (bit w bit).</summary>
         internal static float DstShelf(Settlement dst, ItemObject probe, float dd, int dh, float elast, float lo, float hi)
         {
-            return DstShelfRow(ShelfMemory.Row(dst), ShelfMemory.Slot(probe), (float)RawPrice.Pace, dd, dh, elast, lo, hi);
+            return DstShelfRow(ShelfMemory.Row(dst), ShelfMemory.Slot(probe), (float)RawPrice.Share, dd, dh, elast, lo, hi);   // 299c: udzial od razu (dotad tempo)
         }
 
-        /// <summary>299b po recenzji (koszt wywozu): to samo z wierszem pamieci celu i tempem rozwiazanymi raz (TradeExportMemo) - ta sama funkcja w obu drogach R9.</summary>
+        /// <summary>299b po recenzji (koszt wywozu): to samo z wierszem pamieci celu i udzialem od razu p (299c: RawPrice.Share) rozwiazanymi raz (TradeExportMemo) -
+        /// ta sama funkcja w obu drogach R9.</summary>
         internal static float DstShelfRow(float[] row, int slot, float p, float dd, int dh, float elast, float lo, float hi)
         {
             return MBMath.ClampFloat((float)Math.Pow((dd + 1f) / (ShelfMemory.EffRow(row, slot, p, dh + 1, dd) + 1f), elast), lo, hi);

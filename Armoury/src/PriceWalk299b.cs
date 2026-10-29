@@ -13,7 +13,7 @@ namespace Armoury
 {
     /// <summary>
     /// PACZKA 299b - SONDA PAMIECI PODAZY I CENY SPRZETU NA SZTUKE (Jeff 29.10 ok. 20:20: "tak dla wszysatkich - 15% dziennie za duzo, dajmy 5-8% dziennie").
-    /// Regula: RawPrice (tempo pamieci podazy rynku, wagi 0.14 x tempo) i ShelfMemory (pamiec polki sprzetu). Tu tylko pomiar, raz na dobe pomiaru (LogGate.Lines, zaraz po
+    /// Regula: RawPrice (tempo pamieci podazy rynku; wagi 0.14 x udzial od razu - 299c: PriceInstantShare osobno od tempa) i ShelfMemory (pamiec polki sprzetu). Tu tylko pomiar, raz na dobe pomiaru (LogGate.Lines, zaraz po
     /// linii "Ceny na sztuke (299)"): samotest czynnego modelu ekonomii, liczniki wygladzania, stan pamieci polek, krok ceny sprzetu 299 (bez pamieci - krzywa gry
     /// RawPrice.GameCurve) wobec 299b przy TYM SAMYM stanie, poziom przy M = S, kupno i odsprzedaz w jednej wizycie, petla opozniona gracza na sprzecie i towarach, przyklady
     /// cen gracza w Riverrun. Po recenzji: stosunek 20. sztuki osobno dla polek 0-3 / >= 4 i koszykow na granicy rownowagi (ShelfMemory.Bound), w jednej wizycie cenami
@@ -54,8 +54,9 @@ namespace Armoury
                 if (s == null || Campaign.Current == null || Campaign.Current.Models == null) return;
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 bool slow = s.PriceFlatterLotWalk && s.PriceSlowSupplyMemory, all = s.PriceFlatterLotWalk && s.PriceFlatterAllItems;
-                double pace = RawPrice.Pace;
-                float p = (float)pace;
+                double pace = RawPrice.Pace;          // tempo pamieci (podaz towarow, M sprzetu po 21 dobach)
+                double share = RawPrice.Share;        // 299c: udzial od razu - waga polki teraz w S_eff (Blend); w 299b to samo co tempo
+                float p = (float)share;
                 float e = MBMath.ClampFloat(s.SupplyDemandElasticity, 0.05f, 2f), lo = MBMath.ClampFloat(s.SupplyDemandMinFactor, 0.01f, 1f), hi = Math.Max(1f, s.SupplyDemandMaxFactor);
 
                 // 1. samotest czynnego modelu ekonomii: (miasto, kategoria, dzis 100, popyt 100, stara podaz 0, stary popyt 0)
@@ -162,7 +163,9 @@ namespace Armoury
                                 if (Math.Abs(M - S) < 0.005f)
                                 {
                                     levelAll++;
-                                    if (Math.Abs(ShelfMemory.Eff(st, ty, tier, S, D) - S) <= 1e-3f) levelK++; else levelBad++;
+                                    // 299c: tolerancja = |M - S| (S_eff lezy miedzy S i M; dotad 1e-3 - M 5.996 przy polce 6 po zakupie w dobie dawalo 'rozjazd' bez bledu
+                                    // drogi kodu, 138a: 4 doby po 1 koszyku z ok. 6300)
+                                    if (Math.Abs(ShelfMemory.Eff(st, ty, tier, S, D) - S) <= Math.Abs(M - S) + 1e-4f) levelK++; else levelBad++;
                                 }
                                 else if (memOn && Math.Abs(M - S) >= 1f)
                                     offLv.Add((float)Math.Pow((S + 1f) / (ShelfMemory.Eff(st, ty, tier, S, D) + 1f), e));
@@ -331,7 +334,7 @@ namespace Armoury
 
                 stumbles += ShelfMemory.TakeStumbles();
                 Log.Info("Ceny sprzetu i pamiec podazy (299b): dzien " + day
-                         + " | klucze " + (slow ? "TAK" : "NIE") + "/" + (all ? "TAK" : "NIE") + ", tempo " + pace.ToString("0.000", Inv) + "/d (gra 0.150)"
+                         + " | klucze " + (slow ? "TAK" : "NIE") + "/" + (all ? "TAK" : "NIE") + ", tempo " + pace.ToString("0.000", Inv) + "/d (gra 0.150), od razu " + share.ToString("0.000", Inv)
                          + " | towary: wagi od razu " + RawPrice.ShelfW.ToString("0.0000", Inv) + " / podaz " + RawPrice.SupplyW.ToString("0.0000", Inv)
                          + ", model ekonomii " + (econ != null ? econ.GetType().Name : "?") + ": samotest podaz 100 -> " + R(tSup, "0.00") + " (oczekiwane " + wantSup.ToString("0.00", Inv)
                          + "), popyt 100 -> " + R(tDem, "0.00") + " (oczekiwane 15.00), wygladzen w ostatniej dobie z tempem 299b " + applied + ", z tempem gry " + gameN

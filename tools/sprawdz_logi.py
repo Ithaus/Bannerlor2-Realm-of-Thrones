@@ -81659,9 +81659,15 @@ def z290_selftest():
 #   C299-0 wagi startu = 0.14 x tempo (linia startowa 299b) albo 0.021; C299-2 / 2b pasma x k / 0.525, k = wi / 0.04 (299b k = 0.21: [0.18, 0.28] i [0.18, 0.26]);
 #   C299-3b pasma skalowane skrajnymi stosunkami wag ((0.1 / ws)^0.6 i (0.04 / wi)^0.6 - przy 299 0.90 / 1.47 dawaly 0.95-1.06, p10 0.88, p90 1.30);
 #   C299-6 prog doby max(0.6 k / 0.525, 0.05 + k x max(1, (0.1 + 0.04 x) / (ws + wi x))) - przy 299 jak dotad.
-# C299-12  linia startowa 299b: jest, oba klucze TAK, tempo 0.060, |wi - 0.14 x tempo| <= 5e-5, ws = 0.14 - wi, wpiete GetSupplyDemandForCategory 1 i GetBasePriceFactor 2
+# ---- paczka 299c (29.10, galaz noc/300-integracja; autotest 138a = 137 + 299b + 291d: tempo 6% zbilo handel karawan - placace 0.564 -> 0.402, wynik floty +31.5k -> +14.0k):
+#   udzial od razu (PriceInstantShare 0.06: towary 0.14 x udzial, sprzet S_eff = udzial x polka + (1 - udzial) x M) osobno od tempa pamieci (PriceSupplyMemoryDaily, znow
+#   0.15 gry). Linie 299b dostaja ', od razu X' (startowa: '(tempo T/d, gra 0.150, od razu X)', doby: 'tempo T/d (gra 0.150), od razu X'); log bez tego czlonu (299b) -
+#   udzial = tempo. Wiersze: C299-0 wagi startu = 0.14 x udzial; C299-12 tempo 0.150 i udzial 0.060; C299-13 przy tempie 0.15 wygladzenia tempem gry (299b 0);
+#   C299-14 / 14a / 14c progi z udzialu (krok na sztuke), petle C299-17 z tempa (pamiec po 21 dobach) - sonda liczy to sama.
+# C299-12  linia startowa 299b: jest, oba klucze TAK, tempo 0.150 (299c; 299b 0.060), udzial od razu 0.060, |wi - 0.14 x udzial| <= 5e-5, ws = 0.14 - wi, wpiete
+#          GetSupplyDemandForCategory 1 i GetBasePriceFactor 2
 # C299-13  kazda doba 299b z kluczem tempa TAK: samotest czynnego modelu (100, 100, 0, 0) podaz = 100 x tempo +-0.01, popyt 15.00 +-0.01; wygladzen tempem 299b w ostatniej
-#          dobie >= 0.9 x miasta x kategorie (poza pierwsza doba sesji - doba poprzednia niepelna)
+#          dobie >= 0.9 x miasta x kategorie (poza pierwsza doba sesji - doba poprzednia niepelna); 299c przy tempie 0.150: wygladzen tempem gry >= 0.9 x, tempem 299b 0
 # C299-14  sprzet: stosunek spadku 20. sprzedanej sztuki 299b/299 (mediana dob) w [0.05, g(tempo) + 0.05], g = stosunek przy pustej polce M = S = 0
 #          ((1 - sqrt((1 + p) / (1 + 20 p))) / (1 - sqrt(2 / 21)), elastycznosc 0.5: 0.44 przy p = 0.06; polka 17 przy popycie 22: 0.10) - POPRAWKA PROJEKTU: projekt
 #          [0.05, 0.30] liczyl polki zapelnione, a mediana koszykow z popytem >= 1 ma czesto polke 0-3; C299-14b spadek 5. sztuki 299b INFO;
@@ -81803,7 +81809,8 @@ CENY299B_L = "Ceny sprzetu i pamiec podazy (299b): dzien "
 CENY299B_START_L = "Ceny na sztuke (299b): klucze "
 CENY299B_ERR = ("ERROR in ShelfMemory", "ERROR in PriceWalk299b", "ERROR in RawPrice.SupplyPacePostfix", "ERROR in SyncData.arm_shelfmem")
 CENY299B_START_RE = re.compile(
-    r"^Ceny na sztuke \(299b\): klucze Price Slow Supply Memory (?P<k1>TAK|NIE) \(tempo (?P<pace>[\d.]+)/d, gra 0\.150\), Price Flatter All Items (?P<k2>TAK|NIE)"
+    r"^Ceny na sztuke \(299b\): klucze Price Slow Supply Memory (?P<k1>TAK|NIE) \(tempo (?P<pace>[\d.]+)/d, gra 0\.150(?:, od razu (?P<share>[\d.]+))?\), "
+    r"Price Flatter All Items (?P<k2>TAK|NIE)"
     r"(?P<off> \(oba wymagaja Price Flatter Lot Walk - NIECZYNNE\))? - podaz rynku idzie za polka (?P<pct>[\d.]+)% dziennie \(popyt bez zmian 15%\); swiezy towar wazy "
     r"od razu (?P<wi>[\d.]+), podaz (?P<ws>[\d.]+) \(razem 0\.14\); sprzet \(bron, zbroje, konie, lup\) - pamiec polki koszyka typ x tier, sztuka wazy od razu "
     r"(?P<pe>[\d.]+); wpiete: GetSupplyDemandForCategory w (?P<hs>\d+) modelu \(DefaultSettlementEconomyModel\), GetBasePriceFactor wszystkich kategorii w "
@@ -81811,6 +81818,7 @@ CENY299B_START_RE = re.compile(
 _N9 = CENY299_N
 CENY299B_RE = re.compile(
     r"^Ceny sprzetu i pamiec podazy \(299b\): dzien (?P<d>\d+) \| klucze (?P<k1>TAK|NIE)/(?P<k2>TAK|NIE), tempo (?P<pace>[\d.]+)/d \(gra 0\.150\)"
+    r"(?:, od razu (?P<share>[\d.]+))?"
     r" \| towary: wagi od razu (?P<wi>[\d.]+) / podaz (?P<ws>[\d.]+), model ekonomii (?P<econ>\S+): samotest podaz 100 -> (?P<tsup>" + _N9 + r") \(oczekiwane "
     r"(?P<wsup>[\d.]+)\), popyt 100 -> (?P<tdem>" + _N9 + r") \(oczekiwane 15\.00\), wygladzen w ostatniej dobie z tempem 299b (?P<app>\d+), z tempem gry (?P<gam>\d+) "
     r"\(miasta (?P<towns>\d+) x kategorie (?P<cats>\d+)\), przed startem sesji (?P<bef>\d+)"
@@ -81852,7 +81860,8 @@ CENY299B_Q20_HI = 0.30                 # projekt: koszyki zapelnione (polka >= 4
 CENY299B_SRC_BASE = 1447.5             # 298a: mediana ostatnich 30 dob 'zrodla: warsztaty' + 'strzelarze' (1172.5 + 275.0 szt./d)
 CENY299B_SHELF_BASE = 199907.0         # 298a: mediana ostatnich 30 dob 'polki i schowki osad' (szt.)
 CENY299B_WS_MAX = 1.3
-CENY299B_PACE = 0.06
+CENY299B_PACE = 0.15                   # 299c: tempo pamieci znow gry (299b: 0.06)
+CENY299B_SHARE = 0.06                  # 299c: udzial od razu (PriceInstantShare)
 CENY299B_SMOOTH_SHARE = 0.9
 CENY299B_Q20_MIN = 0.05
 CENY299B_LOOP_MED = 0.0
@@ -81861,14 +81870,14 @@ CENY299B_EXPORT_BASE = 2760.0          # 298a: mediana 'wywoz tej doby' ostatnic
 CENY299B_EXPORT_BAND = (0.5, 1.5)
 CENY299B_SKUP_BASE = 42212.0           # 298a: mediana dob sumy 'zaplacono' w 'Skup sprzetu (doba)' (zl)
 CENY299B_SKUP_MAX = 1.5
-CENY299B_SAMPLE_START = ("Ceny na sztuke (299b): klucze Price Slow Supply Memory TAK (tempo 0.060/d, gra 0.150), Price Flatter All Items TAK - podaz rynku idzie za polka "
-                         "6.0% dziennie (popyt bez zmian 15%); swiezy towar wazy od razu 0.0084, podaz 0.1316 (razem 0.14); sprzet (bron, zbroje, konie, lup) - pamiec polki "
+CENY299B_SAMPLE_START = ("Ceny na sztuke (299b): klucze Price Slow Supply Memory TAK (tempo 0.150/d, gra 0.150, od razu 0.060), Price Flatter All Items TAK - podaz rynku "
+                         "idzie za polka 15.0% dziennie (popyt bez zmian 15%); swiezy towar wazy od razu 0.0084, podaz 0.1316 (razem 0.14); sprzet (bron, zbroje, konie, lup) - pamiec polki "
                          "koszyka typ x tier, sztuka wazy od razu 0.060; wpiete: GetSupplyDemandForCategory w 1 modelu (DefaultSettlementEconomyModel), GetBasePriceFactor "
                          "wszystkich kategorii w 2 modelach; wlasne kopie wzoru: KsFoodCarts.DestParams, KsFoodCore.LotSteps, StartCalibration.Ramp, SupplyDemand.DailyTradeCore, "
                          "TradeExportMemo.PickCore.")
 CENY299B_SAMPLE = (
-    "Ceny sprzetu i pamiec podazy (299b): dzien 109100 | klucze TAK/TAK, tempo 0.060/d (gra 0.150) | towary: wagi od razu 0.0084 / podaz 0.1316, model ekonomii "
-    "BKEconomyModel: samotest podaz 100 -> 6.00 (oczekiwane 6.00), popyt 100 -> 15.00 (oczekiwane 15.00), wygladzen w ostatniej dobie z tempem 299b 6402, z tempem gry 0 "
+    "Ceny sprzetu i pamiec podazy (299b): dzien 109100 | klucze TAK/TAK, tempo 0.150/d (gra 0.150), od razu 0.060 | towary: wagi od razu 0.0084 / podaz 0.1316, model "
+    "ekonomii BKEconomyModel: samotest podaz 100 -> 15.00 (oczekiwane 15.00), popyt 100 -> 15.00 (oczekiwane 15.00), wygladzen w ostatniej dobie z tempem 299b 0, z tempem gry 6402 "
     "(miasta 97 x kategorie 66), przed startem sesji 0 | pamiec polek sprzetu: osad 227, koszykow 5120, |M-S| >= 1: 830 (srednio 2.41, max 31.20), zapis 48211 znakow, "
     "z zapisu 0 osad / 0 koszykow, uzyte 0, czeka 0 | sprzedaz sztuki 5 / 20 wobec 1 (mnoznik polki, koszyki z popytem >= 1 bez granic, 9120): mediana 299 15.2% / 45.1% "
     "-> 299b 2.1% / 9.3%, stosunek 20 szt. 0.212 (bez granicy rownowagi: polki 0-3 0.301 z 3000, polki >= 4 0.120 z 4000; 20. sztuka na granicy rownowagi 2100) "
@@ -82062,15 +82071,22 @@ def ceny299_selftest():
         return f"linia Ceny surowcow: {D['raw'].get(109077)}"
     # 299b
     a = CENY299B_START_RE.match(CENY299B_SAMPLE_START)
-    if not a or a.group("k1") != "TAK" or a.group("k2") != "TAK" or a.group("pace") != "0.060" or a.group("wi") != "0.0084" or a.group("ws") != "0.1316" \
-            or a.group("hs") != "1" or a.group("hf") != "2" or a.group("off"):
+    if not a or a.group("k1") != "TAK" or a.group("k2") != "TAK" or a.group("pace") != "0.150" or a.group("share") != "0.060" or a.group("wi") != "0.0084" \
+            or a.group("ws") != "0.1316" or a.group("hs") != "1" or a.group("hf") != "2" or a.group("off"):
         return "linia startowa 299b nie pasuje"
+    # 299c: stary format 299b (bez ', od razu') dalej pasuje - udzial pusty (= tempo)
+    a = CENY299B_START_RE.match(CENY299B_SAMPLE_START.replace("(tempo 0.150/d, gra 0.150, od razu 0.060)", "(tempo 0.060/d, gra 0.150)"))
+    if not a or a.group("pace") != "0.060" or a.group("share") is not None:
+        return "linia startowa 299b (stary format bez udzialu) nie pasuje"
+    a = CENY299B_RE.match(CENY299B_SAMPLE.replace("tempo 0.150/d (gra 0.150), od razu 0.060 |", "tempo 0.060/d (gra 0.150) |"))
+    if not a or a.group("pace") != "0.060" or a.group("share") is not None:
+        return "linia 299b (stary format bez udzialu) nie pasuje"
     a = CENY299B_RE.match(CENY299B_SAMPLE)
     if not a:
         return "linia 299b nie pasuje"
     g = a.groupdict()
-    want = {"d": "109100", "k1": "TAK", "k2": "TAK", "pace": "0.060", "wi": "0.0084", "ws": "0.1316", "econ": "BKEconomyModel", "tsup": "6.00", "wsup": "6.00",
-            "tdem": "15.00", "app": "6402", "gam": "0", "towns": "97", "cats": "66", "bef": "0", "mbk": "5120", "msave": "48211", "qn": "9120", "a20": "45.1", "b5": "2.1",
+    want = {"d": "109100", "k1": "TAK", "k2": "TAK", "pace": "0.150", "share": "0.060", "wi": "0.0084", "ws": "0.1316", "econ": "BKEconomyModel", "tsup": "15.00",
+            "wsup": "15.00", "tdem": "15.00", "app": "0", "gam": "6402", "towns": "97", "cats": "66", "bef": "0", "mbk": "5120", "msave": "48211", "qn": "9120", "a20": "45.1", "b5": "2.1",
             "q20": "0.212", "fst": "1.143", "lk": "4100", "la": "4100", "lb": "0", "ipb": "0", "ip": "3100", "ln": "1500", "lpa": "-91.5", "lpb": "-90.2", "lpb9": "-41.0",
             "pa": "0", "pb": "0", "gn": "900", "gg": "6.0", "gx": "5.8", "st": "0",
             "q20lo": "0.301", "nlo": "3000", "q20hi": "0.120", "nhi": "4000", "cap": "2100", "offn": "830", "off5": "0.990", "off1": "0.900", "off9": "1.080",
@@ -82111,11 +82127,11 @@ def ceny299_rows(rep, D):
     if st0:
         k, wi, ws, n = st0[-1]
         bs = [x for x in D["bstart"] if x]
-        wexp = 0.14 * float(bs[-1]["pace"]) if bs and bs[-1]["k1"] == "TAK" else 0.021   # 299b: 0.14 x tempo
+        wexp = 0.14 * _c299b_share(bs[-1]) if bs and bs[-1]["k1"] == "TAK" else 0.021   # 299c: 0.14 x udzial od razu (299b: udzial = tempo)
         okw = abs(wi - wexp) <= 5e-5 and abs(ws - (0.14 - wexp)) <= 5e-5
         rep.add("C299-0: linia startowa 'Ceny na sztuke (299)'", f"linii {len(D['start'])} (nierozpoznanych {sum(1 for x in D['start'] if not x)}), klucz {k}, wagi {wi} / {ws}, "
                 f"modeli cen {n}", f"jest, klucz TAK, 2 modele cen (DefaultTradeItemPriceFactorModel, BEE_ItemPriceFactorModel), wagi {wexp:.4f} / {0.14 - wexp:.4f} "
-                "(299b: 0.14 x tempo)", k == "TAK" and n == 2 and len(st0) == len(D["start"]) and okw)
+                "(299c: 0.14 x udzial od razu; 299b: 0.14 x tempo)", k == "TAK" and n == 2 and len(st0) == len(D["start"]) and okw)
     else:
         rep.add("C299-0: linia startowa 'Ceny na sztuke (299)'", "brak" + base, "jest, klucz TAK, 2 modele cen", J(False))
     # C299-1 linie dnia
@@ -82298,23 +82314,24 @@ def ceny299b_rows(rep, D):
         return _c299_med([_c299_f(b2[d][key]) for d in (days if dd is None else dd)])
     # C299-11 (299b): oba klucze 299b NIE
     if days and all(b2[d]["k1"] == "NIE" and b2[d]["k2"] == "NIE" for d in days):
-        bad = [d for d in days if b2[d]["pace"] != "0.150" or _c299_f(b2[d]["tsup"]) is None or abs(_c299_f(b2[d]["tsup"]) - 15.0) > 0.01
+        bad = [d for d in days if b2[d]["pace"] != "0.150" or (b2[d].get("share") or "0.150") != "0.150" or _c299_f(b2[d]["tsup"]) is None or abs(_c299_f(b2[d]["tsup"]) - 15.0) > 0.01
                or (b2[d]["q20"] != "-" and abs(float(b2[d]["q20"]) - 1.0) > 1e-3)]
         rep.add("C299-11 (299b): bieg z kluczami 299b NIE - jak 299", f"dob {len(days)}, z roznica {len(bad)}" + (f" (np. {bad[:3]})" if bad else ""),
-                "tempo 0.150, samotest podazy 15.00, stosunek 20 szt. sprzetu 1.000 kazdej doby", not bad)
+                "tempo i udzial od razu 0.150, samotest podazy 15.00, stosunek 20 szt. sprzetu 1.000 kazdej doby", not bad)
     else:
         rep.add("C299-11 (299b): bieg z kluczami 299b NIE - jak 299", "bieg z kluczami 299b TAK" if days else "brak linii 299b" + base, "INFO (opcjonalny bieg z kluczami NIE)", None)
     # C299-12 linia startowa 299b
     bs = [x for x in D["bstart"] if x]
     if bs:
-        x = bs[-1]; pc = float(x["pace"]); wi = float(x["wi"]); ws = float(x["ws"])
-        ok12 = (len(bs) == len(D["bstart"]) and x["k1"] == "TAK" and x["k2"] == "TAK" and not x["off"] and abs(pc - CENY299B_PACE) < 5e-4 and abs(wi - 0.14 * pc) <= 5e-5
-                and abs(ws - (0.14 - wi)) <= 5e-5 and x["hs"] == "1" and x["hf"] == "2")
+        x = bs[-1]; pc = float(x["pace"]); sh = _c299b_share(x); wi = float(x["wi"]); ws = float(x["ws"])
+        ok12 = (len(bs) == len(D["bstart"]) and x["k1"] == "TAK" and x["k2"] == "TAK" and not x["off"] and abs(pc - CENY299B_PACE) < 5e-4
+                and abs(sh - CENY299B_SHARE) < 5e-4 and abs(wi - 0.14 * sh) <= 5e-5 and abs(ws - (0.14 - wi)) <= 5e-5 and x["hs"] == "1" and x["hf"] == "2")
         rep.add("C299-12: linia startowa 'Ceny na sztuke (299b)'", f"linii {len(D['bstart'])} (nierozpoznanych {len(D['bstart']) - len(bs)}), klucze {x['k1']}/{x['k2']}"
-                f"{' NIECZYNNE' if x['off'] else ''}, tempo {x['pace']}, wagi {x['wi']} / {x['ws']}, wpiete {x['hs']} / {x['hf']}",
-                f"jest, oba klucze TAK, tempo {CENY299B_PACE:.3f}, wi = 0.14 x tempo +-5e-5, ws = 0.14 - wi, GetSupplyDemandForCategory 1, GetBasePriceFactor 2", ok12)
+                f"{' NIECZYNNE' if x['off'] else ''}, tempo {x['pace']}, od razu {x['share'] or '- (299b: = tempo)'}, wagi {x['wi']} / {x['ws']}, wpiete {x['hs']} / {x['hf']}",
+                f"jest, oba klucze TAK, tempo {CENY299B_PACE:.3f}, od razu {CENY299B_SHARE:.3f} (299c), wi = 0.14 x udzial +-5e-5, ws = 0.14 - wi, GetSupplyDemandForCategory 1, "
+                "GetBasePriceFactor 2", ok12)
     else:
-        rep.add("C299-12: linia startowa 'Ceny na sztuke (299b)'", "brak" + base, "jest, oba klucze TAK, tempo 0.060", J(False))
+        rep.add("C299-12: linia startowa 'Ceny na sztuke (299b)'", "brak" + base, f"jest, oba klucze TAK, tempo {CENY299B_PACE:.3f}, od razu {CENY299B_SHARE:.3f}", J(False))
     # C299-13 samotest i liczba wygladzen
     slow = [d for d in days if b2[d]["k1"] == "TAK"]
     bad13, lowsm = [], []
@@ -82322,7 +82339,9 @@ def ceny299b_rows(rep, D):
         x = b2[d]; pc = float(x["pace"]); ts, td = _c299_f(x["tsup"]), _c299_f(x["tdem"])
         if ts is None or td is None or abs(ts - max(0.1, 100.0 * pc)) > 0.01 or abs(td - 15.0) > 0.01:
             bad13.append(d)
-        if i > 0 and int(x["app"]) < CENY299B_SMOOTH_SHARE * int(x["towns"]) * int(x["cats"]):
+        # 299c: przy tempie gry (0.150) postfiks tempa nic nie zmienia - wygladzenia ida tempem gry, tempem 299b ma byc 0
+        nsm = int(x["app"]) if pc < 0.15 - 1e-6 else int(x["gam"])
+        if i > 0 and (nsm < CENY299B_SMOOTH_SHARE * int(x["towns"]) * int(x["cats"]) or (pc >= 0.15 - 1e-6 and int(x["app"]) != 0)):
             lowsm.append(d)
     nrm = D["bbad"] + D["bexbad"]
     last = b2[slow[-1]] if slow else None
@@ -82330,11 +82349,12 @@ def ceny299b_rows(rep, D):
             + f", za malo wygladzen {len(lowsm)}" + (f" (np. {lowsm[:3]})" if lowsm else "") + f", nierozpoznanych linii {nrm}"
             + (f" | ostatnia doba: model {last['econ']}, podaz {last['tsup']} (oczekiwane {last['wsup']}), popyt {last['tdem']}, wygladzen {last['app']} (gra {last['gam']}, "
                f"{last['towns']} x {last['cats']}), przed startem sesji {last['bef']}" if last else "")) + base,
-            f"podaz = 100 x tempo +-0.01, popyt 15.00 +-0.01, wygladzen >= {CENY299B_SMOOTH_SHARE} x miasta x kategorie (bez 1. doby sesji), linie rozpoznane",
+            f"podaz = 100 x tempo +-0.01, popyt 15.00 +-0.01, wygladzen >= {CENY299B_SMOOTH_SHARE} x miasta x kategorie (bez 1. doby sesji; przy tempie 0.150 tempem gry, "
+            "tempem 299b 0), linie rozpoznane",
             J(bool(slow) and not bad13 and not lowsm and nrm == 0))
     # C299-14 sprzet: krok ceny
     alld = [d for d in days if b2[d]["k2"] == "TAK"]
-    pc = float(b2[alld[-1]]["pace"]) if alld else CENY299B_PACE
+    pc = _c299b_share(b2[alld[-1]]) if alld else CENY299B_SHARE   # 299c: krok na sztuke z udzialu od razu (299b: = tempo)
     q20hi = (1.0 - ((1.0 + pc) / (1.0 + 20.0 * pc)) ** 0.5) / (1.0 - (2.0 / 21.0) ** 0.5) + 0.05
     fhi = (2.0 / (1.0 + pc)) ** 0.5 + 0.01
     q20, fst = med("q20", alld), med("fst", alld)
@@ -82346,10 +82366,10 @@ def ceny299b_rows(rep, D):
             f"[{CENY299B_Q20_MIN}, {CENY299B_Q20_HI}] (projekt: polki zapelnione; polka 17 / popyt 22 bez granicy: 0.10)",
             J(q4 is not None and CENY299B_Q20_MIN <= q4 <= CENY299B_Q20_HI))
     rep.add("C299-14a: sprzet - to samo, koszyki z polka 0-3 bez granicy rownowagi (mediana dob)", f"{fmt(q03)} (koszykow {fmt(med('nlo', alld), '{:.0f}')}/d)" + base,
-            f"[{CENY299B_Q20_MIN}, {q20hi:.3f}] (gora: pusta polka M = S = 0 przy tempie {pc:.3f} + 0.05)",
+            f"[{CENY299B_Q20_MIN}, {q20hi:.3f}] (gora: pusta polka M = S = 0 przy udziale od razu {pc:.3f} + 0.05)",
             J(q03 is not None and CENY299B_Q20_MIN <= q03 <= q20hi))
     rep.add("C299-14b: sprzet - spadek 5. sztuki 299b (mediana dob)", f"299 {fmt(med('a5', alld), '{:.1f}')}% -> 299b {fmt(med('b5', alld), '{:.1f}')}%", "INFO (oczekiwane <= 3%)", None)
-    rep.add("C299-14c: sprzet - pierwsza sprzedana sztuka 299b/299 (mediana dob)", f"{fmt(fst)}" + base, f"[1.00, {fhi:.3f}] (gora: pusta polka sqrt(2 / (1 + tempo)))",
+    rep.add("C299-14c: sprzet - pierwsza sprzedana sztuka 299b/299 (mediana dob)", f"{fmt(fst)}" + base, f"[1.00, {fhi:.3f}] (gora: pusta polka sqrt(2 / (1 + udzial od razu)))",
             J(fst is not None and 1.0 - 1e-9 <= fst <= fhi))
     # C299-15 w jednej wizycie cenami gracza (recenzja 299b: dawny licznik porownywal Factor sam ze soba)
     b15 = [d for d in days if b2[d]["ipb"] != "0" or b2[d]["ip"] == "0"]
@@ -82362,7 +82382,7 @@ def ceny299b_rows(rep, D):
     b16 = [d for d in alld if int(b2[d]["mbk"]) <= 0 or b2[d]["lb"] != "0"]
     stum = sum(int(b2[d]["st"]) for d in days)
     msave = max((int(b2[d]["msave"]) for d in days), default=0)
-    rep.add("C299-16: pamiec polek sprzetu - koszyki, potkniecia, bledy", f"dob bez koszykow {len(b16)} z {len(alld)}, potkniecia {stum}, ERROR {D['berr']}"
+    rep.add("C299-16: pamiec polek sprzetu - koszyki, potkniecia, bledy", f"dob bez koszykow albo z rozjazdem {len(b16)} z {len(alld)}, potkniecia {stum}, ERROR {D['berr']}"
             + (f" ({'; '.join(D['berrs'])})" if D["berrs"] else "")
             + (f"; ostatnia doba: osad {b2[days[-1]]['mpl']}, koszykow {b2[days[-1]]['mbk']}, |M-S| >= 1 {b2[days[-1]]['moff']} (srednio {b2[days[-1]]['mavg']}, max "
                f"{b2[days[-1]]['mmax']}), z zapisu {b2[days[-1]]['mload']}" if days else "") + base,
@@ -82425,6 +82445,11 @@ def ceny299b_rows(rep, D):
     rep.add("C299-18d: przyklady gracza (ostatnia doba, zl za 1. / 5. / 20. sprzedana sztuke, 299 -> 299b)", "; ".join(parts) if parts else "brak", "INFO", None)
 
 
+def _c299b_share(x):
+    """299c: udzial od razu z linii 299b (', od razu X'); log bez tego czlonu (299b) - udzial = tempo."""
+    return float(x["share"]) if x.get("share") else float(x["pace"])
+
+
 def _c299_jeff_lim(x, wi=0.021, ws=0.119):
     """C299-6: prog stosunku spadku 299/gra dla stanu doby x = polka/podaz (None - podaz 0): k x (0.1 S + 0.04 I) / (ws S + wi I) bez stalej +2 (stala
     ciagnie stosunek do k = wi / 0.04), najmniej k, + 0.05; nigdy ponizej CENY299_JEFF_DROP x k / 0.525 (299b: wagi doby 0.0084 / 0.1316 - przy 299 jak dotad)."""
@@ -82433,11 +82458,13 @@ def _c299_jeff_lim(x, wi=0.021, ws=0.119):
     return max(CENY299_JEFF_DROP * k / 0.525, 0.05 + k * max(1.0, q))
 
 
-def _c299b_line(d, k1="TAK", k2="TAK", pace="0.060", tsup="6.00", app=6402, q20="0.212", fst="1.143", lb=0, ipb=0, lpb="-90.2", lpb9="-41.0", st_=0, mbk=5120,
+def _c299b_line(d, k1="TAK", k2="TAK", pace="0.150", tsup="15.00", app=0, gam=6402, share="0.060", q20="0.212", fst="1.143", lb=0, ipb=0, lpb="-90.2", lpb9="-41.0", st_=0, mbk=5120,
                 q20lo="0.301", q20hi="0.120", ip=3100, lhb="-45.0", rb="-91.0", rhb9="-20.0"):
     """299b: linia doby jak w C# (z CENY299B_SAMPLE przez zamiane wartosci)."""
-    return (CENY299B_SAMPLE.replace("dzien 109100", f"dzien {d}").replace("klucze TAK/TAK, tempo 0.060/d", f"klucze {k1}/{k2}, tempo {pace}/d")
-            .replace("samotest podaz 100 -> 6.00 (oczekiwane 6.00)", f"samotest podaz 100 -> {tsup} (oczekiwane {tsup})").replace("tempem 299b 6402", f"tempem 299b {app}")
+    return (CENY299B_SAMPLE.replace("dzien 109100", f"dzien {d}")
+            .replace("klucze TAK/TAK, tempo 0.150/d (gra 0.150), od razu 0.060", f"klucze {k1}/{k2}, tempo {pace}/d (gra 0.150)" + (f", od razu {share}" if share else ""))
+            .replace("samotest podaz 100 -> 15.00 (oczekiwane 15.00)", f"samotest podaz 100 -> {tsup} (oczekiwane {tsup})")
+            .replace("tempem 299b 0, z tempem gry 6402", f"tempem 299b {app}, z tempem gry {gam}")
             .replace("stosunek 20 szt. 0.212", f"stosunek 20 szt. {q20}").replace("mediana 1.143", f"mediana {fst}").replace("(rozjazdow 0)", f"(rozjazdow {lb})")
             .replace("-> 299b -90.2%, p90 299 -48.0% -> 299b -41.0%", f"-> 299b {lpb}%, p90 299 -48.0% -> 299b {lpb9}%")
             .replace("| potkniecia 0.", f"| potkniecia {st_}.").replace("koszykow 5120,", f"koszykow {mbk},")
@@ -82526,12 +82553,20 @@ def ceny299_selftest2():
     v299 = verdicts(_c299_synth())
     if any(v299.get(k) != "INFO" for k in ("C299-12", "C299-13", "C299-14", "C299-14a", "C299-15", "C299-16", "C299-17", "C299-17h", "C299-17r", "C299-18", "C299-19")):
         return f"bieg 299 bez linii 299b: wiersze 299b nie INFO ({v299})"
-    offs = _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", tsup="15.00", q20="1.000", fst="1.000", q20lo="1.000", q20hi="1.000"), **gb)
+    offs = _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", share="0.150", tsup="15.00", q20="1.000", fst="1.000", q20lo="1.000", q20hi="1.000"), **gb)
     if verdicts(offs).get("C299-11 (299b)") != "TAK":
         return "bieg z kluczami 299b NIE: C299-11 (299b) nie TAK"
-    st_nie = CENY299B_SAMPLE_START.replace("Supply Memory TAK (tempo 0.060/d", "Supply Memory NIE (tempo 0.150/d")
+    # 299c: bieg 299b (tempo 6%, linie bez udzialu - wagi 0.0084 / 0.1316 te same) przechodzi wiersze 13 / 14, a C299-12 lapie stare tempo
+    old = dict(pace="0.060", share=None, tsup="6.00", app=6402, gam=0)
+    vold = verdicts(_c299_synth(b=old, bstart=CENY299B_SAMPLE_START.replace("(tempo 0.150/d, gra 0.150, od razu 0.060)", "(tempo 0.060/d, gra 0.150)"), **gb))
+    if vold.get("C299-13") != "TAK" or vold.get("C299-14a") != "TAK" or vold.get("C299-0") != "TAK" or vold.get("C299-12") != "NIE":
+        return f"bieg 299b (stary format, tempo 0.060): C299-0 / 13 / 14a TAK i C299-12 NIE oczekiwane ({vold})"
+    st_nie = CENY299B_SAMPLE_START.replace("Supply Memory TAK (tempo 0.150/d", "Supply Memory NIE (tempo 0.150/d")
     casesb = [("C299-12", _c299_synth(b={}, bstart=st_nie, **gb)), ("C299-12", _c299_synth(b={}, bstart=CENY299B_SAMPLE_START.replace("w 1 modelu", "w 0 modelu"), **gb)),
-              ("C299-13", _c299_synth(b=dict(tsup="15.00"), **gb)), ("C299-13", _c299_synth(b=dict(app=100), **gb)),
+              ("C299-13", _c299_synth(b=dict(tsup="6.00"), **gb)), ("C299-13", _c299_synth(b=dict(gam=100), **gb)), ("C299-13", _c299_synth(b=dict(app=500), **gb)),
+              ("C299-13", _c299_synth(b=dict(pace="0.060", tsup="6.00", app=100, gam=6302), **gb)),
+              ("C299-12", _c299_synth(b={}, bstart=CENY299B_SAMPLE_START.replace("od razu 0.060)", "od razu 0.150)"), **gb)),
+              ("C299-12", _c299_synth(b={}, bstart=CENY299B_SAMPLE_START.replace("(tempo 0.150/d, gra 0.150, od razu 0.060)", "(tempo 0.060/d, gra 0.150)"), **gb)),
               ("C299-14", _c299_synth(b=dict(q20hi="0.450"), **gb)), ("C299-14", _c299_synth(b=dict(q20hi="0.010"), **gb)), ("C299-14c", _c299_synth(b=dict(fst="0.950"), **gb)),
               ("C299-14a", _c299_synth(b=dict(q20lo="0.600"), **gb)),
               ("C299-15", _c299_synth(b=dict(ip=0), **gb)), ("C299-15", _c299_synth(b=dict(ipb=2), **gb)), ("C299-16", _c299_synth(b=dict(lb=1), **gb)),
@@ -82540,9 +82575,11 @@ def ceny299_selftest2():
               ("C299-17h", _c299_synth(b=dict(lhb="4.0"), **gb)), ("C299-17r", _c299_synth(b=dict(rb="2.0"), **gb)), ("C299-17r", _c299_synth(b=dict(rhb9="12.0"), **gb)),
               ("C299-19", _c299_synth(b={}, arms=(2200, 218143), **gb)), ("C299-19", _c299_synth(b={}, arms=(1359, 300000), **gb)),
               ("C299-18", _c299_synth(b={}, exp=1000, **gb)), ("C299-18b", _c299_synth(b={}, skup=90000, **gb)),
-              ("C299-11 (299b)", _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", tsup="15.00", q20="0.500"), **gb)),
+              ("C299-11 (299b)", _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", share="0.150", tsup="15.00", q20="0.500"), **gb)),
+              ("C299-11 (299b)", _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", share="0.060", tsup="15.00", q20="1.000", fst="1.000", q20lo="1.000",
+                                                     q20hi="1.000"), **gb)),
               ("C299-2", _c299_synth(b={}, q30=0.552, q10=0.215, gdx=-2.0)), ("C299-6", _c299_synth(b={}, q30=0.231, q10=0.215, gdx=-5.0)),
-              ("C299-0", _c299_synth(b={}, bstart=CENY299B_SAMPLE_START.replace("tempo 0.060/d", "tempo 0.080/d"), **gb))]
+              ("C299-0", _c299_synth(b={}, bstart=CENY299B_SAMPLE_START.replace("od razu 0.060)", "od razu 0.080)"), **gb))]
     for row, D in casesb:
         v = verdicts(D)
         if v.get(row) != "NIE":
@@ -82557,7 +82594,8 @@ def ceny299_main(logp):
     rep.add("C299-S: self-test wyrazen (linia 299 i startowa jak w C#: PriceWalk299.Daily, RawPrice.ApplyAll; E3-T1, 287, 294b, Ceny surowcow)", s1 or "OK",
             "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     s2 = ceny299_selftest2()
-    rep.add("C299-S2: test syntetyczny (dobry bieg 299 i 299b, biegi z kluczami NIE, prog C299-6 z rachunku, 20 + 26 zlych - wiersze 0-19)", s2 or "OK", "OK", s2 is None)
+    rep.add("C299-S2: test syntetyczny (dobry bieg 299 i 299c, bieg 299b w starym formacie, biegi z kluczami NIE, prog C299-6 z rachunku, 20 + 31 zlych - wiersze 0-19)",
+            s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("C299-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()

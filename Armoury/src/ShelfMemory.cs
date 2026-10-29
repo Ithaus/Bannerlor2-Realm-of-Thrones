@@ -13,9 +13,11 @@ namespace Armoury
     /// PACZKA 299b - PAMIEC POLKI SPRZETU (Jeff 29.10 ok. 20:20, pytany, czy wyplaszczenie ceny ma objac tez lup i sprzet: "tak dla wszysatkich - 15% dziennie za duzo, dajmy
     /// 5-8% dziennie"). Prawo podazy i popytu sprzetu (SupplyDemand.Factor: ((popyt + 1) / (polka + 1))^0.5 na koszyk typ x tier) nie mialo pamieci - kazda sprzedana sztuka
     /// liczyla sie w cenie od razu cala (sesja Jeffa 29.10: miecz t3 w Riverrun, polka 17, popyt 22.1 - 1. sztuka x1.10, 20. x0.78). Teraz to samo prawo, ktore 299b daje
-    /// towarom handlowym: kazdy koszyk (osada x typ x tier) pamieta, ile sztuk lezalo (M), i co dobe zamyka czesc Pace (RawPrice.Pace, 6%) roznicy do polki; cena widzi
-    /// S_eff = Pace x polka teraz + (1 - Pace) x M - sztuka sprzedana albo kupiona wazy od razu tylko Pace, reszta przychodzi w nastepnych dobach.
-    /// Przy M = S kupno bez zmian (S_eff = S); sprzedaz pierwszej sztuki liczona przy S + Pace zamiast S + 1 (troche drozej). Kupno i odsprzedaz w jednej wizycie daja ten sam
+    /// towarom handlowym: kazdy koszyk (osada x typ x tier) pamieta, ile sztuk lezalo (M), i co dobe zamyka czesc Pace (RawPrice.Pace) roznicy do polki; cena widzi
+    /// S_eff = Share x polka teraz + (1 - Share) x M - sztuka sprzedana albo kupiona wazy od razu tylko Share, reszta przychodzi w nastepnych dobach.
+    /// 299c: dwie osobne liczby - udzial od razu Share (RawPrice.Share, PriceInstantShare 0.06) i tempo pamieci Pace (PriceSupplyMemoryDaily, znow 0.15 gry; w 299b
+    /// jedna liczba 0.06 na oba - przesyt i brak po handlu trwaly ok. 2.5 x dluzej, kupcy wywozili x1.77 sprzetu wobec 298a). Krok na sztuke jak w 299b, pamiec jak w grze.
+    /// Przy M = S kupno bez zmian (S_eff = S); sprzedaz pierwszej sztuki liczona przy S + Share zamiast S + 1 (troche drozej). Kupno i odsprzedaz w jednej wizycie daja ten sam
     /// czynnik (cena zalezy tylko od stanu polki i pamieci). Polka fizyczna rzadzi dalej tym, ILE sie bierze i wiezie (nadwyzka i toShip wywozu, bestCap, ShopReserve,
     /// Substitution, brak w warsztatach), zamowienia podnosza popyt od razu. Start neutralny: koszyk bez pamieci (nowa kampania, stary zapis, klucz wlaczony w trakcie gry)
     /// dostaje M = polka teraz. Zapis "arm_shelfmem": tylko roznice M - polka >= 0.005 (przy wczytaniu M = polka + roznica). Sama cena - zlota ani sztuk nie przybywa.
@@ -144,7 +146,7 @@ namespace Armoury
             return Eff(st, it.ItemType, TierOf(it), sDir, d);
         }
 
-        /// <summary>Polka, jaka widzi cena: Pace x sDir + (1 - Pace) x M w granicy rownowagi (Bound, d = popyt tej samej wyceny). sDir = polka wedlug SupplyDemand.Stock
+        /// <summary>Polka, jaka widzi cena: Share x sDir + (1 - Share) x M (299c: udzial od razu, nie tempo pamieci) w granicy rownowagi (Bound, d = popyt tej samej wyceny). sDir = polka wedlug SupplyDemand.Stock
         /// (przy sprzedazy + 1). Klucz wylaczony, krzywa gry (RawPrice.GameCurve), osada poza miastem i zamkiem albo potkniecie - sDir (jak w 299).</summary>
         internal static float Eff(Settlement st, ItemObject.ItemTypeEnum type, int tier, float sDir, float d)
         {
@@ -155,7 +157,7 @@ namespace Armoury
             {
                 var x = Get(st);
                 if (x == null) return sDir;
-                return EffRow(x.M, ty * TierSlots + tier, (float)RawPrice.Pace, sDir, d);
+                return EffRow(x.M, ty * TierSlots + tier, (float)RawPrice.Share, sDir, d);   // 299c: udzial od razu (299b: tempo)
             }
             catch (Exception e) { Stumble("Eff", e); return sDir; }
         }
@@ -196,7 +198,7 @@ namespace Armoury
         }
 
         /// <summary>Raz na dobe (ArmouryBehavior, zaraz po SupplyDemand.DecayOrders - przed ArmsPricing.Daily i wywozem kupcow, jak wygladzanie podazy gry na poczatku doby
-        /// miasta): kazdy koszyk miast i zamkow M += Pace x (polka - M), przy |M - polka| &lt; 0.005 M = polka. Klucz wylaczony - pamiec czyszczona (wlaczenie = start neutralny).</summary>
+        /// miasta): kazdy koszyk miast i zamkow M += Pace x (polka - M) (299c: tempo pamieci, domyslnie 0.15 gry - niezalezne od udzialu od razu), przy |M - polka| &lt; 0.005 M = polka. Klucz wylaczony - pamiec czyszczona (wlaczenie = start neutralny).</summary>
         internal static void Daily()
         {
             DRan = false;

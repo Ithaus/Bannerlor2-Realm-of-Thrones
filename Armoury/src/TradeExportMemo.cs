@@ -44,10 +44,11 @@ namespace Armoury
         private static int[] _demAt, _mulAt;              // numer koszyka, w ktorym liczba powstala
         private static int _serial;
         private static ItemObject _probe;
-        // 299b po recenzji (koszt): wiersz pamieci polki kazdego celu raz na wywoz doby (ShelfMemory.Row), miejsce koszyka raz na koszyk, tempo raz na wywoz
+        // 299b po recenzji (koszt): wiersz pamieci polki kazdego celu raz na wywoz doby (ShelfMemory.Row), miejsce koszyka raz na koszyk, udzial od razu raz na wywoz
+        // (299c: RawPrice.Share - waga polki teraz w S_eff; tempo pamieci nie wchodzi do wyceny)
         private static float[][] _memRow;
         private static int _slot = -1;
-        private static float _pace;
+        private static float _share;
         private static bool _ready, _dayOff;
 
         // wynik nowej drogi dla jednego wyboru celu (miedzy PickStart a PickEnd)
@@ -137,7 +138,7 @@ namespace Armoury
                 for (int i = 0; i < n; i++) _stockAt[i] = stock[places[i]];
                 if (_memRow == null || _memRow.Length != n) _memRow = new float[n][];
                 for (int i = 0; i < n; i++) _memRow[i] = ShelfMemory.Row(places[i]);
-                _pace = (float)RawPrice.Pace;
+                _share = (float)RawPrice.Share;
                 _ready = true;
                 return true;
             }
@@ -266,7 +267,7 @@ namespace Armoury
                 int dh; _stockAt[j].TryGetValue(key, out dh);
                 if (carts) dh += TradeCarts.Incoming(dst, key);
                 float dd = Dem(j);
-                float dstShelf = SupplyDemand.DstShelfRow(_memRow[j], _slot, _pace, dd, dh, elast, minF, maxF);   // 299b: ta sama liczba co stara petla (DstShelf - pamiec polki celu)
+                float dstShelf = SupplyDemand.DstShelfRow(_memRow[j], _slot, _share, dd, dh, elast, minF, maxF);   // 299b: ta sama liczba co stara petla (DstShelf - pamiec polki celu)
                 float profit = dstShelf * Mul(j) - srcIdx - perDist * dist;
                 if (profit <= bestProfit) continue;
                 best = dst; bestProfit = profit; bestCap = Math.Max(1, (int)Math.Ceiling(dd) - dh); bestDist = dist;

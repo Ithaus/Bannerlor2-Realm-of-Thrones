@@ -43,7 +43,8 @@ namespace Armoury
     /// rudy miasto-mediana placi 37 d (x4.6), miasto z kuznia 74 d (x9); zapas na 7 dob = wartosc bazowa; zapas docelowy karawan
     /// (10 dob) x0.82; prog nadwyzki (20 dob) x0.54; 100 dob x0.2. Swiezo dowieziony towar zbija cene slabiej niz zapas, ktory lezy
     /// (0.14): w grze 0.04 od razu, od paczki 299 (klucz PriceFlatterLotWalk) 0.021 od razu i reszta przez pamiec podazy (15% dziennie), od paczki 299b
-    /// (klucz PriceSlowSupplyMemory) pamiec podazy idzie za polka 6% dziennie, a swiezy towar wazy od razu 0.14 x 0.06 = 0.0084 -
+    /// (klucz PriceSlowSupplyMemory) swiezy towar wazy od razu 0.14 x 0.06 = 0.0084, a od 299c pamiec podazy idzie za polka znow w tempie gry 15% dziennie
+    /// (299b: 6% - przesyt po sprzedazy trwal ok. 2.5 x dluzej; udzial od razu PriceInstantShare i tempo PriceSupplyMemoryDaily to dwa osobne ustawienia) -
     /// dostawa calego zapasu docelowego idzie srednio po x2.5 wartosci (liczone wagami gry).
     /// Sufit x10 zostaje z gry - jeden dla wszystkich towarow handlowych. Historycznie (woz ok. 1.5 d za tone na mile, Anglia
     /// XIV w. - szacunek): rudzie po 75 d za tone droga ladowa doklada jej wlasna wartosc co ok. 80 km, drewnu po 35 d co
@@ -126,9 +127,19 @@ namespace Armoury
         // (0.0084), podaz 0.14 - 0.0084 = 0.1316; przy S = I mianownik dalej 0.14 I + 2 - ceny ustalone bez zmian. Klucz PriceFlatterAllItems: to samo prawo dla sprzetu i lupu
         // (ShelfMemory - pamiec polki koszyka typ x tier w SupplyDemand.Factor) i te same wagi w czynniku gry kategorii spoza towarow handlowych (0.8-1.3: podstawa sprzedazy broni
         // i zbroi, SellByCondition.Fraction). Oba klucze NIE - dokladnie jak w paczce 299.
+        // PACZKA 299c (autotest 138a = 137 + 299b + 291d wobec 299a = WGRANE 137, 90 dob): tempo 6% pamieci podazy - nie krok ceny na sztuke - zbilo handel karawan:
+        // placace zold 0.564 -> 0.402, mediana wynik - zold +26 -> -31 zl/d, wynik floty +31.5k -> +14.0k zl/d, miasta bez rudy 11.0 -> 16.1, wywoz kupcow sprzetu x1.77 (298a).
+        // Dowod z logow (sprawdzone liczbami): indeks miast drozszych (287 p75) od 11. doby 10-20% nizej (doby 31-90 x0.79-0.81, p25 x0.89-0.95), mediana marzy miast
+        // 94-96% -> 71-78%, marza T1 ostatnich 7 dob 79% -> 57% przy 741 zamiast 506 szt./d, sprzedaz na stracie doby 61-90 75 -> 144 szt./d, rozne miasta z wjazdem
+        // wobec rozrzutu 0.666 -> 0.588 (karawany zjezdzaja do tych samych miast). Przyczyna: wolna pamiec trzyma przesyt po dostawie ok. 2.5 x dluzej - podaz miasta
+        // przed nastepna dostawa jeszcze pamieta poprzednia (rachunek a299c/sim.py: dostawa 200 co 20 dob - cena sprzedazy karawany x1.12 w 299, x0.96 w 299b),
+        // a w miastach, z ktorych towar schodzi (zima, glod), podaz zostaje nad polka (opoznienie ok. (1 - p) / p dob: 5.7 przy 15%, 15.7 przy 6%).
+        // Jeff czul KROK NA SZTUKE (spadek ceny w chwili sprzedazy) - wiec 299c rozdziela dwie liczby: udzial od razu (PriceInstantShare, 0.06: sztuka wazy od razu
+        // 0.14 x 0.06 = 0.0084, sprzet S_eff = 0.06 x polka + 0.94 x M) i tempo pamieci (PriceSupplyMemoryDaily, domyslnie znow 0.15 gry - postfiks tempa nic nie zmienia).
         internal static bool SlowOn { get { var s = Settings.Current; return s != null && s.PriceFlatterLotWalk && s.PriceSlowSupplyMemory; } }
         internal static bool AllItemsOn { get { var s = Settings.Current; return s != null && s.PriceFlatterLotWalk && s.PriceFlatterAllItems; } }
-        /// <summary>Dzienne tempo pamieci podazy: klucz PriceSlowSupplyMemory - PriceSupplyMemoryDaily w granicach 0.02-0.15; inaczej 0.15 gry.</summary>
+        /// <summary>Dzienne tempo pamieci podazy (ile luki miedzy pamiecia a polka zamyka doba - towary: podaz rynku, sprzet: M koszyka): klucz PriceSlowSupplyMemory -
+        /// PriceSupplyMemoryDaily w granicach 0.02-0.15 (299c: domyslnie 0.15 = gra); inaczej 0.15 gry.</summary>
         internal static double Pace { get { return PaceOf(Settings.Current); } }
         internal static double PaceOf(Settings s)
         {
@@ -137,20 +148,32 @@ namespace Armoury
             if (!(v >= 0.02f)) return 0.02;          // takze NaN
             return v >= 0.15f ? GameDayW : v;
         }
+        /// <summary>299c: udzial od razu - jaka czesc wagi polki sztuka sprzedana albo kupiona wazy na cenie w chwili handlu (towary: 0.14 x udzial od razu, reszta
+        /// przez pamiec podazy; sprzet: S_eff = udzial x polka + (1 - udzial) x M). Klucz PriceSlowSupplyMemory - PriceInstantShare w granicach 0.02-0.15 (domyslnie 0.06);
+        /// inaczej 0.15 (299: tyle, ile przepuszcza jedna doba wygladzania gry). Niezalezny od tempa pamieci (Pace).</summary>
+        internal static double Share { get { return ShareOf(Settings.Current); } }
+        internal static double ShareOf(Settings s)
+        {
+            if (s == null || !s.PriceFlatterLotWalk || !s.PriceSlowSupplyMemory) return GameDayW;
+            float v = s.PriceInstantShare;
+            if (!(v >= 0.02f)) return 0.02;          // takze NaN
+            return v >= 0.15f ? GameDayW : v;
+        }
         /// <summary>299b: true od OnSessionLaunched (ArmouryBehavior) do Reset - 10 przebiegow wygladzania nowej kampanii (ItemConsumptionBehavior.OnNewGameCreatedFollowUpEnd,
         /// Campaign: OnNewGameCreated przed OnSessionStart) zostaje w tempie gry.</summary>
         internal static bool MemoryLive;
-        /// <summary>Mnozniki wag polki i podazy w FactorPrefix: 299 - 0.525 / 1.19; 299b - (0.14 x tempo) / 0.04 i (0.14 - 0.14 x tempo) / 0.1.</summary>
+        /// <summary>Mnozniki wag polki i podazy w FactorPrefix: 299 - 0.525 / 1.19; 299c - (0.14 x udzial od razu) / 0.04 i (0.14 - 0.14 x udzial) / 0.1
+        /// (299b liczyl je z tempa pamieci - jedna liczba na dwie rzeczy).</summary>
         private static void Weights(Settings s, out float ks, out float kp)
         {
             if (!s.PriceSlowSupplyMemory) { ks = KShelf; kp = KSupply; return; }
-            double sh = (GameShelfW + GameSupplyW) * PaceOf(s);
+            double sh = (GameShelfW + GameSupplyW) * ShareOf(s);
             ks = (float)(sh / GameShelfW); kp = (float)((GameShelfW + GameSupplyW - sh) / GameSupplyW);
         }
         /// <summary>Wagi wzoru dla wlasnych kopii wzoru (KsFoodCarts.DestParams, KsFoodCore.LotSteps, StartCalibration.Ramp); klucz wylaczony - dokladnie literaly gry;
-        /// 299b (PriceSlowSupplyMemory) - 0.14 x tempo i reszta do 0.14.</summary>
-        internal static double ShelfW { get { return LotWalkOn ? (SlowOn ? (GameShelfW + GameSupplyW) * Pace : LotShelfW) : 0.04; } }
-        internal static double SupplyW { get { return LotWalkOn ? (SlowOn ? GameShelfW + GameSupplyW - (GameShelfW + GameSupplyW) * Pace : LotSupplyW) : 0.1; } }
+        /// 299c (PriceSlowSupplyMemory) - 0.14 x udzial od razu (Share) i reszta do 0.14 - krok lotu w chwili handlu; pamiec podazy idzie tempem Pace osobno.</summary>
+        internal static double ShelfW { get { return LotWalkOn ? (SlowOn ? (GameShelfW + GameSupplyW) * Share : LotShelfW) : 0.04; } }
+        internal static double SupplyW { get { return LotWalkOn ? (SlowOn ? GameShelfW + GameSupplyW - (GameShelfW + GameSupplyW) * Share : LotSupplyW) : 0.1; } }
         internal static int FactorModels { get { return _factorModels; } }
 
         /// <summary>Recenzja 299: stala wzoru "+2" po przeliczniku monety, jak w FactorPrefix - (r D / (r X + 2))^e = (D / (X + 2 / r))^e, wiec przy r > 1
@@ -195,7 +218,7 @@ namespace Armoury
                 var s = Settings.Current;
                 // paczka 299: sprzedawana sztuka dolacza do polki z waga polki, polka 0.525 x, podaz 1.19 x (0.04 -> 0.021, 0.1 -> 0.119; razem 0.14 jak w grze);
                 // przed przelicznikiem monety (mnozenie przez r dalej jest przemienne); GetTradePenalty dostaje wartosci oryginalne (ref zmienia tylko to wywolanie)
-                // 299b (klucz PriceSlowSupplyMemory): wagi z tempa pamieci podazy (0.0084 / 0.1316 przy 6%); klucz NIE - stale 299 (bit w bit)
+                // 299c (klucz PriceSlowSupplyMemory): wagi z udzialu od razu (0.0084 / 0.1316 przy 0.06; 299b - z tempa pamieci); klucz NIE - stale 299 (bit w bit)
                 if (s != null && s.PriceFlatterLotWalk && !GameCurve)
                 {
                     if (__4 && __5 != 0) { __1 += __5; __5 = 0; }
@@ -657,12 +680,14 @@ namespace Armoury
                          + " - swiezy towar wazy od razu " + shw.ToString("0.0000", inv) + " (gra 0.040), podaz " + spw.ToString("0.0000", inv)
                          + " (gra 0.100), razem 0.14 jak w grze; przez RawPrice.FactorPrefix w " + _factorModels + " modelach cen; wlasne kopie wzoru: KsFoodCarts.DestParams, KsFoodCore.LotSteps, StartCalibration.Ramp.");
                 bool slow = s != null && s.PriceSlowSupplyMemory, all = s != null && s.PriceFlatterAllItems;
-                double pace = PaceOf(s);
-                Log.Info("Ceny na sztuke (299b): klucze Price Slow Supply Memory " + (slow ? "TAK" : "NIE") + " (tempo " + pace.ToString("0.000", inv) + "/d, gra 0.150), Price Flatter All Items "
+                double pace = PaceOf(s), share = ShareOf(s);
+                // 299c: ", od razu X" - udzial od razu (PriceInstantShare) osobno od tempa pamieci; sprawdz_logi ceny299 C299-12 czyta oba
+                Log.Info("Ceny na sztuke (299b): klucze Price Slow Supply Memory " + (slow ? "TAK" : "NIE") + " (tempo " + pace.ToString("0.000", inv) + "/d, gra 0.150, od razu "
+                         + share.ToString("0.000", inv) + "), Price Flatter All Items "
                          + (all ? "TAK" : "NIE") + (lot ? "" : " (oba wymagaja Price Flatter Lot Walk - NIECZYNNE)")
                          + " - podaz rynku idzie za polka " + (100.0 * pace).ToString("0.0", inv) + "% dziennie (popyt bez zmian 15%); swiezy towar wazy od razu " + ShelfW.ToString("0.0000", inv)
                          + ", podaz " + SupplyW.ToString("0.0000", inv) + " (razem 0.14); sprzet (bron, zbroje, konie, lup) - pamiec polki koszyka typ x tier, sztuka wazy od razu "
-                         + (lot && all ? pace : 1.0).ToString("0.000", inv) + "; wpiete: GetSupplyDemandForCategory w " + _paceModels + " modelu (DefaultSettlementEconomyModel), GetBasePriceFactor wszystkich kategorii w "
+                         + (lot && all ? share : 1.0).ToString("0.000", inv) + "; wpiete: GetSupplyDemandForCategory w " + _paceModels + " modelu (DefaultSettlementEconomyModel), GetBasePriceFactor wszystkich kategorii w "
                          + _factorModels + " modelach; wlasne kopie wzoru: KsFoodCarts.DestParams, KsFoodCore.LotSteps, StartCalibration.Ramp, SupplyDemand.DailyTradeCore, TradeExportMemo.PickCore.");
             }
             catch (Exception e) { Log.Error("RawPrice.ApplyAll", e); }

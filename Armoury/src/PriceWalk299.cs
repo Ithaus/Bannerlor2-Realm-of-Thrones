@@ -18,7 +18,8 @@ namespace Armoury
     /// krzywa gry (RawPrice.GameCurve = true) i krzywa 299. Czysty rachunek: zadnej zmiany polki, podazy, popytu ani zlota, zadnego stanu w zapisie.
     /// Wsie handluja na danych rynku miasta (Bound), zamki maja popyt 0 (indeks na podlodze 0.1) - liczone same miasta.
     /// Linia "Ceny na sztuke (299): dzien" czyta grupa ceny299 w tools/sprawdz_logi.py.
-    /// Paczka 299b: "299" w linii to nasza krzywa (przy kluczu PriceSlowSupplyMemory wagi 0.14 x tempo); po 7 dobach gra idzie swoim tempem 0.15, nasza krzywa - RawPrice.Pace.
+    /// Paczka 299b: "299" w linii to nasza krzywa (przy kluczu PriceSlowSupplyMemory wagi 0.14 x udzial od razu - 299c: RawPrice.Share); po 7 dobach gra idzie swoim tempem 0.15,
+    /// nasza krzywa - RawPrice.Pace (299c: domyslnie tez 0.15).
     /// </summary>
     internal static class PriceWalk299
     {
