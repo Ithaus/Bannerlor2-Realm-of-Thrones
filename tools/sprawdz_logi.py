@@ -77936,7 +77936,7 @@ BITWA291_RX = {
                     r"taktyka ataku przy trzymaniu (\d+) s; puszczone: S2 (\d+), napastnik nie podchodzi \d+ s (\d+), zwarcie (\d+); "
                     r"probka (.*?); potkniecia (\d+) \|"),
     "c": re.compile(r"\| C piechota bez tarcz biegnie pod ostrzalem (TAK|NIE): szykow (\d+), wejsc w bieg (\d+) \(sr\. tarcz (\S+), prog ([\d.]+)\), koncow biegu (\d+), "
-                    r"szyko-sekund biegu (\d+); z tarczami pod ostrzalem zostal krok (\d+)\.$"),
+                    r"szyko-sekund biegu (\d+); z tarczami pod ostrzalem zostal krok (\d+)(?: \(sr\. tarcz ([\d.]+)\))?\.$"),   # 291b: sr. tarcz przy kroku > 0
 }
 # linie kontrolne - napisy jak w kodzie C# (Battle291.Write, HorsePursuit.Seg291A, Doctrine.Dh291Segment, MarchToContact.Rush291Segment)
 BITWA291_TEST = {
@@ -77969,8 +77969,12 @@ def bitwa291_selftest():
                                "T176/vlandia sila x0.81 trzyma, taktyka DefensiveEngagement s. 1 -> DefensiveEngagement", "0"):
         return f"b: {m.groups() if m else 'brak'}"
     m = RX["c"].search(s)
-    if not m or m.groups() != ("TAK", "1", "1", "0.10", "0.60", "1", "24", "0"):
+    if not m or m.groups() != ("TAK", "1", "1", "0.10", "0.60", "1", "24", "0", None):
         return f"c: {m.groups() if m else 'brak'}"
+    # 291b: krok z tarczami > 0 - dopisek sr. tarcz (MarchToContact.Rush291Segment)
+    m = RX["c"].search(T["lineno"].replace("zostal krok 0.", "zostal krok 2 (sr. tarcz 0.85)."))
+    if not m or (m.group(8), m.group(9)) != ("2", "0.85"):
+        return f"c kept: {m.groups() if m else 'brak'}"
     s = T["lineno"]
     m = RX["line"].match(s)
     if not m or m.group(2) != "NIE" or not RX["a"].search(s) or not RX["b"].search(s) or not RX["c"].search(s):
@@ -78051,8 +78055,20 @@ def bitwa291_rows(rep, D):
         rep.add("B291-3: C bieg bez tarcz pod ostrzalem - tylko szyki ponizej progu tarcz, koncow <= wejsc", txt, "sr. tarcz < prog, koncow <= wejsc", not bad)
     else:
         kept = sum(int(x[3].group(8)) for x in L)
+        # 291b (autotest 296a: 7 bitew, "z tarczami zostal krok 4", wejsc 0): powod wprost - pod ostrzalem w marszu byly tylko szyki z tarczami (bandy autotestu),
+        # szyki gracza autotestu poza regula; u Jeffa 29.10 00:46-00:49 trafieni strzala piechurzy wroga 44 z 44 bez tarczy w ekwipunku - tam regula ma wejsc
+        ks = [(int(x[3].group(8)), float(x[3].group(9)), x[3].group(5)) for x in L if x[3].group(9)]
+        if ks:
+            kn = sum(k[0] for k in ks)
+            avg = sum(k[0] * k[1] for k in ks) / kn
+            why = (f"brak wejsc w bieg: pod ostrzalem w marszu tylko szyki piechoty AI z tarczami - {kept} szykow, sr. tarcz {avg:.2f} >= prog {ks[0][2]} "
+                   "(w tym biegu nie bylo piechoty AI bez tarcz pod ostrzalem; szyki gracza autotestu poza regula) - regula do sprawdzenia w grze")
+        elif kept:
+            why = f"brak wejsc w bieg (z tarczami zostal krok {kept}; log sprzed 291b - bez sr. tarcz)"
+        else:
+            why = "brak wejsc w bieg: zaden szyk piechoty AI nie szedl marszem pod ostrzalem"
         rep.add("B291-3: C bieg bez tarcz pod ostrzalem - tylko szyki ponizej progu tarcz, koncow <= wejsc",
-                f"brak wejsc w bieg (z tarczami zostal krok {kept})", "INFO (bitwa bez piechoty bez tarcz pod ostrzalem)", None)
+                why, "INFO (bitwa bez piechoty AI bez tarcz pod ostrzalem - powod w wartosci)", None)
     # B291-4 regresja
     stum = sum(int(x[2].group(11)) for x in L)
     known = bool(L or D["err"])
@@ -78158,7 +78174,8 @@ def main(argv):
 #   S292-8 sr. maxStamina RBM zywych ludzi na koniec misji (odczyt postawy) / sr. pula RBM PRZED mnoznikiem z linii startu w [0.75 K, 1.3 K] (lacznie, wazone
 #          liczba ludzi); misja z >= 10 ludzmi poza [0.6 K, 1.6 K] - NIE (inna populacja - polegli i posilki - stad szerokie progi; ok. 1 przy K = 2 = pula wrocila)
 #   S292-9 log bazowy (ten sam skrypt bitew sprzed 292): konie - 'Konie (136)' pelny galop do zera sr. i kon gracza w kolejnych misjach rowne bazie
-#          (+-max(3 s, 8%) / +-1 s); misje laczone po kolei, ta sama bitwa = 'Bieg (127)' sr. reguly 127 +-3 s; bez bazy albo inna liczba misji - INFO
+#          (+-max(3 s, 8%) / +-1 s); misje laczone po kolei, ta sama bitwa = 'Bieg (127)' sr. reguly 127 +-3 s; bez bazy albo inna liczba misji - INFO;
+#          291b: srednia tylko przy tych samych koniach (liczba koni z jezdzcem i sr. obciazenie r +-1 pkt), kon gracza - to samo id i r; inny sklad - INFO
 #   S292-6 INFO: zadyszki ludzi i gracza na misje ('Oddech (137)'), z baza - baza -> teraz
 STAMINA292_K = 2.0
 STAMINA292_RX = {
@@ -78177,8 +78194,9 @@ STAMINA292_RX = {
                          r"zadyszek (?P<pw>\d+), sekund w zadyszce (?P<ps>\d+)|-)"),
     "b130": re.compile(r"BattleWind \(130\): gracz - stamina z Atletyki jak kazdy .*?\| pula (?P<p>\d+), regeneracja [\d.]+ pkt/s \(bez mnoznika Endurance"
                        r"(?:, z mnoznikiem ludzi x(?P<k>[\d.]+) - 292)?\)\."),
-    "hend": re.compile(r"Konie \(136\): koni z jezdzcem \d+ .*?\| gracz: (?:kon (?P<id>\S+) \d+ kg, r \d+%, Vbase [\d.]+ m/s, pelny galop do zera (?:(?P<t>\d+) s|nigdy)|-)"),
-    "hend2": re.compile(r"Konie \(136\): koni z jezdzcem (?P<n>\d+) .*?zajechanych do 0: strona gracza (?P<z0>\d+), wrog (?P<z1>\d+) .*?pelny galop do zera sr\. (?:(?P<avg>\d+) s|-)"),
+    "hend": re.compile(r"Konie \(136\): koni z jezdzcem \d+ .*?\| gracz: (?:kon (?P<id>\S+) \d+ kg, r (?P<r>\d+)%, Vbase [\d.]+ m/s, pelny galop do zera (?:(?P<t>\d+) s|nigdy)|-)"),
+    "hend2": re.compile(r"Konie \(136\): koni z jezdzcem (?P<n>\d+) .*?zajechanych do 0: strona gracza (?P<z0>\d+), wrog (?P<z1>\d+) "
+                       r"(?:.*?sr\. obciazenie r (?P<r>\d+)%)?.*?pelny galop do zera sr\. (?:(?P<avg>\d+) s|-)"),   # 291b: r - sklad koni (S292-9)
     "err": re.compile(r"ERROR in (?:BattleWind\.StaminaInit|BattleWind\.StartLine292)"),
 }
 STAMINA292_ATEND = "wypisane na koncu misji krotszej niz 3 s"
@@ -78256,10 +78274,10 @@ def STAMINA292_selftest():
     if not m or m["k"] is not None:
         return "b130old (stary format musi sie dopasowac bez mnoznika)"
     m = RX["hend"].search(T["hend"])
-    if not m or (m["id"], m["t"]) != ("t3_empire_horse", "92"):
+    if not m or (m["id"], m["t"], m["r"]) != ("t3_empire_horse", "92", "37"):
         return f"hend: {m.groupdict() if m else 'brak dopasowania'}"
     m = RX["hend2"].search(T["hend"])
-    if not m or (m["n"], m["z0"], m["z1"], m["avg"]) != ("14", "3", "0", "77"):
+    if not m or (m["n"], m["z0"], m["z1"], m["avg"], m["r"]) != ("14", "3", "0", "77", "37"):
         return f"hend2: {m.groupdict() if m else 'brak dopasowania'}"
     # wzor: ten sam co w kodzie (po = K x przed) - przyklad z linii kontrolnej
     if abs(3728 - 2.0 * 1864) > 0.5 * 2.0 + 1.5 or abs(143 - 2.0 * 71) > 0.5 * 2.0 + 0.5:
@@ -78514,22 +78532,39 @@ def STAMINA292_rows(rep, D, B=None):
             rep.add(name, f"misji: teraz Bieg {len(rc)} / Konie {len(hc)}, baza Bieg {len(rb)} / Konie {len(hb)} - inna liczba, bez laczenia", "INFO", None)
         else:
             same = [abs(int(a["t"]) - int(b["t"])) <= 3 for a, b in zip(rc, rb)] if len(rc) == len(hc) else [True] * len(hc)
-            probs, parts, nm = [], [], 0
+            # 291b (autotest 296a wobec 133a: #1 77 -> 88 s, #4 68 -> 94 s, #7 69 -> 94 s - NIE): galop do zera to wzor 136/203 z konia (masa, szybkosc,
+            # wytrzymalosc), obciazenia r i Jazdy jezdzca (HorseWind.GallopToZero) - kod koni bez zmian od 203 (292 dopisal tylko odczyt Note292); 296a mial inny
+            # sklad (bitwa 1: koni 14 / r 37% -> 18 / r 34%, bitwy 4 i 7: r 38% -> 30%, kon gracza t3_empire_horse 520 kg -> noble_horse_northern 490 kg).
+            # Srednia porownywana tylko przy tych samych koniach (ta sama liczba koni z jezdzcem i sr. r +-1 pkt), kon gracza - to samo id i r (+-1 pkt).
+            probs, parts, nm, npl, nx, other = [], [], 0, 0, 0, []
             for i, ((c2, c1), (b2, b1)) in enumerate(zip(hc, hb)):
                 if not same[i]:
                     parts.append(f"#{i + 1} inna bitwa")
                     continue
-                if c2["avg"] is None or b2["avg"] is None:
-                    continue
-                nm += 1
-                ca, ba = int(c2["avg"]), int(b2["avg"])
-                parts.append(f"#{i + 1} {ba} -> {ca} s")
-                if abs(ca - ba) > max(3.0, 0.08 * ba):
-                    probs.append(f"#{i + 1} sr. galop {ba} -> {ca} s")
-                if c1 is not None and b1 is not None and c1["id"] == b1["id"] and c1["t"] and b1["t"] and abs(int(c1["t"]) - int(b1["t"])) > 1:
-                    probs.append(f"#{i + 1} kon gracza {b1['id']} {b1['t']} -> {c1['t']} s")
-            rep.add(name, f"misji polaczonych {nm} | " + ", ".join(parts[-8:]) + (" | " + "; ".join(probs[:3]) if probs else ""),
-                    "sr. galop +-max(3 s, 8%), kon gracza +-1 s (ta sama bitwa: sr. regula 127 +-3 s)", (not probs) if nm else None)
+                if c2["avg"] is not None and b2["avg"] is not None:
+                    ca, ba = int(c2["avg"]), int(b2["avg"])
+                    pop = c2["n"] == b2["n"] and c2["r"] is not None and b2["r"] is not None and abs(int(c2["r"]) - int(b2["r"])) <= 1
+                    if pop:
+                        nm += 1
+                        parts.append(f"#{i + 1} {ba} -> {ca} s")
+                        if abs(ca - ba) > max(3.0, 0.08 * ba):
+                            probs.append(f"#{i + 1} sr. galop {ba} -> {ca} s")
+                    else:
+                        nx += 1
+                        parts.append(f"#{i + 1} inny sklad koni ({b2['n']} / r {b2['r'] or '-'}% -> {c2['n']} / r {c2['r'] or '-'}%: {ba} -> {ca} s)")
+                if c1 is not None and b1 is not None and c1["t"] and b1["t"]:
+                    if c1["id"] == b1["id"] and c1["r"] is not None and b1["r"] is not None and abs(int(c1["r"]) - int(b1["r"])) <= 1:
+                        npl += 1
+                        if abs(int(c1["t"]) - int(b1["t"])) > 1:
+                            probs.append(f"#{i + 1} kon gracza {b1['id']} {b1['t']} -> {c1['t']} s")
+                    elif not other:
+                        other.append(f"kon gracza inny ({b1['id']} r {b1['r']}% {b1['t']} s -> {c1['id']} r {c1['r']}% {c1['t']} s)")
+            val = (f"misji polaczonych {nm}, kon gracza porownany {npl}, inny sklad koni {nx} | " + ", ".join(parts[-8:])
+                   + (" | " + other[0] if other else "") + (" | " + "; ".join(probs[:3]) if probs else ""))
+            if not nm and not npl and nx:
+                val += " | inny sklad koni we wszystkich misjach (inny zapis albo druzyna autotestu) - bez porownania; porownac z baza z tym samym zapisem"
+            rep.add(name, val, "te same konie: sr. galop +-max(3 s, 8%), kon gracza (to samo id i r) +-1 s; inny sklad - bez porownania (ta sama bitwa: sr. regula 127 +-3 s)",
+                    (not probs) if (nm or npl) else None)
     # S292-6 INFO
     parts = []
     for r in mis[-6:]:
@@ -78569,6 +78604,12 @@ def STAMINA292_synth():
                      T["breath"].replace("pula 4934", "pula 2467"), T["hend"].replace("do zera 92 s", "do zera 184 s"),
                      T["runold"].replace("[02:02:40]", "[02:05:00]") + " | 292: stamina ludzi x2.00, pelny bieg do zera sr. 150 s, gracz 143 s"]
                 base += [T["runold"].replace("[02:02:40]", "[02:05:00]")]
+            elif kind == "sklad":
+                # 291b: baza z innym skladem koni i innym koniem gracza (inny zapis) - S292-9 bez porownania
+                L = [T["b130"], T["start"], b130b, T["run"], T["breath"].replace("pula 4934", "pula 4960"), T["hend"]]
+                base = [T["b130old"], T["runold"], T["breath"].replace("pula 4934", "pula 2467"),
+                        T["hend"].replace("koni z jezdzcem 14", "koni z jezdzcem 10").replace("obciazenie r 37%", "obciazenie r 30%")
+                        .replace("sr. 77 s", "sr. 94 s").replace("kon t3_empire_horse 520 kg, r 37%", "kon noble_horse_northern 490 kg, r 39%")]
             else:
                 L = ["[10:00:00] Armoury: inna linia", T["runold"]]
             open(logp, "w", encoding="utf-8").write("\n".join(L) + "\n")
@@ -78585,6 +78626,7 @@ def STAMINA292_synth():
                 "S292-9": "NIE", "S292-6": "INFO"},
         "none": {"S292-0": "INFO", "S292-1": "INFO", "S292-2": "INFO", "S292-3": "INFO", "S292-4": "INFO", "S292-5": "INFO", "S292-7": "INFO", "S292-8": "INFO",
                  "S292-9": "INFO", "S292-6": "INFO"},
+        "sklad": {"S292-9": "INFO"},   # 291b
     }
     diff = []
     for kind, e in exp.items():

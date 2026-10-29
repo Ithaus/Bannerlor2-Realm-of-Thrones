@@ -143,7 +143,7 @@ namespace Armoury
         private static bool _rush = true, _evalWasRush;
         private static MovementOrder.MovementOrderEnum _evalOe;
         private static int _rushIn, _rushOut, _rushShieldKept;
-        private static float _rushSec, _rushShareSum;
+        private static float _rushSec, _rushShareSum, _rushKeptShareSum;   // 291b: sr. tarcz szykow, ktore pod ostrzalem zostaly krokiem
         private static readonly HashSet<int> _rushForms = new HashSet<int>(), _rushKeptForms = new HashSet<int>();
         private static bool _scanDragon;
         private static readonly Action<Agent> _scan = ScanUnit;
@@ -252,9 +252,14 @@ namespace Armoury
             // poprawka 132b: nekajacy autotestu (HorsePursuit.TestRunAnyThread - tylko LogGate.Mode 1, klucz HuntHarasserInAutotest) - bez limitu tempa szyku.
             // Gra wpisuje tu limit czlowieka w szyku z Formation.CachedMovementSpeed (latka 1 obniza ja do tempa marszu) - samo pominiecie capu (283a) zostawialo
             // tempo szyku: autotest 132b A 2.0 m/s przy swoim szyku, B 1.0-1.2 m/s przez 170 s. -1 = bez limitu (jak OnRetreating gry), takze kon.
+            // 291b (autotest 296a C: wojownik testu biegl 90 s skrzydlem bez budzetu oddechu, przy celu 25 m od szyku w zadyszce (jedyna zadyszka strony gracza,
+            // 19 s), szyk celu w marszu odchodzil tym samym tempem - ani jednego ciosu, padl): pieszy nekajacy testu bez limitu szyku, ale z capem oddechu AiBreath
+            // jak kazdy pieszy AI (gracz tez nie dobiega bez tchu) - krok, gdy do celu dalej niz budzet biegu, ostatnie 25 m biegiem
             if (HorsePursuit.TestRunAnyThread(agent))
             {
-                try { agent.SetMaximumSpeedLimit(-1f, false); agent.MountAgent?.SetMaximumSpeedLimit(-1f, false); } catch { }
+                float tb = agent.MountAgent == null ? AiBreath.CapOf(agent) : 0f;
+                try { agent.SetMaximumSpeedLimit(tb > 0f ? tb : -1f, false); agent.MountAgent?.SetMaximumSpeedLimit(-1f, false); } catch { }
+                if (tb > 0f) AiBreath.NotePost();
                 return;
             }
             if (!_on && !AiBreath.On) return;
@@ -711,7 +716,7 @@ namespace Armoury
                     Set(f, idx, 0f, 0f, false);
                     return;
                 }
-                if (fire && !bare && _shield[idx] >= 0f && _rushKeptForms.Add(idx)) _rushShieldKept++;
+                if (fire && !bare && _shield[idx] >= 0f && _rushKeptForms.Add(idx)) { _rushShieldKept++; _rushKeptShareSum += _shield[idx]; }
             }
             Set(f, idx, pace, underFire ? 0f : pace, false);
         }
@@ -829,7 +834,7 @@ namespace Armoury
         internal static void Rush291Reset()
         {
             _rushIn = _rushOut = _rushShieldKept = 0;
-            _rushSec = _rushShareSum = 0f;
+            _rushSec = _rushShareSum = _rushKeptShareSum = 0f;
             _rushForms.Clear(); _rushKeptForms.Clear();
         }
 
@@ -841,7 +846,8 @@ namespace Armoury
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             return "C piechota bez tarcz biegnie pod ostrzalem " + (key ? "TAK" : "NIE") + ": szykow " + _rushForms.Count + ", wejsc w bieg " + _rushIn
                    + " (sr. tarcz " + (_rushIn > 0 ? (_rushShareSum / _rushIn).ToString("0.00", inv) : "-") + ", prog " + CloseRanks.WallFrom.ToString("0.00", inv)
-                   + "), koncow biegu " + _rushOut + ", szyko-sekund biegu " + _rushSec.ToString("0", inv) + "; z tarczami pod ostrzalem zostal krok " + _rushShieldKept;
+                   + "), koncow biegu " + _rushOut + ", szyko-sekund biegu " + _rushSec.ToString("0", inv) + "; z tarczami pod ostrzalem zostal krok " + _rushShieldKept
+                   + (_rushShieldKept > 0 ? " (sr. tarcz " + (_rushKeptShareSum / _rushShieldKept).ToString("0.00", inv) + ")" : "");   // 291b: dlaczego bez biegu
         }
 
         /// <summary>Szyk idzie teraz marszem (ma cap). Glowny watek.</summary>
@@ -878,7 +884,14 @@ namespace Armoury
             breath = false;
             if (a == null || !a.IsAIControlled || a.IsRunningAway) return -1f;
             if (HorsePursuit.CounterAnyThread(a)) return -1f;   // 283: pieszy oddzial na nekajacego - kara FieldCraft bez gornego capu marszu / oddechu (jak PostSpeed)
-            if (HorsePursuit.TestRunAnyThread(a)) return -1f;   // 283a: nekajacy autotestu - jak wyzej
+            if (HorsePursuit.TestRunAnyThread(a))
+            {
+                // 283a: nekajacy autotestu bez capu marszu; 291b: pieszy z capem oddechu AiBreath (jak PostSpeed)
+                float tb = a.MountAgent == null ? AiBreath.CapOf(a) : 0f;
+                if (tb <= 0f) return -1f;
+                breath = true;
+                return tb;
+            }
             var f = a.Formation;
             if (_on)
             {

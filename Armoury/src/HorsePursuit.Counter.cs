@@ -120,6 +120,26 @@ namespace Armoury
             return f.CachedAveragePosition;
         }
 
+        /// <summary>291b: miara smyczy jezdzca (HunterCheck, MaxFromMain): punkt rozkazu tylko, gdy szyk na nim stoi (oslona skrzydla - Move na miejscu albo Stop),
+        /// inaczej srodek ludzi szyku, ktorzy nie jada w poscigu (RestPos; wszyscy jada - Home jak dotad). Autotest 296a bitwa 4: 'najdalej jazda 358 m' przy smyczy
+        /// 250 m, a najdalej w epizodach 116 m - OrderPosition to w marszu (Move / Advance) CEL drogi, a w szarzy punkt z ostatniego Move (gra go nie przestawia -
+        /// MovementOrder.OnApply); po 291 armia idzie dalej mimo nekajacego (bez postoju R5, ktory stawial szyk w miejscu), obronca trzyma punkt i potem szarzuje -
+        /// punkt rozkazu odjezdzal od szyku i smycz 'od glownej sily' mierzyla od pustego miejsca (skok miary miedzy passami).</summary>
+        private static Vec2 LeashHome(Formation f)
+        {
+            try
+            {
+                var oe = f.GetReadonlyMovementOrderReference().OrderEnum;
+                if ((oe == MovementOrder.MovementOrderEnum.Move || oe == MovementOrder.MovementOrderEnum.Stop) && !Moving(f))
+                {
+                    Vec2 p = f.OrderPosition;
+                    if (p.IsValid && (p.x != 0f || p.y != 0f)) return p;
+                }
+            }
+            catch { }
+            return RestPos(f);
+        }
+
         /// <summary>Strzelec blizej niz CounterFootGap od nietknietego szyku pieszego swojej strony (szyk od IntactMin ludzi, nie konnica ani konni lucznicy;
         /// odleglosc od mediany minus promien szyku, najwyzej 40 m - jak IntactNear 148).</summary>
         private static bool FootNear(Mission m, Agent s)

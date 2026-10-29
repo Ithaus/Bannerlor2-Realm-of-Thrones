@@ -582,6 +582,9 @@ namespace Armoury
             if (ps < 0) { _tF = null; return; }
             var fl = HForms[1 - ps];
             Vec2 ap = a.Position.AsVec2;
+            // 291b (autotest 296a C: 'lucznikow wroga 0' - 8 lucznikow bandy (skag_bowman) w szyku piechoty 38 ludzi, szyku Ranged brak; wojownik szedl na
+            // najblizszego piechura i nie doszedl do lucznikow): C - najblizszy pieszy strzelec wroga (IsRangedCached) z dowolnego szyku; bez niego jak dotad
+            if (_rKey && _tScen == 2 && TestArcherTarget(a, fl, ap)) return;
             int best = -1;
             float bd = float.MaxValue;
             // przebiegi: 0 - wedlug scenariusza (strzelcy A/C, piechota B), 1 - dowolny pieszy, 2 - dowolny
@@ -618,6 +621,39 @@ namespace Armoury
                 _tTgt = tb;
                 if (_tState == 1) { try { a.SetTargetAgent(tb); } catch { } }
             }
+        }
+
+        /// <summary>291b: scenariusz C - cel = najblizszy pieszy czlowiek wroga z amunicja (IsRangedCached) w dowolnym szyku strony (lucznicy band bywaja
+        /// w szyku piechoty); szyk celu = jego szyk. false = brak takiego strzelca (wolajacy wybiera jak dotad).</summary>
+        private static bool TestArcherTarget(Agent a, System.Collections.Generic.List<FI> fl, Vec2 ap)
+        {
+            Agent tb = null;
+            Formation tf = null;
+            float td = float.MaxValue;
+            for (int i = 0; i < fl.Count; i++)
+            {
+                var f = fl[i].F;
+                if (f == null || f.CountOfUnits <= 0) continue;
+                HUnits.Clear();
+                f.ApplyActionOnEachUnit(HCollect);
+                for (int u = 0; u < HUnits.Count; u++)
+                {
+                    var x = HUnits[u];
+                    if (x == null || !x.IsActive() || !x.IsHuman || x.MountAgent != null || !x.IsRangedCached) continue;
+                    float d = x.Position.AsVec2.Distance(ap);
+                    if (d < td) { td = d; tb = x; tf = f; }
+                }
+                HUnits.Clear();
+            }
+            if (tb == null) return false;
+            _tF = tf;
+            _tBehind = false;
+            if (!ReferenceEquals(tb, _tTgt))
+            {
+                _tTgt = tb;
+                if (_tState == 1) { try { a.SetTargetAgent(tb); } catch { } }
+            }
+            return true;
         }
 
         /// <summary>Koniec proby: nekajacy oddany grze (cel automatyczny, pozycja zdjeta), linia "TEST koniec".</summary>

@@ -783,7 +783,7 @@ namespace Armoury
             }
             if (a.MountAgent == null) return UOther;
             if (Blown(HorseS(a))) return UHorse;
-            float df = a.Position.AsVec2.Distance(Home(h.F));
+            float df = a.Position.AsVec2.Distance(LeashHome(h.F));   // 291b: od szyku, nie od celu drogi / starego punktu szarzy
             if (df > h.T.MaxFar) h.T.MaxFar = df;
             if (df > _hMaxFar) _hMaxFar = df;
             if (df > _maxFrom) return ULeash;
