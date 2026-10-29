@@ -685,7 +685,18 @@ namespace Armoury
         internal static int PantryUnits(MobileParty mp)
         {
             if (mp == null) return 0;
-            return (int)Math.Ceiling(Math.Max(0.0, -mp.FoodChange) * FoodKeepDays);
+            return (int)Math.Ceiling(Math.Max(0.0, -mp.FoodChange) * PantryDays());
+        }
+
+        /// <summary>298 E5 (klucz CaravanPantryLegDays): doby spizarni eskorty = zmierzony odcinek drogi (Stage8World.LegDays, 288) + 2 doby zapasu, najwyzej FoodKeepDays;
+        /// bez pomiaru albo klucz NIE - FoodKeepDays (10) jak 294b. 296e: spizarnia 10 dob trzymala w jukach ok. 5.3 tys. szt. jedzenia poza handlem (sprzedaz jedzenia
+        /// karawan 939 -> 625 szt./d), a odcinek to 4.3 doby.</summary>
+        internal static double PantryDays()
+        {
+            var s = Settings.Current;
+            double leg = Stage8World.LegDays;
+            if (s == null || !s.CaravanPantryLegDays || !(leg > 0)) return FoodKeepDays;
+            return Math.Min(FoodKeepDays, Math.Ceiling(leg) + 2.0);
         }
 
         /// <summary>284: najwiecej sztuk z n, ktorych KAZDA idzie w tym miescie po cenie po mycie (E3-G3) nie nizszej niz koszt sztuki (cena k-tej sztuki maleje z k -
@@ -986,7 +997,7 @@ namespace Armoury
             int wage = Math.Max(0, mp.TotalWage), cap = Math.Max(1, mp.InventoryCapacity);
             bool disband = mp.IsDisbanding;
             double foodUse = Math.Max(0.0, -mp.FoodChange);
-            int foodKeep = (int)Math.Ceiling(foodUse * FoodKeepDays), foodHave = 0;
+            int foodKeep = (int)Math.Ceiling(foodUse * PantryDays()), foodHave = 0;   // 298 E5: odcinek + 2 doby
             double keepK = 1.0 - TownToll.CaravanRateFor(mp, st);          // utarg po mycie E3-G3 (poprawki: prog zysku netto); R3-05a: z oplata jarmarku
             // ksiega: koszt calego ladunku towarow handlowych (podzial zoldu) i kandydaci
             double cargo = 0;

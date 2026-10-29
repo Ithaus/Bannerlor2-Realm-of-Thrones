@@ -9598,7 +9598,7 @@ namespace Armoury
 
         [SettingPropertyBool("Player Caravans Follow Road Guard Rule", HintText = "your own caravans follow the same road guard rule, starting the day after a message tells you (once per session); every pay-off is announced. Off = your caravans only hire up to the need and never pay anyone off", RequireRestart = false)]
         [SettingPropertyGroup("Caravan guards by road strength, old surplus goods, iron mines by their own town (286)")]
-        public bool CaravanGuardPlayerAfterNotice { get; set; } = false;
+        public bool CaravanGuardPlayerAfterNotice { get; set; } = true;
 
         [SettingPropertyBool("Old Hoarded Caravan Goods Sell At Market Price", HintText = "a good caravans hoard (they stopped buying it - more in their packs than ten days of sales) that has lain in a pack for over 30 days no longer waits for a town that pays above cost: it goes at the day's price in small portions, like any good with no market", RequireRestart = false)]
         [SettingPropertyGroup("Caravan guards by road strength, old surplus goods, iron mines by their own town (286)")]
@@ -9691,6 +9691,10 @@ namespace Armoury
         [SettingPropertyBool("Caravans Stock Escort Food Where Towns Are Not Hungry", HintText = "with Caravan Road Food: a caravan leaving a town that is not hungry tops its escort food up to the ten days of rations it keeps, paid from its purse to the town; in a hungry town it buys only for the next leg. Off = as before (food for the next leg only)", RequireRestart = false)]
         [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
         public bool CaravanRoadFoodTopUp { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Escort Food For The Measured Leg", HintText = "298: the escort food a caravan keeps (never sold, topped up on leaving a town) covers its measured road leg plus two days, not ten days of rations - the rest is trade goods. Off = ten days as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
+        public bool CaravanPantryLegDays { get; set; } = true;
 
         [SettingPropertyBool("Caravan Food Gate By Towns That Pay", HintText = "with Caravans Measure Sales By Town Demand, Caravans Buy Food By Their Own Sales, Caravan Food Gate Counts Trade Stock Only, Caravans Price The Unit The Market Will Take and Caravans Buy Only With Reachable Profit: all caravans together may carry as much food that spoils as the towns paying at least the average price for it eat during one measured caravan leg (instead of a week of what one average town buys) - the same amount at which the market-depth price test starts to see a queue of other caravans' food ahead of a new unit, so the two rules no longer contradict each other. Each caravan still buys a unit only while the market-depth price says it sells at a profit. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans carry food for the towns that pay (298)")]
@@ -12870,6 +12874,7 @@ namespace Armoury
             s.KsIronWorldFlowOwnTownCut = KsIronWorldFlowOwnTownCut;
             s.CaravanPantryAllSales = CaravanPantryAllSales;
             s.CaravanRoadFoodTopUp = CaravanRoadFoodTopUp;
+            s.CaravanPantryLegDays = CaravanPantryLegDays;
             s.CaravanFoodGateByPayingTowns = CaravanFoodGateByPayingTowns;
             s.BkRetinueFromVillage = BkRetinueFromVillage;
             s.WinterSparesMinesAndFelling = WinterSparesMinesAndFelling;
