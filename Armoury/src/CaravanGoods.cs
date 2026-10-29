@@ -820,7 +820,7 @@ namespace Armoury
                     l.Cost += paid; l.N += got;
                     _bookBuys++; _bookBuyUnits += got;
                     if (mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 1, paid, 0, 0.0);   // 259: zakup karawany gracza (linia majatku gracza)
-                    CaravanTrade284.NoteBuy(mp, it, got);   // 284: juki karawan wedlug kategorii (bramka przeplywu na zywo)
+                    CaravanTrade284.NoteBuy(mp, it, got, __state.St);   // 284: juki karawan wedlug kategorii (bramka przeplywu na zywo); 298: miasto zakupu (pomiar)
                     var cat = it.ItemCategory;
                     Visit v;
                     if (_visit.TryGetValue(mp, out v) && ReferenceEquals(v.St, __state.St) && v.Cats.Contains(cat)) _rebought += got;   // odkupione to, co tu sprzedalismy (gabka, CaravanBulk)

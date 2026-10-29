@@ -67,7 +67,8 @@ namespace Armoury
         // Wind - doba poczatku zwijania (int.MinValue - nie), Old - karawana sprzed pierwszej doby sesji bez wpisu w zapisie (bez historii - nie 'nowa').
         // Zapis (klucz arm_k294, tylko przy kluczu CaravanLosingWoundUp albo CaravanEntryWhenTradePays): ksiega przezywa wczytanie - zwijanie i brama nie zaczynaja
         // od zera po kazdym wczytaniu (recenzja 294: przy krotkich sesjach Jeffa wszystkie karawany byly 'nowe' przez 7 dob, a zwijanie nie ruszalo przed 28. doba).
-        private sealed class Acc { public readonly long[] R = new long[Ring]; public readonly int[] D = new int[Ring]; public int First, Below, BelowDay = int.MinValue, Wind = int.MinValue; public bool Old; }
+        private sealed class Acc { public readonly long[] R = new long[Ring]; public readonly int[] D = new int[Ring]; public int First, Below, BelowDay = int.MinValue, Wind = int.MinValue; public bool Old;
+            public int Born = int.MinValue; }   // 298 (tylko pomiar, bez zapisu): doba powstania - wpis z przegladu doby: doba zamknieta (First = jutro), ze sprzedazy: jej doba
         private static readonly Dictionary<MobileParty, Acc> _acc = new Dictionary<MobileParty, Acc>();
         private static string _bookPend;                                        // 294: napis arm_k294 do pierwszego uzycia ksiegi (karawany juz sa)
         private static bool _bookHad, _dayRan;                                  // klucz w zapisie; pierwsza doba sesji juz byla
@@ -134,8 +135,17 @@ namespace Armoury
         /// <summary>294b R2: zbyt i dni jedzenia wedlug rodzaju (psujace / trwale jak towar) - przy R2 i mierze popytu rynkow 287.</summary>
         private static bool R2Full(Settings s) { return R2On(s) && s.CaravanFlowByMarketDemand; }
 
+        /// <summary>298 (tylko pomiar): blad pomiaru linii 298 - wlasny licznik (potkniecia 298), bez licznikow 284 i 294b, ktore oceniaja reguly handlu.</summary>
+        private static void M298Stumble(string where, Exception e)
+        {
+            _m298Stum++; _m298StumSess++;
+            try { if (_err.Add("Line298" + where)) Log.Error("CaravanTrade284.Line298." + where, e); } catch { }
+        }
+
         private static void DStumble(string where, Exception e)
         {
+            // 298 (recenzja): pomocnicy glebokosci wolani z pomiaru linii 298 (IdleWhy) licza bledy w potknieciach 298, nie 294b (K294-8 ocenia regule kupna)
+            if (_in298 > 0) { M298Stumble(where, e); return; }
             _dStum++; _dStumSess++;
             try { if (_err.Add("Depth" + where)) Log.Error("CaravanTrade284.Depth" + where, e); } catch { }
         }
@@ -169,6 +179,7 @@ namespace Armoury
             _dEval = _dStop = _dOld = _dOpen = _dNone = _dAgeWait = _dAgeOldWait = _dStum = 0;   // 294b
             _dSpongeN = _dLossN = _dLossG = _dLossC = _dBk5N = _dBk5C = 0;
             _dLossOldN = _dHeldT1 = _dHeldBk = 0;
+            _fLossN = _fLossG = _fLossC = _fsLossN = _fsLossG = _fsLossC = _fBuyN = _fBuyKs = 0; _fBuyU = 0.0;   // 298
         }
 
         private static void Stumble(string where, Exception e)
@@ -641,12 +652,19 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zdarzenia handlu (CaravanGoods.TradePostfix)
-        internal static void NoteBuy(MobileParty mp, ItemObject it, int got)
+        internal static void NoteBuy(MobileParty mp, ItemObject it, int got, Settlement st)
         {
             try
             {
                 var c = it != null ? it.ItemCategory : null;
                 if (got > 0 && _heldReady && Tracked(c)) _held[c] = Held(c) + got;
+                // 298 (tylko pomiar): kupno jedzenia psujacego sie i glod miasta zrodla (KsHunger.HungerOf - migawka doby; miasto bez migawki poza srednia)
+                if (got > 0 && c != null && SpoilCat(c))
+                {
+                    _fBuyN += got;
+                    float u = KsHunger.HungerOf(st != null ? st.Town : null);
+                    if (u >= 0f) { _fBuyKs += got; _fBuyU += u * (double)got; }
+                }
             }
             catch (Exception e) { Stumble("NoteBuy", e); }
         }
@@ -666,6 +684,12 @@ namespace Armoury
                 if (mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan) { _plG[p] += got; _plR[p] += real; }
                 AddReal(mp, (int)CampaignTime.Now.ToDays, real);
                 var c = it != null ? it.ItemCategory : null;
+                if (real < 0 && IsFoodCat(c))   // 298 (tylko pomiar): jedzenie ponizej kosztu wszystkimi drogami (ta sama miara co _pLoss*, kategoria jedzenia)
+                {
+                    long cr = (long)Math.Round(cost);
+                    _fLossN += moved; _fLossG += got; _fLossC += cr;
+                    if (SpoilCat(c)) { _fsLossN += moved; _fsLossG += got; _fsLossC += cr; }
+                }
                 if (Tracked(c))
                 {
                     if (_heldReady) _held[c] = Math.Max(0, Held(c) - moved);
@@ -702,13 +726,13 @@ namespace Armoury
             if (mp != null && _acc.TryGetValue(mp, out a)) { a.Wind = int.MinValue; a.Below = 0; }
         }
 
-        private static Acc AccOf(MobileParty mp, int day)
+        private static Acc AccOf(MobileParty mp, int day, int born = int.MinValue)
         {
             EnsureBook();
             Acc a;
             if (!_acc.TryGetValue(mp, out a))
             {
-                a = new Acc { First = day, Old = !_dayRan };
+                a = new Acc { First = day, Old = !_dayRan, Born = born != int.MinValue ? born : day };
                 for (int i = 0; i < Ring; i++) a.D[i] = int.MinValue;
                 _acc[mp] = a;
             }
@@ -1239,8 +1263,12 @@ namespace Armoury
         // 285: przesyt karawan do miasta z brakiem surowca tabeli (SellGuardPrefix) - liczniki od ostatniej linii 285
         private static long _g285N, _g285C; private static int _g285Acts;
         // 298 (tylko pomiar): pierwsza doba sesji (Daily) - kohorta karawan powstalych od 31. doby biegu; potkniecia linii 298 (doba / sesja)
-        private static int _day0 = int.MinValue, _m298Stum, _m298StumSess;
+        private static int _day0 = int.MinValue, _m298Stum, _m298StumSess, _in298;
         private const int CohortDay = 30;
+        // 298 (recenzja, tylko pomiar - kontrola L1): jedzenie sprzedane ponizej kosztu wszystkimi drogami (szt. / utarg / koszt; psujace osobno) i kupno psujacych
+        // przez karawany (szt.; w miastach z migawka glodu KS: szt. i suma glod x szt.) - liczniki doby (ZeroDay)
+        private static long _fLossN, _fLossG, _fLossC, _fsLossN, _fsLossG, _fsLossC, _fBuyN, _fBuyKs;
+        private static double _fBuyU;
         private static readonly Dictionary<string, int> _g285By = new Dictionary<string, int>();
 
         /// <summary>285 (MaterialOrders.Line285): odcinek "przesyt karawan do miasta z brakiem" i zerowanie licznikow.</summary>
@@ -1548,25 +1576,37 @@ namespace Armoury
         /// <summary>298 (tylko pomiar): linia doby "Karawany bez handlu i kohorta (298)" - karawany bez sprzedazy w 7 dobach (ksiega zysku 284, ta sama miara co
         /// 'karawany 7 dob: z handlem') wedlug przyczyny (IdleWhy) i karawany powstale od 31. doby biegu (bez jukow sprzed testu): placace zold / tracace, mediana
         /// (wynik handlu - zold)/d - ta sama miara co linia 294. Nic nie zmienia w grze; wyjatek na karawane - licznik potkniec.</summary>
-        private static string Line298(int day, int nCar, List<MobileParty> idle, int n, int w, List<double> net)
+        private static string Line298(int day, int nCar, List<MobileParty> idle, int n, int w, List<double> net, Dictionary<ItemCategory, double> cost)
         {
             var why = new int[5];
             foreach (var mp in idle)
             {
+                _in298++;   // recenzja: bledy pomocnikow glebokosci (DStumble) z tego pomiaru - w potknieciach 298
                 try { why[IdleWhy(mp)]++; }
-                catch (Exception e) { _m298Stum++; _m298StumSess++; Stumble("Line298", e); }
+                catch (Exception e) { M298Stumble("Idle", e); }
+                finally { _in298--; }
             }
             net.Sort();
+            // recenzja (kontrola L1): juki psujacych po koszcie wobec wszystkich jukow po koszcie (przeglad doby ScanHeld - ze spizarnia eskorty, jak 'juki po koszcie' 287)
+            double cs = 0.0, ca = 0.0;
+            try { if (cost != null) foreach (var kv in cost) { ca += kv.Value; if (SpoilCat(kv.Key)) cs += kv.Value; } }
+            catch (Exception e) { M298Stumble("Cost", e); cs = ca = 0.0; }
             var sb = new StringBuilder(600);
             sb.Append("Karawany bez handlu i kohorta (298): dzien ").Append(day)
               .Append(" | bez sprzedazy w 7 dobach ").Append(idle.Count).Append(" z ").Append(nCar)
               .Append(": pusta kiesa (bez towaru, pol kiesy < ").Append(CashDays).Append(" doby zoldu) ").Append(why[0])
               .Append(", bez towaru z kiesa ").Append(why[1]).Append(", towar bez rynku z zyskiem wedlug glebokosci ").Append(why[2])
               .Append(", towar z rynkiem z zyskiem - czeka ").Append(why[3]).Append(", towar bez miary ").Append(why[4])
-              .Append(" | karawany od ").Append(CohortDay + 1).Append(". doby biegu (doba >= ").Append(_day0 != int.MinValue ? (_day0 - 1 + CohortDay).ToString(Inv) : "-")
+              .Append(" | karawany od ").Append(CohortDay + 1).Append(". doby biegu (doba powstania >= ").Append(_day0 != int.MinValue ? (_day0 - 1 + CohortDay).ToString(Inv) : "-")
               .Append("): zmierzone ").Append(n).Append(", placace ").Append(w).Append(", tracace ").Append(n - w)
               .Append(", udzial placacych ").Append(n > 0 ? (w / (double)n).ToString("0.000", Inv) : "-")
               .Append(", mediana wyniku - zoldu/d ").Append(net.Count > 0 ? net[net.Count / 2].ToString("0", Inv) : "-").Append(" zl")
+              .Append(" | jedzenie ponizej kosztu wszystkimi drogami ").Append(_fLossN).Append(" szt. za ").Append(_fLossG).Append(" zl (koszt ").Append(_fLossC)
+              .Append(" zl), w tym psujace ").Append(_fsLossN).Append(" szt. za ").Append(_fsLossG).Append(" zl (koszt ").Append(_fsLossC).Append(" zl)")
+              .Append("; kupno psujacych ").Append(_fBuyN).Append(" szt., w miastach z pomiarem glodu KS ").Append(_fBuyKs).Append(" szt. (glod miasta zakupu srednio ")
+              .Append(_fBuyKs > 0 ? (100.0 * _fBuyU / _fBuyKs).ToString("0.0", Inv) + "%" : "-").Append(")")
+              .Append("; juki psujace po koszcie ").Append(((long)cs).ToString(Inv)).Append(" zl z ").Append(((long)ca).ToString(Inv)).Append(" zl (udzial ")
+              .Append(ca > 0.0 ? (cs / ca).ToString("0.000", Inv) : "-").Append(", ze spizarnia eskorty)")
               .Append(" | potkniecia 298 ").Append(_m298Stum).Append(" (sesja ").Append(_m298StumSess).Append(").");
             _m298Stum = 0;
             return sb.ToString();
@@ -1761,7 +1801,7 @@ namespace Armoury
                         if (toll <= 0) toll = TownToll.CaravanRateFor(mp);
                     }
                     catch (Exception e) { _mktStum++; Stumble("Daily(287)", e); }
-                    var a = AccOf(mp, today);
+                    var a = AccOf(mp, today, day);   // 298: nowy wpis - powstala w dobie zamknietej (Born = day; First = today jak dotad)
                     bool any;
                     long r7 = SumLast(a, day, 7, out any);
                     if (any) { withTrade++; reals.Add(r7); sum7 += r7; if (r7 > 0) withProfit++; }
@@ -1781,7 +1821,8 @@ namespace Armoury
                             if (pd >= wg) w294++; else { l294++; if (a.Below >= Ring) s294++; }
                             n294.Add(pd - wg); p294.Add(pd); g294.Add(wg);
                             // 298 (pomiar): karawana powstala od 31. doby biegu (caly towar kupiony w biegu, bez jukow sprzed testu)
-                            if (!a.Old && _day0 != int.MinValue && a.First - (_day0 - 1) >= CohortDay) { n298++; if (pd >= wg) w298++; net298.Add(pd - wg); }
+                            // recenzja: doba powstania (Born), nie First - wpis z przegladu doby ma First = jutro (granica o 1 dobe za wczesnie)
+                            if (!a.Old && _day0 != int.MinValue && (a.Born != int.MinValue ? a.Born : a.First) - (_day0 - 1) >= CohortDay) { n298++; if (pd >= wg) w298++; net298.Add(pd - wg); }
                             // 294 (klucz CaravanLosingWoundUp): seria >= 14 dob pomiaru ponizej zoldu i karawana sledzona >= 28 dob - wlasciciel zaczyna zwijac: kupno BK
                             // stoi (Why 6), towar schodzi zwyklymi regulami T1 / BK w nastepnych miastach, rozwiazanie w miescie, gdy gotowa (CaravanFlow.WindHourly)
                             if (windOn && a.Wind == int.MinValue && a.Below >= Ring && today - a.First >= CaravanMarket294.ExitDays)
@@ -1876,7 +1917,7 @@ namespace Armoury
                 Log.Info(CaravanMarket294.Daily(day, w294, l294, t294, u294, s294, n294, p294, g294, wNew294, wind294, wWhy294, _rWind, _bookHad, _bookOk, _bookGone, _bookBad));
 
                 // linia 298 (tylko pomiar): karawany bez sprzedazy w 7 dobach wedlug przyczyny i kohorta karawan od 31. doby biegu
-                Log.Info(Line298(day, nCar, idle298, n298, w298, net298));
+                Log.Info(Line298(day, nCar, idle298, n298, w298, net298, cost));
 
                 // linia 4 (F, na sucho przy kluczu NIE)
                 Log.Info(new StringBuilder(500).Append("Wielkosc karawan (284, na sucho): dzien ").Append(day).Append(" | klucz Caravan Size By Trade ").Append(YN(s.CaravanSizeByTrade))

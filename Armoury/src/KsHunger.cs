@@ -308,6 +308,13 @@ namespace Armoury
             return t != null && snap != null && snap.Count > 0 && snap.TryGetValue(t, out r) && r != null && r.F > 0;
         }
 
+        /// <summary>298 (CaravanTrade284.NoteBuy, tylko pomiar): glod miasta tej doby (Row.U 0..1, migawka doby); -1 - bez migawki albo miasto poza pomiarem KS.</summary>
+        internal static float HungerOf(Town t)
+        {
+            var snap = _snap; Row r;
+            return t != null && snap != null && snap.TryGetValue(t, out r) && r != null ? r.U : -1f;
+        }
+
         /// <summary>Miasta glodne tej doby (czesc kary f > 0) z luka rynku i jej wartoscia - KsLordFood (pan miasta placi za dowoz). Kolejnosc wedlug StringId (stala).</summary>
         internal static void Hungry(List<KeyValuePair<Town, Row>> outList)
         {
