@@ -729,6 +729,10 @@ namespace Armoury
                 if (Settings.Current.HideoutAlarmEnabled && Campaign.Current != null && mission != null
                     && HideoutAlarm.IsHideout(mission))
                     mission.AddMissionBehavior(new HideoutAlarm());
+                // 293: zapas rozmowy z hersztem kryjowki (rozmowa bez odpowiedzi -> walka rusza) i linia misji "Kryjowka - herszt (293)"
+                if (Settings.Current.HideoutBossTalkFix && Campaign.Current != null && mission != null
+                    && HideoutAlarm.IsHideout(mission))
+                    mission.AddMissionBehavior(new HideoutBossTalk.Logic());
                 if (Settings.Current.HideoutArmouryGear && Campaign.Current != null && mission != null
                     && HideoutAlarm.IsHideout(mission)
                     && mission.GetMissionBehavior<IMissionAgentSpawnLogic>() == null)

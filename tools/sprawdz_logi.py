@@ -1263,6 +1263,14 @@ Uzycie (Python 3, tylko odczyt):
                     (mnoznik 2.00, pule, regeneracja, pelny bieg po = K x przed; 'Oddech (137)' = ostatnia 'BattleWind (130)' misji; konie x1.00); POMIAR:
                     S292-7 pasek w ciaglym biegu wobec reguly sprzed 292 (R ok. x K), S292-8 maxStamina RBM zywych na koniec / pula przed mnoznikiem (ok. x K);
                     S292-9 konie wobec logu bazowego (galop do zera rowny); S292-6 INFO (zadyszki, z baza: baza -> teraz).
+--grupa kryjowka293: (29.10, paczka 293 noc/293-kryjowka-boss - Jeff 29.10 "Walczylem w kryjowce, i jak dozedlem do walki z bossem nie odaplil sie dialog
+                    ... jak go atakowalem to nie zadawlaem mu obrazn musiale kliknac retreat"; Armoury/src/HideoutBossTalk.cs) python -I tools/sprawdz_logi.py
+                    --grupa kryjowka293 <Armoury-*.log> (strumieniowo; log biegu 90 dob albo bitew - bez misji kryjowki wiersze misji INFO). Linie
+                    'Kryjowka - herszt (293)': start sesji, misja kryjowki, ZAPAS, ZAPAS BLAD. K293-S self-test; K293-0 linia startu (klucz, pola gry),
+                    ERROR 0, potkniecia 0;
+                    K293-1 kazda faza herszta konczy sie wyborem (pojedynek / wszyscy / zapas); K293-2 nasz wiersz w kazdej rozmowie przy kluczu TAK;
+                    K293-3 zapas zgodny z regula (pojedynek tylko bez ludzi), stan po zapasie BossFight*, 0 ZAPAS BLAD; K293-4 INFO (herszci, warunki
+                    wierszy gry).
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -78574,6 +78582,241 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return STAMINA292_main(rest[0] if rest else None, rest[1] if len(rest) > 1 else None)
     return STAMINA292_main_prev(argv)
+
+
+# ------------------------------------------------------------ kryjowka293 (29.10, paczka 293 noc/293-kryjowka-boss: rozmowa z hersztem kryjowki zawsze pyta
+#   "sam czy ze wszystkimi", zapas gdy rozmowa skonczy sie bez odpowiedzi; Jeff 29.10 "jak dozedlem do walki z bossem nie odaplil sie dialog ... nie zadawlaem
+#   mu obrazn musiale kliknac retreat"; Armoury/src/HideoutBossTalk.cs, klucz HideoutBossTalkFix)
+#   python -I tools/sprawdz_logi.py --grupa kryjowka293 <Armoury-*.log>      (strumieniowo; bieg 90 dob albo bitwy - bez misji kryjowki wiersze misji INFO)
+# Dowod (sesja Jeffa 29.10, zainstalowane 136): rgl_log_28248.txt 01:28:00 herszt 'Wild Hare Horseman' (forest_people_tier_3, zajecie Soldier) -> wiersz gry
+#   'guard_start' zamknal rozmowe, brak 'defeat_hideout_boss_objective', Retreat 01:28:23.
+# K293-S  self-test wyrazen (linia startu, linia misji w 5 wariantach, linia ZAPAS x2, linia ZAPAS BLAD) i decyzji kryjowka293_pick_ok / kryjowka293_fallback_ok
+# K293-0  linia startu sesji: klucz TAK, pola gry kryjowka TAK i zasadzka TAK; nierozpoznanych linii 293 0; ERROR HideoutBossTalk 0; potkniecia misji i sesji 0
+# K293-1  kazda misja z faza herszta konczy sie wyborem: pojedynek / wszyscy / zapas wszyscy / zapas pojedynek (nigdy 'brak (stan ...)' ani 'zapas blad')
+# K293-2  w kazdej misji z rozmowa i kluczem TAK - nasz wiersz TAK (rozmowa z hersztem zaczela sie od pytania o pojedynek)
+# K293-3  ZAPAS zgodny z regula: pojedynek tylko przy 0 ludzi gracza, stan po zapasie BossFightWithDuel / BossFightWithAll, linii ZAPAS tyle co misji 'zapas'
+#         (wszyscy / pojedynek), linii ZAPAS BLAD 0 i misji 'zapas blad' 0 (proba zapasu rzucila - po recenzji 293 do 2 prob na misje)
+# K293-4  INFO: misje kryjowki (z faza herszta / bez), herszci (zajecie, bohater, kultura bandycka), warunek wiersza gry i wiersz straznika (ktora
+#         przyczyna z 29.10: wiersz gry falszywy czy przegrany kolejnoscia), wybory
+KRYJOWKA293_ERR = ("ERROR in HideoutBossTalk.",)
+KRYJOWKA293_TAG = "Kryjowka - herszt (293): "
+KRYJOWKA293_START = re.compile(r"^Kryjowka - herszt \(293\): wiersz rozmowy herszta wpiety \(priorytet (\d+)\) \| klucz (TAK|NIE) \| pola gry: kryjowka (TAK|NIE), "
+                        r"zasadzka (TAK|NIE)\.$")
+KRYJOWKA293_MIS = re.compile(r"^Kryjowka - herszt \(293\): misja (?P<kind>kryjowka|zasadzka) \| klucz (?P<k>TAK|NIE) \| faza herszta (?P<ph>TAK|NIE), stan na koniec "
+                      r"(?P<st>\S+) \| herszt (?P<bn>.*?) \[(?P<bid>[^\]]*)\] \(zajecie (?P<occ>\S+), bohater (?P<hero>TAK|NIE|-), kultura bandycka "
+                      r"(?P<band>TAK|NIE|-)\) \| rozmowa (?P<talk>TAK|NIE), nasz wiersz (?P<our>TAK|NIE) \(razy (?P<n>\d+)\), warunek wiersza gry "
+                      r"(?P<gc>TAK|NIE|-) \(frakcja spotkania (?P<fac>.*?)\), wiersz straznika gry pasowalby (?P<gd>TAK|NIE|-) \| ludzi gracza przy rozmowie "
+                      r"(?P<men>-|\d+) \| wybor (?P<pick>.*?) \| potkniecia misji (?P<mstum>\d+)(?P<stop> \(logika zatrzymana\))?, sesja (?P<stum>\d+)\.$")
+KRYJOWKA293_FB = re.compile(r"^Kryjowka - herszt \(293\): ZAPAS - misja (?P<kind>kryjowka|zasadzka) \| rozmowa z hersztem (?P<bn>.*?) \[(?P<bid>[^\]]*)\] "
+                     r"(?P<why>zamknieta bez odpowiedzi|nie ruszyla) \(\d+\.\d s stanu ConversationBetweenLeaders bez rozmowy\) -> "
+                     r"(?:(?P<duel>pojedynek) \(ludzi gracza 0\)|walka wszystkich \(ludzi gracza (?P<men>\d+)\)) \| stan po (?P<after>\S+) \| proba (?P<try>\d+)\.$")
+KRYJOWKA293_FBE = re.compile(r"^Kryjowka - herszt \(293\): ZAPAS BLAD - misja (?P<kind>kryjowka|zasadzka) \| herszt (?P<bn>.*?) \[(?P<bid>[^\]]*)\] \| proba "
+                      r"(?P<try>\d+) z (?P<max>\d+) \((?P<mode>pojedynek|walka wszystkich)\) \| (?P<exc>\S+) \| stan po (?P<after>\S+) \| "
+                      r"(?P<next>koniec prob|powtorka za \d+\.\d s)\.$")
+KRYJOWKA293_PICKS = ("pojedynek", "wszyscy", "zapas wszyscy", "zapas pojedynek")
+
+
+def kryjowka293_mis_line(kind="kryjowka", k="TAK", ph="TAK", st="BossFightWithAll", bn="Wild Hare Horseman", bid="forest_people_tier_3", occ="Soldier", hero="NIE",
+                  band="NIE", talk="TAK", our="TAK", n=1, gc="TAK", fac="hilltribesmen", gd="TAK", men="12", pick="wszyscy", mstum=0, stop=False, stum=0):
+    """Linia misji 293 w ukladzie HideoutBossTalk.Logic.Line (do self-testu)."""
+    return (f"Kryjowka - herszt (293): misja {kind} | klucz {k} | faza herszta {ph}, stan na koniec {st} | herszt {bn} [{bid}] (zajecie {occ}, bohater {hero}, "
+            f"kultura bandycka {band}) | rozmowa {talk}, nasz wiersz {our} (razy {n}), warunek wiersza gry {gc} (frakcja spotkania {fac}), wiersz straznika gry "
+            f"pasowalby {gd} | ludzi gracza przy rozmowie {men} | wybor {pick} | potkniecia misji {mstum}{' (logika zatrzymana)' if stop else ''}, sesja {stum}.")
+
+
+def kryjowka293_pick_ok(ph, pick):
+    """K293-1: faza herszta TAK -> wybor z KRYJOWKA293_PICKS; bez fazy - 'bez fazy herszta'."""
+    if ph == "TAK":
+        return pick in KRYJOWKA293_PICKS
+    return pick == "bez fazy herszta"
+
+
+def kryjowka293_fallback_ok(duel, men, after):
+    """K293-3: zapas pojedynek tylko przy 0 ludzi gracza, walka wszystkich przy >= 1; stan po zapasie zgodny z wyborem."""
+    if duel:
+        return after == "BossFightWithDuel"
+    return men is not None and men >= 1 and after == "BossFightWithAll"
+
+
+def kryjowka293_selftest():
+    bad = []
+    a = KRYJOWKA293_START.match("Kryjowka - herszt (293): wiersz rozmowy herszta wpiety (priorytet 100000) | klucz TAK | pola gry: kryjowka TAK, zasadzka TAK.")
+    if not a or a.group(1) != "100000" or a.group(3) != "TAK" or a.group(4) != "TAK":
+        bad.append("linia startu")
+    m = KRYJOWKA293_MIS.match(kryjowka293_mis_line())
+    if not m or m.group("occ") != "Soldier" or m.group("pick") != "wszyscy" or m.group("men") != "12" or m.group("fac") != "hilltribesmen":
+        bad.append("linia misji (wszyscy)")
+    m = KRYJOWKA293_MIS.match(kryjowka293_mis_line(ph="NIE", st="InitialFightBeforeBossFight", bn="-", bid="-", occ="-", hero="-", band="-", talk="NIE", our="NIE", n=0,
+                                     gc="-", fac="-", gd="-", men="-", pick="bez fazy herszta"))
+    if not m or m.group("ph") != "NIE" or m.group("bid") != "-" or m.group("pick") != "bez fazy herszta":
+        bad.append("linia misji (bez fazy)")
+    m = KRYJOWKA293_MIS.match(kryjowka293_mis_line(kind="zasadzka", st="ConversationBetweenLeaders", bn="Robber Knight Boss", bid="robber_boss", occ="Bandit", band="TAK",
+                                     gd="NIE", fac="brak frakcji", pick="brak (stan ConversationBetweenLeaders)", mstum=10, stop=True, stum=12))
+    if not m or m.group("kind") != "zasadzka" or m.group("pick") != "brak (stan ConversationBetweenLeaders)" or m.group("stum") != "12" \
+            or m.group("fac") != "brak frakcji" or m.group("mstum") != "10" or not m.group("stop"):
+        bad.append("linia misji (brak wyboru)")
+    m = KRYJOWKA293_MIS.match(kryjowka293_mis_line(st="ConversationBetweenLeaders", pick="zapas blad (prob 2, stan ConversationBetweenLeaders)", mstum=2, stum=2))
+    if not m or m.group("pick") != "zapas blad (prob 2, stan ConversationBetweenLeaders)" or m.group("mstum") != "2" or m.group("stop"):
+        bad.append("linia misji (zapas blad)")
+    m = KRYJOWKA293_MIS.match(kryjowka293_mis_line(bn="Ser Gage [the Red]", bid="CharacterObject_6940", occ="Lord", hero="TAK", pick="zapas pojedynek", men="0"))
+    if not m or m.group("bn") != "Ser Gage [the Red]" or m.group("bid") != "CharacterObject_6940" or m.group("hero") != "TAK":
+        bad.append("linia misji (nawias w imieniu)")
+    f = KRYJOWKA293_FB.match("Kryjowka - herszt (293): ZAPAS - misja kryjowka | rozmowa z hersztem Wild Hare Horseman [forest_people_tier_3] zamknieta bez odpowiedzi "
+                      "(1.0 s stanu ConversationBetweenLeaders bez rozmowy) -> walka wszystkich (ludzi gracza 12) | stan po BossFightWithAll | proba 1.")
+    if not f or f.group("duel") or f.group("men") != "12" or f.group("after") != "BossFightWithAll" or f.group("try") != "1":
+        bad.append("linia ZAPAS (wszyscy)")
+    f = KRYJOWKA293_FB.match("Kryjowka - herszt (293): ZAPAS - misja zasadzka | rozmowa z hersztem X [x] nie ruszyla (1.0 s stanu ConversationBetweenLeaders bez rozmowy) "
+                      "-> pojedynek (ludzi gracza 0) | stan po BossFightWithDuel | proba 2.")
+    if not f or f.group("duel") != "pojedynek" or f.group("men") is not None or f.group("why") != "nie ruszyla" or f.group("try") != "2":
+        bad.append("linia ZAPAS (pojedynek)")
+    f = KRYJOWKA293_FBE.match("Kryjowka - herszt (293): ZAPAS BLAD - misja kryjowka | herszt Wild Hare Horseman [forest_people_tier_3] | proba 1 z 2 "
+                       "(walka wszystkich) | NullReferenceException | stan po ConversationBetweenLeaders | powtorka za 1.0 s.")
+    if not f or f.group("try") != "1" or f.group("max") != "2" or f.group("exc") != "NullReferenceException" or f.group("next") != "powtorka za 1.0 s":
+        bad.append("linia ZAPAS BLAD")
+    if KRYJOWKA293_FB.match("Kryjowka - herszt (293): ZAPAS BLAD - misja kryjowka | herszt X [x] | proba 2 z 2 (pojedynek) | E | stan po S | koniec prob."):
+        bad.append("ZAPAS lapie ZAPAS BLAD")
+    cases = [(("TAK", "pojedynek"), True), (("TAK", "wszyscy"), True), (("TAK", "zapas wszyscy"), True), (("TAK", "zapas pojedynek"), True),
+             (("TAK", "brak (stan ConversationBetweenLeaders)"), False), (("TAK", "zapas blad (prob 2, stan ConversationBetweenLeaders)"), False),
+             (("NIE", "bez fazy herszta"), True), (("NIE", "wszyscy"), False)]
+    for args, want in cases:
+        if kryjowka293_pick_ok(*args) != want:
+            bad.append(f"kryjowka293_pick_ok{args}")
+    cases = [((True, None, "BossFightWithDuel"), True), ((True, None, "ConversationBetweenLeaders"), False), ((False, 3, "BossFightWithAll"), True),
+             ((False, 0, "BossFightWithAll"), False), ((False, 3, "BossFightWithDuel"), False), ((False, None, "BossFightWithAll"), False)]
+    for args, want in cases:
+        if kryjowka293_fallback_ok(*args) != want:
+            bad.append(f"kryjowka293_fallback_ok{args}")
+    return "; ".join(bad) if bad else None
+
+
+def kryjowka293_collect(logp):
+    D = {"start": [], "mis": [], "fb": [], "fbe": [], "bad": [], "err": 0, "errs": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(KRYJOWKA293_ERR):
+                    D["err"] += 1
+                    if len(D["errs"]) < 3:
+                        D["errs"].append(s[:160])
+                continue
+            if not s.startswith(KRYJOWKA293_TAG):
+                continue
+            a = KRYJOWKA293_START.match(s)
+            if a:
+                D["start"].append(a.groups())
+                continue
+            a = KRYJOWKA293_MIS.match(s)
+            if a:
+                D["mis"].append(a.groupdict())
+                continue
+            a = KRYJOWKA293_FB.match(s)
+            if a:
+                D["fb"].append(a.groupdict())
+                continue
+            a = KRYJOWKA293_FBE.match(s)
+            if a:
+                D["fbe"].append(a.groupdict())
+                continue
+            if len(D["bad"]) < 3:
+                D["bad"].append(s[:160])
+            else:
+                D["bad"].append(None)
+    return D
+
+
+def kryjowka293_rows(rep, D):
+    st = D["start"]
+    nbad = len(D["bad"])
+    stum = max([int(x["stum"]) for x in D["mis"]] + [0])
+    mstum = sum(int(x["mstum"]) for x in D["mis"])
+    nstop = sum(1 for x in D["mis"] if x["stop"])
+    ok0 = bool(st) and all(x[1] == "TAK" and x[2] == "TAK" and x[3] == "TAK" for x in st) and nbad == 0 and D["err"] == 0 and stum == 0 and mstum == 0
+    rep.add("K293-0: linia startu, nierozpoznane, ERROR, potkniecia",
+            f"linii startu {len(st)} (klucz/kryjowka/zasadzka: {', '.join('/'.join(x[1:]) for x in st[:3]) or '-'}), nierozpoznanych {nbad} "
+            f"{[x for x in D['bad'] if x][:2]}, ERROR {D['err']} {D['errs'][:2]}, potkniecia (sesja) {stum}, misji (suma) {mstum}, logika zatrzymana {nstop}",
+            "start >= 1, klucz TAK, pola gry TAK/TAK; 0 / 0 / 0", ok0)
+    mis = D["mis"]
+    ph = [x for x in mis if x["ph"] == "TAK"]
+    if not mis:
+        rep.add("K293-1: faza herszta konczy sie wyborem", "brak misji kryjowki w logu", "INFO (bieg bez kryjowki)", None)
+        rep.add("K293-2: nasz wiersz w rozmowie z hersztem", "brak misji kryjowki w logu", "INFO (bieg bez kryjowki)", None)
+    else:
+        badp = [x for x in mis if not kryjowka293_pick_ok(x["ph"], x["pick"])]
+        rep.add("K293-1: faza herszta konczy sie wyborem",
+                f"misji {len(mis)}, z faza herszta {len(ph)}, zle {len(badp)} {[(x['bn'], x['st'], x['pick']) for x in badp[:3]]}",
+                "0 (wybor pojedynek / wszyscy / zapas; bez fazy - 'bez fazy herszta')", not badp)
+        tk = [x for x in mis if x["talk"] == "TAK" and x["k"] == "TAK"]
+        bado = [x for x in tk if x["our"] != "TAK"]
+        rep.add("K293-2: nasz wiersz w rozmowie z hersztem",
+                f"rozmow przy kluczu TAK {len(tk)}, bez naszego wiersza {len(bado)} {[(x['bn'], x['bid']) for x in bado[:3]]}",
+                "0" if tk else "INFO (zadnej rozmowy z hersztem)", (not bado) if tk else None)
+    fb = D["fb"]
+    fbe = D["fbe"]
+    nzap = sum(1 for x in mis if x["pick"] in ("zapas wszyscy", "zapas pojedynek"))
+    nzbl = sum(1 for x in mis if x["pick"].startswith("zapas blad"))
+    badf = [x for x in fb if not kryjowka293_fallback_ok(bool(x["duel"]), int(x["men"]) if x["men"] is not None else None, x["after"])]
+    if not fb and nzap == 0 and not fbe and nzbl == 0:
+        rep.add("K293-3: zapas zgodny z regula", "zapas nie ruszal (0 linii ZAPAS, 0 ZAPAS BLAD, 0 misji 'zapas')", "INFO (zapas bez potrzeby)", None)
+    else:
+        rep.add("K293-3: zapas zgodny z regula",
+                f"linii ZAPAS {len(fb)} (pojedynek {sum(1 for x in fb if x['duel'])}), misji 'zapas' {nzap}, niezgodnych {len(badf)} "
+                f"{[(x['bn'], x['men'], x['after']) for x in badf[:3]]}, ZAPAS BLAD {len(fbe)} "
+                f"{[(x['bn'], x['try'], x['exc'], x['after']) for x in fbe[:3]]}, misji 'zapas blad' {nzbl}",
+                "0 niezgodnych, linii ZAPAS = misji 'zapas', ZAPAS BLAD 0, misji 'zapas blad' 0",
+                not badf and len(fb) == nzap and not fbe and nzbl == 0)
+    parts = [f"misji kryjowki {len(mis)} (zasadzki {sum(1 for x in mis if x['kind'] == 'zasadzka')}), z faza herszta {len(ph)}, bez fazy "
+             f"{len(mis) - len(ph)}"]
+    if ph:
+        occ = {}
+        for x in ph:
+            key = f"{x['occ']}/{'bohater' if x['hero'] == 'TAK' else 'bandyta' if x['band'] == 'TAK' else 'inny'}"
+            occ[key] = occ.get(key, 0) + 1
+        parts.append("herszci (zajecie/rodzaj): " + ", ".join(f"{k} {v}" for k, v in sorted(occ.items())))
+        our = [x for x in ph if x["our"] == "TAK"]
+        parts.append(f"warunek wiersza gry TAK/NIE {sum(1 for x in our if x['gc'] == 'TAK')}/{sum(1 for x in our if x['gc'] == 'NIE')} "
+                     f"(frakcje spotkania: {', '.join(sorted(set(x['fac'] for x in our)))[:120] or '-'}), wiersz straznika pasowalby "
+                     f"{sum(1 for x in our if x['gd'] == 'TAK')}")
+        pk = {}
+        for x in ph:
+            pk[x["pick"]] = pk.get(x["pick"], 0) + 1
+        parts.append("wybory: " + ", ".join(f"{k} {v}" for k, v in sorted(pk.items())))
+        parts.append("herszci: " + "; ".join(f"{x['bn']} [{x['bid']}]" for x in ph[:6]))
+    rep.add("K293-4: przebieg (INFO)", "; ".join(parts), "INFO", None)
+
+
+def kryjowka293_main(logp):
+    """kryjowka293 (29.10, paczka 293): K293-S, K293-0..K293-4 - opis w komentarzu nad stalymi KRYJOWKA293_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = kryjowka293_selftest()
+    rep.add("K293-S: self-test wyrazen (start, misja x5, ZAPAS x2, ZAPAS BLAD x1 + 1 odrzucenie) i decyzji (kryjowka293_pick_ok, kryjowka293_fallback_ok)", s1 or "OK",
+            "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("K293-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = kryjowka293_collect(logp)
+    print(f"plik: {logp} | linii startu 293 {len(D['start'])}, misji kryjowki {len(D['mis'])}, ZAPAS {len(D['fb'])}, ZAPAS BLAD {len(D['fbe'])}, "
+          f"nierozpoznanych {len(D['bad'])}, "
+          f"ERROR {D['err']}")
+    kryjowka293_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_kryjowka293_main_prev = main
+
+
+def main(argv):
+    # paczka 293: grupa kryjowka293 - opakowanie main jak zelazo290
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "kryjowka293":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return kryjowka293_main(rest[0] if rest else None)
+    return _kryjowka293_main_prev(argv)
 
 
 if __name__ == "__main__":

@@ -5468,6 +5468,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool HideoutAlarmVoice { get; set; } = true;
 
+        [SettingPropertyBool("Hideout Boss Talk Fix", HintText = "when you reach the hideout boss he always asks to settle it one-on-one, whoever he is (a bandit chief, a deserter soldier or a hero), and you answer duel or all together as in the game; if that talk ever ends without an answer, the fight starts anyway - all together, or a duel when you have no men left - so the boss can never stand there unhurt to the end. Off = as before (a boss who is a soldier could greet you as a town guard and the fight never resumed)", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool HideoutBossTalkFix { get; set; } = true;
+
         [SettingPropertyBool("Sight Cycle Enabled", HintText = "eyes follow the sun: every party sees further by day and shorter after dark", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool SightCycleEnabled { get; set; } = true;
@@ -11746,6 +11750,7 @@ namespace Armoury
             s.HideoutAlarmRelay = HideoutAlarmRelay;
             s.HideoutNoisePerArmorKg = HideoutNoisePerArmorKg;
             s.HideoutAlarmVoice = HideoutAlarmVoice;
+            s.HideoutBossTalkFix = HideoutBossTalkFix;
             s.SightCycleEnabled = SightCycleEnabled;
             s.DaySightFactor = DaySightFactor;
             s.NightSightFactor = NightSightFactor;

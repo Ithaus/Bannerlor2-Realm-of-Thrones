@@ -2076,6 +2076,9 @@ namespace Armoury
         public bool HideoutAlarmRelay = true;              // a woken man shouts too: the alarm leaps man to man while each next stands within scream range of the last - never across the whole camp at once
         public float HideoutNoisePerArmorKg = 0.2f;        // every kilogram of worn armour adds this many meters to a RUNNING man's noise - plate thunders, leather whispers
         public bool HideoutAlarmVoice = true;              // the alarm is HEARD: one man in every ring of the relay lets out a real battle yell (the game's own voice line)
+        // 293 (Jeff 29.10: w kryjowce herszt bez rozmowy "sam czy ze wszystkimi" i bez obrazen, wyjscie tylko Retreat): HideoutBossTalk.cs -
+        // wiersz rozmowy herszta ponad wiersz straznika gry (herszt-zolnierz, zajecie Soldier) i zapas, gdy rozmowa skonczy sie bez odpowiedzi.
+        public bool HideoutBossTalkFix = true;              // when you reach the hideout boss he always asks to settle it one-on-one, whoever he is (a bandit chief, a deserter soldier or a hero), and you answer duel or all together as in the game; if that talk ever ends without an answer, the fight starts anyway - all together, or a duel when you have no men left - so the boss can never stand there unhurt to the end. Off = as before (a boss who is a soldier could greet you as a town guard and the fight never resumed)
         public bool SightCycleEnabled = true;              // eyes follow the sun: every party sees further by day and shorter after dark
         public float DaySightFactor = 1.15f;               // spotting range in daylight, times this
         public float NightSightFactor = 0.65f;             // spotting range at night (the game's night, 22:00-2:00) - the cut is mild, for you HEAR more after dark: a marching column is loud
