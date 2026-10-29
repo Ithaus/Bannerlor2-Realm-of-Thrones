@@ -591,8 +591,15 @@ namespace Armoury
         /// mycie co najmniej `min` (koszt sztuki; T1 - prog sprzedazy z zyskiem). Wtedy towar czeka na takie miasto (T1 i BK sprzedaja tam z zyskiem); bez takiego
         /// rynku - wyjscie na stracie porcjami jak dotad. Jedzenie - bez zmian (powod 4 przed wiekiem). Tylko przy age > 30 dob (liczy sie licznik "czeka").
         /// </summary>
+        // 294b (recenzja): werdykt ostatniego AgeMarket (watek glowny; czytany zaraz po LossWhy w T1 i po LossReason w SellGuardPrefix BK / gry): AgeDepthNo - 'bez
+        // rynku' wydal test glebokosci, AgeDepthNet - cena tej sztuki w miescie odniesienia po mycie (prog sprzedazy na stracie), AgeOldWait - stara regula ofert czekalaby
+        internal static bool AgeDepthNo { get; private set; }
+        internal static bool AgeOldWait { get; private set; }
+        internal static double AgeDepthNet { get; private set; }
+
         private static bool AgeMarket(MobileParty mp, ItemObject it, double min, double keep, double age)
         {
+            AgeDepthNo = false; AgeOldWait = false; AgeDepthNet = double.NaN;
             if (!(age > MaxAgeDays) || it == null || !CaravanMarket294.Durable(it) || it.ItemCategory == null || !(min > 0.0)) return false;   // 294: jedzenie, ktore sie nie psuje - jak towar
             // 286 (klucz CaravanAgedGlutSells): towar w przesycie (kupno stoi - karawany swiata wioza wiecej niz 10 dob sprzedazy miastom, CaravanTrade284.GateShut)
             // nie czeka na rynek z zyskiem - ten rynek bierze tylko tyle, ile sprzedaz (log 134a: srebro w jukach 2 326 = 90.5 doby sprzedazy, 'dlugo w jukach czeka'
@@ -602,8 +609,29 @@ namespace Armoury
             double e = CaravanTrade284.SellIdxOf(it.ItemCategory);
             if (!(e > 0.0)) return false;
             bool ok = Math.Max(1, it.Value) * e / (1.0 + Penalty(mp, it)) * keep >= min;
+            // 294b (klucz CaravanBuyByMarketDepth): rynek z zyskiem = cena NASTEPNEJ sztuki w typowym drozszym miescie (miasto odniesienia - mediana miast
+            // placacych co najmniej srednia), w kolejce za udzialem jukow innych karawan, minus to, co miasto zje w dobie drogi (CaravanTrade284.DepthNet / QueueK),
+            // po mycie tego miasta - nie sama oferta indeksu. Bez rynku z glebokoscia - regula 5 porcjami jak dotad (stara regula liczona w linii 294b).
+            if (CaravanTrade284.DepthOn)
+            {
+                double dn = CaravanTrade284.DepthNetAged(mp, it);
+                if (!double.IsNaN(dn))
+                {
+                    bool okD = dn >= min; CaravanTrade284.NoteDepthAge(okD, ok);
+                    if (!okD) { AgeDepthNo = true; AgeOldWait = ok; AgeDepthNet = dn; }
+                    ok = okD;
+                }
+            }
             if (ok) { CaravanTrade284.NoteAgeWait(); if (it.IsFood) CaravanMarket294.NoteDurableWait(); }
             return ok;
+        }
+
+        /// <summary>294b: spizarnia eskorty - sztuki jedzenia, ktorych T1 nie sprzedaje (Sell: ceil(-FoodChange x FoodKeepDays)); ta sama miara w bramce jedzenia
+        /// (CaravanTrade284.ScanHeld - poza towarem handlowym).</summary>
+        internal static int PantryUnits(MobileParty mp)
+        {
+            if (mp == null) return 0;
+            return (int)Math.Ceiling(Math.Max(0.0, -mp.FoodChange) * FoodKeepDays);
         }
 
         /// <summary>284: najwiecej sztuk z n, ktorych KAZDA idzie w tym miescie po cenie po mycie (E3-G3) nie nizszej niz koszt sztuki (cena k-tej sztuki maleje z k -
@@ -981,7 +1009,9 @@ namespace Armoury
                         while (kp >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kp, wv) * keepK <= c.Min) kp--;
                         if (kp >= 1) { step = kp; pLast = PriceAt(model, el.EquipmentElement, mp, d, kp, wv); profit = true; _profitCut++; }
                     }
+                    AgeDepthNo = false; AgeOldWait = false; AgeDepthNet = double.NaN;
                     int why = profit ? 0 : LossWhy(disband, cash, full, c.Spoil, age, AgeMarket(mp, it, c.Min, keepK, age));   // 132a: > 30 dob bez rynku z zyskiem; 294: jedzenie, ktore sie nie psuje - jak towar
+                    bool depthNo = AgeDepthNo, depthOld = AgeOldWait; double depthNet = AgeDepthNet;   // 294b (recenzja): werdykt testu glebokosci dla tego kroku
                     if (why == 3)
                     {
                         // juki ponad udzwig: na stracie tylko tyle wagi, ile trzeba do zejscia pod udzwig
@@ -1034,6 +1064,19 @@ namespace Armoury
                             if (kf < step) { step = kf; pLast = PriceAt(model, el.EquipmentElement, mp, d, kf, wv); }
                         }
                     }
+                    if (why == 5 && depthNo)
+                    {
+                        // 294b (recenzja): stary towar bez rynku z glebokoscia - kazda sztuka kroku po mycie nie taniej niz min(koszt, cena tej sztuki w miescie odniesienia
+                        // po mycie / 1.03; CaravanTrade284.DepthAgedFloor) - nie oddaje towaru miastu tanszemu niz typowe miasto drozsze o odcinek dalej; reszta czeka
+                        double fl = CaravanTrade284.DepthAgedFloor(c.Min, depthNet);
+                        if (fl > 0.0)
+                        {
+                            int kf = step;
+                            while (kf >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kf, wv) * keepK < fl) kf--;
+                            if (kf <= 0) { CaravanTrade284.NoteDepthHeldT1(step); break; }
+                            if (kf < step) { CaravanTrade284.NoteDepthHeldT1(step - kf); step = kf; pLast = PriceAt(model, el.EquipmentElement, mp, d, kf, wv); }
+                        }
+                    }
                     if (pLast < GabkaFloor * it.Value) { _rGabka++; break; }
                     int price = Math.Max(1, town.GetItemPrice(el.EquipmentElement, mp, true));
                     int spare = town.Gold - TownPurse.BuyFloor(town, reserve);
@@ -1079,6 +1122,7 @@ namespace Armoury
                         switch (why) { case 1: _lDisband += moved; _lDisbandG += gross; break; case 2: _lCash += moved; _lCashG += gross; break; case 3: _lFull += moved; _lFullG += gross; break; case 4: _lFood += moved; _lFoodG += gross; break; default: _lAge += moved; _lAgeG += gross; break; }
                         if (why == 5 && c.Dur && AgedGlut(cat)) NoteAged286(moved, gross, (long)cost, cat, true);   // 286: stary towar w przesycie (licznik)
                         if (why == 5 && c.Food) CaravanMarket294.NoteDurableLoss(moved, gross);   // 294: jedzenie, ktore sie nie psuje - dlugo w jukach jak towar
+                        if (why == 5 && depthNo) CaravanTrade284.NoteDepthLoss(moved, gross, (long)cost, depthOld);    // 294b: towar > 30 dob bez rynku z glebokoscia (werdykt testu glebokosci) - na stracie porcjami (licznik)
                     }
                     Visit v; if (!_visit.TryGetValue(mp, out v)) { v = new Visit { St = st }; _visit[mp] = v; }
                     v.Cats.Add(cat);

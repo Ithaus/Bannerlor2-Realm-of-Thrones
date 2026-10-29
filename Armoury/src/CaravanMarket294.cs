@@ -40,6 +40,8 @@ namespace Armoury
     ///     nowa gra, wczytanie zapisu bez ksiegi 294). Zloto zostaje u kupca / lorda.
     /// Nic z niczego: A - mniej sprzedazy ponizej kosztu (towar w jukach, zloto w kasie miasta); B - istniejace drogi sprzedazy i rozwiazania (kazda moneta i sztuka
     /// z platnikiem); C - zakup karawany nie zachodzi. Linia doby "Rynek karawan (294): dzien N" (CaravanTrade284.Daily, takze przy kluczach NIE - pomiar).
+    /// 294b: B i C domyslnie NIE (autotest 296a: zwijanie zniszczylo 2/3 handlu - karawan zmierzonych 423 -> 133, pula 0.43, wyprzedaz zwinietych strata 7 155 zl/d,
+    /// najazdy na karawane 0.64% -> 2.49% na dobe; brama blokowala zastepstwa) - przyczyna strat (martwy towar) idzie przez glebokosc rynku (CaravanTrade284.DepthNet).
     /// </summary>
     internal static class CaravanMarket294
     {

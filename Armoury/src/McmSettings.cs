@@ -9650,11 +9650,23 @@ namespace Armoury
 
         [SettingPropertyBool("Losing Caravans Are Wound Up", HintText = "a merchant or lord does not keep a caravan that does not earn its wages: when an AI caravan watched for at least 28 days has made less from trade (sales minus tolls minus what the goods cost) than its wages for 14 days in a row, its owner stops buying new goods and the caravan sells off what it carries in the next towns at the usual prices; once little is left (or after 28 days) it is wound up in a town - the rest of its goods are sold to the town, its coin goes to the owner, its men go home. Your clan's caravans, caravans led by a hero, quest caravans, troop convoys and ships are never wound up. The record of each caravan's trade is kept in the save. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans pay their way, food that keeps does not spoil (294)")]
-        public bool CaravanLosingWoundUp { get; set; } = true;
+        public bool CaravanLosingWoundUp { get; set; } = false;
 
         [SettingPropertyBool("New Caravans Only When Trade Pays", HintText = "a merchant or a Banner Kings lord sends out a new caravan only while at least 6 in 10 caravans earn their wages after it is added (a new caravan has not proven anything yet); an owner whose caravan was wound up waits 28 days. Until half the caravans have a trade record (a new game, or a save from before this option) caravans start as before. The coin stays with the merchant or lord. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans pay their way, food that keeps does not spoil (294)")]
-        public bool CaravanEntryWhenTradePays { get; set; } = true;
+        public bool CaravanEntryWhenTradePays { get; set; } = false;
+
+        [SettingPropertyBool("Caravans Price The Unit The Market Will Take", HintText = "with Caravans Buy Only With Reachable Profit: a caravan buys a good only if the unit it would bring still sells for at least 3% more than it pays here in a typical dearer town - priced after the shelf there fills up with what this caravan and its share of all other caravans' stock of that good would put on it, less what that town eats while the caravan is on the road (the same price drop the game applies unit by unit). The same price tells a caravan whether goods older than 30 days are worth carrying further; if not, they are sold off in portions as before. Off = as before (buy and wait by the dearer towns' price index alone)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans trade what the market will take (294b)")]
+        public bool CaravanBuyByMarketDepth { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Food Gate Counts Trade Stock Only", HintText = "with Caravans Buy Food By Their Own Sales: the food a caravan keeps for its own escort (about ten days of rations, which it never sells) is not counted as food waiting to be sold, so caravans can buy food to trade again; food that spoils is held to a week of sales (at least what one average town buys a day), food that keeps (grain, cheese, olives, beer, honey...) is treated like any other goods. Off = as before (the escort's rations block food buying)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans trade what the market will take (294b)")]
+        public bool CaravanFoodGateTradeStock { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Road Food For The Measured Leg", HintText = "with Caravan Road Food: a caravan leaving a town buys food for the longer of the straight-line trip to its next stop and the average leg caravans really take between towns (caravans of the world divided by town departures, last 7 days); with no known next stop it buys for that average leg. Off = as before (straight-line trip, or to the nearest town)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans trade what the market will take (294b)")]
+        public bool CaravanRoadFoodMeasuredLeg { get; set; } = true;
 
         [SettingPropertyBool("Bk Retinue From Village", HintText = "with People Origin and Levy From Villages: Banner Kings retinues are made of real people - the retinue of a village manor, the retinue of an estate and the Castle Retinue of a castle garrison: a man who joins (and every man of a newly raised retinue) leaves the people of the retinue's village (a castle: its villages), and if they have no one to spare he does not join; a man a manor retinue sends away goes back home instead of vanishing; when an estate's lord calls up his retinue, its men keep their origin in his party. The retinues' sizes and their one-man-a-day pace stay as Banner Kings sets them. Off = as before (retinue men appear from nothing and vanish)", RequireRestart = false)]
         [SettingPropertyGroup("Banner Kings manor retinues from the village's own people (295)")]
@@ -12821,6 +12833,9 @@ namespace Armoury
             s.CaravanFoodKeepsByKind = CaravanFoodKeepsByKind;
             s.CaravanLosingWoundUp = CaravanLosingWoundUp;
             s.CaravanEntryWhenTradePays = CaravanEntryWhenTradePays;
+            s.CaravanBuyByMarketDepth = CaravanBuyByMarketDepth;
+            s.CaravanFoodGateTradeStock = CaravanFoodGateTradeStock;
+            s.CaravanRoadFoodMeasuredLeg = CaravanRoadFoodMeasuredLeg;
             s.BkRetinueFromVillage = BkRetinueFromVillage;
             s.WinterSparesMinesAndFelling = WinterSparesMinesAndFelling;
             s.VillageCartMilitiaEscort = VillageCartMilitiaEscort;
