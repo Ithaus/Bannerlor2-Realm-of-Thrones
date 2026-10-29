@@ -646,6 +646,19 @@ namespace Armoury
             return w;
         }
 
+        /// <summary>295: ilu ludzi ma slownik skladu tego rosteru w ksiedze (0 - bez slownika / ksiega nieczynna). Sam odczyt, nie rzuca.</summary>
+        internal static double BookMen(TroopRoster r)
+        {
+            try
+            {
+                if (!OriginLive || r == null) return 0.0;
+                PartyBase owner; int kind;
+                var o = OrgOf(r, false, out owner, out kind);
+                return o != null ? o.Sum : 0.0;
+            }
+            catch { return 0.0; }
+        }
+
         /// <summary>Szeregowi rosteru bez bohaterow i bez wightow (jedna miara ksiegi pochodzenia).</summary>
         internal static int Men(TroopRoster r)
         {

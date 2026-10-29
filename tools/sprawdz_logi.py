@@ -4365,7 +4365,7 @@ def etap4_e48(rep, lines, start, win, hea, until):
     # N5 - wojsko lordow (jak E4/7 T9)
     rep.add("E4/8 N5: wojsko lordow d90-d120", "patrz E4/7 T9 (ta sama linia \"Ludzie:\")", "95-115 tys. (podloga 85)", None)
     # N6 - kontrole
-    kc = [fnum(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e(?: \+ ob)?\) = " + SF, arm[d]) for d in adays]   # m97-wioski krok 2: + ob (obroncy wiosek pobocznych) - stare logi bez ob
+    kc = [fnum(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e(?: \+ ob)?(?: \+ rt)?\) = " + SF, arm[d]) for d in adays]   # m97-wioski krok 2: + ob (obroncy wiosek pobocznych) - stare logi bez ob; 295: + rt (orszaki dworow BK)
     kc = [x for x in kc if x is not None]
     rep.add("E4/8 N6: KONTROLA linii E4/8 (najwieksza |roznica|)", f"{max(abs(x) for x in kc):.2f} ({len(kc)} dob)" if kc else "-", "<= 1 czlowiek kazdej doby", (max(abs(x) for x in kc) <= 1.0) if kc else None)
     mdays = [d for d in sorted(mia) if 1 <= run_day(d, start) <= until]
@@ -33976,6 +33976,9 @@ NWAR_F7_ERR = ("ERROR in F7Workshops", "ERROR in TownCrafts.SyncData(arm_f7_clot
 NWAR_TC = re.compile(r"^Rzemioslo miasta \(148\): dzien (\d+) ")
 NWAR_TC_SHELF = re.compile(r"na polkach miast \[([^\]]*)\]")
 NWAR_TC_PART = re.compile(r"^(\S+) (\d+) \(indeks ([\d.]+)\)$")
+# 295 (a): wyrob rzemiosla 148 na dobe (plotno z lnu, skora ze skor) - NWAR-15 (klin maleje przy rosnacym wyrobie = rynek wsadu, nie blad)
+NWAR_TC_MADE = (("plotno", re.compile(r"len -> plotno: zrobiono (\d+)")), ("skora", re.compile(r"skory -> skora: zrobiono (\d+)")))
+DROBNE295_WEDGE_WIN = 14        # NWAR-15: okno dob (poczatek od pierwszej doby + 14, koniec - ostatnie 14 dob); dzienna mediana indeksu z ok. 30 miast z lnem skacze 0.95-1.75
 NWAR_LEDGER = re.compile(r"^Towary: dzien (\d+) - (leather|linen) \(")
 NWAR_LEDGER_OFF = (re.compile(r"odziez wojska \(150\) (\d+)"), re.compile(r"naprawy kowali miasta \(135\) (\d+)"),
                    re.compile(r"wsie \(zakupy w miescie, E5/B1\) (\d+)"), re.compile(r"dwory \(E3-P1\) (\d+)"))
@@ -34038,6 +34041,10 @@ def _nwar_read(logp, ks=None, f7=None):
                         mp = NWAR_TC_PART.match(part.strip())
                         if mp:
                             dd[mp.group(1)] = float(mp.group(3))
+                    for nm_, rx_ in NWAR_TC_MADE:   # 295 (a): wyrob na dobe do NWAR-15 (klucze z "_" - poza indeksami polek)
+                        mk_ = rx_.search(s)
+                        if mk_:
+                            dd["_mk_" + nm_] = int(mk_.group(1))
                     f7.setdefault("tc", {})[int(mm.group(1))] = dd
                     ex = [int(x) for x in NWAR_F14_EXP.findall(s)]   # f14-rynek K4: plotno i skora "tylko dzieki cenie wywozu" (NWAR-18)
                     if ex:
@@ -34305,6 +34312,32 @@ def _nwar_wedge(tc, first, skip=0):
     return None
 
 
+def _nwar_wedge_win(tc, first, skip=0, n=DROBNE295_WEDGE_WIN):
+    """295 (a): klin cen srednio z okna n dob z obiema parami: (doba od, doba do, skora/skory, plotno/len, plotno zrobione/d, skora zrobiona/d, dob).
+    first - pierwsze n dob od pierwszej doby linii + skip; inaczej ostatnie n dob. Mniej niz n/2 dob - None."""
+    if not tc:
+        return None
+    lo_ = (min(tc) + skip) if first else None
+    ds = [x for x in sorted(tc) if (lo_ is None or x >= lo_) and tc[x].get("skory", 0) > 0 and tc[x].get("len", 0) > 0 and "skora" in tc[x] and "plotno" in tc[x]]
+    ds = ds[:n] if first else ds[-n:]
+    if len(ds) < max(2, n // 2):
+        return None
+    k = len(ds)
+    sk = sum(tc[x]["skora"] / tc[x]["skory"] for x in ds) / k
+    pl = sum(tc[x]["plotno"] / tc[x]["len"] for x in ds) / k
+    mp_ = sum(tc[x].get("_mk_plotno", 0) for x in ds) / k
+    ms_ = sum(tc[x].get("_mk_skora", 0) for x in ds) / k
+    return ds[0], ds[-1], sk, pl, mp_, ms_, k
+
+
+def _drobne295_wedge_ok(a, b):
+    """295 (a): para (skora, plotno) w porzadku, gdy klin z okna >= 0.9 x poczatku albo (wyrob na dobe nie spadl i klin na koniec >= 1.0 - wyrob drozszy od
+    wsadu wzgledem receptury, rzemioslo dalej sie oplaca: wsad drozeje, bo rzemieslnicy go wiecej kupuja - rynek, nie blad). Zwraca (ok_skora, ok_plotno)."""
+    oks = b[2] >= 0.9 * a[2] or (b[5] >= a[5] and b[2] >= 1.0)
+    okp = b[3] >= 0.9 * a[3] or (b[4] >= a[4] and b[3] >= 1.0)
+    return oks, okp
+
+
 def _nwar_ws_cycles(ws):
     """Cykle towarow codziennych na dobe biegu z 'Warsztaty towarowe' (srednia dob z rozliczeniem): typ -> (cykli/d, warsztatow pracujacych/d)."""
     tot = {t: [0, 0] for t in NWAR_DAILY_GOODS}
@@ -34488,16 +34521,28 @@ def _nwar_f7_wedge_cycles(rep, f7, ws, bdp, has_f7):
             bws, btc = None, {}
     tc = f7.get("tc", {})
     a, b = _nwar_wedge(tc, True, 14), _nwar_wedge(tc, False)   # m105-miasta T10: start pomiaru = pierwsza doba + 14
-    bb_end = _nwar_wedge(btc, False) if btc else None
-    if a and b and a[0] != b[0]:
-        txt = f"d{a[0]} -> d{b[0]}: skora/skory {a[1]:.2f} -> {b[1]:.2f}, plotno/len {a[2]:.2f} -> {b[2]:.2f} (mediany indeksow z linii 'Rzemioslo miasta (148)')"
-        if bb_end:
-            txt += f"; baza na koniec (d{bb_end[0]}): {bb_end[1]:.2f}, {bb_end[2]:.2f}"
-        ok = (b[1] >= 0.9 * a[1] and b[2] >= 0.9 * a[2]) if has_f7 else None
-        et = bool(bb_end) and ok is False and b[1] >= bb_end[1] and b[2] >= bb_end[2]
-        rep.add("NWAR-15: klin cen wyrobu wobec wsadu (skora/skory, plotno/len) koniec wobec poczatku", txt,
-                ">= 0.9 x poczatek obu par (poczatek = pierwsza doba linii + 14 - m105-miasta T10; fin91 bez paczki: 0.49 -> 0.25, 0.52 -> 0.34); gorzej, ale nie gorzej niz koniec bazy (--baza-doby) - ETAP"
+    # 295 (a): ocena z okien 14 dob (srednia klinow dob) - pojedyncza doba (mediana indeksu z ok. 30 miast z lnem) skacze 0.95-1.75 bez trendu (132a-136a),
+    # dawny prog doba wobec doby dawal NIE w 132a/132c/133a/134a/134b/135a/135b/135c z samego szumu; klin maleje takze wtedy, gdy wsad drozeje, bo rzemioslo
+    # kupuje go wiecej (136a: len 1.11 -> 1.31 przy wyrobie plotna 140 -> 186/d) - to rynek, nie blad: NIE tylko, gdy klin spada i wyrob nie rosnie albo klin < 1.0
+    wa, wb = _nwar_wedge_win(tc, True, 14), _nwar_wedge_win(tc, False)
+    bw_end = _nwar_wedge_win(btc, False) if btc else None
+    if wa and wb and wa[0] < wb[0]:
+        oks, okp = _drobne295_wedge_ok(wa, wb)
+        txt = (f"okna {wa[6]} dob d{wa[0]}-d{wa[1]} -> d{wb[0]}-d{wb[1]}: skora/skory {wa[2]:.2f} -> {wb[2]:.2f} (skora {wa[5]:.0f} -> {wb[5]:.0f}/d), "
+               f"plotno/len {wa[3]:.2f} -> {wb[3]:.2f} (plotno {wa[4]:.0f} -> {wb[4]:.0f}/d)")
+        if a and b:
+            txt += f"; pojedyncze doby (INFO) d{a[0]} -> d{b[0]}: {a[1]:.2f} -> {b[1]:.2f}, {a[2]:.2f} -> {b[2]:.2f}"
+        if bw_end:
+            txt += f"; baza na koniec (okno d{bw_end[0]}-d{bw_end[1]}): {bw_end[2]:.2f}, {bw_end[3]:.2f}"
+        ok = (oks and okp) if has_f7 else None
+        et = bool(bw_end) and ok is False and wb[2] >= bw_end[2] and wb[3] >= bw_end[3]
+        rep.add("NWAR-15: klin cen wyrobu wobec wsadu (skora/skory, plotno/len) koniec wobec poczatku - okna 14 dob", txt,
+                ">= 0.9 x poczatek dla kazdej pary albo (wyrob pary na dobe nie spadl i klin na koniec >= 1.0 - wsad drozeje od popytu rzemiosla; 295) "
+                "(poczatek = pierwsza doba linii + 14 - m105-miasta T10; fin91 bez paczki: 0.49 -> 0.25, 0.52 -> 0.34); gorzej, ale nie gorzej niz koniec bazy (--baza-doby) - ETAP"
                 + ("" if has_f7 else " - INFO bez paczki f7"), ok, etap=et)
+    elif a and b and a[0] != b[0]:
+        rep.add("NWAR-15: klin cen wyrobu wobec wsadu", f"za malo dob na okna {DROBNE295_WEDGE_WIN} dob; pojedyncze doby d{a[0]} -> d{b[0]}: {a[1]:.2f} -> {b[1]:.2f}, {a[2]:.2f} -> {b[2]:.2f}",
+                "INFO (bieg krotszy niz 14 + 2 x 7 dob)", None)
     else:
         rep.add("NWAR-15: klin cen wyrobu wobec wsadu", "za malo linii 'Rzemioslo miasta (148)' z polkami", "INFO", None)
     cyc = _nwar_ws_cycles(ws) if ws else {}
@@ -79129,6 +79174,273 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return karawany294_main(rest[0] if rest else None)
     return _karawany294_main_prev(argv)
+
+# ================================================================ drobne295 (29.10, paczka 295 - Jeff "napraw pozostale bledy")
+# Grupa drobne295: (b) orszaki dworow BK z ludzi wsi (klucz BkRetinueFromVillage, ArmsFromPeople.Retinue295.cs) - linia "Orszaki dworow BK (295)",
+# "w nicosc ... inne" i "z niczego ... inne" linii "Pochodzenie (E4/7)", KONTROLA linii "Wojsko z ludzi (E4/8)" z czlonem rt, orszaki w "niedobor skladow";
+# (a) NWAR-15 z okien 14 dob (_nwar_wedge_win) - ta sama ocena co w grupie nwar. Strumieniowo, tylko odczyt; log bitwy (kilka dob) - wiersze INFO.
+# Recenzja 295: tez orszaki majatkow BK (Estate.Tick / TakeRetinue) i Castle Retinue zamkow (TickCastle) w tej samej linii; log z budowy 295 (KONTROLA E4/8
+# z czlonem " + rt") bez linii 295, bez linii startowej z 4 latkami albo z latka w BRAK - NIE (nie INFO); "z niczego - inne" na dobe z progiem (D295-7).
+DROBNE295_RET = re.compile(r"Orszaki dworow BK \(295\): dzien (\d+) \| klucz (TAK|NIE), ksiega z poborem (TAK|NIE) \| wywolan (\d+) \(pominiete: bitwa, Straz, Inni, nie wies (\d+)\)"
+                           r" \| przyrost BK \+(\d+) \(w tym nowe orszaki z szablonu (\d+)\) = z DOM ([\d.]+) \+ bez DOM \(ulamki, nie do zdjecia\) ([\d.]+) \+ zdjeci \(DOM na podlodze albo bez wolnych rak\) (\d+)"
+                           r" \| ubytek BK -(\d+) do domu \(ta wies ([\d.]+), inne regiony ([\d.]+), bez pochodzenia ([\d.]+), na Mur ([\d.]+)\)"
+                           r" \| majatki BK \(Estate\): wywolan (\d+), przyrost \+(\d+) \(nowe orszaki (\d+)\), do partii pana (\d+) razy, ludzi ([\d.]+) \(bez przeniesienia ([\d.]+)\)"
+                           r" \| zamki BK \(Castle Retinue\): przyrost \+(\d+)"
+                           r" \| potkniecia RetinuePre (\d+), RetinuePost (\d+), EstatePre (\d+), EstatePost (\d+), EstateTake (\d+), CastlePre (\d+), CastlePost (\d+)\.")
+# grupy: 16 wywolan majatkow, 17 przyrost majatkow, 18 nowe orszaki majatkow, 19 TakeRetinue razy, 20 przeniesieni, 21 bez przeniesienia, 22 zamki, 23-29 potkniecia
+DROBNE295_START = "Wojsko z ludzi (E4/8): wpiete: "
+DROBNE295_HOOKS = ("orszaki dworow BK (RetinueComponent.DailyTick, 295)", "orszaki majatkow BK (Estate.Tick, 295)",
+                   "orszak majatku do partii pana (Estate.TakeRetinue, 295)", "orszak zamku BK (BKSettlementBehavior.TickCastle, 295)")
+# ERROR z miejsc 295 (Stumble -> Log.Error "ArmsFromPeople.<miejsce>"): latki, linia doby, wpiecie
+DROBNE295_ERR = (b"ERROR in ArmsFromPeople.Retinue", b"ERROR in ArmsFromPeople.Estate", b"ERROR in ArmsFromPeople.Castle", b"ERROR in ArmsFromPeople.Line(295)",
+                 b"ERROR in ArmsFromPeople.WireRetinue", b"ERROR in ArmsFromPeople.Wire(orsza")
+DROBNE295_POCH = re.compile(r"^Pochodzenie \(E4/7\): dzien (\d+) ")
+DROBNE295_Z = re.compile(r"\| bez nazwy: z niczego \+([\d.]+) \(([^)]*)\), w nicosc -([\d.]+) \(([^)]*)\)")
+DROBNE295_KIND = re.compile(r"(?:^|, |; )inne ([\d.]+)")
+DROBNE295_CUT = re.compile(r"\| niedobor skladow wedlug stanu partii \(diagnostyka P2-T4\): ([^|]*)")
+DROBNE295_E48 = re.compile(r"^Wojsko z ludzi \(E4/8\): dzien (\d+) ")
+DROBNE295_KON = re.compile(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e(?: \+ ob)?( \+ rt)?\) = (-?[\d.]+)")
+DROBNE295_SAMPLE_RET = ("Orszaki dworow BK (295): dzien 109047 | klucz TAK, ksiega z poborem TAK | wywolan 182 (pominiete: bitwa, Straz, Inni, nie wies 3) | przyrost BK +7 "
+                        "(w tym nowe orszaki z szablonu 4) = z DOM 5.5 + bez DOM (ulamki, nie do zdjecia) 0.5 + zdjeci (DOM na podlodze albo bez wolnych rak) 1 | ubytek BK -5 do domu "
+                        "(ta wies 4.2, inne regiony 0.8, bez pochodzenia 0, na Mur 0) | majatki BK (Estate): wywolan 40, przyrost +3 (nowe orszaki 2), do partii pana 1 razy, "
+                        "ludzi 6.0 (bez przeniesienia 0) | zamki BK (Castle Retinue): przyrost +2 | potkniecia RetinuePre 0, RetinuePost 0, EstatePre 0, EstatePost 0, "
+                        "EstateTake 0, CastlePre 0, CastlePost 0.")
+DROBNE295_SAMPLE_START = ("Wojsko z ludzi (E4/8): wpiete: przyrost zalog z modelu (TickGarrisonChangeForTown), orszaki dworow BK (RetinueComponent.DailyTick, 295), "
+                          "orszaki majatkow BK (Estate.Tick, 295), orszak majatku do partii pana (Estate.TakeRetinue, 295), orszak zamku BK (BKSettlementBehavior.TickCastle, 295); "
+                          "BRAK: -; wlasciciele latek celow: ...")
+DROBNE295_SAMPLE_POCH = ("Pochodzenie (E4/7): dzien 109047 | stan: ... | bez nazwy: z niczego +3 (partie rodow 0, zalogi 2, patrole gry 1), w nicosc -5 (partie rodow 0, inne 5; "
+                         "przy zniknieciu partii 0), pula: znani 0.3 | fixA: ... | niedobor skladow wedlug stanu partii (diagnostyka P2-T4): armia 0, w osadzie 5; najwiekszy: "
+                         "Retinue from Fozzo (inne, w osadzie) 1; Retinue from Amycon (inne, w osadzie) 1 | kontrola: ...")
+DROBNE295_SAMPLE_KON = ("Wojsko z ludzi (E4/8): dzien 109047 | ... | KONTROLA: zdjete z DOM przyczynami E4/8 812.4 - (m1 + a1 + c1 + c3 + n1w + n1e + ob + rt) = 0.00 "
+                        "(ob - obroncy wiosek pobocznych 0, rt - orszaki dworow BK (295) 5.5) | potkniecia 0")
+DROBNE295_NOTHING_MAX = 1.0      # D295-2: "w nicosc ... inne" srednio na dobe przy kluczu TAK (136a bez paczki: 4-6/d)
+DROBNE295_FROM_MAX = 1.0         # D295-7: "z niczego ... inne" srednio na dobe przy kluczu TAK (136a bez paczki: 11.01/d - skoki +52/+53 nowych orszakow dworow, +1/d)
+
+
+def drobne295_selftest():
+    bad = []
+    m = DROBNE295_RET.search(DROBNE295_SAMPLE_RET)
+    if not m or m.group(2) != "TAK" or m.group(6) != "7" or m.group(8) != "5.5" or m.group(10) != "1" or m.group(11) != "5" or m.group(16) != "40" \
+            or m.group(17) != "3" or m.group(19) != "1" or m.group(20) != "6.0" or m.group(22) != "2" or m.group(29) != "0":
+        bad.append("linia 295 (ArmsFromPeople.RetinueLine)")
+    st = drobne295_hooks(DROBNE295_SAMPLE_START)
+    if st != (4, 0):
+        bad.append("linia startowa E4/8 - latki 295")
+    if drobne295_hooks(DROBNE295_SAMPLE_START.replace("BRAK: -", "BRAK: orszaki majatkow BK (Estate.Tick, 295)")) != (4, 1):
+        bad.append("linia startowa E4/8 - latka 295 w BRAK")
+    z = DROBNE295_Z.search(DROBNE295_SAMPLE_POCH)
+    if not z or z.group(3) != "5" or DROBNE295_KIND.findall(z.group(4)) != ["5"] or DROBNE295_KIND.findall(z.group(2)):
+        bad.append("bez nazwy E4/7 (PeopleBook.OriginLines)")
+    c = DROBNE295_CUT.search(DROBNE295_SAMPLE_POCH)
+    if not c or c.group(1).count("Retinue from") != 2:
+        bad.append("niedobor skladow (NoteCut)")
+    k = DROBNE295_KON.search(DROBNE295_SAMPLE_KON)
+    if not k or k.group(1) != " + rt" or k.group(2) != "0.00":
+        bad.append("KONTROLA E4/8 z rt")
+    k2 = DROBNE295_KON.search(DROBNE295_SAMPLE_KON.replace(" + rt", ""))
+    if not k2 or k2.group(1) is not None:
+        bad.append("KONTROLA E4/8 bez rt (log sprzed 295)")
+    # regex grupy etap4 (E4/8 N6) musi czytac linie z rt
+    if not re.search(r"\| KONTROLA: zdjete z DOM przyczynami E4/8 [\d.]+ - \(m1 \+ a1 \+ c1 \+ c3 \+ n1w \+ n1e(?: \+ ob)?(?: \+ rt)?\) = ", DROBNE295_SAMPLE_KON):
+        bad.append("E4/8 N6 (etap4) wobec KONTROLI z rt")
+    # NWAR-15 okna: 30 dob, klin plotna maleje przy rosnacym wyrobie - TAK; maleje przy stalym wyrobie - NIE
+    tc = {}
+    for i in range(44):
+        tc[1000 + i] = {"skory": 1.0, "skora": 1.1, "len": 1.0 + 0.01 * i, "plotno": 1.5, "_mk_plotno": 100 + 2 * i, "_mk_skora": 250}
+    a, b = _nwar_wedge_win(tc, True, 14), _nwar_wedge_win(tc, False)
+    if not a or not b or a[0] != 1014 or b[1] != 1043 or a[6] != 14 or _drobne295_wedge_ok(a, b) != (True, True):
+        bad.append("NWAR-15 okna (rosnacy wyrob)")
+    for x in tc:
+        tc[x]["_mk_plotno"] = 200 - (x - 1000)
+    a, b = _nwar_wedge_win(tc, True, 14), _nwar_wedge_win(tc, False)
+    if not a or not b or _drobne295_wedge_ok(a, b)[1] is not False:
+        bad.append("NWAR-15 okna (malejacy wyrob)")
+    return "; ".join(bad) if bad else None
+
+
+def drobne295_hooks(line):
+    """(ile z 4 latek 295 w czesci 'wpiete', ile z nich w czesci 'BRAK')."""
+    i = line.find("; BRAK: ")
+    wired, missing = (line[:i], line[i:]) if i >= 0 else (line, "")
+    j = missing.find("; wlasciciele")
+    missing = missing[:j] if j >= 0 else missing
+    return sum(1 for h in DROBNE295_HOOKS if h in wired), sum(1 for h in DROBNE295_HOOKS if h in missing)
+
+
+def drobne295_collect(logp):
+    D = {"ret": {}, "z": {}, "q": {}, "cut": {}, "kon": {}, "tc": {}, "err": 0, "start": None, "retbad": 0}
+    with open(logp, "rb") as f:
+        for raw in f:
+            if b"Orszaki dworow BK (295)" not in raw and b"Pochodzenie (E4/7): dzien" not in raw and b"Wojsko z ludzi (E4/8): " not in raw \
+                    and b"Rzemioslo miasta (148): dzien" not in raw and not any(e in raw for e in DROBNE295_ERR):
+                continue
+            if any(e in raw for e in DROBNE295_ERR):
+                D["err"] += 1
+                continue
+            s = raw.decode("utf-8", "replace").rstrip("\r\n")
+            s = s[11:] if s.startswith("[") and len(s) > 11 and s[9] == "]" else s
+            if s.startswith(DROBNE295_START):
+                if D["start"] is None:
+                    D["start"] = s
+                continue
+            if s.startswith("Orszaki dworow BK (295)"):
+                m = DROBNE295_RET.search(s)
+                if m:
+                    D["ret"][int(m.group(1))] = m
+                else:
+                    D["retbad"] += 1
+                continue
+            mp = DROBNE295_POCH.match(s)
+            if mp:
+                d = int(mp.group(1))
+                z = DROBNE295_Z.search(s)
+                if z:
+                    D["z"][d] = sum(float(x) for x in DROBNE295_KIND.findall(z.group(2)))
+                    D["q"][d] = sum(float(x) for x in DROBNE295_KIND.findall(z.group(4)))
+                c = DROBNE295_CUT.search(s)
+                if c:
+                    D["cut"][d] = c.group(1).count("Retinue from")
+                continue
+            me = DROBNE295_E48.match(s)
+            if me:
+                k = DROBNE295_KON.search(s)
+                if k:
+                    D["kon"][int(me.group(1))] = (k.group(1) is not None, float(k.group(2)))
+                continue
+            if s.startswith("Rzemioslo miasta (148): dzien "):
+                mm = NWAR_TC.match(s)
+                ms = NWAR_TC_SHELF.search(s) if mm else None
+                if ms:
+                    dd = {}
+                    for part in ms.group(1).split(", "):
+                        pm = NWAR_TC_PART.match(part.strip())
+                        if pm:
+                            dd[pm.group(1)] = float(pm.group(3))
+                    for nm_, rx_ in NWAR_TC_MADE:
+                        mk_ = rx_.search(s)
+                        if mk_:
+                            dd["_mk_" + nm_] = int(mk_.group(1))
+                    D["tc"][int(mm.group(1))] = dd
+    return D
+
+
+def drobne295_rows(rep, D):
+    ret = D["ret"]
+    rd = sorted(ret)
+    on = [d for d in rd if ret[d].group(2) == "TAK" and ret[d].group(3) == "TAK"]
+    b295 = bool(rd) or D["retbad"] > 0 or any(v[0] for v in D["kon"].values())     # budowa 295: linia 295 albo KONTROLA E4/8 z czlonem rt
+    rep.add("D295-0: linia 'Orszaki dworow BK (295)' w kazdej dobie, klucz BkRetinueFromVillage i ksiega z poborem",
+            f"linii {len(rd)} (nieczytelnych {D['retbad']}), z kluczem i poborem {len(on)}" + (f" (d{rd[0]}-d{rd[-1]})" if rd else "") + f"; budowa 295 {'TAK' if b295 else 'NIE'}",
+            "kazda doba z linia E4/8 ma linie 295, 0 nieczytelnych; log sprzed 295 - INFO",
+            (len(rd) > 0 and len(rd) >= len(D["kon"]) - 1 and D["retbad"] == 0) if b295 else None)
+    st = D["start"]
+    if st is not None:
+        w, mi = drobne295_hooks(st)
+        rep.add("D295-6: linia startowa E4/8 - 4 latki 295 wpiete (dwor, majatek Tick, majatek TakeRetinue, zamek)", f"wpiete {w} z 4, w BRAK {mi}",
+                "4 / 0; log sprzed 295 - INFO", (w == 4 and mi == 0) if (b295 or w or mi) else None)
+    else:
+        rep.add("D295-6: linia startowa E4/8 (latki 295)", "brak linii 'Wojsko z ludzi (E4/8): wpiete'", "jest w pierwszej dobie kampanii; log sprzed 295 - INFO",
+                False if b295 else None)
+    if on:
+        calls = sum(int(ret[d].group(4)) for d in on) / len(on)
+        up = sum(int(ret[d].group(6)) for d in on)
+        new = sum(int(ret[d].group(7)) for d in on)
+        got = sum(float(ret[d].group(8)) for d in on)
+        frac = sum(float(ret[d].group(9)) for d in on)
+        strip = sum(int(ret[d].group(10)) for d in on)
+        home = sum(int(ret[d].group(11)) for d in on)
+        hb = [sum(float(ret[d].group(i)) for d in on) for i in (12, 13, 14, 15)]
+        bad = [d for d in on if abs(int(ret[d].group(6)) - (float(ret[d].group(8)) + float(ret[d].group(9)) + int(ret[d].group(10)))) > 1.0]
+        badh = [d for d in on if abs(int(ret[d].group(11)) - sum(float(ret[d].group(i)) for i in (12, 13, 14, 15))) > 1.0]
+        es = [sum(float(ret[d].group(i)) for d in on) for i in (16, 17, 18, 19, 20, 21, 22)]
+        rep.add("D295-1: orszaki - przyrost BK = z DOM + bez DOM + zdjeci, ubytek = do domu (kazda doba)",
+                f"dob {len(on)}, wywolan dworow srednio {calls:.0f}/d; przyrost {up} (nowe orszaki {new}) = z DOM {got:.1f} + bez DOM {frac:.1f} + zdjeci {strip}; ubytek {home} -> "
+                f"ta wies {hb[0]:.1f}, inne regiony {hb[1]:.1f}, bez pochodzenia {hb[2]:.1f}, Mur {hb[3]:.1f}; dob z roznica > 1: {len(bad)} / {len(badh)} | majatki: wywolan "
+                f"srednio {es[0] / len(on):.0f}/d, przyrost {es[1]:.0f} (nowe {es[2]:.0f}), do partii pana {es[3]:.0f} razy / {es[4]:.1f} ludzi (bez przeniesienia {es[5]:.1f}) | "
+                f"zamki Castle Retinue: przyrost {es[6]:.0f}",
+                "0 / 0 dob z roznica; wywolan dworow > 0 (wsie z Dworem BK)", not bad and not badh and calls > 0)
+    else:
+        rep.add("D295-1: orszaki - rachunek linii 295", "brak dob z kluczem i poborem", "INFO (klucz NIE, ksiega bez poboru albo log sprzed 295)" if not b295 else
+                "dni z kluczem i poborem (NIE: budowa 295 bez czytelnej linii)", False if b295 and not rd else None)
+    if b295:
+        stum = sum(sum(int(ret[d].group(i)) for i in range(23, 30)) for d in rd)
+        rep.add("D295-5: potkniecia latek 295 (RetinuePre/Post, EstatePre/Post, EstateTake, CastlePre/Post) i ERROR z miejsc 295", f"potkniec {stum}, ERROR {D['err']}", "0 / 0",
+                stum == 0 and D["err"] == 0)
+    else:
+        rep.add("D295-5: ERROR z miejsc 295", f"ERROR {D['err']}", "0 (log sprzed 295 - INFO)", None if D["err"] == 0 else False)
+    # D295-2: w nicosc / z niczego - inne (linia E4/7), orszaki w niedoborze skladow
+    qd = sorted(D["q"])
+    if qd:
+        sel = [d for d in qd if d in ret and ret[d].group(2) == "TAK" and ret[d].group(3) == "TAK"]
+        base = sel if sel else qd
+        q = sum(D["q"][d] for d in base) / len(base)
+        z = sum(D["z"].get(d, 0.0) for d in base) / len(base)
+        cut = sum(D["cut"].get(d, 0) for d in base)
+        cutd = sum(1 for d in base if D["cut"].get(d, 0) > 0)
+        txt = (f"{'z kluczem 295' if sel else 'bez linii 295'} ({len(base)} dob): w nicosc - inne {q:.2f}/d, z niczego - inne {z:.2f}/d; orszaki 'Retinue from' w 5 najwiekszych "
+               f"niedoborach skladu {cut} razy w {cutd} dobach")
+        rep.add("D295-2: ksiega ludzi - 'w nicosc ... inne' (orszaki dworow BK) na dobe", txt,
+                f"z kluczem: w nicosc - inne <= {DROBNE295_NOTHING_MAX:.0f}/d i 0 dob z orszakiem w niedoborze (136a bez paczki: 4-6/d, orszak co dobe); bez linii 295 - INFO",
+                (q <= DROBNE295_NOTHING_MAX and cutd == 0) if sel else None)
+        zs = sorted(((D["z"].get(d, 0.0), d) for d in base), reverse=True)[:5]
+        rep.add("D295-7: ksiega ludzi - 'z niczego ... inne' (nowe orszaki dworow, majatki +1/d) na dobe",
+                f"{'z kluczem 295' if sel else 'bez linii 295'} ({len(base)} dob): {z:.2f}/d; najwieksze doby: " + ", ".join(f"d{d} {v:.0f}" for v, d in zs),
+                f"z kluczem: <= {DROBNE295_FROM_MAX:.0f}/d (136a bez paczki: 11.01/d, skoki +52/+53); bez linii 295 - INFO",
+                (z <= DROBNE295_FROM_MAX) if sel else None)
+    else:
+        rep.add("D295-2: ksiega ludzi - 'w nicosc ... inne'", "brak linii 'Pochodzenie (E4/7)' z bez nazwy", "INFO (ksiega pochodzenia wylaczona albo log bitwy)", None)
+    # D295-3: KONTROLA E4/8
+    kd = sorted(D["kon"])
+    if kd:
+        rt = sum(1 for d in kd if D["kon"][d][0])
+        mx = max(abs(D["kon"][d][1]) for d in kd)
+        rep.add("D295-3: KONTROLA linii E4/8 z czlonem rt (orszaki) - najwieksza |roznica|", f"{mx:.2f} ({len(kd)} dob, z czlonem rt {rt})",
+                "<= 1 czlowiek kazdej doby; linie 295 maja czlon rt", mx <= 1.0 and (rt == len(kd) or not rd))
+    else:
+        rep.add("D295-3: KONTROLA linii E4/8", "brak linii", "INFO (log bitwy albo LogEnabled wylaczone)", None)
+    # D295-4: NWAR-15 okna 14 dob
+    tc = D["tc"]
+    wa, wb = _nwar_wedge_win(tc, True, 14), _nwar_wedge_win(tc, False)
+    if wa and wb and wa[0] < wb[0]:
+        oks, okp = _drobne295_wedge_ok(wa, wb)
+        rep.add("D295-4: NWAR-15 klin cen (okna 14 dob) - skora/skory i plotno/len",
+                f"d{wa[0]}-d{wa[1]} -> d{wb[0]}-d{wb[1]}: skora/skory {wa[2]:.2f} -> {wb[2]:.2f} (skora {wa[5]:.0f} -> {wb[5]:.0f}/d), plotno/len {wa[3]:.2f} -> {wb[3]:.2f} "
+                f"(plotno {wa[4]:.0f} -> {wb[4]:.0f}/d)", ">= 0.9 x poczatek albo (wyrob na dobe nie spadl i klin >= 1.0) dla kazdej pary (jak NWAR-15 grupy nwar)", oks and okp)
+    else:
+        rep.add("D295-4: NWAR-15 klin cen (okna 14 dob)", f"za malo dob linii 'Rzemioslo miasta (148)' ({len(tc)})", "INFO (bieg krotszy niz 14 + 2 x 7 dob)", None)
+
+
+def drobne295_main(logp):
+    """drobne295 (29.10, paczka 295): D295-S, D295-0..D295-5 - opis w komentarzu nad stalymi DROBNE295_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = drobne295_selftest()
+    rep.add("D295-S: self-test wyrazen (linia 295, linia startowa E4/8, bez nazwy E4/7, niedobor skladow, KONTROLA E4/8 z rt i bez, regex E4/8 N6, NWAR-15 okna)",
+            s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("D295-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = drobne295_collect(logp)
+    print(f"plik: {logp} | linii 295 {len(D['ret'])} (nieczytelnych {D['retbad']}), E4/7 {len(D['q'])}, E4/8 {len(D['kon'])}, 'Rzemioslo miasta (148)' {len(D['tc'])}, "
+          f"linia startowa E4/8 {'TAK' if D['start'] else 'NIE'}, ERROR {D['err']}")
+    drobne295_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_drobne295_main_prev = main
+
+
+def main(argv):
+    # paczka 295: grupa drobne295 - opakowanie main jak zelazo290
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "drobne295":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return drobne295_main(rest[0] if rest else None)
+    return _drobne295_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
