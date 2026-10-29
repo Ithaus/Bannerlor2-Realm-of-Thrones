@@ -365,8 +365,9 @@ namespace Armoury
             var c = Settings.Current;
             d = Demand(st, it) + Substitution(st, it);
             s = Stock(st.ItemRoster, it, isSelling ? 1 : -1) + (isSelling ? 1 : 0);
-            // 299b (klucz PriceFlatterAllItems): cena widzi polke z pamiecia koszyka (ShelfMemory.Eff = Pace x s + (1 - Pace) x M); s zostaje fizyczne - wolajacy licza z niego brak
-            float se = ShelfMemory.Eff(st, it, s);
+            // 299b (klucz PriceFlatterAllItems): cena widzi polke z pamiecia koszyka (ShelfMemory.Eff = Pace x s + (1 - Pace) x M, w granicy rownowagi popytu d);
+            // s zostaje fizyczne - wolajacy licza z niego brak
+            float se = ShelfMemory.Eff(st, it, s, d);
             float f = (float)Math.Pow((d + 1f) / (se + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
             float lo = MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f);
             float hi = Math.Max(1f, c.SupplyDemandMaxFactor);
@@ -473,22 +474,30 @@ namespace Armoury
         /// z k - 1 sztukami tego koszyka dodanymi do polki tylko na czas wyceny (Stock, try/finally) i krzywa gry (RawPrice.GameCurve: bez pamieci polki = 299) albo 299b.
         /// Nie zmienia polki, zlota ani ksiag (_quiet - bez linii handlu gracza i bez sladu w ksiedze skupu). false = osada poza prawem podazy.
         /// </summary>
-        internal static bool ProbeEquipWalk(Settlement st, EquipmentElement el, int[] units, bool gameCurve, int[] prices)
+        internal static bool ProbeEquipWalk(Settlement st, EquipmentElement el, int[] units, bool gameCurve, int[] prices, bool selling = true)
         {
             if (st == null || st.Town == null || st.ItemRoster == null || el.Item == null || MobileParty.MainParty == null || !Prices(st.Party, el.Item)) return false;
+            for (int i = 0; i < units.Length; i++) prices[i] = ProbeEquipAt(st, el, selling ? Math.Max(0, units[i] - 1) : -Math.Max(0, units[i] - 1), selling, gameCurve);
+            return true;
+        }
+
+        /// <summary>
+        /// 299b po recenzji: cena gracza jednej sztuki (sprzedaz albo kupno) tym samym lancuchem co ekran handlu (TownMarketData.GetPrice, partia osady jako kupiec), z virt
+        /// sztukami koszyka dopisanymi do polki (ujemne - zdjete; Stock, try/finally) i krzywa gry (bez pamieci = 299) albo 299b. Kupno k-tej sztuki w wizycie: virt = -(k - 1);
+        /// sprzedaz k-tej: virt = k - 1; odsprzedaz po kupnie n sztuk: virt = -n + (k - 1). Bez zmian polki, zlota i ksiag (_quiet). -1 = osada poza prawem podazy.
+        /// </summary>
+        internal static int ProbeEquipAt(Settlement st, EquipmentElement el, int virt, bool selling, bool gameCurve)
+        {
+            if (st == null || st.Town == null || st.ItemRoster == null || el.Item == null || MobileParty.MainParty == null || !Prices(st.Party, el.Item)) return -1;
             bool q = _quiet, gc = RawPrice.GameCurve;
+            var vs = _virtShelf; int vt = _virtType, vr = _virtTier, vn = _virtN;
             try
             {
                 _quiet = true; RawPrice.GameCurve = gameCurve;
-                var md = st.Town.MarketData;
-                for (int i = 0; i < units.Length; i++)
-                {
-                    _virtShelf = st.ItemRoster; _virtType = (int)el.Item.ItemType; _virtTier = TierOf(el.Item); _virtN = Math.Max(0, units[i] - 1);
-                    prices[i] = md.GetPrice(el, MobileParty.MainParty, true, st.Party);
-                }
-                return true;
+                _virtShelf = virt != 0 ? st.ItemRoster : null; _virtType = (int)el.Item.ItemType; _virtTier = TierOf(el.Item); _virtN = virt;
+                return st.Town.MarketData.GetPrice(el, MobileParty.MainParty, selling, st.Party);
             }
-            finally { _virtShelf = null; _virtN = 0; RawPrice.GameCurve = gc; _quiet = q; }
+            finally { _virtShelf = vs; _virtType = vt; _virtTier = vr; _virtN = vn; RawPrice.GameCurve = gc; _quiet = q; }
         }
 
         /// <summary>299b: mnoznik polki (Factor) z n sztukami koszyka dodanymi do polki na czas wyceny (n ujemne - zdjete) i krzywa gry albo 299b - sonda PriceWalk299b.</summary>
@@ -524,7 +533,13 @@ namespace Armoury
         /// dh z towarem w drodze) przez pamiec koszyka. Klucz wylaczony - (dd + 1) / (dh + 2) jak dotad (bit w bit).</summary>
         internal static float DstShelf(Settlement dst, ItemObject probe, float dd, int dh, float elast, float lo, float hi)
         {
-            return MBMath.ClampFloat((float)Math.Pow((dd + 1f) / (ShelfMemory.Eff(dst, probe, dh + 1) + 1f), elast), lo, hi);
+            return DstShelfRow(ShelfMemory.Row(dst), ShelfMemory.Slot(probe), (float)RawPrice.Pace, dd, dh, elast, lo, hi);
+        }
+
+        /// <summary>299b po recenzji (koszt wywozu): to samo z wierszem pamieci celu i tempem rozwiazanymi raz (TradeExportMemo) - ta sama funkcja w obu drogach R9.</summary>
+        internal static float DstShelfRow(float[] row, int slot, float p, float dd, int dh, float elast, float lo, float hi)
+        {
+            return MBMath.ClampFloat((float)Math.Pow((dd + 1f) / (ShelfMemory.EffRow(row, slot, p, dh + 1, dd) + 1f), elast), lo, hi);
         }
 
         /// <summary>Postfix na GetPrice kazdego modelu cen - po MarketGlut (rejestrowany pozniej).</summary>
@@ -720,8 +735,9 @@ namespace Armoury
                         float surplus = have - srcD;
                         if (surplus <= 0f) continue;
                         int toShip = (int)Math.Ceiling(surplus * share);
-                        // 299b: mnoznik polki zrodla (strona kupna, bez + 1) przez pamiec koszyka; nadwyzka i toShip - polka fizyczna
-                        float srcFactor = (float)Math.Pow(((fast ? srcD : Demand(src, probe)) + 1f) / (ShelfMemory.Eff(src, probe, have) + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
+                        // 299b: mnoznik polki zrodla (strona kupna, bez + 1) przez pamiec koszyka w granicy rownowagi; nadwyzka i toShip - polka fizyczna
+                        float srcDem = fast ? srcD : Demand(src, probe);
+                        float srcFactor = (float)Math.Pow((srcDem + 1f) / (ShelfMemory.Eff(src, probe, have, srcDem) + 1f), MBMath.ClampFloat(c.SupplyDemandElasticity, 0.05f, 2f));
                         srcFactor = MBMath.ClampFloat(srcFactor, MBMath.ClampFloat(c.SupplyDemandMinFactor, 0.01f, 1f), 1f);
                         var srcPos = src.GetPosition2D;
                         var poor = new HashSet<Settlement>();   // odbiorcy bez zlota - do konca tego przebiegu

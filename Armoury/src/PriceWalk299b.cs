@@ -16,7 +16,10 @@ namespace Armoury
     /// Regula: RawPrice (tempo pamieci podazy rynku, wagi 0.14 x tempo) i ShelfMemory (pamiec polki sprzetu). Tu tylko pomiar, raz na dobe pomiaru (LogGate.Lines, zaraz po
     /// linii "Ceny na sztuke (299)"): samotest czynnego modelu ekonomii, liczniki wygladzania, stan pamieci polek, krok ceny sprzetu 299 (bez pamieci - krzywa gry
     /// RawPrice.GameCurve) wobec 299b przy TYM SAMYM stanie, poziom przy M = S, kupno i odsprzedaz w jednej wizycie, petla opozniona gracza na sprzecie i towarach, przyklady
-    /// cen gracza w Riverrun. Czysty rachunek: zadnej zmiany polki, pamieci, podazy, popytu ani zlota. Linie czyta grupa ceny299 w tools/sprawdz_logi.py (C299-12..18).
+    /// cen gracza w Riverrun. Po recenzji: stosunek 20. sztuki osobno dla polek 0-3 / >= 4 i koszykow na granicy rownowagi (ShelfMemory.Bound), w jednej wizycie cenami
+    /// gracza (GetPrice, kup do 3 i odsprzedaj, takze M != S), petle osobno dla koni, petla odwrotna (kup, odsprzedaj po 21 dobach), kurs miedzy miastami (kup 20 w
+    /// najtanszym, sprzedaj 20 w najdrozszym) i przesyt koszykow. Czysty rachunek: zadnej zmiany polki, pamieci, podazy, popytu ani zlota. Linie czyta grupa ceny299
+    /// w tools/sprawdz_logi.py (C299-12..19).
     /// </summary>
     internal static class PriceWalk299b
     {
@@ -84,9 +87,14 @@ namespace Armoury
 
                 // 3. koszyki sprzetu: krok ceny 299 (bez pamieci) wobec 299b przy tym samym stanie
                 var d5a = new List<float>(); var d20a = new List<float>(); var d5b = new List<float>(); var d20b = new List<float>(); var q20 = new List<float>(); var first = new List<float>();
-                var loopA = new List<float>(); var loopB = new List<float>();
-                int cellsEq = 0, levelK = 0, levelAll = 0, levelBad = 0, inPlace = 0, inPlaceBad = 0, profA = 0, profB = 0;
+                var q20lo = new List<float>(); var q20hi = new List<float>(); var offLv = new List<float>();
+                var loopA = new List<float>(); var loopB = new List<float>(); var loopAh = new List<float>(); var loopBh = new List<float>();
+                var revA = new List<float>(); var revB = new List<float>(); var revAh = new List<float>(); var revBh = new List<float>();
+                int cellsEq = 0, levelK = 0, levelAll = 0, levelBad = 0, inPlace = 0, inPlaceBad = 0, inOff = 0, inOffBad = 0, profA = 0, profB = 0, profAh = 0, profBh = 0;
+                int revPA = 0, revPB = 0, revPAh = 0, revPBh = 0, capN = 0, glutN = 0; double glutPieces = 0;
                 int n = ShelfMemory.Slots; var counts = new int[n]; var sample = new ItemObject[n];
+                // kurs miedzy miastami (recenzja 299b): na koszyk miasto najtansze do kupna 20 szt. (polka >= 20) i najdrozsze do sprzedazy pierwszej sztuki
+                var srcSt = new Settlement[n]; var srcIt = new ItemObject[n]; var srcF = new float[n]; var dstSt = new Settlement[n]; var dstF = new float[n];
                 double keep21 = Math.Pow(1.0 - pace, 21);
                 foreach (var st in Settlement.All)
                 {
@@ -115,42 +123,77 @@ namespace Armoury
                                 int slot = (int)ty * 8 + tier;
                                 if (slot < 0 || slot >= n) continue;
                                 float D = SupplyDemand.Demand(st, ty, tier);
-                                if (!(D >= 1f)) continue;
                                 float S = counts[slot];
-                                float M = ShelfMemory.M(st, ty, tier);
-                                if (float.IsNaN(M)) M = S;
+                                float M0 = ShelfMemory.M(st, ty, tier);
+                                bool memOn = all && !float.IsNaN(M0);
+                                float M = memOn ? M0 : S;
+                                if (S > 2f * Math.Max(0f, D) + 2f) { glutN++; glutPieces += S - (2f * Math.Max(0f, D) + 2f); }
+                                var it = sample[slot];
+                                // kurs miedzy miastami: zrodlo (miasto, polka >= 20, takze popyt < 1 - przesyt bez popytu jest najtanszy)
+                                if (st.IsTown && it != null && S >= 20f)
+                                {
+                                    float fb0 = MBMath.ClampFloat((float)Math.Pow((Math.Max(0f, D) + 1f) / (ShelfMemory.Eff(st, ty, tier, S, D) + 1f), e), lo, hi);
+                                    if (srcSt[slot] == null || fb0 < srcF[slot]) { srcSt[slot] = st; srcIt[slot] = it; srcF[slot] = fb0; }
+                                }
+                                if (!(D >= 1f)) continue;
+                                if (st.IsTown)
+                                {
+                                    float fs0 = MBMath.ClampFloat((float)Math.Pow((D + 1f) / (ShelfMemory.Eff(st, ty, tier, S + 1f, D) + 1f), e), lo, hi);
+                                    if (dstSt[slot] == null || fs0 > dstF[slot]) { dstSt[slot] = st; dstF[slot] = fs0; }
+                                }
                                 cellsEq++;
                                 float a1 = (float)Math.Pow((D + 1f) / (S + 2f), e), a5 = (float)Math.Pow((D + 1f) / (S + 6f), e), a20 = (float)Math.Pow((D + 1f) / (S + 21f), e);
-                                float b1 = (float)Math.Pow((D + 1f) / (ShelfMemory.Eff(st, ty, tier, S + 1f) + 1f), e);
-                                float b5 = (float)Math.Pow((D + 1f) / (ShelfMemory.Eff(st, ty, tier, S + 5f) + 1f), e);
-                                float b20 = (float)Math.Pow((D + 1f) / (ShelfMemory.Eff(st, ty, tier, S + 20f) + 1f), e);
+                                float b1 = (float)Math.Pow((D + 1f) / (ShelfMemory.Eff(st, ty, tier, S + 1f, D) + 1f), e);
+                                float b5 = (float)Math.Pow((D + 1f) / (ShelfMemory.Eff(st, ty, tier, S + 5f, D) + 1f), e);
+                                float e20 = ShelfMemory.Eff(st, ty, tier, S + 20f, D);
+                                float b20 = (float)Math.Pow((D + 1f) / (e20 + 1f), e);
                                 float da5 = 1f - a5 / a1, da20 = 1f - a20 / a1, db5 = 1f - b5 / b1, db20 = 1f - b20 / b1;
                                 d5a.Add(da5); d20a.Add(da20); d5b.Add(db5); d20b.Add(db20);
-                                if (da20 >= 0.005f) q20.Add(db20 / da20);
+                                // granica rownowagi przy 20. sztuce: polka z pamiecia podniesiona do popytu (20. sztuka po cenie rownowagi, mnoznik 1)
+                                bool capped = memOn && Math.Abs(e20 - ShelfMemory.Blend(p, S + 20f, M)) > 1e-4f;
+                                if (capped) capN++;
+                                if (da20 >= 0.005f)
+                                {
+                                    q20.Add(db20 / da20);
+                                    if (!capped) (S <= 3f ? q20lo : q20hi).Add(db20 / da20);
+                                }
                                 first.Add(b1 / a1);
-                                // poziom przy M = S: kupno (polka bez + 1) przez pamiec = bez pamieci
+                                // poziom przy M = S (sprawdzenie drogi kodu: kupno przez pamiec = bez pamieci) i przesuniecie ceny kupna przy |M - S| >= 1
                                 if (Math.Abs(M - S) < 0.005f)
                                 {
                                     levelAll++;
-                                    if (Math.Abs(ShelfMemory.Eff(st, ty, tier, S) - S) <= 1e-3f) levelK++; else levelBad++;
+                                    if (Math.Abs(ShelfMemory.Eff(st, ty, tier, S, D) - S) <= 1e-3f) levelK++; else levelBad++;
                                 }
-                                var it = sample[slot];
-                                if (it == null || S < 1f) continue;
-                                // w miejscu: kupno sztuki (polka S), potem odsprzedaz tej samej (polka S - 1 + 1) - prawdziwy Factor z sztuka sondy
-                                float dd; int sh;
-                                float fb = SupplyDemand.FactorProbe(st, it, false, 0, false, out dd, out sh);
-                                float fs = SupplyDemand.FactorProbe(st, it, true, -1, false, out dd, out sh);
-                                inPlace++;
-                                if (fs > fb + 1e-5f) inPlaceBad++;
-                                // petla opozniona gracza (miasta, koszyki >= 3 szt.): sprzedaj 20 teraz, odkup 20 po 21 dobach, polka bez odplywu (S + 20), z marza i kara (ceny gracza)
-                                if (!st.IsTown || S < 3f) continue;
+                                else if (memOn && Math.Abs(M - S) >= 1f)
+                                    offLv.Add((float)Math.Pow((S + 1f) / (ShelfMemory.Eff(st, ty, tier, S, D) + 1f), e));
+                                if (it == null || S < 1f || !st.IsTown) continue;
                                 var el0 = new EquipmentElement(it);
+                                // w jednej wizycie, ceny gracza (GetPrice, krzywa 299b): kup do 3 sztuk, potem odsprzedaj te same - wszystkie koszyki, takze M != S
+                                int nv = Math.Min(3, (int)S);
+                                long bSum = 0, sSum = 0; bool okv = true;
+                                for (int k = 1; k <= nv && okv; k++)
+                                {
+                                    int pbk = SupplyDemand.ProbeEquipAt(st, el0, -(k - 1), false, false);
+                                    int psk = SupplyDemand.ProbeEquipAt(st, el0, -nv + (k - 1), true, false);
+                                    if (pbk < 0 || psk < 0) okv = false;
+                                    bSum += pbk; sSum += psk;
+                                }
+                                if (okv)
+                                {
+                                    inPlace++;
+                                    if (sSum > bSum) inPlaceBad++;
+                                    if (memOn && Math.Abs(M - S) >= 1f) { inOff++; if (sSum > bSum) inOffBad++; }
+                                }
+                                // petle opoznione gracza (miasta, koszyki >= 3 szt.), z marza i kara (ceny gracza): (a) sprzedaj 20 teraz, odkup 20 po 21 dobach, polka bez
+                                // odplywu (S + 20); (b) odwrotna: kup do 20 teraz, odsprzedaj po 21 dobach, polka bez doplywu (S - N)
+                                if (S < 3f) continue;
                                 int pb, ps;
                                 if (!SupplyDemand.ProbeBuySell(st, el0, true, out pb, out ps) || pb <= 0) continue;
                                 float dA; int sA;
                                 float fbA = SupplyDemand.FactorProbe(st, it, false, 0, true, out dA, out sA), fsA = SupplyDemand.FactorProbe(st, it, true, 0, true, out dA, out sA);
                                 if (!(fbA > 0f) || !(fsA > 0f)) continue;
                                 double rho = (ps / (double)fsA) / (pb / (double)fbA);
+                                bool horse = ty == ItemObject.ItemTypeEnum.Horse;
                                 double sa = 0, ba = 0, sb2 = 0, bb = 0;
                                 float M21 = (float)((S + 20f) + (M - (S + 20f)) * keep21);
                                 for (int k = 1; k <= 20; k++)
@@ -158,7 +201,8 @@ namespace Armoury
                                     float sDir = S + k, bDir = S + 21 - k;
                                     sa += MBMath.ClampFloat((float)Math.Pow((dA + 1f) / (sDir + 1f), e), lo, hi);
                                     ba += MBMath.ClampFloat((float)Math.Pow((dA + 1f) / (bDir + 1f), e), lo, hi);
-                                    float sE = all ? ShelfMemory.Blend(p, sDir, M) : sDir, bE = all ? ShelfMemory.Blend(p, bDir, M21) : bDir;
+                                    float sE = memOn ? ShelfMemory.Bound(ShelfMemory.Blend(p, sDir, M), sDir, dA) : sDir;
+                                    float bE = memOn ? ShelfMemory.Bound(ShelfMemory.Blend(p, bDir, M21), bDir, dA) : bDir;
                                     sb2 += MBMath.ClampFloat((float)Math.Pow((dA + 1f) / (sE + 1f), e), lo, hi);
                                     bb += MBMath.ClampFloat((float)Math.Pow((dA + 1f) / (bE + 1f), e), lo, hi);
                                 }
@@ -168,11 +212,79 @@ namespace Armoury
                                     loopA.Add(ga); loopB.Add(gb);
                                     if (ga > 0f) profA++;
                                     if (gb > 0f) profB++;
+                                    if (horse) { loopAh.Add(ga); loopBh.Add(gb); if (ga > 0f) profAh++; if (gb > 0f) profBh++; }
+                                }
+                                int nr = Math.Min(20, (int)S);
+                                float low = S - nr;
+                                float M21r = (float)(low + (M - low) * keep21);
+                                double rsa = 0, rba = 0, rsb = 0, rbb = 0;
+                                for (int k = 1; k <= nr; k++)
+                                {
+                                    float bDir = S - (k - 1), sDir = low + k;
+                                    rba += MBMath.ClampFloat((float)Math.Pow((dA + 1f) / (bDir + 1f), e), lo, hi);
+                                    rsa += MBMath.ClampFloat((float)Math.Pow((dA + 1f) / (sDir + 1f), e), lo, hi);
+                                    float bE = memOn ? ShelfMemory.Bound(ShelfMemory.Blend(p, bDir, M), bDir, dA) : bDir;
+                                    float sE = memOn ? ShelfMemory.Bound(ShelfMemory.Blend(p, sDir, M21r), sDir, dA) : sDir;
+                                    rbb += MBMath.ClampFloat((float)Math.Pow((dA + 1f) / (bE + 1f), e), lo, hi);
+                                    rsb += MBMath.ClampFloat((float)Math.Pow((dA + 1f) / (sE + 1f), e), lo, hi);
+                                }
+                                if (rba > 0 && rbb > 0)
+                                {
+                                    float ra = (float)(rho * rsa / rba - 1.0), rb = (float)(rho * rsb / rbb - 1.0);
+                                    revA.Add(ra); revB.Add(rb);
+                                    if (ra > 0f) revPA++;
+                                    if (rb > 0f) revPB++;
+                                    if (horse) { revAh.Add(ra); revBh.Add(rb); if (ra > 0f) revPAh++; if (rb > 0f) revPBh++; }
                                 }
                             }
                             catch (Exception ex) { Cell(ref stumbles, "koszyk", ex); }
                         }
                     }
+                }
+
+                // 3b. kurs miedzy miastami (gracz, ceny GetPrice): kup 20 w najtanszym miescie koszyka, sprzedaj 20 w najdrozszym, bez kosztu drogi i czasu (gorna granica);
+                // pelny kurs tylko dla koszykow, gdzie pierwsza sztuka sprzedana da co najmniej 0.8 ceny kupna (299 albo 299b) - inne nie maja szans
+                var runA = new List<float>(); var runB = new List<float>(); var goldA = new List<float>(); var goldB = new List<float>();
+                int runCells = 0, runChecked = 0, runPA = 0, runPB = 0, runPAh = 0, runPBh = 0, runHorse = 0;
+                float runMaxA = float.NaN, runMaxB = float.NaN, runMaxAh = float.NaN, runMaxBh = float.NaN;
+                for (int slot = 0; slot < n; slot++)
+                {
+                    if (srcSt[slot] == null || dstSt[slot] == null || ReferenceEquals(srcSt[slot], dstSt[slot])) continue;
+                    runCells++;
+                    try
+                    {
+                        var el = new EquipmentElement(srcIt[slot]);
+                        bool horse = srcIt[slot].ItemType == ItemObject.ItemTypeEnum.Horse;
+                        int b1a = SupplyDemand.ProbeEquipAt(srcSt[slot], el, 0, false, true), s1a = SupplyDemand.ProbeEquipAt(dstSt[slot], el, 0, true, true);
+                        int b1b = SupplyDemand.ProbeEquipAt(srcSt[slot], el, 0, false, false), s1b = SupplyDemand.ProbeEquipAt(dstSt[slot], el, 0, true, false);
+                        if (b1a <= 0 || b1b <= 0 || s1a < 0 || s1b < 0) continue;
+                        if (s1a < 0.8f * b1a && s1b < 0.8f * b1b) continue;
+                        long ba = 0, sa = 0, bb = 0, sb = 0; bool ok = true;
+                        for (int k = 1; k <= 20 && ok; k++)
+                        {
+                            int x1 = SupplyDemand.ProbeEquipAt(srcSt[slot], el, -(k - 1), false, true), x2 = SupplyDemand.ProbeEquipAt(dstSt[slot], el, k - 1, true, true);
+                            int y1 = SupplyDemand.ProbeEquipAt(srcSt[slot], el, -(k - 1), false, false), y2 = SupplyDemand.ProbeEquipAt(dstSt[slot], el, k - 1, true, false);
+                            if (x1 < 0 || x2 < 0 || y1 < 0 || y2 < 0) ok = false;
+                            ba += x1; sa += x2; bb += y1; sb += y2;
+                        }
+                        if (!ok || ba <= 0 || bb <= 0) continue;
+                        runChecked++;
+                        float ga = (float)(sa / (double)ba - 1.0), gb = (float)(sb / (double)bb - 1.0);
+                        runA.Add(ga); runB.Add(gb);
+                        if (ga > 0f) { runPA++; goldA.Add(sa - ba); }
+                        if (gb > 0f) { runPB++; goldB.Add(sb - bb); }
+                        if (float.IsNaN(runMaxA) || ga > runMaxA) runMaxA = ga;
+                        if (float.IsNaN(runMaxB) || gb > runMaxB) runMaxB = gb;
+                        if (horse)
+                        {
+                            runHorse++;
+                            if (ga > 0f) runPAh++;
+                            if (gb > 0f) runPBh++;
+                            if (float.IsNaN(runMaxAh) || ga > runMaxAh) runMaxAh = ga;
+                            if (float.IsNaN(runMaxBh) || gb > runMaxBh) runMaxBh = gb;
+                        }
+                    }
+                    catch (Exception ex) { Cell(ref stumbles, "kurs", ex); }
                 }
 
                 // 4. towary handlowe: petla 30 szt. (sprzedaj teraz, odkup po 21 dobach, brutto) - gra w tempie 0.15, nasza krzywa w tempie Pace; polki >= 3 dob
@@ -228,11 +340,25 @@ namespace Armoury
                          + " (srednio " + ShelfMemory.DAvg.ToString("0.00", Inv) + ", max " + ShelfMemory.DMax.ToString("0.00", Inv) + "), zapis " + saveLen + " znakow, z zapisu " + ShelfMemory.LoadReport()
                          + " | sprzedaz sztuki 5 / 20 wobec 1 (mnoznik polki, koszyki z popytem >= 1 bez granic, " + cellsEq + "): mediana 299 " + P(Q(d5a, 0.5)) + "% / " + P(Q(d20a, 0.5))
                          + "% -> 299b " + P(Q(d5b, 0.5)) + "% / " + P(Q(d20b, 0.5)) + "%, stosunek 20 szt. " + R(Q(q20, 0.5), "0.000")
+                         + " (bez granicy rownowagi: polki 0-3 " + R(Q(q20lo, 0.5), "0.000") + " z " + q20lo.Count + ", polki >= 4 " + R(Q(q20hi, 0.5), "0.000") + " z " + q20hi.Count
+                         + "; 20. sztuka na granicy rownowagi " + capN + ")"
                          + " | pierwsza sprzedana sztuka 299b/299 mediana " + R(Q(first, 0.5), "0.000")
-                         + " | poziom przy M = S: kupno 299b = 299 w " + levelK + " z " + levelAll + " (rozjazdow " + levelBad + ")"
-                         + " | w miejscu: sprzedaz po kupnie drozej niz kupno " + inPlaceBad + " z " + inPlace
+                         + " | poziom przy M = S: kupno 299b = 299 w " + levelK + " z " + levelAll + " (rozjazdow " + levelBad + "); przy |M-S| >= 1 (" + offLv.Count + "): kupno 299b/299 mediana "
+                         + R(Q(offLv, 0.5), "0.000") + ", p10 " + R(Q(offLv, 0.1), "0.000") + ", p90 " + R(Q(offLv, 0.9), "0.000")
+                         + " | w jednej wizycie (ceny gracza, kup do 3 szt. i odsprzedaj): sprzedaz drozej niz kupno " + inPlaceBad + " z " + inPlace + ", przy |M-S| >= 1: " + inOffBad + " z " + inOff
                          + " | petla opozniona sprzet (gracz, sprzedaj 20, odkup 20 po 21 dobach, bez odplywu, z marza i kara) koszyki >= 3 szt. (" + loopA.Count + "): mediana 299 "
                          + P(Q(loopA, 0.5)) + "% -> 299b " + P(Q(loopB, 0.5)) + "%, p90 299 " + P(Q(loopA, 0.9)) + "% -> 299b " + P(Q(loopB, 0.9)) + "%, zyskownych " + profA + " -> " + profB
+                         + "; konie (" + loopAh.Count + "): mediana 299 " + P(Q(loopAh, 0.5)) + "% -> 299b " + P(Q(loopBh, 0.5)) + "%, p90 299 " + P(Q(loopAh, 0.9)) + "% -> 299b "
+                         + P(Q(loopBh, 0.9)) + "%, zyskownych " + profAh + " -> " + profBh
+                         + " | petla odwrotna (gracz, kup do 20, odsprzedaj po 21 dobach, bez doplywu, z marza i kara) koszyki >= 3 szt. (" + revA.Count + "): mediana 299 "
+                         + P(Q(revA, 0.5)) + "% -> 299b " + P(Q(revB, 0.5)) + "%, p90 299 " + P(Q(revA, 0.9)) + "% -> 299b " + P(Q(revB, 0.9)) + "%, zyskownych " + revPA + " -> " + revPB
+                         + "; konie (" + revAh.Count + "): mediana 299 " + P(Q(revAh, 0.5)) + "% -> 299b " + P(Q(revBh, 0.5)) + "%, p90 299 " + P(Q(revAh, 0.9)) + "% -> 299b "
+                         + P(Q(revBh, 0.9)) + "%, zyskownych " + revPAh + " -> " + revPBh
+                         + " | miedzy miastami (gracz, kup 20 w najtanszym miescie, sprzedaj 20 w najdrozszym, bez kosztu drogi) koszykow " + runCells + ", sprawdzonych " + runChecked
+                         + ": zyskownych 299 " + runPA + " -> 299b " + runPB + ", mediana 299 " + P(Q(runA, 0.5)) + "% -> 299b " + P(Q(runB, 0.5)) + "%, max 299 " + P(runMaxA) + "% -> 299b "
+                         + P(runMaxB) + "%, zl na kurs (mediana zyskownych) 299 " + R(Q(goldA, 0.5), "0") + " -> 299b " + R(Q(goldB, 0.5), "0") + "; konie (" + runHorse + "): zyskownych "
+                         + runPAh + " -> " + runPBh + ", max 299 " + P(runMaxAh) + "% -> 299b " + P(runMaxBh) + "%"
+                         + " | przesyt (polka > 2 x popyt + 2, wszystkie koszyki): koszykow " + glutN + ", sztuk ponad " + glutPieces.ToString("0", Inv)
                          + " | towary: petla 30 szt. po 21 dobach (" + goodsG.Count + ") mediana gra " + P(Q(goodsG, 0.5)) + "% -> 299b " + P(Q(goodsN, 0.5)) + "%"
                          + " | przyklady (gracz, zl za sztuke 1/5/20, 299 -> 299b): " + ex2
                          + " | potkniecia " + stumbles + ".");

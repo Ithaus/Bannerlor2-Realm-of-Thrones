@@ -81604,10 +81604,19 @@ def z290_selftest():
 #          ((1 - sqrt((1 + p) / (1 + 20 p))) / (1 - sqrt(2 / 21)), elastycznosc 0.5: 0.44 przy p = 0.06; polka 17 przy popycie 22: 0.10) - POPRAWKA PROJEKTU: projekt
 #          [0.05, 0.30] liczyl polki zapelnione, a mediana koszykow z popytem >= 1 ma czesto polke 0-3; C299-14b spadek 5. sztuki 299b INFO;
 #          C299-14c pierwsza sprzedana sztuka 299b/299 (mediana dob) w [1.00, sqrt(2 / (1 + p)) + 0.01] (1.37 przy pustej polce - projekt [1.00, 1.10] tylko dla polek zapelnionych)
-# C299-15  kazda doba: 'rozjazdow 0' (kupno przy M = S bez zmian) i 'sprzedaz po kupnie drozej niz kupno 0' (w jednej wizycie)
-# C299-16  koszykow w pamieci > 0 kazdej doby z kluczem sprzetu TAK, potkniecia 0, ERROR ShelfMemory / PriceWalk299b / SupplyPacePostfix / arm_shelfmem 0; zapis - INFO
+#          POPRAWKA PO RECENZJI 299b (granica rownowagi ShelfMemory.Bound - 20. sztuka sprzedana ponad popyt idzie po cenie rownowagi): C299-14 liczy koszyki bez granicy
+#          przy 20. sztuce i polce >= 4 w [0.05, 0.30] (projekt); C299-14a polki 0-3 bez granicy w [0.05, g + 0.05]; stosunek wszystkich koszykow - INFO w C299-14
+# C299-15  kazda doba: w jednej wizycie cenami gracza (GetPrice: kup do 3 szt., odsprzedaj te same; wszystkie koszyki miast, takze M != S) sprzedaz drozej niz kupno 0,
+#          ocen > 0; przesuniecie ceny kupna przy |M-S| >= 1 - INFO (recenzja: dawny licznik porownywal Factor sam ze soba)
+# C299-16  koszykow w pamieci > 0 kazdej doby z kluczem sprzetu TAK, potkniecia 0, ERROR ShelfMemory / PriceWalk299b / SupplyPacePostfix / arm_shelfmem 0, 'rozjazdow 0'
+#          (droga kodu: kupno przez pamiec przy M = S = bez pamieci); zapis - INFO
 # C299-17  petla opozniona gracza na sprzecie (sprzedaj 20, odkup 20 po 21 dobach, bez odplywu, z marza i kara), mediana dob: 299b mediana <= 0%, p90 <= +5%
-#          (NIE = nastepny krok: blokada odkupienia 7 dob karawan AI takze dla gracza)
+#          (NIE = nastepny krok: blokada odkupienia 7 dob karawan AI takze dla gracza); C299-17h to samo tylko konie (sprzedaz konia z wartosci / (1 + kara), ok. 0.5
+#          kupna - kara BK broni i zbroi nie zaslania); C299-17r petla odwrotna (kup do 20, odsprzedaj po 21 dobach, bez doplywu) wszystkie i konie - te same progi;
+#          C299-17t kurs miedzy miastami (kup 20 w najtanszym, sprzedaj 20 w najdrozszym, bez drogi - gorna granica) - INFO: to handel miedzy rynkami, poziom cen miast
+#          (przesyt Riverrun koni t4 66 / 5.4 = x0.31) daje zysk juz w 299 na pierwszych sztukach
+# C299-19  warsztaty i polki sprzetu wobec 298a ('Uzbrojenie wedlug zrodla (E6/0)', mediany ostatnich 30 dob): zrodla warsztaty + strzelarze <= 1.3 x 1447.5 szt./d,
+#          polki i schowki osad <= 1.3 x 199907 szt. (recenzja: warsztaty widza cene z pamiecia - przesyt koszykow); przesyt z linii 299b - INFO
 # C299-18  skutki uboczne wobec 298a (m113/logi/298a-probyN/Armoury-2026-10-29_18-53-39.log): wywoz kupcow (E8/O3 'wywoz tej doby') mediana ostatnich 30 dob
 #          w [0.5, 1.5] x 2760 szt./d; C299-18b 'Skup sprzetu (doba)' zaplacono razem - mediana dob <= 1.5 x 42212 zl; C299-18c dlugosc zapisu INFO
 CENY299_L = "Ceny na sztuke (299): dzien "
@@ -81747,11 +81756,25 @@ CENY299B_RE = re.compile(
     r"(?P<msave>\d+) znakow, z zapisu (?P<mload>.*?)"
     r" \| sprzedaz sztuki 5 / 20 wobec 1 \(mnoznik polki, koszyki z popytem >= 1 bez granic, (?P<qn>\d+)\): mediana 299 (?P<a5>" + _N9 + r")% / (?P<a20>" + _N9
     + r")% -> 299b (?P<b5>" + _N9 + r")% / (?P<b20>" + _N9 + r")%, stosunek 20 szt\. (?P<q20>" + _N9 + r")"
+    r" \(bez granicy rownowagi: polki 0-3 (?P<q20lo>" + _N9 + r") z (?P<nlo>\d+), polki >= 4 (?P<q20hi>" + _N9 + r") z (?P<nhi>\d+); 20\. sztuka na granicy rownowagi "
+    r"(?P<cap>\d+)\)"
     r" \| pierwsza sprzedana sztuka 299b/299 mediana (?P<fst>" + _N9 + r")"
-    r" \| poziom przy M = S: kupno 299b = 299 w (?P<lk>\d+) z (?P<la>\d+) \(rozjazdow (?P<lb>\d+)\)"
-    r" \| w miejscu: sprzedaz po kupnie drozej niz kupno (?P<ipb>\d+) z (?P<ip>\d+)"
+    r" \| poziom przy M = S: kupno 299b = 299 w (?P<lk>\d+) z (?P<la>\d+) \(rozjazdow (?P<lb>\d+)\); przy \|M-S\| >= 1 \((?P<offn>\d+)\): kupno 299b/299 mediana "
+    r"(?P<off5>" + _N9 + r"), p10 (?P<off1>" + _N9 + r"), p90 (?P<off9>" + _N9 + r")"
+    r" \| w jednej wizycie \(ceny gracza, kup do 3 szt\. i odsprzedaj\): sprzedaz drozej niz kupno (?P<ipb>\d+) z (?P<ip>\d+), przy \|M-S\| >= 1: (?P<iob>\d+) z (?P<io>\d+)"
     r" \| petla opozniona sprzet \(gracz, sprzedaj 20, odkup 20 po 21 dobach, bez odplywu, z marza i kara\) koszyki >= 3 szt\. \((?P<ln>\d+)\): mediana 299 (?P<lpa>"
     + _N9 + r")% -> 299b (?P<lpb>" + _N9 + r")%, p90 299 (?P<lpa9>" + _N9 + r")% -> 299b (?P<lpb9>" + _N9 + r")%, zyskownych (?P<pa>\d+) -> (?P<pb>\d+)"
+    r"; konie \((?P<lhn>\d+)\): mediana 299 (?P<lha>" + _N9 + r")% -> 299b (?P<lhb>" + _N9 + r")%, p90 299 (?P<lha9>" + _N9 + r")% -> 299b (?P<lhb9>" + _N9
+    + r")%, zyskownych (?P<pha>\d+) -> (?P<phb>\d+)"
+    r" \| petla odwrotna \(gracz, kup do 20, odsprzedaj po 21 dobach, bez doplywu, z marza i kara\) koszyki >= 3 szt\. \((?P<rn>\d+)\): mediana 299 (?P<ra>" + _N9
+    + r")% -> 299b (?P<rb>" + _N9 + r")%, p90 299 (?P<ra9>" + _N9 + r")% -> 299b (?P<rb9>" + _N9 + r")%, zyskownych (?P<rpa>\d+) -> (?P<rpb>\d+)"
+    r"; konie \((?P<rhn>\d+)\): mediana 299 (?P<rha>" + _N9 + r")% -> 299b (?P<rhb>" + _N9 + r")%, p90 299 (?P<rha9>" + _N9 + r")% -> 299b (?P<rhb9>" + _N9
+    + r")%, zyskownych (?P<rpha>\d+) -> (?P<rphb>\d+)"
+    r" \| miedzy miastami \(gracz, kup 20 w najtanszym miescie, sprzedaj 20 w najdrozszym, bez kosztu drogi\) koszykow (?P<tc>\d+), sprawdzonych (?P<tk>\d+): "
+    r"zyskownych 299 (?P<tpa>\d+) -> 299b (?P<tpb>\d+), mediana 299 (?P<ta>" + _N9 + r")% -> 299b (?P<tb>" + _N9 + r")%, max 299 (?P<tma>" + _N9 + r")% -> 299b (?P<tmb>"
+    + _N9 + r")%, zl na kurs \(mediana zyskownych\) 299 (?P<tga>" + _N9 + r") -> 299b (?P<tgb>" + _N9 + r"); konie \((?P<thn>\d+)\): zyskownych (?P<tpha>\d+) -> "
+    r"(?P<tphb>\d+), max 299 (?P<thma>" + _N9 + r")% -> 299b (?P<thmb>" + _N9 + r")%"
+    r" \| przesyt \(polka > 2 x popyt \+ 2, wszystkie koszyki\): koszykow (?P<gln>\d+), sztuk ponad (?P<glp>\d+)"
     r" \| towary: petla 30 szt\. po 21 dobach \((?P<gn>\d+)\) mediana gra (?P<gg>" + _N9 + r")% -> 299b (?P<gx>" + _N9 + r")%"
     r" \| przyklady \(gracz, zl za sztuke 1/5/20, 299 -> 299b\): (?P<ex>.*?) \| potkniecia (?P<st>\d+)\.$")
 CENY299B_EX = re.compile(r"^(?P<n>\w+) t(?P<t>\d)@(?P<town>.+?) \((?P<id>\S+), wartosc (?P<v>\d+), polka (?P<s>\d+), popyt (?P<dm>[\d.]+), pamiec (?P<m>[\d.]+|-)\): "
@@ -81761,6 +81784,12 @@ CENY299B_EXPL = "Wywoz kupcow (E8/O3): dzien "
 CENY299B_EXP = re.compile(r"^Wywoz kupcow \(E8/O3\): dzien (\d+) .*\| wywoz tej doby: (\d+) szt\.")
 CENY299B_SKUPL = "Skup sprzetu (doba): "
 CENY299B_SKUP = re.compile(r"zaplacono (\d+) = ")
+CENY299B_ARMSL = "Uzbrojenie wedlug zrodla (E6/0): dzien "
+CENY299B_ARMS = re.compile(r"^Uzbrojenie wedlug zrodla \(E6/0\): dzien (\d+) \| zrodla: warsztaty (\d+), strzelarze (\d+) .*?polki i schowki osad (\d+)")
+CENY299B_Q20_HI = 0.30                 # projekt: koszyki zapelnione (polka >= 4) bez granicy rownowagi przy 20. sztuce
+CENY299B_SRC_BASE = 1447.5             # 298a: mediana ostatnich 30 dob 'zrodla: warsztaty' + 'strzelarze' (1172.5 + 275.0 szt./d)
+CENY299B_SHELF_BASE = 199907.0         # 298a: mediana ostatnich 30 dob 'polki i schowki osad' (szt.)
+CENY299B_WS_MAX = 1.3
 CENY299B_PACE = 0.06
 CENY299B_SMOOTH_SHARE = 0.9
 CENY299B_Q20_MIN = 0.05
@@ -81780,14 +81809,25 @@ CENY299B_SAMPLE = (
     "BKEconomyModel: samotest podaz 100 -> 6.00 (oczekiwane 6.00), popyt 100 -> 15.00 (oczekiwane 15.00), wygladzen w ostatniej dobie z tempem 299b 6402, z tempem gry 0 "
     "(miasta 97 x kategorie 66), przed startem sesji 0 | pamiec polek sprzetu: osad 227, koszykow 5120, |M-S| >= 1: 830 (srednio 2.41, max 31.20), zapis 48211 znakow, "
     "z zapisu 0 osad / 0 koszykow, uzyte 0, czeka 0 | sprzedaz sztuki 5 / 20 wobec 1 (mnoznik polki, koszyki z popytem >= 1 bez granic, 9120): mediana 299 15.2% / 45.1% "
-    "-> 299b 2.1% / 9.3%, stosunek 20 szt. 0.212 | pierwsza sprzedana sztuka 299b/299 mediana 1.143 | poziom przy M = S: kupno 299b = 299 w 4100 z 4100 (rozjazdow 0) "
-    "| w miejscu: sprzedaz po kupnie drozej niz kupno 0 z 3100 | petla opozniona sprzet (gracz, sprzedaj 20, odkup 20 po 21 dobach, bez odplywu, z marza i kara) "
-    "koszyki >= 3 szt. (1500): mediana 299 -91.5% -> 299b -90.2%, p90 299 -48.0% -> 299b -41.0%, zyskownych 0 -> 0 | towary: petla 30 szt. po 21 dobach (900) mediana "
+    "-> 299b 2.1% / 9.3%, stosunek 20 szt. 0.212 (bez granicy rownowagi: polki 0-3 0.301 z 3000, polki >= 4 0.120 z 4000; 20. sztuka na granicy rownowagi 2100) "
+    "| pierwsza sprzedana sztuka 299b/299 mediana 1.143 | poziom przy M = S: kupno 299b = 299 w 4100 z 4100 (rozjazdow 0); przy |M-S| >= 1 (830): kupno 299b/299 "
+    "mediana 0.990, p10 0.900, p90 1.080 | w jednej wizycie (ceny gracza, kup do 3 szt. i odsprzedaj): sprzedaz drozej niz kupno 0 z 3100, przy |M-S| >= 1: 0 z 600 "
+    "| petla opozniona sprzet (gracz, sprzedaj 20, odkup 20 po 21 dobach, bez odplywu, z marza i kara) "
+    "koszyki >= 3 szt. (1500): mediana 299 -91.5% -> 299b -90.2%, p90 299 -48.0% -> 299b -41.0%, zyskownych 0 -> 0; konie (60): mediana 299 -50.0% -> 299b -45.0%, "
+    "p90 299 -30.0% -> 299b -25.0%, zyskownych 0 -> 0 | petla odwrotna (gracz, kup do 20, odsprzedaj po 21 dobach, bez doplywu, z marza i kara) koszyki >= 3 szt. (1500): "
+    "mediana 299 -92.0% -> 299b -91.0%, p90 299 -50.0% -> 299b -44.0%, zyskownych 0 -> 0; konie (60): mediana 299 -52.0% -> 299b -40.0%, p90 299 -35.0% -> 299b -20.0%, "
+    "zyskownych 0 -> 0 | miedzy miastami (gracz, kup 20 w najtanszym miescie, sprzedaj 20 w najdrozszym, bez kosztu drogi) koszykow 90, sprawdzonych 12: zyskownych 299 "
+    "3 -> 299b 7, mediana 299 -20.0% -> 299b 10.0%, max 299 26.0% -> 299b 111.0%, zl na kurs (mediana zyskownych) 299 5000 -> 299b 40000; konie (6): zyskownych 3 -> 6, "
+    "max 299 26.0% -> 299b 111.0% | przesyt (polka > 2 x popyt + 2, wszystkie koszyki): koszykow 900, sztuk ponad 20000 | towary: petla 30 szt. po 21 dobach (900) mediana "
     "gra 6.0% -> 299b 5.8% | przyklady (gracz, zl za sztuke 1/5/20, 299 -> 299b): miecz t3@Riverrun (vlandia_sword_3_t3, wartosc 117, polka 17, popyt 22.1, pamiec 17.0): "
     "10/9/8 -> 10/10/10 ; zbroja t3@Riverrun (mail_shirt, wartosc 391, polka 2, popyt 70.0, pamiec 2.0): 109/81/48 -> 109/109/109 ; kon t5@- brak | potkniecia 0.")
 CENY299B_SAMPLE_EXP = ("Wywoz kupcow (E8/O3): dzien 109100 | TradeExportFast [WL] | osad 227, zasieg 250 | pamiec celow: z pamieci, budowana od startu sesji 1, par zrodlo-cel w "
                        "zasiegu 7154 | wybor celu: nowa droga 4000 / stara droga 60 | wywoz tej doby: 2760 szt. w 900 transakcjach, zaplacone 100 zl, bez odbiorcy 5 szt., wycen "
                        "3000, czas wywozu 50.0 ms | potkniecia od startu sesji 0.")
+CENY299B_SAMPLE_ARMS = ("Uzbrojenie wedlug zrodla (E6/0): dzien 109167 | zrodla: warsztaty 1091, strzelarze 268 (dorobek startowy ColdStart - w stanie wyjsciowym) | ujscia: "
+                        "zlom 633, spalone w rabunku (E7/R1) 0, spalone przy lupie miast (L7) 0, zjedzone na rynku wsi BK (A12) 0 | przeniesienia (przyjazdy na polki miast, info): "
+                        "przerzut kupcow 2962, sakiewki 7033, zalogi 27 | stan 1530260 (polki i schowki osad 218143, tabory 727, zbrojownie DTE 1269561, w drodze wozem (215) "
+                        "11197), zmiana 1537 | reszta 811 (40.7% zrodel + ujsc)")
 CENY299B_SAMPLE_SKUP = ("Skup sprzetu (doba): lordowie AI (SellItemsAction) 7 szt. (wartosc 267, ze stanem 252, zaplacono 51 = 19.1% wartosci, 20.2% ze stanem; na podlodze 5, "
                         "na suficie 0); inne partie (SellItemsAction) 16 szt. (wartosc 80418, ze stanem 80418, zaplacono 39354 = 48.9% wartosci, 48.9% ze stanem; na podlodze 0, "
                         "na suficie 0) [BkTradePenaltyOnce True, SellPriceByCondition True, sufit 10% ceny nowej, podloga 2%].")
@@ -81807,7 +81847,7 @@ def _c299_med(vals):
 
 def _c299_new():
     return {"start": [], "g": {}, "bad": 0, "ex": {}, "exbad": 0, "err": 0, "errs": [], "rawdays": set(), "raw": {}, "t1": {}, "c287": {}, "b": {},
-            "bstart": [], "b2": {}, "bex": {}, "bbad": 0, "bexbad": 0, "berr": 0, "berrs": [], "exp": {}, "skup": []}
+            "bstart": [], "b2": {}, "bex": {}, "bbad": 0, "bexbad": 0, "berr": 0, "berrs": [], "exp": {}, "skup": [], "arms": {}}
 
 
 def _c299_feed(D, s):
@@ -81873,6 +81913,11 @@ def _c299_feed(D, s):
         return
     if s.startswith(CENY299B_SKUPL):
         D["skup"].append(sum(int(v) for v in CENY299B_SKUP.findall(s)))
+        return
+    if s.startswith(CENY299B_ARMSL):
+        a = CENY299B_ARMS.match(s)
+        if a:
+            D["arms"][int(a.group(1))] = (int(a.group(2)) + int(a.group(3)), int(a.group(4)))
         return
     if s.startswith(CENY299_START_L):
         a = CENY299_START_RE.match(s)
@@ -81965,7 +82010,11 @@ def ceny299_selftest():
     want = {"d": "109100", "k1": "TAK", "k2": "TAK", "pace": "0.060", "wi": "0.0084", "ws": "0.1316", "econ": "BKEconomyModel", "tsup": "6.00", "wsup": "6.00",
             "tdem": "15.00", "app": "6402", "gam": "0", "towns": "97", "cats": "66", "bef": "0", "mbk": "5120", "msave": "48211", "qn": "9120", "a20": "45.1", "b5": "2.1",
             "q20": "0.212", "fst": "1.143", "lk": "4100", "la": "4100", "lb": "0", "ipb": "0", "ip": "3100", "ln": "1500", "lpa": "-91.5", "lpb": "-90.2", "lpb9": "-41.0",
-            "pa": "0", "pb": "0", "gn": "900", "gg": "6.0", "gx": "5.8", "st": "0"}
+            "pa": "0", "pb": "0", "gn": "900", "gg": "6.0", "gx": "5.8", "st": "0",
+            "q20lo": "0.301", "nlo": "3000", "q20hi": "0.120", "nhi": "4000", "cap": "2100", "offn": "830", "off5": "0.990", "off1": "0.900", "off9": "1.080",
+            "iob": "0", "io": "600", "lhn": "60", "lhb": "-45.0", "lhb9": "-25.0", "phb": "0", "rn": "1500", "rb": "-91.0", "rb9": "-44.0", "rhn": "60", "rhb": "-40.0",
+            "rhb9": "-20.0", "tc": "90", "tk": "12", "tpa": "3", "tpb": "7", "ta": "-20.0", "tb": "10.0", "tma": "26.0", "tmb": "111.0", "tga": "5000", "tgb": "40000",
+            "thn": "6", "tpha": "3", "tphb": "6", "thma": "26.0", "thmb": "111.0", "gln": "900", "glp": "20000"}
     for k, v in want.items():
         if g.get(k) != v:
             return f"linia 299b: {k} = {g.get(k)} (oczekiwane {v})"
@@ -81977,8 +82026,9 @@ def ceny299_selftest():
         return f"przyklady linii 299b: {ex} (nierozpoznanych {D['bexbad']})"
     _c299_feed(D, CENY299B_SAMPLE_EXP)
     _c299_feed(D, CENY299B_SAMPLE_SKUP)
-    if D["exp"] != {109100: 2760} or D["skup"] != [39405]:
-        return f"linie wywozu / skupu: {D['exp']} / {D['skup']}"
+    _c299_feed(D, CENY299B_SAMPLE_ARMS)
+    if D["exp"] != {109100: 2760} or D["skup"] != [39405] or D["arms"] != {109167: (1359, 218143)}:
+        return f"linie wywozu / skupu / zrodel uzbrojenia: {D['exp']} / {D['skup']} / {D['arms']}"
     _c299_feed(D, "ERROR in ShelfMemory.Eff: System.Exception")
     _c299_feed(D, "ERROR in PriceWalk299b.Daily: System.Exception")
     if D["berr"] != 2 or D["err"] != 0:
@@ -82226,28 +82276,36 @@ def ceny299b_rows(rep, D):
     q20hi = (1.0 - ((1.0 + pc) / (1.0 + 20.0 * pc)) ** 0.5) / (1.0 - (2.0 / 21.0) ** 0.5) + 0.05
     fhi = (2.0 / (1.0 + pc)) ** 0.5 + 0.01
     q20, fst = med("q20", alld), med("fst", alld)
-    rep.add("C299-14: sprzet - stosunek spadku 20. sprzedanej sztuki 299b/299 (mediana dob)", f"{fmt(q20)} (299 {fmt(med('a20', alld), '{:.1f}')}% -> 299b "
-            f"{fmt(med('b20', alld), '{:.1f}')}%, koszykow {fmt(med('qn', alld), '{:.0f}')}/d, dob {len(alld)})" + base,
-            f"[{CENY299B_Q20_MIN}, {q20hi:.3f}] (gora: pusta polka M = S = 0 przy tempie {pc:.3f} + 0.05; polka 17 / popyt 22: 0.10)",
-            J(q20 is not None and CENY299B_Q20_MIN <= q20 <= q20hi))
+    q4, q03 = med("q20hi", alld), med("q20lo", alld)
+    rep.add("C299-14: sprzet - stosunek spadku 20. sprzedanej sztuki 299b/299, koszyki z polka >= 4 bez granicy rownowagi (mediana dob)",
+            f"{fmt(q4)} (koszykow {fmt(med('nhi', alld), '{:.0f}')}/d; wszystkie koszyki z granica {fmt(q20)} - INFO, 20. sztuka na granicy rownowagi "
+            f"{fmt(med('cap', alld), '{:.0f}')}/d; spadek 20. sztuki 299 {fmt(med('a20', alld), '{:.1f}')}% -> 299b {fmt(med('b20', alld), '{:.1f}')}%, koszykow "
+            f"{fmt(med('qn', alld), '{:.0f}')}/d, dob {len(alld)})" + base,
+            f"[{CENY299B_Q20_MIN}, {CENY299B_Q20_HI}] (projekt: polki zapelnione; polka 17 / popyt 22 bez granicy: 0.10)",
+            J(q4 is not None and CENY299B_Q20_MIN <= q4 <= CENY299B_Q20_HI))
+    rep.add("C299-14a: sprzet - to samo, koszyki z polka 0-3 bez granicy rownowagi (mediana dob)", f"{fmt(q03)} (koszykow {fmt(med('nlo', alld), '{:.0f}')}/d)" + base,
+            f"[{CENY299B_Q20_MIN}, {q20hi:.3f}] (gora: pusta polka M = S = 0 przy tempie {pc:.3f} + 0.05)",
+            J(q03 is not None and CENY299B_Q20_MIN <= q03 <= q20hi))
     rep.add("C299-14b: sprzet - spadek 5. sztuki 299b (mediana dob)", f"299 {fmt(med('a5', alld), '{:.1f}')}% -> 299b {fmt(med('b5', alld), '{:.1f}')}%", "INFO (oczekiwane <= 3%)", None)
     rep.add("C299-14c: sprzet - pierwsza sprzedana sztuka 299b/299 (mediana dob)", f"{fmt(fst)}" + base, f"[1.00, {fhi:.3f}] (gora: pusta polka sqrt(2 / (1 + tempo)))",
             J(fst is not None and 1.0 - 1e-9 <= fst <= fhi))
-    # C299-15 poziom i w miejscu
-    b15 = [d for d in days if b2[d]["lb"] != "0" or b2[d]["ipb"] != "0"]
-    rep.add("C299-15: kupno przy M = S bez zmian i w jednej wizycie bez zysku", f"dob z rozjazdem albo sprzedaza drozej niz kupno {len(b15)} z {len(days)}"
-            + (f" (np. {[(d, b2[d]['lb'], b2[d]['ipb']) for d in b15[:3]]})" if b15 else "")
-            + (f"; ostatnia doba: poziom {b2[days[-1]]['lk']} z {b2[days[-1]]['la']}, w miejscu {b2[days[-1]]['ip']} ocen" if days else "") + base,
-            "rozjazdow 0 i drozej niz kupno 0 kazdej doby", J(bool(days) and not b15))
+    # C299-15 w jednej wizycie cenami gracza (recenzja 299b: dawny licznik porownywal Factor sam ze soba)
+    b15 = [d for d in days if b2[d]["ipb"] != "0" or b2[d]["ip"] == "0"]
+    rep.add("C299-15: w jednej wizycie bez zysku - ceny gracza (kup do 3 szt., odsprzedaj), wszystkie koszyki miast", f"dob ze sprzedaza drozej niz kupno albo bez ocen "
+            f"{len(b15)} z {len(days)}" + (f" (np. {[(d, b2[d]['ipb'], b2[d]['ip']) for d in b15[:3]]})" if b15 else "")
+            + (f"; ostatnia doba: ocen {b2[days[-1]]['ip']}, przy |M-S| >= 1 {b2[days[-1]]['iob']} z {b2[days[-1]]['io']}; kupno 299b/299 przy |M-S| >= 1 ({b2[days[-1]]['offn']}) "
+               f"mediana {b2[days[-1]]['off5']}, p10 {b2[days[-1]]['off1']}, p90 {b2[days[-1]]['off9']} (INFO)" if days else "") + base,
+            "drozej niz kupno 0 kazdej doby, ocen > 0", J(bool(days) and not b15))
     # C299-16 pamiec, potkniecia, bledy, zapis
-    b16 = [d for d in alld if int(b2[d]["mbk"]) <= 0]
+    b16 = [d for d in alld if int(b2[d]["mbk"]) <= 0 or b2[d]["lb"] != "0"]
     stum = sum(int(b2[d]["st"]) for d in days)
     msave = max((int(b2[d]["msave"]) for d in days), default=0)
     rep.add("C299-16: pamiec polek sprzetu - koszyki, potkniecia, bledy", f"dob bez koszykow {len(b16)} z {len(alld)}, potkniecia {stum}, ERROR {D['berr']}"
             + (f" ({'; '.join(D['berrs'])})" if D["berrs"] else "")
             + (f"; ostatnia doba: osad {b2[days[-1]]['mpl']}, koszykow {b2[days[-1]]['mbk']}, |M-S| >= 1 {b2[days[-1]]['moff']} (srednio {b2[days[-1]]['mavg']}, max "
                f"{b2[days[-1]]['mmax']}), z zapisu {b2[days[-1]]['mload']}" if days else "") + base,
-            "koszykow > 0 kazdej doby z kluczem sprzetu TAK, potkniecia 0, ERROR 0", J(bool(days) and not b16 and stum == 0 and D["berr"] == 0))
+            "koszykow > 0 i 'rozjazdow 0' (kupno przy M = S przez pamiec = bez pamieci) kazdej doby z kluczem sprzetu TAK, potkniecia 0, ERROR 0",
+            J(bool(days) and not b16 and stum == 0 and D["berr"] == 0))
     rep.add("C299-18c: dlugosc zapisu pamieci polek (arm_shelfmem)", f"max {msave} znakow (SaveText dzieli dlugie napisy)", "INFO", None)
     # C299-17 petla opozniona gracza na sprzecie
     lpb, lpb9, lpa = med("lpb", alld), med("lpb9", alld), med("lpa", alld)
@@ -82256,6 +82314,30 @@ def ceny299b_rows(rep, D):
             f"p90 299b {fmt(lpb9, '{:+.1f}')}% (koszykow {fmt(med('ln', alld), '{:.0f}')}/d); towary petla 30 szt. po 21 dobach gra {fmt(gg, '{:+.1f}')}% -> 299b {fmt(gx, '{:+.1f}')}%"
             + base, f"299b mediana <= {CENY299B_LOOP_MED:+.0f}% i p90 <= +{CENY299B_LOOP_P90:.0f}% (NIE: blokada odkupienia 7 dob takze dla gracza)",
             J(lpb is not None and lpb <= CENY299B_LOOP_MED and lpb9 is not None and lpb9 <= CENY299B_LOOP_P90))
+
+    def loop_ok(m, m9):
+        return m is not None and m <= CENY299B_LOOP_MED and m9 is not None and m9 <= CENY299B_LOOP_P90
+    hd = [d for d in alld if int(b2[d]["lhn"]) > 0]
+    lhb, lhb9, lha = med("lhb", hd), med("lhb9", hd), med("lha", hd)
+    rep.add("C299-17h: petla opozniona gracza - tylko konie (sprzedaz z wartosci / (1 + kara), kara BK broni nie zaslania)",
+            (f"mediana 299 {fmt(lha, '{:+.1f}')}% -> 299b {fmt(lhb, '{:+.1f}')}%, p90 299b {fmt(lhb9, '{:+.1f}')}% (koszykow {fmt(med('lhn', hd), '{:.0f}')}/d, dob {len(hd)})"
+             if hd else "brak koszykow koni >= 3 szt. w miastach") + base,
+            f"299b mediana <= {CENY299B_LOOP_MED:+.0f}% i p90 <= +{CENY299B_LOOP_P90:.0f}%", J(loop_ok(lhb, lhb9)) if hd else None)
+    rb, rb9, ra = med("rb", alld), med("rb9", alld), med("ra", alld)
+    rhd = [d for d in alld if int(b2[d]["rhn"]) > 0]
+    rhb, rhb9 = med("rhb", rhd), med("rhb9", rhd)
+    rep.add("C299-17r: petla odwrotna gracza (kup do 20, odsprzedaj po 21 dobach, bez doplywu), wszystkie koszyki i konie",
+            f"wszystkie: mediana 299 {fmt(ra, '{:+.1f}')}% -> 299b {fmt(rb, '{:+.1f}')}%, p90 299b {fmt(rb9, '{:+.1f}')}% (koszykow {fmt(med('rn', alld), '{:.0f}')}/d); konie: "
+            f"mediana 299b {fmt(rhb, '{:+.1f}')}%, p90 299b {fmt(rhb9, '{:+.1f}')}% (dob z konmi {len(rhd)})" + base,
+            f"299b mediana <= {CENY299B_LOOP_MED:+.0f}% i p90 <= +{CENY299B_LOOP_P90:.0f}% (wszystkie i konie)",
+            J(loop_ok(rb, rb9) and (not rhd or loop_ok(rhb, rhb9))))
+    lt = b2[alld[-1]] if alld else None
+    rep.add("C299-17t: kurs gracza miedzy miastami (kup 20 w najtanszym, sprzedaj 20 w najdrozszym, bez kosztu drogi - gorna granica)",
+            (f"ostatnia doba: koszykow {lt['tc']}, sprawdzonych {lt['tk']}, zyskownych 299 {lt['tpa']} -> 299b {lt['tpb']}, mediana 299 {lt['ta']}% -> 299b {lt['tb']}%, "
+             f"max 299 {lt['tma']}% -> 299b {lt['tmb']}%, zl na kurs 299 {lt['tga']} -> 299b {lt['tgb']}; konie ({lt['thn']}): zyskownych {lt['tpha']} -> {lt['tphb']}, "
+             f"max {lt['thma']}% -> {lt['thmb']}%; mediana dob zyskownych 299b {fmt(med('tpb', alld), '{:.0f}')}, max 299b {fmt(med('tmb', alld), '{:+.1f}')}%"
+             if lt else "brak") + base,
+            "INFO (handel miedzy rynkami - roznica poziomu cen miast; granica rownowagi tnie premie braku ponad popyt; decyzja po pomiarze)", None)
     # C299-18 skutki uboczne wobec 298a
     ed = sorted(D["exp"])[-30:]
     em = st.median([D["exp"][d] for d in ed]) if ed else None
@@ -82265,6 +82347,17 @@ def ceny299b_rows(rep, D):
     sm = st.median(D["skup"]) if D["skup"] else None
     rep.add("C299-18b: 'Skup sprzetu (doba)' zaplacono razem - mediana dob, wobec 298a", f"{fmt(sm, '{:.0f}')} zl (x{fmt(sm / CENY299B_SKUP_BASE if sm is not None else None, '{:.2f}')}, "
             f"dob {len(D['skup'])})" + base, f"<= {CENY299B_SKUP_MAX} x {CENY299B_SKUP_BASE:.0f}", J(sm is not None and sm <= CENY299B_SKUP_MAX * CENY299B_SKUP_BASE))
+    # C299-19 warsztaty i polki sprzetu wobec 298a (recenzja 299b: warsztaty widza cene z pamiecia)
+    ad = sorted(D["arms"])[-30:]
+    wsrc = st.median([D["arms"][d][0] for d in ad]) if ad else None
+    wsh = st.median([D["arms"][d][1] for d in ad]) if ad else None
+    lg = b2[days[-1]] if days else None
+    rep.add("C299-19: warsztaty i polki sprzetu (E6/0), mediany ostatnich 30 dob, wobec 298a",
+            f"zrodla warsztaty + strzelarze {fmt(wsrc, '{:.0f}')} szt./d (x{fmt(wsrc / CENY299B_SRC_BASE if wsrc is not None else None, '{:.2f}')}), polki i schowki osad "
+            f"{fmt(wsh, '{:.0f}')} (x{fmt(wsh / CENY299B_SHELF_BASE if wsh is not None else None, '{:.2f}')}), dob {len(D['arms'])}"
+            + (f"; przesyt (linia 299b, ostatnia doba): koszykow {lg['gln']}, sztuk ponad {lg['glp']} - INFO" if lg else "") + base,
+            f"zrodla <= {CENY299B_WS_MAX} x {CENY299B_SRC_BASE}, polki <= {CENY299B_WS_MAX} x {CENY299B_SHELF_BASE:.0f}",
+            J(wsrc is not None and wsh is not None and wsrc <= CENY299B_WS_MAX * CENY299B_SRC_BASE and wsh <= CENY299B_WS_MAX * CENY299B_SHELF_BASE))
     lex = D["bex"].get(days[-1], {}) if days else {}
     parts = [f"{k} t{x['t']}@{x['town']} ({x['id']}, polka {x['s']}, popyt {x['dm']}, pamiec {x['m']}): {x['pa']} -> {x['pb']}" if x else f"{k}: brak" for k, x in lex.items()]
     rep.add("C299-18d: przyklady gracza (ostatnia doba, zl za 1. / 5. / 20. sprzedana sztuke, 299 -> 299b)", "; ".join(parts) if parts else "brak", "INFO", None)
@@ -82278,17 +82371,21 @@ def _c299_jeff_lim(x, wi=0.021, ws=0.119):
     return max(CENY299_JEFF_DROP * k / 0.525, 0.05 + k * max(1.0, q))
 
 
-def _c299b_line(d, k1="TAK", k2="TAK", pace="0.060", tsup="6.00", app=6402, q20="0.212", fst="1.143", lb=0, ipb=0, lpb="-90.2", lpb9="-41.0", st_=0, mbk=5120):
+def _c299b_line(d, k1="TAK", k2="TAK", pace="0.060", tsup="6.00", app=6402, q20="0.212", fst="1.143", lb=0, ipb=0, lpb="-90.2", lpb9="-41.0", st_=0, mbk=5120,
+                q20lo="0.301", q20hi="0.120", ip=3100, lhb="-45.0", rb="-91.0", rhb9="-20.0"):
     """299b: linia doby jak w C# (z CENY299B_SAMPLE przez zamiane wartosci)."""
     return (CENY299B_SAMPLE.replace("dzien 109100", f"dzien {d}").replace("klucze TAK/TAK, tempo 0.060/d", f"klucze {k1}/{k2}, tempo {pace}/d")
             .replace("samotest podaz 100 -> 6.00 (oczekiwane 6.00)", f"samotest podaz 100 -> {tsup} (oczekiwane {tsup})").replace("tempem 299b 6402", f"tempem 299b {app}")
             .replace("stosunek 20 szt. 0.212", f"stosunek 20 szt. {q20}").replace("mediana 1.143", f"mediana {fst}").replace("(rozjazdow 0)", f"(rozjazdow {lb})")
-            .replace("drozej niz kupno 0 z", f"drozej niz kupno {ipb} z").replace("-> 299b -90.2%, p90 299 -48.0% -> 299b -41.0%", f"-> 299b {lpb}%, p90 299 -48.0% -> 299b {lpb9}%")
-            .replace("| potkniecia 0.", f"| potkniecia {st_}.").replace("koszykow 5120,", f"koszykow {mbk},"))
+            .replace("-> 299b -90.2%, p90 299 -48.0% -> 299b -41.0%", f"-> 299b {lpb}%, p90 299 -48.0% -> 299b {lpb9}%")
+            .replace("| potkniecia 0.", f"| potkniecia {st_}.").replace("koszykow 5120,", f"koszykow {mbk},")
+            .replace("polki 0-3 0.301 z", f"polki 0-3 {q20lo} z").replace("polki >= 4 0.120 z", f"polki >= 4 {q20hi} z")
+            .replace("kupno 0 z 3100,", f"kupno {ipb} z {ip},").replace("-> 299b -45.0%,", f"-> 299b {lhb}%,").replace("-> 299b -91.0%,", f"-> 299b {rb}%,")
+            .replace("-> 299b -20.0%,", f"-> 299b {rhb9}%,"))
 
 
 def _c299_synth(key="TAK", q30=0.552, q10=0.531, eq=1.0, inv=0, lpx=6.5, gdx=-5.0, gfx="207", st_=0, under=0, units=480, kon=0, days=20, gap=0, startn=2,
-                lbx=6.6, isr="1.25", lossu=40, stop=590, b=None, bstart=None, exp=2760, skup=39405):
+                lbx=6.6, isr="1.25", lossu=40, stop=590, b=None, bstart=None, exp=2760, skup=39405, arms=(1359, 218143)):
     """Bieg syntetyczny: linie jak w C# (z CENY299_SAMPLE przez zamiane wartosci) - przechodza przez _c299_feed. b - slownik argumentow linii 299b (_c299b_line;
     None - bieg 299 bez linii 299b, {} - dobry bieg 299b: wagi doby 0.0084 / 0.1316); bstart - linia startowa 299b (domyslna z przykladu)."""
     D = _c299_new()
@@ -82320,6 +82417,8 @@ def _c299_synth(key="TAK", q30=0.552, q10=0.531, eq=1.0, inv=0, lpx=6.5, gdx=-5.
         if b is not None:
             _c299_feed(D, CENY299B_SAMPLE_EXP.replace("dzien 109100", f"dzien {d}").replace("wywoz tej doby: 2760", f"wywoz tej doby: {exp}"))
             _c299_feed(D, CENY299B_SAMPLE_SKUP.replace("zaplacono 39354", f"zaplacono {skup - 51}"))
+            _c299_feed(D, CENY299B_SAMPLE_ARMS.replace("dzien 109167", f"dzien {d}").replace("warsztaty 1091, strzelarze 268", f"warsztaty {arms[0] - 268}, strzelarze 268")
+                       .replace("polki i schowki osad 218143", f"polki i schowki osad {arms[1]}"))
         _c299_feed(D, CENY299_SAMPLE_T1.replace("dzien 109078", f"dzien {d}").replace("z zyskiem 175 szt.", f"z zyskiem {units} szt.").replace("marza +36.8%", "marza +65.0%")
                    .replace("(roznica 0)", f"(roznica {kon})")
                    .replace("na stracie 204 szt. za 76272 (koszt 130327, strata 54055)", f"na stracie {lossu} szt. za 3000 (koszt 5000, strata 2000)").replace("bez zysku 49", "bez zysku 120").replace("z kas miast 100170 (", "z kas miast 60000 ("))
@@ -82358,23 +82457,26 @@ def ceny299_selftest2():
     # 299b: dobry bieg (wagi doby 0.0084 / 0.1316 - pasma 2 / 2b / 3b / 6 skalowane), bieg 299 bez linii 299b - wiersze 299b INFO
     gb = dict(q30=0.231, q10=0.215, gdx=-2.0)
     good = verdicts(_c299_synth(b={}, **gb))
-    needb = need + ("C299-12", "C299-13", "C299-14", "C299-14c", "C299-15", "C299-16", "C299-17", "C299-18", "C299-18b")
+    needb = need + ("C299-12", "C299-13", "C299-14", "C299-14a", "C299-14c", "C299-15", "C299-16", "C299-17", "C299-17h", "C299-17r", "C299-18", "C299-18b", "C299-19")
     bad = [k for k in needb if good.get(k) != "TAK"]
     if bad:
         return f"dobry bieg 299b nie przechodzi ({bad}): {good}"
     v299 = verdicts(_c299_synth())
-    if any(v299.get(k) != "INFO" for k in ("C299-12", "C299-13", "C299-14", "C299-15", "C299-16", "C299-17", "C299-18")):
+    if any(v299.get(k) != "INFO" for k in ("C299-12", "C299-13", "C299-14", "C299-14a", "C299-15", "C299-16", "C299-17", "C299-17h", "C299-17r", "C299-18", "C299-19")):
         return f"bieg 299 bez linii 299b: wiersze 299b nie INFO ({v299})"
-    offs = _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", tsup="15.00", q20="1.000", fst="1.000"), **gb)
+    offs = _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", tsup="15.00", q20="1.000", fst="1.000", q20lo="1.000", q20hi="1.000"), **gb)
     if verdicts(offs).get("C299-11 (299b)") != "TAK":
         return "bieg z kluczami 299b NIE: C299-11 (299b) nie TAK"
     st_nie = CENY299B_SAMPLE_START.replace("Supply Memory TAK (tempo 0.060/d", "Supply Memory NIE (tempo 0.150/d")
     casesb = [("C299-12", _c299_synth(b={}, bstart=st_nie, **gb)), ("C299-12", _c299_synth(b={}, bstart=CENY299B_SAMPLE_START.replace("w 1 modelu", "w 0 modelu"), **gb)),
               ("C299-13", _c299_synth(b=dict(tsup="15.00"), **gb)), ("C299-13", _c299_synth(b=dict(app=100), **gb)),
-              ("C299-14", _c299_synth(b=dict(q20="0.900"), **gb)), ("C299-14", _c299_synth(b=dict(q20="0.010"), **gb)), ("C299-14c", _c299_synth(b=dict(fst="0.950"), **gb)),
-              ("C299-15", _c299_synth(b=dict(lb=1), **gb)), ("C299-15", _c299_synth(b=dict(ipb=2), **gb)),
+              ("C299-14", _c299_synth(b=dict(q20hi="0.450"), **gb)), ("C299-14", _c299_synth(b=dict(q20hi="0.010"), **gb)), ("C299-14c", _c299_synth(b=dict(fst="0.950"), **gb)),
+              ("C299-14a", _c299_synth(b=dict(q20lo="0.600"), **gb)),
+              ("C299-15", _c299_synth(b=dict(ip=0), **gb)), ("C299-15", _c299_synth(b=dict(ipb=2), **gb)), ("C299-16", _c299_synth(b=dict(lb=1), **gb)),
               ("C299-16", _c299_synth(b=dict(st_=1), **gb)), ("C299-16", _c299_synth(b=dict(mbk=0), **gb)),
               ("C299-17", _c299_synth(b=dict(lpb="3.0"), **gb)), ("C299-17", _c299_synth(b=dict(lpb9="9.0"), **gb)),
+              ("C299-17h", _c299_synth(b=dict(lhb="4.0"), **gb)), ("C299-17r", _c299_synth(b=dict(rb="2.0"), **gb)), ("C299-17r", _c299_synth(b=dict(rhb9="12.0"), **gb)),
+              ("C299-19", _c299_synth(b={}, arms=(2200, 218143), **gb)), ("C299-19", _c299_synth(b={}, arms=(1359, 300000), **gb)),
               ("C299-18", _c299_synth(b={}, exp=1000, **gb)), ("C299-18b", _c299_synth(b={}, skup=90000, **gb)),
               ("C299-11 (299b)", _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", tsup="15.00", q20="0.500"), **gb)),
               ("C299-2", _c299_synth(b={}, q30=0.552, q10=0.215, gdx=-2.0)), ("C299-6", _c299_synth(b={}, q30=0.231, q10=0.215, gdx=-5.0)),
@@ -82393,7 +82495,7 @@ def ceny299_main(logp):
     rep.add("C299-S: self-test wyrazen (linia 299 i startowa jak w C#: PriceWalk299.Daily, RawPrice.ApplyAll; E3-T1, 287, 294b, Ceny surowcow)", s1 or "OK",
             "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     s2 = ceny299_selftest2()
-    rep.add("C299-S2: test syntetyczny (dobry bieg 299 i 299b, biegi z kluczami NIE, prog C299-6 z rachunku, 20 + 19 zlych - wiersze 0-18)", s2 or "OK", "OK", s2 is None)
+    rep.add("C299-S2: test syntetyczny (dobry bieg 299 i 299b, biegi z kluczami NIE, prog C299-6 z rachunku, 20 + 26 zlych - wiersze 0-19)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("C299-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()

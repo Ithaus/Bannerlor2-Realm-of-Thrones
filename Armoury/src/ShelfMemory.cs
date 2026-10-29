@@ -21,6 +21,11 @@ namespace Armoury
     /// dostaje M = polka teraz. Zapis "arm_shelfmem": tylko roznice M - polka >= 0.005 (przy wczytaniu M = polka + roznica). Sama cena - zlota ani sztuk nie przybywa.
     /// Klucz PriceFlatterAllItems (wymaga PriceFlatterLotWalk) i prawo podazy wlaczone; wylaczony - cena dokladnie jak w 299 (Eff zwraca polke), pamiec czyszczona.
     /// RawPrice.GameCurve (sonda 299 / 299b) - krzywa bez pamieci. Watki: wyceny moga biec poza watkiem gry - tablica osady powstaje pod zamkiem, odczyt bez zamka (float).
+    /// 299b po recenzji - GRANICA ROWNOWAGI (Bound): pamiec spowalnia cene, ale nie przenosi jej przez popyt na druga strone niz polka fizyczna. Gdy polka po transakcji
+    /// trzyma co najmniej tyle, ile miasto chce (sDir >= popyt), cena nie placi juz premii braku (S_eff >= popyt, mnoznik <= 1); gdy trzyma mniej - nie daje rabatu przesytu
+    /// (S_eff <= popyt, mnoznik >= 1). Bez tego 20 koni sprzedanych do miasta, ktore chce 5, szlo po cenie pustej stajni (recenzja: kurs miedzy miastami Riverrun t4 66 / 5.4
+    /// -> pusta polka 0 / 5.4 z rachunku +219% na 20 sztukach, 299 +26%; z granica +111%, a do miasta w rownowadze +55% jak bez granicy - to juz roznica poziomu cen miast).
+    /// Przy M = S bez zmian (S_eff = S); funkcja tylko stanu (sDir, M, popyt), wiec kupno i odsprzedaz w jednej wizycie dalej daja te same mnozniki.
     /// </summary>
     internal static class ShelfMemory
     {
@@ -126,15 +131,22 @@ namespace Armoury
 
         internal static float Blend(float p, float sDir, float m) { return p * sDir + (1f - p) * m; }
 
-        internal static float Eff(Settlement st, ItemObject it, float sDir)
+        /// <summary>Granica rownowagi (opis klasy): polka z pamiecia nie po drugiej stronie popytu niz polka fizyczna sDir. Popyt nieznany (NaN, ujemny) - bez granicy.</summary>
+        internal static float Bound(float se, float sDir, float d)
         {
-            if (it == null) return sDir;
-            return Eff(st, it.ItemType, TierOf(it), sDir);
+            if (!(d >= 0f)) return se;
+            return sDir >= d ? Math.Max(se, d) : Math.Min(se, d);
         }
 
-        /// <summary>Polka, jaka widzi cena: Pace x sDir + (1 - Pace) x M. sDir = polka wedlug SupplyDemand.Stock (przy sprzedazy + 1). Klucz wylaczony, krzywa gry
-        /// (RawPrice.GameCurve), osada poza miastem i zamkiem albo potkniecie - sDir (jak w 299).</summary>
-        internal static float Eff(Settlement st, ItemObject.ItemTypeEnum type, int tier, float sDir)
+        internal static float Eff(Settlement st, ItemObject it, float sDir, float d)
+        {
+            if (it == null) return sDir;
+            return Eff(st, it.ItemType, TierOf(it), sDir, d);
+        }
+
+        /// <summary>Polka, jaka widzi cena: Pace x sDir + (1 - Pace) x M w granicy rownowagi (Bound, d = popyt tej samej wyceny). sDir = polka wedlug SupplyDemand.Stock
+        /// (przy sprzedazy + 1). Klucz wylaczony, krzywa gry (RawPrice.GameCurve), osada poza miastem i zamkiem albo potkniecie - sDir (jak w 299).</summary>
+        internal static float Eff(Settlement st, ItemObject.ItemTypeEnum type, int tier, float sDir, float d)
         {
             if (st == null || RawPrice.GameCurve || !On) return sDir;
             int ty = (int)type;
@@ -143,11 +155,34 @@ namespace Armoury
             {
                 var x = Get(st);
                 if (x == null) return sDir;
-                float m = x.M[ty * TierSlots + tier];
-                if (float.IsNaN(m)) return sDir;
-                return Blend((float)RawPrice.Pace, sDir, m);
+                return EffRow(x.M, ty * TierSlots + tier, (float)RawPrice.Pace, sDir, d);
             }
             catch (Exception e) { Stumble("Eff", e); return sDir; }
+        }
+
+        /// <summary>Recenzja 299b (koszt wywozu): pamiec osady raz na dobe wywozu zamiast wyszukania przy kazdym celu - wiersz tablicy (null = ta osada liczy bez pamieci,
+        /// jak Eff: klucz wylaczony, krzywa gry, osada poza miastem i zamkiem). Te same liczby co Eff (EffRow wspolne).</summary>
+        internal static float[] Row(Settlement st)
+        {
+            if (st == null || RawPrice.GameCurve || !On || (!st.IsTown && !st.IsCastle)) return null;
+            try { var x = Get(st); return x != null ? x.M : null; }
+            catch (Exception e) { Stumble("Row", e); return null; }
+        }
+
+        /// <summary>Miejsce koszyka przedmiotu w wierszu (typ x 8 + tier); -1 = poza tablica (Eff zwrocilby sDir).</summary>
+        internal static int Slot(ItemObject it)
+        {
+            if (it == null) return -1;
+            int ty = (int)it.ItemType;
+            return ty < 0 || ty >= Types ? -1 : ty * TierSlots + TierOf(it);
+        }
+
+        internal static float EffRow(float[] row, int slot, float p, float sDir, float d)
+        {
+            if (row == null || slot < 0 || slot >= row.Length) return sDir;
+            float m = row[slot];
+            if (float.IsNaN(m)) return sDir;
+            return Bound(Blend(p, sDir, m), sDir, d);
         }
 
         /// <summary>Pamiec koszyka (NaN - brak pamieci albo klucz wylaczony) - sonda i linia handlu gracza.</summary>
