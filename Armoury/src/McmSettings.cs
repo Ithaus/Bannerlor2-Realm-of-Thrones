@@ -9644,6 +9644,18 @@ namespace Armoury
         [SettingPropertyGroup("Iron mines follow the world's iron, caravans buy only the food they can sell before it spoils (290)")]
         public bool CaravanFoodBuyOwnSales { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Food Spoils By Kind", HintText = "in a caravan's packs only food that really goes bad is treated as spoiling: fish, meat, eggs, butter, fruit, carrots, bread and pies. After a week in the packs the caravan may sell them below cost, but never by more than 1.5% of their cost for each day they have been carried (the same rate the food merchants' carts lose on the road) - the rest waits for the next town; grain, cheese, olives, beer, honey and other food that keeps is treated like any other goods (sold at a loss only after 30 days with no town paying a profit). Off = as before (all food sold at a loss after 7 days)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans pay their way, food that keeps does not spoil (294)")]
+        public bool CaravanFoodKeepsByKind { get; set; } = true;
+
+        [SettingPropertyBool("Losing Caravans Are Wound Up", HintText = "a merchant or lord does not keep a caravan that does not earn its wages: when an AI caravan watched for at least 28 days has made less from trade (sales minus tolls minus what the goods cost) than its wages for 14 days in a row, its owner stops buying new goods and the caravan sells off what it carries in the next towns at the usual prices; once little is left (or after 28 days) it is wound up in a town - the rest of its goods are sold to the town, its coin goes to the owner, its men go home. Your clan's caravans, caravans led by a hero, quest caravans, troop convoys and ships are never wound up. The record of each caravan's trade is kept in the save. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans pay their way, food that keeps does not spoil (294)")]
+        public bool CaravanLosingWoundUp { get; set; } = true;
+
+        [SettingPropertyBool("New Caravans Only When Trade Pays", HintText = "a merchant or a Banner Kings lord sends out a new caravan only while at least 6 in 10 caravans earn their wages after it is added (a new caravan has not proven anything yet); an owner whose caravan was wound up waits 28 days. Until half the caravans have a trade record (a new game, or a save from before this option) caravans start as before. The coin stays with the merchant or lord. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans pay their way, food that keeps does not spoil (294)")]
+        public bool CaravanEntryWhenTradePays { get; set; } = true;
+
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsFollowMarket { get; set; } = true;
@@ -12794,6 +12806,9 @@ namespace Armoury
             s.EfficientCampaignerAlways = EfficientCampaignerAlways;
             s.KsIronWorldFlow = KsIronWorldFlow;
             s.CaravanFoodBuyOwnSales = CaravanFoodBuyOwnSales;
+            s.CaravanFoodKeepsByKind = CaravanFoodKeepsByKind;
+            s.CaravanLosingWoundUp = CaravanLosingWoundUp;
+            s.CaravanEntryWhenTradePays = CaravanEntryWhenTradePays;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;

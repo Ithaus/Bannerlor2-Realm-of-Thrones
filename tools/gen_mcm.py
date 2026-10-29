@@ -728,6 +728,10 @@ LABELS = {
     # 290
     'KsIronWorldFlow': 'Ks Iron Hands Follow World Iron Stock',
     'CaravanFoodBuyOwnSales': 'Caravans Buy Food By Their Own Sales',
+    # 294
+    'CaravanFoodKeepsByKind': 'Caravan Food Spoils By Kind',
+    'CaravanLosingWoundUp': 'Losing Caravans Are Wound Up',
+    'CaravanEntryWhenTradePays': 'New Caravans Only When Trade Pays',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial

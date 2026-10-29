@@ -571,7 +571,15 @@ namespace Armoury
             var l = Sync(mp, it, mp.ItemRoster.GetItemNumber(it), false);
             double age = l != null ? Math.Max(0, Now - l.Day) : 0;
             bool market = l != null && l.N > 0 && AgeMarket(mp, it, l.Cost / l.N, 1.0 - TownToll.CaravanRateFor(mp, st), age);
-            return LossWhy(mp.IsDisbanding, cash, full, it.IsFood, age, market);
+            return LossWhy(mp.IsDisbanding, cash, full, CaravanMarket294.Spoils(it), age, market);   // 294: jedzenie, ktore sie nie psuje - jak towar
+        }
+
+        /// <summary>294: doby towaru w jukach wedlug ksiegi kosztu (0 - bez wpisu) - granica psucia w sprzedazy BK / gry (CaravanTrade284.SellGuardPrefix).</summary>
+        internal static double AgeOf(MobileParty mp, ItemObject it)
+        {
+            if (mp == null || it == null || mp.ItemRoster == null) return 0.0;
+            var l = Sync(mp, it, mp.ItemRoster.GetItemNumber(it), false);
+            return l != null ? Math.Max(0, Now - l.Day) : 0.0;
         }
 
         /// <summary>
@@ -585,7 +593,7 @@ namespace Armoury
         /// </summary>
         private static bool AgeMarket(MobileParty mp, ItemObject it, double min, double keep, double age)
         {
-            if (!(age > MaxAgeDays) || it == null || it.IsFood || it.ItemCategory == null || !(min > 0.0)) return false;
+            if (!(age > MaxAgeDays) || it == null || !CaravanMarket294.Durable(it) || it.ItemCategory == null || !(min > 0.0)) return false;   // 294: jedzenie, ktore sie nie psuje - jak towar
             // 286 (klucz CaravanAgedGlutSells): towar w przesycie (kupno stoi - karawany swiata wioza wiecej niz 10 dob sprzedazy miastom, CaravanTrade284.GateShut)
             // nie czeka na rynek z zyskiem - ten rynek bierze tylko tyle, ile sprzedaz (log 134a: srebro w jukach 2 326 = 90.5 doby sprzedazy, 'dlugo w jukach czeka'
             // 2 394 ocen w dobie); stary towar (> 30 dob) schodzi na stracie porcjami T1 jak towar bez rynku (kupiec nie trzyma kapitalu w towarze bez konca)
@@ -594,7 +602,7 @@ namespace Armoury
             double e = CaravanTrade284.SellIdxOf(it.ItemCategory);
             if (!(e > 0.0)) return false;
             bool ok = Math.Max(1, it.Value) * e / (1.0 + Penalty(mp, it)) * keep >= min;
-            if (ok) CaravanTrade284.NoteAgeWait();
+            if (ok) { CaravanTrade284.NoteAgeWait(); if (it.IsFood) CaravanMarket294.NoteDurableWait(); }
             return ok;
         }
 
@@ -825,7 +833,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ wjazd do miasta
 
-        private sealed class Cand { public ItemObject It; public EquipmentElement El; public int Have; public double Unit, Min; public bool Food; public float Gain; public int Price; }
+        // 294: Spoil - dziala regula 'jedzenie psuje sie' (CaravanMarket294.Spoils), Dur - towar jak trwaly (regula 5, 286/286b; CaravanMarket294.Durable)
+        private sealed class Cand { public ItemObject It; public EquipmentElement El; public int Have; public double Unit, Min; public bool Food, Spoil, Dur; public float Gain; public int Price; }
 
         /// <summary>Powod sprzedazy na stracie (0 - brak wyjscia nie zachodzi): 1 rozwiazanie, 2 brak na zold, 3 juki ponad udzwig, 4 jedzenie psuje sie, 5 dlugo w jukach
         /// (poprawka 132a: tylko bez rynku z zyskiem - market z AgeMarket).</summary>
@@ -914,7 +923,7 @@ namespace Armoury
                 bool dup = false;
                 foreach (var c in cands) if (ReferenceEquals(c.It, it)) { dup = true; break; }
                 if (dup) continue;
-                cands.Add(new Cand { It = it, El = el.EquipmentElement, Have = pack.GetItemNumber(it), Unit = l.Cost / l.N, Food = it.IsFood });
+                cands.Add(new Cand { It = it, El = el.EquipmentElement, Have = pack.GetItemNumber(it), Unit = l.Cost / l.N, Food = it.IsFood, Spoil = CaravanMarket294.Spoils(it), Dur = CaravanMarket294.Durable(it) });
             }
             if (cands.Count == 0) return;
             foreach (var c in cands)
@@ -972,7 +981,7 @@ namespace Armoury
                         while (kp >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kp, wv) * keepK <= c.Min) kp--;
                         if (kp >= 1) { step = kp; pLast = PriceAt(model, el.EquipmentElement, mp, d, kp, wv); profit = true; _profitCut++; }
                     }
-                    int why = profit ? 0 : LossWhy(disband, cash, full, c.Food, age, AgeMarket(mp, it, c.Min, keepK, age));   // 132a: > 30 dob bez rynku z zyskiem
+                    int why = profit ? 0 : LossWhy(disband, cash, full, c.Spoil, age, AgeMarket(mp, it, c.Min, keepK, age));   // 132a: > 30 dob bez rynku z zyskiem; 294: jedzenie, ktore sie nie psuje - jak towar
                     if (why == 3)
                     {
                         // juki ponad udzwig: na stracie tylko tyle wagi, ile trzeba do zejscia pod udzwig
@@ -999,7 +1008,20 @@ namespace Armoury
                         if (kl <= 0) { if (stop == 1) _rPortionIdx++; else _rPortionPrice++; break; }
                         if (kl < step) { step = kl; _portionCut++; pLast = PriceAt(model, el.EquipmentElement, mp, d, kl, wv); }
                     }
-                    if (why == 5 && !c.Food && AgedGlut(cat))
+                    if (why == 4 && CaravanMarket294.FoodKeepsOn)
+                    {
+                        // 294 (klucz CaravanFoodKeepsByKind): psujace sie jedzenie na stracie nie taniej niz koszt x (1 - 1.5% x doby w jukach) - kupiec traci najwyzej tyle,
+                        // ile juz sie zepsulo (ulamek wozow KS-H w drodze); kazda sztuka kroku po mycie nie ponizej tej granicy, reszta czeka na nastepne miasto
+                        double fl = CaravanMarket294.SpoilFloor(c.Unit, age);
+                        if (fl > 0.0)
+                        {
+                            int kf = step;
+                            while (kf >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kf, wv) * keepK < fl) kf--;
+                            if (kf <= 0) { CaravanMarket294.NoteFloorT1(); break; }
+                            if (kf < step) { step = kf; pLast = PriceAt(model, el.EquipmentElement, mp, d, kf, wv); }
+                        }
+                    }
+                    if (why == 5 && c.Dur && AgedGlut(cat))
                     {
                         // poprawka 135a (286b): stary towar w przesycie - kazda sztuka kroku po mycie nie ponizej wartosci w ksiedze 259 (AgedGlutFloor); reszta czeka
                         // na miasto, ktore placi wiecej (indeks ponad srednia - tam, gdzie towaru brak)
@@ -1055,7 +1077,8 @@ namespace Armoury
                     {
                         r.LossN += moved; r.LossG += gross; r.LossCost += (long)cost;
                         switch (why) { case 1: _lDisband += moved; _lDisbandG += gross; break; case 2: _lCash += moved; _lCashG += gross; break; case 3: _lFull += moved; _lFullG += gross; break; case 4: _lFood += moved; _lFoodG += gross; break; default: _lAge += moved; _lAgeG += gross; break; }
-                        if (why == 5 && !c.Food && AgedGlut(cat)) NoteAged286(moved, gross, (long)cost, cat, true);   // 286: stary towar w przesycie (licznik)
+                        if (why == 5 && c.Dur && AgedGlut(cat)) NoteAged286(moved, gross, (long)cost, cat, true);   // 286: stary towar w przesycie (licznik)
+                        if (why == 5 && c.Food) CaravanMarket294.NoteDurableLoss(moved, gross);   // 294: jedzenie, ktore sie nie psuje - dlugo w jukach jak towar
                     }
                     Visit v; if (!_visit.TryGetValue(mp, out v)) { v = new Visit { St = st }; _visit[mp] = v; }
                     v.Cats.Add(cat);
