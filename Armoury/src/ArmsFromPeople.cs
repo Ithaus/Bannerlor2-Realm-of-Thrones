@@ -39,7 +39,7 @@ namespace Armoury
     /// jest prawdziwym czlowiekiem z Westeros (WatchLaw.GiveLevy: Mur, pule wyrzutkow, ludnosc); osada Daru poza frakcja Strazy - "" jak dotad; wedrowcy BK z Daru -
     /// zwykla regula R19 (migracja rodzin z DOM osady, nie sluzba). Przy wylaczonym WatchLaw - "" jak w E4/8.
     /// </summary>
-    internal static class ArmsFromPeople
+    internal static partial class ArmsFromPeople
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const double Eps = 1e-6;
@@ -88,6 +88,9 @@ namespace Armoury
             // rozwiazane bez bitwy (R6)
             public int q, qRemoved; public double qHere, qOther, qNone, qWall, qVet; public readonly Dictionary<int, int> qKind = new Dictionary<int, int>();
             public double ob;                    // m97-wioski krok 2: obroncy wioski pobocznej zdjeci z DOM wsi okregu (PeopleBook.TakeLevyHere, MLevyMilitia) - do KONTROLI
+            // 295: orszaki dworow BK (RetinueComponent.DailyTick) - rt zdjeci z DOM wsi (MLevyMilitia, do KONTROLI); reszta - linia "Orszaki dworow BK (295)"
+            public double rt, rtFrac, rtH1, rtH2, rtH3, rtH4;
+            public int rtCalls, rtSkip, rtUp, rtNew, rtStrip, rtHome;
             public long ticks;
         }
         private static Day D = new Day();
@@ -1038,6 +1041,7 @@ namespace Armoury
             Wire(h, "wedrowcy BK (CreateTravellerParty)", trav, P(nameof(TravPre)), null, P(nameof(BkFin)));
             Wire(h, "konwoje BK - zywnosc (CreateFoodCaravan)", food, P(nameof(CargoPre)), null, P(nameof(BkFin)));
             Wire(h, "konwoje BK - niewolnicy (CreateSlaveCaravan)", slave, P(nameof(CargoPre)), null, P(nameof(BkFin)));
+            WireRetinue(h, P);   // 295: orszaki dworow BK (RetinueComponent.DailyTick) - ArmsFromPeople.Retinue295.cs
             Log.Info("Wojsko z ludzi (E4/8): latki przy starcie gry " + _wired.Count + " z " + _targets.Count + "; BRAK: " + (_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-")
                      + "; pelna linia z wlascicielami latek - w pierwszej dobie kampanii.");
         }
@@ -1091,6 +1095,7 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             if (!_startLogged) { _startLogged = true; try { Log.Info(StartLine()); } catch (Exception e) { Stumble("StartLine", e); } }
             try { Log.Info(Line(day, d, s, t0)); } catch (Exception e) { Stumble("Line", e); }
+            try { Log.Info(RetinueLine(day, d, s)); } catch (Exception e) { Stumble("Line(295)", e); }
             try { TownGrowth.Line(day, true); } catch (Exception e) { Stumble("Daily(Miasta)", e); }
             _stumblesDay = 0; _stumbleAt.Clear();
         }
@@ -1155,8 +1160,9 @@ namespace Armoury
             // kontrola kodu: ruch DOM przyczynami E4/8 w ksiedze (PeopleBook.ArmsDayMen) = to, co linia zdjela
             var bm = PeopleBook.ArmsDayMen;
             double bookOut = bm[PeopleBook.MLevyMilitia] + bm[PeopleBook.MLevySpawn] + bm[PeopleBook.MCaravanOut] + bm[PeopleBook.MCaravanRefill] + bm[PeopleBook.MRoadOut];
-            double ours = d.m1 + d.a1 + d.c1 + d.c3 + d.n1w + d.n1e + d.ob;   // m97-wioski krok 2: + ob (obroncy wiosek pobocznych)
-            sb.Append(" | KONTROLA: zdjete z DOM przyczynami E4/8 ").Append(F1(bookOut)).Append(" - (m1 + a1 + c1 + c3 + n1w + n1e + ob) = ").Append((bookOut - ours).ToString("0.00", Inv)).Append(" (ob - obroncy wiosek pobocznych ").Append(F1(d.ob)).Append(")");
+            double ours = d.m1 + d.a1 + d.c1 + d.c3 + d.n1w + d.n1e + d.ob + d.rt;   // m97-wioski krok 2: + ob (obroncy wiosek pobocznych); 295: + rt (orszaki dworow BK)
+            sb.Append(" | KONTROLA: zdjete z DOM przyczynami E4/8 ").Append(F1(bookOut)).Append(" - (m1 + a1 + c1 + c3 + n1w + n1e + ob + rt) = ").Append((bookOut - ours).ToString("0.00", Inv)).Append(" (ob - obroncy wiosek pobocznych ").Append(F1(d.ob))
+              .Append(", rt - orszaki dworow BK (295) ").Append(F1(d.rt)).Append(")");
             sb.Append(" | potkniecia ").Append(_stumblesDay);
             if (_stumbleAt.Count > 0) sb.Append(" (").Append(string.Join(", ", _stumbleAt.Select(kv => kv.Key + " " + kv.Value).ToArray())).Append(")");
             double ms = (d.ticks + (Stopwatch.GetTimestamp() - t0)) * 1000.0 / Stopwatch.Frequency;

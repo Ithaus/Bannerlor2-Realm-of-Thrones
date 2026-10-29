@@ -4374,6 +4374,12 @@ namespace Armoury
         public bool KsIronWorldFlow = true;                 // with Ks Iron Hands Follow Market: the weekly step moves hands at iron mines by what the whole iron stock of the market did in the last week (town stalls, iron on the road, caravan packs, villages, villager carts and castles) - a full market loses hands only while its iron still grows, a market short of ore gains hands until its iron grows, and in between hands follow the stock up and down; production follows what is really used. Off = as before (full market always loses hands)
         public bool CaravanFoodBuyOwnSales = true;          // with Caravans Measure Sales By Town Demand: food (it spoils in a caravan's packs after a week) is bought only up to a week of what caravans themselves sell to towns, not up to a week of the towns' whole demand - caravans stop buying bread and fish they would have to dump at a loss. Off = as before (food measured by town demand)
 
+        // --- Banner Kings manor retinues from the village's own people (295) ---
+        // Paczka 295 (29.10, Jeff "napraw pozostale bledy"): ksiega ludzi E4/7 w 136a - 4-6 ludzi na dobe "w nicosc - inne" i skoki "z niczego - inne" (+116 d109063):
+        // orszaki dworow BK (RetinueComponent.DailyTick: +1 z szablonu ponizej celu poziom x 15, -1 powyzej; nowy orszak z szablonu kultury). ArmsFromPeople.Retinue295.cs.
+        // Nowy klucz (plik MCM Jeffa go nie ma).
+        public bool BkRetinueFromVillage = true;            // with People Origin and Levy From Villages: the retinue of a village manor (Banner Kings) is made of that village's own people - a man who joins it (and every man of a newly raised retinue) leaves the village's people, and if the village has no one to spare he does not join; a man the retinue sends away goes back home to the village instead of vanishing. The retinue's size and its one-man-a-day pace stay as Banner Kings sets them. Off = as before (retinue men appear from nothing and vanish)
+
         // --- Food follows the market under the start calibration (night 18.10) ---
         // Paczka f20-d4 (decyzja Jeffa 18.10 "4. b"): po D+49 (koniec sterowania rynku) podaz jedzenia i soli pod KS nie szla za cena - A7 wylaczona, Plan rusza tylko
         // prace domowa (fin93: Essos oliwki 0.14 T*, mieso 0.20, winogrona 0.33 przy indeksie 3-4.5; sol Essos 3.62 T*, ryby Westeros 3.28 T* i rosna). Ta sama regula
