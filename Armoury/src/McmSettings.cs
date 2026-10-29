@@ -3320,6 +3320,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool RawPriceByUse { get; set; } = true;
 
+        [SettingPropertyBool("Price Flatter Lot Walk", HintText = "goods traded at a town's stall weigh on its price at once only as much as one day of the market's memory lets through: the game counts a fresh lot at once at 0.04 of the 0.14 a stocked stall weighs; on: 0.021 at once and the rest through the town's supply memory at 15% a day, as in the game. While you trade, a lot moves the price about half as much - buying and selling, for you and every caravan, cart and townsman; the price a town settles at once the goods have lain a week is the same as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PriceFlatterLotWalk { get; set; } = true;
+
         [SettingPropertyBool("Population Rent Enabled", HintText = "a fief pays by the people it stands for: each village and town on the map is a symbol of a whole land, and its lord's rents follow that land's population (the Reach richest, the Iron Islands poor)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool PopulationRentEnabled { get; set; } = true;
@@ -11281,6 +11285,7 @@ namespace Armoury
             s.HistMixedCategoryShelf = HistMixedCategoryShelf;
             s.PriceFormulaInNewCoin = PriceFormulaInNewCoin;
             s.RawPriceByUse = RawPriceByUse;
+            s.PriceFlatterLotWalk = PriceFlatterLotWalk;
             s.PopulationRentEnabled = PopulationRentEnabled;
             s.PopulationRentPerHead = PopulationRentPerHead;
             s.PopulationScale = PopulationScale;
