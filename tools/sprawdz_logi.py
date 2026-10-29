@@ -75916,13 +75916,15 @@ N283_RX = {
     "end": re.compile(r"^Nekanie \(283\) koniec: (padl od odpowiedzi|padl od innych|odpedzony|uszedl|koniec bitwy|inne) po ([\d.]+) s \| nekajacy (\S+) \| rodzaj "
                       r"(konny strzelec|pieszy strzelec|konny wrecz|pieszy wrecz) \| piechoty wyslanej (\d+), jezdzcow (\d+), szykow stoi (\d+) \| padlo od niego (\d+)$"),
     "tstart": re.compile(r"^Nekanie \(283\) TEST ([ABC]): nekajacy (\S+) \((konno|pieszo), (\S+), tier (\d+)\) \| cel .* \| wolnej piechoty wroga (\d+) \(szykow (\d+)\), "
-                         r"wolnej jazdy wroga (\d+) \(szykow (\d+)\), lucznikow wroga (\d+) \| wrog w marszu (TAK|NIE)$"),
+                         r"wolnej jazdy wroga (\d+) \(szykow (\d+)\), lucznikow wroga (\d+)(?: \(w szyku piechoty \d+\))? \| wrog w marszu (TAK|NIE)$"),
     "tnone": re.compile(r"^Nekanie \(283\) TEST ([ABC]): brak nekajacego - (.*)$"),
     "tcls": re.compile(r"\| cel \S+ szyku (\S+) "),   # recenzja 291: szyk celu proby (N283-1)
     "tphase": re.compile(r"^Nekanie \(283\) TEST ([ABC]): nekajacy (\S+) faza (\S+) po ([\d.]+) s"),
     "tend": re.compile(r"^Nekanie \(283\) TEST koniec: scenariusz ([ABC]), nekajacy (\S+), wynik (.+?) po ([\d.]+) s \| strzalow (\d+), wykryc (\d+), epizodow (\d+), "
                        r"lucznikow na cel (\d+), piechoty (\d+), jezdzcow (\d+), szykow stoi (\d+) \| wolnej piechoty wroga (\d+), wolnej jazdy wroga (\d+), "
-                       r"lucznikow wroga (\d+), wrog w marszu (TAK|NIE)$"),
+                       r"lucznikow wroga (\d+)(?: \(w szyku piechoty \d+\))?, wrog w marszu (TAK|NIE)$"),
+    # 291b (recenzja): piesi strzelcy wroga w szykach piechoty (HuntTest.cs InfArchTxt) - R1 bierze tylko szyki Ranged / konnych lucznikow
+    "tinfarch": re.compile(r"lucznikow wroga \d+ \(w szyku piechoty (\d+)\)"),
 }
 N283_ERR = re.compile(r"^ERROR in HorsePursuit\b")
 # linie kontrolne - napisy jak w kodzie C# (HorsePursuit.React.cs ReactWrite / ReactStartLine / ReactEndLine, HorsePursuit.HuntTest.cs TestPick / TestEnd / TestPhase)
@@ -75960,6 +75962,11 @@ N283_TEST = {
                 "wolnej piechoty wroga w 110 m 30 (szykow 1), od swoich 120 m, samotny TAK, strzalow 1)"),
     "tend": ("Nekanie (283) TEST koniec: scenariusz A, nekajacy vlandian_horse_archer#211, wynik padl po 30.0 s | strzalow 12, wykryc 14, epizodow 1, lucznikow na cel 6, "
              "piechoty 0, jezdzcow 8, szykow stoi 3 | wolnej piechoty wroga 30, wolnej jazdy wroga 6, lucznikow wroga 8, wrog w marszu TAK"),
+    # 291b (recenzja): lucznicy bandy w szyku piechoty (autotest 296a C)
+    "tstart2": ("Nekanie (283) TEST C: nekajacy river_swordmaster#63 (pieszo, OneHandedSword, tier 5) | cel skag_bowman#12 szyku Infantry (38 ludzi) | na cel wrecz "
+                "| wolnej piechoty wroga 38 (szykow 1), wolnej jazdy wroga 6 (szykow 2), lucznikow wroga 0 (w szyku piechoty 8) | wrog w marszu TAK"),
+    "tend2": ("Nekanie (283) TEST koniec: scenariusz C, nekajacy river_swordmaster#63, wynik padl po 60.0 s | strzalow 0, wykryc 3, epizodow 1, lucznikow na cel 0, "
+              "piechoty 2, jezdzcow 0, szykow stoi 0 | wolnej piechoty wroga 38, wolnej jazdy wroga 6, lucznikow wroga 0 (w szyku piechoty 8), wrog w marszu TAK"),
 }
 
 
@@ -76016,6 +76023,17 @@ def nekanie283_selftest():
     m = RX["tend"].match(T["tend"])
     if not m or m.groups() != ("A", "vlandian_horse_archer#211", "padl", "30.0", "12", "14", "1", "6", "0", "8", "3", "30", "6", "8", "TAK"):
         return f"tend: {m.groups() if m else 'brak dopasowania'}"
+    if RX["tinfarch"].search(T["tend"]):
+        return "tinfarch: dopasowanie bez strzelcow w szyku piechoty"
+    m = RX["tstart"].match(T["tstart2"])
+    if not m or m.groups() != ("C", "river_swordmaster#63", "pieszo", "OneHandedSword", "5", "38", "1", "6", "2", "0", "TAK"):
+        return f"tstart2: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["tend"].match(T["tend2"])
+    if not m or m.groups() != ("C", "river_swordmaster#63", "padl", "60.0", "0", "3", "1", "0", "2", "0", "0", "38", "6", "0", "TAK"):
+        return f"tend2: {m.groups() if m else 'brak dopasowania'}"
+    mi = RX["tinfarch"].search(T["tend2"])
+    if not mi or mi.group(1) != "8":
+        return "tinfarch"
     return None
 
 
@@ -76131,7 +76149,8 @@ def nekanie283_rows(rep, D):
         rep.add(row2, "; ".join(parts), rule2, ok)
     # N283-3: C - wojownik wrecz na lucznikow
     row3 = "N283-3: scenariusz C (wojownik wrecz na lucznikow): wykrycie wrecz, odpowiedz lucznikow (strzal / krok / bron boczna), oddzial piechoty"
-    rule3 = "wykryc >= 1; lucznikow wroga > 0: lucznikow na cel + krok w bok udany + krok w tyl + bron boczna >= 1; wolna piechota > 0: piechoty >= 1"
+    rule3 = ("wykryc >= 1; lucznikow wroga > 0: lucznikow na cel + krok w bok udany + krok w tyl + bron boczna >= 1; wolna piechota > 0: piechoty >= 1 "
+             "(strzelcy wroga tylko w szyku piechoty - odpowiedz lucznikow nie sprawdzana, R1 bierze szyki Ranged / konnych lucznikow)")
     if not by["C"]:
         _skip(row3, "C", rule3)
     else:
@@ -76143,7 +76162,12 @@ def nekanie283_rows(rep, D):
             dmel = _n283_g("det", line, 5) + _n283_g("det", line, 4)
             o = det >= 1 and dmel >= 1 and (earch <= 0 or r1 >= 1) and (free_inf <= 0 or foot >= 1)
             ok = ok and o
-            parts.append(f"wykryc {det} (wrecz w bitwie {dmel}), R1 {r1} (lucznikow wroga {earch}), piechoty {foot} (wolnej {free_inf}), wynik {m.group(3)}")
+            # 291b (recenzja): autotest 296a - lucznicy bandy w szyku piechoty, 'lucznikow wroga 0': polowa reguly o lucznikach nie biegnie - powiedziec to wprost
+            mi = N283_RX["tinfarch"].search(m.string)
+            inarch = int(mi.group(1)) if mi else 0
+            note = (f"; odpowiedz lucznikow NIE SPRAWDZONA - {inarch} strzelcow wroga tylko w szyku piechoty (R1 bierze szyki Ranged / konnych lucznikow)"
+                    if earch <= 0 and inarch > 0 else "")
+            parts.append(f"wykryc {det} (wrecz w bitwie {dmel}), R1 {r1} (lucznikow wroga {earch}), piechoty {foot} (wolnej {free_inf}), wynik {m.group(3)}{note}")
         rep.add(row3, "; ".join(parts), rule3, ok)
     # N283-4: regresja
     lines = [g["line"] for g in segs]
@@ -76231,7 +76255,7 @@ def nekanie283_synth():
     bad_tend_b = tend_b.replace("piechoty 5", "piechoty 0").replace("jezdzcow 2, szykow", "jezdzcow 0, szykow")
     runs = {
         "good": [nb2, T["tstart"], T["start"], T["end"], T["tend"], T["line"], nb2, T["tphase"], T["tphase3"], T["start2"], T["end"], tend_b, T["line"], nb2, T["tphase2"], tend_c,
-                 T["line"]],
+                 T["line"], nb2, T["tstart2"], T["tend2"], T["line"]],
         "bad": [nb2, T["tstart"], T["start"], bad_tend_a, bad_line, nb2, bad_tend_b, T["line"], "ERROR in HorsePursuit.NekanieWrecz: NullReferenceException"],
         "none": [nb2, T["tnone"], T["line"]],
         "empty": ["Armoury: inna linia"],
@@ -78055,20 +78079,21 @@ def bitwa291_rows(rep, D):
         rep.add("B291-3: C bieg bez tarcz pod ostrzalem - tylko szyki ponizej progu tarcz, koncow <= wejsc", txt, "sr. tarcz < prog, koncow <= wejsc", not bad)
     else:
         kept = sum(int(x[3].group(8)) for x in L)
-        # 291b (autotest 296a: 7 bitew, "z tarczami zostal krok 4", wejsc 0): powod wprost - pod ostrzalem w marszu byly tylko szyki z tarczami (bandy autotestu),
-        # szyki gracza autotestu poza regula; u Jeffa 29.10 00:46-00:49 trafieni strzala piechurzy wroga 44 z 44 bez tarczy w ekwipunku - tam regula ma wejsc
+        # 291b (autotest 296a: 7 bitew, "z tarczami zostal krok 4", wejsc 0): powod wprost - pod ostrzalem w marszu (MarchCap) byly tylko szyki AI z tarczami
+        # (obu stron - _player tylko szyki gracza); szyki stojace, w zwarciu i pod rozkazami gracza licznik pomija; u Jeffa 29.10 00:46-00:49 trafieni strzala piechurzy
+        # wroga 44 z 44 bez tarczy w ekwipunku - tam regula ma wejsc
         ks = [(int(x[3].group(8)), float(x[3].group(9)), x[3].group(5)) for x in L if x[3].group(9)]
         if ks:
             kn = sum(k[0] for k in ks)
             avg = sum(k[0] * k[1] for k in ks) / kn
-            why = (f"brak wejsc w bieg: pod ostrzalem w marszu tylko szyki piechoty AI z tarczami - {kept} szykow, sr. tarcz {avg:.2f} >= prog {ks[0][2]} "
-                   "(w tym biegu nie bylo piechoty AI bez tarcz pod ostrzalem; szyki gracza autotestu poza regula) - regula do sprawdzenia w grze")
+            why = (f"brak wejsc w bieg: w marszu (MarchCap) pod ostrzalem tylko szyki piechoty AI z tarczami - {kept} szykow, sr. tarcz {avg:.2f} >= prog {ks[0][2]}; "
+                   "szyki stojace / w zwarciu / pod rozkazami gracza poza licznikiem - regula do sprawdzenia w grze")
         elif kept:
             why = f"brak wejsc w bieg (z tarczami zostal krok {kept}; log sprzed 291b - bez sr. tarcz)"
         else:
-            why = "brak wejsc w bieg: zaden szyk piechoty AI nie szedl marszem pod ostrzalem"
+            why = "brak wejsc w bieg: zaden szyk piechoty AI nie szedl marszem (MarchCap) pod ostrzalem; szyki stojace / w zwarciu poza licznikiem"
         rep.add("B291-3: C bieg bez tarcz pod ostrzalem - tylko szyki ponizej progu tarcz, koncow <= wejsc",
-                why, "INFO (bitwa bez piechoty AI bez tarcz pod ostrzalem - powod w wartosci)", None)
+                why, "INFO (w marszu pod ostrzalem bez szyku piechoty AI bez tarcz - powod w wartosci)", None)
     # B291-4 regresja
     stum = sum(int(x[2].group(11)) for x in L)
     known = bool(L or D["err"])

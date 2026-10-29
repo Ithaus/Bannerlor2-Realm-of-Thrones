@@ -120,6 +120,7 @@ namespace Armoury
             public bool Hold;                     // poprawka 132b: krok z NoAttack (nekajacy wrecz w zwarciu ze swoimi)
             public Formation Home;                // poprawka 132b: R2 straz strzelcow - smycz od szyku strzezonego, nie od swojego
             public Vec2 Anchor = Vec2.Invalid;    // 291: R2 - smycz od miejsca wyslania (szyk idzie dalej z armia, ArmyMarchesPastHarassers)
+            public Vec2 RideFrom = Vec2.Invalid;  // 291b: jezdziec - srodek ludzi szyku przy wyslaniu (smycz LeashHome, gdy w poscigu jedzie caly szyk)
         }
 
         private struct FI
@@ -522,6 +523,13 @@ namespace Armoury
         /// <summary>Recenzja 204: srodek ludzi szyku, ktorzy nie jada za strzelcem (jezdzcy 204 pominieci); wszyscy jada - miejsce szyku (Home).</summary>
         private static Vec2 RestPos(Formation f)
         {
+            Vec2 p;
+            return TryRestPos(f, out p) ? p : Home(f);
+        }
+
+        /// <summary>291b: jak RestPos; false = w szyku nie ma czynnego czlowieka poza jezdzcami / piechota w poscigu (p niewazne).</summary>
+        private static bool TryRestPos(Formation f, out Vec2 p)
+        {
             HUnits.Clear();
             f.ApplyActionOnEachUnit(HCollect);
             float x = 0f, y = 0f;
@@ -536,7 +544,8 @@ namespace Armoury
                 x += q.x; y += q.y; n++;
             }
             HUnits.Clear();
-            return n > 0 ? new Vec2(x / n, y / n) : Home(f);
+            p = n > 0 ? new Vec2(x / n, y / n) : Vec2.Invalid;
+            return n > 0;
         }
 
         private static void Bump(Dictionary<Formation, int> d, Formation f, int by)
@@ -783,7 +792,7 @@ namespace Armoury
             }
             if (a.MountAgent == null) return UOther;
             if (Blown(HorseS(a))) return UHorse;
-            float df = a.Position.AsVec2.Distance(LeashHome(h.F));   // 291b: od szyku, nie od celu drogi / starego punktu szarzy
+            float df = a.Position.AsVec2.Distance(LeashHome(h));   // 291b: od szyku, nie od celu drogi / starego punktu szarzy
             if (df > h.T.MaxFar) h.T.MaxFar = df;
             if (df > _hMaxFar) _hMaxFar = df;
             if (df > _maxFrom) return ULeash;
@@ -1215,6 +1224,7 @@ namespace Armoury
             t.Melee++;
             t.MeleeEver++;
             h.Group = t.Group;
+            h.RideFrom = fi.Rest;   // 291b: smycz, gdy w poscigu jedzie caly szyk (LeashHome)
             Bump(FormRiders, fi.F, 1);
             if (h.Group)
             {

@@ -120,24 +120,28 @@ namespace Armoury
             return f.CachedAveragePosition;
         }
 
-        /// <summary>291b: miara smyczy jezdzca (HunterCheck, MaxFromMain): punkt rozkazu tylko, gdy szyk na nim stoi (oslona skrzydla - Move na miejscu albo Stop),
-        /// inaczej srodek ludzi szyku, ktorzy nie jada w poscigu (RestPos; wszyscy jada - Home jak dotad). Autotest 296a bitwa 4: 'najdalej jazda 358 m' przy smyczy
-        /// 250 m, a najdalej w epizodach 116 m - OrderPosition to w marszu (Move / Advance) CEL drogi, a w szarzy punkt z ostatniego Move (gra go nie przestawia -
-        /// MovementOrder.OnApply); po 291 armia idzie dalej mimo nekajacego (bez postoju R5, ktory stawial szyk w miejscu), obronca trzyma punkt i potem szarzuje -
-        /// punkt rozkazu odjezdzal od szyku i smycz 'od glownej sily' mierzyla od pustego miejsca (skok miary miedzy passami).</summary>
-        private static Vec2 LeashHome(Formation f)
+        /// <summary>291b: miara smyczy jezdzca (HunterCheck, MaxFromMain): punkt rozkazu tylko, gdy szyk na nim stoi (oslona skrzydla - Move z mediana szyku
+        /// w 5 srednicach od punktu, Moving), inaczej srodek ludzi szyku, ktorzy nie jada w poscigu (RestPos), a gdy jada wszyscy - miejsce ludzi szyku przy
+        /// wyslaniu jezdzca (Hunter.RideFrom). Autotest 296a bitwa 4: 'najdalej jazda 358 m' przy smyczy 250 m, a najdalej w epizodach 116 m - OrderPosition to
+        /// w marszu (Move / Advance) CEL drogi, a w szarzy i przy Stop punkt z ostatniego Move (gra go nie przestawia - MovementOrder.OnApply ustawia punkt tylko
+        /// dla Move); po 291 armia idzie dalej mimo nekajacego (bez postoju R5, ktory stawial szyk w miejscu), obronca trzyma punkt i potem szarzuje - punkt rozkazu
+        /// odjezdzal od szyku i smycz 'od glownej sily' mierzyla od pustego miejsca (skok miary miedzy passami). Recenzja 291b: Stop bez sprawdzenia, czy szyk
+        /// stoi na punkcie, i szyk konnicy 2-3 ludzi (bitwa 4 'szyki [Cavalry 2/3]'), w ktorym jada wszyscy (RestPos -> Home = stary punkt), wracaly do starej miary.</summary>
+        private static Vec2 LeashHome(Hunter h)
         {
+            var f = h.F;
             try
             {
-                var oe = f.GetReadonlyMovementOrderReference().OrderEnum;
-                if ((oe == MovementOrder.MovementOrderEnum.Move || oe == MovementOrder.MovementOrderEnum.Stop) && !Moving(f))
+                if (f.GetReadonlyMovementOrderReference().OrderEnum == MovementOrder.MovementOrderEnum.Move && !Moving(f))
                 {
                     Vec2 p = f.OrderPosition;
                     if (p.IsValid && (p.x != 0f || p.y != 0f)) return p;
                 }
             }
             catch { }
-            return RestPos(f);
+            Vec2 r;
+            if (TryRestPos(f, out r)) return r;
+            return h.RideFrom.IsValid ? h.RideFrom : Home(f);
         }
 
         /// <summary>Strzelec blizej niz CounterFootGap od nietknietego szyku pieszego swojej strony (szyk od IntactMin ludzi, nie konnica ani konni lucznicy;

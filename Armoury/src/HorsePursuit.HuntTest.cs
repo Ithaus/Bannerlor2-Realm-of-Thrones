@@ -59,6 +59,7 @@ namespace Armoury
         private static string _tEnd = "-";
         // 283: scenariusz (licznik bitew mocnych sesji - nie zerowany miedzy misjami), liczniki odpowiedzi na nekajacego testu
         private static int _tSeq, _tScen, _tArch, _tFoot, _tHalt, _tFreeInf, _tInfForms, _tEnemyArch;
+        private static int _tInfArch;   // 291b (recenzja): piesi strzelcy wroga w szykach piechoty (R1 ich nie bierze - tylko szyki Ranged / konnych lucznikow)
         private static bool _tBehind, _tMarch;
         // 283a: nekajacy bez capu marszu (MarchToContact - watki robocze, Volatile), etap drogi, punkt drogi, ostatnia pozycja skryptowa, postoj
         private static Agent _tRun;
@@ -98,7 +99,7 @@ namespace Armoury
             _tDeploy = -1f; _tStart = 0f; _tFleeUntil = -1f; _tContact = -1f;
             _tA = null; _tTgt = null; _tF = null; _tFlee = false;
             _tShots = _tDet = _tMissPass = _tEp = _tRiders = _tLines = _tFreeCav = _tCavForms = 0;
-            _tScen = 0; _tArch = _tFoot = _tHalt = _tFreeInf = _tInfForms = _tEnemyArch = 0;
+            _tScen = 0; _tArch = _tFoot = _tHalt = _tFreeInf = _tInfForms = _tEnemyArch = _tInfArch = 0;
             _tBehind = _tMarch = false;
             _tEnd = "-";
             Volatile.Write(ref _tRun, null);
@@ -454,7 +455,8 @@ namespace Armoury
             try { var mv = (a.MountAgent ?? a).MovementVelocity; v = mv.Length; } catch { v = 0f; }
             TestPhase("stan", now, " (etap " + TestLegName[Math.Min(2, Math.Max(0, _tLeg))] + (_tInPlace ? ", na miejscu" : "") + ", do punktu "
                       + (_tSet.IsValid ? F0(ap.Distance(_tSet)) : "-") + " m, od szyku celu " + (df >= 0f ? F0(df) : "-") + " m, " + TestOwnTxt(a, ap) + ", strzalow "
-                      + _tShots + ", predkosc " + v.ToString("0.0", Inv) + " m/s, punkt poza polem " + _tOff + ")");
+                      + _tShots + ", predkosc " + v.ToString("0.0", Inv) + " m/s, punkt poza polem " + _tOff
+                      + (a.MountAgent == null ? ", krok oddechu " + (AiBreath.CapOf(a) > 0f ? "TAK" : "NIE") : "") + ")");   // 291b: cap AiBreath pieszego nekajacego
         }
 
         /// <summary>Punkt nekajacego: 283 A / B - za szykiem (mediana - Direction x (Depth/2 + 3 albo 15 m)); 204 - 10 m od krawedzi szyku od strony nekajacego.</summary>
@@ -536,7 +538,7 @@ namespace Armoury
                 if (fi.Player) continue;
                 if (fi.Cav) { _tFreeCav += fi.N; _tCavForms++; }
                 else if (fi.Rng) _tEnemyArch += fi.N;
-                else if (fi.Foot) { _tFreeInf += fi.N; _tInfForms++; }
+                else if (fi.Foot) { _tFreeInf += fi.N; _tInfForms++; _tInfArch += FootShooters(fi.F); }
                 if (fi.Ha) _tEnemyArch += fi.N;
                 try { if (!fi.Retreat && Moving(fi.F)) _tMarch = true; } catch { }
             }
@@ -557,9 +559,27 @@ namespace Armoury
                 Log.Info("Nekanie (283) TEST " + TestScenName[_tScen] + ": nekajacy " + Who(best) + " (" + (best.MountAgent != null ? "konno" : "pieszo") + ", " + Weapon(best)
                          + ", tier " + TierOf(best) + ") | cel " + Who(_tTgt) + " szyku " + _tF.FormationIndex + " (" + _tF.CountOfUnits + " ludzi) | " + wtxt
                          + " | wolnej piechoty wroga " + _tFreeInf + " (szykow " + _tInfForms + "), wolnej jazdy wroga " + _tFreeCav + " (szykow " + _tCavForms
-                         + "), lucznikow wroga " + _tEnemyArch + " | wrog w marszu " + (_tMarch ? "TAK" : "NIE"));
+                         + "), lucznikow wroga " + _tEnemyArch + InfArchTxt() + " | wrog w marszu " + (_tMarch ? "TAK" : "NIE"));
             return true;
         }
+
+        /// <summary>291b (recenzja): piesi ludzie z amunicja (IsRangedCached) w szyku - lucznicy band bywaja w szyku piechoty (autotest 296a: 8 skag_bowman
+        /// w szyku Infantry, 'lucznikow wroga 0').</summary>
+        private static int FootShooters(Formation f)
+        {
+            int n = 0;
+            HUnits.Clear();
+            f.ApplyActionOnEachUnit(HCollect);
+            for (int u = 0; u < HUnits.Count; u++)
+            {
+                var x = HUnits[u];
+                if (x != null && x.IsActive() && x.IsHuman && x.MountAgent == null && x.IsRangedCached) n++;
+            }
+            HUnits.Clear();
+            return n;
+        }
+
+        private static string InfArchTxt() { return _tInfArch > 0 ? " (w szyku piechoty " + _tInfArch + ")" : ""; }
 
         private static float NearestFoot(int es, Vec2 p)
         {
@@ -683,7 +703,7 @@ namespace Armoury
                 Log.Info("Nekanie (283) TEST koniec: scenariusz " + TestScenName[_tScen] + ", nekajacy " + Who(a) + ", wynik " + why + " po "
                          + Math.Max(0f, now - _tStart).ToString("0.0", Inv) + " s | strzalow " + _tShots + ", wykryc " + _tDet + ", epizodow " + _tEp
                          + ", lucznikow na cel " + _tArch + ", piechoty " + _tFoot + ", jezdzcow " + _tRiders + ", szykow stoi " + _tHalt
-                         + " | wolnej piechoty wroga " + _tFreeInf + ", wolnej jazdy wroga " + _tFreeCav + ", lucznikow wroga " + _tEnemyArch
+                         + " | wolnej piechoty wroga " + _tFreeInf + ", wolnej jazdy wroga " + _tFreeCav + ", lucznikow wroga " + _tEnemyArch + InfArchTxt()
                          + ", wrog w marszu " + (_tMarch ? "TAK" : "NIE"));
         }
     }
