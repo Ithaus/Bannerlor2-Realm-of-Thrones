@@ -357,6 +357,7 @@ namespace Armoury
                 try { Write(m); } catch (Exception e) { Stumble("HorsePursuit.Write", e); }
                 try { HuntWrite(); } catch (Exception e) { Stumble("HorsePursuit.JazdaLinia", e); }   // 204: linia "Jazda na strzelca (204)" raz na bitwe polowa
                 try { ReactWrite(); } catch (Exception e) { Stumble("HorsePursuit.NekanieLinia", e); }   // 283: linia "Nekanie (283)" raz na bitwe polowa
+                try { if (_field) Battle291.Write(m, _kind, Seg291A()); } catch (Exception e) { Stumble("HorsePursuit.Bitwa291", e); }   // 291: linia "Bitwa (291)"
             }
             _live = false;
             Clear();

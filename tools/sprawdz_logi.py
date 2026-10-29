@@ -1246,6 +1246,14 @@ Uzycie (Python 3, tylko odczyt):
                     Z290-S self-test; Z290-0 segment i linia co dobe; Z290-1 ruch 290 zgodny z regula; Z290-2 zelazo swiata w [-10, +10]/d (30 dob i caly bieg);
                     Z290-3 miasta bez rudy nie rosna; Z290-4 T1 jedzenie na stracie <= 80 szt./d, utarg na stracie <= 1000 zl/d; Z290-5 bramka jedzenia spojna;
                     Z290-6 jedzenie w jukach <= 12 dob wlasnej sprzedazy; Z290-7 INFO.
+--grupa bitwa291  : (29.10, paczka 291 noc/291-bitwa-ai - Jeff 29.10 "armia sie zatrzymala aby zobaczyc z kim walcze ... glowna czesc sil szlaby na przod
+                    a wydzielili by tylko maly odzial", "jak ja atakuje to przeciwnik wybiera najlepsze pozycje do obrony i czeka na mnie", "piechota nie ma tarcz ...
+                    biegnie na przeciwnika"; Armoury/src/HorsePursuit.ReactHalt.cs, Doctrine.Hold291.cs, MarchToContact.cs, Battle291.cs; klucze ArmyMarchesPastHarassers,
+                    DefendersHoldTheirGround, UnshieldedRushUnderFire) python -I tools/sprawdz_logi.py --grupa bitwa291 <Armoury-*.log> (strumieniowo; bieg bitew
+                    autotestu albo bieg 90 dob - bez bitew polowych INFO). Linia 'Bitwa (291): misja ...' raz na bitwe polowa. B291-S self-test, B291-S2 test
+                    syntetyczny; B291-0 linia w kazdej bitwie polowej (NB2), klucze TAK; B291-1 A: R5 (cala armia) 0, R4 tylko strzelcy (R4 = strzelcy staja);
+                    B291-2 B: taktyka ataku obroncy przy trzymaniu <= 4 s na bitwe (po pierwszej decyzji gry); B291-3 C: bieg tylko szykow z tarcza ponizej progu,
+                    koncow <= wejsc; B291-4 regresja (potkniecia B 0, 'ERROR in' Doctrine / HorsePursuit / MarchToContact 0); B291-5 INFO (sumy).
 --grupa z268      : (27.10, paczka 268 noc/268-gotowosc-zbroja - Jeff 27.10 "czemu wojsko czesto nie ma pancerza", "tak zacznij od tych pieciu"; Armoury/src/
                     ArmedStrength.cs, ArmedStrength.Test.cs, ArmsFirst.cs, ArmourOrders.cs, AiGear.cs, MenUpgradeOrders.cs, NewLordKit.cs) python -I tools/sprawdz_logi.py
                     --grupa z268 <Armoury-*.log> (strumieniowo). Z268-S self-test, Z268-S2 test syntetyczny; Z268-0 start p9 z kluczami 268; Z268-1 segment
@@ -70467,10 +70475,12 @@ M204_RX = {
                        r"po ([\d.]+) s \| strzelec (\S+) \| jezdzcy padli (\d+), ciosy w strzelca (\d+), kontakt (-|[\d.]+ s), najdalej od szyku (\d+) m$"),
     "tstart": re.compile(r"^Jazda na strzelca \(204\) TEST: nekajacy (\S+) \(konno, (\S+), amunicja TAK\) \| cel .*\| wolnej jazdy wroga (\d+) \(szykow (\d+)\) \| faza podjazd$"),
     "tnone": re.compile(r"^Jazda na strzelca \(204\) TEST: brak nekajacego - (.*)$"),
-    "tend": re.compile(r"^Jazda na strzelca \(204\) TEST koniec: strzalow (\d+), wykryc (\d+) \(w tym pudla/przelot (\d+)\), epizodow (\d+), jezdzcow (\d+), "
+    # 291: '(w tym pudla/przelot N, wrecz W, pudel razem M)' - wykrycia ciosem i wszystkie pudla nekajacego testu (stary log bez - grupy bez zmian)
+    "tend": re.compile(r"^Jazda na strzelca \(204\) TEST koniec: strzalow (\d+), wykryc (\d+) \(w tym pudla/przelot (\d+)(?:, wrecz \d+, pudel razem \d+)?\), epizodow (\d+), jezdzcow (\d+), "
                        r"kontakt (-|[\d.]+ s), wynik (.+?) po ([\d.]+) s \| wolnej jazdy wroga (\d+) \(szykow (\d+)\)$"),
 }
 M204_ERR = re.compile(r"^ERROR in HorsePursuit\b")
+M204_TEND291 = re.compile(r"\(w tym pudla/przelot \d+, wrecz (\d+), pudel razem (\d+)\)")   # 291 (J204-1)
 # linie kontrolne - napisy jak w kodzie C# (HorsePursuit.Hunt.cs HuntWrite / StartEp / Contact / EndEp, HorsePursuit.HuntTest.cs TestPick / TestEnd / HuntTestStep)
 M204_TEST = {
     "line": ("Jazda na strzelca (204): misja bitwa, klucz TAK (konny strzelec wroga zauwazony po trafieniu, pudle w 4.5 m od ludzi, upadku / przelocie w 8 m, celu AI; "
@@ -70507,6 +70517,9 @@ M204_TEST = {
              "| wolnej jazdy wroga 6 (szykow 1)"),
     "tend0": ("Jazda na strzelca (204) TEST koniec: strzalow 0, wykryc 0 (w tym pudla/przelot 0), epizodow 0, jezdzcow 0, kontakt -, wynik padl po 3.0 s "
               "| wolnej jazdy wroga 0 (szykow 0)"),
+    # 291: wykrycia ciosem i pudla razem (HorsePursuit.HuntTest.cs TestEnd)
+    "tend291": ("Jazda na strzelca (204) TEST koniec: strzalow 4, wykryc 13 (w tym pudla/przelot 0, wrecz 7, pudel razem 0), epizodow 2, jezdzcow 7, kontakt 6.6 s, "
+                "wynik 2 epizody po 80.7 s | wolnej jazdy wroga 6 (szykow 2)"),
 }
 
 
@@ -70576,6 +70589,12 @@ def m204jazda_selftest():
     m = RX["tend"].match(T["tend0"])
     if not m or m.group(6) != "-" or m.group(7) != "padl":
         return "tend0"
+    m = RX["tend"].match(T["tend291"])   # 291: nowy format - te same grupy
+    if not m or m.groups()[:7] != ("4", "13", "0", "2", "7", "6.6 s", "2 epizody"):
+        return f"tend291: {m.groups() if m else 'brak dopasowania'}"
+    m = M204_TEND291.search(T["tend291"])
+    if not m or m.groups() != ("7", "0") or M204_TEND291.search(T["tend"]):
+        return "tend291 wrecz/pudel"
     return None
 
 
@@ -70643,11 +70662,27 @@ def m204jazda_rows(rep, D):
             ok1 = ok2 = ok3 = None
             base += " - NIE SPRAWDZONE (strzalow < 3 albo wrog bez wolnej jazdy)"
         else:
-            ok1 = det >= 1 and mp >= 1
+            # 291: wykryc z linii TEST koniec liczy tez ciosy (React MeleeEvent) i cel AI - J204-1 to wykrycie POCISKOW; nekajacy AI ma cel, wiec przy strzale
+            # wykrycie jest 'cel AI', a pudlo widac dopiero przy upadku obok ludzi. Nowy format: pociskiem >= 1 i (pudlo/przelot >= 1 albo zadnego pudla;
+            # pudla tylko z dala od ludzi - nie do sprawdzenia, INFO). Stary format (bez 'wrecz') - jak dotad.
+            n291 = [M204_TEND291.search(s) for s, _ in te]
+            if all(n291):
+                mel = sum(int(x.group(1)) for x in n291)
+                miss = sum(int(x.group(2)) for x in n291)
+                shot_det = det - mel
+                base += f", wrecz {mel}, pudel razem {miss}, wykryc pociskiem {shot_det}"
+                if shot_det >= 1 and mp == 0 and miss > 0:
+                    ok1 = None
+                    base += " - pudla tylko z dala od ludzi (nie do sprawdzenia)"
+                else:
+                    ok1 = shot_det >= 1 and (mp >= 1 or miss == 0)
+            else:
+                ok1 = det >= 1 and mp >= 1
             ok2 = ep >= 1 and rid >= min(2, free)
             ok3 = bool(cont) or bool(ok_end) or bool(cont_lines)
         rep.add("J204-1: wykrycie strzalow nekajacego (takze pudla / przelot)", f"{base}; wykryc {det}, w tym pudla/przelot {mp}",
-                ">= 1 wykrycie, w tym >= 1 pudlo albo przelot (przy >= 3 strzalach i wolnej jezdzie wroga)", ok1)
+                ">= 1 wykrycie, w tym >= 1 pudlo albo przelot (przy >= 3 strzalach i wolnej jezdzie wroga); 291: >= 1 wykrycie pociskiem (bez ciosow), pudlo/przelot "
+                ">= 1 albo bez pudel", ok1)
         rep.add("J204-2: odpowiedz jazdy (epizod, jezdzcy)", f"epizodow {ep}, jezdzcow {rid}", f">= 1 epizod i jezdzcow >= min(2, wolnej jazdy {free})", ok2)
         rep.add("J204-3: kontakt albo wynik padl / odpedzony", f"kontakt {', '.join(cont) or '-'}; koncow padl od jezdzcow / odpedzony {len(ok_end)}; linii kontaktu {len(cont_lines)}",
                 "kontakt albo epizod zakonczony 'padl od jezdzcow' / 'odpedzony'", ok3)
@@ -77805,6 +77840,219 @@ def main(argv):
             return zelazo290_main(rest[0] if rest else None)
     return _zelazo290_main_prev(argv)
 
+
+
+# ------------------------------------------------------------ bitwa291 (29.10, paczka 291 noc/291-bitwa-ai: A armia idzie dalej mimo nekajacego (bez R5, R4 tylko
+# strzelcy, smycz R2 od miejsca wyslania), B obronca trzyma pozycje (wagi ataku 0 przy wadze obrony), C piechota bez tarcz biegnie pod ostrzalem;
+# Armoury/src/HorsePursuit.ReactHalt.cs, Doctrine.Hold291.cs, MarchToContact.cs, Battle291.cs)
+#   python -I tools/sprawdz_logi.py --grupa bitwa291 <Armoury-*.log>
+BITWA291_FIELD = re.compile(r"^Bitwa \(NB2\): misja bitwa \(pole bitwy TAK")
+BITWA291_ERR = re.compile(r"^ERROR in (Doctrine|HorsePursuit|MarchToContact|Battle291)\b")
+BITWA291_ATK_MAX = 4.0   # s taktyki ataku obroncy przy trzymaniu (po DhGrace 6 s; decyzja gry co ok. 5 s, takt doktryny 2 s)
+BITWA291_RX = {
+    "line": re.compile(r"^Bitwa \(291\): misja (\S+) \| klucze: armia idzie dalej (TAK|NIE), obronca trzyma (TAK|NIE), bieg bez tarcz (TAK|NIE) \| "),
+    "a": re.compile(r"\| A armia idzie dalej (TAK|NIE): armia nie stanela (\d+) \(R5 (\d+)\), szykow poszlo dalej (\d+) \(ludzi (\d+)\), strzelcy staja (\d+) "
+                    r"\(R4 (\d+)\); oddzial od miejsca wyslania (\d+) \(powrotow ze smyczy (\d+)\) \|"),
+    "b": re.compile(r"\| B obronca trzyma pozycje (TAK|NIE)[^:]*: druzyn obroncy (\d+), sekund trzymania (\d+), wagi ataku ciete (\d+) \(bez wagi obrony (\d+)\), "
+                    r"taktyka ataku przy trzymaniu (\d+) s; puszczone: silniejszy x[\d.]+ (\d+), S2 (\d+), napastnik nie podchodzi \d+ s (\d+), zwarcie (\d+); "
+                    r"probka (.*?); potkniecia (\d+) \|"),
+    "c": re.compile(r"\| C piechota bez tarcz biegnie pod ostrzalem (TAK|NIE): szykow (\d+), wejsc w bieg (\d+) \(sr\. tarcz (\S+), prog ([\d.]+)\), koncow biegu (\d+), "
+                    r"szyko-sekund biegu (\d+); z tarczami pod ostrzalem zostal krok (\d+)\.$"),
+}
+# linie kontrolne - napisy jak w kodzie C# (Battle291.Write, HorsePursuit.Seg291A, Doctrine.Dh291Segment, MarchToContact.Rush291Segment)
+BITWA291_TEST = {
+    "line": ("Bitwa (291): misja bitwa | klucze: armia idzie dalej TAK, obronca trzyma TAK, bieg bez tarcz TAK | A armia idzie dalej TAK: armia nie stanela 1 "
+             "(R5 0), szykow poszlo dalej 2 (ludzi 40), strzelcy staja 1 (R4 1); oddzial od miejsca wyslania 6 (powrotow ze smyczy 1) | B obronca trzyma pozycje TAK: "
+             "druzyn obroncy 1, sekund trzymania 120, wagi ataku ciete 48 (bez wagi obrony 0), taktyka ataku przy trzymaniu 0 s; puszczone: silniejszy x1.5 0, S2 0, "
+             "napastnik nie podchodzi 90 s 0, zwarcie 1; probka T176/vlandia sila x0.81 trzyma, taktyka DefensiveEngagement s. 1 -> DefensiveEngagement; potkniecia 0 "
+             "| C piechota bez tarcz biegnie pod ostrzalem TAK: szykow 1, wejsc w bieg 1 (sr. tarcz 0.10, prog 0.60), koncow biegu 1, szyko-sekund biegu 24; z tarczami "
+             "pod ostrzalem zostal krok 0."),
+    "lineno": ("Bitwa (291): misja bitwa | klucze: armia idzie dalej NIE, obronca trzyma NIE, bieg bez tarcz NIE | A armia idzie dalej NIE: armia nie stanela 0 "
+               "(R5 1), szykow poszlo dalej 0 (ludzi 0), strzelcy staja 0 (R4 2); oddzial od miejsca wyslania 0 (powrotow ze smyczy 0) | B obronca trzyma pozycje "
+               "NIE (tylko pomiar): druzyn obroncy 1, sekund trzymania 0, wagi ataku ciete 0 (bez wagi obrony 0), taktyka ataku przy trzymaniu 0 s; puszczone: "
+               "silniejszy x1.5 0, S2 0, napastnik nie podchodzi 90 s 0, zwarcie 0; probka -, taktyka -; potkniecia 0 | C piechota bez tarcz biegnie pod ostrzalem "
+               "NIE: szykow 0, wejsc w bieg 0 (sr. tarcz -, prog 0.60), koncow biegu 0, szyko-sekund biegu 0; z tarczami pod ostrzalem zostal krok 0."),
+}
+
+
+def bitwa291_selftest():
+    """bitwa291: wyrazenia wobec linii kontrolnych BITWA291_TEST (napisy jak w kodzie C#). None = OK, inaczej opis."""
+    RX, T = BITWA291_RX, BITWA291_TEST
+    s = T["line"]
+    m = RX["line"].match(s)
+    if not m or m.groups() != ("bitwa", "TAK", "TAK", "TAK"):
+        return "line"
+    m = RX["a"].search(s)
+    if not m or m.groups() != ("TAK", "1", "0", "2", "40", "1", "1", "6", "1"):
+        return f"a: {m.groups() if m else 'brak'}"
+    m = RX["b"].search(s)
+    if not m or m.groups() != ("TAK", "1", "120", "48", "0", "0", "0", "0", "0", "1",
+                               "T176/vlandia sila x0.81 trzyma, taktyka DefensiveEngagement s. 1 -> DefensiveEngagement", "0"):
+        return f"b: {m.groups() if m else 'brak'}"
+    m = RX["c"].search(s)
+    if not m or m.groups() != ("TAK", "1", "1", "0.10", "0.60", "1", "24", "0"):
+        return f"c: {m.groups() if m else 'brak'}"
+    s = T["lineno"]
+    m = RX["line"].match(s)
+    if not m or m.group(2) != "NIE" or not RX["a"].search(s) or not RX["b"].search(s) or not RX["c"].search(s):
+        return "lineno"
+    if RX["b"].search(s).group(1) != "NIE" or RX["c"].search(s).group(4) != "-":
+        return "lineno b/c"
+    return None
+
+
+def bitwa291_collect(logp):
+    """Strumieniowo: bitwy polowe NB2, linie 'Bitwa (291)', ERROR in (Doctrine|HorsePursuit|MarchToContact|Battle291)."""
+    D = {"field": 0, "lines": [], "bad": [], "err": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            mt = TS.match(ln.rstrip("\n"))
+            s = mt.group(2) if mt else ln.rstrip("\n")
+            if BITWA291_FIELD.match(s):
+                D["field"] += 1
+                continue
+            if s.startswith("ERROR in ") and BITWA291_ERR.match(s):
+                D["err"].append(s[:200])
+                continue
+            if not s.startswith("Bitwa (291)"):
+                continue
+            RX = BITWA291_RX
+            m0 = RX["line"].match(s)
+            ma, mb, mc = RX["a"].search(s), RX["b"].search(s), RX["c"].search(s)
+            if not (m0 and ma and mb and mc):
+                D["bad"].append(s[:160])
+                continue
+            D["lines"].append((m0, ma, mb, mc))
+    return D
+
+
+def bitwa291_rows(rep, D):
+    L = D["lines"]
+    nfield = sum(1 for m0, _, _, _ in L if m0.group(1) == "bitwa")
+    keyoff = sum(1 for m0, _, _, _ in L if "NIE" in m0.groups()[1:])
+    if D["field"] == 0 and not L:
+        ok0 = None
+    else:
+        ok0 = nfield >= D["field"] and keyoff == 0 and not D["bad"]
+    rep.add("B291-0: linia 'Bitwa (291): misja' w kazdej bitwie polowej, klucze TAK, linie rozpoznane",
+            f"bitew polowych {D['field']}, linii {len(L)} (bitwa {nfield}), z kluczem NIE {keyoff}, nierozpoznanych {len(D['bad'])}"
+            + (f" ({D['bad'][0]})" if D["bad"] else ""), "linii >= bitew, klucze TAK, nierozpoznanych 0 (brak bitew - INFO)", ok0)
+    # B291-1 A
+    la = [ma for m0, ma, _, _ in L if ma.group(1) == "TAK"]
+    if la:
+        r5 = sum(int(m.group(3)) for m in la)
+        bad = [m for m in la if int(m.group(7)) != int(m.group(6))]
+        txt = (f"bitew z kluczem {len(la)}: armia nie stanela {sum(int(m.group(2)) for m in la)}, R5 {r5}, szykow poszlo dalej {sum(int(m.group(4)) for m in la)} "
+               f"(ludzi {sum(int(m.group(5)) for m in la)}), R4 {sum(int(m.group(7)) for m in la)} = strzelcy {sum(int(m.group(6)) for m in la)} "
+               f"(bitew niezgodnych {len(bad)}), oddzial od miejsca wyslania {sum(int(m.group(8)) for m in la)}, powrotow ze smyczy {sum(int(m.group(9)) for m in la)}")
+        rep.add("B291-1: A armia idzie dalej - R5 (cala armia) 0, R4 tylko szyki strzelcow", txt, "R5 = 0, R4 = strzelcy staja w kazdej bitwie", r5 == 0 and not bad)
+    else:
+        rep.add("B291-1: A armia idzie dalej - R5 (cala armia) 0, R4 tylko szyki strzelcow", "brak bitew z kluczem (Army Marches Past Harassers NIE albo brak linii)",
+                "INFO", None)
+    # B291-2 B
+    lb = [mb for m0, _, mb, _ in L if mb.group(1) == "TAK" and int(mb.group(2)) > 0]
+    if lb:
+        atk = [int(m.group(6)) for m in lb]
+        bad = [a for a in atk if a > BITWA291_ATK_MAX]
+        txt = (f"bitew z obronca {len(lb)}: sekund trzymania {sum(int(m.group(3)) for m in lb)}, wagi ataku ciete {sum(int(m.group(4)) for m in lb)} "
+               f"(bez wagi obrony {sum(int(m.group(5)) for m in lb)}), taktyka ataku przy trzymaniu najwiecej {max(atk)} s; puszczone: silniejszy "
+               f"{sum(int(m.group(7)) for m in lb)}, S2 {sum(int(m.group(8)) for m in lb)}, napastnik nie podchodzi {sum(int(m.group(9)) for m in lb)}, zwarcie "
+               f"{sum(int(m.group(10)) for m in lb)}; probki: " + " / ".join(m.group(11) for m in lb[:3]))
+        rep.add("B291-2: B obronca trzyma pozycje - bez taktyki ataku przy trzymaniu", txt, f"<= {BITWA291_ATK_MAX:.0f} s w kazdej bitwie", not bad)
+    else:
+        rep.add("B291-2: B obronca trzyma pozycje - bez taktyki ataku przy trzymaniu", "brak bitwy z druzyna obroncy AI i kluczem TAK", "INFO", None)
+    # B291-3 C
+    lc = [mc for m0, _, _, mc in L if mc.group(1) == "TAK" and int(mc.group(3)) > 0]
+    if lc:
+        bad = [m for m in lc if float(m.group(4)) >= float(m.group(5)) or int(m.group(6)) > int(m.group(3))]
+        txt = (f"bitew z biegiem {len(lc)}: szykow {sum(int(m.group(2)) for m in lc)}, wejsc {sum(int(m.group(3)) for m in lc)}, koncow {sum(int(m.group(6)) for m in lc)}, "
+               f"szyko-sekund {sum(int(m.group(7)) for m in lc)}, sr. tarcz " + ", ".join(m.group(4) for m in lc[:5])
+               + f"; z tarczami zostal krok {sum(int(x[3].group(8)) for x in L)}")
+        rep.add("B291-3: C bieg bez tarcz pod ostrzalem - tylko szyki ponizej progu tarcz, koncow <= wejsc", txt, "sr. tarcz < prog, koncow <= wejsc", not bad)
+    else:
+        kept = sum(int(x[3].group(8)) for x in L)
+        rep.add("B291-3: C bieg bez tarcz pod ostrzalem - tylko szyki ponizej progu tarcz, koncow <= wejsc",
+                f"brak wejsc w bieg (z tarczami zostal krok {kept})", "INFO (bitwa bez piechoty bez tarcz pod ostrzalem)", None)
+    # B291-4 regresja
+    stum = sum(int(x[2].group(12)) for x in L)
+    known = bool(L or D["err"])
+    rep.add("B291-4: regresja - potkniecia B, 'ERROR in' Doctrine / HorsePursuit / MarchToContact / Battle291",
+            f"potkniecia {stum}, ERROR {len(D['err'])}" + (f" ({D['err'][0]})" if D["err"] else ""), "0 / 0",
+            None if not known else (stum == 0 and not D["err"]))
+    # B291-5 INFO
+    rep.add("B291-5: sumy (INFO)",
+            f"linii {len(L)}; A armia nie stanela {sum(int(x[1].group(2)) for x in L)}, szykow dalej {sum(int(x[1].group(4)) for x in L)}; B trzymania "
+            f"{sum(int(x[2].group(3)) for x in L)} s, ciec {sum(int(x[2].group(4)) for x in L)}; C wejsc {sum(int(x[3].group(3)) for x in L)}, "
+            f"szyko-sekund {sum(int(x[3].group(7)) for x in L)}", "INFO", None)
+
+
+def bitwa291_synth():
+    """Test syntetyczny: dobry bieg, zly bieg, bez bitwy. None = OK, inaczej opis roznic."""
+    import tempfile
+    import shutil
+    T = BITWA291_TEST
+    nb2 = "Bitwa (NB2): misja bitwa (pole bitwy TAK, ...)"
+    bad = (T["line"].replace("(R5 0)", "(R5 2)").replace("taktyka ataku przy trzymaniu 0 s", "taktyka ataku przy trzymaniu 40 s")
+           .replace("(sr. tarcz 0.10, prog 0.60)", "(sr. tarcz 0.80, prog 0.60)").replace("; potkniecia 0 |", "; potkniecia 2 |"))
+    runs = {
+        "good": [nb2, T["line"], nb2, T["line"]],
+        "bad": [nb2, bad, nb2, "ERROR in HorsePursuit.Bitwa291: NullReferenceException"],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"B291-0": "TAK", "B291-1": "TAK", "B291-2": "TAK", "B291-3": "TAK", "B291-4": "TAK", "B291-5": "INFO"},
+        "bad": {"B291-0": "NIE", "B291-1": "NIE", "B291-2": "NIE", "B291-3": "NIE", "B291-4": "NIE"},
+        "empty": {"B291-0": "INFO", "B291-1": "INFO", "B291-2": "INFO", "B291-3": "INFO", "B291-4": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="b291_")
+    diff = []
+    try:
+        for kind, L in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(L)) + "\n")
+            rep = Report()
+            bitwa291_rows(rep, bitwa291_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def bitwa291_main(logp):
+    """bitwa291 (29.10, paczka 291): B291-S, B291-S2, B291-0..B291-5 - opis w --help. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = bitwa291_selftest()
+    rep.add("B291-S: self-test wyrazen (linie kontrolne jak w kodzie C#: Battle291.cs, HorsePursuit.ReactHalt.cs, Doctrine.Hold291.cs, MarchToContact.cs)",
+            s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    try:
+        s2 = bitwa291_synth()
+    except Exception as e:
+        s2 = f"wyjatek {type(e).__name__}: {e}"
+    rep.add("B291-S2: test syntetyczny (dobry, zly, bez bitwy)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("B291-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = bitwa291_collect(logp)
+    print(f"plik: {logp} | bitew polowych {D['field']}, linii 291 {len(D['lines'])}, nierozpoznanych {len(D['bad'])}, ERROR {len(D['err'])}")
+    bitwa291_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_bitwa291_main_prev = main
+
+
+def main(argv):
+    # paczka 291: grupa bitwa291 - opakowanie main jak zelazo290
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "bitwa291":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return bitwa291_main(rest[0] if rest else None)
+    return _bitwa291_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

@@ -119,6 +119,7 @@ namespace Armoury
             public Vec2 StepAt = Vec2.Invalid;   // poprawka 132b: punkt kroku (ponowna pozycja z NoAttack / bez)
             public bool Hold;                     // poprawka 132b: krok z NoAttack (nekajacy wrecz w zwarciu ze swoimi)
             public Formation Home;                // poprawka 132b: R2 straz strzelcow - smycz od szyku strzezonego, nie od swojego
+            public Vec2 Anchor = Vec2.Invalid;    // 291: R2 - smycz od miejsca wyslania (szyk idzie dalej z armia, ArmyMarchesPastHarassers)
         }
 
         private struct FI
@@ -341,6 +342,7 @@ namespace Armoury
                     Victim(t, hv, true);
                     return;
                 }
+                if (test) _tMissAll++;   // 291 (J204-1): pocisk nekajacego testu, ktory w nikogo nie trafil - takze z dala od ludzi
                 if (!NearMen(m, p.AsVec2, ShieldsUp.MissRadius, s.Team)) return;
                 if (t == null) { t = Notice(s, ss, side, DMiss, now, true); Fire(t, now); }
                 else t.LastFire = now;
@@ -557,6 +559,7 @@ namespace Armoury
                 _hKey = c != null && c.RidersRunDownShooters;
                 _rKey = c != null && c.FormationsAnswerHarassers;            // 283: klucze z MCM na zywo (jak 204)
                 _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
+                _rMarchOn = _rKey && c.ArmyMarchesPastHarassers;             // 291
                 Volatile.Write(ref _rLive, _rKey ? 1 : 0);                   // OnHit: kolejka wrecz tylko po rozstawieniu (Tick wola pass po IsDeploymentFinished)
                 _hQPass = 0;
                 _hQChk = 0;
@@ -773,7 +776,7 @@ namespace Armoury
                 // 283 R8: smycz 50 m od szyku (InfRearm), 60 s (MaxSeconds 148), konny nekajacy (nie w walce wrecz) dalej niz 30 m - piechota konia nie dogoni
                 float dh = FootLeash(h, a.Position.AsVec2);   // poprawka 132b: straz strzelcow - od drogi do szyku strzezonego
                 if (dh > _rFootFar) _rFootFar = dh;
-                if (dh > MarchToContact.InfRearm) return ULeash;
+                if (dh > MarchToContact.InfRearm) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }
                 if (now - h.Start >= MaxSeconds) return UTime;
                 if (s.MountAgent != null && !MeleeKind(h.T) && a.Position.AsVec2.Distance(s.Position.AsVec2) > HuntScreen) return URange;
                 return -1;

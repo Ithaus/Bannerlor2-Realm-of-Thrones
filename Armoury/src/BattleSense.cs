@@ -57,6 +57,7 @@ namespace Armoury
             return c != null && (c.MarchToContactEnabled || c.CultureDoctrines || c.ShootBeforeAttacking || c.CavalrySeeksFlanks || c.ArchersFallBackBehindInfantry
                                  || c.BattleSoundsEnabled || c.BannerCompaniesEnabled
                                  || c.DefendersAdvanceUnderFire     // 141: S2 obronca pod ostrzalem (Doctrine.S2.cs) - wejscia tylko z BattleSense (Doctrine.Begin / Tick / End)
+                                 || c.DefendersHoldTheirGround      // 291: obronca trzyma pozycje (Doctrine.Hold291.cs) - tak samo
                                  || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 
@@ -189,6 +190,7 @@ namespace Armoury
             // noc 25.10 P0 (K3): latki misji P1/P2 raz, przy pierwszej bitwie; potem Begin paczek - Doctrine PRZED WarCouncil (WarCouncil.One wola Doctrine.ApplyList)
             bool night = Night;
             try { if (night) NightHooks.FirstBattle(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "NightHooks.FirstBattle", e); }
+            try { if (night) Battle291.Begin(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Battle291.Begin", e); }   // 291: liczniki przed Begin paczek
             try { if (night) MarchToContact.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "MarchToContact.Begin", e); }
             try { if (night) Doctrine.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Begin", e); }
             try { if (_battle) WarCouncil.Council(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteTactics, "WarCouncil.Council", e); }
