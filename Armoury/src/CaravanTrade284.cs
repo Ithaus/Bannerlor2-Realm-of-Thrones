@@ -63,7 +63,8 @@ namespace Armoury
         private static int _impOk, _impBad; private static bool _impHad, _impLogged;
 
         // ------------------------------------------------------------ ksiega zysku na karawane (14 dob, bez zapisu)
-        private sealed class Acc { public readonly long[] R = new long[Ring]; public readonly int[] D = new int[Ring]; public int First; }
+        // 294: Below - kolejne doby pomiaru z wynikiem handlu ponizej zoldu (CaravanMarket294 - zwijanie stratnej karawany), BelowDay - doba ostatniego liczenia
+        private sealed class Acc { public readonly long[] R = new long[Ring]; public readonly int[] D = new int[Ring]; public int First, Below, BelowDay = int.MinValue; }
         private static readonly Dictionary<MobileParty, Acc> _acc = new Dictionary<MobileParty, Acc>();
 
         // ------------------------------------------------------------ liczniki doby
@@ -332,6 +333,20 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteSale", e); }
         }
 
+        /// <summary>294: okno ksiegi zysku karawany (doby) - seria stratnej karawany liczy sie w tych dobach.</summary>
+        internal const int RingDays = Ring;
+
+        /// <summary>294 (CaravanMarket294.Losing): seria dob pomiaru z wynikiem handlu ponizej zoldu i doby sledzenia karawany w sesji; false - karawana bez ksiegi.</summary>
+        internal static bool LosingStreak(MobileParty mp, out int streak, out int age)
+        {
+            streak = 0; age = 0;
+            Acc a;
+            if (mp == null || !_acc.TryGetValue(mp, out a)) return false;
+            streak = a.Below;
+            age = (int)CampaignTime.Now.ToDays - a.First;
+            return true;
+        }
+
         private static Acc AccOf(MobileParty mp, int day)
         {
             Acc a;
@@ -530,7 +545,25 @@ namespace Armoury
                 if (lr != 0)
                 {
                     if (bk) _bkExit++; else _vanExit++;
-                    if (lr == 5 && !it.IsFood && CaravanGoods.AgedGlut(it.ItemCategory))
+                    if (lr == 4 && CaravanMarket294.FoodKeepsOn)
+                    {
+                        // 294 (klucz CaravanFoodKeepsByKind): psujace sie jedzenie w sprzedazy BK / gry - ta sama granica co T1: po mycie nie taniej niz koszt x (1 - 1.5% x doby
+                        // w jukach); reszta czeka na nastepne miasto
+                        double u4 = CaravanGoods.UnitCost(mp, it);
+                        double fl4 = CaravanMarket294.SpoilFloor(u4, CaravanGoods.AgeOf(mp, it));
+                        if (fl4 > 0.0)
+                        {
+                            int kf = Math.Max(0, CaravanGoods.MaxAtCost(__1.Settlement.Town, __1.Settlement, mp, __2.EquipmentElement, __3, fl4));
+                            if (kf < __3)
+                            {
+                                CaravanMarket294.NoteFloorBk(__3 - kf);
+                                Withhold(mp, __2.EquipmentElement, bk, __3 - kf, u4);
+                                __3 = kf;
+                            }
+                        }
+                        return;
+                    }
+                    if (lr == 5 && CaravanMarket294.Durable(it) && CaravanGoods.AgedGlut(it.ItemCategory))
                     {
                         // poprawka 135a (286b, klucz CaravanAgedGlutAtBookWorth): stary towar w przesycie schodzi w sprzedazy BK / gry tylko po cenie po mycie nie nizszej
                         // niz wartosc sztuki w ksiedze 259 (min(koszt, wartosc x srednia indeksu 97 miast) - CaravanGoods.WorthOf); reszta czeka na miasto, ktore placi wiecej
@@ -927,6 +960,9 @@ namespace Armoury
                 var alive = new HashSet<MobileParty>();
                 var pdL = new List<double>(); var wgL = new List<double>(); var penL = new List<double>();   // 287: wynik handlu i zold na dobe, kara handlowa
                 int nCover = 0; double wAll = 0, toll = 0;
+                // 294: rynek karawan bez konwojow DTE - placace (W), tracace (L), nowe ponizej MeasureDays (T), seria stratnych, wynik - zold, wynik, zold
+                int w294 = 0, l294 = 0, t294 = 0, s294 = 0;
+                var n294 = new List<double>(); var p294 = new List<double>(); var g294 = new List<double>();
                 foreach (var mp in MobileParty.AllCaravanParties)
                 {
                     if (mp == null || !mp.IsActive || mp.ItemRoster == null) continue;
@@ -955,7 +991,16 @@ namespace Armoury
                         fN++; fMargin += pd; fWage += Math.Max(0, mp.TotalWage);
                         if (pd < Math.Max(0, mp.TotalWage)) fBelow++;
                         pdL.Add(pd); wgL.Add(Math.Max(0, mp.TotalWage)); if (pd >= Math.Max(0, mp.TotalWage)) nCover++;   // 287
+                        // 294: seria stratnej karawany (raz na dobe) i rynek karawan bez konwojow DTE (nie handluja)
+                        if (a.BelowDay != today) { a.BelowDay = today; a.Below = pd < Math.Max(0, mp.TotalWage) ? a.Below + 1 : 0; }
+                        if (!Measure31.IsDteConvoy(mp))
+                        {
+                            double wg = Math.Max(0, mp.TotalWage);
+                            if (pd >= wg) w294++; else { l294++; if (a.Below >= Ring) s294++; }
+                            n294.Add(pd - wg); p294.Add(pd); g294.Add(wg);
+                        }
                     }
+                    else if (!Measure31.IsDteConvoy(mp)) t294++;   // 294: nowa (jeszcze bez pomiaru) - niczego nie dowiodla
                 }
                 var gone = new List<MobileParty>();
                 foreach (var k in _acc.Keys) if (!alive.Contains(k)) gone.Add(k);
@@ -1028,6 +1073,9 @@ namespace Armoury
 
                 // linia 290 (tylko pomiar): jedzenie w jukach wobec wlasnej sprzedazy karawan i popytu rynkow, stan bramki (miara Flow)
                 if (s.CaravanFlowByMarketDemand) Log.Info(Line290(s, day, rows));
+
+                // linia 294: rynek karawan (jedzenie wedlug rodzaju, zwijanie stratnych, nowe karawany wedlug miejsca) - takze przy kluczach NIE (pomiar)
+                Log.Info(CaravanMarket294.Daily(day, w294, l294, t294, s294, n294, p294, g294));
 
                 // linia 4 (F, na sucho przy kluczu NIE)
                 Log.Info(new StringBuilder(500).Append("Wielkosc karawan (284, na sucho): dzien ").Append(day).Append(" | klucz Caravan Size By Trade ").Append(YN(s.CaravanSizeByTrade))

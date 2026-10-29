@@ -118,8 +118,9 @@ namespace Armoury
         private static readonly Dictionary<Hero, int> _ownerDay = new Dictionary<Hero, int>();   // wlasciciel -> doba rozwiazania jego karawany (ochrona przed petla: rozwiaz - kup - rozwiaz)
         // m6b (6, klucz IdleCaravanDisband): karawana bez statkow, ktora stoi w tym samym miescie z droga do innych miast od IdleDisbandDays+ dob (BK nie znajduje
         // zysku - bieg roczny: kupiec z Thenn 289 dob), rozwiazywana ta sama droga co karawana bez drogi (Resolve): towar z nadwyzki kasy, kiesa do wlasciciela
-        private const double IdleDisbandDays = 28.0;
+        internal const double IdleDisbandDays = 28.0;                         // 294: ten sam czas sledzenia przed zwinieciem stratnej karawany (CaravanMarket294)
         private static int _dIdle, _dIdleDone, _dIdleLeft;
+        private static int _dLose, _dLoseLeft;                                  // 294: stratne karawany zwiniete / zostaly (CaravanMarket294.Losing)
         private static double _dIdleMax;
         private static readonly Dictionary<string, int> _dIdleAt = new Dictionary<string, int>();
 
@@ -150,6 +151,7 @@ namespace Armoury
             _dSoldU = _dSoldG = _dUnsoldU = _dUnsoldV = _dPurse = _dOwnerGot = _dMenPurse = 0;
             _dDoneAt.Clear(); _dKept.Clear(); _dEx.Clear();
             _dIdle = _dIdleDone = _dIdleLeft = 0; _dIdleMax = 0; _dIdleAt.Clear();   // m6b (6)
+            _dLose = _dLoseLeft = 0;                                                 // 294
             _dCapAsk = _dCapHeld = 0; _dCapWho.Clear();
         }
 
@@ -307,8 +309,12 @@ namespace Armoury
                 bool ships;
                 if (!Template(__0, at, out ships)) return;
                 _dBuyAsk++;
-                if (ships) { _dBuyShips++; return; }
-                if (!DeadEnd(at)) return;
+                if (ships) { _dBuyShips++; if (!CaravanMarket294.EntryAllowed(WoundUpLately(__0), true)) __result = false; return; }   // 294: lord BK - karawana morska tez
+                if (!DeadEnd(at))
+                {
+                    if (!CaravanMarket294.EntryAllowed(WoundUpLately(__0), true)) __result = false;   // 294: lord BK - ta sama regula co kupiec
+                    return;
+                }
                 if (!s.IslandCaravanFix) { _dBuyShadow++; return; }
                 __result = false;
                 _dBuySkip++; Bump(_dBuyAt, Name(at));
@@ -430,15 +436,23 @@ namespace Armoury
             }
         }
 
-        private static void Resolve(MobileParty c, Settings s, int day, bool idle = false)
+        private static void Resolve(MobileParty c, Settings s, int day, bool idle = false, bool losing = false)
         {
             var at = c.CurrentSettlement;
             if (at == null) return;
             Hero owner = null;
             try { owner = c.Owner ?? (c.Party != null ? c.Party.Owner : null); } catch { owner = null; }
-            string why = Blocker(c, at, owner, day, idle);
-            if (why != null) { if (idle) _dIdleLeft++; else _dLeft++; Bump(_dKept, (idle ? "bez zysku: " : "") + why); return; }
-            if (idle ? !s.IdleCaravanDisband : !s.IslandCaravanFix) { if (idle) _dIdleLeft++; else { _dLeft++; _dGoneShadow++; } return; }       // w cieniu: tylko licznik
+            string why = Blocker(c, at, owner, day, idle || losing);           // 294: stratna karawana jak bez zysku (bez odczytu drogi, ochrona petli 28 dob)
+            if (losing)
+            {
+                // 294 (klucz CaravanLosingWoundUp): stratna karawana - osobne liczniki (linia 294 i dopisek linii E8/G1); kandydat jest tylko przy kluczu TAK
+                if (why != null) { _dLoseLeft++; Bump(_dKept, "stratna: " + why); CaravanMarket294.NoteExit(false, why, 0, 0, 0); return; }
+            }
+            else
+            {
+                if (why != null) { if (idle) _dIdleLeft++; else _dLeft++; Bump(_dKept, (idle ? "bez zysku: " : "") + why); return; }
+                if (idle ? !s.IdleCaravanDisband : !s.IslandCaravanFix) { if (idle) _dIdleLeft++; else { _dLeft++; _dGoneShadow++; } return; }       // w cieniu: tylko licznik
+            }
             string town = Name(at), who = "?";
             try { who = owner.Name != null ? owner.Name.ToString() : "?"; } catch { }
             int men = c.MemberRoster != null ? c.MemberRoster.TotalManCount : 0;
@@ -451,8 +465,9 @@ namespace Armoury
             int g0 = head != null ? head.Gold : 0;
             _ownerDay[owner] = day;
             DestroyPartyAction.Apply(null, c);
-            if (c.IsActive) { _dFail++; if (idle) _dIdleLeft++; else _dLeft++; return; }
-            if (idle) { _dIdleDone++; Bump(_dIdleAt, town); } else { _dDone++; Bump(_dDoneAt, town); }
+            if (c.IsActive) { _dFail++; if (losing) { _dLoseLeft++; CaravanMarket294.NoteExitFail(); } else if (idle) _dIdleLeft++; else _dLeft++; return; }
+            if (losing) { _dLose++; CaravanMarket294.NoteExit(true, null, soldG, purse, men); }   // 294
+            else if (idle) { _dIdleDone++; Bump(_dIdleAt, town); } else { _dDone++; Bump(_dDoneAt, town); }
             _dUnsoldU += leftU; _dUnsoldV += leftV; _dPurse += purse; _dMen += men; _dMenPurse += menPurse;
             if (head != null) _dOwnerGot += Math.Max(0, head.Gold - g0);
             if (_dEx.Count < MaxEx)
@@ -461,7 +476,7 @@ namespace Armoury
 
         private static void Islands(Settings s, int day)
         {
-            List<MobileParty> cand = null, idle = null;
+            List<MobileParty> cand = null, idle = null, lose = null;
             var all = MobileParty.AllCaravanParties;
             if (all == null) return;
             foreach (var c in all)
@@ -471,6 +486,8 @@ namespace Armoury
                     if (c == null || !c.IsActive || !c.IsCaravan) continue;
                     var at = c.CurrentSettlement;
                     if (at == null || !at.IsTown) continue;
+                    // 294 (klucz CaravanLosingWoundUp): karawana w miescie, ktora od 14 dob pomiaru nie zarabia na zold (sesja >= 28 dob) - wlasciciel ja zwija (takze morska)
+                    if (CaravanMarket294.Losing(c)) { if (lose == null) lose = new List<MobileParty>(); lose.Add(c); continue; }
                     if (!c.HasLandNavigationCapability || c.HasNavalNavigationCapability) continue;
                     if (!IslandRoads.LonelyTown(at))
                     {
@@ -500,6 +517,12 @@ namespace Armoury
                     try { Resolve(c, s, day, true); }
                     catch (Exception e) { _dIdleLeft++; Stumble("Islands(bez zysku)", e); }
                 }
+            if (lose != null)
+                foreach (var c in lose)                                          // 294: stratne karawany - ta sama droga rozwiazania
+                {
+                    try { Resolve(c, s, day, false, true); }
+                    catch (Exception e) { _dLoseLeft++; CaravanMarket294.NoteExitFail(); Stumble("Islands(stratna)", e); }
+                }
         }
 
         // ------------------------------------------------------------ 4. limit karawan kupca (A1)
@@ -523,7 +546,13 @@ namespace Armoury
             {
                 if (__0 == Hero.MainHero || (__0.Clan != null && __0.Clan == Clan.PlayerClan)) return;
                 int n = Owned(__0);
-                if (n <= 0) return;                                             // pierwsza karawana - jak w grze
+                if (n <= 0)
+                {
+                    // 294 (klucz CaravanEntryWhenTradePays): pierwsza karawana kupca tylko przy miejscu na rynku karawan (CaravanMarket294.EntryAllowed); kupiec, ktoremu
+                    // zwinieto karawane, czeka IdleDisbandDays dob; bez klucza - jak w grze
+                    if (!CaravanMarket294.EntryAllowed(WoundUpLately(__0), false)) __result = false;
+                    return;
+                }
                 _dCapAsk++;
                 var s = Settings.Current;
                 int cap = s != null ? s.NotableCaravanCap : 0;
@@ -532,6 +561,14 @@ namespace Armoury
                 _dCapHeld++; _dCapWho.Add(__0);
             }
             catch (Exception e) { Stumble("NotableCapPostfix", e); }
+        }
+
+        /// <summary>294: bohaterowi rozwiazano karawane (ta sama pamiec co ochrona petli _ownerDay) mniej niz IdleDisbandDays dob temu.</summary>
+        private static bool WoundUpLately(Hero h)
+        {
+            int was;
+            if (h == null || !_ownerDay.TryGetValue(h, out was)) return false;
+            return (int)CampaignTime.Now.ToDays - 1 - was < IdleDisbandDays;
         }
 
         /// <summary>Raz na dobe: rozklad karawan na notabla-wlasciciela (ta sama liczba, ktora czyta limit - Owned).</summary>
@@ -649,6 +686,9 @@ namespace Armoury
                 sb.Append(" | karawany bez zysku (Idle Caravan Disband ").Append(s.IdleCaravanDisband ? "CZYNNE" : "WYLACZONE").Append("; bez statkow, w tym samym miescie z droga do innych miast od ")
                   .Append(IdleDisbandDays.ToString("0", Inv)).Append("+ dob): stan ").Append(_dIdle).Append(", najdluzej ").Append(_dIdleMax.ToString("0.0", Inv)).Append(" dob, rozwiazane ").Append(_dIdleDone)
                   .Append(Top(_dIdleAt, 4)).Append(", zostalo ").Append(_dIdleLeft).Append(" (powody w 'karawany bez drogi' z przedrostkiem 'bez zysku')");
+                // 294: dopisek na koncu linii
+                sb.Append(" | stratne karawany (294, Caravan Losing Wound Up ").Append(s.CaravanLosingWoundUp ? "CZYNNE" : "WYLACZONE").Append("): rozwiazane ").Append(_dLose)
+                  .Append(", zostalo ").Append(_dLoseLeft).Append(" (powody w 'karawany bez drogi' z przedrostkiem 'stratna')");
                 sb.Append('.');
                 Log.Info(sb.ToString());
             }

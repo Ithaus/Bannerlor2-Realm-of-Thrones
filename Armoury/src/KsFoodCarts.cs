@@ -74,7 +74,7 @@ namespace Armoury
         // recenzja runda 3 (wazne): kasa celu - zapas kupcow zostaje podloga; przy pustej polce zboza i soli najwyzej do polowy zapasu i najwyzej 5% zapasu na dobe ponad zwykly budzet
         private const double ReserveFloorShort = 0.5, ReserveDayShort = 0.05;
         // recenzja runda 3 (drobne): psucie w drodze - psujace sie traca 1.5% sztuk na dobe drogi (ujscie w ksiedze towarow)
-        private const double SpoilPerDay = 0.015;
+        internal const double SpoilPerDay = 0.015;                         // 294: ta sama miara psucia jedzenia w jukach karawan (CaravanMarket294.SpoilFloor)
         private const int SampleCap = 256;                                  // probka wyceny: sztuka po sztuce najwyzej pierwsze 256 sztuk lotu (koszt)
         // KS-R3 (port symulatora 17.10, runda 2): gdy zadne z 12 najblizszych miast nie moze wyslac (bez nadwyzki, poza zasiegiem, wojna, cena) - najwyzej 4 dalsze miasta
         // rynku z nadwyzka w zasiegu (wedlug dob; Qarth, Meereen, Polnoc: nadwyzka zboza Volantis i Reach lezala poza 12 najblizszymi - 191 z 240 prob "bez nadwyzki")
