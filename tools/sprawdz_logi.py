@@ -77820,7 +77820,7 @@ def main(argv):
 #   python -I tools/sprawdz_logi.py --grupa kryjowka293 <Armoury-*.log>      (strumieniowo; bieg 90 dob albo bitwy - bez misji kryjowki wiersze misji INFO)
 # Dowod (sesja Jeffa 29.10, zainstalowane 136): rgl_log_28248.txt 01:28:00 herszt 'Wild Hare Horseman' (forest_people_tier_3, zajecie Soldier) -> wiersz gry
 #   'guard_start' zamknal rozmowe, brak 'defeat_hideout_boss_objective', Retreat 01:28:23.
-# K293-S  self-test wyrazen (linia startu, linia misji w 6 wariantach, linia ZAPAS x2, linia ZAPAS BLAD) i decyzji kryjowka293_pick_ok / kryjowka293_fallback_ok
+# K293-S  self-test wyrazen (linia startu, linia misji w 5 wariantach, linia ZAPAS x2, linia ZAPAS BLAD) i decyzji kryjowka293_pick_ok / kryjowka293_fallback_ok
 # K293-0  linia startu sesji: klucz TAK, pola gry kryjowka TAK i zasadzka TAK; nierozpoznanych linii 293 0; ERROR HideoutBossTalk 0; potkniecia misji i sesji 0
 # K293-1  kazda misja z faza herszta konczy sie wyborem: pojedynek / wszyscy / zapas wszyscy / zapas pojedynek (nigdy 'brak (stan ...)' ani 'zapas blad')
 # K293-2  w kazdej misji z rozmowa i kluczem TAK - nasz wiersz TAK (rozmowa z hersztem zaczela sie od pytania o pojedynek)
@@ -78020,7 +78020,7 @@ def kryjowka293_main(logp):
     """kryjowka293 (29.10, paczka 293): K293-S, K293-0..K293-4 - opis w komentarzu nad stalymi KRYJOWKA293_*. Strumieniowo, tylko odczyt logu."""
     rep = Report()
     s1 = kryjowka293_selftest()
-    rep.add("K293-S: self-test wyrazen (start, misja x6, ZAPAS x2, ZAPAS BLAD x2) i decyzji (kryjowka293_pick_ok, kryjowka293_fallback_ok)", s1 or "OK",
+    rep.add("K293-S: self-test wyrazen (start, misja x5, ZAPAS x2, ZAPAS BLAD x1 + 1 odrzucenie) i decyzji (kryjowka293_pick_ok, kryjowka293_fallback_ok)", s1 or "OK",
             "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("K293-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
