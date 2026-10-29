@@ -148,6 +148,7 @@ namespace Armoury
             _impOk = _impBad = 0; _impHad = _impLogged = false;
             _acc.Clear(); _sellIdx.Clear(); _sellDay = -1;
             _depth.Clear(); _perish = null; _rep = null; _nTowns = 0; _nTownsDay = int.MinValue; _pantryN = 0; _dStumSess = 0;   // 294b
+            _h1Bk = _h1Van = 0; _pk.Mp = null; _pk.PeekTown = null; _pk.PeekK.Clear(); _pk.PeekNet.Clear();   // 294c
             _bookPend = null; _bookHad = _dayRan = false; _bookOk = _bookGone = _bookBad = 0;   // 294
             Path = 0; _bkSelling = 0; _vanSelling = 0; _b.Mp = null;
             _stumbleSess = 0; _err.Clear();
@@ -789,8 +790,95 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zakup BK (BuyGoods -> CalculateBuyValue)
-        private sealed class Buy { public MobileParty Mp; public bool Exempt; public int Capital, Floor, Wage, Purse0; public double Stock0, Pen = -1, Toll; public readonly HashSet<ItemCategory> Seen = new HashSet<ItemCategory>(), SeenD = new HashSet<ItemCategory>(); }
+        private sealed class Buy { public MobileParty Mp; public bool Exempt; public int Capital, Floor, Wage, Purse0; public double Stock0, Pen = -1, Toll; public readonly HashSet<ItemCategory> Seen = new HashSet<ItemCategory>(), SeenD = new HashSet<ItemCategory>();
+            public Town PeekTown; public readonly Dictionary<ItemCategory, int> PeekK = new Dictionary<ItemCategory, int>(); public readonly Dictionary<ItemObject, double> PeekNet = new Dictionary<ItemObject, double>(); }
         private static readonly Buy _b = new Buy();
+        private static readonly Buy _pk = new Buy();   // 294c: ocena celu BK (WhyPeek) - osobny stan, _b (wizyta BuyGoods) nietkniety
+
+        /// <summary>294c (CaravanRoute294c, ThinkNextDestination): stan oceny celu dla karawany - kapital i podloga 259, ladunek po koszcie (CargoCost), kiesa; raz na decyzje.
+        /// false - karawana bez zasad 284 (kontrakt, rozkaz gracza, nie handluje) albo klucze zakupu NIE.</summary>
+        internal static bool PeekStart(MobileParty mp)
+        {
+            _pk.Mp = null; _pk.PeekTown = null; _pk.PeekK.Clear(); _pk.PeekNet.Clear(); _pk.Pen = -1;
+            var s = Settings.Current;
+            if (s == null || mp == null || !(s.CaravanBuyByFlow || s.CaravanBuyWorkingCapital || s.CaravanBuyProfitCheck)) return false;
+            if (!mp.IsCaravan || mp.Owner == null || !CaravanBulk.TradesForT1(mp) || MaterialOrders.HasContract(mp) || CaravanBulk.HasOrders(mp)) return false;
+            int cap, floor;
+            CaravanSettle.CapFloor(mp, out cap, out floor);
+            _pk.Capital = cap; _pk.Floor = floor; _pk.Wage = Math.Max(0, mp.TotalWage); _pk.Purse0 = mp.PartyTradeGold;
+            _pk.Stock0 = CaravanGoods.CargoCost(mp);
+            _pk.Mp = mp;
+            return true;
+        }
+
+        internal static void PeekEnd() { _pk.Mp = null; _pk.PeekTown = null; _pk.PeekK.Clear(); _pk.PeekNet.Clear(); }
+
+        /// <summary>294c: regula zakupu BK, ktora zablokowalaby kategorie w miescie town (WhyCore bez licznikow i bez reguly 3): 0 - kupno czynne; 1 bramka, 2 kapital,
+        /// 4 zysk / glebokosc, 5 jedzenie > 7 dob, 6 zwijanie. Tylko kategorie Tracked, po PeekStart tej karawany; inaczej 0.</summary>
+        internal static int WhyPeek(MobileParty mp, ItemCategory cat, Town town)
+        {
+            if (mp == null || town == null || !ReferenceEquals(_pk.Mp, mp) || !Tracked(cat)) return 0;
+            var s = Settings.Current;
+            if (s == null) return 0;
+            try
+            {
+                if (!ReferenceEquals(_pk.PeekTown, town)) { _pk.PeekTown = town; _pk.Pen = -1; _pk.Toll = TownToll.CaravanRateFor(mp, town.Settlement); }
+                return WhyCore(_pk, mp, cat, town, s, true);
+            }
+            catch (Exception e) { Stumble("WhyPeek", e); return 0; }
+        }
+
+        /// <summary>294c: DepthBuy dla oceny celu - k (QueueK, zalezy tylko od karawany i kategorii) i cena sztuki w miescie odniesienia (zalezy od towaru) z pamieci
+        /// decyzji; w miescie celu tylko pierwszy towar kategorii na polce i jego cena kupna (ta sama regula: net < 1.03 x cena kupna - kupno stoi).</summary>
+        private static int DepthBuyPeek(Buy b, MobileParty mp, ItemCategory cat, Town town)
+        {
+            try
+            {
+                var rep = RepOnShelf(town, cat);
+                if (rep == null) return -1;
+                var el = new EquipmentElement(rep);
+                int buy = town.GetItemPrice(el, mp, false);
+                if (buy <= 0) return -1;
+                int k;
+                if (!b.PeekK.TryGetValue(cat, out k)) { k = QueueK(mp, cat, TradeUnits(mp, cat) + 1); b.PeekK[cat] = k; }
+                double net;
+                if (!b.PeekNet.TryGetValue(rep, out net)) { net = DepthNet(mp, el, k); b.PeekNet[rep] = net; }
+                if (double.IsNaN(net)) return -1;
+                return net < CarrierMargin * buy ? 1 : 0;
+            }
+            catch (Exception e) { DStumble("BuyPeek", e); return -1; }
+        }
+
+        /// <summary>294c: kopia spizarni eskorty karawany (PantryOf - wspolna pamiec _pantryTmp nadpisywana przez kazde TradeUnits); null - brak spizarni.</summary>
+        internal static Dictionary<ItemObject, int> PantryCopy(MobileParty mp)
+        {
+            var p = PantryOf(mp);
+            return p != null ? new Dictionary<ItemObject, int>(p) : null;
+        }
+
+        /// <summary>294c: karawana sprzedala cos w dobach (end - 7, end] (ksiega zysku 284 - ta sama miara co 'karawany 7 dob: z handlem'). Bez wpisu - false.</summary>
+        internal static bool SoldIn7(MobileParty mp, int end)
+        {
+            Acc a;
+            if (mp == null || !_acc.TryGetValue(mp, out a)) return false;
+            bool any;
+            SumLast(a, end, 7, out any);
+            return any;
+        }
+
+        /// <summary>294c: ile JEDNO miasto zjada kategorii na dobe w jednostkach polki (wartosc) - ten sam czlon co petla Mkt (budzet doby modelu gry / indeks miasta).</summary>
+        internal static double MktTownValue(Town t, ItemCategory c)
+        {
+            if (t == null || c == null || !t.IsTown || t.MarketData == null) return 0.0;
+            float dem = t.MarketData.GetCategoryData(c).Demand;
+            if (!(dem > 0f)) return 0.0;
+            var cg = Campaign.Current;
+            var em = cg != null && cg.Models != null ? cg.Models.SettlementEconomyModel : null;
+            float idx = Math.Max(0.1f, t.GetItemCategoryPriceIndex(c));
+            float bud = em != null ? em.CalculateDailySettlementBudgetForItemCategory(t, dem, c) : dem * (float)Math.Pow(idx, 0.3);
+            if (!(bud > 0f) || float.IsNaN(bud) || float.IsInfinity(bud)) return 0.0;
+            return bud / (double)idx;
+        }
 
         /// <summary>Prefiks BK BuyGoods (z CaravanGoods.BkBuyPrefix): kapital i podloga 259, ladunek po koszcie, kiesa, myto - raz na wywolanie.</summary>
         internal static void BuyStart(MobileParty mp, Town town)
@@ -837,34 +925,38 @@ namespace Armoury
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
         }
 
-        private static int Why(MobileParty mp, ItemCategory cat, Town town, Settings s)
+        private static int Why(MobileParty mp, ItemCategory cat, Town town, Settings s) { return WhyCore(_b, mp, cat, town, s, false); }
+
+        /// <summary>Reguly zakupu BK (Why). 294c: peek - ta sama logika dla oceny celu BK (CaravanRoute294c, klucz CaravanRouteByBuyRules) bez licznikow, bez stanu
+        /// wizyty (_b) i bez reguly 3 (rezerwa zoldu - kiesa w miescie celu bedzie inna po sprzedazy); k glebokosci i cena sztuki w miescie odniesienia z pamieci decyzji.</summary>
+        private static int WhyCore(Buy b, MobileParty mp, ItemCategory cat, Town town, Settings s, bool peek)
         {
             if (s.CaravanLosingWoundUp && WindDays(mp) >= 0) return 6;          // 294: karawana w zwijaniu - wlasciciel juz nie kupuje, tylko wyprzedaje
             if (s.CaravanBuyByFlow && GateShut(cat)) return 1;
             int purse = mp.PartyTradeGold;
-            double cargo = _b.Stock0 + Math.Max(0, _b.Purse0 - purse);      // ladunek po koszcie: z poczatku BuyGoods + to, co BK juz wydal w tym wywolaniu
+            double cargo = b.Stock0 + Math.Max(0, b.Purse0 - purse);      // ladunek po koszcie: z poczatku BuyGoods + to, co BK juz wydal w tym wywolaniu
             double spend = Math.Min(0.5 * Math.Max(0, purse), 1500.0);        // BK BuyCategory: najwyzej pol kiesy i 1 500 na kategorie
             if (s.CaravanBuyWorkingCapital)
             {
                 // recenzja 284 (drobna 4): podloga z rezerwa 30 dni zoldu (karawana bez zwrotu zoldu) moze byc >= kapital - to podloga wyplaty, nie granica handlu;
                 // wtedy bez reguly kapitalu (kiese dalej pilnuje rezerwa zoldu nizej)
-                if (_b.Capital - _b.Floor > 0 && cargo >= _b.Capital - _b.Floor) return 2;
-                if (purse - spend < CashDays * _b.Wage) return 3;
+                if (b.Capital - b.Floor > 0 && cargo >= b.Capital - b.Floor) return 2;
+                if (!peek && purse - spend < CashDays * b.Wage) return 3;
             }
             if (s.CaravanBuyProfitCheck)
             {
                 float idx = town.GetItemCategoryPriceIndex(cat), e = SellIdx(cat);
-                if (_b.Pen < 0) _b.Pen = PenOf(mp, town);
+                if (b.Pen < 0) b.Pen = PenOf(mp, town);
                 // recenzja 284 (wazne 1 i 3): bez zoldu w tescie zakupu - zold karawana placi, czy kupi, czy nie (koszt staly, jak po stronie sprzedazy
                 // CaravanSellNoSunkWage); odmowa zakupu z dodatnia marza nie oszczedza zoldu, tylko traci marze. Koszty stale pilnuja reguly 2 i 3.
-                bool old4 = !(e > 0f) || idx * (1.0 + _b.Pen) >= e / (1.0 + _b.Pen) * (1.0 - _b.Toll);
+                bool old4 = !(e > 0f) || idx * (1.0 + b.Pen) >= e / (1.0 + b.Pen) * (1.0 - b.Toll);
                 if (DepthOn)
                 {
                     // 294b (klucz CaravanBuyByMarketDepth): zamiast oferty indeksu - cena sztuki, ktora ta karawana by przywiozla, w kolejce za swoimi sztukami i udzialem
                     // jukow innych karawan na jedno miasto drozsze, minus zjedzone tam w dobie drogi (DepthBuy); marza przewoznika 3% jak KS-H; bez zoldu (koszt staly,
                     // recenzja 284). Nadkup ograniczony przez BK (1 500 zl na kategorie na wizyte), w nastepnej wizycie moje + udzial juz blokuja. Bez miary - stara regula.
-                    int dz = DepthBuy(mp, cat, town);
-                    if (_b.SeenD.Add(cat)) { _dEval++; if (old4) _dOld++; if (dz == 1) _dStop++; else if (dz == 0) _dOpen++; else _dNone++; }
+                    int dz = peek ? DepthBuyPeek(b, mp, cat, town) : DepthBuy(mp, cat, town);
+                    if (!peek && b.SeenD.Add(cat)) { _dEval++; if (old4) _dOld++; if (dz == 1) _dStop++; else if (dz == 0) _dOpen++; else _dNone++; }
                     if (dz == 1 || (dz < 0 && old4)) return 4;
                 }
                 else if (old4) return 4;
@@ -973,7 +1065,11 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.CaravanBkSellAtCost || __0 == null || __1 == null) return;
+                if (s == null || __0 == null || __1 == null) return;
+                // 294c H1 (klucz CaravanPantryAllSales): spizarnia eskorty (ta sama miara, ktora T1 zatrzymuje - PantryOf, najtansze najpierw) nie schodzi tez w sprzedazy
+                // BK i gry - przed reszta zasad i niezaleznie od kontraktu / rozkazu (eskorta je z jukow w drodze, 288); wstrzymane przez Withhold (lista transakcji BK)
+                if (s.CaravanPantryAllSales) PantryGuard(__0.MobileParty, __1, __2.EquipmentElement, bk, ref __3);
+                if (!s.CaravanBkSellAtCost || __3 <= 0) return;
                 var mp = __0.MobileParty;
                 if (mp == null || !mp.IsCaravan || !__1.IsSettlement || __1.Settlement == null || __1.Settlement.Town == null) return;
                 var it = __2.EquipmentElement.Item;
@@ -1078,10 +1174,41 @@ namespace Armoury
             if (n <= 0) return;
             if (bk) { _bkHeldN += n; _bkHeldC += (long)Math.Round(n * unit); }
             else { _vanHeldN += n; _vanHeldC += (long)Math.Round(n * unit); }
+            WithholdNote(mp, el, n);
+        }
+
+        /// <summary>294c: wpis sztuk wstrzymanych dla TakeWithheld (lista transakcji BK / gry ma liczbe sprzed przyciecia) - bez licznikow 'ponizej kosztu'.</summary>
+        private static void WithholdNote(MobileParty mp, EquipmentElement el, int n)
+        {
+            if (n <= 0) return;
             if (!ReferenceEquals(_bkWithheldMp, mp)) { _bkWithheld.Clear(); _bkWithheldMp = mp; }
             int w0; _bkWithheld.TryGetValue(el, out w0);
             _bkWithheld[el] = w0 + n;
         }
+
+        // 294c H1: spizarnia eskorty wstrzymana w sprzedazy BK / gry (szt.) - od ostatniej linii 288 (CaravanEscort.Daily czyta i zeruje)
+        private static long _h1Bk, _h1Van;
+
+        /// <summary>294c H1: sprzedaz BK albo gry jedzenia karawany - najwyzej sztuki ponad spizarnie eskorty tego towaru (PantryOf: ceil(-FoodChange x 10) sztuk,
+        /// najtansze najpierw - ten sam przydzial co bramka 294b i T1).</summary>
+        private static void PantryGuard(MobileParty mp, PartyBase to, EquipmentElement el, bool bk, ref int n)
+        {
+            var it = el.Item;
+            if (n <= 0 || mp == null || !mp.IsCaravan || mp.IsDisbanding || it == null || !it.IsFood || mp.ItemRoster == null || !to.IsSettlement) return;
+            var pan = PantryOf(mp);
+            int keep;
+            if (pan == null || !pan.TryGetValue(it, out keep) || keep <= 0) return;
+            int have = mp.ItemRoster.GetItemNumber(it);
+            int k = Math.Max(0, Math.Min(n, have - keep));
+            if (k >= n) return;
+            int held = n - k;
+            if (bk) _h1Bk += held; else _h1Van += held;
+            WithholdNote(mp, el, held);
+            n = k;
+        }
+
+        /// <summary>294c (linia 288): spizarnia wstrzymana w sprzedazy BK i gry od ostatniej linii - odczyt i zero.</summary>
+        internal static void TakePantryHeld(out long bk, out long van) { bk = _h1Bk; van = _h1Van; _h1Bk = _h1Van = 0; }
 
         // 285: przesyt karawan do miasta z brakiem surowca tabeli (SellGuardPrefix) - liczniki od ostatniej linii 285
         private static long _g285N, _g285C; private static int _g285Acts;

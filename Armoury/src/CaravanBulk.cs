@@ -105,6 +105,7 @@ namespace Armoury
             public int Unload; public long UnloadGold;
             public readonly HashSet<Town> UnloadTowns = new HashSet<Town>();
             public bool WasGlut;                               // stan bramki z poprzedniego Daily (kupno przez miniona dobe) - do linii 282
+            public float ShortUse;                             // 294c (G): zuzycie doby miast z brakiem i z kasa (Use) - z przeliczenia swiata
 
             public Good(int ix, string id, string name, int floor, int free, float perHand, float fixedUse, float perCycle)
             { Ix = ix; Id = id; Name = name; Floor = floor; Free = free; PerHand = perHand; Fixed = fixedUse; PerCycle = perCycle; }
@@ -511,7 +512,16 @@ namespace Armoury
         // 284 (klucz CaravanBulkFlowGateAll): ta sama bramka dla wszystkich surowcow tabeli (drewno, skory, skora, len, plotno, welna) - dotad tylko ruda, reszta na sucho
         private static bool FlowOn(Good g, Settings s) { return (g.Ix == OreIx || s.CaravanBulkFlowGateAll) && s.CaravanBulkFlowGate && g.SoldDays >= FlowMinDays; }
 
-        private static float FlowCap(Good g, Settings s) { return g.SoldEma * Math.Max(0, s.CaravanBulkStockDays); }
+        // 294c (G, klucz CaravanOreGateByShortTowns): prog przeplywu = max(sprzedaz karawan EMA, zuzycie doby miast z brakiem i z kasa) x CaravanBulkStockDays - zasada 287
+        // (bramka wedlug popytu miast, nie samej sprzedazy karawan) dla surowcow: autotest 296c - ruda w jukach 593 w 24 karawanach, sprzedaz 14 dob 13.5/d, prog 135,
+        // 3 wjazdy z ruda na dobe (1 do miasta z brakiem) przy 14.4 miasta bez rudy - sprzedaz zalezy od tego, co bramka przepusci, wiec bramka karmila sama siebie.
+        // Dawna bramka (CaravanBulkTransitCover x brak miast) dalej gorna granica (Cover). Klucz NIE - jak 282.
+        private static float FlowCap(Good g, Settings s)
+        {
+            float e = g.SoldEma;
+            if (s.CaravanOreGateByShortTowns) e = Math.Max(e, g.ShortUse);
+            return e * Math.Max(0, s.CaravanBulkStockDays);
+        }
 
         /// <summary>Ile tego surowca moga razem wiezc wszystkie karawany: dawna bramka CaravanBulkTransitCover x brak miast; 282 - dla rudy najwyzej prog przeplywu.</summary>
         private static float Cover(Good g, Settings s)
@@ -590,7 +600,94 @@ namespace Armoury
                 any = true;
             }
             if (!any) sb.Append('-');
+            // 294c (G): prog rudy w linii 282 (na koncu segmentu - wyrazenie RU282_RE czyta '; na sucho [^|]*')
+            foreach (var g in _goods)
+            {
+                if (g.Ix != OreIx) continue;
+                sb.Append("; 294c: prog rudy = max(sprzedaz EMA ").Append(g.SoldEma.ToString("0.0", inv)).Append(", zuzycie miast z brakiem ").Append(g.ShortUse.ToString("0.0", inv))
+                  .Append(") x ").Append(Math.Max(0, s.CaravanBulkStockDays)).Append(" = ").Append(FlowCap(g, s).ToString("0", inv))
+                  .Append(" (klucz ").Append(s.CaravanOreGateByShortTowns ? "TAK" : "NIE").Append(", bramka ").Append(FlowOn(g, s) ? "czynna" : "nieczynna").Append(')');
+            }
             return sb.ToString();
+        }
+
+        // ------------------------------------------------------------ 294c: ocena celu BK (CaravanRoute294c)
+        private static Good GoodOf(ItemObject it)
+        {
+            if (it == null || _goods == null) return null;
+            foreach (var g in _goods) if (ReferenceEquals(g.Item, it)) return g;
+            return null;
+        }
+
+        private static Good GoodOfCat(ItemCategory c)
+        {
+            if (c == null || _goods == null) return null;
+            foreach (var g in _goods) if (g.Item != null && g.Item.ItemCategory == c) return g;
+            return null;
+        }
+
+        /// <summary>294c (D1): ile sztuk surowca masowego it miasto town przyjmie od karawany przy wjezdzie (ta sama miara co Sell: brak do zapasu docelowego, przy
+        /// zamknietym kupnie - do progu nadwyzki; miasto bez kasy ponad rezerwe - 0) minus towar w drodze do niego (kontrakty i wozy kupcow 174 - MaterialOrders.InTransitTo).
+        /// -1 - nie surowiec tabeli albo regula nieczynna (bez granicy).</summary>
+        internal static int SellableAt(Town town, ItemObject it)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !_wired || !s.CaravanBulkEnabled || town == null || !Ready() || town.Owner == null || town.Owner.ItemRoster == null) return -1;
+                var g = GoodOf(it);
+                if (g == null) return -1;
+                EnsureWorld(s);
+                int reserve = (int)Math.Max(0f, s.TownRentFloorGold);
+                if (town.Gold <= TownPurse.BuyFloorPeek(town, reserve)) return 0;
+                int held = Math.Max(town.Owner.ItemRoster.GetItemNumber(g.Item), FreeOf(g));
+                int want = Glut(g, s) ? Keep(town, g, s) - held : Target(town, g, s) - held;
+                int tr = town.Settlement != null ? Math.Max(0, MaterialOrders.InTransitTo(town.Settlement, g.Item)) : 0;
+                return Math.Max(0, want - tr);
+            }
+            catch { return -1; }
+        }
+
+        /// <summary>294c (D2): czy karawana mp kupi w miescie town surowiec kategorii c regula CaravanBuy (te same warunki co Buy: nadwyzka polki ponad prog, bramka
+        /// Cover - w jukach swiata > 0, indeks ponizej sredniej, cena sztuki < cena zbytu). true - kupno mozliwe albo poza regula (nie zerujemy oceny BK).</summary>
+        internal static bool BuyOpen(MobileParty mp, Town town, ItemCategory c)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !_wired || !s.CaravanBulkEnabled || town == null || !Ready() || town.Owner == null || town.Owner.ItemRoster == null) return true;
+                var g = GoodOfCat(c);
+                if (g == null) return true;
+                EnsureWorld(s);
+                if (town.Owner.ItemRoster.GetItemNumber(g.Item) - Keep(town, g, s) <= 0) return false;
+                if ((int)Cover(g, s) - g.Carried <= 0) return false;
+                if (g.AvgIndex > 0f && town.GetItemCategoryPriceIndex(c) >= g.AvgIndex) return false;
+                int price = PriceOf(town, g, mp, false);
+                return price > 0 && price < g.SellPrice;
+            }
+            catch { return true; }
+        }
+
+        /// <summary>294c (linia 294c): brak rudy miasta (zapas docelowy - polka) &gt; 0 - miasto z brakiem; false - brak rudy w tabeli albo regula nieczynna.</summary>
+        internal static bool OreShort(Town town)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !_wired || town == null || !Ready() || town.Owner == null || town.Owner.ItemRoster == null) return false;
+                foreach (var g in _goods)
+                    if (g.Ix == OreIx) return Target(town, g, s) - Math.Max(town.Owner.ItemRoster.GetItemNumber(g.Item), FreeOf(g)) > 0;
+                return false;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>294c: przedmiot rudy (zelazo) z tabeli; null - brak.</summary>
+        internal static ItemObject OreItem()
+        {
+            if (!Ready()) return null;
+            foreach (var g in _goods) if (g.Ix == OreIx) return g.Item;
+            return null;
         }
 
         /// <summary>282: zapis arm_cb282 - "c282|id:srednia:doby:dzis;..." (srednia sprzedazy karawan wedlug surowca). Brak klucza (starszy zapis) - pomiar od zera,
@@ -647,7 +744,7 @@ namespace Armoury
             _worldDay = day;
             if (_goods.Length < _all.Length) Resolve();      // przedmiot z XML mogl dojsc po pierwszym wywolaniu
             Array.Sort(_goods, (a, b) => (b.Item.Value / b.Kg).CompareTo(a.Item.Value / a.Kg));
-            foreach (var g in _goods) { g.Need = 0; g.Carried = 0; g.Short = 0; g.Empty = 0; g.Buyers = 0; g.AvgIndex = 0f; g.SellPrice = 0f; g.Carriers = 0; g.InTown = 0; }
+            foreach (var g in _goods) { g.Need = 0; g.Carried = 0; g.Short = 0; g.Empty = 0; g.Buyers = 0; g.AvgIndex = 0f; g.SellPrice = 0f; g.Carriers = 0; g.InTown = 0; g.ShortUse = 0f; }
             int reserve = (int)Math.Max(0f, s.TownRentFloorGold);
             int towns = 0, caravans = 0, inTown = 0;
             foreach (var t in Town.AllTowns)
@@ -667,6 +764,7 @@ namespace Armoury
                         if (pays)
                         {
                             g.Need += lack;
+                            g.ShortUse += Math.Max(0f, Use(t, g, s));   // 294c (G): zuzycie doby miast, ktorym surowca brakuje i ktore placa
                             int p = Fetch(t, g, lack);           // miasto z brakiem i z kasa: tu karawana ten surowiec sprzeda
                             if (p > 0) { g.SellPrice += p; g.Buyers++; }
                         }

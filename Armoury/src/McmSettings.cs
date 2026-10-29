@@ -9668,6 +9668,30 @@ namespace Armoury
         [SettingPropertyGroup("Caravans trade what the market will take (294b)")]
         public bool CaravanRoadFoodMeasuredLeg { get; set; } = true;
 
+        [SettingPropertyBool("Caravans Head Where Their Cargo Sells", HintText = "a Banner Kings caravan picks its next town by what it can really sell there: each good counts only for the units the town will still pay at least the caravan's floor for (its cost; old or spoiling goods by the same floors as in town), after the goods other caravans are already bringing to that town (less what the town uses while this caravan is on the road), within the town's purse and, for raw goods, the town's own shortage. The escort's food does not count as cargo. Player caravans with Banner Kings orders, quest caravans and contract carriers are left as they are. Off = as before (Banner Kings scores towns by the price index alone)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
+        public bool CaravanRouteBySale { get; set; } = true;
+
+        [SettingPropertyBool("Caravans Skip Towns Where Our Rules Block Buying", HintText = "a Banner Kings caravan does not head for a town to buy a good that our buying rules would stop it from buying there anyway (the flow gate of the world's caravan stock, the caravan's working capital, the price the unit would fetch in a typical dearer town, spoiling food over a week of sales; raw goods by their own flow gate and profit). If no town scores at all, the caravan picks as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
+        public bool CaravanRouteByBuyRules { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Raw Goods Gate By Short Towns", HintText = "the caravans' flow gate for iron ore (and, with the all-goods gate, the other raw goods) lets them carry at least ten days of what the towns short of that good use, not only ten days of what caravans themselves sold - so ore that never reached a short town no longer keeps the gate shut. Off = as before (ten days of the caravans' own sales)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
+        public bool CaravanOreGateByShortTowns { get; set; } = true;
+
+        [SettingPropertyBool("Ks Iron Full Market Cuts Own Full Towns Only", HintText = "with Ks Iron Hands Follow World Iron Stock: when an iron market is full, the weekly step cuts mine hands only while the market's iron still grows by more than one step's worth, and (with Ks Iron Full Only Own Town) only at mines whose own market town is itself full; mines of towns without a surplus keep their hands. Off = as before (a full market cuts on any rise, at every mine except those of short towns)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
+        public bool KsIronWorldFlowOwnTownCut { get; set; } = true;
+
+        [SettingPropertyBool("Escort Food Kept On Every Sale", HintText = "a caravan never sells the food its escort needs (about ten days of rations) - in Banner Kings' and the game's own sales too, not only in ours. Off = as before (only our sale keeps it)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
+        public bool CaravanPantryAllSales { get; set; } = true;
+
+        [SettingPropertyBool("Caravans Stock Escort Food Where Towns Are Not Hungry", HintText = "with Caravan Road Food: a caravan leaving a town that is not hungry tops its escort food up to the ten days of rations it keeps, paid from its purse to the town; in a hungry town it buys only for the next leg. Off = as before (food for the next leg only)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
+        public bool CaravanRoadFoodTopUp { get; set; } = true;
+
         [SettingPropertyBool("Bk Retinue From Village", HintText = "with People Origin and Levy From Villages: Banner Kings retinues are made of real people - the retinue of a village manor, the retinue of an estate and the Castle Retinue of a castle garrison: a man who joins (and every man of a newly raised retinue) leaves the people of the retinue's village (a castle: its villages), and if they have no one to spare he does not join; a man a manor retinue sends away goes back home instead of vanishing; when an estate's lord calls up his retinue, its men keep their origin in his party. The retinues' sizes and their one-man-a-day pace stay as Banner Kings sets them. Off = as before (retinue men appear from nothing and vanish)", RequireRestart = false)]
         [SettingPropertyGroup("Banner Kings manor retinues from the village's own people (295)")]
         public bool BkRetinueFromVillage { get; set; } = true;
@@ -12836,6 +12860,12 @@ namespace Armoury
             s.CaravanBuyByMarketDepth = CaravanBuyByMarketDepth;
             s.CaravanFoodGateTradeStock = CaravanFoodGateTradeStock;
             s.CaravanRoadFoodMeasuredLeg = CaravanRoadFoodMeasuredLeg;
+            s.CaravanRouteBySale = CaravanRouteBySale;
+            s.CaravanRouteByBuyRules = CaravanRouteByBuyRules;
+            s.CaravanOreGateByShortTowns = CaravanOreGateByShortTowns;
+            s.KsIronWorldFlowOwnTownCut = KsIronWorldFlowOwnTownCut;
+            s.CaravanPantryAllSales = CaravanPantryAllSales;
+            s.CaravanRoadFoodTopUp = CaravanRoadFoodTopUp;
             s.BkRetinueFromVillage = BkRetinueFromVillage;
             s.WinterSparesMinesAndFelling = WinterSparesMinesAndFelling;
             s.VillageCartMilitiaEscort = VillageCartMilitiaEscort;

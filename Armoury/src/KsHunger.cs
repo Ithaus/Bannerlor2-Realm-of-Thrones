@@ -301,6 +301,13 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ dla KsLordFood
+        /// <summary>294c (CaravanEscort H2): miasto glodne tej doby (migawka doby, czesc kary F > 0). Bez migawki (pomiar wylaczony, pierwsza doba sesji) - nie glodne.</summary>
+        internal static bool IsHungry(Town t)
+        {
+            var snap = _snap; Row r;
+            return t != null && snap != null && snap.Count > 0 && snap.TryGetValue(t, out r) && r != null && r.F > 0;
+        }
+
         /// <summary>Miasta glodne tej doby (czesc kary f > 0) z luka rynku i jej wartoscia - KsLordFood (pan miasta placi za dowoz). Kolejnosc wedlug StringId (stala).</summary>
         internal static void Hungry(List<KeyValuePair<Town, Row>> outList)
         {

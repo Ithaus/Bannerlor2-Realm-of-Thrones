@@ -66,6 +66,7 @@ namespace Armoury
             Array.Clear(_rsS, 0, RatioRing); Array.Clear(_rsN, 0, RatioRing); _rsI = _rsCount = _dRawN = 0; _dRawS = 0;   // 294b
             _dDep = _dEnough = _dBuyCar = _dNoGoods = _dNoPurse = _dSkipConvoy = 0;
             _dBought = _dGold = _dWantUnits = _dRoadDays = _dStraight = 0;
+            _hDep = _hSkipHungry = 0; _hUnits = _hGold = 0;   // 294c
             _stumbles = _sessStumbles = 0; _err = false;
         }
 
@@ -103,16 +104,55 @@ namespace Armoury
                 int days = RoadDays(mp, st, s, out straight);
                 _dRoadDays += days; _dStraight += straight;
                 float need = Need(mp);
-                int want = (int)Math.Ceiling(need * days) - BandFood.FoodUnits(mp.ItemRoster);
+                int have = BandFood.FoodUnits(mp.ItemRoster);
+                int leg = (int)Math.Ceiling(need * days);
+                int want = leg - have;
+                // 294c H2 (klucz CaravanRoadFoodTopUp): w miescie bez glodu (migawka KsHunger - czesc kary F = 0) zapas eskorty do spizarni, ktora T1 i (H1) BK / gra
+                // trzymaja w jukach (CaravanGoods.PantryUnits = ceil(-FoodChange x 10)); w miescie glodnym tylko na odcinek (jak 288) - karawana nie wyjada glodnego miasta
+                bool top = false;
+                if (s != null && s.CaravanRoadFoodTopUp)
+                {
+                    if (KsHunger.IsHungry(st.Town)) _hSkipHungry++;
+                    else
+                    {
+                        int pan = CaravanGoods.PantryUnits(mp);
+                        if (pan - have > want) { want = pan - have; top = true; }
+                    }
+                }
                 if (want <= 0) { _dEnough++; return; }
                 _dWantUnits += want;
                 if (mp.PartyTradeGold <= 0) { _dNoPurse++; return; }
                 bool poor;
+                long g0 = _dGold;
                 int got = Buy(mp, st, want, out poor);
                 if (got > 0) { _dBuyCar++; _dTowns.Add(st); }
                 if (got < want) { if (poor) _dNoPurse++; else _dNoGoods++; }
+                if (top)
+                {
+                    int extra = Math.Max(0, got - Math.Max(0, leg - have));   // ponad potrzebe odcinka (ta sama cena - Buy kupuje sztuka po sztuce)
+                    if (extra > 0) { _hDep++; _hUnits += extra; _hGold += got > 0 ? (long)Math.Round((_dGold - g0) * (double)extra / got) : 0; }
+                }
             }
             catch (Exception e) { Stumble("OnLeft", e); }
+        }
+
+        // 294c H2: zapas eskorty w miastach bez glodu - wyjazdy z dokupionym zapasem ponad odcinek, sztuki, zloto (czesc ceny zakupu), pominiete w miastach glodnych
+        private static int _hDep, _hSkipHungry;
+        private static long _hUnits, _hGold;
+
+        /// <summary>294c (CaravanRoute294c, D1): dni drogi karawany do miasta - ta sama miara co jedzenie na droge (RoadDays): prosta odleglosc z miejsca karawany
+        /// (miasto, w ktorym stoi, albo pozycja na mapie) / dzien drogi taboru x wspolczynnik droga / prosta (294b, 1..2); bez pomiaru - sama prosta. Bez zaokraglenia.</summary>
+        internal static double RoadDaysTo(MobileParty mp, Settlement to)
+        {
+            if (mp == null || to == null) return 0.0;
+            var s = Settings.Current;
+            double perDay = Math.Max(1.0, MarketCarts.PerDay(s));
+            var cs = mp.CurrentSettlement;
+            Vec2 from = cs != null ? cs.GetPosition2D : mp.GetPosition2D;
+            double raw = from.Distance(to.GetPosition2D) / perDay;
+            double leg = s != null && s.CaravanRoadFoodMeasuredLeg ? Stage8World.LegDays : 0.0;
+            double r = leg > 0.0 && !double.IsInfinity(leg) ? Ratio(leg) : 0.0;
+            return r > 0.0 ? raw * r : raw;
         }
 
         /// <summary>Dni drogi do celu: prosta odleglosc miasto - cel / dzien drogi taboru (MarketCarts.PerDay), w gore; bez celu (albo cel = to miasto) - do
@@ -304,9 +344,16 @@ namespace Armoury
               .Append(", droga/prosta ").Append(Ratio(Stage8World.LegDays) > 0.0 ? Ratio(Stage8World.LegDays).ToString("0.00", Inv) : "-")      // 294b recenzja
               .Append("), z zapasem w jukach ").Append(_dEnough).Append(", kupilo ").Append(_dBuyCar).Append(" karawan ").Append(_dBought).Append(" z ").Append(_dWantUnits)
               .Append(" szt. za ").Append(_dGold).Append(" zl z kies karawan do kas ").Append(_dTowns.Count).Append(" miast, bez towaru ").Append(_dNoGoods).Append(", bez kiesy ").Append(_dNoPurse)
-              .Append(", konwoje DTE ").Append(_dSkipConvoy)
-              .Append(" | potkniecia ").Append(_stumbles).Append(" (zold 288 ").Append(MountedWage.CarStumbles).Append("), w sesji ").Append(_sessStumbles);
+              .Append(", konwoje DTE ").Append(_dSkipConvoy);
+            // 294c: spizarnia eskorty w sprzedazy BK i gry (H1), zapas eskorty w miastach bez glodu (H2) - segment przed potknieciami (wyrazenie K288_RE z opcjonalna grupa)
+            long h1b, h1v;
+            CaravanTrade284.TakePantryHeld(out h1b, out h1v);
+            sb.Append(" | 294c: spizarnia - BK ").Append(h1b).Append(" szt., gra ").Append(h1v).Append(" szt. wstrzymane (klucz ").Append(s.CaravanPantryAllSales ? "TAK" : "NIE")
+              .Append("); zapas w miastach bez glodu: wyjazdow ").Append(_hDep).Append(", szt. ").Append(_hUnits).Append(", zl ").Append(_hGold)
+              .Append("; pominiete glodne ").Append(_hSkipHungry).Append(" (klucz ").Append(s.CaravanRoadFoodTopUp ? "TAK" : "NIE").Append(')');
+            sb.Append(" | potkniecia ").Append(_stumbles).Append(" (zold 288 ").Append(MountedWage.CarStumbles).Append("), w sesji ").Append(_sessStumbles);
             Log.Info(sb.ToString());
+            _hDep = _hSkipHungry = 0; _hUnits = _hGold = 0;
             NoteRatioDay(); _dRawS = 0; _dRawN = 0;   // 294b
             _dDep = _dEnough = _dBuyCar = _dNoGoods = _dNoPurse = _dSkipConvoy = 0;
             _dBought = _dGold = _dWantUnits = _dRoadDays = _dStraight = 0;

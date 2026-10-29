@@ -43,6 +43,8 @@ namespace Armoury
         private static int _r6Eval, _r6NoStr, _r6Dep, _r6Below, _r6Hire, _r6RelCar, _r6RelMen, _r6Kept, _r6Notice, _r6PlRel, _r6PlWait;
         private static double _r6SumRoute, _r6SumTown, _r6SumStr, _r6RelStr;
         private static long _r6RelWage, _r6RelUnit;
+        // 294c J (tylko log - decyzja Jeffa): karawana gracza bez zwolnien (CaravanGuardPlayerAfterNotice NIE) - ile zwolnilaby regula sily drogi (ostatnia ocena doby)
+        private static int _jEval, _jMen; private static long _jWage; private static double _jNeed, _jStr; private static string _jName;
 
         internal static bool Road286On(Settings s) { return s != null && s.CaravanGuardByRisk && s.CaravanGuardByRoadStrength; }
 
@@ -56,6 +58,7 @@ namespace Armoury
         {
             _r6Eval = _r6NoStr = _r6Dep = _r6Below = _r6Hire = _r6RelCar = _r6RelMen = _r6Kept = _r6Notice = _r6PlRel = _r6PlWait = 0;
             _r6SumRoute = _r6SumTown = _r6SumStr = _r6RelStr = 0; _r6RelWage = _r6RelUnit = 0;
+            _jEval = _jMen = 0; _jWage = 0; _jNeed = _jStr = 0; _jName = null;   // 294c J
         }
 
         /// <summary>Odleglosc punktu p od odcinka a-b (mapa 2D).</summary>
@@ -175,7 +178,13 @@ namespace Armoury
             if (plan == null) { _relDay[mp] = today; _r6Kept++; if (men < lim) _blocked++; return false; }
             if (player)
             {
-                if (!s.CaravanGuardPlayerAfterNotice) { _relDay[mp] = today; _relPlayerSkip++; return false; }
+                if (!s.CaravanGuardPlayerAfterNotice)
+                {
+                    // 294c J: sam pomiar dla Jeffa - plan regula sily drogi (ci sami ludzie, ktorych zwolnilaby karawana AI), bez zwolnienia
+                    int jn = 0; foreach (var kv in plan) jn += kv.Value;
+                    _jEval++; _jMen = jn; _jWage = relUnit; _jNeed = need; _jStr = str; _jName = mp.Name != null ? mp.Name.ToString() : "?";
+                    _relDay[mp] = today; _relPlayerSkip++; return false;
+                }
                 if (_noticeDay < 0)
                 {
                     _noticeDay = today; _r6Notice++; _relDay[mp] = today;
@@ -246,8 +255,13 @@ namespace Armoury
               .Append(men > 0 ? ((double)unit / men).ToString("0.00", inv) : "-").Append(" na czlowieka); tier <=3 ").Append(tn[0]).Append(" (").Append(tw[0])
               .Append(" zl), tier 4 ").Append(tn[1]).Append(" (").Append(tw[1]).Append(" zl), tier 5+ ").Append(tn[2]).Append(" (").Append(tw[2]).Append(" zl), najemnicy ")
               .Append(merc).Append(" (").Append(mercW).Append(" zl), konni ").Append(mounted)
-              .Append(" | ").Append(CaravanGoods.Seg286())
-              .Append(" | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
+              .Append(" | ").Append(CaravanGoods.Seg286());
+            // 294c J (tylko log): karawana gracza wedlug sily drogi - segment przed potknieciami (wyrazenie H286_RE_G z opcjonalna grupa)
+            if (_jEval > 0)
+                sb.Append(" | 294c J: karawana gracza wedlug sily drogi zwolnilaby ").Append(_jMen).Append(" ludzi (zold -").Append(_jWage).Append(" zl/d), potrzeba ")
+                  .Append(_jNeed.ToString("0", inv)).Append(", sila ").Append(_jStr.ToString("0", inv)).Append(" ('").Append((_jName ?? "?").Replace("'", "").Replace("|", "/"))
+                  .Append("', ocen ").Append(_jEval).Append("; Player Caravans Follow Road Guard Rule NIE - decyzja gracza)");
+            sb.Append(" | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
             Log.Info(sb.ToString());
             Zero286();
         }

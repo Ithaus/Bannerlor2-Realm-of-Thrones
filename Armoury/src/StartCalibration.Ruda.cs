@@ -212,6 +212,13 @@ namespace Armoury
             var wV = new long[2]; var wP = new long[2]; var wC = new long[2]; var wTot = new long[2]; var wPrev = new long[2];
             var lv = new int[2]; var act = new int[2];             // act: +1 w gore, -1 w dol, 0 trzymane, 3 bez pomiaru (trzymane), 2 poza regula 290 (reguly 282-287)
             var u290 = new int[2]; var d290 = new int[2]; var h290 = new int[2];
+            // 294c (F, klucz KsIronWorldFlowOwnTownCut): autotest 296c - przy rynku PELNYM krok 290 cial rece przy KAZDYM wzroscie zapasu swiata (dW > 0, nie > prog) i we
+            // wszystkich kopalniach poza miastami z brakiem (z pominieciem reguly 287 KsIronFullOnlyOwnTown); zelazo swiata ostatnie 30 dob -30.5/d (296b bez 294b -8.3),
+            // wytop bez wegla 20.1 lup/d. Teraz przy PELNYM: w dol tylko przy dW > prog (jak PASMO; nadmiar mniejszy niz krok schodzi sam), a ciecie (przy 287) tylko kopalnie
+            // miast targowych pelnych - kopalnie miast bez nadmiaru trzymaja rece (kubel 'trzymane'); kopalnia bez znanego miasta targowego - w dol jak dotad. W gore,
+            // BRAK i PASMO bez zmian. Tylko podzial rak bloku; klucz NIE - co do bitu jak 290.
+            bool fCutOn = flowOn && sR.KsIronWorldFlowOwnTownCut;
+            var fDn = new int[2]; var fHold = new int[2];
             if (flowOn)
             {
                 try
@@ -242,7 +249,7 @@ namespace Armoury
                 else
                 {
                     long dl = wTot[m] - wPrev[m];
-                    if (lv[m] == -1) act[m] = dl > 0 ? -1 : dl < -2 * thr[m] ? 1 : 0;
+                    if (lv[m] == -1) act[m] = dl > (fCutOn ? thr[m] : 0) ? -1 : dl < -2 * thr[m] ? 1 : 0;   // 294c (F): przy kluczu w dol dopiero ponad prog
                     else if (lv[m] == 1) act[m] = dl < thr[m] ? 1 : 0;
                     else act[m] = dl > thr[m] ? -1 : dl < -thr[m] ? 1 : 0;
                 }
@@ -305,7 +312,8 @@ namespace Armoury
                                     if (act[m] == -1)
                                     {
                                         if (bandOn && locShort) h290[m]++;
-                                        else { f = F5Down; d290[m]++; }
+                                        else if (fCutOn && lv[m] == -1 && fullOwnOn && mtKnown && !locFull) { h290[m]++; fHold[m]++; }   // 294c (F): PELNY - miasto bez nadmiaru trzyma
+                                        else { f = F5Down; d290[m]++; if (fCutOn && lv[m] == -1) fDn[m]++; }
                                     }
                                     else if (act[m] == 1)
                                     {
@@ -401,7 +409,9 @@ namespace Armoury
                       .Append(", wsie ").Append(wV[m]).Append(", wozy wsi ").Append(wP[m]).Append(", zamki ").Append(wC[m]).Append(", prog ").Append(thr[m])
                       .Append(", poziom ").Append(lv[m] == 1 ? "BRAK" : lv[m] == -1 ? "PELNY" : lv[m] == 0 ? "PASMO" : "BEZ CELU")
                       .Append(", ruch ").Append(act[m] == 1 ? "W GORE" : act[m] == -1 ? "W DOL" : act[m] == 0 ? "TRZYMANE" : act[m] == 3 ? "BEZ POMIARU (trzymane)" : "REGULY 282-287")
-                      .Append(", w gore ").Append(u290[m]).Append(", w dol ").Append(d290[m]).Append(", trzymane ").Append(h290[m]);
+                      .Append(", w gore ").Append(u290[m]).Append(", w dol ").Append(d290[m]).Append(", trzymane ").Append(h290[m])
+                      .Append("; 294c: PELNY w dol tylko przy dW > prog ").Append(fCutOn ? "TAK" : "NIE").Append(", kopalnie miast pelnych w dol ").Append(fDn[m])
+                      .Append(", trzymane (miasto bez nadmiaru) ").Append(fHold[m]);
             }
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
               .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(Bloomery.F7On ? " (w tym przez rece weglarzy f7-wegiel " + nColl + ")" : "").Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)
