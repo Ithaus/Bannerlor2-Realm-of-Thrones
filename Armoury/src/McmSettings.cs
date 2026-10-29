@@ -1188,7 +1188,7 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PlayerHaggle { get; set; } = true;
 
-        [SettingPropertyBool("Player Rebuy Cap", HintText = "replaces the one-tenth cap (Sell Cap Percent Of New Ask) for your sales: a town will not pay you more for a piece than you paid there for a worse copy of the same item you have not sold back - buying worn gear, mending it and selling it back in the same town never pays. Needs Player Haggle", RequireRestart = false)]
+        [SettingPropertyBool("Player Rebuy Cap", HintText = "replaces the one-tenth cap (Sell Cap Percent Of New Ask) for your own sales: for one season a town will not pay you more for a piece than you paid there for a worse copy of the same item you have not sold back, so buying worn gear, mending it and selling it back in the same town does not pay. Your clan's parties are not capped. Needs Player Haggle", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PlayerRebuyCap { get; set; } = true;
 

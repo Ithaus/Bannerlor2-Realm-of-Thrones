@@ -481,8 +481,8 @@ namespace Armoury
                 if (__1 != null && __1.IsSettlement && __0 != null && __0.MobileParty != null && !__0.MobileParty.IsMainParty)
                 {
                     var mp = __0.MobileParty;
-                    // 300b: partie rodu gracza (bez karawan) osobno - tam dziala targ gracza (PlayerHaggle.Side)
-                    _ctx = mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan && !mp.IsCaravan ? ClanParties : mp.IsLordParty ? Lords : OtherParties;
+                    // 300b: partie rodu gracza osobno - ta sama regula co targ gracza (PlayerHaggle.Side: rod gracza, przywodca-bohater, nie karawana); reszta jak dotad
+                    _ctx = PlayerHaggle.Side(mp) ? ClanParties : mp.IsLordParty ? Lords : OtherParties;
                 }
             }
             catch { }

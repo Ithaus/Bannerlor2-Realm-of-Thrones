@@ -40,6 +40,8 @@ namespace Armoury
         [ThreadStatic] private static int _forceS1;     // sonda przy zadanym S (S + 1; 0 = S przywodcy)
         private static readonly List<string> _models = new List<string>();
         private static readonly Dictionary<MobileParty, Terms> _cache = new Dictionary<MobileParty, Terms>();
+        // 300b po recenzji: mnoznik BK na typ modelu, ktory robi zewnetrzne wywolanie (aktywny = BkPenaltyOnce.LastMult; inny typ - pomiar na nim, raz na sesje)
+        private static readonly Dictionary<Type, float> _mbkType = new Dictionary<Type, float>();
         private static readonly object _lock = new object();
         private static int _errors, _dayErrors;
 
@@ -81,6 +83,30 @@ namespace Armoury
 
         /// <summary>Mnoznik BK do zdjecia przy sprzedazy strony gracza (pomiar BkPenaltyOnce.Sync; brak pomiaru albo liczba poza 0.5..50 = 1).</summary>
         internal static float Mbk { get { float m = BkPenaltyOnce.LastMult; return m >= 0.5f && m <= 50f ? m : 1f; } }
+
+        /// <summary>300b po recenzji: mnoznik BK do zdjecia dla typu modelu, ktory liczy zewnetrzne wywolanie. Aktywny model = Mbk (pomiar Sync); inny typ
+        /// (np. wlasna instancja Default w cudzym modelu) - BkPenaltyOnce.Measure na tej instancji raz na sesje (przy BkTradePenaltyOnce = false aktywny BKROT
+        /// mierzy x25, a goly Default tylko x5 - jeden globalny mnoznik dzielilby go przez 25). Pomiar poza 0.5..50 = Mbk.</summary>
+        private static float MbkFor(TradeItemPriceFactorModel inst)
+        {
+            float g = Mbk;
+            if (inst == null || !BkPenaltyOnce.Measured) return g;
+            var cm = Campaign.Current != null ? Campaign.Current.Models : null;
+            var ty = inst.GetType();
+            if (cm != null && cm.TradeItemPriceFactorModel != null && cm.TradeItemPriceFactorModel.GetType() == ty) return g;
+            lock (_lock) { float v; if (_mbkType.TryGetValue(ty, out v)) return v; }
+            float m = g;
+            var a = ArmourNear(1f);
+            if (a != null)
+            {
+                // wewnetrzne wywolanie: licznik zagniezdzenia > 1 i brak partii - postfiks 300b nic nie zmienia, wynik = sam lancuch tego modelu
+                float r = BkPenaltyOnce.Measure(inst, a);
+                if (!float.IsNaN(r) && r >= 0.5f && r <= 50f) m = r;
+            }
+            lock (_lock) _mbkType[ty] = m;
+            Log.Info("Targ gracza (300b): model " + ty.FullName + " (nie aktywny) - BK x" + m.ToString("0.0", Inv) + " zmierzone na nim (aktywny x" + g.ToString("0.0", Inv) + ").");
+            return m;
+        }
 
         private static float E(int points)
         {
@@ -144,7 +170,7 @@ namespace Armoury
         public static Exception Finalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
 
         /// <summary>Postfiks GetTradePenalty (Priority.Last - po BK); tylko zewnetrzne wywolanie (BKROT -> base Default liczy raz).</summary>
-        public static void Postfix(ItemObject __0, MobileParty __1, PartyBase __2, bool __3, ref float __result)
+        public static void Postfix(TradeItemPriceFactorModel __instance, ItemObject __0, MobileParty __1, PartyBase __2, bool __3, ref float __result)
         {
             if (_depth > 1 || Raw || __1 == null || __0 == null) return;
             try
@@ -153,7 +179,7 @@ namespace Armoury
                 var t = Get(__1, __2);
                 if (t == null) return;
                 float r = __result * t.K;
-                if (__3 && BkScope(__0)) r /= Mbk;
+                if (__3 && BkScope(__0)) r /= MbkFor(__instance);
                 if (!float.IsNaN(r) && !float.IsInfinity(r)) __result = r;
             }
             catch (Exception e) { Stumble("Postfix", e); }
@@ -328,7 +354,10 @@ namespace Armoury
             return l;
         }
 
-        /// <summary>Naruszenia "sprzedaz >= kupno" cenami gracza (ProbeBuySell) przy S (fs) na probce polek.</summary>
+        /// <summary>Naruszenie arbitrazu: sprzedaz > kupno albo sprzedaz = kupno ponad minimum gry (1 = 1 zl przy minimum ceny to nie arbitraz - kupno i sprzedaz po 1 zl, zysk 0).</summary>
+        internal static bool Violates(int buy, int sell) { return sell > buy || (sell == buy && buy > 1); }
+
+        /// <summary>Naruszenia "sprzedaz >= kupno" cenami gracza (ProbeBuySell) przy S (fs) na probce polek (bez 1 = 1 zl - Violates).</summary>
         private static void Violations(IEnumerable<Settlement> towns, int perTown, int fs, ref int bad, ref int n)
         {
             int f0 = _forceS1;
@@ -341,7 +370,7 @@ namespace Armoury
                         int buy, sell;
                         if (!SupplyDemand.ProbeBuySell(st, el, false, out buy, out sell)) continue;
                         n++;
-                        if (sell >= buy) bad++;
+                        if (Violates(buy, sell)) bad++;
                     }
             }
             finally { _forceS1 = f0; }
@@ -356,7 +385,7 @@ namespace Armoury
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
                 var main = MobileParty.MainParty;
                 if (s == null || model == null || main == null) { Log.Info("Targ gracza (300b): linia startowa niemozliwa (brak modelu cen albo partii gracza)."); return; }
-                lock (_lock) _cache.Clear();
+                lock (_lock) { _cache.Clear(); _mbkType.Clear(); }   // po BkPenaltyOnce.Sync - pomiar BK na typ od nowa
                 var sb = new StringBuilder();
                 sb.Append("Targ gracza (300b): klucz Player Haggle ").Append(s.PlayerHaggle ? "TAK" : "NIE").Append(", Player Rebuy Cap ").Append(s.PlayerRebuyCap ? "TAK" : "NIE")
                   .Append(" | GetTradePenalty wpiete w ").Append(_models.Count).Append(" modelach (").Append(Models()).Append(')')
@@ -379,6 +408,17 @@ namespace Armoury
                 sb.Append(" (");
                 for (int i = 0; i < items.Length; i++) { if (i > 0) sb.Append('/'); sb.Append(items[i] != null ? items[i].StringId : "-"); }
                 sb.Append(')');
+                // 300b po recenzji: perki i modyfikatory partii gracza w krzywej (Appraiser, Gladiator BK, Aserai, blogoslawienstwa) - kara przy S = 0 / wzor gry bez perkow
+                // (0.06 + 1.5 + 0.25 x max(0, Tierf - 1)); sprawdz_logi L300-4 liczy z tego krzywa oczekiwana (wynik gry liniowy w num, wiec jeden mnoznik na krzywa)
+                sb.Append(", perki x");
+                if (items[0] != null)
+                {
+                    float b0 = 1.56f + 0.25f * Math.Max(0f, items[0].Tierf - 1f);
+                    float p0 = Pen(model, items[0], main, null, true, 0f, 0f, 0f, false, 0);
+                    float pf = b0 > 0f ? p0 / b0 : float.NaN;
+                    sb.Append(float.IsNaN(pf) || float.IsInfinity(pf) ? "-" : pf.ToString("0.000", Inv));
+                }
+                else sb.Append('-');
                 foreach (int S in CurveS)
                 {
                     sb.Append(", S=").Append(S).Append(": ");
@@ -475,6 +515,7 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays - 1;
             try
             {
+                RebuyLedger.Expire();   // 300b po recenzji: wpisy ksiegi starsze niz pora roku wypadaja (falszywe sufity nie zostaja na zawsze)
                 var s = Settings.Current;
                 var main = MobileParty.MainParty;
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
@@ -509,7 +550,7 @@ namespace Armoury
                                 float g = FractionAt(st, el.Item, main, false, fs);
                                 int buy, sell;
                                 if (!SupplyDemand.ProbeBuySell(st, el, false, out buy, out sell)) continue;
-                                if (k == 0) { if (!float.IsNaN(g)) gNow.Add(g); vnN++; if (sell >= buy) vbN++; } else { if (!float.IsNaN(g)) g700.Add(g); vn7++; if (sell >= buy) vb7++; }
+                                if (k == 0) { if (!float.IsNaN(g)) gNow.Add(g); vnN++; if (Violates(buy, sell)) vbN++; } else { if (!float.IsNaN(g)) g700.Add(g); vn7++; if (Violates(buy, sell)) vb7++; }
                                 if (el.ItemValue > 0) (k == 0 ? wNow : w700).Add((float)sell / el.ItemValue);
                                 // petla wrak + material -> czysta w tym samym miescie bez ksiegi odkupu (gorna granica: towar przywieziony z innego miasta)
                                 if (el.Item.ItemType == ItemObject.ItemTypeEnum.Horse) continue;
@@ -555,23 +596,55 @@ namespace Armoury
     ///    (osada, przedmiot) -> [mnoznik stanu, zaplacone za sztuke];
     ///  - wycena sprzedazy strony gracza sztuki tego samego przedmiotu w LEPSZYM stanie w tej osadzie: cena <= najnizsze zaplacone (wiaze: "odkup") - petla traci
     ///    co najmniej material i robocizne; dziala tez na strzaly czyszczone za darmo (CleanseAmmo);
-    ///  - zatwierdzona sprzedaz zuzywa wpisy (najpierw ten sam stan - sztuka oddana jak kupiona, potem najtansze) przy zamknieciu ekranu. W trakcie ekranu
-    ///    kazda sztuka idzie na sufit, poki jest wpis (ostroznie: sprzedaz, cofniecie i ponowna sprzedaz w jednym ekranie nie zdejmuje sufitu).
+    ///  - zatwierdzona sprzedaz zuzywa wpisy (najpierw ten sam stan - sztuka oddana jak kupiona, potem najtansze) przy zamknieciu ekranu i przy sprzedazy nadwyzki
+    ///    zbrojowni gracza (MenPurse.SellPlayerSurplus). W trakcie ekranu kazda sztuka idzie na sufit, poki jest wpis (ostroznie: sprzedaz, cofniecie i ponowna
+    ///    sprzedaz w jednym ekranie nie zdejmuje sufitu);
+    ///  - sufit tylko dla partii gracza (to jego zakupy); partie rodu bez sufitu;
+    ///  - wpis zyje jedna pore roku (CampaignTimeModel: DaysInWeek x WeeksInSeason, u Jeffa 91 dob) - sztuki kupione zuzyte dla ludzi i nigdy nieoddane nie trzymaja
+    ///    falszywego sufitu na czysty lup tej rzeczy na zawsze; po porze roku petla w tym samym miescie jest tylko wolniejsza odmiana handlu miedzy miastami (decyzja 3).
     /// Zapis arm_lupy300 (SaveText.Sync), najwyzej 50 wpisow na (osada, przedmiot) i 5000 razem (najstarsze wypadaja). Reset w konstruktorze ArmouryBehavior.
     /// </summary>
     internal static class RebuyLedger
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const int PerKey = 50, Total = 5000;
-        private sealed class Entry { internal float Pm; internal int Paid; internal long Seq; }
+        private sealed class Entry { internal float Pm; internal int Paid; internal long Seq; internal int Day; }
         private static readonly Dictionary<string, List<Entry>> _book = new Dictionary<string, List<Entry>>();
-        private static int _total, _loaded, _notedDay, _usedDay, _cappedDay;
+        private static int _total, _loaded, _notedDay, _usedDay, _cappedDay, _expiredDay;
         private static long _seq;
 
         internal static int Loaded { get { return _loaded; } }
 
-        internal static void Reset() { _book.Clear(); _total = _loaded = _notedDay = _usedDay = _cappedDay = 0; _seq = 0; }
-        internal static void DayReset() { _notedDay = _usedDay = _cappedDay = 0; }
+        internal static void Reset() { _book.Clear(); _total = _loaded = _notedDay = _usedDay = _cappedDay = _expiredDay = 0; _seq = 0; }
+        internal static void DayReset() { _notedDay = _usedDay = _cappedDay = _expiredDay = 0; }
+
+        private static int Today() { return (int)CampaignTime.Now.ToDays; }
+
+        /// <summary>Zycie wpisu: pora roku z ZYWEGO modelu czasu (jak LandValue.DaysInSeason; u Jeffa 7 x 13 = 91).</summary>
+        private static int Life()
+        {
+            try { var m = Campaign.Current.Models.CampaignTimeModel; return Math.Max(7, m.DaysInWeek * m.WeeksInSeason); }
+            catch { return 91; }
+        }
+
+        /// <summary>Raz na dobe (PlayerHaggle.Daily): wpisy starsze niz pora roku wypadaja.</summary>
+        internal static void Expire()
+        {
+            try
+            {
+                if (_total == 0) return;
+                int cut = Today() - Life();
+                List<string> empty = null;
+                foreach (var kv in _book)
+                {
+                    int n = kv.Value.RemoveAll(e => e.Day < cut);
+                    if (n > 0) { _total -= n; _expiredDay += n; }
+                    if (kv.Value.Count == 0) { if (empty == null) empty = new List<string>(); empty.Add(kv.Key); }
+                }
+                if (empty != null) foreach (var k in empty) _book.Remove(k);
+            }
+            catch (Exception e) { PlayerHaggle.Stumble("RebuyLedger.Expire", e); }
+        }
 
         private static string Key(Settlement st, ItemObject it) { return st.StringId + "|" + it.StringId; }
         private static float Pm(EquipmentElement el) { return el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f; }
@@ -582,11 +655,11 @@ namespace Armoury
                    && it.ItemType != ItemObject.ItemTypeEnum.Horse;
         }
 
-        private static void Add(string key, float pm, int paid)
+        private static void Add(string key, float pm, int paid, int day)
         {
             List<Entry> l;
             if (!_book.TryGetValue(key, out l)) _book[key] = l = new List<Entry>();
-            l.Add(new Entry { Pm = pm, Paid = paid, Seq = ++_seq });
+            l.Add(new Entry { Pm = pm, Paid = paid, Seq = ++_seq, Day = day });
             _total++;
             if (l.Count > PerKey) { l.RemoveAt(0); _total--; }
             while (_total > Total)
@@ -609,7 +682,8 @@ namespace Armoury
                 float pm = Pm(el);
                 if (pm >= 1f) return;
                 string key = Key(st, el.Item);
-                for (int i = 0; i < n; i++) Add(key, pm, Math.Max(1, unit));
+                int today = Today();
+                for (int i = 0; i < n; i++) Add(key, pm, Math.Max(1, unit), today);
                 _notedDay += n;
             }
             catch (Exception e) { PlayerHaggle.Stumble("RebuyLedger.Note", e); }
@@ -670,7 +744,7 @@ namespace Armoury
         {
             var towns = new HashSet<string>();
             foreach (var k in _book.Keys) { int i = k.IndexOf('|'); towns.Add(i > 0 ? k.Substring(0, i) : k); }
-            return "wpisow " + _total + ", miast " + towns.Count + ", zapisano dzis " + _notedDay + ", zuzyto dzis " + _usedDay + ", sufitow dzis " + _cappedDay;
+            return "wpisow " + _total + ", miast " + towns.Count + ", zapisano dzis " + _notedDay + ", zuzyto dzis " + _usedDay + ", sufitow dzis " + _cappedDay + ", wygaslo dzis " + _expiredDay;
         }
 
         internal static string SkupBrief()
@@ -680,7 +754,7 @@ namespace Armoury
             return "ksiega odkupu: wpisow " + _total + ", miast " + towns.Count + ", zuzytych dzis " + _usedDay;
         }
 
-        /// <summary>Zapis: "osada|przedmiot=pm:zaplacone,pm:zaplacone;..." (kolejnosc wpisow = kolejnosc kupna). Kontrola: odczyt napisu daje te sama liczbe wpisow.</summary>
+        /// <summary>Zapis: "osada|przedmiot=pm:zaplacone:dzien,pm:zaplacone:dzien;..." (kolejnosc wpisow = kolejnosc kupna). Kontrola: odczyt napisu daje te sama liczbe wpisow.</summary>
         internal static string Export()
         {
             var sb = new StringBuilder();
@@ -692,7 +766,7 @@ namespace Armoury
                 for (int i = 0; i < kv.Value.Count; i++)
                 {
                     if (i > 0) sb.Append(',');
-                    sb.Append(kv.Value[i].Pm.ToString("0.####", Inv)).Append(':').Append(kv.Value[i].Paid);
+                    sb.Append(kv.Value[i].Pm.ToString("0.####", Inv)).Append(':').Append(kv.Value[i].Paid).Append(':').Append(kv.Value[i].Day);
                     n++;
                 }
                 sb.Append(';');
@@ -707,6 +781,7 @@ namespace Armoury
         {
             int n = 0;
             if (string.IsNullOrEmpty(s)) return 0;
+            int today = into != null ? Today() : 0;
             foreach (var part in s.Split(';'))
             {
                 if (part.Length == 0) continue;
@@ -715,15 +790,16 @@ namespace Armoury
                 string key = part.Substring(0, eq);
                 foreach (var e in part.Substring(eq + 1).Split(','))
                 {
-                    int c = e.IndexOf(':');
-                    float pm; int paid;
-                    if (c <= 0 || !float.TryParse(e.Substring(0, c), NumberStyles.Float, Inv, out pm) || !int.TryParse(e.Substring(c + 1), NumberStyles.Integer, Inv, out paid)) continue;
+                    var f = e.Split(':');
+                    float pm; int paid, day;
+                    if (f.Length < 2 || f.Length > 3 || !float.TryParse(f[0], NumberStyles.Float, Inv, out pm) || !int.TryParse(f[1], NumberStyles.Integer, Inv, out paid)) continue;
+                    if (f.Length < 3 || !int.TryParse(f[2], NumberStyles.Integer, Inv, out day)) day = today;   // wpis bez dnia - od dnia wczytania
                     n++;
                     if (into != null)
                     {
                         List<Entry> l;
                         if (!into.TryGetValue(key, out l)) into[key] = l = new List<Entry>();
-                        l.Add(new Entry { Pm = pm, Paid = paid });
+                        l.Add(new Entry { Pm = pm, Paid = paid, Day = day });
                     }
                 }
             }
@@ -737,7 +813,7 @@ namespace Armoury
                 Reset();
                 var tmp = new Dictionary<string, List<Entry>>();
                 Parse(s, tmp);
-                foreach (var kv in tmp) foreach (var e in kv.Value) Add(kv.Key, e.Pm, e.Paid);
+                foreach (var kv in tmp) foreach (var e in kv.Value) Add(kv.Key, e.Pm, e.Paid, e.Day);
                 _loaded = _total;
             }
             catch (Exception e) { PlayerHaggle.Stumble("RebuyLedger.Import", e); }

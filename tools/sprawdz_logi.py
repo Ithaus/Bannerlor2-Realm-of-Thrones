@@ -82533,9 +82533,10 @@ def main(argv):
 # L300-0   linia startowa: klucz Player Haggle TAK, >= 1 model z GetTradePenalty, BK x5.0 +-0.05 (zmierzone); klucz NIE - INFO
 # L300-1   samotest: AI bez zmian a/a, a > 0 (kazda linia startowa)
 # L300-2   samotest: bez klucza = 137 b/b, b > 0
-# L300-3   naruszen sprzedaz >= kupno cenami gracza = 0 (start: S teraz i S=700; kazda doba pomiaru: S teraz i S=700); bez probek - INFO
-# L300-4   krzywa (klucz TAK): niemalejaca w S dla kazdego Tierf; Tierf 1: S=0 w [0.29, 0.33], S=700 w [0.46, 0.52] (rachunek: 0.8 / (1 + 1.56 / (1 + 0.002 S)),
-#          Appraiser do 0.515)
+# L300-3   naruszen sprzedaz >= kupno cenami gracza = 0 (start: S teraz i S=700; kazda doba pomiaru: S teraz i S=700; 1 = 1 zl przy minimum ceny C# nie liczy); bez probek - INFO
+# L300-4   krzywa (klucz TAK): niemalejaca w S dla kazdego Tierf; kazdy punkt = wzor gry 0.8 / (1 + pf x (1.56 + 0.25 x max(0, Tierf - 1)) / (1 + 0.002 S)) +-0.003,
+#          pf = 'perki x' z linii (kara przy S = 0 / wzor bez perkow; Appraiser 0.85, Gladiator BK 0.8, blogoslawienstwa...) w [0.40, 1.01] - po recenzji: dotad
+#          stale pasmo Tierf 1 S=0 [0.29, 0.33] mowilo NIE przy dobrym buildzie u postaci z perkami
 # L300-5   gracz w 'Skup sprzetu (doba)': mediana % ze stanem >= 20% w dobach ze sprzedaza (INFO, gdy brak sprzedazy - autotest zwykle nie handluje)
 # L300-6   ERROR in PlayerHaggle / RebuyLedger / arm_lupy300 = 0, potkniecia w liniach doby = 0
 # L300-7   ksiega odkupu: zapis = odczyt kontrolny przy kazdym zapisie (INFO, gdy zapisu nie bylo)
@@ -82550,15 +82551,16 @@ LUPY300_SKUP_L = "Skup sprzetu (doba): "
 LUPY300_BK_L = "Kara handlowa BK: x"
 LUPY300_ERR = ("ERROR in PlayerHaggle", "ERROR in RebuyLedger", "ERROR in SyncData.arm_lupy300")
 LUPY300_BK = (4.95, 5.05)
-LUPY300_T1_S0 = (0.29, 0.33)
-LUPY300_T1_S700 = (0.46, 0.52)
+LUPY300_PF = (0.40, 1.01)
+LUPY300_FIT = 0.003
+LUPY300_SAMPLE_TIERS = (1.00, 4.02, 5.98)
 LUPY300_SKUP_MIN = 20.0
 LUPY300_F = r"(?:\d+(?:\.\d+)?|-)"
 LUPY300_START_RE = re.compile(
     r"^Targ gracza \(300b\): klucz Player Haggle (?P<key>TAK|NIE), Player Rebuy Cap (?P<rb>TAK|NIE) \| GetTradePenalty wpiete w (?P<nm>\d+) modelach \((?P<models>[^)]*)\)"
     r" \| BK x(?P<bk>[\d.]+) \((?P<bkm>zmierzone|bez pomiaru - nic do zdjecia)\)"
     r" \| gracz: (?:Handel (?P<t>\d+), perswazja (?P<p>-?\d+) \((?P<plog>Urok .*?= -?\d+)\) -> czynnik kary (?P<h>[\d.]+) \(sam Handel (?P<tf>[\d.]+)\), narzut (?P<mk>[\d.]+)%|brak przywodcy)"
-    r" \| krzywa \(ulamek przed polka, bpf 0\.8\) Tierf (?P<tiers>\S+) \((?P<ids>\S+)\)(?P<curve>(?:, S=\d+: [\d./-]+)+)"
+    r" \| krzywa \(ulamek przed polka, bpf 0\.8\) Tierf (?P<tiers>\S+) \((?P<ids>\S+)\), perki x(?P<pf>[\d.]+|-)(?P<curve>(?:, S=\d+: [\d./-]+)+)"
     r" \| samotest: AI bez zmian (?P<a1>\d+)/(?P<a2>\d+), bez klucza = 137 (?P<b1>\d+)/(?P<b2>\d+), sprzedaz < kupno przy S teraz i S=700: naruszen (?P<v1>\d+) z (?P<v2>\d+)"
     r" \| ksiega odkupu: wczytano (?P<ld>\d+)\.$")
 LUPY300_CURVE = re.compile(r", S=(\d+): ([\d./-]+)")
@@ -82569,7 +82571,7 @@ LUPY300_DAY_RE = re.compile(
     r" \| naruszen sprzedaz >= kupno: S teraz (?P<vb0>\d+) z (?P<vn0>\d+), S=700 (?P<vb7>\d+) z (?P<vn7>\d+)"
     rf" \| petla wrak \+ material -> czysta tu \(bez ksiegi, INFO\): S teraz mediana (?P<l0>-?{LUPY300_F})% max (?P<l0x>-?{LUPY300_F})% \((?P<l0n>\d+)\), "
     rf"S=700 mediana (?P<l7>-?{LUPY300_F})% max (?P<l7x>-?{LUPY300_F})% \((?P<l7n>\d+)\)"
-    r" \| ksiega odkupu: wpisow (?P<le>\d+), miast (?P<lm>\d+), zapisano dzis (?P<lz>\d+), zuzyto dzis (?P<lu>\d+), sufitow dzis (?P<lc>\d+)"
+    r" \| ksiega odkupu: wpisow (?P<le>\d+), miast (?P<lm>\d+), zapisano dzis (?P<lz>\d+), zuzyto dzis (?P<lu>\d+), sufitow dzis (?P<lc>\d+), wygaslo dzis (?P<lx>\d+)"
     r" \| rod gracza: partii (?P<cp>\d+), z przywodca (?P<ch>\d+) \| potkniecia (?P<err>\d+)\.$")
 LUPY300_DAY_SHORT = re.compile(r"^Targ gracza \(300b\): dzien (\d+) \| potkniecia (\d+)\.$")
 LUPY300_SAVE_RE = re.compile(r"^Ksiega odkupu \(300b\): zapis (\d+) wpisow \(kluczy (\d+)\), dlugosc (\d+), odczyt kontrolny (\d+)\.$")
@@ -82578,17 +82580,35 @@ LUPY300_SKUP_CL = re.compile(r"(?:: |; )rod gracza \(SellItemsAction\) (\d+) szt
 LUPY300_SKUP_KEY = re.compile(r"PlayerHaggle (True|False), PlayerRebuyCap (True|False)")
 LUPY300_BK_RE = re.compile(r"^Kara handlowa BK: x([\d.]+) ")
 
-LUPY300_SAMPLE_START = (
+LUPY300_SAMPLE_HEAD = (
     "Targ gracza (300b): klucz Player Haggle TAK, Player Rebuy Cap TAK | GetTradePenalty wpiete w 2 modelach (TaleWorlds.CampaignSystem.GameComponents."
     "DefaultTradeItemPriceFactorModel, BKROTPatch.Models.BKROTPriceModel) | BK x5.0 (zmierzone) | gracz: Handel 18, perswazja 18 (Urok 18 + Imposing Stature 0 + "
-    "Meaningful Favors 0 + przywodca 0 (-) + mistrz 0 + trudnosc 0 = 18) -> czynnik kary 0.933 (sam Handel 0.965), narzut 9.3% | krzywa (ulamek przed polka, bpf 0.8) "
-    "Tierf 1.00/4.02/5.98 (a1/a4/a6), S=0: 0.312/0.242/0.210, S=36: 0.326/0.254/0.221, S=200: 0.378/0.302/0.266, S=400: 0.429/0.350/0.312, S=700: 0.485/0.408/0.369 | "
-    "samotest: AI bez zmian 240/240, bez klucza = 137 24/24, sprzedaz < kupno przy S teraz i S=700: naruszen 0 z 312 | ksiega odkupu: wczytano 0.")
+    "Meaningful Favors 0 + przywodca 0 (-) + mistrz 0 + trudnosc 0 = 18) -> czynnik kary 0.933 (sam Handel 0.965), narzut 9.3% | krzywa (ulamek przed polka, bpf 0.8) ")
+LUPY300_SAMPLE_TAIL = " | samotest: AI bez zmian 240/240, bez klucza = 137 24/24, sprzedaz < kupno przy S teraz i S=700: naruszen 0 z 312 | ksiega odkupu: wczytano 0."
+
+
+def _l300_frac(tier, s_, pf):
+    """Wzor gry (DefaultTradeItemPriceFactorModel 1.4.8, sprzedaz zbroi, bpf 0.8, bez kupca): 0.8 / (1 + pf x (1.56 + 0.25 x max(0, Tierf - 1)) / (1 + 0.002 S))."""
+    return 0.8 / (1.0 + pf * (1.56 + 0.25 * max(0.0, tier - 1.0)) / (1.0 + 0.002 * s_))
+
+
+def _l300_sample_start(pf=1.0, tweak=None):
+    """Linia startowa jak w C# (PlayerHaggle.StartLine) z krzywa ze wzoru; tweak(S, [v1, v4, v6]) -> zmienione wartosci (zle biegi)."""
+    parts = []
+    for s_ in (0, 36, 200, 400, 700):
+        vals = [_l300_frac(x, s_, pf) for x in LUPY300_SAMPLE_TIERS]
+        if tweak:
+            vals = tweak(s_, vals)
+        parts.append(f", S={s_}: " + "/".join(f"{v:.3f}" for v in vals))
+    return LUPY300_SAMPLE_HEAD + f"Tierf 1.00/4.02/5.98 (a1/a4/a6), perki x{pf:.3f}" + "".join(parts) + LUPY300_SAMPLE_TAIL
+
+
+LUPY300_SAMPLE_START = _l300_sample_start()
 LUPY300_SAMPLE_DAY = (
     "Targ gracza (300b): dzien 109100 | klucz TAK, ksiega TAK | gracz Handel 18, perswazja 18, S 36, czynnik 0.933 | probki 900 w 60 miastach | ulamek gry przed polka "
     "mediana S teraz 0.301, S=700 0.452 | sprzedaz/wartosc ze stanem mediana S teraz 0.322, S=700 0.480 | naruszen sprzedaz >= kupno: S teraz 0 z 900, S=700 0 z 900 | "
     "petla wrak + material -> czysta tu (bez ksiegi, INFO): S teraz mediana -12.5% max 40.1% (800), S=700 mediana 10.2% max 90.0% (800) | ksiega odkupu: wpisow 3, "
-    "miast 1, zapisano dzis 3, zuzyto dzis 0, sufitow dzis 0 | rod gracza: partii 2, z przywodca 2 | potkniecia 0.")
+    "miast 1, zapisano dzis 3, zuzyto dzis 0, sufitow dzis 0, wygaslo dzis 1 | rod gracza: partii 2, z przywodca 2 | potkniecia 0.")
 LUPY300_SAMPLE_SAVE = "Ksiega odkupu (300b): zapis 3 wpisow (kluczy 1), dlugosc 42, odczyt kontrolny 3."
 LUPY300_SAMPLE_SKUP = (
     "Skup sprzetu (doba): gracz 10 szt. (wartosc 1000, ze stanem 900, zaplacono 280 = 28.0% wartosci, 31.1% ze stanem; na podlodze 0, na suficie 0, na suficie odkupu 0, "
@@ -82669,17 +82689,19 @@ def lupy300_selftest():
     a = LUPY300_START_RE.match(LUPY300_SAMPLE_START)
     if not a:
         return "linia startowa nie pasuje"
-    if a.group("key") != "TAK" or a.group("nm") != "2" or a.group("bk") != "5.0" or a.group("v2") != "312" or a.group("t") != "18":
+    if a.group("key") != "TAK" or a.group("nm") != "2" or a.group("bk") != "5.0" or a.group("v2") != "312" or a.group("t") != "18" or a.group("pf") != "1.000":
         return f"linia startowa: zle grupy {a.groupdict()}"
     c = _l300_curve(a.groupdict())
-    if sorted(c) != [0, 36, 200, 400, 700] or c[0][0] != 0.312 or c[700][2] != 0.369:
+    if sorted(c) != [0, 36, 200, 400, 700] or abs(c[0][0] - 0.3125) > 0.0006 or abs(c[700][2] - 0.369) > 0.0006:
         return f"krzywa: {c}"
+    if not LUPY300_START_RE.match(LUPY300_SAMPLE_START.replace("perki x1.000", "perki x-")):
+        return "linia startowa z 'perki x-' nie pasuje"
     nobody = LUPY300_SAMPLE_START.replace("gracz: Handel 18, perswazja 18 (Urok 18 + Imposing Stature 0 + Meaningful Favors 0 + przywodca 0 (-) + mistrz 0 + trudnosc 0 = 18) "
                                           "-> czynnik kary 0.933 (sam Handel 0.965), narzut 9.3%", "gracz: brak przywodcy")
     if not LUPY300_START_RE.match(nobody):
         return "linia startowa bez przywodcy nie pasuje"
     b = LUPY300_DAY_RE.match(LUPY300_SAMPLE_DAY)
-    if not b or b.group("vn7") != "900" or b.group("l7x") != "90.0" or b.group("ch") != "2" or b.group("err") != "0":
+    if not b or b.group("vn7") != "900" or b.group("l7x") != "90.0" or b.group("ch") != "2" or b.group("err") != "0" or b.group("lx") != "1":
         return f"linia doby: {b.groupdict() if b else None}"
     empty = LUPY300_SAMPLE_DAY.replace("mediana -12.5% max 40.1% (800)", "mediana -% max -% (0)").replace("mediana S teraz 0.301", "mediana S teraz -")
     if not LUPY300_DAY_RE.match(empty):
@@ -82739,10 +82761,18 @@ def lupy300_rows(rep, D, c299=None):
         c = _l300_curve(last)
         Ss = sorted(c)
         mono = all(all(c[Ss[i]][k] is None or c[Ss[i + 1]][k] is None or c[Ss[i + 1]][k] >= c[Ss[i]][k] - 1e-9 for i in range(len(Ss) - 1)) for k in range(3))
+        tiers = [None if x == "-" else float(x) for x in last["tiers"].split("/")]
+        pf = None if last["pf"] == "-" else float(last["pf"])
+        errs = [abs(v - _l300_frac(tiers[k], s_, pf)) for s_ in Ss for k, v in enumerate(c[s_])
+                if pf is not None and v is not None and k < len(tiers) and tiers[k] is not None]
+        err = max(errs) if errs else None
         t1 = (c.get(0, [None])[0], c.get(700, [None])[0])
-        ok = mono and t1[0] is not None and t1[1] is not None and LUPY300_T1_S0[0] <= t1[0] <= LUPY300_T1_S0[1] and LUPY300_T1_S700[0] <= t1[1] <= LUPY300_T1_S700[1]
-        rep.add("L300-4: krzywa ulamka przed polka (Tierf 1/4/6 x S)", f"Tierf {last['tiers']} ({last['ids']}): " + ", ".join(f"S={s_} {'/'.join('-' if v is None else f'{v:.3f}' for v in c[s_])}" for s_ in Ss)
-                + f"; niemalejaca {'tak' if mono else 'NIE'}", f"niemalejaca; Tierf 1 S=0 w {list(LUPY300_T1_S0)}, S=700 w {list(LUPY300_T1_S700)}", J(ok))
+        ok = (mono and t1[0] is not None and t1[1] is not None and pf is not None and LUPY300_PF[0] <= pf <= LUPY300_PF[1]
+              and err is not None and err <= LUPY300_FIT)
+        rep.add("L300-4: krzywa ulamka przed polka (Tierf 1/4/6 x S)", f"Tierf {last['tiers']} ({last['ids']}), perki x{last['pf']}: "
+                + ", ".join(f"S={s_} {'/'.join('-' if v is None else f'{v:.3f}' for v in c[s_])}" for s_ in Ss)
+                + f"; niemalejaca {'tak' if mono else 'NIE'}; najwiekszy rozjazd ze wzorem gry {'-' if err is None else f'{err:.4f}'}",
+                f"niemalejaca; perki x w {list(LUPY300_PF)}; kazdy punkt = 0.8 / (1 + pf x (1.56 + 0.25 x (Tierf - 1)) / (1 + 0.002 S)) +-{LUPY300_FIT}", J(ok))
     # L300-5
     pl = [x for x in D["skup_pl"] if x[0] > 0 and x[2] > 0]
     if not pl:
@@ -82820,6 +82850,9 @@ def lupy300_selftest2():
     bad = [k for k in need if good.get(k) != "TAK"]
     if bad:
         return f"dobry bieg nie przechodzi ({bad}): {good}"
+    perks = verdicts(_l300_synth(start=_l300_sample_start(pf=0.85 * 0.8)))
+    if perks.get("L300-4") != "TAK":
+        return f"bieg z perkami (Appraiser + Gladiator, perki x0.680) nie TAK w L300-4: {perks.get('L300-4')}"
     if verdicts(_l300_synth(), {"C299-15": "TAK", "C299-17": "TAK"}).get("L300-10") != "TAK":
         return "L300-10 nie TAK przy C299-15/17 TAK"
     off = verdicts(_l300_synth(key="NIE"))
@@ -82832,8 +82865,11 @@ def lupy300_selftest2():
              ("L300-1", _l300_synth(start=S.replace("AI bez zmian 240/240", "AI bez zmian 0/0"))),
              ("L300-2", _l300_synth(start=S.replace("137 24/24", "137 23/24"))),
              ("L300-3", _l300_synth(viol=1)), ("L300-3", _l300_synth(start=S.replace("naruszen 0 z 312", "naruszen 2 z 312"))),
-             ("L300-4", _l300_synth(start=S.replace("S=0: 0.312/", "S=0: 0.250/"))), ("L300-4", _l300_synth(start=S.replace("S=700: 0.485/", "S=700: 0.540/"))),
-             ("L300-4", _l300_synth(start=S.replace("S=400: 0.429/0.350/", "S=400: 0.429/0.290/"))),
+             ("L300-4", _l300_synth(start=_l300_sample_start(tweak=lambda s_, v: [0.250] + v[1:] if s_ == 0 else v))),
+             ("L300-4", _l300_synth(start=_l300_sample_start(tweak=lambda s_, v: [0.540] + v[1:] if s_ == 700 else v))),
+             ("L300-4", _l300_synth(start=_l300_sample_start(tweak=lambda s_, v: [v[0], 0.290, v[2]] if s_ == 400 else v))),
+             ("L300-4", _l300_synth(start=_l300_sample_start(pf=1.2))), ("L300-4", _l300_synth(start=S.replace("perki x1.000", "perki x-"))),
+             ("L300-4", _l300_synth(start=_l300_sample_start(pf=0.85, tweak=lambda s_, v: [_l300_frac(1.0, s_, 1.0)] + v[1:]))),
              ("L300-5", _l300_synth(skup_pct=10.0)), ("L300-6", _l300_synth(err=1)),
              ("L300-7", _l300_synth(save="Ksiega odkupu (300b): zapis 3 wpisow (kluczy 1), dlugosc 42, odczyt kontrolny 2.")),
              ("L300-9", _l300_synth(bk="25.0"))]
@@ -82853,7 +82889,7 @@ def lupy300_main(logp):
     rep.add("L300-S: self-test wyrazen (linie 300b jak w C#: PlayerHaggle.StartLine / Daily, RebuyLedger.Export, Skup sprzetu, Kara handlowa BK)", s1 or "OK",
             "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     s2 = lupy300_selftest2()
-    rep.add("L300-S2: test syntetyczny (dobry bieg, bieg z kluczem NIE, 15 + 1 zlych - wiersze 0-10)", s2 or "OK", "OK", s2 is None)
+    rep.add("L300-S2: test syntetyczny (dobry bieg, bieg z perkami, bieg z kluczem NIE, 18 + 1 zlych - wiersze 0-10)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("L300-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()

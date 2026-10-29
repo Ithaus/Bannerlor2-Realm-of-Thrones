@@ -606,7 +606,8 @@ namespace Armoury
                 if (byCond)
                 {
                     // 300b B (klucz PlayerRebuyCap): dla strony gracza zamiast sufitu 1/10 ksiega odkupu - nie wiecej, niz gracz zaplacil TU za gorsza sztuke tej rzeczy
-                    if (side && PlayerHaggle.RebuyOn) { capP = RebuyLedger.Cap(st, __0); if (capP > 0 && __result > capP) { __result = capP; bound = 3; } }
+                    // (po recenzji: sufit tylko partii gracza - to jego zakupy; partie rodu bez sufitu; MenPurse.SellPlayerSurplus zuzywa wpisy jak ekran handlu)
+                    if (side && PlayerHaggle.RebuyOn) { capP = __1.IsMainParty ? RebuyLedger.Cap(st, __0) : 0; if (capP > 0 && __result > capP) { __result = capP; bound = 3; } }
                     else { capP = SellByCondition.Cap(__0, f, mk); if (capP > 0 && __result > capP) { __result = capP; bound = 2; } }
                 }
                 // 300b A5: bez arbitrazu - sprzedaz strony gracza najwyzej cena kupna tej sztuki przy f sprzedazy (<= f kupna) minus 1 zl

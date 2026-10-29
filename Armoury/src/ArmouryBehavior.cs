@@ -2521,8 +2521,8 @@ namespace Armoury
             HeroHp.StartLine();   // m110-stan krok 2: linia "HP sprzetu (m110): start" (klucze, latka, ksiegi, kontrola krzywej) - PO wyrownaniu nazw; wlasny try w srodku
             try { RaceLaw.OnSessionLaunched(); } catch (Exception e) { Log.Error("RaceLaw.OnSessionLaunched", e); }   // Jeff 10.10: postfiks rasy takze na nadpisaniu w modelu slubu, ktory gra uzywa (ROT); linia "Rasy: start sesji"
             try { AiDowry.OnSessionLaunched(); } catch (Exception e) { Log.Error("AiDowry.OnSessionLaunched", e); }   // R3-01c: latka kontraktu BK i przechyl swatow na modelu slubu, ktory gra uzywa (ROT)
-            try { SellByCondition.OnSessionLaunched(); } catch (Exception e) { Log.Error("SellByCondition.OnSessionLaunched", e); }
-            try { PlayerHaggle.StartLine(); } catch (Exception e) { Log.Error("PlayerHaggle.StartLine", e); }   // 300b: linia "Targ gracza (300b): klucz ..." - PO pomiarze kary BK (BkPenaltyOnce.Sync wyzej); krzywa i samotest, tylko odczyt   // cena sprzedazy sprzetu: wylacznik kary BK z MCM (PO McmSettings.Apply wyzej) i kontrola "Kara handlowa BK: x5.0"; ksiega skupu od zera
+            try { SellByCondition.OnSessionLaunched(); } catch (Exception e) { Log.Error("SellByCondition.OnSessionLaunched", e); }   // cena sprzedazy sprzetu: wylacznik kary BK z MCM (PO McmSettings.Apply wyzej) i kontrola "Kara handlowa BK: x5.0"; ksiega skupu od zera
+            try { PlayerHaggle.StartLine(); } catch (Exception e) { Log.Error("PlayerHaggle.StartLine", e); }   // 300b: linia "Targ gracza (300b): klucz ..." - PO pomiarze kary BK (BkPenaltyOnce.Sync wyzej); krzywa i samotest, tylko odczyt
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { TryRestoreArmoryWear("sesja"); } catch (Exception e) { Log.Error("TryRestoreArmoryWear", e); }
             try { if (!LoreSeedFix.On) LorePurgeOnce(); } catch (Exception e) { Log.Error("LorePurgeOnce", e); }   // m96-wzory: przy kluczu - w OnAfterSessionLaunched (LoreSeedFix)
@@ -3155,8 +3155,8 @@ namespace Armoury
             try { MoneyLedger.Mark(MoneyLedger.MOrders); } catch { }
             try { ArmsScrap.Daily(); } catch (Exception e) { Log.Error("ArmsScrap.Daily", e); } DayProfile.Lap("ArmsScrap.Daily");   // 174 pytanie 4: pomiar popytu koszykow zawsze; skup na zlom tylko przy OldStockToScrap (domyslnie wylaczony)
             try { MoneyLedger.Probe169("ArmsScrap.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
-            try { SellByCondition.Daily(); } catch (Exception e) { Log.Error("SellByCondition.Daily", e); } DayProfile.Lap("SellByCondition.Daily");
-            try { PlayerHaggle.Daily(); } catch (Exception e) { Log.Error("PlayerHaggle.Daily", e); } DayProfile.Lap("PlayerHaggle.Daily");   // 300b: w dobie pomiaru linia "Targ gracza (300b): dzien N" (sonda cen gracza, tylko odczyt); liczniki ksiegi doby od zera   // cena sprzedazy sprzetu: linia "Skup sprzetu" wedlug sprzedajacego (tylko log)
+            try { SellByCondition.Daily(); } catch (Exception e) { Log.Error("SellByCondition.Daily", e); } DayProfile.Lap("SellByCondition.Daily");   // cena sprzedazy sprzetu: linia "Skup sprzetu" wedlug sprzedajacego (tylko log)
+            try { PlayerHaggle.Daily(); } catch (Exception e) { Log.Error("PlayerHaggle.Daily", e); } DayProfile.Lap("PlayerHaggle.Daily");   // 300b: w dobie pomiaru linia "Targ gracza (300b): dzien N" (sonda cen gracza, tylko odczyt); liczniki ksiegi doby od zera
             try { MoneyLedger.Probe169("SellByCondition.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { RecruitCost.Daily(); } catch (Exception e) { Log.Error("RecruitCost.Daily", e); } DayProfile.Lap("RecruitCost.Daily");   // poprawka 157 / paczka 160: linia "Konie rekrutow" (tylko log)
             try { MoneyLedger.Probe169("RecruitCost.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
