@@ -139,7 +139,12 @@ namespace Armoury
                 sb.Append("It makes about ").Append(Math.Round(vd).ToString("N0", Inv)).Append(" a day (").Append(Math.Round(vd * 364).ToString("N0", Inv)).Append(" a year) at ")
                   .Append(town != null && town.Name != null ? town.Name.ToString() : "market").Append(" prices: ").Append(DistrictIcon.MixText(v, qs)).Append(".\n");
                 double winter = 0; foreach (var wq in qs) if (wq.Winter > winter) winter = wq.Winter;   // 297: kopalnie i wyrab bez ciecia - najwieksze ciecie czesci okregu
-                sb.Append(winter > 0.05 ? "Winter now: it cuts what villages make by about " + Math.Round(100 * winter) + "%, and your income with it.\n" : "Winter cuts what villages make by about 40%, and your income with it.\n");
+                // 297 (recenzja): okreg z samymi kopalniami / wyrebem w zimie - zima go nie tnie (zdanie ogolne o 40% byloby nieprawda); klucz NIE - jak dotad
+                bool spareAll = false;
+                if (winter <= 0.05 && qs.Count > 0 && WinterBite.SparesOn) { try { spareAll = WinterBite.VillageCut(v) > 0.05; } catch { spareAll = false; } }
+                sb.Append(winter > 0.05 ? "Winter now: it cuts what villages make by about " + Math.Round(100 * winter) + "%, and your income with it.\n"
+                          : spareAll ? "Winter now: it does not cut mines or timber felling, so what this district makes and your income stay as they are.\n"
+                          : "Winter cuts what villages make by about 40%, and your income with it.\n");
                 sb.Append("Side villages toward the enemy burn first; the main village burns last.\n");
                 sb.Append("Room for works: ").Append(Math.Round(room).ToString("N0", Inv)).Append(" (").Append(Math.Round(sens).ToString("N0", Inv)).Append(" of it still earns at least 12% a year).\n");
                 string head = HeadText(st);
