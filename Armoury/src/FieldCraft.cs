@@ -78,6 +78,10 @@ namespace Armoury
         private static int _runN, _regenSkipped;
         private static float _runKgSum, _runKgMax, _runTSum, _runTMin = float.MaxValue;
         private static float _plKg = -1f, _plAth, _plT, _plFit;   // paczka 203: _plFit - sprawnosc gracza (linia "Bieg (127)", sprawdz_logi p203 liczy T od nowa)
+        // 292: czas pelnego biegu PO mnozniku staminy ludzi (st.RunSeconds) - linia "Bieg (127)" zostaje przy regule 127/203 (sprawdz_logi p203), K w dopisku
+        private static float _runT292Sum, _plT292;
+        private bool _k292Said;      // linia "Stamina (292)" juz wypisana w tej misji
+        private float _k292From;     // Mission.CurrentTime z AfterStart
         // Paczka 203: k z paczki 127 - tylko do porownania w linii "Bieg (127)" ("przy 2.25%/kg z 127 bylo X s"); regula liczy z ArmourRunCostPerKgPercent
         private const float ArmourRunCost127 = 2.25f;
 
@@ -91,6 +95,7 @@ namespace Armoury
             _runN = 0; _regenSkipped = 0;
             _runKgSum = 0f; _runKgMax = 0f; _runTSum = 0f; _runTMin = float.MaxValue;
             _plKg = -1f; _plAth = 0f; _plT = 0f; _plFit = 0f;
+            _runT292Sum = 0f; _plT292 = 0f;
             PanicRun.Reset();                   // 147: liczniki linii "Bieg zlamanych (147)"
         }
 
@@ -223,21 +228,28 @@ namespace Armoury
             float w = 0f;
             try { w = agent.SpawnEquipment.GetTotalWeightOfArmor(true); } catch { }
 
-            st.RunSeconds = RunSecondsFor(ath, w, c);
+            // 292: pelny bieg do zera x mnoznik staminy ludzi - pula RBM jest x K (BattleWind.ApplyHumanMul), a drenaz biegu = pula / RunSeconds, wiec bez tego
+            // bieg trwalby tyle samo; ta sama liczba idzie do AiBreath (budzet biegu AI) i PanicRun (pomiar). Linia "Bieg (127)" liczy regule 127/203 (t0)
+            float k292 = BattleWind.HumanStaminaMul(c);
+            if (Math.Abs(k292 - 1f) <= 0.001f) k292 = 1f;
+            float t0 = RunSecondsFor(ath, w, c);
+            st.RunSeconds = t0 * k292;
             _runN++;
             _runKgSum += w;
             if (w > _runKgMax) _runKgMax = w;
-            _runTSum += st.RunSeconds;
-            if (st.RunSeconds < _runTMin) _runTMin = st.RunSeconds;
-            if (agent.IsMainAgent) { _plKg = w; _plAth = ath; _plT = st.RunSeconds; _plFit = RunFit(ath, c); }
+            _runTSum += t0;
+            _runT292Sum += st.RunSeconds;
+            if (t0 < _runTMin) _runTMin = t0;
+            if (agent.IsMainAgent) { _plKg = w; _plAth = ath; _plT = t0; _plT292 = st.RunSeconds; _plFit = RunFit(ath, c); }
             st.TiredFloor = Math.Min(0.92f, c.TiredSpeedFactor + ath / 1000f);
 
             // wlasna pula (gdy RBM nieobecny) - te same zasady co RBM: 1000 * bonus z Atletyki
             float athCap = Math.Min(ath, 500f);
-            st.PoolMax = 1000f * (1f + 3f * athCap / 500f) * st.EndBonus;
+            // 292: wlasna pula i jej regeneracja x K - jak pula i regeneracja RBM (BattleWind.ApplyHumanMul); RegenPerSec oddaje tez dlug biegu przy pasku RBM bez oddechu 137
+            st.PoolMax = 1000f * (1f + 3f * athCap / 500f) * st.EndBonus * k292;
             st.Pool = st.PoolMax;
             // regeneracja rosnie z Atletyka (jak w RBM) ORAZ z Endurance bohatera
-            st.RegenPerSec = Math.Max(1f, c.StaminaRegenPerSecond) * (1f + 2f * athCap / 500f) * st.EndBonus;
+            st.RegenPerSec = Math.Max(1f, c.StaminaRegenPerSecond) * (1f + 2f * athCap / 500f) * st.EndBonus * k292;
         }
 
         private static bool _sprintLogged;
@@ -409,7 +421,10 @@ namespace Armoury
                              + " (pominiete regeneracje RBM " + _regenSkipped + ")"
                              + (_plKg >= 0f ? " | gracz: zbroja " + _plKg.ToString("0.0") + " kg, Atletyka " + _plAth.ToString("0") + " -> " + _plT.ToString("0") + " s"
                                 + " (sprawnosc " + _plFit.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + ", przy " + ArmourRunCost127.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
-                                + "%/kg z 127 bylo " + RunSecondsWith(_plFit, _plKg, ArmourRunCost127, c).ToString("0") + " s)" : " | gracz: -"));
+                                + "%/kg z 127 bylo " + RunSecondsWith(_plFit, _plKg, ArmourRunCost127, c).ToString("0") + " s)" : " | gracz: -")
+                             // 292: dopisek na koncu (wyrazenie p203 konczy sie na segmencie gracza) - pelny bieg po mnozniku staminy ludzi
+                             + " | 292: stamina ludzi x" + BattleWind.HumanStaminaMul(c).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
+                             + ", pelny bieg do zera sr. " + (_runT292Sum / _runN).ToString("0") + " s" + (_plKg >= 0f ? ", gracz " + _plT292.ToString("0") + " s" : ", gracz -"));
             }
             catch { }
             // 144: linia "Oddech AI (144)" raz na bitwe - biegi w toku zamkniete, capy zdjete
@@ -438,6 +453,8 @@ namespace Armoury
         {
             try { MissionTeams.Begin(Mission); } catch { }
             ResetRunStats();
+            _k292Said = false;                                // 292: linia "Stamina (292)" kilka sekund po starcie misji
+            try { _k292From = Mission.CurrentTime; } catch { _k292From = 0f; }
             try { AiBreath.Begin(Mission); } catch { }        // 144: liczniki i capy oddechu AI od zera
             _live = this;                                     // 139: odczyt zadyszki dla BrokenFate
             base.AfterStart();
@@ -1049,6 +1066,17 @@ namespace Armoury
                 // 144: koniec taktu - szyki rozciagniete (D3), koszt zasady; pokaz zadyszki sprzata wpisy nie widziane w tym takcie
                 try { if (aiLive) AiBreath.EndTick(aiCost * 1000.0 / System.Diagnostics.Stopwatch.Frequency); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "AiBreath.EndTick", e); }
                 try { WindedShow.EndTick(now); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "WindedShow.EndTick", e); }
+                // 292: linia "Stamina (292)" raz na misje, 3 s po starcie (ludzie startu juz w bitwie i zmierzeni do biegu, konie z jezdzcem policzone)
+                if (!_k292Said && now - _k292From >= 3f)
+                {
+                    _k292Said = true;
+                    try
+                    {
+                        var ma = Mission.MainAgent;
+                        BattleWind.StartLine292(Mission, c, _runN, _runTSum, _runT292Sum, _plKg >= 0f ? _plT : 0f, _plKg >= 0f ? _plT292 : 0f, ma == null || ma.MountAgent == null);
+                    }
+                    catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRun, "BattleWind.StartLine292", e); }
+                }
             }
             catch (Exception e) { Log.Error("FieldCraft.Tick", e); }
         }

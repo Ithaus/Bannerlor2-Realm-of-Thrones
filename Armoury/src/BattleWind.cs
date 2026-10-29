@@ -211,6 +211,107 @@ namespace Armoury
             _curveN++;
         }
 
+        // ---- 292 STAMINA LUDZI x K (Jeff 29.10: "Stamina zwieksz poziom staminy wszystkim AI i jednostkom i mi x 2, za szybko sie konczy i zaraz jestes zmeczony.
+        // Konie sa okay."). Dowod (sesja 29.10 00:09-01:52 na 136): gracz pula 2507-2546 (Atletyka 256-262), pelny bieg do zera 71-72 s w 46.3 kg, zadyszki
+        // gracza 1-2 na bitwe (22-52 s w zadyszce); szeregowi bieg sr. 78-84 s. RBM: wszystkie koszty (cios 35-40, blok 40-46 x (1 - skill/1000), trafienie
+        // 2 x obrazenia + 20, strzal ok. 50, pocisk w tarcze 40 / 210, w cialo 50 / 300) to STALE punkty, a kazdy skutek (kary, Frontline, leczenie > 85%, szybki regen < 70%)
+        // czyta STOSUNEK stamina / maxStamina - pula x K = kazdy wydatek K razy mniejsza czescia paska. Regeneracja RBM (staminaRegenPerTick, pkt) x K - ten sam
+        // czas pelnego odnowienia paska (gumka RBM liczy ze stosunku); oddech dwufazowy 137 liczy odnowe jako ulamek dlugu (tau) - bez zmian.
+        // Bieg FieldCraft (drenaz = pula / RunSeconds) dostaje RunSeconds x K w FieldCraft.MeasureWind. Konie (HorseWind, wlasna pula 0..100) bez mnoznika.
+        internal const float HumanMulMin = 0.5f, HumanMulMax = 4f;   // = RANGES w tools/gen_mcm.py
+
+        /// <summary>292: mnoznik staminy ludzi (klucz HumanStaminaMultiplier przyciety jak suwak 0.5..4; brak ustawien albo NaN = 1, jak dotad).</summary>
+        internal static float HumanStaminaMul(Settings c)
+        {
+            float k = c != null ? c.HumanStaminaMultiplier : 1f;
+            if (float.IsNaN(k) || float.IsInfinity(k)) return 1f;
+            return Clamp(k, HumanMulMin, HumanMulMax);
+        }
+
+        // liczniki misji linii "Stamina (292)" (glowny watek: InitializeStamina RBM przy spawnie)
+        private static WeakReference _k292M;
+        private static int _k292N, _k292Dead;
+        private static float _k292Sum0, _k292Sum1, _k292K = 1f;
+        private static float _k292Pl0 = -1f, _k292Pl1, _k292PlR0, _k292PlR1;
+
+        private static void K292Mission(Mission m)
+        {
+            var w = _k292M;
+            if (w != null && ReferenceEquals(w.Target, m)) return;
+            _k292M = new WeakReference(m);
+            _k292N = 0; _k292Dead = 0; _k292Sum0 = 0f; _k292Sum1 = 0f; _k292K = 1f;
+            _k292Pl0 = -1f; _k292Pl1 = 0f; _k292PlR0 = 0f; _k292PlR1 = 0f;
+        }
+
+        private static void Note292Dead(Agent agent)
+        {
+            K292Mission(agent.Mission);
+            _k292Dead++;
+        }
+
+        /// <summary>292: pula, stan i regeneracja RBM tej postawy x mnoznik ludzi (raz na InitializeStamina - RBM liczy je od zera przy kazdym wywolaniu,
+        /// wiec ponowne wywolanie na tym samym obiekcie nie mnozy drugi raz). Przy K = 1 nic nie pisze (co do bitu jak dotad), tylko liczy do linii.</summary>
+        private static void ApplyHumanMul(Agent agent, object stance, Settings c)
+        {
+            K292Mission(agent.Mission);
+            float k = HumanStaminaMul(c);
+            float max0 = (float)_fMaxStamina.GetValue(stance);
+            float r0 = (float)_fStaminaRegen.GetValue(stance);
+            if (Math.Abs(k - 1f) > 0.001f)
+            {
+                _fMaxStamina.SetValue(stance, max0 * k);
+                _fStamina.SetValue(stance, (float)_fStamina.GetValue(stance) * k);
+                _fStaminaRegen.SetValue(stance, r0 * k);
+            }
+            else k = 1f;
+            _k292N++;
+            _k292Sum0 += max0;
+            _k292Sum1 += max0 * k;
+            _k292K = k;
+            if (agent.IsPlayerControlled)
+            {
+                _k292Pl0 = max0;
+                _k292Pl1 = max0 * k;
+                _k292PlR0 = r0 * RbmTickCount / RbmTickSeconds;
+                _k292PlR1 = _k292PlR0 * k;
+            }
+        }
+
+        /// <summary>292: linia "Stamina (292)" raz na misje, kilka sekund po starcie (FieldCraft.OnMissionTick): mnoznik, pule ludzi przed / po, gracz (pula,
+        /// regeneracja RBM, pelny bieg do zera przed / po), konie (HorseWind.Note292 - bez mnoznika).</summary>
+        internal static void StartLine292(Mission m, Settings c, int runN, float runT0Sum, float runT1Sum, float plT0, float plT1, bool playerOnFoot)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            float k = HumanStaminaMul(c);
+            var w = _k292M;
+            bool here = w != null && ReferenceEquals(w.Target, m);
+            var sb = new System.Text.StringBuilder(600);
+            sb.Append("Stamina (292): start misji | mnoznik staminy ludzi x").Append(k.ToString("0.00", inv))
+              .Append(" (klucz HumanStaminaMultiplier; pula, stan i regeneracja RBM x K, pelny bieg do zera x K, oddech dwufazowy 137 bez zmian, konie bez mnoznika)");
+            if (here && _k292N > 0)
+                sb.Append(" | ludzi z pula ").Append(_k292N).Append(" (x").Append(_k292K.ToString("0.00", inv)).Append("): sr. pula RBM ")
+                  .Append((_k292Sum0 / _k292N).ToString("0", inv)).Append(" -> ").Append((_k292Sum1 / _k292N).ToString("0", inv));
+            else sb.Append(" | ludzi z pula 0 (stamina RBM nieczynna albo latka InitializeStamina niewpieta)");
+            sb.Append(", umarli bez mnoznika ").Append(here ? _k292Dead : 0);
+            if (runN > 0)
+                sb.Append(" | bieg: ludzi ").Append(runN).Append(", pelny bieg do zera sr. ").Append((runT0Sum / runN).ToString("0", inv)).Append(" -> ")
+                  .Append((runT1Sum / runN).ToString("0", inv)).Append(" s");
+            else sb.Append(" | bieg: -");
+            sb.Append(" | gracz: ");
+            if (here && _k292Pl0 >= 0f)
+            {
+                sb.Append("pula RBM ").Append(_k292Pl0.ToString("0", inv)).Append(" -> ").Append(_k292Pl1.ToString("0", inv))
+                  .Append(", regeneracja RBM ").Append(_k292PlR0.ToString("0.00", inv)).Append(" -> ").Append(_k292PlR1.ToString("0.00", inv)).Append(" pkt/s");
+                if (plT0 > 0f) sb.Append(", pelny bieg do zera ").Append(plT0.ToString("0", inv)).Append(" -> ").Append(plT1.ToString("0", inv)).Append(" s");
+                else sb.Append(", pelny bieg do zera -");
+                sb.Append(playerOnFoot ? ", pieszo" : ", konno");
+            }
+            else sb.Append("-");
+            sb.Append(" | ");
+            try { HorseWind.Note292(sb); } catch { sb.Append("konie: -"); }
+            Log.Info(sb.ToString());
+        }
+
         private static float Winded(float current, float max)
         {
             float floor = Clamp(Settings.Current.BattleWindedFloor, 0.05f, 1f);
@@ -229,6 +330,7 @@ namespace Armoury
                 if (agent == null || stance == null) return;
                 if (Undead.Character(agent.Character))
                 {
+                    Note292Dead(agent);                                                            // 292: umarli bez mnoznika (pula i tak bez dna)
                     Breath bd; if (Breaths.TryGetValue(stance, out bd)) Breaths.Remove(stance);   // 137: umarli bez oddechu - tick idzie oryginalem RBM
                     // 137: latka wpieta takze bez oddechu bohaterow (BattleStaminaEnabled wylaczony przy starcie) - umarli wtedy jak dotad: czysty RBM
                     if (!Active) return;
@@ -253,6 +355,9 @@ namespace Armoury
                 // do staminy jak i jej regeneracji"): kazdy czlowiek (szeregowy i bohater) - pula i regeneracja RBM liczone z Atletyki po krzywej (CurvedAthletics)
                 var cs0 = Settings.Current;
                 if (cs0 != null) ApplyAthleticsCurve(agent, stance, cs0);
+                // 292: pula, stan i regeneracja RBM x mnoznik ludzi - po krzywej 130, przed oddechem 137 (zbiornik Fm i pula gracza z juz wiekszej puli)
+                // i przed mnoznikiem Endurance bohaterow (mnozenie - kolejnosc bez znaczenia, kazdy mnoznik raz)
+                ApplyHumanMul(agent, stance, cs0);
                 // 137: oddech dwufazowy - kazdy czlowiek (po krzywej 130 i po galezi umarlych); pula zostaje, jak ja policzono wyzej
                 // recenzja: tylko przy wlaczonej staminie RBM (inaczej tick oddechu nie przychodzi, a FieldCraft wycisza zwrot SprintDebt)
                 if (cs0 != null && cs0.BreathTwoPhase && _breathReady)
@@ -276,7 +381,8 @@ namespace Armoury
                     if (agent.IsPlayerControlled)
                         Log.Info("BattleWind (130): gracz - stamina z Atletyki jak kazdy (RBM po krzywej " + CurveP(cs).ToString("0.00") + "): Atletyka "
                                  + _lastAth.ToString("0") + " liczona jak " + _lastAth2.ToString("0") + " | pula " + (int)(float)_fMaxStamina.GetValue(stance)
-                                 + ", regeneracja " + ((float)_fStaminaRegen.GetValue(stance) * RbmTickCount / RbmTickSeconds).ToString("0.0") + " pkt/s (bez mnoznika Endurance).");
+                                 + ", regeneracja " + ((float)_fStaminaRegen.GetValue(stance) * RbmTickCount / RbmTickSeconds).ToString("0.0") + " pkt/s (bez mnoznika Endurance"
+                                 + (Math.Abs(HumanStaminaMul(cs) - 1f) > 0.001f ? ", z mnoznikiem ludzi x" + HumanStaminaMul(cs).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + " - 292" : "") + ").");
                     return;
                 }
                 // 137: latka wpieta takze bez oddechu bohaterow (BattleStaminaEnabled wylaczony przy starcie) - wtedy jak dotad: Endurance doklada FieldCraft
@@ -286,7 +392,8 @@ namespace Armoury
                 float max = (float)_fMaxStamina.GetValue(stance) * mul;
                 _fMaxStamina.SetValue(stance, max);
                 _fStamina.SetValue(stance, max);          // na starcie pelna, jak w RBM
-                var p = new Profile { StaminaRegenPerSec = RegenPerSec(hero, agent) };
+                // 292: wlasne tempo bohatera (pkt/s) x mnoznik ludzi - jak regeneracja RBM w ApplyHumanMul (pasek wraca w tym samym czasie)
+                var p = new Profile { StaminaRegenPerSec = RegenPerSec(hero, agent) * HumanStaminaMul(cs) };
                 // nadpisz takze perTick RBM - gdyby cos poza naszym prefixem z niego czytalo
                 _fStaminaRegen.SetValue(stance, p.StaminaRegenPerSec * RbmTickSeconds / RbmTickCount);
                 Profile old; if (Managed.TryGetValue(stance, out old)) Managed.Remove(stance);
@@ -809,10 +916,11 @@ namespace Armoury
                 // tego klucza po cichu gasilo krzywa (i gasiloby oddech). Teraz takze przy BreathTwoPhase albo krzywej > 1; tickStaminaRegen takze przy oddechu.
                 bool breath = c != null && c.BreathTwoPhase;
                 bool curve = c != null && CurveP(c) > 1.0001f;
-                bool initS = wind || breath || curve;
+                bool human = Math.Abs(HumanStaminaMul(c) - 1f) > 0.001f;   // 292: mnoznik staminy ludzi tez potrzebuje latki InitializeStamina
+                bool initS = wind || breath || curve || human;
                 bool tickS = wind || noBreath || breath;
                 _baseOn = wind || tiers || heroSkill;
-                if (!wind && !tiers && !duelGuard && !heroSkill && !noBreath && !breath && !curve) { Log.Info("BattleWind: wylaczone."); return; }
+                if (!wind && !tiers && !duelGuard && !heroSkill && !noBreath && !breath && !curve && !human) { Log.Info("BattleWind: wylaczone."); return; }
                 var tStance = QuartermasterLaw.FindType("RBMAI.Stance");
                 if (tStance == null) { Log.Info("BattleWind: RBM nieobecny - nic do roboty."); return; }
 
