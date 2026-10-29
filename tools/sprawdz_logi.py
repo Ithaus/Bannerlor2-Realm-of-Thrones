@@ -77349,7 +77349,7 @@ K288_RE = re.compile(
     r" \| jedzenie: w drodze (?P<road>\d+) karawan, w miescie \(karczma z zoldu\) (?P<town>\d+), w bitwie (?P<bat>\d+), konwoje DTE (?P<conv>\d+); "
     r"potrzeba (?P<need>[\d.]+) szt\., zjedzone (?P<eat>\d+), najedzone (?P<fed>\d+), glodne (?P<hun>\d+) \(brak (?P<lack>\d+) szt\., bez jedzenia (?P<empty>\d+)\), "
     r"zywnosc w jukach po jedzeniu (?P<stock>\d+) "
-    r"\| zapas na droge przy wyjezdzie: wyjazdow (?P<dep>\d+) \(dni drogi srednio (?P<rd>[\d.]+|-)(?:, prosta (?P<rs>[\d.]+|-), zmierzona (?P<rm>[\d.]+|-))?\), z zapasem w jukach (?P<enough>\d+), kupilo (?P<bc>\d+) karawan "
+    r"\| zapas na droge przy wyjezdzie: wyjazdow (?P<dep>\d+) \(dni drogi srednio (?P<rd>[\d.]+|-)(?:, prosta (?P<rs>[\d.]+|-), zmierzona (?P<rm>[\d.]+|-)(?:, droga/prosta (?P<rr>[\d.]+|-))?)?\), z zapasem w jukach (?P<enough>\d+), kupilo (?P<bc>\d+) karawan "
     r"(?P<bu>\d+) z (?P<want>\d+) szt\. za (?P<bg>\d+) zl z kies karawan do kas (?P<bt>\d+) miast, bez towaru (?P<ng>\d+), bez kiesy (?P<np>\d+), konwoje DTE (?P<dc>\d+) "
     r"\| potkniecia (?P<st>\d+) \(zold 288 (?P<sw>\d+)\), w sesji (?P<ss>\d+)$")
 K288_SAMPLE = ("Karawany - zold eskorty i jedzenie w drodze (288): dzien 109070 | klucze: polowa zoldu eskorty TAK, jedzenie w drodze TAK | zold karawan swiata: "
@@ -77931,7 +77931,8 @@ KARAWANY294B_RE = re.compile(
     r"(?P<k2>TAK|NIE), jedzenie na zmierzona droge (?P<k3>TAK|NIE) \| kupno: ocen (?P<ev>\d+) \(kategoria x wizyta\), stoi wedlug glebokosci (?P<stop>\d+) "
     r"\(stara regula ofert stalaby (?P<old>\d+)\), czynne (?P<open>\d+), bez miary (?P<none>\d+); gabka cofnieta wedlug glebokosci (?P<sp>\d+) szt\. "
     r"\| wiek > 30 dob: czeka \(rynek z glebokoscia\) (?P<aw>\d+), bez rynku z glebokoscia - na stracie porcjami T1 (?P<ln>\d+) szt\. za (?P<lg>\d+) zl "
-    r"\(koszt (?P<lc>\d+) zl\), BK i gra wypuszczone (?P<bn>\d+) szt\. \(koszt (?P<bc>\d+) zl\) \(stara regula: czekalby (?P<aow>\d+)\) "
+    r"\(koszt (?P<lc>\d+) zl\), BK i gra wypuszczone (?P<bn>\d+) szt\. \(koszt (?P<bc>\d+) zl\) \(stara regula: czekalby (?P<aow>\d+); sprzedane, choc stara "
+    r"regula czekalaby (?P<lold>\d+) szt\.\), wstrzymane do miasta drozszego \(cena w miescie odniesienia / 1\.03\) T1 (?P<ht1>\d+), BK i gra (?P<hbk>\d+) szt\. "
     r"\| jedzenie: spizarnia eskorty (?P<pan>\d+) szt\. poza bramka \| dni drogi zmierzone (?P<leg>[\d.]+|-) \(karawany / wyjazdy, (?P<legn>\d+) dob\) "
     r"\| marza przewoznika (?P<mg>\d+)%, kategorii czynne (?P<co>\d+), stoi (?P<cs>\d+) \| wedlug kategorii \(juki swiata / miast drozszych N / miasto "
     r"odniesienia indeks / udzial innych / zjedzone w dobie drogi / k / cena k-tej po mycie / cena kupna p25 / CZYNNE\|STOI\): (?P<list>.*?) "
@@ -77946,7 +77947,8 @@ KARAWANY294B_SAMPLE = (
     "Glebokosc rynku karawan (294b): dzien 109133 | klucze: cena sztuki wedlug glebokosci rynku TAK, bramka jedzenia na towar handlowy TAK, jedzenie na zmierzona "
     "droge TAK | kupno: ocen 900 (kategoria x wizyta), stoi wedlug glebokosci 300 (stara regula ofert stalaby 120), czynne 580, bez miary 20; gabka cofnieta wedlug "
     "glebokosci 14 szt. | wiek > 30 dob: czeka (rynek z glebokoscia) 40, bez rynku z glebokoscia - na stracie porcjami T1 25 szt. za 3000 zl (koszt 4100 zl), BK i gra "
-    "wypuszczone 6 szt. (koszt 900 zl) (stara regula: czekalby 400) | jedzenie: spizarnia eskorty 5400 szt. poza bramka | dni drogi zmierzone 4.24 (karawany / "
+    "wypuszczone 6 szt. (koszt 900 zl) (stara regula: czekalby 400; sprzedane, choc stara regula czekalaby 11 szt.), wstrzymane do miasta drozszego (cena w "
+    "miescie odniesienia / 1.03) T1 7, BK i gra 3 szt. | jedzenie: spizarnia eskorty 5400 szt. poza bramka | dni drogi zmierzone 4.24 (karawany / "
     "wyjazdy, 7 dob) | marza przewoznika 3%, kategorii czynne 1, stoi 1 | wedlug kategorii (juki swiata / miast drozszych N / miasto odniesienia indeks / udzial "
     "innych / zjedzone w dobie drogi / k / cena k-tej po mycie / cena kupna p25 / CZYNNE|STOI): cotton 900/48/1.62/19/4.0/16/123.4/150/STOI, grain "
     "800/50/2.10/16/590.0/1/20.0/15/CZYNNE | potkniecia 294b 0 (sesja 0).")
@@ -78296,6 +78298,7 @@ def k294b_rows(rep, D):
                 continue
             sm = lambda k: sum(int(b[d][k]) for d in ds)
             parts.append(f"doby {ds[0]}-{ds[-1]}: T1 regula 5 {sm('ln')} szt. za {sm('lg')} zl (koszt {sm('lc')}), BK i gra {sm('bn')} szt. (koszt {sm('bc')}), "
+                         f"z tego stara regula czekalaby {sm('lold')} szt., wstrzymane do miasta drozszego T1 {sm('ht1')} / BK i gra {sm('hbk')} szt., "
                          f"kupno stoi wedlug glebokosci {sm('stop')} z ocen {sm('ev')} (stara regula {sm('old')}), gabka {sm('sp')} szt.")
         lastb = b[days[-1]]
         parts.append(f"ostatnia doba: spizarnia eskorty {lastb['pan']} szt., dni drogi zmierzone {lastb['leg']}")
@@ -78323,7 +78326,7 @@ def _k294_synth(share, net, loss, food, pool_late, jeff, xn=0, xw=3, liq=(0, 0),
         late = i >= 23
         lst = ("cotton 900/48/1.62/19/4.0/16/123.4/" + ("100" if incons and late else "150") + "/STOI, grain 800/50/2.10/16/590.0/1/20.0/15/CZYNNE")
         bl[d] = {"st": str(bst if late else 0), "mg": "3", "list": lst, "co": "1", "cs": "1", "ln": "5", "lg": "500", "lc": "700", "bn": "1", "bc": "90",
-                 "stop": "30", "ev": "90", "old": "12", "sp": "2", "pan": "5400", "leg": "4.24"}
+                 "stop": "30", "ev": "90", "old": "12", "sp": "2", "pan": "5400", "leg": "4.24", "lold": "2", "ht1": "1", "hbk": "1"}
         c288[d] = (int(400 * (cars if late else 1.0)), 380, int(380 * (hun if late else 0.10)))
         c284[d] = (400, int(400 * (traded if late else 0.85)), 100000)
         c287[d] = int(100000 * (turn if late else 20.0))
@@ -78348,7 +78351,8 @@ def k294_selftest():
     # 294b: linia glebokosci, kategorie, linie 284 / 287 / 285 / 288 (nowy zapis dni drogi) / 290 (segment 294b)
     x = KARAWANY294B_RE.match(KARAWANY294B_SAMPLE)
     if not x or x.group("d") != "109133" or x.group("stop") != "300" or x.group("old") != "120" or x.group("ln") != "25" or x.group("lc") != "4100" \
-            or x.group("pan") != "5400" or x.group("leg") != "4.24" or x.group("mg") != "3" or x.group("bn") != "6" or x.group("aow") != "400":
+            or x.group("pan") != "5400" or x.group("leg") != "4.24" or x.group("mg") != "3" or x.group("bn") != "6" or x.group("aow") != "400" \
+            or x.group("lold") != "11" or x.group("ht1") != "7" or x.group("hbk") != "3":
         return f"linia 294b nie pasuje: {x.groupdict() if x else None}"
     it = _k294b_items(x.group("list"))
     if len(it) != 2 or it[0][0] != "cotton" or it[0][7] != "123.4" or it[0][8] != "150" or it[0][9] != "STOI" or it[1][6] != "1" or it[1][9] != "CZYNNE":
@@ -78366,6 +78370,9 @@ def k294_selftest():
     if not a or a.group(3) != "44" or a.group(4) != "7880" or a.group(5) != "33":
         return "linia 285 (najem, zwolnieni) nie pasuje"
     k = K288_RE.match(K288_SAMPLE.replace("(dni drogi srednio 3.2)", "(dni drogi srednio 4.6, prosta 3.4, zmierzona 4.2)"))
+    k2 = K288_RE.match(K288_SAMPLE.replace("(dni drogi srednio 3.2)", "(dni drogi srednio 4.6, prosta 3.4, zmierzona 4.2, droga/prosta 1.27)"))
+    if not k2 or k2.group("rr") != "1.27" or k2.group("rm") != "4.2":
+        return "linia 288 z droga/prosta nie pasuje"
     if not k or k.group("rd") != "4.6" or k.group("rs") != "3.4" or k.group("rm") != "4.2" or k.group("hun") != "10" or k.group("road") != "420":
         return "linia 288 z dniami drogi 294b nie pasuje"
     k = K288_RE.match(K288_SAMPLE)

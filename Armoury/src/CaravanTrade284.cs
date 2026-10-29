@@ -120,6 +120,7 @@ namespace Armoury
         // liczniki doby (linia 294b)
         private static int _dEval, _dStop, _dOld, _dOpen, _dNone, _dAgeWait, _dAgeOldWait, _dStum, _dStumSess;
         private static long _dSpongeN, _dLossN, _dLossG, _dLossC, _dBk5N, _dBk5C;
+        private static long _dLossOldN, _dHeldT1, _dHeldBk;              // 294b recenzja: sprzedane, choc stara regula czekalaby; wstrzymane do miasta drozszego (T1 / BK i gra)
 
         /// <summary>294b: marza przewoznika - ta sama co wozy KS-H (KsFoodCore.Margin: indeks celu >= 1.03 x koszt na miejscu); jedna regula przewozu.</summary>
         internal const double CarrierMargin = 1.0 + KsFoodCore.Margin;
@@ -165,6 +166,7 @@ namespace Armoury
             _rWind = 0;   // 294
             _dEval = _dStop = _dOld = _dOpen = _dNone = _dAgeWait = _dAgeOldWait = _dStum = 0;   // 294b
             _dSpongeN = _dLossN = _dLossG = _dLossC = _dBk5N = _dBk5C = 0;
+            _dLossOldN = _dHeldT1 = _dHeldBk = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -425,6 +427,27 @@ namespace Armoury
             return _pantryTmp.Count > 0 ? _pantryTmp : null;
         }
 
+        /// <summary>294b (recenzja): sztuki spizarni eskorty w kategorii c przy jukach `units` (gabka - juki sprzed zakupu BK); ten sam przydzial co PantryOf.</summary>
+        private static int PantryOfCat(MobileParty mp, Dictionary<ItemObject, int> units, ItemCategory c)
+        {
+            int left;
+            try { left = CaravanGoods.PantryUnits(mp); }
+            catch (Exception e) { DStumble("Pantry", e); return 0; }
+            if (left <= 0 || units == null) return 0;
+            var foods = new List<KeyValuePair<ItemObject, int>>();
+            foreach (var kv in units) if (kv.Key != null && kv.Value > 0 && kv.Key.IsFood && !kv.Key.NotMerchandise) foods.Add(kv);
+            foods.Sort((x, y) => x.Key.Value.CompareTo(y.Key.Value));
+            int inCat = 0;
+            foreach (var kv in foods)
+            {
+                if (left <= 0) break;
+                int k = Math.Min(left, kv.Value);
+                if (kv.Key.ItemCategory == c) inCat += k;
+                left -= k;
+            }
+            return inCat;
+        }
+
         /// <summary>294b: sztuki kategorii w jukach karawany, ktore ida na sprzedaz (bez spizarni eskorty przy kluczu CaravanFoodGateTradeStock).</summary>
         private static int TradeUnits(MobileParty mp, ItemCategory c)
         {
@@ -467,12 +490,22 @@ namespace Armoury
         /// na jedno miasto drozsze (ceil((juki swiata - moje) / N miast drozszych)) - to, co to miasto zje w dobie drogi (ceil(LegEat)); najmniej 1.</summary>
         internal static int QueueK(MobileParty mp, ItemCategory c, int ownAfter)
         {
+            int own;
+            try { own = mp != null ? TradeUnits(mp, c) : 0; }
+            catch (Exception e) { DStumble("Queue", e); return Math.Max(1, ownAfter); }
+            return QueueKOwn(c, own, ownAfter);
+        }
+
+        /// <summary>294b (recenzja): QueueK z jawna liczba moich sztuk handlowych w jukach swiata (Held) - gabka liczy je sprzed zakupu BK (BK kupuje AddToCounts,
+        /// bez NoteBuy, wiec Held nie ma sztuk gabki).</summary>
+        private static int QueueKOwn(ItemCategory c, int ownTrade, int ownAfter)
+        {
             try
             {
                 var r = DepthOf(c);
                 int n = r != null ? Math.Max(1, r.N) : 1;
                 EnsureHeld();
-                long others = Math.Max(0L, Held(c) - (mp != null ? TradeUnits(mp, c) : 0));
+                long others = Math.Max(0L, Held(c) - Math.Max(0, ownTrade));
                 double k = ownAfter + Math.Ceiling(others / (double)n) - Math.Ceiling(LegEat(c));
                 return (int)Math.Max(1.0, Math.Min(1000000.0, k));
             }
@@ -498,11 +531,16 @@ namespace Armoury
             catch (Exception e) { DStumble("Net", e); return double.NaN; }
         }
 
-        /// <summary>294b (CaravanGoods.AgeMarket): cena nastepnej sztuki starego towaru (k = QueueK z ownAfter 1) w miescie odniesienia po mycie; NaN - brak miary.</summary>
+        /// <summary>294b (CaravanGoods.AgeMarket): cena starego towaru w miescie odniesienia po mycie dla OSTATNIEJ sztuki, ktora karawana postawi na jednej polce
+        /// drozszego miasta - polowa jej sztuk kategorii (T1 sprzedaje w jednym miescie najwyzej polowe stosu, CaravanGoods.Sell maxSell), w kolejce za udzialem
+        /// jukow innych karawan (recenzja 294b: ownAfter 1 kazal czekac calemu stosowi, gdy rynek bral tylko pierwsza sztuke). NaN - brak miary.</summary>
         internal static double DepthNetAged(MobileParty mp, ItemObject it)
         {
             if (it == null || it.ItemCategory == null) return double.NaN;
-            return DepthNet(mp, new EquipmentElement(it), QueueK(mp, it.ItemCategory, 1));
+            int own;
+            try { own = TradeUnits(mp, it.ItemCategory); }
+            catch (Exception e) { DStumble("Aged", e); return double.NaN; }
+            return DepthNet(mp, new EquipmentElement(it), QueueKOwn(it.ItemCategory, own, Math.Max(1, (own + 1) / 2)));
         }
 
         /// <summary>294b: pierwszy towar handlowy kategorii na polce miasta (jak PenOf - wzor ceny kupna); null - brak.</summary>
@@ -543,12 +581,15 @@ namespace Armoury
             if (!DepthOn || it == null || !Tracked(it.ItemCategory)) return false;
             try
             {
+                var cat = it.ItemCategory;
                 int own = 0;
-                foreach (var kv in before) if (kv.Key != null && kv.Key.ItemCategory == it.ItemCategory) own += kv.Value;
+                foreach (var kv in before) if (kv.Key != null && kv.Key.ItemCategory == cat) own += kv.Value;
+                // recenzja 294b: spizarnia eskorty poza towarem handlowym takze tu (jak TradeUnits) - przydzial najtanszym najpierw na jukach sprzed gabki
+                if (own > 0 && IsFoodCat(cat) && R2On(Settings.Current)) own = Math.Max(0, own - PantryOfCat(mp, before, cat));
                 var el = new EquipmentElement(it);
                 int buy = town.GetItemPrice(el, mp, false);
                 if (buy <= 0) return false;
-                double net = DepthNet(mp, el, QueueK(mp, it.ItemCategory, own + 1));
+                double net = DepthNet(mp, el, QueueKOwn(cat, own, own + 1));
                 return !double.IsNaN(net) && net < CarrierMargin * buy;
             }
             catch (Exception e) { DStumble("Sponge", e); return false; }
@@ -557,8 +598,20 @@ namespace Armoury
         /// <summary>294b (CaravanGoods.AgeMarket przy kluczu): ocena starego towaru - czeka wedlug glebokosci (okDepth) i co mowila stara regula ofert (okOld).</summary>
         internal static void NoteDepthAge(bool okDepth, bool okOld) { if (okDepth) _dAgeWait++; if (okOld) _dAgeOldWait++; }
 
-        /// <summary>294b (T1): sprzedaz na stracie regula 5 (towar > 30 dob bez rynku) - sztuki, utarg, koszt.</summary>
-        internal static void NoteDepthLoss(int n, long gross, long cost) { if (n > 0) { _dLossN += n; _dLossG += gross; _dLossC += cost; } }
+        /// <summary>294b (T1): sprzedaz na stracie regula 5, gdy werdykt 'bez rynku' wydal test glebokosci (CaravanGoods.AgeMarket) - sztuki, utarg, koszt; old - stara
+        /// regula ofert kazalaby czekac (odpis przypisany 294b).</summary>
+        internal static void NoteDepthLoss(int n, long gross, long cost, bool old) { if (n > 0) { _dLossN += n; _dLossG += gross; _dLossC += cost; if (old) _dLossOldN += n; } }
+
+        /// <summary>294b (recenzja, T1): sztuki kroku na stracie wstrzymane, bo to miasto placi mniej niz cena tej sztuki w miescie odniesienia po mycie / 1.03.</summary>
+        internal static void NoteDepthHeldT1(int n) { if (n > 0) _dHeldT1 += n; }
+
+        /// <summary>294b (recenzja): najnizsza cena po mycie starego towaru bez rynku z glebokoscia - min(koszt, cena tej sztuki w miescie odniesienia po mycie / marza
+        /// przewoznika 1.03). Sprzedaz taniej niz miasto drozsze o dobe drogi dalej - nie tutaj (reszta czeka). 0 - bez progu (brak miary).</summary>
+        internal static double DepthAgedFloor(double unitCost, double depthNet)
+        {
+            if (!(unitCost > 0.0) || double.IsNaN(depthNet) || !(depthNet > 0.0)) return 0.0;
+            return Math.Min(unitCost, depthNet / CarrierMargin);
+        }
 
         // ------------------------------------------------------------ zdarzenia handlu (CaravanGoods.TradePostfix)
         internal static void NoteBuy(MobileParty mp, ItemObject it, int got)
@@ -967,7 +1020,24 @@ namespace Armoury
                         }
                         CaravanGoods.NoteAged286(__3, 0, 0, it.ItemCategory, false);   // 286: stary towar w przesycie (licznik - sztuki wypuszczone)
                     }
-                    if (lr == 5 && __3 > 0) { _dBk5N += __3; _dBk5C += (long)Math.Round(__3 * CaravanGoods.UnitCost(mp, it)); }   // 294b: stary towar bez rynku - BK / gra (licznik)
+                    if (lr == 5 && __3 > 0 && CaravanGoods.AgeDepthNo)
+                    {
+                        // 294b (recenzja): stary towar bez rynku z glebokoscia - w sprzedazy BK / gry ta sama granica co T1: po mycie nie taniej niz min(koszt, cena tej sztuki
+                        // w miescie odniesienia po mycie / 1.03) - nie oddaje towaru miastu tanszemu niz typowe miasto drozsze o odcinek dalej; reszta czeka
+                        double u5d = CaravanGoods.UnitCost(mp, it);
+                        double fld = DepthAgedFloor(u5d, CaravanGoods.AgeDepthNet);
+                        if (fld > 0.0)
+                        {
+                            int kf = Math.Max(0, CaravanGoods.MaxAtCost(__1.Settlement.Town, __1.Settlement, mp, __2.EquipmentElement, __3, fld));
+                            if (kf < __3)
+                            {
+                                _dHeldBk += __3 - kf;
+                                Withhold(mp, __2.EquipmentElement, bk, __3 - kf, u5d);
+                                __3 = kf;
+                            }
+                        }
+                        if (__3 > 0) { _dBk5N += __3; _dBk5C += (long)Math.Round(__3 * u5d); if (CaravanGoods.AgeOldWait) _dLossOldN += __3; }   // 294b: licznik
+                    }
                     return;
                 }
                 double unit = CaravanGoods.UnitCost(mp, it);
@@ -1393,7 +1463,8 @@ namespace Armoury
                   .Append(_dOld).Append("), czynne ").Append(_dOpen).Append(", bez miary ").Append(_dNone).Append("; gabka cofnieta wedlug glebokosci ").Append(_dSpongeN).Append(" szt.")
                   .Append(" | wiek > 30 dob: czeka (rynek z glebokoscia) ").Append(_dAgeWait).Append(", bez rynku z glebokoscia - na stracie porcjami T1 ").Append(_dLossN)
                   .Append(" szt. za ").Append(_dLossG).Append(" zl (koszt ").Append(_dLossC).Append(" zl), BK i gra wypuszczone ").Append(_dBk5N).Append(" szt. (koszt ")
-                  .Append(_dBk5C).Append(" zl) (stara regula: czekalby ").Append(_dAgeOldWait).Append(')')
+                  .Append(_dBk5C).Append(" zl) (stara regula: czekalby ").Append(_dAgeOldWait).Append("; sprzedane, choc stara regula czekalaby ").Append(_dLossOldN)
+                  .Append(" szt.), wstrzymane do miasta drozszego (cena w miescie odniesienia / 1.03) T1 ").Append(_dHeldT1).Append(", BK i gra ").Append(_dHeldBk).Append(" szt.")
                   .Append(" | jedzenie: spizarnia eskorty ").Append(_pantryN).Append(" szt. poza bramka")
                   .Append(" | dni drogi zmierzone ").Append(leg > 0.0 ? leg.ToString("0.00", Inv) : "-").Append(" (karawany / wyjazdy, ").Append(Stage8World.LegSamples).Append(" dob)")
                   .Append(" | marza przewoznika ").Append((100.0 * (CarrierMargin - 1.0)).ToString("0", Inv)).Append("%, kategorii czynne ").Append(open).Append(", stoi ").Append(stop)
