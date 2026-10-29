@@ -160,12 +160,13 @@ namespace Armoury
                                 }
                                 first.Add(b1 / a1);
                                 // poziom przy M = S (sprawdzenie drogi kodu: kupno przez pamiec = bez pamieci) i przesuniecie ceny kupna przy |M - S| >= 1
-                                if (Math.Abs(M - S) < 0.005f)
+                                if (M == S)
                                 {
                                     levelAll++;
-                                    // 299c: tolerancja = |M - S| (S_eff lezy miedzy S i M; dotad 1e-3 - M 5.996 przy polce 6 po zakupie w dobie dawalo 'rozjazd' bez bledu
-                                    // drogi kodu, 138a: 4 doby po 1 koszyku z ok. 6300)
-                                    if (Math.Abs(ShelfMemory.Eff(st, ty, tier, S, D) - S) <= Math.Abs(M - S) + 1e-4f) levelK++; else levelBad++;
+                                    // 299c (recenzja): tylko koszyki z M dokladnie = polce (ShelfMemory.Daily przyciaga M do polki przy |M - S| < 0.005) i tolerancja 1e-3 -
+                                    // kupno przez pamiec ma tu dac dokladnie cene bez pamieci (lapie zly wiersz / miejsce, blad Blend / Bound). Koszyki z 0 < |M - S| < 0.005
+                                    // (handel w tej dobie po Daily, np. M 5.996 przy polce 6 - 138a: 4 doby po 1 koszyku z ok. 6300) nie wchodza - dotad liczone jako 'rozjazd'.
+                                    if (Math.Abs(ShelfMemory.Eff(st, ty, tier, S, D) - S) <= 1e-3f) levelK++; else levelBad++;
                                 }
                                 else if (memOn && Math.Abs(M - S) >= 1f)
                                     offLv.Add((float)Math.Pow((S + 1f) / (ShelfMemory.Eff(st, ty, tier, S, D) + 1f), e));

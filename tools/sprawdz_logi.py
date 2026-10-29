@@ -81635,6 +81635,11 @@ def z290_selftest():
 # C299-4   w miejscu: kupno sztuki tansze niz odsprzedaz przy tym samym stanie - 0 kazdej doby (299 i gra); C299-4b rowne ceny INFO
 # C299-5   petla opozniona (sprzedaj 30 teraz, odkup po 7 dobach, brutto), polki >= 3 dob, mediana dob: 299 - gra <= +8 pp i 299/gra <= 1.35; C299-5b p90 INFO;
 #          C299-5c (recenzja 299) petla lustrzana - kup 30 teraz, sprzedaj po 7 dobach (polki >= 3 dob z >= 30 szt.) - te same progi; C299-5d p90 INFO
+#          POPRAWKA PO RECENZJI 299c: petla brutto rosnie z waga podazy ws x czescia przesytu wchlonietego w 7 dob d7 = 1 - (1 - tempo)^7 (wyrazy kroku od razu
+#          znosza sie miedzy sprzedaza a odkupem); progi 8 pp / 1.35 byly dla 299 (ws 0.119, tempo 0.15) - teraz x k5 (pp <= 8 k5, stosunek <= 1 + 0.35 k5),
+#          k5 = max(1, (ws d7 - 0.1 d7g) / (0.119 d7g - 0.1 d7g)), d7g = d7(0.15): 299 / 299b k5 = 1 (bez zmian), 299c (ws 0.1316, tempo 0.15) k5 = 1.66 -
+#          pp <= 13.3, stosunek <= 1.58 (rachunek x1.32-1.44, 299a zmierzone +5% ponad rachunek). Petla netto gracza (kara 12.4% w obie strony, zysk od +26.3% brutto):
+#          mediana gra ok. -1%, 299a ok. +4%, 299c ok. +7..+10% na 7 dob (bez zuzycia i innych kupcow - gorna granica) - koszt plaskiego kroku Jeffa, nie blad drogi
 # C299-6   przypadek Jeffa grain @ town_V2 (Riverrun), 233 sztuki: spadek indeksu 299 <= granica x gry (mediana dob) i pierwsza sztuka tansza o 1 zl (299) >= 1.6 x gry
 #          (recenzja 299: granica z rachunku dla stanu doby x = polka/podaz - max(0.6, 0.05 + 0.525 x max(1, (0.1 + 0.04 x) / (0.119 + 0.021 x))); stosunek kroku
 #          299/gra to 0.525 przy S = I, ale 0.635 przy I = 3 S, np. zaraz po dostawie - staly prog 0.6 odrzucalby poprawny build)
@@ -81679,7 +81684,7 @@ def z290_selftest():
 # C299-16  koszykow w pamieci > 0 kazdej doby z kluczem sprzetu TAK, potkniecia 0, ERROR ShelfMemory / PriceWalk299b / SupplyPacePostfix / arm_shelfmem 0, 'rozjazdow 0'
 #          (droga kodu: kupno przez pamiec przy M = S = bez pamieci); zapis - INFO
 # C299-17  petla opozniona gracza na sprzecie (sprzedaj 20, odkup 20 po 21 dobach, bez odplywu, z marza i kara), mediana dob: 299b mediana <= 0%, p90 <= +5%
-#          (NIE = nastepny krok: blokada odkupienia 7 dob karawan AI takze dla gracza); C299-17h to samo tylko konie (sprzedaz konia z wartosci / (1 + kara), ok. 0.5
+#          (NIE = decyzja po pomiarze - sonda bez odplywu to gorna granica; karawany AI maja blokade tylko w tej samej wizycie); C299-17h to samo tylko konie (sprzedaz konia z wartosci / (1 + kara), ok. 0.5
 #          kupna - kara BK broni i zbroi nie zaslania); C299-17r petla odwrotna (kup do 20, odsprzedaj po 21 dobach, bez doplywu) wszystkie i konie - te same progi;
 #          C299-17t kurs miedzy miastami (kup 20 w najtanszym, sprzedaj 20 w najdrozszym, bez drogi - gorna granica) - INFO: to handel miedzy rynkami, poziom cen miast
 #          (przesyt Riverrun koni t4 66 / 5.4 = x0.31) daje zysk juz w 299 na pierwszych sztukach
@@ -82178,28 +82183,32 @@ def ceny299_rows(rep, D):
     rep.add("C299-4: kupno tansze niz odsprzedaz przy tym samym stanie (w jednej wizycie)", f"299 {inv}, gra {inv0} (sum dob {len(days)})" + base, "0 i 0 kazdej doby",
             J(bool(days) and inv == 0 and inv0 == 0))
     rep.add("C299-4b: rowne ceny kupna i odsprzedazy", f"299 {fmt(med('eqp'), '{:.0f}')}/d, gra {fmt(med('eqp0'), '{:.0f}')}/d z {fmt(med('invm'), '{:.0f}')} ocen", "INFO", None)
-    # C299-5 petla opozniona
+    # C299-5 petla opozniona; recenzja 299c: progi x k5 z wagi podazy doby i tempa pamieci (linia startowa 299b; bez niej 0.15)
+    bs5 = [x for x in D["bstart"] if x]
+    pace5 = float(bs5[-1]["pace"]) if bs5 and bs5[-1]["k1"] == "TAK" else 0.15
+    k5 = _c299_loop_k(wsd, pace5)
+    lpp, lrat = CENY299_LOOP_PP * k5, 1.0 + (CENY299_LOOP_RATIO - 1.0) * k5
+    lim5 = f"299 - gra <= +{lpp:.1f} pp i 299/gra <= {lrat:.2f} (k5 {k5:.2f} z ws {wsd:.4f} i tempa {pace5:.3f}; 299: 8 pp / 1.35"
     lg, lx = med("lpg"), med("lpx")
     if lg is not None and lx is not None:
         ratio = lx / lg if lg > 0.5 else None
         v5 = f"mediana dob gra {lg:+.1f}% -> 299 {lx:+.1f}% ({lx - lg:+.1f} pp" + (f", x{ratio:.2f})" if ratio is not None else ", gra <= 0.5% - bez stosunku)")
-        ok5 = lx - lg <= CENY299_LOOP_PP and (ratio is None or ratio <= CENY299_LOOP_RATIO)
+        ok5 = lx - lg <= lpp + 1e-9 and (ratio is None or ratio <= lrat + 1e-9)
     else:
         v5, ok5 = "brak", False
     rep.add("C299-5: petla opozniona (sprzedaj 30 teraz, odkup po 7 dobach, brutto) - polki >= 3 dob", v5 + base,
-            f"299 - gra <= +{CENY299_LOOP_PP:.0f} pp i 299/gra <= {CENY299_LOOP_RATIO} (oczekiwane +4..+12 pp, x1.2-1.3; kara gracza w obie strony 12.4%)", J(ok5))
+            lim5 + "; oczekiwane 299 +4..+12 pp x1.2-1.3, 299c +8..+13 pp x1.38-1.5; kara gracza w obie strony 12.4% - zysk netto od +26.3% brutto)", J(ok5))
     rep.add("C299-5b: petla opozniona p90", f"gra {fmt(med('lpg9'), '{:+.1f}')}% -> 299 {fmt(med('lpx9'), '{:+.1f}')}%", "INFO", None)
     # C299-5c petla lustrzana (recenzja 299): kup 30 teraz, sprzedaj po 7 dobach
     bg_, bx_ = med("lbg"), med("lbx")
     if bg_ is not None and bx_ is not None:
         ratio = bx_ / bg_ if bg_ > 0.5 else None
         v5c = f"mediana dob gra {bg_:+.1f}% -> 299 {bx_:+.1f}% ({bx_ - bg_:+.1f} pp" + (f", x{ratio:.2f})" if ratio is not None else ", gra <= 0.5% - bez stosunku)")
-        ok5c = bx_ - bg_ <= CENY299_LOOP_PP and (ratio is None or ratio <= CENY299_LOOP_RATIO)
+        ok5c = bx_ - bg_ <= lpp + 1e-9 and (ratio is None or ratio <= lrat + 1e-9)
     else:
         v5c, ok5c = "brak", False
     rep.add("C299-5c: petla lustrzana (kup 30 teraz, sprzedaj po 7 dobach, brutto) - polki >= 3 dob z >= 30 szt.", v5c + base,
-            f"299 - gra <= +{CENY299_LOOP_PP:.0f} pp i 299/gra <= {CENY299_LOOP_RATIO} (rachunek: polka 7 dob, lot 1 doby gra +4.6% -> 299 +5.4%; zuzycie miasta jej pomaga)",
-            J(ok5c))
+            lim5 + "; rachunek: polka 7 dob, lot 1 doby gra +4.6% -> 299 +5.4%; zuzycie miasta jej pomaga)", J(ok5c))
     rep.add("C299-5d: petla lustrzana p90", f"gra {fmt(med('lbg9'), '{:+.1f}')}% -> 299 {fmt(med('lbx9'), '{:+.1f}')}%", "INFO", None)
     # C299-6 przypadek Jeffa
     gr = [(d, D["ex"][d].get("grain")) for d in days if D["ex"].get(d, {}).get("grain")]
@@ -82394,7 +82403,7 @@ def ceny299b_rows(rep, D):
     gx, gg = med("gx"), med("gg")
     rep.add("C299-17: petla opozniona gracza na sprzecie (sprzedaj 20, odkup po 21 dobach, z marza i kara)", f"mediana 299 {fmt(lpa, '{:+.1f}')}% -> 299b {fmt(lpb, '{:+.1f}')}%, "
             f"p90 299b {fmt(lpb9, '{:+.1f}')}% (koszykow {fmt(med('ln', alld), '{:.0f}')}/d); towary petla 30 szt. po 21 dobach gra {fmt(gg, '{:+.1f}')}% -> 299b {fmt(gx, '{:+.1f}')}%"
-            + base, f"299b mediana <= {CENY299B_LOOP_MED:+.0f}% i p90 <= +{CENY299B_LOOP_P90:.0f}% (NIE: blokada odkupienia 7 dob takze dla gracza)",
+            + base, f"299b mediana <= {CENY299B_LOOP_MED:+.0f}% i p90 <= +{CENY299B_LOOP_P90:.0f}% (NIE: decyzja po pomiarze - sonda bez odplywu, gorna granica)",
             J(lpb is not None and lpb <= CENY299B_LOOP_MED and lpb9 is not None and lpb9 <= CENY299B_LOOP_P90))
 
     def loop_ok(m, m9):
@@ -82445,6 +82454,15 @@ def ceny299b_rows(rep, D):
     rep.add("C299-18d: przyklady gracza (ostatnia doba, zl za 1. / 5. / 20. sprzedana sztuke, 299 -> 299b)", "; ".join(parts) if parts else "brak", "INFO", None)
 
 
+def _c299_loop_k(ws, pace):
+    """299c (recenzja): mnoznik progow petli opoznionej C299-5 / 5c - waga podazy ws x czesc przesytu wchlonieta w 7 dob tempem pamieci wobec 299 (ws 0.119, tempo 0.15);
+    nigdy ponizej 1 (299 i 299b - progi jak dotad)."""
+    def d7(p):
+        return 1.0 - (1.0 - p) ** 7
+    g = 0.1 * d7(0.15)
+    return max(1.0, (ws * d7(pace) - g) / (0.119 * d7(0.15) - g))
+
+
 def _c299b_share(x):
     """299c: udzial od razu z linii 299b (', od razu X'); log bez tego czlonu (299b) - udzial = tempo."""
     return float(x["share"]) if x.get("share") else float(x["pace"])
@@ -82474,7 +82492,7 @@ def _c299b_line(d, k1="TAK", k2="TAK", pace="0.150", tsup="15.00", app=0, gam=64
 
 
 def _c299_synth(key="TAK", q30=0.552, q10=0.531, eq=1.0, inv=0, lpx=6.5, gdx=-5.0, gfx="207", st_=0, under=0, units=480, kon=0, days=20, gap=0, startn=2,
-                lbx=6.6, isr="1.25", lossu=40, stop=590, b=None, bstart=None, exp=2760, skup=39405, arms=(1359, 218143)):
+                lbx=6.6, isr="1.25", lpg=5.0, lbg=5.5, lossu=40, stop=590, b=None, bstart=None, exp=2760, skup=39405, arms=(1359, 218143)):
     """Bieg syntetyczny: linie jak w C# (z CENY299_SAMPLE przez zamiane wartosci) - przechodza przez _c299_feed. b - slownik argumentow linii 299b (_c299b_line;
     None - bieg 299 bez linii 299b, {} - dobry bieg 299b: wagi doby 0.0084 / 0.1316); bstart - linia startowa 299b (domyslna z przykladu)."""
     D = _c299_new()
@@ -82491,9 +82509,9 @@ def _c299_synth(key="TAK", q30=0.552, q10=0.531, eq=1.0, inv=0, lpx=6.5, gdx=-5.
                    "plotno (wartosc 100 d): indeks min/mediana/max 0.7/1.34/10, bez towaru 1 miast; welna"))
         if i >= gap:
             s = (CENY299_SAMPLE.replace("dzien 109100", f"dzien {d}").replace("klucz TAK", "klucz " + key).replace("30 szt. 0.552", f"30 szt. {q30:.3f}")
-                 .replace("10 szt. 0.531", f"10 szt. {q10:.3f}").replace("mediana gra 5.5% -> 299 6.6%", f"mediana gra 5.5% -> 299 {lbx:.1f}%")
+                 .replace("10 szt. 0.531", f"10 szt. {q10:.3f}").replace("mediana gra 5.5% -> 299 6.6%", f"mediana gra {lbg:.1f}% -> 299 {lbx:.1f}%")
                  .replace("polka/podaz 1.25)", f"polka/podaz {isr})").replace("rownowaga (300) mediana 1.000", f"rownowaga (300) mediana {eq:.3f}")
-                 .replace("kupno < odsprzedaz 0 (gra 0)", f"kupno < odsprzedaz {inv} (gra 0)").replace("mediana gra 5.0% -> 299 6.5%", f"mediana gra 5.0% -> 299 {lpx:.1f}%")
+                 .replace("kupno < odsprzedaz 0 (gra 0)", f"kupno < odsprzedaz {inv} (gra 0)").replace("mediana gra 5.0% -> 299 6.5%", f"mediana gra {lpg:.1f}% -> 299 {lpx:.1f}%")
                  .replace("gra -9.0% -> 299 -5.0%, spadek o 1 zl od sztuki 109 -> 207, pod gra przy polce >= podazy 0",
                           f"gra -9.0% -> 299 {gdx:.1f}%, spadek o 1 zl od sztuki 109 -> {gfx}, pod gra przy polce >= podazy {under}")
                  .replace("| potkniecia 0.", f"| potkniecia {st_}."))
@@ -82553,6 +82571,10 @@ def ceny299_selftest2():
     v299 = verdicts(_c299_synth())
     if any(v299.get(k) != "INFO" for k in ("C299-12", "C299-13", "C299-14", "C299-14a", "C299-15", "C299-16", "C299-17", "C299-17h", "C299-17r", "C299-18", "C299-19")):
         return f"bieg 299 bez linii 299b: wiersze 299b nie INFO ({v299})"
+    # recenzja 299c: petla opozniona przy wagach 299c (ws 0.1316, tempo 0.15) - progi x k5 = 1.66: gra +25% -> +35% (x1.40, +10 pp) TAK; w biegu 299 (k5 = 1) NIE
+    for row, kw in (("C299-5", dict(lpg=25.0, lpx=35.0)), ("C299-5c", dict(lbg=4.0, lbx=5.9))):
+        if verdicts(_c299_synth(b={}, **kw, **gb)).get(row) != "TAK" or verdicts(_c299_synth(**kw)).get(row) != "NIE":
+            return f"{row}: petla x1.40-1.48 przy wagach 299c nie TAK albo przy wagach 299 nie NIE"
     offs = _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", share="0.150", tsup="15.00", q20="1.000", fst="1.000", q20lo="1.000", q20hi="1.000"), **gb)
     if verdicts(offs).get("C299-11 (299b)") != "TAK":
         return "bieg z kluczami 299b NIE: C299-11 (299b) nie TAK"
@@ -82579,7 +82601,9 @@ def ceny299_selftest2():
               ("C299-11 (299b)", _c299_synth(b=dict(k1="NIE", k2="NIE", pace="0.150", share="0.060", tsup="15.00", q20="1.000", fst="1.000", q20lo="1.000",
                                                      q20hi="1.000"), **gb)),
               ("C299-2", _c299_synth(b={}, q30=0.552, q10=0.215, gdx=-2.0)), ("C299-6", _c299_synth(b={}, q30=0.231, q10=0.215, gdx=-5.0)),
-              ("C299-0", _c299_synth(b={}, bstart=CENY299B_SAMPLE_START.replace("od razu 0.060)", "od razu 0.080)"), **gb))]
+              ("C299-0", _c299_synth(b={}, bstart=CENY299B_SAMPLE_START.replace("od razu 0.060)", "od razu 0.080)"), **gb)),
+              ("C299-5", _c299_synth(b={}, lpg=25.0, lpx=39.0, **gb)), ("C299-5", _c299_synth(b={}, lpg=10.0, lpx=16.5, **gb)),
+              ("C299-5c", _c299_synth(b={}, lbg=4.0, lbx=6.6, **gb))]
     for row, D in casesb:
         v = verdicts(D)
         if v.get(row) != "NIE":
@@ -82594,7 +82618,7 @@ def ceny299_main(logp):
     rep.add("C299-S: self-test wyrazen (linia 299 i startowa jak w C#: PriceWalk299.Daily, RawPrice.ApplyAll; E3-T1, 287, 294b, Ceny surowcow)", s1 or "OK",
             "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     s2 = ceny299_selftest2()
-    rep.add("C299-S2: test syntetyczny (dobry bieg 299 i 299c, bieg 299b w starym formacie, biegi z kluczami NIE, prog C299-6 z rachunku, 20 + 31 zlych - wiersze 0-19)",
+    rep.add("C299-S2: test syntetyczny (dobry bieg 299 i 299c, bieg 299b w starym formacie, biegi z kluczami NIE, prog C299-6 z rachunku, 20 + 34 zlych, petle przy wagach 299c - wiersze 0-19)",
             s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("C299-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
