@@ -34,7 +34,10 @@ namespace Armoury
     ///     T1), surowce masowe najwyzej brak miasta (CaravanBulk.SellableAt) minus towar innych karawan w drodze;
     ///  D2 (klucz CaravanRouteByBuyRules) - ocena kupna kategorii = 0, gdy nasza regula zakupu zablokowalaby ja w tym miescie (CaravanTrade284.WhyPeek: bramka,
     ///     kapital, glebokosc 294b / zysk osiagalny, jedzenie > 7 dob, zwijanie; surowce masowe - CaravanBulk.BuyOpen);
-    ///  awaryjnie: gdy po D1/D2 BK nie znajdzie zadnego miasta (null), wybor BK bez zmian (drugie wywolanie z obejsciem, licznik).
+    ///  awaryjnie: gdy po D1/D2 przebieg BK z limitem odleglosci (FindNextDestinationForCaravan distanceCut true) nie znajdzie miasta, a BK sam by je znalazl - wybor
+    ///     BK z limitem bez zmian (powtorka przebiegu z obejsciem; recenzja 294c - bez tego BK szedl do drugiego przebiegu po wszystkich miastach i wybieral daleki
+    ///     cel, czyli dluzszy odcinek, zold i glod w drodze); gdy po D1/D2 nie ma celu w ogole (null) - wybor BK bez zmian (drugie wywolanie z obejsciem). Liczniki obu.
+    ///  Surowiec masowy (recenzja 294c): kasa miasta jak CaravanBulk.Sell (cala nadwyzka ponad rezerwe / cena pierwszej sztuki, bez 1/20 T1), prog jak CaravanBulk.Sell.
     /// Bez zmian: karawany nie handlujace (konwoje DTE), z kontraktem 174, z rozkazem BK gracza (CaravanOrdersBehavior.HasOrder - kotwica rozkazu), z zadania.
     /// Pamiec 'w drodze do miasta' (Inbound) tylko w sesji: przebudowa z celow karawan w dobie, na biezaco przy decyzji (stara wycofana, nowa dopisana) i przy wjezdzie
     /// do miasta (wycofana). Linia doby 'Cel karawan (294c): dzien N' (po linii 294b). Wyjatek - licznik potkniec (wybor BK jak dotad).
@@ -54,8 +57,10 @@ namespace Armoury
         private static Dictionary<ItemObject, int> _pantry;   // spizarnia eskorty karawany (kopia - PantryOf nadpisuje wspolna pamiec)
         private static Town _town;                        // miasto w GetTradeScoreForTown
         private static double _days = -1;                 // dni drogi do _town (leniwie)
-        private static readonly Dictionary<ItemObject, double> _floor = new Dictionary<ItemObject, double>();   // prog sprzedazy towaru w _town
+        // prog sprzedazy towaru - na decyzje (recenzja 294c: SaleFloor zalezy od miasta tylko przez myto - klucz (towar, 1 - myto); czyszczony w ThinkPrefix / Postfix)
+        private static readonly Dictionary<(ItemObject, double), double> _floor = new Dictionary<(ItemObject, double), double>();
         private static Rec _old;                          // wpis Inbound karawany sprzed decyzji (przywracany, gdy BK nie wybierze celu)
+        private static int _passZero;                     // _zeroCall na poczatku przebiegu FindNextDestinationForCaravan
 
         // ------------------------------------------------------------ w drodze do miast (Inbound)
         private sealed class Rec { public Town T; public readonly Dictionary<ItemCategory, double[]> V = new Dictionary<ItemCategory, double[]>(); }   // [0] sztuki, [1] jednostki polki
@@ -68,6 +73,8 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki doby
         private static int _cThink, _cScore, _cSell, _cBuy;                 // wywolania latek (JIT - metoda wkompilowana w wolajacego nie wola latki)
         private static int _dec, _exempt, _decTrade, _fallback, _fallNull;
+        private static int _cutFall, _cutFallNull, _farPass, _farZero;     // przebieg z limitem pusty przez nasze zera - wybor BK z limitem; drugi przebieg (bez limitu)
+        private static int _cFind;
         private static int _fEval, _fZero, _fFloor, _fQueue, _fPurse, _fBulk, _fPantry;
         private static double _fSum;
         private static int _bZero, _bGate, _bCap, _bDepth, _bFood, _bWind, _bBulk;
@@ -77,12 +84,13 @@ namespace Armoury
         private static int _stumbles, _stumbleSess;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _wThink, _wScore, _wSell, _wBuy;
-        private static MethodInfo _thinkMi;
+        private static MethodInfo _thinkMi, _findMi;
+        private static bool _wFind;
         private static MethodInfo _hasOrderMi; private static PropertyInfo _ordersInst;
 
         internal static void Reset()
         {
-            _mp = null; _bypass = false; _peek = false; _zeroCall = 0; _pantry = null; _town = null; _days = -1; _floor.Clear(); _old = null;
+            _mp = null; _bypass = false; _peek = false; _zeroCall = 0; _passZero = 0; _pantry = null; _town = null; _days = -1; _floor.Clear(); _old = null;
             _in.Clear(); _agg.Clear(); _snap.Clear();
             ZeroDay();
             _stumbleSess = 0; _err.Clear();
@@ -92,6 +100,7 @@ namespace Armoury
         {
             _cThink = _cScore = _cSell = _cBuy = 0;
             _dec = _exempt = _decTrade = _fallback = _fallNull = 0;
+            _cutFall = _cutFallNull = _farPass = _farZero = 0; _cFind = 0;
             _fEval = _fZero = _fFloor = _fQueue = _fPurse = _fBulk = _fPantry = 0; _fSum = 0;
             _bZero = _bGate = _bCap = _bDepth = _bFood = _bWind = _bBulk = 0;
             _chosen = 0; _chosenDays = 0;
@@ -202,7 +211,7 @@ namespace Armoury
         public static void ThinkPrefix(MobileParty __0)
         {
             if (_bypass) return;
-            _mp = null; _town = null; _zeroCall = 0; _old = null; _pantry = null; _peek = false;
+            _mp = null; _town = null; _zeroCall = 0; _passZero = 0; _old = null; _pantry = null; _peek = false; _floor.Clear();
             _cThink++;
             var s = Settings.Current;
             if (__0 == null || !(D1On(s) || D2On(s))) return;
@@ -233,7 +242,7 @@ namespace Armoury
         {
             if (_bypass) return;
             var s = Settings.Current;
-            if (__0 == null || !(D1On(s) || D2On(s))) { _mp = null; return; }
+            if (__0 == null || !(D1On(s) || D2On(s))) { EndDecision(); return; }
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -257,11 +266,56 @@ namespace Armoury
             catch (Exception e) { Stumble("ThinkPostfix", e); }
             finally
             {
-                _mp = null; _town = null; _old = null; _pantry = null; _floor.Clear();
-                if (_peek) CaravanTrade284.PeekEnd();
-                _peek = false;
+                EndDecision();
                 _ticks += Stopwatch.GetTimestamp() - t0;
             }
+        }
+
+        private static void EndDecision()
+        {
+            _mp = null; _town = null; _old = null; _pantry = null; _floor.Clear(); _zeroCall = 0; _passZero = 0;
+            if (_peek) CaravanTrade284.PeekEnd();
+            _peek = false;
+        }
+
+        /// <summary>Finalizer ThinkNextDestination (recenzja 294c): wyjatek w BK (wolajacy BK go polyka) - postfiks nie biegnie; stary wpis Inbound wraca, stan regul zakupu
+        /// zamkniety, decyzja wyczyszczona. Wyjatek idzie dalej bez zmian (finalizer void).</summary>
+        public static void ThinkFinalizer(MobileParty __0, Exception __exception)
+        {
+            if (_bypass || __exception == null) return;
+            try { if (_old != null && _old.T != null && __0 != null) Put(__0, _old); }
+            catch (Exception e) { Stumble("ThinkFinalizer", e); }
+            finally { EndDecision(); }
+        }
+
+        /// <summary>Prefiks FindNextDestinationForCaravan(caravan, distanceCut): poczatek przebiegu - zera D1/D2 liczone od tego miejsca.</summary>
+        public static void FindPrefix(MobileParty __0)
+        {
+            if (_bypass) return;
+            _cFind++;
+            if (_mp != null && ReferenceEquals(__0, _mp)) _passZero = _zeroCall;
+        }
+
+        /// <summary>Postfiks FindNextDestinationForCaravan: przebieg z limitem odleglosci pusty, a w nim zerowalismy oceny - wybor BK z limitem bez zmian (powtorka przebiegu
+        /// z obejsciem), zeby nasze zera nie wypychaly karawany do drugiego przebiegu BK po wszystkich miastach (daleki cel). Drugi przebieg - licznik.</summary>
+        public static void FindPostfix(object __instance, MobileParty __0, bool __1, ref Town __result)
+        {
+            if (_bypass || _mp == null || !ReferenceEquals(__0, _mp)) return;
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                bool zeroed = _zeroCall > _passZero;
+                if (!__1) { _farPass++; if (zeroed) _farZero++; return; }
+                if (__result != null || !zeroed || _findMi == null || __instance == null) return;
+                _bypass = true;
+                try { __result = _findMi.Invoke(__instance, new object[] { __0, true }) as Town; }
+                catch (TargetInvocationException e) { Stumble("FindPostfix(BK)", e.InnerException ?? e); }
+                finally { _bypass = false; }
+                _cutFall++;
+                if (__result == null) _cutFallNull++;
+            }
+            catch (Exception e) { Stumble("FindPostfix", e); }
+            finally { _ticks += Stopwatch.GetTimestamp() - t0; }
         }
 
         /// <summary>Prefiks GetTradeScoreForTown(caravan, town, ...): miasto oceny (dni drogi i progi leniwie).</summary>
@@ -270,7 +324,7 @@ namespace Armoury
             if (_bypass) return;
             _cScore++;
             if (_mp == null || !ReferenceEquals(__0, _mp)) { _town = null; return; }
-            _town = __1; _days = -1; _floor.Clear();
+            _town = __1; _days = -1;
         }
 
         public static void ScorePostfix() { if (!_bypass) _town = null; }
@@ -319,15 +373,15 @@ namespace Armoury
             var model = cg != null && cg.Models != null ? cg.Models.TradeItemPriceFactorModel : null;
             var st = town.Settlement;
             if (model == null || st == null || town.MarketData == null) return 1.0;
+            double keepT = 1.0 - TownToll.CaravanRateFor(mp, st);
             double floor;
-            if (!_floor.TryGetValue(it, out floor)) { floor = CaravanGoods.SaleFloor(mp, it, st); _floor[it] = floor; }
+            if (!_floor.TryGetValue((it, keepT), out floor)) { floor = CaravanGoods.SaleFloor(mp, it, st); _floor[(it, keepT)] = floor; }
             var cat = it.ItemCategory;
             if (_days < 0) _days = Math.Max(0.0, CaravanEscort.RoadDaysTo(mp, st));
             var inb = InboundOf(town, cat);
             double eat = CaravanTrade284.MktTownValue(town, cat) * _days;
             double q = inb != null ? Math.Max(0.0, inb[1] - eat) : 0.0;           // jednostki polki innych karawan, ktore beda tam przede mna
             double qn = inb != null && inb[1] > 0 ? Math.Max(0.0, inb[0] * (q / inb[1])) : 0.0;   // to samo w sztukach (surowce masowe)
-            double keepT = 1.0 - TownToll.CaravanRateFor(mp, st);
             var d = town.MarketData.GetCategoryData(cat);
             int wv = Math.Max(1, HistoricalPrices.ShelfWorth(it));
             var ee = el.EquipmentElement;
@@ -337,11 +391,12 @@ namespace Armoury
                 if (q > 0.0 && MaxK(model, ee, mp, d, 0.0, wv, keepT, floor, maxSell) > 0) _fQueue++; else _fFloor++;
                 return 0.0;
             }
-            // kasa miasta: limit T1 (1/20 kasy ponad rezerwe kupcow na dobe) / cena pierwszej sztuki
+            // kasa miasta: towar T1 - limit T1 (1/20 kasy ponad rezerwe kupcow na dobe) / cena pierwszej sztuki; surowiec masowy - regula CaravanBulk.Sell (cala kasa ponad
+            // rezerwe / cena pierwszej sztuki, bez 1/20 - recenzja 294c)
             int reserve = (int)Math.Max(0f, s.TownRentFloorGold);
             int spare = town.Gold - TownPurse.BuyFloorPeek(town, reserve);
             int p1 = Math.Max(1, CaravanGoods.PriceAtExtra(model, ee, mp, d, q, 1, wv));
-            int kc = spare > 0 ? spare / TownDayShare / p1 : 0;
+            int kc = spare > 0 ? (bulk ? spare / p1 : spare / TownDayShare / p1) : 0;
             if (kc <= 0) { _fPurse++; return 0.0; }
             k = Math.Min(k, kc);
             // surowiec masowy: najwyzej brak miasta (do zapasu docelowego; przy zamknietym kupnie do progu nadwyzki) minus towar w drodze (174 i inne karawany)
@@ -484,7 +539,8 @@ namespace Armoury
                     var tg = mp.TargetSettlement;
                     var tt = tg != null && tg.IsTown ? tg.Town : null;
                     if (oreIt != null && r.GetItemNumber(oreIt) > 0) { ore++; if (tt != null && mp.CurrentSettlement == null && CaravanBulk.OreShort(tt)) oreShort++; }
-                    if (!on || tt == null || mp.CurrentSettlement != null) continue;   // w miescie - cel nowy wybierze przy wyjezdzie
+                    // w miescie bez nowego celu (cel = to miasto) - cel wybierze przy wyjezdzie; w miescie z nowym celem (decyzja zapadla, wyjazd w nastepnym ticku) - wpis zostaje
+                    if (!on || tt == null || (mp.CurrentSettlement != null && mp.CurrentSettlement == tg)) continue;
                     var rec = RecOf(mp, tt);
                     if (rec == null) continue;
                     Put(mp, rec);
@@ -507,12 +563,14 @@ namespace Armoury
               .Append(" | kupno wyzerowane ").Append(_bZero).Append(" (bramka ").Append(_bGate).Append(", kapital ").Append(_bCap).Append(", glebokosc ").Append(_bDepth)
               .Append(", jedzenie ").Append(_bFood).Append(", zwijanie ").Append(_bWind).Append(", surowce ").Append(_bBulk).Append(')')
               .Append(" | awaryjnie wybor BK ").Append(_fallback).Append(" (bez celu i tak ").Append(_fallNull).Append(')')
+              .Append(" | limit odleglosci: wpieta ").Append(_wFind ? "TAK" : "NIE").Append(", przebiegow ").Append(_cFind).Append(", pusty po zerowaniu - wybor BK z limitem ")
+              .Append(_cutFall).Append(" (bez celu i tak ").Append(_cutFallNull).Append("), drugi przebieg bez limitu ").Append(_farPass).Append(" (z zerowaniem ").Append(_farZero).Append(')')
               .Append(" | w drodze do miast: karawan ").Append(inCars).Append(", szt. ").Append(inUnits.ToString("0", Inv)).Append(", jednostek polki ").Append(inValue.ToString("0", Inv))
               .Append(" | dni drogi wybranych miast srednio ").Append(_chosen > 0 ? (_chosenDays / _chosen).ToString("0.00", Inv) : "-").Append(" (").Append(_chosen).Append(" decyzji)")
               .Append(" | wjazdy z towarem handlowym (przy wyjezdzie) ").Append(_eTrade).Append(", ze sprzedaza ").Append(_eSold)
               .Append(" | karawany handlujace ").Append(cars).Append(", z towarem handlowym ").Append(withTrade).Append(", z nich sprzedaly w 7 dobach ").Append(withSold)
               .Append(" | ruda: karawan z ruda ").Append(ore).Append(", w drodze do miast z brakiem ").Append(oreShort)
-              .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
+              .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms (na decyzje ").Append(_dec > 0 ? (ms / _dec).ToString("0.000", Inv) : "-").Append(" ms) | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
             Log.Info(sb.ToString());
             ZeroDay();
         }
@@ -538,6 +596,7 @@ namespace Armoury
                 var score = AccessTools.Method(bkc, "GetTradeScoreForTown");
                 var sell = AccessTools.Method(bkc, "CalculateTownSellScoreForCategory", new[] { typeof(MobileParty), typeof(TownMarketData), typeof(int), typeof(float) });
                 var buy = AccessTools.Method(bkc, "CalculateTownBuyScoreForCategory", new[] { typeof(TownMarketData), typeof(int) });
+                var find = AccessTools.Method(bkc, "FindNextDestinationForCaravan", new[] { typeof(MobileParty), typeof(bool) });
                 try
                 {
                     var tco = AccessTools.TypeByName("BannerKings.Behaviours.Caravans.CaravanOrdersBehavior");
@@ -556,15 +615,22 @@ namespace Armoury
                 if (Fits(score, typeof(float), typeof(MobileParty), typeof(Town)))
                 { h.Patch(score, prefix: new HarmonyMethod(typeof(CaravanRoute294c), nameof(ScorePrefix)) { priority = Priority.First }, postfix: new HarmonyMethod(typeof(CaravanRoute294c), nameof(ScorePostfix))); _wScore = true; }
                 else miss.Add("GetTradeScoreForTown(MobileParty, Town, ..)");
+                if (_wScore && Fits(find, typeof(Town), typeof(MobileParty), typeof(bool)))
+                {
+                    h.Patch(find, prefix: new HarmonyMethod(typeof(CaravanRoute294c), nameof(FindPrefix)), postfix: new HarmonyMethod(typeof(CaravanRoute294c), nameof(FindPostfix)));
+                    _findMi = find; _wFind = true;
+                }
+                else miss.Add("FindNextDestinationForCaravan(MobileParty, bool)");
                 if (_wScore && Fits(think, typeof(Town), typeof(MobileParty)))
                 {
-                    h.Patch(think, prefix: new HarmonyMethod(typeof(CaravanRoute294c), nameof(ThinkPrefix)), postfix: new HarmonyMethod(typeof(CaravanRoute294c), nameof(ThinkPostfix)));
+                    h.Patch(think, prefix: new HarmonyMethod(typeof(CaravanRoute294c), nameof(ThinkPrefix)), postfix: new HarmonyMethod(typeof(CaravanRoute294c), nameof(ThinkPostfix)),
+                            finalizer: new HarmonyMethod(typeof(CaravanRoute294c), nameof(ThinkFinalizer)));
                     _thinkMi = think; _wThink = true;
                 }
                 else miss.Add("ThinkNextDestination(MobileParty)");
             }
             catch (Exception e) { Log.Error("CaravanRoute294c.ApplyAll", e); }
-            Log.Info("CaravanRoute294c (294c): cel karawan BK - mysl " + (_wThink ? "wpieta" : "BRAK") + ", ocena miasta " + (_wScore ? "wpieta" : "BRAK")
+            Log.Info("CaravanRoute294c (294c): cel karawan BK - mysl " + (_wThink ? "wpieta" : "BRAK") + ", przebieg z limitem " + (_wFind ? "wpiety" : "BRAK") + ", ocena miasta " + (_wScore ? "wpieta" : "BRAK")
                      + ", ocena sprzedazy " + (_wSell ? "wpieta" : "BRAK") + ", ocena kupna " + (_wBuy ? "wpieta" : "BRAK")
                      + (miss.Count > 0 ? "; BRAK w kodzie BK: " + string.Join(", ", miss.ToArray()) + " - ta czesc nie dziala" : "") + ".");
         }

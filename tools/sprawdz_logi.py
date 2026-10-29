@@ -77655,7 +77655,8 @@ H290_SEG = ("; 290: zapas swiata rynku (polki + droga + juki + wsie + wozy wsi +
 H290_F5 = re.compile(r"(Westeros|Essos): [^|]*?; 290: zapas swiata rynku \(polki \+ droga \+ juki \+ wsie \+ wozy wsi \+ zamki\) (-|\d+) -> (-|\d+)(?: \(([+-]\d+)\))?, "
                      r"wsie (\d+), wozy wsi (\d+), zamki (\d+), prog (\d+), poziom (BRAK|PELNY|PASMO|BEZ CELU), "
                      r"ruch (W GORE|W DOL|TRZYMANE|BEZ POMIARU \(trzymane\)|REGULY 282-287), w gore (\d+), w dol (\d+), trzymane (\d+)"
-                     r"(?:; 294c: PELNY w dol tylko przy dW > prog (TAK|NIE), kopalnie miast pelnych w dol (\d+), trzymane \(miasto bez nadmiaru\) (\d+))?")
+                     r"(?:; 294c: PELNY w dol tylko przy dW > prog (TAK|NIE), kopalnie miast pelnych w dol (\d+), trzymane \(miasto bez nadmiaru\) (\d+)"
+                     r"(?:, w dol bez znanego miasta targowego (\d+), w dol bez reguly 287 (\d+))?)?")
 Z290_L = "Jedzenie karawan (290): dzien "
 Z290_RE = re.compile(r"^Jedzenie karawan \(290\): dzien (?P<d>\d+) \| klucz kupno jedzenia wedlug wlasnej sprzedazy (?P<k>TAK|NIE) \| kategorii jedzenia (?P<n>\d+), "
                      r"kupno stoi (?P<shut>\d+) \| w jukach (?P<h>\d+) szt\., sprzedaz karawan miastom (?P<e>[\d.]+) szt\./d \((?P<days>[\d.]+|-) dob\), popyt rynkow "
@@ -80496,9 +80497,12 @@ def main(argv):
 #   Wiersze dopisane do grup karawany294, zelazo297, ruda282, karawany259 (opakowania funkcji - bez zmian w srodku istniejacych grup):
 # K294-16  linia 'Cel karawan (294c)' co dobe (dziur <= 1), nierozpoznanych 0, potkniecia 0, ERROR CaravanRoute294c 0, latki 4/4 TAK i wywolania mysl / sprzedaz /
 #          kupno > 0 (metoda BK wkompilowana w wolajacego nie wola latki - liczniki musza byc > 0)
-# K294-17  wjazdy z towarem handlowym zakonczone sprzedaza (294c, przy wyjezdzie) ostatnie 7 dob >= KARAWANY294C_ENTRY_SOLD (log bez 294c - baza E3-T1 INFO)
+# K294-17  wjazdy z towarem zakonczone sprzedaza T1 (E3-T1 'sprzedaly / wjazdow z towarem' - ta sama miara co baza 296c 0.48) ostatnie 7 dob >= KARAWANY294C_ENTRY_SOLD;
+#          licznik 294c (kazdy spadek towaru handlowego w miescie: T1, BK, gra, surowce, zjedzone) - INFO obok (recenzja 294c: inna miara niz baza)
 # K294-18  rozne miasta z wjazdem karawan na dobe ('Karawany (kierunek)') srednio ostatnie 7 dob >= KARAWANY294C_TOWNS (296c 39.9)
-# K294-19  zmierzony odcinek karawan (288 'zmierzona') ostatnie 7 dob <= KARAWANY294C_LEG x pierwsze 7 (od 3. doby); awaryjny wybor BK <= 5% decyzji
+# K294-19  zmierzony odcinek karawan (288 'zmierzona') ostatnie 7 dob <= KARAWANY294C_LEG x KARAWANY294C_LEG_BASE (296c ostatnie 7 dob 4.31 - stala baza, recenzja
+#          294c: porownanie biegu z samym soba przepuszczalo wydluzenie od 1. doby); awaryjny wybor BK (bez celu) <= 5% decyzji
+# K294-21  INFO: przebieg BK z limitem odleglosci pusty po naszych zerach - wybor BK z limitem; drugi przebieg BK bez limitu (udzial decyzji); koszt na decyzje
 # K294-9a  glodne w drodze przed zima (doby przed pierwsza linia '(297)', od 8. doby) <= KARAWANY294C_HUNGRY_PRE
 # K294-9w  INFO: glodne w drodze w zimie i udzial wyjazdow bez jedzenia na polce (288 'bez towaru' / 'wyjazdow')
 # K294-10b karawany z towarem handlowym ze sprzedaza w 7 dobach (294c) ostatnie 7 dob >= KARAWANY294C_TRADED_GOODS
@@ -80506,7 +80510,8 @@ def main(argv):
 # K294-S3  self-test wyrazen 294c i test syntetyczny k294c_rows (dobry - TAK, zle - NIE) - czesc K294-S
 KARAWANY294C_ENTRY_SOLD = 0.64     # 296c (E3-T1 'sprzedaly / wjazdow z towarem') ok. 0.48
 KARAWANY294C_TOWNS = 45.0          # 296c ostatnie 7 dob 39.9
-KARAWANY294C_LEG = 1.15            # zmierzony odcinek ostatnie 7 / pierwsze 7 (296c 4.29 doby)
+KARAWANY294C_LEG = 1.15            # zmierzony odcinek ostatnie 7 dob / KARAWANY294C_LEG_BASE
+KARAWANY294C_LEG_BASE = 4.31       # 296c (HEAD 971570ad, bez 294c) zmierzony odcinek ostatnie 7 dob - ten sam zapis, te same doby biegu
 KARAWANY294C_FALLBACK = 0.05       # awaryjny wybor BK / decyzje
 KARAWANY294C_HUNGRY_PRE = 0.10     # 136a przed zima 0.09-0.10
 KARAWANY294C_TRADED_GOODS = 0.85
@@ -80521,19 +80526,22 @@ KARAWANY294C_RE = re.compile(
     r"spizarnia (?P<fpa>\d+)\), f srednio (?P<fm>[\d.]+|-) "
     r"\| kupno wyzerowane (?P<bz>\d+) \(bramka (?P<bg>\d+), kapital (?P<bc>\d+), glebokosc (?P<bd>\d+), jedzenie (?P<bf>\d+), zwijanie (?P<bw>\d+), surowce (?P<bb>\d+)\) "
     r"\| awaryjnie wybor BK (?P<fall>\d+) \(bez celu i tak (?P<fn>\d+)\) "
+    r"\| limit odleglosci: wpieta (?P<wf>TAK|NIE), przebiegow (?P<cfi>\d+), pusty po zerowaniu - wybor BK z limitem (?P<cf>\d+) \(bez celu i tak (?P<cfn>\d+)\), "
+    r"drugi przebieg bez limitu (?P<sp2>\d+) \(z zerowaniem (?P<sp2z>\d+)\) "
     r"\| w drodze do miast: karawan (?P<ic>\d+), szt\. (?P<iu>\d+), jednostek polki (?P<iv>\d+) "
     r"\| dni drogi wybranych miast srednio (?P<rd>[\d.]+|-) \((?P<rn>\d+) decyzji\) "
     r"\| wjazdy z towarem handlowym \(przy wyjezdzie\) (?P<et>\d+), ze sprzedaza (?P<es>\d+) "
     r"\| karawany handlujace (?P<cars>\d+), z towarem handlowym (?P<wt>\d+), z nich sprzedaly w 7 dobach (?P<ws>\d+) "
     r"\| ruda: karawan z ruda (?P<ore>\d+), w drodze do miast z brakiem (?P<ors>\d+) "
-    r"\| czas (?P<ms>[\d.]+) ms \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
+    r"\| czas (?P<ms>[\d.]+) ms \(na decyzje (?P<msd>[\d.]+|-) ms\) \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
 KARAWANY294C_SAMPLE = (
     "Cel karawan (294c): dzien 109100 | klucze: cel wedlug sprzedazy TAK, ocena kupna wedlug regul TAK | latki: mysl TAK, ocena miasta TAK, sprzedaz TAK, kupno TAK "
     "| wywolania: mysl 120, ocena miast 4000, sprzedaz 30000, kupno 9000 | decyzje 118 (zwolnione 3, z towarem handlowym 100) | sprzedaz: ocen 5000, f = 0 1200 "
     "(pod progiem 700, kolejka 300, kasa miasta 100, brak surowca 50, spizarnia 50), f srednio 0.512 | kupno wyzerowane 800 (bramka 100, kapital 200, glebokosc 400, "
-    "jedzenie 50, zwijanie 0, surowce 50) | awaryjnie wybor BK 2 (bez celu i tak 0) | w drodze do miast: karawan 380, szt. 40000, jednostek polki 900000 | dni drogi "
+    "jedzenie 50, zwijanie 0, surowce 50) | awaryjnie wybor BK 2 (bez celu i tak 0) | limit odleglosci: wpieta TAK, przebiegow 130, pusty po zerowaniu - wybor BK "
+    "z limitem 7 (bez celu i tak 1), drugi przebieg bez limitu 9 (z zerowaniem 4) | w drodze do miast: karawan 380, szt. 40000, jednostek polki 900000 | dni drogi "
     "wybranych miast srednio 4.10 (110 decyzji) | wjazdy z towarem handlowym (przy wyjezdzie) 85, ze sprzedaza 60 | karawany handlujace 400, z towarem handlowym 390, "
-    "z nich sprzedaly w 7 dobach 340 | ruda: karawan z ruda 24, w drodze do miast z brakiem 10 | czas 12.34 ms | potkniecia 0 (sesja 0).")
+    "z nich sprzedaly w 7 dobach 340 | ruda: karawan z ruda 24, w drodze do miast z brakiem 10 | czas 12.34 ms (na decyzje 0.105 ms) | potkniecia 0 (sesja 0).")
 KARAWANY294C_288 = re.compile(r"spizarnia - BK (\d+) szt\., gra (\d+) szt\. wstrzymane \(klucz (TAK|NIE)\); zapas w miastach bez glodu: wyjazdow (\d+), szt\. (\d+), "
                               r"zl (\d+); pominiete glodne (\d+) \(klucz (TAK|NIE)\)")
 KARAWANY294C_288SEG = ("| 294c: spizarnia - BK 12 szt., gra 3 szt. wstrzymane (klucz TAK); zapas w miastach bez glodu: wyjazdow 40, szt. 300, zl 2100; pominiete glodne 9 "
@@ -80610,28 +80618,30 @@ def k294c_rows(rep, C, run):
     if days:
         holes = [d for d in range(days[0], days[-1] + 1) if d not in c]
         st = sum(int(c[d]["st"]) for d in days)
-        wired = all(c[days[-1]][k] == "TAK" for k in ("w1", "w2", "w3", "w4"))
+        wired = all(c[days[-1]][k] == "TAK" for k in ("w1", "w2", "w3", "w4", "wf"))
         on = [d for d in days if c[d]["k1"] == "TAK" or c[d]["k2"] == "TAK"]
         calls = {k: sum(int(c[d][k]) for d in on) for k in ("cth", "cse", "cbu")}
         okc = not on or (calls["cth"] > 0 and calls["cse"] > 0 and calls["cbu"] > 0)
-        rep.add("K294-16: linia 294c co dobe, potkniecia 0, ERROR 0, latki 4/4, wywolania latek > 0",
+        mss = [float(c[d]["ms"]) for d in on]
+        decs = sum(int(c[d]["dec"]) for d in on)
+        rep.add("K294-16: linia 294c co dobe, potkniecia 0, ERROR 0, latki 5/5, wywolania latek > 0",
                 f"dob {len(days)} (d{days[0]}-d{days[-1]}), dziur {len(holes)}, nierozpoznanych {C['cbad']}, potkniec {st}, ERROR {C['cerr']}, latki {'TAK' if wired else 'NIE'}, "
-                f"wywolania (doby z kluczem) mysl {calls['cth']}, sprzedaz {calls['cse']}, kupno {calls['cbu']}",
+                f"wywolania (doby z kluczem) mysl {calls['cth']}, sprzedaz {calls['cse']}, kupno {calls['cbu']}"
+                + (f"; czas srednio {sum(mss) / len(mss):.2f} ms/d, na decyzje {sum(mss) / decs:.3f} ms" if mss and decs > 0 else ""),
                 "dziur <= 1, 0 / 0 / 0, latki TAK, wywolania > 0", len(holes) <= 1 and C["cbad"] == 0 and st == 0 and C["cerr"] == 0 and wired and okc)
     else:
         rep.add("K294-16: linia 294c co dobe", f"brak linii 'Cel karawan (294c)' (nierozpoznanych {C['cbad']})", "linia w kazdej dobie (log sprzed 294c - brak)", False)
     # K294-17 wjazdy z towarem zakonczone sprzedaza
+    # recenzja 294c: ocena na mierze E3-T1 (sprzedaz T1) - ta sama co baza 296c 0.48; licznik 294c (kazdy spadek towaru) tylko INFO obok
+    t1 = C["t1"]; l7t = sorted(t1)[-7:]
+    et1 = sum(t1[d][0] for d in l7t); es1 = sum(t1[d][1] for d in l7t)
+    v17 = es1 / et1 if et1 > 0 else None
+    s17 = f"E3-T1 (sprzedaz T1) ostatnie 7 dob: wjazdow z towarem {et1}, sprzedaly {es1} ({'-' if v17 is None else f'{v17:.3f}'})"
     if days:
         l7 = days[-7:]
         et = sum(int(c[d]["et"]) for d in l7); es = sum(int(c[d]["es"]) for d in l7)
-        v17 = es / et if et > 0 else None
-        s17 = f"ostatnie 7 dob: wjazdow z towarem handlowym {et}, ze sprzedaza {es} ({'-' if v17 is None else f'{v17:.3f}'})"
-    else:
-        t1 = C["t1"]; l7 = sorted(t1)[-7:]
-        et = sum(t1[d][0] for d in l7); es = sum(t1[d][1] for d in l7)
-        v17 = None
-        s17 = f"baza E3-T1 (tylko sprzedaz T1) ostatnie 7 dob: wjazdow z towarem {et}, sprzedaly {es} ({(es / et if et else 0):.3f})"
-    rep.add("K294-17: wjazdy z towarem handlowym zakonczone sprzedaza (ostatnie 7 dob)", s17 + sfx, f">= {KARAWANY294C_ENTRY_SOLD} (296c ok. 0.48)",
+        s17 += f"; INFO licznik 294c (kazda droga, w tym zjedzone): wjazdow {et}, ze spadkiem towaru {es} ({(es / et if et else 0):.3f})"
+    rep.add("K294-17: wjazdy z towarem zakonczone sprzedaza T1 (E3-T1, ostatnie 7 dob)", s17 + sfx, f">= {KARAWANY294C_ENTRY_SOLD} (296c 0.48 ta sama miara)",
             (v17 is not None and v17 >= KARAWANY294C_ENTRY_SOLD) if judge else None)
     # K294-18 rozne miasta
     kd = sorted(C["kier"])[-7:]
@@ -80643,16 +80653,30 @@ def k294c_rows(rep, C, run):
     rd = [d for d in sorted(c288) if c288[d][4] is not None][2:]
     if len(rd) >= 14:
         f7 = sum(c288[d][4] for d in rd[:7]) / 7.0; l7v = sum(c288[d][4] for d in rd[-7:]) / 7.0
-        r19 = l7v / f7 if f7 > 0 else None
-        s19 = f"zmierzony odcinek pierwsze 7 dob {f7:.2f}, ostatnie 7 {l7v:.2f} ({'-' if r19 is None else f'{r19:.2f}'})"
+        r19 = l7v / KARAWANY294C_LEG_BASE
+        s19 = f"zmierzony odcinek ostatnie 7 dob {l7v:.2f} / baza 296c {KARAWANY294C_LEG_BASE:.2f} = {r19:.2f} (pierwsze 7 dob tego biegu {f7:.2f})"
     else:
         r19, s19 = None, f"za malo dob z pomiarem odcinka ({len(rd)})"
     fall = sum(int(c[d]["fall"]) for d in days); dec = sum(int(c[d]["dec"]) for d in days)
     rf = fall / dec if dec > 0 else 0.0
     if days:
         s19 += f"; awaryjny wybor BK {fall} z {dec} decyzji ({rf:.3f})"
-    rep.add("K294-19: dlugosc odcinka (288 zmierzona) i awaryjny wybor BK", s19 + sfx, f"ostatnie 7 <= {KARAWANY294C_LEG} x pierwsze 7, awaryjnie <= {KARAWANY294C_FALLBACK:.0%} decyzji",
+    rep.add("K294-19: dlugosc odcinka (288 zmierzona) i awaryjny wybor BK", s19 + sfx,
+            f"ostatnie 7 <= {KARAWANY294C_LEG} x {KARAWANY294C_LEG_BASE} = {KARAWANY294C_LEG * KARAWANY294C_LEG_BASE:.2f} dob, awaryjnie <= {KARAWANY294C_FALLBACK:.0%} decyzji",
             (r19 is not None and r19 <= KARAWANY294C_LEG and rf <= KARAWANY294C_FALLBACK) if judge else None)
+    # K294-21 INFO: przebieg z limitem pusty po zerowaniu (wybor BK z limitem) i drugi przebieg bez limitu
+    if days:
+        cf = sum(int(c[d]["cf"]) for d in days); cfn = sum(int(c[d]["cfn"]) for d in days)
+        fp = sum(int(c[d]["sp2"]) for d in days); fpz = sum(int(c[d]["sp2z"]) for d in days)
+        l7 = days[-7:]; dl7 = sum(int(c[d]["dec"]) for d in l7)
+        cf7 = sum(int(c[d]["cf"]) for d in l7); fp7 = sum(int(c[d]["sp2"]) for d in l7)
+        rds = [float(c[d]["rd"]) for d in l7 if c[d]["rd"] != "-"]
+        rep.add("K294-21: przebieg BK z limitem odleglosci - pusty po zerowaniu i drugi przebieg bez limitu (INFO)",
+                f"caly bieg: z {dec} decyzji wybor BK z limitem {cf} (bez celu i tak {cfn}), drugi przebieg {fp} (z zerowaniem {fpz}); ostatnie 7 dob: "
+                f"{cf7 / dl7 if dl7 else 0:.3f} / {fp7 / dl7 if dl7 else 0:.3f} decyzji"
+                + (f"; dni drogi wybranych miast srednio {sum(rds) / len(rds):.2f}" if rds else ""), "INFO", None)
+    else:
+        rep.add("K294-21: przebieg BK z limitem odleglosci (INFO)", "brak linii 294c", "INFO", None)
     # K294-9a / K294-9w glod w drodze przed zima i w zimie
     hd = sorted(c288)
     w0 = C["winter"]
@@ -80701,7 +80725,9 @@ def k294c_selftest():
             or a.group("fall") != "2" or a.group("iv") != "900000" or a.group("rd") != "4.10" or a.group("es") != "60" or a.group("ws") != "340" or a.group("ors") != "10" \
             or a.group("ms") != "12.34" or a.group("ss") != "0":
         return f"linia 294c: {a.groupdict() if a else None}"
-    if not KARAWANY294C_RE.match(KARAWANY294C_SAMPLE.replace("f srednio 0.512", "f srednio -").replace("srednio 4.10", "srednio -")):
+    if a.group("wf") != "TAK" or a.group("cf") != "7" or a.group("cfn") != "1" or a.group("sp2") != "9" or a.group("sp2z") != "4" or a.group("msd") != "0.105":
+        return f"linia 294c - limit odleglosci / koszt na decyzje: {a.groupdict()}"
+    if not KARAWANY294C_RE.match(KARAWANY294C_SAMPLE.replace("f srednio 0.512", "f srednio -").replace("srednio 4.10", "srednio -").replace("na decyzje 0.105", "na decyzje -")):
         return "linia 294c bez ocen"
     k = K288_RE.match(K288_SAMPLE.replace("konwoje DTE 0 | potkniecia", "konwoje DTE 0 " + KARAWANY294C_288SEG + "| potkniecia"))
     if not k or not k.group("c294") or k.group("st") != "0" or k.group("dc") != "0":
@@ -80731,6 +80757,7 @@ def k294c_selftest():
         C = {"c": {}, "cbad": 0, "cerr": 0, "kier": {}, "kore": {}, "t1": {}, "c288": {}, "winter": 109020, "j": {}}
         for i in range(30):
             d = 109000 + i
+            C["t1"][d] = (100, int(100 * es))
             x = KARAWANY294C_RE.match(KARAWANY294C_SAMPLE).groupdict()
             x.update({"d": str(d), "et": "100", "es": str(int(100 * es)), "wt": "100", "ws": str(int(100 * ws)), "fall": str(fall), "dec": "100",
                       "st": str(st if i == 29 else 0), "cth": str(calls * 100), "cse": str(calls * 100), "cbu": str(calls * 100)})
@@ -80744,8 +80771,21 @@ def k294c_selftest():
         k294c_rows(r, C, 30)
         return {x[0].split(":")[0]: x[3] for x in r.rows}
     good = verdicts(synth())
-    if any(good.get(k) != "TAK" for k in ("K294-16", "K294-17", "K294-18", "K294-19", "K294-9a", "K294-10b")):
+    if any(good.get(k) != "TAK" for k in ("K294-16", "K294-17", "K294-18", "K294-19", "K294-9a", "K294-10b")) or good.get("K294-21") != "INFO":
         return f"294c dobry bieg nie przechodzi: {good}"
+    # recenzja 294c: K294-17 na mierze E3-T1 - licznik 294c wysoki przy niskim E3-T1 nie przechodzi
+    C17 = synth(es=0.5)
+    for d in C17["c"]:
+        C17["c"][d]["es"] = "90"
+    if verdicts(C17).get("K294-17") != "NIE":
+        return "294c K294-17 ocenia licznik 294c zamiast E3-T1"
+    # K294-19 stala baza: wydluzenie od 1. doby (caly bieg 1.25 x baza) nie przechodzi
+    C19 = synth()
+    for d in C19["c288"]:
+        x = C19["c288"][d]
+        C19["c288"][d] = x[:4] + (KARAWANY294C_LEG_BASE * 1.25,) + x[5:]
+    if verdicts(C19).get("K294-19") != "NIE":
+        return "294c K294-19 przepuszcza wydluzenie od 1. doby"
     for row, C in [("K294-16", synth(st=1)), ("K294-16", synth(calls=0)), ("K294-17", synth(es=0.5)), ("K294-18", synth(towns=40)), ("K294-19", synth(leg=1.3)),
                    ("K294-19", synth(fall=10)), ("K294-9a", synth(hun_pre=0.15)), ("K294-10b", synth(ws=0.7))]:
         v = verdicts(C)
@@ -80787,12 +80827,16 @@ def k294b_rows(rep, D):
 # Z297-16 sprzedaz rudy karawan (282 'sprzedaz 14 dob' rudy) srednio ostatnie 30 dob >= ZELAZO297C_ORE_SOLD /d (296c 13.6)
 # Z297-17 wjazdy z ruda do miast z brakiem / wszystkie wjazdy z ruda ('Karawany (kierunek)') ostatnie 30 dob >= ZELAZO297C_ORE_SHORT (296c 66/186 = 0.35)
 # Z297-18 kopalnie bez wegla ('Zelazo (lupy)' 'kopalnia bez wegla X lup') srednio ostatnie 30 dob <= ZELAZO297C_NOCOAL lup/d (296c 20.1, 296b 12.3)
-# Z297-19 krok 290 przy PELNYM z kluczem 294c: w dol tylko przy dW > prog, kubel 'w dol' = kopalnie miast pelnych (segment '; 294c'); bez segmentu - INFO
+# Z297-19 krok 290 przy PELNYM z kluczem 294c: w dol tylko przy dW > prog; kubel 290 'w dol' = kopalnie miast pelnych + bez znanego miasta targowego + bez reguly 287
+#         (recenzja 294c: osobne kubly - ciecie poza nimi = ciecie przy miescie bez nadmiaru); przy segmencie 287 w linii (regula wlaczona) kubel 'bez reguly 287' = 0;
+#         bez segmentu - INFO
+# Z297-21 krok 290: najdluzsza seria tygodni PELNY z kluczem 294c, dW > prog i 0 kopalni w dol (nadmiar swiata poza miastami pelnymi - bez hamulca) <= ZELAZO297C_HOLDRUN
 # Z297-20 INFO: stosunek ceny rudy miasta bez rudy / zrodla (282 'stosunek') srednio ostatnie 10 dob (296c 4.07; cel <= 3.0)
 ZELAZO297C_ORE_SOLD = 30.0
 ZELAZO297C_ORE_SHORT = 0.60
 ZELAZO297C_NOCOAL = 10.0
 ZELAZO297C_RATIO = 3.0
+ZELAZO297C_HOLDRUN = 2
 ZELAZO297C_282 = re.compile(r"^Ruda przeplyw \(282\): dzien (\d+) .*?stosunek ([\d.]+|-) \|")
 ZELAZO297C_282ORE = re.compile(r"karawany ruda: w jukach (\d+) \(w \d+ karawanach\), sprzedaz 14 dob ([\d.]+)/d")
 ZELAZO297C_282SEG = re.compile(r"; 294c: prog rudy = max\(sprzedaz EMA ([\d.]+), zuzycie miast z brakiem ([\d.]+)\) x (\d+) = (\d+) \(klucz (TAK|NIE), bramka (czynna|nieczynna)\)")
@@ -80836,6 +80880,7 @@ def z297c_collect(logp):
                 d0 = re.match(r"^Ruda KS \(f5-ruda\): dzien (\d+)", s)
                 if d0:
                     C["f5"][int(d0.group(1))] = [g.groups() for g in H290_F5.finditer(s)]
+                    C.setdefault("f5_287", {})[int(d0.group(1))] = {g.group(1) for g in H287_F5.finditer(s)}
     return C
 
 
@@ -80857,7 +80902,9 @@ def z297c_rows(rep, C):
     rep.add("Z297-18: kopalnie bez wegla ('Zelazo (lupy)', ostatnie 30 dob)", (f"srednio {v18:.1f} lup/d" if v18 is not None else "brak") + sfx,
             f"<= {ZELAZO297C_NOCOAL:.0f} lup/d (296c 20.1, 296b 12.3)", (v18 is not None and v18 <= ZELAZO297C_NOCOAL) if judge else None)
     bad, nf, nseg = [], 0, 0
-    prev = {}
+    tot = [0, 0, 0]
+    run, best = {}, {}
+    f287 = C.get("f5_287", {})
     for d in sorted(C["f5"]):
         for g in C["f5"][d]:
             mk = g[0]
@@ -80865,20 +80912,41 @@ def z297c_rows(rep, C):
                 continue
             nseg += 1
             if g[13] != "TAK" or g[8] != "PELNY":
+                run[mk] = 0
                 continue
             nf += 1
             pv = None if g[1] == "-" else int(g[1]); nw = None if g[2] == "-" else int(g[2])
             dl = (nw - pv) if (pv is not None and nw is not None) else None
             thr = int(g[7]); act = g[9]; dn = int(g[11]); fdn = int(g[14])
+            fu = int(g[16]) if len(g) > 17 and g[16] is not None else None
+            fno = int(g[17]) if len(g) > 17 and g[17] is not None else None
+            cuts = fdn + (fu or 0) + (fno or 0)
             if act == "W DOL" and (dl is None or dl <= thr):
                 bad.append(f"{d} {mk}: W DOL przy dW {dl} <= prog {thr}")
-            if act == "W DOL" and dn != fdn:
+            if fu is not None:
+                tot[0] += fdn; tot[1] += fu; tot[2] += fno
+                if act == "W DOL" and dn != cuts:
+                    bad.append(f"{d} {mk}: w dol {dn} != kopalnie miast pelnych {fdn} + bez miasta targowego {fu} + bez 287 {fno} (ciecie przy miescie bez nadmiaru)")
+                if fno > 0 and mk in f287.get(d, set()):
+                    bad.append(f"{d} {mk}: w dol bez reguly 287 {fno}, a regula 287 wlaczona")
+            elif act == "W DOL" and dn != fdn:
                 bad.append(f"{d} {mk}: w dol {dn} != kopalnie miast pelnych w dol {fdn}")
-            if act != "W DOL" and fdn > 0:
-                bad.append(f"{d} {mk}: kopalnie w dol {fdn} przy {act}")
+            if act != "W DOL" and cuts > 0:
+                bad.append(f"{d} {mk}: kopalnie w dol {cuts} przy {act}")
+            # Z297-21: tydzien PELNY ponad prog bez zadnego ciecia
+            if dl is not None and dl > thr and cuts == 0:
+                run[mk] = run.get(mk, 0) + 1
+                best[mk] = max(best.get(mk, 0), run[mk])
+            else:
+                run[mk] = 0
     rep.add("Z297-19: krok 290 przy PELNYM (294c F) - w dol tylko przy dW > prog i tylko kopalnie miast pelnych",
-            f"segmentow 294c {nseg}, krokow PELNY z kluczem {nf}, niezgodnych {len(bad)}" + (f" {bad[:3]}" if bad else ""), "0",
+            f"segmentow 294c {nseg}, krokow PELNY z kluczem {nf}, niezgodnych {len(bad)}" + (f" {bad[:3]}" if bad else "")
+            + f"; w dol razem: miast pelnych {tot[0]}, bez znanego miasta targowego {tot[1]}, bez reguly 287 {tot[2]}", "0",
             (not bad) if nseg else None)
+    mx = max(best.values()) if best else 0
+    rep.add("Z297-21: krok 290 - najdluzsza seria tygodni PELNY, dW > prog, 0 kopalni w dol (294c F bez hamulca)",
+            f"{mx} ({', '.join(f'{k} {v}' for k, v in sorted(best.items())) or '-'})", f"<= {ZELAZO297C_HOLDRUN}",
+            (mx <= ZELAZO297C_HOLDRUN) if nf else None)
     r20 = [ru[d][0] for d in sorted(ru)[-10:] if ru[d][0] is not None]
     v20 = sum(r20) / len(r20) if r20 else None
     rep.add("Z297-20: stosunek ceny rudy miasta bez rudy / zrodla (282, ostatnie 10 dob) (INFO)", f"srednio {v20:.2f}" if v20 is not None else "brak",
@@ -80895,6 +80963,33 @@ def z297c_selftest():
                                                        sdays=9, unl=61, meas=38, uout=59).replace(" | swiat lupy", "; 294c: prog rudy = max(sprzedaz EMA 41.3, zuzycie miast z "
                                                                                                     "brakiem 30.0) x 10 = 413 (klucz TAK, bramka czynna) | swiat lupy", 1)):
         return "RU282_RE z segmentem 294c"
+    sw = H290_SEG.format(p=9000, n=9100, dl=" (+100)", v=1500, wp=700, c=40, thr=90, lv="PELNY", act="W DOL", u=0, dn=30, h=12)
+    se = H290_SEG.format(p=4000, n=4200, dl=" (+200)", v=500, wp=200, c=9, thr=56, lv="PELNY", act="W DOL", u=0, dn=0, h=200)
+    seg = "; 294c: PELNY w dol tylko przy dW > prog TAK, kopalnie miast pelnych w dol {a}, trzymane (miasto bez nadmiaru) 4, w dol bez znanego miasta targowego {b}, w dol bez reguly 287 {c}"
+    x = z290_f5_line("PELNY (w dol)", sw + seg.format(a=20, b=10, c=0), se + seg.format(a=0, b=0, c=0))
+    gg = [g.groups() for g in H290_F5.finditer(x)]
+    if len(gg) != 2 or gg[0][14] != "20" or gg[0][16] != "10" or gg[0][17] != "0" or h290_sum(x) != 30 + 12 + 200:
+        return f"segment 294c z kublami: {gg}"
+    if not NRU_W.match(x) or len(RU282_F5.findall(x)) != 2 or len(list(H285_F5.finditer(x))) != 2 or h287_hold(x) != 0:
+        return "linia f5 z kublami 294c wobec NRU_W / RU282_F5 / H285_F5 / H287_F5"
+    def z19(xs):
+        C = {"ru": {}, "seg": {}, "kore": {}, "coal": {}, "f5": {}, "f5_287": {}}
+        for i, xx in enumerate(xs):
+            C["f5"][109000 + 7 * i] = [g.groups() for g in H290_F5.finditer(xx)]
+            C["f5_287"][109000 + 7 * i] = {g.group(1) for g in H287_F5.finditer(xx)}
+        r = Report()
+        z297c_rows(r, C)
+        return {q[0].split(":")[0]: q[3] for q in r.rows}
+    v = z19([x])
+    if v.get("Z297-19") != "TAK" or v.get("Z297-21") != "TAK":
+        return f"Z297-19/21 dobry krok: {v}"
+    if z19([z290_f5_line("PELNY (w dol)", sw + seg.format(a=20, b=0, c=0), se + seg.format(a=0, b=0, c=0))]).get("Z297-19") != "NIE":
+        return "Z297-19 nie wykrywa ciecia poza kublami (miasto bez nadmiaru)"
+    if z19([z290_f5_line("PELNY (w dol)", sw + seg.format(a=20, b=0, c=10), se + seg.format(a=0, b=0, c=0))]).get("Z297-19") != "NIE":
+        return "Z297-19 nie wykrywa ciecia 'bez reguly 287' przy wlaczonej 287"
+    held = sw.replace("w dol 30", "w dol 0") + seg.format(a=0, b=0, c=0)
+    if z19([z290_f5_line("PELNY (w dol)", held, se + seg.format(a=0, b=0, c=0))] * 3).get("Z297-21") != "NIE":
+        return "Z297-21 nie wykrywa 3 tygodni PELNY bez ciecia"
     b = ZELAZO297C_NOCOAL_RE.search("kopalnia bez wegla 28.9 lup (model ponad drewno w dymarce)")
     if not b or b.group(1) != "28.9":
         return "kopalnia bez wegla"
@@ -80929,7 +81024,18 @@ def zelazo297b_rows(rep, D):
 
 
 # ---- ruda282: RU282-10 (294c G) prog przeplywu rudy >= zuzycie miast z brakiem x 10
+# RU282-11 INFO (recenzja 294c): G przy CaravanBulkFlowGateAll otwiera bramke takze surowcom innym niz ruda (drewno, skory, len, plotno, welna) - juki na koniec wobec
+#          poczatku i wobec progu przeplywu (282 'na sucho'); surowce ponad max(poczatek, prog) wypisane
+RU282C_DRY = re.compile(r"([a-z]+(?: [a-z]+)?) w jukach (\d+) / sprzedaz ([\d.]+)/d / prog przeplywu (\d+) / dawny (\d+) -> (KUPNO STOI|CZYNNE)")
 _ru282_collect_prev = ru282_collect
+
+
+def ru282_dry(s):
+    i = s.find("na sucho (282)")
+    if i < 0:
+        return None
+    j = s.find(" | ", i)
+    return {m.group(1): (int(m.group(2)), float(m.group(3)), int(m.group(4))) for m in RU282C_DRY.finditer(s[i:j if j > 0 else len(s)])}
 
 
 def ru282_collect(logp):
@@ -80938,6 +81044,20 @@ def ru282_collect(logp):
         D["c294"] = z297c_collect(logp)["seg"]
     except Exception:
         D["c294"] = {}
+    first = last = None
+    try:
+        with open(logp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if "Ruda przeplyw (282): dzien " not in ln or "na sucho (282)" not in ln:
+                    continue
+                x = ru282_dry(ln)
+                if x:
+                    if first is None:
+                        first = x
+                    last = x
+    except Exception:
+        pass
+    D["dry294"] = (first, last)
     return D
 
 
@@ -80950,6 +81070,7 @@ def ru282_rows(rep, D):
     on = [d for d in sorted(seg) if seg[d][4] == "TAK"]
     if not on:
         rep.add("RU282-10: prog przeplywu rudy >= zuzycie miast z brakiem x dni (294c G)", f"dob z segmentem 294c {len(seg)}, z kluczem TAK 0", "INFO (klucz NIE albo log sprzed 294c)", None)
+        ru282c_dry_row(rep, D)
         return
     bad = []
     for d in on:
@@ -80960,6 +81081,46 @@ def ru282_rows(rep, D):
     rep.add("RU282-10: prog przeplywu rudy >= zuzycie miast z brakiem x dni (294c G)",
             f"dob {len(on)}, niezgodnych {len(bad)}" + (f" {bad[:3]}" if bad else "") + f"; ostatnia doba: sprzedaz EMA {last[0]}, zuzycie miast z brakiem {last[1]}, prog {last[3]}",
             "prog = max(sprzedaz, zuzycie miast z brakiem) x dni (+-1) i = prog przeplywu linii", not bad)
+    ru282c_dry_row(rep, D)
+
+
+def ru282c_dry_row(rep, D):
+    first, last = D.get("dry294") or (None, None)
+    if not first or not last:
+        rep.add("RU282-11: surowce poza ruda w jukach wobec progu przeplywu (294c G, INFO)", "brak segmentu 'na sucho (282)'", "INFO", None)
+        return
+    parts, over = [], []
+    for k in sorted(last):
+        a0 = first.get(k, (0, 0.0, 0))[0]; n, _sold, gate = last[k]
+        parts.append(f"{k} {a0} -> {n} (prog {gate})")
+        if n > max(a0, gate):
+            over.append(k)
+    rep.add("RU282-11: surowce poza ruda w jukach wobec progu przeplywu (294c G, INFO)", "; ".join(parts) + (f" | ponad max(poczatek, prog): {', '.join(over)}" if over else ""),
+            "INFO (juki na koniec <= max(poczatek, prog przeplywu))", None)
+
+
+def ru282c_selftest():
+    s = ZELAZO297C_282SAMPLE.replace("na sucho (282) - ...: drewno w jukach 108", "na sucho (282) - od 284 bramka czynna dla wszystkich surowcow: skory surowe w jukach 72 / "
+                                     "sprzedaz 4.7/d / prog przeplywu 47 / dawny 12048 -> KUPNO STOI, rozladunek 0, drewno w jukach 108")
+    x = ru282_dry(s)
+    if not x or x.get("skory surowe") != (72, 4.7, 47) or x.get("drewno") != (108, 2.8, 28) or len(x) != 2:
+        return f"282 'na sucho': {x}"
+    r = Report()
+    ru282c_dry_row(r, {"dry294": ({"drewno": (50, 1.0, 10)}, {"drewno": (108, 2.8, 28)})})
+    if "ponad max(poczatek, prog): drewno" not in r.rows[0][1] or r.rows[0][3] != "INFO":
+        return f"RU282-11: {r.rows}"
+    return None
+
+
+_ru282_selftest_prev = ru282_selftest
+
+
+def ru282_selftest(*a, **k):
+    r = _ru282_selftest_prev(*a, **k)
+    q = ru282c_selftest()
+    if q:
+        return "; ".join(x for x in (r if isinstance(r, str) else None, "294c RU282-11: " + q) if x)
+    return r
 
 
 # ---- karawany259: K259-11 (294c) udzial karawan rodow z wyplata 259 nie spada

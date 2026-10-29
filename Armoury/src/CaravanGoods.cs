@@ -631,8 +631,10 @@ namespace Armoury
         /// 294c (CaravanRoute294c, klucz CaravanRouteBySale): najnizsza cena PO MYCIE miasta st, za ktora karawana sprzeda sztuke towaru it teraz - te same progi co T1
         /// (CaravanGoods.Sell) i sprzedaz BK / gry (CaravanTrade284.SellGuardPrefix): bez wyjscia na stracie - koszt sztuki; jedzenie psujace sie > 7 dob - granica psucia
         /// 294 (SpoilFloor), stary towar > 30 dob bez rynku - prog przesytu 286b (AgedGlutFloor) albo miasta drozszego 294b (DepthAgedFloor); wyjscia na stracie porcjami
-        /// (ponad udzwig, reszta reguly 4/5) - 0.60 x wartosci (S1 PortionStop), rozwiazanie i brak na zold - 0.40 x wartosci (gabka T1); surowiec masowy z kosztem
-        /// z oszacowania - 0 (CaravanBulk.Sell bez progu). Sam odczyt: AgeMarket bez licznikow, stan werdyktu AgeDepth* przywrocony. 0 - brak towaru albo progu.
+        /// (ponad udzwig, reszta reguly 4/5) - 0.60 x wartosci (S1 PortionStop), rozwiazanie i brak na zold - 0.40 x wartosci (gabka T1). Surowiec masowy - ten sam prog
+        /// co CaravanBulk.Sell: koszt sztuki tylko przy kluczu CaravanBkSellAtCost, koszcie z ksiegi (nie z oszacowania) i bez wyjscia na stracie (LossReason 0), inaczej 0
+        /// (recenzja 294c). Towar T1 - progi T1 niezaleznie od klucza CaravanBkSellAtCost (T1 stosuje je zawsze). Sam odczyt: AgeMarket bez licznikow, stan werdyktu
+        /// AgeDepth* przywrocony. 0 - brak towaru albo progu.
         /// </summary>
         internal static double SaleFloor(MobileParty mp, ItemObject it, Settlement st)
         {
@@ -657,6 +659,11 @@ namespace Armoury
             }
             finally { AgeDepthNo = dNo0; AgeOldWait = dOld0; AgeDepthNet = dNet0; }
             int why = LossWhy(mp.IsDisbanding, cash, full, CaravanMarket294.Spoils(it), age, market);
+            if (CaravanBulk.Owns(it))
+            {
+                var sB = Settings.Current;
+                return sB != null && sB.CaravanBkSellAtCost && why == 0 ? unit : 0.0;   // recenzja 294c: CaravanBulk.Sell - prog kosztu tylko przy kluczu i LossReason 0
+            }
             if (why == 0) return unit;
             if (why <= 2) return GabkaFloor * value * keep;
             double fl = LossFloor * value * keep;

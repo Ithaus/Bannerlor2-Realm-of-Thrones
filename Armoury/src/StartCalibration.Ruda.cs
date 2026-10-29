@@ -219,6 +219,8 @@ namespace Armoury
             // BRAK i PASMO bez zmian. Tylko podzial rak bloku; klucz NIE - co do bitu jak 290.
             bool fCutOn = flowOn && sR.KsIronWorldFlowOwnTownCut;
             var fDn = new int[2]; var fHold = new int[2];
+            // recenzja 294c: ciecia przy PELNYM w osobnych kublach - kopalnie miast pelnych (fDn), bez znanego miasta targowego (fDnU), regula 287 wylaczona (fDnN)
+            var fDnU = new int[2]; var fDnN = new int[2];
             if (flowOn)
             {
                 try
@@ -313,7 +315,11 @@ namespace Armoury
                                     {
                                         if (bandOn && locShort) h290[m]++;
                                         else if (fCutOn && lv[m] == -1 && fullOwnOn && mtKnown && !locFull) { h290[m]++; fHold[m]++; }   // 294c (F): PELNY - miasto bez nadmiaru trzyma
-                                        else { f = F5Down; d290[m]++; if (fCutOn && lv[m] == -1) fDn[m]++; }
+                                        else
+                                        {
+                                            f = F5Down; d290[m]++;
+                                            if (fCutOn && lv[m] == -1) { if (!fullOwnOn) fDnN[m]++; else if (!mtKnown) fDnU[m]++; else fDn[m]++; }
+                                        }
                                     }
                                     else if (act[m] == 1)
                                     {
@@ -411,7 +417,8 @@ namespace Armoury
                       .Append(", ruch ").Append(act[m] == 1 ? "W GORE" : act[m] == -1 ? "W DOL" : act[m] == 0 ? "TRZYMANE" : act[m] == 3 ? "BEZ POMIARU (trzymane)" : "REGULY 282-287")
                       .Append(", w gore ").Append(u290[m]).Append(", w dol ").Append(d290[m]).Append(", trzymane ").Append(h290[m])
                       .Append("; 294c: PELNY w dol tylko przy dW > prog ").Append(fCutOn ? "TAK" : "NIE").Append(", kopalnie miast pelnych w dol ").Append(fDn[m])
-                      .Append(", trzymane (miasto bez nadmiaru) ").Append(fHold[m]);
+                      .Append(", trzymane (miasto bez nadmiaru) ").Append(fHold[m]).Append(", w dol bez znanego miasta targowego ").Append(fDnU[m])
+                      .Append(", w dol bez reguly 287 ").Append(fDnN[m]);
             }
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
               .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(Bloomery.F7On ? " (w tym przez rece weglarzy f7-wegiel " + nColl + ")" : "").Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)
