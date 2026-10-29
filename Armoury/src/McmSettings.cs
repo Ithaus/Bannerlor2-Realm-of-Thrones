@@ -9638,11 +9638,23 @@ namespace Armoury
 
         [SettingPropertyBool("Losing Caravans Are Wound Up", HintText = "a merchant or lord does not keep a caravan that does not earn its wages: when an AI caravan watched for at least 28 days has made less from trade (sales minus tolls minus what the goods cost) than its wages for 14 days in a row, its owner stops buying new goods and the caravan sells off what it carries in the next towns at the usual prices; once little is left (or after 28 days) it is wound up in a town - the rest of its goods are sold to the town, its coin goes to the owner, its men go home. Your clan's caravans, caravans led by a hero, quest caravans, troop convoys and ships are never wound up. The record of each caravan's trade is kept in the save. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans pay their way, food that keeps does not spoil (294)")]
-        public bool CaravanLosingWoundUp { get; set; } = true;
+        public bool CaravanLosingWoundUp { get; set; } = false;
 
         [SettingPropertyBool("New Caravans Only When Trade Pays", HintText = "a merchant or a Banner Kings lord sends out a new caravan only while at least 6 in 10 caravans earn their wages after it is added (a new caravan has not proven anything yet); an owner whose caravan was wound up waits 28 days. Until half the caravans have a trade record (a new game, or a save from before this option) caravans start as before. The coin stays with the merchant or lord. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans pay their way, food that keeps does not spoil (294)")]
-        public bool CaravanEntryWhenTradePays { get; set; } = true;
+        public bool CaravanEntryWhenTradePays { get; set; } = false;
+
+        [SettingPropertyBool("Caravans Price The Unit The Market Will Take", HintText = "with Caravans Buy Only With Reachable Profit: a caravan buys a good only if the unit it would bring still sells for at least 3% more than it pays here in a typical dearer town - priced after the shelf there fills up with what this caravan and its share of all other caravans' stock of that good would put on it, less what that town eats while the caravan is on the road (the same price drop the game applies unit by unit). The same price tells a caravan whether goods older than 30 days are worth carrying further; if not, they are sold off in portions as before. Off = as before (buy and wait by the dearer towns' price index alone)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans trade what the market will take (294b)")]
+        public bool CaravanBuyByMarketDepth { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Food Gate Counts Trade Stock Only", HintText = "with Caravans Buy Food By Their Own Sales: the food a caravan keeps for its own escort (about ten days of rations, which it never sells) is not counted as food waiting to be sold, so caravans can buy food to trade again; food that spoils is held to a week of sales (at least what one average town buys a day), food that keeps (grain, cheese, olives, beer, honey...) is treated like any other goods. Off = as before (the escort's rations block food buying)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans trade what the market will take (294b)")]
+        public bool CaravanFoodGateTradeStock { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Road Food For The Measured Leg", HintText = "with Caravan Road Food: a caravan leaving a town buys food for the longer of the straight-line trip to its next stop and the average leg caravans really take between towns (caravans of the world divided by town departures, last 7 days); with no known next stop it buys for that average leg. Off = as before (straight-line trip, or to the nearest town)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans trade what the market will take (294b)")]
+        public bool CaravanRoadFoodMeasuredLeg { get; set; } = true;
 
         [SettingPropertyBool("Ks Food Hands Follow Market", HintText = "under the start calibration, from 49 days after the end of its supply ramp: once a week the hands of a village part follow the food of the whole market (Westeros or Essos) - a work whose food the market's stalls lack today (below half of the stock they should hold, even counting food on the merchants' carts) takes up to 5% more hands, a work whose food lies on the stalls at more than twice that stock gives up to 5%, the other works of the same land give or take the difference; salt pits, sea salt and date groves get 5% more or fewer hands the same way. Hands move only between works the part's land allows, never more than 5% of a work's hands a week; no gold is paid or made. In winter the hands stay where they are (a winter shortage is the season, not the market). The 28-day price rule of salt and dates stops then (one rule). Only while the work-switch rule is off (Start Calibration Switch Rule, Ks Switch Signal Rule): with it on, that rule alone moves the works. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
@@ -12786,6 +12798,9 @@ namespace Armoury
             s.CaravanFoodKeepsByKind = CaravanFoodKeepsByKind;
             s.CaravanLosingWoundUp = CaravanLosingWoundUp;
             s.CaravanEntryWhenTradePays = CaravanEntryWhenTradePays;
+            s.CaravanBuyByMarketDepth = CaravanBuyByMarketDepth;
+            s.CaravanFoodGateTradeStock = CaravanFoodGateTradeStock;
+            s.CaravanRoadFoodMeasuredLeg = CaravanRoadFoodMeasuredLeg;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.BloomeryColliers = BloomeryColliers;

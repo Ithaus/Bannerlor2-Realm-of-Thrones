@@ -48,7 +48,7 @@ namespace Armoury
 
         // liczniki od ostatniej linii doby (zakupy przy wyjezdzie i jedzenie doby)
         private static int _dDep, _dEnough, _dBuyCar, _dNoGoods, _dNoPurse, _dSkipConvoy;
-        private static long _dBought, _dGold, _dWantUnits, _dRoadDays;
+        private static long _dBought, _dGold, _dWantUnits, _dRoadDays, _dStraight;   // 294b: _dStraight - dni drogi wedlug samej prostej (bez pomiaru odcinka)
         private static readonly HashSet<Settlement> _dTowns = new HashSet<Settlement>();
         private static int _stumbles, _sessStumbles;
         private static bool _err;
@@ -57,7 +57,7 @@ namespace Armoury
         {
             _owed.Clear(); _gone.Clear(); _dTowns.Clear();
             _dDep = _dEnough = _dBuyCar = _dNoGoods = _dNoPurse = _dSkipConvoy = 0;
-            _dBought = _dGold = _dWantUnits = _dRoadDays = 0;
+            _dBought = _dGold = _dWantUnits = _dRoadDays = _dStraight = 0;
             _stumbles = _sessStumbles = 0; _err = false;
         }
 
@@ -91,8 +91,9 @@ namespace Armoury
                 if (Measure31.IsDteConvoy(mp)) { _dSkipConvoy++; return; }
                 var s = Settings.Current;
                 _dDep++;
-                int days = RoadDays(mp, st, s);
-                _dRoadDays += days;
+                int straight;
+                int days = RoadDays(mp, st, s, out straight);
+                _dRoadDays += days; _dStraight += straight;
                 float need = Need(mp);
                 int want = (int)Math.Ceiling(need * days) - BandFood.FoodUnits(mp.ItemRoster);
                 if (want <= 0) { _dEnough++; return; }
@@ -107,14 +108,17 @@ namespace Armoury
         }
 
         /// <summary>Dni drogi do celu: prosta odleglosc miasto - cel / dzien drogi taboru (MarketCarts.PerDay), w gore; bez celu (albo cel = to miasto) - do
-        /// najblizszego innego miasta. Najmniej 1.</summary>
-        private static int RoadDays(MobileParty mp, Settlement st, Settings s)
+        /// najblizszego innego miasta. Najmniej 1. 294b (klucz CaravanRoadFoodMeasuredLeg): nie mniej niz zmierzony odcinek karawan (Stage8World.LegDays - karawany
+        /// AI swiata / wyjazdy z miast, 7 dob; 296a: 4.2-4.4 doby przy prostej 3.3-3.5), bez celu - zmierzony odcinek zamiast najblizszego miasta; bez pomiaru
+        /// (pierwsza doba sesji) - jak 288. straight - dni wedlug samej prostej (linia doby).</summary>
+        private static int RoadDays(MobileParty mp, Settlement st, Settings s, out int straight)
         {
             double perDay = Math.Max(1.0, MarketCarts.PerDay(s));
             Vec2 from = st.GetPosition2D;
             float dist = -1f;
             var tg = mp.TargetSettlement;
-            if (tg != null && tg != st) dist = from.Distance(tg.GetPosition2D);
+            bool target = tg != null && tg != st;
+            if (target) dist = from.Distance(tg.GetPosition2D);
             else
             {
                 float best = float.MaxValue;
@@ -127,8 +131,11 @@ namespace Armoury
                 }
                 if (best < float.MaxValue) dist = best;
             }
-            if (dist <= 0f) return 1;
-            return Math.Max(1, (int)Math.Ceiling(dist / perDay));
+            straight = dist <= 0f ? 1 : Math.Max(1, (int)Math.Ceiling(dist / perDay));
+            double leg = s != null && s.CaravanRoadFoodMeasuredLeg ? Stage8World.LegDays : 0.0;
+            if (!(leg > 0.0) || double.IsInfinity(leg)) return straight;
+            int legD = Math.Max(1, (int)Math.Ceiling(Math.Min(60.0, leg)));
+            return target ? Math.Max(straight, legD) : legD;
         }
 
         /// <summary>Zakup z polki miasta: najtansza zywnosc (wartosc), sztuka po sztuce po cenie targu dla tej karawany, za kiese karawany -> kasa miasta.
@@ -260,13 +267,15 @@ namespace Armoury
               .Append("; potrzeba ").Append(needSum.ToString("0.0", Inv)).Append(" szt., zjedzone ").Append(eaten).Append(", najedzone ").Append(fed).Append(", glodne ").Append(hungry)
               .Append(" (brak ").Append(lack).Append(" szt., bez jedzenia ").Append(empty).Append("), zywnosc w jukach po jedzeniu ").Append(stock)
               .Append(" | zapas na droge przy wyjezdzie: wyjazdow ").Append(_dDep).Append(" (dni drogi srednio ").Append(_dDep > 0 ? ((double)_dRoadDays / _dDep).ToString("0.0", Inv) : "-")
+              .Append(", prosta ").Append(_dDep > 0 ? ((double)_dStraight / _dDep).ToString("0.0", Inv) : "-")                                     // 294b
+              .Append(", zmierzona ").Append(Stage8World.LegDays > 0.0 ? Stage8World.LegDays.ToString("0.0", Inv) : "-")
               .Append("), z zapasem w jukach ").Append(_dEnough).Append(", kupilo ").Append(_dBuyCar).Append(" karawan ").Append(_dBought).Append(" z ").Append(_dWantUnits)
               .Append(" szt. za ").Append(_dGold).Append(" zl z kies karawan do kas ").Append(_dTowns.Count).Append(" miast, bez towaru ").Append(_dNoGoods).Append(", bez kiesy ").Append(_dNoPurse)
               .Append(", konwoje DTE ").Append(_dSkipConvoy)
               .Append(" | potkniecia ").Append(_stumbles).Append(" (zold 288 ").Append(MountedWage.CarStumbles).Append("), w sesji ").Append(_sessStumbles);
             Log.Info(sb.ToString());
             _dDep = _dEnough = _dBuyCar = _dNoGoods = _dNoPurse = _dSkipConvoy = 0;
-            _dBought = _dGold = _dWantUnits = _dRoadDays = 0;
+            _dBought = _dGold = _dWantUnits = _dRoadDays = _dStraight = 0;
             _dTowns.Clear();
             _stumbles = 0;
         }

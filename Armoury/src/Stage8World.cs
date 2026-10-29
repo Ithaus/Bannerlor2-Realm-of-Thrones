@@ -119,7 +119,7 @@ namespace Armoury
             ClearUnder();
             _itemsSought = false; _sheep = _wool = _meat = null;
             ClearSheep();
-            _carIn.Clear(); ClearCaravans();
+            _carIn.Clear(); ClearCaravans(); ResetLeg();
             _mcClan = null; ClearMerc();
             ClearBk();
             ClearOrders();
@@ -393,6 +393,31 @@ namespace Armoury
             catch (Exception e) { Stumble("OnLeft", e); }
         }
 
+        // 294b: zmierzony odcinek karawany miedzy miastami - karawany AI swiata / wyjazdy z miast (takze bez wjazdu w pamieci), suma ostatnich LegRing dob
+        // (jedna doba waha sie 83-141 wyjazdow - 2.8-4.8 doby; 296a 109100-109109: 4.2 doby). 0 - bez pomiaru (pierwsza doba sesji, Stage8WorldLog NIE).
+        private const int LegRing = 7;
+        private static readonly int[] _legW = new int[LegRing], _legX = new int[LegRing];
+        private static int _legN, _legI;
+
+        /// <summary>294b: srednia dlugosc odcinka karawany AI w dobach (karawany swiata / wyjazdy z miast, ostatnie 7 dob); 0 - jeszcze bez pomiaru.</summary>
+        internal static double LegDays { get; private set; }
+
+        /// <summary>294b: doby pomiaru w LegDays (0..7).</summary>
+        internal static int LegSamples { get { return _legN; } }
+
+        private static void NoteLeg(int world, int exits)
+        {
+            if (world <= 0 || exits <= 0) return;
+            _legW[_legI] = world; _legX[_legI] = exits;
+            _legI = (_legI + 1) % LegRing;
+            if (_legN < LegRing) _legN++;
+            long w = 0, x = 0;
+            for (int i = 0; i < _legN; i++) { w += _legW[i]; x += _legX[i]; }
+            LegDays = x > 0 ? w / (double)x : 0.0;
+        }
+
+        private static void ResetLeg() { Array.Clear(_legW, 0, LegRing); Array.Clear(_legX, 0, LegRing); _legN = _legI = 0; LegDays = 0.0; }
+
         private static void CaravanLine(int day)
         {
             try
@@ -421,6 +446,7 @@ namespace Armoury
                         if (at != null && at.IsTown) inTown++;
                     }
                 int left = _stays.Count;
+                NoteLeg(world, left + _carLeaveUnknown);   // 294b: zmierzony odcinek karawan (jedzenie na droge 288, kolejka glebokosci rynku)
                 string mean = "-", med = "-", p90 = "-", top = "-";
                 if (left > 0)
                 {
