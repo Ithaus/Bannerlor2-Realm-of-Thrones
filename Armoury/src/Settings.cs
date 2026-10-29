@@ -4402,6 +4402,22 @@ namespace Armoury
         // Recenzja 295: tez orszaki majatkow BK (Estate.Tick +1/d, CreateRetinue, TakeRetinue do partii pana) i Castle Retinue zamkow (TickCastle +1 elitarny/d).
         // Nowy klucz (plik MCM Jeffa go nie ma).
         public bool BkRetinueFromVillage = true;            // with People Origin and Levy From Villages: Banner Kings retinues are made of real people - the retinue of a village manor, the retinue of an estate and the Castle Retinue of a castle garrison: a man who joins (and every man of a newly raised retinue) leaves the people of the retinue's village (a castle: its villages), and if they have no one to spare he does not join; a man a manor retinue sends away goes back home instead of vanishing; when an estate's lord calls up his retinue, its men keep their origin in his party. The retinues' sizes and their one-man-a-day pace stay as Banner Kings sets them. Off = as before (retinue men appear from nothing and vanish)
+        // --- Winter spares mines and timber felling (297) ---
+        // Paczka 297 (29.10, Jeff "sprobuj to" o zelazie swiata i "napraw pozostale bledy i pusc test 90"). Autotest 137a (136 + 290, 90 dob 109077-109166 na kopii
+        // zapisu Jeffa): przed zima (109079-109140, 62 doby) zelazo swiata 9320 -> 9110 (-3.4/d, wydobycie 347 / zuzycie 356 lup/d) - krok 290 trzyma wydobycie
+        // za zuzyciem; od zimy 109141 model kopalni 365 -> 227 lup/d w 9 dobach (WinterBite tnie KAZDY towar wsi: 48.6% reszta, 15.7% cieple), wydobycie 228
+        // przy zuzyciu 338 - zelazo swiata -105.6/d, miasta bez rudy do 22. Ta sama zima tnie drewno wyrebu (wsie 3660 -> 2067 ladunkow/d, drewno swiata -570/d).
+        // Zima mowi "wioski nie rodza" - tnie plon pola i stada; ruda z kopalni i wyrab lasu to praca rak, nie plon (zima to pora wyrebu i wozenia saniami).
+        // WinterBite.cs, StartCalibration.Live.cs (ComputeDistrict), StartCalibration.Zima297.cs, VillageCrafts.cs, DistrictWorks.cs. Nowy klucz (plik MCM Jeffa go nie ma).
+        public bool WinterSparesMinesAndFelling = true;     // winter cuts what grows, not what is dug or felled: iron ore, silver ore and gold ore from the mines and hardwood from the woodcutters keep their output through the winter (in villages under the start calibration, in villages under the game's rules and in side-village works alike) - the mine and the forest are worked by hands, and winter was the season for felling timber and hauling it by sledge. Crops, fruit, herds, fish, salt pans, clay pits and quarries are cut by winter as before. Off = as before (winter cuts every village good)
+
+        // --- Village carts ride out with the village militia past roaming bands (297b) ---
+        // Paczka 297b (29.10, ta sama prosba Jeffa). Autotest 137a: zatkane wsie (zapas >= 1.5 W - gra nie wola TickGoodProduction) 40-75 z 571, z nich 24-56 z wozem
+        // "w domu, gotowy do wyjazdu" srednio 20-40 dob od wyjazdu (max rosnie 1 doba na dobe) - to wsie wstrzymane przez m107 K1 (Village Cart Flee Unload): 30-55 wsi,
+        // 13-23 ponad 30 dob, wrog w 51 z 51 przykladow to Broken Men (wynik ucieczki 3-11), bandy z domem w tej wsi kraza wokol niej, wiec woz nigdy nie wyjezdza;
+        // kopalnie zelaza zatkane 1-4 z 26 (Tylemos w domu 60 dob), model 365 wobec wydobycia ok. 340 lup/d. CartEscort297.cs, CartGuard.cs (HoldCheck, Home).
+        // Nowy klucz (plik MCM Jeffa go nie ma).
+        public bool VillageCartMilitiaEscort = true;        // with Village Cart Flee Unload: when bands roam around a village so that its cart would only flee back in, the village sends men of its own militia with the cart (the same men, in the militia's own mix of troops) - just as many men as the game's own judgement of danger needs so the cart no longer flees and is at least as strong as the band - and the cart takes its goods to market; the militia men ride the whole journey and go back into the village militia when the cart is home and no longer needs them (the wounded come back wounded; men killed or taken on the road are lost, as any militia). With too few militia the village waits as before. No men are made: the same men leave the militia and come back. Off = as before (the village waits until the bands move off)
 
         // --- Food follows the market under the start calibration (night 18.10) ---
         // Paczka f20-d4 (decyzja Jeffa 18.10 "4. b"): po D+49 (koniec sterowania rynku) podaz jedzenia i soli pod KS nie szla za cena - A7 wylaczona, Plan rusza tylko

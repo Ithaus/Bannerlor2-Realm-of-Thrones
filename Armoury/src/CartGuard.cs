@@ -83,10 +83,14 @@ namespace Armoury
         /// <summary>K1 dziala przy wlaczonym strazniku (Home wolany z Guard).</summary>
         internal static bool FleeOn { get { var s = Settings.Current; return s != null && s.VillageCartFleeUnload && s.VillageCartStuckGuard; } }
 
+        /// <summary>297b (linia "Kopalnie rudy (297b)"): doba wstrzymania wsi (m107 K1) albo -1.</summary>
+        internal static int HeldSince(Village v) { int d; return v != null && _fleeHold.TryGetValue(v, out d) ? d : -1; }
+
         internal static void Reset()
         {
             _st.Clear(); _notes.Clear(); _onceDone = false; _errSites.Clear();
             _fleeHold.Clear(); _noCartSince.Clear();
+            CartEscort.Reset();   // 297b: eskorta milicji (pamiec sesji)
             ClearDay();
         }
 
@@ -330,6 +334,7 @@ namespace Armoury
                 // recenzja Z11: wszystkie klucze W2 wylaczone - bez linii doby (kod jak w a7a767e8); liczniki doby tylko zerowane
                 _st.Clear(); _notes.Clear();
                 MarketCarts.TakeM106(); CartRisk.SkipDay(); ClearDay();
+                CartEscort.Daily(day, false, true);   // 297b: eskorty w domu wracaja do milicji (tylko gdy jakies sa), bez linii doby (recenzja 297b: jak reszta tej drogi)
                 return;
             }
             var ex7 = new List<string>();
@@ -379,6 +384,7 @@ namespace Armoury
             foreach (var l in ex7) Log.Info(l);   // m107 K1: przyklady wstrzymanych i bez wozu (co 5 dob, najwyzej 3 i 3)
             _ex7 = null;
             ClearDay();
+            CartEscort.Daily(day, on, false);     // 297b: ksiega eskort milicji i linie "Eskorta wozow (297b)", "Kopalnie rudy (297b)"
         }
 
         /// <summary>m107 K1: raz na dobe kazda wstrzymana wies - woz brak / nie w domu / nieczynny - zdjecie; inaczej zagrozenie wedlug modelu AI gry (to samo zapytanie, ktore gra
@@ -403,6 +409,8 @@ namespace Armoury
                     try { model.GetBestInitiativeBehavior(cart, out b, out foe, out sc, out av); threat = sc > 1f && MobileParty.IsFleeBehavior(b); }
                     catch (Exception e) { Stumble("CartGuard.HoldCheck(model)", e); threat = false; b = AiBehavior.None; foe = null; sc = 0f; }
                     if (!threat) { free.Add(v); continue; }
+                    // 297b: zagrozenie trwa, magazyn >= W - eskorta milicji wsi (CartEscort); dostala albo zagrozenia juz nie ma - zdjecie wstrzymania (gra laduje i wysyla woz)
+                    if (CartEscort.HoldStep(cart, v, model)) { free.Add(v); continue; }
                     _fuStill++;
                     int since = today - kv.Value;
                     if (since > LongDays) _fuLong++;
@@ -572,6 +580,9 @@ namespace Armoury
             var tg = cart.TargetSettlement;
             bool order = cart.DefaultBehavior == AiBehavior.GoToSettlement && tg != null && tg != home;
             bool lo = load && order;
+            // 297b: eskorta milicji wsi (CartEscort.HomeStep) - zaladowany woz pod ucieczka dostaje eskorte od razu (bez 3 dob i rozladunku), eskorta wozu bez jukow
+            // liczona od nowa albo wraca do milicji; klucz wylaczony - eskorta w domu wraca do milicji
+            if (CartEscort.HomeStep(cart, v, home, lo)) { ClearHome(st); return; }
             // m107 K1: ucieczka gry trzyma zaladowany woz w domu (cel chwilowy = dom - warunek z H1) - po FleeUnloadDays dobach rozladunek do magazynu tej wsi, rozkaz do domu
             // i wstrzymanie zaladunku (ThinkPrefix) do doby bez zagrozenia (HoldCheck); epizod konczy sie bez krokow 5/10/20. Bez ucieczki - logika jak dotad.
             if (s.VillageCartFleeUnload)

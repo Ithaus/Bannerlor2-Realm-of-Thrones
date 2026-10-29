@@ -193,13 +193,39 @@ namespace Armoury
             catch { }
         }
 
-        /// <summary>Produkcja wioski zima: -50% razy gradient polnocy razy czynnik krainy (E4/1).</summary>
-        public static void VillageProdPostfix(Village village, ref ExplainedNumber __result)
+        // 297 (klucz WinterSparesMinesAndFelling, domyslnie TAK): zima tnie to, co rosnie (plon pola, sadu, stada, polow, warzelnie, glinianki, kamieniolomy),
+        // nie rude z kopalni i drewno z wyrebu. Autotest 137a: od zimy 109141 model kopalni zelaza 365 -> 227 lup/d (ciecie 48.6% reszta, 15.7% cieple) przy
+        // zuzyciu 338/d - zelazo swiata -105.6/d (przed zima -3.4/d); drewno wyrebu wsi 3660 -> 2067 ladunkow/d. Jedna lista towarow dla wszystkich drog produkcji
+        // wsi: KS (StartCalibration.ComputeDistrict), model gry (VillageProdPostfix nizej), dopiski zajec wiosek pobocznych (VillageCrafts). Klucz NIE - jak dotad.
+        private static int _spareGame;                     // 297: wywolania modelu gry (wies poza pelna stawka KS) z towarem bez ciecia zimy - do linii 'Zima - kopalnie i wyrab (297)'
+
+        internal static bool SparesOn { get { var s = Settings.Current; return s != null && s.WinterSparesMinesAndFelling; } }
+
+        /// <summary>297: towar, ktorego zima nie tnie (ruda zelaza, srebra, zlota i drewno wyrebu) - bez klucza (lista).</summary>
+        internal static bool SparedId(string id) { return id == "iron" || id == "silver" || id == "gold_ore" || id == "hardwood"; }
+
+        /// <summary>297: przy kluczu - towar bez ciecia zimy. Nie rzuca.</summary>
+        internal static bool Spares(TaleWorlds.Core.ItemObject item)
+        {
+            try { return item != null && SparesOn && SparedId(item.StringId); }
+            catch { return false; }
+        }
+
+        /// <summary>297: wywolania modelu gry bez ciecia zimy od ostatniego odczytu (zerowane).</summary>
+        internal static int TakeSpareGame() { return System.Threading.Interlocked.Exchange(ref _spareGame, 0); }
+
+        /// <summary>Produkcja wioski zima: -50% razy gradient polnocy razy czynnik krainy (E4/1). 297: bez ciecia rudy z kopalni i drewna wyrebu (klucz).</summary>
+        public static void VillageProdPostfix(Village village, TaleWorlds.Core.ItemObject item, ref ExplainedNumber __result)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !WinterNow() || village == null || village.Settlement == null || __result.ResultNumber <= 0f) return;
+                if (Spares(item))
+                {
+                    if (!StartCalibration.FullFor(village)) System.Threading.Interlocked.Increment(ref _spareGame);
+                    return;
+                }
                 float cut = CutOf(s, village);
                 if (cut > 0f) __result.AddFactor(-cut, _txtWinter);
             }
