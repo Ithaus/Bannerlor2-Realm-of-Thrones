@@ -621,6 +621,31 @@ namespace Armoury
             return _restV[idx];
         }
 
+        /// <summary>292: segment koni linii "Stamina (292)" (BattleWind.StartLine292, glowny watek) - konie bez mnoznika staminy ludzi: pula 0..100, pelny galop
+        /// do zera z GallopToZero (srednia koni z jezdzcem policzonych do teraz i kon gracza, jesli na nim siedzi). Tylko odczyt.</summary>
+        internal static void Note292(System.Text.StringBuilder sb)
+        {
+            var hw = _live;
+            if (hw == null || !hw._on) { sb.Append("konie: - (stamina koni nieczynna w tej misji)"); return; }
+            var c = Settings.Current;
+            float scale = c != null ? Clamp(c.HorseGallopDrainScale, 0.25f, 3f) : 1f;
+            sb.Append("konie: bez mnoznika (x1.00), pula 0-100, z jezdzcem ").Append(_seen)
+              .Append(", pelny galop do zera sr. ").Append(_tN > 0 ? F(_tSum / _tN, "0") + " s" : "-")
+              .Append(" (drenaz galopu x").Append(F(scale, "0.00")).Append(')');
+            Horse p = null;
+            Agent main = null;
+            try { main = hw.Mission != null ? hw.Mission.MainAgent : null; } catch { }
+            if (main != null)
+                foreach (var kv in hw._horses)
+                    if (kv.Value != null && kv.Value.Ex == ExNone && kv.Value.Counted && ReferenceEquals(kv.Value.Rider, main)) { p = kv.Value; break; }
+            if (p != null)
+            {
+                float t = GallopToZero(p, scale);
+                sb.Append(", gracz: kon ").Append(p.Id).Append(", pelny galop do zera ").Append(t < 100000f ? F(t, "0") + " s" : "nigdy");
+            }
+            else sb.Append(", gracz: -");
+        }
+
         /// <summary>MarchToContact: szyk konnicy AI zaczal odpoczywac (licznik linii).</summary>
         internal static void NoteAiRest() { _aiRests++; }
 

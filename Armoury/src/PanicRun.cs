@@ -161,7 +161,13 @@ namespace Armoury
                   .Append(S(_spentMin)).Append(", najdluzej ").Append(S(_spentMax)).Append(')');
             else sb.Append(", sr. czas do wyczerpania -");
             if (_barN > 0)
-                sb.Append(", pasek przy wejsciu sr. ").Append(S(_barSum / _barN * 100f)).Append("%, pelny bieg 127 sr. ").Append(S(_runTSum / _barN)).Append(" s");
+            {
+                // 292 (recenzja): RunSeconds jest juz x mnoznik staminy ludzi - znak K w napisie (przy K = 1 napis jak dotad)
+                float k292 = BattleWind.HumanStaminaMul(c);
+                sb.Append(", pasek przy wejsciu sr. ").Append(S(_barSum / _barN * 100f)).Append("%, pelny bieg 127")
+                  .Append(Math.Abs(k292 - 1f) > 0.001f ? " x" + k292.ToString("0.00", CultureInfo.InvariantCulture) + " (292)" : "")
+                  .Append(" sr. ").Append(S(_runTSum / _barN)).Append(" s");
+            }
             sb.Append("; bez tchu juz przy wejsciu ").Append(_atEntry).Append("; koniec paniki przed wyczerpaniem ").Append(_exitEarly);
             sb.Append(" | czas w panice pieszo ").Append(S(_secs)).Append(" s: na 50% (zadyszka) ").Append(S(_halfSecs)).Append(" s - udzial biegu na 50% ")
               .Append(_secs > 0.01f ? S(_halfSecs / _secs * 100f) + "%" : "-").Append(", strefa 10% ").Append(S(_zoneSecs)).Append(" s, ponizej progu biegu ")

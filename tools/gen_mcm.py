@@ -620,6 +620,8 @@ RANGES = {
     'ChargeRunsFrom': (20.0, 200.0, "0"),
     # 130 krzywa Atletyki 1.0..1.5
     'AthleticsStaminaCurve': (1.0, 1.5, "0.00"),
+    # 292 stamina ludzi x K: 0.5..4 (BattleWind.HumanStaminaMul przycina do tego samego zakresu; 1 = jak dotad)
+    'HumanStaminaMultiplier': (0.5, 4.0, "0.00"),
     # 131 udzwig z Endurance 0..20 kg za punkt
     'EnduranceCarryKgPerPoint': (0.0, 20.0, "0.#"),
     # 136 stamina koni (HorseWind.cs przycina do tych samych zakresow; progi odpoczynku AI w MarchToContact)

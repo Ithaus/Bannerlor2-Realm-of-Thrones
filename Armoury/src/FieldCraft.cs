@@ -55,6 +55,9 @@ namespace Armoury
             public float Ratio = 1f;        // 144: biezacy pasek staminy / max (przy oddechu 137 = pula - F - S) - budzet biegu AiBreath
             public AiBreath.Man Ai;         // 144: stan zasady "AI oszczedza sily" (AiBreath.Step)
             public PanicRun.Man Pr;         // 147: pomiar biegu w panice (linia "Bieg zlamanych (147)") - tworzony przy pierwszej panice
+            public float RunSeconds0 = -1f;  // 292: pelny bieg do zera z reguly 127/203 PRZED mnoznikiem staminy ludzi (pomiar biegu w linii "Bieg (127)")
+            public float Run292Prev = -1f;   // 292: pasek na koniec poprzedniego taktu ciaglego biegu (-1 = poprzedni takt bez biegu)
+            public float Run292Max;          // 292: maxStamina RBM przy Run292Prev (zmiana puli w biegu - takt pominiety)
         }
 
         // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
@@ -78,6 +81,13 @@ namespace Armoury
         private static int _runN, _regenSkipped;
         private static float _runKgSum, _runKgMax, _runTSum, _runTMin = float.MaxValue;
         private static float _plKg = -1f, _plAth, _plT, _plFit;   // paczka 203: _plFit - sprawnosc gracza (linia "Bieg (127)", sprawdz_logi p203 liczy T od nowa)
+        // 292: czas pelnego biegu PO mnozniku staminy ludzi (st.RunSeconds) - linia "Bieg (127)" zostaje przy regule 127/203 (sprawdz_logi p203), K w dopisku
+        private static float _runT292Sum, _plT292;
+        // 292 (recenzja): POMIAR - spadek paska postawy RBM w ciaglym biegu (odczyt co takt: drenaz biegu, koszty RBM, oddech 137) wobec reguly sprzed 292
+        // (krok / RunSeconds0) - sekundy biegu, spadek paska, oczekiwany spadek sprzed 292; ludzie i gracz osobno
+        private static float _m292Sec, _m292Bar, _m292Exp, _m292PlSec, _m292PlBar, _m292PlExp;
+        private bool _k292Said;      // linia "Stamina (292)" juz wypisana w tej misji
+        private float _k292From;     // Mission.CurrentTime z AfterStart
         // Paczka 203: k z paczki 127 - tylko do porownania w linii "Bieg (127)" ("przy 2.25%/kg z 127 bylo X s"); regula liczy z ArmourRunCostPerKgPercent
         private const float ArmourRunCost127 = 2.25f;
 
@@ -91,6 +101,8 @@ namespace Armoury
             _runN = 0; _regenSkipped = 0;
             _runKgSum = 0f; _runKgMax = 0f; _runTSum = 0f; _runTMin = float.MaxValue;
             _plKg = -1f; _plAth = 0f; _plT = 0f; _plFit = 0f;
+            _runT292Sum = 0f; _plT292 = 0f;
+            _m292Sec = _m292Bar = _m292Exp = _m292PlSec = _m292PlBar = _m292PlExp = 0f;
             PanicRun.Reset();                   // 147: liczniki linii "Bieg zlamanych (147)"
         }
 
@@ -223,21 +235,29 @@ namespace Armoury
             float w = 0f;
             try { w = agent.SpawnEquipment.GetTotalWeightOfArmor(true); } catch { }
 
-            st.RunSeconds = RunSecondsFor(ath, w, c);
+            // 292: pelny bieg do zera x mnoznik staminy ludzi - pula RBM jest x K (BattleWind.ApplyHumanMul), a drenaz biegu = pula / RunSeconds, wiec bez tego
+            // bieg trwalby tyle samo; ta sama liczba idzie do AiBreath (budzet biegu AI) i PanicRun (pomiar). Linia "Bieg (127)" liczy regule 127/203 (t0)
+            float k292 = BattleWind.HumanStaminaMul(c);
+            if (Math.Abs(k292 - 1f) <= 0.001f) k292 = 1f;
+            float t0 = RunSecondsFor(ath, w, c);
+            st.RunSeconds = t0 * k292;
+            st.RunSeconds0 = t0;
             _runN++;
             _runKgSum += w;
             if (w > _runKgMax) _runKgMax = w;
-            _runTSum += st.RunSeconds;
-            if (st.RunSeconds < _runTMin) _runTMin = st.RunSeconds;
-            if (agent.IsMainAgent) { _plKg = w; _plAth = ath; _plT = st.RunSeconds; _plFit = RunFit(ath, c); }
+            _runTSum += t0;
+            _runT292Sum += st.RunSeconds;
+            if (t0 < _runTMin) _runTMin = t0;
+            if (agent.IsMainAgent) { _plKg = w; _plAth = ath; _plT = t0; _plT292 = st.RunSeconds; _plFit = RunFit(ath, c); }
             st.TiredFloor = Math.Min(0.92f, c.TiredSpeedFactor + ath / 1000f);
 
             // wlasna pula (gdy RBM nieobecny) - te same zasady co RBM: 1000 * bonus z Atletyki
             float athCap = Math.Min(ath, 500f);
-            st.PoolMax = 1000f * (1f + 3f * athCap / 500f) * st.EndBonus;
+            // 292: wlasna pula i jej regeneracja x K - jak pula i regeneracja RBM (BattleWind.ApplyHumanMul); RegenPerSec oddaje tez dlug biegu przy pasku RBM bez oddechu 137
+            st.PoolMax = 1000f * (1f + 3f * athCap / 500f) * st.EndBonus * k292;
             st.Pool = st.PoolMax;
             // regeneracja rosnie z Atletyka (jak w RBM) ORAZ z Endurance bohatera
-            st.RegenPerSec = Math.Max(1f, c.StaminaRegenPerSecond) * (1f + 2f * athCap / 500f) * st.EndBonus;
+            st.RegenPerSec = Math.Max(1f, c.StaminaRegenPerSecond) * (1f + 2f * athCap / 500f) * st.EndBonus * k292;
         }
 
         private static bool _sprintLogged;
@@ -387,6 +407,42 @@ namespace Armoury
             return sum;
         }
 
+        /// <summary>292 (recenzja): koncowka linii "Bieg (127)" - POMIAR z postaw RBM: (1) pasek w ciaglym biegu (sekundy, pelny pasek w X s, krotnosc wobec
+        /// reguly sprzed 292 = oczekiwany spadek / zmierzony), ludzie i gracz; (2) sr. maxStamina RBM zywych ludzi na koniec misji (odczyt postawy, bez umarlych).
+        /// Tylko odczyt; wolane z OnEndMission przed ResetRunStats.</summary>
+        private string Measured292()
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var sb = new System.Text.StringBuilder(260);
+            sb.Append(" | 292 zmierzone: bieg ludzi ").Append(_m292Sec.ToString("0", inv)).Append(" s");
+            if (_m292Sec >= 1f && _m292Bar > 0.0001f)
+                sb.Append(", pelny pasek w ").Append((_m292Sec / _m292Bar).ToString("0", inv)).Append(" s, x").Append((_m292Exp / _m292Bar).ToString("0.00", inv))
+                  .Append(" wobec reguly sprzed 292");
+            else sb.Append(", pelny pasek w - s");
+            sb.Append(", gracz ").Append(_m292PlSec.ToString("0", inv)).Append(" s");
+            if (_m292PlSec >= 1f && _m292PlBar > 0.0001f)
+                sb.Append(" (pelny pasek w ").Append((_m292PlSec / _m292PlBar).ToString("0", inv)).Append(" s, x").Append((_m292PlExp / _m292PlBar).ToString("0.00", inv)).Append(')');
+            int n = 0;
+            double sum = 0.0;
+            if (_rbmMaxStamina != null)
+                foreach (var kv in _states)
+                {
+                    var a = kv.Key;
+                    var st = kv.Value;
+                    if (a == null || st == null || st.RbmStance == null) continue;
+                    try
+                    {
+                        if (!a.IsActive() || !a.IsHuman || Undead.Character(a.Character)) continue;
+                        sum += (float)_rbmMaxStamina.GetValue(st.RbmStance);
+                        n++;
+                    }
+                    catch { }
+                }
+            sb.Append(" | pula RBM zywych ludzi na koniec: ludzi ").Append(n);
+            if (n > 0) sb.Append(", sr. ").Append((sum / n).ToString("0", inv));
+            return sb.ToString();
+        }
+
         protected override void OnEndMission()
         {
             try
@@ -397,6 +453,18 @@ namespace Armoury
                 _skipHits = 0; _skipShots = 0;
             }
             catch { }
+            // 292 (recenzja): misja krotsza niz 3 s czasu misji (autotest, odwrot) - linia "Stamina (292)" teraz, przed "Bieg (127)" (raz na misje jak dotad)
+            if (!_k292Said && _runN > 0)
+            {
+                _k292Said = true;
+                try
+                {
+                    var ma = Mission.MainAgent;
+                    BattleWind.StartLine292(Mission, Settings.Current, _runN, _runTSum, _runT292Sum, _plKg >= 0f ? _plT : 0f, _plKg >= 0f ? _plT292 : 0f,
+                                            ma == null || ma.MountAgent == null, true);
+                }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRun, "BattleWind.StartLine292", e); }
+            }
             try
             {
                 var c = Settings.Current;
@@ -409,7 +477,11 @@ namespace Armoury
                              + " (pominiete regeneracje RBM " + _regenSkipped + ")"
                              + (_plKg >= 0f ? " | gracz: zbroja " + _plKg.ToString("0.0") + " kg, Atletyka " + _plAth.ToString("0") + " -> " + _plT.ToString("0") + " s"
                                 + " (sprawnosc " + _plFit.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + ", przy " + ArmourRunCost127.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
-                                + "%/kg z 127 bylo " + RunSecondsWith(_plFit, _plKg, ArmourRunCost127, c).ToString("0") + " s)" : " | gracz: -"));
+                                + "%/kg z 127 bylo " + RunSecondsWith(_plFit, _plKg, ArmourRunCost127, c).ToString("0") + " s)" : " | gracz: -")
+                             // 292: dopisek na koncu (wyrazenie p203 konczy sie na segmencie gracza) - pelny bieg po mnozniku staminy ludzi
+                             + " | 292: stamina ludzi x" + BattleWind.HumanStaminaMul(c).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
+                             + ", pelny bieg do zera sr. " + (_runT292Sum / _runN).ToString("0") + " s" + (_plKg >= 0f ? ", gracz " + _plT292.ToString("0") + " s" : ", gracz -")
+                             + Measured292());
             }
             catch { }
             // 144: linia "Oddech AI (144)" raz na bitwe - biegi w toku zamkniete, capy zdjete
@@ -438,6 +510,8 @@ namespace Armoury
         {
             try { MissionTeams.Begin(Mission); } catch { }
             ResetRunStats();
+            _k292Said = false;                                // 292: linia "Stamina (292)" kilka sekund po starcie misji
+            try { _k292From = Mission.CurrentTime; } catch { _k292From = 0f; }
             try { AiBreath.Begin(Mission); } catch { }        // 144: liczniki i capy oddechu AI od zera
             _live = this;                                     // 139: odczyt zadyszki dla BrokenFate
             base.AfterStart();
@@ -734,8 +808,11 @@ namespace Armoury
                             if (sprinting && !_sprintLogged)
                             {
                                 _sprintLogged = true;
+                                // 292 (recenzja): RunSeconds jest juz x mnoznik staminy ludzi - znak K w napisie (przy K = 1 napis jak dotad)
+                                float k292 = BattleWind.HumanStaminaMul(c);
                                 Log.Info("FieldCraft: bieg wykryty (" + speed.ToString("0.0") + " m/s, prog "
-                                         + runThr.ToString("0.0") + "), pelny bieg do zera " + st.RunSeconds.ToString("0") + " s (127).");
+                                         + runThr.ToString("0.0") + "), pelny bieg do zera " + st.RunSeconds.ToString("0") + " s (127"
+                                         + (Math.Abs(k292 - 1f) > 0.001f ? " x" + k292.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + " - 292" : "") + ").");
                             }
                         }
                         // 147 (klucz PanicRunsUntilSpent, karta syntezy "139b Bieg bez odsapki"): pieszy AI w PANICE (przelacznik 139) pije oddech jak w biegu
@@ -799,6 +876,17 @@ namespace Armoury
                                     _rbmStamina.SetValue(stance, stam);
                                     // 137 (recenzja): zdjete punkty to bieg, nie walka - BattleWind nie otworzy za nie okna walki (BreathFightShare)
                                     if (breathOwns) BattleWind.NoteRunSpend(stance, stam0 - stam);
+                                    // 292 (recenzja): pomiar - spadek paska od konca poprzedniego taktu biegu (tick RBM i oddech 137 miedzy taktami w srodku);
+                                    // takt z paskiem na zerze albo ze zmiana puli pominiety (spadek obciety / inna pula)
+                                    float r292 = stam / maxStam;
+                                    if (st.Run292Prev >= 0f && Math.Abs(maxStam - st.Run292Max) < 0.5f && stam > 0f && st.RunSeconds0 > 0f)
+                                    {
+                                        float db = st.Run292Prev - r292;
+                                        _m292Sec += step; _m292Bar += db; _m292Exp += step / st.RunSeconds0;
+                                        if (agent.IsMainAgent) { _m292PlSec += step; _m292PlBar += db; _m292PlExp += step / st.RunSeconds0; }
+                                    }
+                                    st.Run292Prev = r292;
+                                    st.Run292Max = maxStam;
                                 }
                                 else if (st.SprintDebt > 0.01f && stam < maxStam && !breathOwns && !BattleWind.Manages(stance))
                                 {
@@ -815,6 +903,7 @@ namespace Armoury
                                     st.SprintDebt -= back;
                                     _rbmStamina.SetValue(stance, stam);
                                 }
+                                if (!drains) st.Run292Prev = -1f;   // 292: pomiar tylko w ciaglym biegu
                                 bool wasWinded = st.Winded;
                                 st.Ratio = stam / maxStam;   // 144: pasek po drenazu biegu i zwrocie dlugu (oddech 137 - pasek RBM to pula - F - S)
                                 st.Pace = PaceFromRatio(st, stam / maxStam, breathOwns ? BattleWind.WindedExit(c) : 0.10f);
@@ -836,10 +925,11 @@ namespace Armoury
                                     }
                                 }
                             }
-                            catch { st.Pace = 1f; st.Winded = false; }
+                            catch { st.Pace = 1f; st.Winded = false; st.Run292Prev = -1f; }
                         }
                         else
                         {
+                            st.Run292Prev = -1f;   // 292: pomiar tylko na postawie RBM
                             // bez RBM: wlasna pula na tych samych zasadach
                             if (st.Pool < 0f) st.Pool = st.PoolMax;
                             if (drains) st.Pool -= st.PoolMax / st.RunSeconds * step;   // 147: takze w panice
@@ -1050,6 +1140,17 @@ namespace Armoury
                 // 144: koniec taktu - szyki rozciagniete (D3), koszt zasady; pokaz zadyszki sprzata wpisy nie widziane w tym takcie
                 try { if (aiLive) AiBreath.EndTick(aiCost * 1000.0 / System.Diagnostics.Stopwatch.Frequency); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "AiBreath.EndTick", e); }
                 try { WindedShow.EndTick(now); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "WindedShow.EndTick", e); }
+                // 292: linia "Stamina (292)" raz na misje, 3 s po starcie (ludzie startu juz w bitwie i zmierzeni do biegu, konie z jezdzcem policzone)
+                if (!_k292Said && now - _k292From >= 3f)
+                {
+                    _k292Said = true;
+                    try
+                    {
+                        var ma = Mission.MainAgent;
+                        BattleWind.StartLine292(Mission, c, _runN, _runTSum, _runT292Sum, _plKg >= 0f ? _plT : 0f, _plKg >= 0f ? _plT292 : 0f, ma == null || ma.MountAgent == null, false);
+                    }
+                    catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRun, "BattleWind.StartLine292", e); }
+                }
             }
             catch (Exception e) { Log.Error("FieldCraft.Tick", e); }
         }
