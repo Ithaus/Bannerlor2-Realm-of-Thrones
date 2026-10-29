@@ -747,6 +747,8 @@ LABELS = {
     'KsIronWorldFlowOwnTownCut': 'Ks Iron Full Market Cuts Own Full Towns Only',
     'CaravanPantryAllSales': 'Escort Food Kept On Every Sale',
     'CaravanRoadFoodTopUp': 'Caravans Stock Escort Food Where Towns Are Not Hungry',
+    # 298
+    'CaravanFoodGateByPayingTowns': 'Caravan Food Gate By Towns That Pay',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial

@@ -4429,6 +4429,15 @@ namespace Armoury
         public bool CaravanPantryAllSales = true;           // a caravan never sells the food its escort needs (about ten days of rations) - in Banner Kings' and the game's own sales too, not only in ours. Off = as before (only our sale keeps it)
         public bool CaravanRoadFoodTopUp = true;            // with Caravan Road Food: a caravan leaving a town that is not hungry tops its escort food up to the ten days of rations it keeps, paid from its purse to the town; in a hungry town it buys only for the next leg. Off = as before (food for the next leg only)
 
+        // --- Caravans carry food for the towns that pay (298) ---
+        // Paczka 298 (29.10, Jeff: "Napraw te karwany one traz nie maja sensu bo glownie traca nikt by ich nie trzymal" i "napraw pozostale bledy i pusc test 90,
+        // rob tak dlugo porawi az bedziesz zadowlony z wyniku"). Autotest 296c doba 109166: mieso, ryby, jaja KUPNO STOI przy progu bramki swiata 61, 124 i 52 szt.
+        // (prog psujacych = 7 x max(sprzedaz karawan, popyt rynkow / 97 miast)), a popyt rynkow na ryby 1 718 szt./d przy sprzedazy karawan 9.3/d; w 296d wszystkie
+        // 8 kategorii psujacych STOI. Test glebokosci 294b (k = moje + udzial innych na miasto placace - zjedzone w dobie drogi) widzi te same kategorie CZYNNE
+        // (ryby k = 1, 93.1 wobec 44) - jego granica k = 1 to juki swiata = N miast placacych x zjedzone w odcinku (ryby ok. 3 970 szt.). Dwie reguly sobie
+        // przecza, wygrywa ciasniejsza bramka. CaravanTrade284.cs (Flow, Line290). Nowy klucz (plik MCM Jeffa go nie ma).
+        public bool CaravanFoodGateByPayingTowns = true;    // with Caravan Food Gate Counts Trade Stock Only and Caravans Price The Unit The Market Will Take: all caravans together may carry as much food that spoils as the towns paying at least the average price for it eat during one measured caravan leg (instead of a week of what one average town buys) - the same amount at which the market-depth price test starts to see a queue of other caravans' food ahead of a new unit, so the two rules no longer contradict each other. Each caravan still buys a unit only while the market-depth price says it sells at a profit. Off = as before
+
         // --- Banner Kings manor retinues from the village's own people (295) ---
         // Paczka 295 (29.10, Jeff "napraw pozostale bledy"): ksiega ludzi E4/7 w 136a - 4-6 ludzi na dobe "w nicosc - inne" i skoki "z niczego - inne" (+116 d109063):
         // orszaki dworow BK (RetinueComponent.DailyTick: +1 z szablonu ponizej celu poziom x 15, -1 powyzej; nowy orszak z szablonu kultury). ArmsFromPeople.Retinue295.cs.

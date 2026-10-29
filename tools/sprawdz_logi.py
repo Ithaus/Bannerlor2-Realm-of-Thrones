@@ -1277,6 +1277,9 @@ Uzycie (Python 3, tylko odczyt):
                     Linia 'Rynek karawan (294)'. K294-S self-test, K294-S2 test syntetyczny; K294-0 linia co dobe, potkniecia 0; K294-1 udzial placacych zold
                     >= 0.60; K294-2 mediana (wynik - zold) > 0; K294-3 T1 na stracie + wyprzedaz zwinietych ponizej kosztu <= 800 zl/d, jedzenie <= 50 szt./d;
                     K294-4 karawany gracza netto >= 0 (NIE = DECYZJA); K294-5 spojnosc zwijania i nowych; K294-6 pula wyniku handlu >= 0.8 x doby 8-14; K294-7 INFO.
+                    298 (miary rundy 4): K294-1/2 ostatnie 7 dob i srednia dob 61-90; K294-1n INFO kohorta od 31. doby; K294-2b handel - zold - najem strazy -
+                    jedzenie eskorty >= 0; K294-3 strata ponizej kosztu wszystkimi drogami 284 <= 800 zl/d; K294-6 pula >= zold i >= 0.95 x 182 zl/d na karawane;
+                    K294-10 INFO; K294-18 rozne miasta / rozrzut losowy >= 0.647; K294-22 INFO karawany bez handlu wedlug przyczyny (linia 298).
 --grupa zelazo297 : (29.10, paczka 297 noc/297-zelazo - Jeff 29.10 "sprobuj to" o zelazie swiata i "napraw pozostale bledy i pusc test 90"; zima nie tnie rudy
                     z kopalni ani drewna z wyrebu; Armoury/src/WinterBite.cs, StartCalibration.Live.cs, StartCalibration.Zima297.cs, VillageCrafts.cs) python -I
                     tools/sprawdz_logi.py --grupa zelazo297 <Armoury-*.log> (strumieniowo; progi na bieg 90 dob). Linia 'Zima - kopalnie i wyrab (297)'.
@@ -79073,6 +79076,28 @@ KARAWANY294_TURN = 30.0         # 294b K294-11: dob (wiek reguly 5); ostatnie 7 
 KARAWANY294_FOOD_ALIVE = 0.80   # 294b K294-12: sprzedaz jedzenia karawan ostatnie 7 dob wobec dob 8-14 (296a: 873 -> 29 szt./d)
 KARAWANY294_PERISH_DAYS = 7.0   # 294b K294-12: juki handlowe psujacych / ich zbyt (bramka 7 dob)
 KARAWANY294_CARS = 0.85         # 294b K294-13: 136a 0.88, 296a 0.33
+# 298 (29.10, runda 4 - plan-runda4 sekcja 2, miary M1-M6; Jeff 29.10 "Napraw te karwany one traz nie maja sensu bo glownie traca nikt by ich nie trzymal" i "pusc
+#   test 90, rob tak dlugo porawi az bedziesz zadowlony z wyniku"). Bazy: 296c (m113/logi/296c-probyN/Armoury-2026-10-29_15-09-25.log), 296d (296d-probyN/...17-07-46).
+# K294-1   (M4) udzial placacych ostatnie 7 dob >= KARAWANY294_SHARE i srednia dob biegu 61-90 >= KARAWANY294_SHARE_STEADY (udzial rosl jeszcze w 90. dobie)
+# K294-1n  INFO (M4): to samo dla karawan powstalych od 31. doby biegu (linia 298 - bez jukow sprzed testu)
+# K294-2   (M4) mediana (wynik - zold) > 0 ostatnie 7 dob i srednio doby 61-90
+# K294-2b  (M2) wynik floty: pula handlu - zold (linia 284 na sucho) - najem strazy 285 - jedzenie eskorty 288 ('za X zl z kies karawan') srednio ostatnie 7 dob >= 0;
+#          linie 285 i 288 maja numer doby jutra (CampaignTime.Now w takcie dobowym, linie 284/294 - doba zamknieta 'today - 1') - wyrownane do doby 284 (M5)
+# K294-3   (M3) strata ponizej kosztu wszystkimi drogami linii 284 (koszt - utarg sztuk ponizej kosztu; wyprzedaz przy zwinieciu idzie przez SellItemsAction - juz
+#          w drogach) + niesprzedane na polke przy zwinieciu, srednio ostatnie 10 dob <= KARAWANY294_LOSS_MAX; jedzenie psuje sie (E3-T1) <= KARAWANY294_FOOD_MAX;
+#          T1 sam - INFO (296c 3169, 296d 5580 zl/d)
+# K294-6   (M1) ostatnie 7 dob: pula wyniku handlu >= zold i pula na zmierzona karawane >= KARAWANY294_POOL_CARF x KARAWANY294_POOL_CAR; doby pomiaru 8-14 - INFO
+#          ze znakiem (dawna ocena 'x doby 8-14' dzielila przez ujemny poczatek - 'pula 0' w 296d)
+# K294-10  (M5) INFO
+# K294-18  (M5) rozne miasta z wjazdem / rozrzut losowy T x (1 - (1 - 1/T)^E) (T miast z targiem z linii 290, E wjazdow 'Karawany: dzien') ostatnie 7 dob
+#          >= KARAWANY294C_TOWNS_RND
+# K294-22  INFO (M6): karawany bez sprzedazy w 7 dobach wedlug przyczyny (linia 298): pusta kiesa, bez towaru z kiesa, towar bez rynku z zyskiem wedlug glebokosci,
+#          towar z rynkiem z zyskiem - czeka, bez miary
+# K259-11  (M5, grupa karawany259) udzial karawan rodow z wyplata - wspolny (suma wyplat / suma karawan) ostatnie 30 dob wobec pierwszych 30; INFO liczba karawan rodow
+KARAWANY294_SHARE_STEADY = 0.55  # plan rundy 4 (sekcja 5): cel doby 61-90
+KARAWANY294_POOL_CAR = 182.0     # 296c ostatnie 7 dob: 71 367 zl/d / 392 karawan zmierzonych
+KARAWANY294_POOL_CARF = 0.95
+KARAWANY294_STEADY = (61, 90)    # doby biegu (1 = pierwsza linia)
 KARAWANY294B_L = "Glebokosc rynku karawan (294b): dzien "
 KARAWANY294B_ERR = ("ERROR in CaravanTrade284.Depth",)
 KARAWANY294B_RE = re.compile(
@@ -79089,7 +79114,19 @@ KARAWANY294B_RE = re.compile(
 KARAWANY294B_ITEM = re.compile(r"(\S+) (\d+)/(\d+)/([\d.]+|-)/(\d+)/([\d.]+)/(\d+)/([\d.]+|-)/(\d+|-)/(CZYNNE|STOI|BEZ MIARY)")
 KARAWANY294B_284 = re.compile(r"^Handel karawan \(284\): dzien (\d+) \| .*?\| sprzedaz wedlug drogi \(szt\./utarg/myto/koszt/zysk; ponizej kosztu szt\./utarg/koszt\): "
                               r"(.*?) \| razem zysk zrealizowany -?\d+ zl \| karawany 7 dob: karawan (\d+), z handlem (\d+),")
-KARAWANY294B_PATH = re.compile(r"(\d+)/(\d+)/(\d+)/(\d+)/(-?\d+) \(")
+KARAWANY294B_PATH = re.compile(r"(\d+)/(\d+)/(\d+)/(\d+)/(-?\d+) \((\d+)/(\d+)/(\d+)\)")   # 298 M3: takze ponizej kosztu (szt./utarg/koszt)
+KARAWANY298_PATHN = re.compile(r"(?:^|, )([^,(|]+?) (\d+)/(\d+)/(\d+)/(\d+)/(-?\d+) \((\d+)/(\d+)/(\d+)\)")   # 298: z nazwa drogi (T1 osobno)
+KARAWANY298_F288 = re.compile(r"kupilo \d+ karawan \d+ z \d+ szt\. za (\d+) zl z kies karawan")
+KARAWANY298_ENT = re.compile(r"^Karawany: dzien (\d+) - wjazdy karawan do miast (\d+),")
+KARAWANY298_L = "Karawany bez handlu i kohorta (298): dzien "
+KARAWANY298_RE = re.compile(
+    r"^Karawany bez handlu i kohorta \(298\): dzien (?P<d>\d+) \| bez sprzedazy w 7 dobach (?P<idle>\d+) z (?P<cars>\d+): pusta kiesa \(bez towaru, pol kiesy < \d+ "
+    r"doby zoldu\) (?P<i0>\d+), bez towaru z kiesa (?P<i1>\d+), towar bez rynku z zyskiem wedlug glebokosci (?P<i2>\d+), towar z rynkiem z zyskiem - czeka (?P<i3>\d+), "
+    r"towar bez miary (?P<i4>\d+) \| karawany od \d+\. doby biegu \(doba >= (?:\d+|-)\): zmierzone (?P<n>\d+), placace (?P<w>\d+), tracace (?P<l>\d+), "
+    r"udzial placacych (?P<sh>[\d.]+|-), mediana wyniku - zoldu/d (?P<med>-?\d+|-) zl \| potkniecia 298 (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
+KARAWANY298_SAMPLE = ("Karawany bez handlu i kohorta (298): dzien 109166 | bez sprzedazy w 7 dobach 119 z 407: pusta kiesa (bez towaru, pol kiesy < 3 doby zoldu) 12, "
+                      "bez towaru z kiesa 9, towar bez rynku z zyskiem wedlug glebokosci 40, towar z rynkiem z zyskiem - czeka 50, towar bez miary 8 | karawany od 31. "
+                      "doby biegu (doba >= 109106): zmierzone 120, placace 70, tracace 50, udzial placacych 0.583, mediana wyniku - zoldu/d -4 zl | potkniecia 298 0 (sesja 0).")
 KARAWANY294B_287 = re.compile(r"^Handel z roznicy cen \(287\): dzien (\d+) .*?\| koszt drogi: zold karawan (\d+) zl/d, juki po koszcie (\d+) zl")
 KARAWANY294B_285 = re.compile(r"^Straz karawan \(285\): dzien (\d+) .*?najem do potrzeby: wizyt (\d+), ludzi (\d+) za (\d+) zl; .*?zwolnieni do domu \(droga 166\): (\d+) ludzi")
 KARAWANY294B_SAMPLE = (
@@ -79150,7 +79187,8 @@ KARAWANY294_PL_SAMPLE = ("Majatek gracza (karawany i warsztaty) (259): dzien 109
 
 def k294_collect(logp):
     D = {"g": {}, "bad": 0, "err": 0, "errs": [], "pool": {}, "t1": {}, "pl": {}, "plend": set(),
-         "b": {}, "bbad": 0, "berr": 0, "c288": {}, "c284": {}, "c287": {}, "c290": {}, "c285": {}}   # 294b
+         "b": {}, "bbad": 0, "berr": 0, "c288": {}, "c284": {}, "c287": {}, "c290": {}, "c285": {},   # 294b
+         "f288": {}, "x298": {}, "x298bad": 0}   # 298
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\r\n"))
@@ -79174,12 +79212,26 @@ def k294_collect(logp):
                 a = K288_RE.match(s)
                 if a:
                     D["c288"][int(a.group("d"))] = (int(a.group("cars")), int(a.group("road")), int(a.group("hun")))
+                    f = KARAWANY298_F288.search(s)   # 298 M2: jedzenie eskorty kupione z kies karawan
+                    if f:
+                        D["f288"][int(a.group("d"))] = int(f.group(1))
+                continue
+            if s.startswith(KARAWANY298_L):
+                a = KARAWANY298_RE.match(s)
+                if a:
+                    D["x298"][int(a.group("d"))] = a.groupdict()
+                else:
+                    D["x298bad"] += 1
                 continue
             if s.startswith("Handel karawan (284): dzien "):
                 a = KARAWANY294B_284.match(s)
                 if a:
-                    cs = sum(int(x[3]) for x in KARAWANY294B_PATH.findall(a.group(2)))
-                    D["c284"][int(a.group(1))] = (int(a.group(3)), int(a.group(4)), cs)
+                    pp = KARAWANY294B_PATH.findall(a.group(2))
+                    cs = sum(int(x[3]) for x in pp)
+                    # 298 M3: ponizej kosztu wszystkimi drogami (utarg, koszt) i T1 osobno
+                    lg_ = sum(int(x[6]) for x in pp); lc_ = sum(int(x[7]) for x in pp)
+                    t1p = [x for x in KARAWANY298_PATHN.findall(a.group(2)) if x[0] == "T1"]
+                    D["c284"][int(a.group(1))] = (int(a.group(3)), int(a.group(4)), cs, lg_, lc_, int(t1p[0][7]) if t1p else 0, int(t1p[0][8]) if t1p else 0)
                 continue
             if s.startswith("Handel z roznicy cen (287): dzien "):
                 a = KARAWANY294B_287.match(s)
@@ -79243,23 +79295,39 @@ def _k294_liq(x):
     return g if g < c else 0
 
 
+def _k298_steady(days, d0):
+    """298 M4: doby biegu 61-90 (d0 - doba 1) z listy dob; bieg krotszy - ostatnia trzecia czesc (co najmniej 7 dob). (doby, opis)."""
+    lo, hi = KARAWANY294_STEADY
+    w = [d for d in days if lo <= d - d0 + 1 <= hi]
+    if len(w) >= 7:
+        return w, f"doby biegu {lo}-{hi}"
+    n = min(len(days), max(7, len(days) // 3))
+    return days[-n:], f"ostatnie {n} dob (bieg krotszy niz {lo + 6} dob)"
+
+
 def k294_common(rep, D, judge, tag):
     """K294-3, K294-4, K294-6 - takze na logu sprzed 294 (baza, INFO). judge - progi sprawdzane; tag - dopisek do wartosci."""
     short = not judge
     g = D["g"]
-    # K294-3 sprzedaz na stracie (T1 + wyprzedaz przy zwinieciu ponizej kosztu)
-    t1 = D["t1"]; td = sorted(t1)[-10:]
+    # K294-3 (298 M3): strata sprzedazy ponizej kosztu WSZYSTKIMI drogami linii 284 (koszt - utarg; T1, BK, gra, surowce, kontrakt) + niesprzedane na polke przy
+    # zwinieciu 294 (koszt bez utargu; sama wyprzedaz przy zwinieciu idzie przez SellItemsAction - juz w drogach 284); T1 sam i E3-T1 - INFO; jedzenie psuje sie (E3-T1)
+    t1 = D["t1"]; c284 = D.get("c284", {})
+    td = [d for d in sorted(c284) if len(c284[d]) > 3][-10:]
     if td:
-        lg = sum(t1[d][1] for d in td) / len(td); lf = sum(t1[d][2] for d in td) / len(td)
-        lq = sum(_k294_liq(g.get(d)) for d in td) / len(td)
-        lqc = sum(int(g[d]["xc"]) - int(g[d]["xg"]) + int(g[d]["xlc"]) for d in td if d in g) / len(td)
-        v3 = (f"ostatnie {len(td)} dob: utarg na stracie T1 {lg:.0f} zl/d + wyprzedaz zwinietych ponizej kosztu {lq:.0f} zl/d = {lg + lq:.0f} zl/d (strata wyprzedazy "
-              f"i polki {lqc:.0f} zl/d), jedzenie psuje sie {lf:.0f} szt./d")
-        ok3 = lg + lq <= KARAWANY294_LOSS_MAX and lf <= KARAWANY294_FOOD_MAX
+        lg = sum(c284[d][3] for d in td) / len(td); lc = sum(c284[d][4] for d in td) / len(td)
+        shelf = sum(int(g[d]["xlc"]) for d in td if d in g) / len(td)
+        t1l = sum(c284[d][6] - c284[d][5] for d in td) / len(td)
+        tdt = [d for d in td if d in t1]
+        lf = sum(t1[d][2] for d in tdt) / len(tdt) if tdt else None
+        lgt = sum(t1[d][1] for d in tdt) / len(tdt) if tdt else 0.0
+        loss = lc - lg + shelf
+        v3 = (f"ostatnie {len(td)} dob: ponizej kosztu wszystkimi drogami utarg {lg:.0f} / koszt {lc:.0f} zl/d, strata {lc - lg:.0f} + niesprzedane na polke {shelf:.0f} "
+              f"= {loss:.0f} zl/d; jedzenie psuje sie {'-' if lf is None else f'{lf:.0f}'} szt./d; INFO: T1 sam strata {t1l:.0f} zl/d (E3-T1 utarg na stracie {lgt:.0f} zl/d)")
+        ok3 = loss <= KARAWANY294_LOSS_MAX and lf is not None and lf <= KARAWANY294_FOOD_MAX
     else:
-        v3, ok3 = "brak linii E3-T1", False
-    rep.add("K294-3: sprzedaz na stracie (T1 + wyprzedaz zwinietych, ostatnie 10 dob)", v3 + (f" | {tag}" if tag else ""),
-            f"utarg <= {KARAWANY294_LOSS_MAX:.0f} zl/d i jedzenie <= {KARAWANY294_FOOD_MAX:.0f} szt./d (136a: 2649 / 216)", None if short else ok3)
+        v3, ok3 = "brak linii 284 z drogami ponizej kosztu", False
+    rep.add("K294-3: strata ponizej kosztu - wszystkie drogi 284 (ostatnie 10 dob)", v3 + (f" | {tag}" if tag else ""),
+            f"strata (koszt - utarg) <= {KARAWANY294_LOSS_MAX:.0f} zl/d i jedzenie <= {KARAWANY294_FOOD_MAX:.0f} szt./d (296c 3169, 296d 5580 zl/d)", None if short else ok3)
     # K294-4 karawany gracza
     parts, ok4, judged = [], True, False
     for name, pts in sorted(D["pl"].items()):
@@ -79274,16 +79342,41 @@ def k294_common(rep, D, judge, tag):
     rep.add("K294-4: karawany gracza - netto dla rodu (linia 259) w biegu", "; ".join(parts) if parts else "brak karawan gracza",
             ">= 0 dla karawany, ktora przezyla bieg (136a: -14 tys. w 90 dobach); NIE = DECYZJA (rod gracza poza 294 B/C, zold strazy drogi 286)",
             ok4 if judged and not short else None, decide=True)
-    # K294-6 pula handlu
+    # K294-6 (298 M1): ostatnie 7 dob - pula wyniku handlu >= zold i pula na zmierzona karawane >= 0.95 x baza 296c; doby pomiaru 8-14 - INFO ze znakiem
+    # (dawna ocena 'ostatnie 7 >= 0.8 x doby 8-14' przy ujemnym poczatku dawala 'pula 0' / NIE, choc pula rosla 10-krotnie)
     pool = D["pool"]; pdays = [d for d in sorted(pool) if pool[d][0] > 0]
     if len(pdays) >= 14:
+        d0 = min(pool)
         early = sum(pool[d][1] for d in pdays[7:14]) / 7.0
-        late = sum(pool[d][1] for d in pdays[-7:]) / 7.0
-        v6 = f"pula wyniku handlu swiata doby 8-14 {early:.0f} zl/d, ostatnie 7 {late:.0f} zl/d ({late / early:.2f}); karawan zmierzonych {pool[pdays[7]][0]} -> {pool[pdays[-1]][0]}" if early > 0 else "pula 0"
-        ok6 = early > 0 and late >= KARAWANY294_POOL * early
+        l7 = pdays[-7:]
+        late = sum(pool[d][1] for d in l7) / 7.0; wl = sum(pool[d][2] for d in l7) / 7.0; nl = sum(pool[d][0] for d in l7) / 7.0
+        pc = late / nl if nl > 0 else 0.0
+        v6 = (f"ostatnie 7 dob: pula wyniku handlu {late:.0f} zl/d, zold {wl:.0f} zl/d, karawan zmierzonych {nl:.0f}, na karawane {pc:.1f} zl/d; INFO: doby pomiaru 8-14 "
+              f"(doby biegu {pdays[7] - d0 + 1}-{pdays[13] - d0 + 1}) {early:+.0f} zl/d")
+        ok6 = late >= wl and pc >= KARAWANY294_POOL_CARF * KARAWANY294_POOL_CAR
     else:
         v6, ok6 = f"za malo dob z pula ({len(pdays)})", None
-    rep.add("K294-6: handel nie umiera (pula wyniku handlu swiata)", v6 + (f" | {tag}" if tag else ""), f">= {KARAWANY294_POOL} x doby 8-14 (136a: 1.21)", None if short else ok6)
+    rep.add("K294-6: handel nie umiera (pula wyniku handlu swiata, ostatnie 7 dob)", v6 + (f" | {tag}" if tag else ""),
+            f"pula >= zold i na karawane >= {KARAWANY294_POOL_CARF} x {KARAWANY294_POOL_CAR:.0f} zl/d (296c 71367 / 392)", None if short else ok6)
+    # K294-2b (298 M2): wynik floty - pula handlu - zold - najem strazy 285 - jedzenie eskorty 288 (285 / 288 wyrownane do doby 284), ostatnie 7 dob; doby 61-90 INFO
+    c285 = D.get("c285", {}); f288 = D.get("f288", {})
+    if len(pdays) >= 7:
+        def fleet(d):
+            return pool[d][1] - pool[d][2] - (c285[d][1] if d in c285 else 0) - f288.get(d, 0)
+        l7 = pdays[-7:]
+        tr = sum(pool[d][1] for d in l7) / 7.0; wg = sum(pool[d][2] for d in l7) / 7.0
+        hi = sum(c285[d][1] for d in l7 if d in c285) / 7.0; fo = sum(f288.get(d, 0) for d in l7) / 7.0
+        v2b = tr - wg - hi - fo
+        miss = sum(1 for d in l7 if d not in c285 or d not in f288)
+        stw, stl = _k298_steady(pdays, min(pool))
+        vst = sum(fleet(d) for d in stw) / len(stw)
+        s2b = (f"ostatnie 7 dob: handel {tr:.0f} - zold {wg:.0f} - najem strazy 285 {hi:.0f} - jedzenie eskorty 288 {fo:.0f} = {v2b:+.0f} zl/d; {stl} {vst:+.0f} zl/d (INFO)"
+               + (f"; dob bez linii 285 / segmentu 288: {miss}" if miss else ""))
+        ok2b = v2b >= 0 and miss == 0
+    else:
+        s2b, ok2b = f"za malo dob z pula ({len(pdays)})", None
+    rep.add("K294-2b: wynik floty karawan (handel - zold - najem strazy - jedzenie eskorty, ostatnie 7 dob)", s2b + (f" | {tag}" if tag else ""),
+            ">= 0 zl/d (296c +7460, 296d -2819 zl/d)", None if short else ok2b)
 
 
 def k294_rows(rep, D):
@@ -79302,19 +79395,25 @@ def k294_rows(rep, D):
     short = len(days) < KARAWANY294_MIN_DAYS
     tag = f"bieg za krotki ({len(days)} dob < {KARAWANY294_MIN_DAYS}) - INFO" if short else None
     last7 = days[-7:]
-    # K294-1 udzial placacych
+    # K294-1 udzial placacych - 298 M4: ostatnie 7 dob i srednia dob biegu 61-90 (stan ustalony; udzial rosl jeszcze w 90. dobie)
+    stw, stl = _k298_steady(days, days[0])
     sh = _k294_avg([_k294_num(g[d]["share"]) for d in last7])
+    shs = _k294_avg([_k294_num(g[d]["share"]) for d in stw])
     w7 = _k294_avg([int(g[d]["w"]) for d in last7]); l7 = _k294_avg([int(g[d]["l"]) for d in last7]); t7 = _k294_avg([int(g[d]["t"]) for d in last7])
-    v1 = f"ostatnie 7 dob: udzial {sh:.3f}, placace {w7:.0f}, tracace {l7:.0f}, nowe {t7:.0f}" if sh is not None else "brak zmierzonych karawan"
-    rep.add("K294-1: udzial karawan placacych zold (ostatnie 7 dob)", v1 + (f" | {tag}" if tag else ""), f">= {KARAWANY294_SHARE} (136a: 0.37)",
-            None if short else (sh is not None and sh >= KARAWANY294_SHARE))
-    # K294-2 mediana netto
+    v1 = (f"ostatnie 7 dob: udzial {sh:.3f}, placace {w7:.0f}, tracace {l7:.0f}, nowe {t7:.0f}; {stl}: udzial {'-' if shs is None else f'{shs:.3f}'}"
+          if sh is not None else "brak zmierzonych karawan")
+    rep.add("K294-1: udzial karawan placacych zold (ostatnie 7 dob i doby 61-90)", v1 + (f" | {tag}" if tag else ""),
+            f">= {KARAWANY294_SHARE} ostatnie 7 i >= {KARAWANY294_SHARE_STEADY} doby 61-90 (136a: 0.37; 296c 0.503 / 0.427, 296d 0.441 / 0.392)",
+            None if short else (sh is not None and sh >= KARAWANY294_SHARE and shs is not None and shs >= KARAWANY294_SHARE_STEADY))
+    # K294-2 mediana netto - 298 M4: ostatnie 7 dob i doby 61-90
     nt = _k294_avg([_k294_num(g[d]["net"]) for d in last7])
+    nts = _k294_avg([_k294_num(g[d]["net"]) for d in stw])
     pdm = _k294_avg([_k294_num(g[d]["pd"]) for d in last7]); wgm = _k294_avg([_k294_num(g[d]["wg"]) for d in last7])
-    v2 = (f"ostatnie 7 dob: mediana wyniku - zoldu {nt:.0f} zl/d (wynik {pdm:.0f}, zold {wgm:.0f})" if nt is not None and pdm is not None and wgm is not None
-          else "brak mediany")
-    rep.add("K294-2: mediana (wynik handlu - zold) na karawane (ostatnie 7 dob)", v2 + (f" | {tag}" if tag else ""), "> 0 (136a: 33 - 85 = -52)",
-            None if short else (nt is not None and nt > 0))
+    v2 = (f"ostatnie 7 dob: mediana wyniku - zoldu {nt:.0f} zl/d (wynik {pdm:.0f}, zold {wgm:.0f}); {stl}: {'-' if nts is None else f'{nts:.1f}'} zl/d"
+          if nt is not None and pdm is not None and wgm is not None else "brak mediany")
+    rep.add("K294-2: mediana (wynik handlu - zold) na karawane (ostatnie 7 dob i doby 61-90)", v2 + (f" | {tag}" if tag else ""), "> 0 i > 0 (136a: 33 - 85 = -52; 296c -1 / -27.1, 296d -26 / -36.5)",
+            None if short else (nt is not None and nt > 0 and nts is not None and nts > 0))
+    k298_rows(rep, D)
     k294_common(rep, D, not short, tag)
     # K294-5 spojnosc
     bad5 = []
@@ -79373,8 +79472,9 @@ def k294b_rows(rep, D):
     d10 = sorted(c284)[-7:]
     r10 = [c284[d][1] / c284[d][0] for d in d10 if c284[d][0] > 0]
     v10 = sum(r10) / len(r10) if r10 else None
+    # 298 M5: INFO (bez progu - przyczyny bez handlu w K294-22)
     rep.add("K294-10: karawany ze sprzedaza w 7 dobach (284, ostatnie 7 dob)", (f"srednio {v10:.3f} (z handlem / karawan)" if v10 is not None else "brak linii 284") + sfx,
-            f">= {KARAWANY294_TRADED} (ostatnie 7 dob: 136a 0.631, 296a 0.548)", (v10 is not None and v10 >= KARAWANY294_TRADED) if judge else None)
+            f"INFO (298; dawny prog {KARAWANY294_TRADED}; ostatnie 7 dob: 136a 0.631, 296a 0.548, 296c 0.710)", None)
     # K294-11 obrot jukow
     d11 = [d for d in sorted(c287) if d in c284][-7:]
     if d11:
@@ -79458,7 +79558,7 @@ def k294b_rows(rep, D):
 
 
 def _k294_synth(share, net, loss, food, pool_late, jeff, xn=0, xw=3, liq=(0, 0), hun=0.10, traded=0.85, turn=20.0, food_late=1.0, perish=5.0,
-                cars=0.95, incons=False, bst=0):
+                cars=0.95, incons=False, bst=0, shelf=0, pool_early=50000, fleet=4000, share_mid=None):
     """Syntetyczne dane k294_rows: 30 dob, ostatnie 7 z podanymi wartosciami. liq - (utarg, koszt) wyprzedazy zwinietych na dobe. 294b: hun - glodne / w drodze,
     traded - z handlem / karawan, turn - dni obrotu jukow, food_late - sprzedaz jedzenia ostatnie 7 dob wobec dob 8-14, perish - dni psujacych, cars - karawany
     ostatnie 7 wobec pierwszych 7, incons - zla kategoria STOI w linii 294b, bst - potkniecia 294b."""
@@ -79466,23 +79566,26 @@ def _k294_synth(share, net, loss, food, pool_late, jeff, xn=0, xw=3, liq=(0, 0),
     bl, c288, c284, c287, c290 = {}, {}, {}, {}, {}
     for i in range(30):
         d = 109000 + i
-        g[d] = {"st": "0", "share": f"{share:.3f}", "w": "200", "l": "100", "t": "10", "u": "0", "net": str(net), "pd": "110", "wg": "85", "xn": str(xn),
-                "xw": str(xw), "xs": "1", "xu": "5", "xg": str(liq[0]), "xc": str(liq[1]), "xlu": "0", "xlc": "0", "xr": "0", "xf": "0",
+        sh_i = share_mid if (share_mid is not None and 20 <= i < 23) else share   # 298 M4: doby przed ostatnimi 7 w oknie stanu ustalonego
+        g[d] = {"st": "0", "share": f"{sh_i:.3f}", "w": "200", "l": "100", "t": "10", "u": "0", "net": str(net), "pd": "110", "wg": "85", "xn": str(xn),
+                "xw": str(xw), "xs": "1", "xu": "5", "xg": str(liq[0]), "xc": str(liq[1]), "xlu": "0", "xlc": str(shelf), "xr": "0", "xf": "0",
                 "ke": "TAK", "kx": "TAK", "r0": "5", "eok": "2", "end": "0", "ft1": "1", "fbk": "2", "fdn": "0", "ea": "3", "el": "0", "er": "1", "eo": "0",
                 "m": "300", "all": "310", "r1": "90", "bh": "TAK", "bo": "300"}
         t1[d] = (100, loss, food)
-        pool[d] = (300, 50000 if i < 23 else pool_late, 40000)
+        pool[d] = (250, (pool_early if 7 <= i < 14 else 50000) if i < 23 else pool_late, 40000)   # 298 M1: 250 karawan - 200 zl/d na karawane
         late = i >= 23
         lst = ("cotton 900/48/1.62/19/4.0/16/123.4/" + ("100" if incons and late else "150") + "/STOI, grain 800/50/2.10/16/590.0/1/20.0/15/CZYNNE")
         bl[d] = {"st": str(bst if late else 0), "mg": "3", "list": lst, "co": "1", "cs": "1", "ln": "5", "lg": "500", "lc": "700", "bn": "1", "bc": "90",
                  "stop": "30", "ev": "90", "old": "12", "sp": "2", "pan": "5400", "leg": "4.24", "lold": "2", "ht1": "1", "hbk": "1"}
         c288[d] = (int(400 * (cars if late else 1.0)), 380, int(380 * (hun if late else 0.10)))
-        c284[d] = (400, int(400 * (traded if late else 0.85)), 100000)
+        c284[d] = (400, int(400 * (traded if late else 0.85)), 100000, 2000, 2000 + loss, 300, 300 + loss // 2)   # 298 M3: ponizej kosztu wszystkimi drogami, T1
         c287[d] = int(100000 * (turn if late else 20.0))
         c290[d] = (600.0 * (food_late if late else 1.0), perish if late else 5.0)
     return {"g": g, "bad": 0, "err": 0, "errs": [], "pool": pool, "t1": t1,
             "pl": {"Caravan X": [(109000, -1000), (109029, -1000 + jeff)]}, "plend": set(),
-            "b": bl, "bbad": 0, "berr": 0, "c288": c288, "c284": c284, "c287": c287, "c290": c290, "c285": {109001: (44, 7880, 33)}}
+            "b": bl, "bbad": 0, "berr": 0, "c288": c288, "c284": c284, "c287": c287, "c290": c290,
+            # 298 M2: najem strazy i jedzenie eskorty - po polowie z 'fleet' (pula 50000 - zold 40000 - fleet)
+            "c285": {109000 + i: (10, fleet // 2, 3) for i in range(30)}, "f288": {109000 + i: fleet - fleet // 2 for i in range(30)}, "x298": {}, "x298bad": 0}
 
 
 def k294_selftest():
@@ -79541,18 +79644,22 @@ def k294_selftest2():
         k294_rows(r, D)
         return {x[0].split(":")[0]: x[3] for x in r.rows}
     good = verdicts(_k294_synth(0.70, 20, 500, 30, 50000, 500, 1, 2, (300, 200)))
-    if any(good.get(k) != "TAK" for k in ("K294-0", "K294-1", "K294-2", "K294-3", "K294-4", "K294-5", "K294-6", "K294-8", "K294-9", "K294-10", "K294-11",
-                                          "K294-12", "K294-13", "K294-14")):
+    if any(good.get(k) != "TAK" for k in ("K294-0", "K294-1", "K294-2", "K294-2b", "K294-3", "K294-4", "K294-5", "K294-6", "K294-8", "K294-9", "K294-11",
+                                          "K294-12", "K294-13", "K294-14")) or good.get("K294-10") != "INFO":
         return f"dobry bieg nie przechodzi: {good}"
     cases = [("K294-1", "NIE", _k294_synth(0.50, 20, 500, 30, 50000, 500)), ("K294-2", "NIE", _k294_synth(0.70, -5, 500, 30, 50000, 500)),
              ("K294-3", "NIE", _k294_synth(0.70, 20, 900, 30, 50000, 500)), ("K294-3", "NIE", _k294_synth(0.70, 20, 500, 60, 50000, 500)),
-             ("K294-3", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, 1, 2, (400, 900))),
+             ("K294-3", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, 1, 2, shelf=400)),
              ("K294-6", "NIE", _k294_synth(0.70, 20, 500, 30, 30000, 500)), ("K294-4", "DECYZJA", _k294_synth(0.70, 20, 500, 30, 50000, -1)),
              ("K294-5", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, 3, 2)),
+             # 298: M1 ujemny poczatek przy dobrej puli na koncu - TAK; pula na karawane ponizej 0.95 x 182 - NIE; M2 wynik floty ujemny; M4 stan ustalony ponizej 0.55
+             ("K294-6", "TAK", _k294_synth(0.70, 20, 500, 30, 50000, 500, pool_early=-20000)),
+             ("K294-6", "NIE", _k294_synth(0.70, 20, 500, 30, 42000, 500)),
+             ("K294-2b", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, fleet=12000)),
+             ("K294-1", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, share_mid=0.10)),
              # 294b
              ("K294-8", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, bst=1)),
              ("K294-9", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, hun=0.20)),
-             ("K294-10", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, traded=0.60)),
              ("K294-11", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, turn=40.0)),
              ("K294-12", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, food_late=0.5)),
              ("K294-12", "NIE", _k294_synth(0.70, 20, 500, 30, 50000, 500, perish=9.0)),
@@ -79572,7 +79679,7 @@ def karawany294_main(logp):
     rep.add("K294-S: self-test wyrazen (linie jak w kodzie C#: CaravanMarket294.Daily, CaravanTrade284.Daily, CaravanSettle.Player)", s1 or "OK",
             "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
     s2 = k294_selftest2()
-    rep.add("K294-S2: test syntetyczny (1 dobry bieg, 16 zlych - takze 294b K294-8..K294-14)", s2 or "OK", "OK", s2 is None)
+    rep.add("K294-S2: test syntetyczny (1 dobry bieg, 19 przypadkow - takze 294b K294-8..K294-14 i 298 K294-1/2b/3/6)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("K294-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
@@ -80509,7 +80616,8 @@ def main(argv):
 # K294-20  INFO: spizarnia wstrzymana w sprzedazy BK i gry (H1), zapas eskorty w miastach bez glodu (H2), straz gracza wedlug sily drogi (J, linia 286)
 # K294-S3  self-test wyrazen 294c i test syntetyczny k294c_rows (dobry - TAK, zle - NIE) - czesc K294-S
 KARAWANY294C_ENTRY_SOLD = 0.64     # 296c (E3-T1 'sprzedaly / wjazdow z towarem') ok. 0.48
-KARAWANY294C_TOWNS = 45.0          # 296c ostatnie 7 dob 39.9
+KARAWANY294C_TOWNS = 45.0          # 296c ostatnie 7 dob 39.1 (dawna ocena - 298: wobec rozrzutu losowego, KARAWANY294C_TOWNS_RND)
+KARAWANY294C_TOWNS_RND = 0.647     # 298 M5: rozne miasta / T x (1 - (1 - 1/T)^E) ostatnie 7 dob (plan rundy 4)
 KARAWANY294C_LEG = 1.15            # zmierzony odcinek ostatnie 7 dob / KARAWANY294C_LEG_BASE
 KARAWANY294C_LEG_BASE = 4.31       # 296c (HEAD 971570ad, bez 294c) zmierzony odcinek ostatnie 7 dob - ten sam zapis, te same doby biegu
 KARAWANY294C_FALLBACK = 0.05       # awaryjny wybor BK / decyzje
@@ -80555,7 +80663,7 @@ KARAWANY294C_J = re.compile(r"zwolnilaby (\d+) ludzi \(zold -(\d+) zl/d\), potrz
 
 
 def k294c_collect(logp):
-    C = {"c": {}, "cbad": 0, "cerr": 0, "kier": {}, "kore": {}, "t1": {}, "c288": {}, "winter": None, "j": {}}
+    C = {"c": {}, "cbad": 0, "cerr": 0, "kier": {}, "kore": {}, "t1": {}, "c288": {}, "winter": None, "j": {}, "ent": {}, "ntown": None}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\r\n"))
@@ -80582,6 +80690,16 @@ def k294c_collect(logp):
                 a = KARAWANY294C_T1.match(s)
                 if a:
                     C["t1"][int(a.group(1))] = (int(a.group(2)), int(a.group(3)))
+                continue
+            if s.startswith("Karawany: dzien "):   # 298 M5: wjazdy karawan do miast na dobe (E rozrzutu losowego K294-18)
+                a = KARAWANY298_ENT.match(s)
+                if a:
+                    C["ent"][int(a.group(1))] = int(a.group(2))
+                continue
+            if s.startswith(Z290_L):   # 298 M5: miasta z targiem (T rozrzutu losowego)
+                a = re.search(r"miast z targiem (\d+)", s)
+                if a:
+                    C["ntown"] = int(a.group(1))
                 continue
             if s.startswith(K288_G):
                 a = K288_RE.match(s)
@@ -80643,11 +80761,18 @@ def k294c_rows(rep, C, run):
         s17 += f"; INFO licznik 294c (kazda droga, w tym zjedzone): wjazdow {et}, ze spadkiem towaru {es} ({(es / et if et else 0):.3f})"
     rep.add("K294-17: wjazdy z towarem zakonczone sprzedaza T1 (E3-T1, ostatnie 7 dob)", s17 + sfx, f">= {KARAWANY294C_ENTRY_SOLD} (296c 0.48 ta sama miara)",
             (v17 is not None and v17 >= KARAWANY294C_ENTRY_SOLD) if judge else None)
-    # K294-18 rozne miasta
+    # K294-18 rozne miasta - 298 M5: wobec rozrzutu losowego E wjazdow na T miast, T x (1 - (1 - 1/T)^E), ostatnie 7 dob
     kd = sorted(C["kier"])[-7:]
     v18 = sum(C["kier"][d] for d in kd) / len(kd) if kd else None
-    rep.add("K294-18: rozne miasta z wjazdem karawan na dobe (ostatnie 7 dob)", (f"srednio {v18:.1f}" if v18 is not None else "brak linii 'Karawany (kierunek)'") + sfx,
-            f">= {KARAWANY294C_TOWNS:.0f} (296c 39.9; rozrzut losowy ok. 58)", (v18 is not None and v18 >= KARAWANY294C_TOWNS) if judge else None)
+    tn = C.get("ntown") or 97
+    ent = C.get("ent", {})
+    rr = [C["kier"][d] / (tn * (1.0 - (1.0 - 1.0 / tn) ** ent[d])) for d in kd if ent.get(d, 0) > 0]
+    r18 = sum(rr) / len(rr) if rr and len(rr) == len(kd) else None
+    e18 = sum(ent.get(d, 0) for d in kd) / len(kd) if kd else 0
+    rep.add("K294-18: rozne miasta z wjazdem karawan na dobe wobec rozrzutu losowego (ostatnie 7 dob)",
+            (f"srednio {v18:.1f} miast przy {e18:.1f} wjazdach na {tn} miast; wobec rozrzutu losowego {('-' if r18 is None else f'{r18:.3f}')}" if v18 is not None
+             else "brak linii 'Karawany (kierunek)'") + sfx,
+            f">= {KARAWANY294C_TOWNS_RND} (296c 39.1 miast / 0.649, 296d 35.7 / 0.702)", (r18 is not None and r18 >= KARAWANY294C_TOWNS_RND) if judge else None)
     # K294-19 dlugosc odcinka i awaryjny wybor
     c288 = C["c288"]
     rd = [d for d in sorted(c288) if c288[d][4] is not None][2:]
@@ -80754,7 +80879,7 @@ def k294c_selftest():
         return "linia 286 z segmentem 294c J"
     # test syntetyczny: dobry bieg - TAK, zle - NIE
     def synth(es=0.7, towns=50, leg=1.0, fall=1, hun_pre=0.08, ws=0.9, st=0, calls=1):
-        C = {"c": {}, "cbad": 0, "cerr": 0, "kier": {}, "kore": {}, "t1": {}, "c288": {}, "winter": 109020, "j": {}}
+        C = {"c": {}, "cbad": 0, "cerr": 0, "kier": {}, "kore": {}, "t1": {}, "c288": {}, "winter": 109020, "j": {}, "ent": {}, "ntown": 97}
         for i in range(30):
             d = 109000 + i
             C["t1"][d] = (100, int(100 * es))
@@ -80763,6 +80888,7 @@ def k294c_selftest():
                       "st": str(st if i == 29 else 0), "cth": str(calls * 100), "cse": str(calls * 100), "cbu": str(calls * 100)})
             C["c"][d] = x
             C["kier"][d] = towns
+            C["ent"][d] = 88   # 298: rozrzut losowy 97 x (1 - (96/97)^88) = 58.0 miast
             C["c288"][d] = (400, int(400 * (hun_pre if d < 109020 else 0.15)), 100, 10, 4.2 * (leg if i >= 23 else 1.0), KARAWANY294C_288SEG)
         return C
 
@@ -80786,7 +80912,7 @@ def k294c_selftest():
         C19["c288"][d] = x[:4] + (KARAWANY294C_LEG_BASE * 1.25,) + x[5:]
     if verdicts(C19).get("K294-19") != "NIE":
         return "294c K294-19 przepuszcza wydluzenie od 1. doby"
-    for row, C in [("K294-16", synth(st=1)), ("K294-16", synth(calls=0)), ("K294-17", synth(es=0.5)), ("K294-18", synth(towns=40)), ("K294-19", synth(leg=1.3)),
+    for row, C in [("K294-16", synth(st=1)), ("K294-16", synth(calls=0)), ("K294-17", synth(es=0.5)), ("K294-18", synth(towns=36)), ("K294-19", synth(leg=1.3)),
                    ("K294-19", synth(fall=10)), ("K294-9a", synth(hun_pre=0.15)), ("K294-10b", synth(ws=0.7))]:
         v = verdicts(C)
         if v.get(row) != "NIE":
@@ -81131,15 +81257,164 @@ _k259_rows_prev = k259_rows
 def k259_rows(rep, D):
     _k259_rows_prev(rep, D)
     days = D.get("days") or {}
-    ds = sorted(days)
-    sh = {d: int(days[d].group(6)) / int(days[d].group(3)) for d in ds if int(days[d].group(3)) > 0}
-    sd = sorted(sh)
-    if len(sd) >= 14:
-        f7 = sum(sh[d] for d in sd[:7]) / 7.0; l7 = sum(sh[d] for d in sd[-7:]) / 7.0
-        rep.add("K259-11: udzial karawan rodow z wyplata 259 (294c) - nie spada", f"pierwsze 7 dob {f7:.3f}, ostatnie 7 {l7:.3f} ({(l7 / f7 if f7 > 0 else 0):.2f})",
-                f"ostatnie 7 >= {K259C_SHARE} x pierwsze 7 (296c 0.132 -> 0.123 = 0.93)", f7 <= 0 or l7 >= K259C_SHARE * f7)
+    ds = [d for d in sorted(days) if int(days[d].group(3)) > 0]
+    # 298 M5: udzial wspolny (suma karawan z wyplata / suma karawan rodow) - pierwsze i ostatnie 30 dob (bieg < 60 dob - polowy biegu); dzienne udzialy 4/39 szumia
+    if len(ds) >= 14:
+        k = min(30, len(ds) // 2)
+        fa, la = ds[:k], ds[-k:]
+        pooled = lambda w: sum(int(days[d].group(6)) for d in w) / max(1, sum(int(days[d].group(3)) for d in w))
+        f30, l30 = pooled(fa), pooled(la)
+        rep.add(f"K259-11: udzial karawan rodow z wyplata 259 (294c) - nie spada (wspolny, {k} dob)",
+                f"pierwsze {k} dob {f30:.3f}, ostatnie {k} {l30:.3f} ({(l30 / f30 if f30 > 0 else 0):.2f})",
+                f"ostatnie {k} >= {K259C_SHARE} x pierwsze {k} (298: suma wyplat / suma karawan)", f30 <= 0 or l30 >= K259C_SHARE * f30)
+        cars = lambda w, gi: sum(int(days[d].group(gi)) for d in w) / len(w)
+        rep.add("K259-11i: karawany rodow (259) - liczba (INFO)",
+                f"pierwsze {k} dob: karawan rodow {cars(fa, 3):.1f} (lordow {cars(fa, 5):.1f}), z wyplata {cars(fa, 6):.1f}; ostatnie {k}: {cars(la, 3):.1f} "
+                f"(lordow {cars(la, 5):.1f}), z wyplata {cars(la, 6):.1f}", "INFO", None)
     else:
-        rep.add("K259-11: udzial karawan rodow z wyplata 259 (294c)", f"za malo dob ({len(sd)})", "INFO (>= 14 dob)", None)
+        rep.add("K259-11: udzial karawan rodow z wyplata 259 (294c)", f"za malo dob ({len(ds)})", "INFO (>= 14 dob)", None)
+
+
+# ================================================================ 298 (29.10, runda 4 - miary M1-M6 i L1 CaravanFoodGateByPayingTowns; opis nad stalymi KARAWANY294_SHARE_STEADY)
+def k298_rows(rep, D):
+    """298: K294-1n (kohorta od 31. doby) i K294-22 (karawany bez handlu wedlug przyczyny) - INFO z linii 'Karawany bez handlu i kohorta (298)'."""
+    x = D.get("x298") or {}
+    days = sorted(x)
+    if not days:
+        rep.add("K294-1n: karawany od 31. doby biegu - udzial placacych (INFO)", f"brak linii 298 (log sprzed 298; nierozpoznanych {D.get('x298bad', 0)})", "INFO", None)
+        rep.add("K294-22: karawany bez sprzedazy w 7 dobach wedlug przyczyny (INFO)", "brak linii 298", "INFO", None)
+        return
+    st = sum(int(x[d]["st"]) for d in days)
+    l7 = days[-7:]
+    stw, stl = _k298_steady(days, min(D.get("g") or {days[0]: 0}))
+    pooled = lambda w: (sum(int(x[d]["w"]) for d in w), sum(int(x[d]["n"]) for d in w))
+    a7, b7 = pooled(l7); a6, b6 = pooled(stw)
+    meds = [int(x[d]["med"]) for d in l7 if x[d]["med"] != "-"]
+    rep.add("K294-1n: karawany od 31. doby biegu - udzial placacych (INFO)",
+            f"ostatnie 7 dob: {('-' if b7 == 0 else f'{a7 / b7:.3f}')} (zmierzone srednio {b7 / len(l7):.0f}), mediana wyniku - zoldu "
+            f"{('-' if not meds else f'{sum(meds) / len(meds):.0f}')} zl/d; {stl}: {('-' if b6 == 0 else f'{a6 / b6:.3f}')}; nierozpoznanych {D.get('x298bad', 0)}, "
+            f"potkniec 298 {st}", "INFO (cel jak K294-1)", None)
+    av = lambda k: sum(int(x[d][k]) for d in l7) / len(l7)
+    rep.add("K294-22: karawany bez sprzedazy w 7 dobach wedlug przyczyny (INFO, ostatnie 7 dob)",
+            f"bez sprzedazy {av('idle'):.0f} z {av('cars'):.0f}: pusta kiesa {av('i0'):.1f}, bez towaru z kiesa {av('i1'):.1f}, towar bez rynku z zyskiem wedlug glebokosci "
+            f"{av('i2'):.1f}, towar z rynkiem z zyskiem - czeka {av('i3'):.1f}, bez miary {av('i4'):.1f}", "INFO (miara rundy 5)", None)
+
+
+def _k298_shift(d, top):
+    """298 M5: linie 285 / 288 z numerem doby jutra (CampaignTime.Now w takcie dobowym) - klucze o 1 w tyl, gdy ostatnia doba = ostatnia doba 284/294 + 1."""
+    if d and top is not None and max(d) == top + 1:
+        return {k - 1: v for k, v in d.items()}, True
+    return d, False
+
+
+_k298_collect_prev = k294_collect
+
+
+def k294_collect(logp):
+    D = _k298_collect_prev(logp)
+    ref = D.get("g") or D.get("pool") or {}
+    top = max(ref) if ref else None
+    D["c288"], sh = _k298_shift(D.get("c288", {}), top)
+    if sh:
+        D["f288"] = {k - 1: v for k, v in D.get("f288", {}).items()}
+        if D.get("c294"):
+            D["c294"]["c288"] = {k - 1: v for k, v in D["c294"]["c288"].items()}
+    D["c285"], _sh = _k298_shift(D.get("c285", {}), top)
+    return D
+
+
+_k298_selftest_prev = k294_selftest
+
+
+def k294_selftest():
+    r = _k298_selftest_prev()
+    if r:
+        return r
+    a = KARAWANY298_RE.match(KARAWANY298_SAMPLE)
+    if not a or a.group("idle") != "119" or a.group("i2") != "40" or a.group("i3") != "50" or a.group("sh") != "0.583" or a.group("med") != "-4" or a.group("n") != "120":
+        return f"298: linia 298 {a.groupdict() if a else None}"
+    if not KARAWANY298_RE.match(KARAWANY298_SAMPLE.replace("udzial placacych 0.583, mediana wyniku - zoldu/d -4", "udzial placacych -, mediana wyniku - zoldu/d -")
+                                .replace("(doba >= 109106)", "(doba >= -)")):
+        return "298: linia 298 bez kohorty"
+    s = KARAWANY294B_SAMPLES["284"]
+    a = KARAWANY294B_284.match(s)
+    pp = KARAWANY294B_PATH.findall(a.group(2)) if a else []
+    t1 = [x for x in KARAWANY298_PATHN.findall(a.group(2))] if a else []
+    if len(pp) != 3 or sum(int(x[6]) for x in pp) != 13022 + 324 + 0 or sum(int(x[7]) for x in pp) != 15084 + 554 + 0 \
+            or [x[0] for x in t1] != ["inne", "T1", "kontrakt 174"] or t1[1][7] != "324" or t1[1][8] != "554":
+        return f"298: drogi ponizej kosztu linii 284 {pp} {t1}"
+    f = KARAWANY298_F288.search("zapas na droge przy wyjezdzie: wyjazdow 81 (dni drogi srednio 6.4), z zapasem w jukach 51, kupilo 25 karawan 148 z 439 szt. za 9116 zl z "
+                                "kies karawan do kas 22 miast, bez towaru 10")
+    e = KARAWANY298_ENT.match("Karawany: dzien 109166 - wjazdy karawan do miast 87, w tym ze sprzedaza surowcow 2; reszta")
+    if not f or f.group(1) != "9116" or not e or e.groups() != ("109166", "87"):
+        return "298: linia 288 (jedzenie eskorty) albo 'Karawany: dzien'"
+    sh, ok = _k298_shift({109078: 1, 109167: 2}, 109166)
+    if not ok or sorted(sh) != [109077, 109166] or _k298_shift({109077: 1, 109166: 2}, 109166)[1]:
+        return "298: wyrownanie dob 285 / 288"
+    w, lab = _k298_steady(list(range(109077, 109167)), 109077)
+    if len(w) != 30 or w[0] != 109137 or w[-1] != 109166 or lab != "doby biegu 61-90":
+        return f"298: okno dob 61-90 {w[:2]} {lab}"
+    return None
+
+
+# ---- zelazo290 / Z290-5: 298 L1 - prog psujacych z miast placacych (segment '; 298: psujace - miasta placace' linii 290 i N przy kategorii)
+Z290_B = re.compile(r"\| 294b: bramka na towar handlowy (TAK|NIE), spizarnia eskorty (\d+) szt\. \(poza bramka\), miast z targiem (\d+) - prog dolny psujacych "
+                    r"\(srednie miasto\) = popyt rynkow / miasta x (\d+) dob, trwale jak towar (\d+) dob"
+                    r"(?:; 298: psujace - miasta placace (?P<l1>TAK|NIE) \(prog = .*?\), odcinek (?P<leg>[\d.]+|-) dob\))?$")
+Z290_ITEM_N = re.compile(r"(\S+) (\d+)/([\d.]+)/([\d.]+|-)/([\d.]+)/(\d+)/(KUPNO STOI|CZYNNE)/psujace/(\d+)")
+_z290_b_prev = z290_b
+
+
+def z290_b(lst):
+    """294b + 298 L1: segment linii 290 - jak dotad i l1 (klucz CaravanFoodGateByPayingTowns przy DepthOn), leg (zmierzony odcinek), nmap (N miast placacych)."""
+    b = _z290_b_prev(lst)
+    if b is None:
+        return None
+    m = Z290_B.search(lst or "")
+    b["l1"] = bool(m and m.group("l1") == "TAK")
+    b["leg"] = float(m.group("leg")) if m and m.group("leg") not in (None, "-") else None
+    b["nmap"] = {x[0]: int(x[7]) for x in Z290_ITEM_N.findall(lst or "")}
+    return b
+
+
+_z290_cap_prev = z290_cap
+
+
+def z290_cap(it, e, mk, bb):
+    """298 L1: psujace przy l1 - 7 x max(sprzedaz, popyt / miasta, popyt / miasta x N placacych x min(odcinek, 7) / 7); reszta jak dotad."""
+    want, dd = _z290_cap_prev(it, e, mk, bb)
+    kind = bb["kinds"].get(it) if bb and bb["on"] else None
+    if kind == "psujace" and bb.get("l1") and bb.get("leg") and it in bb.get("nmap", {}):
+        fd = bb["fd"]
+        want = max(want, fd * mk / bb["M"] * bb["nmap"][it] * min(bb["leg"], fd) / fd)
+    return want, dd
+
+
+_z290_selftest_prev = z290_selftest
+
+
+def z290_selftest():
+    r = _z290_selftest_prev()
+    bad = [r] if r else []
+    # 298 L1: ryby psujace N = 52, odcinek 4.312, popyt 1718.0, 97 miast: prog = 7 x 1718 / 97 x 52 x 4.312 / 7 = 3971
+    l1 = Z290_SAMPLE_294B.replace("bread 300/71.4/4.2/2148.1/500/CZYNNE/psujace", "fish 300/9.3/32.3/1718.0/3971/CZYNNE/psujace/52") \
+        .replace("trwale jak towar 10 dob ", "trwale jak towar 10 dob; 298: psujace - miasta placace TAK (prog = 7 x max(sprzedaz, popyt / miasta, popyt / miasta x N "
+                 "placacych x min(odcinek, 7) / 7), odcinek 4.312 dob) ")
+    a = Z290_RE.match(l1)
+    bb = z290_b(a.group("list")) if a else None
+    if not bb or not bb["l1"] or bb["leg"] != 4.312 or bb["nmap"] != {"fish": 52} or bb["kinds"].get("fish") != "psujace":
+        bad.append(f"298: segment L1 linii 290 {bb}")
+    else:
+        w, _dd = z290_cap("fish", 9.3, 1718.0, bb)
+        if abs(w - 3971) > 2.0:
+            bad.append(f"298: prog L1 {w:.1f} != 3971")
+        if abs(z290_cap("grain", 39.9, 13299.3, bb)[0] - 132993) > 1.0:
+            bad.append("298: trwale przy L1")
+    a0 = Z290_RE.match(Z290_SAMPLE_294B)
+    b0 = z290_b(a0.group("list")) if a0 else None
+    if not b0 or b0["l1"] or b0["nmap"] or abs(z290_cap("bread", 71.4, 2148.1, b0)[0] - 7 * max(71.4, 2148.1 / 97)) > 0.01:
+        bad.append("298: linia 290 bez segmentu L1")
+    return "; ".join(bad) if bad else None
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

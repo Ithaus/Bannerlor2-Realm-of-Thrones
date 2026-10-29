@@ -153,6 +153,7 @@ namespace Armoury
             Path = 0; _bkSelling = 0; _vanSelling = 0; _b.Mp = null;
             _stumbleSess = 0; _err.Clear();
             _g285N = _g285C = 0; _g285Acts = 0; _g285By.Clear();   // 285
+            _day0 = int.MinValue; _m298Stum = _m298StumSess = 0;   // 298
             ZeroDay();
         }
 
@@ -268,10 +269,35 @@ namespace Armoury
             {
                 // 294b (klucz CaravanFoodGateTradeStock): psujace - wlasna sprzedaz karawan, ale nie mniej niz zakupy doby jednego sredniego miasta (popyt rynkow /
                 // miasta z targiem) - bramka moze sie otworzyc, gdy sprzedaz karawan zgasla (296a: 873 -> 29 szt./d przy zamknietej bramce); trwale - jak towar (287)
-                if (s.CaravanFoodGateTradeStock) return SpoilCat(c) ? Math.Max(e, Mkt(c) / NTowns()) : Math.Max(e, Mkt(c));
+                // 298 L1 (klucz CaravanFoodGateByPayingTowns przy DepthOn): psujace - prog swiata = N miast placacych (DepthRef.N) x to, co jedno z nich zje w zmierzonym
+                // odcinku (LegEat), czyli Flow = popyt rynkow / miasta x N x min(odcinek, 7) / 7 (Cap = Flow x 7 = N x LegEat) - ten sam punkt, od ktorego test glebokosci
+                // 294b widzi kolejke (k > 1); dolny prog 294b (jedno srednie miasto) zostaje (bramka tylko w gore). Bez miary (brak miasta odniesienia, odcinek 0) - jak 294b.
+                if (s.CaravanFoodGateTradeStock)
+                {
+                    if (!SpoilCat(c)) return Math.Max(e, Mkt(c));
+                    float floor = Mkt(c) / NTowns();
+                    int n; double leg;
+                    double l1 = SpoilLegFlow(c, out n, out leg);
+                    return Math.Max(e, l1 > floor ? (float)l1 : floor);
+                }
                 return e;
             }
             return Math.Max(e, Mkt(c));
+        }
+
+        /// <summary>298 L1: zbyt doby psujacych z miast placacych - popyt rynkow 287 / miasta z targiem x N miast placacych co najmniej srednia (DepthRef.N, ten sam zbior
+        /// co SellIdx i test glebokosci) x min(zmierzony odcinek Stage8World.LegDays, 7) / 7; -1 - klucz NIE, DepthOn NIE albo bez miary (n, leg - wejscia, do linii 290).
+        /// Wola tylko DepthOf (SellIdx: indeksy miast, AvgIndex), Mkt i NTowns - zadne z nich nie wola Flow, Cap ani GateShut (bez rekurencji).</summary>
+        private static double SpoilLegFlow(ItemCategory c, out int n, out double leg)
+        {
+            n = 0; leg = 0.0;
+            var s = Settings.Current;
+            if (s == null || !s.CaravanFoodGateByPayingTowns || !DepthOn || c == null) return -1.0;
+            var r = DepthOf(c);
+            double lg = Stage8World.LegDays;
+            if (r == null || r.N <= 0 || !(lg > 0.0) || double.IsInfinity(lg)) return -1.0;
+            n = r.N; leg = lg;
+            return Mkt(c) / (double)NTowns() * n * Math.Min(lg, (double)FoodDays) / FoodDays;
         }
 
         /// <summary>287: wartosc sztuki kategorii na polce (jednostka danych rynku - HistoricalPrices.ShelfWorth), srednia towarow handlowych kategorii; raz na dobe (z pamiecia Mkt).</summary>
@@ -1212,6 +1238,9 @@ namespace Armoury
 
         // 285: przesyt karawan do miasta z brakiem surowca tabeli (SellGuardPrefix) - liczniki od ostatniej linii 285
         private static long _g285N, _g285C; private static int _g285Acts;
+        // 298 (tylko pomiar): pierwsza doba sesji (Daily) - kohorta karawan powstalych od 31. doby biegu; potkniecia linii 298 (doba / sesja)
+        private static int _day0 = int.MinValue, _m298Stum, _m298StumSess;
+        private const int CohortDay = 30;
         private static readonly Dictionary<string, int> _g285By = new Dictionary<string, int>();
 
         /// <summary>285 (MaterialOrders.Line285): odcinek "przesyt karawan do miasta z brakiem" i zerowanie licznikow.</summary>
@@ -1486,6 +1515,63 @@ namespace Armoury
             return sb.ToString();
         }
 
+        /// <summary>298 M6 (tylko odczyt): przyczyna, ze karawana nic nie sprzedala w 7 dobach. 0 pusta kiesa (bez towaru handlowego, pol kiesy < 3 doby zoldu - regula 3
+        /// zakupu), 1 bez towaru z kiesa, 2 caly towar bez rynku z zyskiem wedlug glebokosci (cena ostatniej sztuki w miescie odniesienia po mycie, DepthNetAged, nizsza
+        /// od kosztu sztuki z ksiegi - HeldCost, bez Sync), 3 towar z rynkiem z zyskiem - czeka, 4 towar bez miary. Spizarnia eskorty poza towarem (PantryCopy).</summary>
+        private static int IdleWhy(MobileParty mp)
+        {
+            var r = mp.ItemRoster;
+            var pan = R2On(Settings.Current) ? PantryCopy(mp) : null;
+            bool goods = false, measured = false;
+            HashSet<ItemObject> seen = null;
+            for (int i = 0; r != null && i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (it == null || el.Amount <= 0 || !it.IsTradeGood || it.HasHorseComponent || !Tracked(it.ItemCategory)) continue;
+                if (seen == null) seen = new HashSet<ItemObject>();
+                if (!seen.Add(it)) continue;
+                int all = r.GetItemNumber(it), keep = 0;
+                if (pan != null) pan.TryGetValue(it, out keep);
+                if (all - Math.Max(0, keep) <= 0) continue;
+                goods = true;
+                double unit = CaravanGoods.HeldCost(mp, it, all) / Math.Max(1, all);
+                double net = DepthNetAged(mp, it);
+                if (double.IsNaN(net) || !(unit > 0.0)) continue;
+                measured = true;
+                if (net >= unit) return 3;
+            }
+            if (!goods) { int purse = mp.PartyTradeGold; return purse <= 0 || 0.5 * purse < CashDays * Math.Max(0, mp.TotalWage) ? 0 : 1; }
+            return measured ? 2 : 4;
+        }
+
+        /// <summary>298 (tylko pomiar): linia doby "Karawany bez handlu i kohorta (298)" - karawany bez sprzedazy w 7 dobach (ksiega zysku 284, ta sama miara co
+        /// 'karawany 7 dob: z handlem') wedlug przyczyny (IdleWhy) i karawany powstale od 31. doby biegu (bez jukow sprzed testu): placace zold / tracace, mediana
+        /// (wynik handlu - zold)/d - ta sama miara co linia 294. Nic nie zmienia w grze; wyjatek na karawane - licznik potkniec.</summary>
+        private static string Line298(int day, int nCar, List<MobileParty> idle, int n, int w, List<double> net)
+        {
+            var why = new int[5];
+            foreach (var mp in idle)
+            {
+                try { why[IdleWhy(mp)]++; }
+                catch (Exception e) { _m298Stum++; _m298StumSess++; Stumble("Line298", e); }
+            }
+            net.Sort();
+            var sb = new StringBuilder(600);
+            sb.Append("Karawany bez handlu i kohorta (298): dzien ").Append(day)
+              .Append(" | bez sprzedazy w 7 dobach ").Append(idle.Count).Append(" z ").Append(nCar)
+              .Append(": pusta kiesa (bez towaru, pol kiesy < ").Append(CashDays).Append(" doby zoldu) ").Append(why[0])
+              .Append(", bez towaru z kiesa ").Append(why[1]).Append(", towar bez rynku z zyskiem wedlug glebokosci ").Append(why[2])
+              .Append(", towar z rynkiem z zyskiem - czeka ").Append(why[3]).Append(", towar bez miary ").Append(why[4])
+              .Append(" | karawany od ").Append(CohortDay + 1).Append(". doby biegu (doba >= ").Append(_day0 != int.MinValue ? (_day0 - 1 + CohortDay).ToString(Inv) : "-")
+              .Append("): zmierzone ").Append(n).Append(", placace ").Append(w).Append(", tracace ").Append(n - w)
+              .Append(", udzial placacych ").Append(n > 0 ? (w / (double)n).ToString("0.000", Inv) : "-")
+              .Append(", mediana wyniku - zoldu/d ").Append(net.Count > 0 ? net[net.Count / 2].ToString("0", Inv) : "-").Append(" zl")
+              .Append(" | potkniecia 298 ").Append(_m298Stum).Append(" (sesja ").Append(_m298StumSess).Append(").");
+            _m298Stum = 0;
+            return sb.ToString();
+        }
+
         /// <summary>290: linia doby "Jedzenie karawan (290)" - kategorie jedzenia z jukami albo sprzedaza: juki, wlasna sprzedaz karawan miastom (14 dob), dni jukow
         /// przy tej sprzedazy, popyt rynkow (287), prog bramki (Cap - miara Flow przy kluczu) i stan. Tylko odczyt.</summary>
         private static string Line290(Settings s, int day, List<ItemCategory> rows)
@@ -1506,6 +1592,12 @@ namespace Armoury
                          .Append(ec > 0.05f ? (hc / (double)ec).ToString("0.0", Inv) : "-").Append('/').Append(mc.ToString("0.0", Inv)).Append('/')
                          .Append(Cap(c).ToString("0", Inv)).Append('/').Append(sh ? "KUPNO STOI" : "CZYNNE");
                     if (R2Full(s)) parts.Append(SpoilCat(c) ? "/psujace" : "/trwale");   // 294b: rodzaj (psujace - 7 dob zbytu, trwale - jak towar)
+                    if (R2Full(s) && SpoilCat(c))
+                    {
+                        // 298 L1: N miast placacych, z ktorych liczy sie prog (tylko gdy regula L1 dala miare - ta sama chwila co Cap wyzej)
+                        int nl; double lgl;
+                        if (SpoilLegFlow(c, out nl, out lgl) >= 0.0) parts.Append('/').Append(nl);
+                    }
                 }
                 sb.Append("Jedzenie karawan (290): dzien ").Append(day).Append(" | klucz kupno jedzenia wedlug wlasnej sprzedazy ").Append(YN(s.CaravanFoodBuyOwnSales))
                   .Append(" | kategorii jedzenia ").Append(k).Append(", kupno stoi ").Append(shut)
@@ -1515,6 +1607,9 @@ namespace Armoury
                   .Append(" | 294b: bramka na towar handlowy ").Append(YN(R2Full(s))).Append(", spizarnia eskorty ").Append(_pantryN)
                   .Append(" szt. (poza bramka), miast z targiem ").Append(NTowns()).Append(" - prog dolny psujacych (srednie miasto) = popyt rynkow / miasta x ").Append(FoodDays)
                   .Append(" dob, trwale jak towar ").Append(Math.Max(1, s.CaravanBulkStockDays)).Append(" dob")
+                  .Append("; 298: psujace - miasta placace ").Append(YN(s.CaravanFoodGateByPayingTowns && DepthOn))
+                  .Append(" (prog = 7 x max(sprzedaz, popyt / miasta, popyt / miasta x N placacych x min(odcinek, 7) / 7), odcinek ")
+                  .Append(Stage8World.LegDays > 0.0 ? Stage8World.LegDays.ToString("0.000", Inv) : "-").Append(" dob)")
                   .Append(" | potkniecia 287 ").Append(_mktStum).Append(" (sesja).");
                 return sb.ToString();
             }
@@ -1617,6 +1712,7 @@ namespace Armoury
                     Log.Info("Karawany przeplyw towarow (284): " + (_impHad ? "wczytano pomiar sprzedazy karawan - kategorii " + _impOk + ", dob pomiaru " + _days + ", nieczytelnych " + _impBad
                                                                           : "zapis bez klucza arm_cs284 - pomiar od zera, bramka kupna wszystkich towarow po " + FlowMinDays + " dobach") + ".");
                 }
+                if (_day0 == int.MinValue) _day0 = today;   // 298: pierwsza doba sesji (tylko pomiar)
                 // 1. srednia sprzedazy (pierwsze 14 dob srednia zwykla, potem wygladzenie 1/14 - jak 282)
                 if (_days < int.MaxValue) _days++;
                 var cats = new HashSet<ItemCategory>(_ema.Keys);
@@ -1646,6 +1742,7 @@ namespace Armoury
                 var wWhy294 = new Dictionary<string, int>();
                 bool windOn = s.CaravanLosingWoundUp;
                 var n294 = new List<double>(); var p294 = new List<double>(); var g294 = new List<double>();
+                var idle298 = new List<MobileParty>(); var net298 = new List<double>(); int n298 = 0, w298 = 0;   // 298: bez sprzedazy w 7 dobach; kohorta od 31. doby
                 foreach (var mp in MobileParty.AllCaravanParties)
                 {
                     if (mp == null || !mp.IsActive || mp.ItemRoster == null) continue;
@@ -1668,6 +1765,7 @@ namespace Armoury
                     bool any;
                     long r7 = SumLast(a, day, 7, out any);
                     if (any) { withTrade++; reals.Add(r7); sum7 += r7; if (r7 > 0) withProfit++; }
+                    else idle298.Add(mp);   // 298: przyczyna liczona po przegladzie (juki swiata _held kompletne)
                     if (today - a.First >= MeasureDays)
                     {
                         bool any2;
@@ -1682,6 +1780,8 @@ namespace Armoury
                             double wg = Math.Max(0, mp.TotalWage);
                             if (pd >= wg) w294++; else { l294++; if (a.Below >= Ring) s294++; }
                             n294.Add(pd - wg); p294.Add(pd); g294.Add(wg);
+                            // 298 (pomiar): karawana powstala od 31. doby biegu (caly towar kupiony w biegu, bez jukow sprzed testu)
+                            if (!a.Old && _day0 != int.MinValue && a.First - (_day0 - 1) >= CohortDay) { n298++; if (pd >= wg) w298++; net298.Add(pd - wg); }
                             // 294 (klucz CaravanLosingWoundUp): seria >= 14 dob pomiaru ponizej zoldu i karawana sledzona >= 28 dob - wlasciciel zaczyna zwijac: kupno BK
                             // stoi (Why 6), towar schodzi zwyklymi regulami T1 / BK w nastepnych miastach, rozwiazanie w miescie, gdy gotowa (CaravanFlow.WindHourly)
                             if (windOn && a.Wind == int.MinValue && a.Below >= Ring && today - a.First >= CaravanMarket294.ExitDays)
@@ -1774,6 +1874,9 @@ namespace Armoury
 
                 // linia 294: rynek karawan (jedzenie wedlug rodzaju, zwijanie stratnych, nowe karawany wedlug miejsca) - takze przy kluczach NIE (pomiar)
                 Log.Info(CaravanMarket294.Daily(day, w294, l294, t294, u294, s294, n294, p294, g294, wNew294, wind294, wWhy294, _rWind, _bookHad, _bookOk, _bookGone, _bookBad));
+
+                // linia 298 (tylko pomiar): karawany bez sprzedazy w 7 dobach wedlug przyczyny i kohorta karawan od 31. doby biegu
+                Log.Info(Line298(day, nCar, idle298, n298, w298, net298));
 
                 // linia 4 (F, na sucho przy kluczu NIE)
                 Log.Info(new StringBuilder(500).Append("Wielkosc karawan (284, na sucho): dzien ").Append(day).Append(" | klucz Caravan Size By Trade ").Append(YN(s.CaravanSizeByTrade))

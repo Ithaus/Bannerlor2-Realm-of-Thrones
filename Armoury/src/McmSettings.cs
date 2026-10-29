@@ -9692,6 +9692,10 @@ namespace Armoury
         [SettingPropertyGroup("Caravans head where their cargo sells (294c)")]
         public bool CaravanRoadFoodTopUp { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Food Gate By Towns That Pay", HintText = "with Caravan Food Gate Counts Trade Stock Only and Caravans Price The Unit The Market Will Take: all caravans together may carry as much food that spoils as the towns paying at least the average price for it eat during one measured caravan leg (instead of a week of what one average town buys) - the same amount at which the market-depth price test starts to see a queue of other caravans' food ahead of a new unit, so the two rules no longer contradict each other. Each caravan still buys a unit only while the market-depth price says it sells at a profit. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans carry food for the towns that pay (298)")]
+        public bool CaravanFoodGateByPayingTowns { get; set; } = true;
+
         [SettingPropertyBool("Bk Retinue From Village", HintText = "with People Origin and Levy From Villages: Banner Kings retinues are made of real people - the retinue of a village manor, the retinue of an estate and the Castle Retinue of a castle garrison: a man who joins (and every man of a newly raised retinue) leaves the people of the retinue's village (a castle: its villages), and if they have no one to spare he does not join; a man a manor retinue sends away goes back home instead of vanishing; when an estate's lord calls up his retinue, its men keep their origin in his party. The retinues' sizes and their one-man-a-day pace stay as Banner Kings sets them. Off = as before (retinue men appear from nothing and vanish)", RequireRestart = false)]
         [SettingPropertyGroup("Banner Kings manor retinues from the village's own people (295)")]
         public bool BkRetinueFromVillage { get; set; } = true;
@@ -12866,6 +12870,7 @@ namespace Armoury
             s.KsIronWorldFlowOwnTownCut = KsIronWorldFlowOwnTownCut;
             s.CaravanPantryAllSales = CaravanPantryAllSales;
             s.CaravanRoadFoodTopUp = CaravanRoadFoodTopUp;
+            s.CaravanFoodGateByPayingTowns = CaravanFoodGateByPayingTowns;
             s.BkRetinueFromVillage = BkRetinueFromVillage;
             s.WinterSparesMinesAndFelling = WinterSparesMinesAndFelling;
             s.VillageCartMilitiaEscort = VillageCartMilitiaEscort;
