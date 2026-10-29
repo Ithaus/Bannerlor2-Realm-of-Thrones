@@ -39,7 +39,7 @@ namespace Armoury
     ///     (pojedynek / wszyscy, ta sama blokada "You don't have any men" i te same skutki).
     ///  2. zapas: stan ConversationBetweenLeaders bez trwajacej rozmowy przez SafetySec (rozmowa zamknieta bez odpowiedzi albo w ogole
     ///     nie ruszyla) -> walka rusza tak, jak dalaby ja gra: ludzie gracza na nogach -> StartBossFightBattleMode (wszyscy), bez ludzi ->
-    ///     StartBossFightDuelMode (gra wtedy tez daje tylko pojedynek). Nigdy herszt nietykalny do konca misji.
+    ///     StartBossFightDuelMode (gra wtedy tez daje tylko pojedynek); gdy proba rzuci - jeszcze jedna. Nigdy herszt nietykalny do konca misji.
     ///  3. linia po kazdej misji kryjowki "Kryjowka - herszt (293)" (sciezka, herszt, warunki gry, wybor) i linia przy zapasie.
     /// Stan tylko w pamieci misji, bez zapisu kampanii.
     /// </summary>
@@ -159,13 +159,20 @@ namespace Armoury
             return c != null && c.Occupation == Occupation.Soldier && PlayerEncounter.Current != null && PlayerEncounter.InsideSettlement;
         }
 
-        /// <summary>Zachowanie misji kryjowki (dopinane w SubModuleMain obok HideoutAlarm): zapas i linia misji.</summary>
+        /// <summary>Zachowanie misji kryjowki (dopinane w SubModuleMain obok HideoutAlarm): zapas i linia misji.
+        /// Flagi rozdzielone (recenzja 293): _fired = StartBossFight* wrocilo (zapas zadzialal), _tries = proby zapasu; potkniecia liczone NA MISJE -
+        /// wyjatek w zwyklym ticku nie wylacza zapasu, wyjatek w probie zapasu = jeszcze jedna proba po SafetySec, po MaxTries koniec prob.</summary>
         internal sealed class Logic : MissionBehavior
         {
             public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
-            private bool _talkPhase, _talkSeen, _ourLine, _gameCond, _guardCond, _fallback, _fallbackDuel, _lined;
-            private int _ourLines, _menAtTalk = -1;
+            // proby zapasu na misje: pierwsza + jedna powtorka (gdy StartBossFight* rzucil, a stan dalej ConversationBetweenLeaders)
+            private const int MaxTries = 2;
+            // potkniecia zwyklego ticku na misje, po ktorych logika tej misji staje (wyjatek co klatke - nie ma czego ratowac)
+            private const int MaxMissionStumbles = 10;
+
+            private bool _talkPhase, _talkSeen, _ourLine, _gameCond, _guardCond, _fired, _inTry, _fallbackDuel, _stopped, _lined;
+            private int _ourLines, _menAtTalk = -1, _tries, _missionStumbles;
             private float _idle;
             private string _faction = "-", _lastState = "-", _bossName = "-", _bossId = "-", _bossOcc = "-", _bossHero = "-", _bossBandit = "-";
             private bool _ambush;
@@ -179,7 +186,7 @@ namespace Armoury
                     _guardCond = GuardCond(boss.Character as CharacterObject);
                     _menAtTalk = PlayerMen(Mission);
                 }
-                catch (Exception e) { Stumble("NoteOurLine", e); }
+                catch (Exception e) { _missionStumbles++; Stumble("NoteOurLine", e); }
             }
 
             private void NoteBoss(Agent boss)
@@ -195,10 +202,10 @@ namespace Armoury
 
             public override void OnMissionTick(float dt)
             {
+                var s = Settings.Current;
+                if (s == null || !s.HideoutBossTalkFix || _fired || _stopped) return;
                 try
                 {
-                    var s = Settings.Current;
-                    if (s == null || !s.HideoutBossTalkFix || _fallback) return;
                     var m = Mission;
                     if (!Read(m, out _, out _ambush, out var state, out var boss)) return;
                     if (state != null) _lastState = state;
@@ -210,9 +217,10 @@ namespace Armoury
                     _idle += dt;
                     if (_idle < SafetySec) return;
                     // rozmowa przywodcow skonczona bez odpowiedzi (albo nie ruszyla): walka rusza tak, jak dalaby ja gra
-                    _fallback = true;
+                    _tries++;
                     int men = PlayerMen(m);
                     _fallbackDuel = men == 0 && boss != null && boss.IsActive();
+                    _inTry = true;
                     if (_ambush)
                     {
                         if (_fallbackDuel) HideoutAmbushMissionController.StartBossFightDuelMode(); else HideoutAmbushMissionController.StartBossFightBattleMode();
@@ -221,19 +229,39 @@ namespace Armoury
                     {
                         if (_fallbackDuel) HideoutMissionController.StartBossFightDuelMode(); else HideoutMissionController.StartBossFightBattleMode();
                     }
+                    _inTry = false;
+                    _fired = true;
                     Read(m, out _, out _, out var after, out _);
                     if (after != null) _lastState = after;
                     Log.Info(Tag + ": ZAPAS - misja " + (_ambush ? "zasadzka" : "kryjowka") + " | rozmowa z hersztem " + _bossName + " [" + _bossId + "] "
                              + (_talkSeen ? "zamknieta bez odpowiedzi" : "nie ruszyla") + " (" + SafetySec.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s stanu " + TalkState
                              + " bez rozmowy) -> " + (_fallbackDuel ? "pojedynek (ludzi gracza 0)" : "walka wszystkich (ludzi gracza " + men + ")")
-                             + " | stan po " + (after ?? "?") + ".");
+                             + " | stan po " + (after ?? "?") + " | proba " + _tries + ".");
                 }
-                catch (Exception e) { _fallback = true; Stumble("OnMissionTick", e); }
+                catch (Exception e)
+                {
+                    _missionStumbles++;
+                    Stumble("OnMissionTick", e);
+                    if (_inTry)
+                    {
+                        // proba zapasu rzucila: stan czytany od nowa; gdy dalej rozmowa przywodcow - jeszcze jedna proba po SafetySec (do MaxTries)
+                        _inTry = false;
+                        _idle = 0f;
+                        string after = null;
+                        try { Read(Mission, out _, out _, out after, out _); } catch (Exception e2) { _missionStumbles++; Stumble("OnMissionTick.Read", e2); }
+                        if (after != null) _lastState = after;
+                        if (_tries >= MaxTries) _stopped = true;
+                        Log.Info(Tag + ": ZAPAS BLAD - misja " + (_ambush ? "zasadzka" : "kryjowka") + " | herszt " + _bossName + " [" + _bossId + "] | proba " + _tries
+                                 + " z " + MaxTries + " (" + (_fallbackDuel ? "pojedynek" : "walka wszystkich") + ") | " + e.GetType().Name + " | stan po " + (after ?? "?")
+                                 + " | " + (_stopped ? "koniec prob" : "powtorka za " + SafetySec.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s") + ".");
+                    }
+                    else if (_missionStumbles >= MaxMissionStumbles) _stopped = true;
+                }
             }
 
             protected override void OnEndMission()
             {
-                try { Line(); } catch (Exception e) { Stumble("OnEndMission", e); }
+                try { Line(); } catch (Exception e) { _missionStumbles++; Stumble("OnEndMission", e); }
                 base.OnEndMission();
             }
 
@@ -242,9 +270,13 @@ namespace Armoury
                 if (_lined) return;
                 _lined = true;
                 var s = Settings.Current;
+                // stan na koniec czytany jeszcze raz (stany gry tylko rosna) - po zatrzymaniu logiki tick go juz nie odswieza
+                try { if (Read(Mission, out _, out _, out var st, out _) && st != null) _lastState = st; }
+                catch (Exception e) { _missionStumbles++; Stumble("Line.Read", e); }
                 string pick;
                 if (!_talkPhase) pick = "bez fazy herszta";
-                else if (_fallback) pick = _fallbackDuel ? "zapas pojedynek" : "zapas wszyscy";
+                else if (_fired) pick = _fallbackDuel ? "zapas pojedynek" : "zapas wszyscy";
+                else if (_tries > 0) pick = "zapas blad (prob " + _tries + ", stan " + _lastState + ")";
                 else if (_lastState == "BossFightWithDuel") pick = "pojedynek";
                 else if (_lastState == "BossFightWithAll") pick = "wszyscy";
                 else pick = "brak (stan " + _lastState + ")";
@@ -255,7 +287,7 @@ namespace Armoury
                          + ", warunek wiersza gry " + (_ourLine ? (_gameCond ? "TAK" : "NIE") : "-") + " (frakcja spotkania " + _faction + ")"
                          + ", wiersz straznika gry pasowalby " + (_ourLine ? (_guardCond ? "TAK" : "NIE") : "-")
                          + " | ludzi gracza przy rozmowie " + (_menAtTalk < 0 ? "-" : _menAtTalk.ToString())
-                         + " | wybor " + pick + " | potkniecia (sesja) " + _stumbles + ".");
+                         + " | wybor " + pick + " | potkniecia misji " + _missionStumbles + (_stopped ? " (logika zatrzymana)" : "") + ", sesja " + _stumbles + ".");
             }
         }
     }
