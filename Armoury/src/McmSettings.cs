@@ -1200,6 +1200,10 @@ namespace Armoury
         [SettingPropertyGroup("Caravan leaders trade by skill (139b)")]
         public bool CaravanLeaderTradeXp { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Leader Judgement", HintText = "a caravan led by a hero judges the market by its leader's Trade (about 9% better judgement at 50 points of Trade, 23% at 150, 38% at 300): it waits less for a dearer town that may never come - past half a stack it sells where it already makes a profit unless the dearer town, after the road, would pay clearly more - and it takes a profitable town up to that much farther than its usual choice when the road still pays (works through Caravans Weigh Waiting Against Wage and Caravans Count Road Cost In Destination). It never sells below cost. Caravans led by a plain caravan master are not touched. Off - hero-led caravans decide like any other caravan", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan leaders trade by skill (139b)")]
+        public bool CaravanLeaderJudgement { get; set; } = true;
+
         [SettingPropertyInteger("Sell Cap Percent Of New Ask", 0, 40, "0", HintText = "the most a town or castle merchant pays for a weapon, a piece of armour, a saddle or ammunition, as % of what his own stall asks for a NEW one of the same kind and quality - and never more than he charges for its wreck, so buying worn gear or spoilt arrows, putting them right and selling them back in the same town never pays; carrying mended gear to a town that lacks it still pays. Horses and pack animals are not capped (0 = no cap; needs Sell Price By Condition)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public int SellCapPercentOfNewAsk { get; set; } = 10;
@@ -10803,6 +10807,7 @@ namespace Armoury
             s.PlayerRebuyCap = PlayerRebuyCap;
             s.CaravanLeaderHaggle = CaravanLeaderHaggle;
             s.CaravanLeaderTradeXp = CaravanLeaderTradeXp;
+            s.CaravanLeaderJudgement = CaravanLeaderJudgement;
             s.SellCapPercentOfNewAsk = SellCapPercentOfNewAsk;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;
             s.LordThirdOnTotal = LordThirdOnTotal;

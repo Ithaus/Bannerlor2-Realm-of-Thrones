@@ -1062,6 +1062,7 @@ namespace Armoury
             // polowa stosu jak dotad; ponad polowe nigdy na stracie (wyjscia na stracie - polowa stosu jak dotad)
             bool a1 = CaravanWait139.AOn(s);
             double a1Day = -1, a1Leg = CaravanWait139.Leg;
+            float a1J = -1f;                                                 // 139c: ocena rynku dowodcy (CaravanLeader139b.SkillJudge; AI - 0)
             foreach (var c in cands)
             {
                 var it = c.It; var cat = it.ItemCategory;
@@ -1083,6 +1084,7 @@ namespace Armoury
                     }
                     if (step <= 0) break;
                     bool beyond = false;
+                    int a1Base = -1;                                             // 139c: sztuki kroku, ktore prog bez oceny by przepuscil (-1 - krok bez J)
                     if (maxSell > half)
                     {
                         if (sold < half) step = Math.Min(step, half - sold);       // 139 A: krok konczy sie na polowie stosu, dalsze sztuki - wlasna regula
@@ -1101,9 +1103,20 @@ namespace Armoury
                         double dn = CaravanTrade284.DepthNetAged(mp, it);
                         if (double.IsNaN(dn)) { atHalf = true; break; }
                         if (a1Day < 0) a1Day = CaravanWait139.DayCost(mp);
-                        double need = Math.Max(c.Min, dn - CaravanWait139.Carry(a1Day, c.Unit, a1Leg, cargo));
+                        if (a1J < 0f) a1J = CaravanLeader139b.SkillJudge(mp);
+                        // 139c: dowodca z ocena J > 0 - wymagany zysk czekania x (1 - J), prog c.Min bez zmian (CaravanWait139.Need; J = 0 - 139 co do bitu)
+                        double carryA = CaravanWait139.Carry(a1Day, c.Unit, a1Leg, cargo);
+                        double need = CaravanWait139.Need(c.Min, dn, carryA, a1J);
                         int kq = step;
                         while (kq >= 1) { double pq = PriceAt(model, el.EquipmentElement, mp, d, kq, wv) * keepK; if (pq > c.Min && pq >= need) break; kq--; }
+                        if (a1J > 0f)
+                        {
+                            double need0 = CaravanWait139.Need(c.Min, dn, carryA, 0f);
+                            int k0 = step;
+                            while (k0 >= 1) { double pq = PriceAt(model, el.EquipmentElement, mp, d, k0, wv) * keepK; if (pq > c.Min && pq >= need0) break; k0--; }
+                            a1Base = Math.Max(0, k0);
+                            if (kq <= 0) CaravanWait139.NoteJA(a1J, 0);
+                        }
                         if (kq <= 0)
                         {
                             // zatrzymane, bo czekanie sie oplaca: pierwsza sztuka ma tu zysk, ale mniejszy niz w miescie odniesienia po koszcie drogi
@@ -1222,6 +1235,7 @@ namespace Armoury
                     _cTown += tg0 - town.Gold; _cPurse += mp.PartyTradeGold - purse; _cToll += toll; _cTollTown += tollTown;
                     if (moved <= 0) break;
                     if (beyond) CaravanWait139.NoteA1Step(moved, gross - toll, c.Unit * moved);   // 139 A: sprzedane ponad polowe stosu (utarg po mycie, koszt)
+                    if (a1Base >= 0) CaravanWait139.NoteJA(a1J, moved - Math.Min(moved, a1Base));   // 139c: krok z ocena dowodcy (sztuki ponad prog bez oceny)
                     sold += moved; any = true;
                     left = Math.Max(0, left - gross);
                     if (c.Food) foodHave -= moved;

@@ -34,8 +34,8 @@ namespace Armoury
     ///     tu", bo czynnik bazowy kupna i odkupu tej samej sztuki jest ten sam). Czynnik jest w [0, 1] (H <= tfT <= 1), wiec kara nigdy nie rosnie.
     ///     Wojna, wies, perki, BK x5, x0.95 BK i BKROT zostaja jako mnozniki lancucha. Karawana bez bohatera - wczesne wyjscie, zero zmian.
     ///     Wpiete w postfiks 300b (PlayerHaggle.Postfix) - ta sama latka na kazdym modelu cen i ten sam licznik zagniezdzenia.
-    /// (2) OCENA (pod kluczem CaravanLeaderHaggle - osobny przelacznik dopiero, gdy ktos ja czyta): SkillJudge(mp) = 1 - tf (sam Handel - ocena rynku to wiedza,
-    ///     nie urok); bez dowodcy 0. W 139b nikt jej nie czyta - to pomocnik dla rundy 139 (czekanie na rynek, trasa BK).
+    /// (2) OCENA (139c: wlasny klucz CaravanLeaderJudgement; w 139b byla pod kluczem CaravanLeaderHaggle): SkillJudge(mp) = 1 - tf (sam Handel - ocena rynku to wiedza,
+    ///     nie urok); bez dowodcy 0. Czyta ja 139c (CaravanWait139.Need / Range: regula A - czekanie na rynek, regula C - cel z kosztem drogi).
     /// (3) XP HANDLU (klucz CaravanLeaderTradeXp): regula gracza (TradeSkillCampaignBehavior: XP = 0.5 x zysk sprzedazy ponad koszt zakupu) przy kazdej sprzedazy
     ///     karawany z dowodca miastu (CaravanGoods.TradePostfix, ksiega kosztu E3-T1; koszt szacowany przy wczytaniu - gorna granica ceny zakupu, zysk nie zawyzony);
     ///     XP z wyplat nadwyzki (259, E3/9, wyplata gry, wplata BK) dla tego dowodcy pominiete (prefiks na OnTradeProfitMade(Hero) - ten sam zysk nie liczy sie dwa
@@ -68,6 +68,8 @@ namespace Armoury
         private static bool _xpOk;
 
         internal static bool On { get { if (Off) return false; var s = Settings.Current; return s != null && s.CaravanLeaderHaggle; } }
+        /// <summary>139c: klucz oceny rynku dowodcy (CaravanLeaderJudgement); samotest (Off) - jak przy kluczach wylaczonych.</summary>
+        internal static bool JudgeOn { get { if (Off) return false; var s = Settings.Current; return s != null && s.CaravanLeaderJudgement; } }
         internal static bool XpOn { get { if (Off) return false; var s = Settings.Current; return s != null && s.CaravanLeaderTradeXp; } }
 
         internal static void Reset()
@@ -170,17 +172,17 @@ namespace Armoury
         }
 
         /// <summary>
-        /// POMOCNIK DLA RUNDY 139 (ocena rynku dowodcy): J = 1 - PartyTradeModel.GetTradePenaltyFactor(mp) dla karawany z bohaterem-dowodca, w [0, 1]; bez dowodcy
-        /// albo przy kluczu CaravanLeaderHaggle NIE - 0 (dokladnie jak bez 139b; 139 przy wpieciu moze dac wlasny przelacznik). Handel 0 / 50 / 150 / 300: 0 / 0.091 / 0.231 / 0.375. Tylko odczyt.
-        /// Gdzie 139 ma to wpiac (139b niczego nie wpina): (a) CaravanGoods.AgeMarket, regula "czekanie kosztuje zold": najdluzsze czekanie x (1 - J);
-        /// (b) CaravanRoute294c, GetTradeScoreForTown / ThinkNextDestination z kosztem drogi 139: dopuszczalna odleglosc x (1 + J), wagi kosztu drogi bez zmian;
-        /// (c) limit BK BuyCategory 1500 - bez J (limit wplywu na rynek, nie wiedzy).
+        /// OCENA RYNKU DOWODCY: J = 1 - PartyTradeModel.GetTradePenaltyFactor(mp) dla karawany z bohaterem-dowodca, w [0, 1]; bez dowodcy albo przy kluczu
+        /// CaravanLeaderJudgement NIE - 0 (dokladnie jak 139). Handel 0 / 50 / 150 / 300: 0 / 0.091 / 0.231 / 0.375. Tylko odczyt.
+        /// Wpiete w 139c: (a) regula A "czekanie kosztuje zold" (CaravanGoods.Sell T1 ponad polowe stosu i CaravanWait139.SaleValue): wymagany zysk czekania x (1 - J),
+        /// prog sprzedazy (koszt) bez zmian - nie w AgeMarket (tam J skracaloby czekanie przed sprzedaza na stracie); (b) regula C (CaravanWait139.Route): dopuszczalne
+        /// dni drogi x (1 + J), ocena R i koszt drogi bez zmian; (c) limit BK BuyCategory 1500 - bez J (limit wplywu na rynek, nie wiedzy).
         /// </summary>
         internal static float SkillJudge(MobileParty mp)
         {
             try
             {
-                if (!On || mp == null || !mp.IsCaravan || mp.LeaderHero == null) return 0f;
+                if (!JudgeOn || mp == null || !mp.IsCaravan || mp.LeaderHero == null) return 0f;
                 float j = 1f - TfOf(mp);
                 return j < 0f ? 0f : j > 1f ? 1f : j;
             }

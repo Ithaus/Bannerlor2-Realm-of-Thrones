@@ -34,6 +34,11 @@ namespace Armoury
     ///     Oceny BK nie sa zerowane (bez drugiego przebiegu BK bez limitu - blad 294c D1), zysk sprzedazy z tych samych zasad co sprzedaz (SaleValue: T1 z rezerwa kasy
     ///     i 1/20, potem BK SellGoods z cala kasa i wzorem BK, nasz straznik kosztu, surowce masowe regula CaravanBulk).
     /// Linia doby 'Karawany - czekanie, limit BK i droga (139): dzien N' (po linii 294c; pomiar czekajacych takze przy kluczach NIE). Wyjatek - licznik potkniec.
+    /// 139c (30.10, Jeff "tak zrob" - towarzysz z wysokim Handlem prowadzacy karawane handluje lepiej i lepiej decyduje): ocena rynku dowodcy J = CaravanLeader139b.SkillJudge
+    /// (0 dla karawan bez bohatera-dowodcy, czyli calego AI, i przy kluczu CaravanLeaderJudgement NIE) w regulach A i C: A - wymagany zysk czekania (cena odniesienia
+    /// po przewozie ponad prog sprzedazy) x (1 - J), prog sprzedazy (koszt z zoldem minionym, c.Min) bez zmian - dowodca nie czeka na rynek, ktory nie przyjdzie, i nigdy
+    /// nie sprzedaje ponizej kosztu (Need); C - dopuszczalne dni drogi x (1 + J), ocena R i koszt drogi bez zmian, kandydaci dalej tylko z przebiegu BK z limitem
+    /// odleglosci (Range). J = 0 - dokladnie 139 (te same dzialania na liczbach). Limit BK (B) - bez J.
     /// </summary>
     internal static class CaravanWait139
     {
@@ -55,6 +60,10 @@ namespace Armoury
         private static int _cT, _cP, _cQ, _cE, _cF, _cG, _cD, _cNone, _cHome, _cStake, _mSample;
         private static double _cDb, _cDn, _cVb, _cVn, _cRb, _cRn;
         private static long _ticks;
+        // 139c: ocena dowodcy (J > 0) - A: krokow ponad polowe ocenianych z J, suma J, sztuk sprzedanych ponad prog bez oceny; C: decyzji z J, suma J, zmienione,
+        // zmienione na miasto dalej niz zasieg bez oceny; samotest Need / Range raz na sesje
+        private static int _jAN, _jAU, _jCN, _jCE, _jCW; private static double _jAJ, _jCJ;
+        private static int[] _jSelf;
         private static int _stumbles, _stumbleSess;
         private static readonly HashSet<string> _err = new HashSet<string>();
         // latki
@@ -76,7 +85,7 @@ namespace Armoury
         {
             ZeroDay();
             _stumbleSess = 0; _err.Clear();
-            _lotMp = null; _lotCat = null; _recs.Clear(); _floorC.Clear(); _dnC.Clear(); _minIdx.Clear(); _minDay = -1;
+            _lotMp = null; _lotCat = null; _recs.Clear(); _floorC.Clear(); _dnC.Clear(); _minIdx.Clear(); _minDay = -1; _jSelf = null;
             CaravanTrade284.Waiting298.Clear();
         }
 
@@ -86,6 +95,7 @@ namespace Armoury
             _bVisits = _bBound = _bLift = _bOver = _bLiftUnits = 0; _bLiftGold = _bClipDepth = _bClipCap = _bClipGate = 0; _bTop.Clear();
             _cT = _cP = _cQ = _cE = _cF = _cG = _cD = _cNone = _cHome = _cStake = _mSample = 0; _cDb = _cDn = _cVb = _cVn = _cRb = _cRn = 0;
             _ticks = 0; _stumbles = 0;
+            _jAN = _jAU = _jCN = _jCE = _jCW = 0; _jAJ = _jCJ = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -172,6 +182,56 @@ namespace Armoury
         {
             if (!(dayCost > 0) || !(unit > 0) || !(days > 0) || !(cargo > 0)) return 0.0;
             return dayCost * days * unit / cargo;
+        }
+
+        // ------------------------------------------------------------ 139c: ocena rynku dowodcy (CaravanLeader139b.SkillJudge)
+        /// <summary>Prog ceny sztuki ponad polowe stosu (regula A, sprzedaz T1 i SaleValue): max(floor, dn - carry) - cena tej sztuki w typowym drozszym miescie po
+        /// przewozie odcinka, nie mniej niz prog sprzedazy. 139c: dowodca z ocena J > 0 zdejmuje czesc J wymaganego zysku czekania (dn - carry - floor) - zna rynek,
+        /// wiec nie czeka na lepsze miasto, ktore moze nie przyjsc; nigdy ponizej floor (koszt sztuki z zoldem minionym). J = 0 - dokladnie 139.</summary>
+        internal static double Need(double floor, double dn, double carry, float j)
+        {
+            double t = dn - carry;
+            if (j > 0f && t > floor) t -= Math.Min(1.0, (double)j) * (t - floor);
+            return Math.Max(floor, t);
+        }
+
+        /// <summary>Dopuszczalne dni drogi celu C: 139c - dowodca z ocena J > 0 przyjmuje miasto z zyskiem do dmax x (1 + J) (ocena R i koszt drogi bez zmian; kandydaci
+        /// tylko z przebiegu BK z limitem odleglosci). J = 0 - dokladnie 139.</summary>
+        internal static double Range(double dmax, float j) { return j > 0f ? dmax * (1.0 + Math.Min(1.0, (double)j)) : dmax; }
+
+        /// <summary>139c A: krok ponad polowe oceniany z J > 0 (extra - sztuki sprzedane ponad to, co prog bez oceny by przepuscil).</summary>
+        internal static void NoteJA(float j, int extra) { _jAN++; _jAJ += j; if (extra > 0) _jAU += extra; }
+
+        /// <summary>139c: samotest Need / Range na siatce (raz na sesje): [0, 1] J = 0 co do bitu jak 139; [2, 3] Need w [floor, 139], nierosnace z J; [4, 5] Range J = 0 = dmax,
+        /// J > 0 w [dmax, 2 dmax], niemalejace z J.</summary>
+        private static int[] SelfTest()
+        {
+            var r = new int[6];
+            double[] fl = { 0, 1, 50, 500 }, dn = { 0, 40, 100, 1000, 5000 }, ca = { 0, 10, 200 };
+            float[] js = { 0f, 0.091f, 0.231f, 0.375f, 1f };
+            foreach (var f in fl) foreach (var d in dn) foreach (var c in ca)
+            {
+                double b = Math.Max(f, d - c);
+                r[1]++; if (Need(f, d, c, 0f) == b) r[0]++;
+                double prev = double.MaxValue;
+                foreach (var j in js)
+                {
+                    double v = Need(f, d, c, j);
+                    r[3]++; if (v >= f && v <= b && v <= prev) r[2]++;
+                    prev = v;
+                }
+            }
+            foreach (var dm in new double[] { 1, 2.5, 4.47, 9 })
+            {
+                double prev = 0;
+                foreach (var j in js)
+                {
+                    double v = Range(dm, j);
+                    r[5]++; if ((j > 0f ? v >= dm && v <= 2 * dm : v == dm) && v >= prev) r[4]++;
+                    prev = v;
+                }
+            }
+            return r;
         }
 
         /// <summary>Zmierzony odcinek karawan (288, Stage8World.LegDays); 0 - bez pomiaru.</summary>
@@ -274,6 +334,7 @@ namespace Armoury
             double bkGold = town.Gold;
             bool a1 = AOn(s);
             double leg = Leg, dc = -1, cargo = -1;
+            float jv = -1f;                                                  // 139c: ocena dowodcy (A) - ta sama regula co sprzedaz T1
             var lots = new List<Lot>();
             var vcat = new Dictionary<ItemCategory, double>();
             HashSet<ItemObject> seen = null;
@@ -337,7 +398,8 @@ namespace Armoury
                             if (!double.IsNaN(dn))
                             {
                                 if (dc < 0) { dc = DayCost(mp); cargo = CargoRO(mp); }
-                                double need = Math.Max(l.Thr, dn - Carry(dc, l.Unit, leg, cargo));
+                                if (jv < 0f) jv = CaravanLeader139b.SkillJudge(mp);
+                                double need = Need(l.Thr, dn, Carry(dc, l.Unit, leg, cargo), jv);
                                 kp = MaxK(model, l, mp, keep, need, half + 1, lim);
                             }
                         }
@@ -548,7 +610,11 @@ namespace Armoury
                 if (mp.HomeSettlement != null && result.Settlement == mp.HomeSettlement) { _cHome++; return; }
                 if (Stakeholder(mp, result.Settlement)) { _cStake++; return; }
                 double db = Days(mp, result.Settlement);
-                double dmax = stuck ? Math.Max(db, Leg) : db;
+                double dmax0 = stuck ? Math.Max(db, Leg) : db;
+                // 139c: dowodca z ocena J > 0 przyjmuje miasto z zyskiem do dmax x (1 + J); J = 0 (AI) - zasieg 139
+                float jr = CaravanLeader139b.SkillJudge(mp);
+                double dmax = Range(dmax0, jr);
+                if (jr > 0f) { _jCN++; _jCJ += jr; }
                 var cand = new List<KeyValuePair<Town, double>>();
                 foreach (var kv in _recs)
                 {
@@ -579,6 +645,7 @@ namespace Armoury
                 _cE++;
                 if (dbest < db - 1e-6) _cF++; else if (dbest > db + 1e-6) _cG++;
                 if (stuck) _cD++;
+                if (jr > 0f) { _jCE++; if (dbest > dmax0 + 1e-6) _jCW++; }
                 _cDb += db; _cDn += dbest; _cVb += vb; _cVn += vbest; _cRb += dc * db; _cRn += dc * dbest;
                 result = best;
             }
@@ -633,6 +700,16 @@ namespace Armoury
                 }
                 int nC = dcL.Count;
                 double dcMed = Med(dcL);
+                // 139c: karawany z bohaterem-dowodca i ich ocena J (spis z konca doby)
+                int nH = 0, nHj = 0; double jS = 0, jM = 0;
+                foreach (var mp in MobileParty.AllCaravanParties)
+                {
+                    if (mp == null || !mp.IsActive || mp.LeaderHero == null) continue;
+                    nH++;
+                    float jj = CaravanLeader139b.SkillJudge(mp);
+                    if (jj > 0f) { nHj++; jS += jj; if (jj > jM) jM = jj; }
+                }
+                if (_jSelf == null) _jSelf = SelfTest();
                 // czekajace (klasa 3 linii 298)
                 var wait = CaravanTrade284.Waiting298;
                 double vSum = 0, zSum = 0; int inLeg = 0, far = 0, none = 0;
@@ -715,6 +792,13 @@ namespace Armoury
                   .Append(", zysk sprzedazy BK ").Append(_cE > 0 ? (_cVb / _cE).ToString("0", Inv) : "-").Append(" -> 139 ").Append(_cE > 0 ? (_cVn / _cE).ToString("0", Inv) : "-")
                   .Append(" zl, koszt drogi ").Append(_cE > 0 ? (_cRb / _cE).ToString("0", Inv) : "-").Append(" -> ").Append(_cE > 0 ? (_cRn / _cE).ToString("0", Inv) : "-")
                   .Append(" zl, bez miasta z zyskiem ").Append(_cNone).Append(", bez zmian - dom ").Append(_cHome).Append(" / udzialowiec ").Append(_cStake)
+                  .Append(" | dowodca (139c): klucz ocena ").Append(s.CaravanLeaderJudgement ? "TAK" : "NIE").Append(", karawan z dowodca ").Append(nH).Append(" (J > 0 ").Append(nHj).Append(", J sr ").Append(nHj > 0 ? (jS / nHj).ToString("0.000", Inv) : "-")
+                  .Append(", max ").Append(nHj > 0 ? jM.ToString("0.000", Inv) : "-").Append("); A: krokow ponad polowe z J ").Append(_jAN)
+                  .Append(" (J sr ").Append(_jAN > 0 ? (_jAJ / _jAN).ToString("0.000", Inv) : "-").Append("), szt. ponad prog bez oceny ").Append(_jAU)
+                  .Append("; C: decyzji z J ").Append(_jCN).Append(" (J sr ").Append(_jCN > 0 ? (_jCJ / _jCN).ToString("0.000", Inv) : "-").Append("), zmienione ").Append(_jCE)
+                  .Append(", dalej niz zasieg bez oceny ").Append(_jCW)
+                  .Append("; samotest J=0 = 139 ").Append(_jSelf[0]).Append("/").Append(_jSelf[1]).Append(", prog ").Append(_jSelf[2]).Append("/").Append(_jSelf[3])
+                  .Append(", zasieg ").Append(_jSelf[4]).Append("/").Append(_jSelf[5])
                   .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
             }
             catch (Exception e)
