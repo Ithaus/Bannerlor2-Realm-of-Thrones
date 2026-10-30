@@ -49,6 +49,24 @@ namespace Armoury
 
         private static bool D1On(Settings s) { return s != null && s.CaravanRouteBySale; }
         private static bool D2On(Settings s) { return s != null && s.CaravanRouteByBuyRules; }
+        // 139 (klucz CaravanRouteRoadCost, CaravanWait139.Route): stan decyzji i kolejka 'w drodze do miast' (Inbound) takze bez D1/D2 - cel z kosztem drogi liczy
+        // zysk sprzedazy za towarem innych karawan jadacych do tego miasta (bez kolejki wszystkie karawany wybralyby to samo najblizsze miasto)
+        private static bool RouteOn(Settings s) { return D1On(s) || D2On(s) || CaravanWait139.COn(s); }
+
+        /// <summary>139: karawana w biezacej decyzji (ThinkNextDestination, nie zwolniona); null - poza decyzja.</summary>
+        internal static MobileParty Deciding { get { return _bypass ? null : _mp; } }
+
+        /// <summary>139 (CaravanWait139.SaleValue): towar innych karawan w drodze do miasta t w kategorii c - [0] sztuki, [1] jednostki polki; bez wpisu karawany self
+        /// (pomiar doby - jej wlasny towar nie stoi w kolejce przed nia). null - brak.</summary>
+        internal static double[] InboundFor(Town t, ItemCategory c, MobileParty self)
+        {
+            var x = InboundOf(t, c);
+            if (x == null) return null;
+            Rec own; double[] v;
+            if (self != null && _in.TryGetValue(self, out own) && own != null && own.T == t && own.V.TryGetValue(c, out v))
+                return new[] { Math.Max(0.0, x[0] - v[0]), Math.Max(0.0, x[1] - v[1]) };
+            return x;
+        }
 
         // ------------------------------------------------------------ stan decyzji (watek glowny)
         private static MobileParty _mp;                   // karawana w ThinkNextDestination (null - poza decyzja albo zwolniona)
@@ -214,7 +232,7 @@ namespace Armoury
             _mp = null; _town = null; _zeroCall = 0; _passZero = 0; _old = null; _pantry = null; _peek = false; _floor.Clear();
             _cThink++;
             var s = Settings.Current;
-            if (__0 == null || !(D1On(s) || D2On(s))) return;
+            if (__0 == null || !RouteOn(s)) return;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -242,7 +260,7 @@ namespace Armoury
         {
             if (_bypass) return;
             var s = Settings.Current;
-            if (__0 == null || !(D1On(s) || D2On(s))) { EndDecision(); return; }
+            if (__0 == null || !RouteOn(s)) { EndDecision(); return; }
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -293,7 +311,7 @@ namespace Armoury
         {
             if (_bypass) return;
             _cFind++;
-            if (_mp != null && ReferenceEquals(__0, _mp)) _passZero = _zeroCall;
+            if (_mp != null && ReferenceEquals(__0, _mp)) { _passZero = _zeroCall; CaravanWait139.PassStart(); }   // 139: oceny miast BK tego przebiegu od nowa
         }
 
         /// <summary>Postfiks FindNextDestinationForCaravan: przebieg z limitem odleglosci pusty, a w nim zerowalismy oceny - wybor BK z limitem bez zmian (powtorka przebiegu
@@ -306,13 +324,18 @@ namespace Armoury
             {
                 bool zeroed = _zeroCall > _passZero;
                 if (!__1) { _farPass++; if (zeroed) _farZero++; return; }
-                if (__result != null || !zeroed || _findMi == null || __instance == null) return;
-                _bypass = true;
-                try { __result = _findMi.Invoke(__instance, new object[] { __0, true }) as Town; }
-                catch (TargetInvocationException e) { Stumble("FindPostfix(BK)", e.InnerException ?? e); }
-                finally { _bypass = false; }
-                _cutFall++;
-                if (__result == null) _cutFallNull++;
+                if (__result == null && zeroed && _findMi != null && __instance != null)
+                {
+                    _bypass = true;
+                    try { __result = _findMi.Invoke(__instance, new object[] { __0, true }) as Town; }
+                    catch (TargetInvocationException e) { Stumble("FindPostfix(BK)", e.InnerException ?? e); }
+                    finally { _bypass = false; }
+                    _cutFall++;
+                    if (__result == null) _cutFallNull++;
+                }
+                // 139 (klucz CaravanRouteRoadCost): wybor BK z limitem odleglosci b* - karawana z ladunkiem albo utknieta moze wziac miasto nie dalsze, w ktorym zysk
+                // sprzedazy po koszcie dni drogi na dobe jest wiekszy (CaravanWait139.Route); ocen BK nie zmienia, drugi przebieg BK bez zmian
+                if (__result != null) CaravanWait139.Route(__0, ref __result);
             }
             catch (Exception e) { Stumble("FindPostfix", e); }
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
@@ -470,7 +493,7 @@ namespace Armoury
             {
                 if (_in.Count > 0) Take(mp);
                 var s = Settings.Current;
-                if (!(D1On(s) || D2On(s)) || !CaravanBulk.TradesForT1(mp) || mp.ItemRoster == null) return;
+                if (!RouteOn(s) || !CaravanBulk.TradesForT1(mp) || mp.ItemRoster == null) return;
                 var r = mp.ItemRoster;
                 var pantry = CaravanTrade284.PantryCopy(mp);
                 Dictionary<ItemObject, int> snap = null;
@@ -515,7 +538,7 @@ namespace Armoury
             int today = (int)CampaignTime.Now.ToDays, day = today - 1;
             int cars = 0, withTrade = 0, withSold = 0, ore = 0, oreShort = 0, inCars = 0;
             double inUnits = 0, inValue = 0;
-            bool on = D1On(s) || D2On(s);
+            bool on = RouteOn(s);
             try
             {
                 _in.Clear(); _agg.Clear();

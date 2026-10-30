@@ -83252,5 +83252,290 @@ def k294_selftest():
     return None
 
 
+# ---- 139 (30.10, Jeff "Napraw karawany"): czekanie kosztuje zold (A), limit BK w monecie towaru (B), cel z kosztem drogi (C) - grupa karawany294
+# Linia 'Karawany - czekanie, limit BK i droga (139): dzien N' (CaravanWait139.Daily, po linii 294c). Log bez linii 139 (sprzed 139) - wiersze INFO z miarami bazy.
+# K294-27 linia 139 co dobe (dziur <= 1), nierozpoznanych 0, potkniecia 0, ERROR CaravanWait139.* 0, latka BuyCategory 2/2 przy kluczu B
+# K294-28 klasa 'towar z rynkiem z zyskiem - czeka' linii 298: ostatnie 7 dob <= 90 (0.85 x 106 z 138c) i doby 61-90 <= 95; liczniki A - INFO
+# K294-29 A ponad polowe stosu nic ponizej kosztu (utarg po mycie >= koszt kazdej doby) i K294-3 (strata wszystkimi drogami, ostatnie 10 dob) <= 1700 zl/d
+# K294-30 B: przy kluczu podniesione loty > 0 (sztuki ponad to, co 138 kupilby z 1 500); loty podniesione ponad limit (budzet ksiegowany jak BK) i najwiecej - INFO
+# K294-31 odcinek 288 ostatnie 7 dob <= 4.60 i doby 61-90 <= 4.59; zmienione decyzje: dni drogi 139 <= BK; 'dalej w odcinku' <= skierowane utkniete (kazda doba);
+#         bez zmian (wybor BK = dom karawany / miasto udzialowca klanu) - INFO
+# K294-32 K294-1 ostatnie 7 dob >= 0.58; K294-2b ostatnie 7 >= 0.9 x 78.9k, doby 61-90 >= 0.9 x 43.6k (138c)
+# K294-33 self-test wyrazen i wierszy (w K294-S)
+KAR139_L = "Karawany - czekanie, limit BK i droga (139): dzien "
+KAR139_ERR = ("ERROR in CaravanWait139.",)
+KAR139_N = r"(-?\d+|-)"
+KAR139_RE = re.compile(
+    r"^Karawany - czekanie, limit BK i droga \(139\): dzien (?P<d>\d+)"
+    r" \| klucze: czekanie wedlug zoldu (?P<ka>TAK|NIE), limit BK w monecie towaru (?P<kb>TAK|NIE), koszt drogi w celu (?P<kc>TAK|NIE)"
+    r" \| koszt dnia karawany mediana (?P<dcm>-?\d+|-) zl/d, srednio (?P<dca>-?\d+|-) zl/d \(zold (?P<dcw>-?\d+|-) \+ jedzenie (?P<dcf>-?\d+|-)\), karawan (?P<nc>\d+),"
+    r" odcinek (?P<leg>[0-9.]+) dob"
+    r" \| A: T1 ponad polowe stosu krokow (?P<as>\d+), szt\. (?P<an>\d+) za (?P<ag>-?\d+) zl \(koszt (?P<ac>-?\d+) zl\), zatrzymane - czekanie sie oplaca (?P<ah>\d+) szt\."
+    r"; czekajace (?P<w>\d+): towar po koszcie (?P<wv>-?\d+) zl, dni od ostatniej sprzedazy mediana (?P<wd>\d+|-) / p90 (?P<wd9>\d+|-),"
+    r" zold od ostatniej sprzedazy (?P<wz>-?\d+) zl, najblizsze miasto placace >= koszt \+ droga \(proba (?P<wm>\d+)\): w odcinku (?P<wa>\d+) / dalej (?P<wb>\d+)"
+    r" / brak (?P<wc>\d+), dni drogi mediana (?P<we>[0-9.]+|-), cena tam / koszt mediana (?P<wr>[0-9.]+|-); skierowane utkniete (?P<sd>\d+)"
+    r" \| B: wizyt BK (?P<bk>\d+), limit 1500 wiazal (?P<bj>\d+), podniesiony (?P<bu>\d+) \(szt\. (?P<bv>\d+) za (?P<bw>\d+) zl\), lotow ponad limit (?P<bo>\d+),"
+    r" przyciete glebokosc (?P<bx>\d+) / kapital (?P<by>\d+) / bramka (?P<bz>\d+) szt\., latka (?P<bp>2/2|BRAK \d+/2), najwiecej: (?P<btop>[^|]*?)"
+    r" \| C: decyzji z towarem (?P<ct>\d+) \(zaladowane (?P<cp>\d+), utkniete (?P<cq>\d+)\), zmienione (?P<ce>\d+) \(blizej (?P<cf>\d+), dalej w odcinku (?P<cg>\d+)\),"
+    r" dni drogi BK (?P<cdb>[0-9.]+|-) -> 139 (?P<cdn>[0-9.]+|-), zysk sprzedazy BK (?P<cvb>-?\d+|-) -> 139 (?P<cvn>-?\d+|-) zl,"
+    r" koszt drogi (?P<crb>-?\d+|-) -> (?P<crn>-?\d+|-) zl, bez miasta z zyskiem (?P<cn>\d+), bez zmian - dom (?P<ch>\d+) / udzialowiec (?P<cs>\d+)"
+    r" \| czas (?P<ms>[0-9.]+) ms \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
+KAR139_SAMPLE = ("Karawany - czekanie, limit BK i droga (139): dzien 109166 | klucze: czekanie wedlug zoldu TAK, limit BK w monecie towaru TAK, koszt drogi w celu TAK"
+                 " | koszt dnia karawany mediana 94 zl/d, srednio 118 zl/d (zold 109 + jedzenie 9), karawan 394, odcinek 4.47 dob"
+                 " | A: T1 ponad polowe stosu krokow 50, szt. 200 za 30000 zl (koszt 22000 zl), zatrzymane - czekanie sie oplaca 300 szt.; czekajace 80: towar po koszcie"
+                 " 350000 zl, dni od ostatniej sprzedazy mediana 10 / p90 14, zold od ostatniej sprzedazy 90000 zl, najblizsze miasto placace >= koszt + droga (proba 40):"
+                 " w odcinku 30 / dalej 4 / brak 6, dni drogi mediana 2.5, cena tam / koszt mediana 1.35; skierowane utkniete 12"
+                 " | B: wizyt BK 800, limit 1500 wiazal 300, podniesiony 40 (szt. 60 za 90000 zl), lotow ponad limit 0, przyciete glebokosc 10 / kapital 5 / bramka 0 szt.,"
+                 " latka 2/2, najwiecej: cotton 20, jewelry 10"
+                 " | C: decyzji z towarem 150 (zaladowane 80, utkniete 60), zmienione 30 (blizej 25, dalej w odcinku 5), dni drogi BK 4.10 -> 139 2.90, zysk sprzedazy BK 700"
+                 " -> 139 900 zl, koszt drogi 400 -> 300 zl, bez miasta z zyskiem 20, bez zmian - dom 7 / udzialowiec 3 | czas 35.20 ms | potkniecia 0 (sesja 0).")
+KAR139_SAMPLE_OFF = ("Karawany - czekanie, limit BK i droga (139): dzien 109077 | klucze: czekanie wedlug zoldu NIE, limit BK w monecie towaru NIE, koszt drogi w celu NIE"
+                     " | koszt dnia karawany mediana - zl/d, srednio - zl/d (zold - + jedzenie -), karawan 0, odcinek 0.00 dob"
+                     " | A: T1 ponad polowe stosu krokow 0, szt. 0 za 0 zl (koszt 0 zl), zatrzymane - czekanie sie oplaca 0 szt.; czekajace 0: towar po koszcie 0 zl,"
+                     " dni od ostatniej sprzedazy mediana - / p90 -, zold od ostatniej sprzedazy 0 zl, najblizsze miasto placace >= koszt + droga (proba 0): w odcinku 0 / dalej 0"
+                     " / brak 0, dni drogi mediana -, cena tam / koszt mediana -; skierowane utkniete 0 | B: wizyt BK 0, limit 1500 wiazal 0, podniesiony 0 (szt. 0 za 0 zl),"
+                     " lotow ponad limit 0, przyciete glebokosc 0 / kapital 0 / bramka 0 szt., latka BRAK 0/2, najwiecej: - | C: decyzji z towarem 0 (zaladowane 0, utkniete 0),"
+                     " zmienione 0 (blizej 0, dalej w odcinku 0), dni drogi BK - -> 139 -, zysk sprzedazy BK - -> 139 - zl, koszt drogi - -> - zl, bez miasta z zyskiem 0,"
+                     " bez zmian - dom 0 / udzialowiec 0 | czas 0.00 ms | potkniecia 0 (sesja 0).")
+KAR139_WAIT_L7 = 90.0          # 0.85 x 106 (138c, ostatnie 7 dob)
+KAR139_WAIT_ST = 95.0          # doby 61-90 (138c 111.7)
+KAR139_LOSS = 1700.0           # K294-3 (138c 1014; szum biegow 1-5 tys.)
+KAR139_LEG_L7 = 4.60           # 138c 4.47
+KAR139_LEG_ST = 4.59           # 138c doby 61-90 4.46
+KAR139_SHARE = 0.58            # K294-1 ostatnie 7 dob (138c 0.529)
+KAR139_FLEET_L7 = 0.9 * 78883  # K294-2b ostatnie 7 dob (138c)
+KAR139_FLEET_ST = 0.9 * 43634  # K294-2b doby 61-90 (138c)
+
+
+def _k139_i(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _k139_f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _k139_share(D):
+    """K294-1 jak w k294_rows: udzial placacych srednio ostatnie 7 dob i doby 61-90 (linia 294)."""
+    g = D.get("g") or {}
+    days = sorted(g)
+    if not days:
+        return None, None
+    stw, _ = _k298_steady(days, days[0])
+    return _k294_avg([_k294_num(g[d]["share"]) for d in days[-7:]]), _k294_avg([_k294_num(g[d]["share"]) for d in stw])
+
+
+def _k139_fleet(D):
+    """K294-2b jak w k294_common: wynik floty ostatnie 7 dob i doby 61-90."""
+    c285 = D.get("c285", {}); f288 = D.get("f288", {}); r284 = D.get("r284", {}); w287 = D.get("w287", {})
+    fdays = [d for d in sorted(r284) if d in w287]
+    if len(fdays) < 7:
+        return None, None
+    fl = lambda d: r284[d] - w287[d] - (c285[d][1] if d in c285 else 0) - f288.get(d, 0)
+    stw, _ = _k298_steady(fdays, min(fdays))
+    return sum(fl(d) for d in fdays[-7:]) / 7.0, sum(fl(d) for d in stw) / len(stw)
+
+
+def _k139_loss(D):
+    """K294-3 jak w k294_common: strata ponizej kosztu wszystkimi drogami + niesprzedane na polke, ostatnie 10 dob."""
+    g = D.get("g") or {}; c284 = D.get("c284", {})
+    td = [d for d in sorted(c284) if len(c284[d]) > 3][-10:]
+    if not td:
+        return None
+    lg = sum(c284[d][3] for d in td) / len(td); lc = sum(c284[d][4] for d in td) / len(td)
+    shelf = sum(int(g[d]["xlc"]) for d in td if d in g) / len(td)
+    return lc - lg + shelf
+
+
+_k139_collect_prev = k294_collect
+
+
+def k294_collect(logp):
+    D = _k139_collect_prev(logp)
+    x = {}; bad = 0; err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if KAR139_L not in ln and "ERROR in CaravanWait139." not in ln:
+                continue
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(KAR139_ERR):
+                err += 1
+                continue
+            if not s.startswith(KAR139_L):
+                continue
+            a = KAR139_RE.match(s)
+            if a:
+                x[int(a.group("d"))] = a.groupdict()
+            else:
+                bad += 1
+    D["k139"] = x; D["k139bad"] = bad; D["k139err"] = err
+    return D
+
+
+def k139_rows(rep, D):
+    x = D.get("k139") or {}
+    days = sorted(x)
+    g = D.get("g") or {}
+    run = len(g) if g else len(days)
+    judge = bool(days) and run >= KARAWANY294_MIN_DAYS
+    tag = "" if judge else (" | log bez linii 139 - baza, INFO" if not days else f" | bieg za krotki ({run} dob) - INFO")
+    j = lambda ok: ok if judge else None
+    last = x[days[-1]] if days else None
+    # K294-27
+    if days:
+        holes = [d for d in range(days[0], days[-1] + 1) if d not in x]
+        st = sum(int(x[d]["st"]) for d in days)
+        bon = last["kb"] == "TAK"
+        okp = (not bon) or last["bp"] == "2/2"
+        rep.add("K294-27: linia 139 co dobe, nierozpoznanych 0, potkniecia 0, ERROR CaravanWait139 0, latka BuyCategory 2/2 przy kluczu B",
+                f"dob {len(days)} (d{days[0]}-d{days[-1]}), dziur {len(holes)}, nierozpoznanych {D.get('k139bad', 0)}, potkniec {st}, ERROR {D.get('k139err', 0)}, "
+                f"latka {last['bp']} (klucz B {last['kb']}); klucze A/B/C {last['ka']}/{last['kb']}/{last['kc']}, czas ostatniej doby {last['ms']} ms",
+                "dziur <= 1, 0 / 0 / 0, latka 2/2 przy kluczu B",
+                len(holes) <= 1 and D.get("k139bad", 0) == 0 and st == 0 and D.get("k139err", 0) == 0 and okp)
+    else:
+        rep.add("K294-27: linia 139 co dobe, nierozpoznanych 0, potkniecia 0, ERROR CaravanWait139 0, latka BuyCategory 2/2 przy kluczu B",
+                f"brak linii 139 (log sprzed 139; nierozpoznanych {D.get('k139bad', 0)}, ERROR {D.get('k139err', 0)})", "linia w kazdej dobie (log sprzed 139 - INFO)",
+                False if (D.get("k139bad", 0) or D.get("k139err", 0)) else None)
+    # K294-28 klasa 3 linii 298
+    x298 = D.get("x298") or {}
+    d298 = sorted(x298)
+    if d298:
+        stw, stl = _k298_steady(d298, min(g) if g else d298[0])
+        w7 = sum(int(x298[d]["i3"]) for d in d298[-7:]) / len(d298[-7:]); ws = sum(int(x298[d]["i3"]) for d in stw) / len(stw)
+        l7 = days[-7:]
+        aseg = (f"; A ostatnie {len(l7)} dob: krokow {sum(int(x[d]['as']) for d in l7) / len(l7):.1f}/d, szt. {sum(int(x[d]['an']) for d in l7) / len(l7):.1f}/d, "
+                f"zatrzymane {sum(int(x[d]['ah']) for d in l7) / len(l7):.1f} szt./d; czekajace (139, proba {last['wm']}) w odcinku / dalej / brak "
+                f"{sum(int(x[d]['wa']) for d in l7) / len(l7):.1f} / {sum(int(x[d]['wb']) for d in l7) / len(l7):.1f} / {sum(int(x[d]['wc']) for d in l7) / len(l7):.1f}, "
+                f"dni od sprzedazy mediana {last['wd']}, cena tam / koszt {last['wr']}") if days else ""
+        rep.add("K294-28: karawany bez sprzedazy z towarem z rynkiem z zyskiem - czeka (298, ostatnie 7 dob i doby 61-90)",
+                f"ostatnie 7 dob {w7:.1f}, {stl} {ws:.1f}{aseg}{tag}", f"<= {KAR139_WAIT_L7:.0f} i <= {KAR139_WAIT_ST:.0f} (138c 106.0 / 111.7)",
+                j(w7 <= KAR139_WAIT_L7 and ws <= KAR139_WAIT_ST))
+    else:
+        rep.add("K294-28: karawany bez sprzedazy z towarem z rynkiem z zyskiem - czeka (298)", "brak linii 298" + tag, "INFO", None)
+    # K294-29 A nie ponizej kosztu i K294-3
+    loss = _k139_loss(D)
+    if days:
+        below = [d for d in days if int(x[d]["ag"]) + 1 < int(x[d]["ac"])]
+        an = sum(int(x[d]["an"]) for d in days); ag = sum(int(x[d]["ag"]) for d in days); ac = sum(int(x[d]["ac"]) for d in days)
+        v29 = f"A caly bieg: szt. {an}, utarg po mycie {ag} zl, koszt {ac} zl, dob z utargiem < koszt {len(below)}"
+        ok29 = not below
+    else:
+        v29, ok29 = "brak linii 139", True
+    v29 += f"; K294-3 ostatnie 10 dob {'-' if loss is None else f'{loss:.0f}'} zl/d"
+    rep.add("K294-29: A ponad polowe stosu nic ponizej kosztu i strata wszystkimi drogami (K294-3)", v29 + tag,
+            f"utarg >= koszt kazdej doby i K294-3 <= {KAR139_LOSS:.0f} zl/d (138c 1014)", j(ok29 and loss is not None and loss <= KAR139_LOSS))
+    # K294-30 B
+    if days:
+        on = [d for d in days if x[d]["kb"] == "TAK"]
+        bu = sum(int(x[d]["bu"]) for d in on); bo = sum(int(x[d]["bo"]) for d in on); bv = sum(int(x[d]["bv"]) for d in on)
+        bj = sum(int(x[d]["bj"]) for d in days); bk = sum(int(x[d]["bk"]) for d in days)
+        clip = [sum(int(x[d][k]) for d in on) for k in ("bx", "by", "bz")]
+        rep.add("K294-30: B - limit BK w monecie towaru (loty podniesione, ponad limit, przyciete)",
+                f"dob z kluczem {len(on)}: wizyt (caly bieg) {bk}, limit 1500 wiazal {bj}, podniesione {bu} (szt. {bv}), ponad limit {bo}, przyciete glebokosc / kapital / bramka "
+                f"{clip[0]} / {clip[1]} / {clip[2]} szt.; najwiecej (ostatnia doba): {last['btop']}{tag}",
+                "przy kluczu: podniesione > 0 (ponad limit - INFO)", j(bu > 0) if on else None)
+    else:
+        rep.add("K294-30: B - limit BK w monecie towaru", "brak linii 139" + tag, "INFO", None)
+    # K294-31 odcinek i decyzje C
+    C = D.get("c294") or {}
+    c288 = C.get("c288") or {}
+    rd = [d for d in sorted(c288) if c288[d][4] is not None][2:]
+    if len(rd) >= 7:
+        l7v = sum(c288[d][4] for d in rd[-7:]) / 7.0
+        stw, stl = _k298_steady(rd, min(g) if g else rd[0])
+        sv = sum(c288[d][4] for d in stw) / len(stw)
+        v31 = f"odcinek 288 ostatnie 7 dob {l7v:.2f}, {stl} {sv:.2f}"
+        ok31 = l7v <= KAR139_LEG_L7 and sv <= KAR139_LEG_ST
+    else:
+        v31, ok31 = f"za malo dob z pomiarem odcinka ({len(rd)})", False
+    if days:
+        ce = sum(int(x[d]["ce"]) for d in days)
+        sdb = sum(int(x[d]["ce"]) * float(x[d]["cdb"]) for d in days if x[d]["cdb"] != "-")
+        sdn = sum(int(x[d]["ce"]) * float(x[d]["cdn"]) for d in days if x[d]["cdn"] != "-")
+        far = [d for d in days if int(x[d]["cg"]) > int(x[d]["sd"])]
+        v31 += (f"; C caly bieg: zmienione {ce}, dni drogi BK {sdb / ce:.2f} -> 139 {sdn / ce:.2f}" if ce > 0 else "; C: zmienionych 0") + f", dob z 'dalej' > skierowane utkniete {len(far)}"
+        v31 += f", bez zmian - dom {sum(int(x[d]['ch']) for d in days)} / udzialowiec {sum(int(x[d]['cs']) for d in days)}"
+        ok31 = ok31 and (ce == 0 or sdn <= sdb + 1e-6) and not far
+    rep.add("K294-31: odcinek (288) i decyzje celu z kosztem drogi (C)", v31 + tag,
+            f"ostatnie 7 <= {KAR139_LEG_L7} i doby 61-90 <= {KAR139_LEG_ST} (138c 4.47 / 4.46); dni 139 <= BK; dalej tylko utkniete", j(ok31))
+    # K294-32 wynik
+    sh7, shs = _k139_share(D)
+    f7, fs = _k139_fleet(D)
+    fmt = lambda v, p: "-" if v is None else p.format(v)
+    rep.add("K294-32: udzial placacych zold (K294-1) i wynik floty (K294-2b) wobec 138c",
+            f"K294-1 ostatnie 7 dob {fmt(sh7, '{:.3f}')} (doby 61-90 {fmt(shs, '{:.3f}')}); K294-2b ostatnie 7 {fmt(f7, '{:+.0f}')} zl/d, doby 61-90 {fmt(fs, '{:+.0f}')} zl/d{tag}",
+            f"K294-1 >= {KAR139_SHARE}; K294-2b >= {KAR139_FLEET_L7:.0f} i >= {KAR139_FLEET_ST:.0f} zl/d (0.9 x 138c)",
+            j(sh7 is not None and sh7 >= KAR139_SHARE and f7 is not None and f7 >= KAR139_FLEET_L7 and fs is not None and fs >= KAR139_FLEET_ST))
+
+
+_k139_rows_prev = k294_rows
+
+
+def k294_rows(rep, D):
+    _k139_rows_prev(rep, D)
+    k139_rows(rep, D)
+
+
+_k139_selftest_prev = k294_selftest
+
+
+def k294_selftest():
+    r = _k139_selftest_prev()
+    if r:
+        return r
+    a = KAR139_RE.match(KAR139_SAMPLE)
+    if not a or a.group("d") != "109166" or a.group("an") != "200" or a.group("ac") != "22000" or a.group("wa") != "30" or a.group("wm") != "40" or a.group("bp") != "2/2" \
+            or a.group("sd") != "12" or a.group("ch") != "7" or a.group("cs") != "3" \
+            or a.group("btop") != "cotton 20, jewelry 10" or a.group("cdn") != "2.90" or a.group("cn") != "20" or a.group("ss") != "0" or a.group("leg") != "4.47":
+        return f"139: linia 139 {a.groupdict() if a else None}"
+    b = KAR139_RE.match(KAR139_SAMPLE_OFF)
+    if not b or b.group("dcm") != "-" or b.group("bp") != "BRAK 0/2" or b.group("cdb") != "-" or b.group("btop") != "-" or b.group("wm") != "0" or b.group("cs") != "0":
+        return f"139: linia 139 przy kluczach NIE {b.groupdict() if b else None}"
+    for bad in (KAR139_SAMPLE.replace(" | C: decyzji", " | X: decyzji"), KAR139_SAMPLE.replace("latka 2/2", "latka 1/2"), KAR139_SAMPLE[:-1],
+                KAR139_SAMPLE.replace("skierowane utkniete", "skierowane blizej"), KAR139_SAMPLE.replace(" (proba 40)", "")):
+        if KAR139_RE.match(bad):
+            return "139: zly napis pasuje do wyrazenia linii 139"
+    # wiersze na danych syntetycznych: 30 dob linii 139 (dobry bieg) i log bez linii 139 (INFO)
+    def synth(**kw):
+        D = {"g": {}, "x298": {}, "c284": {}, "r284": {}, "w287": {}, "c285": {}, "f288": {}, "c294": {"c288": {}}, "k139": {}, "k139bad": 0, "k139err": 0}
+        for i in range(30):
+            d = 109137 + i
+            D["g"][d] = {"share": str(kw.get("share", 0.62)), "xlc": "0"}
+            D["x298"][d] = {"i3": str(kw.get("wait", 70))}
+            D["c284"][d] = (0, 0, 0, 1000.0, 1000.0 + kw.get("loss", 500.0), 0, 0)
+            D["r284"][d] = 150000; D["w287"][d] = 150000 - kw.get("fleet", 80000)
+            D["c294"]["c288"][d] = (0, 0, 0, 0, kw.get("leg", 4.3), None)
+            if kw.get("line", True):
+                s = KAR139_SAMPLE.replace("dzien 109166", f"dzien {d}")
+                if kw.get("below"):
+                    s = s.replace("za 30000 zl (koszt 22000 zl)", "za 20000 zl (koszt 22000 zl)")
+                if kw.get("far"):
+                    s = s.replace("dalej w odcinku 5)", "dalej w odcinku 20)")
+                D["k139"][d] = KAR139_RE.match(s).groupdict()
+        return D
+
+    def verdicts(D):
+        rp = Report()
+        k139_rows(rp, D)
+        return {row[0].split(":")[0]: row[3] for row in rp.rows}
+    v = verdicts(synth())
+    if any(v.get(k) != "TAK" for k in ("K294-27", "K294-28", "K294-29", "K294-30", "K294-31", "K294-32")):
+        return f"139: dobry bieg {v}"
+    for code, kw in (("K294-28", {"wait": 100}), ("K294-29", {"below": True}), ("K294-29", {"loss": 2500.0}), ("K294-31", {"leg": 4.8}),
+                     ("K294-31", {"far": True}), ("K294-32", {"share": 0.55}), ("K294-32", {"fleet": 60000})):
+        if verdicts(synth(**kw)).get(code) != "NIE":
+            return f"139: {code} przy {kw} nie NIE"
+    vi = verdicts(synth(line=False))
+    if any(vi.get(k) not in ("INFO",) for k in ("K294-27", "K294-28", "K294-29", "K294-30", "K294-31", "K294-32")):
+        return f"139: log bez linii 139 nie INFO {vi}"
+    return None
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
