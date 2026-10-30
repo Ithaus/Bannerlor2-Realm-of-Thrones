@@ -60,9 +60,10 @@ namespace Armoury
         private static int _cT, _cP, _cQ, _cE, _cF, _cG, _cD, _cNone, _cHome, _cStake, _mSample;
         private static double _cDb, _cDn, _cVb, _cVn, _cRb, _cRn;
         private static long _ticks;
-        // 139c: ocena dowodcy (J > 0) - A: krokow ponad polowe ocenianych z J, suma J, sztuk sprzedanych ponad prog bez oceny; C: decyzji z J, suma J, zmienione,
-        // zmienione na miasto dalej niz zasieg bez oceny; samotest Need / Range raz na sesje
-        private static int _jAN, _jAU, _jCN, _jCE, _jCW; private static double _jAJ, _jCJ;
+        // 139c: ocena dowodcy (J > 0) - A: krokow ponad polowe ocenianych z J (w tym zatrzymanych), suma J, sztuk sprzedanych ponad prog bez oceny; C: decyzji z J,
+        // suma J, zmienione, zmienione na miasto dalej niz zasieg bez oceny przy karawanie nieutknietej (utknieta - juz w 'skierowane utkniete'); samotest Need / Range
+        // raz na sesje
+        private static int _jAN, _jAH, _jAU, _jCN, _jCE, _jCW; private static double _jAJ, _jCJ;
         private static int[] _jSelf;
         private static int _stumbles, _stumbleSess;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -95,7 +96,7 @@ namespace Armoury
             _bVisits = _bBound = _bLift = _bOver = _bLiftUnits = 0; _bLiftGold = _bClipDepth = _bClipCap = _bClipGate = 0; _bTop.Clear();
             _cT = _cP = _cQ = _cE = _cF = _cG = _cD = _cNone = _cHome = _cStake = _mSample = 0; _cDb = _cDn = _cVb = _cVn = _cRb = _cRn = 0;
             _ticks = 0; _stumbles = 0;
-            _jAN = _jAU = _jCN = _jCE = _jCW = 0; _jAJ = _jCJ = 0;
+            _jAN = _jAH = _jAU = _jCN = _jCE = _jCW = 0; _jAJ = _jCJ = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -199,8 +200,9 @@ namespace Armoury
         /// tylko z przebiegu BK z limitem odleglosci). J = 0 - dokladnie 139.</summary>
         internal static double Range(double dmax, float j) { return j > 0f ? dmax * (1.0 + Math.Min(1.0, (double)j)) : dmax; }
 
-        /// <summary>139c A: krok ponad polowe oceniany z J > 0 (extra - sztuki sprzedane ponad to, co prog bez oceny by przepuscil).</summary>
-        internal static void NoteJA(float j, int extra) { _jAN++; _jAJ += j; if (extra > 0) _jAU += extra; }
+        /// <summary>139c A: krok ponad polowe oceniany z J > 0 (extra - sztuki sprzedane ponad to, co prog bez oceny by przepuscil; held - krok zatrzymany, nic
+        /// nie sprzedane). Recenzja 139c: zatrzymane osobno, bo kroki sprzedane z J (krokow z J - zatrzymane) sa podzbiorem krokow A ponad polowe.</summary>
+        internal static void NoteJA(float j, int extra, bool held) { _jAN++; _jAJ += j; if (held) _jAH++; if (extra > 0) _jAU += extra; }
 
         /// <summary>139c: samotest Need / Range na siatce (raz na sesje): [0, 1] J = 0 co do bitu jak 139; [2, 3] Need w [floor, 139], nierosnace z J; [4, 5] Range J = 0 = dmax,
         /// J > 0 w [dmax, 2 dmax], niemalejace z J.</summary>
@@ -645,7 +647,8 @@ namespace Armoury
                 _cE++;
                 if (dbest < db - 1e-6) _cF++; else if (dbest > db + 1e-6) _cG++;
                 if (stuck) _cD++;
-                if (jr > 0f) { _jCE++; if (dbest > dmax0 + 1e-6) _jCW++; }
+                // recenzja 139c: 'dalej niz zasieg bez oceny' tylko nieutkniete - utknieta jest juz w 'skierowane utkniete' (_cD), wiec K294-31 liczy ja raz
+                if (jr > 0f) { _jCE++; if (!stuck && dbest > dmax0 + 1e-6) _jCW++; }
                 _cDb += db; _cDn += dbest; _cVb += vb; _cVn += vbest; _cRb += dc * db; _cRn += dc * dbest;
                 result = best;
             }
@@ -794,9 +797,9 @@ namespace Armoury
                   .Append(" zl, bez miasta z zyskiem ").Append(_cNone).Append(", bez zmian - dom ").Append(_cHome).Append(" / udzialowiec ").Append(_cStake)
                   .Append(" | dowodca (139c): klucz ocena ").Append(s.CaravanLeaderJudgement ? "TAK" : "NIE").Append(", karawan z dowodca ").Append(nH).Append(" (J > 0 ").Append(nHj).Append(", J sr ").Append(nHj > 0 ? (jS / nHj).ToString("0.000", Inv) : "-")
                   .Append(", max ").Append(nHj > 0 ? jM.ToString("0.000", Inv) : "-").Append("); A: krokow ponad polowe z J ").Append(_jAN)
-                  .Append(" (J sr ").Append(_jAN > 0 ? (_jAJ / _jAN).ToString("0.000", Inv) : "-").Append("), szt. ponad prog bez oceny ").Append(_jAU)
+                  .Append(" (J sr ").Append(_jAN > 0 ? (_jAJ / _jAN).ToString("0.000", Inv) : "-").Append("), w tym zatrzymane ").Append(_jAH).Append(", szt. ponad prog bez oceny ").Append(_jAU)
                   .Append("; C: decyzji z J ").Append(_jCN).Append(" (J sr ").Append(_jCN > 0 ? (_jCJ / _jCN).ToString("0.000", Inv) : "-").Append("), zmienione ").Append(_jCE)
-                  .Append(", dalej niz zasieg bez oceny ").Append(_jCW)
+                  .Append(", dalej niz zasieg bez oceny (nieutkniete) ").Append(_jCW)
                   .Append("; samotest J=0 = 139 ").Append(_jSelf[0]).Append("/").Append(_jSelf[1]).Append(", prog ").Append(_jSelf[2]).Append("/").Append(_jSelf[3])
                   .Append(", zasieg ").Append(_jSelf[4]).Append("/").Append(_jSelf[5])
                   .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");

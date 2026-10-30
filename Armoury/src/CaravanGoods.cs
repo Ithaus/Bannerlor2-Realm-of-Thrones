@@ -1115,7 +1115,7 @@ namespace Armoury
                             int k0 = step;
                             while (k0 >= 1) { double pq = PriceAt(model, el.EquipmentElement, mp, d, k0, wv) * keepK; if (pq > c.Min && pq >= need0) break; k0--; }
                             a1Base = Math.Max(0, k0);
-                            if (kq <= 0) CaravanWait139.NoteJA(a1J, 0);
+                            if (kq <= 0) CaravanWait139.NoteJA(a1J, 0, true);
                         }
                         if (kq <= 0)
                         {
@@ -1235,7 +1235,7 @@ namespace Armoury
                     _cTown += tg0 - town.Gold; _cPurse += mp.PartyTradeGold - purse; _cToll += toll; _cTollTown += tollTown;
                     if (moved <= 0) break;
                     if (beyond) CaravanWait139.NoteA1Step(moved, gross - toll, c.Unit * moved);   // 139 A: sprzedane ponad polowe stosu (utarg po mycie, koszt)
-                    if (a1Base >= 0) CaravanWait139.NoteJA(a1J, moved - Math.Min(moved, a1Base));   // 139c: krok z ocena dowodcy (sztuki ponad prog bez oceny)
+                    if (a1Base >= 0) CaravanWait139.NoteJA(a1J, moved - Math.Min(moved, a1Base), false);   // 139c: krok z ocena dowodcy (sztuki ponad prog bez oceny)
                     sold += moved; any = true;
                     left = Math.Max(0, left - gross);
                     if (c.Food) foodHave -= moved;

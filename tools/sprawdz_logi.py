@@ -83263,10 +83263,11 @@ def k294_selftest():
 # K294-32 K294-1 ostatnie 7 dob >= 0.58; K294-2b ostatnie 7 >= 0.9 x 78.9k, doby 61-90 >= 0.9 x 43.6k (138c)
 # K294-33 self-test wyrazen i wierszy (w K294-S)
 # 139c (30.10, Jeff "tak zrob"): ocena rynku dowodcy J (CaravanLeader139b.SkillJudge, AI 0) w A (wymagany zysk czekania x (1 - J)) i C (zasieg x (1 + J)) - segment
-#   ' | dowodca (139c): ...' przed ' | czas' (log 139 bez segmentu - rozpoznany, K294-34 INFO). K294-31: 'dalej w odcinku' <= skierowane utkniete + 'dalej niz zasieg bez oceny'.
+#   ' | dowodca (139c): ...' przed ' | czas' (log 139 bez segmentu - rozpoznany, K294-34 INFO). K294-31: 'dalej w odcinku' <= skierowane utkniete + 'dalej niz zasieg bez oceny (nieutkniete)'.
 # K294-34 segment 139c kazdej doby: samotest Need / Range pelny (n > 0); J sr i max w [0, 1], J sr <= max; J > 0 <= karawan z dowodca; klucz ocena (CaravanLeaderJudgement)
 #         NIE - wszystkie liczniki z J 0; klucz A NIE - liczniki A z J 0,
-#         klucz C NIE - liczniki C z J 0; szt. ponad prog bez oceny <= szt. A ponad polowe; dalej niz zasieg <= zmienione z J <= decyzji z J; zmienione z J <= zmienione C,
+#         klucz C NIE - liczniki C z J 0; szt. ponad prog bez oceny <= szt. A ponad polowe; zatrzymane z J <= krokow z J, krokow z J - zatrzymane <= krokow A
+#         ponad polowe (recenzja 139c); dalej niz zasieg (nieutkniete) <= zmienione z J <= decyzji z J, dalej niz zasieg <= 'dalej w odcinku'; zmienione z J <= zmienione C,
 #         decyzji z J <= decyzji C z towarem; doby bez karawan z dowodca (spis) z licznikami z J > 0 - INFO (dowodca mogl odejsc w dobie)
 KAR139_L = "Karawany - czekanie, limit BK i droga (139): dzien "
 KAR139_ERR = ("ERROR in CaravanWait139.",)
@@ -83286,8 +83287,8 @@ KAR139_RE = re.compile(
     r" dni drogi BK (?P<cdb>[0-9.]+|-) -> 139 (?P<cdn>[0-9.]+|-), zysk sprzedazy BK (?P<cvb>-?\d+|-) -> 139 (?P<cvn>-?\d+|-) zl,"
     r" koszt drogi (?P<crb>-?\d+|-) -> (?P<crn>-?\d+|-) zl, bez miasta z zyskiem (?P<cn>\d+), bez zmian - dom (?P<ch>\d+) / udzialowiec (?P<cs>\d+)"
     r"(?: \| dowodca \(139c\): klucz ocena (?P<kj>TAK|NIE), karawan z dowodca (?P<jh>\d+) \(J > 0 (?P<jhj>\d+), J sr (?P<jsr>[0-9.]+|-), max (?P<jmx>[0-9.]+|-)\);"
-    r" A: krokow ponad polowe z J (?P<jan>\d+) \(J sr (?P<jaj>[0-9.]+|-)\), szt\. ponad prog bez oceny (?P<jau>\d+);"
-    r" C: decyzji z J (?P<jcn>\d+) \(J sr (?P<jcj>[0-9.]+|-)\), zmienione (?P<jce>\d+), dalej niz zasieg bez oceny (?P<jcw>\d+);"
+    r" A: krokow ponad polowe z J (?P<jan>\d+) \(J sr (?P<jaj>[0-9.]+|-)\), w tym zatrzymane (?P<jah>\d+), szt\. ponad prog bez oceny (?P<jau>\d+);"
+    r" C: decyzji z J (?P<jcn>\d+) \(J sr (?P<jcj>[0-9.]+|-)\), zmienione (?P<jce>\d+), dalej niz zasieg bez oceny \(nieutkniete\) (?P<jcw>\d+);"
     r" samotest J=0 = 139 (?P<js1>\d+)/(?P<js2>\d+), prog (?P<js3>\d+)/(?P<js4>\d+), zasieg (?P<js5>\d+)/(?P<js6>\d+))?"
     r" \| czas (?P<ms>[0-9.]+) ms \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
 KAR139_SAMPLE = ("Karawany - czekanie, limit BK i droga (139): dzien 109166 | klucze: czekanie wedlug zoldu TAK, limit BK w monecie towaru TAK, koszt drogi w celu TAK"
@@ -83299,11 +83300,11 @@ KAR139_SAMPLE = ("Karawany - czekanie, limit BK i droga (139): dzien 109166 | kl
                  " latka 2/2, najwiecej: cotton 20, jewelry 10"
                  " | C: decyzji z towarem 150 (zaladowane 80, utkniete 60), zmienione 30 (blizej 25, dalej w odcinku 5), dni drogi BK 4.10 -> 139 2.90, zysk sprzedazy BK 700"
                  " -> 139 900 zl, koszt drogi 400 -> 300 zl, bez miasta z zyskiem 20, bez zmian - dom 7 / udzialowiec 3"
-                 " | dowodca (139c): klucz ocena TAK, karawan z dowodca 1 (J > 0 1, J sr 0.194, max 0.194); A: krokow ponad polowe z J 6 (J sr 0.194), szt. ponad prog bez oceny 9;"
-                 " C: decyzji z J 2 (J sr 0.194), zmienione 1, dalej niz zasieg bez oceny 1; samotest J=0 = 139 60/60, prog 300/300, zasieg 20/20"
+                 " | dowodca (139c): klucz ocena TAK, karawan z dowodca 1 (J > 0 1, J sr 0.194, max 0.194); A: krokow ponad polowe z J 6 (J sr 0.194), w tym zatrzymane 2, szt. ponad prog bez oceny 9;"
+                 " C: decyzji z J 2 (J sr 0.194), zmienione 1, dalej niz zasieg bez oceny (nieutkniete) 1; samotest J=0 = 139 60/60, prog 300/300, zasieg 20/20"
                  " | czas 35.20 ms | potkniecia 0 (sesja 0).")
-KAR139_SEG = (" | dowodca (139c): klucz ocena TAK, karawan z dowodca 1 (J > 0 1, J sr 0.194, max 0.194); A: krokow ponad polowe z J 6 (J sr 0.194), szt. ponad prog bez oceny 9;"
-              " C: decyzji z J 2 (J sr 0.194), zmienione 1, dalej niz zasieg bez oceny 1; samotest J=0 = 139 60/60, prog 300/300, zasieg 20/20")
+KAR139_SEG = (" | dowodca (139c): klucz ocena TAK, karawan z dowodca 1 (J > 0 1, J sr 0.194, max 0.194); A: krokow ponad polowe z J 6 (J sr 0.194), w tym zatrzymane 2, szt. ponad prog bez oceny 9;"
+              " C: decyzji z J 2 (J sr 0.194), zmienione 1, dalej niz zasieg bez oceny (nieutkniete) 1; samotest J=0 = 139 60/60, prog 300/300, zasieg 20/20")
 KAR139_SAMPLE_OFF = ("Karawany - czekanie, limit BK i droga (139): dzien 109077 | klucze: czekanie wedlug zoldu NIE, limit BK w monecie towaru NIE, koszt drogi w celu NIE"
                      " | koszt dnia karawany mediana - zl/d, srednio - zl/d (zold - + jedzenie -), karawan 0, odcinek 0.00 dob"
                      " | A: T1 ponad polowe stosu krokow 0, szt. 0 za 0 zl (koszt 0 zl), zatrzymane - czekanie sie oplaca 0 szt.; czekajace 0: towar po koszcie 0 zl,"
@@ -83312,7 +83313,7 @@ KAR139_SAMPLE_OFF = ("Karawany - czekanie, limit BK i droga (139): dzien 109077 
                      " lotow ponad limit 0, przyciete glebokosc 0 / kapital 0 / bramka 0 szt., latka BRAK 0/2, najwiecej: - | C: decyzji z towarem 0 (zaladowane 0, utkniete 0),"
                      " zmienione 0 (blizej 0, dalej w odcinku 0), dni drogi BK - -> 139 -, zysk sprzedazy BK - -> 139 - zl, koszt drogi - -> - zl, bez miasta z zyskiem 0,"
                      " bez zmian - dom 0 / udzialowiec 0 | dowodca (139c): klucz ocena NIE, karawan z dowodca 0 (J > 0 0, J sr -, max -); A: krokow ponad polowe z J 0 (J sr -),"
-                     " szt. ponad prog bez oceny 0; C: decyzji z J 0 (J sr -), zmienione 0, dalej niz zasieg bez oceny 0; samotest J=0 = 139 60/60, prog 300/300,"
+                     " w tym zatrzymane 0, szt. ponad prog bez oceny 0; C: decyzji z J 0 (J sr -), zmienione 0, dalej niz zasieg bez oceny (nieutkniete) 0; samotest J=0 = 139 60/60, prog 300/300,"
                      " zasieg 20/20 | czas 0.00 ms | potkniecia 0 (sesja 0).")
 KAR139_WAIT_L7 = 90.0          # 0.85 x 106 (138c, ostatnie 7 dob)
 KAR139_WAIT_ST = 95.0          # doby 61-90 (138c 111.7)
@@ -83523,6 +83524,10 @@ def k139c_row(rep, x, days):
             why.append("liczniki C z J przy kluczu C NIE")
         if I("jau") > I("an"):
             why.append(f"szt. ponad prog {g['jau']} > szt. A {g['an']}")
+        if I("jah") > I("jan") or I("jan") - I("jah") > I("as"):          # recenzja 139c: kroki z J sprzedane - podzbior krokow A ponad polowe
+            why.append(f"A z J: krokow {g['jan']} / zatrzymane {g['jah']} / krokow A {g['as']}")
+        if I("jcw") > I("cg"):
+            why.append(f"dalej niz zasieg {g['jcw']} > dalej w odcinku {g['cg']}")
         if not (I("jcw") <= I("jce") <= I("jcn")):
             why.append(f"C z J: dalej {g['jcw']} / zmienione {g['jce']} / decyzji {g['jcn']}")
         if I("jce") > I("ce") or I("jcn") > I("ct"):
@@ -83533,7 +83538,7 @@ def k139c_row(rep, x, days):
             info.append(d)
     hd = [d for d in jd if int(x[d]["jhj"]) > 0]
     last = x[jd[-1]]
-    v = (f"dob z segmentem {len(jd)} z {len(days)}, z dowodca J > 0 {len(hd)}; caly bieg: A krokow z J {sum(int(x[d]['jan']) for d in jd)}, szt. ponad prog bez oceny "
+    v = (f"dob z segmentem {len(jd)} z {len(days)}, z dowodca J > 0 {len(hd)}; caly bieg: A krokow z J {sum(int(x[d]['jan']) for d in jd)} (zatrzymane {sum(int(x[d]['jah']) for d in jd)}), szt. ponad prog bez oceny "
          f"{sum(int(x[d]['jau']) for d in jd)}; C decyzji z J {sum(int(x[d]['jcn']) for d in jd)}, zmienione {sum(int(x[d]['jce']) for d in jd)}, dalej niz zasieg "
          f"{sum(int(x[d]['jcw']) for d in jd)}; ostatnia doba: karawan z dowodca {last['jh']} (J > 0 {last['jhj']}, J sr {last['jsr']}, max {last['jmx']}), samotest "
          f"{last['js1']}/{last['js2']}, {last['js3']}/{last['js4']}, {last['js5']}/{last['js6']}")
@@ -83541,7 +83546,7 @@ def k139c_row(rep, x, days):
         v += f"; dob z J bez dowodcy w spisie {len(info)} (INFO)"
     if bad:
         v += " | " + "; ".join(bad[:3])
-    rep.add(name, v, "samotest pelny; J w [0, 1]; klucz NIE - liczniki z J 0; liczniki z J <= liczniki A / C (autotest bez karawan gracza: z dowodca 0, wszystko 0)", not bad)
+    rep.add(name, v, "samotest pelny; J w [0, 1]; klucz NIE - liczniki z J 0; liczniki z J <= liczniki A / C (sprzedane kroki z J <= kroki A, dalej z J <= dalej w odcinku) (autotest bez karawan gracza: z dowodca 0, wszystko 0)", not bad)
 
 
 _k139_rows_prev = k294_rows
@@ -83567,16 +83572,17 @@ def k294_selftest():
     b = KAR139_RE.match(KAR139_SAMPLE_OFF)
     if not b or b.group("dcm") != "-" or b.group("bp") != "BRAK 0/2" or b.group("cdb") != "-" or b.group("btop") != "-" or b.group("wm") != "0" or b.group("cs") != "0":
         return f"139: linia 139 przy kluczach NIE {b.groupdict() if b else None}"
-    if a.group("jh") != "1" or a.group("jsr") != "0.194" or a.group("jau") != "9" or a.group("jcw") != "1" or a.group("js3") != "300" or a.group("js6") != "20":
+    if a.group("jh") != "1" or a.group("jsr") != "0.194" or a.group("jau") != "9" or a.group("jcw") != "1" or a.group("jah") != "2" or a.group("js3") != "300" or a.group("js6") != "20":
         return f"139c: segment dowodcy {a.groupdict()}"
-    if b.group("jsr") != "-" or b.group("jaj") != "-" or b.group("jh") != "0" or b.group("js1") != "60" or b.group("kj") != "NIE" or a.group("kj") != "TAK":
+    if b.group("jsr") != "-" or b.group("jaj") != "-" or b.group("jh") != "0" or b.group("jah") != "0" or b.group("js1") != "60" or b.group("kj") != "NIE" or a.group("kj") != "TAK":
         return f"139c: segment dowodcy przy kluczach NIE {b.groupdict()}"
     o = KAR139_RE.match(KAR139_SAMPLE.replace(KAR139_SEG, ""))
     if not o or o.group("jh") is not None or o.group("cs") != "3":
         return f"139c: linia 139 bez segmentu (log sprzed 139c) {o.groupdict() if o else None}"
     for bad in (KAR139_SAMPLE.replace(" | C: decyzji", " | X: decyzji"), KAR139_SAMPLE.replace("latka 2/2", "latka 1/2"), KAR139_SAMPLE[:-1],
                 KAR139_SAMPLE.replace("skierowane utkniete", "skierowane blizej"), KAR139_SAMPLE.replace(" (proba 40)", ""),
-                KAR139_SAMPLE.replace("dalej niz zasieg bez oceny 1;", "dalej niz zasieg 1;"), KAR139_SAMPLE.replace("prog 300/300", "prog 300"),
+                KAR139_SAMPLE.replace("dalej niz zasieg bez oceny (nieutkniete) 1;", "dalej niz zasieg bez oceny 1;"),
+                KAR139_SAMPLE.replace(", w tym zatrzymane 2,", ","), KAR139_SAMPLE.replace("prog 300/300", "prog 300"),
                 KAR139_SAMPLE.replace("(J > 0 1, J sr 0.194", "(J > 0 1, J sr x")):
         if KAR139_RE.match(bad):
             return "139: zly napis pasuje do wyrazenia linii 139"
@@ -83597,7 +83603,7 @@ def k294_selftest():
                 if kw.get("far"):
                     s = s.replace("dalej w odcinku 5)", "dalej w odcinku 20)")
                 if kw.get("farj"):                                   # 139c: 8 dalej z J ponad 12 utknietych - 20 <= 12 + 8
-                    s = s.replace("dalej w odcinku 5)", "dalej w odcinku 20)").replace("zmienione 1, dalej niz zasieg bez oceny 1;", "zmienione 8, dalej niz zasieg bez oceny 8;") \
+                    s = s.replace("dalej w odcinku 5)", "dalej w odcinku 20)").replace("zmienione 1, dalej niz zasieg bez oceny (nieutkniete) 1;", "zmienione 8, dalej niz zasieg bez oceny (nieutkniete) 8;") \
                          .replace("C: decyzji z J 2 ", "C: decyzji z J 9 ")
                 if kw.get("noseg"):
                     s = s.replace(KAR139_SEG, "")
@@ -83624,7 +83630,9 @@ def k294_selftest():
                {"seg": (("karawan z dowodca 1 (J > 0 1,", "karawan z dowodca 0 (J > 0 1,"),)},
                {"seg": (("czekanie wedlug zoldu TAK", "czekanie wedlug zoldu NIE"),)}, {"seg": (("koszt drogi w celu TAK", "koszt drogi w celu NIE"),)},
                {"seg": (("szt. ponad prog bez oceny 9;", "szt. ponad prog bez oceny 900;"),)},
-               {"seg": (("zmienione 1, dalej niz zasieg bez oceny 1;", "zmienione 1, dalej niz zasieg bez oceny 2;"),)},
+               {"seg": (("zmienione 1, dalej niz zasieg bez oceny (nieutkniete) 1;", "zmienione 1, dalej niz zasieg bez oceny (nieutkniete) 2;"),)},
+               {"seg": (("w tym zatrzymane 2,", "w tym zatrzymane 7,"),)}, {"seg": (("polowe z J 6 (", "polowe z J 60 ("),)},
+               {"seg": (("dalej w odcinku 5)", "dalej w odcinku 0)"),)},
                {"seg": (("C: decyzji z J 2 ", "C: decyzji z J 0 "),)}, {"seg": (("klucz ocena TAK", "klucz ocena NIE"),)}):
         if verdicts(synth(**kw)).get("K294-34") != "NIE":
             return f"139c: K294-34 przy {kw} nie NIE"
