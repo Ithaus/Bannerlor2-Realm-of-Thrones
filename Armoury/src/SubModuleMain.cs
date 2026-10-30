@@ -132,6 +132,7 @@ namespace Armoury
                 CaravanBulk.ApplyAll(_harmony);  // wpis 103: karawany woza surowce masowe wedle brakow miast, nie wedle indeksu ceny
                 try { CaravanAmmo.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CaravanAmmo.ApplyAll", e); }   // paczka 172b: karawany nie kupuja strzal i beltow (wycena BK, gabka BK)
                 try { CaravanRoute294c.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CaravanRoute294c.ApplyAll", e); }   // 294c: cel karawan BK wedlug tego, co sprzedadza i kupia (postfiksy ocen miast BK)
+                try { CaravanWait139.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CaravanWait139.ApplyAll", e); }   // 139: limit kategorii BK w monecie towaru (BuyCategory), ocena miast BK do celu z kosztem drogi
                 // K1: ksiega pieniadza i przeplywow osad - same postfiksy-liczniki (tylko log); we wlasnym try - jej wywrotka nie moze zatrzymac latek ponizej
                 try { MoneyLedger.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MoneyLedger.ApplyAll", e); }
                 // 110 (etap 2 krok B): zawor kasy zamku - regulator gry dla zamku tylko w dol, "zakupy" ludnosci zamku bez zlota z niczego (te same cele co ksiega, postfiksy First); we wlasnym try

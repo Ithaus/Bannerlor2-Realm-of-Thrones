@@ -995,7 +995,7 @@ namespace Armoury
             if (s.CaravanBuyByFlow && GateShut(cat)) return 1;
             int purse = mp.PartyTradeGold;
             double cargo = b.Stock0 + Math.Max(0, b.Purse0 - purse);      // ladunek po koszcie: z poczatku BuyGoods + to, co BK juz wydal w tym wywolaniu
-            double spend = Math.Min(0.5 * Math.Max(0, purse), 1500.0);        // BK BuyCategory: najwyzej pol kiesy i 1 500 na kategorie
+            double spend = Math.Min(0.5 * Math.Max(0, purse), (double)CaravanWait139.CapFor(mp, cat, true));   // BK BuyCategory: najwyzej pol kiesy i 1 500 na kategorie (139 B: w monecie towaru - ten sam limit co latka BuyCategory)
             if (s.CaravanBuyWorkingCapital)
             {
                 // recenzja 284 (drobna 4): podloga z rezerwa 30 dni zoldu (karawana bez zwrotu zoldu) moze byc >= kapital - to podloga wyplaty, nie granica handlu;
@@ -1119,6 +1119,8 @@ namespace Armoury
         /// udzwig - takze toLoseWeight BK, jedzenie > 7 dob, towar > 30 dob) - bez zmian.</summary>
         public static void SellGuardPrefix(PartyBase __0, PartyBase __1, ItemRosterElement __2, ref int __3)
         {
+            // 139 B (klucz CaravanBkLotInItemCoin): zakup BK (BuyCategory - miasto sprzedaje karawanie) - reguly zakupu na kazda sztuke; przy kluczu NIE nic nie robi
+            if (__3 > 0 && __0 != null && __1 != null && __0.IsSettlement && __1.MobileParty != null && CaravanGoods.BkBuyerIs(__1.MobileParty)) BuyGuard139(__0, __1.MobileParty, __2, ref __3);
             if ((_bkSelling <= 0 && _vanSelling <= 0) || __3 <= 0) return;   // poprawka 132a: takze sprzedaz gry (VanSellPre)
             bool bk = _bkSelling > 0;
             long t0 = Stopwatch.GetTimestamp();
@@ -1225,6 +1227,88 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("SellGuardPrefix", e); }
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>139 B (CaravanWait139.BkCatCapCmp): karawana z zasadami zakupu 284 w biezacym BK BuyGoods (BuyStart, bez zwolnienia).</summary>
+        internal static bool BuyRulesActive(MobileParty mp) { return mp != null && ReferenceEquals(_b.Mp, mp) && !_b.Exempt; }
+
+        /// <summary>139 B (klucz CaravanBkLotInItemCoin): straznik zakupu BK - liczba sztuk kroku BuyCategory przycieta do najmniejszej z: glebokosc rynku (najwiecej n,
+        /// przy ktorym cena n-tej sztuki w miescie odniesienia w kolejce za moimi n sztukami - DepthNet(QueueK(moje + n)) - jest >= 1.03 x cena kupna n-tej sztuki tutaj;
+        /// ta sama regula 294b co dla pierwszej sztuki), kapital obrotowy (sztuki, ktore zaczynaja sie ponizej kapital - podloga; regula 2 na sztuke) i bramka przeplywu
+        /// (sztuki do progu Cap - juki swiata; regula 1 na sztuke). Limit BK 1 500 pilnowal tego dla pierwszej sztuki - wiekszy limit w monecie towaru wymaga regul na
+        /// kazda sztuke. BK liczy swoj budzet nieprzycieta liczba (konczy szybciej - bezpiecznie).</summary>
+        private static void BuyGuard139(PartyBase town, MobileParty mp, ItemRosterElement el, ref int n)
+        {
+            var s = Settings.Current;
+            if (!CaravanWait139.BOn(s) || !BuyRulesActive(mp)) return;
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                var ee = el.EquipmentElement;
+                var it = ee.Item;
+                var tw = town.Settlement != null ? town.Settlement.Town : null;
+                if (it == null || tw == null || !it.IsTradeGood || it.HasHorseComponent || !Tracked(it.ItemCategory)) return;
+                var cat = it.ItemCategory;
+                var cg = Campaign.Current;
+                var model = cg != null && cg.Models != null ? cg.Models.TradeItemPriceFactorModel : null;
+                if (model == null || tw.MarketData == null) return;
+                var d = tw.MarketData.GetCategoryData(cat);
+                int wv = Math.Max(1, HistoricalPrices.ShelfWorth(it));
+                // cena kupna m-tej sztuki: gra placi sztuka po sztuce, polka maleje o wage sztuki (SellItemsAction.ApplyInternal - GetItemPrice przy kazdej sztuce)
+                Func<int, int> buyAt = m => Math.Max(1, model.GetPrice(ee, mp, null, false, Math.Max(0f, d.InStoreValue - (Math.Max(1, m) - 1) * (float)wv), d.Supply, d.Demand));
+                int n0 = n, cDepth = 0, cCap = 0, cGate = 0;
+                int p1 = buyAt(1);
+                if (s.CaravanBuyWorkingCapital && _b.Capital - _b.Floor > 0)
+                {
+                    double cargo = _b.Stock0 + Math.Max(0, _b.Purse0 - mp.PartyTradeGold);
+                    double room = _b.Capital - _b.Floor - cargo;
+                    int nc = room > 0 ? (int)Math.Min(int.MaxValue, Math.Ceiling(room / p1)) : 0;
+                    if (nc < n) { cCap = n - nc; n = nc; }
+                }
+                if (n > 0 && s.CaravanBuyByFlow && _days >= FlowMinDays)
+                {
+                    EnsureHeld();
+                    double room = Cap(cat) - Held(cat);                       // regula 1 (GateShut: juki > prog) na sztuke: sztuka m, gdy juki przed nia <= prog
+                    int ng = room >= 0 ? (int)Math.Min(int.MaxValue - 1, Math.Floor(room)) + 1 : 0;
+                    if (ng < n) { cGate = n - ng; n = ng; }
+                }
+                if (n > 0 && DepthOn)
+                {
+                    int own = TradeUnits(mp, cat);
+                    Func<int, int> ok = m => { double net = DepthNet(mp, ee, QueueKOwn(cat, own, own + m)); return double.IsNaN(net) ? -1 : (net >= CarrierMargin * buyAt(m) ? 1 : 0); };
+                    int o1 = ok(1);
+                    if (o1 >= 0)
+                    {
+                        int k = 0;
+                        if (o1 == 1)
+                        {
+                            int lo = 1, hi = n;
+                            while (lo < hi) { int mid = (lo + hi + 1) / 2; if (ok(mid) == 1) lo = mid; else hi = mid - 1; }
+                            k = lo;
+                        }
+                        if (k < n) { cDepth = n - k; n = k; }
+                    }
+                }
+                if (n < 0) n = 0;
+                if (n > n0) n = n0;
+                double gold = n > 0 ? n * 0.5 * (p1 + buyAt(n)) : 0.0;
+                CaravanWait139.NoteBuyStep(mp, cat, n, gold, n > 0 ? buyAt(n) : 0, cDepth, cCap, cGate);
+            }
+            catch (Exception e) { Stumble("BuyGuard139", e); }
+            finally { _ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>139 (pomiar, linia 139): karawany klasy 3 linii 298 (towar z rynkiem z zyskiem - czeka) z ostatniej doby.</summary>
+        internal static readonly List<MobileParty> Waiting298 = new List<MobileParty>();
+
+        /// <summary>139 (pomiar): doby od ostatniej sprzedazy karawany (ksiega zysku 284, okno 14 dob); bez sprzedazy w oknie - doby od pierwszej doby ksiegi (co najmniej 7).</summary>
+        internal static int DaysSinceSale(MobileParty mp, int today)
+        {
+            Acc a;
+            if (mp == null || !_acc.TryGetValue(mp, out a)) return 7;
+            int last = int.MinValue;
+            for (int k = 0; k < Ring; k++) if (a.D[k] != int.MinValue && a.D[k] <= today && a.D[k] > last) last = a.D[k];
+            return last != int.MinValue ? Math.Max(0, today - last) : Math.Max(7, today - a.First);
         }
 
         /// <summary>SellGuardPrefix: n sztuk wstrzymanych (licznik BK / gry, koszt) i wpis dla TakeWithheld (lista transakcji ma liczbe sprzed przyciecia) - wydzielone
@@ -1641,10 +1725,11 @@ namespace Armoury
         private static string Line298(int day, int nCar, List<MobileParty> idle, int n, int w, List<double> net, Dictionary<ItemCategory, double> cost)
         {
             var why = new int[5];
+            Waiting298.Clear();
             foreach (var mp in idle)
             {
                 _in298++;   // recenzja: bledy pomocnikow glebokosci (DStumble) z tego pomiaru - w potknieciach 298
-                try { why[IdleWhy(mp)]++; }
+                try { int w0 = IdleWhy(mp); why[w0]++; if (w0 == 3) Waiting298.Add(mp); }   // 139: czekajace do pomiaru linii 139
                 catch (Exception e) { M298Stumble("Idle", e); }
                 finally { _in298--; }
             }

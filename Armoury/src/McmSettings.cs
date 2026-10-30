@@ -9732,6 +9732,18 @@ namespace Armoury
         [SettingPropertyGroup("Caravans carry food for the towns that pay (298)")]
         public bool CaravanFoodGateByPayingTowns { get; set; } = true;
 
+        [SettingPropertyBool("Caravans Weigh Waiting Against Wage", HintText = "139: waiting for a dearer town costs the caravan its wages. Entering a town, a caravan may sell more than half of a stack, but only pieces that still make a profit and fetch here at least what a typical dearer town would pay for them after its toll, less this piece's share of the caravan's daily wages and escort food over the measured road leg. It never sells below cost this way, and goods that would go at a loss are still kept to half a stack. A caravan that has sold nothing for a week may also head for a nearer town that pays its cost plus the road, within the measured leg (with Caravans Count Road Cost In Destination). Off = at most half of each stack, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans weigh waiting, lot cap and road cost (139)")]
+        public bool CaravanWaitCostsWage { get; set; } = true;
+
+        [SettingPropertyBool("BK Caravan Lot Cap In Item Coin", HintText = "139: the most a Banner Kings caravan spends on one kind of goods in one visit (1 500) is counted in the goods' own coin: for goods whose price rose in the new coin (cotton, velvet, jewelry, wool, fur, eggs, papyrus and others) the cap rises by the same ratio, so a caravan can buy a few pieces of a luxury and not none. Every piece of such a lot must still pass our buying rules one by one: the price that piece will fetch in a typical dearer town after the goods already on their way, the caravan's working capital and the world's flow gate. Off = 1 500 per kind of goods for everything, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans weigh waiting, lot cap and road cost (139)")]
+        public bool CaravanBkLotInItemCoin { get; set; } = true;
+
+        [SettingPropertyBool("Caravans Count Road Cost In Destination", HintText = "139: a Banner Kings caravan carrying a full load (its goods at cost are worth at least its purse, or its working capital is full) may pick, instead of Banner Kings' choice, a town no farther than that choice where the profit of its sale, after the caravan's wages and escort food for the days on the road, is higher per day of road. The sale is reckoned by the same rules as in town: our own sale with the town's reserve and a twentieth of its purse, then Banner Kings' sale from the whole purse, never below cost, after the goods other caravans are already bringing there. Banner Kings' scores are not changed. Off = Banner Kings' choice, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans weigh waiting, lot cap and road cost (139)")]
+        public bool CaravanRouteRoadCost { get; set; } = true;
+
         [SettingPropertyBool("Bk Retinue From Village", HintText = "with People Origin and Levy From Villages: Banner Kings retinues are made of real people - the retinue of a village manor, the retinue of an estate and the Castle Retinue of a castle garrison: a man who joins (and every man of a newly raised retinue) leaves the people of the retinue's village (a castle: its villages), and if they have no one to spare he does not join; a man a manor retinue sends away goes back home instead of vanishing; when an estate's lord calls up his retinue, its men keep their origin in his party. The retinues' sizes and their one-man-a-day pace stay as Banner Kings sets them. Off = as before (retinue men appear from nothing and vanish)", RequireRestart = false)]
         [SettingPropertyGroup("Banner Kings manor retinues from the village's own people (295)")]
         public bool BkRetinueFromVillage { get; set; } = true;
@@ -12916,6 +12928,9 @@ namespace Armoury
             s.CaravanRoadFoodTopUp = CaravanRoadFoodTopUp;
             s.CaravanPantryLegDays = CaravanPantryLegDays;
             s.CaravanFoodGateByPayingTowns = CaravanFoodGateByPayingTowns;
+            s.CaravanWaitCostsWage = CaravanWaitCostsWage;
+            s.CaravanBkLotInItemCoin = CaravanBkLotInItemCoin;
+            s.CaravanRouteRoadCost = CaravanRouteRoadCost;
             s.BkRetinueFromVillage = BkRetinueFromVillage;
             s.WinterSparesMinesAndFelling = WinterSparesMinesAndFelling;
             s.VillageCartMilitiaEscort = VillageCartMilitiaEscort;

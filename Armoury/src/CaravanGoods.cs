@@ -897,6 +897,9 @@ namespace Armoury
         }
         public static Exception BkBuyFinalizer(Exception __exception) { _bkBuyer = null; CaravanTrade284.BuyEnd(); return __exception; }
 
+        /// <summary>139 B (CaravanTrade284.SellGuardPrefix - straznik zakupu): karawana w biezacym BK BuyGoods.</summary>
+        internal static bool BkBuyerIs(MobileParty mp) { return mp != null && ReferenceEquals(_bkBuyer, mp); }
+
         /// <summary>BK CalculateBuyValue: kategoria, ktora T1 sprzedal w tym miescie (do 7 dob, dopoki sprzedane sztuki leza na polce) - wycena 0 dla KAZDEJ karawany. Nie rzuca.</summary>
         public static void BkValuePostfix(ItemCategory __0, Town __1, ref float __result)
         {
@@ -1041,10 +1044,16 @@ namespace Armoury
             }
             bool any = false;
             List<(EquipmentElement, int)> done = null;
+            // 139 A (klucz CaravanWaitCostsWage): czekanie na lepsze miasto kosztuje zold - ponad polowe stosu T1 sprzedaje sztuke, gdy cena tu po mycie >= max(koszt sztuki,
+            // cena tej sztuki w typowym drozszym miescie po mycie (DepthNetAged, na zywo) - udzial sztuki w koszcie dnia karawany x zmierzony odcinek 288); bez miary -
+            // polowa stosu jak dotad; ponad polowe nigdy na stracie (wyjscia na stracie - polowa stosu jak dotad)
+            bool a1 = CaravanWait139.AOn(s);
+            double a1Day = -1, a1Leg = CaravanWait139.Leg;
             foreach (var c in cands)
             {
                 var it = c.It; var cat = it.ItemCategory;
-                int maxSell = (c.Have + 1) / 2, sold = 0;
+                int half = (c.Have + 1) / 2, maxSell = a1 ? c.Have : half, sold = 0;
+                bool atHalf = false;
                 int wv = Math.Max(1, HistoricalPrices.ShelfWorth(it));
                 for (int guard = 0; guard < 100 && sold < maxSell; guard++)
                 {
@@ -1060,6 +1069,12 @@ namespace Armoury
                         step = Math.Min(step, room);
                     }
                     if (step <= 0) break;
+                    bool beyond = false;
+                    if (maxSell > half)
+                    {
+                        if (sold < half) step = Math.Min(step, half - sold);       // 139 A: krok konczy sie na polowie stosu, dalsze sztuki - wlasna regula
+                        else beyond = true;
+                    }
                     var d = town.MarketData.GetCategoryData(cat);
                     int pLast = PriceAt(model, el.EquipmentElement, mp, d, step, wv);   // cena ostatniej sztuki kroku
                     var lot = Sync(mp, it, pack.GetItemNumber(it), false);
@@ -1089,6 +1104,20 @@ namespace Armoury
                         }
                     }
                     if (!profit && why == 0) { _rNoProfit++; break; }
+                    if (beyond)
+                    {
+                        // 139 A: ponad polowe stosu tylko z zyskiem i tylko, gdy czekanie na miasto drozsze kosztuje wiecej, niz tam zyskam
+                        int heldN = c.Food ? Math.Min(pack.GetItemNumber(it), Math.Max(0, foodHave - foodKeep)) : pack.GetItemNumber(it);
+                        if (why != 0) { atHalf = true; break; }
+                        double dn = CaravanTrade284.DepthNetAged(mp, it);
+                        if (double.IsNaN(dn)) { atHalf = true; break; }
+                        if (a1Day < 0) a1Day = CaravanWait139.DayCost(mp);
+                        double need = Math.Max(c.Min, dn - CaravanWait139.Carry(a1Day, c.Unit, a1Leg, cargo));
+                        int kq = step;
+                        while (kq >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kq, wv) * keepK < need) kq--;
+                        if (kq <= 0) { CaravanWait139.NoteA1Held(heldN); atHalf = true; break; }
+                        if (kq < step) { step = kq; pLast = PriceAt(model, el.EquipmentElement, mp, d, kq, wv); }
+                    }
                     if (why >= 3)
                     {
                         // S1: na stracie (juki ponad udzwig, jedzenie psuje sie, dlugo w jukach) porcjami - sztuka po sztuce, stop przed sztuka, ktora zbilaby indeks
@@ -1174,6 +1203,7 @@ namespace Armoury
                     // kontrola (poprawki, uwaga recenzji 1): zmierzone po obu stronach - kasa miasta i kiesa karawany, takze przy wyjatku
                     _cTown += tg0 - town.Gold; _cPurse += mp.PartyTradeGold - purse; _cToll += toll; _cTollTown += tollTown;
                     if (moved <= 0) break;
+                    if (beyond) CaravanWait139.NoteA1Step(moved, gross - toll, c.Unit * moved);   // 139 A: sprzedane ponad polowe stosu (utarg po mycie, koszt)
                     sold += moved; any = true;
                     left = Math.Max(0, left - gross);
                     if (c.Food) foodHave -= moved;
@@ -1214,7 +1244,7 @@ namespace Armoury
                     done.Add((el.EquipmentElement, moved));
                     if (broke) break;
                 }
-                if (sold >= maxSell && sold > 0) _rHalf++;
+                if ((sold >= maxSell || atHalf) && sold > 0) _rHalf++;   // 139 A: przy kluczu - stop na polowie stosu, bo czekanie sie oplaca (albo bez miary)
             }
             _townLeft[town] = left;
             if (any) _sellers++;
