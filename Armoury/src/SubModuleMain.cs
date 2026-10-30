@@ -81,6 +81,7 @@ namespace Armoury
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
+                try { CaravanLeader139b.Install(_harmony); } catch (Exception e) { Log.Error("CaravanLeader139b.Install", e); }   // 139b: XP z wyplat dowodcy karawany pominiete (prefiks OnTradeProfitMade(Hero)) - kara karawan idzie przez latke 300b ponizej
                 PlayerHaggle.ApplyAll(_harmony);     // 300b: targ gracza - postfiks GetTradePenalty kazdego modelu cen (Priority.Last, po BK): Handel + perswazja, bez x5 BK przy sprzedazy strony gracza
                 try { A16Signals.ApplyAll(_harmony); } catch (Exception e) { Log.Error("A16Signals.ApplyAll", e); }   // A16: premia pokoju RBL po 30 dobach spokoju, dubel warstwy dobrobytu BK, pomiar ludnosci BK (latki pomiaru zawsze)
                 SellByCondition.ApplyAll(_harmony);  // cena sprzedazy sprzetu (B): ksiega skupu (tylko log) - kto sprzedaje: ekran handlu gracza, SellItemsAction

@@ -758,6 +758,9 @@ namespace Armoury
         // 223 (26.10): stan "eskorta lordow" (narazone partie lordow, kolejki, sonda pojman) od zera przy nowej kampanii / wczytaniu (osobna linia, jak p9)
         private readonly bool _e223Reset = E223Reset();
         private static bool E223Reset() { try { LordEscort.Reset(); } catch (Exception e) { Log.Error("E223Reset", e); } return true; }
+        // 139b (30.10): liczniki karawan z dowodca od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest - bez zmiany wspolnej linii konstruktora)
+        private readonly bool _d139bReset = D139bReset();
+        private static bool D139bReset() { try { CaravanLeader139b.Reset(); } catch (Exception e) { Log.Error("D139bReset", e); } return true; }
         // m110-stan krok 2: rejestry misji ochrony z dokladnego HP i ksiegi sprzetu towarzyszy od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _m110HpReset = M110HpReset();
         private static bool M110HpReset() { try { HeroHp.Reset(); HeroBook.Reset(); } catch (Exception e) { Log.Error("M110HpReset", e); } return true; }
@@ -2523,6 +2526,7 @@ namespace Armoury
             try { AiDowry.OnSessionLaunched(); } catch (Exception e) { Log.Error("AiDowry.OnSessionLaunched", e); }   // R3-01c: latka kontraktu BK i przechyl swatow na modelu slubu, ktory gra uzywa (ROT)
             try { SellByCondition.OnSessionLaunched(); } catch (Exception e) { Log.Error("SellByCondition.OnSessionLaunched", e); }   // cena sprzedazy sprzetu: wylacznik kary BK z MCM (PO McmSettings.Apply wyzej) i kontrola "Kara handlowa BK: x5.0"; ksiega skupu od zera
             try { PlayerHaggle.StartLine(); } catch (Exception e) { Log.Error("PlayerHaggle.StartLine", e); }   // 300b: linia "Targ gracza (300b): klucz ..." - PO pomiarze kary BK (BkPenaltyOnce.Sync wyzej); krzywa i samotest, tylko odczyt
+            try { CaravanLeader139b.Start(); } catch (Exception e) { Log.Error("CaravanLeader139b.Start", e); }   // 139b: linia "Karawany - dowodca (139b): start" (krzywa, samotest) - po linii 300b
             try { CleanseNegativeStacks(); } catch (Exception e) { Log.Error("CleanseNegativeStacks", e); }
             try { TryRestoreArmoryWear("sesja"); } catch (Exception e) { Log.Error("TryRestoreArmoryWear", e); }
             try { if (!LoreSeedFix.On) LorePurgeOnce(); } catch (Exception e) { Log.Error("LorePurgeOnce", e); }   // m96-wzory: przy kluczu - w OnAfterSessionLaunched (LoreSeedFix)
@@ -2967,6 +2971,7 @@ namespace Armoury
             try { CaravanBulk.Daily(); } catch (Exception e) { Log.Error("CaravanBulk.Daily", e); } DayProfile.Lap("CaravanBulk.Daily");   // wpis 103: surowce masowe w karawanach (przeliczenie swiata + log)
             try { CaravanAmmo.Daily(); } catch (Exception e) { Log.Error("CaravanAmmo.Daily", e); } DayProfile.Lap("CaravanAmmo.Daily");   // paczka 172b: linia "Karawany bez amunicji (172b)" (zablokowane, sprzedane z taborow, w taborach)
             try { CaravanGoods.Daily(); } catch (Exception e) { Log.Error("CaravanGoods.Daily", e); } DayProfile.Lap("CaravanGoods.Daily");
+            try { CaravanLeader139b.Daily(); } catch (Exception e) { Log.Error("CaravanLeader139b.Daily", e); } DayProfile.Lap("CaravanLeader139b.Daily");   // 139b: linia "Karawany - dowodca (139b): dzien N" (ceny i XP karawan z dowodca; tylko pomiar), liczniki doby od zera
             try { CaravanTrade284.Daily(); } catch (Exception e) { Log.Error("CaravanTrade284.Daily", e); } DayProfile.Lap("CaravanTrade284.Daily");   // 284: linie "Handel karawan (284)", "Przeplyw towarow karawan (284)", "Wielkosc karawan (284, na sucho)"
             try { CaravanRoute294c.Daily(); } catch (Exception e) { Log.Error("CaravanRoute294c.Daily", e); } DayProfile.Lap("CaravanRoute294c.Daily");   // 294c: linia 'Cel karawan (294c)' po linii 294b; przebudowa 'w drodze do miast'
             try { CaravanWait139.Daily(); } catch (Exception e) { Log.Error("CaravanWait139.Daily", e); } DayProfile.Lap("CaravanWait139.Daily");   // 139: linia 'Karawany - czekanie, limit BK i droga (139)' po linii 294c

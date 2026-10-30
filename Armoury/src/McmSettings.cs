@@ -1192,6 +1192,14 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PlayerRebuyCap { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Leader Haggle", HintText = "a caravan led by a hero (a companion you gave a caravan) buys and sells at better prices the better its leader's Trade and persuasion (Charm and persuasion perks, as in Player Haggle): with no skill it pays the caravan's usual trade penalty (about 3% each way in a town at peace), and the penalty shrinks to nothing at about 500 points of Trade plus persuasion (150 points: about half). It never goes below zero, so buying and selling back in the same town still does not pay. The gold comes out of the towns' purses. Caravans led by a plain caravan master are not touched. Off - every caravan trades as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan leaders trade by skill (139b)")]
+        public bool CaravanLeaderHaggle { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Leader Trade Xp", HintText = "a caravan's hero leader learns Trade from every sale to a town that makes a profit over what the goods cost, by the game's own rule for your trade screen (half a point of experience per denar of profit, before the learning rate); for goods it carries without a recorded purchase (from an older save) the cost is the most it would have paid, so the profit is never overstated. Village sales give none. The caravan's surplus paid to its owner then no longer gives the leader experience, so one profit is not counted twice. Off - the leader learns only from payouts, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan leaders trade by skill (139b)")]
+        public bool CaravanLeaderTradeXp { get; set; } = true;
+
         [SettingPropertyInteger("Sell Cap Percent Of New Ask", 0, 40, "0", HintText = "the most a town or castle merchant pays for a weapon, a piece of armour, a saddle or ammunition, as % of what his own stall asks for a NEW one of the same kind and quality - and never more than he charges for its wreck, so buying worn gear or spoilt arrows, putting them right and selling them back in the same town never pays; carrying mended gear to a town that lacks it still pays. Horses and pack animals are not capped (0 = no cap; needs Sell Price By Condition)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public int SellCapPercentOfNewAsk { get; set; } = 10;
@@ -10793,6 +10801,8 @@ namespace Armoury
             s.SellPriceByCondition = SellPriceByCondition;
             s.PlayerHaggle = PlayerHaggle;
             s.PlayerRebuyCap = PlayerRebuyCap;
+            s.CaravanLeaderHaggle = CaravanLeaderHaggle;
+            s.CaravanLeaderTradeXp = CaravanLeaderTradeXp;
             s.SellCapPercentOfNewAsk = SellCapPercentOfNewAsk;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;
             s.LordThirdOnTotal = LordThirdOnTotal;

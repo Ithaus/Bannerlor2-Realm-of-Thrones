@@ -90,6 +90,7 @@ namespace Armoury
         public struct TState { public bool On; public int Kind; public MobileParty Mp; public Settlement St; public ItemObject It; public int Gold0, N0; }
 
         private static bool _hooked, _startDone, _bkHooked;
+        internal static bool Hooked { get { return _hooked; } }   // 139b: linia startowa karawan z dowodca
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         // ------------------------------------------------------------ liczniki doby
@@ -832,6 +833,7 @@ namespace Armoury
                     _bookBuys++; _bookBuyUnits += got;
                     if (mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 1, paid, 0, 0.0);   // 259: zakup karawany gracza (linia majatku gracza)
                     CaravanTrade284.NoteBuy(mp, it, got, __state.St);   // 284: juki karawan wedlug kategorii (bramka przeplywu na zywo); 298: miasto zakupu (pomiar)
+                    CaravanLeader139b.NoteBuy(mp, it, __state.St, got, paid);   // 139b: karawana z dowodca - oszczednosc wobec kary 138 (tylko pomiar)
                     var cat = it.ItemCategory;
                     Visit v;
                     if (_visit.TryGetValue(mp, out v) && ReferenceEquals(v.St, __state.St) && v.Cats.Contains(cat)) _rebought += got;   // odkupione to, co tu sprzedalismy (gabka, CaravanBulk)
@@ -846,14 +848,17 @@ namespace Armoury
                     int moved = __state.N0 - n1;
                     int got = mp.PartyTradeGold - __state.Gold0;
                     double costRm = 0;   // 259: koszt zdjety z ksiegi (zysk ze sprzedazy w linii majatku gracza)
+                    int mCost = 0;       // 139b: sztuki z kosztem w ksiedze (przed zdjeciem) - XP dowodcy tylko z nich
+                    bool mEst = false;   // 139b: koszt wpisu choc czesciowo z oszacowania (Restore - gorna granica ceny zakupu)
                     if (moved > 0)
                     {
                         var l = Sync(mp, it, __state.N0, false);
-                        if (l != null && l.N > 0) { int m = Math.Min(moved, l.N); costRm = l.Cost * m / l.N; l.Cost -= costRm; l.N -= m; if (l.N <= 0) l.Est = false; }
+                        if (l != null && l.N > 0) { int m = Math.Min(moved, l.N); mCost = m; mEst = l.Est; costRm = l.Cost * m / l.N; l.Cost -= costRm; l.N -= m; if (l.N <= 0) l.Est = false; }
                     }
                     if (got > 0) TownToll.LastTaken = TownToll.TakeCaravan(__state.St, mp, got);
                     if (got > 0 && mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 2, got, TownToll.LastTaken, costRm);   // 259: sprzedaz karawany gracza (utarg przed mytem, myto)
                     if (moved > 0) CaravanTrade284.NoteSale(mp, it, moved, Math.Max(0, got), got > 0 ? TownToll.LastTaken : 0, costRm);   // 284: zysk zrealizowany wedlug drogi, pomiar sprzedazy kategorii
+                    if (moved > 0) CaravanLeader139b.NoteSale(mp, it, __state.St, moved, mCost, mEst, got, got > 0 ? TownToll.LastTaken : 0, costRm);   // 139b: karawana z dowodca - XP Handlu jak gracz, premia wobec 138
                 }
             }
             catch (Exception e) { Stumble("TradePostfix", e); }

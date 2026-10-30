@@ -83537,5 +83537,370 @@ def k294_selftest():
         return f"139: log bez linii 139 nie INFO {vi}"
     return None
 
+
+# ---- 139b (30.10): karawana z bohaterem-dowodca handluje jego umiejetnoscia (CaravanLeader139b.cs) - grupa dowodca139
+# Linie: 'Karawany - dowodca (139b): start | ...' (CaravanLeader139b.Start, po linii 300b) i 'Karawany - dowodca (139b): dzien N | ...' (CaravanLeader139b.Daily,
+# po CaravanGoods.Daily; w dobie pomiaru albo przy karawanach z dowodca / potknieciach).
+# D139-S  self-test wyrazen (linie jak w C#)                    D139-S2 test syntetyczny (dobry bieg, bieg z kluczami NIE, zle biegi - kazdy wiersz 0-8)
+# D139-0  linia startowa jest, wpiecia TAK (kara w >= 1 modelu, XP OnTradeProfitMade(Hero) TAK, lancuch menedzera ... TAK, SellItemsAction TAK)
+# D139-1  krzywa: czynnik(S) = max(0, 2 / (1 + 0.002 S) - 1) +-0.002; kara(S) = kara(0) x czynnik(S) +-0.0003 (klucz targ NIE: kara(S) = kara(0)), kara(0) w [0.02, 0.04],
+#         nierosnaca i >= 0; J(T) = 1 - 1 / (1 + 0.002 T) +-0.002; E = 0.0020
+# D139-2  samotest a..e pelny (a, c, d, e: n > 0; b: n > 0 albo tf sondy != 1)
+# D139-3  kazda doba: 'bez dowodcy N (zmienione 0; sonda S)' - sonda doby (do 20 karawan bez dowodcy x towar z juk x kupno / sprzedaz: kara z latka == kara bez
+#         latki, Raw); S > 0, gdy sa karawany bez dowodcy (karawan > z dowodca)
+# D139-4  doby ze sprzedaza / kupnem karawan z dowodca: premia i oszczednosc w [0, kara 138 max + 0.1] (%) - nie wiecej niz zdjeta kara
+# D139-5  XP = 0.50 x Zk +-1; XP > 0 tylko gdy 'w dobie' > 0 (karawany z dowodca widziane w dobie - spis 'z dowodca' jest z konca doby); 'zastapione' > 0
+#         tylko przy kluczu XP TAK
+# D139-6  ERROR CaravanLeader139b = 0, potkniecia dob 0
+# D139-7  INFO: karawany z dowodca, sredni Handel, czynnik, premia, XP
+# D139-8  doby z 'z dowodca 0' i 'w dobie 0': liczniki z dowodca (wywolan, zmienione, sprzedaz, kupno, zysk, XP, zastapione) = 0
+# (klucz oceny CaravanLeaderJudgement usuniety w recenzji 139b - J pod kluczem targu; linie bez 'ocena')
+DOWODCA139_START_L = "Karawany - dowodca (139b): start "
+DOWODCA139_DAY_L = "Karawany - dowodca (139b): dzien "
+DOWODCA139_ERR = ("ERROR in CaravanLeader139b",)
+DOWODCA139_START_RE = re.compile(
+    r"^Karawany - dowodca \(139b\): start \| klucze: targ (?P<kt>TAK|NIE), XP (?P<kx>TAK|NIE)"
+    r" \| wpiete: kara w (?P<nm>\d+) modelach \(latka 300b\), XP OnTradeProfitMade\(Hero\) (?P<xh>TAK|NIE) \((?P<chain>[^()]*)\), sprzedaz SellItemsAction (?P<sh>TAK|NIE)"
+    r" \| E (?P<e>[0-9.]+)/pkt, XP (?P<xr>[0-9.]+)/zl"
+    r" \| czynnik S=(?P<cs>[0-9/]+): (?P<cf>[0-9./-]+), kara (?P<ck>[0-9./-]+), obrot x(?P<co>[0-9./-]+) \(sonda: karawana bez dowodcy tf (?P<tf>[0-9.]+|-), towar (?P<good>[^)]*)\)"
+    r" \| J Handel (?P<jt>[0-9/]+): (?P<jv>[0-9./-]+)"
+    r" \| samotest: bez dowodcy = 138 (?P<a1>\d+)/(?P<a2>\d+), S=0 = 138 (?P<b1>\d+)/(?P<b2>\d+), sprzedaz <= kupno (?P<ct>\d+) miasta x (?P<cg>\d+) towary x S 0/150/300/700"
+    r" (?P<c1>\d+)/(?P<c2>\d+), klucz NIE = 138 (?P<d1>\d+)/(?P<d2>\d+), J bez dowodcy 0 (?P<e1>\d+)/(?P<e2>\d+)"
+    r" \| karawan (?P<k>\d+), z dowodca (?P<h>\d+) \(rod gracza (?P<hp>\d+), inne (?P<ho>\d+)\)\.$")
+DOWODCA139_DAY_RE = re.compile(
+    r"^Karawany - dowodca \(139b\): dzien (?P<d>\d+) \| klucze: targ (?P<kt>TAK|NIE), XP (?P<kx>TAK|NIE)"
+    r" \| karawan (?P<k>\d+), z dowodca (?P<h>\d+) \(gracza (?P<hp>\d+), inne (?P<ho>\d+); w dobie (?P<hd>\d+)\)"
+    r" \| Handel sr (?P<t>[0-9.]+|-) \((?P<tmin>-?\d+|-)\.\.(?P<tmax>-?\d+|-)\), perswazja sr (?P<p>[0-9.]+|-), S sr (?P<s>[0-9.]+|-),"
+    r" czynnik sr (?P<f>[0-9.]+|-) \((?P<fmin>[0-9.]+|-)\.\.(?P<fmax>[0-9.]+|-)\), J sr (?P<j>[0-9.]+|-)"
+    r" \| wywolan kary: z dowodca (?P<n1>\d+) \(zmienione (?P<n1c>\d+)\), bez dowodcy (?P<n0>\d+) \(zmienione (?P<n0c>\d+); sonda (?P<n0s>\d+)\)"
+    r" \| sprzedaz z dowodca (?P<sq>\d+) szt\. utarg (?P<sg>\d+) \(przy karze 138 ok\. (?P<sg0>\d+), premia \+(?P<prem>-?[0-9.]+|-)%\),"
+    r" kupno (?P<bq>\d+) szt\. (?P<bb>\d+) \(przy 138 ok\. (?P<bb0>\d+), oszczednosc (?P<save>-?[0-9.]+|-)%\), kara 138 max (?P<kmax>[0-9.]+)%"
+    r" \| zysk dowodcow (?P<z>-?\d+) zl, XP (?P<x>\d+) pkt surowe \((?P<xr>[0-9.]+) x (?P<zk>\d+); sprzedazy (?P<xs>\d+); sztuk z kosztem szacowanym (?P<u>\d+)\),"
+    r" XP z wyplat zastapione (?P<r>\d+) \((?P<ra>\d+) zl\)"
+    r" \| potkniecia (?P<e>\d+) \(sesja (?P<es>\d+)\)(?P<who>.*)\.$")
+DOWODCA139_S = (0, 50, 150, 300, 500, 700)
+DOWODCA139_T = (0, 50, 150, 300)
+DOWODCA139_FIT_F = 0.002
+DOWODCA139_FIT_K = 0.0003
+DOWODCA139_K0 = (0.02, 0.04)
+
+
+def _d139_fac(s_):
+    return max(0.0, 2.0 / (1.0 + 0.002 * s_) - 1.0)
+
+
+def _d139_start(kt="TAK", kx="TAK", k0=0.03, tweak=None, h=0, tf="1.000"):
+    fac = [_d139_fac(x) for x in DOWODCA139_S]
+    if tweak:
+        fac = tweak(fac)
+    pen = [k0 * f if kt == "TAK" else k0 for f in fac]
+    obr = [((1 + pen[0]) / (1 + p)) ** 2 for p in pen]
+    jv = [1 - 1 / (1 + 0.002 * t) for t in DOWODCA139_T]
+    return ("Karawany - dowodca (139b): start | klucze: targ " + kt + ", XP " + kx
+            + " | wpiete: kara w 2 modelach (latka 300b), XP OnTradeProfitMade(Hero) TAK (Naval -> Default TAK), sprzedaz SellItemsAction TAK"
+            + " | E 0.0020/pkt, XP 0.50/zl | czynnik S=" + "/".join(str(x) for x in DOWODCA139_S) + ": " + "/".join(f"{x:.3f}" for x in fac)
+            + ", kara " + "/".join(f"{x:.4f}" for x in pen) + ", obrot x" + "/".join(f"{x:.3f}" for x in obr)
+            + f" (sonda: karawana bez dowodcy tf {tf}, towar grain)"
+            + " | J Handel " + "/".join(str(x) for x in DOWODCA139_T) + ": " + "/".join(f"{x:.3f}" for x in jv)
+            + " | samotest: bez dowodcy = 138 320/320, S=0 = 138 320/320, sprzedaz <= kupno 3 miasta x 3 towary x S 0/150/300/700 36/36, klucz NIE = 138 320/320,"
+            + f" J bez dowodcy 0 20/20 | karawan 393, z dowodca {h} (rod gracza {h}, inne 0).")
+
+
+DOWODCA139_SAMPLE_START = _d139_start()
+DOWODCA139_SAMPLE_DAY0 = ("Karawany - dowodca (139b): dzien 109166 | klucze: targ TAK, XP TAK | karawan 393, z dowodca 0 (gracza 0, inne 0; w dobie 0)"
+                          " | Handel sr - (-..-), perswazja sr -, S sr -, czynnik sr - (-..-), J sr -"
+                          " | wywolan kary: z dowodca 0 (zmienione 0), bez dowodcy 81234 (zmienione 0; sonda 40)"
+                          " | sprzedaz z dowodca 0 szt. utarg 0 (przy karze 138 ok. 0, premia +-%), kupno 0 szt. 0 (przy 138 ok. 0, oszczednosc -%), kara 138 max 0.00%"
+                          " | zysk dowodcow 0 zl, XP 0 pkt surowe (0.50 x 0; sprzedazy 0; sztuk z kosztem szacowanym 0), XP z wyplat zastapione 0 (0 zl) | potkniecia 0 (sesja 0).")
+DOWODCA139_SAMPLE_DAY1 = ("Karawany - dowodca (139b): dzien 109167 | klucze: targ TAK, XP TAK | karawan 394, z dowodca 1 (gracza 1, inne 0; w dobie 1)"
+                          " | Handel sr 120.0 (120..120), perswazja sr 40.0, S sr 160.0, czynnik sr 0.524 (0.524..0.524), J sr 0.194"
+                          " | wywolan kary: z dowodca 412 (zmienione 412), bez dowodcy 80111 (zmienione 0; sonda 40)"
+                          " | sprzedaz z dowodca 40 szt. utarg 4100 (przy karze 138 ok. 4053, premia +1.16%), kupno 30 szt. 2900 (przy 138 ok. 2933, oszczednosc 1.14%),"
+                          " kara 138 max 2.42%"
+                          " | zysk dowodcow 1301 zl, XP 650 pkt surowe (0.50 x 1301; sprzedazy 3; sztuk z kosztem szacowanym 0), XP z wyplat zastapione 1 (2100 zl) | potkniecia 0 (sesja 0)"
+                          " || 'Caravan of Isa Storm' (wodz: Handel 120 (+650 XP dzis), perswazja 40, czynnik 0.524).")
+
+
+def _d139_new():
+    return {"start": [], "startbad": 0, "day": {}, "daybad": 0, "err": 0}
+
+
+def _d139_feed(D, s):
+    if any(e in s for e in DOWODCA139_ERR):
+        D["err"] += 1
+        return
+    if s.startswith(DOWODCA139_START_L):
+        a = DOWODCA139_START_RE.match(s)
+        if a:
+            D["start"].append(a.groupdict())
+        else:
+            D["startbad"] += 1
+    elif s.startswith(DOWODCA139_DAY_L):
+        a = DOWODCA139_DAY_RE.match(s)
+        if a:
+            D["day"][int(a.group("d"))] = a.groupdict()
+        else:
+            D["daybad"] += 1
+
+
+def dowodca139_collect(logp):
+    D = _d139_new()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            _d139_feed(D, m.group(2) if m else ln.rstrip("\r\n"))
+    return D
+
+
+def _d139_f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def dowodca139_selftest():
+    a = DOWODCA139_START_RE.match(DOWODCA139_SAMPLE_START)
+    if not a or a.group("chain") != "Naval -> Default TAK" or a.group("cf").split("/")[2] != "0.538" or a.group("ck").split("/")[3] != "0.0075" \
+            or a.group("c1") != "36" or a.group("tf") != "1.000" or a.group("jv").split("/")[3] != "0.375":
+        return f"139b: linia startowa {a.groupdict() if a else None}"
+    b = DOWODCA139_DAY_RE.match(DOWODCA139_SAMPLE_DAY0)
+    if not b or b.group("h") != "0" or b.group("t") != "-" or b.group("prem") != "-" or b.group("n0") != "81234" or b.group("who") != "":
+        return f"139b: linia doby bez dowodcy {b.groupdict() if b else None}"
+    c = DOWODCA139_DAY_RE.match(DOWODCA139_SAMPLE_DAY1)
+    if not c or c.group("prem") != "1.16" or c.group("zk") != "1301" or c.group("x") != "650" or c.group("r") != "1" or "Isa Storm" not in c.group("who") \
+            or c.group("kmax") != "2.42" or c.group("tmin") != "120" or c.group("hd") != "1" or c.group("u") != "0":
+        return f"139b: linia doby z dowodca {c.groupdict() if c else None}"
+    if not DOWODCA139_DAY_RE.match(DOWODCA139_SAMPLE_DAY1.replace("premia +1.16%", "premia +-0.20%")):
+        return "139b: ujemna premia nie rozpoznana"
+    if DOWODCA139_START_RE.match(DOWODCA139_SAMPLE_START.replace("XP OnTradeProfitMade(Hero) TAK", "XP OnTradeProfitMade(Hero) tak")):
+        return "139b: zly napis wpiecia rozpoznany"
+    return None
+
+
+def dowodca139_rows(rep, D):
+    starts = D["start"]
+    last = starts[-1] if starts else None
+    # D139-0
+    if not last:
+        rep.add("D139-0: linia startowa 139b i wpiecia", f"brak linii startowej (nierozpoznanych {D['startbad']})", "linia jest, wpiecia TAK", False)
+    else:
+        ok = int(last["nm"]) >= 1 and last["xh"] == "TAK" and last["chain"].endswith("TAK") and last["sh"] == "TAK" and D["startbad"] == 0
+        rep.add("D139-0: linia startowa 139b i wpiecia", f"startow {len(starts)} (nierozpoznanych {D['startbad']}); klucze targ {last['kt']}, XP {last['kx']};"
+                f" kara w {last['nm']} modelach, XP {last['xh']} ({last['chain']}), SellItemsAction {last['sh']}",
+                "kara w >= 1 modelu, XP OnTradeProfitMade(Hero) TAK, lancuch menedzera ... TAK, SellItemsAction TAK", ok)
+    # D139-1
+    if last:
+        why = []
+        cs = [int(x) for x in last["cs"].split("/")]
+        cf = [_d139_f(x) for x in last["cf"].split("/")]
+        ck = [_d139_f(x) for x in last["ck"].split("/")]
+        if len(cf) != len(cs) or len(ck) != len(cs) or any(v is None for v in cf + ck):
+            why.append("krzywa niepelna")
+        else:
+            for s_, f in zip(cs, cf):
+                if abs(f - _d139_fac(s_)) > DOWODCA139_FIT_F:
+                    why.append(f"czynnik S={s_} {f:.3f} (wzor {_d139_fac(s_):.3f})")
+            k0 = ck[0]
+            if not (DOWODCA139_K0[0] <= k0 <= DOWODCA139_K0[1]):
+                why.append(f"kara S=0 {k0:.4f} poza {list(DOWODCA139_K0)}")
+            for s_, f, k in zip(cs, cf, ck):
+                want = k0 * f if last["kt"] == "TAK" else k0
+                if abs(k - want) > DOWODCA139_FIT_K:
+                    why.append(f"kara S={s_} {k:.4f} (oczekiwana {want:.4f})")
+            if any(ck[i + 1] > ck[i] + 1e-9 for i in range(len(ck) - 1)) or min(ck) < 0:
+                why.append("kara rosnie albo < 0")
+        jt = [int(x) for x in last["jt"].split("/")]
+        jv = [_d139_f(x) for x in last["jv"].split("/")]
+        if len(jv) != len(jt) or any(v is None for v in jv):
+            why.append("J niepelne")
+        else:
+            for t, j in zip(jt, jv):
+                if abs(j - (1 - 1 / (1 + 0.002 * t))) > DOWODCA139_FIT_F:
+                    why.append(f"J Handel {t} {j:.3f}")
+        if abs(float(last["e"]) - 0.002) > 1e-6:
+            why.append(f"E {last['e']}")
+        rep.add("D139-1: krzywa czynnika, kary i J (linia startowa)", f"czynnik {last['cf']}, kara {last['ck']}, obrot x{last['co']}, J {last['jv']}"
+                + (" | " + "; ".join(why) if why else ""),
+                f"czynnik = max(0, 2/(1+0.002S) - 1) +-{DOWODCA139_FIT_F}; kara = kara(S=0) x czynnik +-{DOWODCA139_FIT_K} (klucz NIE: stala), kara(S=0) w {list(DOWODCA139_K0)};"
+                f" nierosnaca >= 0; J = 1 - 1/(1+0.002T) +-{DOWODCA139_FIT_F}", not why)
+        # D139-2
+        pairs = [("a", "bez dowodcy = 138"), ("b", "S=0 = 138"), ("c", "sprzedaz <= kupno"), ("d", "klucz NIE = 138"), ("e", "J bez dowodcy 0")]
+        bad = []
+        for x, name in pairs:
+            o, n = int(last[x + "1"]), int(last[x + "2"])
+            if o != n or (n == 0 and not (x == "b" and last["tf"] != "1.000")):
+                bad.append(f"{name} {o}/{n}")
+        rep.add("D139-2: samotest a..e (linia startowa)", f"a {last['a1']}/{last['a2']}, b {last['b1']}/{last['b2']}, c {last['c1']}/{last['c2']} ({last['ct']} miasta x {last['cg']} towary),"
+                f" d {last['d1']}/{last['d2']}, e {last['e1']}/{last['e2']}, tf sondy {last['tf']}" + (" | " + "; ".join(bad) if bad else ""),
+                "kazdy pelny, n > 0 (b: n > 0 albo tf sondy != 1)", not bad)
+    else:
+        rep.add("D139-1: krzywa czynnika, kary i J (linia startowa)", "brak linii startowej", "linia startowa", False)
+        rep.add("D139-2: samotest a..e (linia startowa)", "brak linii startowej", "linia startowa", False)
+    days = D["day"]
+    ds = sorted(days)
+    # D139-3
+    if not ds:
+        rep.add("D139-3: kazda doba 'bez dowodcy ... (zmienione 0)'", f"brak linii doby (nierozpoznanych {D['daybad']})", "linie doby sa, zmienione 0", False)
+    else:
+        bad = [d for d in ds if days[d]["n0c"] != "0" or (int(days[d]["n0s"]) == 0 and int(days[d]["k"]) > int(days[d]["h"]))]
+        rep.add("D139-3: kazda doba 'bez dowodcy ... (zmienione 0)'", f"dob {len(ds)} (nierozpoznanych {D['daybad']}), sonda razem {sum(int(days[d]['n0s']) for d in ds)}, dob ze zmiana bez dowodcy albo bez sondy {len(bad)}"
+                + (f" (np. {bad[:3]})" if bad else ""), "0 dob ze zmiana, sonda > 0 przy karawanach bez dowodcy, 0 nierozpoznanych", not bad and D["daybad"] == 0)
+    # D139-4
+    trade = [d for d in ds if int(days[d]["sq"]) > 0 or int(days[d]["bq"]) > 0]
+    if not trade:
+        rep.add("D139-4: premia sprzedazy i oszczednosc kupna karawan z dowodca", "brak handlu karawan z dowodca (zapis bez karawan gracza)", "w [0, kara 138 max + 0.1] % (INFO bez handlu)", None)
+    else:
+        bad = []
+        for d in trade:
+            g = days[d]
+            km = float(g["kmax"]) + 0.1
+            for key, q in (("prem", "sq"), ("save", "bq")):
+                if int(g[q]) <= 0:
+                    continue
+                v = _d139_f(g[key])
+                if v is None or v < -0.005 or v > km:
+                    bad.append(f"dzien {d} {key} {g[key]}% (max {km:.2f})")
+        rep.add("D139-4: premia sprzedazy i oszczednosc kupna karawan z dowodca", f"dob z handlem {len(trade)}, poza zakresem {len(bad)}" + (" | " + "; ".join(bad[:3]) if bad else ""),
+                "w [0, kara 138 max + 0.1] % (wiecej niz zdjeta kara = blad wyceny)", not bad)
+    # D139-5
+    if not ds:
+        rep.add("D139-5: XP = 0.50 x zysk, XP tylko z dowodca, zastapione tylko przy kluczu XP", "brak linii doby", "linie doby", False)
+    else:
+        bad = []
+        for d in ds:
+            g = days[d]
+            x, zk, hd, r = int(g["x"]), int(g["zk"]), int(g["hd"]), int(g["r"])
+            if abs(x - 0.5 * zk) > 1:
+                bad.append(f"dzien {d} XP {x} wobec 0.5 x {zk}")
+            if x > 0 and hd == 0:
+                bad.append(f"dzien {d} XP {x} bez karawany z dowodca w dobie")
+            if r > 0 and g["kx"] != "TAK":
+                bad.append(f"dzien {d} zastapione {r} przy kluczu XP NIE")
+        xs = sum(int(days[d]["x"]) for d in ds)
+        rs = sum(int(days[d]["r"]) for d in ds)
+        rep.add("D139-5: XP = 0.50 x zysk, XP tylko z dowodca, zastapione tylko przy kluczu XP", f"dob {len(ds)}, XP razem {xs} pkt surowe, zastapione {rs}"
+                + (" | " + "; ".join(bad[:3]) if bad else ""), "XP = 0.5 x Zk +-1; XP > 0 tylko przy w dobie > 0; zastapione > 0 tylko przy kluczu XP TAK", not bad)
+    # D139-6
+    pot = sum(int(days[d]["e"]) for d in ds)
+    rep.add("D139-6: ERROR CaravanLeader139b i potkniecia dob", f"ERROR {D['err']}, potkniecia {pot}", "0 i 0", D["err"] == 0 and pot == 0)
+    # D139-7
+    if ds:
+        with_h = [d for d in ds if int(days[d]["h"]) > 0]
+        g = days[ds[-1]]
+        sg = sum(int(days[d]["sg"]) for d in ds); sg0 = sum(int(days[d]["sg0"]) for d in ds)
+        bb = sum(int(days[d]["bb"]) for d in ds); bb0 = sum(int(days[d]["bb0"]) for d in ds)
+        prem = f"{100.0 * (sg / sg0 - 1):.2f}%" if sg0 > 0 else "-"
+        save = f"{100.0 * (1 - bb / bb0):.2f}%" if bb0 > 0 else "-"
+        rep.add("D139-7: karawany z dowodca - INFO", f"ostatnia doba: karawan {g['k']}, z dowodca {g['h']} (gracza {g['hp']}), Handel sr {g['t']}, czynnik sr {g['f']}, J sr {g['j']};"
+                f" dob z dowodca {len(with_h)} z {len(ds)}; caly bieg: utarg {sg} (138 ok. {sg0}, premia {prem}), kupno {bb} (138 ok. {bb0}, oszczednosc {save}),"
+                f" XP {sum(int(days[d]['x']) for d in ds)} pkt surowe", "INFO (autotest na zapisie bez karawan gracza: z dowodca 0, wszystko 0)", None)
+    else:
+        rep.add("D139-7: karawany z dowodca - INFO", "brak linii doby", "INFO", None)
+    # D139-8
+    zero = [d for d in ds if int(days[d]["h"]) == 0 and int(days[d]["hd"]) == 0]
+    bad = [d for d in zero if any(int(days[d][k]) != 0 for k in ("n1", "n1c", "sq", "bq", "sg", "bb", "zk", "x", "xs", "r"))]
+    rep.add("D139-8: doby bez karawan z dowodca - liczniki z dowodca 0", f"dob bez dowodcy (spis i w dobie) {len(zero)}, z niezerowym licznikiem {len(bad)}" + (f" (np. {bad[:3]})" if bad else ""),
+            "0 (bez dowodcy nic nie liczy sie po stronie dowodcy)", not bad if zero else None)
+
+
+def _d139_synth(start=None, days0=3, days1=2, err=0, day0=None, day1=None, nostart=False):
+    lines = []
+    if not nostart:
+        lines.append(start if start is not None else DOWODCA139_SAMPLE_START)
+    for i in range(days0):
+        lines.append((day0 or DOWODCA139_SAMPLE_DAY0).replace("dzien 109166", f"dzien {109100 + i}"))
+    for i in range(days1):
+        lines.append((day1 or DOWODCA139_SAMPLE_DAY1).replace("dzien 109167", f"dzien {109200 + i}"))
+    for _ in range(err):
+        lines.append("ERROR in CaravanLeader139b.Penalty (potkniecie 1): System.NullReferenceException")
+    D = _d139_new()
+    for s in lines:
+        _d139_feed(D, s)
+    return D
+
+
+def _d139_verdicts(D):
+    r = Report()
+    dowodca139_rows(r, D)
+    return {x[0].split(":")[0]: x[3] for x in r.rows}
+
+
+def dowodca139_selftest2():
+    v = _d139_verdicts(_d139_synth())
+    if any(x == "NIE" for x in v.values()):
+        return f"dobry bieg: {v}"
+    v = _d139_verdicts(_d139_synth(start=_d139_start(kt="NIE", kx="NIE"), days1=0,
+                                   day0=DOWODCA139_SAMPLE_DAY0.replace("targ TAK, XP TAK", "targ NIE, XP NIE")))
+    if any(x == "NIE" for x in v.values()):
+        return f"bieg z kluczami NIE: {v}"
+    # karawana z dowodca w dobie, ale nie w spisie konca doby (dowodca odszedl, karawana rozwiazana) - liczniki > 0 przy z dowodca 0 to nie blad
+    v = _d139_verdicts(_d139_synth(day1=DOWODCA139_SAMPLE_DAY1.replace("z dowodca 1 (gracza 1, inne 0; w dobie 1)", "z dowodca 0 (gracza 0, inne 0; w dobie 1)")))
+    if v.get("D139-5") != "TAK" or v.get("D139-8") == "NIE":
+        return f"dowodca tylko w dobie: {v}"
+    v = _d139_verdicts(_d139_synth(start=_d139_start(tf="0.950").replace("S=0 = 138 320/320", "S=0 = 138 0/0")))
+    if v.get("D139-2") != "TAK":
+        return f"sonda tf != 1 bez b: {v}"
+    bad = [
+        ("D139-0", dict(start=DOWODCA139_SAMPLE_START.replace("XP OnTradeProfitMade(Hero) TAK", "XP OnTradeProfitMade(Hero) NIE"))),
+        ("D139-0", dict(start=DOWODCA139_SAMPLE_START.replace("(Naval -> Default TAK)", "(Naval -> Default NIE)"))),
+        ("D139-0", dict(nostart=True)),
+        ("D139-1", dict(start=_d139_start(tweak=lambda f: [x if i != 2 else x + 0.05 for i, x in enumerate(f)]))),
+        ("D139-1", dict(start=_d139_start().replace("kara 0.0300/0.0245", "kara 0.0300/0.0300"))),
+        ("D139-1", dict(start=_d139_start(k0=0.15))),
+        ("D139-1", dict(start=_d139_start().replace(": 0.000/0.091/0.231/0.375", ": 0.000/0.091/0.300/0.375"))),
+        ("D139-2", dict(start=DOWODCA139_SAMPLE_START.replace("bez dowodcy = 138 320/320", "bez dowodcy = 138 319/320"))),
+        ("D139-2", dict(start=DOWODCA139_SAMPLE_START.replace("x S 0/150/300/700 36/36", "x S 0/150/300/700 35/36"))),
+        ("D139-2", dict(start=DOWODCA139_SAMPLE_START.replace("J bez dowodcy 0 20/20", "J bez dowodcy 0 0/0"))),
+        ("D139-3", dict(day0=DOWODCA139_SAMPLE_DAY0.replace("bez dowodcy 81234 (zmienione 0; sonda 40)", "bez dowodcy 81234 (zmienione 3; sonda 40)"))),
+        ("D139-3", dict(days0=0, days1=0)),
+        ("D139-3", dict(day0=DOWODCA139_SAMPLE_DAY0.replace("(zmienione 0; sonda 40)", "(zmienione 0; sonda 0)"))),
+        ("D139-4", dict(day1=DOWODCA139_SAMPLE_DAY1.replace("premia +1.16%", "premia +5.00%"))),
+        ("D139-4", dict(day1=DOWODCA139_SAMPLE_DAY1.replace("oszczednosc 1.14%", "oszczednosc -1.00%"))),
+        ("D139-5", dict(day1=DOWODCA139_SAMPLE_DAY1.replace("XP 650 pkt", "XP 900 pkt"))),
+        ("D139-5", dict(day1=DOWODCA139_SAMPLE_DAY1.replace("targ TAK, XP TAK", "targ TAK, XP NIE"))),
+        ("D139-5", dict(day0=DOWODCA139_SAMPLE_DAY0.replace("XP 0 pkt surowe (0.50 x 0;", "XP 5 pkt surowe (0.50 x 10;"))),
+        ("D139-6", dict(err=1)),
+        ("D139-6", dict(day1=DOWODCA139_SAMPLE_DAY1.replace("potkniecia 0 (sesja 0)", "potkniecia 2 (sesja 2)"))),
+        ("D139-8", dict(day0=DOWODCA139_SAMPLE_DAY0.replace("z dowodca 0 (zmienione 0)", "z dowodca 5 (zmienione 5)"))),
+    ]
+    for row, kw in bad:
+        v = _d139_verdicts(_d139_synth(**kw))
+        if v.get(row) != "NIE":
+            return f"zly bieg nie wykryty w {row}: {kw} -> {v.get(row)}"
+    return None
+
+
+def dowodca139_main(logp):
+    """dowodca139 (30.10, paczka 139b): D139-S, D139-S2, D139-0..D139-8 - opis nad stalymi DOWODCA139_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = dowodca139_selftest()
+    rep.add("D139-S: self-test wyrazen (linie 139b jak w C#: CaravanLeader139b.Start / Daily)", s1 or "OK", "OK (zmiana napisu w kodzie bez zmiany wyrazen - NIE)", s1 is None)
+    s2 = dowodca139_selftest2()
+    rep.add("D139-S2: test syntetyczny (dobry bieg, bieg z kluczami NIE, sonda tf != 1, 21 zlych, dowodca tylko w dobie - wiersze 0-8)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("D139-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = dowodca139_collect(logp)
+    print(f"plik: {logp} | startow {len(D['start'])} (nierozpoznanych {D['startbad']}), dob {len(D['day'])} (nierozpoznanych {D['daybad']}), ERROR {D['err']}")
+    dowodca139_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_dowodca139_main_prev = main
+
+
+def main(argv):
+    # paczka 139b: grupa dowodca139 - opakowanie main jak lupy300
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "dowodca139":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return dowodca139_main(rest[0] if rest else None)
+    return _dowodca139_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
