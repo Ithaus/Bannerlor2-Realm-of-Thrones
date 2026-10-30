@@ -114,7 +114,7 @@ namespace Armoury
             return se != null ? se.GetSkillEffectValue(points) : 0.002f * points;
         }
 
-        private static CultureObject CultureOf(PartyBase merchant)
+        internal static CultureObject CultureOf(PartyBase merchant)
         {
             if (merchant == null) return null;
             try
@@ -148,11 +148,12 @@ namespace Armoury
         }
 
         /// <summary>Warunki targu przywodcy party wobec kupca (kultura osady kupca; pamiec na godzine gry). null = brak przywodcy - bez zmian.</summary>
-        internal static Terms Get(MobileParty party, PartyBase merchant)
+        internal static Terms Get(MobileParty party, PartyBase merchant) { return GetFor(party, CultureOf(merchant), ForceS); }
+
+        /// <summary>139b: warunki targu przy zadanej kulturze rozmowcy (karawany: kultura osady, gdy kupca nie ma) i S sondy (fs; -1 = prawdziwe S - z pamiecia).</summary>
+        internal static Terms GetFor(MobileParty party, CultureObject cul, int fs)
         {
             if (party == null) return null;
-            var cul = CultureOf(merchant);
-            int fs = ForceS;
             int hour = (int)CampaignTime.Now.ToHours;
             if (fs < 0)
                 lock (_lock) { Terms c; if (_cache.TryGetValue(party, out c) && c.Hour == hour && c.Culture == cul) return c; }
@@ -175,6 +176,8 @@ namespace Armoury
             if (_depth > 1 || Raw || __1 == null || __0 == null) return;
             try
             {
+                // 139b: karawana - kara wedlug umiejetnosci dowodcy (CaravanLeader139b; bez dowodcy wczesne wyjscie, jak dotad); strona gracza karawan nie obejmuje
+                if (__1.IsCaravan) { CaravanLeader139b.Penalty(__instance, __0, __1, __2, __3, ref __result); return; }
                 if (!On || !Side(__1) || QuartermasterEscrow.Active || !SupplyDemand.Equipmentish(__0)) return;
                 var t = Get(__1, __2);
                 if (t == null) return;
@@ -229,6 +232,8 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("PlayerHaggle.ApplyAll", e); }
         }
+
+        internal static int ModelCount { get { return _models.Count; } }   // 139b: linia startowa karawan
 
         private static string Models() { return _models.Count == 0 ? "-" : string.Join(", ", _models); }
 
