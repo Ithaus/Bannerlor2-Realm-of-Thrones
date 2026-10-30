@@ -83657,6 +83657,9 @@ def k294_selftest():
 #         skierowane z domu <= skierowane utkniete 139; ocena skierowanych po 7 dobach (bieg z kluczem TAK): ocenione >= 20 -> ze sprzedaza / ocenione >= 0.5
 #         (mniej ocenionych - INFO)
 # K294-S self-test: wyrazenie (TAK, NIE z '-', 4 zle napisy), dobry bieg syntetyczny, zly bieg na kazdy warunek, log bez linii 140 - INFO
+# Recenzja 140: K294-35 pokazuje odcinek (wszystkie / bez postoju / uzywany) takze w dobach 61-90; K294-19 i K294-31 (werdykt z odcinka uzywanego, przy kluczu 1
+#         TAK - nowa miara) dostaja dopisek INFO z odcinkiem 'wszystkie karawany' (miara 139) ostatnich 7 dob i dob 61-90 oraz ile z roznicy daje sama miara -
+#         raport autotestu pokazuje oba odczyty; werdykt bez zmian (k140_annotate, self-test w K294-S).
 KAR140_L = "Karawany - odcinek i utkniete (140): dzien "
 KAR140_ERR = ("ERROR in CaravanLeg140.",)
 KAR140_RE = re.compile(
@@ -83760,6 +83763,8 @@ def k140_rows(rep, D):
     last = x[days[-1]]
     v35 = (f"dob {len(days)} (d{days[0]}-d{days[-1]}), dziur {len(holes)}, nierozpoznanych {D.get('k140bad', 0)}, potkniec {st}, ERROR {D.get('k140err', 0)}; "
            f"klucz 1 {last['k1']}; ostatnie {len(l7)} dob odcinek: wszystkie {avg('la'):.2f}, bez postoju {avg('lm'):.2f}, uzywany {avg('lu'):.2f}")
+    stw, stl = _k298_steady(days, min(g) if g else days[0])
+    v35 += f"; {stl}: wszystkie {avg('la', stw):.2f}, bez postoju {avg('lm', stw):.2f}, uzywany {avg('lu', stw):.2f}"
     if pk:
         v35 += (f"; stoja poza miastami srednio {avg('p', pk):.1f} (zamki {avg('pc', pk):.1f} / wsie {avg('pv', pk):.1f}; alarm {avg('pa', pk):.1f}, Hold {avg('ph', pk):.1f}, "
                 f"ranni > 40% {avg('pw', pk):.1f}, kiesa < 100 {avg('pk', pk):.1f}, utkniete {avg('pq', pk):.1f}, cel ta osada {avg('pt', pk):.1f}, 7+ dob {avg('p7', pk):.1f}) - INFO")
@@ -83814,12 +83819,32 @@ def k140_rows(rep, D):
     rep.add(n36, v36, f"liczniki spojne (klucz NIE - seek 0); ze sprzedaza / ocenione >= {KAR140_OUT_SHARE} przy >= {KAR140_OUT_MIN} ocenionych", ok36)
 
 
+def k140_annotate(rep, D):
+    """Recenzja 140: dopisek INFO do K294-19 i K294-31 (odcinek 288 = odcinek uzywany) - odcinek 'wszystkie karawany' (miara 139) i 'bez postoju poza miastami'
+    z linii 140, ostatnie 7 dob i doby 61-90; werdykt wiersza bez zmian. Log bez linii 140 - bez dopisku."""
+    x = D.get("k140") or {}
+    days = sorted(x)
+    if not days:
+        return
+    g = D.get("g") or {}
+    l7 = days[-7:]
+    stw, stl = _k298_steady(days, min(g) if g else days[0])
+    avg = lambda k, dd: sum(float(x[d][k]) for d in dd) / len(dd)
+    note = (f" | 140 (INFO, poza werdyktem): odcinek wszystkie karawany (miara 139) ostatnie {len(l7)} dob {avg('la', l7):.2f}, {stl} {avg('la', stw):.2f};"
+            f" bez postoju poza miastami {avg('lm', l7):.2f} / {avg('lm', stw):.2f}; uzywany {avg('lu', l7):.2f} / {avg('lu', stw):.2f}"
+            f" (klucz 1 {x[days[-1]]['k1']}; sama miara {avg('lu', l7) - avg('la', l7):+.2f} / {avg('lu', stw) - avg('la', stw):+.2f} doby)")
+    for i, row in enumerate(rep.rows):
+        if row[0].startswith(("K294-19:", "K294-31:")):
+            rep.rows[i] = (row[0], row[1] + note, row[2], row[3])
+
+
 _k140_rows_prev = k294_rows
 
 
 def k294_rows(rep, D):
     _k140_rows_prev(rep, D)
     k140_rows(rep, D)
+    k140_annotate(rep, D)
 
 
 _k140_selftest_prev = k294_selftest
@@ -83894,6 +83919,24 @@ def k294_selftest():
     vi = verdicts(synth(line=False))
     if vi.get("K294-35") != "INFO" or vi.get("K294-36") != "INFO":
         return f"140: log bez linii 140 nie INFO {vi}"
+    # recenzja 140: dopisek INFO do K294-19 / K294-31 - werdykt bez zmian, oba odczyty odcinka w tekscie; bez linii 140 - bez dopisku; K294-35 z dobami 61-90
+    for with_line in (True, False):
+        rp = Report()
+        rp.add("K294-19: odcinek", "v19", "r", True); rp.add("K294-31: odcinek", "v31", "r", False); rp.add("K294-32: inne", "v32", "r", True)
+        k140_annotate(rp, synth(line=with_line))
+        vv = [(r[0].split(":")[0], r[1], r[3]) for r in rp.rows]
+        if [v_[2] for v_ in vv] != ["TAK", "NIE", "TAK"] or vv[2][1] != "v32":
+            return f"140: dopisek zmienia werdykt albo inny wiersz {vv}"
+        has = ["odcinek wszystkie karawany (miara 139) ostatnie 7 dob 4.95" in v_[1] and "uzywany 4.47" in v_[1] and "sama miara -0.48" in v_[1] for v_ in vv[:2]]
+        if with_line and not all(has):
+            return f"140: brak dopisku odcinka 'wszystkie' w K294-19 / K294-31 {vv}"
+        if not with_line and (vv[0][1] != "v19" or vv[1][1] != "v31"):
+            return f"140: dopisek bez linii 140 {vv}"
+    rp = Report()
+    k140_rows(rp, synth())
+    _sw, _sl = _k298_steady(sorted(synth()["k140"]), 109137)
+    if f"{_sl}: wszystkie 4.95, bez postoju 4.47, uzywany 4.47" not in rp.rows[0][1]:
+        return f"140: K294-35 bez odcinka dob 61-90 {rp.rows[0][1]}"
     return None
 
 

@@ -235,7 +235,9 @@ namespace Armoury
                     {
                         if (mp == null || !mp.IsActive) { _oGone++; continue; }
                         _oN++;
-                        if (today - CaravanTrade284.DaysSinceSale(mp, today) >= kv.Value) _oSold++;
+                        // recenzja 140: tylko prawdziwa sprzedaz z ksiegi (DaysSinceSale bez wpisu daje 7 - w dobie oceny liczylaby sie jak sprzedaz)
+                        int ls = CaravanTrade284.LastSaleDay(mp, today);
+                        if (ls != int.MinValue && ls >= kv.Value) _oSold++;
                     }
                     catch (Exception e) { Stumble("Daily(ocena)", e); }
                 }

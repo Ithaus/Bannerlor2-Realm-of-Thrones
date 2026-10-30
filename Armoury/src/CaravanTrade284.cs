@@ -1329,6 +1329,17 @@ namespace Armoury
             return last != int.MinValue ? Math.Max(0, today - last) : Math.Max(7, today - a.First);
         }
 
+        /// <summary>140 (recenzja, pomiar): doba ostatniej sprzedazy karawany z ksiegi zysku 284 (okno 14 dob), &lt;= today; brak wpisu ksiegi albo brak sprzedazy
+        /// w oknie - int.MinValue (DaysSinceSale daje wtedy 7 / doby od pierwszej doby ksiegi - nie sprzedaz).</summary>
+        internal static int LastSaleDay(MobileParty mp, int today)
+        {
+            Acc a;
+            if (mp == null || !_acc.TryGetValue(mp, out a)) return int.MinValue;
+            int last = int.MinValue;
+            for (int k = 0; k < Ring; k++) if (a.D[k] != int.MinValue && a.D[k] <= today && a.D[k] > last) last = a.D[k];
+            return last;
+        }
+
         /// <summary>SellGuardPrefix: n sztuk wstrzymanych (licznik BK / gry, koszt) i wpis dla TakeWithheld (lista transakcji ma liczbe sprzed przyciecia) - wydzielone
         /// w poprawce 135a, ta sama ksiega co dotad (takze dla progu wartosci starego towaru w przesycie).</summary>
         private static void Withhold(MobileParty mp, EquipmentElement el, bool bk, int n, double unit)
