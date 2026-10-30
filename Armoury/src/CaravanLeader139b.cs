@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -33,11 +34,12 @@ namespace Armoury
     ///     tu", bo czynnik bazowy kupna i odkupu tej samej sztuki jest ten sam). Czynnik jest w [0, 1] (H <= tfT <= 1), wiec kara nigdy nie rosnie.
     ///     Wojna, wies, perki, BK x5, x0.95 BK i BKROT zostaja jako mnozniki lancucha. Karawana bez bohatera - wczesne wyjscie, zero zmian.
     ///     Wpiete w postfiks 300b (PlayerHaggle.Postfix) - ta sama latka na kazdym modelu cen i ten sam licznik zagniezdzenia.
-    /// (2) OCENA (klucz CaravanLeaderJudgement): SkillJudge(mp) = 1 - tf (sam Handel - ocena rynku to wiedza, nie urok); bez dowodcy 0. W 139b nikt jej nie czyta -
-    ///     to pomocnik dla rundy 139 (czekanie na rynek, trasa BK).
+    /// (2) OCENA (pod kluczem CaravanLeaderHaggle - osobny przelacznik dopiero, gdy ktos ja czyta): SkillJudge(mp) = 1 - tf (sam Handel - ocena rynku to wiedza,
+    ///     nie urok); bez dowodcy 0. W 139b nikt jej nie czyta - to pomocnik dla rundy 139 (czekanie na rynek, trasa BK).
     /// (3) XP HANDLU (klucz CaravanLeaderTradeXp): regula gracza (TradeSkillCampaignBehavior: XP = 0.5 x zysk sprzedazy ponad koszt zakupu) przy kazdej sprzedazy
-    ///     karawany z dowodca miastu (CaravanGoods.TradePostfix, ksiega kosztu E3-T1); XP z wyplat nadwyzki (259, E3/9, wyplata gry, wplata BK) dla tego dowodcy
-    ///     pominiete (prefiks na OnTradeProfitMade(Hero) - ten sam zysk nie liczy sie dwa razy).
+    ///     karawany z dowodca miastu (CaravanGoods.TradePostfix, ksiega kosztu E3-T1; koszt szacowany przy wczytaniu - gorna granica ceny zakupu, zysk nie zawyzony);
+    ///     XP z wyplat nadwyzki (259, E3/9, wyplata gry, wplata BK) dla tego dowodcy pominiete (prefiks na OnTradeProfitMade(Hero) - ten sam zysk nie liczy sie dwa
+    ///     razy) - tylko gdy latka sprzedazy (SellItemsAction) wpieta; bez niej XP z wyplat jak w 138.
     /// Wyjatek per wywolanie - licznik potkniec, nic nie gasimy. Reset w konstruktorze ArmouryBehavior.
     /// </summary>
     internal static class CaravanLeader139b
@@ -54,8 +56,9 @@ namespace Armoury
 
         private static readonly object _lock = new object();
         // doba
-        private static long _c1, _c1c, _c0;
-        private static int _sellQ, _buyQ, _xpSales, _noCost, _payR;
+        private static long _c1, _c1c, _c0;   // Interlocked (wywolania kary moga przyjsc z kilku watkow)
+        private static int _sellQ, _buyQ, _xpSales, _estQ, _payR;
+        private static readonly HashSet<MobileParty> _seen = new HashSet<MobileParty>();   // karawany z dowodca widziane w dobie (kara, kupno, sprzedaz)
         private static long _sellG, _buyB, _profitZ, _profitZk, _payA;
         private static double _sellG0, _buyB0, _maxOld;
         private static readonly Dictionary<Hero, double> _xpHero = new Dictionary<Hero, double>();
@@ -66,25 +69,28 @@ namespace Armoury
 
         internal static bool On { get { if (Off) return false; var s = Settings.Current; return s != null && s.CaravanLeaderHaggle; } }
         internal static bool XpOn { get { if (Off) return false; var s = Settings.Current; return s != null && s.CaravanLeaderTradeXp; } }
-        internal static bool JudgeOn { get { if (Off) return false; var s = Settings.Current; return s != null && s.CaravanLeaderJudgement; } }
 
         internal static void Reset()
         {
-            lock (_lock) { DayZero(); _errors = 0; }
+            lock (_lock) { DayZero(); Interlocked.Exchange(ref _errors, 0); }
         }
 
         private static void DayZero()
         {
-            _c1 = _c1c = _c0 = 0; _sellQ = _buyQ = _xpSales = _noCost = _payR = 0;
+            Interlocked.Exchange(ref _c1, 0); Interlocked.Exchange(ref _c1c, 0); Interlocked.Exchange(ref _c0, 0);
+            _sellQ = _buyQ = _xpSales = _estQ = _payR = 0;
             _sellG = _buyB = _profitZ = _profitZk = _payA = 0; _sellG0 = _buyB0 = _maxOld = 0.0;
-            _xpHero.Clear(); _dayErrors = 0;
+            _xpHero.Clear(); _seen.Clear(); Interlocked.Exchange(ref _dayErrors, 0);
         }
 
         internal static void Stumble(string where, Exception e)
         {
-            _dayErrors++;
-            if (++_errors <= 5 || _errors % 100 == 0) Log.Error("CaravanLeader139b." + where + " (potkniecie " + _errors + ")", e);
+            Interlocked.Increment(ref _dayErrors);
+            int n = Interlocked.Increment(ref _errors);
+            if (n <= 5 || n % 100 == 0) Log.Error("CaravanLeader139b." + where + " (potkniecie " + n + ")", e);
         }
+
+        private static void Seen(MobileParty mp) { lock (_lock) _seen.Add(mp); }
 
         private static float E(int points)
         {
@@ -141,7 +147,12 @@ namespace Armoury
                 if (mp.LeaderHero == null)
                 {
                     int ps = _probe1 - 1;
-                    if (ps < 0) { if (!_quiet) _c0++; return; }
+                    if (ps < 0)
+                    {
+                        // bez dowodcy: wynik bez zmian (sprawdza to codzienna sonda w Daily: lancuch z latka == lancuch bez latki)
+                        if (!_quiet) Interlocked.Increment(ref _c0);
+                        return;
+                    }
                     float tf = TfOf(mp);
                     float inv = 1f / tf + E(ps);
                     float rp = result * FactorOf(inv > 0.05f ? 1f / inv : 20f, tf);
@@ -152,7 +163,7 @@ namespace Armoury
                 if (t == null) return;
                 float r = result * Factor(t);
                 if (float.IsNaN(r) || float.IsInfinity(r)) return;
-                if (!_quiet) { _c1++; if (r != result) _c1c++; }
+                if (!_quiet) { Interlocked.Increment(ref _c1); if (r != result) Interlocked.Increment(ref _c1c); Seen(mp); }
                 result = r;
             }
             catch (Exception e) { Stumble("Penalty", e); }
@@ -160,7 +171,7 @@ namespace Armoury
 
         /// <summary>
         /// POMOCNIK DLA RUNDY 139 (ocena rynku dowodcy): J = 1 - PartyTradeModel.GetTradePenaltyFactor(mp) dla karawany z bohaterem-dowodca, w [0, 1]; bez dowodcy
-        /// albo przy kluczu CaravanLeaderJudgement NIE - 0 (dokladnie jak bez 139b). Handel 0 / 50 / 150 / 300: 0 / 0.091 / 0.231 / 0.375. Tylko odczyt.
+        /// albo przy kluczu CaravanLeaderHaggle NIE - 0 (dokladnie jak bez 139b; 139 przy wpieciu moze dac wlasny przelacznik). Handel 0 / 50 / 150 / 300: 0 / 0.091 / 0.231 / 0.375. Tylko odczyt.
         /// Gdzie 139 ma to wpiac (139b niczego nie wpina): (a) CaravanGoods.AgeMarket, regula "czekanie kosztuje zold": najdluzsze czekanie x (1 - J);
         /// (b) CaravanRoute294c, GetTradeScoreForTown / ThinkNextDestination z kosztem drogi 139: dopuszczalna odleglosc x (1 + J), wagi kosztu drogi bez zmian;
         /// (c) limit BK BuyCategory 1500 - bez J (limit wplywu na rynek, nie wiedzy).
@@ -169,7 +180,7 @@ namespace Armoury
         {
             try
             {
-                if (!JudgeOn || mp == null || !mp.IsCaravan || mp.LeaderHero == null) return 0f;
+                if (!On || mp == null || !mp.IsCaravan || mp.LeaderHero == null) return 0f;
                 float j = 1f - TfOf(mp);
                 return j < 0f ? 0f : j > 1f ? 1f : j;
             }
@@ -202,7 +213,7 @@ namespace Armoury
                 Pens(mp, it, st, false, out old, out now);
                 lock (_lock)
                 {
-                    _buyQ += got; _buyB += paid;
+                    _buyQ += got; _buyB += paid; _seen.Add(mp);
                     _buyB0 += paid * (1.0 + old) / Math.Max(0.05, 1.0 + now);
                     if (old > _maxOld) _maxOld = old;
                 }
@@ -211,11 +222,13 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Sprzedaz karawany miastu (Kind 2, po NoteSale 284): moved sztuk, m z nich z kosztem w ksiedze (przed zdjeciem), got utarg przed mytem, toll myto, costRm koszt
-        /// zdjety z ksiegi. Pomiar premii wobec kary 138 i XP dowodcy: zysk = round(got x m / moved - toll x m / moved - costRm); zysk > 0 i klucz XP - regula gracza
-        /// (SkillLevelingManager.OnTradeProfitMade(PartyBase): 0.5 x zysk dla PartyLeader). Sztuki bez kosztu w ksiedze - bez XP (jak u gracza).
+        /// Sprzedaz karawany miastu (Kind 2, po NoteSale 284): moved sztuk, m z nich z kosztem w ksiedze (przed zdjeciem), est - koszt wpisu choc czesciowo szacowany
+        /// (Restore: gorna granica ceny zakupu - Sync odtwarza brakujace sztuki, wiec m = moved), got utarg przed mytem, toll myto, costRm koszt zdjety z ksiegi.
+        /// Pomiar premii wobec kary 138 i XP dowodcy: zysk = round(got x m / moved - toll x m / moved - costRm); zysk > 0 i klucz XP - regula gracza
+        /// (SkillLevelingManager.OnTradeProfitMade(PartyBase): 0.5 x zysk dla PartyLeader). Koszt szacowany - XP z niego (zysk nie zawyzony; gracz bez zapisu
+        /// zakupu dostaje 0 - roznica swiadoma, licznik "sztuk z kosztem szacowanym").
         /// </summary>
-        internal static void NoteSale(MobileParty mp, ItemObject it, Settlement st, int moved, int m, int got, int toll, double costRm)
+        internal static void NoteSale(MobileParty mp, ItemObject it, Settlement st, int moved, int m, bool est, int got, int toll, double costRm)
         {
             try
             {
@@ -235,7 +248,8 @@ namespace Armoury
                     _sellQ += moved;
                     if (got > 0) { _sellG += got; _sellG0 += got * (1.0 + now) / Math.Max(0.05, 1.0 + old); }
                     if (old > _maxOld) _maxOld = old;
-                    if (moved > m) _noCost += moved - Math.Max(0, m);
+                    _seen.Add(mp);
+                    if (est && m > 0) _estQ += m;
                     if (profit > 0) _profitZ += profit;
                     if (who != null)
                     {
@@ -254,7 +268,8 @@ namespace Armoury
         {
             try
             {
-                if (__0 == null || __1 <= 0 || !XpOn) return true;
+                // bez latki sprzedazy (CaravanGoods.Hooked NIE) XP ze sprzedazy nie przyjdzie - XP z wyplat zostaje jak w 138
+                if (__0 == null || __1 <= 0 || !XpOn || !CaravanGoods.Hooked) return true;
                 var p = __0.PartyBelongedTo;
                 if (p == null || !p.IsCaravan || p.LeaderHero != __0) return true;
                 lock (_lock) { _payR++; _payA += __1; }
@@ -381,7 +396,6 @@ namespace Armoury
                 float tf0 = p0 != null ? TfOf(p0) : float.NaN;
                 var sb = new StringBuilder();
                 sb.Append("Karawany - dowodca (139b): start | klucze: targ ").Append(YN(s.CaravanLeaderHaggle)).Append(", XP ").Append(YN(s.CaravanLeaderTradeXp))
-                  .Append(", ocena ").Append(YN(s.CaravanLeaderJudgement))
                   .Append(" | wpiete: kara w ").Append(PlayerHaggle.ModelCount).Append(" modelach (latka 300b), XP OnTradeProfitMade(Hero) ").Append(YN(_xpOk))
                   .Append(" (").Append(chain).Append("), sprzedaz SellItemsAction ").Append(YN(CaravanGoods.Hooked))
                   .Append(" | E ").Append(E(1).ToString("0.0000", Inv)).Append("/pkt, XP ").Append(XpPerProfit.ToString("0.00", Inv)).Append("/zl");
@@ -507,12 +521,45 @@ namespace Armoury
                         listed++;
                     }
                 }
-                if (!LogGate.Lines && hAll == 0 && _dayErrors == 0) return;
+                int hd; lock (_lock) hd = _seen.Count;
+                if (!LogGate.Lines && hAll == 0 && hd == 0 && _dayErrors == 0) return;
+                // sonda doby: do 20 karawan bez dowodcy x towar z ich juk x kupno / sprzedaz - kara z latka == kara bez latki (Raw); kazda roznica = zmiana AI
+                int n0s = 0, n0c = 0;
+                var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
+                if (model != null)
+                {
+                    bool q0 = _quiet; int seen0 = 0;
+                    try
+                    {
+                        _quiet = true;
+                        foreach (var mp in MobileParty.AllCaravanParties)
+                        {
+                            if (seen0 >= 20) break;
+                            if (mp == null || !mp.IsActive || mp.LeaderHero != null || mp.ItemRoster == null) continue;
+                            ItemObject it = null;
+                            for (int i = 0; i < mp.ItemRoster.Count && it == null; i++)
+                            {
+                                var e = mp.ItemRoster.GetElementCopyAtIndex(i);
+                                if (e.Amount > 0 && e.EquipmentElement.Item != null && e.EquipmentElement.Item.IsTradeGood) it = e.EquipmentElement.Item;
+                            }
+                            if (it == null) continue;
+                            seen0++;
+                            var mer = mp.CurrentSettlement != null ? mp.CurrentSettlement.Party : null;
+                            for (int sell = 0; sell < 2; sell++)
+                            {
+                                n0s++;
+                                if (PlayerHaggle.Pen(model, it, mp, mer, sell == 1, 0f, 0f, 0f, false, -1) != PlayerHaggle.Pen(model, it, mp, mer, sell == 1, 0f, 0f, 0f, true, -1)) n0c++;
+                            }
+                        }
+                    }
+                    catch (Exception e) { Stumble("Daily(sonda)", e); }
+                    finally { _quiet = q0; }
+                }
                 double n = Math.Max(1, hm);
                 var sb = new StringBuilder();
                 sb.Append("Karawany - dowodca (139b): dzien ").Append(day)
-                  .Append(" | klucze: targ ").Append(YN(s.CaravanLeaderHaggle)).Append(", XP ").Append(YN(s.CaravanLeaderTradeXp)).Append(", ocena ").Append(YN(s.CaravanLeaderJudgement))
-                  .Append(" | karawan ").Append(k).Append(", z dowodca ").Append(hAll).Append(" (gracza ").Append(hp).Append(", inne ").Append(ho).Append(')');
+                  .Append(" | klucze: targ ").Append(YN(s.CaravanLeaderHaggle)).Append(", XP ").Append(YN(s.CaravanLeaderTradeXp))
+                  .Append(" | karawan ").Append(k).Append(", z dowodca ").Append(hAll).Append(" (gracza ").Append(hp).Append(", inne ").Append(ho).Append("; w dobie ").Append(hd).Append(')');
                 if (hm > 0)
                     sb.Append(" | Handel sr ").Append((tSum / n).ToString("0.0", Inv)).Append(" (").Append(tMin).Append("..").Append(tMax).Append("), perswazja sr ").Append((pSum / n).ToString("0.0", Inv))
                       .Append(", S sr ").Append((sSum / n).ToString("0.0", Inv)).Append(", czynnik sr ").Append((fSum / n).ToString("0.000", Inv)).Append(" (").Append(F3(fMin)).Append("..").Append(F3(fMax))
@@ -521,12 +568,12 @@ namespace Armoury
                 lock (_lock)
                 {
                     double prem = _sellG0 > 0 ? _sellG / _sellG0 - 1.0 : double.NaN, save = _buyB0 > 0 ? 1.0 - _buyB / _buyB0 : double.NaN;
-                    sb.Append(" | wywolan kary: z dowodca ").Append(_c1).Append(" (zmienione ").Append(_c1c).Append("), bez dowodcy ").Append(_c0).Append(" (zmienione 0)")
+                    sb.Append(" | wywolan kary: z dowodca ").Append(_c1).Append(" (zmienione ").Append(_c1c).Append("), bez dowodcy ").Append(_c0).Append(" (zmienione ").Append(n0c).Append("; sonda ").Append(n0s).Append(')')
                       .Append(" | sprzedaz z dowodca ").Append(_sellQ).Append(" szt. utarg ").Append(_sellG).Append(" (przy karze 138 ok. ").Append(_sellG0.ToString("0", Inv))
                       .Append(", premia +").Append(Pct(prem)).Append("%), kupno ").Append(_buyQ).Append(" szt. ").Append(_buyB).Append(" (przy 138 ok. ").Append(_buyB0.ToString("0", Inv))
                       .Append(", oszczednosc ").Append(Pct(save)).Append("%), kara 138 max ").Append(Pct(_maxOld)).Append('%')
                       .Append(" | zysk dowodcow ").Append(_profitZ).Append(" zl, XP ").Append((XpPerProfit * _profitZk).ToString("0", Inv)).Append(" pkt surowe (")
-                      .Append(XpPerProfit.ToString("0.00", Inv)).Append(" x ").Append(_profitZk).Append("; sprzedazy ").Append(_xpSales).Append("; sztuk bez kosztu ").Append(_noCost)
+                      .Append(XpPerProfit.ToString("0.00", Inv)).Append(" x ").Append(_profitZk).Append("; sprzedazy ").Append(_xpSales).Append("; sztuk z kosztem szacowanym ").Append(_estQ)
                       .Append("), XP z wyplat zastapione ").Append(_payR).Append(" (").Append(_payA).Append(" zl)")
                       .Append(" | potkniecia ").Append(_dayErrors).Append(" (sesja ").Append(_errors).Append(')');
                 }

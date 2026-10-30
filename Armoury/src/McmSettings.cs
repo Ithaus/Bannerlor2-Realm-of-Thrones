@@ -1196,13 +1196,9 @@ namespace Armoury
         [SettingPropertyGroup("Caravan leaders trade by skill (139b)")]
         public bool CaravanLeaderHaggle { get; set; } = true;
 
-        [SettingPropertyBool("Caravan Leader Trade Xp", HintText = "a caravan's hero leader learns Trade from every sale to a town that makes a profit over what the goods cost, by the game's own rule for your trade screen (half a point of experience per denar of profit, before the learning rate); goods with no known cost give none. The caravan's surplus paid to its owner then no longer gives the leader experience, so one profit is not counted twice. Off - the leader learns only from payouts, as before", RequireRestart = false)]
+        [SettingPropertyBool("Caravan Leader Trade Xp", HintText = "a caravan's hero leader learns Trade from every sale to a town that makes a profit over what the goods cost, by the game's own rule for your trade screen (half a point of experience per denar of profit, before the learning rate); for goods it carries without a recorded purchase (from an older save) the cost is the most it would have paid, so the profit is never overstated. Village sales give none. The caravan's surplus paid to its owner then no longer gives the leader experience, so one profit is not counted twice. Off - the leader learns only from payouts, as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravan leaders trade by skill (139b)")]
         public bool CaravanLeaderTradeXp { get; set; } = true;
-
-        [SettingPropertyBool("Caravan Leader Judgement", HintText = "a caravan's hero leader reads markets by Trade (0 with no skill, about 0.23 at 150 Trade, 0.38 at 300) - prepared for the caravan waiting and route rules; nothing reads it yet, so today it changes nothing. Off - hero leaders judge markets like plain caravan masters", RequireRestart = false)]
-        [SettingPropertyGroup("Caravan leaders trade by skill (139b)")]
-        public bool CaravanLeaderJudgement { get; set; } = true;
 
         [SettingPropertyInteger("Sell Cap Percent Of New Ask", 0, 40, "0", HintText = "the most a town or castle merchant pays for a weapon, a piece of armour, a saddle or ammunition, as % of what his own stall asks for a NEW one of the same kind and quality - and never more than he charges for its wreck, so buying worn gear or spoilt arrows, putting them right and selling them back in the same town never pays; carrying mended gear to a town that lacks it still pays. Horses and pack animals are not capped (0 = no cap; needs Sell Price By Condition)", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -10795,7 +10791,6 @@ namespace Armoury
             s.PlayerRebuyCap = PlayerRebuyCap;
             s.CaravanLeaderHaggle = CaravanLeaderHaggle;
             s.CaravanLeaderTradeXp = CaravanLeaderTradeXp;
-            s.CaravanLeaderJudgement = CaravanLeaderJudgement;
             s.SellCapPercentOfNewAsk = SellCapPercentOfNewAsk;
             s.EnlistedSoldierNoLooting = EnlistedSoldierNoLooting;
             s.LordThirdOnTotal = LordThirdOnTotal;
