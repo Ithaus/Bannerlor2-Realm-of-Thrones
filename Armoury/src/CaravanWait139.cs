@@ -88,6 +88,7 @@ namespace Armoury
             _stumbleSess = 0; _err.Clear();
             _lotMp = null; _lotCat = null; _recs.Clear(); _floorC.Clear(); _dnC.Clear(); _minIdx.Clear(); _minDay = -1; _jSelf = null;
             CaravanTrade284.Waiting298.Clear();
+            CaravanLeg140.Reset();                                           // 140: spis postoju poza miastami, decyzje utknietych
         }
 
         private static void ZeroDay()
@@ -575,7 +576,9 @@ namespace Armoury
         /// <summary>FindNextDestinationForCaravan(distanceCut true) z wyborem BK b* (CaravanRoute294c.FindPostfix): karawana z ladunkiem - miasta nie dalsze niz b*,
         /// utknieta (klucz A, bez sprzedazy w 7 dobach) - do max(b*, zmierzony odcinek); sposrod 10 najblizszych dozwolonych miasto z najwiekszym
         /// R = (zysk sprzedazy - koszt dnia x dni) / max(1, dni), gdy R > 0 i lepsze niz R wyboru BK. Bez zmian: karawana pusta, bez ladunku, przebieg bez limitu.</summary>
-        internal static void Route(MobileParty mp, ref Town result)
+        // 140 (klucz CaravanStuckSeekPayingTown, tylko karawana utknieta z towarem handlowym, bez statkow): kandydaci ze wszystkich miast z wykluczeniami BK
+        // (CaravanLeg140.Towns; bk - BKCaravansBehavior z FindPostfix), dom zostaje tylko przy R(dom) > 0. Klucz NIE - 139 co do bitu.
+        internal static void Route(MobileParty mp, ref Town result, object bk)
         {
             var s = Settings.Current;
             if (!COn(s) || mp == null || result == null || result.Settlement == null) return;
@@ -583,17 +586,8 @@ namespace Armoury
             _floorC.Clear(); _dnC.Clear();
             try
             {
-                var r = mp.ItemRoster;
                 var pantry = CaravanTrade284.PantryCopy(mp);
-                bool has = false;
-                for (int i = 0; r != null && i < r.Count && !has; i++)
-                {
-                    var it = r.GetElementCopyAtIndex(i).EquipmentElement.Item;
-                    if (!Goods(it)) continue;
-                    int kp = 0; if (pantry != null && it.IsFood) pantry.TryGetValue(it, out kp);
-                    if (r.GetItemNumber(it) - Math.Max(0, kp) > 0) has = true;
-                }
-                if (!has) return;
+                if (!HasTrade(mp, pantry)) return;
                 _cT++;
                 double cargo = CargoRO(mp);
                 bool loaded = cargo >= mp.PartyTradeGold;
@@ -607,28 +601,41 @@ namespace Armoury
                 if (loaded) _cP++;
                 if (stuck) _cQ++;
                 if (!loaded && !stuck) return;
+                // 140 (klucz 2): karawana utknieta bez statkow - kandydaci ze wszystkich miast, dom tylko z zyskiem
+                bool seek = stuck && CaravanLeg140.SeekOn(s) && !mp.HasNavalNavigationCapability;
+                bool home = mp.HomeSettlement != null && result.Settlement == mp.HomeSettlement;
                 // recenzja 139: wybor BK = dom karawany (przyciaganie domu BK rosnie z dobami od ostatniej wizyty) albo miasto udzialowca klanu wlasciciela (BK x1.5,
                 // wyplaty klanu K259) - bez zmian
-                if (mp.HomeSettlement != null && result.Settlement == mp.HomeSettlement) { _cHome++; return; }
-                if (Stakeholder(mp, result.Settlement)) { _cStake++; return; }
+                if (home && !seek) { _cHome++; return; }
+                if (!home && Stakeholder(mp, result.Settlement)) { _cStake++; return; }
                 double db = Days(mp, result.Settlement);
+                double dc = DayCost(mp);
+                int u; double rv, cs;
+                double vb = SaleValue(mp, result, db, SameDay(mp, result.Settlement), true, pantry, out u, out rv, out cs);
+                double rb = (vb - dc * db) / Math.Max(1.0, db);
+                if (home && rb > 0) { _cHome++; return; }                    // 140: dom z zyskiem zostaje (tylko seek - bez seek dom wyszedl wyzej)
                 double dmax0 = stuck ? Math.Max(db, Leg) : db;
                 // 139c: dowodca z ocena J > 0 przyjmuje miasto z zyskiem do dmax x (1 + J); J = 0 (AI) - zasieg 139
                 float jr = CaravanLeader139b.SkillJudge(mp);
                 double dmax = Range(dmax0, jr);
                 if (jr > 0f) { _jCN++; _jCJ += jr; }
-                var cand = new List<KeyValuePair<Town, double>>();
-                foreach (var kv in _recs)
+                List<KeyValuePair<Town, double>> cand;
+                if (seek)
                 {
-                    var t = kv.Key;
-                    if (t == null || t == result || t.Settlement == null) continue;
-                    double d = Days(mp, t.Settlement);
-                    if (d <= dmax + 1e-6) cand.Add(new KeyValuePair<Town, double>(t, d));
+                    cand = CaravanLeg140.Towns(mp, bk, result, dmax, RouteTowns);
+                    CaravanLeg140.NoteFirst(cand.Count);
                 }
-                double dc = DayCost(mp);
-                int u; double rv, cs;
-                double vb = SaleValue(mp, result, db, SameDay(mp, result.Settlement), true, pantry, out u, out rv, out cs);
-                double rb = (vb - dc * db) / Math.Max(1.0, db);
+                else
+                {
+                    cand = new List<KeyValuePair<Town, double>>();
+                    foreach (var kv in _recs)
+                    {
+                        var t = kv.Key;
+                        if (t == null || t == result || t.Settlement == null) continue;
+                        double d = Days(mp, t.Settlement);
+                        if (d <= dmax + 1e-6) cand.Add(new KeyValuePair<Town, double>(t, d));
+                    }
+                }
                 Town best = null; double rbest = rb, vbest = 0, dbest = 0, rmax = rb;
                 if (cand.Count > 0)
                 {
@@ -643,10 +650,12 @@ namespace Armoury
                     }
                 }
                 if (!(rmax > 0)) _cNone++;
+                if (home) CaravanLeg140.NoteHomeNo(best != null && rbest > 0);   // 140: dom bez zysku (tylko seek)
                 if (best == null || !(rbest > 0)) return;
                 _cE++;
                 if (dbest < db - 1e-6) _cF++; else if (dbest > db + 1e-6) _cG++;
-                if (stuck) _cD++;
+                if (stuck) { _cD++; CaravanLeg140.Track(mp); }               // 140: ocena skierowania po 7 dobach (takze przy kluczu 2 NIE - tylko pomiar)
+                if (seek && !_recs.ContainsKey(best)) CaravanLeg140.NoteOutside();
                 // recenzja 139c: 'dalej niz zasieg bez oceny' tylko nieutkniete - utknieta jest juz w 'skierowane utkniete' (_cD), wiec K294-31 liczy ja raz
                 if (jr > 0f) { _jCE++; if (!stuck && dbest > dmax0 + 1e-6) _jCW++; }
                 _cDb += db; _cDn += dbest; _cVb += vb; _cVn += vbest; _cRb += dc * db; _cRn += dc * dbest;
@@ -654,6 +663,58 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Route", e); }
             finally { _floorC.Clear(); _dnC.Clear(); _ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>Karawana ma towar handlowy poza spizarnia eskorty (warunek C).</summary>
+        private static bool HasTrade(MobileParty mp, Dictionary<ItemObject, int> pantry)
+        {
+            var r = mp.ItemRoster;
+            for (int i = 0; r != null && i < r.Count; i++)
+            {
+                var it = r.GetElementCopyAtIndex(i).EquipmentElement.Item;
+                if (!Goods(it)) continue;
+                int kp = 0; if (pantry != null && it.IsFood) pantry.TryGetValue(it, out kp);
+                if (r.GetItemNumber(it) - Math.Max(0, kp) > 0) return true;
+            }
+            return false;
+        }
+
+        /// <summary>140 (klucz CaravanStuckSeekPayingTown): pierwszy przebieg BK (z limitem odleglosci) bez miasta, karawana utknieta (klucz A, CaravanTrade284.Stuck7)
+        /// z towarem handlowym, bez statkow - miasto z najwiekszym R = (zysk sprzedazy - koszt dnia x dni) / max(1, dni) > 0 sposrod 10 najblizszych dozwolonych
+        /// (CaravanLeg140.Towns) w zasiegu zmierzonego odcinka x (1 + J); wtedy BK nie robi drugiego przebiegu bez limitu. Pomiar decyzji (pusty przebieg) takze przy
+        /// kluczu NIE; klucz NIE, C NIE albo A NIE - wynik bez zmian (null - drugi przebieg BK jak w 139).</summary>
+        internal static void RouteEmpty(MobileParty mp, ref Town result, object bk)
+        {
+            var s = Settings.Current;
+            if (!COn(s) || !AOn(s) || mp == null || result != null) return;
+            long t0 = Stopwatch.GetTimestamp();
+            _floorC.Clear(); _dnC.Clear();
+            try
+            {
+                if (!CaravanTrade284.Stuck7(mp, (int)CampaignTime.Now.ToDays)) return;
+                var pantry = CaravanTrade284.PantryCopy(mp);
+                if (!HasTrade(mp, pantry)) return;
+                double leg = Leg;
+                if (!CaravanLeg140.SeekOn(s) || mp.HasNavalNavigationCapability || !(leg > 0)) { CaravanLeg140.NoteEmpty(false); return; }
+                double dmax = Range(leg, CaravanLeader139b.SkillJudge(mp));
+                var cand = CaravanLeg140.Towns(mp, bk, null, dmax, RouteTowns);
+                double dc = DayCost(mp);
+                Town best = null; double rbest = 0;
+                foreach (var kv in cand)
+                {
+                    int u; double rv, cs;
+                    double d = kv.Value;
+                    double v = SaleValue(mp, kv.Key, d, SameDay(mp, kv.Key.Settlement), true, pantry, out u, out rv, out cs);
+                    double rr = (v - dc * d) / Math.Max(1.0, d);
+                    if (rr > rbest) { rbest = rr; best = kv.Key; }
+                }
+                CaravanLeg140.NoteEmpty(best != null);
+                if (best == null) return;
+                CaravanLeg140.Track(mp);
+                result = best;
+            }
+            catch (Exception e) { Stumble("RouteEmpty", e); }
+            finally { _floorC.Clear(); _dnC.Clear(); CaravanLeg140.AddTicks(Stopwatch.GetTimestamp() - t0); }
         }
 
         /// <summary>Recenzja 139: miasto udzialowca klanu wlasciciela karawany (BK CaravanOrdersBehavior.IsClanStakeholderTown - ocena BK x1.5); bez BK - false.</summary>

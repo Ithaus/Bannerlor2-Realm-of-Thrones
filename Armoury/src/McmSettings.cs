@@ -9756,6 +9756,14 @@ namespace Armoury
         [SettingPropertyGroup("Caravans weigh waiting, lot cap and road cost (139)")]
         public bool CaravanRouteRoadCost { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Leg Counts Moving Caravans", HintText = "140: the measured caravan leg (the road days between towns used for the escort food a caravan keeps, the road-to-straight ratio of every road-day reckoning and the cost of carrying goods on) leaves out caravans standing in a castle or a village - they travel no leg and leave no town. A stay in a town stays part of the leg, as before. Off = every caravan counts, as in 139", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan leg and stuck caravans (140)")]
+        public bool CaravanLegMovingOnly { get; set; } = true;
+
+        [SettingPropertyBool("Stuck Caravans Seek A Paying Town", HintText = "140: with Caravans Weigh Waiting Against Wage and Caravans Count Road Cost In Destination, a caravan that has sold nothing for seven days while carrying trade goods looks for a paying town among all towns Banner Kings would allow (not besieged, not at war, not the last or current town, reachable by land), not only among those Banner Kings scored. When Banner Kings finds no town within its usual distance, the stuck caravan takes the town within its measured leg (longer for a skilled leader) where its sale pays most per day of road after wages and escort food, instead of a far town; its home town no longer holds it when selling there would not pay. The same sale rules and the same profit test as before; it only changes where the caravan goes. Caravans with ships are not touched. Off = as in 139", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan leg and stuck caravans (140)")]
+        public bool CaravanStuckSeekPayingTown { get; set; } = true;
+
         [SettingPropertyBool("Bk Retinue From Village", HintText = "with People Origin and Levy From Villages: Banner Kings retinues are made of real people - the retinue of a village manor, the retinue of an estate and the Castle Retinue of a castle garrison: a man who joins (and every man of a newly raised retinue) leaves the people of the retinue's village (a castle: its villages), and if they have no one to spare he does not join; a man a manor retinue sends away goes back home instead of vanishing; when an estate's lord calls up his retinue, its men keep their origin in his party. The retinues' sizes and their one-man-a-day pace stay as Banner Kings sets them. Off = as before (retinue men appear from nothing and vanish)", RequireRestart = false)]
         [SettingPropertyGroup("Banner Kings manor retinues from the village's own people (295)")]
         public bool BkRetinueFromVillage { get; set; } = true;
@@ -12946,6 +12954,8 @@ namespace Armoury
             s.CaravanWaitCostsWage = CaravanWaitCostsWage;
             s.CaravanBkLotInItemCoin = CaravanBkLotInItemCoin;
             s.CaravanRouteRoadCost = CaravanRouteRoadCost;
+            s.CaravanLegMovingOnly = CaravanLegMovingOnly;
+            s.CaravanStuckSeekPayingTown = CaravanStuckSeekPayingTown;
             s.BkRetinueFromVillage = BkRetinueFromVillage;
             s.WinterSparesMinesAndFelling = WinterSparesMinesAndFelling;
             s.VillageCartMilitiaEscort = VillageCartMilitiaEscort;

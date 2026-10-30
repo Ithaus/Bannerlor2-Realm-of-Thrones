@@ -323,7 +323,7 @@ namespace Armoury
             try
             {
                 bool zeroed = _zeroCall > _passZero;
-                if (!__1) { _farPass++; if (zeroed) _farZero++; return; }
+                if (!__1) { _farPass++; if (zeroed) _farZero++; CaravanLeg140.NoteSecond(__0); return; }   // 140: drugi przebieg karawany utknietej - licznik
                 if (__result == null && zeroed && _findMi != null && __instance != null)
                 {
                     _bypass = true;
@@ -335,7 +335,9 @@ namespace Armoury
                 }
                 // 139 (klucz CaravanRouteRoadCost): wybor BK z limitem odleglosci b* - karawana z ladunkiem albo utknieta moze wziac miasto nie dalsze, w ktorym zysk
                 // sprzedazy po koszcie dni drogi na dobe jest wiekszy (CaravanWait139.Route); ocen BK nie zmienia, drugi przebieg BK bez zmian
-                if (__result != null) CaravanWait139.Route(__0, ref __result);
+                if (__result != null) CaravanWait139.Route(__0, ref __result, __instance);
+                // 140 (klucz CaravanStuckSeekPayingTown): pierwszy przebieg pusty, karawana utknieta - miasto placace w zasiegu odcinka zamiast drugiego przebiegu BK
+                else CaravanWait139.RouteEmpty(__0, ref __result, __instance);
             }
             catch (Exception e) { Stumble("FindPostfix", e); }
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }

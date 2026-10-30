@@ -83646,6 +83646,257 @@ def k294_selftest():
     return None
 
 
+# ---- 140 (30.10, Jeff "pracuj jeszcze nad karawana dobranoc"): odcinek bez postoju poza miastami (klucz 1 CaravanLegMovingOnly), utkniete szukaja miasta
+# placacego (klucz 2 CaravanStuckSeekPayingTown) - grupa karawany294. Linia 'Karawany - odcinek i utkniete (140): dzien N' (CaravanLeg140.Daily, po linii 139).
+# Log bez linii 140 (sprzed 140) - wiersze INFO. K294-19 / K294-31 czytaja odcinek 288 'zmierzona' = odcinek uzywany (przy kluczu 1 TAK - nowa miara, sama z kodu).
+# K294-35 miara: linia 140 co dobe (dziur <= 1), nierozpoznanych 0, potkniecia 0, ERROR CaravanLeg140 0; kazda doba: bez postoju <= wszystkie, uzywany = bez postoju
+#         (klucz 1 TAK) albo wszystkie (NIE), uzywany = 'odcinek' linii 139 tej doby (+-0.011); spis postoju: zamki + wsie + inne = N, cechy <= N, utkniete <= z towarem,
+#         7+ <= 1+, cel ta osada + inna + brak = N; liczba stojacych - INFO
+# K294-36 utkniete (klucz 2): klucz NIE - liczniki seek 0 (pierwszy przebieg, skierowane z pustego, dom bez zysku, spoza ocen BK; pusty i drugi przebieg - pomiar);
+#         klucz TAK - skierowane z pustego <= pusty, skierowane z domu <= dom bez zysku <= pierwszy przebieg <= 'utkniete' linii 139, spoza ocen BK <= zmienione 139,
+#         skierowane z domu <= skierowane utkniete 139; ocena skierowanych po 7 dobach (bieg z kluczem TAK): ocenione >= 20 -> ze sprzedaza / ocenione >= 0.5
+#         (mniej ocenionych - INFO)
+# K294-S self-test: wyrazenie (TAK, NIE z '-', 4 zle napisy), dobry bieg syntetyczny, zly bieg na kazdy warunek, log bez linii 140 - INFO
+KAR140_L = "Karawany - odcinek i utkniete (140): dzien "
+KAR140_ERR = ("ERROR in CaravanLeg140.",)
+KAR140_RE = re.compile(
+    r"^Karawany - odcinek i utkniete \(140\): dzien (?P<d>\d+)"
+    r" \| klucze: odcinek bez postoju poza miastami (?P<k1>TAK|NIE), utkniete szukaja miasta (?P<k2>TAK|NIE)"
+    r" \| odcinek: wszystkie karawany (?P<la>[0-9.]+), bez postoju poza miastami (?P<lm>[0-9.]+), uzywany (?P<lu>[0-9.]+) dob \(dob pomiaru (?P<ln>\d+)\)"
+    r" \| postoj poza miastami (?P<p>\d+|-) \(zamki (?P<pc>\d+) / wsie (?P<pv>\d+) / inne (?P<po>\d+); alarm (?P<pa>\d+), Hold (?P<ph>\d+), ranni > 40% (?P<pw>\d+),"
+    r" kiesa < 100 (?P<pk>\d+), z towarem (?P<pg>\d+), utkniete (?P<pq>\d+); cel ta osada (?P<pt>\d+) / inna (?P<pi>\d+) / brak (?P<pn>\d+);"
+    r" stoja od 1\+ dob (?P<p1>\d+), 7\+ dob (?P<p7>\d+)\)"
+    r" \| utkniete: pierwszy przebieg (?P<q1>\d+) \(kandydatow srednio (?P<qk>[0-9.]+|-)\), pusty przebieg (?P<qe>\d+) \(skierowane (?P<qee>\d+)\), drugi przebieg (?P<q2>\d+),"
+    r" dom bez zysku (?P<qh>\d+) \(skierowane (?P<qhe>\d+)\), skierowane do miasta spoza ocen BK (?P<qo>\d+)"
+    r" \| po skierowaniu utknietej \(7 dob\): ocenione (?P<on>\d+), ze sprzedaza (?P<os>\d+), znikly (?P<og>\d+), w toku (?P<ot>\d+)"
+    r" \| czas (?P<ms>[0-9.]+) ms \| potkniecia (?P<st>\d+) \(sesja (?P<ss>\d+)\)\.$")
+KAR140_SAMPLE = ("Karawany - odcinek i utkniete (140): dzien 109166 | klucze: odcinek bez postoju poza miastami TAK, utkniete szukaja miasta TAK"
+                 " | odcinek: wszystkie karawany 4.95, bez postoju poza miastami 4.47, uzywany 4.47 dob (dob pomiaru 7)"
+                 " | postoj poza miastami 19 (zamki 15 / wsie 3 / inne 1; alarm 4, Hold 1, ranni > 40% 2, kiesa < 100 3, z towarem 16, utkniete 12; cel ta osada 14 / inna 4"
+                 " / brak 1; stoja od 1+ dob 15, 7+ dob 6)"
+                 " | utkniete: pierwszy przebieg 10 (kandydatow srednio 8.5), pusty przebieg 9 (skierowane 6), drugi przebieg 3, dom bez zysku 4 (skierowane 2),"
+                 " skierowane do miasta spoza ocen BK 3"
+                 " | po skierowaniu utknietej (7 dob): ocenione 12, ze sprzedaza 8, znikly 1, w toku 70 | czas 3.20 ms | potkniecia 0 (sesja 0).")
+KAR140_SAMPLE_OFF = ("Karawany - odcinek i utkniete (140): dzien 109077 | klucze: odcinek bez postoju poza miastami NIE, utkniete szukaja miasta NIE"
+                     " | odcinek: wszystkie karawany 0.00, bez postoju poza miastami 0.00, uzywany 0.00 dob (dob pomiaru 0)"
+                     " | postoj poza miastami - (zamki 0 / wsie 0 / inne 0; alarm 0, Hold 0, ranni > 40% 0, kiesa < 100 0, z towarem 0, utkniete 0; cel ta osada 0 / inna 0"
+                     " / brak 0; stoja od 1+ dob 0, 7+ dob 0)"
+                     " | utkniete: pierwszy przebieg 0 (kandydatow srednio -), pusty przebieg 0 (skierowane 0), drugi przebieg 0, dom bez zysku 0 (skierowane 0),"
+                     " skierowane do miasta spoza ocen BK 0"
+                     " | po skierowaniu utknietej (7 dob): ocenione 0, ze sprzedaza 0, znikly 0, w toku 0 | czas 0.00 ms | potkniecia 0 (sesja 0).")
+KAR140_OUT_MIN = 20            # ocenionych skierowan, od ktorych K294-36 ocenia udzial ze sprzedaza
+KAR140_OUT_SHARE = 0.5         # skierowana utknieta karawana sprzedaje w 7 dobach (projekt 140)
+
+_k140_collect_prev = k294_collect
+
+
+def k294_collect(logp):
+    D = _k140_collect_prev(logp)
+    x = {}; bad = 0; err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if KAR140_L not in ln and "ERROR in CaravanLeg140." not in ln:
+                continue
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(KAR140_ERR):
+                err += 1
+                continue
+            if not s.startswith(KAR140_L):
+                continue
+            a = KAR140_RE.match(s)
+            if a:
+                x[int(a.group("d"))] = a.groupdict()
+            else:
+                bad += 1
+    D["k140"] = x; D["k140bad"] = bad; D["k140err"] = err
+    return D
+
+
+def k140_rows(rep, D):
+    x = D.get("k140") or {}
+    days = sorted(x)
+    y = D.get("k139") or {}
+    g = D.get("g") or {}
+    run = len(g) if g else len(days)
+    n35 = "K294-35: 140 - odcinek bez postoju poza miastami (miara) i spis karawan stojacych w zamkach / wsiach"
+    n36 = "K294-36: 140 - utkniete karawany szukaja miasta placacego (decyzje, skierowane, sprzedaz po 7 dobach)"
+    if not days:
+        tag = " (log sprzed 140)"
+        rep.add(n35, f"brak linii 140{tag}; nierozpoznanych {D.get('k140bad', 0)}, ERROR {D.get('k140err', 0)}", "linia w kazdej dobie (log sprzed 140 - INFO)",
+                False if (D.get("k140bad", 0) or D.get("k140err", 0)) else None)
+        rep.add(n36, f"brak linii 140{tag}", "INFO (log sprzed 140)", None)
+        return
+    I = lambda r, k: int(r[k])
+    F = lambda r, k: float(r[k])
+    # K294-35
+    holes = [d for d in range(days[0], days[-1] + 1) if d not in x]
+    st = sum(I(x[d], "st") for d in days)
+    bad = []
+    for d in days:
+        r = x[d]; why = []
+        if F(r, "lm") > F(r, "la") + 0.005:
+            why.append(f"bez postoju {r['lm']} > wszystkie {r['la']}")
+        want = F(r, "lm") if r["k1"] == "TAK" else F(r, "la")
+        if abs(F(r, "lu") - want) > 0.005:
+            why.append(f"uzywany {r['lu']} != {'bez postoju' if r['k1'] == 'TAK' else 'wszystkie'} {want:.2f}")
+        if d in y and abs(F(r, "lu") - float(y[d]["leg"])) > 0.011:
+            why.append(f"uzywany {r['lu']} != odcinek 139 {y[d]['leg']}")
+        if r["p"] != "-":
+            P = I(r, "p")
+            if I(r, "pc") + I(r, "pv") + I(r, "po") != P:
+                why.append("zamki + wsie + inne != N")
+            if any(I(r, k) > P for k in ("pa", "ph", "pw", "pk", "pg", "p1")):
+                why.append("cecha > N")
+            if I(r, "pq") > I(r, "pg") or I(r, "p7") > I(r, "p1"):
+                why.append("utkniete > z towarem albo 7+ > 1+")
+            if I(r, "pt") + I(r, "pi") + I(r, "pn") != P:
+                why.append("cel ta / inna / brak != N")
+        if why:
+            bad.append(f"dzien {d}: " + ", ".join(why))
+    l7 = days[-7:]
+    avg = lambda k, dd=l7: sum(float(x[d][k]) for d in dd) / len(dd)
+    pk = [d for d in l7 if x[d]["p"] != "-"]
+    last = x[days[-1]]
+    v35 = (f"dob {len(days)} (d{days[0]}-d{days[-1]}), dziur {len(holes)}, nierozpoznanych {D.get('k140bad', 0)}, potkniec {st}, ERROR {D.get('k140err', 0)}; "
+           f"klucz 1 {last['k1']}; ostatnie {len(l7)} dob odcinek: wszystkie {avg('la'):.2f}, bez postoju {avg('lm'):.2f}, uzywany {avg('lu'):.2f}")
+    if pk:
+        v35 += (f"; stoja poza miastami srednio {avg('p', pk):.1f} (zamki {avg('pc', pk):.1f} / wsie {avg('pv', pk):.1f}; alarm {avg('pa', pk):.1f}, Hold {avg('ph', pk):.1f}, "
+                f"ranni > 40% {avg('pw', pk):.1f}, kiesa < 100 {avg('pk', pk):.1f}, utkniete {avg('pq', pk):.1f}, cel ta osada {avg('pt', pk):.1f}, 7+ dob {avg('p7', pk):.1f}) - INFO")
+    if bad:
+        v35 += " | " + "; ".join(bad[:3])
+    rep.add(n35, v35, "dziur <= 1, 0 / 0 / 0; bez postoju <= wszystkie; uzywany wedlug klucza 1 = odcinek 139; spis postoju spojny",
+            len(holes) <= 1 and D.get("k140bad", 0) == 0 and st == 0 and D.get("k140err", 0) == 0 and not bad)
+    # K294-36
+    bad = []
+    for d in days:
+        r = x[d]; why = []
+        if r["k2"] != "TAK":
+            if I(r, "q1") or I(r, "qee") or I(r, "qh") or I(r, "qhe") or I(r, "qo"):
+                why.append("liczniki seek przy kluczu 2 NIE")
+        else:
+            if I(r, "qee") > I(r, "qe"):
+                why.append("skierowane z pustego > pusty")
+            if not (I(r, "qhe") <= I(r, "qh") <= I(r, "q1")):
+                why.append(f"dom {r['qhe']}/{r['qh']} / pierwszy {r['q1']}")
+            if d in y:
+                z = y[d]
+                if I(r, "q1") > int(z["cq"]):
+                    why.append(f"pierwszy przebieg {r['q1']} > utkniete 139 {z['cq']}")
+                if I(r, "qo") > int(z["ce"]):
+                    why.append(f"spoza ocen BK {r['qo']} > zmienione 139 {z['ce']}")
+                if I(r, "qhe") > int(z["sd"]):
+                    why.append(f"z domu {r['qhe']} > skierowane utkniete 139 {z['sd']}")
+        if why:
+            bad.append(f"dzien {d}: " + ", ".join(why))
+    on = [d for d in days if x[d]["k2"] == "TAK"]
+    sn = sum(I(x[d], "on") for d in on); ss = sum(I(x[d], "os") for d in on); sg = sum(I(x[d], "og") for d in on)
+    share = ss / sn if sn else None
+    cq = [y[d] for d in l7 if d in y]
+    v36 = (f"klucz 2 {last['k2']} (dob z kluczem {len(on)}); ostatnie {len(l7)} dob na dobe: pierwszy przebieg z miastami wszystkimi {avg('q1'):.1f}"
+           + (f" (utkniete 139 {sum(int(z['cq']) for z in cq) / len(cq):.1f}, skierowane utkniete 139 {sum(int(z['sd']) for z in cq) / len(cq):.1f})" if cq else "")
+           + f", pusty przebieg {avg('qe'):.1f} (skierowane {avg('qee'):.1f}), drugi przebieg {avg('q2'):.1f}, dom bez zysku {avg('qh'):.1f} (skierowane {avg('qhe'):.1f}),"
+           f" spoza ocen BK {avg('qo'):.1f}; po 7 dobach (bieg z kluczem): ocenione {sn}, ze sprzedaza {ss}"
+           + (f" ({share:.2f})" if share is not None else "") + f", znikly {sg}")
+    if bad:
+        v36 += " | " + "; ".join(bad[:3])
+    judge_out = bool(on) and sn >= KAR140_OUT_MIN and run >= KARAWANY294_MIN_DAYS
+    if bad:
+        ok36 = False
+    elif judge_out:
+        ok36 = share >= KAR140_OUT_SHARE
+    elif on:
+        ok36 = None
+        v36 += f" | ocenionych < {KAR140_OUT_MIN} albo bieg krotszy niz {KARAWANY294_MIN_DAYS} dob - INFO"
+    else:
+        ok36 = None
+        v36 += " | klucz 2 NIE - pomiar, INFO"
+    rep.add(n36, v36, f"liczniki spojne (klucz NIE - seek 0); ze sprzedaza / ocenione >= {KAR140_OUT_SHARE} przy >= {KAR140_OUT_MIN} ocenionych", ok36)
+
+
+_k140_rows_prev = k294_rows
+
+
+def k294_rows(rep, D):
+    _k140_rows_prev(rep, D)
+    k140_rows(rep, D)
+
+
+_k140_selftest_prev = k294_selftest
+
+
+def k294_selftest():
+    r = _k140_selftest_prev()
+    if r:
+        return r
+    a = KAR140_RE.match(KAR140_SAMPLE)
+    if not a or a.group("d") != "109166" or a.group("lm") != "4.47" or a.group("p") != "19" or a.group("pw") != "2" or a.group("p7") != "6" or a.group("qk") != "8.5" \
+            or a.group("qee") != "6" or a.group("qo") != "3" or a.group("os") != "8" or a.group("ot") != "70" or a.group("ss") != "0":
+        return f"140: linia 140 {a.groupdict() if a else None}"
+    b = KAR140_RE.match(KAR140_SAMPLE_OFF)
+    if not b or b.group("p") != "-" or b.group("qk") != "-" or b.group("k1") != "NIE" or b.group("k2") != "NIE" or b.group("ln") != "0":
+        return f"140: linia 140 przy kluczach NIE {b.groupdict() if b else None}"
+    for s in (KAR140_SAMPLE.replace("ranni > 40% 2", "ranni 2"), KAR140_SAMPLE.replace(" (dob pomiaru 7)", ""), KAR140_SAMPLE[:-1],
+              KAR140_SAMPLE.replace("pusty przebieg 9 (skierowane 6)", "pusty przebieg 9"), KAR140_SAMPLE.replace("utkniete szukaja miasta TAK", "utkniete szukaja miasta ?")):
+        if KAR140_RE.match(s):
+            return "140: zly napis pasuje do wyrazenia linii 140"
+
+    def synth(rep_=(), k2="TAK", out=(12, 8), line=True, l139=True):
+        D = {"g": {}, "k140": {}, "k140bad": 0, "k140err": 0, "k139": {}}
+        for i in range(30):
+            d = 109137 + i
+            D["g"][d] = {"share": "0.6", "xlc": "0"}
+            if l139:
+                D["k139"][d] = KAR139_RE.match(KAR139_SAMPLE.replace("dzien 109166", f"dzien {d}")).groupdict()
+            if not line:
+                continue
+            s = KAR140_SAMPLE.replace("dzien 109166", f"dzien {d}").replace("ocenione 12, ze sprzedaza 8", f"ocenione {out[0]}, ze sprzedaza {out[1]}")
+            if k2 != "TAK":
+                s = s.replace("utkniete szukaja miasta TAK", "utkniete szukaja miasta NIE").replace("pierwszy przebieg 10 (kandydatow srednio 8.5)", "pierwszy przebieg 0 (kandydatow srednio -)") \
+                     .replace("pusty przebieg 9 (skierowane 6)", "pusty przebieg 9 (skierowane 0)").replace("dom bez zysku 4 (skierowane 2)", "dom bez zysku 0 (skierowane 0)") \
+                     .replace("spoza ocen BK 3", "spoza ocen BK 0")
+            for o_, n_ in rep_:
+                s = s.replace(o_, n_)
+            D["k140"][d] = KAR140_RE.match(s).groupdict()
+        return D
+
+    def verdicts(D):
+        rp = Report()
+        k140_rows(rp, D)
+        return {row[0].split(":")[0]: row[3] for row in rp.rows}
+    v = verdicts(synth())
+    if v.get("K294-35") != "TAK" or v.get("K294-36") != "TAK":
+        return f"140: dobry bieg {v}"
+    v = verdicts(synth(k2="NIE"))
+    if v.get("K294-35") != "TAK" or v.get("K294-36") != "INFO":
+        return f"140: bieg z kluczem 2 NIE {v}"
+    v = verdicts(synth(out=(0, 0)))
+    if v.get("K294-36") != "INFO":
+        return f"140: malo ocenionych {v}"
+    v = verdicts(synth(l139=False))
+    if v.get("K294-35") != "TAK" or v.get("K294-36") != "TAK":
+        return f"140: bez linii 139 {v}"
+    for code, kw in (("K294-35", {"rep_": (("uzywany 4.47", "uzywany 4.95"),)}),
+                     ("K294-35", {"rep_": (("bez postoju poza miastami 4.47, uzywany 4.47", "bez postoju poza miastami 5.47, uzywany 5.47"),)}),
+                     ("K294-35", {"rep_": (("wszystkie karawany 4.95, bez postoju poza miastami 4.47, uzywany 4.47", "wszystkie karawany 4.95, bez postoju poza miastami 4.40, uzywany 4.40"),)}),
+                     ("K294-35", {"rep_": (("zamki 15 / wsie 3", "zamki 15 / wsie 4"),)}),
+                     ("K294-35", {"rep_": (("utkniete 12; cel", "utkniete 17; cel"),)}),
+                     ("K294-35", {"rep_": (("cel ta osada 14 / inna 4", "cel ta osada 14 / inna 5"),)}),
+                     ("K294-35", {"rep_": (("| potkniecia 0 (sesja 0).", "| potkniecia 1 (sesja 1)."),)}),
+                     ("K294-36", {"k2": "NIE", "rep_": (("spoza ocen BK 0", "spoza ocen BK 1"),)}),
+                     ("K294-36", {"rep_": (("pusty przebieg 9 (skierowane 6)", "pusty przebieg 5 (skierowane 6)"),)}),
+                     ("K294-36", {"rep_": (("dom bez zysku 4 (skierowane 2)", "dom bez zysku 12 (skierowane 2)"),)}),
+                     ("K294-36", {"rep_": (("pierwszy przebieg 10 (", "pierwszy przebieg 70 ("), ("dom bez zysku 4 (skierowane 2)", "dom bez zysku 4 (skierowane 2)"))}),
+                     ("K294-36", {"rep_": (("spoza ocen BK 3", "spoza ocen BK 40"),)}),
+                     ("K294-36", {"out": (12, 4)})):
+        if verdicts(synth(**kw)).get(code) != "NIE":
+            return f"140: {code} przy {kw} nie NIE"
+    vi = verdicts(synth(line=False))
+    if vi.get("K294-35") != "INFO" or vi.get("K294-36") != "INFO":
+        return f"140: log bez linii 140 nie INFO {vi}"
+    return None
+
+
 # ---- 139b (30.10): karawana z bohaterem-dowodca handluje jego umiejetnoscia (CaravanLeader139b.cs) - grupa dowodca139
 # Linie: 'Karawany - dowodca (139b): start | ...' (CaravanLeader139b.Start, po linii 300b) i 'Karawany - dowodca (139b): dzien N | ...' (CaravanLeader139b.Daily,
 # po CaravanGoods.Daily; w dobie pomiaru albo przy karawanach z dowodca / potknieciach).

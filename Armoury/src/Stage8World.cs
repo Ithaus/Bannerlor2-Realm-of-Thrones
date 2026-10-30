@@ -397,28 +397,38 @@ namespace Armoury
         // (jedna doba waha sie 83-141 wyjazdow - 2.8-4.8 doby; 296a 109100-109109: 4.2 doby). 0 - bez pomiaru (pierwsza doba sesji, Stage8WorldLog NIE).
         private const int LegRing = 7;
         private static readonly int[] _legW = new int[LegRing], _legX = new int[LegRing];
+        private static readonly int[] _legP = new int[LegRing];   // 140: karawany AI stojace w osadzie, ktora nie jest miastem (zamek, wies) - w tej samej probce doby
         private static int _legN, _legI;
         private static bool _legSkip = true;   // recenzja 294b: pierwsza doba po wczytaniu - wyjazdy tylko od wczytania (czesc doby), karawany swiata cale - bez probki
 
         /// <summary>294b: srednia dlugosc odcinka karawany AI w dobach (karawany swiata / wyjazdy z miast, ostatnie 7 dob); 0 - jeszcze bez pomiaru.</summary>
         internal static double LegDays { get; private set; }
 
+        /// <summary>140: odcinek liczony wszystkimi karawanami AI swiata (miara 139) i bez karawan stojacych w osadzie poza miastem (klucz CaravanLegMovingOnly);
+        /// LegDays = jedna z nich wedlug klucza. Tylko linia 140.</summary>
+        internal static double LegDaysAll { get; private set; }
+        internal static double LegDaysMoving { get; private set; }
+
         /// <summary>294b: doby pomiaru w LegDays (0..7).</summary>
         internal static int LegSamples { get { return _legN; } }
 
-        private static void NoteLeg(int world, int exits)
+        private static void NoteLeg(int world, int parked, int exits)
         {
             if (_legSkip) { _legSkip = false; return; }
             if (world <= 0 || exits <= 0) return;
-            _legW[_legI] = world; _legX[_legI] = exits;
+            _legW[_legI] = world; _legX[_legI] = exits; _legP[_legI] = Math.Max(0, Math.Min(world, parked));
             _legI = (_legI + 1) % LegRing;
             if (_legN < LegRing) _legN++;
-            long w = 0, x = 0;
-            for (int i = 0; i < _legN; i++) { w += _legW[i]; x += _legX[i]; }
-            LegDays = x > 0 ? w / (double)x : 0.0;
+            long w = 0, x = 0, p = 0;
+            for (int i = 0; i < _legN; i++) { w += _legW[i]; x += _legX[i]; p += _legP[i]; }
+            LegDaysAll = x > 0 ? w / (double)x : 0.0;
+            LegDaysMoving = x > 0 ? (w - p) / (double)x : 0.0;
+            // 140 (klucz CaravanLegMovingOnly): karawana stojaca w zamku albo we wsi nie jedzie zadnym odcinkiem i nie wyjezdza z miasta - poza licznikiem;
+            // postoj w miescie zostaje czescia odcinka miasto - miasto (jak 139). Klucz NIE - LegDays = w / x co do bitu jak 139
+            LegDays = CaravanLeg140.LegOn(Settings.Current) ? LegDaysMoving : LegDaysAll;
         }
 
-        private static void ResetLeg() { Array.Clear(_legW, 0, LegRing); Array.Clear(_legX, 0, LegRing); _legN = _legI = 0; LegDays = 0.0; _legSkip = true; }
+        private static void ResetLeg() { Array.Clear(_legW, 0, LegRing); Array.Clear(_legX, 0, LegRing); Array.Clear(_legP, 0, LegRing); _legN = _legI = 0; LegDays = LegDaysAll = LegDaysMoving = 0.0; _legSkip = true; }
 
         private static void CaravanLine(int day)
         {
@@ -437,7 +447,8 @@ namespace Armoury
                     standing++; sum += d; if (d > max) max = d; if (d >= IdleHours) idle++;
                 }
                 if (gone != null) { swept = gone.Count; foreach (var k in gone) _carIn.Remove(k); }
-                int world = 0, inTown = 0;
+                int world = 0, inTown = 0, parked = 0;
+                CaravanLeg140.ParkedBegin(day);
                 var all = MobileParty.AllCaravanParties;
                 if (all != null)
                     foreach (var c in all)
@@ -446,9 +457,11 @@ namespace Armoury
                         world++;
                         var at = c.CurrentSettlement;
                         if (at != null && at.IsTown) inTown++;
+                        else if (at != null) { parked++; CaravanLeg140.Parked(c, at, day); }   // 140: postoj w zamku albo we wsi (spis w linii 140)
                     }
+                CaravanLeg140.ParkedEnd();
                 int left = _stays.Count;
-                NoteLeg(world, left + _carLeaveUnknown);   // 294b: zmierzony odcinek karawan (jedzenie na droge 288, kolejka glebokosci rynku)
+                NoteLeg(world, parked, left + _carLeaveUnknown);   // 294b: zmierzony odcinek karawan (jedzenie na droge 288, kolejka glebokosci rynku); 140: bez postoju poza miastami
                 string mean = "-", med = "-", p90 = "-", top = "-";
                 if (left > 0)
                 {

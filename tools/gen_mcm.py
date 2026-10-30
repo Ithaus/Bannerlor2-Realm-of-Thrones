@@ -758,6 +758,9 @@ LABELS = {
     'CaravanWaitCostsWage': 'Caravans Weigh Waiting Against Wage',
     'CaravanBkLotInItemCoin': 'BK Caravan Lot Cap In Item Coin',
     'CaravanRouteRoadCost': 'Caravans Count Road Cost In Destination',
+    # 140
+    'CaravanLegMovingOnly': 'Caravan Leg Counts Moving Caravans',
+    'CaravanStuckSeekPayingTown': 'Stuck Caravans Seek A Paying Town',
 }
 # f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
 # przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial
