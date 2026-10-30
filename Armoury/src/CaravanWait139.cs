@@ -42,6 +42,7 @@ namespace Armoury
         private const float BkCap = 1500f;            // BKCaravansBehavior.MaxMoneyToSpendOnSingleCategory
         private const int RouteTowns = 10;            // miast ocenianych w C (najblizsze dozwolone)
         private const int MeasureTowns = 12;          // miast sprawdzanych w pomiarze czekajacych (najblizsze)
+        private const int MeasureMax = 40;            // recenzja 139: karawan czekajacych z szukaniem miasta na dobe (proba co k-ta, przesuwana co dobe) - czas doby
 
         internal static bool AOn(Settings s) { return s != null && s.CaravanWaitCostsWage; }
         internal static bool BOn(Settings s) { return s != null && s.CaravanBkLotInItemCoin; }
@@ -51,7 +52,7 @@ namespace Armoury
         private static int _aSteps, _aUnits; private static long _aNet, _aHeld; private static double _aCost;
         private static int _bVisits, _bBound, _bLift, _bOver, _bLiftUnits; private static long _bLiftGold, _bClipDepth, _bClipCap, _bClipGate;
         private static readonly Dictionary<string, int> _bTop = new Dictionary<string, int>();
-        private static int _cT, _cP, _cQ, _cE, _cF, _cG, _cD, _cNone;
+        private static int _cT, _cP, _cQ, _cE, _cF, _cG, _cD, _cNone, _cHome, _cStake, _mSample;
         private static double _cDb, _cDn, _cVb, _cVn, _cRb, _cRn;
         private static long _ticks;
         private static int _stumbles, _stumbleSess;
@@ -59,10 +60,15 @@ namespace Armoury
         // latki
         private static bool _wScore, _wBuy; private static int _bFound; private static string _owners = "-";
         // B: biezacy lot BK (BuyCategory - od porownania z limitem do nastepnej kategorii)
-        private static MobileParty _lotMp; private static ItemCategory _lotCat; private static double _lotCap, _lotSpend; private static int _lotMaxPrice; private static bool _lotLift;
+        // recenzja 139: _lotBk - budzet lotu ksiegowany jak BK (num3 -= (num7 + 1) x itemPrice, num7 sprzed przyciecia) - z niego sztuki, ktore 138 kupilby z 1 500
+        private static MobileParty _lotMp; private static ItemCategory _lotCat; private static double _lotCap, _lotBk; private static int _lotMaxPrice; private static bool _lotLift;
         // C: oceny miast BK w biezacym przebiegu (karawana w decyzji)
         private static readonly Dictionary<Town, float> _recs = new Dictionary<Town, float>();
         private static readonly Dictionary<(ItemObject, double), double> _floorC = new Dictionary<(ItemObject, double), double>();
+        // recenzja 139: DepthNetAged karawany (nie zalezy od miasta oceny) - pamiec jednej decyzji / jednej karawany pomiaru
+        private static readonly Dictionary<ItemObject, double> _dnC = new Dictionary<ItemObject, double>();
+        // recenzja 139: BK CaravanOrdersBehavior.Instance / IsClanStakeholderTown(Clan, Settlement) - miasto udzialowca klanu (BK x1.5)
+        private static PropertyInfo _ordInst; private static MethodInfo _stakeMi;
         // pamiec doby: najnizszy indeks kategorii w miastach (BK CreatePriceDataCache - MinBuySellPriceIndex)
         private static readonly Dictionary<ItemCategory, float> _minIdx = new Dictionary<ItemCategory, float>(); private static int _minDay = -1;
 
@@ -70,7 +76,7 @@ namespace Armoury
         {
             ZeroDay();
             _stumbleSess = 0; _err.Clear();
-            _lotMp = null; _lotCat = null; _recs.Clear(); _floorC.Clear(); _minIdx.Clear(); _minDay = -1;
+            _lotMp = null; _lotCat = null; _recs.Clear(); _floorC.Clear(); _dnC.Clear(); _minIdx.Clear(); _minDay = -1;
             CaravanTrade284.Waiting298.Clear();
         }
 
@@ -78,7 +84,7 @@ namespace Armoury
         {
             _aSteps = _aUnits = 0; _aNet = _aHeld = 0; _aCost = 0;
             _bVisits = _bBound = _bLift = _bOver = _bLiftUnits = 0; _bLiftGold = _bClipDepth = _bClipCap = _bClipGate = 0; _bTop.Clear();
-            _cT = _cP = _cQ = _cE = _cF = _cG = _cD = _cNone = 0; _cDb = _cDn = _cVb = _cVn = _cRb = _cRn = 0;
+            _cT = _cP = _cQ = _cE = _cF = _cG = _cD = _cNone = _cHome = _cStake = _mSample = 0; _cDb = _cDn = _cVb = _cVn = _cRb = _cRn = 0;
             _ticks = 0; _stumbles = 0;
         }
 
@@ -175,6 +181,24 @@ namespace Armoury
         /// rachunek oceny BK i wozow wsi, karawana jedzie droga ladowa i placi zold za cala droge - bez mnoznika.</summary>
         internal static double Days(MobileParty mp, Settlement st) { return Math.Max(1.0, CaravanEscort.RoadDaysTo(mp, st)); }
 
+        /// <summary>Recenzja 139: karawana dojedzie jeszcze w tej dobie (czesc doby, ktora minela + dni drogi bez minimum < 1) - limit T1 miasta (1/20 kasy na dobe)
+        /// jest wtedy wspolny z karawanami, ktore sprzedaly tam dzis (CaravanGoods.T1LeftPeek).</summary>
+        private static bool SameDay(MobileParty mp, Settlement st)
+        {
+            double now = CampaignTime.Now.ToDays;
+            return now - Math.Floor(now) + CaravanEscort.RoadDaysTo(mp, st) < 1.0;
+        }
+
+        /// <summary>DepthNetAged z pamieci decyzji (_dnC; ta sama karawana - cena w miescie odniesienia nie zalezy od miasta oceny).</summary>
+        private static double DnAged(MobileParty mp, ItemObject it)
+        {
+            double v;
+            if (_dnC.TryGetValue(it, out v)) return v;
+            v = CaravanTrade284.DepthNetAged(mp, it);
+            _dnC[it] = v;
+            return v;
+        }
+
         // ------------------------------------------------------------ A (CaravanGoods.Sell)
         internal static void NoteA1Step(int moved, long net, double cost) { if (moved > 0) { _aSteps++; _aUnits += moved; _aNet += net; _aCost += cost; } }
         internal static void NoteA1Held(int n) { if (n > 0) _aHeld += n; }
@@ -229,7 +253,7 @@ namespace Armoury
         /// nadwyzka kasy ponad rezerwe, brak miasta minus towar w drodze). Polka = polka miasta + towar innych karawan jadacych tam (Inbound) - to, co miasto zje w dniach
         /// drogi. route - prog z CaravanGoods.SaleFloor (te same progi co T1 i straznik); pomiar - koszt sztuki TYLKO ODCZYT. Sprzedaz gry ('inne') bez modelu.
         /// </summary>
-        internal static double SaleValue(MobileParty mp, Town town, double days, bool route, Dictionary<ItemObject, int> pantry, out int units, out double rev, out double cost)
+        internal static double SaleValue(MobileParty mp, Town town, double days, bool sameDay, bool route, Dictionary<ItemObject, int> pantry, out int units, out double rev, out double cost)
         {
             units = 0; rev = 0; cost = 0;
             var s = Settings.Current;
@@ -242,6 +266,11 @@ namespace Armoury
             int reserve = (int)Math.Max(0f, s.TownRentFloorGold);
             int spare = town.Gold - TownPurse.BuyFloorPeek(town, reserve);
             double t1Left = s.CaravanSellWhereDear ? Math.Max(0, spare) / (double)TownDayShare : 0.0;
+            if (sameDay && t1Left > 0)
+            {
+                int peek = CaravanGoods.T1LeftPeek(town);                    // recenzja 139: limit doby juz czesciowo wydany przez inne karawany
+                if (peek >= 0) t1Left = Math.Min(t1Left, peek);
+            }
             double bkGold = town.Gold;
             bool a1 = AOn(s);
             double leg = Leg, dc = -1, cargo = -1;
@@ -304,7 +333,7 @@ namespace Armoury
                         int kp = MaxK(model, l, mp, keep, l.Thr, 1, Math.Min(lim, half));
                         if (a1 && kp >= half && lim > half)
                         {
-                            double dn = CaravanTrade284.DepthNetAged(mp, l.It);
+                            double dn = DnAged(mp, l.It);
                             if (!double.IsNaN(dn))
                             {
                                 if (dc < 0) { dc = DayCost(mp); cargo = CargoRO(mp); }
@@ -376,7 +405,7 @@ namespace Armoury
                 {
                     _bVisits++;
                     if (num2 > BkCap) _bBound++;
-                    _lotMp = mp; _lotCat = cat; _lotCap = Math.Min(num2, cap); _lotSpend = 0; _lotMaxPrice = 0; _lotLift = cap > BkCap && num2 > BkCap;
+                    _lotMp = mp; _lotCat = cat; _lotCap = Math.Min(num2, cap); _lotBk = 0; _lotMaxPrice = 0; _lotLift = cap > BkCap && num2 > BkCap;
                     if (_lotLift) _bLift++;
                 }
             }
@@ -391,22 +420,38 @@ namespace Armoury
             catch (Exception e) { Stumble("BkCatCap", e); return BkCap; }
         }
 
+        /// <summary>Koniec lotu: lot podniesiony, w ktorym budzet ksiegowany jak BK przekroczyl limit o wiecej niz dwie ceny sztuki (BK konczy przy num3 <= 0, krok
+        /// najwyzej round(num3 / cena) + 1 sztuka) - kontrola, ze BK wydaje tyle, ile limit z latki (licznik; recenzja 139: tylko loty podniesione).</summary>
         private static void LotEnd()
         {
-            if (_lotMp != null && _lotCap > 0 && _lotSpend > _lotCap + _lotMaxPrice) _bOver++;
-            _lotMp = null; _lotCat = null; _lotSpend = 0; _lotMaxPrice = 0; _lotLift = false;
+            if (_lotMp != null && _lotLift && _lotCap > 0 && _lotBk > _lotCap + 2.0 * _lotMaxPrice) _bOver++;
+            _lotMp = null; _lotCat = null; _lotBk = 0; _lotMaxPrice = 0; _lotLift = false;
         }
 
-        /// <summary>Straznik zakupu (CaravanTrade284.BuyGuard139): krok zakupu BK po przycieciu - sztuki, zaplata (oszacowanie), przyciete wedlug reguly.</summary>
-        internal static void NoteBuyStep(MobileParty mp, ItemCategory cat, int units, double gold, int maxPrice, int cDepth, int cCap, int cGate)
+        /// <summary>Recenzja 139: biezacy lot BK tej karawany i kategorii ma limit podniesiony (num2 > 1 500 i limit w monecie towaru > 1 500) - tylko wtedy dziala
+        /// straznik zakupu; lot do 1 500 - jak 138.</summary>
+        internal static bool LotLifted(MobileParty mp, ItemCategory cat) { return _lotLift && mp != null && ReferenceEquals(mp, _lotMp) && ReferenceEquals(cat, _lotCat); }
+
+        /// <summary>Recenzja 139: sztuki kroku, ktore 138 kupilby z budzetu 1 500 (BK: num7 = round(num3 / itemPrice), num3 = 1 500 - ksiegowane kroki) - te ida jak
+        /// w 138, reguly na sztuke dopiero ponad nie.</summary>
+        internal static int LotFree(int pBk)
         {
+            double rem = BkCap - _lotBk;
+            return rem > 0 && pBk > 0 ? (int)Math.Min(int.MaxValue, Math.Round(rem / pBk)) : 0;
+        }
+
+        /// <summary>Straznik zakupu (CaravanTrade284.BuyGuard139), lot podniesiony: krok BK - n0 sztuk zadanych przez BK (ksiegowanie budzetu BK: (n0 + 1) x pBk), n po
+        /// przycieciu, free - sztuki jak w 138; ponad nie (n - free) - licznik podniesienia z zaplata (oszacowanie); przyciete wedlug reguly.</summary>
+        internal static void NoteBuyStep(MobileParty mp, ItemCategory cat, int n0, int n, int free, int pBk, double extraGold, int cDepth, int cCap, int cGate)
+        {
+            if (!LotLifted(mp, cat)) return;
             _bClipDepth += cDepth; _bClipCap += cCap; _bClipGate += cGate;
-            if (units <= 0 || !ReferenceEquals(mp, _lotMp) || !ReferenceEquals(cat, _lotCat)) return;
-            _lotSpend += gold; if (maxPrice > _lotMaxPrice) _lotMaxPrice = maxPrice;
-            if (_lotLift)
+            _lotBk += (n0 + 1) * (double)pBk; if (pBk > _lotMaxPrice) _lotMaxPrice = pBk;
+            int extra = n - Math.Min(n, Math.Max(0, free));
+            if (extra > 0)
             {
-                _bLiftUnits += units; _bLiftGold += (long)Math.Round(gold);
-                string id = cat.StringId ?? "?"; int x; _bTop.TryGetValue(id, out x); _bTop[id] = x + units;
+                _bLiftUnits += extra; _bLiftGold += (long)Math.Round(extraGold);
+                string id = cat.StringId ?? "?"; int x; _bTop.TryGetValue(id, out x); _bTop[id] = x + extra;
             }
         }
 
@@ -471,7 +516,7 @@ namespace Armoury
             var s = Settings.Current;
             if (!COn(s) || mp == null || result == null || result.Settlement == null) return;
             long t0 = Stopwatch.GetTimestamp();
-            _floorC.Clear();
+            _floorC.Clear(); _dnC.Clear();
             try
             {
                 var r = mp.ItemRoster;
@@ -494,10 +539,14 @@ namespace Armoury
                     CaravanSettle.CapFloor(mp, out cap, out floor);
                     loaded = cap - floor > 0 && cargo >= cap - floor;
                 }
-                bool stuck = AOn(s) && !CaravanTrade284.SoldIn7(mp, (int)CampaignTime.Now.ToDays);
+                bool stuck = AOn(s) && CaravanTrade284.Stuck7(mp, (int)CampaignTime.Now.ToDays);   // recenzja 139: ksiega 284 co najmniej 7 dob (nie nowa karawana)
                 if (loaded) _cP++;
                 if (stuck) _cQ++;
                 if (!loaded && !stuck) return;
+                // recenzja 139: wybor BK = dom karawany (przyciaganie domu BK rosnie z dobami od ostatniej wizyty) albo miasto udzialowca klanu wlasciciela (BK x1.5,
+                // wyplaty klanu K259) - bez zmian
+                if (mp.HomeSettlement != null && result.Settlement == mp.HomeSettlement) { _cHome++; return; }
+                if (Stakeholder(mp, result.Settlement)) { _cStake++; return; }
                 double db = Days(mp, result.Settlement);
                 double dmax = stuck ? Math.Max(db, Leg) : db;
                 var cand = new List<KeyValuePair<Town, double>>();
@@ -510,7 +559,7 @@ namespace Armoury
                 }
                 double dc = DayCost(mp);
                 int u; double rv, cs;
-                double vb = SaleValue(mp, result, db, true, pantry, out u, out rv, out cs);
+                double vb = SaleValue(mp, result, db, SameDay(mp, result.Settlement), true, pantry, out u, out rv, out cs);
                 double rb = (vb - dc * db) / Math.Max(1.0, db);
                 Town best = null; double rbest = rb, vbest = 0, dbest = 0, rmax = rb;
                 if (cand.Count > 0)
@@ -519,7 +568,7 @@ namespace Armoury
                     for (int i = 0; i < cand.Count && i < RouteTowns; i++)
                     {
                         double d = cand[i].Value;
-                        double v = SaleValue(mp, cand[i].Key, d, true, pantry, out u, out rv, out cs);
+                        double v = SaleValue(mp, cand[i].Key, d, SameDay(mp, cand[i].Key.Settlement), true, pantry, out u, out rv, out cs);
                         double rr = (v - dc * d) / Math.Max(1.0, d);
                         if (rr > rmax) rmax = rr;
                         if (rr > rbest) { rbest = rr; best = cand[i].Key; vbest = v; dbest = d; }
@@ -534,7 +583,19 @@ namespace Armoury
                 result = best;
             }
             catch (Exception e) { Stumble("Route", e); }
-            finally { _floorC.Clear(); _ticks += Stopwatch.GetTimestamp() - t0; }
+            finally { _floorC.Clear(); _dnC.Clear(); _ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>Recenzja 139: miasto udzialowca klanu wlasciciela karawany (BK CaravanOrdersBehavior.IsClanStakeholderTown - ocena BK x1.5); bez BK - false.</summary>
+        private static bool Stakeholder(MobileParty mp, Settlement st)
+        {
+            if (_stakeMi == null || _ordInst == null || st == null || mp == null || mp.Owner == null || mp.Owner.Clan == null) return false;
+            try
+            {
+                var beh = _ordInst.GetValue(null, null);
+                return beh != null && _stakeMi.Invoke(beh, new object[] { mp.Owner.Clan, st }) is bool b && b;
+            }
+            catch (Exception e) { Stumble("Stakeholder", e); return false; }
         }
 
         // ------------------------------------------------------------ doba
@@ -576,8 +637,11 @@ namespace Armoury
                 var wait = CaravanTrade284.Waiting298;
                 double vSum = 0, zSum = 0; int inLeg = 0, far = 0, none = 0;
                 var daysL = new List<double>(); var roadL = new List<double>(); var ratioL = new List<double>();
+                // recenzja 139: szukanie miasta (do 12 x SaleValue) tylko dla proby co k-tej karawany (najwyzej MeasureMax), przesuwanej co dobe; reszta miar - wszystkie
+                int stride = Math.Max(1, (wait.Count + MeasureMax - 1) / MeasureMax), off = stride > 1 ? today % stride : 0, wi = -1;
                 foreach (var mp in wait)
                 {
+                    wi++;
                     if (mp == null || !mp.IsActive || mp.ItemRoster == null) continue;
                     try
                     {
@@ -585,6 +649,9 @@ namespace Armoury
                         vSum += CargoRO(mp);
                         int ds = CaravanTrade284.DaysSinceSale(mp, today);
                         daysL.Add(ds); zSum += dc * ds;
+                        if (wi % stride != off) continue;
+                        _mSample++;
+                        _dnC.Clear();
                         var pantry = CaravanTrade284.PantryCopy(mp);
                         Vec2 from = mp.CurrentSettlement != null ? mp.CurrentSettlement.GetPosition2D : mp.GetPosition2D;
                         var towns = new List<KeyValuePair<Town, float>>();
@@ -601,7 +668,7 @@ namespace Armoury
                             var t = towns[i].Key;
                             double d = Days(mp, t.Settlement);
                             int u; double rv, cs;
-                            double v = SaleValue(mp, t, d, false, pantry, out u, out rv, out cs);
+                            double v = SaleValue(mp, t, d, SameDay(mp, t.Settlement), false, pantry, out u, out rv, out cs);
                             if (u > 0 && v - dc * d > 0)
                             {
                                 found = true;
@@ -614,6 +681,7 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Daily(czekajace)", e); }
                 }
+                _dnC.Clear();
                 double ms = (Stopwatch.GetTimestamp() - t0 + _ticks) * 1000.0 / Stopwatch.Frequency;
                 string top = "-";
                 if (_bTop.Count > 0)
@@ -635,9 +703,9 @@ namespace Armoury
                   .Append(((long)Math.Round(_aCost)).ToString(Inv)).Append(" zl), zatrzymane - czekanie sie oplaca ").Append(_aHeld).Append(" szt.")
                   .Append("; czekajace ").Append(wait.Count).Append(": towar po koszcie ").Append(((long)vSum).ToString(Inv)).Append(" zl, dni od ostatniej sprzedazy mediana ")
                   .Append(F(Med(daysL), "0")).Append(" / p90 ").Append(F(Med(daysL, 0.9), "0")).Append(", zold od ostatniej sprzedazy ").Append(((long)zSum).ToString(Inv))
-                  .Append(" zl, najblizsze miasto placace >= koszt + droga: w odcinku ").Append(inLeg).Append(" / dalej ").Append(far).Append(" / brak ").Append(none)
+                  .Append(" zl, najblizsze miasto placace >= koszt + droga (proba ").Append(_mSample).Append("): w odcinku ").Append(inLeg).Append(" / dalej ").Append(far).Append(" / brak ").Append(none)
                   .Append(", dni drogi mediana ").Append(F(Med(roadL), "0.0")).Append(", cena tam / koszt mediana ").Append(F(Med(ratioL), "0.00"))
-                  .Append("; skierowane blizej ").Append(_cD)
+                  .Append("; skierowane utkniete ").Append(_cD)
                   .Append(" | B: wizyt BK ").Append(_bVisits).Append(", limit 1500 wiazal ").Append(_bBound).Append(", podniesiony ").Append(_bLift).Append(" (szt. ").Append(_bLiftUnits)
                   .Append(" za ").Append(_bLiftGold).Append(" zl), lotow ponad limit ").Append(_bOver).Append(", przyciete glebokosc ").Append(_bClipDepth).Append(" / kapital ")
                   .Append(_bClipCap).Append(" / bramka ").Append(_bClipGate).Append(" szt., latka ").Append(patch).Append(", najwiecej: ").Append(top)
@@ -646,7 +714,7 @@ namespace Armoury
                   .Append(" -> 139 ").Append(_cE > 0 ? (_cDn / _cE).ToString("0.00", Inv) : "-")
                   .Append(", zysk sprzedazy BK ").Append(_cE > 0 ? (_cVb / _cE).ToString("0", Inv) : "-").Append(" -> 139 ").Append(_cE > 0 ? (_cVn / _cE).ToString("0", Inv) : "-")
                   .Append(" zl, koszt drogi ").Append(_cE > 0 ? (_cRb / _cE).ToString("0", Inv) : "-").Append(" -> ").Append(_cE > 0 ? (_cRn / _cE).ToString("0", Inv) : "-")
-                  .Append(" zl, bez miasta z zyskiem ").Append(_cNone)
+                  .Append(" zl, bez miasta z zyskiem ").Append(_cNone).Append(", bez zmian - dom ").Append(_cHome).Append(" / udzialowiec ").Append(_cStake)
                   .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
             }
             catch (Exception e)
@@ -684,6 +752,14 @@ namespace Armoury
                     if (info != null) _owners = string.Join(", ", new List<string>(info.Owners).ToArray());
                 }
                 catch (Exception e) { _owners = "blad " + e.GetType().Name; }
+                try
+                {
+                    var tco = AccessTools.TypeByName("BannerKings.Behaviours.Caravans.CaravanOrdersBehavior");
+                    _ordInst = tco != null ? AccessTools.Property(tco, "Instance") : null;
+                    _stakeMi = tco != null ? AccessTools.Method(tco, "IsClanStakeholderTown", new[] { typeof(Clan), typeof(Settlement) }) : null;
+                    if (_ordInst == null || _stakeMi == null || _stakeMi.ReturnType != typeof(bool)) { _ordInst = null; _stakeMi = null; miss.Add("CaravanOrdersBehavior.IsClanStakeholderTown"); }
+                }
+                catch (Exception e) { _ordInst = null; _stakeMi = null; miss.Add("CaravanOrdersBehavior.IsClanStakeholderTown"); Log.Error("CaravanWait139.ApplyAll(udzialowcy)", e); }
                 var buy = AccessTools.Method(bkc, "BuyCategory", new[] { typeof(MobileParty), typeof(Town), typeof(ItemCategory), typeof(float), typeof(float), typeof(List<(EquipmentElement, int)>) });
                 if (buy != null && !buy.IsStatic)
                 {

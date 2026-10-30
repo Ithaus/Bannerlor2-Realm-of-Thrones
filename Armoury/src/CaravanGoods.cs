@@ -900,6 +900,14 @@ namespace Armoury
         /// <summary>139 B (CaravanTrade284.SellGuardPrefix - straznik zakupu): karawana w biezacym BK BuyGoods.</summary>
         internal static bool BkBuyerIs(MobileParty mp) { return mp != null && ReferenceEquals(_bkBuyer, mp); }
 
+        /// <summary>Recenzja 139 (CaravanWait139.SaleValue): reszta limitu T1 miasta na dzis (1/20 kasy ponad rezerwe, wspolny dla wszystkich karawan) - tylko odczyt;
+        /// -1 - dzis jeszcze nikt tu nie sprzedawal (limit pelny).</summary>
+        internal static int T1LeftPeek(Town town)
+        {
+            int left;
+            return town != null && _townDay == (int)CampaignTime.Now.ToDays && _townLeft.TryGetValue(town, out left) ? left : -1;
+        }
+
         /// <summary>BK CalculateBuyValue: kategoria, ktora T1 sprzedal w tym miescie (do 7 dob, dopoki sprzedane sztuki leza na polce) - wycena 0 dla KAZDEJ karawany. Nie rzuca.</summary>
         public static void BkValuePostfix(ItemCategory __0, Town __1, ref float __result)
         {
@@ -1081,7 +1089,26 @@ namespace Armoury
                     double age = lot != null ? Math.Max(0, now - lot.Day) : 0;
                     float wgt = it.Weight;
                     bool cash = mp.PartyTradeGold < CashDays * wage, full = wgt > 0f && mp.TotalWeightCarried > cap;   // poprawki (uwaga recenzji 2): ponad udzwig, jak BK
-                    bool profit = pLast * keepK > c.Min;
+                    if (beyond)
+                    {
+                        // 139 A: ponad polowe stosu tylko z zyskiem i tylko, gdy czekanie na miasto drozsze kosztuje wiecej, niz tam zyskam; liczy PRZED regulami straty
+                        // i licznikami 294/294b (LossWhy, AgeMarket, 'bez zysku', S1) - te zostaja w znaczeniu 138 (krok ponad polowe w 138 nie istnial); stop = polowa stosu
+                        double dn = CaravanTrade284.DepthNetAged(mp, it);
+                        if (double.IsNaN(dn)) { atHalf = true; break; }
+                        if (a1Day < 0) a1Day = CaravanWait139.DayCost(mp);
+                        double need = Math.Max(c.Min, dn - CaravanWait139.Carry(a1Day, c.Unit, a1Leg, cargo));
+                        int kq = step;
+                        while (kq >= 1) { double pq = PriceAt(model, el.EquipmentElement, mp, d, kq, wv) * keepK; if (pq > c.Min && pq >= need) break; kq--; }
+                        if (kq <= 0)
+                        {
+                            // zatrzymane, bo czekanie sie oplaca: pierwsza sztuka ma tu zysk, ale mniejszy niz w miescie odniesienia po koszcie drogi
+                            if (pLast > 0 && PriceAt(model, el.EquipmentElement, mp, d, 1, wv) * keepK > c.Min)
+                                CaravanWait139.NoteA1Held(c.Food ? Math.Min(pack.GetItemNumber(it), Math.Max(0, foodHave - foodKeep)) : pack.GetItemNumber(it));
+                            atHalf = true; break;
+                        }
+                        if (kq < step) { step = kq; pLast = PriceAt(model, el.EquipmentElement, mp, d, kq, wv); }
+                    }
+                    bool profit = beyond || pLast * keepK > c.Min;
                     if (!profit && step > 1)
                     {
                         // S1: krok nie przeskakuje progu zysku - najwiecej sztuk, z ktorych OSTATNIA ma jeszcze zysk (gra placi sztuka po sztuce); reszta - regula straty
@@ -1104,20 +1131,6 @@ namespace Armoury
                         }
                     }
                     if (!profit && why == 0) { _rNoProfit++; break; }
-                    if (beyond)
-                    {
-                        // 139 A: ponad polowe stosu tylko z zyskiem i tylko, gdy czekanie na miasto drozsze kosztuje wiecej, niz tam zyskam
-                        int heldN = c.Food ? Math.Min(pack.GetItemNumber(it), Math.Max(0, foodHave - foodKeep)) : pack.GetItemNumber(it);
-                        if (why != 0) { atHalf = true; break; }
-                        double dn = CaravanTrade284.DepthNetAged(mp, it);
-                        if (double.IsNaN(dn)) { atHalf = true; break; }
-                        if (a1Day < 0) a1Day = CaravanWait139.DayCost(mp);
-                        double need = Math.Max(c.Min, dn - CaravanWait139.Carry(a1Day, c.Unit, a1Leg, cargo));
-                        int kq = step;
-                        while (kq >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kq, wv) * keepK < need) kq--;
-                        if (kq <= 0) { CaravanWait139.NoteA1Held(heldN); atHalf = true; break; }
-                        if (kq < step) { step = kq; pLast = PriceAt(model, el.EquipmentElement, mp, d, kq, wv); }
-                    }
                     if (why >= 3)
                     {
                         // S1: na stracie (juki ponad udzwig, jedzenie psuje sie, dlugo w jukach) porcjami - sztuka po sztuce, stop przed sztuka, ktora zbilaby indeks

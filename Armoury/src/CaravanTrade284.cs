@@ -926,6 +926,15 @@ namespace Armoury
             return any;
         }
 
+        /// <summary>139 (recenzja): karawana utknieta - wpis ksiegi 284 co najmniej 7 dob (nie nowa karawana, nie swiezo po wczytaniu bez ksiegi) i bez sprzedazy
+        /// w dobach (end - 7, end].</summary>
+        internal static bool Stuck7(MobileParty mp, int end)
+        {
+            Acc a;
+            if (mp == null || !_acc.TryGetValue(mp, out a) || end - a.First < 7) return false;
+            return !SoldIn7(mp, end);
+        }
+
         /// <summary>294c: ile JEDNO miasto zjada kategorii na dobe w jednostkach polki (wartosc) - ten sam czlon co petla Mkt (budzet doby modelu gry / indeks miasta).</summary>
         internal static double MktTownValue(Town t, ItemCategory c)
         {
@@ -1232,11 +1241,13 @@ namespace Armoury
         /// <summary>139 B (CaravanWait139.BkCatCapCmp): karawana z zasadami zakupu 284 w biezacym BK BuyGoods (BuyStart, bez zwolnienia).</summary>
         internal static bool BuyRulesActive(MobileParty mp) { return mp != null && ReferenceEquals(_b.Mp, mp) && !_b.Exempt; }
 
-        /// <summary>139 B (klucz CaravanBkLotInItemCoin): straznik zakupu BK - liczba sztuk kroku BuyCategory przycieta do najmniejszej z: glebokosc rynku (najwiecej n,
-        /// przy ktorym cena n-tej sztuki w miescie odniesienia w kolejce za moimi n sztukami - DepthNet(QueueK(moje + n)) - jest >= 1.03 x cena kupna n-tej sztuki tutaj;
-        /// ta sama regula 294b co dla pierwszej sztuki), kapital obrotowy (sztuki, ktore zaczynaja sie ponizej kapital - podloga; regula 2 na sztuke) i bramka przeplywu
-        /// (sztuki do progu Cap - juki swiata; regula 1 na sztuke). Limit BK 1 500 pilnowal tego dla pierwszej sztuki - wiekszy limit w monecie towaru wymaga regul na
-        /// kazda sztuke. BK liczy swoj budzet nieprzycieta liczba (konczy szybciej - bezpiecznie).</summary>
+        /// <summary>139 B (klucz CaravanBkLotInItemCoin): straznik zakupu BK - TYLKO lot z limitem podniesionym (CaravanWait139.LotLifted: num2 > 1 500 i limit w monecie
+        /// towaru > 1 500; recenzja 139 - lot do 1 500 kupuje jak 138). Sztuki kroku, ktore 138 kupilby z budzetu 1 500 (CaravanWait139.LotFree - budzet ksiegowany jak BK),
+        /// ida jak w 138; ponad nie liczba sztuk przycieta do najmniejszej z: glebokosc rynku (najwiecej m, przy ktorym cena m-tej sztuki w miescie odniesienia w kolejce
+        /// za moimi m sztukami - DepthNet(QueueK(moje + m)) - jest >= 1.03 x cena kupna m-tej sztuki tutaj; ta sama regula 294b co dla pierwszej sztuki), kapital
+        /// obrotowy (sztuki, ktore zaczynaja sie ponizej kapital - podloga; regula 2 na sztuke) i bramka przeplywu (sztuki do progu Cap - juki swiata; regula 1 na sztuke).
+        /// Limit BK 1 500 pilnowal tego dla pierwszej sztuki - wiekszy limit wymaga regul na kazda sztuke ponad 1 500. BK liczy swoj budzet nieprzycieta liczba (konczy
+        /// szybciej - bezpiecznie).</summary>
         private static void BuyGuard139(PartyBase town, MobileParty mp, ItemRosterElement el, ref int n)
         {
             var s = Settings.Current;
@@ -1247,52 +1258,59 @@ namespace Armoury
                 var ee = el.EquipmentElement;
                 var it = ee.Item;
                 var tw = town.Settlement != null ? town.Settlement.Town : null;
-                if (it == null || tw == null || !it.IsTradeGood || it.HasHorseComponent || !Tracked(it.ItemCategory)) return;
+                if (it == null || tw == null || !CaravanWait139.LotLifted(mp, it.ItemCategory)) return;
                 var cat = it.ItemCategory;
+                int n0 = n, cDepth = 0, cCap = 0, cGate = 0;
+                int pBk = Math.Max(1, tw.GetItemPrice(ee, mp, false));           // BK itemPrice - ta sama cena, ktora BK ksieguje budzet kroku
+                int free = Math.Min(n0, CaravanWait139.LotFree(pBk));
                 var cg = Campaign.Current;
                 var model = cg != null && cg.Models != null ? cg.Models.TradeItemPriceFactorModel : null;
-                if (model == null || tw.MarketData == null) return;
-                var d = tw.MarketData.GetCategoryData(cat);
-                int wv = Math.Max(1, HistoricalPrices.ShelfWorth(it));
-                // cena kupna m-tej sztuki: gra placi sztuka po sztuce, polka maleje o wage sztuki (SellItemsAction.ApplyInternal - GetItemPrice przy kazdej sztuce)
-                Func<int, int> buyAt = m => Math.Max(1, model.GetPrice(ee, mp, null, false, Math.Max(0f, d.InStoreValue - (Math.Max(1, m) - 1) * (float)wv), d.Supply, d.Demand));
-                int n0 = n, cDepth = 0, cCap = 0, cGate = 0;
-                int p1 = buyAt(1);
-                if (s.CaravanBuyWorkingCapital && _b.Capital - _b.Floor > 0)
+                double extraGold = 0.0;
+                if (n0 > free && model != null && tw.MarketData != null && it.IsTradeGood && !it.HasHorseComponent)
                 {
-                    double cargo = _b.Stock0 + Math.Max(0, _b.Purse0 - mp.PartyTradeGold);
-                    double room = _b.Capital - _b.Floor - cargo;
-                    int nc = room > 0 ? (int)Math.Min(int.MaxValue, Math.Ceiling(room / p1)) : 0;
-                    if (nc < n) { cCap = n - nc; n = nc; }
-                }
-                if (n > 0 && s.CaravanBuyByFlow && _days >= FlowMinDays)
-                {
-                    EnsureHeld();
-                    double room = Cap(cat) - Held(cat);                       // regula 1 (GateShut: juki > prog) na sztuke: sztuka m, gdy juki przed nia <= prog
-                    int ng = room >= 0 ? (int)Math.Min(int.MaxValue - 1, Math.Floor(room)) + 1 : 0;
-                    if (ng < n) { cGate = n - ng; n = ng; }
-                }
-                if (n > 0 && DepthOn)
-                {
-                    int own = TradeUnits(mp, cat);
-                    Func<int, int> ok = m => { double net = DepthNet(mp, ee, QueueKOwn(cat, own, own + m)); return double.IsNaN(net) ? -1 : (net >= CarrierMargin * buyAt(m) ? 1 : 0); };
-                    int o1 = ok(1);
-                    if (o1 >= 0)
+                    var d = tw.MarketData.GetCategoryData(cat);
+                    int wv = Math.Max(1, HistoricalPrices.ShelfWorth(it));
+                    // cena kupna m-tej sztuki: gra placi sztuka po sztuce, polka maleje o wage sztuki (SellItemsAction.ApplyInternal - GetItemPrice przy kazdej sztuce)
+                    Func<int, int> buyAt = m => Math.Max(1, model.GetPrice(ee, mp, null, false, Math.Max(0f, d.InStoreValue - (Math.Max(1, m) - 1) * (float)wv), d.Supply, d.Demand));
+                    int p1 = buyAt(1);
+                    if (s.CaravanBuyWorkingCapital && _b.Capital - _b.Floor > 0)
                     {
-                        int k = 0;
-                        if (o1 == 1)
-                        {
-                            int lo = 1, hi = n;
-                            while (lo < hi) { int mid = (lo + hi + 1) / 2; if (ok(mid) == 1) lo = mid; else hi = mid - 1; }
-                            k = lo;
-                        }
-                        if (k < n) { cDepth = n - k; n = k; }
+                        double cargo = _b.Stock0 + Math.Max(0, _b.Purse0 - mp.PartyTradeGold);
+                        double room = _b.Capital - _b.Floor - cargo;
+                        int nc = room > 0 ? (int)Math.Min(int.MaxValue, Math.Ceiling(room / p1)) : 0;
+                        nc = Math.Max(free, nc);
+                        if (nc < n) { cCap = n - nc; n = nc; }
                     }
+                    if (n > free && s.CaravanBuyByFlow && _days >= FlowMinDays)
+                    {
+                        EnsureHeld();
+                        double room = Cap(cat) - Held(cat);                       // regula 1 (GateShut: juki > prog) na sztuke: sztuka m, gdy juki przed nia <= prog
+                        int ng = room >= 0 ? (int)Math.Min(int.MaxValue - 1, Math.Floor(room)) + 1 : 0;
+                        ng = Math.Max(free, ng);
+                        if (ng < n) { cGate = n - ng; n = ng; }
+                    }
+                    if (n > free && DepthOn)
+                    {
+                        int own = TradeUnits(mp, cat);
+                        Func<int, int> ok = m => { double net = DepthNet(mp, ee, QueueKOwn(cat, own, own + m)); return double.IsNaN(net) ? -1 : (net >= CarrierMargin * buyAt(m) ? 1 : 0); };
+                        int o1 = ok(free + 1);
+                        if (o1 >= 0)
+                        {
+                            int k = free;
+                            if (o1 == 1)
+                            {
+                                int lo = free + 1, hi = n;
+                                while (lo < hi) { int mid = (lo + hi + 1) / 2; if (ok(mid) == 1) lo = mid; else hi = mid - 1; }
+                                k = lo;
+                            }
+                            if (k < n) { cDepth = n - k; n = k; }
+                        }
+                    }
+                    if (n < free) n = free;
+                    if (n > n0) n = n0;
+                    if (n > free) extraGold = (n - free) * 0.5 * (buyAt(free + 1) + buyAt(n));
                 }
-                if (n < 0) n = 0;
-                if (n > n0) n = n0;
-                double gold = n > 0 ? n * 0.5 * (p1 + buyAt(n)) : 0.0;
-                CaravanWait139.NoteBuyStep(mp, cat, n, gold, n > 0 ? buyAt(n) : 0, cDepth, cCap, cGate);
+                CaravanWait139.NoteBuyStep(mp, cat, n0, n, free, pBk, extraGold, cDepth, cCap, cGate);
             }
             catch (Exception e) { Stumble("BuyGuard139", e); }
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
