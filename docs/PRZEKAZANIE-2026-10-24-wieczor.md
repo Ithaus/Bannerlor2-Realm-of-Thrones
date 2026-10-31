@@ -1,5 +1,16 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 07:20 CET - WGRANIE 141 (noc/305-jeff-31-10 8deb9735 wypchniete) - START DLA NASTEPNEJ SESJI
+- W GRZE: Armoury.dll bd055889e03a5e8c3be9ae673be33157 (141 = 140 + 305a-f). Kopie 140: Armoury.dll.bak-2026-10-31-przed-wgranie141 i D:\Backup-Bannerlord\wgrane\2026-10-31-wgranie141-przed.
+  CrashScribe bez zmian bef9db58 (latka smokow 305c NIE wgrana - zrodlo bef9db58 to commit 84205371, ktorego nie ma w repo; budowa z n305 wnioslaby niewgrane 133a). Zapis testowy na
+  D:\...\zapisy-testowe-archiwum\2026-10-31-141 (Game Saves czyste). Testy 141base/141a/141b (m113\seria-141*.out.txt, logi m113\logi\141*): kod 0, ERROR 0; analiza scratchpad d16b0e41\an141.
+- 141 zawiera: 305a osobna linia 'Caravan wages' w podpowiedzi zlota (suma bez zmian), dziennik karawany gracza (transakcje, miejsce, koniec + komunikat); 305b kuznia/warsztat gracza
+  z bronia jako firma (PlayerArmsAsFirm), zwrot kapitalu przy zmianie produkcji bez podatku, cena kupna z pamieci pol na pol + tempo, ksiega zysk vs zwrot kapitalu; 305c zalamania
+  kompanii po stratach, poscig 148 od ofiary, konnica AI zwalnia za wlasna piechota (FF 21 -> 1), smycz z wyprzedzeniem; 305d jedna zasada XP kowala (stamina x 7 x tier), blad
+  zaokraglenia (miecz/przetop 1 XP) naprawiony; 305e widok prac okregu od zakupu, ryby Night Raider; 305f poprawki przegladu (ksiega Basis, petla kupno-odsprzedaz, robota w toku w cenie).
+- W TOKU: runda 306 (wf_89f0090f-a58): 306a arbitraz karawany Bjorna 10k -> 119k (przyczyna ceny?), 306b sondy autotestu (kowalstwo XP, karawana gracza, zmiana produkcji) -
+  worktree zb\n306a, zb\n306b. Potem test 142a z flagami sond, WGRANIE 142.
+
 ## DOPISEK 31.10 ok. 04:35 CEST - NOWA SESJA (d16b0e41): Jeff wyjezdza do niedzieli, pelna zgoda "pracuj tak dlugo az naprawisz", wgrywac samemu
 - Jeff gra NOWA kampanie: Ironman0gXONzURi8yO.sav (rod KARDA, bohater Przemyslaw, doby 108648-108878, ok. 220k zl). Logi 30.10 18:01/19:48/21:04-03:30 skopiowane do
   D:\Backup-Bannerlord\logi-jeffa\2026-10-31-sesje-30-10 i scratchpad d16b0e41\logi. Stary zapis testowy (KkUpHftX7ZIq) przeniesiony na D:\...\zapisy-testowe-archiwum\2026-10-31-stary-przekierowany.
