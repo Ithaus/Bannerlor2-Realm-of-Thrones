@@ -185,6 +185,8 @@ namespace Armoury
             try { BattleGore.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteGore, "BattleGore.Begin", e); }
             try { BattleCries.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.Begin", e); }
             try { BloodPools.Begin(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Begin", e); }
+            // 309: koszt klatki - tylko bitwa polowa (linia "Koszt klatki Armoury (309)" w Clean)
+            try { FrameCost309.Begin(m, _battle && m != null && m.IsFieldBattle, MissionTeams.Kind(m)); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "FrameCost309.Begin", e); }
             try { if (_battle || _duel) VeteranAi.CheckOrder(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVeteran, "VeteranAi.CheckOrder", e); }
             try { if (_duel || (_battle && FieldDuel.HooksWanted(Settings.Current))) DuelGuard.CheckOrder(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelGuard.CheckOrder", e); }
             // noc 25.10 P0 (K3): latki misji P1/P2 raz, przy pierwszej bitwie; potem Begin paczek - Doctrine PRZED WarCouncil (WarCouncil.One wola Doctrine.ApplyList)
@@ -208,27 +210,48 @@ namespace Armoury
 
         public override void OnMissionTick(float dt)
         {
+            long t309;   // 309: koszt klatki modulow (FrameCost309) - pomiar, zachowanie bez zmian
+            t309 = FrameCost309.T();
             try { BattleCries.Tick(Mission, dt); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteVoice, "BattleCries.Tick", e); }
+            FrameCost309.Add(FrameCost309.MCries, t309);
             // noc 25.10 P0 (K4): po BattleCries (jedyny detektor szarzy) - marsz, doktryna, dzwiek; kazde we wlasnym try
             if (Night)
             {
+                t309 = FrameCost309.T();
                 try { MarchToContact.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "MarchToContact.Tick", e); }
+                FrameCost309.Add(FrameCost309.MMarch, t309);
+                t309 = FrameCost309.T();
                 try { Doctrine.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Tick", e); }
+                FrameCost309.Add(FrameCost309.MDoctrine, t309);
+                t309 = FrameCost309.T();
                 try { BattleSound.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Tick", e); }
+                FrameCost309.Add(FrameCost309.MSound, t309);
+                t309 = FrameCost309.T();
                 try { ShieldsUp.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.Tick", e); }   // 140
+                FrameCost309.Add(FrameCost309.MShields, t309);
+                t309 = FrameCost309.T();
                 try { CloseRanks.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.Tick", e); }   // 146 - po S4 tej klatki
+                FrameCost309.Add(FrameCost309.MRanks, t309);
+                t309 = FrameCost309.T();
                 try { HorsePursuit.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.Tick", e); }   // 148 - po MarchToContact (odpoczynek koni) tej klatki
+                FrameCost309.Add(FrameCost309.MPursuit, t309);
+                t309 = FrameCost309.T();
                 try { HeroCaution.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.Tick", e); }   // 149 - zachowania misji tykaja od konca listy (Mission.cs:3741-3744): BattleSense PRZED RoutKeeper i BrokenMen
+                FrameCost309.Add(FrameCost309.MHeroes, t309);
             }
+            t309 = FrameCost309.T();
             try { BloodPools.Tick(Mission, dt); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.Tick", e); }
+            FrameCost309.Add(FrameCost309.MPools, t309);
+            t309 = FrameCost309.T();
             if (_duel && InDuel(Mission)) DuelTick(Mission, dt);
             // m113-walka2: zrywy bohaterow w bitwie (zgloszenia z hakow B, UpdateAgentStats tylko tutaj, najwyzej 8 na klatke)
             else if (_battle && FieldDuel.BurstsOn(Settings.Current) && InBattle(Mission))
             {
                 try { DuelCraft.Tick(Mission, true); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDuel, "DuelCraft.Tick bitwa", e); }
             }
+            FrameCost309.Add(FrameCost309.MDuel, t309);
         }
 
         // m111-walka: tick pojedynku (glowny watek) - runda, zrywy (UpdateAgentStats tylko tutaj), probkowanie, lista meczu, linie DU
@@ -365,6 +388,7 @@ namespace Armoury
 
         private void Clean()
         {
+            try { FrameCost309.End(Mission); } catch { }   // 309: linia kosztu klatki raz na bitwe (End bezpieczne wielokrotnie)
             try { BattleCries.Clear(); } catch { }
             try { BattleGore.Clear(); } catch { }
             try { BloodPools.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SitePools, "BloodPools.End", e); }

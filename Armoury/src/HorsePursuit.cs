@@ -117,6 +117,10 @@ namespace Armoury
         private static WeakReference _m;
         private static bool _live, _key, _night, _written, _field, _naval;
         private static bool _nearVictim;   // 305c: klucz CavalryPursuitNearVictim (kopia w Pass)
+        // 309 (klucze PursuitDelegatedFormations, PursuitStartNearVictims; kopia w Begin i Pass): szyk gracza w 148 tylko pod jego rozkazami; brama wejscia
+        // wedlug ofiar (jest uciekajacy w 150 m poza VictimIntactR od nietknietego szyku) zamiast 80 m od srodka szyku; bez jezdzcow do wyslania - bez wejscia
+        private static bool _delegated, _gateVictims;
+        private static int _noRiders, _gateOpenedByVictims, _playerSideEntries;
         // 305c: przyczyny u wolnych jezdzcow (w passie przydzialu): kontrola O* i brak celu P*
         private const int PNone = 0, PLimit = 1, PIntact = 2, PFar = 3, PLate = 4, PKinds = 5;
         private static readonly int[] FreeWhy = new int[OKinds];
@@ -232,6 +236,9 @@ namespace Armoury
             var c = Settings.Current;
             _key = c != null && c.AiCavalryPursues;
             _nearVictim = c != null && c.CavalryPursuitNearVictim;
+            _delegated = c != null && c.PursuitDelegatedFormations;
+            _gateVictims = c != null && c.PursuitStartNearVictims;
+            _noRiders = _gateOpenedByVictims = _playerSideEntries = 0;
             _restBelow = c != null && c.HorseStaminaEnabled ? Math.Max(0, Math.Min(80, c.HorseAiRestBelow)) : 0;   // 204: odpowiedz moze wejsc w pierwszym passie
             _live = _field;
             HuntBegin(c);   // 204 (po _field - proba autotestu tylko w bitwie polowej)
@@ -433,6 +440,49 @@ namespace Armoury
             return main != null && ReferenceEquals(f.PlayerOwner, main);
         }
 
+        /// <summary>309 (klucz PursuitDelegatedFormations): szyk pod rozkazami gracza - bez warunku "druzyna gracza-wodza". Dekompilacja 1.4.8: Team.cs:452/713
+        /// SetControlledByAI(this != PlayerTeam || !IsPlayerGeneral) - u gracza-wodza szyki sa NIE-AI, dopoki gracz nie odda dowodzenia (Team.DelegateCommandToAI
+        /// :467-473 - wszystkie SetControlledByAI(true)); szyk z rozkazem gracza wraca pod gracza (IsAIControlled false). Tylko poscig 148 (Form) - inne paczki
+        /// (204, 283, 149, 140) dalej PlayerForm.</summary>
+        internal static bool PlayerFormDirect(Formation f)
+        {
+            if (!f.IsAIControlled || f.IsPlayerTroopInFormation) return true;
+            var main = Agent.Main;
+            return main != null && ReferenceEquals(f.PlayerOwner, main);
+        }
+
+        /// <summary>309 (klucz PursuitStartNearVictims): jest uciekajacy wroga e w SeekRadius od c, ktory nie stoi w VictimIntactR od nietknietego szyku
+        /// wroga - ta sama miara co wybor ofiary (Pick); pozycje z passu.</summary>
+        private static bool VictimOpen(int e, Vec2 c)
+        {
+            if (e < 0) return false;
+            var ps = FleePos[e];
+            float vr = VictimIntactR;
+            for (int i = 0; i < ps.Count; i++)
+            {
+                if (c.Distance(ps[i]) > SeekRadius) continue;
+                if (!IntactNear(e, ps[i], vr)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>309: szyk ma choc jednego jezdzca, ktorego poscig moze wyslac (bez wykluczonych Excl, paniki, odwrotu rannego, 204, odlaczonych).</summary>
+        private static bool AnyRider(Formation f)
+        {
+            Units.Clear();
+            f.ApplyActionOnEachUnit(Collect);
+            bool any = false;
+            for (int u = 0; u < Units.Count && !any; u++)
+            {
+                var a = Units[u];
+                if (a == null || !a.IsActive() || !a.IsHuman || a.MountAgent == null || Hunters.ContainsKey(a)) continue;
+                if (Excl(a) != 0 || a.IsDetachedFromFormation || a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) continue;
+                any = true;
+            }
+            Units.Clear();
+            return any;
+        }
+
         /// <summary>Chorazy wedlug RBM (Utilities.IsBannerBearer:28-58): bron w rece klasy Banner albo uzycie "banner" - RBM sam steruje jego celem.
         /// 149: takze HeroCaution (chorazego nie przestawiamy w szyku) - jedna definicja "chorazy".</summary>
         internal static bool Banner(Agent a)
@@ -517,6 +567,8 @@ namespace Armoury
             var c = Settings.Current;
             _key = c != null && c.AiCavalryPursues;
             _nearVictim = c != null && c.CavalryPursuitNearVictim;
+            _delegated = c != null && c.PursuitDelegatedFormations;
+            _gateVictims = c != null && c.PursuitStartNearVictims;
             _restBelow = c != null && c.HorseStaminaEnabled ? Math.Max(0, Math.Min(80, c.HorseAiRestBelow)) : 0;   // ten sam prog co odpoczynek konnicy AI (MarchToContact)
             try { BuildSides(m); }
             catch (Exception e) { Stumble("HorsePursuit.Strony", e); return; }
@@ -647,7 +699,7 @@ namespace Armoury
         {
             Vec2 c = f.CachedAveragePosition;
             if (!c.IsValid) return;
-            bool player = PlayerForm(f);
+            bool player = _delegated ? PlayerFormDirect(f) : PlayerForm(f);
             if (st.Active)
             {
                 st.HasMain = hasMain;
@@ -675,11 +727,19 @@ namespace Armoury
             if (now < st.CoolUntil) why = NCool;
             else if (!Broke(st.Side, e)) why = NNotBroken;
             else if (m.MissionEnded) why = NEnded;
-            else if (IntactNear(e, c, IntactRadius)) why = NIntact;
+            else if (_gateVictims ? !VictimOpen(e, c) : IntactNear(e, c, IntactRadius)) why = NIntact;
             else if (Blown(HorseWind.AvgStamina(f))) why = NHorses;
             else if (MarchToContact.Resting(f)) why = NRest;
             else if (hasMain && c.Distance(anchor) > _maxFrom) why = NFar;
             if (why >= 0) { NoStart[why]++; return; }
+            if (_gateVictims)
+            {
+                // 309: brama otwarta przez ofiary, choc stara miara (80 m od srodka szyku) by ja zamknela - licznik dowodu zmiany
+                if (IntactNear(e, c, IntactRadius)) _gateOpenedByVictims++;
+                // 309 (b9: szyk 2 ludzi, bohater i chorazy wykluczeni - epizod bez jezdzcow do konca ciszy): bez wejscia
+                if (_key && !AnyRider(f)) { _noRiders++; return; }
+            }
+            if (_delegated && PlayerForm(f)) _playerSideEntries++;   // 309: wejscie szyku, ktory stara definicja liczyla jako szyk gracza (oddane dowodzenie)
             // wejscie w poscig
             st.Active = true;
             st.Dry = !_key;
@@ -1125,6 +1185,25 @@ namespace Armoury
                   .Append(" jezdzcow ").Append(FreeNoPick[PLimit]).Append(", ofiara przy nietknietym szyku ").Append(FreeNoPick[PIntact]).Append(", ofiara poza ")
                   .Append(F0(_maxFrom - FarMargin)).Append(" m ").Append(FreeNoPick[PFar]).Append(", cel nieaktualny ").Append(FreeNoPick[PLate])
                   .Append("; przydzialy wolnym ").Append(_freeAssign).Append("; zawroceni w kroku 0.25 s (jezdziec w 15 m + droga konia 1 s od pelnego promienia szyku) ").Append(_trackIntact);
+            }
+            // 309: szyk gracza w 148 tylko pod rozkazami gracza, brama wejscia wedlug ofiar; straty: padli (zabici + nieprzytomni) / uszli / poza walka na strone
+            sb.Append(" | 309 poscig: szyk gracza tylko pod jego rozkazami ").Append(_delegated ? "TAK" : "NIE").Append(" (wejscia szykow oddanych SI przez gracza-wodza ")
+              .Append(_playerSideEntries).Append("), brama wedlug ofiar ").Append(_gateVictims ? "TAK" : "NIE").Append(" (otwarta mimo szyku w ").Append(F0(IntactRadius))
+              .Append(" m od srodka ").Append(_gateOpenedByVictims).Append(", szyk bez jezdzcow do wyslania - bez wejscia ").Append(_noRiders).Append(')');
+            sb.Append(" | straty 309 (z wystawionych, padli = zabici + nieprzytomni):");
+            for (int s = 1; s >= 0; s--)
+            {
+                int tot = Lost[s, 0] + Lost[s, 1] + Lost[s, 2] + Lost[s, 3] + onField[s];
+                sb.Append(s == 1 ? " atakujacy" : "; obroncy").Append(" padli ").Append(Pct(Lost[s, 0] + Lost[s, 1], tot)).Append(" / uszli ").Append(Pct(Lost[s, 2], tot))
+                  .Append(" / poza walka ").Append(Pct(Lost[s, 0] + Lost[s, 1] + Lost[s, 2], tot));
+            }
+            if (loser >= 0)
+            {
+                int w = 1 - loser;
+                int tl = Lost[loser, 0] + Lost[loser, 1] + Lost[loser, 2] + Lost[loser, 3] + onField[loser];
+                int tw = Lost[w, 0] + Lost[w, 1] + Lost[w, 2] + Lost[w, 3] + onField[w];
+                sb.Append("; przegrani padli ").Append(Pct(Lost[loser, 0] + Lost[loser, 1], tl)).Append(" (cel 15-40%), zwyciezca poza walka ")
+                  .Append(Pct(Lost[w, 0] + Lost[w, 1] + Lost[w, 2], tw)).Append(" (cel 5-15%)");
             }
             AppendCounter(sb);   // 157 P3: segment " | kontra na strzelca (157) ..." (przed potknieciami - wzor AI139_LINES)
             sb.Append(" | potkniecia poscig ").Append(stum).Append(" (wypadli ").Append(_dropped).Append(").");

@@ -86045,6 +86045,7 @@ B307_WD = re.compile(r"\| krok w tyl przodem do wroga \(307b, klucz (TAK|NIE)\):
 B307_WDR = re.compile(r"\| krok w tyl - los i kierunek \(recenzja 307b\): doszedl do punktu (\d+), punkt przed pierwszym szeregiem (\d+), patrzy na wroga (\d+) "
                       r"z (\d+) ocen \(plecami (\d+)\); padl przy kroku poza 'zginal w drodze'; tyl szyku od srodka sredniego \(klucz (TAK|NIE)\)")
 B307_WDN = re.compile(r"\| odwrot rannych (\d+) \(.*?\| za linia (\d+) \(.*?\| zginal w drodze (\d+) \(")
+B309_WDP = re.compile(r"\| zginal w drodze \d+ \([^)]*\), padl na postoju (\d+)")   # 309: B307-4b liczy tez 'padl na postoju'
 
 B307_SAMPLE_PR = ("[07:54:37] Bieg zlamanych (147): misja bitwa, klucz TAK (...) | zlamani pieszo 11 (strona gracza 4 / wroga 7; ...) | czas w panice pieszo 40 s: na 50% "
                   "(zadyszka) 0 s - udzial biegu na 50% 0%, strefa 10% 0 s, ponizej progu biegu 33 s (drenaz tylko przez 147) | ponizej progu biegu - przyczyny (307b, "
@@ -86206,12 +86207,19 @@ def bitwa307b_main(logp):
     rep.add("B307-3b: udzial FF w trafieniach ludzi", ", ".join(x + "%" for x in ffs[:8]) or "-", "INFO (cel < 10%; 142a: 20-25%, Willow 27.9%)", None)
     # B307-4
     bad4, n4, men, orders, back, died = [], 0, 0, 0, 0, 0
-    wdn, wline, wdied = 0, 0, 0
+    wdn, wline, wdied, wpost = 0, 0, 0, 0
     n4c, reached, ahead, face_f, face_n, face_b, center = 0, 0, 0, 0, 0, 0, False
     for l in wd:
         m = B307_WD.search(l)
         if not m:
             bad4.append("format: " + l[:120]); continue
+        # 309: odwrot rannych liczony bez wzgledu na klucz kroku 307b (144a: 'odwrotow 0' przy 41/40 odwrotach w b8/b9 - klucz kroku domyslnie NIE)
+        w = B307_WDN.search(l)
+        if w:
+            wdn += int(w.group(1)); wline += int(w.group(2)); wdied += int(w.group(3))
+            pp = B309_WDP.search(l)
+            if pp:
+                wpost += int(pp.group(1))
         if m.group(1) != "TAK":
             continue
         n4 += 1
@@ -86219,9 +86227,6 @@ def bitwa307b_main(logp):
         men += a; orders += o; back += b; died += d
         if o < a or d > a:
             bad4.append(m.group(0))
-        w = B307_WDN.search(l)
-        if w:
-            wdn += int(w.group(1)); wline += int(w.group(2)); wdied += int(w.group(3))
         r = B307_WDR.search(l)
         if r:
             n4c += 1
@@ -86233,9 +86238,9 @@ def bitwa307b_main(logp):
     rep.add("B307-4: krok w tyl rannego przodem do wroga - rozkazow >= ludzi, padl przy kroku <= ludzi",
             f"linii {n4}, ludzi {men}, rozkazow {orders}, potem odwrot {back}, padl przy kroku {died}, zlych {len(bad4)}" + (f" ({bad4[0]})" if bad4 else ""),
             "zlych 0 (brak linii z kluczem TAK - INFO)", None if n4 == 0 and not bad4 else not bad4)
-    rep.add("B307-4b: odwrot rannych - zginal w drodze (bez kroku), padl przy kroku, za linia", f"odwrotow {wdn}, zginal w drodze {wdied} "
-            f"({(100.0 * wdied / wdn) if wdn else 0:.0f}%), padl przy kroku {died}, razem jak dawne 'w drodze' {wdied + died} ({(100.0 * (wdied + died) / wdn) if wdn else 0:.0f}%), "
-            f"za linia {wline} ({(100.0 * wline / wdn) if wdn else 0:.0f}%)", "INFO (cel: razem < 25%, za linia > 20%; 142a: 41% / 11%)", None)
+    rep.add("B307-4b: odwrot rannych - zginal w drodze (bez kroku), padl przy kroku, padl na postoju (309), za linia", f"odwrotow {wdn}, zginal w drodze {wdied} "
+            f"({(100.0 * wdied / wdn) if wdn else 0:.0f}%), padl przy kroku {died}, padl na postoju {wpost}, razem {wdied + died + wpost} ({(100.0 * (wdied + died + wpost) / wdn) if wdn else 0:.0f}%), "
+            f"za linia {wline} ({(100.0 * wline / wdn) if wdn else 0:.0f}%)", "INFO (cel: razem < 25%, za linia > 20%; 142a: 41% / 11%; 309: liczone bez wzgledu na klucz kroku)", None)
     rep.add("B307-4c: krok w tyl - doszli do punktu, punkt przed pierwszym szeregiem, kierunek patrzenia", f"linii {n4c}, doszedl do punktu {reached} z {men}, "
             f"punkt przed linia {ahead}, przodem do wroga {face_f} z {face_n} ocen ({(100.0 * face_f / face_n) if face_n else 0:.0f}%), plecami {face_b}; "
             f"tyl od srodka sredniego {'TAK' if center else 'NIE/brak'}", "INFO (cel: punkt przed linia ~0, przodem > 60%; plecami duzo = krok nie jest 'przodem do wroga')", None)
@@ -86430,6 +86435,180 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return karawany308_main(rest[0] if rest else None)
     return _karawany308_main_prev(argv)
+
+
+# ---------------------------------------------------------------- paczka 309 (31.10): bitwa armii - grupa bitwa309
+# B309-S self-test wyrazen i wierszy; B309-1 'Choragwie (CH) koniec' segmenty 'wczesne zalamanie (309)' i 'rzuty zdarzen wedlug strat (309)': format, zalaman <= rzutow;
+# B309-1b sr. utracona czesc przy zalamaniu w bitwach od 8 kompanii (INFO, cel 0.25-0.40; 144a: 0.55-0.58); B309-2 rzuty zdarzen (INFO; 144a: 0 zalaman z 11-12
+# upadkow); B309-3 'poscig (148)' segment '309 poscig': format, wejscia i przydzialy (INFO, cel przydzialy > 0 w bitwach armii; 144a: 0); B309-4 'straty 309': przegrani
+# padli (cel 15-40%) i zwyciezca poza walka (cel 5-15%) - INFO; B309-5 'Koszt klatki Armoury (309)': format, potkniecia pomiaru 0, suma naszych na klatke (INFO: p99,
+# najwiecej, klatki ponad 5 ms, najdrozsze moduly); B309-6 zamach FieldCraft: zapisy / pominiete (INFO, przy kluczu TAK pominiete > 0 w bitwie z rannymi).
+B309_CH = re.compile(r"\| wczesne zalamanie \(309\) (TAK|NIE): rzutow przy 1/6 (\d+) \(sr\. szansa (\S+), zalaman (\d+)\), rozbite bez rzutu (\d+), poza szeregiem przy "
+                     r"rzutach: panika (\d+), ranni w odwrocie (\d+), rzutow udzialu bez rzutu \(klucz NIE\) (\d+) \| rzuty zdarzen wedlug strat \(309\) (TAK|NIE): rzutow (\d+) "
+                     r"\(sr\. udzial strat (\S+), sr\. szansa (\S+)\), zalaman (\d+) \| zalamania wedlug udzialu strat lacznie \(309\): (\d+) z (\d+) kompanii, sr\. utracona "
+                     r"czesc przy zalamaniu (\S+)")
+B309_PS = re.compile(r"\| 309 poscig: szyk gracza tylko pod jego rozkazami (TAK|NIE) \(wejscia szykow oddanych SI przez gracza-wodza (\d+)\), brama wedlug ofiar (TAK|NIE) "
+                     r"\(otwarta mimo szyku w \d+ m od srodka (\d+), szyk bez jezdzcow do wyslania - bez wejscia (\d+)\)")
+B309_PSK = re.compile(r"wejsc (\d+) \(sr\. czas .*?jezdzcow w poscigu (\d+) \(przydzialow celu (\d+)")
+B309_ST = re.compile(r"\| straty 309 \(z wystawionych, padli = zabici \+ nieprzytomni\): atakujacy padli (\S+) / uszli (\S+) / poza walka (\S+); obroncy padli (\S+) / "
+                     r"uszli (\S+) / poza walka (\S+?)(?:; przegrani padli (\S+) \(cel 15-40%\), zwyciezca poza walka (\S+) \(cel 5-15%\))?(?: \||$)")
+B309_FC = re.compile(r"Koszt klatki Armoury \(309\): misja (\S+), klatek z nasza praca (\d+) .*?\| suma naszych na klatke: p50 (.+?), p99 (.+?), najwiecej (\S+) ms; "
+                     r"klatek ponad 2 ms (\d+), ponad 5 ms (\d+) \| odstep klatek realny \(cala klatka gry\): sr\. (\S+) ms, ponad 33 ms (\d+), ponad 50 ms (\d+), "
+                     r"ponad 100 ms (\d+), najdluzszy (\d+) ms \| moduly \(ms razem / najwiecej na wywolanie / wywolan\): (.*?) \| zamach FieldCraft \(309, klucz (TAK|NIE)\): "
+                     r"zapisy do silnika (\d+), pominiete bez zmiany (\d+), ponowione po nadpisaniu (\d+) \| potkniecia pomiaru (\d+)")
+B309_MOD = re.compile(r"(?:^|, )([^,]+?) (\d+\.\d) / (\d+\.\d{3}) / (\d+)")
+
+B309_SAMPLE_CH = ("[13:59:07] Choragwie (CH) koniec: kompanii 14 | sztandar padl 7 (...) | straty wedlug udzialu (307b) TAK: rzutow 4 (przy 2/6 2, 3/6 1, 4/6 1, 5/6 0; "
+                  "sr. utracona czesc 0.42, sr. szansa 0.150), zalaman wedlug udzialu 1 | stan bitwy w rzucie (307e) TAK: rzutow 9, mnoznik sr. 1.00 (najmniej 0.30, najwiecej 1.50) "
+                  "| zalamania wedlug rzutu: sztandar 1, dowodca 0, udzial strat 1, straty 305c / polowa 0, inne 0 | wczesne zalamanie (309) TAK: rzutow przy 1/6 5 (sr. szansa "
+                  "0.050, zalaman 2), rozbite bez rzutu 1, poza szeregiem przy rzutach: panika 12, ranni w odwrocie 2, rzutow udzialu bez rzutu (klucz NIE) 0 | rzuty zdarzen "
+                  "wedlug strat (309) TAK: rzutow 12 (sr. udzial strat 0.35, sr. szansa 0.120), zalaman 1 | zalamania wedlug udzialu strat lacznie (309): 3 z 14 kompanii, "
+                  "sr. utracona czesc przy zalamaniu 0.31 | potkniecia 0.")
+B309_SAMPLE_PS = ("[13:59:07] poscig (148): misja bitwa, klucz TAK (...) | szyki 2 (strona gracza 1 / wroga 1; konnica 2, konni lucznicy 0), wejsc 3 (sr. czas 20.0 s, najdluzej "
+                  "30.0 s), jezdzcow w poscigu 12 (przydzialow celu 20, nowy cel po utracie 3), uciekajacych gonionych 15 | ... | 309 poscig: szyk gracza tylko pod jego "
+                  "rozkazami TAK (wejscia szykow oddanych SI przez gracza-wodza 2), brama wedlug ofiar TAK (otwarta mimo szyku w 80 m od srodka 5, szyk bez jezdzcow do "
+                  "wyslania - bez wejscia 1) | straty 309 (z wystawionych, padli = zabici + nieprzytomni): atakujacy padli 10.0% / uszli 1.0% / poza walka 11.0%; obroncy "
+                  "padli 35.0% / uszli 40.0% / poza walka 75.0%; przegrani padli 35.0% (cel 15-40%), zwyciezca poza walka 11.0% (cel 5-15%) | potkniecia poscig 0 (wypadli 0).")
+B309_SAMPLE_FC = ("[13:59:07] Koszt klatki Armoury (309): misja bitwa, klatek z nasza praca 3000 (czas misji 472 s, realny 55 s) | suma naszych na klatke: p50 <= 0.25 ms, "
+                  "p99 <= 3 ms, najwiecej 4.123 ms; klatek ponad 2 ms 12, ponad 5 ms 0 | odstep klatek realny (cala klatka gry): sr. 16.0 ms, ponad 33 ms 3, ponad 50 ms 1, "
+                  "ponad 100 ms 0, najdluzszy 120 ms | moduly (ms razem / najwiecej na wywolanie / wywolan): FieldCraft 120.5 / 1.200 / 3000, okrzyki 3.0 / 0.100 / 3000, "
+                  "poscig 148/204/283 40.2 / 0.700 / 3000, RoutKeeper 10.0 / 2.900 / 3000 | zamach FieldCraft (309, klucz TAK): zapisy do silnika 100, pominiete bez zmiany 900, "
+                  "ponowione po nadpisaniu 3 | potkniecia pomiaru 0.")
+
+
+def _p309(x):
+    try:
+        return float(x.rstrip("%"))
+    except (ValueError, AttributeError):
+        return None
+
+
+def b309_rows(rep, ch, ps, fc):
+    # B309-1
+    bad1, n1, er, eb, ev, evb, empty, big = [], 0, 0, 0, 0, 0, 0, []
+    for l in ch:
+        m = B309_CH.search(l)
+        if not m:
+            bad1.append("format: " + l[:120]); continue
+        n1 += 1
+        r1, b1, r2, b2 = int(m.group(2)), int(m.group(4)), int(m.group(10)), int(m.group(13))
+        er += r1; eb += b1; ev += r2; evb += b2; empty += int(m.group(5))
+        if b1 > r1 or b2 > r2 or int(m.group(14)) > int(m.group(15)):
+            bad1.append(m.group(0)[:160])
+        if int(m.group(15)) >= 8:
+            big.append(m.group(16))
+    rep.add("B309-1: choragwie 309 - format, zalaman <= rzutow (1/6, zdarzenia), zalaman udzialu <= kompanii",
+            f"linii {n1}, rzutow przy 1/6 {er} (zalaman {eb}), rozbite bez rzutu {empty}, zlych {len(bad1)}" + (f" ({bad1[0]})" if bad1 else ""),
+            "zlych 0 (brak linii - INFO)", None if n1 == 0 and not bad1 else not bad1)
+    rep.add("B309-1b: sr. utracona czesc przy zalamaniu (bitwy od 8 kompanii)", ", ".join(big[:8]) or "-", "INFO (cel 0.25-0.40; 144a b8/b9: 0.55 / 0.58)", None)
+    rep.add("B309-2: rzuty zdarzen (sztandar, dowodca) wedlug strat bez bramki morale", f"rzutow {ev}, zalaman {evb}", "INFO (144a: 0 zalaman z 11-12 upadkow; zwyciezcy rzadko)", None)
+    # B309-3 / B309-4
+    bad3, n3, ent, asg, loss = [], 0, 0, 0, []
+    for l in ps:
+        m = B309_PS.search(l)
+        if not m:
+            bad3.append("format: " + l[:120]); continue
+        n3 += 1
+        k = B309_PSK.search(l)
+        if k:
+            ent += int(k.group(1)); asg += int(k.group(3))
+        s = B309_ST.search(l)
+        if not s:
+            bad3.append("straty: " + l[-160:]); continue
+        if s.group(7) is not None:
+            loss.append(f"przegrani padli {s.group(7)}, zwyciezca poza walka {s.group(8)}")
+    rep.add("B309-3: poscig 148 (309) - format segmentu i strat", f"linii {n3}, wejsc {ent}, przydzialow celu {asg}, zlych {len(bad3)}" + (f" ({bad3[0]})" if bad3 else ""),
+            "zlych 0 (brak linii - INFO)", None if n3 == 0 and not bad3 else not bad3)
+    rep.add("B309-3b: przydzialy poscigu (bitwy z segmentem 309)", f"{asg}", "INFO (cel > 0 w bitwach armii; 144a b8/b9: 0)", None)
+    rep.add("B309-4: straty stron (padli / poza walka)", "; ".join(loss[:9]) or "-", "INFO (cel: przegrani padli 15-40%, zwyciezca poza walka 5-15%; 144a b9: 82% / 42%)", None)
+    # B309-5 / B309-6
+    bad5, n5, stum, worst, over5, frames, tops, sw, ss, srw = [], 0, 0, 0.0, 0, 0, [], 0, 0, 0
+    for l in fc:
+        m = B309_FC.search(l)
+        if not m:
+            bad5.append("format: " + l[:120]); continue
+        n5 += 1
+        frames += int(m.group(2)); over5 += int(m.group(7))
+        st = int(m.group(18)); stum += st
+        w = _p309(m.group(5))
+        if w is not None and w > worst:
+            worst = w
+        mods = sorted(((float(x.group(2)), x.group(1).strip()) for x in B309_MOD.finditer(m.group(13))), reverse=True)
+        tops.append("/".join(f"{nm} {v:.0f}" for v, nm in mods[:3]) + f" (p99 {m.group(4)})")
+        sw += int(m.group(15)); ss += int(m.group(16)); srw += int(m.group(17))
+        if st > 0:
+            bad5.append("potkniecia: " + m.group(0)[-60:])
+    rep.add("B309-5: koszt klatki Armoury (309) - format, potkniecia pomiaru 0", f"linii {n5}, klatek {frames}, potkniec {stum}, zlych {len(bad5)}" + (f" ({bad5[0]})" if bad5 else ""),
+            "zlych 0 (brak linii - INFO)", None if n5 == 0 and not bad5 else not bad5)
+    rep.add("B309-5b: suma naszych na klatke - najwiecej, klatek ponad 5 ms, najdrozsze moduly (ms razem)", f"najwiecej {worst:.3f} ms, ponad 5 ms {over5}; " + "; ".join(tops[:9]),
+            "INFO (budzet: p99 <= 3 ms, najwiecej < 8 ms; 1500+ ludzi = x3.4 wobec b8)", None)
+    rep.add("B309-6: zamach FieldCraft - zapisy do silnika / pominiete / ponowione", f"{sw} / {ss} / {srw}", "INFO (przy kluczu TAK pominiete >> zapisy w bitwie z rannymi)", None)
+
+
+def bitwa309_selftest():
+    for name, rx, s in (("CH", B309_CH, B309_SAMPLE_CH), ("PS", B309_PS, B309_SAMPLE_PS), ("PSK", B309_PSK, B309_SAMPLE_PS), ("ST", B309_ST, B309_SAMPLE_PS),
+                        ("FC", B309_FC, B309_SAMPLE_FC), ("CH307", B307_CH, B309_SAMPLE_CH), ("WDP", B309_WDP, B307_SAMPLE_WD)):
+        if not rx.search(s):
+            return "wyrazenie " + name + " nie pasuje do probki"
+    rep = Report()
+    b309_rows(rep, [B309_SAMPLE_CH], [B309_SAMPLE_PS], [B309_SAMPLE_FC])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    bad = [k for k in ("B309-1", "B309-3", "B309-5") if v.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad}"
+    s = B309_ST.search(B309_SAMPLE_PS)
+    if s.group(6) != "75.0%" or s.group(7) != "35.0%" or s.group(8) != "11.0%":
+        return f"straty: zle grupy {s.groups()}"
+    rep = Report()
+    b309_rows(rep, [B309_SAMPLE_CH.replace("(sr. szansa 0.050, zalaman 2)", "(sr. szansa 0.050, zalaman 9)")],
+              [B309_SAMPLE_PS.replace("| straty 309", "| strty 309")], [B309_SAMPLE_FC.replace("potkniecia pomiaru 0.", "potkniecia pomiaru 2.")])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("B309-1", "B309-3", "B309-5") if v.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss}"
+    m = B309_FC.search(B309_SAMPLE_FC)
+    if len(list(B309_MOD.finditer(m.group(13)))) != 4:
+        return "moduly: zla liczba"
+    return None
+
+
+def bitwa309_main(logp):
+    """bitwa309 (31.10, paczka 309): B309-S, B309-1..6 - opis nad B309_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = bitwa309_selftest()
+    rep.add("B309-S: self-test wyrazen i wierszy (linie 309 jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("B309-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    ch, ps, fc = [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Choragwie (CH) koniec:" in line and "(309)" in line:
+                ch.append(line.strip())
+            elif "poscig (148):" in line and "309 poscig" in line:
+                ps.append(line.strip())
+            elif "Koszt klatki Armoury (309):" in line:
+                fc.append(line.strip())
+    print(f"plik: {logp}")
+    b309_rows(rep, ch, ps, fc)
+    rep.show()
+    return 0
+
+
+_bitwa309_main_prev = main
+
+
+def main(argv):
+    # paczka 309: grupa bitwa309 - opakowanie main jak karawany308
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "bitwa309":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return bitwa309_main(rest[0] if rest else None)
+    return _bitwa309_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

@@ -56,7 +56,15 @@ namespace Armoury
             base.OnEndMission();
         }
 
+        // 309: koszt klatki (FrameCost309) - pomiar calego ticku, zachowanie bez zmian
         public override void OnMissionTick(float dt)
+        {
+            long t309 = FrameCost309.T();
+            try { Tick309(dt); }
+            finally { FrameCost309.Add(FrameCost309.MBroken, t309); }
+        }
+
+        private void Tick309(float dt)
         {
             try
             {

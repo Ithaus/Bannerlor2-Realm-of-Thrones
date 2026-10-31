@@ -904,7 +904,15 @@ namespace Armoury
 
         // ------------------------------------------------------------ tick
 
+        // 309: koszt klatki (FrameCost309) - pomiar calego ticku, zachowanie bez zmian
         public override void OnMissionTick(float dt)
+        {
+            long t309 = FrameCost309.T();
+            try { Tick309(dt); }
+            finally { FrameCost309.Add(FrameCost309.MRout, t309); }
+        }
+
+        private void Tick309(float dt)
         {
             // 139: probka losu zlamanych (co 1 s, takze bez naszych zlamanych i po koncu bitwy - wiwat zwyciezcow); sama lapie wyjatki
             BrokenFate.Tick(Mission, dt);

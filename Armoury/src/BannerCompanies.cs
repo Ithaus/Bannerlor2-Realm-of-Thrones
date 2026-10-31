@@ -110,7 +110,17 @@ namespace Armoury
         // 307e (klucz BannerBreakBattleState): mnoznik stanu bitwy B = clamp(sila wroga / sila naszych, 0.3, 1.5) w rzucie - liczba, suma, najmniej, najwiecej;
         // zalamania wedlug zrodla rzutu (0 inne, 1 sztandar, 2 dowodca, 3 udzial strat 307b, 4 straty 305c / polowa skladu)
         internal static int StateRolls; internal static float StateSum, StateMin = 9f, StateMax;
-        internal static readonly int[] BreakBySrc = new int[5];
+        // 309: indeks 5 = rzut przy 1/6 strat (klucz BannerBreakEarly) - poza licznikami 307b (B307-2: rzutow = suma 2/6..5/6)
+        internal static readonly int[] BreakBySrc = new int[6];
+        // 309 (klucz BannerBreakEarly): rzuty przy 1/6 strat (liczba, zalamania, suma p), kompanie bez nikogo zdolnego do rzutu (rozbite bez rzutu),
+        // pominiete w szeregu (panika wedlug SurvivalMode.InPanic poza IsPanicked, ranni w odwrocie 143) - suma na przegladach InRanks z rzutem;
+        // rzuty udzialu strat bez rzutu (n == 0) przy kluczu NIE (dawny brak spojnosci B307-2)
+        internal static int EarlyRolls, EarlyBreaks, EmptyBroken, RanksPanicSkip, RanksWithdrawSkip, ShareNoRoll;
+        internal static float EarlyPSum, BreakShareSum;
+        internal static int BreakShareN;   // 309: zalamania z rzutu udzialu strat (1/6 i 307b) - suma utraconej czesci przy zalamaniu
+        // 309 (klucz BannerEventRollByLoss): rzuty zdarzen (sztandar, dowodca) bez bramki morale gry - liczba, suma udzialu strat, suma p, zalamania
+        internal static int EventRolls, EventBreaks;
+        internal static float EventShareSum, EventPSum;
 
         internal static void ResetCounters()
         {
@@ -125,6 +135,8 @@ namespace Armoury
             ShareLostSum = SharePSum = 0f;
             Array.Clear(ShareStep, 0, ShareStep.Length);
             StateRolls = 0; StateSum = 0f; StateMin = 9f; StateMax = 0f; Array.Clear(BreakBySrc, 0, BreakBySrc.Length);
+            EarlyRolls = EarlyBreaks = EmptyBroken = RanksPanicSkip = RanksWithdrawSkip = ShareNoRoll = BreakShareN = 0; EarlyPSum = BreakShareSum = 0f;
+            EventRolls = EventBreaks = 0; EventShareSum = EventPSum = 0f;
         }
 
         internal static int Activity { get { return Companies + StdField + StdFell + CmdFell + Breaks + Stumbles; } }
@@ -581,7 +593,15 @@ namespace Armoury
 
         // ------------------------------------------------------------ tick
 
+        // 309: koszt klatki (FrameCost309) - pomiar calego ticku, zachowanie bez zmian
         public override void OnMissionTick(float dt)
+        {
+            long t309 = FrameCost309.T();
+            try { Tick309(dt); }
+            finally { FrameCost309.Add(FrameCost309.MBanner, t309); }
+        }
+
+        private void Tick309(float dt)
         {
             // 158: kolejka zdarzen sztandarow co klatke (tani odczyt), biegacze co 0.25 s / wybor co 0.5 s - takze bez kompanii (klucz BannerCompaniesEnabled NIE)
             if (_runSub)
@@ -670,17 +690,35 @@ namespace Armoury
             {
                 if (!co.Broken && co.Peak >= 4)
                 {
-                    int ranks = InRanks(co);
+                    // 309 (klucz BannerBreakEarly; 144a b8/b9: 61-71% poleglych przegranego padlo w szeregu, 5-7 kompanii stalo przy 5/6 strat): pierwszy rzut
+                    // juz przy 1/6 strat (pol szansy), "w szeregu" = jedna definicja paniki (SurvivalMode.InPanic) i bez rannych w odwrocie 143
+                    bool early = c.BannerBreakEarly;
+                    int ranks = early ? InRanksLive(co, false) : InRanks(co);
                     float lost = 1f - (float)ranks / co.Peak;
                     int k = (int)(lost * 6f + 0.0001f);
                     if (k > 5) k = 5;
-                    if (k >= 2 && k > co.LossStep)
+                    int first = early ? 1 : 2;
+                    if (k >= first && k > co.LossStep)
                     {
-                        co.LossStep = k;
-                        if (!co.ThirdDone) { co.ThirdDone = true; if (k == 2) BannerCompanies.Third++; }
-                        if (k >= 3 && !co.HalfDone) { co.HalfDone = true; BannerCompanies.Half++; }
-                        BannerCompanies.ShareStep[k]++;
-                        Roll(co, k == 2 ? 0.5f : 1f, c, now, true, lost, 3);
+                        if (!early) co.LossStep = k;   // klucz NIE: krok zapisany przed rzutem jak dotad (bez rzutu - krok stracony)
+                        if (early) InRanksLive(co, true);   // pominieci w szeregu - licznik linii tylko przy rzucie
+                        int src = k == 1 ? 5 : 3;
+                        float factor = k == first ? 0.5f : 1f;
+                        bool rolled = Roll(co, factor, c, now, true, lost, src);
+                        if (rolled)
+                        {
+                            co.LossStep = k;
+                            if (k >= 2 && !co.ThirdDone) { co.ThirdDone = true; if (k == 2) BannerCompanies.Third++; }
+                            if (k >= 3 && !co.HalfDone) { co.HalfDone = true; BannerCompanies.Half++; }
+                            if (k >= 2) BannerCompanies.ShareStep[k]++;   // 309: licznik koszyka dopiero po rzucie (B307-2: 27 wobec 26)
+                        }
+                        else if (early)
+                        {
+                            // 309: nikt zdolny do rzutu (sami bohaterowie, uciekajacy, ranni w odwrocie) - kompania de facto rozbita, bez okrzyku i fal
+                            co.LossStep = k;
+                            if (!co.Broken) { co.Broken = true; BannerCompanies.EmptyBroken++; }
+                        }
+                        else BannerCompanies.ShareNoRoll++;
                     }
                 }
             }
@@ -713,6 +751,25 @@ namespace Armoury
                 if (a == null || !a.IsActive()) continue;
                 var cai = a.CommonAIComponent;
                 if (cai != null && cai.IsPanicked) continue;
+                n++;
+            }
+            return n;
+        }
+
+        /// <summary>309 (klucz BannerBreakEarly): ludzie w szeregu - czynni, nie w PANICE wedlug SurvivalMode.InPanic (IsPanicked, odwrot komponentu bez
+        /// rozkazu - szarza RBM, zbior RoutHold) i nie w odwrocie rannego 143 (RoutKeeper.Withdrawing). count = dopisz pominietych do licznikow linii.</summary>
+        private static int InRanksLive(Company co, bool count)
+        {
+            int n = 0;
+            var k = RoutHold.Live;
+            for (int i = 0; i < co.Men.Count; i++)
+            {
+                var a = co.Men[i];
+                if (a == null || !a.IsActive()) continue;
+                if (SurvivalMode.InPanic(a)) { if (count) BannerCompanies.RanksPanicSkip++; continue; }
+                bool wd = false;
+                try { wd = k != null && k.Withdrawing(a); } catch { wd = false; }
+                if (wd) { if (count) BannerCompanies.RanksWithdrawSkip++; continue; }
                 n++;
             }
             return n;
@@ -918,35 +975,58 @@ namespace Armoury
         }
 
         /// <summary>Rzut na zalamanie (raz na zdarzenie): p = szansa x F x M / R. 305c: loss = rzut po stratach (trzecia czesc / polowa skladu) przy kluczu
-        /// BannerLossBreakIgnoresMorale - bez bramki morale ponizej 50 (M przy wysokim morale zostaje na dole 0.4).</summary>
-        private void Roll(Company co, float factor, Settings c, float now, bool loss = false, float share = -1f, int src = 0)
+        /// BannerLossBreakIgnoresMorale - bez bramki morale ponizej 50 (M przy wysokim morale zostaje na dole 0.4).
+        /// 309: zwraca true, gdy rzut sie odbyl (takze bez zalamania); false = kompania zlamana, nikt zdolny do rzutu albo rzut pominiety bramka morale.
+        /// Klucz BannerBreakEarly: rzut udzialu strat (src 3 i 5) z szansa BannerBreakEarlyChance i odpornoscia R = 0.25 x tier + 1, liczeni ludzie bez PANIKI
+        /// (SurvivalMode.InPanic) i bez rannych w odwrocie 143 - ta sama definicja co InRanksLive. Klucz BannerEventRollByLoss: rzut zdarzenia (src 1 sztandar,
+        /// 2 dowodca) bez bramki morale gry, M = clamp(2 x udzial juz poniesionych strat, 0.4, 1.6), R = 0.25 x tier + 1; stan bitwy B (307e) bez zmian.</summary>
+        private bool Roll(Company co, float factor, Settings c, float now, bool loss = false, float share = -1f, int src = 0)
         {
-            if (co.Broken) return;
+            if (co.Broken) return false;
+            bool shareRoll = share >= 0f && (src == 3 || src == 5);
+            bool early = c.BannerBreakEarly && shareRoll;
+            bool evt = c.BannerEventRollByLoss && (src == 1 || src == 2);
+            bool live = early || evt;
+            var rk = live ? RoutHold.Live : null;
             float sum = 0f, tsum = 0f;
             int n = 0;
             for (int i = 0; i < co.Men.Count; i++)
             {
                 var a = co.Men[i];
                 if (a == null || !a.IsActive() || !a.IsAIControlled || a.IsHero || a.IsRunningAway) continue;
+                if (live)
+                {
+                    if (SurvivalMode.InPanic(a)) continue;
+                    bool wd = false;
+                    try { wd = rk != null && rk.Withdrawing(a); } catch { wd = false; }
+                    if (wd) continue;
+                }
                 float mo = a.GetMorale();
                 if (mo < 0f) continue;
                 sum += mo; tsum += Tier(a); n++;
             }
-            if (n == 0) return;
+            if (n == 0) return false;
             float avg = sum / n, tier = tsum / n;
             int ix = TierIx(tier);
             co.TierIx = ix;
-            if (avg >= BannerCompanies.RollBelow)
+            if (evt)
             {
-                if (!loss) { BannerCompanies.RollsSkipped++; return; }
+                // 309: udzial juz poniesionych strat kompanii - ludzie widza, ilu padlo, a nie morale gry (144a b8: sr. morale przy rzutach 75.7, rzuty zdarzen martwe)
+                int ranks = InRanksLive(co, false);
+                share = co.Peak > 0 ? 1f - (float)ranks / co.Peak : 0f;
+                if (share < 0f) share = 0f;
+            }
+            else if (avg >= BannerCompanies.RollBelow)
+            {
+                if (!loss) { BannerCompanies.RollsSkipped++; return false; }
                 BannerCompanies.LossOverGate++;
             }
-            float r = 0.5f * tier + 1f;
+            float r = (early || evt) ? 0.25f * tier + 1f : 0.5f * tier + 1f;
             if (r < 1f) r = 1f;
             float mm = share >= 0f ? 2f * share : 2f - avg / 25f;   // 307b: przy rzucie wedlug udzialu strat M z udzialu, nie z morale gry
             if (mm < 0.4f) mm = 0.4f;
             if (mm > 1.6f) mm = 1.6f;
-            float p = c.BannerBreakChance * factor * mm / r;
+            float p = (early ? c.BannerBreakEarlyChance : c.BannerBreakChance) * factor * mm / r;
             // 307e (143a bitwa 4: kompania T5 Swordmasterow zalamala sie przy 32 zywych gracza na 7 wroga - rzut z upadku sierzanta): zywy czlowiek widzi, jak
             // idzie bitwa - p x B, B = clamp(sila walczacych wroga / sila walczacych naszych, 0.3, 1.5); jedna regula dla obu stron (klucz BannerBreakBattleState)
             if (c.BannerBreakBattleState)
@@ -967,19 +1047,27 @@ namespace Armoury
                 BannerCompanies.LossMoraleSum += avg;
                 BannerCompanies.LossPSum += p;
             }
-            if (share >= 0f)
+            // 309: rzut przy 1/6 (src 5) i rzut zdarzenia z udzialem (evt) poza licznikami 307b - B307-2 liczy rzutow = suma 2/6..5/6
+            bool share307 = share >= 0f && src == 3;
+            if (share307)
             {
                 BannerCompanies.ShareRolls++;
                 BannerCompanies.ShareLostSum += share;
                 BannerCompanies.SharePSum += p;
             }
+            else if (src == 5) { BannerCompanies.EarlyRolls++; BannerCompanies.EarlyPSum += p; }
+            if (evt) { BannerCompanies.EventRolls++; BannerCompanies.EventShareSum += share; BannerCompanies.EventPSum += p; }
             if (MBRandom.RandomFloat < p)
             {
-                if (share >= 0f) BannerCompanies.ShareBreaks++;
+                if (share307) BannerCompanies.ShareBreaks++;
+                else if (src == 5) BannerCompanies.EarlyBreaks++;
+                if (share307 || src == 5) { BannerCompanies.BreakShareSum += share; BannerCompanies.BreakShareN++; }
+                if (evt) BannerCompanies.EventBreaks++;
                 if (loss) { co.LossBreak = true; BannerCompanies.LossBreaks++; }
                 BannerCompanies.BreakBySrc[src >= 0 && src < BannerCompanies.BreakBySrc.Length ? src : 0]++;
                 Break(co, ix, c, now);
             }
+            return true;
         }
 
         /// <summary>307e: stan bitwy wobec kompanii - sila walczacych wroga / sila walczacych jej strony (CharacterPowerCached ludzi czynnych, nie w ucieczce
@@ -1213,6 +1301,20 @@ namespace Armoury
               .Append(" | zalamania wedlug rzutu: sztandar ").Append(BannerCompanies.BreakBySrc[1]).Append(", dowodca ").Append(BannerCompanies.BreakBySrc[2])
               .Append(", udzial strat ").Append(BannerCompanies.BreakBySrc[3]).Append(", straty 305c / polowa ").Append(BannerCompanies.BreakBySrc[4])
               .Append(", inne ").Append(BannerCompanies.BreakBySrc[0]);
+            // 309: wczesne zalamanie (klucz BannerBreakEarly) i rzuty zdarzen wedlug strat (klucz BannerEventRollByLoss)
+            int er = BannerCompanies.EarlyRolls, ev = BannerCompanies.EventRolls;
+            sb.Append(" | wczesne zalamanie (309) ").Append(c305 != null && c305.BannerBreakEarly ? "TAK" : "NIE")
+              .Append(": rzutow przy 1/6 ").Append(er).Append(" (sr. szansa ").Append(er > 0 ? (BannerCompanies.EarlyPSum / er).ToString("0.000", inv305) : "-")
+              .Append(", zalaman ").Append(BannerCompanies.EarlyBreaks).Append("), rozbite bez rzutu ").Append(BannerCompanies.EmptyBroken)
+              .Append(", poza szeregiem przy rzutach: panika ").Append(BannerCompanies.RanksPanicSkip).Append(", ranni w odwrocie ").Append(BannerCompanies.RanksWithdrawSkip)
+              .Append(", rzutow udzialu bez rzutu (klucz NIE) ").Append(BannerCompanies.ShareNoRoll)
+              .Append(" | rzuty zdarzen wedlug strat (309) ").Append(c305 != null && c305.BannerEventRollByLoss ? "TAK" : "NIE")
+              .Append(": rzutow ").Append(ev).Append(" (sr. udzial strat ").Append(ev > 0 ? (BannerCompanies.EventShareSum / ev).ToString("0.00", inv305) : "-")
+              .Append(", sr. szansa ").Append(ev > 0 ? (BannerCompanies.EventPSum / ev).ToString("0.000", inv305) : "-")
+              .Append("), zalaman ").Append(BannerCompanies.EventBreaks)
+              .Append(" | zalamania wedlug udzialu strat lacznie (309): ").Append(BannerCompanies.BreakBySrc[3] + BannerCompanies.BreakBySrc[5])
+              .Append(" z ").Append(BannerCompanies.Companies).Append(" kompanii, sr. utracona czesc przy zalamaniu ")
+              .Append(BannerCompanies.BreakShareN > 0 ? (BannerCompanies.BreakShareSum / BannerCompanies.BreakShareN).ToString("0.00", inv305) : "-");
             sb.Append(" | potkniecia ").Append(BannerCompanies.Stumbles).Append('.');
             Log.Info(sb.ToString());
         }

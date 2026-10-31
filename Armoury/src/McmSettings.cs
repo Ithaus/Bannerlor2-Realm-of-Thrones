@@ -10732,6 +10732,30 @@ namespace Armoury
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public float CaravanSeaNearDays { get; set; } = 12f;
 
+        [SettingPropertyBool("Banner Break Early", HintText = "With Banner Companies: a company first rolls to break after losing a sixth of its men (half the chance), not a third, and veterans' steadiness counts half as much as before (tier 4 divides the chance by 2, not 3). Men who have already fled, men pushed back in a rout and wounded men walking to the rear no longer count as standing in the ranks. Real companies broke after losing a tenth to a fifth of their men; most of the dead then fell in the flight. Off = from a third on, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
+        public bool BannerBreakEarly { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Banner Break Early Chance", 0.00f, 3.20f, "0.00", HintText = "With Banner Break Early: base chance a company breaks when it rolls for its losses (a tier 4 company that has lost half its men breaks about 6 times in 10 by then, if the battle stands even)", RequireRestart = false)]
+        [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
+        public float BannerBreakEarlyChance { get; set; } = 0.8f;
+
+        [SettingPropertyBool("Banner Event Roll By Loss", HintText = "With Banner Companies: when a company's standard or its commander falls, its men weigh how many of them have already fallen, not the game's morale - the roll is no longer skipped while morale stays above 50. How the battle stands still counts, so a winning company rarely breaks. Off = the roll only below morale 50, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
+        public bool BannerEventRollByLoss { get; set; } = true;
+
+        [SettingPropertyBool("Pursuit Delegated Formations", HintText = "With AI Cavalry Pursues: your own horsemen ride down fleeing enemies when you have handed command to the AI (or never gave an order); formations you command yourself are never touched. Off = none of your party's formations pursue while you are the general, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
+        public bool PursuitDelegatedFormations { get; set; } = true;
+
+        [SettingPropertyBool("Pursuit Start Near Victims", HintText = "With AI Cavalry Pursues: a cavalry formation begins a pursuit when there are fleeing enemies within reach who are not sheltering by an unbroken enemy formation, instead of holding back whenever any enemy formation stands within 80 m of it; a formation with no rider free to send does not begin one. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
+        public bool PursuitStartNearVictims { get; set; } = true;
+
+        [SettingPropertyBool("Field Craft Swing On Change", HintText = "Performance: the slower swing of a tired or wounded man is sent to the game only when it changes, not five times a second for every wounded man. The penalty itself is the same. Off = sent every time, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
+        public bool FieldCraftSwingOnChange { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13414,6 +13438,12 @@ namespace Armoury
             s.BattleStallSeconds = BattleStallSeconds;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
+            s.BannerBreakEarly = BannerBreakEarly;
+            s.BannerBreakEarlyChance = BannerBreakEarlyChance;
+            s.BannerEventRollByLoss = BannerEventRollByLoss;
+            s.PursuitDelegatedFormations = PursuitDelegatedFormations;
+            s.PursuitStartNearVictims = PursuitStartNearVictims;
+            s.FieldCraftSwingOnChange = FieldCraftSwingOnChange;
         }
 
         internal static void Apply()

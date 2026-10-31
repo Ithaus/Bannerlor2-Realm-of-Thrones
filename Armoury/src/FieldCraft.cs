@@ -35,6 +35,7 @@ namespace Armoury
             public float BaseSwing = -1f;  // zlapana baza do kar bojowych
             public float BaseThrust = -1f;
             public bool SwingApplied;      // czy nasza kara siedzi teraz we wlasciwosciach agenta
+            public float LastSwingF = -1f; // 309 (klucz FieldCraftSwingOnChange): mnoznik zamachu z ostatniego zapisu do silnika
             public bool Panicked;
             // policzone raz na agenta
             public float RunSeconds = -1f;  // 127: sekundy pelnego biegu do zera (fizjologia: Atletyka i waga zbroi) - drenaz = cala pula / RunSeconds
@@ -64,7 +65,7 @@ namespace Armoury
         // zerowane w RoutHold.Ensure przez MarchToContact.ResetCounters)
         private static int _spdPenalty, _spdMarch, _spdRelease, _spdOld;
 
-        internal static void ResetSpeedCounters() { _spdPenalty = _spdMarch = _spdRelease = _spdOld = 0; }
+        internal static void ResetSpeedCounters() { _spdPenalty = _spdMarch = _spdRelease = _spdOld = 0; ResetSwingCounters(); }
 
         /// <summary>Koncowka segmentu 'marsz' (bez znaku '|'): zapisy limitu FieldCraft w tej misji. Wolajacy trzyma RoutHold.Gate.</summary>
         internal static void AppendSpeed(System.Text.StringBuilder sb, Settings c)
@@ -287,6 +288,11 @@ namespace Armoury
             base.OnRemoveBehavior();
         }
         private readonly List<KeyValuePair<Agent, int>> _unstick = new List<KeyValuePair<Agent, int>>();
+        // 309 (soczewka wydajnosci): wspolny bufor migawki Mission.Agents zamiast nowej listy co takt 0.2 s (alokacja ok. 600-1500 wpisow na takt w duzej bitwie)
+        private readonly List<Agent> _snap = new List<Agent>(512);
+        // 309: zapisy zamachu do silnika (UpdateCustomDrivenProperties) - wywolane / pominiete bez zmiany / ponowione po nadpisaniu przez gre lub RBM
+        internal static int SwingWrites, SwingSkips, SwingRewrites;
+        internal static void ResetSwingCounters() { SwingWrites = SwingSkips = SwingRewrites = 0; }
         // czyj to wierzchowiec: kon -> bohater z klanu gracza (spisujemy w locie)
         private readonly Dictionary<Agent, Hero> _mountOwners = new Dictionary<Agent, Hero>();
         private float _accum;
@@ -710,7 +716,15 @@ namespace Armoury
             catch { }
         }
 
+        // 309: koszt klatki (FrameCost309) - pomiar calego ticku, zachowanie bez zmian
         public override void OnMissionTick(float dt)
+        {
+            long t309 = FrameCost309.T();
+            try { Tick309(dt); }
+            finally { FrameCost309.Add(FrameCost309.MFieldCraft, t309); }
+        }
+
+        private void Tick309(float dt)
         {
             try
             {
@@ -744,8 +758,12 @@ namespace Armoury
                 // MIGAWKA LISTY (log 15.09: "Collection was modified" x25 w OnMissionTick):
                 // agent.Die() przy wykrwawieniu usuwa agenta z Mission.Agents W TRAKCIE
                 // tej petli - reszta ludzi nie dostawala tiku. Iterujemy po kopii.
-                foreach (var agent in new System.Collections.Generic.List<Agent>(Mission.Agents))
+                _snap.Clear();
+                _snap.AddRange(Mission.Agents);
+                bool swingOnChange = c.FieldCraftSwingOnChange;
+                for (int ai = 0; ai < _snap.Count; ai++)
                 {
+                    var agent = _snap[ai];
                     if (agent == null || !agent.IsActive() || !agent.IsHuman) continue;
                     // wight nie zna zadyszki, ran, krwawienia ani strachu - trup
                     // maszeruje i bije, poki go nie potna na kawalki
@@ -1063,6 +1081,7 @@ namespace Armoury
                             if (st.BaseThrust > 0f) adp.ThrustOrRangedReadySpeedMultiplier = st.BaseThrust;
                             agent.UpdateCustomDrivenProperties();
                             st.SwingApplied = false;
+                            st.LastSwingF = -1f;
                         }
                         else
                         {
@@ -1077,9 +1096,25 @@ namespace Armoury
                             st.BaseSwing = adp.SwingSpeedMultiplier;
                             st.BaseThrust = adp.ThrustOrRangedReadySpeedMultiplier;
                         }
-                        if (st.BaseSwing > 0f) adp.SwingSpeedMultiplier = st.BaseSwing * swingF;
-                        if (st.BaseThrust > 0f) adp.ThrustOrRangedReadySpeedMultiplier = st.BaseThrust * swingF;
-                        agent.UpdateCustomDrivenProperties();
+                        // 309 (klucz FieldCraftSwingOnChange; Willow: 224 zapisy/s czasu misji przy ok. 45 rannych): zapis tylko przy zmianie mnoznika o >= 0.02
+                        // albo gdy gra / RBM nadpisaly wlasciwosci (UpdateAgentProperties przy zmianie broni) - wtedy wartosc w adp odbiega od naszej
+                        bool same = false;
+                        if (swingOnChange && st.SwingApplied && st.LastSwingF > 0f && Math.Abs(swingF - st.LastSwingF) < 0.02f)
+                        {
+                            bool okS = !(st.BaseSwing > 0f) || Math.Abs(adp.SwingSpeedMultiplier - st.BaseSwing * st.LastSwingF) < 0.0005f;
+                            bool okT = !(st.BaseThrust > 0f) || Math.Abs(adp.ThrustOrRangedReadySpeedMultiplier - st.BaseThrust * st.LastSwingF) < 0.0005f;
+                            if (okS && okT) same = true;
+                            else SwingRewrites++;
+                        }
+                        if (same) SwingSkips++;
+                        else
+                        {
+                            if (st.BaseSwing > 0f) adp.SwingSpeedMultiplier = st.BaseSwing * swingF;
+                            if (st.BaseThrust > 0f) adp.ThrustOrRangedReadySpeedMultiplier = st.BaseThrust * swingF;
+                            agent.UpdateCustomDrivenProperties();
+                            st.LastSwingF = swingF;
+                            SwingWrites++;
+                        }
                         st.SwingApplied = true;
                     }
 
@@ -1137,6 +1172,7 @@ namespace Armoury
                         }
                     }
                 }
+                _snap.Clear();   // 309: bez referencji do ludzi miedzy taktami
                 // 144: koniec taktu - szyki rozciagniete (D3), koszt zasady; pokaz zadyszki sprzata wpisy nie widziane w tym takcie
                 try { if (aiLive) AiBreath.EndTick(aiCost * 1000.0 / System.Diagnostics.Stopwatch.Frequency); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "AiBreath.EndTick", e); }
                 try { WindedShow.EndTick(now); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteBreath, "WindedShow.EndTick", e); }
