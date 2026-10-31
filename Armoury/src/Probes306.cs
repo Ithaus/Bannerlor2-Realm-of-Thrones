@@ -495,6 +495,8 @@ namespace Armoury
             bool ok, skip;
             string body = CaravanSettle.ExpProbe306(n, out ok, out skip);
             Log.Info(P + "karawana - wydatki doby " + day + " | karawan gracza " + n + " | " + body + " -> wynik " + (skip ? "POMINIETY" : ok ? "TAK" : "NIE") + ".");
+            // 307a: wynik karawan gracza z rozbiciem (konie osobno, pierwsza partia towaru i wynik bez niej) - tylko odczyt ksiegi 259
+            try { Log.Info(P + "karawana - wynik doby " + day + " (307a) | " + CaravanSettle.Res307() + "."); } catch (Exception e) { Stumble("Res307", e); }
         }
 
         // ============================================================ (3) zmiana produkcji warsztatu gracza

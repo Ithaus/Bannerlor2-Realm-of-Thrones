@@ -328,7 +328,7 @@ namespace Armoury
             finally { if (__state.F != null) { try { GoodsLedger.End(__state.F); } catch { } } }
         }
 
-        internal sealed class CrewState { public GoodsLedger.Frame F; public ItemRoster R; public int Fish0; }
+        internal sealed class CrewState { public GoodsLedger.Frame F; public ItemRoster R; public int Fish0; public MobileParty Mp; }   // 307a: Mp - polow karawany do ksiegi kosztu po 0
 
         /// <summary>Prefiks NavalFishingCampaignBehaviour.OnHourlyTickParty(MobileParty): partia na morzu - ramka polowu ksiegi towarow (FFish, zrodlo nazwane:
         /// polow zalogi). Kazda inna partia - nic (jedno porownanie).</summary>
@@ -339,7 +339,7 @@ namespace Armoury
             {
                 if (__0 == null || !FishOn || !__0.IsCurrentlyAtSea || __0.ItemRoster == null) return;
                 var f = Fish;
-                __state = new CrewState { R = __0.ItemRoster, Fish0 = f != null ? __0.ItemRoster.GetItemNumber(f) : 0, F = FishFrame(__0, LabCrew) };
+                __state = new CrewState { R = __0.ItemRoster, Fish0 = f != null ? __0.ItemRoster.GetItemNumber(f) : 0, F = FishFrame(__0, LabCrew), Mp = __0 };
             }
             catch (Exception e) { __state = null; Stumble("CrewPre", e); }
         }
@@ -352,6 +352,7 @@ namespace Armoury
                 var f = Fish;
                 int d = f != null ? __state.R.GetItemNumber(f) - __state.Fish0 : 0;
                 if (d > 0) { _fCrew += d; _fCrewParties++; }
+                if (d > 0 && __state.Mp != null && __state.Mp.IsCaravan) CaravanGoods.NoteFreeCatch(__state.Mp, f, __state.Fish0, d);   // 307a: polow karawany bez zakupu - koszt 0 w ksiedze
             }
             catch (Exception e) { Stumble("CrewFin", e); }
             finally { try { GoodsLedger.End(__state.F); } catch { } }

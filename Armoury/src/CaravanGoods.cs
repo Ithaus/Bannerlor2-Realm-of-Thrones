@@ -59,7 +59,7 @@ namespace Armoury
     /// najwiekszy spadek indeksu w jednym miescie, juki i mediana indeksu wybranych towarow). Nic w zapisie. Wyjatek per wizyta - licznik potkniec (sprzedaz
     /// zostaje jak w BK).
     /// </summary>
-    internal static class CaravanGoods
+    internal static partial class CaravanGoods
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const int MaxAgeDays = 30, FoodAgeDays = 7, FoodKeepDays = 10, CashDays = 3, StepN = 5, DearValue = 200, TownDayShare = 20, BlockDays = 7, BkLogDays = 7;
@@ -178,6 +178,7 @@ namespace Armoury
             _startDone = false; _stumbleSess = 0; _err.Clear();
             LastOwnerPaid = LastOwnerNot = LastOwnerLord = LastOwnerPlayer = 0; LastOwnerN = 0; _oStumbles = _oStumbleSess = 0;
             _pend284 = null; _had284 = false; _cbLots = _cbBad = _cbGone = 0; _cbUnits = 0; _snapLimit = 0;   // 284: ksiega z zapisu (Import284 po Reset)
+            Reset307(); CaravanSeaHold307.Reset();                           // 307a: gabka i polow w ksiedze, cel morski do doplyniecia
             ZeroDay();
         }
 
@@ -225,7 +226,7 @@ namespace Armoury
         private static readonly object _worthLock = new object();
 
         /// <summary>
-        /// 259 (CaravanSettle): wartosc TOWARU w jukach karawany - TYLKO ODCZYT (bez EnsureSnap / Sync / Restore - nic nie zapisuje do ksiegi; dozwolone tylko
+        /// 259 (CaravanSettle): wartosc TOWARU w jukach karawany - TYLKO ODCZYT ksiegi (jedyny zapis: licznik pomiaru 307a _w307Unk, liczony po wszystkich wywolaniach, takze podgladach) (bez EnsureSnap / Sync / Restore - nic nie zapisuje do ksiegi; dozwolone tylko
         /// pamieci sredniej indeksu AvgIndex). Towar handlowy jak T1 (IsTradeGood), a zwierzeta i inne przedmioty - tylko kupione z kiesy (nizej, recenzja 259).
         /// Na sztuke: znany koszt zakupu (ksiega E3-T1) -> nizsza z kosztu i rynku (wartosc x srednia indeksu 97 miast); sztuki bez wpisu w ksiedze
         /// (po wczytaniu, przed migawka) -> wartosc x min(1, srednia indeksu) (blad w dol). cost - koszt (znany + oszacowanie bez wpisu), market - rynek,
@@ -248,6 +249,8 @@ namespace Armoury
                 double worth = 0, dc = 0, dm = 0, dOther = 0;
                 int packNeed = mp.MemberRoster != null ? Math.Max(0, mp.MemberRoster.TotalManCount) : 0;
                 HashSet<ItemObject> seen = null;
+                bool an307 = Animals307;                              // 307a: zwierzeta bez wpisu w ksiedze tez wyceniane (dolne oszacowanie)
+                Dictionary<ItemObject, int> packUsed = null;          // 307a: juczne bez wpisu zajete do niesienia (petla nizej) - nie wyceniane
                 // juczne bez wpisu w ksiedze (K5, gra, dary BK) niosa jako pierwsze - zmniejszaja potrzebe, zanim policzymy kupione z kiesy
                 for (int i = 0; i < r.Count && packNeed > 0; i++)
                 {
@@ -259,7 +262,9 @@ namespace Armoury
                     int have = r.GetItemNumber(it);
                     Lot lp;
                     int known = d != null && d.TryGetValue(it, out lp) && lp != null && lp.N > 0 ? Math.Min(lp.N, have) : 0;
-                    packNeed -= Math.Min(packNeed, Math.Max(0, have - known));
+                    int use = Math.Min(packNeed, Math.Max(0, have - known));
+                    packNeed -= use;
+                    if (an307 && use > 0) { if (packUsed == null) packUsed = new Dictionary<ItemObject, int>(); packUsed[it] = use; }
                 }
                 if (seen != null) seen.Clear();
                 for (int i = 0; i < r.Count; i++)
@@ -269,12 +274,35 @@ namespace Armoury
                     if (it == null || el.Amount <= 0) continue;
                     bool goods = it.IsTradeGood && !it.HasHorseComponent && it.ItemCategory != DefaultItemCategories.PackAnimal;
                     Lot l = null;
-                    if (!goods && (d == null || !d.TryGetValue(it, out l) || l == null || l.N <= 0)) continue;   // nie towar i bez zakupu z kiesy - pominiete
+                    bool animal = an307 && !goods && it.HasHorseComponent;   // 307a: kon, juczne, bydlo - towar na sprzedaz takze bez wpisu w ksiedze
+                    if (!goods && !animal && (d == null || !d.TryGetValue(it, out l) || l == null || l.N <= 0)) continue;   // nie towar i bez zakupu z kiesy - pominiete
+                    if (animal && (d == null || !d.TryGetValue(it, out l) || l == null || l.N <= 0)) l = null;
                     if (seen == null) seen = new HashSet<ItemObject>();
                     if (!seen.Add(it)) continue;                      // ten sam towar w kilku wierszach (modyfikatory) - GetItemNumber liczy wszystkie
                     int have = r.GetItemNumber(it);
                     if (have <= 0) continue;
                     double val = Math.Max(1, it.Value), idx = AvgIndex(it.ItemCategory);
+                    if (animal)
+                    {
+                        // 307a: sztuki z wpisem jak dotad (nizsza z kosztu i rynku, juczne potrzebne do niesienia pominiete); bez wpisu - wartosc x min(1, srednia indeksu)
+                        // (jak towar bez wpisu - blad w dol), bez jucznych bez wpisu zajetych do niesienia (petla wyzej)
+                        int knownA = l != null ? Math.Min(l.N, have) : 0, cntA = knownA;
+                        if (knownA > 0 && it.ItemCategory == DefaultItemCategories.PackAnimal)
+                        {
+                            int skipA = Math.Min(packNeed, knownA);
+                            packNeed -= skipA; cntA = knownA - skipA;
+                        }
+                        int usedA = 0;
+                        if (packUsed != null) packUsed.TryGetValue(it, out usedA);
+                        int unkA = Math.Max(0, have - knownA - usedA);
+                        double kcA = cntA > 0 ? l.Cost * cntA / l.N : 0.0, mA = cntA * val * idx, uA = unkA * val * Math.Min(1.0, idx);
+                        double wA = (cntA > 0 ? Math.Min(kcA, mA) : 0.0) + uA;
+                        if (cntA + unkA <= 0) continue;
+                        kinds++; units += cntA + unkA;
+                        worth += wA; dOther += wA; dc += kcA + uA; dm += mA + unkA * val * idx;
+                        if (unkA > 0) _w307Unk += unkA;
+                        continue;
+                    }
                     if (!goods)
                     {
                         int known = Math.Min(l.N, have), cnt = known;

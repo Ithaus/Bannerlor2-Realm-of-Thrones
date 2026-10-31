@@ -10608,6 +10608,38 @@ namespace Armoury
         [SettingPropertyGroup("Autotest probes (306b)")]
         public bool Autotest306Probes { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Sponge To Book", HintText = "What a caravan buys cheap on its way out of a town (Banner Kings' bargain buying, horses included) goes into its books at what it paid, like any other purchase, so its worth and its trade log are true. Off = those purchases stay off the books, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
+        public bool CaravanSpongeToBook { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Worth Trade Animals", HintText = "A caravan's worth counts the horses and other animals it carries for sale, even ones it did not buy through the market, at the lower of their value and the market (pack animals it needs to carry its load are not counted). Off = only animals it bought are counted, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
+        public bool CaravanWorthTradeAnimals { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Catch At Zero Cost", HintText = "Fish a caravan's crew catches at sea goes into its books at no cost: it adds nothing to the caravan's worth until it is sold, so no profit is paid out for goods not yet sold. Off = the catch is valued like bought goods, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
+        public bool CaravanCatchAtZeroCost { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Sea Hold Target", HintText = "A caravan at sea keeps sailing to the port it chose until it gets there, unless that town is at war with it, under siege, or the voyage takes far longer than planned. Off = it may change its mind at sea on a whim, as before (a player's caravan rarely reached a far port)", RequireRestart = false)]
+        [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
+        public bool CaravanSeaHoldTarget { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Caravan Sea Hold Factor", 0.00f, 8.00f, "0.00", HintText = "With Caravan Sea Hold Target: how many times the planned days of the voyage a caravan keeps its port before it may choose again", RequireRestart = false)]
+        [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
+        public float CaravanSeaHoldFactor { get; set; } = 2.0f;
+
+        [SettingPropertyInteger("Caravan Sea Hold Min Days", 0, 24, "0", HintText = "With Caravan Sea Hold Target: the shortest a caravan keeps its port at sea, days", RequireRestart = false)]
+        [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
+        public int CaravanSeaHoldMinDays { get; set; } = 6;
+
+        [SettingPropertyInteger("Caravan Sea Hold Max Days", 0, 120, "0", HintText = "With Caravan Sea Hold Target: the longest a caravan keeps its port at sea, days", RequireRestart = false)]
+        [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
+        public int CaravanSeaHoldMaxDays { get; set; } = 30;
+
+        [SettingPropertyBool("Caravan Week From First Day", HintText = "The weekly note on a player caravan below its capital counts its trade from the day it was formed, so the first day's purchases are not left out. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
+        public bool CaravanWeekFromFirstDay { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13259,6 +13291,14 @@ namespace Armoury
             s.PriceBandMerchantMargin = PriceBandMerchantMargin;
             s.PriceBandHaulKm = PriceBandHaulKm;
             s.Autotest306Probes = Autotest306Probes;
+            s.CaravanSpongeToBook = CaravanSpongeToBook;
+            s.CaravanWorthTradeAnimals = CaravanWorthTradeAnimals;
+            s.CaravanCatchAtZeroCost = CaravanCatchAtZeroCost;
+            s.CaravanSeaHoldTarget = CaravanSeaHoldTarget;
+            s.CaravanSeaHoldFactor = CaravanSeaHoldFactor;
+            s.CaravanSeaHoldMinDays = CaravanSeaHoldMinDays;
+            s.CaravanSeaHoldMaxDays = CaravanSeaHoldMaxDays;
+            s.CaravanWeekFromFirstDay = CaravanWeekFromFirstDay;
         }
 
         internal static void Apply()

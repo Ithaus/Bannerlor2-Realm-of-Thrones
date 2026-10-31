@@ -5045,6 +5045,18 @@ namespace Armoury
         // zmiana produkcji warsztatu) - Probes306.cs. Dzialaja TYLKO w DLL autotestu CrashScribe (LogGate.Mode 1/2) i tylko przy plikach armoury-kowal305.flag,
         // armoury-karawana305.flag, armoury-warsztat305.flag w Documents\Mount and Blade II Bannerlord\CrashScribe. W zwyklej grze klucz nic nie zmienia.
         public bool Autotest306Probes = true;              // Test runs only: lets the automatic test check smithing XP, give the player a caravan and change the trade of one of the player's workshops, when the test's own flag files are present. In a normal game it does nothing. Off = those checks never run, even with the flag files
+        // --- Player and world caravans: every purchase on the books, sea voyages kept (307a) ---
+        // 307a (Jeff 31.10 "karawany, aby dzialaly i zarabialy"; krytyk 307): gabka BK przy wyjezdzie (BKPartyBehavior.OnSettlementLeft) kupowala z kiesy poza
+        // SellItemsAction - konie za 21 tys. poza ksiega E3-T1 i dziennikiem 305a; karawana morska gracza zmieniala cel w drodze (BK 1% na tik, tik co godzine) i nie
+        // doplywala 76 dob. Jedna regula dla gracza i AI. NIE = stare zachowanie. Nowe klucze - MCM Jeffa ich nie ma.
+        public bool CaravanSpongeToBook = true;            // What a caravan buys cheap on its way out of a town (Banner Kings' bargain buying, horses included) goes into its books at what it paid, like any other purchase, so its worth and its trade log are true. Off = those purchases stay off the books, as before
+        public bool CaravanWorthTradeAnimals = true;       // A caravan's worth counts the horses and other animals it carries for sale, even ones it did not buy through the market, at the lower of their value and the market (pack animals it needs to carry its load are not counted). Off = only animals it bought are counted, as before
+        public bool CaravanCatchAtZeroCost = true;         // Fish a caravan's crew catches at sea goes into its books at no cost: it adds nothing to the caravan's worth until it is sold, so no profit is paid out for goods not yet sold. Off = the catch is valued like bought goods, as before
+        public bool CaravanSeaHoldTarget = true;           // A caravan at sea keeps sailing to the port it chose until it gets there, unless that town is at war with it, under siege, or the voyage takes far longer than planned. Off = it may change its mind at sea on a whim, as before (a player's caravan rarely reached a far port)
+        public float CaravanSeaHoldFactor = 2.0f;          // With Caravan Sea Hold Target: how many times the planned days of the voyage a caravan keeps its port before it may choose again
+        public int CaravanSeaHoldMinDays = 6;              // With Caravan Sea Hold Target: the shortest a caravan keeps its port at sea, days
+        public int CaravanSeaHoldMaxDays = 30;             // With Caravan Sea Hold Target: the longest a caravan keeps its port at sea, days
+        public bool CaravanWeekFromFirstDay = true;        // The weekly note on a player caravan below its capital counts its trade from the day it was formed, so the first day's purchases are not left out. Off = as before
 
         public static void Load(string moduleDataDir)
         {

@@ -2982,6 +2982,8 @@ namespace Armoury
             try { CaravanBulk.Daily(); } catch (Exception e) { Log.Error("CaravanBulk.Daily", e); } DayProfile.Lap("CaravanBulk.Daily");   // wpis 103: surowce masowe w karawanach (przeliczenie swiata + log)
             try { CaravanAmmo.Daily(); } catch (Exception e) { Log.Error("CaravanAmmo.Daily", e); } DayProfile.Lap("CaravanAmmo.Daily");   // paczka 172b: linia "Karawany bez amunicji (172b)" (zablokowane, sprzedane z taborow, w taborach)
             try { CaravanGoods.Daily(); } catch (Exception e) { Log.Error("CaravanGoods.Daily", e); } DayProfile.Lap("CaravanGoods.Daily");
+            try { CaravanGoods.Daily307(); } catch (Exception e) { Log.Error("CaravanGoods.Daily307", e); }   // 307a: linia "Karawany - zakupy poza handlem gry (307a)"
+            try { CaravanSeaHold307.Daily(); } catch (Exception e) { Log.Error("CaravanSeaHold307.Daily", e); } DayProfile.Lap("Caravan307.Daily");   // 307a: linia "Karawany morskie - cel do doplyniecia (307a)"
             try { CaravanLeader139b.Daily(); } catch (Exception e) { Log.Error("CaravanLeader139b.Daily", e); } DayProfile.Lap("CaravanLeader139b.Daily");   // 139b: linia "Karawany - dowodca (139b): dzien N" (ceny i XP karawan z dowodca; tylko pomiar), liczniki doby od zera
             try { CaravanTrade284.Daily(); } catch (Exception e) { Log.Error("CaravanTrade284.Daily", e); } DayProfile.Lap("CaravanTrade284.Daily");   // 284: linie "Handel karawan (284)", "Przeplyw towarow karawan (284)", "Wielkosc karawan (284, na sucho)"
             try { CaravanRoute294c.Daily(); } catch (Exception e) { Log.Error("CaravanRoute294c.Daily", e); } DayProfile.Lap("CaravanRoute294c.Daily");   // 294c: linia 'Cel karawan (294c)' po linii 294b; przebudowa 'w drodze do miast'

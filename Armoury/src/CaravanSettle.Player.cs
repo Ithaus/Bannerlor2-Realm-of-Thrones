@@ -26,6 +26,7 @@ namespace Armoury
         private const string PP = "Majatek gracza (karawany i warsztaty) (259): ";
         private const int LowDays = 7;                 // rytm tygodnia BK (OnWeeklyCaravanLedger) i E3-T1 BlockDays
         private const int Ring = 8;                    // pierscien dob (ostatnie 7 pelnych dob + biezaca)
+        private const int CarRing = 9;                 // recenzja 307a: pierscien karawany - 8 pelnych dob + biezaca (doba dzis-8 nie dzieli slotu z dzisiejsza)
 
         private sealed class CarRec
         {
@@ -37,12 +38,15 @@ namespace Armoury
             public long DSold, DBought, DToll, DReal, DPay259, DPayBk, DPayE39, DPayEnd, DPayVan, DWage, DTop, DShort;
             public bool HaveCalc, LastBusy, WageGuess, DTick;
             public Calc Last;
-            public readonly long[,] Wk = new long[Ring, 5];   // 0 sprzedaz, 1 zakupy, 2 myto, 3 zold rodu, 4 doplata BK
-            public readonly int[] WkDay = { -1, -1, -1, -1, -1, -1, -1, -1 };
+            public readonly long[,] Wk = new long[CarRing, 5];   // 0 sprzedaz, 1 zakupy, 2 myto, 3 zold rodu, 4 doplata BK
+            public readonly int[] WkDay = { -1, -1, -1, -1, -1, -1, -1, -1, -1 };
             // 305a (sesja, bez zapisu): dziennik karawany i przyczyna konca
             public readonly List<string> DTx = new List<string>(); public int DTxDrop;
             public int LastTownDay = -1, LastTradeDay = -1, NoTradeRun, MaxNoTradeRun; public string LastTownName = "-";
             public Hero LeaderRef; public long LastPurse, LastGoods; public string EndCause; public bool EndMsg;
+            // 307a (sesja, bez zapisu; tylko pomiar sondy 306b): sprzedaz koni i zwierzat, pierwsza partia towaru (kupiona w dobie FirstDay i nastepnej)
+            public long HorseSold, HorseReal, FirstSold, FirstReal, FirstBought;
+            public readonly Dictionary<ItemObject, int> FirstLot = new Dictionary<ItemObject, int>();
         }
 
         private sealed class WsRec
@@ -85,17 +89,32 @@ namespace Armoury
         private static void WkAdd(long[,] a, int[] days, int col, long v)
         {
             if (v == 0) return;
-            int d = Today, i = ((d % Ring) + Ring) % Ring;
+            int len = days.Length, d = Today, i = ((d % len) + len) % len;   // recenzja 307a: dlugosc pierscienia z tablicy (tydzien gracza 8, karawana 9)
             if (days[i] != d) { days[i] = d; for (int k = 0; k < a.GetLength(1); k++) a[i, k] = 0; }   // 305b: tydzien gracza ma 6 kolumn
             a[i, col] += v;
         }
 
         /// <summary>Suma kolumny z dob [dzis - 7, dzis] i liczba dob z wpisem.</summary>
-        private static long WkSum(long[,] a, int[] days, int col, out int n)
+        private static long WkSum(long[,] a, int[] days, int col, out int n) { return WkSum(a, days, col, Today - 7, out n); }
+
+        /// <summary>307a: suma kolumny z dob [from, dzis]; from nie wczesniej niz dzis - Ring (pierscien trzyma 8 dob - slot starszej doby moze byc juz nadpisany,
+        /// wtedy days[i] ma nowsza dobe i nie liczy sie podwojnie).</summary>
+        private static long WkSum(long[,] a, int[] days, int col, int from, out int n)
         {
-            int d = Today; long s = 0; n = 0;
-            for (int i = 0; i < Ring; i++) if (days[i] >= d - 7 && days[i] <= d) { s += a[i, col]; n++; }
+            int d = Today, len = days.Length; long s = 0; n = 0;
+            from = Math.Max(from, d - (len - 1));   // recenzja 307a: najstarsza doba, ktora nie dzieli slotu z dzisiejsza (pierscien 8: dzis-7, 9: dzis-8)
+            for (int i = 0; i < len; i++) if (days[i] >= from && days[i] <= d) { s += a[i, col]; n++; }
             return s;
+        }
+
+        /// <summary>307a (klucz CaravanWeekFromFirstDay): poczatek okna komunikatu tygodniowego - doba utworzenia rekordu wlacznie, gdy wypada tuz przed oknem
+        /// [dzis - 7, dzis] (dowod 142b: komunikat "ponizej kapitalu 7 dob" - "bought 0", zold 1614 = 6 dob; zakupy 875 doby utworzenia poza oknem).</summary>
+        private static int WkFrom(CarRec r)
+        {
+            int d = Today;
+            var s = S;
+            if (s == null || !s.CaravanWeekFromFirstDay || r == null) return d - 7;
+            return Math.Min(d - 7, Math.Max(r.FirstDay, d - (CarRing - 1)));
         }
 
         // ------------------------------------------------------------ rekordy
@@ -165,6 +184,7 @@ namespace Armoury
                     r.DSold += gold; r.Sold += gold; r.DToll += toll; r.Toll += toll; r.DReal += real; r.Realized += real;
                     WkAdd(r.Wk, r.WkDay, 0, gold); WkAdd(r.Wk, r.WkDay, 2, toll);
                 }
+                try { Note307(r, kind, gold, toll, costRm, it, units); } catch (Exception e) { Stumble("Note307", e); }
             }
             catch (Exception e) { Stumble("NoteTrade", e); }
         }
@@ -333,6 +353,50 @@ namespace Armoury
             return (fromLoad ? "od wczytania 259" : "od zakupu") + " (dzien " + firstDay + ", " + Math.Max(0, day - firstDay + 1) + " dob)";
         }
 
+        /// <summary>307a (tylko pomiar sondy 306b): sprzedaz koni i zwierzat oraz pierwsza partia towaru - zakupy w dobie utworzenia rekordu i nastepnej.</summary>
+        private static void Note307(CarRec r, int kind, long gold, int toll, double costRm, ItemObject it, int units)
+        {
+            if (r == null || it == null || units <= 0) return;
+            if (kind == 1)
+            {
+                if (Today <= r.FirstDay + 1)
+                {
+                    int x; r.FirstLot.TryGetValue(it, out x); r.FirstLot[it] = x + units; r.FirstBought += gold;
+                }
+                return;
+            }
+            long real = (long)Math.Round(gold - toll - costRm);
+            if (it.HasHorseComponent) { r.HorseSold += gold; r.HorseReal += real; }
+            int lot;
+            if (r.FirstLot.TryGetValue(it, out lot) && lot > 0)
+            {
+                int take = Math.Min(lot, units);
+                r.FirstLot[it] = lot - take;
+                r.FirstSold += gold * take / units; r.FirstReal += real * take / units;
+            }
+        }
+
+        /// <summary>307a: sonda 306b (Probes306.CaravanDay) - wynik karawan gracza z rozbiciem: netto dla rodu, sprzedaz koni, pierwsza partia i wynik bez niej.</summary>
+        internal static string Res307()
+        {
+            var sb = new StringBuilder(300);
+            int n = 0;
+            foreach (var r in _cars.Values)
+            {
+                if (r == null) continue;
+                n++;
+                long net = r.Paid - r.Wage - r.Topup;
+                sb.Append(n > 1 ? "; " : "").Append("'").Append(r.Name).Append("' od doby ").Append(r.FirstDay).Append(": netto dla rodu ").Append(net)
+                  .Append(" (wyplaty ").Append(r.Paid).Append(", zold ").Append(r.Wage).Append(", doplaty ").Append(r.Topup).Append("), sprzedaz ").Append(r.Sold)
+                  .Append(", zysk ze sprzedazy ").Append(r.Realized).Append(" | konie i zwierzeta: sprzedaz ").Append(r.HorseSold).Append(", zysk ").Append(r.HorseReal)
+                  .Append(" | pierwsza partia (zakupy dob ").Append(r.FirstDay).Append("-").Append(r.FirstDay + 1).Append(" za ").Append(r.FirstBought).Append("): sprzedana za ")
+                  .Append(r.FirstSold).Append(", zysk ").Append(r.FirstReal).Append(" | wynik bez pierwszej partii ").Append(net - r.FirstReal)
+                  .Append(", zysk ze sprzedazy bez pierwszej partii ").Append(r.Realized - r.FirstReal)
+                  .Append(", wynik handlu bez pierwszej partii (zysk ze sprzedazy bez niej - zold rodu) ").Append(r.Realized - r.FirstReal - r.Wage);   // recenzja 307a: obie strony to wynik handlu, nie gotowka przekazana rodowi
+            }
+            return n == 0 ? "brak rekordow karawan gracza" : sb.ToString();
+        }
+
         private static string Totals(CarRec r)
         {
             return "wyplaty " + r.Paid + ", zold rodu " + r.Wage + ", doplaty " + r.Topup + ", brak rodu " + r.Short + ", sprzedaz " + r.Sold + ", zakupy " + r.Bought
@@ -420,10 +484,12 @@ namespace Armoury
                     {
                         r.LastLowMsg = day; lowMsgs++;
                         int nd;
-                        long sold = WkSum(r.Wk, r.WkDay, 0, out nd), bought = WkSum(r.Wk, r.WkDay, 1, out nd), toll = WkSum(r.Wk, r.WkDay, 2, out nd);
-                        long wg = WkSum(r.Wk, r.WkDay, 3, out nd), tp = WkSum(r.Wk, r.WkDay, 4, out nd);
-                        int days = 0; for (int i = 0; i < Ring; i++) if (r.WkDay[i] >= Today - 7) days++;
+                        int wf = WkFrom(r);   // 307a: od doby utworzenia wlacznie (klucz NIE - dzis - 7, jak dotad)
+                        long sold = WkSum(r.Wk, r.WkDay, 0, wf, out nd), bought = WkSum(r.Wk, r.WkDay, 1, wf, out nd), toll = WkSum(r.Wk, r.WkDay, 2, wf, out nd);
+                        long wg = WkSum(r.Wk, r.WkDay, 3, wf, out nd), tp = WkSum(r.Wk, r.WkDay, 4, wf, out nd);
+                        int days = 0; for (int i = 0; i < r.WkDay.Length; i++) if (r.WkDay[i] >= Today - 7) days++;
                         string span = days >= 7 ? "Last 7 days" : "Since the game was loaded";
+                        if (wf < Today - 7) span = "Since it was formed";   // recenzja 307a: okno z doba utworzenia ma 8 dob, nie 7
                         // recenzja 259: kapital - to, co karawana dostala (E3/7) albo kapital modelu; towar - nizsza z ceny zakupu i rynku; warunek wyplaty - oba warunki reguly
                         string capTxt = basis.CapE37 ? "the " + N(basis.Capital) + " it was given to trade with" : "its trading capital of " + N(basis.Capital);
                         string txt = r.Name + " is worth " + N(basis.Worth) + " (coin " + N(basis.Purse) + ", goods " + N(basis.Goods) + " valued at the lower of what it paid and the market) - less than "
