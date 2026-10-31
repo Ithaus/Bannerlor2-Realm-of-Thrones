@@ -58,6 +58,8 @@ namespace Armoury
             // 305b (WorkshopLedgerCapitalSplit): kapital wlasny gracza w warsztacie (kapital przy pierwszym wpisie + doplaty - zwroty; -1 = jeszcze nie znany),
             // czesc wyplat ponizej niego (zwrot kapitalu, nie zysk), zwroty i doplaty przy zmianie produkcji (WorkshopTrade.RetoolSettle) - razem i dzis
             public long Basis = -1, PaidRet, CapRet, CapAdd, DPaidRet, DCapRet, DCapAdd;
+            // 311c (WorkshopLedgerMarkDrop): znacznik gry (InitialCapital) z ostatniego rozliczenia doby (-1 = nieznany) i ile razy znacznik spadl bez przelewu
+            public int Mark = -1; public int MarkDrops;
         }
 
         private static readonly Dictionary<string, CarRec> _cars = new Dictionary<string, CarRec>(StringComparer.Ordinal);
@@ -221,6 +223,8 @@ namespace Armoury
         }
 
         private static bool CapSplit { get { var s = Settings.Current; return s != null && s.WorkshopLedgerCapitalSplit; } }
+        /// <summary>311c: spadek znacznika bez przelewu liczony jako kapital wlasny (tylko przy podziale 305b - bez niego wszystko i tak idzie razem).</summary>
+        private static bool MarkDropOn { get { var s = Settings.Current; return s != null && s.WorkshopLedgerCapitalSplit && s.WorkshopLedgerMarkDrop; } }
 
         /// <summary>305b: WorkshopTrade.RetoolSettle - zwrot kapitalu do kiesy (back) albo doplata z kiesy (added) przy zmianie produkcji warsztatu gracza; capBefore -
         /// kapital przed przelewem, oldMark - znacznik gry (InitialCapital) sprzed zmiany produkcji, -1 = nieznany. Tylko licznik.
@@ -234,6 +238,7 @@ namespace Armoury
                 if (r.Basis < 0) r.Basis = Math.Max(0, oldMark >= 0 ? Math.Min(oldMark, capBefore) : capBefore);
                 if (back > 0) { r.CapRet += back; r.DCapRet += back; r.Basis = Math.Max(0L, r.Basis - back); if (CapSplit) WkAdd(_wk, _wkDay, 5, back); else WkAdd(_wk, _wkDay, 3, back); }   // recenzja 305b: bez podzialu - jak dotad "workshops paid you"
                 if (added > 0) { r.CapAdd += added; r.DCapAdd += added; r.Basis += added; }
+                r.Mark = Math.Max(0, w.InitialCapital);   // 311c: przelew juz wyrownal kapital do nowego znacznika - TickPost nie liczy tego spadku drugi raz
             }
             catch (Exception e) { Stumble("NoteWsCapital", e); }
         }
@@ -328,11 +333,27 @@ namespace Armoury
                         // 305b (WorkshopLedgerCapitalSplit): wyplata, ktora zbija kapital ponizej kapitalu wlasnego gracza, to zwrot jego pieniedzy, nie zysk
                         // 305f (przeglad scalenia): punkt wyjscia = znacznik gry (InitialCapital), nie cala kasa - kapital ponad znacznik to niewyplacony zysk
                         // (BK/gra wyplaca ProfitMade czesciami co dobe), wiec jego wyplata to zysk, nie "zwrot kapitalu"; kasa ponizej znacznika - tyle wkladu zostalo
+                        // 311c (WorkshopLedgerMarkDrop, Seagard 108819-108823: smithy -> silversmith, znacznik 10000 -> 5000 bez przelewu, kapital 9994 -> 5000 wyplacony
+                        // jako "zysk" 4994/2494/1244/619/307): znacznik w dol bez RetoolSettle (klucz WYL, zmiana typu cudzym kodem - Get, potkniecie przelewu) - kasa
+                        // miedzy nowym a starym znacznikiem to kapital wlasny gracza (ta sama miara co zwrot RetoolSettle: min(kapital, stary znacznik)), nie zysk
+                        if (MarkDropOn && wr.Mark >= 0 && w.InitialCapital < wr.Mark)
+                        {
+                            long own = Math.Min((long)wr.Mark, (long)kv.Value);
+                            if (own > wr.Basis)
+                            {
+                                wr.MarkDrops++;
+                                Log.Info("Warsztaty gracza - kapital (311c): " + (w.Settlement != null ? w.Settlement.Name.ToString() : "?") + " " + (w.WorkshopType != null ? w.WorkshopType.StringId : "?")
+                                         + " | znacznik w dol bez przelewu " + wr.Mark + " -> " + w.InitialCapital + ", kapital " + kv.Value + ", kapital wlasny " + (wr.Basis >= 0 ? wr.Basis.ToString(Inv) : "-")
+                                         + " -> " + own + " (wyplata kasy ponizej " + own + " = zwrot kapitalu, nie zysk; spadkow w tym warsztacie " + wr.MarkDrops + ").");
+                                wr.Basis = own;
+                            }
+                        }
                         if (wr.Basis < 0) wr.Basis = Math.Max(0, Math.Min(w.InitialCapital, kv.Value));
                         long ret = Math.Max(0L, Math.Min(payout, Math.Max(0L, wr.Basis - w.Capital) - Math.Max(0L, wr.Basis - kv.Value)));
                         if (ret > 0) { wr.PaidRet += ret; wr.DPaidRet += ret; wr.Basis -= ret; }
                         if (CapSplit) { WkAdd(_wk, _wkDay, 3, payout - ret); WkAdd(_wk, _wkDay, 5, ret); }
                         else WkAdd(_wk, _wkDay, 3, payout);
+                        wr.Mark = Math.Max(0, w.InitialCapital);   // 311c: znacznik po rozliczeniu doby - punkt odniesienia jutra
                     }
                     catch (Exception e) { Stumble("TickPost(warsztat)", e); }
                 }
@@ -597,6 +618,9 @@ namespace Armoury
             // 305b: kapital wlasny i zwroty w osobnym wierszu (stary format "w" bez zmian - starsza DLL wiersz "wb" odrzuci jako zly, reszta zostaje)
             foreach (var w in _wss.Values)
                 sb.Append("wb|").Append(w.Key).Append('|').Append(w.Basis).Append('|').Append(w.PaidRet).Append('|').Append(w.CapRet).Append('|').Append(w.CapAdd).Append('\n');
+            // 311c: znacznik z ostatniego rozliczenia w osobnym wierszu (starsza DLL odrzuci "wm" jako zly, reszta zostaje - jak "wb")
+            foreach (var w in _wss.Values)
+                if (w.Mark >= 0) sb.Append("wm|").Append(w.Key).Append('|').Append(w.Mark).Append('|').Append(w.MarkDrops).Append('\n');
             return sb.ToString();
         }
 
@@ -631,6 +655,11 @@ namespace Armoury
                     {
                         WsRec w;
                         if (_wss.TryGetValue(p[1], out w)) { w.Basis = L(p[2]); w.PaidRet = L(p[3]); w.CapRet = L(p[4]); w.CapAdd = L(p[5]); }
+                    }
+                    else if (p[0] == "wm" && p.Length == 4)
+                    {
+                        WsRec w;
+                        if (_wss.TryGetValue(p[1], out w)) { w.Mark = I(p[2]); w.MarkDrops = I(p[3]); }
                     }
                     else _impBad++;
                 }
