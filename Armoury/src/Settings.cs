@@ -5095,6 +5095,12 @@ namespace Armoury
         public bool BannerBreakBattleState = true;         // With Banner Companies: how the battle stands weighs on whether a shaken company breaks - the chance is multiplied by the strength still fighting against it divided by its own side's (no less than x0.3, no more than x1.5), so a company that sees the day being won rarely runs and one facing a stronger foe breaks sooner. The same rule for both sides
         public bool BattleStallBreak = true;               // In a field battle where no blow has landed and no shot has been loosed for a while after the lines first met, every man who has nothing left to fight with - no hand weapon and no ammunition - leaves the field, so the battle can end instead of standing still. A short report of who is left goes to the log
         public int BattleStallSeconds = 60;                // With Battle Stall Break: seconds of battle time without a blow or a shot (after the first blow) before men with nothing to fight with leave the field
+        // --- Caravans with ships: destination by profit per day of the real sea voyage (308a) ---
+        // 308a (Jeff 31.10 "karawany, aby dzialaly i zarabialy"; 143c/143d): BK liczy karawanie ze statkami odleglosc LADEM (1e8 z wysp i z morza) - drugi
+        // przebieg bez wzgledu na droge (Driftwood Hall -> Qarth 30+ dob, 64 doby bez handlu); kontrakty surowcow bez kosztu dni. Jedna regula dla gracza i AI.
+        // NIE = stare zachowanie co do bitu (pomiar linii doby zostaje). Nowe klucze - MCM Jeffa ich nie ma.
+        public bool CaravanSeaTrueDistance = true;         // A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before
+        public float CaravanSeaNearDays = 12f;             // With Caravan Sea True Distance: days of sailing within which a caravan with goods to sell looks for a better port before it takes a longer voyage
 
         public static void Load(string moduleDataDir)
         {

@@ -873,7 +873,10 @@ namespace Armoury
                             continue;
                         }
                         float perKg = margin / (q * kg);
-                        float score = perDay ? perKg / Math.Max(1, TradeCarts.DaysFor(d)) : perKg;   // 282 (F2): zysk na kg i dobe drogi (doby z modelu wozow)
+                        // 308a (klucz CaravanSeaTrueDistance): kontrakt karawany tylko z zyskiem po koszcie dni drogi (zold + jedzenie x dni) - ta sama regula co cel karawan
+                        float net = CaravanSea308.ContractNet(car, margin, TradeCarts.DaysFor(d), naval);
+                        if (!(net > 0f)) continue;   // mniejszy ladunek - jak marza <= 0 (petla polowienia)
+                        float score = perDay ? (net / (q * kg)) / Math.Max(1, TradeCarts.DaysFor(d)) : net / (q * kg);   // 282 (F2): zysk na kg i dobe drogi (doby z modelu wozow)
                         if (score > bestScore) { bestScore = score; bestPerKg = perKg; bestSrc = src; bestCar = car; bestQ = q; bestDist = d; bestNaval = naval; bestMargin = margin; bestPacks = packs; }
                         break;
                     }

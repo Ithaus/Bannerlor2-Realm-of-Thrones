@@ -86283,5 +86283,143 @@ def main(argv):
     return _paczka307c_main_prev(argv)
 
 
+
+# ======================================================================================== paczka 308a
+# 308a (31.10): karawany ze statkami - cel wedlug zysku na dobe prawdziwej drogi morskiej (CaravanSea308.cs). Linie: "Karawany morskie - cel wedlug zysku
+# na dobe (308a): ..." (start i doba), do K308-5/6 te same linie co grupa karawany307 (259 '(305a)', sonda 306b '(307a)'). Uzycie: --grupa karawany308 <Armoury-*.log>.
+K308_P = "Karawany morskie - cel wedlug zysku na dobe (308a): "
+K308_RX_DAY = re.compile(r"dzien (\d+) \| klucz Caravan Sea True Distance (TAK|NIE), blisko <= ([\d.]+) dob \| ocena BK: (wpieta|NIE), odleglosc morska (\d+), "
+                         r"bez drogi morskiej \(BK ladem\) (\d+), dom morzem (\d+) \| decyzje karawan ze statkami (\d+) \(drugi przebieg BK (\d+), cel bez drogi morskiej (\d+), "
+                         r"gracza (\d+)\), dni drogi morzem: <=5 (\d+), 5-10 (\d+), 10-20 (\d+), 20-30 (\d+), >30 (\d+), srednio ([\d.]+), najwiecej ([\d.]+) \| "
+                         r"z towarem i bliskim portem (\d+): zysk/dobe wybranego srednio (-?\d+), najlepszego bliskiego srednio (-?\d+), daleki rejs gorszy niz bliski port: "
+                         r"przed regula (\d+), zamienione na bliski (\d+), zostalo (\d+) \| kontrakty surowcow karawana bez zysku po koszcie dni: lad (\d+), morze (\d+) \| "
+                         r"gracza: (.*) \| potkniecia (\d+) \(sesja (\d+)\)\.$")
+
+
+def k308_new():
+    return {"start": None, "days": 0, "key": None, "sea": 0, "land": 0, "dec": 0, "far": 0, "b": [0, 0, 0, 0, 0], "rn": 0, "rc": 0, "rb": 0,
+            "before": 0, "swap": 0, "left": 0, "mo_l": 0, "mo_s": 0, "stum": 0, "fmt": 0, "pl": [], "k307": k307_new()}
+
+
+def k308_feed(D, ln):
+    k307_feed(D["k307"], ln)
+    if K308_P not in ln:
+        return
+    if "ocena miast BK" in ln:
+        D["start"] = "ocena miast BK wpieta" in ln
+        return
+    m = K308_RX_DAY.search(ln)
+    if not m:
+        D["fmt"] += 1
+        return
+    g = m.groups()
+    D["days"] += 1; D["key"] = g[1]
+    D["sea"] += int(g[4]); D["land"] += int(g[5]); D["dec"] += int(g[7]); D["far"] += int(g[8])
+    for k in range(5):
+        D["b"][k] += int(g[11 + k])
+    n = int(g[18]); D["rn"] += n; D["rc"] += n * int(g[19]); D["rb"] += n * int(g[20])
+    D["before"] += int(g[21]); D["swap"] += int(g[22]); D["left"] += int(g[23]); D["mo_l"] += int(g[24]); D["mo_s"] += int(g[25])
+    if g[26] != "-" and len(D["pl"]) < 12:
+        D["pl"].append(f"d{g[0]}: {g[26][:160]}")
+    D["stum"] += int(g[27])
+
+
+def k308_rows(rep, D):
+    on = D["key"] == "TAK"
+    rep.add("K308-0: latka 308a (ocena miast BK - droga morska)", f"{D['start']}", "wpieta", bool(D["start"]))
+    rep.add("K308-1: linie doby 308a, format i potkniecia", f"dob {D['days']}, zly format {D['fmt']}, potkniecia {D['stum']}", ">= 1 doba, format 0, potkniecia 0",
+            D["days"] >= 1 and D["fmt"] == 0 and D["stum"] == 0)
+    rep.add("K308-2: ocena BK liczy droge morska (klucz TAK)", f"klucz {D['key']}, odleglosc morska {D['sea']}, BK ladem {D['land']}", "> 0 przy kluczu TAK",
+            (D["sea"] > 0) if on else None)
+    nb = sum(D["b"])
+    longv = D["b"][3] + D["b"][4]
+    rep.add("K308-3: decyzje karawan ze statkami - rejsy > 20 dob", f"decyzji {D['dec']} (z droga morska {nb}; drugi przebieg BK {D['far']}), <=5 {D['b'][0]}, 5-10 {D['b'][1]}, "
+            f"10-20 {D['b'][2]}, 20-30 {D['b'][3]}, >30 {D['b'][4]} ({(100.0 * longv / nb) if nb else 0:.1f}% > 20 dob)", "<= 10% decyzji przy kluczu TAK (143c gracz: 29.9 doby)",
+            (nb > 0 and longv * 10 <= nb) if on else None)
+    rep.add("K308-4: daleki rejs gorszy niz bliski port (zysk na dobe)", f"przed regula {D['before']}, zamienione {D['swap']}, zostalo {D['left']}",
+            "zostalo 0 przy kluczu TAK", (D["left"] == 0) if on else None)
+    rep.add("K308-4b: zysk na dobe wybranego / najlepszego bliskiego portu, drugi przebieg BK, kontrakty bez zysku po dniach",
+            f"ocen {D['rn']}, wybrany srednio {(D['rc'] / D['rn']) if D['rn'] else 0:.0f}, bliski srednio {(D['rb'] / D['rn']) if D['rn'] else 0:.0f}; drugi przebieg {D['far']} z {D['dec']}; "
+            f"kontrakty odrzucone lad {D['mo_l']} morze {D['mo_s']}; gracza: {' ; '.join(D['pl'][:4]) or '-'}", "INFO", None)
+    E = D["k307"]
+    rm = E["run_max"]
+    rep.add("K308-5: karawana gracza - najdluzej bez handlu", f"{rm} dob", "<= 20 (143c: 64, 143d: 32)", None if rm is None else rm <= 20)
+    if E["res"] is None:
+        rep.add("K308-6: wynik handlu karawany gracza bez pierwszej partii", "brak linii", "sonda 306b", None)
+    else:
+        m = K307_RX_RESC.search(E["res"][1])
+        tr = int(m.group(7)) if m else None
+        rep.add("K308-6: wynik handlu karawany gracza bez pierwszej partii", f"doba {E['res'][0]}: {tr}", ">= 0 (143c: -14.7k w 90 dobach)", None if tr is None else tr >= 0)
+
+
+K308_SAMPLES = [
+    K308_P + "ocena miast BK wpieta (odleglosc partia - miasto 1, miasto - dom 1).",
+    K308_P + "dzien 108900 | klucz Caravan Sea True Distance TAK, blisko <= 12 dob | ocena BK: wpieta, odleglosc morska 5000, bez drogi morskiej (BK ladem) 10, dom morzem 300 | "
+    "decyzje karawan ze statkami 70 (drugi przebieg BK 3, cel bez drogi morskiej 0, gracza 1), dni drogi morzem: <=5 40, 5-10 20, 10-20 8, 20-30 2, >30 0, srednio 6.1, najwiecej 24.0 | "
+    "z towarem i bliskim portem 30: zysk/dobe wybranego srednio 120, najlepszego bliskiego srednio 100, daleki rejs gorszy niz bliski port: przed regula 4, zamienione na bliski 4, zostalo 0 | "
+    "kontrakty surowcow karawana bez zysku po koszcie dni: lad 1, morze 2 | gracza: 'Convoy of Ser X' Driftwood Hall -> Duskendale 3.1 dob morzem, zysk/dobe 300, najlepszy bliski Rosby 2.0 dob 200 | potkniecia 0 (sesja 0).",
+] + list(K307_SAMPLES)
+
+
+def karawany308_selftest():
+    D = k308_new()
+    for ln in K308_SAMPLES:
+        k308_feed(D, "[06:39:07] " + ln)
+    rep = Report(); k308_rows(rep, D)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    bad = [k for k in ("K308-0", "K308-1", "K308-2", "K308-3", "K308-4", "K308-5", "K308-6") if v.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad} ({v})"
+    B = k308_new()
+    for ln in K308_SAMPLES:
+        x = ln.replace(" wpieta (odleglosc", " NIE (brak").replace("odleglosc morska 5000", "odleglosc morska 0").replace(">30 0,", ">30 30,").replace("zostalo 0 |", "zostalo 3 |")
+        x = x.replace("potkniecia 0 (sesja 0).", "potkniecia 1 (sesja 1).").replace("najdluzej od wczytania 18", "najdluzej od wczytania 64").replace("zold rodu) 3279", "zold rodu) -14700")
+        k308_feed(B, "[06:39:07] " + x)
+    rep = Report(); k308_rows(rep, B)
+    vb = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("K308-0", "K308-1", "K308-2", "K308-3", "K308-4", "K308-5", "K308-6") if vb.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss} ({vb})"
+    C = k308_new()
+    k308_feed(C, "[06:39:07] " + K308_SAMPLES[1].replace("Distance TAK", "Distance NIE").replace("zostalo 0 |", "zostalo 3 |"))
+    rep = Report(); k308_rows(rep, C)
+    vc = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if vc.get("K308-2") != "INFO" or vc.get("K308-3") != "INFO" or vc.get("K308-4") != "INFO" or vc.get("K308-1") != "TAK":
+        return f"klucz NIE zle: {vc}"
+    return None
+
+
+def karawany308_main(logp):
+    """karawany308 (31.10, paczka 308a): K308-S, K308-0..K308-6. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = karawany308_selftest()
+    rep.add("K308-S: self-test wyrazen (linie jak w CaravanSea308.cs)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("K308-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = k308_new()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            k308_feed(D, ln.rstrip("\r\n"))
+    print(f"plik: {logp}")
+    k308_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_karawany308_main_prev = main
+
+
+def main(argv):
+    # paczka 308a: grupa karawany308 - opakowanie main jak karawany305
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "karawany308":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return karawany308_main(rest[0] if rest else None)
+    return _karawany308_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

@@ -273,6 +273,8 @@ namespace Armoury
                     _fallback++;
                     if (__result == null) _fallNull++;
                 }
+                // 308a: karawana ze statkami - rejs dalszy niz Caravan Sea Near Days tylko z lepszym zyskiem na dobe niz bliski port; pomiar dni drogi morskiej
+                if (ReferenceEquals(_mp, __0)) CaravanSea308.Decide(__0, ref __result);
                 if (__result != null && __result.Settlement != null && CaravanBulk.TradesForT1(__0))
                 {
                     var rec = RecOf(__0, __result);
@@ -323,7 +325,7 @@ namespace Armoury
             try
             {
                 bool zeroed = _zeroCall > _passZero;
-                if (!__1) { _farPass++; if (zeroed) _farZero++; CaravanLeg140.NoteSecond(__0); return; }   // 140: drugi przebieg karawany utknietej - licznik
+                if (!__1) { _farPass++; if (zeroed) _farZero++; CaravanLeg140.NoteSecond(__0); CaravanSea308.NoteFar(__0); return; }   // 140: drugi przebieg karawany utknietej - licznik
                 if (__result == null && zeroed && _findMi != null && __instance != null)
                 {
                     _bypass = true;

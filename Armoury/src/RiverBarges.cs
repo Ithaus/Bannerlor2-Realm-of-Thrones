@@ -196,6 +196,7 @@ namespace Armoury
         public static void ScorePostfix(MobileParty __0, Town __1, CampaignTime __2, ref float __result)
         {
             if (!(__result > 0f) || __0 == null || __1 == null) return;
+            if (CaravanSea308.ScoresBySea(__0)) return;   // 308a: ocena BK karawany ze statkami liczy juz droge morska - mnoznik barek (droga ladowa) nie dotyczy
             try
             {
                 var map = _river;

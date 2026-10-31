@@ -666,7 +666,19 @@ namespace Armoury
         }
 
         /// <summary>Karawana ma towar handlowy poza spizarnia eskorty (warunek C).</summary>
-        private static bool HasTrade(MobileParty mp, Dictionary<ItemObject, int> pantry)
+        /// <summary>308a (CaravanSea308): zysk na dobe drogi R = (zysk sprzedazy - koszt dnia x dni) / max(1, dni) - ten sam rachunek co C (Route).</summary>
+        internal static double PerDayNet(MobileParty mp, Town t, double days, Dictionary<ItemObject, int> pantry)
+        {
+            int u; double rv, cs;
+            double d = Math.Max(1.0, days);
+            double v = SaleValue(mp, t, d, SameDay(mp, t.Settlement), true, pantry, out u, out rv, out cs);
+            return (v - DayCost(mp) * d) / d;
+        }
+
+        /// <summary>308a: pamiec decyzji SaleValue (progi i ceny odniesienia) czyszczona po ocenach CaravanSea308 - jak w finally Route.</summary>
+        internal static void ClearDecision() { _floorC.Clear(); _dnC.Clear(); }
+
+        internal static bool HasTrade(MobileParty mp, Dictionary<ItemObject, int> pantry)
         {
             var r = mp.ItemRoster;
             for (int i = 0; r != null && i < r.Count; i++)

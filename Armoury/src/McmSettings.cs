@@ -10724,6 +10724,14 @@ namespace Armoury
         [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
         public int BattleStallSeconds { get; set; } = 60;
 
+        [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
+        public bool CaravanSeaTrueDistance { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Caravan Sea Near Days", 0.00f, 48.00f, "0.00", HintText = "With Caravan Sea True Distance: days of sailing within which a caravan with goods to sell looks for a better port before it takes a longer voyage", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
+        public float CaravanSeaNearDays { get; set; } = 12f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13404,6 +13412,8 @@ namespace Armoury
             s.BannerBreakBattleState = BannerBreakBattleState;
             s.BattleStallBreak = BattleStallBreak;
             s.BattleStallSeconds = BattleStallSeconds;
+            s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
+            s.CaravanSeaNearDays = CaravanSeaNearDays;
         }
 
         internal static void Apply()

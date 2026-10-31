@@ -145,6 +145,8 @@ namespace Armoury
         internal static double RoadDaysTo(MobileParty mp, Settlement to)
         {
             if (mp == null || to == null) return 0.0;
+            double sea = CaravanSea308.SeaDays(mp, to);                      // 308a: karawana ze statkami - droga morska (klucz CaravanSeaTrueDistance)
+            if (sea >= 0) return sea;
             var s = Settings.Current;
             double perDay = Math.Max(1.0, MarketCarts.PerDay(s));
             var cs = mp.CurrentSettlement;

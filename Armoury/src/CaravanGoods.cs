@@ -178,7 +178,7 @@ namespace Armoury
             _startDone = false; _stumbleSess = 0; _err.Clear();
             LastOwnerPaid = LastOwnerNot = LastOwnerLord = LastOwnerPlayer = 0; LastOwnerN = 0; _oStumbles = _oStumbleSess = 0;
             _pend284 = null; _had284 = false; _cbLots = _cbBad = _cbGone = 0; _cbUnits = 0; _snapLimit = 0;   // 284: ksiega z zapisu (Import284 po Reset)
-            Reset307(); CaravanSeaHold307.Reset();                           // 307a: gabka i polow w ksiedze, cel morski do doplyniecia
+            Reset307(); CaravanSeaHold307.Reset(); CaravanSea308.Reset();                           // 307a: gabka i polow w ksiedze, cel morski do doplyniecia
             ZeroDay();
         }
 
