@@ -44,6 +44,9 @@ namespace Armoury
     ///      305b i reszta testu ja mierzy) na typ bez linii broni o najnizszym kapitale startowym (StartCapitalFor) - ChangeProductionTypeOfWorkshopAction.Apply(w, typ)
     ///      jak rozmowa (WorkshopsCharactersCampaignBehavior.conversation_player_workshop_player_changed_production_on_consequence). Obietnica rozmowy
     ///      (WorkshopTrade.RetoolPromise - te same liczby co RetoolCondition) wobec przelewu RetoolSettle, kapitalu, znacznika, kapitalu wlasnego 259 i zlota gracza.
+    ///  307c: (3) pomija warsztaty z linia zbytku BK (srebrnik Seagard - reszta testu mierzy jego zarobek); jedyny taki kandydat - przestawiony z powrotem
+    ///      nastepnej doby ("warsztat - powrot produkcji"). (3b) doba N+4: kupno najtanszego warsztatu notabla bez linii broni i luksusu i natychmiastowa
+    ///      odsprzedaz ("warsztat - kupno i odsprzedaz": cena = GetCostForPlayer, odkup <= cena, zloto gracza i kiesy zgodne, kapital bez zmian).
     /// Potkniecia liczone (bez wylacznika). Linie "Sondy autotestu (306b): ..." (grupa sprawdz_logi sondy306).
     /// </summary>
     internal static class Probes306
@@ -56,12 +59,16 @@ namespace Armoury
         private static int _flagDay = -1, _firstDay = -1, _stumbles, _carTries;
         private static bool _fK, _fC, _fW, _startDone, _kowalDone, _carDone, _wsDone;
         private static string _carMark;   // znacznik karawany testu z zapisu albo z tej sesji ("id@doba"); null = brak
+        // 307c: (3a) warsztat z linia luksusu przestawiony w braku innego - powrot nastepnej doby; (3b) kupno i natychmiastowa odsprzedaz (doba N+4)
+        private static Workshop _revW; private static WorkshopType _revType; private static int _revDay = -1; private static bool _saleDone;
+        private static readonly string[] LuxCats = { "silver", "velvet", "jewelry", "spice", "fur" };   // jak TownFolk.Probe.LuxIds (zbytki BK)
 
         internal static void Reset()
         {
             _flagDay = -1; _firstDay = -1; _stumbles = 0; _carTries = 0;
             _fK = _fC = _fW = false; _startDone = _kowalDone = _carDone = _wsDone = false;
             _carMark = null;
+            _revW = null; _revType = null; _revDay = -1; _saleDone = false;   // 307c
         }
 
         private static void Stumble(string where, Exception e)
@@ -131,6 +138,8 @@ namespace Armoury
             }
             if (_fC) { try { CaravanDay(day); } catch (Exception e) { Stumble("CaravanDay", e); Log.Info(P + "karawana - wydatki doby " + day + " | wyjatek " + e.GetType().Name + " -> wynik NIE."); } }
             if (_fW && !_wsDone && day >= _firstDay + 3) { _wsDone = true; try { Retool(day); } catch (Exception e) { Stumble("Retool", e); Log.Info(P + "warsztat - zmiana produkcji doba " + day + " | wyjatek " + e.GetType().Name + ": " + e.Message + " -> wynik NIE."); } }
+            if (_revW != null && day > _revDay) { try { Revert(day); } catch (Exception e) { Stumble("Revert", e); Log.Info(P + "warsztat - powrot produkcji doba " + day + " | wyjatek " + e.GetType().Name + " -> wynik NIE."); } finally { _revW = null; _revType = null; } }
+            if (_fW && !_saleDone && day >= _firstDay + 4) { _saleDone = true; try { BuyResell(day); } catch (Exception e) { Stumble("BuyResell", e); Log.Info(P + "warsztat - kupno i odsprzedaz doba " + day + " | wyjatek " + e.GetType().Name + ": " + e.Message + " -> wynik NIE."); } }
         }
 
         // ============================================================ (1) kowalstwo
@@ -506,12 +515,22 @@ namespace Armoury
             var s = Settings.Current;
             if (!WorkshopTrade.On || !s.WorkshopRetoolSettlesCapital)
             { Log.Info(P + "warsztat - zmiana produkcji doba " + day + " | bez proby: WorkshopTrade " + Tn(WorkshopTrade.On) + ", WorkshopRetoolSettlesCapital " + Tn(s.WorkshopRetoolSettlesCapital) + " -> wynik POMINIETY."); return; }
-            Workshop pick = null; bool armsOnly = false;
+            Workshop pick = null; bool armsOnly = false, luxPicked = false; int luxSkipped = 0;
             foreach (var w in hero.OwnedWorkshops)
             {
                 if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || w.Settlement == null || w.Settlement.Town == null) continue;
                 if (WorkshopTrade.ProbeHasArmsLine(w.WorkshopType)) continue;
+                if (HasLuxLine(w.WorkshopType)) { luxSkipped++; continue; }   // 307c: warsztat z linia luksusu gracza zostaje (reszta testu mierzy jego zarobek)
                 if (pick == null || w.ProfitMade < pick.ProfitMade) pick = w;
+            }
+            if (pick == null)
+            {
+                foreach (var w in hero.OwnedWorkshops)
+                {
+                    if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || w.Settlement == null || w.Settlement.Town == null || WorkshopTrade.ProbeHasArmsLine(w.WorkshopType)) continue;
+                    if (pick == null || w.ProfitMade < pick.ProfitMade) pick = w;
+                }
+                luxPicked = pick != null;   // 307c: jedyny kandydat z linia luksusu - przestawiony z powrotem nastepnej doby
             }
             if (pick == null)
             {
@@ -567,7 +586,110 @@ namespace Armoury
                      + " | kapital " + cap0 + " -> " + cap1 + " (oczekiwane " + capWant + ", " + Tn(capOk) + "), znacznik " + mark0 + " -> " + mark1 + " (" + Tn(markOk) + ")"
                      + ", kapital wlasny (259) " + b0 + " -> " + b1 + " (oczekiwane " + bWant + ", " + Tn(basisOk) + ")"
                      + " | zloto gracza " + g0 + " -> " + g1 + " (oczekiwane " + goldWant + " = przed - sprzet + zwrot - doplata, " + Tn(goldOk) + "), kasa miasta " + tg0 + " -> " + tg1 + " (oczekiwane " + tgWant + " = przed + sprzet, " + Tn(townOk) + ")"
-                     + " | typ zmieniony " + Tn(typeOk) + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
+                     + " | typ zmieniony " + Tn(typeOk) + " | 307c: z linia luksusu pominiete " + luxSkipped + (luxPicked ? ", jedyny kandydat z luksusem - powrot nastepnej doby" : "")
+                     + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
+            if (luxPicked && typeOk) { _revW = pick; _revType = WorkshopType.Find(from); _revDay = day; }
+        }
+
+        /// <summary>307c: typ ma linie z wyjsciem zbytku BK (srebro, aksamit, klejnoty, przyprawy, futra).</summary>
+        private static bool HasLuxLine(WorkshopType t)
+        {
+            if (t == null) return false;
+            foreach (var p in t.Productions)
+                if (p.Outputs != null)
+                    foreach (var o in p.Outputs)
+                        if (o.Item1 != null && Array.IndexOf(LuxCats, (o.Item1.StringId ?? "").ToLowerInvariant()) >= 0) return true;
+            return false;
+        }
+
+        /// <summary>307c (3a): powrot produkcji warsztatu z linia luksusu (jedyny kandydat sondy) - ta sama akcja co rozmowa, z kosztem sprzetu.</summary>
+        private static void Revert(int day)
+        {
+            var w = _revW; var t = _revType;
+            if (w == null || t == null || w.Owner != Hero.MainHero) { Log.Info(P + "warsztat - powrot produkcji doba " + day + " | warsztat nie jest juz gracza albo brak typu -> wynik POMINIETY."); return; }
+            int g0 = Hero.MainHero.Gold; string from = w.WorkshopType != null ? w.WorkshopType.StringId : "?";
+            int tools, mark, cap, back, add;
+            WorkshopTrade.RetoolPromise(w, t, g0, out tools, out mark, out cap, out back, out add);   // recenzja: zloto wedlug tej samej obietnicy co zmiana produkcji
+            ChangeProductionTypeOfWorkshopAction.Apply(w, t);
+            bool typeOk = w.WorkshopType == t;
+            int g1 = Hero.MainHero.Gold, goldWant = g0 - tools + back - add;
+            bool goldOk = g1 == goldWant;
+            bool ok = typeOk && goldOk;
+            Log.Info(P + "warsztat - powrot produkcji doba " + day + " | " + w.Settlement.Name + " " + from + " -> " + t.StringId + " | zloto gracza " + g0 + " -> " + g1
+                     + " (oczekiwane " + goldWant + " = przed - sprzet " + tools + " + zwrot " + back + " - doplata " + add + ", " + Tn(goldOk) + ")"
+                     + " | typ przywrocony " + Tn(typeOk) + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
+        }
+
+        /// <summary>
+        /// 307c (3b): kupno warsztatu bez linii broni od notabla i natychmiastowa odsprzedaz - ta sama droga co rozmowy (WorkshopsCharactersCampaignBehavior, dekompilacja 1.4.8):
+        /// ChangeOwnerOfWorkshopAction.ApplyByPlayerBuying(w) (cena = WorkshopModel.GetCostForPlayer, gracz -> wlasciciel), potem GetNotableOwnerForWorkshop
+        /// i ApplyByPlayerSelling(w, kupiec, typ) (cena = GetCostForNotable; WorkshopTrade.SalePrefix/SalePostfix: placi kupiec z kiesy, najwyzej tyle, ile ma).
+        /// Sprawdza: cena kupna = GetCostForPlayer, zloto gracza i kiesa sprzedawcy o te cene, odkup <= cena kupna (bez petli zysku), zaplata odkupu = kiesa kupca,
+        /// kapital warsztatu po obu zmianach bez zmian (OwnerPrefix). Najtanszy warsztat notabla bez linii broni i luksusu, na ktory gracza stac (z zapasem 2x).
+        /// </summary>
+        private static void BuyResell(int day)
+        {
+            var hero = Hero.MainHero;
+            var wm = Campaign.Current.Models.WorkshopModel;
+            if (!WorkshopTrade.On) { Log.Info(P + "warsztat - kupno i odsprzedaz doba " + day + " | WorkshopTrade NIE -> wynik POMINIETY."); return; }
+            if (hero.OwnedWorkshops.Count >= wm.GetMaxWorkshopCountForClanTier(Clan.PlayerClan.Tier))
+            { Log.Info(P + "warsztat - kupno i odsprzedaz doba " + day + " | gracz ma juz najwiecej warsztatow (" + hero.OwnedWorkshops.Count + ") -> wynik POMINIETY."); return; }
+            Workshop pick = null; int price = int.MaxValue;
+            foreach (var t in Town.AllTowns)
+            {
+                if (t == null || t.Workshops == null || t.Settlement == null || t.Settlement.IsUnderSiege || t.Settlement.MapFaction == null) continue;
+                if (hero.MapFaction != null && FactionManager.IsAtWarAgainstFaction(hero.MapFaction, t.Settlement.MapFaction)) continue;
+                foreach (var w in t.Workshops)
+                {
+                    if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || w.Owner == null || w.Owner == hero || !w.Owner.IsNotable || !w.Owner.IsAlive) continue;
+                    if (WorkshopTrade.ProbeHasArmsLine(w.WorkshopType) || HasLuxLine(w.WorkshopType)) continue;
+                    int c = wm.GetCostForPlayer(w);
+                    if (c <= 0 || (long)c * 2 > hero.Gold || c >= price) continue;
+                    pick = w; price = c;
+                }
+            }
+            if (pick == null) { Log.Info(P + "warsztat - kupno i odsprzedaz doba " + day + " | brak warsztatu notabla bez linii broni w zasiegu kiesy " + hero.Gold + " (z zapasem 2x) -> wynik POMINIETY."); return; }
+            var seller = pick.Owner; var town = pick.Settlement; string type = pick.WorkshopType.StringId;
+            int g0 = hero.Gold, s0 = seller.Gold, cap0 = pick.Capital;
+            ChangeOwnerOfWorkshopAction.ApplyByPlayerBuying(pick);
+            int g1 = hero.Gold, s1 = seller.Gold, cap1 = pick.Capital;
+            bool own = pick.Owner == hero;
+            bool buyOk = own && g0 - g1 == price && s1 - s0 == price && cap1 == cap0;
+            int back = -1, paid = -1, b0 = -1, b1 = -1, g2 = g1, g3 = g1, cap2 = cap1; string buyerName = "-"; bool sold = false;
+            if (own)
+            {
+                back = wm.GetCostForNotable(pick);
+                var buyer = wm.GetNotableOwnerForWorkshop(pick);
+                if (buyer != null)
+                {
+                    buyerName = buyer.Name.ToString();
+                    b0 = buyer.Gold; g2 = hero.Gold;
+                    ChangeOwnerOfWorkshopAction.ApplyByPlayerSelling(pick, buyer, pick.WorkshopType);
+                    b1 = buyer.Gold; g3 = hero.Gold; cap2 = pick.Capital;
+                    sold = pick.Owner == buyer;
+                    paid = g3 - g2;
+                }
+            }
+            string left = "";
+            if (pick.Owner == hero && !sold)
+            {
+                // recenzja: bez kupca warsztat nie zostaje u gracza do konca testu (przeklamalby pomiary 305b) - odsprzedaz sprzedawcy, ta sama akcja
+                try
+                {
+                    if (seller != null && seller.IsAlive && seller.IsNotable) { ChangeOwnerOfWorkshopAction.ApplyByPlayerSelling(pick, seller, pick.WorkshopType); }
+                    left = pick.Owner == hero ? " | warsztat zostal u gracza" : " | bez kupca - odsprzedany sprzedawcy " + seller.Name + " (zloto gracza " + g1 + " -> " + hero.Gold + ")";
+                }
+                catch (Exception e) { left = " | odsprzedaz sprzedawcy: wyjatek " + e.GetType().Name + " - warsztat zostal u gracza"; }
+            }
+            bool noLoop = back >= 0 && back <= price;
+            bool payOk = sold && paid == Math.Min(back, Math.Max(0, b0)) && b0 - b1 == paid;
+            bool capOk = cap2 == cap0;
+            bool ok = buyOk && sold && noLoop && payOk && capOk;
+            Log.Info(P + "warsztat - kupno i odsprzedaz doba " + day + " | " + town.Name + " " + type + " od " + seller.Name + " | cena kupna (GetCostForPlayer) " + price
+                     + " | zloto gracza " + g0 + " -> " + g1 + ", kiesa sprzedawcy " + s0 + " -> " + s1 + ", kapital " + cap0 + " -> " + cap1 + " (" + Tn(buyOk) + ")"
+                     + " | odkup (GetCostForNotable) " + back + " <= cena kupna " + Tn(noLoop) + " | kupiec " + buyerName + ": kiesa " + b0 + " -> " + b1 + ", zloto gracza " + g2 + " -> " + g3
+                     + " (zaplata " + paid + ", " + Tn(payOk) + "), kapital po odsprzedazy " + cap2 + " (" + Tn(capOk) + ") | strata gracza na obrocie " + (g0 - g3) + left
+                     + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
         }
     }
 }

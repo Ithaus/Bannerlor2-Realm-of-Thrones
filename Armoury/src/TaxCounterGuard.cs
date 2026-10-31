@@ -38,7 +38,7 @@ namespace Armoury
         internal static int Trips { get { return _trips; } }
 
         /// <summary>Nowa sesja (konstruktor ArmouryBehavior): liczniki potkniec od zera.</summary>
-        internal static void Reset() { _trips = _flipped = _zeroed = _stumbles = 0; _dayN = _dayFlip = _dayZero = 0; _dayFix = 0; }
+        internal static void Reset() { _trips = _flipped = _zeroed = _stumbles = 0; _dayN = _dayFlip = _dayZero = 0; _dayFix = 0; BkEstateShare307.Reset(); }   // 307c
 
         internal static bool Bad(int v) { return v < 0 || v > Max; }
 

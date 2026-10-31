@@ -281,7 +281,9 @@ namespace Armoury
             }
             try
             {
-                if (SiegeWalls.Veto(__instance)) { __result = false; return; }   // OB1 / przerwa OB2 (SiegeWalls.cs) - PRZED okupem: okup liczy tylko po naszym "tak"
+                bool ransomOnly;
+                if (SiegeWalls.Veto(__instance, out ransomOnly)) { __result = false; return; }   // OB1 / przerwa OB2 (SiegeWalls.cs) - PRZED okupem: okup liczy tylko po naszym "tak"
+                if (ransomOnly) __result = false;                          // recenzja 307c (SiegeRepelHoldRansom): po odparciach bez szturmu, ale okup / kapitulacja ponizej liczone jak zwykle
                 if (!Live || !AnyKey) return;
                 var ev = __instance != null ? __instance.SiegeEvent : null;
                 if (ev == null || ev.BesiegedSettlement == null || ev.BesiegedSettlement.Town == null) return;
@@ -302,7 +304,13 @@ namespace Armoury
                 if (j.DefPays && j.AiAccepts) _dBoth++;
                 if (j.Player != "-") _dPlayerSide++;
                 string outcome = Decide(s, j);                             // O1-O3 (wylaczone - "szturm (gra)")
-                if (Hold(s, false)) __result = false;
+                bool held = Hold(s, false);
+                if (held) __result = false;
+                if (ransomOnly)
+                {
+                    SiegeWalls2.NoteRetryRansom(held);
+                    if (!held) outcome = "bez szturmu (307c: po odparciach te same mury; bez umowy - " + outcome + ")";
+                }
                 if (MeasureOn) MeasureLine(j, outcome);
             }
             catch (Exception e) { Stumble("AssaultPost", e); }
