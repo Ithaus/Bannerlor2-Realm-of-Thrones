@@ -61,6 +61,9 @@ namespace Armoury
         /// <summary>305d: slowo zrodla nastepnego XP Smithing (luk / kusza / amunicja / pancerz / miecz / zlecenie / przetop / rafinacja).</summary>
         internal static void Tag(string src) { _tag = src; _tagAt = Environment.TickCount; }
 
+        /// <summary>306b (sonda autotestu kowal305): zdjecie slowa zrodla zostawionego przez podglad XP modelu - nie opisze nastepnego prawdziwego XP.</summary>
+        internal static void ClearTag() { _tag = null; }
+
         private static int TakeTag()
         {
             string t = _tag;

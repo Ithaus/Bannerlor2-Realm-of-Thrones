@@ -5040,6 +5040,11 @@ namespace Armoury
         public bool PriceBandByCarriage = true;            // A trade good (not food) costs in any town between 1/k and k times its normal price, where k is what a merchant needs to carry it from the cheapest market to the dearest: his margin times the cost of the haul by cart against the price of a kilogram. Light, precious goods (velvet, jewelry, spice, fur) then differ between towns about 2-4 times at most, bulky cheap goods (salt, timber, clay, stone) keep the game's own range of 0.1-10. Food keeps the game's range (it spoils and is priced by local plenty or famine), and so do animals - horses, cattle, sheep, pigs and poultry walk to market on their own feet. Only prices change, for you and the AI alike - no coin is made or lost. Off = the game's range 0.1-10 for every trade good, as before
         public float PriceBandMerchantMargin = 1.0f;       // With Price Band By Carriage: the long-distance merchant's share for risk, tolls, time and profit (1.0 = he wants twice what he paid, so velvet ranges about 0.5-2 times its price; 9 = the game's range)
         public int PriceBandHaulKm = 2000;                 // With Price Band By Carriage: the longest land haul a merchant prices in, km (carriage 1.5 pence per ton per mile, 14th-century England): the longer, the wider the band of cheap heavy goods
+        // --- Autotest probes (306b) ---
+        // 306b (Jeff 31.10 "rob tak dlugo az bedzie to dzialalo perfekcyjnie"): sondy autotestu dla zmian 305, ktorych autotest 141b nie pokryl (kucie, karawana gracza,
+        // zmiana produkcji warsztatu) - Probes306.cs. Dzialaja TYLKO w DLL autotestu CrashScribe (LogGate.Mode 1/2) i tylko przy plikach armoury-kowal305.flag,
+        // armoury-karawana305.flag, armoury-warsztat305.flag w Documents\Mount and Blade II Bannerlord\CrashScribe. W zwyklej grze klucz nic nie zmienia.
+        public bool Autotest306Probes = true;              // Test runs only: lets the automatic test check smithing XP, give the player a caravan and change the trade of one of the player's workshops, when the test's own flag files are present. In a normal game it does nothing. Off = those checks never run, even with the flag files
 
         public static void Load(string moduleDataDir)
         {
