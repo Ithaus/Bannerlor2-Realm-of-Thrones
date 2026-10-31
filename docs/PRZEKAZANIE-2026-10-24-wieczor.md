@@ -1,5 +1,9 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 17:15 CET - WGRANIE 146 (noc/310-strzaly-tarcze, wypchniete) - START DLA NASTEPNEJ SESJI
+- W GRZE: Armoury.dll ed0199b997bebb13c90e4106d94e1dfe (146 = 145 + 310 czysty strzal AI, sciana tarcz pod ostrzalem, budzet RoutKeeper). Kopie 145: .bak-2026-10-31-przed-wgranie146
+  i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie146-przed. CrashScribe bef9db58. LINIA GLOWNA: noc/310-strzaly-tarcze (zb n310). Testy 146a/146b (bitwy z armiami).
+
 ## DOPISEK 31.10 ok. 16:00 CET - WGRANIE 145 (noc/309-bitwa-armie, wypchniete) - START DLA NASTEPNEJ SESJI
 - W GRZE: Armoury.dll 050a484260b7004038507783a9b1264b (145 = 144 + 309 bitwa armii). Kopie 144: .bak-2026-10-31-przed-wgranie145 i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie145-przed.
   CrashScribe bef9db58. LINIA GLOWNA: noc/309-bitwa-armie (zb n309). Testy 145a/145b (tylko bitwy, z armiami).
