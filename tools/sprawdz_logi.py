@@ -84421,6 +84421,162 @@ def karawany305_main(logp):
     return 0
 
 
+# ---------------------------------------------------------------- paczka 305c (31.10): bitwa i AI - grupa bitwa305c
+# B305-S self-test wyrazen; B305-1 'Choragwie (CH) koniec' segment 'straty bez bramki morale (305c)': przy kluczu TAK kazde zdarzenie strat
+# (trzecia czesc + polowa skladu) daje rzut strat (rzutow strat >= polowa + trzecia czesc minus kompanie juz zlamane - tolerancja: rzutow > 0, gdy zdarzen > 0),
+# zalamania ze strat w bitwach od 8 kompanii (INFO, cel > 0); B305-2 'poscig (148)' segment 'wolni jezdzcy (305c': przydzialy wolnym (INFO),
+# przyczyny; B305-3 'Szarza przez swoich (305c)': potkniecia 0, takt sr. < 0.5 ms i najwyzej < 10 ms, szarze AI w swoich (INFO, porownac z 2866 Willow);
+# B305-4 linia nekania 283: przy 'smycz z wyprzedzeniem (305c) TAK' najdalej piechota <= 60 m (smycz 50 m + 1 krok); B305-5 log CrashScribe (opcjonalny
+# drugi argument): 'Mends: smoki ROT na ladzie (305c) - prefiks ... wpiety 1/1', bledy prefiksu 0, pominiete (INFO).
+B305_CH = re.compile(r"\| straty bez bramki morale \(305c\) (TAK|NIE): trzecia czesc strat (\d+), rzutow strat (\d+) \(morale od 50: (\d+), sr\. morale (\S+), "
+                     r"sr\. szansa (\S+)\), zalaman ze strat (\d+) \(ludzi (\d+)\)")
+B305_CHK = re.compile(r"Choragwie \(CH\) koniec: (?:.*?\| )?kompanii (\d+) \|.*?, polowa skladu (\d+),")
+B305_HP = re.compile(r"\| wolni jezdzcy \(305c, ofiara przy szyku (TAK|NIE): .*?kontrola - poza \d+ m (\d+), nietknieta formacja przy jezdzcu (\d+), kon zajechany (\d+), "
+                     r"wiwat (\d+), panika / inne (\d+); bez celu - brak uciekajacych w \d+ m (\d+), limit \d+ jezdzcow (\d+), ofiara przy nietknietym szyku (\d+), "
+                     r"ofiara poza \d+ m (\d+), cel nieaktualny (\d+); przydzialy wolnym (\d+)(?:; zawroceni w kroku 0\.25 s \(.*?\) (\d+))?")
+B305_HPW = re.compile(r"wejsc (\d+) \(")
+B305_OF = re.compile(r"Szarza przez swoich \(305c\): misja (\S+), klucz Cavalry Slows For Own Foot (TAK|NIE)")
+B305_OFT = re.compile(r"\| taktow (\d+) \(sr\. (\S+) ms, najwyzej (\S+) ms\).*?\| zwolnieni przed swoim pieszym: razy (\d+) \(jezdzcow (\d+)\)")
+B305_OFF = re.compile(r"\| szarze AI w swoich \(FF\) (\d+) \(w czasie zwolnienia (\d+)\)")
+B305_OFS = re.compile(r"\| potkniecia (\d+)")
+B305_LE = re.compile(r"najdalej piechota (\d+) m.*?\| smycz z wyprzedzeniem \(305c\) (TAK|NIE): zawroceni przed smycza (\d+), w kroku sterowania (\d+)")
+B305_CS = re.compile(r"Mends: smoki ROT na ladzie \(305c\) - prefiks ROTDragonMissionBehavior\.GetAllShipPositions (wpiety 1/1|NIE wpiety 0/1)")
+B305_CSM = re.compile(r"Mends: smoki ROT na ladzie \(305c\): misja (\S+) - GetAllShipPositions bez NavalShipsLogic (\d+) razy .*?bledy prefiksu (\d+)")
+
+B305_SAMPLE_CH = ("[02:44:01] Choragwie (CH) koniec: kompanii 16 | sztandar padl 51 (podniesiony 43, odszedl z chorazym do innej formacji 18), dowodca padl 7 (bohater 7, "
+                  "wodz 1, gracz 0; odszedl do innej formacji 9), polowa skladu 15, wstrzasnietych ludzi 4800 | rzutow 30 (pominiete przy morale od 50: 40), zalaman 4 "
+                  "(T1 0/0, T2 4/30, T3 0/0, T4 0/0, T5 0/0, T6 0/0, T7 0/0), zlamanych ludzi 300 (RoutHold 300, morale 0 0, odmowy 0) | okrzykow zwyciestwa 4 "
+                  "(bez wroga w 60 m 0), komunikatow 23 (pominiete limitem 1) | posilkow dolaczonych 2368, przeniesionych 2732, formacji podzielonych pozniej 3 "
+                  "| linie sztandaru (154) 120 (ponad limit 239) | straty bez bramki morale (305c) TAK: trzecia czesc strat 14, rzutow strat 29 (morale od 50: 25, "
+                  "sr. morale 61.2, sr. szansa 0.081), zalaman ze strat 4 (ludzi 300) | potkniecia 0.")
+B305_SAMPLE_HP = ("poscig (148): misja bitwa, klucz TAK (...) | szyki 5 (strona gracza 2 / wroga 3; konnica 4, konni lucznicy 1), wejsc 37 (sr. czas 52.1 s, najdluzej 60.0 s) "
+                  "| wolni jezdzcy (305c, ofiara przy szyku TAK: ofiara w 40 m, jezdziec w 15 m od nietknietego szyku): kontrola - poza 250 m 3, nietknieta formacja "
+                  "przy jezdzcu 10, kon zajechany 0, wiwat 0, panika / inne 1; bez celu - brak uciekajacych w 150 m 100, limit 2 jezdzcow 5, ofiara przy nietknietym "
+                  "szyku 40, ofiara poza 240 m 0, cel nieaktualny 2; przydzialy wolnym 12; zawroceni w kroku 0.25 s (jezdziec w 15 m + droga konia 1 s od pelnego "
+                  "promienia szyku) 3 | potkniecia poscig 0 (wypadli 0).")
+B305_SAMPLE_OF = ("Szarza przez swoich (305c): misja bitwa, klucz Cavalry Slows For Own Foot TAK (korytarz 3 m + 0.5 s jazdy, najwyzej 8 m, szer. 2 x 1.1 m; step 2.0 m/s; "
+                  "latka AdjustSpeedLimit TAK) | taktow 2400 (sr. 0.120 ms, najwyzej 2.400 ms), jezdzcow sprawdzonych 600, zapytan 90000 (limit taktu 3) | zwolnieni "
+                  "przed swoim pieszym: razy 800 (jezdzcow 300), jezdzco-sekund 900, ocen z wrogiem dalej w drodze 50, naraz najwyzej 40, limit w latce 2000 | szarze AI "
+                  "w swoich (FF) 900 (w czasie zwolnienia 100): RBM szarzuje 300, RBM przejazd 200, RBM przegrupowanie 50, RBM inny stan 0, szarza gry 100, oslona skrzydla "
+                  "50, inne (marsz, stoi) 200 | ofiary: piesi wrecz 700, piesi strzelcy 150, konni 50 | potkniecia 0.")
+B305_SAMPLE_LE = ("... | wyniki padl od odpowiedzi 1, odpedzony 1; najdalej piechota 52 m, jazda 120 m; piechoty padlo 0 | FF od lucznikow 283 0 (strzalow 0) | ... "
+                  "| smycz z wyprzedzeniem (305c) TAK: zawroceni przed smycza 3, w kroku sterowania 2, prognoza najwyzej 55 m | potkniecia nekanie 0.")
+B305_SAMPLE_CS = "Mends: smoki ROT na ladzie (305c) - prefiks ROTDragonMissionBehavior.GetAllShipPositions wpiety 1/1 (bez NavalShipsLogic ...)."
+B305_SAMPLE_CSM = ("Mends: smoki ROT na ladzie (305c): misja pole - GetAllShipPositions bez NavalShipsLogic 400 razy (pusta lista bez refleksji), z NavalShipsLogic "
+                   "(oryginal ROT) 0, bledy prefiksu 0 | sesja: pominiete 400, oryginal 0 | koniec: koniec misji.")
+
+
+def bitwa305c_selftest():
+    for name, rx, s in (("CH", B305_CH, B305_SAMPLE_CH), ("CHK", B305_CHK, B305_SAMPLE_CH), ("HP", B305_HP, B305_SAMPLE_HP), ("HPW", B305_HPW, B305_SAMPLE_HP),
+                        ("OF", B305_OF, B305_SAMPLE_OF), ("OFT", B305_OFT, B305_SAMPLE_OF), ("OFF", B305_OFF, B305_SAMPLE_OF), ("LE", B305_LE, B305_SAMPLE_LE),
+                        ("CS", B305_CS, B305_SAMPLE_CS), ("CSM", B305_CSM, B305_SAMPLE_CSM)):
+        if not rx.search(s):
+            return "wyrazenie " + name + " nie pasuje do probki"
+    return None
+
+
+def bitwa305c_main(logp, csp=None):
+    """bitwa305c (31.10, paczka 305c): B305-S, B305-1..5 - opis nad B305_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = bitwa305c_selftest()
+    rep.add("B305-S: self-test wyrazen (linie 305c jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("B305-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log> [session-*.log]", None)
+        rep.show()
+        return 0
+    ch, hp, of, le = [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Choragwie (CH) koniec:" in line and "(305c)" in line:
+                ch.append(line.strip())
+            elif "poscig (148): misja " in line:
+                hp.append(line.strip())
+            elif "Szarza przez swoich (305c):" in line:
+                of.append(line.strip())
+            elif "smycz z wyprzedzeniem (305c)" in line:
+                le.append(line.strip())
+    # B305-1
+    bad, big, big_breaks, events, rolls, breaks = [], 0, 0, 0, 0, 0
+    for l in ch:
+        m = B305_CH.search(l); k = B305_CHK.search(l)
+        if not m or not k:
+            bad.append("format: " + l[:120]); continue
+        if m.group(1) != "TAK":
+            continue
+        ev = int(m.group(2)) + int(k.group(2))
+        events += ev; rolls += int(m.group(3)); breaks += int(m.group(7))
+        if ev > 0 and int(m.group(3)) == 0:
+            bad.append(l[:160])
+        if int(k.group(1)) >= 8:
+            big += 1; big_breaks += int(m.group(7))
+    rep.add("B305-1: rzut po stratach bez bramki morale (zdarzenia strat -> rzuty)", f"linii {len(ch)}, zdarzen strat {events}, rzutow strat {rolls}, zalaman ze strat {breaks}, zlych {len(bad)}"
+            + (f" ({bad[0]})" if bad else ""), "zlych 0 (brak linii z kluczem TAK - INFO)", None if not ch else not bad)
+    rep.add("B305-1b: zalamania kompanii ze strat w bitwach od 8 kompanii", f"bitew {big}, zalaman ze strat {big_breaks}", "> 0 (INFO; Willow Wood 30.10: 0)", None)
+    # B305-2
+    tot = [0] * 11; n2 = 0; ent = 0; tstep = 0
+    for l in hp:
+        m = B305_HP.search(l)
+        if not m:
+            continue
+        n2 += 1
+        for j in range(11):
+            tot[j] += int(m.group(j + 2))
+        if m.group(13): tstep += int(m.group(13))
+        w = B305_HPW.search(l)
+        if w: ent += int(w.group(1))
+    rep.add("B305-2: poscig 148 - wolni jezdzcy (przyczyny i przydzialy)", f"linii {n2} z {len(hp)}, wejsc {ent}, przydzialy wolnym {tot[10]}; kontrola: daleko {tot[0]}, szyk przy jezdzcu {tot[1]}, "
+            f"kon {tot[2]}, wiwat {tot[3]}, inne {tot[4]}; bez celu: brak {tot[5]}, limit {tot[6]}, ofiara przy szyku {tot[7]}, daleko {tot[8]}, nieaktualny {tot[9]}",
+            "INFO (przydzialy > 0 przy wejsciach > 0; Willow 30.10: 0 z 37 wejsc)", None)
+    rep.add("B305-2b: poscig 148 - zawroceni przy nietknietym szyku w kroku 0.25 s (recenzja 305c)", f"zawroconych w kroku {tstep}",
+            "INFO (porownac 'gonacy padli' i 'FF na wlasnej jezdzie' w linii poscig (148) z biegiem przy CavalryPursuitNearVictim=false)", None)
+    # B305-3
+    bad3, ffs, ffslow, slowed, n3 = [], 0, 0, 0, 0
+    for l in of:
+        n3 += 1
+        st = B305_OFS.findall(l); t = B305_OFT.search(l); ff = B305_OFF.search(l)
+        if not st or int(st[-1]) != 0:
+            bad3.append("potkniecia: " + l[-160:])
+        if t:
+            slowed += int(t.group(4))
+            try:
+                if float(t.group(2)) >= 0.5 or float(t.group(3)) >= 10.0:
+                    bad3.append("koszt: " + t.group(0))
+            except ValueError:
+                pass
+        if ff:
+            ffs += int(ff.group(1)); ffslow += int(ff.group(2))
+    rep.add("B305-3: jezdziec AI zwalnia przed swoim pieszym - potkniecia 0, takt sr. < 0.5 ms / max < 10 ms", f"linii {n3}, zlych {len(bad3)}" + (f" ({bad3[0]})" if bad3 else ""),
+            "zlych 0 (brak bitwy - INFO)", None if not of else not bad3)
+    rep.add("B305-3b: szarze AI w swoich (FF) i zwolnienia", f"szarz w swoich {ffs} (w czasie zwolnienia {ffslow}), zwolnien {slowed}", "INFO (Willow 30.10: 2866 szarz AI w swoich)", None)
+    # B305-4
+    bad4, n4 = [], 0
+    for l in le:
+        m = B305_LE.search(l)
+        if not m or m.group(2) != "TAK":
+            continue
+        n4 += 1
+        if int(m.group(1)) > 60:
+            bad4.append(m.group(0))
+    rep.add("B305-4: smycz piechoty z wyprzedzeniem - najdalej piechota <= 60 m", f"linii {n4}, zlych {len(bad4)}" + (f" ({bad4[0]})" if bad4 else ""),
+            "zlych 0 (Willow 30.10: 78 m; brak nekania - INFO)", None if n4 == 0 else not bad4)
+    # B305-5
+    if csp and os.path.isfile(csp):
+        inst, skipped, err = [], 0, 0
+        with open(csp, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = B305_CS.search(line)
+                if m: inst.append(m.group(1))
+                m = B305_CSM.search(line)
+                if m: skipped += int(m.group(2)); err += int(m.group(3))
+        ok5 = bool(inst) and all(x == "wpiety 1/1" for x in inst) and err == 0
+        rep.add("B305-5: CrashScribe - prefiks smoka ROT na ladzie wpiety, bledy prefiksu 0", f"linii wpiecia {len(inst)} ({', '.join(inst[:2]) or '-'}), pominiete {skipped}, bledy {err}",
+                "wpiety 1/1, bledy 0 (porownac koszyk '(inne)' GetMethodImpl w SUMMARY: 3790 w sesji 30.10)", ok5 if inst else None)
+    else:
+        rep.add("B305-5: CrashScribe - prefiks smoka ROT", "bez logu CrashScribe (drugi argument)", "INFO", None)
+    rep.show()
+    return 0
+
+
 
 # ------------------------------------------------------------ paczka 305b: warsztaty gracza (firma broni, kapital przy zmianie produkcji, cena kupna, ksiega 259)
 # Linie C#: WorkshopLaw.ApplyAll ("WorkshopLaw: warsztaty gracza (poprawka 174b ... | 305b linie broni/zbroi z wsadem jako firma (Player Arms As Firm): TAK, wpiete 1/1."),
@@ -84551,6 +84707,20 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return w305_main(rest[0] if rest else None)
     return _w305_main_prev(argv)
+
+_bitwa305c_main_prev = main
+
+
+def main(argv):
+    # paczka 305c: grupa bitwa305c - opakowanie main jak dowodca139
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "bitwa305c":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return bitwa305c_main(rest[0] if rest else None, rest[1] if len(rest) > 1 else None)
+    return _bitwa305c_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

@@ -10552,6 +10552,22 @@ namespace Armoury
         [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
         public bool CaravanLossNotice { get; set; } = true;
 
+        [SettingPropertyBool("Banner Loss Break Ignores Morale", HintText = "with Banner Companies: a company that has lost a third of its men (half the base chance) and again when it has lost half (full chance) rolls to break even when its men's morale is still high - losses frighten men whatever the game's morale says. Veterans still hold far longer (the chance is divided by the morale resistance of their tier, and high morale keeps it at its lowest). Off = no roll at a third, and the roll at half is skipped while morale is 50 or more, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: fighting for life (305c)")]
+        public bool BannerLossBreakIgnoresMorale { get; set; } = true;
+
+        [SettingPropertyBool("Cavalry Pursuit Near Victim", HintText = "with AI Cavalry Pursues: a pursuing rider leaves a fleeing man alone only if that man is within 40 m of an unbroken enemy formation, and turns back himself once he would reach 15 m of its edge within the next second of riding (checked four times a second, measured from the full width of the line), so he does not ride into the spears. Off = no pursuit while the rider or the fleeing man is within 80 m of any unbroken enemy formation, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: fighting for life (305c)")]
+        public bool CavalryPursuitNearVictim { get; set; } = true;
+
+        [SettingPropertyBool("Cavalry Slows For Own Foot", HintText = "an AI rider whose path is blocked by a man of his own side on foot - within 3 m of the horse's head, more at a gallop (up to 8 m) - reins in to a walk until the way is clear, unless an enemy stands closer in his path. Only in field battles; your own horse is never touched. Off = AI riders ride through their own infantry, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: fighting for life (305c)")]
+        public bool CavalrySlowsForOwnFoot { get; set; } = true;
+
+        [SettingPropertyBool("Infantry Leash Lookahead", HintText = "infantry sent after a harasser turns back before it runs past its 50 m leash: the leash is checked at every steering step and with the distance it will cover until the next check. Off = the leash is checked once a second at the current distance, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: fighting for life (305c)")]
+        public bool InfantryLeashLookahead { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13189,6 +13205,10 @@ namespace Armoury
             s.CaravanWagesSeparateLine = CaravanWagesSeparateLine;
             s.CaravanPlayerDiary = CaravanPlayerDiary;
             s.CaravanLossNotice = CaravanLossNotice;
+            s.BannerLossBreakIgnoresMorale = BannerLossBreakIgnoresMorale;
+            s.CavalryPursuitNearVictim = CavalryPursuitNearVictim;
+            s.CavalrySlowsForOwnFoot = CavalrySlowsForOwnFoot;
+            s.InfantryLeashLookahead = InfantryLeashLookahead;
         }
 
         internal static void Apply()

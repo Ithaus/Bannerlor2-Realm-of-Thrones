@@ -139,6 +139,18 @@ namespace CrashScribe
             UnwindRepair.Tick();   // UW: zlecone skany (menu/sesja), pelny skan co 5 min, straz bajtow co 30 s - poza tym bez alokacji w klatce
         }
 
+        /// <summary>305c: prefiks na smoka ROT (DragonShips) - wpiety leniwie w pierwszej misji, linia misji przez DragonShips.Logic.</summary>
+        public override void OnMissionBehaviorInitialize(Mission mission)
+        {
+            base.OnMissionBehaviorInitialize(mission);
+            try
+            {
+                DragonShips.EnsureInstalled(_harmony);
+                if (DragonShips.Installed && mission != null) mission.AddMissionBehavior(new DragonShips.Logic());
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnMissionBehaviorInitialize.DragonShips", null); } catch { } }
+        }
+
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
         {
             base.OnGameStart(game, gameStarterObject);

@@ -262,6 +262,27 @@ namespace Armoury
                 if (tb > 0f) AiBreath.NotePost();
                 return;
             }
+            // 305c (klucz CavalrySlowsForOwnFoot): jezdziec AI ze swoim pieszym w korytarzu przed lbem konia (OwnFootAhead, znacznik z glownego watku) - step,
+            // jedna regula z capem marszu 128 / odpoczynku 136: najmniejszy limit wygrywa (step ponizej klusa 128 i odpoczynku 136; nizszy wpis gry zostaje)
+            if (OwnFootAhead.SlowAnyThread(agent))
+            {
+                try
+                {
+                    var mt = agent.MountAgent;
+                    if (mt != null && !agent.IsRunningAway)
+                    {
+                        float mx = mt.GetMaximumForwardUnlimitedSpeed();
+                        float cur = desiredSpeed < 0f ? mx : (limitIsMultiplier ? desiredSpeed * mx : desiredSpeed);
+                        float lim = OwnFootAhead.Step;
+                        if (cur > 0.3f && cur < lim) lim = cur;
+                        agent.SetMaximumSpeedLimit(lim, false);
+                        mt.SetMaximumSpeedLimit(lim, false);
+                        OwnFootAhead.NotePost();
+                        return;
+                    }
+                }
+                catch { Interlocked.Increment(ref _postErr); return; }
+            }
             if (!_on && !AiBreath.On) return;
             try
             {

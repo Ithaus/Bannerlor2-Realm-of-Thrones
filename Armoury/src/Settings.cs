@@ -5009,6 +5009,16 @@ namespace Armoury
         public bool CaravanPlayerDiary = true;              // The mod log records every purchase and sale of your caravans (goods, town, pieces, price per piece, the town price after the deal, base value and price index of the goods) and once a day where each caravan is, where it is heading, what it is doing and how many days ago it was last in a town. Log only, nothing in the game changes. Off = as before
         public bool CaravanLossNotice = true;               // When one of your caravans is destroyed you get a message saying who destroyed it, near which settlement and how much coin and goods it carried at its last count; when it is gone without a battle, whether its purse came back to your clan. The mod log records the same. Off = no message, as before
 
+        // --- Battle: fighting for life (305c) ---
+        // 305c (Jeff 31.10: "sprawdz bitwe ... jak mozesz podkrec AI i trudnosc zachowania AI"; zasada 25.10: kazdy walczy o zycie w granicach umiejetnosci
+        // i sprzetu, panika = tylko ucieczka). Willow Wood 30.10: przegrani uszli 7%, zwyciezcy wypadli 78%, zalaman kompanii 0 (69 rzutow pominietych przy
+        // morale od 50), poscig 148 bez przydzialu, 27.9% trafien od swoich (2866 szarz koni AI w swoich). Bez premii do obrazen i HP.
+        // BannerCompanies.cs (Roll), HorsePursuit.cs (RidersPass), OwnFootAhead.cs + MarchToContact.PostSpeed, HorsePursuit.Hunt.cs (HunterCheck)
+        public bool BannerLossBreakIgnoresMorale = true;   // with Banner Companies: a company that has lost a third of its men (half the base chance) and again when it has lost half (full chance) rolls to break even when its men's morale is still high - losses frighten men whatever the game's morale says. Veterans still hold far longer (the chance is divided by the morale resistance of their tier, and high morale keeps it at its lowest). Off = no roll at a third, and the roll at half is skipped while morale is 50 or more, as before
+        public bool CavalryPursuitNearVictim = true;       // with AI Cavalry Pursues: a pursuing rider leaves a fleeing man alone only if that man is within 40 m of an unbroken enemy formation, and turns back himself once he would reach 15 m of its edge within the next second of riding (checked four times a second, measured from the full width of the line), so he does not ride into the spears. Off = no pursuit while the rider or the fleeing man is within 80 m of any unbroken enemy formation, as before
+        public bool CavalrySlowsForOwnFoot = true;         // an AI rider whose path is blocked by a man of his own side on foot - within 3 m of the horse's head, more at a gallop (up to 8 m) - reins in to a walk until the way is clear, unless an enemy stands closer in his path. Only in field battles; your own horse is never touched. Off = AI riders ride through their own infantry, as before
+        public bool InfantryLeashLookahead = true;         // infantry sent after a harasser turns back before it runs past its 50 m leash: the leash is checked at every steering step and with the distance it will cover until the next check. Off = the leash is checked once a second at the current distance, as before
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

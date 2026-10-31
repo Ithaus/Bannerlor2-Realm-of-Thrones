@@ -87,6 +87,10 @@ namespace Armoury
         private static int _rLeaderAim, _rFootCoolN, _rRespNear, _rRespDrop;
         private static readonly HashSet<int> RUnreachT = new HashSet<int>();
         private static float _rFootFar;
+        // 305c (InfantryLeashLookahead): kopia klucza, zawroceni z wyprzedzeniem, zawroceni w kroku sterowania, najwieksza prognoza dystansu
+        private static bool _leashAhead;
+        private static int _rLeashEarly, _rLeashStep;
+        private static float _rLeashPredMax;
         private static int _rQOver, _rFfArch;   // Interlocked (OnHit)
         // poprawka 132b: R2 straz strzelcow - oddzial z szyku piechoty dalej niz smycz (do 110 m), gdy nekajacy bije strzelcow / wodza / chorazego
         private static int _rGuardN;
@@ -99,6 +103,7 @@ namespace Armoury
             _rKey = c != null && c.FormationsAnswerHarassers;
             _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
             _rMarchOn = _rKey && c.ArmyMarchesPastHarassers;   // 291
+            _leashAhead = c != null && c.InfantryLeashLookahead;   // 305c
             Volatile.Write(ref _rLive, 0);
         }
 
@@ -120,6 +125,7 @@ namespace Armoury
             _rLeaderAim = _rFootCoolN = _rRespNear = _rRespDrop = 0;
             RUnreachT.Clear();
             _rFootFar = 0f;
+            _rLeashEarly = _rLeashStep = 0; _rLeashPredMax = 0f;   // 305c
             Interlocked.Exchange(ref _rQOver, 0); Interlocked.Exchange(ref _rFfArch, 0);
             HaltClear();
             NearClear();                 // poprawka 132b
@@ -710,6 +716,8 @@ namespace Armoury
               .Append(" / max ").Append(_rPassN > 0 ? (_rMaxTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.000", Inv) : "-")
               .Append(" ms (passow ").Append(_rPassN).Append("; promieni najwiecej ").Append(_rRayMax).Append(" na pass, limit ").Append(RaysPerPass).Append(')')
               .Append(" | test: ").Append(ReactTestSummary())
+              .Append(" | smycz z wyprzedzeniem (305c) ").Append(_leashAhead ? "TAK" : "NIE").Append(": zawroceni przed smycza ").Append(_rLeashEarly)
+              .Append(", w kroku sterowania ").Append(_rLeashStep).Append(", prognoza najwyzej ").Append(F0(_rLeashPredMax)).Append(" m")
               .Append(" | potkniecia nekanie ").Append(_rStum).Append('.');
             Log.Info(sb.ToString());
         }

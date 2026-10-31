@@ -121,6 +121,7 @@ namespace Armoury
             public Formation Home;                // poprawka 132b: R2 straz strzelcow - smycz od szyku strzezonego, nie od swojego
             public Vec2 Anchor = Vec2.Invalid;    // 291: R2 - smycz od miejsca wyslania (szyk idzie dalej z armia, ArmyMarchesPastHarassers)
             public Vec2 RideFrom = Vec2.Invalid;  // 291b: jezdziec - srodek ludzi szyku przy wyslaniu (smycz LeashHome, gdy w poscigu jedzie caly szyk)
+            public float LeashAt = -1f;           // 305c: chwila ostatniego sprawdzenia smyczy piechoty (czas do nastepnego - z odstepu)
         }
 
         private struct FI
@@ -567,6 +568,7 @@ namespace Armoury
                 var c = Settings.Current;
                 _hKey = c != null && c.RidersRunDownShooters;
                 _rKey = c != null && c.FormationsAnswerHarassers;            // 283: klucze z MCM na zywo (jak 204)
+                _leashAhead = c != null && c.InfantryLeashLookahead;         // 305c
                 _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
                 _rMarchOn = _rKey && c.ArmyMarchesPastHarassers;             // 291
                 Volatile.Write(ref _rLive, _rKey ? 1 : 0);                   // OnHit: kolejka wrecz tylko po rozstawieniu (Tick wola pass po IsDeploymentFinished)
@@ -754,6 +756,21 @@ namespace Armoury
             return locked;
         }
 
+        /// <summary>305c (InfantryLeashLookahead): pieszy oddzial przekroczy smycz do nastepnego sprawdzenia - dystans + predkosc x odstep od ostatniego
+        /// sprawdzenia (0.25..2 s; pierwsze - 1 s w passie, 0.25 s w kroku sterowania - recenzja 305c). Licznik zawroconych z wyprzedzeniem i najwieksza prognoza.</summary>
+        private static bool LeashAhead(Hunter h, Agent a, float dh, float now, bool pass)
+        {
+            float gap = h.LeashAt >= 0f ? now - h.LeashAt : (pass ? PassEvery : TrackEvery);
+            if (gap < 0.25f) gap = 0.25f; else if (gap > 2f) gap = 2f;
+            h.LeashAt = now;
+            float v = a.GetRealGlobalVelocity().AsVec2.Length;
+            float pred = dh + v * gap;
+            if (pred > _rLeashPredMax) _rLeashPredMax = pred;
+            if (pred <= MarchToContact.InfRearm) return false;
+            _rLeashEarly++;
+            return true;
+        }
+
         /// <summary>-1 = dalej, inaczej przyczyna konca U*. pass = takze kon, smycz, odwrot szyku, klucz, zasieg lucznika.</summary>
         private static int HunterCheck(Mission m, Hunter h, float now, bool pass)
         {
@@ -769,6 +786,13 @@ namespace Armoury
             // 283: piechota tez nie wbiega w jego szyk
             bool rider = h.Role == RoleIntercept || h.Role == RoleCut;
             if (h.Role != RoleRanged && IntactNear(h.T.SSide, a.Position.AsVec2, CounterFootGap)) return UIntact;
+            // 305c (InfantryLeashLookahead): smycz piechoty takze w kroku sterowania (co 0.25 s), nie tylko w passie co 1 s
+            if (!pass && _leashAhead && h.Role == RoleFoot && _rKey)
+            {
+                float dk = FootLeash(h, a.Position.AsVec2);
+                if (dk > _rFootFar) _rFootFar = dk;
+                if (dk > MarchToContact.InfRearm || LeashAhead(h, a, dk, now, false)) { if (h.Anchor.IsValid) _l291LeashBack++; _rLeashStep++; return ULeash; }
+            }
             if (!pass) return rider && a.MountAgent == null ? UOther : -1;
             // klucze: jezdzcy 204, piechota 283, lucznicy - ktorykolwiek (283 sam strzela, gdy jazda wylaczona)
             if (rider ? !_hKey : (h.Role == RoleFoot ? !_rKey : !_hKey && !_rKey)) return UKey;
@@ -786,6 +810,7 @@ namespace Armoury
                 float dh = FootLeash(h, a.Position.AsVec2);   // poprawka 132b: straz strzelcow - od drogi do szyku strzezonego
                 if (dh > _rFootFar) _rFootFar = dh;
                 if (dh > MarchToContact.InfRearm) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }
+                if (_leashAhead && LeashAhead(h, a, dh, now, true)) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }   // 305c: zawrot z wyprzedzeniem
                 if (now - h.Start >= MaxSeconds) return UTime;
                 if (s.MountAgent != null && !MeleeKind(h.T) && a.Position.AsVec2.Distance(s.Position.AsVec2) > HuntScreen) return URange;
                 return -1;
