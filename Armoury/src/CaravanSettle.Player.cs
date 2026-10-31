@@ -51,6 +51,9 @@ namespace Armoury
             public long Paid, Tax;
             public long DPaid, DTaxDue, DTaxPaid; public int DProfit; public bool DTick;
             public string Name = "?";
+            // 305b (WorkshopLedgerCapitalSplit): kapital wlasny gracza w warsztacie (kapital przy pierwszym wpisie + doplaty - zwroty; -1 = jeszcze nie znany),
+            // czesc wyplat ponizej niego (zwrot kapitalu, nie zysk), zwroty i doplaty przy zmianie produkcji (WorkshopTrade.RetoolSettle) - razem i dzis
+            public long Basis = -1, PaidRet, CapRet, CapAdd, DPaidRet, DCapRet, DCapAdd;
         }
 
         private static readonly Dictionary<string, CarRec> _cars = new Dictionary<string, CarRec>(StringComparer.Ordinal);
@@ -65,8 +68,8 @@ namespace Armoury
         private static readonly Dictionary<MobileParty, int> _tickPay = new Dictionary<MobileParty, int>();
         private static readonly Dictionary<Workshop, int> _tickCap = new Dictionary<Workshop, int>();
         private static readonly Dictionary<Workshop, int> _tickProfit = new Dictionary<Workshop, int>();
-        // tydzien gracza (komunikat tygodniowy): 0 karawany do rodu, 1 zold rodu, 2 doplaty BK, 3 warsztaty do rodu, 4 podatek warsztatow
-        private static readonly long[,] _wk = new long[Ring, 5];
+        // tydzien gracza (komunikat tygodniowy): 0 karawany do rodu, 1 zold rodu, 2 doplaty BK, 3 warsztaty do rodu, 4 podatek warsztatow, 5 zwrot kapitalu warsztatow (305b)
+        private static readonly long[,] _wk = new long[Ring, 6];
         private static readonly int[] _wkDay = { -1, -1, -1, -1, -1, -1, -1, -1 };
 
         private static void PlayerReset()
@@ -83,7 +86,7 @@ namespace Armoury
         {
             if (v == 0) return;
             int d = Today, i = ((d % Ring) + Ring) % Ring;
-            if (days[i] != d) { days[i] = d; for (int k = 0; k < 5; k++) a[i, k] = 0; }
+            if (days[i] != d) { days[i] = d; for (int k = 0; k < a.GetLength(1); k++) a[i, k] = 0; }   // 305b: tydzien gracza ma 6 kolumn
             a[i, col] += v;
         }
 
@@ -194,6 +197,23 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteWsTax", e); }
         }
 
+        private static bool CapSplit { get { var s = Settings.Current; return s != null && s.WorkshopLedgerCapitalSplit; } }
+
+        /// <summary>305b: WorkshopTrade.RetoolSettle - zwrot kapitalu do kiesy (back) albo doplata z kiesy (added) przy zmianie produkcji warsztatu gracza; capBefore -
+        /// kapital przed przelewem (punkt wyjscia kapitalu wlasnego, gdy rekord nowy). Tylko licznik.</summary>
+        internal static void NoteWsCapital(Workshop w, long back, long added, int capBefore)
+        {
+            try
+            {
+                var r = Ws(w, true);
+                if (r == null) return;
+                if (r.Basis < 0) r.Basis = Math.Max(0, capBefore);
+                if (back > 0) { r.CapRet += back; r.DCapRet += back; r.Basis = Math.Max(0L, r.Basis - back); if (CapSplit) WkAdd(_wk, _wkDay, 5, back); else WkAdd(_wk, _wkDay, 3, back); }   // recenzja 305b: bez podzialu - jak dotad "workshops paid you"
+                if (added > 0) { r.CapAdd += added; r.DCapAdd += added; r.Basis += added; }
+            }
+            catch (Exception e) { Stumble("NoteWsCapital", e); }
+        }
+
         /// <summary>IncomePrefix (z wyplata): rozliczenie 259 karawany rodu gracza - wejscia reguly do linii (K259-2) i kwota do TickPost.</summary>
         private static void PlayerCalc(MobileParty mp, Calc c, int moved, bool busy)
         {
@@ -281,7 +301,12 @@ namespace Armoury
                         long payout = Math.Max(0, kv.Value - w.Capital);
                         int prof; _tickProfit.TryGetValue(w, out prof);
                         wr.DProfit = prof; wr.DPaid += payout; wr.Paid += payout; wr.DTick = true;
-                        WkAdd(_wk, _wkDay, 3, payout);
+                        // 305b (WorkshopLedgerCapitalSplit): wyplata, ktora zbija kapital ponizej kapitalu wlasnego gracza, to zwrot jego pieniedzy, nie zysk
+                        if (wr.Basis < 0) wr.Basis = Math.Max(0, kv.Value);
+                        long ret = Math.Max(0L, Math.Min(payout, Math.Max(0L, wr.Basis - w.Capital) - Math.Max(0L, wr.Basis - kv.Value)));
+                        if (ret > 0) { wr.PaidRet += ret; wr.DPaidRet += ret; wr.Basis -= ret; }
+                        if (CapSplit) { WkAdd(_wk, _wkDay, 3, payout - ret); WkAdd(_wk, _wkDay, 5, ret); }
+                        else WkAdd(_wk, _wkDay, 3, payout);
                     }
                     catch (Exception e) { Stumble("TickPost(warsztat)", e); }
                 }
@@ -338,14 +363,14 @@ namespace Armoury
             foreach (var r in _wss.Values) if (!wkeys.Contains(r.Key)) wgone.Add(r);
             foreach (var r in wgone)
             {
-                Log.Info(PP + "warsztat '" + r.Name + "' zakonczony (sprzedany albo utracony) | " + Since(r.FirstDay, r.FromLoad, day) + ": wyplaty " + r.Paid + ", podatek " + r.Tax + ".");
+                Log.Info(PP + "warsztat '" + r.Name + "' zakonczony (sprzedany albo utracony) | " + Since(r.FirstDay, r.FromLoad, day) + ": wyplaty " + r.Paid + ", podatek " + r.Tax + WsCapText(r) + ".");
                 _wss.Remove(r.Key);
             }
             if (cur.Count == 0 && wsNow.Count == 0) return;
 
             var sb = new StringBuilder(2048);
             sb.Append(PP).Append("dzien ").Append(day);
-            long t259 = 0, tBk = 0, tE39 = 0, tEnd = 0, tVan = 0, tWage = 0, tTop = 0, tShort = 0, tWs = 0, tTax = 0;
+            long t259 = 0, tBk = 0, tE39 = 0, tEnd = 0, tVan = 0, tWage = 0, tTop = 0, tShort = 0, tWs = 0, tTax = 0, tWsRet = 0;
             var pays = new List<string>(); var caps = new SortedSet<int>();
             int lowMsgs = 0;
             bool rep = s.CaravanReports;
@@ -422,9 +447,12 @@ namespace Armoury
                     sb.Append(" || warsztat '").Append(r.Name).Append("' (").Append(town).Append(", glowa rodu) | kapital ").Append(w.Capital).Append(" (poczatkowy ").Append(w.InitialCapital)
                       .Append("), zysk przed wyplata ").Append(r.DTick ? r.DProfit.ToString(Inv) : "-").Append(", wyplata ").Append(r.DPaid)
                       .Append(", podatek BK (D11-3) nalezny ").Append(r.DTaxDue).Append(" zaplacony ").Append(r.DTaxPaid)
-                      .Append(" | ").Append(Since(r.FirstDay, r.FromLoad, day)).Append(": wyplaty ").Append(r.Paid).Append(", podatek ").Append(r.Tax);
-                    tWs += r.DPaid; tTax += r.DTaxPaid;
+                      .Append(" | ").Append(Since(r.FirstDay, r.FromLoad, day)).Append(": wyplaty ").Append(r.Paid).Append(", podatek ").Append(r.Tax).Append(WsCapText(r))
+                      .Append(" | dzis 305b: wyplata zysku ").Append(r.DPaid - r.DPaidRet).Append(", zwrot kapitalu w wyplacie ").Append(r.DPaidRet)
+                      .Append(", zwrot przy zmianie produkcji ").Append(r.DCapRet).Append(", doplata kapitalu ").Append(r.DCapAdd);
+                    tWs += r.DPaid; tTax += r.DTaxPaid; tWsRet += r.DPaidRet + r.DCapRet;
                     r.DPaid = r.DTaxDue = r.DTaxPaid = 0; r.DProfit = 0; r.DTick = false;
+                    r.DPaidRet = r.DCapRet = r.DCapAdd = 0;
                 }
                 catch (Exception e) { Stumble("PlayerDaily(warsztat)", e); }
             }
@@ -451,8 +479,10 @@ namespace Armoury
                 {
                     int n;
                     long car = WkSum(_wk, _wkDay, 0, out n), wg = WkSum(_wk, _wkDay, 1, out n), tp = WkSum(_wk, _wkDay, 2, out n), wsp = WkSum(_wk, _wkDay, 3, out n), tx = WkSum(_wk, _wkDay, 4, out n);
+                    long wsr = WkSum(_wk, _wkDay, 5, out n);   // 305b: zwrot kapitalu warsztatow (0 przy wylaczonym kluczu)
                     string txt = "Your caravans and workshops, last 7 days: caravans sent you " + N(car) + "; your clan paid their wages " + N(wg) + " and " + N(tp)
-                                 + " to top up their purses; workshops paid you " + N(wsp) + " and you paid " + N(tx) + " in workshop tax.";
+                                 + " to top up their purses; workshops paid you " + N(wsp) + (CapSplit ? " in profit" : "") + (wsr > 0 ? " and gave back " + N(wsr) + " of your own working capital" : "")
+                                 + " and you paid " + N(tx) + " in workshop tax.";
                     Log.Player(txt);
                     Log.Info(PP + "komunikat - tydzien | " + txt);
                     week = true;
@@ -461,11 +491,18 @@ namespace Armoury
             }
             sb.Append(" || razem dzis: karawany do rodu ").Append(t259 + tBk + tE39 + tVan + tEnd).Append(" (rozliczenie 259 ").Append(t259).Append(", BK ").Append(tBk).Append(", E3/9 ").Append(tE39)
               .Append(", gra 10% ").Append(tVan).Append(", rozwiazanie ").Append(tEnd).Append("), zold rodu ").Append(tWage).Append(", doplaty BK ").Append(tTop).Append(", brak rodu ").Append(tShort)
-              .Append(", warsztaty do rodu ").Append(tWs).Append(", podatek warsztatow ").Append(tTax)
+              .Append(", warsztaty do rodu ").Append(tWs).Append(" (305b: w tym zwrot kapitalu ").Append(tWsRet).Append(", klucz podzialu ").Append(CapSplit ? "TAK" : "NIE").Append(")").Append(", podatek warsztatow ").Append(tTax)
               .Append(" | komunikaty: wyplata ").Append(payMsg).Append(", ponizej kapitalu ").Append(lowMsgs).Append(", tydzien ").Append(week ? "TAK" : "NIE")
               .Append(" | BK Workshop taxes w modelu warsztatow ").Append(bkWs ? "TAK (pobiera BK w rozliczeniu rodu - poza ta linia)" : "NIE")
               .Append(" | potkniecia ").Append(_sSt - st0).Append('.');
             Log.Info(sb.ToString());
+        }
+
+        /// <summary>305b: czesc linii warsztatu - zysk i zwrot kapitalu rozdzielone (kapital wlasny, zwroty w wyplatach i przy zmianie produkcji, doplaty).</summary>
+        private static string WsCapText(WsRec r)
+        {
+            return " (305b: z tego wyplaty zysku " + (r.Paid - r.PaidRet) + ", zwrot kapitalu w wyplatach " + r.PaidRet + "; zwrot kapitalu przy zmianie produkcji " + r.CapRet
+                   + ", doplata kapitalu " + r.CapAdd + ", kapital wlasny w warsztacie " + (r.Basis >= 0 ? r.Basis.ToString(Inv) : "-") + ")";
         }
 
         private static string[] Fmt(SortedSet<int> caps)
@@ -485,6 +522,9 @@ namespace Armoury
                   .Append(r.LowSince).Append('|').Append(r.LastLowMsg).Append('|').Append(r.FromLoad ? 1 : 0).Append('\n');
             foreach (var w in _wss.Values)
                 sb.Append("w|").Append(w.Key).Append('|').Append(w.FirstDay).Append('|').Append(w.Paid).Append('|').Append(w.Tax).Append('|').Append(w.FromLoad ? 1 : 0).Append('\n');
+            // 305b: kapital wlasny i zwroty w osobnym wierszu (stary format "w" bez zmian - starsza DLL wiersz "wb" odrzuci jako zly, reszta zostaje)
+            foreach (var w in _wss.Values)
+                sb.Append("wb|").Append(w.Key).Append('|').Append(w.Basis).Append('|').Append(w.PaidRet).Append('|').Append(w.CapRet).Append('|').Append(w.CapAdd).Append('\n');
             return sb.ToString();
         }
 
@@ -514,6 +554,11 @@ namespace Armoury
                         w.FirstDay = I(p[2]); w.Paid = L(p[3]); w.Tax = L(p[4]); w.FromLoad = I(p[5]) != 0;
                         if (w.Key.Length == 0) throw new FormatException("klucz");
                         _wss[w.Key] = w; _impWs++;
+                    }
+                    else if (p[0] == "wb" && p.Length == 6)
+                    {
+                        WsRec w;
+                        if (_wss.TryGetValue(p[1], out w)) { w.Basis = L(p[2]); w.PaidRet = L(p[3]); w.CapRet = L(p[4]); w.CapAdd = L(p[5]); }
                     }
                     else _impBad++;
                 }
