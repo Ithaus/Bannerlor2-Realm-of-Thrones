@@ -1,5 +1,9 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-31 WGRANIE 146 - noc/310-strzaly-tarcze b357ccb5 (145 + 310: lucznicy AI nie strzelaja w klebowisko ze swoimi, sciana tarcz pod ostrzalem poza RBM, budzet RoutKeeper); Armoury.dll ed0199b997bebb13c90e4106d94e1dfe, kopia 145: Armoury.dll.bak-2026-10-31-przed-wgranie146 i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie146-przed
+**Ryzyko / co sprawdzic:** 2 biegi bitew 146a / 146b (7 band + 2 bitwy armii, CrashScribe-at-n308): kod 0, ERROR 0, bitwy 9/9 zgodnie z planem, bitwa310 / bitwa309 / bitwa307b / bitwa305c bez NIE. FF pociskow AI w bitwach armii 10.3% / 12.7% (145: 12-21%; jedna mala bitwa 24.9% przy 277 trafieniach); RoutKeeper tick max ok. 3.1 ms (145: 3.6-7.6); szczyt klatki 18.4 / 6.1 ms. Sciana tarcz 310 w testach 0 szyko-sekund - sytuacja (piechota w Line pod ostrzalem przed zwarciem) nie wystapila; niesprawdzona w dzialaniu.
+**Status:** WGRANE 146 (31.10 ok. 17:15 CET).
+
 ## 2026-10-31 310 bitwa - lucznik AI nie strzela w klebowisko ze swoimi, ShieldWall pod ostrzalem poza decyzja RBM, szczyty RoutKeeper
 **Problem (autotesty 144a/145a/145b b8 [armia] 200 vs 240 i b9 [sojusz] 200 vs 200, logi m113\logi\14xx-bitwaN; Willow Wood 30.10 Armoury-2026-10-30_21-04-45.log):**
 - Strzaly AI w swoich: FF pociskow AI / (FF + trafienia wroga z linii 140) - 144a b8 131/611 = 21.4%, b9 18.6%; 145a 12.4% / 18.5%; 145b 15.9% / 13.8%; razem 441/2631 = 16.8%; Willow 1105 pociskow AI w swoich przy 'trafien 6300' = 17.6%; gracz 0. Probka HIT (878 trafien z rozpoznana strona, 97 FF): ponizej 10 m 18, 10-39 m 16, 40-99 m 38, 100+ m 25 - ok. 80% to cel w zwarciu ze swoimi, ok. 20% plaski strzal przez wlasny szereg; 283 R1b: 680 promieni ze swoim na linii, silnik FriendInWay 159.
