@@ -11,6 +11,11 @@ RANGES = {
     # 306a: pasmo ceny od przewozu - kod przycina marze do 0.25..9, droge do 100..6000 km (PriceBand306.MarginOf / KmOf)
     'PriceBandMerchantMargin': (0.25, 9.0, "0.00"),
     'PriceBandHaulKm': (100, 6000, "0"),
+    # 311b: mennica korony - kod przycina oplate do 0..0.5, psucie do 0..1, zapas do 1..120 dni, zuzycie do 0..0.2/rok (CrownMint.Daily)
+    'MintSeigniorage': (0.0, 0.5, "0.000"),
+    'DebasementMintExtra': (0.0, 1.0, "0.00"),
+    'MintSilverReserveDays': (1, 120, "0"),
+    'CoinWearPerYear': (0.0, 0.2, "0.0000"),
     # 307c: oblezenia i cena warsztatu - kod przycina (SiegeWalls2.TimeFloor / SiegeWalls.RepelGrowth / RetryAfter / RetryRatio, WorkshopTrade.StockDays)
     'SiegeGameTimeTermFloor': (0.0, 0.8, "0.00"),
     'SiegeRepelPauseGrowth': (0.0, 2.0, "0.00"),

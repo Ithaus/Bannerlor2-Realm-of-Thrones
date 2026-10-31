@@ -554,6 +554,14 @@ namespace Armoury
             return a;
         }
 
+        /// <summary>311b (mennica): pelny dzienny wsad rudy srebra linii warsztatow miasta (szt./d, bez przejscia i bez klucza SilverOreToSmiths) - zapas zlotnikow,
+        /// ktorego mennica nie bierze. Blad - 0 (potkniecie liczone). Tylko odczyt.</summary>
+        internal static float SilverNeedOf(Town town)
+        {
+            try { return town == null ? 0f : Math.Max(0f, NeedOf(town)[1]); }
+            catch (Exception e) { Stumble("SilverNeedOf", e); return 0f; }
+        }
+
         /// <summary>Zapas warsztatow miasta (szt.), ktorego mieszczanie nie biora: CraftDays x dzienny wsad linii warsztatow tej kategorii x przejscie. 0 - poza regula.</summary>
         internal static float CraftReserve(Town town, ItemCategory c)
         {

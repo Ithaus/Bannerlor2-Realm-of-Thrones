@@ -196,6 +196,7 @@ namespace Armoury
                 case MFolk: return "kiesa ludu"; case MFolkStart: return "start kies ludu"; case MZc6: return "ziemia ZC6"; case MKs: return "KS"; case MKsH: return "kupcy KS-H";
                 case MVetPurse: return "weterani";
                 case MTownHire: return "roboty miast (p6-a7)";
+                case MMint: return "mennica (311b)";
                 default: return "M" + k;
             }
         }
@@ -426,6 +427,8 @@ namespace Armoury
             long zs = z1 + z2 + z3 + z4 + z5, us = u1 + u2 + u3 + u4 + u5 + u6 + u7 + u8 + u9 + u10;
             long s31 = Seal31.SrcNow(), u31 = Seal31.SinkNow(), n31 = Seal31.NetNow();   // 3.1 (31): wlasne pozycje etapu 3 (portfele wezwan, U8r, oddane przez 164a)
             zs += s31; us += u31;
+            long z6 = Seal31.Sum[Seal31.ZMint], u11 = Seal31.Sum[Seal31.UCoinWear];   // 311b: mennica korony (nowa moneta z kruszcu) i zuzycie monety (kiesy ludu, kasy miast)
+            zs += z6; us += u11;
             long sTot = s0 - k1 + zs, uTot = u0 + us, nTot = n1 + n2 + n3 + n4 + n5 + n6 + n7 + n8 + n9;
             nTot += n31;
             long R = z - sTot + uTot - nTot;
@@ -482,7 +485,8 @@ namespace Armoury
               .Append(", BK sprzedaz niewolnikow ").Append(Wv(z3, CW.WSlaves))
               .Append(", zloto bohaterow, ktorzy wrocili do swiata ").Append(Wv(z4, CW.WHeroState))
               .Append(", myto (perk Tollgates zarzadcow) ").Append(Wv(z5, CW.WTolls))
-              .Append(Seal31.SrcText());   // 3.1 (31)
+              .Append(Seal31.SrcText())   // 3.1 (31)
+              .Append(", mennica korony - nowa moneta z kruszcu (311b) ").Append(z6);
             // UJSCIA
             sb.Append(" | UJSCIA w nicosc ").Append(uTot).Append(" [P]: rozliczenia rodow na minus ").Append(_clanDown).Append(", regulator kas skasowal ").Append(regOut)
               .Append(", z utargu wsi zniklo ").Append(vanished).Append(", zloto zabrane przez gre w nicosc poza rozliczeniami rodow ").Append(to).Append(" (w tym: ");
@@ -519,7 +523,8 @@ namespace Armoury
               .Append(", karawany BetterEconomy (kasa karawany bez odbiorcy) ").Append(CW.Wired[CW.WBeeEscort] || CW.Wired[CW.WBeeDanger] ? u10.ToString(Inv) : "-")
               .Append(" (najem eskorty ").Append(u10e).Append(" w ").Append(Sm[CW.IBeeEscortN]).Append(" karawanach, awanse zalogi ").Append(u10p)
               .Append(", straty na niebezpiecznych drogach ").Append(u10d).Append(" w ").Append(Sm[CW.IBeeDangerN]).Append(" karawanach)")
-              .Append(Seal31.SinkText());   // 3.1 (31)
+              .Append(Seal31.SinkText())   // 3.1 (31)
+              .Append(", zuzycie i gubienie monety (311b) ").Append(u11);
             // NETTO
             sb.Append(" | NETTO (zmiana swiata) ").Append(S(nTot)).Append(" [P]: BK rynek osady ").Append(WvS(n1, CW.WMarket)).Append(", BK rynek wsi ").Append(WvS(n2, CW.WVillageMarket))
               .Append(", warsztaty BK bez pokrycia w kasie ").Append(Wired2(n3, CW.WWorkshopOut, CW.WWorkshopIn))
@@ -548,9 +553,9 @@ namespace Armoury
             sb.Append(" | kontrola: Z=").Append(z).Append(" S=").Append(sTot).Append(" U=").Append(uTot).Append(" N=").Append(nTot).Append(" R=").Append(R).Append(" R0=").Append(r0)
               .Append(" RB=").Append(haveRb ? rb.ToString(Inv) : "-").Append(" from=").Append(from).Append(" fromW=").Append(fromW).Append(" to=").Append(to).Append(" toW=").Append(toW)
               .Append(" S0=").Append(s0).Append(" U0=").Append(u0).Append(" K1=").Append(k1)
-              .Append(" Z1=").Append(z1).Append(" Z2=").Append(z2).Append(" Z3=").Append(z3).Append(" Z4=").Append(z4).Append(" Z5=").Append(z5)
+              .Append(" Z1=").Append(z1).Append(" Z2=").Append(z2).Append(" Z3=").Append(z3).Append(" Z4=").Append(z4).Append(" Z5=").Append(z5).Append(" Z6=").Append(z6)
               .Append(" U1=").Append(u1).Append(" U2=").Append(u2).Append(" U3=").Append(u3).Append(" U4=").Append(u4).Append(" U5=").Append(u5).Append(" U6=").Append(u6)
-              .Append(" U7=").Append(u7).Append(" U8=").Append(u8).Append(" U9=").Append(u9).Append(" U10=").Append(u10)
+              .Append(" U7=").Append(u7).Append(" U8=").Append(u8).Append(" U9=").Append(u9).Append(" U10=").Append(u10).Append(" U11=").Append(u11)
               .Append(" N1=").Append(n1).Append(" N2=").Append(n2).Append(" N3=").Append(n3).Append(" N4=").Append(n4).Append(" N5=").Append(n5).Append(" N6=").Append(n6).Append(" N7=").Append(n7)
               .Append(" N8=").Append(n8).Append(" N9=").Append(n9)
               .Append(Seal31.Keys())   // 3.1 (31)
