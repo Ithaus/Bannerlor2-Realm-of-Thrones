@@ -58,6 +58,11 @@ namespace Armoury
         private static float _daySet, _owedSet, _dayCapMax;
         private static double _setLine;
         private static int _stumbles, _sessions;
+        // 311e (trening przed snem, NightRest.TrainBeforeSleep.cs): _preNext - nastepne wejscie w menu cwiczen jest postojem 311e (NightRest.TbsHour, ActivateGameMenu
+        // z ticku godzinowego jak oboz z rozkazu OwnCamp); _pre - biezaca sesja cwiczen jest postojem 311e (DrillInit przejmuje _preNext); _preOwed - godziny 311e
+        // czesc _owed (do linii gracza i udzialu XP). Bez zapisu: wczytanie w srodku sesji = zwykle cwiczenia (powrot do menu obozu jak dotad)
+        private static bool _preNext, _pre;
+        private static float _preOwed;
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         // ------------------------------------------------------------ pomiar doby (linia AI i strony gracza)
@@ -69,6 +74,7 @@ namespace Armoury
         {
             _dayHours = 0f; _dayIdx = -1; _owed = 0f; _leave = false; _session = 0f; _stumbles = 0; _sessions = 0; _pSession = 0; _auto = 0; _lastDrillAt = -1e9;
             _stay.Clear(); _daySet = _owedSet = _dayCapMax = 0f; _setLine = 0;   // m109-musztra
+            _preNext = _pre = false; _preOwed = 0f;   // 311e
             _err.Clear(); ClearDay();
             TownStay.Reset();
         }
@@ -192,7 +198,12 @@ namespace Armoury
                 var s = Settings.Current;
                 if (c == null || !c.Camp) return;
                 float h = _owed;
+                float hPre = Math.Min(_preOwed, h);   // 311e: godziny postoju przed snem w tym ticku
                 _owed = 0f; _owedSet = 0f;   // m109-musztra: czesc w osadzie zuzyta tym samym tickiem
+                _preOwed = 0f;
+                // 311e: udzial XP postoju przed snem - wzor liniowy w godzinach (D = godziny / 8 x 2.25), wiec czesc XP = czesc godzin; do linii doby 311e
+                double xpPre = h > 0f && hPre > 0f ? Math.Max(0L, accepted) * (double)(hPre / h) : 0;
+                if (hPre > 0f) NightRest.TbsXp(hPre, xpPre, men);
                 if (s == null || !s.DrillLog) { _pSession = 0; _auto = 0; _setLine = 0; return; }
                 Roll();
                 bool stay = s.DrillTownStay;   // m109-musztra: dopiski postoju tylko przy kluczu (NIE - linia jak dotad)
@@ -205,6 +216,7 @@ namespace Armoury
                          + " | uzbrojeni " + (int)Math.Round(100 * armed) + "% | kara w chwili ticku: " + (c.Hungry ? "glod" : c.Sleepless ? "dlug snu o swicie" : "brak")
                          + ((c.Hungry || c.Sleepless) && h > 0f ? " - godziny zrobione przed kara policzone" : "") + (c.Off ? " - KARA ZASTOSOWANA" : "")
                          + (stay ? " | " + StayNote() : "")
+                         + (hPre > 0f ? " | w tym trening przed snem (311e) " + F2(hPre) + " h, XP ok. " + (long)Math.Round(xpPre) : "")
                          + " | wejsc w Train the men " + _sessions + ", potkniecia " + _stumbles + ".");
                 _pSession = 0; _sessions = 0; _auto = 0; _setLine = 0;
             }
@@ -454,8 +466,8 @@ namespace Armoury
             Log.Info(P + "opcja \"Train the men\" w menu obozu (arm_camp_wait) i menu cwiczen " + Menu + " | klucz Drill Camp Only " + (PlayerOn(Settings.Current) ? "TAK" : "NIE") + ".");
         }
 
-        /// <summary>Powod, dla ktorego teraz nie ma cwiczen (null = mozna).</summary>
-        private static string WhyNot()
+        /// <summary>Powod, dla ktorego teraz nie ma cwiczen (null = mozna). 311e: ten sam warunek przed postojem na trening przed snem (NightRest.TbsHour).</summary>
+        internal static string WhyNot()
         {
             try
             {
@@ -483,6 +495,7 @@ namespace Armoury
                 var mp = MobileParty.MainParty;
                 if (mp != null) mp.SetMoveModeHold();      // cwiczenia = postoj
                 _leave = false;
+                _pre = _preNext; _preNext = false;   // 311e: sesja z postoju przed snem (tylko wejscie z NightRest.TbsHour)
                 // kazde wejscie (takze ponowne po wczytaniu albo po spotkaniu, ktore gra przelaczyla sama) - nowa sesja cwiczen do linii "koniec cwiczen"
                 _session = 0f; _sessionStart = CampaignTime.Now.ToHours; _sessions++;
                 Roll();
@@ -495,21 +508,50 @@ namespace Armoury
         private static void SetText()
         {
             MBTextManager.SetTextVariable("ARM_DRILL_TEXT", "The men drill in camp - sword and shield, the spear wall, volleys at the butts, marching in step. Today: "
-                + F1(_dayHours) + " of " + (int)FullHours + " hours. What they learn is counted with their daily drill.");
+                + F1(_dayHours) + " of " + (int)FullHours + " hours. What they learn is counted with their daily drill."
+                + (_pre ? " The column halted to drill before sleep; at nightfall (" + NightRest.SleepNightStart + ":00) the men bed down." : ""));   // 311e
         }
+
+        /// <summary>311e: postoj na trening przed snem - wejscie w menu cwiczen z czystej mapy (NightRest.TbsHour z ticku godzinowego, po wszystkich warunkach).
+        /// GameMenu.ActivateGameMenu sam startuje czekanie menu oczekiwania (dekompilacja GameMenu.ActivateGameMenu: IsWaitMenu -> StartWait); DrillInit jak przy
+        /// "Train the men" (postoj, sesja, tekst).</summary>
+        internal static void BeginPreSleep()
+        {
+            _preNext = true;
+            try { GameMenu.ActivateGameMenu(Menu); }
+            catch { _preNext = false; throw; }
+        }
+
+        /// <summary>311e: sesja cwiczen to postoj przed snem (tekst menu, autotest).</summary>
+        internal static bool PreSleepNow { get { return _pre; } }
 
         private static void Leave(string why, string msg)
         {
+            bool pre = _pre, sleep = false;
+            _pre = false;
             try
             {
                 if (msg != null) Log.Player(msg);
                 var s = Settings.Current;
                 if (s != null && s.DrillLog)
                     Log.Info(P + "koniec cwiczen | " + F2(_session) + " h cwiczen (zegara " + F1(CampaignTime.Now.ToHours - _sessionStart) + " h) | dzis " + F2(_dayHours) + " z "
-                             + (int)FullHours + ", do policzenia " + F2(_owed) + " | powod: " + why + ".");
+                             + (int)FullHours + ", do policzenia " + F2(_owed) + " | powod: " + why + (pre ? " | trening przed snem (311e)" : "") + ".");
+                // 311e: koniec postoju przed snem - linia 311e; o zmierzchu snu prosto do snu w menu (zamiast twardej pauzy menu obozu)
+                if (pre) sleep = NightRest.TbsEnd(_session, why, (float)(CampaignTime.Now.ToHours - _sessionStart));
             }
             catch (Exception e) { Stumble("Leave", e); }
+            // z ticku menu oczekiwania (DrillTick) - SwitchToMenu wolno (jak dotad); sen: ten sam SwitchToMenu do arm_sleep_wait, powrot snu = oboz (namiot zostaje)
+            if (sleep) { try { NightRest.TbsSleepNow(); return; } catch (Exception e) { Stumble("Leave.Sleep", e); } }
             GameMenu.SwitchToMenu("arm_camp_wait");
+        }
+
+        // poprawka recenzji 311e (1): MainParty.IsMoving = !Campaign.IsMainPartyWaiting, a te flage gra liczy dopiero w RealTick (po ticku menu w tej samej
+        // klatce). Menu cwiczen otwarte z ticku godzinowego (postoj 311e w marszu) widzialo w pierwszej klatce stara flage "w ruchu" i konczylo sie od razu
+        // ("ruch", 0 h). Rozkaz Hold + ComputeIsWaiting (to samo, co gra wpisze do flagi) = stoi; kazdy inny rozkaz ruchu nadal konczy cwiczenia.
+        private static bool Moving(MobileParty mp)
+        {
+            if (!mp.IsMoving) return false;
+            return !(mp.IsMainParty && mp.DefaultBehavior == AiBehavior.Hold && mp.ComputeIsWaiting());
         }
 
         private static void DrillTick(MenuCallbackArgs args, CampaignTime dt)
@@ -525,10 +567,11 @@ namespace Armoury
                 if (mp.Party != null && mp.Party.IsStarving) { Leave("glod", "The men are too hungry to drill."); return; }
                 // recenzja 1: kare pilnuje menu w chwili cwiczen (tick treningu juz jej nie stosuje do godzin zrobionych) - dlug o swicie takze tu, nie tylko przy wejsciu
                 if (NightRest.DawnDebtOf(mp) >= 1) { Leave("dlug snu", "The men met the dawn short of sleep - no drill until the next dawn."); return; }
-                if (mp.CurrentSettlement != null || mp.AttachedTo != null || mp.BesiegerCamp != null || mp.SiegeEvent != null || mp.IsMoving) { Leave("ruch", null); return; }
+                if (mp.CurrentSettlement != null || mp.AttachedTo != null || mp.BesiegerCamp != null || mp.SiegeEvent != null || Moving(mp)) { Leave("ruch", null); return; }
                 float add = (float)dt.ToHours;
                 float take = Math.Max(0f, Math.Min(add, FullHours - _dayHours));
                 _dayHours += take; _owed += take; _session += take; _pSession += take;
+                if (_pre) _preOwed += take;   // 311e: czesc godzin do policzenia z postoju przed snem
                 if (take > 0f) _lastDrillAt = CampaignTime.Now.ToHours;   // ksiega snu: ta godzina to praca, nie odpoczynek (recenzja 4)
                 if (_dayHours >= FullHours - 0.001f)
                 {

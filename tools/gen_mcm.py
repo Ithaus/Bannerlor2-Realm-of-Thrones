@@ -105,6 +105,8 @@ RANGES = {
     'CartSpeedPenaltyPercent': (0, 50, "0"),
     'PackSaddleExtraKg': (0, 300, "0"),
     'CampStartHour': (0, 23, "0"),
+    # 311e: trening przed snem - kod przycina do 0..8 h (NightRest.TbsHours)
+    'CampTrainBeforeSleepHours': (0, 8, "0"),
     'CampEndHour': (0, 23, "0"),
     'OldStockScrapYield': (0.0, 1.0, "0.00"),
     'OldStockScrapDailyShare': (0.0, 0.1, "0.000"),

@@ -6424,6 +6424,10 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillTownStay { get; set; } = true;
 
+        [SettingPropertyInteger("Camp Train Before Sleep Hours", 0, 8, "0", HintText = "with Drill Camp Only: each day on the march your party (and the army you lead) halts this many hours before nightfall, drills in camp ('Train the men', the same pace and the same 8 hours a day) and at nightfall beds down. 0 = off. Only on open land, by day, out of danger - never in a settlement, at sea, at a siege, in another lord's army, on a forced march, when starving or after a dawn short of sleep. The camp menu ('Train before sleep') sets it for the current campaign and then this value is no longer used there", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public int CampTrainBeforeSleepHours { get; set; } = 0;
+
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)", RequireRestart = false)]
         [SettingPropertyGroup("Arms production")]
         public bool ArmsNotHouseholdGoods { get; set; } = true;
@@ -12425,6 +12429,7 @@ namespace Armoury
             s.DrillMaster = DrillMaster;
             s.DrillSiegeArmy = DrillSiegeArmy;
             s.DrillTownStay = DrillTownStay;
+            s.CampTrainBeforeSleepHours = CampTrainBeforeSleepHours;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;
