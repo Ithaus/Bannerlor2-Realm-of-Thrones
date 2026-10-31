@@ -147,7 +147,7 @@ namespace Armoury
             _dWageCap = _dWagePurse = _dKeepCap = _dKeepPurse = _dUnpaid = _dPayNotable = _dPayLord = _dPayPlayer = _dFunded = _dSalePaid = _dSaleShort = _dGear = 0;
             _dNotFrom = _dNotTo = 0;
             _dFail = _dNoTaker = _dStumbles = 0;
-            _dRetBack = _dRetAdd = _dRetShort = 0; _dRetN = _dQBlend = _dQExpFull = _dQExpHalf = _dQPace = _dQArms = _dQResaleCap = _dMemPace = 0;   // 305b
+            _dRetBack = _dRetAdd = _dRetShort = 0; _dRetN = _dQBlend = _dQExpFull = _dQExpHalf = _dQPace = _dQArms = _dQResaleCap = _dMemPace = _dQStock = 0;   // 305b (307c: _dQStock)
             _dGateCut = 0; _dGateCutGold = 0;
             _dClampN = 0; _dClampBack = _dClampLeft = 0;
         }
@@ -176,6 +176,11 @@ namespace Armoury
         /// <summary>Cena sprawiedliwa (123): czynna razem z paczka warsztatow (nowa moneta) i wlasnym wlacznikiem - i tylko, gdy wpiete
         /// sa wszystkie jej latki pomiaru (recenzja).</summary>
         private static bool Fair { get { return On && _fairWired && Settings.Current.WorkshopTradeFairPrice; } }
+        // 307c (WorkshopPriceStockPace): oczekiwany wynik z cen targu tylko na tyle, na ile polka karmi linie (WorkshopPriceStockDays dob pracy)
+        private static bool StockPaceOn { get { var s = Settings.Current; return s != null && s.WorkshopPriceStockPace; } }
+        private static double StockDays { get { var s = Settings.Current; return s == null ? 7.0 : Math.Max(1, Math.Min(28, s.WorkshopPriceStockDays)); } }
+        private static int _dQStock;          // 307c: prawdziwe wyceny dla gracza z przycietym Expected (licznik doby, linia 305b)
+        private static bool _lastExpCut;      // 307c: ostatnie Expected przyciete zapasem polki (do Quote.StockCut)
         // ------------------------------------------------------------ 241: cena kupca (zamiast kosztu x marza mistrza z paczki 123)
         /// <summary>241: czy regula ceny kupca jest czynna (ten sam wlacznik WorkshopTradeFairPrice, wpiete latki pomiaru) - dla WorkshopPace i TownFolk (sam odczyt).</summary>
         internal static bool MerchantRule { get { return Fair; } }
@@ -1323,6 +1328,8 @@ namespace Armoury
             public bool Exp;                    // 241: zysk z cen targu (Expected) wyzszy niz pamiec - sprzedajacy liczy wedlug dzisiejszej ceny kupca
             // 305b (WorkshopTradeBuyerMemory): pamieci do rozmowy, pol na pol, cena targu w calosci (krotka historia) albo polowa, korekta tempa, bez linii broni
             public float Avg, Slow, Pace = 1f; public int Mem; public bool Blend, ExpHalf, ArmsIdle;
+            public bool StockCut;               // 307c: Expected w cenie przyciete zapasem polki (WorkshopPriceStockPace)
+            public float ExpRaw = -1f;          // 307c: Expected uzyte w cenie (po przycieciu; -1 = nie liczone)
         }
 
         /// <summary>
@@ -1376,14 +1383,14 @@ namespace Armoury
                 q.Profit = year ? rec.Slow : rec.Avg;
                 q.Window = Math.Min(rec.Mem, year ? YearSpan : Span);   // R3-11b: okno = doby w pamieci (po rozruchu rynku od 7 ostatnich dob rozruchu)
             }
-            else q.Profit = Expected(w);
+            else { q.Profit = Expected(w); q.StockCut |= _lastExpCut; q.ExpRaw = q.Profit; }
             q.Avg = rec.Avg; q.Slow = rec.Slow; q.Mem = rec.Mem;
             // 241: pamieci (ok. 30 dob, rok) trzymaja jeszcze wyniki sprzed ceny kupca (przyciete do kosztu x marza) - sprzedajacy nie odda warsztatu za ulamek
             // tego, co da dzis kupiec: bierze lepsze z pamieci i oczekiwanego wyniku z cen (Expected - istniejacy model, ten sam co bez historii). Notabl (gorsza pamiec) bez zmian
             // 305b: przy WorkshopTradeBuyerMemory cena targu w calosci tylko przy krotkiej historii (< WorkshopBuyerShortHistoryDays), potem najwyzej polowa
             if (sellerAsks && rec.Days > 0 && Fair)
             {
-                float exp = Expected(w);
+                float exp = Expected(w); q.StockCut |= _lastExpCut; q.ExpRaw = exp;
                 bool half = q.Blend && rec.Mem >= Math.Max(1, Settings.Current.WorkshopBuyerShortHistoryDays);
                 if (half) exp *= 0.5f;
                 if (exp > q.Profit) { q.Profit = exp; q.Exp = true; q.ExpHalf = half; if (_qCount) { if (half) _dQExpHalf++; else if (q.Blend) _dQExpFull++; } }
@@ -1394,7 +1401,7 @@ namespace Armoury
             // dotad odkup liczyl sie od pamieci notabla z zarobkiem broni (MemToNewOwner pomija linie broni), wiec kupno i natychmiastowa odsprzedaz dawaly zysk
             if ((sellerAsks || w.Owner == Hero.MainHero) && BuyerBlend && HasArmsInputLine(w.WorkshopType) && !PlayerArmsLive)
             {
-                q.Profit = Expected(w); q.Exp = true; q.ExpHalf = false; q.ArmsIdle = true; if (_qCount) _dQArms++;
+                q.Profit = Expected(w); q.StockCut |= _lastExpCut; q.ExpRaw = q.Profit; q.Exp = true; q.ExpHalf = false; q.ArmsIdle = true; if (_qCount) _dQArms++;
             }
             q.Tax = tax;
             q.Years = Math.Max(0f, s.WorkshopTradePriceYears);
@@ -1573,6 +1580,7 @@ namespace Armoury
         /// </summary>
         internal static float Expected(Workshop w)
         {
+            bool pace = StockPaceOn, cut = false; _lastExpCut = false;
             try
             {
                 var town = w != null && w.Settlement != null ? w.Settlement.Town : null;
@@ -1585,10 +1593,17 @@ namespace Armoury
                     if (!IsTradeLine(p) || p.ConversionSpeed <= 0f) continue;
                     if (TownFletchers.ClosesLine(p, w)) continue;   // 172: linia strzal warsztatu notabla zamknieta - nic nie zarobi
                     int inCost = 0; bool ok = true;
+                    double cyc = double.MaxValue;   // 307c: ile cykli wsadu lezy na polce (najmniej po wszystkich wsadach)
                     if (p.Inputs != null)
                         foreach (var inp in p.Inputs)
                         {
                             int need = inp.Item2;
+                            if (pace && need > 0 && roster != null)
+                            {
+                                long have = 0;
+                                for (int i = 0; i < roster.Count; i++) { var it = roster.GetItemAtIndex(i); if (it != null && it.ItemCategory == inp.Item1) have += Math.Max(0, roster.GetElementNumber(i)); }
+                                cyc = Math.Min(cyc, (double)have / need);
+                            }
                             if (roster != null)
                                 for (int i = 0; i < roster.Count && need > 0; i++)
                                 {
@@ -1609,8 +1624,18 @@ namespace Armoury
                     float labour = Math.Max(crew, share * pay);
                     float gate = Batch ? Math.Max(crew, share * sell) : 200f / p.ConversionSpeed;
                     if (sell <= inCost + gate) continue;
-                    sum += (pay - inCost - labour) * p.ConversionSpeed / BulkFactor(p);   // kopalnia: przechodzi co N-ty cykl
+                    float line = (pay - inCost - labour) * p.ConversionSpeed / BulkFactor(p);   // kopalnia: przechodzi co N-ty cykl
+                    // 307c (WorkshopPriceStockPace): linia liczy sie w pelni tylko, gdy polka karmi ja StockDays dob pracy (cykli = dni x szybkosc); inaczej udzial
+                    if (pace && line > 0f && cyc < double.MaxValue)
+                    {
+                        double want = StockDays * Math.Max(0.01, (double)p.ConversionSpeed / BulkFactor(p));
+                        double f = Math.Min(1.0, cyc / want);
+                        if (f < 1.0) { line = (float)(line * f); cut = true; }
+                    }
+                    sum += line;
                 }
+                if (cut && _qCount) _dQStock++;
+                _lastExpCut = cut;
                 return sum - UpkeepAt(w);
             }
             catch (Exception e) { Stumble("WorkshopTrade.Expected", e); return 0f; }
@@ -1693,7 +1718,7 @@ namespace Armoury
                      + ", krotka historia " + s.WorkshopBuyerShortHistoryDays + " dob, Player Arms As Firm " + (PlayerArmsLive ? "TAK" : "NIE")
                      + " | zmiany produkcji gracza " + _dRetN + ": zwrot kapitalu do kiesy " + _dRetBack + ", doplata z kiesy " + _dRetAdd + ", brak (odbudowa z utargu) " + _dRetShort
                      + " | wyceny dla gracza (cena gry GetCostForPlayer): pol na pol " + _dQBlend + ", cena targu w calosci (krotka historia) " + _dQExpFull + ", polowa ceny targu " + _dQExpHalf
-                     + ", korekta tempa " + _dQPace + ", bez linii broni " + _dQArms + ", odkup notabla przyciety do ceny gracza " + _dQResaleCap + ", pamiec przeliczona na tempo nowego wlasciciela " + _dMemPace + " | potkniecia " + _dStumbles + ".");
+                     + ", korekta tempa " + _dQPace + ", bez linii broni " + _dQArms + ", odkup notabla przyciety do ceny gracza " + _dQResaleCap + ", pamiec przeliczona na tempo nowego wlasciciela " + _dMemPace + ", cena targu przycieta zapasem polki (307c, " + (StockPaceOn ? "TAK, " + StockDays.ToString("0", CultureInfo.InvariantCulture) + " dob" : "NIE") + ") " + _dQStock + " | potkniecia " + _dStumbles + ".");
         }
 
         // ------------------------------------------------------------ linia dnia
@@ -1709,6 +1734,7 @@ namespace Armoury
                 int shops = 0, broke = 0, worked = 0, cycles = 0;
                 long plus = 0, minus = 0;
                 var prices = new List<int>();
+                Quote topQ = null; Workshop topW = null; int stockCut = 0;   // 307c
                 Town sampleTown = null; float bestProsperity = -1f;
                 foreach (var t in Town.AllTowns)
                 {
@@ -1719,7 +1745,14 @@ namespace Armoury
                         if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || w.Owner == null) continue;
                         shops++; any = true;
                         if (w.Capital < Math.Max(1, (int)Math.Ceiling(UpkeepAt(w)))) broke++;
-                        try { prices.Add(QuoteFor(w, Hero.MainHero).Price); } catch (Exception e) { Stumble("WorkshopTrade.Daily(cena)", e); }
+                        try
+                        {
+                            var qd = QuoteFor(w, Hero.MainHero);
+                            prices.Add(qd.Price);
+                            if (qd.StockCut) stockCut++;
+                            if (topQ == null || qd.Price > topQ.Price) { topQ = qd; topW = w; }   // 307c krok 1: warsztat z ceny max
+                        }
+                        catch (Exception e) { Stumble("WorkshopTrade.Daily(cena)", e); }
                     }
                     if (!any) continue;
                     if (t.Settlement != null && t.Settlement.StringId == "town_V9") { sampleTown = t; bestProsperity = float.MaxValue; }   // Lannisport (zgloszenie Jeffa)
@@ -1752,6 +1785,7 @@ namespace Armoury
                   .Append("; sprzedaz gracza notablom: zaplacone ").Append(_dSalePaid).Append(", zabraklo kupcowi ").Append(_dSaleShort)
                   .Append(" | ").Append(FairText()).Append(" | ").Append(NotablesText())
                   .Append(" | cena kupna dla gracza: mediana ").Append(med).Append(", od ").Append(min).Append(" do ").Append(max).Append(" (").Append(prices.Count).Append(" warsztatow)");
+                if (topQ != null && topW != null) sb.Append("; ").Append(TopText(topQ, topW, stockCut));
                 if (sampleTown != null) sb.Append("; ").Append(SampleLine(sampleTown));
                 sb.Append(" | zasady: utrzymanie ").Append(N1(Upkeep)).Append(" d na dobe").Append(s.WorkshopWageByTier ? " x poziom plac miasta (dobrobyt / " + N1(s.TownWageRefProsperity) + ", 0.5-1.5)" : "").Append(", place cyklu ").Append(s.WorkshopTradeBatchWages ? N1(Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay)) + " d na dobe pelnej pracy" : "WYLACZONE (prog gry 200 / szybkosc)")
                   .Append(", cena = ").Append(N1(Math.Max(0f, s.WorkshopTradePriceYears))).Append(" x roczny zysk po podatku kupujacego (nie mniej niz sprzet) + kapital; zysk ze sredniej ok. ").Append(Span)
@@ -1761,6 +1795,19 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("WorkshopTrade.Daily", e); }
             finally { ClearDay(); }
+        }
+
+        /// <summary>307c krok 1: warsztat z najwyzsza cena dla gracza - skad cena (zysk, pamieci, cena targu, kapital) i ile cen przyciela polka.</summary>
+        private static string TopText(Quote q, Workshop w, int stockCut)
+        {
+            var inv = CultureInfo.InvariantCulture;
+            string town = "?", type = "?", owner = "?";
+            try { town = w.Settlement != null ? w.Settlement.Name.ToString() : "?"; type = w.WorkshopType != null ? w.WorkshopType.StringId : "?"; owner = w.Owner == null ? "-" : w.Owner == Hero.MainHero ? "gracz" : w.Owner.IsNotable ? "notabl" : "lord"; } catch { }
+            return "najdrozszy (307c): " + town + " " + type + " (" + owner + ") cena " + q.Price + " = wartosc " + Math.Max(q.Going, q.Equip) + (q.Floor ? " (sprzet)" : "") + " + kapital " + q.Capital + " + w robocie " + q.Wip
+                 + " | zysk/d " + q.Profit.ToString("0.0", inv) + " (pamiec miesiac " + q.Avg.ToString("0.0", inv) + ", rok " + q.Slow.ToString("0.0", inv) + ", doby " + q.Mem
+                 + (q.Blend ? ", pol na pol" : "") + (q.Exp ? (q.ExpHalf ? ", cena targu polowa" : ", cena targu") : "") + (q.ArmsIdle ? ", bez linii broni" : "")
+                 + ", cena targu " + (q.ExpRaw >= 0f ? q.ExpRaw.ToString("0.0", inv) : "-") + (q.StockCut ? " przycieta polka" : "") + ", podatek " + q.Tax.ToString("0.00", inv) + ")"
+                 + " | cen przycietych polka dzis " + stockCut + (StockPaceOn ? "" : " (klucz NIE)");
         }
 
         private static int SumShops() { int n = 0; foreach (var t in _dType.Values) n += t.Shops; return n; }

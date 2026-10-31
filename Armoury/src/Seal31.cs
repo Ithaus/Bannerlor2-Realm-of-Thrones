@@ -202,6 +202,7 @@ namespace Armoury
             try { CapitalTreasury.EnsureHooks(); } catch (Exception e) { Stumble("CapitalTreasury.EnsureHooks", e); }   // L5b-1: okno szturmu (KingdomManager.SiegeCompleted) dla blizniakow ROT
             try { EnemyCaravans.EnsureHooks(); } catch (Exception e) { Stumble("EnemyCaravans.EnsureHooks", e); }       // L5b-2: karawany wroga w zdobytym miescie (KingdomManager.SiegeCompleted)
             try { SiegeRansom.EnsureHooks(); } catch (Exception e) { Stumble("SiegeRansom.EnsureHooks", e); }           // okup zamiast szturmu: decyzja gry o szturmie (BesiegerCamp) i reszta latek okupu
+            try { BkEstateShare307.EnsureHooks(); } catch (Exception e) { Stumble("BkEstateShare307.EnsureHooks", e); }   // 307c: udzial majatku BK bez dzielenia przez zero (sila robocza wsi 0)
             var s = Settings.Current;
             Log.Info("Szczelnosc (164a): latki w kampanii - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
                      + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-")

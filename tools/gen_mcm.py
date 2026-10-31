@@ -11,6 +11,12 @@ RANGES = {
     # 306a: pasmo ceny od przewozu - kod przycina marze do 0.25..9, droge do 100..6000 km (PriceBand306.MarginOf / KmOf)
     'PriceBandMerchantMargin': (0.25, 9.0, "0.00"),
     'PriceBandHaulKm': (100, 6000, "0"),
+    # 307c: oblezenia i cena warsztatu - kod przycina (SiegeWalls2.TimeFloor / SiegeWalls.RepelGrowth / RetryAfter / RetryRatio, WorkshopTrade.StockDays)
+    'SiegeGameTimeTermFloor': (0.0, 0.8, "0.00"),
+    'SiegeRepelPauseGrowth': (0.0, 2.0, "0.00"),
+    'SiegeRepelRetryAfter': (1, 10, "0"),
+    'SiegeRepelRetryMinRatio': (2.0, 20.0, "0.0"),
+    'WorkshopPriceStockDays': (1, 28, "0"),
     # m113-zakup: kupno ziemi - relacje -100..100 (regula ogolna dalaby przy -10 suwak -30..0), lata zakupu 1..40, udzialy 0..1
     'LandRelationSideVillage': (-100, 100, "0"),
     'LandRelationLordship': (-100, 100, "0"),

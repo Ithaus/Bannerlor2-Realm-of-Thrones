@@ -10608,6 +10608,42 @@ namespace Armoury
         [SettingPropertyGroup("Autotest probes (306b)")]
         public bool Autotest306Probes { get; set; } = true;
 
+        [SettingPropertyBool("Siege Sane Assault Odds", HintText = "When an AI lord storms without waiting for engines still being built, his chance is reckoned with the walls never counting in his favour: the game's own sum lets the walls' weight fall below zero after a long siege, so the walls seemed to help the attackers and every hour's roll became certain. Off = the game's sum, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public bool SiegeSaneAssaultOdds { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Game Time Term Floor", 0.00f, 0.80f, "0.00", HintText = "With Siege Sane Assault Odds: the least weight the walls keep in that sum however long the siege (0 = the walls count for nothing, never against the defenders)", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public float SiegeGameTimeTermFloor { get; set; } = 0f;
+
+        [SettingPropertyBool("Siege Repel Learn", HintText = "An AI commander thrown back from the same walls does not send his men up them again unchanged: each repelled assault lengthens the next wait, and after a few he storms again only with a breach in the walls or a crushing edge in men. Off = the same wait after every repulse and no such condition, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public bool SiegeRepelLearn { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Repel Pause Growth", 0.00f, 2.00f, "0.00", HintText = "With Siege Repel Learn: the wait after a repulse grows by this share for every earlier repulse in the same siege (0.5: second repulse x1.5, third x2), still no longer than four times the base wait", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public float SiegeRepelPauseGrowth { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Siege Repel Retry After", 1, 10, "0", HintText = "With Siege Repel Learn: after this many repulses in one siege the next assault needs a breach or the edge below", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public int SiegeRepelRetryAfter { get; set; } = 2;
+
+        [SettingPropertyFloatingInteger("Siege Repel Retry Min Ratio", 2.00f, 20.00f, "0.0", HintText = "With Siege Repel Learn: besiegers' strength against the full defence needed to storm unbroken walls again after those repulses", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public float SiegeRepelRetryMinRatio { get; set; } = 6f;
+
+        [SettingPropertyBool("Workshop Price Stock Pace", HintText = "The price a workshop asks of you counts a trade line's expected profit only as far as the market holds its materials: a line whose stock feeds it for a day or two is priced as working a day or two in a week, not every day. Off = full profit whenever one batch of materials is on the market, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public bool WorkshopPriceStockPace { get; set; } = true;
+
+        [SettingPropertyInteger("Workshop Price Stock Days", 1, 28, "0", HintText = "With Workshop Price Stock Pace: days of work the market stock must cover for a line to count in full", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public int WorkshopPriceStockDays { get; set; } = 7;
+
+        [SettingPropertyBool("Bk Estate Share No Workforce", HintText = "Banner Kings estates take no share of a village's trade tax when the village has no workforce at all (Banner Kings divided by zero there: the share came out as nothing-at-all or as the whole tax). Off = as in Banner Kings", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public bool BkEstateShareNoWorkforce { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13259,6 +13295,15 @@ namespace Armoury
             s.PriceBandMerchantMargin = PriceBandMerchantMargin;
             s.PriceBandHaulKm = PriceBandHaulKm;
             s.Autotest306Probes = Autotest306Probes;
+            s.SiegeSaneAssaultOdds = SiegeSaneAssaultOdds;
+            s.SiegeGameTimeTermFloor = SiegeGameTimeTermFloor;
+            s.SiegeRepelLearn = SiegeRepelLearn;
+            s.SiegeRepelPauseGrowth = SiegeRepelPauseGrowth;
+            s.SiegeRepelRetryAfter = SiegeRepelRetryAfter;
+            s.SiegeRepelRetryMinRatio = SiegeRepelRetryMinRatio;
+            s.WorkshopPriceStockPace = WorkshopPriceStockPace;
+            s.WorkshopPriceStockDays = WorkshopPriceStockDays;
+            s.BkEstateShareNoWorkforce = BkEstateShareNoWorkforce;
         }
 
         internal static void Apply()

@@ -773,23 +773,29 @@ namespace Armoury
                 _unHour[ev] = hour;
                 var m = SiegeWalls.Measure(camp);
                 if (m.Empty || m.SGame <= 1.0) return false;                             // gra: sila / (obroncy x przewaga^w) <= 1 - bez szturmu
+                string held307;
+                int rep307 = SiegeWalls.RepelsOf(ev);
+                if (rep307 > 0 && RetryHeld(camp, m, rep307, SiegeWalls.RetryHoldUntil(ev), false, out held307)) return false;   // 307c (2): Veto i tak wstrzyma - bez losowania i linii MB
+                double sg = SaneS(m);                                                     // 307c (1): czlon czasu gry bez ujemnych murow (klucz wylaczony - s gry)
+                NoteSane(m.SGame, sg);
+                if (sg <= 1.0) return false;
                 double pGame = m.PGame, pt = 0.0; string why = null;                      // pGame: szansa gry tej chwili (z kara machin w budowie)
                 if (eng)
                 {
                     double p = prog + 0.25 * (5 - m.Eq);
                     double pen = Math.Min(3, m.Eq) / 3.0 * (1.0 - 0.85 * p * p);
-                    double pe = pen > 0 ? Clamp(0.1 * m.SGame * pen, 0.0, 1.0) : 0.0;
+                    double pe = pen > 0 ? Clamp(0.1 * sg * pen, 0.0, 1.0) : 0.0;
                     if (pe > pt) { pt = pe; why = "machiny"; }
                 }
                 if (gap)
                 {
                     // TB2-c: rozbity odcinek muru - bez czlonu 0.25 x (5 - gotowe) i bez postepu taranu albo wiezy w budowie (gra przy 1-2 gotowych daje kare <= 0)
-                    double pw = Clamp(0.1 * m.SGame, 0.0, 1.0);
+                    double pw = Clamp(0.1 * sg, 0.0, 1.0);
                     if (pw > pt) { pt = pw; why = "wyrwa"; }
                 }
                 if (lad && LadderOk(camp, m))
                 {
-                    double pl = Clamp(0.1 * m.SGame, 0.0, 1.0);
+                    double pl = Clamp(0.1 * sg, 0.0, 1.0);
                     if (pl > pt) { pt = pl; why = "drabiny"; }
                 }
                 if (why == null || pGame >= 1.0 || pt <= pGame) return false;            // kara gry nie byla przeszkoda
@@ -803,7 +809,7 @@ namespace Armoury
                              + (lp.MapFaction != null ? lp.MapFaction.StringId : "-") + ") | oblezenie " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob | powod: " + why
                              + " | taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie") + ", wyrwa " + (m.Gap ? "tak" : "nie") + ", gotowe machiny " + m.Eq
                              + ", taran / wieza w budowie " + F(prog * 100.0, "0") + "%, kara gry " + F(m.Pen, "0.000") + " | sila oblegajacy " + F(m.Att, "0") + " / obroncy " + F(def, "0")
-                             + " = " + F(def > 0 ? m.Att / def : 0.0, "0.00") + ", s gry " + F(m.SGame, "0.000") + " | szansa gry " + F(pGame, "0.000") + " -> " + F(pt, "0.000") + " | dalej OB1 i okup.");
+                             + " = " + F(def > 0 ? m.Att / def : 0.0, "0.00") + ", s gry " + F(m.SGame, "0.000") + (sg < m.SGame ? " (307c: do szansy " + F(sg, "0.000") + ")" : "") + " | szansa gry " + F(pGame, "0.000") + " -> " + F(pt, "0.000") + " | dalej OB1 i okup.");
                 }
                 return true;
             }

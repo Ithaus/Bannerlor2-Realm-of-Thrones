@@ -38,7 +38,7 @@ namespace Armoury
         internal static int Trips { get { return _trips; } }
 
         /// <summary>Nowa sesja (konstruktor ArmouryBehavior): liczniki potkniec od zera.</summary>
-        internal static void Reset() { _trips = _flipped = _zeroed = _stumbles = 0; _dayN = _dayFlip = _dayZero = 0; _dayFix = 0; }
+        internal static void Reset() { _trips = _flipped = _zeroed = _stumbles = 0; _dayN = _dayFlip = _dayZero = 0; _dayFix = 0; BkEstateShare307.Reset(); }   // 307c
 
         internal static bool Bad(int v) { return v < 0 || v > Max; }
 
@@ -134,6 +134,7 @@ namespace Armoury
             if (Campaign.Current == null) return;
             foreach (var v in Village.All) FixVillage(v, "przeglad doby");
             foreach (var t in Town.AllFiefs) FixTown(t, "przeglad doby");
+            try { BkEstateShare307.Daily(); } catch (Exception e) { Log.Error("BkEstateShare307.Daily", e); }   // 307c: linia doby latki u zrodla (BK)
             if (_dayN > 0)
             {
                 // korekta licznika, nie ujscie ani zrodlo zlota: okna ksiegi (utarg wsi, 112) i migawki "Pieniadz swiata" widza juz naprawione

@@ -381,8 +381,21 @@ namespace Armoury
                     if (LogOn && _vetoLogged.Add(ev)) VetoLine(camp, null, "przerwa po odparciu do dnia " + F(pz.Until, "0.0") + " (odparc w tym oblezeniu " + pz.Repels + ")", null);
                     return true;
                 }
+                Meas mPre = null;
+                if (pz != null && pz.Repels > 0 && SiegeWalls2.LearnOn && !SiegeWalls2.Surrendered(st))
+                {
+                    // 307c (2): po kilku odparciach te same mury - szturm dopiero przy wyrwie albo miazdzacej przewadze (wodz nie posyla ludzi trzeci raz bez zmiany warunkow)
+                    mPre = Measure(camp);
+                    string why307;
+                    if (SiegeWalls2.RetryHeld(camp, mPre, pz.Repels, pz.Until + 3.0 * PauseDays, true, out why307))
+                    {
+                        _dPause++;
+                        if (LogOn && _vetoLogged.Add(ev)) VetoLine(camp, mPre, why307, null);
+                        return true;
+                    }
+                }
                 if (!Ob1On) { _dPass++; return false; }
-                var m = Measure(camp);
+                var m = mPre ?? Measure(camp);
                 _lastCamp = camp; _last = m; _lastAt = Now;
                 if (m.Empty) { _dEmpty++; _dPass++; return false; }
                 // DR (oblezenia 2, SiegeWalls2): po dlugim oblezeniu miazdzaca przewaga sil przepuszcza decyzje gry, ktora OB1 by wstrzymal (drabiny drogo - SZ)
@@ -484,6 +497,20 @@ namespace Armoury
         {
             try { var pz = PauseOf(ev, false); return pz != null && Now < pz.Until && !SiegeWalls2.Surrendered(ev.BesiegedSettlement); }
             catch (Exception e) { Stumble("InRepelPause", e); return false; }
+        }
+
+        /// <summary>307c: liczba odparc szturmu w tym oblezeniu (OB2). 0 - brak przerwy w pamieci.</summary>
+        internal static int RepelsOf(SiegeEvent ev)
+        {
+            try { var pz = PauseOf(ev, false); return pz != null ? pz.Repels : 0; }
+            catch (Exception e) { Stumble("RepelsOf", e); return 0; }
+        }
+
+        /// <summary>307c: koniec okna "nie na te same mury" - koniec przerwy + 3 x podstawa (SiegeRepelPauseDays). Bez przerwy - 0 (bez wstrzymania).</summary>
+        internal static double RetryHoldUntil(SiegeEvent ev)
+        {
+            try { var pz = PauseOf(ev, false); return pz != null ? pz.Until + 3.0 * PauseDays : 0.0; }
+            catch (Exception e) { Stumble("RetryHoldUntil", e); return 0.0; }
         }
 
         private static Pause PauseOf(SiegeEvent ev, bool create)
@@ -618,6 +645,8 @@ namespace Armoury
             try { me.AttackerSide.LeaderParty.MobileParty.RecalculateShortTermBehavior(); }
             catch (Exception e) { Stumble("Repel.Recalculate", e); a.Off = true; return; }
             var pz = PauseOf(ev, true);
+            double grow = 1.0; int prior = pz != null ? pz.Repels : 0;
+            T = SiegeWalls2.GrowPause(T, prior, b * 4.0, out grow);              // 307c (2): kazde wczesniejsze odparcie w tym oblezeniu wydluza przerwe (najwyzej 4 x podstawa)
             if (pz != null) { pz.Until = Now + (float)T; pz.Repels++; }
             a.Repelled = true;
             _dRepelled++; _dLossSum += a.Loss; _dThrSum += a.Thr; _dPauseSum += T;
@@ -631,11 +660,11 @@ namespace Armoury
                       .Append(" | ludzi na starcie ").Append(a.Men0).Append(", zostalo ").Append(left).Append("; obroncow bylo ").Append(a.Def0).Append(", zostalo ").Append(dmen)
                       .Append(" | prog armii ").Append(F(a.Thr * 100.0, "0.0")).Append("%, straty ").Append(F(a.Loss * 100.0, "0.0")).Append('%')
                       .Append(" | godzin szturmu ").Append(F((Now - a.Start) * 24.0, "0")).Append(MoralePart(me, a)).Append(" | bitwa ").Append(me.IsSiegeOutside ? "z murow (OB3)" : "szturm")
-                      .Append(" | przerwa ").Append(F(T, "0.0")).Append(" dob do dnia ").Append(F(Now + T, "0.0")).Append(" (podstawa ").Append(F(b, "0.0"))
+                      .Append(" | przerwa ").Append(F(T, "0.0")).Append(" dob do dnia ").Append(F(Now + T, "0.00")).Append(" (podstawa ").Append(F(b, "0.0"))
                       .Append(" x morale ").Append(F(morale, "0")).Append(" -> ").Append(F(fM, "0.00"))
                       .Append(" x ludzie ").Append(left).Append('/').Append(dmen).Append(" = ").Append(F(ratio, "0.00")).Append(" -> ").Append(F(fL, "0.00"))
                       .Append(" x oplacalnosc ").Append(F(val, "0")).Append(" / zold ").Append(wage).Append("/d = ").Append(worth >= 9999 ? "-" : F(worth, "0")).Append(" dob -> ").Append(F(fO, "0.00"))
-                      .Append(") | odparc w tym oblezeniu ").Append(pz != null ? pz.Repels : 1).Append('.');
+                      .Append(")").Append(grow > 1.0001 ? " x wczesniejsze odparcia " + prior + " -> " + F(grow, "0.00") + " (307c)" : "").Append(" | odparc w tym oblezeniu ").Append(pz != null ? pz.Repels : 1).Append('.');
                     Log.Info(sb.ToString());
                 }
                 catch (Exception e) { Stumble("RepelLine", e); }
@@ -1221,6 +1250,7 @@ namespace Armoury
                   .Append(" | oblezenia: nowe ").Append(_dSiegesNew).Append(", trwajace ").Append(going).Append(", najdluzsze ").Append(F(longest, "0.0")).Append(" dob (").Append(longestSt).Append(')')
                   .Append(", ponad 45 dob: ").Append(over45.Count == 0 ? "-" : string.Join(", ", over45.ToArray()))
                   .Append(" | w pamieci: szturmy ").Append(_assaults.Count).Append(", przerwy ").Append(_pauses.Count + _pendingPauses.Count)
+                  .Append(" | ").Append(SiegeWalls2.Day307Text())
                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (od wczytania ").Append(_stumbles).Append(").");
                 Log.Info(sb.ToString());
                 SzDaily();                                                       // SZ: linia doby bitwy szturmu

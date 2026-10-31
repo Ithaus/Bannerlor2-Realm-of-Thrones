@@ -5045,6 +5045,20 @@ namespace Armoury
         // zmiana produkcji warsztatu) - Probes306.cs. Dzialaja TYLKO w DLL autotestu CrashScribe (LogGate.Mode 1/2) i tylko przy plikach armoury-kowal305.flag,
         // armoury-karawana305.flag, armoury-warsztat305.flag w Documents\Mount and Blade II Bannerlord\CrashScribe. W zwyklej grze klucz nic nie zmienia.
         public bool Autotest306Probes = true;              // Test runs only: lets the automatic test check smithing XP, give the player a caravan and change the trade of one of the player's workshops, when the test's own flag files are present. In a normal game it does nothing. Off = those checks never run, even with the flag files
+        // --- Sieges, workshop prices, estates (307c) ---
+        // 307c (Jeff 31.10 "AI walczy o zycie", krytyk 307 'reszta' waga 4): MB liczyl szanse szturmu z wykladnika gry 0.8 - 0.02 x (godziny - 96), ktory po kilkunastu dobach
+        // oblezenia jest ujemny (-21.554) - mury "pomagaja" oblegajacym, stosunek 2.8e18 i szansa 1.0 co godzine; po kazdym odparciu przerwa ok. 3 dob i szturm na te same mury.
+        public bool SiegeSaneAssaultOdds = true;           // When an AI lord storms without waiting for engines still being built, his chance is reckoned with the walls never counting in his favour: the game's own sum lets the walls' weight fall below zero after a long siege, so the walls seemed to help the attackers and every hour's roll became certain. Off = the game's sum, as before
+        public float SiegeGameTimeTermFloor = 0f;          // With Siege Sane Assault Odds: the least weight the walls keep in that sum however long the siege (0 = the walls count for nothing, never against the defenders)
+        public bool SiegeRepelLearn = true;                // An AI commander thrown back from the same walls does not send his men up them again unchanged: each repelled assault lengthens the next wait, and after a few he storms again only with a breach in the walls or a crushing edge in men. Off = the same wait after every repulse and no such condition, as before
+        public float SiegeRepelPauseGrowth = 0.5f;         // With Siege Repel Learn: the wait after a repulse grows by this share for every earlier repulse in the same siege (0.5: second repulse x1.5, third x2), still no longer than four times the base wait
+        public int SiegeRepelRetryAfter = 2;               // With Siege Repel Learn: after this many repulses in one siege the next assault needs a breach or the edge below
+        public float SiegeRepelRetryMinRatio = 6f;         // With Siege Repel Learn: besiegers' strength against the full defence needed to storm unbroken walls again after those repulses
+        // 307c (krytyk 307 'warsztaty_inwestycje' waga 3): cena kupna dla gracza bierze oczekiwany wynik z cen targu, gdy wsad na JEDEN cykl lezy na polce - jakby linia pracowala co dobe
+        public bool WorkshopPriceStockPace = true;         // The price a workshop asks of you counts a trade line's expected profit only as far as the market holds its materials: a line whose stock feeds it for a day or two is priced as working a day or two in a week, not every day. Off = full profit whenever one batch of materials is on the market, as before
+        public int WorkshopPriceStockDays = 7;             // With Workshop Price Stock Pace: days of work the market stock must cover for a line to count in full
+        // 307c (krytyk 307 'reszta' waga 3, TaxCounterGuard): BK GetEstateWorkforceProportion dzieli ludzi majatku przez sile robocza wsi - 0/0 = NaN, x/0 = caly podatek
+        public bool BkEstateShareNoWorkforce = true;       // Banner Kings estates take no share of a village's trade tax when the village has no workforce at all (Banner Kings divided by zero there: the share came out as nothing-at-all or as the whole tax). Off = as in Banner Kings
 
         public static void Load(string moduleDataDir)
         {

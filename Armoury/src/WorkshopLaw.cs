@@ -46,6 +46,7 @@ namespace Armoury
         internal static void Reset() { _pending = null; _market.Clear(); _marketDay = -1; _handsStart = -1f; _handsDay = -1; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _skipFletch = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
             _plFree = _plHeld = _plStumbles = 0; _plErrLogged = false; _freeRawByType.Clear();   // AM-30
             _plFirmCycles = _plFirmMade = _plFirmGame = _plFirmShops = 0; _plFirmRev = _plFirmCost = 0; _plFirmCall = false; _plFirmSeen.Clear();   // 305b
+            _plSkipLoss = _plSkipMat = _plSkipLabor = _plSkipGold = _plSkipFletch = _plNoneMade = 0; Array.Clear(_plSkipMatBy, 0, _plSkipMatBy.Length);   // 307c
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
@@ -61,6 +62,8 @@ namespace Armoury
         // oddane grze (wyjatek / brak miasta w CyclePrefix); _plFirmCall - CyclePrefix wolany z PlayerFirm (warsztat gracza nie wraca do gry)
         private static int _plFirmCycles, _plFirmMade, _plFirmGame, _plFirmShops; private static long _plFirmRev, _plFirmCost; private static bool _plFirmCall;
         private static readonly HashSet<Workshop> _plFirmSeen = new HashSet<Workshop>();
+        // 307c (krytyk 307 'warsztaty_inwestycje' waga 4): powody postoju cykli firmy gracza (ten sam podzial co liczniki swiata w CyclePrefix) - tylko log
+        private static int _plSkipLoss, _plSkipMat, _plSkipLabor, _plSkipGold, _plSkipFletch, _plNoneMade; private static readonly int[] _plSkipMatBy = new int[4];
         private static bool _plErrLogged;
         private static long _dayRevenue, _dayCost;
         private static readonly Dictionary<ItemObject.ItemTypeEnum, int> _madeByType = new Dictionary<ItemObject.ItemTypeEnum, int>();
@@ -1473,6 +1476,8 @@ namespace Armoury
                 Log.Info("Warsztaty gracza jak firma (305b): dzien " + _dayStamp + " - klucz " + (Settings.Current != null && Settings.Current.PlayerArmsAsFirm ? "TAK" : "NIE")
                          + " | warsztatow " + _plFirmShops + ", cykli linii broni/zbroi z wsadem przez firme " + _plFirmCycles + ", sztuk " + _plFirmMade + ", sprzedaz miastu " + _plFirmRev
                          + ", koszt (surowiec + place) " + _plFirmCost + ", wynik " + (_plFirmRev - _plFirmCost) + " | cykli oddanych grze (wyjatek albo brak miasta) " + _plFirmGame
+                         + " | powody cykli bez sztuki (307c): cykli bez sztuki " + _plNoneMade + ", w robocie " + _plSkipLabor + ", brak surowca " + _plSkipMat + " [ruda " + _plSkipMatBy[0] + ", drewno " + _plSkipMatBy[1]
+                         + ", skora " + _plSkipMatBy[2] + ", len/welna " + _plSkipMatBy[3] + "], brak zlota/kupca " + _plSkipGold + ", bez zysku " + _plSkipLoss + ", czeka na strzelarzy " + _plSkipFletch
                          + (_plStumbles > 0 ? " | potkniecia warsztatow gracza " + _plStumbles : "") + " | cykl gry pominiety w kazdym cyklu firmy (bron nie powstaje za darmo).");
             if (_freeRawByType.Count > 0)   // AM-30 (audyt 14.10): zablokowane cykle linii bez wsadu wedlug typu warsztatu
             {
@@ -1489,6 +1494,7 @@ namespace Armoury
             _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = _skipFletch = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
             _plFree = _plHeld = _plStumbles = 0;
             _plFirmCycles = _plFirmMade = _plFirmGame = _plFirmShops = 0; _plFirmRev = _plFirmCost = 0; _plFirmSeen.Clear();   // 305b
+            _plSkipLoss = _plSkipMat = _plSkipLabor = _plSkipGold = _plSkipFletch = _plNoneMade = 0; Array.Clear(_plSkipMatBy, 0, _plSkipMatBy.Length);   // 307c
             Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
         }
 
@@ -1726,6 +1732,8 @@ namespace Armoury
             if (Campaign.Current == null || !Campaign.Current.GameStarted) return true;
             RollDay();   // przed odczytem licznikow doby - CyclePrefix nie zrobi Flush w srodku (ta sama doba)
             int made0 = _made; long rev0 = _dayRevenue, cost0 = _dayCost;
+            int sl0 = _skipLoss, sm0 = _skipMat, sb0 = _skipLabor, sg0 = _skipGold, sf0 = _skipFletch;   // 307c
+            int m00 = _skipMatBy[0], m10 = _skipMatBy[1], m20 = _skipMatBy[2], m30 = _skipMatBy[3];
             int csp = 0; bool go = true, susp = false;
             try
             {
@@ -1741,6 +1749,11 @@ namespace Armoury
                 _plFirmCycles++;
                 if (_plFirmSeen.Add(w)) _plFirmShops++;
                 _plFirmMade += Math.Max(0, _made - made0); _plFirmRev += Math.Max(0L, _dayRevenue - rev0); _plFirmCost += Math.Max(0L, _dayCost - cost0);
+                // 307c: powod cyklu bez sztuki (roznica licznikow swiata w tym jednym cyklu firmy)
+                _plSkipLoss += Math.Max(0, _skipLoss - sl0); _plSkipMat += Math.Max(0, _skipMat - sm0); _plSkipLabor += Math.Max(0, _skipLabor - sb0);
+                _plSkipGold += Math.Max(0, _skipGold - sg0); _plSkipFletch += Math.Max(0, _skipFletch - sf0);
+                _plSkipMatBy[0] += Math.Max(0, _skipMatBy[0] - m00); _plSkipMatBy[1] += Math.Max(0, _skipMatBy[1] - m10); _plSkipMatBy[2] += Math.Max(0, _skipMatBy[2] - m20); _plSkipMatBy[3] += Math.Max(0, _skipMatBy[3] - m30);
+                if (_made - made0 <= 0) _plNoneMade++;
                 Wip wip;
                 if (result || (_wip.TryGetValue(new KeyValuePair<Workshop, string>(w, LineKey(p)), out wip) && wip != null && wip.Item != null)) w.UpdateLastRunTime();
             }
