@@ -443,7 +443,8 @@ namespace Armoury
             // 157: histogram i linia 140 jak dotad (klucz albo HitScribe); kolejka zdarzen takze dla pomiaru konnicy (P1) i kontry na strzelca (P3)
             _hist = _key || (c != null && c.HitScribeEnabled);
             CavBegin(m, c);
-            _live = _hist || _cavLog || _counterKey || _huntKey;
+            CleanShot.Begin(m, c);   // 310: czysty strzal (klucz albo pomiar na sucho) - kolejka zywa takze dla niego, tylko bitwa polowa
+            _live = _hist || _cavLog || _counterKey || _huntKey || CleanShot.Live;
             _on = _key;
         }
 
@@ -504,6 +505,8 @@ namespace Armoury
             _now = m.CurrentTime;
             _qFrame = 0;
             Drain(m);
+            // 310: przeglad wlasnosci celu i wstrzyman (co 0.5 s, najwyzej 16 wpisow; padly cel - od razu)
+            if (CleanShot.Live) { try { CleanShot.Tick(m, dt); } catch (Exception e) { Stumble("ShieldsUp.CzystyStrzal", e); } }
             // 157 P1: pomiar konnicy AI pod ostrzalem (co 1 s, bitwa polowa) - takze przy kluczu 140 NIE
             if (!_on && !_cavLog) return;
             bool deployed = false;
@@ -587,13 +590,18 @@ namespace Armoury
             _qOverTotal += over;
             bool act = _on;
             bool deployed = false;
-            if (n > 0 && (act || _cavLog || _counterKey || _huntKey)) { try { deployed = m.IsDeploymentFinished; } catch { } }
+            bool clean = CleanShot.Live;
+            if (n > 0 && (act || _cavLog || _counterKey || _huntKey || clean)) { try { deployed = m.IsDeploymentFinished; } catch { } }
             bool hunt = _huntKey && deployed;
             if (hunt) HorsePursuit.FireFrame();
+            clean = clean && deployed;
+            if (clean) CleanShot.Frame();
             for (int i = 0; i < n; i++)
             {
                 // 204: wykrycie konnego strzelca - przed bramkami 140 (wlasny try w OnFire)
                 if (hunt) HorsePursuit.OnFire(m, q[i].K, q[i].A, q[i].V, q[i].P, q[i].Vel);
+                // 310: strzal AI - czysty cel (po 204, ktory moze wziac strzelca; wlasny try w OnShot, niezaleznie od bramki 140)
+                if (clean && q[i].K == 1) CleanShot.OnShot(m, q[i].A, q[i].Thrown);
                 try
                 {
                     if (q[i].K == 1) Shot(m, ref q[i], act && deployed);
@@ -602,6 +610,7 @@ namespace Armoury
                 catch (Exception e) { Stumble("ShieldsUp.Zdarzenie", e); }
                 q[i].A = null; q[i].V = null;
             }
+            if (clean) CleanShot.FrameEnd();
         }
 
         private static void Shot(Mission m, ref Ev ev, bool act)

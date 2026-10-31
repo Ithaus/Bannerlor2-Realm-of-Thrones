@@ -19,9 +19,10 @@ namespace Armoury
     internal static class FrameCost309
     {
         internal const int MFieldCraft = 0, MCries = 1, MMarch = 2, MDoctrine = 3, MSound = 4, MShields = 5, MRanks = 6, MPursuit = 7, MHeroes = 8, MPools = 9,
-                           MDuel = 10, MRout = 11, MBroken = 12, MHorseWind = 13, MBanner = 14, MOwnFoot = 15, MStall = 16, MKinds = 17;
+                           MDuel = 10, MRout = 11, MBroken = 12, MHorseWind = 13, MBanner = 14, MOwnFoot = 15, MStall = 16, MClean = 17, MKinds = 18;
         private static readonly string[] Names = { "FieldCraft", "okrzyki", "marsz", "doktryna", "dzwiek", "tarcze 140", "szyk 146", "poscig 148/204/283",
-                                                   "bohaterowie 149", "kaluze", "zrywy", "RoutKeeper", "BrokenMen", "HorseWind", "choragwie", "305c OwnFootAhead", "zastoj 307e" };
+                                                   "bohaterowie 149", "kaluze", "zrywy", "RoutKeeper", "BrokenMen", "HorseWind", "choragwie", "305c OwnFootAhead", "zastoj 307e",
+                                                   "czysty strzal 310 (w tarcze 140)" };
         // koszyki sumy naszych na klatke (ms, gorna granica)
         private static readonly double[] Edges = { 0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 8, 12, 20, double.MaxValue };
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -88,6 +89,15 @@ namespace Armoury
                 _frameSum += d;
             }
             catch { _stumbles++; }
+        }
+
+        /// <summary>310: czas modulu liczonego WEWNATRZ innego (czysty strzal w ShieldsUp.Tick) - tylko razem / najwiecej / wywolan, bez sumy klatki
+        /// (ta juz jest w module zewnetrznym).</summary>
+        internal static void AddTicks(int mod, long ticks)
+        {
+            if (!_on || ticks <= 0 || mod < 0 || mod >= MKinds) return;
+            Sum[mod] += ticks; N[mod]++;
+            if (ticks > Max[mod]) Max[mod] = ticks;
         }
 
         private static int FrameNo()

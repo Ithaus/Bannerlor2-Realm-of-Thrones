@@ -76,6 +76,8 @@ namespace Armoury
         private static int _siegeCancel, _siegeHit;                                      // machiny: AI w swojego anulowane (gra), trafienia swojego bez skali
         private static long _hpBefore10, _hpAfter10;                                     // HP od swoich x10 przed / po skali
         private static int _humanHits, _ffHumanHits, _heroHits, _playerHits;
+        // 310 (pomiar): pociski AI w swoich wedlug odleglosci strzelec-ofiara (<10 / 10-39 / 40-99 / 100+ m) i rodzaju ofiary (konny / strzelec / pieszy)
+        private static int _ffD0, _ffD1, _ffD2, _ffD3, _ffVCav, _ffVRng, _ffVFoot;
         private static int _killedAtt, _koAtt, _killedDef, _koDef, _heroDown;
         private static int _stum, _stumProcess;
         private static string _stumWhere;
@@ -491,7 +493,27 @@ namespace Armoury
                     if (pl) Interlocked.Increment(ref _chargePl);
                     else { Interlocked.Increment(ref _chargeAi); OwnFootAhead.NoteChargeFf(r, v); }   // 305c: stan szyku jezdzca x klasa ofiary (pomiar)
                 }
-                else if (missile) { if (pl) Interlocked.Increment(ref _missPl); else Interlocked.Increment(ref _missAi); }
+                else if (missile)
+                {
+                    if (pl) Interlocked.Increment(ref _missPl);
+                    else
+                    {
+                        Interlocked.Increment(ref _missAi);
+                        // 310: koszyk odleglosci i rodzaj ofiary - bez zapytan, tylko Interlocked (watek dowolny)
+                        float dd = r != null ? r.Position.Distance(v.Position) : -1f;
+                        if (dd >= 0f)
+                        {
+                            if (dd < 10f) Interlocked.Increment(ref _ffD0);
+                            else if (dd < 40f) Interlocked.Increment(ref _ffD1);
+                            else if (dd < 100f) Interlocked.Increment(ref _ffD2);
+                            else Interlocked.Increment(ref _ffD3);
+                        }
+                        var vr = Rider(v);
+                        if (v.IsMount || (vr != null && vr.HasMount)) Interlocked.Increment(ref _ffVCav);
+                        else if (vr != null && vr.IsRangedCached) Interlocked.Increment(ref _ffVRng);
+                        else Interlocked.Increment(ref _ffVFoot);
+                    }
+                }
                 else { if (pl) Interlocked.Increment(ref _meleePl); else Interlocked.Increment(ref _meleeAi); }
                 Interlocked.Add(ref _hpBefore10, (long)Math.Round(before * 10f));
                 Interlocked.Add(ref _hpAfter10, (long)Math.Round(after * 10f));
@@ -524,6 +546,7 @@ namespace Armoury
             Interlocked.Exchange(ref _hpBefore10, 0);
             Interlocked.Exchange(ref _hpAfter10, 0);
             _humanHits = _ffHumanHits = _heroHits = _playerHits = 0;
+            _ffD0 = _ffD1 = _ffD2 = _ffD3 = _ffVCav = _ffVRng = _ffVFoot = 0;
             _killedAtt = _koAtt = _killedDef = _koDef = _heroDown = 0;
             _stum = 0;
             _stumWhere = null;
@@ -614,6 +637,8 @@ namespace Armoury
             sb.Append(" | trafienia swoich: wrecz ").Append(melee).Append(" (AI ").Append(_meleeAi).Append(", gracz ").Append(_meleePl).Append(')')
               .Append(", pociski ").Append(miss).Append(" (AI ").Append(_missAi).Append(", gracz ").Append(_missPl).Append(')')
               .Append(", szarza ").Append(charge).Append(" (AI ").Append(_chargeAi).Append(", gracz ").Append(_chargePl).Append(')');
+            sb.Append(" | pociski AI w swoich (310) wedlug odleglosci <10/10-39/40-99/100+ m ").Append(_ffD0).Append('/').Append(_ffD1).Append('/').Append(_ffD2)
+              .Append('/').Append(_ffD3).Append(", ofiara konny/strzelec/pieszy ").Append(_ffVCav).Append('/').Append(_ffVRng).Append('/').Append(_ffVFoot);
             sb.Append(" | bramki gry otwarte: wrecz ").Append(_openMelee).Append(", pociski AI ").Append(_openMissAi).Append(", szarza ").Append(_openCharge)
               .Append("; pociski anulowane przy 0% ").Append(_cancelMiss);
             int msk = _mSkillPass + _mSkillStop;

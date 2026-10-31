@@ -100,6 +100,9 @@ namespace Armoury
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
         internal const float Radius = 50f;        // promien liczenia wrogow
         internal const int PathPerFrame = 20;     // zapytan o droge na klatke (cala misja)
+        // 310 (klucz RoutKeeperTimeBudget; 145a b8: 7.6 ms w jednym ticku = 20 zapytan x 0.33 ms po fali 129 zlamanych): budzet CZASU ticku listy - po nim nowe
+        // zapytanie o droge dopiero w nastepnym ticku (sciezka LimitKind: cel gry teraz, proba za 0.5 s); zawsze co najmniej jedno zapytanie na tick
+        internal const double PathBudgetMs = 1.2;
         internal const int PathPerMan = 3;        // kandydatow z droga na czlowieka w jednej ocenie
         internal const float NoHandlerAfter = 1f; // po tylu sekundach bez odwrotu z handlera paniki wysylamy odwrot sami
         internal const float DebacleMax = 3f;     // najdluzszy okrzyk Debacle po Panic (1,47-3,0 s): po zgaszeniu paniki przez innych ponowienie juz od Since + 3 s
@@ -133,6 +136,7 @@ namespace Armoury
         internal static readonly HashSet<int> ResendPeople = new HashSet<int>();
         // ---- kierunek
         internal static int DirGame, DirSector, DirNoRoad, DirLimit, DirOff, PathQueries;
+        internal static int DirLimitTime, PhaseSpread;   // 310: limit czasu ticku (czesc DirLimit), pierwsza ponowna ocena z rozrzucona faza
         internal static readonly HashSet<int> GameRejected = new HashSet<int>();  // poprawka 16.10: cel gry odrzucony (w strone wrogow) - rozni ludzie
         internal static readonly HashSet<int> NearMain = new HashSet<int>();      // z tego: gracz blizej niz 15 m, a cel gry nie od niego
         internal static int Field = -1;           // -1 nie wiadomo, 0 nie pole bitwy (cel gry), 1 bitwa polowa (sektory)
@@ -325,6 +329,7 @@ namespace Armoury
             Broken = Fled = Panics = Already = RePanic = Pins = Extinct = Resends = Turns = NoHandler = Player = 0;
             AfterEnd.Clear(); NoTeam.Clear(); Ordered.Clear(); PinPeople.Clear(); ResendPeople.Clear();
             DirGame = DirSector = DirNoRoad = DirLimit = DirOff = PathQueries = 0;
+            DirLimitTime = PhaseSpread = 0;
             GameRejected.Clear(); NearMain.Clear();
             Field = -1;
             for (int i = 0; i < Tiers.Length; i++) Tiers[i].Clear();
@@ -596,6 +601,9 @@ namespace Armoury
             return d;
         }
         private int _pathLeft;
+        private long _pathT0;      // 310: poczatek ticku listy (budzet czasu zapytan o droge)
+        private int _pathUsed;     // 310: zapytan w tym ticku
+        private bool _pathTime;    // 310: klucz RoutKeeperTimeBudget w tym ticku
         private int _field = -1;
 
         // 142: kolejka paniki gry. Mission.OnAgentPanicked iteruje zachowania misji (Mission.cs:6704-6710) - w callbacku tylko wpis do kolejki,
@@ -955,6 +963,9 @@ namespace Armoury
                 }
                 if (_list.Count == 0) return;
                 _pathLeft = RoutHold.PathPerFrame;
+                _pathT0 = System.Diagnostics.Stopwatch.GetTimestamp();   // 310: budzet czasu ticku listy
+                _pathUsed = 0;
+                _pathTime = c.RoutKeeperTimeBudget;
                 bool dead = false;
                 for (int i = 0; i < _list.Count; i++)
                 {
@@ -1063,6 +1074,23 @@ namespace Armoury
         {
             var a = e.A;
             e.NextEval = now + RoutHold.RefreshEvery;
+            // 310 (klucz RoutKeeperCourseFirst; 145a b8: 1978 zapytan o droge, a kurs utrzymany 1526 razy - wynik Choose do kosza): przy ponownej ocenie z trzymanym
+            // kursem najpierw tani warunek rozstrzygajacy (droga zablokowana, jedno zapytanie o wrogow w 12 m) - wolna droga i odwrot trwa = bez nowego
+            // Agent.Retreat i tak (send = false), wiec bez Choose. Decyzje identyczne; Choose tylko przy blokadzie, zgaslym odwrocie, pierwszej ocenie, mustSend.
+            bool knownBlocked = false;
+            if (c.RoutKeeperCourseFirst && c.PanicFleeHoldCourse && e.Decided && !mustSend && e.Target.IsValid)
+            {
+                bool lost0 = false;
+                try { lost0 = !a.IsRetreating() && !a.IsFadingOut(); } catch { }
+                if (!lost0)
+                {
+                    bool blk;
+                    try { blk = CourseBlocked(a, m, e.Target); }
+                    catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteDir, "RoutHold.KursNajpierw", ex); blk = true; }
+                    if (!blk) { PanicRun.Course(3); return; }
+                    knownBlocked = true;
+                }
+            }
             int kind = GameKind;
             WorldPosition pick = WorldPosition.Invalid;
             try { pick = Choose(e, m, c, out kind); }
@@ -1081,6 +1109,13 @@ namespace Armoury
             if (first)
             {
                 e.Decided = true;
+                // 310 (klucz RoutKeeperTimeBudget): fala z jednej kompanii (BannerCompanies - 4 fale co 0.5 s) ma te sama faze ocen - pierwsza ponowna ocena
+                // za 3-5 s wedlug numeru czlowieka (srednio dalej 4 s), potem staly odstep; fala 30 ludzi ocenia sie w 16 roznych chwilach, nie w jednym ticku
+                if (c.RoutKeeperTimeBudget)
+                {
+                    e.NextEval = now + RoutHold.RefreshEvery * (0.75f + 0.5f * (((a.Index * 7) & 15) / 16f));
+                    RoutHold.PhaseSpread++;
+                }
                 if (kind == GameKind) RoutHold.DirGame++;
                 else if (kind == SectorKind) RoutHold.DirSector++;
                 else if (kind == NoRoadKind) RoutHold.DirNoRoad++;
@@ -1107,7 +1142,7 @@ namespace Armoury
                 // tylko, gdy na drodze do celu stoi wrog (nie uciekajacy) w 12 m w stozku 60 stopni; inaczej bez nowego Agent.Retreat (bez zawracania co ocene)
                 if (send && c.PanicFleeHoldCourse && e.Target.IsValid)
                 {
-                    if (CourseBlocked(a, m, e.Target)) PanicRun.Course(2);
+                    if (knownBlocked || CourseBlocked(a, m, e.Target)) PanicRun.Course(2);
                     else { PanicRun.Course(0); send = false; }
                 }
                 else if (send) PanicRun.Course(1);
@@ -1290,7 +1325,15 @@ namespace Armoury
                 if (!p.IsValid) continue;
                 if (!m.IsPositionInsideBoundaries(p)) p = edge;
                 if (_pathLeft <= 0) { kind = LimitKind; return game; }
+                if (_pathTime && _pathUsed > 0
+                    && (System.Diagnostics.Stopwatch.GetTimestamp() - _pathT0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency > RoutHold.PathBudgetMs)
+                {
+                    RoutHold.DirLimitTime++;   // 310: budzet czasu ticku zuzyty - ta sama sciezka co limit sztuk
+                    kind = LimitKind;
+                    return game;
+                }
                 _pathLeft--;
+                _pathUsed++;
                 tried++;
                 RoutHold.PathQueries++;
                 WorldPosition from = a.GetWorldPosition();

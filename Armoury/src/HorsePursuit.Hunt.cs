@@ -1215,6 +1215,7 @@ namespace Armoury
 
         private static Hunter StartHunter(Threat t, Agent a, FI fi, byte role, float range, float now)
         {
+            CleanShot.Yield(a);   // 310: nasz wpis czystego strzalu zdjety (wstrzymanie ognia tez) - cel ustawia 204/283 ponizej
             var h = new Hunter { A = a, F = fi.F, T = t, Role = role, Start = now, Range = range };
             Hunters[a] = h;
             HList.Add(h);

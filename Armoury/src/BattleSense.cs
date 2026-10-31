@@ -314,6 +314,9 @@ namespace Armoury
                 // 149: los bohatera (w wycofaniu czy nie) - tylko liczniki
                 try { HeroCaution.OnRemoved(Mission, affectedAgent, agentState); }
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.OnRemoved", e); }
+                // 310: strzelec padl - wpis bez wywolan silnika; cel padl - automat celu wraca w najblizszym ticku
+                try { CleanShot.OnRemoved(Mission, affectedAgent); }
+                catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "CleanShot.OnRemoved", e); }
             }
         }
 
@@ -398,6 +401,8 @@ namespace Armoury
             try { BattleSound.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.End", e); }
             // 140: linia "Bitwa (140 tarcze)" raz na bitwe, flagi postfiksow zgaszone (End bezpieczne wielokrotnie i poza bitwa)
             try { ShieldsUp.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.End", e); }
+            // 310: czysty strzal - cel i wstrzymanie zdjete wszystkim, linia "Czysty strzal (310)" raz na bitwe polowa (End bezpieczne wielokrotnie)
+            try { CleanShot.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "CleanShot.End", e); }
             // 146: linia "Szyk pod ostrzalem (146)" raz na bitwe, po linii 140 (End bezpieczne wielokrotnie i poza bitwa)
             try { CloseRanks.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRanks, "CloseRanks.End", e); }
             // 148: jezdzcy oddani grze, linia "poscig (148)" raz na bitwe (End bezpieczne wielokrotnie i poza bitwa)

@@ -179,6 +179,9 @@ namespace Armoury
             sb.Append(" (koniec misji ").Append(_missionEnd >= 0f ? S(_missionEnd) : "-").Append(" s)")
               .Append(" | tick RoutKeeper: sr. ").Append(_costFrames > 0 ? Ms((double)_costTicks / _costFrames) : "-").Append(" ms (klatek z praca ")
               .Append(_costFrames).Append("), najwiecej ").Append(Ms(_costMax)).Append(" ms")
+              .Append(" | budzet RoutKeeper (310, klucz ").Append(Settings.Current != null && Settings.Current.RoutKeeperTimeBudget ? "TAK" : "NIE")
+              .Append("): limit czasu ticku ").Append(RoutHold.PathBudgetMs.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)).Append(" ms trafiony ")
+              .Append(RoutHold.DirLimitTime).Append(" razy, faza ocen rozrzucona ").Append(RoutHold.PhaseSpread)
               .Append(" | potkniecia powrot ").Append(RoutHold.StumblesLocked(RoutHold.SiteNoReturn)).Append('.');
             Log.Info(sb.ToString());
         }

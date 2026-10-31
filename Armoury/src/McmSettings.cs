@@ -10756,6 +10756,22 @@ namespace Armoury
         [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
         public bool FieldCraftSwingOnChange { get; set; } = true;
 
+        [SettingPropertyBool("Archers Avoid Own Men", HintText = "An AI archer or crossbowman who sees his own men fighting around his mark - or standing in his line when he shoots flat at close range - picks a clear mark instead: the rear ranks of the same enemy formation, their archers or another formation within his reach; when none is clear he holds his shot for a few seconds. Both sides alike, your own men too when the AI commands them; you aim yourself. No change to damage. Off = he shoots at whatever the game picked, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
+        public bool ArchersAvoidOwnMen { get; set; } = true;
+
+        [SettingPropertyBool("Shield Wall Under Fire Any Order", HintText = "With AI Formations Under Fire: every AI infantry formation of 8 men or more that stands under arrows before it closes - holding a hill, guarding a flank, regrouping or defending, not only one advancing in a body of 30 - closes into a shield wall when six in ten hold a shield (open order when fewer do), and keeps the wall while the shooting lasts instead of being pulled back into a line. Formations under your command are never touched. Off = only formations RBM itself asks about, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
+        public bool ShieldWallUnderFireAnyOrder { get; set; } = true;
+
+        [SettingPropertyBool("Rout Keeper Time Budget", HintText = "Performance: when a whole company breaks at once, the search for each fleeing man's way off the field is spread over the next moments (at most about a millisecond of searching per frame) and the men of one wave look again at their course at slightly different times. Where they run is unchanged. Off = up to 20 searches in a single frame, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
+        public bool RoutKeeperTimeBudget { get; set; } = true;
+
+        [SettingPropertyBool("Rout Keeper Course First", HintText = "Performance: a fleeing man who keeps his course first checks whether an enemy blocks his way and only then weighs a new direction - he turns exactly as before, without the needless search when the way is clear. Off = the new direction is weighed every time, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
+        public bool RoutKeeperCourseFirst { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13444,6 +13460,10 @@ namespace Armoury
             s.PursuitDelegatedFormations = PursuitDelegatedFormations;
             s.PursuitStartNearVictims = PursuitStartNearVictims;
             s.FieldCraftSwingOnChange = FieldCraftSwingOnChange;
+            s.ArchersAvoidOwnMen = ArchersAvoidOwnMen;
+            s.ShieldWallUnderFireAnyOrder = ShieldWallUnderFireAnyOrder;
+            s.RoutKeeperTimeBudget = RoutKeeperTimeBudget;
+            s.RoutKeeperCourseFirst = RoutKeeperCourseFirst;
         }
 
         internal static void Apply()

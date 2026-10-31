@@ -51,6 +51,7 @@ namespace Armoury
         internal const float ContactOff = 40f;      // wyjscie ze zwarcia (wejscie: Doctrine.S1ContactGap)
         internal const float StaleCall = 3f;        // RBM nie wola decyzji od 3 s - nasz szyk wraca w passie
         internal const int MinMen = 30;             // prog RBM (OverrideBehaviorAdvance:401, OverrideBehaviorCharge:296)
+        internal const int MinMenAny = 8;           // 310: prog szyku dla decyzji w passie (poza RBM) - kompanie i skrzydla od 8 ludzi
         internal const float SureAdvanceGap = 100f; // recenzja 146: "pewna" sytuacja RBM w Advance - pieszy wrog blizej niz 100 m (FootGap, od krawedzi szykow;
                                                     // RBM: srodek szyku do mediany FindSignificantEnemy < 150 m - OverrideBehaviorAdvance:398-404)
         private const byte WNone = 0, WWall = 1, WLoose = 2, WHold = 3;
@@ -95,6 +96,19 @@ namespace Armoury
         private static int _rbmRuns, _rbmWall, _rbmChg, _rbmToLine, _rbmToLoose, _rbmToWall, _rbmChgFire;
         private static readonly float[] Dry = new float[5];   // klucz NIE: szyko-sekundy pod ostrzalem w sytuacji decyzji RBM - ShieldWall / Loose / czekanie / RBM (zwarcie...) / RBM (konnica)
         private static readonly int[] Hit = new int[9];       // trafienia przed zwarciem w szykach pod ostrzalem: [szyk 0 nasz ShieldWall, 1 nasz Loose, 2 RBM] x [0 cialo, 1 tarcza w rece, 2 plecy]
+        // 310 (klucz ShieldWallUnderFireAnyOrder): decyzja w passie dla szykow, ktorych RBM nie pyta (HoldHighGround / ProtectFlank / Regroup / Defend,
+        // kompanie ponizej 30), straz przed nadpisaniem naszego ShieldWall przez Line / Loose (prefiks Formation.SetArrangementOrder) i pomiar szyko-sekund
+        private static bool _any, _guardTried;
+        private static volatile bool _guard;
+        internal static bool GuardPatched;
+        private static string _guardTarget = "bez latki";
+        private static int _anyWall, _anyLoose, _anyKeep, _anyHold, _anyReactN;
+        private static double _anyReact;
+        private static int _gCalls, _gSwaps;                                    // prefiks (dowolny watek) - Interlocked
+        private const int SArr = 4, SBeh = 7;
+        private static readonly float[] Sec = new float[SArr * SBeh * 2];   // szyko-s pod ostrzalem przed zwarciem: [szyk ShieldWall/Line/Loose/inny] x [zachowanie] x [tarcze w rece >= 60%]
+        private static readonly string[] ArrName = { "ShieldWall", "Line", "Loose", "inny" };
+        private static readonly string[] BehName = { "Advance", "Charge", "HoldHighGround", "ProtectFlank", "Regroup", "Defend", "inne" };
         private static readonly HashSet<Formation> FireForms = new HashSet<Formation>(), PlayerSideForms = new HashSet<Formation>(),
                                                    PlayerOrderForms = new HashSet<Formation>(), DecidedForms = new HashSet<Formation>();
 
@@ -146,6 +160,75 @@ namespace Armoury
                 return pre && post;
             }
             catch { return false; }
+        }
+
+        /// <summary>310: pierwsza bitwa z kluczem ShieldWallUnderFireAnyOrder - prefiks Formation.SetArrangementOrder (DeclaredMethod na klasie deklarujacej).</summary>
+        private static void EnsureGuard()
+        {
+            if (_guardTried) return;
+            _guardTried = true;
+            var h = NightHooks.H;
+            if (h == null) { _guardTarget = "brak Harmony"; return; }
+            try
+            {
+                var t = AccessTools.DeclaredMethod(typeof(Formation), "SetArrangementOrder", new[] { typeof(ArrangementOrder) });
+                if (t == null) _guardTarget = "brak metody";
+                else
+                {
+                    h.Patch(t, prefix: new HarmonyMethod(typeof(CloseRanks), nameof(ArrPrefix)) { priority = Priority.Last });
+                    bool ok = false;
+                    var info = Harmony.GetPatchInfo(t);
+                    if (info != null) foreach (var p in info.Prefixes) if (p != null && p.PatchMethod != null && p.PatchMethod.DeclaringType == typeof(CloseRanks)) ok = true;
+                    GuardPatched = ok;
+                    _guardTarget = ok ? "TAK" : "NIEWPIETA";
+                }
+            }
+            catch (Exception e) { _guardTarget = "BLAD " + e.GetType().Name; Stumble("CloseRanks.PatchStraz", e); }
+            Log.Info("Szyk pod ostrzalem (310): straz szyku raz na proces (pierwsza bitwa z kluczem ShieldWallUnderFireAnyOrder) - Formation.SetArrangementOrder "
+                     + _guardTarget + " (prefiks: szyk AI w naszym ShieldWall pod ostrzalem przed zwarciem - przychodzace Line / Loose zamienione na ShieldWall).");
+        }
+
+        /// <summary>310: przed Formation.SetArrangementOrder (dowolny watek - tick druzyn). Szyk AI w naszym ShieldWall pod ostrzalem przed zwarciem: Line / Loose
+        /// (BehaviorProtectFlank:130-137 co tick, Regroup RBM co tick, HoldHighGround przy wejsciu) zamienione na ShieldWall - gra robi wtedy SoftUpdate
+        /// zamiast OnCancel + OnApply na kazdym czlowieku. Inne szyki (Square / Circle / Column / Scatter / Skein) i rozkazy gracza - bez zmiany.</summary>
+        public static void ArrPrefix(Formation __instance, ref ArrangementOrder order)
+        {
+            if (!_guard) return;
+            try
+            {
+                Interlocked.Increment(ref _gCalls);
+                var f = __instance;
+                if (f == null || !f.IsAIControlled) return;
+                var oe = order.OrderEnum;
+                if (oe != ArrangementOrder.ArrangementOrderEnum.Line && oe != ArrangementOrder.ArrangementOrderEnum.Loose) return;
+                if (f.ArrangementOrder.OrderEnum != ArrangementOrder.ArrangementOrderEnum.ShieldWall) return;
+                lock (Gate)
+                {
+                    St st;
+                    if (!Forms.TryGetValue(f, out st)) return;
+                    if (!st.Ours || st.Applied != ArrangementOrder.ArrangementOrderEnum.ShieldWall || !st.Fire || st.Contact) return;
+                }
+                order = ArrangementOrder.ArrangementOrderShieldWall;
+                Interlocked.Increment(ref _gSwaps);
+            }
+            catch (Exception e) { PatchError("CloseRanks.ArrPrefix", e); }
+        }
+
+        private static int BehOf(BehaviorComponent b)
+        {
+            if (b is BehaviorAdvance) return 0;
+            if (b is BehaviorCharge) return 1;
+            if (b is BehaviorHoldHighGround) return 2;
+            if (b is BehaviorProtectFlank) return 3;
+            if (b is BehaviorRegroup) return 4;
+            if (b is BehaviorDefend) return 5;
+            return 6;
+        }
+
+        private static int ArrOf(ArrangementOrder.ArrangementOrderEnum e)
+        {
+            return e == ArrangementOrder.ArrangementOrderEnum.ShieldWall ? 0 : e == ArrangementOrder.ArrangementOrderEnum.Line ? 1
+                 : e == ArrangementOrder.ArrangementOrderEnum.Loose ? 2 : 3;
         }
 
         /// <summary>Czy RBM AI wola decyzje szyku: prefiks com.rbmai na BehaviorAdvance.TickOccasionally i BehaviorCharge.CalculateCurrentOrder
@@ -300,15 +383,18 @@ namespace Armoury
             _naval = false;
             try { _naval = m.IsNavalBattle || m.IsNavalRaidBattle; } catch { }
             _key = c != null && c.AiFormationsUnderFire;
+            _any = _key && c.ShieldWallUnderFireAnyOrder;   // 310
             _s4 = ShieldsUp.On;
             _field = false;
             try { _field = m.IsFieldBattle; } catch { }
             if (_key) EnsurePatched();
+            if (_any) EnsureGuard();
             _rbmAdv = RbmPrefix(typeof(BehaviorAdvance), "TickOccasionally");
             _rbmCharge = RbmPrefix(typeof(BehaviorCharge), "CalculateCurrentOrder");
             _now = m.CurrentTime;
             _live = _s4 && _field;
             _on = _live && _key && Patched;
+            _guard = _on && _any && GuardPatched;
         }
 
         /// <summary>BattleSense.OnMissionTick (po ShieldsUp.Tick - S4 z tej klatki): pass szykow co 0.5 s.</summary>
@@ -372,6 +458,7 @@ namespace Armoury
             if (m != null && !ReferenceEquals(w.Target, m)) return;
             _on = false;
             _live = false;
+            _guard = false;
             if (!_written)
             {
                 _written = true;
@@ -395,7 +482,12 @@ namespace Armoury
                 _rbmRuns = _rbmWall = _rbmChg = _rbmToLine = _rbmToLoose = _rbmToWall = _rbmChgFire = 0;
                 for (int i = 0; i < Dry.Length; i++) Dry[i] = 0f;
                 for (int i = 0; i < Hit.Length; i++) Hit[i] = 0;
+                _anyWall = _anyLoose = _anyKeep = _anyHold = _anyReactN = 0;
+                _anyReact = 0;
+                for (int i = 0; i < Sec.Length; i++) Sec[i] = 0f;
             }
+            Interlocked.Exchange(ref _gCalls, 0);
+            Interlocked.Exchange(ref _gSwaps, 0);
             Units.Clear();
             _acc = 0f;
             Interlocked.Exchange(ref _calls, 0);
@@ -437,10 +529,12 @@ namespace Armoury
             var cur = f.ArrangementOrder.OrderEnum;
             bool sit = false, sure = false;
             float gap = float.MaxValue;
+            int beh = 6;
             if (ai && inf)
             {
                 var fai = f.AI;
                 var b = fai != null ? fai.ActiveBehavior : null;
+                beh = BehOf(b);
                 sit = f.CountOfUnitsWithoutDetachedOnes >= MinMen && (b is BehaviorAdvance || b is BehaviorCharge);
                 gap = Doctrine.FootGap(t, f);
                 // recenzja 146: RBM wola decyzje z Advance tylko przy pieszym wrogu w 150 m (OverrideBehaviorAdvance:398-404), z Charge tylko z celem
@@ -472,8 +566,9 @@ namespace Armoury
                 Units.Clear();
                 horse = ShieldsUp.CavNear(m, f);
             }
-            bool restore = false;
+            bool restore = false, apply = false;
             var back = ArrangementOrder.ArrangementOrderEnum.Line;
+            var target = ArrangementOrder.ArrangementOrderEnum.ShieldWall;
             lock (Gate)
             {
                 // zmiana szyku poza latka (inne sciezki RBM - OverrideBehaviorAdvance:265 / OverrideBehaviorCharge:229,270 - gra, gracz) - tez liczy sie do 10 s
@@ -531,6 +626,31 @@ namespace Armoury
                     else if (why == YHorse) Dry[4] += PassEvery;
                     else Dry[3] += PassEvery;
                 }
+                // 310: pomiar - szyko-sekundy pod ostrzalem przed zwarciem wedlug szyku x zachowania x tarcz w rece (szyk AI piechoty z ludzmi)
+                if (ai && inf && fire && !contact && men > 0)
+                    Sec[(ArrOf(cur) * SBeh + beh) * 2 + ((float)hand / men >= WallFrom ? 1 : 0)] += PassEvery;
+                // 310: szyk, ktorego RBM nie pyta o szyk (HoldHighGround / ProtectFlank / Regroup / Defend, kompania ponizej 30) - ta sama decyzja w passie
+                if (_on && _any && !_ended && ai && inf && fire && !contact && men >= MinMenAny && _now - st.LastCall > StaleCall && (want == WWall || want == WLoose))
+                {
+                    target = want == WWall ? ArrangementOrder.ArrangementOrderEnum.ShieldWall : ArrangementOrder.ArrangementOrderEnum.Loose;
+                    if (cur == target) _anyKeep++;
+                    else if (_now - st.LastChange < MinGap) _anyHold++;
+                    else
+                    {
+                        if (!st.Ours)
+                        {
+                            st.Before = cur;
+                            if (st.FireStart >= 0f) { _anyReact += _now - st.FireStart; _anyReactN++; }
+                        }
+                        st.Ours = true;
+                        st.Applied = target;
+                        st.LastChange = _now;
+                        st.Seen = target;
+                        st.SeenOk = true;
+                        if (want == WWall) _anyWall++; else _anyLoose++;
+                        apply = true;
+                    }
+                }
                 // nasz szyk niepotrzebny, a RBM nie wola decyzji (wrog > 150 m, < 30 ludzi, inne zachowanie) - przywrocenie szyku sprzed naszej zmiany
                 if (_on && !_ended && st.Ours && ai && want == WNone && cur == st.Applied && _now - st.LastChange >= MinGap && _now - st.LastCall > StaleCall)
                 {
@@ -543,6 +663,7 @@ namespace Armoury
                 }
             }
             if (restore) f.SetArrangementOrder(Of(back));
+            else if (apply) f.SetArrangementOrder(Of(target));
         }
 
         // ------------------------------------------------------------ linia bitwy
@@ -605,7 +726,28 @@ namespace Armoury
                   .Append(" | trafienia pociskami przed zwarciem w szykach pod ostrzalem (cialo/tarcza/plecy): nasz ShieldWall ").Append(Hit[0]).Append('/').Append(Hit[1])
                   .Append('/').Append(Hit[2]).Append(", nasz Loose ").Append(Hit[3]).Append('/').Append(Hit[4]).Append('/').Append(Hit[5])
                   .Append(", szyk bez naszej zmiany ").Append(Hit[6]).Append('/').Append(Hit[7]).Append('/').Append(Hit[8])
-                  .Append(" | potkniecia szyk ").Append(stum).Append(" (w latce ").Append(perr).Append(").");
+                  .Append(" | 310 szyk bez decyzji RBM ").Append(_any ? "TAK" : "NIE").Append(" (od ").Append(MinMenAny).Append(" ludzi, RBM nie pytal od ")
+                  .Append(StaleCall.ToString("0", Inv)).Append(" s): ShieldWall ").Append(_anyWall).Append(", Loose ").Append(_anyLoose).Append(", juz w szyku ").Append(_anyKeep)
+                  .Append(", wstrzymane do ").Append(MinGap.ToString("0", Inv)).Append(" s ").Append(_anyHold).Append(", sr. od poczatku ostrzalu ").Append(Avg(_anyReact, _anyReactN, "0.0"))
+                  .Append(" s; straz szyku (Formation.SetArrangementOrder) ").Append(_guardTarget).Append(": wywolan ").Append(Volatile.Read(ref _gCalls))
+                  .Append(", Line/Loose zamienione na ShieldWall ").Append(Volatile.Read(ref _gSwaps));
+                float wl = 0f, all = 0f;
+                for (int i = 0; i < Sec.Length; i++) all += Sec[i];
+                for (int bh = 0; bh < SBeh; bh++) wl += Sec[(1 * SBeh + bh) * 2 + 1];
+                sb.Append(" | szyko-s pod ostrzalem przed zwarciem (310): razem ").Append(F1(all)).Append(", Line z >=60% tarcz w rece ").Append(F1(wl)).Append(" (szyk/zachowanie/tarcze>=60%:");
+                bool anyCell = false;
+                for (int ar = 0; ar < SArr; ar++)
+                    for (int bh = 0; bh < SBeh; bh++)
+                        for (int sh = 0; sh < 2; sh++)
+                        {
+                            float v = Sec[(ar * SBeh + bh) * 2 + sh];
+                            if (v <= 0f) continue;
+                            sb.Append(anyCell ? ", " : " ").Append(ArrName[ar]).Append('/').Append(BehName[bh]).Append('/').Append(sh == 1 ? "TAK" : "NIE").Append(' ').Append(F1(v));
+                            anyCell = true;
+                        }
+                if (!anyCell) sb.Append(" -");
+                sb.Append(')');
+                sb.Append(" | potkniecia szyk ").Append(stum).Append(" (w latce ").Append(perr).Append(").");
             }
             Log.Info(sb.ToString());
         }

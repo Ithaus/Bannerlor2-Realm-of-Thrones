@@ -46,7 +46,7 @@ namespace Armoury
         internal const int MaxProbes = 20000;
         internal const int ProbeEvery = 5;
         private static float _sW, _vSecs;   // 307d: czas przypisany probkom (waga), czas z pomiarem predkosci
-        private static int _probes, _entryPain, _entryWound, _hpN, _courseHeld, _courseTurned, _courseBlocked;
+        private static int _probes, _entryPain, _entryWound, _hpN, _courseHeld, _courseTurned, _courseBlocked, _courseFree;
         private static float _sFoe, _sLim, _sNotRun, _sGoal, _sStuck, _sWound, _sCrowd, _sOther, _sNoProbe, _vSum, _mxSum, _limSum, _limSecs, _hpSum;
         private static readonly MBList<Agent> _near = new MBList<Agent>();
 
@@ -56,12 +56,13 @@ namespace Armoury
         {
             if (what == 0) _courseHeld++;
             else if (what == 1) _courseTurned++;
+            else if (what == 3) _courseFree++;   // 310: droga wolna sprawdzona przed Choose (klucz RoutKeeperCourseFirst) - kurs trzymany bez oceny kierunku
             else _courseBlocked++;
         }
 
         internal static void Reset()
         {
-            _probes = _entryPain = _entryWound = _hpN = _courseHeld = _courseTurned = _courseBlocked = 0;
+            _probes = _entryPain = _entryWound = _hpN = _courseHeld = _courseTurned = _courseBlocked = _courseFree = 0;
             _sFoe = _sLim = _sNotRun = _sGoal = _sStuck = _sWound = _sCrowd = _sOther = _sNoProbe = _vSum = _mxSum = _limSum = _limSecs = _hpSum = 0f;
             _sW = _vSecs = 0f;
             _men[0] = 0; _men[1] = 0;
@@ -276,7 +277,8 @@ namespace Armoury
               .Append(", ponizej progu kary ran ").Append(_entryWound).Append(", zdrowszych ").Append(_hpN - _entryPain - _entryWound).Append(')');
             sb.Append(" | kurs ucieczki (307b, klucz ").Append(c.PanicFleeHoldCourse ? "TAK" : "NIE").Append("): utrzymany ").Append(_courseHeld)
               // 307e: liczniki rozlaczne (Course: 1 albo 2) - napis "w tym" mylil (zmieniony 0, w tym zablokowana 1)
-              .Append(", zmieniony bez blokady ").Append(_courseTurned).Append(", zmieniony przy zablokowanej drodze ").Append(_courseBlocked);
+              .Append(", zmieniony bez blokady ").Append(_courseTurned).Append(", zmieniony przy zablokowanej drodze ").Append(_courseBlocked)
+              .Append(", droga wolna bez oceny kierunku (310) ").Append(_courseFree);
             sb.Append(" | odsapki w panice (wyjscia z zadyszki) ").Append(_recover).Append(c.PanicRunsUntilSpent ? " (oczekiwane 0)" : " (stara regula)");
             sb.Append(" | na koniec misji w panice na polu ").Append(_endIn).Append(", z nich na 50% ").Append(_endHalf);
             sb.Append(" | potkniecia bieg ").Append(_fails).Append(" (wypadli z probek ").Append(_out).Append(").");
