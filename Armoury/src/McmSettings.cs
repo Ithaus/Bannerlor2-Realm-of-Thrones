@@ -10516,6 +10516,18 @@ namespace Armoury
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool LordsJoinNearArmy { get; set; } = true;
 
+        [SettingPropertyBool("Works Paid Since Buy", HintText = "Your village works' income in the clan screen (Finance box, gold tooltip, Fiefs tab) is averaged over the days since you paid for the works when that is shorter than the last 28 days, and a total below 1 a day is shown as 1 instead of 0. Display only - the coin still comes when the district's carts return. Off = always averaged over the days of history kept (at least 7), rounded to even", RequireRestart = false)]
+        [SettingPropertyGroup("Small fixes (31.10)")]
+        public bool WorksPaidSinceBuy { get; set; } = true;
+
+        [SettingPropertyBool("Works Tab Yearly Return", HintText = "The Fiefs tab also shows what your village works should pay you in a year (the average a day so far times the days of the year) and that as a share of what you put in. Display only. Off = no such line", RequireRestart = false)]
+        [SettingPropertyGroup("Small fixes (31.10)")]
+        public bool WorksTabYearlyReturn { get; set; } = true;
+
+        [SettingPropertyBool("A17 Night Raider Block All Ks", HintText = "While the start calibration (KS) is applied, the Night Raider governor perk (War Sails) adds no fish from nothing to any village - also in lands the calibration handed back to the game's own economy. Fish only come from fishermen's hands. Off = the perk still adds its fish in those lands", RequireRestart = false)]
+        [SettingPropertyGroup("Small fixes (31.10)")]
+        public bool A17NightRaiderBlockAllKs { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13144,6 +13156,9 @@ namespace Armoury
             s.LordsAvoidDanger = LordsAvoidDanger;
             s.LordEscortFromGarrison = LordEscortFromGarrison;
             s.LordsJoinNearArmy = LordsJoinNearArmy;
+            s.WorksPaidSinceBuy = WorksPaidSinceBuy;
+            s.WorksTabYearlyReturn = WorksTabYearlyReturn;
+            s.A17NightRaiderBlockAllKs = A17NightRaiderBlockAllKs;
         }
 
         internal static void Apply()

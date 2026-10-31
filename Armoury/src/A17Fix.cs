@@ -74,6 +74,7 @@ namespace Armoury
         internal static bool SiegeOn { get { var s = S; return s != null && s.A17SiegeCommitRescue; } }
         internal static bool ShipOn { get { var s = S; return s != null && s.A17ShipyardBuildsFromTimber; } }
         internal static bool PortFolkOn { get { var s = S; return s != null && s.A17PortFishPaysFolk; } }   // recenzja stare-a17 (3)
+        internal static bool NrAllKsOn { get { var s = S; return s != null && s.A17NightRaiderBlockAllKs; } }   // 305e: Night Raider zablokowany w kazdej wsi przy KS zastosowanym
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
         private static int _stumbles, _stumblesDay;
@@ -90,6 +91,7 @@ namespace Armoury
         // F1
         private static long _bkSkipped, _bkSkippedPack, _bkHorsesHome, _bkPartiesHome, _bkNoWhere, _bkTradingKept;
         // F2
+        private static long _fNrAllV, _fNrAllN;   // 305e: z zablokowanych - wsie poza stawkami KS (kraina wrocona, wies bez stawek, pierwsza doba sesji przed stawkami)
         private static long _fNrBlockedV, _fNrBlockedN, _fNrPassV, _fNrPassN, _fPortBlocked, _fPortPass, _fPortPassFish, _fPortPassGold, _fCrew, _fCrewParties, _fPortPaid, _fPortFolk, _fPortBack;
         // F3
         private static long _uSkip, _uSkipAll;
@@ -115,6 +117,7 @@ namespace Armoury
         {
             _stumblesDay = 0;
             _bkSkipped = _bkSkippedPack = _bkHorsesHome = _bkPartiesHome = _bkNoWhere = _bkTradingKept = 0;
+            _fNrAllV = _fNrAllN = 0;
             _fNrBlockedV = _fNrBlockedN = _fNrPassV = _fNrPassN = _fPortBlocked = _fPortPass = _fPortPassFish = _fPortPassGold = _fCrew = _fCrewParties = _fPortPaid = _fPortFolk = _fPortBack = 0;
             _uSkip = 0;
             _cFail = _cFailSiege = _cFailOther = _cRescued = _cCommitFail = _cPassed = _cCapIn = _cCapDone = _cInCommit = 0; _cTypes.Clear();
@@ -253,9 +256,12 @@ namespace Armoury
                 if (!FishOn || __0 == null || !__0.IsVillage || __0.Village == null || __0.Village.TradeBound == null) return true;
                 int n = NightRaiderFish(__0.Village);
                 bool ks = StartCalibration.AppliedFor(__0.Village);
-                if (ks)
+                // 305e (NA17-2e 3560 szt. na logu Jeffa 30.10): KS zastosowany - takze wsie bez stawek KS (krainy wrocone przez bramke: freefolk, skagosi; pierwsza doba
+                // sesji, zanim stawki sa w _rates) - ryby z atutu to dalej ryby z niczego. StartCalibration.PerkFishPrefix (ta sama metoda, wpiety po nas) przepuszcza kraine wrocona.
+                bool all = !ks && NrAllKsOn && StartCalibration.Applied;
+                if (ks || all)
                 {
-                    if (n != 0) { _fNrBlockedV++; if (n > 0) _fNrBlockedN += n; }
+                    if (n != 0) { _fNrBlockedV++; if (n > 0) _fNrBlockedN += n; if (all) { _fNrAllV++; if (n > 0) _fNrAllN += n; } }
                     return false;   // metoda NavalDLC robi tylko ten dopisek ryb - pominieta cala
                 }
                 if (n > 0) { _fNrPassV++; _fNrPassN += n; }
@@ -722,7 +728,8 @@ namespace Armoury
                          + " | porty BK (RunPorts): zablokowane w KS " + _fPortBlocked + " miast, poza KS (z niczego) " + _fPortPassFish + " szt. w " + _fPortPass + " miastach za " + _fPortPassGold + " zl w nicosc"
                          + " (klucz A17PortFishPaysFolk " + YN(PortFolkOn) + ": zaplacone " + _fPortPaid + " zl = do kiesy ludu " + _fPortFolk + " + zostalo w kasie " + _fPortBack + ")"
                          + " | polow zalogi na morzu (Master Angler, ramka polowu ksiegi towarow - zrodlo nazwane) " + _fCrew + " szt. w " + _fCrewParties + " godzinach partii"
-                         + " | razem ryby z niczego " + (_fNrPassN + _fPortPassFish) + pot);
+                         + " | razem ryby z niczego " + (_fNrPassN + _fPortPassFish)
+                         + " | 305e: Night Raider przy KS we wszystkich wsiach (klucz A17NightRaiderBlockAllKs " + YN(NrAllKsOn) + "): z zablokowanych poza stawkami KS " + _fNrAllN + " szt. w " + _fNrAllV + " wsiach" + pot);
                 Log.Info("Unikaty u band (A17 F3): dzien " + day + " | klucz A17UniquesNotOutlawKit " + YN(UniqOn) + " | unikaty pominiete przy awansie band (kandydaci u pasera i w jukach) "
                          + _uSkip + " (sesja " + _uSkipAll + ") - unikat zostaje na polce albo w jukach (lup), nie znika w zolnierzu bandy" + pot);
                 var tb = new StringBuilder();

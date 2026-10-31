@@ -132,8 +132,8 @@ namespace Armoury
                 // dawaly OK). Wyplaty ksiegi w 28 dobach / max(7, doby historii), suma zaokraglona raz (jak widok); > 0 przy kluczu - linia prac musi byc
                 double expRaw = 0;
                 foreach (var pw in DistrictWorks.PlayerWorks())
-                    if (pw != null && pw.WarWith == null && pw.Paused == null && pw.Eff > 1e-6 && pw.Paid28 > 0) expRaw += pw.Paid28 / Math.Max(7, pw.PaidDaysN);
-                long expLed = (long)Math.Round(expRaw);
+                    if (pw != null && pw.WarWith == null && pw.Paused == null && pw.Eff > 1e-6 && pw.Paid28 > 0) expRaw += pw.Paid28 / DistrictWorks.ViewDays(pw);   // 305e: ten sam dzielnik co widok (od zakupu przy WorksPaidSinceBuy)
+                long expLed = DistrictWorks.ViewRound(expRaw);                                                      // 305e: to samo zaokraglenie co widok
                 bool pend = DistrictWorks.ImportPending;
                 var per = new System.Text.StringBuilder();
                 if (vl != null) foreach (var l in vl) per.Append(per.Length > 0 ? ", " : "").Append(l.Name).Append(' ').Append(l.Amt);
