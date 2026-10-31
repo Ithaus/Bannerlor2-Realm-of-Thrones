@@ -26,6 +26,7 @@ namespace Armoury
         private const string PP = "Majatek gracza (karawany i warsztaty) (259): ";
         private const int LowDays = 7;                 // rytm tygodnia BK (OnWeeklyCaravanLedger) i E3-T1 BlockDays
         private const int Ring = 8;                    // pierscien dob (ostatnie 7 pelnych dob + biezaca)
+        private const int CarRing = 9;                 // recenzja 307a: pierscien karawany - 8 pelnych dob + biezaca (doba dzis-8 nie dzieli slotu z dzisiejsza)
 
         private sealed class CarRec
         {
@@ -37,8 +38,8 @@ namespace Armoury
             public long DSold, DBought, DToll, DReal, DPay259, DPayBk, DPayE39, DPayEnd, DPayVan, DWage, DTop, DShort;
             public bool HaveCalc, LastBusy, WageGuess, DTick;
             public Calc Last;
-            public readonly long[,] Wk = new long[Ring, 5];   // 0 sprzedaz, 1 zakupy, 2 myto, 3 zold rodu, 4 doplata BK
-            public readonly int[] WkDay = { -1, -1, -1, -1, -1, -1, -1, -1 };
+            public readonly long[,] Wk = new long[CarRing, 5];   // 0 sprzedaz, 1 zakupy, 2 myto, 3 zold rodu, 4 doplata BK
+            public readonly int[] WkDay = { -1, -1, -1, -1, -1, -1, -1, -1, -1 };
             // 305a (sesja, bez zapisu): dziennik karawany i przyczyna konca
             public readonly List<string> DTx = new List<string>(); public int DTxDrop;
             public int LastTownDay = -1, LastTradeDay = -1, NoTradeRun, MaxNoTradeRun; public string LastTownName = "-";
@@ -88,7 +89,7 @@ namespace Armoury
         private static void WkAdd(long[,] a, int[] days, int col, long v)
         {
             if (v == 0) return;
-            int d = Today, i = ((d % Ring) + Ring) % Ring;
+            int len = days.Length, d = Today, i = ((d % len) + len) % len;   // recenzja 307a: dlugosc pierscienia z tablicy (tydzien gracza 8, karawana 9)
             if (days[i] != d) { days[i] = d; for (int k = 0; k < a.GetLength(1); k++) a[i, k] = 0; }   // 305b: tydzien gracza ma 6 kolumn
             a[i, col] += v;
         }
@@ -100,9 +101,9 @@ namespace Armoury
         /// wtedy days[i] ma nowsza dobe i nie liczy sie podwojnie).</summary>
         private static long WkSum(long[,] a, int[] days, int col, int from, out int n)
         {
-            int d = Today; long s = 0; n = 0;
-            from = Math.Max(from, d - Ring);
-            for (int i = 0; i < Ring; i++) if (days[i] >= from && days[i] <= d) { s += a[i, col]; n++; }
+            int d = Today, len = days.Length; long s = 0; n = 0;
+            from = Math.Max(from, d - (len - 1));   // recenzja 307a: najstarsza doba, ktora nie dzieli slotu z dzisiejsza (pierscien 8: dzis-7, 9: dzis-8)
+            for (int i = 0; i < len; i++) if (days[i] >= from && days[i] <= d) { s += a[i, col]; n++; }
             return s;
         }
 
@@ -113,7 +114,7 @@ namespace Armoury
             int d = Today;
             var s = S;
             if (s == null || !s.CaravanWeekFromFirstDay || r == null) return d - 7;
-            return Math.Min(d - 7, Math.Max(r.FirstDay, d - Ring));
+            return Math.Min(d - 7, Math.Max(r.FirstDay, d - (CarRing - 1)));
         }
 
         // ------------------------------------------------------------ rekordy
@@ -390,7 +391,8 @@ namespace Armoury
                   .Append(", zysk ze sprzedazy ").Append(r.Realized).Append(" | konie i zwierzeta: sprzedaz ").Append(r.HorseSold).Append(", zysk ").Append(r.HorseReal)
                   .Append(" | pierwsza partia (zakupy dob ").Append(r.FirstDay).Append("-").Append(r.FirstDay + 1).Append(" za ").Append(r.FirstBought).Append("): sprzedana za ")
                   .Append(r.FirstSold).Append(", zysk ").Append(r.FirstReal).Append(" | wynik bez pierwszej partii ").Append(net - r.FirstReal)
-                  .Append(", zysk ze sprzedazy bez pierwszej partii ").Append(r.Realized - r.FirstReal);
+                  .Append(", zysk ze sprzedazy bez pierwszej partii ").Append(r.Realized - r.FirstReal)
+                  .Append(", wynik handlu bez pierwszej partii (zysk ze sprzedazy bez niej - zold rodu) ").Append(r.Realized - r.FirstReal - r.Wage);   // recenzja 307a: obie strony to wynik handlu, nie gotowka przekazana rodowi
             }
             return n == 0 ? "brak rekordow karawan gracza" : sb.ToString();
         }
@@ -485,8 +487,9 @@ namespace Armoury
                         int wf = WkFrom(r);   // 307a: od doby utworzenia wlacznie (klucz NIE - dzis - 7, jak dotad)
                         long sold = WkSum(r.Wk, r.WkDay, 0, wf, out nd), bought = WkSum(r.Wk, r.WkDay, 1, wf, out nd), toll = WkSum(r.Wk, r.WkDay, 2, wf, out nd);
                         long wg = WkSum(r.Wk, r.WkDay, 3, wf, out nd), tp = WkSum(r.Wk, r.WkDay, 4, wf, out nd);
-                        int days = 0; for (int i = 0; i < Ring; i++) if (r.WkDay[i] >= Today - 7) days++;
+                        int days = 0; for (int i = 0; i < r.WkDay.Length; i++) if (r.WkDay[i] >= Today - 7) days++;
                         string span = days >= 7 ? "Last 7 days" : "Since the game was loaded";
+                        if (wf < Today - 7) span = "Since it was formed";   // recenzja 307a: okno z doba utworzenia ma 8 dob, nie 7
                         // recenzja 259: kapital - to, co karawana dostala (E3/7) albo kapital modelu; towar - nizsza z ceny zakupu i rynku; warunek wyplaty - oba warunki reguly
                         string capTxt = basis.CapE37 ? "the " + N(basis.Capital) + " it was given to trade with" : "its trading capital of " + N(basis.Capital);
                         string txt = r.Name + " is worth " + N(basis.Worth) + " (coin " + N(basis.Purse) + ", goods " + N(basis.Goods) + " valued at the lower of what it paid and the market) - less than "

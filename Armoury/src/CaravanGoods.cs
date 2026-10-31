@@ -226,7 +226,7 @@ namespace Armoury
         private static readonly object _worthLock = new object();
 
         /// <summary>
-        /// 259 (CaravanSettle): wartosc TOWARU w jukach karawany - TYLKO ODCZYT (bez EnsureSnap / Sync / Restore - nic nie zapisuje do ksiegi; dozwolone tylko
+        /// 259 (CaravanSettle): wartosc TOWARU w jukach karawany - TYLKO ODCZYT ksiegi (jedyny zapis: licznik pomiaru 307a _w307Unk, liczony po wszystkich wywolaniach, takze podgladach) (bez EnsureSnap / Sync / Restore - nic nie zapisuje do ksiegi; dozwolone tylko
         /// pamieci sredniej indeksu AvgIndex). Towar handlowy jak T1 (IsTradeGood), a zwierzeta i inne przedmioty - tylko kupione z kiesy (nizej, recenzja 259).
         /// Na sztuke: znany koszt zakupu (ksiega E3-T1) -> nizsza z kosztu i rynku (wartosc x srednia indeksu 97 miast); sztuki bez wpisu w ksiedze
         /// (po wczytaniu, przed migawka) -> wartosc x min(1, srednia indeksu) (blad w dol). cost - koszt (znany + oszacowanie bez wpisu), market - rynek,

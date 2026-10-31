@@ -85496,7 +85496,9 @@ K307_RX_STUM = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.")
 K307_RX_SEA = re.compile(r"\| klucz Caravan Sea Hold Target (TAK|NIE) .*? cel trzymany (\d+) tikow u (\d+) karawan.*?\| zmiany celu w drodze: morskie (\d+) \(BK: wojna (\d+), oblezenie (\d+), limit (\d+), nie port (\d+), losowa przy kluczu NIE (\d+), inne (\d+); inna droga (\d+)\), w tym karawany gracza (\d+)")
 K307_RX_MADE = re.compile(r"karawana - utworzona \| '([^']+)'.*?kiesa karawany (\d+)")
 K307_RX_RES = re.compile(r"karawana - wynik doby (\d+) \(307a\) \| (.*)\.$")
-K307_RX_RESC = re.compile(r"netto dla rodu (-?\d+).*?\| konie i zwierzeta: sprzedaz (-?\d+), zysk (-?\d+) \| pierwsza partia .*?: sprzedana za (-?\d+), zysk (-?\d+) \| wynik bez pierwszej partii (-?\d+)")
+K307_RX_RESC = re.compile(r"netto dla rodu (-?\d+).*?\| konie i zwierzeta: sprzedaz (-?\d+), zysk (-?\d+) \| pierwsza partia .*?: sprzedana za (-?\d+), zysk (-?\d+) \| wynik bez pierwszej partii (-?\d+)"
+                         r".*?wynik handlu bez pierwszej partii \(zysk ze sprzedazy bez niej - zold rodu\) (-?\d+)")   # recenzja 307a: K307-7 na wyniku handlu
+K307_RX_ARR = re.compile(r"\| doplyniecia do trzymanego celu (\d+) \(po limicie (\d+)\), dni rejsu / droga z decyzji: srednio ([\d.]+), najwiecej ([\d.]+); trzymane dluzej niz droga z decyzji (\d+), najstarsze trzymanie ([\d.]+) dob")
 K307_RX_NOW = re.compile(r"\| teraz: kiesa (-?\d+), .*?\| dzis: sprzedaz (\d+) \(myto (\d+)\), zakupy (\d+), .*?doplata BK (\d+), .*?\| wyplaty dzis: rozliczenie 259 (\d+), BK (\d+), E3/9 (\d+), gra 10% (\d+), rozwiazanie (\d+)")
 K307_RX_RUN = re.compile(r"bez handlu z rzedu (\d+) dob \(najdluzej od wczytania (\d+)\)")
 K307_RX_MSG = re.compile(r"komunikat - ponizej kapitalu: karawana '([^']+)'.*?(?:Last 7 days|Since the game was loaded) it sold ([\d,]+), bought ([\d,]+)")
@@ -85505,7 +85507,7 @@ K307_RX_MSG = re.compile(r"komunikat - ponizej kapitalu: karawana '([^']+)'.*?(?
 def k307_new():
     return {"start_buy": None, "start_sea": None, "buy_days": 0, "sea_days": 0, "stum": 0, "sp_g": 0, "sp_h": 0, "sp_p": 0,
             "sea_key": None, "held": 0, "ch_sea": 0, "ch_rand": 0, "ch_pl": 0, "made": None, "first_gap": None, "first_bought": None,
-            "run_max": None, "msg_bought": None, "res": None, "res_n": 0}
+            "run_max": None, "msg_bought": None, "res": None, "res_n": 0, "arr": 0, "arr_over": 0, "arr_qmax": 0.0, "hold_max": 0.0}
 
 
 def k307_seg(ln, name):
@@ -85538,6 +85540,10 @@ def k307_feed(D, ln):
             D["sea_days"] += 1
             D["sea_key"] = m.group(1)
             D["held"] += int(m.group(2)); D["ch_sea"] += int(m.group(4)); D["ch_rand"] += int(m.group(9)); D["ch_pl"] += int(m.group(12))
+        m = K307_RX_ARR.search(ln)
+        if m:
+            D["arr"] += int(m.group(1)); D["arr_over"] += int(m.group(2))
+            D["arr_qmax"] = max(D["arr_qmax"], float(m.group(4))); D["hold_max"] = max(D["hold_max"], float(m.group(6)))
         m = K307_RX_STUM.search(ln)
         if m:
             D["stum"] += int(m.group(1))
@@ -85599,9 +85605,16 @@ def k307_rows(rep, D):
         if not m:
             rep.add("K307-7: wynik karawany gracza bez pierwszej partii (sonda 306b/307a)", D["res"][1][:200], "format", False)
         else:
-            net, hs, hr, fs, fr, ex = (int(m.group(k)) for k in range(1, 7))
-            rep.add("K307-7: wynik karawany gracza bez pierwszej partii (sonda 306b/307a)", f"doba {D['res'][0]}: netto {net}, konie sprzedaz {hs} (zysk {hr}), pierwsza partia {fs} (zysk {fr}), bez niej {ex}",
-                    "bez pierwszej partii >= 0 (kryterium krytyka 307)", ex >= 0)
+            net, hs, hr, fs, fr, ex, tr = (int(m.group(k)) for k in range(1, 8))
+            rep.add("K307-7: wynik karawany gracza bez pierwszej partii (sonda 306b/307a)", f"doba {D['res'][0]}: netto {net}, konie sprzedaz {hs} (zysk {hr}), pierwsza partia {fs} (zysk {fr}), "
+                    f"gotowka bez niej {ex} (INFO), wynik handlu bez niej {tr}",
+                    "wynik handlu bez pierwszej partii (zysk ze sprzedazy - zold rodu) >= 0 (recenzja 307a: spojne wielkosci)", tr >= 0)
+    # recenzja 307a: trafnosc limitu trzymania (droga z decyzji to miara ladowa)
+    if not key_on or (D["arr"] == 0 and D["held"] == 0):
+        rep.add("K307-8: doplyniecia do trzymanego celu (trafnosc limitu)", f"klucz {D['sea_key']}, doplyniecia {D['arr']}", "przy kluczu TAK", None)
+    else:
+        rep.add("K307-8: doplyniecia do trzymanego celu (trafnosc limitu)", f"doplyniecia {D['arr']}, po limicie {D['arr_over']}, najwiecej dni rejsu / droga {D['arr_qmax']:.2f}, "
+                f"najstarsze trzymanie {D['hold_max']:.1f} dob", "doplyniecia > 0, po limicie <= 20%", D["arr"] > 0 and D["arr_over"] * 5 <= D["arr"])
 
 
 K307_SAMPLES = [
@@ -85610,10 +85623,10 @@ K307_SAMPLES = [
     K307_PROBE + "karawana - utworzona | 'Convoy of Ser X' (caravan_t) w Driftwood Hall (port TAK, gracz w miescie TAK), wodz Ser X (towarzysz), szablon naval | koszt rozmowy 30000, zloto gracza 1 -> 0 (zaplacone 30000, TAK) | kiesa karawany 30000 (E3/7 kontekst gracza: kapital modelu 35000, oczekiwane min(kapital, zaplacone) 30000, TAK)",
     K307_PP + "dzien 108879 || karawana 'Convoy of Ser X' (wodz Ser X, morska, kapital 30000) | rozliczenie doby: kiesa 8034 (podloga 5269) | teraz: kiesa 8034, towar 22000, wartosc 30034 | dzis: sprzedaz 0 (myto 0), zakupy 21966, zysk ze sprzedazy 0 | zold 269 zaplacil rod, doplata BK 0, brak rodu 0 | wyplaty dzis: rozliczenie 259 0, BK 0, E3/9 0, gra 10% 0, rozwiazanie 0 | ponizej kapitalu 1 dob | gdzie (305a): na morzu, cel Pentos, bez handlu z rzedu 0 dob (najdluzej od wczytania 0) || warsztat 'X'",
     K307_BUY + "dzien 108879 | klucze: gabka do ksiegi (Caravan Sponge To Book) TAK | latka gabki wpieta | gabka BK: wyjazdow z zakupem 40, zaksiegowane 300 szt. za 25000 zl (konie i zwierzeta 16 szt. za 21091 zl; karawany gracza 21091 zl), bez zaplaty netto 0, poza ksiega przy kluczu NIE 0 wyjazdow za 0 zl [charger 11364] | polow zalogi do ksiegi po 0: 0 szt. w 0 godzinach karawan | wycena 259: zwierzat bez wpisu 0 sztuko-wycen | potkniecia 0 (sesja 0).",
-    K307_SEA + "dzien 108879 | klucz Caravan Sea Hold Target TAK (limit 2.0 x droga z decyzji, 6-30 dob) | latki: tik BK wpiety, pomiar celu wpiety | tiki BK karawan morskich w drodze 300, cel trzymany 280 tikow u 40 karawan, nowych celow trzymanych 12, w trzymaniu teraz 40 | wpuszczone do BK: wojna 1, oblezenie 0, limit dni 0, cel nie miasto z portem 0, klucz NIE 0 | zmiany celu w drodze: morskie 1 (BK: wojna 1, oblezenie 0, limit 0, nie port 0, losowa przy kluczu NIE 0, inne 0; inna droga 0), w tym karawany gracza 0, ladowe 30 | gracza: - | potkniecia 0 (sesja 0).",
+    K307_SEA + "dzien 108879 | klucz Caravan Sea Hold Target TAK (limit 2.0 x droga z decyzji, 6-30 dob) | latki: tik BK wpiety, pomiar celu wpiety | tiki BK karawan morskich w drodze 300, cel trzymany 280 tikow u 40 karawan, nowych celow trzymanych 12, w trzymaniu teraz 40 | wpuszczone do BK: wojna 1, oblezenie 0, limit dni 0, cel nie miasto z portem 0, klucz NIE 0 | zmiany celu w drodze: morskie 1 (BK: wojna 1, oblezenie 0, limit 0, nie port 0, losowa przy kluczu NIE 0, inne 0; inna droga 0), w tym karawany gracza 0, ladowe 30 | gracza: - | doplyniecia do trzymanego celu 10 (po limicie 0), dni rejsu / droga z decyzji: srednio 0.90, najwiecej 1.60; trzymane dluzej niz droga z decyzji 2, najstarsze trzymanie 9.5 dob; gracza: - | potkniecia 0 (sesja 0).",
     K307_PP + "dzien 108885 || karawana 'Convoy of Ser X' (wodz Ser X) | teraz: kiesa 8034, towar 1, wartosc 1 | dzis: sprzedaz 0 (myto 0), zakupy 0, zysk ze sprzedazy 0 | zold 269 zaplacil rod, doplata BK 0, brak rodu 0 | wyplaty dzis: rozliczenie 259 0, BK 0, E3/9 0, gra 10% 0, rozwiazanie 0 | gdzie (305a): na morzu, bez handlu z rzedu 6 dob (najdluzej od wczytania 18)",
     K307_PP + "komunikat - ponizej kapitalu: karawana 'Convoy of Ser X' ponizej kapitalu 7 dob | Convoy of Ser X is worth 9,199 (coin 8,034) - less than the 30,000 it was given to trade with. Since the game was loaded it sold 0, bought 21,966, paid 0 in tolls; your clan paid",
-    K307_PROBE + "karawana - wynik doby 108966 (307a) | 'Convoy of Ser X' od doby 108879: netto dla rodu 23574 (wyplaty 40295, zold 16721, doplaty 0), sprzedaz 86410, zysk ze sprzedazy 40000 | konie i zwierzeta: sprzedaz 56068, zysk 33900 | pierwsza partia (zakupy dob 108879-108880 za 21966): sprzedana za 56068, zysk 20000 | wynik bez pierwszej partii 3574, zysk ze sprzedazy bez pierwszej partii 20000.",
+    K307_PROBE + "karawana - wynik doby 108966 (307a) | 'Convoy of Ser X' od doby 108879: netto dla rodu 23574 (wyplaty 40295, zold 16721, doplaty 0), sprzedaz 86410, zysk ze sprzedazy 40000 | konie i zwierzeta: sprzedaz 56068, zysk 33900 | pierwsza partia (zakupy dob 108879-108880 za 21966): sprzedana za 56068, zysk 20000 | wynik bez pierwszej partii 3574, zysk ze sprzedazy bez pierwszej partii 20000, wynik handlu bez pierwszej partii (zysk ze sprzedazy bez niej - zold rodu) 3279.",
 ]
 
 
@@ -85628,25 +85641,25 @@ def karawany307_selftest():
     B = k307_new()
     for ln in K307_SAMPLES:
         x = ln.replace("zakupy 21966,", "zakupy 875,").replace("bought 21,966", "bought 0").replace("najdluzej od wczytania 18", "najdluzej od wczytania 76")
-        x = x.replace("losowa przy kluczu NIE 0", "losowa przy kluczu NIE 5").replace("wynik bez pierwszej partii 3574", "wynik bez pierwszej partii -10300")
+        x = x.replace("losowa przy kluczu NIE 0", "losowa przy kluczu NIE 5").replace("wynik bez pierwszej partii 3574", "wynik bez pierwszej partii -10300").replace("zold rodu) 3279", "zold rodu) -10300").replace("(po limicie 0)", "(po limicie 9)")
         x = x.replace(") wpieta - zakup", ") NIE (brak metody BK) - zakup").replace("potkniecia 0 (sesja 0).", "potkniecia 2 (sesja 2).").replace("za 25000 zl (", "za 0 zl (")
         k307_feed(B, "[06:39:07] " + x)
     rep = Report(); k307_rows(rep, B)
     vb = {r[0].split(":")[0]: r[3] for r in rep.rows}
-    miss = [k for k in ("K307-0", "K307-1", "K307-2", "K307-3", "K307-4", "K307-5", "K307-6", "K307-7") if vb.get(k) != "NIE"]
+    miss = [k for k in ("K307-0", "K307-1", "K307-2", "K307-3", "K307-4", "K307-5", "K307-6", "K307-7", "K307-8") if vb.get(k) != "NIE"]
     if miss:
         return f"zly bieg nie wykryty: {miss} ({vb})"
     C = k307_new()
     k307_feed(C, "[06:39:07] " + K307_SAMPLES[0])
     rep = Report(); k307_rows(rep, C)
     vc = {r[0].split(":")[0]: r[3] for r in rep.rows}
-    if vc.get("K307-3") != "INFO" or vc.get("K307-6") != "INFO" or vc.get("K307-7") != "INFO":
+    if vc.get("K307-3") != "INFO" or vc.get("K307-6") != "INFO" or vc.get("K307-7") != "INFO" or vc.get("K307-8") != "INFO":
         return f"bez sondy zle: {vc}"
     return None
 
 
 def karawany307_main(logp):
-    """karawany307 (31.10, paczka 307a): K307-S, K307-0..K307-7. Strumieniowo, tylko odczyt logu."""
+    """karawany307 (31.10, paczka 307a): K307-S, K307-0..K307-8. Strumieniowo, tylko odczyt logu."""
     rep = Report()
     s1 = karawany307_selftest()
     rep.add("K307-S: self-test wyrazen (linie jak w CaravanBuy307.cs / CaravanSeaHold307.cs / Probes306.cs)", s1 or "OK", "OK", s1 is None)

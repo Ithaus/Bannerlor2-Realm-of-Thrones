@@ -37,6 +37,9 @@ namespace Armoury
         private static long _ticks, _held, _newHold, _exWar, _exSiege, _exLimit, _exNotPort, _exOff;
         private static readonly HashSet<MobileParty> _heldCars = new HashSet<MobileParty>();
         private static long _chSea, _chLand, _chSeaPlayer, _chOther;
+        // recenzja 307a (pomiar trafnosci limitu): doplyniecia do trzymanego celu - liczba, suma i najwiekszy stosunek dni rejsu / droga z decyzji, w tym ponad limit
+        private static long _arr, _arrOver; private static double _arrRatioSum, _arrRatioMax;
+        private static readonly List<string> _arrDet = new List<string>();
         private static readonly long[] _chWhy = new long[7];
         private static readonly List<string> _det = new List<string>();
         private static int _stumbles, _stumbleSess;
@@ -50,6 +53,7 @@ namespace Armoury
             _h.Clear(); _inBk = null; _inWhy = 0;
             _ticks = _held = _newHold = _exWar = _exSiege = _exLimit = _exNotPort = _exOff = 0; _heldCars.Clear();
             _chSea = _chLand = _chSeaPlayer = _chOther = 0; Array.Clear(_chWhy, 0, _chWhy.Length); _det.Clear();
+            _arr = _arrOver = 0; _arrRatioSum = _arrRatioMax = 0; _arrDet.Clear();
             _stumbles = _stumbleSess = 0; _err.Clear();
         }
 
@@ -60,6 +64,28 @@ namespace Armoury
         }
 
         private static bool Naval(MobileParty mp) { try { return mp.HasNavalNavigationCapability; } catch { return false; } }
+
+        /// <summary>Recenzja 307a (tylko pomiar): karawana w osadzie z wpisem trzymania - doplynela do trzymanego celu? Faktyczne dni rejsu wobec drogi z decyzji
+        /// (Days0, CaravanEscort.RoadDaysTo - miara ladowa) - do doboru Caravan Sea Hold Factor / Min Days po autotescie.</summary>
+        private static void Arrived(MobileParty mp, Hold h)
+        {
+            try
+            {
+                if (mp == null || h == null || h.T == null || mp.CurrentSettlement != h.T) return;
+                double days = CampaignTime.Now.ToDays - h.Start;
+                _arr++;
+                if (days > h.Limit) _arrOver++;
+                if (h.Days0 > 0)
+                {
+                    double q = days / h.Days0;
+                    _arrRatioSum += q; if (q > _arrRatioMax) _arrRatioMax = q;
+                }
+                if (mp.ActualClan == Clan.PlayerClan && _arrDet.Count < DetMax)
+                    _arrDet.Add("'" + (mp.Name != null ? mp.Name.ToString() : mp.StringId) + "' w " + Nm(h.T) + " po " + days.ToString("0.0", Inv) + " dob (droga z decyzji "
+                                + h.Days0.ToString("0.0", Inv) + ", limit " + h.Limit.ToString("0.0", Inv) + ")");
+            }
+            catch (Exception e) { Stumble("Arrived", e); }
+        }
 
         private static double LimitDays(MobileParty mp, Settlement t, Settings s, out double d0)
         {
@@ -78,7 +104,7 @@ namespace Armoury
             {
                 var mp = __0;
                 if (mp == null || !mp.IsCaravan) return true;
-                if (mp.CurrentSettlement != null) { if (_h.Count > 0) _h.Remove(mp); return true; }   // w osadzie: decyzja BK jak dotad, trzymanie od nowa
+                if (mp.CurrentSettlement != null) { Hold ha; if (_h.Count > 0 && _h.TryGetValue(mp, out ha)) { Arrived(mp, ha); _h.Remove(mp); } return true; }   // w osadzie: decyzja BK jak dotad, trzymanie od nowa
                 if (mp.MapEvent != null || !mp.IsPartyTradeActive || mp.Ai == null || mp.Ai.DoNotMakeNewDecisions) return true;
                 if (!Naval(mp)) return true;
                 _ticks++;
@@ -205,7 +231,16 @@ namespace Armoury
                 {
                     List<MobileParty> gone = null;
                     foreach (var kv in _h) if (kv.Key == null || !kv.Key.IsActive || kv.Key.CurrentSettlement != null) { if (gone == null) gone = new List<MobileParty>(); gone.Add(kv.Key); }
-                    if (gone != null) foreach (var g in gone) _h.Remove(g);
+                    if (gone != null) foreach (var g in gone) { Hold ha; if (g != null && g.IsActive && _h.TryGetValue(g, out ha)) Arrived(g, ha); _h.Remove(g); }
+                }
+                // recenzja 307a (tylko pomiar): wpisy trzymane dluzej niz droga z decyzji i najstarszy wpis (brak postepu wychodzi tu, zanim zmieni sie regula)
+                int hOver = 0; double hMax = 0, nowD = CampaignTime.Now.ToDays;
+                foreach (var kv in _h)
+                {
+                    var hh = kv.Value; if (hh == null) continue;
+                    double age = nowD - hh.Start;
+                    if (age > hMax) hMax = age;
+                    if (hh.Days0 > 0 && age > hh.Days0) hOver++;
                 }
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 var sb = new StringBuilder(700);
@@ -221,12 +256,17 @@ namespace Armoury
                   .Append(", limit ").Append(_chWhy[3]).Append(", nie port ").Append(_chWhy[4]).Append(", losowa przy kluczu NIE ").Append(_chWhy[5]).Append(", inne ").Append(_chWhy[6])
                   .Append("; inna droga ").Append(_chOther).Append("), w tym karawany gracza ").Append(_chSeaPlayer).Append(", ladowe ").Append(_chLand)
                   .Append(" | gracza: ").Append(_det.Count == 0 ? "-" : string.Join("; ", _det.ToArray()))
+                  .Append(" | doplyniecia do trzymanego celu ").Append(_arr).Append(" (po limicie ").Append(_arrOver).Append("), dni rejsu / droga z decyzji: srednio ")
+                  .Append((_arr > 0 ? _arrRatioSum / _arr : 0).ToString("0.00", Inv)).Append(", najwiecej ").Append(_arrRatioMax.ToString("0.00", Inv))
+                  .Append("; trzymane dluzej niz droga z decyzji ").Append(hOver).Append(", najstarsze trzymanie ").Append(hMax.ToString("0.0", Inv)).Append(" dob")
+                  .Append("; gracza: ").Append(_arrDet.Count == 0 ? "-" : string.Join("; ", _arrDet.ToArray()))
                   .Append(" | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
             _ticks = _held = _newHold = _exWar = _exSiege = _exLimit = _exNotPort = _exOff = 0; _heldCars.Clear();
             _chSea = _chLand = _chSeaPlayer = _chOther = 0; Array.Clear(_chWhy, 0, _chWhy.Length); _det.Clear(); _stumbles = 0;
+            _arr = _arrOver = 0; _arrRatioSum = _arrRatioMax = 0; _arrDet.Clear();
         }
     }
 }

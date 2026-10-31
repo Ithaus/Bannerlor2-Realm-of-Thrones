@@ -210,7 +210,7 @@ namespace Armoury
                 for (int i = 0; i < l.Count && i < 8; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].Key).Append(' ').Append(l[i].Value);
                 sb.Append(l.Count == 0 ? "-]" : "]");
                 sb.Append(" | polow zalogi do ksiegi po 0: ").Append(_c307N).Append(" szt. w ").Append(_c307Cars).Append(" godzinach karawan")
-                  .Append(" | wycena 259: zwierzat bez wpisu ").Append(_w307Unk).Append(" sztuko-wycen")
+                  .Append(" | wycena 259: zwierzat bez wpisu ").Append(_w307Unk).Append(" sztuko-wycen (suma po wszystkich wywolaniach WorthOf, takze podgladach finansow - nie liczba sztuk)")
                   .Append(" | potkniecia ").Append(_s307Stumbles).Append(" (sesja ").Append(_s307StumbleSess).Append(").");
                 Log.Info(sb.ToString());
             }
