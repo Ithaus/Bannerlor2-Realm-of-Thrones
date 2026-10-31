@@ -10592,6 +10592,18 @@ namespace Armoury
         [SettingPropertyGroup("Small fixes (31.10)")]
         public bool A17NightRaiderBlockAllKs { get; set; } = true;
 
+        [SettingPropertyBool("Price Band By Carriage", HintText = "A trade good (not food) costs in any town between 1/k and k times its normal price, where k is what a merchant needs to carry it from the cheapest market to the dearest: his margin times the cost of the haul by cart against the price of a kilogram. Light, precious goods (velvet, jewelry, spice, fur) then differ between towns about 2-4 times at most, bulky cheap goods (salt, timber, clay, stone) keep the game's own range of 0.1-10. Food keeps the game's range (it spoils and is priced by local plenty or famine). Only prices change, for you and the AI alike - no coin is made or lost. Off = the game's range 0.1-10 for every trade good, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Market prices: band between towns by cost of carriage (306a)")]
+        public bool PriceBandByCarriage { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Price Band Merchant Margin", 0.25f, 9.00f, "0.00", HintText = "With Price Band By Carriage: the long-distance merchant's share for risk, tolls, time and profit (1.0 = he wants twice what he paid, so velvet ranges about 0.5-2 times its price; 9 = the game's range)", RequireRestart = false)]
+        [SettingPropertyGroup("Market prices: band between towns by cost of carriage (306a)")]
+        public float PriceBandMerchantMargin { get; set; } = 1.0f;
+
+        [SettingPropertyInteger("Price Band Haul Km", 100, 6000, "0", HintText = "With Price Band By Carriage: the longest land haul a merchant prices in, km (carriage 1.5 pence per ton per mile, 14th-century England): the longer, the wider the band of cheap heavy goods", RequireRestart = false)]
+        [SettingPropertyGroup("Market prices: band between towns by cost of carriage (306a)")]
+        public int PriceBandHaulKm { get; set; } = 2000;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13239,6 +13251,9 @@ namespace Armoury
             s.WorksPaidSinceBuy = WorksPaidSinceBuy;
             s.WorksTabYearlyReturn = WorksTabYearlyReturn;
             s.A17NightRaiderBlockAllKs = A17NightRaiderBlockAllKs;
+            s.PriceBandByCarriage = PriceBandByCarriage;
+            s.PriceBandMerchantMargin = PriceBandMerchantMargin;
+            s.PriceBandHaulKm = PriceBandHaulKm;
         }
 
         internal static void Apply()

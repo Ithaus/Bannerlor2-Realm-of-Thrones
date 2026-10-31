@@ -78,7 +78,8 @@ namespace Armoury
         internal static void Reset()
         {
             _errFactor = false; _errUse = false; _errLog = false; _errBudget = false; _stFactor = 0; _stUse = 0; _stBudget = 0;
-            MemoryLive = false; _errPace = false;   // 299b: ticki startowe nowej kampanii (przed OnSessionLaunched) wygladzaja podaz tempem gry
+            MemoryLive = false; _errPace = false;
+            PriceBand306.Reset();   // 306a: migawka pasm i liczniki nowej kampanii   // 299b: ticki startowe nowej kampanii (przed OnSessionLaunched) wygladzaja podaz tempem gry
             lock (_paceLock) { _paceDay = -1; _paceNow = 0; _paceLast = 0; _paceNowGame = 0; _paceLastGame = 0; }
             System.Threading.Interlocked.Exchange(ref _paceBefore, 0); System.Threading.Interlocked.Exchange(ref _stPace, 0);
         }
@@ -101,6 +102,8 @@ namespace Armoury
         // alokacji, jeden odczyt slownika. Pomiar poza gra na prawdziwym modelu: wycena 17 ns, z latka 34 ns (przez model w
         // modelu 43 ns), z wylaczonym wlacznikiem 25 ns - przy 2 mln wycen na dobe to ok. 50 ms.
         [ThreadStatic] private static int _depth;
+        /// <summary>306a (PriceBand306.BandPostfix): glebokosc zagniezdzenia GetBasePriceFactor na tym watku (1 = najbardziej zewnetrzne wywolanie; prefiks juz policzyl, finalizer jeszcze nie).</summary>
+        internal static int Depth { get { return _depth; } }
 
         // ------------------------------------------------------------ paczka 299: plaski krok ceny na sztuke (Jeff 29.10: "za bardzo spada cena jak sprzedaje towar,
         // trzeba bardziej wyplaszczyc zmiane kursu towaru gdy jest sprzedaz i zakup"). Wzor gry: (D / (0.1 S + 0.04 I + 2))^0.6 - polka, ktora lezy (S = I), wazy

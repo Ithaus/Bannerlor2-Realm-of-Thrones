@@ -2954,6 +2954,8 @@ namespace Armoury
                 DayProfile.Lap("PriceWalk299.Daily"); // recenzja 299: koszt sondy osobnym odcinkiem profilu doby
                 try { PriceWalk299b.Daily(); } catch (Exception e) { Log.Error("PriceWalk299b.Daily", e); }   // 299b: sonda pamieci podazy i ceny sprzetu na sztuke (tylko odczyt)
                 DayProfile.Lap("PriceWalk299b.Daily");
+                try { PriceBand306.Daily(); } catch (Exception e) { Log.Error("PriceBand306.Daily", e); }   // 306a: linia "Pasmo cen od przewozu (306a)" (tylko odczyt)
+                DayProfile.Lap("PriceBand306.Daily");
             }
             else { try { RawPrice.QuietDay(); } catch (Exception e) { Log.Error("RawPrice.QuietDay", e); } DayProfile.Lap("RawPrice.Daily"); }
             try { XbowPrice.Daily(); } catch (Exception e) { Log.Error("XbowPrice.Daily", e); } DayProfile.Lap("XbowPrice.Daily");   // kusze wedlug luku (noc 15/16.10): linia "Kusze wedlug luku (zakupy)" (tylko log)

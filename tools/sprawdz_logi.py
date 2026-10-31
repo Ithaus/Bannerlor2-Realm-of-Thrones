@@ -85011,5 +85011,222 @@ def main(argv):
             return drobne305e_main(rest[0] if rest else None)
     return _drobne305e_main_prev(argv)
 
+# ============================================================ 306a (31.10, paczka 306a): pasmo ceny miedzy rynkami od kosztu przewozu (PriceBand306)
+P306_START = re.compile(r"Pasmo cen od przewozu \(306a\): klucz Price Band By Carriage (TAK|NIE), marza kupca ([\d.]+), droga (\d+) km - postfiks GetBasePriceFactor wpiety w (\d+) modelach")
+P306_DAY = re.compile(r"Pasmo cen od przewozu \(306a\): dzien (-?\d+) \| klucz (TAK|NIE), marza kupca ([\d.]+), droga (\d+) km, .*?\| latka wpieta w (\d+) modelach")
+P306_ROW = re.compile(r"([A-Za-z_]\w*) ([\d.]+) d/kg ([\d.]+)-([\d.]+)")
+P306_TOWN = re.compile(r"([A-Za-z_]\w*) ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+) \(x([\d.]+)\) -> ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+) \(x([\d.]+)\)")
+P306_TAIL = re.compile(r"miasto-kategorii (\d+): teraz przy podlodze (\d+), przy suficie (\d+) \| wycen przycietych od ostatniej linii(?: \(klucz NIE - 0\))?: do podlogi (\d+), do sufitu (\d+) \| potkniecia (\d+)\.")
+P306_287 = re.compile(r"Handel z roznicy cen \(287\): dzien (-?\d+) .*?wedlug kategorii \(popyt rynkow/d / sprzedaz karawan/d / indeks p25-p75 / marza\): (.*?)(?: \||$)")
+P306_287C = re.compile(r"([A-Za-z_]\w*) [\d.]+/[\d.]+/([\d.]+)-([\d.]+)/(-?\d+)%")
+P306_287Q = re.compile(r"\(wynik handlu - zold\)/d karawan zmierzonych (\d+): p10 (-?\d+), p25 (-?\d+), p50 (-?\d+), p75 (-?\d+), p90 (-?\d+)")
+P306_259 = re.compile(r"Majatek gracza \(karawany i warsztaty\) \(259\): dzien (-?\d+)")
+P306_259K = re.compile(r"karawana '([^']*)'.*?\| dzis: sprzedaz (\d+) \(myto \d+\), zakupy (\d+), zysk ze sprzedazy (-?\d+)")
+CARRIAGE_306 = 1.5 / 1000.0 / 1.609344
+
+
+def p306_k(vpk, margin, km):
+    """Ten sam wzor co PriceBand306.KFor: k = min(10, (1 + marza) x (1 + przewoz na droge / cena kg))."""
+    carry = CARRIAGE_306 * km / vpk if vpk > 0 else float("inf")
+    k = (1.0 + margin) * (1.0 + carry)
+    return 10.0 if k >= 10.0 else k
+
+
+def p306_parse(t):
+    """Linia doby -> slownik albo None."""
+    m = P306_DAY.search(t)
+    if not m:
+        return None
+    d = {"day": int(m.group(1)), "key": m.group(2), "margin": float(m.group(3)), "km": int(m.group(4)), "models": int(m.group(5)), "rows": {}, "towns": {}, "tail": None}
+    i = t.find("kategorii z pasmem ")
+    j = t.find(" | miasta (")
+    if i >= 0 and j > i:
+        seg = t[t.find("): ", i) + 3:j]
+        for r in P306_ROW.finditer(seg):
+            d["rows"][r.group(1)] = (float(r.group(2)), float(r.group(3)), float(r.group(4)))
+    k = t.find(" | miasto-kategorii ")
+    if j >= 0 and k > j:
+        for r in P306_TOWN.finditer(t[j:k]):
+            d["towns"][r.group(1)] = tuple(float(x) for x in r.groups()[1:])
+    mt = P306_TAIL.search(t)
+    if mt:
+        d["tail"] = tuple(int(x) for x in mt.groups())
+    return d
+
+
+def p306_selftest():
+    # wzor: aksamit 4000 d / 10 kg przy marzy 1.0 i 2000 km = 2.0093; sol 0.18 d/kg - sufit gry 10; ruda 2.5 d/kg = 3.4913
+    k = p306_k(400.0, 1.0, 2000)
+    if abs(k - 2.0093) > 0.001:
+        return f"k aksamitu {k:.4f} != 2.0093"
+    if p306_k(0.18, 1.0, 2000) != 10.0:
+        return "sol nie ma pasma gry"
+    if abs(p306_k(2.5, 1.0, 2000) - 3.4913) > 0.001:
+        return f"k rudy {p306_k(2.5, 1.0, 2000):.4f} != 3.4913"
+    ln = ("Pasmo cen od przewozu (306a): dzien 108900 | klucz TAK, marza kupca 1.00, droga 2000 km, przewoz 1.5 d za tone na mile = 1.86 d/kg na droge | latka wpieta w 2 modelach"
+          " | kategorii z pasmem 2 (jedzenie bez pasma 30, przewoz ponad x10 - pasmo gry 5): velvet 400 d/kg 0.50-2.01, iron 2.5 d/kg 0.29-3.49"
+          " | miasta (indeks bez pasma -> z pasmem: min/p25/p50/p75/max, rozpietosc max/min; 8 najszerszych): velvet 0.37/2.41/9.90/10.00/10.00 (x27.0) -> 0.50/2.01/2.01/2.01/2.01 (x4.0)"
+          " ; iron 0.20/1.00/1.50/2.00/9.00 (x45.0) -> 0.29/1.00/1.50/2.00/3.49 (x12.0)"
+          " | miasto-kategorii 194: teraz przy podlodze 3, przy suficie 80 | wycen przycietych od ostatniej linii: do podlogi 10, do sufitu 2000 | potkniecia 0.")
+    d = p306_parse(ln)
+    if not d or d["day"] != 108900 or d["key"] != "TAK" or d["models"] != 2:
+        return "naglowek linii doby"
+    if d["rows"].get("velvet") != (400.0, 0.5, 2.01) or d["rows"].get("iron") != (2.5, 0.29, 3.49):
+        return f"pasma {d['rows']}"
+    if "velvet" not in d["towns"] or d["towns"]["velvet"][6] != 0.5 or d["towns"]["iron"][11] != 12.0:
+        return f"miasta {d['towns']}"
+    if d["tail"] != (194, 3, 80, 10, 2000, 0):
+        return f"ogon {d['tail']}"
+    if p306_parse(ln.replace("(306a): dzien", "(306a): doba")) is not None:
+        return "zly bieg przyjety (naglowek)"
+    if p306_parse(ln.replace(" | potkniecia 0.", " | potkniecia x."))["tail"] is not None:
+        return "zly bieg przyjety (ogon)"
+    m = P306_287.search("Handel z roznicy cen (287): dzien 5 | x | wedlug kategorii (popyt rynkow/d / sprzedaz karawan/d / indeks p25-p75 / marza): velvet 22.0/6.3/2.41-10.00/284%, fur 162.1/79.7/1.22-4.09/209% | dalej")
+    if not m or [c.groups() for c in P306_287C.finditer(m.group(2))] != [("velvet", "2.41", "10.00", "284"), ("fur", "1.22", "4.09", "209")]:
+        return "linia 287"
+    mk = P306_259K.search("karawana 'Caravan of Bjorn' (wodz Bjorn) | rozliczenie doby: x | teraz: x | dzis: sprzedaz 118842 (myto 2375), zakupy 2519, zysk ze sprzedazy 110177 | zold 135")
+    if not mk or mk.group(4) != "110177":
+        return "linia 259"
+    return None
+
+
+def pasmo306a_main(logp):
+    """pasmo306a (31.10, paczka 306a): P306-S self-test; P306-0 start (latka wpieta >= 1 model); P306-1 linie doby; P306-2 pasma = wzor (k z ceny kg, marzy, drogi);
+    P306-3 indeks miast z pasmem w pasmie i rozpietosc <= k^2; P306-4 prawdziwe indeksy gry (linia 287, p25-p75) w pasmie przy kluczu TAK; P306-5 przyciete wyceny > 0
+    przy kluczu TAK; P306-6 potkniecia 0, ERROR PriceBand306 0; P306-7 (INFO) najwiekszy zysk dnia karawany gracza (259) i (wynik - zold)/d karawan AI (138c)."""
+    rep = Report()
+    s1 = p306_selftest()
+    rep.add("P306-S: self-test wzoru i wyrazen (linie jak w PriceBand306.cs)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("P306-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, errs, q287, c287, best = [], [], 0, None, [], None
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if "306a" not in ln and "(287)" not in ln and "(259)" not in ln and "(138c)" not in ln and "PriceBand306" not in ln:
+                continue
+            m = TS.match(ln.rstrip("\r\n"))
+            t = m.group(2) if m else ln.rstrip("\r\n")
+            if t.startswith("Pasmo cen od przewozu (306a): klucz"):
+                ms = P306_START.search(t)
+                if ms:
+                    starts.append(ms.groups())
+            elif t.startswith("Pasmo cen od przewozu (306a): dzien"):
+                d = p306_parse(t)
+                if d:
+                    days.append(d)
+            elif t.startswith("Handel z roznicy cen (287): dzien"):
+                mm = P306_287.search(t)
+                if mm:
+                    c287.append((int(mm.group(1)), [c.groups() for c in P306_287C.finditer(mm.group(2))]))
+            elif t.startswith("Rozklad wyniku karawan (138c): dzien"):
+                mq = P306_287Q.search(t)
+                if mq:
+                    q287 = mq.groups()
+            elif t.startswith("Majatek gracza (karawany i warsztaty) (259): dzien"):
+                md = P306_259.search(t)
+                for seg in t.split(" || ")[1:]:
+                    mk = P306_259K.search(seg)
+                    if mk and md and (best is None or int(mk.group(4)) > best[3]):
+                        best = (int(md.group(1)), mk.group(1), int(mk.group(2)), int(mk.group(4)))
+            elif "ERROR in PriceBand306" in t:
+                errs += 1
+    print(f"plik: {logp} | startow {len(starts)}, dob 306a {len(days)}, linii 287 {len(c287)}")
+    if not starts and not days:
+        rep.add("P306-0: linie 306a", "brak", "INFO (log sprzed paczki 306a)", None)
+        if best:
+            rep.add("P306-7: najwiekszy zysk dnia karawany gracza (259)", f"dzien {best[0]} '{best[1]}': sprzedaz {best[2]}, zysk {best[3]}", "INFO (30.10 przed 306a: 110177 w 108850)", None)
+        if q287:
+            rep.add("P306-7b: (wynik handlu - zold)/d karawan AI (ostatnia 138c)", f"zmierzonych {q287[0]}: p10 {q287[1]}, p25 {q287[2]}, p50 {q287[3]}, p75 {q287[4]}, p90 {q287[5]}",
+                    "INFO (bieg bazowy)", None)
+        rep.show()
+        return 0
+    rep.add("P306-0: start - postfiks wpiety", "; ".join(f"klucz {a}, marza {b}, droga {c} km, modeli {d_}" for a, b, c, d_ in starts) or "brak",
+            ">= 1 model w kazdym starcie", bool(starts) and all(int(x[3]) >= 1 for x in starts))
+    on = [d for d in days if d["key"] == "TAK"]
+    rep.add("P306-1: linie doby", f"{len(days)} (klucz TAK {len(on)}), dzien {days[0]['day']}..{days[-1]['day']}" if days else "0", ">= 1 linia doby pomiaru", bool(days))
+    if not days:
+        rep.show()
+        return 0
+    # P306-2: pasma z linii = wzor
+    bad2 = []
+    for d in days:
+        for cid, (vpk, lo, hi) in d["rows"].items():
+            k = p306_k(vpk if vpk > 0 else 1e-9, d["margin"], d["km"])
+            # vpk w linii zaokraglony (0 albo 0.0) - tolerancja 2%
+            if abs(hi - k) > max(0.015, 0.02 * k) or abs(lo - 1.0 / hi) > 0.011:
+                bad2.append(f"{d['day']} {cid} {lo}-{hi} (wzor {k:.2f})")
+    last = days[-1]
+    vel = last["rows"].get("velvet")
+    rep.add("P306-2: pasma = wzor (k = min(10, (1 + marza) x (1 + przewoz / cena kg)))", f"niezgodnych {len(bad2)}" + (f" (np. {bad2[0]})" if bad2 else "")
+            + f"; ostatnio kategorii z pasmem {len(last['rows'])}" + (f", aksamit {vel[1]:.2f}-{vel[2]:.2f}" if vel else ""), "0 niezgodnych", not bad2 and bool(last["rows"]))
+    # P306-3: indeks miast z pasmem w pasmie, rozpietosc <= k^2
+    bad3 = []
+    for d in days:
+        for cid, v in d["towns"].items():
+            r = d["rows"].get(cid)
+            if not r:
+                continue
+            lo, hi = r[1], r[2]
+            if v[6] < lo - 0.011 or v[10] > hi + 0.011 or v[11] > hi / lo * 1.03 + 0.1:
+                bad3.append(f"{d['day']} {cid} {v[6]}..{v[10]} x{v[11]} (pasmo {lo}-{hi})")
+    ex = last["towns"].get("velvet")
+    rep.add("P306-3: indeks miast z pasmem w pasmie (8 najszerszych)", f"poza pasmem {len(bad3)}" + (f" (np. {bad3[0]})" if bad3 else "")
+            + (f"; aksamit ostatnio bez pasma {ex[0]:.2f}..{ex[4]:.2f} (x{ex[5]}) -> {ex[6]:.2f}..{ex[10]:.2f} (x{ex[11]})" if ex else ""), "0", not bad3)
+    # P306-4: prawdziwe indeksy gry (287, przez GetItemCategoryPriceIndex) w pasmie przy kluczu TAK
+    bands = last["rows"]
+    if on and c287:
+        first_on = on[0]["day"]
+        bad4, seen = [], 0
+        for dd, cats in c287:
+            if dd < first_on:
+                continue
+            for cid, p25, p75, _m in cats:
+                r = bands.get(cid)
+                if not r:
+                    continue
+                seen += 1
+                if float(p75) > r[2] + 0.011 or float(p25) < r[1] - 0.011:
+                    bad4.append(f"{dd} {cid} {p25}-{p75} (pasmo {r[1]}-{r[2]})")
+        vl = [c for c in c287[-1][1] if c[0] == "velvet"]
+        rep.add("P306-4: indeks p25-p75 linii 287 (cena gry) w pasmie", f"komorek {seen}, poza pasmem {len(bad4)}" + (f" (np. {bad4[0]})" if bad4 else "")
+                + (f"; aksamit ostatnio {vl[0][1]}-{vl[0][2]}, marza {vl[0][3]}%" if vl else ""), "0 poza pasmem (przed 306a aksamit 2.41-10.00, marza 284%)", seen > 0 and not bad4)
+    else:
+        rep.add("P306-4: indeks p25-p75 linii 287 w pasmie", "brak linii 287 albo klucz NIE", "INFO", None)
+    # P306-5: przyciete wyceny
+    if on:
+        fl = sum(d["tail"][3] for d in on if d["tail"])
+        ce = sum(d["tail"][4] for d in on if d["tail"])
+        rep.add("P306-5: wyceny przyciete pasmem (klucz TAK)", f"do podlogi {fl}, do sufitu {ce}"
+                + (f"; ostatnio miasto-kategorii {last['tail'][0]}: przy podlodze {last['tail'][1]}, przy suficie {last['tail'][2]}" if last["tail"] else ""), "> 0", fl + ce > 0)
+    # P306-6: potkniecia
+    st = sum(d["tail"][5] for d in days if d["tail"])
+    rep.add("P306-6: potkniecia i ERROR PriceBand306", f"potkniecia {st}, ERROR {errs}, linii bez ogona {sum(1 for d in days if not d['tail'])}", "0 / 0 / 0",
+            st == 0 and errs == 0 and all(d["tail"] for d in days))
+    # P306-7: INFO
+    rep.add("P306-7: najwiekszy zysk dnia karawany gracza (259)", f"dzien {best[0]} '{best[1]}': sprzedaz {best[2]}, zysk {best[3]}" if best else "brak karawany gracza",
+            "INFO (30.10 przed 306a: 110177 w 108850, reszta 173 dob ok. 465/d)", None)
+    if q287:
+        rep.add("P306-7b: (wynik handlu - zold)/d karawan AI (ostatnia 138c)", f"zmierzonych {q287[0]}: p10 {q287[1]}, p25 {q287[2]}, p50 {q287[3]}, p75 {q287[4]}, p90 {q287[5]}",
+                "INFO (porownac z biegiem bazowym: 30.10 p50 -2, p90 622)", None)
+    rep.show()
+    return 0
+
+
+_pasmo306a_main_prev = main
+
+
+def main(argv):
+    # paczka 306a: grupa pasmo306a - opakowanie main jak karawany305
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "pasmo306a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return pasmo306a_main(rest[0] if rest else None)
+    return _pasmo306a_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

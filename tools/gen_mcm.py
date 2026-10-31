@@ -8,6 +8,9 @@ RANGES = {
     'PriceSupplyMemoryDaily': (0.02, 0.15, "0.000"),
     # 299c: udzial od razu - kod przycina do 0.02..0.15 (RawPrice.Share)
     'PriceInstantShare': (0.02, 0.15, "0.000"),
+    # 306a: pasmo ceny od przewozu - kod przycina marze do 0.25..9, droge do 100..6000 km (PriceBand306.MarginOf / KmOf)
+    'PriceBandMerchantMargin': (0.25, 9.0, "0.00"),
+    'PriceBandHaulKm': (100, 6000, "0"),
     # m113-zakup: kupno ziemi - relacje -100..100 (regula ogolna dalaby przy -10 suwak -30..0), lata zakupu 1..40, udzialy 0..1
     'LandRelationSideVillage': (-100, 100, "0"),
     'LandRelationLordship': (-100, 100, "0"),
