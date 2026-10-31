@@ -1069,8 +1069,10 @@ namespace Armoury
                     pack.AddToCounts(g.Item, -extra);
                     shelf.AddToCounts(g.Item, extra);
                     // polka wrocila do stanu sprzed gabki, wiec cena jest ta sama, ktora BK pomnozyl przez liczbe sztuk
-                    int refund = Math.Min(town.Gold, (int)(extra * (float)town.GetItemPrice(new EquipmentElement(g.Item), __0, false)));
+                    int due = (int)(extra * (float)town.GetItemPrice(new EquipmentElement(g.Item), __0, false));
+                    int refund = Math.Min(town.Gold, due);
                     if (refund > 0) { town.ChangeGold(-refund); __0.PartyTradeGold += refund; _refunded += refund; }
+                    CaravanGoods.SpongeUndo307(__0, due, refund);   // 307d: niezwrocona czesc - strata gabki, nie koszt innych przedmiotow
                     if (refund > 0) MoneyLedger.Note169(MoneyLedger.N169Other, __1, -refund, TownFolk.BBack);   // paczka 169: linia kas (tylko licznik); E5/0: zwrot 171 z calej kasy (BBack)
                     g.Undone += extra;
                 }

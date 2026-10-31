@@ -258,8 +258,10 @@ namespace Armoury
                     if (extra <= 0) continue;
                     pack.AddToCounts(what, -extra);
                     shelf.AddToCounts(what, extra);
-                    int refund = Math.Min(town.Gold, (int)(extra * (float)town.GetItemPrice(what, __0, false)));   // to samo wyrazenie co w BK
+                    int due = (int)(extra * (float)town.GetItemPrice(what, __0, false));   // to samo wyrazenie co w BK
+                    int refund = Math.Min(town.Gold, due);
                     if (refund > 0) { town.ChangeGold(-refund); __0.PartyTradeGold += refund; _dRefund += refund; }
+                    CaravanGoods.SpongeUndo307(__0, due, refund);   // 307d: niezwrocona czesc - strata gabki, nie koszt innych przedmiotow
                     _dSponge += extra;
                 }
             }

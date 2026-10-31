@@ -1469,7 +1469,9 @@ namespace Armoury
                     var el = new EquipmentElement(kv.Key);
                     pack.AddToCounts(el, -kv.Value);
                     shelf.AddToCounts(el, kv.Value);
-                    int refund = Math.Min(town.Gold, (int)(kv.Value * (float)town.GetItemPrice(el, __0, false)));
+                    int due = (int)(kv.Value * (float)town.GetItemPrice(el, __0, false));
+                    int refund = Math.Min(town.Gold, due);
+                    CaravanGoods.SpongeUndo307(__0, due, refund);   // 307d: niezwrocona czesc - strata gabki, nie koszt innych przedmiotow
                     if (refund > 0)
                     {
                         town.ChangeGold(-refund); __0.PartyTradeGold += refund;

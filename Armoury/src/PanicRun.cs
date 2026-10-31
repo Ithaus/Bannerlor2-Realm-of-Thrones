@@ -29,6 +29,8 @@ namespace Armoury
             public bool Seen, MountSeen, In, Spent, Out;
             public int Fails;
             public float At = -1f;      // czas misji wejscia w biezaca panike (pieszo)
+            public int SlowN;           // 307d: takty ponizej progu biegu (probka co ProbeEvery takt)
+            public float SlowAcc;       // 307d: czas taktow ponizej progu od ostatniej probki (waga nastepnej probki)
         }
 
         // ---- liczniki misji (zerowane w FieldCraft.ResetRunStats: AfterStart i po linii)
@@ -39,7 +41,11 @@ namespace Armoury
         // 307b (krytyk 307 "zlamani nie uciekaja", 142a: 82-98% czasu paniki ponizej progu biegu): rozbicie czasu ponizej progu na przyczyny (nie rozlaczne - czlowiek
         // moze miec kilka naraz), probka natywna tylko w takcie ponizej progu (co 0.2 s na zlamanego), najwyzej MaxProbes na misje (dalej - "bez probki").
         // Takze HP przy wejsciu w panike (bol FieldCraft < AiFleeBelowPercent = lamie sie prawie martwy) i kurs ucieczki (RoutKeeper.Decide, klucz PanicFleeHoldCourse).
-        internal const int MaxProbes = 400000;
+        // 307d (przeglad scalenia, CPU): probka co ProbeEvery. takt na czlowieka z waga = czas taktow od poprzedniej probki; sufit 20000 probek na misje.
+        // Czas taktow bez probki (ogon po ostatniej probce czlowieka, sufit) idzie do "bez probki"; predkosci srednie dzielone przez czas z probka.
+        internal const int MaxProbes = 20000;
+        internal const int ProbeEvery = 5;
+        private static float _sW, _vSecs;   // 307d: czas przypisany probkom (waga), czas z pomiarem predkosci
         private static int _probes, _entryPain, _entryWound, _hpN, _courseHeld, _courseTurned, _courseBlocked;
         private static float _sFoe, _sLim, _sNotRun, _sGoal, _sStuck, _sWound, _sCrowd, _sOther, _sNoProbe, _vSum, _mxSum, _limSum, _limSecs, _hpSum;
         private static readonly MBList<Agent> _near = new MBList<Agent>();
@@ -56,6 +62,7 @@ namespace Armoury
         {
             _probes = _entryPain = _entryWound = _hpN = _courseHeld = _courseTurned = _courseBlocked = 0;
             _sFoe = _sLim = _sNotRun = _sGoal = _sStuck = _sWound = _sCrowd = _sOther = _sNoProbe = _vSum = _mxSum = _limSum = _limSecs = _hpSum = 0f;
+            _sW = _vSecs = 0f;
             _men[0] = 0; _men[1] = 0;
             _mounted = _compMen = _spells = _atEntry = _spentN = _exitEarly = _recover = _fails = _out = _endIn = _endHalf = _barN = 0;
             _spentSum = 0f; _spentMin = float.MaxValue; _spentMax = 0f;
@@ -114,7 +121,7 @@ namespace Armoury
                     _secs += step;
                     if (winded) _halfSecs += step;
                     else if (pace < 0.999f) _zoneSecs += step;
-                    if (!sprinting) { _slowSecs += step; Slow(a, step); }
+                    if (!sprinting) { _slowSecs += step; Slow(a, man, step); }
                     if (windedBefore && !winded) _recover++;   // odsapka w panice: wyjscie z zadyszki (przy kluczu TAK oczekiwane 0)
                     if (ComponentOnly(a)) _compSecs += step;
                 }
@@ -148,12 +155,17 @@ namespace Armoury
 
         /// <summary>307b: takt ponizej progu biegu w panice - przyczyny (wrog w 3 m, limit predkosci ponizej 1, bez natywnego odwrotu, cel odwrotu w 5 m,
         /// stoi ponizej 0.5 m/s, kara ran, tlok swoich w 1.5 m) i predkosc rzeczywista wobec mozliwej. Wyjatek idzie do Step (liczony per czlowiek).</summary>
-        private static void Slow(Agent a, float step)
+        private static void Slow(Agent a, Man man, float step)
         {
+            // 307d: probka w 1., 6., 11. ... takcie czlowieka ponizej progu; waga = czas taktow od poprzedniej probki (wlacznie z tym)
+            man.SlowAcc += step;
+            if (man.SlowN++ % ProbeEvery != 0) return;
+            step = man.SlowAcc; man.SlowAcc = 0f;
             if (_probes >= MaxProbes) { _sNoProbe += step; return; }
             _probes++;
             var m = a.Mission;
             if (m == null || !MissionTeams.Valid(a.Team)) { _sNoProbe += step; return; }
+            _sW += step;
             Vec2 my = a.Position.AsVec2;
             bool any = false;
             bool foe = false;
@@ -177,8 +189,7 @@ namespace Armoury
             if (a.IsRunningAway && rv.IsValid && rv.DistanceSquared(my) < 25f) { _sGoal += step; any = true; }   // recenzja 307b: cel tylko przy natywnym odwrocie (inaczej stary/zerowy)
             float v = a.GetCurrentVelocity().Length;
             float mx = a.GetMaximumForwardUnlimitedSpeed();
-            if (v >= 0f && !float.IsInfinity(v)) _vSum += v * step;
-            if (mx >= 0f && !float.IsInfinity(mx)) _mxSum += mx * step;
+            if (v >= 0f && !float.IsInfinity(v) && mx >= 0f && !float.IsInfinity(mx)) { _vSum += v * step; _mxSum += mx * step; _vSecs += step; }
             if (v < 0.5f) { _sStuck += step; any = true; }
             var c = Settings.Current;
             float hm = a.HealthLimit;
@@ -250,14 +261,15 @@ namespace Armoury
             // 307b: przyczyny czasu ponizej progu biegu (nie rozlaczne), HP przy wejsciu, kurs ucieczki
             float sl = _slowSecs;
             var inv = CultureInfo.InvariantCulture;
+            float noProbe = _sNoProbe + Math.Max(0f, sl - _sW - _sNoProbe);   // 307d: ogon taktow po ostatniej probce czlowieka tez "bez probki" 
             sb.Append(" | ponizej progu biegu - przyczyny (307b, nie rozlaczne): wrog w 3 m ").Append(S(_sFoe)).Append(" s (").Append(Pc(_sFoe, sl))
               .Append("), limit predkosci < 1 ").Append(S(_sLim)).Append(" s (").Append(Pc(_sLim, sl)).Append("), bez natywnego odwrotu ").Append(S(_sNotRun))
               .Append(" s (").Append(Pc(_sNotRun, sl)).Append("), cel odwrotu w 5 m ").Append(S(_sGoal)).Append(" s (").Append(Pc(_sGoal, sl))
               .Append("), stoi < 0.5 m/s ").Append(S(_sStuck)).Append(" s (").Append(Pc(_sStuck, sl)).Append("), kara ran ").Append(S(_sWound))
               .Append(" s (").Append(Pc(_sWound, sl)).Append("), tlok swoich w 1.5 m ").Append(S(_sCrowd)).Append(" s (").Append(Pc(_sCrowd, sl))
-              .Append("), zadna z nich ").Append(S(_sOther)).Append(" s (").Append(Pc(_sOther, sl)).Append("), bez probki ").Append(S(_sNoProbe)).Append(" s")
-              .Append("; predkosc sr. ").Append(sl > 0.01f ? (_vSum / sl).ToString("0.00", inv) : "-")
-              .Append(" m/s przy mozliwej ").Append(sl > 0.01f ? (_mxSum / sl).ToString("0.00", inv) : "-")
+              .Append("), zadna z nich ").Append(S(_sOther)).Append(" s (").Append(Pc(_sOther, sl)).Append("), bez probki ").Append(S(noProbe)).Append(" s")
+              .Append("; predkosc sr. ").Append(_vSecs > 0.01f ? (_vSum / _vSecs).ToString("0.00", inv) : "-")
+              .Append(" m/s przy mozliwej ").Append(_vSecs > 0.01f ? (_mxSum / _vSecs).ToString("0.00", inv) : "-")
               .Append(" m/s, limit natywny sr. ").Append(_limSecs > 0.01f ? (_limSum / _limSecs).ToString("0.00", inv) : "-");
             sb.Append(" | HP przy wejsciu w panike sr. ").Append(_hpN > 0 ? S(_hpSum / _hpN * 100f) + "%" : "-").Append(" (ponizej progu bolu ").Append(_entryPain)
               .Append(", ponizej progu kary ran ").Append(_entryWound).Append(", zdrowszych ").Append(_hpN - _entryPain - _entryWound).Append(')');

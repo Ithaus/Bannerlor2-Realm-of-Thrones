@@ -114,7 +114,10 @@ namespace Armoury
             int d = Today;
             var s = S;
             if (s == null || !s.CaravanWeekFromFirstDay || r == null) return d - 7;
-            return Math.Min(d - 7, Math.Max(r.FirstDay, d - (CarRing - 1)));
+            // 307d (przeglad scalenia): okno rozszerzone tylko, gdy rekord powstal dokladnie dobe przed oknem (i nie od wczytania) - starsza karawana
+            // ma zwykle okno 7 dob; dotad kazda starsza niz 8 dob dostawala 9 dob i napis "Since it was formed"
+            if (!r.FromLoad && r.FirstDay == d - (CarRing - 1)) return r.FirstDay;
+            return d - 7;
         }
 
         // ------------------------------------------------------------ rekordy
@@ -489,7 +492,7 @@ namespace Armoury
                         long wg = WkSum(r.Wk, r.WkDay, 3, wf, out nd), tp = WkSum(r.Wk, r.WkDay, 4, wf, out nd);
                         int days = 0; for (int i = 0; i < r.WkDay.Length; i++) if (r.WkDay[i] >= Today - 7) days++;
                         string span = days >= 7 ? "Last 7 days" : "Since the game was loaded";
-                        if (wf < Today - 7) span = "Since it was formed";   // recenzja 307a: okno z doba utworzenia ma 8 dob, nie 7
+                        if (wf < Today - 7) span = "Since it was formed";   // recenzja 307a / 307d: tylko okno z doba utworzenia tuz przed oknem 7 dob (WkFrom)
                         // recenzja 259: kapital - to, co karawana dostala (E3/7) albo kapital modelu; towar - nizsza z ceny zakupu i rynku; warunek wyplaty - oba warunki reguly
                         string capTxt = basis.CapE37 ? "the " + N(basis.Capital) + " it was given to trade with" : "its trading capital of " + N(basis.Capital);
                         string txt = r.Name + " is worth " + N(basis.Worth) + " (coin " + N(basis.Purse) + ", goods " + N(basis.Goods) + " valued at the lower of what it paid and the market) - less than "

@@ -40,6 +40,10 @@ namespace Armoury
         private static long _w307Unk;                                       // WorthOf: zwierzeta bez wpisu wycenione (sztuko-wyceny od linii)
         private static long _s307N, _s307G, _s307Calls, _s307Horse, _s307HorseG, _s307PlayerG, _s307Neg, _s307Shadow, _s307ShadowG;
         private static long _c307N, _c307Cars;
+        // 307d (przeglad scalenia): zloto gabki niezwrocone przy cofnieciach (CaravanAmmo / CaravanBulk / CaravanTrade284 LeftPostfix zwracaja min(town.Gold, cena)) -
+        // strata karawany poza kosztem przedmiotow; zbierane dla partii biezacego wyjazdu (SpongePre ustawia, SpongeUndo307 dopisuje, SpongePost zdejmuje)
+        private static MobileParty _s307UndoMp; private static long _s307UndoLost;
+        private static long _s307Lost, _s307LostN, _s307LostPlayer;
         private static int _s307Stumbles, _s307StumbleSess;
         private static readonly Dictionary<string, long> _s307By = new Dictionary<string, long>(StringComparer.Ordinal);
 
@@ -49,6 +53,7 @@ namespace Armoury
         {
             _w307Unk = 0; _s307N = _s307G = _s307Calls = _s307Horse = _s307HorseG = _s307PlayerG = _s307Neg = _s307Shadow = _s307ShadowG = 0;
             _c307N = _c307Cars = 0; _s307Stumbles = _s307StumbleSess = 0; _s307By.Clear();
+            _s307UndoMp = null; _s307UndoLost = 0; _s307Lost = _s307LostN = _s307LostPlayer = 0;
         }
 
         private static void Stumble307(string where, Exception e)
@@ -61,6 +66,7 @@ namespace Armoury
         public static void SpongePre(MobileParty __0, Settlement __1, out Left307 __state)
         {
             __state = null;
+            _s307UndoMp = __0; _s307UndoLost = 0;   // 307d: niezwrocone zloto cofniec tego wyjazdu
             try
             {
                 if (__0 == null || __1 == null || !__0.IsCaravan || __1.Town == null || __0.ItemRoster == null) return;
@@ -77,6 +83,13 @@ namespace Armoury
             catch (Exception e) { __state = null; Stumble307("SpongePre", e); }
         }
 
+        /// <summary>307d: cofniecie gabki (LeftPostfix CaravanAmmo / CaravanBulk / CaravanTrade284) zwrocilo mniej niz zaplata BK (kasa miasta) - roznica poza kosztem przedmiotow.</summary>
+        internal static void SpongeUndo307(MobileParty mp, long expected, long refund)
+        {
+            if (mp == null || mp != _s307UndoMp || expected <= refund) return;
+            _s307UndoLost += expected - Math.Max(0, refund);
+        }
+
         /// <summary>Postfiks gabki (Priority.Last - po cofnieciach CaravanBulk / CaravanTrade284): netto przybyle sztuki i netto zeszle zloto - do ksiegi i dziennika.</summary>
         public static void SpongePost(Left307 __state)
         {
@@ -86,6 +99,15 @@ namespace Armoury
                 var mp = __state.Mp; var st = __state.St; var town = st.Town;
                 var r = mp.ItemRoster;
                 long paid = (long)__state.Gold0 - mp.PartyTradeGold;
+                long lost = _s307UndoMp == mp ? _s307UndoLost : 0;   // 307d: niezwrocone przy cofnieciach - nie koszt przedmiotow, ktore zostaly
+                _s307UndoMp = null; _s307UndoLost = 0;
+                if (lost > 0)
+                {
+                    long take = Math.Min(lost, Math.Max(0, paid));
+                    paid -= take;
+                    _s307Lost += take; _s307LostN++;
+                    if (mp.ActualClan == Clan.PlayerClan) _s307LostPlayer += take;
+                }
                 List<KeyValuePair<ItemObject, int>> got = null;
                 double wsum = 0;
                 for (int i = 0; i < r.Count; i++)
@@ -209,6 +231,8 @@ namespace Armoury
                 l.Sort((a, b) => b.Value.CompareTo(a.Value));
                 for (int i = 0; i < l.Count && i < 8; i++) sb.Append(i > 0 ? ", " : "").Append(l[i].Key).Append(' ').Append(l[i].Value);
                 sb.Append(l.Count == 0 ? "-]" : "]");
+                sb.Append(" | strata gabki - niezwrocone przy cofnieciach (kasa miasta, 307d): ").Append(_s307LostN).Append(" wyjazdow za ").Append(_s307Lost)
+                  .Append(" zl (karawany gracza ").Append(_s307LostPlayer).Append(" zl), poza kosztem przedmiotow");
                 sb.Append(" | polow zalogi do ksiegi po 0: ").Append(_c307N).Append(" szt. w ").Append(_c307Cars).Append(" godzinach karawan")
                   .Append(" | wycena 259: zwierzat bez wpisu ").Append(_w307Unk).Append(" sztuko-wycen (suma po wszystkich wywolaniach WorthOf, takze podgladach finansow - nie liczba sztuk)")
                   .Append(" | potkniecia ").Append(_s307Stumbles).Append(" (sesja ").Append(_s307StumbleSess).Append(").");
@@ -217,6 +241,7 @@ namespace Armoury
             catch (Exception e) { Stumble307("Daily307", e); }
             _w307Unk = 0; _s307N = _s307G = _s307Calls = _s307Horse = _s307HorseG = _s307PlayerG = _s307Neg = _s307Shadow = _s307ShadowG = 0;
             _c307N = _c307Cars = 0; _s307Stumbles = 0; _s307By.Clear();
+            _s307Lost = _s307LostN = _s307LostPlayer = 0;
         }
     }
 }

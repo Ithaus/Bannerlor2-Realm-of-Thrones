@@ -85502,13 +85502,14 @@ K307_RX_RESC = re.compile(r"netto dla rodu (-?\d+).*?\| konie i zwierzeta: sprze
 K307_RX_ARR = re.compile(r"\| doplyniecia do trzymanego celu (\d+) \(po limicie (\d+)\), dni rejsu / droga z decyzji: srednio ([\d.]+), najwiecej ([\d.]+); trzymane dluzej niz droga z decyzji (\d+), najstarsze trzymanie ([\d.]+) dob")
 K307_RX_NOW = re.compile(r"\| teraz: kiesa (-?\d+), .*?\| dzis: sprzedaz (\d+) \(myto (\d+)\), zakupy (\d+), .*?doplata BK (\d+), .*?\| wyplaty dzis: rozliczenie 259 (\d+), BK (\d+), E3/9 (\d+), gra 10% (\d+), rozwiazanie (\d+)")
 K307_RX_RUN = re.compile(r"bez handlu z rzedu (\d+) dob \(najdluzej od wczytania (\d+)\)")
-K307_RX_MSG = re.compile(r"komunikat - ponizej kapitalu: karawana '([^']+)'.*?(?:Last 7 days|Since the game was loaded) it sold ([\d,]+), bought ([\d,]+)")
+K307_RX_MSG = re.compile(r"komunikat - ponizej kapitalu: karawana '([^']+)'.*?(Last 7 days|Since the game was loaded|Since it was formed) it sold ([\d,]+), bought ([\d,]+)")   # 307d: okno w grupie 2
+K307_RX_PPDAY = re.compile(r"\(259\): dzien (\d+)")   # 307d: doba linii 259 (komunikat pada przed linia swojej doby - doba = ostatnia linia + 1)
 
 
 def k307_new():
     return {"start_buy": None, "start_sea": None, "buy_days": 0, "sea_days": 0, "stum": 0, "sp_g": 0, "sp_h": 0, "sp_p": 0,
             "sea_key": None, "held": 0, "ch_sea": 0, "ch_rand": 0, "ch_pl": 0, "made": None, "first_gap": None, "first_bought": None,
-            "run_max": None, "msg_bought": None, "res": None, "res_n": 0, "arr": 0, "arr_over": 0, "arr_qmax": 0.0, "hold_max": 0.0}
+            "run_max": None, "msg_bought": None, "msg_span": None, "msg_day": None, "first_day": None, "pp_day": None, "res": None, "res_n": 0, "arr": 0, "arr_over": 0, "arr_qmax": 0.0, "hold_max": 0.0}
 
 
 def k307_seg(ln, name):
@@ -85563,8 +85564,13 @@ def k307_feed(D, ln):
         if "komunikat - ponizej kapitalu" in ln:
             m = K307_RX_MSG.search(ln)
             if m and m.group(1) == name and D["msg_bought"] is None:
-                D["msg_bought"] = int(m.group(3).replace(",", ""))
+                D["msg_bought"] = int(m.group(4).replace(",", ""))
+                D["msg_span"] = m.group(2)
+                D["msg_day"] = D["pp_day"] + 1 if D["pp_day"] is not None else None
             return
+        m = K307_RX_PPDAY.search(ln)
+        if m:
+            D["pp_day"] = int(m.group(1))
         seg = k307_seg(ln, name)
         if seg is None:
             return
@@ -85574,6 +85580,7 @@ def k307_feed(D, ln):
             pays = sum(int(m.group(k)) for k in range(6, 11))
             D["first_gap"] = purse0 + sold - toll + top - bought - pays - kiesa
             D["first_bought"] = bought
+            D["first_day"] = D["pp_day"]
         m = K307_RX_RUN.search(seg)
         if m:
             D["run_max"] = int(m.group(2))
@@ -85592,8 +85599,19 @@ def k307_rows(rep, D):
         rep.add("K307-3: karawana gracza - kiesa pierwszej doby wedlug dziennika", f"'{D['made'][0]}' kiesa {D['made'][1]}, roznica poza dziennikiem {g} (zakupy {D['first_bought']})",
                 "|roznica| <= 300 (142b: 21091)", g is not None and abs(g) <= 300)
         mb, fb = D["msg_bought"], D["first_bought"]
-        rep.add("K307-4: komunikat 'ponizej kapitalu' liczy zakupy doby utworzenia", f"bought {mb}, zakupy pierwszej doby {fb}", "bought >= zakupy pierwszej doby (bez komunikatu - INFO)",
-                None if mb is None or fb is None else mb >= fb)
+        # 307d (przeglad scalenia): doba komunikatu - doba utworzenia (linie 259); okno [dzis-7, dzis] = doby linii 259 [k-6, k]; 7 = doba utworzenia tuz przed oknem
+        # (wtedy i tylko wtedy "Since it was formed" i zakupy pierwszej doby w oknie); > 7 - doba utworzenia poza oknem z zalozenia (INFO, ale napis "formed" = NIE)
+        sp, k = D["msg_span"], (D["msg_day"] - D["first_day"]) if D["msg_day"] is not None and D["first_day"] is not None else None
+        if mb is None or fb is None or k is None:
+            v4 = None
+        elif sp == "Since it was formed":
+            v4 = k == 7 and mb >= fb
+        elif k <= 7:
+            v4 = mb >= fb
+        else:
+            v4 = None
+        rep.add("K307-4: komunikat 'ponizej kapitalu' liczy zakupy doby utworzenia", f"bought {mb}, zakupy pierwszej doby {fb}, okno '{sp}', doby od utworzenia {k}",
+                "bought >= zakupy pierwszej doby przy <= 7 dobach; 'Since it was formed' tylko przy 7 (bez komunikatu / starsza - INFO)", v4)
         rm = D["run_max"]
         rep.add("K307-5: karawana gracza - najdluzej bez handlu", f"{rm} dob", "<= 35 (142a: 76, 142b: 43)", None if rm is None else rm <= 35)
     key_on = D["sea_key"] == "TAK"
@@ -85623,10 +85641,10 @@ K307_SAMPLES = [
     K307_SEA + "BK HourlyTickPartyImpl wpiety, pomiar SetMoveGoToSettlement wpiety.",
     K307_PROBE + "karawana - utworzona | 'Convoy of Ser X' (caravan_t) w Driftwood Hall (port TAK, gracz w miescie TAK), wodz Ser X (towarzysz), szablon naval | koszt rozmowy 30000, zloto gracza 1 -> 0 (zaplacone 30000, TAK) | kiesa karawany 30000 (E3/7 kontekst gracza: kapital modelu 35000, oczekiwane min(kapital, zaplacone) 30000, TAK)",
     K307_PP + "dzien 108879 || karawana 'Convoy of Ser X' (wodz Ser X, morska, kapital 30000) | rozliczenie doby: kiesa 8034 (podloga 5269) | teraz: kiesa 8034, towar 22000, wartosc 30034 | dzis: sprzedaz 0 (myto 0), zakupy 21966, zysk ze sprzedazy 0 | zold 269 zaplacil rod, doplata BK 0, brak rodu 0 | wyplaty dzis: rozliczenie 259 0, BK 0, E3/9 0, gra 10% 0, rozwiazanie 0 | ponizej kapitalu 1 dob | gdzie (305a): na morzu, cel Pentos, bez handlu z rzedu 0 dob (najdluzej od wczytania 0) || warsztat 'X'",
-    K307_BUY + "dzien 108879 | klucze: gabka do ksiegi (Caravan Sponge To Book) TAK | latka gabki wpieta | gabka BK: wyjazdow z zakupem 40, zaksiegowane 300 szt. za 25000 zl (konie i zwierzeta 16 szt. za 21091 zl; karawany gracza 21091 zl), bez zaplaty netto 0, poza ksiega przy kluczu NIE 0 wyjazdow za 0 zl [charger 11364] | polow zalogi do ksiegi po 0: 0 szt. w 0 godzinach karawan | wycena 259: zwierzat bez wpisu 0 sztuko-wycen | potkniecia 0 (sesja 0).",
-    K307_SEA + "dzien 108879 | klucz Caravan Sea Hold Target TAK (limit 2.0 x droga z decyzji, 6-30 dob) | latki: tik BK wpiety, pomiar celu wpiety | tiki BK karawan morskich w drodze 300, cel trzymany 280 tikow u 40 karawan, nowych celow trzymanych 12, w trzymaniu teraz 40 | wpuszczone do BK: wojna 1, oblezenie 0, limit dni 0, cel nie miasto z portem 0, klucz NIE 0 | zmiany celu w drodze: morskie 1 (BK: wojna 1, oblezenie 0, limit 0, nie port 0, losowa przy kluczu NIE 0, inne 0; inna droga 0), w tym karawany gracza 0, ladowe 30 | gracza: - | doplyniecia do trzymanego celu 10 (po limicie 0), dni rejsu / droga z decyzji: srednio 0.90, najwiecej 1.60; trzymane dluzej niz droga z decyzji 2, najstarsze trzymanie 9.5 dob; gracza: - | potkniecia 0 (sesja 0).",
+    K307_BUY + "dzien 108879 | klucze: gabka do ksiegi (Caravan Sponge To Book) TAK | latka gabki wpieta | gabka BK: wyjazdow z zakupem 40, zaksiegowane 300 szt. za 25000 zl (konie i zwierzeta 16 szt. za 21091 zl; karawany gracza 21091 zl), bez zaplaty netto 0, poza ksiega przy kluczu NIE 0 wyjazdow za 0 zl [charger 11364] | strata gabki - niezwrocone przy cofnieciach (kasa miasta, 307d): 1 wyjazdow za 120 zl (karawany gracza 0 zl), poza kosztem przedmiotow | polow zalogi do ksiegi po 0: 0 szt. w 0 godzinach karawan | wycena 259: zwierzat bez wpisu 0 sztuko-wycen | potkniecia 0 (sesja 0).",
+    K307_SEA + "dzien 108879 | klucz Caravan Sea Hold Target TAK (limit 2.0 x droga z decyzji, 6-30 dob) | latki: tik BK wpiety, pomiar celu wpiety | tiki BK karawan morskich w drodze 300, cel trzymany 280 tikow u 40 karawan, nowych celow trzymanych 12, w trzymaniu teraz 40 | wpuszczone do BK: wojna 1, oblezenie 0, limit dni 0, cel nie miasto z portem 0, klucz NIE 0, stoi (zachowanie None - BK zwalnia, 307d) 3 | zmiany celu w drodze: morskie 1 (BK: wojna 1, oblezenie 0, limit 0, nie port 0, losowa przy kluczu NIE 0, inne 0; inna droga 0), w tym karawany gracza 0, ladowe 30 | gracza: - | doplyniecia do trzymanego celu 10 (po limicie 0), dni rejsu / droga z decyzji: srednio 0.90, najwiecej 1.60; trzymane dluzej niz droga z decyzji 2, najstarsze trzymanie 9.5 dob; gracza: - | potkniecia 0 (sesja 0).",
     K307_PP + "dzien 108885 || karawana 'Convoy of Ser X' (wodz Ser X) | teraz: kiesa 8034, towar 1, wartosc 1 | dzis: sprzedaz 0 (myto 0), zakupy 0, zysk ze sprzedazy 0 | zold 269 zaplacil rod, doplata BK 0, brak rodu 0 | wyplaty dzis: rozliczenie 259 0, BK 0, E3/9 0, gra 10% 0, rozwiazanie 0 | gdzie (305a): na morzu, bez handlu z rzedu 6 dob (najdluzej od wczytania 18)",
-    K307_PP + "komunikat - ponizej kapitalu: karawana 'Convoy of Ser X' ponizej kapitalu 7 dob | Convoy of Ser X is worth 9,199 (coin 8,034) - less than the 30,000 it was given to trade with. Since the game was loaded it sold 0, bought 21,966, paid 0 in tolls; your clan paid",
+    K307_PP + "komunikat - ponizej kapitalu: karawana 'Convoy of Ser X' ponizej kapitalu 7 dob | Convoy of Ser X is worth 9,199 (coin 8,034) - less than the 30,000 it was given to trade with. Since it was formed it sold 0, bought 21,966, paid 0 in tolls; your clan paid",
     K307_PROBE + "karawana - wynik doby 108966 (307a) | 'Convoy of Ser X' od doby 108879: netto dla rodu 23574 (wyplaty 40295, zold 16721, doplaty 0), sprzedaz 86410, zysk ze sprzedazy 40000 | konie i zwierzeta: sprzedaz 56068, zysk 33900 | pierwsza partia (zakupy dob 108879-108880 za 21966): sprzedana za 56068, zysk 20000 | wynik bez pierwszej partii 3574, zysk ze sprzedazy bez pierwszej partii 20000, wynik handlu bez pierwszej partii (zysk ze sprzedazy bez niej - zold rodu) 3279.",
 ]
 
@@ -85656,6 +85674,16 @@ def karawany307_selftest():
     vc = {r[0].split(":")[0]: r[3] for r in rep.rows}
     if vc.get("K307-3") != "INFO" or vc.get("K307-6") != "INFO" or vc.get("K307-7") != "INFO" or vc.get("K307-8") != "INFO":
         return f"bez sondy zle: {vc}"
+    # 307d: blad 307a - "Since it was formed" u karawany starszej niz 8 dob (NIE); starsza z "Last 7 days" - INFO
+    for span, want in (("Since it was formed", "NIE"), ("Last 7 days", "INFO")):
+        E = k307_new()
+        for ln in K307_SAMPLES:
+            x = ln.replace("dzien 108885", "dzien 108890").replace("Since it was formed", span)
+            k307_feed(E, "[06:39:07] " + x)
+        rep = Report(); k307_rows(rep, E)
+        ve = {r[0].split(":")[0]: r[3] for r in rep.rows}
+        if ve.get("K307-4") != want:
+            return f"K307-4 przy 11 dobach i '{span}': {ve.get('K307-4')} (oczekiwane {want})"
     return None
 
 

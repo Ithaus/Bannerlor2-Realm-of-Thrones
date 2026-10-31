@@ -34,7 +34,7 @@ namespace Armoury
         private static readonly Dictionary<MobileParty, Hold> _h = new Dictionary<MobileParty, Hold>();
         private static bool _wImpl, _wMove;
         private static MobileParty _inBk; private static int _inWhy;   // karawana w tiku BK w drodze i powod wpuszczenia (0 brak / 1 wojna / 2 oblezenie / 3 limit / 4 cel nie port / 5 klucz NIE / 6 inne)
-        private static long _ticks, _held, _newHold, _exWar, _exSiege, _exLimit, _exNotPort, _exOff;
+        private static long _ticks, _held, _newHold, _exWar, _exSiege, _exLimit, _exNotPort, _exOff, _exIdle;   // 307d: _exIdle - ShortTermBehavior None (BK zwalnia karawane)
         private static readonly HashSet<MobileParty> _heldCars = new HashSet<MobileParty>();
         private static long _chSea, _chLand, _chSeaPlayer, _chOther;
         // recenzja 307a (pomiar trafnosci limitu): doplyniecia do trzymanego celu - liczba, suma i najwiekszy stosunek dni rejsu / droga z decyzji, w tym ponad limit
@@ -46,12 +46,12 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         private const int DetMax = 8;
         private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
-        private static readonly string[] WhyName = { "-", "wojna", "oblezenie", "limit dni (potem losowa 1% na tik)", "cel nie miasto z portem", "losowa 1% na tik (klucz NIE)", "inne (Hold, nie GoToSettlement)" };
+        private static readonly string[] WhyName = { "-", "wojna", "oblezenie", "limit dni (potem losowa 1% na tik)", "cel nie miasto z portem", "losowa 1% na tik (klucz NIE)", "inne (Hold, nie GoToSettlement, zachowanie None)" };
 
         internal static void Reset()
         {
             _h.Clear(); _inBk = null; _inWhy = 0;
-            _ticks = _held = _newHold = _exWar = _exSiege = _exLimit = _exNotPort = _exOff = 0; _heldCars.Clear();
+            _ticks = _held = _newHold = _exWar = _exSiege = _exLimit = _exNotPort = _exOff = _exIdle = 0; _heldCars.Clear();
             _chSea = _chLand = _chSeaPlayer = _chOther = 0; Array.Clear(_chWhy, 0, _chWhy.Length); _det.Clear();
             _arr = _arrOver = 0; _arrRatioSum = _arrRatioMax = 0; _arrDet.Clear();
             _stumbles = _stumbleSess = 0; _err.Clear();
@@ -110,6 +110,9 @@ namespace Armoury
                 _ticks++;
                 _inBk = mp; _inWhy = 6;
                 if (mp.DefaultBehavior != AiBehavior.GoToSettlement || mp.ShortTermBehavior == AiBehavior.Hold || mp.DefaultBehavior == AiBehavior.Hold) return true;
+                // 307d (przeglad scalenia, dekompilacja BK HourlyTickPartyImpl): ShortTermBehavior None (karawana stoi - np. po bitwie albo ucieczce) -> BK wola
+                // ReleaseCaravanFromHold (RethinkAtNextHourlyTick, ruch do celu); tego tiku nie wolno pominac
+                if (mp.ShortTermBehavior == AiBehavior.None) { _exIdle++; return true; }
                 var t = mp.TargetSettlement;
                 if (t == null || t.Town == null || !t.IsTown || !t.HasPort) { _exNotPort++; _inWhy = 4; return true; }
                 if (t.IsUnderSiege) { _exSiege++; _inWhy = 2; return true; }
@@ -251,7 +254,7 @@ namespace Armoury
                   .Append(" | tiki BK karawan morskich w drodze ").Append(_ticks).Append(", cel trzymany ").Append(_held).Append(" tikow u ").Append(_heldCars.Count).Append(" karawan, nowych celow trzymanych ")
                   .Append(_newHold).Append(", w trzymaniu teraz ").Append(_h.Count)
                   .Append(" | wpuszczone do BK: wojna ").Append(_exWar).Append(", oblezenie ").Append(_exSiege).Append(", limit dni ").Append(_exLimit).Append(", cel nie miasto z portem ")
-                  .Append(_exNotPort).Append(", klucz NIE ").Append(_exOff)
+                  .Append(_exNotPort).Append(", klucz NIE ").Append(_exOff).Append(", stoi (zachowanie None - BK zwalnia, 307d) ").Append(_exIdle)
                   .Append(" | zmiany celu w drodze: morskie ").Append(_chSea).Append(" (BK: wojna ").Append(_chWhy[1]).Append(", oblezenie ").Append(_chWhy[2])
                   .Append(", limit ").Append(_chWhy[3]).Append(", nie port ").Append(_chWhy[4]).Append(", losowa przy kluczu NIE ").Append(_chWhy[5]).Append(", inne ").Append(_chWhy[6])
                   .Append("; inna droga ").Append(_chOther).Append("), w tym karawany gracza ").Append(_chSeaPlayer).Append(", ladowe ").Append(_chLand)
@@ -264,7 +267,7 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
-            _ticks = _held = _newHold = _exWar = _exSiege = _exLimit = _exNotPort = _exOff = 0; _heldCars.Clear();
+            _ticks = _held = _newHold = _exWar = _exSiege = _exLimit = _exNotPort = _exOff = _exIdle = 0; _heldCars.Clear();
             _chSea = _chLand = _chSeaPlayer = _chOther = 0; Array.Clear(_chWhy, 0, _chWhy.Length); _det.Clear(); _stumbles = 0;
             _arr = _arrOver = 0; _arrRatioSum = _arrRatioMax = 0; _arrDet.Clear();
         }
