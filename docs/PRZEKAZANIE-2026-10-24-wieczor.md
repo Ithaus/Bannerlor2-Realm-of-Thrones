@@ -1,5 +1,12 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 13:20 CET - WGRANIE 143 (noc/307-integracja, wypchniete) - START DLA NASTEPNEJ SESJI
+- W GRZE: Armoury.dll fa2bd807d67098d590b870222f189c68 (143 = 142 + 307a-f). Kopie 142: .bak-2026-10-31-przed-wgranie143 i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie143-przed.
+  CrashScribe bef9db58 bez zmian. Zapis testowy na D:/Backup-Bannerlord/zapisy-testowe-archiwum/2026-10-31-143 (Game Saves czyste). LINIA GLOWNA: noc/307-integracja (zb n307).
+- Testy 143a-d w m113 logi 143*; analizy scratchpad d16b0e41 a143, a143c. 143d: kod 0, ERROR 0, bitwy 7/7, karawany AI 0.575 placacych, mediana +28.
+- Otwarte: karawana morska gracza - dlugie rejsy BK (Qarth, 64 doby bez handlu w 143c), K307-7 minus bez pierwszej partii; reguly 307e (powrot rozbitych, zastoj) niesprawdzone
+  w dzialaniu (0 przypadkow); cennik warsztatow skok x3.8; CrashScribe latka smokow niewgrana; autotest bitew bez armii lordow (tylko bandy).
+
 ## DOPISEK 31.10 ok. 11:30 CET - runda 307 (NIE wgrana, w grze dalej 142)
 - noc/307-integracja (zb n307): 307a karawany (zakupy gabki BK do ksiegi, wycena zwierzat, karawany morskie trzymaja cel), 307b bitwa (ucieczka, zalamania ze strat, FF wrecz
   wedlug umiejetnosci, odwrot rannych), 307c (szturmy, cennik, NaN BK), 307d (poprawki przegladu). 143a: kod 0, ERROR 0; FF 22% -> 7-10%, ksiega karawany gracza OK, szturmy OK,
