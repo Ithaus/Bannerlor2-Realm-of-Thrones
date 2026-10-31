@@ -1321,6 +1321,10 @@ Uzycie (Python 3, tylko odczyt):
 --grupa m97szkolenie : (20.10, Jeff "szkolenie wojska nie odbywa sie w marszu"; Armoury/src/CampDrill.cs, klucze DrillCampOnly, DrillCampOnlyAi, DrillMaster)
                     python -I tools/sprawdz_logi.py --grupa m97szkolenie <Armoury-*.log> (strumieniowo). SZ-0 start sesji i perki przerobione, SZ-1 zero XP z marszu
                     (gracz), SZ-2 godziny tylko z menu obozu (albo samoczynnie w obozie oblezenia / cudzej armii), SZ-3 ERROR 0, SZ-4 XP z marszu 0 przy czynnej zasadzie (AI, strona gracza), SZ-5 AI wobec dawnej reguly (INFO), SZ-6 potkniecia 0.
+--grupa trening311e : (31.10, 311e trening przed snem; Armoury/src/NightRest.TrainBeforeSleep.cs, CampDrill.cs; klucz CampTrainBeforeSleepHours i "Train before sleep" w menu obozu)
+                    python -I tools/sprawdz_logi.py --grupa trening311e <Armoury-*.log> (strumieniowo). T311-S self-test, T311-0 linie (INFO), T311-1 start (W <= N, W <= 8 - dzis,
+                    start + W = noc snu), T311-2 koniec (godziny <= zamierzone, zmierzch -> sen w menu), T311-3 starty = konce, T311-4 godziny 311e <= godziny ticku m97,
+                    T311-5 potkniecia i ERROR 0, T311-6 powody pominiec (INFO).
 --grupa m109muszt  : (23.10, galaz w-toku/m109-musztra - Jeff 22.10 "jak czekam w miescie, wojsko ma rozkaz drill, ale mniej, bo wydaja kase, pija, chodza na kobiety";
                     Armoury/src/TownStay.cs, CampDrill.cs, Drill.cs; klucze DrillTownStay i TownStaySpend) python -I tools/sprawdz_logi.py --grupa m109muszt <Armoury-*.log>
                     (strumieniowo). MUSZT-S self-test wyrazen wobec linii kontrolnych jak w kodzie C# (takze wyrazenie gracza m97szkolenie: nowa i stara linia), MUSZT-S2
@@ -86823,6 +86827,157 @@ def main(argv):
             return bitwa310_main(rest[0] if rest else None)
     return _bitwa310_main_prev(argv)
 
+
+# ---------------------------------------------------------------- 311e (31.10): trening przed snem - grupa trening311e
+# Jeff 31.10 "w menu obozu dodaj opcje, ile godzin przed snem armia ma sie zatrzymywac na trening od 1 do 8 godzin" (Armoury/src/NightRest.TrainBeforeSleep.cs,
+# CampDrill.cs; klucz CampTrainBeforeSleepHours, wybor z menu obozu w zapisie arm_nightrest pole 6).
+# T311-S self-test wyrazen (linie jak w C#, dobry i zly bieg); T311-0 linie 311e (INFO - brak = ustawienie 0 albo log sprzed 311e); T311-1 start: cwiczen do nocy
+# snu W h <= ustawienie i <= 8 - dzis od switu, godzina startu + W = noc snu; T311-2 koniec: godziny <= zamierzone + 0.05, powod 'noc' -> sen w menu; T311-3 starty
+# = konce (+1 dopuszczalny na koncu logu); T311-4 linia gracza m97: godziny 311e <= godziny cwiczen ticku; T311-5 potkniecia 0 i ERROR 'NightRest.Tbs.' 0;
+# T311-6 powody pominiec (INFO).
+T311_START = re.compile(r"Trening przed snem \(311e\): start o (\d+):00 \| ustawienie (\d+) h (z menu obozu|z MCM \(Camp Train Before Sleep Hours \d+\)), cwiczen do nocy snu (\d+) h"
+                        r" \(noc snu od (\d+):00, dzis od switu juz ([\d.]+) h z 8\) \| ludzi zdolnych (\d+)")
+T311_END = re.compile(r"Trening przed snem \(311e\): koniec o (\d+):00 \| cwiczen ([\d.]+) h \(zegara ([\d.]+) h, zamierzone (\d+) h\) \| powod: ([^|]+?) \| dzis od switu ([\d.]+) h z 8"
+                      r".*?\| dalej: (sen w menu \(arm_sleep_wait\)|menu obozu)\.")
+T311_SKIP = re.compile(r"Trening przed snem \(311e\): pominiety o (\d+):00 \(doba switu (-?\d+), ustawienie (\d+) h .*?\) \| powod: (.+?) \| kolejne")
+T311_DAWN = re.compile(r"Trening przed snem \(311e\): doba switu (-?\d+) \| ustawienie (\d+) h .*?\| startow (\d+), koncow (\d+) \(prosto do snu (\d+)\), godzin cwiczen ([\d.]+)"
+                       r" \| tick musztry: godzin 311e ([\d.]+), XP ok\. (\d+) .*?\| potkniecia (\d+)\.")
+T311_PLAYER = re.compile(r"Szkolenie w obozie \(m97\): gracz dzien (\d+) \| godzin cwiczen ([\d.]+) .*?\| w tym trening przed snem \(311e\) ([\d.]+) h, XP ok\. (\d+)")
+T311_SAMPLE_START = ("[15:00:01] Trening przed snem (311e): start o 15:00 | ustawienie 3 h z menu obozu, cwiczen do nocy snu 3 h (noc snu od 18:00, dzis od switu juz 0.00 h z 8)"
+                     " | ludzi zdolnych 120 | dlug snu 0, odpoczynek doby 0.00 h.")
+T311_SAMPLE_END = ("[15:00:09] Trening przed snem (311e): koniec o 18:00 | cwiczen 3.00 h (zegara 3.00 h, zamierzone 3 h) | powod: noc | dzis od switu 3.00 h z 8, do policzenia 3.00 h"
+                   " - XP policzy tick musztry (linia 'Szkolenie w obozie (m97): gracz' z dopiskiem 311e) | dalej: sen w menu (arm_sleep_wait).")
+T311_SAMPLE_SKIP = ("[14:00:01] Trening przed snem (311e): pominiety o 15:00 (doba switu 4530, ustawienie 3 h z MCM (Camp Train Before Sleep Hours 3)) | powod: w osadzie"
+                    " | kolejne godziny okna probuja znowu, linia raz na dobe.")
+T311_SAMPLE_DAWN = ("[15:01:00] Trening przed snem (311e): doba switu 4530 | ustawienie 3 h z menu obozu | startow 1, koncow 1 (prosto do snu 1), godzin cwiczen 3.00"
+                    " | tick musztry: godzin 311e 3.00, XP ok. 450 (na glowe 3.8) | godzin pominietych 0 | potkniecia 0.")
+T311_SAMPLE_PLAYER = ("[15:01:01] Szkolenie w obozie (m97): gracz dzien 108720 | godzin cwiczen 3.00 (z menu obozu od ostatniej linii 3.00, samoczynnie w obozie oblezenia albo w cudzej"
+                      " armii 0.00, w osadzie (m109) 0.00; dzis od switu 3.00 z 8) -> dzien x0.84 (pelny x2.25), godzin ruchu w dobie 9 (dawna regula x0.90) | XP przyjete 450"
+                      " (na glowe 3.8, ludzi 120), perki +0.0 na glowe | Przywodztwo x0.50 (dowodca 10, mistrz musztry brak; bez mistrza x0.50) | zapas x1.00 | uzbrojeni 100%"
+                      " | kara w chwili ticku: brak | w tym trening przed snem (311e) 3.00 h, XP ok. 450 | wejsc w Train the men 1, potkniecia 0.")
+
+
+def t311_rows(rep, starts, ends, skips, dawns, players, n_err, tail_open):
+    rep.add("T311-0: linie 311e (start / koniec / pominiecia / doby / linie gracza z 311e)", f"{len(starts)} / {len(ends)} / {len(skips)} / {len(dawns)} / {len(players)}",
+            "INFO (brak - ustawienie 0 albo log sprzed 311e)", None)
+    bad1 = []
+    for m in starts:
+        hc, n, w, night, done = int(m.group(1)), int(m.group(2)), int(m.group(4)), int(m.group(5)), float(m.group(6))
+        if not (1 <= w <= n <= 8) or w > 8 - done + 0.01 or (hc + w) % 24 != night:
+            bad1.append(f"start {hc}:00 W={w} N={n} noc {night} dzis {done}")
+    rep.add("T311-1: start - W <= ustawienie, W <= 8 - dzis, start + W = noc snu", "; ".join(bad1[:5]) or f"OK ({len(starts)} startow)", "0 naruszen",
+            None if not starts else not bad1)
+    bad2 = []
+    whys = {}
+    for m in ends:
+        h, want, why, nxt = float(m.group(2)), int(m.group(4)), m.group(5).strip(), m.group(7)
+        whys[why] = whys.get(why, 0) + 1
+        if h > want + 0.05:
+            bad2.append(f"koniec {m.group(1)}:00 {h} h > zamierzone {want}")
+        if why == "noc" and not nxt.startswith("sen w menu"):
+            bad2.append(f"koniec {m.group(1)}:00 powod noc, dalej {nxt}")
+        if why != "noc" and nxt.startswith("sen w menu"):
+            bad2.append(f"koniec {m.group(1)}:00 powod {why}, a sen")
+    rep.add("T311-2: koniec - godziny <= zamierzone, zmierzch snu -> sen w menu", ("; ".join(bad2[:5]) or "OK") + f" | powody {whys}", "0 naruszen (powod noc w menu bez ksiegi snu - menu obozu)",
+            None if not ends else not bad2)
+    d = len(starts) - len(ends)
+    rep.add("T311-3: starty = konce", f"startow {len(starts)}, koncow {len(ends)}", "rowne (+1, gdy log urwany w trakcie; bitwa w trakcie cwiczen konczy sesje bez linii - INFO)",
+            None if not starts and not ends else (d == 0 or (d == 1 and tail_open)))
+    bad4 = [f"dzien {m.group(1)}: 311e {m.group(3)} > cwiczen {m.group(2)}" for m in players if float(m.group(3)) > float(m.group(2)) + 0.01]
+    rep.add("T311-4: linia gracza m97 - godziny 311e <= godziny ticku", "; ".join(bad4[:5]) or f"OK ({len(players)} linii)", "0 naruszen", None if not players else not bad4)
+    st = sum(int(m.group(9)) for m in dawns)
+    rep.add("T311-5: potkniecia (linie doby) i ERROR 'NightRest.Tbs.'", f"potkniecia {st}, ERROR {n_err}", "0 i 0", None if not dawns and n_err == 0 else (st == 0 and n_err == 0))
+    reasons = {}
+    for m in skips:
+        k = m.group(4).split(" (")[0]
+        reasons[k] = reasons.get(k, 0) + 1
+    rep.add("T311-6: powody pominiec (raz na dobe)", str(dict(sorted(reasons.items(), key=lambda x: -x[1])[:8])), "INFO", None)
+
+
+def trening311e_selftest():
+    for name, rx, s in (("start", T311_START, T311_SAMPLE_START), ("koniec", T311_END, T311_SAMPLE_END), ("pominiety", T311_SKIP, T311_SAMPLE_SKIP),
+                        ("doba", T311_DAWN, T311_SAMPLE_DAWN), ("gracz", T311_PLAYER, T311_SAMPLE_PLAYER)):
+        if not rx.search(s):
+            return "wyrazenie " + name + " nie pasuje do probki"
+    if not M97SZ_PLAYER.search(T311_SAMPLE_PLAYER.split("(m97): ", 1)[1]):
+        return "linia gracza z dopiskiem 311e nie pasuje do M97SZ_PLAYER (regresja m97szkolenie)"
+    rep = Report()
+    t311_rows(rep, [T311_START.search(T311_SAMPLE_START)], [T311_END.search(T311_SAMPLE_END)], [T311_SKIP.search(T311_SAMPLE_SKIP)], [T311_DAWN.search(T311_SAMPLE_DAWN)],
+              [T311_PLAYER.search(T311_SAMPLE_PLAYER)], 0, False)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    bad = [k for k in ("T311-1", "T311-2", "T311-3", "T311-4", "T311-5") if v.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad}"
+    rep = Report()
+    t311_rows(rep, [T311_START.search(T311_SAMPLE_START.replace("start o 15:00", "start o 14:00"))],
+              [T311_END.search(T311_SAMPLE_END.replace("dalej: sen w menu (arm_sleep_wait)", "dalej: menu obozu"))], [],
+              [T311_DAWN.search(T311_SAMPLE_DAWN.replace("potkniecia 0.", "potkniecia 2."))],
+              [T311_PLAYER.search(T311_SAMPLE_PLAYER.replace("(311e) 3.00 h", "(311e) 4.00 h"))], 0, False)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("T311-1", "T311-2", "T311-4", "T311-5") if v.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss}"
+    return None
+
+
+def trening311e_main(logp):
+    """trening311e (31.10, 311e): T311-S, T311-0..6 - opis nad T311_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = trening311e_selftest()
+    rep.add("T311-S: self-test wyrazen i wierszy (linie 311e jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("T311-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, ends, skips, dawns, players = [], [], [], [], []
+    n_err = 0
+    last = None
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "ERROR" in line and "NightRest.Tbs." in line:
+                n_err += 1
+            if "(311e)" not in line:
+                continue
+            if "Trening przed snem (311e): start o" in line:
+                m = T311_START.search(line)
+                if m:
+                    starts.append(m)
+                    last = "start"
+            elif "Trening przed snem (311e): koniec o" in line:
+                m = T311_END.search(line)
+                if m:
+                    ends.append(m)
+                    last = "koniec"
+            elif "Trening przed snem (311e): pominiety" in line:
+                m = T311_SKIP.search(line)
+                if m:
+                    skips.append(m)
+            elif "Trening przed snem (311e): doba switu" in line:
+                m = T311_DAWN.search(line)
+                if m:
+                    dawns.append(m)
+            elif "Szkolenie w obozie (m97): gracz" in line:
+                m = T311_PLAYER.search(line)
+                if m:
+                    players.append(m)
+    print(f"plik: {logp}")
+    t311_rows(rep, starts, ends, skips, dawns, players, n_err, last == "start")
+    rep.show()
+    return 0
+
+
+_trening311e_main_prev = main
+
+
+def main(argv):
+    # 311e: grupa trening311e - opakowanie main jak bitwa310
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "trening311e":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return trening311e_main(rest[0] if rest else None)
+    return _trening311e_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

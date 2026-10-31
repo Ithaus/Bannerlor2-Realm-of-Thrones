@@ -300,6 +300,9 @@ namespace Armoury
                 // nie liczy drugi raz
                 CreditRest(s);
 
+                // 311e (NightRest.TrainBeforeSleep.cs): postoj na trening przed noca snu - N godzin przed SleepNightStart, z warunkami obozu z rozkazu i menu cwiczen
+                TbsHour(s, mp, captive, enl, raidNow, forced);
+
                 // ZMIERZCH (Jeff 31.08: "jade i zapada noc - popup czy rozbijamy
                 // oboz, z auto-obozem albo wylaczeniem"). Pytamy TYLKO kolumne
                 // w ruchu na czystej mapie; wybor trybu zyje w save.
@@ -400,6 +403,7 @@ namespace Armoury
                     ForcedMarch.Dawn(s, restBefore, sleepingNow);   // R3-08c recenzja: zanik zmeczenia z odpoczynkiem doby PO godzinie 5-6, przed zerowaniem doby
                     SettleNight(s);
                     LogPlayerDawn(s, restBefore, debtBefore, sleepingNow, creditedBefore, marchH, autoCamps, cuts);
+                    TbsDawnLine();   // 311e: linia doby treningu przed snem (wlasny try)
                     _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _raidWorkHoursDay = 0;
                 }
                 // T10: AiNightCamp i AiBanditRest przeniesione do AiHourly (przed wyjscia gracza)
@@ -532,6 +536,7 @@ namespace Armoury
                 ResetHourCounters();
                 ResetAi();   // T10: ksiega snu AI, snu dluznikow, alarmy, wstrzymani w osadach
                 ResetGate(); // E7/O1 (228): zegar przegladu osad
+                TbsReset();  // 311e: wybor treningu przed snem i liczniki - nowa kampania od MCM (wczytanie: Import z zapisu)
             }
             catch { }
         }
@@ -2332,6 +2337,7 @@ namespace Armoury
                             "You and your companions strike camp - an hour to pack up, then you move on."), Colors.Yellow);
                         GameMenu.ExitToLast();
                     }, true, 9);
+                try { TbsAddMenus(starter); } catch (Exception e) { Log.Error("NightRest.TbsAddMenus", e); }   // 311e: "Train before sleep: N h" w menu obozu
 
                 starter.AddWaitGameMenu("arm_sleep_wait",
                     "{=!}{ARM_SLEEP_TEXT}",
@@ -2630,7 +2636,8 @@ namespace Armoury
                    _restTonight.ToString(CultureInfo.InvariantCulture) + ";" +
                    (_credited ? "1" : "0") + ";" +
                    CampPromptMode.ToString(CultureInfo.InvariantCulture) + ";" +
-                   DawnDebt.ToString(CultureInfo.InvariantCulture);
+                   DawnDebt.ToString(CultureInfo.InvariantCulture) + ";" +
+                   _tbsSet.ToString(CultureInfo.InvariantCulture);   // 311e: szoste pole - trening przed snem z menu obozu (-1 = wedlug MCM; stary DLL pole pomija)
         }
 
         internal static void Import(string data)
@@ -2649,6 +2656,9 @@ namespace Armoury
                 // MUSZTRA-j: dlug o swicie z piatego pola; stary zapis (bez pola) - dlug o swicie = dlug (jak ksiega AI: ResolveImport)
                 int dd;
                 DawnDebt = parts.Length > 4 && int.TryParse(parts[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out dd) ? Math.Max(0, Math.Min(3, dd)) : Debt;
+                // 311e: szoste pole - wybor z menu obozu; stary zapis (bez pola) albo zla wartosc = -1 (wedlug MCM)
+                int tb;
+                _tbsSet = parts.Length > 5 && int.TryParse(parts[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out tb) && tb >= 0 && tb <= TbsMax ? tb : -1;
             }
             catch { }
         }
