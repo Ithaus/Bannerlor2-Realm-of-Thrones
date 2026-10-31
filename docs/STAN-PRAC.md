@@ -2,7 +2,7 @@
 
 ## STAN 31.10.2026 ok. 18:00 CET (najnowszy - starsze sekcje nizej sa historyczne; pelny dziennik dnia w docs/PRZEKAZANIE-2026-10-24-wieczor.md, wpisy 31.10)
 - W GRZE: Armoury.dll ed0199b997bebb13c90e4106d94e1dfe = WGRANIE 146 (galaz noc/310-strzaly-tarcze, wypchnieta; worktree scratchpad sesji d16b0e41 zb n310).
-  CrashScribe bef9db58 (bez zmian od 136). Kampania Jeffa: Ironman0gXONzURi8yO.sav (rod KARDA, Przemyslaw), nowa od 30.10.
+  CrashScribe 535aa8cd = WGRANIE 146cs (bef9db58 + latka smokow ROT 305c; zrodlo bef9db58 = 6888ffa3 potwierdzone dekompilacja). Kampania Jeffa: Ironman0gXONzURi8yO.sav (rod KARDA, Przemyslaw), nowa od 30.10.
 - Wgrania 31.10: 141 (305a-f karawany/warsztaty/bitwa/kowalstwo/drobne), 142 (306a pasmo cen od przewozu marza 2.0 + 306b sondy), 143 (307a-f karawany, bitwa, oblezenia),
   144 (308a rejsy karawan), 145 (309 bitwa armii), 146 (310 strzaly i tarcze). Kopie poprzednich: Modules/Armoury/bin/Win64_Shipping_Client/Armoury.dll.bak-2026-10-31-przed-wgranieNNN
   i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranieNNN-przed.
@@ -11,7 +11,7 @@
 - Narzedzia testu: m113/testy-noc-283.ps1 (scratchpad 6570af7b), CrashScribe-at-n308 z bitwami armii (scratchpad d16b0e41 cs-at308, flaga armoury-bitwa-armie.flag), sondy 306b.
 - DO SPRAWDZENIA PRZEZ JEFFA W GRZE: podpowiedz zlota rodu (linia 'Caravan wages'), kuznia gracza (zarabia na broni), rozmowa zmiany produkcji (zwrot kapitalu),
   XP kowalstwa (miecz/luk/przetop), komunikaty karawany (koniec karawany, 'Since it was formed'), bitwy (zalamania, poscig, lucznicy), ceny luksusu (pasmo ok. 3x).
-- OTWARTE: latka smokow ROT dla produkcyjnego CrashScribe (zrodlo bef9db58 = commit 84205371 nieobecny w repo); sciana tarcz 310 i reguly 307e niesprawdzone w dzialaniu;
+- OTWARTE: sciana tarcz 310 i reguly 307e niesprawdzone w dzialaniu;
   przegrani w bitwach armii padli 67-76%; cennik warsztatow skok x3.8; FF strzalow AI ok. 10-13%.
 
 

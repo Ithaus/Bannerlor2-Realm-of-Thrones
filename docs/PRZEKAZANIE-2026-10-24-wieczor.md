@@ -1,5 +1,8 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 18:15 CET - WGRANIE 146cs: CrashScribe 535aa8cd (bef9db58 + latka smokow ROT 305c)
+- Zrodlo bef9db58 potwierdzone: build z 6888ffa3 zdekompilowany = zainstalowany (tylko AssemblyInfo). Kopia .bak-2026-10-31-przed-wgranie146cs i D:/.../wgrane/2026-10-31-wgranie146cs-przed.
+
 ## DOPISEK 31.10 ok. 18:00 CET - TEST REGRESJI 146c (wersja w grze) - CZYSTY; podsumowanie w docs/STAN-PRAC.md (sekcja 31.10)
 - 146c: 9 bitew (7 band + armia + sojusz) wygrane/przegrane wedlug planu, 90 dob kod 0, ERROR 0, ARYTMETYKA OK 89/89; K294-1 0.620 TAK (pierwszy raz >= 0.60); K308-5 11 dob,
   K308-6 +68 848; NIE tylko P307-4b i H287-6. Zapis testowy na D:/Backup-Bannerlord/zapisy-testowe-archiwum/2026-10-31-146c; Game Saves czyste; flagi testu usuniete.
