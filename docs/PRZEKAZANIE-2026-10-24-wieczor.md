@@ -1,5 +1,12 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 09:10 CET - WGRANIE 142 (noc/306-integracja) - START DLA NASTEPNEJ SESJI
+- W GRZE: Armoury.dll 8f4b11470962bc694a9c2fcc546b2df1 (142 = 141 + 306a pasmo cen od przewozu, marza 2.0 + 306b sondy). Kopie 141: .bak-2026-10-31-przed-wgranie142 i
+  D:\Backup-Bannerlord\wgrane\2026-10-31-wgranie142-przed. CrashScribe bef9db58 bez zmian. Zapis testowy na D:\...\zapisy-testowe-archiwum\2026-10-31-142 (Game Saves czyste).
+- LINIA GLOWNA: noc/306-integracja (worktree scratchpad d16b0e41\zb\n306). Testy 142a/142b w m113\logi\142*; sondy: flagi armoury-kowal305/karawana305/warsztat305.flag, grupa sondy306.
+- Otwarte: karawany AI 0.559 placacych (141b 0.579) - pasmo cen; CrashScribe latka smokow ROT (DragonShips.cs w n305) niewgrana - brak zrodla bef9db58 (84205371);
+  N283-2/3 scenariusze testowe, K294-1 >= 0.60, NWAR-15. Do sprawdzenia przez Jeffa w grze: podpowiedz zlota ('Caravan wages'), kuznia gracza, rozmowa zmiany produkcji, XP kucia.
+
 ## DOPISEK 31.10 ok. 07:20 CET - WGRANIE 141 (noc/305-jeff-31-10 8deb9735 wypchniete) - START DLA NASTEPNEJ SESJI
 - W GRZE: Armoury.dll bd055889e03a5e8c3be9ae673be33157 (141 = 140 + 305a-f). Kopie 140: Armoury.dll.bak-2026-10-31-przed-wgranie141 i D:\Backup-Bannerlord\wgrane\2026-10-31-wgranie141-przed.
   CrashScribe bez zmian bef9db58 (latka smokow 305c NIE wgrana - zrodlo bef9db58 to commit 84205371, ktorego nie ma w repo; budowa z n305 wnioslaby niewgrane 133a). Zapis testowy na
