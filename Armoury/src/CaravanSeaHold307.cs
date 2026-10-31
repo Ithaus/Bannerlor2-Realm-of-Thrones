@@ -39,6 +39,8 @@ namespace Armoury
         // 307e (K307-8): po limicie decyzja BK od razu (ThinkNextDestination) - nowy cel / ten sam albo brak (BK dalej jak dotad, wpis bez trzymania)
         private static long _limNew, _limSame;
         private static System.Reflection.MethodInfo _think; private static bool _thinkLooked;
+        // recenzja 307e: lista celow porzuconych przez BK (BKCaravansBehavior._previouslyChangedCaravanTargetsDueToEnemyOnWay) - jak BK w bloku flag3 (:1072-1081)
+        private static System.Reflection.FieldInfo _prevF;
         private static readonly HashSet<MobileParty> _heldCars = new HashSet<MobileParty>();
         private static long _chSea, _chLand, _chSeaPlayer, _chOther;
         // recenzja 307a (pomiar trafnosci limitu): doplyniecia do trzymanego celu - liczba, suma i najwiekszy stosunek dni rejsu / droga z decyzji, w tym ponad limit
@@ -160,11 +162,28 @@ namespace Armoury
                 {
                     _thinkLooked = true;
                     _think = AccessTools.DeclaredMethod(bk.GetType(), "ThinkNextDestination", new[] { typeof(MobileParty) });
+                    _prevF = AccessTools.DeclaredField(bk.GetType(), "_previouslyChangedCaravanTargetsDueToEnemyOnWay");
+                    if (_think == null)
+                        Log.Info("Karawany morskie - cel do doplyniecia (307e): brak metody BK ThinkNextDestination(MobileParty) w " + bk.GetType().FullName
+                                 + " - po limicie BK jak dotad (1% na tik), licznik 'ten sam albo brak'.");
                 }
                 if (_think == null) { _limSame++; return false; }
                 var town = _think.Invoke(bk, new object[] { mp }) as Town;
                 var st = town != null ? town.Settlement : null;
                 if (st == null || st == old) { _limSame++; return false; }
+                // recenzja 307e: porzucony cel na liste BK (jak BK po ThinkNextDestination != null) - nastepna decyzja BK go pomija;
+                // BK czysci liste przy wejsciu do miasta (OnSettlementEntered) i gdy ThinkNextDestination nie da celu. Bez pola - tylko bez tego wpisu.
+                try
+                {
+                    var dict = _prevF != null ? _prevF.GetValue(bk) as Dictionary<MobileParty, List<Settlement>> : null;
+                    if (dict != null && old != null)
+                    {
+                        List<Settlement> l;
+                        if (!dict.TryGetValue(mp, out l) || l == null) { l = new List<Settlement>(); dict[mp] = l; }
+                        l.Add(old);
+                    }
+                }
+                catch (Exception e) { Stumble("NewTargetNow(lista BK)", e); }
                 _inBk = mp; _inWhy = 3;
                 mp.SetMoveGoToSettlement(st, MobileParty.NavigationType.Naval, true);
                 _limNew++;

@@ -16,7 +16,7 @@ namespace Armoury
     /// HIPOTEZA (nie udowodniona): zostali ludzie bez czym walczyc (luk bez strzal, bez broni recznej) - strzelec bez strzal i bez noza nie podejdzie do wroga,
     /// a wrog nie ma do kogo isc albo sam stoi w tym samym polozeniu.
     /// REGULA (klucz BattleStallBreak, bitwa polowa kampanii, obie strony jednakowo): po pierwszym ciosie w bitwie, gdy przez BattleStallSeconds sekund czasu misji
-    /// nie padl zaden cios i nie wylecial zaden pocisk - kazdy czlowiek AI (nie gracz) bez broni recznej, bez amunicji do luku / kuszy i bez broni rzucanej
+    /// nie padl zaden cios i nie wylecial zaden pocisk - kazdy czlowiek AI (nie gracz, nie bohater - recenzja 307e) bez broni recznej, bez amunicji do luku / kuszy i bez broni rzucanej
     /// schodzi z pola: RoutHold.Break (ta sama droga zlamanego - bez powrotu, do granicy pola; liczy sie w linii NB2), bez RoutKeeper - morale 0 (droga paniki
     /// gry). Kto ma czym walczyc - bez zmian. Pierwszy zastoj misji (i do 3 na misje) - linia diagnozy "Zastoj bitwy (307e)" ze spisem obu stron (bron, szyk,
     /// rozkaz, zachowanie szyku, predkosc, odleglosc do wroga, panika) - dowod do nastepnego kroku. Linia konca misji "Zastoj bitwy (307e): koniec misji".
@@ -25,12 +25,12 @@ namespace Armoury
     internal sealed class BattleStall307e : MissionLogic
     {
         private const float CheckEvery = 1f, RecheckEvery = 10f;
-        private const int DumpMax = 3, ListMax = 12;
+        private const int DumpMax = 3, ListMax = 12, SampleMax = 40;   // recenzja 307e: odleglosc do wroga tylko dla probki (bez O(n^2) po calym polu)
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private float _last = -1f, _next, _nextRecheck;
         private bool _contact, _open, _field, _fieldKnown, _deployed, _ended;
-        private int _episodes, _dumps, _outPlayer, _outFoe, _outRefused, _outMorale, _stumbles;
+        private int _episodes, _dumps, _outPlayer, _outFoe, _outRefused, _outMorale, _outMoraleP, _outMoraleF, _skipUndead, _stumbles;
         private float _longest, _stallSince;
         private bool _err;
 
@@ -135,6 +135,8 @@ namespace Armoury
                 try
                 {
                     if (a == null || !a.IsHuman || !a.IsActive() || a.IsMainAgent || !a.IsAIControlled || a.Team == null || a.IsRunningAway) continue;
+                    // recenzja 307e: bohater zostaje (tylko w diagnozie) - rozbitemu bohaterowi gra robi WoundTroop, lord moglby trafic do niewoli
+                    if (a.IsHero) continue;
                     if (RoutHold.KnownAnyThread(a)) continue;
                     int ammo; bool melee, ranged;
                     if (CanFight(a, out ammo, out melee, out ranged)) continue;
@@ -152,9 +154,15 @@ namespace Armoury
                     if (RoutHold.On(m))
                     {
                         if (!RoutHold.Break(a, MissionTeams.Flee)) { _outRefused++; continue; }
+                        if (pl) _outPlayer++; else _outFoe++;
                     }
-                    else { a.SetMorale(0f); _outMorale++; }
-                    if (pl) _outPlayer++; else _outFoe++;
+                    else
+                    {
+                        // recenzja 307e: bez RoutKeeper - trup nie zna strachu (jak RoutHold.Break); morale 0 liczone osobno (to nie "zeszli z pola" - gra moze ich nie wyprowadzic)
+                        if (Undead.Character(a.Character)) { _skipUndead++; continue; }
+                        a.SetMorale(0f); _outMorale++;
+                        if (pl) _outMoraleP++; else _outMoraleF++;
+                    }
                 }
                 catch (Exception e) { Stumble("SendOff", e); }
             }
@@ -165,12 +173,20 @@ namespace Armoury
             try
             {
                 var sb = new StringBuilder(2048);
+                // recenzja 307e: pozycje ludzi obu stron zebrane raz (strona gracza / wrog) - odleglosc do najblizszego wroga tylko dla probki SampleMax
+                var posPl = new List<Vec3>(); var posFoe = new List<Vec3>();
+                foreach (var o in m.Agents)
+                {
+                    if (o == null || !o.IsHuman || !o.IsActive() || o.Team == null) continue;
+                    if (o.Team.IsPlayerTeam || o.Team.IsPlayerAlly) posPl.Add(o.Position); else posFoe.Add(o.Position);
+                }
                 sb.Append("Zastoj bitwy (307e): ").Append(idle.ToString("0", Inv)).Append(" s czasu misji bez ciosu i strzalu (czas misji ").Append(m.CurrentTime.ToString("0", Inv))
                   .Append(" s, prog ").Append(c.BattleStallSeconds).Append(" s, klucz Battle Stall Break ").Append(c.BattleStallBreak ? "TAK" : "NIE").Append(')');
                 for (int side = 0; side < 2; side++)
                 {
                     bool wantPlayer = side == 0;
-                    int n = 0, fight = 0, none = 0, panic = 0, mounted = 0, rangedEmpty = 0, listed = 0;
+                    int n = 0, fight = 0, none = 0, panic = 0, mounted = 0, rangedEmpty = 0, listed = 0, sampled = 0;
+                    var foes = wantPlayer ? posFoe : posPl;
                     float dSum = 0f, dMin = float.MaxValue;
                     var det = new StringBuilder(800);
                     foreach (var a in m.Agents)
@@ -186,8 +202,13 @@ namespace Armoury
                         bool pan = a.IsRunningAway || RoutHold.KnownAnyThread(a);
                         if (pan) panic++;
                         if (a.HasMount) mounted++;
-                        float d = Nearest(m, a);
-                        if (d < float.MaxValue) { dSum += d; if (d < dMin) dMin = d; }
+                        float d = float.MaxValue;
+                        if (sampled < SampleMax)
+                        {
+                            sampled++;
+                            d = Nearest(foes, a.Position);
+                            if (d < float.MaxValue) { dSum += d; if (d < dMin) dMin = d; }
+                        }
                         if (listed >= ListMax) continue;
                         listed++;
                         string troop = "?";
@@ -215,7 +236,7 @@ namespace Armoury
                     }
                     sb.Append(" | ").Append(wantPlayer ? "strona gracza" : "wrog").Append(": ludzi ").Append(n).Append(" (moga walczyc ").Append(fight).Append(", bez czym walczyc ")
                       .Append(none).Append(", luk/rzucana bez amunicji ").Append(rangedEmpty).Append(", w ucieczce ").Append(panic).Append(", konno ").Append(mounted)
-                      .Append("; do najblizszego wroga sr. ").Append(n > 0 && dMin < float.MaxValue ? (dSum / n).ToString("0", Inv) : "-").Append(" m, najmniej ")
+                      .Append("; do najblizszego wroga (probka ").Append(sampled).Append(") sr. ").Append(sampled > 0 && dMin < float.MaxValue ? (dSum / sampled).ToString("0", Inv) : "-").Append(" m, najmniej ")
                       .Append(dMin < float.MaxValue ? dMin.ToString("0", Inv) : "-").Append(" m) [").Append(det).Append(']');
                 }
                 Log.Info(sb.Append('.').ToString());
@@ -236,14 +257,13 @@ namespace Armoury
             return false;
         }
 
-        private static float Nearest(Mission m, Agent a)
+        /// <summary>Najblizszy wrog z listy pozycji drugiej strony (zebranej raz w Dump).</summary>
+        private static float Nearest(List<Vec3> foes, Vec3 p)
         {
             float best = float.MaxValue;
-            var p = a.Position;
-            foreach (var o in m.Agents)
+            for (int i = 0; i < foes.Count; i++)
             {
-                if (o == null || !o.IsHuman || !o.IsActive() || o.Team == null || !o.Team.IsEnemyOf(a.Team)) continue;
-                float d = o.Position.Distance(p);
+                float d = foes[i].Distance(p);
                 if (d < best) best = d;
             }
             return best;
@@ -269,7 +289,8 @@ namespace Armoury
                     Log.Info("Zastoj bitwy (307e): koniec misji | rozstawienie " + (_deployed ? "TAK" : "NIE") + " | klucz Battle Stall Break " + (c != null && c.BattleStallBreak ? "TAK" : "NIE") + ", prog "
                              + (c != null ? c.BattleStallSeconds.ToString(Inv) : "-") + " s | pierwszy cios " + (_contact ? "TAK" : "NIE") + " | zastojow " + _episodes
                              + " (najdluzszy " + _longest.ToString("0", Inv) + " s, linii diagnozy " + _dumps + ") | zeszli z pola bez czym walczyc: strona gracza " + _outPlayer
-                             + ", wrog " + _outFoe + " (morale 0 bez RoutKeeper " + _outMorale + ", odmowy RoutHold " + _outRefused + ") | potkniecia " + _stumbles + ".");
+                             + ", wrog " + _outFoe + " (odmowy RoutHold " + _outRefused + ") | bez RoutKeeper morale 0: strona gracza " + _outMoraleP + ", wrog " + _outMoraleF
+                             + " (razem " + _outMorale + ", nieumarli pominieci " + _skipUndead + ") | bohaterowie nie schodza | potkniecia " + _stumbles + ".");
                 }
             }
             catch { }

@@ -152,7 +152,7 @@ namespace Armoury
             FenceNewDay(); LastHarbourTithe = 0; _hoardSeen.Clear(); _hoardKeep.Clear(); _errSell = false; _errHide = false; _errFenceLog = false; _errLife = false; _errStart = false; _errFood = false; _errUpgrade = false;
             _gold.Clear(); _goldTick = false; _foodSnap.Clear();      // migawki dziennego ticku gry nie przechodza do nastepnej kampanii
             _upLoot = _upFence = _upBlocked = _fenceGold = 0;         // liczniki zakupow u pasera ida do linii "Paser:" - nie moga przejsc z poprzedniej kampanii
-            _hearthRegion.Clear(); H3NewDay(); _errH3 = false;        // H3: liczniki rozbitych i powrotow z puli tylko z tej kampanii
+            _hearthRegion.Clear(); H3NewDay(); _errH3 = false; RoutedReturn307e.Reset();   // H3: liczniki rozbitych i powrotow z puli tylko z tej kampanii; recenzja 307e: liczniki i flaga ERROR powrotow rozbitych zwyciezcow tez
             _desUndead = 0; OverflowHome.Reset();                      // W4b/W4c: liczniki dopisku linii "Wyrzutki:" i notatki przepelnienia tylko z tej kampanii
             _disbandUndead = 0;                                        // E4/2 (e)
             _inDesert = _inRouted = _inRaid = _inMisery = _inDisband = _outReturn = 0f;   // E4/3: liczniki dnia nie przechodza do nastepnej kampanii (drobiazg z 108)

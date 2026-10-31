@@ -28,10 +28,10 @@ namespace Armoury
     /// </summary>
     internal static class RoutedReturn307e
     {
-        private static int _men, _parties, _kept, _player, _stumbles;
+        private static int _men, _parties, _kept, _over, _player, _stumbles;   // _over: ponad limit partii - zostali w rozbitych (H3)
         private static bool _err;
 
-        internal static void NewDay() { _men = _parties = _kept = _player = _stumbles = 0; }
+        internal static void NewDay() { _men = _parties = _kept = _over = _player = _stumbles = 0; }
 
         internal static void Reset() { NewDay(); _err = false; }
 
@@ -40,7 +40,7 @@ namespace Armoury
             var s = Settings.Current;
             float sh = s != null ? MBMath.ClampFloat(s.RoutedWinnersReturnShare, 0f, 1f) : 0f;
             return " | rozbici zwyciezcow wracaja (307e, udzial " + sh.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "): do druzyn " + _men
-                   + " (druzyn " + _parties + ", w tym gracza " + _player + "), zostali w rozbitych (H3) " + _kept + (_stumbles > 0 ? ", potkniecia " + _stumbles : "");
+                   + " (druzyn " + _parties + ", w tym gracza " + _player + "), zostali w rozbitych (H3) " + _kept + " (w tym ponad limit partii " + _over + ")" + (_stumbles > 0 ? ", potkniecia " + _stumbles : "");
         }
 
         /// <summary>OutlawLaw.OnMapEventEnded (przed DoomedPartyMen.Before i H3): czesc rozbitych zwycieskiej strony z powrotem do skladu ich partii.</summary>
@@ -57,7 +57,7 @@ namespace Armoury
             try { side = me.GetMapEventSide(win); } catch { return; }
             if (side == null || side.Parties == null) return;
             bool playerHere = false;
-            int pBack = 0, pRouted = 0;
+            int pBack = 0, pRouted = 0, pOver = 0;
             foreach (var mep in side.Parties)
             {
                 try
@@ -67,27 +67,35 @@ namespace Armoury
                     if (mp != null && !mp.IsActive) continue;
                     var roster = mep.RoutedInBattle;
                     var list = new List<TroopRosterElement>(roster.GetTroopRoster());   // kopia - AddToCounts usuwa element przy 0
-                    int back = 0, all = 0;
+                    int back = 0, all = 0, over = 0;
+                    // recenzja 307e: powrot nie ponad limit partii gry (PartySizeLimit - sklad), nadwyzka zostaje w rozbitych i idzie do H3 jak reszta
+                    int room = int.MaxValue;
+                    try { room = Math.Max(0, mep.Party.PartySizeLimit - mep.Party.MemberRoster.TotalManCount); } catch { room = int.MaxValue; }
                     foreach (var e in list)
                     {
                         if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
                         int n = e.Number;
                         all += n;
                         int b = Math.Min(n, Math.Max(0, MBRandom.RoundRandomized(n * share)));
+                        if (b > room) { over += b - room; b = room; }
                         if (b <= 0) continue;
+                        room -= b;
                         mep.Party.MemberRoster.AddToCounts(e.Character, b);
                         roster.AddToCounts(e.Character, -b);
                         back += b;
                     }
+                    _over += over;
+                    bool isPl = mp != null && mp == MobileParty.MainParty;
+                    if (isPl) { playerHere = true; pRouted += all; pOver += over; }
                     if (back <= 0) { _kept += all; continue; }
                     _men += back; _kept += all - back; _parties++;
-                    if (mp != null && mp == MobileParty.MainParty) { _player += back; playerHere = true; pBack += back; pRouted += all; }
+                    if (isPl) { _player += back; pBack += back; }
                 }
                 catch (Exception e) { _stumbles++; if (!_err) { _err = true; Log.Error("RoutedReturn307e.Apply", e); } }
             }
             if (playerHere)
                 Log.Info("Rozbici zwyciezcow wracaja (307e): bitwa wygrana przez strone gracza | uciekli z pola " + pRouted + ", wrocilo do druzyny gracza " + pBack
-                         + ", reszta (" + (pRouted - pBack) + ") jak rozbici dotad (H3: dom albo las).");
+                         + ", reszta (" + (pRouted - pBack) + ", w tym ponad limit druzyny " + pOver + ") jak rozbici dotad (H3: dom albo las).");
         }
     }
 }
