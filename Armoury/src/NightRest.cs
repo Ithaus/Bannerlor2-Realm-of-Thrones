@@ -2637,7 +2637,8 @@ namespace Armoury
                    (_credited ? "1" : "0") + ";" +
                    CampPromptMode.ToString(CultureInfo.InvariantCulture) + ";" +
                    DawnDebt.ToString(CultureInfo.InvariantCulture) + ";" +
-                   _tbsSet.ToString(CultureInfo.InvariantCulture);   // 311e: szoste pole - trening przed snem z menu obozu (-1 = wedlug MCM; stary DLL pole pomija)
+                   _tbsSet.ToString(CultureInfo.InvariantCulture) + ";" +   // 311e: szoste pole - trening przed snem z menu obozu (-1 = wedlug MCM; stary DLL pole pomija)
+                   _tbsDay.ToString(CultureInfo.InvariantCulture);          // 311e poprawka recenzji (3): siodme pole - doba switu ostatniego postoju (raz na dobe po wczytaniu)
         }
 
         internal static void Import(string data)
@@ -2659,6 +2660,9 @@ namespace Armoury
                 // 311e: szoste pole - wybor z menu obozu; stary zapis (bez pola) albo zla wartosc = -1 (wedlug MCM)
                 int tb;
                 _tbsSet = parts.Length > 5 && int.TryParse(parts[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out tb) && tb >= 0 && tb <= TbsMax ? tb : -1;
+                // 311e poprawka recenzji (3): siodme pole - doba ostatniego postoju; brak pola = long.MinValue (jak dotad)
+                long td;
+                _tbsDay = parts.Length > 6 && long.TryParse(parts[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out td) ? td : long.MinValue;
             }
             catch { }
         }

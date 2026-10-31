@@ -198,7 +198,15 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 _tbsEnds++; _tbsHours += Math.Max(0f, hours);
-                sleep = why == "noc" && s != null && s.NightRestEnabled && !_sleeping && MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == null;
+                // poprawka recenzji 311e (2): pelny dzien (8 h) dobity tuz przed noca snu (start rowno o pelnej godzinie) - to ten sam zmierzch, idziemy spac
+                // (inaczej twarda pauza menu obozu o 17:59); prog 0.25 h zegara do poczatku nocy snu
+                if (why == "pelny dzien")
+                {
+                    double hd = CampaignTime.Now.CurrentHourInDay;
+                    double toNight = ((SleepNightStart - hd) % 24.0 + 24.0) % 24.0;
+                    if (toNight <= 0.25) why = "noc (pelny dzien " + F2((float)toNight) + " h przed noca snu)";
+                }
+                sleep = why.StartsWith("noc", StringComparison.Ordinal) && s != null && s.NightRestEnabled && !_sleeping && MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == null;
                 if (sleep) _tbsSleeps++;
                 Log.Info(TbsP + "koniec o " + CampaignTime.Now.GetHourOfDay + ":00 | cwiczen " + F2(hours) + " h (zegara " + F2(clock) + " h, zamierzone " + _tbsWant
                          + " h) | powod: " + why + " | dzis od switu " + F2(CampDrill.PlayerDayHours) + " h z 8, do policzenia " + F2(CampDrill.PlayerOwed)

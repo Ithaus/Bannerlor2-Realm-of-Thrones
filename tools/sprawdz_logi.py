@@ -86874,9 +86874,9 @@ def t311_rows(rep, starts, ends, skips, dawns, players, n_err, tail_open):
         whys[why] = whys.get(why, 0) + 1
         if h > want + 0.05:
             bad2.append(f"koniec {m.group(1)}:00 {h} h > zamierzone {want}")
-        if why == "noc" and not nxt.startswith("sen w menu"):
+        if why.startswith("noc") and not nxt.startswith("sen w menu"):
             bad2.append(f"koniec {m.group(1)}:00 powod noc, dalej {nxt}")
-        if why != "noc" and nxt.startswith("sen w menu"):
+        if not why.startswith("noc") and nxt.startswith("sen w menu"):   # poprawka recenzji 311e (2): "noc (pelny dzien ...)" = zmierzch
             bad2.append(f"koniec {m.group(1)}:00 powod {why}, a sen")
     rep.add("T311-2: koniec - godziny <= zamierzone, zmierzch snu -> sen w menu", ("; ".join(bad2[:5]) or "OK") + f" | powody {whys}", "0 naruszen (powod noc w menu bez ksiegi snu - menu obozu)",
             None if not ends else not bad2)

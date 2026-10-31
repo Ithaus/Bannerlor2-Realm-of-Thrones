@@ -545,6 +545,15 @@ namespace Armoury
             GameMenu.SwitchToMenu("arm_camp_wait");
         }
 
+        // poprawka recenzji 311e (1): MainParty.IsMoving = !Campaign.IsMainPartyWaiting, a te flage gra liczy dopiero w RealTick (po ticku menu w tej samej
+        // klatce). Menu cwiczen otwarte z ticku godzinowego (postoj 311e w marszu) widzialo w pierwszej klatce stara flage "w ruchu" i konczylo sie od razu
+        // ("ruch", 0 h). Rozkaz Hold + ComputeIsWaiting (to samo, co gra wpisze do flagi) = stoi; kazdy inny rozkaz ruchu nadal konczy cwiczenia.
+        private static bool Moving(MobileParty mp)
+        {
+            if (!mp.IsMoving) return false;
+            return !(mp.IsMainParty && mp.DefaultBehavior == AiBehavior.Hold && mp.ComputeIsWaiting());
+        }
+
         private static void DrillTick(MenuCallbackArgs args, CampaignTime dt)
         {
             try
@@ -558,7 +567,7 @@ namespace Armoury
                 if (mp.Party != null && mp.Party.IsStarving) { Leave("glod", "The men are too hungry to drill."); return; }
                 // recenzja 1: kare pilnuje menu w chwili cwiczen (tick treningu juz jej nie stosuje do godzin zrobionych) - dlug o swicie takze tu, nie tylko przy wejsciu
                 if (NightRest.DawnDebtOf(mp) >= 1) { Leave("dlug snu", "The men met the dawn short of sleep - no drill until the next dawn."); return; }
-                if (mp.CurrentSettlement != null || mp.AttachedTo != null || mp.BesiegerCamp != null || mp.SiegeEvent != null || mp.IsMoving) { Leave("ruch", null); return; }
+                if (mp.CurrentSettlement != null || mp.AttachedTo != null || mp.BesiegerCamp != null || mp.SiegeEvent != null || Moving(mp)) { Leave("ruch", null); return; }
                 float add = (float)dt.ToHours;
                 float take = Math.Max(0f, Math.Min(add, FullHours - _dayHours));
                 _dayHours += take; _owed += take; _session += take; _pSession += take;
