@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -45,6 +46,8 @@ namespace Armoury
         internal sealed class Rec
         {
             public int Sig, Key;
+            public HorseState.State St;                                 // poprawka recenzji: stan koni partii referencja (klucz z hashy moze sie zderzyc)
+            public float Nomad;                                         // poprawka recenzji: perk NomadicTraditions wodza (jak gra do "Footmen on horses"), 0 - brak
             public int Men, FootV, MountsV, Free, Att;                 // jak gra / CountColumn (z doczepionymi)
             public int Riders, RidersArm, RidersTpl, RidersHero;        // konni z koniem; zrodlo jakosci: zbrojownia, wzorzec, bohater
             public double RidersD, RidersQ;                             // suma d i szybkosci koni jezdzcow
@@ -199,6 +202,7 @@ namespace Armoury
         {
             public HorseState.State Src;
             public Lot[] Ride, Spare;
+            public int Low, High;                    // poprawka recenzji: sklad, dla ktorego liczony przydzial (zmiana rosteru = liczymy od nowa)
             public int Ridden, SpareAll, Unhorsed;   // Unhorsed - jezdzcy wzorca na zwyklym koniu bez konia w zbrojowni (jak Balance plainOnly)
         }
 
@@ -207,10 +211,10 @@ namespace Armoury
         private static ArmQ ArmOf(MobileParty x, HorseState.State st, int low, int high)
         {
             ArmQ a;
-            if (_arm.TryGetValue(x, out a) && a != null && ReferenceEquals(a.Src, st)) return a;
+            if (_arm.TryGetValue(x, out a) && a != null && ReferenceEquals(a.Src, st) && a.Low == low && a.High == high) return a;
             var all = AiGear.Armories();
             Dictionary<ItemObject, int> arm;
-            a = new ArmQ { Src = st };
+            a = new ArmQ { Src = st, Low = low, High = high };
             if (all != null && all.TryGetValue(x.Id, out arm) && arm != null) Fill(a, arm, low, high);
             _arm[x] = a;   // podmiana w calosci
             return a;
@@ -246,6 +250,8 @@ namespace Armoury
             unchecked
             {
                 int h = k;
+                h = h * 397 + s.WarHorseFromTier;     // poprawka recenzji: progi tieru w AddParty (low / high)
+                h = h * 397 + s.NobleHorseFromTier;
                 h = h * 397 + (int)(p.Ref * 100f);
                 h = h * 397 + (int)(p.Slope * 1000f);
                 h = h * 397 + (int)(p.Bon * 1000f);
@@ -338,8 +344,12 @@ namespace Armoury
             ArmQ aq = st != null ? ArmOf(x, st, low, high) : null;
             if (aq != null && aq.Spare != null) free.AddRange(aq.Spare);   // wolne konie zbrojowni z szybkoscia (najlepsze najpierw)
             if (regular <= 0) return;
+            // poprawka recenzji: konie zbrojowni pod jezdzcami i krok 3 tylko dla partii, ktora DTE ubiera z rozdzielacza (ten sam predykat co
+            // GarrisonKit.DteDresses / OutsideGuard: bez bandytow, patroli i umarlych); reszta - kon wzorca, jak w bitwie
+            bool dte = x.IsMainParty || GarrisonKit.DteDresses(x);
+            bool ownX = own && dte;
             Lot[] ride = null; int ridden = 0, un = 0;
-            if (aq != null)
+            if (aq != null && dte)
             {
                 ride = aq.Ride; ridden = aq.Ridden;
                 un = Math.Min(Math.Max(0, aq.Unhorsed), regular);
@@ -383,7 +393,7 @@ namespace Armoury
             }
             if (un > 0)
             {
-                if (own) r.Walk += un;   // krok 3 (klucz w Build): bez konia - pieszo
+                if (ownX) r.Walk += un;   // krok 3 (klucz w Build): bez konia - pieszo
                 else { double k = un / (double)regular; r.Riders += un; r.RidersTpl += un; r.RidersD += tplD * k; r.RidersQ += tplQ * k; }   // bez reguly wlasnego sprzetu DTE daje konia wzorca
             }
         }
@@ -410,7 +420,8 @@ namespace Armoury
         private static Rec Build(MobileParty mp, Settings s, P p, int sig, int key)
         {
             long t0 = Stopwatch.GetTimestamp();
-            var r = new Rec { Sig = sig, Key = key };
+            var r = new Rec { Sig = sig, Key = key, St = HorseState.Of(mp) };
+            try { var lh = mp.LeaderHero; var pk = DefaultPerks.Riding.NomadicTraditions; if (lh != null && pk != null && lh.GetPerkValue(pk)) r.Nomad = pk.PrimaryBonus; } catch { r.Nomad = 0f; }
             bool own = GarrisonKit.OwnKitOn;
             var tabor = Tmp(ref _tmpA); var free = Tmp(ref _tmpB);
             AddParty(mp, r, p, own, tabor, free);
@@ -432,7 +443,7 @@ namespace Armoury
             if (r.Men > 0)
             {
                 r.FHq = s.HorseQualitySpeed ? (float)((r.RidersD + r.SpareFD) / r.Men) : 0f;
-                r.FDry = (float)((0.15 * r.Extra - 0.3 * r.Walk) / r.Men) + r.FHq;
+                r.FDry = (float)((0.15 * r.Extra * (1.0 + r.Nomad) - 0.3 * r.Walk) / r.Men) + r.FHq;
             }
             if (_inDaily) { _dBuilds++; _dBuildTicks += Stopwatch.GetTimestamp() - t0; }
             else { Interlocked.Increment(ref _builds); Interlocked.Add(ref _buildTicks, Stopwatch.GetTimestamp() - t0); }
@@ -469,7 +480,7 @@ namespace Armoury
                 int sig = Sig(s, p), key = KeyOf(mp);
                 var d = _rec;
                 Rec r;
-                if (d.TryGetValue(mp, out r) && r != null && r.Sig == sig && r.Key == key) return r.Men > 0 ? r : null;
+                if (d.TryGetValue(mp, out r) && r != null && r.Sig == sig && r.Key == key && ReferenceEquals(r.St, HorseState.Of(mp))) return r.Men > 0 ? r : null;
                 r = Build(mp, s, p, sig, key);
                 d[mp] = r;   // podmiana w calosci
                 return r.Men > 0 ? r : null;
@@ -506,7 +517,8 @@ namespace Armoury
             var s = Settings.Current;
             if (!AnyOn(s) || !InScope(mp)) return;
             if (!SpeedDepth.OutermostFinal) return;
-            long t = (++_calls & 15) == 1 ? Stopwatch.GetTimestamp() : 0L;
+            bool cnt = !_inDaily;   // poprawka recenzji: probki linii doby poza licznikiem goracej sciezki
+            long t = cnt && (++_calls & 15) == 1 ? Stopwatch.GetTimestamp() : 0L;
             try
             {
                 var r = GetFast(mp);
@@ -515,7 +527,8 @@ namespace Armoury
                 bool any = r.Extra > 0 || r.Walk > 0 || (s.HorseQualitySpeed && (r.Riders > 0 || r.SpareF > 0));
                 if (!any) return;
                 float wm = WetMul(mp);
-                if (r.Extra > 0) result.AddFactor(0.15f * r.Extra / n * wm, r.ExtraFree ? TxArm : TxArmWalk);
+                // jak gra: mokro tnie 30% wpisu, perk NomadicTraditions doklada procent wpisu bez mokra (dpsm: modifier * PrimaryBonus)
+                if (r.Extra > 0) result.AddFactor(0.15f * r.Extra / n * (wm + r.Nomad), r.ExtraFree ? TxArm : TxArmWalk);
                 if (s.HorseQualitySpeed)
                 {
                     if (r.Riders > 0 && Math.Abs(r.RidersD) > 1e-6) result.AddFactor((float)(r.RidersD / n) * wm, TxRiders);
