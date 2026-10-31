@@ -10560,6 +10560,22 @@ namespace Armoury
         [SettingPropertyGroup("Your workshops (305b)")]
         public bool WorkshopLedgerCapitalSplit { get; set; } = true;
 
+        [SettingPropertyBool("Workshop Quote Steady", HintText = "the price you pay for a workshop no longer follows one day's market jump: today's market prices count only up to Workshop Quote Market Cap times the larger of the shop's own record and what shops of the same trade across the world earned over their last month (median), a shop with short records is priced partly by that same trade median instead of by today's market, and the profit the price is reckoned from may rise above the shop's own record (or, without one, above the trade median) at most Workshop Quote Day Step times from one day to the next, unless the shop changed its trade or its owner; it is never held above the shop's own record when the market falls. The price is still Workshop Trade Price Years of yearly profit after your tax plus the capital in the till. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public bool WorkshopQuoteSteady { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Workshop Quote Day Step", 1.00f, 4.00f, "0.00", HintText = "with Workshop Quote Steady: the most the profit behind a workshop's price may rise from one day to the next above the shop's own record or the trade median (1.5 = by half)", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public float WorkshopQuoteDayStep { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Workshop Quote Market Cap", 1.00f, 10.00f, "0.00", HintText = "with Workshop Quote Steady: today's market prices count only up to this many times the larger of the shop's own record and the median of its trade", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public float WorkshopQuoteMarketCap { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Workshop Ranking Log", HintText = "the mod log gets a line with the 10 best and the 10 worst workshops of the world (town and trade) by what they really earned a day over their last month, with today's price for you and the yearly return on that price after your tax, so you can see where to invest. Log only. Off = no line", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public bool WorkshopRankingLog { get; set; } = true;
+
         [SettingPropertyBool("Caravan Wages Separate Line", HintText = "In the daily gold tooltip, the wages of your caravans are shown as their own line, Caravan wages, instead of inside Garrison and Party Expense. The Banner Kings top-up of a caravan purse below 5 000 is added only when the day is settled, so the tooltip never shows it; it is paid within Garrison and Party Expense. Only the display changes: the daily total and the gold paid stay exactly the same. Off = one line, as before", RequireRestart = false)]
         [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
         public bool CaravanWagesSeparateLine { get; set; } = true;
@@ -13443,6 +13459,10 @@ namespace Armoury
             s.WorkshopBuyerShortHistoryDays = WorkshopBuyerShortHistoryDays;
             s.WorkshopBuyerPaceCorrection = WorkshopBuyerPaceCorrection;
             s.WorkshopLedgerCapitalSplit = WorkshopLedgerCapitalSplit;
+            s.WorkshopQuoteSteady = WorkshopQuoteSteady;
+            s.WorkshopQuoteDayStep = WorkshopQuoteDayStep;
+            s.WorkshopQuoteMarketCap = WorkshopQuoteMarketCap;
+            s.WorkshopRankingLog = WorkshopRankingLog;
             s.CaravanWagesSeparateLine = CaravanWagesSeparateLine;
             s.CaravanPlayerDiary = CaravanPlayerDiary;
             s.CaravanLossNotice = CaravanLossNotice;

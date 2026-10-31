@@ -22,6 +22,9 @@ RANGES = {
     'SiegeRepelRetryAfter': (1, 10, "0"),
     'SiegeRepelRetryMinRatio': (2.0, 20.0, "0.0"),
     'WorkshopPriceStockDays': (1, 28, "0"),
+    # 311c: wycena stala - kod przycina krok doby do 1..4, przyciecie ceny targu do 1..10 (WorkshopTrade.QStep / QCap)
+    'WorkshopQuoteDayStep': (1.0, 4.0, "0.00"),
+    'WorkshopQuoteMarketCap': (1.0, 10.0, "0.00"),
     # 307e: rozbici zwyciezcow wracaja (RoutedReturn307e - clamp 0..1), zastoj bitwy (BattleStall307e - clamp 20..300 s)
     'RoutedWinnersReturnShare': (0.0, 1.0, "0.00"),
     'BattleStallSeconds': (20, 300, "0"),

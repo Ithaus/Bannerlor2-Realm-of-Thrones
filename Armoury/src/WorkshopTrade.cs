@@ -63,7 +63,7 @@ namespace Armoury
     ///     warsztatow (zostaje w ArmsPricing i TownCrafts).
     /// Linii uzbrojenia (WorkshopLaw), ukrytych rzemieslnikow, receptur i szybkosci NIE rusza. Przy wylaczonym - gra jak dotad.
     /// </summary>
-    internal static class WorkshopTrade
+    internal static partial class WorkshopTrade
     {
         // ------------------------------------------------------------ stan
         private sealed class Rec
@@ -80,6 +80,8 @@ namespace Armoury
             public int Wages, Cycles;           // dzis: place za cykle (razem) i liczba cykli towarowych
             public float WageCarry, KeepCarry;  // ulamki pensa do nastepnej wyplaty (gra zna tylko pensy calkowite)
             public int CapEnd; public bool HasEnd;   // kapital po rozliczeniu doby - roznica do nastepnego ticku to wyplata wlascicielowi
+            // 311c (WorkshopQuoteSteady, sesja): zysk wyceny dla gracza dzis i z poprzedniej doby wyceny (po regule i przed nia), wlasciciel tej pamieci
+            public int QDay = -1, QPrevDay = -1; public float QProfit, QRaw, QPrevProfit, QPrevRaw; public Hero QOwner;
         }
 
         private sealed class TypeStat { public int Shops, Worked, Cycles; public long Plus, Minus, Wages, Keep; }
@@ -139,6 +141,7 @@ namespace Armoury
             WorkshopRetool.Reset();  // E3-D3: zmiany typu za cena - pamiec sesji (limit miasta 30 dob)
             WorkshopFairScore.Reset();   // F4 (noc 17/18.10): pomiar wsadu regionu i pamiec ocen - stan sesji (pomiar wraca z zapisu arm_wsinput)
             WorkshopStartup.Reset();     // R3-11b: rozruch rynku - liczniki i porownanie w logu (stan sesji)
+            Reset311();                  // 311c: mediany branz (stan sesji)
         }
 
         private static void ClearDay()
@@ -150,6 +153,7 @@ namespace Armoury
             _dRetBack = _dRetAdd = _dRetShort = 0; _dRetN = _dQBlend = _dQExpFull = _dQExpHalf = _dQPace = _dQArms = _dQResaleCap = _dMemPace = _dQStock = 0;   // 305b (307c: _dQStock)
             _dGateCut = 0; _dGateCutGold = 0;
             _dClampN = 0; _dClampBack = _dClampLeft = 0;
+            Clear311Day();   // 311c
         }
 
         /// <summary>Nowa moneta warsztatow ma sens tylko przy cenach historycznych (HistoricalPrices) - bez nich zostaje gra.
@@ -279,6 +283,7 @@ namespace Armoury
                     // zmiana produkcji albo bankructwo: srednia od nowa. Typ potrafi tez zmienic cudzy kod wprost
                     // (Workshop.ChangeWorkshopProduction - np. CrashScribe "strawa Polnocy") - wtedy znacznik kapitalu poprawiamy tutaj
                     r.Type = type; r.Avg = 0f; r.Slow = 0f; r.Days = 0; r.WageCarry = 0f; r.Mem = 0; r.Warm = false; r.Week = null;
+                    r.QDay = r.QPrevDay = -1;   // 311c: nowy typ - wycena bez kroku doby (warsztat naprawde sie zmienil)
                     try { if (On) SyncInitialCapital(w); } catch (Exception e) { Stumble("WorkshopTrade.Get(kapital)", e); }
                 }
                 return r;
@@ -1330,6 +1335,10 @@ namespace Armoury
             public float Avg, Slow, Pace = 1f; public int Mem; public bool Blend, ExpHalf, ArmsIdle;
             public bool StockCut;               // 307c: Expected w cenie przyciete zapasem polki (WorkshopPriceStockPace)
             public float ExpRaw = -1f;          // 307c: Expected uzyte w cenie (po przycieciu; -1 = nie liczone)
+            // 311c (WorkshopQuoteSteady): zysk z pamieci przed cena targu (NaN = bez historii), zysk przed regula, mediana branzy (NaN = brak), poprzednia doba
+            // wyceny (po i przed regula, NaN = brak), odstep dob; rodzaj poprawki (1 krotka historia ku branzy, 2 cena targu przycieta, 4 krok doby), zdanie rozmowy
+            public float MemP = float.NaN, RawP = float.NaN, Ind = float.NaN, PrevP = float.NaN, PrevRaw = float.NaN; public int Gap, SteadyKind; public string SteadyWhy;
+            public float Stable = float.NaN;    // 311c recenzja: podstawa kroku doby (pamiec, bez niej mediana branzy; NaN = bez reguly) - ponad nia zysk rosnie najwyzej o krok
         }
 
         /// <summary>
@@ -1385,6 +1394,7 @@ namespace Armoury
             }
             else { q.Profit = Expected(w, true); q.StockCut |= _lastExpCut; q.ExpRaw = q.Profit; }
             q.Avg = rec.Avg; q.Slow = rec.Slow; q.Mem = rec.Mem;
+            if (rec.Days > 0) q.MemP = q.Profit;   // 311c: zysk z pamieci, zanim cena targu go podniesie
             // 241: pamieci (ok. 30 dob, rok) trzymaja jeszcze wyniki sprzed ceny kupca (przyciete do kosztu x marza) - sprzedajacy nie odda warsztatu za ulamek
             // tego, co da dzis kupiec: bierze lepsze z pamieci i oczekiwanego wyniku z cen (Expected - istniejacy model, ten sam co bez historii). Notabl (gorsza pamiec) bez zmian
             // 305b: przy WorkshopTradeBuyerMemory cena targu w calosci tylko przy krotkiej historii (< WorkshopBuyerShortHistoryDays), potem najwyzej polowa
@@ -1402,6 +1412,12 @@ namespace Armoury
             if ((sellerAsks || w.Owner == Hero.MainHero) && BuyerBlend && HasArmsInputLine(w.WorkshopType) && !PlayerArmsLive)
             {
                 q.Profit = Expected(w, true); q.StockCut |= _lastExpCut; q.ExpRaw = q.Profit; q.Exp = true; q.ExpHalf = false; q.ArmsIdle = true; if (_qCount) _dQArms++;
+            }
+            // 311c (WorkshopQuoteSteady): cena kupna bez skokow jednej doby targu - przyciecie do mediany branzy, krotka historia ku branzy, krok doby (wlasny try)
+            if (sellerAsks && SteadyOn)
+            {
+                try { Steady(w, rec, q); }
+                catch (Exception e) { Stumble("WorkshopTrade.Steady311c", e); }
             }
             q.Tax = tax;
             q.Years = Math.Max(0f, s.WorkshopTradePriceYears);
@@ -1473,7 +1489,7 @@ namespace Armoury
                 int worth = Math.Max(q.Going, q.Equip);
                 // 305b (WorkshopTradeBuyerMemory): ta sama miara co przy kupnie (pol na pol pamieci) - i nigdy wiecej niz udzial tego, co za ten warsztat zaplacilby
                 // dzis gracz (inny podatek notabla nie robi z kupna i odsprzedazy zysku)
-                if (q.Blend || q.ArmsIdle)   // 305f: takze cena z linii towarowych (ArmsIdle) - w rozruchu rynku (bez Blend) podatek notabla nizszy od gracza nie da zysku
+                if (q.Blend || q.ArmsIdle || (SteadyOn && __0.Owner == Hero.MainHero))   // 311c: przy wycenie stalej zawsze przy odkupie od gracza (krok doby moze trzymac cene gracza ponizej pamieci notabla; recenzja: tylko warsztat gracza - cudzych sprzedazy i kosztu wyceny nie rusza); 305f: takze cena z linii towarowych (ArmsIdle) - w rozruchu rynku (bez Blend) podatek notabla nizszy od gracza nie da zysku
                 {
                     var qp = QuoteFor(__0, Hero.MainHero);
                     int wp = Math.Max(qp.Going, qp.Equip);
@@ -1679,6 +1695,7 @@ namespace Armoury
             string earned = q.Days > 0 && !q.Exp
                 ? "The shop has cleared about " + N1(q.Profit) + " a day " + (q.Window >= YearSpan ? "over the past year" : q.Window <= 1 ? "over the last day" : "over the last " + q.Window + " days")
                 : "At today's market prices the shop should clear about " + N1(q.Profit) + " a day";
+            if (q.SteadyWhy != null) earned = q.SteadyWhy + "I count it at about " + N1(q.Profit) + " a day";   // 311c
             if (q.Floor)
                 sb.Append(earned).Append(" - too little to price it by, so I ask only what its tools and fittings are worth: ").Append(q.Equip).Append(". ");
             else
@@ -1701,6 +1718,7 @@ namespace Armoury
             sb.Append("Last ").Append(mon).Append(mon == 1 ? " day: " : " days: ").Append(N1(q.Avg)).Append(" a day, ")
               .Append(q.Mem >= YearSpan ? "last year: " : "since my records begin (" + Math.Max(1, q.Mem) + " days): ").Append(N1(q.Slow)).Append(" a day. ");
             if (q.ArmsIdle) sb.Append("Its weapon and armour lines would earn you nothing, so I price it by its trade lines alone: about ").Append(N1(q.Profit)).Append(" a day. ");
+            else if (q.SteadyWhy != null) sb.Append(q.SteadyWhy).Append("I count it at about ").Append(N1(q.Profit)).Append(" a day. ");   // 311c
             else if (q.Exp) sb.Append(q.ExpHalf ? "Half of what today's market prices promise is more than that: " : "My records are short, and today's market prices promise more: ").Append(N1(q.Profit)).Append(" a day. ");
             else if (q.Pace != 1f) sb.Append("My hands ran it ").Append(q.Pace > 1f ? "faster" : "slower").Append(" with this town's market than yours will; at your pace that is about ").Append(N1(q.Profit)).Append(" a day. ");
             else sb.Append("I price it by half of each: ").Append(N1(q.Profit)).Append(" a day. ");
@@ -1757,6 +1775,7 @@ namespace Armoury
                         {
                             var qd = QuoteFor(w, Hero.MainHero);
                             prices.Add(qd.Price);
+                            try { Note311(w, qd); } catch (Exception e) { Stumble("WorkshopTrade.Note311", e); }   // 311c: skoki wyceny i ranking (tylko odczyt)
                             if (qd.StockCut) stockCut++;
                             if (topQ == null || qd.Price > topQ.Price) { topQ = qd; topW = w; }   // 307c krok 1: warsztat z ceny max
                         }
@@ -1800,6 +1819,7 @@ namespace Armoury
                   .Append(" dob albo roku - gracz kupuje wedle lepszej, notabl odkupuje wedle gorszej; potkniecia ").Append(_dStumbles).Append('.');
                 Log.Info(sb.ToString());
                 try { Daily305b(day); } catch (Exception e) { Stumble("WorkshopTrade.Daily305b", e); }
+                try { Daily311c(day); } catch (Exception e) { Stumble("WorkshopTrade.Daily311c", e); }
             }
             catch (Exception e) { Log.Error("WorkshopTrade.Daily", e); }
             finally { ClearDay(); }
