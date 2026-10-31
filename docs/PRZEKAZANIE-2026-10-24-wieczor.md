@@ -1,5 +1,11 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 11:30 CET - runda 307 (NIE wgrana, w grze dalej 142)
+- noc/307-integracja (zb n307): 307a karawany (zakupy gabki BK do ksiegi, wycena zwierzat, karawany morskie trzymaja cel), 307b bitwa (ucieczka, zalamania ze strat, FF wrecz
+  wedlug umiejetnosci, odwrot rannych), 307c (szturmy, cennik, NaN BK), 307d (poprawki przegladu). 143a: kod 0, ERROR 0; FF 22% -> 7-10%, ksiega karawany gracza OK, szturmy OK,
+  flota AI +70k zl/d; BLOKER: bitwa 4 - zwyciezcy zlamani uciekli z pola (27 z 65), zastoj 4 vs 6, odwrot. 143b (z 307d) w toku; 307e (agent) naprawia bitwe 4.
+  Analiza 143a: scratchpad d16b0e41 a143. Nie wgrywac 307 bez powtorki bitew.
+
 ## DOPISEK 31.10 ok. 09:10 CET - WGRANIE 142 (noc/306-integracja) - START DLA NASTEPNEJ SESJI
 - W GRZE: Armoury.dll 8f4b11470962bc694a9c2fcc546b2df1 (142 = 141 + 306a pasmo cen od przewozu, marza 2.0 + 306b sondy). Kopie 141: .bak-2026-10-31-przed-wgranie142 i
   D:\Backup-Bannerlord\wgrane\2026-10-31-wgranie142-przed. CrashScribe bef9db58 bez zmian. Zapis testowy na D:\...\zapisy-testowe-archiwum\2026-10-31-142 (Game Saves czyste).
