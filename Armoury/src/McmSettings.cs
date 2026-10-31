@@ -10516,6 +10516,30 @@ namespace Armoury
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool LordsJoinNearArmy { get; set; } = true;
 
+        [SettingPropertyBool("Player Arms As Firm", HintText = "your workshop's weapon and armour lines that take iron, wood or hides work as a real business, by the same rule as a notable's: the shop buys the iron, wood, leather and linen from the town's market out of its till, pays its hands, and the town buys each finished piece - the profit stays in the till and is paid out to you as workshop income. Lines with no input stay idle. Off = as before: the game makes those weapons from the town's iron for free and your workshop earns nothing on them", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public bool PlayerArmsAsFirm { get; set; } = true;
+
+        [SettingPropertyBool("Workshop Retool Settles Capital", HintText = "when you change what your workshop produces, its working capital is settled at once: coin in the till above what the new trade needs comes back to your purse as returned capital (not as profit, so no workshop tax on it), and if the new trade needs more, it is added from your purse (what you cannot cover the shop rebuilds from its own takings before it pays you again). The confirmation shows the tools and the capital. Off = as before: only the target changes and the gold stays in the till", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public bool WorkshopRetoolSettlesCapital { get; set; } = true;
+
+        [SettingPropertyBool("Workshop Trade Buyer Memory", HintText = "the price you pay for a workshop is reckoned from half its last month's and half its last year's profit (not the better of the two), today's market prices count in full only while the shop has less than Workshop Buyer Short History Days of records (after that at most half), a shop whose weapon lines would earn you nothing (Player Arms As Firm off) is priced by its trade lines only, and a notable buying it back pays by the same measure times Workshop Trade Resale Share. The offer shows the last month's and the last year's profit. Off = as before: the better of the two memories and today's prices", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public bool WorkshopTradeBuyerMemory { get; set; } = true;
+
+        [SettingPropertyInteger("Workshop Buyer Short History Days", 0, 240, "0", HintText = "with Workshop Trade Buyer Memory: below this many days of records the price still counts what today's market prices promise in full", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public int WorkshopBuyerShortHistoryDays { get; set; } = 60;
+
+        [SettingPropertyBool("Workshop Buyer Pace Correction", HintText = "with Workshop Trade Buyer Memory: a shop of trade lines only, bought from a notable whose lines ran faster or slower with the town's market (Workshop Pace By Market - your own workshops run at the game's pace), is priced by what it will earn at your pace. Off = by the notable's record as it is", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public bool WorkshopBuyerPaceCorrection { get; set; } = true;
+
+        [SettingPropertyBool("Workshop Ledger Capital Split", HintText = "the workshop report and the weekly message keep your own working capital coming back out of the shop apart from its profit, so a payout of your own coin is not shown as earnings. Off = as before: all payouts together", RequireRestart = false)]
+        [SettingPropertyGroup("Your workshops (305b)")]
+        public bool WorkshopLedgerCapitalSplit { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13144,6 +13168,12 @@ namespace Armoury
             s.LordsAvoidDanger = LordsAvoidDanger;
             s.LordEscortFromGarrison = LordEscortFromGarrison;
             s.LordsJoinNearArmy = LordsJoinNearArmy;
+            s.PlayerArmsAsFirm = PlayerArmsAsFirm;
+            s.WorkshopRetoolSettlesCapital = WorkshopRetoolSettlesCapital;
+            s.WorkshopTradeBuyerMemory = WorkshopTradeBuyerMemory;
+            s.WorkshopBuyerShortHistoryDays = WorkshopBuyerShortHistoryDays;
+            s.WorkshopBuyerPaceCorrection = WorkshopBuyerPaceCorrection;
+            s.WorkshopLedgerCapitalSplit = WorkshopLedgerCapitalSplit;
         }
 
         internal static void Apply()

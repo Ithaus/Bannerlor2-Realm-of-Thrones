@@ -84304,5 +84304,123 @@ def main(argv):
             return dowodca139_main(rest[0] if rest else None)
     return _dowodca139_main_prev(argv)
 
+
+# ------------------------------------------------------------ paczka 305b: warsztaty gracza (firma broni, kapital przy zmianie produkcji, cena kupna, ksiega 259)
+# Linie C#: WorkshopLaw.ApplyAll ("WorkshopLaw: warsztaty gracza (poprawka 174b ... | 305b linie broni/zbroi z wsadem jako firma (Player Arms As Firm): TAK, wpiete 1/1."),
+# WorkshopLaw.Flush ("Warsztaty gracza jak firma (305b): dzien N - klucz TAK | warsztatow a, cykli ... przez firme c, sztuk s, sprzedaz miastu r, koszt k, wynik x |
+# cykli oddanych grze g ..."), WorkshopTrade.Daily305b ("Warsztaty gracza - kapital i cena (305b): dzien N | klucze: ... | zmiany produkcji gracza n: zwrot kapitalu do kiesy b,
+# doplata z kiesy a, brak (odbudowa z utargu) s | wyceny dla gracza: ... | potkniecia p."), RetoolSettle ("... zmiana produkcji (miasto, typ) - kapital C nad znacznikiem M, zwrot do kiesy B.")
+# i 259 ("warsztat 'X' (miasto, glowa rodu) | kapital C (poczatkowy I), zysk przed wyplata P, ...").
+W305_WIRE_RE = re.compile(r"305b linie broni/zbroi z wsadem jako firma \(Player Arms As Firm\): (?P<k>TAK|NIE), wpiete (?P<w>\d)/1\.")
+W305_FIRM_RE = re.compile(r"^Warsztaty gracza jak firma \(305b\): dzien (?P<d>\d+) - klucz (?P<k>TAK|NIE) \| warsztatow (?P<n>\d+), cykli linii broni/zbroi z wsadem przez firme (?P<c>\d+),"
+                          r" sztuk (?P<s>\d+), sprzedaz miastu (?P<r>-?\d+), koszt \(surowiec \+ place\) (?P<k2>-?\d+), wynik (?P<x>-?\d+) \| cykli oddanych grze \(wyjatek albo brak miasta\) (?P<g>\d+)")
+W305_DAY_RE = re.compile(r"^Warsztaty gracza - kapital i cena \(305b\): dzien (?P<d>\d+) \|.*zmiany produkcji gracza (?P<n>\d+): zwrot kapitalu do kiesy (?P<b>\d+), doplata z kiesy (?P<a>\d+),"
+                         r" brak \(odbudowa z utargu\) (?P<s>\d+) \|.*\| potkniecia (?P<p>\d+)\.$")
+W305_RET_RE = re.compile(r"^Warsztaty gracza - kapital i cena \(305b\): zmiana produkcji \((?P<w>[^)]*)\) - kapital (?P<c>\d+) (?P<dir>nad|pod) znacznikiem (?P<m>\d+)")
+W305_WS_RE = re.compile(r"warsztat '(?P<t>[^']*)' \((?P<town>[^,]*), glowa rodu\) \| kapital (?P<c>-?\d+) \(poczatkowy (?P<i>\d+)\), zysk przed wyplata (?P<p>-?\d+|-),")
+W305_ERR = ("ERROR in WorkshopLaw.PlayerWorkshop", "ERROR in WorkshopTrade.RetoolSettle", "ERROR in WorkshopTrade.RetoolCondition", "ERROR in WorkshopTrade.Daily305b",
+            "ERROR in CaravanSettle.NoteWsCapital", "ERROR in WorkshopPace.ShopFactor")
+W305_SAMPLE_FIRM = ("Warsztaty gracza jak firma (305b): dzien 108900 - klucz TAK | warsztatow 1, cykli linii broni/zbroi z wsadem przez firme 3, sztuk 1, sprzedaz miastu 812,"
+                    " koszt (surowiec + place) 655, wynik 157 | cykli oddanych grze (wyjatek albo brak miasta) 0 | cykl gry pominiety w kazdym cyklu firmy (bron nie powstaje za darmo).")
+W305_SAMPLE_DAY = ("Warsztaty gracza - kapital i cena (305b): dzien 108900 | klucze: Workshop Retool Settles Capital TAK, Workshop Trade Buyer Memory TAK (pol na pol), Pace Correction TAK,"
+                   " krotka historia 60 dob, Player Arms As Firm TAK | zmiany produkcji gracza 1: zwrot kapitalu do kiesy 7968, doplata z kiesy 0, brak (odbudowa z utargu) 0"
+                   " | wyceny dla gracza: pol na pol 280, cena targu w calosci (krotka historia) 4, polowa ceny targu 31, korekta tempa 190, bez linii broni 0, odkup notabla przyciety do ceny gracza 0 | potkniecia 0.")
+W305_SAMPLE_WS = ("Majatek gracza (karawany i warsztaty) (259): dzien 108900 || warsztat 'Smithy' (Fairmarket, glowa rodu) | kapital 10120 (poczatkowy 10000), zysk przed wyplata 240, wyplata 0,")
+
+
+def w305_selftest():
+    if not W305_FIRM_RE.match(W305_SAMPLE_FIRM):
+        return "305b: linia firmy"
+    if not W305_DAY_RE.match(W305_SAMPLE_DAY):
+        return "305b: linia doby"
+    m = W305_WS_RE.search(W305_SAMPLE_WS)
+    if not m or m.group("p") != "240" or m.group("t") != "Smithy":
+        return "305b: linia warsztatu 259"
+    if not W305_RET_RE.match("Warsztaty gracza - kapital i cena (305b): zmiana produkcji (White Harbor, bakery) - kapital 9968 nad znacznikiem 2000, zwrot do kiesy 7968."):
+        return "305b: linia zmiany produkcji"
+    return None
+
+
+def w305_main(logp):
+    """warsztaty305b (31.10, paczka 305b): W305-S, W305-0..W305-5. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = w305_selftest()
+    rep.add("W305-S: self-test wyrazen (linie 305b jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("W305-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    wires, firm, days, rets, err, ws = [], {}, {}, [], 0, {}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if "305b" not in s and "ERROR in" not in s and "glowa rodu" not in s:
+                continue
+            if any(e in s for e in W305_ERR):
+                err += 1
+            a = W305_WIRE_RE.search(s)
+            if a:
+                wires.append(a.groupdict())
+            a = W305_FIRM_RE.match(s)
+            if a:
+                firm[int(a.group("d"))] = a.groupdict()
+            a = W305_DAY_RE.match(s)
+            if a:
+                days[int(a.group("d"))] = a.groupdict()
+            a = W305_RET_RE.match(s)
+            if a:
+                rets.append(a.groupdict())
+            if s.startswith("Majatek gracza (karawany i warsztaty) (259): dzien "):
+                try:
+                    d = int(s.split("dzien ", 1)[1].split()[0])
+                except (IndexError, ValueError):
+                    d = -1
+                for b in W305_WS_RE.finditer(s):
+                    ws.setdefault((b.group("t"), b.group("town")), []).append((d, b.groupdict()))
+    last = wires[-1] if wires else None
+    rep.add("W305-0: wpiecie firmy warsztatow gracza (linia startu WorkshopLaw)", f"startow {len(wires)}" + (f", klucz {last['k']}, wpiete {last['w']}/1" if last else ""),
+            "wpiete 1/1 (klucz TAK)", bool(last) and last["w"] == "1")
+    fd = sorted(firm)
+    if fd:
+        c = sum(int(firm[d]["c"]) for d in fd); s_ = sum(int(firm[d]["s"]) for d in fd); g = sum(int(firm[d]["g"]) for d in fd)
+        x = sum(int(firm[d]["x"]) for d in fd)
+        rep.add("W305-1: firma - cykle oddane grze (wyjatek / brak miasta)", f"dob {len(fd)}, cykli firmy {c}, sztuk {s_}, wynik razem {x}, oddanych grze {g}", "0 oddanych grze", g == 0)
+        rep.add("W305-2: firma - sztuki i wynik (INFO)", f"dob ze sztuka {sum(1 for d in fd if int(firm[d]['s']) > 0)} z {len(fd)}, sprzedaz {sum(int(firm[d]['r']) for d in fd)},"
+                f" koszt {sum(int(firm[d]['k2']) for d in fd)}", "INFO (kuznia gracza z wsadem na polce: sztuki > 0 w 30 dobach)", None)
+    else:
+        rep.add("W305-1: firma - cykle oddane grze (wyjatek / brak miasta)", "brak linii 'Warsztaty gracza jak firma (305b)'", "INFO (gracz bez warsztatu z linia broni z wsadem)", None)
+    dd = sorted(days)
+    if dd:
+        p = sum(int(days[d]["p"]) for d in dd)
+        rep.add("W305-3: linia doby kapitalu i ceny, potkniecia", f"dob {len(dd)}, potkniecia {p}, zmian produkcji {sum(int(days[d]['n']) for d in dd)},"
+                f" zwrot {sum(int(days[d]['b']) for d in dd)}, doplata {sum(int(days[d]['a']) for d in dd)}, brak {sum(int(days[d]['s']) for d in dd)}", "linia co dobe, potkniecia 0", p == 0)
+    else:
+        rep.add("W305-3: linia doby kapitalu i ceny, potkniecia", "brak linii 'Warsztaty gracza - kapital i cena (305b): dzien'", "linia co dobe", False)
+    # W305-4 (INFO): warsztaty gracza w 259 - doby z zyskiem przed wyplata > 0 (kuznia z linia broni po 305b powinna je miec, gdy jest wsad na polce)
+    parts = []
+    for key, rows in sorted(ws.items()):
+        pos = sum(1 for d, g in rows if g["p"] not in ("-",) and int(g["p"]) > 0)
+        parts.append(f"{key[0]} ({key[1]}) {pos}/{len(rows)}, ostatni kapital {rows[-1][1]['c']} (poczatkowy {rows[-1][1]['i']})")
+    rep.add("W305-4: ksiega 259 - doby z zyskiem przed wyplata (INFO)", f"zmian produkcji z wyrownaniem w logu {len(rets)} | " + ("; ".join(parts) if parts else "brak warsztatow gracza"),
+            "INFO (Smithy Fairmarket: po 305b wiecej dob z zyskiem > 0; log 30.10 przed 305b: 5/60)", None)
+    rep.add("W305-5: ERROR 305b", f"{err}", "0", err == 0)
+    rep.show()
+    return 0
+
+
+_w305_main_prev = main
+
+
+def main(argv):
+    # paczka 305b: grupa warsztaty305b - opakowanie main jak dowodca139
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "warsztaty305b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return w305_main(rest[0] if rest else None)
+    return _w305_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

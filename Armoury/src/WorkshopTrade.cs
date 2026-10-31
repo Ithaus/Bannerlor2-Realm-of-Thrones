@@ -93,6 +93,9 @@ namespace Armoury
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
         private static long _dWageCap, _dWagePurse, _dKeepCap, _dKeepPurse, _dUnpaid, _dPayNotable, _dPayLord, _dPayPlayer, _dFunded, _dSalePaid, _dSaleShort, _dGear;
         private static int _dFail, _dNoTaker, _dStumbles;
+        // 305b: zmiana produkcji gracza z wyrownaniem kapitalu (WorkshopRetoolSettlesCapital) - zwrot do kiesy, doplata z kiesy, brak (gracza nie stac), zmian;
+        // wyceny dla gracza (WorkshopTradeBuyerMemory) - z pamieci pol na pol, z cen targu w calosci (krotka historia), z polowa cen targu, z korekta tempa, bez linii broni
+        private static long _dRetBack, _dRetAdd, _dRetShort; private static int _dRetN, _dQBlend, _dQExpFull, _dQExpHalf, _dQPace, _dQArms, _dQResaleCap;
         private static int _gatePatched;                    // ile razy transpiler podmienil stala 200 (Harmony przelicza go przy kazdej nowej latce na metodzie - liczy sie przyrost w ApplyAll)
         private static Harmony _harmony;                    // do latki zakladanej w kampanii (raz na proces - Reset jej nie rusza)
         private static bool _finTried, _finPatched;
@@ -141,6 +144,7 @@ namespace Armoury
             _dWageCap = _dWagePurse = _dKeepCap = _dKeepPurse = _dUnpaid = _dPayNotable = _dPayLord = _dPayPlayer = _dFunded = _dSalePaid = _dSaleShort = _dGear = 0;
             _dNotFrom = _dNotTo = 0;
             _dFail = _dNoTaker = _dStumbles = 0;
+            _dRetBack = _dRetAdd = _dRetShort = 0; _dRetN = _dQBlend = _dQExpFull = _dQExpHalf = _dQPace = _dQArms = _dQResaleCap = 0;   // 305b
             _dGateCut = 0; _dGateCutGold = 0;
             _dClampN = 0; _dClampBack = _dClampLeft = 0;
         }
@@ -1044,15 +1048,110 @@ namespace Armoury
             catch (Exception e) { Stumble("WorkshopTrade.ConvertPostfix(kapital)", e); }
             try
             {
-                if (__state <= 0 || __0 == null || __0.Owner == null || __0.Settlement == null) return;
-                int before = __0.Owner.Gold;
-                bool pn = __0.Owner == Hero.MainHero && PayNotes.On;   // m96-wies (recenzja): warsztat gracza - jeden komunikat z powodem zamiast golego "You paid N"
-                GiveGoldAction.ApplyForCharacterToSettlement(__0.Owner, __0.Settlement, __state, pn);
-                int took = before - __0.Owner.Gold;
-                _dGear += took;
-                if (pn) PayNotes.Paid("workshopgear", took, " to the craftsmen of " + __0.Settlement.Name + " for new tools to change your workshop's trade.");
+                if (__state > 0 && __0 != null && __0.Owner != null && __0.Settlement != null)   // 305b: bez return - wyrownanie kapitalu idzie po tym bloku
+                {
+                    int before = __0.Owner.Gold;
+                    bool pn = __0.Owner == Hero.MainHero && PayNotes.On;   // m96-wies (recenzja): warsztat gracza - jeden komunikat z powodem zamiast golego "You paid N"
+                    GiveGoldAction.ApplyForCharacterToSettlement(__0.Owner, __0.Settlement, __state, pn);
+                    int took = before - __0.Owner.Gold;
+                    _dGear += took;
+                    if (pn) PayNotes.Paid("workshopgear", took, " to the craftsmen of " + __0.Settlement.Name + " for new tools to change your workshop's trade.");
+                }
             }
             catch (Exception e) { Stumble("WorkshopTrade.ConvertPostfix", e); }
+            // 305b (WorkshopRetoolSettlesCapital): po sprzecie - kapital do znacznika nowego typu od razu (wlasny try; tylko warsztat gracza)
+            try { if (On && __0 != null && __0.Owner == Hero.MainHero && RetoolSettleOn) RetoolSettle(__0); }
+            catch (Exception e) { Stumble("WorkshopTrade.RetoolSettle", e); }
+        }
+
+        private static bool RetoolSettleOn { get { var s = Settings.Current; return s != null && s.WorkshopRetoolSettlesCapital; } }
+
+        /// <summary>
+        /// 305b (WorkshopRetoolSettlesCapital, diagnoza 31.10 ustalenia 2-3): SyncInitialCapital przesuwa sam znacznik kapitalu poczatkowego, zloto zostaje w kasie.
+        /// Gra liczy zysk jako Capital - InitialCapital, wiec znacznik w dol oddawal wlasny kapital gracza jako "zysk" (po polowie na dobe, z podatkiem D11-3 -
+        /// White Harbor: 7968 + 4994 zwrotu, ok. 3700 podatku), a znacznik w gore zamrazal wyplaty. Teraz wyrownanie od razu i tylko miedzy kasa warsztatu a kiesa
+        /// wlasciciela: nadwyzka -> kiesa (poza CalculateOwnerIncomeFromWorkshop, wiec bez D11-3), brak <- kiesa (ile gracz ma; reszte warsztat odbuduje z utargu,
+        /// zanim znow zaplaci). Znacznik konca doby (CapEnd) przesuniety o ten sam przelew - RunPrefix nie liczy go jako wyplaty zysku. Ksiega 259 dostaje zwrot
+        /// i doplate osobno (CaravanSettle.NoteWsCapital). Notable bez zmian (WorkshopRetool i bankructwa - pas kies notabli).
+        /// </summary>
+        private static void RetoolSettle(Workshop w)
+        {
+            var owner = w.Owner;
+            if (owner == null || w.WorkshopType == null || w.WorkshopType.IsHidden) return;
+            int mark = Math.Max(0, w.InitialCapital), cap = w.Capital;
+            var rec = Get(w);   // typ juz nowy - Get zaczyna pamiec od nowa (jak dotad przy pierwszym odczycie po zmianie)
+            bool pn = PayNotes.On;
+            _dRetN++;
+            if (cap > mark)
+            {
+                int back = cap - mark;
+                w.ChangeGold(-back);
+                owner.ChangeHeroGold(back);
+                if (rec.HasEnd) rec.CapEnd -= back;
+                _dRetBack += back;
+                CaravanSettle.NoteWsCapital(w, back, 0, cap);
+                string why = " from your workshop's till in " + w.Settlement.Name + ": working capital returned - its new trade needs only " + mark + " to work with.";
+                if (pn) PayNotes.Got("workshopcapital", back, why); else Log.Player("You received " + back + " denars" + why);
+                Log.Info("Warsztaty gracza - kapital i cena (305b): zmiana produkcji (" + w.Settlement.Name + ", " + TypeId(w) + ") - kapital " + cap + " nad znacznikiem " + mark + ", zwrot do kiesy " + back + ".");
+            }
+            else if (cap < mark)
+            {
+                int need = mark - cap;
+                int add = Math.Min(need, Math.Max(0, owner.Gold));
+                if (add > 0)
+                {
+                    owner.ChangeHeroGold(-add);
+                    w.ChangeGold(add);
+                    if (rec.HasEnd) rec.CapEnd += add;
+                    _dRetAdd += add;
+                    CaravanSettle.NoteWsCapital(w, 0, add, cap);
+                    string why = " into your workshop's till in " + w.Settlement.Name + ": working capital for its new trade, which needs " + mark + " to work with.";
+                    if (pn) PayNotes.Paid("workshopcapital", add, why); else Log.Player("You paid " + add + " denars" + why);
+                }
+                if (add < need)
+                {
+                    _dRetShort += need - add;
+                    Log.Player("Your workshop in " + w.Settlement.Name + " holds " + (cap + add) + " of the " + mark + " its new trade needs to work with. It pays you no profit until its own takings make up the rest.", true);
+                }
+                Log.Info("Warsztaty gracza - kapital i cena (305b): zmiana produkcji (" + w.Settlement.Name + ", " + TypeId(w) + ") - kapital " + cap + " pod znacznikiem " + mark + ", doplata z kiesy " + add
+                         + (add < need ? ", brak " + (need - add) + " (wyplaty po odbudowie z utargu)" : "") + ".");
+            }
+        }
+
+        /// <summary>305b: linia rozmowy potwierdzenia zmiany produkcji (stan player_change_production_3, przed linia gry workshop_46): sprzet i kapital nowego typu.</summary>
+        private static FieldInfo _lastType; private static MethodInfo _findShop; private static bool _retoolTalkTried;
+        internal static bool RetoolCondition()
+        {
+            try
+            {
+                if (!On || !RetoolSettleOn || Campaign.Current == null) return false;
+                var beh = Campaign.Current.GetCampaignBehavior<WorkshopsCharactersCampaignBehavior>();
+                if (beh == null) return false;
+                if (!_retoolTalkTried)
+                {
+                    _retoolTalkTried = true;
+                    _lastType = AccessTools.DeclaredField(typeof(WorkshopsCharactersCampaignBehavior), "_lastSelectedWorkshopType");
+                    _findShop = AccessTools.DeclaredMethod(typeof(WorkshopsCharactersCampaignBehavior), "FindCurrentWorkshop");
+                    if (_lastType == null || _findShop == null) Log.Info("Warsztaty gracza - kapital i cena (305b): rozmowa zmiany produkcji - BRAK pola _lastSelectedWorkshopType albo FindCurrentWorkshop, linia gry jak dotad.");
+                }
+                if (_lastType == null || _findShop == null) return false;
+                var t = _lastType.GetValue(beh) as WorkshopType;
+                var w = _findShop.Invoke(beh, null) as Workshop;
+                if (t == null || w == null || w.Owner != Hero.MainHero || t.IsHidden) return false;
+                int tools = Math.Max(0, Campaign.Current.Models.WorkshopModel.GetConvertProductionCost(t));
+                int mark = StartCapitalFor(t), cap = Math.Max(0, w.Capital);
+                int purse = Math.Max(0, Hero.MainHero.Gold - tools);
+                var sb = new StringBuilder();
+                sb.Append("All right. Just to confirm - you want us to switch to ").Append(t.Name).Append("? New tools cost ").Append(tools).Append(" denars. ");
+                sb.Append("The new trade needs ").Append(mark).Append(" in its till and the shop holds ").Append(cap);
+                if (cap > mark) sb.Append(", so ").Append(cap - mark).Append(" of your working capital comes back to your purse.");
+                else if (cap == mark) sb.Append(" - just what it needs.");
+                else if (purse >= mark - cap) sb.Append(", so you add ").Append(mark - cap).Append(" from your purse.");
+                else sb.Append(". You can add only ").Append(purse).Append(" after the tools; until its own takings make up the rest, the shop pays you no profit.");
+                MBTextManager.SetTextVariable("ARM_WS_RETOOL", sb.ToString(), false);
+                return true;
+            }
+            catch (Exception e) { Stumble("WorkshopTrade.RetoolCondition", e); return false; }
         }
 
         // ------------------------------------------------------------ latki: stale modelu w nowej monecie
@@ -1154,6 +1253,8 @@ namespace Armoury
             public float Profit, Tax, Years;
             public bool Floor;                  // zysk nie dzwiga wartosci sprzetu - cena to sam sprzet
             public bool Exp;                    // 241: zysk z cen targu (Expected) wyzszy niz pamiec - sprzedajacy liczy wedlug dzisiejszej ceny kupca
+            // 305b (WorkshopTradeBuyerMemory): pamieci do rozmowy, pol na pol, cena targu w calosci (krotka historia) albo polowa, korekta tempa, bez linii broni
+            public float Avg, Slow, Pace = 1f; public int Mem; public bool Blend, ExpHalf, ArmsIdle;
         }
 
         /// <summary>
@@ -1183,6 +1284,24 @@ namespace Armoury
             {
                 q.Profit = wp; q.Window = wn;   // R3-11b: w rozruchu rynku zysk z 7 ostatnich dob (notabl - najgorsza z tygodnia, miesiaca i roku)
             }
+            else if (rec.Days > 0 && BuyerBlend && (sellerAsks || w.Owner == Hero.MainHero))   // tylko kupno przez gracza i odkup od gracza (sprzedaz lorda z dlugu - jak dotad)
+            {
+                // 305b (WorkshopTradeBuyerMemory): pol na pol pamiec miesiaca i roku - ta sama miara dla kupujacego gracza i odkupujacego notabla (CostNotablePostfix);
+                // przy kupnie od cudzego wlasciciela pamiec przeliczona na tempo gracza (warsztat gracza pracuje w tempie gry - WorkshopPace pomija gracza)
+                q.Profit = 0.5f * (rec.Avg + rec.Slow);
+                q.Window = Math.Min(rec.Mem, YearSpan);
+                q.Blend = true; if (sellerAsks) _dQBlend++;
+                if (sellerAsks && Settings.Current.WorkshopBuyerPaceCorrection && w.Owner != Hero.MainHero && !HasArmsLine(w.WorkshopType))
+                {
+                    float f = WorkshopPace.ShopFactor(w);
+                    if (f > 0.01f && Math.Abs(f - 1f) > 0.02f)
+                    {
+                        float up = UpkeepAt(w);
+                        q.Profit = (q.Profit + up) / f - up;   // wynik = (linie x F) - utrzymanie -> (linie x 1) - utrzymanie
+                        q.Pace = f; _dQPace++;
+                    }
+                }
+            }
             else if (rec.Days > 0)
             {
                 bool year = sellerAsks ? rec.Slow > rec.Avg : rec.Slow < rec.Avg;
@@ -1190,12 +1309,22 @@ namespace Armoury
                 q.Window = Math.Min(rec.Mem, year ? YearSpan : Span);   // R3-11b: okno = doby w pamieci (po rozruchu rynku od 7 ostatnich dob rozruchu)
             }
             else q.Profit = Expected(w);
+            q.Avg = rec.Avg; q.Slow = rec.Slow; q.Mem = rec.Mem;
             // 241: pamieci (ok. 30 dob, rok) trzymaja jeszcze wyniki sprzed ceny kupca (przyciete do kosztu x marza) - sprzedajacy nie odda warsztatu za ulamek
             // tego, co da dzis kupiec: bierze lepsze z pamieci i oczekiwanego wyniku z cen (Expected - istniejacy model, ten sam co bez historii). Notabl (gorsza pamiec) bez zmian
+            // 305b: przy WorkshopTradeBuyerMemory cena targu w calosci tylko przy krotkiej historii (< WorkshopBuyerShortHistoryDays), potem najwyzej polowa
             if (sellerAsks && rec.Days > 0 && Fair)
             {
                 float exp = Expected(w);
-                if (exp > q.Profit) { q.Profit = exp; q.Exp = true; }
+                bool half = q.Blend && rec.Mem >= Math.Max(1, Settings.Current.WorkshopBuyerShortHistoryDays);
+                if (half) exp *= 0.5f;
+                if (exp > q.Profit) { q.Profit = exp; q.Exp = true; q.ExpHalf = half; if (half) _dQExpHalf++; else if (q.Blend) _dQExpFull++; }
+            }
+            // 305b: warsztat z linia broni/zbroi z wsadem, gdy te linie nic graczowi nie dadza (PlayerArmsAsFirm wylaczone) - pamiec notabla zawiera zarobek broni
+            // (WorkshopLaw.CyclePrefix), ktorego gracz nie dostanie: cena z linii towarowych (Expected - tylko IsTradeLine)
+            if (sellerAsks && BuyerBlend && w.Owner != Hero.MainHero && HasArmsInputLine(w.WorkshopType) && !PlayerArmsLive)
+            {
+                q.Profit = Expected(w); q.Exp = true; q.ExpHalf = false; q.ArmsIdle = true; _dQArms++;
             }
             q.Tax = tax;
             q.Years = Math.Max(0f, s.WorkshopTradePriceYears);
@@ -1206,6 +1335,38 @@ namespace Armoury
             q.Floor = q.Going <= q.Equip;
             q.Price = Math.Max(q.Going, q.Equip) + q.Capital;
             return q;
+        }
+
+        private static bool BuyerBlend { get { var s = Settings.Current; return s != null && s.WorkshopTradeBuyerMemory; } }
+        /// <summary>305b: linie broni gracza pracuja jako firma (PlayerArmsAsFirm i WorkshopLaw czynne).</summary>
+        private static bool PlayerArmsLive { get { var s = Settings.Current; return s != null && s.PlayerArmsAsFirm && WorkshopLaw.On; } }
+
+        /// <summary>305b: typ ma linie, ktorej wszystkie wyjscia to nie-towar (bron, zbroja, kon) - z wsadem albo bez.</summary>
+        private static bool HasArmsLine(WorkshopType t)
+        {
+            if (t == null) return false;
+            foreach (var p in t.Productions)
+            {
+                if (p.Outputs == null || p.Outputs.Count == 0) continue;
+                bool arms = true;
+                foreach (var o in p.Outputs) if (o.Item1 == null || o.Item1.IsTradeGood) { arms = false; break; }
+                if (arms) return true;
+            }
+            return false;
+        }
+
+        /// <summary>305b: typ ma linie broni z wsadem (ta, ktora PlayerArmsAsFirm zamienia w firme).</summary>
+        private static bool HasArmsInputLine(WorkshopType t)
+        {
+            if (t == null) return false;
+            foreach (var p in t.Productions)
+            {
+                if (p.Inputs == null || p.Inputs.Count == 0 || p.Outputs == null || p.Outputs.Count == 0) continue;
+                bool arms = true;
+                foreach (var o in p.Outputs) if (o.Item1 == null || o.Item1.IsTradeGood) { arms = false; break; }
+                if (arms) return true;
+            }
+            return false;
         }
 
         /// <summary>DefaultWorkshopModel.GetCostForPlayer - cena z zarobku zamiast sprzet + 4 x dobrobyt + 2000. Ukryci rzemieslnicy: bez zmian (1 000 000 - nie na sprzedaz).</summary>
@@ -1229,7 +1390,16 @@ namespace Armoury
                 if (!On || !Live || __0 == null || __0.WorkshopType == null || __0.WorkshopType.IsHidden) return;
                 var q = QuoteForNotable(__0);
                 float share = MBMath.ClampFloat(Settings.Current.WorkshopTradeResaleShare, 0f, 1f);
-                __result = (int)Math.Round(Math.Max(q.Going, q.Equip) * share) + q.Capital;
+                int worth = Math.Max(q.Going, q.Equip);
+                // 305b (WorkshopTradeBuyerMemory): ta sama miara co przy kupnie (pol na pol pamieci) - i nigdy wiecej niz udzial tego, co za ten warsztat zaplacilby
+                // dzis gracz (inny podatek notabla nie robi z kupna i odsprzedazy zysku)
+                if (q.Blend)
+                {
+                    var qp = QuoteFor(__0, Hero.MainHero);
+                    int wp = Math.Max(qp.Going, qp.Equip);
+                    if (wp < worth) { worth = wp; _dQResaleCap++; }
+                }
+                __result = (int)Math.Round(worth * share) + q.Capital;
                 int purse = RichestBuyerPurse(__0);
                 if (purse >= 0 && __result > purse) __result = purse;
             }
@@ -1399,6 +1569,7 @@ namespace Armoury
         {
             var sb = new StringBuilder();
             sb.Append("I'm willing to sell. It will cost you ").Append(price).Append(" denars. ");
+            if (q.Blend) return OfferBlend(sb, q);   // 305b
             string earned = q.Days > 0 && !q.Exp
                 ? "The shop has cleared about " + N1(q.Profit) + " a day " + (q.Window >= YearSpan ? "over the past year" : q.Window <= 1 ? "over the last day" : "over the last " + q.Window + " days")
                 : "At today's market prices the shop should clear about " + N1(q.Profit) + " a day";
@@ -1413,6 +1584,39 @@ namespace Armoury
             }
             sb.Append("The ").Append(q.Capital).Append(" in its till stays with the shop and becomes yours. Are you willing to pay?");
             return sb.ToString();
+        }
+
+        /// <summary>305b (WorkshopTradeBuyerMemory): rozmowa kupna - oba wyniki z pamieci i miara ceny (po angielsku).</summary>
+        private static string OfferBlend(StringBuilder sb, Quote q)
+        {
+            int mon = Math.Min(Math.Max(1, q.Mem), Span);
+            sb.Append("Last ").Append(mon).Append(mon == 1 ? " day: " : " days: ").Append(N1(q.Avg)).Append(" a day, ")
+              .Append(q.Mem >= YearSpan ? "last year: " : "since my records begin (" + Math.Max(1, q.Mem) + " days): ").Append(N1(q.Slow)).Append(" a day. ");
+            if (q.ArmsIdle) sb.Append("Its weapon and armour lines would earn you nothing, so I price it by its trade lines alone: about ").Append(N1(q.Profit)).Append(" a day. ");
+            else if (q.Exp) sb.Append(q.ExpHalf ? "Half of what today's market prices promise is more than that: " : "My records are short, and today's market prices promise more: ").Append(N1(q.Profit)).Append(" a day. ");
+            else if (q.Pace != 1f) sb.Append("My hands ran it ").Append(q.Pace > 1f ? "faster" : "slower").Append(" with this town's market than yours will; at your pace that is about ").Append(N1(q.Profit)).Append(" a day. ");
+            else sb.Append("I price it by half of each: ").Append(N1(q.Profit)).Append(" a day. ");
+            if (q.Floor) sb.Append("That is too little to price it by, so I ask only what its tools and fittings are worth: ").Append(q.Equip).Append(". ");
+            else
+            {
+                bool taxed = q.Tax > 0.001f;
+                if (taxed) sb.Append("The town takes about ").Append(N1(q.Tax * 100f)).Append("% of that in tax. ");
+                sb.Append("I ask ").Append(N1(q.Years)).Append(taxed ? " years of what is left: " : " years of that: ").Append(q.Going).Append(". ");
+            }
+            sb.Append("The ").Append(q.Capital).Append(" in its till stays with the shop and becomes yours. Are you willing to pay?");
+            return sb.ToString();
+        }
+
+        /// <summary>305b: linia doby "Warsztaty gracza - kapital i cena (305b)" (z Daily, po linii "Warsztaty towarowe").</summary>
+        private static void Daily305b(int day)
+        {
+            var s = Settings.Current;
+            Log.Info("Warsztaty gracza - kapital i cena (305b): dzien " + day + " | klucze: Workshop Retool Settles Capital " + (s.WorkshopRetoolSettlesCapital ? "TAK" : "NIE")
+                     + ", Workshop Trade Buyer Memory " + (s.WorkshopTradeBuyerMemory ? "TAK (pol na pol)" : "NIE (lepsza pamiec)") + ", Pace Correction " + (s.WorkshopBuyerPaceCorrection ? "TAK" : "NIE")
+                     + ", krotka historia " + s.WorkshopBuyerShortHistoryDays + " dob, Player Arms As Firm " + (PlayerArmsLive ? "TAK" : "NIE")
+                     + " | zmiany produkcji gracza " + _dRetN + ": zwrot kapitalu do kiesy " + _dRetBack + ", doplata z kiesy " + _dRetAdd + ", brak (odbudowa z utargu) " + _dRetShort
+                     + " | wyceny dla gracza: pol na pol " + _dQBlend + ", cena targu w calosci (krotka historia) " + _dQExpFull + ", polowa ceny targu " + _dQExpHalf
+                     + ", korekta tempa " + _dQPace + ", bez linii broni " + _dQArms + ", odkup notabla przyciety do ceny gracza " + _dQResaleCap + " | potkniecia " + _dStumbles + ".");
         }
 
         // ------------------------------------------------------------ linia dnia
@@ -1476,6 +1680,7 @@ namespace Armoury
                   .Append(", cena = ").Append(N1(Math.Max(0f, s.WorkshopTradePriceYears))).Append(" x roczny zysk po podatku kupujacego (nie mniej niz sprzet) + kapital; zysk ze sredniej ok. ").Append(Span)
                   .Append(" dob albo roku - gracz kupuje wedle lepszej, notabl odkupuje wedle gorszej; potkniecia ").Append(_dStumbles).Append('.');
                 Log.Info(sb.ToString());
+                try { Daily305b(day); } catch (Exception e) { Stumble("WorkshopTrade.Daily305b", e); }
             }
             catch (Exception e) { Log.Error("WorkshopTrade.Daily", e); }
             finally { ClearDay(); }
@@ -1768,6 +1973,9 @@ namespace Armoury
                 // ta sama para stanow co linia gry "workshop_notable_owner_answer_1_single" (priorytet 100) - nasza idzie pierwsza, gdy paczka jest czynna
                 starter.AddDialogLine("arm_ws_owner_answer_single", "workshop_owner_notable_single_response", "workshop_notable_player_buy_options",
                                       "{=!}{ARM_WS_OFFER}", WorkshopTrade.OfferCondition, null, 200);
+                // 305b (WorkshopRetoolSettlesCapital): potwierdzenie zmiany produkcji ze sprzetem i kapitalem - ta sama para stanow co linia gry "workshop_46" (priorytet 100)
+                starter.AddDialogLine("arm_ws_retool_confirm", "player_change_production_3", "player_change_production_5",
+                                      "{=!}{ARM_WS_RETOOL}", WorkshopTrade.RetoolCondition, null, 200);
             }
             catch (Exception e) { Log.Error("WorkshopTrade.OnSessionLaunched", e); }
         }

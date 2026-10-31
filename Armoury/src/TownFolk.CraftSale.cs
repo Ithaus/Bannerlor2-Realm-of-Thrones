@@ -236,6 +236,11 @@ namespace Armoury
         public static void CsPlayerPre() { _csPlayer++; }
         public static void CsPlayerFin() { if (_csPlayer > 0) _csPlayer--; }
 
+        /// <summary>305b (PlayerArmsAsFirm): firma WorkshopLaw w cyklu warsztatu gracza wysyla OnItemProduced za kazda sztuke sama (jak w cyklu notabla) - na czas
+        /// firmy cykl nie liczy sie jako cykl gracza (zdarzenie to prawdziwa sztuka, nie zbiorcze zdarzenie gry). Zwraca glebokosc do CsPlayerResume.</summary>
+        internal static int CsPlayerSuspend() { int p = _csPlayer; _csPlayer = 0; return p; }
+        internal static void CsPlayerResume(int p) { _csPlayer = Math.Max(0, p); }
+
         /// <summary>Finalizer cyklu notabla: oczekiwania bez zdarzenia zbiorczego (gra zawsze je wysyla po wywolaniu - licznik powinien stac na 0) czyszczone.</summary>
         public static void CsNotableFin()
         {

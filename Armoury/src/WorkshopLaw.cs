@@ -45,6 +45,7 @@ namespace Armoury
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
         internal static void Reset() { _pending = null; _market.Clear(); _marketDay = -1; _handsStart = -1f; _handsDay = -1; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _skipFletch = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
             _plFree = _plHeld = _plStumbles = 0; _plErrLogged = false; _freeRawByType.Clear();   // AM-30
+            _plFirmCycles = _plFirmMade = _plFirmGame = _plFirmShops = 0; _plFirmRev = _plFirmCost = 0; _plFirmCall = false; _plFirmSeen.Clear();   // 305b
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
@@ -56,6 +57,10 @@ namespace Armoury
         private static readonly Dictionary<Workshop, KeyValuePair<float, int>> _labor = new Dictionary<Workshop, KeyValuePair<float, int>>();
         private static int _dayStamp = -1, _made, _skipLoss, _skipMat, _skipLabor, _skipGold, _skipFletch;
         private static int _plFree, _plHeld, _plStumbles;   // poprawka 174b (recenzja): warsztaty gracza - cykle linii bez wsadu zamkniete, cykle czekajace na strzelarzy
+        // 305b (PlayerArmsAsFirm): warsztat gracza - linie broni i zbroi Z WSADEM jako firma (ta sama regula co u notabla): cykle przez firme, sztuki, utarg, koszt, cykle
+        // oddane grze (wyjatek / brak miasta w CyclePrefix); _plFirmCall - CyclePrefix wolany z PlayerFirm (warsztat gracza nie wraca do gry)
+        private static int _plFirmCycles, _plFirmMade, _plFirmGame, _plFirmShops; private static long _plFirmRev, _plFirmCost; private static bool _plFirmCall;
+        private static readonly HashSet<Workshop> _plFirmSeen = new HashSet<Workshop>();
         private static bool _plErrLogged;
         private static long _dayRevenue, _dayCost;
         private static readonly Dictionary<ItemObject.ItemTypeEnum, int> _madeByType = new Dictionary<ItemObject.ItemTypeEnum, int>();
@@ -238,7 +243,7 @@ namespace Armoury
                 if (Bloomery.TownMineBlocked(production, workshop)) { __result = false; return false; }   // E6/R1 (214): kopalnia BK w miescie/zamku - lupa tylko z drewnem z polki tego miasta
                 if (ToolsByUse.Held(production, workshop)) { __result = false; return false; }   // E6/R3 (215): linia narzedzi przy zapasie miasta >= 30 dni popytu - cykl nie idzie (wsad zostaje)
                 if (!On || !AllOutputsArms(production) || workshop == null || workshop.Settlement == null) return true;
-                if (workshop.Owner == Hero.MainHero) return true;          // warsztaty gracza - vanilla
+                if (workshop.Owner == Hero.MainHero && !_plFirmCall) return true;          // warsztaty gracza - vanilla (305b: PlayerArmsAsFirm - linie broni z wsadem przez PlayerFirm)
                 if (!Campaign.Current.GameStarted) return true;           // start gry - vanilla zapelnia rynki
                 var town = workshop.Settlement.Town;
                 if (town == null) return true;
@@ -343,6 +348,8 @@ namespace Armoury
                     try { TownFolk.Note(workshop.Settlement, wagesI, TownFolk.KCraftPaid); } catch { }   // E5/0 (195): place cyklu juz wyplacone - kontrola plac 35% (tylko licznik)
                     shelf.AddToCounts(new EquipmentElement(w.Item, mod, null, false), 1);
                     CampaignEventDispatcher.Instance.OnItemProduced(w.Item, workshop.Settlement, 1);
+                    // 305b (PlayerArmsAsFirm): sztuka warsztatu gracza oddana miastu daje Handel jak w cyklu gry (TickOneProductionCycleForPlayerWorkshop -> OnProductionProducedToWarehouse)
+                    if (_plFirmCall) { try { TaleWorlds.CampaignSystem.CharacterDevelopment.SkillLevelingManager.OnProductionProducedToWarehouse(new EquipmentElement(w.Item, mod, null, false)); } catch (Exception e) { PlayerStumble(e); } }
                     Measure174b.NoteArrival(workshop.Settlement, w.Item, 1, Measure174b.ArrWorkshop);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
                     any = true;
                     int cost = w.MatCost + wagesI;
@@ -1461,6 +1468,12 @@ namespace Armoury
                          + " | warsztaty gracza (poprawka 174b, jedna regula" + (Settings.Current != null && Settings.Current.PlayerWorkshopsSameRule ? "" : " - WYLACZONA") + "): cykle linii bez wsadu (zbroja, strzaly) zamkniete "
                          + _plFree + ", czeka na strzelarzy " + _plHeld + (_plStumbles > 0 ? ", potkniecia " + _plStumbles : "") + ".");
             }
+            // 305b (PlayerArmsAsFirm): linia doby warsztatow gracza z liniami broni z wsadem (tylko gdy ktorys cykl przyszedl)
+            if (_plFirmCycles + _plFirmGame > 0)
+                Log.Info("Warsztaty gracza jak firma (305b): dzien " + _dayStamp + " - klucz " + (Settings.Current != null && Settings.Current.PlayerArmsAsFirm ? "TAK" : "NIE")
+                         + " | warsztatow " + _plFirmShops + ", cykli linii broni/zbroi z wsadem przez firme " + _plFirmCycles + ", sztuk " + _plFirmMade + ", sprzedaz miastu " + _plFirmRev
+                         + ", koszt (surowiec + place) " + _plFirmCost + ", wynik " + (_plFirmRev - _plFirmCost) + " | cykli oddanych grze (wyjatek albo brak miasta) " + _plFirmGame
+                         + (_plStumbles > 0 ? " | potkniecia warsztatow gracza " + _plStumbles : "") + " | cykl gry pominiety w kazdym cyklu firmy (bron nie powstaje za darmo).");
             if (_freeRawByType.Count > 0)   // AM-30 (audyt 14.10): zablokowane cykle linii bez wsadu wedlug typu warsztatu
             {
                 var fr = new List<string>();
@@ -1475,6 +1488,7 @@ namespace Armoury
             NewDay174();
             _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = _skipFletch = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
             _plFree = _plHeld = _plStumbles = 0;
+            _plFirmCycles = _plFirmMade = _plFirmGame = _plFirmShops = 0; _plFirmRev = _plFirmCost = 0; _plFirmSeen.Clear();   // 305b
             Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
         }
 
@@ -1640,7 +1654,7 @@ namespace Armoury
             if (_dayStamp != d0) { Flush(); _dayStamp = d0; }
         }
 
-        public static bool PlayerCyclePrefix(WorkshopType.Production __0, Workshop __1, ref bool __result)
+        public static bool PlayerCyclePrefix(WorkshopsCampaignBehavior __instance, WorkshopType.Production __0, Workshop __1, ref bool __result)
         {
             try
             {
@@ -1651,7 +1665,7 @@ namespace Armoury
                 // Kopalnia w takim cyklu pracuje (ladunek zbiera sie z dziesieciu cykli) - znacznik ostatniej pracy idzie dalej, zeby ekran rodu
                 // nie pisal "Halted" (LastRunCampaignTime czyta tylko ten ekran; gra stawia go po udanym cyklu).
                 if (s.PlayerMineBulkSkip && BulkLineSkip(__0)) { SmallFixes8.NotePlayerMine(); __1.UpdateLastRunTime(); __result = false; return false; }
-                if (!s.PlayerWorkshopsSameRule) return true;
+                if (!s.PlayerWorkshopsSameRule) return PlayerFirm(__instance, __0, __1, ref __result);   // 305b: klucz PlayerArmsAsFirm niezalezny od 174b
                 // audyt 13.10 (drobne, [zloto]): kopalnia BK w rekach gracza - ta sama regula dymarki co u notabla (E6/R1, CyclePrefix): lupa tylko
                 // z drewnem z polki tego miasta, kupionym z kapitalu warsztatu (zloto do kasy miasta). Dotad cykl gracza omijal TownMineBlocked i lupy
                 // powstawaly bez spalonego drewna. Tu tylko sprawdzenie i rezerwacja - drewno schodzi w Bloomery.CyclePostfix po udanym cyklu gry.
@@ -1660,13 +1674,55 @@ namespace Armoury
                 if (ToolsByUse.Held(__0, __1, true)) { __result = false; return false; }   // E6/R3 (215): linia narzedzi gracza - ta sama regula co u notabli (licznik w ToolsByUse)
                 // AM-30 (regula A): linia bez wsadu z surowcem (np. rzeznik BK: kura / ges, ktorych gra nie przeczytala) - ta sama regula co u notabli
                 if (s.WorkshopNoFreeRawAllTypes && FreeRawLine(__0, __1)) { RollDay(); NoteFreeRaw(__1, true); __result = false; return false; }
-                if (!TownFletchers.ClosesLine(__0, __1) && !(noInput && On && AllOutputsArms(__0))) return true;
+                if (!TownFletchers.ClosesLine(__0, __1) && !(noInput && On && AllOutputsArms(__0))) return PlayerFirm(__instance, __0, __1, ref __result);   // 305b: linia broni z wsadem - firma
                 RollDay();
                 _plFree++;
                 __result = false;
                 return false;
             }
             catch (Exception e) { PlayerStumble(e); return true; }
+        }
+
+        /// <summary>
+        /// 305b (PlayerArmsAsFirm, diagnoza 31.10 "WARSZTATY GRACZA" ustalenie 1): linia broni albo zbroi Z WSADEM w warsztacie gracza szla droga gry
+        /// (WorkshopsCampaignBehavior.RunTownWorkshop 1.4.8: flag3 = false dla nie-towaru, wiec TickOneProductionCycleForPlayerWorkshop z effectCapital = false -
+        /// ConsumeInputFromTownMarket i ProduceAnOutputToTown nie ruszaja zlota): zelazo znikalo z polki, bron pojawiala sie na polce, nikt nikomu nie placil,
+        /// a warsztat gracza nic nie zarabial. Teraz ta sama firma co u notabla (CyclePrefix: rece WorkshopWorkers x m_t, surowiec z polki z kapitalu do kasy miasta,
+        /// place do kiesy ludu, miasto placi cene wyrobu do kapitalu) - wspolna metoda, nie kopia. Zwrot false do gry: wsad schodzi z polki RAZ (DoStart), gra nie
+        /// robi drugiej sztuki za darmo. Zysk zostaje w kapitale, wyplata zwykla droga gry (CalculateOwnerIncomeFromWorkshop) i D11-3. Znacznik pracy (ekran rodu)
+        /// po cyklu z gotowa sztuka albo ze sztuka w robocie (gra stawia go tylko po cyklu towarowym - "Halted"). Sztuki firmy w cyklu gracza licza sie do puli
+        /// doplaty ludu jak u notabla (TownFolk.CsPlayerSuspend - bez tego CsAdd bralby je za zbiorcze zdarzenie gry). Linie bez wsadu dalej zamkniete (174b),
+        /// strzaly - TownFletchers.ClosesLine (przed ta metoda), ruda dla strzelarzy - kod 5 w TryStart (PlayerGatePostfix nie przychodzi, bo gra nie rusza).
+        /// true = cykl idzie do gry (klucz NIE, nie bron z wsadem, wyjatek w firmie - jak dotad).
+        /// </summary>
+        private static bool PlayerFirm(WorkshopsCampaignBehavior beh, WorkshopType.Production p, Workshop w, ref bool result)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.PlayerArmsAsFirm || !On || beh == null || w == null || w.Settlement == null || w.Owner != Hero.MainHero) return true;
+            if (p.Inputs == null || p.Inputs.Count == 0 || !AllOutputsArms(p)) return true;   // Production to struct
+            if (Campaign.Current == null || !Campaign.Current.GameStarted) return true;
+            RollDay();   // przed odczytem licznikow doby - CyclePrefix nie zrobi Flush w srodku (ta sama doba)
+            int made0 = _made; long rev0 = _dayRevenue, cost0 = _dayCost;
+            int csp = 0; bool go = true, susp = false;
+            try
+            {
+                csp = TownFolk.CsPlayerSuspend(); susp = true;
+                _plFirmCall = true;
+                go = CyclePrefix(beh, p, w, ref result);
+            }
+            catch (Exception e) { PlayerStumble(e); go = true; }
+            finally { _plFirmCall = false; if (susp) TownFolk.CsPlayerResume(csp); }
+            if (go) { _plFirmGame++; return true; }
+            try
+            {
+                _plFirmCycles++;
+                if (_plFirmSeen.Add(w)) _plFirmShops++;
+                _plFirmMade += Math.Max(0, _made - made0); _plFirmRev += Math.Max(0L, _dayRevenue - rev0); _plFirmCost += Math.Max(0L, _dayCost - cost0);
+                Wip wip;
+                if (result || (_wip.TryGetValue(new KeyValuePair<Workshop, string>(w, LineKey(p)), out wip) && wip != null && wip.Item != null)) w.UpdateLastRunTime();
+            }
+            catch (Exception e) { PlayerStumble(e); }
+            return false;
         }
 
         /// <summary>Postfiks CanPlayerWorkshopProduceThisCycle (gra sama policzyla koszt wsadu z polki miasta i utarg cyklu): 174b.3 dla warsztatu gracza - ta
@@ -1720,7 +1776,8 @@ namespace Armoury
                 }
                 catch (Exception e) { Log.Error("WorkshopLaw.ApplyAll(warsztaty gracza)", e); }
                 Log.Info("WorkshopLaw: warsztaty gracza (poprawka 174b, jedna regula) - linie bez wsadu " + (plCyc ? "wpiete" : "BRAK TickOneProductionCycleForPlayerWorkshop")
-                         + ", ruda dla strzelarzy " + (plGate ? "wpieta" : "BRAK CanPlayerWorkshopProduceThisCycle") + "; " + (Settings.Current != null && Settings.Current.PlayerWorkshopsSameRule ? "CZYNNE" : "wylaczone w MCM (jak w grze)") + ".");
+                         + ", ruda dla strzelarzy " + (plGate ? "wpieta" : "BRAK CanPlayerWorkshopProduceThisCycle") + "; " + (Settings.Current != null && Settings.Current.PlayerWorkshopsSameRule ? "CZYNNE" : "wylaczone w MCM (jak w grze)")
+                         + " | 305b linie broni/zbroi z wsadem jako firma (Player Arms As Firm): " + (Settings.Current != null && Settings.Current.PlayerArmsAsFirm ? "TAK" : "NIE") + ", wpiete " + (plCyc ? "1/1" : "0/1") + ".");
                 var ri = AccessTools.Method(typeof(WorkshopsCampaignBehavior), "GetRandomItemAux");
                 if (ri != null) h.Patch(ri, postfix: new HarmonyMethod(typeof(WorkshopLaw), nameof(RandomItemPostfix)));
                 Log.Info("WorkshopLaw: koniec surowcow z niczego - rzemieslnicy bez wsadu " + (Settings.Current != null && Settings.Current.WorkshopNoFreeRaw ? "ZABLOKOWANI" : "wolni (MCM)")

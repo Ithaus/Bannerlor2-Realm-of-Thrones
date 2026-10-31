@@ -142,24 +142,9 @@ namespace Armoury
                 for (int i = 0; i < n; i++)
                 {
                     var p = prods[i];
-                    float f = 1f;
-                    if (Paced(p) && !TownFletchers.ClosesLine(p, w))
+                    float f, pp;
+                    if (LineFactor(town, w, p, mp, out f, out pp))   // 305b: rachunek linii wydzielony bez zmian (ten sam dla ShopFactor)
                     {
-                        float idx = 1f;
-                        try
-                        {
-                            var o = p.Outputs[0].Item1;
-                            if (o != null)
-                            {
-                                idx = town.GetItemCategoryPriceIndex(o);
-                                // 241: przy cenie kupca tempo nie goni ceny pustej polki, ktorej nikt nie placi - najwyzej indeks kupca (srednia sprzedaz z 28 dob / cena graniczna ludu)
-                                if (WorkshopTrade.MerchantRule) { bool fh; float mi = (float)WorkshopTrade.MerchantIndex(town, o, out fh); if (mi < idx) idx = Math.Max(0.01f, mi); }
-                            }
-                        }
-                        catch { idx = 1f; }
-                        if (!(idx > 0f) || float.IsInfinity(idx)) idx = 1f;
-                        float pp = MBMath.ClampFloat((float)Math.Sqrt(idx), PMin, PMax);
-                        f = MBMath.ClampFloat(mp * pp, MMin, FMax);   // razem 0.3-4 (progi NE3-23)
                         _dMSum += mp; _dPSum += pp;
                         any = true;
                     }
@@ -174,6 +159,57 @@ namespace Armoury
                 ts.Shops++;
             }
             catch (Exception e) { _shop = null; Stumble("Begin", e); }
+        }
+
+        /// <summary>F linii (E3-D2): linia towarowa z wsadem, nie zamknieta linia strzal - F = clamp(mp x clamp(sqrt(indeks wyrobu), 0.7, 1.4), 0.3, 4); inaczej F = 1 i false.
+        /// Wydzielone w 305b z Begin bez zmiany rachunku (sam odczyt).</summary>
+        private static bool LineFactor(Town town, Workshop w, WorkshopType.Production p, float mp, out float f, out float pp)
+        {
+            f = 1f; pp = 1f;
+            if (!Paced(p) || TownFletchers.ClosesLine(p, w)) return false;
+            float idx = 1f;
+            try
+            {
+                var o = p.Outputs[0].Item1;
+                if (o != null)
+                {
+                    idx = town.GetItemCategoryPriceIndex(o);
+                    // 241: przy cenie kupca tempo nie goni ceny pustej polki, ktorej nikt nie placi - najwyzej indeks kupca (srednia sprzedaz z 28 dob / cena graniczna ludu)
+                    if (WorkshopTrade.MerchantRule) { bool fh; float mi = (float)WorkshopTrade.MerchantIndex(town, o, out fh); if (mi < idx) idx = Math.Max(0.01f, mi); }
+                }
+            }
+            catch { idx = 1f; }
+            if (!(idx > 0f) || float.IsInfinity(idx)) idx = 1f;
+            pp = MBMath.ClampFloat((float)Math.Sqrt(idx), PMin, PMax);
+            f = MBMath.ClampFloat(mp * pp, MMin, FMax);   // razem 0.3-4 (progi NE3-23)
+            return true;
+        }
+
+        /// <summary>305b (WorkshopBuyerPaceCorrection): sredni F linii towarowych warsztatu (wazony szybkoscia linii; linia towarowa bez tempa = 1) przy dzisiejszych
+        /// ludziach i cenach - tyle szybciej (wolniej) niz gracz pracuje ten warsztat u notabla albo lorda. 1 - regula wylaczona, latka nie wpieta, zamek, warsztat
+        /// gracza, warsztat poza regula (niezgodny licznik). Sam odczyt, bez licznikow doby.</summary>
+        internal static float ShopFactor(Workshop w)
+        {
+            try
+            {
+                if (!On || !Live || _target == null || w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || w.Owner == null || w.Owner == Hero.MainHero) return 1f;
+                var st = w.Settlement;
+                if (st == null || !st.IsTown || st.Town == null || _bad.Contains(w)) return 1f;
+                EnsureAvg();
+                float m = PeopleMarket.WorkersScale(st.Town);
+                if (!(m > 0f) || float.IsInfinity(m)) m = 1f;
+                float mp = MBMath.ClampFloat(m / Math.Max(0.01f, _avgM), MMin, MMax);
+                double sum = 0, wsum = 0;
+                foreach (var p in w.WorkshopType.Productions)
+                {
+                    if (!WorkshopTrade.IsTradeLine(p) || p.ConversionSpeed <= 0f) continue;
+                    float f, pp;
+                    LineFactor(st.Town, w, p, mp, out f, out pp);
+                    sum += f * p.ConversionSpeed; wsum += p.ConversionSpeed;
+                }
+                return wsum > 0 ? (float)(sum / wsum) : 1f;
+            }
+            catch (Exception e) { Stumble("ShopFactor", e); return 1f; }
         }
 
         /// <summary>Z WorkshopTrade.RunPostfix: koniec ticku warsztatu - licznik linii musi byc rowny liczbie linii typu.</summary>
