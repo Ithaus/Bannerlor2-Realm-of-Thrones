@@ -10608,6 +10608,22 @@ namespace Armoury
         [SettingPropertyGroup("Autotest probes (306b)")]
         public bool Autotest306Probes { get; set; } = true;
 
+        [SettingPropertyBool("Panic Flee Hold Course", HintText = "A man who has broken and runs keeps the course he took - toward a gap, his own rear or the edge of the field - and turns only when an enemy who is not fleeing himself stands in his way within 12 m. Off = his course is chosen again every few seconds and he turns whenever the best direction changes by more than 45 degrees, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
+        public bool PanicFleeHoldCourse { get; set; } = true;
+
+        [SettingPropertyBool("Banner Loss Break By Share", HintText = "With Banner Companies: a company rolls to break each time it has lost another sixth of its men, from a third on (a third: half the base chance; half, two thirds, five sixths: the full chance), and the share lost - not the game's morale - sets how frightened it is (a third x0.67, half x1.0, two thirds x1.33, five sixths x1.6). Veterans still hold far longer: the chance is divided by the morale resistance of their tier. Off = the rolls at a third and at half only, weighed by the men's morale", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
+        public bool BannerLossBreakByShare { get; set; } = true;
+
+        [SettingPropertyBool("Friendly Fire Melee By Skill", HintText = "With Friendly Fire: when an AI fighter's blow would land on a man of his own side, it goes through only with a chance set by his skill with the weapon in his hand (skill 0: 50%, 100: 25%, 180 or more: 5%); otherwise he checks the blow as the game does. A green recruit sometimes cuts a comrade, a veteran almost never. Your own blows are never checked - you aim yourself. Off = every AI blow on a comrade goes through, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
+        public bool FriendlyFireMeleeBySkill { get; set; } = true;
+
+        [SettingPropertyBool("Wounded Back Step Facing Foe", HintText = "With Wounded Withdraw With Arms: a wounded man with an enemy on foot within 6 m - or with no safe place to go - steps back facing the enemy, still defending himself, to a point 4 m behind his own front rank, and turns his back to walk to the rear only once no enemy on foot is within 10 m. Off = he turns and walks to the rear at once, or stays in the line when there is no safe place, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
+        public bool WoundedBackStepFacingFoe { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13259,6 +13275,10 @@ namespace Armoury
             s.PriceBandMerchantMargin = PriceBandMerchantMargin;
             s.PriceBandHaulKm = PriceBandHaulKm;
             s.Autotest306Probes = Autotest306Probes;
+            s.PanicFleeHoldCourse = PanicFleeHoldCourse;
+            s.BannerLossBreakByShare = BannerLossBreakByShare;
+            s.FriendlyFireMeleeBySkill = FriendlyFireMeleeBySkill;
+            s.WoundedBackStepFacingFoe = WoundedBackStepFacingFoe;
         }
 
         internal static void Apply()

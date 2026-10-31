@@ -50,6 +50,7 @@ namespace Armoury
         {
             public Agent A;
             public bool Holding;              // za linia: postoj (ScriptedPosition)
+            public bool Step;                 // 307b: krok w tyl przodem do wroga (ScriptedPosition bez NoAttack) - jeszcze nie za linia
             public bool Arrived;              // postoj juz liczony (raz na czlowieka)
             public bool Done;                 // poza tickiem (los, inna droga, gracz, potkniecia) - klucz w _wd zostaje (raz na bitwe)
             public bool Fought;               // cios wrecz zadany po wejsciu
@@ -173,8 +174,9 @@ namespace Armoury
         /// <summary>Postoj zdjety (DisableScriptedMovement), gdy byl. Natywnego odwrotu w drodze nie ruszamy - nadpisze go cudzy odwrot albo handler paniki.</summary>
         private static void Release(Wd w)
         {
-            if (!w.Holding) return;
+            if (!w.Holding && !w.Step) return;
             w.Holding = false;
+            w.Step = false;                                               // 307b: krok w tyl to tez nasza pozycja skryptowa
             try { if (w.A != null && w.A.IsActive()) w.A.DisableScriptedMovement(); } catch { }
         }
 
@@ -187,6 +189,7 @@ namespace Armoury
                 Wd w;
                 if (a == null || !_wd.TryGetValue(a, out w) || w.Done) return;
                 w.Done = true;
+                if (w.Step && !w.Arrived && (state == AgentState.Killed || state == AgentState.Unconscious)) WoundedWithdraw.StepDied++;   // 307b
                 bool wpn, sh;
                 BrokenFate.Arms(a, out wpn, out sh);                      // przed zrzutem broni z trupa (Mission.OnAgentRemoved)
                 WoundedWithdraw.Fate(w.Arrived, state, wpn, sh);          // Arrived: byl za linia (postoj albo po koncu bitwy postoj zdjety)
@@ -316,7 +319,7 @@ namespace Armoury
             if (a.GetMorale() < WoundedWithdraw.MoraleFloor) { a.SetMorale(WoundedWithdraw.MoraleFloor); WoundedWithdraw.Pins++; }
             if (!w.Fought && a.LastMeleeAttackTime > w.Since) { w.Fought = true; WoundedWithdraw.FoughtPeople.Add(a.Index); }
 
-            if (!w.Holding)
+            if (!w.Holding && !w.Step)                                    // 307b: punkt kroku w tyl to nie cel odwrotu - bez postoju przy nim
             {
                 Vec2 pos = a.Position.AsVec2;
                 // co klatke: postoj przed promieniem zanikania gry (natywny odwrot + CanAgentRout). Promien gry (do kwadratu) = 0.5-0.6 s x v^2 + 2 x promien
@@ -350,6 +353,7 @@ namespace Armoury
             a.SetScriptedPosition(ref wp, false, Agent.AIScriptedFrameFlags.None);
             w.Wp = wp;
             w.Holding = true;
+            w.Step = false;
             if (!w.Arrived)
             {
                 w.Arrived = true;
@@ -389,6 +393,29 @@ namespace Armoury
             WorldPosition wp;
             Vec2 t = Pick(a, m, out kind, out wp);
             if (kind == KindLimit) { WoundedWithdraw.PathLimit++; w.NextEval = now + 0.5f; return; }   // budzet zapytan - proba za chwile
+            // 307b (klucz WoundedBackStepFacingFoe; krytyk 307: 142a 66 odwrotow, 27 zginelo w drodze, 7 za linia): pieszy wrog blizej niz StepNear albo brak
+            // bezpiecznego celu - krok w tyl przodem do wroga (pozycja skryptowa bez NoAttack: broni sie, nie odwraca plecow) za wlasna pierwsza linie;
+            // natywny Agent.Retreat dopiero, gdy pieszy wrog dalej niz StepFar i cel bezpieczny
+            var c307 = Settings.Current;
+            if (!w.Holding && c307 != null && c307.WoundedBackStepFacingFoe)
+            {
+                Vec2 foePos;
+                float fd = NearestFootFoe(a, m, WoundedWithdraw.StepFar, out foePos);
+                bool near = fd < WoundedWithdraw.StepNear;
+                if (!t.IsValid || near || (w.Step && fd <= WoundedWithdraw.StepFar))
+                {
+                    if (!t.IsValid) WoundedWithdraw.NoSpot++;
+                    StepBack(w, m, foePos);
+                    return;
+                }
+                if (w.Step)
+                {
+                    // wrog odstapil (dalej niz StepFar), cel bezpieczny - pozycja kroku zdjeta, dalej natywny odwrot do celu (ponizej)
+                    w.Step = false;
+                    try { a.DisableScriptedMovement(); } catch { }
+                    WoundedWithdraw.StepToRetreat++;
+                }
+            }
             bool lost = false;
             if (w.Holding)
             {
@@ -440,6 +467,74 @@ namespace Armoury
                 return;
             }
             Resend(w, now);
+        }
+
+        /// <summary>307b: najblizszy pieszy wrog (aktywny czlowiek bez konia, nie uciekajacy) w promieniu r; float.MaxValue = nikogo. Zapytanie natywne do wlasnej listy.</summary>
+        private float NearestFootFoe(Agent a, Mission m, float r, out Vec2 at)
+        {
+            at = Vec2.Invalid;
+            float best = float.MaxValue;
+            Vec2 my = a.Position.AsVec2;
+            if (!my.IsValid) return best;
+            try
+            {
+                m.GetNearbyEnemyAgents(my, r, a.Team, _near);
+                for (int i = 0; i < _near.Count; i++)
+                {
+                    var x = _near[i];
+                    if (x == null || !x.IsActive() || !x.IsHuman || x.IsRunningAway || x.MountAgent != null) continue;
+                    float d = x.Position.AsVec2.Distance(my);
+                    if (d < best) { best = d; at = x.Position.AsVec2; }
+                }
+            }
+            finally { _near.Clear(); }
+            return best;
+        }
+
+        /// <summary>307b: krok w tyl przodem do wroga - punkt StepBehindFront za pierwsza linia wlasnego szyku (srodek + kierunek x glebokosc/2 - 4 m); kto juz
+        /// stoi za tym punktem, stoi tam, gdzie jest; bez szyku - 4 m od najblizszego pieszego wroga. Natywny odwrot zgaszony (plecy do wroga), pozycja skryptowa
+        /// bez NoAttack (broni sie). Nowy rozkaz tylko przy przesunieciu punktu o ponad 1.5 m albo gdy ktos zdjal pozycje (RBM StanceLogic).</summary>
+        private static void StepBack(Wd w, Mission m, Vec2 foePos)
+        {
+            var a = w.A;
+            Vec2 my = a.Position.AsVec2;
+            if (!my.IsValid || m.Scene == null) return;
+            Vec2 sp = Vec2.Invalid;
+            var f = a.Formation;
+            if (f != null && f.CountOfUnits > 1)
+            {
+                Vec2 cen = f.CurrentPosition, dir = f.Direction;
+                if (cen.IsValid && dir.IsValid && dir.LengthSquared > 0.25f)
+                {
+                    dir = dir.Normalized();
+                    float half = Math.Max(0f, f.Depth) * 0.5f;
+                    sp = cen + dir * (half - WoundedWithdraw.StepBehindFront);
+                    if ((my - sp).DotProduct(dir) < 0f) sp = my;          // juz za tym punktem - zostaje, przodem do wroga
+                }
+            }
+            if (!sp.IsValid && foePos.IsValid)
+            {
+                Vec2 away = my - foePos;
+                float l = away.Length;
+                if (l > 0.05f) sp = my + away * (WoundedWithdraw.StepBehindFront / l);
+            }
+            if (!sp.IsValid) sp = my;
+            if (!m.IsPositionInsideBoundaries(sp)) sp = my;
+            bool moved = !w.Step || !w.Target.IsValid || w.Target.DistanceSquared(sp) > 2.25f;
+            if (!moved)
+            {
+                bool lost = false;
+                try { lost = (a.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) == 0; } catch { lost = false; }
+                if (!lost) return;
+                WoundedWithdraw.Restored++;
+            }
+            try { if (a.IsRetreating()) a.StopRetreating(); } catch { }  // natywne SetRetreatMode(false) - bez plecow do wroga
+            var wp = new WorldPosition(m.Scene, UIntPtr.Zero, new Vec3(sp.x, sp.y, a.Position.z), false);
+            a.SetScriptedPosition(ref wp, false, Agent.AIScriptedFrameFlags.None);
+            if (!w.Step) { w.Step = true; WoundedWithdraw.StepPeople.Add(a.Index); }
+            WoundedWithdraw.Steps++;
+            w.Target = sp;
+            w.Wp = wp;
         }
 
         /// <summary>W drodze: natywny odwrot zgasl - ponowienie na ten sam cel (najwyzej co RefreshEvery, bo wolane z oceny).</summary>
@@ -614,7 +709,7 @@ namespace Armoury
                     BrokenFate.Arms(a, out wpn, out sh);
                     WoundedWithdraw.AtEnd(w.Arrived, wpn, sh);
                     w.Done = true;
-                    if (w.Holding) { Release(w); continue; }
+                    if (w.Holding || w.Step) { Release(w); continue; }
                     if (res == null || w.LastSend < -50f) continue;
                     var t = a.Team;
                     bool mine = t != null && (t.IsPlayerTeam || t.IsPlayerAlly);

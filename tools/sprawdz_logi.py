@@ -85483,5 +85483,223 @@ def main(argv):
     return _sondy306_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 307b (31.10): bitwa i AI - grupa bitwa307b
+# B307-S self-test wyrazen; B307-1 'Bieg zlamanych (147)' segment 307b: przyczyny czasu ponizej progu biegu (INFO: udzial ponizej progu w czasie paniki,
+# cel < 30%), HP przy wejsciu w panike, kurs ucieczki (zmiany bez blokady przy kluczu TAK - INFO); B307-1b 'LOS ZLAMANYCH (139)': uszli, sr. bieg dopadnietych
+# (INFO, cel: uszli > 0, bieg > 20 m); B307-2 'Choragwie (CH) koniec' segment 'straty wedlug udzialu (307b)': rzutow = suma rzutow przy 2/6..5/6, sr. utracona
+# czesc 0.33-0.84, zalaman <= rzutow; B307-2b zalamania w bitwach od 8 kompanii (INFO); B307-3 'FF (' segment 'wrecz AI wedlug umiejetnosci (307b)': przepuszczone
+# <= bramki gry wrecz, sr. szansa 0.05-0.50, udzial FF (INFO, cel < 10%); B307-4 'ODWROT RANNYCH (143)' segment 'krok w tyl przodem do wroga (307b': rozkazow
+# >= ludzi, padl przy kroku <= ludzi; B307-4b zginal w drodze / odwrot rannych i za linia (INFO, cel < 15% i > 40%).
+B307_PR = re.compile(r"\| ponizej progu biegu - przyczyny \(307b, nie rozlaczne\): wrog w 3 m (\d+) s \(([\d-]+%?)\), limit predkosci < 1 (\d+) s \(([\d-]+%?)\), "
+                     r"bez natywnego odwrotu (\d+) s \(([\d-]+%?)\), cel odwrotu w 5 m (\d+) s \(([\d-]+%?)\), stoi < 0\.5 m/s (\d+) s \(([\d-]+%?)\), kara ran (\d+) s "
+                     r"\(([\d-]+%?)\), tlok swoich w 1\.5 m (\d+) s \(([\d-]+%?)\), zadna z nich (\d+) s \(([\d-]+%?)\), bez probki (\d+) s; predkosc sr\. (\S+) m/s "
+                     r"przy mozliwej (\S+) m/s, limit natywny sr\. (\S+) \| HP przy wejsciu w panike sr\. (\S+) \(ponizej progu bolu (\d+), ponizej progu kary ran (\d+), "
+                     r"zdrowszych (-?\d+)\) \| kurs ucieczki \(307b, klucz (TAK|NIE)\): utrzymany (\d+), zmieniony (\d+) \(w tym droga zablokowana (\d+)\)")
+B307_PRT = re.compile(r"\| czas w panice pieszo (\d+) s: .*?ponizej progu biegu (\d+) s \(")
+B307_LZ = re.compile(r"LOS ZLAMANYCH \(139\): misja \S+ \| nasi (\d+) \(zabici (\d+) / nieprzytomni (\d+) / uszli (\d+) / na polu (\d+)\).*?\| sr\. bieg: dopadnieci (\S+) m / (\S+) s")
+B307_CH = re.compile(r"\| straty wedlug udzialu \(307b\) (TAK|NIE): rzutow (\d+) \(przy 2/6 (\d+), 3/6 (\d+), 4/6 (\d+), 5/6 (\d+); sr\. utracona czesc (\S+), "
+                     r"sr\. szansa (\S+)\), zalaman wedlug udzialu (\d+)")
+B307_CHK = re.compile(r"Choragwie \(CH\) koniec: (?:.*?\| )?kompanii (\d+) \|")
+B307_FF = re.compile(r"\| bramki gry otwarte: wrecz (\d+), .*?\| wrecz AI wedlug umiejetnosci \(307b\) (TAK|NIE): przepuszczone (\d+), zatrzymane \(zasada gry\) (\d+), "
+                     r"sr\. szansa (\S+)")
+B307_FFU = re.compile(r"udzial FF w trafieniach ludzi (\S+)% \((\d+)/(\d+)\)")
+B307_WD = re.compile(r"\| krok w tyl przodem do wroga \(307b, klucz (TAK|NIE)\): ludzi (\d+), rozkazow (\d+), potem odwrot natywny (\d+), padl przy kroku (\d+)")
+B307_WDN = re.compile(r"\| odwrot rannych (\d+) \(.*?\| za linia (\d+) \(.*?\| zginal w drodze (\d+) \(")
+
+B307_SAMPLE_PR = ("[07:54:37] Bieg zlamanych (147): misja bitwa, klucz TAK (...) | zlamani pieszo 11 (strona gracza 4 / wroga 7; ...) | czas w panice pieszo 40 s: na 50% "
+                  "(zadyszka) 0 s - udzial biegu na 50% 0%, strefa 10% 0 s, ponizej progu biegu 33 s (drenaz tylko przez 147) | ponizej progu biegu - przyczyny (307b, "
+                  "nie rozlaczne): wrog w 3 m 20 s (61%), limit predkosci < 1 33 s (100%), bez natywnego odwrotu 1 s (3%), cel odwrotu w 5 m 0 s (0%), stoi < 0.5 m/s "
+                  "12 s (36%), kara ran 30 s (91%), tlok swoich w 1.5 m 9 s (27%), zadna z nich 0 s (0%), bez probki 0 s; predkosc sr. 1.20 m/s przy mozliwej 4.10 m/s, "
+                  "limit natywny sr. 0.73 | HP przy wejsciu w panike sr. 8% (ponizej progu bolu 10, ponizej progu kary ran 1, zdrowszych 0) | kurs ucieczki (307b, "
+                  "klucz TAK): utrzymany 5, zmieniony 2 (w tym droga zablokowana 2) | odsapki w panice (wyjscia z zadyszki) 0 (oczekiwane 0) | ...")
+B307_SAMPLE_PR0 = ("Bieg zlamanych (147): misja bitwa, ... | czas w panice pieszo 0 s: na 50% (zadyszka) 0 s - udzial biegu na 50% -, strefa 10% 0 s, ponizej progu biegu 0 s "
+                   "(drenaz tylko przez 147) | ponizej progu biegu - przyczyny (307b, nie rozlaczne): wrog w 3 m 0 s (-), limit predkosci < 1 0 s (-), bez natywnego "
+                   "odwrotu 0 s (-), cel odwrotu w 5 m 0 s (-), stoi < 0.5 m/s 0 s (-), kara ran 0 s (-), tlok swoich w 1.5 m 0 s (-), zadna z nich 0 s (-), bez probki "
+                   "0 s; predkosc sr. - m/s przy mozliwej - m/s, limit natywny sr. - | HP przy wejsciu w panike sr. - (ponizej progu bolu 0, ponizej progu kary ran 0, "
+                   "zdrowszych 0) | kurs ucieczki (307b, klucz TAK): utrzymany 0, zmieniony 0 (w tym droga zablokowana 0) | odsapki ...")
+B307_SAMPLE_LZ = ("[07:54:37] LOS ZLAMANYCH (139): misja bitwa | nasi 15 (zabici 10 / nieprzytomni 5 / uszli 0 / na polu 0) | panika gry 0 (...) | dopadnieci w ucieczce "
+                  "15: konny 0 / pieszy 12 / pocisk 1 / inne 2; padli po powrocie do walki 0 | sr. bieg: dopadnieci 6 m / 2.7 s, uszli - m / - s (droga z probek co 1 s)")
+B307_SAMPLE_CH = ("Choragwie (CH) koniec: kompanii 7 | sztandar padl 0 (...) | linie sztandaru (154) 0 (ponad limit 0) | straty bez bramki morale (305c) TAK: trzecia "
+                  "czesc strat 2, rzutow strat 4 (morale od 50: 4, sr. morale 69.0, sr. szansa 0.060), zalaman ze strat 1 (ludzi 6) | straty wedlug udzialu (307b) TAK: "
+                  "rzutow 4 (przy 2/6 2, 3/6 1, 4/6 1, 5/6 0; sr. utracona czesc 0.42, sr. szansa 0.150), zalaman wedlug udzialu 1 | potkniecia 0.")
+B307_SAMPLE_FF = ("FF (pole): klucze pociski 100%, wrecz 50%, szarza 50% | trafienia swoich: wrecz 40 (AI 40, gracz 0), pociski 10 (AI 10, gracz 0), szarza 0 (AI 0, "
+                  "gracz 0) | bramki gry otwarte: wrecz 60, pociski AI 10, szarza 0; pociski anulowane przy 0% 0 | wrecz AI wedlug umiejetnosci (307b) TAK: przepuszczone "
+                  "60, zatrzymane (zasada gry) 143, sr. szansa 0.31 | machiny (zasada gry): ... | udzial FF w trafieniach ludzi 9.1% (50/550) | potkniecia 0 (sesja 0)")
+B307_SAMPLE_WD = ("ODWROT RANNYCH (143): misja bitwa, klucz TAK (...) | odwrot rannych 18 (strona gracza 5 / wroga 13; ...) | za linia 9 (cel: tyl szyku 9, ...) | zginal "
+                  "w drodze 2 (zabici 1 / nieprzytomni 1), padl na postoju 1, ... | rozkazy: odwrot 4, ... | krok w tyl przodem do wroga (307b, klucz TAK): ludzi 12, "
+                  "rozkazow 30, potem odwrot natywny 8, padl przy kroku 1 (pieszy wrog blizej niz 6 m albo brak bezpiecznego celu; odwrot plecami dopiero od 10 m) "
+                  "| morale do 0.02 0 razy | ...")
+
+
+def bitwa307b_selftest():
+    for name, rx, s in (("PR", B307_PR, B307_SAMPLE_PR), ("PR0", B307_PR, B307_SAMPLE_PR0), ("PRT", B307_PRT, B307_SAMPLE_PR), ("LZ", B307_LZ, B307_SAMPLE_LZ),
+                        ("CH", B307_CH, B307_SAMPLE_CH), ("CHK", B307_CHK, B307_SAMPLE_CH), ("FF", B307_FF, B307_SAMPLE_FF), ("FFU", B307_FFU, B307_SAMPLE_FF),
+                        ("WD", B307_WD, B307_SAMPLE_WD), ("WDN", B307_WDN, B307_SAMPLE_WD)):
+        if not rx.search(s):
+            return "wyrazenie " + name + " nie pasuje do probki"
+    return None
+
+
+def _f307(x):
+    try:
+        return float(x)
+    except ValueError:
+        return None
+
+
+def bitwa307b_main(logp):
+    """bitwa307b (31.10, paczka 307b): B307-S, B307-1..4 - opis nad B307_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = bitwa307b_selftest()
+    rep.add("B307-S: self-test wyrazen (linie 307b jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("B307-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    pr, lz, ch, ff, wd = [], [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Bieg zlamanych (147):" in line:
+                pr.append(line.strip())
+            elif "LOS ZLAMANYCH (139):" in line:
+                lz.append(line.strip())
+            elif "Choragwie (CH) koniec:" in line and "(307b)" in line:
+                ch.append(line.strip())
+            elif "] FF (" in line and "(307b)" in line:
+                ff.append(line.strip())
+            elif "ODWROT RANNYCH (143):" in line and "(307b" in line:
+                wd.append(line.strip())
+    # B307-1
+    n1, bad1, secs, slow = 0, [], 0, 0
+    cause = [0] * 8
+    pain = woundn = healthy = 0
+    held = turned = blocked = 0
+    keyon = False
+    for l in pr:
+        m = B307_PR.search(l)
+        if not m:
+            if "(307b" in l:
+                bad1.append("format: " + l[:120])
+            continue
+        n1 += 1
+        t = B307_PRT.search(l)
+        if t:
+            secs += int(t.group(1)); slow += int(t.group(2))
+        for j in range(8):
+            cause[j] += int(m.group(1 + 2 * j))
+        pain += int(m.group(22)); woundn += int(m.group(23)); healthy += int(m.group(24))
+        if m.group(25) == "TAK":
+            keyon = True
+        held += int(m.group(26)); turned += int(m.group(27)); blocked += int(m.group(28))
+        if int(m.group(28)) > int(m.group(27)):
+            bad1.append("zablokowane > zmienione: " + m.group(0)[-90:])
+    share = f"{100.0 * slow / secs:.0f}%" if secs > 0 else "-"
+    rep.add("B307-1: bieg zlamanych - linia 307b w formacie, zablokowane <= zmienione", f"linii 147 {len(pr)}, z segmentem 307b {n1}, zlych {len(bad1)}" + (f" ({bad1[0]})" if bad1 else ""),
+            "zlych 0 (brak linii 147 - INFO)", None if n1 == 0 and not bad1 else not bad1)
+    names = ("wrog w 3 m", "limit < 1", "bez odwrotu", "cel w 5 m", "stoi", "kara ran", "tlok", "zadna")
+    rep.add("B307-1a: czas ponizej progu biegu w panice i przyczyny (nie rozlaczne)", f"panika pieszo {secs} s, ponizej progu {slow} s ({share}); "
+            + ", ".join(f"{names[j]} {cause[j]} s" for j in range(8)), "INFO (cel < 30%; 142a: 82-98%)", None)
+    rep.add("B307-1b: HP przy wejsciu w panike", f"ponizej progu bolu {pain}, ponizej progu kary ran {woundn}, zdrowszych {healthy}",
+            "INFO (ilu lamie sie prawie martwych - bol FieldCraft)", None)
+    rep.add("B307-1c: kurs ucieczki (PanicFleeHoldCourse)", f"klucz {'TAK' if keyon else 'NIE/brak'}: utrzymany {held}, zmieniony {turned} (zablokowany {blocked})",
+            "INFO (przy TAK zmiany prawie tylko zablokowane)", None)
+    esc, n_lz, run = 0, 0, []
+    for l in lz:
+        m = B307_LZ.search(l)
+        if not m:
+            continue
+        n_lz += 1
+        esc += int(m.group(4))
+        v = _f307(m.group(6))
+        if v is not None and int(m.group(1)) > 0:
+            run.append(v)
+    rep.add("B307-1d: los zlamanych - uszli i bieg dopadnietych", f"linii {n_lz}, uszli {esc}, sr. bieg dopadnietych (m) {', '.join(f'{x:.0f}' for x in run[:8]) or '-'}",
+            "INFO (cel: uszli > 0 w duzych bitwach, bieg > 20 m; 142a: 0 i 4-6 m)", None)
+    # B307-2
+    bad2, rolls, breaks, big, bigb, n2 = [], 0, 0, 0, 0, 0
+    for l in ch:
+        m = B307_CH.search(l); k = B307_CHK.search(l)
+        if not m or not k:
+            bad2.append("format: " + l[:120]); continue
+        if m.group(1) != "TAK":
+            continue
+        n2 += 1
+        r = int(m.group(2)); s = sum(int(m.group(j)) for j in range(3, 7)); b = int(m.group(9))
+        rolls += r; breaks += b
+        if r != s or b > r:
+            bad2.append(m.group(0))
+        if r > 0:
+            lo = _f307(m.group(7))
+            if lo is None or lo < 0.33 or lo > 0.84:
+                bad2.append("utracona czesc: " + m.group(0))
+        if int(k.group(1)) >= 8:
+            big += 1; bigb += b
+    rep.add("B307-2: zalamania wedlug udzialu strat - rzutow = suma 2/6..5/6, utracona czesc 0.33-0.84, zalaman <= rzutow",
+            f"linii {n2}, rzutow {rolls}, zalaman {breaks}, zlych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else ""), "zlych 0 (brak linii z kluczem TAK - INFO)",
+            None if n2 == 0 and not bad2 else not bad2)
+    rep.add("B307-2b: zalamania wedlug udzialu w bitwach od 8 kompanii", f"bitew {big}, zalaman {bigb}", "INFO (cel >= 1; 142a: 0 na 23 rzuty)", None)
+    # B307-3
+    bad3, n3, passed, stopped, ffs = [], 0, 0, 0, []
+    for l in ff:
+        m = B307_FF.search(l)
+        if not m:
+            bad3.append("format: " + l[:120]); continue
+        if m.group(2) != "TAK":
+            continue
+        n3 += 1
+        p, st = int(m.group(3)), int(m.group(4))
+        passed += p; stopped += st
+        if p > int(m.group(1)):
+            bad3.append("przepuszczone > bramki: " + m.group(0)[-120:])
+        if p + st > 0:
+            sp = _f307(m.group(5))
+            if sp is None or sp < 0.05 or sp > 0.5:
+                bad3.append("szansa: " + m.group(0)[-80:])
+        u = B307_FFU.search(l)
+        if u:
+            ffs.append(u.group(1))
+    rep.add("B307-3: friendly fire wrecz AI wedlug umiejetnosci - przepuszczone <= bramki gry, sr. szansa 0.05-0.50",
+            f"linii {n3}, przepuszczone {passed}, zatrzymane {stopped}, zlych {len(bad3)}" + (f" ({bad3[0]})" if bad3 else ""), "zlych 0 (brak bitwy - INFO)",
+            None if n3 == 0 and not bad3 else not bad3)
+    rep.add("B307-3b: udzial FF w trafieniach ludzi", ", ".join(x + "%" for x in ffs[:8]) or "-", "INFO (cel < 10%; 142a: 20-25%, Willow 27.9%)", None)
+    # B307-4
+    bad4, n4, men, orders, back, died = [], 0, 0, 0, 0, 0
+    wdn, wline, wdied = 0, 0, 0
+    for l in wd:
+        m = B307_WD.search(l)
+        if not m:
+            bad4.append("format: " + l[:120]); continue
+        if m.group(1) != "TAK":
+            continue
+        n4 += 1
+        a, o, b, d = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))
+        men += a; orders += o; back += b; died += d
+        if o < a or d > a:
+            bad4.append(m.group(0))
+        w = B307_WDN.search(l)
+        if w:
+            wdn += int(w.group(1)); wline += int(w.group(2)); wdied += int(w.group(3))
+    rep.add("B307-4: krok w tyl rannego przodem do wroga - rozkazow >= ludzi, padl przy kroku <= ludzi",
+            f"linii {n4}, ludzi {men}, rozkazow {orders}, potem odwrot {back}, padl przy kroku {died}, zlych {len(bad4)}" + (f" ({bad4[0]})" if bad4 else ""),
+            "zlych 0 (brak linii z kluczem TAK - INFO)", None if n4 == 0 and not bad4 else not bad4)
+    rep.add("B307-4b: odwrot rannych - zginal w drodze i za linia", f"odwrotow {wdn}, zginal w drodze {wdied} ({(100.0 * wdied / wdn) if wdn else 0:.0f}%), "
+            f"za linia {wline} ({(100.0 * wline / wdn) if wdn else 0:.0f}%)", "INFO (cel: w drodze < 15%, za linia > 40%; 142a: 41% / 11%)", None)
+    rep.show()
+    return 0
+
+
+_bitwa307b_main_prev = main
+
+
+def main(argv):
+    # paczka 307b: grupa bitwa307b - opakowanie main jak karawany305
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "bitwa307b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return bitwa307b_main(rest[0] if rest else None)
+    return _bitwa307b_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

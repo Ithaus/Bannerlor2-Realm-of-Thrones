@@ -35,6 +35,11 @@ namespace Armoury
         internal const float MoraleFloor = 0.02f; // pod 0.01 gra sama wolalaby Panic (CommonAIComponent.OnTickParallel) - jak RoutHold po zgaszeniu
         internal const float BrokenShare = 0.5f;  // szyk rozbity: co najmniej polowa reszty szyku (obecni + zbiegli) zbiegla albo w panice (recenzja 143)
         internal const int PathPerFrame = 10;     // zapytan o droge na klatke (osobny budzet od RoutHold)
+        // 307b (klucz WoundedBackStepFacingFoe): krok w tyl przodem do wroga, gdy pieszy wrog blizej niz StepNear (albo brak bezpiecznego celu); natywny odwrot
+        // dopiero przy wrogu dalej niz StepFar; punkt kroku StepBehindFront za pierwsza linia wlasnego szyku
+        internal const float StepNear = 6f, StepFar = 10f, StepBehindFront = 4f;
+        internal static readonly HashSet<int> StepPeople = new HashSet<int>();
+        internal static int Steps, StepToRetreat, StepDied;
 
         // powody konca odwrotu
         internal const int WhyNoFormation = 1, WhyAlone = 2, WhyHalf = 3, WhyPain = 4, WhyCompany = 5, WhyGame = 6, WhyComp = 7, WhyOther = 8;
@@ -89,6 +94,8 @@ namespace Armoury
             Player = BreakRefused = Dropped = 0;
             _armDen = _armed = _shield = 0;
             Sends = Resends = Turns = Moves = Restored = NoSpot = FoeAtSpot = PathQueries = PathLimit = Pins = 0;
+            StepPeople.Clear();
+            Steps = StepToRetreat = StepDied = 0;
             _bannerSeen = -1;
         }
 
@@ -211,6 +218,9 @@ namespace Armoury
               .Append(", ocen bez bezpiecznego miejsca ").Append(NoSpot).Append(" (wrog przy celu ").Append(FoeAtSpot).Append("), sztandary ")
               .Append(_bannerSeen < 0 ? "nie szukano" : (_bannerSeen > 0 ? "TAK" : "brak BannerBearerLogic"))
               .Append(", zapytan o droge ").Append(PathQueries).Append(" (limit ").Append(PathLimit).Append(')')
+              .Append(" | krok w tyl przodem do wroga (307b, klucz ").Append(c != null && c.WoundedBackStepFacingFoe ? "TAK" : "NIE").Append("): ludzi ").Append(StepPeople.Count)
+              .Append(", rozkazow ").Append(Steps).Append(", potem odwrot natywny ").Append(StepToRetreat).Append(", padl przy kroku ").Append(StepDied)
+              .Append(" (pieszy wrog blizej niz ").Append(StepNear.ToString("0", Inv)).Append(" m albo brak bezpiecznego celu; odwrot plecami dopiero od ").Append(StepFar.ToString("0", Inv)).Append(" m)")
               .Append(" | morale do ").Append(MoraleFloor.ToString("0.00", Inv)).Append(' ').Append(Pins).Append(" razy")
               .Append(" | rozbici BrokenMen w NB2 ").Append(RoutHold.Broken).Append(on && c != null && c.RoutedMenNeverRally ? " (oczekiwane 0)" : "")
               .Append(" | potkniecia odwrot ").Append(RoutHold.StumblesLocked(RoutHold.SiteWithdraw)).Append(" (wypadli ").Append(Dropped).Append(").");
