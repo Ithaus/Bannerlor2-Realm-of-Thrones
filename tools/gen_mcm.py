@@ -658,6 +658,9 @@ RANGES = {
     # 140 tarcza pod ostrzalem (ShieldsUp.Begin przycina do tych samych zakresow): trzymanie 2..30 s, szyk pod ostrzalem od 1..20 pociskow w 5 s
     'ShieldsUpHoldSeconds': (2.0, 30.0, "0.0"),
     'ShieldsUpFormationShots': (1, 20, "0"),
+    # 311a oslona strzelca (HorsePursuit.Cover przycina do tych samych zakresow): trzymanie 10..120 s po ostatniej szkodzie, ukryty po 1..10 s
+    'CoverHoldSeconds': (10.0, 120.0, "0"),
+    'CoverHiddenSeconds': (1.0, 10.0, "0.0"),
     # 144 AI oszczedza sily (AiBreath przycina do tych samych zakresow): zapas tchu 20..80 %, ostatnie metry biegiem 10..60 m; poza zadyszki 0..3 (WindedShow)
     'AiArriveWithBreathPercent': (20, 80, "0"),
     'AiRunsLastMetres': (10.0, 60.0, "0"),

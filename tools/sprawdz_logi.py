@@ -86824,5 +86824,140 @@ def main(argv):
     return _bitwa310_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 311a (31.10): oslona strzelca - grupa bitwa311a
+# B311a-S self-test wyrazen i wierszy (dobry / zly bieg); B311a-0 linia startu 'Oslona strzelca (311a) start' (raz na proces - jest, gdy jest linia bitwy);
+# B311a-1 linia bitwy: format, potkniecia 0, pod sterowaniem 311a na koniec 0, koszt kroku najwiecej < 2 ms; B311a-2 spojnosc: z odpowiedzia <= z ukryciem
+# <= epizody, suma powodow konca = epizody (gdy nikt nie zostal), pozycji zdjetych <= zwolnien, ludzie wyslani tylko przy odpowiedzi; B311a-3 przebieg (INFO:
+# sekundy ukrycia, obchodzacy lewo / prawo, szturm, linia odzyskana, po obejsciu); B311a-4 promienie i budzet (INFO, ponad budzet blisko 0);
+# B311a-5 epizody 283 'koniec: inne po 8.0 s' (INFO - przed 311a koniec po ciszy ShieldsUpHoldSeconds; przy kluczu TAK rzadziej przy samotnym strzelcu).
+B311A_L = re.compile(r"Oslona strzelca \(311a\): misja (\S+), klucz (TAK|NIE) \(283 (TAK|NIE)\), trzymanie (\d+) s, ukryty po (\S+) s \| epizody (\d+) "
+                     r"\(z ukryciem (\d+), z odpowiedzia (\d+), planow (\d+), ponownych (\d+)\), sekund ukrycia (\S+), sr\. do odpowiedzi (\S+) s \| kontroli (\d+), "
+                     r"promieni (\d+) \(zasloniete (\d+), ponad budzet (\d+)\), silnik: nie widzi (\d+), widzi (\d+) \| punkty: strona bez punktu (\d+), punkt bez "
+                     r"linii (\d+), grupa pusta (\d+) \| obchodzacy lewo (\d+) / prawo (\d+), szturm lewo (\d+) / prawo (\d+) \(z piechoty R2 (\d+)\), bez szturmu - "
+                     r"przewaga ponizej 3:1 (\d+) \| linia odzyskana (\d+), na punkcie bez linii (\d+), ponowne obejscie (\d+) \| po obejsciu: trafien nekajacego "
+                     r"(\d+), powalonych przez niego (\d+); nekajacy trafiony (\d+), padl (\d+) \(od obchodzacych / szturmu (\d+)\) \| koniec: (.+?) \| zwolnien "
+                     r"ludzi (\d+), pozycji zdjetych (\d+) \| pominieci z szyku gracza (\d+), ponad limit zapytan (\d+) \| pod sterowaniem 311a na koniec (\d+) "
+                     r"\(oczekiwane 0\) \| koszt sr\. (\S+) / max (\S+) ms \(krokow (\d+)\) \| potkniecia (\d+)\.")
+B311A_START = re.compile(r"Oslona strzelca \(311a\) start: klucz (TAK|NIE) \(z 283 (TAK|NIE)\), trzymanie (\d+) s po ostatniej szkodzie, ukryty po (\S+) s")
+B311A_SAMPLE = ("Oslona strzelca (311a): misja bitwa, klucz TAK (283 TAK), trzymanie 45 s, ukryty po 2.5 s | epizody 3 (z ukryciem 2, z odpowiedzia 2, planow 3, "
+                "ponownych 1), sekund ukrycia 14.5, sr. do odpowiedzi 4.5 s | kontroli 120, promieni 300 (zasloniete 90, ponad budzet 0), silnik: nie widzi 12, "
+                "widzi 40 | punkty: strona bez punktu 1, punkt bez linii 4, grupa pusta 0 | obchodzacy lewo 3 / prawo 3, szturm lewo 2 / prawo 2 (z piechoty R2 1), "
+                "bez szturmu - przewaga ponizej 3:1 0 | linia odzyskana 4, na punkcie bez linii 1, ponowne obejscie 1 | po obejsciu: trafien nekajacego 2, "
+                "powalonych przez niego 1; nekajacy trafiony 3, padl 1 (od obchodzacych / szturmu 1) | koniec: czas po szkodzie 1, nekajacy padl 1, dalej niz 110 m 0, "
+                "konno 0, koniec bitwy 1, klucz 0, inne 0, nie samotny 0 | zwolnien ludzi 10, pozycji zdjetych 9 | pominieci z szyku gracza 0, ponad limit zapytan 0 "
+                "| pod sterowaniem 311a na koniec 0 (oczekiwane 0) | koszt sr. 0.020 / max 0.640 ms (krokow 400) | potkniecia 0.")
+B311A_SAMPLE_START = ("Oslona strzelca (311a) start: klucz TAK (z 283 TAK), trzymanie 45 s po ostatniej szkodzie, ukryty po 2.5 s, kontrola co 0.5 s, promieni najwyzej "
+                      "64 na s, obchodzacych najwyzej 16, szturm najwyzej 12 przy przewadze 3:1, luk 20-40 m.")
+
+
+def b311a_rows(rep, lines, starts, inne8):
+    bad, n, run, rays = [], 0, [], []
+    for l in lines:
+        m = B311A_L.search(l)
+        if not m:
+            bad.append("format: " + l[:120]); continue
+        n += 1
+        g = lambda i: int(m.group(i))
+        if g(45) > 0:
+            bad.append("potkniecia " + m.group(45))
+        if g(41) > 0:
+            bad.append("pod sterowaniem na koniec " + m.group(41))
+        mx = _f310(m.group(43))
+        if mx is not None and mx >= 2.0:
+            bad.append("koszt max " + m.group(43) + " ms")
+        ep, hid, resp = g(6), g(7), g(8)
+        if not (resp <= hid <= ep):
+            bad.append(f"odpowiedz {resp} / ukrycie {hid} / epizody {ep}")
+        ends = sum(int(x) for x in re.findall(r" (\d+)(?:,|$)", m.group(36) + ","))
+        if g(41) == 0 and ends != ep:
+            bad.append(f"powody konca {ends} != epizody {ep}")
+        if g(38) > g(37):
+            bad.append(f"pozycji zdjetych {g(38)} > zwolnien {g(37)}")
+        sent = g(22) + g(23) + g(24) + g(25)
+        if sent > 0 and resp == 0:
+            bad.append(f"wyslani {sent} bez odpowiedzi")
+        run.append(f"{m.group(2)}: ep {ep} (ukr. {hid}, odp. {resp}, plany {g(9)}/{g(10)}), ukrycia {m.group(11)} s, do odp. {m.group(12)} s, obchodzacy "
+                   f"{g(22)}/{g(23)}, szturm {g(24)}/{g(25)} (R2 {g(26)}), linia odzyskana {g(28)}, bez linii {g(29)}, po obejsciu: jego trafien {g(31)}, "
+                   f"powalonych {g(32)}, on trafiony {g(33)}, padl {g(34)} (od nich {g(35)})")
+        rays.append(f"kontroli {g(13)}, promieni {g(14)} (zasl. {g(15)}, ponad budzet {g(16)}), silnik nie widzi {g(17)} / widzi {g(18)}, strona bez punktu "
+                    f"{g(19)}, punkt bez linii {g(20)}, koszt max {m.group(43)} ms")
+    if n > 0 or starts:
+        sm = [B311A_START.search(s) for s in starts]
+        ok0 = bool(starts) and all(sm)
+        rep.add("B311a-0: linia startu 311a (raz na proces)", f"linii {len(starts)}" + (f" ({starts[0][:90]})" if starts else ""), "jest, format",
+                ok0)
+    rep.add("B311a-1/2: linia 'Oslona strzelca (311a)' - format, potkniecia 0, na koniec 0, koszt < 2 ms, spojnosc licznikow",
+            f"linii {n}, zlych {len(bad)}" + (f" ({bad[0]})" if bad else ""), "zlych 0 (brak linii - INFO)", None if n == 0 and not bad else not bad)
+    rep.add("B311a-3: przebieg oslony", "; ".join(run[:6]) or "-", "INFO (przypadek Jeffa: ukrycie > 0, obchodzacy z obu stron, linia odzyskana > 0)", None)
+    rep.add("B311a-4: promienie i budzet", "; ".join(rays[:6]) or "-", "INFO (ponad budzet blisko 0)", None)
+    rep.add("B311a-5: epizody 283 'koniec: inne po 8.0 s'", str(inne8), "INFO (przed 311a: koniec po ciszy strzelca; mniej przy samotnym strzelcu za oslona)", None)
+
+
+def bitwa311a_selftest():
+    if not B311A_L.search(B311A_SAMPLE):
+        return "wyrazenie linii nie pasuje do probki"
+    if not B311A_START.search(B311A_SAMPLE_START):
+        return "wyrazenie startu nie pasuje do probki"
+    rep = Report()
+    b311a_rows(rep, [B311A_SAMPLE], [B311A_SAMPLE_START], 0)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if v.get("B311a-0") != "TAK" or v.get("B311a-1/2") != "TAK":
+        return f"dobry bieg - nie TAK: {v}"
+    for name, bad in (("potkniecia", B311A_SAMPLE.replace("potkniecia 0.", "potkniecia 2.")),
+                      ("na koniec", B311A_SAMPLE.replace("na koniec 0 (", "na koniec 3 (")),
+                      ("koszt", B311A_SAMPLE.replace("max 0.640 ms", "max 2.400 ms")),
+                      ("powody", B311A_SAMPLE.replace("koniec bitwy 1,", "koniec bitwy 0,")),
+                      ("odpowiedz", B311A_SAMPLE.replace("z odpowiedzia 2,", "z odpowiedzia 3,")),
+                      ("format", B311A_SAMPLE.replace("| obchodzacy lewo", "| obchodzacy lw"))):
+        rep = Report()
+        b311a_rows(rep, [bad], [B311A_SAMPLE_START], 0)
+        v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+        if v.get("B311a-1/2") != "NIE":
+            return "zly bieg nie wykryty: " + name
+    rep = Report()
+    b311a_rows(rep, [B311A_SAMPLE], [], 0)
+    if {r[0].split(":")[0]: r[3] for r in rep.rows}.get("B311a-0") != "NIE":
+        return "brak linii startu nie wykryty"
+    return None
+
+
+def bitwa311a_main(logp):
+    """bitwa311a (31.10, paczka 311a): B311a-S, B311a-0..5 - opis nad B311A_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = bitwa311a_selftest()
+    rep.add("B311a-S: self-test wyrazen i wierszy (linie 311a jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("B311a-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    lines, starts, inne8 = [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Oslona strzelca (311a) start:" in line:
+                starts.append(line.strip())
+            elif "Oslona strzelca (311a):" in line:
+                lines.append(line.strip())
+            elif "Nekanie (283) koniec: inne po 8.0 s" in line:
+                inne8 += 1
+    print(f"plik: {logp}")
+    b311a_rows(rep, lines, starts, inne8)
+    rep.show()
+    return 0
+
+
+_bitwa311a_main_prev = main
+
+
+def main(argv):
+    # paczka 311a: grupa bitwa311a - opakowanie main jak bitwa310
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "bitwa311a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return bitwa311a_main(rest[0] if rest else None)
+    return _bitwa311a_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

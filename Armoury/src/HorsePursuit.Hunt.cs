@@ -103,6 +103,8 @@ namespace Armoury
             public float FootCool;   // recenzja 283 (3): do kiedy piechota (R2) nie rusza na tego nekajacego po powrocie ze smyczy / czasu / konny uszedl
             public bool Lone, Leader, OnArchers, OnBanner, H4Used, H5Used, Line204, Rx, DownByResp;
             public Formation VicF, LeaderF;
+            public float LastHarm = -1f;   // 311a: ostatnie trafienie czlowieka strony pociskiem (zegar epizodu oslony)
+            public CovEp Cov;              // 311a: epizod oslony (null - brak)
         }
 
         private sealed class Hunter
@@ -122,6 +124,9 @@ namespace Armoury
             public Vec2 Anchor = Vec2.Invalid;    // 291: R2 - smycz od miejsca wyslania (szyk idzie dalej z armia, ArmyMarchesPastHarassers)
             public Vec2 RideFrom = Vec2.Invalid;  // 291b: jezdziec - srodek ludzi szyku przy wyslaniu (smycz LeashHome, gdy w poscigu jedzie caly szyk)
             public float LeashAt = -1f;           // 305c: chwila ostatniego sprawdzenia smyczy piechoty (czas do nastepnego - z odstepu)
+            public byte Cov, CovSt;               // 311a: rola oslony (CvFlankL/R, CvRushL/R; 0 - brak), stan obchodzacego (w drodze / stoi)
+            public int CovBlind;                  // 311a: kontroli z rzedu bez linii u stojacego obchodzacego
+            public float Leash;                   // 311a: smycz szturmujacego (0 - InfRearm jak R2)
         }
 
         private struct FI
@@ -209,6 +214,7 @@ namespace Armoury
             _hold = c != null ? Math.Max(2f, Math.Min(30f, c.ShieldsUpHoldSeconds)) : 8f;           // jak ShieldsUp.Begin
             _shots3 = c != null ? Math.Max(1, Math.Min(20, c.ShieldsUpFormationShots)) : 3;          // jak ShieldsUp.Begin
             ReactBegin(c);   // 283 (przed testem - scenariusz zalezy od klucza 283)
+            CoverBegin(c);   // 311a
             HuntTestBegin(c);
         }
 
@@ -234,6 +240,7 @@ namespace Armoury
             _hContactSum = 0f; _hContactMin = float.MaxValue; _hContactMax = 0f; _hMaxFar = 0f;
             Interlocked.Exchange(ref _hBlows, 0); Interlocked.Exchange(ref _hFFMissile, 0); Interlocked.Exchange(ref _hFFMelee, 0);
             ReactClear();   // 283
+            CoverClear();   // 311a
             HuntTestClear();
         }
 
@@ -257,6 +264,7 @@ namespace Armoury
             try { TestEnd(Mission.Current, "koniec bitwy", now); } catch (Exception e) { HStumble("HorsePursuit.JazdaTest", e); }
             Volatile.Write(ref _rLive, 0);
             try { HaltEndAll(); } catch (Exception e) { RStumble("HorsePursuit.NekanieKoniec", e); }   // 283: postoje zwolnione
+            try { CoverEndAll(); } catch (Exception e) { CvStumble("HorsePursuit.OslonaKoniec", e); }   // 311a: pod sterowaniem na koniec (oczekiwane 0)
             _hLeft = CountIn(Volatile.Read(ref _countering)) + CountIn(Volatile.Read(ref _aiming)) + HList.Count;
             _rLeft = _hLeft;   // 283: ten sam stan (piechota 283 w _countering)
         }
@@ -342,6 +350,7 @@ namespace Armoury
                     else t.LastFire = now;
                     Detect(t, DHit, test, now);
                     Victim(t, hv, true);
+                    CoverHarm(t, now);   // 311a: zegar oslony od ostatniej szkody
                     return;
                 }
                 if (test) _tMissAll++;   // 291 (J204-1): pocisk nekajacego testu, ktory w nikogo nie trafil - takze z dala od ludzi
@@ -571,6 +580,7 @@ namespace Armoury
                 _leashAhead = c != null && c.InfantryLeashLookahead;         // 305c
                 _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
                 _rMarchOn = _rKey && c.ArmyMarchesPastHarassers;             // 291
+                CoverKeys(c);                                                // 311a
                 Volatile.Write(ref _rLive, _rKey ? 1 : 0);                   // OnHit: kolejka wrecz tylko po rozstawieniu (Tick wola pass po IsDeploymentFinished)
                 _hQPass = 0;
                 _hQChk = 0;
@@ -758,7 +768,7 @@ namespace Armoury
 
         /// <summary>305c (InfantryLeashLookahead): pieszy oddzial przekroczy smycz do nastepnego sprawdzenia - dystans + predkosc x odstep od ostatniego
         /// sprawdzenia (0.25..2 s; pierwsze - 1 s w passie, 0.25 s w kroku sterowania - recenzja 305c). Licznik zawroconych z wyprzedzeniem i najwieksza prognoza.</summary>
-        private static bool LeashAhead(Hunter h, Agent a, float dh, float now, bool pass)
+        private static bool LeashAhead(Hunter h, Agent a, float dh, float now, bool pass, float lim)
         {
             float gap = h.LeashAt >= 0f ? now - h.LeashAt : (pass ? PassEvery : TrackEvery);
             if (gap < 0.25f) gap = 0.25f; else if (gap > 2f) gap = 2f;
@@ -766,7 +776,7 @@ namespace Armoury
             float v = a.GetRealGlobalVelocity().AsVec2.Length;
             float pred = dh + v * gap;
             if (pred > _rLeashPredMax) _rLeashPredMax = pred;
-            if (pred <= MarchToContact.InfRearm) return false;
+            if (pred <= lim) return false;   // 311a: smycz szturmujacego (FootLim), inaczej InfRearm
             _rLeashEarly++;
             return true;
         }
@@ -791,7 +801,8 @@ namespace Armoury
             {
                 float dk = FootLeash(h, a.Position.AsVec2);
                 if (dk > _rFootFar) _rFootFar = dk;
-                if (dk > MarchToContact.InfRearm || LeashAhead(h, a, dk, now, false)) { if (h.Anchor.IsValid) _l291LeashBack++; _rLeashStep++; return ULeash; }
+                float lk = FootLim(h);   // 311a
+                if (dk > lk || LeashAhead(h, a, dk, now, false, lk)) { if (h.Anchor.IsValid) _l291LeashBack++; _rLeashStep++; return ULeash; }
             }
             if (!pass) return rider && a.MountAgent == null ? UOther : -1;
             // klucze: jezdzcy 204, piechota 283, lucznicy - ktorykolwiek (283 sam strzela, gdy jazda wylaczona)
@@ -801,7 +812,9 @@ namespace Armoury
             {
                 if (!a.IsRangedCached) return UOther;
                 if (a.Position.AsVec2.Distance(s.Position.AsVec2) > h.Range) return URange;
-                if (h.Step && a.Position.AsVec2.Distance(FootHome(h.F)) > MarchToContact.InfRearm) return ULeash;   // 283: krok, a szyk odszedl
+                // 283: krok, a szyk odszedl; 311a: obchodzacy - smycz od celu (HuntClose), nie od szyku (luk 20-40 m od celu bywa dalej niz 50 m od szyku)
+                if (h.Step && (h.Cov != 0 ? a.Position.AsVec2.Distance(s.Position.AsVec2) > HuntClose
+                                          : a.Position.AsVec2.Distance(FootHome(h.F)) > MarchToContact.InfRearm)) return ULeash;
                 return -1;
             }
             if (h.Role == RoleFoot)
@@ -809,8 +822,9 @@ namespace Armoury
                 // 283 R8: smycz 50 m od szyku (InfRearm), 60 s (MaxSeconds 148), konny nekajacy (nie w walce wrecz) dalej niz 30 m - piechota konia nie dogoni
                 float dh = FootLeash(h, a.Position.AsVec2);   // poprawka 132b: straz strzelcow - od drogi do szyku strzezonego
                 if (dh > _rFootFar) _rFootFar = dh;
-                if (dh > MarchToContact.InfRearm) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }
-                if (_leashAhead && LeashAhead(h, a, dh, now, true)) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }   // 305c: zawrot z wyprzedzeniem
+                float lim = FootLim(h);   // 311a: szturmujacy - smycz do celu + 25 m
+                if (dh > lim) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }
+                if (_leashAhead && LeashAhead(h, a, dh, now, true, lim)) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }   // 305c: zawrot z wyprzedzeniem
                 if (now - h.Start >= MaxSeconds) return UTime;
                 if (s.MountAgent != null && !MeleeKind(h.T) && a.Position.AsVec2.Distance(s.Position.AsVec2) > HuntScreen) return URange;
                 return -1;
@@ -855,6 +869,8 @@ namespace Armoury
             float range = rx && MeleeKind(t) ? HuntScreen : ShooterRange(s);   // 283: nekajacy wrecz - "odpedzony" dalej niz 30 m (HuntScreen)
             if (rx && range <= 1f) range = HuntScreen;
             bool quiet = now - t.LastFire >= _hold;
+            // 311a: samotny strzelec, ktory trafil ludzi strony, zyje wlasnym zegarem (CoverHoldSeconds po szkodzie) - cisza (schowal sie i laduje) nie konczy
+            if (rx && CoverKeep(m, t, sp, lone, dAll, now)) quiet = false;
             if (quiet && dAll > range) { EndThreat(t, HAway, now); return; }   // odpedzony (albo zapomniany, gdy bez epizodu)
             if (quiet && !t.Active) { EndThreat(t, HOther, now); return; }     // zauwazony, ale bez jezdzcow i cicho - zapomniany (nowy strzal = nowe wykrycie)
             if (quiet && rx && t.Melee + t.Foot <= 0) { EndThreat(t, HOther, now); return; }   // 283: epizod tylko lucznikow / postoju - cisza konczy
@@ -1330,6 +1346,8 @@ namespace Armoury
 
         private static void EndThreat(Threat t, int outcome, float now)
         {
+            // 311a: epizod oslony zamkniety bez zwalniania - ludzi (takze 311a) zwalnia petla nizej, wynik 283 z EndEp
+            if (t.Cov != null) CoverEnd(t, outcome == HDownRiders || outcome == HDownOthers ? CeDown : outcome == HEnded ? CeEnded : CeOther, now, false);
             if (t.Active) EndEp(t, outcome, now);
             for (int i = t.Hs.Count - 1; i >= 0; i--)
             {
@@ -1363,6 +1381,8 @@ namespace Armoury
             t.Hs.Remove(h);
             bool rider = h.Role == RoleIntercept || h.Role == RoleCut;
             bool foot = h.Role == RoleFoot;   // 283
+            bool cov = h.Cov != 0;            // 311a
+            if (cov) { _cvEnded++; h.Cov = 0; }
             if (foot) FEnd[why]++; else UEnd[why]++;
             if (rider) { MarkCounter(a, false); t.Melee--; t.LastEnd = why; Bump(FormRiders, h.F, -1); if (h.Group) Bump(FormGroup, h.F, -1); }
             else if (foot)
@@ -1378,7 +1398,7 @@ namespace Armoury
                 // pozycja skryptowa: jezdzcy, piechota 283 i lucznicy na punkcie kroku 283 (odwrot rannego 143 - jego pozycja zostaje, chyba ze force)
                 if ((rider || foot || h.Step) && (force || a.IsRunningAway || !Withdrawing(a)))
                 {
-                    try { if ((a.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) != 0) a.DisableScriptedMovement(); } catch { }
+                    try { if ((a.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) != 0) { a.DisableScriptedMovement(); if (cov) _cvRel++; } } catch { }
                 }
             }
             if (cool && (rider || foot) && a != null) HuntCool[a] = now + CounterCool;
@@ -1452,6 +1472,7 @@ namespace Armoury
                 }
                 _hRot = next;
             }
+            try { CoverTick(m, now); } catch (Exception e) { CvStumble("HorsePursuit.Oslona", e); }   // 311a: ukrycie, obejscie (epizod co 0.5 s)
             try { HuntTestStep(m, now, false); } catch (Exception e) { HStumble("HorsePursuit.JazdaTest", e); }
         }
 
@@ -1467,7 +1488,7 @@ namespace Armoury
             float d = a.Position.AsVec2.Distance(sp);
             if (d <= ShieldsUp.RaiseNear && t.Active && t.FirstContact < 0f) Contact(t, a, d, now);
             Vec2 p = sp;
-            if (h.Role == RoleFoot) { }   // 283: piechota prosto na nekajacego (bez wyprzedzenia i zaslony - smycz 50 m trzyma ja przy szyku)
+            if (h.Role == RoleFoot) { if (h.Cov >= CvRushL) p = RushPoint(h, sp, d); }   // 283: piechota prosto na nekajacego (smycz 50 m trzyma ja przy szyku); 311a: szturm z boku, w 12 m prosto
             else if (t.Screen && t.ScreenC.IsValid)
             {
                 Vec2 c = t.ScreenC;
@@ -1566,6 +1587,7 @@ namespace Armoury
             Agent vic = victim.IsMount ? victim.RiderAgent : victim;
             Agent att = affector.IsMount ? affector.RiderAgent : affector;
             if (vic == null || att == null || ReferenceEquals(vic, att)) return;
+            CoverOnHit(att, vic);   // 311a: nekajacy z obejsciem trafiony (tablica, Interlocked)
             if (!blow.IsMissile && CounterAnyThread(att) && In(Volatile.Read(ref _hunted), vic))
             {
                 Interlocked.Increment(ref _hBlows);
@@ -1586,6 +1608,7 @@ namespace Armoury
         private static void HuntRemoved(Mission m, Agent a, Agent by, bool down)
         {
             float now = m != null ? m.CurrentTime : 0f;
+            try { CoverRemoved(a, by != null && by.IsMount ? by.RiderAgent : by, down); } catch (Exception e) { CvStumble("HorsePursuit.OslonaStrata", e); }   // 311a: przed zwolnieniem
             if (down && by != null)
             {
                 Agent k = by.IsMount ? by.RiderAgent : by;

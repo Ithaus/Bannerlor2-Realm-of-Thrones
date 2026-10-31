@@ -10772,6 +10772,18 @@ namespace Armoury
         [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
         public bool RoutKeeperCourseFirst { get; set; } = true;
 
+        [SettingPropertyBool("Ai Flank Hidden Shooter", HintText = "With AI Formations Answer Harassers: when a lone enemy shooter on foot - you above all - has hit their men and then ducks behind a tree, a rock or a rise, the AI men near him do not stand and wait for him to show again. Once they have lost sight of him for a few seconds their archers split into two halves and walk round to the left and the right of his cover to a spot from which they can see him, stop there and shoot; their men with melee weapons (archers with a side weapon when there are few of them) close in on him from both sides, if they outnumber him and his men nearby three to one. Heroes and standard bearers are never sent, your own formations never move. Both sides alike. Off = as before (the answer ends a few seconds after his last shot)", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: a lone shooter behind cover is flanked, not waited for (311a)")]
+        public bool AiFlankHiddenShooter { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Cover Hold Seconds", 10.00f, 120.00f, "0", HintText = "With AI Flank Hidden Shooter: for how many seconds after a lone shooter last hit one of their men the AI keeps hunting him behind his cover. Lower = they give up sooner and return to their formation", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: a lone shooter behind cover is flanked, not waited for (311a)")]
+        public float CoverHoldSeconds { get; set; } = 45f;
+
+        [SettingPropertyFloatingInteger("Cover Hidden Seconds", 1.00f, 10.00f, "0.0", HintText = "With AI Flank Hidden Shooter: how many seconds the shooter must stay out of their sight before the AI men start to go round his cover", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: a lone shooter behind cover is flanked, not waited for (311a)")]
+        public float CoverHiddenSeconds { get; set; } = 2.5f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13464,6 +13476,9 @@ namespace Armoury
             s.ShieldWallUnderFireAnyOrder = ShieldWallUnderFireAnyOrder;
             s.RoutKeeperTimeBudget = RoutKeeperTimeBudget;
             s.RoutKeeperCourseFirst = RoutKeeperCourseFirst;
+            s.AiFlankHiddenShooter = AiFlankHiddenShooter;
+            s.CoverHoldSeconds = CoverHoldSeconds;
+            s.CoverHiddenSeconds = CoverHiddenSeconds;
         }
 
         internal static void Apply()
