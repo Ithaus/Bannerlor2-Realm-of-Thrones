@@ -86824,5 +86824,215 @@ def main(argv):
     return _bitwa310_main_prev(argv)
 
 
+# ============================================================ 311b: mennica korony i zuzycie monety (CrownMint.cs, TownFolk.Mint.cs)
+# M311-S self-test wyrazen i wierszy; M311-0 linie doby "Mennica (311b)"; M311-1 arytmetyka linii (moneta = do kas + oplata + psucie = wartosc kruszcu + psucie,
+# zuzycie = kiesy + kasy, netto = moneta - zuzycie); M311-2 kontrola swiata (rozjazd 0); M311-3 ksiega pieniadza tej doby: Z6 = moneta, U11 = zuzycie;
+# M311-4 oplata = stawka x wartosc (ulamki - najwyzej 1 zl na mennice i kruszec); M311-5 ksiega towarow: koszyk "mennica (311b)" = zbite sztuki, srebro i ruda zlota
+# "bez wyjasnienia" +0; M311-6 reszta R ksiegi (srednia 28 dob) < 10000; M311-7 potkniecia 0 i ERROR CrownMint / CoinWear / SilverNeedOf 0;
+# M311-8 (INFO) skala: moneta, zuzycie i netto %/rok, zapas jewelry pierwszy -> ostatni, wsad zlotnikow.
+M311_LINE = re.compile(
+    r"Mennica \(311b\): dzien (\d+) \| klucz TAK \| mennic (\d+) \(bily dzis (\d+), miast ze zlotnikami (\d+), krolestw z psuciem monety (\d+)\)"
+    r" \| kruszec: srebro (\d+) szt\. za (\d+) \(zapas zostawiony na polkach (\d+), zuzycie swiata na miasto ([\d.]+)/d\);"
+    r" ruda zlota (\d+) szt\. za (\d+) \(zapas zostawiony na polkach (\d+), zuzycie swiata na miasto ([\d.]+)/d\)"
+    r" \| zapas dni (\d+), ksiega towarow z dnia ([^|]+?)"
+    r" \| nowa moneta (\d+) = do kas miast (\d+) \+ oplata mennicza do skarbcow (\d+) \(([\d.]+)%\) \+ psucie monety do skarbcow (\d+) \(([\d.]+)%\)"
+    r" \| zuzycie monety (\d+) = kiesy ludu (\d+) \((\d+) kies\) \+ kasy miast (\d+) \((\d+) miast\); stawka ([\d.]+)%/rok"
+    r" \| netto swiata ([+-]?\d+) \(([+-]?[\d.]+)%/rok; od wczytania (\d+) dob: moneta (\d+), zuzycie (\d+), ([+-]?[\d.]+)%/rok; rok (\d+) dni\)"
+    r" \| kontrola swiata: przed (-?\d+), po (-?\d+), roznica (-?\d+), oczekiwane (-?\d+), rozjazd (-?\d+)"
+    r" \| krolestwa: (.*?) \| koszt ([\d.]+) ms(?: \| potkniecia (\d+)[^.]*)?\.$")
+M311_KEYS = ("day", "mints", "minted", "smith", "debk", "spcs", "sval", "skept", "spt", "gpcs", "gval", "gkept", "gpt", "days", "ksday",
+             "coin", "totown", "seig", "seigp", "extra", "extrap", "wear", "wf", "wfn", "wt", "wtn", "wyear", "net", "pct", "sdays", "scoin", "swear", "spct", "yd",
+             "w0", "w1", "diff", "exp", "rozj", "kings", "ms", "stum")
+M311_CTL = re.compile(r"Pieniadz swiata \(bilans - przyczyny\): dzien (\d+) .*?kontrola: .*? Z6=(-?\d+) .*? U11=(-?\d+)")
+M311_AVG = re.compile(r"Pieniadz swiata \(bilans - przyczyny\): dzien (\d+) .*?srednia 28 dob ([+-]?\d+)")
+M311_TOW = re.compile(r"Towary: dzien (\d+) - (silver|gold_ore|jewelry) \(\d+ d\): zapas (\d+).*?\| zuzycie (\d+) \[(.*?)\] \| bez wyjasnienia (\S+) \|")
+M311_TOWMINT = re.compile(r"mennica \(311b\) (\d+)")
+M311_SMITH = re.compile(r"linie warsztatow (\d+)")
+M311_ERR = ("ERROR in CrownMint", "ERROR in TownFolk.CoinWear", "ERROR in GoodsPaths.SilverNeedOf")
+M311_SAMPLE = ("Mennica (311b): dzien 108900 | klucz TAK | mennic 90 (bily dzis 7, miast ze zlotnikami 20, krolestw z psuciem monety 1) | kruszec: srebro 40 szt. za 1600"
+               " (zapas zostawiony na polkach 300, zuzycie swiata na miasto 2.20/d); ruda zlota 6 szt. za 600 (zapas zostawiony na polkach 2, zuzycie swiata na miasto"
+               " 0.07/d) | zapas dni 15, ksiega towarow z dnia 108899 | nowa moneta 2210 = do kas miast 2090 + oplata mennicza do skarbcow 110 (5.0%) + psucie monety"
+               " do skarbcow 10 (10.0%) | zuzycie monety 250 = kiesy ludu 80 (300 kies) + kasy miast 170 (97 miast); stawka 0.300%/rok | netto swiata +1960"
+               " (0.3245%/rok; od wczytania 3 dob: moneta 6000, zuzycie 750, 0.2899%/rok; rok 364 dni) | kontrola swiata: przed 219800000, po 219801960, roznica"
+               " 1960, oczekiwane 1960, rozjazd 0 | krolestwa: Ziemie Zachodnie [miast 3, srebro 40, ruda zlota 6, moneta 2210, oplata 110, psucie 10, Debasement]"
+               " | koszt 4.2 ms.")
+M311_SAMPLE_CTL = ("Pieniadz swiata (bilans - przyczyny): dzien 108900 | zmiana sumy +1 [P] ... srednia 28 dob -871 (z 3 dob) - prog 10000: OK | kontrola: Z=1 S=2 U=3"
+                   " N=0 R=0 Z5=0 Z6=2210 U10=0 U11=250 N1=0 ARYTMETYKA OK.")
+M311_SAMPLE_TOW = ("Towary: dzien 108900 - silver (20 d): zapas 1953 (+73) | produkcja 203 [wsie 202] | zuzycie 170 [linie warsztatow 50 (silversmithy 50); mieszczanie 62;"
+                   " mennica (311b) 40; dwory (E3-P1) 18] | bez wyjasnienia +0 | przewoz [wozy do osad 47] | posiadacze [miasta 313].")
+
+
+def m311_parse(t):
+    m = M311_LINE.search(t)
+    if not m:
+        return None
+    d = dict(zip(M311_KEYS, m.groups()))
+    for k, v in list(d.items()):
+        if k in ("ksday", "kings"):
+            continue
+        if v is None:
+            d[k] = 0
+        elif re.fullmatch(r"[+-]?\d+", v):
+            d[k] = int(v)
+        else:
+            d[k] = float(v)
+    return d
+
+
+def m311_rows(rep, days, ctl, avg, tow, errs):
+    """Wiersze M311-0..8 z list: days (slowniki m311_parse), ctl {dzien: (Z6, U11)}, avg [(dzien, srednia)], tow {(dzien, id): (zapas, mint, smith, bez)}, errs."""
+    rep.add("M311-0: linie doby 'Mennica (311b)'", f"{len(days)}" + (f", dzien {days[0]['day']}..{days[-1]['day']}" if days else ""), ">= 1 linia (klucz Crown Mint TAK)", bool(days))
+    if not days:
+        return
+    bad1 = []
+    for d in days:
+        if d["coin"] != d["totown"] + d["seig"] + d["extra"]:
+            bad1.append(f"{d['day']}: moneta {d['coin']} != kasy+oplata+psucie")
+        elif d["coin"] != d["sval"] + d["gval"] + d["extra"]:
+            bad1.append(f"{d['day']}: moneta {d['coin']} != wartosc kruszcu + psucie")
+        elif d["wear"] != d["wf"] + d["wt"]:
+            bad1.append(f"{d['day']}: zuzycie {d['wear']} != kiesy + kasy")
+        elif d["net"] != d["coin"] - d["wear"]:
+            bad1.append(f"{d['day']}: netto {d['net']} != moneta - zuzycie")
+        elif d["extrap"] == 0 and d["extra"] != 0:
+            bad1.append(f"{d['day']}: psucie przy stawce 0")
+    rep.add("M311-1: arytmetyka linii (moneta, zuzycie, netto)", f"bledow {len(bad1)}" + (f" (np. {bad1[0]})" if bad1 else ""), "0", not bad1)
+    bad2 = [f"{d['day']}: rozjazd {d['rozj']}" for d in days if d["rozj"] != 0 or d["diff"] != d["w1"] - d["w0"] or d["exp"] != d["net"]]
+    rep.add("M311-2: kontrola swiata (zloto po - przed = moneta - zuzycie)", f"dob z rozjazdem {len(bad2)}" + (f" (np. {bad2[0]})" if bad2 else ""), "0 (rozjazd 0 w kazdej dobie)", not bad2)
+    bad3, seen3 = [], 0
+    for d in days:
+        c = ctl.get(d["day"])
+        if c is None:
+            continue
+        seen3 += 1
+        if c[0] != d["coin"] or c[1] != d["wear"]:
+            bad3.append(f"{d['day']}: Z6 {c[0]} / moneta {d['coin']}, U11 {c[1]} / zuzycie {d['wear']}")
+    rep.add("M311-3: ksiega pieniadza - Z6 = nowa moneta, U11 = zuzycie (ta sama doba)", f"dob porownanych {seen3}, niezgodnych {len(bad3)}" + (f" (np. {bad3[0]})" if bad3 else ""),
+            ">= 1 doba, 0 niezgodnych", seen3 > 0 and not bad3)
+    bad4 = []
+    for d in days:
+        val = d["sval"] + d["gval"]
+        tol = 2 * max(1, d["minted"]) + 1
+        if abs(d["seig"] - val * d["seigp"] / 100.0) > tol + val * 0.0006:
+            bad4.append(f"{d['day']}: oplata {d['seig']} wobec {val} x {d['seigp']}%")
+        if d["extrap"] > 0 and d["debk"] == 0 and d["extra"] != 0:
+            bad4.append(f"{d['day']}: psucie {d['extra']} bez krolestwa z Debasement")
+    rep.add("M311-4: oplata mennicza = stawka x wartosc kruszcu; psucie tylko przy Debasement", f"bledow {len(bad4)}" + (f" (np. {bad4[0]})" if bad4 else ""), "0", not bad4)
+    bad5, seen5 = [], 0
+    for d in days:
+        for mid, key in (("silver", "spcs"), ("gold_ore", "gpcs")):
+            r = tow.get((d["day"], mid))
+            if r is None:
+                continue
+            seen5 += 1
+            if r[1] != d[key]:
+                bad5.append(f"{d['day']} {mid}: koszyk mennica {r[1]} != zbite {d[key]}")
+            if r[3] not in ("+0", "-"):
+                bad5.append(f"{d['day']} {mid}: bez wyjasnienia {r[3]}")
+    rep.add("M311-5: ksiega towarow - koszyk 'mennica (311b)' = zbite sztuki, 'bez wyjasnienia' +0", f"linii {seen5}, bledow {len(bad5)}" + (f" (np. {bad5[0]})" if bad5 else ""),
+            "0 bledow (brak linii towaru - INFO)", (not bad5) if seen5 else None)
+    if avg:
+        rep.add("M311-6: reszta R ksiegi pieniadza - srednia 28 dob (ostatnia)", f"{avg[-1][1]} (dzien {avg[-1][0]})", "|R| < 10000", abs(avg[-1][1]) < 10000)
+    else:
+        rep.add("M311-6: reszta R ksiegi pieniadza", "brak linii przyczyn", "|R| < 10000", None)
+    st_ = sum(d["stum"] for d in days)
+    rep.add("M311-7: potkniecia mennicy i ERROR (CrownMint, CoinWear, SilverNeedOf)", f"potkniec {st_}, ERROR {errs}", "0 i 0", st_ == 0 and errs == 0)
+    last = days[-1]
+    coin = sum(d["coin"] for d in days); wear = sum(d["wear"] for d in days); n = len(days)
+    w0 = days[0]["w0"] or 1
+    yd = last["yd"] or 364
+    rep.add("M311-8: skala (INFO)", f"{n} dob: moneta {coin} (srebro {sum(d['spcs'] for d in days)} szt., ruda zlota {sum(d['gpcs'] for d in days)} szt., oplata {sum(d['seig'] for d in days)},"
+            f" psucie {sum(d['extra'] for d in days)}), zuzycie {wear}; netto {(coin - wear) / n * yd * 100.0 / w0:.4f}%/rok swiata", "INFO (raport 311: srebro ok. 0.7%/rok przy biciu calego urobku)", None)
+    jw = sorted((k[0], v[0]) for k, v in tow.items() if k[1] == "jewelry")
+    sm = [v[2] for k, v in tow.items() if k[1] == "silver"]
+    rep.add("M311-8b: zapas jewelry i wsad zlotnikow (INFO)", (f"jewelry {jw[0][1]} -> {jw[-1][1]} (dni {jw[0][0]}..{jw[-1][0]})" if jw else "brak linii jewelry")
+            + (f"; srebro do linii warsztatow srednio {sum(sm) / len(sm):.1f}/d" if sm else ""), "INFO (przed 311b: 95 -> 52, warsztaty ok. 108/d)", None)
+
+
+def mennica311b_selftest():
+    d = m311_parse(M311_SAMPLE)
+    if not d:
+        return "wzorzec linii nie pasuje"
+    if d["coin"] != 2210 or d["rozj"] != 0 or d["spcs"] != 40 or d["gval"] != 600 or d["wear"] != 250 or d["stum"] != 0:
+        return f"zle pola: {d}"
+    if m311_parse(M311_SAMPLE[:-1] + " | potkniecia 2 (pierwszy wyjatek z miejsca w logu jako ERROR).")["stum"] != 2:
+        return "potkniecia nie czytane"
+    mc = M311_CTL.search(M311_SAMPLE_CTL)
+    if not mc or mc.groups() != ("108900", "2210", "250"):
+        return "kontrola Z6/U11 nie czytana"
+    mt = M311_TOW.search(M311_SAMPLE_TOW)
+    if not mt or M311_TOWMINT.search(mt.group(5)).group(1) != "40" or mt.group(6) != "+0":
+        return "linia Towary nie czytana"
+    rep = Report()
+    m311_rows(rep, [d], {108900: (2210, 250)}, [(108900, -871)], {(108900, "silver"): (1953, 40, 50, "+0"), (108900, "gold_ore"): (10, 6, 0, "+0")}, 0)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    bad = [k for k in ("M311-0", "M311-1", "M311-2", "M311-3", "M311-4", "M311-5", "M311-6", "M311-7") if v.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad}"
+    e = dict(d); e["rozj"] = 5; e["net"] = 1; e["seig"] = 300
+    rep = Report()
+    m311_rows(rep, [e], {108900: (2211, 250)}, [(108900, 20000)], {(108900, "silver"): (1953, 39, 50, "+3")}, 1)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("M311-1", "M311-2", "M311-3", "M311-4", "M311-5", "M311-6", "M311-7") if v.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss}"
+    return None
+
+
+def mennica311b_main(logp):
+    """mennica311b (31.10, paczka 311b): M311-S, M311-0..8 - opis nad M311_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = mennica311b_selftest()
+    rep.add("M311-S: self-test wyrazen i wierszy (linie 311b jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("M311-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    days, ctl, avg, tow, errs, raw = [], {}, [], {}, 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            t = m.group(2) if m else ln.rstrip("\r\n")
+            if t.startswith("Mennica (311b): dzien"):
+                raw += 1
+                d = m311_parse(t)
+                if d:
+                    days.append(d)
+            elif t.startswith("Pieniadz swiata (bilans - przyczyny): dzien"):
+                mc = M311_CTL.search(t)
+                if mc:
+                    ctl[int(mc.group(1))] = (int(mc.group(2)), int(mc.group(3)))
+                ma = M311_AVG.search(t)
+                if ma:
+                    avg.append((int(ma.group(1)), int(ma.group(2))))
+            elif t.startswith("Towary: dzien"):
+                mt = M311_TOW.search(t)
+                if mt:
+                    mm = M311_TOWMINT.search(mt.group(5)); ms = M311_SMITH.search(mt.group(5))
+                    tow[(int(mt.group(1)), mt.group(2))] = (int(mt.group(3)), int(mm.group(1)) if mm else 0, int(ms.group(1)) if ms else 0, mt.group(6))
+            elif any(x in t for x in M311_ERR):
+                errs += 1
+    print(f"plik: {logp} | linii 311b {raw} (czytelnych {len(days)}), linii przyczyn z Z6 {len(ctl)}, linii Towary kruszcow {len(tow)}")
+    if raw and len(days) != raw:
+        rep.add("M311-P: linie 311b czytelne", f"{len(days)} z {raw}", "wszystkie (zmieniony format w C#?)", False)
+    m311_rows(rep, days, ctl, avg, tow, errs)
+    rep.show()
+    return 0
+
+
+_mennica311b_main_prev = main
+
+
+def main(argv):
+    # paczka 311b: grupa mennica311b - opakowanie main jak bitwa310
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "mennica311b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return mennica311b_main(rest[0] if rest else None)
+    return _mennica311b_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

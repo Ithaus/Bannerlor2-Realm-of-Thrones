@@ -100,6 +100,7 @@ namespace Armoury
             public double DBook;                                      // GL-2: ludzie ksiegi osady ostatniej doby (linia "ludzie ksiegi", CSV ludzie_ksiegi) - glowy moga isc od ludzi rynku
             // ---- E5/B1 (kiesa czynna, TownFolk.Live.cs): prawdziwe zloto w kiesach - long, przelewy co do zlotowki
             public long KW, KR, KP, KG;                               // miasto: kiesy W/R/P i gmina; zamek: KW = kiesa podzamcza (zapis arm_townfolk)
+            public readonly double[] WearCarry = new double[4];       // 311b (CoinWear): ulamek zuzycia monety klas W/R/P/gmina przeniesiony na jutro - bez zapisu
             public long CourtCr;                                      // zamek: kredyt dworu (kuchnia pana) - liczba, bez zlota (zapis)
             public readonly long[] EarnWin = new long[3];             // zarobek okna klas - podstawa podatkow panu (zamek: [0])
             public readonly long[] ZcE = new long[3]; public int ZcDay = -1;   // ZC0 (DailyLife, tylko odczyt): zarobek okna klas z ostatniej doby kiesy czynnej (zamek: [0]) i jej dzien; bez zapisu

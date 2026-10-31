@@ -33,9 +33,12 @@ namespace Armoury
         // ------------------------------------------------------------ wlasne pozycje ksiegi (znak jak CW.AddWorld: +1 zrodlo/netto/minus-ujscie, -1 ujscie/korekta zrodel)
         internal const int UCtwLegacy = 0, UCtwBelow = 1, UPartyRemoved = 2, MUpgradeAi = 3, MUpgradePlayer = 4, MLordBuyPaid = 5, KCapFromPrice = 6, NCtwNet = 7,
                            IU8Disb = 8, MRotSwapPurse = 9,   // D11-5: doplata podmiany ROT oddana do sakiewek ludzi / kas miast (RotLeaks37)
-                           KCapNotable = 15, Items = 16;     // E5/A3 (164c): kapital karawan notabli z kies notabli i kas miast startu (NotableGold); 10-14 zarezerwowane
+                           KCapNotable = 15;                 // E5/A3 (164c): kapital karawan notabli z kies notabli i kas miast startu (NotableGold); 10-14 zarezerwowane
                                                             // dla drzew etapu 5 (zasada "pierwszy wolny + 5" - drzewo A1 i inne biora od 10; nieuzywane, znak 0)
-        private static readonly int[] Sign = { -1, -1, -1, +1, +1, +1, -1, +1, 0, +1, 0, 0, 0, 0, 0, -1 };
+        // 311b (mennica korony): ZMint - nowa moneta z kruszcu (zrodlo, klucz Z6 linii przyczyn), UCoinWear - zuzycie i gubienie monety (ujscie, klucz U11);
+        // poza SrcNow / SinkNow (wlasne klucze w "kontrola:", sumowane w MoneyLedger.Obieg - narzedzie obieg169 sumuje Z1.. i U1..)
+        internal const int ZMint = 16, UCoinWear = 17, Items = 18;
+        private static readonly int[] Sign = { -1, -1, -1, +1, +1, +1, -1, +1, 0, +1, 0, 0, 0, 0, 0, -1, +1, -1 };
         internal static readonly long[] Sum = new long[Items];
 
         internal static int Stumbles;

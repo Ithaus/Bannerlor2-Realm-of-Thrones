@@ -4256,6 +4256,26 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float DebasementShare { get; set; } = 0.005f;
 
+        [SettingPropertyBool("Crown Mint", HintText = "every town of a realm has a royal mint: each day it buys the gold ore and silver ore lying on the town stall beyond what the town's silversmiths and townsfolk need (Mint Silver Reserve Days), melts it down and strikes NEW coin worth the metal at the town's price - the town merchants get that coin less the mint fee, the kingdom treasury gets the fee. Real metal makes real money: the world's coin now grows a little where the mines are, and wears away a little in use (Coin Wear Per Year). Off = no coin is ever struck, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool CrownMint { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Mint Seigniorage", 0.000f, 0.500f, "0.000", HintText = "the mint fee (seigniorage and the cost of striking) the crown keeps from every coin struck - around 5% in England c. 1300", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float MintSeigniorage { get; set; } = 0.05f;
+
+        [SettingPropertyInteger("Mint Silver Reserve Days", 1, 120, "0", HintText = "the mint takes metal only beyond this many days of what the town needs: the daily ore of its silversmith workshops plus the world's daily use of that metal shared out over all towns (gold ore: the townsfolk's share alone), so the smiths and the folk find their metal first", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public int MintSilverReserveDays { get; set; } = 15;
+
+        [SettingPropertyFloatingInteger("Coin Wear Per Year", 0.0000f, 0.2000f, "0.0000", HintText = "share of the coin in townsfolk purses and town merchants' purses lost each year to wear, clipping and loss (0 = coin never wears away)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float CoinWearPerYear { get; set; } = 0.003f;
+
+        [SettingPropertyFloatingInteger("Debasement Mint Extra", 0.00f, 1.00f, "0.00", HintText = "while a realm has the Debasement of the Currency policy, its mints strike this much more coin from the same metal (lighter, baser coin) and the crown keeps the extra; the old daily share of town purses for the crown stays as it was", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float DebasementMintExtra { get; set; } = 0.1f;
+
         [SettingPropertyBool("Monopoly From Daily Profit", HintText = "State Monopolies: in the towns of the ruling clan the ruler takes 5% of what a workshop pays its owner that day, out of the workshop's capital - not 5% of all the profit the workshop has piled up, which was several times the policy's five percent, taken every day. Off = the old reckoning", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool MonopolyFromDailyProfit { get; set; } = true;
@@ -11835,6 +11855,11 @@ namespace Armoury
             s.CrownCustomsDutyMultiplier = CrownCustomsDutyMultiplier;
             s.PolicyIncomeConserved = PolicyIncomeConserved;
             s.DebasementShare = DebasementShare;
+            s.CrownMint = CrownMint;
+            s.MintSeigniorage = MintSeigniorage;
+            s.MintSilverReserveDays = MintSilverReserveDays;
+            s.CoinWearPerYear = CoinWearPerYear;
+            s.DebasementMintExtra = DebasementMintExtra;
             s.MonopolyFromDailyProfit = MonopolyFromDailyProfit;
             s.BesiegedPayNothing = BesiegedPayNothing;
             s.NoRotClanBailout = NoRotClanBailout;
