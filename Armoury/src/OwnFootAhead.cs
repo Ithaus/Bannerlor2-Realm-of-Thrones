@@ -38,6 +38,9 @@ namespace Armoury
         internal const float Step = 2.0f;               // m/s - step konia (lekki step; klus podejscia 128 to ok. 0.45 x pelna, odpoczynek 136 step / lekki klus)
         internal const float TickEvery = 0.2f, MinSpeed = 1.5f, HeadOff = 1.3f, LookMin = 3f, LookMax = 8f, LookSec = 0.5f, Side = 1.1f;
         private const int QueriesPerTick = 160;
+        // recenzja 305c: zwolniony (do stepa 2 m/s) puszczany dopiero ponizej 0.5 m/s - inaczej step pod 1.5 m/s w tlumie dawal petle zwolnij-pusc;
+        // kierunek korytarza zwolnionego wolnego konia z kierunku ruchu agenta (GetMovementDirection), nie ze skaczacego wektora predkosci
+        private const float HeldMinSpeed = 0.5f;
         private const int MaxIndex = 65536;
 
         // ---- znaczniki dla latki (watki robocze); pisze tylko glowny watek
@@ -202,7 +205,7 @@ namespace Armoury
             {
                 var a = Slowed[i];
                 bool keep = false;
-                try { keep = Eligible(a) && Blocked(m, a); budget--; }
+                try { keep = Eligible(a) && Blocked(m, a, true); budget--; }
                 catch (Exception e) { Stumble("OwnFootAhead.Zwolniony", e); keep = false; }
                 if (!keep) Release(i);
                 else Apply(a);   // limit odnowiony co takt (bez latki AdjustSpeedLimit gra wpisalaby swoj po ok. 0.5 s)
@@ -218,7 +221,7 @@ namespace Armoury
                 {
                     if (!Eligible(a)) continue;
                     budget--;
-                    if (Blocked(m, a)) Slow(a);
+                    if (Blocked(m, a, false)) Slow(a);
                 }
                 catch (Exception e) { Stumble("OwnFootAhead.Jezdziec", e); }
             }
@@ -256,13 +259,19 @@ namespace Armoury
         }
 
         /// <summary>Swoj pieszy w korytarzu przed lbem konia blizej niz pierwszy wrog w korytarzu (jedno zapytanie gry).</summary>
-        private static bool Blocked(Mission m, Agent a)
+        private static bool Blocked(Mission m, Agent a, bool held)
         {
             var mt = a.MountAgent;
             Vec2 vel = mt.GetRealGlobalVelocity().AsVec2;
             float sp = vel.Length;
-            if (!(sp > MinSpeed)) return false;
+            if (!(sp > (held ? HeldMinSpeed : MinSpeed))) return false;
             Vec2 fwd = vel * (1f / sp);
+            if (held && sp < MinSpeed)
+            {
+                Vec2 md = mt.GetMovementDirection();
+                float ml = md.Length;
+                if (ml > 0.01f) fwd = md * (1f / ml);
+            }
             float look = LookMin + LookSec * sp;
             if (look > LookMax) look = LookMax;
             Vec2 head = mt.Position.AsVec2 + fwd * HeadOff;

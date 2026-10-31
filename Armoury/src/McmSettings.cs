@@ -10520,7 +10520,7 @@ namespace Armoury
         [SettingPropertyGroup("Battle: fighting for life (305c)")]
         public bool BannerLossBreakIgnoresMorale { get; set; } = true;
 
-        [SettingPropertyBool("Cavalry Pursuit Near Victim", HintText = "with AI Cavalry Pursues: a pursuing rider leaves a fleeing man alone only if that man is within 40 m of an unbroken enemy formation, and turns back himself only within 15 m of one (never rides into spears). Off = no pursuit while the rider or the fleeing man is within 80 m of any unbroken enemy formation, as before", RequireRestart = false)]
+        [SettingPropertyBool("Cavalry Pursuit Near Victim", HintText = "with AI Cavalry Pursues: a pursuing rider leaves a fleeing man alone only if that man is within 40 m of an unbroken enemy formation, and turns back himself once he would reach 15 m of its edge within the next second of riding (checked four times a second, measured from the full width of the line), so he does not ride into the spears. Off = no pursuit while the rider or the fleeing man is within 80 m of any unbroken enemy formation, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: fighting for life (305c)")]
         public bool CavalryPursuitNearVictim { get; set; } = true;
 

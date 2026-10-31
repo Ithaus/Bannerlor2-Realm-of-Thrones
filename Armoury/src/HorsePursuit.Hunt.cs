@@ -757,10 +757,10 @@ namespace Armoury
         }
 
         /// <summary>305c (InfantryLeashLookahead): pieszy oddzial przekroczy smycz do nastepnego sprawdzenia - dystans + predkosc x odstep od ostatniego
-        /// sprawdzenia (0.25..2 s; pierwsze - 1 s, pass). Licznik zawroconych z wyprzedzeniem i najwieksza prognoza.</summary>
-        private static bool LeashAhead(Hunter h, Agent a, float dh, float now)
+        /// sprawdzenia (0.25..2 s; pierwsze - 1 s w passie, 0.25 s w kroku sterowania - recenzja 305c). Licznik zawroconych z wyprzedzeniem i najwieksza prognoza.</summary>
+        private static bool LeashAhead(Hunter h, Agent a, float dh, float now, bool pass)
         {
-            float gap = h.LeashAt >= 0f ? now - h.LeashAt : PassEvery;
+            float gap = h.LeashAt >= 0f ? now - h.LeashAt : (pass ? PassEvery : TrackEvery);
             if (gap < 0.25f) gap = 0.25f; else if (gap > 2f) gap = 2f;
             h.LeashAt = now;
             float v = a.GetRealGlobalVelocity().AsVec2.Length;
@@ -791,7 +791,7 @@ namespace Armoury
             {
                 float dk = FootLeash(h, a.Position.AsVec2);
                 if (dk > _rFootFar) _rFootFar = dk;
-                if (dk > MarchToContact.InfRearm || LeashAhead(h, a, dk, now)) { if (h.Anchor.IsValid) _l291LeashBack++; _rLeashStep++; return ULeash; }
+                if (dk > MarchToContact.InfRearm || LeashAhead(h, a, dk, now, false)) { if (h.Anchor.IsValid) _l291LeashBack++; _rLeashStep++; return ULeash; }
             }
             if (!pass) return rider && a.MountAgent == null ? UOther : -1;
             // klucze: jezdzcy 204, piechota 283, lucznicy - ktorykolwiek (283 sam strzela, gdy jazda wylaczona)
@@ -810,7 +810,7 @@ namespace Armoury
                 float dh = FootLeash(h, a.Position.AsVec2);   // poprawka 132b: straz strzelcow - od drogi do szyku strzezonego
                 if (dh > _rFootFar) _rFootFar = dh;
                 if (dh > MarchToContact.InfRearm) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }
-                if (_leashAhead && LeashAhead(h, a, dh, now)) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }   // 305c: zawrot z wyprzedzeniem
+                if (_leashAhead && LeashAhead(h, a, dh, now, true)) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }   // 305c: zawrot z wyprzedzeniem
                 if (now - h.Start >= MaxSeconds) return UTime;
                 if (s.MountAgent != null && !MeleeKind(h.T) && a.Position.AsVec2.Distance(s.Position.AsVec2) > HuntScreen) return URange;
                 return -1;

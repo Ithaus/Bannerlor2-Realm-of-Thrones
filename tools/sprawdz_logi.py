@@ -84316,7 +84316,7 @@ B305_CH = re.compile(r"\| straty bez bramki morale \(305c\) (TAK|NIE): trzecia c
 B305_CHK = re.compile(r"Choragwie \(CH\) koniec: (?:.*?\| )?kompanii (\d+) \|.*?, polowa skladu (\d+),")
 B305_HP = re.compile(r"\| wolni jezdzcy \(305c, ofiara przy szyku (TAK|NIE): .*?kontrola - poza \d+ m (\d+), nietknieta formacja przy jezdzcu (\d+), kon zajechany (\d+), "
                      r"wiwat (\d+), panika / inne (\d+); bez celu - brak uciekajacych w \d+ m (\d+), limit \d+ jezdzcow (\d+), ofiara przy nietknietym szyku (\d+), "
-                     r"ofiara poza \d+ m (\d+), cel nieaktualny (\d+); przydzialy wolnym (\d+)")
+                     r"ofiara poza \d+ m (\d+), cel nieaktualny (\d+); przydzialy wolnym (\d+)(?:; zawroceni w kroku 0\.25 s \(.*?\) (\d+))?")
 B305_HPW = re.compile(r"wejsc (\d+) \(")
 B305_OF = re.compile(r"Szarza przez swoich \(305c\): misja (\S+), klucz Cavalry Slows For Own Foot (TAK|NIE)")
 B305_OFT = re.compile(r"\| taktow (\d+) \(sr\. (\S+) ms, najwyzej (\S+) ms\).*?\| zwolnieni przed swoim pieszym: razy (\d+) \(jezdzcow (\d+)\)")
@@ -84335,7 +84335,8 @@ B305_SAMPLE_CH = ("[02:44:01] Choragwie (CH) koniec: kompanii 16 | sztandar padl
 B305_SAMPLE_HP = ("poscig (148): misja bitwa, klucz TAK (...) | szyki 5 (strona gracza 2 / wroga 3; konnica 4, konni lucznicy 1), wejsc 37 (sr. czas 52.1 s, najdluzej 60.0 s) "
                   "| wolni jezdzcy (305c, ofiara przy szyku TAK: ofiara w 40 m, jezdziec w 15 m od nietknietego szyku): kontrola - poza 250 m 3, nietknieta formacja "
                   "przy jezdzcu 10, kon zajechany 0, wiwat 0, panika / inne 1; bez celu - brak uciekajacych w 150 m 100, limit 2 jezdzcow 5, ofiara przy nietknietym "
-                  "szyku 40, ofiara poza 240 m 0, cel nieaktualny 2; przydzialy wolnym 12 | potkniecia poscig 0 (wypadli 0).")
+                  "szyku 40, ofiara poza 240 m 0, cel nieaktualny 2; przydzialy wolnym 12; zawroceni w kroku 0.25 s (jezdziec w 15 m + droga konia 1 s od pelnego "
+                  "promienia szyku) 3 | potkniecia poscig 0 (wypadli 0).")
 B305_SAMPLE_OF = ("Szarza przez swoich (305c): misja bitwa, klucz Cavalry Slows For Own Foot TAK (korytarz 3 m + 0.5 s jazdy, najwyzej 8 m, szer. 2 x 1.1 m; step 2.0 m/s; "
                   "latka AdjustSpeedLimit TAK) | taktow 2400 (sr. 0.120 ms, najwyzej 2.400 ms), jezdzcow sprawdzonych 600, zapytan 90000 (limit taktu 3) | zwolnieni "
                   "przed swoim pieszym: razy 800 (jezdzcow 300), jezdzco-sekund 900, ocen z wrogiem dalej w drodze 50, naraz najwyzej 40, limit w latce 2000 | szarze AI "
@@ -84395,7 +84396,7 @@ def bitwa305c_main(logp, csp=None):
             + (f" ({bad[0]})" if bad else ""), "zlych 0 (brak linii z kluczem TAK - INFO)", None if not ch else not bad)
     rep.add("B305-1b: zalamania kompanii ze strat w bitwach od 8 kompanii", f"bitew {big}, zalaman ze strat {big_breaks}", "> 0 (INFO; Willow Wood 30.10: 0)", None)
     # B305-2
-    tot = [0] * 11; n2 = 0; ent = 0
+    tot = [0] * 11; n2 = 0; ent = 0; tstep = 0
     for l in hp:
         m = B305_HP.search(l)
         if not m:
@@ -84403,11 +84404,14 @@ def bitwa305c_main(logp, csp=None):
         n2 += 1
         for j in range(11):
             tot[j] += int(m.group(j + 2))
+        if m.group(13): tstep += int(m.group(13))
         w = B305_HPW.search(l)
         if w: ent += int(w.group(1))
     rep.add("B305-2: poscig 148 - wolni jezdzcy (przyczyny i przydzialy)", f"linii {n2} z {len(hp)}, wejsc {ent}, przydzialy wolnym {tot[10]}; kontrola: daleko {tot[0]}, szyk przy jezdzcu {tot[1]}, "
             f"kon {tot[2]}, wiwat {tot[3]}, inne {tot[4]}; bez celu: brak {tot[5]}, limit {tot[6]}, ofiara przy szyku {tot[7]}, daleko {tot[8]}, nieaktualny {tot[9]}",
             "INFO (przydzialy > 0 przy wejsciach > 0; Willow 30.10: 0 z 37 wejsc)", None)
+    rep.add("B305-2b: poscig 148 - zawroceni przy nietknietym szyku w kroku 0.25 s (recenzja 305c)", f"zawroconych w kroku {tstep}",
+            "INFO (porownac 'gonacy padli' i 'FF na wlasnej jezdzie' w linii poscig (148) z biegiem przy CavalryPursuitNearVictim=false)", None)
     # B305-3
     bad3, ffs, ffslow, slowed, n3 = [], 0, 0, 0, 0
     for l in of:

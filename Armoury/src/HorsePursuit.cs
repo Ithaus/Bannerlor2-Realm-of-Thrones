@@ -79,6 +79,7 @@ namespace Armoury
         // 305c (klucz CavalryPursuitNearVictim): ofiara odpada dopiero blizej niz 40 m od nietknietego szyku wroga, jezdziec zawraca dopiero 15 m od niego
         // (CounterFootGap 204 - nie wjezdza w wlocznie); NIE = 80 m od jezdzca i od ofiary jak dotad
         internal const float VictimIntactRadius = 40f;
+        private const float RiderSpeedCap = 15f;   // 305c recenzja: predkosc do zapasu zawrocenia najwyzej tyle m/s (galop 10-14)
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private const byte RFree = 0, RChase = 1, ROut = 2;
@@ -121,6 +122,7 @@ namespace Armoury
         private static readonly int[] FreeWhy = new int[OKinds];
         private static readonly int[] FreeNoPick = new int[PKinds];
         private static int _freeAssign;
+        private static int _trackIntact;   // 305c recenzja: zawroceni przy szyku w kroku 0.25 s (z OutWhy[OIntact])
         private static string _kind = "?";
         private static float _passAcc, _trackAcc, _maxSec = MaxSeconds, _maxFrom = MaxFromMain, _rideLeash = RideLeash;
         private static int _restBelow, _rot;
@@ -133,6 +135,8 @@ namespace Armoury
         private static readonly List<Vec2>[] FleePos = { new List<Vec2>(), new List<Vec2>() };
         private static readonly List<Vec2>[] IntactPos = { new List<Vec2>(), new List<Vec2>() };
         private static readonly List<float>[] IntactR = { new List<float>(), new List<float>() };
+        // 305c recenzja: promien szyku BEZ limitu 40 m - tylko do zawrocenia jezdzca przy kluczu CavalryPursuitNearVictim (szeroka linia wielkiej bitwy)
+        private static readonly List<float>[] IntactRFull = { new List<float>(), new List<float>() };
         private static readonly int[] Panic = new int[2], Alive = new int[2];
         private static readonly List<Agent> Units = new List<Agent>();
         private static readonly Action<Agent> Collect = a => Units.Add(a);
@@ -381,7 +385,7 @@ namespace Armoury
             foreach (var r in Riders.Values) MarkRiding(r.A, false);
             Volatile.Write(ref _riding, null);
             Forms.Clear(); Riders.Clear(); All.Clear(); Chasers.Clear(); EverChased.Clear(); Units.Clear(); EndList.Clear();
-            for (int s = 0; s < 2; s++) { Flee[s].Clear(); FleePos[s].Clear(); IntactPos[s].Clear(); IntactR[s].Clear(); Panic[s] = 0; Alive[s] = 0; }
+            for (int s = 0; s < 2; s++) { Flee[s].Clear(); FleePos[s].Clear(); IntactPos[s].Clear(); IntactR[s].Clear(); IntactRFull[s].Clear(); Panic[s] = 0; Alive[s] = 0; }
             _passAcc = _trackAcc = 0f;
             _rot = 0;
             _episodes = _assign = _retarget = _sets = _budgetHit = _ridersLost = _dropped = 0;
@@ -401,6 +405,7 @@ namespace Armoury
             Array.Clear(FreeWhy, 0, FreeWhy.Length);
             Array.Clear(FreeNoPick, 0, FreeNoPick.Length);
             _freeAssign = 0;
+            _trackIntact = 0;
             ExSeen.Clear(); EverRiders.Clear(); EverVictims.Clear(); PursuedForms.Clear(); DryForms.Clear(); PlayerSkipped.Clear();
             _formsPlayerSide = _formsFoe = _formsCav = _formsHa = 0;
             CounterClear();   // 157 (licznik trafien jezdzcow, tablica _countering)
@@ -558,7 +563,7 @@ namespace Armoury
         /// <summary>Uciekajacy (PANIKA 139) i liczba ludzi na strone, nietkniete formacje stron (szyk od IntactMin ludzi - uciekajacy nie maja szyku).</summary>
         private static void BuildSides(Mission m)
         {
-            for (int s = 0; s < 2; s++) { Flee[s].Clear(); FleePos[s].Clear(); IntactPos[s].Clear(); IntactR[s].Clear(); Panic[s] = 0; Alive[s] = 0; }
+            for (int s = 0; s < 2; s++) { Flee[s].Clear(); FleePos[s].Clear(); IntactPos[s].Clear(); IntactR[s].Clear(); IntactRFull[s].Clear(); Panic[s] = 0; Alive[s] = 0; }
             var ags = m.Agents;
             int n = ags != null ? ags.Count : 0;
             for (int i = 0; i < n; i++)
@@ -595,6 +600,7 @@ namespace Armoury
                     if (!mp.IsValid) continue;
                     IntactPos[s].Add(mp.AsVec2);
                     IntactR[s].Add(Math.Min(RadiusCap, 0.5f * Math.Max(f.Width, f.Depth)));
+                    IntactRFull[s].Add(0.5f * Math.Max(f.Width, f.Depth));
                 }
             }
         }
@@ -777,8 +783,27 @@ namespace Armoury
             float d = p.Distance(st.Anchor);
             if (r.St == RChase && d > _maxFar) _maxFar = d;
             if (d > _maxFrom) return OFar;
-            if (IntactNear(st.Enemy, p, RiderIntactR)) return OIntact;
+            if (RiderNearIntact(st.Enemy, a, p)) return OIntact;
             return -1;
+        }
+
+        /// <summary>305c recenzja: jezdziec przy nietknietym szyku wroga. Klucz CavalryPursuitNearVictim NIE = IntactNear 80 m jak dotad. TAK = 15 m
+        /// (CounterFootGap) plus droga konia do nastepnego sprawdzenia (predkosc x PassEvery - pass i krok co 0.25 s), od pelnego promienia szyku (bez limitu 40 m).</summary>
+        private static bool RiderNearIntact(int s, Agent a, Vec2 p)
+        {
+            if (!_nearVictim) return IntactNear(s, p, IntactRadius);
+            if (s < 0) return false;
+            float v = 0f;
+            try { var mv = (a.MountAgent ?? a).MovementVelocity; v = mv.Length; } catch { v = 0f; }
+            if (v > RiderSpeedCap) v = RiderSpeedCap;
+            float gap = CounterFootGap + v * PassEvery;
+            var ps = IntactPos[s];
+            var rs = IntactRFull[s];
+            for (int i = 0; i < ps.Count; i++)
+            {
+                if (p.Distance(ps[i]) - rs[i] < gap) return true;
+            }
+            return false;
         }
 
         /// <summary>Cel nadal wazny: zywy, w PANICE, w 150 m od jezdzca, nie przy nietknietej formacji wroga, w limicie od glownej sily.</summary>
@@ -972,6 +997,8 @@ namespace Armoury
                     if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) { Out(r, OPanic); continue; }
                     if (!ReferenceEquals(a.Formation, r.F) || a.MountAgent == null) { Out(r, OOther); continue; }
                     if (a.GetComponent<VictoryComponent>() != null) { Out(r, OCheer); continue; }   // gra wybrala go do wiwatu - od razu, bez czekania na pass
+                    // 305c recenzja: przy kluczu CavalryPursuitNearVictim zawrocenie przy nietknietym szyku takze w kroku 0.25 s (NIE = tylko w passie jak dotad)
+                    if (_nearVictim && RiderNearIntact(r.S.Enemy, a, a.Position.AsVec2)) { Out(r, OIntact); _trackIntact++; continue; }
                     var v = r.V;
                     if (v == null || !v.IsActive() || !SurvivalMode.InPanic(v))
                     {
@@ -1097,7 +1124,7 @@ namespace Armoury
                   .Append("; bez celu - brak uciekajacych w ").Append(F0(SeekRadius)).Append(" m ").Append(FreeNoPick[PNone]).Append(", limit ").Append(PerVictim)
                   .Append(" jezdzcow ").Append(FreeNoPick[PLimit]).Append(", ofiara przy nietknietym szyku ").Append(FreeNoPick[PIntact]).Append(", ofiara poza ")
                   .Append(F0(_maxFrom - FarMargin)).Append(" m ").Append(FreeNoPick[PFar]).Append(", cel nieaktualny ").Append(FreeNoPick[PLate])
-                  .Append("; przydzialy wolnym ").Append(_freeAssign);
+                  .Append("; przydzialy wolnym ").Append(_freeAssign).Append("; zawroceni w kroku 0.25 s (jezdziec w 15 m + droga konia 1 s od pelnego promienia szyku) ").Append(_trackIntact);
             }
             AppendCounter(sb);   // 157 P3: segment " | kontra na strzelca (157) ..." (przed potknieciami - wzor AI139_LINES)
             sb.Append(" | potkniecia poscig ").Append(stum).Append(" (wypadli ").Append(_dropped).Append(").");
