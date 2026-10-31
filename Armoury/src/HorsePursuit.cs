@@ -444,11 +444,12 @@ namespace Armoury
         /// SetControlledByAI(this != PlayerTeam || !IsPlayerGeneral) - u gracza-wodza szyki sa NIE-AI, dopoki gracz nie odda dowodzenia (Team.DelegateCommandToAI
         /// :467-473 - wszystkie SetControlledByAI(true)); szyk z rozkazem gracza wraca pod gracza (IsAIControlled false). Tylko poscig 148 (Form) - inne paczki
         /// (204, 283, 149, 140) dalej PlayerForm.</summary>
+        /// Poprawka recenzji 309: bez porownania PlayerOwner - AssignPlayerRoleInTeamMissionController.OnTeamDeployed ustawia PlayerOwner = gracz WSZYSTKIM
+        /// szykom gracza-wodza, a DelegateCommandToAI go nie czysci (porownanie zrownywalo oddane szyki z szykami gracza, dopoki gracz zyl). Sierzant
+        /// gracza: setter PlayerOwner daje IsAIControlled false - obejmuje go pierwszy warunek.
         internal static bool PlayerFormDirect(Formation f)
         {
-            if (!f.IsAIControlled || f.IsPlayerTroopInFormation) return true;
-            var main = Agent.Main;
-            return main != null && ReferenceEquals(f.PlayerOwner, main);
+            return !f.IsAIControlled || f.IsPlayerTroopInFormation;
         }
 
         /// <summary>309 (klucz PursuitStartNearVictims): jest uciekajacy wroga e w SeekRadius od c, ktory nie stoi w VictimIntactR od nietknietego szyku
@@ -475,7 +476,7 @@ namespace Armoury
             for (int u = 0; u < Units.Count && !any; u++)
             {
                 var a = Units[u];
-                if (a == null || !a.IsActive() || !a.IsHuman || a.MountAgent == null || Hunters.ContainsKey(a)) continue;
+                if (a == null || !a.IsActive() || !a.IsHuman || a.MountAgent == null || Hunters.ContainsKey(a) || Riders.ContainsKey(a)) continue;   // jak RidersPass
                 if (Excl(a) != 0 || a.IsDetachedFromFormation || a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) continue;
                 any = true;
             }
@@ -1137,7 +1138,7 @@ namespace Armoury
                 sb.Append(" | na sucho: szykow ").Append(DryForms.Count).Append(", wejsc ").Append(_dryEpisodes).Append(", szyko-sekund poscigu ")
                   .Append(_drySec.ToString("0", Inv));
             }
-            sb.Append(" | nie zaczeli (passy z uciekajacymi w ").Append(F0(SeekRadius)).Append(" m): nietknieta formacja w ").Append(F0(IntactRadius)).Append(" m ")
+            sb.Append(" | nie zaczeli (passy z uciekajacymi w ").Append(F0(SeekRadius)).Append(" m): ").Append(_gateVictims ? "brak ofiary poza szykiem wroga w " + F0(SeekRadius) + " m " : "nietknieta formacja w " + F0(IntactRadius) + " m ")
               .Append(NoStart[NIntact]).Append(", konie szyku ").Append(NoStart[NHorses]).Append(", odpoczynek koni ").Append(NoStart[NRest]).Append(", poza ")
               .Append(F0(_maxFrom)).Append(" m od glownej sily ").Append(NoStart[NFar]).Append(", wrog nie zlamany ").Append(NoStart[NNotBroken])
               .Append(", po rozstrzygnieciu ").Append(NoStart[NEnded]).Append(", przerwa po poscigu ").Append(NoStart[NCool]).Append("; formacje gracza pominiete ")
@@ -1189,7 +1190,7 @@ namespace Armoury
             // 309: szyk gracza w 148 tylko pod rozkazami gracza, brama wejscia wedlug ofiar; straty: padli (zabici + nieprzytomni) / uszli / poza walka na strone
             sb.Append(" | 309 poscig: szyk gracza tylko pod jego rozkazami ").Append(_delegated ? "TAK" : "NIE").Append(" (wejscia szykow oddanych SI przez gracza-wodza ")
               .Append(_playerSideEntries).Append("), brama wedlug ofiar ").Append(_gateVictims ? "TAK" : "NIE").Append(" (otwarta mimo szyku w ").Append(F0(IntactRadius))
-              .Append(" m od srodka ").Append(_gateOpenedByVictims).Append(", szyk bez jezdzcow do wyslania - bez wejscia ").Append(_noRiders).Append(')');
+              .Append(" m od srodka ").Append(_gateOpenedByVictims).Append(", szyk bez jezdzcow do wyslania - passy bez wejscia ").Append(_noRiders).Append(')');
             sb.Append(" | straty 309 (z wystawionych, padli = zabici + nieprzytomni):");
             for (int s = 1; s >= 0; s--)
             {
@@ -1202,8 +1203,8 @@ namespace Armoury
                 int w = 1 - loser;
                 int tl = Lost[loser, 0] + Lost[loser, 1] + Lost[loser, 2] + Lost[loser, 3] + onField[loser];
                 int tw = Lost[w, 0] + Lost[w, 1] + Lost[w, 2] + Lost[w, 3] + onField[w];
-                sb.Append("; przegrani padli ").Append(Pct(Lost[loser, 0] + Lost[loser, 1], tl)).Append(" (cel 15-40%), zwyciezca poza walka ")
-                  .Append(Pct(Lost[w, 0] + Lost[w, 1] + Lost[w, 2], tw)).Append(" (cel 5-15%)");
+                sb.Append("; przegrani padli ").Append(Pct(Lost[loser, 0] + Lost[loser, 1], tl)).Append(" (cel 15-40%), zwyciezca padli ")
+                  .Append(Pct(Lost[w, 0] + Lost[w, 1], tw)).Append(" (cel 5-15%), poza walka ").Append(Pct(Lost[w, 0] + Lost[w, 1] + Lost[w, 2], tw));   // recenzja 309: cel 5-15% = padli
             }
             AppendCounter(sb);   // 157 P3: segment " | kontra na strzelca (157) ..." (przed potknieciami - wzor AI139_LINES)
             sb.Append(" | potkniecia poscig ").Append(stum).Append(" (wypadli ").Append(_dropped).Append(").");

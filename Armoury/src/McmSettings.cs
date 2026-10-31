@@ -10744,7 +10744,7 @@ namespace Armoury
         [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
         public bool BannerEventRollByLoss { get; set; } = true;
 
-        [SettingPropertyBool("Pursuit Delegated Formations", HintText = "With AI Cavalry Pursues: your own horsemen ride down fleeing enemies when you have handed command to the AI (or never gave an order); formations you command yourself are never touched. Off = none of your party's formations pursue while you are the general, as before", RequireRestart = false)]
+        [SettingPropertyBool("Pursuit Delegated Formations", HintText = "With AI Cavalry Pursues: your own horsemen ride down fleeing enemies when you have handed command of your formations to the AI, or when you have fallen; formations you command yourself are never touched. Off = none of your party's formations pursue while you are the general, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
         public bool PursuitDelegatedFormations { get; set; } = true;
 

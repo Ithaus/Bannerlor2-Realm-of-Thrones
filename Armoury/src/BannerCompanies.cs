@@ -115,7 +115,7 @@ namespace Armoury
         // 309 (klucz BannerBreakEarly): rzuty przy 1/6 strat (liczba, zalamania, suma p), kompanie bez nikogo zdolnego do rzutu (rozbite bez rzutu),
         // pominiete w szeregu (panika wedlug SurvivalMode.InPanic poza IsPanicked, ranni w odwrocie 143) - suma na przegladach InRanks z rzutem;
         // rzuty udzialu strat bez rzutu (n == 0) przy kluczu NIE (dawny brak spojnosci B307-2)
-        internal static int EarlyRolls, EarlyBreaks, EmptyBroken, RanksPanicSkip, RanksWithdrawSkip, ShareNoRoll;
+        internal static int EarlyRolls, EarlyBreaks, EmptyBroken, RanksPanicSkip, RanksWithdrawSkip, ShareNoRoll, EmptyWait;
         internal static float EarlyPSum, BreakShareSum;
         internal static int BreakShareN;   // 309: zalamania z rzutu udzialu strat (1/6 i 307b) - suma utraconej czesci przy zalamaniu
         // 309 (klucz BannerEventRollByLoss): rzuty zdarzen (sztandar, dowodca) bez bramki morale gry - liczba, suma udzialu strat, suma p, zalamania
@@ -135,7 +135,7 @@ namespace Armoury
             ShareLostSum = SharePSum = 0f;
             Array.Clear(ShareStep, 0, ShareStep.Length);
             StateRolls = 0; StateSum = 0f; StateMin = 9f; StateMax = 0f; Array.Clear(BreakBySrc, 0, BreakBySrc.Length);
-            EarlyRolls = EarlyBreaks = EmptyBroken = RanksPanicSkip = RanksWithdrawSkip = ShareNoRoll = BreakShareN = 0; EarlyPSum = BreakShareSum = 0f;
+            EarlyRolls = EarlyBreaks = EmptyBroken = RanksPanicSkip = RanksWithdrawSkip = ShareNoRoll = EmptyWait = BreakShareN = 0; EarlyPSum = BreakShareSum = 0f;
             EventRolls = EventBreaks = 0; EventShareSum = EventPSum = 0f;
         }
 
@@ -629,6 +629,7 @@ namespace Armoury
             if (_acc < BannerCompanies.TickEvery) return;
             _acc = 0f;
             float now = m.CurrentTime;
+            _bs.Clear(); _bsAt = now;   // poprawka recenzji 309: stan bitwy liczony raz na takt (na druzyne)
             var c = Settings.Current;
             if (c == null || !c.BannerCompaniesEnabled) return;
             for (int i = 0; i < _all.Count; i++)
@@ -714,9 +715,15 @@ namespace Armoury
                         }
                         else if (early)
                         {
-                            // 309: nikt zdolny do rzutu (sami bohaterowie, uciekajacy, ranni w odwrocie) - kompania de facto rozbita, bez okrzyku i fal
-                            co.LossStep = k;
-                            if (!co.Broken) { co.Broken = true; BannerCompanies.EmptyBroken++; }
+                            // 309: nikt zdolny do rzutu (sami bohaterowie, uciekajacy, ranni w odwrocie) - kompania de facto rozbita, bez okrzyku i fal.
+                            // Poprawka recenzji 309: chwilowy odwrot komponentu (szarza RBM, ok. 10 s) tez wyklucza z rzutu - wtedy bez Broken i bez kroku,
+                            // rzut ponowiony w nastepnym takcie (0.5 s); rozbita dopiero, gdy nie ma czynnego czlowieka AI poza trwala ucieczka
+                            if (AnyAbleLater(co)) BannerCompanies.EmptyWait++;
+                            else
+                            {
+                                co.LossStep = k;
+                                if (!co.Broken) { co.Broken = true; BannerCompanies.EmptyBroken++; }
+                            }
                         }
                         else BannerCompanies.ShareNoRoll++;
                     }
@@ -754,6 +761,27 @@ namespace Armoury
                 n++;
             }
             return n;
+        }
+
+        /// <summary>Poprawka recenzji 309: w kompanii jest czynny czlowiek AI (nie bohater), ktory moze jeszcze stanac do rzutu - nie ucieka (IsRunningAway,
+        /// IsPanicked), nie jest w zbiorze zlamanych RoutHold i nie idzie ranny na tyly (143). Chwilowy odwrot komponentu (szarza RBM) go NIE wyklucza.</summary>
+        private static bool AnyAbleLater(Company co)
+        {
+            var k = RoutHold.Live;
+            for (int i = 0; i < co.Men.Count; i++)
+            {
+                var a = co.Men[i];
+                if (a == null || !a.IsActive() || !a.IsAIControlled || a.IsHero || a.IsRunningAway) continue;
+                try
+                {
+                    var cai = a.CommonAIComponent;
+                    if (cai != null && cai.IsPanicked) continue;
+                    if (k != null && (k.Knows(a) || k.Withdrawing(a))) continue;
+                }
+                catch { continue; }
+                return true;
+            }
+            return false;
         }
 
         /// <summary>309 (klucz BannerBreakEarly): ludzie w szeregu - czynni, nie w PANICE wedlug SurvivalMode.InPanic (IsPanicked, odwrot komponentu bez
@@ -1072,8 +1100,28 @@ namespace Armoury
 
         /// <summary>307e: stan bitwy wobec kompanii - sila walczacych wroga / sila walczacych jej strony (CharacterPowerCached ludzi czynnych, nie w ucieczce
         /// ani w zbiorze zlamanych RoutHold), clamp 0.3..1.5; bez danych - 1 (rzut jak dotad). Rzuty sa rzadkie (zdarzenia kompanii) - pelny przeglad Mission.Agents.</summary>
+        private readonly Dictionary<Team, float> _bs = new Dictionary<Team, float>();
+        private float _bsAt = -100f;
+
+        /// <summary>Poprawka recenzji 309 (rzuty od 1/6 i rzuty zdarzen bez bramki - wiele rzutow w jednym takcie): B na druzyne raz na takt TickEvery;
+        /// rzut zdarzenia poza taktem bierze wartosc najwyzej 0.5 s stara. Wynik jak BattleStateNow.</summary>
         private float BattleState(Company co)
         {
+            var m = Mission;
+            if (m == null || co == null || co.T == null) return 1f;
+            float t = m.CurrentTime;
+            if (t - _bsAt >= BannerCompanies.TickEvery || t < _bsAt) { _bs.Clear(); _bsAt = t; }
+            float q;
+            if (_bs.TryGetValue(co.T, out q)) return q;
+            bool ok;
+            q = BattleStateNow(co, out ok);
+            if (ok) _bs[co.T] = q;
+            return q;
+        }
+
+        private float BattleStateNow(Company co, out bool ok)
+        {
+            ok = false;
             try
             {
                 var m = Mission;
@@ -1088,6 +1136,7 @@ namespace Armoury
                     if (!(pw > 0f)) pw = 1f;
                     if (a.Team.Side == side) ours += pw; else if (a.Team.IsEnemyOf(co.T)) foe += pw;
                 }
+                ok = true;
                 if (!(ours > 0f)) return 1.5f;
                 float q = foe / ours;
                 if (q < 0.3f) q = 0.3f;
@@ -1315,6 +1364,7 @@ namespace Armoury
               .Append(" | zalamania wedlug udzialu strat lacznie (309): ").Append(BannerCompanies.BreakBySrc[3] + BannerCompanies.BreakBySrc[5])
               .Append(" z ").Append(BannerCompanies.Companies).Append(" kompanii, sr. utracona czesc przy zalamaniu ")
               .Append(BannerCompanies.BreakShareN > 0 ? (BannerCompanies.BreakShareSum / BannerCompanies.BreakShareN).ToString("0.00", inv305) : "-");
+            sb.Append(" | czekanie na rzut 1/6 (wszyscy chwilowo poza szeregiem, poprawka 309): taktow ").Append(BannerCompanies.EmptyWait);
             sb.Append(" | potkniecia ").Append(BannerCompanies.Stumbles).Append('.');
             Log.Info(sb.ToString());
         }

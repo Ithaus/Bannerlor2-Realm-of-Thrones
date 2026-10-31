@@ -86448,10 +86448,10 @@ B309_CH = re.compile(r"\| wczesne zalamanie \(309\) (TAK|NIE): rzutow przy 1/6 (
                      r"\(sr\. udzial strat (\S+), sr\. szansa (\S+)\), zalaman (\d+) \| zalamania wedlug udzialu strat lacznie \(309\): (\d+) z (\d+) kompanii, sr\. utracona "
                      r"czesc przy zalamaniu (\S+)")
 B309_PS = re.compile(r"\| 309 poscig: szyk gracza tylko pod jego rozkazami (TAK|NIE) \(wejscia szykow oddanych SI przez gracza-wodza (\d+)\), brama wedlug ofiar (TAK|NIE) "
-                     r"\(otwarta mimo szyku w \d+ m od srodka (\d+), szyk bez jezdzcow do wyslania - bez wejscia (\d+)\)")
+                     r"\(otwarta mimo szyku w \d+ m od srodka (\d+), szyk bez jezdzcow do wyslania - passy bez wejscia (\d+)\)")
 B309_PSK = re.compile(r"wejsc (\d+) \(sr\. czas .*?jezdzcow w poscigu (\d+) \(przydzialow celu (\d+)")
 B309_ST = re.compile(r"\| straty 309 \(z wystawionych, padli = zabici \+ nieprzytomni\): atakujacy padli (\S+) / uszli (\S+) / poza walka (\S+); obroncy padli (\S+) / "
-                     r"uszli (\S+) / poza walka (\S+?)(?:; przegrani padli (\S+) \(cel 15-40%\), zwyciezca poza walka (\S+) \(cel 5-15%\))?(?: \||$)")
+                     r"uszli (\S+) / poza walka (\S+?)(?:; przegrani padli (\S+) \(cel 15-40%\), zwyciezca padli (\S+) \(cel 5-15%\), poza walka (\S+))?(?: \||$)")
 B309_FC = re.compile(r"Koszt klatki Armoury \(309\): misja (\S+), klatek z nasza praca (\d+) .*?\| suma naszych na klatke: p50 (.+?), p99 (.+?), najwiecej (\S+) ms; "
                      r"klatek ponad 2 ms (\d+), ponad 5 ms (\d+) \| odstep klatek realny \(cala klatka gry\): sr\. (\S+) ms, ponad 33 ms (\d+), ponad 50 ms (\d+), "
                      r"ponad 100 ms (\d+), najdluzszy (\d+) ms \| moduly \(ms razem / najwiecej na wywolanie / wywolan\): (.*?) \| zamach FieldCraft \(309, klucz (TAK|NIE)\): "
@@ -86463,12 +86463,12 @@ B309_SAMPLE_CH = ("[13:59:07] Choragwie (CH) koniec: kompanii 14 | sztandar padl
                   "| zalamania wedlug rzutu: sztandar 1, dowodca 0, udzial strat 1, straty 305c / polowa 0, inne 0 | wczesne zalamanie (309) TAK: rzutow przy 1/6 5 (sr. szansa "
                   "0.050, zalaman 2), rozbite bez rzutu 1, poza szeregiem przy rzutach: panika 12, ranni w odwrocie 2, rzutow udzialu bez rzutu (klucz NIE) 0 | rzuty zdarzen "
                   "wedlug strat (309) TAK: rzutow 12 (sr. udzial strat 0.35, sr. szansa 0.120), zalaman 1 | zalamania wedlug udzialu strat lacznie (309): 3 z 14 kompanii, "
-                  "sr. utracona czesc przy zalamaniu 0.31 | potkniecia 0.")
+                  "sr. utracona czesc przy zalamaniu 0.31 | czekanie na rzut 1/6 (wszyscy chwilowo poza szeregiem, poprawka 309): taktow 4 | potkniecia 0.")
 B309_SAMPLE_PS = ("[13:59:07] poscig (148): misja bitwa, klucz TAK (...) | szyki 2 (strona gracza 1 / wroga 1; konnica 2, konni lucznicy 0), wejsc 3 (sr. czas 20.0 s, najdluzej "
                   "30.0 s), jezdzcow w poscigu 12 (przydzialow celu 20, nowy cel po utracie 3), uciekajacych gonionych 15 | ... | 309 poscig: szyk gracza tylko pod jego "
                   "rozkazami TAK (wejscia szykow oddanych SI przez gracza-wodza 2), brama wedlug ofiar TAK (otwarta mimo szyku w 80 m od srodka 5, szyk bez jezdzcow do "
-                  "wyslania - bez wejscia 1) | straty 309 (z wystawionych, padli = zabici + nieprzytomni): atakujacy padli 10.0% / uszli 1.0% / poza walka 11.0%; obroncy "
-                  "padli 35.0% / uszli 40.0% / poza walka 75.0%; przegrani padli 35.0% (cel 15-40%), zwyciezca poza walka 11.0% (cel 5-15%) | potkniecia poscig 0 (wypadli 0).")
+                  "wyslania - passy bez wejscia 1) | straty 309 (z wystawionych, padli = zabici + nieprzytomni): atakujacy padli 10.0% / uszli 1.0% / poza walka 11.0%; obroncy "
+                  "padli 35.0% / uszli 40.0% / poza walka 75.0%; przegrani padli 35.0% (cel 15-40%), zwyciezca padli 10.0% (cel 5-15%), poza walka 11.0% | potkniecia poscig 0 (wypadli 0).")
 B309_SAMPLE_FC = ("[13:59:07] Koszt klatki Armoury (309): misja bitwa, klatek z nasza praca 3000 (czas misji 472 s, realny 55 s) | suma naszych na klatke: p50 <= 0.25 ms, "
                   "p99 <= 3 ms, najwiecej 4.123 ms; klatek ponad 2 ms 12, ponad 5 ms 0 | odstep klatek realny (cala klatka gry): sr. 16.0 ms, ponad 33 ms 3, ponad 50 ms 1, "
                   "ponad 100 ms 0, najdluzszy 120 ms | moduly (ms razem / najwiecej na wywolanie / wywolan): FieldCraft 120.5 / 1.200 / 3000, okrzyki 3.0 / 0.100 / 3000, "
@@ -86516,11 +86516,11 @@ def b309_rows(rep, ch, ps, fc):
         if not s:
             bad3.append("straty: " + l[-160:]); continue
         if s.group(7) is not None:
-            loss.append(f"przegrani padli {s.group(7)}, zwyciezca poza walka {s.group(8)}")
+            loss.append(f"przegrani padli {s.group(7)}, zwyciezca padli {s.group(8)} (poza walka {s.group(9)})")
     rep.add("B309-3: poscig 148 (309) - format segmentu i strat", f"linii {n3}, wejsc {ent}, przydzialow celu {asg}, zlych {len(bad3)}" + (f" ({bad3[0]})" if bad3 else ""),
             "zlych 0 (brak linii - INFO)", None if n3 == 0 and not bad3 else not bad3)
     rep.add("B309-3b: przydzialy poscigu (bitwy z segmentem 309)", f"{asg}", "INFO (cel > 0 w bitwach armii; 144a b8/b9: 0)", None)
-    rep.add("B309-4: straty stron (padli / poza walka)", "; ".join(loss[:9]) or "-", "INFO (cel: przegrani padli 15-40%, zwyciezca poza walka 5-15%; 144a b9: 82% / 42%)", None)
+    rep.add("B309-4: straty stron (padli / poza walka)", "; ".join(loss[:9]) or "-", "INFO (cel: przegrani padli 15-40%, zwyciezca padli 5-15%; 144a b9: 82% / 42% poza walka)", None)
     # B309-5 / B309-6
     bad5, n5, stum, worst, over5, frames, tops, sw, ss, srw = [], 0, 0, 0.0, 0, 0, [], 0, 0, 0
     for l in fc:
@@ -86557,7 +86557,7 @@ def bitwa309_selftest():
     if bad:
         return f"dobry bieg - nie TAK: {bad}"
     s = B309_ST.search(B309_SAMPLE_PS)
-    if s.group(6) != "75.0%" or s.group(7) != "35.0%" or s.group(8) != "11.0%":
+    if s.group(6) != "75.0%" or s.group(7) != "35.0%" or s.group(8) != "10.0%" or s.group(9) != "11.0%":
         return f"straty: zle grupy {s.groups()}"
     rep = Report()
     b309_rows(rep, [B309_SAMPLE_CH.replace("(sr. szansa 0.050, zalaman 2)", "(sr. szansa 0.050, zalaman 9)")],
