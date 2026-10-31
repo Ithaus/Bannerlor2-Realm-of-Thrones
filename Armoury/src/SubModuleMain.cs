@@ -193,6 +193,7 @@ namespace Armoury
                 try { SoldierPay.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SoldierPay.ApplyAll", e); }   // zold do obiegu: sakiewki ludzi, kasy osad, zwrot ze skarbca
                 WearKeep.ApplyAll(_harmony);
                 HistoricalPrices.ApplyAll(_harmony);
+                try { SmithXpRule.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SmithXpRule.ApplyAll", e); }   // 305d: jedna zasada XP za prace kowala (stamina x 7 x tier x nauka) - wolne kucie, CRAFT BK, zlecenia; slowa zrodel do linii dobowej
                 try { FixedSums38.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FixedSums38.ApplyAll", e); }   // 3.8: okna wartosci w starej monecie (nagroda turnieju gry i TXP)
                 RawPrice.ApplyAll(_harmony);     // cena surowcow od niedoboru: stala wzoru ceny w nowej monecie, popyt z prawdziwego zuzycia miasta
                 try { TownFolk.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplyAll", e); }   // E5/0 (195): okna pomiaru kiesy ludu - tylko odczyt (budzet dnia, wiersze polki BK, konsumpcja, bitwy, notable)

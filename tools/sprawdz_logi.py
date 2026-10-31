@@ -84682,6 +84682,150 @@ def w305_main(logp):
     return 0
 
 
+
+# ============================================================ kowal305 (31.10, paczka 305d KOWALSTWO - BALANS XP)
+# Linie C#: SmithXpRule.ApplyAll "Kowalstwo - jedna zasada XP (305d): wpiete N/N ..." i SmithXp.DailySources "Kowalstwo - zrodla XP (305d): dzien N | surowe XP X
+# w N wywolaniach: luk n x / X, ... | zasada pracy TAK (...): wolne kucie broni n / X, pancerz CRAFT n / X, zlecenie n / X + premia n / X | od dawnej wartosci
+# (SmithXpRoundFix TAK) N | potkniecia zasady N." oraz m109 "Kowalstwo wolniej (m109): dzien N | ... XP przed X -> po Y".
+# KOW305-0 wpiecie, KOW305-1 doby i potkniecia, KOW305-2 przetop > 1 XP na wywolanie, KOW305-3 miecz > 50 XP na wywolanie (przy zasadzie),
+# KOW305-4 udzial lukow (INFO), KOW305-5 ciecie 0.70 dalej dziala (po / przed), KOW305-6 test m109 (TAK). Uzycie: --grupa kowal305 <Armoury-*.log>.
+KOW305_START = re.compile(r"Kowalstwo - jedna zasada XP \(305d\): wpiete (\d+)/(\d+) .*?klucz SmithXpOneRule (TAK|NIE), SmithXpPerStaminaTier (\d+), SmithXpRoundFix (TAK|NIE) \| potkniecia (\d+)\.")
+KOW305_DAY = re.compile(r"Kowalstwo - zrodla XP \(305d\): dzien (\d+) \| surowe XP ([\d.]+) w (\d+) wywolaniach: (.*?) \| zasada pracy (TAK|NIE)[^:]*: (.*?) \| od dawnej wartosci \(SmithXpRoundFix (TAK|NIE)\) (\d+) \| potkniecia zasady (\d+)\.")
+KOW305_SRC = re.compile(r"(\w+) (\d+) x / ([\d.]+)")
+KOW305_M109 = re.compile(r"Kowalstwo wolniej \(m109\): dzien (\d+) \| wywolan (\d+) .*?XP przed ([\d.]+) -> po ([\d.]+)")
+KOW305_M109T = re.compile(r"Kowalstwo wolniej \(m109\): test - .* - (TAK|NIE)\.")
+KOW305_NAMES = ["luk", "kusza", "amunicja", "pancerz", "miecz", "zlecenie", "przetop", "rafinacja", "inne"]
+
+
+def kowal305_new():
+    return {"start": [], "days": [], "m109": [], "m109t": [], "bad": 0}
+
+
+def kowal305_feed(D, s):
+    if "(305d)" not in s and "Kowalstwo wolniej (m109)" not in s:
+        return
+    m = KOW305_START.search(s)
+    if m:
+        D["start"].append((int(m.group(1)), int(m.group(2)), m.group(3), int(m.group(4)), m.group(5), int(m.group(6))))
+        return
+    m = KOW305_DAY.search(s)
+    if m:
+        src = {}
+        for x in KOW305_SRC.finditer(m.group(4)):
+            src[x.group(1)] = (int(x.group(2)), float(x.group(3)))
+        D["days"].append({"day": int(m.group(1)), "sum": float(m.group(2)), "n": int(m.group(3)), "src": src, "rule": m.group(5),
+                          "fix": m.group(7), "fixed": int(m.group(8)), "stum": int(m.group(9))})
+        return
+    m = KOW305_M109.search(s)
+    if m:
+        D["m109"].append((int(m.group(1)), int(m.group(2)), float(m.group(3)), float(m.group(4))))
+        return
+    m = KOW305_M109T.search(s)
+    if m:
+        D["m109t"].append(m.group(1))
+        return
+    if "Kowalstwo - zrodla XP (305d)" in s or "Kowalstwo - jedna zasada XP (305d): wpiete" in s:
+        D["bad"] += 1
+
+
+def kowal305_rows(rep, D):
+    st = D["start"]
+    if not st:
+        rep.add("KOW305-0: linia startu 'Kowalstwo - jedna zasada XP (305d): wpiete N/N'", "brak w logu", "INFO (log sprzed paczki 305d)", None)
+    else:
+        w, n, rule, k, fix, stum = st[-1]
+        rep.add("KOW305-0: wpiecie zasady XP (ostatni start)", f"wpiete {w}/{n}, SmithXpOneRule {rule}, stawka {k}, SmithXpRoundFix {fix}, potkniecia {stum}", "wpiete N/N, N >= 6", w == n and n >= 6)
+    m = D["m109"]
+    if m:
+        b = sum(r[2] for r in m)
+        a = sum(r[3] for r in m)
+        rep.add("KOW305-5: ciecie m109 (po / przed, suma dob)", f"{(a / b) if b > 0 else 0:.3f} (przed {b:.0f}, po {a:.0f})", "0.70 +- 0.01 (klucz SmithingXpFactor domyslny)", (abs(a / b - 0.70) <= 0.01) if b > 0 else None)
+    if D["m109t"]:
+        rep.add("KOW305-6: test m109 (poziom postaci bez ciecia)", D["m109t"][-1], "TAK", D["m109t"][-1] == "TAK")
+    days = D["days"]
+    if D["bad"]:
+        rep.add("KOW305-B: nierozpoznane linie 305d", str(D["bad"]), "0 (zmiana napisu w C#)", False)
+    if not days:
+        rep.add("KOW305-1: linie dobowe 'Kowalstwo - zrodla XP (305d)'", "brak", "INFO (w biegu nie bylo kuzni)", None)
+        return
+    tot = {k: [0, 0.0] for k in KOW305_NAMES}
+    for d in days:
+        for k, (c, x) in d["src"].items():
+            if k in tot:
+                tot[k][0] += c
+                tot[k][1] += x
+    stum = days[-1]["stum"]
+    allsum = sum(v[1] for v in tot.values())
+    rep.add("KOW305-1: doby z kuznia i potkniecia zasady", f"dob {len(days)}, surowe XP {allsum:.0f}, potkniecia (ostatnia doba) {stum}", "potkniecia 0", stum == 0)
+    rep.add("KOW305-1b: rozbicie XP (suma dob)", ", ".join(f"{k} {tot[k][0]} x / {tot[k][1]:.0f}" for k in KOW305_NAMES), "INFO", None)
+    fix = days[-1]["fix"] == "TAK"
+    c, x = tot["przetop"]
+    if c == 0:
+        rep.add("KOW305-2: przetop - XP na wywolanie", "brak przetopow", "INFO", None)
+    else:
+        rep.add("KOW305-2: przetop - XP na wywolanie (SmithXpRoundFix " + ("TAK" if fix else "NIE") + ")", f"{x / c:.1f} ({c} wywolan)", "> 1.5 przy TAK (bylo 1.0 - zaokraglenie od nowej ceny)", (x / c > 1.5) if fix else None)
+    rule = days[-1]["rule"] == "TAK"
+    c, x = tot["miecz"]
+    if c == 0:
+        rep.add("KOW305-3: wolny miecz - XP na wywolanie", "brak wolnego kucia broni", "INFO", None)
+    else:
+        rep.add("KOW305-3: wolny miecz - XP na wywolanie (zasada " + ("TAK" if rule else "NIE") + ")", f"{x / c:.1f} ({c} wywolan)", "> 50 przy TAK (stamina 15-36 x 7 x tier)", (x / c > 50) if rule else None)
+    if allsum > 0:
+        rep.add("KOW305-4: udzial lukow, kusz i amunicji w surowym XP", f"{(tot['luk'][1] + tot['kusza'][1] + tot['amunicja'][1]) / allsum * 100:.0f}%", "INFO (log 30.10: 51% przed 305d)", None)
+
+
+def kowal305_selftest():
+    D = kowal305_new()
+    lines = [
+        "Kowalstwo - jedna zasada XP (305d): wpiete 10/10 (kowal z kuzni gry i z CRAFT BK, wolne kucie, zlecenie, slowa przetopu i rafinacji w 1 modelach kowalstwa) | klucz SmithXpOneRule TAK, SmithXpPerStaminaTier 7, SmithXpRoundFix TAK | potkniecia 0.",
+        "Kowalstwo - zrodla XP (305d): dzien 5 | surowe XP 1258 w 4 wywolaniach: luk 1 x / 546, kusza 0 x / 0, amunicja 0 x / 0, pancerz 0 x / 0, miecz 1 x / 504, zlecenie 0 x / 0, przetop 2 x / 40, rafinacja 1 x / 60, inne 0 x / 0 | zasada pracy TAK (7 XP na stamine x tier): wolne kucie broni 1 / 504, pancerz CRAFT 0 / 0, zlecenie 0 / 0 + premia 0 / 0 | od dawnej wartosci (SmithXpRoundFix TAK) 3 | potkniecia zasady 0.",
+        "Kowalstwo wolniej (m109): dzien 5 | wywolan 4 (gracz 4, rod 0, inni 0), XP przed 1258 -> po 880.6 (gracz 1258 -> 880.6), bez mnoznika (ustawianie poziomu) 0, potkniecia 0.",
+    ]
+    for ln in lines:
+        kowal305_feed(D, ln)
+    if len(D["start"]) != 1 or D["start"][0][0] != 10:
+        return "linia startu nie rozpoznana"
+    if len(D["days"]) != 1 or D["days"][0]["src"].get("miecz") != (1, 504.0) or D["days"][0]["fixed"] != 3:
+        return "linia dobowa nie rozpoznana: " + repr(D["days"])
+    if len(D["m109"]) != 1 or abs(D["m109"][0][3] - 880.6) > 0.01:
+        return "linia m109 nie rozpoznana"
+    rep = Report()
+    kowal305_rows(rep, D)
+    bad = [r for r in rep.rows if r[3] == "NIE"]
+    if bad:
+        return "dobry bieg daje NIE: " + repr(bad)
+    D2 = kowal305_new()
+    kowal305_feed(D2, lines[0])
+    kowal305_feed(D2, lines[1].replace("przetop 2 x / 40", "przetop 2 x / 2").replace("miecz 1 x / 504", "miecz 1 x / 1"))
+    rep2 = Report()
+    kowal305_rows(rep2, D2)
+    v = {r[0][:9]: r[3] for r in rep2.rows}
+    if v.get("KOW305-2:") != "NIE" or v.get("KOW305-3:") != "NIE":
+        return "zly bieg (1 XP za przetop i miecz) nie wykryty: " + repr(v)
+    return None
+
+
+def kowal305_main(logp):
+    rep = Report()
+    s1 = kowal305_selftest()
+    rep.add("KOW305-S: self-test wyrazen (linie 305d jak w C#: SmithXpRule.ApplyAll / SmithXp.DailySources)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("KOW305-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = kowal305_new()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if "Kowalstwo" not in ln:
+                continue
+            m = TS.match(ln.rstrip("\r\n"))
+            kowal305_feed(D, m.group(2) if m else ln.rstrip("\r\n"))
+    print(f"plik: {logp} | startow 305d {len(D['start'])}, dob 305d {len(D['days'])}, dob m109 {len(D['m109'])}")
+    kowal305_rows(rep, D)
+    rep.show()
+    return 0
+
+
 _karawany305_main_prev = main
 
 
@@ -84721,6 +84865,18 @@ def main(argv):
             return bitwa305c_main(rest[0] if rest else None, rest[1] if len(rest) > 1 else None)
     return _bitwa305c_main_prev(argv)
 
+_kowal305_main_prev = main
+
+
+def main(argv):
+    # paczka 305d: grupa kowal305 - opakowanie main jak dowodca139
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "kowal305":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return kowal305_main(rest[0] if rest else None)
+    return _kowal305_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

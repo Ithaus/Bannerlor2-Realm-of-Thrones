@@ -10568,6 +10568,18 @@ namespace Armoury
         [SettingPropertyGroup("Battle: fighting for life (305c)")]
         public bool InfantryLeashLookahead { get; set; } = true;
 
+        [SettingPropertyBool("Smith Xp Round Fix", HintText = "Smithing XP of a forged weapon, a smelted item, a crafting order and refining is counted straight from the item's value before the historical price change (the game's own rates: 2% of the value for forging and smelting, 10% for an order, 30% of the output for refining). Off = the game's XP from the new low price is scaled up afterwards, so a cheap blade or a smelted item gives 1 XP", RequireRestart = false)]
+        [SettingPropertyGroup("Smithing XP (305d)")]
+        public bool SmithXpRoundFix { get; set; } = true;
+
+        [SettingPropertyBool("Smith Xp One Rule", HintText = "One rule for Smithing XP from work at the forge: XP = stamina spent x Smith XP Per Stamina Tier x the item's tier x your learning (full up to the item's difficulty plus the full-credit margin, then less). It holds for bows, crossbows, ammunition, armour from the CRAFT tab, weapons you design and crafting orders (an order adds a quarter of that when its demands are met, as the game does). A bow, a sword or a cuirass of the same tier then teach the same per point of stamina. Off = bows pay by forge days, weapons and armour by their price", RequireRestart = false)]
+        [SettingPropertyGroup("Smithing XP (305d)")]
+        public bool SmithXpOneRule { get; set; } = true;
+
+        [SettingPropertyInteger("Smith Xp Per Stamina Tier", 0, 28, "0", HintText = "With Smith XP One Rule: Smithing XP per point of stamina per tier of the item (7 keeps bows where they were: 238, 546 and 980 XP for tier 2, 3 and 4)", RequireRestart = false)]
+        [SettingPropertyGroup("Smithing XP (305d)")]
+        public int SmithXpPerStaminaTier { get; set; } = 7;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13209,6 +13221,9 @@ namespace Armoury
             s.CavalryPursuitNearVictim = CavalryPursuitNearVictim;
             s.CavalrySlowsForOwnFoot = CavalrySlowsForOwnFoot;
             s.InfantryLeashLookahead = InfantryLeashLookahead;
+            s.SmithXpRoundFix = SmithXpRoundFix;
+            s.SmithXpOneRule = SmithXpOneRule;
+            s.SmithXpPerStaminaTier = SmithXpPerStaminaTier;
         }
 
         internal static void Apply()
