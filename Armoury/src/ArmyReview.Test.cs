@@ -199,7 +199,7 @@ namespace Armoury
                 t1c = col.Double > 0
                     // 311d2: na drugiego - luzaki najpierw pod jencow, nikt nie idzie, reszta piechurow za jezdzcami
                     ? col.Walkers == 0 && col.Kind != 0 && col.Prisoners <= col.Horses && (col.RidingFoot == Math.Min(col.Foot, col.Horses - col.Prisoners) || (col.RidingFoot == 0 && col.Double == col.Foot))
-                      && col.RidingFoot + col.Double == col.Foot && col.Double <= Settings.Current.RideDoubleRatio * col.Riders + 0.001f
+                      && col.RidingFoot + col.Double == col.Foot && col.Double <= TaleWorlds.Library.MBMath.ClampFloat(Settings.Current.RideDoubleRatio, 0f, 1f) * col.Riders + 0.001f
                     : walk == col.Walkers && (col.Kind == 0) == (walk > 0) && (col.Kind != 0 || col.N == walk);
             }
             // 133c: tozsamosc podgladu - puste sloty = GarrisonKit.Missing u kazdego czlowieka (Bad 0); rozbicie: suma brakow - zastapione = puste

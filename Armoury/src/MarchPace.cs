@@ -135,8 +135,16 @@ namespace Armoury
             }
             int allowance = (int)Math.Ceiling(men * Math.Max(0f, c.MarchPackAllowance));
             if (train > allowance && c.MarchTrainPace < cap) { cap = c.MarchTrainPace; kind = 3; n = 0; }
-            if (dbl > 0 && cap < c.MarchFootPace) cap = c.MarchFootPace;   // 311d2: na drugiego nigdy wolniej niz pieszo (tylko przy dziwnych ustawieniach sufitow)
+            if (dbl > 0 && cap < c.MarchFootPace) { cap = c.MarchFootPace; kind = 4; n = dbl; }   // 311d2: na drugiego nigdy wolniej niz pieszo (tylko przy dziwnych ustawieniach sufitow); opis - na drugiego, nie tabor
             return cap;
+        }
+
+        /// <summary>311d2 (recenzja): rzeczywisty spadek sufitu w % wzgledem tempa jazdy x jakosc koni (capRaw - sufit przed tempem swiata); w mokro wiekszy niz kara
+        /// z ustawien, bo zysk ponad stary sufit jest ciety o 30%. Wspolne dla wpisu predkosci i okna "Review the army".</summary>
+        internal static float RideDoubleCut(Settings c, float capRaw, float mul)
+        {
+            float full = c.MarchRiderPace * mul;
+            return full > 0.0001f ? Math.Max(0f, (1f - capRaw / full) * 100f) : 0f;
         }
 
         /// <summary>noc 25.10 P4 (przeglad armii): kolumna partii "na sucho" do okna "Review the army" - skad wpis predkosci "Marching column: N afoot".</summary>
@@ -287,7 +295,7 @@ namespace Armoury
                                    : kind == 2 ? new TextObject("{=!}Marching column: {N} footmen on spare horses").SetTextVariable("N", n)
                                    : kind == 3 ? new TextObject("{=!}Marching column: baggage train")
                                    : kind == 4 ? new TextObject("{=!}Marching column: riding double - {N} footmen behind riders (-{P}%)").SetTextVariable("N", n)
-                                                 .SetTextVariable("P", (MBMath.ClampFloat(c.RideDoublePenalty, 0f, 0.5f) * 100f).ToString("0", System.Globalization.CultureInfo.InvariantCulture))
+                                                 .SetTextVariable("P", RideDoubleCut(c, cap / scale, mulR).ToString("0", System.Globalization.CultureInfo.InvariantCulture))
                                    : new TextObject("{=!}Marching column: all riders");
                     float f = 1f + __result.SumOfFactors;
                     __result.Add(f > 0.01f ? (cap - current) / f : (cap - current), why);

@@ -637,7 +637,7 @@ namespace Armoury
             {
                 if (v == null || !v.Ok) return new InquiryElement("march", MarchRow(col), null, true, "Why your column walks or rides on the map, and what would change it.");
                 string what = col == null ? "column rule off" : col.Kind == 0 ? col.N + " afoot, the column walks" : col.Kind == 2 ? col.N + " footmen on spare horses"
-                            : col.Kind == 3 ? "the baggage train sets the pace" : "all riders";
+                            : col.Kind == 3 ? "the baggage train sets the pace" : col.Kind == 4 ? col.N + " footmen riding double" : "all riders";
                 if (v.Excess > 0) what += "; herd " + v.Excess + " too many";
                 return new InquiryElement("march", "On the march: speed " + F2(v.Result) + " - " + what, null, true,
                                           "Why your party moves at the speed it does on the map: every line of the game's speed, the herd, and our marching column.");
