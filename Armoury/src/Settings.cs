@@ -4992,6 +4992,14 @@ namespace Armoury
         public bool LordEscortFromGarrison = true;         // With Lords Avoid Danger: a weak lord inside a town or castle of his own house takes men from its garrison until his healthy men fill 60% of his party - real men with their own kit, the garrison never drops below the game's own minimum (75 in a castle, 125 in a town), and nothing is taken while the fortress is besieged or an enemy lord is near. Off = he waits for recruits instead
         public bool LordsJoinNearArmy = true;              // With Lords Avoid Danger: a weak lord joins an army of his own realm whose leader is within about a day's ride, if he has food for the march and the army's leader has the influence the game charges for calling him; a ruler never joins another lord's army. Off = he rides with a stronger lord or goes to a fortress instead
 
+        // --- Player caravans: wages line, caravan diary and caravan loss (305a) ---
+        // Paczka 305a (31.10, Jeff: "czy mozna oddzielic koszt karawany od kosztu mojej armii, aby to bylo oddzielne pole w wydatkach"; "karawany, aby dzialaly i zarabialy").
+        // CaravanSettle.P305.cs. Zold karawan gracza siedzi w linii BK "Garrison and Party Expense" (PartyExpensesPrefix); karawana Bjorna: 7 szt. za 10297 -> 5 szt. za 118842
+        // bez sladu towaru i miasta w logu; koniec karawany 108877 bez przyczyny w logu. Nowe klucze (plik MCM Jeffa ich nie ma - wchodza domyslne).
+        public bool CaravanWagesSeparateLine = true;        // In the daily gold tooltip, the wages of your caravans and the Banner Kings top-up of a caravan purse below 5 000 are shown as their own lines, Caravan wages and Caravan purse top-up, instead of inside Garrison and Party Expense. Only the display changes: the daily total and the gold paid stay exactly the same. Off = one line, as before
+        public bool CaravanPlayerDiary = true;              // The mod log records every purchase and sale of your caravans (goods, town, pieces, price per piece, the town price after the deal, base value and price index of the goods) and once a day where each caravan is, where it is heading, what it is doing and how many days ago it was last in a town. Log only, nothing in the game changes. Off = as before
+        public bool CaravanLossNotice = true;               // When one of your caravans is destroyed you get a message saying who destroyed it, near which settlement and how much coin and goods it carried at its last count; when it is gone without a battle, whether its purse came back to your clan. The mod log records the same. Off = no message, as before
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

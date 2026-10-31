@@ -432,6 +432,7 @@ namespace Armoury
                         if (p != null && p.PatchMethod != null && p.PatchMethod.Name == "PartyExpensesPrefix") _bkRefund = true;
             }
             catch (Exception e) { Stumble("EnsureHooks(PartyExpensesPrefix)", e); }
+            EnsureHooks305(miss);   // 305a: osobna linia zoldu karawan gracza (prefiks / postfiks wydatkow rodu, postfiks CalculatePartyWage) - po wykryciu _bkRefund
             _hookMiss = miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-";
         }
 
@@ -516,6 +517,7 @@ namespace Armoury
             LastPaid = paid; LastPaidPlayer = paidPl;
             try { FundPrune(); } catch (Exception e) { Stumble("FundPrune", e); }
             try { PlayerDaily(s, day); } catch (Exception e) { Stumble("PlayerDaily", e); }
+            try { Daily305(s, day); } catch (Exception e) { Stumble("Daily305", e); }   // 305a: linia "Karawany gracza - osobna linia zoldu (305a)" z samotestem
             try { TestStep(day); } catch (Exception e) { Stumble("TestStep", e); }
         }
 

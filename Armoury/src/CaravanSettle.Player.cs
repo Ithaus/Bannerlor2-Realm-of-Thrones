@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Core;
 
 namespace Armoury
 {
@@ -38,6 +39,10 @@ namespace Armoury
             public Calc Last;
             public readonly long[,] Wk = new long[Ring, 5];   // 0 sprzedaz, 1 zakupy, 2 myto, 3 zold rodu, 4 doplata BK
             public readonly int[] WkDay = { -1, -1, -1, -1, -1, -1, -1, -1 };
+            // 305a (sesja, bez zapisu): dziennik karawany i przyczyna konca
+            public readonly List<string> DTx = new List<string>(); public int DTxDrop;
+            public int LastTownDay = -1, LastTradeDay = -1, NoTradeRun, MaxNoTradeRun; public string LastTownName = "-";
+            public Hero LeaderRef; public long LastPurse, LastGoods; public string EndCause; public bool EndMsg;
         }
 
         private sealed class WsRec
@@ -140,12 +145,16 @@ namespace Armoury
         // ------------------------------------------------------------ wpisy z innych miejsc (tylko liczniki; kazde we wlasnym try)
         /// <summary>CaravanGoods.TradePostfix (karawana rodu gracza): kind 1 zakup (gold - zaplacone), 2 sprzedaz (gold - utarg przed mytem, toll - myto E3-G3,
         /// costRm - koszt zdjety z ksiegi E3-T1).</summary>
-        internal static void NoteTrade(MobileParty mp, int kind, long gold, int toll, double costRm)
+        internal static void NoteTrade(MobileParty mp, int kind, long gold, int toll, double costRm) { NoteTrade(mp, kind, gold, toll, costRm, null, null, 0); }
+
+        /// <summary>305a: to samo z towarem, miastem i liczba sztuk - wpis transakcji do dziennika karawany gracza (klucz CaravanPlayerDiary, tylko log).</summary>
+        internal static void NoteTrade(MobileParty mp, int kind, long gold, int toll, double costRm, ItemObject it, Settlement st, int units)
         {
             try
             {
                 var r = Car(mp, true);
                 if (r == null) return;
+                try { Tx305(r, kind, gold, toll, costRm, it, st, units); } catch (Exception e) { Stumble305("Tx305", e); }
                 if (kind == 1) { r.DBought += gold; r.Bought += gold; WkAdd(r.Wk, r.WkDay, 1, gold); }
                 else
                 {
@@ -318,7 +327,7 @@ namespace Armoury
             foreach (var r in gone)
             {
                 Log.Info(PP + "karawana '" + r.Name + "' zakonczona (" + (r.DPayEnd > 0 ? "rozwiazana - kiesa do rodu " + r.DPayEnd : "rozbita albo zniknela") + ") | "
-                         + Since(r.FirstDay, r.FromLoad, day) + ": " + Totals(r) + ".");
+                         + Since(r.FirstDay, r.FromLoad, day) + ": " + Totals(r) + EndText305(r) + ".");   // 305a: przyczyna konca i komunikat (rozwiazana / zniknela)
                 _cars.Remove(r.Id);
             }
             var ld = pc.Leader;
@@ -376,6 +385,7 @@ namespace Armoury
                       .Append(", rozwiazanie ").Append(r.DPayEnd)
                       .Append(" | ponizej kapitalu ").Append(low).Append(" dob")
                       .Append(" | ").Append(Since(r.FirstDay, r.FromLoad, day)).Append(": ").Append(Totals(r));
+                    try { DiaryLine(sb, mp, r, now, day); } catch (Exception e) { Stumble305("DiaryLine", e); }   // 305a: gdzie / cel / zachowanie / transakcje dnia
                     t259 += r.DPay259; tBk += r.DPayBk; tE39 += r.DPayE39; tEnd += r.DPayEnd; tVan += r.DPayVan; tWage += r.DWage; tTop += r.DTop; tShort += r.DShort;
                     if (r.DPay259 > 0) { pays.Add(r.Name + " " + N(r.DPay259)); caps.Add(basis.Capital); }
                     if (rep && low >= LowDays && (r.LastLowMsg < 0 || day - r.LastLowMsg >= LowDays))

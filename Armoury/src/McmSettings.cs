@@ -10516,6 +10516,18 @@ namespace Armoury
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool LordsJoinNearArmy { get; set; } = true;
 
+        [SettingPropertyBool("Caravan Wages Separate Line", HintText = "In the daily gold tooltip, the wages of your caravans and the Banner Kings top-up of a caravan purse below 5 000 are shown as their own lines, Caravan wages and Caravan purse top-up, instead of inside Garrison and Party Expense. Only the display changes: the daily total and the gold paid stay exactly the same. Off = one line, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
+        public bool CaravanWagesSeparateLine { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Player Diary", HintText = "The mod log records every purchase and sale of your caravans (goods, town, pieces, price per piece, the town price after the deal, base value and price index of the goods) and once a day where each caravan is, where it is heading, what it is doing and how many days ago it was last in a town. Log only, nothing in the game changes. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
+        public bool CaravanPlayerDiary { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Loss Notice", HintText = "When one of your caravans is destroyed you get a message saying who destroyed it, near which settlement and how much coin and goods it carried at its last count; when it is gone without a battle, whether its purse came back to your clan. The mod log records the same. Off = no message, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
+        public bool CaravanLossNotice { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13144,6 +13156,9 @@ namespace Armoury
             s.LordsAvoidDanger = LordsAvoidDanger;
             s.LordEscortFromGarrison = LordEscortFromGarrison;
             s.LordsJoinNearArmy = LordsJoinNearArmy;
+            s.CaravanWagesSeparateLine = CaravanWagesSeparateLine;
+            s.CaravanPlayerDiary = CaravanPlayerDiary;
+            s.CaravanLossNotice = CaravanLossNotice;
         }
 
         internal static void Apply()

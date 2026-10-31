@@ -84304,5 +84304,132 @@ def main(argv):
             return dowodca139_main(rest[0] if rest else None)
     return _dowodca139_main_prev(argv)
 
+# ---------------------------------------------------------------- paczka 305a: karawany gracza - osobna linia zoldu, dziennik, koniec karawany
+# Linie C# (CaravanSettle.P305.cs): "Karawany gracza - osobna linia zoldu (305a): dzien N | klucze: osobna linia TAK, dziennik karawany TAK, koniec karawany TAK
+# | latki wpiete 2/2 (brak: -), BK PartyExpensesPrefix TAK | rozliczenie rodu (apply): ... | podglad (podpowiedz zlota): ... zmiana sumy 0 (max 0.0)
+# | samotest: ... -> ZGODNE | potkniecia 0 (sesja 0)."; linia 259 gracza "... | gdzie (305a): ... | transakcje dnia (305a) N[: ...]";
+# "karawana 'X' zakonczona (...) | ...: ... | przyczyna (305a): ...".
+K305_SAMPLE_DAY = ("Karawany gracza - osobna linia zoldu (305a): dzien 108900 | klucze: osobna linia TAK, dziennik karawany TAK, koniec karawany TAK"
+                   " | latki wpiete 2/2 (brak: -), BK PartyExpensesPrefix TAK | rozliczenie rodu (apply): wywolan 1, zold karawan w linii BK 90, doplata BK do kiesy 0,"
+                   " linia partii i zalog BK razem 225, pominiete przez BK (Lordship / glowa rodu) 0 (zold z kiesy 0) | podglad (podpowiedz zlota): wywolan z opisem 12,"
+                   " rozbite 12, bez linii BK albo za mala 0, zmiana sumy 0 (max 0.0) | samotest: wydatki rodu (podglad) bez rozbicia -225, z rozbiciem -225 (roznica 0)"
+                   " | linie: 'Garrison and Party Expense' -225 -> -135, 'Caravan wages' -90, 'Caravan purse top-up' 0 -> ZGODNE | potkniecia 0 (sesja 0).")
+K305_SAMPLE_259 = ("Majatek gracza (karawany i warsztaty) (259): dzien 108900 || karawana 'Caravan of Bjorn' (wodz Bjorn, zwykla) | gdzie (305a): w drodze, cel Lys,"
+                   " zachowanie GoToSettlement/GoToSettlement, ostatnio w miescie Pentos w dobie 108898 (2 dob temu), ostatni handel w dobie 108898, bez handlu z rzedu 2 dob"
+                   " (najdluzej od wczytania 5) | transakcje dnia (305a) 1: sprzedaz jewelry x5 w Lys @23768 (polka kupuje 20000, jewelry indeks 9.50, Value 2400), koszt/szt 1471 UWAGA x16.2")
+K305_SAMPLE_END = ("Majatek gracza (karawany i warsztaty) (259): karawana 'Caravan of Bjorn' zakonczona (rozbita albo zniknela) | od zakupu (dzien 1, 2 dob): wyplaty 0"
+                   " | przyczyna (305a): rozbita przez X.")
+K305_RE_DAY = re.compile(r"Karawany gracza - osobna linia zoldu \(305a\): dzien (\d+) \| klucze: osobna linia (TAK|NIE), dziennik karawany (TAK|NIE), koniec karawany (TAK|NIE)"
+                         r" \| latki wpiete (\d)/2")
+K305_RE_SUM = re.compile(r"zmiana sumy (\d+) \(max ([\d.]+)\)")
+K305_RE_TEST = re.compile(r"\| samotest: (.*?) \| potkniecia (\d+) \(sesja (\d+)\)")
+K305_RE_TX = re.compile(r"transakcje dnia \(305a\) (\d+)")
+
+
+def k305_new():
+    return dict(days=0, hookbad=0, sumbad=0, testok=0, testbad=0, testbadx=None, st=0, unrec=0, end=0, endbad=0, endbattle=0, diary=0, tx=0, warn=0)
+
+
+def k305_feed(D, ln):
+    if "(259)" in ln and "Majatek gracza" in ln and " zakonczona (" in ln:
+        D["end"] += 1
+        if "przyczyna (305a):" not in ln:
+            D["endbad"] += 1
+        elif "rozbita przez" in ln:
+            D["endbattle"] += 1
+        return
+    if "(305a)" not in ln:
+        return
+    m = K305_RE_DAY.search(ln)
+    if m:
+        D["days"] += 1
+        on = m.group(2) == "TAK"
+        if int(m.group(5)) != 2:
+            D["hookbad"] += 1
+        ms = K305_RE_SUM.search(ln)
+        if ms and int(ms.group(1)) != 0:
+            D["sumbad"] += 1
+        mt = K305_RE_TEST.search(ln)
+        if not mt:
+            D["unrec"] += 1
+            return
+        t = mt.group(1)
+        if on:
+            if t.endswith("-> ZGODNE"):
+                D["testok"] += 1
+            else:
+                D["testbad"] += 1
+                if D["testbadx"] is None:
+                    D["testbadx"] = t[:160]
+        D["st"] += int(mt.group(2))
+        return
+    if "Majatek gracza" in ln and "(259)" in ln and "gdzie (305a):" in ln:
+        D["diary"] += 1
+        for mx in K305_RE_TX.finditer(ln):
+            D["tx"] += int(mx.group(1))
+        D["warn"] += ln.count(" UWAGA x")
+
+
+def k305_rows(rep, D):
+    rep.add("K305-0: linie doby 305a", f"{D['days']} (nierozpoznane {D['unrec']})", "> 0", D["days"] > 0 and D["unrec"] == 0)
+    rep.add("K305-1: latki wpiete 2/2 w kazdej dobie", f"dob z brakiem {D['hookbad']}", "0", D["days"] > 0 and D["hookbad"] == 0)
+    rep.add("K305-2: suma wydatkow bez zmian (podglad, 'zmiana sumy')", f"dob ze zmiana {D['sumbad']}", "0", D["days"] > 0 and D["sumbad"] == 0)
+    rep.add("K305-3: samotest rozbicia ZGODNE (klucz TAK)", f"ZGODNE {D['testok']}, inne {D['testbad']}" + (f" (np. {D['testbadx']})" if D["testbadx"] else ""),
+            "inne 0, ZGODNE > 0", D["testok"] > 0 and D["testbad"] == 0)
+    rep.add("K305-4: potkniecia 305a", str(D["st"]), "0", D["st"] == 0)
+    rep.add("K305-5: linia 259 gracza z dziennikiem (gdzie / transakcje)", f"{D['diary']} linii, transakcji {D['tx']}, oznaczonych UWAGA (sprzedaz >= 5 x koszt) {D['warn']}",
+            "INFO (0 linii = gracz bez karawany)", None)
+    rep.add("K305-6: kazda zakonczona karawana gracza z przyczyna", f"zakonczonych {D['end']} (rozbitych {D['endbattle']}), bez przyczyny {D['endbad']}", "0 bez przyczyny", D["endbad"] == 0)
+
+
+def k305_selftest():
+    D = k305_new()
+    for ln in (K305_SAMPLE_DAY, K305_SAMPLE_259, K305_SAMPLE_END):
+        k305_feed(D, ln)
+    if D["days"] != 1 or D["testok"] != 1 or D["sumbad"] or D["hookbad"] or D["unrec"]:
+        return f"linia doby: {D}"
+    if D["diary"] != 1 or D["tx"] != 1 or D["warn"] != 1 or D["end"] != 1 or D["endbad"] or D["endbattle"] != 1:
+        return f"linia 259: {D}"
+    B = k305_new()
+    k305_feed(B, K305_SAMPLE_DAY.replace("-> ZGODNE", "-> NIEZGODNE").replace("zmiana sumy 0", "zmiana sumy 3").replace("wpiete 2/2", "wpiete 1/2"))
+    k305_feed(B, K305_SAMPLE_END.replace(" | przyczyna (305a): rozbita przez X", ""))
+    if B["testbad"] != 1 or B["sumbad"] != 1 or B["hookbad"] != 1 or B["endbad"] != 1:
+        return f"zly bieg nie wykryty: {B}"
+    return None
+
+
+def karawany305_main(logp):
+    """karawany305 (31.10, paczka 305a): K305-S, K305-0..K305-6. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = k305_selftest()
+    rep.add("K305-S: self-test wyrazen (linie jak w CaravanSettle.P305.cs)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("K305-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = k305_new()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            k305_feed(D, ln.rstrip("\r\n"))
+    print(f"plik: {logp}")
+    k305_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_karawany305_main_prev = main
+
+
+def main(argv):
+    # paczka 305a: grupa karawany305 - opakowanie main jak dowodca139
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "karawany305":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return karawany305_main(rest[0] if rest else None)
+    return _karawany305_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

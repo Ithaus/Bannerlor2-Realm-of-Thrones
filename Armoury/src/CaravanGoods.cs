@@ -831,7 +831,7 @@ namespace Armoury
                     l.Day = l.N > 0 ? (l.Day * l.N + now * got) / (l.N + got) : now;
                     l.Cost += paid; l.N += got;
                     _bookBuys++; _bookBuyUnits += got;
-                    if (mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 1, paid, 0, 0.0);   // 259: zakup karawany gracza (linia majatku gracza)
+                    if (mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 1, paid, 0, 0.0, it, __state.St, got);   // 259: zakup karawany gracza (linia majatku gracza)
                     CaravanTrade284.NoteBuy(mp, it, got, __state.St);   // 284: juki karawan wedlug kategorii (bramka przeplywu na zywo); 298: miasto zakupu (pomiar)
                     CaravanLeader139b.NoteBuy(mp, it, __state.St, got, paid);   // 139b: karawana z dowodca - oszczednosc wobec kary 138 (tylko pomiar)
                     var cat = it.ItemCategory;
@@ -856,7 +856,7 @@ namespace Armoury
                         if (l != null && l.N > 0) { int m = Math.Min(moved, l.N); mCost = m; mEst = l.Est; costRm = l.Cost * m / l.N; l.Cost -= costRm; l.N -= m; if (l.N <= 0) l.Est = false; }
                     }
                     if (got > 0) TownToll.LastTaken = TownToll.TakeCaravan(__state.St, mp, got);
-                    if (got > 0 && mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 2, got, TownToll.LastTaken, costRm);   // 259: sprzedaz karawany gracza (utarg przed mytem, myto)
+                    if (got > 0 && mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 2, got, TownToll.LastTaken, costRm, it, __state.St, moved);   // 259: sprzedaz karawany gracza (utarg przed mytem, myto)
                     if (moved > 0) CaravanTrade284.NoteSale(mp, it, moved, Math.Max(0, got), got > 0 ? TownToll.LastTaken : 0, costRm);   // 284: zysk zrealizowany wedlug drogi, pomiar sprzedazy kategorii
                     if (moved > 0) CaravanLeader139b.NoteSale(mp, it, __state.St, moved, mCost, mEst, got, got > 0 ? TownToll.LastTaken : 0, costRm);   // 139b: karawana z dowodca - XP Handlu jak gracz, premia wobec 138
                 }

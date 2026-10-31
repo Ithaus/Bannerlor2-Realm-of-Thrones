@@ -1967,6 +1967,10 @@ namespace Armoury
                     qt[6] = System.Diagnostics.Stopwatch.GetTimestamp();
                     MapSpeedProfile.HourSplit(qt);
                 }));
+            // 305a: karawana gracza - wjazd do miasta (doby od ostatniej wizyty w linii 259) i koniec karawany (przyczyna, komunikat). Nasluch zniszczenia dopisany
+            // OSTATNI w RegisterEvents (MbEvent: dopisany pozniej = wolany wczesniej) - widzi kiese i towar przed BeatenPurse i CaravanCapital.RoutePurse (Seal31).
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("CaravanSettle.OnEntered305", CaravanSettle.OnEntered305));
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("CaravanSettle.OnDestroyed305", CaravanSettle.OnDestroyed305));
         }
 
         private void OnGameMenuOpened(TaleWorlds.CampaignSystem.GameMenus.MenuCallbackArgs args)
